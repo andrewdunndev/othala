@@ -1,0 +1,82 @@
+# Lab Caddyfile: validates the production Caddy image (custom dunn.dev/caddy-estate)
+# with cloudflare DNS-01 + admin-path basicauth + Authentik forward-auth pattern.
+
+{
+	email admin@dunn.dev
+}
+
+# Authentik IDP: TLS via DNS-01, admin path gated by basicauth.
+auth.{$DOMAIN} {
+	tls {
+		dns cloudflare {env.CF_API_TOKEN}
+	}
+
+	# Admin path: shared HTTP Basic credential before Authentik OIDC sees the request.
+	# Bcrypt hash provided via env. Brute-force protection comes from bcrypt's slowness
+	# plus the long random password length.
+	@admin path /if/admin/*
+	handle @admin {
+		basicauth {
+			admin {env.ADMIN_BCRYPT_HASH}
+		}
+		reverse_proxy authentik-server:9000
+	}
+
+	# Everything else passes through to Authentik (login flows, OIDC endpoints, user UI).
+	reverse_proxy authentik-server:9000
+}
+
+# OIDC native — plain reverse proxy, app handles its own session via Authentik OIDC.
+keep.{$DOMAIN} {
+	tls { dns cloudflare {env.CF_API_TOKEN} }
+	reverse_proxy vaultwarden:80
+}
+
+larder.{$DOMAIN} {
+	tls { dns cloudflare {env.CF_API_TOKEN} }
+	reverse_proxy mealie:9000
+}
+
+listen.{$DOMAIN} {
+	tls { dns cloudflare {env.CF_API_TOKEN} }
+	reverse_proxy audiobookshelf:80
+}
+
+memory.{$DOMAIN} {
+	tls { dns cloudflare {env.CF_API_TOKEN} }
+	reverse_proxy immich-server:2283
+}
+
+# LDAP — plain reverse proxy. Authentik LDAP outpost handles bind/search.
+# In production, the outpost is co-located in the Jellyfin pod for locality.
+cinema.{$DOMAIN} {
+	tls { dns cloudflare {env.CF_API_TOKEN} }
+	reverse_proxy jellyfin:8096
+}
+
+# Forward auth: Navidrome via Authentik proxy outpost.
+# Subsonic API (/rest/*) and shares (/share/*) bypass auth — native clients use HTTP Basic.
+tune.{$DOMAIN} {
+	tls { dns cloudflare {env.CF_API_TOKEN} }
+
+	# Outpost endpoints (login start, callback, sign-out) — proxied to authentik-server.
+	handle /outpost.goauthentik.io/* {
+		reverse_proxy authentik-server:9000
+	}
+
+	# Subsonic API + shares: bypass forward_auth entirely.
+	@subsonic path /rest/* /share/*
+	handle @subsonic {
+		reverse_proxy navidrome:4533
+	}
+
+	# Web UI: gated by Authentik forward-auth.
+	handle {
+		forward_auth authentik-server:9000 {
+			uri /outpost.goauthentik.io/auth/caddy
+			copy_headers X-Authentik-Username X-Authentik-Groups X-Authentik-Email X-Authentik-Name X-Authentik-Uid X-Authentik-Jwt
+			trusted_proxies private_ranges
+		}
+		reverse_proxy navidrome:4533
+	}
+}

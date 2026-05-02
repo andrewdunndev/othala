@@ -1,0 +1,201 @@
+# Lab compose stack: Authentik + app stubs for SSO pattern validation.
+#
+# Patterns under test:
+#   - OIDC native:   keep (Vaultwarden), larder (Mealie), listen (Audiobookshelf), memory (Immich)
+#   - LDAP outpost:  cinema (Jellyfin)
+#   - Forward auth:  tune (Navidrome) via Authentik proxy outpost
+#
+# Auth substrate: Authentik at auth.${DOMAIN}.
+# Caddy: custom dunn.dev/caddy-estate image with cloudflare DNS-01 plugin.
+# Production carmine uses the same compose patterns inside per-service quadlets.
+
+services:
+  # --- Authentik IDP ---
+  postgres:
+    image: docker.io/library/postgres:16-alpine
+    container_name: auth-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: authentik
+      POSTGRES_USER: authentik
+      POSTGRES_PASSWORD: ${AUTHENTIK_PG_PASS}
+    volumes:
+      - pg_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -d authentik -U authentik"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  authentik-server:
+    image: ghcr.io/goauthentik/server:2026.2.1
+    container_name: auth-authentik-server
+    restart: unless-stopped
+    command: server
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      AUTHENTIK_SECRET_KEY: ${AUTHENTIK_SECRET_KEY}
+      AUTHENTIK_POSTGRESQL__HOST: postgres
+      AUTHENTIK_POSTGRESQL__NAME: authentik
+      AUTHENTIK_POSTGRESQL__USER: authentik
+      AUTHENTIK_POSTGRESQL__PASSWORD: ${AUTHENTIK_PG_PASS}
+      AUTHENTIK_COOKIE_DOMAIN: ${DOMAIN}
+      AUTHENTIK_DISABLE_UPDATE_CHECK: "true"
+      AUTHENTIK_ERROR_REPORTING__ENABLED: "false"
+      AUTHENTIK_BOOTSTRAP_PASSWORD: ${AUTHENTIK_BOOTSTRAP_PASSWORD}
+      AUTHENTIK_BOOTSTRAP_TOKEN: ${AUTHENTIK_BOOTSTRAP_TOKEN}
+      AUTHENTIK_BOOTSTRAP_EMAIL: ${AUTHENTIK_BOOTSTRAP_EMAIL}
+    volumes:
+      - ak_media:/media
+      - ak_templates:/templates
+      - ../../authentik/blueprints:/blueprints/custom:ro,z
+    ports:
+      - "9000:9000"
+      - "9443:9443"
+      - "3389:3389"
+      - "6636:6636"
+    healthcheck:
+      test: ["CMD", "curl", "-sf", "http://localhost:9000/-/health/live/"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
+
+  authentik-worker:
+    image: ghcr.io/goauthentik/server:2026.2.1
+    container_name: auth-authentik-worker
+    restart: unless-stopped
+    command: worker
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      AUTHENTIK_SECRET_KEY: ${AUTHENTIK_SECRET_KEY}
+      AUTHENTIK_POSTGRESQL__HOST: postgres
+      AUTHENTIK_POSTGRESQL__NAME: authentik
+      AUTHENTIK_POSTGRESQL__USER: authentik
+      AUTHENTIK_POSTGRESQL__PASSWORD: ${AUTHENTIK_PG_PASS}
+      AUTHENTIK_COOKIE_DOMAIN: ${DOMAIN}
+      AUTHENTIK_DISABLE_UPDATE_CHECK: "true"
+      AUTHENTIK_ERROR_REPORTING__ENABLED: "false"
+    volumes:
+      - ak_media:/media
+      - ak_templates:/templates
+      - ../../authentik/blueprints:/blueprints/custom:ro,z
+
+  # --- Reverse proxy: custom Caddy with cloudflare DNS-01 plugin ---
+  caddy:
+    image: dunn.dev/caddy-estate:lab
+    container_name: auth-caddy
+    restart: unless-stopped
+    depends_on:
+      authentik-server:
+        condition: service_healthy
+    ports:
+      - "80:80"
+      - "443:443"
+    environment:
+      DOMAIN: ${DOMAIN}
+      CF_API_TOKEN: ${CF_API_TOKEN}
+      ADMIN_BCRYPT_HASH: ${ADMIN_BCRYPT_HASH}
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+
+  # --- App stubs ---
+  # Real app containers with minimal config: just enough to validate auth flows. No persistent data.
+
+  vaultwarden:
+    image: docker.io/vaultwarden/server:latest
+    container_name: auth-vaultwarden
+    restart: unless-stopped
+    environment:
+      DOMAIN: https://keep.${DOMAIN}
+      SIGNUPS_ALLOWED: "false"
+      SSO_ENABLED: "true"
+      SSO_ONLY: "false"
+      SSO_AUTHORITY: https://auth.${DOMAIN}/application/o/keep
+      SSO_CLIENT_ID: keep
+      SSO_CLIENT_SECRET: ${KEEP_CLIENT_SECRET:-bench-keep-secret}
+
+  mealie:
+    image: ghcr.io/mealie-recipes/mealie:latest
+    container_name: auth-mealie
+    restart: unless-stopped
+    environment:
+      ALLOW_SIGNUP: "false"
+      BASE_URL: https://larder.${DOMAIN}
+      OIDC_AUTH_ENABLED: "true"
+      OIDC_SIGNUP_ENABLED: "true"
+      OIDC_CONFIGURATION_URL: https://auth.${DOMAIN}/application/o/larder/.well-known/openid-configuration
+      OIDC_CLIENT_ID: larder
+      OIDC_CLIENT_SECRET: ${LARDER_CLIENT_SECRET:-bench-larder-secret}
+      OIDC_AUTO_REDIRECT: "true"
+      OIDC_PROVIDER_NAME: "Dunn Family"
+      OIDC_ADMIN_GROUP: admin
+      OIDC_USER_GROUP: family
+
+  audiobookshelf:
+    image: ghcr.io/advplyr/audiobookshelf:latest
+    container_name: auth-audiobookshelf
+    restart: unless-stopped
+    # ABS OIDC is configured via the API after first launch (configure-apps.sh).
+
+  jellyfin:
+    image: docker.io/jellyfin/jellyfin:latest
+    container_name: auth-jellyfin
+    restart: unless-stopped
+    volumes:
+      - ./jellyfin-ldap.xml:/config/plugins/configurations/LDAP-Auth.xml:ro,z
+    # LDAP plugin must be installed once via Jellyfin admin UI then it picks up this config automatically.
+
+  navidrome:
+    image: docker.io/deluan/navidrome:latest
+    container_name: auth-navidrome
+    restart: unless-stopped
+    environment:
+      ND_BASEURL: ""
+    # No native SSO. Auth is handled by Caddy forward_auth → Authentik proxy outpost.
+
+  immich-server:
+    image: ghcr.io/immich-app/immich-server:release
+    container_name: auth-immich
+    restart: unless-stopped
+    depends_on:
+      immich-postgres:
+        condition: service_healthy
+    environment:
+      DB_HOSTNAME: immich-postgres
+      DB_USERNAME: immich
+      DB_PASSWORD: ${IMMICH_PG_PASS:-bench-immich-pg}
+      DB_DATABASE_NAME: immich
+      IMMICH_MACHINE_LEARNING_URL: ""
+      # OIDC configured via Immich admin UI or API after launch (configure-apps.sh).
+
+  immich-postgres:
+    image: docker.io/tensorchord/pgvecto-rs:pg16-v0.2.0
+    container_name: auth-immich-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: immich
+      POSTGRES_USER: immich
+      POSTGRES_PASSWORD: ${IMMICH_PG_PASS:-bench-immich-pg}
+      POSTGRES_INITDB_ARGS: "--data-checksums"
+    volumes:
+      - immich_pg_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -d immich -U immich"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  pg_data:
+  ak_media:
+  ak_templates:
+  caddy_data:
+  caddy_config:
+  immich_pg_data:

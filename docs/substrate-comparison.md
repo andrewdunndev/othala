@@ -109,30 +109,41 @@ The Phase 0 findings on kanidm (AI ban, closed contribution doors, structurally 
 
 The decision is reversible: lab harness validates either substrate with the same Playwright contract and Caddy patterns. Lab cost a few hours either way. Andrew's original "single container" preference becomes "two purpose-fit containers" — a small concession for the sustainability and built-in-forward-auth wins.
 
-## What this changes if accepted
+## Final outcome — 2026-05-02
 
-- **Substrate: Authelia + lldap** (instead of kanidm)
-- **Forward-auth substrate: Authelia native**, not caddy-security plugin (still build the custom Caddy with cloudflare DNS-01 + Authelia integration via Caddy's built-in `forward_auth` directive)
-- **Caddy plugin choice**: Caddy's built-in `forward_auth` directive against Authelia's `/api/verify` endpoint. No second plugin needed in the custom image. Containerfile simplifies (just cloudflare DNS-01).
-- **Lab artifacts** (compose, Caddyfile, configuration scripts) need redrafting against Authelia + lldap
-- **Phase 0 findings on kanidm** stay as evidence in the repo — they tell the journey
+**Decision: Authentik with eyes-open hardening.**
 
-## What stays the same
+After the wider eval and a follow-up Pocket-ID evaluation (`../lab/docs/eval-pocket-id.md` — RED, doesn't serve LDAP), the picture clarified:
 
-- Phase 0 research is durable evidence regardless of substrate
-- Caddy pattern (custom image, direct go build, cloudflare DNS-01)
-- Three-state Astro home portal at home.dunn.dev (still bounces to auth.dunn.dev for login)
-- CSS skin as the customization ceiling
-- Cloudflare Tunnel for most subdomains; gray-cloud for Immich
-- Tailscale not load-bearing
-- No split identity (Authelia is the one IDP for everything; lldap is just the user store)
-- Bitwarden master password as the only intentional non-SSO credential
+- **Authelia + lldap was wrong-shaped.** Making lldap (a "Light LDAP" daemon) the root of identity for the entire estate when its primary consumer is just Jellyfin inverts the layering.
+- **Pocket-ID has the same LDAP-server gap as voidauth and Authelia.** Doesn't fit shape.
+- **kanidm's downsides** (bus factor 1, AI ban, closed contribution doors, structurally constrained UI) are real costs even from a consumer perspective.
+- **Authentik's upsides** (largest community, LDAP outpost architecture that solves the source-of-truth concern cleanly, proxy outpost for native forward-auth, free OSS tier covers everything we use, mature ecosystem with validated integrations for every app on our list) hold up under scrutiny.
 
-## Reversal path
+The Django substrate concern that originally drove the move was real but addressable. After researching six alternatives, the answer is to manage the Django risk via a hardening package rather than escape it via a substrate change. The hardening package — admin path basicauth + Authentik admin-MFA + version pinning + audit logging + correct trusted-proxy CIDRs — is documented in `decision.md`.
 
-If lab outcomes for Authelia + lldap are red:
-- Option A: revisit kanidm (we have the prep work)
-- Option B: stay on Authentik with the hardening package previously documented
-- Option C: revisit one of the dropped candidates if the failure mode points at a specific gap
+### What changes vs the original Authentik plan
 
-The bar to abandon Authelia + lldap and go back to kanidm: a meaningful operational pain that comes from the two-container shape (e.g., user-store sync issues, lldap disappears as a maintained project, Authelia moves away from OIDC IDP). None of these are likely.
+- **Public reachability simplifies:** DNS-only Cloudflare + port-forward 443 on home router. No CF Tunnel, no CF Access. One auth feel for the family. Privacy + simplicity.
+- **Admin path hardening:** Caddy `basicauth` with bcrypt-hashed shared admin password (in Bitwarden) on `/if/admin/*` and equivalent app admin paths. Plus Authentik admin-MFA flow. Bcrypt's CPU cost is the brute-force cap (no separate rate-limit plugin needed in the custom Caddy image).
+- **Custom Caddy image** (`dunn.dev/caddy-estate`): direct `go build` from upstream Caddy + plugin Go modules (no xcaddy). Just one plugin: `caddy-dns/cloudflare` for DNS-01 ACME. Forward-auth comes from Authentik's proxy outpost, no Caddy plugin needed.
+- **dunn.dev/auth becomes the IaC home:** retiring `dunn.dev/bench-sso-iac` in favor of consolidating Authentik blueprints, lab harness, custom Caddy image, Astro home portal, and per-pattern snippets here.
+- **No upstream contributions to Authentik** — consumer posture, occasional bug reports.
+
+### What stays from the kanidm-era prep
+
+- **Three-state Astro home portal at home.dunn.dev** — pre-auth (Sign-In button → bounces to auth.dunn.dev), post-auth (tile launcher filtered by groups claim), infra-down (status panel via CF Worker polling Authentik /health). Folds the prior `status.dunn.dev` into `home.dunn.dev`.
+- **Tailscale not load-bearing** — admin paths work without it.
+- **No split identity** — every login through Authentik. Bitwarden master password is the one intentional exception.
+- **Bench infrastructure** (GCP scripts, Playwright contract) ports forward as the Authentik bench under `lab/`.
+
+### Reversal path
+
+If Authentik's commercial trajectory degrades the free-tier offering for our use case, the eval evidence in this repo is the playbook for the next move. **kanidm** is the documented fallback (with bus-factor and AI-ban tradeoffs accepted in exchange for substrate quality). Bench harness in `lab/` is reusable for either substrate.
+
+Watch-outs that would trigger a re-eval:
+- Free-tier features (LDAP outpost, proxy outpost, custom branding, blueprints) moving to enterprise tier
+- Maintainer governance shifts (acquisition, license change, project pivot)
+- Specific deployment-derived issue with no upstream fix path
+
+None of these are likely in the next 12-24 months. Default posture: ship deployment, monitor advisories, file bugs as encountered.

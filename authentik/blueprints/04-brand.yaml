@@ -1,0 +1,18 @@
+# yaml-language-server: $schema=https://goauthentik.io/blueprints/schema.json
+version: 1
+metadata:
+  name: bench-sso — brand configuration
+  labels:
+    blueprints.goauthentik.io/instantiate: "true"
+    blueprints.goauthentik.io/description: "Wire dunn-authentication as default brand flow"
+entries:
+  # Update the default brand to use our passkey-first authentication flow.
+  # This is what makes dunn-authentication the flow users see on OIDC
+  # redirects, forward auth challenges, and direct visits.
+  - model: authentik_brands.brand
+    identifiers:
+      default: true
+    state: present
+    attrs:
+      branding_title: dunn.dev
+      flow_authentication: !Find [authentik_flows.flow, [slug, dunn-authentication]]

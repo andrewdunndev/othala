@@ -1,0 +1,35 @@
+# yaml-language-server: $schema=https://goauthentik.io/blueprints/schema.json
+version: 1
+metadata:
+  name: bench-sso — custom scope mappings
+  labels:
+    blueprints.goauthentik.io/instantiate: "true"
+    blueprints.goauthentik.io/description: "Custom OAuth2 scope mappings for dunn.dev"
+entries:
+  # email_verified scope mapping — ensures OIDC clients get email_verified claim
+  # This is needed because some apps (Vaultwarden, Immich) require it
+  - model: authentik_providers_oauth2.scopemapping
+    id: scope-email-verified
+    identifiers:
+      managed: dunn.dev/scope-email-verified
+    attrs:
+      name: "dunn.dev — email_verified"
+      scope_name: email
+      description: "Include email_verified claim in email scope"
+      expression: |
+        return {
+            "email": request.user.email,
+            "email_verified": True,
+        }
+
+  # offline_access scope mapping — enables refresh tokens
+  - model: authentik_providers_oauth2.scopemapping
+    id: scope-offline-access
+    identifiers:
+      managed: dunn.dev/scope-offline-access
+    attrs:
+      name: "dunn.dev — offline_access"
+      scope_name: offline_access
+      description: "Enable refresh tokens for long-lived sessions"
+      expression: |
+        return {}

@@ -1,0 +1,104 @@
+# yaml-language-server: $schema=https://goauthentik.io/blueprints/schema.json
+version: 1
+metadata:
+  name: bench-sso — groups
+  labels:
+    blueprints.goauthentik.io/instantiate: "true"
+    blueprints.goauthentik.io/description: "Identity and access groups for dunn.dev"
+entries:
+  # --- Identity Groups (who you are) ---
+  - model: authentik_core.group
+    id: group-admin
+    identifiers:
+      name: admin
+    attrs:
+      attributes:
+        type: identity
+        description: "Administrators — full access to all services"
+
+  - model: authentik_core.group
+    id: group-family
+    identifiers:
+      name: family
+    attrs:
+
+      attributes:
+        type: identity
+        description: "Family members"
+
+  - model: authentik_core.group
+    id: group-friends
+    identifiers:
+      name: friends
+    attrs:
+
+      attributes:
+        type: identity
+        description: "Friends — limited service access"
+
+  # --- Access Groups (what you can reach) ---
+  - model: authentik_core.group
+    id: group-access-keep
+    identifiers:
+      name: access-keep
+    attrs:
+
+      attributes:
+        type: access
+        service: keep
+        description: "Access to Vaultwarden"
+
+  - model: authentik_core.group
+    id: group-access-larder
+    identifiers:
+      name: access-larder
+    attrs:
+
+      attributes:
+        type: access
+        service: larder
+        description: "Access to Mealie"
+
+  - model: authentik_core.group
+    id: group-access-listen
+    identifiers:
+      name: access-listen
+    attrs:
+
+      attributes:
+        type: access
+        service: listen
+        description: "Access to Audiobookshelf"
+
+  - model: authentik_core.group
+    id: group-access-cinema
+    identifiers:
+      name: access-cinema
+    attrs:
+
+      attributes:
+        type: access
+        service: cinema
+        description: "Access to Jellyfin"
+
+  - model: authentik_core.group
+    id: group-access-tune
+    identifiers:
+      name: access-tune
+    attrs:
+
+      attributes:
+        type: access
+        service: tune
+        description: "Access to Navidrome"
+
+  - model: authentik_core.group
+    id: group-access-memory
+    identifiers:
+      name: access-memory
+    attrs:
+
+      attributes:
+        type: access
+        service: memory
+        description: "Access to Immich"

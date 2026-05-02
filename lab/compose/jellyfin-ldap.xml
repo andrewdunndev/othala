@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="utf-8"?>
+<PluginConfiguration xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:xsd="http://www.w3.org/2001/XMLSchema">
+  <LdapServer>authentik-server</LdapServer>
+  <LdapPort>3389</LdapPort>
+  <UseSsl>false</UseSsl>
+  <UseStartTls>false</UseStartTls>
+  <SkipSslVerify>false</SkipSslVerify>
+  <LdapBindUser>cn=ldapservice,ou=users,dc=dunn,dc=dev</LdapBindUser>
+  <LdapBindPassword>bench-test-pass</LdapBindPassword>
+  <LdapBaseDn>dc=dunn,dc=dev</LdapBaseDn>
+  <LdapSearchFilter>(objectClass=user)</LdapSearchFilter>
+  <LdapAdminBaseDn></LdapAdminBaseDn>
+  <LdapAdminFilter>(memberOf=cn=admin,ou=groups,dc=dunn,dc=dev)</LdapAdminFilter>
+  <EnableLdapAdminFilterMemberUid>false</EnableLdapAdminFilterMemberUid>
+  <LdapSearchAttributes>uid, cn, mail, displayName</LdapSearchAttributes>
+  <LdapClientCertPath></LdapClientCertPath>
+  <LdapClientKeyPath></LdapClientKeyPath>
+  <LdapRootCaPath></LdapRootCaPath>
+  <CreateUsersFromLdap>true</CreateUsersFromLdap>
+  <AllowPassChange>false</AllowPassChange>
+  <LdapUidAttribute>uid</LdapUidAttribute>
+  <LdapUsernameAttribute>cn</LdapUsernameAttribute>
+  <LdapPasswordAttribute>userPassword</LdapPasswordAttribute>
+  <EnableLdapProfileImageSync>false</EnableLdapProfileImageSync>
+  <RemoveImagesNotInLdap>false</RemoveImagesNotInLdap>
+  <LdapProfileImageAttribute>jpegphoto</LdapProfileImageAttribute>
+  <LdapProfileImageFormat>Default</LdapProfileImageFormat>
+  <EnableAllFolders>true</EnableAllFolders>
+  <EnabledFolders />
+  <LdapUsers />
+</PluginConfiguration>
