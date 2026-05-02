@@ -1,0 +1,20 @@
+.PHONY: help
+
+help:
+	@echo "dunn.dev/auth — SSO substrate (kanidm + portal + lab)"
+	@echo ""
+	@echo "Lab (when populated):"
+	@echo "  lab-up        provision GCP lab VM"
+	@echo "  lab-deploy    deploy kanidm + app stubs"
+	@echo "  lab-test      run Playwright suite from dev machine"
+	@echo "  lab-down      tear down GCP lab VM"
+	@echo ""
+	@echo "Caddy image (when populated):"
+	@echo "  caddy-build   xcaddy build with cloudflare + forward-auth plugins"
+	@echo ""
+	@echo "Portal (when populated):"
+	@echo "  portal-dev    run Astro dev server"
+	@echo "  portal-build  build for Cloudflare Pages"
+	@echo ""
+	@echo "Status:"
+	@echo "  See docs/decision.md for current direction and lab progress."
