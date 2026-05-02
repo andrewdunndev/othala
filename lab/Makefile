@@ -34,17 +34,19 @@ caddy-image: ## Build the custom Caddy image (cloudflare DNS-01 plugin)
 
 # --- Deployment ---
 
-sync: ## Sync compose, blueprints, scripts to VM (single tarball)
+sync: ## Sync auth repo (lab/, authentik/, caddy/, .env) to VM in single tarball
 	@echo "Packing files..."
-	@tar czf /tmp/auth-lab-sync.tar.gz \
-		compose/ scripts/ \
-		-C .. authentik/blueprints \
-		$$([ -f .env ] && echo .env) \
-		$$([ -f .env.example ] && echo .env.example)
+	@cd .. && tar czf /tmp/auth-lab-sync.tar.gz \
+		lab/compose/ lab/scripts/ \
+		authentik/blueprints/ \
+		caddy/Containerfile caddy/Makefile \
+		$$([ -f lab/.env ] && echo lab/.env) \
+		$$([ -f .env.example ] && echo .env.example) \
+		--transform='s|^lab/.env$$|.env|'
 	@echo "Uploading tarball (1 scp)..."
 	$(SCRIPTS)/gcp.sh scp /tmp/auth-lab-sync.tar.gz /tmp/auth-lab-sync.tar.gz
 	@echo "Unpacking on VM (1 ssh)..."
-	$(SCRIPTS)/gcp.sh ssh "sudo mkdir -p $(AUTH_DIR) && sudo tar xzf /tmp/auth-lab-sync.tar.gz -C $(AUTH_DIR) && sudo chmod +x $(AUTH_DIR)/scripts/*.sh && rm -f /tmp/auth-lab-sync.tar.gz"
+	$(SCRIPTS)/gcp.sh ssh "sudo mkdir -p $(AUTH_DIR) && sudo tar xzf /tmp/auth-lab-sync.tar.gz -C $(AUTH_DIR) && sudo chmod +x $(AUTH_DIR)/lab/scripts/*.sh && rm -f /tmp/auth-lab-sync.tar.gz"
 	@rm -f /tmp/auth-lab-sync.tar.gz
 	@echo "Files synced to VM (2 connections total)"
 
@@ -70,7 +72,7 @@ deploy: ## Wait for auto-deploy to complete (started by setup-vm.sh)
 	done
 
 teardown: ## Tear down compose stack on VM
-	$(SCRIPTS)/gcp.sh ssh "cd $(AUTH_DIR)/compose && sudo podman-compose down -v"
+	$(SCRIPTS)/gcp.sh ssh "cd $(AUTH_DIR)/lab/compose && sudo podman-compose down -v"
 
 # --- DNS ---
 
@@ -81,10 +83,10 @@ dns-update: ## Print instructions to update Cloudflare DNS
 # --- Testing ---
 
 smoke: sync ## Run smoke tests against VM
-	$(SCRIPTS)/gcp.sh ssh "sudo bash $(AUTH_DIR)/scripts/smoke.sh"
+	$(SCRIPTS)/gcp.sh ssh "sudo bash $(AUTH_DIR)/lab/scripts/smoke.sh"
 
 smoke-local: ## Run smoke tests locally on VM (single SSH)
-	$(SCRIPTS)/gcp.sh ssh "cd $(AUTH_DIR) && source .env 2>/dev/null; sudo bash scripts/smoke-local.sh"
+	$(SCRIPTS)/gcp.sh ssh "cd $(AUTH_DIR) && source .env 2>/dev/null; sudo bash lab/scripts/smoke-local.sh"
 
 test: ## Run Playwright tests from local machine
 	cd tests && npx playwright test
@@ -92,7 +94,7 @@ test: ## Run Playwright tests from local machine
 # --- Utility ---
 
 logs: ## Tail compose logs on VM
-	$(SCRIPTS)/gcp.sh ssh "cd $(AUTH_DIR)/compose && sudo podman-compose logs -f --tail=50"
+	$(SCRIPTS)/gcp.sh ssh "cd $(AUTH_DIR)/lab/compose && sudo podman-compose logs -f --tail=50"
 
 bcrypt: ## Generate a bcrypt hash for ADMIN_BCRYPT_HASH (prompt for password)
 	@echo "Enter the admin password (will not echo):"

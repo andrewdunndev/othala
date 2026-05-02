@@ -5,7 +5,7 @@ set -euo pipefail
 # smoke-local.sh -- validate Authentik config via localhost only.
 # No DNS, no TLS, no Caddy. Tests the Authentik API and app container ports.
 
-BENCH_DIR="/opt/bench-sso-iac"
+BENCH_DIR="/opt/auth-lab"
 
 if [[ -f "${BENCH_DIR}/.env" ]]; then
     # shellcheck disable=SC1091
@@ -64,7 +64,7 @@ api_count() {
     api_get "$path" | jq '.results | length'
 }
 
-echo "=== bench-sso-iac Smoke Local ==="
+echo "=== auth-lab Smoke Local ==="
 echo "  Testing via localhost only -- no DNS, no TLS"
 echo ""
 

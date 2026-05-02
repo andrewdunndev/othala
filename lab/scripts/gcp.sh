@@ -57,7 +57,7 @@ gcp_up() {
         --image-project="$GCP_IMAGE_PROJECT" \
         --boot-disk-size="${GCP_DISK_SIZE}GB" \
         --boot-disk-type=pd-standard \
-        --metadata-from-file=startup-script="${SCRIPT_DIR}/setup-vm.sh"$([ -f "${PROJECT_DIR}/.env" ] && echo ",bench-env=${PROJECT_DIR}/.env") \
+        --metadata-from-file=startup-script="${SCRIPT_DIR}/setup-vm.sh"$([ -f "${PROJECT_DIR}/.env" ] && echo ",auth-env=${PROJECT_DIR}/.env") \
         --metadata="max-lifetime-sec=${MAX_LIFETIME_SEC}" \
         --tags=http-server,https-server \
         --scopes=default \

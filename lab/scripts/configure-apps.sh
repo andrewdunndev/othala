@@ -15,7 +15,7 @@ set -euo pipefail
 #   - Navidrome (tune): forward auth (no app config)
 #   - Jellyfin (cinema): LDAP plugin requires manual UI setup
 
-BENCH_DIR="/opt/bench-sso-iac"
+BENCH_DIR="/opt/auth-lab"
 
 if [[ -f "${BENCH_DIR}/.env" ]]; then
     set -a

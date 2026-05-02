@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-WORK_DIR="/opt/bench-sso-iac"
+WORK_DIR="/opt/auth-lab"
 MARKER="${WORK_DIR}/.setup-complete"
 DEPLOY_MARKER="${WORK_DIR}/.deploy-complete"
 
@@ -17,7 +17,7 @@ if is_gcp; then
         "http://metadata.google.internal/computeMetadata/v1/instance/attributes/max-lifetime-sec" 2>/dev/null || echo "7200")
     TTL_MIN=$(( TTL_SEC / 60 ))
     if (( TTL_MIN > 0 )); then
-        shutdown -P "+${TTL_MIN}" "bench-sso-iac: auto-shutdown after ${TTL_MIN}min" &
+        shutdown -P "+${TTL_MIN}" "auth-lab: auto-shutdown after ${TTL_MIN}min" &
         echo "Scheduled auto-shutdown in ${TTL_MIN} minutes"
     fi
 fi
@@ -28,7 +28,7 @@ if [[ -f "$MARKER" ]]; then
     exit 0
 fi
 
-echo "=== bench-sso-iac: VM setup ==="
+echo "=== auth-lab: VM setup ==="
 
 # --- Install packages ---
 echo "Installing podman and tools..."
@@ -61,38 +61,34 @@ if command -v firewall-cmd &>/dev/null && systemctl is-active firewalld &>/dev/n
     echo "Firewall: opened ssh, http, https, 636, 9000, 9443"
 fi
 
-# --- Clone repo ---
-echo "Cloning bench-sso-iac..."
+# --- Prepare WORK_DIR (auth repo will be synced via `make sync` from dev machine) ---
 mkdir -p "$WORK_DIR"
-git clone --depth 1 https://gitlab.com/dunn.dev/bench-sso-iac.git "${WORK_DIR}/repo" 2>/dev/null || true
-if [[ -d "${WORK_DIR}/repo" ]]; then
-    cp -r "${WORK_DIR}/repo/compose" "${WORK_DIR}/"
-    cp -r "${WORK_DIR}/repo/blueprints" "${WORK_DIR}/"
-    cp -r "${WORK_DIR}/repo/scripts" "${WORK_DIR}/"
-    chmod +x "${WORK_DIR}/scripts/"*.sh
-    rm -rf "${WORK_DIR}/repo"
-    echo "Repo cloned and files copied"
-fi
 
-# --- Write .env from metadata ---
+# --- Write .env from metadata if available (else wait for sync to provide it) ---
 echo "Fetching .env from instance metadata..."
 ENV_DATA=$(curl -sf -H "Metadata-Flavor: Google" \
-    "http://metadata.google.internal/computeMetadata/v1/instance/attributes/bench-env" 2>/dev/null || true)
+    "http://metadata.google.internal/computeMetadata/v1/instance/attributes/auth-env" 2>/dev/null || true)
 if [[ -n "$ENV_DATA" ]]; then
     echo "$ENV_DATA" > "${WORK_DIR}/.env"
     echo ".env written from metadata"
 else
-    echo "WARNING: No bench-env metadata found. Create .env manually."
+    echo "No auth-env metadata; expecting .env via sync"
 fi
-
-# --- Fix blueprint permissions ---
-chown -R 1000:1000 "${WORK_DIR}/blueprints" 2>/dev/null || true
 
 touch "$MARKER"
 echo "=== Setup complete ==="
+echo ""
+echo "Next: run 'make sync' from your dev machine to push the auth repo."
+echo "Auto-deploy fires once .env and lab/scripts/deploy.sh are present."
 
-# --- Auto-deploy if .env exists ---
-if [[ -f "${WORK_DIR}/.env" ]] && [[ -f "${WORK_DIR}/scripts/deploy.sh" ]]; then
-    echo "=== Starting auto-deploy ==="
-    bash "${WORK_DIR}/scripts/deploy.sh" && touch "$DEPLOY_MARKER" || echo "Deploy failed"
-fi
+# --- Watch for sync to land + .env to appear, then auto-deploy ---
+(
+    while [[ ! -f "${WORK_DIR}/.env" ]] || [[ ! -f "${WORK_DIR}/lab/scripts/deploy.sh" ]]; do
+        sleep 5
+    done
+    echo "=== Sync detected, starting auto-deploy ==="
+    chmod +x "${WORK_DIR}/lab/scripts/"*.sh 2>/dev/null || true
+    chown -R 1000:1000 "${WORK_DIR}/authentik/blueprints" 2>/dev/null || true
+    bash "${WORK_DIR}/lab/scripts/deploy.sh" && touch "$DEPLOY_MARKER" || echo "Deploy failed"
+) &
+disown

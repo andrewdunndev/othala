@@ -2,20 +2,23 @@
 # shellcheck disable=SC1091
 set -euo pipefail
 
-BENCH_DIR="/opt/bench-sso-iac"
-COMPOSE_DIR="${BENCH_DIR}/compose"
-TOKEN_FILE="${BENCH_DIR}/.ak-token"
+AUTH_DIR="/opt/auth-lab"
+COMPOSE_DIR="${AUTH_DIR}/lab/compose"
+SCRIPTS_DIR="${AUTH_DIR}/lab/scripts"
+BLUEPRINTS_DIR="${AUTH_DIR}/authentik/blueprints"
+CADDY_DIR="${AUTH_DIR}/caddy"
+TOKEN_FILE="${AUTH_DIR}/.ak-token"
 
-echo "=== Deploying bench-sso-iac ==="
+echo "=== Deploying auth-lab ==="
 
 # --- Load env ---
-if [[ -f "${BENCH_DIR}/.env" ]]; then
+if [[ -f "${AUTH_DIR}/.env" ]]; then
     set -a
-    source "${BENCH_DIR}/.env"
+    source "${AUTH_DIR}/.env"
     set +a
     echo "Loaded .env (DOMAIN=${DOMAIN:-unset})"
 else
-    echo "ERROR: No .env file at ${BENCH_DIR}/.env" >&2
+    echo "ERROR: No .env file at ${AUTH_DIR}/.env" >&2
     exit 1
 fi
 
@@ -27,16 +30,24 @@ for var in AUTHENTIK_SECRET_KEY AUTHENTIK_PG_PASS AUTHENTIK_BOOTSTRAP_PASSWORD D
     fi
 done
 
+# --- Build the custom Caddy image (cloudflare DNS-01 plugin) ---
+if ! podman image exists dunn.dev/caddy-estate:lab; then
+    echo "Building dunn.dev/caddy-estate:lab from upstream Caddy + plugin modules..."
+    podman build -t dunn.dev/caddy-estate:lab -f "${CADDY_DIR}/Containerfile" "${CADDY_DIR}/" 2>&1 | tail -10
+else
+    echo "dunn.dev/caddy-estate:lab already built"
+fi
+
 cd "$COMPOSE_DIR"
 
 # --- Ensure .env is accessible from compose directory ---
 if [[ ! -f "${COMPOSE_DIR}/.env" ]]; then
-    ln -sf "${BENCH_DIR}/.env" "${COMPOSE_DIR}/.env"
+    ln -sf "${AUTH_DIR}/.env" "${COMPOSE_DIR}/.env"
     echo "Linked .env into compose directory"
 fi
 
 # --- Fix blueprint permissions for container UID 1000 ---
-chown -R 1000:1000 "${BENCH_DIR}/blueprints" 2>/dev/null || true
+chown -R 1000:1000 "${BLUEPRINTS_DIR}" 2>/dev/null || true
 
 # --- Pull images ---
 echo "Pulling images (this may take a few minutes)..."
@@ -60,14 +71,14 @@ while (( ELAPSED < MAX_WAIT )); do
     if (( ELAPSED % 60 == 0 )); then
         echo "  still waiting... (${ELAPSED}s)"
         # Show last error from server logs
-        podman logs authentik-server 2>&1 | grep -i 'error' | tail -1
+        podman logs auth-authentik-server 2>&1 | grep -i 'error' | tail -1
     fi
 done
 
 if (( ELAPSED >= MAX_WAIT )); then
     echo "ERROR: Authentik did not become healthy within ${MAX_WAIT}s" >&2
-    echo "--- authentik-server logs ---"
-    podman logs authentik-server 2>&1 | tail -30
+    echo "--- auth-authentik-server logs ---"
+    podman logs auth-authentik-server 2>&1 | tail -30
     exit 1
 fi
 
@@ -80,7 +91,7 @@ for attempt in 1 2 3; do
         -e AUTHENTIK_POSTGRESQL__NAME=authentik \
         -e AUTHENTIK_POSTGRESQL__USER=authentik \
         -e AUTHENTIK_POSTGRESQL__PASSWORD="${AUTHENTIK_PG_PASS}" \
-        authentik-server ak create_admin_token 2>/dev/null | grep -v '{' | tr -d '[:space:]')
+        auth-authentik-server ak create_admin_token 2>/dev/null | grep -v '{' | tr -d '[:space:]')
     if [[ -n "$AK_TOKEN" ]] && [[ ${#AK_TOKEN} -gt 10 ]]; then
         echo "  Token generated (${#AK_TOKEN} chars)"
         echo "$AK_TOKEN" > "$TOKEN_FILE"
@@ -92,7 +103,7 @@ done
 
 if [[ -z "$AK_TOKEN" ]] || [[ ${#AK_TOKEN} -lt 10 ]]; then
     echo "WARNING: Could not generate API token. Manual setup needed." >&2
-    echo "  Run: podman exec authentik-server ak create_admin_token"
+    echo "  Run: podman exec auth-authentik-server ak create_admin_token"
 fi
 
 # --- Wait for blueprints ---
@@ -113,7 +124,7 @@ if [[ -n "$AK_TOKEN" ]]; then
 
     if [[ "$GROUPS" -lt 3 ]] || [[ "$APPS" -lt 1 ]]; then
         echo "WARNING: Fewer objects than expected" >&2
-        echo "  Check: podman logs authentik-worker | grep -i blueprint" >&2
+        echo "  Check: podman logs auth-authentik-worker | grep -i blueprint" >&2
     fi
 fi
 
@@ -121,12 +132,12 @@ fi
 if [[ -n "$AK_TOKEN" ]]; then
     echo "Setting test user passwords..."
     export AUTHENTIK_BOOTSTRAP_TOKEN="$AK_TOKEN"
-    bash "${BENCH_DIR}/scripts/set-passwords.sh" || echo "  WARNING: password setting failed"
+    bash "${SCRIPTS_DIR}/set-passwords.sh" || echo "  WARNING: password setting failed"
 fi
 
 # --- Configure apps that need API-based OIDC setup ---
 echo "Configuring app OIDC via API..."
-bash "${BENCH_DIR}/scripts/configure-apps.sh" || echo "  WARNING: app configuration had failures"
+bash "${SCRIPTS_DIR}/configure-apps.sh" || echo "  WARNING: app configuration had failures"
 
 # --- Summary ---
 echo ""

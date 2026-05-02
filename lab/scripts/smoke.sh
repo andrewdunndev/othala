@@ -2,7 +2,7 @@
 # shellcheck disable=SC2016
 set -euo pipefail
 
-BENCH_DIR="/opt/bench-sso-iac"
+BENCH_DIR="/opt/auth-lab"
 
 # Load env
 if [[ -f "${BENCH_DIR}/.env" ]]; then
@@ -54,7 +54,7 @@ api_has() {
     [[ "$count" -gt 0 ]]
 }
 
-echo "=== bench-sso-iac Smoke Tests ==="
+echo "=== auth-lab Smoke Tests ==="
 echo ""
 
 # --- Infrastructure ---
