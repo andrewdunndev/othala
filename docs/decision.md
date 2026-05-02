@@ -26,7 +26,7 @@ Production carmine will run 13+ services through kanidm:
 | Gather (sonarr/radarr/sabnzbd/qbittorrent/prowlarr) | Forward auth | Same Caddy pattern |
 | vLLM | OAuth2 client credentials | kanidm OAuth2 |
 
-Forward-auth is the only architectural gap. The custom Caddy image (already built for cloudflare DNS-01 plugin) extends to host a forward-auth plugin via the same xcaddy pattern. Lab validates plugin choice empirically.
+Forward-auth is the only architectural gap. The custom Caddy image (already built for cloudflare DNS-01 plugin) extends to host a forward-auth plugin via the same direct `go build` pattern. Lab validates plugin choice empirically.
 
 ## Architectural decisions
 
@@ -39,15 +39,13 @@ Cloudflare Tunnel (cloudflared) for almost everything. Outbound-only from carmin
 **Exception: upload-heavy subdomains** (Immich confirmed; oCIS to validate). CF Tunnel has per-request body size limits (~100MB) that fail on 4K phone video uploads. These subdomains use gray-cloud DNS direct to carmine via port-forward 443. WAF lost on those subdomains, mitigated by strong app auth + Caddy rate-limiting + (optional) GeoIP allowlist. Once Tailscale is pervasive, mobile clients prefer Tailnet path.
 
 ### 3. Forward auth
-Extend the custom Caddy image. xcaddy build with `caddy-cloudflare` (DNS-01) + a forward-auth plugin. Same image is the universal Caddy sidecar for the estate. Plugin selection candidates (in preference order):
+Extend the custom Caddy image. Direct `go build` linking `caddy-cloudflare` (DNS-01) + a forward-auth plugin into one binary. Same image is the universal Caddy sidecar for the estate. Plugin selection candidates (in preference order):
 1. caddy-security (greenpau) — preferred for conceptual congruity, validate maturity in lab
 2. caddy-jwt + a small custom kanidm-aware plugin we write (~200 LOC Go)
 3. oauth2-proxy as a separate process (last resort, breaks one-process-per-pod)
 
 ### 4. Frontend
-**Layer 2 target:** custom Astro/Tailwind login page matching dunn.dev/design. Kanidm Yew UI retained for self-service flows (passkey enrollment, account settings) with CSS skin. Spend design effort on the every-day surface.
-
-Layer 2 viability gated on Phase 0 research (kanidm `/v1/auth/*` headless API maturity). If headless support is too immature, fall back to Layer 1 (CSS skin only) and queue an upstream headless-flow-API contribution.
+**Layer 1: CSS skin on kanidm's HTMX login UI** matching dunn.dev/design. Kanidm 1.9.0 added CSS-override theming. Layer 2 (custom Astro login form) is not structurally viable per Phase 0 findings — see `upstream/firstyear-walk/findings.md` and `lab/docs/headless-api-notes.md`.
 
 ### 5. Home portal
 Three-state Astro app on Cloudflare Pages at `home.dunn.dev`. Single URL, single brand:
@@ -74,7 +72,7 @@ Every login goes through kanidm. No CF Access with non-kanidm IDP. No "log in wi
 **Intentional exception:** Bitwarden master password. The password manager retains independent auth as the break-glass-of-last-resort.
 
 ### 9. Upstream contributions
-Two targets, sequenced after Phase 0 research clarifies viability. See `docs/contribution-strategy.md` for the full posture, including the "document independently" fallback if upstream rejects.
+**None.** Phase 0 research surfaced kanidm's explicit AI/LLM ban and the architectural rejection of both forward-auth and browser BYO-UI contributions. dunn.dev/auth is consumer-only. See `docs/contribution-strategy.md` for the historical context and `upstream/firstyear-walk/findings.md` for the evidence trail.
 
 ## Reversibility
 
@@ -86,6 +84,44 @@ Lab work proceeds in three phases:
 - Phase 0 — Research: walk the kanidm maintainer's stance on contributions, map kanidm's headless flow API, validate Caddy plugin maturity
 - Phase 1 — GCP lab: provision, configure, wire each pattern (OIDC, LDAPS, forward auth), build home portal prototype, retarget Playwright suite, phone test
 - Phase 2 — Decision lock: capture outcomes, update this doc with green/yellow/red, queue follow-up work
+
+## Phase 0 outcome — 2026-05-02
+
+Phase 0 research findings are documented in:
+- `upstream/firstyear-walk/findings.md` — kanidm maintainer stance on contributions
+- `lab/docs/headless-api-notes.md` — kanidm `/v1/auth/*` API capability map
+- `lab/docs/caddy-plugin-evaluation.md` — Caddy forward-auth plugin selection
+
+Three findings reshape scope without breaking the substrate decision:
+
+### 1. No upstream contributions to kanidm
+
+Kanidm has an explicit AI/LLM ban (AGENTS.md merged February 2026: "Kanidm DOES NOT condone the use of LLMs/AI whatsoever"). Forward-auth is rejected on architectural grounds (issues #2407, #2774 closed by maintainers — blast radius too big, no spec, doesn't fit project goals). Browser BYO-UI is closed as of 2026-04-30 (PR #2980 closed two days before this research; maintainer position: "if you want to make a custom ui, it has to be a subdomain of the IDM").
+
+**Action:** drop the contribution arc. This repo is consumer-only. Patterns documented independently here.
+
+### 2. Layer 2 (custom Astro login form) not structurally viable
+
+Three blockers in kanidm: no CORS in the router, bearer cookie scoped to single host (HttpOnly + SameSite=Lax — JavaScript can't forward, cross-site fetch can't attach), WebAuthn RP-id binding to the kanidm hostname.
+
+**Action:** adopt Layer 1 — CSS-skin kanidm's HTMX login UI (kanidm 1.9.0 added CSS-override theming). The home portal at `home.dunn.dev` bounces to `auth.dunn.dev` for login (standard OIDC redirect, ~1-2s URL shift), returns post-auth.
+
+### 3. caddy-security plugin endorsed by upstream
+
+Kanidm maintainers redirect users seeking forward-auth to the same family of tools that includes caddy-security. The plugin is healthy (v1.1.62 released 2026-04-13, maintainer responsive). Real-world kanidm + caddy-security precedent exists.
+
+**Action:** lock caddy-security as the forward-auth plugin choice in the custom Caddy image build.
+
+## Family UX (revised)
+
+1. Mom opens iPad → bookmark or PWA on home screen → `home.dunn.dev`
+2. Page renders dunn.dev brand → Sign-In button visible (pre-auth state)
+3. Tap Sign In → redirect to `auth.dunn.dev` (briefly visible URL change)
+4. Kanidm login UI (CSS-skinned to dunn.dev) → conditional UI passkey autofill → Face ID
+5. Redirect back to `home.dunn.dev` → tile grid renders based on group membership (post-auth state)
+6. Tap tile → app-side OIDC redirect → already authenticated → app loads
+
+Steps 3-5 happen in ~1-2 seconds. The brief `auth.dunn.dev` URL shift is the standard SSO pattern across the internet.
 
 ## Lab outcome
 

@@ -120,11 +120,14 @@ Health-check loop: a Cloudflare Worker on a 30s cron pings kanidm `/health`, sto
 
 ## Custom Caddy image (`dunn.dev/caddy-estate`)
 
-xcaddy build with:
-- `caddy-dns/cloudflare` (already deployed, DNS-01 ACME)
-- forward-auth plugin (selected in lab — caddy-security, custom kanidm-aware plugin, or oauth2-proxy as separate process)
+Built directly from upstream Caddy + plugin Go modules with `go build` (no xcaddy). Same pattern as basef builds ZFS and NVIDIA from source: pull the modules, write the entry point, link in one binary, no helper tool in the chain.
 
-Same image is the sidecar for every app pod. One process per pod, one config syntax (Caddyfile), one image to maintain. Plugin candidates ordered in `docs/contribution-strategy.md`.
+Modules:
+- `github.com/caddyserver/caddy/v2` (core + standard modules)
+- `github.com/caddy-dns/cloudflare` (DNS-01 ACME)
+- forward-auth plugin selected based on the substrate decision
+
+Same image is the sidecar for every app pod. One process per pod, one config syntax (Caddyfile), one image to maintain.
 
 ## Reversibility
 

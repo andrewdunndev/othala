@@ -15,7 +15,7 @@ This project consolidates everything that touches family identity and access:
 | `docs/` | Decision doc, architecture, contribution strategy |
 | `lab/` | Kanidm + app stubs on GCP, Playwright harness, validates patterns before carmine cutover |
 | `portal/` | Astro home portal app — three-state page (login, tile launcher, status) for Cloudflare Pages |
-| `caddy/` | Custom Caddy image build (xcaddy) — DNS-01 + forward-auth plugins, the universal sidecar substrate |
+| `caddy/` | Custom Caddy image build (direct `go build` from upstream modules) — DNS-01 + forward-auth plugins, the universal sidecar substrate |
 | `kanidm/` | Production kanidm config scripts (CLI-driven, idempotent) |
 | `upstream/` | Drafts of upstream kanidm contributions (forward-auth endpoint, headless flow API) |
 

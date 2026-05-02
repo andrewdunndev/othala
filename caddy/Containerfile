@@ -1,0 +1,74 @@
+# Custom Caddy image for the dunn.dev estate.
+#
+# Built directly from upstream Caddy + plugin Go modules with `go build`.
+# No xcaddy, no helper tool — same pattern as basef builds ZFS/NVIDIA from
+# source. The build is one main.go that imports the modules we want, plus
+# `go mod tidy` and `go build`.
+#
+# Modules pinned via go.mod / go.sum once written; rebuilds are reproducible.
+
+ARG GO_VERSION=1.22
+ARG ALPINE_VERSION=3.19
+
+FROM docker.io/library/golang:${GO_VERSION}-alpine${ALPINE_VERSION} AS builder
+
+# Pin all module versions explicitly.
+ARG CADDY_VERSION=v2.8.4
+ARG CADDY_DNS_CLOUDFLARE_VERSION=v0.2.1
+ARG CADDY_SECURITY_VERSION=v1.1.62
+
+WORKDIR /build
+
+# main.go imports Caddy core + plugins as side-effect imports.
+# Caddy registers each module in init(); calling caddycmd.Main() boots the
+# server with all of them available.
+RUN <<'EOF'
+cat > main.go << 'GO'
+package main
+
+import (
+	caddycmd "github.com/caddyserver/caddy/v2/cmd"
+
+	// Standard Caddy modules (reverse_proxy, file_server, etc.)
+	_ "github.com/caddyserver/caddy/v2/modules/standard"
+
+	// DNS-01 ACME via Cloudflare
+	_ "github.com/caddy-dns/cloudflare"
+
+	// Forward-auth + OIDC client + JWT validation
+	_ "github.com/greenpau/caddy-security"
+)
+
+func main() {
+	caddycmd.Main()
+}
+GO
+EOF
+
+# Initialize the module and pull pinned versions.
+RUN go mod init dunn.dev/caddy-estate
+RUN go get github.com/caddyserver/caddy/v2@${CADDY_VERSION}
+RUN go get github.com/caddy-dns/cloudflare@${CADDY_DNS_CLOUDFLARE_VERSION}
+RUN go get github.com/greenpau/caddy-security@${CADDY_SECURITY_VERSION}
+RUN go mod tidy
+
+# Build a static binary. CGO disabled so the runtime image can be alpine.
+RUN CGO_ENABLED=0 GOOS=linux go build -trimpath -ldflags='-s -w' -o caddy .
+
+# Runtime: minimal alpine with the binary.
+FROM docker.io/library/alpine:${ALPINE_VERSION}
+
+RUN apk add --no-cache ca-certificates mailcap
+
+COPY --from=builder /build/caddy /usr/bin/caddy
+COPY --from=builder /build/go.mod /build/go.sum /usr/share/caddy-estate/
+
+# Sanity-check: the binary exists and lists the plugins we expect.
+RUN /usr/bin/caddy list-modules 2>/dev/null | \
+	grep -E '(dns.providers.cloudflare|security)' >/dev/null || \
+	(echo "plugin verification failed" && exit 1)
+
+EXPOSE 80 443 443/udp
+
+ENTRYPOINT ["/usr/bin/caddy"]
+CMD ["run", "--config", "/etc/caddy/Caddyfile", "--adapter", "caddyfile"]

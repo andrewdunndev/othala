@@ -10,7 +10,7 @@ help:
 	@echo "  lab-down      tear down GCP lab VM"
 	@echo ""
 	@echo "Caddy image (when populated):"
-	@echo "  caddy-build   xcaddy build with cloudflare + forward-auth plugins"
+	@echo "  caddy-build   Build Caddy image directly from upstream modules (no xcaddy)"
 	@echo ""
 	@echo "Portal (when populated):"
 	@echo "  portal-dev    run Astro dev server"
