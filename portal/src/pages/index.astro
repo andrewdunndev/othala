@@ -1,0 +1,101 @@
+---
+// home.dunn.dev — three-state landing/launcher
+//
+// State 1 (infra-down): Authentik unreachable; render status panel
+// State 2 (pre-auth): no Kratos session; render Sign In button
+// State 3 (post-auth): valid session; render tile launcher filtered by groups
+//
+// SSR mode required to read the session cookie at request time.
+export const prerender = false;
+
+import { whoami } from '../lib/kratos';
+
+let state: 'down' | 'pre-auth' | 'post-auth' = 'pre-auth';
+let identity = null;
+
+try {
+  // Forward the user's cookie to Kratos so whoami sees the session.
+  const cookie = Astro.request.headers.get('cookie') ?? undefined;
+  const session = await whoami(cookie);
+  if (session?.active && session.identity) {
+    state = 'post-auth';
+    identity = session.identity;
+  }
+} catch (err) {
+  // Kratos unreachable; render status state.
+  state = 'down';
+}
+
+// In post-auth state, filter the tile catalog by the user's group memberships.
+const TILES = [
+  { slug: 'memory',  name: 'Photos',     emoji: '📷', host: 'memory.dunn.dev',  group: 'access-memory' },
+  { slug: 'listen',  name: 'Audiobooks', emoji: '🎧', host: 'listen.dunn.dev',  group: 'access-listen' },
+  { slug: 'cinema',  name: 'Movies',     emoji: '🎬', host: 'cinema.dunn.dev',  group: 'access-cinema' },
+  { slug: 'tune',    name: 'Music',      emoji: '🎵', host: 'tune.dunn.dev',    group: 'access-tune' },
+  { slug: 'larder',  name: 'Recipes',    emoji: '🍳', host: 'larder.dunn.dev',  group: 'access-larder' },
+  { slug: 'keep',    name: 'Vault',      emoji: '🔐', host: 'keep.dunn.dev',    group: 'access-keep' },
+  { slug: 'library', name: 'Books',      emoji: '📚', host: 'library.dunn.dev', group: 'access-library' },
+  { slug: 'vault',   name: 'Files',      emoji: '📁', host: 'vault.dunn.dev',   group: 'access-vault' },
+];
+
+const groups = identity?.metadata_admin?.groups ?? [];
+const visibleTiles = state === 'post-auth'
+  ? TILES.filter(t => groups.includes(t.group))
+  : [];
+---
+
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Dunn Family</title>
+  <link rel="manifest" href="/manifest.webmanifest" />
+</head>
+<body class="bg-paper text-ink">
+  <main class="mx-auto max-w-4xl p-8">
+    <h1 class="text-3xl font-mono">Dunn Family</h1>
+
+    {state === 'down' && (
+      <section class="mt-12 rounded border border-rules p-6">
+        <h2 class="text-xl">Services are temporarily offline</h2>
+        <p class="mt-2 text-secondary">
+          We'll be back shortly. This page will update automatically.
+        </p>
+        <!-- TODO: client-side poll of /api/health to update without page reload -->
+      </section>
+    )}
+
+    {state === 'pre-auth' && (
+      <section class="mt-12">
+        <a
+          href="/auth/login"
+          class="inline-block rounded bg-ink px-6 py-3 text-paper hover:bg-secondary"
+        >
+          Sign in
+        </a>
+      </section>
+    )}
+
+    {state === 'post-auth' && (
+      <section class="mt-12 grid grid-cols-2 gap-4 md:grid-cols-3 lg:grid-cols-4">
+        {visibleTiles.map(t => (
+          <a
+            href={`https://${t.host}/`}
+            class="block rounded border border-rules p-6 text-center hover:bg-rules/20"
+          >
+            <div class="text-3xl">{t.emoji}</div>
+            <div class="mt-2 font-mono">{t.name}</div>
+          </a>
+        ))}
+      </section>
+    )}
+
+    {state === 'post-auth' && groups.includes('admin') && (
+      <section class="mt-12">
+        <a href="/admin" class="text-secondary hover:text-ink">Admin →</a>
+      </section>
+    )}
+  </main>
+</body>
+</html>

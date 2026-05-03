@@ -1,89 +1,155 @@
-# Lab compose stack: Authentik + app stubs for SSO pattern validation.
+# Lab compose stack for Ory Kratos + Hydra + glauth-kratos bridge +
+# consent service + custom Caddy + app stubs.
 #
-# Patterns under test:
-#   - OIDC native:   keep (Vaultwarden), larder (Mealie), listen (Audiobookshelf), memory (Immich)
-#   - LDAP outpost:  cinema (Jellyfin)
-#   - Forward auth:  tune (Navidrome) via Authentik proxy outpost
-#
-# Auth substrate: Authentik at auth.${DOMAIN}.
-# Caddy: custom dunn.dev/caddy-estate image with cloudflare DNS-01 plugin.
-# Production carmine uses the same compose patterns inside per-service quadlets.
+# Validates the production architecture against real apps in a GCP VM.
+# Production carmine deploys the same components via pyinfra-managed
+# rootless podman quadlets.
 
 services:
-  # --- Authentik IDP ---
+  # --- Postgres (single instance, separate kratos and hydra databases) ---
   postgres:
     image: docker.io/library/postgres:16-alpine
     container_name: auth-postgres
     restart: unless-stopped
     environment:
-      POSTGRES_DB: authentik
-      POSTGRES_USER: authentik
-      POSTGRES_PASSWORD: ${AUTHENTIK_PG_PASS}
+      POSTGRES_MULTIPLE_DATABASES: kratos,hydra
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      KRATOS_PG_PASS: ${KRATOS_PG_PASS}
+      HYDRA_PG_PASS: ${HYDRA_PG_PASS}
     volumes:
       - pg_data:/var/lib/postgresql/data
+      - ./postgres-init.sh:/docker-entrypoint-initdb.d/init.sh:ro
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -d authentik -U authentik"]
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
       interval: 10s
       timeout: 5s
       retries: 5
 
-  authentik-server:
-    image: ghcr.io/goauthentik/server:2026.2.1
-    container_name: auth-authentik-server
-    restart: unless-stopped
-    command: server
+  # --- Hydra schema migration (must run before hydra serve) ---
+  hydra-migrate:
+    image: oryd/hydra:v2.x
+    container_name: auth-hydra-migrate
+    restart: "no"
     depends_on:
       postgres:
         condition: service_healthy
     environment:
-      AUTHENTIK_SECRET_KEY: ${AUTHENTIK_SECRET_KEY}
-      AUTHENTIK_POSTGRESQL__HOST: postgres
-      AUTHENTIK_POSTGRESQL__NAME: authentik
-      AUTHENTIK_POSTGRESQL__USER: authentik
-      AUTHENTIK_POSTGRESQL__PASSWORD: ${AUTHENTIK_PG_PASS}
-      AUTHENTIK_COOKIE_DOMAIN: ${DOMAIN}
-      AUTHENTIK_DISABLE_UPDATE_CHECK: "true"
-      AUTHENTIK_ERROR_REPORTING__ENABLED: "false"
-      AUTHENTIK_BOOTSTRAP_PASSWORD: ${AUTHENTIK_BOOTSTRAP_PASSWORD}
-      AUTHENTIK_BOOTSTRAP_TOKEN: ${AUTHENTIK_BOOTSTRAP_TOKEN}
-      AUTHENTIK_BOOTSTRAP_EMAIL: ${AUTHENTIK_BOOTSTRAP_EMAIL}
+      DSN: postgres://hydra:${HYDRA_PG_PASS}@postgres:5432/hydra?sslmode=disable
+    command: ["migrate", "sql", "-e", "--yes"]
+
+  # --- Kratos ---
+  kratos:
+    image: oryd/kratos:v1.x
+    container_name: auth-kratos
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      DSN: postgres://kratos:${KRATOS_PG_PASS}@postgres:5432/kratos?sslmode=disable
+      KRATOS_PG_PASS: ${KRATOS_PG_PASS}
+      KRATOS_COOKIE_SECRET: ${KRATOS_COOKIE_SECRET}
+      KRATOS_CIPHER_SECRET: ${KRATOS_CIPHER_SECRET}
+      SMTP_USER: ${SMTP_USER}
+      SMTP_PASS: ${SMTP_PASS}
     volumes:
-      - ak_media:/media
-      - ak_templates:/templates
-      - ../../authentik/blueprints:/blueprints/custom:ro,z
+      - ../../kratos/kratos.yml:/etc/config/kratos/kratos.yml:ro
+      - ../../kratos/identity.schema.json:/etc/config/kratos/identity.schema.json:ro
+    command: ["serve", "all", "--config", "/etc/config/kratos/kratos.yml"]
     ports:
-      - "9000:9000"
-      - "9443:9443"
-      - "3389:3389"
-      - "6636:6636"
+      - "4433:4433"   # public
+      - "4434:4434"   # admin
     healthcheck:
-      test: ["CMD", "curl", "-sf", "http://localhost:9000/-/health/live/"]
+      test: ["CMD-SHELL", "wget -qO- http://localhost:4434/admin/health/ready || exit 1"]
       interval: 10s
       timeout: 5s
       retries: 10
       start_period: 30s
 
-  authentik-worker:
-    image: ghcr.io/goauthentik/server:2026.2.1
-    container_name: auth-authentik-worker
+  # --- Kratos courier (singleton; sends recovery/verification emails) ---
+  kratos-courier:
+    image: oryd/kratos:v1.x
+    container_name: auth-kratos-courier
     restart: unless-stopped
-    command: worker
     depends_on:
+      kratos:
+        condition: service_healthy
+    environment:
+      DSN: postgres://kratos:${KRATOS_PG_PASS}@postgres:5432/kratos?sslmode=disable
+      KRATOS_PG_PASS: ${KRATOS_PG_PASS}
+      KRATOS_COOKIE_SECRET: ${KRATOS_COOKIE_SECRET}
+      KRATOS_CIPHER_SECRET: ${KRATOS_CIPHER_SECRET}
+      SMTP_USER: ${SMTP_USER}
+      SMTP_PASS: ${SMTP_PASS}
+    volumes:
+      - ../../kratos/kratos.yml:/etc/config/kratos/kratos.yml:ro
+      - ../../kratos/identity.schema.json:/etc/config/kratos/identity.schema.json:ro
+    command: ["courier", "watch", "--config", "/etc/config/kratos/kratos.yml"]
+    # Singleton: do not scale this service. Multiple couriers can
+    # double-send or skip-send messages.
+
+  # --- Hydra (depends on schema migration completing) ---
+  hydra:
+    image: oryd/hydra:v2.x
+    container_name: auth-hydra
+    restart: unless-stopped
+    depends_on:
+      hydra-migrate:
+        condition: service_completed_successfully
       postgres:
         condition: service_healthy
     environment:
-      AUTHENTIK_SECRET_KEY: ${AUTHENTIK_SECRET_KEY}
-      AUTHENTIK_POSTGRESQL__HOST: postgres
-      AUTHENTIK_POSTGRESQL__NAME: authentik
-      AUTHENTIK_POSTGRESQL__USER: authentik
-      AUTHENTIK_POSTGRESQL__PASSWORD: ${AUTHENTIK_PG_PASS}
-      AUTHENTIK_COOKIE_DOMAIN: ${DOMAIN}
-      AUTHENTIK_DISABLE_UPDATE_CHECK: "true"
-      AUTHENTIK_ERROR_REPORTING__ENABLED: "false"
+      DSN: postgres://hydra:${HYDRA_PG_PASS}@postgres:5432/hydra?sslmode=disable
+      HYDRA_PG_PASS: ${HYDRA_PG_PASS}
+      HYDRA_SYSTEM_SECRET: ${HYDRA_SYSTEM_SECRET}
+      HYDRA_COOKIE_SECRET: ${HYDRA_COOKIE_SECRET}
+      HYDRA_PAIRWISE_SALT: ${HYDRA_PAIRWISE_SALT}
     volumes:
-      - ak_media:/media
-      - ak_templates:/templates
-      - ../../authentik/blueprints:/blueprints/custom:ro,z
+      - ../../hydra/hydra.yml:/etc/config/hydra/hydra.yml:ro
+    command: ["serve", "all", "--config", "/etc/config/hydra/hydra.yml", "--dev"]
+    ports:
+      - "4444:4444"   # public
+      - "4445:4445"   # admin (internal pod network only in production)
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:4445/health/ready || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
+
+  # --- Consent service (carmine-resident; here for lab integration) ---
+  consent:
+    image: dunn.dev/consent:lab
+    container_name: auth-consent
+    restart: unless-stopped
+    depends_on:
+      hydra:
+        condition: service_healthy
+      kratos:
+        condition: service_healthy
+    environment:
+      HYDRA_ADMIN_URL: http://hydra:4445
+      KRATOS_PUBLIC_URL: http://kratos:4433
+    ports:
+      - "4477:4477"
+
+  # --- LDAP bridge (custom glauth binary with Kratos backend) ---
+  ldap-bridge:
+    image: dunn.dev/glauth-kratos:lab
+    container_name: auth-ldap-bridge
+    restart: unless-stopped
+    depends_on:
+      kratos:
+        condition: service_healthy
+    environment:
+      KRATOS_BRIDGE_ADMIN_TOKEN: ${KRATOS_BRIDGE_ADMIN_TOKEN}
+    volumes:
+      - ../../ldap-bridge/glauth.cfg:/etc/glauth/glauth.cfg:ro
+      - ./tls:/etc/glauth/tls:ro
+    ports:
+      - "636:636"
+      - "389:389"
 
   # --- Reverse proxy: custom Caddy with cloudflare DNS-01 plugin ---
   caddy:
@@ -91,23 +157,25 @@ services:
     container_name: auth-caddy
     restart: unless-stopped
     depends_on:
-      authentik-server:
+      kratos:
         condition: service_healthy
+      hydra:
+        condition: service_healthy
+      consent:
+        condition: service_started
     ports:
       - "80:80"
       - "443:443"
     environment:
       DOMAIN: ${DOMAIN}
       CF_API_TOKEN: ${CF_API_TOKEN}
-      ADMIN_BCRYPT_HASH: ${ADMIN_BCRYPT_HASH}
     volumes:
       - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - ../../caddy/snippets:/etc/caddy/snippets:ro
       - caddy_data:/data
       - caddy_config:/config
 
   # --- App stubs ---
-  # Real app containers with minimal config: just enough to validate auth flows. No persistent data.
-
   vaultwarden:
     image: docker.io/vaultwarden/server:latest
     container_name: auth-vaultwarden
@@ -116,10 +184,9 @@ services:
       DOMAIN: https://keep.${DOMAIN}
       SIGNUPS_ALLOWED: "false"
       SSO_ENABLED: "true"
-      SSO_ONLY: "false"
-      SSO_AUTHORITY: https://auth.${DOMAIN}/application/o/keep
+      SSO_AUTHORITY: https://auth.${DOMAIN}/
       SSO_CLIENT_ID: keep
-      SSO_CLIENT_SECRET: ${KEEP_CLIENT_SECRET:-bench-keep-secret}
+      SSO_CLIENT_SECRET: ${KEEP_CLIENT_SECRET}
 
   mealie:
     image: ghcr.io/mealie-recipes/mealie:latest
@@ -129,12 +196,11 @@ services:
       ALLOW_SIGNUP: "false"
       BASE_URL: https://larder.${DOMAIN}
       OIDC_AUTH_ENABLED: "true"
-      OIDC_SIGNUP_ENABLED: "true"
-      OIDC_CONFIGURATION_URL: https://auth.${DOMAIN}/application/o/larder/.well-known/openid-configuration
+      OIDC_CONFIGURATION_URL: https://auth.${DOMAIN}/.well-known/openid-configuration
       OIDC_CLIENT_ID: larder
-      OIDC_CLIENT_SECRET: ${LARDER_CLIENT_SECRET:-bench-larder-secret}
+      OIDC_CLIENT_SECRET: ${LARDER_CLIENT_SECRET}
       OIDC_AUTO_REDIRECT: "true"
-      OIDC_PROVIDER_NAME: "Dunn Family"
+      OIDC_PROVIDER_NAME: Dunn Family
       OIDC_ADMIN_GROUP: admin
       OIDC_USER_GROUP: family
 
@@ -142,23 +208,21 @@ services:
     image: ghcr.io/advplyr/audiobookshelf:latest
     container_name: auth-audiobookshelf
     restart: unless-stopped
-    # ABS OIDC is configured via the API after first launch (configure-apps.sh).
 
   jellyfin:
     image: docker.io/jellyfin/jellyfin:latest
     container_name: auth-jellyfin
     restart: unless-stopped
+    depends_on:
+      ldap-bridge:
+        condition: service_started
     volumes:
       - ./jellyfin-ldap.xml:/config/plugins/configurations/LDAP-Auth.xml:ro,z
-    # LDAP plugin must be installed once via Jellyfin admin UI then it picks up this config automatically.
 
   navidrome:
     image: docker.io/deluan/navidrome:latest
     container_name: auth-navidrome
     restart: unless-stopped
-    environment:
-      ND_BASEURL: ""
-    # No native SSO. Auth is handled by Caddy forward_auth → Authentik proxy outpost.
 
   immich-server:
     image: ghcr.io/immich-app/immich-server:release
@@ -173,7 +237,6 @@ services:
       DB_PASSWORD: ${IMMICH_PG_PASS:-bench-immich-pg}
       DB_DATABASE_NAME: immich
       IMMICH_MACHINE_LEARNING_URL: ""
-      # OIDC configured via Immich admin UI or API after launch (configure-apps.sh).
 
   immich-postgres:
     image: docker.io/tensorchord/pgvecto-rs:pg16-v0.2.0
@@ -194,8 +257,6 @@ services:
 
 volumes:
   pg_data:
-  ak_media:
-  ak_templates:
   caddy_data:
   caddy_config:
   immich_pg_data:

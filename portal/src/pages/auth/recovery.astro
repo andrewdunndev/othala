@@ -1,0 +1,32 @@
+---
+// Recovery flow handler (code strategy, NOT magic link — link is deprecated).
+//
+// Two phases:
+//   1. User enters their email; we POST to /self-service/recovery/api
+//      Kratos sends a numeric code via email (Fastmail SMTP)
+//   2. User enters the code; we POST to /self-service/recovery?flow=<id>
+//      Kratos validates code, creates a privileged session, redirects
+//      to /auth/settings to set a new password / re-enroll passkey
+//
+// Status: skeleton. Real implementation in Phase 3.
+
+export const prerender = false;
+
+const flowId = Astro.url.searchParams.get('flow');
+---
+
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>Recover account — Dunn Family</title>
+</head>
+<body class="bg-paper text-ink">
+  <main class="mx-auto max-w-md p-8">
+    <h1 class="text-2xl font-mono">Recover account</h1>
+
+    <!-- TODO: render email form (phase 1) or code form (phase 2) per flow state -->
+    <p class="mt-6 text-secondary">Recovery form goes here.</p>
+  </main>
+</body>
+</html>

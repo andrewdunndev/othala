@@ -1,31 +1,26 @@
 <?xml version="1.0" encoding="utf-8"?>
-<PluginConfiguration xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:xsd="http://www.w3.org/2001/XMLSchema">
-  <LdapServer>authentik-server</LdapServer>
-  <LdapPort>3389</LdapPort>
+<!--
+  Jellyfin LDAP plugin config for the lab.
+  Points at the glauth-kratos bridge.
+  Production: LdapServer becomes 127.0.0.1 (in-pod), creds from Bitwarden.
+-->
+<LdapConfiguration xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:xsd="http://www.w3.org/2001/XMLSchema">
+  <LdapServer>ldap-bridge</LdapServer>
+  <LdapPort>389</LdapPort>
   <UseSsl>false</UseSsl>
   <UseStartTls>false</UseStartTls>
   <SkipSslVerify>false</SkipSslVerify>
-  <LdapBindUser>cn=ldapservice,ou=users,dc=dunn,dc=dev</LdapBindUser>
-  <LdapBindPassword>bench-test-pass</LdapBindPassword>
-  <LdapBaseDn>dc=dunn,dc=dev</LdapBaseDn>
-  <LdapSearchFilter>(objectClass=user)</LdapSearchFilter>
-  <LdapAdminBaseDn></LdapAdminBaseDn>
+  <LdapBindUser>uid=jellyfin-svc,ou=users,dc=dunn,dc=dev</LdapBindUser>
+  <LdapBindPassword>${LDAP_BIND_PASSWORD}</LdapBindPassword>
+  <LdapBaseDn>ou=users,dc=dunn,dc=dev</LdapBaseDn>
+  <LdapSearchFilter>(uid={username})</LdapSearchFilter>
+  <LdapAdminBaseDn>ou=users,dc=dunn,dc=dev</LdapAdminBaseDn>
   <LdapAdminFilter>(memberOf=cn=admin,ou=groups,dc=dunn,dc=dev)</LdapAdminFilter>
-  <EnableLdapAdminFilterMemberUid>false</EnableLdapAdminFilterMemberUid>
-  <LdapSearchAttributes>uid, cn, mail, displayName</LdapSearchAttributes>
-  <LdapClientCertPath></LdapClientCertPath>
-  <LdapClientKeyPath></LdapClientKeyPath>
-  <LdapRootCaPath></LdapRootCaPath>
+  <LdapSearchAttributes>uid, cn, mail</LdapSearchAttributes>
+  <LdapUidAttribute>uid</LdapUidAttribute>
+  <LdapUsernameAttribute>uid</LdapUsernameAttribute>
+  <LdapPasswordAttribute>userPassword</LdapPasswordAttribute>
+  <EnableAllFolders>false</EnableAllFolders>
   <CreateUsersFromLdap>true</CreateUsersFromLdap>
   <AllowPassChange>false</AllowPassChange>
-  <LdapUidAttribute>uid</LdapUidAttribute>
-  <LdapUsernameAttribute>cn</LdapUsernameAttribute>
-  <LdapPasswordAttribute>userPassword</LdapPasswordAttribute>
-  <EnableLdapProfileImageSync>false</EnableLdapProfileImageSync>
-  <RemoveImagesNotInLdap>false</RemoveImagesNotInLdap>
-  <LdapProfileImageAttribute>jpegphoto</LdapProfileImageAttribute>
-  <LdapProfileImageFormat>Default</LdapProfileImageFormat>
-  <EnableAllFolders>true</EnableAllFolders>
-  <EnabledFolders />
-  <LdapUsers />
-</PluginConfiguration>
+</LdapConfiguration>

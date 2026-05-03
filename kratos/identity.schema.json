@@ -1,0 +1,86 @@
+{
+  "$id": "https://dunn.dev/schemas/family.identity.schema.json",
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Family member",
+  "description": "Identity schema for the dunn.dev family SSO. Traits are user-visible; group membership lives in metadata_admin and is admin-managed only.",
+  "type": "object",
+  "properties": {
+    "traits": {
+      "type": "object",
+      "properties": {
+        "username": {
+          "type": "string",
+          "title": "Username",
+          "description": "Login identifier in firstname.lastname format",
+          "pattern": "^[a-z][a-z0-9.\\-]*[a-z0-9]$",
+          "minLength": 3,
+          "maxLength": 32,
+          "ory.sh/kratos": {
+            "credentials": {
+              "password": {
+                "identifier": true
+              },
+              "webauthn": {
+                "identifier": true
+              },
+              "totp": {
+                "account_name": true
+              },
+              "code": {
+                "identifier": true,
+                "via": "email"
+              }
+            }
+          }
+        },
+        "email": {
+          "type": "string",
+          "format": "email",
+          "title": "Email",
+          "description": "Primary email for recovery and notifications",
+          "ory.sh/kratos": {
+            "credentials": {
+              "password": {
+                "identifier": true
+              },
+              "code": {
+                "identifier": true,
+                "via": "email"
+              }
+            },
+            "verification": {
+              "via": "email"
+            },
+            "recovery": {
+              "via": "email"
+            }
+          },
+          "maxLength": 320
+        },
+        "displayName": {
+          "type": "string",
+          "title": "Display name",
+          "description": "Friendly name shown in the home portal",
+          "maxLength": 64
+        },
+        "recoveryEmail": {
+          "type": "string",
+          "format": "email",
+          "title": "Recovery email",
+          "description": "Alternate email for recovery if primary is unreachable",
+          "ory.sh/kratos": {
+            "recovery": {
+              "via": "email"
+            }
+          },
+          "maxLength": 320
+        }
+      },
+      "required": [
+        "username",
+        "email"
+      ],
+      "additionalProperties": false
+    }
+  }
+}

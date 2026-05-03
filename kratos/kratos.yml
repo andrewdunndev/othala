@@ -1,0 +1,201 @@
+# Kratos configuration — dunn.dev family SSO
+#
+# All locked decisions from docs/decision.md and docs/STATUS.md applied.
+# Version-pinned in compose; this config targets v1.x current at time of build.
+
+dsn: postgres://kratos:${KRATOS_PG_PASS}@postgres:5432/kratos?sslmode=disable
+
+serve:
+  public:
+    base_url: https://auth.dunn.dev/
+    port: 4433
+    cors:
+      enabled: true
+      allowed_origins:
+        - https://home.dunn.dev
+      allowed_methods: [GET, POST, PUT, PATCH, DELETE]
+      allowed_headers:
+        - Authorization
+        - Content-Type
+        - X-Session-Token
+        - Cookie
+        - X-CSRF-Token
+      exposed_headers: [Content-Type, Set-Cookie]
+      allow_credentials: true
+      max_age: 0
+
+  admin:
+    base_url: http://kratos:4434/
+    port: 4434
+
+selfservice:
+  default_browser_return_url: https://home.dunn.dev/
+  allowed_return_urls:
+    - https://home.dunn.dev
+    - https://home.dunn.dev/
+    - https://auth.dunn.dev
+
+  methods:
+    password:
+      enabled: true
+      config:
+        haveibeenpwned_enabled: true
+        max_breaches: 1
+        identifier_similarity_check_enabled: true
+        min_password_length: 12
+
+    webauthn:
+      enabled: true
+      config:
+        # passwordless: passkey is primary auth, password is fallback
+        passwordless: true
+        rp:
+          # CRITICAL one-way decision: registrable parent so passkeys assertable
+          # from any *.dunn.dev origin. Changing this invalidates every passkey.
+          id: dunn.dev
+          display_name: Dunn Family
+          origins:
+            - https://auth.dunn.dev
+            - https://home.dunn.dev
+
+    totp:
+      enabled: true
+      config:
+        issuer: Dunn Family
+
+    # Code strategy for recovery (magic link is deprecated in current Kratos)
+    code:
+      enabled: true
+      passwordless_enabled: false
+
+    # We don't use these but enable explicitly to document the choice
+    profile:
+      enabled: true
+
+    link:
+      # Magic link recovery is deprecated; use 'code' method above
+      enabled: false
+
+    lookup_secret:
+      enabled: true
+
+  flows:
+    error:
+      ui_url: https://home.dunn.dev/auth/error
+
+    settings:
+      ui_url: https://home.dunn.dev/auth/settings
+      privileged_session_max_age: 15m
+      # AAL not enforced here globally; admin UI does AAL2 step-up at SSR layer
+      required_aal: aal1
+      after:
+        password:
+          hooks:
+            - hook: revoke_active_sessions
+        webauthn:
+          hooks:
+            - hook: revoke_active_sessions
+
+    recovery:
+      enabled: true
+      use: code
+      ui_url: https://home.dunn.dev/auth/recovery
+      lifespan: 1h
+      notify_unknown_recipients: false
+
+    verification:
+      enabled: true
+      use: code
+      ui_url: https://home.dunn.dev/auth/verification
+      lifespan: 1h
+      after:
+        default_browser_return_url: https://home.dunn.dev/
+
+    logout:
+      after:
+        default_browser_return_url: https://home.dunn.dev/
+
+    login:
+      ui_url: https://home.dunn.dev/auth/login
+      lifespan: 10m
+      # CRITICAL: aal1 base; AAL2 step-up is requested per-flow via ?aal=aal2
+      # by the admin SSR pages, not enforced globally here.
+      required_aal: aal1
+
+    registration:
+      # Admin-driven onboarding (one-time enrollment URLs); no self-service signup
+      enabled: false
+      ui_url: https://home.dunn.dev/auth/registration
+      lifespan: 1h
+      after:
+        password:
+          hooks:
+            - hook: session
+
+session:
+  lifespan: 2160h    # 90 days for normal flows; admin UI enforces shorter via SSR
+  cookie:
+    # Parent domain so home.dunn.dev / auth.dunn.dev / app pods all see it
+    domain: dunn.dev
+    name: ory_kratos_session
+    persistent: true
+    same_site: Lax
+  whoami:
+    # CRITICAL: aal1 not highest_available. highest_available causes
+    # whoami to return session.identity = null for MFA-enabled identities,
+    # which breaks the LDAP bridge BIND path. AAL is enforced per-flow,
+    # not at whoami.
+    required_aal: aal1
+
+cookies:
+  domain: dunn.dev
+  same_site: Lax
+
+identity:
+  default_schema_id: family
+  schemas:
+    - id: family
+      url: file:///etc/config/kratos/identity.schema.json
+
+courier:
+  smtp:
+    connection_uri: smtps://${SMTP_USER}:${SMTP_PASS}@smtp.fastmail.com:465
+    from_address: noreply@dunn.dev
+    from_name: Dunn Family
+    # local_name: leave default; Fastmail accepts standard HELO
+
+  # Templates default to Kratos built-ins; override later if needed.
+  # templates:
+  #   recovery_code:
+  #     valid:
+  #       email:
+  #         subject: Your Dunn Family recovery code
+
+secrets:
+  # Cookie encryption secret. Rotate by appending a new value to the front;
+  # old sessions remain valid until rotation completes.
+  cookie:
+    - ${KRATOS_COOKIE_SECRET}
+  # Cipher for at-rest encryption of identity credentials.
+  cipher:
+    - ${KRATOS_CIPHER_SECRET}
+
+log:
+  level: info
+  format: json
+  leak_sensitive_values: false
+
+hashers:
+  argon2:
+    parallelism: 1
+    memory: 128MB
+    iterations: 3
+    salt_length: 16
+    key_length: 32
+
+ciphers:
+  algorithm: xchacha20-poly1305
+
+feature_flags:
+  # Account verification flow as a separate UI; we want it.
+  cacheable_sessions: false

@@ -1,0 +1,50 @@
+---
+// Login flow handler.
+//
+// Reads ?flow=<id> from the URL (or initiates a new flow).
+// Renders the appropriate form per Kratos's flow.ui.nodes:
+//   - WebAuthn challenge (passkey conditional UI in the username input)
+//   - Password form
+//   - "Use a passkey from another device" link (kicks the passwordless flow)
+//
+// On submit, POSTs to /self-service/login?flow=<id> via Kratos public API.
+//
+// AAL2 step-up: if URL has ?aal=aal2 (sent by admin SSR pages), starts a
+// refresh login flow at AAL2 to prompt for a second factor.
+//
+// Status: skeleton. Real implementation in Phase 3.
+
+export const prerender = false;
+
+const flowId = Astro.url.searchParams.get('flow');
+const aal = Astro.url.searchParams.get('aal'); // 'aal2' for admin step-up
+const refresh = Astro.url.searchParams.get('refresh') === 'true';
+const returnTo = Astro.url.searchParams.get('return_to');
+
+// TODO: real implementation
+// 1. If !flowId: redirect to Kratos /self-service/login/browser with same params
+// 2. Else: fetch flow state from Kratos public API
+// 3. Render form based on flow.ui.nodes
+// 4. Handle WebAuthn ceremony in client-side script (separate <script>)
+---
+
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Sign in — Dunn Family</title>
+</head>
+<body class="bg-paper text-ink">
+  <main class="mx-auto max-w-md p-8">
+    <h1 class="text-2xl font-mono">Sign in</h1>
+
+    <!-- TODO: render form per Kratos flow.ui -->
+    <p class="mt-6 text-secondary">Login form goes here.</p>
+
+    {aal === 'aal2' && (
+      <p class="mt-4 text-secondary">Additional verification required for admin access.</p>
+    )}
+  </main>
+</body>
+</html>

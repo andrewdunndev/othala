@@ -1,0 +1,12 @@
+client_name: vLLM
+client_id: llm
+grant_types:
+  - client_credentials
+response_types: []
+scope: api
+audience:
+  - https://llm.dunn.dev
+token_endpoint_auth_method: client_secret_basic
+skip_consent: true
+# Machine-to-machine OAuth2 client. Caddy in front of vLLM validates
+# the bearer token via Hydra introspection.

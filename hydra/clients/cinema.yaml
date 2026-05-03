@@ -1,0 +1,18 @@
+client_name: Jellyfin
+client_id: cinema
+grant_types:
+  - authorization_code
+  - refresh_token
+response_types:
+  - code
+scope: openid email profile groups offline_access
+redirect_uris:
+  - https://cinema.dunn.dev/sso/OID/redirect/dunn
+post_logout_redirect_uris:
+  - https://cinema.dunn.dev/
+token_endpoint_auth_method: client_secret_basic
+skip_consent: true
+audience:
+  - https://cinema.dunn.dev
+# Note: native clients (Apple TV / Infuse) use the LDAP path via the
+# glauth-kratos bridge co-located in the Jellyfin pod, not this OIDC client.

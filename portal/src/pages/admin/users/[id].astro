@@ -1,0 +1,30 @@
+---
+// Admin: user detail / edit / sessions / recovery / deactivate.
+// Status: skeleton.
+export const prerender = false;
+
+import { requireAdminSession, getIdentity, generateRecoveryURL, deactivateIdentity } from '../../../lib/admin';
+
+const guard = await requireAdminSession(Astro);
+if (guard instanceof Response) return guard;
+
+const { id } = Astro.params;
+let identity: any = null;
+try {
+  identity = await getIdentity(id!);
+} catch (err) {
+  // TODO: 404
+}
+
+// TODO: handle POST actions: traits/groups update, recovery URL gen, deactivate
+---
+<!doctype html>
+<html lang="en">
+<head><meta charset="utf-8" /><title>User — Admin — Dunn Family</title></head>
+<body class="bg-paper text-ink">
+  <main class="mx-auto max-w-2xl p-8">
+    <h1 class="text-2xl font-mono">{identity?.traits?.username ?? id}</h1>
+    <!-- TODO: sections for traits, groups, credentials, sessions, recovery, deactivate -->
+  </main>
+</body>
+</html>

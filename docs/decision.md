@@ -1,125 +1,192 @@
 # SSO stack fit — decision
 
-**Status:** Decided 2026-05-02. Substrate: **Authentik with eyes-open hardening**, after a wider evaluation of alternatives (kanidm, Authelia, Hanko, voidauth, Pocket-ID, Zitadel) returned to the original choice.
+**Status:** Decided 2026-05-02. Substrate: **Ory Kratos + Hydra + custom glauth-kratos LDAP bridge + Astro UI on Cloudflare Workers + custom Caddy image (direct go build)**.
 
-## Decision
+After evaluating Authentik, kanidm, Authelia, Hanko, voidauth, Pocket-ID, Zitadel, Andrew's reframe — "I want UX excellence, not flow customization" — flipped the call to Ory. The 4 feasibility validations went GREEN/YELLOW with manageable risks, and the adversarial review against upstream docs caught two CRITICAL issues that are now corrected in the locked architecture.
 
-**Authentik** is the central IDP. Free OSS tier; no commercial features used (everything in our stack is in the free tier). Hardening package applied to address the Django substrate concern.
+## Why Ory
 
-This repo (`dunn.dev/auth`) is the IaC/YAML home for the entire auth deployment: Authentik blueprints, custom Caddy image build, lab harness, Astro home portal, and the per-pattern Caddyfile snippets. The retiring `dunn.dev/bench-sso-iac` repo is superseded.
+The journey here was extensive (`docs/substrate-comparison.md` has the full per-candidate evidence). Short version:
 
-## How we got here
+- **Authentik:** flow designer felt like unwanted complexity; commercial trajectory uncertain; we want UX excellence not flow customization
+- **kanidm:** AI/LLM ban in AGENTS.md (Anthropic refusal trigger), forward-auth + BYO-UI explicitly closed by maintainers, bus factor 1
+- **Authelia:** no LDAP server; lldap-as-companion is wrong-shaped (lldap as source of truth for the whole estate when its only consumer is Jellyfin)
+- **Hanko:** not an IDP, doesn't fit shape
+- **voidauth:** single maintainer, capability gaps (no LDAP, no WebFinger, no client_credentials)
+- **Pocket-ID:** consumes external LDAP, doesn't serve LDAP; same gap as Authelia/voidauth
+- **Zitadel:** multi-container architecture mismatch + concerning CVE cadence
 
-The journey across the eval was extensive. Quick history:
+Ory's offer for our shape:
+- Total UI control via Astro on Cloudflare Workers — match dunn.dev/design exactly
+- Composable architecture: Kratos (identity), Hydra (OAuth2/OIDC), each binary doing one thing
+- Free OSS forever; Ory Network is the SaaS commercialization, self-hosted is fully featured Apache 2
+- The LDAP bridge gap becomes a contribution opportunity: a glauth Kratos backend, publishable upstream
 
-1. **Original choice (carmine ROADMAP):** Authentik. Django, largest ecosystem.
-2. **Concern:** Django + AI-attack threat model. Pivoted to evaluate kanidm.
-3. **kanidm Phase 0 research surfaced:** explicit AI/LLM ban (AGENTS.md, Feb 2026, includes Anthropic-specific refusal trigger), forward-auth contribution closed by maintainers (issues #2407, #2774), browser BYO-UI structurally not viable (PR #2980 closed 2026-04-30).
-4. **Wider eval:** Authelia (no LDAP server; lldap-as-companion is wrong-shaped per our needs), Hanko (not an IDP), voidauth (single maintainer + capability gaps), Pocket-ID (no LDAP server), Zitadel (multi-container architecture mismatch + CVE cadence).
-5. **Outcome:** the project that scores best on the user's stated criteria (community sustainability + good security + customizability) is the one we started with — Authentik.
+The cost: BYO UI (we build the Astro app), 4-5 components instead of one, smaller homelab community to lean on. Trades we accept.
 
-Full per-candidate evaluations under `../lab/docs/eval-*.md`; comparison synthesis at `substrate-comparison.md`.
+## Locked architectural decisions
 
-## Architectural decisions locked
+### Identity foundations
 
-### 1. Substrate: Authentik (free OSS tier)
-Everything our estate uses is in the free tier:
-- OIDC IDP, OAuth2, SAML
-- LDAP outpost (for Jellyfin native auth path)
-- Proxy outpost (for Navidrome / Gather forward-auth)
-- Visual flow designer, branding, custom CSS
-- Blueprints (declarative IaC, the basis of `../authentik/blueprints/`)
-- RADIUS PAP, MFA, passkeys, recovery flows
+| Decision | Value | Notes |
+|---|---|---|
+| WebAuthn `rp.id` | `dunn.dev` (registrable parent) | **One-way.** Origins list includes `https://auth.dunn.dev` and `https://home.dunn.dev`. Any future subdomain that needs WebAuthn assertion is a registrable child of `dunn.dev`. |
+| Username convention | `first.last` (e.g., `andrew.dunn`) | LDAP DN-friendly. |
+| Cookie domain | `.dunn.dev`, `SameSite=Lax`, `HttpOnly` | Required for cross-subdomain Astro UI calls to Kratos. |
+| Identity schema | traits = {username, email, displayName?, recoveryEmail?} + `metadata_admin.groups[]` | Groups in metadata_admin (Ory-shaped: admin-managed, user can't self-escalate via settings flow). |
 
-The enterprise-tier features (RADIUS EAP-TLS, RAC, federation between instances) are not on our roadmap. Watch-out: if Authentik moves currently-free features behind the paywall, revisit substrate. kanidm is the documented fallback (we have the evaluation evidence ready).
+### Auth policy
 
-### 2. LDAP outpost co-located in the Jellyfin pod
-Authentik's outpost architecture lets us deploy the LDAP outpost inside the Jellyfin pod. LDAP queries are local to the pod; the outpost queries back to authentik-server over the network. Single source of truth (Authentik) plus deployment locality. The Apple TV / Infuse SSO path works via this LDAP plugin as supported by Jellyfin.
+| Decision | Value | Notes |
+|---|---|---|
+| Passkey policy | Preferred + password fallback | Family won't enroll consistently; lockout protection. |
+| MFA | Optional default | AAL2 step-up enforced at app-layer (Astro SSR), not at Caddy or globally. |
+| Sessions | 90 days normal, 1 day admin | `session.lifespan: 2160h` global; admin SSR pages enforce shorter via re-auth on AAL2. |
+| Recovery | Code strategy (numeric code via email) + admin-issued URL | **Magic link is deprecated** in current Kratos; we use code. |
+| Onboarding | Admin creates user → emit one-time enrollment URL → text via Signal/iMessage | No password ever transits a channel. |
 
-### 3. Proxy outpost for forward-auth (Navidrome, Gather)
-Authentik's proxy outpost handles forward-auth natively. Caddy directs unauthenticated traffic to the outpost endpoint (`/outpost.goauthentik.io/auth/caddy`); the outpost validates the user's session and returns identity headers. No separate forward-auth plugin needed.
+### OIDC posture
 
-### 4. Public reachability: DNS-only Cloudflare + port-forward 443
-Cloudflare's role shrinks to:
-- DNS hosting (free, fast)
-- DNS-01 ACME for cert provisioning via the Cloudflare API (out-of-band, not in the request path)
+| Decision | Value | Notes |
+|---|---|---|
+| Hydra subject identifier | `public` | Family scale, no app-to-app correlation concern. |
+| Consent | `skip_consent: true` per client for all 16 trusted apps | Family never sees consent screens. |
+| Tailscale WebFinger | Static JSON file at `home.dunn.dev/.well-known/webfinger` | RFC 7033, served by CF Workers. |
 
-No CF Tunnel, no CF Access, no CF in the auth or request path. Family auth flow has one feel (Authentik), no Cloudflare challenges in the way. Privacy + simplicity tradeoff: lose CF WAF/DDoS at the edge, gain a clean trust boundary. Caddy-side rate limiting and the inherent strength of bcrypt + long random passwords cover what WAF was contributing.
+### LDAP bridge
 
-### 5. Admin path hardening: basicauth + Authentik
-Admin paths (`/if/admin/*`, app admin paths) are gated by:
-- Caddy `basicauth` with a 64-char random password (bcrypt hashed, stored in Bitwarden, shared by admins)
-- Authentik OIDC with admin-MFA flow (re-prompt for TOTP/passkey on every admin session, not honoring the 90-day session)
-- bcrypt's natural CPU slowness as the brute-force cap (no separate rate-limit plugin needed)
+| Decision | Value | Notes |
+|---|---|---|
+| Implementation | glauth Handler interface (NOT Backend), embedded plugin (compile-time, custom binary) | Adversarial review correction: glauth v2.5.0 added embedded plugins as the recommended path. |
+| DN format | `uid=<username>,ou=users,dc=dunn,dc=dev` | uid as RDN attribute, "users" container. |
+| Deployment | Co-located in Jellyfin pod (production); standalone container (lab) | Smaller blast radius; LDAP traffic local in production. |
+| BIND mechanism | Kratos `/self-service/login/api` flow with implicit aal=aal1 | Bridge runs API-flow login per-bind; password verification only (session token discarded). |
+| BIND cache | 30s TTL on positive results | Absorbs Apple TV / Jellyfin reconnect storms (Argon2 is expensive). |
+| Identity cache | 30s TTL with polling refresh | Kratos doesn't fire admin-side webhooks; polling is the pattern. |
+| Admin token | Identity-read-only scope | Bridge can't mutate identities, just list them. |
 
-Family members never see this layer. Admin operators (Andrew, possibly Jane) enter the Basic Auth credential, then their personal Authentik creds.
+### Frontend
 
-### 6. Custom Caddy image (`dunn.dev/caddy-estate`)
-Built directly from upstream Caddy + plugin Go modules with `go build` (no xcaddy). One plugin: `caddy-dns/cloudflare` for DNS-01 ACME. Forward-auth is handled by Authentik's proxy outpost, so no second plugin is needed.
+| Decision | Value | Notes |
+|---|---|---|
+| Framework | Astro 6 with Cloudflare Workers adapter | Astro 6 dropped the Pages target. |
+| Output mode | hybrid; `export const prerender = false` on every SSR page | No inheritance in Astro 6 hybrid mode. |
+| AAL2 enforcement on /admin/* | App-layer SSR guard (`requireAdminSession` in `portal/src/lib/admin.ts`) | **Not Caddy.** Adversarial review correction: Kratos AAL is per-flow, not per-route. |
+| Health check | Cloudflare Worker polls Kratos `/health/ready` every 30s, stores in Workers KV; Astro page reads KV | Edge-fast; doesn't hammer carmine during outage page-refresh storms. |
 
-### 7. Home portal: three-state Astro on Cloudflare Pages
-`home.dunn.dev` is an OIDC RP. Three states by Authentik reachability: pre-auth (Sign-In button → bounces to auth.dunn.dev), post-auth (tile launcher filtered by group claims), infra-down (status panel via a Cloudflare Worker that polls Authentik). Folds the prior planned `status.dunn.dev` into `home.dunn.dev`.
+### Public reachability
 
-### 8. Tailscale not load-bearing
-Admin paths and recovery paths must work without Tailscale. Tailscale is the convenience layer for remote access, not a trust dependency.
+| Decision | Value | Notes |
+|---|---|---|
+| DNS | Cloudflare DNS-only (gray cloud, no proxy) | No CF Tunnel, no CF Access. No third-party in the auth/request path. |
+| Network | Port-forward 443 on home router → Envoy SNI router → per-pod Caddy | Direct path; one auth feel for the family (no CF challenges). |
+| TLS | Per-pod Caddy with DNS-01 ACME via Cloudflare API | Custom dunn.dev/caddy-estate image, direct go build, one plugin. |
 
-### 9. No split identity
-Every login goes through Authentik. No CF Access with a non-Authentik IDP. No "log in with Google/GitHub" anywhere. forge.dunn.dev (GitLab) uses Authentik OIDC. Tailscale uses Authentik OIDC.
+### Hardening
 
-**Intentional exception:** Bitwarden master password. The password manager retains independent auth as the break-glass-of-last-resort.
+| Decision | Value | Notes |
+|---|---|---|
+| Admin path gate | Caddy forward_auth for "session present"; AAL2 enforced at Astro SSR | App-layer step-up via `?aal=aal2&refresh=true` redirect to Kratos. |
+| Session cookie | `HttpOnly`, `SameSite=Lax`, `domain=.dunn.dev` | Per-app log leakage of cookie names is acceptable; HttpOnly prevents JS access. |
+| `secrets.system` (Hydra) | Generate once, store in Bitwarden, **never rotate** without DB rebuild | Per Hydra docs; baked into the operator playbook. |
+| `hydra-migrate` init | Runs `hydra migrate sql up` before `hydra serve` on every boot | Hydra schema migration is not automatic. |
+| Kratos courier | Singleton (replica:1) | Multiple couriers can double-send. |
 
-### 10. Upstream contributions: not a focus
-Authentik is consumer-only for us. We file occasional bug reports backed by deployment evidence. No code contributions planned. The estate's contribution arc (bootc, composefs, rpm-ostree) doesn't extend to Authentik because the stack is mature and the gaps we identified during eval (Django substrate, commercial trajectory) aren't things we'd contribute fixes for.
+### Operations
 
-## Hardening package
+| Decision | Value | Notes |
+|---|---|---|
+| Postgres | Single instance, separate `kratos` and `hydra` databases | Ory's recommended pattern. |
+| Audit log | alloy → Loki (archival) + small `recent_activity` table for admin UI (last 100 events) | |
+| SMTP | Fastmail | App password from Bitwarden via `SMTP_PASS` env var. |
 
-The Django substrate concern (CyberArk's research on CVE-2024-37905, CVE-2024-42490, plus general AI-attack risk on Python codebases) is real but addressable. The package:
+### Posture
 
-1. **Admin UI never on public internet via untrusted paths.** The Caddy `basicauth` gate plus Authentik's admin-MFA flow plus a long random password are the layers.
-2. **Version-pin in the quadlet, drop AutoUpdate** on the Authentik image. Subscribe to goauthentik.io/security advisories; alert on new CVEs into the same channel as bootc rebuild alerts.
-3. **Audit logging via alloy → Loki for every authz event.** Overlaps with `config-deviation-audit` t10 in the immutable tree.
-4. **Set `AUTHENTIK_LISTEN__TRUSTED_PROXY_CIDRS` correctly** to Caddy's internal CIDR (CVE-2024-47070 mitigation).
-5. **No public exposure of admin API.** `/api/v3/*` is reachable only via the same paths gated by basicauth.
+| Decision | Value |
+|---|---|
+| Tailscale not load-bearing | Admin/auth/recovery paths must work without Tailscale. |
+| No split identity | All login through Kratos. Bitwarden master password is the one intentional exception. |
+| Upstream contributions | Likely target: glauth-kratos backend as upstream embedded plugin contribution. The plugin has standalone value beyond our kit. |
 
-## Family UX
+## Adversarial review findings folded in
 
-1. iPad / iPhone opens `home.dunn.dev` (PWA on home screen)
-2. Page renders dunn.dev brand → "Sign in" button visible (pre-auth state)
-3. Tap Sign In → redirect to `auth.dunn.dev` (briefly visible URL change)
-4. Authentik login UI (branded via custom CSS) → conditional UI passkey autofill → Face ID / Touch ID
-5. Redirect back to `home.dunn.dev` → tile grid renders based on group membership (post-auth state)
-6. Tap tile → app-side OIDC redirect → already authenticated → app loads
+The full review is at `lab/docs/adversarial-review.md`. Highlights:
 
-Steps 3-5 happen in ~1-2 seconds. Standard SSO bounce pattern; no confusing intermediate auth screens.
+- **CRITICAL: Kratos AAL is global-or-per-flow, not per-route.** Original lock said "Caddy enforces AAL2 on /admin/*"; corrected to app-layer SSR guard.
+- **CRITICAL: glauth uses Handler interface (since v2.4), not Backend.** Original lock said "Backend, runtime .so"; corrected to "Handler, embedded plugin (compile-time)".
+- **HIGH: Magic-link recovery is deprecated.** Use code strategy.
+- **HIGH: Hydra schema migration is not automatic.** Added `hydra-migrate` init container.
+- **HIGH: Kratos courier must be singleton.** Configured replica:1.
+- **HIGH: `secrets.system` is non-rotatable.** Documented prominently.
+- **HIGH: `skip_consent` threat model gap acknowledged.** Stolen session = tokens for all 16 apps; acceptable at family scale, revisit if any app gains banking-tier ops.
 
 ## What's in this repo (IaC structure)
 
 ```
 auth/
-├── docs/                       # this file + architecture + contribution-strategy + substrate-comparison
-├── authentik/
-│   └── blueprints/             # Authentik IaC: flows, groups, scopes, brand, per-app providers
+├── docs/
+│   ├── decision.md           # this file
+│   ├── architecture.md       # production topology + per-pattern shapes
+│   ├── contribution-strategy.md
+│   ├── substrate-comparison.md
+│   └── STATUS.md             # cross-session "where we are" entry point
+├── kratos/
+│   ├── kratos.yml            # server config
+│   ├── identity.schema.json
+│   └── README.md
+├── hydra/
+│   ├── hydra.yml             # server config
+│   ├── clients/              # 11 OIDC client manifests
+│   ├── apply-clients.sh      # idempotent apply against running Hydra
+│   └── README.md
+├── consent/                  # small Go service co-located with Hydra (carmine)
+│   ├── main.go, handlers.go
+│   ├── Containerfile, Makefile, README.md
+│   └── go.mod
+├── ldap-bridge/              # glauth-kratos custom binary
+│   ├── main.go               # imports glauth + our handler
+│   ├── kratos/               # Handler interface implementation
+│   ├── glauth.cfg
+│   ├── Containerfile, Makefile, README.md
+│   └── go.mod
 ├── caddy/
-│   ├── Containerfile           # custom dunn.dev/caddy-estate image, direct go build
+│   ├── Containerfile         # direct go build, one plugin (cloudflare-dns)
 │   ├── Makefile
-│   └── snippets/               # reusable Caddyfile patterns (admin-path, oidc-app, ldap-app, forward-auth)
+│   └── snippets/             # admin-session, oidc-app, ldap-app, forward-auth
+├── portal/                   # Astro UI on Cloudflare Workers
+│   ├── astro.config.mjs, wrangler.toml, package.json
+│   ├── src/
+│   │   ├── lib/{kratos,admin}.ts
+│   │   └── pages/{index,auth/*,admin/*}.astro
+│   ├── public/.well-known/webfinger
+│   └── README.md
 ├── lab/
-│   ├── compose/                # docker-compose stack for GCP-based pattern validation
-│   ├── scripts/                # gcp.sh, deploy.sh, smoke.sh, configure-apps.sh, set-passwords.sh
-│   ├── tests/                  # Playwright suite
-│   ├── Makefile
-│   └── docs/                   # eval-*.md per-candidate evaluations + research findings
-├── portal/                     # Astro home portal (three-state)
+│   ├── compose/              # Kratos+Hydra+bridge+consent+caddy+app stubs
+│   ├── scripts/              # gcp.sh, deploy.sh, smoke.sh
+│   ├── tests/                # Playwright suite (port from bench-sso-iac)
+│   └── docs/                 # eval-*.md, feasibility-q*.md, adversarial-review.md
 └── upstream/
-    └── firstyear-walk/         # historical context for the kanidm rejection
+    └── firstyear-walk/       # historical kanidm rejection evidence
 ```
+
+## Family UX
+
+```
+Mom opens iPad → home.dunn.dev (PWA on home screen)
+  ↓
+Three states by Kratos /health reachability:
+  1. Pre-auth: dunn.dev brand + "Sign in" button
+  2. Post-auth: tile launcher filtered by metadata_admin.groups
+  3. Infra-down: friendly status panel
+  ↓
+Sign in: Astro page calls Kratos API flow → WebAuthn challenge → Face ID
+  ↓
+Tile tap → app's OIDC redirect → Hydra (login_challenge → consent service auto-accepts)
+        → app session via standard OIDC code exchange
+```
+
+Steps 4-6 happen in ~1-2 seconds. Standard SSO bounce; brief auth.dunn.dev URL shift; no Cloudflare challenges, no consent screens for trusted apps.
 
 ## Reversibility
 
-Reversible at any time by re-evaluating substrate. The eval evidence is durable in this repo. If Authentik's commercial trajectory makes free-tier insufficient for our needs, kanidm becomes the documented fallback (with the bus-factor and AI-ban tradeoffs accepted). Bench harness is reusable for either substrate.
-
-## Memory pointers
-
-- Cloudflare role: DNS-only, no proxy/tunnel in request path → `feedback`/`project` memory updated
-- Authentik substrate + hardening package → `project` memory updated
-- kanidm evaluated and rejected → `project` memory updated with link to substrate-comparison
+If lab outcomes are red on the load-bearing parts (LDAP bridge BIND mechanism, Astro+Kratos cross-subdomain, Hydra `skip_consent` semantics), the documented fallback is **kanidm** (single binary, opinionated-secure, but bus-factor and AI-ban tradeoffs accepted in exchange for substrate quality). Bench harness is reusable for either substrate. Eval evidence is durable in `lab/docs/`.

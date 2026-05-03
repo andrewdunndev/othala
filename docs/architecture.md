@@ -1,169 +1,149 @@
 # Architecture
 
-Final shape after substrate evaluation. Authentik IDP, custom Caddy with cloudflare DNS-01, DNS-only Cloudflare in front, port-forward 443 on home router. No CF Tunnel, no CF Access, no third-party in the auth path.
+Production topology after the locked Ory pivot. Custom Caddy image (direct go build), DNS-only Cloudflare in front, port-forward 443 on home router, Kratos + Hydra + glauth-kratos + consent service on carmine, Astro UI on Cloudflare Workers.
 
-## Production topology
+## Topology
 
 ```
-internet
-  │
-  ↓
-DNS lookup → Cloudflare DNS (gray cloud, no proxy)
-  │
-  ↓
-home IP : 443 (port-forwarded on home router)
-  │
-  ↓
-carmine
-  ├─→ Envoy (L4 SNI router on 80/443)
-  ├─→ per-pod Caddy sidecars (TLS via DNS-01 ACME, custom dunn.dev/caddy-estate image)
-  ├─→ Authentik pod
-  │     ├─ authentik-server (auth.dunn.dev)
-  │     ├─ authentik-worker
-  │     ├─ postgres
-  │     └─ proxy outpost (used by tune, gather)
-  ├─→ Jellyfin pod
-  │     ├─ jellyfin
-  │     └─ LDAP outpost (co-located, queries authentik-server over network)
-  └─→ all other app pods (per-service users, rootless podman)
+                           home.dunn.dev (Cloudflare Workers + static assets)
+                           ├─ /                       three-state landing/launcher
+                           ├─ /auth/{login,recovery,settings,verification,consent}
+                           ├─ /admin/{users,groups,oauth2,activity}  (SSR + AAL2 guard)
+                           └─ /.well-known/webfinger  (static JSON for Tailscale)
+                                  │
+                                  │ fetch() to Kratos public API
+                                  │ fetch() to consent service for OIDC handoff
+                                  ↓
+                           Cloudflare DNS (gray cloud, no proxy)
+                                  │
+                                  ↓
+                           home IP : 443 (port-forwarded)
+                                  │
+                                  ↓
+                           carmine
+                             ├─ Envoy (L4 SNI router on 80/443)
+                             ├─ per-pod Caddy sidecars (dunn.dev/caddy-estate, DNS-01 ACME)
+                             ├─ auth pod
+                             │    ├─ kratos (4433 public, 4434 admin)
+                             │    ├─ kratos-courier (singleton, sends recovery emails)
+                             │    ├─ hydra (4444 public, 4445 admin internal-only)
+                             │    ├─ hydra-migrate (init container, schema migrations)
+                             │    ├─ consent service (4477 internal; carmine pod-network)
+                             │    └─ postgres (kratos + hydra databases)
+                             ├─ jellyfin pod
+                             │    ├─ jellyfin
+                             │    └─ glauth-kratos bridge (LDAPS 636 in-pod)
+                             └─ all other app pods
+                                  ├─ caddy sidecar (TLS via DNS-01 ACME)
+                                  └─ app container
 
-home.dunn.dev (Cloudflare Pages, edge-cached)
-  └─→ three-state Astro app (pre-auth / post-auth tiles / infra-down)
-       OIDC RP against Authentik
-       Cloudflare Worker polls authentik /health, stores in Workers KV
+home portal health check:
+  Cloudflare Worker (cron) → kratos:4434/health/ready → Workers KV
+  index.astro → reads KV → state determination
 ```
 
-Cloudflare's only roles: DNS hosting, DNS-01 ACME via API, hosting the home portal Astro on Pages. None of these are in the synchronous auth request path.
+## Cloudflare's role
+
+DNS hosting + DNS-01 ACME via API + hosting the home portal Astro on Workers + a single cron Worker for the health check. **Not in the auth or app request path.** Never sees TLS plaintext for app/auth flows.
 
 ## Bootstrap order on carmine
 
-1. carmine boots (bootc immutable image, ZFS pools imported, networking up)
-2. **Authentik pod starts** — first auth-related service
-3. Caddy sidecars obtain DNS-01 certs via Cloudflare API for `*.dunn.dev`
-4. App pods come up as Authentik OIDC clients (or LDAP via outpost for Jellyfin)
-5. Tailscale joins the mesh as an Authentik OIDC client (Tailscale's custom OIDC pattern with WebFinger)
-6. home.dunn.dev (Cloudflare Pages) reachable from the internet directly; OIDC redirects to auth.dunn.dev work
+1. Carmine boots (bootc immutable image, ZFS pools, networking)
+2. Postgres pod up
+3. **Hydra schema migration** (init container; runs `hydra migrate sql up`)
+4. Kratos + Hydra serve up
+5. Consent service up
+6. Caddy sidecars obtain DNS-01 certs
+7. App pods come up as Hydra OIDC clients (or LDAP via bridge for Jellyfin)
+8. Tailscale joins as Hydra OIDC client (custom-OIDC + WebFinger)
 
-Tailscale is not load-bearing. Admin paths work without it (basicauth gate at Caddy + Authentik OIDC + admin-MFA flow).
+Tailscale is not load-bearing. Admin paths work without it.
 
 ## Auth patterns
 
-### OIDC native
+### OIDC native — keep, larder, listen, memory, vault, library, forge, observe
 
-Apps with built-in OIDC support point at `https://auth.dunn.dev/application/o/<slug>/.well-known/openid-configuration` and exchange auth codes for tokens. ID token carries `groups` claim for app-side authz.
-
-Apps: Vaultwarden, Mealie, Audiobookshelf, Immich, BookLore, oCIS, Grafana, GitLab, vLLM (client-credentials variant), Tailscale.
-
-Pattern (per-pod Caddyfile):
-
+Per-app Caddyfile snippet:
 ```caddyfile
 keep.dunn.dev {
-  tls { dns cloudflare {env.CF_API_TOKEN} }
-  reverse_proxy vaultwarden:80
+  import oidc-app vaultwarden 80
 }
 ```
 
-The app handles its own OIDC redirect; Caddy is a plain proxy.
+App handles its own OIDC redirect to `https://auth.dunn.dev/oauth2/auth?...`, exchanges code for tokens via `https://auth.dunn.dev/oauth2/token`. Caddy is just the TLS terminator + reverse proxy.
 
-### LDAP outpost (Jellyfin only)
+### LDAP outpost — cinema (Jellyfin)
 
-Authentik LDAP outpost runs as a separate process. In production, the outpost is **co-located in the Jellyfin pod**: LDAP queries are localhost-to-localhost; the outpost queries back to authentik-server on the network for user data. Single source of truth (Authentik), local LDAP for Jellyfin's plugin.
+The glauth-kratos bridge co-located in the Jellyfin pod presents identities over LDAPS:636. Jellyfin's LDAP plugin binds against `localhost:636`. Bridge translates BIND to a Kratos public-API login flow; SEARCH to Kratos admin-API identity listing.
 
-Pattern:
-
+Per-app Caddyfile:
 ```caddyfile
 cinema.dunn.dev {
-  tls { dns cloudflare {env.CF_API_TOKEN} }
-  reverse_proxy jellyfin:8096
+  import ldap-app jellyfin 8096
 }
 ```
 
-LDAP traffic is internal to the pod, doesn't traverse Caddy. Apple TV / Infuse SSO works through Jellyfin's LDAP plugin.
+LDAP traffic never hits Caddy.
 
-### Forward auth (Navidrome, Gather)
+### Forward auth — tune (Navidrome), gather/* (Sonarr, Radarr, etc.)
 
-Caddy redirects unauthenticated traffic to the Authentik proxy outpost. The outpost validates the session and returns identity headers; Caddy passes those to the upstream app.
-
-Pattern:
+Caddy forward_auth against Kratos `/sessions/whoami`. Subsonic API and shares bypass auth (native clients use HTTP Basic).
 
 ```caddyfile
 tune.dunn.dev {
-  tls { dns cloudflare {env.CF_API_TOKEN} }
-
-  # Outpost endpoints (login, callback, sign-out)
-  handle /outpost.goauthentik.io/* {
-    reverse_proxy authentik-server:9000
-  }
-
-  # Native API bypass — Subsonic clients use HTTP Basic
   @subsonic path /rest/* /share/*
   handle @subsonic {
     reverse_proxy navidrome:4533
   }
-
-  # Web UI: gated by Authentik forward-auth
   handle {
-    forward_auth authentik-server:9000 {
-      uri /outpost.goauthentik.io/auth/caddy
-      copy_headers X-Authentik-Username X-Authentik-Groups X-Authentik-Email X-Authentik-Name X-Authentik-Uid X-Authentik-Jwt
-      trusted_proxies private_ranges
-    }
-    reverse_proxy navidrome:4533
+    import forward-auth navidrome 4533
   }
 }
 ```
 
-Same pattern for Sonarr, Radarr, sabnzbd, qbittorrent, prowlarr (all under `gather.dunn.dev` paths or per-subdomain).
+### Client-credentials — llm (vLLM)
 
-### Admin path hardening
+Caddy validates the `Authorization: Bearer` token via Hydra's `/admin/oauth2/introspect`. Same in-pod sidecar pattern.
 
-Admin paths (Authentik admin, Vaultwarden admin, GitLab admin, Grafana admin, Jellyfin admin, Immich admin) get a Caddy basicauth layer in addition to Authentik OIDC.
+### Custom OIDC — Tailscale
 
-Pattern (Authentik admin shown; same shape for any admin path):
+Tailscale custom-OIDC against Hydra. Doesn't use PKCE. WebFinger response served as a static JSON file at `home.dunn.dev/.well-known/webfinger`.
 
-```caddyfile
-auth.dunn.dev {
-  tls { dns cloudflare {env.CF_API_TOKEN} }
+## Admin path gating
 
-  @admin path /if/admin/*
-  handle @admin {
-    basicauth {
-      admin {env.ADMIN_BCRYPT_HASH}
-    }
-    reverse_proxy authentik-server:9000
-  }
-
-  reverse_proxy authentik-server:9000
-}
+```
+Family member hits home.dunn.dev/admin/*
+  ↓
+Caddy forward_auth → Kratos /sessions/whoami
+  - 401: redirect to home.dunn.dev/auth/login
+  - 200: user is authenticated (any AAL); pass through
+  ↓
+Astro SSR page (admin/*.astro) calls requireAdminSession(Astro):
+  - whoami again on the SSR side
+  - Identity must be in admin group (metadata_admin.groups includes "admin")
+  - authenticator_assurance_level must be aal2
+    - If aal1: redirect to https://auth.dunn.dev/self-service/login/browser?refresh=true&aal=aal2&return_to=...
+  ↓
+On aal2: render admin UI
 ```
 
-64-char random password lives in Bitwarden. Bcrypt's natural CPU slowness is the brute-force cap.
-
-For app-level admin paths (e.g., Grafana `/admin`, Immich `/admin`), the same pattern wraps the path matcher in the relevant pod's Caddyfile.
+Per adversarial review: AAL is enforced at the SSR layer because Kratos AAL is per-flow, not per-route. Caddy alone can't conditionally gate on JSON-body claims.
 
 ## Group model
 
-| Type | Examples | Used for |
-|---|---|---|
-| Identity | admin, family, friends, kids | Who you are; controls Authentik admin panel access, recovery flows |
-| Access | access-keep, access-larder, access-listen, access-cinema, access-tune, access-memory, access-vault, access-gather, access-library, access-llm | What you can reach; per-app authz |
+Two types of groups in `metadata_admin.groups[]`:
 
-Tile launcher in home.dunn.dev renders only tiles for `access-*` groups the user is a member of. Apps enforce authz both at the OIDC `groups` claim and at the proxy (forward-auth `trusted_proxies` + Authentik group membership policies).
+**Identity groups** — who you are: `admin`, `family`, `friends`, `kids` (deferred).
 
-## Home portal three-state design
+**Access groups** — what you can reach (one per app):
+`access-keep`, `access-larder`, `access-listen`, `access-cinema`, `access-tune`, `access-memory`, `access-vault`, `access-gather`, `access-library`, `access-llm`, `access-forge`, `access-observe`.
 
-```
-home.dunn.dev (Cloudflare Pages, edge-cached)
+The home portal tile launcher renders only tiles for `access-*` groups the user is in. Apps enforce authz reading the OIDC `groups` claim (injected by the consent service from `metadata_admin.groups`).
 
-  on load: fetch /api/health (CF Worker reads Authentik /health from Workers KV)
+## Custom Caddy image
 
-  ├─→ Authentik unreachable → STATE 1: status panel
-  ├─→ no Authentik session  → STATE 2: passkey-prompt login (Sign In button → bounce)
-  └─→ valid session         → STATE 3: tile grid filtered by groups claim
-```
-
-CF Worker pings Authentik `/health` on a 30s cron, stores `{status, last_seen}` in Workers KV. Astro page reads from KV at load time, not from carmine directly. Edge-fast for visitors, doesn't hammer carmine during family page-refresh storms.
+`dunn.dev/caddy-estate`: built directly via `go build` from upstream Caddy + plugin Go modules (no xcaddy). One plugin: `caddy-dns/cloudflare`. Forward-auth via Caddy's built-in `forward_auth` directive against Kratos.
 
 ## Reversibility
 
-If Authentik's commercial trajectory degrades the free-tier offering meaningfully, the eval evidence in `lab/docs/eval-*.md` and `docs/substrate-comparison.md` becomes the playbook for the next move. kanidm is the documented fallback (with bus-factor and AI-ban tradeoffs accepted in exchange for substrate quality).
+If lab outcomes red, fallback is kanidm (single-binary, bus-factor and AI-ban accepted in exchange for substrate quality). Bench harness reusable. Eval evidence in `lab/docs/`.

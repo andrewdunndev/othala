@@ -1,0 +1,32 @@
+---
+// Admin: groups overview. Lists known groups (from configured catalog
+// + observed in metadata_admin), with member counts.
+// Status: skeleton.
+export const prerender = false;
+
+import { requireAdminSession, listIdentities } from '../../lib/admin';
+
+const guard = await requireAdminSession(Astro);
+if (guard instanceof Response) return guard;
+
+const KNOWN_GROUPS = [
+  'admin', 'family', 'friends', 'kids',
+  'access-keep', 'access-larder', 'access-listen', 'access-cinema',
+  'access-tune', 'access-memory', 'access-vault', 'access-gather',
+  'access-library', 'access-llm', 'access-forge', 'access-observe',
+];
+
+// TODO: count members per group from listIdentities
+---
+<!doctype html>
+<html lang="en">
+<head><meta charset="utf-8" /><title>Groups — Admin — Dunn Family</title></head>
+<body class="bg-paper text-ink">
+  <main class="mx-auto max-w-2xl p-8">
+    <h1 class="text-2xl font-mono">Groups</h1>
+    <ul class="mt-6">
+      {KNOWN_GROUPS.map(g => <li class="py-1">{g}</li>)}
+    </ul>
+  </main>
+</body>
+</html>

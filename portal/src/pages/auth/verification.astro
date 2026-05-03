@@ -1,0 +1,24 @@
+---
+// Email verification flow handler — used after recovery and onboarding
+// to confirm the user owns the email address.
+//
+// Status: skeleton. Real implementation in Phase 3.
+
+export const prerender = false;
+
+const flowId = Astro.url.searchParams.get('flow');
+---
+
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>Verify email — Dunn Family</title>
+</head>
+<body class="bg-paper text-ink">
+  <main class="mx-auto max-w-md p-8">
+    <h1 class="text-2xl font-mono">Verify email</h1>
+    <!-- TODO -->
+  </main>
+</body>
+</html>

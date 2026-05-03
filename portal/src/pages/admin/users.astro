@@ -1,0 +1,52 @@
+---
+// Admin: list users.
+// Reads from Kratos admin /admin/identities.
+// Status: skeleton.
+export const prerender = false;
+
+import { requireAdminSession, listIdentities } from '../../lib/admin';
+
+const guard = await requireAdminSession(Astro);
+if (guard instanceof Response) return guard;
+
+let identities: any[] = [];
+try {
+  identities = await listIdentities() as any[];
+} catch (err) {
+  // TODO: error UI
+}
+---
+<!doctype html>
+<html lang="en">
+<head><meta charset="utf-8" /><title>Users — Admin — Dunn Family</title></head>
+<body class="bg-paper text-ink">
+  <main class="mx-auto max-w-4xl p-8">
+    <h1 class="text-2xl font-mono">Users</h1>
+    <a href="/admin/users/new" class="text-secondary">+ New user</a>
+    <table class="mt-6 w-full">
+      <thead>
+        <tr class="border-b border-rules">
+          <th class="text-left py-2">Username</th>
+          <th class="text-left py-2">Email</th>
+          <th class="text-left py-2">Groups</th>
+          <th></th>
+        </tr>
+      </thead>
+      <tbody>
+        {identities.map(i => (
+          <tr class="border-b border-rules/50">
+            <td class="py-2">{i.traits?.username}</td>
+            <td class="py-2">{i.traits?.email}</td>
+            <td class="py-2 text-sm text-secondary">
+              {(i.metadata_admin?.groups ?? []).join(', ')}
+            </td>
+            <td class="py-2">
+              <a href={`/admin/users/${i.id}`} class="text-secondary">edit</a>
+            </td>
+          </tr>
+        ))}
+      </tbody>
+    </table>
+  </main>
+</body>
+</html>

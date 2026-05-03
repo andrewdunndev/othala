@@ -1,0 +1,33 @@
+# glauth-kratos: custom glauth binary with Kratos backend embedded.
+# Built directly via go build (no helper tool), same pattern as the
+# custom Caddy image.
+
+ARG GO_VERSION=1.22
+ARG ALPINE_VERSION=3.19
+
+FROM docker.io/library/golang:${GO_VERSION}-alpine${ALPINE_VERSION} AS builder
+
+ARG GLAUTH_VERSION=v2.5.0
+
+WORKDIR /build
+
+COPY go.mod go.sum* ./
+COPY main.go ./
+COPY kratos/ ./kratos/
+
+RUN go mod download
+RUN CGO_ENABLED=0 GOOS=linux go build -trimpath -ldflags='-s -w' -o glauth-kratos .
+
+FROM docker.io/library/alpine:${ALPINE_VERSION}
+
+RUN apk add --no-cache ca-certificates
+
+COPY --from=builder /build/glauth-kratos /usr/bin/glauth-kratos
+
+# LDAPS port
+EXPOSE 636
+# LDAP port (in-pod use only)
+EXPOSE 389
+
+ENTRYPOINT ["/usr/bin/glauth-kratos"]
+CMD ["--config", "/etc/glauth/glauth.cfg"]

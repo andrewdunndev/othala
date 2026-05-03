@@ -1,0 +1,31 @@
+---
+// Settings flow handler — passkey enrollment, password change, profile.
+//
+// Reads flow state from Kratos /self-service/settings/api?flow=<id>
+// Renders sections per available methods:
+//   - Password: change form
+//   - WebAuthn: list enrolled passkeys + "enroll new" button
+//   - TOTP: enroll/show/remove
+//   - Profile: edit displayName, recoveryEmail
+//
+// Status: skeleton. Real implementation in Phase 3.
+
+export const prerender = false;
+
+const flowId = Astro.url.searchParams.get('flow');
+---
+
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>Account settings — Dunn Family</title>
+</head>
+<body class="bg-paper text-ink">
+  <main class="mx-auto max-w-2xl p-8">
+    <h1 class="text-2xl font-mono">Account settings</h1>
+
+    <!-- TODO: sections for password / passkeys / TOTP / profile -->
+  </main>
+</body>
+</html>

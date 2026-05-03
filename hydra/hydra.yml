@@ -1,0 +1,82 @@
+# Hydra configuration — dunn.dev family OAuth2/OIDC IDP
+
+dsn: postgres://hydra:${HYDRA_PG_PASS}@postgres:5432/hydra?sslmode=disable
+
+serve:
+  public:
+    port: 4444
+    cors:
+      enabled: true
+      allowed_origins:
+        - https://home.dunn.dev
+      allowed_methods: [GET, POST, PUT, DELETE]
+      allowed_headers:
+        - Authorization
+        - Content-Type
+      allow_credentials: true
+  admin:
+    port: 4445
+    # Admin port is internal-only on the carmine pod network.
+    # Reachable from the consent service co-located on carmine.
+    # NEVER expose publicly.
+
+urls:
+  self:
+    issuer: https://auth.dunn.dev/
+    public: https://auth.dunn.dev/
+
+  # Login flow handled by Kratos, but Hydra needs to know where to send
+  # the user when they need to authenticate. The Astro UI at home.dunn.dev
+  # handles the login_challenge by checking the Kratos session and
+  # accepting/rejecting via the Hydra admin API (called from the consent
+  # service on carmine, not from the Workers edge).
+  login: https://home.dunn.dev/auth/login
+  consent: https://home.dunn.dev/auth/consent
+  logout: https://home.dunn.dev/auth/logout
+  error: https://home.dunn.dev/auth/error
+  post_logout_redirect: https://home.dunn.dev/
+
+oidc:
+  subject_identifiers:
+    supported_types:
+      - public
+    pairwise:
+      # Required by config schema even when pairwise is unused
+      salt: ${HYDRA_PAIRWISE_SALT}
+
+ttl:
+  access_token: 1h
+  refresh_token: 720h    # 30 days
+  id_token: 1h
+  auth_code: 10m
+  login_consent_request: 1h
+
+oauth2:
+  pkce:
+    enforced: false                    # Tailscale doesn't do PKCE
+    enforced_for_public_clients: false
+  hashers:
+    bcrypt:
+      cost: 10
+  expose_internal_errors: false
+  client_credentials:
+    default_grant_allowed_scope: false
+  grant:
+    jwt:
+      max_ttl: 720h
+      iat_optional: false
+      jti_optional: false
+
+secrets:
+  # CRITICAL: secrets.system is non-rotatable for the life of the Hydra DB.
+  # Generate once, store in Bitwarden as the canonical source. Never change
+  # without rebuilding the database.
+  system:
+    - ${HYDRA_SYSTEM_SECRET}
+  cookie:
+    - ${HYDRA_COOKIE_SECRET}
+
+log:
+  level: info
+  format: json
+  leak_sensitive_values: false

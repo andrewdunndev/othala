@@ -1,0 +1,16 @@
+client_name: Grafana
+client_id: observe
+grant_types:
+  - authorization_code
+  - refresh_token
+response_types:
+  - code
+scope: openid email profile groups offline_access
+redirect_uris:
+  - https://observe.dunn.dev/login/generic_oauth
+post_logout_redirect_uris:
+  - https://observe.dunn.dev/
+token_endpoint_auth_method: client_secret_basic
+skip_consent: true
+audience:
+  - https://observe.dunn.dev
