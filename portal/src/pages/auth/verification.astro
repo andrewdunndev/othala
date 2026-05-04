@@ -12,47 +12,65 @@
 export const prerender = false;
 
 import Layout from '../../layouts/Layout.astro';
+import markSvg from '@dunn.dev/design/mark/mark.svg?raw';
 import { browserFlows, getVerificationFlow } from '../../lib/kratos';
 import { csrfToken, hasMethod, nodesByGroup, asInput } from '../../lib/nodes';
+import type { FlowMessage } from '../../lib/types';
 
 const flowId = Astro.url.searchParams.get('flow');
+const isDev = import.meta.env.DEV;
 
-if (!flowId) {
+if (!flowId && !isDev) {
   return Astro.redirect(browserFlows.verification());
 }
 
 const cookie = Astro.request.headers.get('cookie') ?? undefined;
-const result = await getVerificationFlow(flowId, cookie);
+const result = flowId ? await getVerificationFlow(flowId, cookie).catch(() => null) : null;
 
-if (result.kind !== 'ok') {
+if (flowId && (!result || result.kind !== 'ok') && !isDev) {
   return Astro.redirect(browserFlows.verification());
 }
 
-const flow = result.flow;
-const ui = flow.ui;
-const csrf = csrfToken(ui.nodes);
-const hasCode = hasMethod(ui.nodes, 'code');
+const flow = result && result.kind === 'ok' ? result.flow : null;
+const ui = flow?.ui;
+const csrf = ui ? csrfToken(ui.nodes) : '';
+const hasCode = ui ? hasMethod(ui.nodes, 'code') : true;
 // Kratos verification flow states: choose_method, sent_email, passed_challenge.
 // Map to the two UI shapes recovery uses.
-const phase = flow.state === 'sent_email' ? 'sent' : 'request';
+const phase: 'request' | 'sent' = flow?.state === 'sent_email' ? 'sent' : 'request';
 ---
-<Layout title="Verify email — Dunn Family">
-  <main class="shell shell-sm stack-lg">
-    <header class="stack">
-      <h1>Verify email</h1>
-      <p class="muted text-sm">
-        {phase === 'request' ? 'Enter your email to receive a code.' : 'Enter the code we sent to your email.'}
+<Layout title="Verify email" description="Verify your email address." bare>
+
+  <section class="hero">
+    <span class="hero-mark" set:html={markSvg} />
+    <div>
+      <p class="hero-eyebrow">verify</p>
+      <h1 class="hero-title">Verify your email</h1>
+      <p class="hero-lede">
+        {phase === 'request'
+          ? 'Enter the address you want verified. We will send you a one-time code.'
+          : 'Check your email. Enter the code below to confirm the address.'}
       </p>
-    </header>
+    </div>
+  </section>
 
-    {ui.messages?.map((m) => (
-      <div class={`notice notice-${m.type === 'error' ? 'danger' : m.type === 'success' ? 'success' : 'warning'}`}>
-        {m.text}
-      </div>
-    ))}
+  {ui?.messages?.map((m: FlowMessage) => (
+    <div class={`notice notice-${m.type === 'error' ? 'danger' : m.type === 'success' ? 'success' : 'warning'}`}>
+      {m.text}
+    </div>
+  ))}
 
-    {hasCode && (
-      <form method="POST" action={ui.action} class="stack-lg">
+  {!flow && isDev && (
+    <div class="notice notice-warning" style="margin-bottom: var(--space-6);">
+      Dev preview: no Kratos flow available. Submitting will not work
+      without a live flow.
+    </div>
+  )}
+
+  <section class="verify-card">
+
+    {hasCode && ui && (
+      <form method="POST" action={ui.action} class="verify-form">
         <input type="hidden" name="csrf_token" value={csrf} />
         <input type="hidden" name="method" value="code" />
         {nodesByGroup(ui.nodes, 'code').map((n) => {
@@ -63,7 +81,7 @@ const phase = flow.state === 'sent_email' ? 'sent' : 'request';
           }
           if (a.type === 'submit' || a.type === 'button') {
             return (
-              <button class="button button-primary" type={a.type}
+              <button class="button button-primary verify-primary" type={a.type}
                       name={a.name} value={String(a.value ?? '')}>
                 {n.meta?.label?.text ?? (phase === 'request' ? 'Send code' : 'Verify code')}
               </button>
@@ -87,8 +105,60 @@ const phase = flow.state === 'sent_email' ? 'sent' : 'request';
       </form>
     )}
 
-    <footer class="stack" style="font-size: var(--text-sm);">
-      <a class="subtle mono" href="/auth/login">Back to sign in</a>
-    </footer>
-  </main>
+    {!ui && (
+      <form class="verify-form" onsubmit="return false;">
+        <div class="field">
+          <label for="email">Email</label>
+          <input id="email" name="email" type="email" disabled />
+        </div>
+        <button class="button button-primary verify-primary" type="button" disabled>
+          Send code
+        </button>
+      </form>
+    )}
+
+  </section>
+
+  <footer class="verify-footer">
+    <a href="/auth/login" class="verify-foot-link">Back to sign in</a>
+  </footer>
+
 </Layout>
+
+<style>
+  .verify-card {
+    max-width: 28rem;
+    margin: 0 auto;
+    padding: var(--space-6);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    background: var(--surface);
+  }
+  .verify-form {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-4);
+  }
+  .verify-primary {
+    width: 100%;
+    padding: var(--space-4);
+    font-size: var(--text-base);
+  }
+
+  .verify-footer {
+    max-width: 28rem;
+    margin: var(--space-5) auto 0;
+    display: flex;
+    justify-content: center;
+    font-family: var(--font-mono);
+    font-size: var(--text-xs);
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+  }
+  .verify-foot-link { color: var(--text-muted); text-decoration: none; }
+  .verify-foot-link:hover { color: var(--accent); text-decoration: none; }
+
+  @media (max-width: 640px) {
+    .verify-card { padding: var(--space-5); }
+  }
+</style>

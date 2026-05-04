@@ -13,71 +13,97 @@
 //   - Password fallback (password group): username + password
 //
 // AAL2 step-up: ?aal=aal2 / ?refresh=true pass through to Kratos.
+//
+// Layout: passkey is the headline method; password is collapsed into a
+// disclosure so the page reads as one decision, not two competing forms.
 
 export const prerender = false;
 
 import Layout from '../../layouts/Layout.astro';
+import markSvg from '@dunn.dev/design/mark/mark.svg?raw';
 import { browserFlows, getLoginFlow } from '../../lib/kratos';
 import { csrfToken, hasMethod, nodesByGroup, asInput, scriptNodes } from '../../lib/nodes';
+import type { FlowMessage } from '../../lib/types';
 
 const url = Astro.url;
 const flowId = url.searchParams.get('flow');
 const aal = (url.searchParams.get('aal') as 'aal1' | 'aal2' | null) ?? undefined;
 const refresh = url.searchParams.get('refresh') === 'true';
 const returnTo = url.searchParams.get('return_to') ?? undefined;
+const isDev = import.meta.env.DEV;
 
-if (!flowId) {
+// Dev fallback: when Kratos isn't reachable from `npm run dev`, the
+// browser-flow redirect would leave the page on a dead URL. Skip the
+// redirect in dev so the layout work is visible without the substrate.
+if (!flowId && !isDev) {
   return Astro.redirect(browserFlows.login({ aal, refresh, returnTo }));
 }
 
 const cookie = Astro.request.headers.get('cookie') ?? undefined;
-const result = await getLoginFlow(flowId, cookie);
 
-if (result.kind !== 'ok') {
+const result = flowId ? await getLoginFlow(flowId, cookie).catch(() => null) : null;
+
+if (flowId && (!result || result.kind !== 'ok') && !isDev) {
   return Astro.redirect(browserFlows.login({ aal, refresh, returnTo }));
 }
 
-const flow = result.flow;
-const ui = flow.ui;
-const csrf = csrfToken(ui.nodes);
-const hasPasskey = hasMethod(ui.nodes, 'passkey');
-const hasPassword = hasMethod(ui.nodes, 'password');
-const scripts = scriptNodes(ui.nodes);
+// Guard: dev mode without a real flow renders a static preview of the
+// page. No real form posts will work but the chrome and rhythm do.
+const flow = result && result.kind === 'ok' ? result.flow : null;
+const ui = flow?.ui;
+const csrf = ui ? csrfToken(ui.nodes) : '';
+const hasPasskey = ui ? hasMethod(ui.nodes, 'passkey') : true;
+const hasPassword = ui ? hasMethod(ui.nodes, 'password') : true;
+const scripts = ui ? scriptNodes(ui.nodes) : [];
 
 // Identifier input: in identifier_first flows it lives in the default group.
 // In single-step flows it shows up under password. Either way we surface it
 // once and reuse the value across forms.
-const identifierInput =
+const identifierInput = ui ? (
   nodesByGroup(ui.nodes, 'default').map(asInput).find((a) => a?.name === 'identifier') ||
   nodesByGroup(ui.nodes, 'password').map(asInput).find((a) => a?.name === 'identifier') ||
-  null;
+  null
+) : null;
 
-const passwordInput =
-  nodesByGroup(ui.nodes, 'password').map(asInput).find((a) => a?.name === 'password') || null;
+const passwordInput = ui
+  ? nodesByGroup(ui.nodes, 'password').map(asInput).find((a) => a?.name === 'password') || null
+  : null;
 ---
-<Layout title="Sign in — Dunn Family">
-  <main class="shell shell-sm stack-lg">
-    <header class="stack">
-      <h1>Sign in</h1>
-      {aal === 'aal2' && (
-        <p class="muted text-sm">Additional verification required for admin access.</p>
-      )}
-    </header>
+<Layout title="Sign in" description="Sign in to home.dunn.dev." bare>
 
-    {ui.messages?.map((m) => (
-      <div class={`notice notice-${m.type === 'error' ? 'danger' : m.type === 'success' ? 'success' : 'warning'}`}>
-        {m.text}
-      </div>
-    ))}
+  <section class="hero">
+    <span class="hero-mark" set:html={markSvg} />
+    <div>
+      <p class="hero-eyebrow">sign in</p>
+      <h1 class="hero-title">Welcome back, family.</h1>
+      <p class="hero-lede">
+        {aal === 'aal2'
+          ? 'Additional verification is required to continue.'
+          : 'Use a passkey for the smoothest sign-in. Password works too.'}
+      </p>
+    </div>
+  </section>
+
+  {ui?.messages?.map((m: FlowMessage) => (
+    <div class={`notice notice-${m.type === 'error' ? 'danger' : m.type === 'success' ? 'success' : 'warning'}`}>
+      {m.text}
+    </div>
+  ))}
+
+  {!flow && isDev && (
+    <div class="notice notice-warning" style="margin-bottom: var(--space-6);">
+      Dev preview: no Kratos flow available. The form below is the static
+      layout; submissions will not work without a live flow.
+    </div>
+  )}
+
+  <section class="login-card">
 
     {hasPasskey && (
-      <form method="POST" action={ui.action} class="stack-lg">
+      <form method="POST" action={ui?.action ?? '#'} class="login-block">
         <input type="hidden" name="csrf_token" value={csrf} />
         <input type="hidden" name="method" value="passkey" />
 
-        {/* Conditional-UI host. autocomplete="username webauthn" tells the
-            browser to surface stored passkeys via autofill so the user
-            does not need to type a name first. */}
         <div class="field">
           <label for="identifier">Username</label>
           <input
@@ -87,12 +113,13 @@ const passwordInput =
             autocomplete="username webauthn"
             value={identifierInput?.value ? String(identifierInput.value) : ''}
           />
-          <span class="field-hint">Or click below to use a passkey directly.</span>
+          <span class="field-hint">
+            With a registered passkey on this device, your browser will
+            offer to sign you in automatically.
+          </span>
         </div>
 
-        {/* Render passkey-group nodes verbatim from the flow so we don't
-            drift from Kratos's hidden challenge / trigger field names. */}
-        {nodesByGroup(ui.nodes, 'passkey').map((n) => {
+        {ui && nodesByGroup(ui.nodes, 'passkey').map((n) => {
           const a = asInput(n);
           if (!a) return null;
           if (a.type === 'hidden') {
@@ -101,7 +128,7 @@ const passwordInput =
           if (a.type === 'submit' || a.type === 'button') {
             return (
               <button
-                class="button button-primary"
+                class="button button-primary login-primary"
                 type={a.type}
                 name={a.name}
                 value={String(a.value ?? '')}
@@ -113,64 +140,166 @@ const passwordInput =
           }
           return null;
         })}
-      </form>
-    )}
 
-    {hasPasskey && hasPassword && (
-      <div style="display: flex; align-items: center; gap: 0.75rem;">
-        <hr style="flex: 1; border: none; border-top: 1px solid var(--border);" />
-        <span class="muted text-xs mono">or password</span>
-        <hr style="flex: 1; border: none; border-top: 1px solid var(--border);" />
-      </div>
+        {!ui && (
+          /* Static preview when running dev without Kratos. */
+          <button class="button button-primary login-primary" type="button" disabled>
+            Sign in with passkey
+          </button>
+        )}
+      </form>
     )}
 
     {hasPassword && (
-      <form method="POST" action={ui.action} class="stack-lg">
-        <input type="hidden" name="csrf_token" value={csrf} />
-        <input type="hidden" name="method" value="password" />
+      <details class="password-disclosure">
+        <summary class="password-summary">
+          <span class="password-summary-label">Use a password instead</span>
+          <span class="password-summary-icon" aria-hidden="true">+</span>
+        </summary>
 
-        {!hasPasskey && (
+        <form method="POST" action={ui?.action ?? '#'} class="login-block password-form">
+          <input type="hidden" name="csrf_token" value={csrf} />
+          <input type="hidden" name="method" value="password" />
+
+          {!hasPasskey && (
+            <div class="field">
+              <label for="pw-identifier">Username</label>
+              <input
+                id="pw-identifier"
+                name="identifier"
+                type="text"
+                autocomplete="username"
+                required
+                value={identifierInput?.value ? String(identifierInput.value) : ''}
+              />
+            </div>
+          )}
+          {hasPasskey && (
+            <input type="hidden" name="identifier"
+                   value={identifierInput?.value ? String(identifierInput.value) : ''} />
+          )}
+
           <div class="field">
-            <label for="pw-identifier">Username</label>
+            <label for="password">Password</label>
             <input
-              id="pw-identifier"
-              name="identifier"
-              type="text"
-              autocomplete="username"
+              id="password"
+              name="password"
+              type="password"
+              autocomplete={passwordInput?.autocomplete ?? 'current-password'}
               required
-              value={identifierInput?.value ? String(identifierInput.value) : ''}
             />
           </div>
-        )}
-        {hasPasskey && (
-          <input type="hidden" name="identifier"
-                 value={identifierInput?.value ? String(identifierInput.value) : ''} />
-        )}
 
-        <div class="field">
-          <label for="password">Password</label>
-          <input
-            id="password"
-            name="password"
-            type="password"
-            autocomplete={passwordInput?.autocomplete ?? 'current-password'}
-            required
-          />
-        </div>
-
-        <button class={hasPasskey ? 'button button-secondary' : 'button button-primary'} type="submit">
-          Sign in
-        </button>
-      </form>
+          <button class="button button-secondary" type="submit" disabled={!ui}>
+            Sign in with password
+          </button>
+        </form>
+      </details>
     )}
 
-    <footer class="stack" style="font-size: var(--text-sm);">
-      <a class="subtle mono" href="/auth/recovery">Forgot password</a>
-    </footer>
+  </section>
 
-    {/* Kratos-issued scripts (webauthn.js handles the passkey ceremony). */}
-    {scripts.map((s) => (
-      <script src={s.src} id={s.id} async is:inline></script>
-    ))}
-  </main>
+  <footer class="login-footer">
+    <a href="/auth/recovery" class="login-foot-link">Forgot your password</a>
+    <span class="login-foot-sep" aria-hidden="true">·</span>
+    <a href="/" class="login-foot-link">Back home</a>
+  </footer>
+
+  {scripts.map((s) => (
+    <script src={s.src} id={s.id} async is:inline></script>
+  ))}
+
 </Layout>
+
+<style>
+  /* The login card is the focal element on the page; the hero sets the
+   * tone and the card holds the work. Hairline border, generous interior
+   * padding, single accent button. */
+  .login-card {
+    max-width: 32rem;
+    margin: 0 auto;
+    padding: var(--space-6);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    background: var(--surface);
+  }
+  .login-block {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-4);
+  }
+  .login-primary {
+    width: 100%;
+    padding: var(--space-4);
+    font-size: var(--text-base);
+  }
+
+  /* Disclosure: collapsed by default. The summary line reads as a quiet
+   * secondary affordance, expanding into a sibling form. */
+  .password-disclosure {
+    margin-top: var(--space-5);
+    padding-top: var(--space-5);
+    border-top: 1px solid var(--border);
+  }
+  .password-disclosure[open] .password-summary-icon {
+    transform: rotate(45deg);
+  }
+  .password-summary {
+    list-style: none;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--space-3);
+    font-family: var(--font-mono);
+    font-size: var(--text-sm);
+    color: var(--text-2);
+    transition: color var(--duration-fast) var(--ease-out);
+  }
+  .password-summary:hover { color: var(--text); }
+  .password-summary::-webkit-details-marker { display: none; }
+  .password-summary-label {
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    font-size: var(--text-xs);
+  }
+  .password-summary-icon {
+    display: inline-flex;
+    width: 18px;
+    height: 18px;
+    align-items: center;
+    justify-content: center;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    color: var(--text-muted);
+    font-family: var(--font-mono);
+    font-size: var(--text-base);
+    line-height: 1;
+    transition: transform var(--duration-fast) var(--ease-out);
+  }
+  .password-form { margin-top: var(--space-5); }
+
+  /* Footer links sit centered below the card, mono uppercase, light. */
+  .login-footer {
+    max-width: 32rem;
+    margin: var(--space-5) auto 0;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    gap: var(--space-3);
+    font-family: var(--font-mono);
+    font-size: var(--text-xs);
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+  }
+  .login-foot-link {
+    color: var(--text-muted);
+    text-decoration: none;
+  }
+  .login-foot-link:hover { color: var(--accent); text-decoration: none; }
+  .login-foot-sep { color: var(--border); }
+
+  @media (max-width: 640px) {
+    .login-card { padding: var(--space-5); }
+  }
+</style>

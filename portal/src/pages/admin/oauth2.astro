@@ -20,21 +20,23 @@ const guard = await requireAdminSession(Astro);
 if (guard instanceof Response) return guard;
 
 const manifests = loadClientManifests();
+
+const adminNav = [
+  { href: '/admin',          label: 'Overview' },
+  { href: '/admin/users',    label: 'Users' },
+  { href: '/admin/groups',   label: 'Groups' },
+  { href: '/admin/oauth2',   label: 'Apps' },
+  { href: '/admin/activity', label: 'Activity' },
+];
 ---
-<Layout title="Apps — Admin — Dunn Family">
-  <main class="shell shell-lg stack-lg">
-    <header class="stack">
-      <h1>Apps</h1>
-      <nav class="nav-bar">
-        <a href="/admin">Overview</a>
-        <a href="/admin/users">Users</a>
-        <a href="/admin/groups">Groups</a>
-        <a href="/admin/oauth2" aria-current="page">Apps</a>
-      </nav>
-      <p class="muted text-sm">
-        Read-only. Edit <span class="mono">hydra/clients/*.yaml</span> in the
-        auth repo, then run <span class="mono">apply-clients.sh</span> and
-        rebuild the portal.
+<Layout title="Apps — Admin" description="OIDC client manifests." nav={adminNav}>
+  <main class="stack-lg">
+    <header class="page-header">
+      <p class="page-eyebrow">administration · oidc clients</p>
+      <h1 class="page-title">Apps</h1>
+      <p class="page-lede">
+        Read-only. Edit <code>hydra/clients/*.yaml</code> in the auth repo,
+        then run <code>apply-clients.sh</code> and rebuild the portal.
       </p>
     </header>
 

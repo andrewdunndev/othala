@@ -1,43 +1,69 @@
 ---
 // home.dunn.dev — three-state landing/launcher.
 //
-// State A (infra-down):  Kratos unreachable; render holding panel.
-// State B (pre-auth):    Kratos reachable, no session; render Sign In CTA.
-// State C (post-auth):   active session; render tile launcher filtered
-//                        by metadata_admin.groups (the access-* groups).
+// State A (down):     Kratos unreachable. Holding panel: mark + short
+//                     message + thin technical line. Doesn't read as a
+//                     404; reads as "auth services starting up."
+// State B (pre-auth): Kratos reachable, no session. Hero with mark +
+//                     welcome lede + Sign In CTA. Below: a thin section
+//                     explaining what's behind the door.
+// State C (post-auth): active session. Hero with greeting + section
+//                     "your apps" with the tile launcher (filtered to
+//                     access-* groups the user actually has). Admin
+//                     shortcut at the top of the cta row when the user
+//                     is in the admin group.
 //
-// SSR mode required to read the session cookie at request time.
+// Dev preview: when running `astro dev`, State A also surfaces a small
+// panel of every auth flow link so the developer can click through
+// without Kratos. Hidden in production via import.meta.env.DEV.
+//
+// `?dev-state=down|pre-auth|post-auth` lets the developer force a state
+// in the dev server without running Kratos. Honored only when DEV.
+
 export const prerender = false;
 
 import Layout from '../layouts/Layout.astro';
+import markSvg from '@dunn.dev/design/mark/mark.svg?raw';
 import { getSession, isReachable } from '../lib/kratos';
 import type { Identity } from '../lib/types';
 
 type State = 'down' | 'pre-auth' | 'post-auth';
 
 const cookie = Astro.request.headers.get('cookie') ?? undefined;
+const isDev = import.meta.env.DEV;
+const devOverride = isDev ? Astro.url.searchParams.get('dev-state') : null;
 
 let state: State = 'pre-auth';
 let identity: Identity | null = null;
+let downReason = 'Kratos /health/alive unreachable; retrying.';
 
-try {
-  const session = await getSession(cookie);
-  if (session?.active && session.identity) {
-    state = 'post-auth';
-    identity = session.identity;
+if (devOverride === 'down' || devOverride === 'pre-auth' || devOverride === 'post-auth') {
+  state = devOverride;
+  if (state === 'post-auth') {
+    // A plausible mocked identity so the post-auth view renders something
+    // realistic in dev without having to hand-craft a Kratos session.
+    identity = {
+      id: 'dev-mock',
+      traits: { username: 'dev.user', email: 'dev@example.local', displayName: 'Dev User' },
+      metadata_admin: { groups: ['admin', 'family', 'access-memory', 'access-cinema', 'access-tune', 'access-llm'] },
+    } as unknown as Identity;
   }
-} catch {
-  // whoami threw (network error / 5xx). Verify Kratos is up before
-  // declaring the substrate down; a transient cookie issue shouldn't
-  // trigger State A.
-  const ok = await isReachable();
-  state = ok ? 'pre-auth' : 'down';
+} else {
+  try {
+    const session = await getSession(cookie);
+    if (session?.active && session.identity) {
+      state = 'post-auth';
+      identity = session.identity;
+    }
+  } catch (err) {
+    const ok = await isReachable();
+    state = ok ? 'pre-auth' : 'down';
+    if (!ok && err instanceof Error) downReason = err.message;
+  }
 }
 
 // Tile catalog. Order: media first, then utility, then admin-adjacent.
 // Each tile renders only if the user is in the matching access-* group.
-// The two "placeholder" slots from the spec are gather + observe (already
-// listed); future apps slot in by adding rows here.
 const TILES = [
   { slug: 'memory',  name: 'Photos',     icon: 'PH', host: 'memory.dunn.dev',  group: 'access-memory'  },
   { slug: 'listen',  name: 'Audiobooks', icon: 'AB', host: 'listen.dunn.dev',  group: 'access-listen'  },
@@ -57,58 +83,278 @@ const groups = identity?.metadata_admin?.groups ?? [];
 const visibleTiles = state === 'post-auth' ? TILES.filter((t) => groups.includes(t.group)) : [];
 const isAdmin = state === 'post-auth' && groups.includes('admin');
 const displayName = identity?.traits.displayName || identity?.traits.username || '';
+const firstName = displayName.split(' ')[0] || displayName;
+
+// Dev preview: every browser-flow URL the portal hands to Kratos in real life.
+// In production these all redirect through Kratos; in dev (no Kratos), this
+// list lets the developer load the flow handlers directly to see the UI.
+const devLinks = [
+  { href: '/?dev-state=down',      label: 'State A: down (substrate offline)' },
+  { href: '/?dev-state=pre-auth',  label: 'State B: pre-auth (sign in)' },
+  { href: '/?dev-state=post-auth', label: 'State C: post-auth (mocked identity)' },
+  { href: '/auth/login',           label: 'Login flow' },
+  { href: '/auth/settings',        label: 'Settings flow' },
+  { href: '/auth/recovery',        label: 'Recovery flow' },
+  { href: '/auth/verification',    label: 'Verification flow' },
+  { href: '/auth/logout',          label: 'Logout' },
+  { href: '/admin',                label: 'Admin (requires AAL2)' },
+];
 ---
-<Layout title="Dunn Family">
-  <main class="shell shell-lg stack-xl">
-    <header class="stack">
-      <h1>Dunn Family</h1>
-      {state === 'post-auth' && (
-        <p class="muted text-sm mono">Signed in as {displayName}</p>
-      )}
-    </header>
+<Layout title="Home" description="Family SSO for the dunn.dev estate.">
 
-    {state === 'down' && (
-      <section class="panel">
-        <h2>Services starting up</h2>
-        <p class="muted" style="margin-top: 0.5rem;">
-          The home stack is offline or unreachable. This page will refresh shortly.
+  {state === 'down' && (
+    <section class="holding">
+      <span class="holding-mark" set:html={markSvg} />
+      <p class="holding-eyebrow">home.dunn.dev</p>
+      <h1 class="holding-title">Auth services starting up</h1>
+      <p class="holding-prose">
+        The substrate is offline or unreachable. This page will pick the
+        session back up as soon as it returns. If it persists, ask Andrew.
+      </p>
+      <p class="holding-tech">{downReason}</p>
+    </section>
+  )}
+
+  {state === 'pre-auth' && (
+    <>
+      <section class="hero">
+        <span class="hero-mark" set:html={markSvg} />
+        <div>
+          <p class="hero-eyebrow">home.dunn.dev</p>
+          <h1 class="hero-title">Welcome back</h1>
+          <p class="hero-lede">
+            Family SSO for the home estate. One sign-in, every app.
+          </p>
+          <div class="cta-row">
+            <a href="/auth/login" class="button button-primary">Sign in</a>
+            <span class="cta-note mono">passkey or password</span>
+          </div>
+        </div>
+      </section>
+
+      <section class="section">
+        <p class="section-subtitle">What's behind this door</p>
+        <p class="section-prose">
+          A small set of self-hosted services for the family. Photos,
+          films, music, books, recipes, files. A handful of tools for
+          the people who run the place. Each app respects the same
+          identity, so signing in once is enough.
         </p>
-        <p class="muted-strong text-xs mono" style="margin-top: 1rem;">
-          If this persists, ask Andrew.
+        <p class="section-prose">
+          If you don't have an account yet, ask whoever invited you.
+          Forgot your password? <a href="/auth/recovery">Recover access</a>.
         </p>
       </section>
-    )}
+    </>
+  )}
 
-    {state === 'pre-auth' && (
-      <section class="stack-lg">
-        <p class="muted">Sign in to continue.</p>
-        <a href="/auth/login" class="button button-primary">Sign in with passkey</a>
+  {state === 'post-auth' && (
+    <>
+      <section class="hero">
+        <span class="hero-mark" set:html={markSvg} />
+        <div>
+          <p class="hero-eyebrow">signed in {displayName && (<><span class="hero-eyebrow-sep">·</span><span>{displayName}</span></>)}</p>
+          <h1 class="hero-title">{firstName ? `Hello, ${firstName}.` : 'Welcome back.'}</h1>
+          <p class="hero-lede">
+            Pick up where you left off, or hop into one of the apps below.
+          </p>
+          <div class="cta-row">
+            {isAdmin && <a href="/admin" class="button button-secondary">Admin</a>}
+            <a href="/auth/settings" class="button button-secondary">Account</a>
+            <a href="/auth/logout" class="cta-link mono">Sign out</a>
+          </div>
+        </div>
       </section>
-    )}
 
-    {state === 'post-auth' && visibleTiles.length > 0 && (
-      <section class="tile-grid">
-        {visibleTiles.map((t) => (
-          <a class="tile" href={`https://${t.host}/`}>
-            <div class="tile-icon mono">{t.icon}</div>
-            <div class="tile-name">{t.name}</div>
-          </a>
+      <section class="section">
+        <p class="section-subtitle">Your apps</p>
+        {visibleTiles.length > 0 ? (
+          <div class="tile-grid">
+            {visibleTiles.map((t) => (
+              <a class="tile" href={`https://${t.host}/`}>
+                <div class="tile-icon mono">{t.icon}</div>
+                <div class="tile-name">{t.name}</div>
+              </a>
+            ))}
+          </div>
+        ) : (
+          <p class="section-prose">
+            Your account doesn't have any app access yet. Ask Andrew to
+            enable one.
+          </p>
+        )}
+      </section>
+    </>
+  )}
+
+  {isDev && state === 'down' && (
+    <section class="dev-preview">
+      <p class="section-subtitle">Dev preview · auth flows</p>
+      <p class="section-prose">
+        Kratos isn't reachable from <code>npm run dev</code>. These links
+        exist so the layout work isn't gated on the substrate. Real flows
+        will redirect to Kratos in production.
+      </p>
+      <ul class="dev-list">
+        {devLinks.map((l) => (
+          <li><a class="dev-link mono" href={l.href}>{l.href}</a><span class="dev-link-meta">{l.label}</span></li>
         ))}
-      </section>
-    )}
+      </ul>
+    </section>
+  )}
 
-    {state === 'post-auth' && visibleTiles.length === 0 && (
-      <section class="notice">
-        Your account has no app access yet. Ask Andrew to enable one.
-      </section>
-    )}
-
-    {state === 'post-auth' && (
-      <footer style="display: flex; gap: 1.25rem; align-items: center; font-size: var(--text-sm);">
-        <a class="subtle mono" href="/auth/settings">Account</a>
-        {isAdmin && <a class="subtle mono" href="/admin">Admin</a>}
-        <a class="subtle mono" href="/auth/logout">Sign out</a>
-      </footer>
-    )}
-  </main>
 </Layout>
+
+<style>
+  /* ── State A: holding panel ──
+   * Centered, contained, restrained. Mirrors the hero rhythm but
+   * collapses to a single column so the eye lands on the message. */
+  .holding {
+    max-width: 36rem;
+    margin: var(--space-7) auto 0;
+    padding: var(--space-6);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    background: var(--surface);
+    text-align: left;
+    display: grid;
+    grid-template-columns: 64px 1fr;
+    gap: var(--space-2) var(--space-5);
+    align-items: start;
+  }
+  .holding-mark {
+    grid-row: span 4;
+    color: var(--accent);
+    width: 64px;
+    height: 64px;
+  }
+  .holding-mark :global(svg) { width: 100%; height: 100%; }
+  .holding-eyebrow {
+    font-family: var(--font-mono);
+    font-size: var(--text-xs);
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    color: var(--text-muted);
+  }
+  .holding-title {
+    font-family: var(--font-display);
+    font-size: var(--text-2xl);
+    font-weight: 700;
+    letter-spacing: -0.01em;
+    color: var(--text);
+    line-height: var(--lh-tight);
+  }
+  .holding-prose {
+    font-size: var(--text-base);
+    color: var(--text-2);
+    line-height: 1.6;
+  }
+  .holding-tech {
+    font-family: var(--font-mono);
+    font-size: var(--text-xs);
+    color: var(--text-muted);
+    padding-top: var(--space-2);
+    border-top: 1px solid var(--border);
+  }
+
+  /* ── Hero CTA fragments ── */
+  .cta-note {
+    color: var(--text-muted);
+    font-size: var(--text-xs);
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+  }
+  .cta-link {
+    color: var(--text-muted);
+    font-size: var(--text-xs);
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    margin-left: auto;
+  }
+  .cta-link:hover { color: var(--accent); text-decoration: none; }
+  .hero-eyebrow-sep {
+    margin: 0 0.4em;
+    color: var(--border);
+  }
+
+  /* ── Tile grid ──
+   * Wider gutter than the global tile so post-auth feels less dense. */
+  .tile-grid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: var(--space-3);
+  }
+  @media (min-width: 640px)  { .tile-grid { grid-template-columns: repeat(3, 1fr); } }
+  @media (min-width: 900px)  { .tile-grid { grid-template-columns: repeat(4, 1fr); } }
+  .tile {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: var(--space-2);
+    padding: var(--space-5) var(--space-4);
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    color: var(--text);
+    text-decoration: none;
+    transition:
+      border-color var(--duration-fast) var(--ease-out),
+      color var(--duration-fast) var(--ease-out);
+  }
+  .tile:hover {
+    border-color: var(--accent);
+    color: var(--text);
+    text-decoration: none;
+  }
+  .tile-icon {
+    font-family: var(--font-mono);
+    font-size: var(--text-sm);
+    color: var(--accent);
+    letter-spacing: 0.06em;
+  }
+  .tile-name {
+    font-size: var(--text-base);
+    color: var(--text);
+  }
+
+  /* ── Dev preview ── */
+  .dev-preview {
+    margin-top: var(--space-7);
+    padding: var(--space-5);
+    border: 1px dashed var(--border);
+    border-radius: var(--radius);
+    background: transparent;
+  }
+  .dev-list {
+    list-style: none;
+    padding: 0;
+    margin: var(--space-3) 0 0;
+    display: flex;
+    flex-direction: column;
+  }
+  .dev-list li {
+    display: grid;
+    grid-template-columns: 22rem 1fr;
+    gap: var(--space-4);
+    padding: var(--space-2) 0;
+    border-bottom: 1px solid var(--border);
+    align-items: baseline;
+  }
+  .dev-list li:last-child { border-bottom: none; }
+  .dev-link {
+    font-size: var(--text-sm);
+    color: var(--accent);
+    text-decoration: none;
+  }
+  .dev-link:hover { text-decoration: underline; }
+  .dev-link-meta {
+    font-size: var(--text-xs);
+    color: var(--text-muted);
+  }
+
+  @media (max-width: 640px) {
+    .holding { grid-template-columns: 48px 1fr; gap: var(--space-2) var(--space-4); padding: var(--space-5); }
+    .holding-mark { width: 48px; height: 48px; }
+    .dev-list li { grid-template-columns: 1fr; gap: var(--space-1); }
+  }
+</style>

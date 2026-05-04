@@ -1,10 +1,12 @@
 /* Auth portal global styles.
  *
- * Consumes design tokens from ./tokens/index.css. Do NOT define color
- * values here. If a needed token doesn't exist, add it to
- * dunn.dev/design/tokens/colors.css and re-sync into ./tokens/. */
+ * Consumes design tokens from the @dunn.dev/design package
+ * (file:../../design dependency). Do NOT define color, spacing, motion,
+ * or typography values here. If a needed token doesn't exist, add it
+ * upstream to dunn.dev/design/tokens/ and bump the design package. */
 
-@import './tokens/index.css';
+@import '@dunn.dev/design/tokens/index.css';
+@import '@dunn.dev/design/site/site.css';
 
 /* ── Reset ──────────────────────────────────────────────────── */
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
@@ -29,6 +31,8 @@ body {
 }
 :focus:not(:focus-visible) { outline: none; }
 
+/* Reduced motion is also handled inside motion.css (token zeroing).
+ * This block adds belt-and-braces for any non-token-driven transitions. */
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after {
     animation-duration: 0.01ms !important;
@@ -39,15 +43,15 @@ body {
 /* ── Layout primitives ──────────────────────────────────────── */
 .shell {
   margin: 0 auto;
-  padding: 2rem 1.5rem;
+  padding: var(--space-6) var(--space-5);
 }
 .shell.shell-sm { max-width: 28rem; }
 .shell.shell-md { max-width: 42rem; }
 .shell.shell-lg { max-width: 56rem; }
 
-.stack > * + * { margin-top: 0.75rem; }
-.stack-lg > * + * { margin-top: 1.5rem; }
-.stack-xl > * + * { margin-top: 3rem; }
+.stack > * + * { margin-top: var(--space-3); }
+.stack-lg > * + * { margin-top: var(--space-5); }
+.stack-xl > * + * { margin-top: var(--space-7); }
 
 /* ── Typography ─────────────────────────────────────────────── */
 h1, h2, h3 {
@@ -78,7 +82,7 @@ a.subtle:hover { color: var(--text); }
 /* ── Buttons ────────────────────────────────────────────────── */
 .button {
   display: inline-block;
-  padding: 0.65rem 1.25rem;
+  padding: var(--space-3) var(--space-5);
   font-family: var(--font-mono);
   font-size: var(--text-base);
   font-weight: 500;
@@ -87,7 +91,10 @@ a.subtle:hover { color: var(--text); }
   border: 1px solid transparent;
   cursor: pointer;
   text-decoration: none;
-  transition: background-color 0.12s, border-color 0.12s, color 0.12s;
+  transition:
+    background-color var(--duration-fast) var(--ease-out),
+    border-color var(--duration-fast) var(--ease-out),
+    color var(--duration-fast) var(--ease-out);
 }
 
 .button-primary {
@@ -126,7 +133,7 @@ a.subtle:hover { color: var(--text); }
 }
 
 /* ── Forms ──────────────────────────────────────────────────── */
-.field { display: flex; flex-direction: column; gap: 0.35rem; }
+.field { display: flex; flex-direction: column; gap: var(--space-2); }
 
 .field label {
   font-family: var(--font-mono);
@@ -142,10 +149,10 @@ a.subtle:hover { color: var(--text); }
   color: var(--text);
   border: 1px solid var(--input-border);
   border-radius: var(--radius);
-  padding: 0.6rem 0.75rem;
+  padding: var(--space-3);
   font: inherit;
   width: 100%;
-  transition: border-color 0.12s;
+  transition: border-color var(--duration-fast) var(--ease-out);
 }
 .field input:focus,
 .field select:focus,
@@ -163,7 +170,7 @@ a.subtle:hover { color: var(--text); }
   background: var(--surface);
   border: 1px solid var(--border);
   border-radius: var(--radius);
-  padding: 1.5rem;
+  padding: var(--space-5);
 }
 
 /* Notice / status block (success, danger, warning).
@@ -171,7 +178,7 @@ a.subtle:hover { color: var(--text); }
 .notice {
   border-inline-start: 3px solid var(--text-muted);
   background: var(--surface);
-  padding: 0.75rem 1rem;
+  padding: var(--space-3) var(--space-4);
   border-radius: 0 var(--radius) var(--radius) 0;
   font-size: var(--text-sm);
   color: var(--text-2);
@@ -184,8 +191,8 @@ a.subtle:hover { color: var(--text); }
 .nav-bar {
   display: flex;
   flex-wrap: wrap;
-  gap: 1rem 1.25rem;
-  padding: 0.75rem 0;
+  gap: var(--space-4) var(--space-5);
+  padding: var(--space-3) 0;
   border-bottom: 1px solid var(--border);
   font-family: var(--font-mono);
   font-size: var(--text-sm);
@@ -204,21 +211,24 @@ a.subtle:hover { color: var(--text); }
 .tile-grid {
   display: grid;
   grid-template-columns: repeat(2, 1fr);
-  gap: 0.75rem;
+  gap: var(--space-3);
 }
 @media (min-width: 640px)  { .tile-grid { grid-template-columns: repeat(3, 1fr); } }
 @media (min-width: 900px)  { .tile-grid { grid-template-columns: repeat(4, 1fr); } }
 
 .tile {
   display: block;
-  padding: 1.25rem 1rem;
+  padding: var(--space-5) var(--space-4);
   text-align: center;
   background: var(--surface);
   border: 1px solid var(--border);
   border-radius: var(--radius);
   color: var(--text);
   text-decoration: none;
-  transition: border-color 0.12s, background 0.12s, transform 0.12s;
+  transition:
+    border-color var(--duration-fast) var(--ease-out),
+    background var(--duration-fast) var(--ease-out),
+    transform var(--duration-fast) var(--ease-out);
 }
 .tile:hover {
   border-color: var(--accent);
@@ -229,7 +239,7 @@ a.subtle:hover { color: var(--text); }
 }
 .tile-icon { font-size: 1.75rem; line-height: 1; }
 .tile-name {
-  margin-top: 0.5rem;
+  margin-top: var(--space-2);
   font-family: var(--font-mono);
   font-size: var(--text-sm);
 }
@@ -242,7 +252,7 @@ a.subtle:hover { color: var(--text); }
 }
 .data-table th,
 .data-table td {
-  padding: 0.55rem 0.5rem;
+  padding: var(--space-3) var(--space-2);
   text-align: left;
   border-bottom: 1px solid var(--border);
 }
@@ -256,14 +266,12 @@ a.subtle:hover { color: var(--text); }
 }
 .data-table tbody tr:hover { background: var(--accent-subtle); }
 .data-table td.actions { text-align: right; white-space: nowrap; }
-.data-table td.actions > * + * { margin-left: 0.75rem; }
+.data-table td.actions > * + * { margin-left: var(--space-3); }
 
 /* ── Inline badges (group memberships, role names) ──────────── */
-/* Compact monospace pill used for chips in tables and detail rows.
- * Variants pull from existing semantic tokens: no new color values. */
 .badge {
   display: inline-block;
-  padding: 0.1rem 0.5rem;
+  padding: var(--space-1) var(--space-2);
   border-radius: var(--radius-sm);
   font-family: var(--font-mono);
   font-size: var(--text-xs);
@@ -272,25 +280,23 @@ a.subtle:hover { color: var(--text); }
   border: 1px solid var(--border);
   line-height: 1.4;
 }
-.badge + .badge { margin-left: 0.25rem; }
+.badge + .badge { margin-left: var(--space-1); }
 .badge-muted { background: var(--surface); color: var(--text-2); }
 .badge-warning { background: var(--warning-subtle); border-color: var(--warning); }
 .badge-danger { background: var(--danger-subtle); border-color: var(--danger); }
 
 /* ── Admin form grid ────────────────────────────────────────── */
-/* Two-column checkbox grid for group selectors. Falls back to one
- * column on narrow screens. */
 .checkbox-grid {
   display: grid;
   grid-template-columns: 1fr 1fr;
-  gap: 0.4rem 1rem;
+  gap: var(--space-2) var(--space-4);
 }
 @media (max-width: 540px) {
   .checkbox-grid { grid-template-columns: 1fr; }
 }
 .checkbox-grid label {
   display: flex;
-  gap: 0.5rem;
+  gap: var(--space-2);
   align-items: center;
   font-family: var(--font-mono);
   font-size: var(--text-sm);
@@ -301,15 +307,15 @@ a.subtle:hover { color: var(--text); }
 .role-row {
   display: grid;
   grid-template-columns: 1fr auto;
-  gap: 0.75rem;
+  gap: var(--space-3);
   align-items: center;
-  padding: 0.4rem 0;
+  padding: var(--space-2) 0;
   border-bottom: 1px solid var(--border);
   font-size: var(--text-sm);
 }
 .role-row:last-child { border-bottom: none; }
 .role-row select {
-  padding: 0.3rem 0.5rem;
+  padding: var(--space-1) var(--space-2);
   font: inherit;
   background: var(--input-bg);
   color: var(--text);
@@ -321,10 +327,10 @@ a.subtle:hover { color: var(--text); }
 .card-grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(15rem, 1fr));
-  gap: 1rem;
+  gap: var(--space-4);
 }
-.card-grid .panel { padding: 1rem 1.25rem; }
+.card-grid .panel { padding: var(--space-4) var(--space-5); }
 .card-grid .panel h2 {
   font-size: var(--text-base);
-  margin-bottom: 0.35rem;
+  margin-bottom: var(--space-2);
 }

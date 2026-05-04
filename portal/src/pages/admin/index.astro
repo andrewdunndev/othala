@@ -30,48 +30,105 @@ try {
 const manifests = loadClientManifests();
 const identityGroups = knownIdentityGroups();
 const accessGroups = knownAccessGroups();
+
+const adminNav = [
+  { href: '/admin',          label: 'Overview' },
+  { href: '/admin/users',    label: 'Users' },
+  { href: '/admin/groups',   label: 'Groups' },
+  { href: '/admin/oauth2',   label: 'Apps' },
+  { href: '/admin/activity', label: 'Activity' },
+];
+
+const cards = [
+  { href: '/admin/users',  title: 'Users',  primary: `${userCount}`,           secondary: userCount === 1 ? 'identity' : 'identities' },
+  { href: '/admin/groups', title: 'Groups', primary: `${identityGroups.length} / ${accessGroups.length}`, secondary: 'identity / access' },
+  { href: '/admin/oauth2', title: 'Apps',   primary: `${manifests.length}`,    secondary: 'OIDC clients' },
+];
 ---
-<Layout title="Admin — Dunn Family">
-  <main class="shell shell-lg stack-lg">
-    <header class="stack">
-      <h1>Admin</h1>
-      <p class="muted text-sm mono">
-        {userCount} {userCount === 1 ? 'user' : 'users'},
-        {identityGroups.length} identity groups,
-        {accessGroups.length} access groups,
-        {manifests.length} OIDC clients.
-      </p>
-    </header>
+<Layout title="Admin" description="Identity, group, and OIDC client administration." nav={adminNav}>
 
-    <nav class="nav-bar">
-      <a href="/admin" aria-current="page">Overview</a>
-      <a href="/admin/users">Users</a>
-      <a href="/admin/groups">Groups</a>
-      <a href="/admin/oauth2">Apps</a>
-      <a href="/admin/activity">Activity</a>
-    </nav>
+  <header class="page-header">
+    <p class="page-eyebrow">administration</p>
+    <h1 class="page-title">Overview</h1>
+    <p class="page-lede">
+      Identities, groups, and OIDC clients across the home estate.
+      Editing happens here. Source of truth for client config still
+      lives in <code>hydra/clients/*.yaml</code>.
+    </p>
+  </header>
 
-    {loadError && (
-      <div class="notice notice-danger">
-        Failed to read identity store: {loadError}
-      </div>
-    )}
+  {loadError && (
+    <div class="notice notice-danger">
+      Failed to read identity store: {loadError}
+    </div>
+  )}
 
-    <section class="card-grid">
-      <a href="/admin/users" class="panel" style="display: block; text-decoration: none;">
-        <h2>Users</h2>
-        <p class="muted text-sm">{userCount} active</p>
-      </a>
-      <a href="/admin/groups" class="panel" style="display: block; text-decoration: none;">
-        <h2>Groups</h2>
-        <p class="muted text-sm">
-          {identityGroups.length} identity, {accessGroups.length} access
-        </p>
-      </a>
-      <a href="/admin/oauth2" class="panel" style="display: block; text-decoration: none;">
-        <h2>Apps</h2>
-        <p class="muted text-sm">{manifests.length} OIDC clients</p>
-      </a>
-    </section>
-  </main>
+  <section class="section">
+    <p class="section-subtitle">At a glance</p>
+    <div class="admin-cards">
+      {cards.map((c) => (
+        <a class="admin-card" href={c.href}>
+          <span class="admin-card-primary mono">{c.primary}</span>
+          <span class="admin-card-title">{c.title}</span>
+          <span class="admin-card-secondary mono">{c.secondary}</span>
+          <span class="admin-card-arrow" aria-hidden="true">→</span>
+        </a>
+      ))}
+    </div>
+  </section>
+
 </Layout>
+
+<style>
+  .admin-cards {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(15rem, 1fr));
+    gap: var(--space-3);
+  }
+  .admin-card {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-2);
+    padding: var(--space-5);
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    color: var(--text);
+    text-decoration: none;
+    transition: border-color var(--duration-fast) var(--ease-out),
+                color var(--duration-fast) var(--ease-out);
+  }
+  .admin-card:hover { border-color: var(--accent); text-decoration: none; }
+  .admin-card-primary {
+    font-family: var(--font-mono);
+    font-size: var(--text-3xl);
+    color: var(--text);
+    line-height: 1;
+    letter-spacing: -0.01em;
+  }
+  .admin-card-title {
+    font-family: var(--font-display);
+    font-size: var(--text-lg);
+    font-weight: 700;
+    color: var(--text);
+  }
+  .admin-card-secondary {
+    font-size: var(--text-xs);
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--text-muted);
+  }
+  .admin-card-arrow {
+    position: absolute;
+    top: var(--space-4);
+    right: var(--space-4);
+    color: var(--text-muted);
+    transition: color var(--duration-fast) var(--ease-out),
+                transform var(--duration-fast) var(--ease-out);
+  }
+  .admin-card:hover .admin-card-arrow {
+    color: var(--accent);
+    transform: translateX(2px);
+  }
+</style>

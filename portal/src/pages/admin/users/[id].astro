@@ -211,17 +211,23 @@ const formValues = {
 const csrfTokenSave = signToken(adminIdentityId);
 const csrfTokenActions = signToken(adminIdentityId);
 const csrfTokenDelete = signToken(adminIdentityId);
+
+const adminNav = [
+  { href: '/admin',          label: 'Overview' },
+  { href: '/admin/users',    label: 'Users' },
+  { href: '/admin/groups',   label: 'Groups' },
+  { href: '/admin/oauth2',   label: 'Apps' },
+  { href: '/admin/activity', label: 'Activity' },
+];
 ---
-<Layout title={`${formValues.username || id} — Admin — Dunn Family`}>
-  <main class="shell shell-lg stack-lg">
-    <header class="stack">
-      <h1 class="mono">{formValues.username || id}</h1>
-      <nav class="nav-bar">
-        <a href="/admin">Overview</a>
-        <a href="/admin/users" aria-current="page">Users</a>
-        <a href="/admin/groups">Groups</a>
-        <a href="/admin/oauth2">Apps</a>
-      </nav>
+<Layout title={`${formValues.username || id} — Admin`} description="Identity detail." nav={adminNav}>
+  <main class="stack-lg">
+    <header class="page-header">
+      <p class="page-eyebrow">administration · identity</p>
+      <h1 class="page-title mono">{formValues.username || id}</h1>
+      {formValues.displayName && (
+        <p class="page-lede">{formValues.displayName} · <span class="mono">{formValues.email}</span></p>
+      )}
     </header>
 
     {loadError && (

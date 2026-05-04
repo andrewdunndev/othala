@@ -11,11 +11,32 @@ import { requireAdminSession } from '../../lib/admin';
 const guard = await requireAdminSession(Astro);
 if (guard instanceof Response) return guard;
 
+const adminNav = [
+  { href: '/admin',          label: 'Overview' },
+  { href: '/admin/users',    label: 'Users' },
+  { href: '/admin/groups',   label: 'Groups' },
+  { href: '/admin/oauth2',   label: 'Apps' },
+  { href: '/admin/activity', label: 'Activity' },
+];
+
 // TODO: query Postgres "recent_activity" table for last 100 events
 ---
-<Layout title="Activity — Admin — Dunn Family">
-  <main class="shell shell-lg stack-lg">
-    <h1>Recent activity</h1>
-    {/* TODO: table of last 100 events: timestamp, identity, action, status */}
-  </main>
+<Layout title="Activity — Admin" description="Recent identity and login events." nav={adminNav}>
+  <header class="page-header">
+    <p class="page-eyebrow">administration · audit</p>
+    <h1 class="page-title">Recent activity</h1>
+    <p class="page-lede">
+      Login attempts, password changes, recovery codes, and admin
+      operations. Sourced from the Kratos events stream.
+    </p>
+  </header>
+
+  <section class="section">
+    <p class="section-subtitle">Stream</p>
+    <p class="section-prose">
+      Not wired yet. The archival path is alloy → Loki; this page will
+      surface the last 100 events from a Postgres summary table once the
+      ingest is in place.
+    </p>
+  </section>
 </Layout>

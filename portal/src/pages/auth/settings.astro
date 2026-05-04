@@ -12,7 +12,7 @@
 //   - password: change password
 //   (totp + lookup_secret deferred)
 //
-// Plus a logout button sourced from /self-service/logout/browser.
+// Plus a logout-everywhere button sourced from /self-service/logout/browser.
 
 export const prerender = false;
 
@@ -84,157 +84,286 @@ function fieldLabel(meta: { label?: { text?: string } } | undefined, fallback: s
 const logoutInfo = await getLogoutInfo(cookie);
 const traits = session.identity.traits;
 const groups = session.identity.metadata_admin?.groups ?? [];
+const displayName = traits.displayName || traits.username || '';
+const identityGroups = groups.filter((g) => !g.startsWith('access-'));
+const accessGroups = groups.filter((g) => g.startsWith('access-'));
 ---
-<Layout title="Account — Dunn Family">
-  <main class="shell shell-md stack-xl">
-    <header class="stack">
-      <h1>Account</h1>
-      <p class="muted text-sm mono">
-        {traits.displayName || traits.username} &middot; {traits.email}
+<Layout title="Settings" description="Account settings.">
+
+  <header class="page-header">
+    <p class="page-eyebrow">account</p>
+    <h1 class="page-title">Settings</h1>
+    <p class="page-lede">
+      Profile details, passkeys, password, and active sessions for
+      <strong>{displayName}</strong>.
+    </p>
+  </header>
+
+  {ui.messages?.map((m) => (
+    <div class={`notice notice-${m.type === 'error' ? 'danger' : m.type === 'success' ? 'success' : 'warning'}`}>
+      {m.text}
+    </div>
+  ))}
+
+  {hasProfile && (
+    <section class="section">
+      <p class="section-subtitle">Profile</p>
+      <p class="section-prose">
+        Your display name, email address, and username. Email changes
+        require verification before they take effect.
       </p>
-      {groups.length > 0 && (
-        <p class="muted-strong text-xs mono">Groups: {groups.join(', ')}</p>
-      )}
-    </header>
-
-    {ui.messages?.map((m) => (
-      <div class={`notice notice-${m.type === 'error' ? 'danger' : m.type === 'success' ? 'success' : 'warning'}`}>
-        {m.text}
-      </div>
-    ))}
-
-    {hasProfile && (
-      <section class="stack-lg">
-        <h2>Profile</h2>
-        <form method="POST" action={ui.action} class="stack-lg">
-          <input type="hidden" name="csrf_token" value={csrf} />
-          <input type="hidden" name="method" value="profile" />
-          {inputsFor('profile').map(({ node, attr }) => {
-            if (attr.type === 'hidden') {
-              return <input type="hidden" name={attr.name} value={String(attr.value ?? '')} />;
-            }
-            if (attr.type === 'submit' || attr.type === 'button') {
-              return (
+      <form method="POST" action={ui.action} class="settings-form">
+        <input type="hidden" name="csrf_token" value={csrf} />
+        <input type="hidden" name="method" value="profile" />
+        {inputsFor('profile').map(({ node, attr }) => {
+          if (attr.type === 'hidden') {
+            return <input type="hidden" name={attr.name} value={String(attr.value ?? '')} />;
+          }
+          if (attr.type === 'submit' || attr.type === 'button') {
+            return (
+              <div class="form-actions">
                 <button class="button button-primary" type={attr.type}
                         name={attr.name} value={String(attr.value ?? '')}>
-                  {fieldLabel(node.meta, 'Save')}
+                  {fieldLabel(node.meta, 'Save changes')}
                 </button>
-              );
-            }
-            const id = attr.name.replace(/[^a-zA-Z0-9]+/g, '-');
-            return (
-              <div class="field">
-                <label for={id}>{fieldLabel(node.meta, attr.name)}</label>
-                <input
-                  id={id}
-                  name={attr.name}
-                  type={attr.type}
-                  value={attr.value !== undefined ? String(attr.value) : ''}
-                  required={attr.required}
-                  disabled={attr.disabled}
-                  autocomplete={attr.autocomplete}
-                />
               </div>
             );
-          })}
-        </form>
-      </section>
-    )}
+          }
+          const id = attr.name.replace(/[^a-zA-Z0-9]+/g, '-');
+          return (
+            <div class="field">
+              <label for={id}>{fieldLabel(node.meta, attr.name)}</label>
+              <input
+                id={id}
+                name={attr.name}
+                type={attr.type}
+                value={attr.value !== undefined ? String(attr.value) : ''}
+                required={attr.required}
+                disabled={attr.disabled}
+                autocomplete={attr.autocomplete}
+              />
+            </div>
+          );
+        })}
+      </form>
+    </section>
+  )}
 
-    {hasPasskey && (
-      <section class="stack-lg">
-        <h2>Passkeys</h2>
-        <p class="muted text-sm">
-          Add a passkey to sign in without a password. Register one per device.
-        </p>
-        <form method="POST" action={ui.action} class="stack-lg">
-          <input type="hidden" name="csrf_token" value={csrf} />
-          <input type="hidden" name="method" value="passkey" />
-          {inputsFor('passkey').map(({ node, attr }) => {
-            if (attr.type === 'hidden') {
-              return <input type="hidden" name={attr.name} value={String(attr.value ?? '')} />;
-            }
-            if (attr.type === 'submit' || attr.type === 'button') {
-              return (
+  {hasPasskey && (
+    <section class="section">
+      <p class="section-subtitle">Passkeys</p>
+      <p class="section-prose">
+        Register a passkey on each device you use. With a passkey,
+        signing in is one tap, no password to remember.
+      </p>
+      <form method="POST" action={ui.action} class="settings-form">
+        <input type="hidden" name="csrf_token" value={csrf} />
+        <input type="hidden" name="method" value="passkey" />
+        {inputsFor('passkey').map(({ node, attr }) => {
+          if (attr.type === 'hidden') {
+            return <input type="hidden" name={attr.name} value={String(attr.value ?? '')} />;
+          }
+          if (attr.type === 'submit' || attr.type === 'button') {
+            return (
+              <div class="form-actions">
                 <button class="button button-secondary" type={attr.type}
                         name={attr.name} value={String(attr.value ?? '')}
                         onclick={attr.onclick}>
                   {fieldLabel(node.meta, 'Register a passkey')}
                 </button>
-              );
-            }
-            const id = attr.name.replace(/[^a-zA-Z0-9]+/g, '-');
-            return (
-              <div class="field">
-                <label for={id}>{fieldLabel(node.meta, attr.name)}</label>
-                <input
-                  id={id}
-                  name={attr.name}
-                  type={attr.type}
-                  value={attr.value !== undefined ? String(attr.value) : ''}
-                  autocomplete={attr.autocomplete}
-                />
               </div>
             );
-          })}
-        </form>
-      </section>
-    )}
+          }
+          const id = attr.name.replace(/[^a-zA-Z0-9]+/g, '-');
+          return (
+            <div class="field">
+              <label for={id}>{fieldLabel(node.meta, attr.name)}</label>
+              <input
+                id={id}
+                name={attr.name}
+                type={attr.type}
+                value={attr.value !== undefined ? String(attr.value) : ''}
+                autocomplete={attr.autocomplete}
+              />
+            </div>
+          );
+        })}
+      </form>
+    </section>
+  )}
 
-    {hasPassword && (
-      <section class="stack-lg">
-        <h2>Password</h2>
-        <form method="POST" action={ui.action} class="stack-lg">
-          <input type="hidden" name="csrf_token" value={csrf} />
-          <input type="hidden" name="method" value="password" />
-          {inputsFor('password').map(({ node, attr }) => {
-            if (attr.type === 'hidden') {
-              return <input type="hidden" name={attr.name} value={String(attr.value ?? '')} />;
-            }
-            if (attr.type === 'submit' || attr.type === 'button') {
-              return (
+  {hasPassword && (
+    <section class="section">
+      <p class="section-subtitle">Password</p>
+      <p class="section-prose">
+        Change the password used as a fallback when a passkey isn't
+        available.
+      </p>
+      <form method="POST" action={ui.action} class="settings-form">
+        <input type="hidden" name="csrf_token" value={csrf} />
+        <input type="hidden" name="method" value="password" />
+        {inputsFor('password').map(({ node, attr }) => {
+          if (attr.type === 'hidden') {
+            return <input type="hidden" name={attr.name} value={String(attr.value ?? '')} />;
+          }
+          if (attr.type === 'submit' || attr.type === 'button') {
+            return (
+              <div class="form-actions">
                 <button class="button button-secondary" type={attr.type}
                         name={attr.name} value={String(attr.value ?? '')}>
                   {fieldLabel(node.meta, 'Change password')}
                 </button>
-              );
-            }
-            const id = attr.name.replace(/[^a-zA-Z0-9]+/g, '-');
-            return (
-              <div class="field">
-                <label for={id}>{fieldLabel(node.meta, attr.name)}</label>
-                <input
-                  id={id}
-                  name={attr.name}
-                  type={attr.type}
-                  required={attr.required}
-                  autocomplete={attr.autocomplete ?? 'new-password'}
-                />
               </div>
             );
-          })}
-        </form>
-      </section>
-    )}
-
-    <section class="stack-lg">
-      <h2>Sign out</h2>
-      {logoutInfo ? (
-        <form method="GET" action={logoutInfo.logout_url}>
-          <input type="hidden" name="token" value={logoutInfo.logout_token} />
-          <button class="button button-danger" type="submit">Sign out</button>
-        </form>
-      ) : (
-        <p class="muted text-sm">Logout endpoint unavailable.</p>
-      )}
+          }
+          const id = attr.name.replace(/[^a-zA-Z0-9]+/g, '-');
+          return (
+            <div class="field">
+              <label for={id}>{fieldLabel(node.meta, attr.name)}</label>
+              <input
+                id={id}
+                name={attr.name}
+                type={attr.type}
+                required={attr.required}
+                autocomplete={attr.autocomplete ?? 'new-password'}
+              />
+            </div>
+          );
+        })}
+      </form>
     </section>
+  )}
 
-    <footer class="stack" style="font-size: var(--text-sm);">
-      <a class="subtle mono" href="/">Back to home</a>
-    </footer>
+  <section class="section">
+    <p class="section-subtitle">Sessions</p>
+    <p class="section-prose">
+      Sign out of this device, or revoke every active session at once.
+    </p>
+    {logoutInfo ? (
+      <form method="GET" action={logoutInfo.logout_url} class="settings-form">
+        <input type="hidden" name="token" value={logoutInfo.logout_token} />
+        <div class="form-actions">
+          <button class="button button-danger" type="submit">Sign out everywhere</button>
+        </div>
+      </form>
+    ) : (
+      <p class="muted text-sm">Logout endpoint unavailable.</p>
+    )}
+  </section>
 
-    {scripts.map((s) => (
-      <script src={s.src} id={s.id} async is:inline></script>
-    ))}
-  </main>
+  <section class="section">
+    <p class="section-subtitle">Membership</p>
+    <dl class="kv">
+      <div>
+        <dt>Username</dt>
+        <dd class="mono">{traits.username}</dd>
+      </div>
+      <div>
+        <dt>Email</dt>
+        <dd class="mono">{traits.email}</dd>
+      </div>
+      <div>
+        <dt>Identity</dt>
+        <dd class="kv-chips">
+          {identityGroups.length
+            ? identityGroups.map((g) => <span class="chip">{g}</span>)
+            : <span class="muted text-sm">none</span>}
+        </dd>
+      </div>
+      <div>
+        <dt>App access</dt>
+        <dd class="kv-chips">
+          {accessGroups.length
+            ? accessGroups.map((g) => <span class="chip chip-muted">{g}</span>)
+            : <span class="muted text-sm">none</span>}
+        </dd>
+      </div>
+    </dl>
+  </section>
+
+  <p style="margin-top: var(--space-7);">
+    <a href="/" class="back-link mono">Back home</a>
+  </p>
+
+  {scripts.map((s) => (
+    <script src={s.src} id={s.id} async is:inline></script>
+  ))}
+
 </Layout>
+
+<style>
+  /* Settings forms: column layout, hairline border between fields, labels
+   * sit on their own line so checkboxes and selects align. */
+  .settings-form {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-4);
+    max-width: 32rem;
+    margin-top: var(--space-3);
+  }
+  .form-actions {
+    display: flex;
+    gap: var(--space-3);
+    margin-top: var(--space-2);
+  }
+
+  /* Key/value membership table without the heaviness of a real table.
+   * Hairline rows, mono values, label in muted weight. */
+  .kv {
+    display: flex;
+    flex-direction: column;
+    margin-top: var(--space-3);
+    border-top: 1px solid var(--border);
+  }
+  .kv > div {
+    display: grid;
+    grid-template-columns: 9rem 1fr;
+    gap: var(--space-4);
+    padding: var(--space-3) 0;
+    border-bottom: 1px solid var(--border);
+    align-items: baseline;
+  }
+  .kv dt {
+    font-family: var(--font-mono);
+    font-size: var(--text-xs);
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--text-muted);
+  }
+  .kv dd {
+    font-size: var(--text-sm);
+    color: var(--text);
+  }
+  .kv-chips {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--space-1);
+  }
+  .chip {
+    display: inline-block;
+    padding: var(--space-1) var(--space-2);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    font-family: var(--font-mono);
+    font-size: var(--text-xs);
+    color: var(--text);
+    background: var(--bg);
+    line-height: 1.4;
+  }
+  .chip-muted {
+    color: var(--text-2);
+    background: var(--surface);
+  }
+
+  .back-link {
+    font-size: var(--text-xs);
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--text-muted);
+  }
+  .back-link:hover { color: var(--accent); text-decoration: none; }
+
+  @media (max-width: 640px) {
+    .kv > div { grid-template-columns: 1fr; gap: var(--space-1); }
+  }
+</style>
