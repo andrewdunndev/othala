@@ -81,6 +81,38 @@
         "email"
       ],
       "additionalProperties": false
+    },
+    "metadata_admin": {
+      "type": "object",
+      "title": "Admin-managed metadata",
+      "description": "Admin-only fields. groups[] drives default role derivation via per-app group_role_map; roles{client_id: role_name} is a per-app override that takes precedence. Only `groups` and `roles` are accepted; new fields require a schema update so a typo (e.g. grupos instead of groups) is rejected at write time rather than silently dropped at read time.",
+      "properties": {
+        "groups": {
+          "type": "array",
+          "title": "Groups",
+          "description": "Membership groups. Order matters when deriving per-app roles via group_role_map (first matching group wins). The admin form is responsible for writing groups in the canonical order documented in portal/src/lib/access.ts.",
+          "items": {
+            "type": "string",
+            "pattern": "^[a-z][a-z0-9.\\-]*$",
+            "maxLength": 64
+          },
+          "uniqueItems": true
+        },
+        "roles": {
+          "type": "object",
+          "title": "Per-app role overrides",
+          "description": "Map of client_id to role name. When present for a client, this wins over group-derived role lookup.",
+          "patternProperties": {
+            "^[a-z][a-z0-9]*$": {
+              "type": "string",
+              "pattern": "^[a-z][a-z0-9_\\-]*$",
+              "maxLength": 64
+            }
+          },
+          "additionalProperties": false
+        }
+      },
+      "additionalProperties": false
     }
   }
 }

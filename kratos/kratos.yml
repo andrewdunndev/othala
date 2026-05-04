@@ -29,11 +29,14 @@ serve:
     port: 4434
 
 selfservice:
+  # LOW-3: trailing slash is load-bearing. Kratos allowed_return_urls
+  # uses a prefix match; without the slash, "https://auth.dunn.dev"
+  # accepts "https://auth.dunn.dev.evil.example". Every entry MUST
+  # end in `/` (or a deeper path). Same in lab/compose/kratos.lab.yml.
   default_browser_return_url: https://home.dunn.dev/
   allowed_return_urls:
-    - https://home.dunn.dev
     - https://home.dunn.dev/
-    - https://auth.dunn.dev
+    - https://auth.dunn.dev/
 
   methods:
     password:
@@ -102,6 +105,38 @@ selfservice:
       ui_url: https://home.dunn.dev/auth/recovery
       lifespan: 1h
       notify_unknown_recipients: false
+      # H1 / D3: admin email-recovery is disabled at the application
+      # layer. Kratos calls the recovery-gate webhook before issuing the
+      # privileged settings session; the gate replies 403 if the
+      # identity carries the `admin` group, and 200 otherwise.
+      #
+      # Non-admin family members continue to use email recovery. Admins
+      # recover via console (`kratos identities` on carmine) per
+      # docs/runbooks/admin-recovery.md.
+      after:
+        code:
+          hooks:
+            - hook: web_hook
+              config:
+                # MEDIUM-1 listener split: webhook URL points at the
+                # admin port (:4478), not the public port (:4477).
+                # MEDIUM-2: auth block carries the shared HMAC secret in
+                # the X-Webhook-Auth header; consent constant-time
+                # compares it before reading the body. The receiver
+                # fails closed on missing/wrong secret.
+                url: http://consent:4478/webhooks/recovery-gate
+                method: POST
+                auth:
+                  type: api_key
+                  config:
+                    in: header
+                    name: X-Webhook-Auth
+                    value: ${RECOVERY_GATE_SECRET}
+                response:
+                  ignore: false
+                  parse: false
+                body: file:///etc/config/kratos/hooks/recovery-gate.jsonnet
+                can_interrupt: true
 
     verification:
       enabled: true
@@ -172,13 +207,35 @@ courier:
   #         subject: Your Dunn Family recovery code
 
 secrets:
-  # Cookie encryption secret. Rotate by appending a new value to the front;
-  # old sessions remain valid until rotation completes.
+  # Cookie signing secret. Two slots: the current secret signs new
+  # cookies; the previous secret remains valid for verification until the
+  # last cookie minted under it expires.
+  #
+  # Both slots carry distinct values at all times. Kratos rejects an
+  # empty list entry (YAML schema violation), so on first provision
+  # _PREVIOUS is seeded with a sentinel secret that becomes meaningful
+  # on the first rotation.
+  #
+  # Rotation runbook (docs/runbooks/cookie-rotation.md):
+  #   1. Generate a new secret; set KRATOS_COOKIE_SECRET_PREVIOUS to the
+  #      current KRATOS_COOKIE_SECRET_CURRENT value.
+  #   2. Set KRATOS_COOKIE_SECRET_CURRENT to the new secret.
+  #   3. Restart Kratos.
+  #   4. Wait for the session lifespan to elapse (90 days default).
+  #   5. Mint a fresh sentinel into KRATOS_COOKIE_SECRET_PREVIOUS and
+  #      restart again.
+  #
+  # lab/scripts/gen-secrets.sh seeds both _CURRENT and _PREVIOUS on first
+  # provision.
   cookie:
-    - ${KRATOS_COOKIE_SECRET}
-  # Cipher for at-rest encryption of identity credentials.
+    - ${KRATOS_COOKIE_SECRET_CURRENT}
+    - ${KRATOS_COOKIE_SECRET_PREVIOUS}
+
+  # Cipher for at-rest encryption of identity credentials. Same two-slot
+  # shape as cookie.
   cipher:
-    - ${KRATOS_CIPHER_SECRET}
+    - ${KRATOS_CIPHER_SECRET_CURRENT}
+    - ${KRATOS_CIPHER_SECRET_PREVIOUS}
 
 log:
   level: info
