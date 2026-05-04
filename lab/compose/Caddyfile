@@ -1,73 +1,91 @@
-# Lab Caddyfile: routes Hydra public, Kratos public, consent service,
-# and per-app stubs through the custom dunn.dev/caddy-estate image with
-# cloudflare DNS-01.
+# Phase 1+ lab spike Caddyfile.
+#
+# Hosts:
+#   auth-lab.{$DOMAIN}  — Kratos public + Hydra public + consent UI mux
+#   home-lab.{$DOMAIN}  — Astro portal (carmine-equivalent in lab)
+#   keep-lab.{$DOMAIN}  — Vaultwarden, sample OIDC consumer
+#
+# Path multiplexing on auth-lab: /login is overloaded between Kratos and
+# Hydra (login_challenge handoff). Disambiguated by query param. The
+# portal owns /auth/*, /admin/*, /.well-known/webfinger.
+#
+# Order of handlers matters: most specific first, since handle blocks are
+# evaluated top-down and the first match wins.
 
 {
 	email admin@dunn.dev
 }
 
-# auth.dunn.dev: routes Kratos public, Hydra public, and the consent service.
-auth.{$DOMAIN} {
-	tls {
-		dns cloudflare {env.CF_API_TOKEN}
+auth-lab.{$DOMAIN} {
+	# Kratos serves /.well-known/ory/webauthn.js for WebAuthn ceremonies.
+	# Must come before kratos_ui (which matches *.js) and hydra (which
+	# matches /.well-known/*).
+	@kratos_wellknown path /.well-known/ory/*
+	handle @kratos_wellknown {
+		reverse_proxy kratos:4433
 	}
 
-	# Hydra OAuth2 endpoints — /oauth2/*, /.well-known/*, /userinfo
-	@hydra path /oauth2/* /.well-known/* /userinfo
+	# Portal-owned WebFinger endpoint (real handler, sets jrd+json).
+	@portal_webfinger path /.well-known/webfinger
+	handle @portal_webfinger {
+		reverse_proxy portal:8080
+	}
+
+	# /login with a login_challenge is the Hydra handoff to the consent
+	# service (our own dunn.dev/consent service). /login without the
+	# query param is the Kratos UI login flow and falls through to the
+	# kratos_ui handler below.
+	@consent_login {
+		path /login
+		query login_challenge=*
+	}
+	handle @consent_login {
+		reverse_proxy consent:4477
+	}
+
+	# Consent service owns /consent and /logout (Hydra calls them with
+	# challenge query params). No Kratos counterpart at these paths.
+	#
+	# MEDIUM-1: only :4477 (public mux) is reachable from Caddy. The
+	# admin mux on :4478 (/admin/*, /webhooks/*) is pod-internal; this
+	# file MUST NOT route any /admin/* or /webhooks/* upstream.
+	@consent_other path /consent /consent/* /logout /logout/*
+	handle @consent_other {
+		reverse_proxy consent:4477
+	}
+
+	# Hydra public OAuth2/OIDC endpoints (well-known/openid-config etc.)
+	@hydra path /oauth2/* /.well-known/openid-configuration /.well-known/jwks.json /userinfo
 	handle @hydra {
 		reverse_proxy hydra:4444
 	}
 
-	# Consent service — /login, /consent, /healthz
-	@consent path /login /consent /healthz
-	handle @consent {
-		reverse_proxy consent:4477
+	# Portal owns the user-facing auth flow pages and admin UI.
+	@portal_pages path /auth/* /admin /admin/*
+	handle @portal_pages {
+		reverse_proxy portal:8080
 	}
 
-	# Everything else → Kratos public (self-service flows, sessions, etc.)
+	# Kratos UI paths (login without login_challenge, registration, settings, etc.)
+	# Lab keeps the reference Kratos UI for compatibility while the Astro
+	# portal stabilises. Production drops kratos-ui entirely.
+	@kratos_ui {
+		path / /login /registration /verification /recovery /settings /welcome /home /error
+		path /assets/* /static/*
+		path *.css *.js *.svg *.png *.ico *.woff *.woff2 *.ttf
+	}
+	handle @kratos_ui {
+		reverse_proxy kratos-ui:3000
+	}
+
+	# Everything else: Kratos public (self-service flows API, sessions, identities)
 	reverse_proxy kratos:4433
 }
 
-# OIDC-native apps — plain reverse proxy
-keep.{$DOMAIN} {
-	import /etc/caddy/snippets/oidc-app.caddy
-	import oidc-app vaultwarden 80
+home-lab.{$DOMAIN} {
+	reverse_proxy portal:8080
 }
 
-larder.{$DOMAIN} {
-	import /etc/caddy/snippets/oidc-app.caddy
-	import oidc-app mealie 9000
-}
-
-listen.{$DOMAIN} {
-	import /etc/caddy/snippets/oidc-app.caddy
-	import oidc-app audiobookshelf 80
-}
-
-memory.{$DOMAIN} {
-	import /etc/caddy/snippets/oidc-app.caddy
-	import oidc-app immich-server 2283
-}
-
-# LDAP-bound app — Jellyfin
-cinema.{$DOMAIN} {
-	import /etc/caddy/snippets/ldap-app.caddy
-	import ldap-app jellyfin 8096
-}
-
-# Forward-auth app — Navidrome (with Subsonic API bypass)
-tune.{$DOMAIN} {
-	tls {
-		dns cloudflare {env.CF_API_TOKEN}
-	}
-
-	@subsonic path /rest/* /share/*
-	handle @subsonic {
-		reverse_proxy navidrome:4533
-	}
-
-	handle {
-		import /etc/caddy/snippets/forward-auth.caddy
-		import forward-auth navidrome 4533
-	}
+keep-lab.{$DOMAIN} {
+	reverse_proxy vaultwarden:80
 }

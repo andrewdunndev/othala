@@ -1,0 +1,29 @@
+# Phase 2 Caddyfile: Kratos + reference UI only. No Hydra, no Vaultwarden.
+# Identity creation happens via the Kratos admin API (POST /admin/identities)
+# from inside the VM during deploy; the browser UI exists as a fallback for
+# manual smoke testing.
+
+{
+	email admin@dunn.dev
+}
+
+auth-lab.{$DOMAIN} {
+	# Kratos serves /.well-known/ory/webauthn.js for WebAuthn ceremonies.
+	@kratos_wellknown path /.well-known/ory/*
+	handle @kratos_wellknown {
+		reverse_proxy kratos:4433
+	}
+
+	# Kratos UI paths
+	@kratos_ui {
+		path / /login /registration /verification /recovery /settings /welcome /home /error
+		path /assets/* /static/*
+		path *.css *.js *.svg *.png *.ico *.woff *.woff2 *.ttf
+	}
+	handle @kratos_ui {
+		reverse_proxy kratos-ui:3000
+	}
+
+	# Everything else: Kratos public (self-service flows API, sessions, identities)
+	reverse_proxy kratos:4433
+}

@@ -1,0 +1,78 @@
+# Hydra configuration — Phase 1 lab spike (auth-lab.${DOMAIN})
+#
+# Uses Ory's reference hydra-login-consent-node as the login/consent app
+# instead of our consent service skeleton. Decouples substrate validation
+# from our consent-service correctness.
+
+dsn: postgres://hydra:${HYDRA_PG_PASS}@postgres:5432/hydra?sslmode=disable
+
+serve:
+  public:
+    port: 4444
+    cors:
+      enabled: true
+      allowed_origins:
+        - https://auth-lab.${DOMAIN}
+        - https://keep-lab.${DOMAIN}
+      allowed_methods: [GET, POST, PUT, DELETE]
+      allowed_headers:
+        - Authorization
+        - Content-Type
+      allow_credentials: true
+  admin:
+    port: 4445
+
+urls:
+  self:
+    issuer: https://auth-lab.${DOMAIN}/
+    public: https://auth-lab.${DOMAIN}/
+
+  # Login/consent/logout point at the public host so the Kratos session
+  # cookie (Domain=auth-lab.<sslip>) travels with the redirect. The
+  # consent service runs on consent:4477 inside the pod; Caddy proxies
+  # the public path to it.
+  login: https://auth-lab.${DOMAIN}/login
+  consent: https://auth-lab.${DOMAIN}/consent
+  logout: https://auth-lab.${DOMAIN}/logout
+  error: https://auth-lab.${DOMAIN}/error
+  post_logout_redirect: https://auth-lab.${DOMAIN}/
+
+oidc:
+  subject_identifiers:
+    supported_types:
+      - public
+    pairwise:
+      salt: ${HYDRA_PAIRWISE_SALT}
+
+ttl:
+  access_token: 1h
+  refresh_token: 720h
+  id_token: 1h
+  auth_code: 10m
+  login_consent_request: 1h
+
+oauth2:
+  pkce:
+    enforced: false
+    enforced_for_public_clients: false
+  hashers:
+    bcrypt:
+      cost: 10
+  expose_internal_errors: true
+  client_credentials:
+    default_grant_allowed_scope: false
+
+secrets:
+  system:
+    - ${HYDRA_SYSTEM_SECRET}
+  # H3: rotation slots. Both _CURRENT and _PREVIOUS are populated with
+  # distinct secrets on first provision (gen-secrets.sh seeds both)
+  # because Hydra rejects empty list entries.
+  cookie:
+    - ${HYDRA_COOKIE_SECRET_CURRENT}
+    - ${HYDRA_COOKIE_SECRET_PREVIOUS}
+
+log:
+  level: info
+  format: json
+  leak_sensitive_values: false

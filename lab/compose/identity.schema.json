@@ -1,0 +1,79 @@
+{
+  "$id": "https://dunn.dev/schemas/family.identity.schema.json",
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Family member",
+  "description": "Lab spike copy of the production identity schema.",
+  "type": "object",
+  "properties": {
+    "traits": {
+      "type": "object",
+      "properties": {
+        "username": {
+          "type": "string",
+          "title": "Username",
+          "pattern": "^[a-z][a-z0-9.\\-]*[a-z0-9]$",
+          "minLength": 3,
+          "maxLength": 32,
+          "ory.sh/kratos": {
+            "credentials": {
+              "password": {"identifier": true},
+              "webauthn": {"identifier": true},
+              "totp": {"account_name": true},
+              "code": {"identifier": true, "via": "email"}
+            }
+          }
+        },
+        "email": {
+          "type": "string",
+          "format": "email",
+          "title": "Email",
+          "ory.sh/kratos": {
+            "credentials": {
+              "password": {"identifier": true},
+              "code": {"identifier": true, "via": "email"}
+            }
+          },
+          "maxLength": 320
+        },
+        "displayName": {
+          "type": "string",
+          "title": "Display name",
+          "maxLength": 64
+        }
+      },
+      "required": ["username", "email"],
+      "additionalProperties": false
+    },
+    "metadata_admin": {
+      "type": "object",
+      "title": "Admin-managed metadata",
+      "description": "Admin-only fields. Only `groups` and `roles` are accepted; future fields require a schema update so typos are rejected at write time.",
+      "properties": {
+        "groups": {
+          "type": "array",
+          "title": "Groups",
+          "items": {
+            "type": "string",
+            "pattern": "^[a-z][a-z0-9.\\-]*$",
+            "maxLength": 64
+          },
+          "uniqueItems": true
+        },
+        "roles": {
+          "type": "object",
+          "title": "Per-app role overrides",
+          "description": "Map of client_id to role name. Takes precedence over group_role_map derivation in the client manifest.",
+          "patternProperties": {
+            "^[a-z][a-z0-9]*$": {
+              "type": "string",
+              "pattern": "^[a-z][a-z0-9_\\-]*$",
+              "maxLength": 64
+            }
+          },
+          "additionalProperties": false
+        }
+      },
+      "additionalProperties": false
+    }
+  }
+}

@@ -1,0 +1,79 @@
+# Reusable Caddy snippet — Astro Node SSR portal mux for carmine.
+#
+# The portal serves both home.dunn.dev (the family launcher) and parts
+# of auth.dunn.dev (the user-facing auth flows + admin UI). The Hydra
+# consent service shares auth.dunn.dev for OAuth2/OIDC handlers
+# (/login with login_challenge, /consent, /logout). Path discipline
+# is essential because both upstreams reply on the same host.
+#
+# Two Caddyfile blocks expected at the carmine top-level:
+#
+#   home.dunn.dev {
+#     import portal-tls
+#     reverse_proxy portal:8080
+#   }
+#
+#   auth.dunn.dev {
+#     import portal-tls
+#     import auth-mux
+#   }
+#
+# `portal-tls` here just standardises the DNS-01 ACME issuer so each
+# block doesn't have to repeat it.
+#
+# `auth-mux` does the path split. Order matters: most specific first.
+# Anything matching the portal goes to the portal pod; everything else
+# falls through to the consent service or Kratos public.
+
+(portal-tls) {
+	tls {
+		dns cloudflare {env.CF_API_TOKEN}
+	}
+}
+
+(auth-mux) {
+	# WebAuthn ceremony script Kratos hosts under /.well-known/ory/*.
+	# Must come before any /.well-known/* generic match.
+	@kratos_wellknown path /.well-known/ory/*
+	handle @kratos_wellknown {
+		reverse_proxy kratos:4433
+	}
+
+	# Portal-owned WebFinger endpoint (real handler, sets jrd+json).
+	@portal_webfinger path /.well-known/webfinger
+	handle @portal_webfinger {
+		reverse_proxy portal:8080
+	}
+
+	# Hydra-flagged login (login_challenge present) -> consent service.
+	@hydra_login {
+		path /login
+		query login_challenge=*
+	}
+	handle @hydra_login {
+		reverse_proxy consent:4477
+	}
+
+	# Hydra consent + logout (no Kratos counterpart at these exact paths).
+	@hydra_other path /consent /consent/* /logout /logout/*
+	handle @hydra_other {
+		reverse_proxy consent:4477
+	}
+
+	# Hydra public OAuth2/OIDC endpoints.
+	@hydra path /oauth2/* /.well-known/openid-configuration /.well-known/jwks.json /userinfo
+	handle @hydra {
+		reverse_proxy hydra:4444
+	}
+
+	# Portal owns the user-facing auth flow pages and the admin UI.
+	# These are SSR pages on the portal Node server.
+	@portal_pages path /auth/* /admin /admin/*
+	handle @portal_pages {
+		reverse_proxy portal:8080
+	}
+
+	# Everything else on auth.dunn.dev goes to Kratos public
+	# (self-service flow API, sessions/whoami, etc.).
+	reverse_proxy kratos:4433
+}
