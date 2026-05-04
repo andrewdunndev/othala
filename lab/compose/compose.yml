@@ -32,7 +32,7 @@ services:
       retries: 5
 
   hydra-migrate:
-    image: docker.io/oryd/hydra:v2.2.0
+    image: docker.io/oryd/hydra:v26.2.0
     container_name: auth-hydra-migrate
     restart: "no"
     depends_on:
@@ -43,7 +43,7 @@ services:
     command: ["migrate", "sql", "-e", "--yes"]
 
   kratos-migrate:
-    image: docker.io/oryd/kratos:v1.3.0
+    image: docker.io/oryd/kratos:v26.2.0
     container_name: auth-kratos-migrate
     restart: "no"
     depends_on:
@@ -57,7 +57,7 @@ services:
     command: ["migrate", "sql", "-e", "--yes", "--config", "/etc/config/kratos/kratos.yml"]
 
   kratos:
-    image: docker.io/oryd/kratos:v1.3.0
+    image: docker.io/oryd/kratos:v26.2.0
     container_name: auth-kratos
     restart: unless-stopped
     depends_on:
@@ -88,7 +88,7 @@ services:
       start_period: 30s
 
   hydra:
-    image: docker.io/oryd/hydra:v2.2.0
+    image: docker.io/oryd/hydra:v26.2.0
     container_name: auth-hydra
     restart: unless-stopped
     depends_on:
@@ -121,7 +121,7 @@ services:
   # recovery, verification, error). Mounted under /auth/ via BASE_URL.
   # Production swap: replaced by our Astro UI at portal/ in Phase 3.
   kratos-ui:
-    image: docker.io/oryd/kratos-selfservice-ui-node:v1.3.0
+    image: docker.io/oryd/kratos-selfservice-ui-node:v26.2.0
     container_name: auth-kratos-ui
     restart: unless-stopped
     depends_on:
