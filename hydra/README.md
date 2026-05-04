@@ -30,7 +30,7 @@ Forward-auth-only apps (Navidrome, *arr stack) do **not** have Hydra clients —
 
 ## skip_consent
 
-Every client manifest sets `skip_consent: true`. The 16 trusted apps don't render a consent screen. The consent handler service on carmine reads this flag and auto-accepts. New clients (anything not in `clients/`) get the standard consent screen.
+Every client manifest sets `skip_consent: true`. The 11 OIDC clients listed above don't render a consent screen. The consent handler service on carmine reads this flag and auto-accepts. New clients (anything not in `clients/`) get the standard consent screen.
 
 ## secrets.system non-rotatable
 
