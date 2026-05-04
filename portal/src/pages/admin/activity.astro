@@ -5,6 +5,7 @@
 // Status: skeleton.
 export const prerender = false;
 
+import Layout from '../../layouts/Layout.astro';
 import { requireAdminSession } from '../../lib/admin';
 
 const guard = await requireAdminSession(Astro);
@@ -12,13 +13,9 @@ if (guard instanceof Response) return guard;
 
 // TODO: query Postgres "recent_activity" table for last 100 events
 ---
-<!doctype html>
-<html lang="en">
-<head><meta charset="utf-8" /><title>Activity — Admin — Dunn Family</title></head>
-<body class="bg-paper text-ink">
-  <main class="mx-auto max-w-4xl p-8">
-    <h1 class="text-2xl font-mono">Recent activity</h1>
-    <!-- TODO: table of last 100 events: timestamp, identity, action, status -->
+<Layout title="Activity — Admin — Dunn Family">
+  <main class="shell shell-lg stack-lg">
+    <h1>Recent activity</h1>
+    {/* TODO: table of last 100 events: timestamp, identity, action, status */}
   </main>
-</body>
-</html>
+</Layout>

@@ -1,0 +1,139 @@
+---
+// Admin: list users.
+//
+// Pulls every identity from Kratos admin, filters client-side by group
+// and search query (kept tiny: ~20 family identities total). Server-side
+// rendering reads filter / search params from the URL so deep links and
+// reloads stay stable.
+//
+// `last_authenticated_at` is not in the Identity schema; Kratos exposes
+// it via the session list, which is more API-cost than this page wants
+// at every render. The column is shown when the identity carries it
+// (e.g. via a future enrichment) and falls back to "—" otherwise.
+
+export const prerender = false;
+
+import Layout from '../../../layouts/Layout.astro';
+import { requireAdminSession, listIdentities } from '../../../lib/admin';
+import { knownIdentityGroups, knownAccessGroups } from '../../../lib/manifests';
+import type { Identity } from '../../../lib/types';
+
+const guard = await requireAdminSession(Astro);
+if (guard instanceof Response) return guard;
+
+const url = Astro.url;
+const search = (url.searchParams.get('q') ?? '').toLowerCase().trim();
+const groupFilters = url.searchParams.getAll('group').filter(Boolean);
+
+let identities: Identity[] = [];
+let loadError: string | null = null;
+try {
+  identities = await listIdentities();
+} catch (err) {
+  loadError = err instanceof Error ? err.message : String(err);
+}
+
+function matches(i: Identity): boolean {
+  const groups = i.metadata_admin?.groups ?? [];
+  if (groupFilters.length && !groupFilters.every((g) => groups.includes(g))) return false;
+  if (!search) return true;
+  const hay = [i.traits?.username, i.traits?.email, i.traits?.displayName]
+    .filter(Boolean)
+    .map((s) => String(s).toLowerCase())
+    .join(' ');
+  return hay.includes(search);
+}
+
+const filtered = identities.filter(matches);
+filtered.sort((a, b) =>
+  String(a.traits?.username ?? '').localeCompare(String(b.traits?.username ?? '')),
+);
+
+const allGroups = [...knownIdentityGroups(), ...knownAccessGroups()];
+---
+<Layout title="Users — Admin — Dunn Family">
+  <main class="shell shell-lg stack-lg">
+    <header class="stack">
+      <h1>Users</h1>
+      <nav class="nav-bar">
+        <a href="/admin">Overview</a>
+        <a href="/admin/users" aria-current="page">Users</a>
+        <a href="/admin/groups">Groups</a>
+        <a href="/admin/oauth2">Apps</a>
+      </nav>
+    </header>
+
+    {loadError && (
+      <div class="notice notice-danger">Failed to read identity store: {loadError}</div>
+    )}
+
+    <form method="get" class="stack">
+      <div class="field">
+        <label for="q">Search username, email, display name</label>
+        <input id="q" name="q" type="search" value={search} autocomplete="off" />
+      </div>
+      <div class="field">
+        <label>Filter by group (must include all selected)</label>
+        <div class="checkbox-grid">
+          {allGroups.map((g) => (
+            <label>
+              <input type="checkbox" name="group" value={g} checked={groupFilters.includes(g)} />
+              <span class="mono">{g}</span>
+            </label>
+          ))}
+        </div>
+      </div>
+      <div style="display: flex; gap: 0.75rem; align-items: center;">
+        <button type="submit" class="button button-secondary">Apply</button>
+        <a href="/admin/users" class="subtle mono text-sm">Clear</a>
+        <span style="flex: 1;"></span>
+        <a href="/admin/users/new" class="button button-primary">+ New user</a>
+      </div>
+    </form>
+
+    <p class="muted text-sm mono">
+      {filtered.length} of {identities.length} identities
+    </p>
+
+    <table class="data-table">
+      <thead>
+        <tr>
+          <th>Username</th>
+          <th>Display name</th>
+          <th>Email</th>
+          <th>Groups</th>
+          <th></th>
+        </tr>
+      </thead>
+      <tbody>
+        {filtered.map((i) => {
+          const groups = i.metadata_admin?.groups ?? [];
+          const identityGs = groups.filter((g) => !g.startsWith('access-'));
+          const accessGs = groups.filter((g) => g.startsWith('access-'));
+          return (
+            <tr>
+              <td class="mono">{i.traits?.username ?? '—'}</td>
+              <td>{i.traits?.displayName ?? ''}</td>
+              <td class="mono text-sm">{i.traits?.email ?? '—'}</td>
+              <td>
+                {identityGs.map((g) => <span class="badge">{g}</span>)}
+                {accessGs.length > 0 && (
+                  <span class="badge badge-muted" title={accessGs.join(', ')}>
+                    +{accessGs.length} app
+                  </span>
+                )}
+              </td>
+              <td class="actions">
+                <a href={`/admin/users/${i.id}`} class="subtle mono text-sm">view</a>
+                <a href={`/admin/users/${i.id}?mode=edit`} class="subtle mono text-sm">edit</a>
+              </td>
+            </tr>
+          );
+        })}
+        {filtered.length === 0 && !loadError && (
+          <tr><td colspan="5" class="muted">No matching identities.</td></tr>
+        )}
+      </tbody>
+    </table>
+  </main>
+</Layout>

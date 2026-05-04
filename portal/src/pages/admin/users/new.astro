@@ -1,24 +1,285 @@
 ---
-// Admin: create new user.
-// On submit: create identity in Kratos, generate one-time enrollment URL,
-// display the URL for the admin to copy and text via Signal/iMessage.
-// Status: skeleton.
+// Admin: create a new identity.
+//
+// Flow:
+//   GET  -> render form, manifest-driven group/role checkboxes
+//   POST -> validate -> Kratos createIdentity -> Kratos getRecoveryLink
+//        -> render the one-time enrollment URL for the admin to copy
+//
+// The recovery link is the canonical onboarding handoff: admin texts it
+// over Signal/iMessage, recipient lands on the recovery flow and sets up
+// password + passkey. No password ever transits a channel.
+//
+// Validation is server-side (the source of truth) with light client-side
+// hints. Kratos itself rejects malformed traits, but we surface friendlier
+// messages first.
+
 export const prerender = false;
 
-import { requireAdminSession, createIdentity, generateRecoveryURL } from '../../../lib/admin';
+import Layout from '../../../layouts/Layout.astro';
+import { requireAdminSession, createIdentity, getRecoveryLink } from '../../../lib/admin';
+import { loadClientManifests } from '../../../lib/manifests';
+import { IDENTITY_GROUP_ORDER, normalizeGroupOrder } from '../../../lib/access';
+import { signToken, verifyToken, CSRFError } from '../../../lib/csrf';
 
 const guard = await requireAdminSession(Astro);
 if (guard instanceof Response) return guard;
+const adminIdentityId = guard.identity?.id ?? '';
 
-// TODO: handle POST: createIdentity → generateRecoveryURL → render URL on success
+const manifests = loadClientManifests();
+// Form labels match the canonical order (see access.ts). Adding a new
+// identity group means updating IDENTITY_GROUP_ORDER first; this list
+// derives from it.
+const IDENTITY_GROUPS = [...IDENTITY_GROUP_ORDER];
+const ACCESS_GROUPS = manifests.map((m) => ({
+  group: m.accessGroup,
+  clientId: m.clientId,
+  clientName: m.clientName,
+}));
+
+interface FormState {
+  username: string;
+  email: string;
+  displayName: string;
+  identityGroups: string[];
+  accessGroups: string[];
+  roleOverrides: Record<string, string>;
+}
+
+const empty: FormState = {
+  username: '',
+  email: '',
+  displayName: '',
+  identityGroups: ['family'],
+  accessGroups: [],
+  roleOverrides: {},
+};
+
+let form: FormState = empty;
+let errors: Record<string, string> = {};
+let success: { recoveryUrl: string; expiresAt: string; username: string } | null = null;
+
+const USERNAME_RE = /^[a-z0-9]+(?:\.[a-z0-9]+)+$/;
+const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+function readGroups(fd: FormData, name: string): string[] {
+  return fd.getAll(name).map((v) => String(v)).filter(Boolean);
+}
+
+if (Astro.request.method === 'POST') {
+  const fd = await Astro.request.formData();
+
+  // HIGH-1: verify per-request CSRF token before any side effect.
+  try {
+    verifyToken(String(fd.get('csrf_token') ?? ''), adminIdentityId);
+  } catch (err) {
+    if (err instanceof CSRFError) {
+      return new Response(`CSRF: ${err.message}`, { status: 403 });
+    }
+    throw err;
+  }
+
+  form = {
+    username: String(fd.get('username') ?? '').trim().toLowerCase(),
+    email: String(fd.get('email') ?? '').trim(),
+    displayName: String(fd.get('displayName') ?? '').trim(),
+    identityGroups: readGroups(fd, 'identityGroups'),
+    accessGroups: readGroups(fd, 'accessGroups'),
+    roleOverrides: {},
+  };
+
+  const knownClientIds = new Set(manifests.map((m) => m.clientId));
+  for (const m of manifests) {
+    const v = String(fd.get(`role:${m.clientId}`) ?? '').trim();
+    if (v) form.roleOverrides[m.clientId] = v;
+  }
+  // LOW-1: drop any role keys not in the manifest set.
+  for (const clientId of Object.keys(form.roleOverrides)) {
+    if (!knownClientIds.has(clientId)) {
+      delete form.roleOverrides[clientId];
+    }
+  }
+
+  if (!USERNAME_RE.test(form.username)) {
+    errors.username = 'Use lowercase letters, digits, and dots: first.last';
+  }
+  if (!EMAIL_RE.test(form.email)) errors.email = 'Enter a valid email address.';
+  if (form.identityGroups.length === 0) errors.identityGroups = 'Pick at least one identity group.';
+
+  if (Object.keys(errors).length === 0) {
+    try {
+      // C4: stored order MUST match the canonical order so the consent
+      // service and Effective Access agree on group precedence. The
+      // checkbox UI rendered the boxes in canonical order already, but
+      // a malformed POST or a future drag-reorder would defeat that;
+      // normalize unconditionally.
+      const groups = normalizeGroupOrder([...form.identityGroups, ...form.accessGroups]);
+      const created = await createIdentity({
+        traits: {
+          username: form.username,
+          email: form.email,
+          displayName: form.displayName || undefined,
+        },
+        metadataAdmin: {
+          groups,
+          roles: Object.keys(form.roleOverrides).length ? form.roleOverrides : undefined,
+        },
+      });
+      const link = await getRecoveryLink(created.id, '24h');
+      success = {
+        recoveryUrl: link.recovery_link,
+        expiresAt: link.expires_at,
+        username: form.username,
+      };
+    } catch (err) {
+      errors.submit = err instanceof Error ? err.message : String(err);
+    }
+  }
+}
+
+const isAccessSelected = (g: string) => form.accessGroups.includes(g);
+
+// HIGH-1: per-request CSRF token, single-use.
+const csrfToken = signToken(adminIdentityId);
 ---
-<!doctype html>
-<html lang="en">
-<head><meta charset="utf-8" /><title>New user — Admin — Dunn Family</title></head>
-<body class="bg-paper text-ink">
-  <main class="mx-auto max-w-md p-8">
-    <h1 class="text-2xl font-mono">New user</h1>
-    <!-- TODO: form with username, email, displayName, group checkboxes -->
+<Layout title="New user — Admin — Dunn Family">
+  <main class="shell shell-md stack-lg">
+    <header class="stack">
+      <h1>New user</h1>
+      <nav class="nav-bar">
+        <a href="/admin">Overview</a>
+        <a href="/admin/users" aria-current="page">Users</a>
+        <a href="/admin/groups">Groups</a>
+        <a href="/admin/oauth2">Apps</a>
+      </nav>
+    </header>
+
+    {success ? (
+      <section class="stack-lg">
+        <div class="notice notice-success">
+          <p><strong>Identity created for {success.username}.</strong></p>
+          <p class="text-sm" style="margin-top: 0.5rem;">
+            Share this enrollment URL with them out of band (Signal, iMessage).
+            It expires {success.expiresAt}.
+          </p>
+        </div>
+        <div class="field">
+          <label for="recoveryUrl">Enrollment URL</label>
+          <input id="recoveryUrl" type="text" readonly value={success.recoveryUrl} />
+          <span class="field-hint">Single-use. Do not paste in chat history that syncs to backups.</span>
+        </div>
+        <div style="display: flex; gap: 0.75rem;">
+          <a href="/admin/users" class="button button-secondary">Back to users</a>
+          <a href="/admin/users/new" class="button button-primary">Create another</a>
+        </div>
+      </section>
+    ) : (
+      <form method="post" class="stack-lg" novalidate>
+        <input type="hidden" name="csrf_token" value={csrfToken} />
+        {errors.submit && (
+          <div class="notice notice-danger">{errors.submit}</div>
+        )}
+
+        <div class="field">
+          <label for="username">Username</label>
+          <input
+            id="username"
+            name="username"
+            type="text"
+            required
+            autocomplete="off"
+            value={form.username}
+            pattern="[a-z0-9]+(\.[a-z0-9]+)+"
+            placeholder="first.last"
+          />
+          <span class="field-hint">lowercase, dot-separated (becomes the LDAP uid).</span>
+          {errors.username && <span class="field-error">{errors.username}</span>}
+        </div>
+
+        <div class="field">
+          <label for="email">Email</label>
+          <input id="email" name="email" type="email" required value={form.email} />
+          {errors.email && <span class="field-error">{errors.email}</span>}
+        </div>
+
+        <div class="field">
+          <label for="displayName">Display name (optional)</label>
+          <input id="displayName" name="displayName" type="text" value={form.displayName} />
+        </div>
+
+        <div class="field">
+          <label>Identity groups</label>
+          <div class="checkbox-grid">
+            {IDENTITY_GROUPS.map((g) => (
+              <label>
+                <input
+                  type="checkbox"
+                  name="identityGroups"
+                  value={g}
+                  checked={form.identityGroups.includes(g)}
+                />
+                <span class="mono">{g}</span>
+              </label>
+            ))}
+          </div>
+          {errors.identityGroups && <span class="field-error">{errors.identityGroups}</span>}
+        </div>
+
+        <div class="field">
+          <label>App access (one per app)</label>
+          <div class="checkbox-grid">
+            {ACCESS_GROUPS.map((a) => (
+              <label>
+                <input
+                  type="checkbox"
+                  name="accessGroups"
+                  value={a.group}
+                  checked={form.accessGroups.includes(a.group)}
+                />
+                <span class="mono">{a.clientId}</span>
+                <span class="muted text-xs">{a.clientName}</span>
+              </label>
+            ))}
+          </div>
+        </div>
+
+        <details class="panel">
+          <summary class="mono text-sm">Per-app role overrides</summary>
+          <p class="muted text-xs" style="margin-top: 0.5rem;">
+            Skip a row to use the default role from the app's group_role_map.
+            Only apps the user has access to will resolve a role at consent time.
+          </p>
+          <div class="stack" style="margin-top: 0.75rem;">
+            {manifests.map((m) => (
+              <div class="role-row" style={isAccessSelected(m.accessGroup) ? '' : 'opacity: 0.6;'}>
+                <div>
+                  <div class="mono">{m.clientId}</div>
+                  <div class="muted text-xs">{m.clientName}</div>
+                </div>
+                {m.roles.length === 0 ? (
+                  <span class="muted text-xs mono">no roles declared</span>
+                ) : (
+                  <select name={`role:${m.clientId}`}>
+                    <option value="">(default)</option>
+                    {m.roles.map((r) => (
+                      <option value={r.name} selected={form.roleOverrides[m.clientId] === r.name}>
+                        {r.name}{r.description ? `: ${r.description}` : ''}
+                      </option>
+                    ))}
+                  </select>
+                )}
+              </div>
+            ))}
+          </div>
+        </details>
+
+        <div style="display: flex; gap: 0.75rem;">
+          <button type="submit" class="button button-primary">
+            Create + send enrollment URL
+          </button>
+          <a href="/admin/users" class="button button-secondary">Cancel</a>
+        </div>
+      </form>
+    )}
   </main>
-</body>
-</html>
+</Layout>

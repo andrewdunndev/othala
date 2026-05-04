@@ -1,31 +1,77 @@
 ---
-// Admin overview: user count, recent activity highlights, alerts.
-// Status: skeleton.
+// Admin landing.
+//
+// Three cards: Users / Groups / Apps. Each card shows the live count and
+// links to its index page. Counts are computed from Kratos identities and
+// the manifest catalog so the home admin always sees the truth, not a
+// hard-coded number.
+//
+// AAL2 enforcement happens in requireAdminSession; pages that fail the
+// guard redirect to a refresh login.
+
 export const prerender = false;
 
+import Layout from '../../layouts/Layout.astro';
 import { requireAdminSession, listIdentities } from '../../lib/admin';
+import { loadClientManifests, knownIdentityGroups, knownAccessGroups } from '../../lib/manifests';
 
 const guard = await requireAdminSession(Astro);
 if (guard instanceof Response) return guard;
 
-// TODO: real data
-const identities: unknown[] = []; // await listIdentities();
+let userCount = 0;
+let loadError: string | null = null;
+try {
+  const identities = await listIdentities();
+  userCount = identities.length;
+} catch (err) {
+  loadError = err instanceof Error ? err.message : String(err);
+}
+
+const manifests = loadClientManifests();
+const identityGroups = knownIdentityGroups();
+const accessGroups = knownAccessGroups();
 ---
-<!doctype html>
-<html lang="en">
-<head><meta charset="utf-8" /><title>Admin — Dunn Family</title></head>
-<body class="bg-paper text-ink">
-  <main class="mx-auto max-w-4xl p-8">
-    <h1 class="text-2xl font-mono">Admin</h1>
-    <nav class="mt-6 flex gap-4 text-secondary">
+<Layout title="Admin — Dunn Family">
+  <main class="shell shell-lg stack-lg">
+    <header class="stack">
+      <h1>Admin</h1>
+      <p class="muted text-sm mono">
+        {userCount} {userCount === 1 ? 'user' : 'users'},
+        {identityGroups.length} identity groups,
+        {accessGroups.length} access groups,
+        {manifests.length} OIDC clients.
+      </p>
+    </header>
+
+    <nav class="nav-bar">
+      <a href="/admin" aria-current="page">Overview</a>
       <a href="/admin/users">Users</a>
       <a href="/admin/groups">Groups</a>
-      <a href="/admin/oauth2">OAuth2 clients</a>
+      <a href="/admin/oauth2">Apps</a>
       <a href="/admin/activity">Activity</a>
     </nav>
-    <section class="mt-12">
-      <p class="text-secondary">Identity count: {identities.length}</p>
+
+    {loadError && (
+      <div class="notice notice-danger">
+        Failed to read identity store: {loadError}
+      </div>
+    )}
+
+    <section class="card-grid">
+      <a href="/admin/users" class="panel" style="display: block; text-decoration: none;">
+        <h2>Users</h2>
+        <p class="muted text-sm">{userCount} active</p>
+      </a>
+      <a href="/admin/groups" class="panel" style="display: block; text-decoration: none;">
+        <h2>Groups</h2>
+        <p class="muted text-sm">
+          {identityGroups.length} identity, {accessGroups.length} access
+        </p>
+      </a>
+      <a href="/admin/oauth2" class="panel" style="display: block; text-decoration: none;">
+        <h2>Apps</h2>
+        <p class="muted text-sm">{manifests.length} OIDC clients</p>
+      </a>
     </section>
   </main>
-</body>
-</html>
+</Layout>

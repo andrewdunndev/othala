@@ -1,30 +1,482 @@
 ---
-// Admin: user detail / edit / sessions / recovery / deactivate.
-// Status: skeleton.
+// Admin: user detail / edit / actions.
+//
+// Two modes (`?mode=edit` vs read):
+//   - Read: profile, group memberships, Effective Access table, action panel
+//   - Edit: same form layout as /admin/users/new, pre-populated, posts to
+//           this same URL with `?mode=edit`
+//
+// Actions live behind named POST buttons:
+//   action=issue-recovery -> Kratos getRecoveryLink, render the URL inline
+//   action=delete         -> Kratos deleteIdentity (requires `confirm=<username>`)
+//   action=deactivate     -> Kratos deactivateIdentity (soft delete)
+//
+// Effective Access mirrors the consent-service algorithm: per app, look
+// up override-or-derive role, render the row + source. Apps the user has
+// no access to don't appear (this is the "what can they actually use"
+// view, not the catalog).
+
 export const prerender = false;
 
-import { requireAdminSession, getIdentity, generateRecoveryURL, deactivateIdentity } from '../../../lib/admin';
+import Layout from '../../../layouts/Layout.astro';
+import {
+  requireAdminSession,
+  getIdentity,
+  updateIdentity,
+  deleteIdentity,
+  deactivateIdentity,
+  getRecoveryLink,
+  revokeUserSessions,
+  type RevokeUserResult,
+} from '../../../lib/admin';
+import { loadClientManifests } from '../../../lib/manifests';
+import {
+  computeEffectiveAccess,
+  describeSource,
+  IDENTITY_GROUP_ORDER,
+  normalizeGroupOrder,
+} from '../../../lib/access';
+import { signToken, verifyToken, CSRFError } from '../../../lib/csrf';
+import type { Identity } from '../../../lib/types';
 
 const guard = await requireAdminSession(Astro);
 if (guard instanceof Response) return guard;
+const adminIdentityId = guard.identity?.id ?? '';
 
 const { id } = Astro.params;
-let identity: any = null;
-try {
+if (!id) return new Response('Missing identity id', { status: 400 });
+
+const manifests = loadClientManifests();
+// Identity-group form labels share the canonical order with access.ts.
+const IDENTITY_GROUPS = [...IDENTITY_GROUP_ORDER];
+const ACCESS_GROUPS = manifests.map((m) => ({
+  group: m.accessGroup,
+  clientId: m.clientId,
+  clientName: m.clientName,
+}));
+const USERNAME_RE = /^[a-z0-9]+(?:\.[a-z0-9]+)+$/;
+const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+let identity: Identity | null = null;
+let loadError: string | null = null;
+
+async function reload(): Promise<void> {
   identity = await getIdentity(id!);
-} catch (err) {
-  // TODO: 404
 }
 
-// TODO: handle POST actions: traits/groups update, recovery URL gen, deactivate
+try {
+  await reload();
+} catch (err) {
+  loadError = err instanceof Error ? err.message : String(err);
+}
+
+let mode: 'read' | 'edit' = Astro.url.searchParams.get('mode') === 'edit' ? 'edit' : 'read';
+let actionResult:
+  | { kind: 'recovery'; url: string; expiresAt: string }
+  | { kind: 'deleted'; username: string }
+  | { kind: 'deactivated'; username: string }
+  | { kind: 'updated' }
+  | { kind: 'revoked'; result: RevokeUserResult }
+  | { kind: 'error'; message: string }
+  | null = null;
+let formErrors: Record<string, string> = {};
+
+if (Astro.request.method === 'POST' && identity) {
+  const fd = await Astro.request.formData();
+  const action = String(fd.get('action') ?? 'save');
+
+  // HIGH-1: every state-changing admin POST must carry a per-request
+  // CSRF token bound to the active admin's identity. The token is
+  // single-use and 30-min-TTL; verify before any side effect.
+  try {
+    verifyToken(String(fd.get('csrf_token') ?? ''), adminIdentityId);
+  } catch (err) {
+    if (err instanceof CSRFError) {
+      return new Response(`CSRF: ${err.message}`, { status: 403 });
+    }
+    throw err;
+  }
+
+  try {
+    if (action === 'save') {
+      const traits = {
+        username: String(fd.get('username') ?? '').trim().toLowerCase(),
+        email: String(fd.get('email') ?? '').trim(),
+        displayName: String(fd.get('displayName') ?? '').trim() || undefined,
+      };
+      if (!USERNAME_RE.test(traits.username)) formErrors.username = 'Invalid username pattern.';
+      if (!EMAIL_RE.test(traits.email)) formErrors.email = 'Invalid email.';
+      const identityGroups = fd.getAll('identityGroups').map(String).filter(Boolean);
+      const accessGroups = fd.getAll('accessGroups').map(String).filter(Boolean);
+      if (identityGroups.length === 0) formErrors.identityGroups = 'Pick at least one identity group.';
+
+      const knownClientIds = new Set(manifests.map((m) => m.clientId));
+      const roles: Record<string, string> = {};
+      for (const m of manifests) {
+        const v = String(fd.get(`role:${m.clientId}`) ?? '').trim();
+        if (v) roles[m.clientId] = v;
+      }
+      // LOW-1: cross-check role keys against the manifest set so a
+      // retired client_id can't accumulate in metadata_admin.roles.
+      for (const clientId of Object.keys(roles)) {
+        if (!knownClientIds.has(clientId)) {
+          delete roles[clientId];
+        }
+      }
+
+      if (Object.keys(formErrors).length === 0) {
+        // C4: stored order MUST match canonical order so consent and
+        // portal agree on which group wins for role derivation.
+        const groups = normalizeGroupOrder([...identityGroups, ...accessGroups]);
+        await updateIdentity(id, {
+          traits,
+          metadataAdmin: {
+            groups,
+            roles: Object.keys(roles).length ? roles : undefined,
+          },
+        });
+        await reload();
+        actionResult = { kind: 'updated' };
+        mode = 'read';
+      }
+    } else if (action === 'issue-recovery') {
+      // HIGH-3: refuse admin-to-admin recovery via the UI. The Kratos
+      // admin-issued recovery link bypasses the recovery-gate webhook
+      // (the gate only fires for the public /self-service/recovery/code
+      // flow). Admin recovery is console-only. See
+      // docs/runbooks/admin-recovery.md "Console recovery for an admin".
+      const target = await getIdentity(id);
+      const targetGroups = target.metadata_admin?.groups ?? [];
+      if (targetGroups.includes('admin')) {
+        actionResult = {
+          kind: 'error',
+          message:
+            'Admin recovery is console-only. See docs/runbooks/admin-recovery.md.',
+        };
+      } else {
+        const link = await getRecoveryLink(id, '24h');
+        actionResult = { kind: 'recovery', url: link.recovery_link, expiresAt: link.expires_at };
+      }
+    } else if (action === 'force-relogin') {
+      // D4: revoke every Kratos session for this identity, invalidate
+      // the consent service's identity cache, and emit OIDC back-channel
+      // logout to every RP that supports it. Apps without back-channel
+      // logout (Tailscale, vLLM, BookLore, Jellyfin SSO plugin v3.x)
+      // surface in result.failures so the operator knows where the
+      // local-session gap is.
+      const result = await revokeUserSessions(id);
+      actionResult = { kind: 'revoked', result };
+    } else if (action === 'deactivate') {
+      const username = identity.traits?.username ?? id;
+      await deactivateIdentity(id);
+      await reload();
+      actionResult = { kind: 'deactivated', username };
+    } else if (action === 'delete') {
+      const expected = identity.traits?.username ?? '';
+      const confirm = String(fd.get('confirm') ?? '').trim();
+      if (confirm !== expected) {
+        actionResult = {
+          kind: 'error',
+          message: `Type the username (${expected}) to confirm deletion.`,
+        };
+      } else {
+        await deleteIdentity(id);
+        return Astro.redirect('/admin/users?deleted=1');
+      }
+    }
+  } catch (err) {
+    actionResult = { kind: 'error', message: err instanceof Error ? err.message : String(err) };
+  }
+}
+
+const groups = identity?.metadata_admin?.groups ?? [];
+const identityGroupMembership = groups.filter((g) => !g.startsWith('access-'));
+const accessGroupMembership = groups.filter((g) => g.startsWith('access-'));
+const roleOverrides = (identity?.metadata_admin?.roles ?? {}) as Record<string, string>;
+const effective = identity ? computeEffectiveAccess(identity, manifests) : [];
+
+const formValues = {
+  username: identity?.traits?.username ?? '',
+  email: identity?.traits?.email ?? '',
+  displayName: identity?.traits?.displayName ?? '',
+  identityGroups: identityGroupMembership,
+  accessGroups: accessGroupMembership,
+  roleOverrides,
+};
+
+// HIGH-1: mint a fresh CSRF token per render. Each <form> on this page
+// gets its own token: tokens are single-use, so two forms cannot share
+// one. The TTL is 30 min (matches typical admin session of a few
+// minutes); a stale page can re-render to refresh.
+const csrfTokenSave = signToken(adminIdentityId);
+const csrfTokenActions = signToken(adminIdentityId);
+const csrfTokenDelete = signToken(adminIdentityId);
 ---
-<!doctype html>
-<html lang="en">
-<head><meta charset="utf-8" /><title>User — Admin — Dunn Family</title></head>
-<body class="bg-paper text-ink">
-  <main class="mx-auto max-w-2xl p-8">
-    <h1 class="text-2xl font-mono">{identity?.traits?.username ?? id}</h1>
-    <!-- TODO: sections for traits, groups, credentials, sessions, recovery, deactivate -->
+<Layout title={`${formValues.username || id} — Admin — Dunn Family`}>
+  <main class="shell shell-lg stack-lg">
+    <header class="stack">
+      <h1 class="mono">{formValues.username || id}</h1>
+      <nav class="nav-bar">
+        <a href="/admin">Overview</a>
+        <a href="/admin/users" aria-current="page">Users</a>
+        <a href="/admin/groups">Groups</a>
+        <a href="/admin/oauth2">Apps</a>
+      </nav>
+    </header>
+
+    {loadError && (
+      <div class="notice notice-danger">Failed to load identity: {loadError}</div>
+    )}
+
+    {actionResult?.kind === 'updated' && (
+      <div class="notice notice-success">Identity updated.</div>
+    )}
+    {actionResult?.kind === 'deactivated' && (
+      <div class="notice notice-warning">
+        {actionResult.username} marked inactive. Existing sessions revoked.
+      </div>
+    )}
+    {actionResult?.kind === 'recovery' && (
+      <div class="notice notice-success">
+        <p><strong>Enrollment URL issued.</strong> Expires {actionResult.expiresAt}.</p>
+        <input type="text" readonly value={actionResult.url} style="margin-top: 0.5rem;" />
+      </div>
+    )}
+    {actionResult?.kind === 'revoked' && (
+      <div class="notice notice-success">
+        <p>
+          <strong>Force re-login complete.</strong>
+          Kratos sessions revoked. Back-channel logout sent to {actionResult.result.backchannel_logout_sent.length} app(s){actionResult.result.failures.length ? `; ${actionResult.result.failures.length} failure(s)` : ''}.
+        </p>
+        {actionResult.result.backchannel_logout_sent.length > 0 && (
+          <p class="text-sm">
+            Sent: {actionResult.result.backchannel_logout_sent.map((c) => <span class="badge">{c}</span>)}
+          </p>
+        )}
+        {actionResult.result.failures.length > 0 && (
+          <details>
+            <summary class="text-sm">Failures (apps will keep their local session until cookie expiry)</summary>
+            <ul style="margin-top: 0.5rem;">
+              {actionResult.result.failures.map((f) => (
+                <li class="mono text-xs">{f.client_id}: {f.error}</li>
+              ))}
+            </ul>
+          </details>
+        )}
+      </div>
+    )}
+    {actionResult?.kind === 'error' && (
+      <div class="notice notice-danger">{actionResult.message}</div>
+    )}
+
+    {!identity ? null : mode === 'edit' ? (
+      <form method="post" class="stack-lg" novalidate>
+        <input type="hidden" name="action" value="save" />
+        <input type="hidden" name="csrf_token" value={csrfTokenSave} />
+
+        <div class="field">
+          <label for="username">Username</label>
+          <input
+            id="username"
+            name="username"
+            type="text"
+            required
+            value={formValues.username}
+            pattern="[a-z0-9]+(\.[a-z0-9]+)+"
+          />
+          {formErrors.username && <span class="field-error">{formErrors.username}</span>}
+        </div>
+
+        <div class="field">
+          <label for="email">Email</label>
+          <input id="email" name="email" type="email" required value={formValues.email} />
+          {formErrors.email && <span class="field-error">{formErrors.email}</span>}
+        </div>
+
+        <div class="field">
+          <label for="displayName">Display name</label>
+          <input id="displayName" name="displayName" type="text" value={formValues.displayName} />
+        </div>
+
+        <div class="field">
+          <label>Identity groups</label>
+          <div class="checkbox-grid">
+            {IDENTITY_GROUPS.map((g) => (
+              <label>
+                <input
+                  type="checkbox"
+                  name="identityGroups"
+                  value={g}
+                  checked={formValues.identityGroups.includes(g)}
+                />
+                <span class="mono">{g}</span>
+              </label>
+            ))}
+          </div>
+          {formErrors.identityGroups && <span class="field-error">{formErrors.identityGroups}</span>}
+        </div>
+
+        <div class="field">
+          <label>App access</label>
+          <div class="checkbox-grid">
+            {ACCESS_GROUPS.map((a) => (
+              <label>
+                <input
+                  type="checkbox"
+                  name="accessGroups"
+                  value={a.group}
+                  checked={formValues.accessGroups.includes(a.group)}
+                />
+                <span class="mono">{a.clientId}</span>
+                <span class="muted text-xs">{a.clientName}</span>
+              </label>
+            ))}
+          </div>
+        </div>
+
+        <details class="panel">
+          <summary class="mono text-sm">Per-app role overrides</summary>
+          <div class="stack" style="margin-top: 0.75rem;">
+            {manifests.map((m) => (
+              <div class="role-row">
+                <div>
+                  <div class="mono">{m.clientId}</div>
+                  <div class="muted text-xs">{m.clientName}</div>
+                </div>
+                {m.roles.length === 0 ? (
+                  <span class="muted text-xs mono">no roles declared</span>
+                ) : (
+                  <select name={`role:${m.clientId}`}>
+                    <option value="">(default)</option>
+                    {m.roles.map((r) => (
+                      <option
+                        value={r.name}
+                        selected={formValues.roleOverrides[m.clientId] === r.name}
+                      >
+                        {r.name}{r.description ? `: ${r.description}` : ''}
+                      </option>
+                    ))}
+                  </select>
+                )}
+              </div>
+            ))}
+          </div>
+        </details>
+
+        <div style="display: flex; gap: 0.75rem;">
+          <button type="submit" class="button button-primary">Save</button>
+          <a href={`/admin/users/${id}`} class="button button-secondary">Cancel</a>
+        </div>
+      </form>
+    ) : (
+      <section class="stack-lg">
+        <section class="panel stack">
+          <h2>Profile</h2>
+          <dl class="stack" style="display: grid; grid-template-columns: 9rem 1fr; gap: 0.5rem 1rem;">
+            <dt class="muted text-sm mono">id</dt>
+            <dd class="mono text-xs">{identity.id}</dd>
+            <dt class="muted text-sm mono">state</dt>
+            <dd class="mono text-sm">{identity.state ?? 'active'}</dd>
+            <dt class="muted text-sm mono">email</dt>
+            <dd class="mono text-sm">{formValues.email}</dd>
+            <dt class="muted text-sm mono">displayName</dt>
+            <dd>{formValues.displayName || <span class="muted">(unset)</span>}</dd>
+          </dl>
+          <div style="margin-top: 0.5rem;">
+            <a href={`/admin/users/${id}?mode=edit`} class="button button-secondary">Edit</a>
+          </div>
+        </section>
+
+        <section class="panel stack">
+          <h2>Groups</h2>
+          <div>
+            <p class="muted text-xs mono">identity</p>
+            <div style="margin-top: 0.25rem;">
+              {identityGroupMembership.length
+                ? identityGroupMembership.map((g) => <span class="badge">{g}</span>)
+                : <span class="muted text-sm">none</span>}
+            </div>
+          </div>
+          <div>
+            <p class="muted text-xs mono">access</p>
+            <div style="margin-top: 0.25rem;">
+              {accessGroupMembership.length
+                ? accessGroupMembership.map((g) => <span class="badge badge-muted">{g}</span>)
+                : <span class="muted text-sm">none</span>}
+            </div>
+          </div>
+        </section>
+
+        <section class="panel stack">
+          <h2>Effective access</h2>
+          <p class="muted text-xs">
+            Per app, the role this user receives at consent time. Mirrors
+            the consent service algorithm.
+          </p>
+          {effective.length === 0 ? (
+            <p class="muted text-sm">No app access. Add an access-* group to grant entry.</p>
+          ) : (
+            <table class="data-table">
+              <thead>
+                <tr>
+                  <th>App</th>
+                  <th>Role</th>
+                  <th>Source</th>
+                </tr>
+              </thead>
+              <tbody>
+                {effective.map((row) => (
+                  <tr>
+                    <td>
+                      <span class="mono">{row.clientId}</span>
+                      <span class="muted text-xs"> {row.clientName}</span>
+                    </td>
+                    <td><span class="badge">{row.role}</span></td>
+                    <td class="muted text-sm mono">{describeSource(row.source)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
+        </section>
+
+        <section class="panel stack">
+          <h2>Actions</h2>
+          <form method="post" style="display: flex; gap: 0.75rem; flex-wrap: wrap;">
+            <input type="hidden" name="csrf_token" value={csrfTokenActions} />
+            <button name="action" value="issue-recovery" type="submit" class="button button-secondary">
+              Issue enrollment URL
+            </button>
+            <button name="action" value="force-relogin" type="submit" class="button button-secondary">
+              Force re-login
+            </button>
+            <button name="action" value="deactivate" type="submit" class="button button-secondary">
+              Deactivate
+            </button>
+          </form>
+          <p class="muted text-xs">
+            Force re-login revokes Kratos sessions and asks every supported app to log the user out (OIDC back-channel logout). Apps without that capability keep their local session until the per-app cookie expires.
+          </p>
+
+          <details>
+            <summary class="mono text-sm" style="color: var(--danger); cursor: pointer;">
+              Delete identity
+            </summary>
+            <form method="post" class="stack" style="margin-top: 0.75rem;">
+              <input type="hidden" name="action" value="delete" />
+              <input type="hidden" name="csrf_token" value={csrfTokenDelete} />
+              <p class="text-sm">
+                Permanent. Type <span class="mono">{formValues.username}</span> to confirm.
+              </p>
+              <div class="field">
+                <label for="confirm">Confirm username</label>
+                <input id="confirm" name="confirm" type="text" autocomplete="off" required />
+              </div>
+              <button type="submit" class="button button-danger">Delete permanently</button>
+            </form>
+          </details>
+        </section>
+      </section>
+    )}
   </main>
-</body>
-</html>
+</Layout>

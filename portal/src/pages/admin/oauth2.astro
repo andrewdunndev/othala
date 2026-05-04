@@ -1,39 +1,129 @@
 ---
-// Admin: OAuth2 clients (read-only). Reads from Hydra admin /admin/clients.
-// Source of truth is hydra/clients/*.yaml + apply-clients.sh; this page
-// shows the current state.
-// Status: skeleton.
+// Admin: OAuth2 clients (read-only).
+//
+// Source of truth is `hydra/clients/*.yaml` + `apply-clients.sh`. This
+// page renders the manifest catalog the Worker bundle was built with;
+// editing happens in the repo, not here.
+//
+// The "Edit" affordance is a disabled button with a tooltip pointing
+// the admin at the yaml. Roles + group_role_map come from the manifest;
+// when an app's yaml has no roles block (Phase 4 work), the table shows
+// "(none)" so the absence is visible.
+
 export const prerender = false;
 
-import { requireAdminSession, listOAuth2Clients } from '../../lib/admin';
+import Layout from '../../layouts/Layout.astro';
+import { requireAdminSession } from '../../lib/admin';
+import { loadClientManifests } from '../../lib/manifests';
 
 const guard = await requireAdminSession(Astro);
 if (guard instanceof Response) return guard;
 
-let clients: any[] = [];
-try {
-  clients = await listOAuth2Clients() as any[];
-} catch (err) {
-  // TODO
-}
+const manifests = loadClientManifests();
 ---
-<!doctype html>
-<html lang="en">
-<head><meta charset="utf-8" /><title>OAuth2 — Admin — Dunn Family</title></head>
-<body class="bg-paper text-ink">
-  <main class="mx-auto max-w-4xl p-8">
-    <h1 class="text-2xl font-mono">OAuth2 clients</h1>
-    <p class="mt-2 text-sm text-secondary">
-      Read-only. Manage in hydra/clients/*.yaml then run apply-clients.sh.
-    </p>
-    <ul class="mt-6 space-y-3">
-      {clients.map(c => (
-        <li class="border-b border-rules/50 pb-2">
-          <div class="font-mono">{c.client_id} — {c.client_name}</div>
-          <div class="text-sm text-secondary">{(c.scope ?? '').toString()}</div>
-        </li>
+<Layout title="Apps — Admin — Dunn Family">
+  <main class="shell shell-lg stack-lg">
+    <header class="stack">
+      <h1>Apps</h1>
+      <nav class="nav-bar">
+        <a href="/admin">Overview</a>
+        <a href="/admin/users">Users</a>
+        <a href="/admin/groups">Groups</a>
+        <a href="/admin/oauth2" aria-current="page">Apps</a>
+      </nav>
+      <p class="muted text-sm">
+        Read-only. Edit <span class="mono">hydra/clients/*.yaml</span> in the
+        auth repo, then run <span class="mono">apply-clients.sh</span> and
+        rebuild the portal.
+      </p>
+    </header>
+
+    <section class="stack-lg">
+      {manifests.map((m) => (
+        <article class="panel stack">
+          <header style="display: flex; justify-content: space-between; align-items: baseline; gap: 1rem;">
+            <div>
+              <h2 class="mono">{m.clientId}</h2>
+              <p class="muted text-sm">{m.clientName}</p>
+            </div>
+            <button
+              type="button"
+              class="button button-secondary"
+              disabled
+              title="Edit hydra/clients/{m.clientId}.yaml in the repo"
+            >
+              Edit yaml in repo
+            </button>
+          </header>
+
+          <dl style="display: grid; grid-template-columns: 9rem 1fr; gap: 0.4rem 1rem; font-size: var(--text-sm);">
+            <dt class="muted mono">access group</dt>
+            <dd><span class="badge badge-muted">{m.accessGroup}</span></dd>
+
+            <dt class="muted mono">grant types</dt>
+            <dd class="mono text-xs">{m.grantTypes.join(', ') || '(none)'}</dd>
+
+            <dt class="muted mono">scopes</dt>
+            <dd class="mono text-xs">{m.scopes.join(' ') || '(none)'}</dd>
+
+            <dt class="muted mono">audience</dt>
+            <dd class="mono text-xs">{m.audience.join(', ') || '(none)'}</dd>
+
+            <dt class="muted mono">redirect uris</dt>
+            <dd>
+              <ul class="stack mono text-xs" style="list-style: none;">
+                {m.redirectUris.map((u) => <li>{u}</li>)}
+                {m.redirectUris.length === 0 && <li class="muted">(none)</li>}
+              </ul>
+            </dd>
+
+            <dt class="muted mono">skip consent</dt>
+            <dd class="mono text-xs">{m.skipConsent ? 'true' : 'false'}</dd>
+          </dl>
+
+          <div>
+            <p class="muted text-xs mono">declared roles</p>
+            {m.roles.length === 0 ? (
+              <p class="muted text-sm">(none — populate <span class="mono">roles:</span> in the yaml)</p>
+            ) : (
+              <table class="data-table">
+                <thead>
+                  <tr><th>name</th><th>description</th></tr>
+                </thead>
+                <tbody>
+                  {m.roles.map((r) => (
+                    <tr>
+                      <td><span class="badge">{r.name}</span></td>
+                      <td class="muted text-sm">{r.description || '(no description)'}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            )}
+          </div>
+
+          <div>
+            <p class="muted text-xs mono">group_role_map</p>
+            {Object.keys(m.groupRoleMap).length === 0 ? (
+              <p class="muted text-sm">(none)</p>
+            ) : (
+              <table class="data-table">
+                <thead>
+                  <tr><th>identity group</th><th>default role</th></tr>
+                </thead>
+                <tbody>
+                  {Object.entries(m.groupRoleMap).map(([g, r]) => (
+                    <tr>
+                      <td><span class="badge">{g}</span></td>
+                      <td><span class="badge badge-muted">{r}</span></td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            )}
+          </div>
+        </article>
       ))}
-    </ul>
+    </section>
   </main>
-</body>
-</html>
+</Layout>

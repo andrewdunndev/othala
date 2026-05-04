@@ -1,32 +1,140 @@
 ---
-// Admin: groups overview. Lists known groups (from configured catalog
-// + observed in metadata_admin), with member counts.
-// Status: skeleton.
+// Admin: groups overview (read-only).
+//
+// Two sections:
+//   - Identity groups (admin / family / kids / friends + any other group
+//     a manifest references via group_role_map). Each card lists members.
+//   - Access groups (access-*). Each card names the app it grants entry
+//     to and lists members.
+//
+// Editing happens on the per-user page. This is a navigation aid: spot
+// who's in `kids`, who can reach `access-cinema`, etc.
+
 export const prerender = false;
 
+import Layout from '../../layouts/Layout.astro';
 import { requireAdminSession, listIdentities } from '../../lib/admin';
+import { loadClientManifests, knownIdentityGroups } from '../../lib/manifests';
+import type { Identity } from '../../lib/types';
 
 const guard = await requireAdminSession(Astro);
 if (guard instanceof Response) return guard;
 
-const KNOWN_GROUPS = [
-  'admin', 'family', 'friends', 'kids',
-  'access-keep', 'access-larder', 'access-listen', 'access-cinema',
-  'access-tune', 'access-memory', 'access-vault', 'access-gather',
-  'access-library', 'access-llm', 'access-forge', 'access-observe',
-];
+let identities: Identity[] = [];
+let loadError: string | null = null;
+try {
+  identities = await listIdentities();
+} catch (err) {
+  loadError = err instanceof Error ? err.message : String(err);
+}
 
-// TODO: count members per group from listIdentities
+const manifests = loadClientManifests();
+const identityGroups = knownIdentityGroups();
+const accessGroups = manifests.map((m) => ({
+  group: m.accessGroup,
+  clientId: m.clientId,
+  clientName: m.clientName,
+}));
+
+interface MemberRef {
+  id: string;
+  username: string;
+  displayName?: string;
+}
+
+function membersOf(group: string): MemberRef[] {
+  const out: MemberRef[] = [];
+  for (const i of identities) {
+    if ((i.metadata_admin?.groups ?? []).includes(group)) {
+      out.push({
+        id: i.id,
+        username: i.traits?.username ?? i.id,
+        displayName: i.traits?.displayName,
+      });
+    }
+  }
+  out.sort((a, b) => a.username.localeCompare(b.username));
+  return out;
+}
 ---
-<!doctype html>
-<html lang="en">
-<head><meta charset="utf-8" /><title>Groups — Admin — Dunn Family</title></head>
-<body class="bg-paper text-ink">
-  <main class="mx-auto max-w-2xl p-8">
-    <h1 class="text-2xl font-mono">Groups</h1>
-    <ul class="mt-6">
-      {KNOWN_GROUPS.map(g => <li class="py-1">{g}</li>)}
-    </ul>
+<Layout title="Groups — Admin — Dunn Family">
+  <main class="shell shell-lg stack-lg">
+    <header class="stack">
+      <h1>Groups</h1>
+      <nav class="nav-bar">
+        <a href="/admin">Overview</a>
+        <a href="/admin/users">Users</a>
+        <a href="/admin/groups" aria-current="page">Groups</a>
+        <a href="/admin/oauth2">Apps</a>
+      </nav>
+    </header>
+
+    {loadError && (
+      <div class="notice notice-danger">Failed to read identity store: {loadError}</div>
+    )}
+
+    <section class="stack">
+      <h2>Identity groups</h2>
+      <p class="muted text-sm">Who you are. Drives default roles via group_role_map.</p>
+      <div class="card-grid">
+        {identityGroups.map((g) => {
+          const members = membersOf(g);
+          return (
+            <article class="panel">
+              <h2 class="mono">{g}</h2>
+              <p class="muted text-xs">{members.length} {members.length === 1 ? 'member' : 'members'}</p>
+              <ul class="stack" style="list-style: none; margin-top: 0.5rem;">
+                {members.map((m) => (
+                  <li>
+                    <a href={`/admin/users/${m.id}`} class="subtle mono text-sm">
+                      {m.username}
+                    </a>
+                    {m.displayName && (
+                      <span class="muted text-xs"> {m.displayName}</span>
+                    )}
+                  </li>
+                ))}
+                {members.length === 0 && (
+                  <li class="muted text-sm">empty</li>
+                )}
+              </ul>
+            </article>
+          );
+        })}
+      </div>
+    </section>
+
+    <section class="stack">
+      <h2>Access groups</h2>
+      <p class="muted text-sm">What you can reach. One per OIDC client.</p>
+      <div class="card-grid">
+        {accessGroups.map((a) => {
+          const members = membersOf(a.group);
+          return (
+            <article class="panel">
+              <h2 class="mono">{a.group}</h2>
+              <p class="muted text-xs">
+                grants entry to <span class="mono">{a.clientId}</span> ({a.clientName})
+              </p>
+              <p class="muted text-xs">
+                {members.length} {members.length === 1 ? 'member' : 'members'}
+              </p>
+              <ul class="stack" style="list-style: none; margin-top: 0.5rem;">
+                {members.map((m) => (
+                  <li>
+                    <a href={`/admin/users/${m.id}`} class="subtle mono text-sm">
+                      {m.username}
+                    </a>
+                  </li>
+                ))}
+                {members.length === 0 && (
+                  <li class="muted text-sm">empty</li>
+                )}
+              </ul>
+            </article>
+          );
+        })}
+      </div>
+    </section>
   </main>
-</body>
-</html>
+</Layout>
