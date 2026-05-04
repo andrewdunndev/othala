@@ -1,14 +1,14 @@
 # glauth-kratos
 
-Custom glauth binary with an embedded Kratos backend. Translates LDAP BIND and SEARCH operations to Ory Kratos public-API and admin-API calls. Identities live in Kratos; this bridge presents them over LDAP for clients that need the LDAP protocol (Jellyfin's LDAP plugin for Apple TV / Infuse).
+LDAP bridge to Ory Kratos. Translates LDAP BIND and SEARCH operations to Kratos public-API and admin-API calls. Identities live in Kratos; this bridge presents them over LDAP for clients that need the LDAP protocol (Jellyfin's LDAP plugin for Apple TV / Infuse).
 
 ## Status
 
-Skeleton (Phase 0). Real implementation lands in Phase 2 of the build (see `../docs/STATUS.md`). The structure here is the contract — interfaces, config shape, deployment pattern.
+Phase 2 implementation in place. Code compiles, unit tests pass, binary boots and parses the sample config. Lab validation against a live Kratos is the next step. See `../docs/STATUS.md` for the broader project state.
 
-## Why a custom glauth binary
+## Why this binary, not a glauth fork
 
-glauth has a plugin/handler system; v2.5.0 (April 2026) added compile-time embedded plugins as the recommended path (vs runtime `.so` loading). We build a custom glauth binary with our Kratos handler imported as a side-effect import, registered via `init()`. Same direct-go-build pattern as the custom Caddy image.
+glauth v2.4 has no public handler-registration API. Backends are wired by a hard-coded switch on `backend.Datastore` in `pkg/server`, the `embed` path is build-tag gated to sqlite, and the `plugin` path opens runtime `.so` files (which fights distroless and CGO). The cleanest path is to own the entrypoint: this binary links `github.com/glauth/ldap` (the same LDAP server library glauth uses) and registers our Kratos handler directly. The handler still implements glauth's `pkg/handler.Handler` interface, so it remains drop-in for any future upstream registration API.
 
 ## How it works
 
@@ -78,4 +78,4 @@ make test        # go test ./kratos/...
 
 ## Upstream contribution path
 
-If the bridge proves out in production, extract `kratos/` package (and the surrounding glauth-binary scaffolding) to its own repo: `gitlab.com/dunn.dev/glauth-kratos` (or github mirror). Submit to glauth as an embedded-plugin contribution. Generally useful for any Kratos consumer needing LDAP — meaningful upstream value.
+If the bridge proves out in production, extract the `kratos/` package and its scaffolding to its own repo: `gitlab.com/dunn.dev/glauth-kratos` (or a GitHub mirror). Submit to glauth as a contribution: a public handler-registration API would let this slot in without forking. Generally useful for any Kratos consumer needing LDAP.

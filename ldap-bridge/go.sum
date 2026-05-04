@@ -1,0 +1,8 @@
+github.com/BurntSushi/toml v1.4.0 h1:kuoIxZQy2WRRk1pttg9asf+WVv6tWQuBNVmK8+nqPr0=
+github.com/BurntSushi/toml v1.4.0/go.mod h1:ukJfTF/6rtPPRCnwkur4qwRxa8vTRFBF0uk2lLoLwho=
+github.com/glauth/glauth/v2 v2.4.0 h1:wxZp33kB/1y0DADZCEdTwWJCHignXFLS9ndKfxDafdo=
+github.com/glauth/glauth/v2 v2.4.0/go.mod h1:gjcmMY9PW7oa7ZvlTP4gKO71zkYGs2+17kz0kYVyTnk=
+github.com/glauth/ldap v0.0.0-20240419171521-1f14f5c1b4ad h1:2ERGXiofR9ISXg4evamCngs2EeuMhVJRuDwWGa6bS6s=
+github.com/glauth/ldap v0.0.0-20240419171521-1f14f5c1b4ad/go.mod h1:5ueZMujvJ5nuYPyBj6uQTPV4R1YshboRa/osaP4Emfs=
+github.com/go-asn1-ber/asn1-ber v1.5.5 h1:MNHlNMBDgEKD4TcKr36vQN68BA00aDfjIt3/bD50WnA=
+github.com/go-asn1-ber/asn1-ber v1.5.5/go.mod h1:hEBeB/ic+5LoWskz+yKT7vGhhPYkProFKoKdwZRWMe0=

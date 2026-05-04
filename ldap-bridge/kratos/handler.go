@@ -2,61 +2,64 @@
 // Kratos backend. Identities live in Kratos; the bridge translates
 // LDAP BIND and SEARCH to Kratos public-API and admin-API calls.
 //
-// Handler composition (per glauth v2.4+):
-//   - ldap.Binder        — credential verification (this package)
-//   - ldap.Searcher      — entry lookup (this package)
-//   - ldap.Adder         — no-op (identities are managed via Kratos admin)
-//   - ldap.Modifier      — no-op
-//   - ldap.Deleter       — no-op
-//   - ldap.Closer        — connection cleanup
-//   - HelperMaker        — provides FindUser/FindGroup helpers used by glauth
+// Handler composition (per glauth pkg/handler.Handler):
+//   - ldap.Binder        credential verification
+//   - ldap.Searcher      entry lookup
+//   - ldap.Adder         no-op (identities are managed via Kratos admin)
+//   - ldap.Modifier      no-op
+//   - ldap.Deleter       no-op
+//   - ldap.Closer        connection cleanup
+//   - HelperMaker        FindUser/FindGroup helpers used by glauth
 //
-// CRITICAL design notes (from feasibility-q1-kratos-bind.md):
-//   - Bind uses Kratos /self-service/login API flow with aal=aal1.
-//     Setting aal>1 risks identity=null in whoami responses for
-//     MFA-enabled users (won't bite Bind directly, but matters for
-//     consistency with the cached identity lookup).
-//   - Bind result is cached briefly (~30s) per identity to absorb
-//     Apple TV / Jellyfin reconnect storms (Argon2 is expensive).
-//   - Search uses Kratos /admin/identities. Bridge admin token is
-//     scoped identity-read-only.
-//   - Identity cache TTL ~30s with polling refresh. Kratos admin
-//     mutations don't fire webhooks, so push-invalidation isn't
-//     possible without that contribution upstream.
+// Notes:
+//   - BIND uses Kratos /self-service/login with the API flow. We submit
+//     identifier+password and treat 200 as success, 4xx as wrong creds,
+//     5xx as Unavailable.
+//   - SEARCH refreshes the identity cache on stale read, returns all
+//     entries scoped to the request base; the LDAP server (with
+//     EnforceLDAP set in main.go) applies the filter and scope post-hoc.
+//   - Bind result cache holds positive results briefly (default 30s) to
+//     absorb Apple TV / Jellyfin reconnect storms (Argon2 is expensive
+//     per-call).
+//   - Identity cache refreshes on stale read (default 30s). Kratos
+//     admin mutations don't fire webhooks, so we poll.
 package kratos
 
 import (
 	"context"
 	"errors"
+	"net"
+	"strings"
 	"sync"
 	"time"
 
-	"github.com/go-ldap/ldap/v3"
-	glauth "github.com/glauth/glauth/v2/pkg/handler"
+	"github.com/glauth/glauth/v2/pkg/config"
+	"github.com/glauth/ldap"
 )
 
-// Config is unmarshalled from glauth's config file under
-// `[backend.handler.kratos]` once the handler is registered.
+// Config is the typed runtime config for the kratos handler. The
+// binary's main package builds this from its config file.
 type Config struct {
-	// Public Kratos URL for self-service flows (BIND target).
-	PublicURL string `mapstructure:"public_url"`
+	// PublicURL is the public Kratos URL used for BIND verification.
+	PublicURL string
 
-	// Admin Kratos URL for identity listing (SEARCH target).
-	AdminURL string `mapstructure:"admin_url"`
+	// AdminURL is the admin Kratos URL used for identity listing.
+	AdminURL string
 
-	// Identity-read-only admin API token. Scope: identities:read.
-	// Source: Kratos admin-token issuance + Bitwarden-managed env var.
-	AdminToken string `mapstructure:"admin_token"`
+	// AdminToken authorizes admin API calls. Scope: identities:read.
+	AdminToken string
 
-	// LDAP base DN, e.g., "dc=dunn,dc=dev"
-	BaseDN string `mapstructure:"base_dn"`
+	// BaseDN is the LDAP base, e.g., "dc=dunn,dc=dev".
+	BaseDN string
 
-	// Cache TTL for identity list and bind results.
-	IdentityCacheTTL time.Duration `mapstructure:"identity_cache_ttl"`
-	BindCacheTTL     time.Duration `mapstructure:"bind_cache_ttl"`
+	// IdentityCacheTTL controls how long admin-API listings are reused.
+	IdentityCacheTTL time.Duration
+
+	// BindCacheTTL controls how long positive bind results are cached.
+	BindCacheTTL time.Duration
 }
 
-// Handler implements glauth's Handler composition.
+// Handler implements glauth's Handler interface.
 type Handler struct {
 	cfg     Config
 	client  *Client
@@ -65,8 +68,7 @@ type Handler struct {
 	mu      sync.RWMutex
 }
 
-// New constructs a Handler. Registered with glauth via the init()
-// in this package.
+// New constructs a Handler from a validated Config.
 func New(cfg Config) (*Handler, error) {
 	if cfg.PublicURL == "" || cfg.AdminURL == "" || cfg.AdminToken == "" {
 		return nil, errors.New("kratos handler: public_url, admin_url, admin_token required")
@@ -81,49 +83,36 @@ func New(cfg Config) (*Handler, error) {
 		cfg.BindCacheTTL = 30 * time.Second
 	}
 
-	h := &Handler{
+	return &Handler{
 		cfg:     cfg,
 		client:  newClient(cfg),
 		idCache: newIdentityCache(cfg.IdentityCacheTTL),
 		bdCache: newBindCache(cfg.BindCacheTTL),
-	}
-	return h, nil
+	}, nil
 }
 
 // Bind verifies credentials by initiating a Kratos public-API login flow.
-// On 200 from Kratos, bind succeeds. The Kratos session token returned by
-// the login flow is discarded — we only use the API for verification.
+// On 200 from Kratos, bind succeeds. The Kratos session token returned
+// by the login flow is discarded: we use the API for verification only.
 func (h *Handler) Bind(bindDN, bindSimplePw string, conn net.Conn) (ldap.LDAPResultCode, error) {
 	username, err := parseUsernameFromDN(bindDN, h.cfg.BaseDN)
 	if err != nil {
 		return ldap.LDAPResultInvalidDNSyntax, err
 	}
 
-	// Check bind cache first (absorbs Apple TV reconnect storms).
 	if h.bdCache.verify(username, bindSimplePw) {
 		return ldap.LDAPResultSuccess, nil
 	}
-
-	// TODO: real implementation
-	// 1. POST <PublicURL>/self-service/login/api -> get flow_id
-	// 2. POST <PublicURL>/self-service/login?flow=<flow_id>
-	//    body: {"method":"password","identifier":username,"password":pw}
-	//    headers: Accept: application/json, Content-Type: application/json
-	// 3. 200 -> success; cache (username,pw_hash,success); return LDAPResultSuccess
-	// 4. 4xx -> failure; do not cache; return LDAPResultInvalidCredentials
-	// 5. 5xx -> error; return LDAPResultUnavailable
-	//
-	// Edge case: identity has MFA enabled and Kratos required_aal=highest_available
-	// would return 200 with session.identity=null. Kratos.yml sets
-	// session.whoami.required_aal=aal1 to avoid this. Bind only uses login flow,
-	// not whoami, so this is informational.
 
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 
 	ok, err := h.client.VerifyPassword(ctx, username, bindSimplePw)
 	if err != nil {
-		return ldap.LDAPResultUnavailable, err
+		if errors.Is(err, ErrUnavailable) {
+			return ldap.LDAPResultUnavailable, err
+		}
+		return ldap.LDAPResultOperationsError, err
 	}
 	if !ok {
 		return ldap.LDAPResultInvalidCredentials, nil
@@ -133,69 +122,184 @@ func (h *Handler) Bind(bindDN, bindSimplePw string, conn net.Conn) (ldap.LDAPRes
 	return ldap.LDAPResultSuccess, nil
 }
 
-// Search returns LDAP entries by translating from cached Kratos identities.
-// Filter and base DN are applied per glauth's normal filter logic.
+// Search returns LDAP entries built from cached Kratos identities. The
+// LDAP server (configured with EnforceLDAP=true in main.go) applies
+// scope and filter post-hoc, so this method may over-return.
 func (h *Handler) Search(boundDN string, searchReq ldap.SearchRequest, conn net.Conn) (ldap.ServerSearchResult, error) {
-	// TODO: real implementation
-	// 1. Refresh cache if stale (h.idCache.refresh)
-	// 2. Build a slice of *ldap.Entry from h.idCache.entries:
-	//      DN: uid=<traits.username>,ou=users,<base_dn>
-	//      Attributes:
-	//        objectClass: [inetOrgPerson, posixAccount]
-	//        uid: traits.username
-	//        cn: traits.displayName || traits.username
-	//        mail: traits.email
-	//        memberOf: [cn=<group>,ou=groups,<base_dn> for group in metadata_admin.groups]
-	// 3. Filter through glauth's filter helpers using searchReq.Filter
-	// 4. Return matched subset in ServerSearchResult
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
 
-	if err := h.idCache.refresh(context.Background(), h.client); err != nil {
-		// Stale cache returns are acceptable on transient Kratos outages
-		// for read paths. Log and continue.
+	if err := h.idCache.refresh(ctx, h.client); err != nil {
+		// Stale entries are acceptable on transient Kratos outages.
 	}
 
-	entries := h.idCache.entriesForBase(searchReq.BaseDN, h.cfg.BaseDN)
-	filtered := applyFilter(entries, searchReq.Filter)
+	entries := h.entries()
 
 	return ldap.ServerSearchResult{
-		Entries:    filtered,
+		Entries:    entries,
 		Referrals:  []string{},
 		Controls:   []ldap.Control{},
 		ResultCode: ldap.LDAPResultSuccess,
 	}, nil
 }
 
-// Add, Modify, Delete: identity changes go through Kratos admin API, not LDAP.
-// We return Unwilling To Perform on these operations.
+// entries projects the cached identity list and group set into LDAP
+// entries: one user entry per identity, one group entry per distinct
+// group across the identity set.
+func (h *Handler) entries() []*ldap.Entry {
+	idents := h.idCache.snapshot()
+	groups := h.idCache.allGroups()
 
-func (h *Handler) Add(req ldap.AddRequest, conn net.Conn) (ldap.LDAPResultCode, error) {
-	return ldap.LDAPResultUnwillingToPerform, errors.New("identities are managed via Kratos admin API, not LDAP")
+	out := make([]*ldap.Entry, 0, len(idents)+len(groups))
+
+	for _, ident := range idents {
+		out = append(out, h.userEntry(&ident))
+	}
+	for name, members := range groups {
+		out = append(out, h.groupEntry(name, members))
+	}
+	return out
 }
 
-func (h *Handler) Modify(req ldap.ModifyRequest, conn net.Conn) (ldap.LDAPResultCode, error) {
-	return ldap.LDAPResultUnwillingToPerform, errors.New("identities are managed via Kratos admin API, not LDAP")
+func (h *Handler) userEntry(ident *Identity) *ldap.Entry {
+	display := ident.Display
+	if display == "" {
+		display = ident.Username
+	}
+
+	memberOf := make([]string, 0, len(ident.Groups))
+	for _, g := range ident.Groups {
+		memberOf = append(memberOf, h.groupDN(g))
+	}
+
+	dn := h.userDN(ident.Username)
+	attrs := []*ldap.EntryAttribute{
+		{Name: "objectClass", Values: []string{"inetOrgPerson", "posixAccount"}},
+		{Name: "uid", Values: []string{ident.Username}},
+		{Name: "cn", Values: []string{display}},
+		{Name: "sn", Values: []string{display}},
+	}
+	if ident.Email != "" {
+		attrs = append(attrs, &ldap.EntryAttribute{Name: "mail", Values: []string{ident.Email}})
+	}
+	if len(memberOf) > 0 {
+		attrs = append(attrs, &ldap.EntryAttribute{Name: "memberOf", Values: memberOf})
+	}
+	return &ldap.Entry{DN: dn, Attributes: attrs}
 }
 
-func (h *Handler) Delete(boundDN string, deleteDN string, conn net.Conn) (ldap.LDAPResultCode, error) {
-	return ldap.LDAPResultUnwillingToPerform, errors.New("identities are managed via Kratos admin API, not LDAP")
+func (h *Handler) groupEntry(name string, members []string) *ldap.Entry {
+	memberDNs := make([]string, 0, len(members))
+	for _, m := range members {
+		memberDNs = append(memberDNs, h.userDN(m))
+	}
+	attrs := []*ldap.EntryAttribute{
+		{Name: "objectClass", Values: []string{"groupOfNames"}},
+		{Name: "cn", Values: []string{name}},
+	}
+	if len(memberDNs) > 0 {
+		attrs = append(attrs, &ldap.EntryAttribute{Name: "member", Values: memberDNs})
+	}
+	return &ldap.Entry{DN: h.groupDN(name), Attributes: attrs}
+}
+
+func (h *Handler) userDN(username string) string {
+	return "uid=" + username + ",ou=users," + h.cfg.BaseDN
+}
+
+func (h *Handler) groupDN(name string) string {
+	return "cn=" + name + ",ou=groups," + h.cfg.BaseDN
+}
+
+// Add, Modify, Delete: identity changes go through Kratos admin API.
+// LDAP write operations are refused.
+
+func (h *Handler) Add(boundDN string, req ldap.AddRequest, conn net.Conn) (ldap.LDAPResultCode, error) {
+	return ldap.LDAPResultUnwillingToPerform, errors.New("identities are managed via Kratos admin API")
+}
+
+func (h *Handler) Modify(boundDN string, req ldap.ModifyRequest, conn net.Conn) (ldap.LDAPResultCode, error) {
+	return ldap.LDAPResultUnwillingToPerform, errors.New("identities are managed via Kratos admin API")
+}
+
+func (h *Handler) Delete(boundDN, deleteDN string, conn net.Conn) (ldap.LDAPResultCode, error) {
+	return ldap.LDAPResultUnwillingToPerform, errors.New("identities are managed via Kratos admin API")
 }
 
 func (h *Handler) Close(boundDN string, conn net.Conn) error {
-	// Per-connection cleanup if any. Currently no per-connection state.
 	return nil
 }
 
-// HelperMaker glauth interface — for the FindUser / FindGroup helpers
-// glauth uses internally during search.
-func (h *Handler) FindUser(username string, searchByUPN bool) (bool, glauth.User, error) {
-	// TODO: lookup from identity cache; return User struct populated from Kratos identity
-	return false, glauth.User{}, errors.New("not implemented")
+// FindUser is glauth's HelperMaker hook used during search composition.
+// We project a Kratos identity onto the config.User shape glauth uses
+// internally. Password fields are intentionally empty: bind goes
+// through Bind() against Kratos directly.
+func (h *Handler) FindUser(ctx context.Context, userName string, searchByUPN bool) (bool, config.User, error) {
+	if err := h.idCache.refresh(ctx, h.client); err != nil {
+		// fall through to whatever the cache holds
+	}
+
+	want := userName
+	if searchByUPN {
+		// UPN is "user@domain"; we match the local part if a Kratos
+		// identity uses that as username, or fall back to email.
+		if at := strings.Index(want, "@"); at > 0 {
+			localPart := want[:at]
+			if ident := h.idCache.findByUsername(localPart); ident != nil {
+				return true, h.toConfigUser(ident), nil
+			}
+		}
+		for _, ident := range h.idCache.snapshot() {
+			if strings.EqualFold(ident.Email, want) {
+				i := ident
+				return true, h.toConfigUser(&i), nil
+			}
+		}
+		return false, config.User{}, nil
+	}
+
+	if ident := h.idCache.findByUsername(want); ident != nil {
+		return true, h.toConfigUser(ident), nil
+	}
+	return false, config.User{}, nil
 }
 
-func (h *Handler) FindGroup(groupName string) (bool, glauth.Group, error) {
-	// TODO: derive groups from union of all identities' metadata_admin.groups
-	return false, glauth.Group{}, errors.New("not implemented")
+func (h *Handler) toConfigUser(ident *Identity) config.User {
+	display := ident.Display
+	if display == "" {
+		display = ident.Username
+	}
+	return config.User{
+		Name:        ident.Username,
+		Mail:        ident.Email,
+		GivenName:   display,
+		SN:          display,
+		CustomAttrs: map[string]interface{}{},
+	}
 }
 
-// Imports placeholders below; real go.mod resolves these.
-type net struct{ Conn struct{} }
+// FindGroup derives groups from the union of all identities'
+// metadata_admin.groups.
+func (h *Handler) FindGroup(ctx context.Context, groupName string) (bool, config.Group, error) {
+	if err := h.idCache.refresh(ctx, h.client); err != nil {
+		// serve stale
+	}
+	groups := h.idCache.allGroups()
+	if _, ok := groups[groupName]; !ok {
+		return false, config.Group{}, nil
+	}
+	return true, config.Group{Name: groupName}, nil
+}
+
+// FlushBindCacheFor (MEDIUM-5) drops bind-cache entries so the next bind
+// for the named identity hits Kratos directly (Argon2 verify) rather
+// than the cached positive result. Called from the admin HTTP endpoint
+// after the consent service signals a force-relogin.
+//
+// Bind cache keys mix in the password, so we cannot match by username
+// alone without storing the password (which we deliberately don't). The
+// implementation drops the entire bind cache; rebuild cost is low at
+// family scale.
+func (h *Handler) FlushBindCacheFor(username string) {
+	h.bdCache.FlushOne(username)
+}

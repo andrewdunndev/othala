@@ -1,37 +1,11 @@
-// Package init: register the kratos handler with glauth's plugin registry.
+// Package init notes.
+//
+// glauth v2.5 has no public handler-registration API: backends are
+// wired by a hard-coded switch in pkg/server, and the embed path is
+// build-tag gated to sqlite. So this package does NOT call any
+// handler.Register at init time. The binary's main package wires the
+// Handler directly onto a github.com/glauth/ldap server. Our Handler
+// implements glauth's pkg/handler.Handler interface, so the kratos
+// package remains drop-in for any future upstream registration API
+// without code changes here.
 package kratos
-
-import (
-	"github.com/glauth/glauth/v2/pkg/handler"
-)
-
-// init registers our handler under the name "kratos" so glauth.cfg can
-// reference it via:
-//
-//	[backend]
-//	handler = kratos
-//	[backend.kratos]
-//	public_url = "http://kratos:4433"
-//	admin_url = "http://kratos:4434"
-//	admin_token_env = "KRATOS_BRIDGE_ADMIN_TOKEN"
-//	base_dn = "dc=dunn,dc=dev"
-//	identity_cache_ttl = "30s"
-//	bind_cache_ttl = "30s"
-//
-// glauth invokes our factory with the parsed config map.
-func init() {
-	handler.Register("kratos", func(cfg map[string]interface{}) (handler.Handler, error) {
-		c, err := configFromMap(cfg)
-		if err != nil {
-			return nil, err
-		}
-		return New(c)
-	})
-}
-
-// configFromMap unmarshals glauth's config map into our typed Config.
-// (glauth uses mapstructure under the hood; this is a thin wrapper.)
-func configFromMap(m map[string]interface{}) (Config, error) {
-	// TODO: real implementation via mapstructure.Decode
-	return Config{}, nil
-}
