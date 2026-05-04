@@ -6,7 +6,7 @@ Read this first if you're picking up the project cold.
 
 **Phase:** 0 — drafting locked Ory configs and skeletons.
 
-**Substrate:** Ory Kratos (identity) + Ory Hydra (OAuth2/OIDC) + custom glauth-kratos LDAP bridge (we build) + Astro UI on carmine (Node SSR, in-cluster pod) + custom Caddy image (built directly via go build, no xcaddy). Decided after evaluating Authentik, kanidm, Authelia, Hanko, voidauth, Pocket-ID, Zitadel.
+**Substrate:** Ory Kratos (identity) + Ory Hydra (OAuth2/OIDC) + custom glauth-kratos LDAP bridge (we build) + Astro UI on carmine (Node SSR, in-cluster pod) + custom Caddy image at `registry.gitlab.com/dunn.dev/caddy-estate`, built with xcaddy + `caddy-dns/cloudflare` plugin. Decided after evaluating Authentik, kanidm, Authelia, Hanko, voidauth, Pocket-ID, Zitadel.
 
 **Why Ory:** total UI control to match dunn.dev/design, composable architecture, no commercial-tier creep, the LDAP bridge is publishable as a glauth plugin (upstream contribution opportunity).
 
@@ -47,7 +47,7 @@ Read this first if you're picking up the project cold.
 - 4 feasibility validations (Q1-Q4) for the Ory architecture, all GREEN/YELLOW. Under `lab/docs/feasibility-q*.md`.
 - Adversarial review against upstream Ory/Hydra/glauth/Astro 6 docs completed. Two CRITICAL findings caught and corrected (AAL2 enforcement layer, glauth interface). Six HIGH findings folded into the design. At `lab/docs/adversarial-review.md`.
 - Authentik blueprints removed from working tree (preserved in git history at commit `9cebdd8`).
-- Caddy custom image (`dunn.dev/caddy-estate`) Containerfile written: direct go build, one plugin (`caddy-dns/cloudflare`).
+- Caddy custom image (`registry.gitlab.com/dunn.dev/caddy-estate`) Containerfile written: built with xcaddy, one plugin (`caddy-dns/cloudflare`).
 - Maintainer-walk findings for kanidm (the rejection evidence) at `upstream/firstyear-walk/findings.md`.
 
 ## What's next (immediate)

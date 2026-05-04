@@ -19,7 +19,7 @@ Phase 1 (lab spike) is next; full plan and decision history at `docs/decision.md
 | `hydra/` | Hydra server config + 11 OIDC client manifests + apply script |
 | `consent/` | Consent service (Go, runs on carmine alongside Hydra) |
 | `ldap-bridge/` | glauth-kratos: custom glauth binary with embedded Kratos backend |
-| `caddy/` | Custom dunn.dev/caddy-estate image build (direct go build, no xcaddy) + reusable Caddyfile snippets |
+| `caddy/` | Custom registry.gitlab.com/dunn.dev/caddy-estate image build (xcaddy + caddy-dns/cloudflare plugin) + reusable Caddyfile snippets |
 | `portal/` | Astro UI on Cloudflare Workers (login + recovery + settings + tile launcher + admin) |
 | `lab/` | GCP-based test environment (compose stack, scripts, Playwright suite, eval+feasibility+adversarial docs) |
 | `upstream/` | Maintainer-walk findings and contribution drafts |

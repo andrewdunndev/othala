@@ -1,6 +1,6 @@
 # Architecture
 
-Production topology after the locked Ory pivot. Custom Caddy image (direct go build), DNS-only Cloudflare in front, port-forward 443 on home router. Kratos + Hydra + glauth-kratos + consent service + Astro portal all on carmine, in the same pod network.
+Production topology after the locked Ory pivot. Custom Caddy image at `registry.gitlab.com/dunn.dev/caddy-estate` (built with xcaddy + `caddy-dns/cloudflare` plugin), DNS-only Cloudflare in front, port-forward 443 on home router. Kratos + Hydra + glauth-kratos + consent service + Astro portal all on carmine, in the same pod network.
 
 ## Topology
 
@@ -186,7 +186,7 @@ not Wait.
 
 ## Custom Caddy image
 
-`dunn.dev/caddy-estate`: built directly via `go build` from upstream Caddy + plugin Go modules (no xcaddy). One plugin: `caddy-dns/cloudflare`. Forward-auth via Caddy's built-in `forward_auth` directive against Kratos.
+`registry.gitlab.com/dunn.dev/caddy-estate`: built with xcaddy + `caddy-dns/cloudflare` plugin. Forward-auth via Caddy's built-in `forward_auth` directive against Kratos.
 
 ## Image tag pinning (L6)
 
