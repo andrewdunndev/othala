@@ -7,11 +7,11 @@ PROJECT_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
 
 GCP_PROJECT="${GCP_PROJECT:-}"
 GCP_ZONE="${GCP_ZONE:-us-east1-b}"
-GCP_MACHINE_TYPE="${GCP_MACHINE_TYPE:-e2-standard-4}"
+GCP_MACHINE_TYPE="${GCP_MACHINE_TYPE:-e2-standard-2}"
 GCP_DISK_SIZE="${GCP_DISK_SIZE:-30}"
-GCP_IMAGE_FAMILY="${GCP_IMAGE_FAMILY:-centos-stream-10}"
-GCP_IMAGE_PROJECT="${GCP_IMAGE_PROJECT:-centos-cloud}"
-VM_NAME="${BENCH_VM_NAME:-bench-sso-$(date +%s)}"
+GCP_IMAGE_FAMILY="${GCP_IMAGE_FAMILY:-fedora-cloud-42-x86-64}"
+GCP_IMAGE_PROJECT="${GCP_IMAGE_PROJECT:-fedora-cloud}"
+VM_NAME="${AUTH_VM_NAME:-auth-lab-$(date +%s)}"
 MAX_LIFETIME_SEC="${MAX_LIFETIME_SEC:-7200}"
 
 STATE_FILE="${PROJECT_DIR}/.gcp-state"
@@ -41,7 +41,7 @@ gcp_up() {
     local image_family
     image_family=$(resolve_image_family)
 
-    echo "=== Creating bench VM: ${VM_NAME} ==="
+    echo "=== Creating auth lab VM: ${VM_NAME} ==="
     echo "  Project: ${GCP_PROJECT}"
     echo "  Zone:    ${GCP_ZONE}"
     echo "  Type:    ${GCP_MACHINE_TYPE}"
@@ -57,7 +57,7 @@ gcp_up() {
         --image-project="$GCP_IMAGE_PROJECT" \
         --boot-disk-size="${GCP_DISK_SIZE}GB" \
         --boot-disk-type=pd-standard \
-        --metadata-from-file=startup-script="${SCRIPT_DIR}/setup-vm.sh"$([ -f "${PROJECT_DIR}/.env" ] && echo ",auth-env=${PROJECT_DIR}/.env") \
+        --metadata-from-file=startup-script="${SCRIPT_DIR}/setup-vm.sh"$([ -f "${PROJECT_DIR}/compose/.env" ] && echo ",auth-env=${PROJECT_DIR}/compose/.env") \
         --metadata="max-lifetime-sec=${MAX_LIFETIME_SEC}" \
         --tags=http-server,https-server \
         --scopes=default \
@@ -106,8 +106,8 @@ EOF
 
     echo "=== VM ready ==="
     echo "  IP:  ${outer_ip}"
-    echo "  SSH: make gcp-ssh"
-    echo "  DNS: Set *.test.dunn.dev A record to ${outer_ip}"
+    echo "  SSH: make lab-ssh"
+    echo "  DNS: make lab-dns-up   (creates auth-lab + keep-lab DNS records)"
 }
 
 gcp_wait_ssh() {
@@ -135,7 +135,7 @@ gcp_wait_setup() {
         if gcloud compute ssh "$VM_NAME" \
             --project="$GCP_PROJECT" \
             --zone="$GCP_ZONE" \
-            --command="test -f /opt/bench-sso-iac/.setup-complete" \
+            --command="test -f /opt/auth-lab/.setup-complete" \
             --ssh-flag="-o ConnectTimeout=10" \
             --ssh-flag="-o StrictHostKeyChecking=no" \
             --quiet 2>/dev/null; then

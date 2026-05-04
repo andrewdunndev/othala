@@ -18,3 +18,8 @@ venv/
 .terraform/
 .idea/
 .vscode/
+
+# Build artifacts (Go binaries; rebuilt locally / in CI)
+/consent/consent
+/ldap-bridge/glauth-kratos
+/ldap-bridge/ldap-bridge

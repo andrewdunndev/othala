@@ -1,157 +1,147 @@
 #!/usr/bin/env bash
 # shellcheck disable=SC1091
+# Phase 1 lab spike deploy: bring up Kratos+Hydra+reference-consent+Vaultwarden,
+# wait for health, register the keep-lab OIDC client.
+
 set -euo pipefail
 
 AUTH_DIR="/opt/auth-lab"
 COMPOSE_DIR="${AUTH_DIR}/lab/compose"
-SCRIPTS_DIR="${AUTH_DIR}/lab/scripts"
-BLUEPRINTS_DIR="${AUTH_DIR}/authentik/blueprints"
-CADDY_DIR="${AUTH_DIR}/caddy"
-TOKEN_FILE="${AUTH_DIR}/.ak-token"
 
-echo "=== Deploying auth-lab ==="
+echo "=== Deploying auth-lab spike ==="
 
-# --- Load env ---
-if [[ -f "${AUTH_DIR}/.env" ]]; then
-    set -a
-    source "${AUTH_DIR}/.env"
-    set +a
-    echo "Loaded .env (DOMAIN=${DOMAIN:-unset})"
-else
+if [[ ! -f "${AUTH_DIR}/.env" ]]; then
     echo "ERROR: No .env file at ${AUTH_DIR}/.env" >&2
     exit 1
 fi
 
-# --- Validate required vars ---
-for var in AUTHENTIK_SECRET_KEY AUTHENTIK_PG_PASS AUTHENTIK_BOOTSTRAP_PASSWORD DOMAIN; do
+set -a
+source "${AUTH_DIR}/.env"
+set +a
+echo "Loaded .env (DOMAIN=${DOMAIN:-unset})"
+
+for var in DOMAIN POSTGRES_PASSWORD KRATOS_PG_PASS HYDRA_PG_PASS \
+           KRATOS_COOKIE_SECRET_CURRENT KRATOS_CIPHER_SECRET_CURRENT \
+           HYDRA_SYSTEM_SECRET HYDRA_COOKIE_SECRET_CURRENT HYDRA_PAIRWISE_SALT \
+           KEEP_CLIENT_SECRET CONSENT_ADMIN_BEARER; do
     if [[ -z "${!var:-}" ]]; then
-        echo "ERROR: Required variable ${var} is not set in .env" >&2
+        echo "ERROR: Required variable ${var} is not set" >&2
         exit 1
     fi
 done
 
-# --- Build the custom Caddy image (cloudflare DNS-01 plugin) ---
-if ! podman image exists dunn.dev/caddy-estate:lab; then
-    echo "Building dunn.dev/caddy-estate:lab from upstream Caddy + plugin modules..."
-    podman build -t dunn.dev/caddy-estate:lab -f "${CADDY_DIR}/Containerfile" "${CADDY_DIR}/" 2>&1 | tail -10
-else
-    echo "dunn.dev/caddy-estate:lab already built"
-fi
+# H3 rotation slots: both _CURRENT and _PREVIOUS are populated with
+# distinct secrets on first provision (gen-secrets.sh seeds both). If
+# any _PREVIOUS slot is empty, abort: an empty entry in Kratos or Hydra
+# `secrets.cookie` / `secrets.cipher` is a YAML schema violation and
+# the service refuses to boot. Treat this as a misconfigured .env, not
+# something to paper over with sed.
+for var in KRATOS_COOKIE_SECRET_PREVIOUS KRATOS_CIPHER_SECRET_PREVIOUS HYDRA_COOKIE_SECRET_PREVIOUS; do
+    if [[ -z "${!var:-}" ]]; then
+        echo "ERROR: ${var} is empty. Re-run lab/scripts/gen-secrets.sh; both _CURRENT and _PREVIOUS rotation slots must carry distinct values." >&2
+        exit 1
+    fi
+done
 
 cd "$COMPOSE_DIR"
 
-# --- Ensure .env is accessible from compose directory ---
 if [[ ! -f "${COMPOSE_DIR}/.env" ]]; then
     ln -sf "${AUTH_DIR}/.env" "${COMPOSE_DIR}/.env"
-    echo "Linked .env into compose directory"
 fi
 
-# --- Fix blueprint permissions for container UID 1000 ---
-chown -R 1000:1000 "${BLUEPRINTS_DIR}" 2>/dev/null || true
+# Pre-render Kratos / Hydra config: substitute ${VAR} placeholders.
+# Kratos and Hydra do not natively interpolate ${VAR} in YAML; their config
+# loader treats it as a literal string. We render the YAMLs through envsubst
+# and mount the rendered version into the containers.
+echo "Rendering Kratos + Hydra configs (envsubst)..."
+KRATOS_VARS='${DOMAIN} ${KRATOS_PG_PASS} ${KRATOS_COOKIE_SECRET_CURRENT} ${KRATOS_COOKIE_SECRET_PREVIOUS} ${KRATOS_CIPHER_SECRET_CURRENT} ${KRATOS_CIPHER_SECRET_PREVIOUS}'
+HYDRA_VARS='${DOMAIN} ${HYDRA_PG_PASS} ${HYDRA_SYSTEM_SECRET} ${HYDRA_COOKIE_SECRET_CURRENT} ${HYDRA_COOKIE_SECRET_PREVIOUS} ${HYDRA_PAIRWISE_SALT}'
+envsubst "$KRATOS_VARS" < kratos.lab.yml > kratos.rendered.yml
+envsubst "$HYDRA_VARS"  < hydra.lab.yml  > hydra.rendered.yml
 
-# --- Pull images ---
-echo "Pulling images (this may take a few minutes)..."
-podman-compose pull 2>&1 | tail -10
+echo "Rendered: kratos.rendered.yml ($(wc -l < kratos.rendered.yml) lines), hydra.rendered.yml ($(wc -l < hydra.rendered.yml) lines)"
 
-# --- Start the stack ---
+# Build local images that aren't pulled from a registry. Skip if
+# already present (idempotent re-deploy).
+echo "Building local images (consent + portal) if needed..."
+if ! podman image exists dunn.dev/consent:lab; then
+    echo "  building dunn.dev/consent:lab"
+    (cd "${AUTH_DIR}/consent" && podman build -t dunn.dev/consent:lab .) | tail -5
+fi
+if ! podman image exists dunn.dev/auth-portal:lab; then
+    echo "  building dunn.dev/auth-portal:lab (context = auth repo root)"
+    (cd "${AUTH_DIR}" && podman build -t dunn.dev/auth-portal:lab -f portal/Containerfile .) | tail -5
+fi
+
+echo "Pulling registry images..."
+podman-compose pull 2>&1 | tail -10 || true
+
 echo "Starting services..."
 podman-compose up -d 2>&1
 
-# --- Wait for Authentik ---
-echo "Waiting for Authentik to be healthy..."
-MAX_WAIT=300
+# Wait for Hydra (the slowest dependency before client registration)
+echo "Waiting for Hydra admin API..."
+MAX_WAIT=180
 ELAPSED=0
 while (( ELAPSED < MAX_WAIT )); do
-    if curl -sf http://localhost:9000/-/health/live/ >/dev/null 2>&1; then
-        echo "Authentik healthy after ${ELAPSED}s"
+    if podman exec auth-hydra wget -qO- http://localhost:4445/health/ready >/dev/null 2>&1; then
+        echo "Hydra healthy after ${ELAPSED}s"
         break
     fi
-    sleep 10
-    ELAPSED=$((ELAPSED + 10))
-    if (( ELAPSED % 60 == 0 )); then
-        echo "  still waiting... (${ELAPSED}s)"
-        # Show last error from server logs
-        podman logs auth-authentik-server 2>&1 | grep -i 'error' | tail -1
-    fi
+    sleep 5
+    ELAPSED=$((ELAPSED + 5))
 done
 
 if (( ELAPSED >= MAX_WAIT )); then
-    echo "ERROR: Authentik did not become healthy within ${MAX_WAIT}s" >&2
-    echo "--- auth-authentik-server logs ---"
-    podman logs auth-authentik-server 2>&1 | tail -30
+    echo "ERROR: Hydra did not become healthy within ${MAX_WAIT}s" >&2
+    podman logs auth-hydra 2>&1 | tail -30
     exit 1
 fi
 
-# --- Generate API token ---
-echo "Generating API token via ak create_admin_token..."
-AK_TOKEN=""
-for attempt in 1 2 3; do
-    AK_TOKEN=$(podman exec -e AUTHENTIK_SECRET_KEY="${AUTHENTIK_SECRET_KEY}" \
-        -e AUTHENTIK_POSTGRESQL__HOST=postgres \
-        -e AUTHENTIK_POSTGRESQL__NAME=authentik \
-        -e AUTHENTIK_POSTGRESQL__USER=authentik \
-        -e AUTHENTIK_POSTGRESQL__PASSWORD="${AUTHENTIK_PG_PASS}" \
-        auth-authentik-server ak create_admin_token 2>/dev/null | grep -v '{' | tr -d '[:space:]')
-    if [[ -n "$AK_TOKEN" ]] && [[ ${#AK_TOKEN} -gt 10 ]]; then
-        echo "  Token generated (${#AK_TOKEN} chars)"
-        echo "$AK_TOKEN" > "$TOKEN_FILE"
-        break
-    fi
-    echo "  Attempt $attempt failed, retrying in 10s..."
-    sleep 10
-done
+# Register the keep-lab OIDC client (Vaultwarden's exposed client_id;
+# kept registered separately because the lab Vaultwarden uses its own
+# host and redirect path).
+echo "Registering keep-lab OIDC client in Hydra..."
+podman exec auth-hydra hydra create client \
+    --endpoint http://localhost:4445 \
+    --id keep-lab \
+    --secret "${KEEP_CLIENT_SECRET}" \
+    --name "Vaultwarden Lab" \
+    --grant-type authorization_code,refresh_token \
+    --response-type code \
+    --scope openid,email,profile,offline_access \
+    --redirect-uri "https://keep-lab.${DOMAIN}/identity/connect/oidc-signin" \
+    --post-logout-callback "https://keep-lab.${DOMAIN}/" \
+    --token-endpoint-auth-method client_secret_basic \
+    --skip-consent \
+    --format json 2>&1 | tail -20 || \
+    echo "  (client may already exist, that's OK)"
 
-if [[ -z "$AK_TOKEN" ]] || [[ ${#AK_TOKEN} -lt 10 ]]; then
-    echo "WARNING: Could not generate API token. Manual setup needed." >&2
-    echo "  Run: podman exec auth-authentik-server ak create_admin_token"
+# Apply production OIDC client manifests. apply-clients.sh reads
+# hydra/clients/*.yaml and POSTs the oidc: block to Hydra. Run from
+# the host VM against the published Hydra container IP. The lab VM's
+# setup script (setup-vm.sh) installs jq; yq comes from podman-compose
+# install since the dnf yq is the wrong yq (kislyuk python-yq is what
+# this script targets).
+echo "Applying production OIDC client manifests..."
+if ! command -v yq >/dev/null 2>&1; then
+    echo "  installing yq (python-yq) via pip..."
+    pip3 install --quiet yq 2>/dev/null || pip install --quiet yq 2>/dev/null || true
+fi
+HYDRA_IP=$(podman inspect -f '{{range .NetworkSettings.Networks}}{{.IPAddress}}{{end}}' auth-hydra 2>/dev/null || echo "")
+if [[ -n "$HYDRA_IP" ]]; then
+    HYDRA_ADMIN_URL="http://${HYDRA_IP}:4445" \
+        bash "${AUTH_DIR}/hydra/apply-clients.sh" 2>&1 | tail -30 || \
+        echo "  apply-clients had failures (some manifests may have prod-only constraints)"
+else
+    echo "  WARN: could not resolve auth-hydra container IP; skipping apply-clients"
 fi
 
-# --- Wait for blueprints ---
-echo "Waiting for worker to process blueprints (60s)..."
-sleep 60
-
-# --- Verify blueprints (if we have a token) ---
-if [[ -n "$AK_TOKEN" ]]; then
-    echo "Checking blueprint results..."
-    AK_URL="http://localhost:9000"
-    GROUPS=$(curl -sf -H "Authorization: Bearer ${AK_TOKEN}" \
-        "${AK_URL}/api/v3/core/groups/" 2>/dev/null | jq '.pagination.count // 0' 2>/dev/null || echo 0)
-    APPS=$(curl -sf -H "Authorization: Bearer ${AK_TOKEN}" \
-        "${AK_URL}/api/v3/core/applications/" 2>/dev/null | jq '.pagination.count // 0' 2>/dev/null || echo 0)
-    PROVIDERS=$(curl -sf -H "Authorization: Bearer ${AK_TOKEN}" \
-        "${AK_URL}/api/v3/providers/all/" 2>/dev/null | jq '.pagination.count // 0' 2>/dev/null || echo 0)
-    echo "  Groups: ${GROUPS}, Applications: ${APPS}, Providers: ${PROVIDERS}"
-
-    if [[ "$GROUPS" -lt 3 ]] || [[ "$APPS" -lt 1 ]]; then
-        echo "WARNING: Fewer objects than expected" >&2
-        echo "  Check: podman logs auth-authentik-worker | grep -i blueprint" >&2
-    fi
-fi
-
-# --- Set test user passwords ---
-if [[ -n "$AK_TOKEN" ]]; then
-    echo "Setting test user passwords..."
-    export AUTHENTIK_BOOTSTRAP_TOKEN="$AK_TOKEN"
-    bash "${SCRIPTS_DIR}/set-passwords.sh" || echo "  WARNING: password setting failed"
-fi
-
-# --- Configure apps that need API-based OIDC setup ---
-echo "Configuring app OIDC via API..."
-bash "${SCRIPTS_DIR}/configure-apps.sh" || echo "  WARNING: app configuration had failures"
-
-# --- Summary ---
 echo ""
-echo "=== Deployment complete ==="
-echo "  Authentik:     http://localhost:9000"
-echo "  Admin login:   akadmin / ${AUTHENTIK_BOOTSTRAP_PASSWORD}"
-if [[ -n "$AK_TOKEN" ]]; then
-    echo "  API token:     ${AK_TOKEN:0:8}... (saved to ${TOKEN_FILE})"
-fi
-echo "  Services:      podman-compose ps"
+echo "=== Lab deployment complete ==="
+echo "  Kratos:    https://auth-lab.${DOMAIN}/self-service/registration/browser"
+echo "  Hydra:     https://auth-lab.${DOMAIN}/.well-known/openid-configuration"
+echo "  Vaultwarden: https://keep-lab.${DOMAIN}"
 echo ""
 echo "  Running containers:"
 podman ps --format '  {{.Names}}\t{{.Status}}' 2>/dev/null | sort
-echo ""
-echo "  Next steps:"
-echo "  1. Set *.${DOMAIN} A record to this VM's IP"
-echo "  2. Run: make smoke-local"
