@@ -1,16 +1,59 @@
-client_name: Mealie
-client_id: larder
-grant_types:
-  - authorization_code
-  - refresh_token
-response_types:
-  - code
-scope: openid email profile groups offline_access
-redirect_uris:
-  - https://larder.dunn.dev/login
-post_logout_redirect_uris:
-  - https://larder.dunn.dev/
-token_endpoint_auth_method: client_secret_basic
-skip_consent: true
-audience:
-  - https://larder.dunn.dev
+# Mealie — larder.dunn.dev
+#
+# Mealie OIDC v2 documents standard OIDC RP-initiated logout. Back-channel
+# logout support is partial in mainline; the URI below is set
+# optimistically per the OIDC spec convention. If Mealie returns 4xx on
+# the logout token in the lab, fall back to admin session revoke and file
+# an upstream issue.
+
+oidc:
+  client_id: larder
+  client_name: Mealie
+  grant_types:
+    - authorization_code
+    - refresh_token
+  response_types:
+    - code
+  scope: openid email profile groups offline_access
+  redirect_uris:
+    - https://larder.dunn.dev/login
+  post_logout_redirect_uris:
+    - https://larder.dunn.dev/
+  token_endpoint_auth_method: client_secret_basic
+  audience:
+    - https://larder.dunn.dev
+  skip_consent: true
+  backchannel_logout_uri: https://larder.dunn.dev/api/auth/oidc/logout
+
+# Consent claim shape for this client.
+#
+# Mealie OIDC v2 reads the claim named by OIDC_GROUPS_CLAIM (default
+# `groups`) and treats it as a string array. Membership in the group
+# named by OIDC_USER_GROUP gates login; membership in OIDC_ADMIN_GROUP
+# elevates the user to admin in Mealie. JIT user creation is enabled
+# by default. Two roles only: admin and user.
+#
+# App env on the larder side (set in the Mealie quadlet, not here):
+#   OIDC_AUTH_ENABLED=true
+#   OIDC_GROUPS_CLAIM=groups
+#   OIDC_USER_GROUP=larder-user
+#   OIDC_ADMIN_GROUP=larder-admin
+#   OIDC_USER_CLAIMS_UPDATE=true
+#
+# Source: https://docs.mealie.io/documentation/getting-started/authentication/oidc-v2
+consent:
+  emit_groups_claim: true
+  roles:
+    admin:
+      description: "Admin: manage households, users, and global recipes."
+      claim_emit:
+        groups: ["larder-admin", "larder-user"]
+    user:
+      description: "Browse, add, and edit recipes within own household."
+      claim_emit:
+        groups: ["larder-user"]
+  group_role_map:
+    admin: admin
+    family: user
+    friends: user
+    kids: user
