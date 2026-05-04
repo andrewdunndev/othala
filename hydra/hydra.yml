@@ -73,8 +73,13 @@ secrets:
   # without rebuilding the database.
   system:
     - ${HYDRA_SYSTEM_SECRET}
+
+  # Cookie secret with current/previous slot pattern. See
+  # docs/runbooks/cookie-rotation.md for the rotation procedure. Mirror
+  # of the Kratos shape so both services share one runbook.
   cookie:
-    - ${HYDRA_COOKIE_SECRET}
+    - ${HYDRA_COOKIE_SECRET_CURRENT}
+    - ${HYDRA_COOKIE_SECRET_PREVIOUS}
 
 log:
   level: info
