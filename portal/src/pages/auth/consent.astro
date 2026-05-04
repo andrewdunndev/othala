@@ -2,10 +2,10 @@
 // Hydra consent screen redirect.
 //
 // We don't render consent here. The consent service co-located with
-// Hydra on carmine handles the consent_challenge auto-accept (since all
-// 16 trusted clients have skip_consent: true). This page is just a
-// fallback in case Hydra redirects here directly — we forward the
-// challenge to the consent service.
+// Hydra on carmine handles the consent_challenge auto-accept (the 11
+// OIDC clients in hydra/clients/ all set skip_consent: true). This
+// page is just a fallback in case Hydra redirects here directly: we
+// forward the challenge to the consent service.
 //
 // In v1, no consent UI is rendered. Future untrusted clients would
 // render a consent prompt here.
@@ -13,6 +13,8 @@
 // Status: skeleton.
 
 export const prerender = false;
+
+import Layout from '../../layouts/Layout.astro';
 
 const challenge = Astro.url.searchParams.get('consent_challenge');
 
@@ -25,17 +27,9 @@ if (challenge) {
   );
 }
 ---
-
-<!doctype html>
-<html lang="en">
-<head>
-  <meta charset="utf-8" />
-  <title>Authorize — Dunn Family</title>
-</head>
-<body class="bg-paper text-ink">
-  <main class="mx-auto max-w-md p-8">
-    <h1 class="text-2xl font-mono">Missing consent challenge</h1>
-    <p class="mt-4 text-secondary">This page is a redirect target for OAuth2 consent flows.</p>
+<Layout title="Authorize — Dunn Family">
+  <main class="shell shell-sm stack-lg">
+    <h1>Missing consent challenge</h1>
+    <p class="muted">This page is a redirect target for OAuth2 consent flows.</p>
   </main>
-</body>
-</html>
+</Layout>

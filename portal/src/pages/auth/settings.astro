@@ -1,31 +1,240 @@
 ---
-// Settings flow handler — passkey enrollment, password change, profile.
+// Settings flow handler.
 //
-// Reads flow state from Kratos /self-service/settings/api?flow=<id>
-// Renders sections per available methods:
-//   - Password: change form
-//   - WebAuthn: list enrolled passkeys + "enroll new" button
-//   - TOTP: enroll/show/remove
-//   - Profile: edit displayName, recoveryEmail
+// Requires an active session: redirects to /auth/login if absent.
+// Reads ?flow=<id>; if absent or expired, redirects to Kratos's
+// settings/browser initiator (which sets the anti-CSRF cookie and
+// 303s back here with a fresh flow id).
 //
-// Status: skeleton. Real implementation in Phase 3.
+// Renders sections from flow.ui.nodes per method group:
+//   - profile:  username, email, displayName, recoveryEmail
+//   - passkey:  list enrolled credentials + register new
+//   - password: change password
+//   (totp + lookup_secret deferred)
+//
+// Plus a logout button sourced from /self-service/logout/browser.
 
 export const prerender = false;
 
+import Layout from '../../layouts/Layout.astro';
+import {
+  browserFlows,
+  getLogoutInfo,
+  getSession,
+  getSettingsFlow,
+} from '../../lib/kratos';
+import {
+  asInput,
+  csrfToken,
+  hasMethod,
+  nodesByGroup,
+  scriptNodes,
+} from '../../lib/nodes';
+import type { FlowNode, NodeInputAttributes, Session } from '../../lib/types';
+
+const cookie = Astro.request.headers.get('cookie') ?? undefined;
+
+let session: Session | null;
+try {
+  session = await getSession(cookie);
+} catch {
+  return Astro.redirect('/auth/login');
+}
+if (!session?.active || !session.identity) {
+  return Astro.redirect('/auth/login?return_to=' + encodeURIComponent('/auth/settings'));
+}
+
 const flowId = Astro.url.searchParams.get('flow');
+if (!flowId) {
+  return Astro.redirect(browserFlows.settings('https://home.dunn.dev/auth/settings'));
+}
+
+const result = await getSettingsFlow(flowId, cookie);
+if (result.kind !== 'ok') {
+  return Astro.redirect(browserFlows.settings('https://home.dunn.dev/auth/settings'));
+}
+
+const flow = result.flow;
+const ui = flow.ui;
+const csrf = csrfToken(ui.nodes);
+const scripts = scriptNodes(ui.nodes);
+
+const hasProfile = hasMethod(ui.nodes, 'profile');
+const hasPasskey = hasMethod(ui.nodes, 'passkey');
+const hasPassword = hasMethod(ui.nodes, 'password');
+
+interface InputBundle {
+  node: FlowNode;
+  attr: NodeInputAttributes;
+}
+
+function inputsFor(group: FlowNode['group']): InputBundle[] {
+  const out: InputBundle[] = [];
+  for (const node of nodesByGroup(ui.nodes, group)) {
+    const attr = asInput(node);
+    if (attr) out.push({ node, attr });
+  }
+  return out;
+}
+
+function fieldLabel(meta: { label?: { text?: string } } | undefined, fallback: string): string {
+  return meta?.label?.text ?? fallback;
+}
+
+const logoutInfo = await getLogoutInfo(cookie);
+const traits = session.identity.traits;
+const groups = session.identity.metadata_admin?.groups ?? [];
 ---
+<Layout title="Account — Dunn Family">
+  <main class="shell shell-md stack-xl">
+    <header class="stack">
+      <h1>Account</h1>
+      <p class="muted text-sm mono">
+        {traits.displayName || traits.username} &middot; {traits.email}
+      </p>
+      {groups.length > 0 && (
+        <p class="muted-strong text-xs mono">Groups: {groups.join(', ')}</p>
+      )}
+    </header>
 
-<!doctype html>
-<html lang="en">
-<head>
-  <meta charset="utf-8" />
-  <title>Account settings — Dunn Family</title>
-</head>
-<body class="bg-paper text-ink">
-  <main class="mx-auto max-w-2xl p-8">
-    <h1 class="text-2xl font-mono">Account settings</h1>
+    {ui.messages?.map((m) => (
+      <div class={`notice notice-${m.type === 'error' ? 'danger' : m.type === 'success' ? 'success' : 'warning'}`}>
+        {m.text}
+      </div>
+    ))}
 
-    <!-- TODO: sections for password / passkeys / TOTP / profile -->
+    {hasProfile && (
+      <section class="stack-lg">
+        <h2>Profile</h2>
+        <form method="POST" action={ui.action} class="stack-lg">
+          <input type="hidden" name="csrf_token" value={csrf} />
+          <input type="hidden" name="method" value="profile" />
+          {inputsFor('profile').map(({ node, attr }) => {
+            if (attr.type === 'hidden') {
+              return <input type="hidden" name={attr.name} value={String(attr.value ?? '')} />;
+            }
+            if (attr.type === 'submit' || attr.type === 'button') {
+              return (
+                <button class="button button-primary" type={attr.type}
+                        name={attr.name} value={String(attr.value ?? '')}>
+                  {fieldLabel(node.meta, 'Save')}
+                </button>
+              );
+            }
+            const id = attr.name.replace(/[^a-zA-Z0-9]+/g, '-');
+            return (
+              <div class="field">
+                <label for={id}>{fieldLabel(node.meta, attr.name)}</label>
+                <input
+                  id={id}
+                  name={attr.name}
+                  type={attr.type}
+                  value={attr.value !== undefined ? String(attr.value) : ''}
+                  required={attr.required}
+                  disabled={attr.disabled}
+                  autocomplete={attr.autocomplete}
+                />
+              </div>
+            );
+          })}
+        </form>
+      </section>
+    )}
+
+    {hasPasskey && (
+      <section class="stack-lg">
+        <h2>Passkeys</h2>
+        <p class="muted text-sm">
+          Add a passkey to sign in without a password. Register one per device.
+        </p>
+        <form method="POST" action={ui.action} class="stack-lg">
+          <input type="hidden" name="csrf_token" value={csrf} />
+          <input type="hidden" name="method" value="passkey" />
+          {inputsFor('passkey').map(({ node, attr }) => {
+            if (attr.type === 'hidden') {
+              return <input type="hidden" name={attr.name} value={String(attr.value ?? '')} />;
+            }
+            if (attr.type === 'submit' || attr.type === 'button') {
+              return (
+                <button class="button button-secondary" type={attr.type}
+                        name={attr.name} value={String(attr.value ?? '')}
+                        onclick={attr.onclick}>
+                  {fieldLabel(node.meta, 'Register a passkey')}
+                </button>
+              );
+            }
+            const id = attr.name.replace(/[^a-zA-Z0-9]+/g, '-');
+            return (
+              <div class="field">
+                <label for={id}>{fieldLabel(node.meta, attr.name)}</label>
+                <input
+                  id={id}
+                  name={attr.name}
+                  type={attr.type}
+                  value={attr.value !== undefined ? String(attr.value) : ''}
+                  autocomplete={attr.autocomplete}
+                />
+              </div>
+            );
+          })}
+        </form>
+      </section>
+    )}
+
+    {hasPassword && (
+      <section class="stack-lg">
+        <h2>Password</h2>
+        <form method="POST" action={ui.action} class="stack-lg">
+          <input type="hidden" name="csrf_token" value={csrf} />
+          <input type="hidden" name="method" value="password" />
+          {inputsFor('password').map(({ node, attr }) => {
+            if (attr.type === 'hidden') {
+              return <input type="hidden" name={attr.name} value={String(attr.value ?? '')} />;
+            }
+            if (attr.type === 'submit' || attr.type === 'button') {
+              return (
+                <button class="button button-secondary" type={attr.type}
+                        name={attr.name} value={String(attr.value ?? '')}>
+                  {fieldLabel(node.meta, 'Change password')}
+                </button>
+              );
+            }
+            const id = attr.name.replace(/[^a-zA-Z0-9]+/g, '-');
+            return (
+              <div class="field">
+                <label for={id}>{fieldLabel(node.meta, attr.name)}</label>
+                <input
+                  id={id}
+                  name={attr.name}
+                  type={attr.type}
+                  required={attr.required}
+                  autocomplete={attr.autocomplete ?? 'new-password'}
+                />
+              </div>
+            );
+          })}
+        </form>
+      </section>
+    )}
+
+    <section class="stack-lg">
+      <h2>Sign out</h2>
+      {logoutInfo ? (
+        <form method="GET" action={logoutInfo.logout_url}>
+          <input type="hidden" name="token" value={logoutInfo.logout_token} />
+          <button class="button button-danger" type="submit">Sign out</button>
+        </form>
+      ) : (
+        <p class="muted text-sm">Logout endpoint unavailable.</p>
+      )}
+    </section>
+
+    <footer class="stack" style="font-size: var(--text-sm);">
+      <a class="subtle mono" href="/">Back to home</a>
+    </footer>
+
+    {scripts.map((s) => (
+      <script src={s.src} id={s.id} async is:inline></script>
+    ))}
   </main>
-</body>
-</html>
+</Layout>

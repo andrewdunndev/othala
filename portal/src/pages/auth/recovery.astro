@@ -1,32 +1,91 @@
 ---
-// Recovery flow handler (code strategy, NOT magic link — link is deprecated).
+// Recovery flow handler — code strategy (magic link is deprecated).
 //
-// Two phases:
-//   1. User enters their email; we POST to /self-service/recovery/api
-//      Kratos sends a numeric code via email (Fastmail SMTP)
-//   2. User enters the code; we POST to /self-service/recovery?flow=<id>
-//      Kratos validates code, creates a privileged session, redirects
-//      to /auth/settings to set a new password / re-enroll passkey
+// Phase 1: user enters email; Kratos sends a numeric code via Fastmail.
+// Phase 2: user enters the code; Kratos issues a privileged session and
+//          303s to /auth/settings to set a new password / register a passkey.
 //
-// Status: skeleton. Real implementation in Phase 3.
+// We render the same template for both phases: Kratos's flow.ui.nodes
+// describes which inputs to surface (email -> code).
 
 export const prerender = false;
 
+import Layout from '../../layouts/Layout.astro';
+import { browserFlows, getRecoveryFlow } from '../../lib/kratos';
+import { csrfToken, hasMethod, nodesByGroup, asInput } from '../../lib/nodes';
+
 const flowId = Astro.url.searchParams.get('flow');
+
+if (!flowId) {
+  return Astro.redirect(browserFlows.recovery());
+}
+
+const cookie = Astro.request.headers.get('cookie') ?? undefined;
+const result = await getRecoveryFlow(flowId, cookie);
+
+if (result.kind !== 'ok') {
+  return Astro.redirect(browserFlows.recovery());
+}
+
+const flow = result.flow;
+const ui = flow.ui;
+const csrf = csrfToken(ui.nodes);
+const hasCode = hasMethod(ui.nodes, 'code');
+const phase = flow.state === 'sent_email' ? 'sent' : 'request';
 ---
+<Layout title="Recover account — Dunn Family">
+  <main class="shell shell-sm stack-lg">
+    <header class="stack">
+      <h1>Recover account</h1>
+      <p class="muted text-sm">
+        {phase === 'request' ? 'Enter your email to receive a code.' : 'Enter the code we sent to your email.'}
+      </p>
+    </header>
 
-<!doctype html>
-<html lang="en">
-<head>
-  <meta charset="utf-8" />
-  <title>Recover account — Dunn Family</title>
-</head>
-<body class="bg-paper text-ink">
-  <main class="mx-auto max-w-md p-8">
-    <h1 class="text-2xl font-mono">Recover account</h1>
+    {ui.messages?.map((m) => (
+      <div class={`notice notice-${m.type === 'error' ? 'danger' : m.type === 'success' ? 'success' : 'warning'}`}>
+        {m.text}
+      </div>
+    ))}
 
-    <!-- TODO: render email form (phase 1) or code form (phase 2) per flow state -->
-    <p class="mt-6 text-secondary">Recovery form goes here.</p>
+    {hasCode && (
+      <form method="POST" action={ui.action} class="stack-lg">
+        <input type="hidden" name="csrf_token" value={csrf} />
+        <input type="hidden" name="method" value="code" />
+        {nodesByGroup(ui.nodes, 'code').map((n) => {
+          const a = asInput(n);
+          if (!a) return null;
+          if (a.type === 'hidden') {
+            return <input type="hidden" name={a.name} value={String(a.value ?? '')} />;
+          }
+          if (a.type === 'submit' || a.type === 'button') {
+            return (
+              <button class="button button-primary" type={a.type}
+                      name={a.name} value={String(a.value ?? '')}>
+                {n.meta?.label?.text ?? (phase === 'request' ? 'Send code' : 'Verify code')}
+              </button>
+            );
+          }
+          const id = a.name.replace(/[^a-zA-Z0-9]+/g, '-');
+          return (
+            <div class="field">
+              <label for={id}>{n.meta?.label?.text ?? a.name}</label>
+              <input
+                id={id}
+                name={a.name}
+                type={a.type}
+                required={a.required}
+                autocomplete={a.autocomplete}
+                value={a.value !== undefined ? String(a.value) : ''}
+              />
+            </div>
+          );
+        })}
+      </form>
+    )}
+
+    <footer class="stack" style="font-size: var(--text-sm);">
+      <a class="subtle mono" href="/auth/login">Back to sign in</a>
+    </footer>
   </main>
-</body>
-</html>
+</Layout>

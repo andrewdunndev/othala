@@ -1,24 +1,94 @@
 ---
-// Email verification flow handler — used after recovery and onboarding
-// to confirm the user owns the email address.
+// Email verification flow handler — mirrors recovery's two-phase code form.
 //
-// Status: skeleton. Real implementation in Phase 3.
+// Phase 1: the user enters an email; Kratos sends a numeric code via Fastmail.
+// Phase 2: the user enters the code; Kratos marks the address verified and
+//          303s back to the configured `default_browser_return_url`.
+//
+// Verification is disabled in production (`kratos.yml: flows.verification.enabled`
+// is conditional on the deployment), but the page is here so the lab and any
+// future re-enablement don't land users on a TODO. M8 in adversarial-review-2.
 
 export const prerender = false;
 
-const flowId = Astro.url.searchParams.get('flow');
----
+import Layout from '../../layouts/Layout.astro';
+import { browserFlows, getVerificationFlow } from '../../lib/kratos';
+import { csrfToken, hasMethod, nodesByGroup, asInput } from '../../lib/nodes';
 
-<!doctype html>
-<html lang="en">
-<head>
-  <meta charset="utf-8" />
-  <title>Verify email — Dunn Family</title>
-</head>
-<body class="bg-paper text-ink">
-  <main class="mx-auto max-w-md p-8">
-    <h1 class="text-2xl font-mono">Verify email</h1>
-    <!-- TODO -->
+const flowId = Astro.url.searchParams.get('flow');
+
+if (!flowId) {
+  return Astro.redirect(browserFlows.verification());
+}
+
+const cookie = Astro.request.headers.get('cookie') ?? undefined;
+const result = await getVerificationFlow(flowId, cookie);
+
+if (result.kind !== 'ok') {
+  return Astro.redirect(browserFlows.verification());
+}
+
+const flow = result.flow;
+const ui = flow.ui;
+const csrf = csrfToken(ui.nodes);
+const hasCode = hasMethod(ui.nodes, 'code');
+// Kratos verification flow states: choose_method, sent_email, passed_challenge.
+// Map to the two UI shapes recovery uses.
+const phase = flow.state === 'sent_email' ? 'sent' : 'request';
+---
+<Layout title="Verify email — Dunn Family">
+  <main class="shell shell-sm stack-lg">
+    <header class="stack">
+      <h1>Verify email</h1>
+      <p class="muted text-sm">
+        {phase === 'request' ? 'Enter your email to receive a code.' : 'Enter the code we sent to your email.'}
+      </p>
+    </header>
+
+    {ui.messages?.map((m) => (
+      <div class={`notice notice-${m.type === 'error' ? 'danger' : m.type === 'success' ? 'success' : 'warning'}`}>
+        {m.text}
+      </div>
+    ))}
+
+    {hasCode && (
+      <form method="POST" action={ui.action} class="stack-lg">
+        <input type="hidden" name="csrf_token" value={csrf} />
+        <input type="hidden" name="method" value="code" />
+        {nodesByGroup(ui.nodes, 'code').map((n) => {
+          const a = asInput(n);
+          if (!a) return null;
+          if (a.type === 'hidden') {
+            return <input type="hidden" name={a.name} value={String(a.value ?? '')} />;
+          }
+          if (a.type === 'submit' || a.type === 'button') {
+            return (
+              <button class="button button-primary" type={a.type}
+                      name={a.name} value={String(a.value ?? '')}>
+                {n.meta?.label?.text ?? (phase === 'request' ? 'Send code' : 'Verify code')}
+              </button>
+            );
+          }
+          const id = a.name.replace(/[^a-zA-Z0-9]+/g, '-');
+          return (
+            <div class="field">
+              <label for={id}>{n.meta?.label?.text ?? a.name}</label>
+              <input
+                id={id}
+                name={a.name}
+                type={a.type}
+                required={a.required}
+                autocomplete={a.autocomplete}
+                value={a.value !== undefined ? String(a.value) : ''}
+              />
+            </div>
+          );
+        })}
+      </form>
+    )}
+
+    <footer class="stack" style="font-size: var(--text-sm);">
+      <a class="subtle mono" href="/auth/login">Back to sign in</a>
+    </footer>
   </main>
-</body>
-</html>
+</Layout>

@@ -1,101 +1,114 @@
 ---
-// home.dunn.dev — three-state landing/launcher
+// home.dunn.dev — three-state landing/launcher.
 //
-// State 1 (infra-down): Authentik unreachable; render status panel
-// State 2 (pre-auth): no Kratos session; render Sign In button
-// State 3 (post-auth): valid session; render tile launcher filtered by groups
+// State A (infra-down):  Kratos unreachable; render holding panel.
+// State B (pre-auth):    Kratos reachable, no session; render Sign In CTA.
+// State C (post-auth):   active session; render tile launcher filtered
+//                        by metadata_admin.groups (the access-* groups).
 //
 // SSR mode required to read the session cookie at request time.
 export const prerender = false;
 
-import { whoami } from '../lib/kratos';
+import Layout from '../layouts/Layout.astro';
+import { getSession, isReachable } from '../lib/kratos';
+import type { Identity } from '../lib/types';
 
-let state: 'down' | 'pre-auth' | 'post-auth' = 'pre-auth';
-let identity = null;
+type State = 'down' | 'pre-auth' | 'post-auth';
+
+const cookie = Astro.request.headers.get('cookie') ?? undefined;
+
+let state: State = 'pre-auth';
+let identity: Identity | null = null;
 
 try {
-  // Forward the user's cookie to Kratos so whoami sees the session.
-  const cookie = Astro.request.headers.get('cookie') ?? undefined;
-  const session = await whoami(cookie);
+  const session = await getSession(cookie);
   if (session?.active && session.identity) {
     state = 'post-auth';
     identity = session.identity;
   }
-} catch (err) {
-  // Kratos unreachable; render status state.
-  state = 'down';
+} catch {
+  // whoami threw (network error / 5xx). Verify Kratos is up before
+  // declaring the substrate down; a transient cookie issue shouldn't
+  // trigger State A.
+  const ok = await isReachable();
+  state = ok ? 'pre-auth' : 'down';
 }
 
-// In post-auth state, filter the tile catalog by the user's group memberships.
+// Tile catalog. Order: media first, then utility, then admin-adjacent.
+// Each tile renders only if the user is in the matching access-* group.
+// The two "placeholder" slots from the spec are gather + observe (already
+// listed); future apps slot in by adding rows here.
 const TILES = [
-  { slug: 'memory',  name: 'Photos',     emoji: '📷', host: 'memory.dunn.dev',  group: 'access-memory' },
-  { slug: 'listen',  name: 'Audiobooks', emoji: '🎧', host: 'listen.dunn.dev',  group: 'access-listen' },
-  { slug: 'cinema',  name: 'Movies',     emoji: '🎬', host: 'cinema.dunn.dev',  group: 'access-cinema' },
-  { slug: 'tune',    name: 'Music',      emoji: '🎵', host: 'tune.dunn.dev',    group: 'access-tune' },
-  { slug: 'larder',  name: 'Recipes',    emoji: '🍳', host: 'larder.dunn.dev',  group: 'access-larder' },
-  { slug: 'keep',    name: 'Vault',      emoji: '🔐', host: 'keep.dunn.dev',    group: 'access-keep' },
-  { slug: 'library', name: 'Books',      emoji: '📚', host: 'library.dunn.dev', group: 'access-library' },
-  { slug: 'vault',   name: 'Files',      emoji: '📁', host: 'vault.dunn.dev',   group: 'access-vault' },
+  { slug: 'memory',  name: 'Photos',     icon: 'PH', host: 'memory.dunn.dev',  group: 'access-memory'  },
+  { slug: 'listen',  name: 'Audiobooks', icon: 'AB', host: 'listen.dunn.dev',  group: 'access-listen'  },
+  { slug: 'cinema',  name: 'Movies',     icon: 'MV', host: 'cinema.dunn.dev',  group: 'access-cinema'  },
+  { slug: 'tune',    name: 'Music',      icon: 'MU', host: 'tune.dunn.dev',    group: 'access-tune'    },
+  { slug: 'larder',  name: 'Recipes',    icon: 'RC', host: 'larder.dunn.dev',  group: 'access-larder'  },
+  { slug: 'keep',    name: 'Vault',      icon: 'KP', host: 'keep.dunn.dev',    group: 'access-keep'    },
+  { slug: 'library', name: 'Books',      icon: 'LB', host: 'library.dunn.dev', group: 'access-library' },
+  { slug: 'vault',   name: 'Files',      icon: 'FL', host: 'vault.dunn.dev',   group: 'access-vault'   },
+  { slug: 'gather',  name: 'Gather',     icon: 'GT', host: 'gather.dunn.dev',  group: 'access-gather'  },
+  { slug: 'llm',     name: 'LLM',        icon: 'LM', host: 'llm.dunn.dev',     group: 'access-llm'     },
+  { slug: 'forge',   name: 'Forge',      icon: 'FG', host: 'forge.dunn.dev',   group: 'access-forge'   },
+  { slug: 'observe', name: 'Observe',    icon: 'OB', host: 'observe.dunn.dev', group: 'access-observe' },
 ];
 
 const groups = identity?.metadata_admin?.groups ?? [];
-const visibleTiles = state === 'post-auth'
-  ? TILES.filter(t => groups.includes(t.group))
-  : [];
+const visibleTiles = state === 'post-auth' ? TILES.filter((t) => groups.includes(t.group)) : [];
+const isAdmin = state === 'post-auth' && groups.includes('admin');
+const displayName = identity?.traits.displayName || identity?.traits.username || '';
 ---
-
-<!doctype html>
-<html lang="en">
-<head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Dunn Family</title>
-  <link rel="manifest" href="/manifest.webmanifest" />
-</head>
-<body class="bg-paper text-ink">
-  <main class="mx-auto max-w-4xl p-8">
-    <h1 class="text-3xl font-mono">Dunn Family</h1>
+<Layout title="Dunn Family">
+  <main class="shell shell-lg stack-xl">
+    <header class="stack">
+      <h1>Dunn Family</h1>
+      {state === 'post-auth' && (
+        <p class="muted text-sm mono">Signed in as {displayName}</p>
+      )}
+    </header>
 
     {state === 'down' && (
-      <section class="mt-12 rounded border border-rules p-6">
-        <h2 class="text-xl">Services are temporarily offline</h2>
-        <p class="mt-2 text-secondary">
-          We'll be back shortly. This page will update automatically.
+      <section class="panel">
+        <h2>Services starting up</h2>
+        <p class="muted" style="margin-top: 0.5rem;">
+          The home stack is offline or unreachable. This page will refresh shortly.
         </p>
-        <!-- TODO: client-side poll of /api/health to update without page reload -->
+        <p class="muted-strong text-xs mono" style="margin-top: 1rem;">
+          If this persists, ask Andrew.
+        </p>
       </section>
     )}
 
     {state === 'pre-auth' && (
-      <section class="mt-12">
-        <a
-          href="/auth/login"
-          class="inline-block rounded bg-ink px-6 py-3 text-paper hover:bg-secondary"
-        >
-          Sign in
-        </a>
+      <section class="stack-lg">
+        <p class="muted">Sign in to continue.</p>
+        <a href="/auth/login" class="button button-primary">Sign in with passkey</a>
       </section>
     )}
 
-    {state === 'post-auth' && (
-      <section class="mt-12 grid grid-cols-2 gap-4 md:grid-cols-3 lg:grid-cols-4">
-        {visibleTiles.map(t => (
-          <a
-            href={`https://${t.host}/`}
-            class="block rounded border border-rules p-6 text-center hover:bg-rules/20"
-          >
-            <div class="text-3xl">{t.emoji}</div>
-            <div class="mt-2 font-mono">{t.name}</div>
+    {state === 'post-auth' && visibleTiles.length > 0 && (
+      <section class="tile-grid">
+        {visibleTiles.map((t) => (
+          <a class="tile" href={`https://${t.host}/`}>
+            <div class="tile-icon mono">{t.icon}</div>
+            <div class="tile-name">{t.name}</div>
           </a>
         ))}
       </section>
     )}
 
-    {state === 'post-auth' && groups.includes('admin') && (
-      <section class="mt-12">
-        <a href="/admin" class="text-secondary hover:text-ink">Admin →</a>
+    {state === 'post-auth' && visibleTiles.length === 0 && (
+      <section class="notice">
+        Your account has no app access yet. Ask Andrew to enable one.
       </section>
     )}
+
+    {state === 'post-auth' && (
+      <footer style="display: flex; gap: 1.25rem; align-items: center; font-size: var(--text-sm);">
+        <a class="subtle mono" href="/auth/settings">Account</a>
+        {isAdmin && <a class="subtle mono" href="/admin">Admin</a>}
+        <a class="subtle mono" href="/auth/logout">Sign out</a>
+      </footer>
+    )}
   </main>
-</body>
-</html>
+</Layout>

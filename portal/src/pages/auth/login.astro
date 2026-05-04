@@ -1,50 +1,176 @@
 ---
 // Login flow handler.
 //
-// Reads ?flow=<id> from the URL (or initiates a new flow).
-// Renders the appropriate form per Kratos's flow.ui.nodes:
-//   - WebAuthn challenge (passkey conditional UI in the username input)
-//   - Password form
-//   - "Use a passkey from another device" link (kicks the passwordless flow)
+// Reads ?flow=<id> from the URL. If absent or expired, redirects to
+// Kratos's browser flow initiator which sets the anti-CSRF cookie and
+// redirects back here with a fresh ?flow=...
 //
-// On submit, POSTs to /self-service/login?flow=<id> via Kratos public API.
+// Renders the form Kratos described in flow.ui.nodes:
+//   - Hidden CSRF token (default group)
+//   - Passkey trigger (passkey group). Wired up by /.well-known/ory/webauthn.js
+//     which Kratos returns as a script node. Conditional UI on the
+//     identifier input fires when the browser sees a discoverable credential.
+//   - Password fallback (password group): username + password
 //
-// AAL2 step-up: if URL has ?aal=aal2 (sent by admin SSR pages), starts a
-// refresh login flow at AAL2 to prompt for a second factor.
-//
-// Status: skeleton. Real implementation in Phase 3.
+// AAL2 step-up: ?aal=aal2 / ?refresh=true pass through to Kratos.
 
 export const prerender = false;
 
-const flowId = Astro.url.searchParams.get('flow');
-const aal = Astro.url.searchParams.get('aal'); // 'aal2' for admin step-up
-const refresh = Astro.url.searchParams.get('refresh') === 'true';
-const returnTo = Astro.url.searchParams.get('return_to');
+import Layout from '../../layouts/Layout.astro';
+import { browserFlows, getLoginFlow } from '../../lib/kratos';
+import { csrfToken, hasMethod, nodesByGroup, asInput, scriptNodes } from '../../lib/nodes';
 
-// TODO: real implementation
-// 1. If !flowId: redirect to Kratos /self-service/login/browser with same params
-// 2. Else: fetch flow state from Kratos public API
-// 3. Render form based on flow.ui.nodes
-// 4. Handle WebAuthn ceremony in client-side script (separate <script>)
+const url = Astro.url;
+const flowId = url.searchParams.get('flow');
+const aal = (url.searchParams.get('aal') as 'aal1' | 'aal2' | null) ?? undefined;
+const refresh = url.searchParams.get('refresh') === 'true';
+const returnTo = url.searchParams.get('return_to') ?? undefined;
+
+if (!flowId) {
+  return Astro.redirect(browserFlows.login({ aal, refresh, returnTo }));
+}
+
+const cookie = Astro.request.headers.get('cookie') ?? undefined;
+const result = await getLoginFlow(flowId, cookie);
+
+if (result.kind !== 'ok') {
+  return Astro.redirect(browserFlows.login({ aal, refresh, returnTo }));
+}
+
+const flow = result.flow;
+const ui = flow.ui;
+const csrf = csrfToken(ui.nodes);
+const hasPasskey = hasMethod(ui.nodes, 'passkey');
+const hasPassword = hasMethod(ui.nodes, 'password');
+const scripts = scriptNodes(ui.nodes);
+
+// Identifier input: in identifier_first flows it lives in the default group.
+// In single-step flows it shows up under password. Either way we surface it
+// once and reuse the value across forms.
+const identifierInput =
+  nodesByGroup(ui.nodes, 'default').map(asInput).find((a) => a?.name === 'identifier') ||
+  nodesByGroup(ui.nodes, 'password').map(asInput).find((a) => a?.name === 'identifier') ||
+  null;
+
+const passwordInput =
+  nodesByGroup(ui.nodes, 'password').map(asInput).find((a) => a?.name === 'password') || null;
 ---
+<Layout title="Sign in — Dunn Family">
+  <main class="shell shell-sm stack-lg">
+    <header class="stack">
+      <h1>Sign in</h1>
+      {aal === 'aal2' && (
+        <p class="muted text-sm">Additional verification required for admin access.</p>
+      )}
+    </header>
 
-<!doctype html>
-<html lang="en">
-<head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Sign in — Dunn Family</title>
-</head>
-<body class="bg-paper text-ink">
-  <main class="mx-auto max-w-md p-8">
-    <h1 class="text-2xl font-mono">Sign in</h1>
+    {ui.messages?.map((m) => (
+      <div class={`notice notice-${m.type === 'error' ? 'danger' : m.type === 'success' ? 'success' : 'warning'}`}>
+        {m.text}
+      </div>
+    ))}
 
-    <!-- TODO: render form per Kratos flow.ui -->
-    <p class="mt-6 text-secondary">Login form goes here.</p>
+    {hasPasskey && (
+      <form method="POST" action={ui.action} class="stack-lg">
+        <input type="hidden" name="csrf_token" value={csrf} />
+        <input type="hidden" name="method" value="passkey" />
 
-    {aal === 'aal2' && (
-      <p class="mt-4 text-secondary">Additional verification required for admin access.</p>
+        {/* Conditional-UI host. autocomplete="username webauthn" tells the
+            browser to surface stored passkeys via autofill so the user
+            does not need to type a name first. */}
+        <div class="field">
+          <label for="identifier">Username</label>
+          <input
+            id="identifier"
+            name="identifier"
+            type="text"
+            autocomplete="username webauthn"
+            value={identifierInput?.value ? String(identifierInput.value) : ''}
+          />
+          <span class="field-hint">Or click below to use a passkey directly.</span>
+        </div>
+
+        {/* Render passkey-group nodes verbatim from the flow so we don't
+            drift from Kratos's hidden challenge / trigger field names. */}
+        {nodesByGroup(ui.nodes, 'passkey').map((n) => {
+          const a = asInput(n);
+          if (!a) return null;
+          if (a.type === 'hidden') {
+            return <input type="hidden" name={a.name} value={String(a.value ?? '')} />;
+          }
+          if (a.type === 'submit' || a.type === 'button') {
+            return (
+              <button
+                class="button button-primary"
+                type={a.type}
+                name={a.name}
+                value={String(a.value ?? '')}
+                onclick={a.onclick}
+              >
+                {n.meta?.label?.text ?? 'Sign in with passkey'}
+              </button>
+            );
+          }
+          return null;
+        })}
+      </form>
     )}
+
+    {hasPasskey && hasPassword && (
+      <div style="display: flex; align-items: center; gap: 0.75rem;">
+        <hr style="flex: 1; border: none; border-top: 1px solid var(--border);" />
+        <span class="muted text-xs mono">or password</span>
+        <hr style="flex: 1; border: none; border-top: 1px solid var(--border);" />
+      </div>
+    )}
+
+    {hasPassword && (
+      <form method="POST" action={ui.action} class="stack-lg">
+        <input type="hidden" name="csrf_token" value={csrf} />
+        <input type="hidden" name="method" value="password" />
+
+        {!hasPasskey && (
+          <div class="field">
+            <label for="pw-identifier">Username</label>
+            <input
+              id="pw-identifier"
+              name="identifier"
+              type="text"
+              autocomplete="username"
+              required
+              value={identifierInput?.value ? String(identifierInput.value) : ''}
+            />
+          </div>
+        )}
+        {hasPasskey && (
+          <input type="hidden" name="identifier"
+                 value={identifierInput?.value ? String(identifierInput.value) : ''} />
+        )}
+
+        <div class="field">
+          <label for="password">Password</label>
+          <input
+            id="password"
+            name="password"
+            type="password"
+            autocomplete={passwordInput?.autocomplete ?? 'current-password'}
+            required
+          />
+        </div>
+
+        <button class={hasPasskey ? 'button button-secondary' : 'button button-primary'} type="submit">
+          Sign in
+        </button>
+      </form>
+    )}
+
+    <footer class="stack" style="font-size: var(--text-sm);">
+      <a class="subtle mono" href="/auth/recovery">Forgot password</a>
+    </footer>
+
+    {/* Kratos-issued scripts (webauthn.js handles the passkey ceremony). */}
+    {scripts.map((s) => (
+      <script src={s.src} id={s.id} async is:inline></script>
+    ))}
   </main>
-</body>
-</html>
+</Layout>
