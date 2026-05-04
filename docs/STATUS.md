@@ -2,15 +2,17 @@
 
 Read this first if you're picking up the project cold.
 
+Last updated: 2026-05-04.
+
 ## Where we are
 
-**Phase:** 0 — drafting locked Ory configs and skeletons.
+**Phase:** code complete; production cutover pending operator work.
 
-**Substrate:** Ory Kratos (identity) + Ory Hydra (OAuth2/OIDC) + custom glauth-kratos LDAP bridge (we build) + Astro UI on carmine (Node SSR, in-cluster pod) + custom Caddy image at `registry.gitlab.com/dunn.dev/caddy-estate`, built with xcaddy + `caddy-dns/cloudflare` plugin. Decided after evaluating Authentik, kanidm, Authelia, Hanko, voidauth, Pocket-ID, Zitadel.
+**Substrate:** Ory Kratos (identity) + Ory Hydra (OAuth2/OIDC) + custom glauth-kratos LDAP bridge (we build) + Astro portal on carmine (Node SSR, in-pod) + custom Caddy image at `registry.gitlab.com/dunn.dev/caddy-estate` (xcaddy + caddy-dns/cloudflare).
 
-**Why Ory:** total UI control to match dunn.dev/design, composable architecture, no commercial-tier creep, the LDAP bridge is publishable as a glauth plugin (upstream contribution opportunity).
+**Estate-wide design:** consumes `@dunn.dev/design` v0.3.0 (tokens + site chrome public export). Auth portal mirrors the visual language of `design.dunn.dev`.
 
-**Why not the others:** Authentik flow designer was unwanted complexity (we don't want flow customization, we want UX excellence). kanidm has explicit AI/LLM ban + closed contribution doors. Authelia has no LDAP server. Pocket-ID/voidauth have no LDAP server and immature single-maintainer projects. Zitadel is multi-container architecture mismatch + CVE cadence concerning.
+**Why Ory:** total UI control, composable (Kratos + Hydra each do one thing), no commercial-tier creep, the LDAP bridge is publishable as a glauth contribution.
 
 ## Locked decisions (irreversible without redoing work)
 
@@ -20,86 +22,118 @@ Read this first if you're picking up the project cold.
 | Username | `first.last` | Readable, LDAP DN-friendly. |
 | Cookie domain | `.dunn.dev` (parent), SameSite=Lax, HttpOnly | Cross-subdomain Astro UI calls Kratos. |
 | Passkey policy | Preferred + password fallback | Family won't enroll consistently; lockout protection. |
-| MFA | Optional default; AAL2 enforced at app-layer SSR on `/admin/*` | Adversarial review: Kratos AAL is global-or-per-flow, not per-route. Caddy gates session-present only. |
+| MFA | Optional default; AAL2 enforced at app-layer SSR on `/admin/*` | Adversarial review: Kratos AAL is global-or-per-flow, not per-route. |
 | Sessions | 90d normal, 1d admin | Family UX vs admin posture. |
-| Identity schema | `traits.{username,email,displayName?,recoveryEmail?}` + `metadata_admin.groups[]` | Groups as admin-managed metadata (Ory-shaped, prevents user self-escalation). |
-| Consent | `skip_consent: true` per client for the 11 OIDC clients in `hydra/clients/` | Family never sees consent screens. Total auth-touching apps: 11 OIDC + 1 LDAP-only (Jellyfin) + 2 forward-auth (Navidrome, Sonarr/Radarr) = 14 surfaces. |
-| Subject identifier | `public` | Family scale, no app-to-app correlation concern. |
-| WebFinger | Astro endpoint at `auth.dunn.dev/.well-known/webfinger` | Real handler so we control `Content-Type: application/jrd+json` and the issuer href byte-matches Hydra's `urls.self.issuer`. Static-file serving on Workers ate the MIME type and the trailing-slash mismatch (adversarial-review-2 H6/H7). |
-| LDAP bridge | glauth Handler interface, embedded plugin (custom binary, direct go build) | Not runtime .so. Adversarial review: glauth Backend interface is wrong; Handler is current. |
-| LDAP DN format | `uid=<username>,ou=users,dc=dunn,dc=dev` | uid as RDN attribute. |
+| Identity schema | `traits.{username,email,displayName?}` + `metadata_admin.{groups[],roles{}}` | groups: identity (admin/family/kids/friends) + access-* per app. roles: per-user-per-app override. |
+| Consent | `skip_consent: true` per client for the 11 OIDC clients | Family never sees consent screens. |
+| Subject identifier | `public` | Family scale. |
+| WebFinger | Astro endpoint at `auth.dunn.dev/.well-known/webfinger`, env-driven issuer | Real handler controls Content-Type + byte-match issuer. |
+| LDAP bridge | Custom binary linking glauth/ldap server library directly. NOT a runtime .so plugin (glauth has no public Handler registry per Phase 2 finding) | Phase 2 lab proven. |
+| LDAP DN format | `uid=<username>,ou=users,dc=dunn,dc=dev` | uid as RDN. |
 | Bridge deployment | Co-located in Jellyfin pod | Locality, smaller blast radius. |
 | Postgres | Single instance, separate `kratos` and `hydra` databases | Ory's recommended pattern. |
-| Recovery | Code strategy (numeric code emailed) + admin-issued URL | Magic link is deprecated in current Kratos. |
+| Recovery | Code strategy (numeric code emailed). Admin-group identities BLOCKED at the recovery-gate webhook (console-only break-glass per docs/runbooks/admin-recovery.md). | Adversarial review H1/D3. Stolen-Fastmail does not equal admin takeover. |
 | SMTP | Fastmail | Already in family stack. |
-| Onboarding | Admin creates user → emits one-time enrollment URL → texts via Signal/iMessage | No password ever transits a channel. |
-| Astro adapter | `@astrojs/node` standalone on carmine (not Cloudflare Workers) | adversarial-review-2 C1: Workers couldn't reach the Kratos admin port at `kratos:4434`, and exposing admin ports publicly was off the table. Putting the portal on carmine gives in-pod access to both Kratos admin and Hydra admin. Cloudflare's role shrinks to DNS hosting + DNS-01 ACME. |
-| Hydra admin reachability | Same pod as portal + consent service on carmine | Admin port stays internal; portal calls it directly via `http://hydra:4445`. |
+| Onboarding | Admin creates user in Kratos → admin UI emits one-time enrollment URL → texts via Signal/iMessage | No password ever transits a channel. |
+| Astro adapter | `@astrojs/node` standalone on carmine | Workers couldn't reach Kratos admin port. Portal in-pod gives direct admin access. CF role: DNS hosting + DNS-01 ACME only. |
+| Hydra admin reachability | In-pod only (`http://hydra:4445`); never public | Adversarial review C1. |
 | Audit log | alloy → Loki + small admin "recent activity" table | Operational + immediate UI. |
-| Public reachability | DNS-only Cloudflare + port-forward 443 | No CF Tunnel, no CF Access in auth path. Single auth feel for family. |
+| Public reachability | DNS-only Cloudflare + port-forward 443 on home router | No CF Tunnel, no CF Access in auth path. |
 | Tailscale | Not load-bearing | Admin/auth/recovery paths must work without it. |
-| No split identity | All login through Kratos | Bitwarden master password is the one intentional exception. |
+| Cookie / cipher rotation | Two-slot env (CURRENT + PREVIOUS), gen-secrets seeds both with distinct values, rotation runbook at docs/runbooks/cookie-rotation.md | Adversarial review H3. |
+| Per-app role mapping | Declared in `hydra/clients/*.yaml` under `consent:` block. Resolution: identity's `metadata_admin.roles[client_id]` override → fallback to `group_role_map` walk in user-group order. | Per-app-oidc.md has the full table. |
+| Single source of design tokens | `@dunn.dev/design` package; auth portal imports `@import '@dunn.dev/design/tokens/index.css'` and `@import '@dunn.dev/design/site/site.css'`. NEVER redefine color, type, spacing, motion locally. | Estate consistency. |
 
 ## What's done
 
-- Repo scaffolded at `/Users/andrewdunn/gitlab.com/dunn.dev/auth/`, pushed to gitlab.com/dunn.dev/auth (private)
-- 7 substrate evaluations completed: Authelia, Hanko, voidauth, Zitadel, kanidm (deep), Pocket-ID, Authentik (deep). Per-candidate evidence under `lab/docs/eval-*.md`.
-- 4 feasibility validations (Q1-Q4) for the Ory architecture, all GREEN/YELLOW. Under `lab/docs/feasibility-q*.md`.
-- Adversarial review against upstream Ory/Hydra/glauth/Astro 6 docs completed. Two CRITICAL findings caught and corrected (AAL2 enforcement layer, glauth interface). Six HIGH findings folded into the design. At `lab/docs/adversarial-review.md`.
-- Authentik blueprints removed from working tree (preserved in git history at commit `9cebdd8`).
-- Caddy custom image (`registry.gitlab.com/dunn.dev/caddy-estate`) Containerfile written: built with xcaddy, one plugin (`caddy-dns/cloudflare`).
-- Maintainer-walk findings for kanidm (the rejection evidence) at `upstream/firstyear-walk/findings.md`.
+### Code (committed + pushed)
+- **Phase 1 substrate:** Kratos + Hydra + Postgres + reference UIs + Vaultwarden, lab-validated GREEN at `lab/docs/spike-evidence.md`.
+- **Phase 2 LDAP bridge:** custom binary linking glauth/ldap directly. BIND + SEARCH + filters + cache validated GREEN at `lab/docs/phase2-evidence.md`.
+- **Phase 3 consent service:** v2.1. Login + consent + logout handlers, yaml-namespaced manifest (oidc/consent split), per-app role mapping, deep-merge claim_emit, emit_groups_claim flag, back-channel logout JWT signing (RS256/ES256, OIDC BCL 1.0 compliant, stdlib only no jose), identity cache, listener split (`:4477` public, `:4478` admin), HMAC webhook auth, recovery gate webhook (admin-group rejection), 3-attempt back-channel retry with backoff. ~50 tests.
+- **Phase 3 portal:** Astro Node SSR. Pages: index (three-state landing with dev preview), auth/{login,settings,recovery,verification,logout}, admin/{index,users,users/[id],users/new,groups,oauth2,activity}. CSRF tokens on admin POSTs. metadata-admin app-layer validator. AAL2 step-up at SSR layer. WebFinger endpoint with env-driven byte-match issuer.
+- **Phase 3 ldap-bridge:** per-process bind cache salt; LDAP injection regression cases in DN parser; fuzz harness for DN parsing.
+- **Phase 3 client manifests:** all 11 OIDC yamls populated with roles + group_role_map + backchannel_logout_uri (where supported); audience invariant validated.
+- **Phase 3 design integration:** `@dunn.dev/design` v0.3.0 consumed via package import; tokens + site chrome (header, page, section, hero, footer) imported from upstream.
+- **Phase 3 estate-wide design language:** auth pages refactored to use page-eyebrow / page-title / page-lede / section patterns; mark in chrome; theme toggle; restraint.
+- **Phase 3.5 caddy-estate rename:** `dunn.dev/immutable/caddy-cloudflare` moved + renamed to `dunn.dev/caddy-estate`. All consumers updated across 6 repos. CI pipeline green; image at `registry.gitlab.com/dunn.dev/caddy-estate:latest`.
 
-## What's next (immediate)
+### Validation evidence
+- `lab/docs/spike-evidence.md` — Phase 1 lab GREEN
+- `lab/docs/phase2-evidence.md` — Phase 2 lab GREEN
+- `lab/docs/phase3-evidence.md` — Phase 3 rev1 (5 failures, all fixed in code)
+- `lab/docs/phase3-readiness.md` — Phase 3 rev2 GREEN summary
+- `lab/docs/security-validation.md` — security-remediation lab cycle GREEN
 
-In priority order, all in Phase 0:
+### Adversarial reviews (all addressed)
+- `lab/docs/adversarial-review.md` — Phase 0 review (substrate decisions)
+- `docs/security-review-2026-05-04.md` — Phase 3 security review: 4 HIGH + 7 MEDIUM + 5 LOW + 7 architectural. All remediated.
 
-1. Draft `kratos/kratos.yml`, `kratos/identity.schema.json`, `hydra/hydra.yml`
-2. Draft Caddy snippets at `caddy/snippets/{admin-session,oidc-app,ldap-app,forward-auth}.caddy`
-3. Draft 14 OIDC client manifests at `hydra/clients/*.yaml` (one per app)
-4. Draft `ldap-bridge/` skeleton: main.go, kratos/handler.go, Containerfile, Makefile, README
-5. Draft `consent/` service skeleton (Go, runs on carmine alongside Hydra)
-6. Draft `portal/` Astro 6 project with `@astrojs/node` standalone adapter (runs on carmine in-pod); pages for login/recovery/settings/consent + admin/{users,groups,oauth2,activity}
-7. Draft WebFinger Astro endpoint at `portal/src/pages/.well-known/webfinger.ts` that returns JRD JSON with the issuer href byte-matching Hydra's `urls.self.issuer`
-8. Rewrite `lab/compose/compose.yml` and `lab/compose/Caddyfile` for Kratos+Hydra+bridge
-9. Adapt `lab/scripts/deploy.sh` for Hydra schema migration init + courier singleton
-10. Rewrite `docs/decision.md`, `docs/architecture.md`, `docs/contribution-strategy.md` for Ory
-11. Commit + push as the Ory pivot lock
+### Runbooks
+- `docs/runbooks/admin-recovery.md` — break-glass for admin (console-only)
+- `docs/runbooks/cookie-rotation.md` — _CURRENT / _PREVIOUS slot semantics
+- `docs/runbooks/secrets-rotation.md` — `secrets.system` non-rotatable break-glass
+- `docs/runbooks/postgres-backup.md` — placeholder; needs implementation before family pilot
+- `docs/runbooks/email-recovery.md` — Fastmail SPF/DKIM verification
 
-## After Phase 0 — phased plan
+### Per-app integration
+- `docs/per-app-oidc.md` — table for each of 14 surfaces (11 OIDC + 1 LDAP + 2 forward-auth) with claim shape, JIT support, audience verification status
 
-Tracked as synthesist tasks t39-t44 in the auth/bench spec. Each is human-gated (you review, then approve to proceed):
+### Fuzz harnesses
+- `consent/backchannel_fuzz_test.go` — JWK alg validation (caught real bug)
+- `consent/manifest_fuzz_test.go` — yaml manifest parsing
+- `ldap-bridge/kratos/dn_fuzz_test.go` — DN parser (caught LDAP injection)
 
-- **Phase 1** (3-5 days): GCP lab spike, validate Kratos+Hydra+one OIDC flow + WebAuthn ceremonies
-- **Phase 2** (1-2 weeks): Build glauth-kratos plugin, validate against Jellyfin LDAP plugin
-- **Phase 3** (1-2 weeks): Astro UI implementation
-- **Phase 4** (3-5 days): All 14 auth-touching app surfaces wired (11 OIDC + 1 LDAP + 2 forward-auth), Playwright suite
-- **Phase 5** (3-5 days): Carmine production cutover via pyinfra
-- **Phase 6** (ongoing): Extract glauth-kratos as standalone repo, contribute upstream
+## What's next (production cutover, in order)
 
-Aggressive total: 4-6 weeks to family-on-SSO.
+The substrate is built and validated. Carmine cutover is the next gate. These five steps are operator-flavored:
 
-## Open questions / blockers
+### Step 1 — Pyinfra carmine quadlets (longest pole)
+Author quadlet manifests for kratos, kratos-courier (singleton), kratos-migrate (init), hydra, hydra-migrate (init), consent, portal, postgres. Caddy already lives via per-pod sidecar pattern in carmine; auth pod adds its own Caddy sidecar pulling from `registry.gitlab.com/dunn.dev/caddy-estate:latest`. Reference pattern: `immutable/carmine/services/<app>/.config/containers/systemd/`. Estimated: 1-2 days of focused operator work.
 
-(none currently — all gated decisions are locked)
+### Step 2 — Production secrets
+Generate via `lab/scripts/gen-secrets.sh`-equivalent for production; store in Bitwarden + carmine env. Required: `KRATOS_PG_PASS`, `KRATOS_COOKIE_SECRET_{CURRENT,PREVIOUS}`, `KRATOS_CIPHER_SECRET_{CURRENT,PREVIOUS}`, `HYDRA_PG_PASS`, `HYDRA_SYSTEM_SECRET` (NON-ROTATABLE), `HYDRA_COOKIE_SECRET_{CURRENT,PREVIOUS}`, `HYDRA_PAIRWISE_SALT`, `CSRF_SECRET`, `RECOVERY_GATE_SECRET`, `CONSENT_ADMIN_BEARER`, `LDAP_BRIDGE_ADMIN_BEARER`, per-app OIDC `<APP>_CLIENT_SECRET`. ~30 min.
+
+### Step 3 — DNS + port-forward
+Cloudflare DNS records for `auth.dunn.dev`, `home.dunn.dev`, per-app `<app>.dunn.dev` pointed at home IP (DNS-only / gray cloud). Home router 443 → carmine. ~30 min.
+
+### Step 4 — First-user pilot
+Admin (operator) creates own identity via Kratos admin; admin UI issues one-time enrollment URL; enroll passkey on real DNS; validate full OIDC flow against one app (Vaultwarden recommended). ~30 min.
+
+### Step 5 — Family rollout
+Per family member: admin creates identity, sends enrollment URL via Signal/iMessage, family member enrolls passkey. Pilot one user before fanning out. ~30 min/user × 5–25 users.
+
+## Operational gaps to close before family rollout (NOT blockers for first-user pilot)
+- **Postgres backup** — runbook is a placeholder. Configure pg_dump cron + ZFS snapshot integration. Document restore drill including `secrets.system` rehydration. Per `docs/runbooks/postgres-backup.md`. ~1 day.
+- **Per-app audience verification audit** — every client manifest sets `audience` but no per-app audit confirms each downstream app verifies aud. Tracked in `docs/per-app-oidc.md` (currently NEEDS-VERIFY for all). Lab-validate during Phase 4 wiring of each app.
+- **`docs/decision.md` and `docs/substrate-comparison.md`** still contain "direct go build, no xcaddy" language. Caddy image actually uses xcaddy. Small follow-up commit to scrub.
+
+## Open architectural questions (informational, not blockers)
+- A2: `secrets.system` non-rotatable. Single-key risk for Hydra at-rest encryption of client secrets. Mitigation procedural (Bitwarden + carmine env). See `docs/runbooks/secrets-rotation.md`.
+- A3: Per-app aud verification audit pending Phase 4 lab work.
+- A7: No mTLS in-pod. Pod boundary = trust unit. Acceptable at family scale.
+
+## Cloudflare-Containers thought experiment
+Considered but rejected: Cloudflare doesn't natively offer Postgres; running Postgres-in-Container on CF is just hosting it in their datacenter without HA. For "single company for the family" goal, Hetzner Cloud single VM is closer than CF (but accepted carmine for $0 marginal cost). Decision: ship to carmine. Revisit CF Containers as a redundancy lab later if useful.
 
 ## Where to look
 
 | If you want to know about... | Read |
 |---|---|
-| Why Ory and not Authentik/kanidm/etc | `docs/substrate-comparison.md`, `lab/docs/eval-*.md` |
-| The architectural shape | `docs/architecture.md` |
-| The locked decisions | `docs/decision.md` (this STATUS file is the summary) |
-| Why we don't contribute upstream Authentik or kanidm | `docs/contribution-strategy.md`, `upstream/firstyear-walk/findings.md` |
-| What the adversarial review caught | `lab/docs/adversarial-review.md` |
-| Per-feasibility-question evidence | `lab/docs/feasibility-q1-kratos-bind.md`, `q2-jellyfin-ldap.md`, `q3-tailscale-hydra.md`, `q4-astro-kratos.md` |
-| The Ory homelab gap analysis | `lab/docs/ory-homelab-research.md` |
 | What's currently in flight | this file (`docs/STATUS.md`) |
+| The architectural shape | `docs/architecture.md` |
+| The locked decisions in detail | `docs/decision.md` |
+| Why Ory and not Authentik/kanidm/etc | `docs/substrate-comparison.md`, `lab/docs/eval-*.md` |
+| Per-app integration shapes | `docs/per-app-oidc.md` |
+| Phase 0 (substrate-pick) review | `lab/docs/adversarial-review.md` |
+| Phase 3 security review + remediation | `docs/security-review-2026-05-04.md` |
+| Lab evidence | `lab/docs/spike-evidence.md` (Phase 1), `phase2-evidence.md`, `phase3-evidence.md`, `phase3-readiness.md`, `security-validation.md` |
+| Ory homelab gap analysis | `lab/docs/ory-homelab-research.md` |
+| Runbooks | `docs/runbooks/*.md` |
+| Contribution strategy (what we publish upstream) | `docs/contribution-strategy.md` |
 
 ## Working conventions
 
-- All commits require explicit human approval before push
-- Synthesist tasks (in auth/bench spec) track build phases for cross-session continuity
-- This STATUS.md gets updated when phases shift; it's the canonical "where we are" doc
-- No upstream code contributions to Authentik or kanidm; possibly to glauth (the bridge is a candidate)
-- Apply estate voice conventions to any external text (no em-dashes, direct phrasing, no filler)
+- All commits require explicit human approval before push.
+- This STATUS.md gets updated whenever phase shifts; it's the canonical cross-session resume doc.
+- Apply estate voice in any external text: no em-dashes; direct phrasing; no filler ("comprehensive", "robust", "leverage", "straightforward").
+- The auth pod is a single security domain; defense-in-depth between in-pod services is partial-and-deliberate.
