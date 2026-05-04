@@ -30,6 +30,28 @@ These are speculative. Default posture: ship deployment, monitor advisories, fil
 
 The bridge's standalone value: anyone running Kratos who needs LDAP. The community of homelabbers + small-org Kratos deployments has the same gap; we're not the first to hit it (just the first to assemble the pieces).
 
+#### Module-path rename plan (L5)
+
+Both `consent/go.mod` and `ldap-bridge/go.mod` currently declare module
+paths under `dunn.dev/auth/...` (the marketing domain). For the
+upstream extraction this becomes `gitlab.com/dunn.dev/glauth-kratos`
+(or `github.com/glauth/glauth-kratos` if the path lands on glauth's
+account). The rename is mechanical:
+
+1. `go mod edit -module gitlab.com/dunn.dev/glauth-kratos`
+2. `find . -name '*.go' -exec sed -i '' 's|dunn.dev/auth/ldap-bridge|gitlab.com/dunn.dev/glauth-kratos|g' {} +`
+3. `go mod tidy && go build ./...`
+4. Update Containerfile / Makefile import lines, README install
+   instructions, and the GitLab pipeline include if any.
+
+The consent service stays at `dunn.dev/auth/consent` (it's
+deployment-specific, not a candidate for upstreaming). No rename
+needed there.
+
+Defer until after lab proves the bridge against Jellyfin (Phase 2).
+The rename is a downstream-of-extraction step, not a blocker for
+estate use today.
+
 ## What we do NOT contribute
 
 - **Patches to Authentik or kanidm.** Authentik is mature; kanidm has explicit AI/LLM bans. Both stacks are out of scope.

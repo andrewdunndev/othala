@@ -50,7 +50,7 @@ The cost: BYO UI (we build the Astro app), 4-5 components instead of one, smalle
 | Decision | Value | Notes |
 |---|---|---|
 | Hydra subject identifier | `public` | Family scale, no app-to-app correlation concern. |
-| Consent | `skip_consent: true` per client for all 16 trusted apps | Family never sees consent screens. |
+| Consent | `skip_consent: true` per client for the 11 OIDC clients in `hydra/clients/` | Family never sees consent screens. Total auth-touching apps: 11 OIDC + 1 LDAP-only (Jellyfin) + 2 forward-auth = 14 surfaces. |
 | Tailscale WebFinger | Static JSON file at `home.dunn.dev/.well-known/webfinger` | RFC 7033, served by CF Workers. |
 
 ### LDAP bridge
@@ -118,7 +118,7 @@ The full review is at `lab/docs/adversarial-review.md`. Highlights:
 - **HIGH: Hydra schema migration is not automatic.** Added `hydra-migrate` init container.
 - **HIGH: Kratos courier must be singleton.** Configured replica:1.
 - **HIGH: `secrets.system` is non-rotatable.** Documented prominently.
-- **HIGH: `skip_consent` threat model gap acknowledged.** Stolen session = tokens for all 16 apps; acceptable at family scale, revisit if any app gains banking-tier ops.
+- **HIGH: `skip_consent` threat model gap acknowledged.** Stolen session = tokens for all 14 auth-touching surfaces (11 OIDC + 1 LDAP + 2 forward-auth); acceptable at family scale, revisit if any app gains banking-tier ops.
 
 ## What's in this repo (IaC structure)
 
