@@ -6,22 +6,22 @@ SSO substrate for the dunn.dev estate: Ory Kratos + Hydra + custom glauth-kratos
 
 ## Status
 
-Phase 0 — locked configs and skeletons in `kratos/`, `hydra/`, `consent/`, `ldap-bridge/`, `caddy/`, `portal/`, `lab/`. See `docs/STATUS.md` for the cross-session "where we are" entry point.
+Code complete. Lab validated GREEN twice (Phase 3 rev2 and post-security-remediation). Production cutover pending operator work on carmine: pyinfra quadlets, production secrets, DNS + port-forward, first-user pilot, family rollout.
 
-Phase 1 (lab spike) is next; full plan and decision history at `docs/decision.md`.
+Canonical resume doc: [`docs/STATUS.md`](docs/STATUS.md).
 
 ## Layout
 
 | Path | Contents |
 |---|---|
-| `docs/` | Decision, architecture, contribution strategy, substrate comparison, STATUS |
+| `docs/` | Architecture, decision log, STATUS, security review, Ory ecosystem survey, per-app integration, runbooks |
 | `kratos/` | Kratos server config + identity schema |
 | `hydra/` | Hydra server config + 11 OIDC client manifests + apply script |
-| `consent/` | Consent service (Go, runs on carmine alongside Hydra) |
-| `ldap-bridge/` | glauth-kratos: custom glauth binary with embedded Kratos backend |
-| `caddy/` | Custom registry.gitlab.com/dunn.dev/caddy-estate image build (xcaddy + caddy-dns/cloudflare plugin) + reusable Caddyfile snippets |
-| `portal/` | Astro UI on Cloudflare Workers (login + recovery + settings + tile launcher + admin) |
-| `lab/` | GCP-based test environment (compose stack, scripts, Playwright suite, eval+feasibility+adversarial docs) |
+| `consent/` | Consent service (Go, runs alongside Hydra in the auth pod) |
+| `ldap-bridge/` | glauth-kratos: custom glauth binary linked against Kratos public + admin APIs |
+| `caddy/` | Custom `registry.gitlab.com/dunn.dev/caddy-estate` image (xcaddy + caddy-dns/cloudflare) + reusable Caddyfile snippets |
+| `portal/` | Astro Node SSR app: login, recovery, settings, tile launcher, admin (users, groups, OAuth2, activity), WebFinger |
+| `lab/` | GCP-based test environment: compose stack, gen-secrets, Playwright suite, evidence docs |
 | `upstream/` | Maintainer-walk findings and contribution drafts |
 
 ## Architecture
@@ -32,7 +32,7 @@ Three layers:
 2. **Bridges (glauth-kratos, consent service).** Custom glauth binary with Kratos backend exposes identities over LDAPS for Jellyfin's plugin (Apple TV / Infuse SSO). Small Go consent service co-located with Hydra handles OAuth2 login/consent challenges without exposing Hydra's admin port publicly.
 3. **Family-facing UI (Astro Node SSR on carmine).** All flows we render: login, recovery, settings, tile launcher, admin. Direct Kratos public API consumption; Hydra consent handoff via the consent service. Hosted on carmine in the same pod network as Kratos and Hydra so the admin port is reachable.
 
-Cloudflare's role: DNS hosting + DNS-01 ACME via API. **Not in the auth or app request path.**
+Cloudflare's role: DNS hosting + DNS-01 ACME via API. **Not in the auth or app request path.** Visual language via [`@dunn.dev/design`](https://gitlab.com/dunn.dev/design) v0.3.0 (tokens + site chrome).
 
 ```mermaid
 flowchart TB
@@ -92,9 +92,39 @@ flowchart TB
 
 Full set of diagrams (integration patterns, login flow, admin AAL2 step-up, trust boundary, identity lifecycle, session AAL state machine, recovery-gate decision): [`docs/architecture-diagram.md`](docs/architecture-diagram.md).
 
+## Validation
+
+Phase 0 substrate, Phase 2 LDAP bridge, Phase 3 consent + portal + admin: all lab-validated end-to-end through Playwright. Adversarial security review remediated 4 HIGH + 7 MEDIUM + 5 LOW + 7 architectural findings. Three fuzz harnesses caught two real bugs before merge (JWK algorithm allowlist, LDAP DN escape). Evidence in `lab/docs/`.
+
+## Lab harness
+
+GCP-based compose stack at `lab/`. Driven via `make`:
+
+```sh
+make lab-secrets   # generate compose/.env (CURRENT + PREVIOUS slots)
+make lab-up        # provision GCP VM
+make lab-dns-up    # create auth-lab + keep-lab Cloudflare A records
+make lab-sync      # rsync repo to VM (auto-fires lab-deploy)
+make lab-ssh       # shell into VM for validate-phase3 / validate-security
+make lab-dns-down  # remove DNS records
+make lab-down      # tear down VM
+```
+
+Required env: `GCP_PROJECT`, `CF_API_TOKEN`, `CF_ZONE_ID`. Evidence from the spike, phase 2, phase 3, security validation, and adversarial review lives in `lab/docs/`.
+
+## Production cutover
+
+Five steps remaining, tracked in `docs/STATUS.md`:
+
+1. Pyinfra carmine quadlets (kratos, kratos-courier, hydra, consent, portal, postgres, caddy sidecar)
+2. Production secrets (gen-secrets equivalent + Bitwarden + carmine env)
+3. DNS records + home router port-forward
+4. First-user pilot (admin self-creates, validates one OIDC app)
+5. Family rollout
+
 ## Working conventions
 
-- All commits require explicit human approval before push
-- Synthesist tasks (in `auth/bench` spec) track build phases for cross-session continuity
-- `docs/STATUS.md` is the canonical "where we are" doc; updated when phases shift
-- Apply estate voice conventions to external text (no em-dashes, direct phrasing, no filler)
+- Push requires explicit human approval per action
+- `docs/STATUS.md` is the canonical "where we are" doc; update when phases shift
+- Apply estate voice in external text: no em-dashes, direct phrasing, no filler
+- `@dunn.dev/design` is the single source for tokens and site chrome; do not redefine locally
