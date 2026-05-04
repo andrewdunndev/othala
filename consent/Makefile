@@ -2,16 +2,21 @@ IMAGE ?= dunn.dev/consent
 TAG ?= lab
 RUNTIME ?= podman
 
-.PHONY: help build verify push test
+# Default fuzz duration; override with `make fuzz-jwk FUZZ_TIME=2m`.
+FUZZ_TIME ?= 30s
+
+.PHONY: help build verify push test fuzz-jwk fuzz-manifest
 
 help:
 	@echo "consent service — Hydra login/consent challenge handler"
 	@echo ""
 	@echo "Targets:"
-	@echo "  build    Build the image"
-	@echo "  verify   Run the image and check /healthz"
-	@echo "  test     Run go tests"
-	@echo "  push     Push to registry"
+	@echo "  build          Build the image"
+	@echo "  verify         Run the image and check /healthz"
+	@echo "  test           Run go tests"
+	@echo "  fuzz-jwk       Fuzz jwkToSigningKey for FUZZ_TIME ($(FUZZ_TIME))"
+	@echo "  fuzz-manifest  Fuzz loadClientManifest for FUZZ_TIME ($(FUZZ_TIME))"
+	@echo "  push           Push to registry"
 
 build:
 	$(RUNTIME) build -t $(IMAGE):$(TAG) -f Containerfile .
@@ -24,6 +29,12 @@ verify:
 
 test:
 	go test ./...
+
+fuzz-jwk:
+	go test -run=^$$ -fuzz=FuzzJwkToSigningKey -fuzztime=$(FUZZ_TIME) .
+
+fuzz-manifest:
+	go test -run=^$$ -fuzz=FuzzLoadClientManifest -fuzztime=$(FUZZ_TIME) .
 
 push:
 	$(RUNTIME) push $(IMAGE):$(TAG)
