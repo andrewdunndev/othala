@@ -1,0 +1,31 @@
+# DEPRECATED: portal moved off Cloudflare Workers onto carmine (Node SSR
+# via @astrojs/node standalone). This file is preserved only as a record
+# of the previous Workers deploy shape; nothing in the repo reads it.
+# Cloudflare's role is now DNS + DNS-01 ACME only. See docs/architecture.md
+# for the carmine-hosted topology.
+
+name = "dunn-auth-portal"
+compatibility_date = "2026-05-01"
+compatibility_flags = ["nodejs_compat"]
+
+# `main` and [assets] are injected at build time by @astrojs/cloudflare
+# (it writes a generated wrangler config under dist/). Defining them here
+# would race the build, since the entrypoint doesn't exist until after
+# astro build completes.
+
+# Build-time / runtime vars (non-secret). Kratos URLs are public-known.
+[vars]
+KRATOS_PUBLIC_URL = "https://auth.dunn.dev"
+HYDRA_PUBLIC_URL = "https://auth.dunn.dev"
+CONSENT_URL = "https://auth.dunn.dev/consent"
+
+# Secrets are set via `wrangler secret put`, never committed:
+#   - KRATOS_ADMIN_TOKEN  (admin-only; required by /admin pages, not yet wired)
+#   - HYDRA_INTROSPECT_TOKEN (if used at the edge)
+
+# KV namespace for the home-portal health-check polling Worker.
+# (cron Worker writes Kratos /health status; index.astro reads.)
+# Uncomment + populate after `wrangler kv namespace create AUTH_HEALTH`.
+# [[kv_namespaces]]
+# binding = "AUTH_HEALTH"
+# id = "REPLACE_WITH_KV_ID_AFTER_FIRST_DEPLOY"

@@ -1,28 +1,23 @@
 import { defineConfig } from 'astro/config';
-import cloudflare from '@astrojs/cloudflare';
-import tailwind from '@astrojs/tailwind';
+import node from '@astrojs/node';
+import tailwindcss from '@tailwindcss/vite';
 
-// Astro 6 dropped the Cloudflare Pages target. We use the Workers adapter
-// with static-asset support; functionally near-identical for our shape.
+// Astro 6: Node standalone SSR for the carmine deployment.
 //
-// Output mode: hybrid. Per-page prerender flag is REQUIRED on every route
-// in hybrid mode (no inheritance) — see adversarial-review.md.
+// `output: 'server'` ships SSR-by-default. Pages opt OUT of SSR with
+// `export const prerender = true`. Static assets and prerendered HTML
+// land in `dist/client/`; the SSR entrypoint is `dist/server/entry.mjs`
+// which a small Node process serves on the configured port.
+//
+// We do NOT use Astro's Sessions API. Identity sessions live in the
+// Kratos cookie on `.dunn.dev`, not in any Astro-managed store.
 
 export default defineConfig({
-  output: 'hybrid',
-  adapter: cloudflare({
-    mode: 'directory',
-    runtime: {
-      mode: 'local',
-      type: 'workers',
-    },
-  }),
-  integrations: [tailwind()],
+  output: 'server',
+  adapter: node({ mode: 'standalone' }),
+  integrations: [],
   site: 'https://home.dunn.dev',
   vite: {
-    define: {
-      // Build-time constants
-      __KRATOS_PUBLIC_URL__: JSON.stringify(process.env.KRATOS_PUBLIC_URL || 'https://auth.dunn.dev'),
-    },
+    plugins: [tailwindcss()],
   },
 });

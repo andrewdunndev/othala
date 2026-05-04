@@ -1,0 +1,60 @@
+# dunn.dev/auth-portal — Astro Node SSR for carmine.
+#
+# Stage 1 builds against a full node:20-alpine; Stage 2 ships a slim
+# runtime with only `dist/` and pruned `node_modules/`. Astro Node
+# standalone emits its own minimal HTTP server at `dist/server/entry.mjs`,
+# so no Express/Fastify glue is needed.
+#
+# Build context is the AUTH REPO ROOT, not portal/. The manifest prebuild
+# step reads ../hydra/clients/*.yaml relative to portal/, so both
+# directories must be in the context.
+#
+# Local build (from auth repo root):
+#   podman build -t dunn.dev/auth-portal:lab -f portal/Containerfile .
+# Run:
+#   podman run --rm -p 8080:8080 \
+#     -e KRATOS_PUBLIC_URL=http://kratos:4433 \
+#     -e KRATOS_ADMIN_URL=http://kratos:4434 \
+#     -e HYDRA_PUBLIC_URL=http://hydra:4444 \
+#     -e HYDRA_ADMIN_URL=http://hydra:4445 \
+#     dunn.dev/auth-portal:lab
+
+# ----- Stage 1: build -----
+FROM docker.io/library/node:22-alpine AS build
+
+WORKDIR /src
+
+# Lay out the same shape the build expects: `portal/` + sibling
+# `hydra/clients/`. Install deps first for cache friendliness.
+COPY portal/package.json portal/package-lock.json portal/
+RUN cd portal && npm ci
+
+COPY portal/ portal/
+COPY hydra/clients/ hydra/clients/
+
+RUN cd portal \
+    && npm run build \
+    && npm prune --omit=dev
+
+# ----- Stage 2: runtime -----
+FROM docker.io/library/node:22-alpine
+
+WORKDIR /app
+
+ENV NODE_ENV=production \
+    HOST=0.0.0.0 \
+    PORT=8080
+
+# Run as non-root for the carmine pod posture (matches every other
+# service on the node).
+RUN addgroup -S portal && adduser -S -G portal portal
+
+COPY --from=build --chown=portal:portal /src/portal/dist ./dist
+COPY --from=build --chown=portal:portal /src/portal/node_modules ./node_modules
+COPY --from=build --chown=portal:portal /src/portal/package.json ./package.json
+
+USER portal
+
+EXPOSE 8080
+
+CMD ["node", "./dist/server/entry.mjs"]

@@ -1,0 +1,8 @@
+# Wrangler local dev secrets (loaded by `wrangler dev`).
+# Copy to .dev.vars and fill in for local end-to-end testing against
+# a Kratos lab instance. Astro `npm run dev` reads from .env / process.env
+# directly, so local Astro dev uses .env (gitignored).
+
+KRATOS_PUBLIC_URL = "http://localhost:4433"
+KRATOS_ADMIN_URL  = "http://localhost:4434"
+# KRATOS_ADMIN_TOKEN = ""  # only needed once admin pages are wired
