@@ -1,0 +1,47 @@
+{
+  "moss": {
+    "100": "#d4e6d0",
+    "200": "#9cc494",
+    "300": "#6aaa58",
+    "400": "#4a6741",
+    "500": "#3a5533"
+  },
+  "earth": {
+    "50": "#ffffff",
+    "100": "#f4f4f4",
+    "200": "#e0e0e0",
+    "300": "#b0b0b0",
+    "400": "#707070",
+    "500": "#404040",
+    "600": "#0a0a0a"
+  },
+  "group": {
+    "people": "#4a6741",
+    "infra": "#5b8a72",
+    "tools": "#6b5d7a",
+    "services": "#7a6a4a"
+  },
+  "callout": {
+    "warning": "#c4763a",
+    "tip": "#4a7a6b",
+    "todo": "#7a6a4a"
+  },
+  "status": {
+    "danger": "#a8443a",
+    "success": "#4a7a4a"
+  },
+  "dark": {
+    "bg": "#1c1c1e",
+    "surface": "#242426",
+    "nav-bg": "#161618",
+    "border": "#303032",
+    "text": "#f2f2f7",
+    "text-2": "#aeaeb2",
+    "text-muted": "#8e8e93",
+    "callout-warning": "#d4915a",
+    "callout-tip": "#6aaa8b",
+    "callout-todo": "#aa9a6a",
+    "danger": "#d46a5a",
+    "success": "#6aaa7a"
+  }
+}

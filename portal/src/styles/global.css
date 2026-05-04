@@ -1,0 +1,330 @@
+/* Auth portal global styles.
+ *
+ * Consumes design tokens from ./tokens/index.css. Do NOT define color
+ * values here. If a needed token doesn't exist, add it to
+ * dunn.dev/design/tokens/colors.css and re-sync into ./tokens/. */
+
+@import './tokens/index.css';
+
+/* ── Reset ──────────────────────────────────────────────────── */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+html { font-size: 16px; }
+
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--font-body);
+  font-size: var(--text-base);
+  line-height: var(--lh-base);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* ── Focus indicators ──────────────────────────────────────── */
+:focus-visible {
+  outline: 2px solid var(--input-focus);
+  outline-offset: 2px;
+  border-radius: var(--radius-sm);
+}
+:focus:not(:focus-visible) { outline: none; }
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+/* ── Layout primitives ──────────────────────────────────────── */
+.shell {
+  margin: 0 auto;
+  padding: 2rem 1.5rem;
+}
+.shell.shell-sm { max-width: 28rem; }
+.shell.shell-md { max-width: 42rem; }
+.shell.shell-lg { max-width: 56rem; }
+
+.stack > * + * { margin-top: 0.75rem; }
+.stack-lg > * + * { margin-top: 1.5rem; }
+.stack-xl > * + * { margin-top: 3rem; }
+
+/* ── Typography ─────────────────────────────────────────────── */
+h1, h2, h3 {
+  font-family: var(--font-mono);
+  font-weight: 600;
+  line-height: var(--lh-tight);
+  color: var(--text);
+}
+h1 { font-size: var(--text-3xl); }
+h2 { font-size: var(--text-xl); }
+h3 { font-size: var(--text-lg); }
+
+p { color: var(--text); }
+.muted { color: var(--text-2); }
+.muted-strong { color: var(--text-muted); }
+.mono { font-family: var(--font-mono); }
+.text-xs { font-size: var(--text-xs); }
+.text-sm { font-size: var(--text-sm); }
+.text-lg { font-size: var(--text-lg); }
+
+/* ── Links ──────────────────────────────────────────────────── */
+a { color: var(--accent); text-decoration: none; }
+a:hover { color: var(--accent-hover); text-decoration: underline; }
+
+a.subtle { color: var(--text-2); }
+a.subtle:hover { color: var(--text); }
+
+/* ── Buttons ────────────────────────────────────────────────── */
+.button {
+  display: inline-block;
+  padding: 0.65rem 1.25rem;
+  font-family: var(--font-mono);
+  font-size: var(--text-base);
+  font-weight: 500;
+  line-height: 1;
+  border-radius: var(--radius);
+  border: 1px solid transparent;
+  cursor: pointer;
+  text-decoration: none;
+  transition: background-color 0.12s, border-color 0.12s, color 0.12s;
+}
+
+.button-primary {
+  background: var(--accent);
+  color: var(--accent-contrast);
+  border-color: var(--accent);
+}
+.button-primary:hover {
+  background: var(--accent-hover);
+  border-color: var(--accent-hover);
+  color: var(--accent-contrast);
+  text-decoration: none;
+}
+
+.button-secondary {
+  background: var(--surface);
+  color: var(--text);
+  border-color: var(--border);
+}
+.button-secondary:hover {
+  background: var(--accent-subtle);
+  border-color: var(--accent);
+  color: var(--text);
+  text-decoration: none;
+}
+
+.button-danger {
+  background: var(--bg);
+  color: var(--danger);
+  border-color: var(--danger);
+}
+.button-danger:hover {
+  background: var(--danger-subtle);
+  color: var(--danger);
+  text-decoration: none;
+}
+
+/* ── Forms ──────────────────────────────────────────────────── */
+.field { display: flex; flex-direction: column; gap: 0.35rem; }
+
+.field label {
+  font-family: var(--font-mono);
+  font-size: var(--text-sm);
+  color: var(--text-2);
+  letter-spacing: 0.02em;
+}
+
+.field input,
+.field select,
+.field textarea {
+  background: var(--input-bg);
+  color: var(--text);
+  border: 1px solid var(--input-border);
+  border-radius: var(--radius);
+  padding: 0.6rem 0.75rem;
+  font: inherit;
+  width: 100%;
+  transition: border-color 0.12s;
+}
+.field input:focus,
+.field select:focus,
+.field textarea:focus {
+  outline: none;
+  border-color: var(--input-focus);
+  box-shadow: 0 0 0 3px var(--accent-subtle);
+}
+
+.field-hint { font-size: var(--text-xs); color: var(--text-muted); }
+.field-error { font-size: var(--text-sm); color: var(--danger); }
+
+/* ── Surfaces ───────────────────────────────────────────────── */
+.panel {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 1.5rem;
+}
+
+/* Notice / status block (success, danger, warning).
+ * Uses semantic --danger / --success / --warning tokens. */
+.notice {
+  border-inline-start: 3px solid var(--text-muted);
+  background: var(--surface);
+  padding: 0.75rem 1rem;
+  border-radius: 0 var(--radius) var(--radius) 0;
+  font-size: var(--text-sm);
+  color: var(--text-2);
+}
+.notice-success { border-color: var(--success); background: var(--success-subtle); color: var(--text); }
+.notice-danger  { border-color: var(--danger);  background: var(--danger-subtle);  color: var(--text); }
+.notice-warning { border-color: var(--warning); background: var(--warning-subtle); color: var(--text); }
+
+/* ── Nav bar (admin) ────────────────────────────────────────── */
+.nav-bar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1rem 1.25rem;
+  padding: 0.75rem 0;
+  border-bottom: 1px solid var(--border);
+  font-family: var(--font-mono);
+  font-size: var(--text-sm);
+}
+.nav-bar a {
+  color: var(--text-2);
+  text-decoration: none;
+}
+.nav-bar a:hover,
+.nav-bar a[aria-current="page"] {
+  color: var(--accent);
+  text-decoration: none;
+}
+
+/* ── Tile grid (post-auth launcher) ─────────────────────────── */
+.tile-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 0.75rem;
+}
+@media (min-width: 640px)  { .tile-grid { grid-template-columns: repeat(3, 1fr); } }
+@media (min-width: 900px)  { .tile-grid { grid-template-columns: repeat(4, 1fr); } }
+
+.tile {
+  display: block;
+  padding: 1.25rem 1rem;
+  text-align: center;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  color: var(--text);
+  text-decoration: none;
+  transition: border-color 0.12s, background 0.12s, transform 0.12s;
+}
+.tile:hover {
+  border-color: var(--accent);
+  background: var(--accent-subtle);
+  color: var(--text);
+  text-decoration: none;
+  transform: translateY(-1px);
+}
+.tile-icon { font-size: 1.75rem; line-height: 1; }
+.tile-name {
+  margin-top: 0.5rem;
+  font-family: var(--font-mono);
+  font-size: var(--text-sm);
+}
+
+/* ── Tables (admin lists) ───────────────────────────────────── */
+.data-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: var(--text-sm);
+}
+.data-table th,
+.data-table td {
+  padding: 0.55rem 0.5rem;
+  text-align: left;
+  border-bottom: 1px solid var(--border);
+}
+.data-table th {
+  font-family: var(--font-mono);
+  font-weight: 600;
+  color: var(--text-2);
+  text-transform: uppercase;
+  font-size: var(--text-xs);
+  letter-spacing: 0.05em;
+}
+.data-table tbody tr:hover { background: var(--accent-subtle); }
+.data-table td.actions { text-align: right; white-space: nowrap; }
+.data-table td.actions > * + * { margin-left: 0.75rem; }
+
+/* ── Inline badges (group memberships, role names) ──────────── */
+/* Compact monospace pill used for chips in tables and detail rows.
+ * Variants pull from existing semantic tokens: no new color values. */
+.badge {
+  display: inline-block;
+  padding: 0.1rem 0.5rem;
+  border-radius: var(--radius-sm);
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  background: var(--accent-subtle);
+  color: var(--text);
+  border: 1px solid var(--border);
+  line-height: 1.4;
+}
+.badge + .badge { margin-left: 0.25rem; }
+.badge-muted { background: var(--surface); color: var(--text-2); }
+.badge-warning { background: var(--warning-subtle); border-color: var(--warning); }
+.badge-danger { background: var(--danger-subtle); border-color: var(--danger); }
+
+/* ── Admin form grid ────────────────────────────────────────── */
+/* Two-column checkbox grid for group selectors. Falls back to one
+ * column on narrow screens. */
+.checkbox-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.4rem 1rem;
+}
+@media (max-width: 540px) {
+  .checkbox-grid { grid-template-columns: 1fr; }
+}
+.checkbox-grid label {
+  display: flex;
+  gap: 0.5rem;
+  align-items: center;
+  font-family: var(--font-mono);
+  font-size: var(--text-sm);
+  color: var(--text);
+}
+
+/* Tight inline form-row used inside the per-app role override list. */
+.role-row {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 0.75rem;
+  align-items: center;
+  padding: 0.4rem 0;
+  border-bottom: 1px solid var(--border);
+  font-size: var(--text-sm);
+}
+.role-row:last-child { border-bottom: none; }
+.role-row select {
+  padding: 0.3rem 0.5rem;
+  font: inherit;
+  background: var(--input-bg);
+  color: var(--text);
+  border: 1px solid var(--input-border);
+  border-radius: var(--radius-sm);
+}
+
+/* Card grid used by /admin landing + /admin/groups. */
+.card-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(15rem, 1fr));
+  gap: 1rem;
+}
+.card-grid .panel { padding: 1rem 1.25rem; }
+.card-grid .panel h2 {
+  font-size: var(--text-base);
+  margin-bottom: 0.35rem;
+}

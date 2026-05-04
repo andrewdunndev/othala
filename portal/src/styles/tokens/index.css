@@ -1,0 +1,10 @@
+/* dunn.dev design tokens — single import entry point.
+ *
+ * Usage:
+ *   @import '@dunn.dev/design/tokens/index.css';
+ *   — or —
+ *   @import '../path/to/design/tokens/index.css';
+ */
+
+@import './colors.css';
+@import './typography.css';

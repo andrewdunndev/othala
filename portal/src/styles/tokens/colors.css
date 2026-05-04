@@ -1,0 +1,126 @@
+/* dunn.dev color tokens
+ * Source of truth. All other formats derived from this.
+ *
+ * Palette scales use --dd- prefix (raw values, for tooling/reference).
+ * Semantic tokens use bare names (for direct use in sites). */
+
+:root {
+  /* ── Palette: Moss (accent, hue ~145) ── */
+  --dd-moss-100: #d4e6d0;
+  --dd-moss-200: #9cc494;
+  --dd-moss-300: #6aaa58;
+  --dd-moss-400: #4a6741;
+  --dd-moss-500: #3a5533;
+
+  /* ── Palette: Earth (warm neutrals) ── */
+  --dd-earth-50:  #ffffff;
+  --dd-earth-100: #f4f4f4;
+  --dd-earth-200: #e0e0e0;
+  --dd-earth-300: #b0b0b0;
+  --dd-earth-400: #707070;
+  --dd-earth-500: #404040;
+  --dd-earth-600: #0a0a0a;
+
+  /* ── Palette: Group accents (knowledge graph) ── */
+  --dd-group-people:   #4a6741;
+  --dd-group-infra:    #5b8a72;
+  --dd-group-tools:    #6b5d7a;
+  --dd-group-services: #7a6a4a;
+
+  /* ── Palette: Callout accents ── */
+  --dd-callout-warning: #c4763a;
+  --dd-callout-tip:     #4a7a6b;
+  --dd-callout-todo:    #7a6a4a;
+
+  /* ── Palette: Status (forms, auth, admin actions) ── */
+  --dd-danger:  #a8443a;
+  --dd-success: #4a7a4a;
+
+  /* ── Semantic: Light ── */
+  --bg:              var(--dd-earth-50);
+  --surface:         var(--dd-earth-100);
+  --nav-bg:          var(--dd-earth-100);
+  --border:          var(--dd-earth-200);
+  --text:            var(--dd-earth-600);
+  --text-2:          var(--dd-earth-500);
+  --text-muted:      var(--dd-earth-400);
+  --accent:          var(--dd-moss-400);
+  --accent-hover:    var(--dd-moss-500);
+  --accent-contrast: #ffffff;
+  --accent-subtle:   color-mix(in srgb, var(--accent) 8%, transparent);
+  --accent-link:     color-mix(in srgb, var(--accent) 40%, transparent);
+  --callout-warning: var(--dd-callout-warning);
+  --callout-tip:     var(--dd-callout-tip);
+  --callout-todo:    var(--dd-callout-todo);
+
+  /* ── Semantic: Status (forms, auth) ── */
+  --danger:          var(--dd-danger);
+  --danger-subtle:   color-mix(in srgb, var(--danger) 10%, transparent);
+  --success:         var(--dd-success);
+  --success-subtle:  color-mix(in srgb, var(--success) 10%, transparent);
+  --warning:         var(--callout-warning);
+  --warning-subtle:  color-mix(in srgb, var(--warning) 10%, transparent);
+
+  /* ── Semantic: Forms ── */
+  --input-bg:        var(--bg);
+  --input-border:    var(--border);
+  --input-focus:     var(--accent);
+}
+
+/* ── Semantic: Dark (explicit toggle) ── */
+:root[data-theme="dark"] {
+  --bg:              #1c1c1e;
+  --surface:         #242426;
+  --nav-bg:          #161618;
+  --border:          #303032;
+  --text:            #f2f2f7;
+  --text-2:          #aeaeb2;
+  --text-muted:      #8e8e93;
+  --accent:          var(--dd-moss-300);
+  --accent-hover:    var(--dd-moss-200);
+  --accent-contrast: #1c1c1e;
+  --accent-subtle:   color-mix(in srgb, var(--accent) 8%, transparent);
+  --accent-link:     color-mix(in srgb, var(--accent) 40%, transparent);
+  --callout-warning: #d4915a;
+  --callout-tip:     #6aaa8b;
+  --callout-todo:    #aa9a6a;
+  --danger:          #d46a5a;
+  --danger-subtle:   color-mix(in srgb, var(--danger) 12%, transparent);
+  --success:         #6aaa7a;
+  --success-subtle:  color-mix(in srgb, var(--success) 12%, transparent);
+  --warning:         var(--callout-warning);
+  --warning-subtle:  color-mix(in srgb, var(--warning) 12%, transparent);
+  --input-bg:        var(--surface);
+  --input-border:    var(--border);
+  --input-focus:     var(--accent);
+}
+
+/* ── Semantic: Dark (system preference) ── */
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg:              #1c1c1e;
+    --surface:         #242426;
+    --nav-bg:          #161618;
+    --border:          #303032;
+    --text:            #f2f2f7;
+    --text-2:          #aeaeb2;
+    --text-muted:      #8e8e93;
+    --accent:          var(--dd-moss-300);
+    --accent-hover:    var(--dd-moss-200);
+    --accent-contrast: #1c1c1e;
+    --accent-subtle:   color-mix(in srgb, var(--accent) 8%, transparent);
+    --accent-link:     color-mix(in srgb, var(--accent) 40%, transparent);
+    --callout-warning: #d4915a;
+    --callout-tip:     #6aaa8b;
+    --callout-todo:    #aa9a6a;
+    --danger:          #d46a5a;
+    --danger-subtle:   color-mix(in srgb, var(--danger) 12%, transparent);
+    --success:         #6aaa7a;
+    --success-subtle:  color-mix(in srgb, var(--success) 12%, transparent);
+    --warning:         var(--callout-warning);
+    --warning-subtle:  color-mix(in srgb, var(--warning) 12%, transparent);
+    --input-bg:        var(--surface);
+    --input-border:    var(--border);
+    --input-focus:     var(--accent);
+  }
+}
