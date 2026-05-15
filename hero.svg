@@ -1,112 +1,44 @@
-<svg viewBox="0 0 1200 430" xmlns="http://www.w3.org/2000/svg">
-  <rect x="0" y="0" width="1200" height="430" fill="#faf6ed" stroke="#2c2417" stroke-width="3"/>
-
-  <!-- Title bar -->
-  <rect x="0" y="0" width="1200" height="36" fill="#2c2417"/>
-  <text x="16" y="24" font-family="'IBM Plex Mono', monospace" font-size="14" fill="#faf6ed" font-weight="bold">auth -- SSO substrate for dunn.dev</text>
-  <text x="1184" y="24" font-family="'IBM Plex Mono', monospace" font-size="11" fill="#c4b99a" text-anchor="end">Kratos · Hydra · LDAP bridge · portal</text>
-
-  <!-- COL 1: IDENTITY ATTEMPTS -->
-  <rect x="40" y="60" width="180" height="280" fill="none" stroke="#c4b99a" stroke-width="1.5" stroke-dasharray="6,3"/>
-  <text x="130" y="82" font-family="'IBM Plex Mono', monospace" font-size="10" fill="#6b5d4f" text-anchor="middle" font-weight="bold">CALLERS</text>
-
-  <rect x="56" y="100" width="148" height="28" fill="none" stroke="#2c2417" stroke-width="1.5"/>
-  <text x="130" y="118" font-family="'IBM Plex Mono', monospace" font-size="10" fill="#2c2417" text-anchor="middle">browser (OIDC)</text>
-
-  <rect x="56" y="140" width="148" height="28" fill="none" stroke="#2c2417" stroke-width="1.5"/>
-  <text x="130" y="158" font-family="'IBM Plex Mono', monospace" font-size="10" fill="#2c2417" text-anchor="middle">CLI / device flow</text>
-
-  <rect x="56" y="180" width="148" height="28" fill="none" stroke="#2c2417" stroke-width="1.5"/>
-  <text x="130" y="198" font-family="'IBM Plex Mono', monospace" font-size="10" fill="#2c2417" text-anchor="middle">LDAP client</text>
-
-  <rect x="56" y="220" width="148" height="28" fill="none" stroke="#2c2417" stroke-width="1.5"/>
-  <text x="130" y="238" font-family="'IBM Plex Mono', monospace" font-size="10" fill="#2c2417" text-anchor="middle">family + service</text>
-
-  <text x="130" y="284" font-family="'IBM Plex Mono', monospace" font-size="9" fill="#6b5d4f" text-anchor="middle">homelab estate</text>
-  <text x="130" y="298" font-family="'IBM Plex Mono', monospace" font-size="9" fill="#6b5d4f" text-anchor="middle">+ family identities</text>
-
-  <!-- Arrow 1 -->
-  <line x1="220" y1="200" x2="280" y2="200" stroke="#2c2417" stroke-width="1.5"/>
-  <polygon points="280,195 290,200 280,205" fill="#2c2417"/>
-
-  <!-- COL 2: SUBSTRATE -->
-  <rect x="290" y="60" width="270" height="280" fill="none" stroke="#2c2417" stroke-width="2"/>
-  <rect x="290" y="60" width="270" height="28" fill="#2c2417"/>
-  <text x="425" y="78" font-family="'IBM Plex Mono', monospace" font-size="11" fill="#faf6ed" text-anchor="middle" font-weight="bold">SUBSTRATE</text>
-  <text x="425" y="102" font-family="'IBM Plex Mono', monospace" font-size="9" fill="#6b5d4f" text-anchor="middle">five components, one trust boundary</text>
-
-  <rect x="306" y="120" width="116" height="32" fill="none" stroke="#2c2417" stroke-width="1.5"/>
-  <text x="364" y="132" font-family="'IBM Plex Mono', monospace" font-size="10" fill="#2c2417" text-anchor="middle" font-weight="bold">caddy</text>
-  <text x="364" y="146" font-family="'IBM Plex Mono', monospace" font-size="8" fill="#6b5d4f" text-anchor="middle">tls + reverse proxy</text>
-
-  <rect x="430" y="120" width="116" height="32" fill="none" stroke="#2c2417" stroke-width="1.5"/>
-  <text x="488" y="132" font-family="'IBM Plex Mono', monospace" font-size="10" fill="#2c2417" text-anchor="middle" font-weight="bold">portal</text>
-  <text x="488" y="146" font-family="'IBM Plex Mono', monospace" font-size="8" fill="#6b5d4f" text-anchor="middle">Astro Node SSR</text>
-
-  <rect x="306" y="160" width="116" height="32" fill="none" stroke="#2c2417" stroke-width="1.5"/>
-  <text x="364" y="172" font-family="'IBM Plex Mono', monospace" font-size="10" fill="#2c2417" text-anchor="middle" font-weight="bold">kratos</text>
-  <text x="364" y="186" font-family="'IBM Plex Mono', monospace" font-size="8" fill="#6b5d4f" text-anchor="middle">identity + sessions</text>
-
-  <rect x="430" y="160" width="116" height="32" fill="none" stroke="#2c2417" stroke-width="1.5"/>
-  <text x="488" y="172" font-family="'IBM Plex Mono', monospace" font-size="10" fill="#2c2417" text-anchor="middle" font-weight="bold">hydra</text>
-  <text x="488" y="186" font-family="'IBM Plex Mono', monospace" font-size="8" fill="#6b5d4f" text-anchor="middle">OAuth2 / OIDC</text>
-
-  <rect x="306" y="200" width="240" height="32" fill="none" stroke="#2c2417" stroke-width="1.5"/>
-  <text x="425" y="212" font-family="'IBM Plex Mono', monospace" font-size="10" fill="#2c2417" text-anchor="middle" font-weight="bold">glauth-kratos LDAP bridge</text>
-  <text x="425" y="226" font-family="'IBM Plex Mono', monospace" font-size="8" fill="#6b5d4f" text-anchor="middle">custom: serve LDAP from Kratos identities</text>
-
-  <line x1="306" y1="248" x2="544" y2="248" stroke="#c4b99a" stroke-width="1"/>
-
-  <text x="425" y="270" font-family="'IBM Plex Mono', monospace" font-size="9" fill="#6b5d4f" text-anchor="middle">all containers, all behind one Caddy</text>
-  <text x="425" y="286" font-family="'IBM Plex Mono', monospace" font-size="9" fill="#6b5d4f" text-anchor="middle">no SaaS dependency</text>
-  <text x="425" y="302" font-family="'IBM Plex Mono', monospace" font-size="9" fill="#6b5d4f" text-anchor="middle">IaC + lab harness, reference impl</text>
-
-  <text x="425" y="328" font-family="'IBM Plex Mono', monospace" font-size="9" fill="#2c2417" text-anchor="middle" font-weight="bold">deploys to carmine (homelab)</text>
-
-  <!-- Arrow 2 -->
-  <line x1="560" y1="200" x2="620" y2="200" stroke="#2c2417" stroke-width="1.5"/>
-  <polygon points="620,195 630,200 620,205" fill="#2c2417"/>
-
-  <!-- COL 3: VALIDATION -->
-  <rect x="630" y="80" width="180" height="240" fill="none" stroke="#2c2417" stroke-width="2"/>
-  <rect x="630" y="80" width="180" height="28" fill="#2c2417"/>
-  <text x="720" y="98" font-family="'IBM Plex Mono', monospace" font-size="11" fill="#faf6ed" text-anchor="middle" font-weight="bold">LAB VALIDATION</text>
-  <text x="720" y="122" font-family="'IBM Plex Mono', monospace" font-size="9" fill="#6b5d4f" text-anchor="middle">VM harness + Playwright</text>
-
-  <text x="646" y="150" font-family="'IBM Plex Mono', monospace" font-size="10" fill="#2c2417">spin lab stack</text>
-  <text x="646" y="170" font-family="'IBM Plex Mono', monospace" font-size="10" fill="#2c2417">end-to-end OIDC</text>
-  <text x="646" y="190" font-family="'IBM Plex Mono', monospace" font-size="10" fill="#2c2417">LDAP bind smoke</text>
-  <text x="646" y="210" font-family="'IBM Plex Mono', monospace" font-size="10" fill="#2c2417">teardown clean</text>
-
-  <rect x="646" y="230" width="148" height="24" fill="none" stroke="#6b5d4f" stroke-width="1"/>
-  <text x="720" y="246" font-family="'IBM Plex Mono', monospace" font-size="9" fill="#6b5d4f" text-anchor="middle">GREEN twice (Phase 3)</text>
-
-  <text x="720" y="290" font-family="'IBM Plex Mono', monospace" font-size="9" fill="#6b5d4f" text-anchor="middle">code complete</text>
-
-  <!-- Arrow 3 -->
-  <line x1="810" y1="200" x2="870" y2="200" stroke="#2c2417" stroke-width="1.5"/>
-  <polygon points="870,195 880,200 870,205" fill="#2c2417"/>
-
-  <!-- COL 4: SESSIONS -->
-  <rect x="880" y="110" width="280" height="180" fill="none" stroke="#2c2417" stroke-width="2"/>
-  <text x="1020" y="140" font-family="'IBM Plex Mono', monospace" font-size="10" fill="#2c2417" text-anchor="middle" font-weight="bold">authenticated sessions</text>
-  <line x1="896" y1="150" x2="1144" y2="150" stroke="#c4b99a" stroke-width="1"/>
-  <text x="1020" y="170" font-family="'IBM Plex Mono', monospace" font-size="9" fill="#6b5d4f" text-anchor="middle">across dunn.dev services</text>
-  <text x="1020" y="186" font-family="'IBM Plex Mono', monospace" font-size="9" fill="#6b5d4f" text-anchor="middle">across carmine services</text>
-  <text x="1020" y="202" font-family="'IBM Plex Mono', monospace" font-size="9" fill="#6b5d4f" text-anchor="middle">across LDAP-only legacy</text>
-  <text x="1020" y="218" font-family="'IBM Plex Mono', monospace" font-size="9" fill="#6b5d4f" text-anchor="middle">family identities, one place</text>
-  <line x1="896" y1="230" x2="1144" y2="230" stroke="#c4b99a" stroke-width="1"/>
-  <text x="1020" y="252" font-family="'IBM Plex Mono', monospace" font-size="9" fill="#2c2417" text-anchor="middle">cutover pending: pyinfra quadlets,</text>
-  <text x="1020" y="268" font-family="'IBM Plex Mono', monospace" font-size="9" fill="#2c2417" text-anchor="middle">production secrets, DNS, family rollout</text>
-
-  <!-- Footer -->
-  <line x1="40" y1="360" x2="1160" y2="360" stroke="#c4b99a" stroke-width="1"/>
-  <text x="600" y="380" font-family="'IBM Plex Mono', monospace" font-size="10" fill="#6b5d4f" text-anchor="middle">substrate, not service · IaC + lab harness + reference implementation · code complete · cutover pending</text>
-  <text x="590" y="408" text-anchor="middle" fill="#2c2417" font-family="'IBM Plex Mono', monospace" font-size="9" font-weight="600">Built with GitLab</text>
-  <g transform="translate(634, 397) scale(0.045)">
-    <path d="M282.83,170.73l-.27-.69-26.14-68.22a6.81,6.81,0,0,0-2.69-3.24,7,7,0,0,0-8,.43,7,7,0,0,0-2.32,3.52l-17.65,54H154.29l-17.65-54A6.86,6.86,0,0,0,134.32,99a7,7,0,0,0-8-.43,6.87,6.87,0,0,0-2.69,3.24L97.44,170l-.26.69a48.54,48.54,0,0,0,16.1,56.1l.09.07.24.17,39.82,29.82,19.7,14.91,12,9.06a8.07,8.07,0,0,0,9.76,0l12-9.06,19.7-14.91,40.06-30,.1-.08A48.56,48.56,0,0,0,282.83,170.73Z" fill="#E24329"/>
-    <path d="M282.83,170.73l-.27-.69a88.3,88.3,0,0,0-35.15,15.8L190,229.25c19.55,14.79,36.57,27.64,36.57,27.64l40.06-30,.1-.08A48.56,48.56,0,0,0,282.83,170.73Z" fill="#FC6D26"/>
-    <path d="M153.43,256.89l19.7,14.91,12,9.06a8.07,8.07,0,0,0,9.76,0l12-9.06,19.7-14.91S209.55,244,190,229.25C170.45,244,153.43,256.89,153.43,256.89Z" fill="#FCA326"/>
-    <path d="M132.58,185.84A88.19,88.19,0,0,0,97.44,170l-.26.69a48.54,48.54,0,0,0,16.1,56.1l.09.07.24.17,39.82,29.82s17-12.85,36.57-27.64Z" fill="#FC6D26"/>
+<svg viewBox="0 0 1200 430" width="1200" height="430" font-family="IBM Plex Sans, Helvetica, Arial, sans-serif" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="auth hero: Authentik identity provider for the dunn.dev estate.">
+  <rect x="0" y="0" width="1200" height="430" fill="#f4f4f4"/>
+  <g font-family="IBM Plex Sans, Helvetica, Arial, sans-serif">
+  <text x="60" y="34" font-size="10" font-weight="600" font-family="IBM Plex Mono, Menlo, monospace" fill="#707070" letter-spacing="1.4">AUTH · AUTHENTIK · SINGLE-SIGN-ON FOR THE ESTATE</text>
+  <text x="1140" y="34" text-anchor="end" font-size="10" font-weight="600" font-family="IBM Plex Mono, Menlo, monospace" fill="#707070" letter-spacing="1.4">2026</text>
+  <line x1="60" y1="48" x2="1140" y2="48" stroke="#e0e0e0" stroke-width="1"/>
+  <text x="60" y="138" font-size="72" font-weight="700" fill="#4a6741" letter-spacing="-2">auth</text>
+  <text x="60" y="172" font-size="14" fill="#404040">Authentik instance + blueprints that hold the estate's identity.</text>
+  <text x="60" y="192" font-size="14" fill="#404040">blueprint changes are the only path to an estate auth change.</text>
+  <text x="60" y="222" font-size="12" font-style="italic" fill="#404040">identity is a single artifact, not a config drift.</text>
+  <g transform="translate(110 240) scale(2.2)" stroke="#4a6741" fill="none" stroke-linecap="round">
+    <circle cx="22" cy="32" r="9" stroke-width="2"/>
+    <circle cx="22" cy="32" r="3" fill="#4a6741"/>
+    <line x1="31" y1="32" x2="54" y2="32" stroke-width="2.5"/>
+    <line x1="46" y1="32" x2="46" y2="40" stroke-width="2"/>
+    <line x1="52" y1="32" x2="52" y2="38" stroke-width="2"/>
+  </g>
+  <text x="560" y="72" font-size="10" font-weight="700" font-family="IBM Plex Mono, Menlo, monospace" fill="#707070" letter-spacing="1.4">FLOW</text>
+  <text x="850" y="72" font-size="10" font-weight="700" font-family="IBM Plex Mono, Menlo, monospace" fill="#707070" letter-spacing="1.4">DISCIPLINE</text>
+  <rect x="560" y="84" width="270" height="130" rx="3" fill="#ffffff" stroke="#e0e0e0" stroke-width="1"/>
+  <text x="578" y="106" font-size="10" font-weight="700" font-family="IBM Plex Mono, Menlo, monospace" fill="#707070" letter-spacing="1.4">IN</text>
+  <text x="578" y="152" font-size="32" font-weight="700" fill="#4a6741" letter-spacing="-0.5">blueprints</text>
+  <text x="578" y="178" font-size="11" fill="#404040">yaml that declares users, groups, flows, apps</text>
+  <text x="578" y="200" font-size="9" font-family="IBM Plex Mono, Menlo, monospace" fill="#707070" letter-spacing="0.6">AS-CODE · GIT-RESIDENT</text>
+  <rect x="850" y="84" width="270" height="130" rx="3" fill="#ffffff" stroke="#e0e0e0" stroke-width="1"/>
+  <text x="868" y="106" font-size="10" font-weight="700" font-family="IBM Plex Mono, Menlo, monospace" fill="#707070" letter-spacing="1.4">POSTURE</text>
+  <text x="868" y="152" font-size="32" font-weight="700" fill="#4a6741" letter-spacing="-0.5">self-hosted</text>
+  <text x="868" y="178" font-size="11" fill="#404040">single instance, single household, no SaaS IdP</text>
+  <text x="868" y="200" font-size="9" font-family="IBM Plex Mono, Menlo, monospace" fill="#707070" letter-spacing="0.6">ONE OPERATOR · ONE INSTANCE</text>
+  <rect x="560" y="224" width="270" height="130" rx="3" fill="#ffffff" stroke="#e0e0e0" stroke-width="1"/>
+  <text x="578" y="246" font-size="10" font-weight="700" font-family="IBM Plex Mono, Menlo, monospace" fill="#707070" letter-spacing="1.4">OUT</text>
+  <text x="578" y="292" font-size="32" font-weight="700" fill="#4a6741" letter-spacing="-0.5">idp</text>
+  <text x="578" y="318" font-size="11" fill="#404040">OIDC, SAML, LDAP for every consumer in the estate</text>
+  <text x="578" y="340" font-size="9" font-family="IBM Plex Mono, Menlo, monospace" fill="#707070" letter-spacing="0.6">OIDC · SAML · LDAP</text>
+  <rect x="850" y="224" width="270" height="130" rx="3" fill="#ffffff" stroke="#e0e0e0" stroke-width="1"/>
+  <text x="868" y="246" font-size="10" font-weight="700" font-family="IBM Plex Mono, Menlo, monospace" fill="#707070" letter-spacing="1.4">LIFETIME</text>
+  <text x="868" y="292" font-size="32" font-weight="700" fill="#4a6741" letter-spacing="-0.5">auditable</text>
+  <text x="868" y="318" font-size="11" fill="#404040">every grant flows from a committed blueprint</text>
+  <text x="868" y="340" font-size="9" font-family="IBM Plex Mono, Menlo, monospace" fill="#707070" letter-spacing="0.6">GIT LOG · BLUEPRINT TIMELINE</text>
+  <line x1="60" y1="386" x2="1140" y2="386" stroke="#e0e0e0" stroke-width="1"/>
+  <text x="60" y="412" font-size="10" font-weight="600" font-family="IBM Plex Mono, Menlo, monospace" fill="#707070" letter-spacing="1.4">AUTHENTIK · BLUEPRINTS · OAUTH · SAML</text>
+  <text x="1140" y="412" text-anchor="end" font-size="10" font-weight="600" font-family="IBM Plex Mono, Menlo, monospace" fill="#707070" letter-spacing="1.4">PRIVATE · GITLAB.COM/DUNN.DEV/auth</text>
   </g>
 </svg>

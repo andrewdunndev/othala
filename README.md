@@ -1,3 +1,5 @@
+![hero](hero.svg)
+
 # auth
 
 [![license](https://img.shields.io/badge/license-MIT-green)](LICENSE) ![built with GitLab](https://img.shields.io/badge/built_with-GitLab-FC6D26?logo=gitlab)
