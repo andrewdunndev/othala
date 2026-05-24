@@ -103,7 +103,7 @@ services:
       - "636:636"
 
   caddy:
-    image: docker.io/library/caddy:2.8-alpine
+    image: docker.io/library/caddy:2.11-alpine
     container_name: auth-caddy
     restart: unless-stopped
     depends_on:
