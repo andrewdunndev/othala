@@ -26,7 +26,7 @@ stages:
 
 include:
   # consent service (Go HTTP, public + admin listeners).
-  - component: gitlab.com/dunn.dev/pipeline/container-image@2.3.1
+  - component: gitlab.com/dunn.dev/pipeline/container-image@2.3.2
     inputs:
       job_name: build-consent
       image_tag: consent
@@ -35,7 +35,7 @@ include:
       tag_pipeline: true
 
   # glauth-kratos LDAP-to-Kratos bridge (Go).
-  - component: gitlab.com/dunn.dev/pipeline/container-image@2.3.1
+  - component: gitlab.com/dunn.dev/pipeline/container-image@2.3.2
     inputs:
       job_name: build-ldap-bridge
       image_tag: ldap-bridge
@@ -45,7 +45,7 @@ include:
 
   # auth-portal: Astro Node SSR. Context is repo root because the
   # build reads from sibling hydra/clients/.
-  - component: gitlab.com/dunn.dev/pipeline/container-image@2.3.1
+  - component: gitlab.com/dunn.dev/pipeline/container-image@2.3.2
     inputs:
       job_name: build-portal
       image_tag: portal

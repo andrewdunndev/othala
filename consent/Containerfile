@@ -4,7 +4,7 @@
 # (UBI 9 micro) runtime ships only the binary. Pinned to the dunn.dev
 # pipeline catalog version; Renovate-watched.
 
-ARG CATALOG_VERSION=2.3.1
+ARG CATALOG_VERSION=2.3.2
 
 FROM registry.gitlab.com/dunn.dev/pipeline/ci-go:${CATALOG_VERSION} AS builder
 
