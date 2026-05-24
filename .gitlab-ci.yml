@@ -41,7 +41,7 @@ include:
       job_name: sbom-consent
       container_image: "${CI_REGISTRY_IMAGE}/consent:${CI_COMMIT_TAG}"
       container_image_job: build-consent
-      package_name: consent
+      package_name: auth
 
   # ----- ldap-bridge ----------------------------------------------
   - component: gitlab.com/dunn.dev/pipeline/container-image@2.3.2
@@ -57,7 +57,7 @@ include:
       job_name: sbom-ldap-bridge
       container_image: "${CI_REGISTRY_IMAGE}/ldap-bridge:${CI_COMMIT_TAG}"
       container_image_job: build-ldap-bridge
-      package_name: ldap-bridge
+      package_name: auth
 
   # ----- auth-portal (Astro Node SSR) -----------------------------
   # Context is repo root because the build reads from sibling
@@ -75,7 +75,7 @@ include:
       job_name: sbom-portal
       container_image: "${CI_REGISTRY_IMAGE}/portal:${CI_COMMIT_TAG}"
       container_image_job: build-portal
-      package_name: portal
+      package_name: auth
 
   # ----- GitLab Release: link SBOMs from all three images -------
   # release-create is binary-shaped (expects binary_job + dist/
