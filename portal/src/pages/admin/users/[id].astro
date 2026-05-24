@@ -60,15 +60,16 @@ const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 let identity: Identity | null = null;
 let loadError: string | null = null;
 
-async function reload(): Promise<void> {
-  identity = await getIdentity(id!);
+async function reload(): Promise<Identity | null> {
+  try {
+    return await getIdentity(id!);
+  } catch (err) {
+    loadError = err instanceof Error ? err.message : String(err);
+    return null;
+  }
 }
 
-try {
-  await reload();
-} catch (err) {
-  loadError = err instanceof Error ? err.message : String(err);
-}
+identity = await reload();
 
 let mode: 'read' | 'edit' = Astro.url.searchParams.get('mode') === 'edit' ? 'edit' : 'read';
 let actionResult:
@@ -135,7 +136,7 @@ if (Astro.request.method === 'POST' && identity) {
             roles: Object.keys(roles).length ? roles : undefined,
           },
         });
-        await reload();
+        identity = await reload();
         actionResult = { kind: 'updated' };
         mode = 'read';
       }
