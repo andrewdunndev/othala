@@ -28,7 +28,7 @@ stages:
 
 include:
   # ----- consent ---------------------------------------------------
-  - component: gitlab.com/dunn.dev/pipeline/container-image@2.3.2
+  - component: gitlab.com/dunn.dev/pipeline/container-image@2.3.3
     inputs:
       job_name: build-consent
       image_tag: consent
@@ -36,15 +36,16 @@ include:
       context: consent
       tag_pipeline: true
 
-  - component: gitlab.com/dunn.dev/pipeline/container-sbom@2.3.2
+  - component: gitlab.com/dunn.dev/pipeline/container-sbom@2.3.3
     inputs:
       job_name: sbom-consent
       container_image: "${CI_REGISTRY_IMAGE}/consent:${CI_COMMIT_TAG}"
       container_image_job: build-consent
       package_name: auth
+      sbom_filename: consent-container.sbom.json
 
   # ----- ldap-bridge ----------------------------------------------
-  - component: gitlab.com/dunn.dev/pipeline/container-image@2.3.2
+  - component: gitlab.com/dunn.dev/pipeline/container-image@2.3.3
     inputs:
       job_name: build-ldap-bridge
       image_tag: ldap-bridge
@@ -52,17 +53,18 @@ include:
       context: ldap-bridge
       tag_pipeline: true
 
-  - component: gitlab.com/dunn.dev/pipeline/container-sbom@2.3.2
+  - component: gitlab.com/dunn.dev/pipeline/container-sbom@2.3.3
     inputs:
       job_name: sbom-ldap-bridge
       container_image: "${CI_REGISTRY_IMAGE}/ldap-bridge:${CI_COMMIT_TAG}"
       container_image_job: build-ldap-bridge
       package_name: auth
+      sbom_filename: ldap-bridge-container.sbom.json
 
   # ----- auth-portal (Astro Node SSR) -----------------------------
   # Context is repo root because the build reads from sibling
   # hydra/clients/.
-  - component: gitlab.com/dunn.dev/pipeline/container-image@2.3.2
+  - component: gitlab.com/dunn.dev/pipeline/container-image@2.3.3
     inputs:
       job_name: build-portal
       image_tag: portal
@@ -70,12 +72,13 @@ include:
       context: .
       tag_pipeline: true
 
-  - component: gitlab.com/dunn.dev/pipeline/container-sbom@2.3.2
+  - component: gitlab.com/dunn.dev/pipeline/container-sbom@2.3.3
     inputs:
       job_name: sbom-portal
       container_image: "${CI_REGISTRY_IMAGE}/portal:${CI_COMMIT_TAG}"
       container_image_job: build-portal
       package_name: auth
+      sbom_filename: portal-container.sbom.json
 
   # ----- GitLab Release: link SBOMs from all three images -------
   # release-create is binary-shaped (expects binary_job + dist/
@@ -84,7 +87,7 @@ include:
   # stays empty because container builds don't produce one. The
   # value is the GitLab Release record itself plus links to each
   # service's SBOM in the generic package registry.
-  - component: gitlab.com/dunn.dev/pipeline/release-create@2.3.2
+  - component: gitlab.com/dunn.dev/pipeline/release-create@2.3.3
     inputs:
       package_name: auth
       release_title: "auth $CI_COMMIT_TAG"
