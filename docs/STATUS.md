@@ -2,13 +2,26 @@
 
 Canonical cross-session resume doc. Read first.
 
-Updated 2026-05-04.
+Updated 2026-05-24.
 
 ## Where we are
 
-Code complete; production cutover pending operator work.
+**Shippable.** Container builds + supply-chain artifacts are signed,
+SBOM'd, and pinned. Carmine is online and ready for service deploys.
+Next session: pyinfra carmine quadlets.
 
-**Stack:** Ory Kratos (identity) + Ory Hydra (OAuth2/OIDC) + custom glauth-kratos LDAP bridge + Astro Node SSR portal on carmine + custom Caddy image at `registry.gitlab.com/dunn.dev/caddy-estate` (xcaddy + caddy-dns/cloudflare). Estate design via `@dunn.dev/design` v0.3.0 (tokens + site chrome).
+**Stack:** Ory Kratos (identity) + Ory Hydra (OAuth2/OIDC) + custom glauth-kratos LDAP bridge + Astro Node SSR portal on carmine + custom Caddy image at `registry.gitlab.com/dunn.dev/caddy-estate` (UBI 9 via dunn.dev/pipeline catalog, no xcaddy). Estate design via `@dunn.dev/reference@^0.2.0` (tokens + chrome + journal pattern).
+
+## Released artifacts (v0.1.2)
+
+| Path | What |
+|---|---|
+| `registry.gitlab.com/dunn.dev/auth/consent:v0.1.2` + `:latest` | Go HTTP, signed by digest via cosign keyless |
+| `registry.gitlab.com/dunn.dev/auth/ldap-bridge:v0.1.2` + `:latest` | glauth-kratos LDAP bridge, signed |
+| `registry.gitlab.com/dunn.dev/auth/portal:v0.1.2` + `:latest` | Astro Node SSR, signed |
+| `gitlab.com/dunn.dev/auth/-/releases/v0.1.2` | GitLab Release; SBOMs linked from `/-/packages/generic/auth/v0.1.2/` |
+
+All three images on `dunn.dev/pipeline/ci-runtime-{go,node}:2.3.2` (UBI 9.8). Container registry cleanup policy active: semver + `:latest` + cosign sigs kept forever, everything else pruned after 30d.
 
 ## Locked decisions
 
@@ -35,7 +48,7 @@ Code complete; production cutover pending operator work.
 | Tailscale | Not load-bearing |
 | Cookie/cipher rotation | Two-slot env (CURRENT + PREVIOUS), seeded distinct |
 | Per-app role mapping | In `hydra/clients/*.yaml` `consent:` block; resolution: `metadata_admin.roles[client_id]` override → group_role_map walk in user-group order |
-| Design tokens | `@dunn.dev/design` is the single source. Never redefine locally |
+| Design tokens | `@dunn.dev/reference` is the single source (design was archived 2026-05-24). Never redefine locally |
 | `secrets.system` | NON-ROTATABLE (Hydra at-rest encryption); break-glass procedure in runbook |
 
 Full rationale per decision: `docs/decision.md`.
@@ -45,14 +58,18 @@ Full rationale per decision: `docs/decision.md`.
 - Phase 1 substrate, Phase 2 LDAP bridge, Phase 3 consent service v2.1 + Astro portal + admin UI
 - Adversarial security review: 4 HIGH + 7 MEDIUM + 5 LOW + 7 architectural — all remediated
 - 3 fuzz harnesses (caught 2 real bugs: JWK alg, LDAP DN escape)
-- Estate design integration via `@dunn.dev/design` package
+- Estate design migrated from `@dunn.dev/design` to `@dunn.dev/reference` (design archived)
 - `caddy-estate` rename across 6 repos
+- UBI 9.8 containerization via dunn.dev/pipeline 2.3.2; consent, ldap-bridge, portal published at v0.1.2 with cosign keyless sigs + CycloneDX SBOMs + GitLab Release record
+- Container registry cleanup policy active (keep semver/latest/sigs; prune else after 30d)
 
 Lab-validated GREEN twice (Phase 3 rev2 + post-security-remediation). All VMs torn down.
 
 ## Production cutover (5 steps remaining)
 
-1. **Pyinfra carmine quadlets** (~1-2 days). kratos, kratos-courier, kratos-migrate, hydra, hydra-migrate, consent, portal, postgres + Caddy sidecar pulling `caddy-estate:latest`. Reference: `immutable/carmine/services/<app>/.config/containers/systemd/`.
+Pull-from-tag images at `registry.gitlab.com/dunn.dev/auth/{consent,ldap-bridge,portal}:v0.1.2`. Caddy sidecar at `registry.gitlab.com/dunn.dev/caddy-estate:latest` (UBI 9.8). Carmine online per `0a73f2` (2026-05-23).
+
+1. **Pyinfra carmine quadlets** (~1-2 days). kratos, kratos-courier, kratos-migrate, hydra, hydra-migrate, consent, portal, postgres + Caddy sidecar. Pin each to a specific tag (no `:latest` in production quadlets). Reference: `immutable/carmine/services/<app>/.config/containers/systemd/`. Cosign verify each image by digest before deploy (verify cert identity = GitLab OIDC keyless).
 2. **Production secrets** (~30 min). Generate via gen-secrets.sh equivalent; Bitwarden + carmine env. Full env list in `lab/scripts/gen-secrets.sh`.
 3. **DNS + port-forward** (~30 min). CF DNS-only records + home router 443 → carmine.
 4. **First-user pilot** (~30 min). Admin self-creates → enrollment URL → passkey → validate one OIDC app.
