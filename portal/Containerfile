@@ -19,12 +19,12 @@
 #     -e HYDRA_ADMIN_URL=http://hydra:4445 \
 #     dunn.dev/auth-portal:lab
 
-ARG CATALOG_VERSION=2.3.2
+ARG CATALOG_VERSION=2.5.0
 
 # ----- Stage 1: build -----
 # Use upstream UBI 9 nodejs-22 (full image with npm + build tools).
 # ci-runtime-node is -minimal and intentionally omits npm.
-FROM registry.access.redhat.com/ubi9/nodejs-22:1 AS build
+FROM registry.access.redhat.com/ubi9/nodejs-22:1-1778648048 AS build
 
 WORKDIR /src
 USER root

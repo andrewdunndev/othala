@@ -1,5 +1,7 @@
 github.com/BurntSushi/toml v1.4.0 h1:kuoIxZQy2WRRk1pttg9asf+WVv6tWQuBNVmK8+nqPr0=
 github.com/BurntSushi/toml v1.4.0/go.mod h1:ukJfTF/6rtPPRCnwkur4qwRxa8vTRFBF0uk2lLoLwho=
+github.com/BurntSushi/toml v1.6.0 h1:dRaEfpa2VI55EwlIW72hMRHdWouJeRF7TPYhI+AUQjk=
+github.com/BurntSushi/toml v1.6.0/go.mod h1:ukJfTF/6rtPPRCnwkur4qwRxa8vTRFBF0uk2lLoLwho=
 github.com/glauth/glauth/v2 v2.4.0 h1:wxZp33kB/1y0DADZCEdTwWJCHignXFLS9ndKfxDafdo=
 github.com/glauth/glauth/v2 v2.4.0/go.mod h1:gjcmMY9PW7oa7ZvlTP4gKO71zkYGs2+17kz0kYVyTnk=
 github.com/glauth/ldap v0.0.0-20260119000349-19bd16af77bb h1:z/UMce1Ahui7OoFz0lOyBKkHX+mbdtcK9gXdsJkw1Gk=
