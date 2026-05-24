@@ -14,7 +14,7 @@
   },
   "dependencies": {
     "@astrojs/node": "^10.0.6",
-    "@dunn.dev/design": "file:../../design",
+    "@dunn.dev/reference": "^0.2.0",
     "@tailwindcss/vite": "^4.2.4",
     "astro": "^6.2.1",
     "tailwindcss": "^4.2.4",

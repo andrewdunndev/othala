@@ -1,6 +1,6 @@
 ---
 // Shared head + body wrapper for all portal pages.
-// Imports the design tokens (via @dunn.dev/design package) and the
+// Imports the design tokens (via @dunn.dev/reference package) and the
 // site-level chrome from src/styles/site.css via global.css.
 //
 // Visual language matches the estate (design.dunn.dev): sticky header
@@ -8,7 +8,7 @@
 // localStorage, footer with repo link.
 
 import '../styles/global.css';
-import markSvg from '@dunn.dev/design/mark/mark.svg?raw';
+import markSvg from '@dunn.dev/reference/mark/mark.svg?raw';
 
 interface Props {
   title: string;

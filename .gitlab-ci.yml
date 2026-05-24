@@ -1,0 +1,54 @@
+# dunn.dev/auth -- container build pipeline.
+#
+# Three custom images (consent, ldap-bridge, portal) build via the
+# dunn.dev/pipeline container-image template. caddy lives in the
+# separate dunn.dev/caddy-estate repo; auth/caddy/snippets/ are
+# volume-mounted at deploy time, not baked into an image here.
+#
+# Container rebuilds fire on:
+#   - tag pipeline (image tagged with $CI_COMMIT_TAG)
+#   - main + Containerfile change (image tagged :short-sha + :latest)
+#   - manual via $BUILD_CI_IMAGE=true (per container-image template default)
+#
+# Source-code changes in <service>/ that don't touch <service>/Containerfile
+# don't trigger main-branch rebuilds. Use tag pipelines for releases.
+
+default:
+  interruptible: true
+
+workflow:
+  auto_cancel:
+    on_new_commit: interruptible
+    on_job_failure: all
+
+stages:
+  - build
+
+include:
+  # consent service (Go HTTP, public + admin listeners).
+  - component: gitlab.com/dunn.dev/pipeline/container-image@2.3.1
+    inputs:
+      job_name: build-consent
+      image_tag: consent
+      containerfile: consent/Containerfile
+      context: consent
+      tag_pipeline: true
+
+  # glauth-kratos LDAP-to-Kratos bridge (Go).
+  - component: gitlab.com/dunn.dev/pipeline/container-image@2.3.1
+    inputs:
+      job_name: build-ldap-bridge
+      image_tag: ldap-bridge
+      containerfile: ldap-bridge/Containerfile
+      context: ldap-bridge
+      tag_pipeline: true
+
+  # auth-portal: Astro Node SSR. Context is repo root because the
+  # build reads from sibling hydra/clients/.
+  - component: gitlab.com/dunn.dev/pipeline/container-image@2.3.1
+    inputs:
+      job_name: build-portal
+      image_tag: portal
+      containerfile: portal/Containerfile
+      context: .
+      tag_pipeline: true
