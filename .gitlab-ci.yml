@@ -22,11 +22,38 @@ workflow:
     on_job_failure: all
 
 stages:
+  - verify
   - build
   - package
   - release
 
 include:
+  # ----- Verify (push + MR): per-service build clean ---------------
+  # Closes the Renovate-MR-without-CI gap. The catalog's go-build and
+  # node-build components fire on every push and MR event. go.work at
+  # repo root makes the multi-module layout play nicely with
+  # `go build ./<dir>`.
+  - component: gitlab.com/dunn.dev/pipeline/go-build@2.4.0
+    inputs:
+      stage: verify
+      job_name: verify-consent
+      binary_name: consent
+      package_path: ./consent
+
+  - component: gitlab.com/dunn.dev/pipeline/go-build@2.4.0
+    inputs:
+      stage: verify
+      job_name: verify-ldap-bridge
+      binary_name: ldap-bridge
+      package_path: ./ldap-bridge
+
+  - component: gitlab.com/dunn.dev/pipeline/node-build@2.4.0
+    inputs:
+      stage: verify
+      job_name: verify-portal
+      package_path: portal
+
+
   # ----- consent ---------------------------------------------------
   - component: gitlab.com/dunn.dev/pipeline/container-image@2.3.3
     inputs:
