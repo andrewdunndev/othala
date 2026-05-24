@@ -1,9 +1,12 @@
-# consent service — small Go HTTP server, co-located with Hydra on carmine.
+# consent service -- small Go HTTP server, co-located with Hydra on carmine.
+#
+# Two-stage: ci-go builder produces a static binary, ci-runtime-go
+# (UBI 9 micro) runtime ships only the binary. Pinned to the dunn.dev
+# pipeline catalog version; Renovate-watched.
 
-ARG GO_VERSION=1.22
-ARG ALPINE_VERSION=3.19
+ARG CATALOG_VERSION=2.3.1
 
-FROM docker.io/library/golang:${GO_VERSION}-alpine${ALPINE_VERSION} AS builder
+FROM registry.gitlab.com/dunn.dev/pipeline/ci-go:${CATALOG_VERSION} AS builder
 
 WORKDIR /build
 
@@ -13,12 +16,13 @@ COPY *.go ./
 RUN go mod download
 RUN CGO_ENABLED=0 GOOS=linux go build -trimpath -ldflags='-s -w' -o consent .
 
-FROM docker.io/library/alpine:${ALPINE_VERSION}
-
-RUN apk add --no-cache ca-certificates
+FROM registry.gitlab.com/dunn.dev/pipeline/ci-runtime-go:${CATALOG_VERSION}
 
 COPY --from=builder /build/consent /usr/bin/consent
 
+# Public listener (login/consent/logout handlers behind Caddy).
 EXPOSE 4477
+# Admin listener (recovery-gate webhook + revoke-user, pod-internal only).
+EXPOSE 4478
 
 ENTRYPOINT ["/usr/bin/consent"]

@@ -62,7 +62,13 @@ Lab-validated GREEN twice (Phase 3 rev2 + post-security-remediation). All VMs to
 
 - **Postgres backup** runbook is placeholder; implementation needed before family fanout. ~1 day.
 - **Per-app `aud` verification** audit pending Phase 4 wiring (table in `docs/per-app-oidc.md`).
-- **`docs/decision.md` + `substrate-comparison.md`** still say "direct go build, no xcaddy" — actual image uses xcaddy. Scrub commit needed.
+- **`docs/substrate-comparison.md`** is a pre-Ory-pivot evaluation
+  that concluded with Authentik; superseded by `decision.md`. Banner
+  added 2026-05-23. The "no xcaddy" claim is now accurate (both this
+  repo's historical caddy/ artifact and the production
+  `dunn.dev/caddy-estate` repo migrated to the same main.go
+  side-effect-imports pattern as part of the estate UBI uplift on
+  2026-05-24).
 
 ## Where to look
 

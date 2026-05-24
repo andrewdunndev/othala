@@ -1,33 +1,7 @@
 # .deviations.yaml — declared exceptions to the dunn.dev reference
 # standards. Format per reference.dunn.dev/deviations/.
 
-- standard: design-system
-  assertion: grep:global.css
-  reason: |
-    No HTML surface. The project has no Astro consumer to declare
-    token imports in.
-  expires: 2099-01-01
-  owner: andrew@dunn.dev
-
-- standard: design-system
-  assertion: grep:package.json
-  reason: |
-    Same root cause as the global.css deviation above. Not an Astro
-    consumer; no package.json to declare @dunn.dev/reference in.
-  expires: 2099-01-01
-  owner: andrew@dunn.dev
-
-- standard: pipeline
-  assertion: file-exists:.gitlab-ci.yml
-  reason: |
-    No CI by design — this is configuration / personal artifact /
-    documentation-only and does not need a shared CI surface.
-  expires: 2099-01-01
-  owner: andrew@dunn.dev
-
-- standard: pipeline
-  assertion: file-contains:.gitlab-ci.yml
-  reason: |
-    Same root cause as the file-exists deviation above.
-  expires: 2099-01-01
-  owner: andrew@dunn.dev
+# (none currently — auth's container-publishing + package-publishing +
+#  pipeline + design-system + repository standards are all satisfied
+#  as of 2026-05-24 via portal's @dunn.dev/reference import and the
+#  three container-image catalog includes in .gitlab-ci.yml.)

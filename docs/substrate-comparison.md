@@ -1,5 +1,11 @@
 # Substrate comparison
 
+> **Historical.** This evaluation concluded with Authentik. A subsequent
+> reframe ("UX excellence, not flow customization", see `decision.md`)
+> re-opened the call and selected Ory Kratos + Hydra. Body preserved
+> as-is for the evidence trail; refer to `decision.md` and
+> `STATUS.md` for the current architecture.
+
 Wider evaluation of SSO substrate candidates against the dunn.dev estate's needs. Run after the initial Authentik → kanidm narrowing, on the basis that kanidm felt like fighting the framework and might not be the best-shaped option.
 
 ## Candidates evaluated

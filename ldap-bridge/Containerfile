@@ -1,9 +1,12 @@
-# glauth-kratos: LDAP-to-Kratos bridge built directly via go build.
+# glauth-kratos: LDAP-to-Kratos bridge.
+#
+# Two-stage: ci-go builder produces a static binary, ci-runtime-go
+# (UBI 9 micro) runtime ships only the binary. Pinned to the dunn.dev
+# pipeline catalog version; Renovate-watched.
 
-ARG GO_VERSION=1.22
-ARG ALPINE_VERSION=3.19
+ARG CATALOG_VERSION=2.3.1
 
-FROM docker.io/library/golang:${GO_VERSION}-alpine${ALPINE_VERSION} AS builder
+FROM registry.gitlab.com/dunn.dev/pipeline/ci-go:${CATALOG_VERSION} AS builder
 
 WORKDIR /build
 
@@ -15,15 +18,13 @@ COPY kratos/ ./kratos/
 
 RUN CGO_ENABLED=0 GOOS=linux go build -trimpath -ldflags='-s -w' -o glauth-kratos .
 
-FROM docker.io/library/alpine:${ALPINE_VERSION}
-
-RUN apk add --no-cache ca-certificates
+FROM registry.gitlab.com/dunn.dev/pipeline/ci-runtime-go:${CATALOG_VERSION}
 
 COPY --from=builder /build/glauth-kratos /usr/bin/glauth-kratos
 
-# LDAPS port
+# LDAPS port.
 EXPOSE 636
-# LDAP port (in-pod use only)
+# LDAP port (in-pod use only).
 EXPOSE 389
 
 ENTRYPOINT ["/usr/bin/glauth-kratos"]

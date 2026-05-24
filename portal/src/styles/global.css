@@ -1,12 +1,12 @@
 /* Auth portal global styles.
  *
- * Consumes design tokens from the @dunn.dev/design package
+ * Consumes design tokens from the @dunn.dev/reference package
  * (file:../../design dependency). Do NOT define color, spacing, motion,
  * or typography values here. If a needed token doesn't exist, add it
  * upstream to dunn.dev/design/tokens/ and bump the design package. */
 
-@import '@dunn.dev/design/tokens/index.css';
-@import '@dunn.dev/design/site/site.css';
+@import '@dunn.dev/reference/tokens/index.css';
+@import '@dunn.dev/reference/site.css';
 
 /* ── Reset ──────────────────────────────────────────────────── */
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }

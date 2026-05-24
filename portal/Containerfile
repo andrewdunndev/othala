@@ -1,13 +1,13 @@
-# dunn.dev/auth-portal — Astro Node SSR for carmine.
+# dunn.dev/auth-portal -- Astro Node SSR for carmine.
 #
-# Stage 1 builds against a full node:20-alpine; Stage 2 ships a slim
-# runtime with only `dist/` and pruned `node_modules/`. Astro Node
-# standalone emits its own minimal HTTP server at `dist/server/entry.mjs`,
-# so no Express/Fastify glue is needed.
+# Two-stage: UBI 9 nodejs-22 (full image with npm) for build, UBI 9
+# nodejs-22-minimal via ci-runtime-node for runtime. Astro Node
+# standalone emits its own minimal HTTP server at
+# dist/server/entry.mjs, so no Express/Fastify glue is needed.
 #
-# Build context is the AUTH REPO ROOT, not portal/. The manifest prebuild
-# step reads ../hydra/clients/*.yaml relative to portal/, so both
-# directories must be in the context.
+# Build context is the AUTH REPO ROOT, not portal/. The manifest
+# prebuild step reads ../hydra/clients/*.yaml relative to portal/,
+# so both directories must be in the context.
 #
 # Local build (from auth repo root):
 #   podman build -t dunn.dev/auth-portal:lab -f portal/Containerfile .
@@ -19,14 +19,20 @@
 #     -e HYDRA_ADMIN_URL=http://hydra:4445 \
 #     dunn.dev/auth-portal:lab
 
+ARG CATALOG_VERSION=2.3.1
+
 # ----- Stage 1: build -----
-FROM docker.io/library/node:22-alpine AS build
+# Use upstream UBI 9 nodejs-22 (full image with npm + build tools).
+# ci-runtime-node is -minimal and intentionally omits npm.
+FROM registry.access.redhat.com/ubi9/nodejs-22:1 AS build
 
 WORKDIR /src
+USER root
 
-# Lay out the same shape the build expects: `portal/` + sibling
-# `hydra/clients/`. Install deps first for cache friendliness.
-COPY portal/package.json portal/package-lock.json portal/
+# Install deps first for cache friendliness. .npmrc routes
+# @dunn.dev/* to the GitLab group npm registry endpoint; anonymous
+# access works because reference is in a public group.
+COPY portal/package.json portal/package-lock.json portal/.npmrc portal/
 RUN cd portal && npm ci
 
 COPY portal/ portal/
@@ -37,7 +43,7 @@ RUN cd portal \
     && npm prune --omit=dev
 
 # ----- Stage 2: runtime -----
-FROM docker.io/library/node:22-alpine
+FROM registry.gitlab.com/dunn.dev/pipeline/ci-runtime-node:${CATALOG_VERSION}
 
 WORKDIR /app
 
@@ -45,15 +51,15 @@ ENV NODE_ENV=production \
     HOST=0.0.0.0 \
     PORT=8080
 
-# Run as non-root for the carmine pod posture (matches every other
-# service on the node).
-RUN addgroup -S portal && adduser -S -G portal portal
+# ci-runtime-node inherits the `default` user (uid 1001) from
+# ubi9/nodejs-22-minimal. COPY as root, then switch to 1001 for
+# runtime.
+USER root
+COPY --from=build --chown=1001:0 /src/portal/dist ./dist
+COPY --from=build --chown=1001:0 /src/portal/node_modules ./node_modules
+COPY --from=build --chown=1001:0 /src/portal/package.json ./package.json
 
-COPY --from=build --chown=portal:portal /src/portal/dist ./dist
-COPY --from=build --chown=portal:portal /src/portal/node_modules ./node_modules
-COPY --from=build --chown=portal:portal /src/portal/package.json ./package.json
-
-USER portal
+USER 1001
 
 EXPOSE 8080
 
