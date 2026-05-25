@@ -19,7 +19,7 @@
 #     -e HYDRA_ADMIN_URL=http://hydra:4445 \
 #     dunn.dev/auth-portal:lab
 
-ARG CATALOG_VERSION=2.5.0
+ARG CATALOG_VERSION=2.5.1
 
 # ----- Stage 1: build -----
 # Use upstream UBI 9 nodejs-22 (full image with npm + build tools).
