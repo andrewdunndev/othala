@@ -57,6 +57,12 @@ services:
         condition: service_healthy
     environment:
       DSN: postgres://kratos:${KRATOS_PG_PASS}@postgres:5432/kratos?sslmode=disable
+      # Host env-vars used by canonical kratos.yml (env-substituted at
+      # config load). Lab compose service names; iac quadlets set the
+      # auth.network container names.
+      KRATOS_PG_HOST: postgres
+      KRATOS_ADMIN_HOST: kratos
+      CONSENT_HOST: consent
     volumes:
       - ./kratos.yml:/etc/config/kratos/kratos.yml:ro
       - ./identity.schema.json:/etc/config/kratos/identity.schema.json:ro
@@ -81,6 +87,11 @@ services:
       RECOVERY_GATE_SECRET: ${RECOVERY_GATE_SECRET}
       SMTP_USER: lab
       SMTP_PASS: lab
+      # Host env-vars consumed by canonical kratos.yml (env-substituted
+      # at config load). See kratos-migrate above for the pattern.
+      KRATOS_PG_HOST: postgres
+      KRATOS_ADMIN_HOST: kratos
+      CONSENT_HOST: consent
     volumes:
       - ./kratos.yml:/etc/config/kratos/kratos.yml:ro
       - ./identity.schema.json:/etc/config/kratos/identity.schema.json:ro
@@ -102,6 +113,7 @@ services:
         condition: service_healthy
     environment:
       DSN: postgres://hydra:${HYDRA_PG_PASS}@postgres:5432/hydra?sslmode=disable
+      HYDRA_PG_HOST: postgres
     command: ["migrate", "sql", "-e", "--yes"]
 
   hydra:
@@ -118,6 +130,8 @@ services:
       HYDRA_COOKIE_SECRET_CURRENT: ${HYDRA_COOKIE_SECRET_CURRENT}
       HYDRA_COOKIE_SECRET_PREVIOUS: ${HYDRA_COOKIE_SECRET_PREVIOUS}
       HYDRA_PAIRWISE_SALT: ${HYDRA_PAIRWISE_SALT}
+      # Host env-var consumed by canonical hydra.yml.
+      HYDRA_PG_HOST: postgres
     volumes:
       - ./hydra.yml:/etc/config/hydra/hydra.yml:ro
     command: ["serve", "all", "--config", "/etc/config/hydra/hydra.yml", "--dev"]
@@ -197,6 +211,11 @@ services:
         condition: service_healthy
     environment:
       KRATOS_BRIDGE_ADMIN_TOKEN: lab-bridge-token
+      # Canonical glauth.cfg uses public_url_env / admin_url_env so the
+      # file is topology-neutral. iac quadlets set the auth.network
+      # container names; lab uses the compose service name.
+      KRATOS_PUBLIC_URL: http://kratos:4433
+      KRATOS_ADMIN_URL: http://kratos:4434
     volumes:
       - ./glauth.cfg:/etc/glauth/glauth.cfg:ro
     # Bridge has a /healthz on its admin port (:6478 default per
