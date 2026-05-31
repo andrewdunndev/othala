@@ -199,12 +199,12 @@ None.
     no privilege escalation (a typo'd group means LESS access, not
     more), but support load and confused security posture.
   - Fix: documented as "production gates this via network isolation."
-    Make it explicit in `docs/architecture.md` with a callout that
+    Make it explicit in `ARCHITECTURE.md` with a callout that
     every metadata_admin write goes through `metadata-admin.ts`. If a
     second admin write path ever lands (CLI tool, migration script),
     the validator gets factored out into a Go package shared with
     consent so both languages enforce.
-  - **Status: ACCEPTED.** App-layer enforcement via `portal/src/lib/metadata-admin.ts` is the explicit posture; no second write path exists. `docs/architecture.md` documents the constraint. If a non-portal write path is ever added, factor `validateMetadataAdmin` into a shared Go package and call from both languages — captured as architectural pattern in `docs/golden-path.md`.
+  - **Status: ACCEPTED.** App-layer enforcement via `portal/src/lib/metadata-admin.ts` is the explicit posture; no second write path exists. `ARCHITECTURE.md` documents the constraint (LB-8 + "metadata_admin write boundary"). If a non-portal write path is ever added, factor `validateMetadataAdmin` into a shared Go package and call from both languages — captured as architectural pattern in `docs/golden-path.md`.
 
 - **MEDIUM-4: Per-process bind cache salt not regenerated on reload.** `ldap-bridge/kratos/cache.go:45-54`
   - Salt is filled at `init()` and reused for the life of the process.
@@ -221,7 +221,7 @@ None.
     No action needed for current state.
   - **Status: REMEDIATED in v0.1.3.** `ldap-bridge/kratos/cache.go:81` exposes `RegenerateSalt()`. Future SIGHUP reload path can call it; current SIGTERM-and-restart cycle remains the deployed pattern.
 
-- **MEDIUM-5: Bind-cache positive-result lag during password rotation.** `ldap-bridge/kratos/cache.go:138-195`, `docs/architecture.md:171-184`
+- **MEDIUM-5: Bind-cache positive-result lag during password rotation.** `ldap-bridge/kratos/cache.go:138-195`, `ARCHITECTURE.md` "Group and credential change lag (M5)"
   - Documented and accepted: up to 30s after password rotation, the OLD
     password still binds. The mitigation is the operator clicks
     "Force re-login" which, for LDAP-only Jellyfin native clients,
@@ -237,7 +237,7 @@ None.
     Postgres "revoked" table polled by the bridge). Acceptable-as-is
     for family scale; flag for revisit if rotation ever becomes
     routine.
-  - **Status: ACCEPTED.** 30s positive-cache lag is documented in `docs/architecture.md` "Group and credential change lag". Acceptable at family scale; cross-service invalidation gets reconsidered if a real rotation cadence emerges (currently rotations are break-glass, not routine).
+  - **Status: ACCEPTED.** 30s positive-cache lag is documented in `ARCHITECTURE.md` "Group and credential change lag". Acceptable at family scale; cross-service invalidation gets reconsidered if a real rotation cadence emerges (currently rotations are break-glass, not routine).
 
 - **MEDIUM-6: 15-minute back-channel signing-key cache vs 30-minute Hydra rotation default.** `consent/backchannel.go:152-180`
   - Hydra rotates `hydra.openid.id-token` keys via the admin API, on
@@ -334,7 +334,7 @@ None.
 ## Architectural concerns
 
 - **A1: Trust boundary topology is sound but undocumented.** The pod-network is the trust unit: Kratos public + Kratos admin + Hydra public + Hydra admin + consent + portal + postgres are all "anyone in the pod can talk unauthenticated to anyone." The webhook from Kratos to consent rides this. The portal-to-consent admin call is bearer-protected, which is the only in-pod trust gate. Caddy is the only public boundary. A tier-2 attacker (RCE on a non-auth-pod app like Vaultwarden) does NOT have pod-network access; they're network-isolated to their own pod. So tier 2 is bounded by the pod boundary, which is the right design. Document this explicitly: "the auth pod is a single security domain; defense-in-depth between services inside it is partial-and-deliberate."
-  - **Status: REMEDIATED in v0.1.4.** Documented in `docs/architecture.md` "Trust boundary" section + `docs/golden-path.md` "Single security domain" entry.
+  - **Status: REMEDIATED in v0.1.4.** Documented in `ARCHITECTURE.md` "Trust boundary" section + `docs/golden-path.md` "Single security domain" entry.
 
 - **A2: `secrets.system` single-key risk.** `hydra/hydra.yml:70-75`. Used by Hydra to encrypt OAuth2 client secrets and consent challenges at rest in postgres. If it leaks: an attacker with read access to the hydra postgres database decrypts every client_secret (all 11 OIDC apps). They cannot mint id_tokens by themselves (id_token signing uses a separate JWK that lives in `hydra.openid.id-token`), but they can impersonate apps to Hydra's admin API and issue arbitrary tokens. Mitigation: sops+age stored, never on disk in plaintext, postgres pod isolated. Recovery from leak: rebuild Hydra DB and re-issue every client_secret. Documented; runbook references it. No code action needed; the risk is procedural.
   - **Status: ACCEPTED.** Documented in `docs/runbooks/secrets-rotation.md`. Rotation is break-glass-only.
@@ -351,8 +351,8 @@ None.
 - **A6: Backup-and-restore correctness across Hydra encryption-at-rest.** `docs/runbooks/postgres-backup.md` is a placeholder ("TODO"). The runbook correctly identifies `secrets.system` rehydration as the gating step before pg_restore is meaningful. A partial-state restore (Hydra mid-write, Kratos mid-write) is the worst-case: Postgres point-in-time consistency is per-database, but the auth substrate touches both `kratos` and `hydra` databases in different transactions, so a backup taken between a `kratos` write and a corresponding `hydra` write yields drift (e.g., a Kratos identity exists with a Hydra consent decision pointing at no-such-subject). At family scale, the recovery is "wipe Hydra remembered-consent rows and force re-login" not "fix the row." Document.
   - **Status: OPEN.** Backup tooling (Backblaze B2 via rclone + onsite zpool) is the next session's work in iac, not auth-project work. `docs/runbooks/postgres-backup.md` retains its placeholder posture; backup implementation lives in iac.
 
-- **A7: No mTLS in-cluster.** Plain HTTP across the auth pod (consent → hydra:4445, portal → kratos:4434, kratos → consent:4477). Acceptable at family scale: the pod is one trust domain, podman network isolation prevents cross-pod traffic, and the threat tier that breaks this (a malicious co-tenant) doesn't exist on a single-tenant home lab. Document the assumption in `docs/architecture.md`. Tier-2 implication: any RCE on a service inside the auth pod yields full pod-internal lateral. The pod boundary is the only thing keeping app-pod compromise from auth-pod compromise; ZFS / SELinux / podman-rootless are the secondary boundaries. The gap to a real ent-grade posture is mTLS or SPIFFE; not justified at this scale.
-  - **Status: ACCEPTED.** Documented in `docs/architecture.md` "Trust boundary" + `docs/golden-path.md` "Single security domain" entry.
+- **A7: No mTLS in-cluster.** Plain HTTP across the auth pod (consent → hydra:4445, portal → kratos:4434, kratos → consent:4477). Acceptable at family scale: the pod is one trust domain, podman network isolation prevents cross-pod traffic, and the threat tier that breaks this (a malicious co-tenant) doesn't exist on a single-tenant home lab. Document the assumption in `ARCHITECTURE.md`. Tier-2 implication: any RCE on a service inside the auth pod yields full pod-internal lateral. The pod boundary is the only thing keeping app-pod compromise from auth-pod compromise; ZFS / SELinux / podman-rootless are the secondary boundaries. The gap to a real ent-grade posture is mTLS or SPIFFE; not justified at this scale.
+  - **Status: ACCEPTED.** Documented in `ARCHITECTURE.md` "Trust boundary" + `docs/golden-path.md` "Single security domain" entry.
 
 ## What's NOT in scope
 

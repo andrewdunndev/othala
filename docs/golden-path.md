@@ -112,7 +112,7 @@ it. Operationally fine but a one-way change for that client.
 ### 7. Single security domain
 
 The auth pod is one security domain. Documented in
-`docs/architecture.md` "A1: Trust boundary topology." Network isolation
+`ARCHITECTURE.md` "Trust boundary." Network isolation
 is the gate, not service-level auth. The webhook from Kratos to consent
 is unauthenticated-at-the-network-layer but secret-gated via
 `X-Webhook-Auth` (the recovery-gate posture). Cross-pod traffic is

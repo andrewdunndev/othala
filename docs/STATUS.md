@@ -112,9 +112,8 @@ In addition to the v0.1.3 baseline:
 
 | Topic | File |
 |---|---|
-| **Load-bearing decisions map** | `ARCHITECTURE.md` (root) |
+| **Load-bearing decisions map + topology + flows** | `ARCHITECTURE.md` (root) |
 | **Deploy plane** | `DEPLOY.md` (root) + `dunn.dev/iac/services/auth/` |
-| Architecture | `docs/architecture.md` |
 | **Upgrade-durability choices** | `docs/golden-path.md` |
 | Locked decisions in detail | `docs/decision.md` |
 | Per-app integration | `docs/per-app-oidc.md` |

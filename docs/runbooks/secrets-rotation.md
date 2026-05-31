@@ -141,7 +141,7 @@ After rotation:
 
 ## Related
 
-- `docs/architecture.md` "A2: secrets.system single-key risk"
+- `ARCHITECTURE.md` "LB-3: `secrets.system` is non-rotatable"
 - `docs/runbooks/cookie-rotation.md`
 - `docs/runbooks/admin-recovery.md`
 - `hydra/hydra.yml` `secrets.system` field

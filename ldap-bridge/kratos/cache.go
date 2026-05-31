@@ -21,7 +21,7 @@
 //
 //	A password rotation in Kratos doesn't invalidate this cache; the old
 //	password binds successfully for up to BindCacheTTL (default 30s)
-//	after rotation. Acceptable at homelab scale per docs/architecture.md.
+//	after rotation. Acceptable at homelab scale per ARCHITECTURE.md.
 //	Group changes have the same lag (M5): up to 30s before the bridge's
 //	identity cache reflects a Kratos-side group edit.
 package kratos

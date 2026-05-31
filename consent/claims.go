@@ -4,7 +4,7 @@ package main
 // the apps consume. Hydra does not auto-populate these from Kratos; the
 // consent step is the only place to inject them.
 //
-// Mapping rules (matches docs/architecture.md group model + identity.schema):
+// Mapping rules (matches ARCHITECTURE.md group model + identity.schema):
 //
 //	email              = traits.email                       (required)
 //	email_verified     = verifiable_addresses[email].verified (omitted if no record)

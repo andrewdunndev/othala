@@ -82,8 +82,7 @@ an iac change.
 ## Related docs
 
 - `dunn.dev/auth/docs/STATUS.md` — current release + open items
-- `dunn.dev/auth/docs/architecture.md` — substrate topology
+- `dunn.dev/auth/ARCHITECTURE.md` — load-bearing decisions map + substrate topology + request flows (for new operators or LLMs picking up this codebase cold)
 - `dunn.dev/auth/docs/golden-path.md` — integration choices that keep us durable on Ory upgrades
-- `dunn.dev/auth/ARCHITECTURE.md` — load-bearing decisions map for new operators (or LLMs picking up this codebase cold)
 - `dunn.dev/iac/AGENTS.md` — iac estate conventions
 - `dunn.dev/iac/services/auth/README.md` — service-specific deploy notes (in iac)

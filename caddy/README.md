@@ -27,5 +27,5 @@ that get volume-mounted into the Caddy sidecar at deploy time:
 | `admin-session.caddy` | Auth admin path with AAL2 enforcement at SSR |
 | `portal.caddy` | Home portal Caddyfile chunk |
 
-See `../docs/architecture.md` for how each pattern composes into the
-per-app Caddyfiles in production.
+See `../ARCHITECTURE.md` ("Auth patterns") for how each pattern composes
+into the per-app Caddyfiles in production.

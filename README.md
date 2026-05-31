@@ -92,7 +92,7 @@ flowchart TB
   jellyfin -->|localhost:636| bridge
 ```
 
-Full set of diagrams (integration patterns, login flow, admin AAL2 step-up, trust boundary, identity lifecycle, session AAL state machine, recovery-gate decision): [`docs/architecture-diagram.md`](docs/architecture-diagram.md).
+Full topology, request flows, auth patterns, image pin table, and trust boundary: [`ARCHITECTURE.md`](ARCHITECTURE.md).
 
 ## Validation
 
