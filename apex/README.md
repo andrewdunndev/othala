@@ -10,18 +10,15 @@ WebFinger has to live at the apex.
 
 ```
 apex/
-├── functions/.well-known/webfinger.ts   ← Pages function
-├── public/.well-known/webfinger          ← static fallback (optional)
-├── public/_headers                       ← Content-Type override
+├── functions/.well-known/webfinger.ts   ← Pages function (single source)
 ├── scripts/verify-webfinger.sh           ← local + remote verification
 └── README.md (this file)
 ```
 
 ## When you wire Tailscale
 
-1. Drop the `apex/functions/`, `apex/public/`, and (optionally)
-   `apex/scripts/` into whichever repo serves `dunn.dev` on
-   Cloudflare Pages.
+1. Drop the `apex/functions/` and (optionally) `apex/scripts/` into
+   whichever repo serves `dunn.dev` on Cloudflare Pages.
 
    Likely candidates from your estate:
    - `~/gitlab.com/dunn.dev/home/` (currently empty git init —
@@ -54,17 +51,6 @@ Changing it requires contacting Tailscale support.
 This is why pre-deploy verification matters more than the eventual
 deploy: WebFinger gets read once; you can't fix a typo by
 re-deploying.
-
-## Static fallback
-
-`public/.well-known/webfinger` is included as a static file with the
-JSON body. If the Pages function ever fails to deploy or returns an
-error, the static file still serves the same content. Either path is
-spec-compliant; the function is preferred because future iterations
-could read env vars (e.g., point at a different issuer per branch).
-
-The `_headers` file sets `Content-Type: application/jrd+json` on the
-static path. The function sets it explicitly in code.
 
 ## Reference
 
