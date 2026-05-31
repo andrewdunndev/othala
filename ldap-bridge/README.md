@@ -58,6 +58,19 @@ Wired via `glauth.cfg`:
 
 The `KRATOS_BRIDGE_ADMIN_TOKEN` env var carries the admin token. The token is scoped **identities:read** (read-only); the bridge cannot create, modify, or delete identities. This minimizes blast radius if the bridge is compromised.
 
+### Read-only service bind (non-OAuth clients)
+
+Non-OAuth clients such as Jellyfin's LDAP plugin perform a three-step sequence: bind as a service account, search for the user, then re-bind as the user to verify their password. The service-account bind is a search credential only — it is **not** a Kratos identity.
+
+Configure it with two keys in `[backend.kratos]`:
+
+```toml
+service_bind_dn           = "cn=ldap-reader,dc=dunn,dc=dev"
+service_bind_password_env = "LDAP_SERVICE_BIND_PASSWORD"
+```
+
+The `LDAP_SERVICE_BIND_PASSWORD` env var must be set and non-empty when `service_bind_dn` is configured (the bridge refuses to start otherwise). The password is verified in-process with `crypto/subtle.ConstantTimeCompare`; Kratos is never called for this DN. If `service_bind_dn` is empty (or absent), the feature is disabled and the bridge behaves as before.
+
 ## Risk mitigations (from feasibility-q1-kratos-bind.md)
 
 | Risk | Mitigation |

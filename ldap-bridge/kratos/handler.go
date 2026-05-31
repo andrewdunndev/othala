@@ -27,6 +27,7 @@ package kratos
 
 import (
 	"context"
+	"crypto/subtle"
 	"errors"
 	"net"
 	"strings"
@@ -57,6 +58,18 @@ type Config struct {
 
 	// BindCacheTTL controls how long positive bind results are cached.
 	BindCacheTTL time.Duration
+
+	// ServiceBindDN is the read-only search credential for non-OAuth LDAP
+	// clients (e.g. Jellyfin on Apple TV). When non-empty, a bind with
+	// this exact DN is verified against ServiceBindPassword in-process —
+	// it does NOT correspond to any Kratos identity; humans are managed
+	// only in Ory. If empty, the service-account bind feature is disabled.
+	ServiceBindDN string
+
+	// ServiceBindPassword is the resolved password for ServiceBindDN.
+	// Must be non-empty when ServiceBindDN is set. Held in-memory only;
+	// never logged.
+	ServiceBindPassword string
 }
 
 // Handler implements glauth's Handler interface.
@@ -95,6 +108,20 @@ func New(cfg Config) (*Handler, error) {
 // On 200 from Kratos, bind succeeds. The Kratos session token returned
 // by the login flow is discarded: we use the API for verification only.
 func (h *Handler) Bind(bindDN, bindSimplePw string, conn net.Conn) (ldap.LDAPResultCode, error) {
+	// Service-account short-circuit: if a read-only search DN is
+	// configured (for non-OAuth clients like Jellyfin on Apple TV),
+	// verify it in-process against the configured password. This DN is
+	// NOT a Kratos identity; humans are managed only in Ory. Do not fall
+	// through to Kratos for the service DN.
+	if h.cfg.ServiceBindDN != "" {
+		if strings.EqualFold(strings.TrimSpace(bindDN), strings.TrimSpace(h.cfg.ServiceBindDN)) {
+			if subtle.ConstantTimeCompare([]byte(bindSimplePw), []byte(h.cfg.ServiceBindPassword)) == 1 {
+				return ldap.LDAPResultSuccess, nil
+			}
+			return ldap.LDAPResultInvalidCredentials, nil
+		}
+	}
+
 	username, err := parseUsernameFromDN(bindDN, h.cfg.BaseDN)
 	if err != nil {
 		return ldap.LDAPResultInvalidDNSyntax, err

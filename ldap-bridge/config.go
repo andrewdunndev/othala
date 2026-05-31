@@ -18,10 +18,10 @@ import (
 )
 
 type fileConfig struct {
-	Debug   bool          `toml:"debug"`
-	LDAP    listenerCfg   `toml:"ldap"`
-	LDAPS   listenerCfg   `toml:"ldaps"`
-	Backend backendCfg    `toml:"backend"`
+	Debug   bool        `toml:"debug"`
+	LDAP    listenerCfg `toml:"ldap"`
+	LDAPS   listenerCfg `toml:"ldaps"`
+	Backend backendCfg  `toml:"backend"`
 }
 
 type listenerCfg struct {
@@ -32,8 +32,8 @@ type listenerCfg struct {
 }
 
 type backendCfg struct {
-	BaseDN string         `toml:"baseDN"`
-	Kratos kratosFileCfg  `toml:"kratos"`
+	BaseDN string        `toml:"baseDN"`
+	Kratos kratosFileCfg `toml:"kratos"`
 }
 
 // kratosFileCfg is the raw TOML shape. We materialize a kratos.Config
@@ -46,15 +46,22 @@ type backendCfg struct {
 // set KRATOS_PUBLIC_URL=http://auth-kratos:4433. Same shape as how
 // admin_token_env carries the dummy bearer.
 type kratosFileCfg struct {
-	PublicURL          string `toml:"public_url"`
-	PublicURLEnv       string `toml:"public_url_env"`
-	AdminURL           string `toml:"admin_url"`
-	AdminURLEnv        string `toml:"admin_url_env"`
-	AdminToken         string `toml:"admin_token"`
-	AdminTokenEnv      string `toml:"admin_token_env"`
-	BaseDN             string `toml:"base_dn"`
-	IdentityCacheTTL   string `toml:"identity_cache_ttl"`
-	BindCacheTTL       string `toml:"bind_cache_ttl"`
+	PublicURL        string `toml:"public_url"`
+	PublicURLEnv     string `toml:"public_url_env"`
+	AdminURL         string `toml:"admin_url"`
+	AdminURLEnv      string `toml:"admin_url_env"`
+	AdminToken       string `toml:"admin_token"`
+	AdminTokenEnv    string `toml:"admin_token_env"`
+	BaseDN           string `toml:"base_dn"`
+	IdentityCacheTTL string `toml:"identity_cache_ttl"`
+	BindCacheTTL     string `toml:"bind_cache_ttl"`
+	// ServiceBindDN is the read-only DN for non-OAuth LDAP clients (e.g.
+	// Jellyfin). When empty, the service-account bind feature is disabled.
+	ServiceBindDN string `toml:"service_bind_dn"`
+	// ServiceBindPasswordEnv names the env var that holds the service-account
+	// password. Required when service_bind_dn is non-empty; resolved like
+	// admin_token_env. Never inline the value here.
+	ServiceBindPasswordEnv string `toml:"service_bind_password_env"`
 }
 
 // Config is the runtime config: kratosFileCfg becomes kratos.Config and
@@ -111,6 +118,21 @@ func loadConfig(path string) (*Config, error) {
 		adminURL = v
 	}
 
+	// Service-account bind: optional. If configured, the password env MUST
+	// resolve to a non-empty value — a misconfigured secret is an error,
+	// not a silent no-op.
+	var servicePW string
+	if k.ServiceBindDN != "" {
+		if k.ServiceBindPasswordEnv == "" {
+			return nil, fmt.Errorf("service_bind_dn is set but service_bind_password_env is empty")
+		}
+		v, ok := os.LookupEnv(k.ServiceBindPasswordEnv)
+		if !ok || v == "" {
+			return nil, fmt.Errorf("service_bind_password_env %q not set or empty", k.ServiceBindPasswordEnv)
+		}
+		servicePW = v
+	}
+
 	idTTL, err := parseTTL(k.IdentityCacheTTL, 30*time.Second)
 	if err != nil {
 		return nil, fmt.Errorf("identity_cache_ttl: %w", err)
@@ -126,12 +148,14 @@ func loadConfig(path string) (*Config, error) {
 	}
 
 	cfg.Backend.Kratos = kratos.Config{
-		PublicURL:        publicURL,
-		AdminURL:         adminURL,
-		AdminToken:       token,
-		BaseDN:           baseDN,
-		IdentityCacheTTL: idTTL,
-		BindCacheTTL:     bdTTL,
+		PublicURL:           publicURL,
+		AdminURL:            adminURL,
+		AdminToken:          token,
+		BaseDN:              baseDN,
+		IdentityCacheTTL:    idTTL,
+		BindCacheTTL:        bdTTL,
+		ServiceBindDN:       k.ServiceBindDN,
+		ServiceBindPassword: servicePW,
 	}
 
 	return cfg, nil

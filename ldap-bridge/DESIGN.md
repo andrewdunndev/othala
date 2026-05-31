@@ -27,6 +27,7 @@ own entrypoint and config loader.
 
 | LDAP op | Kratos call | Notes |
 |---|---|---|
+| BIND `cn=ldap-reader,...` (service DN) | none | In-process constant-time compare; not a Kratos identity |
 | BIND `uid=X,ou=users,<base>` | `POST /self-service/login/api` then `POST /self-service/login?flow=<id>` with `method=password`, `identifier=X`, `password=<pw>` | 200 = success, 4xx = wrong creds, 5xx = unavailable |
 | SEARCH (any filter) | `GET /admin/identities` (paginated via `page_token`) cached 30s | Bridge holds a list and applies the LDAP filter in-process |
 | ADD / MODIFY / DELETE | nothing | Returns `LDAPResultUnwillingToPerform`. Identities are admin-managed via Kratos directly. |
@@ -71,6 +72,8 @@ union over all identities.
 
 | Source | LDAP result code |
 |---|---|
+| Service-account DN, correct password | `LDAPResultSuccess` (no Kratos call) |
+| Service-account DN, wrong password | `LDAPResultInvalidCredentials` (no Kratos call) |
 | DN parse error | `LDAPResultInvalidDNSyntax` |
 | Kratos 200 (login) | `LDAPResultSuccess` |
 | Kratos 4xx (login) | `LDAPResultInvalidCredentials` |
@@ -167,6 +170,38 @@ Deferred to lab work:
 - Metrics / structured logging beyond stdlib `log`.
 - AAL2 step-up. Bind always uses aal1; the spike confirms this is what
   Kratos's API flow returns.
+
+## Read-only service bind (Patch B — implemented)
+
+Non-OAuth LDAP clients (Jellyfin on Apple TV, Infuse) perform a
+three-step sequence before verifying a user's password:
+
+1. Bind as a service account (search credential).
+2. Search for the user, e.g. filtered by `memberOf=cn=cinema,...`.
+3. Re-bind as the discovered user DN to verify their password.
+
+Step 1 historically failed because `Bind()` forwarded every DN to
+Kratos, and the service DN is not a Kratos identity.
+
+**Implementation:** `kratos.Config` now accepts `ServiceBindDN` and
+`ServiceBindPassword`. At the top of `Bind()`, before
+`parseUsernameFromDN`, the handler compares the incoming DN against
+`ServiceBindDN` (case-insensitive, space-trimmed, per RFC 4511). On a
+match the password is checked in-process with
+`crypto/subtle.ConstantTimeCompare`; Kratos is never called. Wrong
+password returns `LDAPResultInvalidCredentials`. When `ServiceBindDN`
+is empty the feature is disabled and the existing flow is unaffected.
+
+**Config shape** (in `[backend.kratos]`):
+
+```toml
+service_bind_dn           = "cn=ldap-reader,dc=dunn,dc=dev"
+service_bind_password_env = "LDAP_SERVICE_BIND_PASSWORD"
+```
+
+`service_bind_password_env` names an env var; the bridge refuses to
+start if `service_bind_dn` is set but the env var is missing or empty.
+The password is never logged.
 
 ## Anonymous bind handling (H10)
 
