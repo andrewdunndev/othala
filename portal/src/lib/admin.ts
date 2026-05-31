@@ -7,6 +7,7 @@
 // per-flow / global, not per-route. Caddy already gates "session present"
 // upstream of this guard.
 
+import { Configuration, OAuth2Api, type OAuth2Client } from '@ory/client-fetch';
 import { getSession } from './kratos';
 import { getIdentity } from './admin-api';
 import type { Session } from './types';
@@ -38,11 +39,17 @@ function hydraAdminBase(): string {
   return process.env.HYDRA_ADMIN_URL ?? 'http://hydra:4445';
 }
 
-function hydraAdminAuthHeaders(): HeadersInit {
-  const headers: Record<string, string> = { Accept: 'application/json' };
+// Behaviour-preserving auth: configure the SDK bearer only when
+// HYDRA_ADMIN_TOKEN is set, matching the legacy raw-fetch code that
+// omitted Authorization when the token env was empty.
+function oauth2Api(): OAuth2Api {
   const token = process.env.HYDRA_ADMIN_TOKEN ?? '';
-  if (token) headers.Authorization = `Bearer ${token}`;
-  return headers;
+  return new OAuth2Api(
+    new Configuration({
+      basePath: hydraAdminBase(),
+      ...(token ? { accessToken: token } : {}),
+    }),
+  );
 }
 
 /**
@@ -98,12 +105,8 @@ export async function requireAdminSession(astro: any): Promise<Session | Respons
 }
 
 /** Hydra admin (read-only): used by the OAuth2 viewer to confirm clients exist. */
-export async function listOAuth2Clients(): Promise<unknown[]> {
-  const res = await fetch(`${hydraAdminBase()}/admin/clients`, {
-    headers: hydraAdminAuthHeaders(),
-  });
-  if (!res.ok) throw new Error(`listOAuth2Clients: ${res.status}`);
-  return (await res.json()) as unknown[];
+export async function listOAuth2Clients(): Promise<OAuth2Client[]> {
+  return oauth2Api().listOAuth2Clients();
 }
 
 /**

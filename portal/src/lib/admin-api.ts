@@ -7,11 +7,19 @@
 // (or equivalent) interposer; if set, it's forwarded as Authorization
 // Bearer. If unset, the Authorization header is omitted.
 //
-// All functions throw on non-2xx with the response body folded into the
-// message; callers catch and render an error notice. JSON-Patch is used
-// for trait/metadata updates because Kratos's PATCH endpoint expects RFC
-// 6902 patches, not partial documents.
+// Calls go through the Ory SDK's IdentityApi (`@ory/client-fetch`,
+// fetch-native). JSON-Patch is still used for the state flip in
+// deactivateIdentity because Kratos's PATCH endpoint expects RFC 6902
+// patches, not partial documents. The SDK surfaces a ResponseError on
+// non-2xx; callers catch and render an error notice.
 
+import {
+  Configuration,
+  IdentityApi,
+  type CreateIdentityBody,
+  type UpdateIdentityBody,
+  type JsonPatch,
+} from '@ory/client-fetch';
 import type { Identity } from './types';
 import { validateMetadataAdmin } from './metadata-admin';
 
@@ -23,25 +31,18 @@ function adminToken(): string {
   return process.env.KRATOS_ADMIN_TOKEN ?? '';
 }
 
-function authHeaders(extra: Record<string, string> = {}): HeadersInit {
-  const headers: Record<string, string> = {
-    Accept: 'application/json',
-    ...extra,
-  };
+// Behaviour-preserving auth: the SDK injects the bearer on every request
+// when `accessToken` is configured. The legacy raw-fetch code only added
+// Authorization when KRATOS_ADMIN_TOKEN was set, so guard the option:
+// configure accessToken only when a token is present.
+function identityApi(): IdentityApi {
   const token = adminToken();
-  if (token) headers.Authorization = `Bearer ${token}`;
-  return headers;
-}
-
-async function ok(res: Response, label: string): Promise<void> {
-  if (res.ok) return;
-  let body = '';
-  try {
-    body = await res.text();
-  } catch {
-    /* ignore */
-  }
-  throw new Error(`${label}: ${res.status} ${body.slice(0, 240)}`);
+  return new IdentityApi(
+    new Configuration({
+      basePath: adminBase(),
+      ...(token ? { accessToken: token } : {}),
+    }),
+  );
 }
 
 export interface IdentityTraits {
@@ -78,20 +79,14 @@ export interface UpdateIdentityInput {
 // follow `next` Link headers until exhausted. Today it's deliberately
 // unimplemented.
 export async function listIdentities(): Promise<Identity[]> {
-  const res = await fetch(`${adminBase()}/admin/identities?per_page=250`, {
-    headers: authHeaders(),
-  });
-  await ok(res, 'listIdentities');
-  return (await res.json()) as Identity[];
+  return identityApi().listIdentities({ perPage: 250 });
 }
 
 export async function getIdentity(id: string): Promise<Identity> {
-  const url =
-    `${adminBase()}/admin/identities/${encodeURIComponent(id)}` +
-    `?include_credential=password,webauthn,passkey,totp`;
-  const res = await fetch(url, { headers: authHeaders() });
-  await ok(res, 'getIdentity');
-  return (await res.json()) as Identity;
+  return identityApi().getIdentity({
+    id,
+    includeCredential: ['password', 'webauthn', 'passkey', 'totp'],
+  });
 }
 
 export async function createIdentity(input: CreateIdentityInput): Promise<Identity> {
@@ -100,17 +95,12 @@ export async function createIdentity(input: CreateIdentityInput): Promise<Identi
   // the schema validator. A typo (grupos instead of groups) would
   // otherwise be silently accepted and stored.
   const validated = validateMetadataAdmin(input.metadataAdmin);
-  const res = await fetch(`${adminBase()}/admin/identities`, {
-    method: 'POST',
-    headers: authHeaders({ 'Content-Type': 'application/json' }),
-    body: JSON.stringify({
-      schema_id: input.schemaId ?? 'family',
-      traits: input.traits,
-      metadata_admin: validated,
-    }),
-  });
-  await ok(res, 'createIdentity');
-  return (await res.json()) as Identity;
+  const createIdentityBody: CreateIdentityBody = {
+    schema_id: input.schemaId ?? 'family',
+    traits: input.traits,
+    metadata_admin: validated,
+  };
+  return identityApi().createIdentity({ createIdentityBody });
 }
 
 /**
@@ -121,46 +111,37 @@ export async function createIdentity(input: CreateIdentityInput): Promise<Identi
 export async function updateIdentity(id: string, input: UpdateIdentityInput): Promise<Identity> {
   // J1: same metadata_admin enforcement as createIdentity.
   const validated = validateMetadataAdmin(input.metadataAdmin);
-  const current = await getIdentity(id);
-  const res = await fetch(`${adminBase()}/admin/identities/${encodeURIComponent(id)}`, {
-    method: 'PUT',
-    headers: authHeaders({ 'Content-Type': 'application/json' }),
-    body: JSON.stringify({
-      schema_id: current.schema_id,
-      state: current.state ?? 'active',
-      traits: input.traits,
-      metadata_admin: validated,
-    }),
+  const api = identityApi();
+  const current = await api.getIdentity({
+    id,
+    includeCredential: ['password', 'webauthn', 'passkey', 'totp'],
   });
-  await ok(res, 'updateIdentity');
-  return (await res.json()) as Identity;
+  const updateIdentityBody: UpdateIdentityBody = {
+    schema_id: current.schema_id,
+    state: current.state ?? 'active',
+    traits: input.traits,
+    metadata_admin: validated,
+  };
+  return api.updateIdentity({ id, updateIdentityBody });
 }
 
 export async function deleteIdentity(id: string): Promise<void> {
-  const res = await fetch(`${adminBase()}/admin/identities/${encodeURIComponent(id)}`, {
-    method: 'DELETE',
-    headers: authHeaders(),
-  });
-  await ok(res, 'deleteIdentity');
+  await identityApi().deleteIdentity({ id });
 }
 
 /** Mark the identity inactive without removing it; revokes existing sessions. */
 export async function deactivateIdentity(id: string): Promise<void> {
-  const res = await fetch(`${adminBase()}/admin/identities/${encodeURIComponent(id)}`, {
-    method: 'PATCH',
-    headers: authHeaders({ 'Content-Type': 'application/json-patch+json' }),
-    body: JSON.stringify([{ op: 'replace', path: '/state', value: 'inactive' }]),
-  });
-  await ok(res, 'deactivateIdentity');
+  const api = identityApi();
+  const patchIdentityBody: Array<JsonPatch> = [
+    { op: 'replace', path: '/state', value: 'inactive' },
+  ];
+  await api.patchIdentity({ id, patchIdentityBody });
   // Session revocation is the second half of deactivation. If it fails
-  // (500, network error, etc.) and we don't check, the identity stays in
-  // a half-deactivated state — marked inactive but still holding active
-  // sessions. Surface the failure so the caller can re-run / alert.
-  const sessRes = await fetch(`${adminBase()}/admin/identities/${encodeURIComponent(id)}/sessions`, {
-    method: 'DELETE',
-    headers: authHeaders(),
-  });
-  await ok(sessRes, 'deleteIdentitySessions');
+  // (500, network error, etc.) and we don't await it, the identity stays
+  // in a half-deactivated state — marked inactive but still holding
+  // active sessions. Awaiting surfaces the failure so the caller can
+  // re-run / alert.
+  await api.deleteIdentitySessions({ id });
 }
 
 export interface RecoveryLink {
@@ -170,11 +151,13 @@ export interface RecoveryLink {
 
 /** One-shot enrollment / recovery URL the admin shares out-of-band. */
 export async function getRecoveryLink(id: string, expiresIn = '1h'): Promise<RecoveryLink> {
-  const res = await fetch(`${adminBase()}/admin/recovery/link`, {
-    method: 'POST',
-    headers: authHeaders({ 'Content-Type': 'application/json' }),
-    body: JSON.stringify({ identity_id: id, expires_in: expiresIn }),
+  const link = await identityApi().createRecoveryLinkForIdentity({
+    createRecoveryLinkForIdentityBody: { identity_id: id, expires_in: expiresIn },
   });
-  await ok(res, 'getRecoveryLink');
-  return (await res.json()) as RecoveryLink;
+  // The SDK types expires_at as optional; the portal contract (and an
+  // existing test) treats it as a present string. Coerce at the boundary.
+  return {
+    recovery_link: link.recovery_link,
+    expires_at: String(link.expires_at ?? ''),
+  };
 }

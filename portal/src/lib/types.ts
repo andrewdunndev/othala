@@ -1,51 +1,56 @@
-// Kratos types lifted from the OpenAPI spec, narrowed to the shapes
-// this portal actually consumes. Not exhaustive: nodes carry many more
-// attributes than we touch.
+// Portal type surface.
 //
-// Source: https://www.ory.com/docs/kratos/reference/api
+// Surface split (D1): the ADMIN / programmatic types come straight from
+// the Ory SDK (`@ory/client-fetch`) — Identity, Session, OAuth2Client —
+// because those shapes correspond 1:1 with what the admin APIs return
+// and we now call them through the SDK.
+//
+// The browser-flow / UI-node rendering types below stay hand-maintained.
+// Reason: the self-service flow wrappers in `kratos.ts` are raw-fetch
+// (redirect:'manual') and return Kratos's on-the-wire JSON verbatim
+// (timestamps as ISO *strings*, nodes carrying a `node_type`
+// discriminator). The SDK's deserialised flow models type those same
+// fields as `Date` and reshape `ui.nodes` into `UiNode`, which would not
+// match the raw JSON we hand to the renderer (`nodes.ts` + the flow
+// pages). Keeping these local preserves the browser-flow boundary the
+// portal deliberately holds opaque.
 
-export type AAL = 'aal0' | 'aal1' | 'aal2' | 'aal3';
-export type FlowType = 'browser' | 'api';
-export type MessageType = 'info' | 'error' | 'success';
+import type {
+  AuthenticatorAssuranceLevel as SdkAAL,
+  Identity as SdkIdentity,
+  Session as SdkSession,
+} from '@ory/client-fetch';
 
-export interface Identity {
-  id: string;
-  schema_id: string;
-  schema_url?: string;
-  state?: 'active' | 'inactive';
-  traits: {
-    username: string;
-    email: string;
-    displayName?: string;
-    recoveryEmail?: string;
-  };
+// ── Admin / programmatic surface: SDK types ─────────────────────────────────
+
+export type { OAuth2Client } from '@ory/client-fetch';
+
+/**
+ * SDK Identity, with `metadata_admin` narrowed to the portal's structured
+ * shape. The OpenAPI generator types `metadata_admin` as the opaque
+ * `object` (it's free-form on the wire), but every portal consumer reads
+ * `metadata_admin.groups` / `.roles` — and `metadata-admin.ts` validates
+ * exactly that contract at the write boundary. Narrowing here restores
+ * those reads without re-hand-rolling the whole Identity shape.
+ */
+export type Identity = Omit<SdkIdentity, 'metadata_admin'> & {
   metadata_admin?: {
     groups?: string[];
     /** Per-app role overrides keyed by OIDC client_id. */
     roles?: Record<string, string>;
   };
-  verifiable_addresses?: Array<{
-    id: string;
-    value: string;
-    verified: boolean;
-    via: string;
-    status: string;
-  }>;
-  recovery_addresses?: Array<{
-    id: string;
-    value: string;
-    via: string;
-  }>;
-}
+};
 
-export interface Session {
-  id: string;
-  active: boolean;
-  expires_at: string;
-  authenticated_at: string;
-  authenticator_assurance_level: AAL;
+/** SDK Session, carrying the narrowed Identity (metadata_admin reads). */
+export type Session = Omit<SdkSession, 'identity'> & {
   identity?: Identity;
-}
+};
+
+// ── Browser-flow / UI-node rendering surface: hand-maintained ───────────────
+
+export type AAL = SdkAAL;
+export type FlowType = 'browser' | 'api';
+export type MessageType = 'info' | 'error' | 'success';
 
 export interface FlowMessage {
   id: number;

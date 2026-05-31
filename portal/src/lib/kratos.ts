@@ -79,6 +79,7 @@ export async function isReachable(): Promise<boolean> {
   }
 }
 
+// Kratos self-service flows are browser-mediated; the SDK follows redirects + throws on non-2xx, we need 303s opaque + flow-state discrimination.
 async function getFlow<T>(path: string, flowId: string, cookie?: string): Promise<FlowResult<T>> {
   const url = `${kratosBase()}${path}?id=${encodeURIComponent(flowId)}`;
   const res = await fetch(url, {
