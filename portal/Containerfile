@@ -12,7 +12,7 @@
 # See portal/src/lib/manifests.ts for the runtime read pattern and
 # the source-of-truth chain.
 #
-# Tile-dashboard MDX content (portal/src/content/apps/*.mdx) IS
+# Tile-dashboard MD content (portal/src/content/apps/*.md) IS
 # build-time bundled via Astro Content Collections. Adding an app's
 # education content is an image rebuild; OIDC manifest edits are not.
 #

@@ -27,7 +27,7 @@
 //        -> portal container reads via volume mount
 //
 // Tile-dashboard metadata (name, icon, description, education content)
-// lives separately in portal/src/content/apps/<slug>.mdx — that DOES
+// lives separately in portal/src/content/apps/<slug>.md — that DOES
 // rebuild the portal image on change, intentionally (rich MDX content
 // surface is worth the rebuild cost; OIDC manifest edits are not).
 

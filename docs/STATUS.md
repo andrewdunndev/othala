@@ -48,7 +48,7 @@ sigs kept forever, everything else pruned after 30d.
 | Consent | `skip_consent: true` per client (11 trusted OIDC clients) |
 | Subject identifier | `public` |
 | **Topology** | **Single FQDN `auth.dunn.dev` for the whole SSO stack** (Topology B). home.dunn.dev reserved as future tile-dashboard host, not served today. |
-| **Tile dashboard** | **Session-gated home page at `auth.dunn.dev/`**; reads `portal/src/content/apps/*.mdx` (Astro Content Collection) + filters by user's `metadata_admin.groups` containing `access-<slug>`. Per-app detail pages at `/apps/<slug>` render MDX education content. |
+| **Tile dashboard** | **Session-gated home page at `auth.dunn.dev/`**; reads `portal/src/content/apps/*.md` (Astro Content Collection) + filters by user's `metadata_admin.groups` containing `access-<slug>`. Per-app detail pages at `/apps/<slug>` render MD education content. |
 | WebFinger | **Cloudflare Pages function at `dunn.dev/.well-known/webfinger` (apex)** per Tailscale KB-1240. NOT on this project's portal. |
 | LDAP bridge | Custom binary linking glauth/ldap directly (no .so plugins) |
 | LDAP DN | `uid=<username>,ou=users,dc=dunn,dc=dev` |
@@ -74,7 +74,7 @@ choices: `docs/golden-path.md`. Load-bearing decisions map: `ARCHITECTURE.md`.
 In addition to the v0.1.3 baseline:
 
 - **Topology B**: kratos.yml + hydra.yml + portal env + Caddy snippet now consolidate on `auth.dunn.dev/*`. home.dunn.dev reserved unused.
-- **Tile dashboard**: `portal/src/content/apps/*.mdx` Astro Content Collection; session-gated home page filters by `access-<slug>` groups; per-app detail pages render MDX bodies.
+- **Tile dashboard**: `portal/src/content/apps/*.md` Astro Content Collection; session-gated home page filters by `access-<slug>` groups; per-app detail pages render MD bodies.
 - **Runtime manifest read**: portal reads `hydra/clients/*.yaml` from a mounted directory at request-time, not build-time. Adding a new OIDC client = edit yaml + restart, no image rebuild.
 - **auth-util image**: UBI 9 minimal + curl + jq + yq + apply-clients.sh moved from `hydra/`. One-shot quadlet in iac applies OIDC client manifests against Hydra admin.
 - **Security review annotated**: every HIGH / MEDIUM / LOW carries inline `Status: REMEDIATED|ACCEPTED|OPEN` with evidence citations. Counts: 0 OPEN, 16 REMEDIATED, 1 ACCEPTED.
