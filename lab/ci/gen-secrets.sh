@@ -23,6 +23,19 @@ LAB_DOMAIN="${LAB_DOMAIN:-test.dunn.dev}"
 AUTH_REGISTRY="${AUTH_REGISTRY:-registry.gitlab.com/dunn.dev/auth}"
 AUTH_VERSION="${AUTH_VERSION:-latest}"
 
+# Production (golden-path LB#10) collapses each rotation slot pair to
+# a single sops key feeding both _CURRENT and _PREVIOUS env vars: one
+# auth_session_secret drives Kratos cookie CURRENT+PREVIOUS, one
+# auth_cipher_secret drives Kratos cipher CURRENT+PREVIOUS, and the
+# Hydra cookie pair collapses the same way. The lab intentionally
+# mirrors that wire shape so the substrate it validates IS the
+# substrate that ships — if Ory ever rejects a slot pair with
+# byte-identical entries, the CI lab fails before the change reaches
+# carmine.
+kratos_cookie=$(gen)
+kratos_cipher=$(gen_short)
+hydra_cookie=$(gen)
+
 cat <<EOF
 LAB_DOMAIN=${LAB_DOMAIN}
 AUTH_REGISTRY=${AUTH_REGISTRY}
@@ -32,19 +45,17 @@ POSTGRES_PASSWORD=$(gen_alnum)
 KRATOS_PG_PASS=$(gen_alnum)
 HYDRA_PG_PASS=$(gen_alnum)
 
-# Kratos cookie + cipher slots. Two distinct secrets per slot pair
-# (Kratos rejects empty list elements). Substrate-secret collapse is a
-# production simplification; lab keeps the two-slot model so any
-# Kratos schema change that affects slot handling fails loud here.
-KRATOS_COOKIE_SECRET_CURRENT=$(gen)
-KRATOS_COOKIE_SECRET_PREVIOUS=$(gen)
-KRATOS_CIPHER_SECRET_CURRENT=$(gen_short)
-KRATOS_CIPHER_SECRET_PREVIOUS=$(gen_short)
+# Kratos cookie + cipher + Hydra cookie: production collapsed-key
+# shape (LB#10). Same value in both _CURRENT and _PREVIOUS.
+KRATOS_COOKIE_SECRET_CURRENT=${kratos_cookie}
+KRATOS_COOKIE_SECRET_PREVIOUS=${kratos_cookie}
+KRATOS_CIPHER_SECRET_CURRENT=${kratos_cipher}
+KRATOS_CIPHER_SECRET_PREVIOUS=${kratos_cipher}
 
 # Hydra
 HYDRA_SYSTEM_SECRET=$(gen)
-HYDRA_COOKIE_SECRET_CURRENT=$(gen)
-HYDRA_COOKIE_SECRET_PREVIOUS=$(gen)
+HYDRA_COOKIE_SECRET_CURRENT=${hydra_cookie}
+HYDRA_COOKIE_SECRET_PREVIOUS=${hydra_cookie}
 HYDRA_PAIRWISE_SALT=$(gen_short)
 
 # Consent + portal cross-auth (MEDIUM-1 admin bearer + MEDIUM-2 recovery-gate)
