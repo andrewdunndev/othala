@@ -1,12 +1,12 @@
-<svg viewBox="0 0 1200 430" width="1200" height="430" font-family="IBM Plex Sans, Helvetica, Arial, sans-serif" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="auth hero: Authentik identity provider for the dunn.dev estate.">
+<svg viewBox="0 0 1200 430" width="1200" height="430" font-family="IBM Plex Sans, Helvetica, Arial, sans-serif" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="auth hero: Ory Kratos + Hydra identity provider for the dunn.dev estate.">
   <rect x="0" y="0" width="1200" height="430" fill="#f4f4f4"/>
   <g font-family="IBM Plex Sans, Helvetica, Arial, sans-serif">
-  <text x="60" y="34" font-size="10" font-weight="600" font-family="IBM Plex Mono, Menlo, monospace" fill="#707070" letter-spacing="1.4">AUTH · AUTHENTIK · SINGLE-SIGN-ON FOR THE ESTATE</text>
+  <text x="60" y="34" font-size="10" font-weight="600" font-family="IBM Plex Mono, Menlo, monospace" fill="#707070" letter-spacing="1.4">AUTH · ORY · SINGLE-SIGN-ON FOR THE ESTATE</text>
   <text x="1140" y="34" text-anchor="end" font-size="10" font-weight="600" font-family="IBM Plex Mono, Menlo, monospace" fill="#707070" letter-spacing="1.4">2026</text>
   <line x1="60" y1="48" x2="1140" y2="48" stroke="#e0e0e0" stroke-width="1"/>
   <text x="60" y="138" font-size="72" font-weight="700" fill="#4a6741" letter-spacing="-2">auth</text>
-  <text x="60" y="172" font-size="14" fill="#404040">Authentik instance + blueprints that hold the estate's identity.</text>
-  <text x="60" y="192" font-size="14" fill="#404040">blueprint changes are the only path to an estate auth change.</text>
+  <text x="60" y="172" font-size="14" fill="#404040">Ory Kratos + Hydra + glauth-kratos bridge that hold the estate's identity.</text>
+  <text x="60" y="192" font-size="14" fill="#404040">config-as-code is the only path to an estate auth change.</text>
   <text x="60" y="222" font-size="12" font-style="italic" fill="#404040">identity is a single artifact, not a config drift.</text>
   <g transform="translate(110 240) scale(2.2)" stroke="#4a6741" fill="none" stroke-linecap="round">
     <circle cx="22" cy="32" r="9" stroke-width="2"/>
@@ -19,8 +19,8 @@
   <text x="850" y="72" font-size="10" font-weight="700" font-family="IBM Plex Mono, Menlo, monospace" fill="#707070" letter-spacing="1.4">DISCIPLINE</text>
   <rect x="560" y="84" width="270" height="130" rx="3" fill="#ffffff" stroke="#e0e0e0" stroke-width="1"/>
   <text x="578" y="106" font-size="10" font-weight="700" font-family="IBM Plex Mono, Menlo, monospace" fill="#707070" letter-spacing="1.4">IN</text>
-  <text x="578" y="152" font-size="32" font-weight="700" fill="#4a6741" letter-spacing="-0.5">blueprints</text>
-  <text x="578" y="178" font-size="11" fill="#404040">yaml that declares users, groups, flows, apps</text>
+  <text x="578" y="152" font-size="32" font-weight="700" fill="#4a6741" letter-spacing="-0.5">configs</text>
+  <text x="578" y="178" font-size="11" fill="#404040">kratos.yml, hydra.yml, client manifests in git</text>
   <text x="578" y="200" font-size="9" font-family="IBM Plex Mono, Menlo, monospace" fill="#707070" letter-spacing="0.6">AS-CODE · GIT-RESIDENT</text>
   <rect x="850" y="84" width="270" height="130" rx="3" fill="#ffffff" stroke="#e0e0e0" stroke-width="1"/>
   <text x="868" y="106" font-size="10" font-weight="700" font-family="IBM Plex Mono, Menlo, monospace" fill="#707070" letter-spacing="1.4">POSTURE</text>
@@ -30,15 +30,15 @@
   <rect x="560" y="224" width="270" height="130" rx="3" fill="#ffffff" stroke="#e0e0e0" stroke-width="1"/>
   <text x="578" y="246" font-size="10" font-weight="700" font-family="IBM Plex Mono, Menlo, monospace" fill="#707070" letter-spacing="1.4">OUT</text>
   <text x="578" y="292" font-size="32" font-weight="700" fill="#4a6741" letter-spacing="-0.5">idp</text>
-  <text x="578" y="318" font-size="11" fill="#404040">OIDC, SAML, LDAP for every consumer in the estate</text>
-  <text x="578" y="340" font-size="9" font-family="IBM Plex Mono, Menlo, monospace" fill="#707070" letter-spacing="0.6">OIDC · SAML · LDAP</text>
+  <text x="578" y="318" font-size="11" fill="#404040">OIDC + LDAP + forward-auth for every consumer in the estate</text>
+  <text x="578" y="340" font-size="9" font-family="IBM Plex Mono, Menlo, monospace" fill="#707070" letter-spacing="0.6">OIDC · LDAP · FORWARD-AUTH</text>
   <rect x="850" y="224" width="270" height="130" rx="3" fill="#ffffff" stroke="#e0e0e0" stroke-width="1"/>
   <text x="868" y="246" font-size="10" font-weight="700" font-family="IBM Plex Mono, Menlo, monospace" fill="#707070" letter-spacing="1.4">LIFETIME</text>
   <text x="868" y="292" font-size="32" font-weight="700" fill="#4a6741" letter-spacing="-0.5">auditable</text>
-  <text x="868" y="318" font-size="11" fill="#404040">every grant flows from a committed blueprint</text>
-  <text x="868" y="340" font-size="9" font-family="IBM Plex Mono, Menlo, monospace" fill="#707070" letter-spacing="0.6">GIT LOG · BLUEPRINT TIMELINE</text>
+  <text x="868" y="318" font-size="11" fill="#404040">every grant flows from a committed config</text>
+  <text x="868" y="340" font-size="9" font-family="IBM Plex Mono, Menlo, monospace" fill="#707070" letter-spacing="0.6">GIT LOG · CONFIG TIMELINE</text>
   <line x1="60" y1="386" x2="1140" y2="386" stroke="#e0e0e0" stroke-width="1"/>
-  <text x="60" y="412" font-size="10" font-weight="600" font-family="IBM Plex Mono, Menlo, monospace" fill="#707070" letter-spacing="1.4">AUTHENTIK · BLUEPRINTS · OAUTH · SAML</text>
+  <text x="60" y="412" font-size="10" font-weight="600" font-family="IBM Plex Mono, Menlo, monospace" fill="#707070" letter-spacing="1.4">ORY · KRATOS · HYDRA · OIDC · LDAP</text>
   <text x="1140" y="412" text-anchor="end" font-size="10" font-weight="600" font-family="IBM Plex Mono, Menlo, monospace" fill="#707070" letter-spacing="1.4">PRIVATE · GITLAB.COM/DUNN.DEV/auth</text>
   </g>
 </svg>
