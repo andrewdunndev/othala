@@ -1,29 +1,31 @@
 # Reusable Caddy snippet — Astro Node SSR portal mux for carmine.
 #
-# The portal serves both home.dunn.dev (the family launcher) and parts
-# of auth.dunn.dev (the user-facing auth flows + admin UI). The Hydra
-# consent service shares auth.dunn.dev for OAuth2/OIDC handlers
-# (/login with login_challenge, /consent, /logout). Path discipline
-# is essential because both upstreams reply on the same host.
+# Topology B (v0.1.4): the portal serves auth.dunn.dev exclusively.
+# The Hydra consent service shares auth.dunn.dev for OAuth2/OIDC
+# handlers (/login with login_challenge, /consent, /logout). Path
+# discipline is essential because both upstreams reply on the same
+# host.
 #
-# Two Caddyfile blocks expected at the carmine top-level:
+# home.dunn.dev is reserved as a future tile-dashboard host; not
+# served by this snippet today.
 #
-#   home.dunn.dev {
-#     import portal-tls
-#     reverse_proxy portal:8080
-#   }
+# Single Caddyfile block expected at the carmine top-level:
 #
 #   auth.dunn.dev {
 #     import portal-tls
 #     import auth-mux
 #   }
 #
-# `portal-tls` here just standardises the DNS-01 ACME issuer so each
-# block doesn't have to repeat it.
+# `portal-tls` here just standardises the DNS-01 ACME issuer.
 #
 # `auth-mux` does the path split. Order matters: most specific first.
 # Anything matching the portal goes to the portal pod; everything else
 # falls through to the consent service or Kratos public.
+#
+# NOTE: WebFinger is NOT served from this snippet. RFC 7033 + Tailscale
+# require WebFinger at `${email-domain}/.well-known/webfinger` (the
+# apex), not on the IdP subdomain. dunn.dev/.well-known/webfinger is
+# served by a Cloudflare Pages function on the dunn.dev apex repo.
 
 (portal-tls) {
 	tls {
@@ -37,12 +39,6 @@
 	@kratos_wellknown path /.well-known/ory/*
 	handle @kratos_wellknown {
 		reverse_proxy kratos:4433
-	}
-
-	# Portal-owned WebFinger endpoint (real handler, sets jrd+json).
-	@portal_webfinger path /.well-known/webfinger
-	handle @portal_webfinger {
-		reverse_proxy portal:8080
 	}
 
 	# Hydra-flagged login (login_challenge present) -> consent service.

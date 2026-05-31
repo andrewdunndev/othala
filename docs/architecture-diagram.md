@@ -99,10 +99,10 @@ flowchart LR
   end
 
   subgraph WF[Custom OIDC + WebFinger]
-    w1[Tailscale] -->|webfinger| w2[Astro endpoint]
+    w1[Tailscale] -->|webfinger once at setup| w2[CF Pages function on dunn.dev apex]
     w2 -->|jrd+json| w1
-    w1 -->|OIDC discovery| w3[Hydra]
-    note5[Tailscale only]
+    w1 -->|OIDC discovery| w3[Hydra at auth.dunn.dev]
+    note5[Tailscale only; WebFinger at email-domain root per RFC 7033]
   end
 ```
 

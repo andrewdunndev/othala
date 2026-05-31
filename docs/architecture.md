@@ -21,12 +21,13 @@ Production topology after the locked Ory pivot. Custom Caddy image at `registry.
                              │    ├─ hydra-migrate (init container, schema migrations)
                              │    ├─ consent service (4477 internal)
                              │    ├─ portal (Astro Node SSR, 8080 internal)
-                             │    │    ├─ home.dunn.dev
-                             │    │    │   └─ /                       three-state launcher
                              │    │    └─ auth.dunn.dev (path-shared with Kratos+Hydra+consent)
+                             │    │        ├─ /                       session-gated tile dashboard
+                             │    │        ├─ /apps/<slug>            per-app education page
                              │    │        ├─ /auth/{login,recovery,settings,verification}
-                             │    │        ├─ /admin/{users,groups,oauth2,activity}
-                             │    │        └─ /.well-known/webfinger  (jrd+json handler)
+                             │    │        └─ /admin/{users,groups,oauth2,activity}
+                             │    │   (home.dunn.dev: reserved, not served)
+                             │    │   (WebFinger: dunn.dev apex Pages function, not here)
                              │    └─ postgres (kratos + hydra databases)
                              ├─ jellyfin pod
                              │    ├─ jellyfin
@@ -42,13 +43,19 @@ home portal health check:
 
 ## Cloudflare's role
 
-DNS hosting + DNS-01 ACME via API. **Not in the auth or app request path.** No CF Tunnel, no CF Access, no Worker for the portal, no KV for state. Cloudflare never sees TLS plaintext for app/auth flows. The portal and the WebFinger endpoint both live on carmine.
+DNS hosting + DNS-01 ACME via API. **Not in the auth or app request path** for the portal or OIDC flows. No CF Tunnel, no CF Access, no Worker for the portal, no KV for state. Cloudflare never sees TLS plaintext for app/auth flows.
+
+Two narrow Cloudflare-served endpoints exist on the dunn.dev apex:
+- **WebFinger** at `dunn.dev/.well-known/webfinger` — Pages function returning the OIDC issuer JRD for Tailscale tenant setup (consulted once, never per-login).
+- The marketing landing page at `dunn.dev/` — outside the auth substrate's concern.
 
 ## Why portal-on-carmine, not Workers
 
 adversarial-review-2 C1: with the portal on Workers, the admin pages had to fetch `kratos:4434` (the Kratos admin port). That hostname resolves only inside the carmine pod network; from a Worker it's unreachable. The locked decision "admin port stays internal" jointly with "Astro on Workers" was inconsistent.
 
-Putting the portal on carmine in the same pod network as Kratos and Hydra makes the admin port reachable directly. It also collapses runtime complexity: one Node process, normal `process.env`, no Workers shims, no `wrangler` deploy step. WebFinger gets a real handler so we control `Content-Type` and byte-matching with Hydra's issuer (H6/H7).
+Putting the portal on carmine in the same pod network as Kratos and Hydra makes the admin port reachable directly. It also collapses runtime complexity: one Node process, normal `process.env`, no Workers shims, no `wrangler` deploy step.
+
+(Note: an earlier shape of this repo served WebFinger from the portal at `auth.dunn.dev/.well-known/webfinger`. That handler was deleted in v0.1.4 — Tailscale's KB-1240 requires WebFinger at the email-domain apex, not on the IdP subdomain. Production serves it from a Cloudflare Pages function on the dunn.dev apex repo. See `docs/apex-webfinger-followup.md`.)
 
 The portal's two original Workers motivations were addressable separately:
 
@@ -116,7 +123,21 @@ Caddy validates the `Authorization: Bearer` token via Hydra's `/admin/oauth2/int
 
 ### Custom OIDC — Tailscale
 
-Tailscale custom-OIDC against Hydra. Doesn't use PKCE. WebFinger response served by an Astro endpoint at `auth.dunn.dev/.well-known/webfinger` (`portal/src/pages/.well-known/webfinger.ts`). The handler returns `Content-Type: application/jrd+json` and `Access-Control-Allow-Origin: *`. The issuer `href` field is `https://auth.dunn.dev/` (with trailing slash) and MUST byte-match Hydra's `urls.self.issuer` in `hydra/hydra.yml`. Tailscale rejects discovery on any mismatch.
+Tailscale custom-OIDC against Hydra. Doesn't use PKCE.
+
+**WebFinger lives at the email-domain apex**, not on the IdP subdomain.
+Tailscale's KB-1240 requires `https://${email-domain}/.well-known/webfinger`
+— for our family emails (`<user>@dunn.dev`), that's `https://dunn.dev/.well-known/webfinger`.
+Served by a Cloudflare Pages function in the dunn.dev apex repo. Returns
+`Content-Type: application/jrd+json`, `Access-Control-Allow-Origin: *`,
+issuer `href` byte-matching Hydra's `urls.self.issuer` in `hydra/hydra.yml`
+(currently `https://auth.dunn.dev/` with trailing slash; Tailscale rejects
+any mismatch).
+
+The WebFinger endpoint is consulted exactly once during tailnet setup;
+the issuer is locked-in afterward and changing it requires Tailscale
+support per KB-1240. See `docs/apex-webfinger-followup.md` for
+implementation + verification.
 
 ## Admin path gating
 

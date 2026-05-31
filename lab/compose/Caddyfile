@@ -1,13 +1,21 @@
-# Phase 1+ lab spike Caddyfile.
+# LEGACY Phase 1+ lab spike Caddyfile (Topology A shape).
 #
-# Hosts:
+# This file is preserved as historical evidence of the Phase 3 GREEN
+# lab run. Production (Topology B) consolidates everything on a single
+# auth-lab subdomain — home-lab disappears. The QEMU-CI lab that
+# replaces this static compose will mirror Topology B; see the issue
+# at docs/qemu-ci-lab-followup.md.
+#
+# Hosts (legacy):
 #   auth-lab.{$DOMAIN}  — Kratos public + Hydra public + consent UI mux
 #   home-lab.{$DOMAIN}  — Astro portal (carmine-equivalent in lab)
 #   keep-lab.{$DOMAIN}  — Vaultwarden, sample OIDC consumer
 #
 # Path multiplexing on auth-lab: /login is overloaded between Kratos and
 # Hydra (login_challenge handoff). Disambiguated by query param. The
-# portal owns /auth/*, /admin/*, /.well-known/webfinger.
+# portal owns /auth/*, /admin/*. WebFinger is NOT served here — Topology B
+# moves it to the dunn.dev apex (Cloudflare Pages function), since
+# Tailscale requires it at `${email-domain}/.well-known/webfinger`.
 #
 # Order of handlers matters: most specific first, since handle blocks are
 # evaluated top-down and the first match wins.
@@ -25,11 +33,10 @@ auth-lab.{$DOMAIN} {
 		reverse_proxy kratos:4433
 	}
 
-	# Portal-owned WebFinger endpoint (real handler, sets jrd+json).
-	@portal_webfinger path /.well-known/webfinger
-	handle @portal_webfinger {
-		reverse_proxy portal:8080
-	}
+	# WebFinger is NOT served here — Tailscale requires it at the email
+	# domain root (`${domain}/.well-known/webfinger`), not on the IdP
+	# subdomain. Production serves it from a Cloudflare Pages function
+	# on the dunn.dev apex repo. See docs/decision.md "Tailscale WebFinger".
 
 	# /login with a login_challenge is the Hydra handoff to the consent
 	# service (our own dunn.dev/consent service). /login without the

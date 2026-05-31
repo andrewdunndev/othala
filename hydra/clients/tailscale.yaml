@@ -9,8 +9,11 @@
 # Tailscale tries client_secret_basic first, then client_secret_post.
 # Both work with Hydra defaults.
 #
-# WebFinger response for *@dunn.dev addresses lives at
-# home.dunn.dev/.well-known/webfinger as a static JSON file.
+# WebFinger response for *@dunn.dev addresses lives at the email domain
+# apex: dunn.dev/.well-known/webfinger, served by a Cloudflare Pages
+# function in the dunn.dev apex repo. RFC 7033 + Tailscale KB-1240
+# both require this path (NOT a subdomain). Fetched exactly once during
+# Tailscale tenant setup; the issuer URL is locked in afterward.
 
 oidc:
   client_id: tailscale

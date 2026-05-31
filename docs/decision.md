@@ -51,7 +51,7 @@ The cost: BYO UI (we build the Astro app), 4-5 components instead of one, smalle
 |---|---|---|
 | Hydra subject identifier | `public` | Family scale, no app-to-app correlation concern. |
 | Consent | `skip_consent: true` per client for the 11 OIDC clients in `hydra/clients/` | Family never sees consent screens. Total auth-touching apps: 11 OIDC + 1 LDAP-only (Jellyfin) + 2 forward-auth = 14 surfaces. |
-| Tailscale WebFinger | Static JSON file at `home.dunn.dev/.well-known/webfinger` | RFC 7033, served by CF Workers. |
+| Tailscale WebFinger | Cloudflare Pages function at `dunn.dev/.well-known/webfinger` (apex) | RFC 7033 + Tailscale KB-1240 require WebFinger at `${email-domain}/.well-known/webfinger`, NOT on the IdP subdomain. Pages function lives in the dunn.dev apex repo. Consulted only once during Tailscale tenant setup; lock-in afterward. |
 
 ### LDAP bridge
 
