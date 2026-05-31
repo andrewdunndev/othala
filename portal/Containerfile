@@ -5,14 +5,23 @@
 # standalone emits its own minimal HTTP server at
 # dist/server/entry.mjs, so no Express/Fastify glue is needed.
 #
-# Build context is the AUTH REPO ROOT, not portal/. The manifest
-# prebuild step reads ../hydra/clients/*.yaml relative to portal/,
-# so both directories must be in the context.
+# v0.1.4 change: OIDC client manifests are read at RUNTIME from a
+# mounted directory (/etc/portal/manifests/), not baked into the
+# build via manifests-build.mjs. The build context can therefore be
+# portal/ alone; hydra/clients/ is no longer needed at build time.
+# See portal/src/lib/manifests.ts for the runtime read pattern and
+# the source-of-truth chain.
 #
+# Tile-dashboard MDX content (portal/src/content/apps/*.mdx) IS
+# build-time bundled via Astro Content Collections. Adding an app's
+# education content is an image rebuild; OIDC manifest edits are not.
+#
+# CI build context: auth repo root (see .gitlab-ci.yml build-portal job).
 # Local build (from auth repo root):
 #   podman build -t dunn.dev/auth-portal:lab -f portal/Containerfile .
 # Run:
 #   podman run --rm -p 8080:8080 \
+#     -v ./hydra/clients:/etc/portal/manifests:ro \
 #     -e KRATOS_PUBLIC_URL=http://kratos:4433 \
 #     -e KRATOS_ADMIN_URL=http://kratos:4434 \
 #     -e HYDRA_PUBLIC_URL=http://hydra:4444 \
@@ -36,7 +45,9 @@ COPY portal/package.json portal/package-lock.json portal/.npmrc portal/
 RUN cd portal && npm ci
 
 COPY portal/ portal/
-COPY hydra/clients/ hydra/clients/
+# v0.1.4: hydra/clients/ is NOT copied at build time. OIDC manifests
+# are read at runtime from /etc/portal/manifests/ (mounted via the
+# iac quadlet volume). See portal/src/lib/manifests.ts.
 
 RUN cd portal \
     && npm run build \

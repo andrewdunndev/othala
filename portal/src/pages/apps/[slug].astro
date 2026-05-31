@@ -1,0 +1,157 @@
+---
+// Per-app detail page rendering the education content from the apps
+// Content Collection.
+//
+// Session-gated like the home page: not in `access-<slug>` group =
+// redirect to /auth/error?reason=not-authorised. Admins see every
+// app's detail page regardless of access group.
+//
+// Adding a new app: drop a new MD file in src/content/apps/<slug>.md.
+// Astro generates the dynamic route automatically via getStaticPaths.
+// In SSR mode (Topology B), the path is resolved at request time, so
+// no rebuild needed when MD frontmatter changes — but adding a NEW
+// MD file IS a rebuild (Astro Content Collections are build-time).
+
+export const prerender = false;
+
+import Layout from '../../layouts/Layout.astro';
+import { getCollection, render } from 'astro:content';
+import { getSession } from '../../lib/kratos';
+
+const { slug } = Astro.params;
+if (!slug) {
+  return Astro.redirect('/');
+}
+
+const apps = await getCollection('apps');
+const entry = apps.find((a) => a.id === slug);
+if (!entry) {
+  return new Response('App not found', { status: 404 });
+}
+
+// Session gate.
+const cookie = Astro.request.headers.get('cookie') ?? undefined;
+const session = await getSession(cookie).catch(() => null);
+if (!session?.active || !session.identity) {
+  return Astro.redirect(`/auth/login?return_to=${encodeURIComponent(Astro.url.pathname)}`);
+}
+
+const groups = session.identity.metadata_admin?.groups ?? [];
+const isAdmin = groups.includes('admin');
+const hasAccess = isAdmin || groups.includes(entry.data.access_group);
+if (!hasAccess) {
+  return Astro.redirect('/auth/error?reason=not-authorised');
+}
+
+const { Content } = await render(entry);
+---
+<Layout title={entry.data.name} description={entry.data.description}>
+  <article class="app-detail">
+    <header class="app-header">
+      <p class="app-eyebrow mono">{entry.data.icon} · {entry.data.auth_kind}</p>
+      <h1 class="app-title">{entry.data.name}</h1>
+      <p class="app-lede">{entry.data.description}</p>
+      <div class="app-cta">
+        <a class="button button-primary" href={entry.data.url} rel="noopener">Open {entry.data.name} ↗</a>
+        <a class="cta-link mono" href="/">Back to dashboard</a>
+      </div>
+    </header>
+
+    <section class="app-body">
+      <Content />
+    </section>
+  </article>
+</Layout>
+
+<style>
+  .app-detail {
+    max-width: 50rem;
+    margin: 0 auto;
+  }
+  .app-header {
+    padding: var(--space-6) 0;
+    border-bottom: 1px solid var(--border);
+  }
+  .app-eyebrow {
+    font-size: var(--text-xs);
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--text-muted);
+  }
+  .app-title {
+    font-family: var(--font-display);
+    font-size: var(--text-3xl);
+    font-weight: 700;
+    letter-spacing: -0.01em;
+    line-height: var(--lh-tight);
+    margin: var(--space-2) 0 var(--space-3);
+  }
+  .app-lede {
+    font-size: var(--text-lg);
+    color: var(--text-2);
+    line-height: 1.5;
+    margin-bottom: var(--space-4);
+  }
+  .app-cta {
+    display: flex;
+    gap: var(--space-3);
+    align-items: baseline;
+  }
+  .app-body {
+    padding: var(--space-6) 0;
+    font-size: var(--text-base);
+    line-height: 1.6;
+    color: var(--text);
+  }
+  .app-body :global(h2) {
+    font-family: var(--font-display);
+    font-size: var(--text-xl);
+    font-weight: 700;
+    margin: var(--space-5) 0 var(--space-2);
+  }
+  .app-body :global(h3) {
+    font-family: var(--font-display);
+    font-size: var(--text-lg);
+    font-weight: 600;
+    margin: var(--space-4) 0 var(--space-2);
+  }
+  .app-body :global(p) {
+    margin: var(--space-3) 0;
+  }
+  .app-body :global(ul),
+  .app-body :global(ol) {
+    margin: var(--space-3) 0;
+    padding-left: var(--space-5);
+  }
+  .app-body :global(code) {
+    font-family: var(--font-mono);
+    font-size: var(--text-sm);
+    background: var(--surface-2);
+    padding: 0.1em 0.4em;
+    border-radius: 4px;
+  }
+  .app-body :global(pre) {
+    font-family: var(--font-mono);
+    font-size: var(--text-sm);
+    background: var(--surface-2);
+    border: 1px solid var(--border);
+    padding: var(--space-3);
+    border-radius: var(--radius);
+    overflow-x: auto;
+  }
+  .app-body :global(pre) :global(code) {
+    background: transparent;
+    padding: 0;
+  }
+  .app-body :global(a) {
+    color: var(--accent);
+    text-decoration: underline;
+  }
+  .cta-link {
+    font-size: var(--text-xs);
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--text-muted);
+  }
+  .cta-link:hover { color: var(--accent); text-decoration: none; }
+</style>

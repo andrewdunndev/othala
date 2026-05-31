@@ -1,29 +1,37 @@
 ---
-// auth.dunn.dev — three-state landing/launcher.
+// auth.dunn.dev — session-gated tile dashboard.
+//
+// v0.1.4 architecture (Topology B + apps registry as Content Collection):
 //
 // State A (down):     Kratos unreachable. Holding panel: mark + short
-//                     message + thin technical line. Doesn't read as a
-//                     404; reads as "auth services starting up."
+//                     message + thin technical line. Reads as "auth
+//                     services starting up", not 404.
 // State B (pre-auth): Kratos reachable, no session. Hero with mark +
 //                     welcome lede + Sign In CTA. Below: a thin section
 //                     explaining what's behind the door.
 // State C (post-auth): active session. Hero with greeting + section
-//                     "your apps" with the tile launcher (filtered to
-//                     access-* groups the user actually has). Admin
-//                     shortcut at the top of the cta row when the user
-//                     is in the admin group.
+//                     "your apps" — the tile launcher reads the
+//                     `apps` Content Collection and filters to entries
+//                     whose `access_group` the user's
+//                     `metadata_admin.groups` contains. Admin shortcut
+//                     when the user is in the admin group.
+//
+// Apps registry = Astro Content Collection (portal/src/content/apps/*.md).
+// Each MD has frontmatter (name, description, url, icon, access_group,
+// auth_kind, disabled, order) + an MDX body for the per-app detail page
+// at /apps/<slug>. Adding a new app is one MD file + an iac sops add +
+// `make auth-apply-clients`; for OIDC consumers also one yaml in
+// hydra/clients/.
 //
 // Dev preview: when running `astro dev`, State A also surfaces a small
-// panel of every auth flow link so the developer can click through
-// without Kratos. Hidden in production via import.meta.env.DEV.
-//
-// `?dev-state=down|pre-auth|post-auth` lets the developer force a state
-// in the dev server without running Kratos. Honored only when DEV.
+// panel of every auth flow link. `?dev-state=` lets the developer force
+// a state without running Kratos.
 
 export const prerender = false;
 
 import Layout from '../layouts/Layout.astro';
 import markSvg from '@dunn.dev/reference/mark/mark.svg?raw';
+import { getCollection } from 'astro:content';
 import { getSession, isReachable } from '../lib/kratos';
 import type { Identity } from '../lib/types';
 
@@ -40,12 +48,19 @@ let downReason = 'Kratos /health/alive unreachable; retrying.';
 if (devOverride === 'down' || devOverride === 'pre-auth' || devOverride === 'post-auth') {
   state = devOverride;
   if (state === 'post-auth') {
-    // A plausible mocked identity so the post-auth view renders something
-    // realistic in dev without having to hand-craft a Kratos session.
+    // Plausible mocked identity so the post-auth view renders something
+    // realistic in dev without a Kratos session. Groups include the
+    // access tokens for the apps shown.
     identity = {
       id: 'dev-mock',
       traits: { username: 'dev.user', email: 'dev@example.local', displayName: 'Dev User' },
-      metadata_admin: { groups: ['admin', 'family', 'access-memory', 'access-cinema', 'access-tune', 'access-llm'] },
+      metadata_admin: {
+        groups: [
+          'admin', 'family',
+          'access-memory', 'access-cinema', 'access-tune', 'access-llm',
+          'access-keep', 'access-listen', 'access-larder',
+        ],
+      },
     } as unknown as Identity;
   }
 } else {
@@ -62,32 +77,24 @@ if (devOverride === 'down' || devOverride === 'pre-auth' || devOverride === 'pos
   }
 }
 
-// Tile catalog. Order: media first, then utility, then admin-adjacent.
-// Each tile renders only if the user is in the matching access-* group.
-const TILES = [
-  { slug: 'memory',  name: 'Photos',     icon: 'PH', host: 'memory.dunn.dev',  group: 'access-memory'  },
-  { slug: 'listen',  name: 'Audiobooks', icon: 'AB', host: 'listen.dunn.dev',  group: 'access-listen'  },
-  { slug: 'cinema',  name: 'Movies',     icon: 'MV', host: 'cinema.dunn.dev',  group: 'access-cinema'  },
-  { slug: 'tune',    name: 'Music',      icon: 'MU', host: 'tune.dunn.dev',    group: 'access-tune'    },
-  { slug: 'larder',  name: 'Recipes',    icon: 'RC', host: 'larder.dunn.dev',  group: 'access-larder'  },
-  { slug: 'keep',    name: 'Vault',      icon: 'KP', host: 'keep.dunn.dev',    group: 'access-keep'    },
-  { slug: 'library', name: 'Books',      icon: 'LB', host: 'library.dunn.dev', group: 'access-library' },
-  { slug: 'vault',   name: 'Files',      icon: 'FL', host: 'vault.dunn.dev',   group: 'access-vault'   },
-  { slug: 'gather',  name: 'Gather',     icon: 'GT', host: 'gather.dunn.dev',  group: 'access-gather'  },
-  { slug: 'llm',     name: 'LLM',        icon: 'LM', host: 'llm.dunn.dev',     group: 'access-llm'     },
-  { slug: 'forge',   name: 'Forge',      icon: 'FG', host: 'forge.dunn.dev',   group: 'access-forge'   },
-  { slug: 'observe', name: 'Observe',    icon: 'OB', host: 'observe.dunn.dev', group: 'access-observe' },
-];
+// Apps registry — read at build time from the Content Collection.
+// Frontmatter shapes carry the tile metadata; we don't need the MD body
+// here (that's the /apps/[slug] detail page).
+const appEntries = await getCollection('apps', ({ data }) => !data.disabled);
+const orderedApps = appEntries
+  .map((e) => ({ slug: e.id, ...e.data }))
+  .sort((a, b) => a.order - b.order || a.name.localeCompare(b.name));
 
 const groups = identity?.metadata_admin?.groups ?? [];
-const visibleTiles = state === 'post-auth' ? TILES.filter((t) => groups.includes(t.group)) : [];
+const visibleTiles =
+  state === 'post-auth'
+    ? orderedApps.filter((a) => groups.includes(a.access_group))
+    : [];
 const isAdmin = state === 'post-auth' && groups.includes('admin');
 const displayName = identity?.traits.displayName || identity?.traits.username || '';
 const firstName = displayName.split(' ')[0] || displayName;
 
-// Dev preview: every browser-flow URL the portal hands to Kratos in real life.
-// In production these all redirect through Kratos; in dev (no Kratos), this
-// list lets the developer load the flow handlers directly to see the UI.
+// Dev preview: every browser-flow URL the portal hands to Kratos.
 const devLinks = [
   { href: '/?dev-state=down',      label: 'State A: down (substrate offline)' },
   { href: '/?dev-state=pre-auth',  label: 'State B: pre-auth (sign in)' },
@@ -171,9 +178,11 @@ const devLinks = [
         {visibleTiles.length > 0 ? (
           <div class="tile-grid">
             {visibleTiles.map((t) => (
-              <a class="tile" href={`https://${t.host}/`}>
+              <a class="tile" href={t.url}>
                 <div class="tile-icon mono">{t.icon}</div>
                 <div class="tile-name">{t.name}</div>
+                <div class="tile-desc">{t.description}</div>
+                <a class="tile-learn mono" href={`/apps/${t.slug}`}>learn more →</a>
               </a>
             ))}
           </div>
@@ -278,14 +287,16 @@ const devLinks = [
   }
 
   /* ── Tile grid ──
-   * Wider gutter than the global tile so post-auth feels less dense. */
+   * Now richer: each tile carries an icon, name, short description, and
+   * a "learn more" link to the per-app detail page rendering the MDX
+   * education body. */
   .tile-grid {
     display: grid;
-    grid-template-columns: repeat(2, 1fr);
+    grid-template-columns: repeat(1, 1fr);
     gap: var(--space-3);
   }
-  @media (min-width: 640px)  { .tile-grid { grid-template-columns: repeat(3, 1fr); } }
-  @media (min-width: 900px)  { .tile-grid { grid-template-columns: repeat(4, 1fr); } }
+  @media (min-width: 640px)  { .tile-grid { grid-template-columns: repeat(2, 1fr); } }
+  @media (min-width: 900px)  { .tile-grid { grid-template-columns: repeat(3, 1fr); } }
   .tile {
     display: flex;
     flex-direction: column;
@@ -314,8 +325,21 @@ const devLinks = [
   }
   .tile-name {
     font-size: var(--text-base);
+    font-weight: 600;
     color: var(--text);
   }
+  .tile-desc {
+    font-size: var(--text-sm);
+    color: var(--text-2);
+    line-height: 1.4;
+  }
+  .tile-learn {
+    font-size: var(--text-xs);
+    color: var(--text-muted);
+    margin-top: auto;
+    align-self: flex-end;
+  }
+  .tile-learn:hover { color: var(--accent); text-decoration: none; }
 
   /* ── Dev preview ── */
   .dev-preview {
