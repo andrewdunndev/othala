@@ -152,10 +152,15 @@ export async function deactivateIdentity(id: string): Promise<void> {
     body: JSON.stringify([{ op: 'replace', path: '/state', value: 'inactive' }]),
   });
   await ok(res, 'deactivateIdentity');
-  await fetch(`${adminBase()}/admin/identities/${encodeURIComponent(id)}/sessions`, {
+  // Session revocation is the second half of deactivation. If it fails
+  // (500, network error, etc.) and we don't check, the identity stays in
+  // a half-deactivated state — marked inactive but still holding active
+  // sessions. Surface the failure so the caller can re-run / alert.
+  const sessRes = await fetch(`${adminBase()}/admin/identities/${encodeURIComponent(id)}/sessions`, {
     method: 'DELETE',
     headers: authHeaders(),
   });
+  await ok(sessRes, 'deleteIdentitySessions');
 }
 
 export interface RecoveryLink {

@@ -128,10 +128,11 @@ async function deactivateIdentity(id) {
     body: JSON.stringify([{ op: 'replace', path: '/state', value: 'inactive' }]),
   });
   await ok(res, 'deactivateIdentity');
-  await fetch(`${adminBase()}/admin/identities/${encodeURIComponent(id)}/sessions`, {
+  const sessRes = await fetch(`${adminBase()}/admin/identities/${encodeURIComponent(id)}/sessions`, {
     method: 'DELETE',
     headers: authHeaders(),
   });
+  await ok(sessRes, 'deleteIdentitySessions');
 }
 
 async function getRecoveryLink(id, expiresIn = '1h') {
@@ -456,6 +457,27 @@ test('deactivateIdentity: second request DELETEs sessions', async () => {
   assert.equal(capturedCalls.length, 2);
   assert.equal(capturedCalls[1].opts.method, 'DELETE');
   assert.match(capturedCalls[1].url, /\/admin\/identities\/deact-id\/sessions$/);
+});
+
+test('deactivateIdentity: throws when sessions DELETE fails (half-deactivated guard)', async () => {
+  // PATCH succeeds, sessions DELETE fails (500). Without the ok() check on
+  // sessRes the caller saw silent success and the identity stayed in a
+  // half-deactivated state (marked inactive, sessions still live).
+  let call = 0;
+  globalThis.fetch = async (url, opts) => {
+    capturedCalls.push({ url: String(url), opts });
+    call++;
+    if (call === 1) return new Response('', { status: 200 });
+    return new Response('upstream broken', { status: 500 });
+  };
+  await assert.rejects(
+    () => deactivateIdentity('deact-id'),
+    (err) => {
+      assert.match(err.message, /deleteIdentitySessions/);
+      assert.match(err.message, /500/);
+      return true;
+    },
+  );
 });
 
 // ─── getRecoveryLink ─────────────────────────────────────────────────────────
