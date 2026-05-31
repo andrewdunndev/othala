@@ -54,7 +54,7 @@ estate use today.
 
 ## What we do NOT contribute
 
-- **Patches to Authentik or kanidm.** Authentik is mature; kanidm has explicit AI/LLM bans. Both stacks are out of scope.
+- **Patches to evaluated-but-rejected stacks (kanidm, Authelia, Hanko, voidauth, Pocket-ID, Zitadel).** Out of scope; kanidm specifically has explicit AI/LLM bans.
 - **A fork of Ory.** If Ory itself fails us, we revisit substrate, not patch-and-maintain.
 - **A standalone "Ory homelab kit" project.** The `dunn.dev/auth` repo IS the kit, but extracted only as components (the bridge first; the Astro UI is more opinionated and possibly less generally useful). We don't pre-publish the entire kit because:
   - Maintenance treadmill killed every prior Ory homelab kit (see `lab/docs/ory-homelab-research.md`)

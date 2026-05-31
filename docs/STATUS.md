@@ -121,7 +121,7 @@ In addition to the v0.1.3 baseline:
 | Phase 3 security review | `docs/security-review-2026-05-04.md` |
 | Lab evidence | `lab/docs/{spike,phase2,phase3}-evidence.md`, `phase3-readiness.md`, `security-validation.md` |
 | Runbooks | `docs/runbooks/*.md` |
-| Substrate comparison (why Ory) | `docs/substrate-comparison.md`, `lab/docs/eval-*.md` |
+| Substrate comparison (why Ory) | `lab/docs/eval-*.md` |
 | Contribution strategy | `docs/contribution-strategy.md` |
 | WebFinger Pages function spec | `docs/apex-webfinger-followup.md` |
 

@@ -1,6 +1,6 @@
 # upstream
 
-Historical research notes from the substrate evaluation. We are consumer-only across all evaluated projects (Authentik chosen as substrate; kanidm, Authelia, Hanko, voidauth, Pocket-ID, Zitadel evaluated and rejected). No active upstream code contributions are planned.
+Historical research notes from the substrate evaluation. We are consumer-only across all evaluated projects (Ory Kratos + Hydra chosen as substrate; kanidm, Authelia, Hanko, voidauth, Pocket-ID, Zitadel evaluated and rejected). No active upstream code contributions are planned beyond the glauth-kratos bridge.
 
 ## Layout
 
@@ -10,7 +10,7 @@ Historical research notes from the substrate evaluation. We are consumer-only ac
 
 ## Why this directory exists in a consumer-only repo
 
-The walks documented here informed the substrate decision. They are durable evidence that explains the journey: why kanidm felt like fighting the framework, why we returned to Authentik, what the bar is for re-evaluation in the future. Future operators reading this repo cold should be able to reconstruct the reasoning.
+The walks documented here informed the substrate decision. They are durable evidence that explains the journey: why kanidm felt like fighting the framework, what the bar is for re-evaluation in the future. Future operators reading this repo cold should be able to reconstruct the reasoning.
 
 ## If we ever revisit upstream contribution
 

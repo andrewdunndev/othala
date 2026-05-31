@@ -2,13 +2,12 @@
 
 **Status:** Decided 2026-05-02. Substrate: **Ory Kratos + Hydra + custom glauth-kratos LDAP bridge + Astro UI on Cloudflare Workers + custom Caddy image (direct go build)**.
 
-After evaluating Authentik, kanidm, Authelia, Hanko, voidauth, Pocket-ID, Zitadel, Andrew's reframe — "I want UX excellence, not flow customization" — flipped the call to Ory. The 4 feasibility validations went GREEN/YELLOW with manageable risks, and the adversarial review against upstream docs caught two CRITICAL issues that are now corrected in the locked architecture.
+After evaluating multiple IdP substrates (kanidm, Authelia, Hanko, voidauth, Pocket-ID, Zitadel), Andrew's reframe — "I want UX excellence, not flow customization" — flipped the call to Ory. The 4 feasibility validations went GREEN/YELLOW with manageable risks, and the adversarial review against upstream docs caught two CRITICAL issues that are now corrected in the locked architecture.
 
 ## Why Ory
 
-The journey here was extensive (`docs/substrate-comparison.md` has the full per-candidate evidence). Short version:
+The journey here was extensive (`lab/docs/eval-*.md` has the full per-candidate evidence). Short version:
 
-- **Authentik:** flow designer felt like unwanted complexity; commercial trajectory uncertain; we want UX excellence not flow customization
 - **kanidm:** AI/LLM ban in AGENTS.md (Anthropic refusal trigger), forward-auth + BYO-UI explicitly closed by maintainers, bus factor 1
 - **Authelia:** no LDAP server; lldap-as-companion is wrong-shaped (lldap as source of truth for the whole estate when its only consumer is Jellyfin)
 - **Hanko:** not an IDP, doesn't fit shape
@@ -128,7 +127,6 @@ auth/
 │   ├── decision.md           # this file
 │   ├── architecture.md       # production topology + per-pattern shapes
 │   ├── contribution-strategy.md
-│   ├── substrate-comparison.md
 │   └── STATUS.md             # cross-session "where we are" entry point
 ├── kratos/
 │   ├── kratos.yml            # server config

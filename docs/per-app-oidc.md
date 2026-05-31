@@ -45,7 +45,7 @@ is binary: the user either passes the group check or they don't.
 | App     | App / upstream    | Header / mechanism                 | Role tiers from claims | Group enforcement |
 |---------|-------------------|------------------------------------|------------------------|-------------------|
 | tune    | Navidrome         | `Remote-User` from Caddy after Kratos whoami; `ND_REVERSEPROXYUSERHEADERNAME` on Navidrome side | none — first proxy user becomes Navidrome admin once, others are regular users | `access-tune` checked in Caddy snippet |
-| gather  | Sonarr / Radarr / Prowlarr | Authentik-style forward auth; here Caddy + Kratos whoami | none — *arr admin is a local concept | `access-gather` checked in Caddy snippet |
+| gather  | Sonarr / Radarr / Prowlarr | Caddy forward_auth → Kratos `/sessions/whoami` | none — *arr admin is a local concept | `access-gather` checked in Caddy snippet |
 
 The Subsonic API path (`/rest/*`, `/share/*`) on tune bypasses forward
 auth entirely; native clients authenticate with Subsonic's own user/

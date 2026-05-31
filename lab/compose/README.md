@@ -39,8 +39,8 @@ This compose stack stays available for manual smoke testing:
 
 ```sh
 cd lab/compose
-cp .env.example .env
-# fill in secrets per lab/scripts/gen-secrets.sh
+# create a .env with the substrate secrets the compose file references
+# (POSTGRES_PASSWORD, KRATOS_DSN, HYDRA_DSN, etc.)
 podman compose up -d
 ```
 
