@@ -199,6 +199,16 @@ services:
       KRATOS_BRIDGE_ADMIN_TOKEN: lab-bridge-token
     volumes:
       - ./glauth.cfg:/etc/glauth/glauth.cfg:ro
+    # Bridge has a /healthz on its admin port (:6478 default per
+    # main.go adminListenEnv). UBI 9 minimal runtime ships curl
+    # (Containerfile base swap from micro → minimal for this reason),
+    # so the healthcheck self-validates without a sidecar.
+    healthcheck:
+      test: ["CMD-SHELL", "curl -sf http://localhost:6478/healthz || exit 1"]
+      interval: 5s
+      timeout: 3s
+      retries: 12
+      start_period: 5s
 
   # auth-util is invoked as a one-shot via `compose run` from smoke.sh;
   # not started here so docker-compose's healthcheck loop doesn't mark
