@@ -1,47 +1,16 @@
 // Tests for src/lib/kratos.ts browserFlows URL builders.
 //
-// Run with: KRATOS_PUBLIC_URL=https://test.example node --test scripts/kratos-flows.test.mjs
+// Run with: KRATOS_PUBLIC_URL=https://test.example tsx --test scripts/kratos-flows.test.mjs
 //
-// The browserFlows URL builders are pure functions; mirroring them in
-// JS lets us assert URL shape without booting Kratos. The TS file is
-// canonical; this is regression protection for the query-string
-// construction (return_to encoding, aal/refresh handling, etc.).
+// Imports the canonical builders directly. The builders are pure
+// functions over process.env.KRATOS_PUBLIC_URL (resolved on each call),
+// so the test resolves the same base for its expectations.
 
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
+import { browserFlows } from '../src/lib/kratos.ts';
 
 const BASE = process.env.KRATOS_PUBLIC_URL ?? 'https://auth.dunn.dev';
-
-const browserFlows = {
-  login(opts = {}) {
-    const p = new URLSearchParams();
-    if (opts.aal) p.set('aal', opts.aal);
-    if (opts.refresh) p.set('refresh', 'true');
-    if (opts.returnTo) p.set('return_to', opts.returnTo);
-    const qs = p.toString();
-    return `${BASE}/self-service/login/browser${qs ? `?${qs}` : ''}`;
-  },
-  registration(returnTo) {
-    const qs = returnTo ? `?return_to=${encodeURIComponent(returnTo)}` : '';
-    return `${BASE}/self-service/registration/browser${qs}`;
-  },
-  settings(returnTo) {
-    const qs = returnTo ? `?return_to=${encodeURIComponent(returnTo)}` : '';
-    return `${BASE}/self-service/settings/browser${qs}`;
-  },
-  recovery(returnTo) {
-    const qs = returnTo ? `?return_to=${encodeURIComponent(returnTo)}` : '';
-    return `${BASE}/self-service/recovery/browser${qs}`;
-  },
-  verification(returnTo) {
-    const qs = returnTo ? `?return_to=${encodeURIComponent(returnTo)}` : '';
-    return `${BASE}/self-service/verification/browser${qs}`;
-  },
-  logout(returnTo) {
-    const qs = returnTo ? `?return_to=${encodeURIComponent(returnTo)}` : '';
-    return `${BASE}/self-service/logout/browser${qs}`;
-  },
-};
 
 test('login: no opts', () => {
   assert.equal(browserFlows.login(), `${BASE}/self-service/login/browser`);

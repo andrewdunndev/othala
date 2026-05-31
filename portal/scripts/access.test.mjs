@@ -1,12 +1,11 @@
 // Tests for src/lib/access.ts — Effective Access computation.
 //
-// Run with: node --test scripts/access.test.mjs
+// Run with: tsx --test scripts/access.test.mjs
 //
-// The TS source is the canonical implementation; this test re-ports
-// the algorithm in JS form and asserts the same observable behaviour.
-// This is the C4 reconciliation surface: both this file and
-// `consent/manifest.go LookupRole` must produce identical role
-// assignments for the same input.
+// Imports the canonical implementation directly. This is the C4
+// reconciliation surface: both this module and `consent/manifest.go
+// LookupRole` must produce identical role assignments for the same
+// input.
 //
 // Coverage focus:
 //   - normalizeGroupOrder: identity groups in canonical order,
@@ -17,76 +16,11 @@
 //     * group-map walks STORED order, not lexical
 //     * no-roles manifest yields default + 'no-roles' source
 //     * access granted but no group match = first declared role
-//   - describeSource: all three source kinds render
-//
-// Note on portability: this JS port assumes identity shape
-// `{metadata_admin: {groups: [...], roles: {...}}}`. If the TS shape
-// changes (e.g., metadata_admin becomes typed), update both this file
-// and the production access.ts together — the consent service relies
-// on the same algorithm.
+//   - multi-manifest: rows only for accessible clients
 
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-
-const IDENTITY_GROUP_ORDER = ['admin', 'family', 'friends', 'kids'];
-
-function normalizeGroupOrder(groups) {
-  const set = new Set(groups);
-  const ordered = [];
-  for (const g of IDENTITY_GROUP_ORDER) {
-    if (set.has(g)) {
-      ordered.push(g);
-      set.delete(g);
-    }
-  }
-  const remaining = Array.from(set);
-  const accessGroups = remaining.filter((g) => g.startsWith('access-')).sort();
-  const otherIdentityGroups = remaining.filter((g) => !g.startsWith('access-')).sort();
-  return [...ordered, ...otherIdentityGroups, ...accessGroups];
-}
-
-function readRoleOverrides(id) {
-  const meta = id.metadata_admin;
-  if (!meta) return {};
-  const raw = meta.roles;
-  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return {};
-  const out = {};
-  for (const [k, v] of Object.entries(raw)) {
-    if (typeof v === 'string') out[k] = v;
-  }
-  return out;
-}
-
-function pickIdentityGroup(userGroups, map) {
-  for (const g of userGroups) {
-    if (map[g]) return g;
-  }
-  return null;
-}
-
-function computeEffectiveAccess(identity, manifests) {
-  const userGroups = identity.metadata_admin?.groups ?? [];
-  const overrides = readRoleOverrides(identity);
-  const rows = [];
-  for (const m of manifests) {
-    if (!userGroups.includes(m.accessGroup)) continue;
-    if (m.roles.length === 0) {
-      rows.push({ clientId: m.clientId, clientName: m.clientName, role: 'default', source: { kind: 'no-roles' } });
-      continue;
-    }
-    if (overrides[m.clientId]) {
-      rows.push({ clientId: m.clientId, clientName: m.clientName, role: overrides[m.clientId], source: { kind: 'override' } });
-      continue;
-    }
-    const group = pickIdentityGroup(userGroups, m.groupRoleMap);
-    if (group) {
-      rows.push({ clientId: m.clientId, clientName: m.clientName, role: m.groupRoleMap[group], source: { kind: 'group', group } });
-    } else {
-      rows.push({ clientId: m.clientId, clientName: m.clientName, role: m.roles[0].name, source: { kind: 'no-roles' } });
-    }
-  }
-  return rows;
-}
+import { normalizeGroupOrder, computeEffectiveAccess } from '../src/lib/access.ts';
 
 // Helper: build a manifest fixture.
 function manifest(clientId, opts = {}) {

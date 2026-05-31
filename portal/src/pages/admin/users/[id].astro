@@ -35,6 +35,7 @@ import {
   describeSource,
   IDENTITY_GROUP_ORDER,
   normalizeGroupOrder,
+  shouldRefuseRecovery,
 } from '../../../lib/access';
 import { signToken, verifyToken, CSRFError } from '../../../lib/csrf';
 import type { Identity } from '../../../lib/types';
@@ -141,14 +142,10 @@ if (Astro.request.method === 'POST' && identity) {
         mode = 'read';
       }
     } else if (action === 'issue-recovery') {
-      // HIGH-3: refuse admin-to-admin recovery via the UI. The Kratos
-      // admin-issued recovery link bypasses the recovery-gate webhook
-      // (the gate only fires for the public /self-service/recovery/code
-      // flow). Admin recovery is console-only. See
-      // docs/runbooks/admin-recovery.md "Console recovery for an admin".
+      // HIGH-3 gate: refuse admin-to-admin recovery via the UI. See
+      // shouldRefuseRecovery in src/lib/access.ts for the rationale.
       const target = await getIdentity(id);
-      const targetGroups = target.metadata_admin?.groups ?? [];
-      if (targetGroups.includes('admin')) {
+      if (shouldRefuseRecovery(target)) {
         actionResult = {
           kind: 'error',
           message:

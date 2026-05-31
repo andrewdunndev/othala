@@ -110,8 +110,18 @@ function normaliseGroupRoleMap(raw: unknown): Record<string, string> {
 
 function loadOne(file: string, dir: string): ClientManifest {
   const path = join(dir, file);
-  const yaml = parseYaml(readFileSync(path, 'utf8')) ?? {};
+  return parseManifest(readFileSync(path, 'utf8'), file);
+}
 
+/**
+ * Parse one manifest YAML body into a ClientManifest. Exported so the
+ * test suite can drive parser behaviour without round-tripping through
+ * the filesystem. The on-disk loader uses this via `loadOne`.
+ */
+export function parseManifest(yamlText: string, filename: string): ClientManifest {
+  const yaml = parseYaml(yamlText) ?? {};
+
+  const file = filename;
   const oidc = (yaml as { oidc?: unknown }).oidc;
   const consent = (yaml as { consent?: unknown }).consent;
 

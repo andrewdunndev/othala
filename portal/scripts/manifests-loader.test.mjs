@@ -1,12 +1,11 @@
 // Tests for the runtime YAML manifest reader.
 //
-// Run with: node --test scripts/manifests-loader.test.mjs
+// Run with: tsx --test scripts/manifests-loader.test.mjs
 //
 // The portal's manifest loader (src/lib/manifests.ts) reads
 // hydra/clients/*.yaml from a mounted directory at request time +
-// caches for 30s with mtime invalidation. The TS source is the
-// source of truth; this test re-implements the parse logic in JS
-// to assert behaviour without needing tsc.
+// caches for 30s with mtime invalidation. This file imports the
+// canonical parser directly so the test cannot drift from the source.
 //
 // Coverage focus:
 //   - Namespace split (oidc: + consent: blocks). Pre-namespace flat
@@ -15,88 +14,17 @@
 //   - Roles normaliser handles array + map forms.
 //   - groupRoleMap drops non-string values.
 //   - accessGroup convention: `access-<clientId>`.
-//   - ENOENT (manifest dir not provisioned) returns [] without
-//     throwing.
+//   - Directory walk: sorted by filename, picks up yaml + yml.
 
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { mkdtempSync, writeFileSync, rmSync, readdirSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
-import { parse as parseYaml } from 'yaml';
-
-// JS port mirroring src/lib/manifests.ts parsing logic. When the TS
-// drifts, this port must drift with it.
-
-function splitScope(scope) {
-  if (!scope) return [];
-  if (Array.isArray(scope)) return scope.map(String);
-  return String(scope).split(/\s+/).filter(Boolean);
-}
-
-function normaliseRoles(raw) {
-  if (!raw) return [];
-  if (Array.isArray(raw)) {
-    return raw
-      .filter((r) => r && typeof r === 'object' && 'name' in r)
-      .map((r) => ({ name: String(r.name), description: String(r.description ?? '') }));
-  }
-  if (typeof raw === 'object') {
-    return Object.entries(raw).map(([name, v]) => ({
-      name,
-      description: String((v && typeof v === 'object' && 'description' in v ? v.description : '') ?? ''),
-    }));
-  }
-  return [];
-}
-
-function normaliseGroupRoleMap(raw) {
-  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return {};
-  const out = {};
-  for (const [k, v] of Object.entries(raw)) {
-    if (typeof v === 'string') out[k] = v;
-  }
-  return out;
-}
-
-function loadOne(yamlText, filename) {
-  const yaml = parseYaml(yamlText) ?? {};
-  const oidc = yaml.oidc;
-  const consent = yaml.consent;
-  const flatLikely =
-    'client_id' in yaml ||
-    'client_name' in yaml ||
-    'grant_types' in yaml ||
-    'roles' in yaml ||
-    'group_role_map' in yaml;
-  if (!oidc && flatLikely) {
-    throw new Error(`${filename}: pre-namespace flat shape detected.`);
-  }
-  if (!oidc || typeof oidc !== 'object') {
-    throw new Error(`${filename}: missing or non-object oidc: block`);
-  }
-  const clientId = String(oidc.client_id ?? filename.replace(/\.ya?ml$/, ''));
-  const c = consent && typeof consent === 'object' ? consent : {};
-  return {
-    clientId,
-    clientName: String(oidc.client_name ?? clientId),
-    redirectUris: Array.isArray(oidc.redirect_uris) ? oidc.redirect_uris.map(String) : [],
-    postLogoutRedirectUris: Array.isArray(oidc.post_logout_redirect_uris)
-      ? oidc.post_logout_redirect_uris.map(String)
-      : [],
-    scopes: splitScope(oidc.scope),
-    audience: Array.isArray(oidc.audience) ? oidc.audience.map(String) : [],
-    grantTypes: Array.isArray(oidc.grant_types) ? oidc.grant_types.map(String) : [],
-    skipConsent: Boolean(oidc.skip_consent ?? false),
-    backchannelLogoutUri: oidc.backchannel_logout_uri ? String(oidc.backchannel_logout_uri) : '',
-    accessGroup: `access-${clientId}`,
-    roles: normaliseRoles(c.roles),
-    groupRoleMap: normaliseGroupRoleMap(c.group_role_map),
-  };
-}
+import { parseManifest } from '../src/lib/manifests.ts';
 
 test('namespace split: minimal yaml with oidc + consent blocks parses', () => {
-  const out = loadOne(
+  const out = parseManifest(
     `
 oidc:
   client_id: keep
@@ -116,7 +44,7 @@ consent:
 });
 
 test('pre-namespace flat shape is rejected', () => {
-  assert.throws(() => loadOne(
+  assert.throws(() => parseManifest(
     `
 client_id: keep
 roles:
@@ -127,7 +55,7 @@ roles:
 });
 
 test('non-object oidc block is rejected', () => {
-  assert.throws(() => loadOne(
+  assert.throws(() => parseManifest(
     `
 oidc: just-a-string
 consent: {}
@@ -137,7 +65,7 @@ consent: {}
 });
 
 test('scope splitter handles array form', () => {
-  const out = loadOne(
+  const out = parseManifest(
     `
 oidc:
   client_id: x
@@ -150,7 +78,7 @@ consent: {}
 });
 
 test('scope splitter handles whitespace-separated string', () => {
-  const out = loadOne(
+  const out = parseManifest(
     `
 oidc:
   client_id: x
@@ -163,7 +91,7 @@ consent: {}
 });
 
 test('roles normaliser handles map form', () => {
-  const out = loadOne(
+  const out = parseManifest(
     `
 oidc:
   client_id: x
@@ -182,7 +110,7 @@ consent:
 });
 
 test('roles normaliser handles array form', () => {
-  const out = loadOne(
+  const out = parseManifest(
     `
 oidc:
   client_id: x
@@ -199,7 +127,7 @@ consent:
 });
 
 test('groupRoleMap drops non-string values', () => {
-  const out = loadOne(
+  const out = parseManifest(
     `
 oidc:
   client_id: x
@@ -217,7 +145,7 @@ consent:
 });
 
 test('accessGroup convention: access-<clientId>', () => {
-  const out = loadOne(
+  const out = parseManifest(
     `
 oidc:
   client_id: tailscale
@@ -229,7 +157,7 @@ consent: {}
 });
 
 test('backchannel_logout_uri preserved when present', () => {
-  const out = loadOne(
+  const out = parseManifest(
     `
 oidc:
   client_id: keep
@@ -242,7 +170,7 @@ consent: {}
 });
 
 test('backchannel_logout_uri defaults to empty string when absent', () => {
-  const out = loadOne(
+  const out = parseManifest(
     `
 oidc:
   client_id: tailscale
@@ -254,7 +182,7 @@ consent: {}
 });
 
 test('audience array of strings preserved', () => {
-  const out = loadOne(
+  const out = parseManifest(
     `
 oidc:
   client_id: keep
@@ -269,7 +197,7 @@ consent: {}
 });
 
 test('skipConsent default is false', () => {
-  const out = loadOne(
+  const out = parseManifest(
     `
 oidc:
   client_id: novel
@@ -281,7 +209,7 @@ consent: {}
 });
 
 test('skipConsent true when set', () => {
-  const out = loadOne(
+  const out = parseManifest(
     `
 oidc:
   client_id: keep
@@ -302,11 +230,11 @@ test('directory walk: sorted by filename, yaml + yml both picked up', () => {
     writeFileSync(join(dir, 'alpha.yml'), 'oidc:\n  client_id: alpha\nconsent: {}\n');
     writeFileSync(join(dir, 'beta.yaml'), 'oidc:\n  client_id: beta\nconsent: {}\n');
 
-    // Minimal port of loadFromDisk's filtering + sort.
+    // Mirror loadFromDisk's filter + sort and verify against parseManifest.
     const files = readdirSync(dir).filter((f) => f.endsWith('.yaml') || f.endsWith('.yml')).sort();
     assert.deepEqual(files, ['alpha.yml', 'beta.yaml', 'zeta.yaml']);
 
-    const manifests = files.map((f) => loadOne(readFileSync(join(dir, f), 'utf8'), f));
+    const manifests = files.map((f) => parseManifest(readFileSync(join(dir, f), 'utf8'), f));
     assert.deepEqual(manifests.map((m) => m.clientId), ['alpha', 'beta', 'zeta']);
   } finally {
     rmSync(dir, { recursive: true, force: true });

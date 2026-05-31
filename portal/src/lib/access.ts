@@ -163,6 +163,21 @@ export function computeEffectiveAccess(
   return rows;
 }
 
+/**
+ * HIGH-3 gate: refuse admin-to-admin recovery via the UI. The Kratos
+ * admin-issued recovery link bypasses the recovery-gate webhook (the
+ * gate only fires for the public /self-service/recovery/code flow),
+ * so admin recovery is console-only. See
+ * docs/runbooks/admin-recovery.md "Console recovery for an admin".
+ *
+ * Returns true if the target identity is in the `admin` group and the
+ * caller should refuse the recovery-link issuance.
+ */
+export function shouldRefuseRecovery(identity: Identity | undefined | null): boolean {
+  const groups = identity?.metadata_admin?.groups ?? [];
+  return groups.includes('admin');
+}
+
 /** Pretty-print an access source for the admin UI. */
 export function describeSource(s: AccessSource): string {
   switch (s.kind) {

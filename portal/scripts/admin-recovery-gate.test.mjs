@@ -1,21 +1,16 @@
-// Test for the HIGH-3 admin-to-admin recovery refusal in
-// src/pages/admin/users/[id].astro action=issue-recovery.
+// Test for the HIGH-3 admin-to-admin recovery refusal gate.
 //
-// The .astro file isn't directly importable into a Node test runner
-// (it needs the Astro compiler). This test mirrors the gate logic
-// inline and asserts the contract: identities in the `admin` group
-// are refused; others are allowed.
+// Run with: tsx --test scripts/admin-recovery-gate.test.mjs
+//
+// The gate logic lives in src/lib/access.ts (shouldRefuseRecovery)
+// and is consumed by src/pages/admin/users/[id].astro action=
+// issue-recovery. Importing the helper directly keeps this test
+// aligned with the .astro consumer (a refactor that re-inlines the
+// check breaks compile, not just this test).
 
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-
-// Mirror of the [id].astro inline check. Source-of-truth is the
-// .astro file; this is a regression guard that breaks if anyone
-// inverts the check.
-function shouldRefuseRecovery(identity) {
-  const groups = identity?.metadata_admin?.groups ?? [];
-  return groups.includes('admin');
-}
+import { shouldRefuseRecovery } from '../src/lib/access.ts';
 
 test('admin identity is refused', () => {
   const identity = {

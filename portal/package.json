@@ -9,7 +9,7 @@
     "check": "astro check",
     "preview": "astro preview",
     "start": "node ./dist/server/entry.mjs",
-    "test": "node --test scripts/*.test.mjs"
+    "test": "tsx --test scripts/*.test.mjs"
   },
   "dependencies": {
     "@astrojs/node": "^10.0.6",
@@ -21,6 +21,7 @@
   },
   "devDependencies": {
     "@astrojs/check": "^0.9.4",
+    "tsx": "^4.22.3",
     "typescript": "^6.0.0"
   },
   "overrides": {

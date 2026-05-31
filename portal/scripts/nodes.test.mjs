@@ -1,71 +1,22 @@
 // Tests for src/lib/nodes.ts — Kratos UI node helpers.
 //
-// Run with: node --test scripts/nodes.test.mjs
+// Run with: tsx --test scripts/nodes.test.mjs
 //
-// The TS source is canonical; this re-ports the helpers in JS for
-// regression protection. These helpers shape Kratos flow.ui.nodes
-// arrays into the form fragments Astro renders; a bug here lands as
-// a missing CSRF input or a broken passkey button.
+// Imports the canonical helpers directly. These helpers shape Kratos
+// flow.ui.nodes arrays into the form fragments Astro renders; a bug
+// here lands as a missing CSRF input or a broken passkey button.
 
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-
-function nodesByGroup(nodes, group) {
-  return nodes.filter((n) => n.group === group);
-}
-
-function defaultNodes(nodes) {
-  return nodesByGroup(nodes, 'default');
-}
-
-function asInput(node) {
-  return node.attributes.node_type === 'input' ? node.attributes : null;
-}
-
-function csrfToken(nodes) {
-  for (const n of defaultNodes(nodes)) {
-    if (n.attributes.node_type !== 'input') continue;
-    const a = n.attributes;
-    if (a.name === 'csrf_token') return String(a.value ?? '');
-  }
-  return '';
-}
-
-function hasMethod(nodes, group) {
-  return nodes.some((n) => n.group === group);
-}
-
-function findInput(nodes, name) {
-  for (const n of nodes) {
-    const a = asInput(n);
-    if (a && a.name === name) return a;
-  }
-  return null;
-}
-
-function scriptNodes(nodes) {
-  const out = [];
-  for (const n of nodes) {
-    if (n.attributes.node_type === 'script') {
-      out.push({ id: n.attributes.id, src: n.attributes.src });
-    }
-  }
-  return out;
-}
-
-function inputProps(a) {
-  const props = { name: a.name, type: a.type };
-  if (a.value !== undefined && a.value !== null && a.type !== 'submit') {
-    props.value = String(a.value);
-  } else if (a.value !== undefined && a.type === 'submit') {
-    props.value = String(a.value);
-  }
-  if (a.required) props.required = true;
-  if (a.disabled) props.disabled = true;
-  if (a.autocomplete) props.autocomplete = a.autocomplete;
-  if (a.onclick) props.onclick = a.onclick;
-  return props;
-}
+import {
+  nodesByGroup,
+  defaultNodes,
+  csrfToken,
+  hasMethod,
+  findInput,
+  scriptNodes,
+  inputProps,
+} from '../src/lib/nodes.ts';
 
 // ===== fixtures =====
 

@@ -68,10 +68,10 @@ echo ""
 
 # ----- Portal: tests -----
 echo "Portal:"
-if cd portal && node --test scripts/*.test.mjs >/tmp/pre-tag-portal-test.log 2>&1; then
-    step_pass "portal node --test ($(grep -c '^✔' /tmp/pre-tag-portal-test.log) passed)"
+if cd portal && npm test >/tmp/pre-tag-portal-test.log 2>&1; then
+    step_pass "portal npm test ($(grep -c '^✔' /tmp/pre-tag-portal-test.log) passed)"
 else
-    step_fail "portal node --test" "/tmp/pre-tag-portal-test.log"
+    step_fail "portal npm test" "/tmp/pre-tag-portal-test.log"
 fi
 cd "$REPO_ROOT" || exit 1
 
