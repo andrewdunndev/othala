@@ -135,35 +135,28 @@ landed in iac on 2026-05-30). Documented in `docs/runbooks/secrets-rotation.md`,
 **If you write a Bitwarden mention into a runbook**: stale; correct
 to sops.
 
-### LB-12: `dunn.dev/iac` is the deploy plane (submoduled)
+### LB-12: `dunn.dev/iac` is the deploy plane (vendor-pin model)
 
-This repo is the application; iac is what runs it on carmine.
-Authoritative configs (`kratos/kratos.yml`, `hydra/hydra.yml`,
-`ldap-bridge/glauth.cfg`, `lab/compose/postgres-init.sh`) live HERE.
-iac mounts this repo as a git submodule at `services/auth/upstream/`
-and symlinks the config subdirs into the quadlet tree — there are no
-vendored copies, no drift, no sync script.
+iac is the primary deployment view; this repo is the transitory upstream
+(OSS-bound, heading toward a standalone open-source project). Deploying
+to carmine is the promotion event that takes auth from speculative to actual.
 
-Topology-specific differences (DSN host = `auth-postgres` in iac
-vs `postgres` in lab compose) are handled by env-var substitution:
-canonical YAML uses `${KRATOS_PG_HOST}`, `${KRATOS_ADMIN_HOST}`,
-`${CONSENT_HOST}`, `${HYDRA_PG_HOST}`; iac quadlets and lab compose
-each set the env vars to the names that resolve in their network.
-The `ldap-bridge` config uses the same shape via `public_url_env` /
-`admin_url_env` (matching the existing `admin_token_env` pattern).
+iac vendors config files pinned to a released auth tag (`services/auth/`).
+Drift between auth-HEAD and the iac pin is expected and permitted — iac
+decides when to consume a new auth release. There is no submodule or
+subtree between the repos; that dependency format was rejected. The
+contract is a released tag, not a live pointer.
+
+Topology-specific differences (DSN host = `auth-postgres` in iac vs
+`postgres` in lab compose) are iac-local deviations documented in each
+vendored file's provenance header.
 
 See `DEPLOY.md` (in this repo) + `dunn.dev/iac/services/auth/` (the
 deploy plane).
 
-**If you edit `kratos/kratos.yml` here**: bump the submodule SHA in
-iac (`git submodule update --remote services/auth/upstream` from
-iac), commit, redeploy.
-
-**Failure mode to watch**: operator bumps the submodule SHA without
-verifying the env-var contract still holds (e.g., a new `${VAR}` got
-added in canonical YAML that nobody wired into the quadlets). The
-quadlet `Environment=` block and the canonical YAML's `${VAR}` set
-should match 1:1.
+**If you change a config file here**: tag a new auth release, then the
+operator bumps the iac pin (`make auth-sync-configs`, review diff, port
+desired changes, update provenance headers, commit).
 
 ## Topology
 
