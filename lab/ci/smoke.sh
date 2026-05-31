@@ -123,6 +123,18 @@ else
     fail "A9 portal /healthz" "code=$code"
 fi
 
+# A10: ldap-bridge /healthz on admin port (:6478). The bridge image
+# carries curl (UBI 9 minimal base for this exact reason); exec via
+# compose. The bridge runs all three listeners (LDAP, LDAPS-optional,
+# admin HTTP) off a shared errs channel — if any fails the process
+# dies — so a healthy /healthz implies LDAP :389 is also bound.
+code=$(docker compose exec -T ldap-bridge curl -s -o /dev/null -w "%{http_code}" http://localhost:6478/healthz 2>/dev/null)
+if [[ "$code" == "200" ]]; then
+    pass "A10 ldap-bridge /healthz (implies LDAP :389 bound)"
+else
+    fail "A10 ldap-bridge /healthz" "code=$code"
+fi
+
 # Section B: apply-clients integration
 echo ""
 echo "B. apply-clients integration (auth-util)"

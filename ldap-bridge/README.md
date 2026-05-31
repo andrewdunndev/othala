@@ -48,8 +48,8 @@ Wired via `glauth.cfg`:
   plugin = "kratos"
 
 [backend.kratos]
-  public_url = "http://kratos:4433"
-  admin_url = "http://kratos:4434"
+  public_url_env = "KRATOS_PUBLIC_URL"
+  admin_url_env  = "KRATOS_ADMIN_URL"
   admin_token_env = "KRATOS_BRIDGE_ADMIN_TOKEN"
   base_dn = "dc=dunn,dc=dev"
   identity_cache_ttl = "30s"

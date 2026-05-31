@@ -12,10 +12,11 @@ actually lands on carmine.
 | Application code (consent, ldap-bridge, portal) | `dunn.dev/auth/{consent,ldap-bridge,portal}` | This is the application |
 | Container images (consent, portal, ldap-bridge, util) | `registry.gitlab.com/dunn.dev/auth/{consent,portal,ldap-bridge,util}` | Built by `.gitlab-ci.yml` here |
 | OIDC client manifests | `dunn.dev/auth/hydra/clients/*.yaml` | Single source; consent + portal + util consume |
-| Identity schema | `dunn.dev/auth/kratos/identity.schema.json` | Single source; iac vendors a copy with provenance header |
-| Production Kratos config | **`dunn.dev/auth/kratos/kratos.yml` is authoritative; `dunn.dev/iac/services/auth/kratos/kratos.yml` is a vendored copy** | Drift between the two is a deploy-time hazard; iac's copy carries a provenance header naming this file as upstream |
-| Production Hydra config | Same shape: `dunn.dev/auth/hydra/hydra.yml` authoritative, iac vendors | Same reason |
-| LDAP bridge config | Same shape: `dunn.dev/auth/lab/compose/glauth.cfg` authoritative for the bridge defaults, iac vendors with production-specific tweaks | Same reason |
+| Identity schema | `dunn.dev/auth/kratos/identity.schema.json` | Single source; iac reads via submodule symlink |
+| Production Kratos config | `dunn.dev/auth/kratos/kratos.yml` | Single authoritative file. iac mounts this repo as a submodule at `services/auth/upstream/` and symlinks `services/auth/kratos` → `upstream/kratos`. DSN host + admin host + consent host are env-substituted (`${KRATOS_PG_HOST}` etc.) so the same file works in both topologies. |
+| Production Hydra config | `dunn.dev/auth/hydra/hydra.yml` | Same shape as kratos.yml; `${HYDRA_PG_HOST}` substitutes. |
+| LDAP bridge config | `dunn.dev/auth/ldap-bridge/glauth.cfg` | Single source. `public_url_env` / `admin_url_env` carry the topology delta (lab: `kratos`; production: `auth-kratos`). |
+| Postgres init script | `dunn.dev/auth/lab/compose/postgres-init.sh` | Single source, including the defensive `CREATE EXTENSION "uuid-ossp"`. iac symlinks `services/auth/postgres/init.sh` → `upstream/lab/compose/postgres-init.sh`. |
 | Container quadlets | `dunn.dev/iac/services/auth/.config/containers/systemd/` | The deploy plane owns runtime topology |
 | pyinfra orchestration | `dunn.dev/iac/pyinfra/hosts/carmine.py` `SERVICES["auth"]` | Same |
 | Secrets (sops) | `dunn.dev/iac/pyinfra/secrets.enc.yaml` | Single source for both this stack and every other carmine service |

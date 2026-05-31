@@ -38,9 +38,18 @@ type backendCfg struct {
 
 // kratosFileCfg is the raw TOML shape. We materialize a kratos.Config
 // from this after env-var resolution.
+//
+// public_url / admin_url accept *_env companions following the same
+// shape as admin_token_env: the canonical glauth.cfg in this repo
+// uses public_url_env + admin_url_env so the file is topology-neutral.
+// Lab compose sets KRATOS_PUBLIC_URL=http://kratos:4433; iac quadlets
+// set KRATOS_PUBLIC_URL=http://auth-kratos:4433. Same shape as how
+// admin_token_env carries the dummy bearer.
 type kratosFileCfg struct {
 	PublicURL          string `toml:"public_url"`
+	PublicURLEnv       string `toml:"public_url_env"`
 	AdminURL           string `toml:"admin_url"`
+	AdminURLEnv        string `toml:"admin_url_env"`
 	AdminToken         string `toml:"admin_token"`
 	AdminTokenEnv      string `toml:"admin_token_env"`
 	BaseDN             string `toml:"base_dn"`
@@ -84,6 +93,24 @@ func loadConfig(path string) (*Config, error) {
 		token = v
 	}
 
+	publicURL := k.PublicURL
+	if k.PublicURLEnv != "" {
+		v, ok := os.LookupEnv(k.PublicURLEnv)
+		if !ok || v == "" {
+			return nil, fmt.Errorf("public_url_env %q not set or empty", k.PublicURLEnv)
+		}
+		publicURL = v
+	}
+
+	adminURL := k.AdminURL
+	if k.AdminURLEnv != "" {
+		v, ok := os.LookupEnv(k.AdminURLEnv)
+		if !ok || v == "" {
+			return nil, fmt.Errorf("admin_url_env %q not set or empty", k.AdminURLEnv)
+		}
+		adminURL = v
+	}
+
 	idTTL, err := parseTTL(k.IdentityCacheTTL, 30*time.Second)
 	if err != nil {
 		return nil, fmt.Errorf("identity_cache_ttl: %w", err)
@@ -99,8 +126,8 @@ func loadConfig(path string) (*Config, error) {
 	}
 
 	cfg.Backend.Kratos = kratos.Config{
-		PublicURL:        k.PublicURL,
-		AdminURL:         k.AdminURL,
+		PublicURL:        publicURL,
+		AdminURL:         adminURL,
 		AdminToken:       token,
 		BaseDN:           baseDN,
 		IdentityCacheTTL: idTTL,

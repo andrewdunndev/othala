@@ -1,8 +1,12 @@
 # glauth-kratos: LDAP-to-Kratos bridge.
 #
-# Two-stage: ci-go builder produces a static binary, ci-runtime-go
-# (UBI 9 micro) runtime ships only the binary. Pinned to the dunn.dev
-# pipeline catalog version; Renovate-watched.
+# Two-stage: ci-go builder produces a static binary, runtime layer adds
+# the binary onto UBI 9 minimal. Minimal (not micro) is used because the
+# bridge needs an in-container HTTP client for its compose / quadlet
+# healthcheck against its own /healthz admin endpoint on :6478 — UBI
+# micro has no shell/curl/wget. Minimal is ~30 MB vs micro's ~12 MB; the
+# bridge image stays small and gains self-validation (no `|| exit 0`
+# soft-pass shenanigans).
 
 ARG CATALOG_VERSION=2.5.0
 
@@ -18,7 +22,13 @@ COPY kratos/ ./kratos/
 
 RUN CGO_ENABLED=0 GOOS=linux go build -trimpath -ldflags='-s -w' -o glauth-kratos .
 
-FROM registry.gitlab.com/dunn.dev/pipeline/ci-runtime-go:${CATALOG_VERSION}
+FROM registry.access.redhat.com/ubi9/ubi-minimal:9.8
+
+# curl: HTTP healthcheck against the bridge's own /healthz admin endpoint.
+# No other tools — bridge stays a single-binary surface.
+RUN microdnf install -y --nodocs curl ca-certificates \
+    && microdnf clean all \
+    && rm -rf /var/cache/yum
 
 COPY --from=builder /build/glauth-kratos /usr/bin/glauth-kratos
 
@@ -26,6 +36,8 @@ COPY --from=builder /build/glauth-kratos /usr/bin/glauth-kratos
 EXPOSE 636
 # LDAP port (in-pod use only).
 EXPOSE 389
+# Bridge admin HTTP listener (cache flush + /healthz).
+EXPOSE 6478
 
 ENTRYPOINT ["/usr/bin/glauth-kratos"]
 CMD ["--config", "/etc/glauth/glauth.cfg"]

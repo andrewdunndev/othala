@@ -89,9 +89,12 @@ for line in sys.stdin:
     except: continue
     if d.get('Health')=='healthy': n+=1
 print(n)" 2>/dev/null)
-    # Expecting 5 healthy long-runners: postgres, kratos, hydra, consent, portal
-    if [[ "${healthy:-0}" -ge 5 ]]; then
-        echo "  ✓ substrate healthy ($healthy/5 long-runners up)"
+    # Expecting 6 healthy long-runners: postgres, kratos, hydra, consent,
+    # portal, ldap-bridge. The bridge has its own /healthz on :6478;
+    # gating on it surfaces a broken bridge in the same loop instead of
+    # later in smoke.
+    if [[ "${healthy:-0}" -ge 6 ]]; then
+        echo "  ✓ substrate healthy ($healthy/6 long-runners up)"
         break
     fi
     sleep 5

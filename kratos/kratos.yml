@@ -3,7 +3,12 @@
 # All locked decisions from docs/decision.md and docs/STATUS.md applied.
 # Version-pinned in compose; this config targets v1.x current at time of build.
 
-dsn: postgres://kratos:${KRATOS_PG_PASS}@postgres:5432/kratos?sslmode=disable
+# DSN host is env-substituted so the same file lands in both
+# topologies. Lab compose sets KRATOS_PG_HOST=postgres (compose service
+# name); iac quadlets set KRATOS_PG_HOST=auth-postgres (container name
+# on the auth.network). Same applies to KRATOS_ADMIN_HOST and
+# CONSENT_HOST below.
+dsn: postgres://kratos:${KRATOS_PG_PASS}@${KRATOS_PG_HOST}:5432/kratos?sslmode=disable
 
 serve:
   public:
@@ -25,7 +30,7 @@ serve:
       max_age: 0
 
   admin:
-    base_url: http://kratos:4434/
+    base_url: http://${KRATOS_ADMIN_HOST}:4434/
     port: 4434
 
 selfservice:
@@ -122,7 +127,7 @@ selfservice:
                 # the X-Webhook-Auth header; consent constant-time
                 # compares it before reading the body. The receiver
                 # fails closed on missing/wrong secret.
-                url: http://consent:4478/webhooks/recovery-gate
+                url: http://${CONSENT_HOST}:4478/webhooks/recovery-gate
                 method: POST
                 auth:
                   type: api_key

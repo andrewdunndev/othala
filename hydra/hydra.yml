@@ -1,6 +1,10 @@
 # Hydra configuration — dunn.dev family OAuth2/OIDC IDP
+#
+# DSN host is env-substituted so the same file lands in both topologies.
+# Lab compose sets HYDRA_PG_HOST=postgres (compose service name); iac
+# quadlets set HYDRA_PG_HOST=auth-postgres (container name on auth.network).
 
-dsn: postgres://hydra:${HYDRA_PG_PASS}@postgres:5432/hydra?sslmode=disable
+dsn: postgres://hydra:${HYDRA_PG_PASS}@${HYDRA_PG_HOST}:5432/hydra?sslmode=disable
 
 serve:
   public:
