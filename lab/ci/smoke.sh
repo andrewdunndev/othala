@@ -191,7 +191,6 @@ echo ""
 echo "D. Recovery-gate webhook"
 
 # D1: Admin group → 403
-resp=$(docker compose exec -T consent wget -qO- --post-data='{"identity_id":"x","groups":["admin","family"]}' --header="Content-Type: application/json" --header="X-Webhook-Auth: ${RECOVERY_GATE_SECRET}" http://localhost:4478/webhooks/recovery-gate 2>&1)
 admin_code=$(docker compose exec -T consent wget -qO /dev/null -S --post-data='{"identity_id":"x","groups":["admin","family"]}' --header="Content-Type: application/json" --header="X-Webhook-Auth: ${RECOVERY_GATE_SECRET}" http://localhost:4478/webhooks/recovery-gate 2>&1 | awk '/HTTP/ {print $2}' | tail -1)
 if [[ "$admin_code" == "403" ]]; then
     pass "D1 recovery-gate refuses admin (HIGH-3)"

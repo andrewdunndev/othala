@@ -25,7 +25,7 @@ set -uo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(dirname "$SCRIPT_DIR")"
-cd "$REPO_ROOT"
+cd "$REPO_ROOT" || exit 1
 
 PASS=0
 FAIL=0
@@ -55,7 +55,7 @@ if cd consent && go test ./... >/tmp/pre-tag-consent.log 2>&1; then
 else
     step_fail "consent go test" "/tmp/pre-tag-consent.log"
 fi
-cd "$REPO_ROOT"
+cd "$REPO_ROOT" || exit 1
 
 # ----- Go: ldap-bridge -----
 if cd ldap-bridge && go test ./... >/tmp/pre-tag-ldap.log 2>&1; then
@@ -63,18 +63,17 @@ if cd ldap-bridge && go test ./... >/tmp/pre-tag-ldap.log 2>&1; then
 else
     step_fail "ldap-bridge go test" "/tmp/pre-tag-ldap.log"
 fi
-cd "$REPO_ROOT"
+cd "$REPO_ROOT" || exit 1
 echo ""
 
 # ----- Portal: tests -----
 echo "Portal:"
 if cd portal && node --test scripts/*.test.mjs >/tmp/pre-tag-portal-test.log 2>&1; then
-    test_count=$(grep -c "^ℹ tests" /tmp/pre-tag-portal-test.log 2>/dev/null || echo "?")
-    step_pass "portal node --test ($(grep '^✔' /tmp/pre-tag-portal-test.log | wc -l | tr -d ' ') passed)"
+    step_pass "portal node --test ($(grep -c '^✔' /tmp/pre-tag-portal-test.log) passed)"
 else
     step_fail "portal node --test" "/tmp/pre-tag-portal-test.log"
 fi
-cd "$REPO_ROOT"
+cd "$REPO_ROOT" || exit 1
 
 # ----- Portal: typecheck -----
 if cd portal && npm run check >/tmp/pre-tag-portal-check.log 2>&1; then
@@ -88,7 +87,7 @@ if cd portal && npm run check >/tmp/pre-tag-portal-check.log 2>&1; then
 else
     step_fail "portal astro check (non-zero exit)" "/tmp/pre-tag-portal-check.log"
 fi
-cd "$REPO_ROOT"
+cd "$REPO_ROOT" || exit 1
 
 # ----- Portal: build -----
 if cd portal && npm run build >/tmp/pre-tag-portal-build.log 2>&1; then
@@ -96,7 +95,7 @@ if cd portal && npm run build >/tmp/pre-tag-portal-build.log 2>&1; then
 else
     step_fail "portal astro build" "/tmp/pre-tag-portal-build.log"
 fi
-cd "$REPO_ROOT"
+cd "$REPO_ROOT" || exit 1
 echo ""
 
 # ----- Shell scripts: syntax -----

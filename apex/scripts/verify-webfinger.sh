@@ -26,7 +26,7 @@ echo ""
 
 # Fetch with header capture
 tmp=$(mktemp)
-trap "rm -f $tmp" EXIT
+trap 'rm -f "$tmp"' EXIT
 
 http_code=$(curl -sk -o "$tmp" -w '%{http_code}' \
     -D /tmp/wf-headers \
