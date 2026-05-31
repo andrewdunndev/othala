@@ -1,9 +1,14 @@
 # dunn.dev/auth -- container build + release pipeline.
 #
-# Three custom images (consent, ldap-bridge, portal) build via the
-# dunn.dev/pipeline container-image template; caddy lives in the
+# Four custom images (consent, ldap-bridge, portal, util) build via
+# the dunn.dev/pipeline container-image template; caddy lives in the
 # separate dunn.dev/caddy-estate repo and auth/caddy/snippets/ are
 # volume-mounted at deploy time, not baked into an image here.
+#
+# util/ ships in v0.1.4 — a one-shot operator container carrying
+# apply-clients.sh + curl + jq + yq. iac invokes it via
+# `make auth-apply-clients` to register OIDC client manifests against
+# the auth.network-internal Hydra admin port.
 #
 # Per-image release flow on every tag:
 #   build       container-image  ->  push :TAG + :latest + cosign sig
@@ -89,8 +94,9 @@ include:
       sbom_filename: ldap-bridge-container.sbom.json
 
   # ----- auth-portal (Astro Node SSR) -----------------------------
-  # Context is repo root because the build reads from sibling
-  # hydra/clients/.
+  # Context is repo root (legacy from when build needed hydra/clients/;
+  # v0.1.4 reads manifests at runtime, but context: . is kept stable
+  # because the build is light and changing it requires a CI dance).
   - component: gitlab.com/dunn.dev/pipeline/container-image@2.5.0
     inputs:
       job_name: build-portal
@@ -106,6 +112,24 @@ include:
       container_image_job: build-portal
       package_name: auth
       sbom_filename: portal-container.sbom.json
+
+  # ----- auth-util (one-shot apply-clients runner) ----------------
+  # Context is repo root because the build COPYs from util/.
+  - component: gitlab.com/dunn.dev/pipeline/container-image@2.5.0
+    inputs:
+      job_name: build-util
+      image_tag: util
+      containerfile: util/Containerfile
+      context: .
+      tag_pipeline: true
+
+  - component: gitlab.com/dunn.dev/pipeline/container-sbom@2.5.0
+    inputs:
+      job_name: sbom-util
+      container_image: "${CI_REGISTRY_IMAGE}/util:${CI_COMMIT_TAG}"
+      container_image_job: build-util
+      package_name: auth
+      sbom_filename: util-container.sbom.json
 
   # ----- GitLab Release: link SBOMs from all three images -------
   # release-create is binary-shaped (expects binary_job + dist/

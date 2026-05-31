@@ -1,23 +1,25 @@
 #!/usr/bin/env bash
-# Apply OIDC client manifests under hydra/clients/ to a running Hydra.
+# Apply OIDC client manifests to a running Hydra.
 #
-# M6 (race during in-flight write): the consent service watches this
-# directory and reloads on SIGHUP. If an editor saves a yaml in two
-# system calls (truncate, then write), a concurrent reload reads
-# truncated yaml and aborts the swap (manifest.go Reload keeps prior
-# state on parse error, so the worst observable outcome is a logged
-# reload failure). For a fully race-free apply, write to a tmp dir and
-# rename:
+# v0.1.4: this script ships in the auth-util image
+# (registry.gitlab.com/dunn.dev/auth/util:<tag>). It reads manifest
+# YAMLs from $CLIENTS_DIR (default /etc/util/manifests/) and
+# POSTs/PUTs each to ${HYDRA_ADMIN_URL}/admin/clients.
 #
-#   cp -r hydra/clients hydra/clients.next
-#   ... edits to hydra/clients.next/*.yaml ...
-#   rm -rf hydra/clients.old
-#   mv hydra/clients hydra/clients.old && mv hydra/clients.next hydra/clients
-#   <send SIGHUP>
+# Invocation patterns:
 #
-# Today this script doesn't write yamls (it reads them and posts to
-# Hydra), so the race is bounded to operator-driven edits via $EDITOR.
-# Document; don't reimplement until the race is observed in lab.
+#   1. Operator-driven via iac:
+#        cd dunn.dev/iac && make auth-apply-clients HOST=carmine
+#      iac wraps:
+#        podman run --rm --network=auth ... auth-util:vX
+#      with $HYDRA_ADMIN_URL + per-client secrets pulled from sops.
+#
+#   2. Lab compose end-to-end validation:
+#        podman run --rm --network=auth_default \
+#          -v $(pwd)/hydra/clients:/etc/util/manifests:ro \
+#          -e HYDRA_ADMIN_URL=http://auth-hydra:4445 \
+#          -e KEEP_CLIENT_SECRET=... \
+#          dunn.dev/auth-util:lab
 #
 # Namespace separation (per adversarial review C3 / D6):
 #   The yaml files have two top-level blocks:
@@ -28,33 +30,33 @@
 #   Anything outside oidc: is consent-service-only and must not appear
 #   in the Hydra client object.
 #
-# Usage (in lab or production):
-#   HYDRA_ADMIN_URL=http://hydra:4445 ./apply-clients.sh
-#
 # Optional environment:
-#   CONSENT_RELOAD_HOOK   Command to run after a successful apply, e.g.
-#                         "kill -HUP $(cat /run/consent.pid)" or a
-#                         systemctl reload-or-restart equivalent. The
-#                         script runs the hook once after applying every
-#                         client; the consent service re-reads the
-#                         manifest dir on SIGHUP. Optional; if unset,
-#                         the consent service must be reloaded by hand
-#                         (operator runbook).
+#   HYDRA_ADMIN_URL       Default: http://auth-hydra:4445 (the iac
+#                         quadlet network name). Override for other
+#                         topologies.
+#   CLIENTS_DIR           Default: /etc/util/manifests (set by the
+#                         Containerfile). Override for non-default
+#                         mount points.
+#   CONSENT_RELOAD_HOOK   Command to run after a successful apply,
+#                         e.g. "kill -HUP $(cat /run/consent.pid)" or
+#                         a systemctl reload-or-restart equivalent.
+#                         Optional; if unset, the consent service
+#                         must be reloaded by hand.
 #   DRY_RUN=1             Print the JSON body that would be sent to
-#                         Hydra and exit, instead of calling the API.
-#                         Useful for diff-checking the namespace split.
+#                         Hydra and exit. Useful for diff-checking
+#                         the namespace split.
 #
 # Reads each YAML, transforms to JSON (oidc: block only), calls the
 # Hydra admin API. Idempotent: existing clients are updated; new
 # clients are created. Reads client_secret from environment variable
-# named after the client_id in upper-case (e.g., KEEP_CLIENT_SECRET for
-# client_id=keep). The c_c-only llm client does not need a redirect
-# secret separately; same env var convention applies.
+# named after the client_id in upper-case (e.g., KEEP_CLIENT_SECRET
+# for client_id=keep). The c_c-only llm client does not need a
+# redirect URI separately; same env var convention applies.
 
 set -euo pipefail
 
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-CLIENTS_DIR="${SCRIPT_DIR}/clients"
+CLIENTS_DIR="${CLIENTS_DIR:-/etc/util/manifests}"
+HYDRA_ADMIN_URL="${HYDRA_ADMIN_URL:-http://auth-hydra:4445}"
 DRY_RUN="${DRY_RUN:-0}"
 
 if [[ "$DRY_RUN" != "1" ]]; then
