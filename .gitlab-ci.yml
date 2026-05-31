@@ -144,3 +144,31 @@ include:
       release_title: "auth $CI_COMMIT_TAG"
       binary_job: build-portal
       sbom_job: sbom-portal
+
+
+# -----------------------------------------------------------------
+# Standalone jobs (not catalog components).
+#
+# test-portal: v0.1.4 portal test suite. Runs `npm test` which
+# invokes node --test against scripts/*.test.mjs. Covers:
+#   - manifests-loader.test.mjs (YAML namespace split + parsing)
+#   - apps-collection.test.mjs  (Content Collection frontmatter shape)
+#   - csrf.test.mjs             (HIGH-1 CSRF token semantics)
+#   - admin-recovery-gate.test.mjs (HIGH-3 admin-recovery refusal)
+#
+# Separate from verify-portal (catalog node-build, which runs
+# `npm run build`) because tests gate the change BEFORE the build
+# step. Catches Renovate-bumped breakage at the test layer.
+# -----------------------------------------------------------------
+test-portal:
+  stage: verify
+  image: registry.access.redhat.com/ubi9/nodejs-22:9.8
+  rules:
+    - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
+    - if: '$CI_PIPELINE_SOURCE == "push"'
+    - if: '$CI_COMMIT_TAG'
+  before_script:
+    - cd portal
+    - npm ci --include=dev
+  script:
+    - npm test

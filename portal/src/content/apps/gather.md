@@ -1,6 +1,6 @@
 ---
 name: Gather
-description: Download orchestration: Sonarr, Radarr, Prowlarr, sabnzbd.
+description: "Download orchestration: Sonarr, Radarr, Prowlarr, sabnzbd."
 url: https://gather.dunn.dev
 icon: GT
 access_group: access-gather
