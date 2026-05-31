@@ -49,8 +49,21 @@ runbook didn't account for it" bugs.
    openssl rand -hex 32
    ```
 
-2. Update the operator's environment store (Bitwarden in production,
-   `.env` in lab):
+2. Update sops (production) or `.env` (lab):
+
+   Production (`dunn.dev/iac/pyinfra/secrets.enc.yaml`):
+
+   ```sh
+   sops dunn.dev/iac/pyinfra/secrets.enc.yaml
+   # Edit carmine.auth_session_secret to the new value.
+   # Substrate-secret model (v0.1.4): a single `auth_session_secret` key
+   # feeds both _CURRENT and _PREVIOUS slots — rotation is a single
+   # value swap; collapsing the two-slot semantic into one sops entry
+   # is the homelab-scope simplification documented in
+   # docs/golden-path.md "Substrate secret collapse" entry.
+   ```
+
+   Lab (`lab/.env`):
 
    ```diff
    -KRATOS_COOKIE_SECRET_PREVIOUS=
@@ -59,19 +72,17 @@ runbook didn't account for it" bugs.
    +KRATOS_COOKIE_SECRET_CURRENT=<new value>
    ```
 
-   Repeat for the cipher secret and Hydra cookie secret.
-
 3. Restart Kratos and Hydra:
    - Lab: `podman compose restart kratos hydra`
-   - Production: `pyinfra carmine restart-auth-pod.py` (rolls the pod;
-     the pyinfra play does not exist yet — H11 / postgres backup hooks
-     it the same way)
+   - Production: `make auth-secrets HOST=carmine && make auth-deploy HOST=carmine`
+     (the secrets re-provision picks up the new value; auth-deploy
+     restarts the substrate)
 
 4. Verify both services healthy:
 
    ```sh
    curl -fsS https://auth.dunn.dev/health/ready
-   curl -fsS https://home.dunn.dev/health
+   make auth-smoke HOST=carmine    # full validation suite
    ```
 
 5. Active sessions: still valid. Existing cookies were signed with the

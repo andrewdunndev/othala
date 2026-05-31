@@ -3,13 +3,14 @@
 `secrets.system` is the symmetric key Hydra uses to encrypt OAuth2
 client secrets and consent challenges at rest in Postgres. Rotation is
 a database-rebuild operation, not a periodic maintenance task. Run
-this only on a known compromise of the key (Bitwarden vault breach,
-on-disk leak, accidental commit).
+this only on a known compromise of the key (sops file or age key
+exposure, on-disk leak, accidental commit).
 
 ## When to rotate
 
-- The Bitwarden entry holding `HYDRA_SYSTEM_SECRET` was accessed by an
-  unexpected party.
+- The sops entry `carmine.hydra_system_secret` was accessed by an
+  unexpected party, OR the age private key (`~/.config/sops/age/keys.txt`
+  on the operator workstation) was exposed.
 - The value appeared in a chat / log / commit and you cannot guarantee
   it never reached a third party.
 - A planned-rotation cadence is NOT required at family scale. Hydra's
@@ -19,7 +20,8 @@ on-disk leak, accidental commit).
 ## What rotation costs
 
 - Every Hydra-stored OAuth2 client secret becomes unreadable. Apps
-  re-receive new client_secret values via `apply-clients.sh`.
+  re-receive new client_secret values via the `auth-util` container
+  running `apply-clients.sh`.
 - Outstanding consent challenges (in-flight OAuth2 flows) become
   invalid. Users mid-flow see an error and re-attempt.
 - Hydra's signing keys (id_token JWKS) are unaffected; they live in a
@@ -30,7 +32,8 @@ schedule it for a low-traffic window.
 
 ## Procedure
 
-Prereqs: SSH access to carmine + sudo + Bitwarden access.
+Prereqs: SSH access to carmine + sudo + sops+age access on the operator
+workstation (`SOPS_AGE_KEY_FILE` pointing at the age private key).
 
 1. Generate the new secret (32+ bytes, random):
 
@@ -38,72 +41,91 @@ Prereqs: SSH access to carmine + sudo + Bitwarden access.
    openssl rand -base64 48
    ```
 
-2. Update Bitwarden: replace `HYDRA_SYSTEM_SECRET` with the new value.
-
-3. Stop Hydra:
+2. Update sops:
 
    ```sh
-   sudo systemctl stop hydra.service
+   sops dunn.dev/iac/pyinfra/secrets.enc.yaml
+   # Set carmine.hydra_system_secret to the new value.
+   ```
+
+3. Stop Hydra on carmine:
+
+   ```sh
+   ssh agd@carmine.dunn.dev 'systemctl --user stop auth-hydra.service'
    ```
 
 4. Drop and recreate the Hydra schema (Postgres-side):
 
    ```sh
-   sudo podman exec -it auth-postgres psql -U postgres -c \
-     "DROP DATABASE hydra; CREATE DATABASE hydra OWNER hydra;"
+   ssh agd@carmine.dunn.dev '
+     systemctl --user stop auth-hydra-migrate.service;
+     podman exec -it auth-postgres psql -U postgres -c \
+       "DROP DATABASE hydra; CREATE DATABASE hydra OWNER hydra;"
+   '
    ```
 
-5. Re-run the Hydra migration to populate the schema under the new
-   secret:
+5. Re-provision podman secrets on carmine so the new sops value lands:
 
    ```sh
-   sudo systemctl start hydra-migrate.service
+   cd dunn.dev/iac
+   make auth-secrets HOST=carmine
    ```
 
-   Wait for it to exit cleanly.
-
-6. Push the new secret to the Hydra quadlet:
+6. Re-run the Hydra migration + restart Hydra:
 
    ```sh
-   sudo systemctl edit hydra.service
-   # set HYDRA_SYSTEM_SECRET=<new value>
-   sudo systemctl daemon-reload
-   sudo systemctl start hydra.service
+   cd dunn.dev/iac
+   make auth-deploy HOST=carmine
    ```
 
-7. Re-issue every client secret. From `auth/`:
+   The deploy restarts auth-postgres, auth-hydra-migrate (populates
+   fresh schema under the new secret), and auth-hydra.
+
+7. Re-issue every client secret:
 
    ```sh
-   make -C hydra apply-clients
+   cd dunn.dev/iac
+   make auth-apply-clients HOST=carmine
    ```
 
-   This walks `hydra/clients/*.yaml` and re-creates each client with
-   the new secret.
+   This runs the `auth-util` oneshot container which walks
+   `hydra/clients/*.yaml` and re-creates each Hydra client with its
+   sops-sourced `<svc>_oidc_client_secret`.
 
-8. Update each app's `<APP>_CLIENT_SECRET` env from the new
-   apply-clients output. Apps that don't pick up env changes need a
-   pod restart.
-
-9. Bump the SIGUSR1 on the consent service (the back-channel logout
-   signing key cache holds the old key for up to 15 min; SIGUSR1
-   skips the wait):
+8. Update consumer-service podman secrets if any `<svc>_oidc_client_secret`
+   changed:
 
    ```sh
-   sudo podman exec auth-consent kill -USR1 1
+   cd dunn.dev/iac
+   make keep-secrets HOST=carmine
+   make keep-deploy HOST=carmine
+   # ...repeat for each OIDC consumer that needs to pick up a new secret.
    ```
 
-10. Verify a known OIDC flow end-to-end (login at home.dunn.dev →
-    keep.dunn.dev signin) before clearing the runbook.
+9. Force the consent service to drop its cached signing key (the
+   back-channel logout signing key cache holds the old key for up to
+   15 min; SIGUSR1 forces refresh):
+
+   ```sh
+   ssh agd@carmine.dunn.dev 'podman exec auth-consent kill -USR1 1'
+   ```
+
+10. Verify a known OIDC flow end-to-end (login at auth.dunn.dev →
+    keep.dunn.dev signin) before clearing the runbook. Or run:
+
+    ```sh
+    cd dunn.dev/iac
+    make auth-smoke HOST=carmine
+    ```
 
 ## Verification
 
 After rotation:
 
-- `apply-clients` exited 0 for every yaml in `hydra/clients/`.
+- `make auth-apply-clients` exited 0 for every yaml in `hydra/clients/`.
 - A test login through Vaultwarden (or any OIDC client) completes.
-- Hydra logs show no decryption errors.
-- The Bitwarden vault has only the new `HYDRA_SYSTEM_SECRET` entry;
-  the old one is deleted.
+- Hydra logs show no decryption errors: `journalctl --user -u auth-hydra.service -n 50`.
+- The sops file has only the new `carmine.hydra_system_secret` value.
 
 ## What this does NOT cover
 
@@ -112,11 +134,15 @@ After rotation:
   handles that without touching `secrets.system`. The consent
   service's signing-key cache picks up the new key on next refresh
   (15 min) or on SIGUSR1.
-- Postgres credential rotation. Separate procedure, separate
-  Bitwarden entry.
+- Postgres credential rotation (the `carmine.auth_db_password` sops
+  entry). Separate procedure: stop the substrate, rotate the password,
+  re-deploy. No db rebuild needed since the password is independent
+  of at-rest encryption.
 
 ## Related
 
 - `docs/architecture.md` "A2: secrets.system single-key risk"
 - `docs/runbooks/cookie-rotation.md`
+- `docs/runbooks/admin-recovery.md`
 - `hydra/hydra.yml` `secrets.system` field
+- `dunn.dev/iac/services/auth/` — deploy plane

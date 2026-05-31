@@ -211,31 +211,38 @@ not Wait.
 
 ## Image tag pinning (L6)
 
-Production posture for upstream images is "pin to a known-good
-version; never `latest`":
+Production posture: pin every image to a known-good version. Renovate
+proposes bumps stack-wide. Never roll to `latest` to "see if it fixes
+things."
 
-| Image | Pin |
-|---|---|
-| `docker.io/oryd/kratos` | `v1.3.0` (currently) |
-| `docker.io/oryd/hydra` | `v2.2.0` (currently) |
-| `docker.io/library/postgres` | `16-alpine` |
-| `dunn.dev/caddy-estate` | `<git-sha>` from the build pipeline |
-| `dunn.dev/auth-portal` | `<git-sha>` from the build pipeline |
-| `dunn.dev/glauth-kratos` | `<git-sha>` from the build pipeline |
+| Image | Pin (v0.1.4 baseline) | Renovate-managed |
+|---|---|---|
+| `docker.io/oryd/kratos` | `v26.2.0` | yes |
+| `docker.io/oryd/hydra` | `v26.2.0` | yes |
+| `docker.io/library/postgres` | `18-alpine` | yes |
+| `registry.gitlab.com/dunn.dev/caddy-estate` | semver tag | yes |
+| `registry.gitlab.com/dunn.dev/auth/consent` | `v0.1.4` (this repo's release tag) | self-managed |
+| `registry.gitlab.com/dunn.dev/auth/portal` | `v0.1.4` | self-managed |
+| `registry.gitlab.com/dunn.dev/auth/ldap-bridge` | `v0.1.4` | self-managed |
+| `registry.gitlab.com/dunn.dev/auth/util` | `v0.1.4` | self-managed |
 
 Bumping pins:
 
-1. Pull the candidate image to a lab VM.
-2. Run the lab compose stack against it; smoke-test through Playwright.
-3. If green, update the pin in the production pyinfra play (or quadlet
-   manifest, depending on the deploy mechanism Phase 5 lands on).
-4. Roll the pod, verify, document.
+1. Pull the candidate image to a lab VM (or the QEMU-CI lab, when wired).
+2. Run the lab substrate against it; smoke-test through Playwright.
+3. If green, update the pin in `dunn.dev/iac/services/auth/` quadlets.
+4. `make auth-deploy HOST=carmine`, verify, document.
+
+Ory's release cadence is approximately annual minor releases with
+infrequent breaking changes (v1.3 → v25.4 → v26.2 spanned ~16 months
+with one breaking-change set in v25.4 that didn't touch our integration).
+The `docs/golden-path.md` doc lists the integration choices that kept
+us durable through that transition.
 
 CVE-driven bumps follow the same loop with the lab step compressed:
 review the advisory, decide whether the surface area is in scope (the
 consent service uses zero non-stdlib deps for HTTP, so most Hydra/Kratos
-CVEs are scoped to the Hydra/Kratos containers themselves). Never roll
-to `latest` to "see if it fixes things."
+CVEs are scoped to the Hydra/Kratos containers themselves).
 
 ## Trust boundary topology (A1)
 

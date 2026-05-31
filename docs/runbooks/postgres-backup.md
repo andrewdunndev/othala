@@ -37,13 +37,18 @@ panic; it's the worst single-failure outcome in the auth substrate.
      rollback via ZFS, long-term archive via pg_dump).
 
 3. **Off-host copy**
-   - Dumps rsync'd to a separate machine (NAS? secondary VM?). Same
-     dunn.dev estate; not sent off-LAN.
-   - `secrets.system` lives in Bitwarden, not in the dump (it's an env
-     var). On restore from a fresh DB, the operator pulls
-     `secrets.system` from Bitwarden into the env and only then
-     starts Hydra; otherwise the encrypted client secrets in the
-     dump can't decrypt.
+   - Dumps copied to two destinations: an onsite zpool on a different
+     host (synthetic-tank or similar), AND Backblaze B2 via rclone for
+     offsite durability. The estate's standing backup posture is
+     "once onsite, once offsite."
+   - `secrets.system` lives in sops (`carmine.hydra_system_secret`), not
+     in the dump (it's an env var). On restore from a fresh DB, the
+     operator pulls `secrets.system` from sops into the env and only
+     then starts Hydra; otherwise the encrypted client secrets in the
+     dump can't decrypt. Sops + age key are themselves backed up
+     separately — losing both means the dump is decryptable as raw
+     postgres data but the Hydra client_secret column is permanently
+     ciphertext.
 
 4. **Restore drill**
    - Quarterly: spin up a throwaway VM, restore the latest dump,
@@ -60,16 +65,19 @@ panic; it's the worst single-failure outcome in the auth substrate.
 
 ## Effort estimate
 
-1 day of configuration plus one drill. The work is all on carmine
-(pyinfra hooks for the pg_dump cron + ZFS plumbing); no Kratos / Hydra
-config changes needed.
+1 day of configuration plus one drill. The work is all in
+`dunn.dev/iac` — a new service for the backup runner (pg_dump cron
++ rclone push to B2 + zfs send to the onsite tank). No auth-project
+changes needed.
 
 ## Why this isn't done yet
 
 Phase 0 (config drafting) and Phase 1 (lab spike) explicitly
 de-prioritized backup tooling because the lab is throwaway. The
-adversarial review (H11) flags this as a pre-family-rollout requirement
-and that's where the work lands.
+adversarial review (H11) flags this as a pre-family-rollout requirement.
+**Tracked as the next iac work stream after auth substrate cutover.**
+Backup posture: rclone → Backblaze B2 offsite + zfs send to an onsite
+tank pool; both fire from a single backup quadlet.
 
 ## Partial-state restore (A6)
 
