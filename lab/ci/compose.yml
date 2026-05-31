@@ -1,0 +1,217 @@
+# CI lab compose stack — Topology B substrate for QEMU-runner validation.
+#
+# This file is consumed by lab/ci/validate.sh inside a per-job Fedora VM
+# spawned by the carmine GitLab Runner (Custom Executor, tag carmine,qemu).
+# The VM is ephemeral; the substrate dies with the VM at job end.
+#
+# Topology B shape:
+#   - postgres (kratos + hydra dbs)
+#   - kratos-migrate (oneshot)
+#   - kratos (public 4433, admin 4434)
+#   - hydra-migrate (oneshot)
+#   - hydra (public 4444, admin 4445)
+#   - consent (public 4477, admin 4478)
+#   - portal (8080)
+#   - ldap-bridge (LDAPS 636 — exercised only if the substrate-up smoke
+#     adds an LDAP probe, optional for first land)
+#
+# What's intentionally absent vs production:
+#   - No Caddy / TLS / public DNS. Smoke probes hit container HTTP ports
+#     directly via the compose default network. Production-shape TLS +
+#     issuer-byte-match is validated separately (manual lab on real DNS,
+#     or future end-to-end run when this CI lab exercises Caddy with
+#     `tls internal` against a self-issued CA).
+#   - No auth-util quadlet — util image runs as a one-shot via
+#     `podman compose run --rm util` inside smoke.sh.
+#
+# Image versions: ${AUTH_VERSION} comes from the CI environment. When
+# the lab-validate job declares `needs: [build-consent, build-portal,
+# build-ldap-bridge, build-util]`, AUTH_VERSION resolves to
+# $CI_COMMIT_SHA (the just-built images at their SHA tag). Local
+# operator runs use AUTH_VERSION=latest.
+
+services:
+  postgres:
+    image: docker.io/library/postgres:18-alpine
+    container_name: lab-postgres
+    restart: "no"
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      KRATOS_PG_PASS: ${KRATOS_PG_PASS}
+      HYDRA_PG_PASS: ${HYDRA_PG_PASS}
+    volumes:
+      - ./postgres-init.sh:/docker-entrypoint-initdb.d/init.sh:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 5s
+      timeout: 3s
+      retries: 12
+
+  kratos-migrate:
+    image: docker.io/oryd/kratos:v26.2.0
+    container_name: lab-kratos-migrate
+    restart: "no"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      DSN: postgres://kratos:${KRATOS_PG_PASS}@postgres:5432/kratos?sslmode=disable
+    volumes:
+      - ./kratos.yml:/etc/config/kratos/kratos.yml:ro
+      - ./identity.schema.json:/etc/config/kratos/identity.schema.json:ro
+    command: ["migrate", "sql", "-e", "--yes", "--config", "/etc/config/kratos/kratos.yml"]
+
+  kratos:
+    image: docker.io/oryd/kratos:v26.2.0
+    container_name: lab-kratos
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+      kratos-migrate:
+        condition: service_completed_successfully
+    environment:
+      DSN: postgres://kratos:${KRATOS_PG_PASS}@postgres:5432/kratos?sslmode=disable
+      KRATOS_PG_PASS: ${KRATOS_PG_PASS}
+      KRATOS_COOKIE_SECRET_CURRENT: ${KRATOS_COOKIE_SECRET_CURRENT}
+      KRATOS_COOKIE_SECRET_PREVIOUS: ${KRATOS_COOKIE_SECRET_PREVIOUS}
+      KRATOS_CIPHER_SECRET_CURRENT: ${KRATOS_CIPHER_SECRET_CURRENT}
+      KRATOS_CIPHER_SECRET_PREVIOUS: ${KRATOS_CIPHER_SECRET_PREVIOUS}
+      RECOVERY_GATE_SECRET: ${RECOVERY_GATE_SECRET}
+      SMTP_USER: lab
+      SMTP_PASS: lab
+    volumes:
+      - ./kratos.yml:/etc/config/kratos/kratos.yml:ro
+      - ./identity.schema.json:/etc/config/kratos/identity.schema.json:ro
+      - ./recovery-gate.jsonnet:/etc/config/kratos/hooks/recovery-gate.jsonnet:ro
+    command: ["serve", "all", "--config", "/etc/config/kratos/kratos.yml", "--dev"]
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:4434/admin/health/ready || exit 1"]
+      interval: 5s
+      timeout: 3s
+      retries: 18
+      start_period: 20s
+
+  hydra-migrate:
+    image: docker.io/oryd/hydra:v26.2.0
+    container_name: lab-hydra-migrate
+    restart: "no"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      DSN: postgres://hydra:${HYDRA_PG_PASS}@postgres:5432/hydra?sslmode=disable
+    command: ["migrate", "sql", "-e", "--yes"]
+
+  hydra:
+    image: docker.io/oryd/hydra:v26.2.0
+    container_name: lab-hydra
+    restart: unless-stopped
+    depends_on:
+      hydra-migrate:
+        condition: service_completed_successfully
+    environment:
+      DSN: postgres://hydra:${HYDRA_PG_PASS}@postgres:5432/hydra?sslmode=disable
+      HYDRA_PG_PASS: ${HYDRA_PG_PASS}
+      HYDRA_SYSTEM_SECRET: ${HYDRA_SYSTEM_SECRET}
+      HYDRA_COOKIE_SECRET_CURRENT: ${HYDRA_COOKIE_SECRET_CURRENT}
+      HYDRA_COOKIE_SECRET_PREVIOUS: ${HYDRA_COOKIE_SECRET_PREVIOUS}
+      HYDRA_PAIRWISE_SALT: ${HYDRA_PAIRWISE_SALT}
+    volumes:
+      - ./hydra.yml:/etc/config/hydra/hydra.yml:ro
+    command: ["serve", "all", "--config", "/etc/config/hydra/hydra.yml", "--dev"]
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:4445/health/ready || exit 1"]
+      interval: 5s
+      timeout: 3s
+      retries: 18
+      start_period: 20s
+
+  consent:
+    image: ${AUTH_REGISTRY}/consent:${AUTH_VERSION}
+    container_name: lab-consent
+    restart: unless-stopped
+    depends_on:
+      hydra:
+        condition: service_healthy
+      kratos:
+        condition: service_healthy
+    environment:
+      HYDRA_ADMIN_URL: http://hydra:4445
+      KRATOS_PUBLIC_URL: http://kratos:4433
+      KRATOS_ADMIN_URL: http://kratos:4434
+      HYDRA_ISSUER: http://auth-lab.${LAB_DOMAIN}/
+      LOGIN_URL: http://auth-lab.${LAB_DOMAIN}/auth/login
+      HYDRA_CLIENT_DIR: /etc/consent/manifests
+      CONSENT_ADMIN_BEARER: ${CONSENT_ADMIN_BEARER}
+      PUBLIC_LISTEN: ":4477"
+      ADMIN_LISTEN: ":4478"
+      CONSENT_PUBLIC_URL: http://auth-lab.${LAB_DOMAIN}
+      RECOVERY_GATE_SECRET: ${RECOVERY_GATE_SECRET}
+    volumes:
+      - ../../hydra/clients:/etc/consent/manifests:ro
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:4477/healthz || exit 1"]
+      interval: 5s
+      timeout: 3s
+      retries: 12
+      start_period: 5s
+
+  portal:
+    image: ${AUTH_REGISTRY}/portal:${AUTH_VERSION}
+    container_name: lab-portal
+    restart: unless-stopped
+    depends_on:
+      kratos:
+        condition: service_healthy
+      hydra:
+        condition: service_healthy
+    environment:
+      KRATOS_PUBLIC_URL: http://kratos:4433
+      KRATOS_ADMIN_URL: http://kratos:4434
+      HYDRA_PUBLIC_URL: http://hydra:4444
+      HYDRA_ADMIN_URL: http://hydra:4445
+      HYDRA_ISSUER_URL: http://auth-lab.${LAB_DOMAIN}/
+      CONSENT_ADMIN_URL: http://consent:4478
+      CONSENT_ADMIN_BEARER: ${CONSENT_ADMIN_BEARER}
+      MANIFEST_DIR: /etc/portal/manifests
+      CSRF_SECRET: ${CSRF_SECRET}
+      HOST: 0.0.0.0
+      PORT: "8080"
+    volumes:
+      - ../../hydra/clients:/etc/portal/manifests:ro
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:8080/healthz || exit 1"]
+      interval: 5s
+      timeout: 3s
+      retries: 12
+      start_period: 10s
+
+  ldap-bridge:
+    image: ${AUTH_REGISTRY}/ldap-bridge:${AUTH_VERSION}
+    container_name: lab-ldap-bridge
+    restart: unless-stopped
+    depends_on:
+      kratos:
+        condition: service_healthy
+    environment:
+      KRATOS_BRIDGE_ADMIN_TOKEN: lab-bridge-token
+    volumes:
+      - ./glauth.cfg:/etc/glauth/glauth.cfg:ro
+
+  # auth-util is invoked as a one-shot via `compose run` from smoke.sh;
+  # not started here so docker-compose's healthcheck loop doesn't mark
+  # it failed when the container exits.
+  util:
+    image: ${AUTH_REGISTRY}/util:${AUTH_VERSION}
+    container_name: lab-util
+    profiles: ["oneshot"]
+    depends_on:
+      hydra:
+        condition: service_healthy
+    environment:
+      HYDRA_ADMIN_URL: http://hydra:4445
+      CLIENTS_DIR: /etc/util/manifests
+    volumes:
+      - ../../hydra/clients:/etc/util/manifests:ro

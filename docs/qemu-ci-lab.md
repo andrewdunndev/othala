@@ -1,7 +1,28 @@
-# QEMU-CI lab — design + implementation plan
+# QEMU-CI lab — design + implementation
 
-Status: not yet implemented. Tracked as the replacement for the static
-`lab/compose/` stack which is now legacy.
+Status: **implemented in v0.1.4** (this commit set). Replaces the
+static `lab/compose/` stack which is now legacy.
+
+Files: `lab/ci/{compose.yml,kratos.yml,hydra.yml,identity.schema.json,
+recovery-gate.jsonnet,glauth.cfg,postgres-init.sh,gen-secrets.sh,
+smoke.sh,validate.sh,README.md}` + new `lab-validate` job in
+`.gitlab-ci.yml` tagged `[carmine, qemu]`.
+
+Pipeline shape:
+
+```
+verify   →   build     →   lab-validate   →   package   →   release
+            (4 jobs)        (new gate)         (sbom)
+```
+
+`lab-validate` `needs: [build-consent, build-ldap-bridge, build-portal,
+build-util]` — pulls the just-built image set at `${CI_COMMIT_TAG}`
+(tag pipelines) or `${CI_COMMIT_SHORT_SHA}` (push to main + MR). On
+red, blocks the SBOM + release stages. On green, the substrate is
+proven to come up + smoke clean before the SBOM/release jobs touch
+the registry.
+
+What follows is the original design rationale — preserved verbatim.
 
 ## Why
 
@@ -212,3 +233,13 @@ contention argues for one-at-a-time).
 
 After the v0.1.4 substrate cutover on carmine is stable for ~2 weeks.
 Until then, the static `lab/compose/` stack covers manual smoke.
+
+### Update 2026-05-31
+
+Built earlier than the 2-week recommendation. The carmine runner
+infrastructure was already in place (`dunn.dev/iac/services/runner/`)
+and the lab is light enough to land alongside the substrate v0.1.4
+changes. Files at `lab/ci/`. See `lab/ci/README.md` for invocation
+notes. The lab does not gate the carmine deploy of v0.1.4 — it gates
+future v0.1.X tags. The v0.1.4 first deploy proves the substrate; the
+CI lab proves future bumps don't regress it.

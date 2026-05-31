@@ -29,6 +29,7 @@ workflow:
 stages:
   - verify
   - build
+  - lab-validate
   - package
   - release
 
@@ -172,3 +173,67 @@ test-portal:
     - npm ci --include=dev
   script:
     - npm test
+
+# -----------------------------------------------------------------
+# lab-validate: QEMU-runner substrate validation.
+#
+# Runs in a fresh Fedora VM spawned by the carmine GitLab Runner
+# (Custom Executor; tag carmine,qemu). The VM has podman + docker
+# bridge pre-baked. Inside the VM, lab/ci/validate.sh:
+#
+#   1. Generates per-run secrets
+#   2. podman login to the GitLab registry
+#   3. docker compose up the Topology B substrate
+#   4. Waits for healthchecks
+#   5. Runs lab/ci/smoke.sh — substrate sanity, apply-clients,
+#      identity admin flow, recovery-gate semantics
+#   6. Tears down (VM dies anyway, but be tidy)
+#
+# Sequence: gates the package + release stages. Build images first
+# (stage: build), validate them in the lab (stage: lab-validate),
+# then SBOM + release. CI-MR-PR feedback loop catches Ory-upgrade
+# regressions + Renovate-bump breakage before tag.
+#
+# AUTH_VERSION resolves to $CI_COMMIT_SHA on push (image tagged with
+# the SHA) or $CI_COMMIT_TAG on tag pipelines. Either way, the lab
+# validates the just-built image set, not :latest.
+#
+# See lab/ci/README.md + docs/qemu-ci-lab.md.
+# -----------------------------------------------------------------
+lab-validate:
+  stage: lab-validate
+  tags: [carmine, qemu]
+  needs:
+    - build-consent
+    - build-ldap-bridge
+    - build-portal
+    - build-util
+  variables:
+    LAB_DOMAIN: lab.dunn.dev
+    AUTH_REGISTRY: "${CI_REGISTRY_IMAGE}"
+    # Tag pipelines: use the v-tag. Non-tag: use SHA (matches what
+    # container-image @2.5.0 publishes for non-tag pushes).
+    AUTH_VERSION: "${CI_COMMIT_TAG:-${CI_COMMIT_SHORT_SHA}}"
+  before_script:
+    # The baser golden has podman + podman-docker. Verify here so
+    # missing tools fail loudly at job start, not mid-compose.
+    - podman --version
+    - docker --version
+    - jq --version || true
+    - python3 --version
+  script:
+    - cd lab/ci
+    - bash validate.sh
+  artifacts:
+    when: on_failure
+    paths:
+      - /tmp/lab-smoke-failure.log
+      - /tmp/lab-healthcheck-failure.log
+      - /tmp/apply-clients.log
+    expire_in: 1 week
+  rules:
+    # Run on every push to main + on every MR + on every tag.
+    # Renovate-MR bumps + Ory image bumps fire this loop.
+    - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
+    - if: '$CI_PIPELINE_SOURCE == "push" && $CI_COMMIT_BRANCH == "main"'
+    - if: '$CI_COMMIT_TAG'
