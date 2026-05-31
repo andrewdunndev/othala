@@ -4,12 +4,19 @@
 //
 // Why this service exists:
 //
-//	The Astro UI on Cloudflare Workers cannot reach Hydra's admin port
-//	(internal to carmine). This service runs alongside Hydra, takes the
-//	consent_challenge, login_challenge, and logout_challenge redirects
-//	from Hydra (via auth.dunn.dev), validates the user's Kratos session,
-//	calls Hydra admin internally to accept/reject, and redirects back to
-//	Hydra to complete the OAuth2 flow.
+//	Hydra admin (4445) is auth.network-internal. The browser-facing
+//	Astro portal can't call Hydra admin directly without exposing the
+//	port — explicitly out-of-policy. This service runs alongside Hydra,
+//	takes the consent_challenge, login_challenge, and logout_challenge
+//	redirects from Hydra (via auth.dunn.dev), validates the user's
+//	Kratos session, calls Hydra admin internally to accept/reject,
+//	and redirects back to Hydra to complete the OAuth2 flow.
+//
+//	(Historical: an earlier shape had the portal on Cloudflare Workers,
+//	which made admin-port unreachability literal. Since v0.1.3 the
+//	portal lives on carmine in the same pod network — but the
+//	architectural split between user-facing UI and Hydra-admin glue
+//	is still the right shape, so consent stays.)
 //
 // Endpoints:
 //

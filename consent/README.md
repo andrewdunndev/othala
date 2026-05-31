@@ -6,13 +6,13 @@ Small Go HTTP service that handles Hydra OAuth2 login, consent, and logout chall
 
 Hydra needs a "login app", a "consent app", and a "logout app" to handle the corresponding challenge redirects. The standard pattern would be: Hydra redirects the browser to our Astro UI, which calls the Hydra admin API to accept or reject.
 
-That doesn't work for us:
+Historical context: an earlier iteration of the project ran the Astro UI on Cloudflare Workers (edge), which physically couldn't reach Hydra's admin port (auth.network-internal). The consent service was the workaround. Since v0.1.3, the Astro portal runs as Node SSR on carmine inside the same pod network — but the consent service stays because the architectural split (browser-facing UI vs. Hydra-admin-touching glue) is still right. The portal handles user-facing concerns; consent handles "talk to Hydra's admin API to accept/reject the challenge."
 
-- Astro UI runs on Cloudflare Workers (edge)
-- Hydra admin port (4445) is internal to the carmine pod network
-- We will not expose the admin port publicly or allowlist Cloudflare egress IPs in the auth path
+Topology today:
 
-Solution: a tiny Go service co-located with Hydra. The browser is redirected through `auth.dunn.dev/{login,consent,logout}`; this service validates the Kratos session over the pod network, calls Hydra admin internally, and redirects the browser onward.
+- Astro portal runs on carmine (Node SSR), in the auth.network namespace.
+- Hydra admin port (4445) is auth.network-internal. Never exposed publicly.
+- Consent service co-located on the same network, reachable from Caddy at `auth.dunn.dev/{login,consent,logout}`.
 
 The user sees a brief redirect through `auth.dunn.dev` (the same hostname they already see for the login flow). No exposure of admin internals.
 
