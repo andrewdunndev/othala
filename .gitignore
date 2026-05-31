@@ -23,3 +23,6 @@ venv/
 /consent/consent
 /ldap-bridge/glauth-kratos
 /ldap-bridge/ldap-bridge
+
+# Local maintainability backlog (working notes; synthesist is the eventual home)
+/TODO.md
