@@ -19,7 +19,7 @@ actually lands on carmine.
 | Container quadlets | `dunn.dev/iac/services/auth/.config/containers/systemd/` | The deploy plane owns runtime topology |
 | pyinfra orchestration | `dunn.dev/iac/pyinfra/hosts/carmine.py` `SERVICES["auth"]` | Same |
 | Secrets (sops) | `dunn.dev/iac/pyinfra/secrets.enc.yaml` | Single source for both this stack and every other carmine service |
-| Tile-dashboard MDX | `dunn.dev/auth/portal/src/content/apps/*.mdx` | Astro Content Collection; portal reads at runtime |
+| Tile-dashboard apps registry | `dunn.dev/auth/portal/src/content/apps/*.md` | Astro Content Collection; portal reads at runtime |
 | Deploy runbook | `dunn.dev/iac/AGENTS.md` + `dunn.dev/iac/DEPLOY.md` | Same |
 
 ## Why two repos
