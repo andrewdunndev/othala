@@ -6,8 +6,8 @@
 # discipline is essential because both upstreams reply on the same
 # host.
 #
-# home.dunn.dev is reserved as a future tile-dashboard host; not
-# served by this snippet today.
+# home.dunn.dev was the Topology A user-facing host; dropped in v0.1.4.
+# The tile dashboard now lives at auth.dunn.dev/ (session-gated).
 #
 # Single Caddyfile block expected at the carmine top-level:
 #

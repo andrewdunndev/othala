@@ -29,8 +29,9 @@ urls:
   # Hydra redirects authentication-required flows to auth.dunn.dev/auth/*
   # where the Astro portal renders login/recovery/etc., and the consent
   # service handles /login with login_challenge via the same Caddy mux.
-  # home.dunn.dev was reserved for a future user-facing tile dashboard
-  # but is not served today (see docs/golden-path.md).
+  # home.dunn.dev was the Topology A user-facing host; dropped in v0.1.4
+  # because the IdP + the UI live on the same FQDN now. The portal's
+  # tile dashboard renders at auth.dunn.dev/ for signed-in family members.
   login: https://auth.dunn.dev/auth/login
   consent: https://auth.dunn.dev/auth/consent
   logout: https://auth.dunn.dev/auth/logout
