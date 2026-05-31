@@ -1,74 +1,27 @@
 # lab
 
-GCP-based test environment for SSO pattern validation. Spins up Authentik + app stubs on a single VM, applies the blueprints from `../authentik/blueprints/`, runs Playwright tests against the auth flows.
-
-Replaces the prior `dunn.dev/bench-sso-iac` repo.
-
-## Quick start
-
-```bash
-# Set required env vars (see .env.example in repo root)
-cp ../.env.example .env
-# Edit .env with GCP project, domain, Cloudflare API token, Authentik secrets
-
-# Build the custom Caddy image locally (or load on VM during deploy)
-make caddy-image
-
-# Provision GCP VM (~2 min)
-make up
-
-# Update DNS (Cloudflare *.test.dunn.dev → VM IP, gray cloud)
-make dns-update   # prints the record to add
-
-# Sync files to VM
-make sync
-
-# Wait for auto-deploy (Authentik bootstrap + blueprints)
-make deploy
-
-# Smoke tests
-make smoke
-
-# Playwright (from your dev machine)
-make test
-
-# Tear down
-make down
-```
-
-## What's tested
-
-| Pattern | Apps |
-|---|---|
-| OIDC native | Vaultwarden (keep), Mealie (larder), Audiobookshelf (listen), Immich (memory) |
-| LDAP outpost | Jellyfin (cinema) |
-| Forward auth via Authentik proxy outpost | Navidrome (tune) with Subsonic API bypass |
-| Admin path basicauth | Authentik admin (`/if/admin/*`) |
+Substrate validation for the Ory-based auth stack (Topology B). Two
+paths live here, with the CI path as the primary going forward.
 
 ## Layout
 
-| Path | Contents |
-|---|---|
-| `compose/compose.yml` | Authentik server + worker + postgres + Caddy + app stubs |
-| `compose/Caddyfile` | Caddy config with DNS-01 + admin basicauth + forward-auth pattern |
-| `compose/jellyfin-ldap.xml` | Pre-seeded Jellyfin LDAP plugin config |
-| `scripts/gcp.sh` | GCP VM lifecycle (up, down, ssh, ip, scp) |
-| `scripts/setup-vm.sh` | VM startup script (installs podman, clones repo, writes .env) |
-| `scripts/deploy.sh` | Compose stack startup + blueprint wait + token generation |
-| `scripts/smoke.sh`, `smoke-local.sh` | Smoke tests |
-| `scripts/configure-apps.sh` | Per-app post-deploy configuration (Audiobookshelf, Immich OIDC) |
-| `scripts/set-passwords.sh` | Set test user passwords via Authentik API |
-| `tests/` | Playwright suite (auth flows, app reachability, group access) |
-| `Makefile` | Lab targets: up/down/sync/deploy/smoke/test/logs |
-| `docs/` | Per-candidate substrate evaluations (eval-*.md) — historical research |
+| Path | Status | Purpose |
+|---|---|---|
+| `ci/` | active | QEMU-CI lab. GitLab CI dispatches a job to the carmine runner, spins an ephemeral Fedora VM, brings up the full substrate (Postgres + Kratos + Hydra + consent + portal), runs the smoke matrix, tears down. ~3-5 min turnaround. See `ci/README.md`. |
+| `compose/` | legacy | Static docker-compose stack from the Phase 3 substrate-up validation. Kept until the CI lab fully proves; deletion next session. See `compose/README.md`. |
+| `Makefile` | legacy | Targets for the old GCP-VM + Authentik flow. Slated for removal alongside `compose/`. |
 
-## Bench → carmine production
+The pre-Ory substrate evaluations, feasibility studies, phase
+evidence, and Authentik-era deploy scripts/Playwright suite have
+been deleted — git history retains the lineage if anyone needs to
+reconstruct the decision trail.
 
-Blueprints in `../authentik/blueprints/` are reused identically. Production carmine runs Authentik via pyinfra-managed quadlets; the same blueprints applied via the same volume mount. Caddy patterns under `../caddy/snippets/` are referenced by per-pod Caddyfiles in carmine's `services/<app>/caddy/Caddyfile`.
+## Where things go now
 
-What changes lab → production:
-- Domain: `test.dunn.dev` → `dunn.dev`
-- Secrets: Bitwarden-injected, not env defaults
-- Container runtime: rootless podman quadlets (per-service users), not docker-compose
-- LDAP outpost: co-located in Jellyfin pod (in production), runs alongside authentik-server (in lab compose)
-- Proxy outpost: dedicated quadlet (in production), runs alongside authentik-server (in lab compose)
+- Substrate health probes → `ci/smoke.sh` (extend with each Ory
+  surface change worth catching in CI).
+- Production-shape rendering (TLS, Caddy, OIDC redirect flow) →
+  manual lab work or a future CI iteration that wires Caddy with
+  `tls internal`.
+- Browser-driven OIDC / portal UI validation → planned Playwright
+  layer on top of the CI lab; not in scope today.
