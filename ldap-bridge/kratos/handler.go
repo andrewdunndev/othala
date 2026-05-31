@@ -152,7 +152,31 @@ func (h *Handler) Bind(bindDN, bindSimplePw string, conn net.Conn) (ldap.LDAPRes
 // Search returns LDAP entries built from cached Kratos identities. The
 // LDAP server (configured with EnforceLDAP=true in main.go) applies
 // scope and filter post-hoc, so this method may over-return.
+//
+// Security invariant: only the configured service-account DN may retrieve
+// the full directory. Any other boundDN (including empty, meaning an
+// anonymous or failed-bind connection) receives an empty result set with
+// LDAPResultSuccess. If ServiceBindDN is unconfigured, all searches return
+// empty (fail-closed default — a misconfiguration must not silently open
+// the roster).
 func (h *Handler) Search(boundDN string, searchReq ldap.SearchRequest, conn net.Conn) (ldap.ServerSearchResult, error) {
+	empty := ldap.ServerSearchResult{
+		Entries:    []*ldap.Entry{},
+		Referrals:  []string{},
+		Controls:   []ldap.Control{},
+		ResultCode: ldap.LDAPResultSuccess,
+	}
+
+	// Fail-closed: if no service DN is configured, no search is permitted.
+	if h.cfg.ServiceBindDN == "" {
+		return empty, nil
+	}
+
+	// Only the service-account DN may read the directory.
+	if !strings.EqualFold(strings.TrimSpace(boundDN), strings.TrimSpace(h.cfg.ServiceBindDN)) {
+		return empty, nil
+	}
+
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 

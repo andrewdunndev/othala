@@ -9,3 +9,10 @@
 // package remains drop-in for any future upstream registration API
 // without code changes here.
 package kratos
+
+import "github.com/glauth/glauth/v2/pkg/handler"
+
+// Compile-time interface guard: if Handler drifts from handler.Handler
+// (e.g. glauth adds a new required method), this line fails at build
+// time rather than silently at LDAPS bind runtime.
+var _ handler.Handler = (*Handler)(nil)
