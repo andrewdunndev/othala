@@ -1,0 +1,4 @@
+/.well-known/webfinger
+  Content-Type: application/jrd+json
+  Cache-Control: public, max-age=300
+  Access-Control-Allow-Origin: *
