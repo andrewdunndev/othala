@@ -46,12 +46,12 @@ if (!session?.active || !session.identity) {
 
 const flowId = Astro.url.searchParams.get('flow');
 if (!flowId) {
-  return Astro.redirect(browserFlows.settings('https://home.dunn.dev/auth/settings'));
+  return Astro.redirect(browserFlows.settings('https://auth.dunn.dev/auth/settings'));
 }
 
 const result = await getSettingsFlow(flowId, cookie);
 if (result.kind !== 'ok') {
-  return Astro.redirect(browserFlows.settings('https://home.dunn.dev/auth/settings'));
+  return Astro.redirect(browserFlows.settings('https://auth.dunn.dev/auth/settings'));
 }
 
 const flow = result.flow;

@@ -28,7 +28,7 @@
 
 		@unauthorized status 401 403
 		handle_response @unauthorized {
-			redir https://home.dunn.dev/auth/login?return_to={http.request.uri} 302
+			redir https://auth.dunn.dev/auth/login?return_to={http.request.uri} 302
 		}
 	}
 	# After this snippet, the surrounding Caddyfile block does its own

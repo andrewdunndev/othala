@@ -326,7 +326,7 @@ The running service reloads manifests on `SIGHUP`. A failed reload (parse error,
 | `HYDRA_ADMIN_URL` | `http://hydra:4445` | Hydra admin API base URL. Internal-only. |
 | `KRATOS_PUBLIC_URL` | `http://kratos:4433` | Kratos public API. Used for `/sessions/whoami` with cookie passthrough. |
 | `KRATOS_ADMIN_URL` | `http://kratos:4434` | Kratos admin API. Used for identity lookup during consent. |
-| `LOGIN_URL` | `https://home.dunn.dev/auth/login` | Where to redirect users without a Kratos session. `?return_to=` appended. |
+| `LOGIN_URL` | `https://auth.dunn.dev/auth/login` | Where to redirect users without a Kratos session. `?return_to=` appended. |
 | `HYDRA_CLIENT_DIR` | `../hydra/clients` | Directory of `*.yaml` manifests to load at startup and on `SIGHUP`. The `--manifest-dir` flag overrides this. |
 | `HYDRA_ISSUER` | `https://auth.dunn.dev/` | Public issuer string Hydra mints into id_tokens. Used as `iss` on back-channel logout tokens so RPs verify them against the same JWKS. Must byte-match Hydra's `urls.self.issuer`. |
 | `CONSENT_ADMIN_BEARER` | (empty) | Bearer token gating `/admin/*` endpoints. Empty disables the admin endpoints entirely (fail-closed). |

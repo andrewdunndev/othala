@@ -86,7 +86,7 @@ export async function requireAdminSession(astro: any): Promise<Session | Respons
 
   if (session.authenticator_assurance_level !== 'aal2') {
     const returnTo = encodeURIComponent(
-      `https://home.dunn.dev${astro.url.pathname}${astro.url.search}`,
+      `https://auth.dunn.dev${astro.url.pathname}${astro.url.search}`,
     );
     const kratosUrl =
       `https://auth.dunn.dev/self-service/login/browser` +

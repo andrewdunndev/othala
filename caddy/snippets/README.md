@@ -7,7 +7,7 @@ Reusable Caddyfile patterns. Each `*.caddy` file defines a snippet (named with p
 | `oidc-app` | OIDC-native app, plain reverse proxy | Vaultwarden, Mealie, Audiobookshelf, Immich, oCIS, BookLore, GitLab, Grafana |
 | `ldap-app` | App with LDAP plugin, plain reverse proxy (LDAP traffic goes pod-internal to bridge) | Jellyfin |
 | `forward-auth` | App without native SSO, gated by Caddy forward_auth → Kratos session | Navidrome, Sonarr, Radarr, qBittorrent, sabnzbd, Prowlarr |
-| `admin-session` | Admin path: requires Kratos session (any AAL); AAL2 step-up enforced at SSR | home.dunn.dev/admin/* |
+| `admin-session` | Admin path: requires Kratos session (any AAL); AAL2 step-up enforced at SSR | auth.dunn.dev/admin/* |
 
 ## Per-app Caddyfile pattern
 

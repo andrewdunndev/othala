@@ -6,7 +6,7 @@ Ory Hydra configuration as IaC.
 
 | File | Purpose |
 |---|---|
-| `hydra.yml` | Server config: DSN, serve URLs, CORS, login/consent/logout URLs (point at home.dunn.dev), TTLs, secrets, PKCE off |
+| `hydra.yml` | Server config: DSN, serve URLs, CORS, login/consent/logout URLs (point at auth.dunn.dev per Topology B v0.1.4), TTLs, secrets, PKCE off |
 | `clients/*.yaml` | One YAML per OAuth2/OIDC client. Each maps to a `hydra create oauth2-client` invocation. |
 | `apply-clients.sh` | Apply all client manifests to a running Hydra (idempotent: creates new, updates existing). |
 
@@ -23,7 +23,7 @@ Ory Hydra configuration as IaC.
 | `library` | BookLore | authorization_code | OIDC standard |
 | `forge` | GitLab | authorization_code | OIDC standard |
 | `observe` | Grafana | authorization_code | OIDC standard |
-| `tailscale` | Tailscale | authorization_code | NO PKCE; WebFinger served at home.dunn.dev |
+| `tailscale` | Tailscale | authorization_code | NO PKCE; WebFinger served at dunn.dev apex (Cloudflare Pages function — see docs/apex-webfinger-followup.md) |
 | `llm` | vLLM | client_credentials | Machine-to-machine; Caddy validates bearer via Hydra introspect |
 
 Forward-auth-only apps (Navidrome, *arr stack) do **not** have Hydra clients — their auth is via Caddy `forward_auth` against Kratos `/sessions/whoami` directly. The home portal itself is a Kratos consumer (session reader), not a Hydra OAuth2 client.

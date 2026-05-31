@@ -203,7 +203,7 @@ func loadConfig(manifestDirFlag string) Config {
 	hydraAdmin := getenv("HYDRA_ADMIN_URL", "http://hydra:4445")
 	kratosPublic := getenv("KRATOS_PUBLIC_URL", "http://kratos:4433")
 	kratosAdmin := getenv("KRATOS_ADMIN_URL", "http://kratos:4434")
-	loginURL := getenv("LOGIN_URL", "https://home.dunn.dev/auth/login")
+	loginURL := getenv("LOGIN_URL", "https://auth.dunn.dev/auth/login")
 	// HYDRA_ISSUER is the public issuer string Hydra mints into id_tokens
 	// (`urls.self.issuer` in hydra.yml). The consent service uses it as
 	// `iss` on back-channel logout tokens so RPs verify them against the

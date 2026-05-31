@@ -8,7 +8,7 @@ serve:
     cors:
       enabled: true
       allowed_origins:
-        - https://home.dunn.dev
+        - https://auth.dunn.dev
       allowed_methods: [GET, POST, PUT, DELETE]
       allowed_headers:
         - Authorization
@@ -25,16 +25,17 @@ urls:
     issuer: https://auth.dunn.dev/
     public: https://auth.dunn.dev/
 
-  # Login flow handled by Kratos, but Hydra needs to know where to send
-  # the user when they need to authenticate. The Astro UI at home.dunn.dev
-  # handles the login_challenge by checking the Kratos session and
-  # accepting/rejecting via the Hydra admin API (called from the consent
-  # service on carmine, not from the Workers edge).
-  login: https://home.dunn.dev/auth/login
-  consent: https://home.dunn.dev/auth/consent
-  logout: https://home.dunn.dev/auth/logout
-  error: https://home.dunn.dev/auth/error
-  post_logout_redirect: https://home.dunn.dev/
+  # Topology B (v0.1.4): the entire SSO stack lives on auth.dunn.dev.
+  # Hydra redirects authentication-required flows to auth.dunn.dev/auth/*
+  # where the Astro portal renders login/recovery/etc., and the consent
+  # service handles /login with login_challenge via the same Caddy mux.
+  # home.dunn.dev was reserved for a future user-facing tile dashboard
+  # but is not served today (see docs/golden-path.md).
+  login: https://auth.dunn.dev/auth/login
+  consent: https://auth.dunn.dev/auth/consent
+  logout: https://auth.dunn.dev/auth/logout
+  error: https://auth.dunn.dev/auth/error
+  post_logout_redirect: https://auth.dunn.dev/
 
 oidc:
   subject_identifiers:
@@ -69,8 +70,9 @@ oauth2:
 
 secrets:
   # CRITICAL: secrets.system is non-rotatable for the life of the Hydra DB.
-  # Generate once, store in Bitwarden as the canonical source. Never change
-  # without rebuilding the database.
+  # Generate once, store in sops as carmine.hydra_system_secret. Never
+  # change without rebuilding the database. Rotation procedure in
+  # docs/runbooks/secrets-rotation.md.
   system:
     - ${HYDRA_SYSTEM_SECRET}
 

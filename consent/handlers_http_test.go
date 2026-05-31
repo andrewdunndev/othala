@@ -133,7 +133,7 @@ consent:
 		HydraAdminURL:   hydraURL,
 		KratosPublicURL: kratosURL,
 		KratosAdminURL:  kratosURL,
-		LoginURL:        "https://home.dunn.dev/auth/login",
+		LoginURL:        "https://auth.dunn.dev/auth/login",
 		Hydra:           NewHydraAdminClient(hydraURL),
 		Kratos:          NewKratosClient(kratosURL, kratosURL),
 		Manifest:        mset,

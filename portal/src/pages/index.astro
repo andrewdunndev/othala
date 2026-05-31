@@ -1,5 +1,5 @@
 ---
-// home.dunn.dev — three-state landing/launcher.
+// auth.dunn.dev — three-state landing/launcher.
 //
 // State A (down):     Kratos unreachable. Holding panel: mark + short
 //                     message + thin technical line. Doesn't read as a
@@ -105,7 +105,7 @@ const devLinks = [
   {state === 'down' && (
     <section class="holding">
       <span class="holding-mark" set:html={markSvg} />
-      <p class="holding-eyebrow">home.dunn.dev</p>
+      <p class="holding-eyebrow">auth.dunn.dev</p>
       <h1 class="holding-title">Auth services starting up</h1>
       <p class="holding-prose">
         The substrate is offline or unreachable. This page will pick the
@@ -120,7 +120,7 @@ const devLinks = [
       <section class="hero">
         <span class="hero-mark" set:html={markSvg} />
         <div>
-          <p class="hero-eyebrow">home.dunn.dev</p>
+          <p class="hero-eyebrow">auth.dunn.dev</p>
           <h1 class="hero-title">Welcome back</h1>
           <p class="hero-lede">
             Family SSO for the home estate. One sign-in, every app.
