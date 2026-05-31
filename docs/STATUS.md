@@ -1,6 +1,6 @@
 # Status
 
-Canonical cross-session resume doc. Read first.
+Release-state + resume doc; for cold orientation read ARCHITECTURE.md first.
 
 Updated 2026-05-31.
 
@@ -115,7 +115,7 @@ In addition to the v0.1.3 baseline:
 | **Load-bearing decisions map + topology + flows** | `ARCHITECTURE.md` (root) |
 | **Deploy plane** | `DEPLOY.md` (root) + `dunn.dev/iac/services/auth/` |
 | **Upgrade-durability choices** | `docs/golden-path.md` |
-| Locked decisions in detail | `docs/decision.md` |
+| Historical substrate rationale (the Ory choice); architecture superseded | `docs/decision.md` |
 | Per-app integration | `docs/per-app-oidc.md` |
 | Phase 0 substrate review | `lab/docs/adversarial-review.md` |
 | Phase 3 security review | `docs/security-review-2026-05-04.md` |

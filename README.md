@@ -8,9 +8,15 @@ SSO substrate for the dunn.dev estate: Ory Kratos + Hydra + custom glauth-kratos
 
 ## Status
 
-Code complete. Lab validated GREEN twice (Phase 3 rev2 and post-security-remediation). Production cutover pending operator work on carmine: pyinfra quadlets, production secrets, DNS + port-forward, first-user pilot, family rollout.
+Load-bearing; deployed by dunn.dev/iac via vendored tag-pin (carmine runs v0.1.3, awaiting the v0.1.4 tag). Drift between this repo's HEAD and the iac pin is expected and permitted. Transitory, OSS-bound. Cold-start orientation: [`ARCHITECTURE.md`](ARCHITECTURE.md). Release state: [`docs/STATUS.md`](docs/STATUS.md).
 
-Canonical resume doc: [`docs/STATUS.md`](docs/STATUS.md).
+## Relationship to dunn.dev/iac
+
+`dunn.dev/iac` is the deploy plane. It vendors config files from this repo, pinned to a released auth tag, under `iac/services/auth/`. The dependency is a released tag, not a live pointer; git subtree and similar shared-history formats were rejected.
+
+iac decides when to consume a new auth release. Topology-specific differences (e.g., DSN host = `auth-postgres` in iac vs `postgres` in lab compose) are iac-local deviations documented in each vendored file's provenance header.
+
+For the full deploy model, see [`DEPLOY.md`](DEPLOY.md) and `dunn.dev/iac/services/auth/`. For the load-bearing decision record, see [`ARCHITECTURE.md`](ARCHITECTURE.md) LB-12.
 
 ## Layout
 
@@ -21,7 +27,7 @@ Canonical resume doc: [`docs/STATUS.md`](docs/STATUS.md).
 | `hydra/` | Hydra server config + 11 OIDC client manifests + apply script |
 | `consent/` | Consent service (Go, runs alongside Hydra in the auth pod) |
 | `ldap-bridge/` | glauth-kratos: custom glauth binary linked against Kratos public + admin APIs |
-| `caddy/` | Custom `registry.gitlab.com/dunn.dev/caddy-estate` image (xcaddy + caddy-dns/cloudflare) + reusable Caddyfile snippets |
+| `caddy/` | Reusable Caddyfile snippets (auth-specific); the Caddy image is built in the sibling `caddy-estate` repo |
 | `portal/` | Astro Node SSR app: login, recovery, settings, tile launcher, admin (users, groups, OAuth2, activity), WebFinger |
 | `lab/` | GCP-based test environment: compose stack, gen-secrets, Playwright suite, evidence docs |
 | `upstream/` | Maintainer-walk findings and contribution drafts |
@@ -34,7 +40,7 @@ Three layers:
 2. **Bridges (glauth-kratos, consent service).** Custom glauth binary with Kratos backend exposes identities over LDAPS for Jellyfin's plugin (Apple TV / Infuse SSO). Small Go consent service co-located with Hydra handles OAuth2 login/consent challenges without exposing Hydra's admin port publicly.
 3. **Family-facing UI (Astro Node SSR on carmine).** All flows we render: login, recovery, settings, tile launcher, admin. Direct Kratos public API consumption; Hydra consent handoff via the consent service. Hosted on carmine in the same pod network as Kratos and Hydra so the admin port is reachable.
 
-Cloudflare's role: DNS hosting + DNS-01 ACME via API. **Not in the auth or app request path.** Visual language via [`@dunn.dev/design`](https://gitlab.com/dunn.dev/design) v0.3.0 (tokens + site chrome).
+Cloudflare's role: DNS hosting + DNS-01 ACME via API. **Not in the auth or app request path.** Visual language via [`@dunn.dev/reference`](https://gitlab.com/dunn.dev/reference) ^0.2.0 (tokens + site chrome).
 
 ```mermaid
 flowchart TB
@@ -67,7 +73,7 @@ flowchart TB
     end
 
     subgraph AppPods[app pods]
-      apps[12 apps<br/>caddy sidecar + container]
+      apps[13 apps<br/>caddy sidecar + container]
     end
   end
 
@@ -114,19 +120,10 @@ make lab-down      # tear down VM
 
 Required env: `GCP_PROJECT`, `CF_API_TOKEN`, `CF_ZONE_ID`. Evidence from the spike, phase 2, phase 3, security validation, and adversarial review lives in `lab/docs/`.
 
-## Production cutover
-
-Five steps remaining, tracked in `docs/STATUS.md`:
-
-1. Pyinfra carmine quadlets (kratos, kratos-courier, hydra, consent, portal, postgres, caddy sidecar)
-2. Production secrets (gen-secrets equivalent + Bitwarden + carmine env)
-3. DNS records + home router port-forward
-4. First-user pilot (admin self-creates, validates one OIDC app)
-5. Family rollout
-
 ## Working conventions
 
 - Push requires explicit human approval per action
-- `docs/STATUS.md` is the canonical "where we are" doc; update when phases shift
+- `docs/STATUS.md` is the only place release state is asserted; cold-start orientation is `ARCHITECTURE.md`
 - Apply estate voice in external text: no em-dashes, direct phrasing, no filler
-- `@dunn.dev/design` is the single source for tokens and site chrome; do not redefine locally
+- `@dunn.dev/reference` is the single source for tokens and site chrome; do not redefine locally
+- Secrets: sops + age via `dunn.dev/iac/pyinfra/secrets.enc.yaml`

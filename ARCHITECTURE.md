@@ -9,11 +9,22 @@ matter — what they are, where the code lives, and what would break
 if you changed them. Each entry is short on purpose; follow the
 cross-references for depth.
 
+## Doc source-of-truth hierarchy
+
+Each doc has exactly one job. Follow this when editing or reading:
+
+- **ARCHITECTURE.md** (this file) — cold-start orientation + load-bearing decisions. The authoritative anchor; all other docs defer to it.
+- **docs/STATUS.md** — the only place release/version state is asserted. Do not state versions elsewhere.
+- **README.md** — front door; links the others; asserts no version of its own.
+- **DEPLOY.md** — consumption contract; links ARCHITECTURE.md LB-12 rather than restating it.
+
+This hierarchy is what prevents doc drift from recurring.
+
 ## Reading order
 
 1. **Right now (this file)** — what's load-bearing, where to find it, topology + flows.
 2. `docs/golden-path.md` — the upgrade-durability commitments.
-3. `docs/decision.md` — historical decisions, each with rationale.
+3. `docs/decision.md` — historical substrate rationale (the Ory choice); architecture superseded.
 4. `docs/STATUS.md` — current release state + what's next.
 5. `DEPLOY.md` — bidirectional pointer to `dunn.dev/iac` where production lives.
 
@@ -508,16 +519,18 @@ Production posture: pin every image to a known-good version. Renovate
 proposes bumps stack-wide. Never roll to `latest` to "see if it fixes
 things."
 
-| Image | Pin (v0.1.4 baseline) | Renovate-managed |
+| Image | Pin | Renovate-managed |
 |---|---|---|
-| `docker.io/oryd/kratos` | `v26.2.0` | yes |
-| `docker.io/oryd/hydra` | `v26.2.0` | yes |
-| `docker.io/library/postgres` | `18-alpine` | yes |
-| `registry.gitlab.com/dunn.dev/caddy-estate` | semver tag | yes |
-| `registry.gitlab.com/dunn.dev/auth/consent` | `v0.1.4` (this repo's release tag) | self-managed |
-| `registry.gitlab.com/dunn.dev/auth/portal` | `v0.1.4` | self-managed |
-| `registry.gitlab.com/dunn.dev/auth/ldap-bridge` | `v0.1.4` | self-managed |
-| `registry.gitlab.com/dunn.dev/auth/util` | `v0.1.4` | self-managed |
+| `docker.io/oryd/kratos` | see `dunn.dev/iac` quadlets (authoritative) | yes |
+| `docker.io/oryd/hydra` | see `dunn.dev/iac` quadlets (authoritative) | yes |
+| `docker.io/library/postgres` | see `dunn.dev/iac` quadlets (authoritative) | yes |
+| `registry.gitlab.com/dunn.dev/caddy-estate` | see `dunn.dev/iac` quadlets (authoritative) | yes |
+| `registry.gitlab.com/dunn.dev/auth/consent` | see `dunn.dev/iac` quadlets (authoritative) | self-managed |
+| `registry.gitlab.com/dunn.dev/auth/portal` | see `dunn.dev/iac` quadlets (authoritative) | self-managed |
+| `registry.gitlab.com/dunn.dev/auth/ldap-bridge` | see `dunn.dev/iac` quadlets (authoritative) | self-managed |
+| `registry.gitlab.com/dunn.dev/auth/util` | see `dunn.dev/iac` quadlets (authoritative) | self-managed |
+
+Current pinned versions live in `dunn.dev/iac/services/auth/.config/containers/systemd/auth-*.container` (`Image=` lines). `docs/STATUS.md` states the deployed version. Do not restate version numbers here.
 
 Bumping pins:
 

@@ -1,6 +1,14 @@
 # SSO stack fit — decision
 
-**Status:** Decided 2026-05-02. Substrate: **Ory Kratos + Hydra + custom glauth-kratos LDAP bridge + Astro UI on Cloudflare Workers + custom Caddy image (direct go build)**.
+> **SUPERSEDED (partial) -- 2026-05-31.**
+> Several decisions recorded below were reversed during adversarial review and production hardening:
+>
+> - **Workers/Astro-6/KV reversed:** portal runs as Astro Node SSR on carmine, not on Cloudflare Workers. Workers KV health-check was dropped; state is per-request from Kratos directly.
+> - **Bitwarden reversed:** secrets are managed with sops + age (`dunn.dev/iac/pyinfra/secrets.enc.yaml`). Bitwarden is out of scope for this stack.
+>
+> Reversed rows are annotated inline below. The Ory substrate choice, LDAP bridge design, and all identity/auth-policy decisions remain current. For the authoritative architecture, read [`../ARCHITECTURE.md`](../ARCHITECTURE.md). For release state, read [`STATUS.md`](STATUS.md).
+
+**Status:** Decided 2026-05-02. Substrate: **Ory Kratos + Hydra + custom glauth-kratos LDAP bridge + Astro Node SSR portal on carmine + custom Caddy image (direct go build)**.
 
 After evaluating multiple IdP substrates (kanidm, Authelia, Hanko, voidauth, Pocket-ID, Zitadel), Andrew's reframe — "I want UX excellence, not flow customization" — flipped the call to Ory. The 4 feasibility validations went GREEN/YELLOW with manageable risks, and the adversarial review against upstream docs caught two CRITICAL issues that are now corrected in the locked architecture.
 
@@ -68,10 +76,10 @@ The cost: BYO UI (we build the Astro app), 4-5 components instead of one, smalle
 
 | Decision | Value | Notes |
 |---|---|---|
-| Framework | Astro 6 with Cloudflare Workers adapter | Astro 6 dropped the Pages target. |
+| Framework | ~~Astro 6 with Cloudflare Workers adapter~~ **REVERSED: Astro Node SSR on carmine** | Workers adapter dropped; admin port (`kratos:4434`) unreachable from a Worker. Portal runs as a Node process in the auth pod. |
 | Output mode | hybrid; `export const prerender = false` on every SSR page | No inheritance in Astro 6 hybrid mode. |
 | AAL2 enforcement on /admin/* | App-layer SSR guard (`requireAdminSession` in `portal/src/lib/admin.ts`) | **Not Caddy.** Adversarial review correction: Kratos AAL is per-flow, not per-route. |
-| Health check | Cloudflare Worker polls Kratos `/health/ready` every 30s, stores in Workers KV; Astro page reads KV | Edge-fast; doesn't hammer carmine during outage page-refresh storms. |
+| Health check | ~~Cloudflare Worker polls Kratos `/health/ready` every 30s, stores in Workers KV; Astro page reads KV~~ **REVERSED: per-request in-pod fetch** | KV dropped with Workers adapter. `index.astro` fetches `kratos:4433/health/alive` directly (2s timeout). |
 
 ### Public reachability
 
@@ -87,7 +95,7 @@ The cost: BYO UI (we build the Astro app), 4-5 components instead of one, smalle
 |---|---|---|
 | Admin path gate | Caddy forward_auth for "session present"; AAL2 enforced at Astro SSR | App-layer step-up via `?aal=aal2&refresh=true` redirect to Kratos. |
 | Session cookie | `HttpOnly`, `SameSite=Lax`, `domain=.dunn.dev` | Per-app log leakage of cookie names is acceptable; HttpOnly prevents JS access. |
-| `secrets.system` (Hydra) | Generate once, store in Bitwarden, **never rotate** without DB rebuild | Per Hydra docs; baked into the operator playbook. |
+| `secrets.system` (Hydra) | Generate once, store in ~~Bitwarden~~ **sops + age** (`carmine.hydra_system_secret`), **never rotate** without DB rebuild | **REVERSED: Bitwarden out.** Per Hydra docs; baked into the operator playbook. |
 | `hydra-migrate` init | Runs `hydra migrate sql up` before `hydra serve` on every boot | Hydra schema migration is not automatic. |
 | Kratos courier | Singleton (replica:1) | Multiple couriers can double-send. |
 
@@ -97,14 +105,14 @@ The cost: BYO UI (we build the Astro app), 4-5 components instead of one, smalle
 |---|---|---|
 | Postgres | Single instance, separate `kratos` and `hydra` databases | Ory's recommended pattern. |
 | Audit log | alloy → Loki (archival) + small `recent_activity` table for admin UI (last 100 events) | |
-| SMTP | Fastmail | App password from Bitwarden via `SMTP_PASS` env var. |
+| SMTP | Fastmail | App password from ~~Bitwarden~~ **sops** via `SMTP_PASS` env var. **REVERSED: Bitwarden out.** |
 
 ### Posture
 
 | Decision | Value |
 |---|---|
 | Tailscale not load-bearing | Admin/auth/recovery paths must work without Tailscale. |
-| No split identity | All login through Kratos. Bitwarden master password is the one intentional exception. |
+| No split identity | All login through Kratos. Bitwarden master password is one intentional exception (Bitwarden is personal tooling, outside this stack). |
 | Upstream contributions | Likely target: glauth-kratos backend as upstream embedded plugin contribution. The plugin has standalone value beyond our kit. |
 
 ## Adversarial review findings folded in
