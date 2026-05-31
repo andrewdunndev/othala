@@ -98,18 +98,30 @@ fi
 cd "$REPO_ROOT" || exit 1
 echo ""
 
-# ----- Shell scripts: syntax -----
-echo "Shell syntax:"
-SHELL_BAD=0
-for s in lab/ci/*.sh util/apply-clients.sh; do
+# ----- Shell scripts: syntax + shellcheck -----
+echo "Shell syntax + lint:"
+SHELL_SCRIPTS=(lab/ci/*.sh util/apply-clients.sh apex/scripts/*.sh)
+SYNTAX_BAD=0
+for s in "${SHELL_SCRIPTS[@]}"; do
     [[ -f "$s" ]] || continue
     if ! bash -n "$s" 2>/dev/null; then
         step_fail "bash -n $s"
-        SHELL_BAD=1
+        SYNTAX_BAD=1
     fi
 done
-if [[ $SHELL_BAD -eq 0 ]]; then
-    step_pass "bash -n on every shell script in lab/ci/ + util/"
+if [[ $SYNTAX_BAD -eq 0 ]]; then
+    step_pass "bash -n on $(printf '%s\n' "${SHELL_SCRIPTS[@]}" | wc -l | tr -d ' ') scripts"
+fi
+
+# shellcheck if available; non-fatal if not installed (CI installs it).
+if command -v shellcheck >/dev/null 2>&1; then
+    if shellcheck --severity=warning "${SHELL_SCRIPTS[@]}" >/tmp/pre-tag-shellcheck.log 2>&1; then
+        step_pass "shellcheck --severity=warning"
+    else
+        step_fail "shellcheck warnings" "/tmp/pre-tag-shellcheck.log"
+    fi
+else
+    printf "  \033[33m–\033[0m shellcheck not on PATH; skipped (install via mise)\n"
 fi
 echo ""
 
