@@ -12,10 +12,9 @@
 # auth/caddy/snippets/ are volume-mounted at deploy time, not baked
 # into an image here.
 #
-# The consent/ and util/ modules still exist on disk but no longer build
-# images: their roles converge into the othala app. consent/ (Go) keeps its
-# go-build verify (compile check); util/ is a script module (no verify job).
-# Both retire at the E1 cutover.
+# The legacy consent/ (Go) and util/ (Bash) modules were retired at the
+# E1 cutover: their roles converged into the othala app. The source dirs
+# are deleted; only ldap-bridge remains as a standalone Go module.
 #
 # Per-image release flow on every tag:
 #   build       container-image  ->  push :TAG + :latest + cosign sig
@@ -46,13 +45,6 @@ include:
   # node-build components fire on every push and MR event. go.work at
   # repo root makes the multi-module layout play nicely with
   # `go build ./<dir>`.
-  - component: gitlab.com/dunn.dev/pipeline/go-build@2.5.0
-    inputs:
-      stage: verify
-      job_name: verify-consent
-      binary_name: consent
-      package_path: ./consent
-
   - component: gitlab.com/dunn.dev/pipeline/go-build@2.5.0
     inputs:
       stage: verify

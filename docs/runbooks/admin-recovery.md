@@ -25,7 +25,8 @@ A compromised Fastmail account would otherwise self-recover the admin.
 Email recovery for admins == admin Fastmail is part of the trust
 boundary, which we explicitly don't want.
 
-The recovery-gate webhook (`consent/recovery_gate.go`, configured at
+The recovery-gate webhook (handled in `portal/src/server/listen.mjs` via
+`portal/src/lib/access.ts`, configured at
 `kratos.yml: selfservice.flows.recovery.after.code.hooks`) intercepts
 the recovery flow before the privileged session is issued and replies
 HTTP 403 if the identity carries the `admin` group. Non-admin family
@@ -135,7 +136,7 @@ a non-admin recovery completes end-to-end.
 
 ## Related
 
-- `consent/recovery_gate.go`: the gate implementation.
+- `portal/src/server/listen.mjs` + `portal/src/lib/access.ts`: the gate implementation (in-app, post-convergence).
 - `kratos/hooks/recovery-gate.jsonnet`: the request body Kratos sends.
 - `kratos/kratos.yml`: the `selfservice.flows.recovery.after.code.hooks`
   block that wires the gate in (with `auth: api_key` for MEDIUM-2).

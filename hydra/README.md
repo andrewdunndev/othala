@@ -7,11 +7,12 @@ Ory Hydra configuration + OIDC client catalog.
 | File | Purpose |
 |---|---|
 | `hydra.yml` | Server config: DSN, serve URLs, CORS, login/consent/logout URLs (point at dag.dunn.dev per Topology B v0.1.4), TTLs, secrets, PKCE off |
-| `clients/*.yaml` | One YAML per OAuth2/OIDC client. Each has `oidc:` (forwarded to Hydra) and `consent:` (read by the consent service for role/claim emission) namespace blocks. |
+| `clients/*.yaml` | One YAML per OAuth2/OIDC client. Each has `oidc:` (forwarded to Hydra) and `consent:` (read by the othala app for role/claim emission) namespace blocks. |
 
-apply-clients.sh **moved** in v0.1.4: it now lives in `util/` and ships
-in the `dunn.dev/othala/util:vX` image. The image is invoked from iac
-via `make auth-apply-clients HOST=carmine`. See `util/README.md`.
+Client registration: the legacy `apply-clients.sh` / `util/` runner was
+retired at E1 (source deleted). The in-app successor is
+`portal/src/lib/register-clients.ts`. The live deploy-side registration
+path is documented in `DEPLOY.md` ("Client registration").
 
 ## Clients shipped
 

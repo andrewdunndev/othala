@@ -38,8 +38,9 @@ oidc:
 # The hardcoded role names collide with the identity-token vocabulary
 # (`admin`, `user`); Audiobookshelf only validates id_tokens with
 # audience https://listen.dunn.dev, so the collision stays scoped to
-# this client. The audience invariant in consent/manifest.go's
-# ValidateManifests catches a missing aud.
+# this client. The audience invariant in
+# portal/src/lib/register-clients.ts's validateClients catches a missing
+# aud.
 #
 # Source: https://www.audiobookshelf.org/guides/oidc_authentication/
 # Hardcoded role names: https://github.com/advplyr/audiobookshelf/issues/2878

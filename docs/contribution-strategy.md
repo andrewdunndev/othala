@@ -32,8 +32,8 @@ The bridge's standalone value: anyone running Kratos who needs LDAP. The communi
 
 #### Module-path rename plan (L5)
 
-Both `consent/go.mod` and `ldap-bridge/go.mod` currently declare module
-paths under `dunn.dev/auth/...` (the marketing domain). For the
+`ldap-bridge/go.mod` currently declares its module path under
+`dunn.dev/auth/...` (the marketing domain). For the
 upstream extraction this becomes `gitlab.com/dunn.dev/glauth-kratos`
 (or `github.com/glauth/glauth-kratos` if the path lands on glauth's
 account). The rename is mechanical:
@@ -44,9 +44,9 @@ account). The rename is mechanical:
 4. Update Containerfile / Makefile import lines, README install
    instructions, and the GitLab pipeline include if any.
 
-The consent service stays at `dunn.dev/auth/consent` (it's
-deployment-specific, not a candidate for upstreaming). No rename
-needed there.
+(The legacy Go consent service was deployment-specific and never a
+candidate for upstreaming; it was folded into the othala app and its
+source removed at E1, so it plays no part in the bridge extraction.)
 
 Defer until after lab proves the bridge against Jellyfin (Phase 2).
 The rename is a downstream-of-extraction step, not a blocker for

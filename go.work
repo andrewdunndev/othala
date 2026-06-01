@@ -1,12 +1,9 @@
 go 1.22
 
 // Multi-module workspace for the catalog's go-build component. The
-// consent and ldap-bridge services each have their own go.mod so the
-// individual container builds copy only what they need. go.work makes
-// the verify-* CI jobs runnable from the repo root via the standard
-// `go build ./<dir>` shape the catalog expects.
+// ldap-bridge service has its own go.mod so the container build copies
+// only what it needs. go.work makes the verify-* CI jobs runnable from
+// the repo root via the standard `go build ./<dir>` shape the catalog
+// expects.
 
-use (
-	./consent
-	./ldap-bridge
-)
+use ./ldap-bridge

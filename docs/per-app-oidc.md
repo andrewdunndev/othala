@@ -541,5 +541,5 @@ open an upstream issue if the endpoint exists but returns an error.
 - `docs/per-app-oidc.md` -- role/claim contract and role granularity ranking
 - `hydra/clients/*.yaml` -- authoritative manifests
 - `docs/runbooks/secrets-rotation.md` -- break-glass if `secrets.system` is compromised
-- `util/README.md` -- how `dag-util` and `apply-clients.sh` work
+- `portal/src/lib/register-clients.ts` -- the in-app OIDC client registrar (replaces the legacy `dag-util` / `apply-clients.sh` runner)
 - `DEPLOY.md` -- full promotion path including `make dag-apply-clients`

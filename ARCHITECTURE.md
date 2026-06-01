@@ -64,11 +64,11 @@ invalidate. Do not add one.
 tokens with its own key (native since 2019). The former custom
 private-key signer was DELETED. The app holds NO signing key at rest.
 
-**Legacy, pending removal.** The Go `consent/` service and `util/` apply
-runner still exist in-tree but are RETIRED at the iac deploy cutover
-(additive convergence: the TS app landed alongside them, and the cutover
-drops them). They are NOT the current architecture; their behaviour now
-lives in the TS app. Do not document them as the running shape.
+**Legacy, removed.** The Go `consent/` service and `util/` apply runner
+were RETIRED at the iac deploy cutover (additive convergence: the TS app
+landed alongside them, then the cutover dropped them) and the source dirs
+are now DELETED. Their behaviour lives in the TS app. They are NOT the
+current architecture; do not reintroduce them.
 
 ## The load-bearing decisions
 
@@ -696,8 +696,6 @@ bench harness is reusable. Eval evidence in `lab/docs/` (historical).
 | Othala app | `portal/` | Astro + TS | Tile dashboard + Kratos flows + Hydra login/consent/logout + access gate + claims + revoke + admin UI + client registrar |
 | Apps registry | `portal/src/content/apps/` | Markdown | Per-app tile metadata + education content |
 | LDAP bridge | `ldap-bridge/` | Go | glauth-kratos: LDAPS → Kratos identity backend (Jellyfin native clients) |
-| Consent service (legacy) | `consent/` | Go | Retired at cutover; behaviour now in `portal/` |
-| Util image (legacy) | `util/` | Bash + UBI 9 | Retired at cutover; client registration moves to `register-clients.ts` |
 | Lab compose | `lab/compose/` | YAML | Single-VM lab |
 | CI / build | `.gitlab-ci.yml` | GitLab CI YAML | Per-service verify + container-image + sbom + release |
 

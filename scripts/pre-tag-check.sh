@@ -6,7 +6,6 @@
 # fix before tagging.
 #
 # What it runs:
-#   - consent: go test ./...
 #   - ldap-bridge: go test ./...
 #   - portal: npm test
 #   - portal: npm run check (Astro typecheck)
@@ -48,16 +47,8 @@ echo "Branch: $(git branch --show-current)"
 echo "HEAD: $(git log -1 --oneline)"
 echo ""
 
-# ----- Go: consent -----
-echo "Go tests:"
-if cd consent && go test ./... >/tmp/pre-tag-consent.log 2>&1; then
-    step_pass "consent go test"
-else
-    step_fail "consent go test" "/tmp/pre-tag-consent.log"
-fi
-cd "$REPO_ROOT" || exit 1
-
 # ----- Go: ldap-bridge -----
+echo "Go tests:"
 if cd ldap-bridge && go test ./... >/tmp/pre-tag-ldap.log 2>&1; then
     step_pass "ldap-bridge go test"
 else
@@ -100,7 +91,7 @@ echo ""
 
 # ----- Shell scripts: syntax + shellcheck -----
 echo "Shell syntax + lint:"
-SHELL_SCRIPTS=(lab/ci/*.sh util/apply-clients.sh apex/scripts/*.sh)
+SHELL_SCRIPTS=(lab/ci/*.sh apex/scripts/*.sh)
 SYNTAX_BAD=0
 for s in "${SHELL_SCRIPTS[@]}"; do
     [[ -f "$s" ]] || continue

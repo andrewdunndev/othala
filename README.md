@@ -43,7 +43,6 @@ This README asserts no version. It is the front door.
 | `hydra/` | Hydra server config + OIDC client manifests |
 | `portal/` | The Othala application (Astro Node SSR + TS): Kratos self-service flows, Hydra login/consent/logout challenge handlers, the access gate, claims builder, revoke fan-out, dual-listener admin endpoints, and the OIDC client registrar. Publishes as the `othala` image. |
 | `ldap-bridge/` | glauth-kratos: custom glauth binary linked against Kratos public + admin APIs. Stays Go: a protocol adapter for non-OAuth clients (Jellyfin / Apple TV). |
-| `consent/`, `util/` | Legacy Go consent service + apply-clients runner. Their behaviour now lives in `portal/`; retired at the iac deploy cutover. NOT the current architecture. |
 | `caddy/` | Reusable Caddyfile snippets; the Caddy image is built in the sibling `caddy-estate` repo |
 | `lab/` | GCP-based test environment: compose stack, gen-secrets, Playwright suite, evidence docs |
 | `upstream/` | Maintainer-walk findings and contribution drafts |

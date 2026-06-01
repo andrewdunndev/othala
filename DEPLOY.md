@@ -144,9 +144,10 @@ Do not treat it as the live registration path yet.
 ## Deploy cutover (pending)
 
 At the deploy cutover the convergence becomes additive: the legacy Go
-consent service and the `util` runner are retired (they remain in-tree,
-legacy-pending-removal), and the pod collapses to dag-portal (the othala
-app) + dag-ldap-bridge + Ory. The cutover steps that touch deploy:
+consent service and the `util` runner are retired (their source dirs have
+been deleted from this repo at E1), and the pod collapses to dag-portal
+(the othala app) + dag-ldap-bridge + Ory. The cutover steps that touch
+deploy:
 
 - Drop `dag-consent` from the pod; remove `dag-portal`'s
   `After=` / `Requires=dag-consent` and its `CONSENT_ADMIN_BEARER` /
@@ -164,8 +165,8 @@ app) + dag-ldap-bridge + Ory. The cutover steps that touch deploy:
 
 Until the cutover, the iac `dag-*` quadlets remain at the pre-cutover
 shape (`dag-portal` still depends on `dag-consent`). The Go consent +
-util sources still exist in-tree, **legacy-pending-removal**, and are
-not the current architecture.
+util sources have been removed from this repo at E1; their behaviour
+lives in the converged app and they are not the current architecture.
 
 ## Why two repos
 

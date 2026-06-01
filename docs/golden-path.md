@@ -128,8 +128,9 @@ need real service-to-service auth. Out of scope for family.
 
 ### 8. Recovery-gate is the only "we extend Kratos" code path
 
-The recovery-gate webhook (`consent/recovery_gate.go`) is the single
-piece of code where we intercept a Kratos flow. We use it because
+The recovery-gate webhook (handled in `portal/src/server/listen.mjs` via
+`portal/src/lib/access.ts`) is the single piece of code where we
+intercept a Kratos flow. We use it because
 admin email-recovery is the worst-case footgun (compromised Fastmail
 → admin takeover). Everything else uses Kratos's defaults.
 
