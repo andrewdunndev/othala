@@ -38,6 +38,6 @@
   <text x="868" y="340" font-size="9" font-family="IBM Plex Mono, Menlo, monospace" fill="#707070" letter-spacing="0.6">GIT LOG · CONFIG TIMELINE</text>
   <line x1="60" y1="386" x2="1140" y2="386" stroke="#e0e0e0" stroke-width="1"/>
   <text x="60" y="412" font-size="10" font-weight="600" font-family="IBM Plex Mono, Menlo, monospace" fill="#707070" letter-spacing="1.4">ORY · KRATOS · HYDRA · OIDC · LDAP</text>
-  <text x="1140" y="412" text-anchor="end" font-size="10" font-weight="600" font-family="IBM Plex Mono, Menlo, monospace" fill="#707070" letter-spacing="1.4">PRIVATE · GITLAB.COM/DUNN.DEV/othala</text>
+  <text x="1140" y="412" text-anchor="end" font-size="10" font-weight="600" font-family="IBM Plex Mono, Menlo, monospace" fill="#707070" letter-spacing="1.4">MIT · GITLAB.COM/DUNN.DEV/othala</text>
   </g>
 </svg>

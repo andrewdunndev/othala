@@ -133,3 +133,11 @@ Required env: `GCP_PROJECT`, `CF_API_TOKEN`, `CF_ZONE_ID`. Evidence lives in `la
 - Apply estate voice in external text: no em-dashes, direct phrasing, no filler
 - `@dunn.dev/reference` is the single source for tokens and site chrome; do not redefine locally
 - Secrets: sops + age via `dunn.dev/iac/pyinfra/secrets.enc.yaml`
+
+## License
+
+MIT. See [`LICENSE`](LICENSE).
+
+---
+
+Built by Andrew Dunn with GitLab. The rune is ᛟ *othala* (home, inheritance); the door is ᛞ *dagaz* (the threshold).
