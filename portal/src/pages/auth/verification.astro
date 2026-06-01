@@ -14,7 +14,8 @@ export const prerender = false;
 import Layout from '../../layouts/Layout.astro';
 import markSvg from '@dunn.dev/reference/mark/mark.svg?raw';
 import { browserFlows, getVerificationFlow } from '../../lib/kratos';
-import { csrfToken, hasMethod, nodesByGroup, asInput } from '../../lib/nodes';
+import { csrfToken, hasMethod } from '../../lib/nodes';
+import FlowNodes from '../../components/FlowNodes.astro';
 import type { FlowMessage } from '../../lib/types';
 
 const flowId = Astro.url.searchParams.get('flow');
@@ -73,35 +74,12 @@ const phase: 'request' | 'sent' = flow?.state === 'sent_email' ? 'sent' : 'reque
       <form method="POST" action={ui.action} class="verify-form">
         <input type="hidden" name="csrf_token" value={csrf} />
         <input type="hidden" name="method" value="code" />
-        {nodesByGroup(ui.nodes, 'code').map((n) => {
-          const a = asInput(n);
-          if (!a) return null;
-          if (a.type === 'hidden') {
-            return <input type="hidden" name={a.name} value={String(a.value ?? '')} />;
-          }
-          if (a.type === 'submit' || a.type === 'button') {
-            return (
-              <button class="button button-primary verify-primary" type={a.type}
-                      name={a.name} value={String(a.value ?? '')}>
-                {n.meta?.label?.text ?? (phase === 'request' ? 'Send code' : 'Verify code')}
-              </button>
-            );
-          }
-          const id = a.name.replace(/[^a-zA-Z0-9]+/g, '-');
-          return (
-            <div class="field">
-              <label for={id}>{n.meta?.label?.text ?? a.name}</label>
-              <input
-                id={id}
-                name={a.name}
-                type={a.type}
-                required={a.required}
-                autocomplete={a.autocomplete}
-                value={a.value !== undefined ? String(a.value) : ''}
-              />
-            </div>
-          );
-        })}
+        <FlowNodes
+          nodes={ui.nodes}
+          group="code"
+          buttonClass="button button-primary verify-primary"
+          submitLabel={phase === 'request' ? 'Send code' : 'Verify code'}
+        />
       </form>
     )}
 

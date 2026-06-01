@@ -1,0 +1,113 @@
+---
+// Generic Kratos self-service node renderer.
+//
+// One dispatch loop, shared by the recovery / verification / settings flow
+// pages. It walks a single method group's nodes and emits:
+//   - hidden input  → <input type="hidden"> (covers the per-method `method`
+//                      marker and any flow-issued hidden state; the CSRF token
+//                      lives in the `default` group and is rendered by the page)
+//   - submit/button  → <button> honoring a per-call button class (settings'
+//                      primary/secondary styling) and, optionally, an onclick
+//                      (the passkey trigger Kratos wires up)
+//   - other input    → labeled <input>, label sourced from node.meta.label.text
+//
+// The per-input attribute set is built by lib/nodes.ts `inputProps`, so the
+// hidden/labeled/button attribute policy lives in one tested place. The props
+// below are the small, deliberate differences each page needs while keeping
+// rendered output identical to the hand-rolled loops they replace.
+//
+// Pages keep their own copy/strings/structure; ONLY this inner node-dispatch
+// loop is shared. login.astro is intentionally NOT a consumer — its
+// passkey-first / password-in-disclosure UX is bespoke.
+
+import { asInput, inputProps } from '../lib/nodes';
+import type { FlowNode } from '../lib/types';
+
+interface Props {
+  /** The flow's full node array. */
+  nodes: FlowNode[];
+  /** Which method group to render (code | profile | passkey | password | …). */
+  group: FlowNode['group'];
+  /** Class applied to submit/button nodes. */
+  buttonClass: string;
+  /** Fallback label for submit/button nodes when meta.label.text is absent. */
+  submitLabel: string;
+  /** Fallback label for labeled inputs when meta.label.text is absent (default: the field name). */
+  inputLabelFallback?: (name: string) => string;
+  /** Wrap submit/button nodes in a <div class="form-actions"> (settings layout). */
+  wrapActions?: boolean;
+  /** Forward the node's onclick onto the button (passkey trigger). */
+  passOnclick?: boolean;
+  /** Render the value attribute on labeled inputs, empty-string when absent (off for password fields). */
+  passValue?: boolean;
+  /** Render the disabled attribute on labeled inputs (profile fields). */
+  passDisabled?: boolean;
+  /** Render the required attribute on labeled inputs. */
+  passRequired?: boolean;
+  /** Default autocomplete when the node omits one (e.g. 'new-password'). */
+  defaultAutocomplete?: string;
+}
+
+const {
+  nodes,
+  group,
+  buttonClass,
+  submitLabel,
+  inputLabelFallback = (name: string) => name,
+  wrapActions = false,
+  passOnclick = false,
+  passValue = true,
+  passDisabled = false,
+  passRequired = true,
+  defaultAutocomplete,
+} = Astro.props;
+
+const labelText = (node: FlowNode, fallback: string): string =>
+  node.meta?.label?.text ?? fallback;
+---
+{nodes
+  .filter((n) => n.group === group)
+  .map((node) => {
+    const a = asInput(node);
+    if (!a) return null;
+
+    if (a.type === 'hidden') {
+      return <input type="hidden" name={a.name} value={String(a.value ?? '')} />;
+    }
+
+    if (a.type === 'submit' || a.type === 'button') {
+      const props = inputProps(a);
+      const button = (
+        <button
+          class={buttonClass}
+          type={a.type}
+          name={a.name}
+          value={String(a.value ?? '')}
+          onclick={passOnclick ? (props.onclick as string | undefined) : undefined}
+        >
+          {labelText(node, submitLabel)}
+        </button>
+      );
+      return wrapActions ? <div class="form-actions">{button}</div> : button;
+    }
+
+    // Labeled input. Build the attribute set via the shared inputProps helper,
+    // then apply the page's render policy (which optional attrs to surface).
+    const props = inputProps(a);
+    const id = a.name.replace(/[^a-zA-Z0-9]+/g, '-');
+    const autocomplete = (props.autocomplete as string | undefined) ?? defaultAutocomplete;
+    return (
+      <div class="field">
+        <label for={id}>{labelText(node, inputLabelFallback(a.name))}</label>
+        <input
+          id={id}
+          name={a.name}
+          type={a.type}
+          value={passValue ? ('value' in props ? String(props.value) : '') : undefined}
+          required={passRequired ? (props.required as boolean | undefined) : undefined}
+          disabled={passDisabled ? (props.disabled as boolean | undefined) : undefined}
+          autocomplete={autocomplete}
+        />
+      </div>
+    );
+  })}

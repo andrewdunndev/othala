@@ -24,14 +24,13 @@ import {
   getSettingsFlow,
 } from '../../lib/kratos';
 import {
-  asInput,
   csrfToken,
   hasMethod,
-  nodesByGroup,
   scriptNodes,
 } from '../../lib/nodes';
+import FlowNodes from '../../components/FlowNodes.astro';
 import { revokeSubject, RevokeError } from '../../lib/revoke';
-import type { FlowNode, NodeInputAttributes, Session } from '../../lib/types';
+import type { Session } from '../../lib/types';
 
 const cookie = Astro.request.headers.get('cookie') ?? undefined;
 
@@ -96,24 +95,6 @@ const hasProfile = hasMethod(ui.nodes, 'profile');
 const hasPasskey = hasMethod(ui.nodes, 'passkey');
 const hasPassword = hasMethod(ui.nodes, 'password');
 
-interface InputBundle {
-  node: FlowNode;
-  attr: NodeInputAttributes;
-}
-
-function inputsFor(group: FlowNode['group']): InputBundle[] {
-  const out: InputBundle[] = [];
-  for (const node of nodesByGroup(ui.nodes, group)) {
-    const attr = asInput(node);
-    if (attr) out.push({ node, attr });
-  }
-  return out;
-}
-
-function fieldLabel(meta: { label?: { text?: string } } | undefined, fallback: string): string {
-  return meta?.label?.text ?? fallback;
-}
-
 const logoutInfo = await getLogoutInfo(cookie);
 const traits = session.identity.traits;
 const groups = session.identity.metadata_admin?.groups ?? [];
@@ -148,36 +129,14 @@ const accessGroups = groups.filter((g) => g.startsWith('access-'));
       <form method="POST" action={ui.action} class="settings-form">
         <input type="hidden" name="csrf_token" value={csrf} />
         <input type="hidden" name="method" value="profile" />
-        {inputsFor('profile').map(({ node, attr }) => {
-          if (attr.type === 'hidden') {
-            return <input type="hidden" name={attr.name} value={String(attr.value ?? '')} />;
-          }
-          if (attr.type === 'submit' || attr.type === 'button') {
-            return (
-              <div class="form-actions">
-                <button class="button button-primary" type={attr.type}
-                        name={attr.name} value={String(attr.value ?? '')}>
-                  {fieldLabel(node.meta, 'Save changes')}
-                </button>
-              </div>
-            );
-          }
-          const id = attr.name.replace(/[^a-zA-Z0-9]+/g, '-');
-          return (
-            <div class="field">
-              <label for={id}>{fieldLabel(node.meta, attr.name)}</label>
-              <input
-                id={id}
-                name={attr.name}
-                type={attr.type}
-                value={attr.value !== undefined ? String(attr.value) : ''}
-                required={attr.required}
-                disabled={attr.disabled}
-                autocomplete={attr.autocomplete}
-              />
-            </div>
-          );
-        })}
+        <FlowNodes
+          nodes={ui.nodes}
+          group="profile"
+          buttonClass="button button-primary"
+          submitLabel="Save changes"
+          wrapActions
+          passDisabled
+        />
       </form>
     </section>
   )}
@@ -192,35 +151,15 @@ const accessGroups = groups.filter((g) => g.startsWith('access-'));
       <form method="POST" action={ui.action} class="settings-form">
         <input type="hidden" name="csrf_token" value={csrf} />
         <input type="hidden" name="method" value="passkey" />
-        {inputsFor('passkey').map(({ node, attr }) => {
-          if (attr.type === 'hidden') {
-            return <input type="hidden" name={attr.name} value={String(attr.value ?? '')} />;
-          }
-          if (attr.type === 'submit' || attr.type === 'button') {
-            return (
-              <div class="form-actions">
-                <button class="button button-secondary" type={attr.type}
-                        name={attr.name} value={String(attr.value ?? '')}
-                        onclick={attr.onclick}>
-                  {fieldLabel(node.meta, 'Register a passkey')}
-                </button>
-              </div>
-            );
-          }
-          const id = attr.name.replace(/[^a-zA-Z0-9]+/g, '-');
-          return (
-            <div class="field">
-              <label for={id}>{fieldLabel(node.meta, attr.name)}</label>
-              <input
-                id={id}
-                name={attr.name}
-                type={attr.type}
-                value={attr.value !== undefined ? String(attr.value) : ''}
-                autocomplete={attr.autocomplete}
-              />
-            </div>
-          );
-        })}
+        <FlowNodes
+          nodes={ui.nodes}
+          group="passkey"
+          buttonClass="button button-secondary"
+          submitLabel="Register a passkey"
+          wrapActions
+          passOnclick
+          passRequired={false}
+        />
       </form>
     </section>
   )}
@@ -235,34 +174,15 @@ const accessGroups = groups.filter((g) => g.startsWith('access-'));
       <form method="POST" action={ui.action} class="settings-form">
         <input type="hidden" name="csrf_token" value={csrf} />
         <input type="hidden" name="method" value="password" />
-        {inputsFor('password').map(({ node, attr }) => {
-          if (attr.type === 'hidden') {
-            return <input type="hidden" name={attr.name} value={String(attr.value ?? '')} />;
-          }
-          if (attr.type === 'submit' || attr.type === 'button') {
-            return (
-              <div class="form-actions">
-                <button class="button button-secondary" type={attr.type}
-                        name={attr.name} value={String(attr.value ?? '')}>
-                  {fieldLabel(node.meta, 'Change password')}
-                </button>
-              </div>
-            );
-          }
-          const id = attr.name.replace(/[^a-zA-Z0-9]+/g, '-');
-          return (
-            <div class="field">
-              <label for={id}>{fieldLabel(node.meta, attr.name)}</label>
-              <input
-                id={id}
-                name={attr.name}
-                type={attr.type}
-                required={attr.required}
-                autocomplete={attr.autocomplete ?? 'new-password'}
-              />
-            </div>
-          );
-        })}
+        <FlowNodes
+          nodes={ui.nodes}
+          group="password"
+          buttonClass="button button-secondary"
+          submitLabel="Change password"
+          wrapActions
+          passValue={false}
+          defaultAutocomplete="new-password"
+        />
       </form>
     </section>
   )}
