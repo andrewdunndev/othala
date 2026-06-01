@@ -38,6 +38,14 @@ import { parse as parseYaml } from 'yaml';
 export interface ClientRole {
   name: string;
   description: string;
+  /**
+   * Free-form claim_emit map injected into the id_token when the role
+   * resolves for a user (CU2). Mirrors Go `Role.ClaimEmit`. `null` when
+   * the yaml declares the role but omits a `claim_emit:` key — the
+   * validator treats that as a lint error (Go: `role.ClaimEmit == nil`),
+   * so it is preserved faithfully here rather than coerced to `{}`.
+   */
+  claimEmit: Record<string, unknown> | null;
 }
 
 export interface ClientManifest {
@@ -45,9 +53,22 @@ export interface ClientManifest {
   clientName: string;
   redirectUris: string[];
   postLogoutRedirectUris: string[];
+  /** Scope tokens, split for presentation/lookup. */
   scopes: string[];
+  /**
+   * Raw `oidc.scope` string exactly as written in the yaml (space- or
+   * array-joined). This is what Hydra's OAuth2Client.scope expects (a
+   * single space-separated string) and what apply-clients.sh forwarded
+   * verbatim. `scopes` is the parsed form for the UI; `scope` is the
+   * on-the-wire form for registration.
+   */
+  scope: string;
   audience: string[];
   grantTypes: string[];
+  /** `oidc.response_types`; empty for client_credentials clients (vLLM). */
+  responseTypes: string[];
+  /** `oidc.token_endpoint_auth_method`; empty string when the yaml omits it. */
+  tokenEndpointAuthMethod: string;
   skipConsent: boolean;
   /**
    * OIDC Back-Channel Logout 1.0 endpoint, when the app supports it.
@@ -56,12 +77,36 @@ export interface ClientManifest {
    * action posts a signed logout token to this URI per supported app.
    */
   backchannelLogoutUri: string;
+  /**
+   * `oidc.backchannel_logout_session_required`; flips the "include sid
+   * claim" toggle. Defaults false (Go `OIDCConfig.BackchannelLogoutSessionRequired`).
+   */
+  backchannelLogoutSessionRequired: boolean;
   /** Conventional `access-<clientId>` group that grants entry to this app. */
   accessGroup: string;
   /** Declared role enum for the app; may be empty if the yaml has no `roles:` block. */
   roles: ClientRole[];
   /** identity-group → role-name map; what role a member of <group> gets by default. */
   groupRoleMap: Record<string, string>;
+  /**
+   * `consent.emit_groups_claim`. Pointer-to-bool in Go (default true; an
+   * explicit `false` suppresses the auto groups claim). Represented here
+   * as `boolean | null` where `null` means "absent → default true", so
+   * the M10 contradiction lint can distinguish an explicit false.
+   */
+  emitGroupsClaim: boolean | null;
+  /** `consent.skip_access_check`; disables the access-<client_id> gate. */
+  skipAccessCheck: boolean;
+  /** Source filename the manifest was parsed from (Go `SourcePath`). */
+  sourcePath: string;
+}
+
+/**
+ * ShouldEmitGroups — mirrors Go `(*ClientManifest).ShouldEmitGroups`.
+ * Default true; only an explicit `emit_groups_claim: false` suppresses.
+ */
+export function shouldEmitGroups(m: ClientManifest): boolean {
+  return m.emitGroupsClaim ?? true;
 }
 
 function manifestDir(): string {
@@ -83,20 +128,68 @@ function splitScope(scope: unknown): string[] {
   return String(scope).split(/\s+/).filter(Boolean);
 }
 
+/**
+ * Raw on-the-wire scope string, as Hydra's OAuth2Client.scope expects it:
+ * a single space-separated list. apply-clients.sh forwarded `oidc.scope`
+ * verbatim, so an array form is joined with spaces and a string form is
+ * passed through (trimmed).
+ */
+function rawScope(scope: unknown): string {
+  if (!scope) return '';
+  if (Array.isArray(scope)) return scope.map(String).join(' ');
+  return String(scope).trim();
+}
+
+/**
+ * Read a role's `claim_emit` block. Returns the map when present (even
+ * when empty, e.g. `claim_emit: {}` for identity-only clients), and
+ * `null` when the key is absent — faithfully mirroring Go's
+ * `Role.ClaimEmit == nil` so the validator can flag a declared role that
+ * forgot its claim_emit.
+ */
+function readClaimEmit(v: unknown): Record<string, unknown> | null {
+  if (v && typeof v === 'object' && !Array.isArray(v) && 'claim_emit' in v) {
+    const ce = (v as { claim_emit?: unknown }).claim_emit;
+    if (ce && typeof ce === 'object' && !Array.isArray(ce)) {
+      return ce as Record<string, unknown>;
+    }
+    // Present but not a mapping (e.g. claim_emit: null) → treat as nil.
+    return null;
+  }
+  return null;
+}
+
 function normaliseRoles(raw: unknown): ClientRole[] {
   if (!raw) return [];
   if (Array.isArray(raw)) {
     return raw
       .filter((r): r is { name: unknown; description?: unknown } => typeof r === 'object' && r !== null && 'name' in r)
-      .map((r) => ({ name: String(r.name), description: String(r.description ?? '') }));
+      .map((r) => ({
+        name: String(r.name),
+        description: String(r.description ?? ''),
+        claimEmit: readClaimEmit(r),
+      }));
   }
   if (typeof raw === 'object') {
     return Object.entries(raw as Record<string, unknown>).map(([name, v]) => ({
       name,
       description: String((v && typeof v === 'object' && 'description' in v ? (v as { description?: unknown }).description : '') ?? ''),
+      claimEmit: readClaimEmit(v),
     }));
   }
   return [];
+}
+
+/**
+ * Read `consent.emit_groups_claim` preserving the absent/false/true
+ * distinction Go's `*bool` carries: `null` = absent (default true), and
+ * an explicit boolean otherwise.
+ */
+function readEmitGroups(c: Record<string, unknown>): boolean | null {
+  if (!('emit_groups_claim' in c)) return null;
+  const v = c.emit_groups_claim;
+  if (typeof v === 'boolean') return v;
+  return null;
 }
 
 function normaliseGroupRoleMap(raw: unknown): Record<string, string> {
@@ -153,13 +246,20 @@ export function parseManifest(yamlText: string, filename: string): ClientManifes
       ? o.post_logout_redirect_uris.map(String)
       : [],
     scopes: splitScope(o.scope),
+    scope: rawScope(o.scope),
     audience: Array.isArray(o.audience) ? o.audience.map(String) : [],
     grantTypes: Array.isArray(o.grant_types) ? o.grant_types.map(String) : [],
+    responseTypes: Array.isArray(o.response_types) ? o.response_types.map(String) : [],
+    tokenEndpointAuthMethod: o.token_endpoint_auth_method ? String(o.token_endpoint_auth_method) : '',
     skipConsent: Boolean(o.skip_consent ?? false),
     backchannelLogoutUri: o.backchannel_logout_uri ? String(o.backchannel_logout_uri) : '',
+    backchannelLogoutSessionRequired: Boolean(o.backchannel_logout_session_required ?? false),
     accessGroup: `access-${clientId}`,
     roles: normaliseRoles(c.roles),
     groupRoleMap: normaliseGroupRoleMap(c.group_role_map),
+    emitGroupsClaim: readEmitGroups(c),
+    skipAccessCheck: Boolean(c.skip_access_check ?? false),
+    sourcePath: file,
   };
 }
 
@@ -268,6 +368,95 @@ function originOf(raw: string): string | null {
     return new URL(raw).origin;
   } catch {
     return null;
+  }
+}
+
+/**
+ * validateClients — full TS port of consent/manifest.go `validateClients`
+ * (the lint pass shared by Reload's M2 pre-swap guard and the operator
+ * `--validate-manifests` path). Returns one human-readable string per
+ * finding; an empty array means the set is clean.
+ *
+ * Rules, 1:1 with the Go source:
+ *   1. oidc.client_id non-empty.
+ *   2. oidc.audience non-empty (H4: id_token aud verification needs it).
+ *   3. When both audience and redirect_uris are present, at least one
+ *      audience must match a redirect_uri ORIGIN exactly. Reuses the
+ *      CU1-hardened (exact-origin, fail-closed) audienceMatchesRedirect.
+ *   4. Every value in consent.group_role_map must name a declared role.
+ *   5. Every declared role must have a non-null claim_emit.
+ *   6. M10 contradiction: emit_groups_claim:false paired with a role whose
+ *      claim_emit sets a `groups` key — the role's groups land in the token
+ *      despite the suppression. Promoted to an error (same as Go).
+ */
+export function validateClients(set: ClientManifest[]): string[] {
+  const errs: string[] = [];
+  for (const cm of set) {
+    const src = cm.sourcePath || cm.clientId;
+
+    if (cm.clientId === '') {
+      errs.push(`${src}: oidc.client_id is empty`);
+    }
+
+    if (cm.audience.length === 0) {
+      errs.push(
+        `${src}: oidc.audience is empty (every client needs an audience for id_token aud verification)`,
+      );
+    } else if (cm.redirectUris.length > 0) {
+      if (!audienceMatchesRedirect(cm, cm.audience)) {
+        errs.push(
+          `${src}: no oidc.audience origin matches any redirect_uris origin (apps verify id_token.aud against their own URL)`,
+        );
+      }
+    }
+
+    for (const [groupName, roleName] of Object.entries(cm.groupRoleMap)) {
+      if (!cm.roles.some((r) => r.name === roleName)) {
+        errs.push(
+          `${src}: consent.group_role_map[${JSON.stringify(groupName)}] points at role ${JSON.stringify(roleName)} which is not declared in consent.roles`,
+        );
+      }
+    }
+
+    for (const role of cm.roles) {
+      if (role.claimEmit === null) {
+        errs.push(
+          `${src}: consent.roles[${JSON.stringify(role.name)}] has no claim_emit`,
+        );
+      }
+    }
+
+    // M10: emit_groups_claim:false + a role claim_emit that sets `groups`
+    // is a silent contradiction — the role's groups ship in the token even
+    // though the operator suppressed the auto claim. Error, not warning,
+    // so the pre-swap guard rejects a contradictory draft.
+    if (cm.emitGroupsClaim === false) {
+      for (const role of cm.roles) {
+        if (role.claimEmit === null) continue;
+        if (Object.prototype.hasOwnProperty.call(role.claimEmit, 'groups')) {
+          errs.push(
+            `${src}: consent.emit_groups_claim:false but consent.roles[${JSON.stringify(role.name)}].claim_emit.groups is set; the role's groups will still be emitted`,
+          );
+        }
+      }
+    }
+  }
+  return errs;
+}
+
+/**
+ * assertManifestsValid — throws on the first finding (joining all findings
+ * into the message). The in-app successor to the consent service's
+ * `--validate-manifests` exit-non-zero behaviour; called by the registrar
+ * before any client is pushed to Hydra, so a bad manifest set never
+ * half-registers.
+ */
+export function assertManifestsValid(set: ClientManifest[]): void {
+  const errs = validateClients(set);
+  if (errs.length > 0) {
+    throw new Error(
+      `manifest validation failed (${errs.length} finding(s)):\n  - ${errs.join('\n  - ')}`,
+    );
   }
 }
 
