@@ -1,141 +1,545 @@
-# Per-app OIDC integration
+# Per-app OIDC integration runbook
 
-The role/claim contract for each app in the homelab. This is the
-operator-facing reference for what each app reads from the id_token,
-what role tiers it actually supports, and where per-resource ACLs live
-(those are not driven by claims).
+First-deploy and first-user pilot guide. Covers the two-sided nature
+of each integration: the Hydra-client side (manifest + client secret
+in sops) and the RP-app side (entering issuer/client-id/secret/scopes
+into the app's own config). Both sides must have the same secret or the
+integration will fail silently in ways that look like provider errors.
 
-The consent service reads each `hydra/clients/<app>.yaml` `roles:` and
-`group_role_map:` blocks and emits the per-app claim shape into the
-id_token at consent acceptance time. Resolution order: a non-empty
-`metadata_admin.roles[<app>]` override wins; otherwise the first
-identity group with a `group_role_map` entry maps to a role.
+This runbook covers OIDC-based integrations. For the forward-auth apps
+(Navidrome/tune, Sonarr+Radarr/gather) see `docs/per-app-oidc.md`
+"forward auth" note in `ARCHITECTURE.md`. For Cinema's native clients
+(Apple TV / Infuse), see the [Jellyfin LDAP section](#cinema--jellyfin-ldap-not-oidc).
 
-## OIDC clients
+## Overview
 
-| App      | client_id  | App / upstream    | OIDC method              | Role tiers              | JIT? | Group claim shape                              | Per-resource ACL location | Back-channel logout | Notes |
-|----------|------------|-------------------|--------------------------|-------------------------|------|------------------------------------------------|---------------------------|--------------------|-------|
-| keep     | keep       | Vaultwarden       | authorization_code + PKCE| admin, user             | yes  | `groups: [...]` and `resource_access.keep.roles: [...]` once upstream lands | Org collections inside Vaultwarden | yes (set; verify in lab) | Mainline does not yet have role mapping; PR #6158 tracks. Today every login is regular member. Admin uses local admin token. |
-| larder   | larder     | Mealie            | authorization_code       | admin, user             | yes  | `groups: ["larder-admin", "larder-user"]`      | Households, recipes inside Mealie | yes (set; verify in lab) | Two-role only. Login gated by OIDC_USER_GROUP. |
-| listen   | listen     | Audiobookshelf    | authorization_code       | admin, user, guest      | yes  | `groups: ["admin"\|"user"\|"guest"]`             | Library access inside Audiobookshelf | yes (v2.7+) | Hardcoded role names upstream (issue #2878). guest tier defined but unused. |
-| cinema   | cinema     | Jellyfin (browser SSO plugin) | authorization_code | admin, user      | yes  | `groups: ["jellyfin-admin"\|"jellyfin-user"]`   | Library/folder ACLs inside Jellyfin | no (plugin TBD) | Native clients use LDAP via the bridge, same identity, same memberOf. |
-| memory   | memory     | Immich            | authorization_code (web + mobile redirect) | admin, user | yes | `immich_role: "admin"\|"user"` plus `groups: [...]` | Album sharing inside Immich | yes (v1.117+) | Role read on user creation only; not re-synced. |
-| vault    | vault      | oCIS              | authorization_code       | admin, spaceadmin, user, guest | yes | `roles: ["ocisAdmin"\|"ocisSpaceAdmin"\|"ocisUser"\|"ocisGuest"]` plus `groups: [...]` | Space-level ACLs inside oCIS | yes | Richest role tiering of any app. Group provisioning supported. |
-| library  | library    | BookLore          | authorization_code + PKCE| admin (local-only), user | manual (admin must enable) | `groups: [...]` (ignored upstream) | Library access inside BookLore | no | Admin set inside BookLore; OIDC does not drive role. Effectively single-tier from claims. |
-| forge    | forge      | GitLab            | authorization_code       | admin, user, external   | yes  | `groups: ["forge-admin"\|"forge-user"\|"forge-external"]` | Project Maintainer/Developer/etc inside GitLab | yes (v15.4+) | required_groups gates login; admin_groups elevates to instance admin. |
-| observe  | observe    | Grafana           | authorization_code       | admin (GrafanaAdmin), editor, viewer | yes | `grafana_role: ["GrafanaAdmin"\|"Admin"\|"Editor"\|"Viewer"]` plus `groups: [...]` | Folder/dashboard ACLs inside Grafana | yes (v10.2+) | role_attribute_path JMESPath in app config. allow_assign_grafana_admin=true required for instance admin. |
-| tailscale| tailscale  | Tailscale         | authorization_code (no PKCE) | (none — identity only) | n/a (Tailscale provisions on its side) | none — `groups` claim suppressed | Roles/owners assigned inside Tailscale admin console | no | Custom OIDC has no group/role provisioning per upstream KB. |
-| llm      | llm        | vLLM              | client_credentials       | (none — bearer token)   | n/a  | none — no id_token issued                      | n/a (binary admit/deny in Caddy via Hydra introspect) | n/a | Static API key style; no per-user role. |
+- Issuer: `https://auth.dunn.dev/` (LB-2; non-changeable once any RP
+  is wired).
+- Discovery: `https://auth.dunn.dev/.well-known/openid-configuration`
+- Authorization code flow for all interactive apps; `client_credentials`
+  for `llm` (machine-to-machine only).
+- Client manifests live in `dunn.dev/auth/hydra/clients/<slug>.yaml`.
+  Each file has two top-level keys: `oidc:` (forwarded to Hydra) and
+  `consent:` (read by the consent service; never sent to Hydra).
+- `client_id` equals the slug (e.g., `keep`, `observe`).
+- Client secrets are sops-encrypted in `dunn.dev/iac/pyinfra/secrets.enc.yaml`
+  under `carmine.<slug>_oidc_client_secret`. The same plaintext value
+  must land in both Hydra (via `make auth-apply-clients`) and the RP
+  app's own config. They are not linked automatically.
+- Access groups: every interactive OIDC app has a corresponding Ory
+  group named `access-<slug>`. The consent service denies tokens for
+  users not in this group. Add users there before the login test.
 
-The "Back-channel logout" column tracks whether the app accepts a
-signed OIDC back-channel logout token at the configured
-`backchannel_logout_uri`. When the column says "no" or "TBD", admin-
-driven session revoke (`POST /admin/revoke-user` on the consent
-service) drops the Kratos session but the app's local session
-persists until its own cookie expires. Apps marked "verify in lab"
-have the URI set optimistically; lab smoke tests will confirm.
+## Generic procedure (once per new RP)
 
-## Forward auth (no Hydra client)
+Do these steps in order. Steps 1-4 are PRE-DEPLOY verifiable (no live
+app needed). Step 5 requires the RP app to be running.
 
-Forward auth gates traffic at Caddy by calling Kratos `/sessions/whoami`
-plus optional group checks. There is no id_token in the picture, so
-nothing in `hydra/clients/` applies. Admin/non-admin distinction here
-is binary: the user either passes the group check or they don't.
+**1. Generate a client secret.**
 
-| App     | App / upstream    | Header / mechanism                 | Role tiers from claims | Group enforcement |
-|---------|-------------------|------------------------------------|------------------------|-------------------|
-| tune    | Navidrome         | `Remote-User` from Caddy after Kratos whoami; `ND_REVERSEPROXYUSERHEADERNAME` on Navidrome side | none — first proxy user becomes Navidrome admin once, others are regular users | `access-tune` checked in Caddy snippet |
-| gather  | Sonarr / Radarr / Prowlarr | Caddy forward_auth → Kratos `/sessions/whoami` | none — *arr admin is a local concept | `access-gather` checked in Caddy snippet |
+```sh
+openssl rand -base64 32
+```
 
-The Subsonic API path (`/rest/*`, `/share/*`) on tune bypasses forward
-auth entirely; native clients authenticate with Subsonic's own user/
-password, which is the Navidrome-local user that the proxy auth
-initially provisioned.
+Keep the value. You will need it in steps 2 and 4.
 
-## LDAP (no OIDC client)
+**2. Set the sops key.**
 
-Jellyfin's native clients (Apple TV / Infuse) bind LDAPS against the
-glauth-kratos bridge co-located in the Jellyfin pod. The bridge maps
-`metadata_admin.groups` to LDAP `memberOf` entries; the Jellyfin LDAP
-plugin reads memberOf to assign Jellyfin policies. Same identity surface
-as the cinema OIDC client; the group strings emitted as memberOf match
-`jellyfin-admin` / `jellyfin-user` for symmetry across the two paths.
+```sh
+sops dunn.dev/iac/pyinfra/secrets.enc.yaml
+# Add or update: carmine.<slug>_oidc_client_secret: "<value from step 1>"
+```
 
-## Rough ranking by role granularity
+**3. Apply the Hydra client (Hydra side).**
 
-Most granular to least:
+```sh
+cd dunn.dev/iac
+make auth-secrets HOST=carmine   # writes the new sops entry into podman secrets
+make auth-apply-clients HOST=carmine
+```
 
-1. **vault (oCIS)** — four roles (admin, spaceadmin, user, guest) plus
-   group-level space provisioning.
-2. **observe (Grafana)** — four roles (GrafanaAdmin, Admin, Editor,
-   Viewer); allow_assign_grafana_admin gates instance admin.
-3. **forge (GitLab)** — admin / user / external, plus required_groups
-   gating, plus per-project roles set inside GitLab.
-4. **listen (Audiobookshelf)** — admin / user / guest hardcoded.
-5. **memory (Immich)** — admin / user only.
-6. **larder (Mealie)** — admin / user only.
-7. **cinema (Jellyfin)** — admin / user only.
-8. **keep (Vaultwarden)** — admin / user planned, role mapping not yet
-   in mainline.
-9. **library (BookLore)** — admin local-only; OIDC does not drive role.
-10. **tailscale** — no role mapping; identity only.
-11. **llm (vLLM)** — no role concept; bearer-token gate.
+`auth-apply-clients` runs the `auth-util` one-shot container on the
+`auth` network (the only network that can reach Hydra's admin port 4445)
+and POST/PUTs each `hydra/clients/*.yaml` `oidc:` block. The container
+reads `<SLUG>_CLIENT_SECRET` from env, which is sourced from the sops
+entry above. Exit 0 means Hydra accepted the registration.
 
-## What the IDP can and cannot do
+**4. Configure the RP app (app side).**
 
-The IDP's contract ends at the id_token. Per-resource ACLs (which
-album, which library, which project, which space, which Vaultwarden
-collection) live inside each app and stay there. The IDP role drives:
+Enter into the app's own config:
 
-- Whether the user can sign in at all (required_groups, OIDC_USER_GROUP).
-- Whether the user is an instance/server admin (admin_groups,
-  OIDC_ADMIN_GROUP, GrafanaAdmin, etc.).
-- Whether the user gets a coarse JIT-provisioned role tier.
+| Field | Value |
+|---|---|
+| Issuer / OIDC discovery URL | `https://auth.dunn.dev/` |
+| Client ID | `<slug>` (matches the manifest `client_id`) |
+| Client secret | same plaintext from step 1 |
+| Scopes | as listed in the manifest `scope:` field |
+| Redirect URI | must match the manifest `redirect_uris:` exactly |
 
-It does not drive which folders, which libraries, or which collections
-the user can see. That stays inside the app.
+The exact config location varies per app; see the per-RP sections below.
 
-## Audience verification status (A3)
+After editing the app config, restart the app service before testing.
 
-Every `hydra/clients/*.yaml` sets `audience: [https://<app>.dunn.dev]`.
-The consent service verifies on lint that `audience-host` overlaps
-`redirect-host` (good). It cannot verify that each downstream app
-actually checks `aud` on the id_token. If any of the apps below is
-misconfigured to skip aud verification (or doesn't expose the option),
-a tier-2-compromised app can replay one id_token at another app whose
-aud verification is also lax.
+**5. Add the user to the access group (Ory side).**
 
-Phase 4 lab work populates the "verified in lab" column. Until then,
-every row is `NEEDS-VERIFY`.
+The consent service checks group membership before issuing any token.
+Add via the admin portal at `https://auth.dunn.dev/admin/users/<id>`.
 
-| App      | client_id  | audience                               | Verified in Phase 4 lab |
-|----------|------------|----------------------------------------|-------------------------|
-| keep     | keep       | https://keep.dunn.dev                  | NEEDS-VERIFY            |
-| larder   | larder     | https://larder.dunn.dev                | NEEDS-VERIFY            |
-| listen   | listen     | https://listen.dunn.dev                | NEEDS-VERIFY            |
-| cinema   | cinema     | https://cinema.dunn.dev                | NEEDS-VERIFY            |
-| memory   | memory     | https://memory.dunn.dev                | NEEDS-VERIFY            |
-| vault    | vault      | https://vault.dunn.dev                 | NEEDS-VERIFY            |
-| library  | library    | https://library.dunn.dev               | NEEDS-VERIFY            |
-| forge    | forge      | https://forge.dunn.dev                 | NEEDS-VERIFY            |
-| observe  | observe    | https://observe.dunn.dev               | NEEDS-VERIFY            |
-| tailscale| tailscale  | https://login.tailscale.com (LOW-4)    | N/A (RP check by client_id, not aud) |
-| llm      | llm        | (client_credentials; no id_token)      | N/A                     |
+**6. Test login (LIVE only).**
 
-Per-app verification recipe:
+Navigate to the app URL, click "Sign in with SSO" (or equivalent),
+complete the Kratos authn flow, confirm the app lands the user on the
+correct page with the expected role. Check Hydra logs if the flow
+aborts before redirect:
 
-1. Trigger an OIDC sign-in to app X.
-2. Capture the id_token issued by Hydra (browser dev tools → network →
-   /oauth2/token response).
-3. Tamper with `aud`: edit the JWT payload to set `aud` to a different
-   app's host, re-sign with the actual Hydra signing key (or just flip
-   one byte — the goal is "does the app reject?").
-4. Replay the tampered token at app X's session endpoint. App X must
-   reject. If it accepts: open an issue in `auth/` with the app name
-   and the misbehaving config knob.
+```sh
+journalctl --user -u auth-hydra.service -n 100 | grep -i error
+```
 
-Apps that pass receive a green tick in the column; apps that fail
-yield a follow-up task to fix the app config. Apps where no
-config option exists (e.g., a hypothetical Vaultwarden mainline that
-doesn't verify aud) get a Compensating Control note pointing at the
-sub-domain isolation that limits replay risk in our shape.
+---
+
+## Per-RP integrations
+
+### observe -- Grafana (pilot: first)
+
+- **App:** Grafana at `https://observe.dunn.dev`
+- **Access group:** `access-observe`
+- **Redirect URI:** `https://observe.dunn.dev/login/generic_oauth`
+- **Scopes:** `openid email profile groups offline_access`
+- **Back-channel logout URI:** `https://observe.dunn.dev/login/generic_oauth/logout`
+- **Role claim:** `grafana_role` (array). Evaluated via JMESPath in Grafana config.
+
+RP-side config location: `grafana.ini` section `[auth.generic_oauth]`,
+or environment variables with `GF_AUTH_GENERIC_OAUTH_` prefix.
+
+Minimum required keys:
+
+```ini
+[auth.generic_oauth]
+enabled = true
+name = Auth
+client_id = observe
+client_secret = <value from sops>
+scopes = openid email profile groups offline_access
+auth_url = https://auth.dunn.dev/oauth2/auth
+token_url = https://auth.dunn.dev/oauth2/token
+api_url = https://auth.dunn.dev/userinfo
+redirect_uri = https://observe.dunn.dev/login/generic_oauth
+use_pkce = false
+allow_sign_up = true
+role_attribute_path = contains(grafana_role[*], 'GrafanaAdmin') && 'GrafanaAdmin' || contains(grafana_role[*], 'Admin') && 'Admin' || contains(grafana_role[*], 'Editor') && 'Editor' || 'Viewer'
+allow_assign_grafana_admin = true
+groups_attribute_path = groups
+backchannel_logout_enabled = true
+```
+
+PRE-DEPLOY verifiable: client registered in Hydra, secret matches,
+`allow_assign_grafana_admin` is `true` for the admin role to take effect.
+
+LIVE only: complete login, verify role shown in Grafana user profile.
+
+---
+
+### keep -- Vaultwarden (pilot: second)
+
+- **App:** Vaultwarden at `https://keep.dunn.dev`
+- **Access group:** `access-keep`
+- **Redirect URI:** `https://keep.dunn.dev/identity/connect/oidc-signin`
+- **Scopes:** `openid email profile groups offline_access`
+- **Back-channel logout URI:** `https://keep.dunn.dev/identity/connect/oidc-logout` (set optimistically; verify in lab -- the wiki documents SLO without explicitly confirming back-channel)
+- **Role claim:** `resource_access.keep.roles` (future, once PR #6158 merges upstream). Today: every SSO user is a regular member; admin uses local admin token.
+
+RP-side config location: Vaultwarden environment variables, typically
+set in the quadlet or compose file.
+
+Minimum required env:
+
+```sh
+SSO_ENABLED=true
+SSO_CLIENT_ID=keep
+SSO_CLIENT_SECRET=<value from sops>
+SSO_AUTHORITY=https://auth.dunn.dev/
+SSO_SCOPES=groups offline_access
+# Once PR #6158 lands upstream, also set:
+# SSO_ROLES_ENABLED=true
+# SSO_ROLES_TOKEN_PATH=resource_access.keep.roles
+```
+
+Verify against [Vaultwarden SSO wiki](https://github.com/dani-garcia/vaultwarden/wiki/Enabling-SSO-support-using-OpenId-Connect)
+at deploy for current env var names (the SSO module is under active
+development; names may have shifted).
+
+PRE-DEPLOY verifiable: client registered, env vars set, container
+restart scheduled.
+
+LIVE only: SSO sign-in completes, user appears in Vaultwarden user list.
+Admin role requires PR #6158 to merge; until then, set admin in
+Vaultwarden's local admin panel.
+
+---
+
+### forge -- GitLab
+
+- **App:** Self-managed GitLab at `https://forge.dunn.dev`
+- **Access group:** `access-forge` (enforced via `required_groups: ["forge-user"]` in gitlab.rb)
+- **Redirect URI:** `https://forge.dunn.dev/users/auth/openid_connect/callback`
+- **Scopes:** `openid email profile groups offline_access`
+- **Back-channel logout URI:** `https://forge.dunn.dev/users/auth/openid_connect/logout`
+
+RP-side config location: `gitlab.rb` on the forge side (or `gitlab.yml`
+`omniauth:` for Helm/Kubernetes installs).
+
+```ruby
+gitlab_rails['omniauth_enabled'] = true
+gitlab_rails['omniauth_allow_single_sign_on'] = ['openid_connect']
+gitlab_rails['omniauth_sync_email_from_provider'] = 'openid_connect'
+gitlab_rails['omniauth_auto_link_user'] = ['openid_connect']
+gitlab_rails['omniauth_providers'] = [
+  {
+    name: 'openid_connect',
+    label: 'Auth (dunn.dev)',
+    args: {
+      name: 'openid_connect',
+      scope: ['openid', 'email', 'profile', 'groups', 'offline_access'],
+      response_type: 'code',
+      issuer: 'https://auth.dunn.dev/',
+      discovery: true,
+      client_auth_method: 'basic',
+      client_options: {
+        identifier: 'forge',
+        secret: '<value from sops>',
+        redirect_uri: 'https://forge.dunn.dev/users/auth/openid_connect/callback',
+        gitlab: {
+          groups_attribute: 'groups',
+          required_groups: ['forge-user'],
+          admin_groups: ['forge-admin'],
+          external_groups: ['forge-external']
+        }
+      }
+    }
+  }
+]
+```
+
+Run `gitlab-ctl reconfigure` after editing. Verify against the
+[GitLab OIDC docs](https://docs.gitlab.com/administration/auth/oidc/)
+at deploy; the `client_options.gitlab` sub-key is a GitLab extension
+to the OmniAuth OIDC strategy and the key names may differ across
+GitLab versions.
+
+PRE-DEPLOY verifiable: client registered, `gitlab.rb` updated,
+`reconfigure` exits 0.
+
+LIVE only: SSO login completes, user's admin flag matches their group
+membership.
+
+---
+
+### memory -- Immich
+
+- **App:** Immich at `https://memory.dunn.dev`
+- **Access group:** `access-memory`
+- **Redirect URIs:** `https://memory.dunn.dev/auth/login` and `app.immich:/` (mobile)
+- **Scopes:** `openid email profile groups offline_access`
+- **Back-channel logout URI:** `https://memory.dunn.dev/api/oauth/logout` (v1.117+)
+- **Role claim:** `immich_role` (string: `"admin"` or `"user"`). Read at user creation only; not re-synced on subsequent logins.
+
+RP-side config location: Immich admin UI under Administration > OAuth,
+or `IMMICH_OAUTH_*` environment variables.
+
+Key settings (verify exact env names against [Immich OAuth docs](https://docs.immich.app/administration/oauth/)):
+
+```sh
+OAUTH_ENABLED=true
+OAUTH_ISSUER_URL=https://auth.dunn.dev/
+OAUTH_CLIENT_ID=memory
+OAUTH_CLIENT_SECRET=<value from sops>
+OAUTH_SCOPE=openid email profile groups offline_access
+OAUTH_AUTO_REGISTER=true
+# The role claim name must match what the consent service emits:
+OAUTH_IMMICH_ADMIN_ROLE=admin  # value to match in immich_role claim
+```
+
+PRE-DEPLOY verifiable: client registered, env set or UI values saved.
+
+LIVE only: first login provisions the user with the correct role.
+Role is set once at creation; to change an existing user's role, use
+the Immich admin UI directly.
+
+---
+
+### vault -- oCIS
+
+- **App:** ownCloud Infinite Scale at `https://vault.dunn.dev`
+- **Access group:** `access-vault`
+- **Redirect URIs:** `https://vault.dunn.dev/oidc-callback` and `https://vault.dunn.dev/oidc-silent-redirect`
+- **Scopes:** `openid email profile groups offline_access`
+- **Back-channel logout URI:** `https://vault.dunn.dev/signin/v1/oidc-backchannel-logout`
+- **Role claim:** `roles` (array). Values: `ocisAdmin`, `ocisSpaceAdmin`, `ocisUser`, `ocisGuest`.
+
+RP-side config location: oCIS proxy service config (`proxy.yaml`) and
+oCIS env variables. The proxy reads OIDC claims when
+`PROXY_ROLE_ASSIGNMENT_DRIVER=oidc`.
+
+Key env vars (verify against [oCIS proxy docs](https://doc.owncloud.com/ocis/next/deployment/services/s-list/proxy.html)):
+
+```sh
+PROXY_OIDC_ISSUER=https://auth.dunn.dev/
+OCIS_OIDC_ISSUER=https://auth.dunn.dev/
+PROXY_ROLE_ASSIGNMENT_DRIVER=oidc
+PROXY_ROLE_ASSIGNMENT_OIDC_CLAIM=roles
+PROXY_AUTOPROVISION_CLAIM_GROUPS=groups
+# Client ID/secret used by oCIS internal services for machine-to-machine:
+OCIS_OIDC_CLIENT_ID=vault
+# client_secret: verify against oCIS docs whether this is needed for
+# the proxy path or only for the IDP-internal service accounts.
+```
+
+PRE-DEPLOY verifiable: client registered, proxy config updated.
+
+LIVE only: login completes, user's space appears, role reflects their
+identity group (admin -> ocisAdmin, family -> ocisUser, etc.).
+
+---
+
+### larder -- Mealie
+
+- **App:** Mealie at `https://larder.dunn.dev`
+- **Access group:** `access-larder`
+- **Redirect URI:** `https://larder.dunn.dev/login`
+- **Scopes:** `openid email profile groups offline_access`
+- **Back-channel logout URI:** `https://larder.dunn.dev/api/auth/oidc/logout` (set optimistically; verify in lab)
+- **Role claim:** `groups` array. Values: `larder-admin` or `larder-user`. Login gated by `OIDC_USER_GROUP`.
+
+RP-side config (env vars in the Mealie quadlet):
+
+```sh
+OIDC_AUTH_ENABLED=true
+OIDC_CONFIGURATION_URL=https://auth.dunn.dev/.well-known/openid-configuration
+OIDC_CLIENT_ID=larder
+OIDC_CLIENT_SECRET=<value from sops>
+OIDC_AUTO_REDIRECT=false
+OIDC_GROUPS_CLAIM=groups
+OIDC_USER_GROUP=larder-user
+OIDC_ADMIN_GROUP=larder-admin
+OIDC_USER_CLAIMS_UPDATE=true
+```
+
+Verify against [Mealie OIDC v2 docs](https://docs.mealie.io/documentation/getting-started/authentication/oidc-v2/)
+at deploy; the OIDC env interface was overhauled in the v2 release and
+var names are not stable across minor versions.
+
+PRE-DEPLOY verifiable: client registered, env set, service restart.
+
+LIVE only: login completes, household appears, admin user gets Mealie
+admin badge.
+
+---
+
+### tailscale (external RP)
+
+- **App:** Tailscale control plane at `https://login.tailscale.com`
+- **Redirect URI:** `https://login.tailscale.com/a/oauth_response`
+- **Scopes:** `openid email profile` (no `groups`; groups claim suppressed)
+- **No back-channel logout** (Tailscale custom OIDC has no per-app session to revoke)
+- **No access group enforcement** at the IDP; access is controlled in the Tailscale admin console
+
+Tailscale tenant setup is a one-time operation, not a per-deploy step.
+WebFinger for `*@dunn.dev` is served from the dunn.dev apex
+(Cloudflare Pages function); the issuer URL is locked in at that time.
+See `docs/apex-webfinger-followup.md` for the discovery path.
+
+RP-side config: Tailscale admin console > Settings > OIDC. Enter:
+- Issuer URL: `https://auth.dunn.dev/`
+- Client ID: `tailscale`
+- Client secret: value from sops
+
+Roles and owner assignments are made inside Tailscale; the IDP delivers
+identity only.
+
+PRE-DEPLOY verifiable: client registered in Hydra, WebFinger response
+returns the correct issuer.
+
+LIVE only: user authenticates, Tailscale node approves.
+
+---
+
+### listen -- Audiobookshelf
+
+- **App:** Audiobookshelf at `https://listen.dunn.dev`
+- **Access group:** `access-listen`
+- **Redirect URIs:** `https://listen.dunn.dev/auth/openid/callback` (web) and `https://listen.dunn.dev/auth/openid/mobile-redirect` (mobile)
+- **Scopes:** `openid email profile groups offline_access`
+- **Back-channel logout URI:** `https://listen.dunn.dev/auth/openid/logout` (v2.7+)
+- **Role claim:** `groups` array. Values are the literal strings `admin`, `user`, or `guest` (hardcoded upstream; not configurable as of v2.x).
+
+RP-side config location: Audiobookshelf admin UI under Settings >
+Authentication. Verify exact field names against the
+[Audiobookshelf OIDC guide](https://www.audiobookshelf.org/guides/oidc_authentication/)
+at deploy.
+
+Key fields:
+
+```
+Issuer URL:      https://auth.dunn.dev/
+Client ID:       listen
+Client secret:   <value from sops>
+Scopes:          openid email profile groups offline_access
+Group claim:     groups
+Auto Register:   enabled
+```
+
+PRE-DEPLOY verifiable: client registered, fields saved.
+
+LIVE only: login completes, user's role shown in Audiobookshelf matches
+their identity group (admin -> `admin`, family/friends/kids -> `user`).
+
+---
+
+### library -- BookLore
+
+- **App:** BookLore at `https://library.dunn.dev`
+- **Access group:** `access-library`
+- **Redirect URI:** `https://library.dunn.dev/api/auth/oidc/callback`
+- **Scopes:** `openid email profile groups offline_access`
+- **No back-channel logout** (not implemented in BookLore upstream as of v0.x)
+- **Role claim:** none. BookLore ignores `groups`; admin is set inside BookLore only.
+
+RP-side config: verify against [BookLore OIDC docs](https://booklore.org/docs/tools/user-management)
+at deploy for current config keys. Expected fields:
+
+```
+Issuer URL:    https://auth.dunn.dev/
+Client ID:     library
+Client secret: <value from sops>
+Scopes:        openid email profile groups offline_access
+```
+
+JIT user creation requires an admin to enable it in BookLore settings.
+Enable that before the first login test or the user will see a 403.
+
+PRE-DEPLOY verifiable: client registered, config saved.
+
+LIVE only: login completes, user appears with `OIDC` badge in BookLore
+user list. Admin role must be granted inside BookLore manually.
+
+---
+
+### llm -- vLLM (machine-to-machine only)
+
+- **Flow:** `client_credentials` (no user, no id_token, no login UI)
+- **No access group** (the consent service skips the access check for client_credentials)
+- **No back-channel logout** (bearer tokens expire; revoke via Hydra admin API)
+
+The llm client is for API consumers, not for interactive sign-in.
+Caddy in front of vLLM introspects the bearer token at
+`https://auth.dunn.dev/admin/oauth2/introspect`. A valid active token
+admits the request; anything else is a 401.
+
+Obtain a token:
+
+```sh
+curl -s -u 'llm:<client_secret>' \
+  -d 'grant_type=client_credentials&scope=api' \
+  https://auth.dunn.dev/oauth2/token | jq .access_token
+```
+
+Pass the token as `Authorization: Bearer <token>` to the vLLM API.
+
+PRE-DEPLOY verifiable: client registered, token endpoint returns a
+token for the correct `client_id`.
+
+LIVE only: a token with `scope=api` reaches vLLM without a 401.
+
+---
+
+### listen, library, llm -- unconfirmed target apps
+
+The manifest slugs `listen` (Audiobookshelf), `library` (BookLore), and
+`llm` (vLLM) are confirmed by the manifest comments and consent blocks
+above. No verification gap exists for these slugs; the uncertainty is
+only in the RP-side config field names, which are stable enough to
+link to upstream docs rather than reproduce here.
+
+---
+
+## Cinema / Jellyfin -- LDAP, not OIDC
+
+Browser logins to Jellyfin use the OIDC path above (client_id: `cinema`,
+plugin: `jellyfin-plugin-sso`). Native clients (Apple TV, Infuse) use
+LDAP via the glauth-kratos bridge co-located in the Jellyfin pod.
+
+The bridge maps Kratos identity groups to LDAP `memberOf` attributes.
+The Jellyfin LDAP plugin reads `memberOf` to assign Jellyfin policies.
+The group strings emitted (`jellyfin-admin`, `jellyfin-user`) match the
+OIDC path for consistency.
+
+Configure the Jellyfin LDAP plugin with:
+
+| Field | Value |
+|---|---|
+| LDAP server | `localhost` (bridge is in the same pod) |
+| LDAP port | `636` (LDAPS) or `389` (LDAP; verify against bridge config) |
+| Bind DN | `cn=ldap-reader,dc=dunn,dc=dev` |
+| Bind password | value of `LDAP_SERVICE_BIND_PASSWORD` from sops |
+| Base DN | `dc=dunn,dc=dev` |
+| User search filter | `(&(objectClass=posixAccount)(memberOf=cn=cinema,ou=groups,dc=dunn,dc=dev))` |
+
+IMPORTANT: anonymous bind now returns an empty result set. The bind DN
+is required. If logins return no users or a 401, the first thing to
+check is whether the bind password is set correctly in the plugin.
+
+The LDAP plugin requires the Jellyfin LDAP Authentication plugin to be
+installed from the plugin catalog; it is not bundled. Restart Jellyfin
+after installing and after each config change.
+
+PRE-DEPLOY verifiable: `LDAP_SERVICE_BIND_PASSWORD` is in sops,
+bridge container is running, `ldapsearch` from inside the pod with the
+bind DN returns at least one account in the `cinema` group.
+
+LIVE only: native client login completes and lands the user in the
+correct Jellyfin library.
+
+---
+
+## Troubleshooting
+
+**Redirect URI mismatch.** Hydra rejects the auth request with
+`redirect_uri_mismatch`. The URI in the app config (including trailing
+slash, scheme, and exact path) must byte-match the manifest
+`redirect_uris:` entry. Check both sides. A common mistake is omitting
+or adding a trailing slash.
+
+**Secret mismatch between sides.** The RP app presents the client secret
+to Hydra's token endpoint. If the value differs from what Hydra has
+stored, the token exchange fails with `invalid_client`. Regenerate and
+set the sops value, re-run `make auth-apply-clients`, and update the
+app config. Both must come from the same sops plaintext.
+
+**Missing access group.** The consent service returns an error if the
+authenticating user is not a member of `access-<slug>`. Add the user to
+the group via the admin portal before retesting. The group must exist in
+Kratos; it is created by the Kratos init or by the admin UI -- it is not
+auto-created on first login.
+
+**Nonce / state validation failure.** If the app logs a nonce or state
+mismatch after the redirect, the most common cause is a clock skew
+between carmine and the client, or a redirect through an intermediate
+that drops the state query parameter (e.g., a reverse proxy rewriting
+the Location header). Check NTP sync on carmine and ensure the proxy
+config passes query parameters unchanged.
+
+**Back-channel logout returning 4xx.** For apps marked "verify in lab"
+(`keep`, `larder`), a 4xx on the logout endpoint is expected if the
+upstream has not implemented back-channel. Log the gap, fall back to
+admin session revoke via the portal (`POST /admin/revoke-user`), and
+open an upstream issue if the endpoint exists but returns an error.
+
+## Related
+
+- `ARCHITECTURE.md` -- issuer URL (LB-2), cookie domain (LB-4), subject types (LB-5)
+- `docs/per-app-oidc.md` -- role/claim contract and role granularity ranking
+- `hydra/clients/*.yaml` -- authoritative manifests
+- `docs/runbooks/secrets-rotation.md` -- break-glass if `secrets.system` is compromised
+- `util/README.md` -- how `auth-util` and `apply-clients.sh` work
+- `DEPLOY.md` -- full promotion path including `make auth-apply-clients`
