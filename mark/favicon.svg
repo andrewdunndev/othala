@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="othala rune: home and inheritance — the estate.">
+  <!-- The ᛟ othala rune (home / inheritance), the destination of the
+       ᛞ→ᛟ "door to home" motif. Heavy-stroke 16-32px variant with a
+       filled center dot. Hardcoded accent moss #4a6741 so the favicon
+       reads green in browser chrome regardless of inherited document
+       color (matches the estate favicon convention). -->
+  <line x1="32" y1="8" x2="48" y2="24" stroke="#4a6741" stroke-width="5.5" stroke-linecap="round"/>
+  <line x1="48" y1="24" x2="32" y2="40" stroke="#4a6741" stroke-width="5.5" stroke-linecap="round"/>
+  <line x1="32" y1="40" x2="16" y2="24" stroke="#4a6741" stroke-width="5.5" stroke-linecap="round"/>
+  <line x1="16" y1="24" x2="32" y2="8" stroke="#4a6741" stroke-width="5.5" stroke-linecap="round"/>
+  <line x1="32" y1="40" x2="18" y2="56" stroke="#4a6741" stroke-width="5.5" stroke-linecap="round"/>
+  <line x1="32" y1="40" x2="46" y2="56" stroke="#4a6741" stroke-width="5.5" stroke-linecap="round"/>
+  <circle cx="32" cy="24" r="2.75" fill="#4a6741"/>
+</svg>

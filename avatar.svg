@@ -4,10 +4,41 @@
   <rect x="0" y="0" width="256" height="256" fill="none" stroke="#e0e0e0" stroke-width="1"/>
   <text x="128" y="56" text-anchor="middle" font-size="32" font-weight="700" fill="#4a6741">othala</text>
   <text x="128" y="76" text-anchor="middle" font-size="10" fill="#707070">Ory for your home</text>
-  <g font-family="Menlo, monospace" text-anchor="middle">
-    <text x="78" y="158" font-size="56" font-weight="700" fill="#0a0a0a">&#5662;</text>
-    <text x="128" y="150" font-size="26" fill="#707070">&#8594;</text>
-    <text x="178" y="158" font-size="56" font-weight="700" fill="#0a0a0a">&#5663;</text>
+  <!-- door (dagaz ᛞ) → home (othala ᛟ), geometric runic line-art coherent with mark/ -->
+  <!-- dagaz ᛞ : 64-unit glyph scaled 0.78 (≈50u) centered at (78,128); origin offset = center - 32*scale -->
+  <g transform="translate(53.04 103.04) scale(0.78)" stroke="#0a0a0a" stroke-width="2.4" stroke-linecap="round" fill="none">
+    <line x1="16" y1="14.5" x2="16" y2="49.5"/>
+    <line x1="48" y1="14.5" x2="48" y2="49.5"/>
+    <line x1="17.9" y1="13.9" x2="30.1" y2="30.1"/>
+    <line x1="33.9" y1="33.9" x2="46.1" y2="50.1"/>
+    <line x1="17.9" y1="50.1" x2="30.1" y2="33.9"/>
+    <line x1="33.9" y1="30.1" x2="46.1" y2="13.9"/>
+    <circle cx="16" cy="12" r="2.5" stroke-width="1.9"/>
+    <circle cx="48" cy="12" r="2.5" stroke-width="1.9"/>
+    <circle cx="16" cy="52" r="2.5" stroke-width="1.9"/>
+    <circle cx="48" cy="52" r="2.5" stroke-width="1.9"/>
+    <circle cx="32" cy="32" r="2" stroke-width="1.9"/>
+  </g>
+  <!-- geometric arrow -->
+  <g stroke="#707070" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" fill="none">
+    <line x1="116" y1="128" x2="140" y2="128"/>
+    <polyline points="134,123 140,128 134,133"/>
+  </g>
+  <!-- othala ᛟ : same 64-unit idiom as mark/mark.svg, scaled 0.78 centered at (178,128) -->
+  <g transform="translate(153.04 103.04) scale(0.78)" stroke="#0a0a0a" stroke-width="2.4" stroke-linecap="round" fill="none">
+    <line x1="33.8" y1="9.8" x2="46.2" y2="22.2"/>
+    <line x1="46.2" y1="25.8" x2="33.8" y2="38.2"/>
+    <line x1="30.2" y1="38.2" x2="17.8" y2="25.8"/>
+    <line x1="17.8" y1="22.2" x2="30.2" y2="9.8"/>
+    <line x1="30.4" y1="41.9" x2="19.6" y2="54.1"/>
+    <line x1="33.6" y1="41.9" x2="44.4" y2="54.1"/>
+    <circle cx="32" cy="8" r="2.5" stroke-width="1.9"/>
+    <circle cx="48" cy="24" r="2.5" stroke-width="1.9"/>
+    <circle cx="32" cy="40" r="2.5" stroke-width="1.9"/>
+    <circle cx="16" cy="24" r="2.5" stroke-width="1.9"/>
+    <circle cx="18" cy="56" r="2.5" stroke-width="1.9"/>
+    <circle cx="46" cy="56" r="2.5" stroke-width="1.9"/>
+    <circle cx="32" cy="24" r="2" stroke-width="1.9"/>
   </g>
   <line x1="40" y1="200" x2="216" y2="200" stroke="#e0e0e0" stroke-width="1"/>
   <text x="128" y="218" text-anchor="middle" font-size="9" font-weight="600" fill="#0a0a0a">kratos · hydra · oidc · ldap</text>
