@@ -2,10 +2,8 @@ package main
 
 import (
 	"encoding/json"
-	"io"
 	"net/http"
 	"net/http/httptest"
-	"net/url"
 	"strings"
 	"testing"
 )
@@ -272,29 +270,3 @@ func TestApplyClientsDryRun_HasOnlyOIDCFields(t *testing.T) {
 	}
 }
 
-func TestPostLogoutToken_FormShape(t *testing.T) {
-	// Verifies the consent service POSTs to the RP's URL with the
-	// correct Content-Type and form key per OIDC Back-Channel Logout
-	// 1.0 § 2.5.
-	gotCT := ""
-	gotToken := ""
-	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		gotCT = r.Header.Get("Content-Type")
-		body, _ := io.ReadAll(r.Body)
-		vals, _ := url.ParseQuery(string(body))
-		gotToken = vals.Get("logout_token")
-		w.WriteHeader(http.StatusOK)
-	}))
-	defer srv.Close()
-
-	httpClient := &http.Client{}
-	if err := PostLogoutToken(testContext(t), httpClient, srv.URL, "fakejwt"); err != nil {
-		t.Fatalf("PostLogoutToken: %v", err)
-	}
-	if gotCT != backchannelLogoutContentType {
-		t.Fatalf("content type: got %q want %q", gotCT, backchannelLogoutContentType)
-	}
-	if gotToken != "fakejwt" {
-		t.Fatalf("logout_token: got %q want %q", gotToken, "fakejwt")
-	}
-}

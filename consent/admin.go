@@ -49,23 +49,11 @@ type RevokeUserRequest struct {
 
 // RevokeUserResult is the response body. KratosSessionsRevoked is best-
 // effort: Kratos returns 204 with no count, so the field is currently
-// always 0 on success. BackchannelLogoutSent and Failures contain one
-// entry per RP that has a configured backchannel_logout_uri.
+// always 0 on success.
 type RevokeUserResult struct {
-	Subject                 string             `json:"subject"`
-	KratosSessionsRevoked   int                `json:"kratos_sessions_revoked"`
-	BackchannelLogoutSent   []string           `json:"backchannel_logout_sent"`
-	Failures                []RevokeUserFailure `json:"failures"`
-	IdentityCacheInvalidated bool              `json:"identity_cache_invalidated"`
-}
-
-// RevokeUserFailure describes one app whose back-channel logout call
-// failed. The admin UI surfaces these inline so an operator can see
-// which apps still hold a stale local session.
-type RevokeUserFailure struct {
-	ClientID string `json:"client_id"`
-	Endpoint string `json:"endpoint"`
-	Error    string `json:"error"`
+	Subject                  string `json:"subject"`
+	KratosSessionsRevoked    int    `json:"kratos_sessions_revoked"`
+	IdentityCacheInvalidated bool   `json:"identity_cache_invalidated"`
 }
 
 // handleRevokeUser handles POST /admin/revoke-user.
@@ -74,17 +62,15 @@ type RevokeUserFailure struct {
 //  1. Bearer auth.
 //  2. Parse body for subject (identity ID).
 //  3. Kratos DELETE /admin/identities/{id}/sessions.
-//  4. For each manifest with backchannel_logout_uri set, sign a logout
-//     token (RS256/ES256 depending on Hydra's signing key) and POST it
-//     as application/x-www-form-urlencoded to the RP.
-//  5. Invalidate the identity cache so the next consent flow picks up
+//  4. Invalidate the identity cache so the next consent flow picks up
 //     fresh group state immediately.
+//  5. Best-effort LDAP bridge bind-cache flush.
 //  6. Return summary.
 //
-// Per-RP failures do NOT abort the loop. The admin UI sees the partial
-// failures and the operator can retry the individual app or accept
-// the gap (some apps' local sessions persist until their own cookie
-// expires).
+// Back-channel logout to the RPs is NOT done here: Hydra delivers OIDC
+// back-channel logout tokens natively on admin session revocation, and
+// the portal's revokeSubject (CU3) drives that revocation. See the note
+// in the handler body.
 func handleRevokeUser(cfg Config) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		if r.Method != http.MethodPost {
@@ -110,9 +96,7 @@ func handleRevokeUser(cfg Config) http.HandlerFunc {
 		defer cancel()
 
 		result := RevokeUserResult{
-			Subject:               req.Subject,
-			BackchannelLogoutSent: []string{},
-			Failures:              []RevokeUserFailure{},
+			Subject: req.Subject,
 		}
 
 		// Step 1: Kratos session revoke. If this fails, don't bother
@@ -131,71 +115,16 @@ func handleRevokeUser(cfg Config) http.HandlerFunc {
 		globalIdentityCache.invalidate(req.Subject)
 		result.IdentityCacheInvalidated = true
 
-		// Step 3: send back-channel logout to every RP that has one
-		// configured. Logout tokens are signed with Hydra's id_token
-		// signing key so RPs verify via the same JWKS they already
-		// trust.
-		//
-		// HIGH-4: per-RP failures get up to two retries with backoff
-		// (1s then 3s) before being reported as a failure. The portal
-		// surfaces the per-client failure list so an operator can hit
-		// "Retry" for the named client; auto-retry stops at 2 attempts
-		// to avoid hammering an app that's down hard.
-		if cfg.Manifest != nil && cfg.LogoutSigner != nil {
-			backoffs := []time.Duration{0, 1 * time.Second, 3 * time.Second}
-			for _, cm := range cfg.Manifest.Clients() {
-				uri := cm.OIDC.BackchannelLogoutURI
-				if uri == "" {
-					continue
-				}
-				clientID := cm.OIDC.ClientID
-				claims := LogoutTokenClaims{
-					Issuer:   cfg.LogoutSigner.Issuer,
-					Audience: clientID,
-					Subject:  req.Subject,
-				}
-
-				var lastErr error
-				var sent bool
-				for attempt, sleep := range backoffs {
-					if sleep > 0 {
-						select {
-						case <-time.After(sleep):
-						case <-ctx.Done():
-							lastErr = ctx.Err()
-							break
-						}
-					}
-					// SignAndPostWithKeyRefresh handles MEDIUM-6: a 4xx from
-					// the RP forces one signing-key refresh + retry within
-					// this single attempt before bubbling up. The outer
-					// backoffs handle transport/5xx errors.
-					if err := cfg.LogoutSigner.SignAndPostWithKeyRefresh(ctx, cfg.Hydra.HTTP, uri, claims); err != nil {
-						lastErr = err
-						slog.Warn("revoke-user: backchannel post failed",
-							"client_id", clientID,
-							"endpoint", uri,
-							"attempt", attempt+1,
-							"err", err,
-						)
-						continue
-					}
-					sent = true
-					lastErr = nil
-					break
-				}
-
-				if sent {
-					result.BackchannelLogoutSent = append(result.BackchannelLogoutSent, clientID)
-				} else {
-					result.Failures = append(result.Failures, RevokeUserFailure{
-						ClientID: clientID,
-						Endpoint: uri,
-						Error:    lastErr.Error(),
-					})
-				}
-			}
-		}
+		// Back-channel logout is no longer sent from here. Hydra
+		// (oryd/hydra:v26.2.0) signs + POSTs OIDC back-channel logout
+		// tokens to each client's backchannel_logout_uri NATIVELY, using
+		// its own id_token key, when sessions are revoked via the admin
+		// API. The portal's revokeSubject (CU3) calls
+		// revokeOAuth2LoginSessions + revokeOAuth2ConsentSessions, which
+		// is exactly what triggers Hydra's native BCL delivery to the RPs.
+		// The custom JOSE signer that used to live here (and the private
+		// id_token key fetch it required) has been deleted; native BCL
+		// owns this path now.
 
 		// MEDIUM-5: best-effort flush of the LDAP bridge bind cache for
 		// the named identity. Skip silently if the bridge admin URL is
@@ -206,8 +135,6 @@ func handleRevokeUser(cfg Config) http.HandlerFunc {
 
 		slog.Info("revoke-user complete",
 			"subject", req.Subject,
-			"backchannel_sent", len(result.BackchannelLogoutSent),
-			"failures", len(result.Failures),
 		)
 
 		w.Header().Set("Content-Type", "application/json")

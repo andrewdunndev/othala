@@ -24,7 +24,7 @@ The user sees a brief redirect through `auth.dunn.dev` (the same hostname they a
 | public `:4477` | `GET /consent?consent_challenge=<id>` | Consent challenge handler. Enforces the `access-<client_id>` group, then auto-accepts for trusted clients (`skip_consent: true`). Rejects untrusted clients with `consent_required` (no consent UI in v1). Injects `email`, `email_verified`, `name`, `preferred_username`, `groups`, plus per-app role claims when the client manifest declares them. |
 | public `:4477` | `GET /logout?logout_challenge=<id>` | Logout challenge handler. Always accepts; Kratos session invalidation is handled by the portal logout button hitting Kratos public `/self-service/logout`. Per-app session revocation goes through `/admin/revoke-user`. |
 | public `:4477` | `GET /healthz` | Liveness check. |
-| admin `:4478` | `POST /admin/revoke-user` | Admin endpoint (bearer-gated). Body: `{"subject": "<identity_id>"}`. Revokes every Kratos session for the identity, invalidates the in-process identity cache, posts a signed OIDC back-channel logout token to every RP that has `oidc.backchannel_logout_uri` set, and (MEDIUM-5) flushes the LDAP bridge bind cache when `LDAP_BRIDGE_ADMIN_URL` is configured. Returns a per-app summary including failures. |
+| admin `:4478` | `POST /admin/revoke-user` | Admin endpoint (bearer-gated). Body: `{"subject": "<identity_id>"}`. Revokes every Kratos session for the identity, invalidates the in-process identity cache, and (MEDIUM-5) flushes the LDAP bridge bind cache when `LDAP_BRIDGE_ADMIN_URL` is configured. OIDC back-channel logout to the RPs is delivered by Hydra NATIVELY on admin session revocation (the portal's `revokeSubject` calls `revokeOAuth2LoginSessions` + `revokeOAuth2ConsentSessions`), not by this endpoint. |
 | admin `:4478` | `POST /webhooks/recovery-gate` | Kratos `can_interrupt` hook. Pod-internal only. Rejects email-recovery flows for any identity in the `admin` group (D3). MEDIUM-2: requires `X-Webhook-Auth: <RECOVERY_GATE_SECRET>` header; constant-time compared. |
 | admin `:4478` | `GET /healthz` | Admin-listener liveness check. |
 
@@ -88,10 +88,9 @@ Defense-in-depth on top of network isolation:
   presented as the `X-Webhook-Auth` header (MEDIUM-2). Constant-time
   compare; fail-closed when unset.
 - The portal admin UI at `/admin/users/<id>` includes a "Force
-  re-login" button that POSTs the identity ID to this endpoint. The
-  result panel shows which apps received the back-channel logout and
-  which failed; per-RP failures are retried up to 2 times with backoff
-  (HIGH-4) before being surfaced.
+  re-login" button. The portal's `revokeSubject` fan-out (CU3) drives
+  the Kratos + Hydra admin revocation directly; Hydra then delivers the
+  back-channel logout tokens to the RPs natively.
 
 Rotation (operator runbook): replace the env var on the consent
 quadlet, restart, then update the portal env binding. Both endpoints
@@ -99,25 +98,26 @@ fail-closed during the brief window where the values disagree.
 
 ## Back-channel logout
 
-Logout tokens are signed JWTs per OIDC Back-Channel Logout 1.0
-(§ 2.4–2.6). The consent service:
+OIDC Back-Channel Logout 1.0 (§ 2.4–2.6) is delivered by **Hydra
+natively** (oryd/hydra:v26.2.0). When sessions are revoked via the
+admin API — `revokeOAuth2LoginSessions({subject})` +
+`revokeOAuth2ConsentSessions({subject})`, which the portal's
+`revokeSubject` fan-out (CU3) calls — Hydra signs a logout token with
+its own id_token key and POSTs it to each client's
+`backchannel_logout_uri`. RPs verify it against the same
+`/.well-known/jwks.json` they already trust for id_tokens. No external
+service needs Hydra's private key.
 
-1. Fetches the private signing key from Hydra's admin API at
-   `/admin/keys/hydra.openid.id-token`. Hydra publishes the matching
-   public key at `/.well-known/jwks.json`, which RPs already trust for
-   id_token verification.
-2. Signs the logout token with the same `kid` and `alg` (RS256 by
-   default; ES256/ES384/ES512 supported if Hydra is configured with an
-   EC signing key).
-3. POSTs to the RP's `backchannel_logout_uri` as
-   `application/x-www-form-urlencoded` with body
-   `logout_token=<jwt>`.
+The consent service used to hand-roll this (fetch Hydra's private
+id_token key from `/admin/keys/hydra.openid.id-token`, sign a
+`logout+jwt`, POST it per-RP). That custom signer was removed (DAG CU4)
+once it was confirmed Hydra has done BCL natively since 2019; native
+delivery owns this path now.
 
 Apps that don't support back-channel logout (Tailscale, vLLM, BookLore,
 Jellyfin SSO plugin v3.x) leave `backchannel_logout_uri` empty and are
-skipped. The admin UI surfaces the gap inline so the operator knows the
-local session at those apps will expire on its own (per-app cookie
-TTL).
+not registered for it; their local session expires on its own (per-app
+cookie TTL).
 
 ## Architecture notes
 
@@ -328,7 +328,6 @@ The running service reloads manifests on `SIGHUP`. A failed reload (parse error,
 | `KRATOS_ADMIN_URL` | `http://kratos:4434` | Kratos admin API. Used for identity lookup during consent. |
 | `LOGIN_URL` | `https://auth.dunn.dev/auth/login` | Where to redirect users without a Kratos session. `?return_to=` appended. |
 | `HYDRA_CLIENT_DIR` | `../hydra/clients` | Directory of `*.yaml` manifests to load at startup and on `SIGHUP`. The `--manifest-dir` flag overrides this. |
-| `HYDRA_ISSUER` | `https://auth.dunn.dev/` | Public issuer string Hydra mints into id_tokens. Used as `iss` on back-channel logout tokens so RPs verify them against the same JWKS. Must byte-match Hydra's `urls.self.issuer`. |
 | `CONSENT_ADMIN_BEARER` | (empty) | Bearer token gating `/admin/*` endpoints. Empty disables the admin endpoints entirely (fail-closed). |
 | `RECOVERY_GATE_SECRET` | (empty) | Shared secret Kratos sends as `X-Webhook-Auth` on the recovery-gate webhook. Empty disables the webhook (fail-closed). MEDIUM-2. |
 | `LDAP_BRIDGE_ADMIN_URL` | (empty) | If set, consent flushes the LDAP bridge bind cache after a revoke (MEDIUM-5). Empty = skip silently (lab without bridge). |

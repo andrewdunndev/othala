@@ -119,14 +119,6 @@ func main() {
 		"manifest_dir", cfg.ManifestDir,
 	)
 
-	// SIGUSR1 (MEDIUM-6): flush the back-channel signing-key cache so the
-	// next sign call refetches Hydra's id-token JWKS. Operator runbook
-	// for key rotation: rotate via Hydra admin, then `kill -USR1 <pid>`
-	// instead of waiting out the 15min refresh window.
-	if cfg.LogoutSigner != nil {
-		go flushSignerOnSIGUSR1(cfg.LogoutSigner)
-	}
-
 	errs := make(chan error, 2)
 	go func() {
 		errs <- http.ListenAndServe(publicAddr, publicMux)
@@ -176,19 +168,6 @@ func reloadOnSIGHUP(m *Manifest) {
 	}
 }
 
-// flushSignerOnSIGUSR1 (MEDIUM-6) runs forever; each SIGUSR1 drops the
-// cached back-channel logout signing key. The next Sign call refetches
-// from Hydra. Used by the operator runbook for id_token key rotation
-// to skip the 15-min cache window.
-func flushSignerOnSIGUSR1(s *LogoutTokenSigner) {
-	ch := make(chan os.Signal, 1)
-	signal.Notify(ch, syscall.SIGUSR1)
-	for range ch {
-		s.refreshKey()
-		slog.Info("backchannel signing key cache flushed (SIGUSR1)")
-	}
-}
-
 // Config bundles env-driven settings + lazily constructed clients so the
 // handlers don't have to know about HTTP construction.
 type Config struct {
@@ -197,13 +176,11 @@ type Config struct {
 	KratosAdminURL  string
 	LoginURL        string
 	ManifestDir     string
-	Issuer          string
 	AdminBearer     string
 
-	Hydra        *HydraAdminClient
-	Kratos       *KratosClient
-	Manifest     *Manifest
-	LogoutSigner *LogoutTokenSigner
+	Hydra    *HydraAdminClient
+	Kratos   *KratosClient
+	Manifest *Manifest
 }
 
 func loadConfig(manifestDirFlag string) Config {
@@ -211,11 +188,6 @@ func loadConfig(manifestDirFlag string) Config {
 	kratosPublic := getenv("KRATOS_PUBLIC_URL", "http://kratos:4433")
 	kratosAdmin := getenv("KRATOS_ADMIN_URL", "http://kratos:4434")
 	loginURL := getenv("LOGIN_URL", "https://auth.dunn.dev/auth/login")
-	// HYDRA_ISSUER is the public issuer string Hydra mints into id_tokens
-	// (`urls.self.issuer` in hydra.yml). The consent service uses it as
-	// `iss` on back-channel logout tokens so RPs verify them against the
-	// same JWKS they trust for id_tokens.
-	issuer := getenv("HYDRA_ISSUER", "https://auth.dunn.dev/")
 	adminBearer := os.Getenv(adminBearerEnv)
 	manifestDir := manifestDirFlag
 	if manifestDir == "" {
@@ -228,11 +200,9 @@ func loadConfig(manifestDirFlag string) Config {
 		KratosAdminURL:  kratosAdmin,
 		LoginURL:        loginURL,
 		ManifestDir:     manifestDir,
-		Issuer:          issuer,
 		AdminBearer:     adminBearer,
 		Hydra:           NewHydraAdminClient(hydraAdmin),
 		Kratos:          NewKratosClient(kratosPublic, kratosAdmin),
-		LogoutSigner:    NewLogoutTokenSigner(hydraAdmin, issuer),
 	}
 }
 

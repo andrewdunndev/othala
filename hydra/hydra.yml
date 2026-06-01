@@ -59,8 +59,14 @@ ttl:
 
 oauth2:
   pkce:
-    enforced: false                    # Tailscale doesn't do PKCE
-    enforced_for_public_clients: false
+    enforced: false                    # Tailscale doesn't do PKCE; Hydra
+                                       # has no per-client PKCE knob, so the
+                                       # global stays off for it.
+    enforced_for_public_clients: true  # Free hardening: nothing is a public
+                                       # client today (all confidential), so
+                                       # this is a no-op now but blocks a
+                                       # future silent PKCE skip if a public
+                                       # client is ever added.
   hashers:
     bcrypt:
       cost: 10
