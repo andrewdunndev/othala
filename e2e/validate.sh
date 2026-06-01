@@ -1,32 +1,37 @@
 #!/usr/bin/env bash
-# validate.sh — top-level CI lab orchestrator.
+# validate.sh — top-level Othala e2e orchestrator.
 #
 # Runs INSIDE the per-job Fedora VM the carmine GitLab Runner spawns
 # (Custom Executor, tag carmine,qemu). The VM has podman + podman-docker
 # bridge baked into the baser golden image (per dunn.dev/iac/services/
 # runner/README.md "What pre-bakes into the baser golden image"), so
-# `docker compose` works natively.
+# `docker compose` works natively. The same script runs on an operator
+# workstation — this is the OSS-facing "stand Othala up on compose"
+# example, not a CI-only artifact.
 #
 # Sequence:
-#   1. Generate per-run secrets → lab/ci/.env
+#   1. Generate per-run secrets → e2e/.env
 #   2. Login to the registry (CI_REGISTRY_USER + CI_REGISTRY_PASSWORD
 #      injected by GitLab into every job)
-#   3. `docker compose up -d` (pulls auth images at $AUTH_VERSION)
+#   3. `docker compose up -d` (pulls the othala app + ldap-bridge images
+#      at $AUTH_VERSION)
 #   4. Wait for healthchecks (postgres → migrate → kratos + hydra →
-#      consent + portal). Max 4 min total; if any fail the substrate
+#      othala + ldap-bridge). Max 4 min total; if any fail the substrate
 #      is broken.
 #   5. Run smoke.sh
 #   6. On failure, dump container logs to artifacts
 #   7. `docker compose down -v` (ephemeral; VM dies anyway, but be
 #      tidy in case the test runs against a longer-lived host)
 #
-# Required env (set by .gitlab-ci.yml lab-validate job):
+# Required env (set by .gitlab-ci.yml e2e job):
 #   CI_REGISTRY_USER, CI_REGISTRY_PASSWORD — for podman login
-#   AUTH_REGISTRY — defaults to registry.gitlab.com/dunn.dev/othala
-#   AUTH_VERSION  — defaults to latest; CI should pass $CI_COMMIT_SHA
+#   AUTH_REGISTRY — the registry ROOT (the othala app image); defaults to
+#                   registry.gitlab.com/dunn.dev/othala. ldap-bridge is
+#                   the ${AUTH_REGISTRY}/ldap-bridge sub-image.
+#   AUTH_VERSION  — defaults to latest; CI passes the just-built tag.
 #
 # Local operator invocation:
-#   cd lab/ci
+#   cd e2e
 #   AUTH_VERSION=latest bash validate.sh
 # (you need to be logged in to the registry via your own podman creds)
 
@@ -39,7 +44,7 @@ LAB_DOMAIN="${LAB_DOMAIN:-test.dunn.dev}"
 AUTH_REGISTRY="${AUTH_REGISTRY:-registry.gitlab.com/dunn.dev/othala}"
 AUTH_VERSION="${AUTH_VERSION:-latest}"
 
-echo "=== lab validate: AUTH_REGISTRY=$AUTH_REGISTRY AUTH_VERSION=$AUTH_VERSION LAB_DOMAIN=$LAB_DOMAIN ==="
+echo "=== othala e2e: AUTH_REGISTRY=$AUTH_REGISTRY AUTH_VERSION=$AUTH_VERSION LAB_DOMAIN=$LAB_DOMAIN ==="
 
 # Permission sanity: scripts must be executable.
 chmod +x ./gen-secrets.sh ./smoke.sh ./postgres-init.sh
@@ -89,12 +94,13 @@ for line in sys.stdin:
     except: continue
     if d.get('Health')=='healthy': n+=1
 print(n)" 2>/dev/null)
-    # Expecting 6 healthy long-runners: postgres, kratos, hydra, consent,
-    # portal, ldap-bridge. The bridge has its own /healthz on :6478;
-    # gating on it surfaces a broken bridge in the same loop instead of
-    # later in smoke.
-    if [[ "${healthy:-0}" -ge 6 ]]; then
-        echo "  ✓ substrate healthy ($healthy/6 long-runners up)"
+    # Expecting 5 healthy long-runners: postgres, kratos, hydra, othala,
+    # ldap-bridge. consent + util are gone (folded into the othala app).
+    # The othala healthcheck hits its loopback admin /healthz (:8431);
+    # the bridge has its own /healthz on :6478 — gating on both surfaces
+    # a broken service in this loop instead of later in smoke.
+    if [[ "${healthy:-0}" -ge 5 ]]; then
+        echo "  ✓ substrate healthy ($healthy/5 long-runners up)"
         break
     fi
     sleep 5

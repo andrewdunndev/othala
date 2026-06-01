@@ -1,34 +1,46 @@
-# CI lab compose stack — Topology B substrate for QEMU-runner validation.
+# Othala end-to-end harness — converged substrate for compose.
 #
-# This file is consumed by lab/ci/validate.sh inside a per-job Fedora VM
-# spawned by the carmine GitLab Runner (Custom Executor, tag carmine,qemu).
-# The VM is ephemeral; the substrate dies with the VM at job end.
+# This is the project's canonical OSS-facing end-to-end example: it shows
+# how Othala ("Ory for your home") stands up on plain `docker compose`
+# from the published images. It doubles as the CI `e2e` gate, consumed by
+# e2e/validate.sh inside a per-job Fedora VM spawned by the carmine GitLab
+# Runner (Custom Executor, tag carmine,qemu). The VM is ephemeral; the
+# substrate dies with the VM at job end. An adopter can run the same file
+# on a workstation (see README.md "Local operator invocation").
 #
-# Topology B shape:
+# Converged topology (mirrors what dunn.dev/iac services/dag now models):
 #   - postgres (kratos + hydra dbs)
 #   - kratos-migrate (oneshot)
 #   - kratos (public 4433, admin 4434)
 #   - hydra-migrate (oneshot)
 #   - hydra (public 4444, admin 4445)
-#   - consent (public 4477, admin 4478)
-#   - portal (8080)
-#   - ldap-bridge (LDAPS 636 — exercised only if the substrate-up smoke
-#     adds an LDAP probe, optional for first land)
+#   - othala (the converged Astro Node SSR app, ONE image at the registry
+#     ROOT ${AUTH_REGISTRY}). Public SSR port 8080 serves the family UI +
+#     /auth/* + /admin/* pages + the Hydra login/consent/logout challenge
+#     handlers at /oauth2/{login,consent,logout}. A SEPARATE loopback
+#     admin port 8431 serves /healthz, /readyz, /admin/revoke-user and
+#     /admin/recovery-gate. The two muxes are disjoint by construction.
+#   - ldap-bridge (LDAP 389; admin /healthz on 6478)
+#
+# Convergence note: the legacy `consent` (Go) and `util` (Bash) services
+# are GONE. Their roles folded INTO the othala app: consent's challenge
+# handlers + recovery-gate are now the app's /oauth2/* public routes and
+# its /admin/recovery-gate loopback route; util's apply-clients is the
+# app's in-process registrar (the e2e invokes it as a one-shot — see
+# smoke.sh section B). No consent/util CONTAINER or image is pulled.
 #
 # What's intentionally absent vs production:
 #   - No Caddy / TLS / public DNS. Smoke probes hit container HTTP ports
 #     directly via the compose default network. Production-shape TLS +
 #     issuer-byte-match is validated separately (manual lab on real DNS,
-#     or future end-to-end run when this CI lab exercises Caddy with
-#     `tls internal` against a self-issued CA).
-#   - No auth-util quadlet — util image runs as a one-shot via
-#     `podman compose run --rm util` inside smoke.sh.
+#     or a future iteration that wires Caddy with `tls internal`).
 #
-# Image versions: ${AUTH_VERSION} comes from the CI environment. When
-# the lab-validate job declares `needs: [build-consent, build-portal,
-# build-ldap-bridge, build-util]`, AUTH_VERSION resolves to
-# $CI_COMMIT_SHA (the just-built images at their SHA tag). Local
-# operator runs use AUTH_VERSION=latest.
+# Image versions: ${AUTH_VERSION} comes from the environment. In CI the
+# `e2e` job declares `needs: [build-othala, build-ldap-bridge]`, so
+# AUTH_VERSION resolves to the just-built tag (v-tag on tags, short-SHA
+# on push). Local operator runs use AUTH_VERSION=latest. The app image is
+# ${AUTH_REGISTRY} at the registry root; ldap-bridge is the
+# ${AUTH_REGISTRY}/ldap-bridge sub-image.
 
 services:
   postgres:
@@ -62,7 +74,10 @@ services:
       # auth.network container names.
       KRATOS_PG_HOST: postgres
       KRATOS_ADMIN_HOST: kratos
-      CONSENT_HOST: consent
+      # Recovery-gate webhook target: the converged othala app's loopback
+      # admin port. consent is gone; the gate is the app's
+      # /admin/recovery-gate route.
+      RECOVERY_GATE_HOST: othala
     volumes:
       - ./kratos.yml:/etc/config/kratos/kratos.yml:ro
       - ./identity.schema.json:/etc/config/kratos/identity.schema.json:ro
@@ -91,7 +106,9 @@ services:
       # at config load). See kratos-migrate above for the pattern.
       KRATOS_PG_HOST: postgres
       KRATOS_ADMIN_HOST: kratos
-      CONSENT_HOST: consent
+      # Recovery-gate webhook target host: the converged othala app
+      # (admin port 8431). Was the consent service pre-convergence.
+      RECOVERY_GATE_HOST: othala
     volumes:
       - ./kratos.yml:/etc/config/kratos/kratos.yml:ro
       - ./identity.schema.json:/etc/config/kratos/identity.schema.json:ro
@@ -142,39 +159,23 @@ services:
       retries: 18
       start_period: 20s
 
-  consent:
-    image: ${AUTH_REGISTRY}/consent:${AUTH_VERSION}
-    container_name: lab-consent
-    restart: unless-stopped
-    depends_on:
-      hydra:
-        condition: service_healthy
-      kratos:
-        condition: service_healthy
-    environment:
-      HYDRA_ADMIN_URL: http://hydra:4445
-      KRATOS_PUBLIC_URL: http://kratos:4433
-      KRATOS_ADMIN_URL: http://kratos:4434
-      HYDRA_ISSUER: http://auth-lab.${LAB_DOMAIN}/
-      LOGIN_URL: http://auth-lab.${LAB_DOMAIN}/auth/login
-      HYDRA_CLIENT_DIR: /etc/consent/manifests
-      CONSENT_ADMIN_BEARER: ${CONSENT_ADMIN_BEARER}
-      PUBLIC_LISTEN: ":4477"
-      ADMIN_LISTEN: ":4478"
-      CONSENT_PUBLIC_URL: http://auth-lab.${LAB_DOMAIN}
-      RECOVERY_GATE_SECRET: ${RECOVERY_GATE_SECRET}
-    volumes:
-      - ../../hydra/clients:/etc/consent/manifests:ro
-    healthcheck:
-      test: ["CMD-SHELL", "wget -qO- http://localhost:4477/healthz || exit 1"]
-      interval: 5s
-      timeout: 3s
-      retries: 12
-      start_period: 5s
-
-  portal:
-    image: ${AUTH_REGISTRY}/portal:${AUTH_VERSION}
-    container_name: lab-portal
+  # The converged Othala app — ONE image at the registry ROOT
+  # (${AUTH_REGISTRY}, e.g. registry.gitlab.com/dunn.dev/othala). No
+  # /portal sub-path, no separate consent/util container. The single
+  # process binds two listeners (portal/src/server/listen.mjs):
+  #   - PUBLIC SSR port 8080: family UI + /auth/* + /admin/* pages + the
+  #     Hydra login/consent/logout challenge handlers /oauth2/{login,
+  #     consent,logout}.
+  #   - ADMIN port 8431 (bound on loopback 127.0.0.1 inside the
+  #     container): /healthz, /readyz, /admin/revoke-user,
+  #     /admin/recovery-gate. Disjoint from the public mux.
+  # The admin port is loopback-only, so the healthcheck and the
+  # admin-route smoke probes run via `compose exec` against
+  # localhost:8431 INSIDE the container — they are not reachable across
+  # the compose network (production-faithful: only Caddy fronts 8080).
+  othala:
+    image: ${AUTH_REGISTRY}:${AUTH_VERSION}
+    container_name: lab-othala
     restart: unless-stopped
     depends_on:
       kratos:
@@ -187,16 +188,25 @@ services:
       HYDRA_PUBLIC_URL: http://hydra:4444
       HYDRA_ADMIN_URL: http://hydra:4445
       HYDRA_ISSUER_URL: http://auth-lab.${LAB_DOMAIN}/
-      CONSENT_ADMIN_URL: http://consent:4478
-      CONSENT_ADMIN_BEARER: ${CONSENT_ADMIN_BEARER}
       MANIFEST_DIR: /etc/portal/manifests
       CSRF_SECRET: ${CSRF_SECRET}
+      # CU3 admin model: the allowlist is the sole admin authority. The
+      # recovery-gate refuses recovery for any identity whose email is on
+      # this list. The smoke seeds a known admin email to exercise the
+      # refuse path; everything else is non-admin.
+      OTHALA_ADMIN_SUBJECTS: ${OTHALA_ADMIN_SUBJECTS}
+      OTHALA_ADMIN_ENDPOINT_BEARER: ${OTHALA_ADMIN_ENDPOINT_BEARER}
+      RECOVERY_GATE_SECRET: ${RECOVERY_GATE_SECRET}
       HOST: 0.0.0.0
       PORT: "8080"
+      ADMIN_HOST: 127.0.0.1
+      ADMIN_PORT: "8431"
     volumes:
-      - ../../hydra/clients:/etc/portal/manifests:ro
+      - ../hydra/clients:/etc/portal/manifests:ro
     healthcheck:
-      test: ["CMD-SHELL", "wget -qO- http://localhost:8080/healthz || exit 1"]
+      # /healthz lives on the loopback ADMIN port (8431), not the public
+      # SSR port. Probe it from inside the container.
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:8431/healthz || exit 1"]
       interval: 5s
       timeout: 3s
       retries: 12
@@ -229,18 +239,39 @@ services:
       retries: 12
       start_period: 5s
 
-  # auth-util is invoked as a one-shot via `compose run` from smoke.sh;
-  # not started here so docker-compose's healthcheck loop doesn't mark
-  # it failed when the container exits.
-  util:
-    image: ${AUTH_REGISTRY}/util:${AUTH_VERSION}
-    container_name: lab-util
+  # Client registration — the converged successor to the deleted util/
+  # apply-clients.sh. util's role folded INTO the othala app as the
+  # in-process registrar (portal/src/lib/register-clients.ts ->
+  # registerAllClients), bundled into the image at
+  # dist/server/register-clients.mjs (npm run build:register-clients,
+  # same esbuild pattern as admin-runtime). The registrar is DORMANT in
+  # the deployed app (iac's dag-apply-clients.sh drives registration at
+  # deploy time); the e2e activates it as a `compose run --rm` one-shot
+  # on the SAME othala image to prove the in-app registrar registers
+  # every hydra/clients/*.yaml against Hydra admin. See smoke.sh
+  # section B. `profiles: [oneshot]` keeps it out of the up/healthcheck
+  # loop — smoke runs it explicitly via `compose run`.
+  register-clients:
+    image: ${AUTH_REGISTRY}:${AUTH_VERSION}
+    container_name: lab-register-clients
     profiles: ["oneshot"]
     depends_on:
       hydra:
         condition: service_healthy
     environment:
       HYDRA_ADMIN_URL: http://hydra:4445
-      CLIENTS_DIR: /etc/util/manifests
+      MANIFEST_DIR: /etc/portal/manifests
+      KEEP_CLIENT_SECRET: ${KEEP_CLIENT_SECRET}
+      OBSERVE_CLIENT_SECRET: ${OBSERVE_CLIENT_SECRET}
+      LARDER_CLIENT_SECRET: ${LARDER_CLIENT_SECRET}
+      LISTEN_CLIENT_SECRET: ${LISTEN_CLIENT_SECRET}
+      CINEMA_CLIENT_SECRET: ${CINEMA_CLIENT_SECRET}
+      MEMORY_CLIENT_SECRET: ${MEMORY_CLIENT_SECRET}
+      VAULT_CLIENT_SECRET: ${VAULT_CLIENT_SECRET}
+      LIBRARY_CLIENT_SECRET: ${LIBRARY_CLIENT_SECRET}
+      FORGE_CLIENT_SECRET: ${FORGE_CLIENT_SECRET}
+      TAILSCALE_CLIENT_SECRET: ${TAILSCALE_CLIENT_SECRET}
+      LLM_CLIENT_SECRET: ${LLM_CLIENT_SECRET}
     volumes:
-      - ../../hydra/clients:/etc/util/manifests:ro
+      - ../hydra/clients:/etc/portal/manifests:ro
+    command: ["node", "./dist/server/register-clients.mjs"]

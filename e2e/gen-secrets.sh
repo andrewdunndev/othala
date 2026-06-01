@@ -1,11 +1,11 @@
 #!/usr/bin/env bash
-# gen-secrets.sh — emit per-run lab secrets to stdout in .env format.
+# gen-secrets.sh — emit per-run e2e secrets to stdout in .env format.
 #
-# Used by validate.sh inside the CI lab VM. Every secret is freshly
+# Used by validate.sh inside the e2e VM. Every secret is freshly
 # generated per run; nothing persists past the VM's lifetime.
 #
 # Usage:
-#   bash lab/ci/gen-secrets.sh > lab/ci/.env
+#   bash e2e/gen-secrets.sh > e2e/.env
 
 set -euo pipefail
 
@@ -17,9 +17,11 @@ gen_alnum() { openssl rand -base64 24 | tr -d '+/=' | head -c 32; }
 # smoke suite hits container ports directly.
 LAB_DOMAIN="${LAB_DOMAIN:-test.dunn.dev}"
 
-# AUTH_REGISTRY + AUTH_VERSION resolve which auth-* images to pull.
-# In CI: AUTH_REGISTRY=$CI_REGISTRY_IMAGE, AUTH_VERSION=$CI_COMMIT_SHA
-# (or :latest for local operator runs).
+# AUTH_REGISTRY is the registry ROOT — the converged othala app image
+# itself (registry.gitlab.com/dunn.dev/othala). ldap-bridge is the
+# ${AUTH_REGISTRY}/ldap-bridge sub-image. AUTH_VERSION is the tag.
+# In CI: AUTH_REGISTRY=$CI_REGISTRY_IMAGE, AUTH_VERSION=the just-built
+# tag (v-tag or short-SHA). Local operator runs use :latest.
 AUTH_REGISTRY="${AUTH_REGISTRY:-registry.gitlab.com/dunn.dev/othala}"
 AUTH_VERSION="${AUTH_VERSION:-latest}"
 
@@ -58,11 +60,19 @@ HYDRA_COOKIE_SECRET_CURRENT=${hydra_cookie}
 HYDRA_COOKIE_SECRET_PREVIOUS=${hydra_cookie}
 HYDRA_PAIRWISE_SALT=$(gen_short)
 
-# Consent + portal cross-auth (MEDIUM-1 admin bearer + MEDIUM-2 recovery-gate)
-CONSENT_ADMIN_BEARER=$(gen)
+# Converged app admin model (CU3). consent is gone; these are the
+# othala app's own secrets:
+#   OTHALA_ADMIN_SUBJECTS         the SOLE admin authority — a comma-
+#                                 separated email allowlist. The smoke
+#                                 seeds a known admin email to exercise
+#                                 the recovery-gate refuse path.
+#   OTHALA_ADMIN_ENDPOINT_BEARER  guards POST /admin/revoke-user (loopback)
+#   RECOVERY_GATE_SECRET          guards POST /admin/recovery-gate (loopback)
+OTHALA_ADMIN_SUBJECTS=admin@${LAB_DOMAIN}
+OTHALA_ADMIN_ENDPOINT_BEARER=$(gen)
 RECOVERY_GATE_SECRET=$(gen)
 
-# Portal CSRF tokens (HIGH-1)
+# App CSRF tokens (HIGH-1)
 CSRF_SECRET=$(gen)
 
 # Per-client OIDC secrets for apply-clients smoke. Every client_id in

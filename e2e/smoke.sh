@@ -1,9 +1,16 @@
 #!/usr/bin/env bash
-# smoke.sh — substrate-up validation matrix.
+# smoke.sh — converged-substrate validation matrix.
 #
-# Runs INSIDE the CI lab VM after `podman compose up -d` brings up the
-# auth substrate. Probes each container directly on its compose network
-# hostname (postgres, kratos, hydra, consent, portal, ldap-bridge).
+# Runs INSIDE the e2e VM after `docker compose up -d` brings up the
+# converged Othala substrate. Probes each container directly on its
+# compose network hostname (postgres, kratos, hydra, othala, ldap-bridge).
+#
+# The othala app is ONE service: public SSR port 8080 (family UI +
+# /auth/* + /admin/* + the /oauth2/{login,consent,logout} challenge
+# handlers) and a loopback admin port 8431 (/healthz, /readyz,
+# /admin/revoke-user, /admin/recovery-gate). The admin port binds
+# 127.0.0.1 inside the container, so admin probes run via `compose exec`
+# against localhost:8431; the public port is probed across the network.
 #
 # Exit 0 on all-green, 1 on any failure. Logs container outputs on
 # failure to /tmp/lab-failure.log for CI artifact upload.
@@ -107,20 +114,40 @@ else
     fail "A7 hydra jwks.json missing RS256 key"
 fi
 
-# A8: Consent /healthz
-code=$(curl_code_in consent http://localhost:4477/healthz)
+# A8: Othala app admin /healthz on the loopback admin port (8431).
+# /healthz + /readyz live on the admin mux, NOT the public SSR port.
+code=$(curl_code_in othala http://127.0.0.1:8431/healthz)
 if [[ "$code" == "200" ]]; then
-    pass "A8 consent /healthz"
+    pass "A8 othala admin /healthz (loopback :8431)"
 else
-    fail "A8 consent /healthz" "code=$code"
+    fail "A8 othala admin /healthz" "code=$code"
 fi
 
-# A9: Portal /healthz
-code=$(curl_code_in portal http://localhost:8080/healthz)
-if [[ "$code" == "200" ]]; then
-    pass "A9 portal /healthz"
+# A9: Othala public SSR port (8080) serves a challenge handler. The
+# converged app is Hydra's login/consent/logout provider at
+# /oauth2/{login,consent,logout}. Hit /oauth2/login WITHOUT a
+# login_challenge: the handler is mounted (not 404) and rejects the
+# bad/absent challenge. Any served response (not a connection refusal,
+# not a 404) proves the public mux is up and the challenge route exists.
+code=$(curl_code_in othala http://localhost:8080/oauth2/login)
+if [[ -n "$code" && "$code" != "404" ]]; then
+    pass "A9 othala public /oauth2/login challenge handler mounted (code=$code)"
 else
-    fail "A9 portal /healthz" "code=$code"
+    fail "A9 othala /oauth2/login handler" "code=$code (expected a served non-404; 404 means the route is missing)"
+fi
+
+# A9b: The admin mux is DISJOINT from the public mux — an /admin/* route
+# must NOT be reachable on the public SSR port. /admin/recovery-gate on
+# 8080 is a public page route (gated), never the loopback admin endpoint;
+# the loopback POST handler is unreachable across :8080. Assert the
+# loopback admin route is NOT served as the JSON endpoint on the public
+# port: a GET on 8080 must not be the admin-port 'not found'/handler.
+# (Boundary check — the converged app's by-construction mux split.)
+code=$(curl_code_in othala http://localhost:8080/healthz)
+if [[ "$code" == "404" || -z "$code" ]]; then
+    pass "A9b othala public port does NOT serve admin /healthz (mux split holds)"
+else
+    fail "A9b admin route leaked onto public port" "code=$code (admin /healthz must be loopback-only)"
 fi
 
 # A10: ldap-bridge /healthz on admin port (:6478). The bridge image
@@ -135,18 +162,22 @@ else
     fail "A10 ldap-bridge /healthz" "code=$code"
 fi
 
-# Section B: apply-clients integration
+# Section B: client registration (converged in-app registrar)
 echo ""
-echo "B. apply-clients integration (auth-util)"
+echo "B. client registration (in-app registrar, one-shot)"
 
-# B1: Run auth-util via compose. Expect every client manifest in
-# hydra/clients/*.yaml to register.
-docker compose run --rm util > /tmp/apply-clients.log 2>&1
+# B1: Run the converged app's in-app registrar as a `compose run` one-shot
+# on the SAME othala image (dist/server/register-clients.mjs ->
+# registerAllClients). This is the successor to the deleted util/
+# apply-clients.sh: it reads hydra/clients/*.yaml from MANIFEST_DIR,
+# resolves each <SLUG>_CLIENT_SECRET from env, and POST/PUTs every client
+# to Hydra admin. Expect exit 0 with every manifest registered.
+docker compose run --rm register-clients > /tmp/apply-clients.log 2>&1
 applycode=$?
 if [[ $applycode -eq 0 ]]; then
-    pass "B1 apply-clients exited 0"
+    pass "B1 in-app register-clients exited 0"
 else
-    fail "B1 apply-clients exit code $applycode" "see /tmp/apply-clients.log"
+    fail "B1 register-clients exit code $applycode" "see /tmp/apply-clients.log"
 fi
 
 # B2: Hydra admin lists the registered clients
@@ -198,40 +229,66 @@ if [[ -n "$identity_id" ]]; then
     fi
 fi
 
-# Section D: recovery-gate webhook (MEDIUM-2 + LOW-5)
+# Section D: recovery-gate (converged app loopback admin endpoint)
 echo ""
-echo "D. Recovery-gate webhook"
+echo "D. Recovery-gate (othala :8431 /admin/recovery-gate)"
+#
+# CU3 convergence: the gate moved from the consent service (:4478,
+# X-Webhook-Auth header, group-based refusal) to the othala app's
+# loopback admin port (:8431, Authorization: Bearer, ALLOWLIST-based
+# refusal). The app's recoveryGateVerdict refuses recovery iff the
+# in-flight identity's traits.email is on OTHALA_ADMIN_SUBJECTS (the
+# `admin` metadata_admin group is display-only, NOT consulted). It
+# fails closed on a missing email and 401s a bad bearer. We probe via
+# `compose exec` because the admin port is loopback-only.
 
-# D1: Admin group → 403
-admin_code=$(docker compose exec -T consent wget -qO /dev/null -S --post-data='{"identity_id":"x","groups":["admin","family"]}' --header="Content-Type: application/json" --header="X-Webhook-Auth: ${RECOVERY_GATE_SECRET}" http://localhost:4478/webhooks/recovery-gate 2>&1 | awk '/HTTP/ {print $2}' | tail -1)
+# Helper: POST a recovery-gate body with a bearer, capture HTTP code.
+# Runs inside the othala container (the admin port is loopback there).
+gate_code() {
+    local bearer="$1"; local body="$2"
+    docker compose exec -T othala wget -qO /dev/null -S \
+        --post-data="$body" \
+        --header="Content-Type: application/json" \
+        --header="Authorization: Bearer ${bearer}" \
+        http://127.0.0.1:8431/admin/recovery-gate 2>&1 \
+        | awk '/HTTP/ {print $2}' | tail -1
+}
+
+ADMIN_EMAIL="admin@${LAB_DOMAIN}"
+
+# D1: Allowlisted admin subject → 403 (admin recovery is console-only).
+admin_code=$(gate_code "${RECOVERY_GATE_SECRET}" '{"traits":{"email":"'"${ADMIN_EMAIL}"'"}}')
 if [[ "$admin_code" == "403" ]]; then
-    pass "D1 recovery-gate refuses admin (HIGH-3)"
+    pass "D1 recovery-gate refuses allowlisted admin (HIGH-3, allowlist authority)"
 else
-    fail "D1 recovery-gate admin path" "code=$admin_code"
+    fail "D1 recovery-gate admin path" "code=$admin_code want=403 (email ${ADMIN_EMAIL} on OTHALA_ADMIN_SUBJECTS)"
 fi
 
-# D2: Non-admin → 200
-nonadmin_code=$(docker compose exec -T consent wget -qO /dev/null -S --post-data='{"identity_id":"x","groups":["family"]}' --header="Content-Type: application/json" --header="X-Webhook-Auth: ${RECOVERY_GATE_SECRET}" http://localhost:4478/webhooks/recovery-gate 2>&1 | awk '/HTTP/ {print $2}' | tail -1)
+# D2: Non-admin subject (email NOT on the allowlist) → 200, even if it
+# carries the display-only `admin` group.
+nonadmin_code=$(gate_code "${RECOVERY_GATE_SECRET}" '{"traits":{"email":"kid@'"${LAB_DOMAIN}"'"},"metadata_admin":{"groups":["admin","family"]}}')
 if [[ "$nonadmin_code" == "200" ]]; then
-    pass "D2 recovery-gate allows non-admin"
+    pass "D2 recovery-gate allows non-allowlisted (group 'admin' is display-only)"
 else
-    fail "D2 recovery-gate non-admin path" "code=$nonadmin_code"
+    fail "D2 recovery-gate non-admin path" "code=$nonadmin_code want=200"
 fi
 
-# D3: Empty groups → 403 (LOW-5 defensive default)
-empty_code=$(docker compose exec -T consent wget -qO /dev/null -S --post-data='{"identity_id":"x","groups":[]}' --header="Content-Type: application/json" --header="X-Webhook-Auth: ${RECOVERY_GATE_SECRET}" http://localhost:4478/webhooks/recovery-gate 2>&1 | awk '/HTTP/ {print $2}' | tail -1)
+# D3: Missing/unidentifiable email → 403 (fail-closed on a subject the
+# gate can't identify).
+empty_code=$(gate_code "${RECOVERY_GATE_SECRET}" '{"traits":{}}')
 if [[ "$empty_code" == "403" ]]; then
-    pass "D3 recovery-gate refuses on empty groups (LOW-5)"
+    pass "D3 recovery-gate fails closed on unidentifiable subject"
 else
-    fail "D3 recovery-gate empty groups" "code=$empty_code"
+    fail "D3 recovery-gate missing-email path" "code=$empty_code want=403"
 fi
 
-# D4: Wrong secret → 403 (MEDIUM-2)
-wrong_code=$(docker compose exec -T consent wget -qO /dev/null -S --post-data='{"identity_id":"x","groups":["family"]}' --header="Content-Type: application/json" --header="X-Webhook-Auth: wrong-secret" http://localhost:4478/webhooks/recovery-gate 2>&1 | awk '/HTTP/ {print $2}' | tail -1)
-if [[ "$wrong_code" == "403" ]]; then
-    pass "D4 recovery-gate rejects wrong secret (MEDIUM-2)"
+# D4: Wrong bearer → 401 (constant-time, fail-closed bearer check on the
+# admin mux; distinct from the 403 verdict refusal).
+wrong_code=$(gate_code "wrong-secret" '{"traits":{"email":"kid@'"${LAB_DOMAIN}"'"}}')
+if [[ "$wrong_code" == "401" ]]; then
+    pass "D4 recovery-gate rejects wrong bearer (401, fail-closed)"
 else
-    fail "D4 recovery-gate wrong secret" "code=$wrong_code"
+    fail "D4 recovery-gate wrong bearer" "code=$wrong_code want=401"
 fi
 
 # ----- Summary -----
@@ -252,7 +309,7 @@ else
         docker compose ps
         echo ""
         echo "=== container logs ==="
-        for svc in postgres kratos hydra consent portal ldap-bridge; do
+        for svc in postgres kratos hydra othala ldap-bridge; do
             echo "--- $svc ---"
             docker compose logs --tail=50 "$svc"
         done

@@ -35,7 +35,7 @@ workflow:
 stages:
   - verify
   - build
-  - lab-validate
+  - e2e
   - package
   - release
 
@@ -144,33 +144,41 @@ test-portal:
     - npm test
 
 # -----------------------------------------------------------------
-# lab-validate: QEMU-runner substrate validation.
+# e2e: QEMU-runner end-to-end harness.
 #
-# Runs in a fresh Fedora VM spawned by the carmine GitLab Runner
-# (Custom Executor; tag carmine,qemu). The VM has podman + docker
-# bridge pre-baked. Inside the VM, lab/ci/validate.sh:
+# The project's canonical OSS-facing "stand Othala up on compose"
+# example (e2e/README.md), run here as the release gate. Executes in a
+# fresh Fedora VM spawned by the carmine GitLab Runner (Custom Executor;
+# tag carmine,qemu). The VM has podman + docker bridge pre-baked. Inside
+# the VM, e2e/validate.sh:
 #
 #   1. Generates per-run secrets
 #   2. podman login to the GitLab registry
-#   3. docker compose up the Topology B substrate
+#   3. docker compose up the converged substrate (postgres, kratos,
+#      hydra, the othala app, ldap-bridge — consent + util are folded
+#      into the othala app, no separate containers)
 #   4. Waits for healthchecks
-#   5. Runs lab/ci/smoke.sh — substrate sanity, apply-clients,
-#      identity admin flow, recovery-gate semantics
+#   5. Runs e2e/smoke.sh — substrate sanity, in-app client registration,
+#      identity admin flow, recovery-gate semantics (the converged app's
+#      /oauth2/* public challenge handlers + /admin/* loopback endpoints)
 #   6. Tears down (VM dies anyway, but be tidy)
 #
 # Sequence: gates the package + release stages. Build images first
-# (stage: build), validate them in the lab (stage: lab-validate),
-# then SBOM + release. CI-MR-PR feedback loop catches Ory-upgrade
-# regressions + Renovate-bump breakage before tag.
+# (stage: build), validate them end-to-end (stage: e2e), then SBOM +
+# release. The CI/MR feedback loop catches Ory-upgrade regressions +
+# Renovate-bump breakage before tag.
 #
-# AUTH_VERSION resolves to $CI_COMMIT_SHA on push (image tagged with
-# the SHA) or $CI_COMMIT_TAG on tag pipelines. Either way, the lab
-# validates the just-built image set, not :latest.
+# AUTH_REGISTRY=${CI_REGISTRY_IMAGE} is the registry ROOT — the converged
+# othala app image itself (publish_at_root: true). ldap-bridge is the
+# ${CI_REGISTRY_IMAGE}/ldap-bridge sub-image; e2e/compose.yml pulls the
+# app from root and the bridge from the sub-path. AUTH_VERSION resolves
+# to $CI_COMMIT_TAG on tag pipelines or $CI_COMMIT_SHORT_SHA on push —
+# either way the harness validates the just-built image set, not :latest.
 #
-# See lab/ci/README.md + docs/qemu-ci-lab.md.
+# See e2e/README.md + docs/qemu-ci-lab.md.
 # -----------------------------------------------------------------
-lab-validate:
-  stage: lab-validate
+e2e:
+  stage: e2e
   tags: [carmine, qemu]
   needs:
     - build-othala
@@ -189,7 +197,7 @@ lab-validate:
     - jq --version || true
     - python3 --version
   script:
-    - cd lab/ci
+    - cd e2e
     - bash validate.sh
   artifacts:
     when: on_failure

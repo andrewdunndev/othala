@@ -3,24 +3,36 @@
 Status: **implemented in v0.1.4** (this commit set). Replaces the
 static `lab/compose/` stack which is now legacy.
 
-Files: `lab/ci/{compose.yml,kratos.yml,hydra.yml,identity.schema.json,
+Files: `e2e/{compose.yml,kratos.yml,hydra.yml,identity.schema.json,
 recovery-gate.jsonnet,glauth.cfg,postgres-init.sh,gen-secrets.sh,
-smoke.sh,validate.sh,README.md}` + new `lab-validate` job in
-`.gitlab-ci.yml` tagged `[carmine, qemu]`.
+smoke.sh,validate.sh,README.md}` + the `e2e` job in `.gitlab-ci.yml`
+tagged `[carmine, qemu]`.
+
+> **Renamed + converged.** The directory was `lab/ci/` and the job was
+> `lab-validate`; both are now `e2e` (the project's canonical OSS-facing
+> end-to-end harness — see `e2e/README.md`). The topology converged:
+> the `consent` and `util` containers are gone (folded into the single
+> `othala` app image at the registry root), so the job `needs:
+> [build-othala, build-ldap-bridge]` and the substrate is postgres +
+> kratos + hydra + othala + ldap-bridge. The smoke probes the converged
+> app's `/oauth2/*` public challenge handlers and its loopback
+> `/admin/*` endpoints instead of a separate consent container. The
+> design rationale below is **preserved verbatim as the original
+> pre-convergence design** — read it for the "why on carmine / why a VM"
+> reasoning, not for the current service list.
 
 Pipeline shape:
 
 ```
-verify   →   build     →   lab-validate   →   package   →   release
-            (4 jobs)        (new gate)         (sbom)
+verify   →   build     →   e2e        →   package   →   release
+                            (gate)         (sbom)
 ```
 
-`lab-validate` `needs: [build-consent, build-ldap-bridge, build-portal,
-build-util]` — pulls the just-built image set at `${CI_COMMIT_TAG}`
-(tag pipelines) or `${CI_COMMIT_SHORT_SHA}` (push to main + MR). On
-red, blocks the SBOM + release stages. On green, the substrate is
-proven to come up + smoke clean before the SBOM/release jobs touch
-the registry.
+`e2e` `needs: [build-othala, build-ldap-bridge]` — pulls the just-built
+image set at `${CI_COMMIT_TAG}` (tag pipelines) or
+`${CI_COMMIT_SHORT_SHA}` (push to main + MR). On red, blocks the SBOM +
+release stages. On green, the substrate is proven to come up + smoke
+clean before the SBOM/release jobs touch the registry.
 
 What follows is the original design rationale — preserved verbatim.
 
@@ -239,7 +251,8 @@ Until then, the static `lab/compose/` stack covers manual smoke.
 Built earlier than the 2-week recommendation. The carmine runner
 infrastructure was already in place (`dunn.dev/iac/services/runner/`)
 and the lab is light enough to land alongside the substrate v0.1.4
-changes. Files at `lab/ci/`. See `lab/ci/README.md` for invocation
-notes. The lab does not gate the carmine deploy of v0.1.4 — it gates
-future v0.1.X tags. The v0.1.4 first deploy proves the substrate; the
-CI lab proves future bumps don't regress it.
+changes. Files at `e2e/` (originally `lab/ci/`, renamed + converged —
+see the banner at the top of this doc). See `e2e/README.md` for
+invocation notes. The harness does not gate the carmine deploy of
+v0.1.4 — it gates future v0.1.X tags. The v0.1.4 first deploy proves the
+substrate; the e2e harness proves future bumps don't regress it.

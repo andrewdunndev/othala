@@ -10,7 +10,7 @@
 #   - portal: npm test
 #   - portal: npm run check (Astro typecheck)
 #   - portal: npm run build (full SSR build)
-#   - lab/ci shell-scripts: bash -n syntax check
+#   - e2e shell-scripts: bash -n syntax check
 #   - .gitlab-ci.yml: python yaml parse
 #   - hydra/clients/*.yaml: yaml parse
 #   - portal/src/content/apps/*.md: frontmatter yaml parse
@@ -91,7 +91,7 @@ echo ""
 
 # ----- Shell scripts: syntax + shellcheck -----
 echo "Shell syntax + lint:"
-SHELL_SCRIPTS=(lab/ci/*.sh apex/scripts/*.sh)
+SHELL_SCRIPTS=(e2e/*.sh apex/scripts/*.sh)
 SYNTAX_BAD=0
 for s in "${SHELL_SCRIPTS[@]}"; do
     [[ -f "$s" ]] || continue

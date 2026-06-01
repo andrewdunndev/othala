@@ -88,10 +88,31 @@ selfservice:
       privileged_session_max_age: 15m
 
     recovery:
-      # CI lab exercises the recovery-gate webhook directly via curl
-      # against consent:4478. Don't enable the SMTP courier path in the
-      # lab — Fastmail credentials don't ship in CI.
+      # The e2e exercises the recovery-gate webhook directly (smoke.sh
+      # section D, via `compose exec` against the othala app's loopback
+      # admin port othala:8431/admin/recovery-gate). The courier/SMTP
+      # path stays off — Fastmail credentials don't ship in CI — so
+      # recovery itself is disabled, but the production-shape web_hook
+      # block is recorded below for config fidelity (it points at the
+      # converged app, NOT the retired consent service).
       enabled: false
+      # Production converged shape (inert here because recovery is off):
+      #   after.code.hooks:
+      #     - hook: web_hook
+      #       config:
+      #         url: http://${RECOVERY_GATE_HOST}:8431/admin/recovery-gate
+      #         method: POST
+      #         auth:
+      #           type: api_key
+      #           config:
+      #             in: header
+      #             name: Authorization
+      #             value: Bearer ${RECOVERY_GATE_SECRET}
+      #         body: file:///etc/config/kratos/hooks/recovery-gate.jsonnet
+      #         can_interrupt: true
+      # The app's handleRecoveryGate reads Authorization: Bearer and
+      # refuses recovery for any identity whose traits.email is on
+      # OTHALA_ADMIN_SUBJECTS (the `admin` group is display-only).
 
     verification:
       enabled: false
