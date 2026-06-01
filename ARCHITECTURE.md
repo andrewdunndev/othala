@@ -1,69 +1,90 @@
 # Architecture map
 
 Load-bearing decisions catalog + topology + flows. Read this if you
-(human or LLM) are picking up the codebase cold and need to understand
-where the landmines are.
+(human or LLM) are picking up Othala cold and need to understand where
+the landmines are.
 
-This is NOT a tutorial. It's a finger-pointer at the decisions that
-matter — what they are, where the code lives, and what would break
-if you changed them. Each entry is short on purpose; follow the
-cross-references for depth.
+This is NOT a tutorial. It is a finger-pointer at the decisions that
+matter: what they are, where the code lives, and what would break if you
+changed them. Each entry is short on purpose; follow the cross-references
+for depth.
 
 ## Doc source-of-truth hierarchy
 
 Each doc has exactly one job. Follow this when editing or reading:
 
-- **ARCHITECTURE.md** (this file) — cold-start orientation + load-bearing decisions. The authoritative anchor; all other docs defer to it.
-- **docs/STATUS.md** — the only place release/version state is asserted. Do not state versions elsewhere.
-- **README.md** — front door; links the others; asserts no version of its own.
-- **DEPLOY.md** — consumption contract; links ARCHITECTURE.md LB-12 rather than restating it.
+- **ARCHITECTURE.md** (this file): cold-start orientation + load-bearing decisions. The authoritative anchor; all other docs defer to it.
+- **docs/STATUS.md**: the only place release/version state is asserted. Do not state versions elsewhere.
+- **README.md**: front door; links the others; asserts no version of its own.
+- **DEPLOY.md**: consumption contract; links ARCHITECTURE.md LB-12 rather than restating it.
 
 This hierarchy is what prevents doc drift from recurring.
 
 ## Reading order
 
-1. **Right now (this file)** — what's load-bearing, where to find it, topology + flows.
-2. `docs/golden-path.md` — the upgrade-durability commitments.
-3. `docs/decision.md` — historical substrate rationale (the Ory choice); architecture superseded.
-4. `docs/STATUS.md` — current release state + what's next.
-5. `DEPLOY.md` — bidirectional pointer to `dunn.dev/iac` where production lives.
+1. **Right now (this file)**: what is load-bearing, where to find it, topology + flows.
+2. `docs/golden-path.md`: the upgrade-durability commitments.
+3. `docs/decision.md`: historical substrate rationale (the Ory choice). Architecture section superseded by this file.
+4. `docs/STATUS.md`: current release state + what is next.
+5. `DEPLOY.md`: bidirectional pointer to `dunn.dev/iac` where production lives.
 
 ## The converged application
 
-At HEAD the auth surface is ONE all-TypeScript application (`portal/`, an Astro Node SSR app). It fronts the upstream Ory substrate (Kratos + Hydra + Postgres) and a separate Go LDAP bridge. Read this before the load-bearing list — it is the shape every decision below sits inside.
+At HEAD the auth surface is ONE all-TypeScript application: the Othala
+app (`portal/`, an Astro Node SSR app). It fronts the upstream Ory
+substrate (Kratos + Hydra + Postgres) and a separate Go LDAP bridge.
+Read this before the load-bearing list; it is the shape every decision
+below sits inside.
 
 The app holds, all in one process:
 
-- **Kratos self-service browser flows** — login, registration, recovery, settings, verification. Every flow except login renders generically through ONE `ui.nodes` dispatcher (`portal/src/components/FlowNodes.astro`); login keeps a bespoke passkey-first / password-in-disclosure UX and is intentionally NOT a `FlowNodes` consumer.
+- **Kratos self-service browser flows**: login, registration, recovery, settings, verification. Every flow except login renders generically through ONE `ui.nodes` dispatcher (`portal/src/components/FlowNodes.astro`); login keeps a bespoke passkey-first / password-in-disclosure UX plus the ᛞ→ᛟ rune greeting, and is intentionally NOT a `FlowNodes` consumer (`portal/src/pages/auth/login.astro`).
 - **Hydra login / consent / logout CHALLENGE handlers** (`/oauth2/{login,consent,logout}`, `portal/src/lib/oauth2-handlers.ts`). Hydra ships no UI by design; this app IS Hydra's login + consent provider.
-- **The access gate** (`portal/src/lib/gate.ts`) — two fail-closed checks on BOTH the login and consent challenge: `access-<clientId>` group membership AND identity `state === 'active'`. A failed identity lookup is a closed gate.
+- **The access gate** (`portal/src/lib/gate.ts`): two fail-closed checks on BOTH the login and consent challenge: `access-<clientId>` group membership AND identity `state === 'active'`. A failed identity lookup is a closed gate. See LB-13.
 - **The id_token claims builder** (`portal/src/lib/claims.ts`).
-- **A dual-listener** (`portal/src/server/listen.mjs`) — a public Astro SSR listener and a SEPARATE loopback / pod-only admin listener. Admin endpoints live off the public mux by construction (see LB-13).
-- **The revoke fan-out** (`portal/src/lib/revoke.ts`, `revokeSubject`) — in-process, wired to admin force-logout, user sign-out-everywhere, and deactivate (see LB-14).
-- **OIDC client registration** (`portal/src/lib/manifests.ts` parser + `register-clients.ts` registrar + the full `validateClients` lint). DORMANT until the iac E1 cutover: registration today stays shell-driven via `util/apply-clients.sh`. `register-clients.ts` is NOT yet the live successor and does NOT supersede the shell.
+- **A dual-listener** (`portal/src/server/listen.mjs`): a public Astro SSR listener and a SEPARATE loopback / pod-only admin listener. Admin endpoints live off the public mux by construction. See LB-14.
+- **The revoke fan-out** (`portal/src/lib/revoke.ts`, `revokeSubject`): in-process, wired to admin force-logout, user sign-out-everywhere, and deactivate. See LB-15.
+- **Admin authority** (`portal/src/lib/admin-auth.ts`): the `OTHALA_ADMIN_SUBJECTS` allowlist, the SOLE source of admin authz. See LB-6 and LB-16.
+- **OIDC client registration** (`portal/src/lib/manifests.ts` parser + `register-clients.ts` registrar + the full `validateClients` lint). DORMANT until the deploy cutover: registration today stays shell-driven via `dag-apply-clients.sh` on the iac side. `register-clients.ts` is NOT yet the live successor and does NOT supersede the shell.
 
-**The surface split.** Admin / programmatic calls go through the typed Ory SDK (`@ory/client-fetch`): `admin-api.ts` (IdentityApi), `oauth2-handlers.ts` and `revoke.ts` (OAuth2Api). The redirect-sensitive Kratos self-service flows use thin raw-`fetch` wrappers (`kratos.ts`) instead, because they must forward the incoming Cookie header verbatim and follow Kratos's flow redirects — behaviour the SDK abstracts away.
+**The surface split.** Admin / programmatic calls go through the typed
+Ory SDK (`@ory/client-fetch`): `admin-api.ts` (IdentityApi),
+`oauth2-handlers.ts` and `revoke.ts` (OAuth2Api). The redirect-sensitive
+Kratos self-service flows use thin raw-`fetch` wrappers (`kratos.ts`)
+instead, because they must forward the incoming Cookie header verbatim
+and follow Kratos's flow redirects, behaviour the SDK abstracts away.
 
-**Legacy, pending removal.** The Go `consent/` service and `util/` apply runner still exist in-tree but are RETIRED at the iac E1 cutover (additive convergence). They are NOT the current architecture; their behaviour now lives in the TS app. Do not document them as the running shape.
+**No identity cache.** The hot login/consent path always fetches a fresh
+identity (`oauth2-handlers` → `admin-api.getIdentity`). A revoked or
+deactivated subject fails the gate's `state` check on the next fetch, so
+revocation is correct without any in-process identity cache to
+invalidate. Do not add one.
 
-**Back-channel logout is Hydra-native.** Hydra signs back-channel logout tokens with its own key (native since 2019). The former custom private-key signer in the consent service was DELETED. The app holds NO signing key at rest.
+**Back-channel logout is Hydra-native.** Hydra signs back-channel logout
+tokens with its own key (native since 2019). The former custom
+private-key signer was DELETED. The app holds NO signing key at rest.
 
-## The 14 load-bearing decisions
+**Legacy, pending removal.** The Go `consent/` service and `util/` apply
+runner still exist in-tree but are RETIRED at the iac deploy cutover
+(additive convergence: the TS app landed alongside them, and the cutover
+drops them). They are NOT the current architecture; their behaviour now
+lives in the TS app. Do not document them as the running shape.
+
+## The load-bearing decisions
 
 ### LB-1: WebAuthn `rp.id = dunn.dev`
 
 `kratos/kratos.yml: selfservice.methods.webauthn.config.rp.id`. One-way.
-Changing this invalidates every passkey already enrolled. Documented
-in `docs/decision.md` "WebAuthn rp.id" row.
+Changing this invalidates every passkey already enrolled. Documented in
+`docs/decision.md` "WebAuthn rp.id" row.
 
 **If you change it**: every family member re-enrolls passkeys. Don't.
 
 ### LB-2: Issuer URL `https://dag.dunn.dev/`
 
-`hydra/hydra.yml: urls.self.issuer`. Embedded in every id_token's
-`iss` claim. Once a consumer (Tailscale, Vaultwarden, etc.) is
-configured against this issuer, changing it means re-onboarding the
-consumer.
+`hydra/hydra.yml: urls.self.issuer`. Embedded in every id_token's `iss`
+claim. Once a consumer (Tailscale, Vaultwarden, etc.) is configured
+against this issuer, changing it means re-onboarding the consumer.
 
 Also byte-matches the WebFinger response on the dunn.dev apex (see
 `docs/apex-webfinger-followup.md`).
@@ -74,19 +95,19 @@ contacts support to migrate.
 ### LB-3: `secrets.system` is non-rotatable
 
 `hydra/hydra.yml: secrets.system`. Hydra's at-rest encryption key for
-OAuth2 client secrets. Rotation is a database rebuild. Stored in sops
-(`carmine.hydra_system_secret`). Runbook: `docs/runbooks/secrets-rotation.md`.
+OAuth2 client secrets. Rotation is a database rebuild. Stored in sops.
+Runbook: `docs/runbooks/secrets-rotation.md`.
 
 **If you lose it**: every Hydra-encrypted column is unrecoverable.
 Backup the sops file + age key separately and durably.
 
 ### LB-4: Cookie domain `.dunn.dev`
 
-`kratos/kratos.yml: session.cookie.domain`. Parent-domain cookie so
-the session is readable across every `*.dunn.dev` subdomain. Same-site
-implication: `dag.dunn.dev` and `<app>.dunn.dev` are same-site to
-the browser; CSRF posture must account for this (HIGH-1 in the security
-review documents the specific path; csrf.ts is the mitigation).
+`kratos/kratos.yml: session.cookie.domain`. Parent-domain cookie so the
+session is readable across every `*.dunn.dev` subdomain. Same-site
+implication: `dag.dunn.dev` and `<app>.dunn.dev` are same-site to the
+browser; CSRF posture must account for this (HIGH-1 in the security
+review documents the specific path; `csrf.ts` is the mitigation).
 
 **If you change it**: cross-subdomain SSO breaks; tighten the security
 review for whatever new posture you adopt.
@@ -96,39 +117,42 @@ review for whatever new posture you adopt.
 `hydra/hydra.yml: oidc.subject_identifiers.supported_types`. Same `sub`
 per user across every OIDC client. Tailscale needs this for stable user
 identity. Apps that demand pairwise (cross-client correlation prevention)
-would need a separate hydra config and a per-client decision.
+would need a separate Hydra config and a per-client decision.
 
 ### LB-6: Pod is one trust domain, no mTLS
 
 See "Trust boundary" below + `docs/golden-path.md` "No mTLS in-cluster."
 In-pod HTTP is unauthenticated except where specific bearer secrets gate
-the auth app's loopback admin listener (`OTHALA_ADMIN_ENDPOINT_BEARER` for
-`/admin/revoke-user`, `RECOVERY_GATE_SECRET` for the kratos→app
+the Othala app's loopback admin listener (`OTHALA_ADMIN_ENDPOINT_BEARER`
+for `/admin/revoke-user`, `RECOVERY_GATE_SECRET` for the kratos→app
 recovery-gate webhook). Both are constant-time compared and fail-closed.
 All other in-pod calls are trust-by-network-isolation.
 
-**If you change it**: introduce mTLS or SPIFFE — every in-pod call
-gets a new failure mode.
+**If you change it**: introduce mTLS or SPIFFE, and every in-pod call gets
+a new failure mode.
 
 ### LB-7: Recovery-gate is the only Kratos hook
 
-`consent/recovery_gate.go` + `kratos/kratos.yml: selfservice.flows.recovery.after.code.hooks`.
-Intercepts the post-recovery-code session-issue and returns 403 for
-admin identities (admin email recovery is disabled; console-only). LOW-5
-extends this to refuse-on-empty-groups as a defense against schema drift.
+`portal/src/server/listen.mjs: handleRecoveryGate` +
+`kratos/kratos.yml: selfservice.flows.recovery.after.code.hooks`.
+Kratos posts the in-flight identity to the app's admin-port recovery-gate
+before issuing a public recovery code; the gate returns 403 for any email
+on the `OTHALA_ADMIN_SUBJECTS` allowlist (admin recovery is console-only)
+and fail-closed (403) on a payload it cannot identify. The `admin` group
+is NOT consulted here (display-only; see LB-16).
 
 **If you add more Kratos hooks**: every new hook is a contract with
 Kratos's webhook config schema across versions. Each addition is
 upgrade-burden.
 
-### LB-8: Portal owns metadata_admin writes
+### LB-8: Othala app owns metadata_admin writes
 
 `portal/src/lib/metadata-admin.ts: validateMetadataAdmin`. Kratos's
-schema treats `metadata_admin` as opaque; the portal is the only
-writer. Documented in `docs/security-review-2026-05-04.md` MEDIUM-3.
+schema treats `metadata_admin` as opaque; the app is the only writer.
+Documented in the security review, MEDIUM-3.
 
 **If you add a second writer**: factor `validateMetadataAdmin` into a
-Go package shared with consent so both languages enforce.
+shared validator so every writer enforces the same shape.
 
 ### LB-9: Apps registry is `portal/src/content/apps/*.md`
 
@@ -140,65 +164,165 @@ include `access-<slug>`), and renders.
 
 OIDC clients are a **subset**: only apps that need Hydra registration
 have a corresponding `hydra/clients/<slug>.yaml`. Forward-auth apps
-(tune/Navidrome, gather/Sonarr, etc.) have Markdown entries but no Hydra yaml.
+(tune/Navidrome, gather/Sonarr, etc.) have Markdown entries but no Hydra
+yaml.
 
 **If you change this convention**: the slug across the Markdown file and
 yaml is the cross-reference; renaming either side breaks the lookup.
 
 ### LB-10: WebFinger lives at dunn.dev apex, NOT here
 
-Tailscale KB-1240 requires WebFinger at `${email-domain}/.well-known/webfinger`.
-For dunn.dev family emails this is `dunn.dev/.well-known/webfinger`,
-served by a Cloudflare Pages function in the dunn.dev apex repo.
-**Not** by this project, **not** by the portal.
+Tailscale KB-1240 requires WebFinger at
+`${email-domain}/.well-known/webfinger`. For dunn.dev family emails this
+is `dunn.dev/.well-known/webfinger`, served by a Cloudflare Pages function
+in the dunn.dev apex repo. **Not** by Othala, **not** by the app.
 
-Consulted exactly once during Tailscale tenant setup; lock-in
-afterward. See `docs/apex-webfinger-followup.md`.
+Consulted exactly once during Tailscale tenant setup; lock-in afterward.
+See `docs/apex-webfinger-followup.md`.
 
-**If you add a Webfinger handler here**: Tailscale won't find it.
+**If you add a WebFinger handler here**: Tailscale won't find it.
 Spec-violating to put it on a subdomain.
 
 ### LB-11: Sops + age is the single secrets source
 
-`dunn.dev/iac/pyinfra/secrets.enc.yaml`. Bitwarden is OUT (the migration
-landed in iac on 2026-05-30). Documented in `docs/runbooks/secrets-rotation.md`,
-`docs/runbooks/cookie-rotation.md`, `docs/runbooks/postgres-backup.md`.
-
-**If you write a Bitwarden mention into a runbook**: stale; correct
-to sops.
+`dunn.dev/iac/pyinfra/secrets.enc.yaml`. Secrets are sops + age. iac maps
+the `dag_*` sops keys onto the app's env targets
+(`OTHALA_ADMIN_SUBJECTS`, `OTHALA_ADMIN_ENDPOINT_BEARER`,
+`RECOVERY_GATE_SECRET`, `CSRF_SECRET`, `LDAP_BRIDGE_ADMIN_URL` /
+`LDAP_BRIDGE_ADMIN_TOKEN`, plus the Kratos/Hydra admin tokens and the
+per-client `*_CLIENT_SECRET`s). Documented in
+`docs/runbooks/secrets-rotation.md`, `docs/runbooks/cookie-rotation.md`,
+`docs/runbooks/postgres-backup.md`.
 
 ### LB-12: `dunn.dev/iac` is the deploy plane (vendor-pin model)
 
 iac is the primary deployment view; this repo is the transitory upstream
-(OSS-bound, heading toward a standalone open-source project). Deploying
-to carmine is the promotion event that takes auth from speculative to actual.
+(OSS-bound, the standalone Othala project). Deploying to the SSO host is
+the promotion event that takes Othala from speculative to actual.
 
-iac vendors config files pinned to a released auth tag (`services/auth/`).
-Drift between auth-HEAD and the iac pin is expected and permitted — iac
-decides when to consume a new auth release. There is no submodule or
-subtree between the repos; that dependency format was rejected. The
-contract is a released tag, not a live pointer.
+iac vendors config files pinned to a released Othala tag, under the `dag`
+service grouping (`services/dag/`). Drift between Othala-HEAD and the iac
+pin is expected and permitted; iac decides when to consume a new release.
+There is no submodule or subtree between the repos; that dependency format
+was rejected. The contract is a released tag, not a live pointer.
 
-Topology-specific differences (DSN host = `auth-postgres` in iac vs
-`postgres` in lab compose) are iac-local deviations documented in each
-vendored file's provenance header.
+The published application image is named **othala**. The instance
+grouping in iac is **dag**: `services/dag/`, `dag-*` quadlets, the
+`dag.network`, `dag_*` sops keys. The functional Ory service names
+(kratos / hydra / postgres) keep their role names.
 
-See `DEPLOY.md` (in this repo) + `dunn.dev/iac/services/auth/` (the
-deploy plane).
+Topology-specific differences (DSN host) are iac-local deviations
+documented in each vendored file's provenance header.
 
-**If you change a config file here**: tag a new auth release, then the
-operator bumps the iac pin (`make auth-sync-configs`, review diff, port
-desired changes, update provenance headers, commit).
+See `DEPLOY.md` (in this repo) + `dunn.dev/iac/services/dag/` (the deploy
+plane).
+
+**If you change a config file here**: tag a new Othala release, then the
+operator bumps the iac pin (sync configs, review diff, port desired
+changes, update provenance headers, commit).
+
+### LB-13: The access gate is fail-closed on group AND state
+
+`portal/src/lib/gate.ts: enforceAccessGate`. Two checks, both applied on
+BOTH the login and consent challenge handlers, both fail-closed:
+
+1. `identity.state` must be exactly `"active"`. Deactivated identities are
+   denied. The check is explicit and unconditional, so the skip-login path
+   and the consent path (which read the identity via the admin API, where
+   `state` is present) also reject inactive identities.
+2. The identity must be a member of `access-<clientId>` (clientId
+   lowercased), read from admin-managed `metadata_admin.groups`.
+
+A null identity (lookup failed upstream) is a closed gate. These are pure
+functions over an already-fetched identity, unit-tested without a running
+Kratos.
+
+**If you weaken either check**: a deactivated or non-entitled subject can
+complete a flow. Both checks are the gate; neither is optional.
+
+### LB-14: Dual-listener, admin off the public mux by construction
+
+`portal/src/server/listen.mjs`. Two in-process HTTP listeners bound
+separately:
+
+- **Public** (`PORT`, default 8080, on `HOST` default `0.0.0.0`) serves
+  the Astro SSR handler: the OAuth2 challenge providers, the family UI,
+  `/auth/*`, `/admin/*` pages. This is the only handler exposed to the
+  network.
+- **Admin** (`ADMIN_PORT`, default 8431, on `ADMIN_HOST` default
+  `127.0.0.1`, loopback / pod-only) is a SEPARATE `http.createServer`
+  with its own tiny mux: `GET /healthz`, `GET /readyz`,
+  `POST /admin/revoke-user` (bearer `OTHALA_ADMIN_ENDPOINT_BEARER`),
+  `POST /admin/recovery-gate` (bearer `RECOVERY_GATE_SECRET`).
+
+The admin mux NEVER delegates to the Astro handler, and the public handler
+never sees the admin POST routes. The two muxes are disjoint, so no
+challenge provider and no public route is reachable on the admin port, and
+the privileged endpoints are not reachable from the network. Both bearer
+checks are constant-time (`timingSafeEqual`) and fail-closed: an unset
+secret rejects every request.
+
+**If you collapse the listeners**: the privileged revoke/recovery-gate
+endpoints become network-reachable. The split is the boundary.
+
+### LB-15: revokeSubject is the single in-process revocation fan-out
+
+`portal/src/lib/revoke.ts`. One function called by all three triggers:
+admin force-logout, user sign-out-everywhere (steps 2-5), and deactivate
+(step 1, then 2-5). It calls the Kratos + Hydra admin APIs directly
+through the typed Ory SDK: no string-interpolated admin URLs, no
+out-of-process HTTP hop (the old portal→consent boundary is gone).
+
+Ordered fan-out (do not reorder; steps 1-2 are the hard cut):
+
+1. (deactivate trigger only) Kratos state → inactive. MUST precede step 2,
+   so a session re-minted in the race window is itself for an inactive
+   identity (the gate then denies).
+2. Kratos sessions revoke. FAILURE ABORTS the fan-out; without this the
+   subject keeps a live Kratos session and the cut is a no-op.
+3. Hydra login-session revoke. Cuts the `loginRememberFor` window so a
+   remembered subject cannot skip-login a fresh token. Idempotent.
+4. Hydra consent-session revoke. Invalidates granted consent + associated
+   access tokens. Idempotent.
+5. LDAP bind-cache flush (BEST-EFFORT). Skipped silently when
+   `LDAP_BRIDGE_ADMIN_URL` is unset; a failure here NEVER aborts or rolls
+   back steps 1-4.
+
+Upstream failures on steps 1-4 throw a prescriptive `RevokeError` naming
+the dependency (`kratos-admin` / `hydra-admin`) and the operator's next
+action; the raw upstream error is never surfaced to the caller. There is
+no identity cache to invalidate (see "No identity cache" above).
+
+**If you reorder steps 1-2**: you open a revoke race. The abort-on-step-2
+behaviour is what makes the cut atomic enough.
+
+### LB-16: OTHALA_ADMIN_SUBJECTS is the sole admin authz; the `admin` group is display-only
+
+`portal/src/lib/admin-auth.ts`. Admin authority is an explicit env
+allowlist (`OTHALA_ADMIN_SUBJECTS`, comma-separated identity emails,
+sops-backed), case-folded and trimmed. It is the SOLE authz at
+`requireAdminSession`, the recovery-gate refusal, and the admin page
+gates. Fail-closed: an empty/unset list yields no admins; a missing email
+yields a non-admin.
+
+This REPLACES every former `metadata_admin.groups.includes('admin')`
+gate. The `admin` group is now DISPLAY-ONLY: it still renders in the admin
+UI's group chips and may drive per-app role derivation, but no code path
+gates admin access, recovery refusal, or admin authority on it. An admin
+removing the `admin` group from their own identity therefore cannot drop
+their own admin authority; the allowlist lives outside Kratos.
+
+**If you re-gate admin on the group**: self-demote becomes a lockout
+vector, and an in-Kratos write can grant admin. Keep authz in the
+allowlist.
 
 ## Topology
 
 Production topology after the locked Ory pivot. Custom Caddy image at
-`registry.gitlab.com/dunn.dev/caddy-estate` (built with xcaddy +
-`caddy-dns/cloudflare` plugin), DNS-only Cloudflare in front,
-port-forward 443 on home router. Kratos + Hydra + glauth-kratos +
-consent service + Astro portal all on carmine, in the same pod network.
-Single auth surface: `dag.dunn.dev` (Topology B — `home.dunn.dev` is
-reserved, not served).
+`registry.gitlab.com/dunn.dev/caddy-estate` (xcaddy +
+`caddy-dns/cloudflare`), DNS-only Cloudflare in front, port-forward 443 on
+the home router. Kratos + Hydra + glauth-kratos + the Othala app all run
+in the same SSO pod. Single auth surface: `dag.dunn.dev`.
 
 ```
                            Cloudflare DNS (gray cloud, no proxy)
@@ -207,22 +331,25 @@ reserved, not served).
                            home IP : 443 (port-forwarded)
                                   │
                                   ↓
-                           carmine
+                           SSO host
                              ├─ Envoy (L4 SNI router on 80/443)
                              ├─ per-pod Caddy sidecars (dunn.dev/caddy-estate, DNS-01 ACME)
-                             ├─ auth pod (single pod network)
+                             ├─ SSO pod (single pod network)
                              │    ├─ kratos (4433 public, 4434 admin internal-only)
                              │    ├─ kratos-courier (singleton, sends recovery emails)
                              │    ├─ hydra (4444 public, 4445 admin internal-only)
                              │    ├─ hydra-migrate (init container, schema migrations)
-                             │    ├─ consent service (4477 internal)
-                             │    ├─ portal (Astro Node SSR, 8080 internal)
-                             │    │    └─ dag.dunn.dev (path-shared with Kratos+Hydra+consent)
-                             │    │        ├─ /                       session-gated tile dashboard
-                             │    │        ├─ /apps/<slug>            per-app education page
-                             │    │        ├─ /auth/{login,recovery,settings,verification}
-                             │    │        └─ /admin/{users,groups,oauth2,activity}
-                             │    │   (home.dunn.dev: reserved, not served)
+                             │    ├─ othala app (Astro Node SSR)
+                             │    │    ├─ public listener 8080  → dag.dunn.dev (path-shared with Kratos + Hydra)
+                             │    │    │    ├─ /                       session-gated tile dashboard
+                             │    │    │    ├─ /apps/<slug>            per-app education page
+                             │    │    │    ├─ /oauth2/{login,consent,logout}  Hydra challenge providers
+                             │    │    │    ├─ /auth/{login,recovery,settings,verification}
+                             │    │    │    └─ /admin/{users,groups,oauth2,activity}
+                             │    │    └─ admin listener 8431 (loopback / pod-only)
+                             │    │         ├─ /healthz, /readyz
+                             │    │         ├─ /admin/revoke-user      (OTHALA_ADMIN_ENDPOINT_BEARER)
+                             │    │         └─ /admin/recovery-gate    (RECOVERY_GATE_SECRET)
                              │    │   (WebFinger: dunn.dev apex Pages function, not here)
                              │    └─ postgres (kratos + hydra databases)
                              ├─ jellyfin pod
@@ -234,51 +361,44 @@ reserved, not served).
 
 home portal health check:
   index.astro → kratos:4433/health/alive (in-pod fetch, 2s timeout)
-  No Workers KV: state determination is per-request, no edge cache.
+  No edge cache: state determination is per-request.
 ```
 
 ### Cloudflare's role
 
 DNS hosting + DNS-01 ACME via API. **Not in the auth or app request
-path** for the portal or OIDC flows. No CF Tunnel, no CF Access, no
-Worker for the portal, no KV for state. Cloudflare never sees TLS
-plaintext for app/auth flows.
+path** for the app or OIDC flows. No CF Tunnel, no CF Access, no Worker,
+no KV. Cloudflare never sees TLS plaintext for app/auth flows.
 
 Two narrow Cloudflare-served endpoints exist on the dunn.dev apex:
 
-- **WebFinger** at `dunn.dev/.well-known/webfinger` — Pages function
+- **WebFinger** at `dunn.dev/.well-known/webfinger`: a Pages function
   returning the OIDC issuer JRD for Tailscale tenant setup (consulted
   once, never per-login).
-- The marketing landing page at `dunn.dev/` — outside the auth
-  substrate's concern.
+- The marketing landing page at `dunn.dev/`, outside the auth substrate's
+  concern.
 
-### Why portal-on-carmine, not Workers
+### Why the app on the SSO host, not Workers
 
-adversarial-review-2 C1: with the portal on Workers, the admin pages
-had to fetch `kratos:4434` (the Kratos admin port). That hostname
-resolves only inside the carmine pod network; from a Worker it's
-unreachable. The locked decision "admin port stays internal" jointly
-with "Astro on Workers" was inconsistent.
+adversarial-review-2 C1: with the app on Workers, the admin pages had to
+fetch `kratos:4434` (the Kratos admin port). That hostname resolves only
+inside the SSO pod network; from a Worker it is unreachable. The locked
+decision "admin port stays internal" jointly with "Astro on Workers" was
+inconsistent.
 
-Putting the portal on carmine in the same pod network as Kratos and
-Hydra makes the admin port reachable directly. It also collapses
-runtime complexity: one Node process, normal `process.env`, no Workers
-shims, no `wrangler` deploy step.
+Running the app in the same pod as Kratos and Hydra makes the admin port
+reachable directly. It also collapses runtime complexity: one Node
+process, normal `process.env`, no Workers shims, no `wrangler` deploy
+step. The dual-listener (LB-14) keeps the privileged endpoints off the
+public mux.
 
-(Note: an earlier shape of this repo served WebFinger from the portal
-at `dag.dunn.dev/.well-known/webfinger`. That handler was deleted in
-v0.1.4 — Tailscale's KB-1240 requires WebFinger at the email-domain
-apex, not on the IdP subdomain. Production serves it from a Cloudflare
-Pages function on the dunn.dev apex repo. See
-`docs/apex-webfinger-followup.md`.)
+### Bootstrap order
 
-### Bootstrap order on carmine
-
-1. Carmine boots (bootc immutable image, ZFS pools, networking)
+1. Host boots (bootc immutable image, storage pools, networking)
 2. Postgres pod up
-3. **Hydra schema migration** (init container; runs `hydra migrate sql up`)
+3. **Hydra schema migration** (init container; `hydra migrate sql up`)
 4. Kratos + Hydra serve up
-5. Consent service up
+5. Othala app up (public + admin listeners)
 6. Caddy sidecars obtain DNS-01 certs
 7. App pods come up as Hydra OIDC clients (or LDAP via bridge for Jellyfin)
 8. Tailscale joins as Hydra OIDC client (custom-OIDC + WebFinger)
@@ -289,8 +409,8 @@ Tailscale is not load-bearing. Admin paths work without it.
 
 ### Login flow with passkey
 
-The default family path. Password is the fallback, AAL2 step-up only
-fires for `/admin/*`.
+The default family path. Password is the fallback; AAL2 step-up only fires
+for `/admin/*`.
 
 ```mermaid
 sequenceDiagram
@@ -300,23 +420,24 @@ sequenceDiagram
   participant C as Caddy
   participant K as Kratos
   participant H as Hydra
-  participant CS as Consent service
+  participant O as Othala app
   participant A as App (e.g. keep)
 
   U->>A: visit keep.dunn.dev
   A->>B: 302 to Hydra /oauth2/auth
   B->>H: /oauth2/auth?client_id=keep
-  H->>B: 302 to Kratos /self-service/login
+  H->>O: GET /oauth2/login?login_challenge
+  O->>B: 302 to Kratos login (no session yet)
   B->>K: GET login flow
-  K->>B: render passkey challenge
+  K->>B: render passkey challenge (rendered by /auth/login)
   U->>B: tap passkey (WebAuthn rp.id=dunn.dev)
   B->>K: POST assertion
   K->>B: Set-Cookie ory_session<br/>302 back to Hydra
   B->>H: resume /oauth2/auth
-  H->>CS: consent request<br/>(skip_consent for trusted client)
-  CS->>K: getIdentity (admin API)
-  CS->>CS: enforce access-keep group
-  CS->>H: accept consent + claims
+  H->>O: GET /oauth2/consent?consent_challenge
+  O->>K: getIdentity (admin API, fresh)
+  O->>O: access gate: state==active AND access-keep
+  O->>H: accept consent + id_token claims
   H->>B: 302 with code
   B->>A: /callback?code=...
   A->>H: exchange code for tokens
@@ -325,44 +446,47 @@ sequenceDiagram
 
 ### Tile dashboard render (admin AAL2 step-up)
 
-Admin pages live at `dag.dunn.dev/admin/*`. AAL is per-flow in Kratos,
-so the SSR layer is what enforces step-up. The tile dashboard itself
-(non-admin `/`) skips the AAL2 branch and renders from `metadata_admin.groups`.
+Admin pages live at `dag.dunn.dev/admin/*`. AAL is per-flow in Kratos, so
+the SSR layer is what enforces step-up. The tile dashboard itself
+(non-admin `/`) skips the AAL2 branch and renders from
+`metadata_admin.groups`. Admin authority itself is the
+`OTHALA_ADMIN_SUBJECTS` allowlist (LB-16), checked in
+`requireAdminSession`; the AAL2 step-up is an additional factor on top.
 
 ```mermaid
 sequenceDiagram
   actor U as Admin user
   participant B as Browser
   participant C as Caddy
-  participant P as Astro portal (SSR)
+  participant O as Othala app (SSR)
   participant K as Kratos
 
   U->>B: GET /admin/users
   B->>C: cookie ory_session
   C->>K: forward_auth /sessions/whoami
   K->>C: 200 (any AAL)
-  C->>P: pass through
-  P->>K: getIdentity (admin API)
-  P->>P: check metadata_admin.groups has "admin"<br/>check session.aal == aal2
+  C->>O: pass through
+  O->>K: getIdentity (admin API, fresh)
+  O->>O: requireAdminSession: email in OTHALA_ADMIN_SUBJECTS<br/>check session.aal == aal2
   alt aal1
-    P->>B: 302 /self-service/login/browser?aal=aal2&refresh=true
+    O->>B: 302 /self-service/login/browser?aal=aal2&refresh=true
     B->>K: re-auth with second factor
     K->>B: cookie now aal2
-    B->>P: retry /admin/users
+    B->>O: retry /admin/users
   else aal2
-    P->>B: render admin UI
+    O->>B: render admin UI
   end
 ```
 
 Per adversarial review: AAL is enforced at the SSR layer because Kratos
-AAL is per-flow, not per-route. Caddy alone can't conditionally gate on
+AAL is per-flow, not per-route. Caddy alone cannot conditionally gate on
 JSON-body claims.
 
 ### WebFinger / Tailscale custom-OIDC
 
-Tailscale custom-OIDC against Hydra. Doesn't use PKCE. WebFinger lives
-at the email-domain apex (`dunn.dev/.well-known/webfinger`), served by
-a Cloudflare Pages function in the dunn.dev apex repo, not here.
+Tailscale custom-OIDC against Hydra. Does not use PKCE. WebFinger lives at
+the email-domain apex (`dunn.dev/.well-known/webfinger`), served by a
+Cloudflare Pages function in the dunn.dev apex repo, not here.
 
 ```mermaid
 flowchart LR
@@ -372,21 +496,19 @@ flowchart LR
   h -->|tokens, public sub| ts
 ```
 
-The Cloudflare Pages function returns `Content-Type: application/jrd+json`,
+The Pages function returns `Content-Type: application/jrd+json`,
 `Access-Control-Allow-Origin: *`, issuer `href` byte-matching Hydra's
-`urls.self.issuer` in `hydra/hydra.yml` (currently `https://dag.dunn.dev/`
-with trailing slash; Tailscale rejects any mismatch).
-
-The WebFinger endpoint is consulted exactly once during tailnet setup;
-the issuer is locked-in afterward and changing it requires Tailscale
-support per KB-1240. See `docs/apex-webfinger-followup.md` for
-implementation + verification.
+`urls.self.issuer` in `hydra/hydra.yml` (`https://dag.dunn.dev/` with
+trailing slash; Tailscale rejects any mismatch). Consulted exactly once
+during tenant setup; the issuer is locked-in afterward and changing it
+requires Tailscale support per KB-1240. See
+`docs/apex-webfinger-followup.md`.
 
 ## Auth patterns
 
-Every family app falls into one of five patterns. The pattern is fixed
-at deploy time per app via the Caddyfile snippet it imports. See
-`caddy/` for the canonical snippets.
+Every family app falls into one of five patterns, fixed at deploy time per
+app via the Caddyfile snippet it imports. See `caddy/` for the canonical
+snippets.
 
 | Pattern | Apps | One-line summary |
 |---|---|---|
@@ -400,139 +522,125 @@ at deploy time per app via the Caddyfile snippet it imports. See
 
 Two types of groups in `metadata_admin.groups[]`:
 
-**Identity groups**: who you are. Canonical order:
-`admin`, `family`, `friends`, `kids`. The admin form writes
-`metadata_admin.groups` in canonical order on save (see
-`portal/src/lib/access.ts: normalizeGroupOrder`); both the consent
-service (`consent/manifest.go: LookupRole`) and the portal Effective
-Access view walk stored order, so canonical order IS the precedence.
-Adding a new identity group means updating `IDENTITY_GROUP_ORDER` in
-`access.ts` AND the form's checkbox list (M11 / C4); otherwise the
-new group lands out of order and the cross-implementation invariant
-breaks.
+**Identity groups**: who you are. Canonical order: `admin`, `family`,
+`friends`, `kids`. The admin form writes `metadata_admin.groups` in
+canonical order on save (`portal/src/lib/access.ts:
+normalizeGroupOrder`); stored order IS the precedence. The `admin` group
+here is DISPLAY-ONLY for authz purposes (LB-16): it renders and may drive
+per-app role derivation, but admin authority is the
+`OTHALA_ADMIN_SUBJECTS` allowlist. Adding a new identity group means
+updating `IDENTITY_GROUP_ORDER` in `access.ts` AND the form's checkbox
+list; otherwise the new group lands out of order.
 
-**Access groups**: what you can reach (one per app):
-`access-keep`, `access-larder`, `access-listen`, `access-cinema`,
-`access-tune`, `access-memory`, `access-vault`, `access-gather`,
-`access-library`, `access-llm`, `access-forge`, `access-observe`.
+**Access groups**: what you can reach (one per app), e.g. `access-keep`,
+`access-cinema`, `access-tune`. The tile launcher renders only tiles for
+the `access-*` groups the user is in. The access gate (LB-13) enforces
+`access-<clientId>` membership at the consent challenge: a user without
+the matching access group cannot complete consent regardless of session
+state.
 
-The home portal tile launcher renders only tiles for `access-*` groups
-the user is in. Apps enforce authz reading the OIDC `groups` claim
-(injected by the consent service from `metadata_admin.groups`). The
-consent service ALSO enforces `access-<client_id>` membership at the
-OIDC entry gate (D2 / C2): a user without the matching access group
-cannot complete consent regardless of session state.
+### Group and credential change lag
 
-### Group and credential change lag (M5)
-
-Edits to a user's groups or credentials don't propagate instantly.
+Edits to a user's groups or credentials do not propagate instantly.
 Worst-case lag per consumer:
 
 | Surface | Lag | Source |
 |---|---|---|
-| Home portal tile launcher | next page load | reads Kratos directly |
-| LDAP bridge SEARCH | up to 30s | identity cache TTL |
-| LDAP bridge BIND (old password) | up to 30s | bind cache TTL (positive results) |
-| Consent flow (new flow) | up to 30s | consent identity cache TTL |
-| Consent flow (decision remembered) | up to 1h | Hydra `consentRememberFor` |
-| App refresh-token horizon | up to 30 days | Hydra refresh token TTL |
+| Tile launcher / OIDC consent gate | next flow | reads Kratos fresh per flow |
+| LDAP bridge SEARCH | up to bridge identity-cache TTL | bridge polls Kratos |
+| LDAP bridge BIND (old password) | up to bridge bind-cache TTL | bind cache (positive results) |
+| OIDC consent (decision remembered) | up to Hydra `consentRememberFor` | Hydra remember window |
+| App refresh-token horizon | up to Hydra refresh-token TTL | Hydra refresh token |
 
-The fast revocation path is `Revoke sessions` on the admin user page,
-which kills the Kratos session and Hydra's remember in one action.
-Family runbook: when a member loses a device, an admin clicks Revoke,
-not Wait.
+The fast revocation path is the admin `Revoke user` action, which runs
+`revokeSubject` (LB-15): it kills the Kratos session and Hydra's
+login + consent remember, and best-effort flushes the LDAP bind cache, in
+one action. Family runbook: when a member loses a device, an admin clicks
+Revoke, not Wait. The OIDC consent gate has no app-side identity cache, so
+the next flow re-fetches and the deactivated/ungrouped subject is denied
+at the gate.
 
 ## Trust boundary
 
-The auth pod is one trust domain. Kratos (public + admin), Hydra
-(public + admin), the consent service, the portal, and Postgres all
-sit on the same pod network. Defense-in-depth between services inside
+The SSO pod is one trust domain. Kratos (public + admin), Hydra (public +
+admin), the Othala app (public + loopback admin listeners), and Postgres
+all sit on the same pod network. Defense-in-depth between services inside
 the pod is partial-and-deliberate:
 
 | Edge | Posture | Enforcer |
 |---|---|---|
-| Caddy → Kratos public / Hydra public / consent public | TLS terminated at Caddy; HTTP within the pod | Caddyfile + pod network |
-| Kratos → consent (recovery-gate webhook) | Shared secret in `X-Webhook-Auth`, constant-time compared (MEDIUM-2) | consent code + Kratos web_hook config |
-| portal → consent (`/admin/revoke-user`) | Bearer in `Authorization`, constant-time compared (MEDIUM-1) | consent code |
-| portal → Kratos admin (`:4434`) | No auth; pod-network isolation | pod network |
-| portal → Hydra admin (`:4445`) | No auth; pod-network isolation | pod network |
-| consent → Hydra admin (`:4445`) | No auth; pod-network isolation | pod network |
-| consent → ldap-bridge admin (MEDIUM-5) | Bearer in `Authorization`, constant-time compared | bridge code |
+| Caddy → Kratos public / Hydra public / app public | TLS terminated at Caddy; HTTP within the pod | Caddyfile + pod network |
+| Kratos → app recovery-gate (admin listener) | Bearer `RECOVERY_GATE_SECRET`, constant-time, fail-closed | `listen.mjs` |
+| operator/admin UI → app `/admin/revoke-user` (admin listener) | Bearer `OTHALA_ADMIN_ENDPOINT_BEARER`, constant-time, fail-closed | `listen.mjs` |
+| app → Kratos admin (`:4434`) | No auth; pod-network isolation | pod network |
+| app → Hydra admin (`:4445`) | No auth; pod-network isolation | pod network |
+| app → ldap-bridge admin | Bearer `LDAP_BRIDGE_ADMIN_TOKEN`, best-effort | `revoke.ts` |
 | ldap-bridge → Kratos admin (`:4434`) | Admin token (env-resolved) | Kratos admin token |
 
-Tier-2 attackers (RCE on a non-auth-pod app like Vaultwarden) are
-network-isolated to their own pod and cannot reach this trust domain.
-Tier-2 RCE on an auth-pod service (consent, portal) yields the bearer
-tokens in that service's process memory; the listener-split posture
-(MEDIUM-1) limits the blast radius to "things this service was already
+The privileged endpoints (`/admin/revoke-user`, `/admin/recovery-gate`)
+sit on the loopback admin listener (LB-14), so they are not network
+reachable; the bearer checks are defense-in-depth on top of the
+listener-split. Tier-2 attackers (RCE on a non-SSO-pod app like
+Vaultwarden) are network-isolated to their own pod and cannot reach this
+trust domain. Tier-2 RCE on the Othala app yields the bearer tokens in its
+process memory; the surface is limited to "things this app was already
 authorized to do."
 
 ### metadata_admin write boundary (MEDIUM-3)
 
 All `metadata_admin` writes go through `portal/src/lib/metadata-admin.ts`
-(`validateMetadataAdmin`). Kratos validates `traits` against the
-identity schema but treats `metadata_admin` as opaque, so a typo
-(`grupos` instead of `groups`) would otherwise be accepted silently.
-The application-layer validator catches that.
-
-Production posture: the Kratos admin port (`:4434`) is reachable only
-from inside the auth pod (`portal`, `consent`, `ldap-bridge`). No
-external write path exists. If a future write path is added (CLI
-tool, migration script), the validator factors out into a Go package
-shared with consent so both languages enforce the same shape.
+(`validateMetadataAdmin`). Kratos validates `traits` against the identity
+schema but treats `metadata_admin` as opaque, so a typo (`grupos` instead
+of `groups`) would otherwise be accepted silently. The application-layer
+validator catches that. The Kratos admin port (`:4434`) is reachable only
+from inside the SSO pod; no external write path exists.
 
 ### Recovery-gate fail-closed (A4)
 
-If the consent service is down during a recovery flow, Kratos's
-`web_hook` timeout fires and the flow aborts (fail-closed): Kratos
-will not issue a privileged settings session if the can_interrupt hook
-returns non-2xx OR times out. UX cost: non-admin family recovery
-aborts during a consent outage. Acceptable: family-scale outages are
-operator-resolved within minutes, not autoscaled away.
+If the app's admin listener is down during a recovery flow, Kratos's
+`web_hook` timeout fires and the flow aborts (fail-closed): Kratos will
+not issue a privileged settings session if the can-interrupt hook returns
+non-2xx OR times out. UX cost: non-admin family recovery aborts during an
+app outage. Acceptable: family-scale outages are operator-resolved within
+minutes.
 
 ### Cookie domain + CORS posture (A5)
 
-A compromised app on `<app>.dunn.dev` can read its own cookies but
-NOT the Kratos session cookie (HttpOnly). The browser treats
-`dag.dunn.dev` and `<app>.dunn.dev` as same-site (registrable parent
-`dunn.dev`), so:
+A compromised app on `<app>.dunn.dev` can read its own cookies but NOT the
+Kratos session cookie (HttpOnly). The browser treats `dag.dunn.dev` and
+`<app>.dunn.dev` as same-site (registrable parent `dunn.dev`), so:
 
-- Service-worker fetch-with-credentials: blocked at the IDP CORS
-  layer. Kratos `allowed_origins` lists only `https://dag.dunn.dev`;
-  Hydra likewise. A service worker on `<app>.dunn.dev` calling
-  `dag.dunn.dev` carrying the session cookie is rejected at CORS.
-- Form-driven CSRF (HIGH-1): SameSite=Lax permits same-site POSTs, so
-  a top-level form on `<app>.dunn.dev` posting to
-  `dag.dunn.dev/admin/users/<id>` would carry the session cookie.
-  This is the path HIGH-1 closed by adding per-request CSRF tokens to
-  every admin form POST.
+- Service-worker fetch-with-credentials is blocked at the IDP CORS layer.
+  Kratos `allowed_origins` lists only `https://dag.dunn.dev`; Hydra
+  likewise.
+- Form-driven CSRF (HIGH-1): `SameSite=Lax` permits same-site POSTs, so a
+  top-level form on `<app>.dunn.dev` posting to
+  `dag.dunn.dev/admin/users/<id>` would carry the session cookie. HIGH-1
+  closed this by adding per-request CSRF tokens to every admin form POST
+  (`csrf.ts`, secret `CSRF_SECRET`).
 
-Cross-subdomain cookie reach is the design constraint that motivates
-the parent-domain decision (locked: WebAuthn rp.id requires it). The
-CSRF gate is the matching mitigation.
+Cross-subdomain cookie reach is the design constraint that motivates the
+parent-domain decision (locked: WebAuthn rp.id requires it). The CSRF gate
+is the matching mitigation.
 
 ### Backup correctness across Hydra encryption-at-rest (A6)
 
 `docs/runbooks/postgres-backup.md` covers the basics. Partial-state
-restore (Postgres consistent at the database level but not across
-the `kratos` and `hydra` databases) yields drift between Kratos
-identities and Hydra remembered-consent rows. At family scale the
-recovery is "wipe Hydra remembered-consent rows + force re-login,"
-not "fix the row." See the runbook's "Partial-state restore" section.
+restore (Postgres consistent at the database level but not across the
+`kratos` and `hydra` databases) yields drift between Kratos identities and
+Hydra remembered-consent rows. At family scale the recovery is "wipe Hydra
+remembered-consent rows + force re-login," not "fix the row." See the
+runbook's "Partial-state restore" section.
 
 ### mTLS gap (A7)
 
-No mTLS between auth-pod services. Plain HTTP across `consent →
-hydra:4445`, `portal → kratos:4434`, `kratos → consent:4478`. The pod
-boundary is the trust unit; podman network isolation prevents
-cross-pod traffic; SELinux + ZFS-backed storage close other lateral
-paths.
-
-Tier-2 implication: RCE on any auth-pod service yields full
-pod-internal lateral. Family scale and single-tenancy mean this is
-acceptable; the gap to enterprise-grade posture (mTLS or SPIFFE) is
-not justified at this scale. Documenting the choice so it doesn't
-quietly drift.
+No mTLS between SSO-pod services. The pod boundary is the trust unit;
+podman network isolation prevents cross-pod traffic; SELinux + backed
+storage close other lateral paths. Tier-2 RCE on any SSO-pod service
+yields full pod-internal lateral. Family scale and single-tenancy mean
+this is acceptable; the gap to enterprise posture (mTLS or SPIFFE) is not
+justified at this scale. Documenting the choice so it does not quietly
+drift.
 
 ## Image tag pinning (L6)
 
@@ -546,43 +654,37 @@ things."
 | `docker.io/oryd/hydra` | see `dunn.dev/iac` quadlets (authoritative) | yes |
 | `docker.io/library/postgres` | see `dunn.dev/iac` quadlets (authoritative) | yes |
 | `registry.gitlab.com/dunn.dev/caddy-estate` | see `dunn.dev/iac` quadlets (authoritative) | yes |
-| `registry.gitlab.com/dunn.dev/othala/consent` | see `dunn.dev/iac` quadlets (authoritative) | self-managed |
-| `registry.gitlab.com/dunn.dev/othala/portal` | see `dunn.dev/iac` quadlets (authoritative) | self-managed |
+| `registry.gitlab.com/dunn.dev/othala` | see `dunn.dev/iac` quadlets (authoritative) | self-managed |
 | `registry.gitlab.com/dunn.dev/othala/ldap-bridge` | see `dunn.dev/iac` quadlets (authoritative) | self-managed |
-| `registry.gitlab.com/dunn.dev/othala/util` | see `dunn.dev/iac` quadlets (authoritative) | self-managed |
 
-Current pinned versions live in `dunn.dev/iac/services/auth/.config/containers/systemd/auth-*.container` (`Image=` lines). `docs/STATUS.md` states the deployed version. Do not restate version numbers here.
+The `othala` image is the converged app. The legacy `consent` and `util`
+images still build today but are retired at the deploy cutover. Current
+pinned versions live in the `dunn.dev/iac/services/dag/` quadlets
+(`Image=` lines). `docs/STATUS.md` states the deployed version. Do not
+restate version numbers here.
 
 Bumping pins:
 
 1. Pull the candidate image to a lab VM (or the QEMU-CI lab, when wired).
 2. Run the lab substrate against it; smoke-test through Playwright.
-3. If green, update the pin in `dunn.dev/iac/services/auth/` quadlets.
-4. `make auth-deploy HOST=carmine`, verify, document.
+3. If green, update the pin in `dunn.dev/iac/services/dag/` quadlets.
+4. Deploy, verify, document.
 
-Ory's release cadence is approximately annual minor releases with
-infrequent breaking changes (v1.3 → v25.4 → v26.2 spanned ~16 months
-with one breaking-change set in v25.4 that didn't touch our integration).
-The `docs/golden-path.md` doc lists the integration choices that kept
-us durable through that transition.
-
-CVE-driven bumps follow the same loop with the lab step compressed:
-review the advisory, decide whether the surface area is in scope (the
-consent service uses zero non-stdlib deps for HTTP, so most Hydra/Kratos
-CVEs are scoped to the Hydra/Kratos containers themselves).
+Ory's release cadence is roughly annual minor releases with infrequent
+breaking changes. `docs/golden-path.md` lists the integration choices that
+keep the integration durable through those transitions.
 
 ## Custom Caddy image
 
 `registry.gitlab.com/dunn.dev/caddy-estate`: built with xcaddy +
-`caddy-dns/cloudflare` plugin. Forward-auth via Caddy's built-in
-`forward_auth` directive against Kratos.
+`caddy-dns/cloudflare`. Forward-auth via Caddy's built-in `forward_auth`
+directive against Kratos.
 
 ## Reversibility
 
-If lab outcomes red, fallback is kanidm (single-binary, bus-factor and
-AI-ban accepted in exchange for substrate quality). Bench harness
-reusable. Eval evidence in `lab/docs/` (historical; current set was
-pruned in v0.1.4).
+If lab outcomes go red, the documented fallback is kanidm (single binary;
+bus-factor and AI-ban accepted in exchange for substrate quality). The
+bench harness is reusable. Eval evidence in `lab/docs/` (historical).
 
 ## Where the code lives
 
@@ -591,24 +693,37 @@ pruned in v0.1.4).
 | Kratos config | `kratos/` | YAML | Identity (login, recovery, MFA, session) |
 | Hydra config | `hydra/` | YAML | OIDC OP, OAuth2 AS |
 | OIDC client manifests | `hydra/clients/` | YAML | Per-app `oidc:` + `consent:` blocks |
-| Consent service | `consent/` | Go | Login/consent/logout handlers + recovery-gate webhook + admin revoke-user |
-| LDAP bridge | `ldap-bridge/` | Go | glauth-kratos: LDAPS → Kratos identity backend (Jellyfin native clients) |
-| Portal | `portal/` | Astro + TS | Tile dashboard + auth flows + admin UI |
+| Othala app | `portal/` | Astro + TS | Tile dashboard + Kratos flows + Hydra login/consent/logout + access gate + claims + revoke + admin UI + client registrar |
 | Apps registry | `portal/src/content/apps/` | Markdown | Per-app tile metadata + education content |
-| Util image | `util/` | Bash + UBI 9 | One-shot apply-clients runner (deployed as a quadlet, not a long-running service) |
-| Lab compose | `lab/compose/` | YAML | LEGACY single-VM lab; replaced by QEMU-CI lab (follow-up) |
+| LDAP bridge | `ldap-bridge/` | Go | glauth-kratos: LDAPS → Kratos identity backend (Jellyfin native clients) |
+| Consent service (legacy) | `consent/` | Go | Retired at cutover; behaviour now in `portal/` |
+| Util image (legacy) | `util/` | Bash + UBI 9 | Retired at cutover; client registration moves to `register-clients.ts` |
+| Lab compose | `lab/compose/` | YAML | Single-VM lab |
 | CI / build | `.gitlab-ci.yml` | GitLab CI YAML | Per-service verify + container-image + sbom + release |
 
-## Test surface
+## Test surface and honest strengths
+
+The substantive, real test coverage (from the CV audit):
 
 | Test set | Lives in | Asserts |
 |---|---|---|
-| Consent unit + integration | `consent/*_test.go` | Per-client role lookup, back-channel logout signing, recovery-gate logic, HTTP handlers |
-| Consent fuzz | `consent/*_fuzz_test.go` | Manifest parsing edge cases, JWK alg-confusion |
+| Access gate | `portal/` gate tests | Fail-closed on BOTH group AND state, on login and consent; null-identity denial (LB-13) |
+| Revoke fan-out | `portal/` revoke tests | Step ordering, abort-on-step-2, best-effort step-5 isolation, prescriptive error mapping (LB-15) |
+| Dual-listener | `portal/` listen tests | Admin/public mux disjointness, constant-time fail-closed bearer checks (LB-14) |
+| Admin authz | `portal/` admin-auth tests | `OTHALA_ADMIN_SUBJECTS` as sole authz; `admin` group not consulted (LB-16) |
+| Client registrar | `portal/scripts/register-clients.test.mjs` | Field mapping, `consent:`-never-forwarded, create/update idempotency |
 | LDAP bridge unit | `ldap-bridge/kratos/*_test.go` | Bind cache, DN parse + escape (caught a real bug) |
-| Portal unit | `portal/scripts/*.test.mjs` | csrf token shape, admin-recovery-gate fail-closed |
-| Lab evidence | `lab/docs/*-evidence.md` | Live-stack validation (current set is from v0.1.3 GREEN runs) |
-| CI lab (TODO) | `.gitlab-ci.yml` + `lab/ci/` | Full substrate up + smoke + teardown on every push |
+| Lab evidence | `lab/docs/*-evidence.md` | Live-stack validation |
+
+Native back-channel logout with no signing key at rest (Hydra signs) is a
+real reduction in attack surface, not a stub.
+
+**Caveat, stated honestly.** The content-config `superRefine` test
+validates a hand-copied schema replica (a build-time lint against a copy,
+not the live schema). There is no standing linter on the app: `astro
+check` currently emits a handful of type hints that are not gated in CI.
+Treat the registrar's `validateClients` lint and the content superRefine
+as build-time guards, not a continuous type gate.
 
 ## Where to look when you're confused
 
@@ -616,26 +731,32 @@ pruned in v0.1.4).
 |---|---|
 | "Why does this code exist?" | `git log --follow <file>` first; then `docs/decision.md` for high-level rationale. |
 | "Why is this CHOICE locked-in?" | `docs/golden-path.md` for upgrade-durability choices; `docs/decision.md` for one-time decisions. |
-| "Where does production-X live?" | `dunn.dev/iac/services/auth/` for runtime configs; THIS repo for application code. |
-| "What's open vs fixed?" | `docs/STATUS.md` for top-level; `docs/security-review-2026-05-04.md` for security findings. |
+| "Where does production-X live?" | `dunn.dev/iac/services/dag/` for runtime configs; THIS repo for application code. |
+| "What's open vs fixed?" | `docs/STATUS.md` for top-level; the security review for findings. |
 | "How do I deploy?" | `DEPLOY.md` (this repo's root). |
-| "How do I add a new OIDC client?" | Add `hydra/clients/<slug>.yaml` + `portal/src/content/apps/<slug>.md` + `<slug>_oidc_client_secret` to sops + `make auth-apply-clients HOST=carmine` in iac. |
+| "How do I add a new OIDC client?" | Add `hydra/clients/<slug>.yaml` + `portal/src/content/apps/<slug>.md` + `<slug>_oidc_client_secret` to sops, then apply on the iac side. |
 | "How do I rotate a secret?" | `docs/runbooks/*-rotation.md`. |
 
 ## Don't-Add-Here list
 
 Things that would expand the codebase without obvious value at family
-scale. Each is something an over-eager future contributor (or LLM)
-might propose:
+scale:
 
-- **A full audit-log subsystem**. Stub TODO exists in `portal/src/pages/admin/activity.astro`. `journalctl` is the current audit; expand only if family scale requires.
-- **OIDC self-service registration**. See `docs/golden-path.md` LB#1.
-- **mTLS / SPIFFE inside the auth pod**. See LB-6.
+- **A full audit-log subsystem**. `/admin/activity` is a navigable
+  placeholder (labeled in-page) pending the activity-ingest path
+  (alloy → Loki for archival, a Postgres summary table for the UI). It
+  displays no events today. `journalctl` is the current audit; expand only
+  if family scale requires.
+- **An in-process identity cache**. Revocation is correct without one (see
+  "No identity cache"). Adding one reintroduces a stale-authz window.
+- **A custom back-channel-logout signer**. Hydra signs natively; the app
+  holds no key at rest. Do not reintroduce one.
+- **OIDC self-service registration**. See `docs/golden-path.md`.
+- **mTLS / SPIFFE inside the SSO pod**. See LB-6.
 - **Pairwise OIDC subjects**. See LB-5.
 - **A federated identity story**. Single Kratos instance is the family scope.
-- **K8s migration**. Podman + quadlets is the substrate. No K8s.
-- **Helm charts**. Same.
-- **Account Experience UI from Ory (closed-source OEL)**. Astro portal is the family UI.
+- **K8s migration / Helm charts**. Podman + quadlets is the substrate.
+- **Account Experience UI from Ory (closed-source OEL)**. The Othala app is the family UI.
 
-If you find yourself adding one of these, ask first: is this what
-"single maintainer + LLM leverage at family scale" actually needs?
+If you find yourself adding one of these, ask first: is this what "single
+maintainer + LLM leverage at family scale" actually needs?

@@ -10,49 +10,55 @@ Updated 2026-06-01.
 
 ## Where we are
 
-**Convergence build complete and CV-verified; deploy pending (Wave E,
-operator-gated).** The auth stack has converged to a single all-TS
-application fronting upstream Ory plus the Go LDAP bridge:
+**Convergence build complete, CV-verified, and renamed to Othala /
+dag.dunn.dev. Image-name reconcile (`portal` → `othala`) pending
+(Wave CP). Deploy pending, operator-gated.**
+
+The OSS project is **Othala** ("Ory for your home"); the deployed
+instance host is **dag.dunn.dev**. The stack has converged to a single
+all-TS application fronting upstream Ory plus the Go LDAP bridge:
 
 - One Astro Node SSR app (`portal/`) holds the Kratos self-service
   flows (one generic `ui.nodes` renderer, `FlowNodes.astro`; login
-  keeps the bespoke passkey/password UX), the Hydra
-  login/consent/logout challenge handlers, the fail-closed access-gate
-  (`gate.ts`: `access-<clientId>` group membership AND Kratos state
-  `== active`), the id_token claims builder (`claims.ts`), and the
-  dual-listener (`listen.mjs`: public SSR `8080` + loopback admin
-  `8431` carrying `/admin/revoke-user` + `/admin/recovery-gate`).
+  keeps the bespoke passkey/password UX + the ᛞ→ᛟ rune greeting), the
+  Hydra login/consent/logout challenge handlers, the fail-closed
+  access-gate (`gate.ts`: `access-<clientId>` group membership AND
+  Kratos identity state `== active`), the id_token claims builder
+  (`claims.ts`), and the dual-listener (`listen.mjs`: public SSR `8080`
+  + loopback admin `8431` carrying `/admin/revoke-user` +
+  `/admin/recovery-gate`).
 - `revokeSubject()` (`revoke.ts`) runs the in-process revocation
-  fan-out (Kratos state/sessions, Hydra login/consent session revoke,
-  best-effort LDAP bind-cache flush). No identity cache: the hot path
-  fetches fresh, so a revoked subject fails the gate's state-check on
-  the next fetch.
+  fan-out (Kratos deactivate + sessions, Hydra login/consent session
+  revoke, best-effort LDAP bind-cache flush). No identity cache: the hot
+  path fetches fresh, so a revoked subject fails the gate's state-check
+  on the next fetch.
 - Admin authz is `OTHALA_ADMIN_SUBJECTS` (sops-backed email allowlist),
-  the sole authz at `requireAdminSession` + recovery-gate + page
-  gates. The `admin` group is display-only.
+  the sole authz at `requireAdminSession` + recovery-gate + page gates.
+  The `admin` group is display-only.
 - Back-channel logout is Hydra-native. The app holds no signing key at
   rest; the custom private-key signer was deleted.
 
 The Go consent service and the `util` runner still exist in-tree but
-are **legacy-pending-removal**, retired at the iac E1 cutover. They are
+are **legacy-pending-removal**, retired at the deploy cutover. They are
 not the current architecture.
 
-**Stack:** Ory Kratos + Ory Hydra (OAuth2/OIDC) + Postgres 18 +
-Go glauth-kratos LDAP bridge + the converged Astro Node SSR auth app on
-carmine + custom Caddy edge (`registry.gitlab.com/dunn.dev/caddy-estate`).
-Estate design via `@dunn.dev/reference`.
+**Stack:** Ory Kratos + Ory Hydra (OAuth2/OIDC) + Postgres 18 + Go
+glauth-kratos LDAP bridge + the converged Astro Node SSR Othala app on
+carmine + custom Caddy edge
+(`registry.gitlab.com/dunn.dev/caddy-estate`). Estate design tokens via
+`@dunn.dev/reference`.
 
 ## Pending state
 
 | Item | Wave | Status |
 |---|---|---|
-| **Image rename `portal` → `auth`** | CP | Pending. The published image is named `auth` going forward; CI still builds it as `portal` today (`.gitlab-ci.yml` `build-portal`). The rename lands just after this doc set. |
-| **iac E1 cutover** | E1 | Pending. Retire `auth-consent` + `util` from the pod; wire the dual-listener admin port + its three new secrets; repoint the Kratos recovery-hook from `consent:4478` to the auth admin port `:8431/admin/recovery-gate`. See `DEPLOY.md`. |
-| **Production deploy** | E | Pending, operator-gated. sops key fills + iac config sync/pin + `make auth-deploy`. |
+| **Image name reconcile `portal` → `othala`** | CP | Pending. The published image is named `othala` going forward; CI still builds it as `portal` today (`.gitlab-ci.yml` `build-portal`, and the iac `dag-portal` quadlet still pins `…/othala/portal:<tag>`). The reconcile lands just after this doc set. |
+| **Deploy cutover** | — | Pending. Retire `dag-consent` + `util` from the pod; wire the dual-listener admin port + its admin env targets; repoint the Kratos recovery-hook to the Othala admin port `:8431/admin/recovery-gate`. See `DEPLOY.md`. |
+| **Production deploy** | — | Pending, operator-gated. Fresh `dag_*` sops keys (carmine pre-reinstall) + iac config sync/pin + `make dag-deploy`. |
 
-The iac quadlets remain at the pre-cutover shape until E1 (auth-portal
-still depends on auth-consent and carries the old `CONSENT_ADMIN_URL` /
-`auth_internal_bearer` wiring).
+The iac `dag-*` quadlets remain at the pre-cutover shape until the
+cutover (`dag-portal` still depends on `dag-consent` and carries the old
+`CONSENT_ADMIN_BEARER` / consent-URL wiring).
 
 ## Strengths (CV audit)
 
@@ -61,9 +67,8 @@ Real, substantive coverage:
 - **Fail-closed gate tests** exercise both checks independently (group
   membership AND identity state), including the closed-on-lookup-failure
   path.
-- **Revoke fan-out** has order + abort tests (step 2 session-revoke
-  failure aborts the fan-out; the deactivate-first ordering is
-  enforced).
+- **Revoke fan-out** has order + abort tests (a session-revoke failure
+  aborts the fan-out; the deactivate-first ordering is enforced).
 - **Dual-listener mux-disjointness** is tested: no public/challenge
   path resolves on the admin port and the SSR handler never sees admin
   paths.
@@ -102,9 +107,9 @@ This is honest current state, not a regression.
 | Recovery | Code via Fastmail; admin subjects BLOCKED at the recovery-gate (console-only break-glass) |
 | Hydra admin | In-pod only; never public |
 | Public reachability | DNS-only Cloudflare + port-forward 443. No CF Tunnel/Access |
-| `secrets.system` | NON-ROTATABLE (Hydra at-rest encryption); break-glass in `runbooks/secrets-rotation.md`; sops `carmine.hydra_system_secret` |
+| `secrets.system` | NON-ROTATABLE (Hydra at-rest encryption); break-glass in `runbooks/secrets-rotation.md` |
 | **Secrets store** | sops + age, estate-wide |
-| **Deploy plane** | `dunn.dev/iac/services/auth/` owns runtime topology; vendors auth configs by tag-pin (no submodule). This repo owns app code + authoritative configs |
+| **Deploy plane** | `dunn.dev/iac/services/dag/` owns runtime topology; vendors Othala configs by tag-pin (no submodule). This repo owns app code + authoritative configs |
 | Design tokens | `@dunn.dev/reference` is the single source. Never redefine locally |
 
 Full rationale per decision: `decision.md`. Upgrade-durability choices:
@@ -112,29 +117,33 @@ Full rationale per decision: `decision.md`. Upgrade-durability choices:
 
 ## Not yet working / placeholders
 
-- **`/admin/activity`** is a navigable **placeholder** (pending an
-  alloy→Loki / Postgres-summary ingest). Not a working feature.
+- **`/admin/activity`** is a navigable **placeholder** (labeled in-page;
+  pending an alloy→Loki / Postgres-summary ingest). Not a working
+  feature.
 - **OIDC client registration** is shell-driven via
-  `util/apply-clients.sh` today. The all-TS successor
-  (`manifests.ts` + `register-clients.ts` + `validateClients`) is
-  built but **dormant** until E1; it does not yet supersede the shell
-  path.
+  `scripts/dag-apply-clients.sh` today. The all-TS successor
+  (`manifests.ts` + `register-clients.ts` + `validateClients`) is built
+  but **dormant** until the deploy cutover; it does not yet supersede
+  the shell path.
 - **Postgres backup**: posture documented; implementation is the next
   iac work stream.
 - **No standing app linter** (see Caveat).
 
 ## Production cutover (remaining, operator-gated)
 
-1. **Image rename** `portal` → `auth` (Wave CP).
-2. **iac E1 cutover** (see `DEPLOY.md`): retire consent + util, wire the
-   dual-listener admin port + its secrets, repoint the Kratos
+1. **Image name reconcile** `portal` → `othala` (Wave CP).
+2. **Deploy cutover** (see `DEPLOY.md`): retire consent + util, wire the
+   dual-listener admin port + its env targets, repoint the Kratos
    recovery-hook to `:8431/admin/recovery-gate`.
-3. **Add missing sops keys** before first deploy (Fastmail SMTP,
-   per-OIDC-consumer secrets, the three admin secrets).
-4. **`make auth-sync-configs`** + bump quadlet pins to the released
-   tag, then **`make auth-secrets && make auth-deploy HOST=carmine`**.
-5. **`make auth-apply-clients HOST=carmine`** to register OIDC clients.
-6. **`make auth-smoke HOST=carmine`** to validate the live substrate.
+3. **Regenerate `dag_*` sops keys fresh** before first deploy (carmine
+   pre-reinstall: Fastmail SMTP, per-OIDC-consumer secrets, and the
+   admin secrets behind `OTHALA_ADMIN_SUBJECTS` /
+   `OTHALA_ADMIN_ENDPOINT_BEARER` / `RECOVERY_GATE_SECRET`).
+4. **`make dag-sync-configs`** + bump quadlet pins to the released tag,
+   then **`make dag-secrets && make dag-preflight && make dag-deploy
+   HOST=carmine`**.
+5. **`make dag-apply-clients HOST=carmine`** to register OIDC clients.
+6. **`make dag-smoke HOST=carmine`** to validate the live substrate.
 7. **DNS + port-forward**: `dag.dunn.dev` record + router 443 → carmine.
 8. **First-user pilot**, then **family rollout**.
 
@@ -143,7 +152,7 @@ Full rationale per decision: `decision.md`. Upgrade-durability choices:
 | Topic | File |
 |---|---|
 | **Load-bearing decisions + topology + flows** | `../ARCHITECTURE.md` (root) |
-| **Deploy contract** | `../DEPLOY.md` (root) + `dunn.dev/iac/services/auth/` |
+| **Deploy contract** | `../DEPLOY.md` (root) + `dunn.dev/iac/services/dag/` |
 | Upgrade-durability choices | `golden-path.md` |
 | Historical substrate rationale (the Ory choice); architecture superseded | `decision.md` |
 | Per-app OIDC integration | `per-app-oidc.md` |
@@ -154,7 +163,7 @@ Full rationale per decision: `decision.md`. Upgrade-durability choices:
 
 - Push requires explicit human approval per action.
 - Estate voice: no em-dashes, no filler, direct.
-- The auth pod is one security domain; defense-in-depth between in-pod
+- The Othala pod is one security domain; defense-in-depth between in-pod
   services is partial-and-deliberate.
 - Update this file whenever release/version state shifts. It is the
   only place that asserts it.

@@ -1,16 +1,40 @@
-# SSO stack fit — decision
+# SSO stack fit: decision
 
-> **SUPERSEDED (partial) -- 2026-05-31.**
-> Several decisions recorded below were reversed during adversarial review and production hardening:
+> **SUPERSEDED (architecture). HISTORICAL RATIONALE ONLY.**
+> This document is the original substrate-selection record. The
+> **substrate choice itself remains the decision in force**: Ory Kratos +
+> Hydra + Postgres, a custom glauth-kratos LDAP bridge, and a custom Caddy
+> image. Keep this for "why Ory, not kanidm/Authelia/Zitadel."
 >
-> - **Workers/Astro-6/KV reversed:** portal runs as Astro Node SSR on carmine, not on Cloudflare Workers. Workers KV health-check was dropped; state is per-request from Kratos directly.
-> - **Bitwarden reversed:** secrets are managed with sops + age (`dunn.dev/iac/pyinfra/secrets.enc.yaml`). Bitwarden is out of scope for this stack.
+> The **architecture** described below has been superseded by the converged
+> Othala/dag end-state. Do NOT read the topology, frontend, or IaC-structure
+> sections here as current. The current shape is:
 >
-> Reversed rows are annotated inline below. The Ory substrate choice, LDAP bridge design, and all identity/auth-policy decisions remain current. For the authoritative architecture, read [`../ARCHITECTURE.md`](../ARCHITECTURE.md). For release state, read [`STATUS.md`](STATUS.md).
+> - **Othala is the OSS project**; `dag.dunn.dev` is the deployed instance
+>   (rune motif ᛞ→ᛟ, door to home). The old name `auth`/`auth.dunn.dev` is
+>   retired. GitLab project: `dunn.dev/othala`.
+> - **One all-TypeScript application** (Astro Node SSR, in `portal/`,
+>   published as the `othala` image) fronts Ory and is Hydra's login +
+>   consent + logout provider. NOT Cloudflare Workers. State is per-request
+>   from Kratos; no Workers KV.
+> - **The Go consent service and util runner are legacy**, retired at the
+>   iac deploy cutover. Their behaviour now lives in the TS app. The custom
+>   back-channel-logout signer was DELETED. Hydra signs natively, no key at
+>   rest.
+> - **Admin authority is the `OTHALA_ADMIN_SUBJECTS` allowlist**, not the
+>   `admin` group (display-only).
+> - **Secrets are sops + age** (`dunn.dev/iac/pyinfra/secrets.enc.yaml`).
+>   Bitwarden is out.
+> - **iac vendors a released tag** under `services/dag/` (no submodule).
+>
+> Reversed rows are annotated inline below. The Ory substrate choice, the
+> LDAP bridge design, and the identity/auth-policy decisions remain current.
+> For the authoritative architecture, read [`../ARCHITECTURE.md`](../ARCHITECTURE.md).
+> For release state, read [`STATUS.md`](STATUS.md).
 
 **Status:** Decided 2026-05-02. Substrate: **Ory Kratos + Hydra + custom glauth-kratos LDAP bridge + Astro Node SSR portal on carmine + custom Caddy image (direct go build)**.
 
-After evaluating multiple IdP substrates (kanidm, Authelia, Hanko, voidauth, Pocket-ID, Zitadel), Andrew's reframe — "I want UX excellence, not flow customization" — flipped the call to Ory. The 4 feasibility validations went GREEN/YELLOW with manageable risks, and the adversarial review against upstream docs caught two CRITICAL issues that are now corrected in the locked architecture.
+After evaluating multiple IdP substrates (kanidm, Authelia, Hanko, voidauth, Pocket-ID, Zitadel), Andrew's reframe ("I want UX excellence, not flow customization") flipped the call to Ory. The 4 feasibility validations went GREEN/YELLOW with manageable risks, and the adversarial review against upstream docs caught two CRITICAL issues that are now corrected in the locked architecture.
 
 ## Why Ory
 
@@ -24,7 +48,7 @@ The journey here was extensive (`lab/docs/eval-*.md` has the full per-candidate 
 - **Zitadel:** multi-container architecture mismatch + concerning CVE cadence
 
 Ory's offer for our shape:
-- Total UI control via Astro on Cloudflare Workers — match dunn.dev/design exactly
+- Total UI control via a custom Astro app, matching the estate visual language exactly. *(The original draft said "Astro on Cloudflare Workers"; reversed: the app runs as Astro Node SSR. Visual language comes from `@dunn.dev/reference`, not a `dunn.dev/design` package.)*
 - Composable architecture: Kratos (identity), Hydra (OAuth2/OIDC), each binary doing one thing
 - Free OSS forever; Ory Network is the SaaS commercialization, self-hosted is fully featured Apache 2
 - The LDAP bridge gap becomes a contribution opportunity: a glauth Kratos backend, publishable upstream
@@ -37,7 +61,7 @@ The cost: BYO UI (we build the Astro app), 4-5 components instead of one, smalle
 
 | Decision | Value | Notes |
 |---|---|---|
-| WebAuthn `rp.id` | `dunn.dev` (registrable parent) | **One-way.** Origins list includes `https://dag.dunn.dev` and `https://home.dunn.dev`. Any future subdomain that needs WebAuthn assertion is a registrable child of `dunn.dev`. |
+| WebAuthn `rp.id` | `dunn.dev` (registrable parent) | **One-way.** Origins list is `https://dag.dunn.dev`. (`home.dunn.dev` was the original Topology-A user host; dropped, since the IdP and the UI live on the same FQDN, `dag.dunn.dev`.) Any future subdomain that needs WebAuthn assertion is a registrable child of `dunn.dev`. |
 | Username convention | `first.last` (e.g., `andrew.dunn`) | LDAP DN-friendly. |
 | Cookie domain | `.dunn.dev`, `SameSite=Lax`, `HttpOnly` | Required for cross-subdomain Astro UI calls to Kratos. |
 | Identity schema | traits = {username, email, displayName?, recoveryEmail?} + `metadata_admin.groups[]` | Groups in metadata_admin (Ory-shaped: admin-managed, user can't self-escalate via settings flow). |
@@ -129,6 +153,15 @@ The full review is at `lab/docs/adversarial-review.md`. Highlights:
 
 ## What's in this repo (IaC structure)
 
+> **HISTORICAL.** This tree is the original layout sketch (note the
+> `portal/` "Astro UI on Cloudflare Workers" + `wrangler.toml` +
+> `public/.well-known/webfinger` lines, all reversed). The current layout
+> is in [`../README.md`](../README.md) "Layout" and
+> [`../ARCHITECTURE.md`](../ARCHITECTURE.md) "Where the code lives": one
+> Astro Node SSR app in `portal/` (published as `othala`), consent/util as
+> legacy-pending-removal, no Workers/wrangler, WebFinger served off the
+> dunn.dev apex.
+
 ```
 auth/
 ├── docs/
@@ -177,8 +210,12 @@ auth/
 
 ## Family UX
 
+> *(Original sketch used `home.dunn.dev`; the user-facing host is now
+> `dag.dunn.dev`: the IdP and the family UI share one FQDN. The consent
+> "service" is now the Othala app's in-process consent handler.)*
+
 ```
-Mom opens iPad → home.dunn.dev (PWA on home screen)
+Mom opens iPad → dag.dunn.dev (PWA on home screen)
   ↓
 Three states by Kratos /health reachability:
   1. Pre-auth: dunn.dev brand + "Sign in" button
@@ -187,11 +224,11 @@ Three states by Kratos /health reachability:
   ↓
 Sign in: Astro page calls Kratos API flow → WebAuthn challenge → Face ID
   ↓
-Tile tap → app's OIDC redirect → Hydra (login_challenge → consent service auto-accepts)
+Tile tap → app's OIDC redirect → Hydra (login_challenge → Othala consent handler auto-accepts)
         → app session via standard OIDC code exchange
 ```
 
-Steps 4-6 happen in ~1-2 seconds. Standard SSO bounce; brief dag.dunn.dev URL shift; no Cloudflare challenges, no consent screens for trusted apps.
+The bounce happens in ~1-2 seconds. Standard SSO bounce; brief dag.dunn.dev URL shift; no Cloudflare challenges, no consent screens for trusted apps.
 
 ## Reversibility
 
