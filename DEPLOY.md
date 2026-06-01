@@ -22,20 +22,21 @@ One Othala pod on carmine, fronted by a Caddy edge. The containers:
 
 | Quadlet | Image | Role |
 |---|---|---|
-| **dag-portal** | `registry.gitlab.com/dunn.dev/othala/othala` | The converged Astro Node SSR app. Renders the Kratos self-service flows, serves the Hydra login/consent/logout challenge handlers, runs the access-gate, builds id_token claims, and hosts the loopback admin endpoints. See `ARCHITECTURE.md`. |
+| **dag-portal** | `registry.gitlab.com/dunn.dev/othala` | The converged Astro Node SSR app. Renders the Kratos self-service flows, serves the Hydra login/consent/logout challenge handlers, runs the access-gate, builds id_token claims, and hosts the loopback admin endpoints. See `ARCHITECTURE.md`. |
 | **dag-ldap-bridge** | `registry.gitlab.com/dunn.dev/othala/ldap-bridge` | Go glauth-kratos LDAP bridge. Protocol adapter for non-OAuth native clients (Jellyfin / Apple TV). Stays Go by design. |
 | **dag-kratos** | upstream Ory Kratos | Identity: self-service flows, sessions, recovery. |
 | **dag-hydra** | upstream Ory Hydra | OAuth2/OIDC. Ships no UI by design; the Othala app is its login + consent provider. |
 | **dag-postgres** | `postgres:18-alpine` | Separate `kratos` + `hydra` databases. |
 | **dag-caddy** | `registry.gitlab.com/dunn.dev/caddy-estate` | TLS edge for `dag.dunn.dev`. Snippets are volume-mounted, not baked. |
 
-> **Image name reconcile in flight.** The published app image is named
-> **othala**. The repo still builds it as `portal` today
-> (`.gitlab-ci.yml` `build-portal`, image tag `portal`; the iac
-> `dag-portal` quadlet still pins `…/othala/portal:<tag>`). The
-> rename to `othala` is **Wave CP**, just after this doc lands. Name the
-> target **othala**; expect the live pin to read `…/othala/portal:<tag>`
-> until that tag publishes.
+> **Image name reconciled (Wave CP).** The converged app image
+> publishes at the registry **root**:
+> `registry.gitlab.com/dunn.dev/othala` (the oryd/kratos-style
+> namespace/name shape, `publish_at_root: true` in `.gitlab-ci.yml`
+> `build-othala`). The `dag-portal` quadlet pins this root path. The
+> next published tag (`v0.1.4`) is the first to ship under the new name;
+> the live pin reads `…/othala/portal:<tag>` only until that tag
+> publishes.
 
 ### The dual-listener
 
@@ -70,9 +71,9 @@ tag, sync, bump, deploy:
 # 1. Tag this repo after CI publishes images.
 git tag v0.1.X
 git push --tags
-# CI fires (.gitlab-ci.yml): images publish to
-# registry.gitlab.com/dunn.dev/othala/<name>:v0.1.X
-# (portal/ldap-bridge; the portal→othala image-name reconcile is Wave CP).
+# CI fires (.gitlab-ci.yml): the converged app publishes at the
+# registry root, registry.gitlab.com/dunn.dev/othala:v0.1.X, and the
+# LDAP bridge as registry.gitlab.com/dunn.dev/othala/ldap-bridge:v0.1.X.
 
 # 2. Sync vendored configs into iac and review the drift.
 cd dunn.dev/iac

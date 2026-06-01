@@ -52,7 +52,7 @@ carmine + custom Caddy edge
 
 | Item | Wave | Status |
 |---|---|---|
-| **Image name reconcile `portal` → `othala`** | CP | Pending. The published image is named `othala` going forward; CI still builds it as `portal` today (`.gitlab-ci.yml` `build-portal`, and the iac `dag-portal` quadlet still pins `…/othala/portal:<tag>`). The reconcile lands just after this doc set. |
+| **Image name reconcile `portal` → `othala`** | CP | Done. The converged app builds as `build-othala` and publishes at the registry root `registry.gitlab.com/dunn.dev/othala` (`publish_at_root: true`); the `dag-consent` + `util` image builds + their SBOMs are removed (the `consent/` + `util/` source dirs keep their go-build verify until E1). The iac `dag-portal` quadlet pins the root path. First tag under the new name is `v0.1.4`. |
 | **Deploy cutover** | — | Pending. Retire `dag-consent` + `util` from the pod; wire the dual-listener admin port + its admin env targets; repoint the Kratos recovery-hook to the Othala admin port `:8431/admin/recovery-gate`. See `DEPLOY.md`. |
 | **Production deploy** | — | Pending, operator-gated. Fresh `dag_*` sops keys (carmine pre-reinstall) + iac config sync/pin + `make dag-deploy`. |
 

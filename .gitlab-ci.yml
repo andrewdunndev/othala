@@ -1,14 +1,21 @@
 # dunn.dev/othala -- container build + release pipeline.
 #
-# Four custom images (consent, ldap-bridge, portal, util) build via
-# the dunn.dev/pipeline container-image template; caddy lives in the
-# separate dunn.dev/caddy-estate repo and auth/caddy/snippets/ are
-# volume-mounted at deploy time, not baked into an image here.
+# Two custom images build via the dunn.dev/pipeline container-image
+# template:
+#   - othala       the converged Astro Node SSR app, published at the
+#                  registry root (registry.gitlab.com/dunn.dev/othala)
+#                  via publish_at_root: true (the oryd/kratos-style
+#                  namespace/name shape).
+#   - ldap-bridge  the Go glauth-kratos LDAP bridge, published as the
+#                  othala/ldap-bridge sub-image.
+# caddy lives in the separate dunn.dev/caddy-estate repo and
+# auth/caddy/snippets/ are volume-mounted at deploy time, not baked
+# into an image here.
 #
-# util/ ships in v0.1.4 — a one-shot operator container carrying
-# apply-clients.sh + curl + jq + yq. iac invokes it via
-# `make auth-apply-clients` to register OIDC client manifests against
-# the auth.network-internal Hydra admin port.
+# The consent/ and util/ modules still exist on disk but no longer build
+# images: their roles converge into the othala app. consent/ (Go) keeps its
+# go-build verify (compile check); util/ is a script module (no verify job).
+# Both retire at the E1 cutover.
 #
 # Per-image release flow on every tag:
 #   build       container-image  ->  push :TAG + :latest + cosign sig
@@ -56,26 +63,9 @@ include:
   - component: gitlab.com/dunn.dev/pipeline/node-build@2.5.0
     inputs:
       stage: verify
-      job_name: verify-portal
+      job_name: verify-othala
       package_path: portal
 
-
-  # ----- consent ---------------------------------------------------
-  - component: gitlab.com/dunn.dev/pipeline/container-image@2.5.0
-    inputs:
-      job_name: build-consent
-      image_tag: consent
-      containerfile: consent/Containerfile
-      context: consent
-      tag_pipeline: true
-
-  - component: gitlab.com/dunn.dev/pipeline/container-sbom@2.5.0
-    inputs:
-      job_name: sbom-consent
-      container_image: "${CI_REGISTRY_IMAGE}/consent:${CI_COMMIT_TAG}"
-      container_image_job: build-consent
-      package_name: auth
-      sbom_filename: consent-container.sbom.json
 
   # ----- ldap-bridge ----------------------------------------------
   - component: gitlab.com/dunn.dev/pipeline/container-image@2.5.0
@@ -94,45 +84,32 @@ include:
       package_name: auth
       sbom_filename: ldap-bridge-container.sbom.json
 
-  # ----- auth-portal (Astro Node SSR) -----------------------------
+  # ----- othala (converged Astro Node SSR app) --------------------
+  # Published at the registry ROOT (registry.gitlab.com/dunn.dev/othala)
+  # via publish_at_root: true — the oryd/kratos-style namespace/name
+  # shape. Mirrors dunn.dev/caddy-estate: publish_at_root: true, no
+  # image_tag.
+  #
   # Context is repo root (legacy from when build needed hydra/clients/;
   # v0.1.4 reads manifests at runtime, but context: . is kept stable
   # because the build is light and changing it requires a CI dance).
   - component: gitlab.com/dunn.dev/pipeline/container-image@2.5.0
     inputs:
-      job_name: build-portal
-      image_tag: portal
+      job_name: build-othala
+      publish_at_root: true
       containerfile: portal/Containerfile
       context: .
       tag_pipeline: true
 
   - component: gitlab.com/dunn.dev/pipeline/container-sbom@2.5.0
     inputs:
-      job_name: sbom-portal
-      container_image: "${CI_REGISTRY_IMAGE}/portal:${CI_COMMIT_TAG}"
-      container_image_job: build-portal
+      job_name: sbom-othala
+      container_image: "${CI_REGISTRY_IMAGE}:${CI_COMMIT_TAG}"
+      container_image_job: build-othala
       package_name: auth
-      sbom_filename: portal-container.sbom.json
+      sbom_filename: othala-container.sbom.json
 
-  # ----- auth-util (one-shot apply-clients runner) ----------------
-  # Context is repo root because the build COPYs from util/.
-  - component: gitlab.com/dunn.dev/pipeline/container-image@2.5.0
-    inputs:
-      job_name: build-util
-      image_tag: util
-      containerfile: util/Containerfile
-      context: .
-      tag_pipeline: true
-
-  - component: gitlab.com/dunn.dev/pipeline/container-sbom@2.5.0
-    inputs:
-      job_name: sbom-util
-      container_image: "${CI_REGISTRY_IMAGE}/util:${CI_COMMIT_TAG}"
-      container_image_job: build-util
-      package_name: auth
-      sbom_filename: util-container.sbom.json
-
-  # ----- GitLab Release: link SBOMs from all three images -------
+  # ----- GitLab Release: link SBOMs from the built images -------
   # release-create is binary-shaped (expects binary_job + dist/
   # artifacts). We point binary_job at one container-image build
   # job so the needs: dependency resolves; the dist/ artifact slot
@@ -143,8 +120,8 @@ include:
     inputs:
       package_name: auth
       release_title: "auth $CI_COMMIT_TAG"
-      binary_job: build-portal
-      sbom_job: sbom-portal
+      binary_job: build-othala
+      sbom_job: sbom-othala
 
 
 # -----------------------------------------------------------------
@@ -204,10 +181,8 @@ lab-validate:
   stage: lab-validate
   tags: [carmine, qemu]
   needs:
-    - build-consent
+    - build-othala
     - build-ldap-bridge
-    - build-portal
-    - build-util
   variables:
     LAB_DOMAIN: lab.dunn.dev
     AUTH_REGISTRY: "${CI_REGISTRY_IMAGE}"
