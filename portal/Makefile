@@ -14,7 +14,7 @@ help:
 	@echo "  check      astro check (type-check)"
 	@echo "  test       node --test on scripts/*.test.mjs (CSRF, webfinger)"
 	@echo "  image      podman build -t $(IMAGE):$(TAG)"
-	@echo "  start      node ./dist/server/entry.mjs (after build)"
+	@echo "  start      node ./dist/server/listen.mjs (D-listener; after build)"
 	@echo "  clean      rm dist/ + .astro/"
 
 install:
@@ -30,7 +30,7 @@ check:
 	npm run check
 
 test:
-	node --test scripts/csrf.test.mjs scripts/webfinger.test.mjs scripts/admin-recovery-gate.test.mjs
+	npm test
 
 image:
 	cd $(REPO_ROOT) && podman build -t $(IMAGE):$(TAG) -f portal/Containerfile .

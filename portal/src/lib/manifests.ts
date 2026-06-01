@@ -216,6 +216,61 @@ export function getClientManifest(clientId: string): ClientManifest | undefined 
   return loadClientManifests().find((m) => m.clientId === clientId);
 }
 
+/**
+ * audienceMatchesRedirect — TIGHTENED port of consent/manifest.go (CU1 item 5).
+ *
+ * The Go version compared host-only (url.Host) and, separately, fell back to a
+ * bare-string compare when the audience had no parseable host — which let a
+ * scheme-mismatched or path-decorated audience slip through, and it returned
+ * `true` for the no-usable-redirect-host case (a silent allow). This version:
+ *
+ *   - matches by parsed ORIGIN (scheme://host[:port]) EXACTLY, so
+ *     https://app.example.com.evil.com and http://app.example.com both fail
+ *     against an https://app.example.com redirect;
+ *   - is FAIL-CLOSED: an unknown client, an empty/absent redirect set, a
+ *     non-URL audience, or any audience without an exact-origin redirect match
+ *     all return false. There is no silent `return true` path.
+ *
+ * An empty/absent audience list returns true (nothing to constrain), matching
+ * the Go semantics where there is nothing to verify.
+ */
+export function audienceMatchesRedirect(
+  manifest: ClientManifest | undefined,
+  audience: string[] | undefined,
+): boolean {
+  // Unknown client: no silent allow.
+  if (!manifest) return false;
+
+  const auds = audience ?? [];
+  if (auds.length === 0) return true;
+
+  const allowedOrigins = new Set<string>();
+  for (const redirect of manifest.redirectUris) {
+    const origin = originOf(redirect);
+    if (origin) allowedOrigins.add(origin);
+  }
+  // No usable redirect origins -> fail closed (Go silently allowed here).
+  if (allowedOrigins.size === 0) return false;
+
+  // Every requested audience must match an allowed origin exactly.
+  for (const aud of auds) {
+    const audOrigin = originOf(aud);
+    if (audOrigin === null || !allowedOrigins.has(audOrigin)) {
+      return false;
+    }
+  }
+  return true;
+}
+
+/** Parse a URL string to its exact origin (scheme://host[:port]), or null. */
+function originOf(raw: string): string | null {
+  try {
+    return new URL(raw).origin;
+  } catch {
+    return null;
+  }
+}
+
 /** Distinct identity groups referenced by any client's group_role_map. */
 export function knownIdentityGroups(): string[] {
   const set = new Set<string>(['admin', 'family', 'friends', 'kids']);

@@ -2,8 +2,10 @@
 #
 # Two-stage: UBI 9 nodejs-22 (full image with npm) for build, UBI 9
 # nodejs-22-minimal via ci-runtime-node for runtime. Astro Node
-# standalone emits its own minimal HTTP server at
-# dist/server/entry.mjs, so no Express/Fastify glue is needed.
+# standalone emits an SSR handler at dist/server/entry.mjs; the
+# D-listener wrapper dist/server/listen.mjs serves it on the public
+# port and stands up a separate loopback admin port (CU1 item 4), so
+# no Express/Fastify glue is needed.
 #
 # v0.1.4 change: OIDC client manifests are read at RUNTIME from a
 # mounted directory (/etc/portal/manifests/), not baked into the
@@ -60,7 +62,9 @@ WORKDIR /app
 
 ENV NODE_ENV=production \
     HOST=0.0.0.0 \
-    PORT=8080
+    PORT=8080 \
+    ADMIN_HOST=127.0.0.1 \
+    ADMIN_PORT=8431
 
 # ci-runtime-node inherits the `default` user (uid 1001) from
 # ubi9/nodejs-22-minimal. COPY as root, then switch to 1001 for
@@ -72,6 +76,13 @@ COPY --from=build --chown=1001:0 /src/portal/package.json ./package.json
 
 USER 1001
 
+# Only the public port is EXPOSEd. The admin port (ADMIN_PORT) binds to
+# loopback (ADMIN_HOST=127.0.0.1) and is pod-only by design (D-listener,
+# CU1 item 4); revoke + recovery-gate routes land on it in CU3.
 EXPOSE 8080
 
-CMD ["node", "./dist/server/entry.mjs"]
+# listen.mjs binds the public SSR handler on PORT and the loopback admin mux
+# on ADMIN_PORT in one process (see src/server/listen.mjs). Standalone
+# entry.mjs is imported by listen.mjs for its exported `handler`, not run
+# directly, so it never auto-binds its own server.
+CMD ["node", "./dist/server/listen.mjs"]
