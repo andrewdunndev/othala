@@ -30,6 +30,7 @@ import {
   nodesByGroup,
   scriptNodes,
 } from '../../lib/nodes';
+import { revokeSubject, RevokeError } from '../../lib/revoke';
 import type { FlowNode, NodeInputAttributes, Session } from '../../lib/types';
 
 const cookie = Astro.request.headers.get('cookie') ?? undefined;
@@ -42,6 +43,38 @@ try {
 }
 if (!session?.active || !session.identity) {
   return Astro.redirect('/auth/login?return_to=' + encodeURIComponent('/auth/settings'));
+}
+
+// Self-service "sign out everywhere" (CU3 B1 trigger). Routes through the
+// in-process revoke fan-out (steps 2-6) on the CALLER'S OWN identity — NOT
+// the Kratos browser-logout, which only drops the local Kratos session and
+// leaves Hydra's 24h remembered-login window open. deactivate is false: the
+// user is signing out, not deactivating themselves.
+let signOutError: string | null = null;
+if (Astro.request.method === 'POST') {
+  const fd = await Astro.request.formData();
+  if (String(fd.get('action') ?? '') === 'sign-out-everywhere') {
+    try {
+      await revokeSubject(session.identity.id);
+    } catch (err) {
+      // Prescriptive on a hard-cut failure; do not leak raw upstream errors.
+      signOutError =
+        err instanceof RevokeError
+          ? err.message
+          : 'Could not sign out everywhere; please retry.';
+    }
+    if (!signOutError) {
+      // Cut landed: bounce the caller's own browser session through Kratos
+      // logout so the current cookie is dropped too.
+      const info = await getLogoutInfo(cookie);
+      if (info) {
+        const logoutUrl = new URL(info.logout_url);
+        logoutUrl.searchParams.set('token', info.logout_token);
+        return Astro.redirect(logoutUrl.toString());
+      }
+      return Astro.redirect('/auth/login');
+    }
+  }
 }
 
 const flowId = Astro.url.searchParams.get('flow');
@@ -238,16 +271,20 @@ const accessGroups = groups.filter((g) => g.startsWith('access-'));
     <p class="section-subtitle">Sessions</p>
     <p class="section-prose">
       Sign out of this device, or revoke every active session at once.
+      "Sign out everywhere" cuts your Kratos sessions AND Hydra's
+      remembered-login window, so no app can silently re-issue a token.
     </p>
-    {logoutInfo ? (
-      <form method="GET" action={logoutInfo.logout_url} class="settings-form">
-        <input type="hidden" name="token" value={logoutInfo.logout_token} />
-        <div class="form-actions">
-          <button class="button button-danger" type="submit">Sign out everywhere</button>
-        </div>
-      </form>
-    ) : (
-      <p class="muted text-sm">Logout endpoint unavailable.</p>
+    {signOutError && (
+      <div class="notice notice-danger">{signOutError}</div>
+    )}
+    <form method="POST" action="/auth/settings" class="settings-form">
+      <input type="hidden" name="action" value="sign-out-everywhere" />
+      <div class="form-actions">
+        <button class="button button-danger" type="submit">Sign out everywhere</button>
+      </div>
+    </form>
+    {!logoutInfo && (
+      <p class="muted text-sm">Local logout endpoint unavailable; the revoke still runs.</p>
     )}
   </section>
 

@@ -38,6 +38,7 @@ import {
   shouldRefuseRecovery,
 } from '../../../lib/access';
 import { signToken, verifyToken, CSRFError } from '../../../lib/csrf';
+import { RevokeError } from '../../../lib/revoke';
 import type { Identity } from '../../../lib/types';
 
 const guard = await requireAdminSession(Astro);
@@ -250,19 +251,15 @@ const adminNav = [
       <div class="notice notice-success">
         <p>
           <strong>Force re-login complete.</strong>
-          Kratos sessions revoked. Back-channel logout sent to {actionResult.result.backchannel_logout_sent.length} app(s){actionResult.result.failures.length ? `; ${actionResult.result.failures.length} failure(s)` : ''}.
+          Kratos sessions revoked; Hydra login + consent sessions revoked
+          (the 24h remembered-login window is cut){actionResult.result.bestEffortFailures.length ? `; ${actionResult.result.bestEffortFailures.length} best-effort step(s) failed` : ''}.
         </p>
-        {actionResult.result.backchannel_logout_sent.length > 0 && (
-          <p class="text-sm">
-            Sent: {actionResult.result.backchannel_logout_sent.map((c) => <span class="badge">{c}</span>)}
-          </p>
-        )}
-        {actionResult.result.failures.length > 0 && (
+        {actionResult.result.bestEffortFailures.length > 0 && (
           <details>
-            <summary class="text-sm">Failures (apps will keep their local session until cookie expiry)</summary>
+            <summary class="text-sm">Best-effort failures (the hard cut already landed; these are advisory)</summary>
             <ul style="margin-top: 0.5rem;">
-              {actionResult.result.failures.map((f) => (
-                <li class="mono text-xs">{f.client_id}: {f.error}</li>
+              {actionResult.result.bestEffortFailures.map((f) => (
+                <li class="mono text-xs">{f.dependency} / {f.step}: {f.error}</li>
               ))}
             </ul>
           </details>

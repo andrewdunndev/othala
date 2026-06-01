@@ -1,47 +1,65 @@
-// Test for the HIGH-3 admin-to-admin recovery refusal gate.
+// Test for the admin-to-admin recovery refusal gate (CU3 B2 update).
 //
 // Run with: tsx --test scripts/admin-recovery-gate.test.mjs
 //
-// The gate logic lives in src/lib/access.ts (shouldRefuseRecovery)
-// and is consumed by src/pages/admin/users/[id].astro action=
-// issue-recovery. Importing the helper directly keeps this test
-// aligned with the .astro consumer (a refactor that re-inlines the
-// check breaks compile, not just this test).
+// The gate logic lives in src/lib/access.ts (shouldRefuseRecovery) and is
+// consumed by src/pages/admin/users/[id].astro action=issue-recovery.
+//
+// CU3 B2: admin authority is now the AUTH_ADMIN_SUBJECTS allowlist, NOT the
+// `admin` metadata_admin group. shouldRefuseRecovery refuses iff the TARGET
+// identity's EMAIL is on the allowlist. The `admin` group is display-only
+// and no longer gates recovery.
 
-import { test } from 'node:test';
+import { test, beforeEach } from 'node:test';
 import assert from 'node:assert/strict';
 import { shouldRefuseRecovery } from '../src/lib/access.ts';
 
-test('admin identity is refused', () => {
+beforeEach(() => {
+  process.env.AUTH_ADMIN_SUBJECTS = 'andrew@dunn.dev,ops@dunn.dev';
+});
+
+test('allowlisted admin identity is refused', () => {
   const identity = {
     id: 'a-1',
+    traits: { email: 'andrew@dunn.dev' },
     metadata_admin: { groups: ['admin', 'family'] },
   };
   assert.equal(shouldRefuseRecovery(identity), true);
 });
 
-test('non-admin identity is allowed', () => {
+test('allowlisted admin is refused even after self-demoting out of the admin group', () => {
+  const identity = {
+    id: 'a-2',
+    traits: { email: 'ops@dunn.dev' },
+    metadata_admin: { groups: ['family'] }, // no 'admin' group
+  };
+  assert.equal(shouldRefuseRecovery(identity), true);
+});
+
+test('group-admin NOT on the allowlist is allowed (group is display-only)', () => {
   const identity = {
     id: 'b-1',
+    traits: { email: 'imposter@dunn.dev' },
+    metadata_admin: { groups: ['admin', 'family'] },
+  };
+  assert.equal(shouldRefuseRecovery(identity), false);
+});
+
+test('non-admin identity is allowed', () => {
+  const identity = {
+    id: 'b-2',
+    traits: { email: 'kid@dunn.dev' },
     metadata_admin: { groups: ['family', 'access-keep'] },
   };
   assert.equal(shouldRefuseRecovery(identity), false);
 });
 
-test('identity with no metadata_admin is allowed (non-admin by default)', () => {
+test('identity with no traits/email is allowed (non-admin by default, fail-open for recovery of unknowns)', () => {
   const identity = { id: 'c-1' };
   assert.equal(shouldRefuseRecovery(identity), false);
 });
 
-test('identity with empty groups is allowed (non-admin)', () => {
-  const identity = { id: 'd-1', metadata_admin: { groups: [] } };
-  assert.equal(shouldRefuseRecovery(identity), false);
-});
-
-test('admin in a non-first position is still refused', () => {
-  const identity = {
-    id: 'e-1',
-    metadata_admin: { groups: ['family', 'admin', 'access-keep'] },
-  };
-  assert.equal(shouldRefuseRecovery(identity), true);
+test('null/undefined identity is allowed (no admin)', () => {
+  assert.equal(shouldRefuseRecovery(null), false);
+  assert.equal(shouldRefuseRecovery(undefined), false);
 });

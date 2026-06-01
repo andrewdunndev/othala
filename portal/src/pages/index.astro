@@ -33,6 +33,7 @@ import Layout from '../layouts/Layout.astro';
 import markSvg from '@dunn.dev/reference/mark/mark.svg?raw';
 import { getCollection } from 'astro:content';
 import { getSession, isReachable } from '../lib/kratos';
+import { isAdminSubject } from '../lib/admin-auth';
 import type { Identity } from '../lib/types';
 
 type State = 'down' | 'pre-auth' | 'post-auth';
@@ -90,7 +91,11 @@ const visibleTiles =
   state === 'post-auth'
     ? orderedApps.filter((a) => groups.includes(a.access_group))
     : [];
-const isAdmin = state === 'post-auth' && groups.includes('admin');
+// B2: the Admin nav affordance follows the AUTH_ADMIN_SUBJECTS allowlist,
+// not the (display-only) `admin` group. The /admin route itself is gated by
+// requireAdminSession, also via the allowlist; this just keeps the link
+// truthful so a non-admin isn't shown a tile that bounces.
+const isAdmin = state === 'post-auth' && isAdminSubject(identity?.traits?.email);
 const displayName = identity?.traits.displayName || identity?.traits.username || '';
 const firstName = displayName.split(' ')[0] || displayName;
 

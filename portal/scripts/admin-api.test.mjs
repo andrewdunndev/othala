@@ -426,9 +426,15 @@ test('deleteIdentity: URL-encodes id', async () => {
   assert.match(capturedCalls[0].url, /id%20with%20spaces/);
 });
 
-// ─── deactivateIdentity ───────────────────────────────────────────────────────
+// ─── deactivate: Kratos-side primitives (steps 1-2 of the CU3 fan-out) ────────
+//
+// CU3: the real deactivateIdentity now delegates to revokeSubject({deactivate:
+// true}), which adds Hydra login+consent revoke + best-effort cache/LDAP steps
+// (proven end-to-end in revoke.test.mjs). This re-port still pins the Kratos
+// wire contract those first two steps depend on: PATCH state->inactive THEN
+// DELETE sessions, with the session-delete failure aborting (prescriptive).
 
-test('deactivateIdentity: first request is PATCH with JSON-Patch content type', async () => {
+test('deactivate (Kratos primitive): first request is PATCH with JSON-Patch content type', async () => {
   globalThis.fetch = async (url, opts) => {
     capturedCalls.push({ url: String(url), opts });
     return new Response('', { status: 200 });

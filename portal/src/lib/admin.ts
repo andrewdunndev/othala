@@ -10,6 +10,8 @@
 import { Configuration, OAuth2Api, type OAuth2Client } from '@ory/client-fetch';
 import { getSession } from './kratos';
 import { getIdentity } from './admin-api';
+import { isAdminSubject } from './admin-auth';
+import { revokeSubject, type RevokeResult } from './revoke';
 import type { Session } from './types';
 
 export {
@@ -74,20 +76,23 @@ export async function requireAdminSession(astro: any): Promise<Session | Respons
     return astro.redirect(`/auth/login?return_to=${returnTo}`);
   }
 
-  // F1: Kratos /sessions/whoami strips metadata_admin (admin-only,
-  // never returned to public surfaces). Fetch the identity via the
-  // admin API to read the admin's group membership for the access
-  // gate. Failures here downgrade to "auth-unreachable" rather than
-  // silent fall-through, since a missing metadata_admin would cause
-  // every admin to look like a non-admin.
-  let adminGroups: string[] = [];
-  try {
-    const fullIdentity = await getIdentity(session.identity.id);
-    adminGroups = fullIdentity.metadata_admin?.groups ?? [];
-  } catch {
-    return astro.redirect('/auth/error?reason=auth-unreachable');
+  // B2: admin authority is the AUTH_ADMIN_SUBJECTS allowlist, NOT the
+  // `admin` metadata_admin group. Read the admin's email from the
+  // session traits (whoami strips metadata_admin but returns traits) and
+  // consult the allowlist. The `admin` group is display-only now and
+  // gates nothing here. Fetch the full identity only to resolve the
+  // canonical email when the session traits omit it; failures downgrade
+  // to "auth-unreachable" rather than a silent non-admin.
+  let adminEmail = session.identity.traits?.email as string | undefined;
+  if (!adminEmail) {
+    try {
+      const fullIdentity = await getIdentity(session.identity.id);
+      adminEmail = fullIdentity.traits?.email as string | undefined;
+    } catch {
+      return astro.redirect('/auth/error?reason=auth-unreachable');
+    }
   }
-  if (!adminGroups.includes('admin')) {
+  if (!isAdminSubject(adminEmail)) {
     return astro.redirect('/auth/error?reason=not-admin');
   }
 
@@ -110,49 +115,21 @@ export async function listOAuth2Clients(): Promise<OAuth2Client[]> {
 }
 
 /**
- * Force re-login for an identity.
+ * Force re-login for an identity (admin "revoke user" trigger).
  *
- * Calls the consent service's POST /admin/revoke-user, which:
- *  1. Deletes every Kratos session for the identity.
- *  2. Invalidates the consent service's in-process identity cache.
- *  3. Posts a signed OIDC back-channel logout token to every RP that
- *     supports it (yamls with `oidc.backchannel_logout_uri`).
+ * The portal -> consent-service HTTP hop (POST /admin/revoke-user, guarded
+ * by the overloaded CONSENT_ADMIN_BEARER) is GONE. The fan-out is now
+ * in-process: revokeSubject runs steps 2-6 (Kratos sessions, Hydra login +
+ * consent revoke, identity-cache invalidate, best-effort LDAP bind-cache
+ * flush). deactivate is NOT set here — admin force-logout cuts sessions
+ * without marking the identity inactive.
  *
- * Apps without back-channel logout (Tailscale, vLLM, BookLore, current
- * Jellyfin SSO plugin) keep their local session until it expires; the
- * result includes a `failures` array that the UI surfaces inline so
- * the operator knows where the gap is.
- *
- * Auth: shared bearer in CONSENT_ADMIN_BEARER. Same value lives on the
- * consent service's env. Caddy on auth.dunn.dev/admin/* layers an
- * additional bearer check (defense-in-depth).
+ * Throws a prescriptive RevokeError on a hard-cut (step 2-4) failure; the
+ * caller surfaces dependency + next-action without leaking raw upstream
+ * errors. Best-effort step 5-6 failures land in result.bestEffortFailures.
  */
-export interface RevokeUserResult {
-  subject: string;
-  kratos_sessions_revoked: number;
-  backchannel_logout_sent: string[];
-  failures: Array<{ client_id: string; endpoint: string; error: string }>;
-  identity_cache_invalidated: boolean;
-}
+export type RevokeUserResult = RevokeResult;
 
 export async function revokeUserSessions(subject: string): Promise<RevokeUserResult> {
-  const base = process.env.CONSENT_ADMIN_URL ?? 'https://auth.dunn.dev';
-  const bearer = process.env.CONSENT_ADMIN_BEARER ?? '';
-  if (!bearer) {
-    throw new Error('CONSENT_ADMIN_BEARER is unset; admin revoke disabled');
-  }
-  const res = await fetch(`${base}/admin/revoke-user`, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      Authorization: `Bearer ${bearer}`,
-      Accept: 'application/json',
-    },
-    body: JSON.stringify({ subject }),
-  });
-  if (!res.ok) {
-    const body = await res.text();
-    throw new Error(`revoke-user: ${res.status} ${body}`);
-  }
-  return (await res.json()) as RevokeUserResult;
+  return revokeSubject(subject);
 }

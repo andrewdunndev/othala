@@ -17,6 +17,7 @@ export const prerender = false;
 import Layout from '../../layouts/Layout.astro';
 import { getCollection, render } from 'astro:content';
 import { getSession } from '../../lib/kratos';
+import { isAdminSubject } from '../../lib/admin-auth';
 
 const { slug } = Astro.params;
 if (!slug) {
@@ -36,8 +37,11 @@ if (!session?.active || !session.identity) {
   return Astro.redirect(`/auth/login?return_to=${encodeURIComponent(Astro.url.pathname)}`);
 }
 
+// B2: admin authority is the AUTH_ADMIN_SUBJECTS allowlist, NOT the
+// (display-only) `admin` group. Admins see every app's detail page; everyone
+// else needs the per-app access-<slug> group.
 const groups = session.identity.metadata_admin?.groups ?? [];
-const isAdmin = groups.includes('admin');
+const isAdmin = isAdminSubject(session.identity.traits?.email);
 const hasAccess = isAdmin || groups.includes(entry.data.access_group);
 if (!hasAccess) {
   return Astro.redirect('/auth/error?reason=not-authorised');

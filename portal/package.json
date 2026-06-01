@@ -5,8 +5,9 @@
   "type": "module",
   "scripts": {
     "dev": "astro dev --port 4321",
-    "build": "astro build && npm run copy:listener",
+    "build": "astro build && npm run copy:listener && npm run build:admin-runtime",
     "copy:listener": "cp src/server/listen.mjs dist/server/listen.mjs",
+    "build:admin-runtime": "esbuild src/server/admin-runtime.ts --bundle --format=esm --platform=node --packages=external --outfile=dist/server/admin-runtime.mjs",
     "check": "astro check",
     "preview": "astro preview",
     "start": "node ./dist/server/listen.mjs",

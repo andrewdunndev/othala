@@ -18,10 +18,10 @@ import {
   IdentityApi,
   type CreateIdentityBody,
   type UpdateIdentityBody,
-  type JsonPatch,
 } from '@ory/client-fetch';
 import type { Identity } from './types';
 import { validateMetadataAdmin } from './metadata-admin';
+import { revokeSubject } from './revoke';
 
 function adminBase(): string {
   return process.env.KRATOS_ADMIN_URL ?? 'http://kratos:4434';
@@ -129,19 +129,19 @@ export async function deleteIdentity(id: string): Promise<void> {
   await identityApi().deleteIdentity({ id });
 }
 
-/** Mark the identity inactive without removing it; revokes existing sessions. */
+/**
+ * Mark the identity inactive AND run the full revocation fan-out.
+ *
+ * deactivate is the only trigger that runs step 1 (state -> inactive)
+ * before the rest; revokeSubject({deactivate:true}) does step 1 then 2-6:
+ * Kratos sessions, Hydra login + consent revoke, identity-cache invalidate,
+ * best-effort LDAP bind-cache flush. Step 2 failure aborts (prescriptive
+ * RevokeError); steps 5-6 are best-effort. This completes the old
+ * patch+delete-sessions pair, which left the Hydra 24h login window and the
+ * granted consent open after a "deactivate".
+ */
 export async function deactivateIdentity(id: string): Promise<void> {
-  const api = identityApi();
-  const patchIdentityBody: Array<JsonPatch> = [
-    { op: 'replace', path: '/state', value: 'inactive' },
-  ];
-  await api.patchIdentity({ id, patchIdentityBody });
-  // Session revocation is the second half of deactivation. If it fails
-  // (500, network error, etc.) and we don't await it, the identity stays
-  // in a half-deactivated state — marked inactive but still holding
-  // active sessions. Awaiting surfaces the failure so the caller can
-  // re-run / alert.
-  await api.deleteIdentitySessions({ id });
+  await revokeSubject(id, { deactivate: true });
 }
 
 export interface RecoveryLink {
