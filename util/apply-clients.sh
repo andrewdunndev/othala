@@ -2,7 +2,7 @@
 # Apply OIDC client manifests to a running Hydra.
 #
 # v0.1.4: this script ships in the auth-util image
-# (registry.gitlab.com/dunn.dev/auth/util:<tag>). It reads manifest
+# (registry.gitlab.com/dunn.dev/othala/util:<tag>). It reads manifest
 # YAMLs from $CLIENTS_DIR (default /etc/util/manifests/) and
 # POSTs/PUTs each to ${HYDRA_ADMIN_URL}/admin/clients.
 #
@@ -19,7 +19,7 @@
 #          -v $(pwd)/hydra/clients:/etc/util/manifests:ro \
 #          -e HYDRA_ADMIN_URL=http://auth-hydra:4445 \
 #          -e KEEP_CLIENT_SECRET=... \
-#          dunn.dev/auth-util:lab
+#          dunn.dev/othala-util:lab
 #
 # Namespace separation (per adversarial review C3 / D6):
 #   The yaml files have two top-level blocks:

@@ -5,7 +5,7 @@
 // The gate logic lives in src/lib/access.ts (shouldRefuseRecovery) and is
 // consumed by src/pages/admin/users/[id].astro action=issue-recovery.
 //
-// CU3 B2: admin authority is now the AUTH_ADMIN_SUBJECTS allowlist, NOT the
+// CU3 B2: admin authority is now the OTHALA_ADMIN_SUBJECTS allowlist, NOT the
 // `admin` metadata_admin group. shouldRefuseRecovery refuses iff the TARGET
 // identity's EMAIL is on the allowlist. The `admin` group is display-only
 // and no longer gates recovery.
@@ -15,7 +15,7 @@ import assert from 'node:assert/strict';
 import { shouldRefuseRecovery } from '../src/lib/access.ts';
 
 beforeEach(() => {
-  process.env.AUTH_ADMIN_SUBJECTS = 'andrew@dunn.dev,ops@dunn.dev';
+  process.env.OTHALA_ADMIN_SUBJECTS = 'andrew@dunn.dev,ops@dunn.dev';
 });
 
 test('allowlisted admin identity is refused', () => {

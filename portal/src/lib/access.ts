@@ -171,7 +171,7 @@ export function computeEffectiveAccess(
  * so admin recovery is console-only. See
  * docs/runbooks/admin-recovery.md "Console recovery for an admin".
  *
- * B2: admin status is the AUTH_ADMIN_SUBJECTS allowlist, NOT the `admin`
+ * B2: admin status is the OTHALA_ADMIN_SUBJECTS allowlist, NOT the `admin`
  * metadata_admin group. Refuse iff the TARGET identity's email is on the
  * allowlist. A user carrying the (display-only) `admin` group but not on
  * the allowlist is NOT an admin and recovery is allowed for them; an

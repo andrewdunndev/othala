@@ -22,7 +22,7 @@
 //
 //   Secret model (CU3): the overloaded `auth_internal_bearer` is split into
 //   PURPOSE-NAMED secrets:
-//     - AUTH_ADMIN_ENDPOINT_BEARER  guards POST /admin/revoke-user
+//     - OTHALA_ADMIN_ENDPOINT_BEARER  guards POST /admin/revoke-user
 //     - RECOVERY_GATE_SECRET        guards POST /admin/recovery-gate
 //   Both checks are CONSTANT-TIME (timingSafeEqual) and FAIL-CLOSED (an
 //   unset secret rejects every request). The portal->consent admin HTTP hop
@@ -93,7 +93,7 @@ export function parseBearer(authHeader) {
  *
  * Kratos posts the in-flight identity to the gate before issuing a public
  * recovery code. We REFUSE recovery for any identity whose email is on the
- * AUTH_ADMIN_SUBJECTS allowlist (admin recovery is console-only). The
+ * OTHALA_ADMIN_SUBJECTS allowlist (admin recovery is console-only). The
  * `admin` metadata_admin group is NOT consulted (B2: display-only).
  *
  * FAIL-CLOSED on a malformed payload: if we cannot read an email, refuse —
@@ -163,7 +163,7 @@ async function loadRuntime() {
 }
 
 /**
- * Handle POST /admin/revoke-user. Bearer: AUTH_ADMIN_ENDPOINT_BEARER.
+ * Handle POST /admin/revoke-user. Bearer: OTHALA_ADMIN_ENDPOINT_BEARER.
  * Body: { subject: string }. Runs the in-process revoke fan-out (steps 2-6,
  * deactivate=false). Prescriptive on upstream failure (dependency +
  * next-action), never leaking raw upstream errors.
@@ -171,7 +171,7 @@ async function loadRuntime() {
  * `runtime` is injectable for tests; defaults to the built bundle.
  */
 export async function handleRevokeUser(req, res, runtime) {
-  const expected = process.env.AUTH_ADMIN_ENDPOINT_BEARER ?? '';
+  const expected = process.env.OTHALA_ADMIN_ENDPOINT_BEARER ?? '';
   if (!bearerMatches(parseBearer(req.headers?.authorization), expected)) {
     sendJson(res, 401, { error: 'unauthorized' });
     return;

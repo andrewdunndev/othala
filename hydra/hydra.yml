@@ -12,7 +12,7 @@ serve:
     cors:
       enabled: true
       allowed_origins:
-        - https://auth.dunn.dev
+        - https://dag.dunn.dev
       allowed_methods: [GET, POST, PUT, DELETE]
       allowed_headers:
         - Authorization
@@ -26,21 +26,21 @@ serve:
 
 urls:
   self:
-    issuer: https://auth.dunn.dev/
-    public: https://auth.dunn.dev/
+    issuer: https://dag.dunn.dev/
+    public: https://dag.dunn.dev/
 
-  # Topology B (v0.1.4): the entire SSO stack lives on auth.dunn.dev.
-  # Hydra redirects authentication-required flows to auth.dunn.dev/auth/*
+  # Topology B (v0.1.4): the entire SSO stack lives on dag.dunn.dev.
+  # Hydra redirects authentication-required flows to dag.dunn.dev/auth/*
   # where the Astro portal renders login/recovery/etc., and the consent
   # service handles /login with login_challenge via the same Caddy mux.
   # home.dunn.dev was the Topology A user-facing host; dropped in v0.1.4
   # because the IdP + the UI live on the same FQDN now. The portal's
-  # tile dashboard renders at auth.dunn.dev/ for signed-in family members.
-  login: https://auth.dunn.dev/auth/login
-  consent: https://auth.dunn.dev/auth/consent
-  logout: https://auth.dunn.dev/auth/logout
-  error: https://auth.dunn.dev/auth/error
-  post_logout_redirect: https://auth.dunn.dev/
+  # tile dashboard renders at dag.dunn.dev/ for signed-in family members.
+  login: https://dag.dunn.dev/auth/login
+  consent: https://dag.dunn.dev/auth/consent
+  logout: https://dag.dunn.dev/auth/logout
+  error: https://dag.dunn.dev/auth/error
+  post_logout_redirect: https://dag.dunn.dev/
 
 oidc:
   subject_identifiers:

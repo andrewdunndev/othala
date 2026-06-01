@@ -383,7 +383,7 @@ func buildReturnTo(r *http.Request) string {
 // trailing slash) for return_to construction, or "" if unset.
 //
 // Empty return means buildReturnTo falls back to r.Host + r.TLS sniffing.
-// In production CONSENT_PUBLIC_URL is set to "https://auth.dunn.dev"; in
+// In production CONSENT_PUBLIC_URL is set to "https://dag.dunn.dev"; in
 // the lab compose stack to "https://auth-lab.<sslip>".
 func publicBaseURL() string {
 	v := os.Getenv("CONSENT_PUBLIC_URL")

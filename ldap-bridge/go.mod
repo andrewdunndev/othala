@@ -1,4 +1,4 @@
-module dunn.dev/auth/ldap-bridge
+module dunn.dev/othala/ldap-bridge
 
 go 1.22
 

@@ -110,7 +110,7 @@ workstation (`SOPS_AGE_KEY_FILE` pointing at the age private key).
    ssh agd@carmine.dunn.dev 'podman exec auth-consent kill -USR1 1'
    ```
 
-10. Verify a known OIDC flow end-to-end (login at auth.dunn.dev →
+10. Verify a known OIDC flow end-to-end (login at dag.dunn.dev →
     keep.dunn.dev signin) before clearing the runbook. Or run:
 
     ```sh

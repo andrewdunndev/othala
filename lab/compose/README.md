@@ -7,7 +7,7 @@ primary lab path going forward**.
 
 ## Why legacy
 
-Production now runs Topology B (single FQDN at `auth.dunn.dev`). This
+Production now runs Topology B (single FQDN at `dag.dunn.dev`). This
 compose stack is still on Topology A (auth-lab + home-lab + keep-lab
 subdomains). It works for substrate-up smoke validation but the
 production-shape OIDC redirect flow it exercises is the old shape.

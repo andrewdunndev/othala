@@ -17,8 +17,8 @@
 //   Verify the response shape BEFORE pointing Tailscale at it.
 //
 // Source of truth for the issuer:
-//   dunn.dev/auth/hydra/hydra.yml `urls.self.issuer` — currently
-//   `https://auth.dunn.dev/` (with trailing slash).
+//   dunn.dev/othala/hydra/hydra.yml `urls.self.issuer` — currently
+//   `https://dag.dunn.dev/` (with trailing slash).
 //
 // MEDIUM-7 (security review): `subject` is hardcoded to a fixed value
 // rather than reflecting the `resource` query parameter. Reflecting
@@ -35,7 +35,7 @@ export const onRequest: PagesFunction = (ctx) => {
     links: [
       {
         rel: "http://openid.net/specs/connect/1.0/issuer",
-        href: "https://auth.dunn.dev/",
+        href: "https://dag.dunn.dev/",
       },
     ],
   };

@@ -1,5 +1,5 @@
 ---
-// auth.dunn.dev — session-gated tile dashboard.
+// dag.dunn.dev — session-gated tile dashboard.
 //
 // v0.1.4 architecture (Topology B + apps registry as Content Collection):
 //
@@ -91,7 +91,7 @@ const visibleTiles =
   state === 'post-auth'
     ? orderedApps.filter((a) => groups.includes(a.access_group))
     : [];
-// B2: the Admin nav affordance follows the AUTH_ADMIN_SUBJECTS allowlist,
+// B2: the Admin nav affordance follows the OTHALA_ADMIN_SUBJECTS allowlist,
 // not the (display-only) `admin` group. The /admin route itself is gated by
 // requireAdminSession, also via the allowlist; this just keeps the link
 // truthful so a non-admin isn't shown a tile that bounces.
@@ -117,7 +117,7 @@ const devLinks = [
   {state === 'down' && (
     <section class="holding">
       <span class="holding-mark" set:html={markSvg} />
-      <p class="holding-eyebrow">auth.dunn.dev</p>
+      <p class="holding-eyebrow">dag.dunn.dev</p>
       <h1 class="holding-title">Auth services starting up</h1>
       <p class="holding-prose">
         The substrate is offline or unreachable. This page will pick the
@@ -132,7 +132,13 @@ const devLinks = [
       <section class="hero">
         <span class="hero-mark" set:html={markSvg} />
         <div>
-          <p class="hero-eyebrow">auth.dunn.dev</p>
+          <p class="hero-eyebrow">dag.dunn.dev</p>
+          <p class="rune-greeting" aria-label="door to home">
+            <span class="rune">ᛞ</span>
+            <span class="rune-arrow" aria-hidden="true">→</span>
+            <span class="rune">ᛟ</span>
+            <span class="rune-gloss">door to home</span>
+          </p>
           <h1 class="hero-title">Welcome back</h1>
           <p class="hero-lede">
             Family SSO for the home estate. One sign-in, every app.
@@ -289,6 +295,34 @@ const devLinks = [
   .hero-eyebrow-sep {
     margin: 0 0.4em;
     color: var(--border);
+  }
+
+  /* ── ᛞ→ᛟ greeting (dagaz → othala: door to home) ──
+   * The motif the brand is named for. Glyph strokes in --text. */
+  .rune-greeting {
+    display: flex;
+    align-items: baseline;
+    gap: var(--space-2);
+    margin: var(--space-2) 0 var(--space-3) 0;
+  }
+  .rune-greeting .rune {
+    font-family: var(--font-mono);
+    font-size: var(--text-xl);
+    font-weight: 600;
+    color: var(--text);
+    line-height: 1;
+  }
+  .rune-greeting .rune-arrow {
+    color: var(--text-muted);
+    font-size: var(--text-base);
+  }
+  .rune-greeting .rune-gloss {
+    margin-left: var(--space-2);
+    font-family: var(--font-mono);
+    font-size: var(--text-xs);
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--text-muted);
   }
 
   /* ── Tile grid ──

@@ -17,7 +17,7 @@ domain="${domain#http://}"
 domain="${domain%/}"
 
 url="https://${domain}/.well-known/webfinger?resource=acct%3Auser%40${domain}"
-EXPECTED_ISSUER="https://auth.dunn.dev/"
+EXPECTED_ISSUER="https://dag.dunn.dev/"
 
 echo "=== verify-webfinger ==="
 echo "URL:           $url"

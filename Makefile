@@ -4,7 +4,7 @@ LAB_DIR := lab
 COMPOSE_DIR := $(LAB_DIR)/compose
 
 help:
-	@echo "dunn.dev/auth — SSO substrate (Ory Kratos + Hydra + glauth-kratos + Astro UI)"
+	@echo "dunn.dev/othala — SSO substrate (Ory Kratos + Hydra + glauth-kratos + Astro UI)"
 	@echo ""
 	@echo "Phase 1 lab spike:"
 	@echo "  lab-secrets   generate fresh secrets to lab/compose/.env (runs once)"

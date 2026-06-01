@@ -37,7 +37,7 @@ The cost: BYO UI (we build the Astro app), 4-5 components instead of one, smalle
 
 | Decision | Value | Notes |
 |---|---|---|
-| WebAuthn `rp.id` | `dunn.dev` (registrable parent) | **One-way.** Origins list includes `https://auth.dunn.dev` and `https://home.dunn.dev`. Any future subdomain that needs WebAuthn assertion is a registrable child of `dunn.dev`. |
+| WebAuthn `rp.id` | `dunn.dev` (registrable parent) | **One-way.** Origins list includes `https://dag.dunn.dev` and `https://home.dunn.dev`. Any future subdomain that needs WebAuthn assertion is a registrable child of `dunn.dev`. |
 | Username convention | `first.last` (e.g., `andrew.dunn`) | LDAP DN-friendly. |
 | Cookie domain | `.dunn.dev`, `SameSite=Lax`, `HttpOnly` | Required for cross-subdomain Astro UI calls to Kratos. |
 | Identity schema | traits = {username, email, displayName?, recoveryEmail?} + `metadata_admin.groups[]` | Groups in metadata_admin (Ory-shaped: admin-managed, user can't self-escalate via settings flow). |
@@ -191,7 +191,7 @@ Tile tap → app's OIDC redirect → Hydra (login_challenge → consent service 
         → app session via standard OIDC code exchange
 ```
 
-Steps 4-6 happen in ~1-2 seconds. Standard SSO bounce; brief auth.dunn.dev URL shift; no Cloudflare challenges, no consent screens for trusted apps.
+Steps 4-6 happen in ~1-2 seconds. Standard SSO bounce; brief dag.dunn.dev URL shift; no Cloudflare challenges, no consent screens for trusted apps.
 
 ## Reversibility
 

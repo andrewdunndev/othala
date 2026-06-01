@@ -63,7 +63,7 @@ None.
     POSTs from a third-party origin (the cookie is omitted), so the
     form-driven exploitation path requires a same-site bypass: a
     compromised app on `<app>.dunn.dev` (tier 2) hosting a form whose
-    action is `https://auth.dunn.dev/admin/users/<id>`. The browser
+    action is `https://dag.dunn.dev/admin/users/<id>`. The browser
     sees this as same-site (registrable parent dunn.dev) and includes
     the session cookie. AAL2 is required by `requireAdminSession`, but
     the admin's session is already AAL2 when they're using the admin
@@ -73,7 +73,7 @@ None.
   - Fix: emit a per-request CSRF token (e.g., signed with a per-process
     secret + tied to identity_id), embed in the form, verify on POST.
     Astro's middleware can centralize. Alternatively check `Origin`
-    matches `https://auth.dunn.dev`; cheaper but brittle if the host
+    matches `https://dag.dunn.dev`; cheaper but brittle if the host
     shape changes.
   - **Status: REMEDIATED in v0.1.3.** `portal/src/lib/csrf.ts` mints per-render signed tokens tied to identity_id (HMAC-SHA256 over `ts.identityId.nonce`, 30-min TTL, single-use nonce store in memory). `[id].astro:90-96` verifies on every POST; rejects with 403 on `CSRFError`. Hidden `csrf_token` field injected into every admin form (lines 282+).
 
@@ -97,7 +97,7 @@ None.
     config OR drop the headers entirely and use `r.TLS != nil` plus
     `r.Host` only. The latter is simpler and there's only one upstream
     (Caddy) so the header indirection adds no value.
-  - **Status: REMEDIATED in v0.1.3.** `consent/handlers.go:360-380` drops `X-Forwarded-*` reading entirely. Uses `CONSENT_PUBLIC_URL` env (set to `https://auth.dunn.dev` in production) as the authoritative scheme+host; falls back to `r.Host` + `r.TLS` sniffing. Header indirection eliminated.
+  - **Status: REMEDIATED in v0.1.3.** `consent/handlers.go:360-380` drops `X-Forwarded-*` reading entirely. Uses `CONSENT_PUBLIC_URL` env (set to `https://dag.dunn.dev` in production) as the authoritative scheme+host; falls back to `r.Host` + `r.TLS` sniffing. Header indirection eliminated.
 
 - **HIGH-3: Admin-issued recovery link bypasses the recovery-gate webhook.** `docs/runbooks/admin-recovery.md:80-84` + `consent/recovery_gate.go` (mechanism), `portal/src/pages/admin/users/[id].astro:120-122` (UI).
   - Documented in admin-recovery.md: the admin-issued recovery URL
@@ -296,9 +296,9 @@ None.
     concern; not in scope.
   - **Status: ACCEPTED.** Tier-4 concern (Kratos itself compromised); out of homelab threat model. The schema-evolution flexibility from `map[string]any` is intentional and aligns with Kratos's own identity-schema-versioning posture.
 
-- **LOW-3: `allowed_return_urls` includes `https://auth.dunn.dev` with NO trailing slash.** `kratos/kratos.yml:33-36`
-  - Kratos return-url validation is a prefix match. `https://auth.dunn.dev`
-    accepts `https://auth.dunn.dev.evil.example`. Standard footgun;
+- **LOW-3: `allowed_return_urls` includes `https://dag.dunn.dev` with NO trailing slash.** `kratos/kratos.yml:33-36`
+  - Kratos return-url validation is a prefix match. `https://dag.dunn.dev`
+    accepts `https://dag.dunn.dev.evil.example`. Standard footgun;
     confirm Kratos's implementation does host-equality not prefix.
     Static review can't confirm; needs runtime test. Adding the
     trailing slash to every entry closes it.
@@ -345,7 +345,7 @@ None.
 - **A4: Recovery-gate fail-closed semantics depend on Kratos.** `kratos/kratos.yml:113-124` sets `can_interrupt: true` and `parse: false`. Kratos's documented behavior: a hook that returns non-2xx aborts the flow. Confirmed by the lab evidence at `lab/docs/phase3-evidence.md` line 101 (PASS for the H1 admin-rejection case). If the consent service is DOWN when a recovery is in-flight, Kratos's hook timeout fires and the flow aborts (fail-closed); good. If the hook times out due to a slow consent service, recovery aborts even for non-admins (UX hit, not security regression). Acceptable.
   - **Status: ACCEPTED.** Lab-verified fail-closed; acceptable UX tradeoff for fail-closed posture.
 
-- **A5: Cookie domain `.dunn.dev` cross-subdomain reach.** A compromised app on `<app>.dunn.dev` can read its own cookies but NOT the Kratos session cookie (HttpOnly). It can submit cross-origin POSTs that include the cookie (SameSite=Lax permits same-site POSTs). The browser treats `auth.dunn.dev` and `<app>.dunn.dev` as same-site (registrable parent dunn.dev), so a service worker registered on `<app>.dunn.dev` CANNOT make fetch() calls to `auth.dunn.dev` carrying the session cookie unless CORS permits credentials AND `auth.dunn.dev` opts in via `Access-Control-Allow-Origin`. The Kratos config (`kratos/kratos.yml:13-25`) only allows `https://home.dunn.dev` in `allowed_origins` (updated to `https://auth.dunn.dev` in v0.1.4 per Topology B). Hydra (`hydra/hydra.yml:8-16`) likewise. So service-worker exfiltration of the Kratos session via cookie-bearing CORS fetches is blocked at the IDP CORS layer. Ground truth: HIGH-1 (form-driven CSRF same-site) is the path that bites; service-worker is not.
+- **A5: Cookie domain `.dunn.dev` cross-subdomain reach.** A compromised app on `<app>.dunn.dev` can read its own cookies but NOT the Kratos session cookie (HttpOnly). It can submit cross-origin POSTs that include the cookie (SameSite=Lax permits same-site POSTs). The browser treats `dag.dunn.dev` and `<app>.dunn.dev` as same-site (registrable parent dunn.dev), so a service worker registered on `<app>.dunn.dev` CANNOT make fetch() calls to `dag.dunn.dev` carrying the session cookie unless CORS permits credentials AND `dag.dunn.dev` opts in via `Access-Control-Allow-Origin`. The Kratos config (`kratos/kratos.yml:13-25`) only allows `https://home.dunn.dev` in `allowed_origins` (updated to `https://dag.dunn.dev` in v0.1.4 per Topology B). Hydra (`hydra/hydra.yml:8-16`) likewise. So service-worker exfiltration of the Kratos session via cookie-bearing CORS fetches is blocked at the IDP CORS layer. Ground truth: HIGH-1 (form-driven CSRF same-site) is the path that bites; service-worker is not.
   - **Status: REMEDIATED at architecture level.** HIGH-1 (the path that bites) is closed via CSRF tokens. CORS allowlist is tight; service-worker exfiltration blocked at IDP.
 
 - **A6: Backup-and-restore correctness across Hydra encryption-at-rest.** `docs/runbooks/postgres-backup.md` is a placeholder ("TODO"). The runbook correctly identifies `secrets.system` rehydration as the gating step before pg_restore is meaningful. A partial-state restore (Hydra mid-write, Kratos mid-write) is the worst-case: Postgres point-in-time consistency is per-database, but the auth substrate touches both `kratos` and `hydra` databases in different transactions, so a backup taken between a `kratos` write and a corresponding `hydra` write yields drift (e.g., a Kratos identity exists with a Hydra consent decision pointing at no-such-subject). At family scale, the recovery is "wipe Hydra remembered-consent rows and force re-login" not "fix the row." Document.
@@ -364,7 +364,7 @@ None.
 - Kratos courier / SMTP path beyond config: deliverability runbook covers operator concerns, not threat model.
 - The `lab/` Playwright suite and validate-phase3 scripts: these are the test harness, not the security surface.
 - glauth upstream code: vendored as an import; CVE tracking is on the operator runbook, not this review.
-- Any runtime / dynamic behavior that requires a running stack: alg-confusion, redirect chains, real cookie flows, real RP back-channel logout exchanges. Static review flags but cannot confirm. CI-lab work in `dunn.dev/auth/lab/` will expand this coverage.
+- Any runtime / dynamic behavior that requires a running stack: alg-confusion, redirect chains, real cookie flows, real RP back-channel logout exchanges. Static review flags but cannot confirm. CI-lab work in `dunn.dev/othala/lab/` will expand this coverage.
 
 ## Triage status (v0.1.4)
 

@@ -1,6 +1,6 @@
 # consent
 
-Small Go HTTP service that handles Hydra OAuth2 login, consent, and logout challenges. Runs alongside Hydra on carmine. Never publicly exposed; only reachable via Hydra's redirects, which the user's browser follows back to this service through Caddy on `auth.dunn.dev`.
+Small Go HTTP service that handles Hydra OAuth2 login, consent, and logout challenges. Runs alongside Hydra on carmine. Never publicly exposed; only reachable via Hydra's redirects, which the user's browser follows back to this service through Caddy on `dag.dunn.dev`.
 
 ## Why this exists
 
@@ -12,9 +12,9 @@ Topology today:
 
 - Astro portal runs on carmine (Node SSR), in the auth.network namespace.
 - Hydra admin port (4445) is auth.network-internal. Never exposed publicly.
-- Consent service co-located on the same network, reachable from Caddy at `auth.dunn.dev/{login,consent,logout}`.
+- Consent service co-located on the same network, reachable from Caddy at `dag.dunn.dev/{login,consent,logout}`.
 
-The user sees a brief redirect through `auth.dunn.dev` (the same hostname they already see for the login flow). No exposure of admin internals.
+The user sees a brief redirect through `dag.dunn.dev` (the same hostname they already see for the login flow). No exposure of admin internals.
 
 ## Endpoints
 
@@ -33,7 +33,7 @@ The user sees a brief redirect through `auth.dunn.dev` (the same hostname they a
 Two listeners, two muxes:
 
 ```
-:4477 (public, behind Caddy on auth.dunn.dev)
+:4477 (public, behind Caddy on dag.dunn.dev)
   /login, /consent, /logout, /healthz
 
 :4478 (admin, pod-internal only, NOT proxied by Caddy)
@@ -326,7 +326,7 @@ The running service reloads manifests on `SIGHUP`. A failed reload (parse error,
 | `HYDRA_ADMIN_URL` | `http://hydra:4445` | Hydra admin API base URL. Internal-only. |
 | `KRATOS_PUBLIC_URL` | `http://kratos:4433` | Kratos public API. Used for `/sessions/whoami` with cookie passthrough. |
 | `KRATOS_ADMIN_URL` | `http://kratos:4434` | Kratos admin API. Used for identity lookup during consent. |
-| `LOGIN_URL` | `https://auth.dunn.dev/auth/login` | Where to redirect users without a Kratos session. `?return_to=` appended. |
+| `LOGIN_URL` | `https://dag.dunn.dev/auth/login` | Where to redirect users without a Kratos session. `?return_to=` appended. |
 | `HYDRA_CLIENT_DIR` | `../hydra/clients` | Directory of `*.yaml` manifests to load at startup and on `SIGHUP`. The `--manifest-dir` flag overrides this. |
 | `CONSENT_ADMIN_BEARER` | (empty) | Bearer token gating `/admin/*` endpoints. Empty disables the admin endpoints entirely (fail-closed). |
 | `RECOVERY_GATE_SECRET` | (empty) | Shared secret Kratos sends as `X-Webhook-Auth` on the recovery-gate webhook. Empty disables the webhook (fail-closed). MEDIUM-2. |
@@ -358,7 +358,7 @@ The consent service comes up as a container in the lab compose stack on the same
 # in lab/
 docker compose up -d hydra kratos consent
 # trigger an OIDC flow against any registered client; browser will land on
-# auth.dunn.dev/login?login_challenge=... -> consent service -> back to Hydra
+# dag.dunn.dev/login?login_challenge=... -> consent service -> back to Hydra
 ```
 
 Watch logs:
@@ -371,7 +371,7 @@ Each accept/reject is logged with `subject`, `client`, and `scope` for tracing.
 
 ## Deployment
 
-Production (carmine): runs in a quadlet alongside the Hydra pod. Caddy in front of `auth.dunn.dev` routes `/login`, `/consent`, and `/logout` to this service; everything else to Hydra.
+Production (carmine): runs in a quadlet alongside the Hydra pod. Caddy in front of `dag.dunn.dev` routes `/login`, `/consent`, and `/logout` to this service; everything else to Hydra.
 
 Lab (GCP): runs as a container in the compose stack on the same network as Hydra and Kratos.
 

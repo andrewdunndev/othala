@@ -69,12 +69,18 @@ const passwordInput = ui
   ? nodesByGroup(ui.nodes, 'password').map(asInput).find((a) => a?.name === 'password') || null
   : null;
 ---
-<Layout title="Sign in" description="Sign in to auth.dunn.dev." bare>
+<Layout title="Sign in" description="Sign in to dag.dunn.dev." bare>
 
   <section class="hero">
     <span class="hero-mark" set:html={markSvg} />
     <div>
       <p class="hero-eyebrow">sign in</p>
+      <p class="rune-greeting" aria-label="door to home">
+        <span class="rune">ᛞ</span>
+        <span class="rune-arrow" aria-hidden="true">→</span>
+        <span class="rune">ᛟ</span>
+        <span class="rune-gloss">door to home</span>
+      </p>
       <h1 class="hero-title">Welcome back, family.</h1>
       <p class="hero-lede">
         {aal === 'aal2'
@@ -212,6 +218,35 @@ const passwordInput = ui
 </Layout>
 
 <style>
+  /* The ᛞ→ᛟ greeting: dagaz (door) to othala (home/inheritance).
+   * The motif the brand is named for — a quiet, tasteful mark above the
+   * welcome, glyph strokes in --text per the estate visual language. */
+  .rune-greeting {
+    display: flex;
+    align-items: baseline;
+    gap: var(--space-2);
+    margin: var(--space-2) 0 var(--space-3) 0;
+  }
+  .rune-greeting .rune {
+    font-family: var(--font-mono);
+    font-size: var(--text-xl);
+    font-weight: 600;
+    color: var(--text);
+    line-height: 1;
+  }
+  .rune-greeting .rune-arrow {
+    color: var(--text-muted);
+    font-size: var(--text-base);
+  }
+  .rune-greeting .rune-gloss {
+    margin-left: var(--space-2);
+    font-family: var(--font-mono);
+    font-size: var(--text-xs);
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--text-muted);
+  }
+
   /* The login card is the focal element on the page; the hero sets the
    * tone and the card holds the work. Hairline border, generous interior
    * padding, single accent button. */

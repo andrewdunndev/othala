@@ -1,4 +1,4 @@
-# dunn.dev/auth-portal -- Astro Node SSR for carmine.
+# dunn.dev/othala-portal -- Astro Node SSR for carmine.
 #
 # Two-stage: UBI 9 nodejs-22 (full image with npm) for build, UBI 9
 # nodejs-22-minimal via ci-runtime-node for runtime. Astro Node
@@ -20,7 +20,7 @@
 #
 # CI build context: auth repo root (see .gitlab-ci.yml build-portal job).
 # Local build (from auth repo root):
-#   podman build -t dunn.dev/auth-portal:lab -f portal/Containerfile .
+#   podman build -t dunn.dev/othala-portal:lab -f portal/Containerfile .
 # Run:
 #   podman run --rm -p 8080:8080 \
 #     -v ./hydra/clients:/etc/portal/manifests:ro \
@@ -28,7 +28,7 @@
 #     -e KRATOS_ADMIN_URL=http://kratos:4434 \
 #     -e HYDRA_PUBLIC_URL=http://hydra:4444 \
 #     -e HYDRA_ADMIN_URL=http://hydra:4445 \
-#     dunn.dev/auth-portal:lab
+#     dunn.dev/othala-portal:lab
 
 ARG CATALOG_VERSION=2.5.0
 

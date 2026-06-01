@@ -1,134 +1,162 @@
 # Status
 
-Release-state + resume doc; for cold orientation read ARCHITECTURE.md first.
+The single source of release/version state for this repo. For cold
+orientation (what the app is, the load-bearing decisions) read
+[`../ARCHITECTURE.md`](../ARCHITECTURE.md) first. For the deploy
+contract read [`../DEPLOY.md`](../DEPLOY.md). Those files defer to this
+one for version state and assert none of their own.
 
-Updated 2026-05-31.
+Updated 2026-06-01.
 
 ## Where we are
 
-**v0.1.4 in flight.** Topology B rewrite (auth.dunn.dev consolidated;
-home.dunn.dev reserved as future tile-dashboard host); portal Astro
-Content Collections for the apps registry; runtime-read manifests
-(no rebuild per new OIDC client); auth-util image scaffolded for
-apply-clients; doc-drift sweep complete (sops everywhere, no
-Bitwarden); WebFinger relocated to the dunn.dev apex per Tailscale
-KB-1240. Carmine has the iac quadlets ready, pinned at `:v0.1.3`
-with bump markers awaiting `v0.1.4` tag.
+**Convergence build complete and CV-verified; deploy pending (Wave E,
+operator-gated).** The auth stack has converged to a single all-TS
+application fronting upstream Ory plus the Go LDAP bridge:
 
-**Stack:** Ory Kratos v26.2.0 (identity) + Ory Hydra v26.2.0
-(OAuth2/OIDC) + Postgres 18 + custom glauth-kratos LDAP bridge +
-Astro Node SSR portal on carmine + custom Caddy image at
-`registry.gitlab.com/dunn.dev/caddy-estate` + auth-util one-shot
-container for apply-clients. Estate design via `@dunn.dev/reference@^0.2.0`.
+- One Astro Node SSR app (`portal/`) holds the Kratos self-service
+  flows (one generic `ui.nodes` renderer, `FlowNodes.astro`; login
+  keeps the bespoke passkey/password UX), the Hydra
+  login/consent/logout challenge handlers, the fail-closed access-gate
+  (`gate.ts`: `access-<clientId>` group membership AND Kratos state
+  `== active`), the id_token claims builder (`claims.ts`), and the
+  dual-listener (`listen.mjs`: public SSR `8080` + loopback admin
+  `8431` carrying `/admin/revoke-user` + `/admin/recovery-gate`).
+- `revokeSubject()` (`revoke.ts`) runs the in-process revocation
+  fan-out (Kratos state/sessions, Hydra login/consent session revoke,
+  best-effort LDAP bind-cache flush). No identity cache: the hot path
+  fetches fresh, so a revoked subject fails the gate's state-check on
+  the next fetch.
+- Admin authz is `OTHALA_ADMIN_SUBJECTS` (sops-backed email allowlist),
+  the sole authz at `requireAdminSession` + recovery-gate + page
+  gates. The `admin` group is display-only.
+- Back-channel logout is Hydra-native. The app holds no signing key at
+  rest; the custom private-key signer was deleted.
 
-## Released artifacts (v0.1.3 → tagging v0.1.4)
+The Go consent service and the `util` runner still exist in-tree but
+are **legacy-pending-removal**, retired at the iac E1 cutover. They are
+not the current architecture.
 
-| Path | What |
-|---|---|
-| `registry.gitlab.com/dunn.dev/auth/consent:v0.1.3` + `:latest` | Go HTTP, signed by digest via cosign keyless |
-| `registry.gitlab.com/dunn.dev/auth/ldap-bridge:v0.1.3` + `:latest` | glauth-kratos LDAP bridge, signed |
-| `registry.gitlab.com/dunn.dev/auth/portal:v0.1.3` + `:latest` | Astro Node SSR, signed |
-| `registry.gitlab.com/dunn.dev/auth/util:v0.1.4` (new) | apply-clients runner: UBI 9 minimal + curl + jq + yq + apply-clients.sh |
-| `gitlab.com/dunn.dev/auth/-/releases/v0.1.3` | GitLab Release; SBOMs linked from `/-/packages/generic/auth/v0.1.3/` |
+**Stack:** Ory Kratos + Ory Hydra (OAuth2/OIDC) + Postgres 18 +
+Go glauth-kratos LDAP bridge + the converged Astro Node SSR auth app on
+carmine + custom Caddy edge (`registry.gitlab.com/dunn.dev/caddy-estate`).
+Estate design via `@dunn.dev/reference`.
 
-Container registry cleanup policy active: semver + `:latest` + cosign
-sigs kept forever, everything else pruned after 30d.
+## Pending state
 
-## Locked decisions (v0.1.4 baseline)
+| Item | Wave | Status |
+|---|---|---|
+| **Image rename `portal` → `auth`** | CP | Pending. The published image is named `auth` going forward; CI still builds it as `portal` today (`.gitlab-ci.yml` `build-portal`). The rename lands just after this doc set. |
+| **iac E1 cutover** | E1 | Pending. Retire `auth-consent` + `util` from the pod; wire the dual-listener admin port + its three new secrets; repoint the Kratos recovery-hook from `consent:4478` to the auth admin port `:8431/admin/recovery-gate`. See `DEPLOY.md`. |
+| **Production deploy** | E | Pending, operator-gated. sops key fills + iac config sync/pin + `make auth-deploy`. |
+
+The iac quadlets remain at the pre-cutover shape until E1 (auth-portal
+still depends on auth-consent and carries the old `CONSENT_ADMIN_URL` /
+`auth_internal_bearer` wiring).
+
+## Strengths (CV audit)
+
+Real, substantive coverage:
+
+- **Fail-closed gate tests** exercise both checks independently (group
+  membership AND identity state), including the closed-on-lookup-failure
+  path.
+- **Revoke fan-out** has order + abort tests (step 2 session-revoke
+  failure aborts the fan-out; the deactivate-first ordering is
+  enforced).
+- **Dual-listener mux-disjointness** is tested: no public/challenge
+  path resolves on the admin port and the SSR handler never sees admin
+  paths.
+- `OTHALA_ADMIN_SUBJECTS` as the **sole admin authz** is asserted at
+  every gate.
+- **Native back-channel logout / no key at rest** is verified by the
+  signer's absence.
+
+## Caveat (CV audit)
+
+The content-config `superRefine` test validates a **hand-copied schema
+replica** at build time (a build-time lint, not a runtime check). There
+is **no standing linter** on the app: `astro-check` reports 16 hints.
+This is honest current state, not a regression.
+
+## Locked decisions
 
 | | Decision |
 |---|---|
-| WebAuthn rp.id | `dunn.dev` (registrable parent, **one-way**) |
+| WebAuthn rp.id | `dunn.dev` (registrable parent, one-way) |
+| Issuer URL | `https://dag.dunn.dev/` (non-changeable once any RP is wired) |
 | Username | `first.last` |
 | Cookie domain | `.dunn.dev`, SameSite=Lax, HttpOnly |
 | Passkey policy | Preferred + password fallback |
 | MFA / AAL2 | Optional default; AAL2 enforced at SSR on `/admin/*` |
 | Sessions | 90d normal, 1d admin |
 | Identity schema | `traits.{username,email,displayName?}` + `metadata_admin.{groups[],roles{}}` |
-| Consent | `skip_consent: true` per client (11 trusted OIDC clients) |
 | Subject identifier | `public` |
-| **Topology** | **Single FQDN `auth.dunn.dev` for the whole SSO stack** (Topology B). home.dunn.dev reserved as future tile-dashboard host, not served today. |
-| **Tile dashboard** | **Session-gated home page at `auth.dunn.dev/`**; reads `portal/src/content/apps/*.md` (Astro Content Collection) + filters by user's `metadata_admin.groups` containing `access-<slug>`. Per-app detail pages at `/apps/<slug>` render MD education content. |
-| WebFinger | **Cloudflare Pages function at `dunn.dev/.well-known/webfinger` (apex)** per Tailscale KB-1240. NOT on this project's portal. |
-| LDAP bridge | Custom binary linking glauth/ldap directly (no .so plugins) |
+| **Topology** | Single FQDN `dag.dunn.dev` for the whole SSO stack |
+| **Admin authz** | `OTHALA_ADMIN_SUBJECTS` allowlist (sops); `admin` group is display-only |
+| Access gate | `access-<clientId>` group AND Kratos state `== active`, fail-closed, on login + consent |
+| Back-channel logout | Hydra-native (Hydra-signed); app holds no signing key at rest |
+| LDAP bridge | Go glauth-kratos binary (no `.so` plugins); stays Go |
 | LDAP DN | `uid=<username>,ou=users,dc=dunn,dc=dev` |
 | Postgres | Single instance (`postgres:18-alpine`), separate `kratos` + `hydra` DBs |
-| Recovery | Code via Fastmail; admin group BLOCKED at recovery-gate webhook (console-only break-glass) |
-| Onboarding | Admin creates → enrollment URL → Signal/iMessage |
-| Astro adapter | `@astrojs/node` standalone on carmine |
+| Recovery | Code via Fastmail; admin subjects BLOCKED at the recovery-gate (console-only break-glass) |
 | Hydra admin | In-pod only; never public |
 | Public reachability | DNS-only Cloudflare + port-forward 443. No CF Tunnel/Access |
-| Tailscale | Not load-bearing |
-| Cookie/cipher rotation | Substrate-secret collapse: one sops key feeds both CURRENT and PREVIOUS slots (homelab-scope simplification documented in `docs/golden-path.md` LB#10) |
-| Per-app role mapping | In `hydra/clients/*.yaml` `consent:` block; resolution: `metadata_admin.roles[client_id]` override → group_role_map walk in user-group order |
-| Design tokens | `@dunn.dev/reference` is the single source (design was archived 2026-05-24). Never redefine locally |
-| `secrets.system` | NON-ROTATABLE (Hydra at-rest encryption); break-glass procedure in `docs/runbooks/secrets-rotation.md`. Stored in sops as `carmine.hydra_system_secret`. |
-| **Secrets store** | **sops + age** estate-wide. Bitwarden eliminated 2026-05-30. |
-| **Deploy plane** | **`dunn.dev/iac/services/auth/`** owns runtime topology (quadlets, secret provisioning, sync targets). This repo owns application code + authoritative configs. |
+| `secrets.system` | NON-ROTATABLE (Hydra at-rest encryption); break-glass in `runbooks/secrets-rotation.md`; sops `carmine.hydra_system_secret` |
+| **Secrets store** | sops + age, estate-wide |
+| **Deploy plane** | `dunn.dev/iac/services/auth/` owns runtime topology; vendors auth configs by tag-pin (no submodule). This repo owns app code + authoritative configs |
+| Design tokens | `@dunn.dev/reference` is the single source. Never redefine locally |
 
-Full rationale per decision: `docs/decision.md`. Upgrade-durability
-choices: `docs/golden-path.md`. Load-bearing decisions map: `ARCHITECTURE.md`.
+Full rationale per decision: `decision.md`. Upgrade-durability choices:
+`golden-path.md`. Load-bearing decisions map: `../ARCHITECTURE.md`.
 
-## What's done at v0.1.4 (committed + pushed)
+## Not yet working / placeholders
 
-In addition to the v0.1.3 baseline:
+- **`/admin/activity`** is a navigable **placeholder** (pending an
+  alloy→Loki / Postgres-summary ingest). Not a working feature.
+- **OIDC client registration** is shell-driven via
+  `util/apply-clients.sh` today. The all-TS successor
+  (`manifests.ts` + `register-clients.ts` + `validateClients`) is
+  built but **dormant** until E1; it does not yet supersede the shell
+  path.
+- **Postgres backup**: posture documented; implementation is the next
+  iac work stream.
+- **No standing app linter** (see Caveat).
 
-- **Topology B**: kratos.yml + hydra.yml + portal env + Caddy snippet now consolidate on `auth.dunn.dev/*`. home.dunn.dev reserved unused.
-- **Tile dashboard**: `portal/src/content/apps/*.md` Astro Content Collection; session-gated home page filters by `access-<slug>` groups; per-app detail pages render MD bodies.
-- **Runtime manifest read**: portal reads `hydra/clients/*.yaml` from a mounted directory at request-time, not build-time. Adding a new OIDC client = edit yaml + restart, no image rebuild.
-- **auth-util image**: UBI 9 minimal + curl + jq + yq + apply-clients.sh moved from `hydra/`. One-shot quadlet in iac applies OIDC client manifests against Hydra admin.
-- **Security review annotated**: every HIGH / MEDIUM / LOW carries inline `Status: REMEDIATED|ACCEPTED|OPEN` with evidence citations. Counts: 0 OPEN, 16 REMEDIATED, 1 ACCEPTED.
-- **Doc drift swept**: Bitwarden mentions → sops; pyinfra-play references → iac make targets; image pins updated (v1.3/v2.2 → v26.2.0).
-- **WebFinger relocated**: portal handler deleted; spec-compliant placement at dunn.dev apex documented in `docs/apex-webfinger-followup.md`.
-- **`DEPLOY.md`** (new, repo root): bidirectional pointer to iac.
-- **`ARCHITECTURE.md`** (new, repo root): load-bearing decisions map for new operators (or LLMs picking up the repo cold).
-- **`docs/golden-path.md`** (new): the 12 integration choices that keep us durable across Ory upgrades.
-- **`docs/apex-webfinger-followup.md`** (new): WebFinger Pages function spec for the dunn.dev apex repo.
+## Production cutover (remaining, operator-gated)
 
-## Production cutover (remaining)
-
-1. **Tag dunn.dev/auth v0.1.4** (this repo). CI publishes consent/portal/ldap-bridge/util images at `:v0.1.4`. Operator action.
-2. **Bump iac quadlet pins** from `:v0.1.3` to `:v0.1.4` in `dunn.dev/iac/services/auth/.config/containers/systemd/*.container`. Operator action; comment markers placed in iac.
-3. **Add missing sops keys** before first deploy:
-   - `shared.fastmail_smtp_user`
-   - `shared.fastmail_smtp_password`
-   - Per-OIDC-consumer secrets (`keep_oidc_client_secret` + `observe_oidc_client_secret` already present; add others as each app is wired).
-4. **`make auth-secrets HOST=carmine && make auth-deploy HOST=carmine`** from iac. Validates substrate end-to-end.
-5. **`make auth-sync-manifests HOST=carmine && make auth-apply-clients HOST=carmine`** to register OIDC clients in Hydra and populate the consent service's manifest dir.
-6. **`make auth-smoke HOST=carmine`** validates the live substrate (openid-configuration, issuer byte-match, health endpoints, registered client_ids).
-7. **uuid-ossp Postgres extension verify**: defensively added to `services/auth/postgres/init.sh`; check with `\dx` after first deploy if curious.
-8. **DNS + port-forward**: `auth.dunn.dev` record + home router 443 → carmine. home.dunn.dev not yet served — defer or alias.
-9. **First-user pilot**: admin self-creates → enrollment URL → passkey → validate keep + observe OIDC flows.
-10. **Family rollout**: per user 30 min × 5-25 users.
-
-## Pre-rollout gaps (not blockers for first-user pilot)
-
-- **Postgres backup**: `docs/runbooks/postgres-backup.md` is updated to point at the Backblaze B2 (rclone) + onsite zpool posture; implementation lives in iac and is the next iac work stream.
-- **Per-app `aud` verification audit**: Phase 4 wiring, per consumer.
-- **QEMU-CI lab**: `lab/compose/` carries a legacy banner; the CI-driven lab that replaces it leverages carmine as the GitLab Runner host (QEMU + podman). Follow-up issue to file.
-- **Tailscale**: WebFinger function on dunn.dev apex repo + first tenant setup. Tracked at `docs/apex-webfinger-followup.md`.
+1. **Image rename** `portal` → `auth` (Wave CP).
+2. **iac E1 cutover** (see `DEPLOY.md`): retire consent + util, wire the
+   dual-listener admin port + its secrets, repoint the Kratos
+   recovery-hook to `:8431/admin/recovery-gate`.
+3. **Add missing sops keys** before first deploy (Fastmail SMTP,
+   per-OIDC-consumer secrets, the three admin secrets).
+4. **`make auth-sync-configs`** + bump quadlet pins to the released
+   tag, then **`make auth-secrets && make auth-deploy HOST=carmine`**.
+5. **`make auth-apply-clients HOST=carmine`** to register OIDC clients.
+6. **`make auth-smoke HOST=carmine`** to validate the live substrate.
+7. **DNS + port-forward**: `dag.dunn.dev` record + router 443 → carmine.
+8. **First-user pilot**, then **family rollout**.
 
 ## Where to look
 
 | Topic | File |
 |---|---|
-| **Load-bearing decisions map + topology + flows** | `ARCHITECTURE.md` (root) |
-| **Deploy plane** | `DEPLOY.md` (root) + `dunn.dev/iac/services/auth/` |
-| **Upgrade-durability choices** | `docs/golden-path.md` |
-| Historical substrate rationale (the Ory choice); architecture superseded | `docs/decision.md` |
-| Per-app integration | `docs/per-app-oidc.md` |
-| Phase 0 substrate review | `lab/docs/adversarial-review.md` |
-| Phase 3 security review | `docs/security-review-2026-05-04.md` |
-| Lab evidence | `lab/docs/{spike,phase2,phase3}-evidence.md`, `phase3-readiness.md`, `security-validation.md` |
-| Runbooks | `docs/runbooks/*.md` |
-| Substrate comparison (why Ory) | `lab/docs/eval-*.md` |
-| Contribution strategy | `docs/contribution-strategy.md` |
-| WebFinger Pages function spec | `docs/apex-webfinger-followup.md` |
+| **Load-bearing decisions + topology + flows** | `../ARCHITECTURE.md` (root) |
+| **Deploy contract** | `../DEPLOY.md` (root) + `dunn.dev/iac/services/auth/` |
+| Upgrade-durability choices | `golden-path.md` |
+| Historical substrate rationale (the Ory choice); architecture superseded | `decision.md` |
+| Per-app OIDC integration | `per-app-oidc.md` |
+| Runbooks | `runbooks/*.md` |
+| WebFinger Pages function spec | `apex-webfinger-followup.md` |
 
 ## Conventions
 
 - Push requires explicit human approval per action.
 - Estate voice: no em-dashes, no filler, direct.
-- The auth pod is one security domain; defense-in-depth between in-pod services is partial-and-deliberate.
-- Update this file whenever a phase shifts.
-- **Single-maintainer + LLM-leverage reading discipline**: when picking up cold, read `ARCHITECTURE.md` first, then `docs/golden-path.md`, then this file. Don't widen the integration surface without checking the golden-path doc.
+- The auth pod is one security domain; defense-in-depth between in-pod
+  services is partial-and-deliberate.
+- Update this file whenever release/version state shifts. It is the
+  only place that asserts it.
+- Reading discipline (single maintainer + LLM leverage): read
+  `../ARCHITECTURE.md` first, then `golden-path.md`, then this file.

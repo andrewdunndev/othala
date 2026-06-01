@@ -262,7 +262,7 @@ mutators:
   id_token:
     enabled: true
     config:
-      issuer_url: https://auth.dunn.dev/oathkeeper
+      issuer_url: https://dag.dunn.dev/oathkeeper
       jwks_url: file:///etc/oathkeeper/jwks.json
       ttl: 60s
   header:

@@ -12,7 +12,7 @@
 //   in this repo, rsync to `/var/srv/auth/consent/manifests/` on
 //   carmine via `make auth-sync-manifests`, restart the consent
 //   service and the portal. No image rebuild required.
-// - Source-of-truth stays in `dunn.dev/auth/hydra/clients/`. The
+// - Source-of-truth stays in `dunn.dev/othala/hydra/clients/`. The
 //   portal and consent service read the same files from the same
 //   directory; iac's sync target keeps the on-carmine copy current.
 // - A 30-second in-process cache prevents per-request YAML parsing
@@ -20,7 +20,7 @@
 //
 // Source-of-truth chain:
 //
-//   dunn.dev/auth/hydra/clients/*.yaml             (canonical, this repo)
+//   dunn.dev/othala/hydra/clients/*.yaml             (canonical, this repo)
 //     -> rsync via dunn.dev/iac make auth-sync-manifests
 //     -> /var/srv/auth/{consent,portal}/manifests/ (runtime on carmine)
 //        -> consent container reads via volume mount

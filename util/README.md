@@ -44,7 +44,7 @@ podman run --rm --network=auth \
   -e HYDRA_ADMIN_URL=http://auth-hydra:4445 \
   -e KEEP_CLIENT_SECRET="$(sops -d ... carmine.keep_oidc_client_secret)" \
   -e OBSERVE_CLIENT_SECRET="$(sops -d ... carmine.observe_oidc_client_secret)" \
-  registry.gitlab.com/dunn.dev/auth/util:v0.1.4
+  registry.gitlab.com/dunn.dev/othala/util:v0.1.4
 ```
 
 Each new OIDC consumer added later is one new yaml + one new sops
@@ -86,7 +86,7 @@ util container to the lab compose stack's auto-created network and
 mount the source-controlled manifests:
 
 ```sh
-cd dunn.dev/auth/lab/compose
+cd dunn.dev/othala/lab/compose
 podman compose up -d
 HYDRA_ADMIN_URL=http://localhost:4445 \
   KEEP_CLIENT_SECRET=lab-secret-value \
@@ -95,5 +95,5 @@ HYDRA_ADMIN_URL=http://localhost:4445 \
     -v $(pwd)/../../hydra/clients:/etc/util/manifests:ro \
     -e HYDRA_ADMIN_URL \
     -e KEEP_CLIENT_SECRET \
-    dunn.dev/auth-util:lab
+    dunn.dev/othala-util:lab
 ```

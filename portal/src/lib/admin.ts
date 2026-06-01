@@ -52,7 +52,7 @@ export async function requireAdminSession(astro: any): Promise<Session | Respons
     return astro.redirect(`/auth/login?return_to=${returnTo}`);
   }
 
-  // B2: admin authority is the AUTH_ADMIN_SUBJECTS allowlist, NOT the
+  // B2: admin authority is the OTHALA_ADMIN_SUBJECTS allowlist, NOT the
   // `admin` metadata_admin group. Read the admin's email from the
   // session traits (whoami strips metadata_admin but returns traits) and
   // consult the allowlist. The `admin` group is display-only now and
@@ -74,10 +74,10 @@ export async function requireAdminSession(astro: any): Promise<Session | Respons
 
   if (session.authenticator_assurance_level !== 'aal2') {
     const returnTo = encodeURIComponent(
-      `https://auth.dunn.dev${astro.url.pathname}${astro.url.search}`,
+      `https://dag.dunn.dev${astro.url.pathname}${astro.url.search}`,
     );
     const kratosUrl =
-      `https://auth.dunn.dev/self-service/login/browser` +
+      `https://dag.dunn.dev/self-service/login/browser` +
       `?refresh=true&aal=aal2&return_to=${returnTo}`;
     return astro.redirect(kratosUrl);
   }

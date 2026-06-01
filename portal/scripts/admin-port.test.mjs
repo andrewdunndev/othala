@@ -50,9 +50,9 @@ function fakeReq({ method = 'GET', url = '/', headers = {}, body = '' } = {}) {
 }
 
 beforeEach(() => {
-  delete process.env.AUTH_ADMIN_ENDPOINT_BEARER;
+  delete process.env.OTHALA_ADMIN_ENDPOINT_BEARER;
   delete process.env.RECOVERY_GATE_SECRET;
-  delete process.env.AUTH_ADMIN_SUBJECTS;
+  delete process.env.OTHALA_ADMIN_SUBJECTS;
 });
 
 // ── CU1 disjointness (unchanged) ───────────────────────────────────────────
@@ -147,7 +147,7 @@ test('POST /admin/revoke-user 401s with no/wrong bearer (fail-closed unset)', as
 });
 
 test('POST /admin/revoke-user 401s with a wrong bearer when secret IS set', async () => {
-  process.env.AUTH_ADMIN_ENDPOINT_BEARER = 'right-secret';
+  process.env.OTHALA_ADMIN_ENDPOINT_BEARER = 'right-secret';
   const res = fakeRes();
   await handleAdminRequest(
     fakeReq({ method: 'POST', url: '/admin/revoke-user', headers: { authorization: 'Bearer wrong' }, body: '{"subject":"s"}' }),
@@ -157,7 +157,7 @@ test('POST /admin/revoke-user 401s with a wrong bearer when secret IS set', asyn
 });
 
 test('POST /admin/revoke-user with a valid bearer routes through revokeSubject', async () => {
-  process.env.AUTH_ADMIN_ENDPOINT_BEARER = 'right-secret';
+  process.env.OTHALA_ADMIN_ENDPOINT_BEARER = 'right-secret';
   let revokedSubject = null;
   const runtime = {
     async revokeSubject(subject) {
@@ -178,7 +178,7 @@ test('POST /admin/revoke-user with a valid bearer routes through revokeSubject',
 });
 
 test('POST /admin/revoke-user returns prescriptive error (dependency + action), no raw upstream leak', async () => {
-  process.env.AUTH_ADMIN_ENDPOINT_BEARER = 'right-secret';
+  process.env.OTHALA_ADMIN_ENDPOINT_BEARER = 'right-secret';
   class FakeRevokeError extends Error {
     constructor() {
       super('revoke step "delete-sessions" failed against kratos-admin: re-run the revoke.');
@@ -204,7 +204,7 @@ test('POST /admin/revoke-user returns prescriptive error (dependency + action), 
 });
 
 test('POST /admin/revoke-user 400s on a missing subject', async () => {
-  process.env.AUTH_ADMIN_ENDPOINT_BEARER = 'right-secret';
+  process.env.OTHALA_ADMIN_ENDPOINT_BEARER = 'right-secret';
   const runtime = { async revokeSubject() { throw new Error('should not run'); }, isAdminSubject: () => false };
   const res = fakeRes();
   await handleAdminRequest(

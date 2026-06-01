@@ -89,7 +89,7 @@ portal/
 | Identity traits: `username, email, displayName?, recoveryEmail?` | `Identity.traits` type; surfaced in settings profile section |
 | `metadata_admin.groups[]` controls tile visibility | `index.astro` filters `TILES` by group membership |
 | AAL2 only for admin pages | `admin.ts:requireAdminSession`; not enforced on family pages |
-| WebFinger href byte-matches Hydra issuer | `webfinger.ts` hardcodes `https://auth.dunn.dev/`; matches `hydra/hydra.yml` `urls.self.issuer` |
+| WebFinger href byte-matches Hydra issuer | `webfinger.ts` hardcodes `https://dag.dunn.dev/`; matches `hydra/hydra.yml` `urls.self.issuer` |
 
 ## Dev workflow
 
@@ -99,7 +99,7 @@ KRATOS_PUBLIC_URL=http://localhost:4433 make dev      # astro dev on :4321
 make check                                            # astro check (type-check)
 make build                                            # astro build -> dist/server + dist/client
 make start                                            # node ./dist/server/entry.mjs (after build)
-make image                                            # podman build -t dunn.dev/auth-portal:lab
+make image                                            # podman build -t dunn.dev/othala-portal:lab
 ```
 
 `make image` runs `podman build` with the auth repo root as context (the manifest prebuild reads `../hydra/clients/*.yaml`), so cd to `portal/` is fine but the Containerfile expects the larger context.
@@ -133,7 +133,7 @@ Per adversarial review: AAL is enforced at this layer, NOT at Caddy. Caddy `forw
 
 The Node SSR pod reads:
 
-- `KRATOS_PUBLIC_URL` (default `https://auth.dunn.dev`)
+- `KRATOS_PUBLIC_URL` (default `https://dag.dunn.dev`)
 - `KRATOS_ADMIN_URL` (default `http://kratos:4434`; in-pod hostname)
 - `KRATOS_ADMIN_TOKEN` (optional; reserved for a future Oathkeeper interposer)
 - `HYDRA_ADMIN_URL` (default `http://hydra:4445`; in-pod hostname)
@@ -172,6 +172,6 @@ cp ../../design/tokens/index.css      src/styles/tokens/index.css
 | `/auth/settings` | `GET /self-service/settings/flows?id=`, `GET /self-service/logout/browser` | — | requires session |
 | `/auth/verification` | (stub) | — | follow-up |
 | `/auth/logout` | `GET /self-service/logout/browser` | — | redirects to logout_url |
-| `/auth/consent` | — | redirect to `auth.dunn.dev/consent` | consent service auto-accepts |
+| `/auth/consent` | — | redirect to `dag.dunn.dev/consent` | consent service auto-accepts |
 | `/admin/*` | `GET /sessions/whoami`, admin API via `requireAdminSession` (in-pod `kratos:4434`) | `GET /admin/clients` (read-only, in-pod `hydra:4445`) | |
 | `/.well-known/webfinger` | — | — | JRD JSON, byte-matches Hydra issuer for Tailscale |

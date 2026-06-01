@@ -1,7 +1,7 @@
 // Admin allowlist — the authoritative admin-access gate (DAG CU3 / B2).
 //
 // Admin authority is an explicit env allowlist, NOT group membership.
-// AUTH_ADMIN_SUBJECTS is a comma-separated list of identity emails
+// OTHALA_ADMIN_SUBJECTS is a comma-separated list of identity emails
 // (sops-backed in deployment). A subject is an admin iff its email,
 // case-folded and trimmed, appears in that list.
 //
@@ -14,14 +14,14 @@
 // identity) therefore can no longer drop admin authority — the allowlist
 // is the only source of truth, and it lives outside Kratos.
 //
-// Bootstrap: AUTH_ADMIN_SUBJECTS=andrew@dunn.dev
+// Bootstrap: OTHALA_ADMIN_SUBJECTS=andrew@dunn.dev
 //
 // Fail-closed: an unset / empty / whitespace-only list yields NO admins.
 // A missing email on the identity yields a non-admin.
 
-/** Parse AUTH_ADMIN_SUBJECTS into a normalized Set of admin emails. */
+/** Parse OTHALA_ADMIN_SUBJECTS into a normalized Set of admin emails. */
 export function adminSubjects(): Set<string> {
-  const raw = process.env.AUTH_ADMIN_SUBJECTS ?? '';
+  const raw = process.env.OTHALA_ADMIN_SUBJECTS ?? '';
   const out = new Set<string>();
   for (const part of raw.split(',')) {
     const email = part.trim().toLowerCase();
@@ -32,7 +32,7 @@ export function adminSubjects(): Set<string> {
 
 /**
  * Authoritative admin check. Returns true iff `email` (case-folded,
- * trimmed) is present in AUTH_ADMIN_SUBJECTS. Fail-closed on empty /
+ * trimmed) is present in OTHALA_ADMIN_SUBJECTS. Fail-closed on empty /
  * missing email.
  */
 export function isAdminSubject(email: string | null | undefined): boolean {

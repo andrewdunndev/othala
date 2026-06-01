@@ -81,7 +81,7 @@ runbook didn't account for it" bugs.
 4. Verify both services healthy:
 
    ```sh
-   curl -fsS https://auth.dunn.dev/health/ready
+   curl -fsS https://dag.dunn.dev/health/ready
    make auth-smoke HOST=carmine    # full validation suite
    ```
 

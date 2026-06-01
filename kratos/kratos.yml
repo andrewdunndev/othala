@@ -12,12 +12,12 @@ dsn: postgres://kratos:${KRATOS_PG_PASS}@${KRATOS_PG_HOST}:5432/kratos?sslmode=d
 
 serve:
   public:
-    base_url: https://auth.dunn.dev/
+    base_url: https://dag.dunn.dev/
     port: 4433
     cors:
       enabled: true
       allowed_origins:
-        - https://auth.dunn.dev
+        - https://dag.dunn.dev
       allowed_methods: [GET, POST, PUT, PATCH, DELETE]
       allowed_headers:
         - Authorization
@@ -35,12 +35,12 @@ serve:
 
 selfservice:
   # LOW-3: trailing slash is load-bearing. Kratos allowed_return_urls
-  # uses a prefix match; without the slash, "https://auth.dunn.dev"
-  # accepts "https://auth.dunn.dev.evil.example". Every entry MUST
+  # uses a prefix match; without the slash, "https://dag.dunn.dev"
+  # accepts "https://dag.dunn.dev.evil.example". Every entry MUST
   # end in `/` (or a deeper path). Same in lab/compose/kratos.lab.yml.
-  default_browser_return_url: https://auth.dunn.dev/
+  default_browser_return_url: https://dag.dunn.dev/
   allowed_return_urls:
-    - https://auth.dunn.dev/
+    - https://dag.dunn.dev/
 
   methods:
     password:
@@ -62,7 +62,7 @@ selfservice:
           id: dunn.dev
           display_name: Dunn Family
           origins:
-            - https://auth.dunn.dev
+            - https://dag.dunn.dev
 
     totp:
       enabled: true
@@ -87,10 +87,10 @@ selfservice:
 
   flows:
     error:
-      ui_url: https://auth.dunn.dev/auth/error
+      ui_url: https://dag.dunn.dev/auth/error
 
     settings:
-      ui_url: https://auth.dunn.dev/auth/settings
+      ui_url: https://dag.dunn.dev/auth/settings
       privileged_session_max_age: 15m
       # AAL not enforced here globally; admin UI does AAL2 step-up at SSR layer
       required_aal: aal1
@@ -105,7 +105,7 @@ selfservice:
     recovery:
       enabled: true
       use: code
-      ui_url: https://auth.dunn.dev/auth/recovery
+      ui_url: https://dag.dunn.dev/auth/recovery
       lifespan: 1h
       notify_unknown_recipients: false
       # H1 / D3: admin email-recovery is disabled at the application
@@ -144,17 +144,17 @@ selfservice:
     verification:
       enabled: true
       use: code
-      ui_url: https://auth.dunn.dev/auth/verification
+      ui_url: https://dag.dunn.dev/auth/verification
       lifespan: 1h
       after:
-        default_browser_return_url: https://auth.dunn.dev/
+        default_browser_return_url: https://dag.dunn.dev/
 
     logout:
       after:
-        default_browser_return_url: https://auth.dunn.dev/
+        default_browser_return_url: https://dag.dunn.dev/
 
     login:
-      ui_url: https://auth.dunn.dev/auth/login
+      ui_url: https://dag.dunn.dev/auth/login
       lifespan: 10m
       # CRITICAL: aal1 base; AAL2 step-up is requested per-flow via ?aal=aal2
       # by the admin SSR pages, not enforced globally here.
@@ -163,7 +163,7 @@ selfservice:
     registration:
       # Admin-driven onboarding (one-time enrollment URLs); no self-service signup
       enabled: false
-      ui_url: https://auth.dunn.dev/auth/registration
+      ui_url: https://dag.dunn.dev/auth/registration
       lifespan: 1h
       after:
         password:
@@ -173,7 +173,7 @@ selfservice:
 session:
   lifespan: 2160h    # 90 days for normal flows; admin UI enforces shorter via SSR
   cookie:
-    # Parent domain so auth.dunn.dev (the IdP) and every *.dunn.dev app
+    # Parent domain so dag.dunn.dev (the IdP) and every *.dunn.dev app
     # pod share the same session cookie. SameSite=Lax permits same-site
     # POSTs across subdomains; HIGH-1 CSRF mitigation is per-request
     # tokens in the portal (portal/src/lib/csrf.ts).

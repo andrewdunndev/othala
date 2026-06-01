@@ -37,7 +37,7 @@ if (!session?.active || !session.identity) {
   return Astro.redirect(`/auth/login?return_to=${encodeURIComponent(Astro.url.pathname)}`);
 }
 
-// B2: admin authority is the AUTH_ADMIN_SUBJECTS allowlist, NOT the
+// B2: admin authority is the OTHALA_ADMIN_SUBJECTS allowlist, NOT the
 // (display-only) `admin` group. Admins see every app's detail page; everyone
 // else needs the per-app access-<slug> group.
 const groups = session.identity.metadata_admin?.groups ?? [];

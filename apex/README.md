@@ -3,7 +3,7 @@
 Drop-in package for the Cloudflare Pages function that serves
 `dunn.dev/.well-known/webfinger`. Tailscale custom OIDC requires
 WebFinger at the email-domain root (per Tailscale KB-1240), NOT on
-the IdP subdomain. The auth project itself is on `auth.dunn.dev`;
+the IdP subdomain. The auth project itself is on `dag.dunn.dev`;
 WebFinger has to live at the apex.
 
 ## Files
@@ -32,7 +32,7 @@ apex/
    bash apex/scripts/verify-webfinger.sh dunn.dev
    ```
    Expect: status 200, Content-Type `application/jrd+json`,
-   issuer `href` byte-equals `https://auth.dunn.dev/`.
+   issuer `href` byte-equals `https://dag.dunn.dev/`.
 
 4. Cross-check via [WebFinger Lookup](https://webfinger.net/lookup)
    as an external second opinion.
@@ -56,6 +56,6 @@ re-deploying.
 
 - Tailscale KB-1240: https://tailscale.com/kb/1240/sso-custom-oidc
 - RFC 7033 (WebFinger): https://datatracker.ietf.org/doc/html/rfc7033
-- `dunn.dev/auth/docs/apex-webfinger-followup.md` — extended notes
-- `dunn.dev/auth/hydra/hydra.yml` — `urls.self.issuer` must
+- `dunn.dev/othala/docs/apex-webfinger-followup.md` — extended notes
+- `dunn.dev/othala/hydra/hydra.yml` — `urls.self.issuer` must
   byte-match this WebFinger response's `links[0].href`

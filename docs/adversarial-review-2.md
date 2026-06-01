@@ -54,7 +54,7 @@ which is also unreachable from Workers).
 carmine, serving the subset of admin operations the UI needs. Same
 shape as consent service.
 (b) Move the admin UI off Workers onto carmine (host it under
-`auth.dunn.dev/admin/*` instead of `home.dunn.dev/admin/*`) so it
+`dag.dunn.dev/admin/*` instead of `home.dunn.dev/admin/*`) so it
 shares the carmine pod network with Kratos.
 
 This is a locked-decision second-order effect: the locked decision
@@ -307,8 +307,8 @@ load-bearing on the Caddy layer's strip-and-replace behavior.
 **Location:** `portal/public/.well-known/webfinger:6`,
 `hydra/hydra.yml:24-26`
 
-Webfinger has `"href": "https://auth.dunn.dev"` (no trailing slash).
-Hydra's `urls.self.issuer` is `https://auth.dunn.dev/` (trailing
+Webfinger has `"href": "https://dag.dunn.dev"` (no trailing slash).
+Hydra's `urls.self.issuer` is `https://dag.dunn.dev/` (trailing
 slash). Per the prior review M11, "issuer string in `href` must
 byte-match Hydra's `/.well-known/openid-configuration` issuer
 including trailing-slash handling."
@@ -525,7 +525,7 @@ become attack surface even though they require challenge tokens.
 
 **Recommended fix:** add a comment in the README noting the public
 exposure shape: this service is only reachable via Caddy on
-`auth.dunn.dev/{login,consent,logout}`. Direct access to :4477 from
+`dag.dunn.dev/{login,consent,logout}`. Direct access to :4477 from
 the public internet must be prevented at the network layer.
 
 ### M8. Verification flow is a stub
@@ -697,7 +697,7 @@ recovery test.
 The locked decision "Astro adapter Cloudflare Workers" plus the
 locked decision "admin port stays internal" are jointly inconsistent
 (C1). Pick a path. Recommended: keep the home portal on Workers,
-host the admin UI on carmine under `auth.dunn.dev/admin/*`. This is
+host the admin UI on carmine under `dag.dunn.dev/admin/*`. This is
 NOT a revision of either locked decision; it's a clarification that
 "home portal" and "admin UI" are different deployment targets.
 

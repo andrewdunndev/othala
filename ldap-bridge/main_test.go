@@ -6,7 +6,7 @@ import (
 	"testing"
 	"time"
 
-	"dunn.dev/auth/ldap-bridge/kratos"
+	"dunn.dev/othala/ldap-bridge/kratos"
 )
 
 // TestFlushBindCacheHandler exercises MEDIUM-5: the bridge admin

@@ -13,12 +13,12 @@ This runbook covers OIDC-based integrations. For the forward-auth apps
 
 ## Overview
 
-- Issuer: `https://auth.dunn.dev/` (LB-2; non-changeable once any RP
+- Issuer: `https://dag.dunn.dev/` (LB-2; non-changeable once any RP
   is wired).
-- Discovery: `https://auth.dunn.dev/.well-known/openid-configuration`
+- Discovery: `https://dag.dunn.dev/.well-known/openid-configuration`
 - Authorization code flow for all interactive apps; `client_credentials`
   for `llm` (machine-to-machine only).
-- Client manifests live in `dunn.dev/auth/hydra/clients/<slug>.yaml`.
+- Client manifests live in `dunn.dev/othala/hydra/clients/<slug>.yaml`.
   Each file has two top-level keys: `oidc:` (forwarded to Hydra) and
   `consent:` (read by the consent service; never sent to Hydra).
 - `client_id` equals the slug (e.g., `keep`, `observe`).
@@ -70,7 +70,7 @@ Enter into the app's own config:
 
 | Field | Value |
 |---|---|
-| Issuer / OIDC discovery URL | `https://auth.dunn.dev/` |
+| Issuer / OIDC discovery URL | `https://dag.dunn.dev/` |
 | Client ID | `<slug>` (matches the manifest `client_id`) |
 | Client secret | same plaintext from step 1 |
 | Scopes | as listed in the manifest `scope:` field |
@@ -83,7 +83,7 @@ After editing the app config, restart the app service before testing.
 **5. Add the user to the access group (Ory side).**
 
 The consent service checks group membership before issuing any token.
-Add via the admin portal at `https://auth.dunn.dev/admin/users/<id>`.
+Add via the admin portal at `https://dag.dunn.dev/admin/users/<id>`.
 
 **6. Test login (LIVE only).**
 
@@ -121,9 +121,9 @@ name = Auth
 client_id = observe
 client_secret = <value from sops>
 scopes = openid email profile groups offline_access
-auth_url = https://auth.dunn.dev/oauth2/auth
-token_url = https://auth.dunn.dev/oauth2/token
-api_url = https://auth.dunn.dev/userinfo
+auth_url = https://dag.dunn.dev/oauth2/auth
+token_url = https://dag.dunn.dev/oauth2/token
+api_url = https://dag.dunn.dev/userinfo
 redirect_uri = https://observe.dunn.dev/login/generic_oauth
 use_pkce = false
 allow_sign_up = true
@@ -158,7 +158,7 @@ Minimum required env:
 SSO_ENABLED=true
 SSO_CLIENT_ID=keep
 SSO_CLIENT_SECRET=<value from sops>
-SSO_AUTHORITY=https://auth.dunn.dev/
+SSO_AUTHORITY=https://dag.dunn.dev/
 SSO_SCOPES=groups offline_access
 # Once PR #6158 lands upstream, also set:
 # SSO_ROLES_ENABLED=true
@@ -202,7 +202,7 @@ gitlab_rails['omniauth_providers'] = [
       name: 'openid_connect',
       scope: ['openid', 'email', 'profile', 'groups', 'offline_access'],
       response_type: 'code',
-      issuer: 'https://auth.dunn.dev/',
+      issuer: 'https://dag.dunn.dev/',
       discovery: true,
       client_auth_method: 'basic',
       client_options: {
@@ -251,7 +251,7 @@ Key settings (verify exact env names against [Immich OAuth docs](https://docs.im
 
 ```sh
 OAUTH_ENABLED=true
-OAUTH_ISSUER_URL=https://auth.dunn.dev/
+OAUTH_ISSUER_URL=https://dag.dunn.dev/
 OAUTH_CLIENT_ID=memory
 OAUTH_CLIENT_SECRET=<value from sops>
 OAUTH_SCOPE=openid email profile groups offline_access
@@ -284,8 +284,8 @@ oCIS env variables. The proxy reads OIDC claims when
 Key env vars (verify against [oCIS proxy docs](https://doc.owncloud.com/ocis/next/deployment/services/s-list/proxy.html)):
 
 ```sh
-PROXY_OIDC_ISSUER=https://auth.dunn.dev/
-OCIS_OIDC_ISSUER=https://auth.dunn.dev/
+PROXY_OIDC_ISSUER=https://dag.dunn.dev/
+OCIS_OIDC_ISSUER=https://dag.dunn.dev/
 PROXY_ROLE_ASSIGNMENT_DRIVER=oidc
 PROXY_ROLE_ASSIGNMENT_OIDC_CLAIM=roles
 PROXY_AUTOPROVISION_CLAIM_GROUPS=groups
@@ -315,7 +315,7 @@ RP-side config (env vars in the Mealie quadlet):
 
 ```sh
 OIDC_AUTH_ENABLED=true
-OIDC_CONFIGURATION_URL=https://auth.dunn.dev/.well-known/openid-configuration
+OIDC_CONFIGURATION_URL=https://dag.dunn.dev/.well-known/openid-configuration
 OIDC_CLIENT_ID=larder
 OIDC_CLIENT_SECRET=<value from sops>
 OIDC_AUTO_REDIRECT=false
@@ -350,7 +350,7 @@ WebFinger for `*@dunn.dev` is served from the dunn.dev apex
 See `docs/apex-webfinger-followup.md` for the discovery path.
 
 RP-side config: Tailscale admin console > Settings > OIDC. Enter:
-- Issuer URL: `https://auth.dunn.dev/`
+- Issuer URL: `https://dag.dunn.dev/`
 - Client ID: `tailscale`
 - Client secret: value from sops
 
@@ -381,7 +381,7 @@ at deploy.
 Key fields:
 
 ```
-Issuer URL:      https://auth.dunn.dev/
+Issuer URL:      https://dag.dunn.dev/
 Client ID:       listen
 Client secret:   <value from sops>
 Scopes:          openid email profile groups offline_access
@@ -409,7 +409,7 @@ RP-side config: verify against [BookLore OIDC docs](https://booklore.org/docs/to
 at deploy for current config keys. Expected fields:
 
 ```
-Issuer URL:    https://auth.dunn.dev/
+Issuer URL:    https://dag.dunn.dev/
 Client ID:     library
 Client secret: <value from sops>
 Scopes:        openid email profile groups offline_access
@@ -433,7 +433,7 @@ user list. Admin role must be granted inside BookLore manually.
 
 The llm client is for API consumers, not for interactive sign-in.
 Caddy in front of vLLM introspects the bearer token at
-`https://auth.dunn.dev/admin/oauth2/introspect`. A valid active token
+`https://dag.dunn.dev/admin/oauth2/introspect`. A valid active token
 admits the request; anything else is a 401.
 
 Obtain a token:
@@ -441,7 +441,7 @@ Obtain a token:
 ```sh
 curl -s -u 'llm:<client_secret>' \
   -d 'grant_type=client_credentials&scope=api' \
-  https://auth.dunn.dev/oauth2/token | jq .access_token
+  https://dag.dunn.dev/oauth2/token | jq .access_token
 ```
 
 Pass the token as `Authorization: Bearer <token>` to the vLLM API.

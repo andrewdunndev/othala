@@ -21,7 +21,7 @@ import (
 //
 // Posture (after MEDIUM-1 listener split):
 //   - /admin/* is bound to the ADMIN_LISTEN port (default :4478),
-//     network-isolated to the auth pod. Caddy on auth.dunn.dev does
+//     network-isolated to the auth pod. Caddy on dag.dunn.dev does
 //     NOT forward /admin/* publicly.
 //   - The bearer is in-process defense-in-depth even with the listener
 //     split: every caller in the pod must present a valid bearer.

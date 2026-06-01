@@ -1,4 +1,4 @@
-# dunn.dev/auth-util -- one-shot operator container.
+# dunn.dev/othala-util -- one-shot operator container.
 #
 # v0.1.4: this image carries the small toolchain (curl + jq + yq +
 # apply-clients.sh) needed to register OIDC client manifests with the
@@ -19,13 +19,13 @@
 #   bulk-imports, hydra debugging).
 #
 # Local build:
-#   podman build -t dunn.dev/auth-util:lab -f util/Containerfile .
+#   podman build -t dunn.dev/othala-util:lab -f util/Containerfile .
 # Local run (against the lab compose stack):
 #   podman run --rm --network=auth_default \
 #     -v $(pwd)/hydra/clients:/etc/util/manifests:ro \
 #     -e HYDRA_ADMIN_URL=http://auth-hydra:4445 \
 #     -e KEEP_CLIENT_SECRET=... \
-#     dunn.dev/auth-util:lab apply-clients
+#     dunn.dev/othala-util:lab apply-clients
 
 ARG CATALOG_VERSION=2.5.0
 

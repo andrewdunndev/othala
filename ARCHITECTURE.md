@@ -28,7 +28,27 @@ This hierarchy is what prevents doc drift from recurring.
 4. `docs/STATUS.md` — current release state + what's next.
 5. `DEPLOY.md` — bidirectional pointer to `dunn.dev/iac` where production lives.
 
-## The 12 load-bearing decisions
+## The converged application
+
+At HEAD the auth surface is ONE all-TypeScript application (`portal/`, an Astro Node SSR app). It fronts the upstream Ory substrate (Kratos + Hydra + Postgres) and a separate Go LDAP bridge. Read this before the load-bearing list — it is the shape every decision below sits inside.
+
+The app holds, all in one process:
+
+- **Kratos self-service browser flows** — login, registration, recovery, settings, verification. Every flow except login renders generically through ONE `ui.nodes` dispatcher (`portal/src/components/FlowNodes.astro`); login keeps a bespoke passkey-first / password-in-disclosure UX and is intentionally NOT a `FlowNodes` consumer.
+- **Hydra login / consent / logout CHALLENGE handlers** (`/oauth2/{login,consent,logout}`, `portal/src/lib/oauth2-handlers.ts`). Hydra ships no UI by design; this app IS Hydra's login + consent provider.
+- **The access gate** (`portal/src/lib/gate.ts`) — two fail-closed checks on BOTH the login and consent challenge: `access-<clientId>` group membership AND identity `state === 'active'`. A failed identity lookup is a closed gate.
+- **The id_token claims builder** (`portal/src/lib/claims.ts`).
+- **A dual-listener** (`portal/src/server/listen.mjs`) — a public Astro SSR listener and a SEPARATE loopback / pod-only admin listener. Admin endpoints live off the public mux by construction (see LB-13).
+- **The revoke fan-out** (`portal/src/lib/revoke.ts`, `revokeSubject`) — in-process, wired to admin force-logout, user sign-out-everywhere, and deactivate (see LB-14).
+- **OIDC client registration** (`portal/src/lib/manifests.ts` parser + `register-clients.ts` registrar + the full `validateClients` lint). DORMANT until the iac E1 cutover: registration today stays shell-driven via `util/apply-clients.sh`. `register-clients.ts` is NOT yet the live successor and does NOT supersede the shell.
+
+**The surface split.** Admin / programmatic calls go through the typed Ory SDK (`@ory/client-fetch`): `admin-api.ts` (IdentityApi), `oauth2-handlers.ts` and `revoke.ts` (OAuth2Api). The redirect-sensitive Kratos self-service flows use thin raw-`fetch` wrappers (`kratos.ts`) instead, because they must forward the incoming Cookie header verbatim and follow Kratos's flow redirects — behaviour the SDK abstracts away.
+
+**Legacy, pending removal.** The Go `consent/` service and `util/` apply runner still exist in-tree but are RETIRED at the iac E1 cutover (additive convergence). They are NOT the current architecture; their behaviour now lives in the TS app. Do not document them as the running shape.
+
+**Back-channel logout is Hydra-native.** Hydra signs back-channel logout tokens with its own key (native since 2019). The former custom private-key signer in the consent service was DELETED. The app holds NO signing key at rest.
+
+## The 14 load-bearing decisions
 
 ### LB-1: WebAuthn `rp.id = dunn.dev`
 
@@ -38,7 +58,7 @@ in `docs/decision.md` "WebAuthn rp.id" row.
 
 **If you change it**: every family member re-enrolls passkeys. Don't.
 
-### LB-2: Issuer URL `https://auth.dunn.dev/`
+### LB-2: Issuer URL `https://dag.dunn.dev/`
 
 `hydra/hydra.yml: urls.self.issuer`. Embedded in every id_token's
 `iss` claim. Once a consumer (Tailscale, Vaultwarden, etc.) is
@@ -64,7 +84,7 @@ Backup the sops file + age key separately and durably.
 
 `kratos/kratos.yml: session.cookie.domain`. Parent-domain cookie so
 the session is readable across every `*.dunn.dev` subdomain. Same-site
-implication: `auth.dunn.dev` and `<app>.dunn.dev` are same-site to
+implication: `dag.dunn.dev` and `<app>.dunn.dev` are same-site to
 the browser; CSRF posture must account for this (HIGH-1 in the security
 review documents the specific path; csrf.ts is the mitigation).
 
@@ -81,10 +101,11 @@ would need a separate hydra config and a per-client decision.
 ### LB-6: Pod is one trust domain, no mTLS
 
 See "Trust boundary" below + `docs/golden-path.md` "No mTLS in-cluster."
-In-pod HTTP is unauthenticated except where specific bearer tokens gate
-(`CONSENT_ADMIN_BEARER` for portal→consent admin, `X-Webhook-Auth` for
-kratos→consent recovery-gate). All other in-pod calls are
-trust-by-network-isolation.
+In-pod HTTP is unauthenticated except where specific bearer secrets gate
+the auth app's loopback admin listener (`OTHALA_ADMIN_ENDPOINT_BEARER` for
+`/admin/revoke-user`, `RECOVERY_GATE_SECRET` for the kratos→app
+recovery-gate webhook). Both are constant-time compared and fail-closed.
+All other in-pod calls are trust-by-network-isolation.
 
 **If you change it**: introduce mTLS or SPIFFE — every in-pod call
 gets a new failure mode.
@@ -176,7 +197,7 @@ Production topology after the locked Ory pivot. Custom Caddy image at
 `caddy-dns/cloudflare` plugin), DNS-only Cloudflare in front,
 port-forward 443 on home router. Kratos + Hydra + glauth-kratos +
 consent service + Astro portal all on carmine, in the same pod network.
-Single auth surface: `auth.dunn.dev` (Topology B — `home.dunn.dev` is
+Single auth surface: `dag.dunn.dev` (Topology B — `home.dunn.dev` is
 reserved, not served).
 
 ```
@@ -196,7 +217,7 @@ reserved, not served).
                              │    ├─ hydra-migrate (init container, schema migrations)
                              │    ├─ consent service (4477 internal)
                              │    ├─ portal (Astro Node SSR, 8080 internal)
-                             │    │    └─ auth.dunn.dev (path-shared with Kratos+Hydra+consent)
+                             │    │    └─ dag.dunn.dev (path-shared with Kratos+Hydra+consent)
                              │    │        ├─ /                       session-gated tile dashboard
                              │    │        ├─ /apps/<slug>            per-app education page
                              │    │        ├─ /auth/{login,recovery,settings,verification}
@@ -245,7 +266,7 @@ runtime complexity: one Node process, normal `process.env`, no Workers
 shims, no `wrangler` deploy step.
 
 (Note: an earlier shape of this repo served WebFinger from the portal
-at `auth.dunn.dev/.well-known/webfinger`. That handler was deleted in
+at `dag.dunn.dev/.well-known/webfinger`. That handler was deleted in
 v0.1.4 — Tailscale's KB-1240 requires WebFinger at the email-domain
 apex, not on the IdP subdomain. Production serves it from a Cloudflare
 Pages function on the dunn.dev apex repo. See
@@ -304,7 +325,7 @@ sequenceDiagram
 
 ### Tile dashboard render (admin AAL2 step-up)
 
-Admin pages live at `auth.dunn.dev/admin/*`. AAL is per-flow in Kratos,
+Admin pages live at `dag.dunn.dev/admin/*`. AAL is per-flow in Kratos,
 so the SSR layer is what enforces step-up. The tile dashboard itself
 (non-admin `/`) skips the AAL2 branch and renders from `metadata_admin.groups`.
 
@@ -346,14 +367,14 @@ a Cloudflare Pages function in the dunn.dev apex repo, not here.
 ```mermaid
 flowchart LR
   ts[Tailscale] -->|webfinger once at setup| cf[CF Pages function<br/>on dunn.dev apex]
-  cf -->|jrd+json<br/>issuer href = https://auth.dunn.dev/| ts
-  ts -->|OIDC discovery| h[Hydra at auth.dunn.dev]
+  cf -->|jrd+json<br/>issuer href = https://dag.dunn.dev/| ts
+  ts -->|OIDC discovery| h[Hydra at dag.dunn.dev]
   h -->|tokens, public sub| ts
 ```
 
 The Cloudflare Pages function returns `Content-Type: application/jrd+json`,
 `Access-Control-Allow-Origin: *`, issuer `href` byte-matching Hydra's
-`urls.self.issuer` in `hydra/hydra.yml` (currently `https://auth.dunn.dev/`
+`urls.self.issuer` in `hydra/hydra.yml` (currently `https://dag.dunn.dev/`
 with trailing slash; Tailscale rejects any mismatch).
 
 The WebFinger endpoint is consulted exactly once during tailnet setup;
@@ -369,7 +390,7 @@ at deploy time per app via the Caddyfile snippet it imports. See
 
 | Pattern | Apps | One-line summary |
 |---|---|---|
-| **OIDC native** | keep, larder, listen, memory, vault, library, forge, observe | App redirects to `auth.dunn.dev/oauth2/auth`, exchanges code for tokens at `/oauth2/token`; Caddy is just TLS + reverse proxy. |
+| **OIDC native** | keep, larder, listen, memory, vault, library, forge, observe | App redirects to `dag.dunn.dev/oauth2/auth`, exchanges code for tokens at `/oauth2/token`; Caddy is just TLS + reverse proxy. |
 | **LDAP outpost** | cinema (Jellyfin) | glauth-kratos bridge co-located in the Jellyfin pod presents Kratos identities over LDAPS:636; Jellyfin binds against `localhost:636`. LDAP traffic never hits Caddy. |
 | **Forward auth** | tune (Navidrome), gather/* (Sonarr, Radarr, etc.) | Caddy `forward_auth` against Kratos `/sessions/whoami`. Subsonic API + shares bypass auth (native clients use HTTP Basic). |
 | **Client-credentials** | llm (vLLM) | Caddy validates `Authorization: Bearer` via Hydra's `/admin/oauth2/introspect`; in-pod sidecar pattern. |
@@ -473,16 +494,16 @@ operator-resolved within minutes, not autoscaled away.
 
 A compromised app on `<app>.dunn.dev` can read its own cookies but
 NOT the Kratos session cookie (HttpOnly). The browser treats
-`auth.dunn.dev` and `<app>.dunn.dev` as same-site (registrable parent
+`dag.dunn.dev` and `<app>.dunn.dev` as same-site (registrable parent
 `dunn.dev`), so:
 
 - Service-worker fetch-with-credentials: blocked at the IDP CORS
-  layer. Kratos `allowed_origins` lists only `https://auth.dunn.dev`;
+  layer. Kratos `allowed_origins` lists only `https://dag.dunn.dev`;
   Hydra likewise. A service worker on `<app>.dunn.dev` calling
-  `auth.dunn.dev` carrying the session cookie is rejected at CORS.
+  `dag.dunn.dev` carrying the session cookie is rejected at CORS.
 - Form-driven CSRF (HIGH-1): SameSite=Lax permits same-site POSTs, so
   a top-level form on `<app>.dunn.dev` posting to
-  `auth.dunn.dev/admin/users/<id>` would carry the session cookie.
+  `dag.dunn.dev/admin/users/<id>` would carry the session cookie.
   This is the path HIGH-1 closed by adding per-request CSRF tokens to
   every admin form POST.
 
@@ -525,10 +546,10 @@ things."
 | `docker.io/oryd/hydra` | see `dunn.dev/iac` quadlets (authoritative) | yes |
 | `docker.io/library/postgres` | see `dunn.dev/iac` quadlets (authoritative) | yes |
 | `registry.gitlab.com/dunn.dev/caddy-estate` | see `dunn.dev/iac` quadlets (authoritative) | yes |
-| `registry.gitlab.com/dunn.dev/auth/consent` | see `dunn.dev/iac` quadlets (authoritative) | self-managed |
-| `registry.gitlab.com/dunn.dev/auth/portal` | see `dunn.dev/iac` quadlets (authoritative) | self-managed |
-| `registry.gitlab.com/dunn.dev/auth/ldap-bridge` | see `dunn.dev/iac` quadlets (authoritative) | self-managed |
-| `registry.gitlab.com/dunn.dev/auth/util` | see `dunn.dev/iac` quadlets (authoritative) | self-managed |
+| `registry.gitlab.com/dunn.dev/othala/consent` | see `dunn.dev/iac` quadlets (authoritative) | self-managed |
+| `registry.gitlab.com/dunn.dev/othala/portal` | see `dunn.dev/iac` quadlets (authoritative) | self-managed |
+| `registry.gitlab.com/dunn.dev/othala/ldap-bridge` | see `dunn.dev/iac` quadlets (authoritative) | self-managed |
+| `registry.gitlab.com/dunn.dev/othala/util` | see `dunn.dev/iac` quadlets (authoritative) | self-managed |
 
 Current pinned versions live in `dunn.dev/iac/services/auth/.config/containers/systemd/auth-*.container` (`Image=` lines). `docs/STATUS.md` states the deployed version. Do not restate version numbers here.
 

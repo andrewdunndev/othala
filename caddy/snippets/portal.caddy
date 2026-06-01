@@ -1,17 +1,17 @@
 # Reusable Caddy snippet — Astro Node SSR portal mux for carmine.
 #
-# Topology B (v0.1.4): the portal serves auth.dunn.dev exclusively.
-# The Hydra consent service shares auth.dunn.dev for OAuth2/OIDC
+# Topology B (v0.1.4): the portal serves dag.dunn.dev exclusively.
+# The Hydra consent service shares dag.dunn.dev for OAuth2/OIDC
 # handlers (/login with login_challenge, /consent, /logout). Path
 # discipline is essential because both upstreams reply on the same
 # host.
 #
 # home.dunn.dev was the Topology A user-facing host; dropped in v0.1.4.
-# The tile dashboard now lives at auth.dunn.dev/ (session-gated).
+# The tile dashboard now lives at dag.dunn.dev/ (session-gated).
 #
 # Single Caddyfile block expected at the carmine top-level:
 #
-#   auth.dunn.dev {
+#   dag.dunn.dev {
 #     import portal-tls
 #     import auth-mux
 #   }
@@ -69,7 +69,7 @@
 		reverse_proxy portal:8080
 	}
 
-	# Everything else on auth.dunn.dev goes to Kratos public
+	# Everything else on dag.dunn.dev goes to Kratos public
 	# (self-service flow API, sessions/whoami, etc.).
 	reverse_proxy kratos:4433
 }

@@ -1,11 +1,11 @@
 .PHONY: help install dev build check test image start clean
 
 REPO_ROOT := $(shell git rev-parse --show-toplevel 2>/dev/null || echo $(CURDIR)/..)
-IMAGE     := dunn.dev/auth-portal
+IMAGE     := dunn.dev/othala-portal
 TAG       := lab
 
 help:
-	@echo "dunn.dev/auth-portal — Astro Node SSR portal"
+	@echo "dunn.dev/othala-portal — Astro Node SSR portal"
 	@echo ""
 	@echo "Targets:"
 	@echo "  install    npm install (lockfile-respecting via npm ci)"

@@ -1,6 +1,6 @@
 # Contribution strategy
 
-The dunn.dev/auth project as both consumer and contributor. We use Ory Kratos + Hydra without modification (no fork, no patch series). The novel piece — `glauth-kratos`, our LDAP bridge — has standalone upstream value beyond our deployment.
+The dunn.dev/othala project as both consumer and contributor. We use Ory Kratos + Hydra without modification (no fork, no patch series). The novel piece — `glauth-kratos`, our LDAP bridge — has standalone upstream value beyond our deployment.
 
 ## Posture: consumer of Ory; contributor to glauth (potentially)
 
@@ -56,7 +56,7 @@ estate use today.
 
 - **Patches to evaluated-but-rejected stacks (kanidm, Authelia, Hanko, voidauth, Pocket-ID, Zitadel).** Out of scope; kanidm specifically has explicit AI/LLM bans.
 - **A fork of Ory.** If Ory itself fails us, we revisit substrate, not patch-and-maintain.
-- **A standalone "Ory homelab kit" project.** The `dunn.dev/auth` repo IS the kit, but extracted only as components (the bridge first; the Astro UI is more opinionated and possibly less generally useful). We don't pre-publish the entire kit because:
+- **A standalone "Ory homelab kit" project.** The `dunn.dev/othala` repo IS the kit, but extracted only as components (the bridge first; the Astro UI is more opinionated and possibly less generally useful). We don't pre-publish the entire kit because:
   - Maintenance treadmill killed every prior Ory homelab kit (see `lab/docs/ory-homelab-research.md`)
   - We dogfood on carmine; that's the structural difference vs prior solo maintainers
   - If the bridge proves valuable as a standalone, that's where the leverage is — focus there

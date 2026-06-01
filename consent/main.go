@@ -8,7 +8,7 @@
 //	Astro portal can't call Hydra admin directly without exposing the
 //	port — explicitly out-of-policy. This service runs alongside Hydra,
 //	takes the consent_challenge, login_challenge, and logout_challenge
-//	redirects from Hydra (via auth.dunn.dev), validates the user's
+//	redirects from Hydra (via dag.dunn.dev), validates the user's
 //	Kratos session, calls Hydra admin internally to accept/reject,
 //	and redirects back to Hydra to complete the OAuth2 flow.
 //
@@ -81,9 +81,9 @@ func main() {
 	// MEDIUM-1: listener split.
 	//
 	// Public mux on PUBLIC_LISTEN (default :4477). Caddy proxies these:
-	//   auth.dunn.dev/login
-	//   auth.dunn.dev/consent
-	//   auth.dunn.dev/logout
+	//   dag.dunn.dev/login
+	//   dag.dunn.dev/consent
+	//   dag.dunn.dev/logout
 	//   /healthz (pod readiness probe)
 	//
 	// Admin mux on ADMIN_LISTEN (default :4478). Pod-internal only. Caddy
@@ -187,7 +187,7 @@ func loadConfig(manifestDirFlag string) Config {
 	hydraAdmin := getenv("HYDRA_ADMIN_URL", "http://hydra:4445")
 	kratosPublic := getenv("KRATOS_PUBLIC_URL", "http://kratos:4433")
 	kratosAdmin := getenv("KRATOS_ADMIN_URL", "http://kratos:4434")
-	loginURL := getenv("LOGIN_URL", "https://auth.dunn.dev/auth/login")
+	loginURL := getenv("LOGIN_URL", "https://dag.dunn.dev/auth/login")
 	adminBearer := os.Getenv(adminBearerEnv)
 	manifestDir := manifestDirFlag
 	if manifestDir == "" {

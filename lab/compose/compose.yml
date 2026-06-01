@@ -199,9 +199,9 @@ services:
       - "80"
 
   # Astro Node SSR portal. Same image carmine runs in production. Build
-  # locally with `cd portal && podman build -t dunn.dev/auth-portal:lab .`
+  # locally with `cd portal && podman build -t dunn.dev/othala-portal:lab .`
   portal:
-    image: dunn.dev/auth-portal:lab
+    image: dunn.dev/othala-portal:lab
     container_name: auth-portal
     restart: unless-stopped
     depends_on:

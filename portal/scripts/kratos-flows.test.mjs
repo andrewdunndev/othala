@@ -10,7 +10,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { browserFlows } from '../src/lib/kratos.ts';
 
-const BASE = process.env.KRATOS_PUBLIC_URL ?? 'https://auth.dunn.dev';
+const BASE = process.env.KRATOS_PUBLIC_URL ?? 'https://dag.dunn.dev';
 
 test('login: no opts', () => {
   assert.equal(browserFlows.login(), `${BASE}/self-service/login/browser`);
@@ -34,10 +34,10 @@ test('login: aal2 + refresh + returnTo with reserved chars', () => {
   const url = browserFlows.login({
     aal: 'aal2',
     refresh: true,
-    returnTo: 'https://auth.dunn.dev/admin/users/abc-123?tab=overview',
+    returnTo: 'https://dag.dunn.dev/admin/users/abc-123?tab=overview',
   });
   // URLSearchParams encodes : / ? = & properly
-  assert.ok(url.includes('return_to=https%3A%2F%2Fauth.dunn.dev%2Fadmin%2Fusers%2Fabc-123%3Ftab%3Doverview'));
+  assert.ok(url.includes('return_to=https%3A%2F%2Fdag.dunn.dev%2Fadmin%2Fusers%2Fabc-123%3Ftab%3Doverview'));
 });
 
 test('login: bare returnTo (no aal)', () => {

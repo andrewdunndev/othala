@@ -20,7 +20,7 @@ LAB_DOMAIN="${LAB_DOMAIN:-test.dunn.dev}"
 # AUTH_REGISTRY + AUTH_VERSION resolve which auth-* images to pull.
 # In CI: AUTH_REGISTRY=$CI_REGISTRY_IMAGE, AUTH_VERSION=$CI_COMMIT_SHA
 # (or :latest for local operator runs).
-AUTH_REGISTRY="${AUTH_REGISTRY:-registry.gitlab.com/dunn.dev/auth}"
+AUTH_REGISTRY="${AUTH_REGISTRY:-registry.gitlab.com/dunn.dev/othala}"
 AUTH_VERSION="${AUTH_VERSION:-latest}"
 
 # Production (golden-path LB#10) collapses each rotation slot pair to

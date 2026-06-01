@@ -8,7 +8,7 @@ load-bearing until then.
 Tailscale custom OIDC requires WebFinger at the email-domain root —
 `https://${email-domain}/.well-known/webfinger`. For dunn.dev family
 emails this resolves to `https://dunn.dev/.well-known/webfinger`. NOT
-on the IdP subdomain (auth.dunn.dev) and NOT on any other subdomain.
+on the IdP subdomain (dag.dunn.dev) and NOT on any other subdomain.
 
 Per Tailscale KB-1240, this endpoint is consulted **exactly once**
 during initial tailnet setup (admin-domain proof). After that the
@@ -25,7 +25,7 @@ Add to the dunn.dev apex repo at `functions/.well-known/webfinger.ts`:
 // Tailscale's control plane and this endpoint is never re-read.
 //
 // Issuer must byte-match Hydra's urls.self.issuer in
-// dunn.dev/auth/hydra/hydra.yml (currently `https://auth.dunn.dev/`).
+// dunn.dev/othala/hydra/hydra.yml (currently `https://dag.dunn.dev/`).
 // Any byte difference (trailing slash, case) breaks Tailscale.
 
 export const onRequest: PagesFunction = () =>
@@ -34,7 +34,7 @@ export const onRequest: PagesFunction = () =>
     links: [
       {
         rel: "http://openid.net/specs/connect/1.0/issuer",
-        href: "https://auth.dunn.dev/",
+        href: "https://dag.dunn.dev/",
       },
     ],
   }), {
@@ -59,7 +59,7 @@ Expect:
 - `Content-Type: application/jrd+json`
 - `Access-Control-Allow-Origin: *`
 - Body has `links[0].rel == "http://openid.net/specs/connect/1.0/issuer"`
-- Body has `links[0].href == "https://auth.dunn.dev/"` byte-exact
+- Body has `links[0].href == "https://dag.dunn.dev/"` byte-exact
 
 Then run the same check through `https://webfinger.net/lookup` as an
 external second opinion.
@@ -73,7 +73,7 @@ pointing the family tailnet at it. Cost of getting this wrong once:
 contact-support cycle to migrate; the family is offline from Tailscale
 until that resolves.
 
-## Why not on auth.dunn.dev or home.dunn.dev
+## Why not on dag.dunn.dev or home.dunn.dev
 
 The previous shape of this repo had an Astro handler at
 `portal/src/pages/.well-known/webfinger.ts`. That handler was correct

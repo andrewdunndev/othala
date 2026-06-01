@@ -22,7 +22,7 @@
 #
 # Required env (set by .gitlab-ci.yml lab-validate job):
 #   CI_REGISTRY_USER, CI_REGISTRY_PASSWORD — for podman login
-#   AUTH_REGISTRY — defaults to registry.gitlab.com/dunn.dev/auth
+#   AUTH_REGISTRY — defaults to registry.gitlab.com/dunn.dev/othala
 #   AUTH_VERSION  — defaults to latest; CI should pass $CI_COMMIT_SHA
 #
 # Local operator invocation:
@@ -36,7 +36,7 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 cd "$SCRIPT_DIR"
 
 LAB_DOMAIN="${LAB_DOMAIN:-test.dunn.dev}"
-AUTH_REGISTRY="${AUTH_REGISTRY:-registry.gitlab.com/dunn.dev/auth}"
+AUTH_REGISTRY="${AUTH_REGISTRY:-registry.gitlab.com/dunn.dev/othala}"
 AUTH_VERSION="${AUTH_VERSION:-latest}"
 
 echo "=== lab validate: AUTH_REGISTRY=$AUTH_REGISTRY AUTH_VERSION=$AUTH_VERSION LAB_DOMAIN=$LAB_DOMAIN ==="

@@ -37,14 +37,14 @@ func TestBuildReturnTo_IgnoresForwardedHeaders(t *testing.T) {
 // TLS upstream so the in-pod request is plaintext but the public URL is
 // https.
 func TestBuildReturnTo_PublicBaseURL_OverridesHost(t *testing.T) {
-	t.Setenv("CONSENT_PUBLIC_URL", "https://auth.dunn.dev")
+	t.Setenv("CONSENT_PUBLIC_URL", "https://dag.dunn.dev")
 
 	r := httptest.NewRequest(http.MethodGet, "/login?login_challenge=xyz", nil)
 	r.Host = "internal:4477"
 	r.Header.Set("X-Forwarded-Host", "evil.example")
 
 	got := buildReturnTo(r)
-	want := "https://auth.dunn.dev/login?login_challenge=xyz"
+	want := "https://dag.dunn.dev/login?login_challenge=xyz"
 	if got != want {
 		t.Fatalf("buildReturnTo with public URL: want %q got %q", want, got)
 	}
@@ -53,13 +53,13 @@ func TestBuildReturnTo_PublicBaseURL_OverridesHost(t *testing.T) {
 // TestBuildReturnTo_PublicBaseURL_StripsTrailingSlash: tolerate operator
 // configs that include or omit the trailing slash on CONSENT_PUBLIC_URL.
 func TestBuildReturnTo_PublicBaseURL_StripsTrailingSlash(t *testing.T) {
-	t.Setenv("CONSENT_PUBLIC_URL", "https://auth.dunn.dev/")
+	t.Setenv("CONSENT_PUBLIC_URL", "https://dag.dunn.dev/")
 
 	r := httptest.NewRequest(http.MethodGet, "/consent?consent_challenge=cc", nil)
 	r.Host = "internal:4477"
 
 	got := buildReturnTo(r)
-	want := "https://auth.dunn.dev/consent?consent_challenge=cc"
+	want := "https://dag.dunn.dev/consent?consent_challenge=cc"
 	if got != want {
 		t.Fatalf("trailing-slash strip: want %q got %q", want, got)
 	}
@@ -72,26 +72,26 @@ func TestBuildReturnTo_TLSImpliesHTTPS(t *testing.T) {
 	t.Setenv("CONSENT_PUBLIC_URL", "")
 
 	r := httptest.NewRequest(http.MethodGet, "/consent?consent_challenge=cc", nil)
-	r.Host = "auth.dunn.dev"
+	r.Host = "dag.dunn.dev"
 	r.Header.Set("X-Forwarded-Proto", "javascript")
 	tls := tlsConnectionStateMarker
 	r.TLS = &tls
 
 	got := buildReturnTo(r)
-	want := "https://auth.dunn.dev/consent?consent_challenge=cc"
+	want := "https://dag.dunn.dev/consent?consent_challenge=cc"
 	if got != want {
 		t.Fatalf("TLS->https: want %q got %q", want, got)
 	}
 }
 
 func TestBuildReturnTo_PreservesQueryString(t *testing.T) {
-	t.Setenv("CONSENT_PUBLIC_URL", "https://auth.dunn.dev")
+	t.Setenv("CONSENT_PUBLIC_URL", "https://dag.dunn.dev")
 
 	r := httptest.NewRequest(http.MethodGet, "/consent?consent_challenge=cc&extra=1", nil)
-	r.Host = "auth.dunn.dev"
+	r.Host = "dag.dunn.dev"
 
 	got := buildReturnTo(r)
-	want := "https://auth.dunn.dev/consent?consent_challenge=cc&extra=1"
+	want := "https://dag.dunn.dev/consent?consent_challenge=cc&extra=1"
 	if got != want {
 		t.Fatalf("buildReturnTo: want %q got %q", want, got)
 	}

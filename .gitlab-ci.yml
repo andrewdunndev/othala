@@ -1,4 +1,4 @@
-# dunn.dev/auth -- container build + release pipeline.
+# dunn.dev/othala -- container build + release pipeline.
 #
 # Four custom images (consent, ldap-bridge, portal, util) build via
 # the dunn.dev/pipeline container-image template; caddy lives in the

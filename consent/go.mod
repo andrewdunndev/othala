@@ -1,4 +1,4 @@
-module dunn.dev/auth/consent
+module dunn.dev/othala/consent
 
 go 1.22
 

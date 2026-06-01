@@ -30,7 +30,7 @@ import (
 	"os"
 	"strings"
 
-	"dunn.dev/auth/ldap-bridge/kratos"
+	"dunn.dev/othala/ldap-bridge/kratos"
 
 	"github.com/glauth/ldap"
 )

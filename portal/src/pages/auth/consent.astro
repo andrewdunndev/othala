@@ -23,7 +23,7 @@ if (challenge) {
   // for skip_consent clients and redirects back to Hydra to continue
   // the OAuth2 flow.
   return Astro.redirect(
-    `https://auth.dunn.dev/consent?consent_challenge=${encodeURIComponent(challenge)}`
+    `https://dag.dunn.dev/consent?consent_challenge=${encodeURIComponent(challenge)}`
   );
 }
 ---

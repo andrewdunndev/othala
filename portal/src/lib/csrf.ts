@@ -3,10 +3,10 @@
 // Why (HIGH-1):
 //
 //   The Kratos session cookie is SameSite=Lax with the parent domain
-//   `.dunn.dev`. Browsers consider `auth.dunn.dev` and `<app>.dunn.dev`
+//   `.dunn.dev`. Browsers consider `dag.dunn.dev` and `<app>.dunn.dev`
 //   same-site (registrable parent), so a compromised app on
 //   `<app>.dunn.dev` can host a top-level form that POSTs to
-//   `https://auth.dunn.dev/admin/users/<id>` and the browser includes
+//   `https://dag.dunn.dev/admin/users/<id>` and the browser includes
 //   the session cookie. The admin UI's `requireAdminSession` already
 //   passed AAL2 for the active admin, so the malicious form rides that.
 //

@@ -29,7 +29,7 @@ What follows is the original design rationale — preserved verbatim.
 Static `lab/compose/` worked for Phase 3 substrate validation but:
 
 1. It runs Topology A (auth-lab / home-lab / keep-lab subdomains).
-   Production is Topology B (auth.dunn.dev only). Lab-to-prod drift
+   Production is Topology B (dag.dunn.dev only). Lab-to-prod drift
    is real and lab evidence stops mapping cleanly to production shape.
 2. It's not exercisable from CI — every validation is an operator
    running `podman compose up` on a workstation. Renovate MRs don't
@@ -208,7 +208,7 @@ contention argues for one-at-a-time).
 - **Topology change re-validation**. If we ever add a new auth flow
   (e.g., add device_code grant), the smoke matrix gains an assertion
   and the matrix re-runs on every change touching kratos/hydra.
-- **Confidence between dunn.dev/auth and dunn.dev/iac**. iac quadlet
+- **Confidence between dunn.dev/othala and dunn.dev/iac**. iac quadlet
   edits get tested against the application code in the same flow.
 
 ## What this doesn't replace

@@ -12,7 +12,7 @@ import (
 	"os"
 	"time"
 
-	"dunn.dev/auth/ldap-bridge/kratos"
+	"dunn.dev/othala/ldap-bridge/kratos"
 
 	"github.com/BurntSushi/toml"
 )

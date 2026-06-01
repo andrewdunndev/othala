@@ -133,7 +133,7 @@ consent:
 		HydraAdminURL:   hydraURL,
 		KratosPublicURL: kratosURL,
 		KratosAdminURL:  kratosURL,
-		LoginURL:        "https://auth.dunn.dev/auth/login",
+		LoginURL:        "https://dag.dunn.dev/auth/login",
 		Hydra:           NewHydraAdminClient(hydraURL),
 		Kratos:          NewKratosClient(kratosURL, kratosURL),
 		Manifest:        mset,
@@ -163,7 +163,7 @@ func TestHandleLogin_SkipPath_Accepts(t *testing.T) {
 
 	cfg := newTestConfig(t, hSrv.URL, kSrv.URL)
 	r := httptest.NewRequest(http.MethodGet, "/login?login_challenge=abc", nil)
-	r.Host = "auth.dunn.dev"
+	r.Host = "dag.dunn.dev"
 	w := httptest.NewRecorder()
 	handleLogin(cfg)(w, r)
 
@@ -233,8 +233,8 @@ func TestHandleLogin_NoSession_RedirectsToLoginUI(t *testing.T) {
 
 	cfg := newTestConfig(t, hSrv.URL, kSrv.URL)
 	r := httptest.NewRequest(http.MethodGet, "/login?login_challenge=abc", nil)
-	r.Host = "auth.dunn.dev"
-	r.Header.Set("X-Forwarded-Host", "auth.dunn.dev")
+	r.Host = "dag.dunn.dev"
+	r.Header.Set("X-Forwarded-Host", "dag.dunn.dev")
 	r.Header.Set("X-Forwarded-Proto", "https")
 	w := httptest.NewRecorder()
 	handleLogin(cfg)(w, r)

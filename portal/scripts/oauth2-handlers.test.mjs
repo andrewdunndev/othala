@@ -34,11 +34,11 @@ function stubOAuth2(over = {}) {
       ?? (async () => ({ challenge: 'cc', subject: 'id-1', client: { client_id: 'grafana' }, requested_scope: ['email', 'profile'], requested_access_token_audience: [] })),
     getOAuth2LogoutRequest: over.getOAuth2LogoutRequest
       ?? (async () => ({ challenge: 'gc', subject: 'id-1', client: { client_id: 'grafana' } })),
-    acceptOAuth2LoginRequest: async (p) => { calls.acceptLogin++; calls.acceptLoginBody = p.acceptOAuth2LoginRequest; return { redirect_to: 'https://auth.dunn.dev/after-login' }; },
-    rejectOAuth2LoginRequest: async (p) => { calls.rejectLogin++; calls.rejectLoginReason = p.rejectOAuth2Request?.error_description; return { redirect_to: 'https://auth.dunn.dev/login-rejected' }; },
-    acceptOAuth2ConsentRequest: async (p) => { calls.acceptConsent++; calls.acceptConsentBody = p.acceptOAuth2ConsentRequest; return { redirect_to: 'https://auth.dunn.dev/after-consent' }; },
-    rejectOAuth2ConsentRequest: async (p) => { calls.rejectConsent++; calls.rejectConsentReason = p.rejectOAuth2Request?.error_description; return { redirect_to: 'https://auth.dunn.dev/consent-rejected' }; },
-    acceptOAuth2LogoutRequest: async () => { calls.acceptLogout++; return { redirect_to: 'https://auth.dunn.dev/after-logout' }; },
+    acceptOAuth2LoginRequest: async (p) => { calls.acceptLogin++; calls.acceptLoginBody = p.acceptOAuth2LoginRequest; return { redirect_to: 'https://dag.dunn.dev/after-login' }; },
+    rejectOAuth2LoginRequest: async (p) => { calls.rejectLogin++; calls.rejectLoginReason = p.rejectOAuth2Request?.error_description; return { redirect_to: 'https://dag.dunn.dev/login-rejected' }; },
+    acceptOAuth2ConsentRequest: async (p) => { calls.acceptConsent++; calls.acceptConsentBody = p.acceptOAuth2ConsentRequest; return { redirect_to: 'https://dag.dunn.dev/after-consent' }; },
+    rejectOAuth2ConsentRequest: async (p) => { calls.rejectConsent++; calls.rejectConsentReason = p.rejectOAuth2Request?.error_description; return { redirect_to: 'https://dag.dunn.dev/consent-rejected' }; },
+    acceptOAuth2LogoutRequest: async () => { calls.acceptLogout++; return { redirect_to: 'https://dag.dunn.dev/after-logout' }; },
   };
   return { api, calls };
 }
@@ -60,7 +60,7 @@ test('login accepts an active member (skip path)', async () => {
     getIdentity: async () => activeMember(),
   });
   assert.equal(res.status, 302);
-  assert.equal(res.headers.get('location'), 'https://auth.dunn.dev/after-login');
+  assert.equal(res.headers.get('location'), 'https://dag.dunn.dev/after-login');
   assert.equal(calls.acceptLogin, 1);
   assert.equal(calls.rejectLogin, 0);
 });
@@ -72,7 +72,7 @@ test('login REJECTS when missing the access group', async () => {
     getIdentity: async () => activeMember({ metadata_admin: { groups: [] } }),
   });
   assert.equal(res.status, 302);
-  assert.equal(res.headers.get('location'), 'https://auth.dunn.dev/login-rejected');
+  assert.equal(res.headers.get('location'), 'https://dag.dunn.dev/login-rejected');
   assert.equal(calls.acceptLogin, 0);
   assert.match(calls.rejectLoginReason, /access-grafana group/);
 });
@@ -108,7 +108,7 @@ test('login bounces to RELATIVE return_to when not authenticated (skip=false, no
   assert.equal(res.status, 302);
   const loc = res.headers.get('location');
   // The return_to query param must be a relative path.
-  const u = new URL(loc, 'https://auth.dunn.dev');
+  const u = new URL(loc, 'https://dag.dunn.dev');
   assert.equal(u.pathname, '/auth/login');
   assert.equal(u.searchParams.get('return_to'), '/oauth2/login?login_challenge=lc');
 });
@@ -127,7 +127,7 @@ test('consent accepts an active member and grants scope + injects id_token', asy
     getIdentity: async () => activeMember(),
   });
   assert.equal(res.status, 302);
-  assert.equal(res.headers.get('location'), 'https://auth.dunn.dev/after-consent');
+  assert.equal(res.headers.get('location'), 'https://dag.dunn.dev/after-consent');
   assert.deepEqual(calls.acceptConsentBody.grant_scope, ['email', 'profile']);
   assert.equal(calls.acceptConsentBody.session.id_token.email, 'a@dunn.dev');
   assert.deepEqual(calls.acceptConsentBody.session.id_token.groups, ['access-grafana']);
@@ -175,7 +175,7 @@ test('logout accepts and redirects', async () => {
   const { api, calls } = stubOAuth2();
   const res = await handleLogout(new Request('https://x/oauth2/logout?logout_challenge=gc'), { oauth2: api });
   assert.equal(res.status, 302);
-  assert.equal(res.headers.get('location'), 'https://auth.dunn.dev/after-logout');
+  assert.equal(res.headers.get('location'), 'https://dag.dunn.dev/after-logout');
   assert.equal(calls.acceptLogout, 1);
 });
 
