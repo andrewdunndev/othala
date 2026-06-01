@@ -24,7 +24,7 @@ This runbook covers OIDC-based integrations. For the forward-auth apps
 - `client_id` equals the slug (e.g., `keep`, `observe`).
 - Client secrets are sops-encrypted in `dunn.dev/iac/pyinfra/secrets.enc.yaml`
   under `carmine.<slug>_oidc_client_secret`. The same plaintext value
-  must land in both Hydra (via `make auth-apply-clients`) and the RP
+  must land in both Hydra (via `make dag-apply-clients`) and the RP
   app's own config. They are not linked automatically.
 - Access groups: every interactive OIDC app has a corresponding Ory
   group named `access-<slug>`. The consent service denies tokens for
@@ -54,11 +54,11 @@ sops dunn.dev/iac/pyinfra/secrets.enc.yaml
 
 ```sh
 cd dunn.dev/iac
-make auth-secrets HOST=carmine   # writes the new sops entry into podman secrets
-make auth-apply-clients HOST=carmine
+make dag-secrets HOST=carmine   # writes the new sops entry into podman secrets
+make dag-apply-clients HOST=carmine
 ```
 
-`auth-apply-clients` runs the `auth-util` one-shot container on the
+`dag-apply-clients` runs the `dag-util` one-shot container on the
 `auth` network (the only network that can reach Hydra's admin port 4445)
 and POST/PUTs each `hydra/clients/*.yaml` `oidc:` block. The container
 reads `<SLUG>_CLIENT_SECRET` from env, which is sourced from the sops
@@ -513,7 +513,7 @@ or adding a trailing slash.
 **Secret mismatch between sides.** The RP app presents the client secret
 to Hydra's token endpoint. If the value differs from what Hydra has
 stored, the token exchange fails with `invalid_client`. Regenerate and
-set the sops value, re-run `make auth-apply-clients`, and update the
+set the sops value, re-run `make dag-apply-clients`, and update the
 app config. Both must come from the same sops plaintext.
 
 **Missing access group.** The consent service returns an error if the
@@ -541,5 +541,5 @@ open an upstream issue if the endpoint exists but returns an error.
 - `docs/per-app-oidc.md` -- role/claim contract and role granularity ranking
 - `hydra/clients/*.yaml` -- authoritative manifests
 - `docs/runbooks/secrets-rotation.md` -- break-glass if `secrets.system` is compromised
-- `util/README.md` -- how `auth-util` and `apply-clients.sh` work
-- `DEPLOY.md` -- full promotion path including `make auth-apply-clients`
+- `util/README.md` -- how `dag-util` and `apply-clients.sh` work
+- `DEPLOY.md` -- full promotion path including `make dag-apply-clients`
