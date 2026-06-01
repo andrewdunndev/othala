@@ -2,12 +2,12 @@
 //
 // Run with: tsx --test scripts/claims.test.mjs
 //
-// Mirrors BuildIDTokenClaims + deepMergeClaims in consent/claims.go against the
-// family identity schema (traits: username/email/displayName).
+// Mirrors BuildIDTokenClaims in consent/claims.go against the family
+// identity schema (traits: username/email/displayName).
 
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { buildIDTokenClaims, deepMergeClaims } from '../src/lib/claims.ts';
+import { buildIDTokenClaims } from '../src/lib/claims.ts';
 
 function base(overrides = {}) {
   return {
@@ -68,22 +68,4 @@ test('groups omitted when metadata_admin has none', () => {
 
 test('null identity yields empty claims', () => {
   assert.deepEqual(buildIDTokenClaims(null), {});
-});
-
-test('deepMergeClaims merges nested objects, src precedence', () => {
-  const dst = { a: { x: 1, y: 2 }, b: 1 };
-  deepMergeClaims(dst, { a: { y: 9, z: 3 }, b: 5 });
-  assert.deepEqual(dst, { a: { x: 1, y: 9, z: 3 }, b: 5 });
-});
-
-test('deepMergeClaims: array conflict is last-write-wins', () => {
-  const dst = { groups: ['a', 'b'] };
-  deepMergeClaims(dst, { groups: ['c'] });
-  assert.deepEqual(dst.groups, ['c']);
-});
-
-test('deepMergeClaims replaces non-object dst with object src', () => {
-  const dst = { a: 1 };
-  deepMergeClaims(dst, { a: { nested: true } });
-  assert.deepEqual(dst, { a: { nested: true } });
 });

@@ -24,19 +24,26 @@ const adminNav = [
 <Layout title="Activity — Admin" description="Recent identity and login events." nav={adminNav}>
   <header class="page-header">
     <p class="page-eyebrow">administration · audit</p>
-    <h1 class="page-title">Recent activity</h1>
+    <h1 class="page-title">Recent activity <span class="badge badge-warning">Placeholder</span></h1>
     <p class="page-lede">
       Login attempts, password changes, recovery codes, and admin
       operations. Sourced from the Kratos events stream.
     </p>
   </header>
 
+  <div class="notice notice-warning">
+    <strong>Placeholder — not wired yet.</strong> This page is a navigable
+    skeleton; it does not yet display any events. The feature is pending the
+    activity-ingest path (alloy → Loki for archival, a Postgres summary table
+    for the in-UI last-100 view). Until that lands, treat this page as
+    intentionally empty.
+  </div>
+
   <section class="section">
     <p class="section-subtitle">Stream</p>
     <p class="section-prose">
-      Not wired yet. The archival path is alloy → Loki; this page will
-      surface the last 100 events from a Postgres summary table once the
-      ingest is in place.
+      Once the ingest is in place this section will surface the last 100
+      events from the Postgres summary table.
     </p>
   </section>
 </Layout>

@@ -16,9 +16,9 @@
 //   consent -> re-gate, build id_token claims, accept with consent session
 //   logout  -> accept (Kratos session invalidation is the portal's job)
 //
-// SDK usage: we reuse the class-based @ory/client-fetch OAuth2Api (the same
-// surface admin.ts drives for listOAuth2Clients) and the C1 admin-api
-// getIdentity / kratos getSession helpers, rather than re-hand-rolling fetch.
+// SDK usage: we reuse the class-based @ory/client-fetch OAuth2Api and the
+// C1 admin-api getIdentity / kratos getSession helpers, rather than
+// re-hand-rolling fetch.
 
 import { Configuration, OAuth2Api } from '@ory/client-fetch';
 import type {

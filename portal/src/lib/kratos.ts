@@ -52,9 +52,6 @@ export async function getSession(cookie?: string): Promise<Session | null> {
   return (await res.json()) as Session;
 }
 
-// Backwards-compat alias used by index.astro skeleton.
-export const whoami = getSession;
-
 /**
  * Light health check used by the three-state landing.
  *

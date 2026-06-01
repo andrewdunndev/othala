@@ -1,7 +1,7 @@
 // ID-token claim construction (CU1 item 3).
 //
-// Direct port of consent/claims.go: BuildIDTokenClaims + deepMergeClaims, with
-// IDENTICAL mapping against the family identity schema
+// Direct port of consent/claims.go BuildIDTokenClaims, with IDENTICAL
+// mapping against the family identity schema
 // (traits: username, email, displayName?):
 //
 //   email              = traits.email                            (if present)
@@ -11,9 +11,7 @@
 //   groups             = metadata_admin.groups (string array)    (if present)
 //
 // Anything missing is omitted rather than emitted as null (apps tolerate
-// missing fields better than null). deepMergeClaims mirrors the Go merge used
-// to layer per-role claim_emit maps over the base claims (last-write-wins on
-// scalar/array conflict, recursive merge on nested objects).
+// missing fields better than null).
 
 import type { Identity } from './types';
 
@@ -85,25 +83,4 @@ export function buildIDTokenClaims(identity: Identity | null | undefined): Claim
   }
 
   return claims;
-}
-
-function isPlainObject(v: unknown): v is Record<string, unknown> {
-  return typeof v === 'object' && v !== null && !Array.isArray(v);
-}
-
-/**
- * Recursively merge src into dst, src taking precedence. Mirrors
- * deepMergeClaims in claims.go: both-object -> recurse; otherwise (missing
- * key, scalar/array conflict, type mismatch) src wins (last-write-wins).
- */
-export function deepMergeClaims(dst: Claims, src: Claims): void {
-  if (!dst || !src) return;
-  for (const [k, sv] of Object.entries(src)) {
-    const dv = dst[k];
-    if (isPlainObject(dv) && isPlainObject(sv)) {
-      deepMergeClaims(dv, sv);
-      continue;
-    }
-    dst[k] = sv;
-  }
 }

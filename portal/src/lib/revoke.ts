@@ -24,13 +24,17 @@
 //      skip-login a fresh token. Idempotent.
 //   4. Hydra consent-session revoke revokeOAuth2ConsentSessions({subject,all})
 //      Invalidates granted consent + associated access tokens. Idempotent.
-//   5. identity-cache invalidate (in-process identity cache).
-//   6. LDAP bind-cache flush (BEST-EFFORT)
+//   5. LDAP bind-cache flush (BEST-EFFORT)
 //      POST {LDAP_BRIDGE_ADMIN_URL}/admin/flush-bind-cache?subject={id}
 //      Skipped silently when LDAP_BRIDGE_ADMIN_URL is unset.
 //
-// Steps 5-6 are best-effort: a failure there NEVER aborts/rolls back 1-4.
-// The hard cut (1-4) has already landed by the time we touch 5-6.
+// There is no in-process identity cache to invalidate: the hot login/consent
+// path always fetches a fresh identity (oauth2-handlers -> admin-api.getIdentity),
+// so a revoked/deactivated subject fails the gate's state-check on the next
+// fetch — revocation is correct without a cache.
+//
+// Step 5 is best-effort: a failure there NEVER aborts/rolls back 1-4.
+// The hard cut (1-4) has already landed by the time we touch step 5.
 //
 // Prescriptive errors: an upstream failure on steps 1-4 throws a
 // RevokeError naming WHICH dependency failed (hydra-admin / kratos-admin)
@@ -42,7 +46,6 @@ import {
   OAuth2Api,
   type JsonPatch,
 } from '@ory/client-fetch';
-import { invalidateIdentity } from './identity-cache';
 
 /** Which upstream dependency a revoke step failed against. */
 export type RevokeDependency = 'kratos-admin' | 'hydra-admin' | 'ldap-bridge';
@@ -71,8 +74,6 @@ export interface RevokeDeps {
   oauth2Api: OAuth2Api;
   /** Best-effort LDAP bind-cache flush. Injected for tests. */
   flushLdapBindCache: (subject: string) => Promise<void>;
-  /** In-process identity-cache invalidation. Injected for tests. */
-  invalidateIdentityCache: (subject: string) => void;
 }
 
 export interface RevokeOptions {
@@ -90,8 +91,7 @@ export interface RevokeResult {
   kratosSessionsRevoked: boolean;
   hydraLoginRevoked: boolean;
   hydraConsentRevoked: boolean;
-  identityCacheInvalidated: boolean;
-  /** Best-effort steps that failed (5-6); never aborts the fan-out. */
+  /** Best-effort steps that failed (step 5); never aborts the fan-out. */
   bestEffortFailures: Array<{ dependency: RevokeDependency; step: string; error: string }>;
 }
 
@@ -151,7 +151,6 @@ function resolveDeps(deps: Partial<RevokeDeps> = {}): RevokeDeps {
     identityApi: deps.identityApi ?? buildIdentityApi(),
     oauth2Api: deps.oauth2Api ?? buildOAuth2Api(),
     flushLdapBindCache: deps.flushLdapBindCache ?? defaultFlushLdapBindCache,
-    invalidateIdentityCache: deps.invalidateIdentityCache ?? invalidateIdentity,
   };
 }
 
@@ -159,8 +158,8 @@ function resolveDeps(deps: Partial<RevokeDeps> = {}): RevokeDeps {
  * Run the revocation fan-out for one subject (the Kratos identity id).
  *
  * Steps 1-4 are the hard cut and throw a prescriptive RevokeError on the
- * first failure (the cut aborts — earlier steps already landed). Steps
- * 5-6 are best-effort and collected into result.bestEffortFailures.
+ * first failure (the cut aborts — earlier steps already landed). Step 5
+ * is best-effort and collected into result.bestEffortFailures.
  */
 export async function revokeSubject(
   subject: string,
@@ -174,7 +173,6 @@ export async function revokeSubject(
     kratosSessionsRevoked: false,
     hydraLoginRevoked: false,
     hydraConsentRevoked: false,
-    identityCacheInvalidated: false,
     bestEffortFailures: [],
   };
 
@@ -235,19 +233,7 @@ export async function revokeSubject(
     );
   }
 
-  // ── Step 5 (all, BEST-EFFORT): identity-cache invalidate ────────────────
-  try {
-    d.invalidateIdentityCache(subject);
-    result.identityCacheInvalidated = true;
-  } catch (err) {
-    result.bestEffortFailures.push({
-      dependency: 'kratos-admin',
-      step: 'identity-cache-invalidate',
-      error: err instanceof Error ? err.message : String(err),
-    });
-  }
-
-  // ── Step 6 (all, BEST-EFFORT): LDAP bind-cache flush ────────────────────
+  // ── Step 5 (all, BEST-EFFORT): LDAP bind-cache flush ────────────────────
   // Never aborts/rolls back 1-4. Skipped silently when LDAP_BRIDGE_ADMIN_URL
   // is unset (the default helper returns without a request).
   try {

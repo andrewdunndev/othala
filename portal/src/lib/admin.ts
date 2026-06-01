@@ -7,7 +7,6 @@
 // per-flow / global, not per-route. Caddy already gates "session present"
 // upstream of this guard.
 
-import { Configuration, OAuth2Api, type OAuth2Client } from '@ory/client-fetch';
 import { getSession } from './kratos';
 import { getIdentity } from './admin-api';
 import { isAdminSubject } from './admin-auth';
@@ -30,29 +29,6 @@ export type {
   MetadataAdmin,
   RecoveryLink,
 } from './admin-api';
-
-/** Backwards-compat alias used by older skeleton pages. */
-export { getRecoveryLink as generateRecoveryURL } from './admin-api';
-
-function hydraAdminBase(): string {
-  // Portal and Hydra both run on carmine; the admin port is reachable
-  // directly at the in-pod hostname. Same posture as Kratos admin: no
-  // auth by default, network-isolation gates it.
-  return process.env.HYDRA_ADMIN_URL ?? 'http://hydra:4445';
-}
-
-// Behaviour-preserving auth: configure the SDK bearer only when
-// HYDRA_ADMIN_TOKEN is set, matching the legacy raw-fetch code that
-// omitted Authorization when the token env was empty.
-function oauth2Api(): OAuth2Api {
-  const token = process.env.HYDRA_ADMIN_TOKEN ?? '';
-  return new OAuth2Api(
-    new Configuration({
-      basePath: hydraAdminBase(),
-      ...(token ? { accessToken: token } : {}),
-    }),
-  );
-}
 
 /**
  * SSR guard for /admin/* routes.
@@ -109,24 +85,19 @@ export async function requireAdminSession(astro: any): Promise<Session | Respons
   return session;
 }
 
-/** Hydra admin (read-only): used by the OAuth2 viewer to confirm clients exist. */
-export async function listOAuth2Clients(): Promise<OAuth2Client[]> {
-  return oauth2Api().listOAuth2Clients();
-}
-
 /**
  * Force re-login for an identity (admin "revoke user" trigger).
  *
  * The portal -> consent-service HTTP hop (POST /admin/revoke-user, guarded
  * by the overloaded CONSENT_ADMIN_BEARER) is GONE. The fan-out is now
- * in-process: revokeSubject runs steps 2-6 (Kratos sessions, Hydra login +
- * consent revoke, identity-cache invalidate, best-effort LDAP bind-cache
- * flush). deactivate is NOT set here — admin force-logout cuts sessions
- * without marking the identity inactive.
+ * in-process: revokeSubject runs steps 2-5 (Kratos sessions, Hydra login +
+ * consent revoke, best-effort LDAP bind-cache flush). deactivate is NOT set
+ * here — admin force-logout cuts sessions without marking the identity
+ * inactive.
  *
  * Throws a prescriptive RevokeError on a hard-cut (step 2-4) failure; the
  * caller surfaces dependency + next-action without leaking raw upstream
- * errors. Best-effort step 5-6 failures land in result.bestEffortFailures.
+ * errors. Best-effort step 5 failures land in result.bestEffortFailures.
  */
 export type RevokeUserResult = RevokeResult;
 

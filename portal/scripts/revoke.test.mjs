@@ -8,7 +8,7 @@
 //   - deactivate trigger runs step 1; admin/sign-out triggers do NOT.
 //   - step-2 failure ABORTS the fan-out (Hydra steps never fire) and throws
 //     a prescriptive RevokeError naming kratos-admin.
-//   - steps 5-6 failures DO NOT abort (collected into bestEffortFailures).
+//   - step 5 (LDAP) failure does NOT abort (collected into bestEffortFailures).
 //   - LDAP step is skipped silently when LDAP_BRIDGE_ADMIN_URL is unset (via
 //     the injected flush stub here; the env-skip path is the default helper).
 //   - prescriptive errors name the dependency for hydra-admin failures too.
@@ -41,14 +41,11 @@ function makeDeps() {
       flushLdapBindCache: async (subject) => {
         calls.push(['flushLdapBindCache', subject]);
       },
-      invalidateIdentityCache: (subject) => {
-        calls.push(['invalidateIdentityCache', subject]);
-      },
     },
   };
 }
 
-test('admin/sign-out trigger runs steps 2-6 in order (no step 1)', async () => {
+test('admin/sign-out trigger runs steps 2-5 in order (no step 1)', async () => {
   const { calls, deps } = makeDeps();
   const result = await revokeSubject('sub-1', {}, deps);
 
@@ -57,14 +54,12 @@ test('admin/sign-out trigger runs steps 2-6 in order (no step 1)', async () => {
     'deleteIdentitySessions',
     'revokeOAuth2LoginSessions',
     'revokeOAuth2ConsentSessions',
-    'invalidateIdentityCache',
     'flushLdapBindCache',
   ]);
   assert.equal(result.deactivated, false);
   assert.equal(result.kratosSessionsRevoked, true);
   assert.equal(result.hydraLoginRevoked, true);
   assert.equal(result.hydraConsentRevoked, true);
-  assert.equal(result.identityCacheInvalidated, true);
   assert.equal(result.bestEffortFailures.length, 0);
 });
 
@@ -78,7 +73,6 @@ test('deactivate trigger runs step 1 (state->inactive) BEFORE step 2', async () 
     'deleteIdentitySessions',
     'revokeOAuth2LoginSessions',
     'revokeOAuth2ConsentSessions',
-    'invalidateIdentityCache',
     'flushLdapBindCache',
   ]);
   // The state flip is the documented [{op:replace,path:/state,value:inactive}].
@@ -118,7 +112,7 @@ test('step-2 (delete-sessions) failure ABORTS the fan-out', async () => {
   // Hydra steps + best-effort steps must NOT have fired after the abort.
   const order = calls.map((c) => c[0]);
   assert.ok(!order.includes('revokeOAuth2LoginSessions'));
-  assert.ok(!order.includes('invalidateIdentityCache'));
+  assert.ok(!order.includes('flushLdapBindCache'));
 });
 
 test('step-2 failure under deactivate still runs step 1 first then aborts', async () => {
@@ -167,31 +161,16 @@ test('Hydra login-revoke failure throws prescriptive hydra-admin error', async (
   );
 });
 
-test('best-effort step 5 (cache) failure does NOT abort; collected', async () => {
-  const { calls, deps } = makeDeps();
-  deps.invalidateIdentityCache = () => {
-    throw new Error('cache blew up');
+test('best-effort step 5 (LDAP) failure does NOT abort; collected', async () => {
+  const { deps } = makeDeps();
+  deps.flushLdapBindCache = async () => {
+    throw new Error('ldap unreachable');
   };
   const result = await revokeSubject('sub-1', {}, deps);
   // The hard cut still completed.
   assert.equal(result.kratosSessionsRevoked, true);
   assert.equal(result.hydraLoginRevoked, true);
   assert.equal(result.hydraConsentRevoked, true);
-  assert.equal(result.identityCacheInvalidated, false);
-  // LDAP (step 6) still ran after the cache failure.
-  assert.ok(calls.some((c) => c[0] === 'flushLdapBindCache'));
-  assert.equal(result.bestEffortFailures.length, 1);
-  assert.equal(result.bestEffortFailures[0].step, 'identity-cache-invalidate');
-});
-
-test('best-effort step 6 (LDAP) failure does NOT abort; collected', async () => {
-  const { deps } = makeDeps();
-  deps.flushLdapBindCache = async () => {
-    throw new Error('ldap unreachable');
-  };
-  const result = await revokeSubject('sub-1', {}, deps);
-  assert.equal(result.kratosSessionsRevoked, true);
-  assert.equal(result.identityCacheInvalidated, true);
   assert.equal(result.bestEffortFailures.length, 1);
   assert.equal(result.bestEffortFailures[0].dependency, 'ldap-bridge');
   assert.equal(result.bestEffortFailures[0].step, 'flush-bind-cache');

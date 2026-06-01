@@ -205,7 +205,11 @@ export async function registerClient(
  *
  * Runs the full validateClients lint first (unless skipValidation), then
  * registers each client idempotently. Returns the per-client action list.
- * This is the in-app successor to a full `apply-clients.sh` run.
+ *
+ * DORMANT until the E1 cutover: nothing invokes this yet. Client
+ * registration stays shell-driven via util/apply-clients.sh; this is NOT
+ * yet the live successor and apply-clients.sh is NOT superseded. E1 wires
+ * the in-app path and flips the cutover.
  */
 export async function registerAllClients(
   opts: RegisterOptions = {},

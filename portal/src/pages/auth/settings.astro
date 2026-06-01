@@ -30,6 +30,7 @@ import {
 } from '../../lib/nodes';
 import FlowNodes from '../../components/FlowNodes.astro';
 import { revokeSubject, RevokeError } from '../../lib/revoke';
+import { signToken, verifyToken, CSRFError } from '../../lib/csrf';
 import type { Session } from '../../lib/types';
 
 const cookie = Astro.request.headers.get('cookie') ?? undefined;
@@ -53,6 +54,17 @@ let signOutError: string | null = null;
 if (Astro.request.method === 'POST') {
   const fd = await Astro.request.formData();
   if (String(fd.get('action') ?? '') === 'sign-out-everywhere') {
+    // Match the admin POST pattern: every state-changing POST carries a
+    // per-request CSRF token bound to the caller's own identity. Verify
+    // before any side effect; fails closed.
+    try {
+      verifyToken(String(fd.get('csrf_token') ?? ''), session.identity.id);
+    } catch (err) {
+      if (err instanceof CSRFError) {
+        return new Response(`CSRF: ${err.message}`, { status: 403 });
+      }
+      throw err;
+    }
     try {
       await revokeSubject(session.identity.id);
     } catch (err) {
@@ -96,6 +108,7 @@ const hasPasskey = hasMethod(ui.nodes, 'passkey');
 const hasPassword = hasMethod(ui.nodes, 'password');
 
 const logoutInfo = await getLogoutInfo(cookie);
+const csrfSignOut = signToken(session.identity.id);
 const traits = session.identity.traits;
 const groups = session.identity.metadata_admin?.groups ?? [];
 const displayName = traits.displayName || traits.username || '';
@@ -199,6 +212,7 @@ const accessGroups = groups.filter((g) => g.startsWith('access-'));
     )}
     <form method="POST" action="/auth/settings" class="settings-form">
       <input type="hidden" name="action" value="sign-out-everywhere" />
+      <input type="hidden" name="csrf_token" value={csrfSignOut} />
       <div class="form-actions">
         <button class="button button-danger" type="submit">Sign out everywhere</button>
       </div>
