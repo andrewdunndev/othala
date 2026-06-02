@@ -24,12 +24,14 @@ RUN CGO_ENABLED=0 GOOS=linux go build -trimpath -ldflags='-s -w' -o glauth-krato
 
 FROM registry.access.redhat.com/ubi9/ubi-minimal:9.8
 
-# curl: HTTP healthcheck against the bridge's own /healthz admin endpoint
+# HTTP healthcheck against the bridge's own /healthz admin endpoint
 # (e2e smoke.sh execs `curl` inside this container). No other tools —
 # bridge stays a single-binary surface.
-# --allowerasing: ubi-minimal:9.8 ships curl-minimal preinstalled, which
-# conflicts with the full curl package; allow microdnf to swap it.
-RUN microdnf install -y --nodocs --allowerasing curl ca-certificates \
+# NOTE: ubi-minimal:9.8 already ships curl-minimal (provides /usr/bin/curl),
+# so we do NOT install the full `curl` package — it conflicts with
+# curl-minimal and microdnf has no --allowerasing to swap. curl-minimal
+# handles the smoke's `curl -s -o /dev/null -w "%{http_code}"` fine.
+RUN microdnf install -y --nodocs ca-certificates \
     && microdnf clean all \
     && rm -rf /var/cache/yum
 
