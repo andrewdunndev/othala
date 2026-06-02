@@ -1,6 +1,6 @@
 // Astro Content Collections — apps registry.
 //
-// v0.1.4 architecture decision: portal/src/content/apps/<slug>.md is
+// v0.2.0 architecture decision: portal/src/content/apps/<slug>.md is
 // the canonical "what apps exist in the family estate" registry. Each
 // MD file has frontmatter (tile metadata) and a markdown body
 // (education content shown on the /apps/<slug> detail page).

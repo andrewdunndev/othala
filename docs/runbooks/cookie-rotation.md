@@ -56,7 +56,7 @@ runbook didn't account for it" bugs.
    ```sh
    sops dunn.dev/iac/pyinfra/secrets.enc.yaml
    # Edit carmine.auth_session_secret to the new value.
-   # Substrate-secret model (v0.1.4): a single `auth_session_secret` key
+   # Substrate-secret model (v0.2.0): a single `auth_session_secret` key
    # feeds both _CURRENT and _PREVIOUS slots — rotation is a single
    # value swap; collapsing the two-slot semantic into one sops entry
    # is the homelab-scope simplification documented in

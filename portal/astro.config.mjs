@@ -27,7 +27,7 @@ export default defineConfig({
   output: 'server',
   adapter: node({ mode: 'standalone' }),
   integrations: [],
-  // Topology B (v0.1.4): single FQDN for the whole SSO stack.
+  // Topology B (v0.2.0): single FQDN for the whole SSO stack.
   site: 'https://dag.dunn.dev',
   vite: {
     plugins: [tailwindcss()],

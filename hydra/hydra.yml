@@ -29,7 +29,7 @@ urls:
     issuer: https://dag.dunn.dev/
     public: https://dag.dunn.dev/
 
-  # Topology B (v0.1.4): the entire SSO stack lives on dag.dunn.dev.
+  # Topology B (v0.2.0): the entire SSO stack lives on dag.dunn.dev.
   # Hydra redirects OAuth2 challenge flows to dag.dunn.dev/oauth2/{login,
   # consent,logout} — the converged Astro API routes that handle the Hydra
   # challenge protocol. /auth/{login,logout} remain as the Kratos browser-flow

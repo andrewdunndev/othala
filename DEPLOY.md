@@ -34,7 +34,7 @@ One Othala pod on carmine, fronted by a Caddy edge. The containers:
 > `registry.gitlab.com/dunn.dev/othala` (the oryd/kratos-style
 > namespace/name shape, `publish_at_root: true` in `.gitlab-ci.yml`
 > `build-othala`). The `dag-portal` quadlet pins this root path. The
-> next published tag (`v0.1.4`) is the first to ship under the new name;
+> next published tag (`v0.2.0`) is the first to ship under the new name;
 > the live pin reads `…/othala/portal:<tag>` only until that tag
 > publishes.
 

@@ -6,14 +6,14 @@ Reviewer: adversarial pass (tree scan)
 
 ## Reading this document
 
-Each finding carries an inline **Status:** line reflecting state at v0.1.4.
+Each finding carries an inline **Status:** line reflecting state at v0.2.0.
 Use these tags:
 
 - **REMEDIATED** — fix landed in code; evidence cited inline.
 - **ACCEPTED** — no code change; rationale captured (typically architectural defaults that match family-scale threat model).
 - **OPEN** — fix not yet landed; tracked for action.
 
-Counts at v0.1.4: 0 OPEN, 16 REMEDIATED, 1 ACCEPTED across HIGH/MEDIUM/LOW.
+Counts at v0.2.0: 0 OPEN, 16 REMEDIATED, 1 ACCEPTED across HIGH/MEDIUM/LOW.
 Architectural concerns (A1-A7) are positioning statements, not findings;
 they carry remediation status only where actionable.
 
@@ -28,7 +28,7 @@ logout signer. The architectural posture is consistent with the locked
 decisions and the prior adversarial reviews are mostly closed.
 
 Counts at original review (2026-05-04): 0 CRITICAL, 4 HIGH, 7 MEDIUM, 5 LOW, 7 architectural concerns.
-At v0.1.4 (post-remediation): all HIGH and MEDIUM closed; LOWs either fixed or accepted.
+At v0.2.0 (post-remediation): all HIGH and MEDIUM closed; LOWs either fixed or accepted.
 
 ## Threat model
 
@@ -273,7 +273,7 @@ None.
   - Fix: validate `resource` against a tight regex (`^acct:[A-Za-z0-9._-]+@dunn\.dev$`)
     or just hardcode `subject` to `'acct:user@dunn.dev'` always. The
     field is informational anyway.
-  - **Status: REMEDIATED in v0.1.3.** `portal/src/pages/.well-known/webfinger.ts:44` hardcodes `SAFE_SUBJECT = 'acct:user@dunn.dev'`; the `resource` query is read but never reflected. Test coverage in `portal/scripts/webfinger.test.mjs`. NOTE: as of v0.1.4 this handler is deprecated — WebFinger moves to the dunn.dev apex (Cloudflare Pages function) per Tailscale's spec that WebFinger lives at `${email-domain}/.well-known/webfinger`. Handler scheduled for removal once apex WebFinger lands.
+  - **Status: REMEDIATED in v0.1.3.** `portal/src/pages/.well-known/webfinger.ts:44` hardcodes `SAFE_SUBJECT = 'acct:user@dunn.dev'`; the `resource` query is read but never reflected. Test coverage in `portal/scripts/webfinger.test.mjs`. NOTE: as of v0.2.0 this handler is deprecated — WebFinger moves to the dunn.dev apex (Cloudflare Pages function) per Tailscale's spec that WebFinger lives at `${email-domain}/.well-known/webfinger`. Handler scheduled for removal once apex WebFinger lands.
 
 ## LOW
 
@@ -329,12 +329,12 @@ None.
   - Fix: have the gate refuse-on-empty-groups as a defensive default.
     The Kratos schema invariant says every active identity has at
     least one identity group.
-  - **Status: REMEDIATED in v0.1.4.** Gate refuses-on-empty-groups via positive assertion in the Go handler. See `consent/recovery_gate.go` change in this release.
+  - **Status: REMEDIATED in v0.2.0.** Gate refuses-on-empty-groups via positive assertion in the Go handler. See `consent/recovery_gate.go` change in this release.
 
 ## Architectural concerns
 
 - **A1: Trust boundary topology is sound but undocumented.** The pod-network is the trust unit: Kratos public + Kratos admin + Hydra public + Hydra admin + consent + portal + postgres are all "anyone in the pod can talk unauthenticated to anyone." The webhook from Kratos to consent rides this. The portal-to-consent admin call is bearer-protected, which is the only in-pod trust gate. Caddy is the only public boundary. A tier-2 attacker (RCE on a non-auth-pod app like Vaultwarden) does NOT have pod-network access; they're network-isolated to their own pod. So tier 2 is bounded by the pod boundary, which is the right design. Document this explicitly: "the auth pod is a single security domain; defense-in-depth between services inside it is partial-and-deliberate."
-  - **Status: REMEDIATED in v0.1.4.** Documented in `ARCHITECTURE.md` "Trust boundary" section + `docs/golden-path.md` "Single security domain" entry.
+  - **Status: REMEDIATED in v0.2.0.** Documented in `ARCHITECTURE.md` "Trust boundary" section + `docs/golden-path.md` "Single security domain" entry.
 
 - **A2: `secrets.system` single-key risk.** `hydra/hydra.yml:70-75`. Used by Hydra to encrypt OAuth2 client secrets and consent challenges at rest in postgres. If it leaks: an attacker with read access to the hydra postgres database decrypts every client_secret (all 11 OIDC apps). They cannot mint id_tokens by themselves (id_token signing uses a separate JWK that lives in `hydra.openid.id-token`), but they can impersonate apps to Hydra's admin API and issue arbitrary tokens. Mitigation: sops+age stored, never on disk in plaintext, postgres pod isolated. Recovery from leak: rebuild Hydra DB and re-issue every client_secret. Documented; runbook references it. No code action needed; the risk is procedural.
   - **Status: ACCEPTED.** Documented in `docs/runbooks/secrets-rotation.md`. Rotation is break-glass-only.
@@ -345,7 +345,7 @@ None.
 - **A4: Recovery-gate fail-closed semantics depend on Kratos.** `kratos/kratos.yml:113-124` sets `can_interrupt: true` and `parse: false`. Kratos's documented behavior: a hook that returns non-2xx aborts the flow. Confirmed by the lab evidence at `lab/docs/phase3-evidence.md` line 101 (PASS for the H1 admin-rejection case). If the consent service is DOWN when a recovery is in-flight, Kratos's hook timeout fires and the flow aborts (fail-closed); good. If the hook times out due to a slow consent service, recovery aborts even for non-admins (UX hit, not security regression). Acceptable.
   - **Status: ACCEPTED.** Lab-verified fail-closed; acceptable UX tradeoff for fail-closed posture.
 
-- **A5: Cookie domain `.dunn.dev` cross-subdomain reach.** A compromised app on `<app>.dunn.dev` can read its own cookies but NOT the Kratos session cookie (HttpOnly). It can submit cross-origin POSTs that include the cookie (SameSite=Lax permits same-site POSTs). The browser treats `dag.dunn.dev` and `<app>.dunn.dev` as same-site (registrable parent dunn.dev), so a service worker registered on `<app>.dunn.dev` CANNOT make fetch() calls to `dag.dunn.dev` carrying the session cookie unless CORS permits credentials AND `dag.dunn.dev` opts in via `Access-Control-Allow-Origin`. The Kratos config (`kratos/kratos.yml:13-25`) only allows `https://home.dunn.dev` in `allowed_origins` (updated to `https://dag.dunn.dev` in v0.1.4 per Topology B). Hydra (`hydra/hydra.yml:8-16`) likewise. So service-worker exfiltration of the Kratos session via cookie-bearing CORS fetches is blocked at the IDP CORS layer. Ground truth: HIGH-1 (form-driven CSRF same-site) is the path that bites; service-worker is not.
+- **A5: Cookie domain `.dunn.dev` cross-subdomain reach.** A compromised app on `<app>.dunn.dev` can read its own cookies but NOT the Kratos session cookie (HttpOnly). It can submit cross-origin POSTs that include the cookie (SameSite=Lax permits same-site POSTs). The browser treats `dag.dunn.dev` and `<app>.dunn.dev` as same-site (registrable parent dunn.dev), so a service worker registered on `<app>.dunn.dev` CANNOT make fetch() calls to `dag.dunn.dev` carrying the session cookie unless CORS permits credentials AND `dag.dunn.dev` opts in via `Access-Control-Allow-Origin`. The Kratos config (`kratos/kratos.yml:13-25`) only allows `https://home.dunn.dev` in `allowed_origins` (updated to `https://dag.dunn.dev` in v0.2.0 per Topology B). Hydra (`hydra/hydra.yml:8-16`) likewise. So service-worker exfiltration of the Kratos session via cookie-bearing CORS fetches is blocked at the IDP CORS layer. Ground truth: HIGH-1 (form-driven CSRF same-site) is the path that bites; service-worker is not.
   - **Status: REMEDIATED at architecture level.** HIGH-1 (the path that bites) is closed via CSRF tokens. CORS allowlist is tight; service-worker exfiltration blocked at IDP.
 
 - **A6: Backup-and-restore correctness across Hydra encryption-at-rest.** `docs/runbooks/postgres-backup.md` is a placeholder ("TODO"). The runbook correctly identifies `secrets.system` rehydration as the gating step before pg_restore is meaningful. A partial-state restore (Hydra mid-write, Kratos mid-write) is the worst-case: Postgres point-in-time consistency is per-database, but the auth substrate touches both `kratos` and `hydra` databases in different transactions, so a backup taken between a `kratos` write and a corresponding `hydra` write yields drift (e.g., a Kratos identity exists with a Hydra consent decision pointing at no-such-subject). At family scale, the recovery is "wipe Hydra remembered-consent rows and force re-login" not "fix the row." Document.
@@ -366,7 +366,7 @@ None.
 - glauth upstream code: vendored as an import; CVE tracking is on the operator runbook, not this review.
 - Any runtime / dynamic behavior that requires a running stack: alg-confusion, redirect chains, real cookie flows, real RP back-channel logout exchanges. Static review flags but cannot confirm. CI-lab work in `dunn.dev/othala/lab/` will expand this coverage.
 
-## Triage status (v0.1.4)
+## Triage status (v0.2.0)
 
 All HIGH and MEDIUM findings remediated or accepted with documented rationale. LOW-5 closed in this release. Open architectural items (A3, A6) deferred to specific work streams: A3 (per-app audit) → Phase 4 lab; A6 (postgres backup) → iac work stream. The substrate is family-pilot-ready from a security-finding standpoint.
 

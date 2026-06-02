@@ -83,7 +83,7 @@ include:
   # image_tag.
   #
   # Context is repo root (legacy from when build needed hydra/clients/;
-  # v0.1.4 reads manifests at runtime, but context: . is kept stable
+  # v0.2.0 reads manifests at runtime, but context: . is kept stable
   # because the build is light and changing it requires a CI dance).
   - component: gitlab.com/dunn.dev/pipeline/container-image@2.5.0
     inputs:
@@ -119,7 +119,7 @@ include:
 # -----------------------------------------------------------------
 # Standalone jobs (not catalog components).
 #
-# test-portal: v0.1.4 portal test suite. Runs `npm test` which
+# test-portal: v0.2.0 portal test suite. Runs `npm test` which
 # invokes node --test against scripts/*.test.mjs. Covers:
 #   - manifests-loader.test.mjs (YAML namespace split + parsing)
 #   - apps-collection.test.mjs  (Content Collection frontmatter shape)

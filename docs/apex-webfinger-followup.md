@@ -79,7 +79,7 @@ The previous shape of this repo had an Astro handler at
 `portal/src/pages/.well-known/webfinger.ts`. That handler was correct
 in shape but lived on the wrong host — Tailscale would query
 `dunn.dev/.well-known/webfinger`, not the portal subdomain, and never
-find it. Handler deleted in v0.1.4 alongside this follow-up.
+find it. Handler deleted in v0.2.0 alongside this follow-up.
 
 ## Related
 

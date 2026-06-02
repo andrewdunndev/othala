@@ -6,7 +6,7 @@ Ory Hydra configuration + OIDC client catalog.
 
 | File | Purpose |
 |---|---|
-| `hydra.yml` | Server config: DSN, serve URLs, CORS, login/consent/logout URLs (point at dag.dunn.dev per Topology B v0.1.4), TTLs, secrets, PKCE off |
+| `hydra.yml` | Server config: DSN, serve URLs, CORS, login/consent/logout URLs (point at dag.dunn.dev per Topology B v0.2.0), TTLs, secrets, PKCE off |
 | `clients/*.yaml` | One YAML per OAuth2/OIDC client. Each has `oidc:` (forwarded to Hydra) and `consent:` (read by the othala app for role/claim emission) namespace blocks. |
 
 Client registration: the legacy `apply-clients.sh` / `util/` runner was

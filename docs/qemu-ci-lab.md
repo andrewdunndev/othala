@@ -1,6 +1,6 @@
 # QEMU-CI lab — design + implementation
 
-Status: **implemented in v0.1.4** (this commit set). Replaces the
+Status: **implemented in v0.2.0** (this commit set). Replaces the
 static `lab/compose/` stack which is now legacy.
 
 Files: `e2e/{compose.yml,kratos.yml,hydra.yml,identity.schema.json,
@@ -243,16 +243,16 @@ contention argues for one-at-a-time).
 
 ## When to build this
 
-After the v0.1.4 substrate cutover on carmine is stable for ~2 weeks.
+After the v0.2.0 substrate cutover on carmine is stable for ~2 weeks.
 Until then, the static `lab/compose/` stack covers manual smoke.
 
 ### Update 2026-05-31
 
 Built earlier than the 2-week recommendation. The carmine runner
 infrastructure was already in place (`dunn.dev/iac/services/runner/`)
-and the lab is light enough to land alongside the substrate v0.1.4
+and the lab is light enough to land alongside the substrate v0.2.0
 changes. Files at `e2e/` (originally `lab/ci/`, renamed + converged —
 see the banner at the top of this doc). See `e2e/README.md` for
 invocation notes. The harness does not gate the carmine deploy of
-v0.1.4 — it gates future v0.1.X tags. The v0.1.4 first deploy proves the
+v0.2.0 — it gates future v0.2.X tags. The v0.2.0 first deploy proves the
 substrate; the e2e harness proves future bumps don't regress it.

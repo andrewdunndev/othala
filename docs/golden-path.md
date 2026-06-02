@@ -153,7 +153,7 @@ document.
 
 ### 10. Substrate secret collapse (homelab simplification)
 
-v0.1.3 had 19 sops keys for the auth substrate. v0.1.4 collapses to 6:
+v0.1.3 had 19 sops keys for the auth substrate. v0.2.0 collapses to 6:
 `auth_db_password`, `auth_session_secret` (used for both Kratos and
 Hydra cookie current+previous slots), `auth_cipher_secret`,
 `hydra_system_secret`, `auth_pairwise_salt`, `auth_internal_bearer`.
