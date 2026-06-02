@@ -153,12 +153,13 @@ identity:
 # No courier configured — recovery is disabled in CI lab.
 
 secrets:
+  # Single active secret per slot — mirrors the shipping collapsed-key shape.
+  # kratos v26.2.0 enforces uniqueItems, so two identical slots are rejected;
+  # one sops key = one array element. (Rotation prepends a distinct entry.)
   cookie:
     - ${KRATOS_COOKIE_SECRET_CURRENT}
-    - ${KRATOS_COOKIE_SECRET_PREVIOUS}
   cipher:
     - ${KRATOS_CIPHER_SECRET_CURRENT}
-    - ${KRATOS_CIPHER_SECRET_PREVIOUS}
 
 log:
   level: info

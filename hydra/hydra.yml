@@ -93,12 +93,12 @@ secrets:
   system:
     - ${HYDRA_SYSTEM_SECRET}
 
-  # Cookie secret with current/previous slot pattern. See
-  # docs/runbooks/cookie-rotation.md for the rotation procedure. Mirror
-  # of the Kratos shape so both services share one runbook.
+  # Single active cookie secret. hydra v26.2.0 enforces uniqueItems; rotate
+  # by prepending a distinct entry, restart, then drop the old one once
+  # sessions signed under it have expired (mirror of the Kratos shape, one
+  # shared runbook: docs/runbooks/cookie-rotation.md).
   cookie:
     - ${HYDRA_COOKIE_SECRET_CURRENT}
-    - ${HYDRA_COOKIE_SECRET_PREVIOUS}
 
 log:
   level: info

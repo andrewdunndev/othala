@@ -59,9 +59,9 @@ oauth2:
 secrets:
   system:
     - ${HYDRA_SYSTEM_SECRET}
+  # Single active cookie secret — hydra v26.2.0 enforces uniqueItems.
   cookie:
     - ${HYDRA_COOKIE_SECRET_CURRENT}
-    - ${HYDRA_COOKIE_SECRET_PREVIOUS}
 
 log:
   level: info

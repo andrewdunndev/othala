@@ -25,15 +25,13 @@ LAB_DOMAIN="${LAB_DOMAIN:-test.dunn.dev}"
 AUTH_REGISTRY="${AUTH_REGISTRY:-registry.gitlab.com/dunn.dev/othala}"
 AUTH_VERSION="${AUTH_VERSION:-latest}"
 
-# Production (golden-path LB#10) collapses each rotation slot pair to
-# a single sops key feeding both _CURRENT and _PREVIOUS env vars: one
-# auth_session_secret drives Kratos cookie CURRENT+PREVIOUS, one
-# auth_cipher_secret drives Kratos cipher CURRENT+PREVIOUS, and the
-# Hydra cookie pair collapses the same way. The lab intentionally
-# mirrors that wire shape so the substrate it validates IS the
-# substrate that ships — if Ory ever rejects a slot pair with
-# byte-identical entries, the CI lab fails before the change reaches
-# carmine.
+# Production (golden-path LB#10) collapses each rotation slot to a single
+# sops key: one auth_session_secret drives the Kratos cookie, one
+# auth_cipher_secret the Kratos cipher, one drives the Hydra cookie. Ory
+# v26.2.0 enforces uniqueItems on these arrays, so a collapsed key renders
+# as a SINGLE-element array — never two identical slots. The lab mirrors
+# that shipping wire shape: one value per slot, no _PREVIOUS at rest.
+# (Rotation prepends a distinct entry; see the kratos/hydra.yml runbooks.)
 kratos_cookie=$(gen)
 kratos_cipher=$(gen_short)
 hydra_cookie=$(gen)
@@ -47,17 +45,14 @@ POSTGRES_PASSWORD=$(gen_alnum)
 KRATOS_PG_PASS=$(gen_alnum)
 HYDRA_PG_PASS=$(gen_alnum)
 
-# Kratos cookie + cipher + Hydra cookie: production collapsed-key
-# shape (LB#10). Same value in both _CURRENT and _PREVIOUS.
+# Kratos cookie + cipher + Hydra cookie: single active secret each
+# (collapsed-key, LB#10). No _PREVIOUS at rest — v26.2.0 uniqueItems.
 KRATOS_COOKIE_SECRET_CURRENT=${kratos_cookie}
-KRATOS_COOKIE_SECRET_PREVIOUS=${kratos_cookie}
 KRATOS_CIPHER_SECRET_CURRENT=${kratos_cipher}
-KRATOS_CIPHER_SECRET_PREVIOUS=${kratos_cipher}
 
 # Hydra
 HYDRA_SYSTEM_SECRET=$(gen)
 HYDRA_COOKIE_SECRET_CURRENT=${hydra_cookie}
-HYDRA_COOKIE_SECRET_PREVIOUS=${hydra_cookie}
 HYDRA_PAIRWISE_SALT=$(gen_short)
 
 # Converged app admin model (CU3). consent is gone; these are the

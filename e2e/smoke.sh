@@ -188,7 +188,7 @@ echo "B. client registration (in-app registrar, one-shot)"
 # apply-clients.sh: it reads hydra/clients/*.yaml from MANIFEST_DIR,
 # resolves each <SLUG>_CLIENT_SECRET from env, and POST/PUTs every client
 # to Hydra admin. Expect exit 0 with every manifest registered.
-docker compose run --rm register-clients > /tmp/apply-clients.log 2>&1
+docker compose --profile oneshot run --rm register-clients > /tmp/apply-clients.log 2>&1
 applycode=$?
 if [[ $applycode -eq 0 ]]; then
     pass "B1 in-app register-clients exited 0"

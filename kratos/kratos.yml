@@ -213,35 +213,24 @@ courier:
   #         subject: Your Dunn Family recovery code
 
 secrets:
-  # Cookie signing secret. Two slots: the current secret signs new
-  # cookies; the previous secret remains valid for verification until the
-  # last cookie minted under it expires.
-  #
-  # Both slots carry distinct values at all times. Kratos rejects an
-  # empty list entry (YAML schema violation), so on first provision
-  # _PREVIOUS is seeded with a sentinel secret that becomes meaningful
-  # on the first rotation.
+  # Cookie signing + at-rest cipher secrets. Ory's secrets arrays model
+  # rotation via DISTINCT entries (the first signs/encrypts; older entries
+  # still verify/decrypt). Kratos v26.2.0 enforces uniqueItems, so a single
+  # active secret is a SINGLE-element array — never two identical slots. The
+  # collapsed-key deployment (one sops key per slot, golden-path LB#10) is
+  # exactly this single-element shape.
   #
   # Rotation runbook (docs/runbooks/cookie-rotation.md):
-  #   1. Generate a new secret; set KRATOS_COOKIE_SECRET_PREVIOUS to the
-  #      current KRATOS_COOKIE_SECRET_CURRENT value.
-  #   2. Set KRATOS_COOKIE_SECRET_CURRENT to the new secret.
-  #   3. Restart Kratos.
-  #   4. Wait for the session lifespan to elapse (90 days default).
-  #   5. Mint a fresh sentinel into KRATOS_COOKIE_SECRET_PREVIOUS and
-  #      restart again.
-  #
-  # lab/scripts/gen-secrets.sh seeds both _CURRENT and _PREVIOUS on first
-  # provision.
+  #   1. PREPEND the new secret as a distinct first entry (old becomes 2nd):
+  #        cookie: [<new>, <current>]
+  #   2. Restart Kratos (new signs; old still verifies).
+  #   3. After the session lifespan elapses (90 days default), DROP the old
+  #      entry — back to a single-element array. Restart again.
   cookie:
     - ${KRATOS_COOKIE_SECRET_CURRENT}
-    - ${KRATOS_COOKIE_SECRET_PREVIOUS}
 
-  # Cipher for at-rest encryption of identity credentials. Same two-slot
-  # shape as cookie.
   cipher:
     - ${KRATOS_CIPHER_SECRET_CURRENT}
-    - ${KRATOS_CIPHER_SECRET_PREVIOUS}
 
 log:
   level: info
