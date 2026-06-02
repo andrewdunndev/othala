@@ -50,6 +50,22 @@ curl_code_in() {
     docker compose exec -T "$container" wget -qO /dev/null -S "$@" 2>&1 | awk '/HTTP/ {print $2}' | tail -1
 }
 
+# othala_code <url> — HTTP status code via Node fetch (othala has no wget/curl).
+othala_code() {
+    local url="$1"
+    docker compose exec -T othala node -e \
+        "fetch('${url}').then(r=>{process.stdout.write(String(r.status));process.exit(0)}).catch(()=>{process.stdout.write('0');process.exit(1)})" \
+        2>/dev/null
+}
+
+# othala_get <url> — response body via Node fetch (othala has no wget/curl).
+othala_get() {
+    local url="$1"
+    docker compose exec -T othala node -e \
+        "fetch('${url}').then(r=>r.text()).then(t=>{process.stdout.write(t);process.exit(0)}).catch(()=>process.exit(1))" \
+        2>/dev/null
+}
+
 echo "=== smoke matrix ==="
 
 # Section A: Substrate sanity
@@ -116,7 +132,7 @@ fi
 
 # A8: Othala app admin /healthz on the loopback admin port (8431).
 # /healthz + /readyz live on the admin mux, NOT the public SSR port.
-code=$(curl_code_in othala http://127.0.0.1:8431/healthz)
+code=$(othala_code http://127.0.0.1:8431/healthz)
 if [[ "$code" == "200" ]]; then
     pass "A8 othala admin /healthz (loopback :8431)"
 else
@@ -129,7 +145,7 @@ fi
 # login_challenge: the handler is mounted (not 404) and rejects the
 # bad/absent challenge. Any served response (not a connection refusal,
 # not a 404) proves the public mux is up and the challenge route exists.
-code=$(curl_code_in othala http://localhost:8080/oauth2/login)
+code=$(othala_code http://localhost:8080/oauth2/login)
 if [[ -n "$code" && "$code" != "404" ]]; then
     pass "A9 othala public /oauth2/login challenge handler mounted (code=$code)"
 else
@@ -143,11 +159,11 @@ fi
 # loopback admin route is NOT served as the JSON endpoint on the public
 # port: a GET on 8080 must not be the admin-port 'not found'/handler.
 # (Boundary check — the converged app's by-construction mux split.)
-code=$(curl_code_in othala http://localhost:8080/healthz)
-if [[ "$code" == "404" || -z "$code" ]]; then
+code=$(othala_code http://localhost:8080/healthz)
+if [[ "$code" == "404" ]]; then
     pass "A9b othala public port does NOT serve admin /healthz (mux split holds)"
 else
-    fail "A9b admin route leaked onto public port" "code=$code (admin /healthz must be loopback-only)"
+    fail "A9b admin route leaked onto public port" "code=$code (expected 404; admin /healthz must be loopback-only)"
 fi
 
 # A10: ldap-bridge /healthz on admin port (:6478). The bridge image
@@ -244,14 +260,12 @@ echo "D. Recovery-gate (othala :8431 /admin/recovery-gate)"
 
 # Helper: POST a recovery-gate body with a bearer, capture HTTP code.
 # Runs inside the othala container (the admin port is loopback there).
+# Uses Node fetch — the ci-runtime-node image has no wget/curl.
 gate_code() {
     local bearer="$1"; local body="$2"
-    docker compose exec -T othala wget -qO /dev/null -S \
-        --post-data="$body" \
-        --header="Content-Type: application/json" \
-        --header="Authorization: Bearer ${bearer}" \
-        http://127.0.0.1:8431/admin/recovery-gate 2>&1 \
-        | awk '/HTTP/ {print $2}' | tail -1
+    docker compose exec -T othala node -e \
+        "fetch('http://127.0.0.1:8431/admin/recovery-gate',{method:'POST',headers:{'Content-Type':'application/json','Authorization':'Bearer ${bearer}'},body:'${body}'}).then(r=>{process.stdout.write(String(r.status));process.exit(0)}).catch(()=>{process.stdout.write('0');process.exit(1)})" \
+        2>/dev/null
 }
 
 ADMIN_EMAIL="admin@${LAB_DOMAIN}"
