@@ -40,30 +40,46 @@ fail() {
 # We can't rely on the runner VM having direct access to the compose
 # internal network (podman compose puts it on a private bridge), so
 # every probe goes through `docker compose exec`.
+#
+# podman-compose (1.5.x) prepends an ANSI reset (ESC[0m) to the FIRST line
+# of `exec` output; docker emits none. Strip it from every captured value
+# or JSON parses + string compares break (observed 2026-06-02: curl_code_in
+# read "HTTP/1.1" as the status field). _strip_ansi is a no-op under docker,
+# so the harness stays engine-portable.
+_strip_ansi() { sed 's/\x1b\[[0-9;]*m//g'; }
+
 curl_in() {
     local container="$1"; shift
-    docker compose exec -T "$container" wget -qO- "$@" 2>/dev/null
+    docker compose exec -T "$container" wget -qO- "$@" 2>/dev/null | _strip_ansi
 }
 
 curl_code_in() {
     local container="$1"; shift
-    docker compose exec -T "$container" wget -qO /dev/null -S "$@" 2>&1 | awk '/HTTP/ {print $2}' | tail -1
+    docker compose exec -T "$container" wget -qO /dev/null -S "$@" 2>&1 \
+        | _strip_ansi | grep -oE 'HTTP/[0-9.]+ +[0-9]{3}' | tail -1 | grep -oE '[0-9]{3}$'
 }
 
-# othala_code <url> — HTTP status code via Node fetch (othala has no wget/curl).
+# node_in <container> — run a JS program inside <container>'s node, reading
+# the SCRIPT FROM STDIN. podman-compose's `exec` mangles argv elements that
+# contain spaces/quotes (e.g. `node -e "...'Bearer X'..."` splits on the
+# space and breaks the script); feeding the program on stdin keeps it an
+# opaque byte stream. docker handles stdin identically, so this is portable.
+# othala has node but no wget/curl, so all its probes route through here.
+node_in() {
+    local container="$1"
+    docker compose exec -T "$container" node 2>/dev/null | _strip_ansi
+}
+
+# othala_code <url> — HTTP status code via Node fetch.
 othala_code() {
     local url="$1"
-    docker compose exec -T othala node -e \
-        "fetch('${url}').then(r=>{process.stdout.write(String(r.status));process.exit(0)}).catch(()=>{process.stdout.write('0');process.exit(1)})" \
-        2>/dev/null
+    printf '%s' "fetch('${url}').then(r=>{process.stdout.write(String(r.status));process.exit(0)}).catch(()=>{process.stdout.write('0');process.exit(1)})" | node_in othala
 }
 
-# othala_get <url> — response body via Node fetch (othala has no wget/curl).
+# othala_get <url> — response body via Node fetch.
 othala_get() {
     local url="$1"
-    docker compose exec -T othala node -e \
-        "fetch('${url}').then(r=>r.text()).then(t=>{process.stdout.write(t);process.exit(0)}).catch(()=>process.exit(1))" \
-        2>/dev/null
+    printf '%s' "fetch('${url}').then(r=>r.text()).then(t=>{process.stdout.write(t);process.exit(0)}).catch(()=>process.exit(1))" | node_in othala
 }
 
 echo "=== smoke matrix ==="
@@ -73,7 +89,7 @@ echo ""
 echo "A. Substrate sanity"
 
 # A1: postgres reachable + kratos + hydra DBs exist
-out=$(docker compose exec -T postgres psql -U postgres -t -A -c "SELECT datname FROM pg_database WHERE datname IN ('kratos','hydra');" 2>/dev/null | sort | tr '\n' ',' )
+out=$(docker compose exec -T postgres psql -U postgres -t -A -c "SELECT datname FROM pg_database WHERE datname IN ('kratos','hydra');" 2>/dev/null | _strip_ansi | sort | tr '\n' ',' )
 if [[ "$out" == "hydra,kratos," ]]; then
     pass "A1 postgres: kratos + hydra DBs present"
 else
@@ -81,7 +97,7 @@ else
 fi
 
 # A2: uuid-ossp on hydra DB
-out=$(docker compose exec -T postgres psql -U postgres -d hydra -t -A -c "SELECT extname FROM pg_extension WHERE extname='uuid-ossp';" 2>/dev/null)
+out=$(docker compose exec -T postgres psql -U postgres -d hydra -t -A -c "SELECT extname FROM pg_extension WHERE extname='uuid-ossp';" 2>/dev/null | _strip_ansi)
 if [[ "$out" == "uuid-ossp" ]]; then
     pass "A2 postgres: uuid-ossp on hydra"
 else
@@ -171,7 +187,7 @@ fi
 # compose. The bridge runs all three listeners (LDAP, LDAPS-optional,
 # admin HTTP) off a shared errs channel — if any fails the process
 # dies — so a healthy /healthz implies LDAP :389 is also bound.
-code=$(docker compose exec -T ldap-bridge curl -s -o /dev/null -w "%{http_code}" http://localhost:6478/healthz 2>/dev/null)
+code=$(docker compose exec -T ldap-bridge curl -s -o /dev/null -w "%{http_code}" http://localhost:6478/healthz 2>/dev/null | _strip_ansi)
 if [[ "$code" == "200" ]]; then
     pass "A10 ldap-bridge /healthz (implies LDAP :389 bound)"
 else
@@ -188,7 +204,12 @@ echo "B. client registration (in-app registrar, one-shot)"
 # apply-clients.sh: it reads hydra/clients/*.yaml from MANIFEST_DIR,
 # resolves each <SLUG>_CLIENT_SECRET from env, and POST/PUTs every client
 # to Hydra admin. Expect exit 0 with every manifest registered.
-docker compose --profile oneshot run --rm register-clients > /tmp/apply-clients.log 2>&1
+#
+# --no-deps is REQUIRED under podman-compose: a bare `compose run` does an
+# `up` reconciliation of the service's deps that RECREATES the whole running
+# project (it killed othala + kratos mid-smoke). --no-deps skips that; it is a
+# no-op under docker since `up -d` already started the deps.
+docker compose --profile oneshot run --rm --no-deps register-clients > /tmp/apply-clients.log 2>&1
 applycode=$?
 if [[ $applycode -eq 0 ]]; then
     pass "B1 in-app register-clients exited 0"
@@ -225,8 +246,10 @@ fi
 echo ""
 echo "C. Identity admin flow"
 
-# C1: Create an identity via Kratos admin API
-identity_json=$(docker compose exec -T kratos wget -qO- --post-data='{"schema_id":"family","traits":{"username":"lab.test","email":"lab.test@'${LAB_DOMAIN}'","displayName":"Lab Test"},"metadata_admin":{"groups":["family","access-keep","access-observe"]}}' --header='Content-Type: application/json' http://localhost:4434/admin/identities 2>/dev/null)
+# C1: Create an identity via the Kratos admin API. kratos' busybox wget has
+# no --post-data, so POST from othala's node over the compose network (othala
+# reaches kratos:4434). Program on stdin (podman-compose-safe).
+identity_json=$(printf '%s' "fetch('http://kratos:4434/admin/identities',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({schema_id:'family',traits:{username:'lab.test',email:'lab.test@${LAB_DOMAIN}',displayName:'Lab Test'},metadata_admin:{groups:['family','access-keep','access-observe']}})}).then(r=>r.text()).then(t=>{process.stdout.write(t);process.exit(0)}).catch(()=>process.exit(1))" | node_in othala)
 identity_id=$(echo "$identity_json" | python3 -c "import sys,json; print(json.load(sys.stdin).get('id',''))" 2>/dev/null || echo "")
 if [[ -n "$identity_id" ]]; then
     pass "C1 created identity id=$identity_id"
@@ -263,9 +286,7 @@ echo "D. Recovery-gate (othala :8431 /admin/recovery-gate)"
 # Uses Node fetch — the ci-runtime-node image has no wget/curl.
 gate_code() {
     local bearer="$1"; local body="$2"
-    docker compose exec -T othala node -e \
-        "fetch('http://127.0.0.1:8431/admin/recovery-gate',{method:'POST',headers:{'Content-Type':'application/json','Authorization':'Bearer ${bearer}'},body:'${body}'}).then(r=>{process.stdout.write(String(r.status));process.exit(0)}).catch(()=>{process.stdout.write('0');process.exit(1)})" \
-        2>/dev/null
+    printf '%s' "fetch('http://127.0.0.1:8431/admin/recovery-gate',{method:'POST',headers:{'Content-Type':'application/json','Authorization':'Bearer ${bearer}'},body:'${body}'}).then(r=>{process.stdout.write(String(r.status));process.exit(0)}).catch(()=>{process.stdout.write('0');process.exit(1)})" | node_in othala
 }
 
 ADMIN_EMAIL="admin@${LAB_DOMAIN}"

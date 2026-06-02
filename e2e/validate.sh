@@ -98,17 +98,14 @@ while true; do
         docker compose logs --tail=200 > /tmp/lab-healthcheck-failure.log
         exit 1
     fi
-    # Count healthy long-running services
-    healthy=$(docker compose ps --format json 2>/dev/null | \
-        python3 -c "import sys,json
-n=0
-for line in sys.stdin:
-    line=line.strip()
-    if not line: continue
-    try: d=json.loads(line)
-    except: continue
-    if d.get('Health')=='healthy': n+=1
-print(n)" 2>/dev/null)
+    # Count healthy long-running services. podman-compose's
+    # `ps --format json` emits a different shape than docker compose (NOT
+    # JSON-lines), so a per-line json parser silently counts 0 and this
+    # loop times out at 240s even on a fully-healthy substrate (observed
+    # 2026-06-02, pipeline 2571487244: all 5 healthy, loop never saw them).
+    # The PLAIN `docker compose ps` output reliably shows "(healthy)" in the
+    # status column under both engines — count that instead.
+    healthy=$(docker compose ps 2>/dev/null | grep -c '(healthy)')
     # Expecting 5 healthy long-runners: postgres, kratos, hydra, othala,
     # ldap-bridge. consent + util are gone (folded into the othala app).
     # The othala healthcheck hits its loopback admin /healthz (:8431);
