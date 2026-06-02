@@ -62,9 +62,24 @@ if [[ -n "${CI_REGISTRY_USER:-}" && -n "${CI_REGISTRY_PASSWORD:-}" ]]; then
     echo "$CI_REGISTRY_PASSWORD" | podman login --username "$CI_REGISTRY_USER" --password-stdin "${AUTH_REGISTRY%%/*}"
 fi
 
-# envsubst doesn't help with the YAML configs — they're consumed by
-# kratos/hydra binaries which already do their own ${VAR} substitution
-# from env. Just `docker compose` passes the env vars through.
+# Render the Ory configs. Kratos/Hydra do NOT interpolate ${VAR} inside
+# their YAML (they only accept uppercased-dotted env OVERRIDES), so the
+# ${LAB_DOMAIN} + ${*_SECRET} placeholders in kratos.yml / hydra.yml must
+# be substituted HERE before the containers mount them. Without this,
+# kratos validates the literal "${KRATOS_CIPHER_SECRET_CURRENT}" (31 chars
+# < the 32 minimum) and the ${LAB_DOMAIN} URLs as invalid URIs, and dies.
+# python3 os.path.expandvars (the golden has python3; no gettext/envsubst
+# dependency) substitutes defined vars and leaves any undefined var literal
+# rather than silently blanking it. The VM is ephemeral, so rendering the
+# checked-out configs in place is fine.
+set -a
+source ./.env
+RECOVERY_GATE_HOST="${RECOVERY_GATE_HOST:-othala}"
+set +a
+for cfg in kratos.yml hydra.yml; do
+    python3 -c 'import os,sys; sys.stdout.write(os.path.expandvars(sys.stdin.read()))' < "$cfg" > "$cfg.rendered"
+    mv "$cfg.rendered" "$cfg"
+done
 
 # Step 3: compose up.
 # Set -e here so a failed compose-up aborts before smoke.
