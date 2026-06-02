@@ -186,9 +186,10 @@ e2e:
   variables:
     LAB_DOMAIN: lab.dunn.dev
     AUTH_REGISTRY: "${CI_REGISTRY_IMAGE}"
-    # Tag pipelines: use the v-tag. Non-tag: use SHA (matches what
-    # container-image @2.5.0 publishes for non-tag pushes).
-    AUTH_VERSION: "${CI_COMMIT_TAG:-${CI_COMMIT_SHORT_SHA}}"
+    # Default to the commit short-SHA (what container-image @2.5.0 publishes
+    # for non-tag / BUILD_CI_IMAGE builds). GitLab variables: do NOT honor
+    # bash ${VAR:-default}, so tag pipelines override AUTH_VERSION in rules:.
+    AUTH_VERSION: "$CI_COMMIT_SHORT_SHA"
   before_script:
     # The baser golden has podman + podman-docker. Verify here so
     # missing tools fail loudly at job start, not mid-compose.
@@ -209,13 +210,17 @@ e2e:
   rules:
     # Run on every push to main + on every MR + on every tag.
     # Renovate-MR bumps + Ory image bumps fire this loop.
+    # Tag pipelines pull the v-tag image — override the SHA default above.
+    # (GitLab variables: can't express this inline, so it's rule-scoped.)
+    - if: '$CI_COMMIT_TAG'
+      variables:
+        AUTH_VERSION: "$CI_COMMIT_TAG"
     - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
     - if: '$CI_PIPELINE_SOURCE == "push" && $CI_COMMIT_BRANCH == "main"'
-    - if: '$CI_COMMIT_TAG'
     # On-demand pre-tag validation: a branch pipeline triggered with
     # BUILD_CI_IMAGE=true builds the images (container-image @2.5.0 honors
     # the same flag — see its rule 3) and runs e2e against them. Lets us
     # validate the converged substrate on the carmine runner BEFORE cutting
-    # a tag or merging to main. The build jobs publish :<short-sha>; e2e's
-    # AUTH_VERSION already falls back to CI_COMMIT_SHORT_SHA on non-tag runs.
+    # a tag or merging to main. The builds publish :<short-sha>, which the
+    # AUTH_VERSION default ($CI_COMMIT_SHORT_SHA) matches.
     - if: '$BUILD_CI_IMAGE == "true"'

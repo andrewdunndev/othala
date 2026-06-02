@@ -53,7 +53,7 @@ services:
       KRATOS_PG_PASS: ${KRATOS_PG_PASS}
       HYDRA_PG_PASS: ${HYDRA_PG_PASS}
     volumes:
-      - ./postgres-init.sh:/docker-entrypoint-initdb.d/init.sh:ro
+      - ./postgres-init.sh:/docker-entrypoint-initdb.d/init.sh:ro,z
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U postgres"]
       interval: 5s
@@ -79,8 +79,8 @@ services:
       # /admin/recovery-gate route.
       RECOVERY_GATE_HOST: othala
     volumes:
-      - ./kratos.yml:/etc/config/kratos/kratos.yml:ro
-      - ./identity.schema.json:/etc/config/kratos/identity.schema.json:ro
+      - ./kratos.yml:/etc/config/kratos/kratos.yml:ro,z
+      - ./identity.schema.json:/etc/config/kratos/identity.schema.json:ro,z
     command: ["migrate", "sql", "-e", "--yes", "--config", "/etc/config/kratos/kratos.yml"]
 
   kratos:
@@ -110,9 +110,9 @@ services:
       # (admin port 8431). Was the consent service pre-convergence.
       RECOVERY_GATE_HOST: othala
     volumes:
-      - ./kratos.yml:/etc/config/kratos/kratos.yml:ro
-      - ./identity.schema.json:/etc/config/kratos/identity.schema.json:ro
-      - ./recovery-gate.jsonnet:/etc/config/kratos/hooks/recovery-gate.jsonnet:ro
+      - ./kratos.yml:/etc/config/kratos/kratos.yml:ro,z
+      - ./identity.schema.json:/etc/config/kratos/identity.schema.json:ro,z
+      - ./recovery-gate.jsonnet:/etc/config/kratos/hooks/recovery-gate.jsonnet:ro,z
     command: ["serve", "all", "--config", "/etc/config/kratos/kratos.yml", "--dev"]
     healthcheck:
       test: ["CMD-SHELL", "wget -qO- http://localhost:4434/admin/health/ready || exit 1"]
@@ -150,7 +150,7 @@ services:
       # Host env-var consumed by canonical hydra.yml.
       HYDRA_PG_HOST: postgres
     volumes:
-      - ./hydra.yml:/etc/config/hydra/hydra.yml:ro
+      - ./hydra.yml:/etc/config/hydra/hydra.yml:ro,z
     command: ["serve", "all", "--config", "/etc/config/hydra/hydra.yml", "--dev"]
     healthcheck:
       test: ["CMD-SHELL", "wget -qO- http://localhost:4445/health/ready || exit 1"]
@@ -202,7 +202,7 @@ services:
       ADMIN_HOST: 127.0.0.1
       ADMIN_PORT: "8431"
     volumes:
-      - ../hydra/clients:/etc/portal/manifests:ro
+      - ../hydra/clients:/etc/portal/manifests:ro,z
     healthcheck:
       # /healthz lives on the loopback ADMIN port (8431), not the public
       # SSR port. Probe it from inside the container.
@@ -227,7 +227,7 @@ services:
       KRATOS_PUBLIC_URL: http://kratos:4433
       KRATOS_ADMIN_URL: http://kratos:4434
     volumes:
-      - ./glauth.cfg:/etc/glauth/glauth.cfg:ro
+      - ./glauth.cfg:/etc/glauth/glauth.cfg:ro,z
     # Bridge has a /healthz on its admin port (:6478 default per
     # main.go adminListenEnv). UBI 9 minimal runtime ships curl
     # (Containerfile base swap from micro → minimal for this reason),
@@ -273,5 +273,5 @@ services:
       TAILSCALE_CLIENT_SECRET: ${TAILSCALE_CLIENT_SECRET}
       LLM_CLIENT_SECRET: ${LLM_CLIENT_SECRET}
     volumes:
-      - ../hydra/clients:/etc/portal/manifests:ro
+      - ../hydra/clients:/etc/portal/manifests:ro,z
     command: ["node", "./dist/server/register-clients.mjs"]
