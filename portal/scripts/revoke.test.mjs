@@ -16,6 +16,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { revokeSubject, RevokeError } from '../src/lib/revoke.ts';
+import { ResponseError } from '@ory/client-fetch';
 
 function makeDeps() {
   const calls = [];
@@ -113,6 +114,25 @@ test('step-2 (delete-sessions) failure ABORTS the fan-out', async () => {
   const order = calls.map((c) => c[0]);
   assert.ok(!order.includes('revokeOAuth2LoginSessions'));
   assert.ok(!order.includes('flushLdapBindCache'));
+});
+
+test('step-2 (delete-sessions) 404 = no active sessions: TOLERATED, fan-out continues to Hydra', async () => {
+  const { calls, deps } = makeDeps();
+  deps.identityApi.deleteIdentitySessions = async () => {
+    // Kratos v26 returns 404 (not 204) from DELETE sessions when the subject
+    // has no active sessions. "Nothing to revoke" is the success postcondition.
+    throw new ResponseError(new Response(null, { status: 404 }), 'Not Found');
+  };
+
+  // MUST NOT throw: a subject with no live Kratos session can still hold a
+  // remembered Hydra login / live tokens, which "sign out everywhere" must cut.
+  const result = await revokeSubject('sub-1', {}, deps);
+  const order = calls.map((c) => c[0]);
+  assert.ok(order.includes('revokeOAuth2LoginSessions'), 'Hydra login revoke must run after a 404');
+  assert.ok(order.includes('revokeOAuth2ConsentSessions'), 'Hydra consent revoke must run after a 404');
+  assert.equal(result.kratosSessionsRevoked, true); // nothing to revoke == revoked
+  assert.equal(result.hydraLoginRevoked, true);
+  assert.equal(result.hydraConsentRevoked, true);
 });
 
 test('step-2 failure under deactivate still runs step 1 first then aborts', async () => {

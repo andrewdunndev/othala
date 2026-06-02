@@ -17,8 +17,11 @@
 //   1. Kratos state -> inactive  (deactivate trigger ONLY; MUST precede 2)
 //      PATCH /admin/identities/{id} [{op:replace,path:/state,value:inactive}]
 //   2. Kratos sessions revoke    DELETE /admin/identities/{id}/sessions
-//      FAILURE ABORTS the fan-out — without this the subject keeps a live
-//      Kratos session and the cut is a no-op.
+//      A REAL failure (Kratos unreachable / 5xx) ABORTS the fan-out. But a
+//      404 ("no active sessions") is the SUCCESS postcondition, not a failure
+//      — tolerate it and CONTINUE: a subject with no live Kratos session can
+//      still hold a remembered Hydra login / live access tokens, which is the
+//      very case "sign out everywhere" must cut.
 //   3. Hydra login-session revoke   revokeOAuth2LoginSessions({subject})
 //      Cuts the 24h loginRememberFor window so a remembered subject cannot
 //      skip-login a fresh token. Idempotent.
@@ -44,6 +47,7 @@ import {
   Configuration,
   IdentityApi,
   OAuth2Api,
+  ResponseError,
   type JsonPatch,
 } from '@ory/client-fetch';
 
@@ -66,6 +70,15 @@ export class RevokeError extends Error {
     this.step = step;
     this.cause = cause;
   }
+}
+
+/**
+ * True iff the SDK error is an HTTP 404. Kratos returns 404 from
+ * DELETE /admin/identities/{id}/sessions when the subject has NO active
+ * sessions — "nothing to revoke", the success postcondition, not a failure.
+ */
+function isNotFound(err: unknown): boolean {
+  return err instanceof ResponseError && err.response?.status === 404;
 }
 
 /** The portal-side revoke fan-out clients + the trigger flavour. */
@@ -194,17 +207,24 @@ export async function revokeSubject(
     }
   }
 
-  // ── Step 2 (all triggers): Kratos sessions revoke. FAILURE ABORTS. ──────
+  // ── Step 2 (all triggers): Kratos sessions revoke. ─────────────────────
+  // A 404 means the subject has no active sessions (Kratos v26 returns 404,
+  // not 204, in that case): nothing to revoke == revoked. Tolerate it and
+  // continue to the Hydra cut. Only a REAL failure aborts the fan-out.
   try {
     await d.identityApi.deleteIdentitySessions({ id: subject });
     result.kratosSessionsRevoked = true;
   } catch (err) {
-    throw new RevokeError(
-      'kratos-admin',
-      'delete-sessions',
-      'Could not revoke the subject\'s Kratos sessions; fan-out ABORTED (the subject may still hold a live session). Verify KRATOS_ADMIN_URL, then re-run the revoke.',
-      err,
-    );
+    if (isNotFound(err)) {
+      result.kratosSessionsRevoked = true; // no active sessions == nothing to revoke
+    } else {
+      throw new RevokeError(
+        'kratos-admin',
+        'delete-sessions',
+        'Could not revoke the subject\'s Kratos sessions; fan-out ABORTED (the subject may still hold a live session). Verify KRATOS_ADMIN_URL, then re-run the revoke.',
+        err,
+      );
+    }
   }
 
   // ── Step 3 (all triggers): Hydra login-session revoke. Idempotent. ──────
