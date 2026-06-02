@@ -212,3 +212,10 @@ e2e:
     - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
     - if: '$CI_PIPELINE_SOURCE == "push" && $CI_COMMIT_BRANCH == "main"'
     - if: '$CI_COMMIT_TAG'
+    # On-demand pre-tag validation: a branch pipeline triggered with
+    # BUILD_CI_IMAGE=true builds the images (container-image @2.5.0 honors
+    # the same flag — see its rule 3) and runs e2e against them. Lets us
+    # validate the converged substrate on the carmine runner BEFORE cutting
+    # a tag or merging to main. The build jobs publish :<short-sha>; e2e's
+    # AUTH_VERSION already falls back to CI_COMMIT_SHORT_SHA on non-tag runs.
+    - if: '$BUILD_CI_IMAGE == "true"'
