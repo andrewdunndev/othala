@@ -25,7 +25,6 @@ that get volume-mounted into the Caddy sidecar at deploy time:
 | `ldap-app.caddy` | LDAP-bound app (Jellyfin) plain reverse proxy |
 | `forward-auth.caddy` | Caddy `forward_auth` against Kratos `/sessions/whoami` |
 | `admin-session.caddy` | Auth admin path with AAL2 enforcement at SSR |
-| `portal.caddy` | Home portal Caddyfile chunk |
 
 See `../ARCHITECTURE.md` ("Auth patterns") for how each pattern composes
 into the per-app Caddyfiles in production.

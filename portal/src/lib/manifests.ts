@@ -296,7 +296,17 @@ function freshestMtime(): number {
   }
 }
 
-/** Return all known clients sorted by clientId. Cached 30s + invalidates on mtime change. */
+/** Return all known clients sorted by clientId. Cached 30s + invalidates on mtime change.
+ *
+ * B (pre-swap validation): runs validateClients on the candidate set BEFORE
+ * writing to cache. If validation fails, preserves the prior good cache and
+ * throws. Matches Go Reload() behavior: "A reload that introduces (e.g.) an
+ * undeclared role in group_role_map is rejected with prior state intact."
+ *
+ * Duplicate client_id detection: if two files declare the same client_id
+ * (case-insensitive), throws before swapping. Matches Go:
+ * 'duplicate client_id %q in %s and %s'.
+ */
 export function loadClientManifests(): ClientManifest[] {
   const now = Date.now();
   const mtime = freshestMtime();
@@ -307,13 +317,46 @@ export function loadClientManifests(): ClientManifest[] {
   ) {
     return cache.manifests;
   }
+
+  // Capture prior cache before loading — restore on validation failure.
+  const priorCache = cache;
+
   const manifests = loadFromDisk();
+
+  // Duplicate client_id detection (case-insensitive, matching Go Reload).
+  const seen = new Map<string, string>(); // lowercase clientId -> sourcePath
+  for (const m of manifests) {
+    const key = m.clientId.toLowerCase();
+    const existing = seen.get(key);
+    if (existing !== undefined) {
+      cache = priorCache;
+      throw new Error(
+        `duplicate client_id ${JSON.stringify(key)} in ${existing} and ${m.sourcePath}`,
+      );
+    }
+    seen.set(key, m.sourcePath);
+  }
+
+  // Pre-swap validation guard (Go M2): validate before swapping the cache.
+  const errs = validateClients(manifests);
+  if (errs.length > 0) {
+    cache = priorCache;
+    throw new Error(
+      `manifest validation failed (${errs.length} finding(s)):\n  - ${errs.join('\n  - ')}`,
+    );
+  }
+
   cache = { manifests, mtimeMs: mtime, loadedAtMs: now };
   return manifests;
 }
 
+/**
+ * Return the manifest for a client_id. Case-insensitive lookup to match
+ * Go Manifest.Client(clientID) which calls strings.ToLower(clientID).
+ */
 export function getClientManifest(clientId: string): ClientManifest | undefined {
-  return loadClientManifests().find((m) => m.clientId === clientId);
+  const key = clientId.toLowerCase();
+  return loadClientManifests().find((m) => m.clientId.toLowerCase() === key);
 }
 
 /**

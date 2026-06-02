@@ -21,7 +21,7 @@ import assert from 'node:assert/strict';
 import { mkdtempSync, writeFileSync, rmSync, readdirSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
-import { parseManifest } from '../src/lib/manifests.ts';
+import { parseManifest, loadClientManifests } from '../src/lib/manifests.ts';
 
 test('namespace split: minimal yaml with oidc + consent blocks parses', () => {
   const out = parseManifest(
@@ -219,6 +219,98 @@ consent: {}
     'keep.yaml',
   );
   assert.equal(out.skipConsent, true);
+});
+
+// B: Pre-swap validation — bad candidate set rejected, prior cache preserved.
+test('B: pre-swap validation rejects a set with undeclared group_role_map role', () => {
+  const dir = mkdtempSync(join(tmpdir(), 'manifest-preswap-'));
+  try {
+    // Write a valid manifest first to prime the cache.
+    const goodYaml = `
+oidc:
+  client_id: good-client
+  audience:
+    - https://good.example.com
+  redirect_uris:
+    - https://good.example.com/callback
+consent:
+  roles:
+    user:
+      description: normal user
+      claim_emit: {}
+  group_role_map:
+    family: user
+`;
+    writeFileSync(join(dir, 'good-client.yaml'), goodYaml);
+
+    process.env.MANIFEST_DIR = dir;
+    // Load the good set to prime the cache.
+    const good = loadClientManifests();
+    assert.equal(good.length, 1, 'good set must load');
+    assert.equal(good[0].clientId, 'good-client');
+
+    // Now replace with a bad manifest that references an undeclared role.
+    // Use a different mtime by replacing file content.
+    const badYaml = `
+oidc:
+  client_id: bad-client
+  audience:
+    - https://bad.example.com
+  redirect_uris:
+    - https://bad.example.com/callback
+consent:
+  roles:
+    user:
+      description: normal user
+      claim_emit: {}
+  group_role_map:
+    family: UNDECLARED_ROLE
+`;
+    // Remove old, write bad — must bump mtime to invalidate cache.
+    rmSync(join(dir, 'good-client.yaml'));
+    writeFileSync(join(dir, 'bad-client.yaml'), badYaml);
+
+    // The bad candidate set must be rejected.
+    assert.throws(
+      () => loadClientManifests(),
+      /manifest validation failed/,
+      'bad candidate set must throw with validation error',
+    );
+  } finally {
+    delete process.env.MANIFEST_DIR;
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+// B: duplicate client_id detection at load.
+test('B: duplicate client_id (case-insensitive) is detected and rejected', () => {
+  const dir = mkdtempSync(join(tmpdir(), 'manifest-dup-'));
+  try {
+    writeFileSync(join(dir, 'a-client.yaml'), `
+oidc:
+  client_id: my-client
+  audience:
+    - https://a.example.com
+consent: {}
+`);
+    writeFileSync(join(dir, 'b-client.yaml'), `
+oidc:
+  client_id: my-client
+  audience:
+    - https://b.example.com
+consent: {}
+`);
+
+    process.env.MANIFEST_DIR = dir;
+    assert.throws(
+      () => loadClientManifests(),
+      /duplicate client_id/,
+      'duplicate client_id must be detected',
+    );
+  } finally {
+    delete process.env.MANIFEST_DIR;
+    rmSync(dir, { recursive: true, force: true });
+  }
 });
 
 // Integration-style: write a temp directory of yamls and verify the

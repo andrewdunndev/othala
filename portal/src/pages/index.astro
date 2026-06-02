@@ -31,7 +31,7 @@ export const prerender = false;
 
 import Layout from '../layouts/Layout.astro';
 import markSvg from '@dunn.dev/reference/mark/mark.svg?raw';
-import { getCollection } from 'astro:content';
+import { getCollection, type CollectionEntry } from 'astro:content';
 import { getSession, isReachable } from '../lib/kratos';
 import { isAdminSubject } from '../lib/admin-auth';
 import type { Identity } from '../lib/types';
@@ -81,15 +81,17 @@ if (devOverride === 'down' || devOverride === 'pre-auth' || devOverride === 'pos
 // Apps registry — read at build time from the Content Collection.
 // Frontmatter shapes carry the tile metadata; we don't need the MD body
 // here (that's the /apps/[slug] detail page).
-const appEntries = await getCollection('apps', ({ data }) => !data.disabled);
+type AppEntry = CollectionEntry<'apps'>;
+type AppTile = { slug: string } & AppEntry['data'];
+const appEntries = await getCollection('apps', ({ data }: AppEntry) => !data.disabled);
 const orderedApps = appEntries
-  .map((e) => ({ slug: e.id, ...e.data }))
-  .sort((a, b) => a.order - b.order || a.name.localeCompare(b.name));
+  .map((e: AppEntry): AppTile => ({ slug: e.id, ...e.data }))
+  .sort((a: AppTile, b: AppTile) => a.order - b.order || a.name.localeCompare(b.name));
 
 const groups = identity?.metadata_admin?.groups ?? [];
 const visibleTiles =
   state === 'post-auth'
-    ? orderedApps.filter((a) => groups.includes(a.access_group))
+    ? orderedApps.filter((a: AppTile) => groups.includes(a.access_group))
     : [];
 // B2: the Admin nav affordance follows the OTHALA_ADMIN_SUBJECTS allowlist,
 // not the (display-only) `admin` group. The /admin route itself is gated by
@@ -188,7 +190,7 @@ const devLinks = [
         <p class="section-subtitle">Your apps</p>
         {visibleTiles.length > 0 ? (
           <div class="tile-grid">
-            {visibleTiles.map((t) => (
+            {visibleTiles.map((t: AppTile) => (
               <a class="tile" href={t.url}>
                 <div class="tile-icon mono">{t.icon}</div>
                 <div class="tile-name">{t.name}</div>

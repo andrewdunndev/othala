@@ -30,19 +30,32 @@ import type { Identity, Session } from './types';
 import { getIdentity as defaultGetIdentity } from './admin-api';
 import { getSession as defaultGetSession } from './kratos';
 import { enforceAccessGate, type GateResult } from './gate';
-import { buildIDTokenClaims } from './claims';
+import { composeIDTokenClaims } from './claims';
+import { getClientManifest, type ClientManifest } from './manifests';
+import { verifyToken, CSRFError } from './csrf';
 
-// loginRememberFor / consentRememberFor: same windows as the Go service
-// (consent/handlers.go) so Hydra's remembered decisions expire on the same
-// cadence regardless of which provider answers the challenge.
 const LOGIN_REMEMBER_FOR = 86400; // 24h
-const CONSENT_REMEMBER_FOR = 3600; // 1h
+
+// CONSENT_REMEMBER_FOR_SKIP: 1 hour — matches Go consentRememberFor (3600).
+// Used on the skip auto-accept path (all current skip_consent:true clients).
+// Go comment: "Trusted clients all skip_consent anyway, so remember is
+// mostly belt and suspenders. Short window keeps blast radius small if a
+// group changes mid-session."
+const CONSENT_REMEMBER_FOR_SKIP = 3600; // 1h — matches Go consentRememberFor
+
+// CONSENT_REMEMBER_FOR_PROMPT: 30 days (2 592 000 s).
+// Used on the interactive Allow POST path only. Goal: a prompted client
+// asks ONCE PER USER, then is silent on subsequent logins (coordinator
+// decision 2). Chosen to outlive LOGIN_REMEMBER_FOR (24 h) and align
+// with Hydra's refresh_token TTL (720 h / 30 d). NOT applied on the
+// skip path — skip path uses CONSENT_REMEMBER_FOR_SKIP to match Go.
+const CONSENT_REMEMBER_FOR_PROMPT = 2_592_000; // 30 days
 
 function hydraAdminBase(): string {
   return process.env.HYDRA_ADMIN_URL ?? 'http://hydra:4445';
 }
 
-function defaultOAuth2Api(): OAuth2Api {
+export function defaultOAuth2Api(): OAuth2Api {
   const token = process.env.HYDRA_ADMIN_TOKEN ?? '';
   return new OAuth2Api(
     new Configuration({
@@ -58,6 +71,15 @@ function defaultOAuth2Api(): OAuth2Api {
  */
 function loginUIBase(): string {
   return process.env.PORTAL_LOGIN_URL ?? '/auth/login';
+}
+
+/**
+ * The consent grant-screen base. Production points at /auth/consent (the
+ * Astro page that renders the Allow / Deny UI). Overridable via
+ * PORTAL_CONSENT_URL for test / lab environments.
+ */
+function consentUIBase(): string {
+  return process.env.PORTAL_CONSENT_URL ?? '/auth/consent';
 }
 
 /**
@@ -79,8 +101,9 @@ export interface Deps {
   >;
   getIdentity?: (id: string) => Promise<Identity>;
   getSession?: (cookie?: string) => Promise<Session | null>;
-  gate?: (identity: Identity | null, clientId: string) => GateResult;
-  buildClaims?: (identity: Identity | null) => Record<string, unknown>;
+  gate?: (identity: Identity | null, clientId: string, manifest?: ClientManifest) => GateResult;
+  /** Resolve a client manifest by clientId. Used for claims injection (A3) and gate (C). */
+  manifest?: (clientId: string) => ClientManifest | undefined;
 }
 
 function resolve(deps: Deps): Required<Deps> {
@@ -88,8 +111,8 @@ function resolve(deps: Deps): Required<Deps> {
     oauth2: deps.oauth2 ?? defaultOAuth2Api(),
     getIdentity: deps.getIdentity ?? defaultGetIdentity,
     getSession: deps.getSession ?? defaultGetSession,
-    gate: deps.gate ?? ((identity, clientId) => enforceAccessGate(identity, clientId)),
-    buildClaims: deps.buildClaims ?? buildIDTokenClaims,
+    gate: deps.gate ?? ((identity, clientId, manifest) => enforceAccessGate(identity, clientId, manifest)),
+    manifest: deps.manifest ?? ((clientId) => getClientManifest(clientId)),
   };
 }
 
@@ -167,7 +190,8 @@ export async function handleLogin(req: Request, deps: Deps = {}): Promise<Respon
 
   // Enforce the access gate (state + group), fail-closed on lookup failure.
   const identity = await safeGetIdentity(d, subject);
-  const result = d.gate(identity, clientId);
+  const loginManifest = d.manifest(clientId);
+  const result = d.gate(identity, clientId, loginManifest);
   if (!result.allowed) {
     try {
       const { redirect_to } = await d.oauth2.rejectOAuth2LoginRequest({
@@ -199,6 +223,52 @@ export async function handleLogin(req: Request, deps: Deps = {}): Promise<Respon
   }
 }
 
+/**
+ * Accept a consent request with full claims and remember=true.
+ *
+ * Extracted so both the skip=true auto-accept path in handleConsent AND the
+ * POST handler in /oauth2/consent.ts share one call site (DRY). The identity
+ * is non-null here — callers must have already passed the gate (which denies
+ * on null identity).
+ *
+ * rememberFor: callers pass CONSENT_REMEMBER_FOR_SKIP (3600, matches Go) for
+ * the skip auto-accept path, and CONSENT_REMEMBER_FOR_PROMPT (30d) for the
+ * interactive Allow POST path. Default is CONSENT_REMEMBER_FOR_SKIP (skip
+ * path is the common case for all current skip_consent:true clients).
+ *
+ * clientId: threaded in to resolve the client manifest for claims injection
+ * (A3: composeIDTokenClaims applies emit_groups + lookupRole deepMergeClaims).
+ */
+export async function acceptConsentRequest(
+  challenge: string,
+  consent: OAuth2ConsentRequest,
+  identity: Identity,
+  d: Required<Deps>,
+  clientId: string,
+  rememberFor: number = CONSENT_REMEMBER_FOR_SKIP,
+): Promise<Response> {
+  const manifest = d.manifest(clientId);
+  const idTokenClaims = composeIDTokenClaims(identity, manifest);
+  try {
+    const { redirect_to } = await d.oauth2.acceptOAuth2ConsentRequest({
+      consentChallenge: challenge,
+      acceptOAuth2ConsentRequest: {
+        grant_scope: consent.requested_scope,
+        grant_access_token_audience: consent.requested_access_token_audience,
+        remember: true,
+        remember_for: rememberFor,
+        session: {
+          id_token: idTokenClaims,
+          access_token: {},
+        },
+      },
+    });
+    return redirect(redirect_to);
+  } catch {
+    return new Response('upstream error', { status: 502 });
+  }
+}
+
 /** Handle GET /oauth2/consent?consent_challenge=... */
 export async function handleConsent(req: Request, deps: Deps = {}): Promise<Response> {
   const d = resolve(deps);
@@ -221,7 +291,8 @@ export async function handleConsent(req: Request, deps: Deps = {}): Promise<Resp
   // Consent must gate even when login was remembered (skip), and the consent
   // challenge always fires for skip_consent clients.
   const identity = await safeGetIdentity(d, subject);
-  const result = d.gate(identity, clientId);
+  const consentManifest = d.manifest(clientId);
+  const result = d.gate(identity, clientId, consentManifest);
   if (!result.allowed) {
     try {
       const { redirect_to } = await d.oauth2.rejectOAuth2ConsentRequest({
@@ -238,27 +309,188 @@ export async function handleConsent(req: Request, deps: Deps = {}): Promise<Resp
     }
   }
 
-  // identity is non-null here: the gate denies on a null identity.
-  const idTokenClaims = d.buildClaims(identity);
+  // SKIP PATH (coordinator decision 1 — SACRED):
+  // When consent.skip === true (skip_consent: true client, which all 11
+  // current estate clients are), Hydra already has a remembered grant decision.
+  // Auto-accept immediately — no UI, behaviorally identical to the pre-prompt
+  // implementation. The identity is non-null here (gate passed).
+  // remember_for = CONSENT_REMEMBER_FOR_SKIP (3600) to match Go consentRememberFor.
+  if (consent.skip) {
+    // identity is non-null: gate denies on null identity above.
+    return acceptConsentRequest(challenge, consent, identity!, d, clientId, CONSENT_REMEMBER_FOR_SKIP);
+  }
 
+  // PROMPT PATH (coordinator decision 1):
+  // When consent.skip === false the user has NOT previously granted consent for
+  // this client (or the grant expired). Redirect to the grant screen. The
+  // browser renders /auth/consent, the user clicks Allow / Deny, and the form
+  // POSTs to /oauth2/consent which completes the challenge.
+  const qs = new URLSearchParams({ consent_challenge: challenge });
+  return redirect(`${consentUIBase()}?${qs.toString()}`);
+}
+
+/**
+ * Handle POST /oauth2/consent — Allow/Deny from the grant screen.
+ *
+ * Called by the <form method="POST" action="/oauth2/consent"> in
+ * /auth/consent.astro. Validates signed CSRF token (verifyToken) + subject-
+ * match, then either accepts (with full claims + remember=true) or rejects
+ * the consent challenge.
+ *
+ * Integrity model:
+ *   - Signed CSRF token: csrf_token is verified via verifyToken(token, identityId)
+ *     from csrf.ts — same mechanism as the admin pages. Fail-closed: CSRFError
+ *     returns 400. The token is emitted as a hidden input in consent.astro and
+ *     tied to the session's identity.id.
+ *   - The consent_challenge is re-fetched from Hydra on every POST. Hydra
+ *     single-use challenges prevent replay: a challenge that has already been
+ *     accepted/rejected returns an error, so old form submissions are inert.
+ *   - The current Kratos session's identity.id MUST equal consent.subject.
+ *     A mismatch means a different user's browser session is trying to
+ *     consent on someone else's challenge — reject with access_denied.
+ */
+export async function handleConsentPost(req: Request, deps: Deps = {}): Promise<Response> {
+  const d = resolve(deps);
+
+  let body: URLSearchParams;
   try {
-    const { redirect_to } = await d.oauth2.acceptOAuth2ConsentRequest({
-      consentChallenge: challenge,
-      acceptOAuth2ConsentRequest: {
-        grant_scope: consent.requested_scope,
-        grant_access_token_audience: consent.requested_access_token_audience,
-        remember: true,
-        remember_for: CONSENT_REMEMBER_FOR,
-        session: {
-          id_token: idTokenClaims,
-          access_token: {},
-        },
-      },
-    });
-    return redirect(redirect_to);
+    const text = await req.text();
+    body = new URLSearchParams(text);
+  } catch {
+    return new Response('bad request body', { status: 400 });
+  }
+
+  const challenge = body.get('consent_challenge');
+  if (!challenge) {
+    return new Response('missing consent_challenge', { status: 400 });
+  }
+
+  const action = body.get('action');
+  if (action !== 'allow' && action !== 'deny') {
+    return new Response('invalid action', { status: 400 });
+  }
+
+  // Re-fetch the consent request from Hydra (single-use integrity — validates
+  // the challenge is still open and binds to the correct subject).
+  let consent: OAuth2ConsentRequest;
+  try {
+    consent = await d.oauth2.getOAuth2ConsentRequest({ consentChallenge: challenge });
   } catch {
     return new Response('upstream error', { status: 502 });
   }
+
+  // Resolve the current Kratos session and assert subject match.
+  let session: Session | null;
+  try {
+    session = await d.getSession(req.headers.get('cookie') ?? undefined);
+  } catch {
+    return new Response('upstream error', { status: 502 });
+  }
+
+  if (!session?.active || !session.identity) {
+    // No active session — cannot safely consent on behalf of any user.
+    try {
+      const { redirect_to } = await d.oauth2.rejectOAuth2ConsentRequest({
+        consentChallenge: challenge,
+        rejectOAuth2Request: {
+          error: 'access_denied',
+          error_description: 'no active session',
+          status_code: 403,
+        },
+      });
+      return redirect(redirect_to);
+    } catch {
+      return new Response('upstream error', { status: 502 });
+    }
+  }
+
+  // CSRF verification (D1): verify the signed CSRF token emitted by consent.astro.
+  // The token is bound to session.identity.id; CSRFError means tampered or stale.
+  const csrfToken = body.get('csrf_token');
+  try {
+    verifyToken(csrfToken, session.identity.id);
+  } catch (err) {
+    if (err instanceof CSRFError) {
+      return new Response('CSRF token invalid', { status: 400 });
+    }
+    return new Response('server error', { status: 500 });
+  }
+
+  // Subject-mismatch guard (coordinator decision 4).
+  if (session.identity.id !== consent.subject) {
+    try {
+      const { redirect_to } = await d.oauth2.rejectOAuth2ConsentRequest({
+        consentChallenge: challenge,
+        rejectOAuth2Request: {
+          error: 'access_denied',
+          error_description: 'session subject mismatch',
+          status_code: 403,
+        },
+      });
+      return redirect(redirect_to);
+    } catch {
+      // Hydra reject failed after CSRF nonce was consumed. Redirect back to
+      // the grant screen so the user gets a fresh token and can retry.
+      const qs = new URLSearchParams({ consent_challenge: challenge });
+      return redirect(`${consentUIBase()}?${qs.toString()}`);
+    }
+  }
+
+  // Deny path.
+  if (action === 'deny') {
+    try {
+      const { redirect_to } = await d.oauth2.rejectOAuth2ConsentRequest({
+        consentChallenge: challenge,
+        rejectOAuth2Request: {
+          error: 'access_denied',
+          error_description: 'user denied access',
+          status_code: 403,
+        },
+      });
+      return redirect(redirect_to);
+    } catch {
+      // Hydra reject failed after CSRF nonce was consumed. Redirect back to
+      // the grant screen so the user gets a fresh token and can retry.
+      const qs = new URLSearchParams({ consent_challenge: challenge });
+      return redirect(`${consentUIBase()}?${qs.toString()}`);
+    }
+  }
+
+  // Allow path — re-enforce the access gate before accepting.
+  const clientId = consent.client?.client_id ?? '';
+  const identity = await safeGetIdentity(d, consent.subject ?? '');
+  const allowManifest = d.manifest(clientId);
+  const result = d.gate(identity, clientId, allowManifest);
+  if (!result.allowed) {
+    try {
+      const { redirect_to } = await d.oauth2.rejectOAuth2ConsentRequest({
+        consentChallenge: challenge,
+        rejectOAuth2Request: {
+          error: 'access_denied',
+          error_description: result.reason,
+          status_code: 403,
+        },
+      });
+      return redirect(redirect_to);
+    } catch {
+      // Hydra reject failed after CSRF nonce was consumed. Redirect back to
+      // the grant screen so the user gets a fresh token and can retry.
+      const qs = new URLSearchParams({ consent_challenge: challenge });
+      return redirect(`${consentUIBase()}?${qs.toString()}`);
+    }
+  }
+
+  // identity is non-null here: gate denies on null identity above.
+  // remember_for = CONSENT_REMEMBER_FOR_PROMPT (30d) for the interactive Allow path.
+  // acceptConsentRequest has its own try/catch; on Hydra failure it returns 502.
+  // The CSRF nonce was already consumed above, so on accept failure redirect back
+  // to the grant screen for a fresh token rather than stranding the user.
+  const allowResponse = await acceptConsentRequest(challenge, consent, identity!, d, clientId, CONSENT_REMEMBER_FOR_PROMPT);
+  if (allowResponse.status === 502) {
+    const qs = new URLSearchParams({ consent_challenge: challenge });
+    return redirect(`${consentUIBase()}?${qs.toString()}`);
+  }
+  return allowResponse;
 }
 
 /** Handle GET /oauth2/logout?logout_challenge=... */

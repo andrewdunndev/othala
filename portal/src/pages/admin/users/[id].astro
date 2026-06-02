@@ -38,7 +38,6 @@ import {
   shouldRefuseRecovery,
 } from '../../../lib/access';
 import { signToken, verifyToken, CSRFError } from '../../../lib/csrf';
-import { RevokeError } from '../../../lib/revoke';
 import type { Identity } from '../../../lib/types';
 
 const guard = await requireAdminSession(Astro);

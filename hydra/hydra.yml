@@ -30,15 +30,21 @@ urls:
     public: https://dag.dunn.dev/
 
   # Topology B (v0.1.4): the entire SSO stack lives on dag.dunn.dev.
-  # Hydra redirects authentication-required flows to dag.dunn.dev/auth/*
-  # where the Astro portal renders login/recovery/etc., and the consent
-  # service handles /login with login_challenge via the same Caddy mux.
-  # home.dunn.dev was the Topology A user-facing host; dropped in v0.1.4
-  # because the IdP + the UI live on the same FQDN now. The portal's
-  # tile dashboard renders at dag.dunn.dev/ for signed-in family members.
-  login: https://dag.dunn.dev/auth/login
-  consent: https://dag.dunn.dev/auth/consent
-  logout: https://dag.dunn.dev/auth/logout
+  # Hydra redirects OAuth2 challenge flows to dag.dunn.dev/oauth2/{login,
+  # consent,logout} — the converged Astro API routes that handle the Hydra
+  # challenge protocol. /auth/{login,logout} remain as the Kratos browser-flow
+  # human UI (self-service), which is a separate concern. The old consent
+  # service at /consent (Go, consent:4477) is deleted; all challenge handling
+  # is now in the portal (portal:8080).
+  #
+  # NOTE: the production Caddyfile is iac/services/dag/caddy/Caddyfile. It
+  # already routes the @portal_challenges path set (/oauth2/login,
+  # /oauth2/consent, /oauth2/logout) to dag-portal:8080 before the wider
+  # @hydra /oauth2/* wildcard. No stale caddy/snippets/portal.caddy exists;
+  # that file was removed when the Go consent service was retired.
+  login: https://dag.dunn.dev/oauth2/login
+  consent: https://dag.dunn.dev/oauth2/consent
+  logout: https://dag.dunn.dev/oauth2/logout
   error: https://dag.dunn.dev/auth/error
   post_logout_redirect: https://dag.dunn.dev/
 

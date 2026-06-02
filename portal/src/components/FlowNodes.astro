@@ -60,14 +60,14 @@ const {
   passDisabled = false,
   passRequired = true,
   defaultAutocomplete,
-} = Astro.props;
+} = Astro.props as Props;
 
 const labelText = (node: FlowNode, fallback: string): string =>
   node.meta?.label?.text ?? fallback;
 ---
 {nodes
-  .filter((n) => n.group === group)
-  .map((node) => {
+  .filter((n: FlowNode) => n.group === group)
+  .map((node: FlowNode) => {
     const a = asInput(node);
     if (!a) return null;
 

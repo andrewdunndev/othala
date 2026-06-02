@@ -1,4 +1,4 @@
-// Access gate — the COMPLETE gate (CU1 item 2).
+// Access gate — the COMPLETE gate (CU1 item 2, C skip_access_check).
 //
 // Ported from consent/handlers.go (enforceAccessGate /
 // enforceAccessGateFromGroups) + consent/manifest.go (identityGroups). Two
@@ -15,11 +15,19 @@
 //      admin-managed metadata_admin.groups. clientId is lowercased to match
 //      the Go gate (accessGroupPrefix + strings.ToLower(clientID)).
 //
+// skip_access_check escape hatch (C): if the client manifest sets
+// consent.skip_access_check:true, check (2) is bypassed. Check (1) — the
+// active-state gate — is NEVER bypassed (skip_access_check is access-group
+// only, matching Go enforceAccessGate/enforceAccessGateFromGroups which also
+// only skip the slices.Contains check, not the identity lookup or the state
+// check implicit in the caller).
+//
 // These are pure functions over an already-fetched identity so they can be
 // unit-tested without a running Kratos. The handler treats an identity
 // lookup failure as a closed gate (passes null here -> denied).
 
 import type { Identity } from './types';
+import type { ClientManifest } from './manifests';
 
 /** Per-app entry-gate group convention: "access-<clientId>". */
 export const ACCESS_GROUP_PREFIX = 'access-';
@@ -53,10 +61,16 @@ export interface GateResult {
  * Evaluate the access gate for an identity against a client. FAIL-CLOSED:
  * any missing precondition denies. Mirrors enforceAccessGate in handlers.go,
  * with the state check made explicit (CU1 item 2).
+ *
+ * skip_access_check (C): if manifest.skipAccessCheck is true, the
+ * access-<clientId> group membership check is bypassed. The state===active
+ * check is NEVER bypassed — matching Go's two-function design where
+ * SkipAccessCheck only skips the slices.Contains check.
  */
 export function enforceAccessGate(
   identity: Identity | null | undefined,
   clientId: string,
+  manifest?: ClientManifest | undefined,
 ): GateResult {
   // Fail-closed: no identity == no access (lookup failed upstream).
   if (!identity) {
@@ -64,9 +78,18 @@ export function enforceAccessGate(
   }
 
   // Fail-closed: deactivated identities are denied. State must be exactly
-  // "active"; any other (or missing) value is denied.
+  // "active"; any other (or missing) value is denied. This check is NEVER
+  // skipped by skip_access_check (access-group bypass only).
   if (identity.state !== 'active') {
     return { allowed: false, reason: 'identity not active' };
+  }
+
+  // skip_access_check escape hatch: bypass access-group membership check
+  // but NOT the state check above. Matches Go enforceAccessGateFromGroups
+  // which returns false (not rejected) before the slices.Contains check
+  // when cm.Consent.SkipAccessCheck is true.
+  if (manifest?.skipAccessCheck) {
+    return { allowed: true };
   }
 
   const expected = requiredGroupFor(clientId);

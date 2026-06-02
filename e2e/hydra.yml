@@ -25,9 +25,9 @@ urls:
     issuer: http://auth-lab.${LAB_DOMAIN}/
     public: http://auth-lab.${LAB_DOMAIN}/
 
-  login: http://auth-lab.${LAB_DOMAIN}/auth/login
-  consent: http://auth-lab.${LAB_DOMAIN}/auth/consent
-  logout: http://auth-lab.${LAB_DOMAIN}/auth/logout
+  login: http://auth-lab.${LAB_DOMAIN}/oauth2/login
+  consent: http://auth-lab.${LAB_DOMAIN}/oauth2/consent
+  logout: http://auth-lab.${LAB_DOMAIN}/oauth2/logout
   error: http://auth-lab.${LAB_DOMAIN}/auth/error
   post_logout_redirect: http://auth-lab.${LAB_DOMAIN}/
 

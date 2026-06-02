@@ -15,7 +15,7 @@
 export const prerender = false;
 
 import Layout from '../../layouts/Layout.astro';
-import { getCollection, render } from 'astro:content';
+import { getCollection, render, type CollectionEntry } from 'astro:content';
 import { getSession } from '../../lib/kratos';
 import { isAdminSubject } from '../../lib/admin-auth';
 
@@ -25,7 +25,7 @@ if (!slug) {
 }
 
 const apps = await getCollection('apps');
-const entry = apps.find((a) => a.id === slug);
+const entry = apps.find((a: CollectionEntry<'apps'>) => a.id === slug);
 if (!entry) {
   return new Response('App not found', { status: 404 });
 }

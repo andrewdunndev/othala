@@ -1,35 +1,288 @@
 ---
-// Hydra consent screen redirect.
+// OAuth2 consent grant screen.
 //
-// We don't render consent here. The consent service co-located with
-// Hydra on carmine handles the consent_challenge auto-accept (the 11
-// OIDC clients in hydra/clients/ all set skip_consent: true). This
-// page is just a fallback in case Hydra redirects here directly: we
-// forward the challenge to the consent service.
+// Rendered when Hydra redirects to the consent provider and the client does
+// NOT have skip_consent: true (handleConsent skip=false path). The user sees
+// the client's display name, a plain-language scope list, and Allow / Deny.
 //
-// In v1, no consent UI is rendered. Future untrusted clients would
-// render a consent prompt here.
+// Form POSTs to /oauth2/consent which validates signed CSRF token
+// (verifyToken, same mechanism as admin pages) + subject-match and calls
+// acceptOAuth2ConsentRequest or rejectOAuth2ConsentRequest.
 //
-// Status: skeleton.
+// Design: clone of login.astro visual language — Layout bare=true, hero with
+// markSvg + ᛞ→ᛟ rune greeting, consent-card idiom.
+//
+// NOTE: FlowNodes.astro is intentionally NOT used here — consent is not a
+// Kratos flow and has no flow.ui.nodes to render.
 
 export const prerender = false;
 
 import Layout from '../../layouts/Layout.astro';
+import markSvg from '@dunn.dev/reference/mark/mark.svg?raw';
+import { describeScopeList } from '../../lib/scope-descriptions';
+import { getSession } from '../../lib/kratos';
+import { signToken } from '../../lib/csrf';
+import { defaultOAuth2Api } from '../../lib/oauth2-handlers';
 
 const challenge = Astro.url.searchParams.get('consent_challenge');
 
-if (challenge) {
-  // Forward to the consent service on carmine. The service auto-accepts
-  // for skip_consent clients and redirects back to Hydra to continue
-  // the OAuth2 flow.
-  return Astro.redirect(
-    `https://dag.dunn.dev/consent?consent_challenge=${encodeURIComponent(challenge)}`
-  );
+// Re-fetch the consent request server-side so we can show the client name
+// and requested scopes. Uses the shared defaultOAuth2Api factory from
+// oauth2-handlers.ts — single env-reading code path (process.env resolves
+// identically to import.meta.env in Astro Node SSR at request time).
+
+let clientName = 'Unknown application';
+let scopeDescriptions: Array<{ scope: string; description: string }> = [];
+let fetchError = false;
+let ownershipError = false;
+let csrfToken = '';
+
+if (!challenge) {
+  fetchError = true;
+} else {
+  try {
+    const oauth2 = defaultOAuth2Api();
+    const consent = await oauth2.getOAuth2ConsentRequest({ consentChallenge: challenge });
+
+    // Resolve the Kratos session server-side. Both the session AND the consent
+    // request must be resolved before we can render anything — the ownership
+    // check below compares session.identity.id against consent.subject to
+    // prevent user A seeing user B's client name / scope list.
+    //
+    // If session resolution fails (Kratos down), fall to fetchError: the form
+    // will not render, so no CSRF token is needed (fail-closed).
+    const cookie = Astro.request.headers.get('cookie') ?? undefined;
+    const session = await getSession(cookie);
+    if (!session?.active || !session.identity?.id) {
+      // No active session at render time — degrade to fetchError (form won't render).
+      fetchError = true;
+    } else if (session.identity.id !== consent.subject) {
+      // Render-time ownership check (mirrors POST-time subject-match in
+      // handleConsentPost ~line 420): logged-in user is NOT the subject of
+      // this consent challenge. Do NOT disclose client name or scope list.
+      ownershipError = true;
+    } else {
+      // Session is active and owns the challenge — safe to render.
+      clientName = consent.client?.client_name ?? consent.client?.client_id ?? 'Unknown application';
+      scopeDescriptions = describeScopeList(consent.requested_scope ?? []);
+      csrfToken = signToken(session.identity.id);
+    }
+  } catch {
+    fetchError = true;
+  }
 }
 ---
-<Layout title="Authorize — Dunn Family">
-  <main class="shell shell-sm stack-lg">
-    <h1>Missing consent challenge</h1>
-    <p class="muted">This page is a redirect target for OAuth2 consent flows.</p>
-  </main>
+<Layout title="Authorize — Dunn Family" description="Grant or deny access to your account." bare>
+
+  <section class="hero">
+    <span class="hero-mark" set:html={markSvg} />
+    <div>
+      <p class="hero-eyebrow">authorize</p>
+      <p class="rune-greeting" aria-label="door to home">
+        <span class="rune">ᛞ</span>
+        <span class="rune-arrow" aria-hidden="true">→</span>
+        <span class="rune">ᛟ</span>
+        <span class="rune-gloss">door to home</span>
+      </p>
+      <h1 class="hero-title">Grant access?</h1>
+      <p class="hero-lede">
+        Review what this application is asking for before you proceed.
+      </p>
+    </div>
+  </section>
+
+  {(fetchError || ownershipError) ? (
+    <section class="consent-card">
+      <p class="consent-error">
+        {!challenge
+          ? 'No consent challenge was provided. This page should only be reached via an OAuth2 flow.'
+          : ownershipError
+          ? "This authorization request isn’t yours or could not be loaded."
+          : 'Unable to retrieve the consent request. The challenge may have expired or already been handled.'}
+      </p>
+    </section>
+  ) : (
+    <section class="consent-card">
+      <div class="consent-client">
+        <p class="consent-label">Application requesting access</p>
+        <p class="consent-client-name">{clientName}</p>
+      </div>
+
+      {scopeDescriptions.length > 0 && (
+        <div class="consent-scopes">
+          <p class="consent-label">This application is requesting access to</p>
+          <ul class="consent-scope-list">
+            {scopeDescriptions.map(({ scope, description }) => (
+              <li class="consent-scope-item">
+                <span class="consent-scope-desc">{description}</span>
+                <span class="consent-scope-name">{scope}</span>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+
+      <div class="consent-actions">
+        <form method="POST" action="/oauth2/consent" class="consent-form">
+          <input type="hidden" name="consent_challenge" value={challenge!} />
+          <input type="hidden" name="action" value="allow" />
+          <input type="hidden" name="csrf_token" value={csrfToken} />
+          <button type="submit" class="button button-primary consent-btn">
+            Allow
+          </button>
+        </form>
+        <form method="POST" action="/oauth2/consent" class="consent-form">
+          <input type="hidden" name="consent_challenge" value={challenge!} />
+          <input type="hidden" name="action" value="deny" />
+          <input type="hidden" name="csrf_token" value={csrfToken} />
+          <button type="submit" class="button button-secondary consent-btn">
+            Deny
+          </button>
+        </form>
+      </div>
+    </section>
+  )}
+
+  <footer class="login-footer">
+    <a href="/" class="login-foot-link">Back home</a>
+  </footer>
+
 </Layout>
+
+<style>
+  /* The ᛞ→ᛟ greeting: cloned verbatim from login.astro — the design primitive. */
+  .rune-greeting {
+    display: flex;
+    align-items: baseline;
+    gap: var(--space-2);
+    margin: var(--space-2) 0 var(--space-3) 0;
+  }
+  .rune-greeting .rune {
+    font-family: var(--font-mono);
+    font-size: var(--text-xl);
+    font-weight: 600;
+    color: var(--text);
+    line-height: 1;
+  }
+  .rune-greeting .rune-arrow {
+    color: var(--text-muted);
+    font-size: var(--text-base);
+  }
+  .rune-greeting .rune-gloss {
+    margin-left: var(--space-2);
+    font-family: var(--font-mono);
+    font-size: var(--text-xs);
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--text-muted);
+  }
+
+  /* Consent card: same geometry as login-card in login.astro. */
+  .consent-card {
+    max-width: 32rem;
+    margin: 0 auto;
+    padding: var(--space-6);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    background: var(--surface);
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-5);
+  }
+
+  .consent-label {
+    font-family: var(--font-mono);
+    font-size: var(--text-xs);
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--text-muted);
+    margin: 0 0 var(--space-2) 0;
+  }
+
+  .consent-client-name {
+    font-size: var(--text-lg);
+    font-weight: 600;
+    color: var(--text);
+    margin: 0;
+  }
+
+  .consent-scopes {
+    padding-top: var(--space-5);
+    border-top: 1px solid var(--border);
+  }
+
+  .consent-scope-list {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-2);
+  }
+
+  .consent-scope-item {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: var(--space-3);
+  }
+
+  .consent-scope-desc {
+    color: var(--text);
+    font-size: var(--text-sm);
+  }
+
+  .consent-scope-name {
+    font-family: var(--font-mono);
+    font-size: var(--text-xs);
+    color: var(--text-muted);
+    white-space: nowrap;
+  }
+
+  .consent-actions {
+    display: flex;
+    gap: var(--space-3);
+    padding-top: var(--space-5);
+    border-top: 1px solid var(--border);
+  }
+
+  .consent-form {
+    flex: 1;
+  }
+
+  .consent-btn {
+    width: 100%;
+    padding: var(--space-4);
+    font-size: var(--text-base);
+  }
+
+  .consent-error {
+    color: var(--text-2);
+    font-size: var(--text-sm);
+    margin: 0;
+  }
+
+  /* Footer links: cloned from login.astro verbatim. */
+  .login-footer {
+    max-width: 32rem;
+    margin: var(--space-5) auto 0;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    gap: var(--space-3);
+    font-family: var(--font-mono);
+    font-size: var(--text-xs);
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+  }
+  .login-foot-link {
+    color: var(--text-muted);
+    text-decoration: none;
+  }
+  .login-foot-link:hover { color: var(--accent); text-decoration: none; }
+
+  @media (max-width: 640px) {
+    .consent-card { padding: var(--space-5); }
+    .consent-actions { flex-direction: column; }
+  }
+</style>
