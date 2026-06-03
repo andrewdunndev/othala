@@ -391,6 +391,52 @@ else
     fail "F1 public route leaked onto admin port" "code=$f1 want=404 (admin mux must not serve SSR routes)"
 fi
 
+# Section G: full browser-free OIDC dance (login forged via Hydra admin -> the
+# app's consent handler -> auth code -> ID token). The converged challenge surface
+# end-to-end against LIVE Kratos + Hydra. See oidc-dance.mjs for the mechanics.
+echo ""
+echo "G. OIDC dance (login -> consent -> ID token; claims + access-gate deny)"
+
+# mk_identity <state> <groups-json> <localpart> -> echoes the new identity id.
+mk_identity() {
+    printf '%s' "fetch('http://kratos:4434/admin/identities',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({schema_id:'family',state:'$1',traits:{username:'$3',email:'$3@${LAB_DOMAIN}',displayName:'$3'},metadata_admin:{groups:$2}})}).then(r=>r.json()).then(j=>{process.stdout.write(j.id||'');process.exit(0)}).catch(()=>process.exit(1))" | node_in othala
+}
+# run_dance <subject> -> the dance result line (OK claims=... / DENIED... / STEP/EXC).
+# Substitutes the subject + keep client secret into oidc-dance.mjs and runs it in othala.
+run_dance() {
+    sed "s|__SUBJECT__|$1|g; s|__KEEP_SECRET__|${KEEP_CLIENT_SECRET}|g" ./oidc-dance.mjs \
+        | docker compose exec -T othala node 2>&1 | _strip_ansi | grep -E '^OK |^DENIED|^STEP|^EXC' | tail -1
+}
+
+# G1: active member WITH the access-keep group -> dance completes, and the ID token
+# carries the manifest-injected role claim (resource_access.keep.roles=[user]).
+# This is the integration guard for the claims-injection convergence regression.
+g1_id=$(mk_identity active "['family','access-keep']" g1.activekeep)
+g1=$(run_dance "$g1_id")
+if [[ "$g1" == OK* && "$g1" == *'"keep_roles":["user"]'* ]]; then
+    pass "G1 OIDC dance issues an ID token with the injected role claim (keep_roles=[user])"
+else
+    fail "G1 OIDC dance + claims injection" "got: $g1"
+fi
+
+# G2: INACTIVE identity -> access-gate denies at the consent re-gate (state check).
+g2_id=$(mk_identity inactive "['family','access-keep']" g2.inactive)
+g2=$(run_dance "$g2_id")
+if [[ "$g2" == DENIED* && "$g2" == *active* ]]; then
+    pass "G2 OIDC dance DENIES an inactive identity (state gate, D3)"
+else
+    fail "G2 inactive deny" "got: $g2 (want DENIED ... not active)"
+fi
+
+# G3: active identity WITHOUT the access-keep group -> denied at consent (group check).
+g3_id=$(mk_identity active "['family']" g3.nogroup)
+g3=$(run_dance "$g3_id")
+if [[ "$g3" == DENIED* && "$g3" == *access-keep* ]]; then
+    pass "G3 OIDC dance DENIES a member missing the access-keep group (group gate)"
+else
+    fail "G3 no-group deny" "got: $g3 (want DENIED ... access-keep group)"
+fi
+
 # ----- Summary -----
 echo ""
 TOTAL=$((PASS + FAIL))
