@@ -335,7 +335,7 @@ services:
     working_dir: /test
     # npm ci installs the e2e deps (package.json); node then runs the substituted dance.
     # smoke.sh passes the substituted dance script via stdin.
-    entrypoint: ["sh", "-c", "npm install --no-audit --no-fund --quiet && node"]
+    entrypoint: ["sh", "-c", "npm install --no-package-lock --no-audit --no-fund --quiet && node"]
 
   # Browser-test edge (profile: browser ONLY). Fronts app + Kratos + Hydra on ONE
   # host so a real browser can drive the integrated login -> consent -> token flow.
@@ -407,4 +407,4 @@ services:
       - /test/node_modules
       - ./browser-out:/out:z
     working_dir: /test
-    command: ["sh", "-c", "npm install --no-audit --no-fund && npx playwright test --config=playwright.config.ts"]
+    command: ["sh", "-c", "npm install --no-package-lock --no-audit --no-fund && npx playwright test --config=playwright.config.ts"]
