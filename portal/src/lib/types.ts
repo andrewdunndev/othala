@@ -6,14 +6,14 @@
 // and we now call them through the SDK.
 //
 // The browser-flow / UI-node rendering types below stay hand-maintained.
-// Reason: the self-service flow wrappers in `kratos.ts` are raw-fetch
-// (redirect:'manual') and return Kratos's on-the-wire JSON verbatim
-// (timestamps as ISO *strings*, nodes carrying a `node_type`
-// discriminator). The SDK's deserialised flow models type those same
-// fields as `Date` and reshape `ui.nodes` into `UiNode`, which would not
-// match the raw JSON we hand to the renderer (`nodes.ts` + the flow
-// pages). Keeping these local preserves the browser-flow boundary the
-// portal deliberately holds opaque.
+// Reason: the self-service flow wrappers in `kratos.ts` call the SDK's
+// FrontendApi but cast the return to these local types. The SDK deserialises
+// `expires_at` / `issued_at` as `Date` and types `ui.nodes` as `UiNode`,
+// neither of which matches the raw-JSON shapes the renderer (`nodes.ts` +
+// the flow pages) expects. Keeping these local types preserves the
+// browser-flow boundary the portal deliberately holds opaque; the cast in
+// kratos.ts is safe because the portal only reads `flow.id`, `flow.ui.*`,
+// and similar fields whose wire shape is unchanged.
 
 import type {
   AuthenticatorAssuranceLevel as SdkAAL,

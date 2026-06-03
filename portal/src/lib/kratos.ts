@@ -8,6 +8,7 @@
 //   1. process.env.KRATOS_PUBLIC_URL (compose / quadlet env)
 //   2. http://localhost:4433 (local dev / test fallback)
 
+import { Configuration, FrontendApi, ResponseError } from '@ory/client-fetch';
 import type {
   FlowResult,
   LoginFlow,
@@ -18,21 +19,18 @@ import type {
   VerificationFlow,
 } from './types';
 
-function kratosBase(): string {
+export function kratosBase(): string {
   return process.env.KRATOS_PUBLIC_URL ?? 'http://localhost:4433';
 }
 
 const HEALTH_TIMEOUT_MS = 2000;
 
-interface FetchOpts {
-  cookie?: string;
-  signal?: AbortSignal;
-}
-
-function withCookie(opts: FetchOpts): HeadersInit {
-  const headers: Record<string, string> = { Accept: 'application/json' };
-  if (opts.cookie) headers['Cookie'] = opts.cookie;
-  return headers;
+function frontendApi(): FrontendApi {
+  return new FrontendApi(
+    new Configuration({
+      basePath: kratosBase(),
+    }),
+  );
 }
 
 /**
@@ -43,13 +41,15 @@ function withCookie(opts: FetchOpts): HeadersInit {
  * the infra-down state).
  */
 export async function getSession(cookie?: string): Promise<Session | null> {
-  const res = await fetch(`${kratosBase()}/sessions/whoami`, {
-    headers: withCookie({ cookie }),
-    redirect: 'manual',
-  });
-  if (res.status === 401 || res.status === 403) return null;
-  if (!res.ok) throw new Error(`whoami: ${res.status}`);
-  return (await res.json()) as Session;
+  try {
+    const session = await frontendApi().toSession({ cookie });
+    return session as unknown as Session;
+  } catch (e) {
+    if (e instanceof ResponseError && (e.response.status === 401 || e.response.status === 403)) {
+      return null;
+    }
+    throw e;
+  }
 }
 
 /**
@@ -76,54 +76,81 @@ export async function isReachable(): Promise<boolean> {
   }
 }
 
-// Kratos self-service flows are browser-mediated; the SDK follows redirects + throws on non-2xx, we need 303s opaque + flow-state discrimination.
-async function getFlow<T>(path: string, flowId: string, cookie?: string): Promise<FlowResult<T>> {
-  const url = `${kratosBase()}${path}?id=${encodeURIComponent(flowId)}`;
-  const res = await fetch(url, {
-    headers: withCookie({ cookie }),
-    redirect: 'manual',
-  });
-  if (res.status === 410 || res.status === 404 || res.status === 403) {
-    // 410 Gone: flow expired. 404: not found. 403: CSRF cookie mismatch.
-    // All three resolve the same way: start a fresh flow.
-    return { kind: 'gone' };
+// Generic flow fetcher over the SDK. Wraps the five get*Flow SDK methods into
+// the FlowResult discriminated union the Astro pages depend on.
+//
+// Status mapping (preserved from the hand-rolled getFlow):
+//   410 / 404 / 403 → { kind: 'gone' }   (expired, not-found, CSRF mismatch)
+//   401             → { kind: 'unauthorized' }
+//   2xx             → { kind: 'ok', flow }
+//
+// The SDK deserialises `expires_at` / `issued_at` as Date objects; the portal
+// renderer treats those fields as opaque strings and never parses them, so the
+// cast to the hand-maintained flow types is safe at the use-sites.
+async function wrapFlowResult<T>(call: () => Promise<T>): Promise<FlowResult<T>> {
+  try {
+    const flow = await call();
+    return { kind: 'ok', flow };
+  } catch (e) {
+    if (e instanceof ResponseError) {
+      const s = e.response.status;
+      if (s === 410 || s === 404 || s === 403) return { kind: 'gone' };
+      if (s === 401) return { kind: 'unauthorized' };
+    }
+    throw e;
   }
-  if (res.status === 401) return { kind: 'unauthorized' };
-  if (!res.ok) throw new Error(`flow ${path}: ${res.status}`);
-  const flow = (await res.json()) as T;
-  return { kind: 'ok', flow };
 }
 
 export function getLoginFlow(flowId: string, cookie?: string): Promise<FlowResult<LoginFlow>> {
-  return getFlow<LoginFlow>('/self-service/login/flows', flowId, cookie);
+  return wrapFlowResult(() =>
+    frontendApi()
+      .getLoginFlow({ id: flowId, cookie })
+      .then((f) => f as unknown as LoginFlow),
+  );
 }
 
 export function getRegistrationFlow(
   flowId: string,
   cookie?: string,
 ): Promise<FlowResult<RegistrationFlow>> {
-  return getFlow<RegistrationFlow>('/self-service/registration/flows', flowId, cookie);
+  return wrapFlowResult(() =>
+    frontendApi()
+      .getRegistrationFlow({ id: flowId, cookie })
+      .then((f) => f as unknown as RegistrationFlow),
+  );
 }
 
 export function getSettingsFlow(
   flowId: string,
   cookie?: string,
 ): Promise<FlowResult<SettingsFlow>> {
-  return getFlow<SettingsFlow>('/self-service/settings/flows', flowId, cookie);
+  return wrapFlowResult(() =>
+    frontendApi()
+      .getSettingsFlow({ id: flowId, cookie })
+      .then((f) => f as unknown as SettingsFlow),
+  );
 }
 
 export function getRecoveryFlow(
   flowId: string,
   cookie?: string,
 ): Promise<FlowResult<RecoveryFlow>> {
-  return getFlow<RecoveryFlow>('/self-service/recovery/flows', flowId, cookie);
+  return wrapFlowResult(() =>
+    frontendApi()
+      .getRecoveryFlow({ id: flowId, cookie })
+      .then((f) => f as unknown as RecoveryFlow),
+  );
 }
 
 export function getVerificationFlow(
   flowId: string,
   cookie?: string,
 ): Promise<FlowResult<VerificationFlow>> {
-  return getFlow<VerificationFlow>('/self-service/verification/flows', flowId, cookie);
+  return wrapFlowResult(() =>
+    frontendApi()
+      .getVerificationFlow({ id: flowId, cookie })
+      .then((f) => f as unknown as VerificationFlow),
+  );
 }
 
 /**
@@ -168,6 +195,9 @@ export const browserFlows = {
 /**
  * GET /self-service/logout/browser — returns { logout_url, logout_token }.
  * Pages render a button posting to logout_url to complete the logout.
+ *
+ * The SDK's LogoutFlow has exactly { logout_url, logout_token } — same
+ * shape as LogoutInfo. LogoutInfo is kept as an alias for callers.
  */
 export interface LogoutInfo {
   logout_url: string;
@@ -175,13 +205,13 @@ export interface LogoutInfo {
 }
 
 export async function getLogoutInfo(cookie?: string): Promise<LogoutInfo | null> {
-  const res = await fetch(`${kratosBase()}/self-service/logout/browser`, {
-    headers: withCookie({ cookie }),
-    redirect: 'manual',
-  });
-  if (res.status === 401 || res.status === 403) return null;
-  if (!res.ok) throw new Error(`logout info: ${res.status}`);
-  return (await res.json()) as LogoutInfo;
+  try {
+    const flow = await frontendApi().createBrowserLogoutFlow({ cookie });
+    return flow as LogoutInfo;
+  } catch (e) {
+    if (e instanceof ResponseError && (e.response.status === 401 || e.response.status === 403)) {
+      return null;
+    }
+    throw e;
+  }
 }
-
-export { kratosBase };
