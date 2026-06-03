@@ -284,6 +284,42 @@ test('T2: consent skip=false bounces to /auth/consent with challenge', async () 
   assert.equal(calls.acceptConsent, 0, 'acceptConsent must NOT be called on skip=false');
 });
 
+// T2b: REGRESSION GUARD (Go parity) — Hydra reports consent.skip=false (OSS Hydra
+// v26.2.0 does NOT auto-skip on the client's skip_consent field), but the MANIFEST
+// is skip_consent:true (observe), so the operator pre-consented at authoring time:
+// AUTO-ACCEPT, do NOT bounce to the grant UI. The Go original keyed on the client's
+// skip_consent; the first TS port regressed to consent.skip only, sending every
+// "never prompts" client to the grant screen on first login (caught by e2e
+// deep-coverage 2026-06-02). loadManifest is hoisted, so it is callable here.
+test('T2b: consent skip=false but manifest skip_consent:true AUTO-ACCEPTS', async () => {
+  const { api, calls } = stubOAuth2({
+    getOAuth2ConsentRequest: async () => ({
+      challenge: 'cc',
+      skip: false,
+      subject: 'id-1',
+      client: { client_id: 'observe' },
+      requested_scope: ['openid', 'email'],
+      requested_access_token_audience: [],
+    }),
+  });
+  const res = await handleConsent(
+    new Request('https://x/oauth2/consent?consent_challenge=cc'),
+    {
+      oauth2: api,
+      getIdentity: async () => activeMember(),
+      manifest: () => loadManifest('observe'),
+    },
+  );
+  assert.equal(res.status, 302);
+  assert.equal(res.headers.get('location'), 'https://dag.dunn.dev/after-consent');
+  assert.equal(calls.acceptConsent, 1, 'manifest skip_consent:true must auto-accept');
+  assert.equal(calls.rejectConsent, 0, 'must not reject');
+  assert.ok(
+    !res.headers.get('location')?.includes('/auth/consent'),
+    'manifest skip_consent:true must NOT bounce to the grant screen',
+  );
+});
+
 // T3: POST Allow -> accept with remember:true, remember_for=2592000, grant_scope, id_token claims.
 test('T3: POST Allow accepts with remember=true, 30-day remember_for, claims', async () => {
   _resetForTests();

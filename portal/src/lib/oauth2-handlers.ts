@@ -309,14 +309,19 @@ export async function handleConsent(req: Request, deps: Deps = {}): Promise<Resp
     }
   }
 
-  // SKIP PATH (coordinator decision 1 — SACRED):
-  // When consent.skip === true (skip_consent: true client, which all 11
-  // current estate clients are), Hydra already has a remembered grant decision.
-  // Auto-accept immediately — no UI, behaviorally identical to the pre-prompt
-  // implementation. The identity is non-null here (gate passed).
-  // remember_for = CONSENT_REMEMBER_FOR_SKIP (3600) to match Go consentRememberFor.
-  if (consent.skip) {
-    // identity is non-null: gate denies on null identity above.
+  // SKIP PATH (coordinator decision 1 — SACRED): curated IdP — the operator
+  // pre-consents at manifest-authoring time, so a skip_consent:true client
+  // auto-accepts with NO grant UI ("never prompts").
+  //
+  // The Go original keyed on the CLIENT's skip_consent (consent.Client.SkipConsent,
+  // handlers.go:135). The first TS port regressed to Hydra's `consent.skip` flag,
+  // which is REMEMBER-based — false on the first flow per (subject,client) — so OSS
+  // Hydra v26.2.0 (which does not auto-skip on the client field) sent every "never
+  // prompts" client to the grant UI on first login. Convergence regression caught by
+  // e2e deep-coverage 2026-06-02. Honor the MANIFEST skip_consent (authoritative,
+  // operator-authored), OR Hydra's skip when it is set. Identity is non-null here
+  // (gate denies on null above). remember_for = CONSENT_REMEMBER_FOR_SKIP (3600).
+  if (consent.skip || consentManifest?.skipConsent) {
     return acceptConsentRequest(challenge, consent, identity!, d, clientId, CONSENT_REMEMBER_FOR_SKIP);
   }
 
