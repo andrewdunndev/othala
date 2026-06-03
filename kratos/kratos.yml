@@ -12,12 +12,12 @@ dsn: postgres://kratos:${KRATOS_PG_PASS}@${KRATOS_PG_HOST}:5432/kratos?sslmode=d
 
 serve:
   public:
-    base_url: https://dag.dunn.dev/
+    base_url: ${OTHALA_PUBLIC_URL}/
     port: 4433
     cors:
       enabled: true
       allowed_origins:
-        - https://dag.dunn.dev
+        - ${OTHALA_PUBLIC_URL}
       allowed_methods: [GET, POST, PUT, PATCH, DELETE]
       allowed_headers:
         - Authorization
@@ -35,12 +35,12 @@ serve:
 
 selfservice:
   # LOW-3: trailing slash is load-bearing. Kratos allowed_return_urls
-  # uses a prefix match; without the slash, "https://dag.dunn.dev"
-  # accepts "https://dag.dunn.dev.evil.example". Every entry MUST
-  # end in `/` (or a deeper path). Same in lab/compose/kratos.lab.yml.
-  default_browser_return_url: https://dag.dunn.dev/
+  # uses a prefix match; without the slash, ${OTHALA_PUBLIC_URL} would
+  # accept a prefixed evil cousin host. Every entry MUST end in `/` (or
+  # a deeper path). Same in lab/compose/kratos.lab.yml.
+  default_browser_return_url: ${OTHALA_PUBLIC_URL}/
   allowed_return_urls:
-    - https://dag.dunn.dev/
+    - ${OTHALA_PUBLIC_URL}/
 
   methods:
     password:
@@ -59,15 +59,15 @@ selfservice:
         rp:
           # CRITICAL one-way decision: registrable parent so passkeys assertable
           # from any *.dunn.dev origin. Changing this invalidates every passkey.
-          id: dunn.dev
-          display_name: Dunn Family
+          id: ${OTHALA_WEBAUTHN_RP_ID}
+          display_name: ${OTHALA_INSTANCE_NAME}
           origins:
-            - https://dag.dunn.dev
+            - ${OTHALA_WEBAUTHN_RP_ORIGINS}
 
     totp:
       enabled: true
       config:
-        issuer: Dunn Family
+        issuer: ${OTHALA_INSTANCE_NAME}
 
     # Code strategy for recovery (magic link is deprecated in current Kratos)
     code:
@@ -87,10 +87,10 @@ selfservice:
 
   flows:
     error:
-      ui_url: https://dag.dunn.dev/auth/error
+      ui_url: ${OTHALA_PUBLIC_URL}/auth/error
 
     settings:
-      ui_url: https://dag.dunn.dev/auth/settings
+      ui_url: ${OTHALA_PUBLIC_URL}/auth/settings
       privileged_session_max_age: 15m
       # AAL not enforced here globally; admin UI does AAL2 step-up at SSR layer
       required_aal: aal1
@@ -105,7 +105,7 @@ selfservice:
     recovery:
       enabled: true
       use: code
-      ui_url: https://dag.dunn.dev/auth/recovery
+      ui_url: ${OTHALA_PUBLIC_URL}/auth/recovery
       lifespan: 1h
       notify_unknown_recipients: false
       # H1 / D3: admin email-recovery is disabled at the application
@@ -144,17 +144,17 @@ selfservice:
     verification:
       enabled: true
       use: code
-      ui_url: https://dag.dunn.dev/auth/verification
+      ui_url: ${OTHALA_PUBLIC_URL}/auth/verification
       lifespan: 1h
       after:
-        default_browser_return_url: https://dag.dunn.dev/
+        default_browser_return_url: ${OTHALA_PUBLIC_URL}/
 
     logout:
       after:
-        default_browser_return_url: https://dag.dunn.dev/
+        default_browser_return_url: ${OTHALA_PUBLIC_URL}/
 
     login:
-      ui_url: https://dag.dunn.dev/auth/login
+      ui_url: ${OTHALA_PUBLIC_URL}/auth/login
       lifespan: 10m
       # CRITICAL: aal1 base; AAL2 step-up is requested per-flow via ?aal=aal2
       # by the admin SSR pages, not enforced globally here.
@@ -163,7 +163,7 @@ selfservice:
     registration:
       # Admin-driven onboarding (one-time enrollment URLs); no self-service signup
       enabled: false
-      ui_url: https://dag.dunn.dev/auth/registration
+      ui_url: ${OTHALA_PUBLIC_URL}/auth/registration
       lifespan: 1h
       after:
         password:
@@ -173,11 +173,11 @@ selfservice:
 session:
   lifespan: 2160h    # 90 days for normal flows; admin UI enforces shorter via SSR
   cookie:
-    # Parent domain so dag.dunn.dev (the IdP) and every *.dunn.dev app
-    # pod share the same session cookie. SameSite=Lax permits same-site
-    # POSTs across subdomains; HIGH-1 CSRF mitigation is per-request
-    # tokens in the portal (portal/src/lib/csrf.ts).
-    domain: dunn.dev
+    # Parent apex domain so the IdP and every subdomain app share the
+    # same session cookie. SameSite=Lax permits same-site POSTs across
+    # subdomains; HIGH-1 CSRF mitigation is per-request tokens in the
+    # portal (portal/src/lib/csrf.ts).
+    domain: ${OTHALA_APEX}
     name: ory_kratos_session
     persistent: true
     same_site: Lax
@@ -189,7 +189,7 @@ session:
     required_aal: aal1
 
 cookies:
-  domain: dunn.dev
+  domain: ${OTHALA_APEX}
   same_site: Lax
 
 identity:
@@ -201,8 +201,8 @@ identity:
 courier:
   smtp:
     connection_uri: smtps://${SMTP_USER}:${SMTP_PASS}@smtp.fastmail.com:465
-    from_address: noreply@dunn.dev
-    from_name: Dunn Family
+    from_address: ${OTHALA_SMTP_FROM_ADDRESS}
+    from_name: ${OTHALA_INSTANCE_NAME}
     # local_name: leave default; Fastmail accepts standard HELO
 
   # Templates default to Kratos built-ins; override later if needed.
@@ -210,7 +210,7 @@ courier:
   #   recovery_code:
   #     valid:
   #       email:
-  #         subject: Your Dunn Family recovery code
+  #         subject: Your ${OTHALA_INSTANCE_NAME} recovery code
 
 secrets:
   # Cookie signing + at-rest cipher secrets. Ory's secrets arrays model

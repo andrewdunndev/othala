@@ -39,7 +39,7 @@ it back, set a new password / register a passkey.
 
 ## Console recovery for an admin (break-glass)
 
-Prereq: SSH access to carmine with sudo.
+Prereq: SSH access to the SSO host with sudo.
 
 ### Path A: another admin still has working auth
 
@@ -61,9 +61,9 @@ For admin-to-admin recovery, only Path B (console) is supported.
 
 ### Path B: every admin authenticator is lost
 
-The asteroid case. Recovery is by Kratos admin CLI on carmine.
+The asteroid case. Recovery is by Kratos admin CLI on the SSO host.
 
-1. SSH to carmine.
+1. SSH to the SSO host.
 
 2. Open a Kratos admin shell against the running pod:
 
@@ -75,7 +75,7 @@ The asteroid case. Recovery is by Kratos admin CLI on carmine.
 
    ```sh
    kratos --endpoint http://localhost:4434 identities list \
-     --format json | jq '.[] | select(.traits.username == "andrew.dunn")'
+     --format json | jq '.[] | select(.traits.username == "<your-username>")'
    ```
 
 4. Issue a recovery URL via the Kratos admin API:

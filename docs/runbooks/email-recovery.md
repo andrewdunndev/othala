@@ -1,8 +1,9 @@
 # Email recovery: deliverability and operations
 
-Recovery codes go out via Fastmail SMTP from `noreply@dunn.dev`. This
-runbook captures the deliverability watch-outs and the verification
-loop after the first lab recovery test.
+Recovery codes go out via the SMTP sender configured at
+`kratos/kratos.yml: courier.smtp.from_address`. This runbook captures
+the deliverability watch-outs and the verification loop after the first
+lab recovery test.
 
 ## Pre-rollout checks
 
@@ -16,11 +17,11 @@ a code-recovery email at:
 
 Check:
 
-1. Subject and from-address rendered correctly. Fastmail signs
-   outbound, so SPF/DKIM should pass.
+1. Subject and from-address rendered correctly. If your SMTP provider
+   signs outbound mail, verify SPF/DKIM pass.
 2. The email landed in Inbox, not Spam. "noreply@" prefixes can flag
-   stricter receivers; if any provider quarantines it, the family member
-   can't recover.
+   stricter receivers; if any provider quarantines it, users can't
+   recover.
 3. The code is rendered in monospace and is selectable as a single
    token (some receivers strip whitespace; verify the digit string is
    intact).
@@ -31,13 +32,12 @@ Check:
 Options in order of preference:
 
 1. Switch the from-address to a personalized prefix
-   (`recovery@dunn.dev` instead of `noreply@dunn.dev`). Fastmail
-   accepts arbitrary local parts on the catch-all. Update
-   `kratos/kratos.yml: courier.smtp.from_address`.
-2. Add a SPF record explicitly listing Fastmail's outbound IPs. Fastmail
-   provides the include directive; one DNS update.
-3. Add a DKIM key (Fastmail's setup wizard generates it; one DNS
-   update).
+   (e.g. `recovery@example.com` instead of `noreply@example.com`).
+   Update `kratos/kratos.yml: courier.smtp.from_address`.
+2. Add a SPF record explicitly listing your SMTP provider's outbound IPs.
+   Most providers supply an include directive; one DNS update.
+3. Add a DKIM key (your SMTP provider's setup wizard generates it; one
+   DNS update).
 4. As a last resort, switch to a transactional provider (Postmark,
    Mailgun) for the recovery flow only. Bigger change; reach for it
    only if the cheaper interventions fail.

@@ -30,7 +30,7 @@
 		# and falls through to the handle_response below.
 		@unauthorized status 401 403
 		handle_response @unauthorized {
-			redir https://dag.dunn.dev/auth/login?return_to={http.request.uri.path}&domain={http.request.host} 302
+			redir {env.OTHALA_PUBLIC_URL}/auth/login?return_to={http.request.uri.path}&domain={http.request.host} 302
 		}
 	}
 

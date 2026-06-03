@@ -8,7 +8,7 @@ exposure, on-disk leak, accidental commit).
 
 ## When to rotate
 
-- The sops entry `carmine.hydra_system_secret` was accessed by an
+- The sops entry for `hydra_system_secret` was accessed by an
   unexpected party, OR the age private key (`~/.config/sops/age/keys.txt`
   on the operator workstation) was exposed.
 - The value appeared in a chat / log / commit and you cannot guarantee
@@ -32,8 +32,9 @@ schedule it for a low-traffic window.
 
 ## Procedure
 
-Prereqs: SSH access to carmine + sudo + sops+age access on the operator
-workstation (`SOPS_AGE_KEY_FILE` pointing at the age private key).
+Prereqs: SSH access to the SSO host + sudo + sops+age access on the
+operator workstation (`SOPS_AGE_KEY_FILE` pointing at the age private
+key).
 
 1. Generate the new secret (32+ bytes, random):
 
@@ -44,38 +45,37 @@ workstation (`SOPS_AGE_KEY_FILE` pointing at the age private key).
 2. Update sops:
 
    ```sh
-   sops dunn.dev/iac/pyinfra/secrets.enc.yaml
-   # Set carmine.hydra_system_secret to the new value.
+   sops <your-iac-repo>/pyinfra/secrets.enc.yaml
+   # Set the hydra_system_secret entry to the new value.
    ```
 
-3. Stop Hydra on carmine:
+3. Stop Hydra on the SSO host:
 
    ```sh
-   ssh agd@carmine.dunn.dev 'systemctl --user stop auth-hydra.service'
+   ssh <operator>@<sso-host> 'systemctl --user stop auth-hydra.service'
    ```
 
 4. Drop and recreate the Hydra schema (Postgres-side):
 
    ```sh
-   ssh agd@carmine.dunn.dev '
+   ssh <operator>@<sso-host> '
      systemctl --user stop auth-hydra-migrate.service;
      podman exec -it auth-postgres psql -U postgres -c \
        "DROP DATABASE hydra; CREATE DATABASE hydra OWNER hydra;"
    '
    ```
 
-5. Re-provision podman secrets on carmine so the new sops value lands:
+5. Re-provision podman secrets on the SSO host so the new sops value lands:
 
    ```sh
-   cd dunn.dev/iac
-   make auth-secrets HOST=carmine
+   # using your operator tooling, e.g.:
+   make auth-secrets HOST=<sso-host>
    ```
 
 6. Re-run the Hydra migration + restart Hydra:
 
    ```sh
-   cd dunn.dev/iac
-   make auth-deploy HOST=carmine
+   make auth-deploy HOST=<sso-host>
    ```
 
    The deploy restarts auth-postgres, auth-hydra-migrate (populates
@@ -84,8 +84,7 @@ workstation (`SOPS_AGE_KEY_FILE` pointing at the age private key).
 7. Re-issue every client secret:
 
    ```sh
-   cd dunn.dev/iac
-   make auth-apply-clients HOST=carmine
+   make auth-apply-clients HOST=<sso-host>
    ```
 
    This runs the `auth-util` oneshot container which walks
@@ -96,10 +95,9 @@ workstation (`SOPS_AGE_KEY_FILE` pointing at the age private key).
    changed:
 
    ```sh
-   cd dunn.dev/iac
-   make keep-secrets HOST=carmine
-   make keep-deploy HOST=carmine
-   # ...repeat for each OIDC consumer that needs to pick up a new secret.
+   # repeat for each OIDC consumer that needs to pick up a new secret:
+   make keep-secrets HOST=<sso-host>
+   make keep-deploy HOST=<sso-host>
    ```
 
 9. Force the consent service to drop its cached signing key (the
@@ -107,15 +105,13 @@ workstation (`SOPS_AGE_KEY_FILE` pointing at the age private key).
    15 min; SIGUSR1 forces refresh):
 
    ```sh
-   ssh agd@carmine.dunn.dev 'podman exec auth-consent kill -USR1 1'
+   ssh <operator>@<sso-host> 'podman exec auth-consent kill -USR1 1'
    ```
 
-10. Verify a known OIDC flow end-to-end (login at dag.dunn.dev →
-    keep.dunn.dev signin) before clearing the runbook. Or run:
+10. Verify a known OIDC flow end-to-end before clearing the runbook:
 
     ```sh
-    cd dunn.dev/iac
-    make auth-smoke HOST=carmine
+    make auth-smoke HOST=<sso-host>
     ```
 
 ## Verification
@@ -125,7 +121,7 @@ After rotation:
 - `make auth-apply-clients` exited 0 for every yaml in `hydra/clients/`.
 - A test login through Vaultwarden (or any OIDC client) completes.
 - Hydra logs show no decryption errors: `journalctl --user -u auth-hydra.service -n 50`.
-- The sops file has only the new `carmine.hydra_system_secret` value.
+- The sops file has only the new `hydra_system_secret` value.
 
 ## What this does NOT cover
 
@@ -134,8 +130,8 @@ After rotation:
   handles that without touching `secrets.system`. The consent
   service's signing-key cache picks up the new key on next refresh
   (15 min) or on SIGUSR1.
-- Postgres credential rotation (the `carmine.auth_db_password` sops
-  entry). Separate procedure: stop the substrate, rotate the password,
+- Postgres credential rotation (the `auth_db_password` sops entry).
+  Separate procedure: stop the substrate, rotate the password,
   re-deploy. No db rebuild needed since the password is independent
   of at-rest encryption.
 

@@ -4,7 +4,7 @@
 # manual smoke testing.
 
 {
-	email admin@dunn.dev
+	email {$ACME_EMAIL}
 }
 
 auth-lab.{$DOMAIN} {

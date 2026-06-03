@@ -1,5 +1,5 @@
 {
-  "$id": "https://dunn.dev/schemas/family.identity.schema.json",
+  "$id": "https://example.com/schemas/identity.schema.json",
   "$schema": "http://json-schema.org/draft-07/schema#",
   "title": "Family member",
   "description": "Lab spike copy of the production identity schema.",

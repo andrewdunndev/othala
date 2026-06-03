@@ -13,7 +13,7 @@ The Postgres `kratos` and `hydra` databases hold:
   `secrets.system`, which is itself non-rotatable).
 - Every recovery-code state.
 
-Disk failure on carmine without backups means: every family member
+Disk failure on the SSO host without backups means: every family member
 re-enrolls passkeys, the admin manually re-creates 11 OIDC clients
 with secrets pushed to every app, and `secrets.system` rehydrates
 from Bitwarden (otherwise even partial restore can't decrypt). At
@@ -31,7 +31,7 @@ panic; it's the worst single-failure outcome in the auth substrate.
    - Retention: 30 daily + 12 monthly. Configurable.
 
 2. **ZFS snapshot integration**
-   - The `pg_data` dataset gets snapshotted by the existing carmine
+   - The `pg_data` dataset gets snapshotted by the existing SSO host
      ZFS snapshot policy (sanoid or estate equivalent).
    - Snapshots live alongside dumps for two-tier recovery (quick
      rollback via ZFS, long-term archive via pg_dump).
@@ -41,7 +41,7 @@ panic; it's the worst single-failure outcome in the auth substrate.
      host (synthetic-tank or similar), AND Backblaze B2 via rclone for
      offsite durability. The estate's standing backup posture is
      "once onsite, once offsite."
-   - `secrets.system` lives in sops (`carmine.hydra_system_secret`), not
+   - `secrets.system` lives in sops (the `hydra_system_secret` entry), not
      in the dump (it's an env var). On restore from a fresh DB, the
      operator pulls `secrets.system` from sops into the env and only
      then starts Hydra; otherwise the encrypted client secrets in the

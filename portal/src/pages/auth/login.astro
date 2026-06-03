@@ -22,6 +22,7 @@ export const prerender = false;
 import Layout from '../../layouts/Layout.astro';
 import markSvg from '@dunn.dev/reference/mark/mark.svg?raw';
 import { browserFlows, getLoginFlow } from '../../lib/kratos';
+import { siteName } from '../../lib/config';
 import { csrfToken, hasMethod, nodesByGroup, asInput, scriptNodes } from '../../lib/nodes';
 import type { FlowMessage } from '../../lib/types';
 
@@ -69,7 +70,7 @@ const passwordInput = ui
   ? nodesByGroup(ui.nodes, 'password').map(asInput).find((a) => a?.name === 'password') || null
   : null;
 ---
-<Layout title="Sign in" description="Sign in to dag.dunn.dev." bare>
+<Layout title="Sign in" description={`Sign in to ${siteName}.`} bare>
 
   <section class="hero">
     <span class="hero-mark" set:html={markSvg} />
@@ -81,7 +82,7 @@ const passwordInput = ui
         <span class="rune">ᛟ</span>
         <span class="rune-gloss">door to home</span>
       </p>
-      <h1 class="hero-title">Welcome back, family.</h1>
+      <h1 class="hero-title">Welcome back.</h1>
       <p class="hero-lede">
         {aal === 'aal2'
           ? 'Additional verification is required to continue.'

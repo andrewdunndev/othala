@@ -1,4 +1,4 @@
-IMAGE   ?= dunn.dev/glauth-kratos
+IMAGE   ?= glauth-kratos
 TAG     ?= lab
 RUNTIME ?= podman
 

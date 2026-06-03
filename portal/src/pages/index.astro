@@ -1,5 +1,5 @@
 ---
-// dag.dunn.dev — session-gated tile dashboard.
+// Othala portal — session-gated tile dashboard.
 //
 // v0.2.0 architecture (Topology B + apps registry as Content Collection):
 //
@@ -35,6 +35,7 @@ import { getCollection, type CollectionEntry } from 'astro:content';
 import { getSession, isReachable } from '../lib/kratos';
 import { isAdminSubject } from '../lib/admin-auth';
 import type { Identity } from '../lib/types';
+import { siteName, adminContact } from '../lib/config';
 
 type State = 'down' | 'pre-auth' | 'post-auth';
 
@@ -114,16 +115,16 @@ const devLinks = [
   { href: '/admin',                label: 'Admin (requires AAL2)' },
 ];
 ---
-<Layout title="Home" description="Family SSO for the dunn.dev estate.">
+<Layout title="Home" description={`Single sign-on for ${siteName}.`}>
 
   {state === 'down' && (
     <section class="holding">
       <span class="holding-mark" set:html={markSvg} />
-      <p class="holding-eyebrow">dag.dunn.dev</p>
+      <p class="holding-eyebrow">{siteName}</p>
       <h1 class="holding-title">Auth services starting up</h1>
       <p class="holding-prose">
         The substrate is offline or unreachable. This page will pick the
-        session back up as soon as it returns. If it persists, ask Andrew.
+        session back up as soon as it returns. If it persists, contact {adminContact}.
       </p>
       <p class="holding-tech">{downReason}</p>
     </section>
@@ -134,7 +135,7 @@ const devLinks = [
       <section class="hero">
         <span class="hero-mark" set:html={markSvg} />
         <div>
-          <p class="hero-eyebrow">dag.dunn.dev</p>
+          <p class="hero-eyebrow">{siteName}</p>
           <p class="rune-greeting" aria-label="door to home">
             <span class="rune">ᛞ</span>
             <span class="rune-arrow" aria-hidden="true">→</span>
@@ -143,7 +144,7 @@ const devLinks = [
           </p>
           <h1 class="hero-title">Welcome back</h1>
           <p class="hero-lede">
-            Family SSO for the home estate. One sign-in, every app.
+            Single sign-on for {siteName}. One sign-in, every app.
           </p>
           <div class="cta-row">
             <a href="/auth/login" class="button button-primary">Sign in</a>
@@ -155,7 +156,7 @@ const devLinks = [
       <section class="section">
         <p class="section-subtitle">What's behind this door</p>
         <p class="section-prose">
-          A small set of self-hosted services for the family. Photos,
+          A small set of self-hosted services. Photos,
           films, music, books, recipes, files. A handful of tools for
           the people who run the place. Each app respects the same
           identity, so signing in once is enough.
@@ -201,7 +202,7 @@ const devLinks = [
           </div>
         ) : (
           <p class="section-prose">
-            Your account doesn't have any app access yet. Ask Andrew to
+            Your account doesn't have any app access yet. Contact {adminContact} to
             enable one.
           </p>
         )}

@@ -6,7 +6,7 @@
 //
 // KRATOS_PUBLIC_URL resolution order:
 //   1. process.env.KRATOS_PUBLIC_URL (compose / quadlet env)
-//   2. https://dag.dunn.dev (production fallback)
+//   2. http://localhost:4433 (local dev / test fallback)
 
 import type {
   FlowResult,
@@ -19,7 +19,7 @@ import type {
 } from './types';
 
 function kratosBase(): string {
-  return process.env.KRATOS_PUBLIC_URL ?? 'https://dag.dunn.dev';
+  return process.env.KRATOS_PUBLIC_URL ?? 'http://localhost:4433';
 }
 
 const HEALTH_TIMEOUT_MS = 2000;

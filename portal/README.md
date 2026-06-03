@@ -1,6 +1,6 @@
 # portal
 
-The Astro UI for the dunn.dev auth substrate. Runs on carmine as a Node SSR pod (`@astrojs/node` standalone). Hosts the family-facing home portal AND the admin UI.
+The Astro UI for the Othala auth substrate. Runs as a Node SSR pod (`@astrojs/node` standalone) on the same host as Kratos and Hydra. Hosts the user-facing portal AND the admin UI.
 
 ## Status
 
@@ -16,9 +16,9 @@ Phase 3 minimum-viable pass:
 
 Build passes (`npm run build`). Type-check passes (`npm run check`). Container builds (`make image`).
 
-## Why on carmine, not Cloudflare Workers
+## Why co-located with the Ory services, not Cloudflare Workers
 
-adversarial-review-2 C1: the admin UI on Workers had no path to Kratos's admin port (`kratos:4434`) because that hostname resolves only inside the carmine pod network. Moving the portal to carmine collapses the runtime complexity: one Node process, normal `process.env`, in-pod fetch to Kratos+Hydra admin ports, no Workers shims.
+adversarial-review-2 C1: the admin UI on Workers had no path to Kratos's admin port (`kratos:4434`) because that hostname resolves only inside the SSO pod network. Moving the portal to the same pod collapses the runtime complexity: one Node process, normal `process.env`, in-pod fetch to Kratos+Hydra admin ports, no Workers shims.
 
 Cloudflare's role shrinks to DNS hosting + DNS-01 ACME. The previous WebFinger static-file path also moved into a real Astro endpoint so headers (`Content-Type: application/jrd+json`) and byte-matching with Hydra's issuer are explicit (H6/H7).
 
@@ -65,7 +65,7 @@ portal/
 │       │   ├── recovery.astro    # Kratos recovery (code strategy)
 │       │   ├── settings.astro    # Kratos settings (passkeys, password, profile)
 │       │   ├── verification.astro
-│       │   └── consent.astro     # Hydra consent (forwards to consent service on carmine)
+│       │   └── consent.astro     # Hydra consent (forwards to consent service on the SSO host)
 │       └── admin/
 │           ├── index.astro
 │           ├── users.astro
@@ -89,7 +89,7 @@ portal/
 | Identity traits: `username, email, displayName?, recoveryEmail?` | `Identity.traits` type; surfaced in settings profile section |
 | `metadata_admin.groups[]` controls tile visibility | `index.astro` filters `TILES` by group membership |
 | AAL2 only for admin pages | `admin.ts:requireAdminSession`; not enforced on family pages |
-| WebFinger href byte-matches Hydra issuer | `webfinger.ts` hardcodes `https://dag.dunn.dev/`; matches `hydra/hydra.yml` `urls.self.issuer` |
+| WebFinger href byte-matches Hydra issuer | `webfinger.ts` returns the issuer from `OTHALA_PUBLIC_URL`; must byte-match `hydra/hydra.yml` `urls.self.issuer` |
 
 ## Dev workflow
 
@@ -133,14 +133,14 @@ Per adversarial review: AAL is enforced at this layer, NOT at Caddy. Caddy `forw
 
 The Node SSR pod reads:
 
-- `KRATOS_PUBLIC_URL` (default `https://dag.dunn.dev`)
+- `KRATOS_PUBLIC_URL` (default `http://localhost:4433` in dev; set to your Kratos public URL in production)
 - `KRATOS_ADMIN_URL` (default `http://kratos:4434`; in-pod hostname)
 - `KRATOS_ADMIN_TOKEN` (optional; reserved for a future Oathkeeper interposer)
 - `HYDRA_ADMIN_URL` (default `http://hydra:4445`; in-pod hostname)
 - `HYDRA_ADMIN_TOKEN` (optional; same reservation)
 - `HOST` / `PORT` (Astro Node adapter; default 0.0.0.0:8080 in container)
 
-In the carmine pod the admin ports are reachable at the in-pod hostnames; production overrides default to those.
+In the SSO pod the admin ports are reachable at the in-pod hostnames; production overrides default to those.
 
 ## Design rules
 
@@ -172,6 +172,6 @@ cp ../../design/tokens/index.css      src/styles/tokens/index.css
 | `/auth/settings` | `GET /self-service/settings/flows?id=`, `GET /self-service/logout/browser` | — | requires session |
 | `/auth/verification` | (stub) | — | follow-up |
 | `/auth/logout` | `GET /self-service/logout/browser` | — | redirects to logout_url |
-| `/auth/consent` | — | redirect to `dag.dunn.dev/consent` | consent service auto-accepts |
+| `/auth/consent` | — | redirect to `<othala-host>/consent` | consent service auto-accepts |
 | `/admin/*` | `GET /sessions/whoami`, admin API via `requireAdminSession` (in-pod `kratos:4434`) | `GET /admin/clients` (read-only, in-pod `hydra:4445`) | |
 | `/.well-known/webfinger` | — | — | JRD JSON, byte-matches Hydra issuer for Tailscale |

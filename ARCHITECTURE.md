@@ -105,7 +105,7 @@ Backup the sops file + age key separately and durably.
 
 `kratos/kratos.yml: session.cookie.domain`. Parent-domain cookie so the
 session is readable across every `*.dunn.dev` subdomain. Same-site
-implication: `dag.dunn.dev` and `<app>.dunn.dev` are same-site to the
+implication: `<othala-host>` and `<app>.<parent-domain>` are same-site to the
 browser; CSRF posture must account for this (HIGH-1 in the security
 review documents the specific path; `csrf.ts` is the mitigation).
 
@@ -446,7 +446,7 @@ sequenceDiagram
 
 ### Tile dashboard render (admin AAL2 step-up)
 
-Admin pages live at `dag.dunn.dev/admin/*`. AAL is per-flow in Kratos, so
+Admin pages live at `<othala-host>/admin/*`. AAL is per-flow in Kratos, so
 the SSR layer is what enforces step-up. The tile dashboard itself
 (non-admin `/`) skips the AAL2 branch and renders from
 `metadata_admin.groups`. Admin authority itself is the
@@ -512,7 +512,7 @@ snippets.
 
 | Pattern | Apps | One-line summary |
 |---|---|---|
-| **OIDC native** | keep, larder, listen, memory, vault, library, forge, observe | App redirects to `dag.dunn.dev/oauth2/auth`, exchanges code for tokens at `/oauth2/token`; Caddy is just TLS + reverse proxy. |
+| **OIDC native** | keep, larder, listen, memory, vault, library, forge, observe | App redirects to `<othala-host>/oauth2/auth`, exchanges code for tokens at `/oauth2/token`; Caddy is just TLS + reverse proxy. |
 | **LDAP outpost** | cinema (Jellyfin) | glauth-kratos bridge co-located in the Jellyfin pod presents Kratos identities over LDAPS:636; Jellyfin binds against `localhost:636`. LDAP traffic never hits Caddy. |
 | **Forward auth** | tune (Navidrome), gather/* (Sonarr, Radarr, etc.) | Caddy `forward_auth` against Kratos `/sessions/whoami`. Subsonic API + shares bypass auth (native clients use HTTP Basic). |
 | **Client-credentials** | llm (vLLM) | Caddy validates `Authorization: Bearer` via Hydra's `/admin/oauth2/introspect`; in-pod sidecar pattern. |
@@ -606,16 +606,16 @@ minutes.
 
 ### Cookie domain + CORS posture (A5)
 
-A compromised app on `<app>.dunn.dev` can read its own cookies but NOT the
-Kratos session cookie (HttpOnly). The browser treats `dag.dunn.dev` and
-`<app>.dunn.dev` as same-site (registrable parent `dunn.dev`), so:
+A compromised app on `<app>.<parent-domain>` can read its own cookies but NOT the
+Kratos session cookie (HttpOnly). The browser treats `<othala-host>` and
+`<app>.<parent-domain>` as same-site (shared registrable parent), so:
 
 - Service-worker fetch-with-credentials is blocked at the IDP CORS layer.
-  Kratos `allowed_origins` lists only `https://dag.dunn.dev`; Hydra
+  Kratos `allowed_origins` lists only `https://<othala-host>`; Hydra
   likewise.
 - Form-driven CSRF (HIGH-1): `SameSite=Lax` permits same-site POSTs, so a
-  top-level form on `<app>.dunn.dev` posting to
-  `dag.dunn.dev/admin/users/<id>` would carry the session cookie. HIGH-1
+  top-level form on `<app>.<parent-domain>` posting to
+  `<othala-host>/admin/users/<id>` would carry the session cookie. HIGH-1
   closed this by adding per-request CSRF tokens to every admin form POST
   (`csrf.ts`, secret `CSRF_SECRET`).
 

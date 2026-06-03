@@ -27,8 +27,8 @@ export default defineConfig({
   output: 'server',
   adapter: node({ mode: 'standalone' }),
   integrations: [],
-  // Topology B (v0.2.0): single FQDN for the whole SSO stack.
-  site: 'https://dag.dunn.dev',
+  // Build-time bake: same var as the runtime OTHALA_PUBLIC_URL export in $lib/config.
+  site: process.env.OTHALA_PUBLIC_URL ?? 'http://localhost:4321',
   vite: {
     plugins: [tailwindcss()],
   },

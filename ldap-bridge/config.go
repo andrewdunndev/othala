@@ -53,11 +53,16 @@ type kratosFileCfg struct {
 	AdminToken       string `toml:"admin_token"`
 	AdminTokenEnv    string `toml:"admin_token_env"`
 	BaseDN           string `toml:"base_dn"`
+	BaseDNEnv        string `toml:"base_dn_env"`
 	IdentityCacheTTL string `toml:"identity_cache_ttl"`
 	BindCacheTTL     string `toml:"bind_cache_ttl"`
 	// ServiceBindDN is the read-only DN for non-OAuth LDAP clients (e.g.
 	// Jellyfin). When empty, the service-account bind feature is disabled.
 	ServiceBindDN string `toml:"service_bind_dn"`
+	// ServiceBindDNEnv names an env var holding the full service-account bind
+	// DN, following the same *_env companion shape as base_dn_env; the
+	// canonical glauth.cfg uses it so the file is topology-neutral.
+	ServiceBindDNEnv string `toml:"service_bind_dn_env"`
 	// ServiceBindPasswordEnv names the env var that holds the service-account
 	// password. Required when service_bind_dn is non-empty; resolved like
 	// admin_token_env. Never inline the value here.
@@ -118,11 +123,22 @@ func loadConfig(path string) (*Config, error) {
 		adminURL = v
 	}
 
+	// Service-account bind DN: resolved from service_bind_dn_env when set,
+	// else the inline service_bind_dn — mirrors the base_dn_env pattern.
+	serviceBindDN := k.ServiceBindDN
+	if k.ServiceBindDNEnv != "" {
+		v, ok := os.LookupEnv(k.ServiceBindDNEnv)
+		if !ok || v == "" {
+			return nil, fmt.Errorf("service_bind_dn_env %q not set or empty", k.ServiceBindDNEnv)
+		}
+		serviceBindDN = v
+	}
+
 	// Service-account bind: optional. If configured, the password env MUST
 	// resolve to a non-empty value — a misconfigured secret is an error,
 	// not a silent no-op.
 	var servicePW string
-	if k.ServiceBindDN != "" {
+	if serviceBindDN != "" {
 		if k.ServiceBindPasswordEnv == "" {
 			return nil, fmt.Errorf("service_bind_dn is set but service_bind_password_env is empty")
 		}
@@ -143,6 +159,13 @@ func loadConfig(path string) (*Config, error) {
 	}
 
 	baseDN := k.BaseDN
+	if k.BaseDNEnv != "" {
+		v, ok := os.LookupEnv(k.BaseDNEnv)
+		if !ok || v == "" {
+			return nil, fmt.Errorf("base_dn_env %q not set or empty", k.BaseDNEnv)
+		}
+		baseDN = v
+	}
 	if baseDN == "" {
 		baseDN = raw.Backend.BaseDN
 	}
@@ -154,7 +177,7 @@ func loadConfig(path string) (*Config, error) {
 		BaseDN:              baseDN,
 		IdentityCacheTTL:    idTTL,
 		BindCacheTTL:        bdTTL,
-		ServiceBindDN:       k.ServiceBindDN,
+		ServiceBindDN:       serviceBindDN,
 		ServiceBindPassword: servicePW,
 	}
 

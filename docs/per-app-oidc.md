@@ -11,21 +11,28 @@ This runbook covers OIDC-based integrations. For the forward-auth apps
 "forward auth" note in `ARCHITECTURE.md`. For Cinema's native clients
 (Apple TV / Infuse), see the [Jellyfin LDAP section](#cinema--jellyfin-ldap-not-oidc).
 
+> **Note for adopters:** every issuer/token/userinfo URL in this
+> document uses `{YOUR_OTHALA_URL}` as a placeholder for your Othala
+> instance's public FQDN (the value of `OTHALA_PUBLIC_URL`, no trailing
+> slash). The author's instance runs on `dag.dunn.dev`; that hostname
+> appears in example output only and is not a shared endpoint.
+
 ## Overview
 
-- Issuer: `https://dag.dunn.dev/` (LB-2; non-changeable once any RP
+- Issuer: `https://{YOUR_OTHALA_URL}/` (LB-2; non-changeable once any RP
   is wired).
-- Discovery: `https://dag.dunn.dev/.well-known/openid-configuration`
+- Discovery: `https://{YOUR_OTHALA_URL}/.well-known/openid-configuration`
 - Authorization code flow for all interactive apps; `client_credentials`
   for `llm` (machine-to-machine only).
 - Client manifests live in `dunn.dev/othala/hydra/clients/<slug>.yaml`.
   Each file has two top-level keys: `oidc:` (forwarded to Hydra) and
   `consent:` (read by the consent service; never sent to Hydra).
 - `client_id` equals the slug (e.g., `keep`, `observe`).
-- Client secrets are sops-encrypted in `dunn.dev/iac/pyinfra/secrets.enc.yaml`
-  under `carmine.<slug>_oidc_client_secret`. The same plaintext value
-  must land in both Hydra (via `make dag-apply-clients`) and the RP
-  app's own config. They are not linked automatically.
+- Client secrets are sops-encrypted in your operator repo (e.g.
+  `dunn.dev/iac/pyinfra/secrets.enc.yaml`) under `<host>.<slug>_oidc_client_secret`.
+  The same plaintext value must land in both Hydra (via
+  `make dag-apply-clients`) and the RP app's own config. They are not
+  linked automatically.
 - Access groups: every interactive OIDC app has a corresponding Ory
   group named `access-<slug>`. The consent service denies tokens for
   users not in this group. Add users there before the login test.
@@ -46,16 +53,16 @@ Keep the value. You will need it in steps 2 and 4.
 **2. Set the sops key.**
 
 ```sh
-sops dunn.dev/iac/pyinfra/secrets.enc.yaml
-# Add or update: carmine.<slug>_oidc_client_secret: "<value from step 1>"
+sops <your-iac-repo>/pyinfra/secrets.enc.yaml
+# Add or update: <host>.<slug>_oidc_client_secret: "<value from step 1>"
 ```
 
 **3. Apply the Hydra client (Hydra side).**
 
 ```sh
-cd dunn.dev/iac
-make dag-secrets HOST=carmine   # writes the new sops entry into podman secrets
-make dag-apply-clients HOST=carmine
+cd <your-iac-repo>
+make dag-secrets HOST=<sso-host>   # writes the new sops entry into podman secrets
+make dag-apply-clients HOST=<sso-host>
 ```
 
 `dag-apply-clients` runs the `dag-util` one-shot container on the
@@ -70,7 +77,7 @@ Enter into the app's own config:
 
 | Field | Value |
 |---|---|
-| Issuer / OIDC discovery URL | `https://dag.dunn.dev/` |
+| Issuer / OIDC discovery URL | `https://{YOUR_OTHALA_URL}/` |
 | Client ID | `<slug>` (matches the manifest `client_id`) |
 | Client secret | same plaintext from step 1 |
 | Scopes | as listed in the manifest `scope:` field |
@@ -83,7 +90,7 @@ After editing the app config, restart the app service before testing.
 **5. Add the user to the access group (Ory side).**
 
 The consent service checks group membership before issuing any token.
-Add via the admin portal at `https://dag.dunn.dev/admin/users/<id>`.
+Add via the admin portal at `https://{YOUR_OTHALA_URL}/admin/users/<id>`.
 
 **6. Test login (LIVE only).**
 
@@ -121,9 +128,9 @@ name = Auth
 client_id = observe
 client_secret = <value from sops>
 scopes = openid email profile groups offline_access
-auth_url = https://dag.dunn.dev/oauth2/auth
-token_url = https://dag.dunn.dev/oauth2/token
-api_url = https://dag.dunn.dev/userinfo
+auth_url = https://{YOUR_OTHALA_URL}/oauth2/auth
+token_url = https://{YOUR_OTHALA_URL}/oauth2/token
+api_url = https://{YOUR_OTHALA_URL}/userinfo
 redirect_uri = https://observe.dunn.dev/login/generic_oauth
 use_pkce = false
 allow_sign_up = true
@@ -158,7 +165,7 @@ Minimum required env:
 SSO_ENABLED=true
 SSO_CLIENT_ID=keep
 SSO_CLIENT_SECRET=<value from sops>
-SSO_AUTHORITY=https://dag.dunn.dev/
+SSO_AUTHORITY=https://{YOUR_OTHALA_URL}/
 SSO_SCOPES=groups offline_access
 # Once PR #6158 lands upstream, also set:
 # SSO_ROLES_ENABLED=true
@@ -202,7 +209,7 @@ gitlab_rails['omniauth_providers'] = [
       name: 'openid_connect',
       scope: ['openid', 'email', 'profile', 'groups', 'offline_access'],
       response_type: 'code',
-      issuer: 'https://dag.dunn.dev/',
+      issuer: 'https://{YOUR_OTHALA_URL}/',
       discovery: true,
       client_auth_method: 'basic',
       client_options: {
@@ -251,7 +258,7 @@ Key settings (verify exact env names against [Immich OAuth docs](https://docs.im
 
 ```sh
 OAUTH_ENABLED=true
-OAUTH_ISSUER_URL=https://dag.dunn.dev/
+OAUTH_ISSUER_URL=https://{YOUR_OTHALA_URL}/
 OAUTH_CLIENT_ID=memory
 OAUTH_CLIENT_SECRET=<value from sops>
 OAUTH_SCOPE=openid email profile groups offline_access
@@ -284,8 +291,8 @@ oCIS env variables. The proxy reads OIDC claims when
 Key env vars (verify against [oCIS proxy docs](https://doc.owncloud.com/ocis/next/deployment/services/s-list/proxy.html)):
 
 ```sh
-PROXY_OIDC_ISSUER=https://dag.dunn.dev/
-OCIS_OIDC_ISSUER=https://dag.dunn.dev/
+PROXY_OIDC_ISSUER=https://{YOUR_OTHALA_URL}/
+OCIS_OIDC_ISSUER=https://{YOUR_OTHALA_URL}/
 PROXY_ROLE_ASSIGNMENT_DRIVER=oidc
 PROXY_ROLE_ASSIGNMENT_OIDC_CLAIM=roles
 PROXY_AUTOPROVISION_CLAIM_GROUPS=groups
@@ -315,7 +322,7 @@ RP-side config (env vars in the Mealie quadlet):
 
 ```sh
 OIDC_AUTH_ENABLED=true
-OIDC_CONFIGURATION_URL=https://dag.dunn.dev/.well-known/openid-configuration
+OIDC_CONFIGURATION_URL=https://{YOUR_OTHALA_URL}/.well-known/openid-configuration
 OIDC_CLIENT_ID=larder
 OIDC_CLIENT_SECRET=<value from sops>
 OIDC_AUTO_REDIRECT=false
@@ -350,7 +357,7 @@ WebFinger for `*@dunn.dev` is served from the dunn.dev apex
 See `docs/apex-webfinger-followup.md` for the discovery path.
 
 RP-side config: Tailscale admin console > Settings > OIDC. Enter:
-- Issuer URL: `https://dag.dunn.dev/`
+- Issuer URL: `https://{YOUR_OTHALA_URL}/`
 - Client ID: `tailscale`
 - Client secret: value from sops
 
@@ -381,7 +388,7 @@ at deploy.
 Key fields:
 
 ```
-Issuer URL:      https://dag.dunn.dev/
+Issuer URL:      https://{YOUR_OTHALA_URL}/
 Client ID:       listen
 Client secret:   <value from sops>
 Scopes:          openid email profile groups offline_access
@@ -409,7 +416,7 @@ RP-side config: verify against [BookLore OIDC docs](https://booklore.org/docs/to
 at deploy for current config keys. Expected fields:
 
 ```
-Issuer URL:    https://dag.dunn.dev/
+Issuer URL:    https://{YOUR_OTHALA_URL}/
 Client ID:     library
 Client secret: <value from sops>
 Scopes:        openid email profile groups offline_access
@@ -433,7 +440,7 @@ user list. Admin role must be granted inside BookLore manually.
 
 The llm client is for API consumers, not for interactive sign-in.
 Caddy in front of vLLM introspects the bearer token at
-`https://dag.dunn.dev/admin/oauth2/introspect`. A valid active token
+`https://{YOUR_OTHALA_URL}/admin/oauth2/introspect`. A valid active token
 admits the request; anything else is a 401.
 
 Obtain a token:
@@ -441,7 +448,7 @@ Obtain a token:
 ```sh
 curl -s -u 'llm:<client_secret>' \
   -d 'grant_type=client_credentials&scope=api' \
-  https://dag.dunn.dev/oauth2/token | jq .access_token
+  https://{YOUR_OTHALA_URL}/oauth2/token | jq .access_token
 ```
 
 Pass the token as `Authorization: Bearer <token>` to the vLLM API.
@@ -524,10 +531,10 @@ auto-created on first login.
 
 **Nonce / state validation failure.** If the app logs a nonce or state
 mismatch after the redirect, the most common cause is a clock skew
-between carmine and the client, or a redirect through an intermediate
-that drops the state query parameter (e.g., a reverse proxy rewriting
-the Location header). Check NTP sync on carmine and ensure the proxy
-config passes query parameters unchanged.
+between the SSO host and the client, or a redirect through an
+intermediate that drops the state query parameter (e.g., a reverse
+proxy rewriting the Location header). Check NTP sync on the SSO host
+and ensure the proxy config passes query parameters unchanged.
 
 **Back-channel logout returning 4xx.** For apps marked "verify in lab"
 (`keep`, `larder`), a 4xx on the logout endpoint is expected if the

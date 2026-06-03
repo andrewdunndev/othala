@@ -10,7 +10,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { browserFlows } from '../src/lib/kratos.ts';
 
-const BASE = process.env.KRATOS_PUBLIC_URL ?? 'https://dag.dunn.dev';
+const BASE = process.env.KRATOS_PUBLIC_URL ?? 'http://localhost:4433';
 
 test('login: no opts', () => {
   assert.equal(browserFlows.login(), `${BASE}/self-service/login/browser`);

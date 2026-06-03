@@ -4,25 +4,26 @@
 // directory (default `/etc/portal/manifests/`). The build-time JSON
 // bundle is gone; the Workers-era reasoning that motivated it
 // (Workers can't read the filesystem at runtime) no longer applies
-// since the portal runs as Astro Node SSR on carmine.
+// since the portal runs as Astro Node SSR on the SSO host.
 //
 // Why runtime read:
 //
 // - Adding a new OIDC client is now: edit `hydra/clients/<slug>.yaml`
 //   in this repo, rsync to `/var/srv/auth/consent/manifests/` on
-//   carmine via `make auth-sync-manifests`, restart the consent
-//   service and the portal. No image rebuild required.
+//   the SSO host (e.g. via `make auth-sync-manifests`), restart the
+//   consent service and the portal. No image rebuild required.
 // - Source-of-truth stays in `dunn.dev/othala/hydra/clients/`. The
 //   portal and consent service read the same files from the same
-//   directory; iac's sync target keeps the on-carmine copy current.
+//   directory; the operator's sync target keeps the on-host copy
+//   current.
 // - A 30-second in-process cache prevents per-request YAML parsing
 //   from being a hot path. Cache is invalidated on SIGHUP (future).
 //
 // Source-of-truth chain:
 //
 //   dunn.dev/othala/hydra/clients/*.yaml             (canonical, this repo)
-//     -> rsync via dunn.dev/iac make auth-sync-manifests
-//     -> /var/srv/auth/{consent,portal}/manifests/ (runtime on carmine)
+//     -> rsync via operator sync target (e.g. make auth-sync-manifests)
+//     -> /var/srv/auth/{consent,portal}/manifests/ (runtime on SSO host)
 //        -> consent container reads via volume mount
 //        -> portal container reads via volume mount
 //
@@ -34,6 +35,7 @@
 import { readdirSync, readFileSync, statSync } from 'node:fs';
 import { join } from 'node:path';
 import { parse as parseYaml } from 'yaml';
+import { identityGroups } from './config';
 
 export interface ClientRole {
   name: string;
@@ -503,9 +505,15 @@ export function assertManifestsValid(set: ClientManifest[]): void {
   }
 }
 
-/** Distinct identity groups referenced by any client's group_role_map. */
+/** Distinct identity groups referenced by any client's group_role_map.
+ *
+ * Seeded from OTHALA_IDENTITY_GROUPS (env-driven, always includes 'admin')
+ * so the admin UI shows every configured group even if no manifest references
+ * it yet. Additional groups discovered in manifest group_role_map keys are
+ * appended. Result is sorted for stable display order.
+ */
 export function knownIdentityGroups(): string[] {
-  const set = new Set<string>(['admin', 'family', 'friends', 'kids']);
+  const set = new Set<string>(identityGroups);
   for (const m of loadClientManifests()) {
     for (const g of Object.keys(m.groupRoleMap)) set.add(g);
   }

@@ -2,13 +2,14 @@
 //
 // Why (HIGH-1):
 //
-//   The Kratos session cookie is SameSite=Lax with the parent domain
-//   `.dunn.dev`. Browsers consider `dag.dunn.dev` and `<app>.dunn.dev`
-//   same-site (registrable parent), so a compromised app on
-//   `<app>.dunn.dev` can host a top-level form that POSTs to
-//   `https://dag.dunn.dev/admin/users/<id>` and the browser includes
-//   the session cookie. The admin UI's `requireAdminSession` already
-//   passed AAL2 for the active admin, so the malicious form rides that.
+//   The Kratos session cookie is SameSite=Lax with the parent-domain
+//   cookie domain. Browsers consider the Othala host and any sibling
+//   app subdomain same-site (shared registrable parent), so a
+//   compromised app on `<app>.<parent-domain>` can host a top-level
+//   form that POSTs to `<othala-host>/admin/users/<id>` and the browser
+//   includes the session cookie. The admin UI's `requireAdminSession`
+//   already passed AAL2 for the active admin, so the malicious form
+//   rides that.
 //
 //   Mitigation: a per-request signed token tied to identity_id. Token
 //   embedded in every admin form, verified server-side on POST. Single-

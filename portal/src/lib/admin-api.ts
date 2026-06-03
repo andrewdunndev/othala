@@ -22,6 +22,7 @@ import {
 import type { Identity } from './types';
 import { validateMetadataAdmin } from './metadata-admin';
 import { revokeSubject } from './revoke';
+import { defaultSchemaId } from './config';
 
 function adminBase(): string {
   return process.env.KRATOS_ADMIN_URL ?? 'http://kratos:4434';
@@ -96,7 +97,7 @@ export async function createIdentity(input: CreateIdentityInput): Promise<Identi
   // otherwise be silently accepted and stored.
   const validated = validateMetadataAdmin(input.metadataAdmin);
   const createIdentityBody: CreateIdentityBody = {
-    schema_id: input.schemaId ?? 'family',
+    schema_id: input.schemaId ?? defaultSchemaId,
     traits: input.traits,
     metadata_admin: validated,
   };

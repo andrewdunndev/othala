@@ -14,7 +14,7 @@
 // identity) therefore can no longer drop admin authority — the allowlist
 // is the only source of truth, and it lives outside Kratos.
 //
-// Bootstrap: OTHALA_ADMIN_SUBJECTS=andrew@dunn.dev
+// Bootstrap: OTHALA_ADMIN_SUBJECTS=admin@example.com
 //
 // Fail-closed: an unset / empty / whitespace-only list yields NO admins.
 // A missing email on the identity yields a non-admin.

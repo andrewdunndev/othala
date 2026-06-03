@@ -1,6 +1,6 @@
 # glauth-kratos: LDAP-to-Kratos bridge.
 #
-# Two-stage: ci-go builder produces a static binary, runtime layer adds
+# Two-stage: golang builder produces a static binary, runtime layer adds
 # the binary onto UBI 9 minimal. Minimal (not micro) is used because the
 # bridge needs an in-container HTTP client for its compose / quadlet
 # healthcheck against its own /healthz admin endpoint on :6478 — UBI
@@ -8,9 +8,9 @@
 # bridge image stays small and gains self-validation (no `|| exit 0`
 # soft-pass shenanigans).
 
-ARG CATALOG_VERSION=2.5.0
+ARG GO_VERSION=1.24
 
-FROM registry.gitlab.com/dunn.dev/pipeline/ci-go:${CATALOG_VERSION} AS builder
+FROM docker.io/golang:${GO_VERSION} AS builder
 
 WORKDIR /build
 

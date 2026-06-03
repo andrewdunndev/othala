@@ -24,17 +24,15 @@
 //   alphabetical order. This guarantees portal "Effective Access" and
 //   the token-injection path issue identical roles for the same input.
 //
-//   The canonical identity-group order is:
-//     admin, family, friends, kids
-//
-//   New identity groups (e.g., service, elder) MUST be added to
-//   IDENTITY_GROUP_ORDER below AND to the admin forms' IDENTITY_GROUPS
-//   list. Adding to one without the other re-introduces the C4 drift.
+//   The canonical identity-group order is driven by OTHALA_IDENTITY_GROUPS
+//   (see $lib/config). 'admin' is always first. New identity groups are
+//   added via that env var — no code change required.
 
 import type { ClientManifest } from './manifests';
 import type { Identity } from './types';
 import { isAdminSubject } from './admin-auth';
 import { lookupRole } from './claims';
+import { identityGroups } from './config';
 
 export type AccessSource =
   | { kind: 'override' }
@@ -58,12 +56,11 @@ export interface EffectiveAccessRow {
  * stored order == canonical order, and a stored-order walk produces
  * the same answer as a precedence walk.
  *
- * Adding a new identity group means appending it here AND to the
- * admin form's IDENTITY_GROUPS list (`portal/src/pages/admin/users/new.astro`
- * and `[id].astro`). Otherwise the form will write the group out of
- * canonical order and the cross-implementation invariant breaks.
+ * Driven by OTHALA_IDENTITY_GROUPS (see $lib/config). Adding a new
+ * identity group means setting (or extending) that env var — no code
+ * change required. 'admin' is always first regardless of env content.
  */
-export const IDENTITY_GROUP_ORDER = ['admin', 'family', 'friends', 'kids'] as const;
+export const IDENTITY_GROUP_ORDER: readonly string[] = identityGroups;
 
 /**
  * Sort an unordered list of groups into the canonical stored shape:

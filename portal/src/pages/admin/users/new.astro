@@ -21,15 +21,15 @@ import { requireAdminSession, createIdentity, getRecoveryLink } from '../../../l
 import { loadClientManifests } from '../../../lib/manifests';
 import { IDENTITY_GROUP_ORDER, normalizeGroupOrder } from '../../../lib/access';
 import { signToken, verifyToken, CSRFError } from '../../../lib/csrf';
+import { identityGroups } from '../../../lib/config';
 
 const guard = await requireAdminSession(Astro);
 if (guard instanceof Response) return guard;
 const adminIdentityId = guard.identity?.id ?? '';
 
 const manifests = loadClientManifests();
-// Form labels match the canonical order (see access.ts). Adding a new
-// identity group means updating IDENTITY_GROUP_ORDER first; this list
-// derives from it.
+// Form labels derive from IDENTITY_GROUP_ORDER which is env-driven via
+// OTHALA_IDENTITY_GROUPS (see $lib/config and access.ts).
 const IDENTITY_GROUPS = [...IDENTITY_GROUP_ORDER];
 const ACCESS_GROUPS = manifests.map((m) => ({
   group: m.accessGroup,
@@ -46,11 +46,14 @@ interface FormState {
   roleOverrides: Record<string, string>;
 }
 
+// Default identity group selection: first non-admin group from env config,
+// or empty if only 'admin' is configured (operator will pick manually).
+const defaultIdentityGroup = identityGroups.find((g) => g !== 'admin');
 const empty: FormState = {
   username: '',
   email: '',
   displayName: '',
-  identityGroups: ['family'],
+  identityGroups: defaultIdentityGroup ? [defaultIdentityGroup] : [],
   accessGroups: [],
   roleOverrides: {},
 };
@@ -142,7 +145,7 @@ const isAccessSelected = (g: string) => form.accessGroups.includes(g);
 // HIGH-1: per-request CSRF token, single-use.
 const csrfToken = signToken(adminIdentityId);
 ---
-<Layout title="New user — Admin — Dunn Family">
+<Layout title="New user — Admin">
   <main class="shell shell-md stack-lg">
     <header class="stack">
       <h1>New user</h1>

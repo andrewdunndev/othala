@@ -3,6 +3,12 @@
 Status: BLOCKED on first Tailscale tenant setup. WebFinger is not
 load-bearing until then.
 
+> **Adopter note:** this document describes the WebFinger implementation
+> for the author's Tailscale setup (email domain `dunn.dev`, Othala
+> instance at `dag.dunn.dev`). Substitute your own email domain and
+> Othala public URL throughout. The shape of the Pages function and
+> verification procedure are generic.
+
 ## Background
 
 Tailscale custom OIDC requires WebFinger at the email-domain root —

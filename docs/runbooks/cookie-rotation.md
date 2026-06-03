@@ -53,9 +53,11 @@ runbook didn't account for it" bugs.
 
    Production (`dunn.dev/iac/pyinfra/secrets.enc.yaml`):
 
+   Production (sops-backed operator repo, e.g. `dunn.dev/iac`):
+
    ```sh
-   sops dunn.dev/iac/pyinfra/secrets.enc.yaml
-   # Edit carmine.auth_session_secret to the new value.
+   sops <your-iac-repo>/pyinfra/secrets.enc.yaml
+   # Edit the auth_session_secret entry to the new value.
    # Substrate-secret model (v0.2.0): a single `auth_session_secret` key
    # feeds both _CURRENT and _PREVIOUS slots — rotation is a single
    # value swap; collapsing the two-slot semantic into one sops entry
@@ -74,15 +76,15 @@ runbook didn't account for it" bugs.
 
 3. Restart Kratos and Hydra:
    - Lab: `podman compose restart kratos hydra`
-   - Production: `make auth-secrets HOST=carmine && make auth-deploy HOST=carmine`
-     (the secrets re-provision picks up the new value; auth-deploy
-     restarts the substrate)
+   - Production: re-provision secrets and redeploy via your operator tooling
+     (the secrets re-provision picks up the new value; redeploy restarts
+     the substrate)
 
 4. Verify both services healthy:
 
    ```sh
-   curl -fsS https://dag.dunn.dev/health/ready
-   make auth-smoke HOST=carmine    # full validation suite
+   curl -fsS https://<your-othala-host>/health/ready
+   # run your operator smoke suite, e.g.: make auth-smoke HOST=<sso-host>
    ```
 
 5. Active sessions: still valid. Existing cookies were signed with the

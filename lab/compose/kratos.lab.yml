@@ -54,14 +54,14 @@ selfservice:
         passwordless: true
         rp:
           id: ${DOMAIN}
-          display_name: Dunn Family Lab
+          display_name: ${OTHALA_INSTANCE_NAME}
           origins:
             - https://auth-lab.${DOMAIN}
 
     totp:
       enabled: true
       config:
-        issuer: Dunn Family Lab
+        issuer: ${OTHALA_INSTANCE_NAME}
 
     code:
       enabled: true

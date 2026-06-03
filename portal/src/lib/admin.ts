@@ -7,7 +7,7 @@
 // per-flow / global, not per-route. Caddy already gates "session present"
 // upstream of this guard.
 
-import { getSession } from './kratos';
+import { browserFlows, getSession } from './kratos';
 import { getIdentity } from './admin-api';
 import { isAdminSubject } from './admin-auth';
 import { revokeSubject, type RevokeResult } from './revoke';
@@ -73,13 +73,7 @@ export async function requireAdminSession(astro: any): Promise<Session | Respons
   }
 
   if (session.authenticator_assurance_level !== 'aal2') {
-    const returnTo = encodeURIComponent(
-      `https://dag.dunn.dev${astro.url.pathname}${astro.url.search}`,
-    );
-    const kratosUrl =
-      `https://dag.dunn.dev/self-service/login/browser` +
-      `?refresh=true&aal=aal2&return_to=${returnTo}`;
-    return astro.redirect(kratosUrl);
+    return astro.redirect(browserFlows.login({ refresh: true, aal: 'aal2', returnTo: astro.url.href }));
   }
 
   return session;

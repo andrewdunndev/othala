@@ -16,6 +16,30 @@ is grouped under **dag** (`services/dag/`, `dag-*` quadlets,
 `dag.network`, `dag_*` sops keys); the functional Ory services keep
 their role names (kratos / hydra / postgres).
 
+## Getting started: two entry paths
+
+**Option A — Lab (compose stack, any host):** The fastest way to evaluate
+Othala locally or on a single VM, without iac or sops. Start here if you
+are a new adopter or want to try before committing to the iac model.
+
+```sh
+cd lab/compose
+cp .env.example .env    # fill in POSTGRES_PASSWORD, OTHALA_PUBLIC_URL, etc.
+podman compose up -d
+# Portal is available at OTHALA_PUBLIC_URL (or http://localhost:8080 in dev).
+```
+
+See `lab/compose/README.md` for full env reference and smoke verification.
+The compose stack runs the same Othala app image as production; iac
+differences are quadlets + sops, not the app itself.
+
+**Option B — iac (Andrew's production deployment, `dunn.dev/iac`):** The
+promotion path documented in the rest of this file. Vendor Othala configs
+by tag-pin into your operator repo, manage secrets with sops + age,
+deploy via quadlets. Full details below.
+
+---
+
 ## Deploy shape
 
 One Othala pod on carmine, fronted by a Caddy edge. The containers:

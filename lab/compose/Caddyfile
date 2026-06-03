@@ -21,7 +21,7 @@
 # evaluated top-down and the first match wins.
 
 {
-	email admin@dunn.dev
+	email {$ACME_EMAIL}
 }
 
 auth-lab.{$DOMAIN} {
