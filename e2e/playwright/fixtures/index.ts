@@ -36,17 +36,20 @@ export const test = base.extend<OthalaFixtures>({
     await use(process.env.BASE ?? 'http://auth.othala.test');
   },
 
-  kratosAdminURL: async ({}, use) => {
+  // Worker-scoped: the worker-scoped `member`/`admin` fixtures depend on
+  // kratosAdminURL, and a worker fixture cannot depend on a test-scoped one.
+  // (Matches Ory upstream, where these URLs are worker-scoped options.)
+  kratosAdminURL: [async ({}, use) => {
     await use(process.env.KRATOS_ADMIN_URL ?? 'http://kratos:4434');
-  },
+  }, { scope: 'worker' }],
 
-  hydraPublicURL: async ({}, use) => {
+  hydraPublicURL: [async ({}, use) => {
     await use(process.env.HYDRA_PUBLIC_URL ?? 'http://hydra:4444');
-  },
+  }, { scope: 'worker' }],
 
-  hydraAdminURL: async ({}, use) => {
+  hydraAdminURL: [async ({}, use) => {
     await use(process.env.HYDRA_ADMIN_URL ?? 'http://hydra:4445');
-  },
+  }, { scope: 'worker' }],
 
   // member: bt2@othala.test, access-keep + family groups.
   // NOT on OTHALA_ADMIN_SUBJECTS (admin@othala.test is).

@@ -159,7 +159,7 @@ SMOKE_EXIT=$?
 echo ""
 echo "=== browser e2e (Playwright) ==="
 BROWSER_EXIT=0
-if docker compose --profile browser --env-file=.env up -d caddy; then
+if docker compose --profile browser --env-file=.env up -d --no-deps caddy; then
     sleep 5  # caddy boots in ~1s; brief settle before the specs hit auth.othala.test
     timeout 360 docker compose --profile browser --env-file=.env run --rm --no-deps -T playwright || BROWSER_EXIT=$?
 else
