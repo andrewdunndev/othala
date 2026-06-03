@@ -48,11 +48,18 @@ echo "=== othala e2e: AUTH_REGISTRY=$AUTH_REGISTRY AUTH_VERSION=$AUTH_VERSION ==
 # Permission sanity: scripts must be executable.
 chmod +x ./gen-secrets.sh ./smoke.sh ./postgres-init.sh
 
-# Step 1: per-run secrets
-AUTH_REGISTRY="$AUTH_REGISTRY" \
-AUTH_VERSION="$AUTH_VERSION" \
-  bash ./gen-secrets.sh > .env
-echo "  secrets generated (.env, $(wc -l < .env) lines)"
+# Step 1: per-run secrets. gen-secrets MUST succeed and emit a full env — a
+# partial/empty .env silently renders configs with literal ${VAR} placeholders
+# that crash Ory at startup (observed as a ~45min hang, pipeline 2574071772,
+# when a gen-secrets bug produced an empty .env). Fail fast instead.
+if ! AUTH_REGISTRY="$AUTH_REGISTRY" AUTH_VERSION="$AUTH_VERSION" bash ./gen-secrets.sh > .env; then
+    echo "  ✗ gen-secrets.sh failed — aborting"; exit 1
+fi
+env_vars=$(grep -cE '^[A-Z][A-Z_]*=' .env || true)
+if [[ "$env_vars" -lt 30 ]]; then
+    echo "  ✗ .env has only $env_vars vars (expected >=30) — partial gen-secrets; aborting"; exit 1
+fi
+echo "  secrets generated (.env, $env_vars vars)"
 
 # Step 2: registry login (skip if CI vars absent for local runs)
 if [[ -n "${CI_REGISTRY_USER:-}" && -n "${CI_REGISTRY_PASSWORD:-}" ]]; then
@@ -84,12 +91,27 @@ python3 -c 'import os,sys; sys.stdout.write(os.path.expandvars(sys.stdin.read())
     < ../hydra/hydra.yml   > hydra.rendered.yml
 echo "  canonical configs rendered (kratos.rendered.yml, hydra.rendered.yml)"
 
-# Step 3: compose up.
-# Set -e here so a failed compose-up aborts before smoke.
-set -e
-echo "  docker compose up..."
-docker compose --env-file=.env up -d
-set +e
+# Guard: any un-expanded ${VAR} on a NON-comment line means a required env var
+# was missing — Ory rejects the config and crash-loops. Catch it here, not as
+# a downstream startup hang.
+leftover=$(cat kratos.rendered.yml hydra.rendered.yml | grep -E '\$\{[A-Za-z_]' | grep -E '^[[:space:]]*[^#[:space:]]' || true)
+if [[ -n "$leftover" ]]; then
+    echo "  ✗ un-expanded \${VAR} on non-comment line(s) — a render env var is missing; aborting:"
+    echo "$leftover" | head
+    exit 1
+fi
+
+# Step 3: compose up — wrapped in a timeout. A never-healthy dependency (e.g. a
+# mis-rendered config) makes `up -d` block indefinitely; the health-wait timeout
+# below never arms because we never return from `up -d`. Without this wrapper the
+# job hangs to the CI wall-clock limit (observed: ~45min, pipeline 2574071772).
+echo "  docker compose up (timeout 300s)..."
+if ! timeout 300 docker compose --env-file=.env up -d; then
+    echo "  ✗ compose up failed or timed out — diagnostics:"
+    docker compose ps || true
+    docker compose logs --tail=120 || true
+    exit 1
+fi
 
 # Step 4: wait for healthy
 echo "  waiting for healthchecks (max 240s)..."

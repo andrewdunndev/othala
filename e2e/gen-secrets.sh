@@ -50,7 +50,7 @@ HYDRA_PG_PASS=$(gen_alnum)
 # ── SMTP stub (no real mail in e2e; Kratos courier uses these) ───────────────
 # These are consumed by the expandvars render of kratos.yml (courier.smtp).
 # Courier is effectively inert in the e2e (no real SMTP relay), but the config
-# must not contain literal ${SMTP_USER}/${SMTP_PASS} or Kratos rejects the DSN.
+# must not contain literal \${SMTP_USER}/\${SMTP_PASS} or Kratos rejects the DSN.
 SMTP_USER=lab
 SMTP_PASS=lab
 
@@ -62,7 +62,7 @@ OTHALA_PUBLIC_HOST=auth.othala.test
 OTHALA_APEX=othala.test
 OTHALA_WEBAUTHN_RP_ID=othala.test
 OTHALA_WEBAUTHN_RP_ORIGINS=http://auth.othala.test
-OTHALA_INSTANCE_NAME=Othala Lab
+OTHALA_INSTANCE_NAME='Othala Lab'
 OTHALA_SMTP_FROM_ADDRESS=noreply@othala.test
 
 # ── Password policy: HIBP off for offline VM, min-length 12 ─────────────────
