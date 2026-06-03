@@ -32,7 +32,10 @@
 // This is a public test fixture — NOT a production credential.
 export const TEST_PASSWORD = 'othala-testpass-2026';
 export const TEST_PASSWORD_BCRYPT =
-  '$2y$10$6cMlVk/QqGweMGJ/gEDgQuu0B9o.sYwvVLDG6YBcXIDq9Z5yCBXPG';
+  // $2b$ (not htpasswd's $2y$): Kratos/Go x/crypto/bcrypt accepts $2a$/$2b$ only;
+  // $2y$ is rejected → "credentials invalid". $2y$ and $2b$ are identical for
+  // ASCII passwords (same salt+digest), so the prefix swap is safe + verifiable.
+  '$2b$10$6cMlVk/QqGweMGJ/gEDgQuu0B9o.sYwvVLDG6YBcXIDq9Z5yCBXPG';
 
 export interface SeedOptions {
   email: string;
@@ -74,7 +77,11 @@ export async function createIdentityWithPassword(opts: SeedOptions): Promise<See
     credentials: {
       password: {
         config: {
-          hashed_password: TEST_PASSWORD_BCRYPT,
+          // Plaintext — Kratos hashes it on admin import. This is what Ory's
+          // OWN upstream test/e2e/playwright/actions/identity.ts does; the
+          // earlier "plaintext is a no-op" note was a misdiagnosis (the real
+          // bug was the $2y$ hashed_password variant Go bcrypt rejects).
+          password: TEST_PASSWORD,
         },
       },
     },

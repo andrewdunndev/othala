@@ -56,21 +56,13 @@ test('B — OIDC authorize flow issues id_token with resource_access.keep.roles=
       baseURL,
     );
 
-    const page = await ctx.newPage();
-
-    // Step 2 + 3: intercept the redirect to keep.dunn.dev.
-    // The route captures the full URL before any TCP resolution attempt.
-    let redirectedUrl: string | null = null;
-    await page.route(`${KEEP_REDIRECT_URI}**`, (route) => {
-      redirectedUrl = route.request().url();
-      route.fulfill({ status: 200, contentType: 'text/plain', body: 'intercepted' });
-    });
-    // Also intercept any https://keep.dunn.dev/* (wildcard for the domain).
-    await page.route('https://keep.dunn.dev/**', (route) => {
-      redirectedUrl = route.request().url();
-      route.fulfill({ status: 200, contentType: 'text/plain', body: 'intercepted' });
-    });
-
+    // Step 2+3: walk the OAuth2 authorize redirect chain with the real session
+    // via ctx.request (maxRedirects:0). keep.dunn.dev (the redirect_uri) is
+    // unresolvable inside the compose net, and page.route can't reliably
+    // intercept a top-level NAVIGATION to an unresolvable host — so we read the
+    // auth code straight from the keep redirect's Location header instead of
+    // letting the browser navigate there. ctx.request shares the context cookie
+    // jar, so the Kratos session + Hydra flow cookies propagate across hops.
     const authURL =
       `${baseURL}/oauth2/auth` +
       `?client_id=${KEEP_CLIENT_ID}` +
@@ -80,15 +72,23 @@ test('B — OIDC authorize flow issues id_token with resource_access.keep.roles=
       `&state=pwtest-state-01` +
       `&nonce=pwtest-nonce-01`;
 
-    await page.goto(authURL, { waitUntil: 'domcontentloaded', timeout: 30_000 });
-
-    // The flow should have resolved to the intercepted keep redirect.
-    expect(redirectedUrl, 'OIDC flow must complete to the keep redirect_uri').not.toBeNull();
-
-    const code = redirectedUrl
-      ? new URL(redirectedUrl as string).searchParams.get('code')
-      : null;
-    expect(code, 'auth code must be present in the redirect URL').not.toBeNull();
+    let url = authURL;
+    let code: string | null = null;
+    for (let hop = 0; hop < 8 && !code; hop++) {
+      const resp = await ctx.request.get(url, { maxRedirects: 0 });
+      const loc = resp.headers()['location'];
+      if (!loc) {
+        throw new Error(
+          `OIDC chain stalled at hop ${hop} (${url}): status ${resp.status()}, no Location`,
+        );
+      }
+      if (loc.startsWith('https://keep.dunn.dev')) {
+        code = new URL(loc).searchParams.get('code');
+        break;
+      }
+      url = loc.startsWith('http') ? loc : new URL(loc, baseURL).toString();
+    }
+    expect(code, 'OIDC flow must complete to the keep redirect_uri with a ?code').not.toBeNull();
     expect(code!.length, 'auth code must be non-empty').toBeGreaterThan(0);
 
     // Step 4: token exchange — use the hydraPublicURL directly (inside compose net).

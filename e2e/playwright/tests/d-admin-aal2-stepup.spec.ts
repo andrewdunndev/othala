@@ -37,43 +37,26 @@ test('D — allowlisted admin at AAL1 is redirected to AAL2 step-up at /admin', 
       baseURL,
     );
 
-    const page = await ctx.newPage();
+    // Assert OUR admin gate ISSUES the AAL2 step-up redirect. We do NOT follow
+    // it into Kratos: the seeded admin has no second factor enrolled, so Kratos's
+    // aal2 login flow would error (/auth/error) — that is a Kratos-UI concern, not
+    // what this test covers. requireAdminSession should 30x an AAL1 admin to a
+    // Kratos aal2 login-flow init; maxRedirects:0 captures that first Location.
+    const resp = await ctx.request.get(`${baseURL}/admin`, { maxRedirects: 0 });
+    const loc = resp.headers()['location'] ?? '';
+    console.log('[D] /admin (AAL1 admin) →', resp.status(), loc);
 
-    // Collect any navigation to the dag.dunn.dev host (the portability bug
-    // from the old admin.ts — now fixed). If this intercept fires, the test
-    // note below will surface it.
-    let oldHostIntercept: string | null = null;
-    await page.route('https://dag.dunn.dev/**', (route) => {
-      oldHostIntercept = route.request().url();
-      // Fulfill so the browser doesn't hang, then assert below.
-      route.fulfill({ status: 200, contentType: 'text/plain', body: 'old-host-intercept' });
-    });
-
-    // Navigate to /admin as an AAL1 admin session.
-    await page.goto(`${baseURL}/admin`, { waitUntil: 'domcontentloaded', timeout: 30_000 });
-
-    const finalUrl = page.url();
-    console.log('[D] landed at:', finalUrl);
-    if (oldHostIntercept) {
-      console.warn('[D] PORTABILITY BUG: step-up redirect went to dag.dunn.dev:', oldHostIntercept);
-    }
-
-    await page.screenshot({ path: '/out/d-admin-aal2-stepup.png', fullPage: true }).catch(() => {});
-
-    // Primary assertion: aal=aal2 appears in the landing URL.
-    // After convergence, the step-up URL is under auth.othala.test, so the
-    // browser can follow it without an intercept.
     expect(
-      /aal=aal2/.test(finalUrl) || /aal=aal2/.test(oldHostIntercept ?? ''),
-      `D: admin at AAL1 must trigger AAL2 step-up; landed at ${finalUrl}` +
-        (oldHostIntercept ? ` (old-host intercept: ${oldHostIntercept})` : ''),
+      /aal=aal2/.test(loc),
+      `D: admin at AAL1 must be redirected to AAL2 step-up; got ${resp.status()} ${loc}`,
     ).toBe(true);
 
-    // Secondary assertion: step-up must NOT require the old hardcoded dag.dunn.dev.
+    // Portability: the step-up must use the configured host, NOT the old
+    // hardcoded dag.dunn.dev (the admin.ts bug fixed in the config pass).
     expect(
-      oldHostIntercept,
-      'D (portability): step-up redirect must NOT target dag.dunn.dev — use OTHALA_PUBLIC_URL',
-    ).toBeNull();
+      loc.includes('dag.dunn.dev'),
+      `D (portability): step-up must not target dag.dunn.dev; got ${loc}`,
+    ).toBe(false);
   } finally {
     await ctx.close();
   }
