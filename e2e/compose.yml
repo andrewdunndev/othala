@@ -272,3 +272,25 @@ services:
     volumes:
       - ../hydra/clients:/etc/portal/manifests:ro,z
     command: ["node", "./dist/server/register-clients.mjs"]
+
+  # Browser-test edge (profile: browser ONLY). Fronts app + Kratos + Hydra on ONE
+  # host so a real browser can drive the integrated login -> consent -> token flow.
+  # NOT part of the golden run (D10: the edge is operator-out-of-scope) — starts only
+  # with `docker compose --profile browser up`. Published on the host :8088 so an
+  # interactive agent-browser (Playwright) can reach it via an ssh tunnel to the VM.
+  caddy:
+    image: docker.io/library/caddy:2-alpine
+    container_name: lab-caddy
+    profiles: ["browser"]
+    restart: unless-stopped
+    depends_on:
+      othala:
+        condition: service_healthy
+      hydra:
+        condition: service_healthy
+      kratos:
+        condition: service_healthy
+    volumes:
+      - ./caddy.Caddyfile:/etc/caddy/Caddyfile:ro,z
+    ports:
+      - "8088:80"

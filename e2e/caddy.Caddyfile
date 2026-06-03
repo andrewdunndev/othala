@@ -1,0 +1,46 @@
+# Browser-test edge for the e2e harness ONLY (compose `browser` profile).
+#
+# Othala's golden e2e is deliberately EDGELESS (D10: the edge — Caddy/TLS/DNS — is
+# an operator concern, outside Othala). But driving the HUMAN flow through a real
+# browser needs everything on ONE host with routing. This minimal Caddy provides
+# exactly that, mirroring the PRODUCTION routing (iac/services/dag/caddy/Caddyfile)
+# with the e2e compose service names. It exists only under `--profile browser`; the
+# default golden run never starts it.
+#
+# Plain HTTP (no TLS): the e2e issuer is http://auth-lab.${LAB_DOMAIN} and Hydra runs
+# --dev, so a browser can complete the OAuth2 flow over HTTP without cert friction.
+{
+	auto_https off
+	admin off
+}
+
+:80 {
+	# Kratos public well-known (e.g. /.well-known/ory/webauthn.js)
+	@kratos_wellknown path /.well-known/ory/*
+	handle @kratos_wellknown {
+		reverse_proxy kratos:4433
+	}
+
+	# Hydra login/consent/logout CHALLENGE handlers live in the converged app.
+	# MUST be matched before the broad /oauth2/* -> hydra rule below.
+	@portal_challenges path /oauth2/login /oauth2/consent /oauth2/logout
+	handle @portal_challenges {
+		reverse_proxy othala:8080
+	}
+
+	# Hydra public OAuth2 surface + discovery.
+	@hydra path /oauth2/* /.well-known/openid-configuration /.well-known/jwks.json /userinfo
+	handle @hydra {
+		reverse_proxy hydra:4444
+	}
+
+	# The app's human-facing pages: family UI, Kratos self-service UI, admin, apps.
+	@portal_pages path / /auth /auth/* /admin /admin/* /apps /apps/*
+	handle @portal_pages {
+		reverse_proxy othala:8080
+	}
+
+	# Default: the rest of the Kratos public API (self-service flow endpoints the
+	# browser posts to during login/recovery/settings).
+	reverse_proxy kratos:4433
+}
