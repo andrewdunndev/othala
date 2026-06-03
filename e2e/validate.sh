@@ -143,28 +143,52 @@ while true; do
     sleep 5
 done
 
-# Step 5: smoke
+# Step 5: smoke (the API-level suite + browser-free OIDC dance, sections A-G)
 echo ""
 echo "=== smoke ==="
 set -a; source .env; set +a
 bash ./smoke.sh
 SMOKE_EXIT=$?
 
-# Step 6: log dump on failure
-if [[ $SMOKE_EXIT -ne 0 ]]; then
-    {
-        echo "=== docker compose ps ==="
-        docker compose ps
-        echo ""
-        echo "=== docker compose logs (full) ==="
-        docker compose logs --no-color
-    } > /tmp/lab-smoke-failure.log
-    echo "  failure logs in /tmp/lab-smoke-failure.log (CI uploads as artifact)"
+# Step 5b: browser e2e (Playwright). Ory-faithful two-phase shape — upstream runs
+# `run.sh --only-setup` (stack + client registration up) then `playwright test`.
+# Our smoke already did the setup (incl. section B client registration), so now run
+# the Playwright specs against the live stack. Bring up the browser Caddy edge, then
+# run the playwright service as a ONE-SHOT via `compose run` (podman-compose-safe;
+# `up --exit-code-from` is unreliable under podman-compose, same class as --no-color).
+echo ""
+echo "=== browser e2e (Playwright) ==="
+BROWSER_EXIT=0
+if docker compose --profile browser --env-file=.env up -d caddy; then
+    sleep 5  # caddy boots in ~1s; brief settle before the specs hit auth.othala.test
+    timeout 360 docker compose --profile browser --env-file=.env run --rm --no-deps -T playwright || BROWSER_EXIT=$?
+else
+    echo "  ✗ could not start the caddy edge"; BROWSER_EXIT=1
+fi
+if [[ $BROWSER_EXIT -eq 0 ]]; then echo "  ✓ browser e2e passed"; else echo "  ✗ browser e2e failed (exit $BROWSER_EXIT)"; fi
+
+# Step 6: log dump on failure — STDOUT via native `podman logs` (the podman shim
+# rejects `compose logs --no-color`, and /tmp isn't uploadable as a CI artifact).
+if [[ $SMOKE_EXIT -ne 0 || $BROWSER_EXIT -ne 0 ]]; then
+    echo ""
+    echo "=== container ps ==="
+    docker compose ps 2>&1 || true
+    echo "=== container logs (last 80 each) ==="
+    for svc in postgres kratos hydra othala ldap-bridge caddy; do
+        echo "--- lab-$svc ---"
+        podman logs --tail=80 "lab-$svc" 2>&1 || true
+    done
 fi
 
 # Step 7: teardown
 echo ""
 echo "  docker compose down..."
-docker compose down -v --remove-orphans || true
+docker compose --profile browser down -v --remove-orphans || true
 
-exit $SMOKE_EXIT
+# Fail the job if EITHER the smoke suite or the browser e2e failed.
+if [[ $SMOKE_EXIT -ne 0 || $BROWSER_EXIT -ne 0 ]]; then
+    echo "=== e2e FAILED (smoke=$SMOKE_EXIT browser=$BROWSER_EXIT) ==="
+    exit 1
+fi
+echo "=== e2e PASSED (smoke + browser) ==="
+exit 0
