@@ -11,6 +11,7 @@ import { browserFlows, getSession } from './kratos';
 import { getIdentity } from './admin-api';
 import { isAdminSubject } from './admin-auth';
 import { revokeSubject, type RevokeResult } from './revoke';
+import { publicUrl } from './config';
 import type { Session } from './types';
 
 export {
@@ -73,7 +74,11 @@ export async function requireAdminSession(astro: any): Promise<Session | Respons
   }
 
   if (session.authenticator_assurance_level !== 'aal2') {
-    return astro.redirect(browserFlows.login({ refresh: true, aal: 'aal2', returnTo: astro.url.href }));
+    // return_to must be the PUBLIC origin (publicUrl), not astro.url — behind the
+    // Caddy edge astro.url is the internal bind (localhost:PORT), so astro.url.href
+    // would send the user to an unroutable host after step-up. Path+search are safe.
+    const returnTo = `${publicUrl}${astro.url.pathname}${astro.url.search}`;
+    return astro.redirect(browserFlows.login({ refresh: true, aal: 'aal2', returnTo }));
   }
 
   return session;

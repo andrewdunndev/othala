@@ -86,6 +86,12 @@ func New(cfg Config) (*Handler, error) {
 	if cfg.PublicURL == "" || cfg.AdminURL == "" || cfg.AdminToken == "" {
 		return nil, errors.New("kratos handler: public_url, admin_url, admin_token required")
 	}
+	// Normalize BaseDN once at construction time so that child-of-baseDN
+	// comparisons are stable regardless of how the value arrived (env var,
+	// config file, test code). TrimSpace only — lowercasing is done by
+	// parseUsernameFromDN at call time and must not be applied globally here
+	// because it could break case-sensitive DNs in some directories.
+	cfg.BaseDN = strings.TrimSpace(cfg.BaseDN)
 	if cfg.BaseDN == "" {
 		return nil, errors.New("kratos handler: base_dn required")
 	}
@@ -254,12 +260,65 @@ func (h *Handler) groupEntry(name string, members []string) *ldap.Entry {
 	return &ldap.Entry{DN: h.groupDN(name), Attributes: attrs}
 }
 
+// escapeDNValue escapes a single RDN attribute value per RFC 4514 §2.4.
+// Characters that must be escaped with a leading backslash:
+//
+//	" + , ; < = > \
+//
+// A leading '#' or leading space and a trailing space are also escaped.
+// NUL bytes are encoded as \00.
+//
+// go-ldap/v3 is not a direct dependency of this module; glauth/ldap (the
+// direct dep) does not expose an equivalent helper, so we implement it locally.
+//
+// Implementation note: we iterate over bytes (not runes) so that invalid UTF-8
+// sequences are preserved verbatim rather than replaced with U+FFFD. RFC 4514
+// requires the value to be a valid UTF-8 string in practice, but the escaper
+// must be a pure byte-level pass-through for any bytes it does not recognise as
+// needing escaping.
+func escapeDNValue(s string) string {
+	if s == "" {
+		return s
+	}
+	var b strings.Builder
+	b.Grow(len(s))
+	for i := 0; i < len(s); i++ {
+		c := s[i]
+		switch {
+		case c == 0x00:
+			b.WriteString(`\00`)
+		case c == '"' || c == '+' || c == ',' || c == ';' || c == '<' || c == '=' || c == '>' || c == '\\':
+			b.WriteByte('\\')
+			b.WriteByte(c)
+		case i == 0 && (c == '#' || c == ' '):
+			// Leading '#' or leading space must be escaped.
+			b.WriteByte('\\')
+			b.WriteByte(c)
+		default:
+			b.WriteByte(c)
+		}
+	}
+	// Trailing space must be escaped. The builder output is all bytes so we
+	// can work on the raw string safely.
+	out := b.String()
+	if len(out) > 0 && out[len(out)-1] == ' ' {
+		// Only escape if the trailing space is not already preceded by a backslash
+		// that was itself escaped (i.e. "\\  " — the second space at the end).
+		// In practice our loop above never writes a raw space after a backslash,
+		// so a trailing space here is always unescaped.
+		if len(out) < 2 || out[len(out)-2] != '\\' {
+			out = out[:len(out)-1] + `\ `
+		}
+	}
+	return out
+}
+
 func (h *Handler) userDN(username string) string {
-	return "uid=" + username + ",ou=users," + h.cfg.BaseDN
+	return "uid=" + escapeDNValue(username) + ",ou=users," + h.cfg.BaseDN
 }
 
 func (h *Handler) groupDN(name string) string {
-	return "cn=" + name + ",ou=groups," + h.cfg.BaseDN
+	return "cn=" + escapeDNValue(name) + ",ou=groups," + h.cfg.BaseDN
 }
 
 // Add, Modify, Delete: identity changes go through Kratos admin API.

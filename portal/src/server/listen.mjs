@@ -106,7 +106,11 @@ export function parseBearer(authHeader) {
 export function recoveryGateVerdict(payload, isAdminSubject) {
   const identity = payload?.identity ?? payload;
   const email = identity?.traits?.email;
-  if (typeof email !== 'string' || email.length === 0) {
+  // Fail-closed: reject anything that is not a non-empty, non-whitespace-only
+  // string. A whitespace-only email normalises to '' in the admin-subject
+  // predicate, so it would never match an admin — but it still represents an
+  // unidentifiable subject and must be refused per the fail-closed principle.
+  if (typeof email !== 'string' || email.trim().length === 0) {
     return { refuse: true, reason: 'unidentifiable recovery subject (fail-closed)' };
   }
   if (isAdminSubject(email)) {

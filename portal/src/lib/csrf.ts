@@ -77,7 +77,7 @@ export class CSRFError extends Error {
  * form input named `csrf_token`. The token expires 30 min after issue.
  */
 export function signToken(identityId: string): string {
-  if (!identityId) {
+  if (!identityId || !identityId.trim()) {
     throw new CSRFError('identityId is required to sign a CSRF token');
   }
   const ts = Math.floor(Date.now() / 1000);

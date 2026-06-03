@@ -30,6 +30,7 @@ import {
 } from '../../lib/nodes';
 import FlowNodes from '../../components/FlowNodes.astro';
 import { revokeSubject, RevokeError } from '../../lib/revoke';
+import { publicUrl } from '../../lib/config';
 import { signToken, verifyToken, CSRFError } from '../../lib/csrf';
 import type { Session } from '../../lib/types';
 
@@ -90,12 +91,12 @@ if (Astro.request.method === 'POST') {
 
 const flowId = Astro.url.searchParams.get('flow');
 if (!flowId) {
-  return Astro.redirect(browserFlows.settings(`${Astro.url.origin}/auth/settings`));
+  return Astro.redirect(browserFlows.settings(`${publicUrl}/auth/settings`));
 }
 
 const result = await getSettingsFlow(flowId, cookie);
 if (result.kind !== 'ok') {
-  return Astro.redirect(browserFlows.settings(`${Astro.url.origin}/auth/settings`));
+  return Astro.redirect(browserFlows.settings(`${publicUrl}/auth/settings`));
 }
 
 const flow = result.flow;
