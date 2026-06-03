@@ -216,7 +216,10 @@ applycode=$?
 if [[ $applycode -eq 0 ]]; then
     pass "B1 in-app register-clients exited 0"
 else
-    fail "B1 register-clients exit code $applycode" "see /tmp/apply-clients.log"
+    fail "B1 register-clients exit code $applycode" "register-clients output below"
+    echo "  ----- register-clients output (/tmp/apply-clients.log) -----"
+    sed 's/^/    | /' /tmp/apply-clients.log 2>/dev/null || true
+    echo "  ----- end register-clients output -----"
 fi
 
 # B2: Hydra admin lists the registered clients
@@ -457,15 +460,18 @@ else
     for p in "${FAILED_PROBES[@]}"; do
         echo "  - $p"
     done
-    {
-        echo "=== container ps ==="
-        docker compose ps
-        echo ""
-        echo "=== container logs ==="
-        for svc in postgres kratos hydra othala ldap-bridge; do
-            echo "--- $svc ---"
-            docker compose logs --tail=50 "$svc"
-        done
-    } > /tmp/lab-failure.log
+    # Dump diagnostics to STDOUT (the CI trace) — /tmp artifacts aren't uploadable
+    # (not a subpath of the project dir) and `docker compose logs` fails under the
+    # podman shim (it injects --no-color, which podman-compose rejects). Use native
+    # `podman logs <container>`; container_name is lab-<svc>.
+    echo ""
+    echo "=== container ps ==="
+    docker compose ps 2>&1 || true
+    echo ""
+    echo "=== container logs (last 60 each) ==="
+    for svc in postgres kratos hydra othala ldap-bridge; do
+        echo "--- lab-$svc ---"
+        podman logs --tail=60 "lab-$svc" 2>&1 || true
+    done
     exit 1
 fi
