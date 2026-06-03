@@ -294,3 +294,39 @@ services:
       - ./caddy.Caddyfile:/etc/caddy/Caddyfile:ro,z
     ports:
       - "8088:80"
+    networks:
+      default:
+        # ONE public host that resolves to the edge from inside the net — both the
+        # in-net browser AND the app's server-side use it (the production split-
+        # horizon shape: browser -> Caddy, server-side -> Caddy, one host). MUST be a
+        # subdomain of the Kratos cookie domain (lab.dunn.dev) or the CSRF cookie is
+        # never sent back and the login flow redirect-loops (finding 2026-06-03).
+        aliases:
+          - auth-lab.lab.dunn.dev
+
+  # Scripted browser test (profile: browser ONLY). Runs INSIDE the net, resolves
+  # auth-lab.lab.dunn.dev -> Caddy, drives the real human flow (login form -> session -> consent
+  # -> token, admin gate). The CI artifact for the human-flow layer. Screenshots +
+  # output land in ./browser-out for review.
+  playwright:
+    image: mcr.microsoft.com/playwright:v1.49.1-noble
+    container_name: lab-playwright
+    profiles: ["browser"]
+    depends_on:
+      caddy:
+        condition: service_started
+      othala:
+        condition: service_healthy
+    environment:
+      BASE: http://auth-lab.lab.dunn.dev
+    volumes:
+      - ./browser-test.mjs:/test/browser-test.mjs:ro,z
+      - ./browser-out:/out:z
+    working_dir: /test
+    # The mcr image ships the BROWSERS (/ms-playwright) but not the playwright npm
+    # lib — install it at runtime (browsers are pre-cached, so this is fast).
+    # CODIFICATION TODO: bake this into a thin sub-image to drop the per-run install,
+    # and add a compose override that sets othala KRATOS_PUBLIC_URL=http://auth-lab.
+    # lab.dunn.dev for the browser profile (the golden uses the internal kratos:4433;
+    # the browser login redirect needs the public host).
+    command: ["sh", "-c", "cd /test && npm init -y >/dev/null 2>&1 && PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD=1 npm i playwright@1.49.1 --no-audit --no-fund >/dev/null 2>&1 && node browser-test.mjs"]
