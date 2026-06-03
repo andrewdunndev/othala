@@ -117,29 +117,32 @@ selfservice:
       # recover via console (`kratos identities` on carmine) per
       # docs/runbooks/admin-recovery.md.
       after:
-        code:
-          hooks:
-            - hook: web_hook
-              config:
-                # MEDIUM-1 listener split: webhook URL points at the
-                # admin port (:8431), not the public SSR port (:8080).
-                # The admin listener binds on loopback (127.0.0.1) inside
-                # the container; within the compose/pod network the host
-                # is CONSENT_HOST (= othala). MEDIUM-2: auth block carries
-                # the shared bearer secret; the app's handleRecoveryGate
-                # constant-time compares Authorization: Bearer before
-                # reading the body. Fails closed on missing/wrong secret.
-                url: http://${CONSENT_HOST}:8431/admin/recovery-gate
-                method: POST
-                auth:
-                  type: bearer
-                  config:
-                    token: ${RECOVERY_GATE_SECRET}
-                response:
-                  ignore: false
-                  parse: false
-                body: file:///etc/config/kratos/hooks/recovery-gate.jsonnet
-                can_interrupt: true
+        # v26.2.0: recovery after-hooks live directly under `after.hooks`. The
+        # `selfServiceAfterRecovery` schema has NO per-method `code:` sub-key
+        # (that method nesting is valid for login/registration `after`, not
+        # recovery) — a `code:` wrapper here fails config validation at startup.
+        hooks:
+          - hook: web_hook
+            config:
+              # MEDIUM-1 listener split: webhook URL points at the
+              # admin port (:8431), not the public SSR port (:8080).
+              # The admin listener binds on loopback (127.0.0.1) inside
+              # the container; within the compose/pod network the host
+              # is CONSENT_HOST (= othala). MEDIUM-2: auth block carries
+              # the shared bearer secret; the app's handleRecoveryGate
+              # constant-time compares Authorization: Bearer before
+              # reading the body. Fails closed on missing/wrong secret.
+              url: http://${CONSENT_HOST}:8431/admin/recovery-gate
+              method: POST
+              auth:
+                type: bearer
+                config:
+                  token: ${RECOVERY_GATE_SECRET}
+              response:
+                ignore: false
+                parse: false
+              body: file:///etc/config/kratos/hooks/recovery-gate.jsonnet
+              can_interrupt: true
 
     verification:
       enabled: true
@@ -156,9 +159,10 @@ selfservice:
     login:
       ui_url: ${OTHALA_PUBLIC_URL}/auth/login
       lifespan: 10m
-      # CRITICAL: aal1 base; AAL2 step-up is requested per-flow via ?aal=aal2
-      # by the admin SSR pages, not enforced globally here.
-      required_aal: aal1
+      # aal1 base — the v26.2.0 login flow takes NO `required_aal` property
+      # (it's a `settings`/`session` knob, not a login-flow one). AAL2 step-up
+      # is requested per-flow via ?aal=aal2 by the admin SSR pages
+      # (requireAdminSession), never enforced globally here.
 
     registration:
       # Admin-driven onboarding (one-time enrollment URLs); no self-service signup
