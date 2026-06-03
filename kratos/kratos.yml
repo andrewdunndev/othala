@@ -135,9 +135,16 @@ selfservice:
               url: http://${CONSENT_HOST}:8431/admin/recovery-gate
               method: POST
               auth:
-                type: bearer
+                # Kratos webhooks support only api_key | basic_auth (NO `bearer`
+                # type). Use api_key with header name `Authorization` and a
+                # `Bearer <secret>` value — valid Kratos config that ALSO produces
+                # the exact `Authorization: Bearer …` header the app's
+                # handleRecoveryGate (parseBearer) expects. Satisfies both sides.
+                type: api_key
                 config:
-                  token: ${RECOVERY_GATE_SECRET}
+                  in: header
+                  name: Authorization
+                  value: "Bearer ${RECOVERY_GATE_SECRET}"
               response:
                 ignore: false
                 parse: false
