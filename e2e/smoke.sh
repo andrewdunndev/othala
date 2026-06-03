@@ -413,9 +413,18 @@ mk_identity() {
 # invocation). This is acceptable for 3 G probes; a future optimisation would
 # bake a sub-image with the deps pre-installed.
 run_dance() {
-    sed "s|__SUBJECT__|$1|g; s|__KEEP_SECRET__|${KEEP_CLIENT_SECRET}|g" ./oidc-dance.mjs \
-        | docker compose --profile oneshot run --rm --no-deps -T dance-runner 2>&1 \
-        | _strip_ansi | grep -E '^OK |^DENIED|^STEP|^EXC' | tail -1
+    local out res
+    out=$(sed "s|__SUBJECT__|$1|g; s|__KEEP_SECRET__|${KEEP_CLIENT_SECRET}|g" ./oidc-dance.mjs \
+        | docker compose --profile oneshot run --rm --no-deps -T dance-runner 2>&1 | _strip_ansi)
+    res=$(echo "$out" | grep -E '^OK |^DENIED|^STEP|^EXC' | tail -1)
+    if [[ -z "$res" ]]; then
+        # No result line means the dance crashed (dep install, SDK error, etc.).
+        # Surface the full output to the trace instead of swallowing it.
+        echo "  ----- dance produced no OK/DENIED/STEP/EXC line; full output: -----" >&2
+        echo "$out" | sed 's/^/    | /' | tail -45 >&2
+        echo "  ----- end dance output -----" >&2
+    fi
+    echo "$res"
 }
 
 # G1: active member WITH the access-keep group -> dance completes, and the ID token
