@@ -288,6 +288,10 @@ services:
     environment:
       HYDRA_ADMIN_URL: http://hydra:4445
       MANIFEST_DIR: /etc/portal/manifests
+      # register-clients.mjs imports the app config module (config.ts), which
+      # requires OTHALA_PUBLIC_URL at load (required-no-default in production).
+      # The othala/ldap services already get it; the one-shot registrar needs it too.
+      OTHALA_PUBLIC_URL: http://auth.othala.test
       KEEP_CLIENT_SECRET: ${KEEP_CLIENT_SECRET}
       OBSERVE_CLIENT_SECRET: ${OBSERVE_CLIENT_SECRET}
       LARDER_CLIENT_SECRET: ${LARDER_CLIENT_SECRET}
