@@ -19,7 +19,7 @@
 	admin off
 }
 
-:80 {
+auth.othala.test:80 {
 	# Hydra public OAuth2 surface + OIDC discovery.
 	@hydra path /oauth2/auth /oauth2/token /oauth2/revoke /oauth2/fallbacks/* /.well-known/openid-configuration /.well-known/jwks.json /userinfo
 	handle @hydra {

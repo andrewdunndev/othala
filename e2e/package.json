@@ -1,0 +1,21 @@
+{
+  "name": "othala-e2e",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Othala browser e2e — @playwright/test suite (human-flow layer)",
+  "scripts": {
+    "test": "playwright test",
+    "test:headed": "playwright test --headed"
+  },
+  "dependencies": {
+    "@ory/client-fetch": "^1.22.0",
+    "fetch-cookie": "^3.1.0",
+    "jose": "^5.10.0",
+    "tough-cookie": "^5.1.0"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.49.0",
+    "@types/node": "^22.0.0",
+    "@types/tough-cookie": "^4.0.5"
+  }
+}

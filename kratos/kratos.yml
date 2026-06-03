@@ -46,10 +46,10 @@ selfservice:
     password:
       enabled: true
       config:
-        haveibeenpwned_enabled: true
+        haveibeenpwned_enabled: ${OTHALA_HIBP_ENABLED}
         max_breaches: 1
         identifier_similarity_check_enabled: true
-        min_password_length: 12
+        min_password_length: ${OTHALA_PASSWORD_MIN_LENGTH}
 
     webauthn:
       enabled: true
@@ -122,19 +122,19 @@ selfservice:
             - hook: web_hook
               config:
                 # MEDIUM-1 listener split: webhook URL points at the
-                # admin port (:4478), not the public port (:4477).
-                # MEDIUM-2: auth block carries the shared HMAC secret in
-                # the X-Webhook-Auth header; consent constant-time
-                # compares it before reading the body. The receiver
-                # fails closed on missing/wrong secret.
-                url: http://${CONSENT_HOST}:4478/webhooks/recovery-gate
+                # admin port (:8431), not the public SSR port (:8080).
+                # The admin listener binds on loopback (127.0.0.1) inside
+                # the container; within the compose/pod network the host
+                # is CONSENT_HOST (= othala). MEDIUM-2: auth block carries
+                # the shared bearer secret; the app's handleRecoveryGate
+                # constant-time compares Authorization: Bearer before
+                # reading the body. Fails closed on missing/wrong secret.
+                url: http://${CONSENT_HOST}:8431/admin/recovery-gate
                 method: POST
                 auth:
-                  type: api_key
+                  type: bearer
                   config:
-                    in: header
-                    name: X-Webhook-Auth
-                    value: ${RECOVERY_GATE_SECRET}
+                    token: ${RECOVERY_GATE_SECRET}
                 response:
                   ignore: false
                   parse: false

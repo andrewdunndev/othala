@@ -40,17 +40,15 @@ set -uo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 cd "$SCRIPT_DIR"
 
-LAB_DOMAIN="${LAB_DOMAIN:-test.dunn.dev}"
 AUTH_REGISTRY="${AUTH_REGISTRY:-registry.gitlab.com/dunn.dev/othala}"
 AUTH_VERSION="${AUTH_VERSION:-latest}"
 
-echo "=== othala e2e: AUTH_REGISTRY=$AUTH_REGISTRY AUTH_VERSION=$AUTH_VERSION LAB_DOMAIN=$LAB_DOMAIN ==="
+echo "=== othala e2e: AUTH_REGISTRY=$AUTH_REGISTRY AUTH_VERSION=$AUTH_VERSION ==="
 
 # Permission sanity: scripts must be executable.
 chmod +x ./gen-secrets.sh ./smoke.sh ./postgres-init.sh
 
 # Step 1: per-run secrets
-LAB_DOMAIN="$LAB_DOMAIN" \
 AUTH_REGISTRY="$AUTH_REGISTRY" \
 AUTH_VERSION="$AUTH_VERSION" \
   bash ./gen-secrets.sh > .env
@@ -64,22 +62,27 @@ fi
 
 # Render the Ory configs. Kratos/Hydra do NOT interpolate ${VAR} inside
 # their YAML (they only accept uppercased-dotted env OVERRIDES), so the
-# ${LAB_DOMAIN} + ${*_SECRET} placeholders in kratos.yml / hydra.yml must
+# ${OTHALA_*} + ${*_SECRET} placeholders in the canonical configs must
 # be substituted HERE before the containers mount them. Without this,
 # kratos validates the literal "${KRATOS_CIPHER_SECRET_CURRENT}" (31 chars
-# < the 32 minimum) and the ${LAB_DOMAIN} URLs as invalid URIs, and dies.
+# < the 32 minimum) and the ${OTHALA_PUBLIC_URL} URLs as invalid URIs, and dies.
 # python3 os.path.expandvars (the golden has python3; no gettext/envsubst
 # dependency) substitutes defined vars and leaves any undefined var literal
-# rather than silently blanking it. The VM is ephemeral, so rendering the
-# checked-out configs in place is fine.
+# rather than silently blanking it.
+#
+# Source: the canonical configs at ../kratos/kratos.yml and ../hydra/hydra.yml.
+# Rendered output: kratos.rendered.yml + hydra.rendered.yml in the e2e dir.
+# compose.yml mounts these rendered copies (not the canonical sources directly,
+# since compose bind-mounts require a path that exists at up-time and the
+# canonical sources contain un-expanded placeholders at that point).
 set -a
 source ./.env
-RECOVERY_GATE_HOST="${RECOVERY_GATE_HOST:-othala}"
 set +a
-for cfg in kratos.yml hydra.yml; do
-    python3 -c 'import os,sys; sys.stdout.write(os.path.expandvars(sys.stdin.read()))' < "$cfg" > "$cfg.rendered"
-    mv "$cfg.rendered" "$cfg"
-done
+python3 -c 'import os,sys; sys.stdout.write(os.path.expandvars(sys.stdin.read()))' \
+    < ../kratos/kratos.yml > kratos.rendered.yml
+python3 -c 'import os,sys; sys.stdout.write(os.path.expandvars(sys.stdin.read()))' \
+    < ../hydra/hydra.yml   > hydra.rendered.yml
+echo "  canonical configs rendered (kratos.rendered.yml, hydra.rendered.yml)"
 
 # Step 3: compose up.
 # Set -e here so a failed compose-up aborts before smoke.

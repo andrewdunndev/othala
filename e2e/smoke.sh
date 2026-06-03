@@ -131,7 +131,9 @@ fi
 # A6: Hydra public /.well-known/openid-configuration + issuer byte-match
 oidc=$(curl_in hydra http://localhost:4444/.well-known/openid-configuration)
 issuer=$(echo "$oidc" | python3 -c "import sys,json; print(json.load(sys.stdin).get('issuer',''))" 2>/dev/null || echo "")
-expected_issuer="http://auth-lab.${LAB_DOMAIN}/"
+# Issuer is now the Othala public URL: OTHALA_PUBLIC_URL (set to http://auth.othala.test
+# in the e2e env by gen-secrets.sh). The old auth-lab.${LAB_DOMAIN} prefix is retired.
+expected_issuer="${OTHALA_PUBLIC_URL}/"
 if [[ "$issuer" == "$expected_issuer" ]]; then
     pass "A6 hydra openid-config issuer byte-match: $issuer"
 else
@@ -249,7 +251,7 @@ echo "C. Identity admin flow"
 # C1: Create an identity via the Kratos admin API. kratos' busybox wget has
 # no --post-data, so POST from othala's node over the compose network (othala
 # reaches kratos:4434). Program on stdin (podman-compose-safe).
-identity_json=$(printf '%s' "fetch('http://kratos:4434/admin/identities',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({schema_id:'family',traits:{username:'lab.test',email:'lab.test@${LAB_DOMAIN}',displayName:'Lab Test'},metadata_admin:{groups:['family','access-keep','access-observe']}})}).then(r=>r.text()).then(t=>{process.stdout.write(t);process.exit(0)}).catch(()=>process.exit(1))" | node_in othala)
+identity_json=$(printf '%s' "fetch('http://kratos:4434/admin/identities',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({schema_id:'family',traits:{username:'lab.test',email:'lab.test@${OTHALA_APEX}',displayName:'Lab Test'},metadata_admin:{groups:['family','access-keep','access-observe']}})}).then(r=>r.text()).then(t=>{process.stdout.write(t);process.exit(0)}).catch(()=>process.exit(1))" | node_in othala)
 identity_id=$(echo "$identity_json" | python3 -c "import sys,json; print(json.load(sys.stdin).get('id',''))" 2>/dev/null || echo "")
 if [[ -n "$identity_id" ]]; then
     pass "C1 created identity id=$identity_id"
@@ -289,7 +291,7 @@ gate_code() {
     printf '%s' "fetch('http://127.0.0.1:8431/admin/recovery-gate',{method:'POST',headers:{'Content-Type':'application/json','Authorization':'Bearer ${bearer}'},body:'${body}'}).then(r=>{process.stdout.write(String(r.status));process.exit(0)}).catch(()=>{process.stdout.write('0');process.exit(1)})" | node_in othala
 }
 
-ADMIN_EMAIL="admin@${LAB_DOMAIN}"
+ADMIN_EMAIL="admin@${OTHALA_APEX}"
 
 # D1: Allowlisted admin subject → 403 (admin recovery is console-only).
 admin_code=$(gate_code "${RECOVERY_GATE_SECRET}" '{"traits":{"email":"'"${ADMIN_EMAIL}"'"}}')
@@ -301,7 +303,7 @@ fi
 
 # D2: Non-admin subject (email NOT on the allowlist) → 200, even if it
 # carries the display-only `admin` group.
-nonadmin_code=$(gate_code "${RECOVERY_GATE_SECRET}" '{"traits":{"email":"kid@'"${LAB_DOMAIN}"'"},"metadata_admin":{"groups":["admin","family"]}}')
+nonadmin_code=$(gate_code "${RECOVERY_GATE_SECRET}" '{"traits":{"email":"kid@'"${OTHALA_APEX}"'"},"metadata_admin":{"groups":["admin","family"]}}')
 if [[ "$nonadmin_code" == "200" ]]; then
     pass "D2 recovery-gate allows non-allowlisted (group 'admin' is display-only)"
 else
@@ -319,7 +321,7 @@ fi
 
 # D4: Wrong bearer → 401 (constant-time, fail-closed bearer check on the
 # admin mux; distinct from the 403 verdict refusal).
-wrong_code=$(gate_code "wrong-secret" '{"traits":{"email":"kid@'"${LAB_DOMAIN}"'"}}')
+wrong_code=$(gate_code "wrong-secret" '{"traits":{"email":"kid@'"${OTHALA_APEX}"'"}}')
 if [[ "$wrong_code" == "401" ]]; then
     pass "D4 recovery-gate rejects wrong bearer (401, fail-closed)"
 else
@@ -399,13 +401,18 @@ echo "G. OIDC dance (login -> consent -> ID token; claims + access-gate deny)"
 
 # mk_identity <state> <groups-json> <localpart> -> echoes the new identity id.
 mk_identity() {
-    printf '%s' "fetch('http://kratos:4434/admin/identities',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({schema_id:'family',state:'$1',traits:{username:'$3',email:'$3@${LAB_DOMAIN}',displayName:'$3'},metadata_admin:{groups:$2}})}).then(r=>r.json()).then(j=>{process.stdout.write(j.id||'');process.exit(0)}).catch(()=>process.exit(1))" | node_in othala
+    printf '%s' "fetch('http://kratos:4434/admin/identities',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({schema_id:'family',state:'$1',traits:{username:'$3',email:'$3@${OTHALA_APEX}',displayName:'$3'},metadata_admin:{groups:$2}})}).then(r=>r.json()).then(j=>{process.stdout.write(j.id||'');process.exit(0)}).catch(()=>process.exit(1))" | node_in othala
 }
 # run_dance <subject> -> the dance result line (OK claims=... / DENIED... / STEP/EXC).
-# Substitutes the subject + keep client secret into oidc-dance.mjs and runs it in othala.
+# Substitutes the subject + keep client secret into oidc-dance.mjs and pipes the
+# result to the dance-runner oneshot container (playwright image + npm deps).
+# Each call starts a fresh container (--rm); npm ci runs every time (~5-10s per
+# invocation). This is acceptable for 3 G probes; a future optimisation would
+# bake a sub-image with the deps pre-installed.
 run_dance() {
     sed "s|__SUBJECT__|$1|g; s|__KEEP_SECRET__|${KEEP_CLIENT_SECRET}|g" ./oidc-dance.mjs \
-        | docker compose exec -T othala node 2>&1 | _strip_ansi | grep -E '^OK |^DENIED|^STEP|^EXC' | tail -1
+        | docker compose --profile oneshot run --rm --no-deps -T dance-runner 2>&1 \
+        | _strip_ansi | grep -E '^OK |^DENIED|^STEP|^EXC' | tail -1
 }
 
 # G1: active member WITH the access-keep group -> dance completes, and the ID token

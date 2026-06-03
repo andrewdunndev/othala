@@ -13,10 +13,6 @@ gen()       { openssl rand -hex 32; }
 gen_short() { openssl rand -hex 16; }
 gen_alnum() { openssl rand -base64 24 | tr -d '+/=' | head -c 32; }
 
-# LAB_DOMAIN is the suffix used in URL emission. Not real DNS; the
-# smoke suite hits container ports directly.
-LAB_DOMAIN="${LAB_DOMAIN:-test.dunn.dev}"
-
 # AUTH_REGISTRY is the registry ROOT — the converged othala app image
 # itself (registry.gitlab.com/dunn.dev/othala). ldap-bridge is the
 # ${AUTH_REGISTRY}/ldap-bridge sub-image. AUTH_VERSION is the tag.
@@ -37,13 +33,49 @@ kratos_cipher=$(gen_short)
 hydra_cookie=$(gen)
 
 cat <<EOF
-LAB_DOMAIN=${LAB_DOMAIN}
 AUTH_REGISTRY=${AUTH_REGISTRY}
 AUTH_VERSION=${AUTH_VERSION}
+
+# LAB_DOMAIN: transitional shim consumed by smoke.sh (Round-2 rebase will
+# replace LAB_DOMAIN references with the Othala vars below). Set to the
+# othala.test apex so unqualified email addresses resolve correctly in
+# smoke test-data. The issuer check in smoke.sh will need updating in the
+# Round-2 harness rebase (it still uses the old auth-lab prefix).
+LAB_DOMAIN=othala.test
 
 POSTGRES_PASSWORD=$(gen_alnum)
 KRATOS_PG_PASS=$(gen_alnum)
 HYDRA_PG_PASS=$(gen_alnum)
+
+# ── SMTP stub (no real mail in e2e; Kratos courier uses these) ───────────────
+# These are consumed by the expandvars render of kratos.yml (courier.smtp).
+# Courier is effectively inert in the e2e (no real SMTP relay), but the config
+# must not contain literal ${SMTP_USER}/${SMTP_PASS} or Kratos rejects the DSN.
+SMTP_USER=lab
+SMTP_PASS=lab
+
+# ── Instance identity (e2e test host) ────────────────────────────────────────
+# auth.othala.test is the generic test host alias used by the browser-profile
+# Caddy edge. No real DNS; compose net alias resolves it inside the net.
+OTHALA_PUBLIC_URL=http://auth.othala.test
+OTHALA_PUBLIC_HOST=auth.othala.test
+OTHALA_APEX=othala.test
+OTHALA_WEBAUTHN_RP_ID=othala.test
+OTHALA_WEBAUTHN_RP_ORIGINS=http://auth.othala.test
+OTHALA_INSTANCE_NAME=Othala Lab
+OTHALA_SMTP_FROM_ADDRESS=noreply@othala.test
+
+# ── Password policy: HIBP off for offline VM, min-length 12 ─────────────────
+# haveibeenpwned_enabled=false prevents a network call the CI VM cannot make.
+# min_password_length=12 keeps length enforcement; e2e uses ≥12-char passwords.
+OTHALA_HIBP_ENABLED=false
+OTHALA_PASSWORD_MIN_LENGTH=12
+
+# ── Host routing (compose service names; iac quadlets use container names) ───
+KRATOS_PG_HOST=postgres
+HYDRA_PG_HOST=postgres
+KRATOS_ADMIN_HOST=kratos
+CONSENT_HOST=othala
 
 # Kratos cookie + cipher + Hydra cookie: single active secret each
 # (collapsed-key, LB#10). No _PREVIOUS at rest — v26.2.0 uniqueItems.
@@ -55,6 +87,11 @@ HYDRA_SYSTEM_SECRET=$(gen)
 HYDRA_COOKIE_SECRET_CURRENT=${hydra_cookie}
 HYDRA_PAIRWISE_SALT=$(gen_short)
 
+# ── LDAP bridge ───────────────────────────────────────────────────────────────
+LDAP_BASE_DN=dc=othala,dc=test
+LDAP_SERVICE_BIND_DN=cn=ldap-reader,dc=othala,dc=test
+LDAP_SERVICE_BIND_PASSWORD=$(gen_short)
+
 # Converged app admin model (CU3). consent is gone; these are the
 # othala app's own secrets:
 #   OTHALA_ADMIN_SUBJECTS         the SOLE admin authority — a comma-
@@ -63,7 +100,7 @@ HYDRA_PAIRWISE_SALT=$(gen_short)
 #                                 the recovery-gate refuse path.
 #   OTHALA_ADMIN_ENDPOINT_BEARER  guards POST /admin/revoke-user (loopback)
 #   RECOVERY_GATE_SECRET          guards POST /admin/recovery-gate (loopback)
-OTHALA_ADMIN_SUBJECTS=admin@${LAB_DOMAIN}
+OTHALA_ADMIN_SUBJECTS=admin@othala.test
 OTHALA_ADMIN_ENDPOINT_BEARER=$(gen)
 RECOVERY_GATE_SECRET=$(gen)
 
