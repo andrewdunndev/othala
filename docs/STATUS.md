@@ -127,9 +127,11 @@ Full rationale per decision: `decision.md`. Upgrade-durability choices:
 
 ## Not yet working / placeholders
 
-- **`/admin/activity`** is a navigable **placeholder** (labeled in-page;
-  pending an alloy→Loki / Postgres-summary ingest). Not a working
-  feature.
+- **`/admin/activity`** is **retired** from the shipped product: the route
+  now redirects to `/admin` (admin gate preserved) rather than rendering a
+  dead placeholder. A real activity log (alloy→Loki archival + a
+  Postgres-summary table for the in-UI view) is out of scope for this
+  release.
 - **OIDC client registration** runs the in-app all-TS registrar
   (`manifests.ts` + `register-clients.ts` + `validateClients`, bundled to
   `dist/server/register-clients.mjs`) as a deliberate `--rm` one-shot. CI

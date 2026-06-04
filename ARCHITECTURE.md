@@ -359,7 +359,7 @@ in the same SSO pod. Single auth surface: `dag.dunn.dev`.
                              │    │    │    ├─ /apps/<slug>            per-app education page
                              │    │    │    ├─ /oauth2/{login,consent,logout}  Hydra challenge providers
                              │    │    │    ├─ /auth/{login,recovery,settings,verification}
-                             │    │    │    └─ /admin/{users,groups,oauth2,activity}
+                             │    │    │    └─ /admin/{users,groups,oauth2}
                              │    │    └─ admin listener 8431 (loopback / pod-only)
                              │    │         ├─ /healthz, /readyz
                              │    │         ├─ /admin/revoke-user      (OTHALA_ADMIN_ENDPOINT_BEARER)
@@ -394,11 +394,10 @@ Two narrow Cloudflare-served endpoints exist on the dunn.dev apex:
 
 ### Why the app on the SSO host, not Workers
 
-adversarial-review-2 C1: with the app on Workers, the admin pages had to
-fetch `kratos:4434` (the Kratos admin port). That hostname resolves only
-inside the SSO pod network; from a Worker it is unreachable. The locked
-decision "admin port stays internal" jointly with "Astro on Workers" was
-inconsistent.
+With the app on Workers, the admin pages had to fetch `kratos:4434` (the
+Kratos admin port). That hostname resolves only inside the SSO pod
+network; from a Worker it is unreachable. The locked decision "admin port
+stays internal" jointly with "Astro on Workers" was inconsistent.
 
 Running the app in the same pod as Kratos and Hydra makes the admin port
 reachable directly. It also collapses runtime complexity: one Node
@@ -759,11 +758,11 @@ those as the build-time / release-gate guards, not a continuous type gate.
 Things that would expand the codebase without obvious value at family
 scale:
 
-- **A full audit-log subsystem**. `/admin/activity` is a navigable
-  placeholder (labeled in-page) pending the activity-ingest path
-  (alloy → Loki for archival, a Postgres summary table for the UI). It
-  displays no events today. `journalctl` is the current audit; expand only
-  if family scale requires.
+- **A full audit-log subsystem**. The `/admin/activity` route was retired
+  rather than shipped dead — it now redirects to `/admin` (admin gate
+  preserved). The audit-ingest path (alloy → Loki for archival, a Postgres
+  summary table for the UI) is out of scope for the public release.
+  `journalctl` is the current audit; expand only if family scale requires.
 - **An in-process identity cache**. Revocation is correct without one (see
   "No identity cache"). Adding one reintroduces a stale-authz window.
 - **A custom back-channel-logout signer**. Hydra signs natively; the app

@@ -1,7 +1,12 @@
-# Postgres backup and restore (TODO)
+# Postgres backup and restore
 
-Status: NOT IMPLEMENTED. Placeholder runbook listing what has to land
-before family rollout. Tracked as H11 from the adversarial review.
+This runbook records the **backup posture** for the auth substrate's
+Postgres state and the **restore procedure** an operator follows. The
+backup *implementation* (the cron/quadlet runner, off-host copy, ZFS
+snapshot policy) is `dunn.dev/iac` work, not auth-project code — see
+"Where it lives" below. The stakes, the required posture, and the
+partial-state restore drill documented here are the contract the iac
+runner must satisfy.
 
 ## Stakes
 
@@ -20,7 +25,7 @@ from Bitwarden (otherwise even partial restore can't decrypt). At
 family scale the human cost is hours of re-enrollment plus operator
 panic; it's the worst single-failure outcome in the auth substrate.
 
-## Required deliverables (before family rollout)
+## Required posture (the iac runner must satisfy this)
 
 1. **pg_dump cron job**
    - Run nightly via systemd timer or cron in the postgres pod.
@@ -63,21 +68,15 @@ panic; it's the worst single-failure outcome in the auth substrate.
      `secrets.system` rehydration path, the env-var setup, the
      pg_restore invocation, and the post-restore smoke test.
 
-## Effort estimate
+## Where it lives
 
-1 day of configuration plus one drill. The work is all in
-`dunn.dev/iac` — a new service for the backup runner (pg_dump cron
-+ rclone push to B2 + zfs send to the onsite tank). No auth-project
-changes needed.
-
-## Why this isn't done yet
-
-Phase 0 (config drafting) and Phase 1 (lab spike) explicitly
-de-prioritized backup tooling because the lab is throwaway. The
-adversarial review (H11) flags this as a pre-family-rollout requirement.
-**Tracked as the next iac work stream after auth substrate cutover.**
-Backup posture: rclone → Backblaze B2 offsite + zfs send to an onsite
-tank pool; both fire from a single backup quadlet.
+The backup runner is `dunn.dev/iac` work, not auth-project code: a
+service for the backup runner (pg_dump cron + rclone push to B2 + zfs
+send to the onsite tank). Posture: rclone → Backblaze B2 offsite + zfs
+send to an onsite tank pool; both fire from a single backup quadlet.
+Roughly a day of configuration plus one restore drill; no auth-project
+changes needed. The security review tracks the gating item as A6 (and
+H11 from the earlier review); this runbook is the contract it points at.
 
 ## Partial-state restore (A6)
 

@@ -38,6 +38,40 @@ A manifest with only `presentation:` (a forward_auth, LDAP, or external tile wit
 
 The generic worked examples live in [`e2e/manifests/`](e2e/manifests/): `grafana` (OIDC + role mapping), `audiobookshelf` (OIDC), `jellyfin` (LDAP via the bridge), `proxywatch` (forward_auth), `statuspage` (external). They double as the release-gate fixtures the smoke harness registers.
 
+## Run it locally
+
+The honest first-run path. Two modes, depending on what you want.
+
+### Full stack (the e2e compose harness)
+
+The complete worked example is the e2e harness. It stands up Postgres + Kratos + Hydra + Othala + the LDAP bridge + Mailpit behind Caddy, renders the Ory configs, registers the example clients from `e2e/manifests/`, and runs the OIDC dance + smoke matrix. Everything runs on the RFC 6761 reserved test domain `othala.test`, so nothing touches a real domain.
+
+```sh
+cd e2e
+./gen-secrets.sh        # writes a local .env (secrets + OTHALA_* values)
+bash validate.sh        # render configs -> up -> health-wait -> OIDC dance -> smoke
+```
+
+Needs a Docker or Podman compose runtime. See [`e2e/README.md`](e2e/README.md) for the harness in detail.
+
+### Portal-only dev (`npm run dev`)
+
+To iterate on the Astro UI alone, run the dev server. The dashboard is built from the manifest directory, so **you must point `MANIFEST_DIR` at one or the dashboard renders empty.** The example manifests in `e2e/manifests/` are the easy choice:
+
+```sh
+cd portal
+npm install
+MANIFEST_DIR=../e2e/manifests npm run dev   # http://localhost:4321
+```
+
+Other `OTHALA_*` config falls back to safe dev defaults (with a warning), so the dev server comes up without the full Ory substrate. The OIDC and consent flows need Kratos + Hydra, so they only work in the full-stack mode above; portal-only dev is for the dashboard, self-service UI chrome, and `/apps/<slug>` pages.
+
+```sh
+npm test          # node --test over scripts/*.test.mjs (incl. fuzz suites)
+npm run check     # astro check (type + content checks)
+npm run build     # astro build + bundle the listener / admin / registrar
+```
+
 ## Where to start
 
 - **Cold-start orientation** (the anchor): [`ARCHITECTURE.md`](ARCHITECTURE.md). What the converged app holds, the load-bearing decisions, topology, and trust boundary.

@@ -65,7 +65,8 @@ First family recovery flow gets a manual receipt:
 
 1. Operator triggers a recovery for their own non-admin alias (we
    maintain a non-admin family-test identity for this).
-2. Receipt is logged in `/admin/activity` and the receiving inbox.
+2. Receipt lands in the receiving inbox; the courier send is visible in
+   `journalctl` on the SSO host (the current audit surface).
 3. If the receipt doesn't arrive within 60s, escalate per the
    "deliverability bad" path above.
 

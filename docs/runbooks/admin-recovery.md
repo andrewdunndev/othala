@@ -95,8 +95,9 @@ The asteroid case. Recovery is by Kratos admin CLI on the SSO host.
 5. Open the link in a clean browser session. Set a new password and
    register at least two authenticators before closing the tab.
 
-6. Log the event in the recent-activity audit (`/admin/activity`) by
-   noting "console recovery: <reason>".
+6. Record the event in the operator audit log (`journalctl` on the SSO
+   host is the current audit surface) by noting "console recovery:
+   <reason>".
 
 ### Path C: Kratos itself is unreachable
 
