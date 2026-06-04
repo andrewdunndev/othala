@@ -1,4 +1,12 @@
 {
   "$schema": "https://docs.renovatebot.com/renovate-schema.json",
-  "extends": ["gitlab>dunn.dev/pipeline:renovate-config"]
+  "extends": ["gitlab>dunn.dev/pipeline:renovate-config"],
+  "packageRules": [
+    {
+      "description": "Playwright lockstep: the e2e @playwright/test npm package and the mcr.microsoft.com/playwright Docker image MUST stay version-matched (the npm version drives which browser build the image must carry). Group them into one MR and pin so they bump together, never independently.",
+      "matchPackageNames": ["@playwright/test", "mcr.microsoft.com/playwright"],
+      "groupName": "playwright",
+      "rangeStrategy": "pin"
+    }
+  ]
 }
