@@ -211,7 +211,13 @@ identity:
 
 courier:
   smtp:
-    connection_uri: smtps://${SMTP_USER}:${SMTP_PASS}@smtp.fastmail.com:465
+    # SINGLE source of truth for the courier connection, shared with the
+    # portal's contact-form mailer (portal/src/lib/mailer.ts reads the same
+    # OTHALA_SMTP_CONNECTION_URI). One URI, one relay — a dashboard request
+    # mail travels the exact same outbound path as a recovery/verification
+    # code. gen-secrets.sh / iac default this to the Fastmail implicit-TLS
+    # endpoint with the SMTP_USER/SMTP_PASS app-password credentials.
+    connection_uri: ${OTHALA_SMTP_CONNECTION_URI}
     from_address: ${OTHALA_SMTP_FROM_ADDRESS}
     from_name: ${OTHALA_INSTANCE_NAME}
     # local_name: leave default; Fastmail accepts standard HELO

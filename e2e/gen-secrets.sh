@@ -40,12 +40,22 @@ POSTGRES_PASSWORD=$(gen_alnum)
 KRATOS_PG_PASS=$(gen_alnum)
 HYDRA_PG_PASS=$(gen_alnum)
 
-# ── SMTP stub (no real mail in e2e; Kratos courier uses these) ───────────────
-# These are consumed by the expandvars render of kratos.yml (courier.smtp).
-# Courier is effectively inert in the e2e (no real SMTP relay), but the config
-# must not contain literal \${SMTP_USER}/\${SMTP_PASS} or Kratos rejects the DSN.
+# ── SMTP (e2e mail catcher: mailpit) ─────────────────────────────────────────
+# The e2e stack runs a real mailpit catcher (compose service `mailpit`,
+# SMTP :1025, HTTP API :8025). Both Kratos courier AND the portal contact-form
+# mailer point at it via the SHARED connection URI below — so the contact form
+# is provably functional in the gate (smoke.sh Section H POSTs /api/request and
+# asserts the message lands in mailpit). No auth/TLS: mailpit accepts plain SMTP.
+#
+# OTHALA_SMTP_CONNECTION_URI is the single source of truth, consumed by:
+#   - kratos/kratos.yml  courier.smtp.connection_uri  (rendered by validate.sh)
+#   - portal/src/lib/mailer.ts  (read via lib/config.ts at request time)
 SMTP_USER=lab
 SMTP_PASS=lab
+OTHALA_SMTP_CONNECTION_URI=smtp://mailpit:1025
+# The contact form delivers here; the smoke seeds this as the recipient and
+# asserts mailpit received a message addressed to it.
+OTHALA_CONTACT_RECIPIENT=ops@othala.test
 
 # ── Instance identity (e2e test host) ────────────────────────────────────────
 # auth.othala.test is the generic test host alias used by the browser-profile

@@ -1,49 +1,21 @@
 ---
-// Admin: recent login attempts + failures. Pulled from a small audit
-// table populated by Kratos events (alloy → Loki is the archival path;
-// this is the immediate-UI path).
-// Status: skeleton.
+// /admin/activity has been retired from the shipped product.
+//
+// A real activity log (alloy → Loki archival + a Postgres summary table
+// for the in-UI last-100 view) is out of scope for the public release, so
+// the navigable placeholder it used to render was removed rather than
+// shipped dead. This route is no longer linked from the admin nav; it
+// redirects to the admin overview so any stale bookmark lands somewhere
+// live instead of on a dead page.
 export const prerender = false;
 
-import Layout from '../../layouts/Layout.astro';
 import { requireAdminSession } from '../../lib/admin';
 
+// Keep the admin gate so the redirect can't be used to probe routes
+// unauthenticated; an unauthorized caller gets the same refresh-login
+// redirect every other /admin/* page returns.
 const guard = await requireAdminSession(Astro);
 if (guard instanceof Response) return guard;
 
-const adminNav = [
-  { href: '/admin',          label: 'Overview' },
-  { href: '/admin/users',    label: 'Users' },
-  { href: '/admin/groups',   label: 'Groups' },
-  { href: '/admin/oauth2',   label: 'Apps' },
-  { href: '/admin/activity', label: 'Activity' },
-];
-
-// TODO: query Postgres "recent_activity" table for last 100 events
+return Astro.redirect('/admin', 302);
 ---
-<Layout title="Activity — Admin" description="Recent identity and login events." nav={adminNav}>
-  <header class="page-header">
-    <p class="page-eyebrow">administration · audit</p>
-    <h1 class="page-title">Recent activity <span class="badge badge-warning">Placeholder</span></h1>
-    <p class="page-lede">
-      Login attempts, password changes, recovery codes, and admin
-      operations. Sourced from the Kratos events stream.
-    </p>
-  </header>
-
-  <div class="notice notice-warning">
-    <strong>Placeholder — not wired yet.</strong> This page is a navigable
-    skeleton; it does not yet display any events. The feature is pending the
-    activity-ingest path (alloy → Loki for archival, a Postgres summary table
-    for the in-UI last-100 view). Until that lands, treat this page as
-    intentionally empty.
-  </div>
-
-  <section class="section">
-    <p class="section-subtitle">Stream</p>
-    <p class="section-prose">
-      Once the ingest is in place this section will surface the last 100
-      events from the Postgres summary table.
-    </p>
-  </section>
-</Layout>

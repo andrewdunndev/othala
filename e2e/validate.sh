@@ -131,13 +131,13 @@ while true; do
     # The PLAIN `docker compose ps` output reliably shows "(healthy)" in the
     # status column under both engines — count that instead.
     healthy=$(docker compose ps 2>/dev/null | grep -c '(healthy)')
-    # Expecting 5 healthy long-runners: postgres, kratos, hydra, othala,
-    # ldap-bridge. consent + util are gone (folded into the othala app).
-    # The othala healthcheck hits its loopback admin /healthz (:8431);
-    # the bridge has its own /healthz on :6478 — gating on both surfaces
-    # a broken service in this loop instead of later in smoke.
-    if [[ "${healthy:-0}" -ge 5 ]]; then
-        echo "  ✓ substrate healthy ($healthy/5 long-runners up)"
+    # Expecting 6 healthy long-runners: postgres, kratos, hydra, othala,
+    # ldap-bridge, mailpit. consent + util are gone (folded into the othala
+    # app). The othala healthcheck hits its loopback admin /healthz (:8431);
+    # the bridge has its own /healthz on :6478; mailpit answers `readyz` —
+    # gating on all surfaces a broken service in this loop instead of in smoke.
+    if [[ "${healthy:-0}" -ge 6 ]]; then
+        echo "  ✓ substrate healthy ($healthy/6 long-runners up)"
         break
     fi
     sleep 5
@@ -174,7 +174,7 @@ if [[ $SMOKE_EXIT -ne 0 || $BROWSER_EXIT -ne 0 ]]; then
     echo "=== container ps ==="
     docker compose ps 2>&1 || true
     echo "=== container logs (last 80 each) ==="
-    for svc in postgres kratos hydra othala ldap-bridge caddy; do
+    for svc in postgres kratos hydra othala ldap-bridge mailpit caddy; do
         echo "--- lab-$svc ---"
         podman logs --tail=80 "lab-$svc" 2>&1 || true
     done

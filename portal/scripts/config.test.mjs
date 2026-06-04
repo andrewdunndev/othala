@@ -69,10 +69,19 @@ test('publicUrl: returns dev default in test when absent', async () => {
   assert.equal(publicUrl, 'http://localhost:4321');
 });
 
+// The other required-in-prod vars must also be present or module load throws
+// before reaching the publicUrl assertion. Bundle them into the prod-success
+// env so these cases isolate the publicUrl behaviour under test.
+const PROD_REQUIRED = {
+  OTHALA_SMTP_CONNECTION_URI: 'smtps://u:p@smtp.example.com:465',
+  OTHALA_CONTACT_RECIPIENT: 'ops@example.com',
+};
+
 test('publicUrl: uses explicit value when set', async () => {
   const { publicUrl } = await loadConfig({
     NODE_ENV: 'production',
     OTHALA_PUBLIC_URL: 'https://auth.example.com',
+    ...PROD_REQUIRED,
   });
   assert.equal(publicUrl, 'https://auth.example.com');
 });
@@ -81,6 +90,7 @@ test('publicUrl: strips trailing slash from explicit value', async () => {
   const { publicUrl } = await loadConfig({
     NODE_ENV: 'production',
     OTHALA_PUBLIC_URL: 'https://auth.example.com/',
+    ...PROD_REQUIRED,
   });
   assert.equal(publicUrl, 'https://auth.example.com');
 });
@@ -89,8 +99,61 @@ test('publicUrl: strips multiple trailing slashes', async () => {
   const { publicUrl } = await loadConfig({
     NODE_ENV: 'production',
     OTHALA_PUBLIC_URL: 'https://auth.example.com///',
+    ...PROD_REQUIRED,
   });
   assert.equal(publicUrl, 'https://auth.example.com');
+});
+
+// ── OTHALA_SMTP_CONNECTION_URI ────────────────────────────────────────────────
+
+test('smtpConnectionUri: throws in production when absent', async () => {
+  await assert.rejects(
+    () => loadConfig({ NODE_ENV: 'production', OTHALA_PUBLIC_URL: 'https://a.example.com' }),
+    /OTHALA_SMTP_CONNECTION_URI/,
+  );
+});
+
+test('smtpConnectionUri: returns dev default outside production', async () => {
+  const { smtpConnectionUri } = await loadConfig({ NODE_ENV: 'test' });
+  assert.equal(smtpConnectionUri, 'smtp://lab:lab@localhost:1025');
+});
+
+test('smtpConnectionUri: uses explicit value', async () => {
+  const { smtpConnectionUri } = await loadConfig({
+    NODE_ENV: 'test',
+    OTHALA_SMTP_CONNECTION_URI: 'smtps://x:y@relay:465',
+  });
+  assert.equal(smtpConnectionUri, 'smtps://x:y@relay:465');
+});
+
+// ── OTHALA_CONTACT_RECIPIENT ──────────────────────────────────────────────────
+
+test('contactRecipient: uses explicit value when set', async () => {
+  const { contactRecipient } = await loadConfig({
+    NODE_ENV: 'test',
+    OTHALA_CONTACT_RECIPIENT: 'ops@example.com',
+  });
+  assert.equal(contactRecipient, 'ops@example.com');
+});
+
+test('contactRecipient: falls back to the first OTHALA_ADMIN_SUBJECTS entry', async () => {
+  const { contactRecipient } = await loadConfig({
+    NODE_ENV: 'test',
+    OTHALA_ADMIN_SUBJECTS: 'first@example.com, second@example.com',
+  });
+  assert.equal(contactRecipient, 'first@example.com');
+});
+
+test('contactRecipient: throws in production when neither recipient nor admin subjects set', async () => {
+  await assert.rejects(
+    () =>
+      loadConfig({
+        NODE_ENV: 'production',
+        OTHALA_PUBLIC_URL: 'https://a.example.com',
+        OTHALA_SMTP_CONNECTION_URI: 'smtps://u:p@relay:465',
+      }),
+    /contact recipient/,
+  );
 });
 
 // ── OTHALA_SITE_NAME ──────────────────────────────────────────────────────────

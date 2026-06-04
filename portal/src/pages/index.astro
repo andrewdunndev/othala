@@ -176,6 +176,9 @@ const devLinks = [
             Pick up where you left off, or hop into one of the apps below.
           </p>
           <div class="cta-row">
+            <button type="button" class="button button-primary" id="open-request-form">
+              Request access or suggest an app
+            </button>
             {isAdmin && <a href="/admin" class="button button-secondary">Admin</a>}
             <a href="/auth/settings" class="button button-secondary">Account</a>
             <a href="/auth/logout" class="cta-link mono">Sign out</a>
@@ -203,6 +206,57 @@ const devLinks = [
           </p>
         )}
       </section>
+
+      {/* ── Request / contact form dialog ─────────────────────────────────
+          FUNCTIONAL: the submit POSTs to /api/request, which validates,
+          rate-limits, and delivers via the shared courier SMTP. */}
+      <dialog class="request-modal" id="request-modal" aria-labelledby="request-modal-title">
+        <div class="request-modal-inner">
+          <header class="request-modal-header">
+            <div>
+              <h2 class="request-modal-title" id="request-modal-title">Get in touch</h2>
+              <p class="request-modal-desc">Request access, suggest a new app, or report a problem.</p>
+            </div>
+            <button class="request-modal-close mono" type="button" data-close-request aria-label="Close">✕</button>
+          </header>
+
+          <div class="request-modal-body">
+            <form class="request-form" id="request-form" method="post" action="/api/request" novalidate>
+              <label class="form-field">
+                <span class="form-label">Your name</span>
+                <input class="form-input" type="text" name="name" autocomplete="name" maxlength="80" required placeholder="e.g. Ashley" />
+              </label>
+
+              <label class="form-field">
+                <span class="form-label">Request type</span>
+                <select class="form-select" name="type" required>
+                  <option value="">— choose one —</option>
+                  <option value="access">Access to an app</option>
+                  <option value="new">New app idea</option>
+                  <option value="problem">Problem / something broken</option>
+                  <option value="other">Other</option>
+                </select>
+              </label>
+
+              <label class="form-field">
+                <span class="form-label">Message</span>
+                <textarea class="form-textarea" name="message" rows="5" maxlength="4000" required placeholder="What do you need?"></textarea>
+              </label>
+
+              <p class="form-error mono" id="request-error" role="alert" hidden></p>
+
+              <div class="form-actions">
+                <button class="button button-primary" type="submit" id="request-submit">Send request</button>
+              </div>
+            </form>
+
+            <div class="request-thanks" id="request-thanks" hidden>
+              <p class="request-thanks-msg">Thanks — your request is on its way to {adminContact}.</p>
+              <p class="mono request-thanks-note">You can close this window.</p>
+            </div>
+          </div>
+        </div>
+      </dialog>
     </>
   )}
 
@@ -223,6 +277,89 @@ const devLinks = [
   )}
 
 </Layout>
+
+<script is:inline>
+  // ── Request / contact form (post-auth dashboard) ──────────────────────
+  // Progressive enhancement: the <form> has a real method/action so it works
+  // without JS; this handler intercepts to POST via fetch and render inline
+  // success / error states against the live /api/request endpoint.
+  (function () {
+    var modal = document.getElementById('request-modal');
+    var openBtn = document.getElementById('open-request-form');
+    var form = document.getElementById('request-form');
+    var thanks = document.getElementById('request-thanks');
+    var errorEl = document.getElementById('request-error');
+    var submitBtn = document.getElementById('request-submit');
+    if (!modal || !openBtn || !form) return;
+
+    function showError(msg) {
+      if (!errorEl) return;
+      errorEl.textContent = msg;
+      errorEl.hidden = false;
+    }
+    function clearError() {
+      if (!errorEl) return;
+      errorEl.textContent = '';
+      errorEl.hidden = true;
+    }
+
+    openBtn.addEventListener('click', function () {
+      clearError();
+      if (typeof modal.showModal === 'function') modal.showModal();
+    });
+
+    modal.querySelectorAll('[data-close-request]').forEach(function (btn) {
+      btn.addEventListener('click', function () { modal.close(); });
+    });
+    // Backdrop click closes.
+    modal.addEventListener('click', function (e) {
+      if (e.target === modal) modal.close();
+    });
+
+    form.addEventListener('submit', function (e) {
+      e.preventDefault();
+      clearError();
+      if (typeof form.reportValidity === 'function' && !form.reportValidity()) return;
+
+      if (submitBtn) { submitBtn.disabled = true; submitBtn.textContent = 'Sending…'; }
+
+      fetch('/api/request', {
+        method: 'POST',
+        headers: { 'Accept': 'application/json' },
+        body: new FormData(form),
+      })
+        .then(function (res) {
+          return res.json().catch(function () { return {}; }).then(function (data) {
+            return { ok: res.ok, status: res.status, data: data };
+          });
+        })
+        .then(function (r) {
+          if (r.ok && r.data && r.data.ok) {
+            form.hidden = true;
+            if (thanks) thanks.hidden = false;
+          } else {
+            showError((r.data && r.data.error) || 'Something went wrong. Please try again.');
+          }
+        })
+        .catch(function () {
+          showError('Network error — please check your connection and try again.');
+        })
+        .finally(function () {
+          if (submitBtn) { submitBtn.disabled = false; submitBtn.textContent = 'Send request'; }
+        });
+    });
+
+    // Reset to the form view when the dialog is fully closed, ready for re-open.
+    modal.addEventListener('close', function () {
+      setTimeout(function () {
+        form.hidden = false;
+        if (thanks) thanks.hidden = true;
+        clearError();
+        form.reset();
+      }, 200);
+    });
+  })();
+</script>
 
 <style>
   /* ── State A: holding panel ──
@@ -419,4 +556,108 @@ const devLinks = [
     .holding-mark { width: 48px; height: 48px; }
     .dev-list li { grid-template-columns: 1fr; gap: var(--space-1); }
   }
+
+  /* ── Request / contact form modal ──
+   * Adapted from the /preview prototype, trimmed to the post-auth dashboard.
+   * Explicit centering — does not rely on inset:0 + margin:auto, which some
+   * global dialog rules override. */
+  .request-modal {
+    position: fixed;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    margin: 0;
+    max-width: min(560px, 92vw);
+    max-height: 85vh;
+    width: 100%;
+    overflow: auto;
+    background: var(--bg, #ffffff);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    color: var(--text);
+    padding: 0;
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.22);
+  }
+  .request-modal::backdrop {
+    background: rgba(0, 0, 0, 0.55);
+    backdrop-filter: blur(3px);
+  }
+  .request-modal-inner { display: flex; flex-direction: column; }
+  .request-modal-header {
+    display: grid;
+    grid-template-columns: 1fr auto;
+    gap: var(--space-3) var(--space-4);
+    align-items: start;
+    padding: var(--space-5) var(--space-5) var(--space-4);
+    border-bottom: 1px solid var(--border);
+  }
+  .request-modal-title {
+    font-family: var(--font-mono);
+    font-size: var(--text-xl);
+    font-weight: 700;
+    color: var(--text);
+    line-height: 1.2;
+    margin: 0 0 var(--space-1);
+  }
+  .request-modal-desc {
+    font-size: var(--text-sm);
+    color: var(--text-2);
+    line-height: 1.4;
+    margin: 0;
+  }
+  .request-modal-close {
+    all: unset;
+    cursor: pointer;
+    font-size: var(--text-base);
+    color: var(--text-muted);
+    padding: var(--space-1) var(--space-2);
+    border-radius: var(--radius-sm);
+    line-height: 1;
+    transition: color var(--duration-fast) var(--ease-out);
+  }
+  .request-modal-close:hover { color: var(--text); }
+  .request-modal-close:focus-visible {
+    outline: 2px solid var(--input-focus, var(--accent));
+    outline-offset: 2px;
+  }
+  .request-modal-body { padding: var(--space-5) var(--space-6); }
+  .request-form { display: flex; flex-direction: column; gap: var(--space-4); }
+  .form-field { display: flex; flex-direction: column; gap: var(--space-2); }
+  .form-label { font-size: var(--text-sm); font-weight: 600; color: var(--text); }
+  .form-input,
+  .form-select,
+  .form-textarea {
+    font-family: var(--font-sans, 'IBM Plex Sans', sans-serif);
+    font-size: var(--text-base);
+    color: var(--text);
+    background: var(--bg, #ffffff);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    padding: var(--space-2) var(--space-3);
+    width: 100%;
+    box-sizing: border-box;
+    transition: border-color var(--duration-fast) var(--ease-out);
+  }
+  .form-input:focus,
+  .form-select:focus,
+  .form-textarea:focus {
+    outline: 2px solid var(--input-focus, var(--accent));
+    outline-offset: 1px;
+    border-color: var(--accent);
+  }
+  .form-textarea { resize: vertical; }
+  .form-error {
+    margin: 0;
+    font-size: var(--text-sm);
+    color: var(--danger, #b3261e);
+  }
+  .form-actions { display: flex; justify-content: flex-end; padding-top: var(--space-2); }
+  .request-thanks { text-align: center; padding: var(--space-6) 0; }
+  .request-thanks-msg {
+    font-size: var(--text-lg);
+    font-weight: 600;
+    color: var(--accent);
+    margin-bottom: var(--space-2);
+  }
+  .request-thanks-note { font-size: var(--text-xs); color: var(--text-muted); }
 </style>

@@ -6,10 +6,10 @@
 // blocks to Hydra. This page renders the loaded manifest set; editing
 // happens by changing a manifest, not here.
 //
-// The "Edit" affordance is a disabled button with a tooltip pointing
-// the admin at the manifest. Roles + group_role_map come from the
-// manifest; when an app's manifest has no roles block, the table shows
-// "(none)" so the absence is visible.
+// Editing is by-manifest, not in-page: each card names the source file
+// (`<clientId>.yaml`) so the admin knows where to make changes. Roles +
+// group_role_map come from the manifest; when an app's manifest has no
+// roles block, the table shows "(none)" so the absence is visible.
 
 export const prerender = false;
 
@@ -27,7 +27,6 @@ const adminNav = [
   { href: '/admin/users',    label: 'Users' },
   { href: '/admin/groups',   label: 'Groups' },
   { href: '/admin/oauth2',   label: 'Apps' },
-  { href: '/admin/activity', label: 'Activity' },
 ];
 ---
 <Layout title="Apps — Admin" description="OIDC client manifests." nav={adminNav}>
@@ -50,14 +49,9 @@ const adminNav = [
               <h2 class="mono">{m.clientId}</h2>
               <p class="muted text-sm">{m.clientName}</p>
             </div>
-            <button
-              type="button"
-              class="button button-secondary"
-              disabled
-              title="Edit the {m.clientId}.yaml manifest"
-            >
-              Edit yaml in repo
-            </button>
+            <p class="muted text-xs mono">
+              source: <span class="mono">{m.clientId}.yaml</span>
+            </p>
           </header>
 
           <dl style="display: grid; grid-template-columns: 9rem 1fr; gap: 0.4rem 1rem; font-size: var(--text-sm);">

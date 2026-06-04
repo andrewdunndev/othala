@@ -111,6 +111,76 @@ export const adminContact: string = optionalVar(
 export const instanceName: string =
   process.env.OTHALA_INSTANCE_NAME?.trim() || siteName;
 
+// ── OTHALA_SMTP_CONNECTION_URI ────────────────────────────────────────────────
+//
+// The SINGLE source of truth for the courier SMTP connection, shared by both
+// Kratos (kratos/kratos.yml `courier.smtp.connection_uri`) and the portal's
+// contact-form mailer (lib/mailer.ts). One URI, one relay — the contact form
+// provably uses the exact same outbound path as recovery/verification mail.
+//
+// Form:  smtps://USER:PASS@host:465   (implicit TLS, recommended)
+//        smtp://USER:PASS@host:587     (STARTTLS)
+// The USER/PASS are URL-encoded; the portal mailer URL-decodes them.
+//
+// Required-no-default in production (no working SMTP ⇒ the form can't deliver).
+// Dev/test default points at the lab catcher so `npm run dev` and the e2e gate
+// have a working relay without secrets. (The e2e mailpit listens on :1025.)
+
+// A required image-config parameter (the app sends mail). Exposed
+// explicitly and set wherever the othala image runs — including the
+// register-clients one-shot, which shares the image + this config contract
+// even though it doesn't itself send mail (same pattern as OTHALA_PUBLIC_URL).
+export const smtpConnectionUri: string = requiredVar(
+  'OTHALA_SMTP_CONNECTION_URI',
+  'smtp://lab:lab@localhost:1025',
+);
+
+// ── OTHALA_CONTACT_RECIPIENT ──────────────────────────────────────────────────
+//
+// Where the dashboard contact/request form delivers. A single email address
+// (the operator's inbox). When unset it falls back to the FIRST entry of
+// OTHALA_ADMIN_SUBJECTS (the admin allowlist) — the people who can actually
+// action a request — so a minimal deployment needs no extra config.
+//
+// Fail-loud in production only if BOTH are empty (nowhere to send).
+
+function firstAdminSubject(): string {
+  const raw = process.env.OTHALA_ADMIN_SUBJECTS ?? '';
+  for (const part of raw.split(',')) {
+    const email = part.trim();
+    if (email) return email;
+  }
+  return '';
+}
+
+function resolveContactRecipient(): string {
+  const explicit = process.env.OTHALA_CONTACT_RECIPIENT?.trim();
+  if (explicit) return explicit;
+  const admin = firstAdminSubject();
+  if (admin) return admin;
+  if (isProduction()) {
+    throw new Error(
+      '[othala/config] No contact recipient: set OTHALA_CONTACT_RECIPIENT or ' +
+        'OTHALA_ADMIN_SUBJECTS so the dashboard request form has somewhere to deliver.',
+    );
+  }
+  console.warn(
+    '[othala/config] No OTHALA_CONTACT_RECIPIENT / OTHALA_ADMIN_SUBJECTS; ' +
+      'using dev default "admin@localhost". This would throw in production.',
+  );
+  return 'admin@localhost';
+}
+
+export const contactRecipient: string = resolveContactRecipient();
+
+// From address for portal-originated mail (the contact form). Reuses the
+// Kratos courier From address so all instance mail shares one envelope sender.
+// Neutral default keeps dev/test working without config.
+export const smtpFromAddress: string = optionalVar(
+  'OTHALA_SMTP_FROM_ADDRESS',
+  'noreply@localhost',
+);
+
 // ── OTHALA_DEFAULT_SCHEMA_ID ──────────────────────────────────────────────────
 //
 // Kratos schema_id assigned to identities created by the portal (admin
@@ -165,4 +235,8 @@ export const config = {
   instanceName,
   defaultSchemaId,
   identityGroups,
+  contactRecipient,
+  smtpFromAddress,
+  // smtpConnectionUri intentionally OMITTED from the debug/log object: it
+  // carries the SMTP password. Consumers import it by name when they need it.
 } as const;

@@ -199,7 +199,9 @@ a warning.
 | `OTHALA_IDENTITY_GROUPS` | Ordered group list for the admin UI (`admin` always first). |
 | `OTHALA_DEFAULT_SCHEMA_ID` | Kratos schema_id for portal-created identities. |
 | `OTHALA_WEBAUTHN_RP_ID`, `OTHALA_WEBAUTHN_RP_ORIGINS` | WebAuthn relying-party config. |
-| `OTHALA_SMTP_FROM_ADDRESS` | From address for Kratos courier mail. |
+| `OTHALA_SMTP_FROM_ADDRESS` | From address for Kratos courier mail **and** the portal contact form. |
+| `OTHALA_SMTP_CONNECTION_URI` | SMTP relay URI (`smtps://user:pass@host:465`). **Single source** shared by `kratos.yml` courier and the portal contact-form mailer (`lib/mailer.ts`). Required in prod. |
+| `OTHALA_CONTACT_RECIPIENT` | Where the dashboard request form delivers. Falls back to the first `OTHALA_ADMIN_SUBJECTS` entry. |
 | `OTHALA_PASSWORD_MIN_LENGTH`, `OTHALA_HIBP_ENABLED` | Password policy knobs. |
 
 **Ory configs are rendered, not natively expanded.** Ory has no native

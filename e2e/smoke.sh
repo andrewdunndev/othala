@@ -466,6 +466,56 @@ else
     fail "G3 no-group deny" "got: $g3 (want DENIED ... access-grafana group)"
 fi
 
+# Section H: contact / request form (public SSR /api/request -> shared SMTP).
+echo ""
+echo "H. Contact form (othala :8080 /api/request -> mailpit)"
+#
+# The dashboard contact form POSTs to /api/request, which validates, rate-
+# limits, and delivers via the SAME courier connection Kratos uses
+# (OTHALA_SMTP_CONNECTION_URI -> mailpit:1025 in the e2e). We POST from inside
+# the othala container (it has node; reaches its own :8080 and mailpit's HTTP
+# API), then query mailpit to assert the message landed addressed to the
+# configured recipient. This is the release-gate proof that the form is
+# FUNCTIONAL end-to-end, not a mockup.
+
+# H1: a VALID submission returns 200 {ok:true}.
+H_MARKER="smoke-contact-$(date +%s)-$$"
+h1=$(printf '%s' "fetch('http://localhost:8080/api/request',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({name:'Smoke Tester',type:'access',message:'${H_MARKER} please grant access to an app'})}).then(r=>r.text().then(t=>{process.stdout.write(r.status+'|'+t);process.exit(0)})).catch(()=>{process.stdout.write('0|');process.exit(1)})" | node_in othala)
+h1_code="${h1%%|*}"
+h1_body="${h1#*|}"
+if [[ "$h1_code" == "200" && "$h1_body" == *'"ok":true'* ]]; then
+    pass "H1 /api/request accepts a valid submission (200 ok:true)"
+else
+    fail "H1 /api/request valid submission" "code=$h1_code body=$h1_body"
+fi
+
+# H2: the message actually LANDED in mailpit, addressed to the configured
+# recipient (OTHALA_CONTACT_RECIPIENT). Query mailpit's HTTP API from othala.
+# Match on the unique marker in the subject/snippet so we don't race other mail.
+RECIP="${OTHALA_CONTACT_RECIPIENT:-ops@othala.test}"
+h2=$(printf '%s' "fetch('http://mailpit:8025/api/v1/messages').then(r=>r.json()).then(d=>{const m=(d.messages||[]).find(x=>(x.Subject||'').includes('access')&&(x.To||[]).some(t=>t.Address==='${RECIP}'));process.stdout.write(m?'FOUND':'NONE:'+JSON.stringify((d.messages||[]).map(x=>({s:x.Subject,to:x.To}))));process.exit(0)}).catch(e=>{process.stdout.write('ERR:'+e.message);process.exit(1)})" | node_in othala)
+if [[ "$h2" == "FOUND" ]]; then
+    pass "H2 contact mail delivered to mailpit, addressed to $RECIP (shared courier SMTP works)"
+else
+    fail "H2 contact mail not in catcher" "got=$h2 recipient=$RECIP"
+fi
+
+# H3: validation rejects an empty/short submission with 400 (no mail sent).
+h3=$(printf '%s' "fetch('http://localhost:8080/api/request',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({name:'',type:'access',message:''})}).then(r=>{process.stdout.write(String(r.status));process.exit(0)}).catch(()=>{process.stdout.write('0');process.exit(1)})" | node_in othala)
+if [[ "$h3" == "400" ]]; then
+    pass "H3 /api/request rejects an invalid submission (400, fail-closed validation)"
+else
+    fail "H3 /api/request validation" "code=$h3 want=400"
+fi
+
+# H4: an unknown request type is rejected (400) — the type allowlist holds.
+h4=$(printf '%s' "fetch('http://localhost:8080/api/request',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({name:'X',type:'evil',message:'a valid length message'})}).then(r=>{process.stdout.write(String(r.status));process.exit(0)}).catch(()=>{process.stdout.write('0');process.exit(1)})" | node_in othala)
+if [[ "$h4" == "400" ]]; then
+    pass "H4 /api/request rejects an unknown request type (400, allowlist)"
+else
+    fail "H4 /api/request type allowlist" "code=$h4 want=400"
+fi
+
 # ----- Summary -----
 echo ""
 TOTAL=$((PASS + FAIL))
@@ -488,7 +538,7 @@ else
     docker compose ps 2>&1 || true
     echo ""
     echo "=== container logs (last 60 each) ==="
-    for svc in postgres kratos hydra othala ldap-bridge; do
+    for svc in postgres kratos hydra othala ldap-bridge mailpit; do
         echo "--- lab-$svc ---"
         podman logs --tail=60 "lab-$svc" 2>&1 || true
     done
