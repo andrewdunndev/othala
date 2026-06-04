@@ -451,19 +451,24 @@ fi
 # G2: INACTIVE identity -> access-gate denies at the consent re-gate (state check).
 g2_id=$(mk_identity inactive "['family','access-grafana']" g2.inactive)
 g2=$(run_dance "$g2_id")
-if [[ "$g2" == DENIED* && "$g2" == *active* ]]; then
+# error_description is opaque ('access_denied') by design — the precise reason
+# ('identity not active') is logged server-side only and asserted in
+# oauth2-handlers.test.mjs. The e2e guard is that the inactive identity is DENIED.
+if [[ "$g2" == DENIED* && "$g2" == *access_denied* ]]; then
     pass "G2 OIDC dance DENIES an inactive identity (state gate, D3)"
 else
-    fail "G2 inactive deny" "got: $g2 (want DENIED ... not active)"
+    fail "G2 inactive deny" "got: $g2 (want DENIED ... access_denied)"
 fi
 
 # G3: active identity WITHOUT the access-grafana group -> denied at consent (group check).
 g3_id=$(mk_identity active "['family']" g3.nogroup)
 g3=$(run_dance "$g3_id")
-if [[ "$g3" == DENIED* && "$g3" == *access-grafana* ]]; then
+# Opaque error_description by design (see G2); precise reason is server-side only.
+# The e2e guard is that the no-group member is DENIED.
+if [[ "$g3" == DENIED* && "$g3" == *access_denied* ]]; then
     pass "G3 OIDC dance DENIES a member missing the access-grafana group (group gate)"
 else
-    fail "G3 no-group deny" "got: $g3 (want DENIED ... access-grafana group)"
+    fail "G3 no-group deny" "got: $g3 (want DENIED ... access_denied)"
 fi
 
 # Section H: contact / request form (public SSR /api/request -> shared SMTP).
