@@ -1,0 +1,12 @@
+# Grafana — observe.dunn.dev
+# Unified-manifest prototype (preview route only; NOT a production manifest).
+
+presentation:
+  name: Observe
+  description: Dashboards and metrics for the home lab — CPU, disk, network, and service health at a glance.
+  url: https://observe.dunn.dev
+  icon: OB
+  icon_slug: grafana
+  auth_kind: oidc
+  access_group: access-observe
+  order: 110

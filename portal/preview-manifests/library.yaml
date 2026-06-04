@@ -1,0 +1,14 @@
+# BookLore — library.dunn.dev
+# Unified-manifest prototype (preview route only; NOT a production manifest).
+
+presentation:
+  name: Library
+  description: Book collection manager — track reads, browse the family shelf, and manage ebooks.
+  url: https://library.dunn.dev
+  icon: LB
+  # booklore is not in simple-icons; using generic box fallback
+  icon_slug: ""
+  icon_fallback: box
+  auth_kind: oidc
+  access_group: access-library
+  order: 60

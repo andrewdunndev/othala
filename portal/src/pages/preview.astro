@@ -1,0 +1,791 @@
+---
+// THROWAWAY — /preview
+//
+// Prototype route for the unified-manifest tile design. Non-destructive:
+// reads only from portal/preview-manifests/, never touches the real
+// Content Collection or production pages.
+//
+// To run: cd portal && npx astro dev --port 4399
+// Then visit: http://localhost:4399/preview
+//
+// Delete this file (and portal/preview-manifests/, portal/src/lib/preview-loader.ts)
+// once the design is signed off.
+
+export const prerender = false;
+
+import Layout from '../layouts/Layout.astro';
+import { loadPreviewManifests } from '../lib/preview-loader';
+
+const tiles = loadPreviewManifests();
+
+// simple-icons CDN — monochrome brand SVGs via CSS mask-image.
+// Verified slugs (HTTP 200 on cdn.jsdelivr.net/npm/simple-icons@13/icons/):
+//   jellyfin, gitlab, vaultwarden, immich, grafana, tailscale, audiobookshelf,
+//   bitwarden, owncloud, apple, android, googlechrome, openai
+// Fallback for services not in simple-icons (mealie, navidrome, booklore, vLLM):
+//   box (mealie/library), serverfault (gather/tune), openai (infer/vLLM)
+const SI_CDN = 'https://cdn.jsdelivr.net/npm/simple-icons@13/icons/';
+
+function siUrl(slug: string): string {
+  return `${SI_CDN}${slug}.svg`;
+}
+
+// Resolve the best icon slug for a tile (primary or fallback).
+function resolvedIconSlug(p: { icon_slug?: string; icon_fallback?: string }): string | null {
+  if (p.icon_slug) return p.icon_slug;
+  if (p.icon_fallback) return p.icon_fallback;
+  return null;
+}
+
+const SITE_NAME = 'Othala';
+---
+
+<Layout title="Preview — Unified Manifest" description="Throwaway tile-grid prototype for the unified-manifest design.">
+
+  {/* ── Welcome banner ─────────────────────────────────────────────── */}
+  <section class="welcome-banner">
+    <div class="welcome-inner">
+      <div class="welcome-text">
+        <p class="welcome-eyebrow mono">family apps · {SITE_NAME}</p>
+        <h1 class="welcome-heading">Welcome to {SITE_NAME}</h1>
+        <p class="welcome-lede">
+          The family's apps, all in one place. Sign in once and everything
+          below is available to you on any device.
+        </p>
+      </div>
+      <div class="welcome-actions">
+        <button class="button button-primary" type="button" id="open-request-form">
+          Request access or suggest an app →
+        </button>
+      </div>
+    </div>
+  </section>
+
+  <section class="section">
+    <p class="section-subtitle mono">All services ({tiles.length})</p>
+
+    {/* ── Service grid — standalone .svc-grid, NOT .tile-grid ──── */}
+    <div class="svc-grid">
+      {tiles.map((t) => {
+        const iconSlug = resolvedIconSlug(t.presentation);
+        return (
+          <div class="svc-tile-wrapper">
+            {t.educationHtml ? (
+              <div
+                class="svc-tile svc-tile-btn"
+                role="button"
+                tabindex="0"
+                data-modal={`modal-${t.slug}`}
+                aria-haspopup="dialog"
+                aria-label={`Learn about ${t.presentation.name}`}
+              >
+                {/* internal / external — top left */}
+                <span class={`svc-badge mono svc-badge-${t.presentation.auth_kind === 'external' ? 'ext' : 'int'}`}>
+                  {t.presentation.auth_kind === 'external' ? '↗ external' : 'internal'}
+                </span>
+                {/* launch shortcut — top right (real link; does not open the modal) */}
+                <a
+                  class="svc-launch mono"
+                  href={t.presentation.url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  data-stop
+                  aria-label={`Launch ${t.presentation.name}`}
+                >launch ↗</a>
+
+                {/* Icon — centered, monochrome mask */}
+                <span class="svc-icon-wrap">
+                  {iconSlug ? (
+                    <span
+                      class="svc-icon"
+                      style={`-webkit-mask:url('${siUrl(iconSlug)}') center/contain no-repeat;mask:url('${siUrl(iconSlug)}') center/contain no-repeat;`}
+                      aria-hidden="true"
+                    />
+                  ) : (
+                    <span class="svc-icon-mono mono" aria-hidden="true">{t.presentation.icon}</span>
+                  )}
+                </span>
+
+                <span class="svc-name">{t.presentation.name}</span>
+                <span class="svc-fqdn mono">{t.fqdn}</span>
+                <span class="svc-desc">{t.presentation.description}</span>
+
+                {/* learn more — bottom middle (the whole-tile action) */}
+                <span class="svc-cta mono">learn more →</span>
+              </div>
+            ) : (
+              <a class="svc-tile svc-tile-link" href={t.presentation.url} target="_blank" rel="noopener noreferrer">
+                {/* internal / external — top left */}
+                <span class={`svc-badge mono svc-badge-${t.presentation.auth_kind === 'external' ? 'ext' : 'int'}`}>
+                  {t.presentation.auth_kind === 'external' ? '↗ external' : 'internal'}
+                </span>
+
+                {/* Icon — centered, monochrome mask */}
+                <span class="svc-icon-wrap">
+                  {iconSlug ? (
+                    <span
+                      class="svc-icon"
+                      style={`-webkit-mask:url('${siUrl(iconSlug)}') center/contain no-repeat;mask:url('${siUrl(iconSlug)}') center/contain no-repeat;`}
+                      aria-hidden="true"
+                    />
+                  ) : (
+                    <span class="svc-icon-mono mono" aria-hidden="true">{t.presentation.icon}</span>
+                  )}
+                </span>
+
+                <span class="svc-name">{t.presentation.name}</span>
+                <span class="svc-fqdn mono">{t.fqdn}</span>
+                <span class="svc-desc">{t.presentation.description}</span>
+
+                {/* launch — bottom middle (the whole tile launches) */}
+                <span class="svc-cta mono">launch ↗</span>
+              </a>
+            )}
+          </div>
+        );
+      })}
+    </div>
+  </section>
+
+  {/* ── Per-tile education modals ──────────────────────────────────── */}
+  {tiles.filter((t) => t.educationHtml).map((t) => {
+    const iconSlug = resolvedIconSlug(t.presentation);
+    return (
+      <dialog class="svc-modal" id={`modal-${t.slug}`}>
+        <div class="svc-modal-inner">
+          <header class="svc-modal-header">
+            <span class="svc-modal-icon-wrap">
+              {iconSlug ? (
+                <span
+                  class="svc-modal-icon"
+                  style={`-webkit-mask:url('${siUrl(iconSlug)}') center/contain no-repeat;mask:url('${siUrl(iconSlug)}') center/contain no-repeat;`}
+                  aria-hidden="true"
+                />
+              ) : (
+                <span class="svc-modal-icon-mono mono" aria-hidden="true">{t.presentation.icon}</span>
+              )}
+            </span>
+            <div class="svc-modal-meta">
+              <h2 class="svc-modal-name">{t.presentation.name}</h2>
+              <p class="svc-modal-fqdn mono">{t.fqdn}</p>
+              <p class="svc-modal-desc">{t.presentation.description}</p>
+            </div>
+            <button class="svc-modal-close mono" type="button" data-close aria-label="Close">✕</button>
+          </header>
+
+          <div class="svc-modal-body edu-prose" set:html={t.educationHtml} />
+
+          <footer class="svc-modal-footer">
+            <a
+              class="button button-primary"
+              href={t.presentation.url}
+              target="_blank"
+              rel="noopener noreferrer"
+            >
+              Launch ↗
+            </a>
+            {t.presentation.auth_kind === 'external' && (
+              <span class="svc-modal-ext-note mono">external service — separate account</span>
+            )}
+          </footer>
+        </div>
+      </dialog>
+    );
+  })}
+
+  {/* ── Request form dialog ────────────────────────────────────────── */}
+  {/*
+    UI mockup only — no backend wiring.
+    Real delivery will use the existing Othala SMTP courier (follow-on task).
+  */}
+  <dialog class="svc-modal request-modal" id="request-modal">
+    <div class="svc-modal-inner">
+      <header class="svc-modal-header request-modal-header">
+        <div class="svc-modal-meta">
+          <h2 class="svc-modal-name">Get in touch</h2>
+          <p class="svc-modal-desc">Request access, suggest a new app, or report a problem.</p>
+        </div>
+        <button class="svc-modal-close mono" type="button" data-close-request aria-label="Close">✕</button>
+      </header>
+
+      <div class="svc-modal-body request-body">
+        <form class="request-form" id="request-form" novalidate>
+          <label class="form-field">
+            <span class="form-label">Your name</span>
+            <input class="form-input" type="text" name="name" autocomplete="name" required placeholder="e.g. Ashley" />
+          </label>
+
+          <label class="form-field">
+            <span class="form-label">Request type</span>
+            <select class="form-select" name="type" required>
+              <option value="">— choose one —</option>
+              <option value="access">Access to an app</option>
+              <option value="new">New app idea</option>
+              <option value="problem">Problem / something broken</option>
+              <option value="other">Other</option>
+            </select>
+          </label>
+
+          <label class="form-field">
+            <span class="form-label">Message</span>
+            <textarea class="form-textarea" name="message" rows="5" required placeholder="What do you need?"></textarea>
+          </label>
+
+          <div class="form-actions">
+            <button class="button button-primary" type="submit">Send request</button>
+          </div>
+        </form>
+
+        <div class="request-thanks" id="request-thanks" hidden>
+          <p class="request-thanks-msg">
+            Thanks — sent to the admin.
+          </p>
+          <p class="mono request-thanks-note">
+            (Real delivery via SMTP — wiring is a follow-on task.)
+          </p>
+        </div>
+      </div>
+    </div>
+  </dialog>
+
+</Layout>
+
+<script is:inline>
+  // ── Dialog open/close ──────────────────────────────────────────────
+
+  // Open service-tile modals
+  document.querySelectorAll('[data-modal]').forEach(function(tile) {
+    function open() {
+      var dialog = document.getElementById(tile.getAttribute('data-modal'));
+      if (dialog) dialog.showModal();
+    }
+    tile.addEventListener('click', open);
+    // role="button" tiles activate on Enter / Space
+    tile.addEventListener('keydown', function(e) {
+      if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); open(); }
+    });
+  });
+
+  // A launch shortcut sits inside the clickable tile; its click must not
+  // bubble up and also open the modal.
+  document.querySelectorAll('[data-stop]').forEach(function(el) {
+    el.addEventListener('click', function(e) { e.stopPropagation(); });
+  });
+
+  // Close service modals on backdrop click or [data-close]
+  document.querySelectorAll('.svc-modal:not(.request-modal)').forEach(function(dialog) {
+    dialog.querySelectorAll('[data-close]').forEach(function(closeBtn) {
+      closeBtn.addEventListener('click', function() { dialog.close(); });
+    });
+    dialog.addEventListener('click', function(e) {
+      if (e.target === dialog) dialog.close();
+    });
+  });
+
+  // ── Request form ───────────────────────────────────────────────────
+
+  var requestModal = document.getElementById('request-modal');
+  var openBtn = document.getElementById('open-request-form');
+
+  if (openBtn && requestModal) {
+    openBtn.addEventListener('click', function() { requestModal.showModal(); });
+  }
+
+  if (requestModal) {
+    requestModal.querySelectorAll('[data-close-request]').forEach(function(btn) {
+      btn.addEventListener('click', function() { requestModal.close(); });
+    });
+    requestModal.addEventListener('click', function(e) {
+      if (e.target === requestModal) requestModal.close();
+    });
+  }
+
+  var requestForm = document.getElementById('request-form');
+  var requestThanks = document.getElementById('request-thanks');
+  if (requestForm && requestThanks) {
+    requestForm.addEventListener('submit', function(e) {
+      e.preventDefault();
+      requestForm.hidden = true;
+      requestThanks.hidden = false;
+      // Auto-close after 3 s so the user isn't stuck.
+      setTimeout(function() {
+        if (requestModal) requestModal.close();
+        // Reset for next open
+        setTimeout(function() {
+          requestForm.hidden = false;
+          requestThanks.hidden = true;
+          requestForm.reset();
+        }, 300);
+      }, 3000);
+    });
+  }
+</script>
+
+<style>
+  /* ══════════════════════════════════════════════════════════════════
+     Welcome banner
+  ══════════════════════════════════════════════════════════════════ */
+  .welcome-banner {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: var(--space-6) var(--space-6);
+    margin-bottom: var(--space-6);
+  }
+  .welcome-inner {
+    display: flex;
+    align-items: flex-end;
+    justify-content: space-between;
+    gap: var(--space-5);
+    flex-wrap: wrap;
+  }
+  .welcome-eyebrow {
+    font-size: var(--text-xs);
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    color: var(--text-muted);
+    margin-bottom: var(--space-2);
+  }
+  .welcome-heading {
+    font-family: var(--font-display, var(--font-mono));
+    font-size: var(--text-2xl);
+    font-weight: 700;
+    color: var(--text);
+    margin-bottom: var(--space-3);
+    line-height: 1.15;
+  }
+  .welcome-lede {
+    font-size: var(--text-base);
+    color: var(--text-2);
+    line-height: 1.6;
+    max-width: 52ch;
+    margin: 0;
+  }
+  .welcome-actions {
+    flex-shrink: 0;
+  }
+
+  /* ══════════════════════════════════════════════════════════════════
+     Service grid — standalone .svc-grid, NOT .tile-grid.
+     Forces 3 columns; does NOT inherit any global grid overrides.
+  ══════════════════════════════════════════════════════════════════ */
+  .svc-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: var(--space-5);
+  }
+  @media (max-width: 900px) {
+    .svc-grid { grid-template-columns: repeat(2, 1fr); }
+  }
+  @media (max-width: 560px) {
+    .svc-grid { grid-template-columns: 1fr; }
+  }
+
+  .svc-tile-wrapper {
+    display: contents;
+  }
+
+  /* ── Shared tile card ──────────────────────────────────────────── */
+  .svc-tile-btn,
+  .svc-tile-link {
+    position: relative;          /* anchor for the corner badge + launch shortcut */
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;    /* left-align tile content */
+    gap: var(--space-2);
+    padding: var(--space-7) var(--space-5) var(--space-5);
+    min-height: 260px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    color: var(--text);
+    text-decoration: none;
+    cursor: pointer;
+    width: 100%;
+    box-sizing: border-box;
+    text-align: left;
+    transition:
+      border-color var(--duration-fast) var(--ease-out),
+      background var(--duration-fast) var(--ease-out),
+      box-shadow var(--duration-fast) var(--ease-out);
+  }
+  /* .svc-tile-btn is a <div role="button"> — the shared rule above fully
+     styles it; no UA reset needed. */
+  .svc-tile-btn:hover,
+  .svc-tile-link:hover {
+    border-color: var(--accent);
+    background: var(--accent-subtle, #f0f4ef);
+    color: var(--text);
+    box-shadow: 0 1px 3px rgba(10, 10, 10, 0.06);
+  }
+  .svc-tile-btn:focus-visible,
+  .svc-tile-link:focus-visible {
+    outline: 2px solid var(--input-focus, var(--accent));
+    outline-offset: 2px;
+  }
+
+  /* ── Monochrome icon (simple-icons via CSS mask) ─────────────── */
+  .svc-icon-wrap {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 52px;
+    height: 52px;
+    margin-bottom: var(--space-3);
+    flex-shrink: 0;
+    align-self: center;   /* logo centered; tile text stays left-aligned */
+  }
+  .svc-icon {
+    display: block;
+    width: 44px;
+    height: 44px;
+    background-color: var(--text-2, #404040);
+    /* mask-image set inline via style attribute */
+    flex-shrink: 0;
+  }
+  .svc-tile-btn:hover .svc-icon,
+  .svc-tile-link:hover .svc-icon {
+    background-color: var(--accent, #4a6741);
+  }
+  /* Text monogram fallback when no simple-icons slug resolves */
+  .svc-icon-mono {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 44px;
+    height: 44px;
+    font-size: var(--text-base);
+    font-weight: 700;
+    color: var(--accent);
+    letter-spacing: 0.06em;
+    background: var(--accent-subtle, #f0f4ef);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+  }
+
+  /* ── Tile text ───────────────────────────────────────────────── */
+  .svc-name {
+    font-size: var(--text-lg);
+    font-weight: 700;
+    color: var(--text);
+    line-height: 1.2;
+  }
+  .svc-fqdn {
+    font-family: var(--font-mono);
+    font-size: var(--text-xs);
+    color: var(--text-muted);
+    letter-spacing: 0.03em;
+  }
+  .svc-desc {
+    font-size: var(--text-sm);
+    color: var(--text-2);
+    line-height: 1.5;
+    flex: 1;
+    max-width: 28ch;
+  }
+
+  /* ── Corners: internal/external label (TL) + launch shortcut (TR) ─ */
+  .svc-badge {
+    position: absolute;
+    top: var(--space-4);
+    left: var(--space-5);
+    font-size: var(--text-xs);
+    letter-spacing: 0.06em;
+    color: var(--text-muted);
+    pointer-events: none;       /* a label, not a control */
+  }
+  .svc-launch {
+    position: absolute;
+    top: var(--space-4);
+    right: var(--space-5);
+    z-index: 1;
+    font-size: var(--text-xs);
+    letter-spacing: 0.04em;
+    color: var(--text-muted);
+    text-decoration: none;
+  }
+  .svc-launch:hover {
+    color: var(--accent);
+    text-decoration: underline;
+  }
+  /* ── Bottom-middle CTA (learn more / launch) ──────────────────── */
+  .svc-cta {
+    width: 100%;
+    margin-top: auto;
+    padding-top: var(--space-3);
+    text-align: center;
+    font-size: var(--text-xs);
+    color: var(--text-muted);
+  }
+  .svc-tile-btn:hover .svc-cta,
+  .svc-tile-link:hover .svc-cta { color: var(--accent); }
+
+  /* ══════════════════════════════════════════════════════════════════
+     Service modal — explicit centered position, bypasses global styles.
+  ══════════════════════════════════════════════════════════════════ */
+  .svc-modal {
+    /* Explicit centering — does not rely on inset:0+margin:auto
+     * because some global dialog rules override that pattern.     */
+    position: fixed;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    margin: 0;
+    /* Sizing */
+    max-width: min(640px, 92vw);
+    max-height: 85vh;
+    width: 100%;
+    overflow: auto;
+    /* Surface */
+    background: var(--bg, #ffffff);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    color: var(--text);
+    padding: 0;
+    box-shadow: 0 8px 32px rgba(0,0,0,0.22);
+  }
+  .svc-modal::backdrop {
+    background: rgba(0, 0, 0, 0.55);
+    backdrop-filter: blur(3px);
+  }
+  .svc-modal-inner {
+    display: flex;
+    flex-direction: column;
+  }
+
+  /* Modal header */
+  .svc-modal-header {
+    display: grid;
+    grid-template-columns: 3rem 1fr auto;
+    gap: var(--space-3) var(--space-4);
+    align-items: start;
+    padding: var(--space-5) var(--space-5) var(--space-4);
+    border-bottom: 1px solid var(--border);
+  }
+  .svc-modal-icon-wrap {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 40px;
+    height: 40px;
+    margin-top: 2px;
+  }
+  .svc-modal-icon {
+    display: block;
+    width: 36px;
+    height: 36px;
+    background-color: var(--text-2, #404040);
+    /* mask set inline */
+  }
+  .svc-modal-icon-mono {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 36px;
+    height: 36px;
+    font-size: var(--text-lg);
+    color: var(--accent);
+    letter-spacing: 0.06em;
+  }
+  .svc-modal-meta { }
+  .svc-modal-name {
+    font-family: var(--font-mono);
+    font-size: var(--text-xl);
+    font-weight: 700;
+    color: var(--text);
+    line-height: 1.2;
+    margin: 0 0 var(--space-1);
+  }
+  .svc-modal-fqdn {
+    font-family: var(--font-mono);
+    font-size: var(--text-xs);
+    color: var(--text-muted);
+    letter-spacing: 0.03em;
+    margin: 0 0 var(--space-1);
+  }
+  .svc-modal-desc {
+    font-size: var(--text-sm);
+    color: var(--text-2);
+    line-height: 1.4;
+    margin: 0;
+  }
+  .svc-modal-close {
+    all: unset;
+    cursor: pointer;
+    font-size: var(--text-base);
+    color: var(--text-muted);
+    padding: var(--space-1) var(--space-2);
+    border-radius: var(--radius-sm);
+    line-height: 1;
+    transition: color var(--duration-fast) var(--ease-out);
+  }
+  .svc-modal-close:hover { color: var(--text); }
+  .svc-modal-close:focus-visible {
+    outline: 2px solid var(--input-focus, var(--accent));
+    outline-offset: 2px;
+  }
+
+  /* Modal body */
+  .svc-modal-body {
+    overflow-y: auto;
+    padding: var(--space-5) var(--space-6);
+    flex: 1;
+  }
+
+  /* Modal footer */
+  .svc-modal-footer {
+    display: flex;
+    align-items: center;
+    gap: var(--space-4);
+    padding: var(--space-4) var(--space-5);
+    border-top: 1px solid var(--border);
+  }
+  .svc-modal-ext-note {
+    font-size: var(--text-xs);
+    color: var(--text-muted);
+    letter-spacing: 0.05em;
+  }
+
+  /* ══════════════════════════════════════════════════════════════════
+     Education prose — rendered markdown inside modals.
+  ══════════════════════════════════════════════════════════════════ */
+  .edu-prose {
+    line-height: 1.65;
+    font-size: var(--text-base);
+    color: var(--text);
+    max-width: 62ch;
+    margin: 0 auto;
+  }
+  .edu-prose h2 {
+    font-family: var(--font-mono);
+    font-size: var(--text-lg);
+    font-weight: 600;
+    color: var(--text);
+    margin: var(--space-6) 0 var(--space-3);
+    padding-bottom: var(--space-1);
+    border-bottom: 1px solid var(--border);
+  }
+  .edu-prose h3 {
+    font-family: var(--font-mono);
+    font-size: var(--text-base);
+    font-weight: 600;
+    color: var(--text);
+    margin: var(--space-5) 0 var(--space-2);
+  }
+  .edu-prose p {
+    margin: 0 0 var(--space-4);
+    color: var(--text-2);
+  }
+  .edu-prose p:last-child { margin-bottom: 0; }
+  .edu-prose a {
+    color: var(--accent, #4a6741);
+    text-decoration: underline;
+    text-underline-offset: 2px;
+  }
+  .edu-prose a:hover { opacity: 0.8; }
+  .edu-prose strong { font-weight: 600; color: var(--text); }
+  .edu-prose em { font-style: italic; }
+  .edu-prose code {
+    font-family: var(--font-mono);
+    font-size: 0.875em;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    padding: 0.15em 0.4em;
+  }
+  .edu-prose ol,
+  .edu-prose ul {
+    margin: var(--space-2) 0 var(--space-4) var(--space-5);
+    line-height: 1.65;
+  }
+  .edu-prose li { margin-bottom: var(--space-2); color: var(--text-2); }
+  .edu-prose li:last-child { margin-bottom: 0; }
+  .edu-prose li strong { color: var(--text); }
+
+  /* cat-explainer diagram blocks (inline SVG pattern) */
+  .edu-prose :global(.cat-explainer) {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: var(--space-4);
+    margin: var(--space-5) 0;
+    overflow-x: auto;
+  }
+  .edu-prose :global(.cat-explainer svg) {
+    display: block;
+    width: 100%;
+    max-width: 100%;
+    height: auto;
+  }
+  .edu-prose :global(.cat-explainer p) {
+    margin: var(--space-3) 0 0;
+    font-size: var(--text-sm);
+    color: var(--text-2);
+  }
+
+  /* ══════════════════════════════════════════════════════════════════
+     Request form modal
+  ══════════════════════════════════════════════════════════════════ */
+  .request-modal-header {
+    grid-template-columns: 1fr auto;  /* no icon column */
+  }
+  .request-body {
+    padding: var(--space-5) var(--space-6);
+  }
+  .request-form {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-4);
+  }
+  .form-field {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-2);
+  }
+  .form-label {
+    font-size: var(--text-sm);
+    font-weight: 600;
+    color: var(--text);
+  }
+  .form-input,
+  .form-select,
+  .form-textarea {
+    font-family: var(--font-sans, var(--font-display, 'IBM Plex Sans', sans-serif));
+    font-size: var(--text-base);
+    color: var(--text);
+    background: var(--bg, #ffffff);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    padding: var(--space-2) var(--space-3);
+    width: 100%;
+    box-sizing: border-box;
+    transition: border-color var(--duration-fast) var(--ease-out);
+  }
+  .form-input:focus,
+  .form-select:focus,
+  .form-textarea:focus {
+    outline: 2px solid var(--input-focus, var(--accent));
+    outline-offset: 1px;
+    border-color: var(--accent);
+  }
+  .form-textarea { resize: vertical; }
+  .form-actions {
+    display: flex;
+    justify-content: flex-end;
+    padding-top: var(--space-2);
+  }
+  .request-thanks {
+    text-align: center;
+    padding: var(--space-6) 0;
+  }
+  .request-thanks-msg {
+    font-size: var(--text-lg);
+    font-weight: 600;
+    color: var(--accent);
+    margin-bottom: var(--space-2);
+  }
+  .request-thanks-note {
+    font-size: var(--text-xs);
+    color: var(--text-muted);
+  }
+</style>

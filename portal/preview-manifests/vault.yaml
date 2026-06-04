@@ -1,0 +1,13 @@
+# oCIS — vault.dunn.dev
+# Unified-manifest prototype (preview route only; NOT a production manifest).
+
+presentation:
+  name: Vault
+  description: Self-hosted cloud storage for the family — files, photos, and documents in one place.
+  url: https://vault.dunn.dev
+  icon: VT
+  # oCIS is not in simple-icons; using owncloud (the upstream project) as the closest match
+  icon_slug: owncloud
+  auth_kind: oidc
+  access_group: access-vault
+  order: 70

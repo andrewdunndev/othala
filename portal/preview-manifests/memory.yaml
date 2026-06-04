@@ -1,0 +1,33 @@
+# Immich — memory.dunn.dev
+# Unified-manifest prototype (preview route only; NOT a production manifest).
+# Shape: presentation: + oidc: (from hydra/clients/memory.yaml)
+
+presentation:
+  name: Memory
+  description: "Family photo + video library with sharing, AI search, and timeline."
+  url: https://memory.dunn.dev
+  icon: PH
+  icon_slug: immich
+  auth_kind: oidc
+  access_group: access-memory
+  order: 20
+
+oidc:
+  client_id: memory
+  client_name: Immich
+  grant_types:
+    - authorization_code
+    - refresh_token
+  response_types:
+    - code
+  scope: openid email profile groups offline_access
+  redirect_uris:
+    - https://memory.dunn.dev/auth/login
+    - app.immich:/
+  post_logout_redirect_uris:
+    - https://memory.dunn.dev/
+  token_endpoint_auth_method: client_secret_basic
+  audience:
+    - https://memory.dunn.dev
+  skip_consent: true
+  backchannel_logout_uri: https://memory.dunn.dev/api/oauth/logout

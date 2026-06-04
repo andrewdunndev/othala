@@ -1,0 +1,14 @@
+# Infer — infer.dunn.dev (vLLM backend)
+# Unified-manifest prototype (preview route only; NOT a production manifest).
+# RENAMED from llm → infer (function-first naming, matching estate convention).
+
+presentation:
+  name: Infer
+  description: On-premise AI inference — run large language models locally, no data leaves the house.
+  url: https://infer.dunn.dev
+  icon: AI
+  # vLLM is not in simple-icons; using openai as nearest visual analogue
+  icon_slug: openai
+  auth_kind: oidc
+  access_group: access-infer
+  order: 140
