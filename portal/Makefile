@@ -12,7 +12,7 @@ help:
 	@echo "  dev        run astro dev on :4321 (point KRATOS_PUBLIC_URL at lab)"
 	@echo "  build      astro build (dist/server + dist/client)"
 	@echo "  check      astro check (type-check)"
-	@echo "  test       node --test on scripts/*.test.mjs (CSRF, webfinger)"
+	@echo "  test       node --test on scripts/*.test.mjs"
 	@echo "  image      podman build -t $(IMAGE):$(TAG)"
 	@echo "  start      node ./dist/server/listen.mjs (D-listener; after build)"
 	@echo "  clean      rm dist/ + .astro/"

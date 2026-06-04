@@ -65,7 +65,7 @@ runbook didn't account for it" bugs.
    # docs/golden-path.md "Substrate secret collapse" entry.
    ```
 
-   Lab (`lab/.env`):
+   E2E harness (`e2e/.env`):
 
    ```diff
    -KRATOS_COOKIE_SECRET_PREVIOUS=
@@ -128,6 +128,6 @@ honored until its own expiry.
 ## Related
 
 - `kratos/kratos.yml`, `hydra/hydra.yml`: the env-var indirection.
-- `lab/scripts/gen-secrets.sh`: produces fresh `_CURRENT` AND fresh
+- `e2e/gen-secrets.sh`: produces fresh `_CURRENT` AND fresh
   `_PREVIOUS` (distinct values) for first provisioning.
 - `docs/decision.md`: H4 "Hydra cookie-secret rotation" lock.

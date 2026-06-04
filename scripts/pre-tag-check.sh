@@ -91,7 +91,7 @@ echo ""
 
 # ----- Shell scripts: syntax + shellcheck -----
 echo "Shell syntax + lint:"
-SHELL_SCRIPTS=(e2e/*.sh apex/scripts/*.sh)
+SHELL_SCRIPTS=(e2e/*.sh)
 SYNTAX_BAD=0
 for s in "${SHELL_SCRIPTS[@]}"; do
     [[ -f "$s" ]] || continue

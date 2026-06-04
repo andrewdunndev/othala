@@ -507,8 +507,8 @@ requires Tailscale support per KB-1240. See
 ## Auth patterns
 
 Every family app falls into one of five patterns, fixed at deploy time per
-app via the Caddyfile snippet it imports. See `caddy/` for the canonical
-snippets.
+app via the Caddyfile snippet it imports. The production Caddy config lives
+in the `dunn.dev/iac` deploy repo under `services/dag/`.
 
 | Pattern | Apps | One-line summary |
 |---|---|---|
@@ -684,7 +684,7 @@ directive against Kratos.
 
 If lab outcomes go red, the documented fallback is kanidm (single binary;
 bus-factor and AI-ban accepted in exchange for substrate quality). The
-bench harness is reusable. Eval evidence in `lab/docs/` (historical).
+bench harness is reusable. Eval evidence is retained in git history.
 
 ## Where the code lives
 
@@ -696,7 +696,7 @@ bench harness is reusable. Eval evidence in `lab/docs/` (historical).
 | Othala app | `portal/` | Astro + TS | Tile dashboard + Kratos flows + Hydra login/consent/logout + access gate + claims + revoke + admin UI + client registrar |
 | Apps registry | `portal/src/content/apps/` | Markdown | Per-app tile metadata + education content |
 | LDAP bridge | `ldap-bridge/` | Go | glauth-kratos: LDAPS → Kratos identity backend (Jellyfin native clients) |
-| Lab compose | `lab/compose/` | YAML | Single-VM lab |
+| E2E harness | `e2e/` | Shell + YAML | QEMU-CI smoke harness (compose stack + smoke scripts + gen-secrets) |
 | CI / build | `.gitlab-ci.yml` | GitLab CI YAML | Per-service verify + container-image + sbom + release |
 
 ## Test surface and honest strengths
@@ -711,7 +711,7 @@ The substantive, real test coverage (from the CV audit):
 | Admin authz | `portal/` admin-auth tests | `OTHALA_ADMIN_SUBJECTS` as sole authz; `admin` group not consulted (LB-16) |
 | Client registrar | `portal/scripts/register-clients.test.mjs` | Field mapping, `consent:`-never-forwarded, create/update idempotency |
 | LDAP bridge unit | `ldap-bridge/kratos/*_test.go` | Bind cache, DN parse + escape (caught a real bug) |
-| Lab evidence | `lab/docs/*-evidence.md` | Live-stack validation |
+| E2E smoke evidence | `e2e/` + `docs/security-review-2026-05-04.md` | Live-stack validation |
 
 Native back-channel logout with no signing key at rest (Hydra signs) is a
 real reduction in attack surface, not a stub.

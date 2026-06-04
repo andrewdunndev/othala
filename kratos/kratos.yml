@@ -37,7 +37,7 @@ selfservice:
   # LOW-3: trailing slash is load-bearing. Kratos allowed_return_urls
   # uses a prefix match; without the slash, ${OTHALA_PUBLIC_URL} would
   # accept a prefixed evil cousin host. Every entry MUST end in `/` (or
-  # a deeper path). Same in lab/compose/kratos.lab.yml.
+  # a deeper path).
   default_browser_return_url: ${OTHALA_PUBLIC_URL}/
   allowed_return_urls:
     - ${OTHALA_PUBLIC_URL}/

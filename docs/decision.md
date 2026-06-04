@@ -38,7 +38,7 @@ After evaluating multiple IdP substrates (kanidm, Authelia, Hanko, voidauth, Poc
 
 ## Why Ory
 
-The journey here was extensive (`lab/docs/eval-*.md` has the full per-candidate evidence). Short version:
+The journey here was extensive (prior eval evidence retained in git history). Short version:
 
 - **kanidm:** AI/LLM ban in AGENTS.md (Anthropic refusal trigger), forward-auth + BYO-UI explicitly closed by maintainers, bus factor 1
 - **Authelia:** no LDAP server; lldap-as-companion is wrong-shaped (lldap as source of truth for the whole estate when its only consumer is Jellyfin)
@@ -141,7 +141,7 @@ The cost: BYO UI (we build the Astro app), 4-5 components instead of one, smalle
 
 ## Adversarial review findings folded in
 
-The full review is at `lab/docs/adversarial-review.md`. Highlights:
+The full prior adversarial review is retained in git history. Highlights:
 
 - **CRITICAL: Kratos AAL is global-or-per-flow, not per-route.** Original lock said "Caddy enforces AAL2 on /admin/*"; corrected to app-layer SSR guard.
 - **CRITICAL: glauth uses Handler interface (since v2.4), not Backend.** Original lock said "Backend, runtime .so"; corrected to "Handler, embedded plugin (compile-time)".
@@ -166,7 +166,7 @@ The full review is at `lab/docs/adversarial-review.md`. Highlights:
 auth/
 ├── docs/
 │   ├── decision.md           # this file
-│   ├── architecture.md       # production topology + per-pattern shapes
+│   ├── ARCHITECTURE.md       # production topology + load-bearing decisions
 │   ├── contribution-strategy.md
 │   └── STATUS.md             # cross-session "where we are" entry point
 ├── kratos/
@@ -178,34 +178,19 @@ auth/
 │   ├── clients/              # 11 OIDC client manifests
 │   ├── apply-clients.sh      # idempotent apply against running Hydra
 │   └── README.md
-├── consent/                  # small Go service co-located with Hydra (carmine)
-│   ├── main.go, handlers.go
-│   ├── Containerfile, Makefile, README.md
-│   └── go.mod
 ├── ldap-bridge/              # glauth-kratos custom binary
 │   ├── main.go               # imports glauth + our handler
 │   ├── kratos/               # Handler interface implementation
 │   ├── glauth.cfg
 │   ├── Containerfile, Makefile, README.md
 │   └── go.mod
-├── caddy/
-│   ├── Containerfile         # direct go build, one plugin (cloudflare-dns)
-│   ├── Makefile
-│   └── snippets/             # admin-session, oidc-app, ldap-app, forward-auth
-├── portal/                   # Astro UI on Cloudflare Workers
-│   ├── astro.config.mjs, wrangler.toml, package.json
+├── portal/                   # Astro Node SSR app (Othala app, published as othala image)
+│   ├── astro.config.mjs, package.json
 │   ├── src/
-│   │   ├── lib/{kratos,admin}.ts
-│   │   └── pages/{index,auth/*,admin/*}.astro
-│   ├── public/.well-known/webfinger
+│   │   ├── lib/{kratos,admin-api,oauth2-handlers,gate,claims,revoke,...}.ts
+│   │   └── pages/{index,auth/*,admin/*,oauth2/*}.astro
 │   └── README.md
-├── lab/
-│   ├── compose/              # Kratos+Hydra+bridge+consent+caddy+app stubs
-│   ├── scripts/              # gcp.sh, deploy.sh, smoke.sh
-│   ├── tests/                # Playwright suite (port from bench-sso-iac)
-│   └── docs/                 # eval-*.md, feasibility-q*.md, adversarial-review.md
-└── upstream/
-    └── firstyear-walk/       # historical kanidm rejection evidence
+└── e2e/                      # QEMU-CI smoke harness (compose + scripts + gen-secrets)
 ```
 
 ## Family UX
@@ -232,4 +217,4 @@ The bounce happens in ~1-2 seconds. Standard SSO bounce; brief dag.dunn.dev URL 
 
 ## Reversibility
 
-If lab outcomes are red on the load-bearing parts (LDAP bridge BIND mechanism, Astro+Kratos cross-subdomain, Hydra `skip_consent` semantics), the documented fallback is **kanidm** (single binary, opinionated-secure, but bus-factor and AI-ban tradeoffs accepted in exchange for substrate quality). Bench harness is reusable for either substrate. Eval evidence is durable in `lab/docs/`.
+If lab outcomes are red on the load-bearing parts (LDAP bridge BIND mechanism, Astro+Kratos cross-subdomain, Hydra `skip_consent` semantics), the documented fallback is **kanidm** (single binary, opinionated-secure, but bus-factor and AI-ban tradeoffs accepted in exchange for substrate quality). Bench harness is reusable for either substrate. Eval evidence is retained in git history.

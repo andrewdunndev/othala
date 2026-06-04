@@ -411,10 +411,10 @@ Concretely, mapped to files in this repo:
 
 | Current artifact | Replaced by |
 |---|---|
-| `caddy/snippets/forward-auth.caddy` (Kratos whoami forward_auth + redirect) | `cookie_session` authenticator + `redirect` error handler |
-| `caddy/snippets/admin-session.caddy` (whoami forward_auth, app-layer AAL2) | `cookie_session` + `remote_json` authorizer enforcing AAL2 server-side |
+| Caddy forward-auth snippet (Kratos whoami forward_auth + redirect; production config in `dunn.dev/iac`) | `cookie_session` authenticator + `redirect` error handler |
+| Caddy admin-session snippet (whoami forward_auth, app-layer AAL2; production config in `dunn.dev/iac`) | `cookie_session` + `remote_json` authorizer enforcing AAL2 server-side |
 | Hand-rolled bearer compare for vLLM in Caddy | `id_token` mutator (Oathkeeper-signed JWT) **or** `oauth2_introspection` if vLLM accepts Hydra tokens |
-| Consent service `/admin/revoke-user` bearer auth (security review MEDIUM-1) | `oauth2_introspection` against Hydra + `remote_json` against a "is admin" check |
+| Othala app `/admin/revoke-user` bearer auth (security review MEDIUM-1) | `oauth2_introspection` against Hydra + `remote_json` against a "is admin" check |
 | Per-app `consent.role_map` claim emission in Hydra | **Not replaced.** This is Hydra consent territory, not Oathkeeper. |
 
 Important: Oathkeeper does **not** replace the `consent:` block claim
@@ -508,8 +508,8 @@ admin-mux protections.
 
 ### 10. Migration cost (today)
 
-Reading our current Caddyfile snippets and `lab/compose/Caddyfile`, the
-lift looks like:
+Reading the production Caddyfile (in `dunn.dev/iac/services/dag/`) and the
+e2e harness Caddyfile (`e2e/caddy.Caddyfile`), the lift looks like:
 
 1. Add `oathkeeper.container` Quadlet to the auth pod (~30 min).
 2. Author `oathkeeper.yml` + initial `rules.yml` (~half a day for the
@@ -521,9 +521,9 @@ lift looks like:
    `oathkeeper:4455` and let Oathkeeper proxy to upstream (proxy mode).
    Decision-API mode is the lower-risk migration; proxy mode is
    cleaner but moves all reverse_proxy logic into rules.yml.
-5. Update `caddy/snippets/forward-auth.caddy` and
-   `caddy/snippets/admin-session.caddy` to call Oathkeeper instead of
-   Kratos directly.
+5. Update the Caddy forward-auth and admin-session snippets in the
+   `dunn.dev/iac` deploy repo to call Oathkeeper instead of Kratos
+   directly.
 6. Cut over apps one at a time, validate, rinse, repeat. Each app: ~1h
    end-to-end.
 7. Update runbooks (`docs/runbooks/`) for rule deploy, JWKS rotation,

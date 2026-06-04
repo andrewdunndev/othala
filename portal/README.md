@@ -11,7 +11,6 @@ Phase 3 minimum-viable pass:
 - Settings (`/auth/settings`) — profile, passkey enrollment, password change, sign out
 - Recovery (`/auth/recovery`) — code strategy, two-phase
 - Logout (`/auth/logout`) — fetches the logout token, redirects through Kratos
-- WebFinger (`/.well-known/webfinger`) — Tailscale custom-OIDC discovery endpoint
 - Verification + admin pages are stubs (deferred follow-up)
 
 Build passes (`npm run build`). Type-check passes (`npm run check`). Container builds (`make image`).
@@ -20,7 +19,7 @@ Build passes (`npm run build`). Type-check passes (`npm run check`). Container b
 
 adversarial-review-2 C1: the admin UI on Workers had no path to Kratos's admin port (`kratos:4434`) because that hostname resolves only inside the SSO pod network. Moving the portal to the same pod collapses the runtime complexity: one Node process, normal `process.env`, in-pod fetch to Kratos+Hydra admin ports, no Workers shims.
 
-Cloudflare's role shrinks to DNS hosting + DNS-01 ACME. The previous WebFinger static-file path also moved into a real Astro endpoint so headers (`Content-Type: application/jrd+json`) and byte-matching with Hydra's issuer are explicit (H6/H7).
+Cloudflare's role shrinks to DNS hosting + DNS-01 ACME. WebFinger lives at the dunn.dev apex (a Cloudflare Pages function in the dunn.dev apex repo), not here — Tailscale requires WebFinger at the email-domain apex, not the IdP subdomain.
 
 ## Architecture
 
@@ -58,14 +57,12 @@ portal/
 │   │   └── tokens/         # mirror of dunn.dev/design/tokens/
 │   └── pages/
 │       ├── index.astro     # three-state landing/launcher
-│       ├── .well-known/
-│       │   └── webfinger.ts # JRD JSON for Tailscale custom-OIDC discovery
 │       ├── auth/
 │       │   ├── login.astro       # Kratos login flow
 │       │   ├── recovery.astro    # Kratos recovery (code strategy)
 │       │   ├── settings.astro    # Kratos settings (passkeys, password, profile)
 │       │   ├── verification.astro
-│       │   └── consent.astro     # Hydra consent (forwards to consent service on the SSO host)
+│       │   └── consent.astro     # Hydra consent — in-process grant screen
 │       └── admin/
 │           ├── index.astro
 │           ├── users.astro
@@ -89,7 +86,7 @@ portal/
 | Identity traits: `username, email, displayName?, recoveryEmail?` | `Identity.traits` type; surfaced in settings profile section |
 | `metadata_admin.groups[]` controls tile visibility | `index.astro` filters `TILES` by group membership |
 | AAL2 only for admin pages | `admin.ts:requireAdminSession`; not enforced on family pages |
-| WebFinger href byte-matches Hydra issuer | `webfinger.ts` returns the issuer from `OTHALA_PUBLIC_URL`; must byte-match `hydra/hydra.yml` `urls.self.issuer` |
+| WebFinger lives at dunn.dev apex, not here | Cloudflare Pages function in dunn.dev apex repo; Tailscale requires WebFinger at the email-domain apex (see `ARCHITECTURE.md` LB-10) |
 
 ## Dev workflow
 
@@ -114,7 +111,7 @@ Astro 6 dropped the `'hybrid'` output mode. We use `output: 'server'` (every pag
 
 1. Reads the Kratos session via whoami
 2. Returns redirect to `/auth/login` if no session
-3. Returns redirect to `/auth/error?reason=not-admin` if not in admin group
+3. Returns redirect to `/auth/error?reason=not-admin` if not in the `OTHALA_ADMIN_SUBJECTS` allowlist (the `admin` group is display-only)
 4. Returns redirect to Kratos refresh-login with `?aal=aal2` if session is below aal2
 5. Returns the validated session otherwise
 
@@ -172,6 +169,5 @@ cp ../../design/tokens/index.css      src/styles/tokens/index.css
 | `/auth/settings` | `GET /self-service/settings/flows?id=`, `GET /self-service/logout/browser` | — | requires session |
 | `/auth/verification` | (stub) | — | follow-up |
 | `/auth/logout` | `GET /self-service/logout/browser` | — | redirects to logout_url |
-| `/auth/consent` | — | redirect to `<othala-host>/consent` | consent service auto-accepts |
+| `/auth/consent` | — | `GET/PUT /admin/oauth2/auth/requests/consent` (in-pod `hydra:4445`) | in-process grant screen (`portal/src/pages/auth/consent.astro`) |
 | `/admin/*` | `GET /sessions/whoami`, admin API via `requireAdminSession` (in-pod `kratos:4434`) | `GET /admin/clients` (read-only, in-pod `hydra:4445`) | |
-| `/.well-known/webfinger` | — | — | JRD JSON, byte-matches Hydra issuer for Tailscale |

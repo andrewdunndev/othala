@@ -16,7 +16,7 @@ One converged application, not a fleet of services:
 - **The Ory substrate** (Kratos + Hydra + Postgres). Kratos owns identity (login, recovery, settings, passkeys). Hydra owns OAuth2/OIDC. Single-source-of-truth identity in Kratos; LDAP and OIDC are presentation layers downstream.
 - **The LDAP bridge** (`ldap-bridge/`, Go). A custom glauth binary with a Kratos backend that presents identities over LDAPS for the non-OAuth clients (Jellyfin's plugin, Apple TV / Infuse SSO). Stays Go: it is a protocol adapter, not part of the web app.
 
-The OSS project is **Othala**; the GitLab project is `dunn.dev/othala`. Go modules are `dunn.dev/othala/{consent,ldap-bridge}`; the app package is `@dunn.dev/othala-portal`; images publish under `registry.gitlab.com/dunn.dev/othala/*`.
+The OSS project is **Othala**; the GitLab project is `dunn.dev/othala`. The Go module is `dunn.dev/othala/ldap-bridge`; the app package is `@dunn.dev/othala-portal`; images publish under `registry.gitlab.com/dunn.dev/othala/*`.
 
 ## Relationship to dunn.dev/iac
 
@@ -43,9 +43,7 @@ This README asserts no version. It is the front door.
 | `hydra/` | Hydra server config + OIDC client manifests |
 | `portal/` | The Othala application (Astro Node SSR + TS): Kratos self-service flows, Hydra login/consent/logout challenge handlers, the access gate, claims builder, revoke fan-out, dual-listener admin endpoints, and the OIDC client registrar. Publishes as the `othala` image. |
 | `ldap-bridge/` | glauth-kratos: custom glauth binary linked against Kratos public + admin APIs. Stays Go: a protocol adapter for non-OAuth clients (Jellyfin / Apple TV). |
-| `caddy/` | Reusable Caddyfile snippets; the Caddy image is built in the sibling `caddy-estate` repo |
-| `lab/` | GCP-based test environment: compose stack, gen-secrets, Playwright suite, evidence docs |
-| `upstream/` | Maintainer-walk findings and contribution drafts |
+| `e2e/` | QEMU-CI smoke harness: compose stack + smoke scripts + gen-secrets. Runs on carmine via the `e2e` CI job. |
 
 ## Architecture in brief
 
@@ -107,23 +105,7 @@ Full topology, request flows, auth patterns, image-pin table, and trust boundary
 
 ## Validation
 
-Substrate, LDAP bridge, and the Othala app (flows + login/consent + admin) are lab-validated end-to-end through Playwright. Adversarial security review remediated HIGH + MEDIUM + LOW + architectural findings; fuzz harnesses caught two real bugs before merge (JWK algorithm allowlist, LDAP DN escape). The fail-closed gate, revoke fan-out, and dual-listener boundary carry substantive unit tests. Evidence in `lab/docs/`.
-
-## Lab harness
-
-GCP-based compose stack at `lab/`. Driven via `make`:
-
-```sh
-make lab-secrets   # generate compose/.env (CURRENT + PREVIOUS slots)
-make lab-up        # provision GCP VM
-make lab-dns-up    # create lab Cloudflare A records
-make lab-sync      # rsync repo to VM (auto-fires lab-deploy)
-make lab-ssh       # shell into VM for validate / security checks
-make lab-dns-down  # remove DNS records
-make lab-down      # tear down VM
-```
-
-Required env: `GCP_PROJECT`, `CF_API_TOKEN`, `CF_ZONE_ID`. Evidence lives in `lab/docs/`.
+Substrate, LDAP bridge, and the Othala app (flows + login/consent + admin) are validated end-to-end through the QEMU-CI smoke harness (`e2e/`). Adversarial security review remediated HIGH + MEDIUM + LOW + architectural findings; fuzz harnesses caught two real bugs before merge (JWK algorithm allowlist, LDAP DN escape). The fail-closed gate, revoke fan-out, and dual-listener boundary carry substantive unit tests. Evidence in `e2e/` (smoke harness) and `docs/security-review-2026-05-04.md`.
 
 ## Working conventions
 

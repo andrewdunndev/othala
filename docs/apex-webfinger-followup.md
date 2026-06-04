@@ -91,6 +91,5 @@ find it. Handler deleted in v0.2.0 alongside this follow-up.
 
 - Tailscale KB-1240: https://tailscale.com/kb/1240/sso-custom-oidc
 - RFC 7033 (WebFinger): https://datatracker.ietf.org/doc/html/rfc7033
-- `lab/docs/feasibility-q3-tailscale-hydra.md` — original feasibility doc
 - `docs/decision.md` — Tailscale WebFinger row
 - `hydra/clients/tailscale.yaml` — client manifest with header pointing here

@@ -57,7 +57,7 @@ estate use today.
 - **Patches to evaluated-but-rejected stacks (kanidm, Authelia, Hanko, voidauth, Pocket-ID, Zitadel).** Out of scope; kanidm specifically has explicit AI/LLM bans.
 - **A fork of Ory.** If Ory itself fails us, we revisit substrate, not patch-and-maintain.
 - **A standalone "Ory homelab kit" project.** The `dunn.dev/othala` repo IS the kit, but extracted only as components (the bridge first; the Astro UI is more opinionated and possibly less generally useful). We don't pre-publish the entire kit because:
-  - Maintenance treadmill killed every prior Ory homelab kit (see `lab/docs/ory-homelab-research.md`)
+  - Maintenance treadmill killed every prior Ory homelab kit (prior Ory homelab research retained in git history)
   - We dogfood on carmine; that's the structural difference vs prior solo maintainers
   - If the bridge proves valuable as a standalone, that's where the leverage is — focus there
 
