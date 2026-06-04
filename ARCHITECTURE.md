@@ -45,7 +45,7 @@ The app holds, all in one process:
 - **A dual-listener** (`portal/src/server/listen.mjs`): a public Astro SSR listener and a SEPARATE loopback / pod-only admin listener. Admin endpoints live off the public mux by construction. See LB-14.
 - **The revoke fan-out** (`portal/src/lib/revoke.ts`, `revokeSubject`): in-process, wired to admin force-logout, user sign-out-everywhere, and deactivate. See LB-15.
 - **Admin authority** (`portal/src/lib/admin-auth.ts`): the `OTHALA_ADMIN_SUBJECTS` allowlist, the SOLE source of admin authz. See LB-6 and LB-16.
-- **OIDC client registration** (`portal/src/lib/manifests.ts` parser + `register-clients.ts` registrar + the full `validateClients` lint). DORMANT until the deploy cutover: registration today stays shell-driven via `dag-apply-clients.sh` on the iac side. `register-clients.ts` is NOT yet the live successor and does NOT supersede the shell.
+- **OIDC client registration** (`portal/src/lib/manifests.ts` parser + `register-clients.ts` registrar + the full `validateClients` lint, bundled to `dist/server/register-clients.mjs`). The in-app registrar is the runner: a deliberate `--rm` one-shot (never on app boot, never route-triggered). CI exercises it via the `e2e` harness's `register-clients` compose service against `MANIFEST_DIR`; on the iac side `make dag-apply-clients` runs the same bundle. The legacy shell `apply-clients.sh` + Go `util` runner were retired at E1.
 
 **The surface split.** Admin / programmatic calls go through the typed
 Ory SDK (`@ory/client-fetch`): `admin-api.ts` (IdentityApi),
@@ -154,21 +154,35 @@ Documented in the security review, MEDIUM-3.
 **If you add a second writer**: factor `validateMetadataAdmin` into a
 shared validator so every writer enforces the same shape.
 
-### LB-9: Apps registry is `portal/src/content/apps/*.md`
+### LB-9: An app is one runtime manifest in `MANIFEST_DIR`
 
-Astro Content Collection. Each Markdown file is one app's metadata
-(frontmatter: name, slug, url, icon, description, access_group) plus
-education content (Markdown body). The tile dashboard reads this
-collection, filters by the active user's `metadata_admin.groups` (must
-include `access-<slug>`), and renders.
+An app is a single unified `<slug>.yaml` manifest, read at request time
+from `MANIFEST_DIR` (default `/etc/portal/manifests`) behind a 30-second
+in-process cache. The v0.1 split (an Astro Content Collection under
+`portal/src/content/apps/*.md` for tiles plus a separate
+`hydra/clients/<slug>.yaml` for OIDC) is gone; one file now carries up to
+three namespace blocks:
 
-OIDC clients are a **subset**: only apps that need Hydra registration
-have a corresponding `hydra/clients/<slug>.yaml`. Forward-auth apps
-(tune/Navidrome, gather/Sonarr, etc.) have Markdown entries but no Hydra
-yaml.
+- `presentation:` — tile metadata (name, icon, description, url,
+  `auth_kind`, `access_group`). Read by `portal/src/lib/tiles.ts`. An
+  optional sibling `<slug>.md` in the same directory is education content
+  for the `/apps/<slug>` detail page.
+- `oidc:` — the client fields forwarded to Hydra at registration. Read by
+  `portal/src/lib/manifests.ts`.
+- `consent:` — role + claim-emission shape, consulted at consent time.
 
-**If you change this convention**: the slug across the Markdown file and
-yaml is the cross-reference; renaming either side breaks the lookup.
+The tile loader filters by the active user's `metadata_admin.groups`
+(must include `access-<slug>`) and renders. OIDC clients are a
+**subset**: a manifest with only `presentation:` (a forward_auth, LDAP,
+or external tile with no Hydra client) is skipped by the OIDC loader
+rather than throwing. Because both loaders read the directory at runtime,
+adding or removing an app is a manifest-dir change with **no image
+rebuild**. The generic worked examples live in `e2e/manifests/`.
+
+**If you change this convention**: the slug is the filename
+(`<slug>.yaml` ⇄ `<slug>.md`) and the `oidc.client_id`; the
+`access_group` must be `access-<slug>` (the tile loader throws on a
+mismatch). Renaming either side breaks the lookup.
 
 ### LB-10: WebFinger lives at dunn.dev apex, NOT here
 
@@ -510,13 +524,18 @@ Every family app falls into one of five patterns, fixed at deploy time per
 app via the Caddyfile snippet it imports. The production Caddy config lives
 in the `dunn.dev/iac` deploy repo under `services/dag/`.
 
-| Pattern | Apps | One-line summary |
-|---|---|---|
-| **OIDC native** | keep, larder, listen, memory, vault, library, forge, observe | App redirects to `<othala-host>/oauth2/auth`, exchanges code for tokens at `/oauth2/token`; Caddy is just TLS + reverse proxy. |
-| **LDAP outpost** | cinema (Jellyfin) | glauth-kratos bridge co-located in the Jellyfin pod presents Kratos identities over LDAPS:636; Jellyfin binds against `localhost:636`. LDAP traffic never hits Caddy. |
-| **Forward auth** | tune (Navidrome), gather/* (Sonarr, Radarr, etc.) | Caddy `forward_auth` against Kratos `/sessions/whoami`. Subsonic API + shares bypass auth (native clients use HTTP Basic). |
-| **Client-credentials** | llm (vLLM) | Caddy validates `Authorization: Bearer` via Hydra's `/admin/oauth2/introspect`; in-pod sidecar pattern. |
-| **Custom OIDC** | Tailscale | Custom-OIDC against Hydra (no PKCE); WebFinger at email-domain apex (see flow above). |
+Each `e2e/manifests/<slug>.yaml` example declares its pattern via
+`presentation.auth_kind`. The worked examples below map to those
+fixtures.
+
+| Pattern | `auth_kind` | Example fixture | One-line summary |
+|---|---|---|---|
+| **OIDC native** | `oidc` | grafana (with role mapping), audiobookshelf | App redirects to `<othala-host>/oauth2/auth`, exchanges code for tokens at `/oauth2/token`; Caddy is just TLS + reverse proxy. |
+| **LDAP outpost** | `ldap` | jellyfin | glauth-kratos bridge co-located in the app pod presents Kratos identities over LDAPS:636; the app binds against `localhost:636`. LDAP traffic never hits Caddy. |
+| **Forward auth** | `forward_auth` | proxywatch | Caddy `forward_auth` against Kratos `/sessions/whoami`. No Hydra client; presentation-only manifest. |
+| **External / link-out** | `external` | statuspage | A tile that links out to an externally-authenticated app; no Othala-managed auth. |
+| **Client-credentials** | `oidc` | (machine-to-machine, e.g. vLLM) | Caddy validates `Authorization: Bearer` via Hydra's `/admin/oauth2/introspect`; in-pod sidecar pattern. No `redirect_uris`. |
+| **Custom OIDC** | `oidc` | (e.g. Tailscale) | Custom-OIDC against Hydra (no PKCE); WebFinger at email-domain apex (see flow above). |
 
 ## Group model
 
@@ -532,8 +551,9 @@ per-app role derivation, but admin authority is the
 updating `IDENTITY_GROUP_ORDER` in `access.ts` AND the form's checkbox
 list; otherwise the new group lands out of order.
 
-**Access groups**: what you can reach (one per app), e.g. `access-keep`,
-`access-cinema`, `access-tune`. The tile launcher renders only tiles for
+**Access groups**: what you can reach (one per app), e.g.
+`access-grafana`, `access-jellyfin`, `access-proxywatch`. The tile
+launcher renders only tiles for
 the `access-*` groups the user is in. The access gate (LB-13) enforces
 `access-<clientId>` membership at the consent challenge: a user without
 the matching access group cannot complete consent regardless of session
@@ -692,9 +712,8 @@ bench harness is reusable. Eval evidence is retained in git history.
 |---|---|---|---|
 | Kratos config | `kratos/` | YAML | Identity (login, recovery, MFA, session) |
 | Hydra config | `hydra/` | YAML | OIDC OP, OAuth2 AS |
-| OIDC client manifests | `hydra/clients/` | YAML | Per-app `oidc:` + `consent:` blocks |
-| Othala app | `portal/` | Astro + TS | Tile dashboard + Kratos flows + Hydra login/consent/logout + access gate + claims + revoke + admin UI + client registrar |
-| Apps registry | `portal/src/content/apps/` | Markdown | Per-app tile metadata + education content |
+| App manifests (runtime) | `MANIFEST_DIR` (`/etc/portal/manifests`) | YAML + MD | Per-app `presentation:` / `oidc:` / `consent:` blocks + optional `<slug>.md` education content; read at request time. Examples in `e2e/manifests/`. |
+| Othala app | `portal/` | Astro + TS | Tile dashboard + Kratos flows + Hydra login/consent/logout + access gate + claims + revoke + admin UI + manifest loaders + client registrar |
 | LDAP bridge | `ldap-bridge/` | Go | glauth-kratos: LDAPS → Kratos identity backend (Jellyfin native clients) |
 | E2E harness | `e2e/` | Shell + YAML | QEMU-CI smoke harness (compose stack + smoke scripts + gen-secrets) |
 | CI / build | `.gitlab-ci.yml` | GitLab CI YAML | Per-service verify + container-image + sbom + release |
@@ -716,12 +735,12 @@ The substantive, real test coverage (from the CV audit):
 Native back-channel logout with no signing key at rest (Hydra signs) is a
 real reduction in attack surface, not a stub.
 
-**Caveat, stated honestly.** The content-config `superRefine` test
-validates a hand-copied schema replica (a build-time lint against a copy,
-not the live schema). There is no standing linter on the app: `astro
-check` currently emits a handful of type hints that are not gated in CI.
-Treat the registrar's `validateClients` lint and the content superRefine
-as build-time guards, not a continuous type gate.
+**Caveat, stated honestly.** There is no standing linter on the app:
+`astro check` currently emits a handful of type hints that are not gated
+in CI. The manifest loaders run `validateClients` (the lint shared by the
+registrar and the pre-swap reload guard) at load time, and the smoke
+harness registers the `e2e/manifests/` set against a live Hydra; treat
+those as the build-time / release-gate guards, not a continuous type gate.
 
 ## Where to look when you're confused
 
@@ -732,7 +751,7 @@ as build-time guards, not a continuous type gate.
 | "Where does production-X live?" | `dunn.dev/iac/services/dag/` for runtime configs; THIS repo for application code. |
 | "What's open vs fixed?" | `docs/STATUS.md` for top-level; the security review for findings. |
 | "How do I deploy?" | `DEPLOY.md` (this repo's root). |
-| "How do I add a new OIDC client?" | Add `hydra/clients/<slug>.yaml` + `portal/src/content/apps/<slug>.md` + `<slug>_oidc_client_secret` to sops, then apply on the iac side. |
+| "How do I add a new OIDC client?" | Drop a unified `<slug>.yaml` manifest (`presentation:` + `oidc:` + `consent:`, optional `<slug>.md` education sidecar) into `MANIFEST_DIR`, add `<SLUG>_CLIENT_SECRET` to sops, sync the dir to the host, then run the registrar on the iac side. No image rebuild. See `e2e/manifests/` for worked examples and `docs/per-app-oidc.md` for the per-RP runbook. |
 | "How do I rotate a secret?" | `docs/runbooks/*-rotation.md`. |
 
 ## Don't-Add-Here list

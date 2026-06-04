@@ -54,7 +54,7 @@ curl -fsS -X POST \
   https://auth-lab.example.com/self-service/recovery/api
 
 # Watch Kratos logs for the courier hand-off
-podman logs -f auth-kratos | grep courier
+podman logs -f dag-kratos | grep courier
 ```
 
 Confirm the courier reports `delivered: true` for the message ID.

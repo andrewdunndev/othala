@@ -106,7 +106,6 @@ which is why `register-clients` is a `profiles: [oneshot]` service that
 | File | Purpose |
 |---|---|
 | `compose.yml` | docker-compose for the converged substrate |
-| `kratos.yml` | Kratos config with `${LAB_DOMAIN}` substitution |
 | `hydra.yml` | Hydra config (harness-shape: HTTP issuer, expose_internal_errors=true) |
 | `identity.schema.json` | Production identity schema, vendored |
 | `recovery-gate.jsonnet` | Recovery-gate webhook body, vendored |

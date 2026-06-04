@@ -183,7 +183,6 @@ e2e:
     - build-othala
     - build-ldap-bridge
   variables:
-    LAB_DOMAIN: lab.dunn.dev
     AUTH_REGISTRY: "${CI_REGISTRY_IMAGE}"
     # Default to the commit short-SHA (what container-image @2.5.1 publishes
     # for non-tag / BUILD_CI_IMAGE builds). GitLab variables: do NOT honor

@@ -1,0 +1,19 @@
+# Reusable Caddy snippet — OIDC-native app
+#
+# Usage in a per-app Caddyfile:
+#   import oidc-app vaultwarden 80
+#
+# Imports a snippet that does TLS via DNS-01 + plain reverse_proxy.
+# The app handles its own OIDC redirect to Hydra; Caddy is just the
+# reverse proxy + TLS terminator.
+#
+# Args:
+#   $1 = upstream container name
+#   $2 = upstream port
+
+(oidc-app) {
+	tls {
+		dns cloudflare {env.CF_API_TOKEN}
+	}
+	reverse_proxy {args[0]}:{args[1]}
+}

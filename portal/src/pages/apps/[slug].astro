@@ -1,16 +1,17 @@
 ---
-// Per-app detail page rendering the education content from the apps
-// Content Collection.
+// Per-app detail page rendering the education content sourced from the
+// app's unified manifest (the optional sibling `<slug>.md`, read at
+// request time via getTile in lib/tiles.ts).
 //
 // Session-gated like the home page: not in `access-<slug>` group =
 // redirect to /auth/error?reason=not-authorised. Admins see every
 // app's detail page regardless of access group.
 //
-// Adding a new app: drop a new MD file in src/content/apps/<slug>.md.
-// Astro generates the dynamic route automatically via getStaticPaths.
-// In SSR mode (Topology B), the path is resolved at request time, so
-// no rebuild needed when MD frontmatter changes — but adding a NEW
-// MD file IS a rebuild (Astro Content Collections are build-time).
+// Adding a new app: drop a `<slug>.yaml` (with a `presentation:` block,
+// and an optional sibling `<slug>.md`) into MANIFEST_DIR. The route is
+// SSR (prerender=false) and resolves the slug at request time via
+// getTile, so there is no getStaticPaths and no portal image rebuild
+// when manifests change.
 
 export const prerender = false;
 

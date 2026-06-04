@@ -1,0 +1,60 @@
+# Worked top-level Caddyfile for a single Othala instance.
+#
+# This is an integration example for adopters, not a drop-in deploy file:
+# it shows how to route one hostname across the three upstreams that make
+# up an Othala instance — Kratos (browser auth surface), Hydra (OAuth2
+# surface), and the converged app.
+#
+# The site address is read from $OTHALA_PUBLIC_HOST (e.g. "auth.example.com").
+# Set it in the Caddy environment (systemd unit, compose env, etc.); don't
+# hard-code a hostname here.
+#
+# TLS is issued via DNS-01 ACME using the caddy-dns/cloudflare plugin and a
+# Cloudflare API token in CF_API_TOKEN. Swap the tls block if you use a
+# different DNS provider, an HTTP-01 solver, or terminate TLS upstream.
+#
+# Routing shape — why the default backend is the app, not Kratos:
+#   The catch-all is the Othala app (othala:8080) so static assets
+#   (/_astro/*, manifest.webmanifest, favicon.ico) are served with the
+#   correct Content-Type. The Kratos browser paths and the Hydra OAuth2
+#   surface are matched first and routed to their respective upstreams.
+#   Routing the default to Kratos instead causes static assets to 404 or
+#   be served with the wrong Content-Type, yielding an unstyled UI.
+#
+# Container names used below (adapt to your own service names):
+#   Kratos: kratos:4433   Hydra: hydra:4444   App: othala:8080
+#
+# Note: /oauth2/login, /oauth2/consent, and /oauth2/logout are Hydra
+# challenge handlers served by the converged app, not by Hydra itself.
+# They are matched explicitly so they don't fall into the @hydra block.
+
+{$OTHALA_PUBLIC_HOST} {
+	tls {
+		dns cloudflare {env.CF_API_TOKEN}
+	}
+
+	# Hydra public OAuth2 surface + OIDC discovery.
+	@hydra path /oauth2/auth /oauth2/token /oauth2/revoke /oauth2/fallbacks/* /.well-known/openid-configuration /.well-known/jwks.json /userinfo
+	handle @hydra {
+		reverse_proxy hydra:4444
+	}
+
+	# The converged app owns the Hydra login/consent/logout challenge handlers.
+	# Matched before the app default so they are explicit and auditable.
+	@portal_challenges path /oauth2/login /oauth2/consent /oauth2/logout
+	handle @portal_challenges {
+		reverse_proxy othala:8080
+	}
+
+	# Kratos browser endpoints: well-known ceremony scripts, self-service flow
+	# APIs, session endpoints, and identity schemas.
+	@kratos path /.well-known/ory/* /self-service/* /sessions/* /schemas/*
+	handle @kratos {
+		reverse_proxy kratos:4433
+	}
+
+	# Default -> the app: portal UI, /auth/* + /admin/* pages, AND static
+	# assets (/_astro/*, favicon.ico, manifest.webmanifest). The app is the
+	# catch-all; routing the default to Kratos mis-serves static assets.
+	reverse_proxy othala:8080
+}

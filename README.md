@@ -12,7 +12,7 @@ The name is the rune ᛟ *othala* (home, inheritance, the estate). Andrew's depl
 
 One converged application, not a fleet of services:
 
-- **The Othala app** (`portal/`, Astro Node SSR + TypeScript). It renders the Kratos self-service browser flows, acts as Hydra's login + consent + logout provider (Hydra ships no UI by design), holds the access gate and the id_token claims builder, runs the in-process revoke fan-out, and exposes admin endpoints on a separate loopback listener. It runs as a Node process inside the SSO pod so Kratos's and Hydra's admin ports are reachable directly.
+- **The Othala app** (`portal/`, Astro Node SSR + TypeScript). It renders the Kratos self-service browser flows, acts as Hydra's login + consent + logout provider (Hydra ships no UI by design), holds the access gate and the id_token claims builder, runs the in-process revoke fan-out, and exposes admin endpoints on a separate loopback listener. It reads per-app manifests at runtime from a mounted directory (`MANIFEST_DIR`), so adding an app is a manifest drop, not an image rebuild. It runs as a Node process inside the SSO pod so Kratos's and Hydra's admin ports are reachable directly.
 - **The Ory substrate** (Kratos + Hydra + Postgres). Kratos owns identity (login, recovery, settings, passkeys). Hydra owns OAuth2/OIDC. Single-source-of-truth identity in Kratos; LDAP and OIDC are presentation layers downstream.
 - **The LDAP bridge** (`ldap-bridge/`, Go). A custom glauth binary with a Kratos backend that presents identities over LDAPS for the non-OAuth clients (Jellyfin's plugin, Apple TV / Infuse SSO). Stays Go: it is a protocol adapter, not part of the web app.
 
@@ -25,6 +25,18 @@ The OSS project is **Othala**; the GitLab project is `dunn.dev/othala`. The Go m
 iac decides when to consume a new Othala release. Topology-specific differences (for example the Postgres DSN host) are iac-local deviations documented in each vendored file's provenance header. The published application image is named **othala**; the instance grouping inside iac is **dag** (`services/dag/`, `dag-*` quadlets, the `dag.network`). The functional Ory service names (kratos / hydra / postgres) keep their role names.
 
 For the deploy model, see [`DEPLOY.md`](DEPLOY.md) and `dunn.dev/iac/services/dag/`. For the load-bearing decision record, see [`ARCHITECTURE.md`](ARCHITECTURE.md) LB-12.
+
+## Apps are manifests (runtime-driven)
+
+An app is one unified `<slug>.yaml` manifest, read at request time from `MANIFEST_DIR` (default `/etc/portal/manifests`). One file can carry up to three namespace blocks:
+
+- `presentation:` — the tile metadata (name, icon, description, URL, `auth_kind`, `access_group`). Read by `portal/src/lib/tiles.ts` to render the dashboard. An optional sibling `<slug>.md` is education content shown on the `/apps/<slug>` detail page.
+- `oidc:` — the OAuth2/OIDC client fields forwarded to Hydra at registration. Read by `portal/src/lib/manifests.ts`.
+- `consent:` — role and claim-emission shape, read by the app at consent time.
+
+A manifest with only `presentation:` (a forward_auth, LDAP, or external tile with no Hydra client) is skipped by the OIDC loader. Because both loaders read the directory at runtime behind a 30-second cache, **adding or removing an app is a manifest-dir change with no image rebuild**.
+
+The generic worked examples live in [`e2e/manifests/`](e2e/manifests/): `grafana` (OIDC + role mapping), `audiobookshelf` (OIDC), `jellyfin` (LDAP via the bridge), `proxywatch` (forward_auth), `statuspage` (external). They double as the release-gate fixtures the smoke harness registers.
 
 ## Where to start
 
@@ -40,10 +52,10 @@ This README asserts no version. It is the front door.
 |---|---|
 | `docs/` | Architecture decision history, STATUS, security review, Ory ecosystem survey, per-app integration, runbooks |
 | `kratos/` | Kratos server config + identity schema |
-| `hydra/` | Hydra server config + OIDC client manifests |
-| `portal/` | The Othala application (Astro Node SSR + TS): Kratos self-service flows, Hydra login/consent/logout challenge handlers, the access gate, claims builder, revoke fan-out, dual-listener admin endpoints, and the OIDC client registrar. Publishes as the `othala` image. |
+| `hydra/` | Hydra server config |
+| `portal/` | The Othala application (Astro Node SSR + TS): Kratos self-service flows, Hydra login/consent/logout challenge handlers, the access gate, claims builder, revoke fan-out, dual-listener admin endpoints, the runtime manifest loaders (`tiles.ts` + `manifests.ts`), and the OIDC client registrar. Publishes as the `othala` image. |
 | `ldap-bridge/` | glauth-kratos: custom glauth binary linked against Kratos public + admin APIs. Stays Go: a protocol adapter for non-OAuth clients (Jellyfin / Apple TV). |
-| `e2e/` | QEMU-CI smoke harness: compose stack + smoke scripts + gen-secrets. Runs on carmine via the `e2e` CI job. |
+| `e2e/` | QEMU-CI smoke harness: compose stack + smoke scripts + gen-secrets + the generic example manifests (`e2e/manifests/`). Runs on carmine via the `e2e` CI job. |
 
 ## Architecture in brief
 

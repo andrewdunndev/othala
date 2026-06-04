@@ -68,7 +68,7 @@ The asteroid case. Recovery is by Kratos admin CLI on the SSO host.
 2. Open a Kratos admin shell against the running pod:
 
    ```sh
-   sudo podman exec -it auth-kratos sh
+   sudo podman exec -it dag-kratos sh
    ```
 
 3. Find the identity's ID:
@@ -126,8 +126,9 @@ After any recovery, confirm:
 
 The recovery-gate webhook accepts only requests carrying the shared
 secret in the `X-Webhook-Auth` header. The secret lives in the
-`RECOVERY_GATE_SECRET` env var on both Kratos (sent via
-`web_hook.config.auth: api_key`) and the consent service
+`RECOVERY_GATE_SECRET` env var on both Kratos (sent on the recovery-hook
+to the Othala app's loopback admin port
+`http://127.0.0.1:8431/admin/recovery-gate`) and the Othala app
 (constant-time compared on receive). Empty env on either side fails
 closed.
 

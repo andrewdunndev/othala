@@ -8,29 +8,31 @@
 //
 // Why runtime read:
 //
-// - Adding a new OIDC client is now: edit `hydra/clients/<slug>.yaml`
-//   in this repo, rsync to `/var/srv/auth/consent/manifests/` on
-//   the SSO host (e.g. via `make auth-sync-manifests`), restart the
-//   consent service and the portal. No image rebuild required.
-// - Source-of-truth stays in `dunn.dev/othala/hydra/clients/`. The
-//   portal and consent service read the same files from the same
-//   directory; the operator's sync target keeps the on-host copy
-//   current.
+// - Adding a new OIDC client is now: edit the unified `<slug>.yaml`
+//   manifest, sync it into the runtime manifest directory on the SSO
+//   host (e.g. via `make auth-sync-manifests`), restart the consent
+//   service and the portal. No image rebuild required.
+// - Source-of-truth is the unified per-app manifest set; the portal and
+//   consent service read the same files from the same directory
+//   (MANIFEST_DIR), and the operator's sync target keeps the on-host
+//   copy current.
 // - A 30-second in-process cache prevents per-request YAML parsing
 //   from being a hot path. Cache is invalidated on SIGHUP (future).
 //
 // Source-of-truth chain:
 //
-//   dunn.dev/othala/hydra/clients/*.yaml             (canonical, this repo)
-//     -> rsync via operator sync target (e.g. make auth-sync-manifests)
-//     -> /var/srv/auth/{consent,portal}/manifests/ (runtime on SSO host)
+//   unified manifests <slug>.yaml                    (canonical, this repo)
+//     -> sync via operator sync target (e.g. make auth-sync-manifests)
+//     -> runtime manifest dir on SSO host (MANIFEST_DIR)
 //        -> consent container reads via volume mount
 //        -> portal container reads via volume mount
 //
-// Tile-dashboard metadata (name, icon, description, education content)
-// lives separately in portal/src/content/apps/<slug>.md — that DOES
-// rebuild the portal image on change, intentionally (rich MDX content
-// surface is worth the rebuild cost; OIDC manifest edits are not).
+// A single `<slug>.yaml` serves both loaders: this OIDC client loader
+// reads the `oidc:`/`consent:` blocks, while tiles.ts reads the
+// `presentation:` block (with an optional sibling `<slug>.md` for the
+// per-app detail-page education content). Both read at request time from
+// MANIFEST_DIR — there is no build-time content collection, so adding or
+// removing an app is a manifest-dir change with no portal image rebuild.
 
 import { readdirSync, readFileSync, statSync } from 'node:fs';
 import { join } from 'node:path';

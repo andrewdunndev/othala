@@ -68,8 +68,9 @@ inherit every Kratos UI-shape change.
 
 ### 4. Conservative OIDC grant types
 
-Every `hydra/clients/*.yaml` uses `authorization_code` + `refresh_token`
-or `client_credentials`. No `urn:ietf:params:oauth:grant-type:device_code`,
+Every client manifest's `oidc:` block uses `authorization_code` +
+`refresh_token` or `client_credentials`. No
+`urn:ietf:params:oauth:grant-type:device_code`,
 no implicit, no novel grant patterns.
 
 v25.4 added Device Authorization Grant (RFC 8628) to Hydra additively.

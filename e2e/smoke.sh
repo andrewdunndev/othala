@@ -131,8 +131,8 @@ fi
 # A6: Hydra public /.well-known/openid-configuration + issuer byte-match
 oidc=$(curl_in hydra http://localhost:4444/.well-known/openid-configuration)
 issuer=$(echo "$oidc" | python3 -c "import sys,json; print(json.load(sys.stdin).get('issuer',''))" 2>/dev/null || echo "")
-# Issuer is now the Othala public URL: OTHALA_PUBLIC_URL (set to http://auth.othala.test
-# in the e2e env by gen-secrets.sh). The old auth-lab.${LAB_DOMAIN} prefix is retired.
+# Issuer is the Othala public URL: OTHALA_PUBLIC_URL (set to http://auth.othala.test
+# in the e2e env by gen-secrets.sh).
 expected_issuer="${OTHALA_PUBLIC_URL}/"
 if [[ "$issuer" == "$expected_issuer" ]]; then
     pass "A6 hydra openid-config issuer byte-match: $issuer"

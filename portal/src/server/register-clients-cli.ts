@@ -11,7 +11,7 @@
 //     Hydra's admin port). See DEPLOY.md "Client registration".
 //   - In the e2e harness, `compose run --rm register-clients` invokes THIS
 //     module on the same othala image to prove the in-app registrar
-//     registers every hydra/clients/*.yaml against Hydra admin.
+//     registers every `oidc:` manifest in MANIFEST_DIR against Hydra admin.
 //
 // Bundled to dist/server/register-clients.mjs by `npm run
 // build:register-clients` (esbuild, same shape as admin-runtime). Reads

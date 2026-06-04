@@ -36,13 +36,6 @@ cat <<EOF
 AUTH_REGISTRY=${AUTH_REGISTRY}
 AUTH_VERSION=${AUTH_VERSION}
 
-# LAB_DOMAIN: transitional shim consumed by smoke.sh (Round-2 rebase will
-# replace LAB_DOMAIN references with the Othala vars below). Set to the
-# othala.test apex so unqualified email addresses resolve correctly in
-# smoke test-data. The issuer check in smoke.sh will need updating in the
-# Round-2 harness rebase (it still uses the old auth-lab prefix).
-LAB_DOMAIN=othala.test
-
 POSTGRES_PASSWORD=$(gen_alnum)
 KRATOS_PG_PASS=$(gen_alnum)
 HYDRA_PG_PASS=$(gen_alnum)

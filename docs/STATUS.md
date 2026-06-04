@@ -37,6 +37,14 @@ all-TS application fronting upstream Ory plus the Go LDAP bridge:
   The `admin` group is display-only.
 - Back-channel logout is Hydra-native. The app holds no signing key at
   rest; the custom private-key signer was deleted.
+- Apps are **runtime manifests** (v0.2.0). Each app is one unified
+  `<slug>.yaml` read at request time from `MANIFEST_DIR` (default
+  `/etc/portal/manifests`): `presentation:` drives the tile
+  (`tiles.ts`), `oidc:`/`consent:` drive the client (`manifests.ts`), and
+  a presentation-only manifest is skipped by the OIDC loader. Adding an
+  app is a manifest drop, no image rebuild. The v0.1 split (Astro Content
+  Collection under `portal/src/content/apps/` + `hydra/clients/`) is gone.
+  Generic worked examples live in `e2e/manifests/`.
 
 The standalone Go consent service and the `util` runner have been
 **removed from the tree** — consent folded into the converged app,
@@ -79,10 +87,12 @@ Real, substantive coverage:
 
 ## Caveat (CV audit)
 
-The content-config `superRefine` test validates a **hand-copied schema
-replica** at build time (a build-time lint, not a runtime check). There
-is **no standing linter** on the app: `astro-check` reports 16 hints.
-This is honest current state, not a regression.
+There is **no standing linter** on the app: `astro-check` reports a
+handful of type hints that are not gated in CI. The manifest loaders run
+`validateClients` at load time and the `e2e` harness registers the
+example manifest set against a live Hydra; treat those as the build-time
+/ release-gate guards, not a continuous type gate. This is honest current
+state, not a regression.
 
 ## Locked decisions
 
@@ -120,11 +130,12 @@ Full rationale per decision: `decision.md`. Upgrade-durability choices:
 - **`/admin/activity`** is a navigable **placeholder** (labeled in-page;
   pending an alloy→Loki / Postgres-summary ingest). Not a working
   feature.
-- **OIDC client registration** is shell-driven via
-  `scripts/dag-apply-clients.sh` today. The all-TS successor
-  (`manifests.ts` + `register-clients.ts` + `validateClients`) is built
-  but **dormant** until the deploy cutover; it does not yet supersede
-  the shell path.
+- **OIDC client registration** runs the in-app all-TS registrar
+  (`manifests.ts` + `register-clients.ts` + `validateClients`, bundled to
+  `dist/server/register-clients.mjs`) as a deliberate `--rm` one-shot. CI
+  exercises it in the `e2e` harness against `MANIFEST_DIR`; the iac side
+  invokes the same bundle via `make dag-apply-clients`. The legacy shell
+  `apply-clients.sh` + Go `util` runner were retired at E1.
 - **Postgres backup**: posture documented; implementation is the next
   iac work stream.
 - **No standing app linter** (see Caveat).

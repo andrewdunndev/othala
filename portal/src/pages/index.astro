@@ -1,7 +1,7 @@
 ---
 // Othala portal — session-gated tile dashboard.
 //
-// v0.2.0 architecture (Topology B + apps registry as Content Collection):
+// v0.2.0 architecture (Topology B + runtime unified-manifest tiles):
 //
 // State A (down):     Kratos unreachable. Holding panel: mark + short
 //                     message + thin technical line. Reads as "auth
@@ -10,18 +10,19 @@
 //                     welcome lede + Sign In CTA. Below: a thin section
 //                     explaining what's behind the door.
 // State C (post-auth): active session. Hero with greeting + section
-//                     "your apps" — the tile launcher reads the
-//                     `apps` Content Collection and filters to entries
-//                     whose `access_group` the user's
+//                     "your apps" — the tile launcher reads the tiles
+//                     via loadTiles (tiles.ts) and filters to entries
+//                     whose `accessGroup` the user's
 //                     `metadata_admin.groups` contains. Admin shortcut
 //                     when the user is in the admin group.
 //
-// Apps registry = Astro Content Collection (portal/src/content/apps/*.md).
-// Each MD has frontmatter (name, description, url, icon, access_group,
-// auth_kind, disabled, order) + an MDX body for the per-app detail page
-// at /apps/<slug>. Adding a new app is one MD file + an iac sops add +
-// `make auth-apply-clients`; for OIDC consumers also one yaml in
-// hydra/clients/.
+// Apps registry = unified per-app manifests read at request time from
+// MANIFEST_DIR (see lib/tiles.ts + lib/manifests.ts). Each `<slug>.yaml`
+// carries a `presentation:` block (name, description, url, icon,
+// access_group, auth_kind, disabled, order); an optional sibling
+// `<slug>.md` is the per-app detail-page content at /apps/<slug>. There
+// is no build-time content collection, so adding or removing an app is a
+// manifest-dir change with no portal image rebuild.
 //
 // Dev preview: when running `astro dev`, State A also surfaces a small
 // panel of every auth flow link. `?dev-state=` lets the developer force

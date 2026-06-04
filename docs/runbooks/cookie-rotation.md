@@ -84,7 +84,7 @@ runbook didn't account for it" bugs.
 
    ```sh
    curl -fsS https://<your-othala-host>/health/ready
-   # run your operator smoke suite, e.g.: make auth-smoke HOST=<sso-host>
+   # run your operator smoke suite, e.g.: make dag-smoke HOST=<sso-host>
    ```
 
 5. Active sessions: still valid. Existing cookies were signed with the

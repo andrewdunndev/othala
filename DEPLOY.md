@@ -119,7 +119,10 @@ immutable, so the rollback is deterministic.
 The Othala container's runtime env. The Ory upstream URLs are set by the
 iac quadlet (`KRATOS_PUBLIC_URL`, `KRATOS_ADMIN_URL`, `HYDRA_PUBLIC_URL`,
 `HYDRA_ADMIN_URL`, `HYDRA_ISSUER_URL`); the listener ports default to
-`PORT=8080` / `ADMIN_PORT=8431`. The secrets are sops + age backed in
+`PORT=8080` / `ADMIN_PORT=8431`. `MANIFEST_DIR` (default
+`/etc/portal/manifests`) is the directory the app reads per-app manifests
+from at runtime; the quadlet volume-mounts the synced manifest set there
+read-only. The secrets are sops + age backed in
 `dunn.dev/iac/pyinfra/secrets.enc.yaml` under `carmine.dag_*` keys; iac
 maps each `dag_*` key to the env target below:
 
@@ -142,19 +145,22 @@ custom private-key signer was deleted.
 
 ## Client registration
 
-OIDC client registration is **shell-driven today**: `make
-dag-apply-clients` runs `scripts/dag-apply-clients.sh`, which invokes a
-`--rm` one-shot runner on `dag.network` (the only network that can reach
-Hydra's admin port) and POST/PUTs each `hydra/clients/*.yaml` `oidc:`
-block against Hydra's admin API. See
-[`docs/per-app-oidc.md`](docs/per-app-oidc.md) for the full per-RP
-runbook.
+OIDC client registration is a deliberate **one-shot**, never run on app
+boot or triggered by a route. On the iac side `make dag-apply-clients`
+invokes a `--rm` one-shot runner on `dag.network` (the only network that
+can reach Hydra's admin port) against the manifests synced into
+`MANIFEST_DIR`. See [`docs/per-app-oidc.md`](docs/per-app-oidc.md) for the
+full per-RP runbook.
 
-The repo also carries an all-TS successor (`portal/src/lib/manifests.ts`
-parser + `register-clients.ts` via the Hydra OAuth2Api, plus the full
-`validateClients` lint). It is **dormant**: not yet wired live, and it
-does **not** supersede `dag-apply-clients.sh` until the deploy cutover.
-Do not treat it as the live registration path yet.
+The runner is the converged app's **in-app registrar**
+(`portal/src/lib/register-clients.ts` driving the Hydra OAuth2Api, fed by
+the `manifests.ts` parser + the full `validateClients` lint), bundled to
+`dist/server/register-clients.mjs` and exercised in CI: the `e2e` harness
+runs it as a `compose run --rm register-clients` one-shot against the
+freshly-built image, reading each `<slug>.yaml` `oidc:` block from
+`MANIFEST_DIR` and resolving `<SLUG>_CLIENT_SECRET` from env. The legacy
+shell `apply-clients.sh` + Go `util` runner were retired at E1 (source
+deleted).
 
 ## Deploy cutover (pending)
 

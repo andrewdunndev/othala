@@ -20,8 +20,8 @@ exposure, on-disk leak, accidental commit).
 ## What rotation costs
 
 - Every Hydra-stored OAuth2 client secret becomes unreadable. Apps
-  re-receive new client_secret values via the `auth-util` container
-  running `apply-clients.sh`.
+  re-receive new client_secret values when the in-app registrar re-runs
+  (`make dag-apply-clients`).
 - Outstanding consent challenges (in-flight OAuth2 flows) become
   invalid. Users mid-flow see an error and re-attempt.
 - Hydra's signing keys (id_token JWKS) are unaffected; they live in a
@@ -52,15 +52,15 @@ key).
 3. Stop Hydra on the SSO host:
 
    ```sh
-   ssh <operator>@<sso-host> 'systemctl --user stop auth-hydra.service'
+   ssh <operator>@<sso-host> 'systemctl --user stop dag-hydra.service'
    ```
 
 4. Drop and recreate the Hydra schema (Postgres-side):
 
    ```sh
    ssh <operator>@<sso-host> '
-     systemctl --user stop auth-hydra-migrate.service;
-     podman exec -it auth-postgres psql -U postgres -c \
+     systemctl --user stop dag-hydra-migrate.service;
+     podman exec -it dag-postgres psql -U postgres -c \
        "DROP DATABASE hydra; CREATE DATABASE hydra OWNER hydra;"
    '
    ```
@@ -69,68 +69,55 @@ key).
 
    ```sh
    # using your operator tooling, e.g.:
-   make auth-secrets HOST=<sso-host>
+   make dag-secrets HOST=<sso-host>
    ```
 
 6. Re-run the Hydra migration + restart Hydra:
 
    ```sh
-   make auth-deploy HOST=<sso-host>
+   make dag-deploy HOST=<sso-host>
    ```
 
-   The deploy restarts auth-postgres, auth-hydra-migrate (populates
-   fresh schema under the new secret), and auth-hydra.
+   The deploy restarts dag-postgres, dag-hydra-migrate (populates
+   fresh schema under the new secret), and dag-hydra.
 
 7. Re-issue every client secret:
 
    ```sh
-   make auth-apply-clients HOST=<sso-host>
+   make dag-apply-clients HOST=<sso-host>
    ```
 
-   This runs the `auth-util` oneshot container which walks
-   `hydra/clients/*.yaml` and re-creates each Hydra client with its
-   sops-sourced `<svc>_oidc_client_secret`.
+   This runs the Othala in-app registrar as a `--rm` one-shot, which
+   walks the manifests in `MANIFEST_DIR` and re-creates each Hydra client
+   with its sops-sourced `<SLUG>_CLIENT_SECRET`.
 
-8. Update consumer-service podman secrets if any `<svc>_oidc_client_secret`
-   changed:
+8. Update consumer-service podman secrets if any `<slug>_oidc_client_secret`
+   changed, then redeploy each affected consumer (operator-side, e.g.
+   `make <consumer>-secrets HOST=<sso-host> && make <consumer>-deploy HOST=<sso-host>`).
+
+9. Verify a known OIDC flow end-to-end before clearing the runbook:
 
    ```sh
-   # repeat for each OIDC consumer that needs to pick up a new secret:
-   make keep-secrets HOST=<sso-host>
-   make keep-deploy HOST=<sso-host>
+   make dag-smoke HOST=<sso-host>
    ```
-
-9. Force the consent service to drop its cached signing key (the
-   back-channel logout signing key cache holds the old key for up to
-   15 min; SIGUSR1 forces refresh):
-
-   ```sh
-   ssh <operator>@<sso-host> 'podman exec auth-consent kill -USR1 1'
-   ```
-
-10. Verify a known OIDC flow end-to-end before clearing the runbook:
-
-    ```sh
-    make auth-smoke HOST=<sso-host>
-    ```
 
 ## Verification
 
 After rotation:
 
-- `make auth-apply-clients` exited 0 for every yaml in `hydra/clients/`.
-- A test login through Vaultwarden (or any OIDC client) completes.
-- Hydra logs show no decryption errors: `journalctl --user -u auth-hydra.service -n 50`.
+- `make dag-apply-clients` exited 0 for every manifest in `MANIFEST_DIR`.
+- A test login through any OIDC client completes.
+- Hydra logs show no decryption errors: `journalctl --user -u dag-hydra.service -n 50`.
 - The sops file has only the new `hydra_system_secret` value.
 
 ## What this does NOT cover
 
 - Kratos cookie/cipher rotation. See `cookie-rotation.md`.
-- id_token signing key rotation. Hydra's `/admin/keys/.../rotate`
-  handles that without touching `secrets.system`. The consent
-  service's signing-key cache picks up the new key on next refresh
-  (15 min) or on SIGUSR1.
-- Postgres credential rotation (the `auth_db_password` sops entry).
+- id_token + back-channel-logout signing key rotation. Hydra's
+  `/admin/keys/.../rotate` handles that without touching
+  `secrets.system`; Hydra signs natively, so the Othala app holds no
+  signing key at rest and there is no app-side cache to refresh.
+- Postgres credential rotation (the `dag_db_password` sops entry).
   Separate procedure: stop the substrate, rotate the password,
   re-deploy. No db rebuild needed since the password is independent
   of at-rest encryption.
@@ -141,4 +128,4 @@ After rotation:
 - `docs/runbooks/cookie-rotation.md`
 - `docs/runbooks/admin-recovery.md`
 - `hydra/hydra.yml` `secrets.system` field
-- `dunn.dev/iac/services/auth/` — deploy plane
+- `dunn.dev/iac/services/dag/` — deploy plane

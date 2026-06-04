@@ -1,6 +1,6 @@
 // In-app OIDC client registration — the TS successor to util/apply-clients.sh.
 //
-// CU2 item 2. apply-clients.sh reads hydra/clients/*.yaml, extracts the
+// CU2 item 2. apply-clients.sh read the per-app <slug>.yaml manifests, extracted the
 // `oidc:` block, injects a per-client secret from the environment, and
 // POST/PUTs each client to Hydra's admin API (/admin/clients). This module
 // does the same through the C1 @ory/client-fetch OAuth2Api with a TYPED

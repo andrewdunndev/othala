@@ -1,13 +1,14 @@
 ---
 // Admin: OAuth2 clients (read-only).
 //
-// Source of truth is `hydra/clients/*.yaml` + `apply-clients.sh`. This
-// page renders the manifest catalog the Worker bundle was built with;
-// editing happens in the repo, not here.
+// Source of truth is the unified per-app manifests (`<slug>.yaml`) in
+// MANIFEST_DIR; the in-app registrar syncs their `oidc:`/`consent:`
+// blocks to Hydra. This page renders the loaded manifest set; editing
+// happens by changing a manifest, not here.
 //
 // The "Edit" affordance is a disabled button with a tooltip pointing
-// the admin at the yaml. Roles + group_role_map come from the manifest;
-// when an app's yaml has no roles block (Phase 4 work), the table shows
+// the admin at the manifest. Roles + group_role_map come from the
+// manifest; when an app's manifest has no roles block, the table shows
 // "(none)" so the absence is visible.
 
 export const prerender = false;
@@ -35,8 +36,9 @@ const adminNav = [
       <p class="page-eyebrow">administration · oidc clients</p>
       <h1 class="page-title">Apps</h1>
       <p class="page-lede">
-        Read-only. Edit <code>hydra/clients/*.yaml</code> in the auth repo,
-        then run <code>apply-clients.sh</code> and rebuild the portal.
+        Read-only. Apps are defined by unified <code>&lt;slug&gt;.yaml</code>
+        manifests in the manifest directory; edit a manifest and it is
+        picked up at runtime — no rebuild.
       </p>
     </header>
 
@@ -52,7 +54,7 @@ const adminNav = [
               type="button"
               class="button button-secondary"
               disabled
-              title="Edit hydra/clients/{m.clientId}.yaml in the repo"
+              title="Edit the {m.clientId}.yaml manifest"
             >
               Edit yaml in repo
             </button>

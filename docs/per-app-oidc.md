@@ -24,17 +24,20 @@ This runbook covers OIDC-based integrations. For the forward-auth apps
 - Discovery: `https://{YOUR_OTHALA_URL}/.well-known/openid-configuration`
 - Authorization code flow for all interactive apps; `client_credentials`
   for `llm` (machine-to-machine only).
-- Client manifests live in `dunn.dev/othala/hydra/clients/<slug>.yaml`.
-  Each file has two top-level keys: `oidc:` (forwarded to Hydra) and
-  `consent:` (read by the consent service; never sent to Hydra).
-- `client_id` equals the slug (e.g., `keep`, `observe`).
+- Each app is a unified `<slug>.yaml` manifest read at runtime from
+  `MANIFEST_DIR` (default `/etc/portal/manifests`; synced from this repo,
+  worked examples in `dunn.dev/othala/e2e/manifests/`). A manifest can
+  carry three namespace blocks: `presentation:` (tile metadata),
+  `oidc:` (forwarded to Hydra), and `consent:` (role/claim shape read by
+  the Othala app; never sent to Hydra).
+- `client_id` equals the slug (e.g., `grafana`, `audiobookshelf`).
 - Client secrets are sops-encrypted in your operator repo (e.g.
   `dunn.dev/iac/pyinfra/secrets.enc.yaml`) under `<host>.<slug>_oidc_client_secret`.
   The same plaintext value must land in both Hydra (via
   `make dag-apply-clients`) and the RP app's own config. They are not
   linked automatically.
 - Access groups: every interactive OIDC app has a corresponding Ory
-  group named `access-<slug>`. The consent service denies tokens for
+  group named `access-<slug>`. The access gate denies tokens for
   users not in this group. Add users there before the login test.
 
 ## Generic procedure (once per new RP)
@@ -65,11 +68,12 @@ make dag-secrets HOST=<sso-host>   # writes the new sops entry into podman secre
 make dag-apply-clients HOST=<sso-host>
 ```
 
-`dag-apply-clients` runs the `dag-util` one-shot container on the
-`auth` network (the only network that can reach Hydra's admin port 4445)
-and POST/PUTs each `hydra/clients/*.yaml` `oidc:` block. The container
-reads `<SLUG>_CLIENT_SECRET` from env, which is sourced from the sops
-entry above. Exit 0 means Hydra accepted the registration.
+`dag-apply-clients` runs the Othala in-app registrar as a `--rm`
+one-shot container on `dag.network` (the only network that can reach
+Hydra's admin port 4445) and POST/PUTs each manifest's `oidc:` block from
+`MANIFEST_DIR`. The container reads `<SLUG>_CLIENT_SECRET` from env, which
+is sourced from the sops entry above. Exit 0 means Hydra accepted the
+registration.
 
 **4. Configure the RP app (app side).**
 
@@ -89,7 +93,7 @@ After editing the app config, restart the app service before testing.
 
 **5. Add the user to the access group (Ory side).**
 
-The consent service checks group membership before issuing any token.
+The access gate checks group membership before issuing any token.
 Add via the admin portal at `https://{YOUR_OTHALA_URL}/admin/users/<id>`.
 
 **6. Test login (LIVE only).**
@@ -100,7 +104,7 @@ correct page with the expected role. Check Hydra logs if the flow
 aborts before redirect:
 
 ```sh
-journalctl --user -u auth-hydra.service -n 100 | grep -i error
+journalctl --user -u dag-hydra.service -n 100 | grep -i error
 ```
 
 ---
@@ -263,7 +267,7 @@ OAUTH_CLIENT_ID=memory
 OAUTH_CLIENT_SECRET=<value from sops>
 OAUTH_SCOPE=openid email profile groups offline_access
 OAUTH_AUTO_REGISTER=true
-# The role claim name must match what the consent service emits:
+# The role claim name must match what the Othala app emits at consent:
 OAUTH_IMMICH_ADMIN_ROLE=admin  # value to match in immich_role claim
 ```
 
@@ -435,7 +439,7 @@ user list. Admin role must be granted inside BookLore manually.
 ### llm -- vLLM (machine-to-machine only)
 
 - **Flow:** `client_credentials` (no user, no id_token, no login UI)
-- **No access group** (the consent service skips the access check for client_credentials)
+- **No access group** (the access gate skips the access check for client_credentials)
 - **No back-channel logout** (bearer tokens expire; revoke via Hydra admin API)
 
 The llm client is for API consumers, not for interactive sign-in.
@@ -523,7 +527,7 @@ stored, the token exchange fails with `invalid_client`. Regenerate and
 set the sops value, re-run `make dag-apply-clients`, and update the
 app config. Both must come from the same sops plaintext.
 
-**Missing access group.** The consent service returns an error if the
+**Missing access group.** The access gate returns an error if the
 authenticating user is not a member of `access-<slug>`. Add the user to
 the group via the admin portal before retesting. The group must exist in
 Kratos; it is created by the Kratos init or by the admin UI -- it is not
@@ -546,7 +550,7 @@ open an upstream issue if the endpoint exists but returns an error.
 
 - `ARCHITECTURE.md` -- issuer URL (LB-2), cookie domain (LB-4), subject types (LB-5)
 - `docs/per-app-oidc.md` -- role/claim contract and role granularity ranking
-- `hydra/clients/*.yaml` -- authoritative manifests
+- `MANIFEST_DIR` (`/etc/portal/manifests`) -- the runtime manifest set; worked examples in `e2e/manifests/`
 - `docs/runbooks/secrets-rotation.md` -- break-glass if `secrets.system` is compromised
 - `portal/src/lib/register-clients.ts` -- the in-app OIDC client registrar (replaces the legacy `dag-util` / `apply-clients.sh` runner)
 - `DEPLOY.md` -- full promotion path including `make dag-apply-clients`
