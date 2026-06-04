@@ -45,14 +45,14 @@ include:
   # node-build components fire on every push and MR event. go.work at
   # repo root makes the multi-module layout play nicely with
   # `go build ./<dir>`.
-  - component: gitlab.com/dunn.dev/pipeline/go-build@2.5.0
+  - component: gitlab.com/dunn.dev/pipeline/go-build@2.5.1
     inputs:
       stage: verify
       job_name: verify-ldap-bridge
       binary_name: ldap-bridge
       package_path: ./ldap-bridge
 
-  - component: gitlab.com/dunn.dev/pipeline/node-build@2.5.0
+  - component: gitlab.com/dunn.dev/pipeline/node-build@2.5.1
     inputs:
       stage: verify
       job_name: verify-othala
@@ -60,7 +60,7 @@ include:
 
 
   # ----- ldap-bridge ----------------------------------------------
-  - component: gitlab.com/dunn.dev/pipeline/container-image@2.5.0
+  - component: gitlab.com/dunn.dev/pipeline/container-image@2.5.1
     inputs:
       job_name: build-ldap-bridge
       image_tag: ldap-bridge
@@ -68,7 +68,7 @@ include:
       context: ldap-bridge
       tag_pipeline: true
 
-  - component: gitlab.com/dunn.dev/pipeline/container-sbom@2.5.0
+  - component: gitlab.com/dunn.dev/pipeline/container-sbom@2.5.1
     inputs:
       job_name: sbom-ldap-bridge
       container_image: "${CI_REGISTRY_IMAGE}/ldap-bridge:${CI_COMMIT_TAG}"
@@ -85,7 +85,7 @@ include:
   # Context is repo root (legacy from when build needed hydra/clients/;
   # v0.2.0 reads manifests at runtime, but context: . is kept stable
   # because the build is light and changing it requires a CI dance).
-  - component: gitlab.com/dunn.dev/pipeline/container-image@2.5.0
+  - component: gitlab.com/dunn.dev/pipeline/container-image@2.5.1
     inputs:
       job_name: build-othala
       publish_at_root: true
@@ -93,7 +93,7 @@ include:
       context: .
       tag_pipeline: true
 
-  - component: gitlab.com/dunn.dev/pipeline/container-sbom@2.5.0
+  - component: gitlab.com/dunn.dev/pipeline/container-sbom@2.5.1
     inputs:
       job_name: sbom-othala
       container_image: "${CI_REGISTRY_IMAGE}:${CI_COMMIT_TAG}"
@@ -108,7 +108,7 @@ include:
   # stays empty because container builds don't produce one. The
   # value is the GitLab Release record itself plus links to each
   # service's SBOM in the generic package registry.
-  - component: gitlab.com/dunn.dev/pipeline/release-create@2.5.0
+  - component: gitlab.com/dunn.dev/pipeline/release-create@2.5.1
     inputs:
       package_name: auth
       release_title: "auth $CI_COMMIT_TAG"
@@ -186,7 +186,7 @@ e2e:
   variables:
     LAB_DOMAIN: lab.dunn.dev
     AUTH_REGISTRY: "${CI_REGISTRY_IMAGE}"
-    # Default to the commit short-SHA (what container-image @2.5.0 publishes
+    # Default to the commit short-SHA (what container-image @2.5.1 publishes
     # for non-tag / BUILD_CI_IMAGE builds). GitLab variables: do NOT honor
     # bash ${VAR:-default}, so tag pipelines override AUTH_VERSION in rules:.
     AUTH_VERSION: "$CI_COMMIT_SHORT_SHA"
@@ -218,7 +218,7 @@ e2e:
     - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
     - if: '$CI_PIPELINE_SOURCE == "push" && $CI_COMMIT_BRANCH == "main"'
     # On-demand pre-tag validation: a branch pipeline triggered with
-    # BUILD_CI_IMAGE=true builds the images (container-image @2.5.0 honors
+    # BUILD_CI_IMAGE=true builds the images (container-image @2.5.1 honors
     # the same flag — see its rule 3) and runs e2e against them. Lets us
     # validate the converged substrate on the carmine runner BEFORE cutting
     # a tag or merging to main. The builds publish :<short-sha>, which the
