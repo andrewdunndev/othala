@@ -76,36 +76,68 @@ test('login accepts an active member (skip path)', async () => {
   assert.equal(calls.rejectLogin, 0);
 });
 
-test('login REJECTS when missing the access group', async () => {
+test('login REJECTS when missing the access group — opaque error_description, real reason logged', async () => {
   const { api, calls } = stubOAuth2();
-  const res = await handleLogin(new Request('https://x/oauth2/login?login_challenge=lc'), {
-    oauth2: api,
-    getIdentity: async () => activeMember({ metadata_admin: { groups: [] } }),
-  });
-  assert.equal(res.status, 302);
-  assert.equal(res.headers.get('location'), 'https://dag.dunn.dev/login-rejected');
-  assert.equal(calls.acceptLogin, 0);
-  assert.match(calls.rejectLoginReason, /access-grafana group/);
+  const warnArgs = [];
+  const origWarn = console.warn;
+  console.warn = (...a) => warnArgs.push(a);
+  try {
+    const res = await handleLogin(new Request('https://x/oauth2/login?login_challenge=lc'), {
+      oauth2: api,
+      getIdentity: async () => activeMember({ metadata_admin: { groups: [] } }),
+    });
+    assert.equal(res.status, 302);
+    assert.equal(res.headers.get('location'), 'https://dag.dunn.dev/login-rejected');
+    assert.equal(calls.acceptLogin, 0);
+    // Client-facing error_description must be opaque — NOT the raw group name.
+    assert.equal(calls.rejectLoginReason, 'access_denied', 'error_description must be opaque');
+    // Real reason must appear in the server-side log for operator observability.
+    const logged = warnArgs.find((a) => a[0].includes('oauth2/login'));
+    assert.ok(logged, 'console.warn must be called for denied login');
+    assert.match(logged[1].reason, /access-grafana group/, 'real reason must be in the server-side log');
+  } finally {
+    console.warn = origWarn;
+  }
 });
 
-test('login REJECTS when identity state is inactive', async () => {
+test('login REJECTS when identity state is inactive — opaque error_description, real reason logged', async () => {
   const { api, calls } = stubOAuth2();
-  const res = await handleLogin(new Request('https://x/oauth2/login?login_challenge=lc'), {
-    oauth2: api,
-    getIdentity: async () => activeMember({ state: 'inactive' }),
-  });
-  assert.equal(res.status, 302);
-  assert.equal(calls.rejectLoginReason, 'identity not active');
+  const warnArgs = [];
+  const origWarn = console.warn;
+  console.warn = (...a) => warnArgs.push(a);
+  try {
+    const res = await handleLogin(new Request('https://x/oauth2/login?login_challenge=lc'), {
+      oauth2: api,
+      getIdentity: async () => activeMember({ state: 'inactive' }),
+    });
+    assert.equal(res.status, 302);
+    assert.equal(calls.rejectLoginReason, 'access_denied', 'error_description must be opaque');
+    const logged = warnArgs.find((a) => a[0].includes('oauth2/login'));
+    assert.ok(logged, 'console.warn must be called for denied login');
+    assert.equal(logged[1].reason, 'identity not active', 'real reason must be in the server-side log');
+  } finally {
+    console.warn = origWarn;
+  }
 });
 
-test('login REJECTS when identity lookup fails (fail-closed)', async () => {
+test('login REJECTS when identity lookup fails (fail-closed) — opaque error_description', async () => {
   const { api, calls } = stubOAuth2();
-  const res = await handleLogin(new Request('https://x/oauth2/login?login_challenge=lc'), {
-    oauth2: api,
-    getIdentity: async () => { throw new Error('kratos down'); },
-  });
-  assert.equal(res.status, 302);
-  assert.equal(calls.rejectLoginReason, 'identity lookup failed');
+  const warnArgs = [];
+  const origWarn = console.warn;
+  console.warn = (...a) => warnArgs.push(a);
+  try {
+    const res = await handleLogin(new Request('https://x/oauth2/login?login_challenge=lc'), {
+      oauth2: api,
+      getIdentity: async () => { throw new Error('kratos down'); },
+    });
+    assert.equal(res.status, 302);
+    assert.equal(calls.rejectLoginReason, 'access_denied', 'error_description must be opaque');
+    const logged = warnArgs.find((a) => a[0].includes('oauth2/login'));
+    assert.ok(logged, 'console.warn must be called for denied login');
+    assert.equal(logged[1].reason, 'identity lookup failed', 'real reason must be in the server-side log');
+  } finally {
+    console.warn = origWarn;
+  }
 });
 
 test('login bounces to RELATIVE return_to when not authenticated (skip=false, no session)', async () => {
@@ -145,35 +177,65 @@ test('consent accepts an active member and grants scope + injects id_token', asy
   assert.deepEqual(calls.acceptConsentBody.session.id_token.groups, ['access-grafana']);
 });
 
-test('consent REJECTS when missing the access group', async () => {
+test('consent REJECTS when missing the access group — opaque error_description, real reason logged', async () => {
   const { api, calls } = stubOAuth2();
-  const res = await handleConsent(new Request('https://x/oauth2/consent?consent_challenge=cc'), {
-    oauth2: api,
-    getIdentity: async () => activeMember({ metadata_admin: { groups: [] } }),
-  });
-  assert.equal(res.status, 302);
-  assert.equal(calls.acceptConsent, 0);
-  assert.match(calls.rejectConsentReason, /access-grafana group/);
+  const warnArgs = [];
+  const origWarn = console.warn;
+  console.warn = (...a) => warnArgs.push(a);
+  try {
+    const res = await handleConsent(new Request('https://x/oauth2/consent?consent_challenge=cc'), {
+      oauth2: api,
+      getIdentity: async () => activeMember({ metadata_admin: { groups: [] } }),
+    });
+    assert.equal(res.status, 302);
+    assert.equal(calls.acceptConsent, 0);
+    assert.equal(calls.rejectConsentReason, 'access_denied', 'error_description must be opaque');
+    const logged = warnArgs.find((a) => a[0].includes('oauth2/consent'));
+    assert.ok(logged, 'console.warn must be called for denied consent');
+    assert.match(logged[1].reason, /access-grafana group/, 'real reason must be in the server-side log');
+  } finally {
+    console.warn = origWarn;
+  }
 });
 
-test('consent REJECTS when identity state is inactive', async () => {
+test('consent REJECTS when identity state is inactive — opaque error_description, real reason logged', async () => {
   const { api, calls } = stubOAuth2();
-  const res = await handleConsent(new Request('https://x/oauth2/consent?consent_challenge=cc'), {
-    oauth2: api,
-    getIdentity: async () => activeMember({ state: 'inactive' }),
-  });
-  assert.equal(res.status, 302);
-  assert.equal(calls.rejectConsentReason, 'identity not active');
+  const warnArgs = [];
+  const origWarn = console.warn;
+  console.warn = (...a) => warnArgs.push(a);
+  try {
+    const res = await handleConsent(new Request('https://x/oauth2/consent?consent_challenge=cc'), {
+      oauth2: api,
+      getIdentity: async () => activeMember({ state: 'inactive' }),
+    });
+    assert.equal(res.status, 302);
+    assert.equal(calls.rejectConsentReason, 'access_denied', 'error_description must be opaque');
+    const logged = warnArgs.find((a) => a[0].includes('oauth2/consent'));
+    assert.ok(logged, 'console.warn must be called for denied consent');
+    assert.equal(logged[1].reason, 'identity not active', 'real reason must be in the server-side log');
+  } finally {
+    console.warn = origWarn;
+  }
 });
 
-test('consent REJECTS when identity lookup fails (fail-closed)', async () => {
+test('consent REJECTS when identity lookup fails (fail-closed) — opaque error_description', async () => {
   const { api, calls } = stubOAuth2();
-  const res = await handleConsent(new Request('https://x/oauth2/consent?consent_challenge=cc'), {
-    oauth2: api,
-    getIdentity: async () => { throw new Error('kratos down'); },
-  });
-  assert.equal(res.status, 302);
-  assert.equal(calls.rejectConsentReason, 'identity lookup failed');
+  const warnArgs = [];
+  const origWarn = console.warn;
+  console.warn = (...a) => warnArgs.push(a);
+  try {
+    const res = await handleConsent(new Request('https://x/oauth2/consent?consent_challenge=cc'), {
+      oauth2: api,
+      getIdentity: async () => { throw new Error('kratos down'); },
+    });
+    assert.equal(res.status, 302);
+    assert.equal(calls.rejectConsentReason, 'access_denied', 'error_description must be opaque');
+    const logged = warnArgs.find((a) => a[0].includes('oauth2/consent'));
+    assert.ok(logged, 'console.warn must be called for denied consent');
+    assert.equal(logged[1].reason, 'identity lookup failed', 'real reason must be in the server-side log');
+  } finally {
+    console.warn = origWarn;
+  }
 });
 
 test('consent 400 on missing challenge', async () => {
@@ -714,18 +776,29 @@ test('C: skip_access_check still enforces state===active', async () => {
   // Inactive identity — must still be denied even with skip_access_check.
   const identity = activeMember({ state: 'inactive', metadata_admin: { groups: [] } });
   const skipManifest = { ...grafanaManifest, skipAccessCheck: true };
-  const res = await handleConsent(
-    new Request('https://x/oauth2/consent?consent_challenge=cc'),
-    {
-      oauth2: api,
-      getIdentity: async () => identity,
-      manifest: () => skipManifest,
-    },
-  );
-  assert.equal(res.status, 302);
-  assert.equal(calls.rejectConsent, 1, 'inactive identity must still be denied with skip_access_check');
-  assert.equal(calls.acceptConsent, 0);
-  assert.equal(calls.rejectConsentReason, 'identity not active');
+  const warnArgs = [];
+  const origWarn = console.warn;
+  console.warn = (...a) => warnArgs.push(a);
+  try {
+    const res = await handleConsent(
+      new Request('https://x/oauth2/consent?consent_challenge=cc'),
+      {
+        oauth2: api,
+        getIdentity: async () => identity,
+        manifest: () => skipManifest,
+      },
+    );
+    assert.equal(res.status, 302);
+    assert.equal(calls.rejectConsent, 1, 'inactive identity must still be denied with skip_access_check');
+    assert.equal(calls.acceptConsent, 0);
+    // Client sees opaque error_description; real reason is server-side only.
+    assert.equal(calls.rejectConsentReason, 'access_denied', 'error_description must be opaque');
+    const logged = warnArgs.find((a) => a[0].includes('oauth2/consent'));
+    assert.ok(logged, 'console.warn must be called');
+    assert.equal(logged[1].reason, 'identity not active', 'real reason must be in the server-side log');
+  } finally {
+    console.warn = origWarn;
+  }
 });
 
 // ── Session-presence guard on the POST path ───────────────────────────────────
@@ -793,7 +866,8 @@ test('T7b: POST Allow re-gates and rejects an inactive identity', async () => {
   assert.equal(res.status, 302, 'should redirect (reject path)');
   assert.equal(calls.acceptConsent, 0, 'acceptConsent must NOT be called for inactive identity on allow path');
   assert.equal(calls.rejectConsent, 1, 'rejectConsent must be called when re-gate fails for inactive identity');
-  assert.match(calls.rejectConsentReason, /identity not active/, 'rejection reason must cite inactive identity');
+  // Client-facing error_description must be opaque; real reason stays server-side.
+  assert.equal(calls.rejectConsentReason, 'access_denied', 'error_description must be opaque on allow-path re-gate');
 });
 
 // ── deepMergeClaims — recursive nested-object merge ──────────────────────────

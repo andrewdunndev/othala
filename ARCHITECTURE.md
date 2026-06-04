@@ -74,17 +74,30 @@ current architecture; do not reintroduce them.
 
 ### LB-1: WebAuthn `rp.id = dunn.dev`
 
-`kratos/kratos.yml: selfservice.methods.webauthn.config.rp.id`. One-way.
-Changing this invalidates every passkey already enrolled. Documented in
-`docs/decision.md` "WebAuthn rp.id" row.
+`kratos/kratos.yml: selfservice.methods.webauthn.config.rp.id`
+(`${OTHALA_WEBAUTHN_RP_ID}`). One-way. Changing this invalidates every
+passkey already enrolled. Documented in `docs/decision.md` "WebAuthn
+rp.id" row.
 
-**If you change it**: every family member re-enrolls passkeys. Don't.
+> **Adopters:** `dunn.dev` is this instance's value, set via
+> `OTHALA_WEBAUTHN_RP_ID`. Substitute your own registrable domain. The
+> caution below is about the one-way passkey-enrollment commitment once
+> you have enrolled users — not about using `dunn.dev` specifically.
+
+**If you change it after enrollment**: every user re-enrolls passkeys.
+Choose your `rp.id` before first enrollment and don't change it.
 
 ### LB-2: Issuer URL `https://dag.dunn.dev/`
 
-`hydra/hydra.yml: urls.self.issuer`. Embedded in every id_token's `iss`
-claim. Once a consumer (Tailscale, Vaultwarden, etc.) is configured
-against this issuer, changing it means re-onboarding the consumer.
+`hydra/hydra.yml: urls.self.issuer` (`${OTHALA_PUBLIC_URL}/`). Embedded
+in every id_token's `iss` claim. Once a consumer (Tailscale,
+Vaultwarden, etc.) is configured against this issuer, changing it means
+re-onboarding the consumer.
+
+> **Adopters:** `https://dag.dunn.dev/` is this instance's value, set
+> via `OTHALA_PUBLIC_URL`. Substitute your own public FQDN. The caution
+> below is about the lock-in once any RP is wired — not about using
+> `dag.dunn.dev` specifically.
 
 Also byte-matches the WebFinger response on the dunn.dev apex (see
 `docs/apex-webfinger-followup.md`).
@@ -259,13 +272,14 @@ complete a flow. Both checks are the gate; neither is optional.
 `portal/src/server/listen.mjs`. Two in-process HTTP listeners bound
 separately:
 
-- **Public** (`PORT`, default 8080, on `HOST` default `0.0.0.0`) serves
-  the Astro SSR handler: the OAuth2 challenge providers, the family UI,
-  `/auth/*`, `/admin/*` pages. This is the only handler exposed to the
-  network.
-- **Admin** (`ADMIN_PORT`, default 8431, on `ADMIN_HOST` default
-  `127.0.0.1`, loopback / pod-only) is a SEPARATE `http.createServer`
-  with its own tiny mux: `GET /healthz`, `GET /readyz`,
+- **Public** (`PORT`, code default 4321, on `HOST` default `0.0.0.0`;
+  set to 8080 in `e2e/compose.yml` and production) serves the Astro SSR
+  handler: the OAuth2 challenge providers, the family UI, `/auth/*`,
+  `/admin/*` pages. This is the only handler exposed to the network.
+- **Admin** (`ADMIN_PORT`, code default 4431, on `ADMIN_HOST` default
+  `127.0.0.1`, loopback / pod-only; set to 8431 in `e2e/compose.yml`
+  and production) is a SEPARATE `http.createServer` with its own tiny
+  mux: `GET /healthz`, `GET /readyz`,
   `POST /admin/revoke-user` (bearer `OTHALA_ADMIN_ENDPOINT_BEARER`),
   `POST /admin/recovery-gate` (bearer `RECOVERY_GATE_SECRET`).
 

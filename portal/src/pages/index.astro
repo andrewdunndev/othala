@@ -52,16 +52,17 @@ if (devOverride === 'down' || devOverride === 'pre-auth' || devOverride === 'pos
   state = devOverride;
   if (state === 'post-auth') {
     // Plausible mocked identity so the post-auth view renders something
-    // realistic in dev without a Kratos session. Groups include the
-    // access tokens for the apps shown.
+    // realistic in dev without a Kratos session. Groups match the shipped
+    // example manifests (e2e/manifests/) so the dev preview renders tiles
+    // out of the box for any adopter — replace these with your own groups.
     identity = {
       id: 'dev-mock',
       traits: { username: 'dev.user', email: 'dev@example.local', displayName: 'Dev User' },
       metadata_admin: {
         groups: [
           'admin', 'family',
-          'access-memory', 'access-cinema', 'access-tune', 'access-llm',
-          'access-keep', 'access-listen', 'access-larder',
+          'access-grafana', 'access-audiobookshelf', 'access-jellyfin',
+          'access-proxywatch', 'access-statuspage',
         ],
       },
     } as unknown as Identity;

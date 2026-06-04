@@ -77,6 +77,8 @@ consent:
       claim_emit:
         grafana_role: ["Viewer"]
         groups: ["family"]
+  # group_role_map keys are Kratos identity group names. Replace admin/family/
+  # friends/kids with your own group slugs — these are example names only.
   group_role_map:
     admin: admin
     family: viewer

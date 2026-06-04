@@ -233,6 +233,7 @@ check-portal:
 # -----------------------------------------------------------------
 e2e:
   stage: e2e
+  # NOTE: requires a carmine-tagged QEMU runner; forks without one will see this job pending. See docs/qemu-ci-lab.md.
   tags: [carmine, qemu]
   needs:
     - build-othala

@@ -17,29 +17,22 @@ active sessions.
 database. Do not touch it during cookie rotation. See `hydra/hydra.yml`
 header comment.
 
-## Two-slot model
+## Single-slot model (collapsed key)
 
 Both Kratos `secrets.cookie` and `secrets.cipher`, plus Hydra
 `secrets.cookie`, accept a list of values. The first entry signs new
-material; every entry in the list verifies. The convention used by this
-repo:
+material; every entry in the list verifies.
 
-```
-SECRET_CURRENT  = active signing key (signs new cookies)
-SECRET_PREVIOUS = secondary verification key
-```
-
-Both slots are populated with distinct values at all times. On first
-provision, `gen-secrets.sh` mints two fresh secrets: `_CURRENT` is the
-active signer; `_PREVIOUS` is a sentinel that becomes meaningful on
-the first rotation (when it gets set to the prior `_CURRENT`).
-
-Why not leave `_PREVIOUS` empty on first provision: Kratos and Hydra
-reject empty list elements in `secrets.cookie` / `secrets.cipher` as
-YAML schema violations after envsubst expansion. The two-distinct-secret
-posture keeps the rendered config well-formed with no special-case
-templating, and removes a class of "first deploy fails because the
-runbook didn't account for it" bugs.
+Ory v26.2.0 enforces `uniqueItems` on these arrays, which rules out a
+two-identical-slot approach. Production collapses the rotation model to
+a **single active `_CURRENT` key per secret** (`gen-secrets.sh` mints
+one value per slot — no `_PREVIOUS` at rest). Rotation works by
+prepending a new `_CURRENT` directly into the YAML list in the Kratos
+and Hydra config; the old value remains in the list as a secondary
+verifier until all cookies minted under it have expired, then it is
+removed. The `.env.example` and `gen-secrets.sh` reflect this: only
+`KRATOS_COOKIE_SECRET_CURRENT`, `KRATOS_CIPHER_SECRET_CURRENT`, and
+`HYDRA_COOKIE_SECRET_CURRENT` exist. There is no `_PREVIOUS` env var.
 
 ## Procedure
 
@@ -51,25 +44,18 @@ runbook didn't account for it" bugs.
 
 2. Update sops (production) or `.env` (lab):
 
-   Production (`dunn.dev/iac/pyinfra/secrets.enc.yaml`):
-
    Production (sops-backed operator repo, e.g. `dunn.dev/iac`):
 
    ```sh
    sops <your-iac-repo>/pyinfra/secrets.enc.yaml
-   # Edit the auth_session_secret entry to the new value.
-   # Substrate-secret model (v0.2.0): a single `auth_session_secret` key
-   # feeds both _CURRENT and _PREVIOUS slots — rotation is a single
-   # value swap; collapsing the two-slot semantic into one sops entry
-   # is the homelab-scope simplification documented in
-   # docs/golden-path.md "Substrate secret collapse" entry.
+   # Update auth_session_secret to the new value (single _CURRENT per
+   # secret; no _PREVIOUS slot in the operator store).
    ```
 
-   E2E harness (`e2e/.env`):
+   E2E harness (`e2e/.env`): only `_CURRENT` exists (no `_PREVIOUS`
+   slot). Update the single value:
 
    ```diff
-   -KRATOS_COOKIE_SECRET_PREVIOUS=
-   +KRATOS_COOKIE_SECRET_PREVIOUS=<old current value>
    -KRATOS_COOKIE_SECRET_CURRENT=<old value>
    +KRATOS_COOKIE_SECRET_CURRENT=<new value>
    ```
@@ -88,27 +74,29 @@ runbook didn't account for it" bugs.
    ```
 
 5. Active sessions: still valid. Existing cookies were signed with the
-   old secret; verification still succeeds because `_PREVIOUS` is in
-   the list.
+   old secret; verification still succeeds because the old value
+   remains in the YAML list as a secondary verifier.
 
 6. Wait for the session lifespan to elapse:
    - Kratos: 90 days for normal sessions, 1 day for admin enforcement
      (admin SSR forces re-auth at AAL2 daily).
    - Hydra: 30 days for refresh tokens (the ttl.refresh_token cap).
 
-7. After the wait, no live cookie was minted under the old secret. The
-   prior `_PREVIOUS` is now obsolete. Set `_PREVIOUS` to a fresh
-   sentinel (so the slot is still populated) so the next rotation
-   inherits the same posture:
+7. After the wait, no live cookie was minted under the old secret.
+   Remove the old value from the Kratos and Hydra `secrets.*` YAML
+   lists so only the new `_CURRENT` remains, then update sops (or
+   `.env` for the lab) to match:
 
-   ```diff
-   -KRATOS_COOKIE_SECRET_PREVIOUS=<old current>
-   +KRATOS_COOKIE_SECRET_PREVIOUS=<openssl rand -hex 32>
+   ```sh
+   # The kratos.yml / hydra.yml secrets.cookie list now has only one entry.
+   sops <your-iac-repo>/pyinfra/secrets.enc.yaml
+   # Remove the stale old value from auth_session_secret (or whichever
+   # key feeds the list); only the value from step 1 should remain.
    ```
 
-8. Restart again. Both slots remain populated with distinct values; the
-   old signing key is no longer in memory anywhere except the
-   operator's archive.
+8. Restart again. The single-slot posture is restored; the old signing
+   key is no longer in memory or config anywhere except the operator's
+   archive.
 
 ## Validation
 
@@ -118,16 +106,16 @@ honored until its own expiry.
 
 ## Failure modes
 
-- **Restart with new CURRENT but PREVIOUS empty before old sessions
-  expire:** every active session gets bounced to login. UX hit, not a
-  security regression.
-- **Restart with both CURRENT and PREVIOUS empty:** Kratos refuses to
-  start (`secrets.cookie: at least one entry required`). Same for
-  Hydra. Restore from operator store.
+- **Restart with new CURRENT but old entry accidentally dropped from
+  the list before sessions expire:** every active session gets bounced
+  to login. UX hit, not a security regression.
+- **Restart with the secrets list empty:** Kratos refuses to start
+  (`secrets.cookie: at least one entry required`). Same for Hydra.
+  Restore from operator store.
 
 ## Related
 
 - `kratos/kratos.yml`, `hydra/hydra.yml`: the env-var indirection.
-- `e2e/gen-secrets.sh`: produces fresh `_CURRENT` AND fresh
-  `_PREVIOUS` (distinct values) for first provisioning.
+- `e2e/gen-secrets.sh`: produces a fresh `_CURRENT` for each secret
+  (no `_PREVIOUS` — single-slot / collapsed-key model).
 - `docs/decision.md`: H4 "Hydra cookie-secret rotation" lock.

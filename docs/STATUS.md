@@ -24,8 +24,10 @@ all-TS application fronting upstream Ory plus the Go LDAP bridge:
   Hydra login/consent/logout challenge handlers, the fail-closed
   access-gate (`gate.ts`: `access-<clientId>` group membership AND
   Kratos identity state `== active`), the id_token claims builder
-  (`claims.ts`), and the dual-listener (`listen.mjs`: public SSR `8080`
-  + loopback admin `8431` carrying `/admin/revoke-user` +
+  (`claims.ts`), and the dual-listener (`listen.mjs`: public SSR on
+  `PORT` (code default 4321, set to 8080 in compose/prod) + loopback
+  admin on `ADMIN_PORT` (code default 4431, set to 8431 in
+  compose/prod) carrying `/admin/revoke-user` +
   `/admin/recovery-gate`).
 - `revokeSubject()` (`revoke.ts`) runs the in-process revocation
   fan-out (Kratos deactivate + sessions, Hydra login/consent session

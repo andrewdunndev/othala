@@ -2,7 +2,13 @@
 # Generic example fixture for the Othala e2e harness. A stand-in for an
 # external, hosted service that the portal links to but does not
 # authenticate — auth_kind: external. Presentation ONLY; no oidc:/
-# consent: block and no access group gate on our side.
+# consent: block. There is no SSO session on our side.
+#
+# NOTE: the portal's tile filter gates ALL tiles on group membership,
+# including external ones. This tile requires the access-statuspage group
+# (explicit below). If you want a truly ungated tile visible to every
+# authenticated user, that requires a code change to the tile filter in
+# portal/src/pages/index.astro — see the design note in the OSS README.
 
 presentation:
   name: Statuspage
@@ -12,4 +18,7 @@ presentation:
   icon_slug: ""
   icon_fallback: statuspage
   auth_kind: external
+  # Tile filter in index.astro gates on group membership for all tiles,
+  # including external ones. access-statuspage is required to see this tile.
+  access_group: access-statuspage
   order: 200

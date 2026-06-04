@@ -48,8 +48,7 @@ The complete worked example is the e2e harness. It stands up Postgres + Kratos +
 
 ```sh
 cd e2e
-./gen-secrets.sh        # writes a local .env (secrets + OTHALA_* values)
-bash validate.sh        # render configs -> up -> health-wait -> OIDC dance -> smoke
+AUTH_VERSION=latest bash validate.sh   # generates .env, renders configs, up, health-wait, smoke
 ```
 
 Needs a Docker or Podman compose runtime. See [`e2e/README.md`](e2e/README.md) for the harness in detail.

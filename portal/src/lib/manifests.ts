@@ -212,14 +212,25 @@ function normaliseGroupRoleMap(raw: unknown): Record<string, string> {
  * block and no `oidc:` block, and must be skipped by the OIDC client
  * loader rather than throwing. A stale flat manifest (client fields at the
  * top level, no `oidc:`) still throws via parseManifest's flat-shape guard.
+ *
+ * Any read/parse/validate error (ENOENT from a TOCTOU race during manifest
+ * sync, YAML syntax error, parseManifest throw) is caught, warned, and
+ * returned as null so a single bad file does not take down the whole load.
+ * The caller's .filter() already strips nulls. Mirrors the per-file
+ * isolation pattern used in tiles.ts loadFromDisk.
  */
 function loadOne(file: string, dir: string): ClientManifest | null {
-  const text = readFileSync(join(dir, file), 'utf8');
-  const doc = (parseYaml(text) ?? {}) as { oidc?: unknown; presentation?: unknown };
-  const hasOidc = doc.oidc != null && typeof doc.oidc === 'object';
-  const hasPresentation = doc.presentation != null && typeof doc.presentation === 'object';
-  if (!hasOidc && hasPresentation) return null;
-  return parseManifest(text, file);
+  try {
+    const text = readFileSync(join(dir, file), 'utf8');
+    const doc = (parseYaml(text) ?? {}) as { oidc?: unknown; presentation?: unknown };
+    const hasOidc = doc.oidc != null && typeof doc.oidc === 'object';
+    const hasPresentation = doc.presentation != null && typeof doc.presentation === 'object';
+    if (!hasOidc && hasPresentation) return null;
+    return parseManifest(text, file);
+  } catch (err) {
+    console.warn(`manifests: skipping ${file}: ${err}`);
+    return null;
+  }
 }
 
 /**

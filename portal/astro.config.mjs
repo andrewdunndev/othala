@@ -25,7 +25,11 @@ import tailwindcss from '@tailwindcss/vite';
 
 export default defineConfig({
   output: 'server',
-  adapter: node({ mode: 'standalone' }),
+  // trustProxy: Caddy sets X-Forwarded-For; with trustProxy the adapter
+  // resolves ctx.clientAddress from XFF rather than the raw TCP socket
+  // (which is always the Caddy container IP, collapsing all users to one
+  // rate-limit bucket).
+  adapter: node({ mode: 'standalone', trustProxy: true }),
   integrations: [],
   // Build-time bake: same var as the runtime OTHALA_PUBLIC_URL export in $lib/config.
   site: process.env.OTHALA_PUBLIC_URL ?? 'http://localhost:4321',

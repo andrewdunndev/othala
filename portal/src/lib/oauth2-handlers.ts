@@ -193,12 +193,17 @@ export async function handleLogin(req: Request, deps: Deps = {}): Promise<Respon
   const loginManifest = d.manifest(clientId);
   const result = d.gate(identity, clientId, loginManifest);
   if (!result.allowed) {
+    // Log the real denial reason server-side for operator observability, then
+    // send an opaque error_description to the client (Hydra forwards it into
+    // the RP redirect) to avoid leaking internal group names or identity state
+    // distinguishers to relying parties.
+    console.warn('[oauth2/login] access denied', { clientId, subject, reason: result.reason });
     try {
       const { redirect_to } = await d.oauth2.rejectOAuth2LoginRequest({
         loginChallenge: challenge,
         rejectOAuth2Request: {
           error: 'access_denied',
-          error_description: result.reason,
+          error_description: 'access_denied',
           status_code: 403,
         },
       });
@@ -294,12 +299,15 @@ export async function handleConsent(req: Request, deps: Deps = {}): Promise<Resp
   const consentManifest = d.manifest(clientId);
   const result = d.gate(identity, clientId, consentManifest);
   if (!result.allowed) {
+    // Log the real denial reason server-side; send an opaque error_description
+    // to the client to avoid leaking internal group names / identity state.
+    console.warn('[oauth2/consent] access denied', { clientId, subject, reason: result.reason });
     try {
       const { redirect_to } = await d.oauth2.rejectOAuth2ConsentRequest({
         consentChallenge: challenge,
         rejectOAuth2Request: {
           error: 'access_denied',
-          error_description: result.reason,
+          error_description: 'access_denied',
           status_code: 403,
         },
       });
@@ -467,12 +475,15 @@ export async function handleConsentPost(req: Request, deps: Deps = {}): Promise<
   const allowManifest = d.manifest(clientId);
   const result = d.gate(identity, clientId, allowManifest);
   if (!result.allowed) {
+    // Log the real denial reason server-side; send an opaque error_description
+    // to the client to avoid leaking internal group names / identity state.
+    console.warn('[oauth2/consent/post] access denied', { clientId, subject: consent.subject, reason: result.reason });
     try {
       const { redirect_to } = await d.oauth2.rejectOAuth2ConsentRequest({
         consentChallenge: challenge,
         rejectOAuth2Request: {
           error: 'access_denied',
-          error_description: result.reason,
+          error_description: 'access_denied',
           status_code: 403,
         },
       });

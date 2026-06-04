@@ -55,6 +55,28 @@ test('rejects header-injection control characters', () => {
   assert.equal(r.ok, false);
 });
 
+// CR/LF handling — design call:
+// - name is header-bound (used in email From/Subject) -> CR/LF must be rejected.
+// - message goes into the email BODY only -> multi-line content is legitimate;
+//   CR/LF is NOT rejected in message so users can write multi-paragraph requests.
+// The /[\r\n]/ guard on name (contact.ts line ~77) covers the only header-injection
+// vector. This test documents both sides of that decision explicitly.
+test('name rejects CR/LF (header injection guard)', () => {
+  const r = validateContact({ name: 'Alice\r\nBcc: evil@x', type: 'other', message: 'a real message body' });
+  assert.equal(r.ok, false, 'name with CR/LF must be rejected (header-injection guard)');
+});
+
+test('message allows embedded newlines (multi-line textarea — body-only, not header-bound)', () => {
+  const r = validateContact({
+    name: 'Alice',
+    type: 'problem',
+    message: 'Line one.\r\nLine two.\nLine three.',
+  });
+  assert.equal(r.ok, true, 'message with CR/LF must be accepted (goes to body, not a header)');
+  // Trimmed value is returned verbatim (newlines preserved for the mailer body).
+  assert.ok(r.value.message.includes('\n'), 'embedded newlines must be preserved in the clean value');
+});
+
 test('rejects a body that is mostly links (spam)', () => {
   const r = validateContact({
     name: 'X',

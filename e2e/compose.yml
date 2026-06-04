@@ -302,9 +302,10 @@ services:
   # the deployed app (iac's dag-apply-clients.sh drives registration at
   # deploy time); the e2e activates it as a `compose run --rm` one-shot
   # on the SAME othala image to prove the in-app registrar registers
-  # every hydra/clients/*.yaml against Hydra admin. See smoke.sh
-  # section B. `profiles: [oneshot]` keeps it out of the up/healthcheck
-  # loop — smoke runs it explicitly via `compose run`.
+  # every manifest in MANIFEST_DIR=/etc/portal/manifests (mounted from
+  # e2e/manifests/) against Hydra admin. See smoke.sh section B.
+  # `profiles: [oneshot]` keeps it out of the up/healthcheck loop —
+  # smoke runs it explicitly via `compose run`.
   register-clients:
     image: ${AUTH_REGISTRY}:${AUTH_VERSION}
     container_name: lab-register-clients

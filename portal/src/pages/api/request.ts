@@ -33,8 +33,20 @@ function json(status: number, body: unknown, headers: Record<string, string> = {
   });
 }
 
-/** Best-effort client key for the rate limiter: real IP if the adapter has it,
- *  else a forwarded header, else a constant bucket (still bounds total volume). */
+/** Best-effort client key for the rate limiter.
+ *
+ * With `trustProxy: true` in the node adapter, @astrojs/node resolves
+ * ctx.clientAddress from the X-Forwarded-For header that Caddy sets, so this
+ * is the actual client IP — not the Caddy container IP shared by all requests.
+ *
+ * The manual XFF split below is pure defense-in-depth for the (unexpected) case
+ * where ctx.clientAddress is falsy despite trustProxy.  It is NOT the primary
+ * path and should not be relied upon in production.
+ *
+ * TODO(post-0.3): if ctx.clientAddress is ever falsy here, the XFF leftmost
+ * entry is attacker-controlled (any client can inject XFF headers).  Before the
+ * public flip, replace this fallback with trusted-proxy XFF parsing (e.g.
+ * validate against known proxy CIDRs or use a dedicated header Caddy stamps). */
 function clientKey(ctx: APIContext): string {
   try {
     if (ctx.clientAddress) return ctx.clientAddress;

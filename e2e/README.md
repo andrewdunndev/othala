@@ -70,10 +70,11 @@ VM dies on job end. Total turnaround: ~3-5 minutes including image pulls.
 - **Client registration** — runs the converged app's **in-app registrar**
   (`registerAllClients`, bundled to `dist/server/register-clients.mjs`)
   as a `compose run --rm register-clients` one-shot on the same othala
-  image. It reads `hydra/clients/*.yaml`, resolves each
-  `<SLUG>_CLIENT_SECRET` from env, and POST/PUTs every client to Hydra
-  admin; the smoke asserts the full set registered (specific checks for
-  `keep` and the no-PKCE `tailscale` manifest).
+  image. It reads manifests from `MANIFEST_DIR=/etc/portal/manifests`
+  (mounted from `e2e/manifests/`), resolves each `<SLUG>_CLIENT_SECRET`
+  from env, and POST/PUTs every client to Hydra admin; the smoke asserts
+  the full set registered (specific checks for `grafana` and
+  `audiobookshelf`).
 - **Identity admin flow** — create an identity via the Kratos admin API;
   `metadata_admin.groups` round-trips.
 - **Recovery-gate** — the converged app's loopback endpoint
