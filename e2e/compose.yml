@@ -336,14 +336,17 @@ services:
     command: ["node", "./dist/server/register-clients.mjs"]
 
   # OIDC dance runner (profile: oneshot) — Section G of smoke.sh.
-  # Runs oidc-dance.mjs from inside the compose net using the playwright image,
-  # which has the npm deps (@ ory/client-fetch, tough-cookie, fetch-cookie, jose)
-  # installed via `npm ci` from e2e/package.json. Runs as a one-shot via
+  # Runs oidc-dance.mjs from inside the compose net using the PREBAKED
+  # e2e-tester image (Containerfile): the npm deps (@ory/client-fetch,
+  # tough-cookie, fetch-cookie, jose) AND the e2e sources are baked in at
+  # /test at image-build time, so there is NO runtime `npm install` — the
+  # carmine inner VM can't reach the npm registry (it would stall + exit
+  # 124). Runs as a one-shot via
   # `docker compose --profile oneshot run --rm --no-deps dance-runner`.
   # smoke.sh Section G's run_dance helper drives this.
   # Uses othala:8080 (service name) as APP since it is NOT inside the othala container.
   dance-runner:
-    image: mcr.microsoft.com/playwright:v1.49.1-noble
+    image: ${AUTH_REGISTRY}/e2e-tester:${AUTH_VERSION}
     # No container_name: compose run --rm creates ephemeral unique names;
     # a fixed name would conflict when G1/G2/G3 run in sequence.
     profiles: ["oneshot"]
@@ -354,16 +357,10 @@ services:
         condition: service_healthy
     environment:
       OTHALA_URL: http://othala:8080
-    volumes:
-      - .:/test:ro,z
-      # Anonymous volume shadows /test/node_modules so npm ci can write there
-      # even though the bind mount is read-only (ro). The container overlay fs
-      # handles the writes; the host directory stays clean.
-      - /test/node_modules
     working_dir: /test
-    # npm ci installs the e2e deps (package.json); node then runs the substituted dance.
-    # smoke.sh passes the substituted dance script via stdin.
-    entrypoint: ["sh", "-c", "npm install --no-package-lock --no-audit --no-fund --quiet && node"]
+    # Deps + sources are prebaked at /test; just run node. smoke.sh passes
+    # the substituted dance script via stdin.
+    entrypoint: ["node"]
 
   # Browser-test edge (profile: browser ONLY). Fronts app + Kratos + Hydra on ONE
   # host so a real browser can drive the integrated login -> consent -> token flow.
@@ -401,18 +398,22 @@ services:
   # via @playwright/test specs (e2e/playwright/tests/*.spec.ts). Screenshots + test
   # output land in ./browser-out for CI artifact upload.
   #
-  # The mcr.microsoft.com/playwright image ships Chromium + all browser binaries
-  # pre-installed at /ms-playwright; the playwright npm package is installed at
-  # runtime via `npm ci` from e2e/package.json (mounted at /test/package.json).
-  # PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD=1 prevents a redundant download.
+  # The base mcr.microsoft.com/playwright image ships Chromium + all browser
+  # binaries pre-installed at /ms-playwright. The PREBAKED e2e-tester image
+  # (Containerfile, FROM that base) additionally bakes the @playwright/test
+  # npm package + the e2e sources into /test at image-build time. There is
+  # therefore NO runtime `npm install` — the install happens on the
+  # egress-capable build runner, not in the no-egress carmine inner VM
+  # where a runtime install stalls and times out the gate (exit 124).
+  # PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD=1 (also set in the image) prevents a
+  # redundant download.
   #
-  # CODIFICATION TODO: bake a thin sub-image (FROM mcr...playwright + npm ci) to
-  # drop the per-run install cost. Also add a compose override that sets othala
+  # CODIFICATION TODO (remaining): add a compose override that sets othala
   # KRATOS_PUBLIC_URL=http://auth.othala.test for the browser profile (golden uses
   # internal kratos:4433; the browser login redirect needs the public host so
   # ory_kratos_session is set on the correct domain).
   playwright:
-    image: mcr.microsoft.com/playwright:v1.49.1-noble
+    image: ${AUTH_REGISTRY}/e2e-tester:${AUTH_VERSION}
     container_name: lab-playwright
     profiles: ["browser"]
     depends_on:
@@ -428,11 +429,10 @@ services:
       GRAFANA_CLIENT_SECRET: ${GRAFANA_CLIENT_SECRET}
       PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD: "1"
     volumes:
-      # Mount the entire e2e dir so npm ci has package.json + the playwright/ tree.
-      - .:/test:ro,z
-      # Anonymous volume shadows /test/node_modules so npm ci can write there
-      # even though the bind mount is read-only. Container overlay fs handles writes.
-      - /test/node_modules
+      # Only the artifact sink is mounted: specs + node_modules are baked
+      # into the image at /test. browser-out captures screenshots + the
+      # html report for CI artifact upload.
       - ./browser-out:/out:z
     working_dir: /test
-    command: ["sh", "-c", "npm install --no-package-lock --no-audit --no-fund && npx playwright test --config=playwright.config.ts"]
+    # Deps + specs prebaked at /test; just run the suite. No npm install.
+    command: ["npx", "playwright", "test", "--config=playwright.config.ts"]

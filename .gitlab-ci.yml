@@ -75,6 +75,29 @@ include:
       package_name: auth
       sbom_filename: ldap-bridge-container.sbom.json
 
+  # ----- e2e-tester (prebaked Playwright browser-test image) ------
+  # The browser e2e leg runs inside the carmine inner VM, which can pull
+  # container images from the registry but CANNOT reach the npm registry
+  # (a runtime `npm install` there stalls and times out the gate, exit
+  # 124). This image bakes the @playwright/test deps + the e2e specs into
+  # a thin layer over the playwright base at BUILD time (npm ci against
+  # e2e/package-lock.json, on the egress-capable build runner), so the
+  # inner VM only PULLS it — no runtime npm install. compose.yml's
+  # playwright + dance-runner services consume it as the
+  # ${AUTH_REGISTRY}/e2e-tester sub-image. tag_pipeline: true keeps its
+  # tag set (v-tag on tags, short-sha on main / BUILD_CI_IMAGE) in lockstep
+  # with build-othala + build-ldap-bridge, so AUTH_VERSION resolves the
+  # same tag for all three in the e2e job. No SBOM/release: this is a
+  # test-only image, not a shipped artifact.
+  - component: gitlab.com/dunn.dev/pipeline/container-image@2.5.1
+    inputs:
+      job_name: build-e2e-tester
+      image_tag: e2e-tester
+      containerfile: e2e/Containerfile
+      context: e2e
+      tag_pipeline: true
+      sign_image: false
+
   # ----- othala (converged Astro Node SSR app) --------------------
   # Published at the registry ROOT (registry.gitlab.com/dunn.dev/othala)
   # via publish_at_root: true — the oryd/kratos-style namespace/name
@@ -214,6 +237,9 @@ e2e:
   needs:
     - build-othala
     - build-ldap-bridge
+    # Prebaked browser-test image — pulled by compose.yml's playwright +
+    # dance-runner services. Same VERSION tag as the app images above.
+    - build-e2e-tester
   variables:
     AUTH_REGISTRY: "${CI_REGISTRY_IMAGE}"
     # Default to the commit short-SHA (what container-image @2.5.1 publishes
