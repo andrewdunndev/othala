@@ -11,8 +11,8 @@ Updated 2026-06-01.
 ## Where we are
 
 **Convergence build complete, CV-verified, and renamed to Othala /
-dag.dunn.dev. Image-name reconcile (`portal` → `othala`) pending
-(Wave CP). Deploy pending, operator-gated.**
+dag.dunn.dev. Image published at the registry root as `othala`
+(Wave CP done). Deploy pending, operator-gated.**
 
 The OSS project is **Othala** ("Ory for your home"); the deployed
 instance host is **dag.dunn.dev**. The stack has converged to a single
@@ -38,9 +38,9 @@ all-TS application fronting upstream Ory plus the Go LDAP bridge:
 - Back-channel logout is Hydra-native. The app holds no signing key at
   rest; the custom private-key signer was deleted.
 
-The Go consent service and the `util` runner still exist in-tree but
-are **legacy-pending-removal**, retired at the deploy cutover. They are
-not the current architecture.
+The standalone Go consent service and the `util` runner have been
+**removed from the tree** — consent folded into the converged app,
+`util` retired. They are not the current architecture.
 
 **Stack:** Ory Kratos + Ory Hydra (OAuth2/OIDC) + Postgres 18 + Go
 glauth-kratos LDAP bridge + the converged Astro Node SSR Othala app on
