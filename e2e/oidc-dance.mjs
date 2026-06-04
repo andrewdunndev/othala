@@ -14,7 +14,7 @@
 //   jose               — decodeJwt for id_token claims (replaces manual base64url)
 //   introspectOAuth2Token assertion — confirms active=true + sub matches
 //
-// __SUBJECT__ / __KEEP_SECRET__ are sed-substituted by smoke.sh before piping.
+// __SUBJECT__ / __GRAFANA_SECRET__ are sed-substituted by smoke.sh before piping.
 // Output: single line `OK claims={...}` on success, or `DENIED-at-...` / `EXC`.
 
 import { OAuth2Api, Configuration } from '@ory/client-fetch';
@@ -29,10 +29,12 @@ const HA = 'http://hydra:4445';
 // has the npm deps) this must be the service name: othala:8080.
 // smoke.sh run_dance now execs into the playwright container after npm ci.
 const APP = process.env.OTHALA_URL ?? 'http://othala:8080';
-const CLIENT = 'keep';
-const REDIRECT = 'https://keep.othala.test/identity/connect/oidc-signin';
+// grafana is the role-mapping client; its registered redirect_uri must
+// byte-match the grafana fixture's redirect_uris[0].
+const CLIENT = 'grafana';
+const REDIRECT = 'https://grafana.othala.test/login/generic_oauth';
 const SUBJECT = '__SUBJECT__';
-const SECRET = '__KEEP_SECRET__';
+const SECRET = '__GRAFANA_SECRET__';
 
 // Cookie jar — RFC-compliant, handles Domain/Path/Secure/SameSite attributes.
 // tough-cookie rejects 'secure' cookies on http:// by default; the e2e is HTTP
@@ -181,12 +183,14 @@ const loc = (r) => r.headers.get('location');
       return;
     }
 
-    const keepRoles = claims?.resource_access?.keep?.roles;
+    // grafana's consent block emits a `grafana_role` JMESPath array claim
+    // per identity group (family -> Viewer). The smoke asserts on it.
+    const grafanaRole = claims?.grafana_role;
     console.log('OK claims=' + JSON.stringify({
       sub: claims.sub,
       email: claims.email,
       groups: claims.groups,
-      keep_roles: keepRoles,
+      grafana_role: grafanaRole,
       introspect_active: intro.active,
     }));
   } catch (e) {

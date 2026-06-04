@@ -1,0 +1,16 @@
+# Jellyfin — jellyfin.othala.test
+# Generic OSS example fixture for the Othala e2e harness. Presentation
+# ONLY: Jellyfin authenticates via the LDAP bridge, not OIDC, so there
+# is NO oidc:/consent: block. This exercises the loader's
+# presentation-only-skip path (the OIDC client loader returns null for a
+# manifest with presentation: and no oidc:).
+
+presentation:
+  name: Jellyfin
+  description: Free software media server for movies, TV, and music with multi-user profiles.
+  url: https://jellyfin.othala.test
+  icon: JF
+  icon_slug: jellyfin
+  auth_kind: ldap
+  access_group: access-jellyfin
+  order: 50

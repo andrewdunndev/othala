@@ -1,0 +1,62 @@
+# Audiobookshelf — audiobookshelf.othala.test
+# Generic OSS example fixture for the Othala e2e harness. A clean,
+# plain generic_oauth client: authorization-code + refresh, one simple
+# admin/user role split driven by group_role_map. No JMESPath, no
+# resource_access nesting — the minimal "well-behaved OIDC RP" example.
+#
+# Audiobookshelf supports OIDC back-channel logout; the logout token is
+# accepted at the OpenID callback's logout path.
+
+presentation:
+  name: Audiobookshelf
+  description: Self-hosted audiobook and podcast server with multi-user progress sync.
+  url: https://audiobookshelf.othala.test
+  icon: AB
+  icon_slug: audiobookshelf
+  auth_kind: oidc
+  access_group: access-audiobookshelf
+  order: 40
+
+oidc:
+  client_id: audiobookshelf
+  client_name: Audiobookshelf
+  grant_types:
+    - authorization_code
+    - refresh_token
+  response_types:
+    - code
+  scope: openid email profile groups
+  redirect_uris:
+    - https://audiobookshelf.othala.test/auth/openid/callback
+  post_logout_redirect_uris:
+    - https://audiobookshelf.othala.test/
+  token_endpoint_auth_method: client_secret_basic
+  audience:
+    - https://audiobookshelf.othala.test
+  skip_consent: true
+  backchannel_logout_uri: https://audiobookshelf.othala.test/auth/openid/logout
+
+# Consent claim shape for this client.
+#
+# Audiobookshelf reads a configurable group claim and maps its values to
+# its own admin/user/guest account types. Here we emit a simple `groups`
+# claim per role: admins get the `admin` group, everyone else `user`.
+# Per-collection permissions are managed inside Audiobookshelf.
+#
+# Source: https://www.audiobookshelf.org/guides/oidc_authentication/
+consent:
+  emit_groups_claim: true
+  roles:
+    admin:
+      description: "Server admin: users, libraries, settings."
+      claim_emit:
+        groups: ["admin"]
+    user:
+      description: "Listen and sync progress."
+      claim_emit:
+        groups: ["user"]
+  group_role_map:
+    admin: admin
+    family: user
+    friends: user
+    kids: user

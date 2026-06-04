@@ -41,7 +41,7 @@ export interface SeedOptions {
   email: string;
   username: string;
   displayName: string;
-  /** metadata_admin.groups — controls access-keep group membership */
+  /** metadata_admin.groups — controls access-<app> group membership */
   groups: string[];
   kratosAdminURL: string;
 }

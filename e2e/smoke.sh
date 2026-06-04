@@ -222,29 +222,35 @@ else
     echo "  ----- end register-clients output -----"
 fi
 
-# B2: Hydra admin lists the registered clients
+# B2: Hydra admin lists EXACTLY the clients with an oidc: block. The count
+# is DATA-DRIVEN from the fixtures: grep the manifest dir for files that
+# declare a top-level `oidc:` block (presentation-only tiles — jellyfin,
+# proxywatch, statuspage — have none and register no client). No hardcoded
+# number; add/remove an OIDC fixture and this re-derives.
+oidc_fixture_count=$(grep -lE '^oidc:' ./manifests/*.yaml 2>/dev/null | wc -l | tr -d ' ')
 clients_json=$(curl_in hydra http://localhost:4445/admin/clients)
 client_count=$(echo "$clients_json" | python3 -c "import sys,json; print(len(json.load(sys.stdin)))" 2>/dev/null || echo "0")
-if [[ "$client_count" -ge 11 ]]; then
-    pass "B2 hydra admin lists $client_count clients (expected >=11 per hydra/clients/*.yaml)"
+if [[ "$client_count" == "$oidc_fixture_count" ]]; then
+    pass "B2 hydra admin lists $client_count clients (== $oidc_fixture_count oidc: fixtures)"
 else
-    fail "B2 hydra admin client count" "got=$client_count"
+    fail "B2 hydra admin client count" "got=$client_count want=$oidc_fixture_count (fixtures with an oidc: block)"
 fi
 
-# B3: Specific client check — keep is registered
-keep_check=$(curl_code_in hydra http://localhost:4445/admin/clients/keep)
-if [[ "$keep_check" == "200" ]]; then
-    pass "B3 keep client registered"
+# B3: Specific client check — grafana is registered (the role-mapping client
+# the G-series dance drives against).
+grafana_check=$(curl_code_in hydra http://localhost:4445/admin/clients/grafana)
+if [[ "$grafana_check" == "200" ]]; then
+    pass "B3 grafana client registered"
 else
-    fail "B3 keep client missing" "code=$keep_check"
+    fail "B3 grafana client missing" "code=$grafana_check"
 fi
 
-# B4: tailscale registered (NO PKCE; the manifest is unusual)
-ts_check=$(curl_code_in hydra http://localhost:4445/admin/clients/tailscale)
-if [[ "$ts_check" == "200" ]]; then
-    pass "B4 tailscale client registered (no PKCE pre-condition holds)"
+# B4: audiobookshelf registered (the plain generic_oauth client).
+abs_check=$(curl_code_in hydra http://localhost:4445/admin/clients/audiobookshelf)
+if [[ "$abs_check" == "200" ]]; then
+    pass "B4 audiobookshelf client registered"
 else
-    fail "B4 tailscale client missing" "code=$ts_check"
+    fail "B4 audiobookshelf client missing" "code=$abs_check"
 fi
 
 # Section C: identity admin flow
@@ -254,7 +260,7 @@ echo "C. Identity admin flow"
 # C1: Create an identity via the Kratos admin API. kratos' busybox wget has
 # no --post-data, so POST from othala's node over the compose network (othala
 # reaches kratos:4434). Program on stdin (podman-compose-safe).
-identity_json=$(printf '%s' "fetch('http://kratos:4434/admin/identities',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({schema_id:'family',traits:{username:'lab.test',email:'lab.test@${OTHALA_APEX}',displayName:'Lab Test'},metadata_admin:{groups:['family','access-keep','access-observe']}})}).then(r=>r.text()).then(t=>{process.stdout.write(t);process.exit(0)}).catch(()=>process.exit(1))" | node_in othala)
+identity_json=$(printf '%s' "fetch('http://kratos:4434/admin/identities',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({schema_id:'family',traits:{username:'lab.test',email:'lab.test@${OTHALA_APEX}',displayName:'Lab Test'},metadata_admin:{groups:['family','access-grafana','access-audiobookshelf']}})}).then(r=>r.text()).then(t=>{process.stdout.write(t);process.exit(0)}).catch(()=>process.exit(1))" | node_in othala)
 identity_id=$(echo "$identity_json" | python3 -c "import sys,json; print(json.load(sys.stdin).get('id',''))" 2>/dev/null || echo "")
 if [[ -n "$identity_id" ]]; then
     pass "C1 created identity id=$identity_id"
@@ -266,7 +272,7 @@ fi
 if [[ -n "$identity_id" ]]; then
     rt=$(curl_in kratos "http://localhost:4434/admin/identities/$identity_id")
     groups=$(echo "$rt" | python3 -c "import sys,json; d=json.load(sys.stdin); print(','.join(d.get('metadata_admin',{}).get('groups',[])))" 2>/dev/null || echo "")
-    if [[ "$groups" == "family,access-keep,access-observe" ]]; then
+    if [[ "$groups" == "family,access-grafana,access-audiobookshelf" ]]; then
         pass "C2 identity round-trip preserves metadata_admin.groups"
     else
         fail "C2 metadata_admin.groups round-trip" "got=$groups"
@@ -407,14 +413,17 @@ mk_identity() {
     printf '%s' "fetch('http://kratos:4434/admin/identities',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({schema_id:'family',state:'$1',traits:{username:'$3',email:'$3@${OTHALA_APEX}',displayName:'$3'},metadata_admin:{groups:$2}})}).then(r=>r.json()).then(j=>{process.stdout.write(j.id||'');process.exit(0)}).catch(()=>process.exit(1))" | node_in othala
 }
 # run_dance <subject> -> the dance result line (OK claims=... / DENIED... / STEP/EXC).
-# Substitutes the subject + keep client secret into oidc-dance.mjs and pipes the
-# result to the dance-runner oneshot container (playwright image + npm deps).
+# Substitutes the subject + grafana client secret into oidc-dance.mjs and pipes
+# the result to the dance-runner oneshot container (playwright image + npm deps).
+# The dance drives the grafana client (THE role-mapping example): its registered
+# redirect_uri byte-matches the grafana fixture and its consent block emits the
+# grafana_role claim asserted below.
 # Each call starts a fresh container (--rm); npm ci runs every time (~5-10s per
 # invocation). This is acceptable for 3 G probes; a future optimisation would
 # bake a sub-image with the deps pre-installed.
 run_dance() {
     local out res
-    out=$(sed "s|__SUBJECT__|$1|g; s|__KEEP_SECRET__|${KEEP_CLIENT_SECRET}|g" ./oidc-dance.mjs \
+    out=$(sed "s|__SUBJECT__|$1|g; s|__GRAFANA_SECRET__|${GRAFANA_CLIENT_SECRET}|g" ./oidc-dance.mjs \
         | docker compose --profile oneshot run --rm --no-deps -T dance-runner 2>&1 | _strip_ansi)
     res=$(echo "$out" | grep -E '^OK |^DENIED|^STEP|^EXC' | tail -1)
     if [[ -z "$res" ]]; then
@@ -427,19 +436,20 @@ run_dance() {
     echo "$res"
 }
 
-# G1: active member WITH the access-keep group -> dance completes, and the ID token
-# carries the manifest-injected role claim (resource_access.keep.roles=[user]).
-# This is the integration guard for the claims-injection convergence regression.
-g1_id=$(mk_identity active "['family','access-keep']" g1.activekeep)
+# G1: active member WITH the access-grafana group -> dance completes, and the ID
+# token carries grafana's manifest-injected role claim (family -> viewer ->
+# grafana_role=[Viewer]). This is the integration guard for the claims-injection
+# convergence regression.
+g1_id=$(mk_identity active "['family','access-grafana']" g1.activegrafana)
 g1=$(run_dance "$g1_id")
-if [[ "$g1" == OK* && "$g1" == *'"keep_roles":["user"]'* ]]; then
-    pass "G1 OIDC dance issues an ID token with the injected role claim (keep_roles=[user])"
+if [[ "$g1" == OK* && "$g1" == *'"grafana_role":["Viewer"]'* ]]; then
+    pass "G1 OIDC dance issues an ID token with the injected role claim (grafana_role=[Viewer])"
 else
     fail "G1 OIDC dance + claims injection" "got: $g1"
 fi
 
 # G2: INACTIVE identity -> access-gate denies at the consent re-gate (state check).
-g2_id=$(mk_identity inactive "['family','access-keep']" g2.inactive)
+g2_id=$(mk_identity inactive "['family','access-grafana']" g2.inactive)
 g2=$(run_dance "$g2_id")
 if [[ "$g2" == DENIED* && "$g2" == *active* ]]; then
     pass "G2 OIDC dance DENIES an inactive identity (state gate, D3)"
@@ -447,13 +457,13 @@ else
     fail "G2 inactive deny" "got: $g2 (want DENIED ... not active)"
 fi
 
-# G3: active identity WITHOUT the access-keep group -> denied at consent (group check).
+# G3: active identity WITHOUT the access-grafana group -> denied at consent (group check).
 g3_id=$(mk_identity active "['family']" g3.nogroup)
 g3=$(run_dance "$g3_id")
-if [[ "$g3" == DENIED* && "$g3" == *access-keep* ]]; then
-    pass "G3 OIDC dance DENIES a member missing the access-keep group (group gate)"
+if [[ "$g3" == DENIED* && "$g3" == *access-grafana* ]]; then
+    pass "G3 OIDC dance DENIES a member missing the access-grafana group (group gate)"
 else
-    fail "G3 no-group deny" "got: $g3 (want DENIED ... access-keep group)"
+    fail "G3 no-group deny" "got: $g3 (want DENIED ... access-grafana group)"
 fi
 
 # ----- Summary -----

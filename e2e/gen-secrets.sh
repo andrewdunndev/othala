@@ -107,17 +107,12 @@ RECOVERY_GATE_SECRET=$(gen)
 # App CSRF tokens (HIGH-1)
 CSRF_SECRET=$(gen)
 
-# Per-client OIDC secrets for apply-clients smoke. Every client_id in
-# hydra/clients/*.yaml that the smoke registers needs an env var.
-KEEP_CLIENT_SECRET=$(gen)
-OBSERVE_CLIENT_SECRET=$(gen)
-LARDER_CLIENT_SECRET=$(gen)
-LISTEN_CLIENT_SECRET=$(gen)
-CINEMA_CLIENT_SECRET=$(gen)
-MEMORY_CLIENT_SECRET=$(gen)
-VAULT_CLIENT_SECRET=$(gen)
-LIBRARY_CLIENT_SECRET=$(gen)
-FORGE_CLIENT_SECRET=$(gen)
-TAILSCALE_CLIENT_SECRET=$(gen)
-LLM_CLIENT_SECRET=$(gen)
+# Per-client OIDC secrets for the register-clients smoke. Every fixture
+# in e2e/manifests/ that carries an oidc: block (and so gets registered
+# against Hydra) needs a <SLUG>_CLIENT_SECRET env var. The generic
+# example set has two OIDC clients: grafana + audiobookshelf. The
+# presentation-only fixtures (jellyfin/proxywatch/statuspage) have no
+# oidc: block and need no secret.
+GRAFANA_CLIENT_SECRET=$(gen)
+AUDIOBOOKSHELF_CLIENT_SECRET=$(gen)
 EOF

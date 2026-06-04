@@ -1,0 +1,17 @@
+# Proxywatch — proxywatch.othala.test
+# Generic example fixture for the Othala e2e harness. A stand-in for an
+# internal tool that has NO native OIDC support and is instead gated at
+# the reverse proxy via forward-auth (Caddy / Traefik forward_auth):
+# the proxy makes a subrequest to the auth provider before passing the
+# request through. Presentation ONLY — no oidc:/consent: block.
+
+presentation:
+  name: Proxywatch
+  description: Internal monitoring tool gated at the edge — no native login, the proxy enforces SSO.
+  url: https://proxywatch.othala.test
+  icon: PW
+  icon_slug: ""
+  icon_fallback: serverfault
+  auth_kind: forward_auth
+  access_group: access-proxywatch
+  order: 120

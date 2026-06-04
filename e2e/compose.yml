@@ -292,17 +292,10 @@ services:
       # requires OTHALA_PUBLIC_URL at load (required-no-default in production).
       # The othala/ldap services already get it; the one-shot registrar needs it too.
       OTHALA_PUBLIC_URL: http://auth.othala.test
-      KEEP_CLIENT_SECRET: ${KEEP_CLIENT_SECRET}
-      OBSERVE_CLIENT_SECRET: ${OBSERVE_CLIENT_SECRET}
-      LARDER_CLIENT_SECRET: ${LARDER_CLIENT_SECRET}
-      LISTEN_CLIENT_SECRET: ${LISTEN_CLIENT_SECRET}
-      CINEMA_CLIENT_SECRET: ${CINEMA_CLIENT_SECRET}
-      MEMORY_CLIENT_SECRET: ${MEMORY_CLIENT_SECRET}
-      VAULT_CLIENT_SECRET: ${VAULT_CLIENT_SECRET}
-      LIBRARY_CLIENT_SECRET: ${LIBRARY_CLIENT_SECRET}
-      FORGE_CLIENT_SECRET: ${FORGE_CLIENT_SECRET}
-      TAILSCALE_CLIENT_SECRET: ${TAILSCALE_CLIENT_SECRET}
-      LLM_CLIENT_SECRET: ${LLM_CLIENT_SECRET}
+      # Per-client secrets for every fixture with an oidc: block. The
+      # generic example set registers two OIDC clients.
+      GRAFANA_CLIENT_SECRET: ${GRAFANA_CLIENT_SECRET}
+      AUDIOBOOKSHELF_CLIENT_SECRET: ${AUDIOBOOKSHELF_CLIENT_SECRET}
     volumes:
       - ./manifests:/etc/portal/manifests:ro,z
     command: ["node", "./dist/server/register-clients.mjs"]
@@ -397,7 +390,7 @@ services:
       KRATOS_ADMIN_URL: http://kratos:4434
       HYDRA_PUBLIC_URL: http://hydra:4444
       HYDRA_ADMIN_URL: http://hydra:4445
-      KEEP_CLIENT_SECRET: ${KEEP_CLIENT_SECRET}
+      GRAFANA_CLIENT_SECRET: ${GRAFANA_CLIENT_SECRET}
       PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD: "1"
     volumes:
       # Mount the entire e2e dir so npm ci has package.json + the playwright/ tree.

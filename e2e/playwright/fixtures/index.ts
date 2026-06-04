@@ -8,7 +8,7 @@
  *   hydraPublicURL  — http://hydra:4444 (Hydra public, inside compose net)
  *   hydraAdminURL   — http://hydra:4445 (Hydra admin, inside compose net)
  *   member          — { id, email, password } seeded identity (bt2@othala.test),
- *                     access-keep group, NOT on OTHALA_ADMIN_SUBJECTS
+ *                     access-grafana group, NOT on OTHALA_ADMIN_SUBJECTS
  *   admin           — { id, email, password } seeded identity (admin@othala.test),
  *                     ON OTHALA_ADMIN_SUBJECTS (triggers AAL2 step-up at /admin)
  *
@@ -51,7 +51,7 @@ export const test = base.extend<OthalaFixtures>({
     await use(process.env.HYDRA_ADMIN_URL ?? 'http://hydra:4445');
   }, { scope: 'worker' }],
 
-  // member: bt2@othala.test, access-keep + family groups.
+  // member: bt2@othala.test, access-grafana + family groups.
   // NOT on OTHALA_ADMIN_SUBJECTS (admin@othala.test is).
   member: [
     async ({ kratosAdminURL }, use) => {
@@ -59,7 +59,7 @@ export const test = base.extend<OthalaFixtures>({
         email: 'bt2@othala.test',
         username: 'bt2',
         displayName: 'Browser Test 2',
-        groups: ['family', 'access-keep'],
+        groups: ['family', 'access-grafana'],
         kratosAdminURL,
       });
       await use({ ...result, password: TEST_PASSWORD });
@@ -76,7 +76,7 @@ export const test = base.extend<OthalaFixtures>({
         email: 'admin@othala.test',
         username: 'admin',
         displayName: 'Othala Admin',
-        groups: ['family', 'access-keep', 'admin'],
+        groups: ['family', 'access-grafana', 'admin'],
         kratosAdminURL,
       });
       await use({ ...result, password: TEST_PASSWORD });

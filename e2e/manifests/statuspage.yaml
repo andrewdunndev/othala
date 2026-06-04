@@ -1,0 +1,15 @@
+# Statuspage — status.othala.test (external SaaS tile)
+# Generic example fixture for the Othala e2e harness. A stand-in for an
+# external, hosted service that the portal links to but does not
+# authenticate — auth_kind: external. Presentation ONLY; no oidc:/
+# consent: block and no access group gate on our side.
+
+presentation:
+  name: Statuspage
+  description: Public status and incident history — an external hosted service the portal links out to.
+  url: https://status.othala.test
+  icon: ST
+  icon_slug: ""
+  icon_fallback: statuspage
+  auth_kind: external
+  order: 200
