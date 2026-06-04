@@ -86,6 +86,14 @@ const safeClaimKey = fc.oneof(
   fc.constantFrom('role', 'permissions', 'tenant', 'sub', 'iss', 'custom_claim', 'access_level'),
 );
 
+/** A broad claim key for the injection tests: any 5+ char string EXCEPT the
+ *  prototype-busting keys deepMergeClaims intentionally drops. Those are
+ *  covered by the dedicated prototype-pollution test below; asserting they're
+ *  injected would contradict the (correct) guard. */
+const injectableKey = fc
+  .string({ minLength: 5 })
+  .filter((k) => k !== '__proto__' && k !== 'constructor' && k !== 'prototype');
+
 /** A claim value: string, number, boolean, or shallow object. */
 const claimValue = fc.oneof(
   fc.string(),
@@ -112,7 +120,7 @@ test('P1+P2: claimEmit only injected when subject holds a mapped group', () => {
       // Two disjoint group names
       identifier, identifier,
       // ClaimEmits for each role (key that doesn't overlap to make detection easy)
-      fc.string({ minLength: 5 }), fc.string({ minLength: 5 }),
+      injectableKey, injectableKey,
       fc.context(),
       (roleA, roleB, groupA, groupB, claimKeyA, claimKeyB, ctx) => {
         // Skip if identifiers collide

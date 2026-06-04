@@ -503,13 +503,16 @@ test('D1: POST Allow with invalid csrf_token returns 400', async () => {
 
 // ── A4: Claims injection tests — real manifest data ──────────────────────────
 
-// Load real manifests from hydra/clients/ for test scenarios.
+// Load real manifests from e2e/manifests/ (the unified fixture set) for
+// test scenarios. hydra/clients/ moved to the iac catalog at M3; the e2e
+// fixtures carry the same oidc:/consent: blocks (on othala.test), and
+// parseManifest reads those, ignoring the presentation: block.
 import { readFileSync } from 'node:fs';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
-const clientsDir = join(__dirname, '..', '..', 'hydra', 'clients');
+const clientsDir = join(__dirname, '..', '..', 'e2e', 'manifests');
 
 function loadManifest(name) {
   const yaml = readFileSync(join(clientsDir, `${name}.yaml`), 'utf8');
