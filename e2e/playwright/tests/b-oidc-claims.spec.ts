@@ -15,7 +15,7 @@
  *      app consent handler (/oauth2/consent) → which checks the subject's
  *      groups and emits the role claim → Hydra issues the auth code →
  *      redirects to keep's redirect_uri.
- *   3. Intercept the redirect to keep.dunn.dev (the redirect_uri is not
+ *   3. Intercept the redirect to keep.othala.test (the redirect_uri is not
  *      reachable from inside the compose net) via page.route(), capture the
  *      auth code from the redirect URL.
  *   4. Exchange the code for tokens (POST /oauth2/token, client_secret_basic).
@@ -23,7 +23,7 @@
  *      key via jwks: verify signature against Hydra's JWKS endpoint).
  *   6. Assert resource_access.keep.roles includes 'user'.
  *
- * The keep redirect_uri (https://keep.dunn.dev/identity/connect/oidc-signin)
+ * The keep redirect_uri (https://keep.othala.test/identity/connect/oidc-signin)
  * is external; inside the compose net it is unresolvable. We intercept it at
  * the Playwright route layer before the browser attempts a TCP connection.
  */
@@ -33,7 +33,7 @@ import { loginViaJsonApi } from '../actions/login';
 import { decodeJwt } from 'jose';
 
 const KEEP_CLIENT_ID = 'keep';
-const KEEP_REDIRECT_URI = 'https://keep.dunn.dev/identity/connect/oidc-signin';
+const KEEP_REDIRECT_URI = 'https://keep.othala.test/identity/connect/oidc-signin';
 
 test('B — OIDC authorize flow issues id_token with resource_access.keep.roles=[user]', async ({
   browser,
@@ -57,7 +57,7 @@ test('B — OIDC authorize flow issues id_token with resource_access.keep.roles=
     );
 
     // Step 2+3: walk the OAuth2 authorize redirect chain with the real session
-    // via ctx.request (maxRedirects:0). keep.dunn.dev (the redirect_uri) is
+    // via ctx.request (maxRedirects:0). keep.othala.test (the redirect_uri) is
     // unresolvable inside the compose net, and page.route can't reliably
     // intercept a top-level NAVIGATION to an unresolvable host — so we read the
     // auth code straight from the keep redirect's Location header instead of
@@ -82,7 +82,7 @@ test('B — OIDC authorize flow issues id_token with resource_access.keep.roles=
           `OIDC chain stalled at hop ${hop} (${url}): status ${resp.status()}, no Location`,
         );
       }
-      if (loc.startsWith('https://keep.dunn.dev')) {
+      if (loc.startsWith('https://keep.othala.test')) {
         code = new URL(loc).searchParams.get('code');
         break;
       }

@@ -15,7 +15,7 @@
 export const prerender = false;
 
 import Layout from '../../layouts/Layout.astro';
-import { getCollection, render, type CollectionEntry } from 'astro:content';
+import { getTile } from '../../lib/tiles';
 import { getSession } from '../../lib/kratos';
 import { isAdminSubject } from '../../lib/admin-auth';
 
@@ -24,8 +24,7 @@ if (!slug) {
   return Astro.redirect('/');
 }
 
-const apps = await getCollection('apps');
-const entry = apps.find((a: CollectionEntry<'apps'>) => a.id === slug);
+const entry = getTile(slug);
 if (!entry) {
   return new Response('App not found', { status: 404 });
 }
@@ -42,27 +41,25 @@ if (!session?.active || !session.identity) {
 // else needs the per-app access-<slug> group.
 const groups = session.identity.metadata_admin?.groups ?? [];
 const isAdmin = isAdminSubject(session.identity.traits?.email);
-const hasAccess = isAdmin || groups.includes(entry.data.access_group);
+const hasAccess = isAdmin || groups.includes(entry.accessGroup);
 if (!hasAccess) {
   return Astro.redirect('/auth/error?reason=not-authorised');
 }
-
-const { Content } = await render(entry);
 ---
-<Layout title={entry.data.name} description={entry.data.description}>
+<Layout title={entry.name} description={entry.description}>
   <article class="app-detail">
     <header class="app-header">
-      <p class="app-eyebrow mono">{entry.data.icon} · {entry.data.auth_kind}</p>
-      <h1 class="app-title">{entry.data.name}</h1>
-      <p class="app-lede">{entry.data.description}</p>
+      <p class="app-eyebrow mono">{entry.icon} · {entry.authKind}</p>
+      <h1 class="app-title">{entry.name}</h1>
+      <p class="app-lede">{entry.description}</p>
       <div class="app-cta">
-        <a class="button button-primary" href={entry.data.url} rel="noopener">Open {entry.data.name} ↗</a>
+        <a class="button button-primary" href={entry.url} rel="noopener">Open {entry.name} ↗</a>
         <a class="cta-link mono" href="/">Back to dashboard</a>
       </div>
     </header>
 
     <section class="app-body">
-      <Content />
+      <div class="edu-prose" set:html={entry.educationHtml ?? ''} />
     </section>
   </article>
 </Layout>

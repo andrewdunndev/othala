@@ -203,9 +203,21 @@ function normaliseGroupRoleMap(raw: unknown): Record<string, string> {
   return out;
 }
 
-function loadOne(file: string, dir: string): ClientManifest {
-  const path = join(dir, file);
-  return parseManifest(readFileSync(path, 'utf8'), file);
+/**
+ * Load one manifest file as a ClientManifest, or null when it is a
+ * presentation-only unified manifest (a tile for a forward_auth / ldap /
+ * external app that has NO OIDC client). Those carry a `presentation:`
+ * block and no `oidc:` block, and must be skipped by the OIDC client
+ * loader rather than throwing. A stale flat manifest (client fields at the
+ * top level, no `oidc:`) still throws via parseManifest's flat-shape guard.
+ */
+function loadOne(file: string, dir: string): ClientManifest | null {
+  const text = readFileSync(join(dir, file), 'utf8');
+  const doc = (parseYaml(text) ?? {}) as { oidc?: unknown; presentation?: unknown };
+  const hasOidc = doc.oidc != null && typeof doc.oidc === 'object';
+  const hasPresentation = doc.presentation != null && typeof doc.presentation === 'object';
+  if (!hasOidc && hasPresentation) return null;
+  return parseManifest(text, file);
 }
 
 /**
@@ -280,7 +292,9 @@ function loadFromDisk(): ClientManifest[] {
     }
     throw err;
   }
-  return files.map((f) => loadOne(f, dir));
+  return files
+    .map((f) => loadOne(f, dir))
+    .filter((m): m is ClientManifest => m !== null);
 }
 
 function freshestMtime(): number {

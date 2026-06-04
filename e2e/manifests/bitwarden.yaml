@@ -1,0 +1,15 @@
+# Bitwarden — vault.bitwarden.com
+# Unified app catalog entry for the dag.othala.test instance.
+# Source: portal/preview-manifests/bitwarden.yaml (only source; no hydra
+# client and no content/apps entry — this is an external SaaS tile).
+# No oidc: block: auth_kind is external (Bitwarden's own auth, not ours).
+
+presentation:
+  name: Bitwarden
+  description: "The family password vault — the one we pay for."
+  url: https://vault.bitwarden.com
+  icon: BW
+  icon_slug: bitwarden
+  auth_kind: external
+  access_group: family
+  order: 15

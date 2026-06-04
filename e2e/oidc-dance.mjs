@@ -30,7 +30,7 @@ const HA = 'http://hydra:4445';
 // smoke.sh run_dance now execs into the playwright container after npm ci.
 const APP = process.env.OTHALA_URL ?? 'http://othala:8080';
 const CLIENT = 'keep';
-const REDIRECT = 'https://keep.dunn.dev/identity/connect/oidc-signin';
+const REDIRECT = 'https://keep.othala.test/identity/connect/oidc-signin';
 const SUBJECT = '__SUBJECT__';
 const SECRET = '__KEEP_SECRET__';
 

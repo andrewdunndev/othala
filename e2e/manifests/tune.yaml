@@ -1,0 +1,18 @@
+# Tune — tune.othala.test (Navidrome music, forward_auth)
+# Unified app catalog entry for the dag.othala.test instance.
+# Merged from: portal/src/content/apps/tune.md
+#              + portal/preview-manifests/tune.yaml
+# No hydra client: auth_kind is forward_auth (Caddy forward_auth gates
+# Navidrome; Subsonic API clients authenticate separately with
+# Navidrome's own username/password, not through OIDC).
+
+presentation:
+  name: Tune
+  description: Music streaming — personal Navidrome server with your whole library, accessible from any Subsonic-compatible app.
+  url: https://tune.othala.test
+  icon: TN
+  icon_slug: ""
+  icon_fallback: serverfault
+  auth_kind: forward_auth
+  access_group: access-tune
+  order: 35

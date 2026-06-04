@@ -225,7 +225,7 @@ services:
       ADMIN_HOST: 127.0.0.1
       ADMIN_PORT: "8431"
     volumes:
-      - ../hydra/clients:/etc/portal/manifests:ro,z
+      - ./manifests:/etc/portal/manifests:ro,z
     healthcheck:
       # /healthz lives on the loopback ADMIN port (8431), not the public
       # SSR port. Probe it from inside the container.
@@ -304,7 +304,7 @@ services:
       TAILSCALE_CLIENT_SECRET: ${TAILSCALE_CLIENT_SECRET}
       LLM_CLIENT_SECRET: ${LLM_CLIENT_SECRET}
     volumes:
-      - ../hydra/clients:/etc/portal/manifests:ro,z
+      - ./manifests:/etc/portal/manifests:ro,z
     command: ["node", "./dist/server/register-clients.mjs"]
 
   # OIDC dance runner (profile: oneshot) — Section G of smoke.sh.
