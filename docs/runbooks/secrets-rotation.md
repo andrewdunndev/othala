@@ -45,7 +45,7 @@ key).
 2. Update sops:
 
    ```sh
-   sops <your-iac-repo>/pyinfra/secrets.enc.yaml
+   sops <your-deploy-repo>/pyinfra/secrets.enc.yaml
    # Set the hydra_system_secret entry to the new value.
    ```
 
@@ -128,4 +128,4 @@ After rotation:
 - `docs/runbooks/cookie-rotation.md`
 - `docs/runbooks/admin-recovery.md`
 - `hydra/hydra.yml` `secrets.system` field
-- `dunn.dev/iac/services/dag/` — deploy plane
+- the deploy repo's `services/dag/` — deploy plane

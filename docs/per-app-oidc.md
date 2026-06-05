@@ -31,8 +31,8 @@ This runbook covers OIDC-based integrations. For the forward-auth apps
   `oidc:` (forwarded to Hydra), and `consent:` (role/claim shape read by
   the Othala app; never sent to Hydra).
 - `client_id` equals the slug (e.g., `grafana`, `audiobookshelf`).
-- Client secrets are sops-encrypted in your operator repo (e.g.
-  `dunn.dev/iac/pyinfra/secrets.enc.yaml`) under `<host>.<slug>_oidc_client_secret`.
+- Client secrets are sops-encrypted in your deploy repo (e.g.
+  `pyinfra/secrets.enc.yaml`) under `<host>.<slug>_oidc_client_secret`.
   The same plaintext value must land in both Hydra (via
   `make dag-apply-clients`) and the RP app's own config. They are not
   linked automatically.
@@ -56,14 +56,14 @@ Keep the value. You will need it in steps 2 and 4.
 **2. Set the sops key.**
 
 ```sh
-sops <your-iac-repo>/pyinfra/secrets.enc.yaml
+sops <your-deploy-repo>/pyinfra/secrets.enc.yaml
 # Add or update: <host>.<slug>_oidc_client_secret: "<value from step 1>"
 ```
 
 **3. Apply the Hydra client (Hydra side).**
 
 ```sh
-cd <your-iac-repo>
+cd <your-deploy-repo>
 make dag-secrets HOST=<sso-host>   # writes the new sops entry into podman secrets
 make dag-apply-clients HOST=<sso-host>
 ```

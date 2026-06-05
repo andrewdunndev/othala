@@ -62,11 +62,11 @@ carmine + custom Caddy edge
 
 | Item | Wave | Status |
 |---|---|---|
-| **Image name reconcile `portal` → `othala`** | CP | Done. The converged app builds as `build-othala` and publishes at the registry root `registry.gitlab.com/dunn.dev/othala` (`publish_at_root: true`); the `dag-consent` + `util` image builds + their SBOMs are removed; at E1 the `consent/` + `util/` source dirs were deleted and the `verify-consent` go-build job removed (only `ldap-bridge` remains a standalone Go module). The iac `dag-portal` quadlet pins the root path. First tag under the new name is `v0.2.0`. |
+| **Image name reconcile `portal` → `othala`** | CP | Done. The converged app builds as `build-othala` and publishes at the registry root `registry.gitlab.com/dunn.dev/othala` (`publish_at_root: true`); the `dag-consent` + `util` image builds + their SBOMs are removed; at E1 the `consent/` + `util/` source dirs were deleted and the `verify-consent` go-build job removed (only `ldap-bridge` remains a standalone Go module). The deploy repo's `dag-portal` quadlet pins the root path. First tag under the new name is `v0.2.0`. |
 | **Deploy cutover** | — | Pending. Retire `dag-consent` + `util` from the pod; wire the dual-listener admin port + its admin env targets; repoint the Kratos recovery-hook to the Othala admin port `:8431/admin/recovery-gate`. See `DEPLOY.md`. |
-| **Production deploy** | — | Pending, operator-gated. Fresh `dag_*` sops keys (carmine pre-reinstall) + iac config sync/pin + `make dag-deploy`. |
+| **Production deploy** | — | Pending, operator-gated. Fresh `dag_*` sops keys (carmine pre-reinstall) + deploy repo config sync/pin + `make dag-deploy`. |
 
-The iac `dag-*` quadlets remain at the pre-cutover shape until the
+The deploy repo's `dag-*` quadlets remain at the pre-cutover shape until the
 cutover (`dag-portal` still depends on `dag-consent` and carries the old
 `CONSENT_ADMIN_BEARER` / consent-URL wiring).
 
@@ -121,7 +121,7 @@ state, not a regression.
 | Public reachability | DNS-only Cloudflare + port-forward 443. No CF Tunnel/Access |
 | `secrets.system` | NON-ROTATABLE (Hydra at-rest encryption); break-glass in `runbooks/secrets-rotation.md` |
 | **Secrets store** | sops + age, estate-wide |
-| **Deploy plane** | `dunn.dev/iac/services/dag/` owns runtime topology; vendors Othala configs by tag-pin (no submodule). This repo owns app code + authoritative configs |
+| **Deploy plane** | The deploy repo's `services/dag/` owns runtime topology; vendors Othala configs by tag-pin (no submodule). This repo owns app code + authoritative configs |
 | Design tokens | `@dunn.dev/reference` is the single source. Never redefine locally |
 
 Full rationale per decision: `decision.md`. Upgrade-durability choices:
@@ -137,11 +137,11 @@ Full rationale per decision: `decision.md`. Upgrade-durability choices:
 - **OIDC client registration** runs the in-app all-TS registrar
   (`manifests.ts` + `register-clients.ts` + `validateClients`, bundled to
   `dist/server/register-clients.mjs`) as a deliberate `--rm` one-shot. CI
-  exercises it in the `e2e` harness against `MANIFEST_DIR`; the iac side
+  exercises it in the `e2e` harness against `MANIFEST_DIR`; the deploy plane
   invokes the same bundle via `make dag-apply-clients`. The legacy shell
   `apply-clients.sh` + Go `util` runner were retired at E1.
 - **Postgres backup**: posture documented; implementation is the next
-  iac work stream.
+  deploy-layer work stream.
 - **No standing app linter** (see Caveat).
 
 ## Production cutover (remaining, operator-gated)
@@ -167,7 +167,7 @@ Full rationale per decision: `decision.md`. Upgrade-durability choices:
 | Topic | File |
 |---|---|
 | **Load-bearing decisions + topology + flows** | `../ARCHITECTURE.md` (root) |
-| **Deploy contract** | `../DEPLOY.md` (root) + `dunn.dev/iac/services/dag/` |
+| **Deploy contract** | `../DEPLOY.md` (root) + the deploy repo's `services/dag/` |
 | Upgrade-durability choices | `golden-path.md` |
 | Historical substrate rationale (the Ory choice); architecture superseded | `decision.md` |
 | Per-app OIDC integration | `per-app-oidc.md` |

@@ -8,7 +8,7 @@
 # substrate dies with the VM at job end. An adopter can run the same file
 # on a workstation (see README.md "Local operator invocation").
 #
-# Converged topology (mirrors what dunn.dev/iac services/dag now models):
+# Converged topology (mirrors what the deploy repo's services/dag now models):
 #   - postgres (kratos + hydra dbs)
 #   - kratos-migrate (oneshot)
 #   - kratos (public 4433, admin 4434)
@@ -224,7 +224,7 @@ services:
       mailpit:
         condition: service_healthy
     environment:
-      # Internal service URLs (compose names; iac uses container names on auth.network)
+      # Internal service URLs (compose names; the deploy plane uses container names on auth.network)
       KRATOS_PUBLIC_URL: http://kratos:4433
       KRATOS_ADMIN_URL: http://kratos:4434
       HYDRA_PUBLIC_URL: http://hydra:4444
@@ -272,7 +272,7 @@ services:
     environment:
       KRATOS_BRIDGE_ADMIN_TOKEN: lab-bridge-token
       # Canonical glauth.cfg uses public_url_env / admin_url_env so the
-      # file is topology-neutral. iac quadlets set the auth.network
+      # file is topology-neutral. Deploy-plane quadlets set the auth.network
       # container names; lab uses the compose service name.
       KRATOS_PUBLIC_URL: http://kratos:4433
       KRATOS_ADMIN_URL: http://kratos:4434
@@ -299,7 +299,7 @@ services:
   # registerAllClients), bundled into the image at
   # dist/server/register-clients.mjs (npm run build:register-clients,
   # same esbuild pattern as admin-runtime). The registrar is DORMANT in
-  # the deployed app (iac's dag-apply-clients.sh drives registration at
+  # the deployed app (the deploy plane's dag-apply-clients.sh drives registration at
   # deploy time); the e2e activates it as a `compose run --rm` one-shot
   # on the SAME othala image to prove the in-app registrar registers
   # every manifest in MANIFEST_DIR=/etc/portal/manifests (mounted from

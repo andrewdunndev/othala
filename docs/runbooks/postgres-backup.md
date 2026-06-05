@@ -3,10 +3,10 @@
 This runbook records the **backup posture** for the auth substrate's
 Postgres state and the **restore procedure** an operator follows. The
 backup *implementation* (the cron/quadlet runner, off-host copy, ZFS
-snapshot policy) is `dunn.dev/iac` work, not auth-project code — see
+snapshot policy) is deploy-plane work, not auth-project code — see
 "Where it lives" below. The stakes, the required posture, and the
-partial-state restore drill documented here are the contract the iac
-runner must satisfy.
+partial-state restore drill documented here are the contract the
+deploy-layer runner must satisfy.
 
 ## Stakes
 
@@ -25,7 +25,7 @@ from Bitwarden (otherwise even partial restore can't decrypt). At
 family scale the human cost is hours of re-enrollment plus operator
 panic; it's the worst single-failure outcome in the auth substrate.
 
-## Required posture (the iac runner must satisfy this)
+## Required posture (the deploy-layer runner must satisfy this)
 
 1. **pg_dump cron job**
    - Run nightly via systemd timer or cron in the postgres pod.
@@ -70,7 +70,7 @@ panic; it's the worst single-failure outcome in the auth substrate.
 
 ## Where it lives
 
-The backup runner is `dunn.dev/iac` work, not auth-project code: a
+The backup runner is deploy-plane work, not auth-project code: a
 service for the backup runner (pg_dump cron + rclone push to B2 + zfs
 send to the onsite tank). Posture: rclone → Backblaze B2 offsite + zfs
 send to an onsite tank pool; both fire from a single backup quadlet.

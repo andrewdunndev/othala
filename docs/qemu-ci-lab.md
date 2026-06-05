@@ -51,8 +51,8 @@ Static compose worked for Phase 3 substrate validation but:
 
 The shared GitLab runner pool cannot do nested virt or persistent
 podman state without per-job overhead. carmine has spare capacity, a
-real KVM hypervisor, and a lab VLAN already provisioned (per iac's
-earlier work on the gitlab-runner VM pool). The QEMU-CI harness spawns
+real KVM hypervisor, and a lab VLAN already provisioned (per the
+deploy plane's earlier work on the gitlab-runner VM pool). The QEMU-CI harness spawns
 a QEMU VM inside carmine's `lab` libvirt network, runs real podman +
 quadlets on it, smokes the substrate, and tears the VM down. Total
 turnaround target: 5 minutes per CI invocation.
@@ -60,7 +60,7 @@ turnaround target: 5 minutes per CI invocation.
 ### Update 2026-05-31
 
 Built earlier than the original 2-week recommendation. The carmine
-runner infrastructure was already in place (`dunn.dev/iac/services/runner/`)
+runner infrastructure was already in place (the deploy repo's `services/runner/`)
 and the lab is light enough to land alongside the substrate v0.2.0
 changes. See `e2e/README.md` for invocation notes. The harness does not
 gate the carmine deploy of v0.2.0 — it gates future v0.2.X tags.

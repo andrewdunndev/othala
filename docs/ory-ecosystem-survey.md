@@ -411,8 +411,8 @@ Concretely, mapped to files in this repo:
 
 | Current artifact | Replaced by |
 |---|---|
-| Caddy forward-auth snippet (Kratos whoami forward_auth + redirect; production config in `dunn.dev/iac`) | `cookie_session` authenticator + `redirect` error handler |
-| Caddy admin-session snippet (whoami forward_auth, app-layer AAL2; production config in `dunn.dev/iac`) | `cookie_session` + `remote_json` authorizer enforcing AAL2 server-side |
+| Caddy forward-auth snippet (Kratos whoami forward_auth + redirect; production config in the deploy repo) | `cookie_session` authenticator + `redirect` error handler |
+| Caddy admin-session snippet (whoami forward_auth, app-layer AAL2; production config in the deploy repo) | `cookie_session` + `remote_json` authorizer enforcing AAL2 server-side |
 | Hand-rolled bearer compare for vLLM in Caddy | `id_token` mutator (Oathkeeper-signed JWT) **or** `oauth2_introspection` if vLLM accepts Hydra tokens |
 | Othala app `/admin/revoke-user` bearer auth (security review MEDIUM-1) | `oauth2_introspection` against Hydra + `remote_json` against a "is admin" check |
 | Per-app `consent.role_map` claim emission in Hydra | **Not replaced.** This is Hydra consent territory, not Oathkeeper. |
@@ -508,7 +508,7 @@ admin-mux protections.
 
 ### 10. Migration cost (today)
 
-Reading the production Caddyfile (in `dunn.dev/iac/services/dag/`) and the
+Reading the production Caddyfile (in the deploy repo's `services/dag/`) and the
 e2e harness Caddyfile (`e2e/caddy.Caddyfile`), the lift looks like:
 
 1. Add `oathkeeper.container` Quadlet to the auth pod (~30 min).
@@ -522,7 +522,7 @@ e2e harness Caddyfile (`e2e/caddy.Caddyfile`), the lift looks like:
    Decision-API mode is the lower-risk migration; proxy mode is
    cleaner but moves all reverse_proxy logic into rules.yml.
 5. Update the Caddy forward-auth and admin-session snippets in the
-   `dunn.dev/iac` deploy repo to call Oathkeeper instead of Kratos
+   the deploy repo to call Oathkeeper instead of Kratos
    directly.
 6. Cut over apps one at a time, validate, rinse, repeat. Each app: ~1h
    end-to-end.

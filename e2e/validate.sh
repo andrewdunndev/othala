@@ -3,8 +3,8 @@
 #
 # Runs INSIDE the per-job Fedora VM the carmine GitLab Runner spawns
 # (Custom Executor, tag carmine,qemu). The VM has podman + podman-docker
-# bridge baked into the baser golden image (per dunn.dev/iac/services/
-# runner/README.md "What pre-bakes into the baser golden image"), so
+# bridge baked into the baser golden image (per the deploy repo's
+# runner config "What pre-bakes into the baser golden image"), so
 # `docker compose` works natively. The same script runs on an operator
 # workstation — this is the OSS-facing "stand Othala up on compose"
 # example, not a CI-only artifact.

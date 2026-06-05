@@ -44,10 +44,10 @@ removed. The `.env.example` and `gen-secrets.sh` reflect this: only
 
 2. Update sops (production) or `.env` (lab):
 
-   Production (sops-backed operator repo, e.g. `dunn.dev/iac`):
+   Production (sops-backed deploy repo):
 
    ```sh
-   sops <your-iac-repo>/pyinfra/secrets.enc.yaml
+   sops <your-deploy-repo>/pyinfra/secrets.enc.yaml
    # Update auth_session_secret to the new value (single _CURRENT per
    # secret; no _PREVIOUS slot in the operator store).
    ```
@@ -89,7 +89,7 @@ removed. The `.env.example` and `gen-secrets.sh` reflect this: only
 
    ```sh
    # The kratos.yml / hydra.yml secrets.cookie list now has only one entry.
-   sops <your-iac-repo>/pyinfra/secrets.enc.yaml
+   sops <your-deploy-repo>/pyinfra/secrets.enc.yaml
    # Remove the stale old value from auth_session_secret (or whichever
    # key feeds the list); only the value from step 1 should remain.
    ```

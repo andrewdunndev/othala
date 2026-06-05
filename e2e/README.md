@@ -96,7 +96,7 @@ VM dies on job end. Total turnaround: ~3-5 minutes including image pulls.
 
 The app does **not** self-register clients on boot, and no route triggers
 registration. Registration is a deliberate **one-shot**: in production,
-`dunn.dev/iac`'s `dag-apply-clients.sh` runs the registrar as a `--rm`
+the deploy repo's `dag-apply-clients.sh` runs the registrar as a `--rm`
 one-shot on the network that can reach Hydra's admin port (see the repo
 `DEPLOY.md`). This harness does the same against the freshly-built image,
 which is why `register-clients` is a `profiles: [oneshot]` service that

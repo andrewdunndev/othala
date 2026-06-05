@@ -304,7 +304,7 @@ None.
     trailing slash to every entry closes it.
   - Fix: ensure every entry ends with `/` or a path; verify Kratos
     semantics in lab.
-  - **Status: REMEDIATED in v0.1.3.** Every entry in `kratos/kratos.yml` `allowed_return_urls` ends with `/` (lines 37-40). Inline comment at line 32 documents the invariant: "trailing slash is load-bearing." Mirrored in iac's vendored copy.
+  - **Status: REMEDIATED in v0.1.3.** Every entry in `kratos/kratos.yml` `allowed_return_urls` ends with `/` (lines 37-40). Inline comment at line 32 documents the invariant: "trailing slash is load-bearing." Mirrored in the deploy repo's vendored copy.
 
 - **LOW-4: `audience` in Tailscale client manifest is `https://login.tailscale.com`, not Hydra's redirect host.** `hydra/clients/tailscale.yaml:36-37`
   - The manifest validator (`consent/manifest.go::audienceMatchesRedirect`)
@@ -349,7 +349,7 @@ None.
   - **Status: REMEDIATED at architecture level.** HIGH-1 (the path that bites) is closed via CSRF tokens. CORS allowlist is tight; service-worker exfiltration blocked at IDP.
 
 - **A6: Backup-and-restore correctness across Hydra encryption-at-rest.** `docs/runbooks/postgres-backup.md` is a placeholder ("TODO"). The runbook correctly identifies `secrets.system` rehydration as the gating step before pg_restore is meaningful. A partial-state restore (Hydra mid-write, Kratos mid-write) is the worst-case: Postgres point-in-time consistency is per-database, but the auth substrate touches both `kratos` and `hydra` databases in different transactions, so a backup taken between a `kratos` write and a corresponding `hydra` write yields drift (e.g., a Kratos identity exists with a Hydra consent decision pointing at no-such-subject). At family scale, the recovery is "wipe Hydra remembered-consent rows and force re-login" not "fix the row." Document.
-  - **Status: OPEN.** Backup tooling (Backblaze B2 via rclone + onsite zpool) is the next session's work in iac, not auth-project work. `docs/runbooks/postgres-backup.md` retains its placeholder posture; backup implementation lives in iac.
+  - **Status: OPEN.** Backup tooling (Backblaze B2 via rclone + onsite zpool) is the next session's work in the deploy repo, not auth-project work. `docs/runbooks/postgres-backup.md` retains its placeholder posture; backup implementation lives in the deploy repo.
 
 - **A7: No mTLS in-cluster.** Plain HTTP across the auth pod (consent → hydra:4445, portal → kratos:4434, kratos → consent:4477). Acceptable at family scale: the pod is one trust domain, podman network isolation prevents cross-pod traffic, and the threat tier that breaks this (a malicious co-tenant) doesn't exist on a single-tenant home lab. Document the assumption in `ARCHITECTURE.md`. Tier-2 implication: any RCE on a service inside the auth pod yields full pod-internal lateral. The pod boundary is the only thing keeping app-pod compromise from auth-pod compromise; ZFS / SELinux / podman-rootless are the secondary boundaries. The gap to a real ent-grade posture is mTLS or SPIFFE; not justified at this scale.
   - **Status: ACCEPTED.** Documented in `ARCHITECTURE.md` "Trust boundary" + `docs/golden-path.md` "Single security domain" entry.
@@ -359,8 +359,8 @@ None.
 - The 14 downstream apps' own auth code (Vaultwarden, Jellyfin SSO plugin, etc.): per-app audit is a Phase 4 lab task; static review can't confirm behavior.
 - Cloudflare DNS/ACME flow: covered elsewhere; not in this tree.
 - Caddy custom image build (`dunn.dev/caddy-estate`): repo is separate.
-- pyinfra production deploy plays: now live in `dunn.dev/iac/services/auth/`.
-- Postgres backup tooling: explicitly TODO per runbook (A6 / H11). Lands as iac work.
+- pyinfra production deploy plays: now live in the deploy repo's `services/auth/`.
+- Postgres backup tooling: explicitly TODO per runbook (A6 / H11). Lands as deploy-plane work.
 - Kratos courier / SMTP path beyond config: deliverability runbook covers operator concerns, not threat model.
 - The e2e smoke harness (`e2e/`) and validate-phase3 scripts: these are the test harness, not the security surface.
 - glauth upstream code: vendored as an import; CVE tracking is on the operator runbook, not this review.
@@ -368,7 +368,7 @@ None.
 
 ## Triage status (v0.2.0)
 
-All HIGH and MEDIUM findings remediated or accepted with documented rationale. LOW-5 closed in this release. Open architectural items (A3, A6) deferred to specific work streams: A3 (per-app audit) → Phase 4 lab; A6 (postgres backup) → iac work stream. The substrate is family-pilot-ready from a security-finding standpoint.
+All HIGH and MEDIUM findings remediated or accepted with documented rationale. LOW-5 closed in this release. Open architectural items (A3, A6) deferred to specific work streams: A3 (per-app audit) → Phase 4 lab; A6 (postgres backup) → deploy-plane work stream. The substrate is family-pilot-ready from a security-finding standpoint.
 
 Original triage recommendations preserved for historical reference:
 

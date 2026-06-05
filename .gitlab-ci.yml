@@ -9,7 +9,7 @@
 #   - ldap-bridge  the Go glauth-kratos LDAP bridge, published as the
 #                  othala/ldap-bridge sub-image.
 # caddy lives in the separate dunn.dev/caddy-estate repo; the
-# production Caddyfile snippets live in dunn.dev/iac/services/dag/.
+# production Caddyfile snippets live in the deploy repo's services/dag/.
 #
 # The legacy consent/ (Go) and util/ (Bash) modules were retired at the
 # E1 cutover: their roles converged into the othala app. The source dirs
