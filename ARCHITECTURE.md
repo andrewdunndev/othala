@@ -26,7 +26,7 @@ This hierarchy is what prevents doc drift from recurring.
 2. `docs/golden-path.md`: the upgrade-durability commitments.
 3. `docs/decision.md`: historical substrate rationale (the Ory choice). Architecture section superseded by this file.
 4. `docs/STATUS.md`: current release state + what is next.
-5. `DEPLOY.md`: bidirectional pointer to `dunn.dev/iac` where production lives.
+5. `DEPLOY.md`: bidirectional pointer to the deploy repo where production lives.
 
 ## The converged application
 
@@ -45,7 +45,7 @@ The app holds, all in one process:
 - **A dual-listener** (`portal/src/server/listen.mjs`): a public Astro SSR listener and a SEPARATE loopback / pod-only admin listener. Admin endpoints live off the public mux by construction. See LB-14.
 - **The revoke fan-out** (`portal/src/lib/revoke.ts`, `revokeSubject`): in-process, wired to admin force-logout, user sign-out-everywhere, and deactivate. See LB-15.
 - **Admin authority** (`portal/src/lib/admin-auth.ts`): the `OTHALA_ADMIN_SUBJECTS` allowlist, the SOLE source of admin authz. See LB-6 and LB-16.
-- **OIDC client registration** (`portal/src/lib/manifests.ts` parser + `register-clients.ts` registrar + the full `validateClients` lint, bundled to `dist/server/register-clients.mjs`). The in-app registrar is the runner: a deliberate `--rm` one-shot (never on app boot, never route-triggered). CI exercises it via the `e2e` harness's `register-clients` compose service against `MANIFEST_DIR`; on the iac side `make dag-apply-clients` runs the same bundle. The legacy shell `apply-clients.sh` + Go `util` runner were retired at E1.
+- **OIDC client registration** (`portal/src/lib/manifests.ts` parser + `register-clients.ts` registrar + the full `validateClients` lint, bundled to `dist/server/register-clients.mjs`). The in-app registrar is the runner: a deliberate `--rm` one-shot (never on app boot, never route-triggered). CI exercises it via the `e2e` harness's `register-clients` compose service against `MANIFEST_DIR`; the deploy repo runs the same bundle, e.g. `make dag-apply-clients`. The legacy shell `apply-clients.sh` + Go `util` runner were retired at E1.
 
 **The surface split.** Admin / programmatic calls go through the typed
 Ory SDK (`@ory/client-fetch`): `admin-api.ts` (IdentityApi),
@@ -65,10 +65,10 @@ tokens with its own key (native since 2019). The former custom
 private-key signer was DELETED. The app holds NO signing key at rest.
 
 **Legacy, removed.** The Go `consent/` service and `util/` apply runner
-were RETIRED at the iac deploy cutover (additive convergence: the TS app
-landed alongside them, then the cutover dropped them) and the source dirs
-are now DELETED. Their behaviour lives in the TS app. They are NOT the
-current architecture; do not reintroduce them.
+were RETIRED at the deploy cutover (additive convergence: the TS app
+landed alongside them, then the cutover dropped them) and the source
+dirs are now DELETED. Their behaviour lives in the TS app. They are NOT
+the current architecture; do not reintroduce them.
 
 ## The load-bearing decisions
 
@@ -212,8 +212,8 @@ Spec-violating to put it on a subdomain.
 
 ### LB-11: Sops + age is the single secrets source
 
-`dunn.dev/iac/pyinfra/secrets.enc.yaml`. Secrets are sops + age. iac maps
-the `dag_*` sops keys onto the app's env targets
+The operator's sops-encrypted secrets store. Secrets are sops + age.
+The deploy plane maps the `dag_*` sops keys onto the app's env targets
 (`OTHALA_ADMIN_SUBJECTS`, `OTHALA_ADMIN_ENDPOINT_BEARER`,
 `RECOVERY_GATE_SECRET`, `CSRF_SECRET`, `LDAP_BRIDGE_ADMIN_URL` /
 `LDAP_BRIDGE_ADMIN_TOKEN`, plus the Kratos/Hydra admin tokens and the
@@ -221,31 +221,33 @@ per-client `*_CLIENT_SECRET`s). Documented in
 `docs/runbooks/secrets-rotation.md`, `docs/runbooks/cookie-rotation.md`,
 `docs/runbooks/postgres-backup.md`.
 
-### LB-12: `dunn.dev/iac` is the deploy plane (vendor-pin model)
+### LB-12: The deploy plane is a separate vendor-pin config repo
 
-iac is the primary deployment view; this repo is the transitory upstream
-(OSS-bound, the standalone Othala project). Deploying to the SSO host is
-the promotion event that takes Othala from speculative to actual.
+The deploy repo is the primary deployment view; this repo is the
+transitory upstream (OSS-bound, the standalone Othala project). Deploying
+to the SSO host is the promotion event that takes Othala from speculative
+to actual.
 
-iac vendors config files pinned to a released Othala tag, under the `dag`
-service grouping (`services/dag/`). Drift between Othala-HEAD and the iac
-pin is expected and permitted; iac decides when to consume a new release.
-There is no submodule or subtree between the repos; that dependency format
-was rejected. The contract is a released tag, not a live pointer.
+The deploy repo vendors config files pinned to a released Othala tag,
+under the `dag` service grouping (`services/dag/`). Drift between
+Othala-HEAD and the deploy pin is expected and permitted; the deploy repo
+decides when to consume a new release. There is no submodule or subtree
+between the repos; that dependency format was rejected. The contract is a
+released tag, not a live pointer.
 
 The published application image is named **othala**. The instance
-grouping in iac is **dag**: `services/dag/`, `dag-*` quadlets, the
-`dag.network`, `dag_*` sops keys. The functional Ory service names
-(kratos / hydra / postgres) keep their role names.
+grouping in the deploy repo is **dag**: `services/dag/`, `dag-*`
+quadlets, the `dag.network`, `dag_*` sops keys. The functional Ory
+service names (kratos / hydra / postgres) keep their role names.
 
-Topology-specific differences (DSN host) are iac-local deviations
+Topology-specific differences (DSN host) are deploy-local deviations
 documented in each vendored file's provenance header.
 
-See `DEPLOY.md` (in this repo) + `dunn.dev/iac/services/dag/` (the deploy
-plane).
+See `DEPLOY.md` (in this repo) for the full promotion path and deploy
+shape.
 
 **If you change a config file here**: tag a new Othala release, then the
-operator bumps the iac pin (sync configs, review diff, port desired
+operator bumps the deploy pin (sync configs, review diff, port desired
 changes, update provenance headers, commit).
 
 ### LB-13: The access gate is fail-closed on group AND state
@@ -535,7 +537,7 @@ requires Tailscale support per KB-1240. See
 
 Every family app falls into one of five patterns, fixed at deploy time per
 app via the Caddyfile snippet it imports. The production Caddy config lives
-in the `dunn.dev/iac` deploy repo under `services/dag/`.
+in the deploy repo's service config (e.g. `services/dag/`).
 
 Each `e2e/manifests/<slug>.yaml` example declares its pattern via
 `presentation.auth_kind`. The worked examples below map to those
@@ -683,24 +685,24 @@ things."
 
 | Image | Pin | Renovate-managed |
 |---|---|---|
-| `docker.io/oryd/kratos` | see `dunn.dev/iac` quadlets (authoritative) | yes |
-| `docker.io/oryd/hydra` | see `dunn.dev/iac` quadlets (authoritative) | yes |
-| `docker.io/library/postgres` | see `dunn.dev/iac` quadlets (authoritative) | yes |
-| `registry.gitlab.com/dunn.dev/caddy-estate` | see `dunn.dev/iac` quadlets (authoritative) | yes |
-| `registry.gitlab.com/dunn.dev/othala` | see `dunn.dev/iac` quadlets (authoritative) | self-managed |
-| `registry.gitlab.com/dunn.dev/othala/ldap-bridge` | see `dunn.dev/iac` quadlets (authoritative) | self-managed |
+| `docker.io/oryd/kratos` | see the deploy quadlets (authoritative) | yes |
+| `docker.io/oryd/hydra` | see the deploy quadlets (authoritative) | yes |
+| `docker.io/library/postgres` | see the deploy quadlets (authoritative) | yes |
+| `registry.gitlab.com/dunn.dev/caddy-estate` | see the deploy quadlets (authoritative) | yes |
+| `registry.gitlab.com/dunn.dev/othala` | see the deploy quadlets (authoritative) | self-managed |
+| `registry.gitlab.com/dunn.dev/othala/ldap-bridge` | see the deploy quadlets (authoritative) | self-managed |
 
 The `othala` image is the converged app. The legacy `consent` and `util`
 images still build today but are retired at the deploy cutover. Current
-pinned versions live in the `dunn.dev/iac/services/dag/` quadlets
-(`Image=` lines). `docs/STATUS.md` states the deployed version. Do not
-restate version numbers here.
+pinned versions live in the deploy quadlets (`Image=` lines).
+`docs/STATUS.md` states the deployed version. Do not restate version
+numbers here.
 
 Bumping pins:
 
 1. Pull the candidate image to a lab VM (or the QEMU-CI lab, when wired).
 2. Run the lab substrate against it; smoke-test through Playwright.
-3. If green, update the pin in `dunn.dev/iac/services/dag/` quadlets.
+3. If green, update the pin in the deploy quadlets.
 4. Deploy, verify, document.
 
 Ory's release cadence is roughly annual minor releases with infrequent
@@ -761,10 +763,10 @@ those as the build-time / release-gate guards, not a continuous type gate.
 |---|---|
 | "Why does this code exist?" | `git log --follow <file>` first; then `docs/decision.md` for high-level rationale. |
 | "Why is this CHOICE locked-in?" | `docs/golden-path.md` for upgrade-durability choices; `docs/decision.md` for one-time decisions. |
-| "Where does production-X live?" | `dunn.dev/iac/services/dag/` for runtime configs; THIS repo for application code. |
+| "Where does production-X live?" | The deploy repo's service config (e.g. `services/dag/`) for runtime configs; THIS repo for application code. |
 | "What's open vs fixed?" | `docs/STATUS.md` for top-level; the security review for findings. |
 | "How do I deploy?" | `DEPLOY.md` (this repo's root). |
-| "How do I add a new OIDC client?" | Drop a unified `<slug>.yaml` manifest (`presentation:` + `oidc:` + `consent:`, optional `<slug>.md` education sidecar) into `MANIFEST_DIR`, add `<SLUG>_CLIENT_SECRET` to sops, sync the dir to the host, then run the registrar on the iac side. No image rebuild. See `e2e/manifests/` for worked examples and `docs/per-app-oidc.md` for the per-RP runbook. |
+| "How do I add a new OIDC client?" | Drop a unified `<slug>.yaml` manifest (`presentation:` + `oidc:` + `consent:`, optional `<slug>.md` education sidecar) into `MANIFEST_DIR`, add `<SLUG>_CLIENT_SECRET` to sops, sync the dir to the host, then run the registrar from the deploy repo. No image rebuild. See `e2e/manifests/` for worked examples and `docs/per-app-oidc.md` for the per-RP runbook. |
 | "How do I rotate a secret?" | `docs/runbooks/*-rotation.md`. |
 
 ## Don't-Add-Here list

@@ -1,9 +1,9 @@
 # Deploy
 
-Othala is **deployed by `dunn.dev/iac`**, not from this repo. This
-document is the consumption contract: the deploy shape, the promotion
-path, and the env/secret set. For what the application *is* and the
-load-bearing decisions behind it, read
+Othala is **deployed by a separate vendor-pin config repo** (the deploy
+plane), not from this repo. This document is the consumption contract:
+the deploy shape, the promotion path, and the env/secret set. For what
+the application *is* and the load-bearing decisions behind it, read
 [`ARCHITECTURE.md`](ARCHITECTURE.md). For current release/version
 state, read [`docs/STATUS.md`](docs/STATUS.md). This file does not
 restate either.
@@ -11,7 +11,7 @@ restate either.
 Othala is "Ory for your home": a self-hosted Ory substrate for a
 personal estate, the on-prem analog to Ory Network. The deployed
 instance is **dag.dunn.dev** (dagaz ᛞ, the threshold rune); the login
-screen renders ᛞ→ᛟ, "door to home" (dag→othala). In iac the instance
+screen renders ᛞ→ᛟ, "door to home" (dag→othala). In the deploy repo the instance
 is grouped under **dag** (`services/dag/`, `dag-*` quadlets,
 `dag.network`, `dag_*` sops keys); the functional Ory services keep
 their role names (kratos / hydra / postgres).
@@ -19,15 +19,15 @@ their role names (kratos / hydra / postgres).
 ## Getting started: two entry paths
 
 **Option A — E2E smoke harness (`e2e/`):** The fastest way to validate
-Othala locally against a running substrate, without iac or sops. See
-`e2e/README.md` for env reference and smoke verification. The harness
-runs the same Othala app image as production; iac differences are
-quadlets + sops, not the app itself.
+Othala locally against a running substrate, without a deploy repo or
+sops. See `e2e/README.md` for env reference and smoke verification. The
+harness runs the same Othala app image as production; the deploy plane's
+differences are quadlets + sops, not the app itself.
 
-**Option B — iac (Andrew's production deployment, `dunn.dev/iac`):** The
-promotion path documented in the rest of this file. Vendor Othala configs
-by tag-pin into your operator repo, manage secrets with sops + age,
-deploy via quadlets. Full details below.
+**Option B — production deployment (the operator's deploy repo):** The
+promotion path documented in the rest of this file. Vendor Othala
+configs by tag-pin into your deploy repo, manage secrets with sops +
+age, deploy via quadlets. Full details below.
 
 ---
 
@@ -77,10 +77,10 @@ fail-closed (an unset secret rejects every request).
 
 ## Promotion path
 
-There is **no submodule and no symlink**. iac vendors Othala's
-authoritative configs as copies, each pinned to a released Othala
-**tag** with a short provenance header. The promotion path is edit,
-tag, sync, bump, deploy:
+There is **no submodule and no symlink**. The deploy repo vendors
+Othala's authoritative configs as copies, each pinned to a released
+Othala **tag** with a short provenance header. The promotion path is
+edit, tag, sync, bump, deploy:
 
 ```sh
 # 1. Tag this repo after CI publishes images.
@@ -90,8 +90,8 @@ git push --tags
 # registry root, registry.gitlab.com/dunn.dev/othala:v0.1.X, and the
 # LDAP bridge as registry.gitlab.com/dunn.dev/othala/ldap-bridge:v0.1.X.
 
-# 2. Sync vendored configs into iac and review the drift.
-cd dunn.dev/iac
+# 2. Sync vendored configs into the deploy repo and review the drift.
+# cd <your-deploy-repo>
 make dag-sync-configs       # diff vendored configs vs othala HEAD
 # Port desired changes manually, then bump each dag-* quadlet Image=
 # pin + provenance SHA to v0.1.X.
@@ -110,21 +110,21 @@ make dag-apply-clients HOST=carmine
 make dag-smoke HOST=carmine
 ```
 
-Rollback is purely an iac change: revert the quadlet commit (re-pinning
-the previous tag) and `make dag-deploy` again. Registry tags are
-immutable, so the rollback is deterministic.
+Rollback is purely a deploy-repo change: revert the quadlet commit
+(re-pinning the previous tag) and `make dag-deploy` again. Registry
+tags are immutable, so the rollback is deterministic.
 
 ## Environment and secrets
 
 The Othala container's runtime env. The Ory upstream URLs are set by the
-iac quadlet (`KRATOS_PUBLIC_URL`, `KRATOS_ADMIN_URL`, `HYDRA_PUBLIC_URL`,
+deploy quadlet (`KRATOS_PUBLIC_URL`, `KRATOS_ADMIN_URL`, `HYDRA_PUBLIC_URL`,
 `HYDRA_ADMIN_URL`, `HYDRA_ISSUER_URL`); the listener ports default to
 `PORT=8080` / `ADMIN_PORT=8431`. `MANIFEST_DIR` (default
 `/etc/portal/manifests`) is the directory the app reads per-app manifests
 from at runtime; the quadlet volume-mounts the synced manifest set there
-read-only. The secrets are sops + age backed in
-`dunn.dev/iac/pyinfra/secrets.enc.yaml` under `carmine.dag_*` keys; iac
-maps each `dag_*` key to the env target below:
+read-only. The secrets are sops + age backed in the operator's
+sops-encrypted secrets store under `carmine.dag_*` keys; the deploy
+plane maps each `dag_*` key to the env target below:
 
 | Env target | Guards / used by |
 |---|---|
@@ -146,11 +146,12 @@ custom private-key signer was deleted.
 ## Client registration
 
 OIDC client registration is a deliberate **one-shot**, never run on app
-boot or triggered by a route. On the iac side `make dag-apply-clients`
-invokes a `--rm` one-shot runner on `dag.network` (the only network that
-can reach Hydra's admin port) against the manifests synced into
-`MANIFEST_DIR`. See [`docs/per-app-oidc.md`](docs/per-app-oidc.md) for the
-full per-RP runbook.
+boot or triggered by a route. The deploy repo runs the registrar, e.g.
+`make dag-apply-clients`, which invokes a `--rm` one-shot runner on
+`dag.network` (the only network that can reach Hydra's admin port)
+against the manifests synced into `MANIFEST_DIR`. See
+[`docs/per-app-oidc.md`](docs/per-app-oidc.md) for the full per-RP
+runbook.
 
 The runner is the converged app's **in-app registrar**
 (`portal/src/lib/register-clients.ts` driving the Hydra OAuth2Api, fed by
@@ -184,17 +185,18 @@ deploy:
   reinstalled ahead of the cutover, so the secret material is generated
   fresh, not migrated from any prior instance.
 
-Until the cutover, the iac `dag-*` quadlets remain at the pre-cutover
-shape (`dag-portal` still depends on `dag-consent`). The Go consent +
-util sources have been removed from this repo at E1; their behaviour
-lives in the converged app and they are not the current architecture.
+Until the cutover, the deploy quadlets (`dag-*`) remain at the
+pre-cutover shape (`dag-portal` still depends on `dag-consent`). The Go
+consent + util sources have been removed from this repo at E1; their
+behaviour lives in the converged app and they are not the current
+architecture.
 
 ## Why two repos
 
 `dunn.dev/othala` is the **application** and its authoritative configs.
-`dunn.dev/iac` is the **operator concern**: secrets, runtime topology,
-sops + age, ZFS pools, every other carmine service. iac is the primary
-deployment view; it vendors Othala's configs by tag-pin so the
+The **deploy repo** is the operator concern: secrets, runtime topology,
+sops + age, ZFS pools, every other host service. The deploy repo is the
+primary deployment view; it vendors Othala's configs by tag-pin so the
 open-sourceable application stays decoupled from private infrastructure
 decisions. Othala versions independently; the Othala tag is what gets
 pinned in the `dag-*` quadlets.
@@ -204,5 +206,4 @@ pinned in the `dag-*` quadlets.
 - [`ARCHITECTURE.md`](ARCHITECTURE.md) — what the app is + load-bearing decisions (read this for the architecture; this file does not restate it)
 - [`docs/STATUS.md`](docs/STATUS.md) — the only place release/version state is asserted
 - [`docs/per-app-oidc.md`](docs/per-app-oidc.md) — per-RP OIDC integration runbook
-- `dunn.dev/iac/services/dag/README.md` — service-specific deploy notes (in iac)
-- `dunn.dev/iac/AGENTS.md` — iac estate conventions
+- your deploy repo's docs — service-specific deploy notes and estate conventions
