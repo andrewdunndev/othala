@@ -60,7 +60,7 @@ if (devOverride === 'down' || devOverride === 'pre-auth' || devOverride === 'pos
     const devGroupsEnv = process.env.OTHALA_DEV_MOCK_GROUPS;
     const mockGroups = devGroupsEnv
       ? devGroupsEnv.split(',').map((g) => g.trim()).filter(Boolean)
-      : ['admin', 'family', 'access-grafana', 'access-audiobookshelf', 'access-jellyfin', 'access-proxywatch', 'access-statuspage', 'access-gather-usenet', 'access-gather-torrent'];
+      : ['admin', 'family', 'everyone', 'access-grafana', 'access-audiobookshelf', 'access-jellyfin', 'access-proxywatch', 'access-gather-usenet', 'access-gather-torrent'];
     identity = {
       id: 'dev-mock',
       traits: { username: 'dev.user', email: 'dev@example.local', displayName: 'Dev User' },

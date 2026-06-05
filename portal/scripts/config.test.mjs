@@ -227,17 +227,18 @@ test('defaultSchemaId: uses explicit value', async () => {
 
 // ── OTHALA_IDENTITY_GROUPS ────────────────────────────────────────────────────
 
-test('identityGroups: defaults to ["admin"] when unset', async () => {
+test('identityGroups: defaults to ["admin", "everyone"] when unset (admin + default group)', async () => {
   const { identityGroups } = await loadConfig({ NODE_ENV: 'test' });
-  assert.deepEqual(identityGroups, ['admin']);
+  assert.deepEqual(identityGroups, ['admin', 'everyone']);
 });
 
-test('identityGroups: parses comma-separated list with admin first', async () => {
+test('identityGroups: parses comma-separated list with admin first, default group appended', async () => {
   const { identityGroups } = await loadConfig({
     NODE_ENV: 'test',
     OTHALA_IDENTITY_GROUPS: 'admin,family,friends,work',
   });
-  assert.deepEqual(identityGroups, ['admin', 'family', 'friends', 'work']);
+  // 'everyone' (default OTHALA_DEFAULT_GROUP) is appended automatically.
+  assert.deepEqual(identityGroups, ['admin', 'family', 'friends', 'work', 'everyone']);
 });
 
 test('identityGroups: prepends admin even when omitted from the list', async () => {
@@ -278,6 +279,60 @@ test('identityGroups: trims whitespace around group names', async () => {
   assert.ok(!identityGroups.includes(' family '));
 });
 
+// ── OTHALA_DEFAULT_GROUP ──────────────────────────────────────────────────────
+
+test('defaultGroup: defaults to "everyone" when unset', async () => {
+  const { defaultGroup } = await loadConfig({ NODE_ENV: 'test' });
+  assert.equal(defaultGroup, 'everyone');
+});
+
+test('defaultGroup: uses explicit value when set', async () => {
+  const { defaultGroup } = await loadConfig({
+    NODE_ENV: 'test',
+    OTHALA_DEFAULT_GROUP: 'family',
+  });
+  assert.equal(defaultGroup, 'family');
+});
+
+test('identityGroups: default group appended when not already in list', async () => {
+  const { identityGroups } = await loadConfig({
+    NODE_ENV: 'test',
+    OTHALA_IDENTITY_GROUPS: 'admin,family,friends',
+    OTHALA_DEFAULT_GROUP: 'everyone',
+  });
+  assert.ok(identityGroups.includes('everyone'),
+    'default group must be appended to identityGroups');
+  assert.equal(identityGroups[0], 'admin', 'admin must remain first');
+});
+
+test('identityGroups: default group not duplicated when already in list', async () => {
+  const { identityGroups } = await loadConfig({
+    NODE_ENV: 'test',
+    OTHALA_IDENTITY_GROUPS: 'admin,family,everyone',
+    OTHALA_DEFAULT_GROUP: 'everyone',
+  });
+  const everyoneCount = identityGroups.filter((g) => g === 'everyone').length;
+  assert.equal(everyoneCount, 1, 'default group must appear exactly once');
+});
+
+test('identityGroups: custom default group appended automatically', async () => {
+  const { identityGroups, defaultGroup } = await loadConfig({
+    NODE_ENV: 'test',
+    OTHALA_IDENTITY_GROUPS: 'admin,family',
+    OTHALA_DEFAULT_GROUP: 'household',
+  });
+  assert.equal(defaultGroup, 'household');
+  assert.ok(identityGroups.includes('household'),
+    'custom default group must appear in identityGroups');
+});
+
+test('identityGroups: default group (everyone) appended to bare ["admin"] default', async () => {
+  // When OTHALA_IDENTITY_GROUPS is unset the list starts as ['admin'];
+  // defaultGroup ('everyone') must be appended.
+  const { identityGroups } = await loadConfig({ NODE_ENV: 'test' });
+  assert.deepEqual(identityGroups, ['admin', 'everyone']);
+});
+
 // ── aggregate config object ───────────────────────────────────────────────────
 
 test('config object mirrors individual exports', async () => {
@@ -290,5 +345,6 @@ test('config object mirrors individual exports', async () => {
   assert.equal(mod.config.adminContact, mod.adminContact);
   assert.equal(mod.config.instanceName, mod.instanceName);
   assert.equal(mod.config.defaultSchemaId, mod.defaultSchemaId);
+  assert.equal(mod.config.defaultGroup, mod.defaultGroup);
   assert.deepEqual(mod.config.identityGroups, mod.identityGroups);
 });

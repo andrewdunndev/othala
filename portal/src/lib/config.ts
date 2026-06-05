@@ -21,7 +21,7 @@
 // Usage
 // ─────
 //   import { publicUrl, siteName, instanceName, adminContact,
-//            defaultSchemaId, identityGroups } from '../lib/config';
+//            defaultSchemaId, defaultGroup, identityGroups } from '../lib/config';
 //
 //   // or for consumers that only need one value and want tree-shaking:
 //   import { siteName } from '../lib/config';  // depth-relative per file
@@ -194,6 +194,28 @@ export const defaultSchemaId: string = optionalVar(
   'default',
 );
 
+// ── OTHALA_DEFAULT_GROUP ──────────────────────────────────────────────────────
+//
+// The fallback access group applied to any manifest tile whose
+// `presentation.access_group` field is absent. Every tile in Othala gates on
+// group membership — there is no ungated/bypass concept. When an operator
+// omits `access_group` from a manifest the tile becomes visible to members of
+// this group rather than to nobody.
+//
+// Operators override this per instance (e.g. `OTHALA_DEFAULT_GROUP=family`).
+// The default group is automatically appended to the identityGroups list (see
+// OTHALA_IDENTITY_GROUPS below) so it appears in the admin UI group selector.
+// Membership is NOT auto-assigned to new identities — adding a user to the
+// default group remains an explicit admin act.
+//
+// Neutral default: 'everyone' — an OSS-portable name that makes the intent
+// clear without conflicting with any identity-group convention.
+
+export const defaultGroup: string = optionalVar(
+  'OTHALA_DEFAULT_GROUP',
+  'everyone',
+).toLowerCase();
+
 // ── OTHALA_IDENTITY_GROUPS ────────────────────────────────────────────────────
 //
 // Comma-separated ORDERED list of identity groups available for assignment in
@@ -202,8 +224,13 @@ export const defaultSchemaId: string = optionalVar(
 // preserving the invariant that admin authority gates are always first in any
 // rendered group selector.
 //
+// The value of OTHALA_DEFAULT_GROUP is appended (deduplicated) so the default
+// group always appears in the selector without requiring the operator to list
+// it explicitly.
+//
 // Example:  OTHALA_IDENTITY_GROUPS=admin,family,friends,work
-// Neutral default: ['admin'] — single group; operators extend as needed.
+// Neutral default: ['admin', 'everyone'] — admin plus the default group;
+// operators extend as needed.
 //
 // NOTE: group membership in metadata_admin.groups is DISPLAY-ONLY (CU3/B2).
 //       Admin authority is the OTHALA_ADMIN_SUBJECTS allowlist in admin-auth.ts,
@@ -217,8 +244,11 @@ function parseIdentityGroups(): string[] {
     .filter(Boolean);
 
   // 'admin' is always first; deduplicate without losing order.
-  const groups = ['admin', ...parsed.filter((g) => g !== 'admin')];
-  return groups.length > 1 ? groups : ['admin'];
+  const base = ['admin', ...parsed.filter((g) => g !== 'admin')];
+  const withDefault = base.includes(defaultGroup)
+    ? base
+    : [...base, defaultGroup];
+  return withDefault;
 }
 
 export const identityGroups: string[] = parseIdentityGroups();
@@ -234,6 +264,7 @@ export const config = {
   adminContact,
   instanceName,
   defaultSchemaId,
+  defaultGroup,
   identityGroups,
   contactRecipient,
   smtpFromAddress,

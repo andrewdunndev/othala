@@ -185,17 +185,19 @@ three namespace blocks:
 - `consent:` — role + claim-emission shape, consulted at consent time.
 
 The tile loader filters by the active user's `metadata_admin.groups`
-(must include `access-<slug>`) and renders. OIDC clients are a
-**subset**: a manifest with only `presentation:` (a forward_auth, LDAP,
-or external tile with no Hydra client) is skipped by the OIDC loader
-rather than throwing. Because both loaders read the directory at runtime,
-adding or removing an app is a manifest-dir change with **no image
-rebuild**. The generic worked examples live in `e2e/manifests/`.
+(must include the tile's `access_group`) and renders. Every tile gates on
+group membership — there is no ungated path. When `access_group` is absent
+from a manifest, the tile gates on `OTHALA_DEFAULT_GROUP` (default `everyone`)
+rather than on a phantom per-slug group. OIDC clients are a **subset**: a
+manifest with only `presentation:` (a forward_auth, LDAP, or external tile
+with no Hydra client) is skipped by the OIDC loader rather than throwing.
+Because both loaders read the directory at runtime, adding or removing an app
+is a manifest-dir change with **no image rebuild**. The generic worked examples
+live in `e2e/manifests/`.
 
 **If you change this convention**: the slug is the filename
-(`<slug>.yaml` ⇄ `<slug>.md`) and the `oidc.client_id`; the
-`access_group` must be `access-<slug>` (the tile loader throws on a
-mismatch). Renaming either side breaks the lookup.
+(`<slug>.yaml` ⇄ `<slug>.md`) and the `oidc.client_id`. Renaming either side
+breaks the lookup.
 
 ### LB-10: WebFinger lives at dunn.dev apex, NOT here
 
@@ -556,23 +558,25 @@ fixtures.
 
 Two types of groups in `metadata_admin.groups[]`:
 
-**Identity groups**: who you are. Canonical order: `admin`, `family`,
-`friends`, `kids`. The admin form writes `metadata_admin.groups` in
-canonical order on save (`portal/src/lib/access.ts:
+**Identity groups**: who you are. Canonical order: `admin`, then the
+groups declared in `OTHALA_IDENTITY_GROUPS`, then the default group
+(`OTHALA_DEFAULT_GROUP`, default `everyone`). The admin form writes
+`metadata_admin.groups` in canonical order on save (`portal/src/lib/access.ts:
 normalizeGroupOrder`); stored order IS the precedence. The `admin` group
 here is DISPLAY-ONLY for authz purposes (LB-16): it renders and may drive
 per-app role derivation, but admin authority is the
 `OTHALA_ADMIN_SUBJECTS` allowlist. Adding a new identity group means
-updating `IDENTITY_GROUP_ORDER` in `access.ts` AND the form's checkbox
-list; otherwise the new group lands out of order.
+setting or extending `OTHALA_IDENTITY_GROUPS` — no code change required.
 
-**Access groups**: what you can reach (one per app), e.g.
-`access-grafana`, `access-jellyfin`, `access-proxywatch`. The tile
-launcher renders only tiles for
-the `access-*` groups the user is in. The access gate (LB-13) enforces
-`access-<clientId>` membership at the consent challenge: a user without
-the matching access group cannot complete consent regardless of session
-state.
+**Access groups**: what you can reach. The tile launcher renders only
+tiles whose `access_group` the user is in. When a manifest omits
+`access_group`, the tile gates on `OTHALA_DEFAULT_GROUP` (default
+`everyone`). Explicit per-app groups like `access-grafana`,
+`access-jellyfin`, `access-proxywatch` narrow access to that app's own
+group. The access gate (LB-13) enforces `access-<clientId>` membership at
+the consent challenge: a user without the matching access group cannot
+complete consent regardless of session state. Every tile gates on
+group membership — there is no ungated path.
 
 ### Group and credential change lag
 

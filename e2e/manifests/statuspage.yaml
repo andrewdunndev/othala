@@ -4,11 +4,12 @@
 # authenticate — auth_kind: external. Presentation ONLY; no oidc:/
 # consent: block. There is no SSO session on our side.
 #
-# NOTE: the portal's tile filter gates ALL tiles on group membership,
-# including external ones. This tile requires the access-statuspage group
-# (explicit below). If you want a truly ungated tile visible to every
-# authenticated user, that requires a code change to the tile filter in
-# portal/src/pages/index.astro — see the design note in the OSS README.
+# access_group is deliberately ABSENT here to demonstrate the default-group
+# fallback: tiles without an explicit access_group gate on the configured
+# default group (OTHALA_DEFAULT_GROUP, default value 'everyone'). The portal's
+# tile filter gates ALL tiles on group membership — there is no ungated/bypass
+# concept. Adding a user to the default group is an explicit admin act; it is
+# never automatic.
 
 presentation:
   name: Statuspage
@@ -18,7 +19,6 @@ presentation:
   icon_slug: ""
   icon_fallback: statuspage
   auth_kind: external
-  # Tile filter in index.astro gates on group membership for all tiles,
-  # including external ones. access-statuspage is required to see this tile.
-  access_group: access-statuspage
+  # access_group omitted: gates on the default group (OTHALA_DEFAULT_GROUP,
+  # default 'everyone'). Set access_group explicitly to restrict further.
   order: 200

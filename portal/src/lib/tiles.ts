@@ -34,7 +34,10 @@ import { marked } from 'marked';
 //                             fall back to public/icons/ when dist is absent.
 const _cwd = process.cwd();
 const _iconsDir = (() => {
-  if (import.meta.env.DEV) {
+  // import.meta.env is Astro/Vite-specific; guard it so the module loads
+  // cleanly in plain Node (tests, register-clients one-shot, etc.).
+  const isDev = typeof import.meta.env !== 'undefined' && import.meta.env.DEV;
+  if (isDev) {
     // Always use the source tree in dev; never let a stale dist/ shadow it.
     return join(_cwd, 'public', 'icons');
   }
@@ -108,7 +111,11 @@ export interface AppTile {
    */
   iconHref?: string;
   authKind: AuthKind;
-  /** Conventional `access-<slug>` group that gates this tile. */
+  /**
+   * The group that gates this tile on the dashboard. Sourced from the
+   * manifest's `presentation.access_group`; falls back to the configured
+   * default group (OTHALA_DEFAULT_GROUP) when the field is absent.
+   */
   accessGroup: string;
   /**
    * Optional grouping label for the dashboard (e.g. "Usenet", "Torrent").
@@ -127,6 +134,17 @@ export interface AppTile {
 
 function manifestDir(): string {
   return process.env.MANIFEST_DIR ?? '/etc/portal/manifests';
+}
+
+/**
+ * The fallback access group for tiles whose manifest omits `access_group`.
+ * Read at call time (not module load) so runtime env overrides take effect
+ * immediately without a module reload — consistent with manifestDir().
+ * Mirrors config.ts `defaultGroup` (same env var, same 'everyone' fallback,
+ * lowercased like every group in OTHALA_IDENTITY_GROUPS).
+ */
+function tileDefaultGroup(): string {
+  return process.env.OTHALA_DEFAULT_GROUP?.trim().toLowerCase() || 'everyone';
 }
 
 interface CacheEntry {
@@ -161,21 +179,29 @@ function freshestMtime(dir: string): number {
  * Parse one unified manifest's `presentation:` block into an AppTile.
  * Returns null when the file carries no `presentation:` block (an
  * OIDC-only manifest, or a non-manifest file). Any access_group value is
- * accepted as declared; the convention of `access-<slug>` is used only as a
- * default when the field is absent (dashboard-visibility filter only).
+ * accepted as declared; when the field is absent the tile gates on the
+ * default group (OTHALA_DEFAULT_GROUP — see tileDefaultGroup(), which
+ * mirrors config.ts `defaultGroup`) rather than on a phantom per-slug
+ * group.
+ *
+ * Every tile in Othala gates on group membership — there is no ungated
+ * or bypass path. Omitting `access_group` from a manifest is the
+ * operator's signal that "any member of the default group can see this
+ * tile"; it does NOT make the tile visible to every authenticated user.
+ * Explicit `access_group` always wins over the default.
  */
 function parseTile(slug: string, doc: Record<string, unknown>, dir: string): AppTile | null {
   const pBlock = doc['presentation'];
   if (!pBlock || typeof pBlock !== 'object' || Array.isArray(pBlock)) return null;
   const p = pBlock as Record<string, unknown>;
 
-  // Accept any non-empty access_group as declared; only default to
-  // `access-<slug>` when the field is absent.  The strict slug-match
-  // convention (access-<slug>) was enforced here previously, which silently
-  // dropped tiles whose access_group does not follow that pattern (e.g.
-  // bitwarden's `family`, or the shared `access-gather-*` groups).  This is
-  // a dashboard-visibility filter only — it does not touch the OIDC gate.
-  const accessGroup = p['access_group'] ? String(p['access_group']) : `access-${slug}`;
+  // Accept any non-empty access_group as declared; fall back to the
+  // configured default group (OTHALA_DEFAULT_GROUP) when the field is
+  // absent. The default group is an identity group that operators assign
+  // explicitly — it is not auto-assigned to new users. Tiles using this
+  // fallback are visible only to users the admin has placed in the
+  // default group.
+  const accessGroup = p['access_group'] ? String(p['access_group']) : tileDefaultGroup();
 
   const url = String(p['url'] ?? '');
   let fqdn: string;
