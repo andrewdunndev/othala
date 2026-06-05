@@ -18,6 +18,15 @@ One converged application, not a fleet of services:
 
 The OSS project is **Othala**; the GitLab project is `dunn.dev/othala`. The Go module is `dunn.dev/othala/ldap-bridge`; the app package is `@dunn.dev/othala-portal`; images publish under `registry.gitlab.com/dunn.dev/othala/*`.
 
+## Built for us, open for you
+
+We built Othala for our own home, and we run it in production now while iterating on it rapidly. We are making it open because others standing up Ory at household or small-estate scale may benefit from the same converged shape. It is currently opinionated toward our deployment; that opinionation is what keeps it small enough to run at home.
+
+Two invitations:
+
+- **Potential user, and this needs to be more generalized for your setup?** Please file an issue or a merge request. We are glad to generalize where it helps, and happy to take it further with you.
+- **With Ory, and would like us to donate this upstream?** Please reach out. We would gladly take Othala to Ory upstream, with the generalization work that likely entails.
+
 ## Relationship to dunn.dev/iac
 
 `dunn.dev/iac` is the primary deployment view. It vendors config files from this repo, pinned to a released Othala tag, under the `dag` service grouping (`services/dag/`). The dependency is a released tag, not a live pointer; git submodule and similar shared-history formats were rejected.

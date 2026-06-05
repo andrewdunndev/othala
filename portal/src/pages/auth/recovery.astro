@@ -12,7 +12,7 @@
 export const prerender = false;
 
 import Layout from '../../layouts/Layout.astro';
-import markSvg from '@dunn.dev/reference/mark/mark.svg?raw';
+import PageHero from '../../components/PageHero.astro';
 import { browserFlows, getRecoveryFlow } from '../../lib/kratos';
 import { csrfToken, hasMethod } from '../../lib/nodes';
 import FlowNodes from '../../components/FlowNodes.astro';
@@ -40,18 +40,13 @@ const phase: 'request' | 'sent' = flow?.state === 'sent_email' ? 'sent' : 'reque
 ---
 <Layout title="Recover account" description="Recover access to your account." bare>
 
-  <section class="hero">
-    <span class="hero-mark" set:html={markSvg} />
-    <div>
-      <p class="hero-eyebrow">recover</p>
-      <h1 class="hero-title">Account recovery</h1>
-      <p class="hero-lede">
-        {phase === 'request'
-          ? 'Enter the email tied to your account. We will send you a one-time code.'
-          : 'Check your email. Enter the code below to continue.'}
-      </p>
-    </div>
-  </section>
+  <PageHero
+    title="Account recovery"
+    eyebrow="recover"
+    lede={phase === 'request'
+      ? 'Enter the email tied to your account. We will send you a one-time code.'
+      : 'Check your email. Enter the code below to continue.'}
+  />
 
   {ui?.messages?.map((m: FlowMessage) => (
     <div class={`notice notice-${m.type === 'error' ? 'danger' : m.type === 'success' ? 'success' : 'warning'}`}>

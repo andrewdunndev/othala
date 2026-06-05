@@ -1,0 +1,21 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
+  <!-- Othala: diamond core + forked base. Line ends sit at (ring radius +
+       cap radius) from each vertex — 2.75 at the r2.5 rings — so the round
+       cap tips land on the rings' INNER edges with no penetration into the
+       hollows. -->
+  <line x1="33.94" y1="9.94" x2="46.06" y2="22.06" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+  <line x1="46.06" y1="25.94" x2="33.94" y2="38.06" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+  <line x1="30.06" y1="38.06" x2="17.94" y2="25.94" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+  <line x1="17.94" y1="22.06" x2="30.06" y2="9.94" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+  <line x1="30.19" y1="42.07" x2="19.81" y2="53.93" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+  <line x1="33.81" y1="42.07" x2="44.19" y2="53.93" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+  <!-- hollow vertex rings -->
+  <circle cx="32" cy="8" r="2.5" fill="none" stroke="currentColor" stroke-width="1.5"/>
+  <circle cx="48" cy="24" r="2.5" fill="none" stroke="currentColor" stroke-width="1.5"/>
+  <circle cx="32" cy="40" r="2.5" fill="none" stroke="currentColor" stroke-width="1.5"/>
+  <circle cx="16" cy="24" r="2.5" fill="none" stroke="currentColor" stroke-width="1.5"/>
+  <circle cx="18" cy="56" r="2.5" fill="none" stroke="currentColor" stroke-width="1.5"/>
+  <circle cx="46" cy="56" r="2.5" fill="none" stroke="currentColor" stroke-width="1.5"/>
+  <!-- hollow center -->
+  <circle cx="32" cy="24" r="2" fill="none" stroke="currentColor" stroke-width="1.5"/>
+</svg>

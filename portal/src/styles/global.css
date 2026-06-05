@@ -112,7 +112,7 @@ a.subtle:hover { color: var(--text); }
 .button-secondary {
   background: var(--surface);
   color: var(--text);
-  border-color: var(--border);
+  border-color: var(--border-strong, #b0b0b0);
 }
 .button-secondary:hover {
   background: var(--accent-subtle);
@@ -207,42 +207,31 @@ a.subtle:hover { color: var(--text); }
   text-decoration: none;
 }
 
-/* ── Tile grid (post-auth launcher) ─────────────────────────── */
-.tile-grid {
-  display: grid;
-  grid-template-columns: repeat(2, 1fr);
-  gap: var(--space-3);
+/* ── Theme toggle — icon button in footer ────────────────────── */
+/* Override the text-box style from site.css with a compact icon button. */
+.theme-toggle {
+  border: none;
+  padding: var(--space-1);
+  color: var(--text-muted);
+  margin-left: auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
 }
-@media (min-width: 640px)  { .tile-grid { grid-template-columns: repeat(3, 1fr); } }
-@media (min-width: 900px)  { .tile-grid { grid-template-columns: repeat(4, 1fr); } }
+.theme-toggle:hover { border-color: transparent; }
 
-.tile {
-  display: block;
-  padding: var(--space-5) var(--space-4);
-  text-align: center;
-  background: var(--surface);
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
-  color: var(--text);
-  text-decoration: none;
-  transition:
-    border-color var(--duration-fast) var(--ease-out),
-    background var(--duration-fast) var(--ease-out),
-    transform var(--duration-fast) var(--ease-out);
-}
-.tile:hover {
-  border-color: var(--accent);
-  background: var(--accent-subtle);
-  color: var(--text);
-  text-decoration: none;
-  transform: translateY(-1px);
-}
-.tile-icon { font-size: 1.75rem; line-height: 1; }
-.tile-name {
-  margin-top: var(--space-2);
-  font-family: var(--font-mono);
-  font-size: var(--text-sm);
-}
+/* Sun icon shown when in dark mode (clicking goes to light).
+ * Moon icon shown in light mode (clicking goes to dark).
+ * Default (no data-theme): system preference; show moon (assume light). */
+.theme-icon-sun  { display: none; }
+.theme-icon-moon { display: block; }
+
+[data-theme="dark"] .theme-icon-sun  { display: block; }
+[data-theme="dark"] .theme-icon-moon { display: none; }
+[data-theme="light"] .theme-icon-sun  { display: none; }
+[data-theme="light"] .theme-icon-moon { display: block; }
 
 /* ── Tables (admin lists) ───────────────────────────────────── */
 .data-table {

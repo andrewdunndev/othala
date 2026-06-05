@@ -31,8 +31,8 @@
 export const prerender = false;
 
 import Layout from '../layouts/Layout.astro';
-import markSvg from '@dunn.dev/reference/mark/mark.svg?raw';
-import { loadTiles, type AppTile } from '../lib/tiles';
+import PageHero from '../components/PageHero.astro';
+import { loadTiles, loadGroups, type AppTile } from '../lib/tiles';
 import { getSession, isReachable } from '../lib/kratos';
 import { isAdminSubject } from '../lib/admin-auth';
 import type { Identity } from '../lib/types';
@@ -53,18 +53,18 @@ if (devOverride === 'down' || devOverride === 'pre-auth' || devOverride === 'pos
   if (state === 'post-auth') {
     // Plausible mocked identity so the post-auth view renders something
     // realistic in dev without a Kratos session. Groups match the shipped
-    // example manifests (e2e/manifests/) so the dev preview renders tiles
-    // out of the box for any adopter — replace these with your own groups.
+    // e2e/manifests/ example set so any adopter gets tiles out of the box.
+    //
+    // Dev affordance: set OTHALA_DEV_MOCK_GROUPS=admin,family,access-foo
+    // (comma-separated) to preview any catalog subset without editing code.
+    const devGroupsEnv = process.env.OTHALA_DEV_MOCK_GROUPS;
+    const mockGroups = devGroupsEnv
+      ? devGroupsEnv.split(',').map((g) => g.trim()).filter(Boolean)
+      : ['admin', 'family', 'access-grafana', 'access-audiobookshelf', 'access-jellyfin', 'access-proxywatch', 'access-statuspage', 'access-gather-usenet', 'access-gather-torrent'];
     identity = {
       id: 'dev-mock',
       traits: { username: 'dev.user', email: 'dev@example.local', displayName: 'Dev User' },
-      metadata_admin: {
-        groups: [
-          'admin', 'family',
-          'access-grafana', 'access-audiobookshelf', 'access-jellyfin',
-          'access-proxywatch', 'access-statuspage',
-        ],
-      },
+      metadata_admin: { groups: mockGroups },
     } as unknown as Identity;
   }
 } else {
@@ -86,11 +86,38 @@ if (devOverride === 'down' || devOverride === 'pre-auth' || devOverride === 'pos
 // loadTiles() returns enabled tiles sorted by order then name.
 const orderedApps = loadTiles();
 
+// Group registry — optional groups.yaml in MANIFEST_DIR.
+// loadGroups() returns an empty Map when the file is absent.
+const groupRegistry = loadGroups();
+
 const groups = identity?.metadata_admin?.groups ?? [];
 const visibleTiles =
   state === 'post-auth'
     ? orderedApps.filter((a: AppTile) => groups.includes(a.accessGroup))
     : [];
+
+// Partition visibleTiles into ungrouped (no group field) and grouped sections.
+// Groups are ordered by: groups.yaml `order` (preferred) → min tile order
+// within the group (fallback when a group has no registry entry).
+const ungroupedTiles = visibleTiles.filter((t: AppTile) => !t.group);
+const groupedTilesMap = new Map<string, AppTile[]>();
+for (const tile of visibleTiles.filter((t: AppTile) => !!t.group)) {
+  const g = tile.group as string;
+  if (!groupedTilesMap.has(g)) groupedTilesMap.set(g, []);
+  groupedTilesMap.get(g)!.push(tile);
+}
+// Sort group boxes: registry order < min-tile-order fallback.
+const tileGroups = Array.from(groupedTilesMap.entries())
+  .sort(([nameA, tilesA], [nameB, tilesB]) => {
+    const orderA = groupRegistry.get(nameA)?.order ?? Math.min(...tilesA.map((t) => t.order));
+    const orderB = groupRegistry.get(nameB)?.order ?? Math.min(...tilesB.map((t) => t.order));
+    return orderA - orderB;
+  })
+  .map(([groupName, tiles]) => ({
+    groupName,
+    tiles,
+    meta: groupRegistry.get(groupName),
+  }));
 // B2: the Admin nav affordance follows the OTHALA_ADMIN_SUBJECTS allowlist,
 // not the (display-only) `admin` group. The /admin route itself is gated by
 // requireAdminSession, also via the allowlist; this just keeps the link
@@ -115,40 +142,23 @@ const devLinks = [
 <Layout title="Home" description={`Single sign-on for ${siteName}.`}>
 
   {state === 'down' && (
-    <section class="holding">
-      <span class="holding-mark" set:html={markSvg} />
-      <p class="holding-eyebrow">{siteName}</p>
-      <h1 class="holding-title">Auth services starting up</h1>
-      <p class="holding-prose">
-        The substrate is offline or unreachable. This page will pick the
-        session back up as soon as it returns. If it persists, contact {adminContact}.
-      </p>
+    <PageHero
+      title="Auth services starting up"
+      lede={`The substrate is offline or unreachable. This page will pick the session back up as soon as it returns. If it persists, contact ${adminContact}.`}
+    >
       <p class="holding-tech">{downReason}</p>
-    </section>
+    </PageHero>
   )}
 
   {state === 'pre-auth' && (
     <>
-      <section class="hero">
-        <span class="hero-mark" set:html={markSvg} />
-        <div>
-          <p class="hero-eyebrow">{siteName}</p>
-          <p class="rune-greeting" aria-label="door to home">
-            <span class="rune">ᛞ</span>
-            <span class="rune-arrow" aria-hidden="true">→</span>
-            <span class="rune">ᛟ</span>
-            <span class="rune-gloss">door to home</span>
-          </p>
-          <h1 class="hero-title">Welcome back</h1>
-          <p class="hero-lede">
-            Single sign-on for {siteName}. One sign-in, every app.
-          </p>
-          <div class="cta-row">
-            <a href="/auth/login" class="button button-primary">Sign in</a>
-            <span class="cta-note mono">passkey or password</span>
-          </div>
+      <PageHero title="Welcome" lede={`Single sign-on for ${siteName}. One sign-in, every app.`}>
+        <div class="cta-row">
+          <a href="/auth/login" class="button button-primary">Sign in</a>
+          <a href="/auth/recovery" class="button button-secondary">Recover access</a>
+          <span class="cta-note mono">passkey or password</span>
         </div>
-      </section>
+      </PageHero>
 
       <section class="section">
         <p class="section-subtitle">What's behind this door</p>
@@ -160,7 +170,6 @@ const devLinks = [
         </p>
         <p class="section-prose">
           If you don't have an account yet, ask whoever invited you.
-          Forgot your password? <a href="/auth/recovery">Recover access</a>.
         </p>
       </section>
     </>
@@ -168,38 +177,70 @@ const devLinks = [
 
   {state === 'post-auth' && (
     <>
-      <section class="hero">
-        <span class="hero-mark" set:html={markSvg} />
-        <div>
-          <p class="hero-eyebrow">signed in {displayName && (<><span class="hero-eyebrow-sep">·</span><span>{displayName}</span></>)}</p>
-          <h1 class="hero-title">{firstName ? `Hello, ${firstName}.` : 'Welcome back.'}</h1>
-          <p class="hero-lede">
-            Pick up where you left off, or hop into one of the apps below.
-          </p>
-          <div class="cta-row">
-            <button type="button" class="button button-primary" id="open-request-form">
-              Request access or suggest an app
-            </button>
-            {isAdmin && <a href="/admin" class="button button-secondary">Admin</a>}
-            <a href="/auth/settings" class="button button-secondary">Account</a>
-            <a href="/auth/logout" class="cta-link mono">Sign out</a>
-          </div>
+      <PageHero
+        title={firstName ? `Hello, ${firstName}.` : 'Welcome back.'}
+        eyebrow={`signed in${displayName ? ' · ' + displayName : ''}`}
+        lede="Pick up where you left off, or hop into one of the apps below."
+      >
+        <div class="cta-row">
+          <button type="button" class="button button-primary" id="open-request-form">
+            Request access or suggest an app
+          </button>
+          {isAdmin && <a href="/admin" class="button button-secondary">Admin</a>}
+          <a href="/auth/settings" class="button button-secondary">Account</a>
+          <a href="/auth/logout" class="button button-secondary">Sign out</a>
         </div>
-      </section>
+      </PageHero>
 
       <section class="section">
         <p class="section-subtitle">Your apps</p>
         {visibleTiles.length > 0 ? (
-          <div class="tile-grid">
-            {visibleTiles.map((t: AppTile) => (
-              <a class="tile" href={t.url}>
-                <div class="tile-icon mono">{t.icon}</div>
-                <div class="tile-name">{t.name}</div>
-                <div class="tile-desc">{t.description}</div>
-                <a class="tile-learn mono" href={`/apps/${t.slug}`}>learn more →</a>
-              </a>
+          <>
+            {ungroupedTiles.length > 0 && (
+              <div class="tile-grid">
+                {ungroupedTiles.map((t: AppTile) => (
+                  <article class="tile">
+                    <a class="tile-launch" href={t.url}>
+                      {t.iconHref ? (
+                        <img class="tile-icon-img" src={t.iconHref} alt="" loading="lazy" />
+                      ) : (
+                        <div class="tile-icon mono">{t.icon}</div>
+                      )}
+                      <div class="tile-name">{t.name}</div>
+                      <div class="tile-desc">{t.description}</div>
+                    </a>
+                    <button type="button" class="tile-learn mono" data-app-learn={t.slug}>learn more →</button>
+                  </article>
+                ))}
+              </div>
+            )}
+            {tileGroups.map(({ groupName, tiles, meta }) => (
+              <div class="tile-group">
+                <div class="tile-group-header">
+                  <p class="tile-group-title">{meta?.title ?? groupName}</p>
+                  {(meta?.description) && (
+                    <p class="tile-group-desc">{meta.description}</p>
+                  )}
+                </div>
+                <div class="tile-grid">
+                  {tiles.map((t: AppTile) => (
+                    <article class="tile">
+                      <a class="tile-launch" href={t.url}>
+                        {t.iconHref ? (
+                          <img class="tile-icon-img" src={t.iconHref} alt="" loading="lazy" />
+                        ) : (
+                          <div class="tile-icon mono">{t.icon}</div>
+                        )}
+                        <div class="tile-name">{t.name}</div>
+                        <div class="tile-desc">{t.description}</div>
+                      </a>
+                      <button type="button" class="tile-learn mono" data-app-learn={t.slug}>learn more →</button>
+                    </article>
+                  ))}
+                </div>
+              </div>
             ))}
-          </div>
+          </>
         ) : (
           <p class="section-prose">
             Your account doesn't have any app access yet. Contact {adminContact} to
@@ -207,6 +248,42 @@ const devLinks = [
           </p>
         )}
       </section>
+
+      {/* ── Per-app education data: one hidden <template> per visible tile.
+          The JS modal reads these to populate the app-modal at open time.
+          educationHtml may contain inline SVG (cat-explainer diagrams). */}
+      {visibleTiles.map((t: AppTile) => (
+        <template
+          data-app-edu={t.slug}
+          data-app-name={t.name}
+          data-app-url={t.url}
+          data-app-desc={t.description}
+        >
+          <Fragment set:html={t.educationHtml ?? ''} />
+        </template>
+      ))}
+
+      {/* ── App education modal ────────────────────────────────────────────
+          Mirrors the request-modal structure: fixed, centered, backdrop,
+          Esc + backdrop + × close. Populated at open time from the hidden
+          <template data-app-edu> elements above. */}
+      <dialog class="app-modal" id="app-modal" aria-labelledby="app-modal-title">
+        <div class="app-modal-inner">
+          <header class="app-modal-header">
+            <div class="app-modal-header-text">
+              <h2 class="app-modal-title" id="app-modal-title"></h2>
+              <p class="app-modal-desc"></p>
+            </div>
+            <button class="app-modal-close mono" type="button" data-close-app-modal aria-label="Close">✕</button>
+          </header>
+          <div class="app-modal-cta">
+            <a class="button button-primary app-modal-open-link" href="#" rel="noopener" target="_blank">Open ↗</a>
+          </div>
+          <div class="app-modal-body">
+            <div class="edu-prose app-modal-content"></div>
+          </div>
+        </div>
+      </dialog>
 
       {/* ── Request / contact form dialog ─────────────────────────────────
           FUNCTIONAL: the submit POSTs to /api/request, which validates,
@@ -360,58 +437,76 @@ const devLinks = [
       }, 200);
     });
   })();
+
+  // ── App education modal (post-auth dashboard) ─────────────────────────
+  // Each [data-app-learn] button opens the app-modal and populates it from
+  // the matching hidden <template data-app-edu> element. Close on ×,
+  // backdrop click, and Esc (native <dialog> behaviour).
+  (function () {
+    var appModal = document.getElementById('app-modal');
+    if (!appModal) return;
+
+    var titleEl = appModal.querySelector('.app-modal-title');
+    var descEl  = appModal.querySelector('.app-modal-desc');
+    var openLink = appModal.querySelector('.app-modal-open-link');
+    var contentEl = appModal.querySelector('.app-modal-content');
+
+    function openAppModal(slug) {
+      var tpl = document.querySelector('template[data-app-edu="' + slug + '"]');
+      if (!tpl || !contentEl) return;
+
+      if (titleEl) titleEl.textContent = tpl.dataset.appName || slug;
+      if (descEl)  descEl.textContent  = tpl.dataset.appDesc  || '';
+      if (openLink) {
+        openLink.href = tpl.dataset.appUrl || '#';
+        openLink.textContent = 'Open ' + (tpl.dataset.appName || slug) + ' ↗';
+      }
+
+      // Clone the template content so re-opens always get a fresh copy.
+      contentEl.innerHTML = '';
+      contentEl.appendChild(tpl.content.cloneNode(true));
+
+      if (typeof appModal.showModal === 'function') appModal.showModal();
+    }
+
+    // Delegate click on all [data-app-learn] buttons (covers ungrouped + grouped tiles).
+    document.addEventListener('click', function (e) {
+      var btn = e.target && e.target.closest('[data-app-learn]');
+      if (!btn) return;
+      openAppModal(btn.dataset.appLearn);
+    });
+
+    // × close button.
+    appModal.querySelectorAll('[data-close-app-modal]').forEach(function (btn) {
+      btn.addEventListener('click', function () { appModal.close(); });
+    });
+
+    // Backdrop click closes (click lands on the <dialog> element itself).
+    appModal.addEventListener('click', function (e) {
+      if (e.target === appModal) appModal.close();
+    });
+
+    // Clear content when dialog fully closes (keeps DOM tidy; Esc is native).
+    appModal.addEventListener('close', function () {
+      setTimeout(function () {
+        if (contentEl) contentEl.innerHTML = '';
+        if (titleEl) titleEl.textContent = '';
+        if (descEl)  descEl.textContent  = '';
+        if (openLink) { openLink.href = '#'; openLink.textContent = 'Open ↗'; }
+      }, 200);
+    });
+  })();
 </script>
 
 <style>
-  /* ── State A: holding panel ──
-   * Centered, contained, restrained. Mirrors the hero rhythm but
-   * collapses to a single column so the eye lands on the message. */
-  .holding {
-    max-width: 36rem;
-    margin: var(--space-7) auto 0;
-    padding: var(--space-6);
-    border: 1px solid var(--border);
-    border-radius: var(--radius);
-    background: var(--surface);
-    text-align: left;
-    display: grid;
-    grid-template-columns: 64px 1fr;
-    gap: var(--space-2) var(--space-5);
-    align-items: start;
-  }
-  .holding-mark {
-    grid-row: span 4;
-    color: var(--accent);
-    width: 64px;
-    height: 64px;
-  }
-  .holding-mark :global(svg) { width: 100%; height: 100%; }
-  .holding-eyebrow {
-    font-family: var(--font-mono);
-    font-size: var(--text-xs);
-    text-transform: uppercase;
-    letter-spacing: 0.1em;
-    color: var(--text-muted);
-  }
-  .holding-title {
-    font-family: var(--font-display);
-    font-size: var(--text-2xl);
-    font-weight: 700;
-    letter-spacing: -0.01em;
-    color: var(--text);
-    line-height: var(--lh-tight);
-  }
-  .holding-prose {
-    font-size: var(--text-base);
-    color: var(--text-2);
-    line-height: 1.6;
-  }
+  /* ── State A: down — technical detail line ── */
   .holding-tech {
     font-family: var(--font-mono);
     font-size: var(--text-xs);
-    color: var(--text-muted);
+    color: var(--text-2);
     padding-top: var(--space-2);
     border-top: 1px solid var(--border);
+    margin-top: var(--space-3);
   }
 
   /* ── Hero CTA fragments ── */
@@ -429,47 +524,15 @@ const devLinks = [
     margin-left: auto;
   }
   .cta-link:hover { color: var(--accent); text-decoration: none; }
-  .hero-eyebrow-sep {
-    margin: 0 0.4em;
-    color: var(--border);
-  }
-
-  /* ── ᛞ→ᛟ greeting (dagaz → othala: door to home) ──
-   * The motif the brand is named for. Glyph strokes in --text. */
-  .rune-greeting {
-    display: flex;
-    align-items: baseline;
-    gap: var(--space-2);
-    margin: var(--space-2) 0 var(--space-3) 0;
-  }
-  .rune-greeting .rune {
-    font-family: var(--font-mono);
-    font-size: var(--text-xl);
-    font-weight: 600;
-    color: var(--text);
-    line-height: 1;
-  }
-  .rune-greeting .rune-arrow {
-    color: var(--text-muted);
-    font-size: var(--text-base);
-  }
-  .rune-greeting .rune-gloss {
-    margin-left: var(--space-2);
-    font-family: var(--font-mono);
-    font-size: var(--text-xs);
-    text-transform: uppercase;
-    letter-spacing: 0.08em;
-    color: var(--text-muted);
-  }
 
   /* ── Tile grid ──
-   * Now richer: each tile carries an icon, name, short description, and
-   * a "learn more" link to the per-app detail page rendering the MDX
-   * education body. */
+   * Each tile is an <article> with an inner launch anchor (icon+name+desc)
+   * and a sibling "learn more" anchor — no nested anchors. */
   .tile-grid {
     display: grid;
-    grid-template-columns: repeat(1, 1fr);
+    grid-template-columns: repeat(2, 1fr);
     gap: var(--space-3);
+    align-items: stretch;
   }
   @media (min-width: 640px)  { .tile-grid { grid-template-columns: repeat(2, 1fr); } }
   @media (min-width: 900px)  { .tile-grid { grid-template-columns: repeat(3, 1fr); } }
@@ -477,27 +540,46 @@ const devLinks = [
     display: flex;
     flex-direction: column;
     align-items: flex-start;
-    gap: var(--space-2);
-    padding: var(--space-5) var(--space-4);
+    height: 100%;
     background: var(--surface);
     border: 1px solid var(--border);
     border-radius: var(--radius);
-    color: var(--text);
-    text-decoration: none;
+    overflow: hidden;
     transition:
       border-color var(--duration-fast) var(--ease-out),
-      color var(--duration-fast) var(--ease-out);
+      box-shadow var(--duration-fast) var(--ease-out);
   }
   .tile:hover {
     border-color: var(--accent);
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.10);
+  }
+  /* Inner launch anchor wraps icon + name + desc */
+  .tile-launch {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: var(--space-2);
+    padding: var(--space-5) var(--space-4) var(--space-3);
     color: var(--text);
     text-decoration: none;
+    flex: 1;
+    width: 100%;
+    height: 100%;
   }
+  .tile-launch:hover { text-decoration: none; color: var(--text); }
   .tile-icon {
     font-family: var(--font-mono);
     font-size: var(--text-sm);
     color: var(--accent);
     letter-spacing: 0.06em;
+  }
+  /* Full-color icon image — keeps the SVG's own colors, no tinting. */
+  .tile-icon-img {
+    display: block;
+    width: 1.75rem;
+    height: 1.75rem;
+    object-fit: contain;
+    flex-shrink: 0;
   }
   .tile-name {
     font-size: var(--text-base);
@@ -508,14 +590,67 @@ const devLinks = [
     font-size: var(--text-sm);
     color: var(--text-2);
     line-height: 1.4;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+    /* Reserve height for exactly 2 lines so 1-line and 2-line tiles align */
+    min-height: calc(1.4em * 2);
   }
   .tile-learn {
+    /* Reset default <button> styles so it looks like the previous <a>. */
+    all: unset;
+    cursor: pointer;
+    font-family: var(--font-mono);
     font-size: var(--text-xs);
     color: var(--text-muted);
-    margin-top: auto;
     align-self: flex-end;
+    padding: var(--space-2) var(--space-4);
+    padding-block: var(--space-3);
+    min-height: 44px;
+    display: flex;
+    align-items: center;
+    border-top: 1px solid var(--border);
+    width: 100%;
+    justify-content: flex-end;
+    box-sizing: border-box;
+    margin-top: auto;
   }
   .tile-learn:hover { color: var(--accent); text-decoration: none; }
+  .tile-learn:focus-visible {
+    outline: 2px solid var(--input-focus, var(--accent));
+    outline-offset: -2px;
+  }
+
+  /* ── Grouped tile sections ──
+   * A lightly-bordered labeled section: heading + description above the
+   * tile grid. No background fill so grouped tiles look identical to
+   * ungrouped tiles. Border provides the grouping affordance. */
+  .tile-group {
+    margin-top: var(--space-6);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    background: transparent;
+    padding: var(--space-5);
+  }
+  .tile-group-header {
+    margin-bottom: var(--space-4);
+  }
+  .tile-group-title {
+    font-family: var(--font-sans, 'IBM Plex Sans', sans-serif);
+    font-size: 1.05rem;
+    font-weight: 600;
+    color: var(--text);
+    margin: 0 0 var(--space-1) 0;
+    line-height: var(--lh-tight);
+  }
+  .tile-group-desc {
+    font-size: var(--text-sm);
+    color: var(--text-2);
+    max-width: 60ch;
+    margin: 0;
+    line-height: 1.5;
+  }
 
   /* ── Dev preview ── */
   .dev-preview {
@@ -553,8 +688,6 @@ const devLinks = [
   }
 
   @media (max-width: 640px) {
-    .holding { grid-template-columns: 48px 1fr; gap: var(--space-2) var(--space-4); padding: var(--space-5); }
-    .holding-mark { width: 48px; height: 48px; }
     .dev-list li { grid-template-columns: 1fr; gap: var(--space-1); }
   }
 
@@ -661,4 +794,184 @@ const devLinks = [
     margin-bottom: var(--space-2);
   }
   .request-thanks-note { font-size: var(--text-xs); color: var(--text-muted); }
+
+  /* ── App education modal ──
+   * Mirrors request-modal sizing conventions; wider reading pane (46rem)
+   * with a scrollable body. Prose rules copied from apps/[slug].astro so
+   * the education content renders identically inside the modal. */
+  .app-modal {
+    position: fixed;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    margin: 0;
+    max-width: min(46rem, 92vw);
+    max-height: 85vh;
+    width: 100%;
+    background: var(--bg, #ffffff);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    color: var(--text);
+    padding: 0;
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.22);
+    overflow: hidden;
+  }
+  /* Native <dialog> is display:none until .showModal() sets [open]; scope the
+     flex column layout to [open] so the modal stays hidden when closed. */
+  .app-modal[open] {
+    display: flex;
+    flex-direction: column;
+  }
+  .app-modal::backdrop {
+    background: rgba(0, 0, 0, 0.55);
+    backdrop-filter: blur(3px);
+  }
+  .app-modal-inner {
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+    overflow: hidden;
+  }
+  .app-modal-header {
+    display: grid;
+    grid-template-columns: 1fr auto;
+    gap: var(--space-3) var(--space-4);
+    align-items: start;
+    padding: var(--space-5) var(--space-5) var(--space-4);
+    border-bottom: 1px solid var(--border);
+    flex-shrink: 0;
+  }
+  .app-modal-title {
+    font-family: var(--font-mono);
+    font-size: var(--text-xl);
+    font-weight: 700;
+    color: var(--text);
+    line-height: 1.2;
+    margin: 0 0 var(--space-1);
+  }
+  .app-modal-desc {
+    font-size: var(--text-sm);
+    color: var(--text-2);
+    line-height: 1.4;
+    margin: 0;
+  }
+  .app-modal-close {
+    all: unset;
+    cursor: pointer;
+    font-size: var(--text-base);
+    color: var(--text-muted);
+    padding: var(--space-1) var(--space-2);
+    border-radius: var(--radius-sm);
+    line-height: 1;
+    transition: color var(--duration-fast) var(--ease-out);
+  }
+  .app-modal-close:hover { color: var(--text); }
+  .app-modal-close:focus-visible {
+    outline: 2px solid var(--input-focus, var(--accent));
+    outline-offset: 2px;
+  }
+  .app-modal-cta {
+    padding: var(--space-4) var(--space-5) 0;
+    flex-shrink: 0;
+  }
+  .app-modal-body {
+    padding: var(--space-5) var(--space-5) var(--space-6);
+    overflow-y: auto;
+    flex: 1;
+    font-size: var(--text-base);
+    line-height: 1.6;
+    color: var(--text);
+  }
+
+  /* Prose rules — identical to .app-body :global(...) in apps/[slug].astro */
+  .app-modal :global(.edu-prose h2) {
+    font-family: var(--font-display);
+    font-size: var(--text-lg);
+    font-weight: 600;
+    margin: var(--space-4) 0 var(--space-1);
+  }
+  .app-modal :global(.edu-prose h3) {
+    font-family: var(--font-display);
+    font-size: var(--text-base);
+    font-weight: 600;
+    margin: var(--space-3) 0 var(--space-1);
+  }
+  .app-modal :global(.edu-prose p) {
+    margin: var(--space-3) 0;
+  }
+  .app-modal :global(.edu-prose ul),
+  .app-modal :global(.edu-prose ol) {
+    margin: var(--space-3) 0;
+    padding-left: var(--space-5);
+  }
+  .app-modal :global(.edu-prose code) {
+    font-family: var(--font-mono);
+    font-size: var(--text-sm);
+    background: var(--surface-2);
+    padding: 0.1em 0.4em;
+    border-radius: 4px;
+  }
+  .app-modal :global(.edu-prose pre) {
+    font-family: var(--font-mono);
+    font-size: var(--text-sm);
+    background: var(--surface-2);
+    border: 1px solid var(--border);
+    padding: var(--space-3);
+    border-radius: var(--radius);
+    overflow-x: auto;
+  }
+  .app-modal :global(.edu-prose pre code) {
+    background: transparent;
+    padding: 0;
+  }
+  .app-modal :global(.edu-prose a) {
+    color: var(--accent);
+    text-decoration: underline;
+  }
+
+  /* Cat-explainer diagram CSS (inline SVG diagrams in education content) */
+  .app-modal :global(.cat-explainer) {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: var(--space-4);
+    margin: var(--space-4) 0;
+  }
+  .app-modal :global(.cat-explainer svg) {
+    display: block;
+    width: 100%;
+    height: auto;
+    max-width: 720px;
+    margin: 0 auto;
+  }
+  .app-modal :global(.cat-explainer p) {
+    margin: var(--space-3) 0 0 0;
+    font-size: var(--text-sm);
+    color: var(--text-2);
+  }
+
+  /* ── Mobile ── */
+  @media (max-width: 640px) {
+    /* Stack post-auth CTA actions full-width with adequate tap height. */
+    .cta-row {
+      flex-direction: column;
+      align-items: stretch;
+    }
+    .cta-row .button,
+    .cta-row .cta-link {
+      text-align: center;
+      min-height: 44px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      margin-left: 0;
+    }
+    /* 2-col tile grid on narrow screens (≥375px default, 1-col only if very narrow). */
+    .tile-grid {
+      grid-template-columns: repeat(2, 1fr);
+    }
+  }
+  @media (max-width: 374px) {
+    .tile-grid { grid-template-columns: 1fr; }
+  }
 </style>

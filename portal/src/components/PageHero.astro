@@ -1,0 +1,54 @@
+---
+// PageHero — injectable hero section used by every page in the portal.
+//
+// Renders the canonical dag→othala lockup as a banner above the page title
+// and lede. All auth-flow pages and index.astro states route through here
+// so the hero chrome is defined exactly once.
+//
+// Props
+//   title    (string, required) — the page <h1>.
+//   lede     (string, optional) — subtitle paragraph beneath the title.
+//   eyebrow  (string, optional) — small mono label above the title (e.g.
+//            "sign in", "signed in · Name").
+//
+// Slot: any CTA row or extra content to render below the lede.
+
+import HeroLockup from './HeroLockup.astro';
+
+interface Props {
+  /** The page heading rendered as an <h1>. */
+  title: string;
+  /** Optional subtitle rendered as a <p class="hero-lede">. */
+  lede?: string;
+  /** Optional mono eyebrow label rendered above the title. */
+  eyebrow?: string;
+}
+
+const { title, lede, eyebrow } = Astro.props;
+---
+
+<section class="hero hero-banner">
+  <HeroLockup />
+  <div class="hero-content">
+    {eyebrow && <p class="hero-eyebrow">{eyebrow}</p>}
+    <h1 class="hero-title">{title}</h1>
+    {lede && <p class="hero-lede">{lede}</p>}
+    <slot />
+  </div>
+</section>
+
+<style>
+  /* Override the two-column site.css .hero grid so the dag→othala lockup
+   * spans the full width as a banner with the title/lede stacked below. */
+  .hero-banner {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: var(--space-5);
+  }
+  /* hero-content is a plain div; no additional styling needed — the
+   * site.css .hero-title / .hero-lede / .hero-eyebrow tokens apply. */
+  .hero-content {
+    width: 100%;
+  }
+</style>

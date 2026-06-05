@@ -12,7 +12,7 @@
 export const prerender = false;
 
 import Layout from '../../layouts/Layout.astro';
-import markSvg from '@dunn.dev/reference/mark/mark.svg?raw';
+import PageHero from '../../components/PageHero.astro';
 import { browserFlows, getVerificationFlow } from '../../lib/kratos';
 import { csrfToken, hasMethod } from '../../lib/nodes';
 import FlowNodes from '../../components/FlowNodes.astro';
@@ -42,18 +42,13 @@ const phase: 'request' | 'sent' = flow?.state === 'sent_email' ? 'sent' : 'reque
 ---
 <Layout title="Verify email" description="Verify your email address." bare>
 
-  <section class="hero">
-    <span class="hero-mark" set:html={markSvg} />
-    <div>
-      <p class="hero-eyebrow">verify</p>
-      <h1 class="hero-title">Verify your email</h1>
-      <p class="hero-lede">
-        {phase === 'request'
-          ? 'Enter the address you want verified. We will send you a one-time code.'
-          : 'Check your email. Enter the code below to confirm the address.'}
-      </p>
-    </div>
-  </section>
+  <PageHero
+    title="Verify your email"
+    eyebrow="verify"
+    lede={phase === 'request'
+      ? 'Enter the address you want verified. We will send you a one-time code.'
+      : 'Check your email. Enter the code below to confirm the address.'}
+  />
 
   {ui?.messages?.map((m: FlowMessage) => (
     <div class={`notice notice-${m.type === 'error' ? 'danger' : m.type === 'success' ? 'success' : 'warning'}`}>

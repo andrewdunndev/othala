@@ -295,7 +295,7 @@ function loadFromDisk(): ClientManifest[] {
   let files: string[];
   try {
     files = readdirSync(dir)
-      .filter((f) => f.endsWith('.yaml') || f.endsWith('.yml'))
+      .filter((f) => (f.endsWith('.yaml') || f.endsWith('.yml')) && f !== 'groups.yaml')
       .sort();
   } catch (err) {
     if ((err as NodeJS.ErrnoException).code === 'ENOENT') {
@@ -313,7 +313,9 @@ function loadFromDisk(): ClientManifest[] {
 function freshestMtime(): number {
   const dir = manifestDir();
   try {
-    const files = readdirSync(dir).filter((f) => f.endsWith('.yaml') || f.endsWith('.yml'));
+    const files = readdirSync(dir).filter(
+      (f) => (f.endsWith('.yaml') || f.endsWith('.yml')) && f !== 'groups.yaml',
+    );
     let max = 0;
     for (const f of files) {
       const m = statSync(join(dir, f)).mtimeMs;
