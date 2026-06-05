@@ -217,16 +217,22 @@ const adminNav = [
   { href: '/admin/oauth2',   label: 'Apps' },
 ];
 ---
-<Layout title={`${formValues.username || id} — Admin`} description="Identity detail." nav={adminNav}>
-  <main class="stack-lg">
-    <header class="page-header">
-      <p class="page-eyebrow">administration · identity</p>
-      <h1 class="page-title mono">{formValues.username || id}</h1>
-      {formValues.displayName && (
-        <p class="page-lede">{formValues.displayName} · <span class="mono">{formValues.email}</span></p>
-      )}
-    </header>
+<Layout title={`${formValues.username || id} — Admin`} description="Identity detail.">
+  <header class="page-header">
+    <p class="page-eyebrow">administration · identity</p>
+    <h1 class="page-title">{formValues.username || id}</h1>
+    {formValues.displayName && (
+      <p class="page-lede">{formValues.displayName} · <span class="mono">{formValues.email}</span></p>
+    )}
+  </header>
 
+  <nav class="nav-bar" aria-label="Admin">
+    {adminNav.map(item => (
+      <a href={item.href}>{item.label}</a>
+    ))}
+  </nav>
+
+  <main class="stack-lg">
     {loadError && (
       <div class="notice notice-danger">Failed to load identity: {loadError}</div>
     )}
@@ -242,7 +248,7 @@ const adminNav = [
     {actionResult?.kind === 'recovery' && (
       <div class="notice notice-success">
         <p><strong>Enrollment URL issued.</strong> Expires {actionResult.expiresAt}.</p>
-        <input type="text" readonly value={actionResult.url} style="margin-top: 0.5rem;" />
+        <input type="text" readonly value={actionResult.url} />
       </div>
     )}
     {actionResult?.kind === 'revoked' && (
@@ -255,7 +261,7 @@ const adminNav = [
         {actionResult.result.bestEffortFailures.length > 0 && (
           <details>
             <summary class="text-sm">Best-effort failures (the hard cut already landed; these are advisory)</summary>
-            <ul style="margin-top: 0.5rem;">
+            <ul class="stack">
               {actionResult.result.bestEffortFailures.map((f) => (
                 <li class="mono text-xs">{f.dependency} / {f.step}: {f.error}</li>
               ))}
@@ -316,7 +322,7 @@ const adminNav = [
         </div>
 
         <div class="field">
-          <label>App access</label>
+          <label>App access (one per app)</label>
           <div class="checkbox-grid">
             {ACCESS_GROUPS.map((a) => (
               <label>
@@ -335,7 +341,7 @@ const adminNav = [
 
         <details class="panel">
           <summary class="mono text-sm">Per-app role overrides</summary>
-          <div class="stack" style="margin-top: 0.75rem;">
+          <div class="stack details-content">
             {manifests.map((m) => (
               <div class="role-row">
                 <div>
@@ -362,7 +368,7 @@ const adminNav = [
           </div>
         </details>
 
-        <div style="display: flex; gap: 0.75rem;">
+        <div class="cta-row">
           <button type="submit" class="button button-primary">Save</button>
           <a href={`/admin/users/${id}`} class="button button-secondary">Cancel</a>
         </div>
@@ -371,7 +377,7 @@ const adminNav = [
       <section class="stack-lg">
         <section class="panel stack">
           <h2>Profile</h2>
-          <dl class="stack" style="display: grid; grid-template-columns: 9rem 1fr; gap: 0.5rem 1rem;">
+          <dl class="stack dl-grid">
             <dt class="muted text-sm mono">id</dt>
             <dd class="mono text-xs">{identity.id}</dd>
             <dt class="muted text-sm mono">state</dt>
@@ -381,7 +387,7 @@ const adminNav = [
             <dt class="muted text-sm mono">displayName</dt>
             <dd>{formValues.displayName || <span class="muted">(unset)</span>}</dd>
           </dl>
-          <div style="margin-top: 0.5rem;">
+          <div class="edit-action">
             <a href={`/admin/users/${id}?mode=edit`} class="button button-secondary">Edit</a>
           </div>
         </section>
@@ -390,7 +396,7 @@ const adminNav = [
           <h2>Groups</h2>
           <div>
             <p class="muted text-xs mono">identity</p>
-            <div style="margin-top: 0.25rem;">
+            <div class="badge-row">
               {identityGroupMembership.length
                 ? identityGroupMembership.map((g) => <span class="badge">{g}</span>)
                 : <span class="muted text-sm">none</span>}
@@ -398,7 +404,7 @@ const adminNav = [
           </div>
           <div>
             <p class="muted text-xs mono">access</p>
-            <div style="margin-top: 0.25rem;">
+            <div class="badge-row">
               {accessGroupMembership.length
                 ? accessGroupMembership.map((g) => <span class="badge badge-muted">{g}</span>)
                 : <span class="muted text-sm">none</span>}
@@ -441,7 +447,7 @@ const adminNav = [
 
         <section class="panel stack">
           <h2>Actions</h2>
-          <form method="post" style="display: flex; gap: 0.75rem; flex-wrap: wrap;">
+          <form method="post" class="cta-row">
             <input type="hidden" name="csrf_token" value={csrfTokenActions} />
             <button name="action" value="issue-recovery" type="submit" class="button button-secondary">
               Issue enrollment URL
@@ -458,10 +464,10 @@ const adminNav = [
           </p>
 
           <details>
-            <summary class="mono text-sm" style="color: var(--danger); cursor: pointer;">
+            <summary class="mono text-sm summary-danger">
               Delete identity
             </summary>
-            <form method="post" class="stack" style="margin-top: 0.75rem;">
+            <form method="post" class="stack details-content">
               <input type="hidden" name="action" value="delete" />
               <input type="hidden" name="csrf_token" value={csrfTokenDelete} />
               <p class="text-sm">
@@ -479,3 +485,11 @@ const adminNav = [
     )}
   </main>
 </Layout>
+
+<style>
+  .dl-grid { display: grid; grid-template-columns: 9rem 1fr; gap: var(--space-2) var(--space-4); }
+  .edit-action { margin-top: var(--space-2); }
+  .badge-row { margin-top: var(--space-1); }
+  .details-content { margin-top: var(--space-3); }
+  .summary-danger { color: var(--danger); cursor: pointer; }
+</style>

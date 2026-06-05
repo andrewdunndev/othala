@@ -44,7 +44,7 @@ const cards = [
   { href: '/admin/oauth2', title: 'Apps',   primary: `${manifests.length}`,    secondary: 'OIDC clients' },
 ];
 ---
-<Layout title="Admin" description="Identity, group, and OIDC client administration." nav={adminNav}>
+<Layout title="Admin" description="Identity, group, and OIDC client administration.">
 
   <header class="page-header">
     <p class="page-eyebrow">administration</p>
@@ -56,6 +56,12 @@ const cards = [
     </p>
   </header>
 
+  <nav class="nav-bar" aria-label="Admin">
+    {adminNav.map(item => (
+      <a href={item.href}>{item.label}</a>
+    ))}
+  </nav>
+
   {loadError && (
     <div class="notice notice-danger">
       Failed to read identity store: {loadError}
@@ -64,9 +70,9 @@ const cards = [
 
   <section class="section">
     <p class="section-subtitle">At a glance</p>
-    <div class="admin-cards">
+    <div class="card-grid">
       {cards.map((c) => (
-        <a class="admin-card" href={c.href}>
+        <a class="admin-card panel" href={c.href}>
           <span class="admin-card-primary mono">{c.primary}</span>
           <span class="admin-card-title">{c.title}</span>
           <span class="admin-card-secondary mono">{c.secondary}</span>
@@ -79,20 +85,12 @@ const cards = [
 </Layout>
 
 <style>
-  .admin-cards {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(15rem, 1fr));
-    gap: var(--space-3);
-  }
   .admin-card {
     position: relative;
     display: flex;
     flex-direction: column;
     gap: var(--space-2);
-    padding: var(--space-5);
-    background: var(--surface);
-    border: 1px solid var(--border);
-    border-radius: var(--radius);
+    padding: var(--space-4) var(--space-5);
     color: var(--text);
     text-decoration: none;
     transition: border-color var(--duration-fast) var(--ease-out),
@@ -107,9 +105,9 @@ const cards = [
     letter-spacing: -0.01em;
   }
   .admin-card-title {
-    font-family: var(--font-display);
-    font-size: var(--text-lg);
-    font-weight: 700;
+    font-family: var(--font-mono);
+    font-size: var(--text-base);
+    font-weight: 600;
     color: var(--text);
   }
   .admin-card-secondary {

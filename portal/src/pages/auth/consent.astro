@@ -93,13 +93,13 @@ if (!challenge) {
   ) : (
     <section class="consent-card">
       <div class="consent-client">
-        <p class="consent-label">Application requesting access</p>
+        <p class="section-subtitle">Application requesting access</p>
         <p class="consent-client-name">{clientName}</p>
       </div>
 
       {scopeDescriptions.length > 0 && (
         <div class="consent-scopes">
-          <p class="consent-label">This application is requesting access to</p>
+          <p class="section-subtitle">This application is requesting access to</p>
           <ul class="consent-scope-list">
             {scopeDescriptions.map(({ scope, description }) => (
               <li class="consent-scope-item">
@@ -152,15 +152,6 @@ if (!challenge) {
     gap: var(--space-5);
   }
 
-  .consent-label {
-    font-family: var(--font-mono);
-    font-size: var(--text-xs);
-    text-transform: uppercase;
-    letter-spacing: 0.08em;
-    color: var(--text-muted);
-    margin: 0 0 var(--space-2) 0;
-  }
-
   .consent-client-name {
     font-size: var(--text-lg);
     font-weight: 600;
@@ -191,7 +182,7 @@ if (!challenge) {
 
   .consent-scope-desc {
     color: var(--text);
-    font-size: var(--text-sm);
+    font-size: var(--text-base);
   }
 
   .consent-scope-name {
@@ -214,12 +205,12 @@ if (!challenge) {
 
   .consent-btn {
     width: 100%;
-    padding: var(--space-4);
+    padding: var(--space-3) var(--space-5);
     font-size: var(--text-base);
   }
 
   .consent-error {
-    color: var(--text-2);
+    color: var(--danger);
     font-size: var(--text-sm);
     margin: 0;
   }

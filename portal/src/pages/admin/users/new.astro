@@ -146,22 +146,26 @@ const isAccessSelected = (g: string) => form.accessGroups.includes(g);
 const csrfToken = signToken(adminIdentityId);
 ---
 <Layout title="New user — Admin">
-  <main class="shell shell-md stack-lg">
-    <header class="stack">
-      <h1>New user</h1>
-      <nav class="nav-bar">
-        <a href="/admin">Overview</a>
-        <a href="/admin/users" aria-current="page">Users</a>
-        <a href="/admin/groups">Groups</a>
-        <a href="/admin/oauth2">Apps</a>
-      </nav>
-    </header>
+  <header class="page-header">
+    <p class="page-eyebrow">administration · users</p>
+    <h1 class="page-title">New user</h1>
+    <p class="page-lede">Create a new identity and generate an enrollment URL to share out of band.</p>
+  </header>
+
+  <nav class="nav-bar" aria-label="Admin">
+    <a href="/admin">Overview</a>
+    <a href="/admin/users" aria-current="page">Users</a>
+    <a href="/admin/groups">Groups</a>
+    <a href="/admin/oauth2">Apps</a>
+  </nav>
+
+  <main class="stack-lg">
 
     {success ? (
       <section class="stack-lg">
         <div class="notice notice-success">
           <p><strong>Identity created for {success.username}.</strong></p>
-          <p class="text-sm" style="margin-top: 0.5rem;">
+          <p class="text-sm">
             Share this enrollment URL with them out of band (Signal, iMessage).
             It expires {success.expiresAt}.
           </p>
@@ -171,7 +175,7 @@ const csrfToken = signToken(adminIdentityId);
           <input id="recoveryUrl" type="text" readonly value={success.recoveryUrl} />
           <span class="field-hint">Single-use. Do not paste in chat history that syncs to backups.</span>
         </div>
-        <div style="display: flex; gap: 0.75rem;">
+        <div class="cta-row">
           <a href="/admin/users" class="button button-secondary">Back to users</a>
           <a href="/admin/users/new" class="button button-primary">Create another</a>
         </div>
@@ -248,13 +252,13 @@ const csrfToken = signToken(adminIdentityId);
 
         <details class="panel">
           <summary class="mono text-sm">Per-app role overrides</summary>
-          <p class="muted text-xs" style="margin-top: 0.5rem;">
+          <p class="muted text-xs">
             Skip a row to use the default role from the app's group_role_map.
             Only apps the user has access to will resolve a role at consent time.
           </p>
-          <div class="stack" style="margin-top: 0.75rem;">
+          <div class="stack details-content">
             {manifests.map((m) => (
-              <div class="role-row" style={isAccessSelected(m.accessGroup) ? '' : 'opacity: 0.6;'}>
+              <div class={`role-row${isAccessSelected(m.accessGroup) ? '' : ' role-row-inactive'}`}>
                 <div>
                   <div class="mono">{m.clientId}</div>
                   <div class="muted text-xs">{m.clientName}</div>
@@ -276,7 +280,7 @@ const csrfToken = signToken(adminIdentityId);
           </div>
         </details>
 
-        <div style="display: flex; gap: 0.75rem;">
+        <div class="cta-row">
           <button type="submit" class="button button-primary">
             Create + send enrollment URL
           </button>
@@ -286,3 +290,8 @@ const csrfToken = signToken(adminIdentityId);
     )}
   </main>
 </Layout>
+
+<style>
+  .details-content { margin-top: var(--space-3); }
+  .role-row-inactive { color: var(--text-muted); }
+</style>

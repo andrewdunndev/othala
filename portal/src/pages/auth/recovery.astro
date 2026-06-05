@@ -55,7 +55,7 @@ const phase: 'request' | 'sent' = flow?.state === 'sent_email' ? 'sent' : 'reque
   ))}
 
   {!flow && isDev && (
-    <div class="notice notice-warning" style="margin-bottom: var(--space-6);">
+    <div class="notice notice-warning">
       Dev preview: no Kratos flow available. Submitting will not work
       without a live flow.
     </div>
@@ -99,7 +99,7 @@ const phase: 'request' | 'sent' = flow?.state === 'sent_email' ? 'sent' : 'reque
 
 <style>
   .recover-card {
-    max-width: 28rem;
+    max-width: 32rem;
     margin: 0 auto;
     padding: var(--space-6);
     border: 1px solid var(--border);
@@ -118,7 +118,7 @@ const phase: 'request' | 'sent' = flow?.state === 'sent_email' ? 'sent' : 'reque
   }
 
   .recover-footer {
-    max-width: 28rem;
+    max-width: 32rem;
     margin: var(--space-5) auto 0;
     display: flex;
     justify-content: center;

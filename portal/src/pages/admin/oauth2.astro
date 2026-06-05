@@ -29,99 +29,119 @@ const adminNav = [
   { href: '/admin/oauth2',   label: 'Apps' },
 ];
 ---
-<Layout title="Apps — Admin" description="OIDC client manifests." nav={adminNav}>
-  <main class="stack-lg">
-    <header class="page-header">
-      <p class="page-eyebrow">administration · oidc clients</p>
-      <h1 class="page-title">Apps</h1>
-      <p class="page-lede">
-        Read-only. Apps are defined by unified <code>&lt;slug&gt;.yaml</code>
-        manifests in the manifest directory; edit a manifest and it is
-        picked up at runtime — no rebuild.
-      </p>
-    </header>
+<Layout title="Apps — Admin" description="OIDC client manifests.">
+  <header class="page-header">
+    <p class="page-eyebrow">administration · oidc clients</p>
+    <h1 class="page-title">Apps</h1>
+    <p class="page-lede">
+      Read-only. Apps are defined by unified <code>&lt;slug&gt;.yaml</code>
+      manifests in the manifest directory; edit a manifest and it is
+      picked up at runtime — no rebuild.
+    </p>
+  </header>
 
-    <section class="stack-lg">
-      {manifests.map((m) => (
-        <article class="panel stack">
-          <header style="display: flex; justify-content: space-between; align-items: baseline; gap: 1rem;">
-            <div>
-              <h2 class="mono">{m.clientId}</h2>
-              <p class="muted text-sm">{m.clientName}</p>
-            </div>
-            <p class="muted text-xs mono">
-              source: <span class="mono">{m.clientId}.yaml</span>
-            </p>
-          </header>
+  <nav class="nav-bar" aria-label="Admin">
+    {adminNav.map(item => (
+      <a href={item.href}>{item.label}</a>
+    ))}
+  </nav>
 
-          <dl style="display: grid; grid-template-columns: 9rem 1fr; gap: 0.4rem 1rem; font-size: var(--text-sm);">
-            <dt class="muted mono">access group</dt>
-            <dd><span class="badge badge-muted">{m.accessGroup}</span></dd>
-
-            <dt class="muted mono">grant types</dt>
-            <dd class="mono text-xs">{m.grantTypes.join(', ') || '(none)'}</dd>
-
-            <dt class="muted mono">scopes</dt>
-            <dd class="mono text-xs">{m.scopes.join(' ') || '(none)'}</dd>
-
-            <dt class="muted mono">audience</dt>
-            <dd class="mono text-xs">{m.audience.join(', ') || '(none)'}</dd>
-
-            <dt class="muted mono">redirect uris</dt>
-            <dd>
-              <ul class="stack mono text-xs" style="list-style: none;">
-                {m.redirectUris.map((u) => <li>{u}</li>)}
-                {m.redirectUris.length === 0 && <li class="muted">(none)</li>}
-              </ul>
-            </dd>
-
-            <dt class="muted mono">skip consent</dt>
-            <dd class="mono text-xs">{m.skipConsent ? 'true' : 'false'}</dd>
-          </dl>
-
+  <section class="section stack-lg">
+    {manifests.map((m) => (
+      <article class="panel stack">
+        <header class="card-header">
           <div>
-            <p class="muted text-xs mono">declared roles</p>
-            {m.roles.length === 0 ? (
-              <p class="muted text-sm">(none — populate <span class="mono">roles:</span> in the yaml)</p>
-            ) : (
-              <table class="data-table">
-                <thead>
-                  <tr><th>name</th><th>description</th></tr>
-                </thead>
-                <tbody>
-                  {m.roles.map((r) => (
-                    <tr>
-                      <td><span class="badge">{r.name}</span></td>
-                      <td class="muted text-sm">{r.description || '(no description)'}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            )}
+            <h2 class="mono">{m.clientId}</h2>
+            <p class="muted text-sm">{m.clientName}</p>
           </div>
+          <p class="muted text-xs mono">
+            source: <span class="mono">{m.clientId}.yaml</span>
+          </p>
+        </header>
 
-          <div>
-            <p class="muted text-xs mono">group_role_map</p>
-            {Object.keys(m.groupRoleMap).length === 0 ? (
-              <p class="muted text-sm">(none)</p>
-            ) : (
-              <table class="data-table">
-                <thead>
-                  <tr><th>identity group</th><th>default role</th></tr>
-                </thead>
-                <tbody>
-                  {Object.entries(m.groupRoleMap).map(([g, r]) => (
-                    <tr>
-                      <td><span class="badge">{g}</span></td>
-                      <td><span class="badge badge-muted">{r}</span></td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            )}
-          </div>
-        </article>
-      ))}
-    </section>
-  </main>
+        <dl class="dl-grid">
+          <dt class="muted mono">access group</dt>
+          <dd><span class="badge badge-muted">{m.accessGroup}</span></dd>
+
+          <dt class="muted mono">grant types</dt>
+          <dd class="mono text-xs">{m.grantTypes.join(', ') || '(none)'}</dd>
+
+          <dt class="muted mono">scopes</dt>
+          <dd class="mono text-xs">{m.scopes.join(' ') || '(none)'}</dd>
+
+          <dt class="muted mono">audience</dt>
+          <dd class="mono text-xs">{m.audience.join(', ') || '(none)'}</dd>
+
+          <dt class="muted mono">redirect uris</dt>
+          <dd>
+            <ul class="stack mono text-xs uri-list">
+              {m.redirectUris.map((u) => <li>{u}</li>)}
+              {m.redirectUris.length === 0 && <li class="muted">(none)</li>}
+            </ul>
+          </dd>
+
+          <dt class="muted mono">skip consent</dt>
+          <dd class="mono text-xs">{m.skipConsent ? 'true' : 'false'}</dd>
+        </dl>
+
+        <div>
+          <p class="section-subtitle">declared roles</p>
+          {m.roles.length === 0 ? (
+            <p class="muted text-sm">(none — populate <span class="mono">roles:</span> in the yaml)</p>
+          ) : (
+            <table class="data-table">
+              <thead>
+                <tr><th>name</th><th>description</th></tr>
+              </thead>
+              <tbody>
+                {m.roles.map((r) => (
+                  <tr>
+                    <td><span class="badge">{r.name}</span></td>
+                    <td class="muted text-sm">{r.description || '(no description)'}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
+        </div>
+
+        <div>
+          <p class="section-subtitle">group_role_map</p>
+          {Object.keys(m.groupRoleMap).length === 0 ? (
+            <p class="muted text-sm">(none)</p>
+          ) : (
+            <table class="data-table">
+              <thead>
+                <tr><th>identity group</th><th>default role</th></tr>
+              </thead>
+              <tbody>
+                {Object.entries(m.groupRoleMap).map(([g, r]) => (
+                  <tr>
+                    <td><span class="badge">{g}</span></td>
+                    <td><span class="badge badge-muted">{r}</span></td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
+        </div>
+      </article>
+    ))}
+  </section>
 </Layout>
+
+<style>
+  .card-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    gap: var(--space-3);
+  }
+  .dl-grid {
+    display: grid;
+    grid-template-columns: 9rem 1fr;
+    gap: var(--space-2) var(--space-3);
+    font-size: var(--text-sm);
+  }
+  .uri-list { list-style: none; }
+</style>

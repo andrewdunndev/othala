@@ -58,7 +58,7 @@ const adminNav = [
   { href: '/admin/oauth2',   label: 'Apps' },
 ];
 ---
-<Layout title="Users — Admin" description="Identity directory." nav={adminNav}>
+<Layout title="Users — Admin" description="Identity directory.">
 
   <header class="page-header">
     <p class="page-eyebrow">administration · identities</p>
@@ -68,6 +68,12 @@ const adminNav = [
       or stack group filters to narrow by membership.
     </p>
   </header>
+
+  <nav class="nav-bar" aria-label="Admin">
+    {adminNav.map(item => (
+      <a href={item.href}>{item.label}</a>
+    ))}
+  </nav>
 
   {loadError && (
     <div class="notice notice-danger">Failed to read identity store: {loadError}</div>
@@ -140,9 +146,9 @@ const adminNav = [
               <td class="users-email mono">{i.traits?.email ?? '—'}</td>
               <td>
                 <span class="users-chips">
-                  {identityGs.map((g) => <span class="chip">{g}</span>)}
+                  {identityGs.map((g) => <span class="badge">{g}</span>)}
                   {accessGs.length > 0 && (
-                    <span class="chip chip-muted" title={accessGs.join(', ')}>
+                    <span class="badge badge-muted" title={accessGs.join(', ')}>
                       +{accessGs.length} app
                     </span>
                   )}
@@ -156,7 +162,7 @@ const adminNav = [
           );
         })}
         {filtered.length === 0 && !loadError && (
-          <tr><td colspan="5" class="users-empty">No matching identities.</td></tr>
+          <tr class="users-empty-row"><td colspan="5">No matching identities.</td></tr>
         )}
       </tbody>
     </table>
@@ -169,7 +175,7 @@ const adminNav = [
    * Filter form sits above the table inside its own card so the page
    * doesn't read as one continuous slab of input. */
   .users-controls {
-    margin-top: var(--space-6);
+    margin-top: var(--space-7);
     padding: var(--space-5);
     background: var(--surface);
     border: 1px solid var(--border);
@@ -226,7 +232,7 @@ const adminNav = [
   .users-table thead th {
     font-family: var(--font-mono);
     font-size: var(--text-xs);
-    font-weight: 500;
+    font-weight: 600;
     text-transform: uppercase;
     letter-spacing: 0.08em;
     color: var(--text-muted);
@@ -242,7 +248,7 @@ const adminNav = [
   .users-table tbody tr {
     transition: background var(--duration-fast) var(--ease-out);
   }
-  .users-table tbody tr:hover { background: var(--surface); }
+  .users-table tbody tr:hover { background: var(--accent-subtle); }
 
   .users-username-link {
     color: var(--text);
@@ -263,21 +269,6 @@ const adminNav = [
     flex-wrap: wrap;
     gap: var(--space-1);
   }
-  .chip {
-    display: inline-block;
-    padding: 0.15rem var(--space-2);
-    border: 1px solid var(--border);
-    border-radius: var(--radius-sm);
-    font-family: var(--font-mono);
-    font-size: var(--text-xs);
-    color: var(--text);
-    background: var(--bg);
-    line-height: 1.4;
-  }
-  .chip-muted {
-    color: var(--text-2);
-    background: var(--surface);
-  }
 
   .users-th-actions { width: 1%; }
   .users-actions-cell { white-space: nowrap; text-align: right; }
@@ -291,8 +282,8 @@ const adminNav = [
   .users-action:hover { color: var(--accent); text-decoration: none; }
   .users-action:first-of-type { margin-left: 0; }
 
-  .users-empty {
-    padding: var(--space-5) var(--space-3) !important;
+  .users-table tbody tr.users-empty-row td {
+    padding: var(--space-5) var(--space-3);
     color: var(--text-muted);
     text-align: center;
     font-size: var(--text-sm);

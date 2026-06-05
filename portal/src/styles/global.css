@@ -137,7 +137,7 @@ a.subtle:hover { color: var(--text); }
 
 .field label {
   font-family: var(--font-mono);
-  font-size: var(--text-sm);
+  font-size: var(--text-xs);
   color: var(--text-2);
   letter-spacing: 0.02em;
 }
@@ -182,6 +182,7 @@ a.subtle:hover { color: var(--text); }
   border-radius: 0 var(--radius) var(--radius) 0;
   font-size: var(--text-sm);
   color: var(--text-2);
+  margin-bottom: var(--space-6);
 }
 .notice-success { border-color: var(--success); background: var(--success-subtle); color: var(--text); }
 .notice-danger  { border-color: var(--danger);  background: var(--danger-subtle);  color: var(--text); }

@@ -64,83 +64,91 @@ function membersOf(group: string): MemberRef[] {
   return out;
 }
 ---
-<Layout title="Groups — Admin" description="Identity and access groups." nav={adminNav}>
-  <main class="stack-lg">
-    <header class="page-header">
-      <p class="page-eyebrow">administration · groups</p>
-      <h1 class="page-title">Groups</h1>
-      <p class="page-lede">
-        Identity groups define who someone is. Access groups define what
-        they can reach. Membership is edited per-user.
-      </p>
-    </header>
+<Layout title="Groups — Admin" description="Identity and access groups.">
+  <header class="page-header">
+    <p class="page-eyebrow">administration · groups</p>
+    <h1 class="page-title">Groups</h1>
+    <p class="page-lede">
+      Identity groups define who someone is. Access groups define what
+      they can reach. Membership is edited per-user.
+    </p>
+  </header>
 
-    {loadError && (
-      <div class="notice notice-danger">Failed to read identity store: {loadError}</div>
-    )}
+  <nav class="nav-bar" aria-label="Admin">
+    {adminNav.map(item => (
+      <a href={item.href}>{item.label}</a>
+    ))}
+  </nav>
 
-    <section class="stack">
-      <h2>Identity groups</h2>
-      <p class="muted text-sm">Who you are. Drives default roles via group_role_map.</p>
-      <div class="card-grid">
-        {identityGroups.map((g) => {
-          const members = membersOf(g);
-          return (
-            <article class="panel">
-              <h2 class="mono">{g}</h2>
-              <p class="muted text-xs">{members.length} {members.length === 1 ? 'member' : 'members'}</p>
-              <ul class="stack" style="list-style: none; margin-top: 0.5rem;">
-                {members.map((m) => (
-                  <li>
-                    <a href={`/admin/users/${m.id}`} class="subtle mono text-sm">
-                      {m.username}
-                    </a>
-                    {m.displayName && (
-                      <span class="muted text-xs"> {m.displayName}</span>
-                    )}
-                  </li>
-                ))}
-                {members.length === 0 && (
-                  <li class="muted text-sm">empty</li>
-                )}
-              </ul>
-            </article>
-          );
-        })}
-      </div>
-    </section>
+  {loadError && (
+    <div class="notice notice-danger">Failed to read identity store: {loadError}</div>
+  )}
 
-    <section class="stack">
-      <h2>Access groups</h2>
-      <p class="muted text-sm">What you can reach. One per OIDC client.</p>
-      <div class="card-grid">
-        {accessGroups.map((a) => {
-          const members = membersOf(a.group);
-          return (
-            <article class="panel">
-              <h2 class="mono">{a.group}</h2>
-              <p class="muted text-xs">
-                grants entry to <span class="mono">{a.clientId}</span> ({a.clientName})
-              </p>
-              <p class="muted text-xs">
-                {members.length} {members.length === 1 ? 'member' : 'members'}
-              </p>
-              <ul class="stack" style="list-style: none; margin-top: 0.5rem;">
-                {members.map((m) => (
-                  <li>
-                    <a href={`/admin/users/${m.id}`} class="subtle mono text-sm">
-                      {m.username}
-                    </a>
-                  </li>
-                ))}
-                {members.length === 0 && (
-                  <li class="muted text-sm">empty</li>
-                )}
-              </ul>
-            </article>
-          );
-        })}
-      </div>
-    </section>
-  </main>
+  <section class="section">
+    <p class="section-subtitle">Identity groups</p>
+    <p class="muted text-sm">Who you are. Drives default roles via group_role_map.</p>
+    <div class="card-grid">
+      {identityGroups.map((g) => {
+        const members = membersOf(g);
+        return (
+          <article class="panel">
+            <h2 class="mono">{g}</h2>
+            <p class="muted text-xs">{members.length} {members.length === 1 ? 'member' : 'members'}</p>
+            <ul class="stack group-member-list">
+              {members.map((m) => (
+                <li>
+                  <a href={`/admin/users/${m.id}`} class="subtle mono text-sm">
+                    {m.username}
+                  </a>
+                  {m.displayName && (
+                    <span class="muted text-xs"> {m.displayName}</span>
+                  )}
+                </li>
+              ))}
+              {members.length === 0 && (
+                <li class="muted text-sm">empty</li>
+              )}
+            </ul>
+          </article>
+        );
+      })}
+    </div>
+  </section>
+
+  <section class="section">
+    <p class="section-subtitle">Access groups</p>
+    <p class="muted text-sm">What you can reach. One per OIDC client.</p>
+    <div class="card-grid">
+      {accessGroups.map((a) => {
+        const members = membersOf(a.group);
+        return (
+          <article class="panel">
+            <h2 class="mono">{a.group}</h2>
+            <p class="muted text-xs">
+              grants entry to <span class="mono">{a.clientId}</span> ({a.clientName})
+            </p>
+            <p class="muted text-xs">
+              {members.length} {members.length === 1 ? 'member' : 'members'}
+            </p>
+            <ul class="stack group-member-list">
+              {members.map((m) => (
+                <li>
+                  <a href={`/admin/users/${m.id}`} class="subtle mono text-sm">
+                    {m.username}
+                  </a>
+                </li>
+              ))}
+              {members.length === 0 && (
+                <li class="muted text-sm">empty</li>
+              )}
+            </ul>
+          </article>
+        );
+      })}
+    </div>
+  </section>
 </Layout>
+
+<style>
+  .group-member-list { list-style: none; margin-top: var(--space-2); }
+</style>
