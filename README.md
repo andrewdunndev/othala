@@ -27,14 +27,6 @@ Two invitations:
 - **Potential user, and this needs to be more generalized for your setup?** Please file an issue or a merge request. We are glad to generalize where it helps, and happy to take it further with you.
 - **With Ory, and would like us to donate this upstream?** Please reach out. We would gladly take Othala to Ory upstream, with the generalization work that likely entails.
 
-## Relationship to dunn.dev/iac
-
-`dunn.dev/iac` is the primary deployment view. It vendors config files from this repo, pinned to a released Othala tag, under the `dag` service grouping (`services/dag/`). The dependency is a released tag, not a live pointer; git submodule and similar shared-history formats were rejected.
-
-iac decides when to consume a new Othala release. Topology-specific differences (for example the Postgres DSN host) are iac-local deviations documented in each vendored file's provenance header. The published application image is named **othala**; the instance grouping inside iac is **dag** (`services/dag/`, `dag-*` quadlets, the `dag.network`). The functional Ory service names (kratos / hydra / postgres) keep their role names.
-
-For the deploy model, see [`DEPLOY.md`](DEPLOY.md) and `dunn.dev/iac/services/dag/`. For the load-bearing decision record, see [`ARCHITECTURE.md`](ARCHITECTURE.md) LB-12.
-
 ## Apps are manifests (runtime-driven)
 
 An app is one unified `<slug>.yaml` manifest, read at request time from `MANIFEST_DIR` (default `/etc/portal/manifests`). One file can carry up to three namespace blocks:
@@ -84,7 +76,7 @@ npm run build     # astro build + bundle the listener / admin / registrar
 
 - **Cold-start orientation** (the anchor): [`ARCHITECTURE.md`](ARCHITECTURE.md). What the converged app holds, the load-bearing decisions, topology, and trust boundary.
 - **Release / version state**: [`docs/STATUS.md`](docs/STATUS.md). The only place a deployed version is asserted.
-- **Deploy / consumption contract**: [`DEPLOY.md`](DEPLOY.md) and `dunn.dev/iac/services/dag/`.
+- **Deploy**: [`DEPLOY.md`](DEPLOY.md).
 
 This README asserts no version. It is the front door.
 
@@ -167,7 +159,7 @@ Substrate, LDAP bridge, and the Othala app (flows + login/consent + admin) are v
 - `docs/STATUS.md` is the only place release state is asserted; cold-start orientation is `ARCHITECTURE.md`
 - Apply estate voice in external text: no em-dashes, direct phrasing, no filler
 - `@dunn.dev/reference` is the single source for tokens and site chrome; do not redefine locally
-- Secrets: sops + age via `dunn.dev/iac/pyinfra/secrets.enc.yaml`
+- Secrets: sops + age, operator-managed and never committed
 
 ## License
 
