@@ -1,0 +1,91 @@
+---
+// StatusPage — branded error / status page component.
+//
+// Single source of truth for all error rendering in the portal.
+// Accepts a numeric status code, title, human-readable message, and an
+// optional reason token (displayed as a mono badge for context without
+// leaking internals).
+//
+// Props
+//   status   (number, required) — HTTP status code, e.g. 404, 403, 500.
+//   title    (string, required) — Short title line, e.g. "Not found".
+//   message  (string, required) — Human-readable paragraph shown to the user.
+//   reason   (string, optional) — Reason token shown as a badge (e.g. "not-admin").
+//                                 Never include raw error messages or stack traces here.
+
+import Layout from '../layouts/Layout.astro';
+
+interface Props {
+  /** HTTP status code rendered as the display heading. */
+  status: number;
+  /** Short title shown below the status code. */
+  title: string;
+  /** Human-readable message shown to the user. Never include stack traces. */
+  message: string;
+  /** Optional reason token displayed as a mono badge. */
+  reason?: string;
+}
+
+const { status, title, message, reason } = Astro.props;
+---
+<Layout title={`${status} — ${title}`} bare>
+
+  <header class="page-header status-header">
+    <p class="page-eyebrow status-eyebrow">error</p>
+    <h1 class="page-title status-code">{status}</h1>
+    <p class="page-lede status-title">{title}</p>
+  </header>
+
+  <section class="section status-body">
+    <p class="section-prose">{message}</p>
+
+    {reason && (
+      <p class="status-reason">
+        <span class="badge badge-muted">{reason}</span>
+      </p>
+    )}
+
+    <div class="status-actions">
+      <a href="/" class="button button-secondary">Back home</a>
+      <a href="/auth/login" class="button button-secondary">Sign in</a>
+    </div>
+  </section>
+
+</Layout>
+
+<style>
+  /* Large mono status code as the display H1. */
+  .status-code {
+    font-size: var(--text-3xl);
+    color: var(--text-muted);
+    letter-spacing: -0.02em;
+    line-height: 1;
+  }
+
+  /* Title sits immediately below the code as a lede. */
+  .status-title {
+    font-family: var(--font-mono);
+    font-weight: 600;
+    font-size: var(--text-xl);
+    color: var(--text);
+  }
+
+  .status-header {
+    padding-bottom: var(--space-2);
+  }
+
+  .status-body {
+    max-width: 42rem;
+  }
+
+  .status-reason {
+    margin-top: var(--space-4);
+  }
+
+  .status-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--space-3);
+    margin-top: var(--space-6);
+  }
+</style>

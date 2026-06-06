@@ -1,0 +1,26 @@
+---
+// 500 — Unexpected error.
+//
+// Astro's special 500.astro receives the `error` prop when an unhandled
+// exception propagates from a page or middleware. The error MUST NOT be
+// surfaced to the client — show a generic branded message only. Log
+// server-side so the operator can diagnose without exposing internals.
+
+export const prerender = false;
+
+import StatusPage from '../components/StatusPage.astro';
+
+interface Props {
+  error: unknown;
+}
+
+const { error } = Astro.props;
+
+// Server-side log only — never forwarded to the rendered HTML.
+console.error('[othala/portal] Unhandled server error:', error);
+---
+<StatusPage
+  status={500}
+  title="Unexpected error"
+  message="Something went wrong on our end. Please try again in a moment. If the problem persists, contact your administrator."
+/>
