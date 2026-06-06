@@ -38,6 +38,14 @@ runtime manifest model, plus the rename to **Othala** ("Ory for your home").
   snippets (oidc-app, ldap-app, forward-auth, admin-session).
 - **e2e mailpit catcher** plus smoke Section H, proving the contact form sends,
   the mail lands, and bad input is rejected.
+- **Default-group tile gating.** `OTHALA_DEFAULT_GROUP` closes the external-tile
+  gap: every tile gates through a group, and a tile with no explicit
+  `access_group` falls back to the default group instead of bypassing the gate.
+  The default is auto-appended to the admin group selector but never
+  auto-assigned to identities.
+- **Adversarial e2e specs** codifying the threat model for the robustness
+  harness: consent CSRF tampering, AAL2 bypass, forged sessions, and
+  member→admin POST mutations (`e2e/playwright/tests/e`–`h`).
 
 ### Changed
 
@@ -48,6 +56,9 @@ runtime manifest model, plus the rename to **Othala** ("Ory for your home").
 - **Config exposed, not hidden.** `OTHALA_SMTP_CONNECTION_URI` and
   `OTHALA_CONTACT_RECIPIENT` are explicit load-time params, documented in
   `.env.example` and consumed in the single config module (`lib/config.ts`).
+- **Visual-consistency pass.** One house style across every page — unified
+  admin navigation, a consistent 1100px page width, a single display heading
+  per page, and normalized badge/chip + surface tokens.
 
 ### Removed
 
@@ -65,6 +76,6 @@ runtime manifest model, plus the rename to **Othala** ("Ory for your home").
 ### Validation
 
 - Smoke harness green on the carmine QEMU runner (incl. the contact-form
-  Section H); 440 portal unit tests; `astro check` and `astro build` clean.
+  Section H); 459 portal unit tests; `astro check` and `astro build` clean.
 
 [0.2.0]: https://gitlab.com/dunn.dev/othala/-/releases/v0.2.0
