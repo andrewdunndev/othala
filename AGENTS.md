@@ -307,6 +307,30 @@ go test ./...     # unit tests
 
 ---
 
+## Upstream alignment
+
+For every durable upstream this repo builds on, reach for the upstream's
+intended extension point before hand-rolling an equivalent. The upstream
+maintains it, the docs match it, and version bumps don't surprise us. Only
+deviate when the upstream pathway is genuinely broken on our hardware — and
+then document *why* at the deviation site.
+
+- **Ory Kratos / Hydra config** — use native Kratos/Hydra YAML config fields
+  directly. Ory has no built-in `${VAR}` expansion; the sanctioned bridge is a
+  single `python3 os.path.expandvars` render step that produces `*.rendered.yml`
+  before the services start. Don't bypass this with separate config-management
+  templating — the render-step and its missing-variable guard in `e2e/validate.sh`
+  are the canonical pattern.
+- **`@ory/client-fetch` SDK** — use the generated Ory SDK for all Kratos/Hydra
+  API calls (`portal/src/lib/`). Bespoke `fetch()` calls against the Ory admin
+  or public APIs are a maintenance trap: SDK types and endpoint paths track
+  upstream releases automatically.
+- **`@ory/elements`** — when the Astro layout admits a standard Ory UI component,
+  prefer elements over a bespoke equivalent. The current portal uses a custom
+  `ui.nodes` renderer for Kratos self-service flows because the branded Astro
+  layout doesn't accommodate elements; if that constraint lifts, elements is the
+  right first reach.
+
 ## Where to read next
 
 - `ARCHITECTURE.md` — the full architecture narrative.
