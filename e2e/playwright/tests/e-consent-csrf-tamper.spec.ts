@@ -41,6 +41,13 @@
  *   guard is still exercised (the server calls handleConsentPost
  *   unconditionally on POST).
  *
+ * Two-layer check per POST test:
+ *   1. Origin-less POST → Astro's built-in security.checkOrigin CSRF layer
+ *      rejects forged/origin-less form POSTs with 403 before handleConsentPost
+ *      is reached.
+ *   2. Same-origin POST (Origin header == site origin) → passes checkOrigin and
+ *      reaches the app's consent CSRF guard (verifyToken), which returns 400.
+ *
  * Flow per sub-case:
  *   1. Login as member (bt2@othala.test) via JSON-API.
  *   2. Walk the authorize redirect chain (maxRedirects:0) up to but NOT
@@ -109,31 +116,54 @@ test('E1 — consent POST with MISSING csrf_token is rejected (400)', async ({
   baseURL,
   member,
 }) => {
+  const origin = new URL(baseURL!).origin;
   const ctx = await browser.newContext();
   try {
     await loginViaJsonApi(ctx, { identifier: member.email, password: member.password }, baseURL);
 
-    // Attempt the POST with no csrf_token at all.  Even without a real
-    // consent_challenge this exercises the CSRF guard (verifyToken is called
-    // before Hydra is contacted — handleConsentPost line 422-429).
-    const resp = await ctx.request.post(`${baseURL}/oauth2/consent`, {
+    // Layer 1: Origin-less POST — Astro's security.checkOrigin rejects it with 403
+    // before handleConsentPost is reached.
+    const resp1 = await ctx.request.post(`${baseURL}/oauth2/consent`, {
       maxRedirects: 0,
       headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
       data: 'consent_challenge=fake-challenge-for-csrf-test&action=allow',
       // deliberately omit csrf_token
     });
 
-    const status = resp.status();
-    const body = await resp.text().catch(() => '');
-    console.log('[E1] missing csrf_token →', status, body.slice(0, 120));
+    const status1 = resp1.status();
+    console.log('[E1] origin-less POST missing csrf_token →', status1);
+
+    expect(
+      status1,
+      `E1 (layer 1): origin-less POST must be rejected by Astro checkOrigin with 403; got ${status1}`,
+    ).toBe(403);
+
+    // Layer 2: Same-origin POST with missing csrf_token — passes checkOrigin,
+    // reaches the app's CSRF guard (verifyToken(null, ...) throws CSRFError → 400).
+    // Attempt the POST with no csrf_token at all.  Even without a real
+    // consent_challenge this exercises the CSRF guard (verifyToken is called
+    // before Hydra is contacted — handleConsentPost line 422-429).
+    const resp2 = await ctx.request.post(`${baseURL}/oauth2/consent`, {
+      maxRedirects: 0,
+      headers: {
+        'Content-Type': 'application/x-www-form-urlencoded',
+        'Origin': origin,
+      },
+      data: 'consent_challenge=fake-challenge-for-csrf-test&action=allow',
+      // deliberately omit csrf_token
+    });
+
+    const status2 = resp2.status();
+    const body2 = await resp2.text().catch(() => '');
+    console.log('[E1] same-origin POST missing csrf_token →', status2, body2.slice(0, 120));
 
     // Must be 4xx (400 from the CSRF guard, or 502 from Hydra lookup
     // failing on the fake challenge — both mean no code was issued).
     // We assert NOT a 3xx with a code in the Location header.
-    const loc = resp.headers()['location'] ?? '';
+    const loc2 = resp2.headers()['location'] ?? '';
     expect(
-      loc.includes('code='),
-      `E1: response must NOT contain an auth code; got status=${status} Location=${loc}`,
+      loc2.includes('code='),
+      `E1 (layer 2): response must NOT contain an auth code; got status=${status2} Location=${loc2}`,
     ).toBe(false);
 
     // Primary assertion: the CSRF guard fires before Hydra contact when the
@@ -142,8 +172,8 @@ test('E1 — consent POST with MISSING csrf_token is rejected (400)', async ({
     // When the Hydra challenge lookup fails first (fake challenge → 502),
     // that is also a closed gate.  Either way the code must not be issued.
     expect(
-      status === 400 || status === 502,
-      `E1: status must be 400 (CSRF guard) or 502 (Hydra bad challenge); got ${status}`,
+      status2 === 400 || status2 === 502,
+      `E1 (layer 2): status must be 400 (CSRF guard) or 502 (Hydra bad challenge); got ${status2}`,
     ).toBe(true);
   } finally {
     await ctx.close();
@@ -156,6 +186,7 @@ test('E2 — consent POST with GARBAGE csrf_token is rejected (400)', async ({
   baseURL,
   member,
 }) => {
+  const origin = new URL(baseURL!).origin;
   const ctx = await browser.newContext();
   try {
     await loginViaJsonApi(ctx, { identifier: member.email, password: member.password }, baseURL);
@@ -164,25 +195,45 @@ test('E2 — consent POST with GARBAGE csrf_token is rejected (400)', async ({
     const ts = Math.floor(Date.now() / 1000);
     const forgedToken = `${ts}.some-identity-id.randomnonce.INVALIDSIGNATUREXYZ`;
 
-    const resp = await ctx.request.post(`${baseURL}/oauth2/consent`, {
+    // Layer 1: Origin-less POST — Astro's security.checkOrigin rejects it with 403.
+    const resp1 = await ctx.request.post(`${baseURL}/oauth2/consent`, {
       maxRedirects: 0,
       headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
       data: `consent_challenge=fake-challenge-for-csrf-test&action=allow&csrf_token=${encodeURIComponent(forgedToken)}`,
     });
 
-    const status = resp.status();
-    const body = await resp.text().catch(() => '');
-    console.log('[E2] garbage csrf_token →', status, body.slice(0, 120));
+    const status1 = resp1.status();
+    console.log('[E2] origin-less POST garbage csrf_token →', status1);
 
-    const loc = resp.headers()['location'] ?? '';
     expect(
-      loc.includes('code='),
-      `E2: response must NOT contain an auth code; got status=${status} Location=${loc}`,
+      status1,
+      `E2 (layer 1): origin-less POST must be rejected by Astro checkOrigin with 403; got ${status1}`,
+    ).toBe(403);
+
+    // Layer 2: Same-origin POST with garbage token — passes checkOrigin, reaches
+    // the app's CSRF guard which rejects the invalid signature.
+    const resp2 = await ctx.request.post(`${baseURL}/oauth2/consent`, {
+      maxRedirects: 0,
+      headers: {
+        'Content-Type': 'application/x-www-form-urlencoded',
+        'Origin': origin,
+      },
+      data: `consent_challenge=fake-challenge-for-csrf-test&action=allow&csrf_token=${encodeURIComponent(forgedToken)}`,
+    });
+
+    const status2 = resp2.status();
+    const body2 = await resp2.text().catch(() => '');
+    console.log('[E2] same-origin POST garbage csrf_token →', status2, body2.slice(0, 120));
+
+    const loc2 = resp2.headers()['location'] ?? '';
+    expect(
+      loc2.includes('code='),
+      `E2 (layer 2): response must NOT contain an auth code; got status=${status2} Location=${loc2}`,
     ).toBe(false);
 
     expect(
-      status === 400 || status === 502,
-      `E2: status must be 400 (CSRF guard) or 502 (Hydra bad challenge); got ${status}`,
+      status2 === 400 || status2 === 502,
+      `E2 (layer 2): status must be 400 (CSRF guard) or 502 (Hydra bad challenge); got ${status2}`,
     ).toBe(true);
   } finally {
     await ctx.close();
@@ -210,6 +261,7 @@ test('E3 — consent POST with CROSS-IDENTITY csrf_token is rejected (400)', asy
   //
   // The admin identity.id is available via admin.id from the fixture.
 
+  const origin = new URL(baseURL!).origin;
   const ctx = await browser.newContext();
   try {
     // Login as member — their identity.id is the session subject.
@@ -222,25 +274,45 @@ test('E3 — consent POST with CROSS-IDENTITY csrf_token is rejected (400)', asy
     // identity.id === member.id this mismatch fires immediately.
     const crossToken = `${ts}.${admin.id}.crossnonce.INVALIDSIGNATURE`;
 
-    const resp = await ctx.request.post(`${baseURL}/oauth2/consent`, {
+    // Layer 1: Origin-less POST — Astro's security.checkOrigin rejects it with 403.
+    const resp1 = await ctx.request.post(`${baseURL}/oauth2/consent`, {
       maxRedirects: 0,
       headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
       data: `consent_challenge=fake-challenge-for-csrf-test&action=allow&csrf_token=${encodeURIComponent(crossToken)}`,
     });
 
-    const status = resp.status();
-    const body = await resp.text().catch(() => '');
-    console.log('[E3] cross-identity csrf_token →', status, body.slice(0, 120));
+    const status1 = resp1.status();
+    console.log('[E3] origin-less POST cross-identity csrf_token →', status1);
 
-    const loc = resp.headers()['location'] ?? '';
     expect(
-      loc.includes('code='),
-      `E3: cross-identity token must NOT yield an auth code; got status=${status} Location=${loc}`,
+      status1,
+      `E3 (layer 1): origin-less POST must be rejected by Astro checkOrigin with 403; got ${status1}`,
+    ).toBe(403);
+
+    // Layer 2: Same-origin POST with cross-identity token — passes checkOrigin,
+    // reaches the app's CSRF guard which detects the identity mismatch.
+    const resp2 = await ctx.request.post(`${baseURL}/oauth2/consent`, {
+      maxRedirects: 0,
+      headers: {
+        'Content-Type': 'application/x-www-form-urlencoded',
+        'Origin': origin,
+      },
+      data: `consent_challenge=fake-challenge-for-csrf-test&action=allow&csrf_token=${encodeURIComponent(crossToken)}`,
+    });
+
+    const status2 = resp2.status();
+    const body2 = await resp2.text().catch(() => '');
+    console.log('[E3] same-origin POST cross-identity csrf_token →', status2, body2.slice(0, 120));
+
+    const loc2 = resp2.headers()['location'] ?? '';
+    expect(
+      loc2.includes('code='),
+      `E3 (layer 2): cross-identity token must NOT yield an auth code; got status=${status2} Location=${loc2}`,
     ).toBe(false);
 
     expect(
-      status === 400 || status === 502,
-      `E3: status must be 400 (CSRF identity mismatch) or 502 (Hydra bad challenge); got ${status}`,
+      status2 === 400 || status2 === 502,
+      `E3 (layer 2): status must be 400 (CSRF identity mismatch) or 502 (Hydra bad challenge); got ${status2}`,
     ).toBe(true);
   } finally {
     await ctx.close();

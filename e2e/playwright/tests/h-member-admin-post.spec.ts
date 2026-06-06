@@ -24,6 +24,12 @@
  *   H3 — POST /admin/users/<fake-uuid>  (blind mutation on unknown user)
  *         Same guard, different id — ensures the gate is not id-dependent.
  *
+ * Two-layer check per POST test:
+ *   1. Origin-less POST → Astro's built-in security.checkOrigin CSRF layer
+ *      rejects forged/origin-less form POSTs with 403 before the app guard runs.
+ *   2. Same-origin POST (Origin header == site origin) → passes checkOrigin and
+ *      reaches the app guard (requireAdminSession → 302 reason=not-admin).
+ *
  * All three must be denied (redirect to /auth/error?reason=not-admin or
  * equivalent) — never a 200, never a side effect.
  */
@@ -47,6 +53,7 @@ test('H1 — member POST /admin/users/new is denied (reason=not-admin)', async (
   baseURL,
   member,
 }) => {
+  const origin = new URL(baseURL!).origin;
   const ctx = await browser.newContext();
   try {
     await loginViaJsonApi(ctx, { identifier: member.email, password: member.password }, baseURL);
@@ -55,26 +62,47 @@ test('H1 — member POST /admin/users/new is denied (reason=not-admin)', async (
     const session = await getSession(ctx, baseURL);
     expect(session?.active, 'H1 precondition: member must have active session').toBe(true);
 
-    const resp = await ctx.request.post(`${baseURL}/admin/users/new`, {
+    // Layer 1: Origin-less POST — Astro's security.checkOrigin rejects it with 403
+    // before the app guard ever runs.
+    const resp1 = await ctx.request.post(`${baseURL}/admin/users/new`, {
       maxRedirects: 0,
       headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
       data: DUMMY_FORM_BODY,
     });
 
-    const status = resp.status();
-    const loc = resp.headers()['location'] ?? '';
-    console.log('[H1] member POST /admin/users/new →', status, loc);
+    const status1 = resp1.status();
+    console.log('[H1] origin-less POST /admin/users/new →', status1);
+
+    expect(
+      status1,
+      `H1 (layer 1): origin-less POST must be rejected by Astro checkOrigin with 403; got ${status1}`,
+    ).toBe(403);
+
+    // Layer 2: Same-origin POST — passes checkOrigin, reaches requireAdminSession.
+    // Must redirect to not-admin error, never return 200.
+    const resp2 = await ctx.request.post(`${baseURL}/admin/users/new`, {
+      maxRedirects: 0,
+      headers: {
+        'Content-Type': 'application/x-www-form-urlencoded',
+        'Origin': origin,
+      },
+      data: DUMMY_FORM_BODY,
+    });
+
+    const status2 = resp2.status();
+    const loc2 = resp2.headers()['location'] ?? '';
+    console.log('[H1] same-origin POST /admin/users/new →', status2, loc2);
 
     // Must not return 200 (no form render, no user created).
     expect(
-      status,
-      `H1: member POST /admin/users/new must not return 200; got ${status}`,
+      status2,
+      `H1 (layer 2): member POST /admin/users/new must not return 200; got ${status2}`,
     ).not.toBe(200);
 
     // Must redirect to the not-admin error.
     expect(
-      /reason=not-admin/.test(loc) || /\/auth\/error/.test(loc),
-      `H1: member must be denied at /admin/users/new with reason=not-admin; got ${status} ${loc}`,
+      /reason=not-admin/.test(loc2) || /\/auth\/error/.test(loc2),
+      `H1 (layer 2): member must be denied at /admin/users/new with reason=not-admin; got ${status2} ${loc2}`,
     ).toBe(true);
   } finally {
     await ctx.close();
@@ -90,6 +118,7 @@ test('H2 — member POST /admin/users/<own-id> is denied (reason=not-admin, not 
   // Even if the member knows their own identity id (it is their subject, visible
   // e.g. via /sessions/whoami), the allowlist guard fires BEFORE any id-based
   // lookup or CSRF verification.
+  const origin = new URL(baseURL!).origin;
   const ctx = await browser.newContext();
   try {
     await loginViaJsonApi(ctx, { identifier: member.email, password: member.password }, baseURL);
@@ -99,27 +128,46 @@ test('H2 — member POST /admin/users/<own-id> is denied (reason=not-admin, not 
     const ownId = session?.identity?.id ?? FAKE_UUID;
     console.log('[H2] member identity id:', ownId);
 
-    const resp = await ctx.request.post(`${baseURL}/admin/users/${ownId}`, {
+    // Layer 1: Origin-less POST — Astro's security.checkOrigin rejects it with 403.
+    const resp1 = await ctx.request.post(`${baseURL}/admin/users/${ownId}`, {
       maxRedirects: 0,
       headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
       data: DUMMY_FORM_BODY,
     });
 
-    const status = resp.status();
-    const loc = resp.headers()['location'] ?? '';
-    console.log('[H2] member POST /admin/users/<own-id> →', status, loc);
+    const status1 = resp1.status();
+    console.log('[H2] origin-less POST /admin/users/<own-id> →', status1);
 
     expect(
-      status,
-      `H2: member POST own-id must not return 200; got ${status}`,
+      status1,
+      `H2 (layer 1): origin-less POST must be rejected by Astro checkOrigin with 403; got ${status1}`,
+    ).toBe(403);
+
+    // Layer 2: Same-origin POST — passes checkOrigin, reaches requireAdminSession.
+    const resp2 = await ctx.request.post(`${baseURL}/admin/users/${ownId}`, {
+      maxRedirects: 0,
+      headers: {
+        'Content-Type': 'application/x-www-form-urlencoded',
+        'Origin': origin,
+      },
+      data: DUMMY_FORM_BODY,
+    });
+
+    const status2 = resp2.status();
+    const loc2 = resp2.headers()['location'] ?? '';
+    console.log('[H2] same-origin POST /admin/users/<own-id> →', status2, loc2);
+
+    expect(
+      status2,
+      `H2 (layer 2): member POST own-id must not return 200; got ${status2}`,
     ).not.toBe(200);
 
     // Guard: requireAdminSession → not-admin redirect. Must NOT fall through to
     // CSRF check (which would return 403 "CSRF: ..." — a different response code
     // that would signal the guard fired in the wrong order).
     expect(
-      /reason=not-admin/.test(loc) || /\/auth\/error/.test(loc),
-      `H2: member must be denied with reason=not-admin (not CSRF error); got ${status} ${loc}`,
+      /reason=not-admin/.test(loc2) || /\/auth\/error/.test(loc2),
+      `H2 (layer 2): member must be denied with reason=not-admin (not CSRF error); got ${status2} ${loc2}`,
     ).toBe(true);
   } finally {
     await ctx.close();
@@ -132,6 +180,7 @@ test('H3 — member POST /admin/users/<unknown-uuid> is denied (reason=not-admin
   baseURL,
   member,
 }) => {
+  const origin = new URL(baseURL!).origin;
   const ctx = await browser.newContext();
   try {
     await loginViaJsonApi(ctx, { identifier: member.email, password: member.password }, baseURL);
@@ -139,24 +188,43 @@ test('H3 — member POST /admin/users/<unknown-uuid> is denied (reason=not-admin
     const session = await getSession(ctx, baseURL);
     expect(session?.active, 'H3 precondition: member must have active session').toBe(true);
 
-    const resp = await ctx.request.post(`${baseURL}/admin/users/${FAKE_UUID}`, {
+    // Layer 1: Origin-less POST — Astro's security.checkOrigin rejects it with 403.
+    const resp1 = await ctx.request.post(`${baseURL}/admin/users/${FAKE_UUID}`, {
       maxRedirects: 0,
       headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
       data: DUMMY_FORM_BODY,
     });
 
-    const status = resp.status();
-    const loc = resp.headers()['location'] ?? '';
-    console.log('[H3] member POST /admin/users/<fake-uuid> →', status, loc);
+    const status1 = resp1.status();
+    console.log('[H3] origin-less POST /admin/users/<fake-uuid> →', status1);
 
     expect(
-      status,
-      `H3: member POST /admin/users/<fake-uuid> must not return 200; got ${status}`,
+      status1,
+      `H3 (layer 1): origin-less POST must be rejected by Astro checkOrigin with 403; got ${status1}`,
+    ).toBe(403);
+
+    // Layer 2: Same-origin POST — passes checkOrigin, reaches requireAdminSession.
+    const resp2 = await ctx.request.post(`${baseURL}/admin/users/${FAKE_UUID}`, {
+      maxRedirects: 0,
+      headers: {
+        'Content-Type': 'application/x-www-form-urlencoded',
+        'Origin': origin,
+      },
+      data: DUMMY_FORM_BODY,
+    });
+
+    const status2 = resp2.status();
+    const loc2 = resp2.headers()['location'] ?? '';
+    console.log('[H3] same-origin POST /admin/users/<fake-uuid> →', status2, loc2);
+
+    expect(
+      status2,
+      `H3 (layer 2): member POST /admin/users/<fake-uuid> must not return 200; got ${status2}`,
     ).not.toBe(200);
 
     expect(
-      /reason=not-admin/.test(loc) || /\/auth\/error/.test(loc),
-      `H3: member must be denied with reason=not-admin on unknown-id; got ${status} ${loc}`,
+      /reason=not-admin/.test(loc2) || /\/auth\/error/.test(loc2),
+      `H3 (layer 2): member must be denied with reason=not-admin on unknown-id; got ${status2} ${loc2}`,
     ).toBe(true);
   } finally {
     await ctx.close();
