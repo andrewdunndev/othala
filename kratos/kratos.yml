@@ -51,14 +51,34 @@ selfservice:
         identifier_similarity_check_enabled: true
         min_password_length: ${OTHALA_PASSWORD_MIN_LENGTH}
 
+    # Passkeys — the PRIMARY login method. This is Kratos's dedicated `passkey`
+    # strategy (discoverable credentials + conditional UI), which gives the
+    # usernameless one-tap experience: a family member taps "Sign in with
+    # passkey" and is in, no username typed. This is distinct from the legacy
+    # `webauthn` strategy below — per Ory, use passkey; webauthn is legacy and
+    # has limitations in discoverability/conditional UI.
+    passkey:
+      enabled: true
+      config:
+        rp:
+          # CRITICAL one-way decision: registrable parent so passkeys are
+          # assertable from any *.dunn.dev origin. Changing this id invalidates
+          # every enrolled passkey. (Shared with the webauthn RP below.)
+          id: ${OTHALA_WEBAUTHN_RP_ID}
+          display_name: ${OTHALA_INSTANCE_NAME}
+          origins:
+            - ${OTHALA_WEBAUTHN_RP_ORIGINS}
+
+    # WebAuthn (legacy strategy) — DEMOTED to a second-factor / hardware-
+    # security-key option only (passwordless: false). Passkeys (above) own the
+    # passwordless primary path; keeping webauthn passwordless would duplicate
+    # the login button. Retained (not disabled) so a hardware key can serve as
+    # an AAL2 second factor alongside totp/lookup_secret.
     webauthn:
       enabled: true
       config:
-        # passwordless: passkey is primary auth, password is fallback
-        passwordless: true
+        passwordless: false
         rp:
-          # CRITICAL one-way decision: registrable parent so passkeys assertable
-          # from any *.dunn.dev origin. Changing this invalidates every passkey.
           id: ${OTHALA_WEBAUTHN_RP_ID}
           display_name: ${OTHALA_INSTANCE_NAME}
           origins:
@@ -96,6 +116,9 @@ selfservice:
       required_aal: aal1
       after:
         password:
+          hooks:
+            - hook: revoke_active_sessions
+        passkey:
           hooks:
             - hook: revoke_active_sessions
         webauthn:

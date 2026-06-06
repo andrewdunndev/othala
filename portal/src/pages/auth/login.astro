@@ -96,24 +96,9 @@ const passwordInput = ui
   <section class="login-card">
 
     {hasPasskey && (
-      <form method="POST" action={ui?.action ?? '#'} class="login-block">
+      <form method="POST" action={ui?.action ?? '#'} class="login-block passkey-block">
         <input type="hidden" name="csrf_token" value={csrf} />
         <input type="hidden" name="method" value="passkey" />
-
-        <div class="field">
-          <label for="identifier">Username</label>
-          <input
-            id="identifier"
-            name="identifier"
-            type="text"
-            autocomplete="username webauthn"
-            value={identifierInput?.value ? String(identifierInput.value) : ''}
-          />
-          <span class="field-hint">
-            With a registered passkey on this device, your browser will
-            offer to sign you in automatically.
-          </span>
-        </div>
 
         {ui && nodesByGroup(ui.nodes, 'passkey').map((n) => {
           const a = asInput(n);
@@ -143,13 +128,18 @@ const passwordInput = ui
             Sign in with passkey
           </button>
         )}
+
+        <p class="passkey-hint">
+          One tap with your fingerprint, face, or device PIN — no username, no
+          password to remember.
+        </p>
       </form>
     )}
 
     {hasPassword && (
       <details class="password-disclosure">
         <summary class="password-summary">
-          <span class="password-summary-label">Use a password instead</span>
+          <span class="password-summary-label">Use a username &amp; password instead</span>
           <span class="password-summary-icon" aria-hidden="true">+</span>
         </summary>
 
@@ -157,23 +147,17 @@ const passwordInput = ui
           <input type="hidden" name="csrf_token" value={csrf} />
           <input type="hidden" name="method" value="password" />
 
-          {!hasPasskey && (
-            <div class="field">
-              <label for="pw-identifier">Username</label>
-              <input
-                id="pw-identifier"
-                name="identifier"
-                type="text"
-                autocomplete="username"
-                required
-                value={identifierInput?.value ? String(identifierInput.value) : ''}
-              />
-            </div>
-          )}
-          {hasPasskey && (
-            <input type="hidden" name="identifier"
-                   value={identifierInput?.value ? String(identifierInput.value) : ''} />
-          )}
+          <div class="field">
+            <label for="pw-identifier">Username</label>
+            <input
+              id="pw-identifier"
+              name="identifier"
+              type="text"
+              autocomplete="username"
+              required
+              value={identifierInput?.value ? String(identifierInput.value) : ''}
+            />
+          </div>
 
           <div class="field">
             <label for="password">Password</label>
@@ -229,17 +213,24 @@ const passwordInput = ui
     padding: var(--space-4);
     font-size: var(--text-base);
   }
+  /* Quiet reassurance under the one-tap button. */
+  .passkey-hint {
+    margin: var(--space-2) 0 0;
+    font-size: var(--text-sm);
+    line-height: 1.5;
+    color: var(--text-muted);
+    text-align: center;
+  }
 
   /* Disclosure: collapsed by default. The summary line reads as a quiet
    * secondary affordance, expanding into a sibling form. */
   .password-disclosure {
     margin-top: var(--space-5);
-    padding-top: var(--space-5);
-    border-top: 1px solid var(--border);
   }
   .password-disclosure[open] .password-summary-icon {
     transform: rotate(45deg);
   }
+  /* Thumb-friendly toggle: a full-width tappable row, not a quiet text link. */
   .password-summary {
     list-style: none;
     cursor: pointer;
@@ -247,12 +238,23 @@ const passwordInput = ui
     align-items: center;
     justify-content: space-between;
     gap: var(--space-3);
+    min-height: 52px;
+    padding: var(--space-3) var(--space-4);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
     font-family: var(--font-mono);
     font-size: var(--text-sm);
     color: var(--text-2);
-    transition: color var(--duration-fast) var(--ease-out);
+    transition:
+      color var(--duration-fast) var(--ease-out),
+      border-color var(--duration-fast) var(--ease-out),
+      background var(--duration-fast) var(--ease-out);
   }
-  .password-summary:hover { color: var(--text); }
+  .password-summary:hover {
+    color: var(--text);
+    border-color: var(--border-strong);
+    background: var(--surface);
+  }
   .password-summary::-webkit-details-marker { display: none; }
   .password-summary-label {
     text-transform: uppercase;
