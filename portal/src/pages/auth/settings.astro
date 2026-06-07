@@ -7,10 +7,12 @@
 // 303s back here with a fresh flow id).
 //
 // Renders sections from flow.ui.nodes per method group:
-//   - profile:  username, email, displayName, recoveryEmail
-//   - passkey:  list enrolled credentials + register new
-//   - password: change password
-//   (totp + lookup_secret deferred)
+//   - profile:       username, email, displayName, recoveryEmail
+//   - passkey:       list enrolled credentials + register new
+//   - password:      change password
+//   - totp:          authenticator app QR + verify code (enroll / already enrolled)
+//   - lookup_secret: generate / reveal backup recovery codes
+//   - webauthn:      register a hardware security key (MFA second factor)
 //
 // Plus a logout-everywhere button sourced from /self-service/logout/browser.
 
@@ -26,8 +28,11 @@ import {
 import {
   csrfToken,
   hasMethod,
+  nodesByGroup,
+  asInput,
   scriptNodes,
 } from '../../lib/nodes';
+import type { NodeImageAttributes, NodeTextAttributes } from '../../lib/types';
 import FlowNodes from '../../components/FlowNodes.astro';
 import { revokeSubject, RevokeError } from '../../lib/revoke';
 import { publicUrl } from '../../lib/config';
@@ -107,6 +112,9 @@ const scripts = scriptNodes(ui.nodes);
 const hasProfile = hasMethod(ui.nodes, 'profile');
 const hasPasskey = hasMethod(ui.nodes, 'passkey');
 const hasPassword = hasMethod(ui.nodes, 'password');
+const hasTotp = hasMethod(ui.nodes, 'totp');
+const hasLookupSecret = hasMethod(ui.nodes, 'lookup_secret');
+const hasWebAuthn = hasMethod(ui.nodes, 'webauthn');
 
 const logoutInfo = await getLogoutInfo(cookie);
 const csrfSignOut = signToken(session.identity.id);
@@ -122,8 +130,8 @@ const accessGroups = groups.filter((g) => g.startsWith('access-'));
     <p class="page-eyebrow">account</p>
     <h1 class="page-title">Settings</h1>
     <p class="page-lede">
-      Profile details, passkeys, password, and active sessions for
-      <strong>{displayName}</strong>.
+      Profile details, passkeys, authenticator app, backup codes, and active
+      sessions for <strong>{displayName}</strong>.
     </p>
   </header>
 
@@ -197,6 +205,159 @@ const accessGroups = groups.filter((g) => g.startsWith('access-'));
           passValue={false}
           defaultAutocomplete="new-password"
         />
+      </form>
+    </section>
+  )}
+
+  {hasTotp && (
+    <section class="section">
+      <p class="section-subtitle">Authenticator app</p>
+      <p class="section-prose">
+        Set up a time-based one-time password (TOTP) app such as Google
+        Authenticator or 1Password as a second factor. Scan the QR code or
+        enter the secret manually, then verify with the six-digit code your
+        app shows.
+      </p>
+      <form method="POST" action={ui.action} class="settings-form">
+        <input type="hidden" name="csrf_token" value={csrf} />
+        <input type="hidden" name="method" value="totp" />
+        {nodesByGroup(ui.nodes, 'totp').map((n) => {
+          // img node: QR code
+          if (n.attributes.node_type === 'img') {
+            const a = n.attributes as NodeImageAttributes;
+            return (
+              <div class="totp-qr">
+                <img
+                  src={a.src}
+                  alt={n.meta?.label?.text ?? 'Authenticator app QR code'}
+                  width={a.width ?? 200}
+                  height={a.height ?? 200}
+                />
+              </div>
+            );
+          }
+          // text node: the raw secret for manual entry
+          if (n.attributes.node_type === 'text') {
+            const a = n.attributes as NodeTextAttributes;
+            return (
+              <div class="totp-secret">
+                <p class="totp-secret-label">{n.meta?.label?.text ?? 'Secret key'}</p>
+                <code class="totp-secret-value mono">{a.text?.text ?? ''}</code>
+              </div>
+            );
+          }
+          // input nodes (totp_code + submit)
+          const inp = asInput(n);
+          if (!inp) return null;
+          if (inp.type === 'hidden') {
+            return <input type="hidden" name={inp.name} value={String(inp.value ?? '')} />;
+          }
+          if (inp.type === 'submit') {
+            return (
+              <div class="form-actions">
+                <button class="button button-secondary" type="submit" name={inp.name} value={String(inp.value ?? '')}>
+                  {n.meta?.label?.text ?? 'Save'}
+                </button>
+              </div>
+            );
+          }
+          // totp_code text input
+          const id = inp.name.replace(/[^a-zA-Z0-9]+/g, '-');
+          return (
+            <div class="field">
+              <label for={id}>{n.meta?.label?.text ?? 'Verification code'}</label>
+              <input
+                id={id}
+                name={inp.name}
+                type="text"
+                inputmode="numeric"
+                autocomplete="one-time-code"
+                required={inp.required}
+                placeholder="123456"
+              />
+            </div>
+          );
+        })}
+      </form>
+    </section>
+  )}
+
+  {hasLookupSecret && (
+    <section class="section">
+      <p class="section-subtitle">Backup codes</p>
+      <p class="section-prose">
+        Generate single-use backup recovery codes. Store them somewhere safe —
+        if you lose access to every other sign-in method, a backup code is the
+        last resort.
+      </p>
+      <form method="POST" action={ui.action} class="settings-form">
+        <input type="hidden" name="csrf_token" value={csrf} />
+        <input type="hidden" name="method" value="lookup_secret" />
+        <FlowNodes
+          nodes={ui.nodes}
+          group="lookup_secret"
+          buttonClass="button button-secondary"
+          submitLabel="Generate backup codes"
+          wrapActions
+        />
+      </form>
+    </section>
+  )}
+
+  {hasWebAuthn && (
+    <section class="section">
+      <p class="section-subtitle">Security key</p>
+      <p class="section-prose">
+        Register a hardware security key (YubiKey or similar) as a second
+        factor. This is separate from passkeys — use it if you want a
+        dedicated physical token alongside your passkey.
+      </p>
+      <form method="POST" action={ui.action} class="settings-form">
+        <input type="hidden" name="csrf_token" value={csrf} />
+        <input type="hidden" name="method" value="webauthn" />
+        {nodesByGroup(ui.nodes, 'webauthn').map((n) => {
+          // script nodes are collected by scriptNodes() and rendered at page bottom
+          if (n.attributes.node_type === 'script') return null;
+          const inp = asInput(n);
+          if (!inp) return null;
+          if (inp.type === 'hidden') {
+            return <input type="hidden" name={inp.name} value={String(inp.value ?? '')} />;
+          }
+          // The register trigger button carries onclickTrigger (not onclick on
+          // this strategy). Construct the window call from the trigger name so
+          // the webauthn.js handler fires when the user clicks.
+          if (inp.type === 'button' || inp.type === 'submit') {
+            const onclickAttr = inp.onclick
+              ?? (inp.onclickTrigger ? `window.${inp.onclickTrigger}()` : undefined);
+            return (
+              <div class="form-actions">
+                <button
+                  class="button button-secondary"
+                  type={inp.type}
+                  name={inp.name}
+                  value={String(inp.value ?? '')}
+                  onclick={onclickAttr}
+                >
+                  {n.meta?.label?.text ?? 'Add security key'}
+                </button>
+              </div>
+            );
+          }
+          // Remove buttons (webauthn_remove) are also submit nodes
+          const id = inp.name.replace(/[^a-zA-Z0-9]+/g, '-');
+          return (
+            <div class="field">
+              <label for={id}>{n.meta?.label?.text ?? inp.name}</label>
+              <input
+                id={id}
+                name={inp.name}
+                type={inp.type}
+                value={inp.value !== undefined ? String(inp.value) : undefined}
+                required={inp.required}
+              />
+            </div>
+          );
+        })}
       </form>
     </section>
   )}
@@ -277,6 +438,41 @@ const accessGroups = groups.filter((g) => g.startsWith('access-'));
     display: flex;
     gap: var(--space-3);
     margin-top: var(--space-2);
+  }
+
+  /* TOTP enrollment: QR code centered with a border, secret below it. */
+  .totp-qr {
+    display: flex;
+    justify-content: flex-start;
+  }
+  .totp-qr img {
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    display: block;
+    max-width: 200px;
+    height: auto;
+  }
+  .totp-secret {
+    margin-top: var(--space-2);
+  }
+  .totp-secret-label {
+    font-family: var(--font-mono);
+    font-size: var(--text-xs);
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--text-muted);
+    margin-bottom: var(--space-1);
+  }
+  .totp-secret-value {
+    display: block;
+    padding: var(--space-2) var(--space-3);
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    font-size: var(--text-sm);
+    word-break: break-all;
+    color: var(--text);
+    user-select: all;
   }
 
   /* Key/value membership table without the heaviness of a real table.

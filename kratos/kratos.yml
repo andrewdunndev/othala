@@ -89,10 +89,15 @@ selfservice:
       config:
         issuer: ${OTHALA_INSTANCE_NAME}
 
-    # Code strategy for recovery (magic link is deprecated in current Kratos)
+    # Code strategy: used for recovery AND as a first-class passwordless login
+    # method (email OTP). passwordless_enabled: true makes it available on the
+    # login flow so users on new devices / without a passkey can receive a
+    # one-time code to sign in. This is the promoted second-tier fallback;
+    # it does not weaken security — the code is single-use and expires with
+    # the flow lifespan (10m above).
     code:
       enabled: true
-      passwordless_enabled: false
+      passwordless_enabled: true
 
     # We don't use these but enable explicitly to document the choice
     profile:
