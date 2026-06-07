@@ -3,21 +3,44 @@
  * test/e2e/playwright/fixtures pattern.
  *
  * Exposes via test.extend:
- *   baseURL         — http://auth.othala.test (the Caddy edge inside compose)
- *   kratosAdminURL  — http://kratos:4434 (admin API, reachable inside compose net)
- *   hydraPublicURL  — http://hydra:4444 (Hydra public, inside compose net)
- *   hydraAdminURL   — http://hydra:4445 (Hydra admin, inside compose net)
- *   member          — { id, email, password } seeded identity (bt2@othala.test),
- *                     access-grafana group, NOT on OTHALA_ADMIN_SUBJECTS
- *   admin           — { id, email, password } seeded identity (admin@othala.test),
- *                     ON OTHALA_ADMIN_SUBJECTS (triggers AAL2 step-up at /admin)
+ *   baseURL              — http://auth.othala.test (the Caddy edge inside compose)
+ *   kratosAdminURL       — http://kratos:4434 (admin API, reachable inside compose net)
+ *   hydraPublicURL       — http://hydra:4444 (Hydra public, inside compose net)
+ *   hydraAdminURL        — http://hydra:4445 (Hydra admin, inside compose net)
+ *   member               — { id, email, password } seeded identity (bt2@othala.test),
+ *                          access-grafana group, NOT on OTHALA_ADMIN_SUBJECTS
+ *   admin                — { id, email, password } seeded identity (admin@othala.test),
+ *                          ON OTHALA_ADMIN_SUBJECTS (triggers AAL2 step-up at /admin)
  *
  * Both identities are seeded ONCE per worker (scope: 'worker') so the cost is
  * paid at most once across the serial test run.
+ *
+ * virtualAuthenticator / pageCDPSession — test-scoped fixtures for WebAuthn
+ *   passkey testing via the Chrome DevTools Protocol (CDP). Ported from Ory
+ *   upstream test/e2e/playwright/fixtures/index.ts. Establishes a CDP virtual
+ *   CTAP2 authenticator (internal transport, resident keys, user verification)
+ *   that Kratos's passkey strategy registers and asserts against without any
+ *   real hardware.
+ *
+ *   Upstream reference:
+ *     https://github.com/ory/kratos/blob/master/test/e2e/playwright/fixtures/index.ts
  */
 
 import { test as base } from '@playwright/test';
+import type { CDPSession } from 'playwright-core';
 import { createIdentityWithPassword, TEST_PASSWORD, type SeedResult } from '../actions/identity';
+
+// CDP Protocol WebAuthn types are available via playwright-core's protocol.d.ts.
+// We use inline types here to avoid importing the full Protocol namespace (which
+// is an internal playwright-core detail and not part of the public API surface).
+interface VirtualAuthenticatorOptions {
+  protocol: string;
+  transport: string;
+  hasResidentKey: boolean;
+  hasUserVerification: boolean;
+  isUserVerified: boolean;
+  automaticPresenceSimulation?: boolean;
+}
 
 export interface OthalaFixtures {
   baseURL: string;
@@ -26,6 +49,12 @@ export interface OthalaFixtures {
   hydraAdminURL: string;
   member: SeedResult & { password: string };
   admin: SeedResult & { password: string };
+  /** Override any subset of the virtual authenticator options (test-scoped). */
+  virtualAuthenticatorOptions: Partial<VirtualAuthenticatorOptions>;
+  /** CDP session attached to the current page (test-scoped). */
+  pageCDPSession: CDPSession;
+  /** CDP virtual authenticator id (test-scoped). Cleaned up after each test. */
+  virtualAuthenticator: { authenticatorId: string };
 }
 
 export const test = base.extend<OthalaFixtures>({
@@ -83,6 +112,53 @@ export const test = base.extend<OthalaFixtures>({
     },
     { scope: 'worker' },
   ],
+
+  // ── WebAuthn / Passkey virtual authenticator fixtures ─────────────────────
+  // All three are test-scoped (one instance per test, no cross-test state).
+  // Ported from Ory upstream test/e2e/playwright/fixtures/index.ts.
+
+  // virtualAuthenticatorOptions: tests can override individual fields by
+  // declaring this fixture. Default is undefined (the virtualAuthenticator
+  // fixture applies its own base defaults and then spreads this on top).
+  virtualAuthenticatorOptions: async ({}, use) => {
+    await use({});
+  },
+
+  // pageCDPSession: opens a CDP session on the current page. Detached after
+  // each test. Requires a Chromium-family browser (all our tests use chromium).
+  pageCDPSession: async ({ page }, use) => {
+    const cdpSession = await page.context().newCDPSession(page);
+    await use(cdpSession);
+    await cdpSession.detach();
+  },
+
+  // virtualAuthenticator: enables the WebAuthn CDP domain and registers a
+  // software CTAP2 authenticator with resident keys + user verification
+  // (the configuration Kratos passkey strategy requires for discoverable /
+  // usernameless credentials). Removed + disabled after each test.
+  //
+  // Options match Ory upstream exactly:
+  //   protocol: "ctap2"          — FIDO2 / WebAuthn Level 2
+  //   transport: "internal"      — platform authenticator (triggers conditional UI)
+  //   hasResidentKey: true       — discoverable credentials (required for passkeys)
+  //   hasUserVerification: true  — authenticator supports UV
+  //   isUserVerified: true       — UV always passes (no PIN prompt in tests)
+  virtualAuthenticator: async ({ pageCDPSession, virtualAuthenticatorOptions }, use) => {
+    await pageCDPSession.send('WebAuthn.enable', { enableUI: false });
+    const { authenticatorId } = await pageCDPSession.send('WebAuthn.addVirtualAuthenticator', {
+      options: {
+        protocol: 'ctap2',
+        transport: 'internal',
+        hasResidentKey: true,
+        hasUserVerification: true,
+        isUserVerified: true,
+        ...virtualAuthenticatorOptions,
+      },
+    });
+    await use({ authenticatorId });
+    await pageCDPSession.send('WebAuthn.removeVirtualAuthenticator', { authenticatorId });
+    await pageCDPSession.send('WebAuthn.disable');
+  },
 });
 
 export { expect } from '@playwright/test';
