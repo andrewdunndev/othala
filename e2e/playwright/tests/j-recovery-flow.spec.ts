@@ -18,22 +18,32 @@
  * from being issued.
  *
  * J1 — NON-ADMIN recovery (happy path):
- *   a. Seed a non-admin identity (member.tester2@othala.test) via admin API.
- *   b. Initiate recovery via POST /self-service/recovery/browser.
+ *   a. Seed a fresh non-admin identity (member.recovery@othala.test) via admin API.
+ *   b. Initiate recovery via ctx.request (cookie-bearing) POST /self-service/recovery/browser.
  *   c. Query mailpit :8025/api/v1/messages for the recovery code email.
- *   d. Submit the code via the recovery flow.
+ *   d. Submit the code via ctx.request (SAME cookie jar as flow init).
  *   e. Assert a privileged settings session is established
  *      (AAL1 session with flow=recovery, or /auth/settings redirect).
  *
  * J2 — ADMIN-ALLOWLISTED recovery (gate blocks):
- *   a. Use the existing `admin` fixture identity (admin@othala.test,
- *      which is on OTHALA_ADMIN_SUBJECTS).
+ *   a. Seed a FRESH admin-allowlisted identity (admin.recovery@othala.test) via
+ *      admin API. A fresh seed avoids any residual used-code/flow state from J1
+ *      or from the worker-scoped `admin` fixture.
  *   b. Initiate recovery — same flow as J1.
  *   c. Query mailpit for the admin recovery code.
- *   d. Submit the code.
+ *   d. Submit the code via ctx.request (same cookie jar).
  *   e. Assert recovery is BLOCKED: the gate fires and Kratos aborts the flow.
  *      Observable as: no privileged session (whoami returns null or inactive),
  *      OR Kratos redirects to /auth/error (the recovery flow error page).
+ *
+ * Cookie-jar contract:
+ *   ALL Kratos self-service operations (flow init, email submit, code submit) use
+ *   ctx.request (the Playwright APIRequestContext attached to the BrowserContext).
+ *   This ensures the CSRF cookie and the session cookie issued by Kratos on a
+ *   successful code submission all land in the SAME jar that getSession() reads.
+ *   Using globalThis.fetch for any of these steps breaks the cookie chain and
+ *   causes spurious failures (ErrCodeAlreadyUsed on double-submit, or a 401 from
+ *   getSession() because the session cookie ended up in a discarded fetch context).
  *
  * Live-stack requirements:
  *   - Kratos recovery flow enabled with `use: code`.
@@ -42,7 +52,10 @@
  *   - RECOVERY_GATE_SECRET injected via compose env (the gate 401s a bad bearer).
  *   - Mailpit running on the compose net (mailpit:8025 HTTP API reachable from
  *     inside the playwright container on the same compose network).
- *   - OTHALA_ADMIN_SUBJECTS=admin@othala.test (set in gen-secrets.sh).
+ *   - OTHALA_ADMIN_SUBJECTS=admin@othala.test,admin.recovery@othala.test
+ *     (or the gate must be configured to recognise admin.recovery@othala.test).
+ *     NOTE: if OTHALA_ADMIN_SUBJECTS only lists admin@othala.test, update it to
+ *     include admin.recovery@othala.test, OR change the J2 seed email to match.
  *
  * Mailpit API: GET http://mailpit:8025/api/v1/messages returns:
  *   { messages: [{ ID, Subject, To: [{Address}], Snippet, ... }], ... }
@@ -51,6 +64,7 @@
  * the code by regex.
  */
 
+import type { APIRequestContext } from '@playwright/test';
 import { test, expect } from '../fixtures';
 import { createIdentityWithPassword, TEST_PASSWORD } from '../actions/identity';
 import { getSession } from '../actions/session';
@@ -66,6 +80,7 @@ const MAIL_POLL_INTERVAL_MS = 500;
 
 /**
  * Poll mailpit for a recovery code email sent to `toAddress`.
+ * Uses bare globalThis.fetch — mailpit has no session state so this is safe.
  * Returns { messageId, code } once the email arrives, or throws on timeout.
  */
 async function waitForRecoveryCode(
@@ -109,20 +124,23 @@ async function waitForRecoveryCode(
 }
 
 /**
- * Initiate a Kratos recovery flow and return the flow JSON (including
- * the ui.action URL and CSRF token). Uses the application/json accept path.
+ * Initiate a Kratos recovery flow using the provided APIRequestContext.
+ * The context's cookie jar receives the CSRF cookie from Kratos. This MUST
+ * be the same context used for all subsequent submissions so CSRF validation
+ * and the session cookie remain in a single jar.
  */
-async function initRecoveryFlow(baseURL: string): Promise<{
-  id: string;
-  action: string;
-  csrfToken: string;
-}> {
-  const resp = await fetch(`${baseURL}/self-service/recovery/browser`, {
+async function initRecoveryFlow(
+  req: APIRequestContext,
+  baseURL: string,
+): Promise<{ id: string; action: string; csrfToken: string }> {
+  const resp = await req.get(`${baseURL}/self-service/recovery/browser`, {
     headers: { Accept: 'application/json' },
-    redirect: 'follow',
+    maxRedirects: 5,
   });
-  if (!resp.ok) {
-    throw new Error(`recovery flow init failed: ${resp.status} ${await resp.text().catch(() => '')}`);
+  if (!resp.ok()) {
+    throw new Error(
+      `recovery flow init failed: ${resp.status()} ${await resp.text().catch(() => '')}`,
+    );
   }
   const flow = await resp.json() as {
     id: string;
@@ -147,62 +165,38 @@ async function initRecoveryFlow(baseURL: string): Promise<{
       break;
     }
   }
-  if (!action) throw new Error(`recovery flow missing ui.action: ${JSON.stringify(flow).slice(0, 300)}`);
+  if (!action) {
+    throw new Error(`recovery flow missing ui.action: ${JSON.stringify(flow).slice(0, 300)}`);
+  }
   return { id: flow.id, action, csrfToken };
 }
 
 /**
  * Submit the recovery email address to trigger the code email.
+ * Uses the provided APIRequestContext (must be same jar as initRecoveryFlow).
  */
 async function submitRecoveryEmail(
+  req: APIRequestContext,
   action: string,
   csrfToken: string,
   email: string,
 ): Promise<void> {
-  const resp = await fetch(action, {
-    method: 'POST',
+  const resp = await req.post(action, {
     headers: {
       'Content-Type': 'application/json',
       Accept: 'application/json',
     },
-    body: JSON.stringify({ email, method: 'code', csrf_token: csrfToken }),
-    redirect: 'follow',
+    data: { email, method: 'code', csrf_token: csrfToken },
+    maxRedirects: 5,
   });
   // A 200 or 422 (form re-render with messages) are both acceptable here;
   // Kratos may return 422 while still sending the email.
-  if (resp.status !== 200 && resp.status !== 422) {
+  const status = resp.status();
+  if (status !== 200 && status !== 422) {
     throw new Error(
-      `recovery email submit returned unexpected ${resp.status}: ${await resp.text().catch(() => '')}`,
+      `recovery email submit returned unexpected ${status}: ${await resp.text().catch(() => '')}`,
     );
   }
-}
-
-/**
- * Submit the recovery code to complete the flow. Returns the HTTP response
- * so callers can inspect status / Location.
- */
-async function submitRecoveryCode(
-  action: string,
-  csrfToken: string,
-  code: string,
-): Promise<{ status: number; location: string; body: unknown }> {
-  const resp = await fetch(action, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      Accept: 'application/json',
-    },
-    body: JSON.stringify({ code, method: 'code', csrf_token: csrfToken }),
-    redirect: 'manual', // capture redirect so we can inspect Location
-  });
-  const location = resp.headers.get('location') ?? '';
-  let body: unknown = null;
-  try {
-    body = await resp.json();
-  } catch {
-    body = await resp.text().catch(() => null);
-  }
-  return { status: resp.status, location, body };
 }
 
 // ─── J1: NON-ADMIN recovery (happy path) ─────────────────────────────────────
@@ -224,56 +218,45 @@ test('J1 — non-admin recovery flow issues a privileged settings session', asyn
 
   const ctx = await browser.newContext();
   try {
+    const req = ctx.request;
     const startTime = Date.now();
 
-    // Step 1: Initiate the recovery flow.
-    const flow = await initRecoveryFlow(baseURL);
+    // Step 1: Initiate the recovery flow via ctx.request (cookie-bearing).
+    // This seeds the CSRF cookie into ctx's jar. All subsequent operations
+    // MUST use the same req so CSRF validation passes and the session cookie
+    // from a successful code submission lands in the right jar.
+    const flow = await initRecoveryFlow(req, baseURL);
     console.log('[J1] recovery flow id:', flow.id);
 
     // Step 2: Submit the email address to trigger the code email.
-    await submitRecoveryEmail(flow.action, flow.csrfToken, identity.email);
+    // Uses the same req/cookie jar as flow init.
+    await submitRecoveryEmail(req, flow.action, flow.csrfToken, identity.email);
     console.log('[J1] recovery email submitted');
 
     // Step 3: Wait for the recovery code to arrive in mailpit.
+    // waitForRecoveryCode uses bare fetch (mailpit has no session state).
     const { code, messageId } = await waitForRecoveryCode(identity.email, startTime);
     console.log('[J1] recovery code received, message id:', messageId, 'code:', code);
 
-    // Step 4: Submit the recovery code to complete the flow.
-    // The code submission may return a redirect (302/303) to /auth/settings
-    // (Kratos issues a privileged session and redirects to the settings UI).
-    // We use a separate fetch here (not ctx.request) so we can read the raw
-    // response; the session cookie is set via the response headers.
+    // Step 4: Submit the recovery code ONCE via ctx.request (the same cookie
+    // jar). Kratos validates the CSRF token (which lives in ctx's cookie jar),
+    // marks the code as used, issues a session cookie into ctx's jar, and
+    // redirects to /auth/settings.
     //
-    // Re-fetch the flow state to get the current action URL (Kratos may have
-    // rotated the CSRF token after the email submit step).
-    const codeFlow = await initRecoveryFlow(baseURL);
-    // Re-submit the email to get to the code-entry state.
-    await submitRecoveryEmail(codeFlow.action, codeFlow.csrfToken, identity.email);
-    // Now wait for the second code (the re-submission sends a new email).
-    const { code: code2 } = await waitForRecoveryCode(identity.email, Date.now() - 1000);
-    console.log('[J1] second recovery code (after flow re-init):', code2);
-
-    const codeResult = await submitRecoveryCode(codeFlow.action, codeFlow.csrfToken, code2);
-    console.log('[J1] code submit result:', codeResult.status, codeResult.location);
-
-    // For session assertion, navigate the browser context to the settings page.
-    // Kratos issues the session as a Set-Cookie on the code-submit response;
-    // since we used globalThis.fetch above the cookie is not in ctx. Instead,
-    // navigate the page context to /auth/settings and check whoami from there.
-    //
-    // Alternative: drive the recovery via ctx.request (shares the cookie jar)
-    // and check directly. We use ctx.request for the session check.
-    const req = ctx.request;
-    const recoveryResp = await req.post(codeFlow.action, {
+    // IMPORTANT: do NOT call submitRecoveryCode via globalThis.fetch and then
+    // also via ctx.request — that double-submits the code (ErrCodeAlreadyUsed
+    // on the second call) and the session cookie only lands in the jar used
+    // by the first successful call, which would be the discarded fetch context.
+    const codeResp = await req.post(flow.action, {
       headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
-      data: { code: code2, method: 'code', csrf_token: codeFlow.csrfToken },
+      data: { code, method: 'code', csrf_token: flow.csrfToken },
       maxRedirects: 5,
     });
-    console.log('[J1] ctx.request code submit status:', recoveryResp.status());
+    console.log('[J1] code submit status:', codeResp.status());
 
     // Step 5: Assert an active session is established.
     // After a successful recovery code submission, Kratos issues a session and
-    // redirects to the settings page. The session cookie is now in ctx.
+    // redirects to the settings page. The session cookie is now in ctx's jar.
     const session = await getSession(ctx, baseURL);
 
     expect(
@@ -300,23 +283,34 @@ test('J1 — non-admin recovery flow issues a privileged settings session', asyn
 test('J2 — admin recovery is blocked by the recovery-gate webhook (no privileged session)', async ({
   browser,
   baseURL,
-  admin,
+  kratosAdminURL,
 }) => {
-  // The `admin` fixture is admin@othala.test, which is on OTHALA_ADMIN_SUBJECTS.
-  // The recovery-gate webhook fires for this identity and returns 403, which
-  // Kratos interprets as an abort → no privileged session is issued.
-  console.log('[J2] testing recovery gate for admin identity:', admin.email);
+  // Seed a FRESH admin-allowlisted identity for this test, rather than reusing
+  // the worker-scoped `admin` fixture. Recovery flow submission leaves used-code
+  // and flow state that can persist across tests within the same worker; a fresh
+  // identity starts clean. The email must be on OTHALA_ADMIN_SUBJECTS (update
+  // gen-secrets.sh / compose env to include admin.recovery@othala.test, or
+  // change this email to match whatever the gate is configured to block).
+  const identity = await createIdentityWithPassword({
+    email: 'admin.recovery@othala.test',
+    username: 'admin.recovery',
+    displayName: 'Admin Recovery Test',
+    groups: ['family', 'admin'],
+    kratosAdminURL,
+  });
+  console.log('[J2] seeded admin-allowlisted identity:', identity.id, identity.email);
 
   const ctx = await browser.newContext();
   try {
+    const req = ctx.request;
     const startTime = Date.now();
 
-    // Step 1: Initiate recovery flow for the admin identity.
-    const flow = await initRecoveryFlow(baseURL);
+    // Step 1: Initiate recovery flow via ctx.request (cookie-bearing).
+    const flow = await initRecoveryFlow(req, baseURL);
     console.log('[J2] recovery flow id:', flow.id);
 
-    // Step 2: Submit the admin email.
-    await submitRecoveryEmail(flow.action, flow.csrfToken, admin.email);
+    // Step 2: Submit the admin email via ctx.request.
+    await submitRecoveryEmail(req, flow.action, flow.csrfToken, identity.email);
     console.log('[J2] admin recovery email submitted');
 
     // Step 3: Wait for the recovery code email in mailpit.
@@ -324,7 +318,7 @@ test('J2 — admin recovery is blocked by the recovery-gate webhook (no privileg
     // after the code is validated, not at initiation). So we DO expect an email.
     let code: string;
     try {
-      const result = await waitForRecoveryCode(admin.email, startTime);
+      const result = await waitForRecoveryCode(identity.email, startTime);
       code = result.code;
       console.log('[J2] admin recovery code received:', result.messageId);
     } catch (e) {
@@ -342,22 +336,17 @@ test('J2 — admin recovery is blocked by the recovery-gate webhook (no privileg
       return;
     }
 
-    // Step 4: Submit the recovery code via ctx.request (session-cookie path).
-    // Re-init a fresh flow + code via ctx (to have the cookie jar populated).
-    const codeFlow = await initRecoveryFlow(baseURL);
-    await submitRecoveryEmail(codeFlow.action, codeFlow.csrfToken, admin.email);
-    const { code: adminCode } = await waitForRecoveryCode(admin.email, Date.now() - 1000);
-    console.log('[J2] admin code (second flow):', adminCode);
-
-    const req = ctx.request;
-    const recoveryResp = await req.post(codeFlow.action, {
+    // Step 4: Submit the recovery code via ctx.request (same cookie jar).
+    // The gate webhook fires here (after code validation). Kratos should abort
+    // the flow (no session cookie set) due to the 403 from the gate.
+    const codeResp = await req.post(flow.action, {
       headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
-      data: { code: adminCode, method: 'code', csrf_token: codeFlow.csrfToken },
+      data: { code, method: 'code', csrf_token: flow.csrfToken },
       maxRedirects: 0,
     });
 
-    const status = recoveryResp.status();
-    const loc = recoveryResp.headers()['location'] ?? '';
+    const status = codeResp.status();
+    const loc = codeResp.headers()['location'] ?? '';
     console.log('[J2] admin code submit result:', status, loc);
 
     // Step 5: Assert the gate BLOCKED recovery.

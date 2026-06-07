@@ -46,17 +46,17 @@ import { createIdentityWithPassword, TEST_PASSWORD } from '../actions/identity';
 import { loginViaJsonApi } from '../actions/login';
 import { getSession } from '../actions/session';
 
-// The passkey settings page selector for the "Add a passkey" / "Register" button.
-// Kratos renders a node with group:"passkey" and name:"passkey" of type "button"
-// for the registration trigger on the settings UI. The exact CSS class will
-// differ per Astro theme; we match on the data-testid or button text.
-// Adjust if the Othala settings page wraps the Kratos node differently.
-const PASSKEY_REGISTER_BUTTON = '[data-testid="node/button/passkey"], button[name="passkey"][value="true"], button[name="passkey"]';
+// The passkey settings page selector for the "Add a passkey" / "Register" trigger.
+// Kratos renders a button node with name="passkey_register_trigger" for the
+// passkey registration action on the settings UI (Kratos ui/node/identifiers.go
+// PasskeyRegisterTrigger = "passkey_register_trigger").
+const PASSKEY_REGISTER_BUTTON = 'button[name="passkey_register_trigger"]';
 
-// Login page selector for the "Sign in with a passkey" button (the usernameless
-// path). Kratos renders this as a button node with group:"passkey". The selector
-// must match whatever Othala's login.astro renders for the passkey trigger.
-const PASSKEY_LOGIN_BUTTON = '[data-testid="node/button/passkey"], button[name="identifier"], button[value="passkey"], [data-group="passkey"] button';
+// Login page selector for the "Sign in with a passkey" trigger (the usernameless
+// path). Kratos renders this as a button node with name="passkey_login_trigger"
+// (Kratos passkey_login.go, PasskeyLoginTrigger = "passkey_login_trigger").
+// This is distinct from the hidden passkey_login field used for autocomplete init.
+const PASSKEY_LOGIN_BUTTON = 'button[name="passkey_login_trigger"]';
 
 test.describe('I — Passkey register → usernameless login', () => {
   test('I1 — register a passkey via settings, then log in usernameless', async ({
@@ -102,10 +102,11 @@ test.describe('I — Passkey register → usernameless login', () => {
     await page.goto(`${baseURL}/auth/settings`);
     await page.waitForLoadState('networkidle');
 
-    // Click the passkey registration trigger. The Kratos settings UI renders a
-    // button for the passkey node (group:"passkey"). After clicking, the browser
-    // calls credentials.create() — the virtual authenticator responds with a
-    // synthetic credential, Kratos stores it, and the page reloads showing success.
+    // Click the passkey registration trigger. Kratos renders a button with
+    // name="passkey_register_trigger" (identifiers.go PasskeyRegisterTrigger).
+    // After clicking, the browser calls credentials.create() — the virtual
+    // authenticator responds with a synthetic credential, Kratos stores it,
+    // and the page reloads showing success.
     const registerBtn = page.locator(PASSKEY_REGISTER_BUTTON).first();
     await expect(registerBtn, 'I1: passkey register button must be visible on settings page').toBeVisible({ timeout: 10_000 });
     await registerBtn.click();
@@ -152,6 +153,10 @@ test.describe('I — Passkey register → usernameless login', () => {
     // calls credentials.get() with allowCredentials:[] (discoverable credential
     // request). The virtual authenticator returns the resident key stored in
     // step 3. Kratos verifies the assertion and issues a new session.
+    //
+    // The trigger is button[name="passkey_login_trigger"] (passkey_login.go).
+    // This is the visible "Sign in with a passkey" button — not the hidden
+    // passkey_login field used by oryPasskeyLoginAutocompleteInit.
     await page.goto(`${baseURL}/auth/login`);
     await page.waitForLoadState('networkidle');
 
