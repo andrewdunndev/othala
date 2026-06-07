@@ -41,6 +41,7 @@ const adminNav = [
   { href: '/admin/users',    label: 'Users' },
   { href: '/admin/groups',   label: 'Groups' },
   { href: '/admin/oauth2',   label: 'Apps' },
+  { href: '/auth/settings',  label: 'Settings' },
 ];
 
 interface MemberRef {
@@ -87,6 +88,9 @@ function membersOf(group: string): MemberRef[] {
   <section class="section">
     <p class="section-subtitle">Identity groups</p>
     <p class="muted text-sm">Who you are. Drives default roles via group_role_map.</p>
+    <div class="notice">
+      Identity groups are set via the <code>OTHALA_IDENTITY_GROUPS</code> env var (edit + restart to add one). Access groups are derived automatically from app OIDC manifests.
+    </div>
     <div class="card-grid">
       {identityGroups.map((g) => {
         const members = membersOf(g);
@@ -109,6 +113,11 @@ function membersOf(group: string): MemberRef[] {
                 <li class="muted text-sm">empty</li>
               )}
             </ul>
+            <div class="group-card-footer">
+              <a href={`/admin/users?group=${encodeURIComponent(g)}`} class="group-add-link mono text-xs">
+                Add member →
+              </a>
+            </div>
           </article>
         );
       })}
@@ -151,4 +160,7 @@ function membersOf(group: string): MemberRef[] {
 
 <style>
   .group-member-list { list-style: none; margin-top: var(--space-2); }
+  .group-card-footer { margin-top: var(--space-3); padding-top: var(--space-2); border-top: 1px solid var(--border); }
+  .group-add-link { color: var(--text-muted); text-decoration: none; text-transform: uppercase; letter-spacing: 0.08em; }
+  .group-add-link:hover { color: var(--accent); text-decoration: none; }
 </style>

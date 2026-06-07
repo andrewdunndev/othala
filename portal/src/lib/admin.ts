@@ -21,6 +21,7 @@ export {
   updateIdentity,
   deleteIdentity,
   deactivateIdentity,
+  reactivateIdentity,
   getRecoveryLink,
 } from './admin-api';
 export type {

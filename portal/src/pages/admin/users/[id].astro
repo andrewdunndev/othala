@@ -25,6 +25,7 @@ import {
   updateIdentity,
   deleteIdentity,
   deactivateIdentity,
+  reactivateIdentity,
   getRecoveryLink,
   revokeUserSessions,
   type RevokeUserResult,
@@ -77,6 +78,7 @@ let actionResult:
   | { kind: 'recovery'; url: string; expiresAt: string }
   | { kind: 'deleted'; username: string }
   | { kind: 'deactivated'; username: string }
+  | { kind: 'reactivated'; username: string }
   | { kind: 'updated' }
   | { kind: 'revoked'; result: RevokeUserResult }
   | { kind: 'error'; message: string }
@@ -101,11 +103,14 @@ if (Astro.request.method === 'POST' && identity) {
 
   try {
     if (action === 'save') {
+      const rawRecoveryEmail = String(fd.get('recoveryEmail') ?? '').trim();
       const traits = {
         username: String(fd.get('username') ?? '').trim().toLowerCase(),
         email: String(fd.get('email') ?? '').trim(),
         displayName: String(fd.get('displayName') ?? '').trim() || undefined,
+        recoveryEmail: rawRecoveryEmail && EMAIL_RE.test(rawRecoveryEmail) ? rawRecoveryEmail : undefined,
       };
+      if (rawRecoveryEmail && !EMAIL_RE.test(rawRecoveryEmail)) formErrors.recoveryEmail = 'Invalid recovery email address.';
       if (!USERNAME_RE.test(traits.username)) formErrors.username = 'Invalid username pattern.';
       if (!EMAIL_RE.test(traits.email)) formErrors.email = 'Invalid email.';
       const identityGroups = fd.getAll('identityGroups').map(String).filter(Boolean);
@@ -167,8 +172,13 @@ if (Astro.request.method === 'POST' && identity) {
     } else if (action === 'deactivate') {
       const username = identity.traits?.username ?? id;
       await deactivateIdentity(id);
-      await reload();
+      identity = await reload();
       actionResult = { kind: 'deactivated', username };
+    } else if (action === 'reactivate') {
+      const username = identity.traits?.username ?? id;
+      await reactivateIdentity(id);
+      identity = await reload();
+      actionResult = { kind: 'reactivated', username };
     } else if (action === 'delete') {
       const expected = identity.traits?.username ?? '';
       const confirm = String(fd.get('confirm') ?? '').trim();
@@ -193,10 +203,24 @@ const accessGroupMembership = groups.filter((g) => g.startsWith('access-'));
 const roleOverrides = (identity?.metadata_admin?.roles ?? {}) as Record<string, string>;
 const effective = identity ? computeEffectiveAccess(identity, manifests) : [];
 
+// P2: derive credential enrollment display from the identity's credentials
+// object. The Kratos admin API returns credentials when `includeCredential`
+// is passed (done in getIdentity). Keys present = method enrolled.
+// Robust to the field being absent (list-identities doesn't include them).
+const CREDENTIAL_METHODS: Array<{ key: string; label: string }> = [
+  { key: 'passkey',       label: 'passkey' },
+  { key: 'password',      label: 'password' },
+  { key: 'totp',          label: 'totp' },
+  { key: 'webauthn',      label: 'webauthn' },
+  { key: 'lookup_secret', label: 'backup codes' },
+];
+const credentialMap = identity?.credentials ?? {};
+
 const formValues = {
   username: identity?.traits?.username ?? '',
   email: identity?.traits?.email ?? '',
   displayName: identity?.traits?.displayName ?? '',
+  recoveryEmail: identity?.traits?.recoveryEmail ?? '',
   identityGroups: identityGroupMembership,
   accessGroups: accessGroupMembership,
   roleOverrides,
@@ -215,6 +239,7 @@ const adminNav = [
   { href: '/admin/users',    label: 'Users' },
   { href: '/admin/groups',   label: 'Groups' },
   { href: '/admin/oauth2',   label: 'Apps' },
+  { href: '/auth/settings',  label: 'Settings' },
 ];
 ---
 <Layout title={`${formValues.username || id} — Admin`} description="Identity detail.">
@@ -243,6 +268,11 @@ const adminNav = [
     {actionResult?.kind === 'deactivated' && (
       <div class="notice notice-warning">
         {actionResult.username} marked inactive. Existing sessions revoked.
+      </div>
+    )}
+    {actionResult?.kind === 'reactivated' && (
+      <div class="notice notice-success">
+        {actionResult.username} restored to active. They will need to log in again.
       </div>
     )}
     {actionResult?.kind === 'recovery' && (
@@ -301,6 +331,19 @@ const adminNav = [
         <div class="field">
           <label for="displayName">Display name</label>
           <input id="displayName" name="displayName" type="text" value={formValues.displayName} />
+        </div>
+
+        <div class="field">
+          <label for="recoveryEmail">Recovery email (optional)</label>
+          <input
+            id="recoveryEmail"
+            name="recoveryEmail"
+            type="email"
+            value={formValues.recoveryEmail}
+            placeholder="alternate@example.com"
+          />
+          <span class="field-hint">Used for account recovery when the primary email is inaccessible. Leave blank to use the primary email.</span>
+          {formErrors.recoveryEmail && <span class="field-error">{formErrors.recoveryEmail}</span>}
         </div>
 
         <div class="field">
@@ -368,6 +411,12 @@ const adminNav = [
           </div>
         </details>
 
+        {id === adminIdentityId && (
+          <div class="notice notice-warning">
+            You're editing your own identity. Removing the admin group is cosmetic — admin access is controlled by <code>OTHALA_ADMIN_SUBJECTS</code>, not group membership.
+          </div>
+        )}
+
         <div class="cta-row">
           <button type="submit" class="button button-primary">Save</button>
           <a href={`/admin/users/${id}`} class="button button-secondary">Cancel</a>
@@ -384,8 +433,20 @@ const adminNav = [
             <dd class="mono text-sm">{identity.state ?? 'active'}</dd>
             <dt class="muted text-sm mono">email</dt>
             <dd class="mono text-sm">{formValues.email}</dd>
+            <dt class="muted text-sm mono">recoveryEmail</dt>
+            <dd class="mono text-sm">{formValues.recoveryEmail || <span class="muted">(unset)</span>}</dd>
             <dt class="muted text-sm mono">displayName</dt>
             <dd>{formValues.displayName || <span class="muted">(unset)</span>}</dd>
+            <dt class="muted text-sm mono">credentials</dt>
+            <dd>
+              <span class="cred-row">
+                {CREDENTIAL_METHODS.map((m) => (
+                  credentialMap[m.key]
+                    ? <span class="badge cred-enrolled">{m.label} ✓</span>
+                    : <span class="badge badge-muted">{m.label} —</span>
+                ))}
+              </span>
+            </dd>
           </dl>
           <div class="edit-action">
             <a href={`/admin/users/${id}?mode=edit`} class="button button-secondary">Edit</a>
@@ -455,9 +516,15 @@ const adminNav = [
             <button name="action" value="force-relogin" type="submit" class="button button-secondary">
               Force re-login
             </button>
-            <button name="action" value="deactivate" type="submit" class="button button-secondary">
-              Deactivate
-            </button>
+            {identity.state === 'inactive' ? (
+              <button name="action" value="reactivate" type="submit" class="button button-secondary">
+                Reactivate
+              </button>
+            ) : (
+              <button name="action" value="deactivate" type="submit" class="button button-secondary">
+                Deactivate
+              </button>
+            )}
           </form>
           <p class="muted text-xs">
             Force re-login revokes Kratos sessions and asks every supported app to log the user out (OIDC back-channel logout). Apps without that capability keep their local session until the per-app cookie expires.
@@ -492,4 +559,6 @@ const adminNav = [
   .badge-row { margin-top: var(--space-1); }
   .details-content { margin-top: var(--space-3); }
   .summary-danger { color: var(--danger); cursor: pointer; }
+  .cred-row { display: inline-flex; flex-wrap: wrap; gap: var(--space-1); }
+  .cred-enrolled { background: var(--success-subtle); border-color: var(--success); }
 </style>

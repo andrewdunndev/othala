@@ -144,6 +144,23 @@ export async function deactivateIdentity(id: string): Promise<void> {
   await revokeSubject(id, { deactivate: true });
 }
 
+/**
+ * Restore an inactive identity to active state.
+ *
+ * This is the inverse of deactivateIdentity. Unlike deactivate, reactivate
+ * does NOT need a revocation fan-out: the sessions and consent grants were
+ * already cleared when the identity was deactivated. The user will need to
+ * log in fresh after reactivation — that is the correct postcondition.
+ *
+ * No revokeSubject call here: the fan-out ran at deactivate time and the
+ * identity has had no live sessions since. Calling it again would be a no-op
+ * (Kratos 404 on delete-sessions) and would add unnecessary Hydra churn.
+ */
+export async function reactivateIdentity(id: string): Promise<void> {
+  const patch = [{ op: 'replace' as const, path: '/state', value: 'active' }];
+  await identityApi().patchIdentity({ id, jsonPatch: patch });
+}
+
 export interface RecoveryLink {
   recovery_link: string;
   expires_at: string;
