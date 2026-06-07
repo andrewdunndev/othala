@@ -1,8 +1,8 @@
 {
-  "$id": "https://othala.test/schemas/family.identity.schema.json",
+  "$id": "urn:othala:identity:schema:family",
   "$schema": "http://json-schema.org/draft-07/schema#",
-  "title": "Family member (lab)",
-  "description": "Lab copy of the production identity schema; structurally identical.",
+  "title": "Family member",
+  "description": "Identity schema for the dunn.dev family SSO. Traits are user-visible; group membership lives in metadata_admin and is admin-managed only.",
   "type": "object",
   "properties": {
     "traits": {
@@ -11,15 +11,24 @@
         "username": {
           "type": "string",
           "title": "Username",
+          "description": "Login identifier in firstname.lastname format",
           "pattern": "^[a-z][a-z0-9.\\-]*[a-z0-9]$",
           "minLength": 3,
           "maxLength": 32,
           "ory.sh/kratos": {
             "credentials": {
-              "password": {"identifier": true},
-              "webauthn": {"identifier": true},
-              "totp": {"account_name": true},
-              "code": {"identifier": true, "via": "email"}
+              "password": {
+                "identifier": true
+              },
+              "webauthn": {
+                "identifier": true
+              },
+              "passkey": {
+                "display_name": true
+              },
+              "totp": {
+                "account_name": true
+              }
             }
           }
         },
@@ -27,10 +36,22 @@
           "type": "string",
           "format": "email",
           "title": "Email",
+          "description": "Primary email for recovery and notifications",
           "ory.sh/kratos": {
             "credentials": {
-              "password": {"identifier": true},
-              "code": {"identifier": true, "via": "email"}
+              "password": {
+                "identifier": true
+              },
+              "code": {
+                "identifier": true,
+                "via": "email"
+              }
+            },
+            "verification": {
+              "via": "email"
+            },
+            "recovery": {
+              "via": "email"
             }
           },
           "maxLength": 320
@@ -38,18 +59,37 @@
         "displayName": {
           "type": "string",
           "title": "Display name",
+          "description": "Friendly name shown in the home portal",
           "maxLength": 64
+        },
+        "recoveryEmail": {
+          "type": "string",
+          "format": "email",
+          "title": "Recovery email",
+          "description": "Alternate email for recovery if primary is unreachable",
+          "ory.sh/kratos": {
+            "recovery": {
+              "via": "email"
+            }
+          },
+          "maxLength": 320
         }
       },
-      "required": ["username", "email"],
+      "required": [
+        "username",
+        "email"
+      ],
       "additionalProperties": false
     },
     "metadata_admin": {
       "type": "object",
       "title": "Admin-managed metadata",
+      "description": "Admin-only fields. groups[] drives default role derivation via per-app group_role_map; roles{client_id: role_name} is a per-app override that takes precedence. Only `groups` and `roles` are accepted; new fields require a schema update so a typo (e.g. grupos instead of groups) is rejected at write time rather than silently dropped at read time.",
       "properties": {
         "groups": {
           "type": "array",
+          "title": "Groups",
+          "description": "Membership groups. Order matters when deriving per-app roles via group_role_map (first matching group wins). The admin form is responsible for writing groups in the canonical order documented in portal/src/lib/access.ts.",
           "items": {
             "type": "string",
             "pattern": "^[a-z][a-z0-9.\\-]*$",
@@ -59,6 +99,8 @@
         },
         "roles": {
           "type": "object",
+          "title": "Per-app role overrides",
+          "description": "Map of client_id to role name. When present for a client, this wins over group-derived role lookup.",
           "patternProperties": {
             "^[a-z][a-z0-9]*$": {
               "type": "string",
