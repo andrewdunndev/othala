@@ -213,6 +213,15 @@ const isCodeEntry = codeNodes.some((n) => {
           <form method="POST" action={ui?.action ?? '#'} class="login-block code-form">
             <input type="hidden" name="csrf_token" value={csrf} />
 
+            {/* Hidden fields from the default group (carries identifier and any
+                other state Kratos needs for loginVerifyCode — but skip csrf_token
+                which is already rendered above). */}
+            {ui && nodesByGroup(ui.nodes, 'default').map((n) => {
+              const a = asInput(n);
+              if (!a || a.type !== 'hidden' || a.name === 'csrf_token') return null;
+              return <input type="hidden" name={a.name} value={String(a.value ?? '')} />;
+            })}
+
             {/* Hidden fields from the code group (identifier + method) */}
             {codeNodes.map((n) => {
               const a = asInput(n);

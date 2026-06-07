@@ -86,7 +86,10 @@ export async function listIdentities(): Promise<Identity[]> {
 export async function getIdentity(id: string): Promise<Identity> {
   return identityApi().getIdentity({
     id,
-    includeCredential: ['password', 'webauthn', 'passkey', 'totp'],
+    // 'lookup_secret' must be included or the backup-codes credential is never
+    // fetched: the admin user page keyed the badge on it and would always show
+    // "not enrolled" without this entry.
+    includeCredential: ['password', 'webauthn', 'passkey', 'totp', 'lookup_secret'],
   });
 }
 
@@ -115,7 +118,10 @@ export async function updateIdentity(id: string, input: UpdateIdentityInput): Pr
   const api = identityApi();
   const current = await api.getIdentity({
     id,
-    includeCredential: ['password', 'webauthn', 'passkey', 'totp'],
+    // Keep consistent with getIdentity: 'lookup_secret' must be present so
+    // updateIdentity preserves the current backup-codes credential rather
+    // than losing it on a PUT round-trip.
+    includeCredential: ['password', 'webauthn', 'passkey', 'totp', 'lookup_secret'],
   });
   const updateIdentityBody: UpdateIdentityBody = {
     schema_id: current.schema_id,

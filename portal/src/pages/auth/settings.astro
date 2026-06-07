@@ -18,6 +18,11 @@
 
 export const prerender = false;
 
+// Bug fix: TOTP QR/secret and backup codes must not sit in the browser
+// back/forward cache. Set no-store so every navigation fetches fresh.
+Astro.response.headers.set('Cache-Control', 'no-store, max-age=0');
+Astro.response.headers.set('Pragma', 'no-cache');
+
 import Layout from '../../layouts/Layout.astro';
 import {
   browserFlows,
@@ -293,13 +298,52 @@ const accessGroups = groups.filter((g) => g.startsWith('access-'));
       <form method="POST" action={ui.action} class="settings-form">
         <input type="hidden" name="csrf_token" value={csrf} />
         <input type="hidden" name="method" value="lookup_secret" />
-        <FlowNodes
-          nodes={ui.nodes}
-          group="lookup_secret"
-          buttonClass="button button-secondary"
-          submitLabel="Generate backup codes"
-          wrapActions
-        />
+        {nodesByGroup(ui.nodes, 'lookup_secret').map((n) => {
+          // Bug fix: text nodes carry the actual backup codes in
+          // attributes.text.text — FlowNodes/asInput() returns null for
+          // node_type:"text", silently dropping them. Render them explicitly
+          // so the generated codes are always shown to the user.
+          if (n.attributes.node_type === 'text') {
+            const a = n.attributes as NodeTextAttributes;
+            return (
+              <div class="lookup-codes">
+                <p class="lookup-codes-label">
+                  {n.meta?.label?.text ?? 'Backup codes — save these somewhere safe'}
+                </p>
+                <code class="lookup-codes-value mono" data-testid="backup-codes">
+                  {a.text?.text ?? ''}
+                </code>
+              </div>
+            );
+          }
+          const inp = asInput(n);
+          if (!inp) return null;
+          if (inp.type === 'hidden') {
+            return <input type="hidden" name={inp.name} value={String(inp.value ?? '')} />;
+          }
+          if (inp.type === 'submit' || inp.type === 'button') {
+            return (
+              <div class="form-actions">
+                <button
+                  class="button button-secondary"
+                  type={inp.type}
+                  name={inp.name}
+                  value={String(inp.value ?? '')}
+                >
+                  {n.meta?.label?.text ?? 'Generate backup codes'}
+                </button>
+              </div>
+            );
+          }
+          // Any remaining labeled inputs (e.g. confirm checkbox nodes).
+          const id = inp.name.replace(/[^a-zA-Z0-9]+/g, '-');
+          return (
+            <div class="field">
+              <label for={id}>{n.meta?.label?.text ?? inp.name}</label>
+              <input id={id} name={inp.name} type={inp.type} value={String(inp.value ?? '')} />
+            </div>
+          );
+        })}
       </form>
     </section>
   )}
@@ -324,11 +368,25 @@ const accessGroups = groups.filter((g) => g.startsWith('access-'));
             return <input type="hidden" name={inp.name} value={String(inp.value ?? '')} />;
           }
           // The register trigger button carries onclickTrigger (not onclick on
-          // this strategy). Construct the window call from the trigger name so
-          // the webauthn.js handler fires when the user clicks.
+          // this strategy). Prefer inp.onclick when present (always set for
+          // browser flows). If only onclickTrigger is available, validate it
+          // against the set of known Ory trigger names before interpolating
+          // into window.<name>() — arbitrary values from flow data must not
+          // reach the onclick attribute.
           if (inp.type === 'button' || inp.type === 'submit') {
-            const onclickAttr = inp.onclick
-              ?? (inp.onclickTrigger ? `window.${inp.onclickTrigger}()` : undefined);
+            const KNOWN_TRIGGERS = new Set([
+              'oryWebAuthnRegistration',
+              'oryWebAuthnLogin',
+              'oryPasskeyLogin',
+              'oryPasskeyLoginAutocompleteInit',
+              'oryPasskeyRegistration',
+              'oryPasskeySettingsRegistration',
+            ]);
+            const safeWindowCall =
+              inp.onclickTrigger && KNOWN_TRIGGERS.has(inp.onclickTrigger)
+                ? `window.${inp.onclickTrigger}()`
+                : undefined;
+            const onclickAttr = inp.onclick ?? safeWindowCall;
             return (
               <div class="form-actions">
                 <button
@@ -470,6 +528,31 @@ const accessGroups = groups.filter((g) => g.startsWith('access-'));
     border: 1px solid var(--border);
     border-radius: var(--radius-sm);
     font-size: var(--text-sm);
+    word-break: break-all;
+    color: var(--text);
+    user-select: all;
+  }
+
+  /* Backup codes display: monospace block, select-all for easy copy. */
+  .lookup-codes {
+    margin-top: var(--space-2);
+  }
+  .lookup-codes-label {
+    font-family: var(--font-mono);
+    font-size: var(--text-xs);
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--text-muted);
+    margin-bottom: var(--space-1);
+  }
+  .lookup-codes-value {
+    display: block;
+    padding: var(--space-3);
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    font-size: var(--text-sm);
+    white-space: pre-wrap;
     word-break: break-all;
     color: var(--text);
     user-select: all;
