@@ -1,6 +1,11 @@
 ---
 // Recovery flow handler — code strategy (magic link is deprecated).
 //
+// Audience: family members on a new device, with a lost passkey, or who
+// have never set a password. The promoted path is email → one-time code →
+// privileged session → /auth/settings where they can register a passkey
+// on the current device.
+//
 // Phase 1: user enters email; Kratos sends a numeric code via Fastmail.
 // Phase 2: user enters the code; Kratos issues a privileged session and
 //          303s to /auth/settings to set a new password / register a passkey.
@@ -38,14 +43,14 @@ const csrf = ui ? csrfToken(ui.nodes) : '';
 const hasCode = ui ? hasMethod(ui.nodes, 'code') : true;
 const phase: 'request' | 'sent' = flow?.state === 'sent_email' ? 'sent' : 'request';
 ---
-<Layout title="Recover account" description="Recover access to your account." bare>
+<Layout title="Get back in" description="Regain access to your account with a one-time email code." bare>
 
   <PageHero
-    title="Account recovery"
-    eyebrow="recover"
+    title={phase === 'request' ? 'Get back in' : 'Check your email'}
+    eyebrow="recovery"
     lede={phase === 'request'
-      ? 'Enter the email tied to your account. We will send you a one-time code.'
-      : 'Check your email. Enter the code below to continue.'}
+      ? 'Enter your email and we\'ll send you a one-time code. Once you\'re in, you can set up a passkey on this device for one-tap sign-in next time.'
+      : 'We sent a code to your email. Enter it below to continue — it\'s only valid for a few minutes.'}
   />
 
   {ui?.messages?.map((m: FlowMessage) => (
@@ -61,6 +66,13 @@ const phase: 'request' | 'sent' = flow?.state === 'sent_email' ? 'sent' : 'reque
     </div>
   )}
 
+  {phase === 'request' && (
+    <p class="recovery-context">
+      This works whether you got a new phone, lost your old one, or just
+      want to get in without a passkey. No password needed.
+    </p>
+  )}
+
   <section class="recover-card">
 
     {hasCode && ui && (
@@ -71,7 +83,7 @@ const phase: 'request' | 'sent' = flow?.state === 'sent_email' ? 'sent' : 'reque
           nodes={ui.nodes}
           group="code"
           buttonClass="button button-primary recover-primary"
-          submitLabel={phase === 'request' ? 'Send code' : 'Verify code'}
+          submitLabel={phase === 'request' ? 'Send me a code' : 'Verify code'}
         />
       </form>
     )}
@@ -80,11 +92,11 @@ const phase: 'request' | 'sent' = flow?.state === 'sent_email' ? 'sent' : 'reque
       /* Static dev preview — fields shown so the layout exercises both phases. */
       <form class="recover-form" onsubmit="return false;">
         <div class="field">
-          <label for="email">Email</label>
-          <input id="email" name="email" type="email" disabled />
+          <label for="email">Email address</label>
+          <input id="email" name="email" type="email" placeholder="you@example.com" disabled />
         </div>
         <button class="button button-primary recover-primary" type="button" disabled>
-          Send code
+          Send me a code
         </button>
       </form>
     )}
@@ -93,11 +105,22 @@ const phase: 'request' | 'sent' = flow?.state === 'sent_email' ? 'sent' : 'reque
 
   <footer class="recover-footer">
     <a href="/auth/login" class="recover-foot-link">Back to sign in</a>
+    <span class="recover-foot-sep" aria-hidden="true">·</span>
+    <a href="/docs/family-help" class="recover-foot-link">Need help?</a>
   </footer>
 
 </Layout>
 
 <style>
+  .recovery-context {
+    max-width: 32rem;
+    margin: 0 auto var(--space-5);
+    font-size: var(--text-sm);
+    color: var(--text-muted);
+    text-align: center;
+    line-height: 1.5;
+  }
+
   .recover-card {
     max-width: 32rem;
     margin: 0 auto;
@@ -122,6 +145,8 @@ const phase: 'request' | 'sent' = flow?.state === 'sent_email' ? 'sent' : 'reque
     margin: var(--space-5) auto 0;
     display: flex;
     justify-content: center;
+    align-items: center;
+    gap: var(--space-3);
     font-family: var(--font-mono);
     font-size: var(--text-xs);
     text-transform: uppercase;
@@ -129,6 +154,7 @@ const phase: 'request' | 'sent' = flow?.state === 'sent_email' ? 'sent' : 'reque
   }
   .recover-foot-link { color: var(--text-muted); text-decoration: none; }
   .recover-foot-link:hover { color: var(--accent); text-decoration: none; }
+  .recover-foot-sep { color: var(--border); }
 
   @media (max-width: 640px) {
     .recover-card { padding: var(--space-5); }
