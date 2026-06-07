@@ -24,6 +24,7 @@ import { readdirSync, readFileSync, existsSync, statSync } from 'node:fs';
 import { join } from 'node:path';
 import { parse as parseYaml } from 'yaml';
 import { marked } from 'marked';
+import DOMPurify from 'isomorphic-dompurify';
 
 // Locate the vendored icons directory.
 // Branch on import.meta.env.DEV so a stale dist/ from a previous production
@@ -214,7 +215,10 @@ function parseTile(slug: string, doc: Record<string, unknown>, dir: string): App
   let educationHtml: string | undefined;
   const mdPath = join(dir, `${slug}.md`);
   if (existsSync(mdPath)) {
-    educationHtml = marked.parse(readFileSync(mdPath, 'utf8'), { async: false }) as string;
+    const raw = marked.parse(readFileSync(mdPath, 'utf8'), { async: false }) as string;
+    // Sanitize before set:html injection. Allow SVG + common child tags so
+    // inline cat-explainer diagrams survive (USE_PROFILES: { svg: true }).
+    educationHtml = DOMPurify.sanitize(raw, { USE_PROFILES: { html: true, svg: true } });
   }
 
   const tile: AppTile = {

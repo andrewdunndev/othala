@@ -29,6 +29,7 @@ import {
   getLogoutInfo,
   getSession,
   getSettingsFlow,
+  kratosBase,
 } from '../../lib/kratos';
 import {
   csrfToken,
@@ -90,9 +91,18 @@ if (Astro.request.method === 'POST') {
       // logout so the current cookie is dropped too.
       const info = await getLogoutInfo(cookie);
       if (info) {
-        const logoutUrl = new URL(info.logout_url);
-        logoutUrl.searchParams.set('token', info.logout_token);
-        return Astro.redirect(logoutUrl.toString());
+        // Defense-in-depth: validate logout_url origin against the Kratos
+        // public origin before redirecting, then append the token.
+        try {
+          const logoutUrl = new URL(info.logout_url);
+          const kratosOrigin = new URL(kratosBase()).origin;
+          if (logoutUrl.origin === kratosOrigin) {
+            logoutUrl.searchParams.set('token', info.logout_token);
+            return Astro.redirect(logoutUrl.toString());
+          }
+        } catch {
+          // malformed URL — fall through to login
+        }
       }
       return Astro.redirect('/auth/login');
     }

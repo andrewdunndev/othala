@@ -30,6 +30,7 @@ import {
   revokeUserSessions,
   type RevokeUserResult,
 } from '../../../lib/admin';
+import { deleteCredential, EVICTABLE_CREDENTIAL_TYPES } from '../../../lib/admin-api';
 import { loadClientManifests } from '../../../lib/manifests';
 import {
   computeEffectiveAccess,
@@ -66,7 +67,8 @@ async function reload(): Promise<Identity | null> {
   try {
     return await getIdentity(id!);
   } catch (err) {
-    loadError = err instanceof Error ? err.message : String(err);
+    console.error('[othala/admin/users/[id]] getIdentity failed:', err);
+    loadError = 'Failed to read identity store — check Kratos connectivity.';
     return null;
   }
 }
@@ -81,6 +83,7 @@ let actionResult:
   | { kind: 'reactivated'; username: string }
   | { kind: 'updated' }
   | { kind: 'revoked'; result: RevokeUserResult }
+  | { kind: 'credential-removed'; credType: string }
   | { kind: 'error'; message: string }
   | null = null;
 let formErrors: Record<string, string> = {};
@@ -191,6 +194,22 @@ if (Astro.request.method === 'POST' && identity) {
         await deleteIdentity(id);
         return Astro.redirect('/admin/users?deleted=1');
       }
+    } else if (action === 'remove-credential') {
+      // HIGH-C: lost-device eviction. Removes ALL credentials of the given
+      // type for this identity so any thief-enrolled credential is evicted.
+      // The legitimate user re-enrolls via the recovery/enrollment URL.
+      // Allowlist-validated: only eviction-relevant types are accepted.
+      const credType = String(fd.get('cred_type') ?? '').trim();
+      if (!EVICTABLE_CREDENTIAL_TYPES.has(credType)) {
+        actionResult = {
+          kind: 'error',
+          message: `Invalid credential type '${credType}'. Evictable types: passkey, webauthn, totp, lookup_secret.`,
+        };
+      } else {
+        await deleteCredential(id, credType);
+        identity = await reload();
+        actionResult = { kind: 'credential-removed', credType };
+      }
     }
   } catch (err) {
     actionResult = { kind: 'error', message: err instanceof Error ? err.message : String(err) };
@@ -233,6 +252,14 @@ const formValues = {
 const csrfTokenSave = signToken(adminIdentityId);
 const csrfTokenActions = signToken(adminIdentityId);
 const csrfTokenDelete = signToken(adminIdentityId);
+// One token per credential-remove form: each form is single-use (CSRF token
+// is single-use 30-min TTL); credential types are enumerated at render time.
+const csrfTokensRemove: Record<string, string> = {};
+for (const { key } of CREDENTIAL_METHODS) {
+  if (EVICTABLE_CREDENTIAL_TYPES.has(key) && credentialMap[key]) {
+    csrfTokensRemove[key] = signToken(adminIdentityId);
+  }
+}
 
 const adminNav = [
   { href: '/admin',          label: 'Overview' },
@@ -298,6 +325,12 @@ const adminNav = [
             </ul>
           </details>
         )}
+      </div>
+    )}
+    {actionResult?.kind === 'credential-removed' && (
+      <div class="notice notice-warning">
+        <strong>Credential type removed:</strong> all <span class="mono">{actionResult.credType}</span> credentials
+        have been deleted for this identity. Issue an enrollment URL so the legitimate user can re-enroll.
       </div>
     )}
     {actionResult?.kind === 'error' && (
@@ -439,13 +472,35 @@ const adminNav = [
             <dd>{formValues.displayName || <span class="muted">(unset)</span>}</dd>
             <dt class="muted text-sm mono">credentials</dt>
             <dd>
-              <span class="cred-row">
+              <div class="cred-list">
                 {CREDENTIAL_METHODS.map((m) => (
-                  credentialMap[m.key]
-                    ? <span class="badge cred-enrolled">{m.label} ✓</span>
-                    : <span class="badge badge-muted">{m.label} —</span>
+                  credentialMap[m.key] ? (
+                    <span class="cred-item">
+                      <span class="badge cred-enrolled">{m.label} ✓</span>
+                      {EVICTABLE_CREDENTIAL_TYPES.has(m.key) && csrfTokensRemove[m.key] && (
+                        <form method="post" class="cred-remove-form">
+                          <input type="hidden" name="action" value="remove-credential" />
+                          <input type="hidden" name="cred_type" value={m.key} />
+                          <input type="hidden" name="csrf_token" value={csrfTokensRemove[m.key]} />
+                          <button
+                            type="submit"
+                            class="button button-danger-sm"
+                            title={`Remove all ${m.label} credentials (lost-device eviction). The user must re-enroll after removal.`}
+                          >
+                            Remove
+                          </button>
+                        </form>
+                      )}
+                    </span>
+                  ) : (
+                    <span class="badge badge-muted">{m.label} —</span>
+                  )
                 ))}
-              </span>
+              </div>
+              <p class="cred-eviction-note muted text-xs">
+                Remove evicts the credential type (passkey/webauthn/totp/backup codes) for lost-device response.
+                The user must re-enroll via an enrollment URL. Password cannot be removed here.
+              </p>
             </dd>
           </dl>
           <div class="edit-action">
@@ -559,6 +614,20 @@ const adminNav = [
   .badge-row { margin-top: var(--space-1); }
   .details-content { margin-top: var(--space-3); }
   .summary-danger { color: var(--danger); cursor: pointer; }
-  .cred-row { display: inline-flex; flex-wrap: wrap; gap: var(--space-1); }
+  .cred-list { display: flex; flex-wrap: wrap; gap: var(--space-2); align-items: flex-start; }
+  .cred-item { display: inline-flex; align-items: center; gap: var(--space-1); }
+  .cred-remove-form { display: inline; margin: 0; padding: 0; }
   .cred-enrolled { background: var(--success-subtle); border-color: var(--success); }
+  .cred-eviction-note { margin-top: var(--space-2); }
+  .button-danger-sm {
+    font-size: var(--text-xs);
+    padding: 0.1rem 0.4rem;
+    background: transparent;
+    border: 1px solid var(--danger);
+    color: var(--danger);
+    border-radius: var(--radius-sm, 3px);
+    cursor: pointer;
+    line-height: 1.4;
+  }
+  .button-danger-sm:hover { background: var(--danger-subtle, #fff0f0); }
 </style>

@@ -253,6 +253,37 @@ function parseIdentityGroups(): string[] {
 
 export const identityGroups: string[] = parseIdentityGroups();
 
+// ── OTHALA_ADMIN_FRESHNESS_HOURS ──────────────────────────────────────────────
+//
+// Maximum age (in hours) of the most recent successful authentication before
+// requireAdminSession redirects the admin back to the step-up (AAL2 refresh)
+// login flow. This catches the "stolen admin browser with a 90-day session"
+// threat: even with an existing AAL2 session the admin must have authenticated
+// recently.
+//
+// The check is on `session.authenticated_at`, which Kratos updates on every
+// `refresh=true` re-authentication. A value of 0 disables the freshness check
+// (not recommended for production).
+//
+// Neutral default: 8 (hours). Operators may tighten (4 for high-assurance) or
+// loosen (24 for light-touch family instances).
+
+function parseAdminFreshnessHours(): number {
+  const raw = process.env.OTHALA_ADMIN_FRESHNESS_HOURS;
+  if (raw === undefined || raw.trim() === '') return 8;
+  const n = parseInt(raw.trim(), 10);
+  if (!Number.isFinite(n) || n < 0) {
+    console.warn(
+      `[othala/config] OTHALA_ADMIN_FRESHNESS_HOURS="${raw}" is not a valid non-negative integer; ` +
+        'using default 8.',
+    );
+    return 8;
+  }
+  return n;
+}
+
+export const adminFreshnessHours: number = parseAdminFreshnessHours();
+
 // ── aggregate export for consumers that want the full config object ───────────
 //
 // Named individual exports above are the primary API and are tree-shakeable.
@@ -268,6 +299,7 @@ export const config = {
   identityGroups,
   contactRecipient,
   smtpFromAddress,
+  adminFreshnessHours,
   // smtpConnectionUri intentionally OMITTED from the debug/log object: it
   // carries the SMTP password. Consumers import it by name when they need it.
 } as const;

@@ -30,7 +30,8 @@ let loadError: string | null = null;
 try {
   identities = await listIdentities();
 } catch (err) {
-  loadError = err instanceof Error ? err.message : String(err);
+  console.error('[othala/admin/users] listIdentities failed:', err);
+  loadError = 'Failed to read identity store — check Kratos connectivity.';
 }
 
 function matches(i: Identity): boolean {

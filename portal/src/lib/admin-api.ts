@@ -18,6 +18,7 @@ import {
   IdentityApi,
   type CreateIdentityBody,
   type UpdateIdentityBody,
+  type DeleteIdentityCredentialsTypeEnum,
 } from '@ory/client-fetch';
 import type { Identity } from './types';
 import { validateMetadataAdmin } from './metadata-admin';
@@ -165,6 +166,71 @@ export async function deactivateIdentity(id: string): Promise<void> {
 export async function reactivateIdentity(id: string): Promise<void> {
   const patch = [{ op: 'replace' as const, path: '/state', value: 'active' }];
   await identityApi().patchIdentity({ id, jsonPatch: patch });
+}
+
+// ── Credential eviction ───────────────────────────────────────────────────────
+
+/**
+ * Allowed credential types for admin eviction via the portal UI.
+ *
+ * `password` is intentionally excluded: Kratos rejects DELETE on password and
+ * it is not a lost-device eviction factor (the attacker can't enrol a new
+ * password without knowing the current one and we do not expose that surface).
+ *
+ * Eviction-relevant types: passkey and webauthn (possession factors a thief
+ * could have enrolled), totp and lookup_secret (codes stored on or extracted
+ * from a lost device).
+ */
+export const EVICTABLE_CREDENTIAL_TYPES = new Set<string>([
+  'passkey',
+  'webauthn',
+  'totp',
+  'lookup_secret',
+]);
+
+/**
+ * Delete ALL credentials of `type` for an identity.
+ *
+ * This is the lost-device eviction primitive. Kratos does not expose per-instance
+ * passkey removal on the admin API — the unit of deletion is the credential type.
+ * Removing the type evicts every registered credential of that kind; the
+ * legitimate user re-enrolls via the recovery/enrollment URL issued in the
+ * same admin action.
+ *
+ * 404 from Kratos is treated as success (type not enrolled — nothing to evict).
+ * All other non-2xx statuses propagate as errors to the caller.
+ *
+ * Endpoint: DELETE /admin/identities/{id}/credentials/{type}
+ *
+ * NOTE: The exact endpoint shape and 404 behaviour need live gate validation
+ * against the deployed Kratos version. Confirm via `make dag-e2e` or manual
+ * curl before relying in production.
+ */
+export async function deleteCredential(
+  identityId: string,
+  type: string,
+): Promise<void> {
+  // Only allow eviction-relevant types (not password — Kratos rejects it).
+  if (!EVICTABLE_CREDENTIAL_TYPES.has(type)) {
+    throw new Error(`deleteCredential: '${type}' is not an evictable credential type`);
+  }
+  try {
+    await identityApi().deleteIdentityCredentials({
+      id: identityId,
+      type: type as DeleteIdentityCredentialsTypeEnum,
+    });
+  } catch (err: unknown) {
+    // Tolerate 404: type not present is a no-op for eviction purposes.
+    if (
+      err != null &&
+      typeof err === 'object' &&
+      'response' in err &&
+      (err as { response: { status: number } }).response?.status === 404
+    ) {
+      return;
+    }
+    throw err;
+  }
 }
 
 export interface RecoveryLink {

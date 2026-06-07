@@ -77,7 +77,7 @@ if (devOverride === 'down' || devOverride === 'pre-auth' || devOverride === 'pos
   } catch (err) {
     const ok = await isReachable();
     state = ok ? 'pre-auth' : 'down';
-    if (!ok && err instanceof Error) downReason = err.message;
+    if (!ok) console.error('[othala/index] Kratos unreachable:', err);
   }
 }
 
