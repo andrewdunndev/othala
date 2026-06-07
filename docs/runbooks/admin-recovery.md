@@ -358,6 +358,10 @@ recovery to confirm the gate still allows it.
 
 ## Related runbooks and source files
 
+- `docs/runbooks/lost-device.md` — **lost/stolen device eviction procedure**:
+  audit credentials, remove affected types, force re-login, issue enrollment URL.
+  Read this first when responding to a lost device — force re-login alone is
+  insufficient if a credential was enrolled on the device.
 - `docs/runbooks/email-recovery.md` — deliverability ops for non-admin
   family recovery.
 - `docs/runbooks/cookie-rotation.md` — rotate session cookies after a
