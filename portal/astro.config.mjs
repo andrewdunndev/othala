@@ -23,36 +23,37 @@ import tailwindcss from '@tailwindcss/vite';
 // We do NOT use Astro's Sessions API. Identity sessions live in the
 // Kratos cookie on `.dunn.dev`, not in any Astro-managed store.
 
-// Derive the public URL for build-time config from the same env var the
-// runtime lib/config.ts uses. Needed for `site` (canonical URL, affects
-// sitemaps and metadata) and `security.allowedDomains` (trustProxy host
-// validation — see note below).
+// Build-time `site` (canonical URL — affects sitemaps and metadata) reads the
+// same env var the runtime lib/config.ts uses. It is host-specific by nature,
+// but it does NOT gate any security control: a default-localhost `site` baked
+// into an OSS image only mislabels canonical metadata, which the runtime can't
+// fix anyway. The SECURITY-bearing host resolution (allowedDomains) is host-
+// AGNOSTIC — see below — so the published image carries no baked host.
 const PUBLIC_URL = process.env.OTHALA_PUBLIC_URL ?? 'http://localhost:4321';
 
-// Parse hostname for security.allowedDomains. With trustProxy: true the
-// node adapter resolves the incoming request's host from X-Forwarded-Host
-// (if present) or the Host header, then validates it against allowedDomains.
-// An empty allowedDomains list causes validateHost/validateForwardedHeaders to
-// always return undefined, which makes hostname fall back to "localhost:PORT".
-// That mismatch means url.origin !== Origin header even on legitimate
-// same-origin POSTs → Astro's checkOrigin middleware fires 403 on every form
-// POST, including the app's own consent/admin flows. Setting allowedDomains to
-// the public hostname fixes the reverse-proxy origin check while keeping CSRF
-// protection active for genuinely cross-origin requests.
+// security.allowedDomains — HOST-AGNOSTIC by design. We pass a single empty
+// pattern `[{}]`, which matchPattern() treats as a match-anything wildcard
+// (an undefined hostname/protocol/port/pathname each short-circuits to true,
+// see @astrojs/internal-helpers matchHostname/matchPattern). This makes the
+// node adapter (trustProxy:true) TRUST whatever host Caddy forwards in
+// X-Forwarded-Host and resolve `Astro.url.origin` to it.
 //
-// The pattern `{}` (empty object) means "any hostname is allowed" and is the
-// safe default for deployments where the hostname is not known at build time.
-// Operators who want to lock down to a specific hostname override
-// OTHALA_PUBLIC_URL at build time.
-let allowedDomains = [{}];
-try {
-  const publicHostname = new URL(PUBLIC_URL).hostname;
-  if (publicHostname && publicHostname !== 'localhost') {
-    allowedDomains = [{ hostname: publicHostname }];
-  }
-} catch {
-  // Malformed PUBLIC_URL — fall through to the permissive default.
-}
+// Crucially, the `{}` wildcard does NOT disable the origin check. Astro's
+// checkOrigin middleware (astro/dist/core/app/middlewares.js) compares
+// `request.headers.get('origin') === url.origin` on every unsafe POST. With
+// the wildcard, `url.origin` is the real forwarded host, so:
+//   - a same-origin browser POST (Origin == forwarded host) PASSES, and
+//   - a forged cross-origin POST (Origin == http://evil.example) is 403'd,
+// because Origin != url.origin. No build-time host, no runtime host config:
+// the wildcard accepts whatever Caddy forwards while checkOrigin still
+// enforces Origin == Host. Empirically verified against the live e2e stack
+// (E/F/H same-origin specs pass; forged-Origin POST → 403).
+//
+// NOTE: an EMPTY list `[]` is NOT equivalent — validateHost/
+// validateForwardedHeaders bail when allowedDomains.length === 0, the host
+// falls back to "localhost", and every legitimate same-origin POST then 403s.
+// The list must contain the wildcard entry.
+const allowedDomains = [{}];
 
 export default defineConfig({
   output: 'server',
@@ -62,11 +63,14 @@ export default defineConfig({
   // rate-limit bucket).
   adapter: node({ mode: 'standalone', trustProxy: true }),
   integrations: [],
-  // Build-time bake: same var as the runtime OTHALA_PUBLIC_URL export in $lib/config.
+  // Canonical URL for metadata/sitemaps only (no security weight). Defaults to
+  // localhost for a bare/OSS build; operators who care about canonical links
+  // set OTHALA_PUBLIC_URL at build time, but it is not required.
   site: PUBLIC_URL,
   security: {
-    // See allowedDomains comment above. Required for checkOrigin to work
-    // correctly behind a reverse proxy when trustProxy is true.
+    // Host-agnostic wildcard — see the allowedDomains comment above. Keeps
+    // checkOrigin meaningful behind a trustProxy reverse proxy WITHOUT baking
+    // any host into the image.
     allowedDomains,
   },
   vite: {

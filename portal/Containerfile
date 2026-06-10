@@ -40,13 +40,6 @@ FROM registry.access.redhat.com/ubi9/nodejs-22:9.8 AS build
 WORKDIR /src
 USER root
 
-# Astro bakes security.allowedDomains from OTHALA_PUBLIC_URL at BUILD time
-# (astro.config.mjs) so checkOrigin accepts same-origin POSTs behind the
-# reverse proxy with trustProxy:true. Without the right host baked in, every
-# form POST (login/consent/admin) 403s. Pass the deployment's public URL via
-# `--build-arg OTHALA_PUBLIC_URL=...`; defaults to localhost for a bare build.
-ARG OTHALA_PUBLIC_URL=http://localhost:4321
-
 # Install deps first for cache friendliness. .npmrc routes
 # @dunn.dev/* to the GitLab group npm registry endpoint; anonymous
 # access works because reference is in a public group.
@@ -58,8 +51,11 @@ COPY portal/ portal/
 # are read at runtime from /etc/portal/manifests/ (mounted via the
 # iac quadlet volume). See portal/src/lib/manifests.ts.
 
+# No build-time host: astro.config.mjs uses a host-agnostic
+# security.allowedDomains wildcard, so checkOrigin works behind the reverse
+# proxy without baking any deployment host into the image.
 RUN cd portal \
-    && OTHALA_PUBLIC_URL="$OTHALA_PUBLIC_URL" npm run build \
+    && npm run build \
     && npm prune --omit=dev
 
 # ----- Stage 2: runtime -----
