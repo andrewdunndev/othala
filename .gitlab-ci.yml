@@ -279,20 +279,23 @@ e2e:
       - /tmp/apply-clients.log
     expire_in: 1 week
   rules:
-    # Run on push to main + on every tag.
-    # merge_request_event is intentionally absent: the container-image
-    # component jobs that populate `needs` (build-othala, build-ldap-bridge,
-    # build-e2e-tester) have no merge_request_event rule, so including
-    # merge_request_event here caused GitLab to immediately fail MR-event
-    # pipelines with 0 jobs (unresolvable needs). Renovate-MR verification
-    # is covered by the verify-* and test-/check-portal jobs.
+    # Run on every tag + on-demand (BUILD_CI_IMAGE below). Plain main
+    # pushes and merge_request_event are intentionally absent: the
+    # container-image component jobs that populate `needs` (build-othala,
+    # build-ldap-bridge, build-e2e-tester) fire on main only when their
+    # Containerfile changes — and e2e needs ALL THREE images at the same
+    # short-sha tag. Any rule that puts e2e into a pipeline where those
+    # builds are absent makes GitLab fail the whole pipeline at creation
+    # (0 jobs, unresolvable needs) — that kept main red 2026-06-05→06-10.
+    # Renovate-bump verification is covered by verify-* and
+    # test-/check-portal; full-substrate e2e gates tags (all builds fire
+    # via tag_pipeline) and the BUILD_CI_IMAGE pre-tag path.
     # Tag pipelines pull the v-tag image — override the SHA default above.
     # (GitLab variables: do NOT honor bash ${VAR:-default}, so tag pipelines
     # override AUTH_VERSION in rules:.)
     - if: '$CI_COMMIT_TAG'
       variables:
         AUTH_VERSION: "$CI_COMMIT_TAG"
-    - if: '$CI_PIPELINE_SOURCE == "push" && $CI_COMMIT_BRANCH == "main"'
     # On-demand pre-tag validation: a branch pipeline triggered with
     # BUILD_CI_IMAGE=true builds the images (container-image @2.5.1 honors
     # the same flag — see its rule 3) and runs e2e against them. Lets us
