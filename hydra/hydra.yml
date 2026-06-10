@@ -86,12 +86,13 @@ oauth2:
       # Raised from 10: cost 14 (~700ms on modern hardware) meaningfully
       # raises the bar for offline brute-force of stolen client-secret hashes.
       cost: 14
-  # Pin strategies explicitly so an upstream default change can't silently
-  # weaken token opacity or scope matching. These are the current Hydra
-  # defaults; pinning makes any future deviation a visible config diff.
-  strategies:
-    access_token: opaque
-    scope: exact
+  # NOTE: an explicit `oauth2.strategies` pin (access_token=opaque, scope=exact)
+  # was tried here but Hydra v26.2.0's schema rejects it (additionalProperties
+  # "strategies" not allowed) and the IdP refuses to boot — caught by the live
+  # e2e stand-up. Both values are already the Hydra defaults (the live OIDC
+  # dance confirms correct scope/token behaviour), so we rely on them rather
+  # than gamble on an unverified key location. Revisit if a supported pin
+  # surfaces upstream.
   expose_internal_errors: false
   client_credentials:
     default_grant_allowed_scope: false
