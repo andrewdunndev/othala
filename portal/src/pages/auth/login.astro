@@ -5,17 +5,24 @@
 // Kratos's browser flow initiator which sets the anti-CSRF cookie and
 // redirects back here with a fresh ?flow=...
 //
-// Renders the form Kratos described in flow.ui.nodes:
-//   - Hidden CSRF token (default group)
-//   - Passkey trigger (passkey group). Wired up by /.well-known/ory/webauthn.js
-//     which Kratos returns as a script node. Conditional UI on the
-//     identifier input fires when the browser sees a discoverable credential.
-//   - Password fallback (password group): username + password
+// Three-tier sign-in, in priority order:
+//   1. PRIMARY  — passkey (passkey group). One-tap biometric/PIN, no username.
+//                 Wired up by /.well-known/ory/webauthn.js; conditional UI fires
+//                 on the identifier input when the browser sees a discoverable
+//                 credential.
+//   2. SECONDARY — email code (code group). Two-step: submit identifier →
+//                 Kratos emails a one-time code → submit the code. Promoted
+//                 fallback for new devices and lost passkeys.
+//   3. TERTIARY  — password (password group): username + password, collapsed
+//                 into a disclosure. LDAP bridge / Jellyfin depend on this path;
+//                 it stays enabled but de-emphasised.
+//
+// Code flow state detection: Kratos advances the same flow through two UI
+// shapes. Step 1 (identifier): code group has only a submit; the identifier
+// input is in the default group. Step 2 (code entry): code group gains a
+// text input named "code". We detect state by presence of that node.
 //
 // AAL2 step-up: ?aal=aal2 / ?refresh=true pass through to Kratos.
-//
-// Layout: passkey is the headline method; password is collapsed into a
-// disclosure so the page reads as one decision, not two competing forms.
 
 export const prerender = false;
 
@@ -23,7 +30,7 @@ import Layout from '../../layouts/Layout.astro';
 import PageHero from '../../components/PageHero.astro';
 import { browserFlows, getLoginFlow } from '../../lib/kratos';
 import { siteName } from '../../lib/config';
-import { csrfToken, hasMethod, nodesByGroup, asInput, scriptNodes } from '../../lib/nodes';
+import { csrfToken, hasMethod, nodesByGroup, asInput, scriptNodes, safeOnclick } from '../../lib/nodes';
 import type { FlowMessage } from '../../lib/types';
 
 const url = Astro.url;
@@ -54,6 +61,7 @@ const flow = result && result.kind === 'ok' ? result.flow : null;
 const ui = flow?.ui;
 const csrf = ui ? csrfToken(ui.nodes) : '';
 const hasPasskey = ui ? hasMethod(ui.nodes, 'passkey') : true;
+const hasCode = ui ? hasMethod(ui.nodes, 'code') : true;
 const hasPassword = ui ? hasMethod(ui.nodes, 'password') : true;
 const scripts = ui ? scriptNodes(ui.nodes) : [];
 
@@ -69,6 +77,15 @@ const identifierInput = ui ? (
 const passwordInput = ui
   ? nodesByGroup(ui.nodes, 'password').map(asInput).find((a) => a?.name === 'password') || null
   : null;
+
+// Code flow state detection. Step 1: no "code" text input in the code group.
+// Step 2: "code" text input present — Kratos has sent the email and now wants
+// the user to enter the 6-digit code.
+const codeNodes = ui ? nodesByGroup(ui.nodes, 'code') : [];
+const isCodeEntry = codeNodes.some((n) => {
+  const a = asInput(n);
+  return a?.name === 'code' && a.type === 'text';
+});
 ---
 <Layout title="Sign in" description={`Sign in to ${siteName}.`} bare>
 
@@ -77,7 +94,9 @@ const passwordInput = ui
     eyebrow="sign in"
     lede={aal === 'aal2'
       ? 'Additional verification is required to continue.'
-      : 'Use a passkey for the smoothest sign-in. Password works too.'}
+      : isCodeEntry
+        ? 'Check your email for the sign-in code.'
+        : 'Use a passkey for the smoothest sign-in.'}
   />
 
   {ui?.messages?.map((m: FlowMessage) => (
@@ -95,25 +114,11 @@ const passwordInput = ui
 
   <section class="login-card">
 
+    {/* ── TIER 1: Passkey ───────────────────────────────────────────────── */}
     {hasPasskey && (
-      <form method="POST" action={ui?.action ?? '#'} class="login-block">
+      <form method="POST" action={ui?.action ?? '#'} class="login-block passkey-block">
         <input type="hidden" name="csrf_token" value={csrf} />
         <input type="hidden" name="method" value="passkey" />
-
-        <div class="field">
-          <label for="identifier">Username</label>
-          <input
-            id="identifier"
-            name="identifier"
-            type="text"
-            autocomplete="username webauthn"
-            value={identifierInput?.value ? String(identifierInput.value) : ''}
-          />
-          <span class="field-hint">
-            With a registered passkey on this device, your browser will
-            offer to sign you in automatically.
-          </span>
-        </div>
 
         {ui && nodesByGroup(ui.nodes, 'passkey').map((n) => {
           const a = asInput(n);
@@ -122,13 +127,15 @@ const passwordInput = ui
             return <input type="hidden" name={a.name} value={String(a.value ?? '')} />;
           }
           if (a.type === 'submit' || a.type === 'button') {
+            // safeOnclick validates against KNOWN_TRIGGERS before emitting a
+            // window.<fn>() call. Never pass a.onclick raw to the DOM.
             return (
               <button
                 class="button button-primary login-primary"
                 type={a.type}
                 name={a.name}
                 value={String(a.value ?? '')}
-                onclick={a.onclick}
+                onclick={safeOnclick(a)}
               >
                 {n.meta?.label?.text ?? 'Sign in with passkey'}
               </button>
@@ -143,13 +150,143 @@ const passwordInput = ui
             Sign in with passkey
           </button>
         )}
+
+        <p class="passkey-hint">
+          One tap with your fingerprint, face, or device PIN — no username, no
+          password to remember.
+        </p>
       </form>
     )}
 
+    {/* ── TIER 2: Email code ────────────────────────────────────────────── */}
+    {/*
+      Two states share a single card:
+      - Identifier step (isCodeEntry=false): show email/identifier input +
+        "Send sign-in code" submit. The identifier lives in the default group,
+        but we render it here inside the code form so Kratos receives it.
+      - Code entry step (isCodeEntry=true): show the "code" text input +
+        Continue + Resend buttons. The identifier is now a hidden in code group.
+    */}
+    {hasCode && (
+      <div class="code-block">
+        {!isCodeEntry && (
+          <form method="POST" action={ui?.action ?? '#'} class="login-block code-form">
+            <input type="hidden" name="csrf_token" value={csrf} />
+
+            <div class="field">
+              <label for="code-identifier">Email address</label>
+              <input
+                id="code-identifier"
+                name="identifier"
+                type="email"
+                autocomplete="email"
+                required
+                value={identifierInput?.value ? String(identifierInput.value) : ''}
+                placeholder="you@example.com"
+              />
+            </div>
+
+            {/* Render the code-group submit (method=code) */}
+            {ui && codeNodes.map((n) => {
+              const a = asInput(n);
+              if (!a) return null;
+              if (a.type === 'submit' && a.name === 'method') {
+                return (
+                  <button class="button button-secondary code-submit" type="submit" name={a.name} value={String(a.value ?? 'code')}>
+                    {n.meta?.label?.text ?? 'Send sign-in code'}
+                  </button>
+                );
+              }
+              if (a.type === 'hidden') {
+                return <input type="hidden" name={a.name} value={String(a.value ?? '')} />;
+              }
+              return null;
+            })}
+
+            {!ui && (
+              <button class="button button-secondary code-submit" type="button" disabled>
+                Send sign-in code
+              </button>
+            )}
+          </form>
+        )}
+
+        {isCodeEntry && (
+          <form method="POST" action={ui?.action ?? '#'} class="login-block code-form">
+            <input type="hidden" name="csrf_token" value={csrf} />
+
+            {/* Hidden fields from the default group (carries identifier and any
+                other state Kratos needs for loginVerifyCode — but skip csrf_token
+                which is already rendered above). */}
+            {ui && nodesByGroup(ui.nodes, 'default').map((n) => {
+              const a = asInput(n);
+              if (!a || a.type !== 'hidden' || a.name === 'csrf_token') return null;
+              return <input type="hidden" name={a.name} value={String(a.value ?? '')} />;
+            })}
+
+            {/* Hidden fields from the code group (identifier + method) */}
+            {codeNodes.map((n) => {
+              const a = asInput(n);
+              if (!a) return null;
+              if (a.type === 'hidden') {
+                return <input type="hidden" name={a.name} value={String(a.value ?? '')} />;
+              }
+              return null;
+            })}
+
+            {/* The 6-digit code input */}
+            {codeNodes.map((n) => {
+              const a = asInput(n);
+              if (!a || a.name !== 'code' || a.type !== 'text') return null;
+              return (
+                <div class="field">
+                  <label for="login-code">{n.meta?.label?.text ?? 'Sign-in code'}</label>
+                  <input
+                    id="login-code"
+                    name="code"
+                    type="text"
+                    inputmode="numeric"
+                    autocomplete="one-time-code"
+                    required
+                    autofocus
+                    placeholder="123456"
+                  />
+                </div>
+              );
+            })}
+
+            <div class="code-actions">
+              {/* Continue (primary submit) */}
+              {codeNodes.map((n) => {
+                const a = asInput(n);
+                if (!a || a.type !== 'submit' || a.name !== 'method') return null;
+                return (
+                  <button class="button button-secondary code-submit" type="submit" name={a.name} value={String(a.value ?? 'code')}>
+                    {n.meta?.label?.text ?? 'Continue'}
+                  </button>
+                );
+              })}
+              {/* Resend */}
+              {codeNodes.map((n) => {
+                const a = asInput(n);
+                if (!a || a.type !== 'submit' || a.name !== 'resend') return null;
+                return (
+                  <button class="button button-ghost code-resend" type="submit" name={a.name} value={String(a.value ?? 'code')}>
+                    {n.meta?.label?.text ?? 'Resend code'}
+                  </button>
+                );
+              })}
+            </div>
+          </form>
+        )}
+      </div>
+    )}
+
+    {/* ── TIER 3: Password (legacy) ─────────────────────────────────────── */}
     {hasPassword && (
       <details class="password-disclosure">
         <summary class="password-summary">
-          <span class="password-summary-label">Use a password instead</span>
+          <span class="password-summary-label">Use a password (legacy)</span>
           <span class="password-summary-icon" aria-hidden="true">+</span>
         </summary>
 
@@ -157,23 +294,17 @@ const passwordInput = ui
           <input type="hidden" name="csrf_token" value={csrf} />
           <input type="hidden" name="method" value="password" />
 
-          {!hasPasskey && (
-            <div class="field">
-              <label for="pw-identifier">Username</label>
-              <input
-                id="pw-identifier"
-                name="identifier"
-                type="text"
-                autocomplete="username"
-                required
-                value={identifierInput?.value ? String(identifierInput.value) : ''}
-              />
-            </div>
-          )}
-          {hasPasskey && (
-            <input type="hidden" name="identifier"
-                   value={identifierInput?.value ? String(identifierInput.value) : ''} />
-          )}
+          <div class="field">
+            <label for="pw-identifier">Username</label>
+            <input
+              id="pw-identifier"
+              name="identifier"
+              type="text"
+              autocomplete="username"
+              required
+              value={identifierInput?.value ? String(identifierInput.value) : ''}
+            />
+          </div>
 
           <div class="field">
             <label for="password">Password</label>
@@ -196,13 +327,22 @@ const passwordInput = ui
   </section>
 
   <footer class="login-footer">
-    <a href="/auth/recovery" class="login-foot-link">Forgot your password</a>
+    <a href="/auth/recovery" class="login-foot-link">New device or can't sign in?</a>
     <span class="login-foot-sep" aria-hidden="true">·</span>
     <a href="/" class="login-foot-link">Back home</a>
   </footer>
 
   {scripts.map((s) => (
-    <script src={s.src} id={s.id} async is:inline></script>
+    <script
+      src={s.src}
+      id={s.id}
+      async
+      is:inline
+      integrity={s.integrity}
+      crossorigin={s.crossorigin}
+      referrerpolicy={s.referrerpolicy}
+      nonce={s.nonce}
+    ></script>
   ))}
 
 </Layout>
@@ -229,17 +369,49 @@ const passwordInput = ui
     padding: var(--space-4);
     font-size: var(--text-base);
   }
+  /* Quiet reassurance under the one-tap button. */
+  .passkey-hint {
+    margin: var(--space-2) 0 0;
+    font-size: var(--text-sm);
+    line-height: 1.5;
+    color: var(--text-muted);
+    text-align: center;
+  }
+
+  /* Code block: prominent secondary tier, separated by a divider */
+  .code-block {
+    margin-top: var(--space-5);
+    padding-top: var(--space-5);
+    border-top: 1px solid var(--border);
+  }
+  .code-form {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-4);
+  }
+  .code-submit {
+    width: 100%;
+  }
+  .code-actions {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-2);
+  }
+  .code-resend {
+    width: 100%;
+    font-size: var(--text-sm);
+    color: var(--text-muted);
+  }
 
   /* Disclosure: collapsed by default. The summary line reads as a quiet
    * secondary affordance, expanding into a sibling form. */
   .password-disclosure {
     margin-top: var(--space-5);
-    padding-top: var(--space-5);
-    border-top: 1px solid var(--border);
   }
   .password-disclosure[open] .password-summary-icon {
     transform: rotate(45deg);
   }
+  /* Thumb-friendly toggle: a full-width tappable row, not a quiet text link. */
   .password-summary {
     list-style: none;
     cursor: pointer;
@@ -247,12 +419,23 @@ const passwordInput = ui
     align-items: center;
     justify-content: space-between;
     gap: var(--space-3);
+    min-height: 52px;
+    padding: var(--space-3) var(--space-4);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
     font-family: var(--font-mono);
     font-size: var(--text-sm);
     color: var(--text-2);
-    transition: color var(--duration-fast) var(--ease-out);
+    transition:
+      color var(--duration-fast) var(--ease-out),
+      border-color var(--duration-fast) var(--ease-out),
+      background var(--duration-fast) var(--ease-out);
   }
-  .password-summary:hover { color: var(--text); }
+  .password-summary:hover {
+    color: var(--text);
+    border-color: var(--border-strong);
+    background: var(--surface);
+  }
   .password-summary::-webkit-details-marker { display: none; }
   .password-summary-label {
     text-transform: uppercase;

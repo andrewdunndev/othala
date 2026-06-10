@@ -1,0 +1,55 @@
+# Browser-profile compose override.
+#
+# Layered on top of compose.yml ONLY for the `browser` profile run:
+#
+#   docker compose -f compose.yml -f compose.browser.yml --profile browser up -d
+#
+# WHY THIS FILE EXISTS — the split-horizon problem:
+#
+#   The golden (smoke) run sets KRATOS_PUBLIC_URL=http://kratos:4433 on the
+#   othala service so SSR calls go directly to Kratos over the compose network
+#   (fast, no Caddy hop). That is correct for the golden run because the smoke
+#   never drives a real browser.
+#
+#   The browser profile adds Caddy + Playwright. Playwright drives Chromium
+#   inside the compose net; auth.othala.test resolves to the Caddy container
+#   (network alias). When the portal's browserFlows helpers build the Kratos
+#   initiation URL (e.g. /self-service/login/browser), they use
+#   KRATOS_PUBLIC_URL. With the golden setting that URL becomes
+#   http://kratos:4433/self-service/login/browser — a host the BROWSER cannot
+#   resolve (it resolves compose service names only through the compose network,
+#   and the browser is NOT the othala SSR process). The browser never reaches
+#   Kratos, so the CSRF anti-forgery cookie is never set on the correct domain
+#   (othala.test), and every subsequent browser flow POST returns 403
+#   "Cross-site POST forbidden" or redirect-loops.
+#
+#   Fix: override KRATOS_PUBLIC_URL to http://auth.othala.test (the Caddy edge
+#   alias) for the othala container in the browser profile. SSR calls from the
+#   portal code now go Caddy → Kratos (one extra hop, perfectly acceptable in
+#   the e2e lab). The browser sees auth.othala.test everywhere, the CSRF cookie
+#   is scoped to othala.test, and the login/settings/recovery redirect chains
+#   resolve correctly.
+#
+# NOTE: this is the codification of the TODO left in compose.yml line 385-388.
+# The fix belongs in the OSS harness (any adopter running the browser profile
+# hits the same split-horizon issue), so it ships as a committed override file.
+# The golden smoke path (no -f compose.browser.yml) is unaffected.
+
+services:
+  othala:
+    environment:
+      # Override: browser flows build redirect URLs from this var; must be the
+      # browser-resolvable Caddy edge host, not the internal container name.
+      KRATOS_PUBLIC_URL: http://auth.othala.test
+      # Override: in production (iac), Kratos and the portal run in the same
+      # quadlet pod and share a loopback network namespace — Kratos can reach
+      # http://othala:4431/admin/recovery-gate via 127.0.0.1 inside the pod.
+      # In the e2e lab each container is a separate network peer; 127.0.0.1
+      # inside the othala container is not reachable from the kratos container.
+      # Bind the admin port to all interfaces so the recovery-gate webhook
+      # (Kratos → othala:4431/admin/recovery-gate) can succeed in the lab.
+      # The admin endpoints are protected by bearer tokens (RECOVERY_GATE_SECRET
+      # / OTHALA_ADMIN_ENDPOINT_BEARER), so 0.0.0.0 is safe within the compose
+      # network. The smoke run (no browser profile) keeps 127.0.0.1 since it
+      # never drives the webhook path end-to-end.
+      ADMIN_HOST: "0.0.0.0"

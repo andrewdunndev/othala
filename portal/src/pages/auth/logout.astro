@@ -9,7 +9,7 @@
 
 export const prerender = false;
 
-import { getLogoutInfo, getSession } from '../../lib/kratos';
+import { getLogoutInfo, getSession, kratosBase } from '../../lib/kratos';
 
 const cookie = Astro.request.headers.get('cookie') ?? undefined;
 
@@ -26,7 +26,17 @@ if (!session?.active) {
 
 const info = await getLogoutInfo(cookie);
 if (info) {
-  return Astro.redirect(info.logout_url);
+  // Defense-in-depth: assert the logout_url origin matches the configured
+  // Kratos public origin so a compromised/unexpected Kratos response can't
+  // redirect the user off-instance.
+  try {
+    const logoutOrigin = new URL(info.logout_url).origin;
+    const kratosOrigin = new URL(kratosBase()).origin;
+    if (logoutOrigin === kratosOrigin) return Astro.redirect(info.logout_url);
+  } catch {
+    // malformed URL — fall through to '/'
+  }
+  return Astro.redirect('/');
 }
 
 return Astro.redirect('/');

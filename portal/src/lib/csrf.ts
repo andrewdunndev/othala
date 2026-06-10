@@ -17,12 +17,18 @@
 //
 // Token shape:
 //
-//   <ts>.<identityId>.<nonce>.<sig>
+//   <ts>.<identityId>.<nonce>.<sig>           (identity-only token, action="")
+//   <ts>.<identityId>.<nonce>.<action>.<sig>  (action-scoped token)
 //
 //   - ts:        unix seconds at issuance
 //   - identityId: the admin's identity id; binds the token to one user
-//   - nonce:     16 bytes from crypto.randomUUID() (URL-safe)
-//   - sig:       HMAC-SHA256(secret, ts.identityId.nonce) base64url
+//   - nonce:     16 bytes from randomBytes (URL-safe base64)
+//   - action:    optional verb that limits which POST action the token can
+//                authorise (e.g. "issue-recovery", "force-relogin",
+//                "deactivate"). Present only when signToken() is called with
+//                an action string. Backward-compatible: callers that omit
+//                action still produce/verify 4-part tokens.
+//   - sig:       HMAC-SHA256(secret, <everything before the sig dot>) base64url
 //
 // Single-use replay defence is in-memory: every consumed nonce is held
 // for the TTL window. The portal runs as a single Node SSR pod (no
@@ -75,14 +81,25 @@ export class CSRFError extends Error {
 /**
  * Mint a CSRF token for the given admin identity. Embed in a hidden
  * form input named `csrf_token`. The token expires 30 min after issue.
+ *
+ * @param identityId  The admin's Kratos identity id.
+ * @param action      Optional action verb (e.g. "issue-recovery"). When
+ *                    provided the token is action-scoped: verifyToken will
+ *                    reject it if the submitted action does not match.
+ *                    Omit (or pass undefined) for identity-only tokens
+ *                    (backward-compatible with existing call sites).
  */
-export function signToken(identityId: string): string {
+export function signToken(identityId: string, action?: string): string {
   if (!identityId || !identityId.trim()) {
     throw new CSRFError('identityId is required to sign a CSRF token');
   }
   const ts = Math.floor(Date.now() / 1000);
   const nonce = randomBytes(16).toString('base64url');
-  const body = `${ts}.${identityId}.${nonce}`;
+  // Action is included in the signed body when provided so it cannot be
+  // stripped or swapped without invalidating the HMAC.
+  const body = action
+    ? `${ts}.${identityId}.${nonce}.${action}`
+    : `${ts}.${identityId}.${nonce}`;
   const sig = createHmac('sha256', secret()).update(body).digest('base64url');
   return `${body}.${sig}`;
 }
@@ -92,8 +109,21 @@ export function signToken(identityId: string): string {
  * CSRFError on missing, malformed, expired, replayed, or wrong-identity
  * tokens. On success, the nonce is recorded as consumed: the token
  * cannot be replayed.
+ *
+ * @param presented   The token string from the form submission.
+ * @param identityId  The admin's Kratos identity id.
+ * @param action      Expected action string. When provided, the token must
+ *                    have been minted with the same action (action-scoped
+ *                    tokens). When omitted, an identity-only (4-part) token
+ *                    is expected; passing an action-scoped token for a
+ *                    call site that doesn't require one is rejected (the
+ *                    signature would mismatch).
  */
-export function verifyToken(presented: string | null | undefined, identityId: string): void {
+export function verifyToken(
+  presented: string | null | undefined,
+  identityId: string,
+  action?: string,
+): void {
   if (!presented) {
     throw new CSRFError('CSRF token missing');
   }
@@ -101,10 +131,36 @@ export function verifyToken(presented: string | null | undefined, identityId: st
     throw new CSRFError('identityId required for verify');
   }
   const parts = presented.split('.');
-  if (parts.length !== 4) {
-    throw new CSRFError('CSRF token malformed');
+
+  // A token without an action has 4 parts: ts.identity.nonce.sig
+  // A token with an action has 5 parts: ts.identity.nonce.action.sig
+  // Action strings are simple verbs (letters, hyphens) and cannot contain
+  // dots, so the split is unambiguous.
+  if (action) {
+    if (parts.length !== 5) {
+      throw new CSRFError('CSRF token malformed (expected action-scoped token)');
+    }
+  } else {
+    if (parts.length !== 4) {
+      throw new CSRFError('CSRF token malformed');
+    }
   }
-  const [tsStr, presentedIdentityId, nonce, presentedSig] = parts;
+
+  let tsStr: string;
+  let presentedIdentityId: string;
+  let nonce: string;
+  let presentedAction: string | undefined;
+  let presentedSig: string;
+
+  if (action) {
+    [tsStr, presentedIdentityId, nonce, presentedAction, presentedSig] = parts as [
+      string, string, string, string, string,
+    ];
+  } else {
+    [tsStr, presentedIdentityId, nonce, presentedSig] = parts as [
+      string, string, string, string,
+    ];
+  }
 
   const ts = Number.parseInt(tsStr, 10);
   if (!Number.isFinite(ts) || ts <= 0) {
@@ -124,9 +180,17 @@ export function verifyToken(presented: string | null | undefined, identityId: st
     throw new CSRFError('CSRF token bound to a different identity');
   }
 
-  const expectedSig = createHmac('sha256', secret())
-    .update(`${tsStr}.${presentedIdentityId}.${nonce}`)
-    .digest();
+  // For action-scoped tokens, verify the action matches before checking
+  // the signature so the error is informative. Timing-safe: action mismatch
+  // is not a secret; the HMAC mismatch below is the definitive gate.
+  if (action && presentedAction !== action) {
+    throw new CSRFError(`CSRF token action mismatch (expected '${action}', got '${presentedAction}')`);
+  }
+
+  const signedBody = action
+    ? `${tsStr}.${presentedIdentityId}.${nonce}.${presentedAction}`
+    : `${tsStr}.${presentedIdentityId}.${nonce}`;
+  const expectedSig = createHmac('sha256', secret()).update(signedBody).digest();
   let presentedSigBuf: Buffer;
   try {
     presentedSigBuf = Buffer.from(presentedSig, 'base64url');

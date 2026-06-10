@@ -11,13 +11,26 @@ set -euo pipefail
 
 gen()       { openssl rand -hex 32; }
 gen_short() { openssl rand -hex 16; }
-gen_alnum() { openssl rand -base64 24 | tr -d '+/=' | head -c 32; }
+# gen_alnum: produce exactly 32 alphanumeric characters.
+# base64 24 → ~32 chars after stripping +/=, but tr -d on a partial
+# pipeline can yield fewer than 32 when deletion runs pull the count below
+# the head -c window. 48 bytes → ~64 base64 chars → ~48 alnum survivors,
+# comfortably above 32. The assert loop retries on the astronomically rare
+# sub-32 output (Bernoulli p≈0.75 per char; P(<32 from 48)≈10⁻⁸).
+gen_alnum() {
+    local s
+    while true; do
+        s=$(openssl rand -base64 48 | tr -dc 'a-zA-Z0-9' | head -c 32)
+        [[ ${#s} -eq 32 ]] && break
+    done
+    printf '%s' "$s"
+}
 
 # AUTH_REGISTRY is the registry ROOT — the converged othala app image
-# itself (registry.gitlab.com/dunn.dev/othala). ldap-bridge is the
-# ${AUTH_REGISTRY}/ldap-bridge sub-image. AUTH_VERSION is the tag.
+# itself (registry.gitlab.com/dunn.dev/othala). AUTH_VERSION is the tag.
 # In CI: AUTH_REGISTRY=$CI_REGISTRY_IMAGE, AUTH_VERSION=the just-built
 # tag (v-tag or short-SHA). Local operator runs use :latest.
+# NOTE: the LDAP bridge is now gitlab.com/dunn.dev/kratos-ldap (separate).
 AUTH_REGISTRY="${AUTH_REGISTRY:-registry.gitlab.com/dunn.dev/othala}"
 AUTH_VERSION="${AUTH_VERSION:-latest}"
 
@@ -50,9 +63,14 @@ HYDRA_PG_PASS=$(gen_alnum)
 # OTHALA_SMTP_CONNECTION_URI is the single source of truth, consumed by:
 #   - kratos/kratos.yml  courier.smtp.connection_uri  (rendered by validate.sh)
 #   - portal/src/lib/mailer.ts  (read via lib/config.ts at request time)
+#
+# ?disable_starttls=true is required for mailpit (and any plain-text SMTP relay).
+# Kratos v26.2.0 gomail defaults to MandatoryStartTLS even for smtp:// URIs; without
+# this flag the courier worker connects successfully but then fails STARTTLS
+# negotiation and abandons every message after 6 retries.
 SMTP_USER=lab
 SMTP_PASS=lab
-OTHALA_SMTP_CONNECTION_URI=smtp://mailpit:1025
+OTHALA_SMTP_CONNECTION_URI=smtp://mailpit:1025/?disable_starttls=true
 # The contact form delivers here; the smoke seeds this as the recipient and
 # asserts mailpit received a message addressed to it.
 OTHALA_CONTACT_RECIPIENT=ops@othala.test
@@ -79,6 +97,13 @@ KRATOS_PG_HOST=postgres
 HYDRA_PG_HOST=postgres
 KRATOS_ADMIN_HOST=kratos
 CONSENT_HOST=othala
+
+# ── Admin-plane bind addresses ────────────────────────────────────────────────
+# The e2e harness is single-network, so the admin APIs bind all interfaces.
+# Segmented deployments (iac) set these to the admin-plane network IP so the
+# unauthenticated admin listeners never answer on the edge interface.
+KRATOS_ADMIN_BIND_HOST=0.0.0.0
+HYDRA_ADMIN_BIND_HOST=0.0.0.0
 
 # Kratos cookie + cipher + Hydra cookie: single active secret each
 # (collapsed-key, LB#10). No _PREVIOUS at rest — v26.2.0 uniqueItems.

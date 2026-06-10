@@ -51,6 +51,9 @@ COPY portal/ portal/
 # are read at runtime from /etc/portal/manifests/ (mounted via the
 # iac quadlet volume). See portal/src/lib/manifests.ts.
 
+# No build-time host: astro.config.mjs uses a host-agnostic
+# security.allowedDomains wildcard, so checkOrigin works behind the reverse
+# proxy without baking any deployment host into the image.
 RUN cd portal \
     && npm run build \
     && npm prune --omit=dev
@@ -64,7 +67,7 @@ ENV NODE_ENV=production \
     HOST=0.0.0.0 \
     PORT=8080 \
     ADMIN_HOST=127.0.0.1 \
-    ADMIN_PORT=8431
+    ADMIN_PORT=4431
 
 # ci-runtime-node inherits the `default` user (uid 1001) from
 # ubi9/nodejs-22-minimal. COPY as root, then switch to 1001 for

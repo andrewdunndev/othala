@@ -13,16 +13,21 @@ serve:
       enabled: true
       allowed_origins:
         - ${OTHALA_PUBLIC_URL}
-      allowed_methods: [GET, POST, PUT, DELETE]
+      # Trim to the methods OIDC/OAuth2 actually requires; DELETE and PUT
+      # have no place on the public token/discovery endpoints.
+      allowed_methods: [GET, POST]
       allowed_headers:
         - Authorization
         - Content-Type
       allow_credentials: true
   admin:
     port: 4445
-    # Admin port is internal-only on the carmine pod network.
-    # Reachable from the consent service co-located on carmine.
+    # Admin-plane bind address. The admin API is unauthenticated by design
+    # (Ory's model: the network IS the control), so segmented deployments
+    # bind it to an address only the admin-plane network can reach.
+    # Single-network deployments (the e2e harness) use 0.0.0.0.
     # NEVER expose publicly.
+    host: ${HYDRA_ADMIN_BIND_HOST}
 
 urls:
   self:
@@ -61,7 +66,10 @@ ttl:
   refresh_token: 720h    # 30 days
   id_token: 1h
   auth_code: 10m
-  login_consent_request: 1h
+  # Narrowed from 1h: a stolen challenge redirect is usable for the full
+  # window; 30m cuts the stolen-challenge exposure in half with no UX cost
+  # (users are unlikely to leave a browser tab open that long mid-login).
+  login_consent_request: 30m
 
 oauth2:
   pkce:
@@ -75,7 +83,16 @@ oauth2:
                                        # client is ever added.
   hashers:
     bcrypt:
-      cost: 10
+      # Raised from 10: cost 14 (~700ms on modern hardware) meaningfully
+      # raises the bar for offline brute-force of stolen client-secret hashes.
+      cost: 14
+  # NOTE: an explicit `oauth2.strategies` pin (access_token=opaque, scope=exact)
+  # was tried here but Hydra v26.2.0's schema rejects it (additionalProperties
+  # "strategies" not allowed) and the IdP refuses to boot — caught by the live
+  # e2e stand-up. Both values are already the Hydra defaults (the live OIDC
+  # dance confirms correct scope/token behaviour), so we rely on them rather
+  # than gamble on an unverified key location. Revisit if a supported pin
+  # surfaces upstream.
   expose_internal_errors: false
   client_credentials:
     default_grant_allowed_scope: false

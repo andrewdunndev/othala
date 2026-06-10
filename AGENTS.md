@@ -24,9 +24,10 @@ Othala composes three upstream pieces and adds two of its own:
 - **`portal/`** — one Astro (Node SSR) application that front-ends *all* of the
   above: the Kratos self-service UI, the Hydra login/consent/logout challenge
   handlers, the access gate, the id_token claims builder, and an admin surface.
-- **`ldap-bridge/`** — a small Go binary that presents Kratos identities over
-  LDAP, for apps that can only speak LDAP (e.g. media servers with an LDAP auth
-  plugin) and cannot do OIDC.
+- **LDAP bridge** — the glauth-kratos Go binary that presents Kratos identities
+  over LDAP for non-OAuth clients (Jellyfin, Apple TV / Infuse SSO) is now a
+  separate sibling project: `gitlab.com/dunn.dev/kratos-ldap`. It no longer
+  lives in this repo.
 
 Ory ships its services headless and expects you to bring your own UI and your
 own glue. Othala *is* that UI and glue, opinionated for the single-operator,
@@ -52,7 +53,7 @@ small-user-count case.
   the app's manifest, injected into the issued token
   (`portal/src/lib/claims.ts`, `manifests.ts`).
 - **A dual-listener server.** Public SSR on `:8080`; a loopback-only admin
-  listener on `:8431` carries privileged routes (`/admin/revoke-user`,
+  listener on `:4431` carries privileged routes (`/admin/revoke-user`,
   `/admin/recovery-gate`) so they are never exposed on the public interface
   (`portal/src/server/listen.mjs`, `portal/src/lib/admin-port.*`).
 
@@ -67,8 +68,6 @@ the admin UI is display metadata, not an authority gate.
 ```
 portal/        Astro Node-SSR app: self-service UI, OIDC handlers, gate,
                claims, admin surface, dual-listener server.
-ldap-bridge/   Go binary bridging LDAP BIND/SEARCH to the Kratos public/admin
-               APIs, for LDAP-only relying apps.
 kratos/        Ory Kratos config (kratos.yml), identity schema, hooks.
 hydra/         Ory Hydra config (hydra.yml).
 e2e/           Compose-based stand-up: the canonical "run Othala on Docker/
@@ -93,7 +92,7 @@ pages/auth/*         Kratos self-service pages (login, recovery, settings, …).
 pages/oauth2/*       Hydra login/consent/logout challenge endpoints.
 pages/apps/[slug]    Per-app detail/education page.
 pages/admin/*        Admin UI (users, groups, OAuth2 clients, activity).
-server/listen.mjs    Dual-listener entrypoint (public :8080 + admin :8431).
+server/listen.mjs    Dual-listener entrypoint (public :8080 + admin :4431).
 ```
 
 ---
@@ -203,13 +202,17 @@ a warning.
 | `OTHALA_SMTP_CONNECTION_URI` | SMTP relay URI (`smtps://user:pass@host:465`). **Single source** shared by `kratos.yml` courier and the portal contact-form mailer (`lib/mailer.ts`). Required in prod. |
 | `OTHALA_CONTACT_RECIPIENT` | Where the dashboard request form delivers. Falls back to the first `OTHALA_ADMIN_SUBJECTS` entry. |
 | `OTHALA_PASSWORD_MIN_LENGTH`, `OTHALA_HIBP_ENABLED` | Password policy knobs. |
+| `KRATOS_ADMIN_BIND_HOST`, `HYDRA_ADMIN_BIND_HOST` | Admin-API bind addresses (render vars, not portal config). `0.0.0.0` single-network (e2e); segmented deployments bind the admin-plane network IP. |
 
 **Ory configs are rendered, not natively expanded.** Ory has no native
-`${VAR}` expansion. The `kratos/` and `hydra/` YAML carry `${OTHALA_*}` (and
-`${*_SECRET}`) placeholders that are expanded once — `python3
-os.path.expandvars` — into `*.rendered.yml` before the services start. See
-`e2e/validate.sh`, which also fails loudly if any non-comment line still carries
-an un-expanded `${VAR}` (a missing render variable).
+`${VAR}` expansion. The `kratos/` and `hydra/` YAML are TEMPLATES whose
+`${VAR}` placeholders are substituted by **`scripts/render-config.sh`** — the
+single canonical render, shared by the e2e harness (`e2e/validate.sh`) and the
+deploy plane (`dunn.dev/iac`). The variable contract is derived from the
+template itself: render-config.sh fails fast, listing missing variable NAMES
+(never rendered content), if any `${VAR}` token is unset or empty. Only braced
+`${VAR}` tokens are substituted, and only those appearing in the template — a
+wide caller environment cannot leak into the output.
 
 ---
 
@@ -220,7 +223,7 @@ validation harness. It uses the RFC 6761 reserved test domain **`othala.test`**
 (and `dc=othala,dc=test` for LDAP), so nothing leaks onto a real domain.
 
 ```
-e2e/compose.yml        Postgres + Kratos + Hydra + portal + ldap-bridge + Caddy.
+e2e/compose.yml        Postgres + Kratos + Hydra + portal + Caddy.
 e2e/gen-secrets.sh     Generate the local .env (secrets + OTHALA_* values).
 e2e/validate.sh        Top-level orchestrator: render configs, up, health-wait,
                        run the OIDC dance + smoke matrix.
@@ -238,7 +241,7 @@ bash validate.sh             # render → up → wait → dance → smoke
 ```
 
 `validate.sh` renders the Ory configs, brings the stack up, waits on health
-(the portal's healthcheck hits its loopback admin `/healthz` on `:8431`), runs
+(the portal's healthcheck hits its loopback admin `/healthz` on `:4431`), runs
 the OIDC dance, then the smoke matrix. The compose stack mounts the *rendered*
 config copies, never the canonical sources directly. Caddy fronts the stack so
 specs can hit `othala.test` hostnames over TLS. The harness is validated end to
@@ -266,13 +269,8 @@ The `scripts/*.test.mjs` suite covers the access gate, claims injection, CSRF,
 the manifest loader/validator, admin auth + allowlist, the Kratos node renderer,
 and the recovery gate — including property-based `*.fuzz.test.mjs` suites.
 
-**LDAP bridge (`ldap-bridge/`):**
-
-```sh
-go test ./...     # unit tests
-```
-
-(The repo uses a Go workspace; see `go.work`.)
+**LDAP bridge:** extracted to `gitlab.com/dunn.dev/kratos-ldap`. No Go
+sources or workspace remain in this repo.
 
 ---
 
@@ -287,7 +285,7 @@ go test ./...     # unit tests
 - **Env is read in one place.** All `OTHALA_*` consumption lives in
   `lib/config.ts`. Add new instance config there, with a documented prod
   behavior (throw) and dev default.
-- **The admin port is loopback-only.** Privileged routes live on `:8431` and
+- **The admin port is loopback-only.** Privileged routes live on `:4431` and
   must stay off the public listener. Don't move admin routes to the public mux.
 - **Fail closed.** The gate, the audience/redirect check, and the manifest
   validator all default to deny / reject on anything ambiguous. Preserve that.
@@ -316,11 +314,14 @@ deviate when the upstream pathway is genuinely broken on our hardware — and
 then document *why* at the deviation site.
 
 - **Ory Kratos / Hydra config** — use native Kratos/Hydra YAML config fields
-  directly. Ory has no built-in `${VAR}` expansion; the sanctioned bridge is a
-  single `python3 os.path.expandvars` render step that produces `*.rendered.yml`
-  before the services start. Don't bypass this with separate config-management
-  templating — the render-step and its missing-variable guard in `e2e/validate.sh`
-  are the canonical pattern.
+  directly. Ory has no built-in `${VAR}` expansion; the sanctioned bridge is
+  `scripts/render-config.sh` — the single canonical render producing
+  `*.rendered.yml` before the services start, with a template-derived
+  missing-variable guard. Don't bypass it with separate config-management
+  templating. CAUTION for deploy planes: docker compose interpolates `${VAR}`
+  inside compose.yml natively, but systemd/quadlet `Environment=` does NOT
+  (it empties or passes `${}` literally) — the compose pattern must never be
+  copied into a quadlet; quadlet consumers mount a rendered config instead.
 - **`@ory/client-fetch` SDK** — use the generated Ory SDK for all Kratos/Hydra
   API calls (`portal/src/lib/`). Bespoke `fetch()` calls against the Ory admin
   or public APIs are a maintenance trap: SDK types and endpoint paths track
@@ -337,4 +338,4 @@ then document *why* at the deviation site.
 - `docs/golden-path.md`, `docs/per-app-oidc.md` — the intended deploy shape and
   the per-app OIDC contract.
 - `e2e/README.md` — the harness in detail.
-- `ldap-bridge/README.md`, `ldap-bridge/DESIGN.md` — the LDAP bridge.
+- `gitlab.com/dunn.dev/kratos-ldap` — the LDAP bridge (separate repo).

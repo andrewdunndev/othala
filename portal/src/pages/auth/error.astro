@@ -1,0 +1,96 @@
+---
+// /auth/error — branded denial / auth error page.
+//
+// This is the redirect target for access-denied and auth-failure flows
+// throughout the portal. The `reason` query param drives the status code,
+// title, and message. Known reasons are mapped below; an unknown reason
+// falls through to a generic 400.
+//
+// Known reasons (grep for `/auth/error?reason=` in src/):
+//   not-admin        — user is authenticated but not in the admin allowlist
+//   not-authorised   — user lacks the required access group for an app
+//   auth-unreachable — Kratos is unreachable or returned an unexpected error
+//
+// Additional well-known reasons defined here:
+//   session-expired  — session is invalid or timed out
+//   forbidden        — generic 403 when a more specific reason is unavailable
+//   unavailable      — upstream dependency temporarily unavailable
+
+export const prerender = false;
+
+import StatusPage from '../../components/StatusPage.astro';
+
+interface ErrorEntry {
+  status: number;
+  title: string;
+  message: string;
+}
+
+const REASON_MAP: Record<string, ErrorEntry> = {
+  'not-admin': {
+    status: 403,
+    title: 'Not authorised',
+    message:
+      'Your account does not have administrator access. If you believe this is incorrect, contact your administrator.',
+  },
+  'not-authorised': {
+    status: 403,
+    title: 'Not authorised',
+    message:
+      'Your account does not have access to this resource. Contact your administrator to request access.',
+  },
+  'auth-unreachable': {
+    status: 503,
+    title: 'Auth temporarily unavailable',
+    message:
+      'The authentication service is temporarily unreachable. Please try again in a moment.',
+  },
+  'session-expired': {
+    status: 401,
+    title: 'Session expired',
+    message: 'Your session has expired or is no longer valid. Please sign in again.',
+  },
+  'forbidden': {
+    status: 403,
+    title: 'Forbidden',
+    message: 'You do not have permission to access this resource.',
+  },
+  'unavailable': {
+    status: 503,
+    title: 'Service temporarily unavailable',
+    message: 'A dependency is temporarily unavailable. Please try again in a moment.',
+  },
+  'not-found': {
+    status: 404,
+    title: 'Not found',
+    message: 'The page you are looking for does not exist or has moved.',
+  },
+  'rate-limited': {
+    status: 429,
+    title: 'Too many requests',
+    message: 'You have made too many requests. Please wait a moment and try again.',
+  },
+  'server-error': {
+    status: 500,
+    title: 'Something went wrong',
+    message: 'An unexpected error occurred. Please try again in a moment.',
+  },
+};
+
+const DEFAULT_ENTRY: ErrorEntry = {
+  status: 400,
+  title: 'Access denied',
+  message: 'Your request could not be completed. Please sign in and try again.',
+};
+
+const reason = Astro.url.searchParams.get('reason') ?? '';
+const entry = REASON_MAP[reason] ?? DEFAULT_ENTRY;
+
+Astro.response.status = entry.status;
+---
+<StatusPage
+  status={entry.status}
+  title={entry.title}
+  message={entry.message}
+  reason={reason || undefined}
+/>

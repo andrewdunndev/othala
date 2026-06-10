@@ -1,19 +1,18 @@
 # dunn.dev/othala -- container build + release pipeline.
 #
-# Two custom images build via the dunn.dev/pipeline container-image
+# One custom image builds via the dunn.dev/pipeline container-image
 # template:
 #   - othala       the converged Astro Node SSR app, published at the
 #                  registry root (registry.gitlab.com/dunn.dev/othala)
 #                  via publish_at_root: true (the oryd/kratos-style
 #                  namespace/name shape).
-#   - ldap-bridge  the Go glauth-kratos LDAP bridge, published as the
-#                  othala/ldap-bridge sub-image.
 # caddy lives in the separate dunn.dev/caddy-estate repo; the
 # production Caddyfile snippets live in the deploy repo's services/dag/.
 #
 # The legacy consent/ (Go) and util/ (Bash) modules were retired at the
-# E1 cutover: their roles converged into the othala app. The source dirs
-# are deleted; only ldap-bridge remains as a standalone Go module.
+# E1 cutover: their roles converged into the othala app. The LDAP bridge
+# (glauth-kratos) has been extracted to a separate standalone repo:
+# gitlab.com/dunn.dev/kratos-ldap. Its source no longer lives here.
 #
 # Per-image release flow on every tag:
 #   build       container-image  ->  push :TAG + :latest + cosign sig
@@ -54,40 +53,14 @@ stages:
 
 include:
   # ----- Verify (push + MR): per-service build clean ---------------
-  # Closes the Renovate-MR-without-CI gap. The catalog's go-build and
-  # node-build components fire on every push and MR event. go.work at
-  # repo root makes the multi-module layout play nicely with
-  # `go build ./<dir>`.
-  - component: gitlab.com/dunn.dev/pipeline/go-build@2.5.1
-    inputs:
-      stage: verify
-      job_name: verify-ldap-bridge
-      binary_name: ldap-bridge
-      package_path: ./ldap-bridge
-
+  # Closes the Renovate-MR-without-CI gap. The catalog's node-build
+  # component fires on every push and MR event.
   - component: gitlab.com/dunn.dev/pipeline/node-build@2.5.1
     inputs:
       stage: verify
       job_name: verify-othala
       package_path: portal
 
-
-  # ----- ldap-bridge ----------------------------------------------
-  - component: gitlab.com/dunn.dev/pipeline/container-image@2.5.1
-    inputs:
-      job_name: build-ldap-bridge
-      image_tag: ldap-bridge
-      containerfile: ldap-bridge/Containerfile
-      context: ldap-bridge
-      tag_pipeline: true
-
-  - component: gitlab.com/dunn.dev/pipeline/container-sbom@2.5.1
-    inputs:
-      job_name: sbom-ldap-bridge
-      container_image: "${CI_REGISTRY_IMAGE}/ldap-bridge:${CI_COMMIT_TAG}"
-      container_image_job: build-ldap-bridge
-      package_name: auth
-      sbom_filename: ldap-bridge-container.sbom.json
 
   # ----- e2e-tester (prebaked Playwright browser-test image) ------
   # The browser e2e leg runs inside the carmine inner VM, which can pull
@@ -100,8 +73,8 @@ include:
   # playwright + dance-runner services consume it as the
   # ${AUTH_REGISTRY}/e2e-tester sub-image. tag_pipeline: true keeps its
   # tag set (v-tag on tags, short-sha on main / BUILD_CI_IMAGE) in lockstep
-  # with build-othala + build-ldap-bridge, so AUTH_VERSION resolves the
-  # same tag for all three in the e2e job. No SBOM/release: this is a
+  # with build-othala + build-e2e-tester, so AUTH_VERSION resolves the
+  # same tag for both in the e2e job. No SBOM/release: this is a
   # test-only image, not a shipped artifact.
   - component: gitlab.com/dunn.dev/pipeline/container-image@2.5.1
     inputs:
@@ -155,6 +128,37 @@ include:
 # -----------------------------------------------------------------
 # Standalone jobs (not catalog components).
 #
+# lint-identity-schema: schema-drift guard.
+#
+# Asserts that e2e/identity.schema.json and kratos/identity.schema.json
+# are identical after JSON normalization (jq -S .). Fails the pipeline on
+# any divergence so a schema change in one copy cannot silently break the
+# other.
+#
+# KNOWN DRIFT: as of feat/passkey-first-login these two files diverge
+# (kratos/ adds recoveryEmail + passkey credential block; e2e/ does not).
+# This job INTENTIONALLY FAILS until the drift is reconciled by updating
+# e2e/identity.schema.json to match kratos/identity.schema.json. That
+# reconciliation is the fix — not disabling this lint.
+# -----------------------------------------------------------------
+lint-identity-schema:
+  stage: verify
+  image: registry.access.redhat.com/ubi9/nodejs-22:9.8
+  rules:
+    - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
+    - if: '$CI_PIPELINE_SOURCE == "push"'
+    - if: '$CI_COMMIT_TAG'
+  script:
+    - |
+      if ! diff <(jq -S . e2e/identity.schema.json) <(jq -S . kratos/identity.schema.json); then
+        echo "ERROR: e2e/identity.schema.json and kratos/identity.schema.json have diverged."
+        echo "Reconcile by copying kratos/identity.schema.json to e2e/identity.schema.json"
+        echo "and verifying the e2e test fixtures still match the updated schema."
+        exit 1
+      fi
+      echo "OK: identity schemas are in sync."
+
+# -----------------------------------------------------------------
 # test-portal: v0.2.0 portal test suite. Runs `npm test` which
 # invokes node --test against scripts/*.test.mjs. Covers:
 #   - manifests-loader.test.mjs (YAML namespace split + parsing)
@@ -223,8 +227,8 @@ check-portal:
 #   1. Generates per-run secrets
 #   2. podman login to the GitLab registry
 #   3. docker compose up the converged substrate (postgres, kratos,
-#      hydra, the othala app, ldap-bridge — consent + util are folded
-#      into the othala app, no separate containers)
+#      hydra, the othala app — consent + util are folded into the othala
+#      app, no separate containers)
 #   4. Waits for healthchecks
 #   5. Runs e2e/smoke.sh — substrate sanity, in-app client registration,
 #      identity admin flow, recovery-gate semantics (the converged app's
@@ -237,11 +241,11 @@ check-portal:
 # Renovate-bump breakage before tag.
 #
 # AUTH_REGISTRY=${CI_REGISTRY_IMAGE} is the registry ROOT — the converged
-# othala app image itself (publish_at_root: true). ldap-bridge is the
-# ${CI_REGISTRY_IMAGE}/ldap-bridge sub-image; e2e/compose.yml pulls the
-# app from root and the bridge from the sub-path. AUTH_VERSION resolves
+# othala app image itself (publish_at_root: true). AUTH_VERSION resolves
 # to $CI_COMMIT_TAG on tag pipelines or $CI_COMMIT_SHORT_SHA on push —
-# either way the harness validates the just-built image set, not :latest.
+# either way the harness validates the just-built image, not :latest.
+# The LDAP bridge is now the standalone gitlab.com/dunn.dev/kratos-ldap
+# project; e2e/compose.yml no longer pulls it.
 #
 # See e2e/README.md + docs/qemu-ci-lab.md.
 # -----------------------------------------------------------------
@@ -251,9 +255,8 @@ e2e:
   tags: [carmine, qemu]
   needs:
     - build-othala
-    - build-ldap-bridge
     # Prebaked browser-test image — pulled by compose.yml's playwright +
-    # dance-runner services. Same VERSION tag as the app images above.
+    # dance-runner services. Same VERSION tag as the app image above.
     - build-e2e-tester
   variables:
     AUTH_REGISTRY: "${CI_REGISTRY_IMAGE}"

@@ -1,0 +1,17 @@
+---
+// 404 — Not found.
+//
+// Astro's special 404.astro is served for any unmatched route in SSR mode.
+// Sets the response status to 404 and renders the branded StatusPage.
+
+export const prerender = false;
+
+import StatusPage from '../components/StatusPage.astro';
+
+Astro.response.status = 404;
+---
+<StatusPage
+  status={404}
+  title="Not found"
+  message="The page you're looking for doesn't exist, or you may not have access to it."
+/>

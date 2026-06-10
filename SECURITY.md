@@ -22,8 +22,9 @@ Report privately through one of these channels:
 
 Please include enough to reproduce:
 
-- the affected component (`portal/`, `ldap-bridge/`, the `kratos/` or `hydra/`
-  config, the `e2e/` harness) and version or commit,
+- the affected component (`portal/`, the `kratos/` or `hydra/` config, the
+  `e2e/` harness, or `gitlab.com/dunn.dev/kratos-ldap` for the LDAP bridge)
+  and version or commit,
 - a description of the impact (what an attacker gains — e.g. access-gate
   bypass, token-claim injection, admin-port exposure, LDAP DN escape),
 - concrete reproduction steps or a proof-of-concept, and
@@ -76,18 +77,30 @@ What this project treats as in-scope security surface:
   grants access without both is a vulnerability,
 - the **`OTHALA_ADMIN_SUBJECTS` allowlist** as the sole admin authority —
   identity-group membership is display metadata, never an authorization gate,
-- the **loopback-only admin listener** (`:8431`) — privileged routes
+- the **loopback-only admin listener** (`:4431`) — privileged routes
   (`/admin/*`) must never resolve on the public mux (`:8080`),
 - the **id_token claims builder** (`claims.ts`) — per-app role/claim mapping
   must not leak claims or roles across apps,
 - the **manifest loader/validator** (`manifests.ts`) — it fails closed on a bad
   manifest set (duplicate `client_id`, audience/redirect mismatch, undeclared
   role, etc.) and keeps the prior good state,
-- the **LDAP bridge** (`ldap-bridge/`) — BIND/SEARCH handling, DN escaping, and
-  the Kratos admin-token boundary,
+- the **LDAP bridge** (`gitlab.com/dunn.dev/kratos-ldap`) — BIND/SEARCH
+  handling, DN escaping, and the Kratos admin-token boundary,
 - **secret handling** — the project holds no OAuth signing key at rest
   (back-channel logout is Hydra-signed); report any path that persists or
-  exposes a secret it shouldn't.
+  exposes a secret it shouldn't,
+- **application-layer abuse resistance** — the bundled reverse-proxy
+  `rate_limit` on the self-service flows (email-code / recovery / verification /
+  password) and a bound on concurrent password-hash work ship **with the
+  install**, not as an edge add-on. A path that lets unauthenticated volume
+  flood a family inbox, brute-force a credential, or exhaust host memory via
+  argon2 is in scope. A Cloudflare/edge WAF is optional defence-in-depth, never
+  the load-bearing control — Othala must be safe to self-host without one,
+- **browser hardening of the auth UI** — anti-clickjacking (`frame-ancestors` /
+  `X-Frame-Options`) on the login and consent pages, a Content-Security-Policy,
+  `nosniff`, a tight `Referrer-Policy`, and self-hosted assets (no third-party
+  CDN that could leak `flow` / `consent_challenge` identifiers via `Referer`);
+  a missing, weak, or bypassable header here is in scope.
 
 Out of scope:
 
@@ -98,8 +111,11 @@ Out of scope:
   design** — see `docs/STATUS.md` "Locked decisions"),
 - the `e2e/` test domain (`othala.test`, an RFC 6761 reserved name) and its
   throwaway per-run secrets,
-- denial-of-service from unauthenticated request volume against a self-hosted
-  single-box deployment (sizing/rate-limiting is the operator's edge concern).
+- volumetric / network-layer (L3–L4) DDoS that requires upstream capacity to
+  absorb — that remains a host/edge concern. **Application-layer** abuse
+  (email-code/recovery flooding, credential brute-force, password-hash CPU/memory
+  exhaustion) is **in scope** and ships mitigated by the bundled Caddy `rate_limit`
+  plus the Ory flow config; see `docs/hardening.md`. It is not delegated to a CDN.
 
 Adversarial security review and its remediation are tracked in
 `docs/security-review-2026-05-04.md`; the fuzz suites

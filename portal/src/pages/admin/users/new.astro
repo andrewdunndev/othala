@@ -41,6 +41,7 @@ interface FormState {
   username: string;
   email: string;
   displayName: string;
+  recoveryEmail: string;
   identityGroups: string[];
   accessGroups: string[];
   roleOverrides: Record<string, string>;
@@ -53,6 +54,7 @@ const empty: FormState = {
   username: '',
   email: '',
   displayName: '',
+  recoveryEmail: '',
   identityGroups: defaultIdentityGroup ? [defaultIdentityGroup] : [],
   accessGroups: [],
   roleOverrides: {},
@@ -86,6 +88,7 @@ if (Astro.request.method === 'POST') {
     username: String(fd.get('username') ?? '').trim().toLowerCase(),
     email: String(fd.get('email') ?? '').trim(),
     displayName: String(fd.get('displayName') ?? '').trim(),
+    recoveryEmail: String(fd.get('recoveryEmail') ?? '').trim(),
     identityGroups: readGroups(fd, 'identityGroups'),
     accessGroups: readGroups(fd, 'accessGroups'),
     roleOverrides: {},
@@ -107,6 +110,9 @@ if (Astro.request.method === 'POST') {
     errors.username = 'Use lowercase letters, digits, and dots: first.last';
   }
   if (!EMAIL_RE.test(form.email)) errors.email = 'Enter a valid email address.';
+  if (form.recoveryEmail && !EMAIL_RE.test(form.recoveryEmail)) {
+    errors.recoveryEmail = 'Enter a valid recovery email address.';
+  }
   if (form.identityGroups.length === 0) errors.identityGroups = 'Pick at least one identity group.';
 
   if (Object.keys(errors).length === 0) {
@@ -122,6 +128,7 @@ if (Astro.request.method === 'POST') {
           username: form.username,
           email: form.email,
           displayName: form.displayName || undefined,
+          recoveryEmail: form.recoveryEmail || undefined,
         },
         metadataAdmin: {
           groups,
@@ -157,6 +164,7 @@ const csrfToken = signToken(adminIdentityId);
     <a href="/admin/users" aria-current="page">Users</a>
     <a href="/admin/groups">Groups</a>
     <a href="/admin/oauth2">Apps</a>
+    <a href="/auth/settings">Settings</a>
   </nav>
 
   <main class="stack-lg">
@@ -212,6 +220,19 @@ const csrfToken = signToken(adminIdentityId);
         <div class="field">
           <label for="displayName">Display name (optional)</label>
           <input id="displayName" name="displayName" type="text" value={form.displayName} />
+        </div>
+
+        <div class="field">
+          <label for="recoveryEmail">Recovery email (optional)</label>
+          <input
+            id="recoveryEmail"
+            name="recoveryEmail"
+            type="email"
+            value={form.recoveryEmail}
+            placeholder="alternate@example.com"
+          />
+          <span class="field-hint">Alternate address for account recovery. Leave blank to use the primary email.</span>
+          {errors.recoveryEmail && <span class="field-error">{errors.recoveryEmail}</span>}
         </div>
 
         <div class="field">

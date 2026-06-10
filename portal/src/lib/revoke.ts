@@ -137,9 +137,10 @@ function buildOAuth2Api(): OAuth2Api {
 }
 
 /**
- * Best-effort LDAP bind-cache flush (step 6). POSTs to the ldap-bridge
- * admin endpoint with a bearer. Skipped silently when LDAP_BRIDGE_ADMIN_URL
- * is unset. Never throws to the fan-out — the caller wraps it.
+ * Best-effort LDAP bind-cache flush (step 6). POSTs to the kratos-ldap
+ * admin endpoint (gitlab.com/dunn.dev/kratos-ldap) with a bearer. Skipped
+ * silently when LDAP_BRIDGE_ADMIN_URL is unset. Never throws to the fan-out
+ * — the caller wraps it.
  */
 async function defaultFlushLdapBindCache(subject: string): Promise<void> {
   const base = process.env.LDAP_BRIDGE_ADMIN_URL ?? '';

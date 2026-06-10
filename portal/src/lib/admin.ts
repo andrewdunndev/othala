@@ -11,7 +11,7 @@ import { browserFlows, getSession } from './kratos';
 import { getIdentity } from './admin-api';
 import { isAdminSubject } from './admin-auth';
 import { revokeSubject, type RevokeResult } from './revoke';
-import { publicUrl } from './config';
+import { publicUrl, adminFreshnessHours } from './config';
 import type { Session } from './types';
 
 export {
@@ -21,6 +21,7 @@ export {
   updateIdentity,
   deleteIdentity,
   deactivateIdentity,
+  reactivateIdentity,
   getRecoveryLink,
 } from './admin-api';
 export type {
@@ -80,6 +81,53 @@ export async function requireAdminSession(astro: any): Promise<Session | Respons
     const returnTo = `${publicUrl}${astro.url.pathname}${astro.url.search}`;
     return astro.redirect(browserFlows.login({ refresh: true, aal: 'aal2', returnTo }));
   }
+
+  // AAL2 FRESHNESS CHECK — MEDIUM-C / hardening §7
+  //
+  // Having AAL2 "present" is not enough when the session lifetime is 90 days.
+  // A stolen admin browser with an existing AAL2 session would pass the level
+  // check for the full session lifetime. We additionally require that the admin
+  // authenticated within the last OTHALA_ADMIN_FRESHNESS_HOURS hours (default 8).
+  //
+  // `session.authenticated_at` is a Date (Ory SDK v1+) updated by Kratos on every
+  // `refresh=true` re-authentication. We compare it to now.
+  //
+  // FAIL-OPEN INVARIANT: if authenticated_at is absent, unparseable, or any error
+  // occurs computing the age, we ALLOW access rather than redirect. A redirect here
+  // on bad data would create an unbreakable redirect loop for the admin. We only
+  // redirect when we can POSITIVELY confirm the session is stale.
+  //
+  // TODO: validate the exact freshness behaviour against a live Kratos session.
+  // The field shape (Date vs ISO string) and update semantics (refresh=true vs any
+  // AAL2 completion) need live gate confirmation before tightening.
+  if (adminFreshnessHours > 0) {
+    try {
+      const rawAuthAt = (session as unknown as Record<string, unknown>).authenticated_at;
+      // The SDK deserialises authenticated_at as Date; accept either Date or ISO string.
+      let authAt: Date | null = null;
+      if (rawAuthAt instanceof Date && Number.isFinite(rawAuthAt.getTime())) {
+        authAt = rawAuthAt;
+      } else if (typeof rawAuthAt === 'string' && rawAuthAt.trim() !== '') {
+        const parsed = new Date(rawAuthAt);
+        if (Number.isFinite(parsed.getTime())) authAt = parsed;
+      }
+      if (authAt !== null) {
+        const ageMs = Date.now() - authAt.getTime();
+        const windowMs = adminFreshnessHours * 60 * 60 * 1000;
+        if (ageMs > windowMs) {
+          const returnTo = `${publicUrl}${astro.url.pathname}${astro.url.search}`;
+          return astro.redirect(browserFlows.login({ refresh: true, aal: 'aal2', returnTo }));
+        }
+      }
+      // authAt === null → authenticated_at absent or unparseable: fail open (see above).
+    } catch {
+      // Any unexpected error in the freshness computation: fail open (see above).
+    }
+  }
+
+  // Prevent admin/identity data from being stored in any intermediate cache.
+  // Done here (not in middleware) so it's tightly coupled to the admin guard.
+  astro.response.headers.set('Cache-Control', 'no-store, max-age=0');
 
   return session;
 }

@@ -20,6 +20,7 @@
     "@ory/client-fetch": "^1.22.37",
     "@tailwindcss/vite": "^4.2.4",
     "astro": "^6.2.1",
+    "isomorphic-dompurify": "^3.16.0",
     "marked": "^18.0.4",
     "nodemailer": "^7.0.13",
     "tailwindcss": "^4.2.4",
@@ -31,7 +32,8 @@
     "esbuild": "^0.27.7",
     "fast-check": "^4.8.0",
     "tsx": "^4.22.3",
-    "typescript": "^6.0.0"
+    "typescript": "^6.0.0",
+    "vitest": "^4.1.8"
   },
   "overrides": {
     "vite": "^7.3.2"

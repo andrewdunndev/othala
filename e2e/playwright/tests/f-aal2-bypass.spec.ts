@@ -24,6 +24,12 @@
  *
  * All four sub-cases must result in a redirect to the AAL2 step-up URL
  * (aal=aal2 in Location) or a non-2xx response — never an admin page render.
+ *
+ * F2 two-layer check:
+ *   1. Origin-less POST → Astro's built-in security.checkOrigin CSRF layer
+ *      rejects forged/origin-less form POSTs with 403 before the app guard runs.
+ *   2. Same-origin POST (Origin header == site origin) → passes checkOrigin and
+ *      reaches requireAdminSession, which redirects to aal=aal2 step-up.
  */
 
 import { test, expect } from '../fixtures';
@@ -63,32 +69,56 @@ test('F2 — admin at AAL1: POST /admin/users/new is refused (step-up redirect, 
   //   const guard = await requireAdminSession(Astro);
   //   if (guard instanceof Response) return guard;
   // so an AAL1 admin hits the guard before the CSRF check or identity creation).
+  //
+  // Two-layer check:
+  //   Layer 1 — origin-less POST: Astro security.checkOrigin rejects with 403
+  //             before requireAdminSession is reached.
+  //   Layer 2 — same-origin POST: passes checkOrigin, requireAdminSession fires
+  //             and redirects to the AAL2 step-up (aal=aal2 in Location).
+  const origin = new URL(baseURL!).origin;
   const ctx = await browser.newContext();
   try {
     await loginViaJsonApi(ctx, { identifier: admin.email, password: admin.password }, baseURL);
 
-    // POST to /admin/users/new with a minimal (would-be valid) body.
-    // The guard fires before any body parse, so the actual fields don't matter.
-    const resp = await ctx.request.post(`${baseURL}/admin/users/new`, {
+    // Layer 1: Origin-less POST — Astro's security.checkOrigin rejects it with 403.
+    const resp1 = await ctx.request.post(`${baseURL}/admin/users/new`, {
       maxRedirects: 0,
       headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
       data: 'username=attack.user&email=attack@othala.test&identityGroups=family&csrf_token=fake',
     });
 
-    const status = resp.status();
-    const loc = resp.headers()['location'] ?? '';
-    console.log('[F2] POST /admin/users/new AAL1 →', status, loc);
+    const status1 = resp1.status();
+    console.log('[F2] origin-less POST /admin/users/new AAL1 →', status1);
+
+    expect(
+      status1,
+      `F2 (layer 1): origin-less POST must be rejected by Astro checkOrigin with 403; got ${status1}`,
+    ).toBe(403);
+
+    // Layer 2: Same-origin POST — passes checkOrigin, reaches requireAdminSession.
+    const resp2 = await ctx.request.post(`${baseURL}/admin/users/new`, {
+      maxRedirects: 0,
+      headers: {
+        'Content-Type': 'application/x-www-form-urlencoded',
+        'Origin': origin,
+      },
+      data: 'username=attack.user&email=attack@othala.test&identityGroups=family&csrf_token=fake',
+    });
+
+    const status2 = resp2.status();
+    const loc2 = resp2.headers()['location'] ?? '';
+    console.log('[F2] same-origin POST /admin/users/new AAL1 →', status2, loc2);
 
     // Must not return 200 (which would mean the form rendered a success state).
     expect(
-      status,
-      `F2: POST /admin/users/new at AAL1 must not return 200; got ${status}`,
+      status2,
+      `F2 (layer 2): POST /admin/users/new at AAL1 must not return 200; got ${status2}`,
     ).not.toBe(200);
 
     // The guard should redirect to the AAL2 step-up.
     expect(
-      /aal=aal2/.test(loc),
-      `F2: AAL1 admin POST /admin/users/new must be redirected to aal=aal2; got ${status} ${loc}`,
+      /aal=aal2/.test(loc2),
+      `F2 (layer 2): AAL1 admin POST /admin/users/new must be redirected to aal=aal2; got ${status2} ${loc2}`,
     ).toBe(true);
   } finally {
     await ctx.close();

@@ -27,6 +27,59 @@
 # Note: /oauth2/login, /oauth2/consent, and /oauth2/logout are Hydra
 # challenge handlers served by the converged app, not by Hydra itself.
 # They are matched explicitly so they don't fall into the @hydra block.
+#
+# ---------------------------------------------------------------------------
+# RATE LIMITING — BUILD DEPENDENCY REQUIRED
+#
+# The `rate_limit` directive below is provided by the third-party module
+# mholt/caddy-ratelimit (https://github.com/mholt/caddy-ratelimit).
+# It is NOT part of Caddy's standard distribution and is NOT included in
+# github.com/caddyserver/caddy/v2/modules/standard.
+#
+# To use it you must build Caddy with the module compiled in, e.g.:
+#
+#   xcaddy build --with github.com/mholt/caddy-ratelimit
+#
+# or, if you maintain a custom main.go (like caddy-estate does), add:
+#
+#   _ "github.com/mholt/caddy-ratelimit"
+#
+# to the import block and run `go get github.com/mholt/caddy-ratelimit`.
+#
+# [VERIFY: caddy-estate must include caddy-ratelimit]
+# The estate's Caddy image (dunn.dev/caddy-estate) does NOT currently include
+# this module. Its Containerfile imports only:
+#   - github.com/caddyserver/caddy/v2/modules/standard
+#   - github.com/caddy-dns/cloudflare
+# The comment in that file listing "rate_limit" as a standard module is
+# misleading — mholt/caddy-ratelimit is a separate import. Before relying on
+# this rate_limit block in the iac dag-caddy quadlet deployment, caddy-estate
+# must be updated to import github.com/mholt/caddy-ratelimit.
+#
+# FALLBACK — if caddy-ratelimit cannot be added to the production image:
+#   - Rate-limit at the edge (Cloudflare WAF rate-limiting rules on
+#     /self-service/* paths) — zero-build-cost if Cloudflare is already the
+#     DNS/proxy provider (as it is for dunn.dev).
+#   - Alternatively, if traffic passes through an Envoy sidecar, use Envoy's
+#     local_ratelimit filter on the Kratos cluster.
+#   - Kratos does not natively support per-IP rate limiting as of v1.x.
+#
+# RATIONALE for chosen limit (10 requests / 1 minute / IP):
+#   A family member completing a sign-in with email code makes at most 3-4
+#   requests in the self-service flow (GET /self-service/login/browser,
+#   POST /self-service/login, GET/POST code-submit). A burst to 10 per minute
+#   gives a generous margin for retries and tab-switching while still blocking
+#   an attacker from firing dozens of code-request calls per minute to
+#   email-bomb a victim address. At family scale (5-25 users behind trusted
+#   IPs) false positives from shared NAT are not a concern.
+# ---------------------------------------------------------------------------
+#
+# The `order` global option registers the directive's position in Caddy's
+# handler chain — rate_limit must run before basicauth.
+
+{
+	order rate_limit before basicauth
+}
 
 {$OTHALA_PUBLIC_HOST} {
 	tls {
@@ -48,8 +101,19 @@
 
 	# Kratos browser endpoints: well-known ceremony scripts, self-service flow
 	# APIs, session endpoints, and identity schemas.
+	#
+	# Rate-limit applied here to prevent email-bombing via repeated sign-in
+	# code requests (/self-service/login with method=code). Keyed by client IP
+	# ({remote_host}). See build-dependency note at the top of this file.
 	@kratos path /.well-known/ory/* /self-service/* /sessions/* /schemas/*
 	handle @kratos {
+		rate_limit {
+			zone othala_selfservice {
+				key    {remote_host}
+				events 10
+				window 1m
+			}
+		}
 		reverse_proxy kratos:4433
 	}
 

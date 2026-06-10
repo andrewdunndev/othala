@@ -281,7 +281,7 @@ separately:
   handler: the OAuth2 challenge providers, the family UI, `/auth/*`,
   `/admin/*` pages. This is the only handler exposed to the network.
 - **Admin** (`ADMIN_PORT`, code default 4431, on `ADMIN_HOST` default
-  `127.0.0.1`, loopback / pod-only; set to 8431 in `e2e/compose.yml`
+  `127.0.0.1`, loopback / pod-only; set to 4431 in `e2e/compose.yml`
   and production) is a SEPARATE `http.createServer` with its own tiny
   mux: `GET /healthz`, `GET /readyz`,
   `POST /admin/revoke-user` (bearer `OTHALA_ADMIN_ENDPOINT_BEARER`),
@@ -353,8 +353,9 @@ allowlist.
 Production topology after the locked Ory pivot. Custom Caddy image at
 `registry.gitlab.com/dunn.dev/caddy-estate` (xcaddy +
 `caddy-dns/cloudflare`), DNS-only Cloudflare in front, port-forward 443 on
-the home router. Kratos + Hydra + glauth-kratos + the Othala app all run
-in the same SSO pod. Single auth surface: `dag.dunn.dev`.
+the home router. Kratos + Hydra + the Othala app all run in the same SSO
+pod. The glauth-kratos LDAP bridge (`gitlab.com/dunn.dev/kratos-ldap`) runs
+in the Jellyfin pod. Single auth surface: `dag.dunn.dev`.
 
 ```
                            Cloudflare DNS (gray cloud, no proxy)
@@ -378,7 +379,7 @@ in the same SSO pod. Single auth surface: `dag.dunn.dev`.
                              │    │    │    ├─ /oauth2/{login,consent,logout}  Hydra challenge providers
                              │    │    │    ├─ /auth/{login,recovery,settings,verification}
                              │    │    │    └─ /admin/{users,groups,oauth2}
-                             │    │    └─ admin listener 8431 (loopback / pod-only)
+                             │    │    └─ admin listener 4431 (loopback / pod-only)
                              │    │         ├─ /healthz, /readyz
                              │    │         ├─ /admin/revoke-user      (OTHALA_ADMIN_ENDPOINT_BEARER)
                              │    │         └─ /admin/recovery-gate    (RECOVERY_GATE_SECRET)
@@ -613,8 +614,8 @@ the pod is partial-and-deliberate:
 | operator/admin UI → app `/admin/revoke-user` (admin listener) | Bearer `OTHALA_ADMIN_ENDPOINT_BEARER`, constant-time, fail-closed | `listen.mjs` |
 | app → Kratos admin (`:4434`) | No auth; pod-network isolation | pod network |
 | app → Hydra admin (`:4445`) | No auth; pod-network isolation | pod network |
-| app → ldap-bridge admin | Bearer `LDAP_BRIDGE_ADMIN_TOKEN`, best-effort | `revoke.ts` |
-| ldap-bridge → Kratos admin (`:4434`) | Admin token (env-resolved) | Kratos admin token |
+| app → kratos-ldap admin | Bearer `LDAP_BRIDGE_ADMIN_TOKEN`, best-effort | `revoke.ts` |
+| kratos-ldap → Kratos admin (`:4434`) | Admin token (env-resolved) | Kratos admin token |
 
 The privileged endpoints (`/admin/revoke-user`, `/admin/recovery-gate`)
 sit on the loopback admin listener (LB-14), so they are not network
@@ -694,11 +695,11 @@ things."
 | `docker.io/library/postgres` | see the deploy quadlets (authoritative) | yes |
 | `registry.gitlab.com/dunn.dev/caddy-estate` | see the deploy quadlets (authoritative) | yes |
 | `registry.gitlab.com/dunn.dev/othala` | see the deploy quadlets (authoritative) | self-managed |
-| `registry.gitlab.com/dunn.dev/othala/ldap-bridge` | see the deploy quadlets (authoritative) | self-managed |
+| `registry.gitlab.com/dunn.dev/kratos-ldap` | see the deploy quadlets (authoritative) | self-managed (`gitlab.com/dunn.dev/kratos-ldap`) |
 
-The `othala` image is the converged app. The legacy `consent` and `util`
-images still build today but are retired at the deploy cutover. Current
-pinned versions live in the deploy quadlets (`Image=` lines).
+The `othala` image is the converged app; the `kratos-ldap` image is the
+separate LDAP bridge project. The legacy `consent` and `util` images are
+retired. Current pinned versions live in the deploy quadlets (`Image=` lines).
 `docs/STATUS.md` states the deployed version. Do not restate version
 numbers here.
 
@@ -733,7 +734,7 @@ bench harness is reusable. Eval evidence is retained in git history.
 | Hydra config | `hydra/` | YAML | OIDC OP, OAuth2 AS |
 | App manifests (runtime) | `MANIFEST_DIR` (`/etc/portal/manifests`) | YAML + MD | Per-app `presentation:` / `oidc:` / `consent:` blocks + optional `<slug>.md` education content; read at request time. Examples in `e2e/manifests/`. |
 | Othala app | `portal/` | Astro + TS | Tile dashboard + Kratos flows + Hydra login/consent/logout + access gate + claims + revoke + admin UI + manifest loaders + client registrar |
-| LDAP bridge | `ldap-bridge/` | Go | glauth-kratos: LDAPS → Kratos identity backend (Jellyfin native clients) |
+| LDAP bridge | `gitlab.com/dunn.dev/kratos-ldap` | Go | glauth-kratos: LDAPS → Kratos identity backend (Jellyfin native clients); separate sibling project |
 | E2E harness | `e2e/` | Shell + YAML | QEMU-CI smoke harness (compose stack + smoke scripts + gen-secrets) |
 | CI / build | `.gitlab-ci.yml` | GitLab CI YAML | Per-service verify + container-image + sbom + release |
 
@@ -748,7 +749,7 @@ The substantive, real test coverage (from the CV audit):
 | Dual-listener | `portal/` listen tests | Admin/public mux disjointness, constant-time fail-closed bearer checks (LB-14) |
 | Admin authz | `portal/` admin-auth tests | `OTHALA_ADMIN_SUBJECTS` as sole authz; `admin` group not consulted (LB-16) |
 | Client registrar | `portal/scripts/register-clients.test.mjs` | Field mapping, `consent:`-never-forwarded, create/update idempotency |
-| LDAP bridge unit | `ldap-bridge/kratos/*_test.go` | Bind cache, DN parse + escape (caught a real bug) |
+| LDAP bridge unit | `gitlab.com/dunn.dev/kratos-ldap` | Bind cache, DN parse + escape (caught a real bug) |
 | E2E smoke evidence | `e2e/` + `docs/security-review-2026-05-04.md` | Live-stack validation |
 
 Native back-channel logout with no signing key at rest (Hydra signs) is a

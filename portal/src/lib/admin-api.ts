@@ -18,6 +18,7 @@ import {
   IdentityApi,
   type CreateIdentityBody,
   type UpdateIdentityBody,
+  type DeleteIdentityCredentialsTypeEnum,
 } from '@ory/client-fetch';
 import type { Identity } from './types';
 import { validateMetadataAdmin } from './metadata-admin';
@@ -76,7 +77,7 @@ export interface UpdateIdentityInput {
 // identities) this is fine and the truncation never bites.
 //
 // If the estate ever grows bot/service identities, mirror the
-// pagination loop pattern in ldap-bridge/kratos/client.go:166-220 and
+// pagination loop pattern from gitlab.com/dunn.dev/kratos-ldap and
 // follow `next` Link headers until exhausted. Today it's deliberately
 // unimplemented.
 export async function listIdentities(): Promise<Identity[]> {
@@ -86,7 +87,10 @@ export async function listIdentities(): Promise<Identity[]> {
 export async function getIdentity(id: string): Promise<Identity> {
   return identityApi().getIdentity({
     id,
-    includeCredential: ['password', 'webauthn', 'passkey', 'totp'],
+    // 'lookup_secret' must be included or the backup-codes credential is never
+    // fetched: the admin user page keyed the badge on it and would always show
+    // "not enrolled" without this entry.
+    includeCredential: ['password', 'webauthn', 'passkey', 'totp', 'lookup_secret'],
   });
 }
 
@@ -115,7 +119,10 @@ export async function updateIdentity(id: string, input: UpdateIdentityInput): Pr
   const api = identityApi();
   const current = await api.getIdentity({
     id,
-    includeCredential: ['password', 'webauthn', 'passkey', 'totp'],
+    // Keep consistent with getIdentity: 'lookup_secret' must be present so
+    // updateIdentity preserves the current backup-codes credential rather
+    // than losing it on a PUT round-trip.
+    includeCredential: ['password', 'webauthn', 'passkey', 'totp', 'lookup_secret'],
   });
   const updateIdentityBody: UpdateIdentityBody = {
     schema_id: current.schema_id,
@@ -142,6 +149,88 @@ export async function deleteIdentity(id: string): Promise<void> {
  */
 export async function deactivateIdentity(id: string): Promise<void> {
   await revokeSubject(id, { deactivate: true });
+}
+
+/**
+ * Restore an inactive identity to active state.
+ *
+ * This is the inverse of deactivateIdentity. Unlike deactivate, reactivate
+ * does NOT need a revocation fan-out: the sessions and consent grants were
+ * already cleared when the identity was deactivated. The user will need to
+ * log in fresh after reactivation — that is the correct postcondition.
+ *
+ * No revokeSubject call here: the fan-out ran at deactivate time and the
+ * identity has had no live sessions since. Calling it again would be a no-op
+ * (Kratos 404 on delete-sessions) and would add unnecessary Hydra churn.
+ */
+export async function reactivateIdentity(id: string): Promise<void> {
+  const patch = [{ op: 'replace' as const, path: '/state', value: 'active' }];
+  await identityApi().patchIdentity({ id, jsonPatch: patch });
+}
+
+// ── Credential eviction ───────────────────────────────────────────────────────
+
+/**
+ * Allowed credential types for admin eviction via the portal UI.
+ *
+ * `password` is intentionally excluded: Kratos rejects DELETE on password and
+ * it is not a lost-device eviction factor (the attacker can't enrol a new
+ * password without knowing the current one and we do not expose that surface).
+ *
+ * Eviction-relevant types: passkey and webauthn (possession factors a thief
+ * could have enrolled), totp and lookup_secret (codes stored on or extracted
+ * from a lost device).
+ */
+export const EVICTABLE_CREDENTIAL_TYPES = new Set<string>([
+  'passkey',
+  'webauthn',
+  'totp',
+  'lookup_secret',
+]);
+
+/**
+ * Delete ALL credentials of `type` for an identity.
+ *
+ * This is the lost-device eviction primitive. Kratos does not expose per-instance
+ * passkey removal on the admin API — the unit of deletion is the credential type.
+ * Removing the type evicts every registered credential of that kind; the
+ * legitimate user re-enrolls via the recovery/enrollment URL issued in the
+ * same admin action.
+ *
+ * 404 from Kratos is treated as success (type not enrolled — nothing to evict).
+ * All other non-2xx statuses propagate as errors to the caller.
+ *
+ * Endpoint: DELETE /admin/identities/{id}/credentials/{type}
+ *
+ * NOTE: The exact endpoint shape and 404 behaviour need live gate validation
+ * against the deployed Kratos version. Confirm via `make dag-e2e` or manual
+ * curl before relying in production.
+ */
+export async function deleteCredential(
+  identityId: string,
+  type: string,
+): Promise<void> {
+  // Only allow eviction-relevant types (not password — Kratos rejects it).
+  if (!EVICTABLE_CREDENTIAL_TYPES.has(type)) {
+    throw new Error(`deleteCredential: '${type}' is not an evictable credential type`);
+  }
+  try {
+    await identityApi().deleteIdentityCredentials({
+      id: identityId,
+      type: type as DeleteIdentityCredentialsTypeEnum,
+    });
+  } catch (err: unknown) {
+    // Tolerate 404: type not present is a no-op for eviction purposes.
+    if (
+      err != null &&
+      typeof err === 'object' &&
+      'response' in err &&
+      (err as { response: { status: number } }).response?.status === 404
+    ) {
+      return;
+    }
+    throw err;
+  }
 }
 
 export interface RecoveryLink {

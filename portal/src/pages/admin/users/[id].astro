@@ -25,10 +25,12 @@ import {
   updateIdentity,
   deleteIdentity,
   deactivateIdentity,
+  reactivateIdentity,
   getRecoveryLink,
   revokeUserSessions,
   type RevokeUserResult,
 } from '../../../lib/admin';
+import { deleteCredential, EVICTABLE_CREDENTIAL_TYPES } from '../../../lib/admin-api';
 import { loadClientManifests } from '../../../lib/manifests';
 import {
   computeEffectiveAccess,
@@ -65,7 +67,8 @@ async function reload(): Promise<Identity | null> {
   try {
     return await getIdentity(id!);
   } catch (err) {
-    loadError = err instanceof Error ? err.message : String(err);
+    console.error('[othala/admin/users/[id]] getIdentity failed:', err);
+    loadError = 'Failed to read identity store — check Kratos connectivity.';
     return null;
   }
 }
@@ -77,8 +80,10 @@ let actionResult:
   | { kind: 'recovery'; url: string; expiresAt: string }
   | { kind: 'deleted'; username: string }
   | { kind: 'deactivated'; username: string }
+  | { kind: 'reactivated'; username: string }
   | { kind: 'updated' }
   | { kind: 'revoked'; result: RevokeUserResult }
+  | { kind: 'credential-removed'; credType: string }
   | { kind: 'error'; message: string }
   | null = null;
 let formErrors: Record<string, string> = {};
@@ -87,11 +92,26 @@ if (Astro.request.method === 'POST' && identity) {
   const fd = await Astro.request.formData();
   const action = String(fd.get('action') ?? 'save');
 
-  // HIGH-1: every state-changing admin POST must carry a per-request
-  // CSRF token bound to the active admin's identity. The token is
-  // single-use and 30-min-TTL; verify before any side effect.
+    // HIGH-1: every state-changing admin POST must carry a per-request CSRF
+  // token bound to the active admin's identity. Action-scoped tokens (minted
+  // with signToken(id, action)) additionally verify that the submitted action
+  // matches the one the token was issued for — a captured token from the
+  // "issue-recovery" form cannot fire "deactivate".
+  //
+  // The save / delete actions use identity-only tokens (no action binding)
+  // because those forms post to a distinct action value not shared with the
+  // multi-button actions panel.
+  //
+  // The three actions panel buttons (issue-recovery / force-relogin /
+  // deactivate / reactivate) share a single form POST, so each gets its own
+  // action-scoped token minted at render time.
+  const actionScopedActions = new Set(['issue-recovery', 'force-relogin', 'deactivate', 'reactivate']);
   try {
-    verifyToken(String(fd.get('csrf_token') ?? ''), adminIdentityId);
+    if (actionScopedActions.has(action)) {
+      verifyToken(String(fd.get('csrf_token') ?? ''), adminIdentityId, action);
+    } else {
+      verifyToken(String(fd.get('csrf_token') ?? ''), adminIdentityId);
+    }
   } catch (err) {
     if (err instanceof CSRFError) {
       return new Response(`CSRF: ${err.message}`, { status: 403 });
@@ -101,11 +121,14 @@ if (Astro.request.method === 'POST' && identity) {
 
   try {
     if (action === 'save') {
+      const rawRecoveryEmail = String(fd.get('recoveryEmail') ?? '').trim();
       const traits = {
         username: String(fd.get('username') ?? '').trim().toLowerCase(),
         email: String(fd.get('email') ?? '').trim(),
         displayName: String(fd.get('displayName') ?? '').trim() || undefined,
+        recoveryEmail: rawRecoveryEmail && EMAIL_RE.test(rawRecoveryEmail) ? rawRecoveryEmail : undefined,
       };
+      if (rawRecoveryEmail && !EMAIL_RE.test(rawRecoveryEmail)) formErrors.recoveryEmail = 'Invalid recovery email address.';
       if (!USERNAME_RE.test(traits.username)) formErrors.username = 'Invalid username pattern.';
       if (!EMAIL_RE.test(traits.email)) formErrors.email = 'Invalid email.';
       const identityGroups = fd.getAll('identityGroups').map(String).filter(Boolean);
@@ -167,8 +190,13 @@ if (Astro.request.method === 'POST' && identity) {
     } else if (action === 'deactivate') {
       const username = identity.traits?.username ?? id;
       await deactivateIdentity(id);
-      await reload();
+      identity = await reload();
       actionResult = { kind: 'deactivated', username };
+    } else if (action === 'reactivate') {
+      const username = identity.traits?.username ?? id;
+      await reactivateIdentity(id);
+      identity = await reload();
+      actionResult = { kind: 'reactivated', username };
     } else if (action === 'delete') {
       const expected = identity.traits?.username ?? '';
       const confirm = String(fd.get('confirm') ?? '').trim();
@@ -180,6 +208,22 @@ if (Astro.request.method === 'POST' && identity) {
       } else {
         await deleteIdentity(id);
         return Astro.redirect('/admin/users?deleted=1');
+      }
+    } else if (action === 'remove-credential') {
+      // HIGH-C: lost-device eviction. Removes ALL credentials of the given
+      // type for this identity so any thief-enrolled credential is evicted.
+      // The legitimate user re-enrolls via the recovery/enrollment URL.
+      // Allowlist-validated: only eviction-relevant types are accepted.
+      const credType = String(fd.get('cred_type') ?? '').trim();
+      if (!EVICTABLE_CREDENTIAL_TYPES.has(credType)) {
+        actionResult = {
+          kind: 'error',
+          message: `Invalid credential type '${credType}'. Evictable types: passkey, webauthn, totp, lookup_secret.`,
+        };
+      } else {
+        await deleteCredential(id, credType);
+        identity = await reload();
+        actionResult = { kind: 'credential-removed', credType };
       }
     }
   } catch (err) {
@@ -193,10 +237,24 @@ const accessGroupMembership = groups.filter((g) => g.startsWith('access-'));
 const roleOverrides = (identity?.metadata_admin?.roles ?? {}) as Record<string, string>;
 const effective = identity ? computeEffectiveAccess(identity, manifests) : [];
 
+// P2: derive credential enrollment display from the identity's credentials
+// object. The Kratos admin API returns credentials when `includeCredential`
+// is passed (done in getIdentity). Keys present = method enrolled.
+// Robust to the field being absent (list-identities doesn't include them).
+const CREDENTIAL_METHODS: Array<{ key: string; label: string }> = [
+  { key: 'passkey',       label: 'passkey' },
+  { key: 'password',      label: 'password' },
+  { key: 'totp',          label: 'totp' },
+  { key: 'webauthn',      label: 'webauthn' },
+  { key: 'lookup_secret', label: 'backup codes' },
+];
+const credentialMap = identity?.credentials ?? {};
+
 const formValues = {
   username: identity?.traits?.username ?? '',
   email: identity?.traits?.email ?? '',
   displayName: identity?.traits?.displayName ?? '',
+  recoveryEmail: identity?.traits?.recoveryEmail ?? '',
   identityGroups: identityGroupMembership,
   accessGroups: accessGroupMembership,
   roleOverrides,
@@ -206,15 +264,34 @@ const formValues = {
 // gets its own token: tokens are single-use, so two forms cannot share
 // one. The TTL is 30 min (matches typical admin session of a few
 // minutes); a stale page can re-render to refresh.
+//
+// The three actions panel buttons (issue-recovery, force-relogin,
+// deactivate/reactivate) each get an action-scoped token so a captured
+// token for one action cannot be replayed to trigger a different one.
 const csrfTokenSave = signToken(adminIdentityId);
-const csrfTokenActions = signToken(adminIdentityId);
 const csrfTokenDelete = signToken(adminIdentityId);
+const csrfTokenIssueRecovery = signToken(adminIdentityId, 'issue-recovery');
+const csrfTokenForceRelogin = signToken(adminIdentityId, 'force-relogin');
+// Deactivate/reactivate are mutually exclusive at render time; only one
+// button will be shown, so only one token is needed.
+const csrfTokenDeactivate = identity?.state === 'inactive'
+  ? signToken(adminIdentityId, 'reactivate')
+  : signToken(adminIdentityId, 'deactivate');
+// One token per credential-remove form: each form is single-use (CSRF token
+// is single-use 30-min TTL); credential types are enumerated at render time.
+const csrfTokensRemove: Record<string, string> = {};
+for (const { key } of CREDENTIAL_METHODS) {
+  if (EVICTABLE_CREDENTIAL_TYPES.has(key) && credentialMap[key]) {
+    csrfTokensRemove[key] = signToken(adminIdentityId);
+  }
+}
 
 const adminNav = [
   { href: '/admin',          label: 'Overview' },
   { href: '/admin/users',    label: 'Users' },
   { href: '/admin/groups',   label: 'Groups' },
   { href: '/admin/oauth2',   label: 'Apps' },
+  { href: '/auth/settings',  label: 'Settings' },
 ];
 ---
 <Layout title={`${formValues.username || id} — Admin`} description="Identity detail.">
@@ -245,6 +322,11 @@ const adminNav = [
         {actionResult.username} marked inactive. Existing sessions revoked.
       </div>
     )}
+    {actionResult?.kind === 'reactivated' && (
+      <div class="notice notice-success">
+        {actionResult.username} restored to active. They will need to log in again.
+      </div>
+    )}
     {actionResult?.kind === 'recovery' && (
       <div class="notice notice-success">
         <p><strong>Enrollment URL issued.</strong> Expires {actionResult.expiresAt}.</p>
@@ -268,6 +350,12 @@ const adminNav = [
             </ul>
           </details>
         )}
+      </div>
+    )}
+    {actionResult?.kind === 'credential-removed' && (
+      <div class="notice notice-warning">
+        <strong>Credential type removed:</strong> all <span class="mono">{actionResult.credType}</span> credentials
+        have been deleted for this identity. Issue an enrollment URL so the legitimate user can re-enroll.
       </div>
     )}
     {actionResult?.kind === 'error' && (
@@ -301,6 +389,19 @@ const adminNav = [
         <div class="field">
           <label for="displayName">Display name</label>
           <input id="displayName" name="displayName" type="text" value={formValues.displayName} />
+        </div>
+
+        <div class="field">
+          <label for="recoveryEmail">Recovery email (optional)</label>
+          <input
+            id="recoveryEmail"
+            name="recoveryEmail"
+            type="email"
+            value={formValues.recoveryEmail}
+            placeholder="alternate@example.com"
+          />
+          <span class="field-hint">Used for account recovery when the primary email is inaccessible. Leave blank to use the primary email.</span>
+          {formErrors.recoveryEmail && <span class="field-error">{formErrors.recoveryEmail}</span>}
         </div>
 
         <div class="field">
@@ -368,6 +469,12 @@ const adminNav = [
           </div>
         </details>
 
+        {id === adminIdentityId && (
+          <div class="notice notice-warning">
+            You're editing your own identity. Removing the admin group is cosmetic — admin access is controlled by <code>OTHALA_ADMIN_SUBJECTS</code>, not group membership.
+          </div>
+        )}
+
         <div class="cta-row">
           <button type="submit" class="button button-primary">Save</button>
           <a href={`/admin/users/${id}`} class="button button-secondary">Cancel</a>
@@ -384,8 +491,42 @@ const adminNav = [
             <dd class="mono text-sm">{identity.state ?? 'active'}</dd>
             <dt class="muted text-sm mono">email</dt>
             <dd class="mono text-sm">{formValues.email}</dd>
+            <dt class="muted text-sm mono">recoveryEmail</dt>
+            <dd class="mono text-sm">{formValues.recoveryEmail || <span class="muted">(unset)</span>}</dd>
             <dt class="muted text-sm mono">displayName</dt>
             <dd>{formValues.displayName || <span class="muted">(unset)</span>}</dd>
+            <dt class="muted text-sm mono">credentials</dt>
+            <dd>
+              <div class="cred-list">
+                {CREDENTIAL_METHODS.map((m) => (
+                  credentialMap[m.key] ? (
+                    <span class="cred-item">
+                      <span class="badge cred-enrolled">{m.label} ✓</span>
+                      {EVICTABLE_CREDENTIAL_TYPES.has(m.key) && csrfTokensRemove[m.key] && (
+                        <form method="post" class="cred-remove-form">
+                          <input type="hidden" name="action" value="remove-credential" />
+                          <input type="hidden" name="cred_type" value={m.key} />
+                          <input type="hidden" name="csrf_token" value={csrfTokensRemove[m.key]} />
+                          <button
+                            type="submit"
+                            class="button button-danger-sm"
+                            title={`Remove all ${m.label} credentials (lost-device eviction). The user must re-enroll after removal.`}
+                          >
+                            Remove
+                          </button>
+                        </form>
+                      )}
+                    </span>
+                  ) : (
+                    <span class="badge badge-muted">{m.label} —</span>
+                  )
+                ))}
+              </div>
+              <p class="cred-eviction-note muted text-xs">
+                Remove evicts the credential type (passkey/webauthn/totp/backup codes) for lost-device response.
+                The user must re-enroll via an enrollment URL. Password cannot be removed here.
+              </p>
+            </dd>
           </dl>
           <div class="edit-action">
             <a href={`/admin/users/${id}?mode=edit`} class="button button-secondary">Edit</a>
@@ -447,18 +588,41 @@ const adminNav = [
 
         <section class="panel stack">
           <h2>Actions</h2>
-          <form method="post" class="cta-row">
-            <input type="hidden" name="csrf_token" value={csrfTokenActions} />
-            <button name="action" value="issue-recovery" type="submit" class="button button-secondary">
-              Issue enrollment URL
-            </button>
-            <button name="action" value="force-relogin" type="submit" class="button button-secondary">
-              Force re-login
-            </button>
-            <button name="action" value="deactivate" type="submit" class="button button-secondary">
-              Deactivate
-            </button>
-          </form>
+          {/* Each action gets its own action-scoped CSRF token: a captured
+              token from one button cannot be replayed to trigger another. */}
+          <div class="cta-row">
+            <form method="post" class="actions-form">
+              <input type="hidden" name="action" value="issue-recovery" />
+              <input type="hidden" name="csrf_token" value={csrfTokenIssueRecovery} />
+              <button type="submit" class="button button-secondary">
+                Issue enrollment URL
+              </button>
+            </form>
+            <form method="post" class="actions-form">
+              <input type="hidden" name="action" value="force-relogin" />
+              <input type="hidden" name="csrf_token" value={csrfTokenForceRelogin} />
+              <button type="submit" class="button button-secondary">
+                Force re-login
+              </button>
+            </form>
+            {identity.state === 'inactive' ? (
+              <form method="post" class="actions-form">
+                <input type="hidden" name="action" value="reactivate" />
+                <input type="hidden" name="csrf_token" value={csrfTokenDeactivate} />
+                <button type="submit" class="button button-secondary">
+                  Reactivate
+                </button>
+              </form>
+            ) : (
+              <form method="post" class="actions-form">
+                <input type="hidden" name="action" value="deactivate" />
+                <input type="hidden" name="csrf_token" value={csrfTokenDeactivate} />
+                <button type="submit" class="button button-secondary">
+                  Deactivate
+                </button>
+              </form>
+            )}
+          </div>
           <p class="muted text-xs">
             Force re-login revokes Kratos sessions and asks every supported app to log the user out (OIDC back-channel logout). Apps without that capability keep their local session until the per-app cookie expires.
           </p>
@@ -487,9 +651,28 @@ const adminNav = [
 </Layout>
 
 <style>
+  /* Inline form wrappers inside the actions row so each button carries its
+   * own action-scoped CSRF token without disrupting the flex layout. */
+  .actions-form { display: contents; }
   .dl-grid { display: grid; grid-template-columns: 9rem 1fr; gap: var(--space-2) var(--space-4); }
   .edit-action { margin-top: var(--space-2); }
   .badge-row { margin-top: var(--space-1); }
   .details-content { margin-top: var(--space-3); }
   .summary-danger { color: var(--danger); cursor: pointer; }
+  .cred-list { display: flex; flex-wrap: wrap; gap: var(--space-2); align-items: flex-start; }
+  .cred-item { display: inline-flex; align-items: center; gap: var(--space-1); }
+  .cred-remove-form { display: inline; margin: 0; padding: 0; }
+  .cred-enrolled { background: var(--success-subtle); border-color: var(--success); }
+  .cred-eviction-note { margin-top: var(--space-2); }
+  .button-danger-sm {
+    font-size: var(--text-xs);
+    padding: 0.1rem 0.4rem;
+    background: transparent;
+    border: 1px solid var(--danger);
+    color: var(--danger);
+    border-radius: var(--radius-sm, 3px);
+    cursor: pointer;
+    line-height: 1.4;
+  }
+  .button-danger-sm:hover { background: var(--danger-subtle, #fff0f0); }
 </style>

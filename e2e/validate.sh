@@ -13,11 +13,11 @@
 #   1. Generate per-run secrets → e2e/.env
 #   2. Login to the registry (CI_REGISTRY_USER + CI_REGISTRY_PASSWORD
 #      injected by GitLab into every job)
-#   3. `docker compose up -d` (pulls the othala app + ldap-bridge images
-#      at $AUTH_VERSION)
+#   3. `docker compose up -d` (pulls the othala app at $AUTH_VERSION)
 #   4. Wait for healthchecks (postgres → migrate → kratos + hydra →
-#      othala + ldap-bridge). Max 4 min total; if any fail the substrate
-#      is broken.
+#      othala). Max 4 min total; if any fail the substrate is broken.
+#      NOTE: the LDAP bridge is a separate project (gitlab.com/dunn.dev/
+#      kratos-ldap); no e2e spec exercises LDAP here.
 #   5. Run smoke.sh
 #   6. On failure, dump container logs to artifacts
 #   7. `docker compose down -v` (ephemeral; VM dies anyway, but be
@@ -26,8 +26,7 @@
 # Required env (set by .gitlab-ci.yml e2e job):
 #   CI_REGISTRY_USER, CI_REGISTRY_PASSWORD — for podman login
 #   AUTH_REGISTRY — the registry ROOT (the othala app image); defaults to
-#                   registry.gitlab.com/dunn.dev/othala. ldap-bridge is
-#                   the ${AUTH_REGISTRY}/ldap-bridge sub-image.
+#                   registry.gitlab.com/dunn.dev/othala.
 #   AUTH_VERSION  — defaults to latest; CI passes the just-built tag.
 #
 # Local operator invocation:
@@ -67,39 +66,31 @@ if [[ -n "${CI_REGISTRY_USER:-}" && -n "${CI_REGISTRY_PASSWORD:-}" ]]; then
     echo "$CI_REGISTRY_PASSWORD" | podman login --username "$CI_REGISTRY_USER" --password-stdin "${AUTH_REGISTRY%%/*}"
 fi
 
-# Render the Ory configs. Kratos/Hydra do NOT interpolate ${VAR} inside
-# their YAML (they only accept uppercased-dotted env OVERRIDES), so the
-# ${OTHALA_*} + ${*_SECRET} placeholders in the canonical configs must
-# be substituted HERE before the containers mount them. Without this,
-# kratos validates the literal "${KRATOS_CIPHER_SECRET_CURRENT}" (31 chars
-# < the 32 minimum) and the ${OTHALA_PUBLIC_URL} URLs as invalid URIs, and dies.
-# python3 os.path.expandvars (the golden has python3; no gettext/envsubst
-# dependency) substitutes defined vars and leaves any undefined var literal
-# rather than silently blanking it.
-#
-# Source: the canonical configs at ../kratos/kratos.yml and ../hydra/hydra.yml.
-# Rendered output: kratos.rendered.yml + hydra.rendered.yml in the e2e dir.
-# compose.yml mounts these rendered copies (not the canonical sources directly,
+# Render the Ory configs via THE canonical render, scripts/render-config.sh —
+# shared with the deploy plane (dunn.dev/iac), so e2e and production use the
+# same mechanism and the same template-derived variable contract. Kratos/Hydra
+# do NOT interpolate ${VAR} inside their YAML (they only accept
+# uppercased-dotted env OVERRIDES); the canonical configs are templates that
+# must be rendered before the containers mount them.
+# compose.yml mounts the rendered copies (not the canonical sources directly,
 # since compose bind-mounts require a path that exists at up-time and the
 # canonical sources contain un-expanded placeholders at that point).
+# render-config.sh fails fast — listing missing variable NAMES only, never
+# rendered content — if any template token is unset/empty, so a partial .env
+# cannot reach `compose up` (the old post-render leftover-grep is superseded:
+# the pre-check makes leftovers impossible by construction).
 set -a
 source ./.env
 set +a
-python3 -c 'import os,sys; sys.stdout.write(os.path.expandvars(sys.stdin.read()))' \
-    < ../kratos/kratos.yml > kratos.rendered.yml
-python3 -c 'import os,sys; sys.stdout.write(os.path.expandvars(sys.stdin.read()))' \
-    < ../hydra/hydra.yml   > hydra.rendered.yml
+# render-config.sh runs under set -euo pipefail internally, but validate.sh
+# itself omits -e so a bare `bash ...` call would let a render failure continue.
+# Explicit fail-fast guards surface the failure immediately rather than letting
+# compose up proceed with un-rendered (${VAR}-literal) configs.
+bash ../scripts/render-config.sh ../kratos/kratos.yml kratos.rendered.yml \
+    || { echo "  ✗ render kratos.yml failed — aborting" >&2; exit 1; }
+bash ../scripts/render-config.sh ../hydra/hydra.yml   hydra.rendered.yml \
+    || { echo "  ✗ render hydra.yml failed — aborting" >&2; exit 1; }
 echo "  canonical configs rendered (kratos.rendered.yml, hydra.rendered.yml)"
-
-# Guard: any un-expanded ${VAR} on a NON-comment line means a required env var
-# was missing — Ory rejects the config and crash-loops. Catch it here, not as
-# a downstream startup hang.
-leftover=$(cat kratos.rendered.yml hydra.rendered.yml | grep -E '\$\{[A-Za-z_]' | grep -E '^[[:space:]]*[^#[:space:]]' || true)
-if [[ -n "$leftover" ]]; then
-    echo "  ✗ un-expanded \${VAR} on non-comment line(s) — a render env var is missing; aborting:"
-    echo "$leftover" | head
-    exit 1
-fi
 
 # Step 3: compose up — wrapped in a timeout. A never-healthy dependency (e.g. a
 # mis-rendered config) makes `up -d` block indefinitely; the health-wait timeout
@@ -131,13 +122,13 @@ while true; do
     # The PLAIN `docker compose ps` output reliably shows "(healthy)" in the
     # status column under both engines — count that instead.
     healthy=$(docker compose ps 2>/dev/null | grep -c '(healthy)')
-    # Expecting 6 healthy long-runners: postgres, kratos, hydra, othala,
-    # ldap-bridge, mailpit. consent + util are gone (folded into the othala
-    # app). The othala healthcheck hits its loopback admin /healthz (:8431);
-    # the bridge has its own /healthz on :6478; mailpit answers `readyz` —
-    # gating on all surfaces a broken service in this loop instead of in smoke.
-    if [[ "${healthy:-0}" -ge 6 ]]; then
-        echo "  ✓ substrate healthy ($healthy/6 long-runners up)"
+    # Expecting 5 healthy long-runners: postgres, kratos, hydra, othala,
+    # mailpit. consent + util are gone (folded into the othala app); the
+    # LDAP bridge is now at gitlab.com/dunn.dev/kratos-ldap, no spec here.
+    # The othala healthcheck hits its loopback admin /healthz (:4431);
+    # mailpit answers `readyz` — gating on all surfaces a broken service.
+    if [[ "${healthy:-0}" -ge 5 ]]; then
+        echo "  ✓ substrate healthy ($healthy/5 long-runners up)"
         break
     fi
     sleep 5
@@ -174,7 +165,7 @@ if [[ $SMOKE_EXIT -ne 0 || $BROWSER_EXIT -ne 0 ]]; then
     echo "=== container ps ==="
     docker compose ps 2>&1 || true
     echo "=== container logs (last 80 each) ==="
-    for svc in postgres kratos hydra othala ldap-bridge mailpit caddy; do
+    for svc in postgres kratos hydra othala mailpit caddy; do
         echo "--- lab-$svc ---"
         podman logs --tail=80 "lab-$svc" 2>&1 || true
     done

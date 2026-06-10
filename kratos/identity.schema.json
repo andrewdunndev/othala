@@ -23,12 +23,11 @@
               "webauthn": {
                 "identifier": true
               },
+              "passkey": {
+                "display_name": true
+              },
               "totp": {
                 "account_name": true
-              },
-              "code": {
-                "identifier": true,
-                "via": "email"
               }
             }
           }

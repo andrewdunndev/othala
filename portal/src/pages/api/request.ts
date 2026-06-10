@@ -39,22 +39,17 @@ function json(status: number, body: unknown, headers: Record<string, string> = {
  * ctx.clientAddress from the X-Forwarded-For header that Caddy sets, so this
  * is the actual client IP — not the Caddy container IP shared by all requests.
  *
- * The manual XFF split below is pure defense-in-depth for the (unexpected) case
- * where ctx.clientAddress is falsy despite trustProxy.  It is NOT the primary
- * path and should not be relied upon in production.
- *
- * TODO(post-0.3): if ctx.clientAddress is ever falsy here, the XFF leftmost
- * entry is attacker-controlled (any client can inject XFF headers).  Before the
- * public flip, replace this fallback with trusted-proxy XFF parsing (e.g.
- * validate against known proxy CIDRs or use a dedicated header Caddy stamps). */
+ * The XFF-header fallback has been removed: the leftmost XFF entry is
+ * attacker-injectable and would let a caller bypass the rate limit by spoofing
+ * a fresh IP on every request. With trustProxy configured, ctx.clientAddress
+ * is authoritative; when it is unexpectedly absent we fail closed to 'unknown'
+ * (a single shared bucket) rather than trusting attacker-controlled input. */
 function clientKey(ctx: APIContext): string {
   try {
     if (ctx.clientAddress) return ctx.clientAddress;
   } catch {
     // @astrojs/node only exposes clientAddress for on-demand routes; guard anyway.
   }
-  const fwd = ctx.request.headers.get('x-forwarded-for');
-  if (fwd) return fwd.split(',')[0].trim();
   return 'unknown';
 }
 
