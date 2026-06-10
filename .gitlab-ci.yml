@@ -27,6 +27,20 @@ default:
   interruptible: true
 
 workflow:
+  # Prevent duplicate pipelines: when a branch has an open MR, suppress
+  # the redundant push pipeline and let the merge_request_event pipeline
+  # be the only pipeline for that commit. This fixes the 0-job
+  # merge_request_event pipelines caused by GitLab spawning BOTH a push
+  # pipeline and an MR-event pipeline for the same commit; without this
+  # rule the MR-event pipeline was immediately failed (0 jobs, started_at
+  # null) because the e2e job's `needs` reference jobs that have no
+  # merge_request_event rules in the container-image component.
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+    - if: $CI_COMMIT_BRANCH && $CI_OPEN_MERGE_REQUESTS && $CI_PIPELINE_SOURCE == "push"
+      when: never
+    - if: $CI_COMMIT_BRANCH
+    - if: $CI_COMMIT_TAG
   auto_cancel:
     on_new_commit: interruptible
     on_job_failure: all
@@ -265,14 +279,19 @@ e2e:
       - /tmp/apply-clients.log
     expire_in: 1 week
   rules:
-    # Run on every push to main + on every MR + on every tag.
-    # Renovate-MR bumps + Ory image bumps fire this loop.
+    # Run on push to main + on every tag.
+    # merge_request_event is intentionally absent: the container-image
+    # component jobs that populate `needs` (build-othala, build-ldap-bridge,
+    # build-e2e-tester) have no merge_request_event rule, so including
+    # merge_request_event here caused GitLab to immediately fail MR-event
+    # pipelines with 0 jobs (unresolvable needs). Renovate-MR verification
+    # is covered by the verify-* and test-/check-portal jobs.
     # Tag pipelines pull the v-tag image — override the SHA default above.
-    # (GitLab variables: can't express this inline, so it's rule-scoped.)
+    # (GitLab variables: do NOT honor bash ${VAR:-default}, so tag pipelines
+    # override AUTH_VERSION in rules:.)
     - if: '$CI_COMMIT_TAG'
       variables:
         AUTH_VERSION: "$CI_COMMIT_TAG"
-    - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
     - if: '$CI_PIPELINE_SOURCE == "push" && $CI_COMMIT_BRANCH == "main"'
     # On-demand pre-tag validation: a branch pipeline triggered with
     # BUILD_CI_IMAGE=true builds the images (container-image @2.5.1 honors
