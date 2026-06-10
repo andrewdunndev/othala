@@ -46,6 +46,7 @@
  */
 
 import { test, expect } from '../fixtures';
+import type { APIRequestContext } from '@playwright/test';
 import { createIdentityWithPassword } from '../actions/identity';
 import { getSession } from '../actions/session';
 
@@ -76,20 +77,21 @@ async function waitForLoginCode(
         ID: string;
         Subject: string;
         To: Array<{ Address: string }>;
-        Date: string;
+        // Mailpit v1 API uses `Created` (ISO 8601), NOT `Date`.
+        Created: string;
       }>;
     };
     const messages = data.messages ?? [];
 
     // Find the most-recent email to this address that arrived after startMs.
-    // We sort by Date descending so we always pick up the latest code if Kratos
+    // We sort by Created descending so we always pick up the latest code if Kratos
     // sent multiple (e.g. a re-send).
     const candidates = messages
       .filter((m) =>
         m.To.some((t) => t.Address.toLowerCase() === toAddress.toLowerCase()) &&
-        new Date(m.Date).getTime() >= startMs - 5_000, // 5s grace for clock skew
+        new Date(m.Created).getTime() >= startMs - 5_000, // 5s grace for clock skew
       )
-      .sort((a, b) => new Date(b.Date).getTime() - new Date(a.Date).getTime());
+      .sort((a, b) => new Date(b.Created).getTime() - new Date(a.Created).getTime());
 
     if (candidates.length > 0) {
       const match = candidates[0];
@@ -112,9 +114,19 @@ async function waitForLoginCode(
 
 /**
  * Initiate a Kratos browser login flow via the JSON API path.
- * Returns the flow id, action URL, and CSRF token for step-1 submission.
+ *
+ * IMPORTANT: uses `request` (Playwright APIRequestContext / ctx.request) rather
+ * than bare fetch() so the Kratos anti-CSRF cookie set on the /browser redirect
+ * lands in the browser context's cookie jar.  Subsequent POSTs to the action URL
+ * (also via `request`) then carry that cookie and Kratos accepts the CSRF token.
+ * Using bare fetch() here is the bug: the CSRF cookie goes into a standalone
+ * fetch session that is NOT shared with ctx.request, so the step-1 POST returns
+ * "The HTTP Cookie Header is empty or not set" (Kratos 403).
  */
-async function initLoginFlow(baseURL: string): Promise<{
+async function initLoginFlow(
+  request: APIRequestContext,
+  baseURL: string,
+): Promise<{
   id: string;
   action: string;
   csrfToken: string;
@@ -124,13 +136,13 @@ async function initLoginFlow(baseURL: string): Promise<{
     attributes?: { name?: string; type?: string; value?: unknown };
   }>;
 }> {
-  const resp = await fetch(`${baseURL}/self-service/login/browser`, {
+  const resp = await request.get(`${baseURL}/self-service/login/browser`, {
     headers: { Accept: 'application/json' },
-    redirect: 'follow',
+    maxRedirects: 5,
   });
-  if (!resp.ok) {
+  if (!resp.ok()) {
     throw new Error(
-      `login flow init failed: ${resp.status} ${await resp.text().catch(() => '')}`,
+      `login flow init failed: ${resp.status()} ${await resp.text().catch(() => '')}`,
     );
   }
   const flow = (await resp.json()) as {
@@ -168,10 +180,16 @@ async function initLoginFlow(baseURL: string): Promise<{
 
 /**
  * Submit the identifier (email) to request a login code.
+ *
+ * Uses `request` (same APIRequestContext as initLoginFlow) so the Kratos CSRF
+ * cookie established in the flow-init call is sent with this POST and the
+ * csrf_token in the body is accepted.
+ *
  * Returns the updated flow (step-2 form with the code text input and the
  * identifier hidden node in the default group).
  */
 async function submitIdentifierForCode(
+  request: APIRequestContext,
   action: string,
   csrfToken: string,
   email: string,
@@ -184,18 +202,21 @@ async function submitIdentifierForCode(
     attributes?: { name?: string; type?: string; value?: unknown };
   }>;
 }> {
-  const resp = await fetch(action, {
-    method: 'POST',
+  const resp = await request.post(action, {
     headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
-    body: JSON.stringify({ identifier: email, method: 'code', csrf_token: csrfToken }),
-    redirect: 'follow',
+    data: { identifier: email, method: 'code', csrf_token: csrfToken },
+    maxRedirects: 5,
   });
 
-  // Kratos returns 200 or 422 (re-render with messages) for step-1 submit.
-  // On success the response body is the updated flow (step-2 shape).
-  if (resp.status !== 200 && resp.status !== 422) {
+  // Kratos returns 200, 400, or 422 for the identifier submit step.
+  //   200/422 — standard re-render (flow + messages, email code sent).
+  //   400     — Kratos v26 "flow state mismatch" when the flow has already
+  //             transitioned to `sent_email` (the body is still the updated
+  //             step-2 form, not an error object — this is the success path in v26).
+  const s = resp.status();
+  if (s !== 200 && s !== 400 && s !== 422) {
     throw new Error(
-      `identifier submit returned unexpected ${resp.status}: ${await resp.text().catch(() => '')}`,
+      `identifier submit returned unexpected ${s}: ${await resp.text().catch(() => '')}`,
     );
   }
 
@@ -255,13 +276,17 @@ test('K1 — email-code login delivers a code and establishes an active session'
     const startTime = Date.now();
 
     // Step 1: initiate a login flow.
-    const flow = await initLoginFlow(baseURL);
+    // Pass ctx.request so the Kratos CSRF cookie is stored in the browser
+    // context's cookie jar (bare fetch() would silo the cookie and break
+    // the subsequent POST).
+    const flow = await initLoginFlow(ctx.request, baseURL);
     console.log('[K1] login flow id:', flow.id);
 
     // Step 2: submit the email to request a code.
+    // Also via ctx.request to keep the cookie jar intact across the flow.
     // Kratos returns the step-2 flow shape (code text input now present,
     // plus the identifier as a default-group hidden node).
-    const step2 = await submitIdentifierForCode(flow.action, flow.csrfToken, identity.email);
+    const step2 = await submitIdentifierForCode(ctx.request, flow.action, flow.csrfToken, identity.email);
     console.log('[K1] identifier submitted; step-2 action:', step2.action);
 
     // Verify step-2 has the identifier hidden node in the default group.

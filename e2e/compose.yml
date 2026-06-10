@@ -153,7 +153,7 @@ services:
       - ./kratos.rendered.yml:/etc/config/kratos/kratos.yml:ro,z
       - ../kratos/identity.schema.json:/etc/config/kratos/identity.schema.json:ro,z
       - ../kratos/hooks/recovery-gate.jsonnet:/etc/config/kratos/hooks/recovery-gate.jsonnet:ro,z
-    command: ["serve", "all", "--config", "/etc/config/kratos/kratos.yml", "--dev"]
+    command: ["serve", "--config", "/etc/config/kratos/kratos.yml", "--dev", "--watch-courier"]
     healthcheck:
       test: ["CMD-SHELL", "wget -qO- http://localhost:4434/admin/health/ready || exit 1"]
       interval: 5s
@@ -382,10 +382,12 @@ services:
   # PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD=1 (also set in the image) prevents a
   # redundant download.
   #
-  # CODIFICATION TODO (remaining): add a compose override that sets othala
-  # KRATOS_PUBLIC_URL=http://auth.othala.test for the browser profile (golden uses
-  # internal kratos:4433; the browser login redirect needs the public host so
-  # ory_kratos_session is set on the correct domain).
+  # Split-horizon fix: compose.browser.yml overrides othala
+  # KRATOS_PUBLIC_URL=http://auth.othala.test for the browser profile. The golden
+  # run keeps the internal kratos:4433 (fast, no Caddy hop); the browser profile
+  # needs the public host so browserFlows redirect URLs resolve in Chromium and
+  # ory_kratos_session is scoped to othala.test. See compose.browser.yml for the
+  # full rationale (finding 2026-06-10).
   playwright:
     image: ${AUTH_REGISTRY}/e2e-tester:${AUTH_VERSION}
     container_name: lab-playwright

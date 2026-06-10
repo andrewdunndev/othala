@@ -63,9 +63,14 @@ HYDRA_PG_PASS=$(gen_alnum)
 # OTHALA_SMTP_CONNECTION_URI is the single source of truth, consumed by:
 #   - kratos/kratos.yml  courier.smtp.connection_uri  (rendered by validate.sh)
 #   - portal/src/lib/mailer.ts  (read via lib/config.ts at request time)
+#
+# ?disable_starttls=true is required for mailpit (and any plain-text SMTP relay).
+# Kratos v26.2.0 gomail defaults to MandatoryStartTLS even for smtp:// URIs; without
+# this flag the courier worker connects successfully but then fails STARTTLS
+# negotiation and abandons every message after 6 retries.
 SMTP_USER=lab
 SMTP_PASS=lab
-OTHALA_SMTP_CONNECTION_URI=smtp://mailpit:1025
+OTHALA_SMTP_CONNECTION_URI=smtp://mailpit:1025/?disable_starttls=true
 # The contact form delivers here; the smoke seeds this as the recipient and
 # asserts mailpit received a message addressed to it.
 OTHALA_CONTACT_RECIPIENT=ops@othala.test
