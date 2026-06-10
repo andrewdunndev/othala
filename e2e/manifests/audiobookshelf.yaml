@@ -25,7 +25,10 @@ oidc:
     - refresh_token
   response_types:
     - code
-  scope: openid email profile groups
+  # offline_access is required for Hydra to honour the refresh_token grant type;
+  # without it the authorization server silently omits the refresh token even
+  # when refresh_token is listed in grant_types.
+  scope: openid email profile groups offline_access
   redirect_uris:
     - https://audiobookshelf.othala.test/auth/openid/callback
   post_logout_redirect_uris:

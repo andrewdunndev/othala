@@ -133,7 +133,7 @@ APIs. Cost: fiddly (static IPs, admin-host binding, DNS targeting), but no rebui
 Group Kratos, Hydra, portal, and postgres in a pod (shared network namespace =
 shared `localhost`). Bind the Ory admin listeners to `127.0.0.1`; the portal
 reaches them on loopback — the same pattern the portal already uses for its own
-admin endpoints (`127.0.0.1:8431`). Caddy stays **outside** the pod and reaches
+admin endpoints (`127.0.0.1:4431`). Caddy stays **outside** the pod and reaches
 only the pod's published public ports. The admin APIs become unreachable from
 anything but the in-pod admin consumers. Cost: re-architecting flat-network
 quadlets into a `.pod` unit, but the most Podman-idiomatic isolation.
@@ -152,7 +152,7 @@ wins below instead. This is what the 2026-05-04 review chose.
   service bind password (and any user BIND) crosses the network unprotected.
   Provision a cert (self-signed CA is fine for internal-only consumers) before the
   bridge serves real auth.
-- **Admin ports never published.** `:4434` / `:4445` (and the portal's `:8431`)
+- **Admin ports never published.** `:4434` / `:4445` (and the portal's `:4431`)
   carry **no** `PublishPort`. Confirmed correct in the shipped quadlets — keep it.
 
 ### Gating the admin surface — yes; the auth surface — no

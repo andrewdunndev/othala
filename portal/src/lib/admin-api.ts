@@ -77,7 +77,7 @@ export interface UpdateIdentityInput {
 // identities) this is fine and the truncation never bites.
 //
 // If the estate ever grows bot/service identities, mirror the
-// pagination loop pattern in ldap-bridge/kratos/client.go:166-220 and
+// pagination loop pattern from gitlab.com/dunn.dev/kratos-ldap and
 // follow `next` Link headers until exhausted. Today it's deliberately
 // unimplemented.
 export async function listIdentities(): Promise<Identity[]> {

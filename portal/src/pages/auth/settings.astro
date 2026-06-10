@@ -37,6 +37,7 @@ import {
   nodesByGroup,
   asInput,
   scriptNodes,
+  safeOnclick,
 } from '../../lib/nodes';
 import type { NodeImageAttributes, NodeTextAttributes } from '../../lib/types';
 import FlowNodes from '../../components/FlowNodes.astro';
@@ -377,26 +378,9 @@ const accessGroups = groups.filter((g) => g.startsWith('access-'));
           if (inp.type === 'hidden') {
             return <input type="hidden" name={inp.name} value={String(inp.value ?? '')} />;
           }
-          // The register trigger button carries onclickTrigger (not onclick on
-          // this strategy). Prefer inp.onclick when present (always set for
-          // browser flows). If only onclickTrigger is available, validate it
-          // against the set of known Ory trigger names before interpolating
-          // into window.<name>() — arbitrary values from flow data must not
-          // reach the onclick attribute.
+          // safeOnclick validates against the shared KNOWN_TRIGGERS allowlist
+          // before emitting window.<fn>(). Never pass inp.onclick raw to the DOM.
           if (inp.type === 'button' || inp.type === 'submit') {
-            const KNOWN_TRIGGERS = new Set([
-              'oryWebAuthnRegistration',
-              'oryWebAuthnLogin',
-              'oryPasskeyLogin',
-              'oryPasskeyLoginAutocompleteInit',
-              'oryPasskeyRegistration',
-              'oryPasskeySettingsRegistration',
-            ]);
-            const safeWindowCall =
-              inp.onclickTrigger && KNOWN_TRIGGERS.has(inp.onclickTrigger)
-                ? `window.${inp.onclickTrigger}()`
-                : undefined;
-            const onclickAttr = inp.onclick ?? safeWindowCall;
             return (
               <div class="form-actions">
                 <button
@@ -404,7 +388,7 @@ const accessGroups = groups.filter((g) => g.startsWith('access-'));
                   type={inp.type}
                   name={inp.name}
                   value={String(inp.value ?? '')}
-                  onclick={onclickAttr}
+                  onclick={safeOnclick(inp)}
                 >
                   {n.meta?.label?.text ?? 'Add security key'}
                 </button>
@@ -487,7 +471,16 @@ const accessGroups = groups.filter((g) => g.startsWith('access-'));
   </p>
 
   {scripts.map((s) => (
-    <script src={s.src} id={s.id} async is:inline></script>
+    <script
+      src={s.src}
+      id={s.id}
+      async
+      is:inline
+      integrity={s.integrity}
+      crossorigin={s.crossorigin}
+      referrerpolicy={s.referrerpolicy}
+      nonce={s.nonce}
+    ></script>
   ))}
 
 </Layout>

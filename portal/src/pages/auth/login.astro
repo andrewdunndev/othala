@@ -30,7 +30,7 @@ import Layout from '../../layouts/Layout.astro';
 import PageHero from '../../components/PageHero.astro';
 import { browserFlows, getLoginFlow } from '../../lib/kratos';
 import { siteName } from '../../lib/config';
-import { csrfToken, hasMethod, nodesByGroup, asInput, scriptNodes } from '../../lib/nodes';
+import { csrfToken, hasMethod, nodesByGroup, asInput, scriptNodes, safeOnclick } from '../../lib/nodes';
 import type { FlowMessage } from '../../lib/types';
 
 const url = Astro.url;
@@ -127,13 +127,15 @@ const isCodeEntry = codeNodes.some((n) => {
             return <input type="hidden" name={a.name} value={String(a.value ?? '')} />;
           }
           if (a.type === 'submit' || a.type === 'button') {
+            // safeOnclick validates against KNOWN_TRIGGERS before emitting a
+            // window.<fn>() call. Never pass a.onclick raw to the DOM.
             return (
               <button
                 class="button button-primary login-primary"
                 type={a.type}
                 name={a.name}
                 value={String(a.value ?? '')}
-                onclick={a.onclick}
+                onclick={safeOnclick(a)}
               >
                 {n.meta?.label?.text ?? 'Sign in with passkey'}
               </button>
@@ -331,7 +333,16 @@ const isCodeEntry = codeNodes.some((n) => {
   </footer>
 
   {scripts.map((s) => (
-    <script src={s.src} id={s.id} async is:inline></script>
+    <script
+      src={s.src}
+      id={s.id}
+      async
+      is:inline
+      integrity={s.integrity}
+      crossorigin={s.crossorigin}
+      referrerpolicy={s.referrerpolicy}
+      nonce={s.nonce}
+    ></script>
   ))}
 
 </Layout>

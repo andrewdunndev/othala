@@ -341,16 +341,15 @@ None.
     pipeline can produce and tag a release with a critical CVE present in a direct
     dependency without any gate firing (release-plan Wave 4, "SUPPLY-CHAIN: [HIGH]
     no CVE gate").
-  - Separately: `ldap-bridge/go.mod` declares `go 1.22` and carries
-    `golang.org/x/crypto` at approximately 18 months stale; it is not managed by
-    Renovate (no `renovate.json` ARG annotation).
+  - NOTE (post-review): `ldap-bridge/` has been extracted to the standalone
+    `gitlab.com/dunn.dev/kratos-ldap` project; its `go.mod` staleness concern
+    now lives in that repo's backlog, not here.
   - Threat tier: supply-chain. Asset at risk: known-exploited vulnerability in a
     dependency shipped to production without operator awareness.
   - Fix: add `grype`/`trivy` on the built image (`--fail-on high`) and
-    `npm audit --audit-level=high` + `govulncheck ./...` on the portal and Go
-    components to the CI pipeline; fail the build on unacknowledged high findings.
-    Renovate-annotate the ldap-bridge `go.mod` ARG. Spec in `docs/hardening.md §6`.
-  - **Status: OPEN.** Gate-coordinated; should be part of the W6 supply-chain pass.
+    `npm audit --audit-level=high` on the portal to the CI pipeline; fail the
+    build on unacknowledged high findings. Spec in `docs/hardening.md §6`.
+  - **Status: OPEN** (portal + othala image scope only; kratos-ldap tracked separately).
 
 - **MEDIUM-J: e2e `identity.schema.json` diverges from deployed
   `kratos/identity.schema.json`.**
@@ -391,7 +390,7 @@ unauthenticated admin-API exposure on the flat network — that requires Option 
 
 The cheap-wins from A/B/C regardless: `sslmode=require` on Kratos/Hydra → Postgres
 DSNs; TLS provisioned for the LDAP bridge before it serves real BIND; admin ports
-(`4434`, `4445`, `8431`) confirmed with no `PublishPort`. Decision on Option A/B/C
+(`4434`, `4445`, `4431`) confirmed with no `PublishPort`. Decision on Option A/B/C
 is still OPEN; must be resolved before v0.3.0 tag.
 
 ## What's NOT in scope
@@ -410,8 +409,9 @@ is still OPEN; must be resolved before v0.3.0 tag.
   abuse is now in scope (MEDIUM-B); the line is L3/L4.
 - LDAP bridge TLS provisioning: flagged as a "cheap win" under A1/A7 and in
   `docs/hardening.md §3`; gate-coordinated. glauth cleartext LDAP carries the
-  Jellyfin bind password on the pod network — keep ldap-bridge out of v0.3.0 scope
-  until TLS is provisioned, or accept the pod-trust caveat explicitly.
+  Jellyfin bind password on the pod network — keep kratos-ldap out of v0.3.0 scope
+  until TLS is provisioned, or accept the pod-trust caveat explicitly. Bridge is
+  now at `gitlab.com/dunn.dev/kratos-ldap`.
 - Dynamic / runtime behavior that requires the carmine stack: cookie rotation
   correctness, admin session freshness end-to-end, brute-force-lockout rate
   verification. These are live-validation gate items, not static-review findings.
@@ -455,9 +455,9 @@ branch from being reviewed:
 - **MEDIUM-G** — Container baseline (NoNewPrivileges, ReadOnly, DropCapability) +
   replace AutoUpdate with digest pinning.
 - **MEDIUM-H** — High-value secrets to file mounts.
-- **MEDIUM-I** — CVE evaluation gate in CI pipeline; ldap-bridge Renovate annotation.
+- **MEDIUM-I** — CVE evaluation gate in CI pipeline (portal/othala scope; kratos-ldap tracked separately).
 - A1/A7 network-seg option A/B/C decision + cheap wins (sslmode=require; LDAP TLS
-  or ldap-bridge out of v0.3.0).
+  or kratos-ldap out of v0.3.0).
 
 ### Accepted / deferred
 

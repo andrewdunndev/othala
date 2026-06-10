@@ -50,7 +50,30 @@ template_path, output_path = sys.argv[1], sys.argv[2]
 src = open(template_path).read()
 
 TOKEN = re.compile(r"\$\{([A-Za-z_][A-Za-z0-9_]*)\}")
-needed = sorted(set(TOKEN.findall(src)))
+
+# Derive required tokens from a comment-stripped view so that ${VAR} tokens
+# that appear only inside YAML comments don't become phantom required vars.
+# Heuristic: strip from the first unquoted ' #' (space-hash) on each line, or
+# from the start of lines whose first non-whitespace character is '#'. This is
+# intentionally simple — it will miss '#' inside quoted strings, but no
+# template value legitimately embeds a '#' in a comment context. Substitution
+# itself runs against the full source so comment text is preserved verbatim.
+def strip_comments(text):
+    out = []
+    for line in text.splitlines():
+        stripped = line.lstrip()
+        if stripped.startswith('#'):
+            out.append('')
+            continue
+        # Remove inline comment: space-hash not inside quotes. A full parser
+        # is out of scope; the space requirement avoids fragment-URIs like
+        # https://host/#anchor. Limitation: '#' inside a quoted YAML scalar
+        # that follows a space is also stripped — acceptable for this codebase.
+        pos = line.find(' #')
+        out.append(line[:pos] if pos != -1 else line)
+    return '\n'.join(out)
+
+needed = sorted(set(TOKEN.findall(strip_comments(src))))
 
 missing = [n for n in needed if not os.environ.get(n)]
 if missing:
@@ -60,7 +83,25 @@ if missing:
         print(f"  {n}", file=sys.stderr)
     sys.exit(1)
 
-rendered = TOKEN.sub(lambda m: os.environ[m.group(1)], src)
+# Newline-injection guard: a substituted value containing a newline would
+# break YAML structure (the newline shifts subsequent content out of its
+# intended scalar context). Fail closed before writing any output.
+for name in needed:
+    val = os.environ[name]
+    if '\n' in val:
+        print(f"render-config: {template_path}: variable {name} contains a "
+              f"newline — refusing to render (YAML structure injection guard)",
+              file=sys.stderr)
+        sys.exit(1)
+
+# Substitute only tokens that are in `needed` (the non-comment set).
+# Comment-only tokens are left as literal ${VAR} text in the output,
+# which is harmless — they remain comments in the rendered YAML.
+needed_set = set(needed)
+rendered = TOKEN.sub(
+    lambda m: os.environ[m.group(1)] if m.group(1) in needed_set else m.group(0),
+    src
+)
 with open(output_path, "w") as f:
     f.write(rendered)
 print(f"render-config: {template_path} -> {output_path} ({len(needed)} vars)")

@@ -20,7 +20,7 @@
 // loop is shared. login.astro is intentionally NOT a consumer — its
 // passkey-first / password-in-disclosure UX is bespoke.
 
-import { asInput, inputProps } from '../lib/nodes';
+import { asInput, inputProps, safeOnclick } from '../lib/nodes';
 import type { FlowNode } from '../lib/types';
 
 interface Props {
@@ -76,14 +76,16 @@ const labelText = (node: FlowNode, fallback: string): string =>
     }
 
     if (a.type === 'submit' || a.type === 'button') {
-      const props = inputProps(a);
+      // safeOnclick validates against KNOWN_TRIGGERS before emitting
+      // window.<fn>(). The passOnclick prop controls whether the handler
+      // is forwarded at all (passkey group needs it; password group doesn't).
       const button = (
         <button
           class={buttonClass}
           type={a.type}
           name={a.name}
           value={String(a.value ?? '')}
-          onclick={passOnclick ? (props.onclick as string | undefined) : undefined}
+          onclick={passOnclick ? safeOnclick(a) : undefined}
         >
           {labelText(node, submitLabel)}
         </button>

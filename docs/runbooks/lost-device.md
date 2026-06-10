@@ -69,6 +69,28 @@ If you cannot reach the user (emergency eviction), remove all evictable types
 as a conservative response. The user re-enrolls from scratch via the recovery
 URL in Step 5.
 
+### Step 2b — Check the identity's recovery email address
+
+While you have the Profile section open, look at the **recoveryEmail** row.
+
+A `recoveryEmail` trait accepts an unverified email address. If the attacker had
+a brief authenticated session — even just AAL1 — they could have opened the
+settings flow and planted their own address. That address is not removed by
+`revokeSubject` or credential eviction, so it survives the rest of this
+procedure and stays usable for future account recovery.
+
+**What to check:** the `recoveryEmail` value shown in the Profile section. Ask
+the family member whether they recognise it. If they don't, or if it looks like
+an address they do not own, clear it:
+
+1. Click **Edit** (top of the Profile section).
+2. Clear the **Recovery email** field (leave it blank, or replace it with an
+   address the family member controls).
+3. Click **Save**.
+
+The legitimate user can set a recovery email of their choice after they
+re-enroll in Step 5.
+
 ### Step 3 — Remove the affected credential type(s)
 
 Next to each enrolled evictable credential chip, there is a **Remove** button.
@@ -140,6 +162,7 @@ current password or a privileged recovery session).
 ```
 [ ] 1. Open /admin/users/<id>  (confirm AAL2 + freshness gate passed)
 [ ] 2. Audit the credential chips — note which types were on the lost device
+[ ] 2b. Check the recoveryEmail trait — clear any address the user doesn't recognise
 [ ] 3. Remove each affected evictable type (passkey / webauthn / totp / backup codes)
 [ ] 4. Force re-login  (revoke sessions)
 [ ] 5. Issue enrollment URL  — share via Signal/iMessage

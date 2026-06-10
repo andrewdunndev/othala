@@ -13,11 +13,11 @@
 #   1. Generate per-run secrets → e2e/.env
 #   2. Login to the registry (CI_REGISTRY_USER + CI_REGISTRY_PASSWORD
 #      injected by GitLab into every job)
-#   3. `docker compose up -d` (pulls the othala app + ldap-bridge images
-#      at $AUTH_VERSION)
+#   3. `docker compose up -d` (pulls the othala app at $AUTH_VERSION)
 #   4. Wait for healthchecks (postgres → migrate → kratos + hydra →
-#      othala + ldap-bridge). Max 4 min total; if any fail the substrate
-#      is broken.
+#      othala). Max 4 min total; if any fail the substrate is broken.
+#      NOTE: the LDAP bridge is a separate project (gitlab.com/dunn.dev/
+#      kratos-ldap); no e2e spec exercises LDAP here.
 #   5. Run smoke.sh
 #   6. On failure, dump container logs to artifacts
 #   7. `docker compose down -v` (ephemeral; VM dies anyway, but be
@@ -26,8 +26,7 @@
 # Required env (set by .gitlab-ci.yml e2e job):
 #   CI_REGISTRY_USER, CI_REGISTRY_PASSWORD — for podman login
 #   AUTH_REGISTRY — the registry ROOT (the othala app image); defaults to
-#                   registry.gitlab.com/dunn.dev/othala. ldap-bridge is
-#                   the ${AUTH_REGISTRY}/ldap-bridge sub-image.
+#                   registry.gitlab.com/dunn.dev/othala.
 #   AUTH_VERSION  — defaults to latest; CI passes the just-built tag.
 #
 # Local operator invocation:
@@ -83,8 +82,14 @@ fi
 set -a
 source ./.env
 set +a
-bash ../scripts/render-config.sh ../kratos/kratos.yml kratos.rendered.yml
-bash ../scripts/render-config.sh ../hydra/hydra.yml   hydra.rendered.yml
+# render-config.sh runs under set -euo pipefail internally, but validate.sh
+# itself omits -e so a bare `bash ...` call would let a render failure continue.
+# Explicit fail-fast guards surface the failure immediately rather than letting
+# compose up proceed with un-rendered (${VAR}-literal) configs.
+bash ../scripts/render-config.sh ../kratos/kratos.yml kratos.rendered.yml \
+    || { echo "  ✗ render kratos.yml failed — aborting" >&2; exit 1; }
+bash ../scripts/render-config.sh ../hydra/hydra.yml   hydra.rendered.yml \
+    || { echo "  ✗ render hydra.yml failed — aborting" >&2; exit 1; }
 echo "  canonical configs rendered (kratos.rendered.yml, hydra.rendered.yml)"
 
 # Step 3: compose up — wrapped in a timeout. A never-healthy dependency (e.g. a
@@ -117,13 +122,13 @@ while true; do
     # The PLAIN `docker compose ps` output reliably shows "(healthy)" in the
     # status column under both engines — count that instead.
     healthy=$(docker compose ps 2>/dev/null | grep -c '(healthy)')
-    # Expecting 6 healthy long-runners: postgres, kratos, hydra, othala,
-    # ldap-bridge, mailpit. consent + util are gone (folded into the othala
-    # app). The othala healthcheck hits its loopback admin /healthz (:8431);
-    # the bridge has its own /healthz on :6478; mailpit answers `readyz` —
-    # gating on all surfaces a broken service in this loop instead of in smoke.
-    if [[ "${healthy:-0}" -ge 6 ]]; then
-        echo "  ✓ substrate healthy ($healthy/6 long-runners up)"
+    # Expecting 5 healthy long-runners: postgres, kratos, hydra, othala,
+    # mailpit. consent + util are gone (folded into the othala app); the
+    # LDAP bridge is now at gitlab.com/dunn.dev/kratos-ldap, no spec here.
+    # The othala healthcheck hits its loopback admin /healthz (:4431);
+    # mailpit answers `readyz` — gating on all surfaces a broken service.
+    if [[ "${healthy:-0}" -ge 5 ]]; then
+        echo "  ✓ substrate healthy ($healthy/5 long-runners up)"
         break
     fi
     sleep 5
@@ -160,7 +165,7 @@ if [[ $SMOKE_EXIT -ne 0 || $BROWSER_EXIT -ne 0 ]]; then
     echo "=== container ps ==="
     docker compose ps 2>&1 || true
     echo "=== container logs (last 80 each) ==="
-    for svc in postgres kratos hydra othala ldap-bridge mailpit caddy; do
+    for svc in postgres kratos hydra othala mailpit caddy; do
         echo "--- lab-$svc ---"
         podman logs --tail=80 "lab-$svc" 2>&1 || true
     done

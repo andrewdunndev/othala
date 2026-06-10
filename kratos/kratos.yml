@@ -134,6 +134,15 @@ selfservice:
         webauthn:
           hooks:
             - hook: revoke_active_sessions
+        # An attacker who swaps a TOTP seed or rotates backup codes gains a
+        # re-entry path through any other surviving session. Revoke on change
+        # to close that window — mirrors the credential-swap logic above.
+        totp:
+          hooks:
+            - hook: revoke_active_sessions
+        lookup_secret:
+          hooks:
+            - hook: revoke_active_sessions
 
     recovery:
       enabled: true
@@ -158,14 +167,16 @@ selfservice:
           - hook: web_hook
             config:
               # MEDIUM-1 listener split: webhook URL points at the
-              # admin port (:8431), not the public SSR port (:8080).
+              # admin port (:4431), not the public SSR port (:8080).
               # The admin listener binds on loopback (127.0.0.1) inside
               # the container; within the compose/pod network the host
               # is CONSENT_HOST (= othala). MEDIUM-2: auth block carries
               # the shared bearer secret; the app's handleRecoveryGate
               # constant-time compares Authorization: Bearer before
               # reading the body. Fails closed on missing/wrong secret.
-              url: http://${CONSENT_HOST}:8431/admin/recovery-gate
+              # 4431 = portal code default (listen.mjs:40) + deployed
+              # quadlet; single admin-port convention across envs.
+              url: http://${CONSENT_HOST}:4431/admin/recovery-gate
               method: POST
               auth:
                 # Kratos webhooks support only api_key | basic_auth (NO `bearer`
