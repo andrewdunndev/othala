@@ -20,9 +20,12 @@ serve:
       allow_credentials: true
   admin:
     port: 4445
-    # Admin port is internal-only on the carmine pod network.
-    # Reachable from the consent service co-located on carmine.
+    # Admin-plane bind address. The admin API is unauthenticated by design
+    # (Ory's model: the network IS the control), so segmented deployments
+    # bind it to an address only the admin-plane network can reach.
+    # Single-network deployments (the e2e harness) use 0.0.0.0.
     # NEVER expose publicly.
+    host: ${HYDRA_ADMIN_BIND_HOST}
 
 urls:
   self:

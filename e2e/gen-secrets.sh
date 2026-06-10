@@ -80,6 +80,13 @@ HYDRA_PG_HOST=postgres
 KRATOS_ADMIN_HOST=kratos
 CONSENT_HOST=othala
 
+# ── Admin-plane bind addresses ────────────────────────────────────────────────
+# The e2e harness is single-network, so the admin APIs bind all interfaces.
+# Segmented deployments (iac) set these to the admin-plane network IP so the
+# unauthenticated admin listeners never answer on the edge interface.
+KRATOS_ADMIN_BIND_HOST=0.0.0.0
+HYDRA_ADMIN_BIND_HOST=0.0.0.0
+
 # Kratos cookie + cipher + Hydra cookie: single active secret each
 # (collapsed-key, LB#10). No _PREVIOUS at rest — v26.2.0 uniqueItems.
 KRATOS_COOKIE_SECRET_CURRENT=${kratos_cookie}

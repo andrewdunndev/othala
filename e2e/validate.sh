@@ -67,39 +67,25 @@ if [[ -n "${CI_REGISTRY_USER:-}" && -n "${CI_REGISTRY_PASSWORD:-}" ]]; then
     echo "$CI_REGISTRY_PASSWORD" | podman login --username "$CI_REGISTRY_USER" --password-stdin "${AUTH_REGISTRY%%/*}"
 fi
 
-# Render the Ory configs. Kratos/Hydra do NOT interpolate ${VAR} inside
-# their YAML (they only accept uppercased-dotted env OVERRIDES), so the
-# ${OTHALA_*} + ${*_SECRET} placeholders in the canonical configs must
-# be substituted HERE before the containers mount them. Without this,
-# kratos validates the literal "${KRATOS_CIPHER_SECRET_CURRENT}" (31 chars
-# < the 32 minimum) and the ${OTHALA_PUBLIC_URL} URLs as invalid URIs, and dies.
-# python3 os.path.expandvars (the golden has python3; no gettext/envsubst
-# dependency) substitutes defined vars and leaves any undefined var literal
-# rather than silently blanking it.
-#
-# Source: the canonical configs at ../kratos/kratos.yml and ../hydra/hydra.yml.
-# Rendered output: kratos.rendered.yml + hydra.rendered.yml in the e2e dir.
-# compose.yml mounts these rendered copies (not the canonical sources directly,
+# Render the Ory configs via THE canonical render, scripts/render-config.sh —
+# shared with the deploy plane (dunn.dev/iac), so e2e and production use the
+# same mechanism and the same template-derived variable contract. Kratos/Hydra
+# do NOT interpolate ${VAR} inside their YAML (they only accept
+# uppercased-dotted env OVERRIDES); the canonical configs are templates that
+# must be rendered before the containers mount them.
+# compose.yml mounts the rendered copies (not the canonical sources directly,
 # since compose bind-mounts require a path that exists at up-time and the
 # canonical sources contain un-expanded placeholders at that point).
+# render-config.sh fails fast — listing missing variable NAMES only, never
+# rendered content — if any template token is unset/empty, so a partial .env
+# cannot reach `compose up` (the old post-render leftover-grep is superseded:
+# the pre-check makes leftovers impossible by construction).
 set -a
 source ./.env
 set +a
-python3 -c 'import os,sys; sys.stdout.write(os.path.expandvars(sys.stdin.read()))' \
-    < ../kratos/kratos.yml > kratos.rendered.yml
-python3 -c 'import os,sys; sys.stdout.write(os.path.expandvars(sys.stdin.read()))' \
-    < ../hydra/hydra.yml   > hydra.rendered.yml
+bash ../scripts/render-config.sh ../kratos/kratos.yml kratos.rendered.yml
+bash ../scripts/render-config.sh ../hydra/hydra.yml   hydra.rendered.yml
 echo "  canonical configs rendered (kratos.rendered.yml, hydra.rendered.yml)"
-
-# Guard: any un-expanded ${VAR} on a NON-comment line means a required env var
-# was missing — Ory rejects the config and crash-loops. Catch it here, not as
-# a downstream startup hang.
-leftover=$(cat kratos.rendered.yml hydra.rendered.yml | grep -E '\$\{[A-Za-z_]' | grep -E '^[[:space:]]*[^#[:space:]]' || true)
-if [[ -n "$leftover" ]]; then
-    echo "  ✗ un-expanded \${VAR} on non-comment line(s) — a render env var is missing; aborting:"
-    echo "$leftover" | head
-    exit 1
-fi
 
 # Step 3: compose up — wrapped in a timeout. A never-healthy dependency (e.g. a
 # mis-rendered config) makes `up -d` block indefinitely; the health-wait timeout

@@ -89,7 +89,7 @@ services:
         condition: service_healthy
     environment:
       DSN: postgres://kratos:${KRATOS_PG_PASS}@postgres:5432/kratos?sslmode=disable
-      # All vars consumed by the canonical kratos/kratos.yml after expandvars render.
+      # All vars consumed by the canonical kratos/kratos.yml after the scripts/render-config.sh render.
       # Instance identity
       OTHALA_PUBLIC_URL: ${OTHALA_PUBLIC_URL}
       OTHALA_APEX: ${OTHALA_APEX}
@@ -126,7 +126,7 @@ services:
         condition: service_completed_successfully
     environment:
       DSN: postgres://kratos:${KRATOS_PG_PASS}@postgres:5432/kratos?sslmode=disable
-      # All vars consumed by the canonical kratos/kratos.yml after expandvars render.
+      # All vars consumed by the canonical kratos/kratos.yml after the scripts/render-config.sh render.
       # Instance identity
       OTHALA_PUBLIC_URL: ${OTHALA_PUBLIC_URL}
       OTHALA_APEX: ${OTHALA_APEX}

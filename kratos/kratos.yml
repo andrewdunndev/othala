@@ -31,6 +31,11 @@ serve:
 
   admin:
     base_url: http://${KRATOS_ADMIN_HOST}:4434/
+    # Admin-plane bind address. The admin API is unauthenticated by design
+    # (Ory's model: the network IS the control), so segmented deployments
+    # bind it to an address only the admin-plane network can reach.
+    # Single-network deployments (the e2e harness) use 0.0.0.0.
+    host: ${KRATOS_ADMIN_BIND_HOST}
     port: 4434
 
 selfservice:

@@ -203,13 +203,17 @@ a warning.
 | `OTHALA_SMTP_CONNECTION_URI` | SMTP relay URI (`smtps://user:pass@host:465`). **Single source** shared by `kratos.yml` courier and the portal contact-form mailer (`lib/mailer.ts`). Required in prod. |
 | `OTHALA_CONTACT_RECIPIENT` | Where the dashboard request form delivers. Falls back to the first `OTHALA_ADMIN_SUBJECTS` entry. |
 | `OTHALA_PASSWORD_MIN_LENGTH`, `OTHALA_HIBP_ENABLED` | Password policy knobs. |
+| `KRATOS_ADMIN_BIND_HOST`, `HYDRA_ADMIN_BIND_HOST` | Admin-API bind addresses (render vars, not portal config). `0.0.0.0` single-network (e2e); segmented deployments bind the admin-plane network IP. |
 
 **Ory configs are rendered, not natively expanded.** Ory has no native
-`${VAR}` expansion. The `kratos/` and `hydra/` YAML carry `${OTHALA_*}` (and
-`${*_SECRET}`) placeholders that are expanded once — `python3
-os.path.expandvars` — into `*.rendered.yml` before the services start. See
-`e2e/validate.sh`, which also fails loudly if any non-comment line still carries
-an un-expanded `${VAR}` (a missing render variable).
+`${VAR}` expansion. The `kratos/` and `hydra/` YAML are TEMPLATES whose
+`${VAR}` placeholders are substituted by **`scripts/render-config.sh`** — the
+single canonical render, shared by the e2e harness (`e2e/validate.sh`) and the
+deploy plane (`dunn.dev/iac`). The variable contract is derived from the
+template itself: render-config.sh fails fast, listing missing variable NAMES
+(never rendered content), if any `${VAR}` token is unset or empty. Only braced
+`${VAR}` tokens are substituted, and only those appearing in the template — a
+wide caller environment cannot leak into the output.
 
 ---
 
@@ -316,11 +320,14 @@ deviate when the upstream pathway is genuinely broken on our hardware — and
 then document *why* at the deviation site.
 
 - **Ory Kratos / Hydra config** — use native Kratos/Hydra YAML config fields
-  directly. Ory has no built-in `${VAR}` expansion; the sanctioned bridge is a
-  single `python3 os.path.expandvars` render step that produces `*.rendered.yml`
-  before the services start. Don't bypass this with separate config-management
-  templating — the render-step and its missing-variable guard in `e2e/validate.sh`
-  are the canonical pattern.
+  directly. Ory has no built-in `${VAR}` expansion; the sanctioned bridge is
+  `scripts/render-config.sh` — the single canonical render producing
+  `*.rendered.yml` before the services start, with a template-derived
+  missing-variable guard. Don't bypass it with separate config-management
+  templating. CAUTION for deploy planes: docker compose interpolates `${VAR}`
+  inside compose.yml natively, but systemd/quadlet `Environment=` does NOT
+  (it empties or passes `${}` literally) — the compose pattern must never be
+  copied into a quadlet; quadlet consumers mount a rendered config instead.
 - **`@ory/client-fetch` SDK** — use the generated Ory SDK for all Kratos/Hydra
   API calls (`portal/src/lib/`). Bespoke `fetch()` calls against the Ory admin
   or public APIs are a maintenance trap: SDK types and endpoint paths track
