@@ -96,16 +96,26 @@ async function waitForRecoveryCode(
         ID: string;
         Subject: string;
         To: Array<{ Address: string }>;
-        Date: string;
+        // Mailpit v1 API uses `Created` (ISO 8601), NOT `Date`.
+        Created: string;
       }>;
     };
     const messages = data.messages ?? [];
-    // Find a message addressed to `toAddress` that arrived after our flow started.
-    // The Subject line for Kratos recovery code emails typically contains "recovery".
-    const match = messages.find((m) =>
-      m.To.some((t) => t.Address.toLowerCase() === toAddress.toLowerCase()) &&
-      /recover/i.test(m.Subject),
-    );
+    // Find the most-recent message addressed to `toAddress` that arrived after
+    // our flow started AND has "recovery" in the subject.
+    // IMPORTANT: the `afterMs` guard is required — mailpit accumulates emails
+    // across test runs in the same lab session. Without the date filter the
+    // function returns a code from a PREVIOUS run that has already been used,
+    // the code submit returns 200-with-error (not a session), and the test fails.
+    const candidates = messages
+      .filter((m) =>
+        m.To.some((t) => t.Address.toLowerCase() === toAddress.toLowerCase()) &&
+        /recover/i.test(m.Subject) &&
+        new Date(m.Created).getTime() >= afterMs - 5_000, // 5s grace for clock skew
+      )
+      .sort((a, b) => new Date(b.Created).getTime() - new Date(a.Created).getTime());
+
+    const match = candidates[0];
     if (match) {
       // Fetch the raw message text to extract the 6-digit code.
       const msgResp = await fetch(`${MAILPIT_API}/api/v1/message/${match.ID}`);
