@@ -26,7 +26,7 @@ all-TS application fronting upstream Ory plus the Go LDAP bridge:
   Kratos identity state `== active`), the id_token claims builder
   (`claims.ts`), and the dual-listener (`listen.mjs`: public SSR on
   `PORT` (code default 4321, set to 8080 in compose/prod) + loopback
-  admin on `ADMIN_PORT` (code default 4431, set to 8431 in
+  admin on `ADMIN_PORT` (code default 4431, set to 4431 in
   compose/prod) carrying `/admin/revoke-user` +
   `/admin/recovery-gate`).
 - `revokeSubject()` (`revoke.ts`) runs the in-process revocation
@@ -52,18 +52,18 @@ The standalone Go consent service and the `util` runner have been
 **removed from the tree** — consent folded into the converged app,
 `util` retired. They are not the current architecture.
 
-**Stack:** Ory Kratos + Ory Hydra (OAuth2/OIDC) + Postgres 18 + Go
-glauth-kratos LDAP bridge + the converged Astro Node SSR Othala app on
-carmine + custom Caddy edge
-(`registry.gitlab.com/dunn.dev/caddy-estate`). Estate design tokens via
-`@dunn.dev/reference`.
+**Stack:** Ory Kratos + Ory Hydra (OAuth2/OIDC) + Postgres 18 + the
+converged Astro Node SSR Othala app on carmine + custom Caddy edge
+(`registry.gitlab.com/dunn.dev/caddy-estate`) + Go glauth-kratos LDAP
+bridge as a separate sibling project (`gitlab.com/dunn.dev/kratos-ldap`).
+Estate design tokens via `@dunn.dev/reference`.
 
 ## Pending state
 
 | Item | Wave | Status |
 |---|---|---|
-| **Image name reconcile `portal` → `othala`** | CP | Done. The converged app builds as `build-othala` and publishes at the registry root `registry.gitlab.com/dunn.dev/othala` (`publish_at_root: true`); the `dag-consent` + `util` image builds + their SBOMs are removed; at E1 the `consent/` + `util/` source dirs were deleted and the `verify-consent` go-build job removed (only `ldap-bridge` remains a standalone Go module). The deploy repo's `dag-portal` quadlet pins the root path. First tag under the new name is `v0.2.0`. |
-| **Deploy cutover** | — | Pending. Retire `dag-consent` + `util` from the pod; wire the dual-listener admin port + its admin env targets; repoint the Kratos recovery-hook to the Othala admin port `:8431/admin/recovery-gate`. See `DEPLOY.md`. |
+| **Image name reconcile `portal` → `othala`** | CP | Done. The converged app builds as `build-othala` and publishes at the registry root `registry.gitlab.com/dunn.dev/othala` (`publish_at_root: true`); the `dag-consent` + `util` image builds + their SBOMs are removed; at E1 the `consent/` + `util/` source dirs were deleted and the `verify-consent` go-build job removed; the LDAP bridge (`ldap-bridge/`) has been extracted to a separate project (`gitlab.com/dunn.dev/kratos-ldap`) — no Go workspace remains in this repo. The deploy repo's `dag-portal` quadlet pins the root path. First tag under the new name is `v0.2.0`. |
+| **Deploy cutover** | — | Pending. Retire `dag-consent` + `util` from the pod; wire the dual-listener admin port + its admin env targets; repoint the Kratos recovery-hook to the Othala admin port `:4431/admin/recovery-gate`. See `DEPLOY.md`. |
 | **Production deploy** | — | Pending, operator-gated. Fresh `dag_*` sops keys (carmine pre-reinstall) + deploy repo config sync/pin + `make dag-deploy`. |
 
 The deploy repo's `dag-*` quadlets remain at the pre-cutover shape until the
@@ -113,7 +113,7 @@ state, not a regression.
 | **Admin authz** | `OTHALA_ADMIN_SUBJECTS` allowlist (sops); `admin` group is display-only |
 | Access gate | `access-<clientId>` group AND Kratos state `== active`, fail-closed, on login + consent |
 | Back-channel logout | Hydra-native (Hydra-signed); app holds no signing key at rest |
-| LDAP bridge | Go glauth-kratos binary (no `.so` plugins); stays Go |
+| LDAP bridge | Go glauth-kratos binary at `gitlab.com/dunn.dev/kratos-ldap` (separate project; no `.so` plugins); stays Go |
 | LDAP DN | `uid=<username>,ou=users,dc=dunn,dc=dev` |
 | Postgres | Single instance (`postgres:18-alpine`), separate `kratos` + `hydra` DBs |
 | Recovery | Code via Fastmail; admin subjects BLOCKED at the recovery-gate (console-only break-glass) |
@@ -149,7 +149,7 @@ Full rationale per decision: `decision.md`. Upgrade-durability choices:
 1. **Image name reconcile** `portal` → `othala` (Wave CP).
 2. **Deploy cutover** (see `DEPLOY.md`): retire consent + util, wire the
    dual-listener admin port + its env targets, repoint the Kratos
-   recovery-hook to `:8431/admin/recovery-gate`.
+   recovery-hook to `:4431/admin/recovery-gate`.
 3. **Regenerate `dag_*` sops keys fresh** before first deploy (carmine
    pre-reinstall: Fastmail SMTP, per-OIDC-consumer secrets, and the
    admin secrets behind `OTHALA_ADMIN_SUBJECTS` /

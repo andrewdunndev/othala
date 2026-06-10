@@ -30,7 +30,7 @@ into the app). It runs **two listeners in one process**
   pages, and the Hydra login/consent/logout challenge handlers at
   `/oauth2/{login,consent,logout}`. The only port fronted by Caddy in
   production.
-- **Loopback admin port `8431`** (`127.0.0.1`, pod-only) — a disjoint
+- **Loopback admin port `4431`** (`127.0.0.1`, pod-only) — a disjoint
   mux: `GET /healthz`, `GET /readyz`, `POST /admin/revoke-user`,
   `POST /admin/recovery-gate`. Never delegates to the SSR handler. In
   this harness the admin probes run via `compose exec` because the port
@@ -64,7 +64,7 @@ VM dies on job end. Total turnaround: ~3-5 minutes including image pulls.
 - **Substrate sanity** — postgres up; kratos + hydra DBs exist; uuid-ossp
   on hydra; Kratos admin + public health; Hydra admin health + public
   openid-configuration with issuer byte-match + jwks.json RS256; the
-  othala app admin `/healthz` (loopback `:8431`); the public
+  othala app admin `/healthz` (loopback `:4431`); the public
   `/oauth2/login` challenge handler is mounted on `:8080`; the admin mux
   does NOT leak onto the public port; ldap-bridge `/healthz`.
 - **Client registration** — runs the converged app's **in-app registrar**
@@ -78,7 +78,7 @@ VM dies on job end. Total turnaround: ~3-5 minutes including image pulls.
 - **Identity admin flow** — create an identity via the Kratos admin API;
   `metadata_admin.groups` round-trips.
 - **Recovery-gate** — the converged app's loopback endpoint
-  `othala:8431/admin/recovery-gate`, `Authorization: Bearer`. Refusal is
+  `othala:4431/admin/recovery-gate`, `Authorization: Bearer`. Refusal is
   **allowlist-based** (`OTHALA_ADMIN_SUBJECTS`), NOT group-based: an
   allowlisted admin email → 403; a non-allowlisted subject → 200 (even
   carrying the display-only `admin` group); an unidentifiable subject →
@@ -110,7 +110,7 @@ which is why `register-clients` is a `profiles: [oneshot]` service that
 | `hydra.yml` | Hydra config (harness-shape: HTTP issuer, expose_internal_errors=true) |
 | `identity.schema.json` | Production identity schema, vendored |
 | `recovery-gate.jsonnet` | Recovery-gate webhook body, vendored |
-| `glauth.cfg` | LDAP bridge config (debug mode) |
+| `glauth.cfg` | Example LDAP bridge config for `gitlab.com/dunn.dev/kratos-ldap` (not used by the default compose run; kept as a reference for operators adding LDAP) |
 | `postgres-init.sh` | DB + extension setup |
 | `gen-secrets.sh` | Per-run secret generator |
 | `smoke.sh` | Probe matrix (pass/fail counters) |
@@ -129,7 +129,7 @@ If a probe fails, container logs land at `/tmp/lab-smoke-failure.log`.
 ## CI invocation
 
 `.gitlab-ci.yml`'s `e2e` job (stage `e2e`), tagged `[carmine, qemu]`.
-Depends on `build-othala` + `build-ldap-bridge` so the just-built images
+Depends on `build-othala` + `build-e2e-tester` so the just-built images
 are pulled at the build tag. Gates the package + release stages.
 
 ## When to evolve

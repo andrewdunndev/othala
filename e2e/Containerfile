@@ -19,7 +19,7 @@
 # THE FIX
 # Bake BOTH the e2e test sources and their npm dependencies into a thin
 # image at BUILD time. The image build runs on the normal, egress-capable
-# GitLab runner (the same place build-othala / build-ldap-bridge run),
+# GitLab runner (the same place build-othala runs),
 # where npm registry access is fine. `npm ci` against the committed
 # e2e/package-lock.json installs the deps once, into the image; the
 # specs/config/dance script are COPYed in alongside. At e2e runtime the

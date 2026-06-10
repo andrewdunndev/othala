@@ -64,7 +64,7 @@ ENV NODE_ENV=production \
     HOST=0.0.0.0 \
     PORT=8080 \
     ADMIN_HOST=127.0.0.1 \
-    ADMIN_PORT=8431
+    ADMIN_PORT=4431
 
 # ci-runtime-node inherits the `default` user (uid 1001) from
 # ubi9/nodejs-22-minimal. COPY as root, then switch to 1001 for

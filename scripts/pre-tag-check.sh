@@ -6,7 +6,6 @@
 # fix before tagging.
 #
 # What it runs:
-#   - ldap-bridge: go test ./...
 #   - portal: npm test
 #   - portal: npm run check (Astro typecheck)
 #   - portal: npm run build (full SSR build)
@@ -47,15 +46,9 @@ echo "Branch: $(git branch --show-current)"
 echo "HEAD: $(git log -1 --oneline)"
 echo ""
 
-# ----- Go: ldap-bridge -----
-echo "Go tests:"
-if cd ldap-bridge && go test ./... >/tmp/pre-tag-ldap.log 2>&1; then
-    step_pass "ldap-bridge go test"
-else
-    step_fail "ldap-bridge go test" "/tmp/pre-tag-ldap.log"
-fi
-cd "$REPO_ROOT" || exit 1
-echo ""
+# NOTE: the ldap-bridge (glauth-kratos) has been extracted to the
+# standalone gitlab.com/dunn.dev/kratos-ldap project; its Go tests are
+# no longer part of this pre-tag check.
 
 # ----- Portal: tests -----
 echo "Portal:"

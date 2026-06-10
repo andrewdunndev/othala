@@ -12,7 +12,7 @@
  * completing recovery (kratos.yml flows.recovery.after.hooks). The webhook
  * body is rendered by recovery-gate.jsonnet:
  *   { identity_id, groups, traits: { email, ... } }
- * The gate (othala loopback :8431 /admin/recovery-gate) refuses recovery
+ * The gate (othala loopback :4431 /admin/recovery-gate) refuses recovery
  * (403) iff traits.email is on OTHALA_ADMIN_SUBJECTS. Kratos interprets a
  * 4xx from the webhook as a flow abort, preventing the privileged session
  * from being issued.
@@ -48,7 +48,7 @@
  * Live-stack requirements:
  *   - Kratos recovery flow enabled with `use: code`.
  *   - The recovery-gate webhook is configured in kratos.yml:
- *       flows.recovery.after.hooks → http_request → othala:8431/admin/recovery-gate
+ *       flows.recovery.after.hooks → http_request → othala:4431/admin/recovery-gate
  *   - RECOVERY_GATE_SECRET injected via compose env (the gate 401s a bad bearer).
  *   - Mailpit running on the compose net (mailpit:8025 HTTP API reachable from
  *     inside the playwright container on the same compose network).

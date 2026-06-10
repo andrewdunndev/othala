@@ -22,8 +22,9 @@ Report privately through one of these channels:
 
 Please include enough to reproduce:
 
-- the affected component (`portal/`, `ldap-bridge/`, the `kratos/` or `hydra/`
-  config, the `e2e/` harness) and version or commit,
+- the affected component (`portal/`, the `kratos/` or `hydra/` config, the
+  `e2e/` harness, or `gitlab.com/dunn.dev/kratos-ldap` for the LDAP bridge)
+  and version or commit,
 - a description of the impact (what an attacker gains — e.g. access-gate
   bypass, token-claim injection, admin-port exposure, LDAP DN escape),
 - concrete reproduction steps or a proof-of-concept, and
@@ -76,15 +77,15 @@ What this project treats as in-scope security surface:
   grants access without both is a vulnerability,
 - the **`OTHALA_ADMIN_SUBJECTS` allowlist** as the sole admin authority —
   identity-group membership is display metadata, never an authorization gate,
-- the **loopback-only admin listener** (`:8431`) — privileged routes
+- the **loopback-only admin listener** (`:4431`) — privileged routes
   (`/admin/*`) must never resolve on the public mux (`:8080`),
 - the **id_token claims builder** (`claims.ts`) — per-app role/claim mapping
   must not leak claims or roles across apps,
 - the **manifest loader/validator** (`manifests.ts`) — it fails closed on a bad
   manifest set (duplicate `client_id`, audience/redirect mismatch, undeclared
   role, etc.) and keeps the prior good state,
-- the **LDAP bridge** (`ldap-bridge/`) — BIND/SEARCH handling, DN escaping, and
-  the Kratos admin-token boundary,
+- the **LDAP bridge** (`gitlab.com/dunn.dev/kratos-ldap`) — BIND/SEARCH
+  handling, DN escaping, and the Kratos admin-token boundary,
 - **secret handling** — the project holds no OAuth signing key at rest
   (back-channel logout is Hydra-signed); report any path that persists or
   exposes a secret it shouldn't,

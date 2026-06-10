@@ -3,14 +3,14 @@
 #
 # Runs INSIDE the e2e VM after `docker compose up -d` brings up the
 # converged Othala substrate. Probes each container directly on its
-# compose network hostname (postgres, kratos, hydra, othala, ldap-bridge).
+# compose network hostname (postgres, kratos, hydra, othala).
 #
 # The othala app is ONE service: public SSR port 8080 (family UI +
 # /auth/* + /admin/* + the /oauth2/{login,consent,logout} challenge
-# handlers) and a loopback admin port 8431 (/healthz, /readyz,
+# handlers) and a loopback admin port 4431 (/healthz, /readyz,
 # /admin/revoke-user, /admin/recovery-gate). The admin port binds
 # 127.0.0.1 inside the container, so admin probes run via `compose exec`
-# against localhost:8431; the public port is probed across the network.
+# against localhost:4431; the public port is probed across the network.
 #
 # Exit 0 on all-green, 1 on any failure. Logs container outputs on
 # failure to /tmp/lab-failure.log for CI artifact upload.
@@ -148,11 +148,11 @@ else
     fail "A7 hydra jwks.json missing RS256 key"
 fi
 
-# A8: Othala app admin /healthz on the loopback admin port (8431).
+# A8: Othala app admin /healthz on the loopback admin port (4431).
 # /healthz + /readyz live on the admin mux, NOT the public SSR port.
-code=$(othala_code http://127.0.0.1:8431/healthz)
+code=$(othala_code http://127.0.0.1:4431/healthz)
 if [[ "$code" == "200" ]]; then
-    pass "A8 othala admin /healthz (loopback :8431)"
+    pass "A8 othala admin /healthz (loopback :4431)"
 else
     fail "A8 othala admin /healthz" "code=$code"
 fi
@@ -184,17 +184,12 @@ else
     fail "A9b admin route leaked onto public port" "code=$code (expected 404; admin /healthz must be loopback-only)"
 fi
 
-# A10: ldap-bridge /healthz on admin port (:6478). The bridge image
-# carries curl (UBI 9 minimal base for this exact reason); exec via
-# compose. The bridge runs all three listeners (LDAP, LDAPS-optional,
-# admin HTTP) off a shared errs channel — if any fails the process
-# dies — so a healthy /healthz implies LDAP :389 is also bound.
-code=$(docker compose exec -T ldap-bridge curl -s -o /dev/null -w "%{http_code}" http://localhost:6478/healthz 2>/dev/null | _strip_ansi)
-if [[ "$code" == "200" ]]; then
-    pass "A10 ldap-bridge /healthz (implies LDAP :389 bound)"
-else
-    fail "A10 ldap-bridge /healthz" "code=$code"
-fi
+# A10: ldap-bridge /healthz — SKIPPED. The LDAP bridge is now a
+# separate project (gitlab.com/dunn.dev/kratos-ldap); no bridge
+# service is pulled in this compose harness since no e2e spec exercises
+# LDAP. Operators who extend this harness with LDAP can add A10 back
+# against the kratos-ldap service.
+# pass "A10 ldap-bridge /healthz (implies LDAP :389 bound)" -- not wired
 
 # Section B: client registration (converged in-app registrar)
 echo ""
@@ -281,11 +276,11 @@ fi
 
 # Section D: recovery-gate (converged app loopback admin endpoint)
 echo ""
-echo "D. Recovery-gate (othala :8431 /admin/recovery-gate)"
+echo "D. Recovery-gate (othala :4431 /admin/recovery-gate)"
 #
 # CU3 convergence: the gate moved from the consent service (:4478,
 # X-Webhook-Auth header, group-based refusal) to the othala app's
-# loopback admin port (:8431, Authorization: Bearer, ALLOWLIST-based
+# loopback admin port (:4431, Authorization: Bearer, ALLOWLIST-based
 # refusal). The app's recoveryGateVerdict refuses recovery iff the
 # in-flight identity's traits.email is on OTHALA_ADMIN_SUBJECTS (the
 # `admin` metadata_admin group is display-only, NOT consulted). It
@@ -297,7 +292,7 @@ echo "D. Recovery-gate (othala :8431 /admin/recovery-gate)"
 # Uses Node fetch — the ci-runtime-node image has no wget/curl.
 gate_code() {
     local bearer="$1"; local body="$2"
-    printf '%s' "fetch('http://127.0.0.1:8431/admin/recovery-gate',{method:'POST',headers:{'Content-Type':'application/json','Authorization':'Bearer ${bearer}'},body:'${body}'}).then(r=>{process.stdout.write(String(r.status));process.exit(0)}).catch(()=>{process.stdout.write('0');process.exit(1)})" | node_in othala
+    printf '%s' "fetch('http://127.0.0.1:4431/admin/recovery-gate',{method:'POST',headers:{'Content-Type':'application/json','Authorization':'Bearer ${bearer}'},body:'${body}'}).then(r=>{process.stdout.write(String(r.status));process.exit(0)}).catch(()=>{process.stdout.write('0');process.exit(1)})" | node_in othala
 }
 
 ADMIN_EMAIL="admin@${OTHALA_APEX}"
@@ -339,7 +334,7 @@ fi
 
 # Section E: revoke fan-out (admin endpoint, LIVE Kratos + Hydra)
 echo ""
-echo "E. Revoke fan-out (othala :8431 /admin/revoke-user)"
+echo "E. Revoke fan-out (othala :4431 /admin/revoke-user)"
 #
 # D3: the admin force-logout endpoint runs revokeSubject() against LIVE Kratos
 # + Hydra — delete Kratos sessions + revoke Hydra login/consent sessions
@@ -350,12 +345,12 @@ echo "E. Revoke fan-out (othala :8431 /admin/revoke-user)"
 # revoke_body <bearer> <subject> — POST /admin/revoke-user, return JSON body.
 revoke_body() {
     local bearer="$1"; local subject="$2"
-    printf '%s' "fetch('http://127.0.0.1:8431/admin/revoke-user',{method:'POST',headers:{'Content-Type':'application/json','Authorization':'Bearer ${bearer}'},body:JSON.stringify({subject:'${subject}'})}).then(r=>r.text()).then(t=>{process.stdout.write(t);process.exit(0)}).catch(()=>process.exit(1))" | node_in othala
+    printf '%s' "fetch('http://127.0.0.1:4431/admin/revoke-user',{method:'POST',headers:{'Content-Type':'application/json','Authorization':'Bearer ${bearer}'},body:JSON.stringify({subject:'${subject}'})}).then(r=>r.text()).then(t=>{process.stdout.write(t);process.exit(0)}).catch(()=>process.exit(1))" | node_in othala
 }
 # revoke_code <bearer> <body-json> — POST /admin/revoke-user, return HTTP code.
 revoke_code() {
     local bearer="$1"; local body="$2"
-    printf '%s' "fetch('http://127.0.0.1:8431/admin/revoke-user',{method:'POST',headers:{'Content-Type':'application/json','Authorization':'Bearer ${bearer}'},body:'${body}'}).then(r=>{process.stdout.write(String(r.status));process.exit(0)}).catch(()=>{process.stdout.write('0');process.exit(1)})" | node_in othala
+    printf '%s' "fetch('http://127.0.0.1:4431/admin/revoke-user',{method:'POST',headers:{'Content-Type':'application/json','Authorization':'Bearer ${bearer}'},body:'${body}'}).then(r=>{process.stdout.write(String(r.status));process.exit(0)}).catch(()=>{process.stdout.write('0');process.exit(1)})" | node_in othala
 }
 
 # E1: wrong bearer → 401 (fail-closed, mirrors D4; bearer checked before body).
@@ -395,7 +390,7 @@ echo ""
 echo "F. Listener boundary"
 # A9b proved admin routes don't bleed onto the public port. F1 proves the
 # reverse: the loopback admin mux does NOT serve public SSR routes.
-f1=$(othala_code http://127.0.0.1:8431/oauth2/login)
+f1=$(othala_code http://127.0.0.1:4431/oauth2/login)
 if [[ "$f1" == "404" ]]; then
     pass "F1 admin port does NOT serve public /oauth2/login (mux split holds both ways)"
 else
@@ -543,7 +538,7 @@ else
     docker compose ps 2>&1 || true
     echo ""
     echo "=== container logs (last 60 each) ==="
-    for svc in postgres kratos hydra othala ldap-bridge mailpit; do
+    for svc in postgres kratos hydra othala mailpit; do
         echo "--- lab-$svc ---"
         podman logs --tail=60 "lab-$svc" 2>&1 || true
     done

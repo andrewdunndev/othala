@@ -38,7 +38,7 @@ One Othala pod on carmine, fronted by a Caddy edge. The containers:
 | Quadlet | Image | Role |
 |---|---|---|
 | **dag-portal** | `registry.gitlab.com/dunn.dev/othala` | The converged Astro Node SSR app. Renders the Kratos self-service flows, serves the Hydra login/consent/logout challenge handlers, runs the access-gate, builds id_token claims, and hosts the loopback admin endpoints. See `ARCHITECTURE.md`. |
-| **dag-ldap-bridge** | `registry.gitlab.com/dunn.dev/othala/ldap-bridge` | Go glauth-kratos LDAP bridge. Protocol adapter for non-OAuth native clients (Jellyfin / Apple TV). Stays Go by design. |
+| **dag-ldap-bridge** | `registry.gitlab.com/dunn.dev/kratos-ldap` | Go glauth-kratos LDAP bridge (now a separate project). Protocol adapter for non-OAuth native clients (Jellyfin / Apple TV). See `gitlab.com/dunn.dev/kratos-ldap`. |
 | **dag-kratos** | upstream Ory Kratos | Identity: self-service flows, sessions, recovery. |
 | **dag-hydra** | upstream Ory Hydra | OAuth2/OIDC. Ships no UI by design; the Othala app is its login + consent provider. |
 | **dag-postgres** | `postgres:18-alpine` | Separate `kratos` + `hydra` databases. |
@@ -63,7 +63,7 @@ The Othala container runs **two HTTP listeners in one process**
   UIs, the family tile dashboard + `/auth/*` + `/admin/*` pages, and the
   OAuth2 challenge providers (`/oauth2/{login,consent,logout}`). This is
   the only handler reachable from the network. Caddy fronts this port.
-- **Admin port** (`ADMIN_PORT`, container default `8431`, bound on
+- **Admin port** (`ADMIN_PORT`, container default `4431`, bound on
   `ADMIN_HOST=127.0.0.1`, loopback / pod-only). A separate
   `http.createServer` with its own disjoint mux: `GET /healthz`,
   `GET /readyz`, `POST /admin/revoke-user`, `POST /admin/recovery-gate`.
@@ -87,8 +87,8 @@ edit, tag, sync, bump, deploy:
 git tag v0.1.X
 git push --tags
 # CI fires (.gitlab-ci.yml): the converged app publishes at the
-# registry root, registry.gitlab.com/dunn.dev/othala:v0.1.X, and the
-# LDAP bridge as registry.gitlab.com/dunn.dev/othala/ldap-bridge:v0.1.X.
+# registry root, registry.gitlab.com/dunn.dev/othala:v0.1.X.
+# The LDAP bridge is now a separate project: gitlab.com/dunn.dev/kratos-ldap.
 
 # 2. Sync vendored configs into the deploy repo and review the drift.
 # cd <your-deploy-repo>
@@ -119,7 +119,7 @@ tags are immutable, so the rollback is deterministic.
 The Othala container's runtime env. The Ory upstream URLs are set by the
 deploy quadlet (`KRATOS_PUBLIC_URL`, `KRATOS_ADMIN_URL`, `HYDRA_PUBLIC_URL`,
 `HYDRA_ADMIN_URL`, `HYDRA_ISSUER_URL`); the listener ports default to
-`PORT=8080` / `ADMIN_PORT=8431`. `MANIFEST_DIR` (default
+`PORT=8080` / `ADMIN_PORT=4431`. `MANIFEST_DIR` (default
 `/etc/portal/manifests`) is the directory the app reads per-app manifests
 from at runtime; the quadlet volume-mounts the synced manifest set there
 read-only. The secrets are sops + age backed in the operator's
@@ -174,12 +174,12 @@ deploy:
 - Drop `dag-consent` from the pod; remove `dag-portal`'s
   `After=` / `Requires=dag-consent` and its `CONSENT_ADMIN_BEARER` /
   consent-URL wiring.
-- Wire the dual-listener admin port (`ADMIN_PORT=8431` on loopback) and
+- Wire the dual-listener admin port (`ADMIN_PORT=4431` on loopback) and
   the new admin env targets (`OTHALA_ADMIN_SUBJECTS`,
   `OTHALA_ADMIN_ENDPOINT_BEARER`, `RECOVERY_GATE_SECRET`) into the
   `dag-portal` quadlet.
 - **Repoint the Kratos recovery-hook** from the old consent service to
-  the Othala admin port `http://127.0.0.1:8431/admin/recovery-gate`,
+  the Othala admin port `http://127.0.0.1:4431/admin/recovery-gate`,
   authenticated with `Bearer RECOVERY_GATE_SECRET`.
 - **Regenerate secrets fresh** as `dag_*` sops keys. carmine is being
   reinstalled ahead of the cutover, so the secret material is generated

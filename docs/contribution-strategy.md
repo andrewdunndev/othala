@@ -1,6 +1,6 @@
 # Contribution strategy
 
-The dunn.dev/othala project as both consumer and contributor. We use Ory Kratos + Hydra without modification (no fork, no patch series). The novel piece — `glauth-kratos`, our LDAP bridge — has standalone upstream value beyond our deployment.
+The dunn.dev/othala project as both consumer and contributor. We use Ory Kratos + Hydra without modification (no fork, no patch series). The novel piece — `glauth-kratos`, our LDAP bridge — has been extracted to `gitlab.com/dunn.dev/kratos-ldap` (a separate sibling project) and has standalone upstream value beyond our deployment.
 
 ## Posture: consumer of Ory; contributor to glauth (potentially)
 
@@ -22,35 +22,19 @@ These are speculative. Default posture: ship deployment, monitor advisories, fil
 
 ### glauth: contribution candidate
 
-`glauth-kratos` (the bridge in `ldap-bridge/`) is built as a glauth embedded plugin: a Handler implementation that satisfies glauth's Bind/Search interface against Kratos. Once it proves out in production, the natural contribution path is:
+`glauth-kratos` (the bridge) is built as a glauth embedded plugin: a Handler
+implementation that satisfies glauth's Bind/Search interface against Kratos.
+The bridge has been extracted from this repo to `gitlab.com/dunn.dev/kratos-ldap`
+(a standalone sibling project with its own CI, releases, and image at
+`registry.gitlab.com/dunn.dev/kratos-ldap`). The natural next step is:
 
-1. Extract `ldap-bridge/kratos/` plus the surrounding Containerfile/Makefile to its own repo: `gitlab.com/dunn.dev/glauth-kratos` (with GitHub mirror)
-2. Open a PR against glauth itself proposing the kratos backend as an upstream embedded plugin
-3. Maintain the standalone repo as the authoritative source; the upstream contribution is a pointer
+1. Open a PR against glauth itself proposing the kratos backend as an upstream
+   embedded plugin
+2. Maintain `gitlab.com/dunn.dev/kratos-ldap` as the authoritative source; the
+   upstream contribution is a pointer
 
-The bridge's standalone value: anyone running Kratos who needs LDAP. The community of homelabbers + small-org Kratos deployments has the same gap; we're not the first to hit it (just the first to assemble the pieces).
-
-#### Module-path rename plan (L5)
-
-`ldap-bridge/go.mod` currently declares its module path under
-`dunn.dev/auth/...` (the marketing domain). For the
-upstream extraction this becomes `gitlab.com/dunn.dev/glauth-kratos`
-(or `github.com/glauth/glauth-kratos` if the path lands on glauth's
-account). The rename is mechanical:
-
-1. `go mod edit -module gitlab.com/dunn.dev/glauth-kratos`
-2. `find . -name '*.go' -exec sed -i '' 's|dunn.dev/auth/ldap-bridge|gitlab.com/dunn.dev/glauth-kratos|g' {} +`
-3. `go mod tidy && go build ./...`
-4. Update Containerfile / Makefile import lines, README install
-   instructions, and the GitLab pipeline include if any.
-
-(The legacy Go consent service was deployment-specific and never a
-candidate for upstreaming; it was folded into the othala app and its
-source removed at E1, so it plays no part in the bridge extraction.)
-
-Defer until after lab proves the bridge against Jellyfin (Phase 2).
-The rename is a downstream-of-extraction step, not a blocker for
-estate use today.
+The bridge's standalone value: anyone running Kratos who needs LDAP. The
+community of homelabbers + small-org Kratos deployments has the same gap.
 
 ## What we do NOT contribute
 

@@ -12,11 +12,12 @@ tagged `[carmine, qemu]`.
 > `lab-validate`; both are now `e2e` (the project's canonical OSS-facing
 > end-to-end harness — see `e2e/README.md`). The topology converged:
 > the `consent` and `util` containers are gone (folded into the single
-> `othala` app image at the registry root), so the job `needs:
-> [build-othala, build-ldap-bridge]` and the substrate is postgres +
-> kratos + hydra + othala + ldap-bridge. The smoke probes the converged
-> app's `/oauth2/*` public challenge handlers and its loopback
-> `/admin/*` endpoints.
+> `othala` app image at the registry root); the LDAP bridge has been
+> extracted to `gitlab.com/dunn.dev/kratos-ldap` (no e2e spec exercises
+> LDAP, so no bridge image is pulled here). The substrate is postgres +
+> kratos + hydra + othala. The smoke probes the converged app's
+> `/oauth2/*` public challenge handlers and its loopback `/admin/*`
+> endpoints.
 
 See `e2e/README.md` for invocation notes, environment variables, and
 the smoke assertion list. The harness gates future tags; the v0.2.0
@@ -29,7 +30,7 @@ verify   →   build     →   e2e        →   package   →   release
                             (gate)         (sbom)
 ```
 
-`e2e` `needs: [build-othala, build-ldap-bridge]` — pulls the just-built
+`e2e` `needs: [build-othala, build-e2e-tester]` — pulls the just-built
 image set at `${CI_COMMIT_TAG}` (tag pipelines) or
 `${CI_COMMIT_SHORT_SHA}` (push to main + MR). On red, blocks the SBOM +
 release stages. On green, the substrate is proven to come up + smoke

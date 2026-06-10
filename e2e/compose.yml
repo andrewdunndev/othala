@@ -18,9 +18,12 @@
 #     ROOT ${AUTH_REGISTRY}). Public SSR port 8080 serves the family UI +
 #     /auth/* + /admin/* pages + the Hydra login/consent/logout challenge
 #     handlers at /oauth2/{login,consent,logout}. A SEPARATE loopback
-#     admin port 8431 serves /healthz, /readyz, /admin/revoke-user and
+#     admin port 4431 serves /healthz, /readyz, /admin/revoke-user and
 #     /admin/recovery-gate. The two muxes are disjoint by construction.
-#   - ldap-bridge (LDAP 389; admin /healthz on 6478)
+#   NOTE: the LDAP bridge (glauth-kratos) is now a separate standalone
+#   project at gitlab.com/dunn.dev/kratos-ldap. No e2e spec exercises
+#   LDAP, so no ldap-bridge service is pulled here. Operators who need
+#   LDAP in their lab compose can add the kratos-ldap image directly.
 #
 # Convergence note: the legacy `consent` (Go) and `util` (Bash) services
 # are GONE. Their roles folded INTO the othala app: consent's challenge
@@ -36,11 +39,10 @@
 #     or a future iteration that wires Caddy with `tls internal`).
 #
 # Image versions: ${AUTH_VERSION} comes from the environment. In CI the
-# `e2e` job declares `needs: [build-othala, build-ldap-bridge]`, so
+# `e2e` job declares `needs: [build-othala, build-e2e-tester]`, so
 # AUTH_VERSION resolves to the just-built tag (v-tag on tags, short-SHA
 # on push). Local operator runs use AUTH_VERSION=latest. The app image is
-# ${AUTH_REGISTRY} at the registry root; ldap-bridge is the
-# ${AUTH_REGISTRY}/ldap-bridge sub-image.
+# ${AUTH_REGISTRY} at the registry root.
 
 services:
   postgres:
@@ -205,13 +207,15 @@ services:
   #   - PUBLIC SSR port 8080: family UI + /auth/* + /admin/* pages + the
   #     Hydra login/consent/logout challenge handlers /oauth2/{login,
   #     consent,logout}.
-  #   - ADMIN port 8431 (bound on loopback 127.0.0.1 inside the
+  #   - ADMIN port 4431 (bound on loopback 127.0.0.1 inside the
   #     container): /healthz, /readyz, /admin/revoke-user,
   #     /admin/recovery-gate. Disjoint from the public mux.
   # The admin port is loopback-only, so the healthcheck and the
   # admin-route smoke probes run via `compose exec` against
-  # localhost:8431 INSIDE the container — they are not reachable across
+  # localhost:4431 INSIDE the container — they are not reachable across
   # the compose network (production-faithful: only Caddy fronts 8080).
+  # ADMIN_PORT=4431 aligns with the portal code default (listen.mjs:40)
+  # and the deployed quadlet — single admin-port convention across envs.
   othala:
     image: ${AUTH_REGISTRY}:${AUTH_VERSION}
     container_name: lab-othala
@@ -250,48 +254,17 @@ services:
       HOST: 0.0.0.0
       PORT: "8080"
       ADMIN_HOST: 127.0.0.1
-      ADMIN_PORT: "8431"
+      ADMIN_PORT: "4431"
     volumes:
       - ./manifests:/etc/portal/manifests:ro,z
     healthcheck:
-      # /healthz lives on the loopback ADMIN port (8431), not the public
+      # /healthz lives on the loopback ADMIN port (4431), not the public
       # SSR port. Probe it from inside the container.
-      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:8431/healthz').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:4431/healthz').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
       interval: 5s
       timeout: 3s
       retries: 12
       start_period: 10s
-
-  ldap-bridge:
-    image: ${AUTH_REGISTRY}/ldap-bridge:${AUTH_VERSION}
-    container_name: lab-ldap-bridge
-    restart: unless-stopped
-    depends_on:
-      kratos:
-        condition: service_healthy
-    environment:
-      KRATOS_BRIDGE_ADMIN_TOKEN: lab-bridge-token
-      # Canonical glauth.cfg uses public_url_env / admin_url_env so the
-      # file is topology-neutral. Deploy-plane quadlets set the auth.network
-      # container names; lab uses the compose service name.
-      KRATOS_PUBLIC_URL: http://kratos:4433
-      KRATOS_ADMIN_URL: http://kratos:4434
-      # LDAP directory params (used by glauth.cfg base_dn)
-      LDAP_BASE_DN: ${LDAP_BASE_DN}
-      LDAP_SERVICE_BIND_DN: ${LDAP_SERVICE_BIND_DN}
-      LDAP_SERVICE_BIND_PASSWORD: ${LDAP_SERVICE_BIND_PASSWORD}
-    volumes:
-      - ./glauth.cfg:/etc/glauth/glauth.cfg:ro,z
-    # Bridge has a /healthz on its admin port (:6478 default per
-    # main.go adminListenEnv). UBI 9 minimal runtime ships curl
-    # (Containerfile base swap from micro → minimal for this reason),
-    # so the healthcheck self-validates without a sidecar.
-    healthcheck:
-      test: ["CMD-SHELL", "curl -sf http://localhost:6478/healthz || exit 1"]
-      interval: 5s
-      timeout: 3s
-      retries: 12
-      start_period: 5s
 
   # Client registration — the converged successor to the deleted util/
   # apply-clients.sh. util's role folded INTO the othala app as the
