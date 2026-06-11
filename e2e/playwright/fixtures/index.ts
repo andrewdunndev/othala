@@ -8,9 +8,9 @@
  *   hydraPublicURL       — http://hydra:4444 (Hydra public, inside compose net)
  *   hydraAdminURL        — http://hydra:4445 (Hydra admin, inside compose net)
  *   member               — { id, email, password } seeded identity (bt2@othala.test),
- *                          access-grafana group, NOT on OTHALA_ADMIN_SUBJECTS
+ *                          access-grafana group, NOT on OTHALA_ADMIN_IDS
  *   admin                — { id, email, password } seeded identity (admin@othala.test),
- *                          ON OTHALA_ADMIN_SUBJECTS (triggers AAL2 step-up at /admin)
+ *                          ON OTHALA_ADMIN_IDS (triggers AAL2 step-up at /admin)
  *
  * Both identities are seeded ONCE per worker (scope: 'worker') so the cost is
  * paid at most once across the serial test run.
@@ -80,8 +80,9 @@ export const test = base.extend<OthalaFixtures>({
     await use(process.env.HYDRA_ADMIN_URL ?? 'http://hydra:4445');
   }, { scope: 'worker' }],
 
-  // member: bt2@othala.test, access-grafana + family groups.
-  // NOT on OTHALA_ADMIN_SUBJECTS (admin@othala.test is).
+  // member: bt2@othala.test, access-grafana + family groups. Seeded with a
+  // Kratos-assigned random id, so NOT on OTHALA_ADMIN_IDS (only the admin
+  // fixture's pinned 000...001 id is).
   member: [
     async ({ kratosAdminURL }, use) => {
       const result = await createIdentityWithPassword({
@@ -96,12 +97,15 @@ export const test = base.extend<OthalaFixtures>({
     { scope: 'worker' },
   ],
 
-  // admin: admin@othala.test — must match OTHALA_ADMIN_SUBJECTS in gen-secrets.sh.
-  // The admin gate (requireAdminSession in the othala app) checks this list.
-  // At AAL1 (password only), visiting /admin triggers the AAL2 step-up redirect.
+  // admin: seeded with the fixed identity UUID on OTHALA_ADMIN_IDS in
+  // gen-secrets.sh (CVP-P1: admin authority is keyed on the immutable id, not
+  // the email trait). The admin gate (requireAdminSession) checks that list by
+  // id. At AAL1 (password only), visiting /admin triggers the AAL2 step-up.
   admin: [
     async ({ kratosAdminURL }, use) => {
       const result = await createIdentityWithPassword({
+        // Keep in sync with OTHALA_ADMIN_IDS in e2e/gen-secrets.sh.
+        id: '00000000-0000-0000-0000-000000000001',
         email: 'admin@othala.test',
         username: 'admin',
         displayName: 'Othala Admin',

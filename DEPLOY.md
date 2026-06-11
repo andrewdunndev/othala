@@ -128,7 +128,7 @@ plane maps each `dag_*` key to the env target below:
 
 | Env target | Guards / used by |
 |---|---|
-| `OTHALA_ADMIN_SUBJECTS` | The **sole admin authz**: an allowlist of admin emails. Checked at `requireAdminSession`, the recovery-gate, and the `/admin/*` page gates. The `admin` group is display-only. |
+| `OTHALA_ADMIN_IDS` | The **sole admin authz**: an allowlist of admin identity UUIDs (immutable Kratos identity IDs). Checked at `requireAdminSession`, the recovery-gate, and the `/admin/*` page gates. The `admin` group is display-only. |
 | `OTHALA_ADMIN_ENDPOINT_BEARER` | `POST /admin/revoke-user` on the loopback admin port. Constant-time, fail-closed. |
 | `RECOVERY_GATE_SECRET` | `POST /admin/recovery-gate` (the Kratos recovery-hook). Constant-time, fail-closed. |
 | `LDAP_BRIDGE_ADMIN_URL` / `LDAP_BRIDGE_ADMIN_TOKEN` | Best-effort LDAP bind-cache flush in the revoke fan-out. |
@@ -175,7 +175,7 @@ deploy:
   `After=` / `Requires=dag-consent` and its `CONSENT_ADMIN_BEARER` /
   consent-URL wiring.
 - Wire the dual-listener admin port (`ADMIN_PORT=4431` on loopback) and
-  the new admin env targets (`OTHALA_ADMIN_SUBJECTS`,
+  the new admin env targets (`OTHALA_ADMIN_IDS`,
   `OTHALA_ADMIN_ENDPOINT_BEARER`, `RECOVERY_GATE_SECRET`) into the
   `dag-portal` quadlet.
 - **Repoint the Kratos recovery-hook** from the old consent service to

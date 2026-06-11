@@ -136,15 +136,10 @@ test('contactRecipient: uses explicit value when set', async () => {
   assert.equal(contactRecipient, 'ops@example.com');
 });
 
-test('contactRecipient: falls back to the first OTHALA_ADMIN_SUBJECTS entry', async () => {
-  const { contactRecipient } = await loadConfig({
-    NODE_ENV: 'test',
-    OTHALA_ADMIN_SUBJECTS: 'first@example.com, second@example.com',
-  });
-  assert.equal(contactRecipient, 'first@example.com');
-});
-
-test('contactRecipient: throws in production when neither recipient nor admin subjects set', async () => {
+test('contactRecipient: throws in production when OTHALA_CONTACT_RECIPIENT is not set', async () => {
+  // CVP-P1: OTHALA_ADMIN_IDS now stores UUIDs, not emails, so it can no longer
+  // serve as a contact-form recipient fallback. OTHALA_CONTACT_RECIPIENT is
+  // now required in production.
   await assert.rejects(
     () =>
       loadConfig({

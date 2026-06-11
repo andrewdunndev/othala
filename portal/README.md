@@ -123,7 +123,7 @@ Astro 6 dropped the `'hybrid'` output mode. We use `output: 'server'` (every pag
 
 1. Reads the Kratos session via whoami
 2. Returns redirect to `/auth/login` if no session
-3. Returns redirect to `/auth/error?reason=not-admin` if not in the `OTHALA_ADMIN_SUBJECTS` allowlist (the `admin` group is display-only)
+3. Returns redirect to `/auth/error?reason=not-admin` if the identity's UUID is not in the `OTHALA_ADMIN_IDS` allowlist (CVP-P1; the `admin` group is display-only)
 4. Returns redirect to Kratos refresh-login with `?aal=aal2` if session is below aal2
 5. Returns the validated session otherwise
 

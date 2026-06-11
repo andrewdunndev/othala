@@ -18,7 +18,7 @@ export const prerender = false;
 import Layout from '../../layouts/Layout.astro';
 import { getTile } from '../../lib/tiles';
 import { getSession } from '../../lib/kratos';
-import { isAdminSubject } from '../../lib/admin-auth';
+import { isAdminId } from '../../lib/admin-auth';
 
 const { slug } = Astro.params;
 if (!slug) {
@@ -37,11 +37,12 @@ if (!session?.active || !session.identity) {
   return Astro.redirect(`/auth/login?return_to=${encodeURIComponent(Astro.url.pathname)}`);
 }
 
-// B2: admin authority is the OTHALA_ADMIN_SUBJECTS allowlist, NOT the
-// (display-only) `admin` group. Admins see every app's detail page; everyone
+// CVP-P1: admin authority is the OTHALA_ADMIN_IDS allowlist keyed on the
+// immutable identity id, NOT the (display-only) `admin` group and NOT the
+// user-editable email trait. Admins see every app's detail page; everyone
 // else needs the per-app access-<slug> group.
 const groups = session.identity.metadata_admin?.groups ?? [];
-const isAdmin = isAdminSubject(session.identity.traits?.email);
+const isAdmin = isAdminId(session.identity.id);
 const hasAccess = isAdmin || groups.includes(entry.accessGroup);
 if (!hasAccess) {
   return Astro.redirect('/auth/error?reason=not-authorised');

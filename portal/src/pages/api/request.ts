@@ -7,7 +7,7 @@
 //   4. Send to the operator via the SHARED courier SMTP (lib/mailer.ts, which
 //      reads OTHALA_SMTP_CONNECTION_URI — the same URI kratos.yml's courier
 //      uses). Recipient = config.contactRecipient (OTHALA_CONTACT_RECIPIENT,
-//      else the first OTHALA_ADMIN_SUBJECTS entry).
+//      required in production — set explicitly).
 //
 // Responses:
 //   200 { ok: true }                          — accepted + sent

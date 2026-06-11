@@ -13,7 +13,7 @@
  * body is rendered by recovery-gate.jsonnet:
  *   { identity_id, groups, traits: { email, ... } }
  * The gate (othala loopback :4431 /admin/recovery-gate) refuses recovery
- * (403) iff traits.email is on OTHALA_ADMIN_SUBJECTS. Kratos interprets a
+ * (403) iff identity_id is on OTHALA_ADMIN_IDS (CVP-P1). Kratos interprets a
  * 4xx from the webhook as a flow abort, preventing the privileged session
  * from being issued.
  *
@@ -52,10 +52,9 @@
  *   - RECOVERY_GATE_SECRET injected via compose env (the gate 401s a bad bearer).
  *   - Mailpit running on the compose net (mailpit:8025 HTTP API reachable from
  *     inside the playwright container on the same compose network).
- *   - OTHALA_ADMIN_SUBJECTS=admin@othala.test,admin.recovery@othala.test
- *     (or the gate must be configured to recognise admin.recovery@othala.test).
- *     NOTE: if OTHALA_ADMIN_SUBJECTS only lists admin@othala.test, update it to
- *     include admin.recovery@othala.test, OR change the J2 seed email to match.
+ *   - OTHALA_ADMIN_IDS lists the two e2e admin UUIDs (...0001,...0002); J2
+ *     seeds its identity with the ...0002 id so the gate refuses it by id.
+ *     gen-secrets.sh is the source of truth for the allowlist.
  *
  * Mailpit API: GET http://mailpit:8025/api/v1/messages returns:
  *   { messages: [{ ID, Subject, To: [{Address}], Snippet, ... }], ... }
@@ -298,10 +297,11 @@ test('J2 — admin recovery is blocked by the recovery-gate webhook (no privileg
   // Seed a FRESH admin-allowlisted identity for this test, rather than reusing
   // the worker-scoped `admin` fixture. Recovery flow submission leaves used-code
   // and flow state that can persist across tests within the same worker; a fresh
-  // identity starts clean. The email must be on OTHALA_ADMIN_SUBJECTS (update
-  // gen-secrets.sh / compose env to include admin.recovery@othala.test, or
-  // change this email to match whatever the gate is configured to block).
+  // identity starts clean. CVP-P1: the recovery-gate refuses by identity id, so
+  // this identity is pinned to the second allowlisted UUID (...0002) in
+  // OTHALA_ADMIN_IDS (gen-secrets.sh). The email is incidental.
   const identity = await createIdentityWithPassword({
+    id: '00000000-0000-0000-0000-000000000002',
     email: 'admin.recovery@othala.test',
     username: 'admin.recovery',
     displayName: 'Admin Recovery Test',

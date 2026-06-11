@@ -2,10 +2,10 @@
  * H — Non-admin member POSTs to /admin mutation endpoints (adversarial / negative).
  *
  * Guard under attack:
- *   portal/src/lib/admin.ts:requireAdminSession (line 42)
- *   — specifically the allowlist check at line 72:
- *       if (!isAdminSubject(adminEmail)) return redirect('/auth/error?reason=not-admin')
- *   — and the AAL2 check at line 76.
+ *   portal/src/lib/admin.ts:requireAdminSession
+ *   — specifically the allowlist check:
+ *       if (!isAdminId(session.identity.id)) return redirect('/auth/error?reason=not-admin')
+ *   — and the AAL2 check that follows it.
  *
  * Spec C (c-member-admin-denied.spec.ts) only covers a browser GET navigation
  * to /admin. This spec covers POST (mutation) verbs against real admin mutation

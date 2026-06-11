@@ -75,7 +75,7 @@ What this project treats as in-scope security surface:
 - the **fail-closed access gate** (`portal/src/lib/gate.ts`, `access.ts`) —
   membership in `access-<clientId>` **and** active Kratos state; any path that
   grants access without both is a vulnerability,
-- the **`OTHALA_ADMIN_SUBJECTS` allowlist** as the sole admin authority —
+- the **`OTHALA_ADMIN_IDS` allowlist** as the sole admin authority —
   identity-group membership is display metadata, never an authorization gate,
 - the **loopback-only admin listener** (`:4431`) — privileged routes
   (`/admin/*`) must never resolve on the public mux (`:8080`),

@@ -1,16 +1,16 @@
-// Property-based / adversarial fuzz harness for recoveryGateVerdict.
+// Property-based / adversarial fuzz harness for recoveryGateVerdict (CVP-P1).
 //
 // Run with: tsx --test scripts/recovery-gate.fuzz.test.mjs
 //
 // SECURITY INVARIANT (what an attacker wants to break):
 //   recoveryGateVerdict NEVER returns { refuse: false } for an identity
-//   whose email is on the OTHALA_ADMIN_SUBJECTS allowlist (admins must not
+//   whose IMMUTABLE id is on the OTHALA_ADMIN_IDS allowlist (admins must not
 //   self-recover via email). It fails CLOSED (refuse: true) on
 //   missing/malformed/ambiguous/unidentifiable payloads.
 //
-// In formal terms, for any input (payload, isAdminSubject):
-//   verdict.refuse === false  =>  isAdminSubject(email) === false
-//                                 AND email is a non-empty string.
+// In formal terms, for any input (payload, isAdminId):
+//   verdict.refuse === false  =>  isAdminId(id) === false
+//                                 AND id is a non-empty string.
 //
 // A violation means an attacker can construct a Kratos webhook payload that
 // lets an admin account receive a recovery email instead of being refused.
@@ -24,26 +24,30 @@ import { recoveryGateVerdict } from '../src/server/listen.mjs';
 // Helpers
 // ---------------------------------------------------------------------------
 
-/** A simple isAdminSubject that treats a fixed set as admin. */
-function makeAdminPredicate(adminEmails) {
-  const normalized = new Set(adminEmails.map((e) => e.trim().toLowerCase()));
-  return (email) => {
-    if (typeof email !== 'string') return false;
-    return normalized.has(email.trim().toLowerCase());
+const ADMIN_UUID = '11111111-1111-1111-1111-111111111111';
+const OPS_UUID   = '33333333-3333-3333-3333-333333333333';
+const OTHER_UUID = '22222222-2222-2222-2222-222222222222';
+
+/** A simple isAdminId that treats a fixed set as admin. */
+function makeAdminPredicate(adminIds) {
+  const normalized = new Set(adminIds.map((id) => id.trim().toLowerCase()));
+  return (id) => {
+    if (typeof id !== 'string') return false;
+    return normalized.has(id.trim().toLowerCase());
   };
 }
 
-const ADMIN_EMAILS = ['andrew@dunn.dev', 'ops@example.com', 'ROOT@DUNN.DEV'];
-const isAdminSubject = makeAdminPredicate(ADMIN_EMAILS);
+const ADMIN_IDS = [ADMIN_UUID, OPS_UUID, 'AAAAAAAA-BBBB-CCCC-DDDD-EEEEEEEEEEEE'];
+const isAdminId = makeAdminPredicate(ADMIN_IDS);
 
-// Canonical Kratos-style webhook payload shape.
-function kratosPayload(email) {
-  return { identity: { traits: { email } } };
+// Canonical jsonnet payload shape: { identity_id, groups, traits }
+function kratosPayload(id) {
+  return { identity_id: id, groups: [], traits: { email: 'user@example.com' } };
 }
 
-// Flat shape (without `.identity` wrapper — the fn supports both via `payload?.identity ?? payload`).
-function flatPayload(email) {
-  return { traits: { email } };
+// Fallback shape (identity.id)
+function legacyPayload(id) {
+  return { identity: { id } };
 }
 
 // ---------------------------------------------------------------------------
@@ -52,24 +56,21 @@ function flatPayload(email) {
 
 /**
  * THE invariant: if verdict is "allow" (refuse===false), then:
- *   1. the email must be a non-empty string
- *   2. isAdminSubject(email) must be false
+ *   1. the id must be a non-empty string
+ *   2. isAdminId(id) must be false
  *
  * A violation of either sub-clause is a security bug.
  */
 function assertInvariant(payload, verdict, label) {
   if (!verdict.refuse) {
-    // Sub-invariant 1: we must have identified a real email
-    const identity = payload?.identity ?? payload;
-    const email = identity?.traits?.email;
+    const id = payload?.identity_id ?? payload?.identity?.id;
     assert.ok(
-      typeof email === 'string' && email.length > 0,
-      `${label}: allowed without a real email — fail-closed violation. email=${JSON.stringify(email)}`,
+      typeof id === 'string' && id.length > 0,
+      `${label}: allowed without a real id — fail-closed violation. id=${JSON.stringify(id)}`,
     );
-    // Sub-invariant 2: the allowed email must not be an admin subject
     assert.ok(
-      !isAdminSubject(email),
-      `${label}: admin subject received ALLOW verdict — HIGH-3 violation. email=${JSON.stringify(email)}`,
+      !isAdminId(id),
+      `${label}: admin subject received ALLOW verdict — HIGH-3 violation. id=${JSON.stringify(id)}`,
     );
   }
 }
@@ -79,186 +80,123 @@ function assertInvariant(payload, verdict, label) {
 // ---------------------------------------------------------------------------
 
 test('null payload refuses (fail-closed)', () => {
-  const v = recoveryGateVerdict(null, isAdminSubject);
+  const v = recoveryGateVerdict(null, isAdminId);
   assert.equal(v.refuse, true, 'null payload must refuse');
   assertInvariant(null, v, 'null payload');
 });
 
 test('undefined payload refuses (fail-closed)', () => {
-  const v = recoveryGateVerdict(undefined, isAdminSubject);
+  const v = recoveryGateVerdict(undefined, isAdminId);
   assert.equal(v.refuse, true, 'undefined payload must refuse');
   assertInvariant(undefined, v, 'undefined payload');
 });
 
 test('empty object refuses (fail-closed)', () => {
-  const v = recoveryGateVerdict({}, isAdminSubject);
+  const v = recoveryGateVerdict({}, isAdminId);
   assert.equal(v.refuse, true, 'empty object must refuse');
   assertInvariant({}, v, 'empty object');
 });
 
-test('canonical admin email is refused (kratos shape)', () => {
-  const p = kratosPayload('andrew@dunn.dev');
-  const v = recoveryGateVerdict(p, isAdminSubject);
+test('canonical admin UUID is refused (jsonnet shape)', () => {
+  const p = kratosPayload(ADMIN_UUID);
+  const v = recoveryGateVerdict(p, isAdminId);
   assert.equal(v.refuse, true, 'admin must be refused');
-  assertInvariant(p, v, 'admin kratos shape');
+  assertInvariant(p, v, 'admin jsonnet shape');
 });
 
-test('admin email in UPPERCASE refuses (case-insensitive allowlist)', () => {
-  // isAdminSubject is supposed to fold case; check that recoveryGateVerdict
-  // passes the raw email as-is to isAdminSubject so the predicate can decide.
-  // If the gate strips/folds before passing, that's fine too — must still refuse.
-  const p = kratosPayload('ANDREW@DUNN.DEV');
-  const v = recoveryGateVerdict(p, makeAdminPredicate(['andrew@dunn.dev']));
-  assert.equal(v.refuse, true, 'upper-case admin email must refuse');
-  assertInvariant(p, v, 'uppercase admin email');
+test('admin UUID in UPPERCASE refuses (case-insensitive allowlist)', () => {
+  const p = kratosPayload(ADMIN_UUID.toUpperCase());
+  const v = recoveryGateVerdict(p, makeAdminPredicate([ADMIN_UUID]));
+  assert.equal(v.refuse, true, 'upper-case admin UUID must refuse');
+  assertInvariant(p, v, 'uppercase admin UUID');
 });
 
-test('admin email with leading/trailing whitespace refuses', () => {
-  const p = kratosPayload('  andrew@dunn.dev  ');
-  const v = recoveryGateVerdict(p, makeAdminPredicate(['andrew@dunn.dev']));
-  // The predicate normalizes; the gate passes raw. Invariant: refuse must be true.
-  assert.equal(v.refuse, true, 'whitespace-padded admin email must refuse');
-  assertInvariant(p, v, 'whitespace admin email');
+test('admin UUID with leading/trailing whitespace refuses', () => {
+  const p = kratosPayload(`  ${ADMIN_UUID}  `);
+  const v = recoveryGateVerdict(p, makeAdminPredicate([ADMIN_UUID]));
+  assert.equal(v.refuse, true, 'whitespace-padded admin UUID must refuse');
+  assertInvariant(p, v, 'whitespace admin UUID');
 });
 
-test('admin email in flat payload shape refuses', () => {
-  const p = flatPayload('andrew@dunn.dev');
-  const v = recoveryGateVerdict(p, isAdminSubject);
-  assert.equal(v.refuse, true, 'flat-shape admin must refuse');
-  assertInvariant(p, v, 'flat payload admin');
+test('admin UUID in legacy payload shape (identity.id) refuses', () => {
+  const p = legacyPayload(ADMIN_UUID);
+  const v = recoveryGateVerdict(p, isAdminId);
+  assert.equal(v.refuse, true, 'legacy-shape admin must refuse');
+  assertInvariant(p, v, 'legacy payload admin');
 });
 
-test('non-admin email is allowed (kratos shape)', () => {
-  const p = kratosPayload('alice@example.com');
-  const v = recoveryGateVerdict(p, isAdminSubject);
+test('non-admin UUID is allowed (jsonnet shape)', () => {
+  const p = kratosPayload(OTHER_UUID);
+  const v = recoveryGateVerdict(p, isAdminId);
   assert.equal(v.refuse, false, 'non-admin must be allowed');
-  assertInvariant(p, v, 'non-admin kratos shape');
+  assertInvariant(p, v, 'non-admin jsonnet shape');
 });
 
-test('non-admin email is allowed (flat shape)', () => {
-  const p = flatPayload('alice@example.com');
-  const v = recoveryGateVerdict(p, isAdminSubject);
-  assert.equal(v.refuse, false, 'non-admin flat must be allowed');
-  assertInvariant(p, v, 'non-admin flat shape');
+test('non-admin UUID is allowed (legacy shape)', () => {
+  const p = legacyPayload(OTHER_UUID);
+  const v = recoveryGateVerdict(p, isAdminId);
+  assert.equal(v.refuse, false, 'non-admin legacy must be allowed');
+  assertInvariant(p, v, 'non-admin legacy shape');
 });
 
-test('missing traits refuses (fail-closed)', () => {
-  const p = { identity: { id: 'x' } }; // no traits
-  const v = recoveryGateVerdict(p, isAdminSubject);
+test('missing identity_id refuses (fail-closed)', () => {
+  const p = { groups: [], traits: { email: 'x@y.com' } };
+  const v = recoveryGateVerdict(p, isAdminId);
   assert.equal(v.refuse, true);
-  assertInvariant(p, v, 'missing traits');
+  assertInvariant(p, v, 'missing identity_id');
 });
 
-test('null email refuses (fail-closed)', () => {
-  const p = { identity: { traits: { email: null } } };
-  const v = recoveryGateVerdict(p, isAdminSubject);
+test('null identity_id refuses (fail-closed)', () => {
+  const p = { identity_id: null };
+  const v = recoveryGateVerdict(p, isAdminId);
   assert.equal(v.refuse, true);
-  assertInvariant(p, v, 'null email');
+  assertInvariant(p, v, 'null identity_id');
 });
 
-test('empty string email refuses (fail-closed)', () => {
-  const p = { identity: { traits: { email: '' } } };
-  const v = recoveryGateVerdict(p, isAdminSubject);
+test('empty string identity_id refuses (fail-closed)', () => {
+  const p = { identity_id: '' };
+  const v = recoveryGateVerdict(p, isAdminId);
   assert.equal(v.refuse, true);
-  assertInvariant(p, v, 'empty string email');
+  assertInvariant(p, v, 'empty string identity_id');
 });
 
-test('numeric email refuses (fail-closed)', () => {
-  const p = { identity: { traits: { email: 12345 } } };
-  const v = recoveryGateVerdict(p, isAdminSubject);
+test('whitespace-only identity_id refuses (fail-closed)', () => {
+  const p = { identity_id: '   ' };
+  const v = recoveryGateVerdict(p, isAdminId);
+  assert.equal(v.refuse, true, 'whitespace-only id must refuse — fail-closed');
+  assertInvariant(p, v, 'whitespace-only identity_id');
+});
+
+test('numeric identity_id refuses (fail-closed)', () => {
+  const p = { identity_id: 12345 };
+  const v = recoveryGateVerdict(p, isAdminId);
   assert.equal(v.refuse, true);
-  assertInvariant(p, v, 'numeric email');
+  assertInvariant(p, v, 'numeric identity_id');
 });
 
-test('array email refuses (fail-closed)', () => {
-  const p = { identity: { traits: { email: ['andrew@dunn.dev'] } } };
-  const v = recoveryGateVerdict(p, isAdminSubject);
+test('boolean identity_id refuses (fail-closed)', () => {
+  const p = { identity_id: true };
+  const v = recoveryGateVerdict(p, isAdminId);
   assert.equal(v.refuse, true);
-  assertInvariant(p, v, 'array email');
+  assertInvariant(p, v, 'boolean identity_id');
 });
 
-test('object email refuses (fail-closed)', () => {
-  const p = { identity: { traits: { email: { toString: () => 'andrew@dunn.dev' } } } };
-  const v = recoveryGateVerdict(p, isAdminSubject);
-  assert.equal(v.refuse, true);
-  assertInvariant(p, v, 'object email');
-});
-
-test('boolean email refuses (fail-closed)', () => {
-  const p = { identity: { traits: { email: true } } };
-  const v = recoveryGateVerdict(p, isAdminSubject);
-  assert.equal(v.refuse, true);
-  assertInvariant(p, v, 'boolean email');
-});
-
-// Whitespace-only string — gate now checks email.trim().length === 0 (fixed).
-test('whitespace-only email refuses (fail-closed)', () => {
-  const p = { identity: { traits: { email: '   ' } } };
-  const v = recoveryGateVerdict(p, isAdminSubject);
-  // INVARIANT (fixed): the gate checks `email.trim().length === 0`, so a
-  // whitespace-only email is refused as an unidentifiable subject.
-  assert.equal(v.refuse, true,
-    'whitespace-only email must refuse — fail-closed invariant now holds after fix');
-  assertInvariant(p, v, 'whitespace-only email');
-});
-
-// Null prototype object — prototype-pollution-adjacent test.
 test('null-prototype payload does not crash or allow admin', () => {
   const p = Object.create(null);
-  p.identity = Object.create(null);
-  p.identity.traits = Object.create(null);
-  p.identity.traits.email = 'andrew@dunn.dev';
-  const v = recoveryGateVerdict(p, isAdminSubject);
+  p.identity_id = ADMIN_UUID;
+  const v = recoveryGateVerdict(p, isAdminId);
   assert.equal(v.refuse, true, 'null-prototype admin must refuse');
   assertInvariant(p, v, 'null-prototype payload');
 });
 
-// Identity wrapper confusion: both `identity` and top-level traits present.
-test('both identity wrapper AND top-level traits: identity takes precedence', () => {
+test('identity_id takes precedence over identity.id when both present', () => {
   const p = {
-    identity: { traits: { email: 'andrew@dunn.dev' } }, // admin
-    traits: { email: 'alice@example.com' },              // non-admin
+    identity_id: ADMIN_UUID,  // admin
+    identity: { id: OTHER_UUID }, // non-admin
   };
-  const v = recoveryGateVerdict(p, isAdminSubject);
-  // The gate resolves: identity = payload.identity ?? payload
-  // So identity = { traits: { email: 'andrew@dunn.dev' } } — admin — must refuse.
-  assert.equal(v.refuse, true, 'identity wrapper takes precedence; admin must refuse');
+  const v = recoveryGateVerdict(p, isAdminId);
+  assert.equal(v.refuse, true, 'identity_id takes precedence; admin must refuse');
   assertInvariant(p, v, 'precedence conflict');
-});
-
-// Attacker swaps to flat shape with admin email but wraps in an extra layer.
-test('double-wrapped payload refuses (fail-closed on unidentifiable)', () => {
-  const p = { identity: { identity: { traits: { email: 'andrew@dunn.dev' } } } };
-  // gate reads: identity = p.identity = { identity: { traits: ... } }
-  // then email = identity.traits?.email = undefined → refuse
-  const v = recoveryGateVerdict(p, isAdminSubject);
-  assert.equal(v.refuse, true, 'double-wrapped must refuse (no traits on inner identity wrapper)');
-  assertInvariant(p, v, 'double-wrapped');
-});
-
-// Prototype-polluted email field via __proto__ injection (JSON.parse safe; direct property test).
-test('prototype-polluted email does not allow admin recovery', () => {
-  // Simulate what JSON.parse does with {"__proto__":{"email":"andrew@dunn.dev"}}
-  // Modern V8 / JSON.parse ignores __proto__ as a key for prototype assignment,
-  // but we test the direct case.
-  const p = { identity: { traits: {} } };
-  Object.getPrototypeOf(p.identity.traits).email = 'andrew@dunn.dev';
-  try {
-    const v = recoveryGateVerdict(p, isAdminSubject);
-    // The gate reads identity.traits?.email — if inherited, it would be 'andrew@dunn.dev'.
-    // If the gate allows this, it's a prototype-pollution bypass.
-    if (!v.refuse) {
-      // Check if the email was inherited via prototype
-      const email = p.identity.traits.email;
-      assert.fail(
-        `Prototype-polluted email "${email}" was ALLOWED — prototype pollution bypass!`,
-      );
-    }
-    assertInvariant(p, v, 'prototype-polluted traits');
-  } finally {
-    // Clean up the prototype pollution
-    delete Object.getPrototypeOf(p.identity.traits).email;
-  }
 });
 
 // ---------------------------------------------------------------------------
@@ -266,54 +204,43 @@ test('prototype-polluted email does not allow admin recovery', () => {
 // ---------------------------------------------------------------------------
 
 test('property: NEVER allow an admin subject (1000 random payloads)', () => {
-  const adminSet = ['admin@example.com', 'root@corp.org', 'ops@dunn.dev'];
+  const adminSet = [ADMIN_UUID, OPS_UUID, 'cccccccc-dddd-eeee-ffff-aaaaaaaaaaaa'];
   const pred = makeAdminPredicate(adminSet);
 
   fc.assert(
     fc.property(
-      // Generate a payload: choose one of several shapes
       fc.oneof(
-        // canonical Kratos shape with arbitrary email
-        fc.record({ identity: fc.record({ traits: fc.record({ email: fc.string() }) }) }),
-        // flat shape
-        fc.record({ traits: fc.record({ email: fc.string() }) }),
-        // admin email in canonical shape
-        fc.constantFrom(...adminSet).map((e) => ({ identity: { traits: { email: e } } })),
-        // admin email in flat shape
-        fc.constantFrom(...adminSet).map((e) => ({ traits: { email: e } })),
-        // malformed: no traits
-        fc.record({ identity: fc.record({}) }),
+        // canonical jsonnet shape with arbitrary uuid-like id
+        fc.record({ identity_id: fc.string() }),
+        // admin UUID in canonical shape
+        fc.constantFrom(...adminSet).map((id) => ({ identity_id: id })),
+        // admin UUID in legacy shape
+        fc.constantFrom(...adminSet).map((id) => ({ identity: { id } })),
+        // malformed: no id anywhere
+        fc.constant({}),
         // null
         fc.constant(null),
         // arbitrary object
         fc.object(),
-        // admin email with case variants
-        fc.constantFrom(...adminSet).map((e) => ({
-          identity: { traits: { email: e.toUpperCase() } },
-        })),
-        // admin email with surrounding whitespace
-        fc.constantFrom(...adminSet).map((e) => ({
-          identity: { traits: { email: `  ${e}  ` } },
-        })),
+        // admin UUID with case variants
+        fc.constantFrom(...adminSet).map((id) => ({ identity_id: id.toUpperCase() })),
+        // admin UUID with surrounding whitespace
+        fc.constantFrom(...adminSet).map((id) => ({ identity_id: `  ${id}  ` })),
       ),
       (payload) => {
         const verdict = recoveryGateVerdict(payload, pred);
-        // The invariant: if allowed, email must not be an admin subject.
         if (!verdict.refuse) {
-          const identity = payload?.identity ?? payload;
-          const email = identity?.traits?.email;
-          // Must have a real string email
-          if (typeof email !== 'string' || email.length === 0) {
+          const id = payload?.identity_id ?? payload?.identity?.id;
+          if (typeof id !== 'string' || id.length === 0) {
             throw new Error(
-              `INVARIANT VIOLATION (fail-closed): allowed without a real email. ` +
-              `email=${JSON.stringify(email)}, payload=${JSON.stringify(payload)}`,
+              `INVARIANT VIOLATION (fail-closed): allowed without a real id. ` +
+              `id=${JSON.stringify(id)}, payload=${JSON.stringify(payload)}`,
             );
           }
-          // Must not be an admin
-          if (pred(email)) {
+          if (pred(id)) {
             throw new Error(
               `INVARIANT VIOLATION (HIGH-3): admin subject allowed. ` +
-              `email=${JSON.stringify(email)}, payload=${JSON.stringify(payload)}`,
+              `id=${JSON.stringify(id)}, payload=${JSON.stringify(payload)}`,
             );
           }
         }
@@ -325,8 +252,7 @@ test('property: NEVER allow an admin subject (1000 random payloads)', () => {
 });
 
 test('property: fail-closed on all missing/malformed payloads (500 runs)', () => {
-  // Any payload that lacks a non-empty string email must refuse.
-  const pred = makeAdminPredicate(['admin@example.com']);
+  const pred = makeAdminPredicate([ADMIN_UUID]);
 
   fc.assert(
     fc.property(
@@ -334,13 +260,12 @@ test('property: fail-closed on all missing/malformed payloads (500 runs)', () =>
         fc.constant(null),
         fc.constant(undefined),
         fc.constant({}),
+        fc.record({ identity_id: fc.constant(null) }),
+        fc.record({ identity_id: fc.constant('') }),
+        fc.record({ identity_id: fc.integer() }),
+        fc.record({ identity_id: fc.boolean() }),
+        fc.record({ identity_id: fc.array(fc.string()) }),
         fc.record({ identity: fc.constant({}) }),
-        fc.record({ identity: fc.record({ traits: fc.constant({}) }) }),
-        fc.record({ identity: fc.record({ traits: fc.record({ email: fc.constant(null) }) }) }),
-        fc.record({ identity: fc.record({ traits: fc.record({ email: fc.constant('') }) }) }),
-        fc.record({ identity: fc.record({ traits: fc.record({ email: fc.integer() }) }) }),
-        fc.record({ identity: fc.record({ traits: fc.record({ email: fc.boolean() }) }) }),
-        fc.record({ identity: fc.record({ traits: fc.record({ email: fc.array(fc.string()) }) }) }),
       ),
       (payload) => {
         const verdict = recoveryGateVerdict(payload, pred);
@@ -351,21 +276,28 @@ test('property: fail-closed on all missing/malformed payloads (500 runs)', () =>
   );
 });
 
-test('property: arbitrary isAdminSubject predicate — never allows what predicate claims is admin (1000 runs)', () => {
-  // Generate both a payload and a random "admin set" to verify the gate delegates
-  // correctly regardless of what the predicate considers admin.
+test('property: arbitrary isAdminId predicate — never allows what predicate claims is admin (1000 runs)', () => {
+  const hexSegment = (len) => fc.stringMatching(new RegExp(`^[0-9a-f]{${len}}$`));
+  const uuidArb = fc.tuple(
+    hexSegment(8),
+    hexSegment(4),
+    hexSegment(4),
+    hexSegment(4),
+    hexSegment(12),
+  ).map(([a, b, c, d, e]) => `${a}-${b}-${c}-${d}-${e}`);
+
   fc.assert(
     fc.property(
-      fc.array(fc.emailAddress(), { minLength: 1, maxLength: 5 }),
-      fc.emailAddress(),
-      (adminEmails, targetEmail) => {
-        const pred = makeAdminPredicate(adminEmails);
-        const payload = { identity: { traits: { email: targetEmail } } };
+      fc.array(uuidArb, { minLength: 1, maxLength: 5 }),
+      uuidArb,
+      (adminIds, targetId) => {
+        const pred = makeAdminPredicate(adminIds);
+        const payload = { identity_id: targetId };
         const verdict = recoveryGateVerdict(payload, pred);
-        if (pred(targetEmail) && !verdict.refuse) {
+        if (pred(targetId) && !verdict.refuse) {
           throw new Error(
-            `INVARIANT VIOLATION: predicate says "${targetEmail}" is admin but gate returned allow. ` +
-            `adminEmails=${JSON.stringify(adminEmails)}`,
+            `INVARIANT VIOLATION: predicate says "${targetId}" is admin but gate returned allow. ` +
+            `adminIds=${JSON.stringify(adminIds)}`,
           );
         }
         return true;
@@ -373,20 +305,4 @@ test('property: arbitrary isAdminSubject predicate — never allows what predica
     ),
     { numRuns: 1000, seed: 77 },
   );
-});
-
-// ---------------------------------------------------------------------------
-// Whitespace-only email: explicit invariant gap documentation
-// ---------------------------------------------------------------------------
-
-test('whitespace-only email refuses (fail-closed — fixed)', () => {
-  // The gate now checks: typeof email !== 'string' || email.trim().length === 0
-  // A whitespace-only string ('   ') trims to '' (length 0) and is correctly refused.
-  const p = { identity: { traits: { email: '   ' } } };
-  const v = recoveryGateVerdict(p, isAdminSubject);
-
-  // INVARIANT (fixed): whitespace-only email must be refused (fail-closed principle).
-  assert.equal(v.refuse, true,
-    'whitespace-only email must refuse — unidentifiable subject must not receive allow verdict');
-  assertInvariant(p, v, 'whitespace-only fixed');
 });

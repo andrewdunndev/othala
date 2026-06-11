@@ -3,10 +3,10 @@
 //
 // Run with: tsx --test scripts/public-mux-disjoint.test.mjs
 //
-// /admin/revoke-user and /admin/recovery-gate are served ONLY by the admin
-// listener (src/server/listen.mjs), bearer-guarded and bound to the admin
-// port. They are deliberately absent from src/pages/, so the public port
-// never routes them.
+// /admin/revoke-user, /admin/recovery-gate, and /admin/login-gate are served
+// ONLY by the admin listener (src/server/listen.mjs), bearer-guarded and bound
+// to the admin port. They are deliberately absent from src/pages/, so the
+// public port never routes them.
 //
 // The risk this test fences off: a future `src/pages/admin/revoke-user.ts`
 // (or .astro, or a revoke-user/index.* directory route) would make Astro
@@ -30,7 +30,7 @@ const pagesDir = join(here, '..', 'src', 'pages');
 
 // The admin-listener-only POST paths (mirror of ADMIN_POST_ROUTES in
 // src/server/listen.mjs). No Astro page may resolve to any of these.
-const FORBIDDEN_ROUTES = new Set(['/admin/revoke-user', '/admin/recovery-gate']);
+const FORBIDDEN_ROUTES = new Set(['/admin/revoke-user', '/admin/recovery-gate', '/admin/login-gate']);
 
 // Astro page-file extensions that produce a route.
 const PAGE_EXT = /\.(astro|ts|js|mjs|md|mdx)$/;
@@ -96,7 +96,11 @@ test('the route-mapping helper actually maps the dangerous filenames', () => {
     routeForFile(join(pagesDir, 'admin', 'recovery-gate.astro')),
     '/admin/recovery-gate',
   );
-  for (const r of ['/admin/revoke-user', '/admin/recovery-gate']) {
+  assert.equal(
+    routeForFile(join(pagesDir, 'admin', 'login-gate.astro')),
+    '/admin/login-gate',
+  );
+  for (const r of ['/admin/revoke-user', '/admin/recovery-gate', '/admin/login-gate']) {
     assert.ok(FORBIDDEN_ROUTES.has(r));
   }
 });

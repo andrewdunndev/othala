@@ -122,8 +122,15 @@ selfservice:
     settings:
       ui_url: ${OTHALA_PUBLIC_URL}/auth/settings
       privileged_session_max_age: 15m
-      # AAL not enforced here globally; admin UI does AAL2 step-up at SSR layer
-      required_aal: aal1
+      # CVP-P2: require the highest available AAL before allowing credential
+      # changes. Users with an enrolled AAL2 factor (passkey, TOTP, hardware
+      # key) must step up before modifying passwords, passkeys, or MFA seeds.
+      # Password-only and passkey-only (AAL1-only) users are unaffected —
+      # highest_available resolves to aal1 for them. First-passkey enrollment
+      # is NOT blocked: enrollment is a settings action that requires only aal1
+      # when aal1 is the highest available. This does NOT affect session.whoami
+      # (see below) which must stay aal1 for the LDAP bridge.
+      required_aal: highest_available
       after:
         password:
           hooks:
@@ -214,6 +221,36 @@ selfservice:
       # (it's a `settings`/`session` knob, not a login-flow one). AAL2 step-up
       # is requested per-flow via ?aal=aal2 by the admin SSR pages
       # (requireAdminSession), never enforced globally here.
+      #
+      # CVP-P3: gate fires ONLY on the email-code login method (after.code),
+      # interrupting login for admin identities (forces passkey/console). Other
+      # login methods (passkey/password/webauthn) are unaffected. Reuses
+      # RECOVERY_GATE_SECRET — same Kratos→portal admin-port trust domain, no
+      # new secret. can_interrupt: true lets Kratos surface the 403 body to the
+      # user as a flow error rather than treating it as a webhook failure.
+      # NOTE: the `after.code` hook path needs live Kratos v26.2.0 validation
+      # to confirm the exact schema key for code-method after-hooks on the login
+      # flow. The recovery flow uses a flat `after.hooks` (no method sub-key),
+      # but login after-hooks support per-method nesting per Ory docs — verify
+      # against a running Kratos instance before promoting to production.
+      after:
+        code:
+          hooks:
+            - hook: web_hook
+              config:
+                url: http://${CONSENT_HOST}:4431/admin/login-gate
+                method: POST
+                auth:
+                  type: api_key
+                  config:
+                    in: header
+                    name: Authorization
+                    value: "Bearer ${RECOVERY_GATE_SECRET}"
+                response:
+                  ignore: false
+                  parse: false
+                body: file:///etc/config/kratos/hooks/login-gate.jsonnet
+                can_interrupt: true
 
     registration:
       # Admin-driven onboarding (one-time enrollment URLs); no self-service signup

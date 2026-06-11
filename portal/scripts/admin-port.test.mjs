@@ -1,13 +1,14 @@
-// Contract tests for the D-listener admin mux (CU1 item 4/6, extended CU3).
+// Contract tests for the D-listener admin mux (CU1 item 4/6, extended CU3 + CVP-P3).
 //
 // Run with: tsx --test scripts/admin-port.test.mjs
 //
 // Asserts:
-//   - the admin port serves /healthz + /readyz (GET) and the CU3 admin
-//     endpoints /admin/revoke-user + /admin/recovery-gate (POST), and that
-//     every public/challenge path 404s there (the two muxes are disjoint);
-//   - the revoke-user + recovery-gate paths are NOT public GET routes (the
-//     public mux never sees them via the admin helpers);
+//   - the admin port serves /healthz + /readyz (GET) and the CU3/CVP-P3 admin
+//     endpoints /admin/revoke-user + /admin/recovery-gate + /admin/login-gate
+//     (POST), and that every public/challenge path 404s there (the two muxes
+//     are disjoint);
+//   - the revoke-user + recovery-gate + login-gate paths are NOT public GET
+//     routes (the public mux never sees them via the admin helpers);
 //   - the admin-endpoint + recovery-gate bearer checks are CONSTANT-TIME and
 //     FAIL-CLOSED (unset secret rejects everything).
 //
@@ -28,6 +29,9 @@ import {
   ADMIN_GET_ROUTES,
   ADMIN_POST_ROUTES,
 } from '../src/server/listen.mjs';
+
+const ADMIN_UUID = '11111111-1111-1111-1111-111111111111';
+const OTHER_UUID = '22222222-2222-2222-2222-222222222222';
 
 function fakeRes() {
   return {
@@ -52,7 +56,7 @@ function fakeReq({ method = 'GET', url = '/', headers = {}, body = '' } = {}) {
 beforeEach(() => {
   delete process.env.OTHALA_ADMIN_ENDPOINT_BEARER;
   delete process.env.RECOVERY_GATE_SECRET;
-  delete process.env.OTHALA_ADMIN_SUBJECTS;
+  delete process.env.OTHALA_ADMIN_IDS;
 });
 
 // ── CU1 disjointness (unchanged) ───────────────────────────────────────────
@@ -64,12 +68,12 @@ test('admin GET mux serves exactly /healthz and /readyz', () => {
   assert.equal(isAdminRoute('GET', '/readyz'), true);
 });
 
-test('admin POST mux serves exactly the CU3 endpoints', () => {
-  assert.deepEqual([...ADMIN_POST_ROUTES].sort(), ['/admin/recovery-gate', '/admin/revoke-user']);
+test('admin POST mux serves exactly the CU3 + CVP-P3 endpoints', () => {
+  assert.deepEqual([...ADMIN_POST_ROUTES].sort(), ['/admin/login-gate', '/admin/recovery-gate', '/admin/revoke-user']);
 });
 
-test('revoke-user + recovery-gate are NOT public GET routes (disjoint from public mux)', () => {
-  for (const p of ['/admin/revoke-user', '/admin/recovery-gate']) {
+test('revoke-user + recovery-gate + login-gate are NOT public GET routes (disjoint from public mux)', () => {
+  for (const p of ['/admin/revoke-user', '/admin/recovery-gate', '/admin/login-gate']) {
     assert.equal(isAdminRoute('GET', p), false, `${p} must not be a public GET admin route`);
   }
 });
@@ -106,7 +110,7 @@ test('healthz/readyz return 200 ok on the admin port', async () => {
 });
 
 test('a served admin POST path on the wrong method (GET) 404s', async () => {
-  for (const p of ['/admin/revoke-user', '/admin/recovery-gate']) {
+  for (const p of ['/admin/revoke-user', '/admin/recovery-gate', '/admin/login-gate']) {
     const res = fakeRes();
     await handleAdminRequest(fakeReq({ method: 'GET', url: p }), res);
     assert.equal(res.statusCode, 404, `GET ${p} should 404`);
@@ -164,7 +168,7 @@ test('POST /admin/revoke-user with a valid bearer routes through revokeSubject',
       revokedSubject = subject;
       return { subject, kratosSessionsRevoked: true, bestEffortFailures: [] };
     },
-    isAdminSubject: () => false,
+    isAdminId: () => false,
   };
   const res = fakeRes();
   await handleAdminRequest(
@@ -188,7 +192,7 @@ test('POST /admin/revoke-user returns prescriptive error (dependency + action), 
   }
   const runtime = {
     async revokeSubject() { throw new FakeRevokeError(); },
-    isAdminSubject: () => false,
+    isAdminId: () => false,
   };
   const res = fakeRes();
   await handleAdminRequest(
@@ -205,7 +209,7 @@ test('POST /admin/revoke-user returns prescriptive error (dependency + action), 
 
 test('POST /admin/revoke-user 400s on a missing subject', async () => {
   process.env.OTHALA_ADMIN_ENDPOINT_BEARER = 'right-secret';
-  const runtime = { async revokeSubject() { throw new Error('should not run'); }, isAdminSubject: () => false };
+  const runtime = { async revokeSubject() { throw new Error('should not run'); }, isAdminId: () => false };
   const res = fakeRes();
   await handleAdminRequest(
     fakeReq({ method: 'POST', url: '/admin/revoke-user', headers: { authorization: 'Bearer right-secret' }, body: '{}' }),
@@ -222,21 +226,21 @@ test('POST /admin/recovery-gate is fail-closed when RECOVERY_GATE_SECRET unset',
   await handleAdminRequest(
     fakeReq({ method: 'POST', url: '/admin/recovery-gate', headers: { authorization: 'Bearer x' }, body: '{}' }),
     res,
-    { revokeSubject: async () => ({}), isAdminSubject: () => false },
+    { revokeSubject: async () => ({}), isAdminId: () => false },
   );
   assert.equal(res.statusCode, 401);
 });
 
-test('POST /admin/recovery-gate REFUSES recovery for an allowlisted admin (403)', async () => {
+test('POST /admin/recovery-gate REFUSES recovery for an allowlisted admin UUID (403)', async () => {
   process.env.RECOVERY_GATE_SECRET = 'gate-secret';
-  const runtime = { revokeSubject: async () => ({}), isAdminSubject: (email) => email === 'andrew@dunn.dev' };
+  const runtime = { revokeSubject: async () => ({}), isAdminId: (id) => id === ADMIN_UUID };
   const res = fakeRes();
   await handleAdminRequest(
     fakeReq({
       method: 'POST',
       url: '/admin/recovery-gate',
       headers: { authorization: 'Bearer gate-secret' },
-      body: JSON.stringify({ identity: { traits: { email: 'andrew@dunn.dev' } } }),
+      body: JSON.stringify({ identity_id: ADMIN_UUID, traits: { email: 'andrew@dunn.dev' } }),
     }),
     res,
     runtime,
@@ -244,16 +248,16 @@ test('POST /admin/recovery-gate REFUSES recovery for an allowlisted admin (403)'
   assert.equal(res.statusCode, 403);
 });
 
-test('POST /admin/recovery-gate ALLOWS recovery for a non-admin (200)', async () => {
+test('POST /admin/recovery-gate ALLOWS recovery for a non-admin UUID (200)', async () => {
   process.env.RECOVERY_GATE_SECRET = 'gate-secret';
-  const runtime = { revokeSubject: async () => ({}), isAdminSubject: () => false };
+  const runtime = { revokeSubject: async () => ({}), isAdminId: () => false };
   const res = fakeRes();
   await handleAdminRequest(
     fakeReq({
       method: 'POST',
       url: '/admin/recovery-gate',
       headers: { authorization: 'Bearer gate-secret' },
-      body: JSON.stringify({ identity: { traits: { email: 'kid@dunn.dev' } } }),
+      body: JSON.stringify({ identity_id: OTHER_UUID, traits: { email: 'kid@dunn.dev' } }),
     }),
     res,
     runtime,
@@ -261,15 +265,18 @@ test('POST /admin/recovery-gate ALLOWS recovery for a non-admin (200)', async ()
   assert.equal(res.statusCode, 200);
 });
 
-test('recoveryGateVerdict is FAIL-CLOSED on a malformed payload', () => {
+test('recoveryGateVerdict is FAIL-CLOSED on a malformed payload (no identity_id)', () => {
   assert.equal(recoveryGateVerdict({}, () => false).refuse, true);
+  assert.equal(recoveryGateVerdict({ traits: {} }, () => false).refuse, true);
   assert.equal(recoveryGateVerdict({ identity: {} }, () => false).refuse, true);
-  assert.equal(recoveryGateVerdict({ identity: { traits: {} } }, () => false).refuse, true);
 });
 
-test('recoveryGateVerdict reads identity at top level OR under .identity', () => {
-  const isAdmin = (e) => e === 'a@dunn.dev';
-  assert.equal(recoveryGateVerdict({ traits: { email: 'a@dunn.dev' } }, isAdmin).refuse, true);
-  assert.equal(recoveryGateVerdict({ identity: { traits: { email: 'a@dunn.dev' } } }, isAdmin).refuse, true);
-  assert.equal(recoveryGateVerdict({ traits: { email: 'b@dunn.dev' } }, isAdmin).refuse, false);
+test('recoveryGateVerdict reads identity_id at top level OR identity.id under .identity', () => {
+  const isAdmin = (id) => id === ADMIN_UUID;
+  // top-level identity_id (canonical jsonnet shape)
+  assert.equal(recoveryGateVerdict({ identity_id: ADMIN_UUID, traits: {} }, isAdmin).refuse, true);
+  // fallback: identity.id
+  assert.equal(recoveryGateVerdict({ identity: { id: ADMIN_UUID } }, isAdmin).refuse, true);
+  // non-admin
+  assert.equal(recoveryGateVerdict({ identity_id: OTHER_UUID, traits: {} }, isAdmin).refuse, false);
 });

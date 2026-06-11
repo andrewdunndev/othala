@@ -153,6 +153,7 @@ services:
       - ./kratos.rendered.yml:/etc/config/kratos/kratos.yml:ro,z
       - ../kratos/identity.schema.json:/etc/config/kratos/identity.schema.json:ro,z
       - ../kratos/hooks/recovery-gate.jsonnet:/etc/config/kratos/hooks/recovery-gate.jsonnet:ro,z
+      - ../kratos/hooks/login-gate.jsonnet:/etc/config/kratos/hooks/login-gate.jsonnet:ro,z
     command: ["serve", "--config", "/etc/config/kratos/kratos.yml", "--dev", "--watch-courier"]
     healthcheck:
       test: ["CMD-SHELL", "wget -qO- http://localhost:4434/admin/health/ready || exit 1"]
@@ -239,11 +240,11 @@ services:
       OTHALA_APEX: ${OTHALA_APEX}
       MANIFEST_DIR: /etc/portal/manifests
       CSRF_SECRET: ${CSRF_SECRET}
-      # CU3 admin model: the allowlist is the sole admin authority. The
-      # recovery-gate refuses recovery for any identity whose email is on
-      # this list. The smoke seeds a known admin email to exercise the
-      # refuse path; everything else is non-admin.
-      OTHALA_ADMIN_SUBJECTS: ${OTHALA_ADMIN_SUBJECTS}
+      # CVP-P1 admin model: the allowlist is the sole admin authority, keyed on
+      # immutable identity UUIDs. The recovery-gate and login-gate refuse for
+      # any identity whose id is on this list. The smoke seeds a known admin UUID
+      # to exercise the refuse path; everything else is non-admin.
+      OTHALA_ADMIN_IDS: ${OTHALA_ADMIN_IDS}
       OTHALA_ADMIN_ENDPOINT_BEARER: ${OTHALA_ADMIN_ENDPOINT_BEARER}
       RECOVERY_GATE_SECRET: ${RECOVERY_GATE_SECRET}
       # Contact-form mailer: SAME courier connection Kratos uses (mailpit in
@@ -297,10 +298,8 @@ services:
       # mailer). The registrar doesn't send mail but shares the image + its
       # config contract, so it sets the same relay the othala service does.
       OTHALA_SMTP_CONNECTION_URI: ${OTHALA_SMTP_CONNECTION_URI}
-      # config.ts also resolves a contact recipient at load (OTHALA_CONTACT_RECIPIENT,
-      # or the first OTHALA_ADMIN_SUBJECTS entry). Same image, same config contract.
+      # config.ts resolves a contact recipient at load. Same image, same config contract.
       OTHALA_CONTACT_RECIPIENT: ${OTHALA_CONTACT_RECIPIENT}
-      OTHALA_ADMIN_SUBJECTS: ${OTHALA_ADMIN_SUBJECTS}
       # Per-client secrets for every fixture with an oidc: block. The
       # generic example set registers two OIDC clients.
       GRAFANA_CLIENT_SECRET: ${GRAFANA_CLIENT_SECRET}

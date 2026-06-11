@@ -31,6 +31,25 @@
 			redir {env.OTHALA_PUBLIC_URL}/auth/login?return_to={http.request.uri} 302
 		}
 	}
+	# Strip spoofable inbound identity headers before the caller's reverse_proxy
+	# forwards the request to the upstream. This snippet does not own the
+	# reverse_proxy block (the caller does), so request_header is used here to
+	# mutate the request in-place for all subsequent handlers in the same site
+	# block. X-Kratos-Authenticated-Identity-Id is safe after this point because
+	# copy_headers above re-sets it from the authoritative whoami response.
+	request_header -X-Kratos-Authenticated-Identity-Id
+	request_header -X-Kratos-Groups
+	request_header -X-Remote-User
+	request_header -X-Remote-Groups
+	request_header -X-Remote-Email
+	request_header -X-Remote-Name
+	request_header -X-Forwarded-User
+	request_header -X-Forwarded-Groups
+	request_header -X-Forwarded-Email
+	request_header -X-Auth-Request-User
+	request_header -X-Auth-Request-Groups
+	request_header -X-Auth-Request-Email
+
 	# After this snippet, the surrounding Caddyfile block does its own
 	# reverse_proxy to the upstream. The upstream (typically the Astro
 	# admin app) is responsible for the AAL2 step-up check.

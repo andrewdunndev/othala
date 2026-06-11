@@ -11,4 +11,4 @@
 
 export { revokeSubject, RevokeError } from '../lib/revoke';
 export type { RevokeResult, RevokeDependency } from '../lib/revoke';
-export { isAdminSubject } from '../lib/admin-auth';
+export { isAdminId } from '../lib/admin-auth';

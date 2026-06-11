@@ -44,6 +44,14 @@ export interface SeedOptions {
   /** metadata_admin.groups — controls access-<app> group membership */
   groups: string[];
   kratosAdminURL: string;
+  /**
+   * Optional explicit identity UUID. Kratos createIdentity accepts an `id`
+   * on the create body and uses it verbatim when well-formed. The admin
+   * fixture pins this to the UUID on OTHALA_ADMIN_IDS so the seeded admin
+   * is recognised by the portal's ID-keyed admin allowlist (CVP-P1). Without
+   * it Kratos assigns a random UUID that can never match the allowlist.
+   */
+  id?: string;
 }
 
 export interface SeedResult {
@@ -66,6 +74,9 @@ export async function createIdentityWithPassword(opts: SeedOptions): Promise<See
   const body = {
     schema_id: 'family',
     state: 'active',
+    // Explicit id (CVP-P1): when supplied, Kratos uses it so the seeded
+    // identity matches the portal's OTHALA_ADMIN_IDS allowlist deterministically.
+    ...(opts.id ? { id: opts.id } : {}),
     traits: {
       username: opts.username,
       email: opts.email,

@@ -8,8 +8,7 @@
 // upstream of this guard.
 
 import { browserFlows, getSession } from './kratos';
-import { getIdentity } from './admin-api';
-import { isAdminSubject } from './admin-auth';
+import { isAdminId } from './admin-auth';
 import { revokeSubject, type RevokeResult } from './revoke';
 import { publicUrl, adminFreshnessHours } from './config';
 import type { Session } from './types';
@@ -54,23 +53,13 @@ export async function requireAdminSession(astro: any): Promise<Session | Respons
     return astro.redirect(`/auth/login?return_to=${returnTo}`);
   }
 
-  // B2: admin authority is the OTHALA_ADMIN_SUBJECTS allowlist, NOT the
-  // `admin` metadata_admin group. Read the admin's email from the
-  // session traits (whoami strips metadata_admin but returns traits) and
-  // consult the allowlist. The `admin` group is display-only now and
-  // gates nothing here. Fetch the full identity only to resolve the
-  // canonical email when the session traits omit it; failures downgrade
-  // to "auth-unreachable" rather than a silent non-admin.
-  let adminEmail = session.identity.traits?.email as string | undefined;
-  if (!adminEmail) {
-    try {
-      const fullIdentity = await getIdentity(session.identity.id);
-      adminEmail = fullIdentity.traits?.email as string | undefined;
-    } catch {
-      return astro.redirect('/auth/error?reason=auth-unreachable');
-    }
-  }
-  if (!isAdminSubject(adminEmail)) {
+  // CVP-P1: admin authority is the OTHALA_ADMIN_IDS allowlist keyed on the
+  // IMMUTABLE identity `id` (a Kratos UUID), NOT the user-editable email
+  // trait. `session.identity.id` is always present in a valid whoami response
+  // and is never writable via the self-service profile flow, so it cannot be
+  // escalated by editing a trait. The `admin` group is display-only and gates
+  // nothing here.
+  if (!isAdminId(session.identity.id)) {
     return astro.redirect('/auth/error?reason=not-admin');
   }
 
