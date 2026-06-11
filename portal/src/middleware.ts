@@ -42,11 +42,19 @@ function applySecurityHeaders(res: Response): void {
   res.headers.set('Referrer-Policy', 'no-referrer');
   res.headers.set('Permissions-Policy', 'geolocation=(), camera=(), microphone=()');
   res.headers.set('Cross-Origin-Opener-Policy', 'same-origin');
-  // frame-ancestors / object-src / base-uri only — script-src deferred;
+  // HSTS: 2-year max-age + includeSubDomains + preload.
+  // The IdP is HTTPS-only behind Caddy and serves both the apex and subdomains.
+  res.headers.set('Strict-Transport-Security', 'max-age=63072000; includeSubDomains; preload');
+  // form-action 'self': Kratos self-service forms POST to the same origin as the
+  // portal (both derived from OTHALA_PUBLIC_URL — see kratos/kratos.yml
+  // serve.public.base_url and portal lib/kratos.ts kratosBase()). Confining
+  // form submissions to 'self' prevents a compromised or injected form from
+  // exfiltrating credentials to an off-origin endpoint.
+  // frame-ancestors / object-src / base-uri / form-action — script-src deferred;
   // see docs/hardening.md §2 and the file-level CSP note above.
   res.headers.set(
     'Content-Security-Policy',
-    "frame-ancestors 'none'; object-src 'none'; base-uri 'self'",
+    "frame-ancestors 'none'; object-src 'none'; base-uri 'self'; form-action 'self'",
   );
 }
 

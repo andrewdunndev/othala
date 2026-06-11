@@ -16,7 +16,7 @@
 export const prerender = false;
 
 import Layout from '../../layouts/Layout.astro';
-import { getTile } from '../../lib/tiles';
+import { getTile, safeHref } from '../../lib/tiles';
 import { getSession } from '../../lib/kratos';
 import { isAdminId } from '../../lib/admin-auth';
 
@@ -25,16 +25,19 @@ if (!slug) {
   return Astro.redirect('/');
 }
 
-const entry = getTile(slug);
-if (!entry) {
-  return new Response('App not found', { status: 404 });
-}
-
-// Session gate.
+// Session gate FIRST — check authentication before revealing tile existence.
+// An unauthenticated visitor must not be able to distinguish a valid slug from
+// an invalid one (enumeration defence: the tile-existence 404 runs only after
+// we know the caller is authenticated).
 const cookie = Astro.request.headers.get('cookie') ?? undefined;
 const session = await getSession(cookie).catch(() => null);
 if (!session?.active || !session.identity) {
   return Astro.redirect(`/auth/login?return_to=${encodeURIComponent(Astro.url.pathname)}`);
+}
+
+const entry = getTile(slug);
+if (!entry) {
+  return new Response('App not found', { status: 404 });
 }
 
 // CVP-P1: admin authority is the OTHALA_ADMIN_IDS allowlist keyed on the
@@ -55,7 +58,7 @@ if (!hasAccess) {
       <h1 class="app-title">{entry.name}</h1>
       <p class="app-lede">{entry.description}</p>
       <div class="app-cta">
-        <a class="button button-primary" href={entry.url} rel="noopener">Open {entry.name} ↗</a>
+        <a class="button button-primary" href={safeHref(entry.url)} rel="noopener">Open {entry.name} ↗</a>
         <a class="cta-link mono" href="/">Back to dashboard</a>
       </div>
     </header>

@@ -32,7 +32,7 @@ export const prerender = false;
 
 import Layout from '../layouts/Layout.astro';
 import PageHero from '../components/PageHero.astro';
-import { loadTiles, loadGroups, type AppTile } from '../lib/tiles';
+import { loadTiles, loadGroups, safeHref, type AppTile } from '../lib/tiles';
 import { getSession, isReachable } from '../lib/kratos';
 import { isAdminId } from '../lib/admin-auth';
 import type { Identity } from '../lib/types';
@@ -201,7 +201,7 @@ const devLinks = [
               <div class="tile-grid">
                 {ungroupedTiles.map((t: AppTile) => (
                   <article class="tile">
-                    <a class="tile-launch" href={t.url}>
+                    <a class="tile-launch" href={safeHref(t.url)}>
                       {t.iconHref ? (
                         <img class="tile-icon-img" src={t.iconHref} alt="" loading="lazy" />
                       ) : (
@@ -226,7 +226,7 @@ const devLinks = [
                 <div class="tile-grid">
                   {tiles.map((t: AppTile) => (
                     <article class="tile">
-                      <a class="tile-launch" href={t.url}>
+                      <a class="tile-launch" href={safeHref(t.url)}>
                         {t.iconHref ? (
                           <img class="tile-icon-img" src={t.iconHref} alt="" loading="lazy" />
                         ) : (
@@ -257,7 +257,7 @@ const devLinks = [
         <template
           data-app-edu={t.slug}
           data-app-name={t.name}
-          data-app-url={t.url}
+          data-app-url={safeHref(t.url)}
           data-app-desc={t.description}
         >
           <Fragment set:html={t.educationHtml ?? ''} />

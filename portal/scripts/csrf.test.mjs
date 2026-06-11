@@ -64,3 +64,46 @@ test('rejects token with tampered signature', () => {
   const tampered = tok.slice(0, -4) + 'xxxx';
   assert.throws(() => verifyToken(tampered, 'admin-1'), /signature/);
 });
+
+// ── FIX-H: action mismatch message does not reflect raw attacker input ────────
+
+test('FIX-H: action mismatch message does not contain raw attacker-controlled characters', () => {
+  // Mint a token with action 'consent'.
+  const tok = signToken('admin-1', 'consent');
+  // Tamper: swap the action segment to a long payload with special chars.
+  const parts = tok.split('.');
+  // parts: [ts, identityId, nonce, action, sig]
+  const maliciousAction = '<script>alert(1)</script>' + 'A'.repeat(100);
+  parts[3] = maliciousAction;
+  const tampered = parts.join('.');
+
+  // verifyToken should throw a CSRFError; the message must NOT contain raw HTML.
+  let threw = false;
+  try {
+    verifyToken(tampered, 'admin-1', 'consent');
+  } catch (err) {
+    threw = true;
+    const msg = err.message;
+    // The sanitized form must not contain < > or the full 100-char padding.
+    assert.ok(!msg.includes('<script>'), 'message must not reflect raw HTML');
+    assert.ok(!msg.includes('>'), 'message must not contain ">');
+    assert.ok(!msg.includes('<'), "message must not contain '<'");
+    // The expected action name must still appear.
+    assert.ok(msg.includes("'consent'"), "expected action must appear in message");
+  }
+  assert.ok(threw, 'verifyToken must throw on action mismatch');
+});
+
+test('FIX-H: action mismatch message with safe presented action still readable', () => {
+  const tok = signToken('admin-1', 'deactivate');
+  // Verify as a different (expected) action to trigger the mismatch path.
+  let msg = '';
+  try {
+    verifyToken(tok, 'admin-1', 'consent');
+  } catch (err) {
+    msg = err.message;
+  }
+  // 'deactivate' contains only safe chars and fits in 32 — should appear.
+  assert.ok(msg.includes("'consent'"), "expected action must appear");
+  assert.ok(msg.includes("'deactivate'"), "sanitized presented action should appear when safe");
+});

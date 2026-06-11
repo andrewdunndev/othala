@@ -167,8 +167,23 @@ export async function handleLogin(req: Request, deps: Deps = {}): Promise<Respon
   let acr: string | undefined;
 
   if (login.skip) {
-    // Hydra already remembers this subject. Honor it; the gate still fires.
+    // Hydra remembers this subject, but Kratos is the authentication authority.
+    // Do NOT silently re-SSO on a remembered Hydra login when the Kratos session
+    // is gone (e.g. the user logged out). Re-verify a live Kratos session whose
+    // subject matches before honoring the skip; otherwise force interactive login.
+    let session: Session | null;
+    try {
+      session = await d.getSession(req.headers.get('cookie') ?? undefined);
+    } catch {
+      return new Response('upstream error', { status: 502 });
+    }
+    if (!session?.active || !session.identity || session.identity.id !== login.subject) {
+      const returnTo = buildLoginReturnTo(challenge);
+      const loginURL = `${loginUIBase()}?return_to=${encodeURIComponent(returnTo)}`;
+      return redirect(loginURL);
+    }
     subject = login.subject;
+    acr = session.authenticator_assurance_level ?? undefined;
   } else {
     let session: Session | null;
     try {
@@ -418,10 +433,11 @@ export async function handleConsentPost(req: Request, deps: Deps = {}): Promise<
   }
 
   // CSRF verification (D1): verify the signed CSRF token emitted by consent.astro.
-  // The token is bound to session.identity.id; CSRFError means tampered or stale.
+  // The token is action-scoped to 'consent' (FIX-E): a token minted for any other
+  // action (e.g. 'force-relogin', 'deactivate') cannot be replayed here.
   const csrfToken = body.get('csrf_token');
   try {
-    verifyToken(csrfToken, session.identity.id);
+    verifyToken(csrfToken, session.identity.id, 'consent');
   } catch (err) {
     if (err instanceof CSRFError) {
       return new Response('CSRF token invalid', { status: 400 });
@@ -522,6 +538,30 @@ export async function handleLogout(req: Request, deps: Deps = {}): Promise<Respo
     _logout = await d.oauth2.getOAuth2LogoutRequest({ logoutChallenge: challenge });
   } catch {
     return new Response('upstream error', { status: 502 });
+  }
+
+  // FIX-F: subject-binding defence-in-depth (logout-CSRF hardening).
+  // If a live Kratos session is present, its identity must match the logout
+  // subject. A mismatch means a cross-user forced-logout attempt — refuse it.
+  // If there is no live session the logout proceeds (the session is already gone
+  // or the browser has no cookie, both of which are expected on a legitimate
+  // logout flow initiated by Hydra post-revocation).
+  const logoutSubject = _logout.subject;
+  if (logoutSubject) {
+    let session: Session | null;
+    try {
+      session = await d.getSession(req.headers.get('cookie') ?? undefined);
+    } catch {
+      // Kratos unreachable — fail safe: proceed with accept (logout is never
+      // more dangerous than accepting, and blocking on infra failure is worse).
+      session = null;
+    }
+    if (session?.active && session.identity && session.identity.id !== logoutSubject) {
+      // Live session belongs to a DIFFERENT user than the logout subject.
+      // Refuse to auto-accept — redirect to the portal home instead.
+      const publicUrlBase = process.env.OTHALA_PUBLIC_URL ?? '';
+      return redirect(`${publicUrlBase}/`);
+    }
   }
 
   try {

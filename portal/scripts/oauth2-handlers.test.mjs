@@ -34,6 +34,9 @@ function activeMember(overrides = {}) {
 }
 
 // Build a stub OAuth2Api capturing calls; per-test overrides supply challenge data.
+// defaultSession: the session returned by the default getSession stub. Provided so
+// tests that use the skip=true login path (FIX-A: now re-verifies a live Kratos
+// session) don't need to provide getSession for the common happy path.
 function stubOAuth2(over = {}) {
   const calls = { acceptLogin: 0, rejectLogin: 0, acceptConsent: 0, rejectConsent: 0, acceptLogout: 0 };
   const api = {
@@ -54,6 +57,25 @@ function stubOAuth2(over = {}) {
   return { api, calls };
 }
 
+// Default getSession stub for skip=true login tests: returns an active session
+// matching the default subject 'id-1'. Tests that need a different session
+// (including the FIX-A specific tests) supply their own getSession override.
+function defaultSession(overrides = {}) {
+  return async () => ({
+    active: true,
+    identity: {
+      id: 'id-1',
+      state: 'active',
+      schema_id: 'family',
+      schema_url: '',
+      traits: { username: 'ada', email: 'a@dunn.dev', displayName: 'Ada' },
+      metadata_admin: { groups: ['access-grafana'] },
+    },
+    authenticator_assurance_level: 'aal1',
+    ...overrides,
+  });
+}
+
 // ── return_to hardening (CU1 item 5) ──────────────────────────────────────
 
 test('buildLoginReturnTo is a RELATIVE path (no scheme/host)', () => {
@@ -69,6 +91,7 @@ test('login accepts an active member (skip path)', async () => {
   const res = await handleLogin(new Request('https://x/oauth2/login?login_challenge=lc'), {
     oauth2: api,
     getIdentity: async () => activeMember(),
+    getSession: defaultSession(),
   });
   assert.equal(res.status, 302);
   assert.equal(res.headers.get('location'), 'https://dag.dunn.dev/after-login');
@@ -85,6 +108,7 @@ test('login REJECTS when missing the access group — opaque error_description, 
     const res = await handleLogin(new Request('https://x/oauth2/login?login_challenge=lc'), {
       oauth2: api,
       getIdentity: async () => activeMember({ metadata_admin: { groups: [] } }),
+      getSession: defaultSession(),
     });
     assert.equal(res.status, 302);
     assert.equal(res.headers.get('location'), 'https://dag.dunn.dev/login-rejected');
@@ -109,6 +133,7 @@ test('login REJECTS when identity state is inactive — opaque error_description
     const res = await handleLogin(new Request('https://x/oauth2/login?login_challenge=lc'), {
       oauth2: api,
       getIdentity: async () => activeMember({ state: 'inactive' }),
+      getSession: defaultSession(),
     });
     assert.equal(res.status, 302);
     assert.equal(calls.rejectLoginReason, 'access_denied', 'error_description must be opaque');
@@ -129,6 +154,7 @@ test('login REJECTS when identity lookup fails (fail-closed) — opaque error_de
     const res = await handleLogin(new Request('https://x/oauth2/login?login_challenge=lc'), {
       oauth2: api,
       getIdentity: async () => { throw new Error('kratos down'); },
+      getSession: defaultSession(),
     });
     assert.equal(res.status, 302);
     assert.equal(calls.rejectLoginReason, 'access_denied', 'error_description must be opaque');
@@ -385,7 +411,7 @@ test('T2b: consent skip=false but manifest skip_consent:true AUTO-ACCEPTS', asyn
 // T3: POST Allow -> accept with remember:true, remember_for=2592000, grant_scope, id_token claims.
 test('T3: POST Allow accepts with remember=true, 30-day remember_for, claims', async () => {
   _resetForTests();
-  const csrfToken = signToken('id-1');
+  const csrfToken = signToken('id-1', 'consent');
   const { api, calls } = stubOAuth2({
     getOAuth2ConsentRequest: async () => ({
       challenge: 'cc',
@@ -424,7 +450,7 @@ test('T3: POST Allow accepts with remember=true, 30-day remember_for, claims', a
 // T4: POST Deny -> rejectOAuth2ConsentRequest called, redirects.
 test('T4: POST Deny rejects and redirects', async () => {
   _resetForTests();
-  const csrfToken = signToken('id-1');
+  const csrfToken = signToken('id-1', 'consent');
   const { api, calls } = stubOAuth2({
     getOAuth2ConsentRequest: async () => ({
       challenge: 'cc',
@@ -457,7 +483,7 @@ test('T4: POST Deny rejects and redirects', async () => {
 // T5: Session-subject mismatch -> reject with access_denied.
 test('T5: POST Allow rejects with access_denied on session-subject mismatch', async () => {
   _resetForTests();
-  const csrfToken = signToken('id-1');
+  const csrfToken = signToken('id-1', 'consent');
   const { api, calls } = stubOAuth2({
     getOAuth2ConsentRequest: async () => ({
       challenge: 'cc',
@@ -836,7 +862,7 @@ test('T7a: POST rejects when there is no active session (getSession returns null
 // on the allow path re-gate). Covers the allow-path gate at ~lines 454-472.
 test('T7b: POST Allow re-gates and rejects an inactive identity', async () => {
   _resetForTests();
-  const csrfToken = signToken('id-1');
+  const csrfToken = signToken('id-1', 'consent');
   const { api, calls } = stubOAuth2({
     getOAuth2ConsentRequest: async () => ({
       challenge: 'cc', skip: false, subject: 'id-1',
@@ -923,4 +949,204 @@ test('deepMergeClaims: null/undefined dst or src is a no-op', () => {
   deepMergeClaims(null, { a: 1 });
   deepMergeClaims({ a: 1 }, null);
   deepMergeClaims(undefined, { a: 1 });
+});
+
+// ── FIX-A: login skip=true must re-verify live Kratos session ─────────────────
+
+test('FIX-A: login skip=true with NO live Kratos session redirects to login UI', async () => {
+  const { api, calls } = stubOAuth2({
+    getOAuth2LoginRequest: async () => ({
+      challenge: 'lc', skip: true, subject: 'id-1', client: { client_id: 'grafana' },
+    }),
+  });
+  const res = await handleLogin(new Request('https://x/oauth2/login?login_challenge=lc'), {
+    oauth2: api,
+    getSession: async () => null,   // no live session
+    getIdentity: async () => activeMember(),
+  });
+  // Must bounce to login UI, NOT accept.
+  assert.equal(res.status, 302, 'must redirect');
+  assert.equal(calls.acceptLogin, 0, 'acceptLogin must NOT be called when no session');
+  const loc = res.headers.get('location');
+  const u = new URL(loc, 'https://dag.dunn.dev');
+  assert.equal(u.pathname, '/auth/login', 'must redirect to login UI');
+  assert.equal(u.searchParams.get('return_to'), '/oauth2/login?login_challenge=lc',
+    'return_to must be the relative login challenge path');
+});
+
+test('FIX-A: login skip=true with session whose identity.id !== login.subject redirects to login UI', async () => {
+  const { api, calls } = stubOAuth2({
+    getOAuth2LoginRequest: async () => ({
+      challenge: 'lc', skip: true, subject: 'id-1', client: { client_id: 'grafana' },
+    }),
+  });
+  const res = await handleLogin(new Request('https://x/oauth2/login?login_challenge=lc'), {
+    oauth2: api,
+    // Session is active but for a DIFFERENT user (id-2 vs login.subject id-1).
+    getSession: async () => ({
+      active: true,
+      identity: { id: 'id-2', state: 'active', schema_id: 'family', schema_url: '', traits: {} },
+    }),
+    getIdentity: async () => activeMember(),
+  });
+  assert.equal(res.status, 302, 'must redirect');
+  assert.equal(calls.acceptLogin, 0, 'acceptLogin must NOT be called on subject mismatch');
+  const loc = res.headers.get('location');
+  const u = new URL(loc, 'https://dag.dunn.dev');
+  assert.equal(u.pathname, '/auth/login', 'must redirect to login UI on subject mismatch');
+});
+
+test('FIX-A: login skip=true with matching live active session accepts', async () => {
+  const { api, calls } = stubOAuth2({
+    getOAuth2LoginRequest: async () => ({
+      challenge: 'lc', skip: true, subject: 'id-1', client: { client_id: 'grafana' },
+    }),
+  });
+  const res = await handleLogin(new Request('https://x/oauth2/login?login_challenge=lc'), {
+    oauth2: api,
+    getSession: async () => ({
+      active: true,
+      identity: { id: 'id-1', state: 'active', schema_id: 'family', schema_url: '', traits: {} },
+      authenticator_assurance_level: 'aal1',
+    }),
+    getIdentity: async () => activeMember(),
+  });
+  assert.equal(res.status, 302, 'must redirect');
+  assert.equal(calls.acceptLogin, 1, 'acceptLogin must be called when session matches');
+  assert.equal(res.headers.get('location'), 'https://dag.dunn.dev/after-login');
+});
+
+test('FIX-A: login skip=true with Kratos upstream error returns 502', async () => {
+  const { api, calls } = stubOAuth2({
+    getOAuth2LoginRequest: async () => ({
+      challenge: 'lc', skip: true, subject: 'id-1', client: { client_id: 'grafana' },
+    }),
+  });
+  const res = await handleLogin(new Request('https://x/oauth2/login?login_challenge=lc'), {
+    oauth2: api,
+    getSession: async () => { throw new Error('kratos network error'); },
+    getIdentity: async () => activeMember(),
+  });
+  assert.equal(res.status, 502, 'Kratos error on skip path must return 502');
+  assert.equal(calls.acceptLogin, 0, 'acceptLogin must NOT be called on getSession error');
+});
+
+// ── FIX-E: consent CSRF token must be action-scoped to 'consent' ──────────────
+
+test('FIX-E: POST Allow with identity-only (non-action-scoped) csrf_token returns 400', async () => {
+  _resetForTests();
+  // signToken without action → identity-only 4-part token.
+  // verifyToken now requires action='consent' → 5-part token → malformed error → 400.
+  const csrfToken = signToken('id-1');   // no action — identity-only
+  const { api } = stubOAuth2({
+    getOAuth2ConsentRequest: async () => ({
+      challenge: 'cc', skip: false, subject: 'id-1',
+      client: { client_id: 'grafana' }, requested_scope: ['email'], requested_access_token_audience: [],
+    }),
+  });
+  const body = new URLSearchParams({ consent_challenge: 'cc', action: 'allow', csrf_token: csrfToken });
+  const req = new Request('https://x/oauth2/consent', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    body: body.toString(),
+  });
+  const res = await handleConsentPost(req, {
+    oauth2: api,
+    getSession: async () => ({
+      active: true,
+      identity: { id: 'id-1', state: 'active', schema_id: 'family', schema_url: '', traits: {} },
+    }),
+  });
+  assert.equal(res.status, 400, 'identity-only token must be rejected when action scope is required');
+});
+
+test('FIX-E: POST Allow with wrong action-scoped csrf_token returns 400', async () => {
+  _resetForTests();
+  // Token minted for 'deactivate' — must be rejected for 'consent'.
+  const csrfToken = signToken('id-1', 'deactivate');
+  const { api } = stubOAuth2({
+    getOAuth2ConsentRequest: async () => ({
+      challenge: 'cc', skip: false, subject: 'id-1',
+      client: { client_id: 'grafana' }, requested_scope: ['email'], requested_access_token_audience: [],
+    }),
+  });
+  const body = new URLSearchParams({ consent_challenge: 'cc', action: 'allow', csrf_token: csrfToken });
+  const req = new Request('https://x/oauth2/consent', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    body: body.toString(),
+  });
+  const res = await handleConsentPost(req, {
+    oauth2: api,
+    getSession: async () => ({
+      active: true,
+      identity: { id: 'id-1', state: 'active', schema_id: 'family', schema_url: '', traits: {} },
+    }),
+  });
+  assert.equal(res.status, 400, 'wrong-action token must be rejected');
+});
+
+// ── FIX-F: logout subject-binding ─────────────────────────────────────────────
+
+test('FIX-F: logout subject mismatch (live session belongs to different user) redirects to home', async () => {
+  const { api, calls } = stubOAuth2({
+    getOAuth2LogoutRequest: async () => ({ challenge: 'gc', subject: 'id-1' }),
+  });
+  process.env.OTHALA_PUBLIC_URL = 'https://dag.dunn.dev';
+  try {
+    const res = await handleLogout(
+      new Request('https://x/oauth2/logout?logout_challenge=gc', {
+        headers: { cookie: 'session=s2' },
+      }),
+      {
+        oauth2: api,
+        // Session is for id-2, but logout challenge is for id-1.
+        getSession: async () => ({
+          active: true,
+          identity: { id: 'id-2', state: 'active', schema_id: 'family', schema_url: '', traits: {} },
+        }),
+      },
+    );
+    assert.equal(res.status, 302, 'subject mismatch must redirect');
+    assert.equal(calls.acceptLogout, 0, 'acceptLogout must NOT be called on subject mismatch');
+    const loc = res.headers.get('location');
+    assert.ok(loc?.endsWith('/'), 'must redirect to portal home');
+  } finally {
+    delete process.env.OTHALA_PUBLIC_URL;
+  }
+});
+
+test('FIX-F: logout with matching session subject accepts normally', async () => {
+  const { api, calls } = stubOAuth2({
+    getOAuth2LogoutRequest: async () => ({ challenge: 'gc', subject: 'id-1' }),
+  });
+  const res = await handleLogout(
+    new Request('https://x/oauth2/logout?logout_challenge=gc', {
+      headers: { cookie: 'session=s1' },
+    }),
+    {
+      oauth2: api,
+      getSession: async () => ({
+        active: true,
+        identity: { id: 'id-1', state: 'active', schema_id: 'family', schema_url: '', traits: {} },
+      }),
+    },
+  );
+  assert.equal(res.status, 302, 'matching session must accept');
+  assert.equal(calls.acceptLogout, 1, 'acceptLogout must be called when subjects match');
+});
+
+test('FIX-F: logout with no live session accepts normally (expected on post-Kratos-logout flow)', async () => {
+  const { api, calls } = stubOAuth2({
+    getOAuth2LogoutRequest: async () => ({ challenge: 'gc', subject: 'id-1' }),
+  });
+  const res = await handleLogout(
+    new Request('https://x/oauth2/logout?logout_challenge=gc'),
+    {
+      oauth2: api,
+      getSession: async () => null,   // no session — already logged out of Kratos
+    },
+  );
+  assert.equal(res.status, 302, 'no-session logout must accept');
+  assert.equal(calls.acceptLogout, 1, 'acceptLogout must be called when no session present');
 });

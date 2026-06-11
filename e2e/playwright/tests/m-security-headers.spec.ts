@@ -43,6 +43,10 @@ const REQUIRED_HEADERS: Array<[string, string | RegExp]> = [
   ['referrer-policy', 'no-referrer'],
   // CSP must contain frame-ancestors 'none' — script-src intentionally absent.
   ['content-security-policy', /frame-ancestors\s+'none'/],
+  // CSP must include form-action 'self' (Kratos forms POST to same origin).
+  ['content-security-policy', /form-action\s+'self'/],
+  // HSTS: 2-year max-age; IdP is HTTPS-only behind Caddy.
+  ['strict-transport-security', /max-age=63072000/],
 ];
 
 // Routes to probe. maxRedirects:0 so we read headers from the FIRST response.

@@ -183,8 +183,14 @@ export function verifyToken(
   // For action-scoped tokens, verify the action matches before checking
   // the signature so the error is informative. Timing-safe: action mismatch
   // is not a secret; the HMAC mismatch below is the definitive gate.
+  // FIX-H: sanitize the reflected presentedAction to prevent attacker-controlled
+  // input from appearing verbatim in the 403 body (defence-in-depth; text/plain,
+  // but still reduces reflection surface). Cap to 32 chars of safe characters.
   if (action && presentedAction !== action) {
-    throw new CSRFError(`CSRF token action mismatch (expected '${action}', got '${presentedAction}')`);
+    const safePresented = presentedAction
+      ? presentedAction.replace(/[^a-z0-9:-]/gi, '').slice(0, 32)
+      : '';
+    throw new CSRFError(`CSRF token action mismatch (expected '${action}'${safePresented ? `, got '${safePresented}'` : ''})`);
   }
 
   const signedBody = action

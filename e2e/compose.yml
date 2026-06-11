@@ -49,6 +49,28 @@ services:
     image: docker.io/library/postgres:18-alpine
     container_name: lab-postgres
     restart: "no"
+    # --- Container hardening (P11) ---
+    # no-new-privileges: safe on all OCI runtimes; prevents any setuid
+    # binary inside the container from elevating past the container user.
+    security_opt:
+      - "no-new-privileges:true"
+    # Drop ALL Linux capabilities. Postgres does NOT need any to operate on
+    # its data volume (it runs as the postgres user after startup; it does not
+    # bind a port < 1024). No cap_add required.
+    cap_drop:
+      - ALL
+    # NEEDS-CARMINE-VALIDATION: read_only on postgres is deliberately omitted.
+    # Postgres writes to: its PGDATA directory (named volume / bind), the
+    # pg_wal directory, temporary sort files under /tmp, Unix socket files
+    # under /var/run/postgresql, and various lock files. While tmpfs mounts
+    # can cover /tmp and /var/run/postgresql, the PGDATA tree is a named volume
+    # (not rootfs) so it would not be blocked by read_only — BUT the postgres
+    # entrypoint script also writes init markers and pg_hba.conf into PGDATA at
+    # startup, which means any residual writes outside PGDATA (e.g. /run, /etc
+    # minor writes by the entrypoint) could silently break startup. Adding
+    # read_only: true to postgres risks an opaque startup failure; validate on
+    # carmine before enabling.
+    pids_limit: 512
     environment:
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
@@ -71,6 +93,17 @@ services:
     image: docker.io/axllent/mailpit:latest
     container_name: lab-mailpit
     restart: unless-stopped
+    # --- Container hardening (P11) ---
+    security_opt:
+      - "no-new-privileges:true"
+    cap_drop:
+      - ALL
+    # read_only: mailpit writes UI state / message storage to an in-process
+    # sqlite DB (default /data/mailpit.db). If run without a named volume for
+    # /data it writes to rootfs. NEEDS-CARMINE-VALIDATION: add read_only: true
+    # plus tmpfs: [/tmp] once the data path is confirmed (either a named volume
+    # or confirmed to be irrelevant for the e2e ephemeral run).
+    pids_limit: 256
     environment:
       MP_SMTP_AUTH_ACCEPT_ANY: "1"
       MP_SMTP_AUTH_ALLOW_INSECURE: "1"
@@ -121,6 +154,20 @@ services:
     image: docker.io/oryd/kratos:v26.2.0
     container_name: lab-kratos
     restart: unless-stopped
+    # --- Container hardening (P11) ---
+    security_opt:
+      - "no-new-privileges:true"
+    cap_drop:
+      - ALL
+    # Kratos binds ports 4433/4434 (both > 1024) so NET_BIND_SERVICE is NOT
+    # needed. No cap_add required.
+    read_only: true
+    tmpfs:
+      - /tmp
+    # Kratos writes only to /tmp at runtime (temp flow files, session state
+    # is in postgres). Its config + identity schema are mounted read-only
+    # above. No additional tmpfs paths needed.
+    pids_limit: 512
     depends_on:
       postgres:
         condition: service_healthy
@@ -179,6 +226,18 @@ services:
     image: docker.io/oryd/hydra:v26.2.0
     container_name: lab-hydra
     restart: unless-stopped
+    # --- Container hardening (P11) ---
+    security_opt:
+      - "no-new-privileges:true"
+    cap_drop:
+      - ALL
+    # Hydra binds ports 4444/4445 (both > 1024). No cap_add required.
+    read_only: true
+    tmpfs:
+      - /tmp
+    # Hydra writes only to /tmp at runtime (crypto scratch, temp JWK files).
+    # Its config is mounted read-only; JWKS material is stored in postgres.
+    pids_limit: 512
     depends_on:
       hydra-migrate:
         condition: service_completed_successfully
@@ -221,6 +280,24 @@ services:
     image: ${AUTH_REGISTRY}:${AUTH_VERSION}
     container_name: lab-othala
     restart: unless-stopped
+    # --- Container hardening (P11) ---
+    security_opt:
+      - "no-new-privileges:true"
+    cap_drop:
+      - ALL
+    # Othala binds ports 8080 (public SSR) and 4431 (loopback admin) — both
+    # > 1024. No NET_BIND_SERVICE needed. The Node.js process does not require
+    # any other capability.
+    read_only: true
+    tmpfs:
+      - /tmp
+    # Node.js writes temp files under /tmp (e.g. form upload scratch, V8
+    # snapshot files). The manifests volume is mounted read-only. No other
+    # rootfs paths are written at runtime.
+    # NEEDS-CARMINE-VALIDATION: confirm that the Astro SSR adapter (Node
+    # standalone) does not write to /app or any other non-/tmp rootfs path at
+    # startup (e.g. compiled route caches). If it does, add that path to tmpfs.
+    pids_limit: 512
     depends_on:
       kratos:
         condition: service_healthy
@@ -345,6 +422,31 @@ services:
     container_name: lab-caddy
     profiles: ["browser"]
     restart: unless-stopped
+    # --- Container hardening (P11) ---
+    security_opt:
+      - "no-new-privileges:true"
+    cap_drop:
+      - ALL
+    # This e2e Caddy binds port 80 INSIDE the container (published as 8088 on
+    # the host). Port 80 is < 1024, so the process needs NET_BIND_SERVICE to
+    # bind it without running as root. Caddy's Alpine image drops to a
+    # non-root user after startup; if it doesn't, check the image. Add
+    # NET_BIND_SERVICE conservatively.
+    # NEEDS-CARMINE-VALIDATION: confirm Caddy in caddy:2-alpine uses a
+    # non-root user (UID != 0). If it runs as root, NET_BIND_SERVICE is
+    # redundant (root can bind any port) but harmless. If non-root, it is
+    # required to bind :80.
+    cap_add:
+      - NET_BIND_SERVICE
+    read_only: true
+    tmpfs:
+      # Caddy writes its ACME/cert state and auto-HTTPS data here. In this
+      # e2e context it uses plain HTTP (port 80, no TLS), but Caddy still
+      # writes a data dir at startup.
+      - /data
+      - /config
+      - /tmp
+    pids_limit: 256
     depends_on:
       othala:
         condition: service_healthy

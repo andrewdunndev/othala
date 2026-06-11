@@ -75,6 +75,27 @@ Only the public port is `EXPOSE`d. The admin port stays on loopback
 inside the pod. Both bearer-guarded admin routes are constant-time and
 fail-closed (an unset secret rejects every request).
 
+## Pre-deploy checklist
+
+Run through this list before `make dag-deploy`. Items marked **BLOCKER**
+will cause a failed or degraded deploy if skipped.
+
+- [ ] **BLOCKER** — `caddy-estate` image includes the `caddy-ratelimit`
+  module (`github.com/mholt/caddy-ratelimit`). The production Caddyfile
+  (vendored from `caddy/Caddyfile`) uses the `rate_limit` directive to
+  block email-bombing on Kratos self-service paths. If the module is absent
+  from the Caddy binary, **Caddy fails to start** (config-load error:
+  "unrecognized directive: rate_limit") and the entire dag edge goes down.
+  Verify: `caddy list-modules 2>/dev/null | grep -q rate_limit && echo OK`
+  against the caddy-estate image. If missing, rebuild caddy-estate with
+  `xcaddy build --with github.com/mholt/caddy-ratelimit` or add
+  `_ "github.com/mholt/caddy-ratelimit"` to its custom `main.go`.
+- [ ] sops keys present for all `carmine.dag_*` secrets (`make dag-preflight`).
+- [ ] Registry images reachable and tagged at the pinned version.
+- [ ] SSH connectivity to carmine (`make dag-preflight`).
+
+---
+
 ## Promotion path
 
 There is **no submodule and no symlink**. The deploy repo vendors

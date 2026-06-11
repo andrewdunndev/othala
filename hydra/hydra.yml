@@ -4,7 +4,9 @@
 # Lab compose sets HYDRA_PG_HOST=postgres (compose service name); iac
 # quadlets set HYDRA_PG_HOST=auth-postgres (container name on auth.network).
 
-dsn: postgres://hydra:${HYDRA_PG_PASS}@${HYDRA_PG_HOST}:5432/hydra?sslmode=disable
+dsn: "postgres://hydra:${HYDRA_PG_PASS}@${HYDRA_PG_HOST}:5432/hydra?sslmode=disable"
+# NOTE: the DB password (HYDRA_PG_PASS) must be URL-safe (percent-encoded) —
+# that is a URL constraint; YAML double-quoting cannot fix invalid URL characters.
 
 serve:
   public:
@@ -12,7 +14,7 @@ serve:
     cors:
       enabled: true
       allowed_origins:
-        - ${OTHALA_PUBLIC_URL}
+        - "${OTHALA_PUBLIC_URL}"
       # Trim to the methods OIDC/OAuth2 actually requires; DELETE and PUT
       # have no place on the public token/discovery endpoints.
       allowed_methods: [GET, POST]
@@ -27,12 +29,12 @@ serve:
     # bind it to an address only the admin-plane network can reach.
     # Single-network deployments (the e2e harness) use 0.0.0.0.
     # NEVER expose publicly.
-    host: ${HYDRA_ADMIN_BIND_HOST}
+    host: "${HYDRA_ADMIN_BIND_HOST}"
 
 urls:
   self:
-    issuer: ${OTHALA_PUBLIC_URL}/
-    public: ${OTHALA_PUBLIC_URL}/
+    issuer: "${OTHALA_PUBLIC_URL}/"
+    public: "${OTHALA_PUBLIC_URL}/"
 
   # Topology B (v0.2.0): the entire SSO stack lives on ${OTHALA_PUBLIC_URL}.
   # Hydra redirects OAuth2 challenge flows to ${OTHALA_PUBLIC_URL}/oauth2/{login,
@@ -47,11 +49,11 @@ urls:
   # /oauth2/consent, /oauth2/logout) to dag-portal:8080 before the wider
   # @hydra /oauth2/* wildcard. No stale caddy/snippets/portal.caddy exists;
   # that file was removed when the Go consent service was retired.
-  login: ${OTHALA_PUBLIC_URL}/oauth2/login
-  consent: ${OTHALA_PUBLIC_URL}/oauth2/consent
-  logout: ${OTHALA_PUBLIC_URL}/oauth2/logout
-  error: ${OTHALA_PUBLIC_URL}/auth/error
-  post_logout_redirect: ${OTHALA_PUBLIC_URL}/
+  login: "${OTHALA_PUBLIC_URL}/oauth2/login"
+  consent: "${OTHALA_PUBLIC_URL}/oauth2/consent"
+  logout: "${OTHALA_PUBLIC_URL}/oauth2/logout"
+  error: "${OTHALA_PUBLIC_URL}/auth/error"
+  post_logout_redirect: "${OTHALA_PUBLIC_URL}/"
 
 oidc:
   subject_identifiers:
@@ -59,7 +61,7 @@ oidc:
       - public
     pairwise:
       # Required by config schema even when pairwise is unused
-      salt: ${HYDRA_PAIRWISE_SALT}
+      salt: "${HYDRA_PAIRWISE_SALT}"
 
 ttl:
   access_token: 1h
@@ -108,14 +110,14 @@ secrets:
   # change without rebuilding the database. Rotation procedure in
   # docs/runbooks/secrets-rotation.md.
   system:
-    - ${HYDRA_SYSTEM_SECRET}
+    - "${HYDRA_SYSTEM_SECRET}"
 
   # Single active cookie secret. hydra v26.2.0 enforces uniqueItems; rotate
   # by prepending a distinct entry, restart, then drop the old one once
   # sessions signed under it have expired (mirror of the Kratos shape, one
   # shared runbook: docs/runbooks/cookie-rotation.md).
   cookie:
-    - ${HYDRA_COOKIE_SECRET_CURRENT}
+    - "${HYDRA_COOKIE_SECRET_CURRENT}"
 
 log:
   level: info

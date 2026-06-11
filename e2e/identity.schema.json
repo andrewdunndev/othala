@@ -68,6 +68,9 @@
           "title": "Recovery email",
           "description": "Alternate email for recovery if primary is unreachable",
           "ory.sh/kratos": {
+            "verification": {
+              "via": "email"
+            },
             "recovery": {
               "via": "email"
             }
