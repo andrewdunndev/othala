@@ -118,6 +118,35 @@ test('the window slides — old hits expire', () => {
   assert.equal(rateLimit(key, t0 + 11 * 60 * 1000).allowed, true);
 });
 
+// ── DOS-2: hard cap on Map size ──────────────────────────────────────────────
+
+test('DOS-2: hits Map does not exceed HITS_MAP_MAX under many distinct keys', () => {
+  // Import the internals we need. HITS_MAP_MAX is 10_000 in the source;
+  // we simulate a flood of 11_000 distinct keys with a fake timestamp so
+  // the sweep does not expire any of them.
+  const now = Date.now();
+  // Fill the map past the sweep trigger (> 1000) and past HITS_MAP_MAX.
+  // Each key gets one hit so nothing expires. The cap must fire and clear.
+  for (let i = 0; i < 11_000; i++) {
+    rateLimit(`flood-key-${i}`, now);
+  }
+  // After 11_000 distinct keys the cap should have fired and cleared the map.
+  // We cannot directly inspect `hits` from outside, but we CAN verify that
+  // a previously-blocked key is now allowed again (map was cleared).
+  // Fill key 'flood-key-0' to exhaustion first, then trigger the cap clear.
+  _resetForTests();
+  const key = 'sentinel';
+  for (let i = 0; i < 5; i++) rateLimit(key, now);
+  assert.equal(rateLimit(key, now).allowed, false, 'sentinel should be blocked before clear');
+
+  // Now flood with distinct keys to trigger the cap.
+  for (let i = 0; i < 11_000; i++) {
+    rateLimit(`flood2-${i}`, now);
+  }
+  // After the clear, the sentinel bucket is gone — a fresh call should be allowed.
+  assert.equal(rateLimit(key, now).allowed, true, 'Map cap clear must reset all buckets including sentinel');
+});
+
 // ── parseSmtpUri ─────────────────────────────────────────────────────────────
 
 const { parseSmtpUri, MailerError } = await import('../src/lib/mailer.ts');

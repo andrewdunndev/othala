@@ -90,6 +90,13 @@ export function validateContact(raw: {
 const WINDOW_MS = 10 * 60 * 1000; // 10 minutes
 const MAX_PER_WINDOW = 5; // 5 submissions per key per window
 
+// DOS-2: hard cap on Map size. After the expired-key sweep, if the Map still
+// exceeds this bound, clear it entirely and start fresh. At the contact-form
+// rate (family scale, 5 req/10 min/key) 10_000 entries would require ~50_000
+// submissions in a 10-minute window — that is already an attack. Clearing is
+// safe: it briefly resets all rate-limit state, which is preferable to OOM.
+const HITS_MAP_MAX = 10_000;
+
 const hits = new Map<string, number[]>();
 
 /**
@@ -119,6 +126,11 @@ export function rateLimit(
       const live = ts.filter((t) => t > cutoff);
       if (live.length === 0) hits.delete(k);
       else hits.set(k, live);
+    }
+    // DOS-2: hard cap — if the Map is still over the bound after expiry sweep,
+    // clear it entirely to prevent OOM under a flood of distinct keys.
+    if (hits.size > HITS_MAP_MAX) {
+      hits.clear();
     }
   }
 

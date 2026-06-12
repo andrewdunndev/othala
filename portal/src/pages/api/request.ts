@@ -35,15 +35,17 @@ function json(status: number, body: unknown, headers: Record<string, string> = {
 
 /** Best-effort client key for the rate limiter.
  *
- * With `trustProxy: true` in the node adapter, @astrojs/node resolves
- * ctx.clientAddress from the X-Forwarded-For header that Caddy sets, so this
- * is the actual client IP — not the Caddy container IP shared by all requests.
+ * ctx.clientAddress is authoritative ONLY because Caddy overwrites any
+ * client-supplied X-Forwarded-For with the real socket peer IP before
+ * forwarding to this service (see caddy/Caddyfile and e2e/caddy.Caddyfile,
+ * `header_up X-Forwarded-For {remote_host}`). Without that Caddy-side fix
+ * the leftmost XFF entry is attacker-injectable and a caller could bypass
+ * the rate limit by prepending a fresh fake IP on each request.
  *
- * The XFF-header fallback has been removed: the leftmost XFF entry is
- * attacker-injectable and would let a caller bypass the rate limit by spoofing
- * a fresh IP on every request. With trustProxy configured, ctx.clientAddress
- * is authoritative; when it is unexpectedly absent we fail closed to 'unknown'
- * (a single shared bucket) rather than trusting attacker-controlled input. */
+ * With trustProxy:true (astro.config.mjs) + Caddy overwriting XFF,
+ * @astrojs/node resolves ctx.clientAddress to the real client IP. When it
+ * is unexpectedly absent we fail closed to 'unknown' (a single shared
+ * bucket) rather than trusting attacker-controlled input. */
 function clientKey(ctx: APIContext): string {
   try {
     if (ctx.clientAddress) return ctx.clientAddress;

@@ -169,6 +169,73 @@ with a password containing `"`, ` #`, and `!` round-tripping intact.
 - recovery-gate jsonnet comments corrected to the id-based model; CI gains a
   jsonnet drift-guard job (`lint-jsonnet-hooks`).
 
+## othala second pass (dependency / races / DoS)
+
+A focused second pass over the lenses the first sweep ran shallow.
+
+### DOS-1 — Rate-limit key is X-Forwarded-For-spoofable
+**Severity:** HIGH. **Status:** REMEDIATED (tranche 3).
+The first pass recorded the rate-limit key as authoritative ("XFF fallback
+removed"). It was not: `@astrojs/node` resolves `clientAddress` from the
+leftmost `X-Forwarded-For` entry, and no Caddy config stripped inbound XFF, so
+an attacker prepends a fresh XFF per request and bypasses the `/api/request`
+email-bomb limit. Fixed at the edge: all portal `reverse_proxy` blocks
+(`caddy/Caddyfile`, `e2e/caddy.Caddyfile`) now `header_up X-Forwarded-For
+{remote_host}`, overwriting any client-supplied value with the real socket peer.
+Caveat: if Caddy is ever placed behind another proxy (e.g. Cloudflare), the
+overwrite must move to the outermost edge or use `trusted_proxies`.
+
+### DOS-2 — Rate-limit Map OOM-poisonable (chains with DOS-1)
+**Severity:** MEDIUM. **Status:** REMEDIATED (tranche 3).
+The `hits` Map in `lib/contact.ts` only swept fully-expired keys. Added a hard
+cap (`HITS_MAP_MAX = 10000`): over the bound after the expiry sweep, the map
+clears, bounding memory. With DOS-1 fixed the flood vector is largely closed;
+this is the defense-in-depth backstop.
+
+### DOS-3 — Public SSR POSTs accepted 1 GiB bodies
+**Severity:** MEDIUM. **Status:** REMEDIATED (tranche 3).
+The admin loopback port bounded bodies at 1 MB but the public SSR handler used
+the adapter default of 1 GiB, so every public POST buffered up to 1 GiB before
+validation. Set `bodySizeLimit: 262144` (256 KiB) on the node adapter.
+
+### CRYPTO-1 / CRYPTO-2 — CSRF signing hardening
+**Severity:** LOW. **Status:** REMEDIATED (tranche 3).
+The HMAC body is dot-joined and relied on an unenforced "no field contains a
+dot" invariant; `signToken` now throws if `identityId` or `action` contains a
+`.`. The secret-length gate counted UTF-16 chars; it now counts UTF-8 bytes
+(`Buffer.byteLength >= 32`).
+
+### F1 — nodemailer CRLF advisories
+**Severity:** MODERATE (dependency). **Status:** REMEDIATED (tranche 3).
+`nodemailer` bumped 7.0.13 to ^8.0.11 (GHSA-vvjj-xcjg-gr5g, GHSA-c7w3-x93f-qmm8).
+Runtime `npm audit --omit=dev` now reports 0 vulnerabilities.
+
+### C1 / C3 / C7 — concurrency notes
+**Status:** OPEN / ACCEPTED.
+- C1 (MEDIUM): CSRF single-use is a process-local Map; correctness depends on
+  the single-instance deploy. The intra-process check-and-consume is race-free
+  (synchronous, no await). Documented in `csrf.ts`; a boot guard refusing
+  multi-replica without a shared store would make the assumption load-bearing.
+  OPEN (low priority; single-instance today).
+- C3 (MEDIUM): the manifest/tile mtime cache has a partial-read / mtime-
+  granularity TOCTOU window (up to the 30s TTL). Manifests run pre-swap
+  validation + prior-cache-restore, so a torn file that fails validation cannot
+  poison; the residual is a torn-but-still-valid file with looser constraints.
+  Fix is operator-side: the manifest sync must write atomically (temp + rename).
+  OPEN (doc/operator).
+- C7 (LOW): admin identity update is read-modify-write with no optimistic
+  concurrency; two admins editing the same identity is last-writer-wins. Family
+  scale / single admin makes this near-zero. ACCEPTED.
+
+Positive controls verified: runtime dependency tree healthy (no HIGH/CRITICAL;
+Ory fetch SDK, DOMPurify 3.4.9, marked 18, cookie 1.1.1 all current), lockfiles
+committed with `npm ci`, no committed secrets, `deepMergeClaims` prototype-
+pollution-safe, all user-facing regexes linear (no ReDoS), `revokeSubject`
+deactivate-before-delete ordering correct, login-skip re-verify correct.
+
+Dependency-CI gap: CI generates an SBOM (syft) but never scans it; no `npm
+audit` / CVE gate. This is the othala instance of the estate scanning gap below.
+
 ## kratos-ldap findings (OPEN — first audit, not yet remediated)
 
 ### KL-1 — Empty-password bind has no local guard

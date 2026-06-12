@@ -65,6 +65,39 @@ test('rejects token with tampered signature', () => {
   assert.throws(() => verifyToken(tampered, 'admin-1'), /signature/);
 });
 
+// ── CRYPTO-1: dot invariant enforced at sign time ────────────────────────────
+
+test('CRYPTO-1: signToken throws on dotted identityId', () => {
+  assert.throws(
+    () => signToken('admin.1'),
+    /dot/,
+    'signToken must throw when identityId contains a dot',
+  );
+});
+
+test('CRYPTO-1: signToken throws on dotted action', () => {
+  assert.throws(
+    () => signToken('admin-1', 'issue.recovery'),
+    /dot/,
+    'signToken must throw when action contains a dot',
+  );
+});
+
+test('CRYPTO-1: signToken accepts identityId and action without dots', () => {
+  assert.doesNotThrow(() => signToken('admin-1', 'issue-recovery'));
+});
+
+// ── CRYPTO-2: secret byte-length check ───────────────────────────────────────
+
+test('CRYPTO-2: a 32-ASCII-char secret passes the byte-length gate', () => {
+  // 32 ASCII chars = 32 UTF-8 bytes, must be accepted.
+  process.env.CSRF_SECRET = 'a'.repeat(32);
+  // Importing the module is already done; the secret() fn is lazy — we just need
+  // to call signToken which invokes secret() internally.
+  assert.doesNotThrow(() => signToken('admin-1'));
+  process.env.CSRF_SECRET = 'a'.repeat(64); // restore
+});
+
 // ── FIX-H: action mismatch message does not reflect raw attacker input ────────
 
 test('FIX-H: action mismatch message does not contain raw attacker-controlled characters', () => {

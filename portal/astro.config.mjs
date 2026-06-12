@@ -61,7 +61,9 @@ export default defineConfig({
   // resolves ctx.clientAddress from XFF rather than the raw TCP socket
   // (which is always the Caddy container IP, collapsing all users to one
   // rate-limit bucket).
-  adapter: node({ mode: 'standalone', trustProxy: true }),
+  // DOS-3: default bodySizeLimit is 1 GiB; cap at 256 KiB (262144 bytes) so a
+  // flood of large POST bodies cannot exhaust heap before rate-limiting fires.
+  adapter: node({ mode: 'standalone', trustProxy: true, bodySizeLimit: 262144 }),
   integrations: [],
   // Canonical URL for metadata/sitemaps only (no security weight). Defaults to
   // localhost for a bare/OSS build; operators who care about canonical links

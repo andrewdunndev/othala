@@ -102,7 +102,10 @@
 	# Matched before the app default so they are explicit and auditable.
 	@portal_challenges path /oauth2/login /oauth2/consent /oauth2/logout
 	handle @portal_challenges {
-		reverse_proxy othala:8080
+		# DOS-1: same XFF fix as the default backend — see note below.
+		reverse_proxy othala:8080 {
+			header_up X-Forwarded-For {remote_host}
+		}
 	}
 
 	# Kratos browser endpoints: well-known ceremony scripts, self-service flow
@@ -126,5 +129,14 @@
 	# Default -> the app: portal UI, /auth/* + /admin/* pages, AND static
 	# assets (/_astro/*, favicon.ico, manifest.webmanifest). The app is the
 	# catch-all; routing the default to Kratos mis-serves static assets.
-	reverse_proxy othala:8080
+	#
+	# DOS-1: overwrite any client-supplied X-Forwarded-For with the real
+	# socket peer IP before forwarding to the portal. @astrojs/node resolves
+	# ctx.clientAddress from the LEFTMOST XFF entry; without this, an
+	# attacker can prepend a fresh fake IP on every request and land in a
+	# new rate-limit bucket. header_up replaces the entire incoming header
+	# so only the immediate peer IP reaches the app.
+	reverse_proxy othala:8080 {
+		header_up X-Forwarded-For {remote_host}
+	}
 }
