@@ -5,8 +5,8 @@
 
 # DSN host is env-substituted so the same file lands in both
 # topologies. Lab compose sets KRATOS_PG_HOST=postgres (compose service
-# name); iac quadlets set KRATOS_PG_HOST=auth-postgres (container name
-# on the auth.network). Same applies to KRATOS_ADMIN_HOST and
+# name); iac quadlets set KRATOS_PG_HOST=dag-postgres (container name
+# on the dag-internal network). Same applies to KRATOS_ADMIN_HOST and
 # CONSENT_HOST below.
 dsn: "postgres://kratos:${KRATOS_PG_PASS}@${KRATOS_PG_HOST}:5432/kratos?sslmode=disable"
 # NOTE: the DB password (KRATOS_PG_PASS) must be URL-safe (percent-encoded) —

@@ -2,7 +2,7 @@
 #
 # DSN host is env-substituted so the same file lands in both topologies.
 # Lab compose sets HYDRA_PG_HOST=postgres (compose service name); iac
-# quadlets set HYDRA_PG_HOST=auth-postgres (container name on auth.network).
+# quadlets set HYDRA_PG_HOST=dag-postgres (container name on dag-internal).
 
 dsn: "postgres://hydra:${HYDRA_PG_PASS}@${HYDRA_PG_HOST}:5432/hydra?sslmode=disable"
 # NOTE: the DB password (HYDRA_PG_PASS) must be URL-safe (percent-encoded) —
