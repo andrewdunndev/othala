@@ -67,7 +67,15 @@ ENV NODE_ENV=production \
     HOST=0.0.0.0 \
     PORT=8080 \
     ADMIN_HOST=127.0.0.1 \
-    ADMIN_PORT=4431
+    ADMIN_PORT=4431 \
+    # OpenTelemetry bootstrap (PII-safe; src/server/otel.mjs, copied to
+    # dist/otel.mjs by `npm run copy:otel`). --import runs it BEFORE
+    # listen.mjs so the http instrumentation patches node:http first. The
+    # path is relative to WORKDIR /app, where `dist/` is copied below, and
+    # its bare @opentelemetry/* imports resolve up to /app/node_modules.
+    # No-op unless OTEL_EXPORTER_OTLP_ENDPOINT is set, so this is inert in
+    # any deploy without a collector — the SDK never starts.
+    NODE_OPTIONS="--import ./dist/otel.mjs"
 
 # ci-runtime-node inherits the `default` user (uid 1001) from
 # ubi9/nodejs-22-minimal. COPY as root, then switch to 1001 for
