@@ -17,9 +17,14 @@
 #
 # Semantics (deliberately stricter than os.path.expandvars):
 #   - The variable contract is DERIVED FROM THE TEMPLATE: every ${NAME} token
-#     found in it must be set AND non-empty in the environment, else we fail
-#     fast listing the missing NAMES (names only — never file content, which
-#     after partial substitution could carry secrets into CI logs).
+#     found in it must be SET in the environment, else we fail fast listing the
+#     missing NAMES (names only — never file content, which after partial
+#     substitution could carry secrets into CI logs). An exported-but-EMPTY
+#     value is permitted on purpose: it is a valid intentional signal (e.g.
+#     OTHALA_OTLP_PROVIDER="" disables Ory tracing — the tracer no-ops on an
+#     empty provider). Only a wholly UNSET var is a contract violation. The
+#     empty value is still run through the control-char + escaping guards below,
+#     so an empty string renders as an empty YAML scalar, never a broken one.
 #   - Only braced ${NAME} tokens are substituted. Unbraced $name is left
 #     alone (expandvars would mangle it), and nothing outside the template's
 #     own token set is consulted — no accidental ${HOME}-style pickup from a
@@ -75,9 +80,12 @@ def strip_comments(text):
 
 needed = sorted(set(TOKEN.findall(strip_comments(src))))
 
-missing = [n for n in needed if not os.environ.get(n)]
+# UNSET is the contract violation, not empty. An exported empty value (e.g.
+# OTHALA_OTLP_PROVIDER="") is a deliberate "off" signal and renders as an empty
+# YAML scalar (the control-char + escaping guards below still apply to it).
+missing = [n for n in needed if n not in os.environ]
 if missing:
-    print(f"render-config: {template_path}: missing/empty render variable(s):",
+    print(f"render-config: {template_path}: missing render variable(s):",
           file=sys.stderr)
     for n in missing:
         print(f"  {n}", file=sys.stderr)
