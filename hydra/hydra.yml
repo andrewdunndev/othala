@@ -133,11 +133,13 @@ log:
 #   - OTLP transport is HTTP/protobuf ONLY (collector port 4318, path
 #     /v1/traces) — NOT gRPC (4317). server_url is a bare host:port.
 #   - Ory IGNORES OTEL_* environment variables; it reads only this `tracing:`
-#     block. The ingestion key therefore travels in authorization_header, which
-#     Ory sends verbatim as the HTTP Authorization header to the collector.
-#   - insecure: true = plaintext to the in-network collector. Same accepted-risk
-#     posture as the sslmode=disable DSN above: the hop never leaves the pod
-#     network, so TLS would only protect an already-trusted segment.
+#     block. We emit to the host alloy OTLP receiver (no auth header on this
+#     hop); alloy adds the observe ingest auth, redacts centrally, and forwards
+#     to observe. The emitter therefore carries no ingestion key.
+#   - insecure: true = plaintext to the host alloy receiver. Same accepted-risk
+#     posture as the sslmode=disable DSN above: the hop reaches only the
+#     firewall-scoped host OTLP port, so TLS would only protect an already-
+#     trusted segment.
 #   - sampling_ratio 0.1 = trace 10% of requests (head sampling) to bound volume.
 tracing:
   service_name: hydra
@@ -145,8 +147,7 @@ tracing:
   provider: ${OTHALA_OTLP_PROVIDER}     # "" = disabled (e2e default); "otel" = on (deploy)
   providers:
     otlp:
-      server_url: ${OTHALA_OTLP_ENDPOINT}   # host:port, HTTP — e.g. observe-otelcol:4318
-      insecure: true                         # plaintext to the in-network collector
-      authorization_header: "Bearer ${OTHALA_OTLP_INGEST_TOKEN}"
+      server_url: ${OTHALA_OTLP_ENDPOINT}   # host:port, HTTP — host alloy OTLP receiver
+      insecure: true                         # plaintext to the host alloy receiver
       sampling:
         sampling_ratio: 0.1

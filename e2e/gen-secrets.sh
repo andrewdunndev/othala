@@ -88,15 +88,16 @@ OTHALA_SMTP_FROM_ADDRESS=noreply@othala.test
 
 # ── OpenTelemetry tracing (OFF in e2e) ──────────────────────────────────────
 # render-config.sh fails on ANY unset \${VAR}, so the kratos/hydra `tracing:`
-# blocks need these four set even though tracing is disabled here. OFF-default:
+# blocks need these three set even though tracing is disabled here. OFF-default:
 # OTHALA_OTLP_PROVIDER="" makes Ory ignore the otlp provider entirely (no
 # collector connection, no spans), so the offline VM never reaches for a
-# collector. The endpoint/token/environment are inert placeholders that satisfy
-# the render contract; the deploy plane (iac) overrides all four from sops +
-# inventory with provider="otel" to turn tracing on.
+# collector. The endpoint/environment are inert placeholders that satisfy the
+# render contract; the deploy plane (iac) overrides all three from sops +
+# inventory with provider="otel" to turn tracing on. No ingest token here —
+# the emitters send unauthenticated to the host alloy receiver, which adds the
+# observe ingest auth and redacts centrally on its forward hop.
 OTHALA_OTLP_PROVIDER=""
 OTHALA_OTLP_ENDPOINT=localhost:4318
-OTHALA_OTLP_INGEST_TOKEN=disabled
 OTHALA_OTLP_ENVIRONMENT=lab
 
 # ── Password policy: HIBP off for offline VM, min-length 12 ─────────────────
