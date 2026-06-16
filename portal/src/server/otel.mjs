@@ -57,10 +57,13 @@ const SENSITIVE_HEADER_SUFFIXES = [
   'x-csrf-token',    // http.{request,response}.header.x-csrf-token
 ];
 
-// Span attributes that may hold a URL/target with query parameters. We scrub
-// named-sensitive query params out of each (keeping the key, replacing the
-// value) so a sampled span can't carry an OAuth challenge id or a one-time code.
-const URL_ATTR_KEYS = ['http.url', 'http.target', 'url.full', 'url.query'];
+// Span attributes that may hold a '?'-bearing URL/target. We scrub named-
+// sensitive query params out of each (keeping the key, replacing the value) so
+// a sampled span can't carry an OAuth challenge id or a one-time code. NOTE:
+// `url.query` is handled SEPARATELY (see redactAttributes) — the stable-semconv
+// `url.query` attribute is a BARE query string (no leading '?'), so it goes
+// through scrubQuery directly rather than scrubUrl (which keys off the '?').
+const URL_ATTR_KEYS = ['http.url', 'http.target', 'url.full'];
 
 // Query-param names whose VALUES must be scrubbed. Cookies/codes/challenge ids
 // /flow ids are all sensitive in an IdP request line.
@@ -82,12 +85,36 @@ function isSensitiveHeaderAttr(key) {
 }
 
 /**
- * Scrub sensitive query-param VALUES out of a URL-ish string, keeping each key.
- * Operates on the query portion only; the path is untouched. Tolerant of values
- * that are not full URLs (e.g. a bare "/path?token=…" target) — we split on the
- * first '?' and rewrite the query manually rather than rely on URL parsing,
- * which would throw on a relative target. Returns the (possibly) rewritten
- * string; if there is no query string it is returned unchanged.
+ * Scrub sensitive query-param VALUES out of a BARE query string (no leading
+ * '?', no path, no fragment) — e.g. "token=abc&flow=xyz". Keeps each key,
+ * replacing only the sensitive values. This is the shared primitive used by
+ * both scrubUrl (for the query portion of a '?'-bearing attr) and the bare
+ * `url.query` attribute path. Returns the (possibly) rewritten query string.
+ */
+export function scrubQuery(query) {
+  if (typeof query !== 'string' || query.length === 0) return query;
+  return query
+    .split('&')
+    .map((pair) => {
+      const eq = pair.indexOf('=');
+      if (eq === -1) return pair; // bare flag, no value to scrub
+      const key = pair.slice(0, eq);
+      return SENSITIVE_QUERY_PARAMS.has(key.toLowerCase())
+        ? `${key}=${REDACTED}`
+        : pair;
+    })
+    .join('&');
+}
+
+/**
+ * Scrub sensitive query-param VALUES out of a '?'-bearing URL-ish string,
+ * keeping each key. Operates on the query portion only; the path is untouched.
+ * Tolerant of values that are not full URLs (e.g. a bare "/path?token=…"
+ * target) — we split on the first '?' and rewrite the query manually rather
+ * than rely on URL parsing, which would throw on a relative target. Returns the
+ * (possibly) rewritten string; if there is no query string it is returned
+ * unchanged. The BARE-query case (a query with no leading '?', as carried by
+ * the stable-semconv `url.query` attribute) is handled by scrubQuery directly.
  */
 export function scrubUrl(value) {
   if (typeof value !== 'string' || value.length === 0) return value;
@@ -102,18 +129,7 @@ export function scrubUrl(value) {
     frag = query.slice(h); // includes the '#'
     query = query.slice(0, h);
   }
-  const scrubbed = query
-    .split('&')
-    .map((pair) => {
-      const eq = pair.indexOf('=');
-      if (eq === -1) return pair; // bare flag, no value to scrub
-      const key = pair.slice(0, eq);
-      return SENSITIVE_QUERY_PARAMS.has(key.toLowerCase())
-        ? `${key}=${REDACTED}`
-        : pair;
-    })
-    .join('&');
-  return `${head}?${scrubbed}${frag}`;
+  return `${head}?${scrubQuery(query)}${frag}`;
 }
 
 /** True if a span targets an admin route (/admin/…) we must NOT export. */
@@ -154,6 +170,12 @@ export function redactAttributes(attributes) {
     if (typeof attributes[key] === 'string') {
       attributes[key] = scrubUrl(attributes[key]);
     }
+  }
+  // `url.query` (stable semconv) is a BARE query string — no leading '?', so
+  // scrubUrl's '?'-keyed early-return would pass it through UNSCRUBBED. Scrub
+  // it directly as a bare query (review finding M2).
+  if (typeof attributes['url.query'] === 'string') {
+    attributes['url.query'] = scrubQuery(attributes['url.query']);
   }
   return attributes;
 }
