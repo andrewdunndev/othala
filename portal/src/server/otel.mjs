@@ -15,6 +15,10 @@
 // own `tracing:` block), the Node SDK natively honors the standard OTEL_* env:
 //   OTEL_EXPORTER_OTLP_ENDPOINT   collector base URL (HTTP/protobuf, :4318)
 //   OTEL_EXPORTER_OTLP_HEADERS    e.g. "authorization=Bearer <ingest-token>"
+//   OTLP_INGEST_TOKEN             bare ingestion key; we compose the
+//                                 Authorization header from it (deploy convenience
+//                                 so a podman Secret= can carry just the token).
+//                                 An explicit OTEL_EXPORTER_OTLP_HEADERS wins.
 //   OTEL_SERVICE_NAME             resource service.name (default othala-portal)
 //   OTEL_TRACES_SAMPLER           e.g. parentbased_traceidratio
 //   OTEL_TRACES_SAMPLER_ARG       e.g. 0.1
@@ -207,10 +211,19 @@ export function startTelemetry(env = process.env) {
     // resource — so we don't parse it by hand here, we just name the service.
     const resource = resourceFromAttributes({ [ATTR_SERVICE_NAME]: serviceName });
 
-    // HTTP/protobuf exporter. The SDK reads OTEL_EXPORTER_OTLP_ENDPOINT and
-    // OTEL_EXPORTER_OTLP_HEADERS itself; we pass no URL/headers so there is one
-    // source of truth (the env), matching the Ory-side authorization_header.
-    const traceExporter = new OTLPTraceExporter();
+    // HTTP/protobuf exporter. The SDK reads OTEL_EXPORTER_OTLP_ENDPOINT (and
+    // OTEL_EXPORTER_OTLP_HEADERS, when set) from env. For the ingestion key we
+    // also accept a BARE token via OTLP_INGEST_TOKEN — a clean podman Secret=
+    // delivers just the token, and we compose the `Authorization: Bearer …`
+    // header here (matching the Ory-side authorization_header). An explicit
+    // OTEL_EXPORTER_OTLP_HEADERS takes precedence and disables this composition.
+    const ingestToken = (env.OTLP_INGEST_TOKEN ?? '').trim();
+    const explicitHeaders = (env.OTEL_EXPORTER_OTLP_HEADERS ?? '').trim();
+    const exporterOpts = {};
+    if (ingestToken && ingestToken !== 'disabled' && !explicitHeaders) {
+      exporterOpts.headers = { authorization: `Bearer ${ingestToken}` };
+    }
+    const traceExporter = new OTLPTraceExporter(exporterOpts);
 
     // Batch for efficiency, then wrap in the redactor so EVERY exported span is
     // scrubbed and admin spans are dropped before they leave the process.
