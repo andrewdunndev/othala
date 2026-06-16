@@ -124,3 +124,29 @@ log:
   level: info
   format: json
   leak_sensitive_values: false
+
+# Distributed tracing (OpenTelemetry). OPT-IN and DEFAULT-OFF: the provider is
+# empty unless OTHALA_OTLP_PROVIDER renders to "otel", so the e2e harness (which
+# defaults it to "") stands the stack up with tracing disabled and undisturbed.
+#
+# Ory v26.2.0 specifics that this block is built to:
+#   - OTLP transport is HTTP/protobuf ONLY (collector port 4318, path
+#     /v1/traces) — NOT gRPC (4317). server_url is a bare host:port.
+#   - Ory IGNORES OTEL_* environment variables; it reads only this `tracing:`
+#     block. The ingestion key therefore travels in authorization_header, which
+#     Ory sends verbatim as the HTTP Authorization header to the collector.
+#   - insecure: true = plaintext to the in-network collector. Same accepted-risk
+#     posture as the sslmode=disable DSN above: the hop never leaves the pod
+#     network, so TLS would only protect an already-trusted segment.
+#   - sampling_ratio 0.1 = trace 10% of requests (head sampling) to bound volume.
+tracing:
+  service_name: hydra
+  deployment_environment: ${OTHALA_OTLP_ENVIRONMENT}
+  provider: ${OTHALA_OTLP_PROVIDER}     # "" = disabled (e2e default); "otel" = on (deploy)
+  providers:
+    otlp:
+      server_url: ${OTHALA_OTLP_ENDPOINT}   # host:port, HTTP — e.g. observe-otelcol:4318
+      insecure: true                         # plaintext to the in-network collector
+      authorization_header: "Bearer ${OTHALA_OTLP_INGEST_TOKEN}"
+      sampling:
+        sampling_ratio: 0.1
