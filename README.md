@@ -4,7 +4,7 @@
 
 [![license](https://img.shields.io/badge/license-MIT-green)](LICENSE) ![built with GitLab](https://img.shields.io/badge/built_with-GitLab-FC6D26?logo=gitlab)
 
-Ory for your home. Othala is a self-hosted Ory substrate for a personal estate: the on-prem, family-scale analog to Ory Network. One all-TypeScript application (Astro Node SSR) fronts upstream Ory Kratos (identity) + Hydra (OAuth2/OIDC) + Postgres. For clients that cannot speak OAuth, a companion Go glauth-kratos LDAP bridge is available as a separate sibling project: `gitlab.com/dunn.dev/kratos-ldap`.
+Ory for your home. Othala is a self-hosted Ory substrate for a personal estate: the on-prem, family-scale analog to Ory Network. One all-TypeScript application (Astro Node SSR) fronts upstream Ory Kratos (identity) + Hydra (OAuth2/OIDC) + Postgres. Passkey-first by design — WebAuthn/passkeys are the primary credential; email code and password are fallback paths. For clients that cannot speak OAuth, a companion Go glauth-kratos LDAP bridge is available as a separate sibling project: `gitlab.com/dunn.dev/kratos-ldap`.
 
 The name is the rune ᛟ *othala* (home, inheritance, the estate). Andrew's deployed instance runs on **dag.dunn.dev** (ᛞ *dagaz*, the threshold rune). The login screen renders the motif **ᛞ→ᛟ "door to home"**: through the door (dag), into the home (othala).
 
@@ -75,6 +75,7 @@ npm run build     # astro build + bundle the listener / admin / registrar
 - **Cold-start orientation** (the anchor): [`ARCHITECTURE.md`](ARCHITECTURE.md). What the converged app holds, the load-bearing decisions, topology, and trust boundary.
 - **Release / version state**: [`docs/STATUS.md`](docs/STATUS.md). The only place a deployed version is asserted.
 - **Deploy**: [`DEPLOY.md`](DEPLOY.md).
+- **Network segmentation diagram**: [`docs/diagrams/dag-network-segmentation.svg`](docs/diagrams/dag-network-segmentation.svg). The deployed network topology (Envoy SNI router, SSO pod, app pods, LDAP off-path).
 
 This README asserts no version. It is the front door.
 
@@ -149,7 +150,14 @@ Full topology, request flows, auth patterns, image-pin table, and trust boundary
 
 ## Validation
 
-The Othala app (flows + login/consent + admin) is validated end-to-end through the QEMU-CI smoke harness (`e2e/`). Adversarial security review remediated HIGH + MEDIUM + LOW + architectural findings; fuzz harnesses caught two real bugs before merge (JWK algorithm allowlist). The fail-closed gate, revoke fan-out, and dual-listener boundary carry substantive unit tests. Evidence in `e2e/` (smoke harness) and `docs/security-review-2026-05-04.md`. The LDAP bridge is validated in its own repo (`gitlab.com/dunn.dev/kratos-ldap`).
+The Othala app (flows + login/consent + admin) is validated end-to-end through the QEMU-CI smoke harness (`e2e/`). Adversarial security review remediated HIGH + MEDIUM + LOW + architectural findings across two independent passes; fuzz harnesses caught two real bugs before merge (JWK algorithm allowlist). The fail-closed gate, revoke fan-out, and dual-listener boundary carry substantive unit tests.
+
+Security review artifacts (adversarial, multi-lens):
+
+- [`docs/security-review-2026-05-04.md`](docs/security-review-2026-05-04.md) — initial adversarial pass: consent, admin pages, portal lib, Kratos/Hydra config, Caddy, runbooks.
+- [`docs/security-review-2026-06-07.md`](docs/security-review-2026-06-07.md) — second pass: portal middleware (response headers, font loading), application-layer abuse resistance, lost-device recovery.
+
+The LDAP bridge is validated in its own repo (`gitlab.com/dunn.dev/kratos-ldap`).
 
 ## Working conventions
 
