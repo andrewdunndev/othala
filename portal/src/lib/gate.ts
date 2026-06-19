@@ -58,6 +58,34 @@ export interface GateResult {
 }
 
 /**
+ * Evaluate the access gate for an identity against an ARBITRARY required
+ * group (not derived from a clientId). FAIL-CLOSED: any missing precondition
+ * denies. Used by /api/forward-auth, where the required group arrives as a
+ * query param (e.g. "access-observe") rather than from a client manifest.
+ *
+ * Same two checks as enforceAccessGate, in the same order, with NO
+ * skip_access_check escape hatch (forward_auth has no manifest):
+ *   1. identity present (lookup succeeded) — null denies.
+ *   2. identity.state === "active" — anything else denies.
+ *   3. membership in `group` (metadata_admin.groups) — absent denies.
+ */
+export function enforceGroupGate(
+  identity: Identity | null | undefined,
+  group: string,
+): GateResult {
+  if (!identity) {
+    return { allowed: false, reason: 'identity lookup failed' };
+  }
+  if (identity.state !== 'active') {
+    return { allowed: false, reason: 'identity not active' };
+  }
+  if (!hasGroup(identity, group)) {
+    return { allowed: false, reason: `User is not in ${group} group` };
+  }
+  return { allowed: true };
+}
+
+/**
  * Evaluate the access gate for an identity against a client. FAIL-CLOSED:
  * any missing precondition denies. Mirrors enforceAccessGate in handlers.go,
  * with the state check made explicit (CU1 item 2).
@@ -92,10 +120,8 @@ export function enforceAccessGate(
     return { allowed: true };
   }
 
-  const expected = requiredGroupFor(clientId);
-  if (!hasGroup(identity, expected)) {
-    return { allowed: false, reason: `User is not in ${expected} group` };
-  }
-
-  return { allowed: true };
+  // Identity + state already verified above; the only remaining check is the
+  // access-<clientId> group membership, which enforceGroupGate performs
+  // (it re-runs the identity/state checks idempotently — both already pass here).
+  return enforceGroupGate(identity, requiredGroupFor(clientId));
 }
