@@ -2,15 +2,15 @@
 //
 // Run with: KRATOS_PUBLIC_URL=https://test.example tsx --test scripts/kratos-flows.test.mjs
 //
-// Imports the canonical builders directly. The builders are pure
-// functions over process.env.KRATOS_PUBLIC_URL (resolved on each call),
-// so the test resolves the same base for its expectations.
+// Imports the canonical builders directly. browserFlows now emits
+// SAME-ORIGIN RELATIVE paths (the browser cannot resolve the internal
+// server-side Kratos host), so the expected base is the empty string.
 
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { browserFlows } from '../src/lib/kratos.ts';
 
-const BASE = process.env.KRATOS_PUBLIC_URL ?? 'http://localhost:4433';
+const BASE = ''; // browser-flow initiators are same-origin relative paths
 
 test('login: no opts', () => {
   assert.equal(browserFlows.login(), `${BASE}/self-service/login/browser`);

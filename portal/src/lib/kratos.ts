@@ -156,6 +156,13 @@ export function getVerificationFlow(
 /**
  * URL builders for Kratos browser-flow initiators. Pages redirect to these
  * when no flow ID is present (or the flow is gone).
+ *
+ * These MUST be browser-relative (same-origin), NOT kratosBase(): kratosBase()
+ * is the SERVER-side Kratos URL (e.g. http://dag-kratos:4433 inside the pod),
+ * which the browser cannot resolve. The portal and Kratos's public API are the
+ * same public origin (Caddy routes /self-service/* to Kratos), so a relative
+ * path resolves correctly in the browser regardless of the deployment's
+ * internal hostnames.
  */
 export const browserFlows = {
   login(opts: { aal?: 'aal1' | 'aal2'; refresh?: boolean; returnTo?: string } = {}): string {
@@ -164,23 +171,23 @@ export const browserFlows = {
     if (opts.refresh) p.set('refresh', 'true');
     if (opts.returnTo) p.set('return_to', opts.returnTo);
     const qs = p.toString();
-    return `${kratosBase()}/self-service/login/browser${qs ? `?${qs}` : ''}`;
+    return `/self-service/login/browser${qs ? `?${qs}` : ''}`;
   },
   registration(returnTo?: string): string {
     const qs = returnTo ? `?return_to=${encodeURIComponent(returnTo)}` : '';
-    return `${kratosBase()}/self-service/registration/browser${qs}`;
+    return `/self-service/registration/browser${qs}`;
   },
   settings(returnTo?: string): string {
     const qs = returnTo ? `?return_to=${encodeURIComponent(returnTo)}` : '';
-    return `${kratosBase()}/self-service/settings/browser${qs}`;
+    return `/self-service/settings/browser${qs}`;
   },
   recovery(returnTo?: string): string {
     const qs = returnTo ? `?return_to=${encodeURIComponent(returnTo)}` : '';
-    return `${kratosBase()}/self-service/recovery/browser${qs}`;
+    return `/self-service/recovery/browser${qs}`;
   },
   verification(returnTo?: string): string {
     const qs = returnTo ? `?return_to=${encodeURIComponent(returnTo)}` : '';
-    return `${kratosBase()}/self-service/verification/browser${qs}`;
+    return `/self-service/verification/browser${qs}`;
   },
   logout(returnTo?: string): string {
     // Browser logout endpoint returns 303 to a logout-with-token URL; the
@@ -188,7 +195,7 @@ export const browserFlows = {
     // up the token, then POST it. Astro pages render the form; the JSON
     // version is /self-service/logout/browser.
     const qs = returnTo ? `?return_to=${encodeURIComponent(returnTo)}` : '';
-    return `${kratosBase()}/self-service/logout/browser${qs}`;
+    return `/self-service/logout/browser${qs}`;
   },
 };
 
