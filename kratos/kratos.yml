@@ -53,10 +53,13 @@ selfservice:
     password:
       enabled: true
       config:
-        haveibeenpwned_enabled: "${OTHALA_HIBP_ENABLED}"
+        # Unquoted: kratos v26.2.0 schema types these as bool/int — a quoted
+        # "${VAR}" renders to the string "true"/"12" and fails config validation
+        # (the render is text-substitution, so the source quoting carries through).
+        haveibeenpwned_enabled: ${OTHALA_HIBP_ENABLED}
         max_breaches: 1
         identifier_similarity_check_enabled: true
-        min_password_length: "${OTHALA_PASSWORD_MIN_LENGTH}"
+        min_password_length: ${OTHALA_PASSWORD_MIN_LENGTH}
 
     # Passkeys — the PRIMARY login method. This is Kratos's dedicated `passkey`
     # strategy (discoverable credentials + conditional UI), which gives the
