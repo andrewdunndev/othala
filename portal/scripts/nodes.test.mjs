@@ -151,15 +151,18 @@ test('inputProps: disabled true preserved', () => {
   assert.equal(props.disabled, true);
 });
 
-test('inputProps: onclick preserved (passkey trigger)', () => {
+test('inputProps: raw onclick is stripped (security; pages emit via safeOnclick allowlist)', () => {
+  // inputProps must never pass a raw Kratos onclick string through to the DOM —
+  // that is a CSP/XSS hazard. Trigger buttons are wired through safeOnclick(),
+  // which only emits window.<fn>() for an allowlisted KNOWN_TRIGGERS name.
   const props = inputProps({
     node_type: 'input',
     name: 'webauthn_login',
     type: 'button',
     value: 'sign in with passkey',
-    onclick: 'window.__oryWebAuthnLogin(); return false;',
+    onclick: 'window.oryWebAuthnLogin(); return false;',
   });
-  assert.equal(props.onclick, 'window.__oryWebAuthnLogin(); return false;');
+  assert.equal('onclick' in props, false);
 });
 
 test('inputProps: null value on non-submit → no value field', () => {

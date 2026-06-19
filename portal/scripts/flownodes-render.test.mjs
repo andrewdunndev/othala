@@ -114,7 +114,7 @@ test('passOnclick=true forwards the node onclick onto the button', async () => {
   const nodes = [
     input(
       'passkey',
-      { node_type: 'input', name: 'passkey', type: 'button', value: '', onclick: 'window.__triggerPasskey()' },
+      { node_type: 'input', name: 'passkey', type: 'button', value: '', onclick: 'window.oryWebAuthnLogin()' },
       { label: { text: 'Use passkey' } },
     ),
   ];
@@ -125,14 +125,14 @@ test('passOnclick=true forwards the node onclick onto the button', async () => {
     submitLabel: 'Use passkey',
     passOnclick: true,
   }));
-  assert.match(html, /onclick="window.__triggerPasskey\(\)"/);
+  assert.match(html, /onclick="window.oryWebAuthnLogin\(\)"/);
 });
 
 test('passOnclick=false (default) drops the node onclick', async () => {
   const nodes = [
     input(
       'passkey',
-      { node_type: 'input', name: 'passkey', type: 'button', value: '', onclick: 'window.__triggerPasskey()' },
+      { node_type: 'input', name: 'passkey', type: 'button', value: '', onclick: 'window.oryWebAuthnLogin()' },
       { label: { text: 'Use passkey' } },
     ),
   ];
