@@ -18,46 +18,25 @@ export const prerender = false;
 
 import Layout from '../../../layouts/Layout.astro';
 import { requireAdminSession, createIdentity, getRecoveryLink } from '../../../lib/admin';
-import { loadClientManifests } from '../../../lib/manifests';
-import { IDENTITY_GROUP_ORDER, normalizeGroupOrder } from '../../../lib/access';
 import { signToken, verifyToken, CSRFError } from '../../../lib/csrf';
-import { identityGroups } from '../../../lib/config';
+import { defaultGroup } from '../../../lib/config';
 
 const guard = await requireAdminSession(Astro);
 if (guard instanceof Response) return guard;
 const adminIdentityId = guard.identity?.id ?? '';
-
-const manifests = loadClientManifests();
-// Form labels derive from IDENTITY_GROUP_ORDER which is env-driven via
-// OTHALA_IDENTITY_GROUPS (see $lib/config and access.ts).
-const IDENTITY_GROUPS = [...IDENTITY_GROUP_ORDER];
-const ACCESS_GROUPS = manifests.map((m) => ({
-  group: m.accessGroup,
-  clientId: m.clientId,
-  clientName: m.clientName,
-}));
 
 interface FormState {
   username: string;
   email: string;
   displayName: string;
   recoveryEmail: string;
-  identityGroups: string[];
-  accessGroups: string[];
-  roleOverrides: Record<string, string>;
 }
 
-// Default identity group selection: first non-admin group from env config,
-// or empty if only 'admin' is configured (operator will pick manually).
-const defaultIdentityGroup = identityGroups.find((g) => g !== 'admin');
 const empty: FormState = {
   username: '',
   email: '',
   displayName: '',
   recoveryEmail: '',
-  identityGroups: defaultIdentityGroup ? [defaultIdentityGroup] : [],
-  accessGroups: [],
-  roleOverrides: {},
 };
 
 let form: FormState = empty;
@@ -66,10 +45,6 @@ let success: { recoveryUrl: string; expiresAt: string; username: string } | null
 
 const USERNAME_RE = /^[a-z0-9]+(?:\.[a-z0-9]+)+$/;
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-
-function readGroups(fd: FormData, name: string): string[] {
-  return fd.getAll(name).map((v) => String(v)).filter(Boolean);
-}
 
 if (Astro.request.method === 'POST') {
   const fd = await Astro.request.formData();
@@ -89,22 +64,7 @@ if (Astro.request.method === 'POST') {
     email: String(fd.get('email') ?? '').trim(),
     displayName: String(fd.get('displayName') ?? '').trim(),
     recoveryEmail: String(fd.get('recoveryEmail') ?? '').trim(),
-    identityGroups: readGroups(fd, 'identityGroups'),
-    accessGroups: readGroups(fd, 'accessGroups'),
-    roleOverrides: {},
   };
-
-  const knownClientIds = new Set(manifests.map((m) => m.clientId));
-  for (const m of manifests) {
-    const v = String(fd.get(`role:${m.clientId}`) ?? '').trim();
-    if (v) form.roleOverrides[m.clientId] = v;
-  }
-  // LOW-1: drop any role keys not in the manifest set.
-  for (const clientId of Object.keys(form.roleOverrides)) {
-    if (!knownClientIds.has(clientId)) {
-      delete form.roleOverrides[clientId];
-    }
-  }
 
   if (!USERNAME_RE.test(form.username)) {
     errors.username = 'Use lowercase letters, digits, and dots: first.last';
@@ -113,16 +73,9 @@ if (Astro.request.method === 'POST') {
   if (form.recoveryEmail && !EMAIL_RE.test(form.recoveryEmail)) {
     errors.recoveryEmail = 'Enter a valid recovery email address.';
   }
-  if (form.identityGroups.length === 0) errors.identityGroups = 'Pick at least one identity group.';
 
   if (Object.keys(errors).length === 0) {
     try {
-      // C4: stored order MUST match the canonical order so the consent
-      // service and Effective Access agree on group precedence. The
-      // checkbox UI rendered the boxes in canonical order already, but
-      // a malformed POST or a future drag-reorder would defeat that;
-      // normalize unconditionally.
-      const groups = normalizeGroupOrder([...form.identityGroups, ...form.accessGroups]);
       const created = await createIdentity({
         traits: {
           username: form.username,
@@ -131,8 +84,7 @@ if (Astro.request.method === 'POST') {
           recoveryEmail: form.recoveryEmail || undefined,
         },
         metadataAdmin: {
-          groups,
-          roles: Object.keys(form.roleOverrides).length ? form.roleOverrides : undefined,
+          groups: [defaultGroup],
         },
       });
       const link = await getRecoveryLink(created.id, '24h');
@@ -146,8 +98,6 @@ if (Astro.request.method === 'POST') {
     }
   }
 }
-
-const isAccessSelected = (g: string) => form.accessGroups.includes(g);
 
 // HIGH-1: per-request CSRF token, single-use.
 const csrfToken = signToken(adminIdentityId);
@@ -235,71 +185,10 @@ const csrfToken = signToken(adminIdentityId);
           {errors.recoveryEmail && <span class="field-error">{errors.recoveryEmail}</span>}
         </div>
 
-        <div class="field">
-          <label>Identity groups</label>
-          <div class="checkbox-grid">
-            {IDENTITY_GROUPS.map((g) => (
-              <label>
-                <input
-                  type="checkbox"
-                  name="identityGroups"
-                  value={g}
-                  checked={form.identityGroups.includes(g)}
-                />
-                <span class="mono">{g}</span>
-              </label>
-            ))}
-          </div>
-          {errors.identityGroups && <span class="field-error">{errors.identityGroups}</span>}
-        </div>
-
-        <div class="field">
-          <label>App access (one per app)</label>
-          <div class="checkbox-grid">
-            {ACCESS_GROUPS.map((a) => (
-              <label>
-                <input
-                  type="checkbox"
-                  name="accessGroups"
-                  value={a.group}
-                  checked={form.accessGroups.includes(a.group)}
-                />
-                <span class="mono">{a.clientId}</span>
-                <span class="muted text-xs">{a.clientName}</span>
-              </label>
-            ))}
-          </div>
-        </div>
-
-        <details class="panel">
-          <summary class="mono text-sm">Per-app role overrides</summary>
-          <p class="muted text-xs">
-            Skip a row to use the default role from the app's group_role_map.
-            Only apps the user has access to will resolve a role at consent time.
-          </p>
-          <div class="stack details-content">
-            {manifests.map((m) => (
-              <div class={`role-row${isAccessSelected(m.accessGroup) ? '' : ' role-row-inactive'}`}>
-                <div>
-                  <div class="mono">{m.clientId}</div>
-                  <div class="muted text-xs">{m.clientName}</div>
-                </div>
-                {m.roles.length === 0 ? (
-                  <span class="muted text-xs mono">no roles declared</span>
-                ) : (
-                  <select name={`role:${m.clientId}`}>
-                    <option value="">(default)</option>
-                    {m.roles.map((r) => (
-                      <option value={r.name} selected={form.roleOverrides[m.clientId] === r.name}>
-                        {r.name}{r.description ? `: ${r.description}` : ''}
-                      </option>
-                    ))}
-                  </select>
-                )}
-              </div>
-            ))}
-          </div>
-        </details>
+        <p class="text-sm muted">
+          The new identity is placed in the <span class="mono">{defaultGroup}</span> group automatically.
+          Group membership, app access, and per-app role overrides are assigned after creation via the user's Edit page.
+        </p>
 
         <div class="cta-row">
           <button type="submit" class="button button-primary">
@@ -311,8 +200,3 @@ const csrfToken = signToken(adminIdentityId);
     )}
   </main>
 </Layout>
-
-<style>
-  .details-content { margin-top: var(--space-3); }
-  .role-row-inactive { color: var(--text-muted); }
-</style>
