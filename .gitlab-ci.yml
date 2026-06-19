@@ -149,8 +149,10 @@ lint-identity-schema:
     - if: '$CI_PIPELINE_SOURCE == "push"'
     - if: '$CI_COMMIT_TAG'
   script:
+    # Compare with jq alone — the UBI9 nodejs image ships no diffutils, so
+    # `diff`/`cmp` are absent and `if ! diff …` always took the failure branch.
     - |
-      if ! diff <(jq -S . e2e/identity.schema.json) <(jq -S . kratos/identity.schema.json); then
+      if [ "$(jq -S -c . e2e/identity.schema.json)" != "$(jq -S -c . kratos/identity.schema.json)" ]; then
         echo "ERROR: e2e/identity.schema.json and kratos/identity.schema.json have diverged."
         echo "Reconcile by copying kratos/identity.schema.json to e2e/identity.schema.json"
         echo "and verifying the e2e test fixtures still match the updated schema."
