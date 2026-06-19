@@ -21,7 +21,7 @@
 >   deploy-repo cutover. Their behaviour now lives in the TS app. The custom
 >   back-channel-logout signer was DELETED. Hydra signs natively, no key at
 >   rest.
-> - **Admin authority is the `OTHALA_ADMIN_SUBJECTS` allowlist**, not the
+> - **Admin authority is the `OTHALA_ADMIN_IDS` allowlist**, not the
 >   `admin` group (display-only).
 > - **Secrets are sops + age** (your sops-encrypted secrets store).
 >   Bitwarden is out.

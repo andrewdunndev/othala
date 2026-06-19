@@ -17,7 +17,7 @@
  *         → /admin redirects to /auth/login
  *   G3 — member's real session cookie used to attempt an admin-only route
  *         → session is valid at Kratos (whoami 200) BUT identity is not on
- *           OTHALA_ADMIN_SUBJECTS → /admin redirects to /auth/error?reason=not-admin
+ *           OTHALA_ADMIN_IDS → /admin redirects to /auth/error?reason=not-admin
  *         (This exercises the allowlist gate at portal/src/lib/admin-auth.ts
  *          via requireAdminSession line 72.)
  *
@@ -126,8 +126,8 @@ test('G3 — member real session cannot access /admin (allowlist gate + reason=n
 }) => {
   // bt2@othala.test has a REAL, active Kratos session (Kratos accepts the
   // cookie, whoami returns 200 active:true). But member is not on
-  // OTHALA_ADMIN_SUBJECTS. requireAdminSession (admin.ts line 72):
-  //   if (!isAdminSubject(adminEmail)) redirect('/auth/error?reason=not-admin')
+  // OTHALA_ADMIN_IDS. requireAdminSession (admin.ts):
+  //   if (!isAdminId(session.identity.id)) redirect('/auth/error?reason=not-admin')
   //
   // This is the "valid cookie for wrong identity" case: the session is
   // cryptographically genuine but the identity is not authorized for admin.

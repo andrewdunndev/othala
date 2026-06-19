@@ -65,7 +65,7 @@ if (!challenge) {
       // Session is active and owns the challenge — safe to render.
       clientName = consent.client?.client_name ?? consent.client?.client_id ?? 'Unknown application';
       scopeDescriptions = describeScopeList(consent.requested_scope ?? []);
-      csrfToken = signToken(session.identity.id);
+      csrfToken = signToken(session.identity.id, 'consent');
     }
   } catch {
     fetchError = true;

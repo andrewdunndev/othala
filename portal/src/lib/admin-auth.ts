@@ -1,43 +1,47 @@
-// Admin allowlist — the authoritative admin-access gate (DAG CU3 / B2).
+// Admin allowlist — the authoritative admin-access gate (DAG CU3 / B2, CVP-P1).
 //
-// Admin authority is an explicit env allowlist, NOT group membership.
-// OTHALA_ADMIN_SUBJECTS is a comma-separated list of identity emails
-// (sops-backed in deployment). A subject is an admin iff its email,
-// case-folded and trimmed, appears in that list.
+// Admin authority is an explicit env allowlist keyed on IMMUTABLE identity IDs,
+// NOT group membership and NOT the user-editable email trait. Identity `id` is
+// a Kratos-assigned UUID that is never writable via the self-service profile
+// flow, so it cannot be escalated by editing a trait.
 //
-// This REPLACES every former `metadata_admin.groups.includes('admin')`
-// access/recovery/role gate. The `admin` group is now DISPLAY-ONLY: it
-// still renders in the admin UI's group chips and may drive
-// group_role_map role derivation for individual apps, but NO code path
-// may gate portal-admin access, recovery refusal, or admin authority on
-// it. Self-demote (an admin removing the `admin` group from their own
-// identity) therefore can no longer drop admin authority — the allowlist
-// is the only source of truth, and it lives outside Kratos.
+// OTHALA_ADMIN_IDS is a comma-separated list of Kratos identity UUIDs
+// (sops-backed in deployment). An identity is an admin iff its `id`, trimmed
+// and lowercased, appears in that list. UUIDs are case-insensitive.
 //
-// Bootstrap: OTHALA_ADMIN_SUBJECTS=admin@example.com
+// This REPLACES the former email-based OTHALA_ADMIN_SUBJECTS allowlist. Every
+// former `metadata_admin.groups.includes('admin')` access/recovery/role gate
+// and every email-trait-based gate is gone. The `admin` group is DISPLAY-ONLY:
+// it still renders in the admin UI's group chips and may drive group_role_map
+// role derivation for individual apps, but NO code path may gate portal-admin
+// access, recovery refusal, or admin authority on it. Self-demote (an admin
+// removing the `admin` group from their own identity) therefore can no longer
+// drop admin authority — the ID allowlist is the only source of truth, and it
+// lives outside Kratos.
+//
+// Bootstrap: OTHALA_ADMIN_IDS=<kratos-identity-uuid>
 //
 // Fail-closed: an unset / empty / whitespace-only list yields NO admins.
-// A missing email on the identity yields a non-admin.
+// A missing or empty identity id yields a non-admin.
 
-/** Parse OTHALA_ADMIN_SUBJECTS into a normalized Set of admin emails. */
-export function adminSubjects(): Set<string> {
-  const raw = process.env.OTHALA_ADMIN_SUBJECTS ?? '';
+/** Parse OTHALA_ADMIN_IDS into a normalized Set of admin identity UUIDs. */
+export function adminIds(): Set<string> {
+  const raw = process.env.OTHALA_ADMIN_IDS ?? '';
   const out = new Set<string>();
   for (const part of raw.split(',')) {
-    const email = part.trim().toLowerCase();
-    if (email) out.add(email);
+    const id = part.trim().toLowerCase();
+    if (id) out.add(id);
   }
   return out;
 }
 
 /**
- * Authoritative admin check. Returns true iff `email` (case-folded,
- * trimmed) is present in OTHALA_ADMIN_SUBJECTS. Fail-closed on empty /
- * missing email.
+ * Authoritative admin check. Returns true iff `id` (trimmed, lowercased)
+ * is present in OTHALA_ADMIN_IDS. Fail-closed on empty / missing id.
  */
-export function isAdminSubject(email: string | null | undefined): boolean {
-  if (!email) return false;
-  const normalized = email.trim().toLowerCase();
+export function isAdminId(id: string | null | undefined): boolean {
+  if (!id) return false;
+  const normalized = id.trim().toLowerCase();
   if (!normalized) return false;
-  return adminSubjects().has(normalized);
+  return adminIds().has(normalized);
 }

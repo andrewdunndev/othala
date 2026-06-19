@@ -58,7 +58,7 @@ small-user-count case.
   (`portal/src/server/listen.mjs`, `portal/src/lib/admin-port.*`).
 
 Admin authority is a single allowlist: the email addresses in
-`OTHALA_ADMIN_SUBJECTS` are the only admins. Identity-group membership shown in
+`OTHALA_ADMIN_IDS` are the only admins. Identity-group membership shown in
 the admin UI is display metadata, not an authority gate.
 
 ---
@@ -191,7 +191,7 @@ a warning.
 | --- | --- |
 | `OTHALA_PUBLIC_URL` | Public FQDN / OIDC issuer (no trailing slash). Required in prod. |
 | `OTHALA_APEX` | Registrable parent domain — drives cookie domain and WebAuthn `rp.id`. |
-| `OTHALA_ADMIN_SUBJECTS` | Email allowlist; the **sole** admin authorization. |
+| `OTHALA_ADMIN_IDS` | Comma-separated Kratos identity UUIDs; the **sole** admin authorization (CVP-P1). |
 | `OTHALA_SITE_NAME` | Brand name in titles/headers. |
 | `OTHALA_INSTANCE_NAME` | TOTP issuer / WebAuthn display / SMTP From label. |
 | `OTHALA_ADMIN_CONTACT` | Contact hint shown to locked-out users. |
@@ -200,7 +200,7 @@ a warning.
 | `OTHALA_WEBAUTHN_RP_ID`, `OTHALA_WEBAUTHN_RP_ORIGINS` | WebAuthn relying-party config. |
 | `OTHALA_SMTP_FROM_ADDRESS` | From address for Kratos courier mail **and** the portal contact form. |
 | `OTHALA_SMTP_CONNECTION_URI` | SMTP relay URI (`smtps://user:pass@host:465`). **Single source** shared by `kratos.yml` courier and the portal contact-form mailer (`lib/mailer.ts`). Required in prod. |
-| `OTHALA_CONTACT_RECIPIENT` | Where the dashboard request form delivers. Falls back to the first `OTHALA_ADMIN_SUBJECTS` entry. |
+| `OTHALA_CONTACT_RECIPIENT` | Where the dashboard request form delivers. Required in production (no fallback; `OTHALA_ADMIN_IDS` stores UUIDs, not addresses). |
 | `OTHALA_PASSWORD_MIN_LENGTH`, `OTHALA_HIBP_ENABLED` | Password policy knobs. |
 | `KRATOS_ADMIN_BIND_HOST`, `HYDRA_ADMIN_BIND_HOST` | Admin-API bind addresses (render vars, not portal config). `0.0.0.0` single-network (e2e); segmented deployments bind the admin-plane network IP. |
 

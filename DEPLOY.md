@@ -75,6 +75,27 @@ Only the public port is `EXPOSE`d. The admin port stays on loopback
 inside the pod. Both bearer-guarded admin routes are constant-time and
 fail-closed (an unset secret rejects every request).
 
+## Pre-deploy checklist
+
+Run through this list before `make dag-deploy`. Items marked **BLOCKER**
+will cause a failed or degraded deploy if skipped.
+
+- [ ] **BLOCKER** — `caddy-estate` image includes the `caddy-ratelimit`
+  module (`github.com/mholt/caddy-ratelimit`). The production Caddyfile
+  (vendored from `caddy/Caddyfile`) uses the `rate_limit` directive to
+  block email-bombing on Kratos self-service paths. If the module is absent
+  from the Caddy binary, **Caddy fails to start** (config-load error:
+  "unrecognized directive: rate_limit") and the entire dag edge goes down.
+  Verify: `caddy list-modules 2>/dev/null | grep -q rate_limit && echo OK`
+  against the caddy-estate image. If missing, rebuild caddy-estate with
+  `xcaddy build --with github.com/mholt/caddy-ratelimit` or add
+  `_ "github.com/mholt/caddy-ratelimit"` to its custom `main.go`.
+- [ ] sops keys present for all `carmine.dag_*` secrets (`make dag-preflight`).
+- [ ] Registry images reachable and tagged at the pinned version.
+- [ ] SSH connectivity to carmine (`make dag-preflight`).
+
+---
+
 ## Promotion path
 
 There is **no submodule and no symlink**. The deploy repo vendors
@@ -128,7 +149,7 @@ plane maps each `dag_*` key to the env target below:
 
 | Env target | Guards / used by |
 |---|---|
-| `OTHALA_ADMIN_SUBJECTS` | The **sole admin authz**: an allowlist of admin emails. Checked at `requireAdminSession`, the recovery-gate, and the `/admin/*` page gates. The `admin` group is display-only. |
+| `OTHALA_ADMIN_IDS` | The **sole admin authz**: an allowlist of admin identity UUIDs (immutable Kratos identity IDs). Checked at `requireAdminSession`, the recovery-gate, and the `/admin/*` page gates. The `admin` group is display-only. |
 | `OTHALA_ADMIN_ENDPOINT_BEARER` | `POST /admin/revoke-user` on the loopback admin port. Constant-time, fail-closed. |
 | `RECOVERY_GATE_SECRET` | `POST /admin/recovery-gate` (the Kratos recovery-hook). Constant-time, fail-closed. |
 | `LDAP_BRIDGE_ADMIN_URL` / `LDAP_BRIDGE_ADMIN_TOKEN` | Best-effort LDAP bind-cache flush in the revoke fan-out. |
@@ -175,7 +196,7 @@ deploy:
   `After=` / `Requires=dag-consent` and its `CONSENT_ADMIN_BEARER` /
   consent-URL wiring.
 - Wire the dual-listener admin port (`ADMIN_PORT=4431` on loopback) and
-  the new admin env targets (`OTHALA_ADMIN_SUBJECTS`,
+  the new admin env targets (`OTHALA_ADMIN_IDS`,
   `OTHALA_ADMIN_ENDPOINT_BEARER`, `RECOVERY_GATE_SECRET`) into the
   `dag-portal` quadlet.
 - **Repoint the Kratos recovery-hook** from the old consent service to

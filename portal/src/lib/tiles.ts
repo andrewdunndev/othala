@@ -282,6 +282,33 @@ function loadFromDisk(): AppTile[] {
   return tiles.sort((a, b) => a.order - b.order || a.name.localeCompare(b.name));
 }
 
+/**
+ * Sanitize a tile/app URL for use in an anchor href.
+ *
+ * Only http: and https: absolute URLs and root-relative paths (starting with '/')
+ * are allowed. Any other scheme (javascript:, data:, vbscript:, blob:, …) returns
+ * '#' so a poisoned operator manifest cannot produce a click-to-execute link.
+ *
+ * @param url   The raw URL string from the manifest.
+ * @param base  Optional base URL for resolving relative paths (defaults to
+ *              'https://localhost' — only the protocol of the resolved URL is
+ *              inspected, not the host, so any dummy base works).
+ */
+export function safeHref(url: string, base = 'https://localhost'): string {
+  if (!url) return '#';
+  // Root-relative paths are always safe (no scheme to exploit).
+  if (url.startsWith('/')) return url;
+  try {
+    const resolved = new URL(url, base);
+    if (resolved.protocol === 'http:' || resolved.protocol === 'https:') {
+      return url;
+    }
+  } catch {
+    // Unparseable URL — fall through to '#'.
+  }
+  return '#';
+}
+
 /** All cached tiles (including disabled), sorted by order then name. 30s cache + mtime-invalidated. */
 function allTiles(): AppTile[] {
   const now = Date.now();

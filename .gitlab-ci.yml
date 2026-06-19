@@ -159,6 +159,81 @@ lint-identity-schema:
       echo "OK: identity schemas are in sync."
 
 # -----------------------------------------------------------------
+# lint-jsonnet-hooks: webhook jsonnet drift + existence guard.
+#
+# The Kratos recovery-gate and login-gate webhooks are defined in
+# kratos/hooks/. The e2e harness mounts those files DIRECTLY into the
+# kratos container (../kratos/hooks/*.jsonnet — see e2e/compose.yml).
+# There is NO separate e2e copy of login-gate.jsonnet; the sole
+# separate copy is e2e/recovery-gate.jsonnet (a structural mirror kept
+# for the e2e harness's own reference).
+#
+# This job does two things:
+#   1. Diffs e2e/recovery-gate.jsonnet vs kratos/hooks/recovery-gate.jsonnet
+#      (byte-for-byte after stripping comments), failing on any divergence
+#      so the lab copy cannot silently drift from the production hook.
+#      Comments are stripped with a node one-liner (no jsonnet binary
+#      needed; the image ships nodejs-22). The diff compares the function
+#      body only — comment updates are intentionally allowed without
+#      triggering a false alarm, so we normalize by removing // lines.
+#   2. Asserts that both kratos/hooks/recovery-gate.jsonnet and
+#      kratos/hooks/login-gate.jsonnet exist and are non-empty, so a
+#      rename or deletion cannot silently remove the gate.
+#
+# Runs in the same UBI9 nodejs-22 image as lint-identity-schema (matching
+# its toolchain: node available, jq may be absent). No jsonnet binary
+# required — existence + comment-stripped diff is enough for the invariant.
+# -----------------------------------------------------------------
+lint-jsonnet-hooks:
+  stage: verify
+  image: registry.access.redhat.com/ubi9/nodejs-22:9.8
+  rules:
+    - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
+    - if: '$CI_PIPELINE_SOURCE == "push"'
+    - if: '$CI_COMMIT_TAG'
+  script:
+    - |
+      # 1. Assert both gate files exist and are non-empty.
+      for f in kratos/hooks/recovery-gate.jsonnet kratos/hooks/login-gate.jsonnet; do
+        if [ ! -s "$f" ]; then
+          echo "ERROR: $f missing or empty — gate webhook file must exist."
+          exit 1
+        fi
+        echo "OK: $f exists and is non-empty."
+      done
+
+      # 2. Diff e2e/recovery-gate.jsonnet vs kratos/hooks/recovery-gate.jsonnet.
+      # Strip single-line comments (// ...) before diffing so comment-only
+      # changes in the header don't trigger a false alarm. The function body
+      # (the actual payload shape) must be identical between the two copies.
+      strip_comments() {
+        node -e "
+          const fs = require('fs');
+          const txt = fs.readFileSync(process.argv[1], 'utf8');
+          // Remove // comment lines and blank lines, then trim whitespace.
+          const stripped = txt
+            .split('\n')
+            .filter(l => !l.trim().startsWith('//') && l.trim() !== '')
+            .join('\n');
+          process.stdout.write(stripped);
+        " "$1"
+      }
+
+      A=$(strip_comments e2e/recovery-gate.jsonnet)
+      B=$(strip_comments kratos/hooks/recovery-gate.jsonnet)
+
+      if [ "$A" != "$B" ]; then
+        echo "ERROR: e2e/recovery-gate.jsonnet and kratos/hooks/recovery-gate.jsonnet have diverged."
+        echo "--- e2e/recovery-gate.jsonnet (stripped) ---"
+        echo "$A"
+        echo "--- kratos/hooks/recovery-gate.jsonnet (stripped) ---"
+        echo "$B"
+        echo "Reconcile by updating e2e/recovery-gate.jsonnet to match the production hook body."
+        exit 1
+      fi
+      echo "OK: recovery-gate.jsonnet function bodies are in sync."
+
+# -----------------------------------------------------------------
 # test-portal: v0.2.0 portal test suite. Runs `npm test` which
 # invokes node --test against scripts/*.test.mjs. Covers:
 #   - manifests-loader.test.mjs (YAML namespace split + parsing)

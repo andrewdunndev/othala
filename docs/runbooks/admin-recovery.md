@@ -57,18 +57,20 @@ fallback.
 
 ## 2. How admin authority works
 
-Admin status is controlled by the `OTHALA_ADMIN_SUBJECTS` environment
-variable — a comma-separated list of email addresses. This list lives in sops
-outside Kratos. To be an admin, your email must be in that list.
+Admin status is controlled by the `OTHALA_ADMIN_IDS` environment
+variable — a comma-separated list of Kratos identity UUIDs (the immutable
+`id` field from `kratos identity list`). This list lives in sops outside
+Kratos. To be an admin, your identity UUID must be in that list.
 
 This is intentional: an attacker who gains access to the Kratos database or
-the portal cannot elevate themselves to admin by editing their own identity.
-The list is the only source of truth.
+the portal cannot elevate themselves to admin by editing their own identity
+(e.g. changing their email or group membership). The UUID is immutable;
+the list is the only source of truth.
 
-For dual-admin setup (recommended), both emails go in the list:
+For dual-admin setup (recommended), both identity UUIDs go in the list:
 
 ```
-OTHALA_ADMIN_SUBJECTS=operator@example.com,spouse@example.com
+OTHALA_ADMIN_IDS=xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx,yyyyyyyy-yyyy-yyyy-yyyy-yyyyyyyyyyyy
 ```
 
 ---
@@ -86,7 +88,7 @@ account on the system.
 Technically, the recovery-gate webhook (`kratos/hooks/recovery-gate.jsonnet`
 + the gate handler in the portal) intercepts every recovery attempt before
 Kratos issues a privileged session. If the identity's email is on the
-`OTHALA_ADMIN_SUBJECTS` list, the gate returns HTTP 403 and the recovery
+`OTHALA_ADMIN_IDS` list, the gate returns HTTP 403 and the recovery
 stops. This fires even if someone requests a recovery code and types it in
 correctly — the gate blocks the session promotion step regardless.
 
@@ -131,14 +133,14 @@ re-enrolling.
 ### Step C: The other admin recovers you (dual-admin — the primary break-glass)
 
 This is the recommended path when the dual-admin model is active (both
-operator and spouse on `OTHALA_ADMIN_SUBJECTS`).
+operator and spouse on `OTHALA_ADMIN_IDS`).
 
 **Who does this:** the admin who still has working auth.
 
 **Why it works:** the HIGH-3 guard in the portal UI blocks issuing a recovery
 link for admin targets through the normal "Issue enrollment URL" button. That
 button checks `shouldRefuseRecovery` (in `portal/src/lib/access.ts`), which
-calls `isAdminSubject`. If the target is an admin, it refuses.
+calls `isAdminId`. If the target is an admin, it refuses.
 
 The console path (Step D) bypasses this restriction because it calls the
 Kratos admin API directly, not the portal. The portal guard exists to prevent
@@ -286,7 +288,7 @@ break-glass that can also be abused. Get Kratos running and use Step D.
 ## 5. The dual-admin model (recommended)
 
 The safest single-family configuration is two admins: the operator and the
-spouse. Both emails on `OTHALA_ADMIN_SUBJECTS`.
+spouse. Both identity UUIDs on `OTHALA_ADMIN_IDS`.
 
 What this gives you:
 
@@ -299,9 +301,9 @@ What this gives you:
 To add the spouse as an admin:
 
 1. Create an Othala identity for the spouse (Admin → Users → New, or use the
-   enrollment URL flow).
-2. Edit `pyinfra/secrets.enc.yaml` and add the spouse's email to the
-   `OTHALA_ADMIN_SUBJECTS` value.
+   enrollment URL flow), then note its UUID from `kratos identity list`.
+2. Edit `pyinfra/secrets.enc.yaml` and add the spouse's identity UUID to the
+   `OTHALA_ADMIN_IDS` value.
 3. Re-provision and restart the portal: `make dag-secrets HOST=carmine &&
    make dag-deploy HOST=carmine`.
 4. Have the spouse sign in and verify they reach the admin dashboard.
@@ -370,7 +372,7 @@ recovery to confirm the gate still allows it.
 - `kratos/kratos.yml` — `selfservice.flows.recovery.after.hooks` (the
   gate wire-up and `can_interrupt: true`).
 - `kratos/hooks/recovery-gate.jsonnet` — what the gate sends to the portal.
-- `portal/src/lib/admin-auth.ts` (`isAdminSubject`) — the admin-allowlist
+- `portal/src/lib/admin-auth.ts` (`isAdminId`) — the admin-allowlist
   predicate.
 - `portal/src/lib/access.ts` (`shouldRefuseRecovery`) — HIGH-3 guard that
   blocks portal-UI admin-to-admin recovery.

@@ -120,15 +120,22 @@ LDAP_BASE_DN=dc=othala,dc=test
 LDAP_SERVICE_BIND_DN=cn=ldap-reader,dc=othala,dc=test
 LDAP_SERVICE_BIND_PASSWORD=$(gen_short)
 
-# Converged app admin model (CU3). consent is gone; these are the
+# Converged app admin model (CU3 / CVP-P1). consent is gone; these are the
 # othala app's own secrets:
-#   OTHALA_ADMIN_SUBJECTS         the SOLE admin authority — a comma-
-#                                 separated email allowlist. The smoke
-#                                 seeds a known admin email to exercise
-#                                 the recovery-gate refuse path.
+#   OTHALA_ADMIN_IDS              the SOLE admin authority — a comma-separated
+#                                 list of Kratos identity UUIDs. The e2e fixtures
+#                                 seed identities with these EXACT UUIDs (via the
+#                                 createIdentity `id` field) to exercise the admin
+#                                 gate, recovery-gate, and login-gate refuse paths:
+#                                   ...0001 = `admin` fixture (admin@othala.test)
+#                                   ...0002 = J2 recovery-gate test identity
+#                                 PLACEHOLDER for real deployments: replace with the
+#                                 real admin identity UUID(s) from `kratos identity
+#                                 list` after first boot.
 #   OTHALA_ADMIN_ENDPOINT_BEARER  guards POST /admin/revoke-user (loopback)
 #   RECOVERY_GATE_SECRET          guards POST /admin/recovery-gate (loopback)
-OTHALA_ADMIN_SUBJECTS=admin@othala.test
+#                                 and POST /admin/login-gate (loopback; CVP-P3)
+OTHALA_ADMIN_IDS=00000000-0000-0000-0000-000000000001,00000000-0000-0000-0000-000000000002
 OTHALA_ADMIN_ENDPOINT_BEARER=$(gen)
 RECOVERY_GATE_SECRET=$(gen)
 

@@ -5,19 +5,21 @@
 
 # DSN host is env-substituted so the same file lands in both
 # topologies. Lab compose sets KRATOS_PG_HOST=postgres (compose service
-# name); iac quadlets set KRATOS_PG_HOST=auth-postgres (container name
-# on the auth.network). Same applies to KRATOS_ADMIN_HOST and
+# name); iac quadlets set KRATOS_PG_HOST=dag-postgres (container name
+# on the dag-internal network). Same applies to KRATOS_ADMIN_HOST and
 # CONSENT_HOST below.
-dsn: postgres://kratos:${KRATOS_PG_PASS}@${KRATOS_PG_HOST}:5432/kratos?sslmode=disable
+dsn: "postgres://kratos:${KRATOS_PG_PASS}@${KRATOS_PG_HOST}:5432/kratos?sslmode=disable"
+# NOTE: the DB password (KRATOS_PG_PASS) must be URL-safe (percent-encoded) —
+# that is a URL constraint; YAML double-quoting cannot fix invalid URL characters.
 
 serve:
   public:
-    base_url: ${OTHALA_PUBLIC_URL}/
+    base_url: "${OTHALA_PUBLIC_URL}/"
     port: 4433
     cors:
       enabled: true
       allowed_origins:
-        - ${OTHALA_PUBLIC_URL}
+        - "${OTHALA_PUBLIC_URL}"
       allowed_methods: [GET, POST, PUT, PATCH, DELETE]
       allowed_headers:
         - Authorization
@@ -30,12 +32,12 @@ serve:
       max_age: 0
 
   admin:
-    base_url: http://${KRATOS_ADMIN_HOST}:4434/
+    base_url: "http://${KRATOS_ADMIN_HOST}:4434/"
     # Admin-plane bind address. The admin API is unauthenticated by design
     # (Ory's model: the network IS the control), so segmented deployments
     # bind it to an address only the admin-plane network can reach.
     # Single-network deployments (the e2e harness) use 0.0.0.0.
-    host: ${KRATOS_ADMIN_BIND_HOST}
+    host: "${KRATOS_ADMIN_BIND_HOST}"
     port: 4434
 
 selfservice:
@@ -43,18 +45,18 @@ selfservice:
   # uses a prefix match; without the slash, ${OTHALA_PUBLIC_URL} would
   # accept a prefixed evil cousin host. Every entry MUST end in `/` (or
   # a deeper path).
-  default_browser_return_url: ${OTHALA_PUBLIC_URL}/
+  default_browser_return_url: "${OTHALA_PUBLIC_URL}/"
   allowed_return_urls:
-    - ${OTHALA_PUBLIC_URL}/
+    - "${OTHALA_PUBLIC_URL}/"
 
   methods:
     password:
       enabled: true
       config:
-        haveibeenpwned_enabled: ${OTHALA_HIBP_ENABLED}
+        haveibeenpwned_enabled: "${OTHALA_HIBP_ENABLED}"
         max_breaches: 1
         identifier_similarity_check_enabled: true
-        min_password_length: ${OTHALA_PASSWORD_MIN_LENGTH}
+        min_password_length: "${OTHALA_PASSWORD_MIN_LENGTH}"
 
     # Passkeys — the PRIMARY login method. This is Kratos's dedicated `passkey`
     # strategy (discoverable credentials + conditional UI), which gives the
@@ -69,10 +71,10 @@ selfservice:
           # CRITICAL one-way decision: registrable parent so passkeys are
           # assertable from any *.dunn.dev origin. Changing this id invalidates
           # every enrolled passkey. (Shared with the webauthn RP below.)
-          id: ${OTHALA_WEBAUTHN_RP_ID}
-          display_name: ${OTHALA_INSTANCE_NAME}
+          id: "${OTHALA_WEBAUTHN_RP_ID}"
+          display_name: "${OTHALA_INSTANCE_NAME}"
           origins:
-            - ${OTHALA_WEBAUTHN_RP_ORIGINS}
+            - "${OTHALA_WEBAUTHN_RP_ORIGINS}"
 
     # WebAuthn (legacy strategy) — DEMOTED to a second-factor / hardware-
     # security-key option only (passwordless: false). Passkeys (above) own the
@@ -84,15 +86,15 @@ selfservice:
       config:
         passwordless: false
         rp:
-          id: ${OTHALA_WEBAUTHN_RP_ID}
-          display_name: ${OTHALA_INSTANCE_NAME}
+          id: "${OTHALA_WEBAUTHN_RP_ID}"
+          display_name: "${OTHALA_INSTANCE_NAME}"
           origins:
-            - ${OTHALA_WEBAUTHN_RP_ORIGINS}
+            - "${OTHALA_WEBAUTHN_RP_ORIGINS}"
 
     totp:
       enabled: true
       config:
-        issuer: ${OTHALA_INSTANCE_NAME}
+        issuer: "${OTHALA_INSTANCE_NAME}"
 
     # Code strategy: used for recovery AND as a first-class passwordless login
     # method (email OTP). passwordless_enabled: true makes it available on the
@@ -100,9 +102,22 @@ selfservice:
     # one-time code to sign in. This is the promoted second-tier fallback;
     # it does not weaken security — the code is single-use and expires with
     # the flow lifespan (10m above).
+    #
+    # max_submissions: 5 — after 5 wrong attempts Kratos invalidates the flow,
+    # bounding brute-force of the 6-digit code (10^6 space; 5 attempts = 0.0005%
+    # coverage before lockout). lifespan: 15m — code is valid for 15 minutes;
+    # after expiry the flow must be restarted, which forces a new code.
+    # VALIDATION CAVEAT: `lifespan` under selfservice.methods.code.config is
+    # the per-method code validity window (distinct from the flow lifespan set
+    # at flows.login.lifespan). Confirm both keys against a running Kratos
+    # v26.2.0 instance before promoting to production — schema may reject
+    # `lifespan` here if it was moved/renamed in v1.x.
     code:
       enabled: true
       passwordless_enabled: true
+      config:
+        max_submissions: 5
+        lifespan: 15m
 
     # We don't use these but enable explicitly to document the choice
     profile:
@@ -117,13 +132,20 @@ selfservice:
 
   flows:
     error:
-      ui_url: ${OTHALA_PUBLIC_URL}/auth/error
+      ui_url: "${OTHALA_PUBLIC_URL}/auth/error"
 
     settings:
-      ui_url: ${OTHALA_PUBLIC_URL}/auth/settings
+      ui_url: "${OTHALA_PUBLIC_URL}/auth/settings"
       privileged_session_max_age: 15m
-      # AAL not enforced here globally; admin UI does AAL2 step-up at SSR layer
-      required_aal: aal1
+      # CVP-P2: require the highest available AAL before allowing credential
+      # changes. Users with an enrolled AAL2 factor (passkey, TOTP, hardware
+      # key) must step up before modifying passwords, passkeys, or MFA seeds.
+      # Password-only and passkey-only (AAL1-only) users are unaffected —
+      # highest_available resolves to aal1 for them. First-passkey enrollment
+      # is NOT blocked: enrollment is a settings action that requires only aal1
+      # when aal1 is the highest available. This does NOT affect session.whoami
+      # (see below) which must stay aal1 for the LDAP bridge.
+      required_aal: highest_available
       after:
         password:
           hooks:
@@ -147,7 +169,7 @@ selfservice:
     recovery:
       enabled: true
       use: code
-      ui_url: ${OTHALA_PUBLIC_URL}/auth/recovery
+      ui_url: "${OTHALA_PUBLIC_URL}/auth/recovery"
       lifespan: 1h
       notify_unknown_recipients: false
       # H1 / D3: admin email-recovery is disabled at the application
@@ -176,7 +198,7 @@ selfservice:
               # reading the body. Fails closed on missing/wrong secret.
               # 4431 = portal code default (listen.mjs:40) + deployed
               # quadlet; single admin-port convention across envs.
-              url: http://${CONSENT_HOST}:4431/admin/recovery-gate
+              url: "http://${CONSENT_HOST}:4431/admin/recovery-gate"
               method: POST
               auth:
                 # Kratos webhooks support only api_key | basic_auth (NO `bearer`
@@ -198,27 +220,57 @@ selfservice:
     verification:
       enabled: true
       use: code
-      ui_url: ${OTHALA_PUBLIC_URL}/auth/verification
+      ui_url: "${OTHALA_PUBLIC_URL}/auth/verification"
       lifespan: 1h
       after:
-        default_browser_return_url: ${OTHALA_PUBLIC_URL}/
+        default_browser_return_url: "${OTHALA_PUBLIC_URL}/"
 
     logout:
       after:
-        default_browser_return_url: ${OTHALA_PUBLIC_URL}/
+        default_browser_return_url: "${OTHALA_PUBLIC_URL}/"
 
     login:
-      ui_url: ${OTHALA_PUBLIC_URL}/auth/login
+      ui_url: "${OTHALA_PUBLIC_URL}/auth/login"
       lifespan: 10m
       # aal1 base — the v26.2.0 login flow takes NO `required_aal` property
       # (it's a `settings`/`session` knob, not a login-flow one). AAL2 step-up
       # is requested per-flow via ?aal=aal2 by the admin SSR pages
       # (requireAdminSession), never enforced globally here.
+      #
+      # CVP-P3: gate fires ONLY on the email-code login method (after.code),
+      # interrupting login for admin identities (forces passkey/console). Other
+      # login methods (passkey/password/webauthn) are unaffected. Reuses
+      # RECOVERY_GATE_SECRET — same Kratos→portal admin-port trust domain, no
+      # new secret. can_interrupt: true lets Kratos surface the 403 body to the
+      # user as a flow error rather than treating it as a webhook failure.
+      # NOTE: the `after.code` hook path needs live Kratos v26.2.0 validation
+      # to confirm the exact schema key for code-method after-hooks on the login
+      # flow. The recovery flow uses a flat `after.hooks` (no method sub-key),
+      # but login after-hooks support per-method nesting per Ory docs — verify
+      # against a running Kratos instance before promoting to production.
+      after:
+        code:
+          hooks:
+            - hook: web_hook
+              config:
+                url: "http://${CONSENT_HOST}:4431/admin/login-gate"
+                method: POST
+                auth:
+                  type: api_key
+                  config:
+                    in: header
+                    name: Authorization
+                    value: "Bearer ${RECOVERY_GATE_SECRET}"
+                response:
+                  ignore: false
+                  parse: false
+                body: file:///etc/config/kratos/hooks/login-gate.jsonnet
+                can_interrupt: true
 
     registration:
       # Admin-driven onboarding (one-time enrollment URLs); no self-service signup
       enabled: false
-      ui_url: ${OTHALA_PUBLIC_URL}/auth/registration
+      ui_url: "${OTHALA_PUBLIC_URL}/auth/registration"
       lifespan: 1h
       after:
         password:
@@ -226,13 +278,20 @@ selfservice:
             - hook: session
 
 session:
-  lifespan: 2160h    # 90 days for normal flows; admin UI enforces shorter via SSR
+  # P8: reduced from 2160h (90 days) to 720h (30 days). The apex-scoped session
+  # cookie is replayable by any compromised subdomain app for the full lifespan;
+  # a 30-day window meaningfully reduces blast radius. Passkey re-login is
+  # low-friction (one tap). The admin UI enforces a much shorter freshness window
+  # independently via SSR (privileged_session_max_age: 15m). Leave
+  # session.cookie.persistent and the apex domain unchanged — apex scope is
+  # required for cross-subdomain SSO. Operator-tunable: override in iac inventory.
+  lifespan: 720h
   cookie:
     # Parent apex domain so the IdP and every subdomain app share the
     # same session cookie. SameSite=Lax permits same-site POSTs across
     # subdomains; HIGH-1 CSRF mitigation is per-request tokens in the
     # portal (portal/src/lib/csrf.ts).
-    domain: ${OTHALA_APEX}
+    domain: "${OTHALA_APEX}"
     name: ory_kratos_session
     persistent: true
     same_site: Lax
@@ -244,7 +303,7 @@ session:
     required_aal: aal1
 
 cookies:
-  domain: ${OTHALA_APEX}
+  domain: "${OTHALA_APEX}"
   same_site: Lax
 
 identity:
@@ -261,9 +320,9 @@ courier:
     # mail travels the exact same outbound path as a recovery/verification
     # code. gen-secrets.sh / iac default this to the Fastmail implicit-TLS
     # endpoint with the SMTP_USER/SMTP_PASS app-password credentials.
-    connection_uri: ${OTHALA_SMTP_CONNECTION_URI}
-    from_address: ${OTHALA_SMTP_FROM_ADDRESS}
-    from_name: ${OTHALA_INSTANCE_NAME}
+    connection_uri: "${OTHALA_SMTP_CONNECTION_URI}"
+    from_address: "${OTHALA_SMTP_FROM_ADDRESS}"
+    from_name: "${OTHALA_INSTANCE_NAME}"
     # local_name: leave default; Fastmail accepts standard HELO
 
   # Templates default to Kratos built-ins; override later if needed.
@@ -285,13 +344,13 @@ secrets:
   #   1. PREPEND the new secret as a distinct first entry (old becomes 2nd):
   #        cookie: [<new>, <current>]
   #   2. Restart Kratos (new signs; old still verifies).
-  #   3. After the session lifespan elapses (90 days default), DROP the old
+  #   3. After the session lifespan elapses (30 days default), DROP the old
   #      entry — back to a single-element array. Restart again.
   cookie:
-    - ${KRATOS_COOKIE_SECRET_CURRENT}
+    - "${KRATOS_COOKIE_SECRET_CURRENT}"
 
   cipher:
-    - ${KRATOS_CIPHER_SECRET_CURRENT}
+    - "${KRATOS_CIPHER_SECRET_CURRENT}"
 
 log:
   level: info

@@ -83,26 +83,68 @@ if missing:
         print(f"  {n}", file=sys.stderr)
     sys.exit(1)
 
-# Newline-injection guard: a substituted value containing a newline would
-# break YAML structure (the newline shifts subsequent content out of its
-# intended scalar context). Fail closed before writing any output.
+# Control-character injection guard: a substituted value containing any
+# control character (ord < 0x20, including \r, \n, and other non-printables)
+# can break YAML structure or produce unparseable output. Fail closed before
+# writing any output. \n (newline) would shift content out of its scalar
+# context; \r produces ambiguous line endings; other controls are never
+# legitimate in YAML scalar values in this codebase.
 for name in needed:
     val = os.environ[name]
-    if '\n' in val:
-        print(f"render-config: {template_path}: variable {name} contains a "
-              f"newline — refusing to render (YAML structure injection guard)",
+    bad = [c for c in val if ord(c) < 0x20]
+    if bad:
+        chars = ', '.join(repr(c) for c in set(bad))
+        print(f"render-config: {template_path}: variable {name} contains "
+              f"control character(s) {chars} — refusing to render "
+              f"(YAML structure injection guard)",
               file=sys.stderr)
         sys.exit(1)
+
+# Double-quote-context escaping contract:
+# All ${VAR} tokens in the templates are wrapped in YAML double-quoted scalars
+# (e.g. dsn: "postgres://...${PASS}..."). Inside a YAML double-quoted scalar,
+# backslash is the escape character and double-quote terminates the scalar.
+# A raw value injected verbatim would break the scalar if it contains either
+# character. Escape order matters: backslash first (so the introduced \ in the
+# \" escapes is not re-escaped), then double-quote.
+def escape_for_double_quoted_yaml(val):
+    val = val.replace('\\', '\\\\')   # \ → \\ (must be first)
+    val = val.replace('"', '\\"')     # " → \"
+    return val
 
 # Substitute only tokens that are in `needed` (the non-comment set).
 # Comment-only tokens are left as literal ${VAR} text in the output,
 # which is harmless — they remain comments in the rendered YAML.
 needed_set = set(needed)
 rendered = TOKEN.sub(
-    lambda m: os.environ[m.group(1)] if m.group(1) in needed_set else m.group(0),
+    lambda m: escape_for_double_quoted_yaml(os.environ[m.group(1)])
+              if m.group(1) in needed_set else m.group(0),
     src
 )
 with open(output_path, "w") as f:
     f.write(rendered)
+
+# Post-render YAML validation: parse the rendered output to confirm it is
+# structurally valid YAML. A substituted value that still breaks YAML (e.g. a
+# lone colon at the start, tab characters, or other edge cases not caught by
+# the escaping above) is caught here before the file reaches a container mount.
+# If pyyaml is not available in the environment, skip with a warning — do not
+# hard-fail on a missing module.
+try:
+    import yaml
+    try:
+        yaml.safe_load(open(output_path).read())
+    except yaml.YAMLError as e:
+        print(f"render-config: rendered output {output_path} failed YAML "
+              f"validation — deleting partial output. Error: {e}",
+              file=sys.stderr)
+        import os as _os
+        _os.unlink(output_path)
+        sys.exit(1)
+except ImportError:
+    print(f"render-config: pyyaml not available — skipping post-render YAML "
+          f"validation of {output_path}. Install pyyaml for full validation.",
+          file=sys.stderr)
+
 print(f"render-config: {template_path} -> {output_path} ({len(needed)} vars)")
 PY

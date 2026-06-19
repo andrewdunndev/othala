@@ -1,7 +1,7 @@
 /**
  * C — Non-admin member denied at /admin (browser-test.mjs assertion C).
  *
- * A member (bt2@othala.test) who is NOT on OTHALA_ADMIN_SUBJECTS visits /admin.
+ * A member (bt2@othala.test) who is NOT on OTHALA_ADMIN_IDS visits /admin.
  * The requireAdminSession middleware in the othala app must deny access.
  * Expected: the URL after redirect contains reason=not-admin OR routes to
  * /auth/error (the app's error page for the allowlist gate).
@@ -32,8 +32,8 @@ test('C — non-admin member is denied at /admin with reason=not-admin', async (
     const page = await ctx.newPage();
 
     // Navigate to /admin. The requireAdminSession middleware will check the
-    // session's identity email against OTHALA_ADMIN_SUBJECTS. bt2@othala.test
-    // is not on the list → redirect to error URL with reason=not-admin.
+    // session's identity id against OTHALA_ADMIN_IDS. bt2's id is not on the
+    // list → redirect to error URL with reason=not-admin.
     await page.goto(`${baseURL}/admin`, { waitUntil: 'networkidle', timeout: 30_000 });
 
     const finalUrl = page.url();

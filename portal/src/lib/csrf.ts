@@ -49,9 +49,13 @@ const SECRET_ENV = 'CSRF_SECRET';
  */
 function secret(): Buffer {
   const v = process.env[SECRET_ENV];
-  if (!v || v.length < 32) {
+  // CRYPTO-2: check UTF-8 byte length, not character count. A secret composed
+  // of multi-byte characters (e.g. emoji) can satisfy v.length < 32 while
+  // providing far fewer than 32 bytes of entropy. Buffer.byteLength is the
+  // correct measure for a secret used as HMAC key material.
+  if (!v || Buffer.byteLength(v, 'utf8') < 32) {
     throw new CSRFError(
-      `${SECRET_ENV} is unset or shorter than 32 chars. ` +
+      `${SECRET_ENV} is unset or shorter than 32 bytes (UTF-8). ` +
         'Set it on the portal pod (random 32+ bytes; rotate on a fresh deploy).',
     );
   }
@@ -92,6 +96,16 @@ export class CSRFError extends Error {
 export function signToken(identityId: string, action?: string): string {
   if (!identityId || !identityId.trim()) {
     throw new CSRFError('identityId is required to sign a CSRF token');
+  }
+  // CRYPTO-1: the signing body uses '.' as a field separator. A '.' in
+  // identityId or action would shift the field boundaries and make verifyToken
+  // parse the token incorrectly. Fail closed at sign time so the invariant is
+  // enforced where it's cheapest to catch rather than at verify time under load.
+  if (identityId.includes('.')) {
+    throw new CSRFError('identityId must not contain a dot (would corrupt token structure)');
+  }
+  if (action !== undefined && action.includes('.')) {
+    throw new CSRFError('action must not contain a dot (would corrupt token structure)');
   }
   const ts = Math.floor(Date.now() / 1000);
   const nonce = randomBytes(16).toString('base64url');
@@ -183,8 +197,14 @@ export function verifyToken(
   // For action-scoped tokens, verify the action matches before checking
   // the signature so the error is informative. Timing-safe: action mismatch
   // is not a secret; the HMAC mismatch below is the definitive gate.
+  // FIX-H: sanitize the reflected presentedAction to prevent attacker-controlled
+  // input from appearing verbatim in the 403 body (defence-in-depth; text/plain,
+  // but still reduces reflection surface). Cap to 32 chars of safe characters.
   if (action && presentedAction !== action) {
-    throw new CSRFError(`CSRF token action mismatch (expected '${action}', got '${presentedAction}')`);
+    const safePresented = presentedAction
+      ? presentedAction.replace(/[^a-z0-9:-]/gi, '').slice(0, 32)
+      : '';
+    throw new CSRFError(`CSRF token action mismatch (expected '${action}'${safePresented ? `, got '${safePresented}'` : ''})`);
   }
 
   const signedBody = action

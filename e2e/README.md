@@ -79,8 +79,8 @@ VM dies on job end. Total turnaround: ~3-5 minutes including image pulls.
   `metadata_admin.groups` round-trips.
 - **Recovery-gate** — the converged app's loopback endpoint
   `othala:4431/admin/recovery-gate`, `Authorization: Bearer`. Refusal is
-  **allowlist-based** (`OTHALA_ADMIN_SUBJECTS`), NOT group-based: an
-  allowlisted admin email → 403; a non-allowlisted subject → 200 (even
+  **allowlist-based** (`OTHALA_ADMIN_IDS`, identity UUIDs), NOT group-based: an
+  allowlisted admin UUID → 403; a non-allowlisted identity → 200 (even
   carrying the display-only `admin` group); an unidentifiable subject →
   403 (fail-closed); a wrong bearer → 401.
 

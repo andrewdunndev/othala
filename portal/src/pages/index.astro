@@ -32,9 +32,9 @@ export const prerender = false;
 
 import Layout from '../layouts/Layout.astro';
 import PageHero from '../components/PageHero.astro';
-import { loadTiles, loadGroups, type AppTile } from '../lib/tiles';
+import { loadTiles, loadGroups, safeHref, type AppTile } from '../lib/tiles';
 import { getSession, isReachable } from '../lib/kratos';
-import { isAdminSubject } from '../lib/admin-auth';
+import { isAdminId } from '../lib/admin-auth';
 import type { Identity } from '../lib/types';
 import { siteName, adminContact } from '../lib/config';
 
@@ -118,11 +118,12 @@ const tileGroups = Array.from(groupedTilesMap.entries())
     tiles,
     meta: groupRegistry.get(groupName),
   }));
-// B2: the Admin nav affordance follows the OTHALA_ADMIN_SUBJECTS allowlist,
-// not the (display-only) `admin` group. The /admin route itself is gated by
-// requireAdminSession, also via the allowlist; this just keeps the link
+// CVP-P1: the Admin nav affordance follows the OTHALA_ADMIN_IDS allowlist
+// keyed on the immutable identity id, not the (display-only) `admin` group
+// and not the user-editable email trait. The /admin route itself is gated by
+// requireAdminSession, also via the ID allowlist; this just keeps the link
 // truthful so a non-admin isn't shown a tile that bounces.
-const isAdmin = state === 'post-auth' && isAdminSubject(identity?.traits?.email);
+const isAdmin = state === 'post-auth' && isAdminId(identity?.id);
 const displayName = identity?.traits.displayName || identity?.traits.username || '';
 const firstName = displayName.split(' ')[0] || displayName;
 
@@ -200,7 +201,7 @@ const devLinks = [
               <div class="tile-grid">
                 {ungroupedTiles.map((t: AppTile) => (
                   <article class="tile">
-                    <a class="tile-launch" href={t.url}>
+                    <a class="tile-launch" href={safeHref(t.url)}>
                       {t.iconHref ? (
                         <img class="tile-icon-img" src={t.iconHref} alt="" loading="lazy" />
                       ) : (
@@ -225,7 +226,7 @@ const devLinks = [
                 <div class="tile-grid">
                   {tiles.map((t: AppTile) => (
                     <article class="tile">
-                      <a class="tile-launch" href={t.url}>
+                      <a class="tile-launch" href={safeHref(t.url)}>
                         {t.iconHref ? (
                           <img class="tile-icon-img" src={t.iconHref} alt="" loading="lazy" />
                         ) : (
@@ -256,7 +257,7 @@ const devLinks = [
         <template
           data-app-edu={t.slug}
           data-app-name={t.name}
-          data-app-url={t.url}
+          data-app-url={safeHref(t.url)}
           data-app-desc={t.description}
         >
           <Fragment set:html={t.educationHtml ?? ''} />

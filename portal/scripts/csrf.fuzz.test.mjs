@@ -404,47 +404,27 @@ test('prop: parseBearer returns empty string for non-Bearer or missing headers',
 //     Dots in identity IDs could confuse the 4-segment split.
 // ══════════════════════════════════════════════════════════════════════════
 test('explicit: identityId containing dots is safe (no ambiguity in split)', () => {
-  // An identity id with a dot causes presented.split('.') to produce > 4 parts.
-  // verifyToken must reject this (malformed check: parts.length !== 4).
+  // CRYPTO-1: signToken now throws at sign time when identityId contains a dot,
+  // so a dotty id can never produce a structurally ambiguous token.
   const dottyId = 'admin.user.with.dots';
   _resetForTests();
-  // signToken will embed the dotty id, creating > 4 segments — verifyToken must
-  // reject it as malformed since parts.length !== 4.
-  const tok = signToken(dottyId);
-  let threw = false;
-  try {
-    verifyToken(tok, dottyId);
-  } catch (err) {
-    threw = true;
-    // Expected: either malformed (wrong segment count) or... it "worked" —
-    // if it worked, that is the violation to report.
-  }
-  // This test captures the result either way for reporting; the property
-  // assert below is the actual invariant check.
-  // A token for a dotty id should NOT accidentally verify for a different id.
-  _resetForTests();
-  if (!threw) {
-    // Token verified — ensure cross-identity still holds
-    const otherTok = signToken(dottyId);
-    assertRejects(otherTok, 'admin', 'dotty-id cross-identity');
-  }
+  assert.throws(
+    () => signToken(dottyId),
+    /dot/,
+    'signToken must throw on a dotted identityId (CRYPTO-1)',
+  );
 });
 
 test('explicit: identityId with dot — document whether roundtrip is accepted', () => {
-  // This test explicitly documents the ambiguity: a UUID-style identityId
-  // never contains dots, so the 4-segment split is unambiguous in production.
-  // A dotty id produces > 4 segments; split('.') will produce !== 4 parts
-  // and the malformed guard will fire BEFORE signature check.
+  // CRYPTO-1: the invariant is now enforced at sign time. A dotty id causes
+  // signToken to throw rather than producing a structurally ambiguous token.
   const dottyId = 'a.b';
   _resetForTests();
-  const tok = signToken(dottyId);
-  const parts = tok.split('.');
-  // With dottyId = 'a.b': ts.a.b.nonce.sig => 5 parts => malformed
-  assert.ok(
-    parts.length !== 4,
-    `dotty identity produces ${parts.length} segments; malformed guard fires`,
+  assert.throws(
+    () => signToken(dottyId),
+    /dot/,
+    'signToken must throw for dotty identityId (fail-closed, CRYPTO-1)',
   );
-  assertRejects(tok, dottyId, 'dotty-id malformed guard fires');
 });
 
 // ══════════════════════════════════════════════════════════════════════════

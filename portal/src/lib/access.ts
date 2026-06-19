@@ -30,7 +30,7 @@
 
 import type { ClientManifest } from './manifests';
 import type { Identity } from './types';
-import { isAdminSubject } from './admin-auth';
+import { isAdminId } from './admin-auth';
 import { lookupRole } from './claims';
 import { identityGroups } from './config';
 
@@ -191,15 +191,15 @@ export function computeEffectiveAccess(
  * so admin recovery is console-only. See
  * docs/runbooks/admin-recovery.md "Console recovery for an admin".
  *
- * B2: admin status is the OTHALA_ADMIN_SUBJECTS allowlist, NOT the `admin`
- * metadata_admin group. Refuse iff the TARGET identity's email is on the
- * allowlist. A user carrying the (display-only) `admin` group but not on
+ * CVP-P1: admin status is the OTHALA_ADMIN_IDS allowlist keyed on the
+ * IMMUTABLE identity `id`, NOT the user-editable email trait and NOT the
+ * `admin` metadata_admin group. Refuse iff the TARGET identity's id is on
+ * the allowlist. A user carrying the (display-only) `admin` group but not on
  * the allowlist is NOT an admin and recovery is allowed for them; an
  * allowlisted admin who self-demoted out of the group is STILL refused.
  */
 export function shouldRefuseRecovery(identity: Identity | undefined | null): boolean {
-  const email = identity?.traits?.email as string | undefined;
-  return isAdminSubject(email);
+  return isAdminId(identity?.id);
 }
 
 /** Pretty-print an access source for the admin UI. */

@@ -138,34 +138,22 @@ export const smtpConnectionUri: string = requiredVar(
 // ── OTHALA_CONTACT_RECIPIENT ──────────────────────────────────────────────────
 //
 // Where the dashboard contact/request form delivers. A single email address
-// (the operator's inbox). When unset it falls back to the FIRST entry of
-// OTHALA_ADMIN_SUBJECTS (the admin allowlist) — the people who can actually
-// action a request — so a minimal deployment needs no extra config.
+// (the operator's inbox). Must be set explicitly — OTHALA_ADMIN_IDS now stores
+// UUIDs (not email addresses) so it can no longer serve as a fallback here.
 //
-// Fail-loud in production only if BOTH are empty (nowhere to send).
-
-function firstAdminSubject(): string {
-  const raw = process.env.OTHALA_ADMIN_SUBJECTS ?? '';
-  for (const part of raw.split(',')) {
-    const email = part.trim();
-    if (email) return email;
-  }
-  return '';
-}
+// Fail-loud in production when unset.
 
 function resolveContactRecipient(): string {
   const explicit = process.env.OTHALA_CONTACT_RECIPIENT?.trim();
   if (explicit) return explicit;
-  const admin = firstAdminSubject();
-  if (admin) return admin;
   if (isProduction()) {
     throw new Error(
-      '[othala/config] No contact recipient: set OTHALA_CONTACT_RECIPIENT or ' +
-        'OTHALA_ADMIN_SUBJECTS so the dashboard request form has somewhere to deliver.',
+      '[othala/config] No contact recipient: set OTHALA_CONTACT_RECIPIENT so ' +
+        'the dashboard request form has somewhere to deliver.',
     );
   }
   console.warn(
-    '[othala/config] No OTHALA_CONTACT_RECIPIENT / OTHALA_ADMIN_SUBJECTS; ' +
+    '[othala/config] OTHALA_CONTACT_RECIPIENT is not set; ' +
       'using dev default "admin@localhost". This would throw in production.',
   );
   return 'admin@localhost';
@@ -232,9 +220,9 @@ export const defaultGroup: string = optionalVar(
 // Neutral default: ['admin', 'everyone'] — admin plus the default group;
 // operators extend as needed.
 //
-// NOTE: group membership in metadata_admin.groups is DISPLAY-ONLY (CU3/B2).
-//       Admin authority is the OTHALA_ADMIN_SUBJECTS allowlist in admin-auth.ts,
-//       not this list.
+// NOTE: group membership in metadata_admin.groups is DISPLAY-ONLY (CU3/B2, CVP-P1).
+//       Admin authority is the OTHALA_ADMIN_IDS allowlist (identity UUIDs) in
+//       admin-auth.ts, not this list.
 
 function parseIdentityGroups(): string[] {
   const raw = process.env.OTHALA_IDENTITY_GROUPS ?? '';

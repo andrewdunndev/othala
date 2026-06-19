@@ -1,7 +1,7 @@
 /**
  * D — Admin → /admin → AAL2 step-up enforced (browser-test.mjs assertion D).
  *
- * An identity on OTHALA_ADMIN_SUBJECTS (admin@othala.test) logs in with
+ * An identity on OTHALA_ADMIN_IDS (admin@othala.test) logs in with
  * password only (AAL1) and visits /admin. The requireAdminSession middleware
  * detects AAL1 and redirects to a Kratos login flow requesting AAL2 (step-up
  * with a second factor). The redirect must target auth.othala.test (NOT the

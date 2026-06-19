@@ -34,7 +34,7 @@ all-TS application fronting upstream Ory plus the Go LDAP bridge:
   revoke, best-effort LDAP bind-cache flush). No identity cache: the hot
   path fetches fresh, so a revoked subject fails the gate's state-check
   on the next fetch.
-- Admin authz is `OTHALA_ADMIN_SUBJECTS` (sops-backed email allowlist),
+- Admin authz is `OTHALA_ADMIN_IDS` (sops-backed email allowlist),
   the sole authz at `requireAdminSession` + recovery-gate + page gates.
   The `admin` group is display-only.
 - Back-channel logout is Hydra-native. The app holds no signing key at
@@ -82,7 +82,7 @@ Real, substantive coverage:
 - **Dual-listener mux-disjointness** is tested: no public/challenge
   path resolves on the admin port and the SSR handler never sees admin
   paths.
-- `OTHALA_ADMIN_SUBJECTS` as the **sole admin authz** is asserted at
+- `OTHALA_ADMIN_IDS` as the **sole admin authz** is asserted at
   every gate.
 - **Native back-channel logout / no key at rest** is verified by the
   signer's absence.
@@ -110,7 +110,7 @@ state, not a regression.
 | Identity schema | `traits.{username,email,displayName?}` + `metadata_admin.{groups[],roles{}}` |
 | Subject identifier | `public` |
 | **Topology** | Single FQDN `dag.dunn.dev` for the whole SSO stack |
-| **Admin authz** | `OTHALA_ADMIN_SUBJECTS` allowlist (sops); `admin` group is display-only |
+| **Admin authz** | `OTHALA_ADMIN_IDS` allowlist (sops); `admin` group is display-only |
 | Access gate | `access-<clientId>` group AND Kratos state `== active`, fail-closed, on login + consent |
 | Back-channel logout | Hydra-native (Hydra-signed); app holds no signing key at rest |
 | LDAP bridge | Go glauth-kratos binary at `gitlab.com/dunn.dev/kratos-ldap` (separate project; no `.so` plugins); stays Go |
@@ -152,7 +152,7 @@ Full rationale per decision: `decision.md`. Upgrade-durability choices:
    recovery-hook to `:4431/admin/recovery-gate`.
 3. **Regenerate `dag_*` sops keys fresh** before first deploy (carmine
    pre-reinstall: Fastmail SMTP, per-OIDC-consumer secrets, and the
-   admin secrets behind `OTHALA_ADMIN_SUBJECTS` /
+   admin secrets behind `OTHALA_ADMIN_IDS` /
    `OTHALA_ADMIN_ENDPOINT_BEARER` / `RECOVERY_GATE_SECRET`).
 4. **`make dag-sync-configs`** + bump quadlet pins to the released tag,
    then **`make dag-secrets && make dag-preflight && make dag-deploy

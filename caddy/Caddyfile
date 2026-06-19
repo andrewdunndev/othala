@@ -29,14 +29,22 @@
 # They are matched explicitly so they don't fall into the @hydra block.
 #
 # ---------------------------------------------------------------------------
-# RATE LIMITING — BUILD DEPENDENCY REQUIRED
+# RATE LIMITING — DEPLOY BLOCKER: caddy-estate MUST include caddy-ratelimit
+#
+# !! BLOCKER — DO NOT DEPLOY THIS CADDYFILE UNTIL THE MODULE IS IN THE IMAGE !!
 #
 # The `rate_limit` directive below is provided by the third-party module
 # mholt/caddy-ratelimit (https://github.com/mholt/caddy-ratelimit).
 # It is NOT part of Caddy's standard distribution and is NOT included in
 # github.com/caddyserver/caddy/v2/modules/standard.
 #
-# To use it you must build Caddy with the module compiled in, e.g.:
+# If this Caddyfile is loaded by a Caddy binary that does NOT include the
+# module, Caddy will FAIL TO START with a config-load error:
+#   "unrecognized directive: rate_limit"
+# This is a deploy-time outage, not a degraded-mode fallback. Caddy refuses
+# to serve ANY traffic until the config loads cleanly.
+#
+# To include the module, build Caddy with it compiled in, e.g.:
 #
 #   xcaddy build --with github.com/mholt/caddy-ratelimit
 #
@@ -46,15 +54,13 @@
 #
 # to the import block and run `go get github.com/mholt/caddy-ratelimit`.
 #
-# [VERIFY: caddy-estate must include caddy-ratelimit]
-# The estate's Caddy image (dunn.dev/caddy-estate) does NOT currently include
-# this module. Its Containerfile imports only:
+# STATUS: the estate's Caddy image (dunn.dev/caddy-estate) does NOT currently
+# include this module. Its Containerfile imports only:
 #   - github.com/caddyserver/caddy/v2/modules/standard
 #   - github.com/caddy-dns/cloudflare
-# The comment in that file listing "rate_limit" as a standard module is
-# misleading — mholt/caddy-ratelimit is a separate import. Before relying on
-# this rate_limit block in the iac dag-caddy quadlet deployment, caddy-estate
-# must be updated to import github.com/mholt/caddy-ratelimit.
+# caddy-estate MUST be rebuilt with github.com/mholt/caddy-ratelimit added
+# before this Caddyfile is used in the iac dag-caddy quadlet deployment.
+# See the pre-deploy checklist in DEPLOY.md.
 #
 # FALLBACK — if caddy-ratelimit cannot be added to the production image:
 #   - Rate-limit at the edge (Cloudflare WAF rate-limiting rules on
@@ -96,7 +102,10 @@
 	# Matched before the app default so they are explicit and auditable.
 	@portal_challenges path /oauth2/login /oauth2/consent /oauth2/logout
 	handle @portal_challenges {
-		reverse_proxy othala:8080
+		# DOS-1: same XFF fix as the default backend — see note below.
+		reverse_proxy othala:8080 {
+			header_up X-Forwarded-For {remote_host}
+		}
 	}
 
 	# Kratos browser endpoints: well-known ceremony scripts, self-service flow
@@ -120,5 +129,14 @@
 	# Default -> the app: portal UI, /auth/* + /admin/* pages, AND static
 	# assets (/_astro/*, favicon.ico, manifest.webmanifest). The app is the
 	# catch-all; routing the default to Kratos mis-serves static assets.
-	reverse_proxy othala:8080
+	#
+	# DOS-1: overwrite any client-supplied X-Forwarded-For with the real
+	# socket peer IP before forwarding to the portal. @astrojs/node resolves
+	# ctx.clientAddress from the LEFTMOST XFF entry; without this, an
+	# attacker can prepend a fresh fake IP on every request and land in a
+	# new rate-limit bucket. header_up replaces the entire incoming header
+	# so only the immediate peer IP reaches the app.
+	reverse_proxy othala:8080 {
+		header_up X-Forwarded-For {remote_host}
+	}
 }
