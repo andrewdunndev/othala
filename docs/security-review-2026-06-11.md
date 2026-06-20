@@ -345,3 +345,52 @@ consumed at a pinned catalog version (tracked separately).
   regex DoS, unbounded reads).
 - iac audit: the deploy/secrets/segmentation plane (259 files), never reviewed.
 - Estate self-hosted scanning components in the pipeline catalog.
+
+## AAL2 admin step-up — DEVIATION (2026-06-20)
+
+**Decision:** the Kratos AAL2 step-up and freshness gate were REMOVED from
+`requireAdminSession`. Admin elevation is now enforced at the edge by the Caddy
+`basic_auth` on `/admin/*` (already present, per-admin bcrypt creds), on top of a
+hardware-passkey session and the `OTHALA_ADMIN_IDS` allowlist.
+
+**This supersedes** MEDIUM-C (security-review-2026-06-07, "admin session
+freshness unchecked") and P5 (this doc, "AAL2 admin freshness silently failed
+open"). Both are now moot — there is no AAL2 gate to keep fresh.
+
+**Why deviate from the original AAL2 recommendation:**
+- *Half-implemented, hence unusable.* `login.astro` never rendered the
+  second-factor method groups (`totp` / `webauthn-2fa` / `lookup_secret`), so the
+  step-up page was blank → the admin console was un-enterable through the UI →
+  every routine admin action (e.g. assigning a user a group) forced the operator
+  into the Kratos admin API on the host. A control that pushes the operator to
+  the terminal is itself an operational risk.
+- *Redundant.* `/admin/*` was already gated by `basic_auth` at the edge; AAL2
+  stacked a second, fragile gate on a working one.
+- *Disproportionate management cost* for a family-scale instance (factor
+  enrollment, recovery paths, factor-choice UX).
+
+**The replacement meets the analysis's intent (multi-factor for privileged
+access)** with an equivalent-or-stronger, reliable control. Three independent
+requirements to reach `/admin`:
+- **possession** — a hardware passkey session (phishing-resistant; the
+  active-session + identity check in `requireAdminSession`). A passkey is a
+  *stronger* factor than the TOTP that AAL2 would have leaned on.
+- **knowledge** — the per-admin `/admin/*` `basic_auth` password (held in a
+  password manager).
+- **authorization** — the `OTHALA_ADMIN_IDS` allowlist keyed on the immutable
+  Kratos identity UUID.
+
+**Consciously traded away:** the AAL2 freshness / "sudo timeout" property (AAL2
+can force re-auth every N hours; `basic_auth` caches for the browser session).
+Acceptable at family scale — this is not a bank. `isSessionFresh()` is retained
+(exported, unit-tested) so a fresh re-auth can be required on *destructive*
+actions (delete user, recovery) only, if a future need arises, without
+reinstating the broad gate.
+
+**Maintenance item:** rotate the two `dag_admin_basicauth_*` secrets (one
+plaintext leaked into a working session transcript); the new values live in the
+operator's password manager.
+
+**othala-the-framework** may still offer AAL2 as an adopter option later (it
+would require building the second-factor rendering in `login.astro`); dag's
+policy simply does not require it.

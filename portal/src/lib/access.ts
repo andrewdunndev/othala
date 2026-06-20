@@ -6,7 +6,10 @@
 // implementation in portal/src/lib/claims.ts, not two to keep aligned.
 //
 // Algorithm per client:
-//   1. If user is not in `access-<clientId>` group -> no row (no access).
+//   1. If user is not in ANY of the manifest's bound access groups
+//      (`manifest.accessGroups`, OR-semantics) -> no row (no access). This is
+//      the SAME binding the OIDC gate keys off (access-model Phase 2,
+//      docs/access-model.md §10) — no derived `access-<clientId>` group.
 //   2. Look up `metadata_admin.roles[clientId]`. If set, that's the role
 //      and the source is "override".
 //   3. Otherwise, walk the user's identity groups in stored order and
@@ -63,15 +66,28 @@ export interface EffectiveAccessRow {
 export const IDENTITY_GROUP_ORDER: readonly string[] = identityGroups;
 
 /**
- * Sort an unordered list of groups into the canonical stored shape:
- *   1. Identity groups in IDENTITY_GROUP_ORDER order.
- *   2. Unknown identity groups (not in IDENTITY_GROUP_ORDER and not
- *      access-*) in alphabetical order, after the canonical block.
- *   3. access-* groups in alphabetical order.
+ * Sort an unordered list of groups into the canonical stored shape
+ * (access-model Phase 2 — docs/access-model.md §10):
+ *   1. Identity groups (those in IDENTITY_GROUP_ORDER) in that fixed order.
+ *   2. All remaining groups in alphabetical order.
+ *
+ * This RETIRES the old `access-` prefix partition: a group's position is no
+ * longer a function of its name. The partition is now identity-vs-everything,
+ * driven by the env-configured identity-group set — exactly what the group
+ * registry types as `identity`. Both partitions sort within themselves (fixed
+ * env order; alphabetical), so the stored order is a pure function of the
+ * inputs (determinism proof, §10).
+ *
+ * Worked example (§10): groups [family-editors, family, admin] with
+ * IDENTITY_GROUP_ORDER=[admin, family] → [admin, family, family-editors]; the
+ * claims.ts stored-order walk then resolves `family`'s role before
+ * `family-editors` (coarser-group-wins, same intent as the pre-refactor code,
+ * no prefix needed). To prefer the finer role, don't also assign the coarse
+ * group — identical semantics to today.
  *
  * The admin form calls this on every save so the order in
- * `metadata_admin.groups` is deterministic and both code paths
- * (this file and `consent/manifest.go`) agree on which group wins.
+ * `metadata_admin.groups` is deterministic and both code paths (this file and
+ * the consent role walk in claims.ts) agree on which group wins.
  */
 export function normalizeGroupOrder(groups: string[]): string[] {
   const set = new Set(groups);
@@ -82,10 +98,8 @@ export function normalizeGroupOrder(groups: string[]): string[] {
       set.delete(g);
     }
   }
-  const remaining = Array.from(set);
-  const accessGroups = remaining.filter((g) => g.startsWith('access-')).sort();
-  const otherIdentityGroups = remaining.filter((g) => !g.startsWith('access-')).sort();
-  return [...ordered, ...otherIdentityGroups, ...accessGroups];
+  const remaining = Array.from(set).sort();
+  return [...ordered, ...remaining];
 }
 
 /**
@@ -114,7 +128,12 @@ export function computeEffectiveAccess(
   const rows: EffectiveAccessRow[] = [];
 
   for (const m of manifests) {
-    if (!userGroups.includes(m.accessGroup)) continue;
+    // access-model Phase 2: gate on the manifest's bound access groups
+    // (OR-semantics), the SAME field the OIDC entry gate uses — not a derived
+    // `access-<clientId>` name. skip_access_check grants access without a group.
+    const hasAccess =
+      m.skipAccessCheck || m.accessGroups.some((g) => userGroups.includes(g));
+    if (!hasAccess) continue;
 
     if (m.roles.length === 0) {
       rows.push({

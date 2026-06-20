@@ -104,9 +104,19 @@ test('empty group param → 403', async () => {
   assert.equal(res.status, 403);
 });
 
-test('bad group format (no access- prefix) → 403', async () => {
+test('non-prefixed group, member → 200 (Phase 3: no access- prefix required)', async () => {
+  // ACTIVE_IN_GROUP is in `family` (a bare, non-prefixed adopter group). Under
+  // the relaxed charset regex this now passes the input guard and the gate
+  // ALLOWS on membership. (Pre-Phase-3 this 403'd on the prefix check.)
   installFetch({ whoami: SESSION_OK, identity: ACTIVE_IN_GROUP });
-  const res = await GET(ctx('admin'));
+  const res = await GET(ctx('family'));
+  assert.equal(res.status, 200);
+  assert.equal(await res.text(), 'ok');
+});
+
+test('non-prefixed group, NOT a member → 403 (gate, not format)', async () => {
+  installFetch({ whoami: SESSION_OK, identity: ACTIVE_IN_GROUP });
+  const res = await GET(ctx('photos'));
   assert.equal(res.status, 403);
 });
 

@@ -4,17 +4,19 @@
 // Two sections:
 //   - Identity groups (admin / family / kids / friends + any other group
 //     a manifest references via group_role_map). Each card lists members.
-//   - Access groups (access-*). Each card names the app it grants entry
-//     to and lists members.
+//   - Access groups: registry-derived Group → Apps view (access-model §12). A
+//     group's type comes from its manifest BINDING, not its name; each card
+//     names the apps it grants entry to / maps a role in, and lists members.
 //
 // Editing happens on the per-user page. This is a navigation aid: spot
-// who's in `kids`, who can reach `access-cinema`, etc.
+// who's in `kids`, who can reach a given app, etc.
 
 export const prerender = false;
 
 import Layout from '../../layouts/Layout.astro';
 import { requireAdminSession, listIdentities } from '../../lib/admin';
 import { loadClientManifests, knownIdentityGroups } from '../../lib/manifests';
+import { getGroupRegistry } from '../../lib/group-registry';
 import type { Identity } from '../../lib/types';
 
 const guard = await requireAdminSession(Astro);
@@ -29,12 +31,23 @@ try {
 }
 
 const manifests = loadClientManifests();
+const registry = getGroupRegistry();
+const clientNameById = new Map(manifests.map((m) => [m.clientId, m.clientName] as const));
 const identityGroups = knownIdentityGroups();
-const accessGroups = manifests.map((m) => ({
-  group: m.accessGroup,
-  clientId: m.clientId,
-  clientName: m.clientName,
-}));
+
+// access-model Phase 2 (§12): the access section is now a registry-driven
+// Group → Apps view. A group's type is its BINDING, not its name — so an
+// access group named `memories` shows up correctly. Each row names the apps the
+// group grants ENTRY to (accessFor) and the apps it maps a ROLE in (roleFor).
+const appLabel = (id: string) => clientNameById.get(id) ?? id;
+const accessGroups = Array.from(registry.values())
+  .filter((e) => e.kinds.has('access') || e.kinds.has('role'))
+  .map((e) => ({
+    group: e.name,
+    grantsAccessTo: e.accessFor.map((id) => ({ clientId: id, clientName: appLabel(id) })),
+    grantsRoleIn: e.roleFor.map((id) => ({ clientId: id, clientName: appLabel(id) })),
+  }))
+  .sort((a, b) => a.group.localeCompare(b.group));
 
 const adminNav = [
   { href: '/admin',          label: 'Overview' },
@@ -126,16 +139,31 @@ function membersOf(group: string): MemberRef[] {
 
   <section class="section">
     <p class="section-subtitle">Access groups</p>
-    <p class="muted text-sm">What you can reach. One per OIDC client.</p>
+    <p class="muted text-sm">
+      What a group lets you reach. Derived from each app manifest's
+      <code>access:</code> binding (entry) and <code>group_role_map</code> (role)
+      — a group's type comes from its binding, not its name.
+    </p>
     <div class="card-grid">
       {accessGroups.map((a) => {
         const members = membersOf(a.group);
         return (
           <article class="panel">
             <h2 class="mono">{a.group}</h2>
-            <p class="muted text-xs">
-              grants entry to <span class="mono">{a.clientId}</span> ({a.clientName})
-            </p>
+            {a.grantsAccessTo.length > 0 && (
+              <p class="muted text-xs">
+                grants entry to {a.grantsAccessTo.map((app, i) => (
+                  <>{i > 0 ? ', ' : ''}<span class="mono">{app.clientId}</span></>
+                ))}
+              </p>
+            )}
+            {a.grantsRoleIn.length > 0 && (
+              <p class="muted text-xs">
+                maps a role in {a.grantsRoleIn.map((app, i) => (
+                  <>{i > 0 ? ', ' : ''}<span class="mono">{app.clientId}</span></>
+                ))}
+              </p>
+            )}
             <p class="muted text-xs">
               {members.length} {members.length === 1 ? 'member' : 'members'}
             </p>

@@ -32,8 +32,10 @@ export const prerender = false;
 
 import Layout from '../layouts/Layout.astro';
 import PageHero from '../components/PageHero.astro';
-import { loadTiles, loadGroups, safeHref, type AppTile } from '../lib/tiles';
+import { loadTiles, loadGroups, safeHref, userCanSeeTile, type AppTile } from '../lib/tiles';
 import { getSession, isReachable } from '../lib/kratos';
+import { getIdentity } from '../lib/admin';
+import { identityGroups } from '../lib/gate';
 import { isAdminId } from '../lib/admin-auth';
 import type { Identity } from '../lib/types';
 import { siteName, adminContact } from '../lib/config';
@@ -72,7 +74,18 @@ if (devOverride === 'down' || devOverride === 'pre-auth' || devOverride === 'pos
     const session = await getSession(cookie);
     if (session?.active && session.identity) {
       state = 'post-auth';
-      identity = session.identity;
+      // The public whoami does NOT expose metadata_admin (it's admin-only), so
+      // session.identity.metadata_admin.groups is always empty for real
+      // sessions. Re-fetch the FULL identity via the ADMIN API (same pattern as
+      // /api/forward-auth) to read accurate groups. FAIL-CLOSED: on lookup
+      // failure fall back to the whoami identity (no metadata_admin → no groups
+      // → no tiles), never fail-open.
+      try {
+        identity = await getIdentity(session.identity.id);
+      } catch (lookupErr) {
+        console.error('[othala/index] getIdentity failed; falling back to whoami (no groups):', lookupErr);
+        identity = session.identity;
+      }
     }
   } catch (err) {
     const ok = await isReachable();
@@ -90,10 +103,14 @@ const orderedApps = loadTiles();
 // loadGroups() returns an empty Map when the file is absent.
 const groupRegistry = loadGroups();
 
-const groups = identity?.metadata_admin?.groups ?? [];
+const groups = identityGroups(identity);
+// access-model Phase 2: tile visibility reads the manifest's access binding
+// (accessGroups, OR-semantics) via userCanSeeTile — the SAME field the OIDC
+// entry gate uses, so the tile shows iff the gate would admit the user. Kills
+// the prior tile-vs-gate dual source (docs/access-model.md §10).
 const visibleTiles =
   state === 'post-auth'
-    ? orderedApps.filter((a: AppTile) => groups.includes(a.accessGroup))
+    ? orderedApps.filter((a: AppTile) => userCanSeeTile(a, groups))
     : [];
 
 // Partition visibleTiles into ungrouped (no group field) and grouped sections.

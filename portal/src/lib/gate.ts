@@ -11,9 +11,12 @@
 //      explicit and unconditional so the skip-login path and the consent
 //      path (which read the identity via the admin API, where `state` is
 //      present) also reject inactive identities.
-//   2. identity must be a member of the "access-<clientId>" group, read from
-//      admin-managed metadata_admin.groups. clientId is lowercased to match
-//      the Go gate (accessGroupPrefix + strings.ToLower(clientID)).
+//   2. identity must be a member of ANY group the client's manifest binds for
+//      access (manifest.accessGroups, OR-semantics), read from admin-managed
+//      metadata_admin.groups. access-model Phase 2: the access-bearing group(s)
+//      come from the manifest BINDING, not a derived `access-<clientId>` name
+//      (docs/access-model.md §10). A group's access-bearing status is a property
+//      of the binding, never of its name.
 //
 // skip_access_check escape hatch (C): if the client manifest sets
 // consent.skip_access_check:true, check (2) is bypassed. Check (1) — the
@@ -28,14 +31,6 @@
 
 import type { Identity } from './types';
 import type { ClientManifest } from './manifests';
-
-/** Per-app entry-gate group convention: "access-<clientId>". */
-export const ACCESS_GROUP_PREFIX = 'access-';
-
-/** The group a client requires for access: "access-<lowercased clientId>". */
-export function requiredGroupFor(clientId: string): string {
-  return ACCESS_GROUP_PREFIX + clientId.toLowerCase();
-}
 
 /** Read metadata_admin.groups defensively (tolerates any/undefined shape). */
 export function identityGroups(identity: Identity | null | undefined): string[] {
@@ -87,17 +82,28 @@ export function enforceGroupGate(
 
 /**
  * Evaluate the access gate for an identity against a client. FAIL-CLOSED:
- * any missing precondition denies. Mirrors enforceAccessGate in handlers.go,
- * with the state check made explicit (CU1 item 2).
+ * any missing precondition denies. The state check is explicit (CU1 item 2).
  *
- * skip_access_check (C): if manifest.skipAccessCheck is true, the
- * access-<clientId> group membership check is bypassed. The state===active
- * check is NEVER bypassed — matching Go's two-function design where
- * SkipAccessCheck only skips the slices.Contains check.
+ * access-model Phase 2 (docs/access-model.md §10/§16): the access-bearing
+ * group(s) come from the manifest BINDING (`manifest.accessGroups`), with
+ * OR-semantics — membership in ANY bound group grants entry. The group's
+ * access-bearing status is a property of the manifest binding, not its name;
+ * there is no derived `access-<clientId>` group anymore. `clientId` is kept in
+ * the signature for the caller's logging/parity and is no longer used to derive
+ * a group name (the manifest is the source of truth).
+ *
+ * skip_access_check (C): if manifest.skipAccessCheck is true, the group
+ * membership check is bypassed. The state===active check is NEVER bypassed —
+ * matching Go's two-function design where SkipAccessCheck only skips the
+ * slices.Contains check.
+ *
+ * Fail-closed without a manifest: a missing manifest (unknown client) has no
+ * binding to satisfy, so it denies (unless an explicit skip is impossible to
+ * express without a manifest — there is no implicit access).
  */
 export function enforceAccessGate(
   identity: Identity | null | undefined,
-  clientId: string,
+  _clientId: string,
   manifest?: ClientManifest | undefined,
 ): GateResult {
   // Fail-closed: no identity == no access (lookup failed upstream).
@@ -112,16 +118,25 @@ export function enforceAccessGate(
     return { allowed: false, reason: 'identity not active' };
   }
 
-  // skip_access_check escape hatch: bypass access-group membership check
-  // but NOT the state check above. Matches Go enforceAccessGateFromGroups
-  // which returns false (not rejected) before the slices.Contains check
-  // when cm.Consent.SkipAccessCheck is true.
+  // skip_access_check escape hatch: bypass the group-membership check but NOT
+  // the state check above. Matches Go enforceAccessGateFromGroups.
   if (manifest?.skipAccessCheck) {
     return { allowed: true };
   }
 
-  // Identity + state already verified above; the only remaining check is the
-  // access-<clientId> group membership, which enforceGroupGate performs
-  // (it re-runs the identity/state checks idempotently — both already pass here).
-  return enforceGroupGate(identity, requiredGroupFor(clientId));
+  // Fail-closed: no manifest, or a manifest with no access binding, means no
+  // group can satisfy the gate — no implicit access (docs/access-model.md §4.5).
+  const accessGroups = manifest?.accessGroups ?? [];
+  if (accessGroups.length === 0) {
+    return { allowed: false, reason: 'no access group bound for this app' };
+  }
+
+  // OR-semantics: membership in ANY bound access group grants entry. Identity +
+  // state are already verified above.
+  const userGroups = identityGroups(identity);
+  if (!accessGroups.some((g) => userGroups.includes(g))) {
+    const list = accessGroups.join(', ');
+    return { allowed: false, reason: `User is not in any of the access group(s): ${list}` };
+  }
+  return { allowed: true };
 }

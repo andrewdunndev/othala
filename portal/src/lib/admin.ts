@@ -7,10 +7,9 @@
 // per-flow / global, not per-route. Caddy already gates "session present"
 // upstream of this guard.
 
-import { browserFlows, getSession } from './kratos';
+import { getSession } from './kratos';
 import { isAdminId } from './admin-auth';
 import { revokeSubject, type RevokeResult } from './revoke';
-import { publicUrl, adminFreshnessHours } from './config';
 import type { Session } from './types';
 
 /**
@@ -137,45 +136,23 @@ export async function requireAdminSession(astro: any): Promise<Session | Respons
     return astro.redirect('/auth/error?reason=not-admin');
   }
 
-  if (session.authenticator_assurance_level !== 'aal2') {
-    // return_to must be the PUBLIC origin (publicUrl), not astro.url — behind the
-    // Caddy edge astro.url is the internal bind (localhost:PORT), so astro.url.href
-    // would send the user to an unroutable host after step-up. Path+search are safe.
-    const returnTo = `${publicUrl}${astro.url.pathname}${astro.url.search}`;
-    return astro.redirect(browserFlows.login({ refresh: true, aal: 'aal2', returnTo }));
-  }
-
-  // AAL2 FRESHNESS CHECK — MEDIUM-C / hardening §7
+  // ADMIN ELEVATION — Kratos AAL2 step-up REMOVED (2026-06-20).
   //
-  // Having AAL2 "present" is not enough when the session lifetime is 90 days.
-  // A stolen admin browser with an existing AAL2 session would pass the level
-  // check for the full session lifetime. We additionally require that the admin
-  // authenticated within the last OTHALA_ADMIN_FRESHNESS_HOURS hours (default 8).
-  //
-  // Primary source: authentication_methods[].completed_at for aal2 entries —
-  // the most-recent aal2 entry is the canonical "when did the admin last satisfy
-  // AAL2". Fallback to session.authenticated_at if the array is absent or yields
-  // no parseable entry. Both the field shapes (Date vs ISO string) and
-  // authenticated_at update semantics (refresh=true vs any AAL2 completion) still
-  // warrant live-Kratos confirmation before tightening — see isSessionFresh.
-  //
-  // FAIL-OPEN INVARIANT: if all timestamp sources are absent, unparseable, or any
-  // error occurs, we ALLOW access rather than redirect. A redirect on bad data
-  // would create an unbreakable redirect loop for the admin. We only redirect when
-  // we can POSITIVELY confirm the session is stale (isSessionFresh returns false).
-  if (adminFreshnessHours > 0) {
-    try {
-      const fresh = isSessionFresh(session, adminFreshnessHours);
-      if (fresh === false) {
-        // Confirmed stale — force step-up re-authentication.
-        const returnTo = `${publicUrl}${astro.url.pathname}${astro.url.search}`;
-        return astro.redirect(browserFlows.login({ refresh: true, aal: 'aal2', returnTo }));
-      }
-      // fresh === true → within window; fresh === null → indeterminate, fail open.
-    } catch {
-      // Any unexpected error in the freshness computation: fail open (see above).
-    }
-  }
+  // Admin elevation is enforced at the EDGE by Caddy basic_auth on /admin/*
+  // (per-admin bcrypt creds), NOT by a Kratos AAL2 step-up. The AAL2 flow was
+  // half-implemented (login.astro never rendered the second-factor methods, so
+  // the step-up page was blank → admin un-enterable via the UI, forcing
+  // terminal/admin-API use to manage the instance) AND redundant with that
+  // basic_auth gate. We meet the security analysis's intent (multi-factor for
+  // privileged access) with an equivalent-or-stronger, reliable control:
+  //   - possession:    a hardware passkey session (the active+identity check above)
+  //   - knowledge:     the /admin/* basic_auth password (edge, per-admin)
+  //   - authorization: the OTHALA_ADMIN_IDS allowlist (the isAdminId check above)
+  // Consciously traded away: the AAL2 freshness / "sudo timeout" (basic_auth
+  // caches for the browser session). Acceptable at family scale; if ever needed,
+  // require a fresh re-auth on destructive actions only. isSessionFresh() is
+  // retained (exported, unit-tested) for that future use. See the dated
+  // security-review doc, §AAL2 deviation.
 
   // Prevent admin/identity data from being stored in any intermediate cache.
   // Done here (not in middleware) so it's tightly coupled to the admin guard.

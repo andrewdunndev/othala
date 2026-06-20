@@ -38,6 +38,7 @@ import { readdirSync, readFileSync, statSync } from 'node:fs';
 import { join } from 'node:path';
 import { parse as parseYaml } from 'yaml';
 import { identityGroups } from './config';
+import { parseAccessGroups } from './access-groups';
 
 export interface ClientRole {
   name: string;
@@ -54,6 +55,16 @@ export interface ClientRole {
 
 export interface ClientManifest {
   clientId: string;
+  /**
+   * True when this manifest carries a `presentation:` block but NO `oidc:`
+   * client (a forward_auth / ldap / external tile, e.g. observe.yaml). Such a
+   * manifest still names an access group (so it's an assignable, gate-bearing
+   * binding) but registers no OIDC client, so validateClients must skip the
+   * OIDC-specific rules (audience, redirect/audience match) for it. The OIDC
+   * runtime loader (`loadOne`) skips presentation-only manifests entirely; they
+   * surface only through the parser/validator and the tiles layer.
+   */
+  presentationOnly: boolean;
   clientName: string;
   redirectUris: string[];
   postLogoutRedirectUris: string[];
@@ -86,8 +97,19 @@ export interface ClientManifest {
    * claim" toggle. Defaults false (Go `OIDCConfig.BackchannelLogoutSessionRequired`).
    */
   backchannelLogoutSessionRequired: boolean;
-  /** Conventional `access-<clientId>` group that grants entry to this app. */
-  accessGroup: string;
+  /**
+   * The LOAD-BEARING access binding (access-model Phase 2). Adopter-named groups
+   * (arbitrary charset, no `access-` prefix required) whose members may enter
+   * this app — OR-semantics. Sourced from `presentation.access:` (list) with a
+   * `[access_group]` compat shim. Absence of a binding yields `[]` — there is NO
+   * implicit `access-<clientId>` fallback (othala primitive #5: no implicit
+   * access; absence of a binding means no access). A bare manifest with `[]`
+   * and no `skip_access_check` is a load-time BLOCK (validateClients). The gate
+   * (gate.ts), effective-access view (access.ts), tile visibility
+   * (tiles.ts/index.astro), and the group registry (group-registry.ts) all read
+   * THIS field. See docs/access-model.md §10/§11/§16.
+   */
+  accessGroups: string[];
   /** Declared role enum for the app; may be empty if the yaml has no `roles:` block. */
   roles: ClientRole[];
   /** identity-group → role-name map; what role a member of <group> gets by default. */
@@ -245,6 +267,12 @@ export function parseManifest(yamlText: string, filename: string): ClientManifes
   const oidc = (yaml as { oidc?: unknown }).oidc;
   const consent = (yaml as { consent?: unknown }).consent;
 
+  const presentation = (yaml as { presentation?: unknown }).presentation;
+  const p = (presentation && typeof presentation === 'object' && !Array.isArray(presentation)
+    ? presentation
+    : {}) as Record<string, unknown>;
+  const hasPresentation = presentation != null && typeof presentation === 'object' && !Array.isArray(presentation);
+
   // Namespace split (D6 / C3): reject pre-namespace flat shape so a
   // stale manifest doesn't silently load. Same guard as apply-clients.sh
   // and the consent service's manifest loader.
@@ -257,8 +285,51 @@ export function parseManifest(yamlText: string, filename: string): ClientManifes
   if (!oidc && flatLikely) {
     throw new Error(`${file}: pre-namespace flat shape detected. Migrate to oidc:/consent: blocks.`);
   }
+
+  // access-model Phase 2: `accessGroups` is the LOAD-BEARING access binding (the
+  // gate, computeEffectiveAccess, tiles, and the registry all key off it — see
+  // docs/access-model.md §10/§16). It is sourced from `presentation.access:` (a
+  // list) with a `[access_group]` compat shim (parseAccessGroups, §11). Absence
+  // of a binding yields `[]` — there is NO implicit `access-<clientId>` fallback
+  // (othala primitive #5: no framework default silently grants visibility). A
+  // bare manifest (`[]`, no skip_access_check) is a load-time BLOCK rejected by
+  // validateClients, so it is loudly surfaced, never silently dark.
+  const accessGroups = parseAccessGroups(p);
+
+  // Presentation-only manifest (forward_auth / ldap / external tile, e.g.
+  // observe.yaml): a `presentation:` block with NO `oidc:` client. It registers
+  // no OIDC client but still names an assignable access group, so it parses as a
+  // valid ClientManifest with empty OIDC fields and presentationOnly:true. The
+  // OIDC-specific validateClients rules (audience, redirect/audience match) are
+  // skipped for it. A manifest with neither oidc: nor presentation: is malformed
+  // and still throws.
   if (!oidc || typeof oidc !== 'object') {
-    throw new Error(`${file}: missing or non-object oidc: block`);
+    if (!hasPresentation) {
+      throw new Error(`${file}: missing or non-object oidc: block`);
+    }
+    const clientId = String(p.client_id ?? file.replace(/\.ya?ml$/, ''));
+    return {
+      clientId,
+      presentationOnly: true,
+      clientName: String(p.name ?? clientId),
+      redirectUris: [],
+      postLogoutRedirectUris: [],
+      scopes: [],
+      scope: '',
+      audience: [],
+      grantTypes: [],
+      responseTypes: [],
+      tokenEndpointAuthMethod: '',
+      skipConsent: false,
+      backchannelLogoutUri: '',
+      backchannelLogoutSessionRequired: false,
+      accessGroups,
+      roles: [],
+      groupRoleMap: {},
+      emitGroupsClaim: null,
+      skipAccessCheck: false,
+      sourcePath: file,
+    };
   }
 
   const o = oidc as Record<string, unknown>;
@@ -267,6 +338,7 @@ export function parseManifest(yamlText: string, filename: string): ClientManifes
 
   return {
     clientId,
+    presentationOnly: false,
     clientName: String(o.client_name ?? clientId),
     redirectUris: Array.isArray(o.redirect_uris) ? o.redirect_uris.map(String) : [],
     postLogoutRedirectUris: Array.isArray(o.post_logout_redirect_uris)
@@ -281,7 +353,7 @@ export function parseManifest(yamlText: string, filename: string): ClientManifes
     skipConsent: Boolean(o.skip_consent ?? false),
     backchannelLogoutUri: o.backchannel_logout_uri ? String(o.backchannel_logout_uri) : '',
     backchannelLogoutSessionRequired: Boolean(o.backchannel_logout_session_required ?? false),
-    accessGroup: `access-${clientId}`,
+    accessGroups,
     roles: normaliseRoles(c.roles),
     groupRoleMap: normaliseGroupRoleMap(c.group_role_map),
     emitGroupsClaim: readEmitGroups(c),
@@ -472,15 +544,45 @@ export function validateClients(set: ClientManifest[]): string[] {
       errs.push(`${src}: oidc.client_id is empty`);
     }
 
-    if (cm.audience.length === 0) {
+    // BLOCK (manifest-lint §11, wired into the load-time hard-fail path):
+    // an empty access binding with no skip_access_check is definitionally
+    // unreachable — no group can satisfy the gate. othala primitive #5: absence
+    // of a binding means NO access, so a bare manifest must be LOUDLY rejected at
+    // load (joining these hard-fails), not silently dark. Applies to OIDC and
+    // presentation-only manifests alike.
+    if (cm.accessGroups.length === 0 && !cm.skipAccessCheck) {
       errs.push(
-        `${src}: oidc.audience is empty (every client needs an audience for id_token aud verification)`,
+        `${src}: presentation.access is empty and consent.skip_access_check is not set: ` +
+          `no group can satisfy the gate, so this app is unreachable (no implicit access — ` +
+          `declare presentation.access: or set consent.skip_access_check)`,
       );
-    } else if (cm.redirectUris.length > 0) {
-      if (!audienceMatchesRedirect(cm, cm.audience)) {
+    }
+
+    // BLOCK (manifest-lint §11): a group listed twice in one manifest's binding.
+    const seenGroups = new Set<string>();
+    for (const g of cm.accessGroups) {
+      if (seenGroups.has(g)) {
+        errs.push(`${src}: presentation.access lists ${JSON.stringify(g)} more than once`);
+      }
+      seenGroups.add(g);
+    }
+
+    // OIDC-only rules: a presentation-only manifest (forward_auth / ldap tile,
+    // no oidc: client — e.g. observe.yaml) registers no OAuth2 client, so the
+    // audience / redirect-match rules do not apply to it. The access-binding
+    // BLOCK above still governs it (a presentation-only tile must still name a
+    // group or it is unreachable).
+    if (!cm.presentationOnly) {
+      if (cm.audience.length === 0) {
         errs.push(
-          `${src}: no oidc.audience origin matches any redirect_uris origin (apps verify id_token.aud against their own URL)`,
+          `${src}: oidc.audience is empty (every client needs an audience for id_token aud verification)`,
         );
+      } else if (cm.redirectUris.length > 0) {
+        if (!audienceMatchesRedirect(cm, cm.audience)) {
+          errs.push(
+            `${src}: no oidc.audience origin matches any redirect_uris origin (apps verify id_token.aud against their own URL)`,
+          );
+        }
       }
     }
 
@@ -549,7 +651,14 @@ export function knownIdentityGroups(): string[] {
   return Array.from(set).sort();
 }
 
-/** Distinct access groups across all clients. */
+/** Distinct access groups across all clients (the access-model Phase 2
+ * binding). Derived from each manifest's `accessGroups` list — the same field
+ * the gate keys off — so the admin surfaces and the gate agree on the
+ * access-bearing group set. */
 export function knownAccessGroups(): string[] {
-  return loadClientManifests().map((m) => m.accessGroup).sort();
+  const set = new Set<string>();
+  for (const m of loadClientManifests()) {
+    for (const g of m.accessGroups) set.add(g);
+  }
+  return Array.from(set).sort();
 }

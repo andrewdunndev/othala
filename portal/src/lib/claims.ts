@@ -1,7 +1,8 @@
 // ID-token claim construction (CU1 item 3, CU2 claims injection).
 //
 // Direct port of consent/claims.go BuildIDTokenClaims, deepMergeClaims,
-// and consent/manifest.go LookupRole, with IDENTICAL semantics.
+// and consent/manifest.go LookupRole, with IDENTICAL semantics except
+// where noted.
 //
 // BuildIDTokenClaims mapping against the family identity schema
 // (traits: username, email, displayName?):
@@ -15,11 +16,12 @@
 // Anything missing is omitted rather than emitted as null (apps tolerate
 // missing fields better than null).
 //
-// composeIDTokenClaims implements the 3-step emission sequence from
+// composeIDTokenClaims implements the 4-step emission sequence from
 // consent/handlers.go (~lines 208–223):
 //   1. buildIDTokenClaims (pure identity claims, including groups)
 //   2. if manifest && !shouldEmitGroups(manifest): delete groups claim
 //   3. lookupRole; if found: deepMergeClaims(claims, claimEmit)
+//   4. if requestedScope provided: delete claims whose required scope is absent
 
 import type { Identity } from './types';
 import type { ClientManifest } from './manifests';
@@ -162,13 +164,39 @@ function shallowCopyClaimEmit(ce: Record<string, unknown> | null): Record<string
 }
 
 /**
- * deepMergeClaims — full port of consent/claims.go deepMergeClaims.
+ * unionArrays — merge two arrays preserving dst order and appending any
+ * elements of src not already present. Deduplication uses strict identity for
+ * primitives and JSON.stringify for objects/arrays, which is sufficient for
+ * the real case (string arrays in groups claims). Order is dst-first, then
+ * new elements from src in their original src order.
+ */
+function unionArrays(a: unknown[], b: unknown[]): unknown[] {
+  const out: unknown[] = [];
+  const seen = new Set<string>();
+  for (const el of [...a, ...b]) {
+    const key =
+      typeof el === 'object' && el !== null
+        ? JSON.stringify(el)
+        : `${typeof el}:${String(el)}`;
+    if (seen.has(key)) continue;
+    seen.add(key);
+    out.push(el);
+  }
+  return out;
+}
+
+/**
+ * deepMergeClaims — port of consent/claims.go deepMergeClaims with one
+ * intentional divergence: arrays are UNIONed (order-preserving, deduped)
+ * rather than last-write-wins. This honours the de-facto SCIM `groups`
+ * convention — a role's claim_emit contributes additively to the user's
+ * real membership array, never shadows it.
  *
- * Merges src into dst in-place. Conflict semantics (identical to Go):
+ * Merges src into dst in-place. Conflict semantics:
  *   - Missing key in dst: copy src[k] into dst[k].
  *   - Both values are objects (Record<string,unknown>): recurse.
- *   - Any other conflict (scalar, array, type mismatch): src wins
- *     wholesale. Arrays are last-write-wins, NOT union — matching Go.
+ *   - Both values are arrays: dst[k] = unionArrays(dst[k], src[k]).
+ *   - Any other conflict (scalar, type mismatch): src wins wholesale.
  *   - Nil/undefined dst or src: no-op (mirrors Go nil check).
  */
 export function deepMergeClaims(
@@ -198,21 +226,42 @@ export function deepMergeClaims(
       deepMergeClaims(dv as Record<string, unknown>, sv as Record<string, unknown>);
       continue;
     }
-    // Scalar, array, or type mismatch: src wins.
+    // Array union: preserve dst membership, append additive src elements.
+    if (Array.isArray(dv) && Array.isArray(sv)) {
+      dst[k] = unionArrays(dv, sv);
+      continue;
+    }
+    // Scalar or type mismatch: src wins.
     dst[k] = sv;
   }
 }
 
+/** Map from OIDC scope token to the claim keys it covers (OIDC Core §5.4). */
+const SCOPE_CLAIMS: Record<string, string[]> = {
+  email: ['email', 'email_verified'],
+  profile: ['name', 'preferred_username'],
+  groups: ['groups'],
+};
+
 /**
- * composeIDTokenClaims — the 3-step emission sequence from
+ * composeIDTokenClaims — the 4-step emission sequence from
  * consent/handlers.go. The function acceptConsentRequest calls this
  * instead of buildIDTokenClaims directly.
  *
- * Order matches Go handlers.go ~lines 208-223:
+ * Order matches Go handlers.go ~lines 208-223, plus step 4:
  *   1. buildIDTokenClaims(identity) — pure identity claims
  *   2. if manifest && !shouldEmitGroups(manifest): delete groups claim
  *   3. lookupRole(manifest, identity.metadata_admin); if found:
- *      deepMergeClaims(claims, role.claimEmit)
+ *      deepMergeClaims(claims, role.claimEmit) — array keys are unioned,
+ *      so a role's groups are additive (H1 fix)
+ *   4. if requestedScope provided: delete any claim whose required scope
+ *      is absent (OIDC Core §5.4 scope-gate, H2 fix)
+ *
+ * @param requestedScope - the granted scope tokens from the consent request.
+ *   When provided, only claims covered by a listed scope are emitted.
+ *   When omitted (undefined), all claims are emitted — this preserves
+ *   backward-compat for callers that do not (yet) thread scope through.
+ *   `sub` is set by Hydra, not here; it is never touched.
  *
  * A missing manifest (nil-check in Go: `if cfg.Manifest != nil`) is
  * handled by lookupRole returning null and shouldEmitGroups not being
@@ -221,6 +270,7 @@ export function deepMergeClaims(
 export function composeIDTokenClaims(
   identity: Identity | null | undefined,
   manifest: ClientManifest | undefined | null,
+  requestedScope?: string[],
 ): Record<string, unknown> {
   const claims = buildIDTokenClaims(identity) as Record<string, unknown>;
 
@@ -232,6 +282,16 @@ export function composeIDTokenClaims(
     const result = lookupRole(manifest, identity.metadata_admin);
     if (result) {
       deepMergeClaims(claims, result.claimEmit);
+    }
+  }
+
+  // Step 4: scope-gate (OIDC Core §5.4). Only applied when requestedScope
+  // is provided — omitting it emits everything (back-compat).
+  if (requestedScope) {
+    for (const [scope, keys] of Object.entries(SCOPE_CLAIMS)) {
+      if (!requestedScope.includes(scope)) {
+        for (const k of keys) delete claims[k];
+      }
     }
   }
 

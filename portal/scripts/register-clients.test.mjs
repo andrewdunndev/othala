@@ -65,6 +65,9 @@ oidc:
     - https://keep.dunn.dev
   skip_consent: true
   backchannel_logout_uri: https://keep.dunn.dev/identity/connect/oidc-logout
+presentation:
+  access:
+    - keep
 consent:
   emit_groups_claim: true
   roles:

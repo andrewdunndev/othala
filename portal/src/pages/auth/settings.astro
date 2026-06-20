@@ -42,6 +42,9 @@ import {
 import type { NodeImageAttributes, NodeTextAttributes } from '../../lib/types';
 import FlowNodes from '../../components/FlowNodes.astro';
 import { revokeSubject, RevokeError } from '../../lib/revoke';
+import { getGroupRegistry, isIdentityGroup } from '../../lib/group-registry';
+import { getIdentity } from '../../lib/admin';
+import { identityGroups as readIdentityGroups } from '../../lib/gate';
 import { publicUrl } from '../../lib/config';
 import { signToken, verifyToken, CSRFError } from '../../lib/csrf';
 import type { Session } from '../../lib/types';
@@ -135,10 +138,23 @@ const hasWebAuthn = hasMethod(ui.nodes, 'webauthn');
 const logoutInfo = await getLogoutInfo(cookie);
 const csrfSignOut = signToken(session.identity.id);
 const traits = session.identity.traits;
-const groups = session.identity.metadata_admin?.groups ?? [];
+// The public whoami does NOT expose metadata_admin, so the user's real groups
+// must come from a re-fetch of the FULL identity via the ADMIN API (same
+// pattern as /api/forward-auth). This is DISPLAY-ONLY (the Membership chips),
+// but we still re-fetch so the user sees their actual groups instead of an
+// always-empty list. FAIL-CLOSED: on lookup failure show no groups.
+let groups: string[] = [];
+try {
+  groups = readIdentityGroups(await getIdentity(session.identity.id));
+} catch (lookupErr) {
+  console.error('[othala/settings] getIdentity failed; showing no groups:', lookupErr);
+}
 const displayName = traits.displayName || traits.username || '';
-const identityGroups = groups.filter((g) => !g.startsWith('access-'));
-const accessGroups = groups.filter((g) => g.startsWith('access-'));
+// access-model Phase 2: split the user's own groups by the registry's
+// binding-derived type, not an `access-` name prefix (docs/access-model.md §10).
+const groupRegistry = getGroupRegistry();
+const identityGroups = groups.filter((g) => isIdentityGroup(groupRegistry, g));
+const accessGroups = groups.filter((g) => !isIdentityGroup(groupRegistry, g));
 ---
 <Layout title="Settings" description="Account settings.">
 

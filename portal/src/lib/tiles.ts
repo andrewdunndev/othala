@@ -25,6 +25,7 @@ import { join } from 'node:path';
 import { parse as parseYaml } from 'yaml';
 import { marked } from 'marked';
 import DOMPurify from 'isomorphic-dompurify';
+import { parseAccessGroups } from './access-groups';
 
 // Locate the vendored icons directory.
 // Branch on import.meta.env.DEV so a stale dist/ from a previous production
@@ -119,6 +120,14 @@ export interface AppTile {
    */
   accessGroup: string;
   /**
+   * Normalized adopter-named access groups (access-model Phase 1 — dual-read).
+   * Sourced from `presentation.access:` (list) with a `[access_group]` compat
+   * fallback; `[]` when neither is present. ADDITIVE and parallel to the
+   * singular `accessGroup` field above — no gate logic consumes it yet
+   * (Phase 2/3, docs/access-model.md §17). No `everyone` fallback applied here.
+   */
+  accessGroups: string[];
+  /**
    * Optional grouping label for the dashboard (e.g. "Usenet", "Torrent").
    * Tiles sharing a group are rendered together under a sub-label.
    * Absent for tiles that belong to no named group.
@@ -204,6 +213,11 @@ function parseTile(slug: string, doc: Record<string, unknown>, dir: string): App
   // default group.
   const accessGroup = p['access_group'] ? String(p['access_group']) : tileDefaultGroup();
 
+  // Phase 1 dual-read: parse the new `access:` list (with `[access_group]`
+  // compat fallback) into a normalized list, in parallel to the singular
+  // accessGroup above. No consumer gates off this yet — additive only.
+  const accessGroups = parseAccessGroups(p);
+
   const url = String(p['url'] ?? '');
   let fqdn: string;
   try {
@@ -229,6 +243,7 @@ function parseTile(slug: string, doc: Record<string, unknown>, dir: string): App
     icon: String(p['icon'] ?? '??'),
     authKind: String(p['auth_kind'] ?? 'external') as AuthKind,
     accessGroup,
+    accessGroups,
     order: typeof p['order'] === 'number' ? p['order'] : 999,
     disabled: p['disabled'] === true,
     fqdn,
@@ -333,4 +348,27 @@ export function loadTiles(): AppTile[] {
  */
 export function getTile(slug: string): AppTile | undefined {
   return allTiles().find((t) => t.slug === slug);
+}
+
+/**
+ * The access-bearing group(s) that gate this tile's visibility (access-model
+ * Phase 2). Returns the manifest's `accessGroups` binding — the SAME field the
+ * OIDC entry gate keys off, killing the tile-vs-gate dual-source divergence the
+ * review flagged (docs/access-model.md §9 R1, §10). Falls back to the singular
+ * `accessGroup` (which carries the OTHALA_DEFAULT_GROUP fallback) only for
+ * presentation-only tiles that declare no `access:`/`access_group:` binding, so
+ * the default-group/statuspage pattern keeps working.
+ */
+export function tileAccessGroups(tile: AppTile): string[] {
+  return tile.accessGroups.length > 0 ? tile.accessGroups : [tile.accessGroup];
+}
+
+/**
+ * Whether a user holding `userGroups` may see `tile` on the dashboard.
+ * OR-semantics over the tile's access binding (tileAccessGroups). Mirrors the
+ * OIDC gate's membership check (gate.ts enforceAccessGate) so the tile shows
+ * iff the gate would let the user enter.
+ */
+export function userCanSeeTile(tile: AppTile, userGroups: string[]): boolean {
+  return tileAccessGroups(tile).some((g) => userGroups.includes(g));
 }

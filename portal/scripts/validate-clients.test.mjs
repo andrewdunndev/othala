@@ -81,6 +81,9 @@ oidc:
     - client_credentials
   audience:
     - https://llm.dunn.dev
+presentation:
+  access:
+    - llm
 consent: {}
 `);
   const errs = validateClients([m]);
@@ -125,6 +128,9 @@ oidc:
     - https://novel.dunn.dev/cb
   audience:
     - https://novel.dunn.dev
+presentation:
+  access:
+    - novel
 consent:
   roles:
     user:
@@ -302,6 +308,9 @@ oidc:
     - https://novel.dunn.dev/cb
   audience:
     - https://novel.dunn.dev
+presentation:
+  access:
+    - novel
 consent:
   roles:
     user:
@@ -311,6 +320,94 @@ consent:
     family: user
 `);
   assert.doesNotThrow(() => assertManifestsValid([good]));
+});
+
+// ── access-binding BLOCK wired into the load-time hard-fail (§11, primitive #5) ─
+
+test('BLOCK: bare manifest (no access binding, no skip) is a load-time hard-fail', () => {
+  // othala primitive #5: absence of a binding means NO access. A manifest with
+  // accessGroups: [] and no skip_access_check is definitionally unreachable and
+  // must be LOUDLY rejected at load (not silently dark).
+  const m = fromYaml(`
+oidc:
+  client_id: novel
+  redirect_uris:
+    - https://novel.dunn.dev/cb
+  audience:
+    - https://novel.dunn.dev
+consent: {}
+`);
+  assert.deepEqual(m.accessGroups, []);
+  const errs = validateClients([m]);
+  assert.ok(
+    errs.some((e) => e.includes('presentation.access is empty') && e.includes('unreachable')),
+    errs.join('\n'),
+  );
+  // And the hard-fail surfaces through assertManifestsValid.
+  assert.throws(() => assertManifestsValid([m]), /manifest validation failed/);
+});
+
+test('BLOCK: skip_access_check bypasses the empty-binding block', () => {
+  const m = fromYaml(`
+oidc:
+  client_id: novel
+  audience:
+    - https://novel.dunn.dev
+consent:
+  skip_access_check: true
+`);
+  const errs = validateClients([m]);
+  assert.equal(
+    errs.filter((e) => e.includes('presentation.access is empty')).length,
+    0,
+    errs.join('\n'),
+  );
+});
+
+test('BLOCK: a group listed twice in the access binding fires', () => {
+  const m = fromYaml(`
+oidc:
+  client_id: novel
+  audience:
+    - https://novel.dunn.dev
+presentation:
+  access:
+    - memories
+    - memories
+consent: {}
+`);
+  // parseAccessGroups de-dupes, so craft the duplicate directly on the object to
+  // prove validateClients' guard bites regardless of how it got there.
+  m.accessGroups = ['memories', 'memories'];
+  const errs = validateClients([m]);
+  assert.ok(
+    errs.some((e) => e.includes('more than once')),
+    errs.join('\n'),
+  );
+});
+
+test('presentation-only manifest is valid WITHOUT an oidc: block (audience rule skipped)', () => {
+  // observe.yaml shape: forward_auth tile, no OIDC client. It must validate
+  // clean — the audience / redirect rules do not apply — as long as it names an
+  // access group (which it does, satisfying the binding BLOCK).
+  const m = fromYaml(`
+presentation:
+  name: Observe
+  auth_kind: forward_auth
+  access_group: access-observe
+`, 'observe.yaml');
+  assert.equal(m.presentationOnly, true);
+  assert.deepEqual(validateClients([m]), []);
+});
+
+test('presentation-only manifest with NO access binding is still a BLOCK', () => {
+  const m = fromYaml(`
+presentation:
+  name: Lonely
+  auth_kind: forward_auth
+`, 'lonely.yaml');
+  const errs = validateClients([m]);
+  assert.ok(errs.some((e) => e.includes('unreachable')), errs.join('\n'));
 });
 
 // ── The real on-disk manifest set must be clean ────────────────────────────
@@ -327,10 +424,13 @@ test('every real hydra/clients/*.yaml round-trips AND the set passes validateCli
   const manifests = files.map((f) =>
     parseManifest(readFileSync(join(clientsDir, f), 'utf8'), f),
   );
-  // Round-trip sanity: every manifest has a non-empty clientId + accessGroup.
+  // Round-trip sanity: every manifest has a non-empty clientId + a non-empty
+  // access binding. access-model Phase 2: the binding is the accessGroups list
+  // (sourced from presentation.access: with the conventional fallback) — the
+  // load-bearing gate field — not the singular access-<clientId> name.
   for (const m of manifests) {
     assert.ok(m.clientId.length > 0, `${m.sourcePath}: empty clientId`);
-    assert.equal(m.accessGroup, `access-${m.clientId}`);
+    assert.ok(m.accessGroups.length > 0, `${m.sourcePath}: empty accessGroups`);
   }
   const errs = validateClients(manifests);
   assert.deepEqual(errs, [], `real manifests should be clean:\n${errs.join('\n')}`);

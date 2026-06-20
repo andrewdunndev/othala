@@ -61,8 +61,12 @@ const adminNav = [
         </header>
 
         <dl class="dl-grid">
-          <dt class="muted mono">access group</dt>
-          <dd><span class="badge badge-muted">{m.accessGroup}</span></dd>
+          <dt class="muted mono">access group{m.accessGroups.length === 1 ? '' : 's'}</dt>
+          <dd>
+            {/* access-model Phase 2: show the actual access binding (accessGroups),
+                the field the gate keys off — not the singular conventional name. */}
+            {m.accessGroups.map((g) => <span class="badge badge-muted">{g}</span>)}
+          </dd>
 
           <dt class="muted mono">grant types</dt>
           <dd class="mono text-xs">{m.grantTypes.join(', ') || '(none)'}</dd>
