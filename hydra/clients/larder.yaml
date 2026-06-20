@@ -1,0 +1,67 @@
+# Larder — larder.dunn.dev (Mealie: recipes, meal plans, shopping lists).
+#
+# OIDC client behind dag/othala SSO. Authored on the access-model PRIMITIVES
+# (docs/access-model.md): othala imposes no group-naming convention. The names
+# below are THIS deployment's (dag's) convention, expressed as data:
+#   - `larder`        — membership grants access to Larder. Bare name = access
+#                       (the operator's "membership = access" rule).
+#   - `larder-admin`  — elevation to Mealie's admin role. The `-admin` suffix is
+#                       the state-of-the-art elevation marker (GCP `.admin`,
+#                       k8s `cluster-admin`); it is dag data, not othala code.
+# The portal gate keys off `presentation.access`; the emitted `groups` claim
+# drives Mealie's own role mapping (OIDC_USER_GROUP / OIDC_ADMIN_GROUP).
+#
+# An admin holds BOTH groups: `larder` (entry) + `larder-admin` (elevation).
+#
+# Mealie RP-side config: othala/docs/per-app-oidc.md §larder. Verify OIDC field
+# names against https://docs.mealie.io/documentation/getting-started/authentication/oidc-v2/
+
+presentation:
+  name: Larder
+  description: Recipes, meal plans, and shopping lists for the household.
+  url: https://larder.dunn.dev
+  icon: LR
+  icon_slug: mealie
+  auth_kind: oidc
+  access:
+    - larder        # bare, adopter-named access group — no prefix (primitives)
+  order: 350
+
+oidc:
+  client_id: larder
+  client_name: Larder
+  grant_types:
+    - authorization_code
+    - refresh_token
+  response_types:
+    - code
+  scope: openid email profile groups offline_access
+  redirect_uris:
+    - https://larder.dunn.dev/login
+  post_logout_redirect_uris:
+    - https://larder.dunn.dev/
+  token_endpoint_auth_method: client_secret_basic
+  audience:
+    - https://larder.dunn.dev
+  skip_consent: true
+
+# Consent claim shape. Mealie reads a `groups` claim (OIDC_GROUPS_CLAIM=groups)
+# and matches OIDC_USER_GROUP=larder-user / OIDC_ADMIN_GROUP=larder-admin to
+# grant member / admin. The Kratos identity-group → role map below decides which
+# claim values are emitted.
+consent:
+  emit_groups_claim: true
+  roles:
+    user:
+      description: "Household member: recipes, meal plans, shopping lists."
+      claim_emit:
+        groups: ["larder-user"]
+    admin:
+      description: "Household admin: user management and settings."
+      claim_emit:
+        groups: ["larder-admin"]
+  # group_role_map keys are Kratos identity-group names (dag's convention): a
+  # `larder` member gets the user role; a `larder-admin` member gets admin.
+  group_role_map:
+    larder: user
+    larder-admin: admin
