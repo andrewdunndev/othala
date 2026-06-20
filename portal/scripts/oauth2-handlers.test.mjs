@@ -92,6 +92,9 @@ test('login accepts an active member (skip path)', async () => {
     oauth2: api,
     getIdentity: async () => activeMember(),
     getSession: defaultSession(),
+    // access-model Phase 2: the gate keys off the manifest's accessGroups
+    // binding (grafana.yaml → access-grafana), not a derived name.
+    manifest: () => loadManifest('grafana'),
   });
   assert.equal(res.status, 302);
   assert.equal(res.headers.get('location'), 'https://dag.dunn.dev/after-login');
@@ -109,6 +112,7 @@ test('login REJECTS when missing the access group — opaque error_description, 
       oauth2: api,
       getIdentity: async () => activeMember({ metadata_admin: { groups: [] } }),
       getSession: defaultSession(),
+      manifest: () => loadManifest('grafana'),
     });
     assert.equal(res.status, 302);
     assert.equal(res.headers.get('location'), 'https://dag.dunn.dev/login-rejected');
@@ -118,7 +122,7 @@ test('login REJECTS when missing the access group — opaque error_description, 
     // Real reason must appear in the server-side log for operator observability.
     const logged = warnArgs.find((a) => a[0].includes('oauth2/login'));
     assert.ok(logged, 'console.warn must be called for denied login');
-    assert.match(logged[1].reason, /access-grafana group/, 'real reason must be in the server-side log');
+    assert.match(logged[1].reason, /access group\(s\): access-grafana/, 'real reason must be in the server-side log');
   } finally {
     console.warn = origWarn;
   }
@@ -194,7 +198,7 @@ test('consent accepts an active member and grants scope + injects id_token', asy
   const res = await handleConsent(new Request('https://x/oauth2/consent?consent_challenge=cc'), {
     oauth2: api,
     getIdentity: async () => activeMember(),
-    manifest: () => undefined,
+    manifest: () => loadManifest('grafana'),
   });
   assert.equal(res.status, 302);
   assert.equal(res.headers.get('location'), 'https://dag.dunn.dev/after-consent');
@@ -212,13 +216,14 @@ test('consent REJECTS when missing the access group — opaque error_description
     const res = await handleConsent(new Request('https://x/oauth2/consent?consent_challenge=cc'), {
       oauth2: api,
       getIdentity: async () => activeMember({ metadata_admin: { groups: [] } }),
+      manifest: () => loadManifest('grafana'),
     });
     assert.equal(res.status, 302);
     assert.equal(calls.acceptConsent, 0);
     assert.equal(calls.rejectConsentReason, 'access_denied', 'error_description must be opaque');
     const logged = warnArgs.find((a) => a[0].includes('oauth2/consent'));
     assert.ok(logged, 'console.warn must be called for denied consent');
-    assert.match(logged[1].reason, /access-grafana group/, 'real reason must be in the server-side log');
+    assert.match(logged[1].reason, /access group\(s\): access-grafana/, 'real reason must be in the server-side log');
   } finally {
     console.warn = origWarn;
   }
@@ -309,7 +314,7 @@ test('T1: consent skip=true auto-accepts (REGRESSION GUARD)', async () => {
     {
       oauth2: api,
       getIdentity: async () => activeMember(),
-      manifest: () => undefined,
+      manifest: () => loadManifest('grafana'),
     },
   );
   // Must accept (redirect_to = after-consent URL), NOT bounce to /auth/consent.
@@ -362,6 +367,20 @@ test('T2: consent skip=false bounces to /auth/consent with challenge', async () 
     {
       oauth2: api,
       getIdentity: async () => activeMember(),
+      // Bind access-grafana (so the gate passes) but DON'T skip consent — this
+      // test asserts the bounce to the grant screen, which the real grafana
+      // manifest (skip_consent:true, see T2b) would suppress.
+      manifest: () => ({
+        clientId: 'grafana',
+        clientName: 'grafana',
+        accessGroup: 'access-grafana',
+        accessGroups: ['access-grafana'],
+        skipConsent: false,
+        skipAccessCheck: false,
+        roles: [],
+        groupRoleMap: {},
+        emitGroupsClaim: null,
+      }),
     },
   );
   assert.equal(res.status, 302);
@@ -435,7 +454,7 @@ test('T3: POST Allow accepts with remember=true, 30-day remember_for, claims', a
       active: true,
       identity: { id: 'id-1', state: 'active', schema_id: 'family', schema_url: '', traits: {} },
     }),
-    manifest: () => undefined,
+    manifest: () => loadManifest('grafana'),
   });
   assert.equal(res.status, 302);
   assert.equal(res.headers.get('location'), 'https://dag.dunn.dev/after-consent');
@@ -702,8 +721,15 @@ test('A4c: grafana override (roles.grafana=admin) beats group_role_map for famil
   assert.deepEqual(idToken.grafana_role, ['GrafanaAdmin'], 'override must beat group_role_map');
 });
 
-// A4e: missing manifest -> base claims only (no deepMerge, groups emitted by default)
-test('A4e: missing manifest -> base claims only, groups emitted', async () => {
+// A4e: a manifest that binds access but declares NO roles -> base claims only
+// (no deepMerge, groups emitted by default).
+//
+// access-model Phase 2: a TRULY missing manifest is now fail-closed (no binding
+// = no access — there is no implicit prefix-derived group anymore), so this
+// test supplies a minimal manifest that binds the user's access group but maps
+// no roles. The claim-composition behaviour under test (base claims, groups
+// emitted, zero role injection) is unchanged.
+test('A4e: roleless manifest -> base claims only, groups emitted', async () => {
   const { api, calls } = stubOAuth2({
     getOAuth2ConsentRequest: async () => ({
       challenge: 'cc', skip: true, subject: 'id-1',
@@ -715,12 +741,23 @@ test('A4e: missing manifest -> base claims only, groups emitted', async () => {
   const identity = activeMember({
     metadata_admin: { groups: ['family', 'access-unknown-client'] },
   });
+  // Minimal binding manifest: grants entry via access-unknown-client, no roles.
+  const rolelessManifest = {
+    clientId: 'unknown-client',
+    clientName: 'unknown-client',
+    accessGroup: 'access-unknown-client',
+    accessGroups: ['access-unknown-client'],
+    skipAccessCheck: false,
+    roles: [],
+    groupRoleMap: {},
+    emitGroupsClaim: null,
+  };
   const res = await handleConsent(
     new Request('https://x/oauth2/consent?consent_challenge=cc'),
     {
       oauth2: api,
       getIdentity: async () => identity,
-      manifest: () => undefined,  // no manifest
+      manifest: () => rolelessManifest,
     },
   );
   assert.equal(res.status, 302);
@@ -729,8 +766,8 @@ test('A4e: missing manifest -> base claims only, groups emitted', async () => {
   // Base claims only — groups are present (no suppression), no role injection
   assert.deepEqual(idToken.groups, ['family', 'access-unknown-client'], 'groups must be emitted from identity');
   assert.equal(idToken.email, 'a@dunn.dev', 'email must be present');
-  assert.ok(!('grafana_role' in idToken), 'no role claims injected when manifest missing');
-  assert.ok(!('roles' in idToken), 'no roles claim injected when manifest missing');
+  assert.ok(!('grafana_role' in idToken), 'no role claims injected when manifest declares no roles');
+  assert.ok(!('roles' in idToken), 'no roles claim injected when manifest declares no roles');
 });
 
 // D3 regression guard: grafana skip path injects grafana_role from manifest
@@ -1010,6 +1047,7 @@ test('FIX-A: login skip=true with matching live active session accepts', async (
       authenticator_assurance_level: 'aal1',
     }),
     getIdentity: async () => activeMember(),
+    manifest: () => loadManifest('grafana'),
   });
   assert.equal(res.status, 302, 'must redirect');
   assert.equal(calls.acceptLogin, 1, 'acceptLogin must be called when session matches');

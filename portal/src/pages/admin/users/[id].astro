@@ -39,6 +39,7 @@ import {
   normalizeGroupOrder,
   shouldRefuseRecovery,
 } from '../../../lib/access';
+import { getGroupRegistry, isIdentityGroup } from '../../../lib/group-registry';
 import { signToken, verifyToken, CSRFError } from '../../../lib/csrf';
 import type { Identity } from '../../../lib/types';
 
@@ -50,13 +51,22 @@ const { id } = Astro.params;
 if (!id) return new Response('Missing identity id', { status: 400 });
 
 const manifests = loadClientManifests();
+const registry = getGroupRegistry();
 // Identity-group form labels share the canonical order with access.ts.
 const IDENTITY_GROUPS = [...IDENTITY_GROUP_ORDER];
-const ACCESS_GROUPS = manifests.map((m) => ({
-  group: m.accessGroup,
-  clientId: m.clientId,
-  clientName: m.clientName,
-}));
+// access-model Phase 2: the "App access" checkboxes are the access-BEARING
+// groups derived from the registry (a group's type is its binding, not its
+// name), each annotated with the app(s) it grants entry to. One checkbox per
+// bound access group — multi-group `access:` lists surface every option, and a
+// group bound by several apps lists all of them.
+const clientNameById = new Map(manifests.map((m) => [m.clientId, m.clientName] as const));
+const ACCESS_GROUPS = Array.from(registry.values())
+  .filter((e) => e.kinds.has('access'))
+  .map((e) => ({
+    group: e.name,
+    apps: e.accessFor.map((id) => ({ clientId: id, clientName: clientNameById.get(id) ?? id })),
+  }))
+  .sort((a, b) => a.group.localeCompare(b.group));
 const USERNAME_RE = /^[a-z0-9]+(?:\.[a-z0-9]+)+$/;
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
@@ -232,8 +242,13 @@ if (Astro.request.method === 'POST' && identity) {
 }
 
 const groups = identity?.metadata_admin?.groups ?? [];
-const identityGroupMembership = groups.filter((g) => !g.startsWith('access-'));
-const accessGroupMembership = groups.filter((g) => g.startsWith('access-'));
+// access-model Phase 2: split membership into identity vs access columns by the
+// registry's binding-derived type, NOT by an `access-` name prefix (a group
+// named `memories` would otherwise be mis-filed and its access invisible —
+// docs/access-model.md §9 R1). A group the registry types as `identity` lands
+// in the identity column; everything else (access/role/unknown) is "access".
+const identityGroupMembership = groups.filter((g) => isIdentityGroup(registry, g));
+const accessGroupMembership = groups.filter((g) => !isIdentityGroup(registry, g));
 const roleOverrides = (identity?.metadata_admin?.roles ?? {}) as Record<string, string>;
 const effective = identity ? computeEffectiveAccess(identity, manifests) : [];
 
@@ -423,7 +438,7 @@ const adminNav = [
         </div>
 
         <div class="field">
-          <label>App access (one per app)</label>
+          <label>App access</label>
           <div class="checkbox-grid">
             {ACCESS_GROUPS.map((a) => (
               <label>
@@ -433,8 +448,12 @@ const adminNav = [
                   value={a.group}
                   checked={formValues.accessGroups.includes(a.group)}
                 />
-                <span class="mono">{a.clientId}</span>
-                <span class="muted text-xs">{a.clientName}</span>
+                <span class="mono">{a.group}</span>
+                <span class="muted text-xs">
+                  {a.apps.length
+                    ? `→ ${a.apps.map((app) => app.clientId).join(', ')}`
+                    : ''}
+                </span>
               </label>
             ))}
           </div>
@@ -560,7 +579,7 @@ const adminNav = [
             the consent service algorithm.
           </p>
           {effective.length === 0 ? (
-            <p class="muted text-sm">No app access. Add an access-* group to grant entry.</p>
+            <p class="muted text-sm">No app access. Assign a group named in some app's <code>access:</code> binding to grant entry.</p>
           ) : (
             <table class="data-table">
               <thead>

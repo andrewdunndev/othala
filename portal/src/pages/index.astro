@@ -32,7 +32,7 @@ export const prerender = false;
 
 import Layout from '../layouts/Layout.astro';
 import PageHero from '../components/PageHero.astro';
-import { loadTiles, loadGroups, safeHref, type AppTile } from '../lib/tiles';
+import { loadTiles, loadGroups, safeHref, userCanSeeTile, type AppTile } from '../lib/tiles';
 import { getSession, isReachable } from '../lib/kratos';
 import { isAdminId } from '../lib/admin-auth';
 import type { Identity } from '../lib/types';
@@ -91,9 +91,13 @@ const orderedApps = loadTiles();
 const groupRegistry = loadGroups();
 
 const groups = identity?.metadata_admin?.groups ?? [];
+// access-model Phase 2: tile visibility reads the manifest's access binding
+// (accessGroups, OR-semantics) via userCanSeeTile — the SAME field the OIDC
+// entry gate uses, so the tile shows iff the gate would admit the user. Kills
+// the prior tile-vs-gate dual source (docs/access-model.md §10).
 const visibleTiles =
   state === 'post-auth'
-    ? orderedApps.filter((a: AppTile) => groups.includes(a.accessGroup))
+    ? orderedApps.filter((a: AppTile) => userCanSeeTile(a, groups))
     : [];
 
 // Partition visibleTiles into ungrouped (no group field) and grouped sections.

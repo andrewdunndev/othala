@@ -22,7 +22,10 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { normalizeGroupOrder, computeEffectiveAccess } from '../src/lib/access.ts';
 
-// Helper: build a manifest fixture.
+// Helper: build a manifest fixture. access-model Phase 2: computeEffectiveAccess
+// gates on accessGroups (the load-bearing binding), defaulting to the
+// conventional [access-<clientId>] so the existing fixtures (which assign
+// `access-<slug>` identity groups) keep exercising the access gate.
 function manifest(clientId, opts = {}) {
   return {
     clientId,
@@ -35,6 +38,8 @@ function manifest(clientId, opts = {}) {
     skipConsent: false,
     backchannelLogoutUri: '',
     accessGroup: opts.accessGroup ?? `access-${clientId}`,
+    accessGroups: opts.accessGroups ?? [`access-${clientId}`],
+    skipAccessCheck: opts.skipAccessCheck ?? false,
     roles: opts.roles ?? [],
     groupRoleMap: opts.groupRoleMap ?? {},
   };
@@ -58,17 +63,23 @@ test('normalizeGroupOrder: identity groups in canonical order', () => {
   );
 });
 
-test('normalizeGroupOrder: access-* alphabetised after identity groups', () => {
+// access-model Phase 2: the `access-` prefix no longer partitions group order.
+// The split is identity-vs-everything (identity = OTHALA_IDENTITY_GROUPS, which
+// in the test env is just ['admin', <default>]); identity groups come first in
+// env order, then ALL remaining groups alphabetically — names like `access-*`,
+// `family`, `elder` are sorted together, their position a function of the name
+// alone, not a prefix (docs/access-model.md §10).
+test('normalizeGroupOrder: non-identity groups sort alphabetically after identity groups', () => {
   assert.deepEqual(
     normalizeGroupOrder(['access-tune', 'admin', 'access-keep', 'family']),
-    ['admin', 'family', 'access-keep', 'access-tune'],
+    ['admin', 'access-keep', 'access-tune', 'family'],
   );
 });
 
-test('normalizeGroupOrder: unknown groups go in alphabetical, between identity and access', () => {
+test('normalizeGroupOrder: all non-identity groups (access-* and bare) interleave alphabetically', () => {
   assert.deepEqual(
     normalizeGroupOrder(['service', 'admin', 'access-foo', 'elder']),
-    ['admin', 'elder', 'service', 'access-foo'],
+    ['admin', 'access-foo', 'elder', 'service'],
   );
 });
 

@@ -149,6 +149,59 @@ presentation:
     'empty access_group must fall back to the default group');
 });
 
+// ── accessGroups dual-read (access-model Phase 1) ─────────────────────────────
+
+test('parseTile: presentation.access list populates accessGroups', async () => {
+  const tile = await parseSingleTile(`
+presentation:
+  name: Test App
+  description: A test application
+  url: https://testapp.othala.test
+  icon: TA
+  auth_kind: oidc
+  access:
+    - memories
+    - family
+  order: 10
+`);
+  assert.ok(tile, 'tile must be parsed');
+  assert.deepEqual(tile.accessGroups, ['memories', 'family']);
+});
+
+test('parseTile: only access_group populates accessGroups via compat shim', async () => {
+  const tile = await parseSingleTile(`
+presentation:
+  name: Test App
+  description: A test application
+  url: https://testapp.othala.test
+  icon: TA
+  auth_kind: oidc
+  access_group: access-testapp
+  order: 10
+`);
+  assert.ok(tile, 'tile must be parsed');
+  assert.deepEqual(tile.accessGroups, ['access-testapp']);
+  // The singular field is unchanged (no Phase-1 behavior change).
+  assert.equal(tile.accessGroup, 'access-testapp');
+});
+
+test('parseTile: neither access nor access_group → accessGroups is empty', async () => {
+  const tile = await parseSingleTile(`
+presentation:
+  name: Test App
+  description: A test application
+  url: https://testapp.othala.test
+  icon: TA
+  auth_kind: external
+  order: 10
+`);
+  assert.ok(tile, 'tile must be parsed');
+  assert.deepEqual(tile.accessGroups, [],
+    'no access binding → empty accessGroups (no everyone fallback at this layer)');
+  // The singular field still falls back to the default group (unchanged).
+  assert.equal(tile.accessGroup, 'everyone');
+});
+
 // ── non-presentation manifest ─────────────────────────────────────────────────
 
 test('parseTile: manifest without presentation block returns no tile', async () => {

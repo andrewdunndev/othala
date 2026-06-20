@@ -37,10 +37,56 @@ consent:
     'keep.yaml',
   );
   assert.equal(out.clientId, 'keep');
-  assert.equal(out.accessGroup, 'access-keep');
   assert.deepEqual(out.scopes, ['openid', 'email', 'profile']);
   assert.equal(out.roles.length, 1);
   assert.equal(out.roles[0].name, 'user');
+});
+
+test('accessGroups dual-read: presentation.access list populates accessGroups', () => {
+  const out = parseManifest(
+    `
+oidc:
+  client_id: immich
+  scope: openid
+presentation:
+  access:
+    - memories
+    - admin-memories
+`,
+    'immich.yaml',
+  );
+  assert.deepEqual(out.accessGroups, ['memories', 'admin-memories']);
+});
+
+test('accessGroups dual-read: presentation.access_group compat shim', () => {
+  const out = parseManifest(
+    `
+oidc:
+  client_id: immich
+  scope: openid
+presentation:
+  access_group: access-immich
+`,
+    'immich.yaml',
+  );
+  assert.deepEqual(out.accessGroups, ['access-immich']);
+});
+
+test('accessGroups: no declared binding → [] (no implicit access)', () => {
+  // othala primitive #5 (access-model.md §4/§11 step 3): absence of a binding
+  // means NO access. A manifest that declares neither presentation.access: nor
+  // access_group: yields accessGroups: [] — there is NO implicit
+  // [access-<clientId>] fallback. Such a bare manifest is a load-time BLOCK in
+  // validateClients (covered in validate-clients.test.mjs).
+  const out = parseManifest(
+    `
+oidc:
+  client_id: immich
+  scope: openid
+`,
+    'immich.yaml',
+  );
+  assert.deepEqual(out.accessGroups, []);
 });
 
 test('pre-namespace flat shape is rejected', () => {
@@ -144,16 +190,27 @@ consent:
   assert.deepEqual(Object.keys(out.groupRoleMap).sort(), ['admin', 'family', 'kids']);
 });
 
-test('accessGroup convention: access-<clientId>', () => {
+test('presentation-only manifest (forward_auth, no oidc:) parses with the access binding', () => {
+  // observe.yaml shape: a presentation: block, no oidc: client. It must parse
+  // (not throw), flag presentationOnly, derive clientId from the filename slug,
+  // and carry the access binding through. This is the first-class
+  // forward_auth / ldap tile type (access-model.md §11).
   const out = parseManifest(
     `
-oidc:
-  client_id: tailscale
-consent: {}
+presentation:
+  name: Observe
+  auth_kind: forward_auth
+  access_group: access-observe
 `,
-    'tailscale.yaml',
+    'observe.yaml',
   );
-  assert.equal(out.accessGroup, 'access-tailscale');
+  assert.equal(out.presentationOnly, true);
+  assert.equal(out.clientId, 'observe');
+  assert.deepEqual(out.accessGroups, ['access-observe']);
+});
+
+test('manifest with neither oidc: nor presentation: throws', () => {
+  assert.throws(() => parseManifest(`foo: bar\n`, 'empty.yaml'));
 });
 
 test('backchannel_logout_uri preserved when present', () => {
@@ -233,6 +290,9 @@ oidc:
     - https://good.example.com
   redirect_uris:
     - https://good.example.com/callback
+presentation:
+  access:
+    - good-client
 consent:
   roles:
     user:
@@ -258,6 +318,9 @@ oidc:
     - https://bad.example.com
   redirect_uris:
     - https://bad.example.com/callback
+presentation:
+  access:
+    - bad-client
 consent:
   roles:
     user:
@@ -353,6 +416,9 @@ oidc:
     - https://good.example.com
   redirect_uris:
     - https://good.example.com/callback
+presentation:
+  access:
+    - good-app
 consent: {}
 `);
 
@@ -389,6 +455,9 @@ oidc:
     - https://survivor.example.com
   redirect_uris:
     - https://survivor.example.com/callback
+presentation:
+  access:
+    - survivor
 consent: {}
 `);
 

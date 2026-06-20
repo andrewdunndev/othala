@@ -16,10 +16,15 @@ export const prerender = false;
 import Layout from '../../../layouts/Layout.astro';
 import { requireAdminSession, listIdentities } from '../../../lib/admin';
 import { knownIdentityGroups, knownAccessGroups } from '../../../lib/manifests';
+import { getGroupRegistry, isIdentityGroup } from '../../../lib/group-registry';
 import type { Identity } from '../../../lib/types';
 
 const guard = await requireAdminSession(Astro);
 if (guard instanceof Response) return guard;
+
+// access-model Phase 2: split user group chips by the registry's binding-derived
+// type, not an `access-` name prefix (docs/access-model.md §10).
+const registry = getGroupRegistry();
 
 const url = Astro.url;
 const search = (url.searchParams.get('q') ?? '').toLowerCase().trim();
@@ -135,8 +140,8 @@ const adminNav = [
       <tbody>
         {filtered.map((i) => {
           const groups = i.metadata_admin?.groups ?? [];
-          const identityGs = groups.filter((g) => !g.startsWith('access-'));
-          const accessGs = groups.filter((g) => g.startsWith('access-'));
+          const identityGs = groups.filter((g) => isIdentityGroup(registry, g));
+          const accessGs = groups.filter((g) => !isIdentityGroup(registry, g));
           return (
             <tr>
               <td class="users-username">

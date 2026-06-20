@@ -44,8 +44,12 @@ import type { Identity } from '../../lib/types';
 
 export const prerender = false;
 
-/** Operator-set access groups: "access-" + lowercase alphanumerics/hyphens. */
-const GROUP_RE = /^access-[a-z0-9-]+$/;
+// Operator-set access group name. This is an INPUT GUARD (SSRF/charset), not a
+// naming policy: othala imposes no group-naming convention (access-model Phase
+// 3, docs/access-model.md §10/§11). Any adopter-named group passes as long as it
+// matches the safe charset; the group's MEANING comes from a manifest binding,
+// never its name. (`access-observe` and bare `observe` both pass.)
+const GROUP_RE = /^[a-z0-9][a-z0-9-]*$/;
 
 const ID_HEADER = 'X-Kratos-Authenticated-Identity-Id';
 
@@ -63,7 +67,8 @@ function text(status: number, body: string, headers: Record<string, string> = {}
 
 async function decide(request: Request, url: URL): Promise<Response> {
   // 1. Required group from the (operator-controlled) query param. Fail closed
-  //    if absent/empty or not the strict access-<slug> shape.
+  //    if absent/empty or not within the safe charset (input guard, not a
+  //    naming policy).
   const group = url.searchParams.get('group')?.trim() ?? '';
   if (group === '' || !GROUP_RE.test(group)) {
     return text(403, 'forbidden');

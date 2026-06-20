@@ -16,7 +16,7 @@
 export const prerender = false;
 
 import Layout from '../../layouts/Layout.astro';
-import { getTile, safeHref } from '../../lib/tiles';
+import { getTile, safeHref, userCanSeeTile } from '../../lib/tiles';
 import { getSession } from '../../lib/kratos';
 import { isAdminId } from '../../lib/admin-auth';
 
@@ -43,10 +43,11 @@ if (!entry) {
 // CVP-P1: admin authority is the OTHALA_ADMIN_IDS allowlist keyed on the
 // immutable identity id, NOT the (display-only) `admin` group and NOT the
 // user-editable email trait. Admins see every app's detail page; everyone
-// else needs the per-app access-<slug> group.
+// else needs membership in one of the tile's bound access groups (access-model
+// Phase 2 — userCanSeeTile reads the same accessGroups binding as the gate).
 const groups = session.identity.metadata_admin?.groups ?? [];
 const isAdmin = isAdminId(session.identity.id);
-const hasAccess = isAdmin || groups.includes(entry.accessGroup);
+const hasAccess = isAdmin || userCanSeeTile(entry, groups);
 if (!hasAccess) {
   return Astro.redirect('/auth/error?reason=not-authorised');
 }
