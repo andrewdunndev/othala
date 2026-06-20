@@ -204,7 +204,10 @@ test('consent accepts an active member and grants scope + injects id_token', asy
   assert.equal(res.headers.get('location'), 'https://dag.dunn.dev/after-consent');
   assert.deepEqual(calls.acceptConsentBody.grant_scope, ['email', 'profile']);
   assert.equal(calls.acceptConsentBody.session.id_token.email, 'a@dunn.dev');
-  assert.deepEqual(calls.acceptConsentBody.session.id_token.groups, ['access-grafana']);
+  // Default stub requested_scope is ['email','profile'] — no 'groups' scope, so groups
+  // claim is gate-removed by H2 (OIDC Core §5.4). grafana's viewer role claim_emit also
+  // has grafana_role/groups but neither survives the scope-gate without 'groups'.
+  assert.equal('groups' in calls.acceptConsentBody.session.id_token, false, 'groups absent when groups scope not requested');
 });
 
 test('consent REJECTS when missing the access group — opaque error_description, real reason logged', async () => {
@@ -630,8 +633,8 @@ const grafanaManifest = loadManifest('grafana');
 const audiobookshelfManifest = loadManifest('audiobookshelf');
 
 // A4a: audiobookshelf — identity in 'family' group -> user role ->
-// claim_emit.groups = ['user'] replaces the identity groups.
-test('A4a: audiobookshelf family member gets user role, groups replaced', async () => {
+// claim_emit.groups = ['user'] is UNIONed with identity groups (H1: additive, not replace).
+test('A4a: audiobookshelf family member gets user role, groups unioned', async () => {
   const { api, calls } = stubOAuth2({
     getOAuth2ConsentRequest: async () => ({
       challenge: 'cc', skip: true, subject: 'id-1',
@@ -654,14 +657,18 @@ test('A4a: audiobookshelf family member gets user role, groups replaced', async 
   assert.equal(res.status, 302);
   assert.equal(calls.acceptConsent, 1);
   const idToken = calls.acceptConsentBody.session.id_token;
-  // audiobookshelf user role: claim_emit.groups = ['user'] — replaces identity groups
-  assert.deepEqual(idToken.groups, ['user'], 'groups must be replaced by role claim_emit');
+  // audiobookshelf user role: claim_emit.groups = ['user'] — UNIONed with identity groups
+  // (H1: real memberships preserved; role claim contributes additively)
+  assert.ok(Array.isArray(idToken.groups), 'groups must be an array');
+  assert.ok(idToken.groups.includes('family'), 'identity group family must be preserved');
+  assert.ok(idToken.groups.includes('access-audiobookshelf'), 'identity group access-audiobookshelf must be preserved');
+  assert.ok(idToken.groups.includes('user'), 'role claim_emit group user must be present');
   assert.equal(idToken.email, 'a@dunn.dev', 'email must still be present');
 });
 
 // A4b: grafana — identity in 'admin' group -> admin role ->
-// grafana_role=['GrafanaAdmin'], groups=['admin'].
-test('A4b: grafana admin member gets GrafanaAdmin role, grafana_role claim injected', async () => {
+// grafana_role=['GrafanaAdmin'], groups UNIONed: ['admin','access-grafana'] deduped with ['admin'].
+test('A4b: grafana admin member gets GrafanaAdmin role, grafana_role claim injected, groups unioned', async () => {
   const { api, calls } = stubOAuth2({
     getOAuth2ConsentRequest: async () => ({
       challenge: 'cc', skip: true, subject: 'id-1',
@@ -685,7 +692,11 @@ test('A4b: grafana admin member gets GrafanaAdmin role, grafana_role claim injec
   assert.equal(calls.acceptConsent, 1);
   const idToken = calls.acceptConsentBody.session.id_token;
   assert.deepEqual(idToken.grafana_role, ['GrafanaAdmin'], 'grafana_role claim must be injected');
-  assert.deepEqual(idToken.groups, ['admin'], 'groups must be replaced by role claim_emit');
+  // admin role claim_emit.groups = ['admin']; identity already has 'admin' — deduped.
+  // 'access-grafana' is preserved from identity. Union = ['admin','access-grafana'].
+  assert.ok(Array.isArray(idToken.groups), 'groups must be an array');
+  assert.ok(idToken.groups.includes('admin'), 'admin group must be present');
+  assert.ok(idToken.groups.includes('access-grafana'), 'identity group access-grafana must be preserved');
   assert.equal(idToken.email, 'a@dunn.dev', 'email must still be present');
 });
 
@@ -763,9 +774,10 @@ test('A4e: roleless manifest -> base claims only, groups emitted', async () => {
   assert.equal(res.status, 302);
   assert.equal(calls.acceptConsent, 1);
   const idToken = calls.acceptConsentBody.session.id_token;
-  // Base claims only — groups are present (no suppression), no role injection
-  assert.deepEqual(idToken.groups, ['family', 'access-unknown-client'], 'groups must be emitted from identity');
+  // requested_scope=['email','profile'] — 'groups' not in scope; H2 gates groups out.
+  // Base claims only: email present, groups absent (no scope), no role injection.
   assert.equal(idToken.email, 'a@dunn.dev', 'email must be present');
+  assert.equal('groups' in idToken, false, 'groups absent when groups scope not requested');
   assert.ok(!('grafana_role' in idToken), 'no role claims injected when manifest declares no roles');
   assert.ok(!('roles' in idToken), 'no roles claim injected when manifest declares no roles');
 });
@@ -939,7 +951,7 @@ test('T7b: POST Allow re-gates and rejects an inactive identity', async () => {
 // branch of deepMergeClaims is not exercised by the A4 tests. These unit
 // tests drive it directly.
 
-test('deepMergeClaims: recursive nested-object merge (src-wins on scalar conflict, dst-only keys preserved)', () => {
+test('deepMergeClaims: recursive nested-object merge (array union, scalar src-wins, dst-only keys preserved)', () => {
   // Simulate resource_access.<app>.roles shape as used by some OIDC clients.
   const dst = {
     resource_access: {
@@ -950,18 +962,18 @@ test('deepMergeClaims: recursive nested-object merge (src-wins on scalar conflic
   };
   const src = {
     resource_access: {
-      myapp: { roles: ['admin'] },       // scalar/array conflict: src wins
+      myapp: { roles: ['admin'] },       // array conflict: unioned (H1: union, not src-wins)
     },
     flat_key: 'override',               // scalar conflict: src wins
   };
 
   deepMergeClaims(dst, src);
 
-  // src wins on array conflict inside nested object.
+  // arrays are unioned: dst-first, then new src elements appended.
   assert.deepEqual(
     dst.resource_access.myapp.roles,
-    ['admin'],
-    'src wins on array conflict inside nested object',
+    ['user', 'admin'],
+    'array conflict inside nested object becomes union',
   );
   // dst-only nested key must be preserved.
   assert.deepEqual(
