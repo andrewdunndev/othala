@@ -11,7 +11,11 @@
 # The portal gate keys off `presentation.access`; the emitted `groups` claim
 # drives Mealie's own role mapping (OIDC_USER_GROUP / OIDC_ADMIN_GROUP).
 #
-# An admin holds BOTH groups: `larder` (entry) + `larder-admin` (elevation).
+# Tiers, not stacking: a user is in EXACTLY ONE of `larder` (member) or
+# `larder-admin` (admin). Both grant ACCESS (membership = access); the group
+# also picks the role via group_role_map. Do NOT put an admin in both — othala
+# resolves a single role by precedence (alphabetical/coarser-first), so stacking
+# `larder`+`larder-admin` would resolve to the *user* role and never elevate.
 #
 # Mealie RP-side config: othala/docs/per-app-oidc.md §larder. Verify OIDC field
 # names against https://docs.mealie.io/documentation/getting-started/authentication/oidc-v2/
@@ -24,7 +28,8 @@ presentation:
   icon_slug: mealie
   auth_kind: oidc
   access:
-    - larder        # bare, adopter-named access group — no prefix (primitives)
+    - larder        # member tier: grants access + (group_role_map) the user role
+    - larder-admin  # admin tier: grants access + the admin role (membership ⇒ access)
   order: 350
 
 oidc:
