@@ -18,6 +18,8 @@ export const prerender = false;
 import Layout from '../../layouts/Layout.astro';
 import { getTile, safeHref, userCanSeeTile } from '../../lib/tiles';
 import { getSession } from '../../lib/kratos';
+import { getIdentity } from '../../lib/admin';
+import { identityGroups } from '../../lib/gate';
 import { isAdminId } from '../../lib/admin-auth';
 
 const { slug } = Astro.params;
@@ -45,7 +47,17 @@ if (!entry) {
 // user-editable email trait. Admins see every app's detail page; everyone
 // else needs membership in one of the tile's bound access groups (access-model
 // Phase 2 — userCanSeeTile reads the same accessGroups binding as the gate).
-const groups = session.identity.metadata_admin?.groups ?? [];
+// The public whoami does NOT expose metadata_admin, so the user's groups must
+// come from a re-fetch of the FULL identity via the ADMIN API (same pattern as
+// /api/forward-auth). FAIL-CLOSED: any lookup failure → empty groups → the
+// access gate denies; admin authority below is keyed on the session id (which
+// is always present), independent of this lookup.
+let groups: string[] = [];
+try {
+  groups = identityGroups(await getIdentity(session.identity.id));
+} catch (lookupErr) {
+  console.error('[othala/apps] getIdentity failed; denying (no groups):', lookupErr);
+}
 const isAdmin = isAdminId(session.identity.id);
 const hasAccess = isAdmin || userCanSeeTile(entry, groups);
 if (!hasAccess) {
