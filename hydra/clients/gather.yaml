@@ -1,0 +1,21 @@
+# Gather — gather.dunn.dev (download/media-acquisition stack).
+#
+# Forward-auth gated, NOT OIDC: qBittorrent, SABnzbd, Sonarr, Radarr, and
+# Prowlarr have no meaningful OIDC support. dag SSO gates at the edge —
+# gather-caddy does forward_auth → the portal's
+# /api/forward-auth?group=access-gather endpoint. Only identities in the
+# access-gather group may enter; apps keep their own local config behind the
+# gate.
+#
+# This manifest is presentation-only (no oidc/consent block): it renders the
+# tile and makes `access-gather` a known, assignable access group (Edit page
+# "App access"). access_group MUST equal access-<filename-slug> = access-gather.
+presentation:
+  name: Gather
+  description: Download and media-acquisition stack — qBittorrent, SABnzbd, Sonarr, Radarr, Prowlarr, all behind Mullvad WireGuard VPN.
+  url: https://gather.dunn.dev
+  icon: GA
+  icon_slug: gluetun
+  auth_kind: forward_auth
+  access_group: access-gather
+  order: 800
