@@ -369,4 +369,21 @@ if (import.meta.url === `file://${process.argv[1]}`) {
   adminServer.listen(ADMIN_PORT, ADMIN_HOST, () => {
     console.log(`[portal] admin listener on http://${ADMIN_HOST}:${ADMIN_PORT}`);
   });
+
+  // ── In-process OIDC client reconciler ────────────────────────────────────
+  // Replaces the external dag-apply-clients.sh script. Both listeners are
+  // already bound (healthz is green) BEFORE reconciliation begins, so a slow
+  // or failing Hydra never delays the portal coming up.
+  //
+  // Boot: bounded retry+backoff (reconcileOnBoot). After the retry budget is
+  // exhausted the portal logs a clear operator notice and keeps serving; an
+  // operator SIGHUP retries once Hydra is ready.
+  //
+  // SIGHUP: drops the manifest cache (re-reads from disk) then reconciles.
+  // Errors are swallowed — the portal always continues serving.
+  const registrar = await import('./registrar.mjs');
+  registrar.reconcileOnBoot().catch((e) => console.error('[portal] boot reconcile error', e));
+  process.on('SIGHUP', () => {
+    registrar.reloadOnSighup().catch((e) => console.error('[portal] SIGHUP reload error', e));
+  });
 }
