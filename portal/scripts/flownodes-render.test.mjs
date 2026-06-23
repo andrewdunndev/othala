@@ -189,7 +189,7 @@ test('passValue=true (default) renders the value attribute on labeled inputs', a
   const nodes = [
     input(
       'profile',
-      { node_type: 'input', name: 'traits.email', type: 'text', value: 'a@dunn.dev' },
+      { node_type: 'input', name: 'traits.email', type: 'text', value: 'a@othala.test' },
       { label: { text: 'Email' } },
     ),
   ];
@@ -199,7 +199,7 @@ test('passValue=true (default) renders the value attribute on labeled inputs', a
     buttonClass: 'button button-primary',
     submitLabel: 'Save',
   }));
-  assert.match(html, /value="a@dunn.dev"/);
+  assert.match(html, /value="a@othala.test"/);
 });
 
 test('only nodes in the requested group are rendered', async () => {

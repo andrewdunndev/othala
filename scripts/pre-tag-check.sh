@@ -147,6 +147,16 @@ if [[ $APPS_BAD -eq 0 ]]; then
 fi
 echo ""
 
+# ----- Purity + hygiene -----
+echo "Purity + hygiene:"
+if bash scripts/check-purity.sh >/tmp/pre-tag-purity.log 2>&1; then
+    step_pass "check-purity (no violations)"
+else
+    step_fail "check-purity" "/tmp/pre-tag-purity.log"
+    cat /tmp/pre-tag-purity.log
+fi
+echo ""
+
 # ----- Summary -----
 TOTAL=$((PASS + FAIL))
 if [[ $FAIL -eq 0 ]]; then

@@ -27,31 +27,31 @@ function manifest(redirectUris) {
   };
 }
 
-const m = manifest(['https://grafana.dunn.dev/login/generic_oauth']);
+const m = manifest(['https://grafana.othala.test/login/generic_oauth']);
 
 test('exact-origin audience is accepted', () => {
-  assert.equal(audienceMatchesRedirect(m, ['https://grafana.dunn.dev']), true);
+  assert.equal(audienceMatchesRedirect(m, ['https://grafana.othala.test']), true);
 });
 
 test('REJECTS a suffix-attack audience (prefix/HasPrefix hole closed)', () => {
-  assert.equal(audienceMatchesRedirect(m, ['https://grafana.dunn.dev.evil.com']), false);
+  assert.equal(audienceMatchesRedirect(m, ['https://grafana.othala.test.evil.com']), false);
 });
 
 test('REJECTS a scheme mismatch', () => {
-  assert.equal(audienceMatchesRedirect(m, ['http://grafana.dunn.dev']), false);
+  assert.equal(audienceMatchesRedirect(m, ['http://grafana.othala.test']), false);
 });
 
 test('REJECTS a port mismatch (origin includes port)', () => {
-  assert.equal(audienceMatchesRedirect(m, ['https://grafana.dunn.dev:8443']), false);
+  assert.equal(audienceMatchesRedirect(m, ['https://grafana.othala.test:8443']), false);
 });
 
 test('REJECTS unknown client (undefined manifest, no silent allow)', () => {
-  assert.equal(audienceMatchesRedirect(undefined, ['https://grafana.dunn.dev']), false);
+  assert.equal(audienceMatchesRedirect(undefined, ['https://grafana.othala.test']), false);
 });
 
 test('REJECTS when manifest has no usable redirect origins (no silent allow)', () => {
-  assert.equal(audienceMatchesRedirect(manifest([]), ['https://grafana.dunn.dev']), false);
-  assert.equal(audienceMatchesRedirect(manifest(['app://custom']), ['https://grafana.dunn.dev']), false);
+  assert.equal(audienceMatchesRedirect(manifest([]), ['https://grafana.othala.test']), false);
+  assert.equal(audienceMatchesRedirect(manifest(['app://custom']), ['https://grafana.othala.test']), false);
 });
 
 test('empty / absent audience is unconstrained -> true', () => {
@@ -65,7 +65,7 @@ test('REJECTS a non-URL audience', () => {
 
 test('REJECTS when one of several audiences fails', () => {
   assert.equal(
-    audienceMatchesRedirect(m, ['https://grafana.dunn.dev', 'https://other.dunn.dev']),
+    audienceMatchesRedirect(m, ['https://grafana.othala.test', 'https://other.othala.test']),
     false,
   );
 });

@@ -74,8 +74,8 @@ selfservice:
       config:
         rp:
           # CRITICAL one-way decision: registrable parent so passkeys are
-          # assertable from any *.dunn.dev origin. Changing this id invalidates
-          # every enrolled passkey. (Shared with the webauthn RP below.)
+          # assertable from any *.example.com origin (registrable parent RP ID).
+          # Changing this id invalidates every enrolled passkey. (Shared with the webauthn RP below.)
           id: "${OTHALA_WEBAUTHN_RP_ID}"
           display_name: "${OTHALA_INSTANCE_NAME}"
           origins:

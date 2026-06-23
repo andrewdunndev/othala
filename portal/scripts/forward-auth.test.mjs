@@ -72,7 +72,7 @@ afterEach(() => {
 
 // Build an APIContext-like arg for the handler (request + url, the only fields read).
 function ctx(group, cookie = 'ory_kratos_session=abc') {
-  const base = 'https://dag.dunn.dev/api/forward-auth';
+  const base = 'https://dag.othala.test/api/forward-auth';
   const url = new URL(group === undefined ? base : `${base}?group=${encodeURIComponent(group)}`);
   const headers = new Headers();
   if (cookie !== null) headers.set('cookie', cookie);

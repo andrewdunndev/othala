@@ -15,7 +15,8 @@
     "check": "astro check",
     "preview": "astro preview",
     "start": "node ./dist/server/listen.mjs",
-    "test": "tsx --test scripts/*.test.mjs"
+    "test": "tsx --test scripts/*.test.mjs",
+    "purity": "cd .. && bash scripts/check-purity.sh"
   },
   "dependencies": {
     "@astrojs/node": "^10.0.6",

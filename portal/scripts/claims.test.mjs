@@ -15,28 +15,28 @@ function base(overrides = {}) {
     state: 'active',
     schema_id: 'family',
     schema_url: '',
-    traits: { username: 'ada', email: 'a@dunn.dev', displayName: 'Ada Lovelace' },
+    traits: { username: 'ada', email: 'a@othala.test', displayName: 'Ada Lovelace' },
     metadata_admin: { groups: ['access-grafana'] },
-    verifiable_addresses: [{ value: 'a@dunn.dev', verified: true, via: 'email', status: 'completed' }],
+    verifiable_addresses: [{ value: 'a@othala.test', verified: true, via: 'email', status: 'completed' }],
     ...overrides,
   };
 }
 
 test('email + email_verified from traits.email and verifiable_addresses', () => {
   const c = buildIDTokenClaims(base());
-  assert.equal(c.email, 'a@dunn.dev');
+  assert.equal(c.email, 'a@othala.test');
   assert.equal(c.email_verified, true);
 });
 
 test('email_verified omitted when no verifiable_addresses', () => {
   const c = buildIDTokenClaims(base({ verifiable_addresses: [] }));
-  assert.equal(c.email, 'a@dunn.dev');
+  assert.equal(c.email, 'a@othala.test');
   assert.equal('email_verified' in c, false);
 });
 
 test('email_verified falls back to first address when no exact match', () => {
   const c = buildIDTokenClaims(base({
-    verifiable_addresses: [{ value: 'other@dunn.dev', verified: false, via: 'email', status: 'completed' }],
+    verifiable_addresses: [{ value: 'other@othala.test', verified: false, via: 'email', status: 'completed' }],
   }));
   assert.equal(c.email_verified, false);
 });
@@ -52,7 +52,7 @@ test('name = traits.displayName when present', () => {
 });
 
 test('name falls back to username when no displayName', () => {
-  const c = buildIDTokenClaims(base({ traits: { username: 'ada', email: 'a@dunn.dev' } }));
+  const c = buildIDTokenClaims(base({ traits: { username: 'ada', email: 'a@othala.test' } }));
   assert.equal(c.name, 'ada');
 });
 
@@ -184,7 +184,7 @@ test('composeIDTokenClaims H2: requestedScope [openid, email] — email present,
   const id = identityWithGroups(['larder']);
   const m = manifest();
   const c = composeIDTokenClaims(id, m, ['openid', 'email']);
-  assert.equal(c.email, 'a@dunn.dev');
+  assert.equal(c.email, 'a@othala.test');
   assert.equal(c.email_verified, true);
   assert.equal('name' in c, false, 'name absent');
   assert.equal('preferred_username' in c, false, 'preferred_username absent');
@@ -195,7 +195,7 @@ test('composeIDTokenClaims H2: requestedScope [openid, email, profile, groups] �
   const id = identityWithGroups(['larder']);
   const m = manifest();
   const c = composeIDTokenClaims(id, m, ['openid', 'email', 'profile', 'groups']);
-  assert.equal(c.email, 'a@dunn.dev');
+  assert.equal(c.email, 'a@othala.test');
   assert.equal(c.email_verified, true);
   assert.equal(c.name, 'Ada Lovelace');
   assert.equal(c.preferred_username, 'ada');
@@ -208,7 +208,7 @@ test('composeIDTokenClaims back-compat: no requestedScope → all claims emitted
   const id = identityWithGroups(['larder']);
   const m = manifest();
   const c = composeIDTokenClaims(id, m);
-  assert.equal(c.email, 'a@dunn.dev');
+  assert.equal(c.email, 'a@othala.test');
   assert.equal(c.name, 'Ada Lovelace');
   assert.equal(c.preferred_username, 'ada');
   assert.ok(Array.isArray(c.groups), 'groups is an array');

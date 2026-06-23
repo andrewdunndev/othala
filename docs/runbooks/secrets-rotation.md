@@ -21,7 +21,7 @@ exposure, on-disk leak, accidental commit).
 
 - Every Hydra-stored OAuth2 client secret becomes unreadable. Apps
   re-receive new client_secret values when the in-app registrar re-runs
-  (`make dag-apply-clients`).
+  (`just dag-reload-clients <host>`).
 - Outstanding consent challenges (in-flight OAuth2 flows) become
   invalid. Users mid-flow see an error and re-attempt.
 - Hydra's signing keys (id_token JWKS) are unaffected; they live in a
@@ -84,7 +84,7 @@ key).
 7. Re-issue every client secret:
 
    ```sh
-   make dag-apply-clients HOST=<sso-host>
+   just dag-reload-clients <sso-host>
    ```
 
    This runs the Othala in-app registrar as a `--rm` one-shot, which
@@ -105,7 +105,7 @@ key).
 
 After rotation:
 
-- `make dag-apply-clients` exited 0 for every manifest in `MANIFEST_DIR`.
+- `just dag-reload-clients <host>` exited 0 for every manifest in `MANIFEST_DIR`.
 - A test login through any OIDC client completes.
 - Hydra logs show no decryption errors: `journalctl --user -u dag-hydra.service -n 50`.
 - The sops file has only the new `hydra_system_secret` value.

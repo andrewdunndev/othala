@@ -12,7 +12,7 @@
   <!-- actors -->
   <rect x="120" y="72" width="220" height="40" rx="6" fill="#eef3fb" stroke="#4a78c0"/>
   <text x="230" y="89" text-anchor="middle" font-size="12.5" fill="#222">Operator browser</text>
-  <text x="230" y="104" text-anchor="middle" font-size="11.5" fill="#555">andrew.dunn / ashley.dunn</text>
+  <text x="230" y="104" text-anchor="middle" font-size="11.5" fill="#555">admin-a / admin-b</text>
   <rect x="370" y="72" width="220" height="40" rx="6" fill="#f3f3f3" stroke="#888"/>
   <text x="480" y="89" text-anchor="middle" font-size="12.5" fill="#222">Public internet · OIDC RPs</text>
   <text x="480" y="104" text-anchor="middle" font-size="11.5" fill="#555">Tailscale, Grafana, Audiobookshelf…</text>

@@ -1,4 +1,4 @@
-// In-process OIDC client reconciler — replaces the external dag-apply-clients.sh.
+// In-process OIDC client reconciler — driven by boot reconcile + SIGHUP.
 //
 // Called on BOOT (reconcileOnBoot) and on SIGHUP (reloadOnSighup), both wired
 // in src/server/listen.mjs. The reconciler is resilient: it never crashes the

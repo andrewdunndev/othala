@@ -371,7 +371,7 @@ if (import.meta.url === `file://${process.argv[1]}`) {
   });
 
   // ── In-process OIDC client reconciler ────────────────────────────────────
-  // Replaces the external dag-apply-clients.sh script. Both listeners are
+  // In-process OIDC client reconciler. Both listeners are
   // already bound (healthz is green) BEFORE reconciliation begins, so a slow
   // or failing Hydra never delays the portal coming up.
   //

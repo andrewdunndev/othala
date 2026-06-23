@@ -62,7 +62,7 @@ The cost: BYO UI (we build the Astro app), 4-5 components instead of one, smalle
 | Decision | Value | Notes |
 |---|---|---|
 | WebAuthn `rp.id` | `dunn.dev` (registrable parent) | **One-way.** Origins list is `https://dag.dunn.dev`. (`home.dunn.dev` was the original Topology-A user host; dropped, since the IdP and the UI live on the same FQDN, `dag.dunn.dev`.) Any future subdomain that needs WebAuthn assertion is a registrable child of `dunn.dev`. |
-| Username convention | `first.last` (e.g., `andrew.dunn`) | LDAP DN-friendly. |
+| Username convention | `first.last` (e.g., `alice.smith`) | LDAP DN-friendly. |
 | Cookie domain | `.dunn.dev`, `SameSite=Lax`, `HttpOnly` | Required for cross-subdomain Astro UI calls to Kratos. |
 | Identity schema | traits = {username, email, displayName?, recoveryEmail?} + `metadata_admin.groups[]` | Groups in metadata_admin (Ory-shaped: admin-managed, user can't self-escalate via settings flow). |
 

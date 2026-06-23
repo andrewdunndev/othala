@@ -25,7 +25,7 @@ beforeEach(() => {
 test('allowlisted admin identity is refused', () => {
   const identity = {
     id: ADMIN_UUID,
-    traits: { email: 'andrew@dunn.dev' },
+    traits: { email: 'admin@othala.test' },
     metadata_admin: { groups: ['admin', 'family'] },
   };
   assert.equal(shouldRefuseRecovery(identity), true);
@@ -34,7 +34,7 @@ test('allowlisted admin identity is refused', () => {
 test('allowlisted admin is refused even after self-demoting out of the admin group', () => {
   const identity = {
     id: OPS_UUID,
-    traits: { email: 'ops@dunn.dev' },
+    traits: { email: 'ops@othala.test' },
     metadata_admin: { groups: ['family'] }, // no 'admin' group
   };
   assert.equal(shouldRefuseRecovery(identity), true);
@@ -43,7 +43,7 @@ test('allowlisted admin is refused even after self-demoting out of the admin gro
 test('group-admin NOT on the allowlist is allowed (group is display-only)', () => {
   const identity = {
     id: OTHER_UUID,
-    traits: { email: 'imposter@dunn.dev' },
+    traits: { email: 'imposter@othala.test' },
     metadata_admin: { groups: ['admin', 'family'] },
   };
   assert.equal(shouldRefuseRecovery(identity), false);
@@ -52,14 +52,14 @@ test('group-admin NOT on the allowlist is allowed (group is display-only)', () =
 test('non-admin identity is allowed', () => {
   const identity = {
     id: OTHER_UUID,
-    traits: { email: 'kid@dunn.dev' },
+    traits: { email: 'kid@othala.test' },
     metadata_admin: { groups: ['family', 'access-keep'] },
   };
   assert.equal(shouldRefuseRecovery(identity), false);
 });
 
 test('identity with no id is allowed (no admin by default, fail-open for recovery of unknowns)', () => {
-  const identity = { traits: { email: 'unknown@dunn.dev' } };
+  const identity = { traits: { email: 'unknown@othala.test' } };
   assert.equal(shouldRefuseRecovery(identity), false);
 });
 

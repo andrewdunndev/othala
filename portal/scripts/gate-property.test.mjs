@@ -62,7 +62,7 @@ function identity(groups, state = 'active') {
     state,
     schema_id: 'family',
     schema_url: '',
-    traits: { username: 'tester', email: 'a@dunn.dev' },
+    traits: { username: 'tester', email: 'a@othala.test' },
     metadata_admin: { groups },
   };
 }

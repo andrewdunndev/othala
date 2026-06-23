@@ -77,7 +77,7 @@ function frontmatter(overrides = {}) {
     _slug: 'keep',
     name: 'Vaultwarden',
     description: 'Password manager',
-    url: 'https://keep.dunn.dev',
+    url: 'https://keep.othala.test',
     icon: 'KP',
     access_group: 'access-keep',
     ...overrides,

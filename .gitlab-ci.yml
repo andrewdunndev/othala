@@ -230,6 +230,25 @@ lint-jsonnet-hooks:
       echo "OK: recovery-gate.jsonnet function bodies are in sync."
 
 # -----------------------------------------------------------------
+# check-purity: OSS purity + no-deprecated + dated-debt detection gate.
+#
+# Runs scripts/check-purity.sh against the repo tree to detect instance-
+# specific strings (dunn.dev in configs/tests/docs), references to deleted
+# commands (dag-apply-clients, dag-sync-manifests), lingering DORMANT/
+# (pending) markers, and intentional-failure stubs. No npm deps needed —
+# pure bash + grep.
+# -----------------------------------------------------------------
+check-purity:
+  stage: verify
+  image: registry.access.redhat.com/ubi9/nodejs-22:9.8
+  rules:
+    - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
+    - if: '$CI_PIPELINE_SOURCE == "push"'
+    - if: '$CI_COMMIT_TAG'
+  script:
+    - bash scripts/check-purity.sh
+
+# -----------------------------------------------------------------
 # test-portal: v0.2.0 portal test suite. Runs `npm test` which
 # invokes node --test against scripts/*.test.mjs. Covers:
 #   - manifests-loader.test.mjs (YAML namespace split + parsing)

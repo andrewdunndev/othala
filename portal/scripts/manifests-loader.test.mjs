@@ -218,12 +218,12 @@ test('backchannel_logout_uri preserved when present', () => {
     `
 oidc:
   client_id: keep
-  backchannel_logout_uri: https://keep.dunn.dev/identity/connect/oidc-logout
+  backchannel_logout_uri: https://keep.othala.test/identity/connect/oidc-logout
 consent: {}
 `,
     'keep.yaml',
   );
-  assert.equal(out.backchannelLogoutUri, 'https://keep.dunn.dev/identity/connect/oidc-logout');
+  assert.equal(out.backchannelLogoutUri, 'https://keep.othala.test/identity/connect/oidc-logout');
 });
 
 test('backchannel_logout_uri defaults to empty string when absent', () => {
@@ -244,13 +244,13 @@ test('audience array of strings preserved', () => {
 oidc:
   client_id: keep
   audience:
-    - https://keep.dunn.dev
-    - https://api.keep.dunn.dev
+    - https://keep.othala.test
+    - https://api.keep.othala.test
 consent: {}
 `,
     'keep.yaml',
   );
-  assert.deepEqual(out.audience, ['https://keep.dunn.dev', 'https://api.keep.dunn.dev']);
+  assert.deepEqual(out.audience, ['https://keep.othala.test', 'https://api.keep.othala.test']);
 });
 
 test('skipConsent default is false', () => {

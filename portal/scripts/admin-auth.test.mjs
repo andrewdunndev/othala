@@ -63,7 +63,7 @@ test('user in the admin GROUP but NOT on the allowlist is DENIED admin', () => {
   // by TARGET identity id, not the group. A group-only "admin" is not refused.
   const groupAdminNotAllowlisted = {
     id: OTHER_UUID,
-    traits: { email: 'imposter@dunn.dev' },
+    traits: { email: 'imposter@othala.test' },
     metadata_admin: { groups: ['admin', 'family'] },
   };
   assert.equal(shouldRefuseRecovery(groupAdminNotAllowlisted), false);
@@ -74,7 +74,7 @@ test('self-demote: allowlisted admin who dropped the admin GROUP is STILL admin'
   process.env.OTHALA_ADMIN_IDS = ADMIN_UUID;
   const selfDemoted = {
     id: ADMIN_UUID,
-    traits: { email: 'andrew@dunn.dev' },
+    traits: { email: 'admin@othala.test' },
     // self-demoted: removed 'admin' from their own groups
     metadata_admin: { groups: ['family'] },
   };
@@ -85,6 +85,6 @@ test('self-demote: allowlisted admin who dropped the admin GROUP is STILL admin'
 
 test('shouldRefuseRecovery: non-allowlisted target is allowed recovery', () => {
   process.env.OTHALA_ADMIN_IDS = ADMIN_UUID;
-  const target = { id: OTHER_UUID, traits: { email: 'kid@dunn.dev' }, metadata_admin: { groups: ['kids'] } };
+  const target = { id: OTHER_UUID, traits: { email: 'kid@othala.test' }, metadata_admin: { groups: ['kids'] } };
   assert.equal(shouldRefuseRecovery(target), false);
 });

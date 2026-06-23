@@ -23,7 +23,7 @@ function identity(overrides = {}) {
     state: 'active',
     schema_id: 'family',
     schema_url: '',
-    traits: { username: 'tester', email: 'a@dunn.dev' },
+    traits: { username: 'tester', email: 'a@othala.test' },
     metadata_admin: { groups: ['memories'] },
     ...overrides,
   };

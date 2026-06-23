@@ -1,6 +1,6 @@
 // Kratos admin API wrappers used by /admin/* SSR pages.
 //
-// The portal runs on carmine in the same pod network as Kratos, so the
+// The portal runs on the host in the same pod network as Kratos, so the
 // admin port (4434) is reachable directly at `http://kratos:4434`. The
 // admin port has no auth in default Kratos posture; network isolation
 // is the gate. KRATOS_ADMIN_TOKEN is reserved for a future Oathkeeper

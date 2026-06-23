@@ -2,13 +2,13 @@
 //
 // This is the e2e/deploy entrypoint for the registrar that otherwise lives
 // only as a library (src/lib/register-clients.ts -> registerAllClients).
-// The function is DORMANT in the running app (no route, no boot-time call;
-// the SSR app never self-registers clients). Registration is a deliberate
-// one-shot step:
+// Registration is a deliberate one-shot step — never on app boot or route:
 //
-//   - In production, iac's dag-apply-clients.sh drives registration at
-//     deploy time (a --rm one-shot on the dag.network that can reach
-//     Hydra's admin port). See DEPLOY.md "Client registration".
+//   - In production, the deploy repo's `just dag-reload-clients <host>`
+//     invokes this bundle as a --rm one-shot on the internal network
+//     (the only network that can reach Hydra's admin port).
+//     The registrar also runs on app boot via the SIGHUP-driven reconcile.
+//     See DEPLOY.md "Client registration".
 //   - In the e2e harness, `compose run --rm register-clients` invokes THIS
 //     module on the same othala image to prove the in-app registrar
 //     registers every `oidc:` manifest in MANIFEST_DIR against Hydra admin.

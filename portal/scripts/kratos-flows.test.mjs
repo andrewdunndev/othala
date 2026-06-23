@@ -34,10 +34,10 @@ test('login: aal2 + refresh + returnTo with reserved chars', () => {
   const url = browserFlows.login({
     aal: 'aal2',
     refresh: true,
-    returnTo: 'https://dag.dunn.dev/admin/users/abc-123?tab=overview',
+    returnTo: 'https://dag.othala.test/admin/users/abc-123?tab=overview',
   });
   // URLSearchParams encodes : / ? = & properly
-  assert.ok(url.includes('return_to=https%3A%2F%2Fdag.dunn.dev%2Fadmin%2Fusers%2Fabc-123%3Ftab%3Doverview'));
+  assert.ok(url.includes('return_to=https%3A%2F%2Fdag.othala.test%2Fadmin%2Fusers%2Fabc-123%3Ftab%3Doverview'));
 });
 
 test('login: bare returnTo (no aal)', () => {
