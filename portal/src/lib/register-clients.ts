@@ -49,6 +49,7 @@ import {
 import {
   loadClientManifests,
   assertManifestsValid,
+  CLIENT_ID_ENV_STEM_RE,
   type ClientManifest,
 } from './manifests';
 
@@ -96,8 +97,37 @@ export interface RegisterResult {
   action: 'created' | 'updated';
 }
 
-/** Env var name carrying a client's secret, e.g. keep -> KEEP_CLIENT_SECRET. */
+/**
+ * Env var name carrying a client's secret, e.g. keep -> KEEP_CLIENT_SECRET.
+ *
+ * Fails loudly if `clientId` is not a valid POSIX env-var stem
+ * (^[A-Za-z_][A-Za-z0-9_]*$). A hyphenated id such as "open-webui" would
+ * produce "OPEN-WEBUI_CLIENT_SECRET" — an invalid shell variable that never
+ * resolves. Rather than silently returning a broken name we throw immediately
+ * with a clear message naming the offending client_id and the env var the
+ * operator should look for.
+ *
+ * The durable fix is validateClients (manifest-lint rule 1a), which rejects
+ * an invalid client_id at manifest load time — well before the registrar
+ * reaches this function. This guard is a belt-and-suspenders defence-in-depth
+ * check for callers that bypass assertManifestsValid (e.g. skipValidation).
+ *
+ * Contract: fail-loud validate, NOT silent sanitize. Hyphens are not
+ * silently mapped to underscores because that would hide a manifest the linter
+ * correctly rejects. The clean contract is: linter rejects → registrar never
+ * reaches this code for an invalid id. If it does reach here, it throws.
+ */
 export function secretEnvVar(clientId: string): string {
+  if (!CLIENT_ID_ENV_STEM_RE.test(clientId)) {
+    const wouldBe = `${clientId.toUpperCase()}_CLIENT_SECRET`;
+    throw new Error(
+      `client_id ${JSON.stringify(clientId)} is not a valid POSIX env-var stem ` +
+        `(^[A-Za-z_][A-Za-z0-9_]*$). The registrar would derive ` +
+        `${JSON.stringify(wouldBe)} which is not a valid shell variable and will ` +
+        `never resolve. Rename the client_id to use only letters, digits, and ` +
+        `underscores (manifest-lint rule 1a catches this at load time).`,
+    );
+  }
   return `${clientId.toUpperCase()}_CLIENT_SECRET`;
 }
 

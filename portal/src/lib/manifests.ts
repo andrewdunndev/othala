@@ -315,6 +315,12 @@ export function parseManifest(yamlText: string, filename: string): ClientManifes
       throw new Error(`${file}: missing or non-object oidc: block`);
     }
     const clientId = String(p.client_id ?? file.replace(/\.ya?ml$/, ''));
+    // Presentation-only manifests may still declare consent.skip_access_check
+    // to suppress the empty-access-binding BLOCK when the tile intentionally
+    // carries no access group (e.g. auth_kind: external tiles visible to all
+    // logged-in users — the authentication gate is "logged in to the portal",
+    // not group membership within the portal).
+    const c = (consent && typeof consent === 'object' ? consent : {}) as Record<string, unknown>;
     return {
       clientId,
       presentationOnly: true,
@@ -334,7 +340,7 @@ export function parseManifest(yamlText: string, filename: string): ClientManifes
       roles: [],
       groupRoleMap: {},
       emitGroupsClaim: null,
-      skipAccessCheck: false,
+      skipAccessCheck: Boolean(c.skip_access_check ?? false),
       sourcePath: file,
     };
   }
@@ -525,13 +531,31 @@ function originOf(raw: string): string | null {
 }
 
 /**
+ * Regex a client_id must satisfy so it can be used as an env-var stem.
+ *
+ * The registrar derives `<CLIENT_ID_UPPER>_CLIENT_SECRET` from the client_id.
+ * POSIX env var names must match `[A-Za-z_][A-Za-z0-9_]*`; a hyphenated id
+ * (e.g. "open-webui") becomes "OPEN-WEBUI_CLIENT_SECRET" which is an INVALID
+ * env var name and silently fails to resolve. This regex enforces the valid
+ * stem at load time so the linter rejects the bad manifest before it can crash
+ * the registrar.
+ *
+ * Root cause: S08 staleness ledger (2026-06-23); Tasks 1 + 2, overnight brief.
+ */
+export const CLIENT_ID_ENV_STEM_RE = /^[A-Za-z_][A-Za-z0-9_]*$/;
+
+/**
  * validateClients — full TS port of consent/manifest.go `validateClients`
  * (the lint pass shared by Reload's M2 pre-swap guard and the operator
  * `--validate-manifests` path). Returns one human-readable string per
  * finding; an empty array means the set is clean.
  *
- * Rules, 1:1 with the Go source:
+ * Rules, 1:1 with the Go source, extended with TS-only env-var-stem guard:
  *   1. oidc.client_id non-empty.
+ *   1a. oidc.client_id must be a valid env-var stem (^[A-Za-z_][A-Za-z0-9_]*$)
+ *       so the registrar can derive <CLIENT_ID_UPPER>_CLIENT_SECRET without
+ *       producing an invalid shell variable name. A hyphen, dot, or leading
+ *       digit in client_id silently breaks secret resolution.
  *   2. oidc.audience non-empty (H4: id_token aud verification needs it).
  *   3. When both audience and redirect_uris are present, at least one
  *      audience must match a redirect_uri ORIGIN exactly. Reuses the
@@ -549,6 +573,28 @@ export function validateClients(set: ClientManifest[]): string[] {
 
     if (cm.clientId === '') {
       errs.push(`${src}: oidc.client_id is empty`);
+    }
+
+    // Rule 1a: client_id must be a valid env-var stem.
+    //
+    // The registrar derives the secret env var as `<CLIENT_ID_UPPER>_CLIENT_SECRET`
+    // (e.g. "openwebui" → "OPENWEBUI_CLIENT_SECRET"). A client_id that contains
+    // hyphens, dots, or starts with a digit produces an INVALID env var name
+    // (POSIX: [A-Za-z_][A-Za-z0-9_]*). The env lookup silently returns undefined,
+    // which either hard-errors (allowMissing=false, the production default) or
+    // registers the client without a secret (allowMissing=true, dry-run only).
+    //
+    // The expected env var is reported in the error so the operator knows exactly
+    // what to look for in the sops file / quadlet Secret= lines.
+    if (cm.clientId !== '' && !CLIENT_ID_ENV_STEM_RE.test(cm.clientId)) {
+      const wouldBe = `${cm.clientId.toUpperCase()}_CLIENT_SECRET`;
+      errs.push(
+        `${src}: oidc.client_id ${JSON.stringify(cm.clientId)} contains characters that are ` +
+          `invalid in a POSIX env var name (rule: ^[A-Za-z_][A-Za-z0-9_]*$). ` +
+          `The registrar derives the secret env var as ${JSON.stringify(wouldBe)}, ` +
+          `which is not a valid shell variable and will never resolve. ` +
+          `Rename the client_id to use only letters, digits, and underscores.`,
+      );
     }
 
     // BLOCK (manifest-lint §11, wired into the load-time hard-fail path):

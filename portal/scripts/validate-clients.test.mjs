@@ -15,6 +15,7 @@ import {
   validateClients,
   assertManifestsValid,
   shouldEmitGroups,
+  CLIENT_ID_ENV_STEM_RE,
 } from '../src/lib/manifests.ts';
 
 const here = dirname(fileURLToPath(import.meta.url));
@@ -23,6 +24,119 @@ const clientsDir = join(here, '..', '..', 'hydra', 'clients');
 function fromYaml(yamlText, filename = 'crafted.yaml') {
   return parseManifest(yamlText, filename);
 }
+
+// ── Rule 1a: client_id must be a valid env-var stem ───────────────────────
+// Root cause: S08 staleness ledger; overnight Tasks 1+2.
+// A hyphenated client_id ("open-webui") produces "OPEN-WEBUI_CLIENT_SECRET"
+// which is not a valid POSIX env var and silently fails to resolve.
+
+test('CLIENT_ID_ENV_STEM_RE: valid stems pass', () => {
+  for (const id of ['keep', 'openwebui', 'llm', 'my_app', '_app', 'App123']) {
+    assert.ok(CLIENT_ID_ENV_STEM_RE.test(id), `expected ${JSON.stringify(id)} to be a valid stem`);
+  }
+});
+
+test('CLIENT_ID_ENV_STEM_RE: invalid stems are rejected (hyphens, dots, leading digits)', () => {
+  for (const id of ['open-webui', 'my.app', '1app', 'app-', 'a b']) {
+    assert.ok(!CLIENT_ID_ENV_STEM_RE.test(id), `expected ${JSON.stringify(id)} to be rejected`);
+  }
+});
+
+test('rule 1a: hyphenated client_id fires the env-var-stem error', () => {
+  const m = fromYaml(`
+oidc:
+  client_id: open-webui
+  redirect_uris:
+    - https://open-webui.othala.test/cb
+  audience:
+    - https://open-webui.othala.test
+consent:
+  skip_access_check: true
+`);
+  const errs = validateClients([m]);
+  assert.ok(
+    errs.some(
+      (e) =>
+        e.includes('open-webui') &&
+        e.includes('POSIX env var') &&
+        e.includes('OPEN-WEBUI_CLIENT_SECRET'),
+    ),
+    `expected env-var-stem error, got:\n${errs.join('\n')}`,
+  );
+});
+
+test('rule 1a: client_id with a dot fires the env-var-stem error', () => {
+  const m = fromYaml(`
+oidc:
+  client_id: my.app
+  audience:
+    - https://my-app.othala.test
+consent:
+  skip_access_check: true
+`);
+  const errs = validateClients([m]);
+  assert.ok(
+    errs.some((e) => e.includes('POSIX env var') && e.includes('MY.APP_CLIENT_SECRET')),
+    `expected env-var-stem error, got:\n${errs.join('\n')}`,
+  );
+});
+
+test('rule 1a: client_id starting with a digit fires the env-var-stem error', () => {
+  const m = fromYaml(`
+oidc:
+  client_id: 2app
+  audience:
+    - https://app.othala.test
+consent:
+  skip_access_check: true
+`);
+  const errs = validateClients([m]);
+  assert.ok(
+    errs.some((e) => e.includes('POSIX env var')),
+    `expected env-var-stem error, got:\n${errs.join('\n')}`,
+  );
+});
+
+test('rule 1a: valid client_id without hyphens does NOT fire the env-var-stem error', () => {
+  const m = fromYaml(`
+oidc:
+  client_id: openwebui
+  redirect_uris:
+    - https://openwebui.othala.test/cb
+  audience:
+    - https://openwebui.othala.test
+presentation:
+  access:
+    - access-llm
+consent: {}
+`);
+  const errs = validateClients([m]);
+  assert.equal(
+    errs.filter((e) => e.includes('POSIX env var')).length,
+    0,
+    `openwebui should not trigger the env-var-stem rule:\n${errs.join('\n')}`,
+  );
+});
+
+test('rule 1a: assertManifestsValid surfaces the env-var-stem error in the thrown message', () => {
+  const m = fromYaml(`
+oidc:
+  client_id: open-webui
+  redirect_uris:
+    - https://open-webui.othala.test/cb
+  audience:
+    - https://open-webui.othala.test
+consent:
+  skip_access_check: true
+`);
+  assert.throws(
+    () => assertManifestsValid([m]),
+    (err) =>
+      /manifest validation failed/.test(err.message) &&
+      /POSIX env var/.test(err.message) &&
+      /OPEN-WEBUI_CLIENT_SECRET/.test(err.message),
+  );
+});
 
 // ── Rule 2 + 3: audience presence + audienceMatchesRedirect ────────────────
 

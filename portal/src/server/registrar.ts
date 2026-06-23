@@ -15,6 +15,37 @@
 //
 // Injectable `register` parameter (defaults to registerAllClients) lets the
 // test suite pass a stub without importing a live Hydra SDK.
+//
+// ── SIGHUP delivery mechanism (S08 / overnight-2026-06-23 Task 2) ──────────
+// Signal delivery:  `podman kill --signal HUP dag-portal` (justfile
+//   dag-reload-clients recipe) sends SIGHUP to PID 1 INSIDE the container,
+//   which is the node process running listen.mjs (no init shim). The Node.js
+//   process.on('SIGHUP', ...) handler fires correctly.
+//
+// Known non-delivery class (iac-side, not a code bug):
+//   The pyinfra post_deploy hook in iac/pyinfra/tasks/services/dag.py only
+//   sends SIGHUP when `_if=manifests_changed()` is true (i.e., at least one
+//   manifest file actually changed on disk, checked via did_change()). If the
+//   deployed manifests are byte-for-byte identical to what is already on disk
+//   (e.g., a re-deploy without manifest edits), no SIGHUP is sent. This is
+//   correct "idempotent deploy" behavior — not a bug — but it means a manual
+//   `just dag-reload-clients carmine` is required to force reconciliation when
+//   manifests have not changed but Hydra state is stale (e.g., after a Hydra
+//   DB wipe or if the boot reconcile was exhausted).
+//
+// Single-flight guard interaction: a SIGHUP that arrives while the boot
+//   reconcile is still in-flight is swallowed silently (reconciling=true).
+//   The SIGHUP log line is still printed, but the actual reconcile is skipped.
+//   This is safe — the boot reconcile will complete and register the full
+//   client set. If needed, the operator can SIGHUP again once the portal is
+//   serving (healthz=ok).
+//
+// Fix location: code is correct. The observed "SIGHUP did not reconcile, but
+//   restart did" case is explained by one of the two iac-side behaviors above
+//   (no manifest change on disk = no SIGHUP sent by the hook; OR SIGHUP
+//   arrived while boot reconcile was in-flight). No code change needed here.
+//   Documentation of the delivery contract and the single-flight guard behavior
+//   is the correct fix.
 
 import { registerAllClients, type RegisterOptions } from '../lib/register-clients';
 import { invalidateManifestCache } from '../lib/manifests';

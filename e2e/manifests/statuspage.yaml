@@ -4,12 +4,12 @@
 # authenticate — auth_kind: external. Presentation ONLY; no oidc:/
 # consent: block. There is no SSO session on our side.
 #
-# access_group is deliberately ABSENT here to demonstrate the default-group
-# fallback: tiles without an explicit access_group gate on the configured
-# default group (OTHALA_DEFAULT_GROUP, default value 'everyone'). The portal's
-# tile filter gates ALL tiles on group membership — there is no ungated/bypass
-# concept. Adding a user to the default group is an explicit admin act; it is
-# never automatic.
+# skip_access_check: true is set because auth_kind: external tiles are links
+# to public or externally-authenticated services — there is no othala-managed
+# SSO gate on the link target. The tile is shown to all logged-in portal users
+# regardless of group membership (they are already authenticated to reach the
+# dashboard). To restrict visibility, set consent.skip_access_check: false and
+# add an access binding in presentation.access.
 
 presentation:
   name: Statuspage
@@ -19,6 +19,7 @@ presentation:
   icon_slug: ""
   icon_fallback: statuspage
   auth_kind: external
-  # access_group omitted: gates on the default group (OTHALA_DEFAULT_GROUP,
-  # default 'everyone'). Set access_group explicitly to restrict further.
   order: 200
+
+consent:
+  skip_access_check: true

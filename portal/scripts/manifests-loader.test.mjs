@@ -283,16 +283,18 @@ test('B: pre-swap validation rejects a set with undeclared group_role_map role',
   const dir = mkdtempSync(join(tmpdir(), 'manifest-preswap-'));
   try {
     // Write a valid manifest first to prime the cache.
+    // Note: client_id must be a valid POSIX env-var stem (no hyphens/dots/
+    // leading digits) per manifest-lint rule 1a.
     const goodYaml = `
 oidc:
-  client_id: good-client
+  client_id: goodclient
   audience:
     - https://good.example.com
   redirect_uris:
     - https://good.example.com/callback
 presentation:
   access:
-    - good-client
+    - goodclient
 consent:
   roles:
     user:
@@ -301,26 +303,26 @@ consent:
   group_role_map:
     family: user
 `;
-    writeFileSync(join(dir, 'good-client.yaml'), goodYaml);
+    writeFileSync(join(dir, 'goodclient.yaml'), goodYaml);
 
     process.env.MANIFEST_DIR = dir;
     // Load the good set to prime the cache.
     const good = loadClientManifests();
     assert.equal(good.length, 1, 'good set must load');
-    assert.equal(good[0].clientId, 'good-client');
+    assert.equal(good[0].clientId, 'goodclient');
 
     // Now replace with a bad manifest that references an undeclared role.
     // Use a different mtime by replacing file content.
     const badYaml = `
 oidc:
-  client_id: bad-client
+  client_id: badclient
   audience:
     - https://bad.example.com
   redirect_uris:
     - https://bad.example.com/callback
 presentation:
   access:
-    - bad-client
+    - badclient
 consent:
   roles:
     user:
@@ -330,8 +332,8 @@ consent:
     family: UNDECLARED_ROLE
 `;
     // Remove old, write bad — must bump mtime to invalidate cache.
-    rmSync(join(dir, 'good-client.yaml'));
-    writeFileSync(join(dir, 'bad-client.yaml'), badYaml);
+    rmSync(join(dir, 'goodclient.yaml'));
+    writeFileSync(join(dir, 'badclient.yaml'), badYaml);
 
     // The bad candidate set must be rejected.
     assert.throws(
@@ -408,17 +410,18 @@ oidc:
   client_id: broken
   : this: is: not: valid: yaml: [unclosed
 `);
-    // One valid manifest alongside it.
+    // One valid manifest alongside it (client_id must be a valid env-var stem:
+    // no hyphens, dots, or leading digits — manifest-lint rule 1a).
     writeFileSync(join(dir, 'good.yaml'), `
 oidc:
-  client_id: good-app
+  client_id: goodapp
   audience:
     - https://good.example.com
   redirect_uris:
     - https://good.example.com/callback
 presentation:
   access:
-    - good-app
+    - goodapp
 consent: {}
 `);
 
@@ -428,7 +431,7 @@ consent: {}
     assert.doesNotThrow(() => { manifests = loadClientManifests(); });
     // The one good manifest must still be present.
     assert.equal(manifests.length, 1, 'good manifest must survive broken sibling');
-    assert.equal(manifests[0].clientId, 'good-app');
+    assert.equal(manifests[0].clientId, 'goodapp');
   } finally {
     delete process.env.MANIFEST_DIR;
     rmSync(dir, { recursive: true, force: true });

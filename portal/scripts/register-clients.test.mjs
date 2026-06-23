@@ -178,6 +178,36 @@ test('buildClientBody omits client_secret when undefined (dry-run posture)', () 
 test('secretEnvVar uppercases the client_id (apply-clients.sh convention)', () => {
   assert.equal(secretEnvVar('keep'), 'KEEP_CLIENT_SECRET');
   assert.equal(secretEnvVar('llm'), 'LLM_CLIENT_SECRET');
+  assert.equal(secretEnvVar('openwebui'), 'OPENWEBUI_CLIENT_SECRET');
+  assert.equal(secretEnvVar('my_app'), 'MY_APP_CLIENT_SECRET');
+});
+
+test('secretEnvVar throws loudly on a hyphenated client_id (fail-loud contract)', () => {
+  // "open-webui" → "OPEN-WEBUI_CLIENT_SECRET" is an INVALID POSIX env var.
+  // The function must throw with a clear message naming the client_id and the
+  // would-be env var name, NOT silently return the broken string.
+  assert.throws(
+    () => secretEnvVar('open-webui'),
+    (err) =>
+      /POSIX env-var stem/.test(err.message) &&
+      /open-webui/.test(err.message) &&
+      /OPEN-WEBUI_CLIENT_SECRET/.test(err.message),
+    'expected a loud throw, not a silent invalid env var name',
+  );
+});
+
+test('secretEnvVar throws on a client_id with a dot', () => {
+  assert.throws(
+    () => secretEnvVar('my.app'),
+    (err) => /POSIX env-var stem/.test(err.message) && /MY\.APP_CLIENT_SECRET/.test(err.message),
+  );
+});
+
+test('secretEnvVar throws on a client_id starting with a digit', () => {
+  assert.throws(
+    () => secretEnvVar('2app'),
+    (err) => /POSIX env-var stem/.test(err.message),
+  );
 });
 
 // ── create vs update branching ─────────────────────────────────────────────
