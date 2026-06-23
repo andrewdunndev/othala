@@ -344,16 +344,15 @@ services:
       retries: 12
       start_period: 10s
 
-  # Client registration — the converged successor to the deleted util/
-  # apply-clients.sh. util's role folded INTO the othala app as the
-  # in-process registrar (portal/src/lib/register-clients.ts ->
-  # registerAllClients), bundled into the image at
-  # dist/server/register-clients.mjs (npm run build:register-clients,
-  # same esbuild pattern as admin-runtime). The registrar is DORMANT in
-  # the deployed app (the deploy plane's dag-apply-clients.sh drives registration at
-  # deploy time); the e2e activates it as a `compose run --rm` one-shot
-  # on the SAME othala image to prove the in-app registrar registers
-  # every manifest in MANIFEST_DIR=/etc/portal/manifests (mounted from
+  # Client registration — the active production registration path (E1 cutover
+  # complete). util/apply-clients.sh is deleted; its role is now the in-process
+  # registrar (portal/src/lib/register-clients.ts -> registerAllClients),
+  # bundled into the image at dist/server/register-clients.mjs
+  # (npm run build:register-clients, same esbuild pattern as admin-runtime).
+  # In production the deploy repo runs this as a --rm one-shot on boot and on
+  # SIGHUP (dag-reload-clients). The e2e activates it as a `compose run --rm`
+  # one-shot on the SAME othala image to prove the registrar registers every
+  # manifest in MANIFEST_DIR=/etc/portal/manifests (mounted from
   # e2e/manifests/) against Hydra admin. See smoke.sh section B.
   # `profiles: [oneshot]` keeps it out of the up/healthcheck loop —
   # smoke runs it explicitly via `compose run`.

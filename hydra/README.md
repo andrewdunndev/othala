@@ -23,7 +23,7 @@ For the client catalog and per-RP integration details, see
 ## Client registration
 
 Registration is a deliberate one-shot, never triggered on app boot. On the
-iac side `make dag-apply-clients` runs the Othala in-app registrar
+iac side `just dag-reload-clients` runs the Othala in-app registrar
 (`portal/src/lib/register-clients.ts`, bundled to
 `dist/server/register-clients.mjs`) as a `--rm` container on `dag.network`.
 It reads each manifest's `oidc:` block from `MANIFEST_DIR` and resolves
@@ -33,12 +33,12 @@ Full registration runbook: [`DEPLOY.md`](../DEPLOY.md) "Client registration"
 and [`docs/per-app-oidc.md`](../docs/per-app-oidc.md).
 
 Adding a new OIDC client: add a `<slug>.yaml` to your operator manifest
-directory, add the sops secret, re-run `make dag-apply-clients`.
+directory, add the sops secret, re-run `just dag-reload-clients`.
 
 ## secrets.system non-rotatable
 
 `hydra.yml` references `${HYDRA_SYSTEM_SECRET}`. **Generate once. Store in
-sops as `carmine.hydra_system_secret`. Never rotate without rebuilding the
+sops as `<host>.hydra_system_secret`. Never rotate without rebuilding the
 Hydra database.** Break-glass rotation: `docs/runbooks/secrets-rotation.md`.
 
 ## Schema migrations

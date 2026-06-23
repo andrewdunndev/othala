@@ -57,14 +57,14 @@ oidc:
     - code
   scope: openid email profile groups offline_access
   redirect_uris:
-    - https://keep.dunn.dev/identity/connect/oidc-signin
+    - https://keep.othala.test/identity/connect/oidc-signin
   post_logout_redirect_uris:
-    - https://keep.dunn.dev/
+    - https://keep.othala.test/
   token_endpoint_auth_method: client_secret_basic
   audience:
-    - https://keep.dunn.dev
+    - https://keep.othala.test
   skip_consent: true
-  backchannel_logout_uri: https://keep.dunn.dev/identity/connect/oidc-logout
+  backchannel_logout_uri: https://keep.othala.test/identity/connect/oidc-logout
 presentation:
   access:
     - keep
@@ -91,14 +91,14 @@ test('buildClientBody maps every oidc field exactly as apply-clients.sh did', ()
   assert.deepEqual(body.response_types, ['code']);
   // scope is the on-the-wire space-separated string, not an array.
   assert.equal(body.scope, 'openid email profile groups offline_access');
-  assert.deepEqual(body.redirect_uris, ['https://keep.dunn.dev/identity/connect/oidc-signin']);
-  assert.deepEqual(body.post_logout_redirect_uris, ['https://keep.dunn.dev/']);
+  assert.deepEqual(body.redirect_uris, ['https://keep.othala.test/identity/connect/oidc-signin']);
+  assert.deepEqual(body.post_logout_redirect_uris, ['https://keep.othala.test/']);
   assert.equal(body.token_endpoint_auth_method, 'client_secret_basic');
-  assert.deepEqual(body.audience, ['https://keep.dunn.dev']);
+  assert.deepEqual(body.audience, ['https://keep.othala.test']);
   assert.equal(body.skip_consent, true);
   assert.equal(
     body.backchannel_logout_uri,
-    'https://keep.dunn.dev/identity/connect/oidc-logout',
+    'https://keep.othala.test/identity/connect/oidc-logout',
   );
   assert.equal(body.client_secret, 's3cr3t');
 });
@@ -123,22 +123,22 @@ test('buildClientBody omits empty optional fields (client_credentials shape)', (
   const m = parseManifest(
     `
 oidc:
-  client_id: llm
-  client_name: vLLM
+  client_id: api
+  client_name: API Service
   grant_types:
     - client_credentials
   response_types: []
   scope: api
   audience:
-    - https://llm.dunn.dev
+    - https://api.othala.test
   token_endpoint_auth_method: client_secret_basic
   skip_consent: true
 consent:
   skip_access_check: true
 `,
-    'llm.yaml',
+    'api.yaml',
   );
-  const body = buildClientBody(m, 'llmsecret');
+  const body = buildClientBody(m, 'apisecret');
   assert.equal(body.scope, 'api');
   assert.deepEqual(body.grant_types, ['client_credentials']);
   // No redirect_uris / response_types / post_logout / backchannel for a c_c client.
@@ -158,7 +158,7 @@ test('buildClientBody sets backchannel_logout_session_required only when true', 
 oidc:
   client_id: keep
   backchannel_logout_session_required: true
-  audience: [https://keep.dunn.dev]
+  audience: [https://keep.othala.test]
 consent: {}
 `,
       'keep.yaml',
@@ -254,7 +254,7 @@ test('registerManifests runs the validateClients lint pre-flight and ABORTS on a
 oidc:
   client_id: novel
   redirect_uris:
-    - https://novel.dunn.dev/cb
+    - https://novel.othala.test/cb
 consent: {}
 `,
     'novel.yaml',
@@ -272,8 +272,8 @@ test('registerManifests with skipValidation registers a crafted single manifest'
     `
 oidc:
   client_id: solo
-  audience: [https://solo.dunn.dev]
-  redirect_uris: [https://solo.dunn.dev/cb]
+  audience: [https://solo.othala.test]
+  redirect_uris: [https://solo.othala.test/cb]
 consent: {}
 `,
     'solo.yaml',

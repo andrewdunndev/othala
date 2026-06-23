@@ -1,7 +1,8 @@
-# Kratos configuration — dunn.dev family SSO
+# Kratos configuration — generic Othala instance template
 #
-# All locked decisions from docs/decision.md and docs/STATUS.md applied.
-# Version-pinned in compose; this config targets v1.x current at time of build.
+# All values are ${VAR}-substituted at deploy time. Locked decisions from
+# docs/decision.md and docs/STATUS.md applied. Version-pinned in compose;
+# this config targets v1.x current at time of build.
 
 # DSN host is env-substituted so the same file lands in both
 # topologies. Lab compose sets KRATOS_PG_HOST=postgres (compose service
@@ -54,8 +55,9 @@ selfservice:
       enabled: true
       config:
         # Unquoted: kratos v26.2.0 schema types these as bool/int — a quoted
-        # "${VAR}" renders to the string "true"/"12" and fails config validation
-        # (the render is text-substitution, so the source quoting carries through).
+        # template token renders to the string "true"/"12" and fails config
+        # validation (the render is text-substitution, so source quoting carries
+        # through). Keep these values unquoted.
         haveibeenpwned_enabled: ${OTHALA_HIBP_ENABLED}
         max_breaches: 1
         identifier_similarity_check_enabled: true
@@ -180,8 +182,8 @@ selfservice:
       # privileged settings session; the gate replies 403 if the
       # identity carries the `admin` group, and 200 otherwise.
       #
-      # Non-admin family members continue to use email recovery. Admins
-      # recover via console (`kratos identities` on carmine) per
+      # Non-admin members continue to use email recovery. Admins
+      # recover via console (`kratos identities` on the host) per
       # docs/runbooks/admin-recovery.md.
       after:
         # v26.2.0: recovery after-hooks live directly under `after.hooks`. The

@@ -1,7 +1,7 @@
-# LLM Chat — chat.othala.test (Open WebUI)
+# Prompt — prompt.othala.test (Open WebUI)
 # OIDC SSO client for Open WebUI, the human chat UI over the inference stack.
-# The API path (llm.dunn.dev/v1) is bearer/virtual-key auth (LiteLLM) and is
-# NOT represented here — that is a client_credentials shape, not human SSO.
+# The API path (bearer/virtual-key auth via LiteLLM) is NOT represented here —
+# that is a client_credentials shape, not human SSO.
 #
 # Open WebUI OIDC notes:
 #   - Callback path: /oauth/oidc/callback (Open WebUI 0.3+).
@@ -16,9 +16,9 @@
 # Source: https://docs.openwebui.com/features/sso
 
 presentation:
-  name: LLM Chat
+  name: Prompt
   description: AI chat interface backed by the estate inference stack. SSO via othala — no local password required.
-  url: https://chat.othala.test
+  url: https://prompt.othala.test
   icon: AI
   icon_slug: openwebui
   auth_kind: oidc
@@ -27,8 +27,8 @@ presentation:
   order: 120
 
 oidc:
-  client_id: open-webui
-  client_name: LLM Chat
+  client_id: openwebui
+  client_name: Prompt
   grant_types:
     - authorization_code
     - refresh_token
@@ -38,13 +38,13 @@ oidc:
   # the access_token; without it the refresh_token grant type is a no-op.
   scope: openid email profile groups offline_access
   redirect_uris:
-    - https://chat.othala.test/oauth/oidc/callback
+    - https://prompt.othala.test/oauth/oidc/callback
   post_logout_redirect_uris:
-    - https://chat.othala.test/
+    - https://prompt.othala.test/
   token_endpoint_auth_method: client_secret_basic
   # audience ORIGIN must match a redirect_uri ORIGIN exactly (audienceMatchesRedirect).
   audience:
-    - https://chat.othala.test
+    - https://prompt.othala.test
   skip_consent: true
 
 # Consent claim shape for this client.

@@ -134,12 +134,6 @@ include:
 # are identical after JSON normalization (jq -S .). Fails the pipeline on
 # any divergence so a schema change in one copy cannot silently break the
 # other.
-#
-# KNOWN DRIFT: as of feat/passkey-first-login these two files diverge
-# (kratos/ adds recoveryEmail + passkey credential block; e2e/ does not).
-# This job INTENTIONALLY FAILS until the drift is reconciled by updating
-# e2e/identity.schema.json to match kratos/identity.schema.json. That
-# reconciliation is the fix — not disabling this lint.
 # -----------------------------------------------------------------
 lint-identity-schema:
   stage: verify

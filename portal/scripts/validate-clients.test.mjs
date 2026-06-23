@@ -31,7 +31,7 @@ test('rule: empty audience fires (every client needs an audience)', () => {
 oidc:
   client_id: novel
   redirect_uris:
-    - https://novel.dunn.dev/cb
+    - https://novel.othala.test/cb
 consent: {}
 `);
   const errs = validateClients([m]);
@@ -43,9 +43,9 @@ test('rule: audience that matches no redirect origin fires', () => {
 oidc:
   client_id: novel
   redirect_uris:
-    - https://novel.dunn.dev/cb
+    - https://novel.othala.test/cb
   audience:
-    - https://wrong.dunn.dev
+    - https://wrong.othala.test
 consent: {}
 `);
   const errs = validateClients([m]);
@@ -60,9 +60,9 @@ test('rule: exact-origin audience+redirect passes the audience sub-check', () =>
 oidc:
   client_id: novel
   redirect_uris:
-    - https://novel.dunn.dev/cb
+    - https://novel.othala.test/cb
   audience:
-    - https://novel.dunn.dev
+    - https://novel.othala.test
 consent: {}
 `);
   const errs = validateClients([m]);
@@ -73,17 +73,17 @@ consent: {}
   );
 });
 
-test('rule: client_credentials client with audience but no redirect passes (llm shape)', () => {
+test('rule: client_credentials client with audience but no redirect passes (machine-to-machine shape)', () => {
   const m = fromYaml(`
 oidc:
-  client_id: llm
+  client_id: api
   grant_types:
     - client_credentials
   audience:
-    - https://llm.dunn.dev
+    - https://api.othala.test
 presentation:
   access:
-    - llm
+    - api
 consent: {}
 `);
   const errs = validateClients([m]);
@@ -97,9 +97,9 @@ test('rule: group_role_map referencing an undeclared role fires', () => {
 oidc:
   client_id: novel
   redirect_uris:
-    - https://novel.dunn.dev/cb
+    - https://novel.othala.test/cb
   audience:
-    - https://novel.dunn.dev
+    - https://novel.othala.test
 consent:
   roles:
     user:
@@ -125,9 +125,9 @@ test('rule: group_role_map all mapping to declared roles passes', () => {
 oidc:
   client_id: novel
   redirect_uris:
-    - https://novel.dunn.dev/cb
+    - https://novel.othala.test/cb
   audience:
-    - https://novel.dunn.dev
+    - https://novel.othala.test
 presentation:
   access:
     - novel
@@ -149,9 +149,9 @@ test('rule: declared role with no claim_emit key fires', () => {
 oidc:
   client_id: novel
   redirect_uris:
-    - https://novel.dunn.dev/cb
+    - https://novel.othala.test/cb
   audience:
-    - https://novel.dunn.dev
+    - https://novel.othala.test
 consent:
   roles:
     user:
@@ -169,9 +169,9 @@ test('rule: empty claim_emit {} is NOT a violation (identity-only clients)', () 
 oidc:
   client_id: novel
   redirect_uris:
-    - https://novel.dunn.dev/cb
+    - https://novel.othala.test/cb
   audience:
-    - https://novel.dunn.dev
+    - https://novel.othala.test
 consent:
   roles:
     user:
@@ -189,9 +189,9 @@ test('rule: M10 contradiction (emit_groups_claim:false + role groups claim) fire
 oidc:
   client_id: novel
   redirect_uris:
-    - https://novel.dunn.dev/cb
+    - https://novel.othala.test/cb
   audience:
-    - https://novel.dunn.dev
+    - https://novel.othala.test
 consent:
   emit_groups_claim: false
   roles:
@@ -238,9 +238,9 @@ test('rule: emit_groups_claim:true + role groups claim is fine (no contradiction
 oidc:
   client_id: keep
   redirect_uris:
-    - https://keep.dunn.dev/cb
+    - https://keep.othala.test/cb
   audience:
-    - https://keep.dunn.dev
+    - https://keep.othala.test
 consent:
   emit_groups_claim: true
   roles:
@@ -285,7 +285,7 @@ test('assertManifestsValid throws on a bad set, with all findings in the message
 oidc:
   client_id: novel
   redirect_uris:
-    - https://novel.dunn.dev/cb
+    - https://novel.othala.test/cb
 consent:
   roles:
     user:
@@ -305,9 +305,9 @@ test('assertManifestsValid does not throw on a clean set', () => {
 oidc:
   client_id: novel
   redirect_uris:
-    - https://novel.dunn.dev/cb
+    - https://novel.othala.test/cb
   audience:
-    - https://novel.dunn.dev
+    - https://novel.othala.test
 presentation:
   access:
     - novel
@@ -332,9 +332,9 @@ test('BLOCK: bare manifest (no access binding, no skip) is a load-time hard-fail
 oidc:
   client_id: novel
   redirect_uris:
-    - https://novel.dunn.dev/cb
+    - https://novel.othala.test/cb
   audience:
-    - https://novel.dunn.dev
+    - https://novel.othala.test
 consent: {}
 `);
   assert.deepEqual(m.accessGroups, []);
@@ -352,7 +352,7 @@ test('BLOCK: skip_access_check bypasses the empty-binding block', () => {
 oidc:
   client_id: novel
   audience:
-    - https://novel.dunn.dev
+    - https://novel.othala.test
 consent:
   skip_access_check: true
 `);
@@ -369,7 +369,7 @@ test('BLOCK: a group listed twice in the access binding fires', () => {
 oidc:
   client_id: novel
   audience:
-    - https://novel.dunn.dev
+    - https://novel.othala.test
 presentation:
   access:
     - memories
@@ -410,31 +410,11 @@ presentation:
   assert.ok(errs.some((e) => e.includes('unreachable')), errs.join('\n'));
 });
 
-// ── The real on-disk manifest set must be clean ────────────────────────────
-
-test('every real hydra/clients/*.yaml round-trips AND the set passes validateClients', () => {
-  let files;
-  try {
-    files = readdirSync(clientsDir).filter((f) => f.endsWith('.yaml') || f.endsWith('.yml'));
-  } catch {
-    // hydra/clients/ not in this checkout — skip.
-    return;
-  }
-  assert.ok(files.length > 0, 'expected at least one client manifest');
-  const manifests = files.map((f) =>
-    parseManifest(readFileSync(join(clientsDir, f), 'utf8'), f),
-  );
-  // Round-trip sanity: every manifest has a non-empty clientId + a non-empty
-  // access binding. access-model Phase 2: the binding is the accessGroups list
-  // (sourced from presentation.access: with the conventional fallback) — the
-  // load-bearing gate field — not the singular access-<clientId> name.
-  for (const m of manifests) {
-    assert.ok(m.clientId.length > 0, `${m.sourcePath}: empty clientId`);
-    assert.ok(m.accessGroups.length > 0, `${m.sourcePath}: empty accessGroups`);
-  }
-  const errs = validateClients(manifests);
-  assert.deepEqual(errs, [], `real manifests should be clean:\n${errs.join('\n')}`);
-});
+// ── e2e/manifests/ is now the canonical on-disk fixture set ────────────────
+// hydra/clients/ was removed at M3 (dual-source-of-truth cleanup). The iac
+// catalog under services/dag/catalog/ is the operator source of truth; the
+// e2e/manifests/ fixtures here are the OSS-generic worked examples that CI
+// validates. The hydra/clients/ directory no longer exists in this repo.
 
 // ── e2e fixture set must be clean (mirrors the hydra/clients check above) ──
 
@@ -465,22 +445,22 @@ test('every e2e/manifests/*.yaml round-trips AND the set passes validateClients'
   assert.deepEqual(errs, [], `e2e fixtures should be clean:\n${errs.join('\n')}`);
 });
 
-// ── llm.yaml (Open WebUI SSO) parses correctly and validates clean ──────────
+// ── open-webui.yaml (Open WebUI SSO) parses correctly and validates clean ───
 
-test('llm.yaml: parses correctly — client_id, access binding, redirect, audience, roles', () => {
-  const yaml = readFileSync(join(e2eClientsDir, 'llm.yaml'), 'utf8');
-  const m = parseManifest(yaml, 'llm.yaml');
+test('open-webui.yaml: parses correctly — client_id, access binding, redirect, audience, roles', () => {
+  const yaml = readFileSync(join(e2eClientsDir, 'open-webui.yaml'), 'utf8');
+  const m = parseManifest(yaml, 'open-webui.yaml');
 
-  assert.equal(m.clientId, 'open-webui', 'client_id must be open-webui');
+  assert.equal(m.clientId, 'openwebui', 'client_id must be openwebui');
   assert.equal(m.presentationOnly, false, 'must be an OIDC client, not presentation-only');
 
   // Access binding: access-llm group gate.
   assert.deepEqual(m.accessGroups, ['access-llm'], 'must bind the access-llm group');
 
   // OIDC fields.
-  assert.deepEqual(m.redirectUris, ['https://chat.othala.test/oauth/oidc/callback']);
-  assert.deepEqual(m.postLogoutRedirectUris, ['https://chat.othala.test/']);
-  assert.deepEqual(m.audience, ['https://chat.othala.test']);
+  assert.deepEqual(m.redirectUris, ['https://prompt.othala.test/oauth/oidc/callback']);
+  assert.deepEqual(m.postLogoutRedirectUris, ['https://prompt.othala.test/']);
+  assert.deepEqual(m.audience, ['https://prompt.othala.test']);
   assert.equal(m.skipConsent, true);
   assert.ok(m.scopes.includes('openid'), 'must request openid scope');
   assert.ok(m.scopes.includes('offline_access'), 'must request offline_access for refresh_token');
@@ -501,5 +481,5 @@ test('llm.yaml: parses correctly — client_id, access binding, redirect, audien
 
   // Full validation must pass (audience matches redirect origin, roles clean).
   const errs = validateClients([m]);
-  assert.deepEqual(errs, [], `llm.yaml must validate clean:\n${errs.join('\n')}`);
+  assert.deepEqual(errs, [], `open-webui.yaml must validate clean:\n${errs.join('\n')}`);
 });

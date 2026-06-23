@@ -1,8 +1,9 @@
-# Hydra configuration — dunn.dev family OAuth2/OIDC IDP
+# Hydra configuration — generic Othala instance template
 #
-# DSN host is env-substituted so the same file lands in both topologies.
-# Lab compose sets HYDRA_PG_HOST=postgres (compose service name); iac
-# quadlets set HYDRA_PG_HOST=dag-postgres (container name on dag-internal).
+# All values are ${VAR}-substituted at deploy time. DSN host is env-substituted
+# so the same file lands in both topologies. Lab compose sets
+# HYDRA_PG_HOST=postgres (compose service name); iac quadlets set
+# HYDRA_PG_HOST to the container name on the pod-internal network.
 
 dsn: "postgres://hydra:${HYDRA_PG_PASS}@${HYDRA_PG_HOST}:5432/hydra?sslmode=disable"
 # NOTE: the DB password (HYDRA_PG_PASS) must be URL-safe (percent-encoded) —

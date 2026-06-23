@@ -149,16 +149,16 @@ admin — it is a defense-in-depth measure, not the only lock.
 
 **For the operator:** do this from your workstation.
 
-1. SSH to carmine.
+1. SSH to your host.
 2. Exec into the Kratos container:
 
    ```sh
-   sudo -u dag XDG_RUNTIME_DIR=/run/user/2002 \
+   sudo -u dag XDG_RUNTIME_DIR=/run/user/<service-uid> \
      podman exec -it dag-kratos sh
    ```
 
-   (The `dag` user and UID 2002 are the quadlet service account on carmine.
-   Adjust if your deployment differs. [VERIFY ON CARMINE])
+   (The `dag` user and `<service-uid>` are the quadlet service account on your
+   host. Adjust UID to match your deployment.)
 
 3. Find the identity ID for the locked-out admin:
 
@@ -192,42 +192,40 @@ Step C works when email recovery does not.
 
 ---
 
-### Step C (spouse-friendly version)
+### Step C (co-admin version)
 
-If Andrew is the one locked out and you need to help:
+If one admin is locked out and you need to help:
 
-1. You are signed in to the home portal at dag.dunn.dev as yourself (admin).
-2. Go to Admin → Users → find Andrew's account.
+1. You are signed in to the home portal as yourself (admin).
+2. Go to Admin → Users → find the locked-out admin's account.
 3. The "Issue enrollment URL" button will say "Admin recovery is console-only.
    See docs/runbooks/admin-recovery.md." — the portal intentionally blocks
    this to prevent browser-based admin-to-admin takeover.
-4. You cannot do Step C from the browser. You need SSH access to carmine (the
-   home server) and the console steps above.
+4. You cannot do Step C from the browser. You need SSH access to the host
+   server and the console steps above.
 
-If you have SSH access to carmine, use the console steps above. If you do not,
+If you have SSH access to the host, use the console steps above. If you do not,
 go to Step E.
 
 ---
 
 ### Step D: Console break-glass (SSH — no working admin session)
 
-Use this when neither admin has a working browser session but SSH to carmine
+Use this when neither admin has a working browser session but SSH to the host
 still works.
 
-1. From the operator Mac (or any machine with your SSH key):
+1. From your workstation (or any machine with your SSH key):
 
    ```sh
-   ssh agd@carmine.dunn.dev
+   ssh <operator-user>@<your-host>
    ```
 
 2. Exec into the Kratos container:
 
    ```sh
-   sudo -u dag XDG_RUNTIME_DIR=/run/user/2002 \
+   sudo -u dag XDG_RUNTIME_DIR=/run/user/<service-uid> \
      podman exec -it dag-kratos sh
    ```
-
-   [VERIFY ON CARMINE: confirm the dag service account UID is 2002]
 
 3. Find your identity ID by email:
 
@@ -251,7 +249,7 @@ still works.
    privileged session. Re-enroll passkeys and TOTP before closing the tab.
 
 7. Record the event in the operator log: note the date and reason in
-   `journalctl` on carmine or your ops notes.
+   `journalctl` on the host or your ops notes.
 
 **After recovery, verify:**
 
@@ -264,20 +262,19 @@ still works.
 
 ### Step E: Asteroid (no devices, no SSH — physical access only)
 
-This is the last resort. It requires physical access to carmine.
+This is the last resort. It requires physical access to your host.
 
-1. Sit down at carmine (keyboard + monitor on the machine directly, or BMC
-   serial-over-LAN — see `carmine.md` § "SoL access via BMC").
-2. Log in as `agd` at the console.
+1. Sit down at the host (keyboard + monitor directly, or BMC serial-over-LAN
+   if your hardware supports it).
+2. Log in as `<operator-user>` at the console.
 3. Follow Step D above from the local terminal. The Kratos admin API is
    available on localhost inside the container regardless of network state.
 
-The ZFS data pool (`safe`) is encrypted. If carmine rebooted without
-TPM2-sealed auto-unlock, you will need to enter the ZFS passphrase first.
-That passphrase lives in `pyinfra/secrets.enc.yaml` under
-`carmine.zfs_passphrase` (sops-encrypted). If you do not have the sops age
-key, you need the passphrase from Bitwarden before carmine will mount the
-data pool and start Kratos.
+The ZFS data pool is encrypted. If the host rebooted without TPM2-sealed
+auto-unlock, you will need to enter the ZFS passphrase first. That passphrase
+lives in your sops-encrypted secrets file under `<host>.zfs_passphrase`. If
+you do not have the sops age key, you need the passphrase from your password
+manager before the host will mount the data pool and start Kratos.
 
 There is no "edit the password hash in Postgres directly" procedure.
 That path is not documented because normalizing it would create a class of
@@ -304,46 +301,44 @@ To add the spouse as an admin:
    enrollment URL flow), then note its UUID from `kratos identity list`.
 2. Edit `pyinfra/secrets.enc.yaml` and add the spouse's identity UUID to the
    `OTHALA_ADMIN_IDS` value.
-3. Re-provision and restart the portal: `make dag-secrets HOST=carmine &&
-   make dag-deploy HOST=carmine`.
-4. Have the spouse sign in and verify they reach the admin dashboard.
-5. Have the spouse enroll a second passkey and TOTP per Section 1 above.
+3. Re-provision and restart the portal: `just dag-secrets <your-host> &&
+   just dag-deploy <your-host>`.
+4. Have the co-admin sign in and verify they reach the admin dashboard.
+5. Have the co-admin enroll a second passkey and TOTP per Section 1 above.
 
-Both admins should have SSH keys registered on carmine so either can reach
+Both admins should have SSH keys registered on the host so either can reach
 Step D independently.
 
 ---
 
-## 6. If you're the spouse and Andrew is unavailable
+## 6. If you're the co-admin and the primary admin is unavailable
 
-This section is written for you, not for a technical audience.
+This section is written for non-technical co-admins.
 
 **You still have your own account working:**
-Sign in at dag.dunn.dev with your passkey. Go to Admin → Users. If Andrew's
-account needs anything a family member needs (reset a password, issue an
+Sign in to the portal with your passkey. Go to Admin → Users. If another
+account needs anything a member needs (reset a password, issue an
 enrollment link), you can do that from the admin UI.
 
-**Andrew's account is locked and you need to unlock it:**
+**The primary admin's account is locked and you need to unlock it:**
 The web UI will tell you "Admin recovery is console-only." That is correct.
 You cannot do admin-to-admin recovery from the browser. You need to either:
-- Use SSH to the home server (carmine) and follow the console steps in
+- Use SSH to the host server and follow the console steps in
   Section 4, Step C/D above, OR
-- Wait for Andrew to have physical or SSH access to carmine.
+- Wait for the primary admin to have physical or SSH access to the host.
 
 **Nobody can get into the admin panel at all:**
 This is the Asteroid case (Section 4, Step E). You need physical access to
-the home server. The steps require the ZFS passphrase and the admin API
-commands above. If you're not comfortable with that, write down "Kratos admin
-API recovery" and find someone who is — the procedure is straightforward once
-you're at a terminal on carmine.
+the host. The steps require the ZFS passphrase and the admin API commands
+above. If you're not comfortable with that, write down "Kratos admin API
+recovery" and find someone who is — the procedure is straightforward once
+you're at a terminal on the host.
 
 **What you should have in your password manager before you ever need this:**
 - Your own Othala passkey (enrolled on phone + laptop)
 - Your own TOTP backup codes
-- The ZFS passphrase for carmine (`carmine.zfs_passphrase` in the shared
-  Bitwarden vault)
-- SSH key access to carmine (ask Andrew to add `~/.ssh/authorized_keys` on
-  carmine for your key)
+- The ZFS passphrase for the host (in your shared password manager vault)
+- SSH key access to the host
 
 ---
 

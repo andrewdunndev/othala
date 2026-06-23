@@ -181,8 +181,8 @@ site — no separate vhost, no CA:
 ```
 @admin path /admin/*
 basic_auth @admin {
-    andrew.dunn <bcrypt-hash>
-    ashley.dunn <bcrypt-hash>
+    admin-a <bcrypt-hash>
+    admin-b <bcrypt-hash>
 }
 reverse_proxy @admin dag-portal:8080
 ```

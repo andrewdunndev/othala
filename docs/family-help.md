@@ -1,8 +1,8 @@
 # Getting in — help for family members
 
-This is the short guide for anyone who shares access with Andrew. No
+This is the short guide for anyone who shares access to the home portal. No
 technical background needed. If something here doesn't match what you're
-seeing, text or message Andrew and he can send you a fresh sign-in link.
+seeing, contact your admin and they can send you a fresh sign-in link.
 
 ---
 
@@ -30,7 +30,7 @@ What to do:
    **New device or can't sign in?**
 2. You'll land on a page that asks for your email. Enter it and tap
    **Send me a code**.
-3. Open your email app. There will be a message from Andrew's home server
+3. Open your email app. There will be a message from the home portal
    with a short numeric code. Enter that code on the next screen and tap
    **Verify code**.
 4. You're in. While you're signed in, go to your account settings and add
@@ -56,7 +56,7 @@ If you don't have another device handy:
 4. Once you're in, you can add a passkey for whatever device you're now
    using.
 
-If you can't get to your email either, reach out to Andrew directly. He
+If you can't get to your email either, reach out to your admin directly. They
 can send you a fresh link that gets you straight in.
 
 ---
@@ -92,12 +92,12 @@ use the email code path via **New device or can't sign in?**. Either one
 gets you into your account without a password.
 
 If something you're trying to sign in to asks for a username and password
-(like the music app), message Andrew and he'll sort out the credentials
+(like the music app), message your admin and they'll sort out the credentials
 for that specific app.
 
 ---
 
 ## Still stuck?
 
-Text or message Andrew. He can send a one-time link directly to your phone
-that gets you in without needing a passkey or a code.
+Text or message your admin. They can send a one-time link directly to your
+phone that gets you in without needing a passkey or a code.

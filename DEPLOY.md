@@ -125,7 +125,7 @@ make dag-preflight HOST=carmine    # sops keys, registry images, drift, SSH
 make dag-deploy HOST=carmine
 
 # 5. Register OIDC clients (see "Client registration" below).
-make dag-apply-clients HOST=carmine
+just dag-reload-clients carmine
 
 # 6. Smoke.
 make dag-smoke HOST=carmine
@@ -167,8 +167,8 @@ custom private-key signer was deleted.
 ## Client registration
 
 OIDC client registration is a deliberate **one-shot**, never run on app
-boot or triggered by a route. The deploy repo runs the registrar, e.g.
-`make dag-apply-clients`, which invokes a `--rm` one-shot runner on
+boot or triggered by a route. The deploy repo runs the registrar via
+`just dag-reload-clients`, which invokes a `--rm` one-shot runner on
 `dag.network` (the only network that can reach Hydra's admin port)
 against the manifests synced into `MANIFEST_DIR`. See
 [`docs/per-app-oidc.md`](docs/per-app-oidc.md) for the full per-RP
@@ -184,33 +184,12 @@ freshly-built image, reading each `<slug>.yaml` `oidc:` block from
 shell `apply-clients.sh` + Go `util` runner were retired at E1 (source
 deleted).
 
-## Deploy cutover (pending)
-
-At the deploy cutover the convergence becomes additive: the legacy Go
-consent service and the `util` runner are retired (their source dirs have
-been deleted from this repo at E1), and the pod collapses to dag-portal
-(the othala app) + dag-ldap-bridge + Ory. The cutover steps that touch
-deploy:
-
-- Drop `dag-consent` from the pod; remove `dag-portal`'s
-  `After=` / `Requires=dag-consent` and its `CONSENT_ADMIN_BEARER` /
-  consent-URL wiring.
-- Wire the dual-listener admin port (`ADMIN_PORT=4431` on loopback) and
-  the new admin env targets (`OTHALA_ADMIN_IDS`,
-  `OTHALA_ADMIN_ENDPOINT_BEARER`, `RECOVERY_GATE_SECRET`) into the
-  `dag-portal` quadlet.
-- **Repoint the Kratos recovery-hook** from the old consent service to
-  the Othala admin port `http://127.0.0.1:4431/admin/recovery-gate`,
-  authenticated with `Bearer RECOVERY_GATE_SECRET`.
-- **Regenerate secrets fresh** as `dag_*` sops keys. carmine is being
-  reinstalled ahead of the cutover, so the secret material is generated
-  fresh, not migrated from any prior instance.
-
-Until the cutover, the deploy quadlets (`dag-*`) remain at the
-pre-cutover shape (`dag-portal` still depends on `dag-consent`). The Go
-consent + util sources have been removed from this repo at E1; their
-behaviour lives in the converged app and they are not the current
-architecture.
+<!-- Deploy cutover completed at E1. dag-consent and the util runner are
+     retired; dag-portal is the converged app. Admin env targets
+     (OTHALA_ADMIN_IDS, OTHALA_ADMIN_ENDPOINT_BEARER, RECOVERY_GATE_SECRET)
+     and the dual-listener admin port (ADMIN_PORT=4431) are live in the
+     dag-portal quadlet. The Kratos recovery-hook points at the Othala admin
+     port. Secrets regenerated fresh as dag_* sops keys. -->
 
 ## Why two repos
 

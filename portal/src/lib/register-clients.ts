@@ -206,10 +206,11 @@ export async function registerClient(
  * Runs the full validateClients lint first (unless skipValidation), then
  * registers each client idempotently. Returns the per-client action list.
  *
- * DORMANT until the E1 cutover: nothing invokes this yet. Client
- * registration stays shell-driven via util/apply-clients.sh; this is NOT
- * yet the live successor and apply-clients.sh is NOT superseded. E1 wires
- * the in-app path and flips the cutover.
+ * This is the active production registration path (E1 cutover complete).
+ * The deploy repo runs this bundle as a deliberate --rm one-shot on boot
+ * and on SIGHUP (dag-reload-clients), reading manifests from MANIFEST_DIR
+ * and resolving <SLUG>_CLIENT_SECRET from env. The legacy shell
+ * apply-clients.sh + Go util runner were retired at E1.
  */
 export async function registerAllClients(
   opts: RegisterOptions = {},
