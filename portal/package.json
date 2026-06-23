@@ -5,10 +5,11 @@
   "type": "module",
   "scripts": {
     "dev": "astro dev --port 4321",
-    "build": "astro build && npm run copy:listener && npm run build:admin-runtime && npm run build:register-clients",
+    "build": "astro build && npm run copy:listener && npm run build:admin-runtime && npm run build:register-clients && npm run build:registrar",
     "copy:listener": "cp src/server/listen.mjs dist/server/listen.mjs",
     "build:admin-runtime": "esbuild src/server/admin-runtime.ts --bundle --format=esm --platform=node --packages=external --outfile=dist/server/admin-runtime.mjs",
     "build:register-clients": "esbuild src/server/register-clients-cli.ts --bundle --format=esm --platform=node --packages=external --outfile=dist/server/register-clients.mjs",
+    "build:registrar": "esbuild src/server/registrar.ts --bundle --format=esm --platform=node --packages=external --outfile=dist/server/registrar.mjs",
     "check": "astro check",
     "preview": "astro preview",
     "start": "node ./dist/server/listen.mjs",

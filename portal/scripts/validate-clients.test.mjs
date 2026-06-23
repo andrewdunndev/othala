@@ -435,3 +435,71 @@ test('every real hydra/clients/*.yaml round-trips AND the set passes validateCli
   const errs = validateClients(manifests);
   assert.deepEqual(errs, [], `real manifests should be clean:\n${errs.join('\n')}`);
 });
+
+// ── e2e fixture set must be clean (mirrors the hydra/clients check above) ──
+
+const e2eClientsDir = join(here, '..', '..', 'e2e', 'manifests');
+
+test('every e2e/manifests/*.yaml round-trips AND the set passes validateClients', () => {
+  let files;
+  try {
+    files = readdirSync(e2eClientsDir)
+      .filter((f) => (f.endsWith('.yaml') || f.endsWith('.yml')) && f !== 'groups.yaml');
+  } catch {
+    // e2e/manifests/ not in this checkout — skip.
+    return;
+  }
+  assert.ok(files.length > 0, 'expected at least one e2e fixture manifest');
+  const manifests = files
+    .map((f) => {
+      try {
+        return parseManifest(readFileSync(join(e2eClientsDir, f), 'utf8'), f);
+      } catch {
+        return null;
+      }
+    })
+    // presentation-only manifests (no oidc: block) are returned null by
+    // loadOne; filter them out for the OIDC-client validateClients pass.
+    .filter((m) => m !== null && !m.presentationOnly);
+  const errs = validateClients(manifests);
+  assert.deepEqual(errs, [], `e2e fixtures should be clean:\n${errs.join('\n')}`);
+});
+
+// ── llm.yaml (Open WebUI SSO) parses correctly and validates clean ──────────
+
+test('llm.yaml: parses correctly — client_id, access binding, redirect, audience, roles', () => {
+  const yaml = readFileSync(join(e2eClientsDir, 'llm.yaml'), 'utf8');
+  const m = parseManifest(yaml, 'llm.yaml');
+
+  assert.equal(m.clientId, 'open-webui', 'client_id must be open-webui');
+  assert.equal(m.presentationOnly, false, 'must be an OIDC client, not presentation-only');
+
+  // Access binding: access-llm group gate.
+  assert.deepEqual(m.accessGroups, ['access-llm'], 'must bind the access-llm group');
+
+  // OIDC fields.
+  assert.deepEqual(m.redirectUris, ['https://chat.othala.test/oauth/oidc/callback']);
+  assert.deepEqual(m.postLogoutRedirectUris, ['https://chat.othala.test/']);
+  assert.deepEqual(m.audience, ['https://chat.othala.test']);
+  assert.equal(m.skipConsent, true);
+  assert.ok(m.scopes.includes('openid'), 'must request openid scope');
+  assert.ok(m.scopes.includes('offline_access'), 'must request offline_access for refresh_token');
+  assert.ok(m.scopes.includes('groups'), 'must request groups scope for role claim');
+
+  // Consent: roles declared with claim_emit; emit_groups_claim active.
+  assert.ok(m.emitGroupsClaim !== false, 'emit_groups_claim must not be suppressed');
+  const adminRole = m.roles.find((r) => r.name === 'admin');
+  const userRole = m.roles.find((r) => r.name === 'user');
+  assert.ok(adminRole, 'admin role must be declared');
+  assert.ok(userRole, 'user role must be declared');
+  assert.ok(adminRole.claimEmit !== null, 'admin role must have claim_emit');
+  assert.ok(userRole.claimEmit !== null, 'user role must have claim_emit');
+
+  // group_role_map: admin → admin, family → user.
+  assert.equal(m.groupRoleMap['admin'], 'admin');
+  assert.equal(m.groupRoleMap['family'], 'user');
+
+  // Full validation must pass (audience matches redirect origin, roles clean).
+  const errs = validateClients([m]);
+  assert.deepEqual(errs, [], `llm.yaml must validate clean:\n${errs.join('\n')}`);
+});

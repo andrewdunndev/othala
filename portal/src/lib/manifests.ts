@@ -17,7 +17,8 @@
 //   (MANIFEST_DIR), and the operator's sync target keeps the on-host
 //   copy current.
 // - A 30-second in-process cache prevents per-request YAML parsing
-//   from being a hot path. Cache is invalidated on SIGHUP (future).
+//   from being a hot path. Cache is invalidated on SIGHUP via
+//   invalidateManifestCache() (wired in src/server/registrar.ts).
 //
 // Source-of-truth chain:
 //
@@ -147,6 +148,12 @@ interface CacheEntry {
 
 let cache: CacheEntry | null = null;
 const CACHE_TTL_MS = 30 * 1000;
+
+/** Drop the in-process manifest cache so the next load re-reads from disk.
+ *  Called by the SIGHUP reload path (src/server/registrar.ts reloadOnSighup). */
+export function invalidateManifestCache(): void {
+  cache = null;
+}
 
 function splitScope(scope: unknown): string[] {
   if (!scope) return [];
