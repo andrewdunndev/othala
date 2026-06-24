@@ -24,7 +24,7 @@ const REDACTED = '[REDACTED]';
 
 test('scrubUrl redacts every sensitive value in a ?-bearing http.url', () => {
   const url =
-    'https://auth.dunn.dev/auth/login?token=t1&code=c1&state=s1' +
+    'https://auth.example.test/auth/login?token=t1&code=c1&state=s1' +
     '&login_challenge=lc1&consent_challenge=cc1&logout_challenge=gc1&flow=f1';
   const out = scrubUrl(url);
   for (const k of [
@@ -39,7 +39,7 @@ test('scrubUrl redacts every sensitive value in a ?-bearing http.url', () => {
     assert.match(out, new RegExp(`${k}=\\[REDACTED\\]`), `${k} not redacted`);
   }
   // Path is preserved; no raw sensitive value survives.
-  assert.ok(out.startsWith('https://auth.dunn.dev/auth/login?'));
+  assert.ok(out.startsWith('https://auth.example.test/auth/login?'));
   for (const v of ['t1', 'c1', 's1', 'lc1', 'cc1', 'gc1', 'f1']) {
     assert.equal(out.includes(`=${v}`), false, `raw value ${v} leaked`);
   }
