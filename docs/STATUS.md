@@ -6,13 +6,13 @@ orientation (what the app is, the load-bearing decisions) read
 contract read [`../DEPLOY.md`](../DEPLOY.md). Those files defer to this
 one for version state and assert none of their own.
 
-Updated 2026-06-01.
+Updated 2026-06-24.
 
 ## Where we are
 
-**Convergence build complete, CV-verified, and renamed to Othala /
-dag.dunn.dev. Image published at the registry root as `othala`
-(Wave CP done). Deploy pending, operator-gated.**
+**v0.3.0-rc tagged 2026-06-19 (CVP hardening pass + access-model + OTel
+tracing). 37 commits beyond v0.3.0-rc on main as of 2026-06-24 (unreleased).
+Deploy pending, operator-gated.**
 
 The OSS project is **Othala** ("Ory for your home"); the deployed
 instance host is **dag.dunn.dev**. The stack has converged to a single

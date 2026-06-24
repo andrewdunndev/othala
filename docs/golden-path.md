@@ -83,11 +83,12 @@ TV-app integration that displays a code-to-pair). Cost: device-flow
 UI screens to add to portal + new Hydra config + new threat-model
 considerations.
 
-### 5. No mTLS in-cluster, but pod-network as trust domain
+### 5. No in-pod mTLS, but pod-network as trust domain
 
-Plain HTTP across the auth pod (consent → hydra:4445, portal →
-kratos:4434, kratos → consent:4477). The pod boundary is the trust
-domain; defense-in-depth between in-pod services is partial-and-deliberate.
+Plain HTTP across the auth pod (portal -> kratos:4434, portal ->
+hydra:4445). The pod boundary is the trust domain; defense-in-depth
+between in-pod services is partial-and-deliberate. The standalone
+consent service is retired; there is no longer a kratos -> consent hop.
 
 Ory's roadmap could add mTLS or SPIFFE primitives; we ignore them
 because the family-scale single-tenant homelab doesn't justify the
@@ -114,15 +115,13 @@ it. Operationally fine but a one-way change for that client.
 
 The auth pod is one security domain. Documented in
 `ARCHITECTURE.md` "Trust boundary." Network isolation
-is the gate, not service-level auth. The webhook from Kratos to consent
-is unauthenticated-at-the-network-layer but secret-gated via
-`X-Webhook-Auth` (the recovery-gate posture). Cross-pod traffic is
-podman-network-isolated.
+is the gate, not service-level auth. The recovery-gate webhook (Kratos
+to portal `:4431/admin/recovery-gate`) is secret-gated via
+`X-Webhook-Auth`. Cross-pod traffic is podman-network-isolated.
 
 Ory will continue to ship per-service auth primitives (Hydra admin
 bearer tokens, Kratos session validators, etc.); we use them where
-useful (Hydra admin via consent's CONSENT_ADMIN_BEARER) but don't
-treat them as required boundaries.
+useful but don't treat them as required boundaries.
 
 **To break this**: bring multi-tenancy into the auth pod, which would
 need real service-to-service auth. Out of scope for family.
@@ -154,10 +153,15 @@ document.
 
 ### 10. Substrate secret collapse (homelab simplification)
 
-v0.1.3 had 19 sops keys for the auth substrate. v0.2.0 collapses to 6:
-`auth_db_password`, `auth_session_secret` (used for both Kratos and
-Hydra cookie current+previous slots), `auth_cipher_secret`,
-`hydra_system_secret`, `auth_pairwise_salt`, `auth_internal_bearer`.
+v0.1.3 had 19 sops keys for the auth substrate. v0.2.0 collapses to
+approximately 5 core keys (using the `dag_*` prefix introduced alongside
+the rename): a DB password, a session secret (Kratos and Hydra cookies),
+a cipher secret (Kratos at-rest encryption), the non-rotatable
+`secrets.system` key (Hydra at-rest encryption), and a pairwise salt.
+The `auth_internal_bearer` key (consent service bearer token) was retired
+with the consent service. Exact key names are in the deploy repo's
+`services/dag/` sops file; the cruft scan confirmed these are `dag_*`,
+not `auth_*` as previously written here.
 
 The two-slot cookie rotation pattern (CURRENT + PREVIOUS) is reduced
 to single-value reuse in production. **This trades a small amount of
@@ -179,9 +183,9 @@ enforced). Network isolation prevents direct kratos:4434 writes from
 outside the auth pod; in-pod writes are limited to the portal.
 
 If a second writer is ever added (CLI tool, migration script), the
-validator gets factored out into a Go package shared with consent so
-both languages enforce the same shape. Documented in
-`docs/security-review-2026-05-04.md` MEDIUM-3.
+validator gets factored out into a shared package so both paths enforce
+the same shape. Documented in `docs/security-review-2026-05-04.md`
+MEDIUM-3.
 
 **To break this**: add a second writer without factoring the validator.
 Cost: typo'd groups silently land in storage; users lose role access
