@@ -9,7 +9,10 @@ The git tag is the authoritative version; `portal/package.json` mirrors it.
 
 ## [Unreleased]
 
-Security hardening pass (CVP).
+## [0.3.0] - 2026-06-24
+
+Security hardening pass (CVP), access-model refactor, and PII-safe
+OpenTelemetry tracing.
 
 ### Changed
 
@@ -27,6 +30,15 @@ Security hardening pass (CVP).
   first-factor-only session can no longer enroll or change credentials on an
   account that has a second factor. Password-only and passkey-only users are
   unaffected; first-passkey enrollment is not blocked.
+- **Access-model refactor**: portal now derives tile/gate group membership from
+  a central group registry (`access-model` primitives). Each app manifest
+  declares an `access_group`; the portal builds derived groups and enforces
+  them at the forward-auth gate, replacing the ad-hoc per-tile logic. Includes
+  per-app forward-auth gating for Gather, Open WebUI, and Observe tiles.
+- **AAL2 step-up removed from the admin gate**: admin authority is enforced by
+  the `OTHALA_ADMIN_IDS` allowlist + a basic-auth + passkey session check
+  instead of the Kratos AAL2 step-up challenge, eliminating the dead-end UX
+  path for passkey-only admins.
 
 ### Added
 
@@ -42,6 +54,29 @@ Security hardening pass (CVP).
   forge group membership. Per-app group enforcement guidance corrected: it
   must be done via the OIDC access-gate or a server-side forward_auth endpoint,
   never a passed header.
+- **PII-safe OpenTelemetry tracing**: opt-in OTLP tracing for the portal, Kratos,
+  and Hydra. The portal SDK scrubs `url.query`, `http.url`, and
+  `Authorization` headers from all spans before export; traces emit to the
+  host Alloy receiver via `OTLP_INGEST_TOKEN`. Kratos and Hydra gain opt-in
+  `tracing:` blocks in their configs. The redaction pass is tested with fixture
+  assertions.
+- **In-app OIDC client registrar** (`register-clients.mjs`): replaces the
+  legacy `dag-apply-clients` shell script. Boots on startup and reconciles on
+  `SIGHUP`; CI exercises it against the e2e manifest set.
+- **Open WebUI OIDC manifest** (`access-llm` gate) and **Gather forward-auth
+  tile** (`access-gather` gate) as shipped example manifests.
+- **Env-var-name hardening**: manifest-lint rule 1a enforces uppercase env-var
+  names; the registrar fails loudly on malformed entries; `SIGHUP` analysis
+  added to the config module.
+- **Detection-as-code** purity guards: OSS-purity, no-deprecated, and
+  dated-debt rules enforced in `scripts/check-purity.sh` + CI.
+
+### Security (dependency bumps)
+
+- `nodemailer` → v9 (security; resolves upstream CVE advisory)
+- `astro` → v6.4.6 (security)
+- `esbuild` → ^0.28.0 (security)
+- `tough-cookie` → v6 (security)
 
 ## [0.2.0] - 2026-06-04
 
@@ -114,4 +149,5 @@ runtime manifest model, plus the rename to **Othala** ("Ory for your home").
 - Smoke harness green on the carmine QEMU runner (incl. the contact-form
   Section H); 459 portal unit tests; `astro check` and `astro build` clean.
 
+[0.3.0]: https://gitlab.com/dunn.dev/othala/-/releases/v0.3.0
 [0.2.0]: https://gitlab.com/dunn.dev/othala/-/releases/v0.2.0

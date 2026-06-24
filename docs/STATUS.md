@@ -10,9 +10,9 @@ Updated 2026-06-24.
 
 ## Where we are
 
-**v0.3.0-rc tagged 2026-06-19 (CVP hardening pass + access-model + OTel
-tracing). 37 commits beyond v0.3.0-rc on main as of 2026-06-24 (unreleased).
-Deploy pending, operator-gated.**
+**v0.3.0 release-prep complete on main (CVP hardening pass + access-model +
+OTel tracing + dependency security bumps). 48 commits landed since v0.3.0-rc;
+tag is imminent (operator/joint). Deploy pending, operator-gated.**
 
 The OSS project is **Othala** ("Ory for your home"); the deployed
 instance host is **dag.dunn.dev**. The stack has converged to a single
@@ -62,7 +62,7 @@ Estate design tokens via `@dunn.dev/reference`.
 
 | Item | Wave | Status |
 |---|---|---|
-| **Image name reconcile `portal` → `othala`** | CP | Done. The converged app builds as `build-othala` and publishes at the registry root `registry.gitlab.com/dunn.dev/othala` (`publish_at_root: true`); the `dag-consent` + `util` image builds + their SBOMs are removed; at E1 the `consent/` + `util/` source dirs were deleted and the `verify-consent` go-build job removed; the LDAP bridge (`ldap-bridge/`) has been extracted to a separate project (`gitlab.com/dunn.dev/kratos-ldap`) — no Go workspace remains in this repo. The deploy repo's `dag-portal` quadlet pins the root path. First tag under the new name is `v0.2.0`. |
+| **Image name reconcile `portal` → `othala`** | CP | Done. The converged app builds as `build-othala` and publishes at the registry root `registry.gitlab.com/dunn.dev/othala` (`publish_at_root: true`); the `dag-consent` + `util` image builds + their SBOMs are removed; at E1 the `consent/` + `util/` source dirs were deleted and the `verify-consent` go-build job removed; the LDAP bridge (`ldap-bridge/`) has been extracted to a separate project (`gitlab.com/dunn.dev/kratos-ldap`) — no Go workspace remains in this repo. The deploy repo's `dag-portal` quadlet pins the root path. First tag under the new name was `v0.2.0`; current release target is `v0.3.0`. |
 | **Deploy cutover** | — | Pending. Retire `dag-consent` + `util` from the pod; wire the dual-listener admin port + its admin env targets; repoint the Kratos recovery-hook to the Othala admin port `:4431/admin/recovery-gate`. See `DEPLOY.md`. |
 | **Production deploy** | — | Pending, operator-gated. Fresh `dag_*` sops keys (carmine pre-reinstall) + deploy repo config sync/pin + `make dag-deploy`. |
 
