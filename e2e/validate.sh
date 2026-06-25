@@ -52,13 +52,6 @@ if [[ -S /run/podman/podman.sock ]]; then
   export DOCKER_HOST="unix:///run/podman/podman.sock"
   export CONTAINER_HOST="unix:///run/podman/podman.sock"
   echo "  rootful podman socket detected → DOCKER_HOST/CONTAINER_HOST=/run/podman/podman.sock"
-  # CRUCIBLE DIAGNOSTIC: confirm the client actually reaches the rootful
-  # service (Rootless=false). If this prints true, the stack will run rootless
-  # and postgres chown will fail — surfacing the real cause instead of an
-  # opaque "Operation not permitted" 4 minutes later.
-  echo "  [diag] id: $(id)"
-  echo "  [diag] socket: $(ls -l /run/podman/podman.sock 2>&1)"
-  echo "  [diag] podman-via-socket Rootless=$(podman info --format '{{.Host.Security.Rootless}}' 2>&1 | head -1)"
 fi
 
 AUTH_REGISTRY="${AUTH_REGISTRY:-registry.gitlab.com/dunn.dev/othala}"

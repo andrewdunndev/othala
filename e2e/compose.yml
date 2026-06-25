@@ -54,11 +54,25 @@ services:
     # binary inside the container from elevating past the container user.
     security_opt:
       - "no-new-privileges:true"
-    # Drop ALL Linux capabilities. Postgres does NOT need any to operate on
-    # its data volume (it runs as the postgres user after startup; it does not
-    # bind a port < 1024). No cap_add required.
+    # Drop ALL Linux capabilities, then add back ONLY what the postgres
+    # entrypoint needs DURING INITIALIZATION. The container starts as root,
+    # chowns/chmods PGDATA + /var/run/postgresql, then setuid-drops to the
+    # postgres user (it does not bind a port < 1024). Under cap_drop: [ALL]
+    # those startup steps fail with "chown: Operation not permitted" — even as
+    # real root on the rootful socket, because dropping ALL removes CAP_CHOWN /
+    # CAP_DAC_OVERRIDE / CAP_FOWNER, and the setpriv to postgres needs
+    # CAP_SETUID / CAP_SETGID. (Proven on carmine: cap_drop:[ALL] alone fails
+    # the chown; adding these five reaches "ready to accept connections".)
+    # These are init-time only; postgres holds none of them once it has dropped
+    # to its unprivileged user.
     cap_drop:
       - ALL
+    cap_add:
+      - CHOWN
+      - DAC_OVERRIDE
+      - FOWNER
+      - SETUID
+      - SETGID
     # NEEDS-CARMINE-VALIDATION: read_only on postgres is deliberately omitted.
     # Postgres writes to: its PGDATA directory (named volume / bind), the
     # pg_wal directory, temporary sort files under /tmp, Unix socket files
