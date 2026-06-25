@@ -378,16 +378,26 @@ log:
 #     firewall-scoped host OTLP port, so TLS would only protect an already-
 #     trusted segment.
 #   - sampling_ratio 0.1 = trace 10% of requests (head sampling) to bound volume.
+#
+# CONDITIONAL BLOCK (render-config.sh #@if): the entire tracing block is OMITTED
+# when OTHALA_OTLP_PROVIDER is empty/unset, and emitted verbatim when it is set.
+# Ory v26.2.0's schema rejects a present `tracing:` whose provider is "" — it
+# validates the block's $ref the moment the key exists, so "disabled" must mean
+# "absent", not "present with an empty provider". The e2e harness leaves the
+# provider empty (block drops out; tracing off); iac sets it to "otel" (block
+# renders; tracing on). See scripts/render-config.sh for the fence semantics.
+#@if OTHALA_OTLP_PROVIDER
 tracing:
   service_name: kratos
   deployment_environment: ${OTHALA_OTLP_ENVIRONMENT}
-  provider: ${OTHALA_OTLP_PROVIDER}     # "" = disabled (e2e default); "otel" = on (deploy)
+  provider: ${OTHALA_OTLP_PROVIDER}     # "otel" when enabled (deploy)
   providers:
     otlp:
       server_url: ${OTHALA_OTLP_ENDPOINT}   # host:port, HTTP — host alloy OTLP receiver
       insecure: true                         # plaintext to the host alloy receiver
       sampling:
         sampling_ratio: 0.1
+#@endif
 
 hashers:
   argon2:

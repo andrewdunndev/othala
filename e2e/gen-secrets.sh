@@ -87,18 +87,20 @@ OTHALA_INSTANCE_NAME='Othala Lab'
 OTHALA_SMTP_FROM_ADDRESS=noreply@othala.test
 
 # ── OpenTelemetry tracing (OFF in e2e) ──────────────────────────────────────
-# render-config.sh fails on ANY unset \${VAR}, so the kratos/hydra 'tracing:'
-# blocks need these three set even though tracing is disabled here. OFF-default:
-# OTHALA_OTLP_PROVIDER="" makes Ory ignore the otlp provider entirely (no
-# collector connection, no spans), so the offline VM never reaches for a
-# collector. The endpoint/environment are inert placeholders that satisfy the
-# render contract; the deploy plane (iac) overrides all three from sops +
-# inventory with provider="otel" to turn tracing on. No ingest token here —
-# the emitters send unauthenticated to the host alloy receiver, which adds the
-# observe ingest auth and redacts centrally on its forward hop.
+# OTHALA_OTLP_PROVIDER="" makes render-config.sh DROP the whole tracing block
+# from the rendered kratos/hydra configs (the #@if fence — see
+# scripts/render-config.sh). Ory v26.2.0 rejects a present-but-empty-provider
+# tracing block, so "disabled" must mean "absent", not "present with an empty
+# provider". Because the block is dropped, the ENDPOINT/ENVIRONMENT tokens live only
+# inside dropped lines and are NOT part of the render contract here — they need
+# not be set. They are emitted (commented out below) only as documentation of
+# what the deploy plane (iac) sets when it turns tracing on (provider="otel",
+# from sops + inventory). No ingest token here — the emitters send
+# unauthenticated to the host alloy receiver, which adds the observe ingest auth
+# and redacts centrally on its forward hop.
 OTHALA_OTLP_PROVIDER=""
-OTHALA_OTLP_ENDPOINT=localhost:4318
-OTHALA_OTLP_ENVIRONMENT=lab
+# OTHALA_OTLP_ENDPOINT=localhost:4318   # set by iac when provider="otel"
+# OTHALA_OTLP_ENVIRONMENT=lab           # set by iac when provider="otel"
 
 # ── Password policy: HIBP off for offline VM, min-length 12 ─────────────────
 # haveibeenpwned_enabled=false prevents a network call the CI VM cannot make.

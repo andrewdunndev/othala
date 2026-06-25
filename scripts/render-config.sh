@@ -31,6 +31,21 @@
 #     wide caller environment.
 #   - By construction there can be no un-rendered token left in the output,
 #     so no post-render grep is needed.
+#
+# Conditional blocks (#@if / #@endif):
+#   - A region fenced by a line whose only content is `#@if NAME` and a closing
+#     `#@endif` line is INCLUDED verbatim (fence lines removed) when env var
+#     NAME is set and NON-EMPTY, and DROPPED ENTIRELY when NAME is unset or
+#     empty. This exists for Ory v26's schema, which rejects a present-but-
+#     half-populated optional block: the `tracing:` block must be wholly ABSENT
+#     when tracing is disabled (OTHALA_OTLP_PROVIDER="") but wholly PRESENT and
+#     valid when enabled (provider="otel"). A simple empty-scalar render is not
+#     enough — the schema validates the block's $ref the moment the key exists.
+#   - Conditional stripping happens BEFORE token derivation, so ${VAR} tokens
+#     that live ONLY inside a dropped block are not required in the environment.
+#     (When tracing is off, OTHALA_OTLP_ENDPOINT/ENVIRONMENT need not be set.)
+#   - The gating NAME on an #@if is itself a required-when-present signal, not a
+#     substituted token; it is matched against the environment directly.
 set -euo pipefail
 
 if [[ $# -ne 2 ]]; then
@@ -55,6 +70,54 @@ template_path, output_path = sys.argv[1], sys.argv[2]
 src = open(template_path).read()
 
 TOKEN = re.compile(r"\$\{([A-Za-z_][A-Za-z0-9_]*)\}")
+IF_RE = re.compile(r"^\s*#@if\s+([A-Za-z_][A-Za-z0-9_]*)\s*$")
+ENDIF_RE = re.compile(r"^\s*#@endif\s*$")
+
+
+# Resolve conditional blocks FIRST, before token derivation, so tokens that
+# live only inside a dropped block are not part of the required contract.
+# `#@if NAME` ... `#@endif`: keep the inner lines (drop the two fence lines)
+# when NAME is set and non-empty; drop the whole region (fences + body) when
+# NAME is unset or empty. Blocks do not nest (a nested #@if inside an open
+# block is a template authoring error and is rejected).
+def resolve_conditionals(text):
+    out = []
+    gate = None  # active gating var name, or None when outside a block
+    keep = True  # whether the active block's body should be kept
+    for lineno, line in enumerate(text.splitlines(), 1):
+        m_if = IF_RE.match(line)
+        m_endif = ENDIF_RE.match(line)
+        if m_if:
+            if gate is not None:
+                print(f"render-config: {template_path}: nested #@if at line "
+                      f"{lineno} (block '{gate}' still open) — not supported",
+                      file=sys.stderr)
+                sys.exit(1)
+            gate = m_if.group(1)
+            keep = bool(os.environ.get(gate, ""))
+            continue  # drop the fence line itself
+        if m_endif:
+            if gate is None:
+                print(f"render-config: {template_path}: #@endif without a "
+                      f"matching #@if at line {lineno}", file=sys.stderr)
+                sys.exit(1)
+            gate = None
+            keep = True
+            continue  # drop the fence line itself
+        if gate is None or keep:
+            out.append(line)
+    if gate is not None:
+        print(f"render-config: {template_path}: unterminated #@if '{gate}' "
+              f"(missing #@endif)", file=sys.stderr)
+        sys.exit(1)
+    # Preserve a trailing newline if the source had one.
+    result = '\n'.join(out)
+    if text.endswith('\n'):
+        result += '\n'
+    return result
+
+
+src = resolve_conditionals(src)
 
 # Derive required tokens from a comment-stripped view so that ${VAR} tokens
 # that appear only inside YAML comments don't become phantom required vars.
