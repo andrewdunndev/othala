@@ -1,39 +1,28 @@
 /**
- * H — Non-admin member POSTs to /admin mutation endpoints (adversarial / negative).
+ * H — Non-admin member POSTs to /admin mutation endpoints (INV-1: AAL is necessary).
  *
- * Guard under attack:
- *   portal/src/lib/admin.ts:requireAdminSession
- *   — specifically the AAL2 check (b) and then the admin marker check (c):
- *       if (aal !== 'aal2') → step-up redirect
- *       if (!isAdminMarker(adminIdentity)) → redirect('/auth/error?reason=not-admin')
- *   The AAL2 check fires first; a non-admin member at AAL1 hits the step-up
- *   redirect before the marker check. Either denial satisfies these specs.
+ * SECURITY INVARIANT (INV-1): An AAL1 session NEVER reaches admin mutation
+ * functionality. requireAdminSession enforces checks IN ORDER (ADR 0008):
+ *   (a) active session — yes (member has AAL1 password session)
+ *   (b) AAL2: aal !== 'aal2' → step-up redirect fires FIRST
+ *   (c) admin marker: never reached for an AAL1 session
  *
- * Spec C (c-member-admin-denied.spec.ts) only covers a browser GET navigation
- * to /admin. This spec covers POST (mutation) verbs against real admin mutation
- * endpoints in the portal.  A non-admin member with a real, active Kratos
- * session must be denied on every mutation, not just on navigation.
+ * Spec C (c-member-admin-denied.spec.ts) covers GET /admin. This spec covers
+ * POST (mutation) verbs. INV-1 must hold for mutations too: a non-admin member
+ * with a real AAL1 Kratos session must be denied on every mutation.
  *
  * Endpoints targeted:
  *   H1 — POST /admin/users/new (create-user mutation)
- *         portal/src/pages/admin/users/new.astro line 26:
- *           requireAdminSession runs at SSR entry, before any POST body read.
- *   H2 — POST /admin/users/<member-own-id>  (self-edit attempt via mutation verb)
- *         portal/src/pages/admin/users/[id].astro line 43:
- *           requireAdminSession runs first; even if member knows their own
- *           identity id, the admin guard must fire before the CSRF check
- *           or any Kratos write.
- *   H3 — POST /admin/users/<fake-uuid>  (blind mutation on unknown user)
- *         Same guard, different id — ensures the gate is not id-dependent.
+ *   H2 — POST /admin/users/<member-own-id> (self-edit attempt via mutation verb)
+ *   H3 — POST /admin/users/<fake-uuid> (blind mutation on unknown user)
  *
  * Two-layer check per POST test:
- *   1. Origin-less POST → Astro's built-in security.checkOrigin CSRF layer
- *      rejects forged/origin-less form POSTs with 403 before the app guard runs.
- *   2. Same-origin POST (Origin header == site origin) → passes checkOrigin and
- *      reaches the app guard (requireAdminSession → 302 reason=not-admin).
- *
- * All three must be denied (redirect to /auth/error?reason=not-admin or
- * equivalent) — never a 200, never a side effect.
+ *   Layer 1 (origin-less): Astro's security.checkOrigin rejects it with 403
+ *     before requireAdminSession runs.
+ *   Layer 2 (same-origin): passes checkOrigin, reaches requireAdminSession.
+ *     For an AAL1 member the denial is the step-up redirect (aal=aal2 in Location).
+ *     This is NOT a 403 — the redirect confirms requireAdminSession fired BEFORE
+ *     any CSRF or body processing (right guard, right order).
  */
 
 import { test, expect } from '../fixtures';
@@ -50,7 +39,7 @@ const DUMMY_FORM_BODY =
 const FAKE_UUID = '00000000-0000-4000-a000-000000000001';
 
 // ─── H1: POST /admin/users/new as non-admin member ───────────────────────────
-test('H1 — member POST /admin/users/new is denied (reason=not-admin)', async ({
+test('H1 — INV-1: member POST /admin/users/new at AAL1 is denied (step-up redirect, not 200)', async ({
   browser,
   baseURL,
   member,
@@ -60,12 +49,12 @@ test('H1 — member POST /admin/users/new is denied (reason=not-admin)', async (
   try {
     await loginViaJsonApi(ctx, { identifier: member.email, password: member.password }, baseURL);
 
-    // Confirm the session is active (non-admin member, real session).
+    // Confirm the session is active (non-admin member, AAL1 real session).
     const session = await getSession(ctx, baseURL);
     expect(session?.active, 'H1 precondition: member must have active session').toBe(true);
 
     // Layer 1: Origin-less POST — Astro's security.checkOrigin rejects it with 403
-    // before the app guard ever runs.
+    // before requireAdminSession ever runs.
     const resp1 = await ctx.request.post(`${baseURL}/admin/users/new`, {
       maxRedirects: 0,
       headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
@@ -81,7 +70,10 @@ test('H1 — member POST /admin/users/new is denied (reason=not-admin)', async (
     ).toBe(403);
 
     // Layer 2: Same-origin POST — passes checkOrigin, reaches requireAdminSession.
-    // Must redirect to not-admin error, never return 200.
+    // INV-1: an AAL1 member must be denied. The denial is NOT a 200 (no mutation
+    // fires) and NOT a 403 (requireAdminSession redirects, not CSRF-rejects). The
+    // step-up redirect (aal=aal2 in Location) is the expected denial signal,
+    // proving requireAdminSession fired in the right order before any body read.
     const resp2 = await ctx.request.post(`${baseURL}/admin/users/new`, {
       maxRedirects: 0,
       headers: {
@@ -95,16 +87,18 @@ test('H1 — member POST /admin/users/new is denied (reason=not-admin)', async (
     const loc2 = resp2.headers()['location'] ?? '';
     console.log('[H1] same-origin POST /admin/users/new →', status2, loc2);
 
-    // Must not return 200 (no form render, no user created).
+    // INV-1: must not return 200 (no form render, no user created).
     expect(
       status2,
-      `H1 (layer 2): member POST /admin/users/new must not return 200; got ${status2}`,
+      `H1 (INV-1): member POST /admin/users/new must not return 200; got ${status2}`,
     ).not.toBe(200);
 
-    // Must redirect to the not-admin error.
+    // The denial for an AAL1 session is the step-up redirect (aal=aal2). This
+    // confirms requireAdminSession check (b) fired before any body or marker
+    // processing — a 403 here would indicate the wrong guard (CSRF, not admin gate).
     expect(
-      /reason=not-admin/.test(loc2) || /\/auth\/error/.test(loc2),
-      `H1 (layer 2): member must be denied at /admin/users/new with reason=not-admin; got ${status2} ${loc2}`,
+      /aal=aal2/.test(loc2),
+      `H1 (INV-1): AAL1 member POST must redirect to aal=aal2 step-up (not 200, not 403); got ${status2} ${loc2}`,
     ).toBe(true);
   } finally {
     await ctx.close();
@@ -112,14 +106,14 @@ test('H1 — member POST /admin/users/new is denied (reason=not-admin)', async (
 });
 
 // ─── H2: POST /admin/users/<member-own-id> (self-edit attempt) ───────────────
-test('H2 — member POST /admin/users/<own-id> is denied (reason=not-admin, not CSRF)', async ({
+test('H2 — INV-1: member POST /admin/users/<own-id> at AAL1 is denied (step-up redirect, not CSRF)', async ({
   browser,
   baseURL,
   member,
 }) => {
-  // Even if the member knows their own identity id (it is their subject, visible
-  // e.g. via /sessions/whoami), the admin guard (requireAdminSession) fires
-  // BEFORE any id-based lookup or CSRF verification.
+  // Even if the member knows their own identity id (visible via /sessions/whoami),
+  // requireAdminSession fires BEFORE any id-based lookup or body processing.
+  // INV-1: the AAL1 step-up fires regardless of the id in the path.
   const origin = new URL(baseURL!).origin;
   const ctx = await browser.newContext();
   try {
@@ -130,7 +124,7 @@ test('H2 — member POST /admin/users/<own-id> is denied (reason=not-admin, not 
     const ownId = session?.identity?.id ?? FAKE_UUID;
     console.log('[H2] member identity id:', ownId);
 
-    // Layer 1: Origin-less POST — Astro's security.checkOrigin rejects it with 403.
+    // Layer 1: Origin-less POST — Astro's security.checkOrigin rejects with 403.
     const resp1 = await ctx.request.post(`${baseURL}/admin/users/${ownId}`, {
       maxRedirects: 0,
       headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
@@ -146,6 +140,10 @@ test('H2 — member POST /admin/users/<own-id> is denied (reason=not-admin, not 
     ).toBe(403);
 
     // Layer 2: Same-origin POST — passes checkOrigin, reaches requireAdminSession.
+    // INV-1: must be a redirect (not 200, not 403). A 403 here would mean the CSRF
+    // check fired INSTEAD of the admin guard — the wrong guard, wrong order.
+    // A step-up redirect (aal=aal2) confirms requireAdminSession check (b) fired
+    // first, before any id-lookup or body read.
     const resp2 = await ctx.request.post(`${baseURL}/admin/users/${ownId}`, {
       maxRedirects: 0,
       headers: {
@@ -159,17 +157,18 @@ test('H2 — member POST /admin/users/<own-id> is denied (reason=not-admin, not 
     const loc2 = resp2.headers()['location'] ?? '';
     console.log('[H2] same-origin POST /admin/users/<own-id> →', status2, loc2);
 
+    // INV-1: member must not reach /admin mutation content.
     expect(
       status2,
-      `H2 (layer 2): member POST own-id must not return 200; got ${status2}`,
+      `H2 (INV-1): member POST own-id must not return 200; got ${status2}`,
     ).not.toBe(200);
 
-    // Guard: requireAdminSession → not-admin redirect. Must NOT fall through to
-    // CSRF check (which would return 403 "CSRF: ..." — a different response code
-    // that would signal the guard fired in the wrong order).
+    // The denial for an AAL1 session MUST be the step-up redirect (aal=aal2),
+    // not a 403. This proves guard order: requireAdminSession (b) fired before
+    // any CSRF or identity-id lookup.
     expect(
-      /reason=not-admin/.test(loc2) || /\/auth\/error/.test(loc2),
-      `H2 (layer 2): member must be denied with reason=not-admin (not CSRF error); got ${status2} ${loc2}`,
+      /aal=aal2/.test(loc2),
+      `H2 (INV-1): AAL1 member POST own-id must redirect to aal=aal2 step-up (not 200, not 403); got ${status2} ${loc2}`,
     ).toBe(true);
   } finally {
     await ctx.close();
@@ -177,11 +176,13 @@ test('H2 — member POST /admin/users/<own-id> is denied (reason=not-admin, not 
 });
 
 // ─── H3: POST /admin/users/<fake-uuid> (blind mutation) ──────────────────────
-test('H3 — member POST /admin/users/<unknown-uuid> is denied (reason=not-admin)', async ({
+test('H3 — INV-1: member POST /admin/users/<unknown-uuid> at AAL1 is denied (step-up redirect)', async ({
   browser,
   baseURL,
   member,
 }) => {
+  // INV-1: the guard is not id-dependent. An attacker who guesses a valid UUID
+  // is still denied: requireAdminSession fires before any id lookup.
   const origin = new URL(baseURL!).origin;
   const ctx = await browser.newContext();
   try {
@@ -190,7 +191,7 @@ test('H3 — member POST /admin/users/<unknown-uuid> is denied (reason=not-admin
     const session = await getSession(ctx, baseURL);
     expect(session?.active, 'H3 precondition: member must have active session').toBe(true);
 
-    // Layer 1: Origin-less POST — Astro's security.checkOrigin rejects it with 403.
+    // Layer 1: Origin-less POST — Astro's security.checkOrigin rejects with 403.
     const resp1 = await ctx.request.post(`${baseURL}/admin/users/${FAKE_UUID}`, {
       maxRedirects: 0,
       headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
@@ -206,6 +207,8 @@ test('H3 — member POST /admin/users/<unknown-uuid> is denied (reason=not-admin
     ).toBe(403);
 
     // Layer 2: Same-origin POST — passes checkOrigin, reaches requireAdminSession.
+    // INV-1: the guard fires before any id lookup. The step-up redirect (aal=aal2)
+    // proves the admin gate fired in the right order regardless of the path id.
     const resp2 = await ctx.request.post(`${baseURL}/admin/users/${FAKE_UUID}`, {
       maxRedirects: 0,
       headers: {
@@ -219,14 +222,17 @@ test('H3 — member POST /admin/users/<unknown-uuid> is denied (reason=not-admin
     const loc2 = resp2.headers()['location'] ?? '';
     console.log('[H3] same-origin POST /admin/users/<fake-uuid> →', status2, loc2);
 
+    // INV-1: must not return 200 regardless of the id in the path.
     expect(
       status2,
-      `H3 (layer 2): member POST /admin/users/<fake-uuid> must not return 200; got ${status2}`,
+      `H3 (INV-1): member POST /admin/users/<fake-uuid> must not return 200; got ${status2}`,
     ).not.toBe(200);
 
+    // The denial must be the step-up redirect (aal=aal2), confirming requireAdminSession
+    // check (b) fired before any id-based lookup — the guard is not id-gated.
     expect(
-      /reason=not-admin/.test(loc2) || /\/auth\/error/.test(loc2),
-      `H3 (layer 2): member must be denied with reason=not-admin on unknown-id; got ${status2} ${loc2}`,
+      /aal=aal2/.test(loc2),
+      `H3 (INV-1): AAL1 member POST unknown-id must redirect to aal=aal2 step-up; got ${status2} ${loc2}`,
     ).toBe(true);
   } finally {
     await ctx.close();

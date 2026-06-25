@@ -120,48 +120,51 @@ test('G2 — unauthenticated request (no session cookie) is rejected at /admin',
 });
 
 // ─── G3: member's real session used to access admin (identity cross-use) ──────
-test('G3 — member real session cannot access /admin (no admin marker → reason=not-admin or step-up)', async ({
+test('G3 — INV-1: member real session (valid Kratos cookie, AAL1) never reaches /admin', async ({
   browser,
   baseURL,
   member,
 }) => {
   // bt2@othala.test has a REAL, active Kratos session (Kratos accepts the
-  // cookie, whoami returns 200 active:true). But member does not have
-  // metadata_admin.admin=true (ADR 0008 marker). requireAdminSession (admin.ts)
-  // fires in order: (b) AAL2 check → step-up redirect if AAL1, then (c) marker
-  // check → redirect('/auth/error?reason=not-admin') if no marker.
-  // Either denial is acceptable here.
+  // cookie, whoami returns 200 active:true). But member is at AAL1 (password only).
   //
-  // This is the "valid cookie for wrong identity" case: the session is
-  // cryptographically genuine but the identity is not authorized for admin.
+  // INV-1 property: AAL is necessary. An AAL1 session — even with a valid,
+  // cryptographically genuine Kratos cookie — NEVER reaches admin functionality.
+  // requireAdminSession check (b) fires BEFORE check (c): the step-up redirect
+  // fires before the marker is consulted. This is the "no admin enumeration
+  // oracle at AAL1" property (ADR 0008).
   const ctx = await browser.newContext();
   try {
     await loginViaJsonApi(ctx, { identifier: member.email, password: member.password }, baseURL);
 
-    // Confirm the session IS active at Kratos (this is not an invalid cookie).
+    // Confirm the session IS active at Kratos (this is a genuine cookie, not forged).
     const session = await getSession(ctx, baseURL);
     console.log('[G3] member whoami:', session ? `email=${session.identity?.traits?.email} active=${session.active}` : 'null');
     expect(
       session?.active,
-      'G3 precondition: member must have an active Kratos session',
+      'G3 precondition: member must have an active Kratos session (genuine cookie)',
     ).toBe(true);
     expect(session?.identity?.traits?.email).toBe(member.email);
 
-    // Now attempt /admin — must be denied (AAL2 step-up or not-admin marker gate).
+    // Attempt /admin with the genuine AAL1 session.
     const resp = await ctx.request.get(`${baseURL}/admin`, { maxRedirects: 0 });
     const status = resp.status();
     const loc = resp.headers()['location'] ?? '';
-    console.log('[G3] GET /admin with member session →', status, loc);
+    console.log('[G3] GET /admin with AAL1 member session →', status, loc);
 
+    // INV-1: the member does NOT reach admin content (not 200).
     expect(
       status,
-      `G3: /admin must not return 200 for a non-admin member; got ${status}`,
+      `G3 (INV-1): /admin must not return 200 for an AAL1 member; got ${status}`,
     ).not.toBe(200);
 
-    // Must redirect to error with reason=not-admin OR to /auth/error.
+    // The denial for an AAL1 session MUST be the step-up redirect (aal=aal2 in
+    // Location). This proves check (b) fires first: if the denial were
+    // reason=not-admin the check order would be inverted (an oracle at AAL1).
+    // A password-only session is always at AAL1 and always hits this path.
     expect(
-      /reason=not-admin/.test(loc) || /\/auth\/error/.test(loc),
-      `G3: non-admin member must be denied at /admin with reason=not-admin; got ${status} ${loc}`,
+      /aal=aal2/.test(loc),
+      `G3 (INV-1): AAL1 member must be bounced to aal=aal2 step-up; got ${status} ${loc}`,
     ).toBe(true);
   } finally {
     await ctx.close();

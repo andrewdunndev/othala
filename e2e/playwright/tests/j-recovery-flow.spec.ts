@@ -184,13 +184,18 @@ async function initRecoveryFlow(
 /**
  * Submit the recovery email address to trigger the code email.
  * Uses the provided APIRequestContext (must be same jar as initRecoveryFlow).
+ *
+ * Returns the updated csrf_token from the post-submit flow response. Kratos
+ * rotates the csrf_token when the flow advances to the code-entry step; using
+ * the stale initial token for the code submit causes a 400 (CSRF mismatch).
+ * Falls back to the original token if the response body is unparseable.
  */
 async function submitRecoveryEmail(
   req: APIRequestContext,
   action: string,
   csrfToken: string,
   email: string,
-): Promise<void> {
+): Promise<string> {
   const resp = await req.post(action, {
     headers: {
       'Content-Type': 'application/json',
@@ -207,6 +212,30 @@ async function submitRecoveryEmail(
       `recovery email submit returned unexpected ${status}: ${await resp.text().catch(() => '')}`,
     );
   }
+
+  // Extract the updated csrf_token from the advanced flow. Kratos returns the
+  // current flow state (with a fresh csrf_token for the code-entry step) in the
+  // response body. Parse it so the caller can use the correct token for the
+  // subsequent code submit.
+  let updatedCsrf = csrfToken;
+  try {
+    const body = await resp.json().catch(() => null) as {
+      ui?: { nodes?: Array<{ type: string; attributes?: { name?: string; type?: string; value?: unknown } }> };
+    } | null;
+    for (const node of body?.ui?.nodes ?? []) {
+      if (
+        node?.type === 'input' &&
+        node?.attributes?.name === 'csrf_token' &&
+        node?.attributes?.type === 'hidden'
+      ) {
+        const v = String(node.attributes.value ?? '');
+        if (v) { updatedCsrf = v; break; }
+      }
+    }
+  } catch {
+    // Unparseable body — fall back to the original token.
+  }
+  return updatedCsrf;
 }
 
 // ─── J1: NON-ADMIN recovery (happy path) ─────────────────────────────────────
@@ -239,9 +268,12 @@ test('J1 — non-admin recovery flow issues a privileged settings session', asyn
     console.log('[J1] recovery flow id:', flow.id);
 
     // Step 2: Submit the email address to trigger the code email.
-    // Uses the same req/cookie jar as flow init.
-    await submitRecoveryEmail(req, flow.action, flow.csrfToken, identity.email);
-    console.log('[J1] recovery email submitted');
+    // submitRecoveryEmail now returns the updated csrf_token from the advanced
+    // flow response. Kratos rotates the csrf_token when the flow advances to the
+    // code-entry step; the code submit must use this updated token (not the stale
+    // initial one) to avoid a 400 CSRF mismatch on the code submission.
+    const codeSubmitCsrf = await submitRecoveryEmail(req, flow.action, flow.csrfToken, identity.email);
+    console.log('[J1] recovery email submitted; csrf for code submit:', codeSubmitCsrf !== flow.csrfToken ? 'rotated' : 'unchanged');
 
     // Step 3: Wait for the recovery code to arrive in mailpit.
     // waitForRecoveryCode uses bare fetch (mailpit has no session state).
@@ -253,13 +285,15 @@ test('J1 — non-admin recovery flow issues a privileged settings session', asyn
     // marks the code as used, issues a session cookie into ctx's jar, and
     // redirects to /auth/settings.
     //
-    // IMPORTANT: do NOT call submitRecoveryCode via globalThis.fetch and then
-    // also via ctx.request — that double-submits the code (ErrCodeAlreadyUsed
-    // on the second call) and the session cookie only lands in the jar used
-    // by the first successful call, which would be the discarded fetch context.
+    // IMPORTANT: use `codeSubmitCsrf` (the token from the email-submit response),
+    // NOT `flow.csrfToken` (the initial token). Kratos rotates the csrf_token
+    // when the flow advances; submitting with the stale token returns 400 (CSRF
+    // mismatch → "flow expired" retry loop → ErrCodeAlreadyUsed on the second
+    // submit). The cookie jar must be the same req so the session cookie lands
+    // in ctx's jar after the successful code submission.
     const codeResp = await req.post(flow.action, {
       headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
-      data: { code, method: 'code', csrf_token: flow.csrfToken },
+      data: { code, method: 'code', csrf_token: codeSubmitCsrf },
       maxRedirects: 5,
     });
     console.log('[J1] code submit status:', codeResp.status());
@@ -328,8 +362,10 @@ test('J2 — admin recovery is blocked by the recovery-gate webhook (no privileg
     console.log('[J2] recovery flow id:', flow.id);
 
     // Step 2: Submit the admin email via ctx.request.
-    await submitRecoveryEmail(req, flow.action, flow.csrfToken, identity.email);
-    console.log('[J2] admin recovery email submitted');
+    // Capture the updated csrf_token from the email-submit response (Kratos
+    // rotates it when the flow advances to the code-entry step).
+    const codeSubmitCsrf = await submitRecoveryEmail(req, flow.action, flow.csrfToken, identity.email);
+    console.log('[J2] admin recovery email submitted; csrf rotated:', codeSubmitCsrf !== flow.csrfToken);
 
     // Step 3: Wait for the recovery code email in mailpit.
     // NOTE: Kratos sends the email BEFORE calling the webhook (the webhook fires
@@ -357,9 +393,10 @@ test('J2 — admin recovery is blocked by the recovery-gate webhook (no privileg
     // Step 4: Submit the recovery code via ctx.request (same cookie jar).
     // The gate webhook fires here (after code validation). Kratos should abort
     // the flow (no session cookie set) due to the 403 from the gate.
+    // Use codeSubmitCsrf (rotated after email submit) not flow.csrfToken.
     const codeResp = await req.post(flow.action, {
       headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
-      data: { code, method: 'code', csrf_token: flow.csrfToken },
+      data: { code, method: 'code', csrf_token: codeSubmitCsrf },
       maxRedirects: 0,
     });
 

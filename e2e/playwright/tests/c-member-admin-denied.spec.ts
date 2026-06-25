@@ -1,20 +1,26 @@
 /**
- * C — Non-admin member denied at /admin (browser-test.mjs assertion C).
+ * C — Non-admin member denied at /admin (INV-1: AAL is necessary).
  *
- * A member (bt2@othala.test) who does NOT have metadata_admin.admin=true
- * visits /admin. The requireAdminSession middleware in the othala app must
- * deny access. Expected: the URL after redirect contains reason=not-admin
- * OR routes to /auth/error (the app's error page for the admin marker gate).
+ * SECURITY INVARIANT (INV-1): An AAL1 session — regardless of identity — NEVER
+ * reaches admin functionality. requireAdminSession enforces the SP-3 trinity
+ * (ADR 0008) in strict order:
+ *   (a) active session — yes (member has an AAL1 password session)
+ *   (b) AAL2 server-side — NO → the step-up redirect fires FIRST; the admin
+ *       marker check (c) is never reached for an AAL1 session.
+ *   (c) admin marker — not evaluated (the gate already fired at (b))
  *
- * The member has a valid Kratos session (AAL1, password) so the check is NOT
- * the "unauthenticated" branch — it is specifically the admin marker check
- * (ADR 0008): "authenticated but not an admin" (no metadata_admin.admin marker).
+ * This is ADR 0008's "no admin-enumeration oracle at AAL1" property: an attacker
+ * cannot learn whether an identity has the admin marker by probing /admin at AAL1,
+ * because the step-up fires unconditionally before the marker is ever read.
+ *
+ * The denial signal is the AAL2 step-up redirect: a non-admin member has no
+ * second factor enrolled and cannot satisfy AAL2.
  */
 
 import { test, expect } from '../fixtures';
 import { loginViaJsonApi } from '../actions/login';
 
-test('C — non-admin member is denied at /admin with reason=not-admin', async ({
+test('C — INV-1: non-admin member at AAL1 never reaches /admin (step-up redirect)', async ({
   browser,
   baseURL,
   member,
@@ -22,31 +28,35 @@ test('C — non-admin member is denied at /admin with reason=not-admin', async (
   const ctx = await browser.newContext();
 
   try {
-    // Login as member (NOT an admin subject — no metadata_admin.admin marker).
+    // Login as member (AAL1 password session, no admin marker, no second factor).
     await loginViaJsonApi(
       ctx,
       { identifier: member.email, password: member.password },
       baseURL,
     );
 
-    const page = await ctx.newPage();
+    // Capture the first 30x from /admin without following it. requireAdminSession
+    // fires before any page content is rendered: check (b) AAL2 fires first.
+    const resp = await ctx.request.get(`${baseURL}/admin`, { maxRedirects: 0 });
+    const status = resp.status();
+    const loc = resp.headers()['location'] ?? '';
+    console.log('[C] GET /admin with AAL1 member session →', status, loc);
 
-    // Navigate to /admin. requireAdminSession checks AAL2 first (AAL1 → step-up
-    // redirect), then the admin marker (ADR 0008: metadata_admin.admin === true
-    // via admin API). bt2 has no admin marker → redirect to error with reason=not-admin.
-    // AAL1 step-up fires first for this member, but since the member is not admin
-    // the marker check will ultimately deny. Either redirect satisfies this test's
-    // intent (denied at /admin).
-    await page.goto(`${baseURL}/admin`, { waitUntil: 'networkidle', timeout: 30_000 });
-
-    const finalUrl = page.url();
-    console.log('[C] landed at:', finalUrl);
-
-    await page.screenshot({ path: '/out/c-member-admin-denied.png', fullPage: true }).catch(() => {});
-
+    // INV-1 primary assertion: the member does NOT reach /admin (not 200).
+    // The denial is the AAL2 step-up redirect — the gate fires at (b) BEFORE (c),
+    // so even a non-admin never sees admin content and cannot probe the marker.
     expect(
-      /reason=not-admin/.test(finalUrl) || /\/auth\/error/.test(finalUrl),
-      `C: non-admin member must be denied at /admin; landed at ${finalUrl}`,
+      status,
+      `C (INV-1): /admin must not return 200 for an AAL1 member; got ${status}`,
+    ).not.toBe(200);
+
+    // The denial mechanism for an AAL1 session MUST be the step-up redirect
+    // (aal=aal2 in Location). This is what proves (b) fires before (c): if the
+    // denial were reason=not-admin the gate order would be inverted (an oracle leak).
+    // An AAL1 password-only session always lands here.
+    expect(
+      /aal=aal2/.test(loc),
+      `C (INV-1): AAL1 member must be bounced to aal=aal2 step-up (not admin content, not not-admin); got ${status} ${loc}`,
     ).toBe(true);
   } finally {
     await ctx.close();
