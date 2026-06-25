@@ -282,8 +282,8 @@ test('J1 — non-admin recovery flow issues a privileged settings session', asyn
 
     // Step 4: Submit the recovery code ONCE via ctx.request (the same cookie
     // jar). Kratos validates the CSRF token (which lives in ctx's cookie jar),
-    // marks the code as used, issues a session cookie into ctx's jar, and
-    // redirects to /auth/settings.
+    // marks the code as used, issues the session cookie via Set-Cookie in the
+    // 302 response, and redirects to /auth/settings.
     //
     // IMPORTANT: use `codeSubmitCsrf` (the token from the email-submit response),
     // NOT `flow.csrfToken` (the initial token). Kratos rotates the csrf_token
@@ -291,8 +291,16 @@ test('J1 — non-admin recovery flow issues a privileged settings session', asyn
     // mismatch → "flow expired" retry loop → ErrCodeAlreadyUsed on the second
     // submit). The cookie jar must be the same req so the session cookie lands
     // in ctx's jar after the successful code submission.
+    //
+    // Do NOT include Accept: application/json here. With that header, Kratos
+    // returns 422 with a redirect_browser_to field instead of a proper 302.
+    // The session cookie is issued in the Set-Cookie of the 302 response (the
+    // browser-flow path); the 422 path does not carry Set-Cookie, so the
+    // session never lands in ctx's jar and getSession returns null. Without
+    // the Accept header, Kratos issues a 302 → maxRedirects: 5 follows it →
+    // the ory_kratos_session Set-Cookie is captured before getSession runs.
     const codeResp = await req.post(flow.action, {
-      headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+      headers: { 'Content-Type': 'application/json' },
       data: { code, method: 'code', csrf_token: codeSubmitCsrf },
       maxRedirects: 5,
     });
