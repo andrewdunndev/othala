@@ -185,17 +185,31 @@ async function initRecoveryFlow(
  * Submit the recovery email address to trigger the code email.
  * Uses the provided APIRequestContext (must be same jar as initRecoveryFlow).
  *
- * Returns the updated csrf_token from the post-submit flow response. Kratos
- * rotates the csrf_token when the flow advances to the code-entry step; using
- * the stale initial token for the code submit causes a 400 (CSRF mismatch).
- * Falls back to the original token if the response body is unparseable.
+ * Returns the step-2 flow state: updated csrf_token, updated action URL, and
+ * the full ui.nodes array. The caller MUST use the returned nodes to extract
+ * the `email` default-group hidden node and include it in the code-submit body.
+ * Kratos recovery step-2 (code-entry form) carries `email` as a hidden node in
+ * the default group — exactly like login step-2 carries `identifier`. Omitting
+ * it causes Kratos to return a required-field error (no session issued).
+ *
+ * Also accepts HTTP 400 (Kratos v26 "flow state mismatch" on the
+ * choose-method→sent-email transition — the body is still the valid step-2
+ * flow, not an error object).
  */
 async function submitRecoveryEmail(
   req: APIRequestContext,
   action: string,
   csrfToken: string,
   email: string,
-): Promise<string> {
+): Promise<{
+  csrfToken: string;
+  action: string;
+  nodes: Array<{
+    type: string;
+    group: string;
+    attributes?: { name?: string; type?: string; value?: unknown };
+  }>;
+}> {
   const resp = await req.post(action, {
     headers: {
       'Content-Type': 'application/json',
@@ -204,25 +218,41 @@ async function submitRecoveryEmail(
     data: { email, method: 'code', csrf_token: csrfToken },
     maxRedirects: 5,
   });
-  // A 200 or 422 (form re-render with messages) are both acceptable here;
-  // Kratos may return 422 while still sending the email.
+  // 200, 400, or 422 are all acceptable here.
+  //   200/422 — standard re-render (flow + messages, email code sent).
+  //   400     — Kratos v26 "flow state mismatch" on choose-method→sent-email
+  //             transition (body is still the valid step-2 flow, not an error).
   const status = resp.status();
-  if (status !== 200 && status !== 422) {
+  if (status !== 200 && status !== 400 && status !== 422) {
     throw new Error(
       `recovery email submit returned unexpected ${status}: ${await resp.text().catch(() => '')}`,
     );
   }
 
-  // Extract the updated csrf_token from the advanced flow. Kratos returns the
-  // current flow state (with a fresh csrf_token for the code-entry step) in the
-  // response body. Parse it so the caller can use the correct token for the
-  // subsequent code submit.
+  // Parse the step-2 flow body. Extract the updated csrf_token, the updated
+  // action URL, and the full nodes list (needed by the caller to find the
+  // `email` default-group hidden node for the subsequent code submit).
   let updatedCsrf = csrfToken;
+  let updatedAction = action;
+  let updatedNodes: Array<{
+    type: string;
+    group: string;
+    attributes?: { name?: string; type?: string; value?: unknown };
+  }> = [];
   try {
     const body = await resp.json().catch(() => null) as {
-      ui?: { nodes?: Array<{ type: string; attributes?: { name?: string; type?: string; value?: unknown } }> };
+      ui?: {
+        action?: string;
+        nodes?: Array<{
+          type: string;
+          group: string;
+          attributes?: { name?: string; type?: string; value?: unknown };
+        }>;
+      };
     } | null;
-    for (const node of body?.ui?.nodes ?? []) {
+    updatedNodes = body?.ui?.nodes ?? [];
+    updatedAction = body?.ui?.action ?? action;
+    for (const node of updatedNodes) {
       if (
         node?.type === 'input' &&
         node?.attributes?.name === 'csrf_token' &&
@@ -233,9 +263,9 @@ async function submitRecoveryEmail(
       }
     }
   } catch {
-    // Unparseable body — fall back to the original token.
+    // Unparseable body — fall back to originals.
   }
-  return updatedCsrf;
+  return { csrfToken: updatedCsrf, action: updatedAction, nodes: updatedNodes };
 }
 
 // ─── J1: NON-ADMIN recovery (happy path) ─────────────────────────────────────
@@ -245,10 +275,14 @@ test('J1 — non-admin recovery flow issues a privileged settings session', asyn
   baseURL,
   kratosAdminURL,
 }) => {
-  // Seed a fresh non-admin identity to avoid residual state from other tests.
+  // Seed a fresh non-admin identity with a per-run unique email so that
+  // Playwright test retries don't collide on the fixed email — a duplicate
+  // Kratos identity (or stale flow state from the previous attempt) would mask
+  // the real first-attempt error. The timestamp suffix guarantees a clean slate.
+  const uniqueSuffix = Date.now();
   const identity = await createIdentityWithPassword({
-    email: 'member.recovery@othala.test',
-    username: 'member.recovery',
+    email: `member.recovery.${uniqueSuffix}@othala.test`,
+    username: `member.recovery.${uniqueSuffix}`,
     displayName: 'Recovery Test Member',
     groups: ['family'],
     kratosAdminURL,
@@ -268,12 +302,36 @@ test('J1 — non-admin recovery flow issues a privileged settings session', asyn
     console.log('[J1] recovery flow id:', flow.id);
 
     // Step 2: Submit the email address to trigger the code email.
-    // submitRecoveryEmail now returns the updated csrf_token from the advanced
-    // flow response. Kratos rotates the csrf_token when the flow advances to the
-    // code-entry step; the code submit must use this updated token (not the stale
-    // initial one) to avoid a 400 CSRF mismatch on the code submission.
-    const codeSubmitCsrf = await submitRecoveryEmail(req, flow.action, flow.csrfToken, identity.email);
-    console.log('[J1] recovery email submitted; csrf for code submit:', codeSubmitCsrf !== flow.csrfToken ? 'rotated' : 'unchanged');
+    // submitRecoveryEmail returns the updated step-2 flow state: the rotated
+    // csrf_token, the (usually unchanged) action URL, and the full ui.nodes.
+    // We need the nodes to extract the `email` default-group hidden node — the
+    // Kratos recovery step-2 form carries `email` as a hidden input (default
+    // group) just like the login step-2 form carries `identifier`. Submitting
+    // the code without this field causes Kratos to return a required-field error
+    // (no session issued) — this is the same bug K1 was written to catch in the
+    // login flow.
+    const step2 = await submitRecoveryEmail(req, flow.action, flow.csrfToken, identity.email);
+    console.log('[J1] recovery email submitted; csrf for code submit:', step2.csrfToken !== flow.csrfToken ? 'rotated' : 'unchanged');
+
+    // Extract the `email` hidden node from the default group of the step-2 flow.
+    // Kratos renders it as a hidden input so the code-entry POST can carry the
+    // email alongside the code. Fall back to the original email if the node is
+    // absent (the test still runs; the session assertion reveals any regression).
+    const emailHidden = step2.nodes.find(
+      (n) =>
+        n.group === 'default' &&
+        n.type === 'input' &&
+        n.attributes?.name === 'email' &&
+        n.attributes?.type === 'hidden',
+    );
+    const emailValue = emailHidden?.attributes?.value != null
+      ? String(emailHidden.attributes.value)
+      : identity.email;
+    console.log(
+      '[J1] default-group email hidden node present in step-2 flow:',
+      emailHidden !== undefined,
+      '— value:', emailValue,
+    );
 
     // Step 3: Wait for the recovery code to arrive in mailpit.
     // waitForRecoveryCode uses bare fetch (mailpit has no session state).
@@ -281,27 +339,21 @@ test('J1 — non-admin recovery flow issues a privileged settings session', asyn
     console.log('[J1] recovery code received, message id:', messageId, 'code:', code);
 
     // Step 4: Submit the recovery code ONCE via ctx.request (the same cookie
-    // jar). Kratos validates the CSRF token (which lives in ctx's cookie jar),
-    // marks the code as used, issues the session cookie via Set-Cookie in the
-    // 302 response, and redirects to /auth/settings.
+    // jar as initRecoveryFlow and submitRecoveryEmail).
     //
-    // IMPORTANT: use `codeSubmitCsrf` (the token from the email-submit response),
-    // NOT `flow.csrfToken` (the initial token). Kratos rotates the csrf_token
-    // when the flow advances; submitting with the stale token returns 400 (CSRF
-    // mismatch → "flow expired" retry loop → ErrCodeAlreadyUsed on the second
-    // submit). The cookie jar must be the same req so the session cookie lands
-    // in ctx's jar after the successful code submission.
+    // Body must include:
+    //   - csrf_token   (rotated value from the step-2 flow response)
+    //   - email        (from the default-group hidden node — THE BUG FIX)
+    //   - code         (6-digit token from the recovery email)
+    //   - method       (="code")
     //
-    // Do NOT include Accept: application/json here. With that header, Kratos
-    // returns 422 with a redirect_browser_to field instead of a proper 302.
-    // The session cookie is issued in the Set-Cookie of the 302 response (the
-    // browser-flow path); the 422 path does not carry Set-Cookie, so the
-    // session never lands in ctx's jar and getSession returns null. Without
-    // the Accept header, Kratos issues a 302 → maxRedirects: 5 follows it →
-    // the ory_kratos_session Set-Cookie is captured before getSession runs.
-    const codeResp = await req.post(flow.action, {
-      headers: { 'Content-Type': 'application/json' },
-      data: { code, method: 'code', csrf_token: codeSubmitCsrf },
+    // Using Accept: application/json here aligns this path with K1 (the working
+    // email-code login test). Kratos responds with 200 (session in body + Set-
+    // Cookie) or 422 + redirect_browser_to + Set-Cookie — Playwright stores the
+    // Set-Cookie from either response status. maxRedirects: 5 follows any 3xx.
+    const codeResp = await req.post(step2.action, {
+      headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+      data: { code, method: 'code', csrf_token: step2.csrfToken, email: emailValue },
       maxRedirects: 5,
     });
     console.log('[J1] code submit status:', codeResp.status());
@@ -370,10 +422,25 @@ test('J2 — admin recovery is blocked by the recovery-gate webhook (no privileg
     console.log('[J2] recovery flow id:', flow.id);
 
     // Step 2: Submit the admin email via ctx.request.
-    // Capture the updated csrf_token from the email-submit response (Kratos
-    // rotates it when the flow advances to the code-entry step).
-    const codeSubmitCsrf = await submitRecoveryEmail(req, flow.action, flow.csrfToken, identity.email);
+    // Capture the step-2 flow state: rotated csrf_token, updated action, and
+    // nodes (needed to extract the `email` hidden node for the code submit).
+    const step2 = await submitRecoveryEmail(req, flow.action, flow.csrfToken, identity.email);
+    const codeSubmitCsrf = step2.csrfToken;
     console.log('[J2] admin recovery email submitted; csrf rotated:', codeSubmitCsrf !== flow.csrfToken);
+
+    // Extract the `email` default-group hidden node from the step-2 flow so
+    // the code submit reaches the webhook (rather than failing at field
+    // validation before the gate fires).
+    const emailHidden = step2.nodes.find(
+      (n) =>
+        n.group === 'default' &&
+        n.type === 'input' &&
+        n.attributes?.name === 'email' &&
+        n.attributes?.type === 'hidden',
+    );
+    const emailValue = emailHidden?.attributes?.value != null
+      ? String(emailHidden.attributes.value)
+      : identity.email;
 
     // Step 3: Wait for the recovery code email in mailpit.
     // NOTE: Kratos sends the email BEFORE calling the webhook (the webhook fires
@@ -399,12 +466,14 @@ test('J2 — admin recovery is blocked by the recovery-gate webhook (no privileg
     }
 
     // Step 4: Submit the recovery code via ctx.request (same cookie jar).
-    // The gate webhook fires here (after code validation). Kratos should abort
-    // the flow (no session cookie set) due to the 403 from the gate.
-    // Use codeSubmitCsrf (rotated after email submit) not flow.csrfToken.
-    const codeResp = await req.post(flow.action, {
+    // Include `email` from the step-2 default-group hidden node so Kratos
+    // passes field validation and actually calls the webhook (the gate must
+    // fire for this test to be representative). The gate (is_admin=true → 403)
+    // aborts the flow — no session cookie is set.
+    // maxRedirects: 0 intentionally — we inspect the blocked response directly.
+    const codeResp = await req.post(step2.action, {
       headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
-      data: { code, method: 'code', csrf_token: codeSubmitCsrf },
+      data: { code, method: 'code', csrf_token: codeSubmitCsrf, email: emailValue },
       maxRedirects: 0,
     });
 
