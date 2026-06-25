@@ -105,7 +105,18 @@ bash ../scripts/render-config.sh ../kratos/kratos.yml kratos.rendered.yml \
     || { echo "  ✗ render kratos.yml failed — aborting" >&2; exit 1; }
 bash ../scripts/render-config.sh ../hydra/hydra.yml   hydra.rendered.yml \
     || { echo "  ✗ render hydra.yml failed — aborting" >&2; exit 1; }
-echo "  canonical configs rendered (kratos.rendered.yml, hydra.rendered.yml)"
+# render-config.sh writes 0600 (umask 077) — correct for the deploy plane where
+# the renderer runs AS the service user. In the e2e lab the renderer runs as the
+# unprivileged job user (uid 1000) but the configs are bind-mounted into the
+# kratos/hydra containers, which run as the image's `ory` user (uid 10000) under
+# cap_drop: [ALL] (no CAP_DAC_OVERRIDE). A 0600 file owned by 1000 is unreadable
+# by 10000 → "open /etc/config/.../*.yml: permission denied" → kratos-migrate,
+# kratos serve and hydra serve all Exit(1) (hydra-migrate survives only because
+# it reads its DSN from env, not --config). Make the bind-mounted configs
+# world-readable so the in-container ory user can read them. They are ephemeral,
+# per-run, single-use-VM artifacts; the .env still holds the secrets at 0600.
+chmod 0644 kratos.rendered.yml hydra.rendered.yml
+echo "  canonical configs rendered (kratos.rendered.yml, hydra.rendered.yml; 0644 for in-container ory uid)"
 
 # Step 3: compose up — wrapped in a timeout. A never-healthy dependency (e.g. a
 # mis-rendered config) makes `up -d` block indefinitely; the health-wait timeout
