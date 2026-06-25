@@ -21,7 +21,7 @@
 // passkey-first / password-in-disclosure UX is bespoke.
 
 import { asInput, inputProps, safeOnclick } from '../lib/nodes';
-import type { FlowNode } from '../lib/types';
+import type { FlowNode, FlowMessage } from '../lib/types';
 
 interface Props {
   /** The flow's full node array. */
@@ -110,6 +110,11 @@ const labelText = (node: FlowNode, fallback: string): string =>
           disabled={passDisabled ? (props.disabled as boolean | undefined) : undefined}
           autocomplete={autocomplete}
         />
+        {node.messages?.map((m: FlowMessage) => (
+          <div class={`notice notice-${m.type === 'error' ? 'danger' : m.type === 'success' ? 'success' : 'warning'}`}>
+            {m.text}
+          </div>
+        ))}
       </div>
     );
   })}

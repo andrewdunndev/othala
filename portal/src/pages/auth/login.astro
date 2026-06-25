@@ -159,6 +159,11 @@ const hasAal2Methods = isAal2 && (totpNodes.length > 0 || aal2WebauthnNodes.leng
                       autofocus
                       placeholder="123456"
                     />
+                    {n.messages?.map((m: FlowMessage) => (
+                      <div class={`notice notice-${m.type === 'error' ? 'danger' : m.type === 'success' ? 'success' : 'warning'}`}>
+                        {m.text}
+                      </div>
+                    ))}
                   </div>
                 );
               }
@@ -396,6 +401,11 @@ const hasAal2Methods = isAal2 && (totpNodes.length > 0 || aal2WebauthnNodes.leng
                     autofocus
                     placeholder="123456"
                   />
+                  {n.messages?.map((m: FlowMessage) => (
+                    <div class={`notice notice-${m.type === 'error' ? 'danger' : m.type === 'success' ? 'success' : 'warning'}`}>
+                      {m.text}
+                    </div>
+                  ))}
                 </div>
               );
             })}
