@@ -39,6 +39,21 @@ set -uo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 cd "$SCRIPT_DIR"
 
+# Rootful container engine, when available. The crucible CI VM exposes the
+# system (rootful) podman socket group-accessible to the unprivileged `fedora`
+# user. postgres:18-alpine chowns PGDATA as real root, which fails under
+# rootless userns ("Operation not permitted") — against the rootful socket the
+# container is real root and chown succeeds. The `docker compose` shim reads
+# DOCKER_HOST; native podman (login/logs) reads CONTAINER_HOST — set both so
+# they share ONE store (else login creds + `podman logs` miss the compose
+# containers). Guarded on socket presence so the operator-workstation rootless
+# path (above) is unchanged.
+if [[ -S /run/podman/podman.sock ]]; then
+  export DOCKER_HOST="unix:///run/podman/podman.sock"
+  export CONTAINER_HOST="unix:///run/podman/podman.sock"
+  echo "  rootful podman socket detected → DOCKER_HOST/CONTAINER_HOST=/run/podman/podman.sock"
+fi
+
 AUTH_REGISTRY="${AUTH_REGISTRY:-registry.gitlab.com/dunn.dev/othala}"
 AUTH_VERSION="${AUTH_VERSION:-latest}"
 
