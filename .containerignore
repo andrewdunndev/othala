@@ -1,0 +1,23 @@
+# Build-context excludes for `podman build -f portal/Containerfile .`
+# (context = repo root, as the CI build-othala job uses context: .)
+#
+# portal/.dockerignore is scoped to that subdirectory and does NOT apply
+# when the build context is the repo root.  Without these excludes, a
+# developer's local node_modules (macOS/darwin binaries) would be copied
+# into the build-stage container by `COPY portal/ portal/`, overwriting
+# the linux-arm64 binaries that the preceding `npm ci` step installed.
+# Result: esbuild fails with "Exec format error" on the platform mismatch.
+#
+# CI runners start clean (no pre-existing node_modules) so this only
+# matters for local builds.
+
+# Portal build artefacts — reproduced reproducibly inside the image.
+portal/node_modules/
+portal/dist/
+portal/.astro/
+portal/.env
+portal/.env.*
+portal/*.log
+
+# e2e runtime artefacts — never needed in the portal image.
+e2e/

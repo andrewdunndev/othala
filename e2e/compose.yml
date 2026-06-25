@@ -517,6 +517,12 @@ services:
       KRATOS_ADMIN_URL: http://kratos:4434
       HYDRA_PUBLIC_URL: http://hydra:4444
       HYDRA_ADMIN_URL: http://hydra:4445
+      # J2 direct probe: recovery-gate on the othala admin port.
+      # In the browser profile othala binds :4431 to its static internal IP
+      # (ADMIN_HOST override in compose.browser.yml); the `othala` service
+      # hostname resolves to that IP inside the compose net.
+      OTHALA_ADMIN_URL: http://othala:4431
+      RECOVERY_GATE_SECRET: ${RECOVERY_GATE_SECRET}
       GRAFANA_CLIENT_SECRET: ${GRAFANA_CLIENT_SECRET}
       PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD: "1"
     volumes:
