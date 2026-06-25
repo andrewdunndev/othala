@@ -250,12 +250,24 @@ SMOKE_EXIT=$?
 # `up --exit-code-from` is unreliable under podman-compose, same class as --no-color).
 echo ""
 echo "=== browser e2e (Playwright) ==="
+# The browser phase MUST layer compose.browser.yml on top of compose.yml. That
+# override recreates the othala service with:
+#   - ADMIN_HOST=0.0.0.0       so Kratos can reach the recovery-gate webhook at
+#                              othala:4431 (the default 127.0.0.1 loopback bind
+#                              is unreachable from the kratos container; the
+#                              recovery after-hook then fails connection-refused
+#                              and the J recovery specs can never pass).
+#   - KRATOS_PUBLIC_URL=http://auth.othala.test  so browser redirect chains and
+#                              the CSRF cookie domain resolve through the Caddy edge.
+# It is applied ONLY here (not during the smoke phase, which must keep the
+# internal kratos URL + loopback admin bind), so othala is recreated now.
 BROWSER_EXIT=0
-if docker compose --profile browser --env-file=.env up -d --no-deps caddy; then
-    sleep 5  # caddy boots in ~1s; brief settle before the specs hit auth.othala.test
-    timeout 360 docker compose --profile browser --env-file=.env run --rm --no-deps -T playwright || BROWSER_EXIT=$?
+BROWSER_COMPOSE=(docker compose -f compose.yml -f compose.browser.yml --profile browser --env-file=.env)
+if "${BROWSER_COMPOSE[@]}" up -d --no-deps othala caddy; then
+    sleep 8  # othala recreate + caddy boot; settle before specs hit auth.othala.test
+    timeout 360 "${BROWSER_COMPOSE[@]}" run --rm --no-deps -T playwright || BROWSER_EXIT=$?
 else
-    echo "  ✗ could not start the caddy edge"; BROWSER_EXIT=1
+    echo "  ✗ could not start the browser edge (othala + caddy)"; BROWSER_EXIT=1
 fi
 if [[ $BROWSER_EXIT -eq 0 ]]; then echo "  ✓ browser e2e passed"; else echo "  ✗ browser e2e failed (exit $BROWSER_EXIT)"; fi
 
