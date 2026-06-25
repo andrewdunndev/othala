@@ -54,7 +54,7 @@ KRATOS_PG_PASS=$(gen_alnum)
 HYDRA_PG_PASS=$(gen_alnum)
 
 # ── SMTP (e2e mail catcher: mailpit) ─────────────────────────────────────────
-# The e2e stack runs a real mailpit catcher (compose service `mailpit`,
+# The e2e stack runs a real mailpit catcher (compose service 'mailpit',
 # SMTP :1025, HTTP API :8025). Both Kratos courier AND the portal contact-form
 # mailer point at it via the SHARED connection URI below — so the contact form
 # is provably functional in the gate (smoke.sh Section H POSTs /api/request and
@@ -87,7 +87,7 @@ OTHALA_INSTANCE_NAME='Othala Lab'
 OTHALA_SMTP_FROM_ADDRESS=noreply@othala.test
 
 # ── OpenTelemetry tracing (OFF in e2e) ──────────────────────────────────────
-# render-config.sh fails on ANY unset \${VAR}, so the kratos/hydra `tracing:`
+# render-config.sh fails on ANY unset \${VAR}, so the kratos/hydra 'tracing:'
 # blocks need these three set even though tracing is disabled here. OFF-default:
 # OTHALA_OTLP_PROVIDER="" makes Ory ignore the otlp provider entirely (no
 # collector connection, no spans), so the offline VM never reaches for a
@@ -139,13 +139,13 @@ LDAP_SERVICE_BIND_PASSWORD=$(gen_short)
 #   OTHALA_ADMIN_IDS              the SOLE admin authority — a comma-separated
 #                                 list of Kratos identity UUIDs. The e2e fixtures
 #                                 seed identities with these EXACT UUIDs (via the
-#                                 createIdentity `id` field) to exercise the admin
+#                                 createIdentity 'id' field) to exercise the admin
 #                                 gate, recovery-gate, and login-gate refuse paths:
-#                                   ...0001 = `admin` fixture (admin@othala.test)
+#                                   ...0001 = 'admin' fixture (admin@othala.test)
 #                                   ...0002 = J2 recovery-gate test identity
 #                                 PLACEHOLDER for real deployments: replace with the
-#                                 real admin identity UUID(s) from `kratos identity
-#                                 list` after first boot.
+#                                 real admin identity UUID(s) from 'kratos identity
+#                                 list' after first boot.
 #   OTHALA_ADMIN_ENDPOINT_BEARER  guards POST /admin/revoke-user (loopback)
 #   RECOVERY_GATE_SECRET          guards POST /admin/recovery-gate (loopback)
 #                                 and POST /admin/login-gate (loopback; CVP-P3)
