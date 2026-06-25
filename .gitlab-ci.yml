@@ -203,8 +203,10 @@ lint-jsonnet-hooks:
     - if: '$CI_COMMIT_TAG'
   script:
     - |
-      # 1. Assert both gate files exist and are non-empty.
-      for f in kratos/hooks/recovery-gate.jsonnet kratos/hooks/login-gate.jsonnet; do
+      # 1. Assert the recovery-gate file exists and is non-empty.
+      # (login-gate.jsonnet was RETIRED in ADR 0008 — the after.code login
+      # interrupt is superseded by required_aal: aal2 on /admin.)
+      for f in kratos/hooks/recovery-gate.jsonnet; do
         if [ ! -s "$f" ]; then
           echo "ERROR: $f missing or empty — gate webhook file must exist."
           exit 1
