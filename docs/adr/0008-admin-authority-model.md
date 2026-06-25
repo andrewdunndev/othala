@@ -105,6 +105,21 @@ dance, and the bespoke Kratos hook that blocked email-code login for admins. The
 hook is replaced by the canonical `required_aal: aal2` configuration, which is
 the intended Kratos mechanism and does not require custom hook code.
 
+**Recovery-gate workaround (Kratos v26.2.0 empirical gap, 2026-06-25):** The
+recovery-gate webhook (`kratos/hooks/recovery-gate.jsonnet`) is configured as a
+Kratos after-hook with `can_interrupt: true`. Empirical testing against a live
+v26.2.0 stack confirmed that Kratos omits `metadata_admin` from `ctx.identity`
+in the after-hook body-template context. The jsonnet `is_admin` field therefore
+always evaluates to `false` regardless of the real marker value. The gate
+(`portal/src/server/listen.mjs: handleRecoveryGate`) bypasses the jsonnet field
+by calling the Kratos admin API directly (`GET KRATOS_ADMIN_URL/admin/identities/:id`)
+to read the authoritative `metadata_admin.admin` value. This workaround is
+encapsulated in `fetchAdminMarker()` and is transparent to operators. The jsonnet
+`identity_id` field is the load-bearing field; the gate fails closed (403) when it
+is absent. Both the full end-to-end blocking (no session issued on admin recovery)
+and the AAL2 mitigation (admin sessions from recovery cannot reach `/admin` without
+step-up) are verified in the browser e2e suite (`j-recovery-flow.spec.ts`).
+
 **Adding an admin is now a live UI action, not a config edit plus restart.** The
 operational overhead of onboarding and offboarding admins is reduced to a few
 clicks, and changes take effect immediately without a service interruption.

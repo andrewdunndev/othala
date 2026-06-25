@@ -57,20 +57,26 @@ fallback.
 
 ## 2. How admin authority works
 
-Admin status is controlled by the `OTHALA_ADMIN_IDS` environment
-variable — a comma-separated list of Kratos identity UUIDs (the immutable
-`id` field from `kratos identity list`). This list lives in sops outside
-Kratos. To be an admin, your identity UUID must be in that list.
+Admin status is controlled by the `metadata_admin.admin` flag on a Kratos
+identity — a boolean set only via the Kratos admin API (never settable through
+self-service flows, OIDC claims, or LDAP attributes). The portal reads this flag
+on every request via `GET /admin/identities/:id` on the internal admin endpoint.
 
-This is intentional: an attacker who gains access to the Kratos database or
-the portal cannot elevate themselves to admin by editing their own identity
-(e.g. changing their email or group membership). The UUID is immutable;
-the list is the only source of truth.
+This is intentional: an attacker who gains access to the portal UI or a
+family member's self-service flow cannot elevate themselves to admin by editing
+their own identity (email, groups, traits). The only write path for
+`metadata_admin` is the network-gated admin API, which is not reachable from
+the internet. (See ADR 0008 for full rationale.)
 
-For dual-admin setup (recommended), both identity UUIDs go in the list:
+For dual-admin setup (recommended), both identities get `metadata_admin.admin=true`
+via the admin UI (Admin → Users → Edit → toggle admin marker) or:
 
-```
-OTHALA_ADMIN_IDS=xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx,yyyyyyyy-yyyy-yyyy-yyyy-yyyyyyyyyyyy
+```sh
+# From inside the Kratos container
+curl -fsS -X PATCH \
+  -H 'Content-Type: application/json' \
+  -d '{"metadata_admin":{"admin":true,"groups":["family","admin"]}}' \
+  http://localhost:4434/admin/identities/<UUID>
 ```
 
 ---
@@ -86,11 +92,19 @@ take over the admin account. That would give them full access to every family
 account on the system.
 
 Technically, the recovery-gate webhook (`kratos/hooks/recovery-gate.jsonnet`
-+ the gate handler in the portal) intercepts every recovery attempt before
-Kratos issues a privileged session. If the identity's email is on the
-`OTHALA_ADMIN_IDS` list, the gate returns HTTP 403 and the recovery
-stops. This fires even if someone requests a recovery code and types it in
-correctly — the gate blocks the session promotion step regardless.
++ `fetchAdminMarker` in `portal/src/server/listen.mjs`) intercepts every
+recovery attempt after code verification. Kratos posts the identity id and
+traits to the gate; the gate calls the Kratos admin API to read the
+authoritative `metadata_admin.admin` flag. If the flag is `true`, the gate
+returns HTTP 403 and Kratos (`can_interrupt: true`) aborts the flow — no
+privileged session is issued. This fires even if someone requests a recovery
+code and types it in correctly; the gate blocks the session promotion step.
+
+Note: the jsonnet body template (`recovery-gate.jsonnet`) also computes an
+`is_admin` field from `ctx.identity.metadata_admin.admin`, but Kratos v26.2.0
+omits `metadata_admin` from the after-hook template context. The gate ignores
+the jsonnet `is_admin` field and does its own admin-API lookup using the
+`identity_id` field instead. This workaround is transparent to operators.
 
 Non-admin family members are unaffected. They recover via email as normal.
 
@@ -137,10 +151,9 @@ operator and spouse on `OTHALA_ADMIN_IDS`).
 
 **Who does this:** the admin who still has working auth.
 
-**Why it works:** the HIGH-3 guard in the portal UI blocks issuing a recovery
-link for admin targets through the normal "Issue enrollment URL" button. That
-button checks `shouldRefuseRecovery` (in `portal/src/lib/access.ts`), which
-calls `isAdminId`. If the target is an admin, it refuses.
+**Why it works:** the portal UI blocks issuing a recovery link for admin
+targets through the normal "Issue enrollment URL" button — it checks the
+`metadata_admin.admin` flag and refuses if the target is an admin.
 
 The console path (Step D) bypasses this restriction because it calls the
 Kratos admin API directly, not the portal. The portal guard exists to prevent
@@ -298,13 +311,15 @@ What this gives you:
 To add the spouse as an admin:
 
 1. Create an Othala identity for the spouse (Admin → Users → New, or use the
-   enrollment URL flow), then note its UUID from `kratos identity list`.
-2. Edit `pyinfra/secrets.enc.yaml` and add the spouse's identity UUID to the
-   `OTHALA_ADMIN_IDS` value.
-3. Re-provision and restart the portal: `just dag-secrets <your-host> &&
-   just dag-deploy <your-host>`.
-4. Have the co-admin sign in and verify they reach the admin dashboard.
-5. Have the co-admin enroll a second passkey and TOTP per Section 1 above.
+   enrollment URL flow).
+2. In the admin UI, open the spouse's profile and toggle the admin marker on.
+   (Or via the Kratos admin API: `PATCH /admin/identities/<UUID>` with
+   `{"metadata_admin":{"admin":true,"groups":["family","admin"]}}`.)
+3. Have the co-admin sign in and verify they reach the admin dashboard.
+4. Have the co-admin enroll a second passkey and TOTP per Section 1 above.
+
+No restart required — the admin marker takes effect immediately on the next
+request (the portal reads it from the Kratos admin API on each check).
 
 Both admins should have SSH keys registered on the host so either can reach
 Step D independently.
@@ -366,10 +381,10 @@ recovery to confirm the gate still allows it.
 - `docs/runbooks/secrets-rotation.md` — break-glass rotation of `secrets.system`.
 - `kratos/kratos.yml` — `selfservice.flows.recovery.after.hooks` (the
   gate wire-up and `can_interrupt: true`).
-- `kratos/hooks/recovery-gate.jsonnet` — what the gate sends to the portal.
-- `portal/src/lib/admin-auth.ts` (`isAdminId`) — the admin-allowlist
-  predicate.
-- `portal/src/lib/access.ts` (`shouldRefuseRecovery`) — HIGH-3 guard that
-  blocks portal-UI admin-to-admin recovery.
+- `kratos/hooks/recovery-gate.jsonnet` — webhook body template; note the
+  `is_admin` field is always false in Kratos v26.2.0 (metadata_admin absent
+  from after-hook ctx.identity); the gate does its own admin-API lookup.
+- `portal/src/server/listen.mjs` (`fetchAdminMarker`, `handleRecoveryGate`) —
+  the gate handler; reads `metadata_admin.admin` via the Kratos admin API.
 - `portal/src/lib/admin.ts` (`requireAdminSession`) — AAL2 step-up at the
   SSR layer.

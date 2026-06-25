@@ -26,15 +26,25 @@
  *      (AAL1 session with flow=recovery, or /auth/settings redirect).
  *
  * J2 — ADMIN recovery (gate blocks):
- *   a. Look up the pre-seeded recovery-admin identity (RECOVERY_ADMIN_EMAIL) by
- *      credentials_identifier. validate.sh seeds it with metadata_admin.admin=true
- *      (ADR 0008 marker) before Playwright starts.
+ *   a. Seed a fresh admin identity (admin.recovery.<ts>@othala.test) with
+ *      metadata_admin.admin=true via the Kratos admin API. The test is
+ *      self-contained — no pre-seeding by validate.sh is required.
  *   b. Initiate recovery — same flow as J1.
  *   c. Query mailpit for the admin recovery code.
  *   d. Submit the code via ctx.request (same cookie jar).
- *   e. Assert recovery is BLOCKED: the gate fires (is_admin=true → 403) and
- *      Kratos aborts the flow. Observable as: no privileged session (whoami
- *      returns null or inactive), OR Kratos redirects to /auth/error.
+ *   e. Assert recovery is BLOCKED end-to-end: the gate calls the Kratos admin
+ *      API to read metadata_admin.admin, finds it true, returns 403; Kratos
+ *      (can_interrupt:true) aborts the flow — no privileged session is issued.
+ *
+ * Gate decision path (post 2026-06-25 fix):
+ *   The gate (othala:4431/admin/recovery-gate) no longer relies on the jsonnet
+ *   `is_admin` field in the webhook body. Kratos v26.2.0 omits metadata_admin
+ *   from ctx.identity in after-hook context (empirically confirmed), so the
+ *   jsonnet would always produce is_admin=false. Instead, the gate extracts
+ *   `identity_id` from the webhook body and calls
+ *   `KRATOS_ADMIN_URL/admin/identities/:id` directly to read the authoritative
+ *   metadata_admin.admin value. This bypass is encapsulated in fetchAdminMarker()
+ *   in portal/src/server/listen.mjs.
  *
  * Cookie-jar contract:
  *   ALL Kratos self-service operations (flow init, email submit, code submit) use
@@ -52,10 +62,8 @@
  *   - RECOVERY_GATE_SECRET injected via compose env (the gate 401s a bad bearer).
  *   - Mailpit running on the compose net (mailpit:8025 HTTP API reachable from
  *     inside the playwright container on the same compose network).
- *   - The recovery-admin identity has metadata_admin.admin=true (seeded by validate.sh);
- *     J2 looks up the RECOVERY_ADMIN_EMAIL identity and drives recovery through the
- *     webhook path. The gate refuses it because is_admin=true (set from the marker
- *     by recovery-gate.jsonnet). validate.sh is the source of truth for the seed.
+ *   - J2 self-seeds the admin identity (metadata_admin.admin=true) via the Kratos
+ *     admin API. No pre-seeding by validate.sh is required.
  *
  * Mailpit API: GET http://mailpit:8025/api/v1/messages returns:
  *   { messages: [{ ID, Subject, To: [{Address}], Snippet, ... }], ... }
@@ -393,28 +401,18 @@ test('J2 — admin recovery is blocked by the recovery-gate webhook (no privileg
   baseURL,
   kratosAdminURL,
 }) => {
-  // Look up the pre-seeded recovery-admin identity (RECOVERY_ADMIN_EMAIL).
-  // validate.sh seeds it with metadata_admin.admin=true (ADR 0008 marker) before
-  // Playwright starts. The recovery-gate refuses recovery for this identity because
-  // the jsonnet sets is_admin=true from the marker. No OTHALA_ADMIN_IDS env is
-  // involved — the gate decision is carried in the webhook payload field.
-  const recoveryAdminEmail = process.env.RECOVERY_ADMIN_EMAIL ?? 'admin.recovery@othala.test';
-  const listResp = await fetch(
-    `${kratosAdminURL}/admin/identities?credentials_identifier=${encodeURIComponent(recoveryAdminEmail)}`,
-  );
-  if (!listResp.ok) {
-    throw new Error(
-      `[J2] recovery-admin lookup failed: HTTP ${listResp.status} for ${recoveryAdminEmail}`,
-    );
-  }
-  const idList = (await listResp.json()) as Array<{ id: string }>;
-  if (idList.length === 0) {
-    throw new Error(
-      `[J2] no identity found for ${recoveryAdminEmail} — did validate.sh seed phase run?`,
-    );
-  }
-  const identity = { id: idList[0].id, email: recoveryAdminEmail };
-  console.log('[J2] looked up admin-marker identity:', identity.id, identity.email);
+  // Seed a fresh admin identity per run. Using a timestamp suffix avoids
+  // collisions on retry and makes J2 self-contained (no validate.sh pre-seed).
+  const uniqueSuffix = Date.now();
+  const identity = await createIdentityWithPassword({
+    email: `admin.recovery.${uniqueSuffix}@othala.test`,
+    username: `admin.recovery.${uniqueSuffix}`,
+    displayName: 'Recovery Admin',
+    groups: ['family', 'admin'],
+    isAdmin: true,
+    kratosAdminURL,
+  });
+  console.log('[J2] seeded admin-marker identity:', identity.id, identity.email);
 
   const ctx = await browser.newContext();
   try {
@@ -473,29 +471,22 @@ test('J2 — admin recovery is blocked by the recovery-gate webhook (no privileg
     const loc = codeResp.headers()['location'] ?? '';
     console.log('[J2] admin code submit result:', status, loc);
 
-    // Step 5: PRIMARY assertion — direct probe of the recovery-gate endpoint.
+    // Step 5: DIRECT PROBE — validate gate logic in isolation.
     //
-    // This is the core invariant: the gate correctly refuses recovery for an
-    // admin identity (is_admin=true → 403). The probe is independent of Kratos's
-    // `can_interrupt` behavior and exercises the gate's decision logic directly.
+    // Send identity_id for the seeded admin identity. The gate calls the Kratos
+    // admin API (KRATOS_ADMIN_URL/admin/identities/:id), reads metadata_admin.admin,
+    // finds it true, and returns 403. This is independent of Kratos's can_interrupt
+    // behavior and proves the gate's decision logic is correct.
     //
-    // Kratos v26.2.0 known limitations (both verified empirically by local run):
-    //   (a) `ctx.identity.metadata_admin` may be absent from the recovery
-    //       after-hook body template context, causing the jsonnet to compute
-    //       is_admin=false (gate allows). Upstream: Kratos issue with
-    //       after-hook identity serialization in v26.
-    //   (b) `can_interrupt: true` on `flows.recovery.after.hooks` fires AFTER
-    //       the session cookie is written to the response — the hook cannot
-    //       prevent session issuance even when the gate returns 403.
-    //   Both issues are upstream. The gate's logic (is_admin=true → 403) is
-    //   correct and proven here. The full Kratos integration will work once
-    //   an upstream fix lands (moving the hook to `before` or fixing v26
-    //   after-hook identity/interrupt semantics).
+    // Note: the `is_admin` field in the probe body is NOT the basis for the gate's
+    // decision (Kratos v26.2.0 omits metadata_admin from ctx.identity in after-hook
+    // context, so the jsonnet always produces is_admin=false). The gate ignores this
+    // field and performs its own admin API lookup using `identity_id`.
     const gateBase = process.env.OTHALA_ADMIN_URL ?? 'http://othala:4431';
     const probeBody = JSON.stringify({
       identity_id: identity.id,
-      is_admin: true,
-      groups: ['admin', 'family'],
+      is_admin: false, // deliberately false — proves gate ignores payload, uses admin API
+      groups: ['family'],
       traits: { email: identity.email },
     });
     const probeResp = await fetch(`${gateBase}/admin/recovery-gate`, {
@@ -508,18 +499,26 @@ test('J2 — admin recovery is blocked by the recovery-gate webhook (no privileg
     });
     expect(
       probeResp.status,
-      'J2: recovery-gate must return 403 for is_admin=true (gate logic correctly blocks admin)',
+      'J2: recovery-gate must return 403 for admin identity (gate fetches metadata_admin via admin API, ignoring payload is_admin)',
     ).toBe(403);
-    console.log('[J2] gate direct probe:', probeResp.status, '(403 = gate correctly blocks admin)');
+    console.log('[J2] gate direct probe:', probeResp.status, '(403 = gate correctly blocks admin via admin API lookup)');
 
-    // Step 6: Session check (informational; may show active=true in Kratos v26.2.0
-    // due to the can_interrupt + metadata_admin limitations documented above).
+    // Step 6: PRIMARY END-TO-END assertion — no session must be issued.
+    //
+    // The gate returns 403 when Kratos calls it (via the recovery-gate webhook).
+    // With can_interrupt:true, Kratos aborts the flow and does NOT issue a session.
+    // Both conditions verified empirically against the live v26.2.0 stack:
+    //   - can_interrupt:true DOES prevent session issuance when the gate returns
+    //     a properly-formatted messages-body 403 (refuted claim (b)).
+    //   - The gate correctly reads metadata_admin.admin via the Kratos admin API,
+    //     bypassing the jsonnet serialization gap (confirmed claim (a)).
     const session = await getSession(ctx, baseURL);
     const sessionBlocked = !session || session.active !== true;
-    if (!sessionBlocked) {
-      console.log('[J2] NOTE: Kratos v26.2.0 after-hook limitation — session issued despite gate; gate logic is correct (proven by direct probe above)');
-    }
-    console.log('[J2] PASS — admin recovery-gate blocks admin identity; session:', sessionBlocked ? 'correctly blocked' : 'issued (v26.2.0 upstream gap)');
+    expect(
+      sessionBlocked,
+      'J2: no privileged session must be issued after admin recovery — gate blocks end-to-end',
+    ).toBe(true);
+    console.log('[J2] PASS — admin recovery blocked end-to-end; no session issued');
   } finally {
     await ctx.close();
   }
