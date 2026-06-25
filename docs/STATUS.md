@@ -34,9 +34,9 @@ all-TS application fronting upstream Ory plus the Go LDAP bridge:
   revoke, best-effort LDAP bind-cache flush). No identity cache: the hot
   path fetches fresh, so a revoked subject fails the gate's state-check
   on the next fetch.
-- Admin authz is `OTHALA_ADMIN_IDS` (sops-backed email allowlist),
-  the sole authz at `requireAdminSession` + recovery-gate + page gates.
-  The `admin` group is display-only.
+- Admin authz is the `metadata_admin.admin` marker (ADR 0008;
+  admin-API-only writable), the sole authz at `requireAdminSession` +
+  recovery-gate + page gates. The `admin` group is display-only.
 - Back-channel logout is Hydra-native. The app holds no signing key at
   rest; the custom private-key signer was deleted.
 - Apps are **runtime manifests** (v0.2.0). Each app is one unified
@@ -82,8 +82,8 @@ Real, substantive coverage:
 - **Dual-listener mux-disjointness** is tested: no public/challenge
   path resolves on the admin port and the SSR handler never sees admin
   paths.
-- `OTHALA_ADMIN_IDS` as the **sole admin authz** is asserted at
-  every gate.
+- The `metadata_admin.admin` **marker** (ADR 0008) as the **sole admin
+  authz** is asserted at every gate.
 - **Native back-channel logout / no key at rest** is verified by the
   signer's absence.
 
@@ -110,7 +110,7 @@ state, not a regression.
 | Identity schema | `traits.{username,email,displayName?}` + `metadata_admin.{groups[],roles{}}` |
 | Subject identifier | `public` |
 | **Topology** | Single FQDN `dag.dunn.dev` for the whole SSO stack |
-| **Admin authz** | `OTHALA_ADMIN_IDS` allowlist (sops); `admin` group is display-only |
+| **Admin authz** | `metadata_admin.admin` marker (ADR 0008); admin-API-only writable; `admin` group is display-only |
 | Access gate | `access-<clientId>` group AND Kratos state `== active`, fail-closed, on login + consent |
 | Back-channel logout | Hydra-native (Hydra-signed); app holds no signing key at rest |
 | LDAP bridge | Go glauth-kratos binary at `gitlab.com/dunn.dev/kratos-ldap` (separate project; no `.so` plugins); stays Go |
