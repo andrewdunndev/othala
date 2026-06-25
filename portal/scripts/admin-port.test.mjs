@@ -20,6 +20,7 @@
 
 import { test, beforeEach } from 'node:test';
 import assert from 'node:assert/strict';
+import http from 'node:http';
 import { Readable } from 'node:stream';
 import {
   isAdminRoute,
@@ -59,6 +60,7 @@ function fakeReq({ method = 'GET', url = '/', headers = {}, body = '' } = {}) {
 beforeEach(() => {
   delete process.env.OTHALA_ADMIN_ENDPOINT_BEARER;
   delete process.env.RECOVERY_GATE_SECRET;
+  delete process.env.KRATOS_ADMIN_URL;
 });
 
 // ── CU1 disjointness ──────────────────────────────────────────────────────────
@@ -267,18 +269,34 @@ test('POST /admin/recovery-gate REFUSES recovery when is_admin===true (403)', as
 });
 
 test('POST /admin/recovery-gate ALLOWS recovery when is_admin===false (200)', async () => {
+  // fetchAdminMarker calls the Kratos admin API directly (ADR 0008 workaround:
+  // Kratos v26.2.0 omits metadata_admin from webhook ctx). Provide a mock
+  // Kratos admin API that returns a non-admin identity for OTHER_UUID so the
+  // gate can resolve the marker without a live Kratos instance.
+  const mockKratos = http.createServer((req, res) => {
+    res.writeHead(200, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify({ id: OTHER_UUID, metadata_admin: {} }));
+  });
+  await new Promise((r) => mockKratos.listen(0, '127.0.0.1', r));
+  const { port } = mockKratos.address();
+  process.env.KRATOS_ADMIN_URL = `http://127.0.0.1:${port}`;
   process.env.RECOVERY_GATE_SECRET = 'gate-secret';
-  const res = fakeRes();
-  await handleAdminRequest(
-    fakeReq({
-      method: 'POST',
-      url: '/admin/recovery-gate',
-      headers: { authorization: 'Bearer gate-secret' },
-      body: JSON.stringify({ identity_id: OTHER_UUID, is_admin: false, traits: { email: 'kid@othala.test' } }),
-    }),
-    res,
-  );
-  assert.equal(res.statusCode, 200);
+  try {
+    const res = fakeRes();
+    await handleAdminRequest(
+      fakeReq({
+        method: 'POST',
+        url: '/admin/recovery-gate',
+        headers: { authorization: 'Bearer gate-secret' },
+        body: JSON.stringify({ identity_id: OTHER_UUID, is_admin: false, traits: { email: 'kid@othala.test' } }),
+      }),
+      res,
+    );
+    assert.equal(res.statusCode, 200);
+  } finally {
+    await new Promise((r) => mockKratos.close(r));
+    delete process.env.KRATOS_ADMIN_URL;
+  }
 });
 
 test('POST /admin/recovery-gate refuses when is_admin is missing (malformed, fail-closed)', async () => {
