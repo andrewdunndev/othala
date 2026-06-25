@@ -126,7 +126,15 @@ while true; do
     if [[ $(date +%s) -gt $DEADLINE ]]; then
         echo "  ✗ healthcheck timeout"
         docker compose ps
-        docker compose logs --tail=200 > /tmp/lab-healthcheck-failure.log
+        # Dump each container's logs to STDOUT (the /tmp file isn't an
+        # uploadable CI artifact and the podman-compose `logs` shim is
+        # unreliable). Native `podman logs` per container surfaces WHY a
+        # service never went healthy directly in the job trace.
+        echo "=== container logs (healthcheck timeout) ==="
+        for svc in postgres kratos-migrate kratos hydra-migrate hydra othala mailpit; do
+            echo "--- lab-$svc ---"
+            podman logs --tail=60 "lab-$svc" 2>&1 || true
+        done
         exit 1
     fi
     # Count healthy long-running services. podman-compose's
