@@ -142,7 +142,7 @@ async function deactivateIdentity(id) {
 }
 
 async function getRecoveryLink(id, expiresIn = '1h') {
-  const res = await fetch(`${adminBase()}/admin/recovery/link`, {
+  const res = await fetch(`${adminBase()}/admin/recovery/code`, {
     method: 'POST',
     headers: authHeaders({ 'Content-Type': 'application/json' }),
     body: JSON.stringify({ identity_id: id, expires_in: expiresIn }),
@@ -549,38 +549,39 @@ test('deactivateIdentity: throws when sessions DELETE fails (half-deactivated gu
 
 // ─── getRecoveryLink ─────────────────────────────────────────────────────────
 
-test('getRecoveryLink: POSTs to /admin/recovery/link', async () => {
-  mockFetch({ recovery_link: 'https://example.com/link', expires_at: '2026-01-01T00:00:00Z' });
+test('getRecoveryLink: POSTs to /admin/recovery/code', async () => {
+  mockFetch({ recovery_link: 'https://example.com/link', recovery_code: '123456', expires_at: '2026-01-01T00:00:00Z' });
   await getRecoveryLink('user-id');
   assert.equal(capturedCalls[0].opts.method, 'POST');
-  assert.match(capturedCalls[0].url, /\/admin\/recovery\/link$/);
+  assert.match(capturedCalls[0].url, /\/admin\/recovery\/code$/);
 });
 
 test('getRecoveryLink: request body includes identity_id', async () => {
-  mockFetch({ recovery_link: 'https://example.com/link', expires_at: '2026-01-01T00:00:00Z' });
+  mockFetch({ recovery_link: 'https://example.com/link', recovery_code: '123456', expires_at: '2026-01-01T00:00:00Z' });
   await getRecoveryLink('user-123');
   const body = JSON.parse(capturedCalls[0].opts.body);
   assert.equal(body.identity_id, 'user-123');
 });
 
 test('getRecoveryLink: defaults expires_in to "1h"', async () => {
-  mockFetch({ recovery_link: 'https://example.com/link', expires_at: '2026-01-01T00:00:00Z' });
+  mockFetch({ recovery_link: 'https://example.com/link', recovery_code: '123456', expires_at: '2026-01-01T00:00:00Z' });
   await getRecoveryLink('user-123');
   const body = JSON.parse(capturedCalls[0].opts.body);
   assert.equal(body.expires_in, '1h');
 });
 
 test('getRecoveryLink: passes explicit expires_in', async () => {
-  mockFetch({ recovery_link: 'https://example.com/link', expires_at: '2026-01-01T00:00:00Z' });
+  mockFetch({ recovery_link: 'https://example.com/link', recovery_code: '123456', expires_at: '2026-01-01T00:00:00Z' });
   await getRecoveryLink('user-123', '24h');
   const body = JSON.parse(capturedCalls[0].opts.body);
   assert.equal(body.expires_in, '24h');
 });
 
-test('getRecoveryLink: returns parsed recovery_link + expires_at', async () => {
-  mockFetch({ recovery_link: 'https://example.com/recovery/abc', expires_at: '2026-06-01T00:00:00Z' });
+test('getRecoveryLink: returns parsed recovery_link + recovery_code + expires_at', async () => {
+  mockFetch({ recovery_link: 'https://example.com/recovery/abc', recovery_code: '654321', expires_at: '2026-06-01T00:00:00Z' });
   const result = await getRecoveryLink('user-123');
   assert.equal(result.recovery_link, 'https://example.com/recovery/abc');
+  assert.equal(result.recovery_code, '654321');
   assert.equal(result.expires_at, '2026-06-01T00:00:00Z');
 });
 

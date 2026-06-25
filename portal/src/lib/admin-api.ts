@@ -296,18 +296,30 @@ export async function deleteCredential(
 
 export interface RecoveryLink {
   recovery_link: string;
+  /** The short numeric code Kratos generates (used alongside recovery_link). */
+  recovery_code: string;
   expires_at: string;
 }
 
-/** One-shot enrollment / recovery URL the admin shares out-of-band. */
+/**
+ * One-shot recovery code + link the admin shares out-of-band (ADR 0008).
+ *
+ * Uses `createRecoveryCodeForIdentity` (POST /admin/recovery/code, Kratos
+ * v26.2.0+). The response includes both a `recovery_link` (URL to the
+ * recovery UI with an empty code field) and a `recovery_code` (the
+ * short numeric code Kratos emails or the admin can share directly).
+ *
+ * The SDK deserialises `expires_at` as a Date object. Guard the coercion:
+ * call toISOString() only when the value is actually a Date, fall back to
+ * String() for any other wire shape so the caller always gets a string.
+ */
 export async function getRecoveryLink(id: string, expiresIn = '1h'): Promise<RecoveryLink> {
-  const link = await identityApi().createRecoveryLinkForIdentity({
-    createRecoveryLinkForIdentityBody: { identity_id: id, expires_in: expiresIn },
+  const link = await identityApi().createRecoveryCodeForIdentity({
+    createRecoveryCodeForIdentityBody: { identity_id: id, expires_in: expiresIn },
   });
-  // The SDK types expires_at as optional; the portal contract (and an
-  // existing test) treats it as a present string. Coerce at the boundary.
   return {
     recovery_link: link.recovery_link,
-    expires_at: String(link.expires_at ?? ''),
+    recovery_code: link.recovery_code,
+    expires_at: link.expires_at instanceof Date ? link.expires_at.toISOString() : String(link.expires_at ?? ''),
   };
 }
