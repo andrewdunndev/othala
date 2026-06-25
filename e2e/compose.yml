@@ -391,9 +391,11 @@ services:
       # config.ts resolves a contact recipient at load. Same image, same config contract.
       OTHALA_CONTACT_RECIPIENT: ${OTHALA_CONTACT_RECIPIENT}
       # Per-client secrets for every fixture with an oidc: block. The
-      # generic example set registers two OIDC clients.
+      # generic example set registers three OIDC clients: grafana,
+      # audiobookshelf, openwebui (client_id "openwebui").
       GRAFANA_CLIENT_SECRET: ${GRAFANA_CLIENT_SECRET}
       AUDIOBOOKSHELF_CLIENT_SECRET: ${AUDIOBOOKSHELF_CLIENT_SECRET}
+      OPENWEBUI_CLIENT_SECRET: ${OPENWEBUI_CLIENT_SECRET}
     volumes:
       - ./manifests:/etc/portal/manifests:ro,z
     command: ["node", "./dist/server/register-clients.mjs"]

@@ -160,10 +160,14 @@ CSRF_SECRET=$(gen)
 
 # Per-client OIDC secrets for the register-clients smoke. Every fixture
 # in e2e/manifests/ that carries an oidc: block (and so gets registered
-# against Hydra) needs a <SLUG>_CLIENT_SECRET env var. The generic
-# example set has two OIDC clients: grafana + audiobookshelf. The
+# against Hydra) needs a <SLUG>_CLIENT_SECRET env var, where <SLUG> is the
+# manifest's client_id upper-cased (see portal register-clients.ts
+# envVarName: client_id.toUpperCase() + "_CLIENT_SECRET"). The generic
+# example set has three OIDC clients: grafana, audiobookshelf, and
+# openwebui (client_id "openwebui", manifest open-webui.yaml). The
 # presentation-only fixtures (jellyfin/proxywatch/statuspage) have no
 # oidc: block and need no secret.
 GRAFANA_CLIENT_SECRET=$(gen)
 AUDIOBOOKSHELF_CLIENT_SECRET=$(gen)
+OPENWEBUI_CLIENT_SECRET=$(gen)
 EOF
