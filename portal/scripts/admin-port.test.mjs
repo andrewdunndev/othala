@@ -1,16 +1,19 @@
-// Contract tests for the D-listener admin mux (CU1 item 4/6, extended CU3 + CVP-P3).
+// Contract tests for the D-listener admin mux (CU1 item 4/6, extended CU3).
 //
 // Run with: tsx --test scripts/admin-port.test.mjs
 //
 // Asserts:
-//   - the admin port serves /healthz + /readyz (GET) and the CU3/CVP-P3 admin
-//     endpoints /admin/revoke-user + /admin/recovery-gate + /admin/login-gate
-//     (POST), and that every public/challenge path 404s there (the two muxes
-//     are disjoint);
-//   - the revoke-user + recovery-gate + login-gate paths are NOT public GET
-//     routes (the public mux never sees them via the admin helpers);
+//   - the admin port serves /healthz + /readyz (GET) and the CU3 admin
+//     endpoints /admin/revoke-user + /admin/recovery-gate (POST), and that
+//     every public/challenge path 404s there (the two muxes are disjoint);
+//   - the revoke-user + recovery-gate paths are NOT public GET routes (the
+//     public mux never sees them via the admin helpers);
 //   - the admin-endpoint + recovery-gate bearer checks are CONSTANT-TIME and
 //     FAIL-CLOSED (unset secret rejects everything).
+//
+// The login-gate (POST /admin/login-gate) was retired in ADR 0008: the
+// after.code hook was dropped from kratos.yml; AAL2-on-/admin makes an admin
+// email-code AAL1 session harmless. ADMIN_POST_ROUTES no longer includes it.
 //
 // Imports the pure helpers from listen.mjs without binding any socket or
 // loading the SSR handler / runtime bundle.
@@ -56,10 +59,9 @@ function fakeReq({ method = 'GET', url = '/', headers = {}, body = '' } = {}) {
 beforeEach(() => {
   delete process.env.OTHALA_ADMIN_ENDPOINT_BEARER;
   delete process.env.RECOVERY_GATE_SECRET;
-  delete process.env.OTHALA_ADMIN_IDS;
 });
 
-// ── CU1 disjointness (unchanged) ───────────────────────────────────────────
+// ── CU1 disjointness ──────────────────────────────────────────────────────────
 
 test('admin GET mux serves exactly /healthz and /readyz', () => {
   assert.deepEqual([...ADMIN_GET_ROUTES].sort(), ['/healthz', '/readyz']);
@@ -68,14 +70,22 @@ test('admin GET mux serves exactly /healthz and /readyz', () => {
   assert.equal(isAdminRoute('GET', '/readyz'), true);
 });
 
-test('admin POST mux serves exactly the CU3 + CVP-P3 endpoints', () => {
-  assert.deepEqual([...ADMIN_POST_ROUTES].sort(), ['/admin/login-gate', '/admin/recovery-gate', '/admin/revoke-user']);
+test('admin POST mux serves exactly the CU3 endpoints (login-gate retired)', () => {
+  // Login-gate was retired in ADR 0008; it must NOT be in ADMIN_POST_ROUTES.
+  assert.deepEqual([...ADMIN_POST_ROUTES].sort(), ['/admin/recovery-gate', '/admin/revoke-user']);
+  assert.equal(ADMIN_POST_ROUTES.has('/admin/login-gate'), false, 'login-gate must be retired from POST routes');
 });
 
-test('revoke-user + recovery-gate + login-gate are NOT public GET routes (disjoint from public mux)', () => {
-  for (const p of ['/admin/revoke-user', '/admin/recovery-gate', '/admin/login-gate']) {
+test('revoke-user + recovery-gate are NOT public GET routes (disjoint from public mux)', () => {
+  for (const p of ['/admin/revoke-user', '/admin/recovery-gate']) {
     assert.equal(isAdminRoute('GET', p), false, `${p} must not be a public GET admin route`);
   }
+});
+
+test('login-gate is not an admin GET or POST route (fully retired)', () => {
+  assert.equal(isAdminRoute('GET', '/admin/login-gate'), false);
+  assert.equal(isAdminEndpoint('GET', '/admin/login-gate'), false);
+  assert.equal(isAdminEndpoint('POST', '/admin/login-gate'), false);
 });
 
 test('admin mux does NOT serve any public/challenge path', () => {
@@ -100,6 +110,15 @@ test('challenge + public paths 404 on the admin port', async () => {
   }
 });
 
+test('login-gate POST 404s on the admin port (retired route)', async () => {
+  const res = fakeRes();
+  await handleAdminRequest(
+    fakeReq({ method: 'POST', url: '/admin/login-gate', body: '{}' }),
+    res,
+  );
+  assert.equal(res.statusCode, 404, '/admin/login-gate must 404 (retired)');
+});
+
 test('healthz/readyz return 200 ok on the admin port', async () => {
   for (const p of ['/healthz', '/readyz']) {
     const res = fakeRes();
@@ -110,7 +129,7 @@ test('healthz/readyz return 200 ok on the admin port', async () => {
 });
 
 test('a served admin POST path on the wrong method (GET) 404s', async () => {
-  for (const p of ['/admin/revoke-user', '/admin/recovery-gate', '/admin/login-gate']) {
+  for (const p of ['/admin/revoke-user', '/admin/recovery-gate']) {
     const res = fakeRes();
     await handleAdminRequest(fakeReq({ method: 'GET', url: p }), res);
     assert.equal(res.statusCode, 404, `GET ${p} should 404`);
@@ -140,24 +159,26 @@ test('bearerMatches accepts only the exact secret (constant-time path)', () => {
 
 // ── revoke-user endpoint auth ──────────────────────────────────────────────
 
-test('POST /admin/revoke-user 401s with no/wrong bearer (fail-closed unset)', async () => {
+test('POST /admin/revoke-user 403s with no/wrong bearer (fail-closed unset)', async () => {
   // unset secret -> every request rejected
+  // 403 not 401: Kratos can_interrupt webhooks must see 403 to abort the flow;
+  // a 401 risks skip-and-continue (fail-open).
   const res = fakeRes();
   await handleAdminRequest(
     fakeReq({ method: 'POST', url: '/admin/revoke-user', headers: { authorization: 'Bearer x' }, body: '{"subject":"s"}' }),
     res,
   );
-  assert.equal(res.statusCode, 401);
+  assert.equal(res.statusCode, 403);
 });
 
-test('POST /admin/revoke-user 401s with a wrong bearer when secret IS set', async () => {
+test('POST /admin/revoke-user 403s with a wrong bearer when secret IS set', async () => {
   process.env.OTHALA_ADMIN_ENDPOINT_BEARER = 'right-secret';
   const res = fakeRes();
   await handleAdminRequest(
     fakeReq({ method: 'POST', url: '/admin/revoke-user', headers: { authorization: 'Bearer wrong' }, body: '{"subject":"s"}' }),
     res,
   );
-  assert.equal(res.statusCode, 401);
+  assert.equal(res.statusCode, 403);
 });
 
 test('POST /admin/revoke-user with a valid bearer routes through revokeSubject', async () => {
@@ -168,7 +189,6 @@ test('POST /admin/revoke-user with a valid bearer routes through revokeSubject',
       revokedSubject = subject;
       return { subject, kratosSessionsRevoked: true, bestEffortFailures: [] };
     },
-    isAdminId: () => false,
   };
   const res = fakeRes();
   await handleAdminRequest(
@@ -192,7 +212,6 @@ test('POST /admin/revoke-user returns prescriptive error (dependency + action), 
   }
   const runtime = {
     async revokeSubject() { throw new FakeRevokeError(); },
-    isAdminId: () => false,
   };
   const res = fakeRes();
   await handleAdminRequest(
@@ -209,7 +228,7 @@ test('POST /admin/revoke-user returns prescriptive error (dependency + action), 
 
 test('POST /admin/revoke-user 400s on a missing subject', async () => {
   process.env.OTHALA_ADMIN_ENDPOINT_BEARER = 'right-secret';
-  const runtime = { async revokeSubject() { throw new Error('should not run'); }, isAdminId: () => false };
+  const runtime = { async revokeSubject() { throw new Error('should not run'); } };
   const res = fakeRes();
   await handleAdminRequest(
     fakeReq({ method: 'POST', url: '/admin/revoke-user', headers: { authorization: 'Bearer right-secret' }, body: '{}' }),
@@ -221,36 +240,49 @@ test('POST /admin/revoke-user 400s on a missing subject', async () => {
 
 // ── recovery-gate endpoint auth + verdict ──────────────────────────────────
 
-test('POST /admin/recovery-gate is fail-closed when RECOVERY_GATE_SECRET unset', async () => {
+test('POST /admin/recovery-gate is fail-closed when RECOVERY_GATE_SECRET unset (403)', async () => {
+  // 403 not 401: Kratos can_interrupt webhooks must see 403 to abort the flow;
+  // a 401 risks skip-and-continue (fail-open).
   const res = fakeRes();
   await handleAdminRequest(
     fakeReq({ method: 'POST', url: '/admin/recovery-gate', headers: { authorization: 'Bearer x' }, body: '{}' }),
     res,
-    { revokeSubject: async () => ({}), isAdminId: () => false },
   );
-  assert.equal(res.statusCode, 401);
+  assert.equal(res.statusCode, 403);
 });
 
-test('POST /admin/recovery-gate REFUSES recovery for an allowlisted admin UUID (403)', async () => {
+test('POST /admin/recovery-gate REFUSES recovery when is_admin===true (403)', async () => {
   process.env.RECOVERY_GATE_SECRET = 'gate-secret';
-  const runtime = { revokeSubject: async () => ({}), isAdminId: (id) => id === ADMIN_UUID };
   const res = fakeRes();
   await handleAdminRequest(
     fakeReq({
       method: 'POST',
       url: '/admin/recovery-gate',
       headers: { authorization: 'Bearer gate-secret' },
-      body: JSON.stringify({ identity_id: ADMIN_UUID, traits: { email: 'admin@othala.test' } }),
+      body: JSON.stringify({ identity_id: ADMIN_UUID, is_admin: true, traits: { email: 'admin@othala.test' } }),
     }),
     res,
-    runtime,
   );
   assert.equal(res.statusCode, 403);
 });
 
-test('POST /admin/recovery-gate ALLOWS recovery for a non-admin UUID (200)', async () => {
+test('POST /admin/recovery-gate ALLOWS recovery when is_admin===false (200)', async () => {
   process.env.RECOVERY_GATE_SECRET = 'gate-secret';
-  const runtime = { revokeSubject: async () => ({}), isAdminId: () => false };
+  const res = fakeRes();
+  await handleAdminRequest(
+    fakeReq({
+      method: 'POST',
+      url: '/admin/recovery-gate',
+      headers: { authorization: 'Bearer gate-secret' },
+      body: JSON.stringify({ identity_id: OTHER_UUID, is_admin: false, traits: { email: 'kid@othala.test' } }),
+    }),
+    res,
+  );
+  assert.equal(res.statusCode, 200);
+});
+
+test('POST /admin/recovery-gate refuses when is_admin is missing (malformed, fail-closed)', async () => {
+  process.env.RECOVERY_GATE_SECRET = 'gate-secret';
   const res = fakeRes();
   await handleAdminRequest(
     fakeReq({
@@ -260,23 +292,63 @@ test('POST /admin/recovery-gate ALLOWS recovery for a non-admin UUID (200)', asy
       body: JSON.stringify({ identity_id: OTHER_UUID, traits: { email: 'kid@othala.test' } }),
     }),
     res,
-    runtime,
   );
-  assert.equal(res.statusCode, 200);
+  assert.equal(res.statusCode, 403, 'missing is_admin must refuse (fail-closed)');
+});
+
+test('POST /admin/recovery-gate refuses when is_admin is string "true" (non-boolean, fail-closed)', async () => {
+  process.env.RECOVERY_GATE_SECRET = 'gate-secret';
+  const res = fakeRes();
+  await handleAdminRequest(
+    fakeReq({
+      method: 'POST',
+      url: '/admin/recovery-gate',
+      headers: { authorization: 'Bearer gate-secret' },
+      body: JSON.stringify({ identity_id: OTHER_UUID, is_admin: 'true' }),
+    }),
+    res,
+  );
+  assert.equal(res.statusCode, 403, 'non-boolean is_admin must refuse (fail-closed)');
 });
 
 test('recoveryGateVerdict is FAIL-CLOSED on a malformed payload (no identity_id)', () => {
-  assert.equal(recoveryGateVerdict({}, () => false).refuse, true);
-  assert.equal(recoveryGateVerdict({ traits: {} }, () => false).refuse, true);
-  assert.equal(recoveryGateVerdict({ identity: {} }, () => false).refuse, true);
+  assert.equal(recoveryGateVerdict({}).refuse, true);
+  assert.equal(recoveryGateVerdict({ traits: {}, is_admin: false }).refuse, true);
+  assert.equal(recoveryGateVerdict({ identity: {}, is_admin: false }).refuse, true);
 });
 
 test('recoveryGateVerdict reads identity_id at top level OR identity.id under .identity', () => {
-  const isAdmin = (id) => id === ADMIN_UUID;
   // top-level identity_id (canonical jsonnet shape)
-  assert.equal(recoveryGateVerdict({ identity_id: ADMIN_UUID, traits: {} }, isAdmin).refuse, true);
+  assert.equal(recoveryGateVerdict({ identity_id: ADMIN_UUID, is_admin: true, traits: {} }).refuse, true);
   // fallback: identity.id
-  assert.equal(recoveryGateVerdict({ identity: { id: ADMIN_UUID } }, isAdmin).refuse, true);
+  assert.equal(recoveryGateVerdict({ identity: { id: ADMIN_UUID }, is_admin: true }).refuse, true);
   // non-admin
-  assert.equal(recoveryGateVerdict({ identity_id: OTHER_UUID, traits: {} }, isAdmin).refuse, false);
+  assert.equal(recoveryGateVerdict({ identity_id: OTHER_UUID, is_admin: false, traits: {} }).refuse, false);
+});
+
+// ── Security: bearer rejection MUST be 403, never 401 (Kratos can_interrupt) ─
+
+test('bearer rejection on recovery-gate is 403 (not 401) — Kratos can_interrupt safety', async () => {
+  // Kratos webhooks use can_interrupt: true; a non-403 response (e.g. 401)
+  // risks being treated as a non-interrupting webhook error (skip-and-continue
+  // = fail-open), whereas 403 reliably aborts the flow.
+  process.env.RECOVERY_GATE_SECRET = 'correct';
+  const res = fakeRes();
+  await handleAdminRequest(
+    fakeReq({ method: 'POST', url: '/admin/recovery-gate', headers: { authorization: 'Bearer wrong' }, body: '{}' }),
+    res,
+  );
+  assert.equal(res.statusCode, 403, 'must be 403, not 401');
+  assert.notEqual(res.statusCode, 401, 'must NOT be 401 (would be fail-open under can_interrupt)');
+});
+
+test('bearer rejection on revoke-user is 403 (not 401)', async () => {
+  process.env.OTHALA_ADMIN_ENDPOINT_BEARER = 'correct';
+  const res = fakeRes();
+  await handleAdminRequest(
+    fakeReq({ method: 'POST', url: '/admin/revoke-user', headers: { authorization: 'Bearer wrong' }, body: '{"subject":"s"}' }),
+    res,
+  );
+  assert.equal(res.statusCode, 403, 'must be 403, not 401');
+  assert.notEqual(res.statusCode, 401, 'must NOT be 401');
 });

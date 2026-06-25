@@ -2,14 +2,14 @@
  * F — AAL2 bypass attempts (adversarial / negative).
  *
  * Guard under attack:
- *   portal/src/lib/admin.ts:requireAdminSession (line 42)
- *   — specifically the AAL2 check at line 76:
+ *   portal/src/lib/admin.ts:requireAdminSession
+ *   — specifically the AAL2 check (b):
  *       if (session.authenticator_assurance_level !== 'aal2')
  *           return astro.redirect(browserFlows.login({ ... aal: 'aal2', ... }))
  *
- * An identity on OTHALA_ADMIN_IDS (admin@othala.test) with a valid AAL1
- * session (password-only login, no second factor enrolled or presented) MUST
- * be denied every /admin/* mutation path. No bypass via:
+ * An identity with metadata_admin.admin=true (ADR 0008 marker, admin@othala.test)
+ * with a valid AAL1 session (password-only login, no second factor enrolled or
+ * presented) MUST be denied every /admin/* mutation path. No bypass via:
  *   F1 — direct GET /admin (covered by spec D; repeated here in request form)
  *   F2 — direct POST to /admin/users/new (a create-user mutation)
  *   F3 — return_to parameter manipulation on the step-up redirect

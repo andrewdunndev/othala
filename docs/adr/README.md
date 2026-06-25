@@ -25,6 +25,7 @@ end of the status block.
 | [0005](0005-passkey-first-auth.md) | Passkey-first auth posture | Passkey is the primary credential, not a second factor; password is the recovery on-ramp back to passkey. |
 | [0006](0006-two-pki.md) | Two-PKI: step-ca internal mesh CA + LE edge, never chained | LE for browser-facing FQDNs; step-ca for internal mesh and outpost client certs; the two roots are never chained. |
 | [0007](0007-three-layer-naming.md) | Three-layer naming: Othala / dag.dunn.dev / kratos+hydra | Othala = OSS project, dag.dunn.dev = operator instance, kratos/hydra = Ory functional names; used consistently and never conflated. |
+| [0008](0008-admin-authority-model.md) | Admin authority model: bootstrap floor + `metadata_admin`-managed admins | Two-tier model: `metadata_admin` marker for live admin grant/revoke; Ory-native network admin plane as permanent bootstrap floor and break-glass. Retires the env allowlist and id-pinning dance. |
 
 ## What ADRs are
 

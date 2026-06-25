@@ -1,69 +1,82 @@
-// Test for the admin-to-admin recovery refusal gate (CU3 B2 / CVP-P1 update).
+// Test for the admin-to-admin recovery refusal gate (CU3 B2 / ADR 0008).
 //
 // Run with: tsx --test scripts/admin-recovery-gate.test.mjs
 //
 // The gate logic lives in src/lib/access.ts (shouldRefuseRecovery) and is
 // consumed by src/pages/admin/users/[id].astro action=issue-recovery.
 //
-// CVP-P1: admin authority is now the OTHALA_ADMIN_IDS allowlist keyed on the
-// IMMUTABLE identity `id` (a Kratos UUID). shouldRefuseRecovery refuses iff
-// the TARGET identity's ID is on the allowlist. The `admin` group and the
-// email trait are display-only / user-editable and no longer gate recovery.
+// ADR 0008: admin authority is now the `metadata_admin.admin === true` marker
+// (admin-API-only-writable boolean). shouldRefuseRecovery refuses iff the
+// TARGET identity carries the admin marker. The retired OTHALA_ADMIN_IDS UUID
+// allowlist is no longer consulted. The caller must pass an admin-API-fetched
+// identity (metadata_admin present).
 
-import { test, beforeEach } from 'node:test';
+import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { shouldRefuseRecovery } from '../src/lib/access.ts';
 
-const ADMIN_UUID = '11111111-1111-1111-1111-111111111111';
-const OPS_UUID   = '33333333-3333-3333-3333-333333333333';
-const OTHER_UUID = '22222222-2222-2222-2222-222222222222';
-
-beforeEach(() => {
-  process.env.OTHALA_ADMIN_IDS = `${ADMIN_UUID},${OPS_UUID}`;
-});
-
-test('allowlisted admin identity is refused', () => {
+test('identity with metadata_admin.admin===true is refused', () => {
   const identity = {
-    id: ADMIN_UUID,
+    id: '11111111-1111-1111-1111-111111111111',
     traits: { email: 'admin@othala.test' },
-    metadata_admin: { groups: ['admin', 'family'] },
+    metadata_admin: { admin: true, groups: ['admin', 'family'] },
   };
   assert.equal(shouldRefuseRecovery(identity), true);
 });
 
-test('allowlisted admin is refused even after self-demoting out of the admin group', () => {
+test('identity with metadata_admin.admin===true is refused even without admin group', () => {
+  // Defense-in-depth: the marker is authoritative; group membership is irrelevant.
   const identity = {
-    id: OPS_UUID,
+    id: '33333333-3333-3333-3333-333333333333',
     traits: { email: 'ops@othala.test' },
-    metadata_admin: { groups: ['family'] }, // no 'admin' group
+    metadata_admin: { admin: true, groups: ['family'] }, // no 'admin' group
   };
   assert.equal(shouldRefuseRecovery(identity), true);
 });
 
-test('group-admin NOT on the allowlist is allowed (group is display-only)', () => {
+test('identity with metadata_admin.admin===false is allowed (marker present but false)', () => {
   const identity = {
-    id: OTHER_UUID,
+    id: '22222222-2222-2222-2222-222222222222',
     traits: { email: 'imposter@othala.test' },
-    metadata_admin: { groups: ['admin', 'family'] },
+    // has admin group but marker is false — group is display-only
+    metadata_admin: { admin: false, groups: ['admin', 'family'] },
   };
   assert.equal(shouldRefuseRecovery(identity), false);
 });
 
-test('non-admin identity is allowed', () => {
+test('non-admin identity (no admin marker) is allowed', () => {
   const identity = {
-    id: OTHER_UUID,
+    id: '22222222-2222-2222-2222-222222222222',
     traits: { email: 'kid@othala.test' },
     metadata_admin: { groups: ['family', 'access-keep'] },
   };
   assert.equal(shouldRefuseRecovery(identity), false);
 });
 
-test('identity with no id is allowed (no admin by default, fail-open for recovery of unknowns)', () => {
-  const identity = { traits: { email: 'unknown@othala.test' } };
+test('identity with no metadata_admin is allowed (fail-safe for non-admin)', () => {
+  const identity = { id: '22222222-2222-2222-2222-222222222222', traits: { email: 'unknown@othala.test' } };
   assert.equal(shouldRefuseRecovery(identity), false);
 });
 
-test('null/undefined identity is allowed (no admin)', () => {
+test('identity with metadata_admin.admin as string "true" is allowed (wrong type, fail-closed strict equality)', () => {
+  const identity = {
+    id: '22222222-2222-2222-2222-222222222222',
+    traits: { email: 'trick@othala.test' },
+    metadata_admin: { admin: 'true' },
+  };
+  assert.equal(shouldRefuseRecovery(identity), false);
+});
+
+test('identity with metadata_admin.admin as number 1 is allowed (wrong type, fail-closed strict equality)', () => {
+  const identity = {
+    id: '22222222-2222-2222-2222-222222222222',
+    traits: { email: 'trick2@othala.test' },
+    metadata_admin: { admin: 1 },
+  };
+  assert.equal(shouldRefuseRecovery(identity), false);
+});
+
+test('null/undefined identity is allowed (no admin marker)', () => {
   assert.equal(shouldRefuseRecovery(null), false);
   assert.equal(shouldRefuseRecovery(undefined), false);
 });

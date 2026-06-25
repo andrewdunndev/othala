@@ -10,12 +10,14 @@
 // at the write paths in this portal.
 //
 // Contract (matches identity.schema.json metadata_admin):
-//   { groups?: string[]; roles?: Record<string, string> }
+//   { groups?: string[]; roles?: Record<string, string>; admin?: boolean }
 // where:
 //   - groups: array of lowercase-dash-strings, length 1..64, no
 //     duplicates, regex ^[a-z][a-z0-9.\-]*$
 //   - roles: object with keys matching ^[a-z][a-z0-9]*$ mapping to role
 //     names matching ^[a-z][a-z0-9_\-]*$, length 1..64
+//   - admin: strict boolean (true|false); rejects non-boolean (string "true",
+//     number 1, null, etc.) — fail-closed for admin authority (ADR 0008)
 //   - no other top-level keys allowed
 //
 // Returns the input on success (typed as MetadataAdmin) or an Error
@@ -37,7 +39,7 @@ export class MetadataAdminError extends Error {
   }
 }
 
-const ALLOWED_KEYS = new Set(['groups', 'roles']);
+const ALLOWED_KEYS = new Set(['groups', 'roles', 'admin']);
 
 export function validateMetadataAdmin(input: unknown): MetadataAdmin {
   if (input === null || input === undefined) return {};
@@ -50,7 +52,7 @@ export function validateMetadataAdmin(input: unknown): MetadataAdmin {
   for (const key of Object.keys(input)) {
     if (!ALLOWED_KEYS.has(key)) {
       throw new MetadataAdminError(
-        `metadata_admin: unknown field "${key}". Allowed: groups, roles.`,
+        `metadata_admin: unknown field "${key}". Allowed: groups, roles, admin.`,
       );
     }
   }
@@ -64,6 +66,15 @@ export function validateMetadataAdmin(input: unknown): MetadataAdmin {
 
   if ('roles' in obj && obj.roles !== undefined) {
     out.roles = validateRoles(obj.roles);
+  }
+
+  if ('admin' in obj && obj.admin !== undefined) {
+    if (typeof obj.admin !== 'boolean') {
+      throw new MetadataAdminError(
+        `metadata_admin.admin must be a strict boolean (true or false); got ${typeof obj.admin}.`,
+      );
+    }
+    out.admin = obj.admin;
   }
 
   return out;

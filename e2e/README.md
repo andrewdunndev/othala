@@ -79,10 +79,11 @@ VM dies on job end. Total turnaround: ~3-5 minutes including image pulls.
   `metadata_admin.groups` round-trips.
 - **Recovery-gate** — the converged app's loopback endpoint
   `othala:4431/admin/recovery-gate`, `Authorization: Bearer`. Refusal is
-  **allowlist-based** (`OTHALA_ADMIN_IDS`, identity UUIDs), NOT group-based: an
-  allowlisted admin UUID → 403; a non-allowlisted identity → 200 (even
-  carrying the display-only `admin` group); an unidentifiable subject →
-  403 (fail-closed); a wrong bearer → 401.
+  **marker-based** (`is_admin===true` in the webhook payload, derived from
+  `metadata_admin.admin` by `recovery-gate.jsonnet`), NOT group- or UUID-based
+  (ADR 0008). An identity with `is_admin=true` → 403; `is_admin=false` → 200
+  (even if groups includes `admin`); a non-boolean `is_admin` → 403 (fail-closed);
+  a missing `identity_id` → 403 (fail-closed); a wrong bearer → 401.
 
 ## What it does NOT validate
 

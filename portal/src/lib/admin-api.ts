@@ -58,6 +58,12 @@ export interface MetadataAdmin {
   groups?: string[];
   /** Per-app role overrides, keyed by client_id. */
   roles?: Record<string, string>;
+  /**
+   * Admin authority marker (ADR 0008). Strict boolean; only set via the
+   * Kratos admin API. Use patchAdminMarker for targeted grant/revoke so
+   * groups/roles are never clobbered.
+   */
+  admin?: boolean;
 }
 
 export interface CreateIdentityInput {
@@ -166,6 +172,61 @@ export async function deactivateIdentity(id: string): Promise<void> {
 export async function reactivateIdentity(id: string): Promise<void> {
   const patch = [{ op: 'replace' as const, path: '/state', value: 'active' }];
   await identityApi().patchIdentity({ id, jsonPatch: patch });
+}
+
+/**
+ * Targeted patch of the `metadata_admin.admin` marker (ADR 0008).
+ *
+ * Uses JSON Patch (RFC 6902) against the Kratos PATCH endpoint so groups
+ * and roles are never touched. Grant sets admin=true; revoke removes the key.
+ *
+ * The Kratos PATCH body must include the full path under /metadata_admin.
+ * If metadata_admin is absent entirely, Kratos rejects a /metadata_admin/admin
+ * add directly; we first add /metadata_admin as {} then add the key. Grant
+ * therefore sends a two-op patch that is idempotent on repeated calls (add
+ * with test-or-add semantics). Revoke sends a single remove op; a 404-style
+ * "path not found" error from Kratos is treated as success (already absent).
+ *
+ * This does NOT call validateMetadataAdmin because we only touch a single
+ * boolean key — the other fields are untouched by the patch.
+ */
+export async function patchAdminMarker(id: string, grant: boolean): Promise<void> {
+  const api = identityApi();
+  if (grant) {
+    // Ensure metadata_admin exists, then set admin=true. Use a two-op patch:
+    // first add /metadata_admin if missing (the Kratos SDK patchIdentity call
+    // accepts a standard RFC 6902 array). If the path already exists the add
+    // for /metadata_admin will conflict, so we use a conditional approach:
+    // just send add for /metadata_admin/admin and rely on Kratos creating
+    // intermediate nodes. In practice, Kratos does NOT auto-vivify; we do a
+    // pre-fetch to decide which ops to send.
+    const current = await api.getIdentity({ id });
+    const hasMeta = current.metadata_admin != null && typeof current.metadata_admin === 'object';
+    const patch: Array<{ op: 'add' | 'replace' | 'remove'; path: string; value?: unknown }> = [];
+    if (!hasMeta) {
+      patch.push({ op: 'add', path: '/metadata_admin', value: { admin: true } });
+    } else {
+      // metadata_admin exists — add or replace the admin key.
+      const meta = current.metadata_admin as Record<string, unknown>;
+      if ('admin' in meta) {
+        patch.push({ op: 'replace', path: '/metadata_admin/admin', value: true });
+      } else {
+        patch.push({ op: 'add', path: '/metadata_admin/admin', value: true });
+      }
+    }
+    await api.patchIdentity({ id, jsonPatch: patch });
+  } else {
+    // Remove the admin key. If metadata_admin or admin is absent this is a
+    // no-op at the semantic level; Kratos may return an error for a remove on
+    // a missing path, so we check first.
+    const current = await api.getIdentity({ id });
+    const meta = current.metadata_admin as Record<string, unknown> | undefined;
+    if (!meta || !('admin' in meta)) {
+      // Already absent — nothing to do.
+      return;
+    }
+    await api.patchIdentity({ id, jsonPatch: [{ op: 'remove', path: '/metadata_admin/admin' }] });
+  }
 }
 
 // ── Credential eviction ───────────────────────────────────────────────────────

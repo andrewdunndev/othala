@@ -33,7 +33,7 @@
 
 import type { ClientManifest } from './manifests';
 import type { Identity } from './types';
-import { isAdminId } from './admin-auth';
+import { isAdminMarker } from './admin-auth';
 import { lookupRole } from './claims';
 import { identityGroups } from './config';
 
@@ -210,15 +210,14 @@ export function computeEffectiveAccess(
  * so admin recovery is console-only. See
  * docs/runbooks/admin-recovery.md "Console recovery for an admin".
  *
- * CVP-P1: admin status is the OTHALA_ADMIN_IDS allowlist keyed on the
- * IMMUTABLE identity `id`, NOT the user-editable email trait and NOT the
- * `admin` metadata_admin group. Refuse iff the TARGET identity's id is on
- * the allowlist. A user carrying the (display-only) `admin` group but not on
- * the allowlist is NOT an admin and recovery is allowed for them; an
- * allowlisted admin who self-demoted out of the group is STILL refused.
+ * ADR 0008: admin status is the `metadata_admin.admin === true` marker
+ * (writable only via the Kratos admin API). The caller MUST pass a target
+ * identity fetched from the admin API (e.g. via getIdentity) — the public
+ * /sessions/whoami response strips metadata_admin (Kratos v26). Refuse iff
+ * the TARGET identity carries the admin marker.
  */
 export function shouldRefuseRecovery(identity: Identity | undefined | null): boolean {
-  return isAdminId(identity?.id);
+  return isAdminMarker(identity);
 }
 
 /** Pretty-print an access source for the admin UI. */

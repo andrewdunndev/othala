@@ -214,7 +214,6 @@ services:
       - ./kratos.rendered.yml:/etc/config/kratos/kratos.yml:ro,z
       - ../kratos/identity.schema.json:/etc/config/kratos/identity.schema.json:ro,z
       - ../kratos/hooks/recovery-gate.jsonnet:/etc/config/kratos/hooks/recovery-gate.jsonnet:ro,z
-      - ../kratos/hooks/login-gate.jsonnet:/etc/config/kratos/hooks/login-gate.jsonnet:ro,z
     command: ["serve", "--config", "/etc/config/kratos/kratos.yml", "--dev", "--watch-courier"]
     healthcheck:
       test: ["CMD-SHELL", "wget -qO- http://localhost:4434/admin/health/ready || exit 1"]
@@ -331,11 +330,11 @@ services:
       OTHALA_APEX: ${OTHALA_APEX}
       MANIFEST_DIR: /etc/portal/manifests
       CSRF_SECRET: ${CSRF_SECRET}
-      # CVP-P1 admin model: the allowlist is the sole admin authority, keyed on
-      # immutable identity UUIDs. The recovery-gate and login-gate refuse for
-      # any identity whose id is on this list. The smoke seeds a known admin UUID
-      # to exercise the refuse path; everything else is non-admin.
-      OTHALA_ADMIN_IDS: ${OTHALA_ADMIN_IDS}
+      # ADR 0008 admin model: authority is metadata_admin.admin===true (boolean
+      # marker in Kratos, set via admin API only). The OTHALA_ADMIN_IDS env var
+      # is retired — no UUID allowlist, no portal recreate after seeding.
+      # The recovery-gate reads is_admin from the webhook payload (set by
+      # recovery-gate.jsonnet from the metadata_admin.admin field).
       OTHALA_ADMIN_ENDPOINT_BEARER: ${OTHALA_ADMIN_ENDPOINT_BEARER}
       RECOVERY_GATE_SECRET: ${RECOVERY_GATE_SECRET}
       # Contact-form mailer: SAME courier connection Kratos uses (mailpit in

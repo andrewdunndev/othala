@@ -21,8 +21,9 @@
  *     echo 'othala-testpass-2026' | bcrypt-verify '$2y$10$...'
  *
  * Identity schema: 'family' (the project's canonical schema_id).
- * Both MEMBER and ADMIN are seeded via this action in the fixtures before
- * any spec runs; the identities persist for the lifetime of the compose run.
+ * MEMBER is seeded by this action in the fixtures. ADMIN identities are
+ * seeded by validate.sh (seed phase) before Playwright starts; the admin
+ * fixture looks them up rather than re-creating them.
  */
 
 // Uses globalThis.fetch (Node 18+ / the playwright runner environment).
@@ -43,15 +44,13 @@ export interface SeedOptions {
   displayName: string;
   /** metadata_admin.groups — controls access-<app> group membership */
   groups: string[];
-  kratosAdminURL: string;
   /**
-   * Optional explicit identity UUID. Kratos createIdentity accepts an `id`
-   * on the create body and uses it verbatim when well-formed. The admin
-   * fixture pins this to the UUID on OTHALA_ADMIN_IDS so the seeded admin
-   * is recognised by the portal's ID-keyed admin allowlist (CVP-P1). Without
-   * it Kratos assigns a random UUID that can never match the allowlist.
+   * metadata_admin.admin — the ADR 0008 admin authority marker.
+   * Set to true for admin identities seeded by the admin fixture.
+   * Absent (undefined / false) for non-admin member identities.
    */
-  id?: string;
+  isAdmin?: boolean;
+  kratosAdminURL: string;
 }
 
 export interface SeedResult {
@@ -66,23 +65,28 @@ export interface SeedResult {
  * The Kratos admin API does NOT require authentication in the default
  * compose setup (the admin port 4434 is internal-only, not edge-exposed).
  *
+ * No `id` is supplied on the create body — Kratos v26.2.0 hard-rejects
+ * a caller-supplied `id` with 400 "json: unknown field id". The minted UUID
+ * is read from the 201 response and returned. The admin authority marker
+ * (metadata_admin.admin) is set inline on the create body when isAdmin=true.
+ *
  * Idempotency: if an identity with this email already exists (409), the
  * function returns the existing identity's id by doing a GET /admin/identities
- * with identifier_id filter. On any other error it throws.
+ * with credentials_identifier filter. On any other error it throws.
  */
 export async function createIdentityWithPassword(opts: SeedOptions): Promise<SeedResult> {
   const body = {
     schema_id: 'family',
     state: 'active',
-    // Explicit id (CVP-P1): when supplied, Kratos uses it so the seeded
-    // identity matches the portal's OTHALA_ADMIN_IDS allowlist deterministically.
-    ...(opts.id ? { id: opts.id } : {}),
     traits: {
       username: opts.username,
       email: opts.email,
       displayName: opts.displayName,
     },
     metadata_admin: {
+      // ADR 0008: admin marker is the sole authority for /admin access.
+      // Only set when the caller explicitly requests it (admin fixture).
+      ...(opts.isAdmin === true ? { admin: true } : {}),
       groups: opts.groups,
     },
     credentials: {

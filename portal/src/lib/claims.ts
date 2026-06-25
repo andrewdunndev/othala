@@ -205,12 +205,14 @@ export function deepMergeClaims(
 ): void {
   if (!dst || !src) return;
   for (const [k, sv] of Object.entries(src)) {
-    // Guard against prototype-pollution via __proto__. Object.entries() returns
-    // __proto__ as a plain string key when present in a parsed JSON object, but
-    // dst["__proto__"] resolves to Object.prototype via the special accessor —
-    // the recursive branch would then write onto Object.prototype, polluting the
-    // entire process. Explicitly skipping the key is the safest defence.
-    if (k === '__proto__') continue;
+    // Guard against prototype-pollution via __proto__, constructor, and prototype.
+    // Object.entries() returns __proto__ as a plain string key when present in a
+    // parsed JSON object, but dst["__proto__"] resolves to Object.prototype via
+    // the special accessor — the recursive branch would then write onto
+    // Object.prototype, polluting the entire process. constructor and prototype
+    // are analogous vectors (e.g. src.constructor.prototype mutations).
+    // Explicitly skipping all three is the safest defence.
+    if (k === '__proto__' || k === 'constructor' || k === 'prototype') continue;
     // Use own-property semantics so that inherited keys (e.g. from a polluted
     // prototype) don't create a false "key already in dst" match and cause us
     // to recurse into the prototype chain.

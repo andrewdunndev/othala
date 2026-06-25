@@ -86,6 +86,44 @@ test('deepMergeClaims: scalar conflict still src-wins', () => {
   assert.equal(dst.x, 2);
 });
 
+// ── Prototype-pollution guard ─────────────────────────────────────────────────
+
+test('deepMergeClaims: __proto__ key is silently dropped (no pollution)', () => {
+  // JSON.parse produces a parsed object where __proto__ is a plain string key.
+  // Without the guard, dst["__proto__"] = ... writes onto Object.prototype.
+  const src = JSON.parse('{"__proto__":{"polluted":true},"safe":"value"}');
+  const dst = { existing: 1 };
+  deepMergeClaims(dst, src);
+  // __proto__ key must not have been written
+  assert.equal(Object.prototype.polluted, undefined, '__proto__ must not pollute Object.prototype');
+  // Other keys are still merged normally
+  assert.equal(dst.safe, 'value');
+  assert.equal(dst.existing, 1);
+});
+
+test('deepMergeClaims: constructor key is silently dropped (no pollution)', () => {
+  // A crafted src with a "constructor" key: without the guard, recursive merge
+  // into dst.constructor (a function) would throw or corrupt prototype state.
+  const src = { constructor: { prototype: { polluted: 'constructor-path' } }, safe: 'ok' };
+  const dst = { existing: 2 };
+  deepMergeClaims(dst, src);
+  // constructor key must not have been written onto dst
+  assert.equal(Object.prototype.polluted, undefined, 'constructor path must not pollute prototype');
+  // dst.constructor must still be the normal Object constructor
+  assert.equal(dst.constructor, Object);
+  // Other keys are still merged normally
+  assert.equal(dst.safe, 'ok');
+});
+
+test('deepMergeClaims: prototype key is silently dropped (no pollution)', () => {
+  const src = { prototype: { polluted: 'prototype-path' }, safe: 'also-ok' };
+  const dst = {};
+  deepMergeClaims(dst, src);
+  // prototype key must not appear on dst
+  assert.equal(Object.getOwnPropertyDescriptor(dst, 'prototype'), undefined);
+  assert.equal(dst.safe, 'also-ok');
+});
+
 // ── Minimal manifest helper for composeIDTokenClaims tests ────────────────
 
 /**

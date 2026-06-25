@@ -11,11 +11,11 @@
  * Background: Kratos is configured to POST a recovery-gate webhook before
  * completing recovery (kratos.yml flows.recovery.after.hooks). The webhook
  * body is rendered by recovery-gate.jsonnet:
- *   { identity_id, groups, traits: { email, ... } }
- * The gate (othala loopback :4431 /admin/recovery-gate) refuses recovery
- * (403) iff identity_id is on OTHALA_ADMIN_IDS (CVP-P1). Kratos interprets a
- * 4xx from the webhook as a flow abort, preventing the privileged session
- * from being issued.
+ *   { identity_id, is_admin, groups, traits: { email, ... } }
+ * `is_admin` is derived from metadata_admin.admin (ADR 0008 marker). The gate
+ * (othala loopback :4431 /admin/recovery-gate) refuses recovery (403) iff
+ * is_admin===true. Kratos interprets a 4xx from the webhook as a flow abort,
+ * preventing the privileged session from being issued.
  *
  * J1 — NON-ADMIN recovery (happy path):
  *   a. Seed a fresh non-admin identity (member.recovery@othala.test) via admin API.
@@ -25,16 +25,16 @@
  *   e. Assert a privileged settings session is established
  *      (AAL1 session with flow=recovery, or /auth/settings redirect).
  *
- * J2 — ADMIN-ALLOWLISTED recovery (gate blocks):
- *   a. Seed a FRESH admin-allowlisted identity (admin.recovery@othala.test) via
- *      admin API. A fresh seed avoids any residual used-code/flow state from J1
- *      or from the worker-scoped `admin` fixture.
+ * J2 — ADMIN recovery (gate blocks):
+ *   a. Look up the pre-seeded recovery-admin identity (RECOVERY_ADMIN_EMAIL) by
+ *      credentials_identifier. validate.sh seeds it with metadata_admin.admin=true
+ *      (ADR 0008 marker) before Playwright starts.
  *   b. Initiate recovery — same flow as J1.
  *   c. Query mailpit for the admin recovery code.
  *   d. Submit the code via ctx.request (same cookie jar).
- *   e. Assert recovery is BLOCKED: the gate fires and Kratos aborts the flow.
- *      Observable as: no privileged session (whoami returns null or inactive),
- *      OR Kratos redirects to /auth/error (the recovery flow error page).
+ *   e. Assert recovery is BLOCKED: the gate fires (is_admin=true → 403) and
+ *      Kratos aborts the flow. Observable as: no privileged session (whoami
+ *      returns null or inactive), OR Kratos redirects to /auth/error.
  *
  * Cookie-jar contract:
  *   ALL Kratos self-service operations (flow init, email submit, code submit) use
@@ -52,9 +52,10 @@
  *   - RECOVERY_GATE_SECRET injected via compose env (the gate 401s a bad bearer).
  *   - Mailpit running on the compose net (mailpit:8025 HTTP API reachable from
  *     inside the playwright container on the same compose network).
- *   - OTHALA_ADMIN_IDS lists the two e2e admin UUIDs (...0001,...0002); J2
- *     seeds its identity with the ...0002 id so the gate refuses it by id.
- *     gen-secrets.sh is the source of truth for the allowlist.
+ *   - The recovery-admin identity has metadata_admin.admin=true (seeded by validate.sh);
+ *     J2 looks up the RECOVERY_ADMIN_EMAIL identity and drives recovery through the
+ *     webhook path. The gate refuses it because is_admin=true (set from the marker
+ *     by recovery-gate.jsonnet). validate.sh is the source of truth for the seed.
  *
  * Mailpit API: GET http://mailpit:8025/api/v1/messages returns:
  *   { messages: [{ ID, Subject, To: [{Address}], Snippet, ... }], ... }
@@ -65,7 +66,7 @@
 
 import type { APIRequestContext } from '@playwright/test';
 import { test, expect } from '../fixtures';
-import { createIdentityWithPassword, TEST_PASSWORD } from '../actions/identity';
+import { createIdentityWithPassword } from '../actions/identity';
 import { getSession } from '../actions/session';
 
 // The mailpit HTTP API is reachable inside the compose net on the compose
@@ -294,21 +295,28 @@ test('J2 — admin recovery is blocked by the recovery-gate webhook (no privileg
   baseURL,
   kratosAdminURL,
 }) => {
-  // Seed a FRESH admin-allowlisted identity for this test, rather than reusing
-  // the worker-scoped `admin` fixture. Recovery flow submission leaves used-code
-  // and flow state that can persist across tests within the same worker; a fresh
-  // identity starts clean. CVP-P1: the recovery-gate refuses by identity id, so
-  // this identity is pinned to the second allowlisted UUID (...0002) in
-  // OTHALA_ADMIN_IDS (gen-secrets.sh). The email is incidental.
-  const identity = await createIdentityWithPassword({
-    id: '00000000-0000-0000-0000-000000000002',
-    email: 'admin.recovery@othala.test',
-    username: 'admin.recovery',
-    displayName: 'Admin Recovery Test',
-    groups: ['family', 'admin'],
-    kratosAdminURL,
-  });
-  console.log('[J2] seeded admin-allowlisted identity:', identity.id, identity.email);
+  // Look up the pre-seeded recovery-admin identity (RECOVERY_ADMIN_EMAIL).
+  // validate.sh seeds it with metadata_admin.admin=true (ADR 0008 marker) before
+  // Playwright starts. The recovery-gate refuses recovery for this identity because
+  // the jsonnet sets is_admin=true from the marker. No OTHALA_ADMIN_IDS env is
+  // involved — the gate decision is carried in the webhook payload field.
+  const recoveryAdminEmail = process.env.RECOVERY_ADMIN_EMAIL ?? 'admin.recovery@othala.test';
+  const listResp = await fetch(
+    `${kratosAdminURL}/admin/identities?credentials_identifier=${encodeURIComponent(recoveryAdminEmail)}`,
+  );
+  if (!listResp.ok) {
+    throw new Error(
+      `[J2] recovery-admin lookup failed: HTTP ${listResp.status} for ${recoveryAdminEmail}`,
+    );
+  }
+  const idList = (await listResp.json()) as Array<{ id: string }>;
+  if (idList.length === 0) {
+    throw new Error(
+      `[J2] no identity found for ${recoveryAdminEmail} — did validate.sh seed phase run?`,
+    );
+  }
+  const identity = { id: idList[0].id, email: recoveryAdminEmail };
+  console.log('[J2] looked up admin-marker identity:', identity.id, identity.email);
 
   const ctx = await browser.newContext();
   try {

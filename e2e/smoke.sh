@@ -278,13 +278,14 @@ fi
 echo ""
 echo "D. Recovery-gate (othala :4431 /admin/recovery-gate)"
 #
-# CVP-P1: the gate now refuses recovery iff the in-flight identity's
-# IMMUTABLE id (identity_id in the jsonnet payload) is on OTHALA_ADMIN_IDS
-# (the `admin` group and the email trait are display-only / user-editable,
-# NOT consulted). It fails closed on a missing identity_id and 401s a bad
-# bearer. We probe via `compose exec` because the admin port is loopback-only.
+# ADR 0008: the gate refuses recovery iff the payload's `is_admin` field is true.
+# `is_admin` is set by recovery-gate.jsonnet from metadata_admin.admin (the
+# tamper-proof marker set only via the Kratos admin API). The retired OTHALA_ADMIN_IDS
+# UUID allowlist is no longer consulted. It fails closed on a missing identity_id
+# and 403s a bad bearer. We probe via `compose exec` because the admin port is
+# loopback-only.
 #
-# Payload shape: { identity_id, groups, traits } (per recovery-gate.jsonnet).
+# Payload shape: { identity_id, is_admin, groups, traits } (per recovery-gate.jsonnet).
 
 # Helper: POST a recovery-gate body with a bearer, capture HTTP code.
 # Runs inside the othala container (the admin port is loopback there).
@@ -294,84 +295,50 @@ gate_code() {
     printf '%s' "fetch('http://127.0.0.1:4431/admin/recovery-gate',{method:'POST',headers:{'Content-Type':'application/json','Authorization':'Bearer ${bearer}'},body:'${body}'}).then(r=>{process.stdout.write(String(r.status));process.exit(0)}).catch(()=>{process.stdout.write('0');process.exit(1)})" | node_in othala
 }
 
-# OTHALA_ADMIN_IDS holds the admin UUID(s). Read the first one for D1.
-ADMIN_ID="${OTHALA_ADMIN_IDS%%,*}"
-
-# D1: Allowlisted admin identity_id → 403 (admin recovery is console-only).
-admin_code=$(gate_code "${RECOVERY_GATE_SECRET}" '{"identity_id":"'"${ADMIN_ID}"'","groups":["admin"],"traits":{}}')
+# D1: is_admin=true → 403 (admin recovery is console-only; marker model).
+admin_code=$(gate_code "${RECOVERY_GATE_SECRET}" '{"identity_id":"00000000-0000-0000-0000-000000000001","is_admin":true,"groups":["admin","family"],"traits":{}}')
 if [[ "$admin_code" == "403" ]]; then
-    pass "D1 recovery-gate refuses allowlisted admin UUID (HIGH-3, CVP-P1 allowlist authority)"
+    pass "D1 recovery-gate refuses is_admin=true (ADR 0008 marker model, admin recovery console-only)"
 else
-    fail "D1 recovery-gate admin path" "code=$admin_code want=403 (id ${ADMIN_ID} on OTHALA_ADMIN_IDS)"
+    fail "D1 recovery-gate admin path" "code=$admin_code want=403 (is_admin=true must be refused)"
 fi
 
-# D2: Non-admin identity_id → 200, even if it carries the display-only `admin` group.
-nonadmin_code=$(gate_code "${RECOVERY_GATE_SECRET}" '{"identity_id":"00000000-0000-0000-0000-000000000099","groups":["admin","family"],"traits":{}}')
+# D2: is_admin=false → 200, even if groups includes 'admin' (groups are
+# display-only / observability metadata; is_admin is the sole authority).
+nonadmin_code=$(gate_code "${RECOVERY_GATE_SECRET}" '{"identity_id":"00000000-0000-0000-0000-000000000099","is_admin":false,"groups":["admin","family"],"traits":{}}')
 if [[ "$nonadmin_code" == "200" ]]; then
-    pass "D2 recovery-gate allows non-allowlisted UUID (group 'admin' is display-only)"
+    pass "D2 recovery-gate allows is_admin=false (groups field is display-only, not authority)"
 else
     fail "D2 recovery-gate non-admin path" "code=$nonadmin_code want=200"
 fi
 
 # D3: Missing/unidentifiable identity_id → 403 (fail-closed on a subject the
-# gate can't identify).
-empty_code=$(gate_code "${RECOVERY_GATE_SECRET}" '{"groups":[],"traits":{}}')
+# gate can't identify; is_admin present but id absent).
+empty_code=$(gate_code "${RECOVERY_GATE_SECRET}" '{"is_admin":false,"groups":[],"traits":{}}')
 if [[ "$empty_code" == "403" ]]; then
-    pass "D3 recovery-gate fails closed on unidentifiable subject"
+    pass "D3 recovery-gate fails closed on unidentifiable subject (missing identity_id)"
 else
     fail "D3 recovery-gate missing-identity_id path" "code=$empty_code want=403"
 fi
 
-# D4: Wrong bearer → 401 (constant-time, fail-closed bearer check on the
-# admin mux; distinct from the 403 verdict refusal).
-wrong_code=$(gate_code "wrong-secret" '{"identity_id":"00000000-0000-0000-0000-000000000099","traits":{}}')
-if [[ "$wrong_code" == "401" ]]; then
-    pass "D4 recovery-gate rejects wrong bearer (401, fail-closed)"
+# D4: Wrong bearer → 403 (constant-time, fail-closed bearer check on the admin
+# mux). 403 not 401: Kratos webhooks use can_interrupt, so a non-403 risks being
+# treated as a skippable webhook error (fail-open); the bearer reject returns 403
+# to reliably abort the flow. Bearer check fires before payload inspection.
+wrong_code=$(gate_code "wrong-secret" '{"identity_id":"00000000-0000-0000-0000-000000000099","is_admin":false,"traits":{}}')
+if [[ "$wrong_code" == "403" ]]; then
+    pass "D4 recovery-gate rejects wrong bearer (403, fail-closed)"
 else
-    fail "D4 recovery-gate wrong bearer" "code=$wrong_code want=401"
+    fail "D4 recovery-gate wrong bearer" "code=$wrong_code want=403"
 fi
 
-# Section DL: login-gate (CVP-P3) — same loopback admin mux, gates admin
-# email-code LOGIN. Mirrors the recovery-gate: refuse allowlisted admin id,
-# allow non-admin, fail closed on missing id / wrong bearer.
-echo ""
-echo "DL. Login-gate (othala :4431 /admin/login-gate, CVP-P3)"
-
-login_gate_code() {
-    local bearer="$1" body="$2"
-    printf '%s' "fetch('http://127.0.0.1:4431/admin/login-gate',{method:'POST',headers:{'Content-Type':'application/json','Authorization':'Bearer ${bearer}'},body:'${body}'}).then(r=>{process.stdout.write(String(r.status));process.exit(0)}).catch(()=>{process.stdout.write('0');process.exit(1)})" | node_in othala
-}
-
-# DL1: Allowlisted admin id → 403 (email-code login disabled for admins).
-dl_admin_code=$(login_gate_code "${RECOVERY_GATE_SECRET}" '{"identity_id":"'"${ADMIN_ID}"'","groups":["admin"],"traits":{}}')
-if [[ "$dl_admin_code" == "403" ]]; then
-    pass "DL1 login-gate refuses allowlisted admin UUID (email-code login blocked for admins)"
+# D5: Malformed is_admin (non-boolean) → 403 (fail-closed; jsonnet always
+# emits a boolean, so a non-boolean signals tampering or a gate bug).
+malformed_code=$(gate_code "${RECOVERY_GATE_SECRET}" '{"identity_id":"00000000-0000-0000-0000-000000000099","is_admin":"true","groups":[],"traits":{}}')
+if [[ "$malformed_code" == "403" ]]; then
+    pass "D5 recovery-gate refuses malformed is_admin (non-boolean → fail-closed)"
 else
-    fail "DL1 login-gate admin path" "code=$dl_admin_code want=403 (id ${ADMIN_ID} on OTHALA_ADMIN_IDS)"
-fi
-
-# DL2: Non-admin id → 200 (members may use email-code login).
-dl_nonadmin_code=$(login_gate_code "${RECOVERY_GATE_SECRET}" '{"identity_id":"00000000-0000-0000-0000-000000000099","groups":["admin","family"],"traits":{}}')
-if [[ "$dl_nonadmin_code" == "200" ]]; then
-    pass "DL2 login-gate allows non-allowlisted UUID (member email-code login permitted)"
-else
-    fail "DL2 login-gate non-admin path" "code=$dl_nonadmin_code want=200"
-fi
-
-# DL3: Missing identity_id → 403 (fail-closed on unidentifiable subject).
-dl_empty_code=$(login_gate_code "${RECOVERY_GATE_SECRET}" '{"groups":[],"traits":{}}')
-if [[ "$dl_empty_code" == "403" ]]; then
-    pass "DL3 login-gate fails closed on unidentifiable subject"
-else
-    fail "DL3 login-gate missing-identity_id path" "code=$dl_empty_code want=403"
-fi
-
-# DL4: Wrong bearer → 401 (fail-closed bearer check).
-dl_wrong_code=$(login_gate_code "wrong-secret" '{"identity_id":"00000000-0000-0000-0000-000000000099","traits":{}}')
-if [[ "$dl_wrong_code" == "401" ]]; then
-    pass "DL4 login-gate rejects wrong bearer (401, fail-closed)"
-else
-    fail "DL4 login-gate wrong bearer" "code=$dl_wrong_code want=401"
+    fail "D5 recovery-gate malformed is_admin" "code=$malformed_code want=403 (non-boolean is_admin must be refused)"
 fi
 
 # Section E: revoke fan-out (admin endpoint, LIVE Kratos + Hydra)
@@ -395,12 +362,12 @@ revoke_code() {
     printf '%s' "fetch('http://127.0.0.1:4431/admin/revoke-user',{method:'POST',headers:{'Content-Type':'application/json','Authorization':'Bearer ${bearer}'},body:'${body}'}).then(r=>{process.stdout.write(String(r.status));process.exit(0)}).catch(()=>{process.stdout.write('0');process.exit(1)})" | node_in othala
 }
 
-# E1: wrong bearer → 401 (fail-closed, mirrors D4; bearer checked before body).
+# E1: wrong bearer → 403 (fail-closed, mirrors D4; bearer checked before body).
 e1=$(revoke_code "wrong-secret" '{"subject":"anything"}')
-if [[ "$e1" == "401" ]]; then
-    pass "E1 revoke-user rejects wrong bearer (401, fail-closed)"
+if [[ "$e1" == "403" ]]; then
+    pass "E1 revoke-user rejects wrong bearer (403, fail-closed)"
 else
-    fail "E1 revoke-user wrong bearer" "code=$e1 want=401"
+    fail "E1 revoke-user wrong bearer" "code=$e1 want=403"
 fi
 
 # E2: valid bearer, missing subject → 400.

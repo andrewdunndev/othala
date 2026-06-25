@@ -36,7 +36,7 @@ import { loadTiles, loadGroups, safeHref, userCanSeeTile, type AppTile } from '.
 import { getSession, isReachable } from '../lib/kratos';
 import { getIdentity } from '../lib/admin';
 import { identityGroups } from '../lib/gate';
-import { isAdminId } from '../lib/admin-auth';
+import { isAdminMarker } from '../lib/admin-auth';
 import type { Identity } from '../lib/types';
 import { siteName, adminContact } from '../lib/config';
 
@@ -135,12 +135,13 @@ const tileGroups = Array.from(groupedTilesMap.entries())
     tiles,
     meta: groupRegistry.get(groupName),
   }));
-// CVP-P1: the Admin nav affordance follows the OTHALA_ADMIN_IDS allowlist
-// keyed on the immutable identity id, not the (display-only) `admin` group
-// and not the user-editable email trait. The /admin route itself is gated by
-// requireAdminSession, also via the ID allowlist; this just keeps the link
-// truthful so a non-admin isn't shown a tile that bounces.
-const isAdmin = state === 'post-auth' && isAdminId(identity?.id);
+// ADR 0008: the Admin nav affordance reads metadata_admin.admin from the
+// admin-API-fetched identity (already in `identity` above — no extra call).
+// The /admin route itself is gated by requireAdminSession (AAL2 + marker);
+// this just keeps the link truthful so a non-admin isn't shown a tile that
+// bounces. Fail-closed: isAdminMarker returns false on any error or missing
+// marker (acceptable for cosmetic chrome).
+const isAdmin = state === 'post-auth' && isAdminMarker(identity);
 const displayName = identity?.traits.displayName || identity?.traits.username || '';
 const firstName = displayName.split(' ')[0] || displayName;
 

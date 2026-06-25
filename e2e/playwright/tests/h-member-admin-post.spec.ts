@@ -3,9 +3,11 @@
  *
  * Guard under attack:
  *   portal/src/lib/admin.ts:requireAdminSession
- *   — specifically the allowlist check:
- *       if (!isAdminId(session.identity.id)) return redirect('/auth/error?reason=not-admin')
- *   — and the AAL2 check that follows it.
+ *   — specifically the AAL2 check (b) and then the admin marker check (c):
+ *       if (aal !== 'aal2') → step-up redirect
+ *       if (!isAdminMarker(adminIdentity)) → redirect('/auth/error?reason=not-admin')
+ *   The AAL2 check fires first; a non-admin member at AAL1 hits the step-up
+ *   redirect before the marker check. Either denial satisfies these specs.
  *
  * Spec C (c-member-admin-denied.spec.ts) only covers a browser GET navigation
  * to /admin. This spec covers POST (mutation) verbs against real admin mutation
@@ -19,7 +21,7 @@
  *   H2 — POST /admin/users/<member-own-id>  (self-edit attempt via mutation verb)
  *         portal/src/pages/admin/users/[id].astro line 43:
  *           requireAdminSession runs first; even if member knows their own
- *           identity id, the allowlist gate must fire before the CSRF check
+ *           identity id, the admin guard must fire before the CSRF check
  *           or any Kratos write.
  *   H3 — POST /admin/users/<fake-uuid>  (blind mutation on unknown user)
  *         Same guard, different id — ensures the gate is not id-dependent.
@@ -116,8 +118,8 @@ test('H2 — member POST /admin/users/<own-id> is denied (reason=not-admin, not 
   member,
 }) => {
   // Even if the member knows their own identity id (it is their subject, visible
-  // e.g. via /sessions/whoami), the allowlist guard fires BEFORE any id-based
-  // lookup or CSRF verification.
+  // e.g. via /sessions/whoami), the admin guard (requireAdminSession) fires
+  // BEFORE any id-based lookup or CSRF verification.
   const origin = new URL(baseURL!).origin;
   const ctx = await browser.newContext();
   try {

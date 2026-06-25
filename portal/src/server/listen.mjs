@@ -44,7 +44,7 @@ const ADMIN_HOST = process.env.ADMIN_HOST ?? '127.0.0.1';
 /** GET routes the admin mux serves. Disjoint from the public routes. */
 export const ADMIN_GET_ROUTES = new Set(['/healthz', '/readyz']);
 /** POST routes the admin mux serves. Disjoint from the public routes. */
-export const ADMIN_POST_ROUTES = new Set(['/admin/revoke-user', '/admin/recovery-gate', '/admin/login-gate']);
+export const ADMIN_POST_ROUTES = new Set(['/admin/revoke-user', '/admin/recovery-gate']);
 
 /** Back-compat: the GET probe routes (CU1 contract test imports this name). */
 export const ADMIN_ROUTES = ADMIN_GET_ROUTES;
@@ -93,29 +93,43 @@ export function parseBearer(authHeader) {
  * Decide the recovery-gate verdict for a Kratos webhook payload (pure).
  *
  * Kratos posts the in-flight identity to the gate before issuing a public
- * recovery code. We REFUSE recovery for any identity whose IMMUTABLE id is on
- * the OTHALA_ADMIN_IDS allowlist (admin recovery is console-only). The
- * `admin` metadata_admin group is NOT consulted (CVP-P1: display-only).
+ * recovery code. We REFUSE recovery for any identity whose metadata_admin.admin
+ * marker is true (admin recovery is console-only, defense-in-depth).
  *
- * The webhook payload shape is { identity_id, groups, traits } (see
- * kratos/hooks/recovery-gate.jsonnet). The id is read from identity_id at
- * the top level, falling back to identity.id for compatibility.
+ * The webhook payload shape is { identity_id, is_admin, groups, traits } (see
+ * kratos/hooks/recovery-gate.jsonnet). `is_admin` is set by the jsonnet from
+ * metadata_admin.admin (admin-API-only-writable boolean). The id is read from
+ * identity_id at the top level, falling back to identity.id for compatibility.
  *
- * FAIL-CLOSED on a malformed payload: if we cannot read a non-empty id,
- * refuse — a recovery webhook that can't identify the subject must not pass.
+ * FAIL-CLOSED on a malformed payload:
+ *   - If we cannot read a non-empty id: refuse (unidentifiable subject).
+ *   - If is_admin is not a boolean: treat as refuse AND log an error. The
+ *     jsonnet always sets is_admin via std.get (defaulting to false), so a
+ *     non-boolean is_admin indicates a payload tampering or a bug; protecting
+ *     the admin path and surfacing the error loudly is the right response.
  *
  * @param payload parsed JSON body
- * @param isAdminId the id-allowlist predicate (injected from admin-runtime)
  * @returns { refuse: boolean, reason: string }
  */
-export function recoveryGateVerdict(payload, isAdminId) {
+export function recoveryGateVerdict(payload) {
   const id = payload?.identity_id ?? payload?.identity?.id;
   // Fail-closed: reject anything that is not a non-empty, non-whitespace-only
   // string. An unidentifiable subject must not pass.
   if (typeof id !== 'string' || id.trim().length === 0) {
     return { refuse: true, reason: 'unidentifiable subject (fail-closed)' };
   }
-  if (isAdminId(id)) {
+  const isAdmin = payload?.is_admin;
+  if (typeof isAdmin !== 'boolean') {
+    // The jsonnet always emits a boolean via std.get default=false.
+    // A non-boolean value indicates payload tampering or a gate bug — refuse
+    // (protect the admin) and surface it loudly so an operator notices.
+    console.error(
+      `[portal/recovery-gate] WARN: is_admin is not a boolean (got ${JSON.stringify(isAdmin)}` +
+      ` for identity_id=${JSON.stringify(id)}) — refusing as fail-safe; check the recovery-gate.jsonnet output`,
+    );
+    return { refuse: true, reason: 'malformed is_admin field (fail-closed)' };
+  }
+  if (isAdmin === true) {
     return { refuse: true, reason: 'admin recovery is console-only' };
   }
   return { refuse: false, reason: '' };
@@ -156,10 +170,10 @@ function statusForRevokeError(err) {
 }
 
 /**
- * Lazily load the runtime bundle (revokeSubject + isAdminId), compiled
- * from src/server/admin-runtime.ts to dist/server/admin-runtime.mjs by the
- * build. Cached after first import. Injected in tests so the admin handlers
- * can be exercised without the bundle.
+ * Lazily load the runtime bundle (revokeSubject), compiled from
+ * src/server/admin-runtime.ts to dist/server/admin-runtime.mjs by the build.
+ * Cached after first import. Injected in tests so the admin handlers can be
+ * exercised without the bundle.
  */
 let _runtime = null;
 async function loadRuntime() {
@@ -179,7 +193,10 @@ async function loadRuntime() {
 export async function handleRevokeUser(req, res, runtime) {
   const expected = process.env.OTHALA_ADMIN_ENDPOINT_BEARER ?? '';
   if (!bearerMatches(parseBearer(req.headers?.authorization), expected)) {
-    sendJson(res, 401, { error: 'unauthorized' });
+    // 403 not 401: Kratos webhooks use can_interrupt: true; a non-403 response
+    // (e.g. 401) risks being treated as a non-interrupting webhook error
+    // (skip-and-continue = fail-open), whereas 403 reliably aborts the flow.
+    sendJson(res, 403, { error: 'forbidden' });
     return;
   }
   let body;
@@ -212,16 +229,21 @@ export async function handleRevokeUser(req, res, runtime) {
 
 /**
  * Handle POST /admin/recovery-gate. Bearer: RECOVERY_GATE_SECRET (constant-
- * time, fail-closed). Refuses recovery for allowlisted admin subjects;
- * fail-closed on a malformed payload. Returns the Kratos-webhook error shape
- * on refusal (HTTP 403 + messages), 200 on allow.
+ * time, fail-closed). Refuses recovery for admin identities (is_admin===true
+ * in the jsonnet payload); fail-closed on a malformed payload. Returns the
+ * Kratos-webhook error shape on refusal (HTTP 403 + messages), 200 on allow.
  *
- * `runtime` is injectable for tests; defaults to the built bundle.
+ * Admin authority is read from the `is_admin` field in the webhook payload
+ * (set by kratos/hooks/recovery-gate.jsonnet from metadata_admin.admin).
+ * The retired OTHALA_ADMIN_IDS allowlist and isAdminId are no longer used.
  */
-export async function handleRecoveryGate(req, res, runtime) {
+export async function handleRecoveryGate(req, res) {
   const expected = process.env.RECOVERY_GATE_SECRET ?? '';
   if (!bearerMatches(parseBearer(req.headers?.authorization), expected)) {
-    sendJson(res, 401, { error: 'unauthorized' });
+    // 403 not 401: Kratos webhooks use can_interrupt: true; a non-403 response
+    // (e.g. 401) risks being treated as a non-interrupting webhook error
+    // (skip-and-continue = fail-open), whereas 403 reliably aborts the flow.
+    sendJson(res, 403, { error: 'forbidden' });
     return;
   }
   let body;
@@ -234,60 +256,10 @@ export async function handleRecoveryGate(req, res, runtime) {
     });
     return;
   }
-  const rt = runtime ?? (await loadRuntime());
-  const verdict = recoveryGateVerdict(body, rt.isAdminId);
+  const verdict = recoveryGateVerdict(body);
   if (verdict.refuse) {
     sendJson(res, 403, {
       messages: [{ messages: [{ type: 'error', text: `recovery refused: ${verdict.reason}` }] }],
-    });
-    return;
-  }
-  sendJson(res, 200, { ok: true });
-}
-
-/**
- * Handle POST /admin/login-gate. Bearer: RECOVERY_GATE_SECRET (same
- * Kratos→portal admin-port trust domain as the recovery gate; no new secret).
- *
- * CVP-P3: Kratos fires this webhook on the `after.code` login hook before
- * issuing the session. We REFUSE login for admin identities whose immutable
- * identity id is on the OTHALA_ADMIN_IDS allowlist. Admins must use a passkey
- * or console, not email-code, which would yield an admin AAL1 session from
- * transient mailbox access.
- *
- * Fail-closed on unparseable body (403) and on unidentifiable subject (403).
- * Non-admin returns 200 { ok: true }.
- *
- * `runtime` is injectable for tests; defaults to the built bundle.
- */
-export async function handleLoginGate(req, res, runtime) {
-  const expected = process.env.RECOVERY_GATE_SECRET ?? '';
-  if (!bearerMatches(parseBearer(req.headers?.authorization), expected)) {
-    sendJson(res, 401, { error: 'unauthorized' });
-    return;
-  }
-  let body;
-  try {
-    body = JSON.parse((await readBody(req)) || '{}');
-  } catch {
-    // Fail-closed: an unparseable webhook body refuses login.
-    sendJson(res, 403, {
-      messages: [{ messages: [{ type: 'error', text: 'login refused: malformed payload' }] }],
-    });
-    return;
-  }
-  const rt = runtime ?? (await loadRuntime());
-  // Read identity id from the jsonnet payload shape { identity_id, groups, traits }
-  const id = body?.identity_id ?? body?.identity?.id;
-  if (typeof id !== 'string' || id.trim().length === 0) {
-    sendJson(res, 403, {
-      messages: [{ messages: [{ type: 'error', text: 'login refused: unidentifiable subject (fail-closed)' }] }],
-    });
-    return;
-  }
-  if (rt.isAdminId(id)) {
-    sendJson(res, 403, {
-      messages: [{ messages: [{ type: 'error', text: 'login refused: email-code login is disabled for admins — use a passkey or console' }] }],
     });
     return;
   }
@@ -308,11 +280,7 @@ export async function handleAdminRequest(req, res, runtime) {
     return;
   }
   if (method === 'POST' && path === '/admin/recovery-gate') {
-    await handleRecoveryGate(req, res, runtime);
-    return;
-  }
-  if (method === 'POST' && path === '/admin/login-gate') {
-    await handleLoginGate(req, res, runtime);
+    await handleRecoveryGate(req, res);
     return;
   }
 
@@ -357,9 +325,47 @@ export async function createPublicServer() {
   });
 }
 
+/**
+ * Fail-closed startup assertions. Called before binding any socket; fatal-exits
+ * if any required secret is unset/empty or if ADMIN_HOST is the wildcard address.
+ *
+ * - RECOVERY_GATE_SECRET empty → bearer check on /admin/recovery-gate and
+ *   /admin/login-gate would reject every request (fail-closed is correct), but
+ *   a missing secret is always operator misconfiguration; refuse to boot so the
+ *   problem surfaces immediately rather than silently degrading the gate.
+ * - OTHALA_ADMIN_ENDPOINT_BEARER empty → same reasoning for /admin/revoke-user.
+ * - ADMIN_HOST=0.0.0.0 → admin port would be exposed to the network; the admin
+ *   mux has no public-facing auth hardening and must only be reachable on
+ *   loopback or a dag-internal address. Wildcard is always a misconfiguration.
+ */
+function assertStartupEnv() {
+  const errors = [];
+
+  const recoverySecret = process.env.RECOVERY_GATE_SECRET ?? '';
+  if (!recoverySecret.trim()) {
+    errors.push('[portal] FATAL: RECOVERY_GATE_SECRET is not set or empty — refusing to start');
+  }
+
+  const adminBearer = process.env.OTHALA_ADMIN_ENDPOINT_BEARER ?? '';
+  if (!adminBearer.trim()) {
+    errors.push('[portal] FATAL: OTHALA_ADMIN_ENDPOINT_BEARER is not set or empty — refusing to start');
+  }
+
+  if (ADMIN_HOST === '0.0.0.0') {
+    errors.push('[portal] FATAL: ADMIN_HOST is 0.0.0.0 (wildcard) — the admin port must be bound to loopback or a dag-internal IP, never a wildcard address');
+  }
+
+  if (errors.length > 0) {
+    for (const msg of errors) console.error(msg);
+    process.exit(1);
+  }
+}
+
 // Bind both listeners only when run as the entrypoint (not when imported by
 // tests, which exercise the pure admin mux above).
 if (import.meta.url === `file://${process.argv[1]}`) {
+  assertStartupEnv();
+
   const publicServer = await createPublicServer();
   publicServer.listen(PORT, HOST, () => {
     console.log(`[portal] public listener on http://${HOST}:${PORT}`);

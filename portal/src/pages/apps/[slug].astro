@@ -20,7 +20,7 @@ import { getTile, safeHref, userCanSeeTile } from '../../lib/tiles';
 import { getSession } from '../../lib/kratos';
 import { getIdentity } from '../../lib/admin';
 import { identityGroups } from '../../lib/gate';
-import { isAdminId } from '../../lib/admin-auth';
+import { isAdminBySession } from '../../lib/admin-auth';
 
 const { slug } = Astro.params;
 if (!slug) {
@@ -42,23 +42,27 @@ if (!entry) {
   return new Response('App not found', { status: 404 });
 }
 
-// CVP-P1: admin authority is the OTHALA_ADMIN_IDS allowlist keyed on the
-// immutable identity id, NOT the (display-only) `admin` group and NOT the
-// user-editable email trait. Admins see every app's detail page; everyone
-// else needs membership in one of the tile's bound access groups (access-model
-// Phase 2 — userCanSeeTile reads the same accessGroups binding as the gate).
-// The public whoami does NOT expose metadata_admin, so the user's groups must
-// come from a re-fetch of the FULL identity via the ADMIN API (same pattern as
-// /api/forward-auth). FAIL-CLOSED: any lookup failure → empty groups → the
-// access gate denies; admin authority below is keyed on the session id (which
-// is always present), independent of this lookup.
+// ADR 0008: admin authority is the metadata_admin.admin marker (admin-API-only-
+// writable boolean). Admins see every app's detail page; everyone else needs
+// membership in one of the tile's bound access groups (access-model Phase 2 —
+// userCanSeeTile reads the same accessGroups binding as the gate).
+// The public whoami does NOT expose metadata_admin, so both the user's groups
+// and admin status come from a re-fetch of the FULL identity via the ADMIN API.
+// FAIL-CLOSED: any lookup failure → empty groups → the access gate denies;
+// isAdminBySession is also fail-closed (returns false on any error).
+//
+// NOTE: isAdminBySession adds one Kratos admin-API call per render of this page
+// (in addition to the getIdentity call for groups). This is acceptable for
+// cosmetic chrome — real authority is enforced by requireAdminSession on /admin.
+// A shared admin-API fetch (caching identity across both lookups) can be added
+// later if render latency becomes a concern.
 let groups: string[] = [];
 try {
   groups = identityGroups(await getIdentity(session.identity.id));
 } catch (lookupErr) {
   console.error('[othala/apps] getIdentity failed; denying (no groups):', lookupErr);
 }
-const isAdmin = isAdminId(session.identity.id);
+const isAdmin = await isAdminBySession(session.identity.id);
 const hasAccess = isAdmin || userCanSeeTile(entry, groups);
 if (!hasAccess) {
   return Astro.redirect('/auth/error?reason=not-authorised');

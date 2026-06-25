@@ -151,6 +151,51 @@ async function getRecoveryLink(id, expiresIn = '1h') {
   return await res.json();
 }
 
+// JS port of patchAdminMarker from admin-api.ts.
+// Uses raw fetch (not the SDK) to keep this test self-contained.
+async function patchAdminMarker(id, grant) {
+  // Fetch current identity.
+  const getUrl =
+    `${adminBase()}/admin/identities/${encodeURIComponent(id)}` +
+    `?include_credential=password,webauthn,passkey,totp,lookup_secret`;
+  const getRes = await fetch(getUrl, { headers: authHeaders() });
+  await ok(getRes, 'patchAdminMarker/getIdentity');
+  const current = await getRes.json();
+
+  if (grant) {
+    const hasMeta = current.metadata_admin != null && typeof current.metadata_admin === 'object';
+    let patch;
+    if (!hasMeta) {
+      patch = [{ op: 'add', path: '/metadata_admin', value: { admin: true } }];
+    } else {
+      const meta = current.metadata_admin;
+      if ('admin' in meta) {
+        patch = [{ op: 'replace', path: '/metadata_admin/admin', value: true }];
+      } else {
+        patch = [{ op: 'add', path: '/metadata_admin/admin', value: true }];
+      }
+    }
+    const patchRes = await fetch(`${adminBase()}/admin/identities/${encodeURIComponent(id)}`, {
+      method: 'PATCH',
+      headers: authHeaders({ 'Content-Type': 'application/json-patch+json' }),
+      body: JSON.stringify(patch),
+    });
+    await ok(patchRes, 'patchAdminMarker/patch');
+  } else {
+    const meta = current.metadata_admin;
+    if (!meta || !('admin' in meta)) {
+      // Already absent — no-op.
+      return;
+    }
+    const patchRes = await fetch(`${adminBase()}/admin/identities/${encodeURIComponent(id)}`, {
+      method: 'PATCH',
+      headers: authHeaders({ 'Content-Type': 'application/json-patch+json' }),
+      body: JSON.stringify([{ op: 'remove', path: '/metadata_admin/admin' }]),
+    });
+    await ok(patchRes, 'patchAdminMarker/patch');
+  }
+}
+
 // ─── Fetch stub infrastructure ────────────────────────────────────────────────
 
 let capturedCalls = [];
@@ -564,4 +609,108 @@ test('getRecoveryLink: throws on non-2xx and includes label in message', async (
       return true;
     },
   );
+});
+
+// ─── patchAdminMarker ─────────────────────────────────────────────────────────
+
+test('patchAdminMarker/grant: GET then PATCH add when metadata_admin absent', async () => {
+  // First call = GET identity (no metadata_admin). Second = PATCH.
+  mockFetchSequence([
+    { body: { id: 'u1', traits: {}, schema_id: 'family', state: 'active' /* no metadata_admin */ } },
+    { body: { id: 'u1', traits: {}, metadata_admin: { admin: true } } },
+  ]);
+  await patchAdminMarker('u1', true);
+  assert.equal(capturedCalls.length, 2);
+  // First call: GET
+  assert.match(capturedCalls[0].url, /\/admin\/identities\/u1/);
+  assert.equal(capturedCalls[0].opts?.method, undefined);
+  // Second call: PATCH
+  assert.equal(capturedCalls[1].opts.method, 'PATCH');
+  const patch = JSON.parse(capturedCalls[1].opts.body);
+  assert.equal(patch[0].op, 'add');
+  assert.equal(patch[0].path, '/metadata_admin');
+  assert.deepEqual(patch[0].value, { admin: true });
+});
+
+test('patchAdminMarker/grant: add /metadata_admin/admin when metadata_admin exists without admin key', async () => {
+  mockFetchSequence([
+    { body: { id: 'u2', traits: {}, metadata_admin: { groups: ['family'] } } },
+    { body: { id: 'u2', traits: {}, metadata_admin: { groups: ['family'], admin: true } } },
+  ]);
+  await patchAdminMarker('u2', true);
+  const patch = JSON.parse(capturedCalls[1].opts.body);
+  assert.equal(patch[0].op, 'add');
+  assert.equal(patch[0].path, '/metadata_admin/admin');
+  assert.equal(patch[0].value, true);
+});
+
+test('patchAdminMarker/grant: replace /metadata_admin/admin when admin key already exists', async () => {
+  mockFetchSequence([
+    { body: { id: 'u3', traits: {}, metadata_admin: { groups: ['family'], admin: false } } },
+    { body: { id: 'u3', traits: {}, metadata_admin: { groups: ['family'], admin: true } } },
+  ]);
+  await patchAdminMarker('u3', true);
+  const patch = JSON.parse(capturedCalls[1].opts.body);
+  assert.equal(patch[0].op, 'replace');
+  assert.equal(patch[0].path, '/metadata_admin/admin');
+  assert.equal(patch[0].value, true);
+});
+
+test('patchAdminMarker/revoke: GET then PATCH remove when admin key present', async () => {
+  mockFetchSequence([
+    { body: { id: 'u4', traits: {}, metadata_admin: { groups: ['family'], admin: true } } },
+    { body: { id: 'u4', traits: {}, metadata_admin: { groups: ['family'] } } },
+  ]);
+  await patchAdminMarker('u4', false);
+  assert.equal(capturedCalls.length, 2);
+  assert.equal(capturedCalls[1].opts.method, 'PATCH');
+  const patch = JSON.parse(capturedCalls[1].opts.body);
+  assert.equal(patch[0].op, 'remove');
+  assert.equal(patch[0].path, '/metadata_admin/admin');
+});
+
+test('patchAdminMarker/revoke: no-op (no PATCH) when admin key already absent', async () => {
+  // metadata_admin exists but no admin key.
+  mockFetchSequence([
+    { body: { id: 'u5', traits: {}, metadata_admin: { groups: ['family'] } } },
+  ]);
+  await patchAdminMarker('u5', false);
+  // Only the GET call; no PATCH issued.
+  assert.equal(capturedCalls.length, 1);
+});
+
+test('patchAdminMarker/revoke: no-op when metadata_admin absent entirely', async () => {
+  mockFetchSequence([
+    { body: { id: 'u6', traits: {} } },
+  ]);
+  await patchAdminMarker('u6', false);
+  assert.equal(capturedCalls.length, 1);
+});
+
+// ─── updateIdentity: admin marker preservation ────────────────────────────────
+
+test('updateIdentity: includes admin:true when provided in metadataAdmin', async () => {
+  mockFetchSequence([
+    { body: { id: 'id-admin', traits: {}, schema_id: 'family', state: 'active', metadata_admin: { groups: ['family'], admin: true } } },
+    { body: { id: 'id-admin', traits: {}, metadata_admin: { groups: ['family'], admin: true } } },
+  ]);
+  const newTraits = { username: 'alice', email: 'alice@example.com' };
+  // Caller preserves admin marker by including it in metadataAdmin input.
+  await updateIdentity('id-admin', { traits: newTraits, metadataAdmin: { groups: ['family'], admin: true } });
+  const putBody = JSON.parse(capturedCalls[1].opts.body);
+  assert.equal(putBody.metadata_admin.admin, true);
+});
+
+test('updateIdentity: omitting admin from metadataAdmin does NOT include it in PUT (caller must explicitly preserve)', async () => {
+  // This test documents the contract: the validator only passes through what is
+  // given. The [id].astro save handler is responsible for reading + forwarding
+  // the existing admin value. This test confirms the low-level API is not
+  // silently preserving it (the contract is explicit, not magic).
+  mockFetchSequence([
+    { body: { id: 'id-noadmin', traits: {}, schema_id: 'family', state: 'active', metadata_admin: { groups: ['family'] } } },
+    { body: { id: 'id-noadmin', traits: {}, metadata_admin: { groups: ['family'] } } },
+  ]);
+  await updateIdentity('id-noadmin', { traits: { username: 'bob', email: 'bob@example.com' }, metadataAdmin: { groups: ['family'] } });
+  const putBody = JSON.parse(capturedCalls[1].opts.body);
+  assert.equal(putBody.metadata_admin.admin, undefined);
 });

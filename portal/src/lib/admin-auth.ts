@@ -1,47 +1,62 @@
-// Admin allowlist — the authoritative admin-access gate (DAG CU3 / B2, CVP-P1).
+// Admin authority — metadata_admin marker gate (ADR 0008).
 //
-// Admin authority is an explicit env allowlist keyed on IMMUTABLE identity IDs,
-// NOT group membership and NOT the user-editable email trait. Identity `id` is
-// a Kratos-assigned UUID that is never writable via the self-service profile
-// flow, so it cannot be escalated by editing a trait.
+// ADR 0008 (accepted 2026-06-25): admin authority moves from an env-based
+// UUID allowlist (OTHALA_ADMIN_IDS) to a tamper-proof marker in Kratos
+// `metadata_admin.admin`. The marker is:
+//   - writable ONLY via the Kratos admin API (never via self-service flows
+//     or OIDC claim mapping, which land in traits only)
+//   - absent from the public /sessions/whoami response (Kratos v26.2.0
+//     excludes metadata_admin from whoami — ADR 0008 Consequences)
+//   - read by callers via a fresh admin-API getIdentity call, never from
+//     the session object returned by whoami
 //
-// OTHALA_ADMIN_IDS is a comma-separated list of Kratos identity UUIDs
-// (sops-backed in deployment). An identity is an admin iff its `id`, trimmed
-// and lowercased, appears in that list. UUIDs are case-insensitive.
-//
-// This REPLACES the former email-based OTHALA_ADMIN_SUBJECTS allowlist. Every
-// former `metadata_admin.groups.includes('admin')` access/recovery/role gate
-// and every email-trait-based gate is gone. The `admin` group is DISPLAY-ONLY:
-// it still renders in the admin UI's group chips and may drive group_role_map
-// role derivation for individual apps, but NO code path may gate portal-admin
-// access, recovery refusal, or admin authority on it. Self-demote (an admin
-// removing the `admin` group from their own identity) therefore can no longer
-// drop admin authority — the ID allowlist is the only source of truth, and it
-// lives outside Kratos.
-//
-// Bootstrap: OTHALA_ADMIN_IDS=<kratos-identity-uuid>
-//
-// Fail-closed: an unset / empty / whitespace-only list yields NO admins.
-// A missing or empty identity id yields a non-admin.
+// Authority check: metadata_admin.admin === true (boolean strict equality).
+// Fail-closed: absent key, wrong type (string "true", number 1, null, etc.),
+// or any malformed identity object yields false.
 
-/** Parse OTHALA_ADMIN_IDS into a normalized Set of admin identity UUIDs. */
-export function adminIds(): Set<string> {
-  const raw = process.env.OTHALA_ADMIN_IDS ?? '';
-  const out = new Set<string>();
-  for (const part of raw.split(',')) {
-    const id = part.trim().toLowerCase();
-    if (id) out.add(id);
+import type { Identity } from './types';
+import { getIdentity } from './admin-api';
+
+/**
+ * Authoritative admin marker check (ADR 0008 Tier 1).
+ *
+ * Returns true iff `identity.metadata_admin.admin === true` (boolean strict
+ * equality). The caller MUST supply an identity fetched fresh from the Kratos
+ * admin API — never the identity object embedded in a /sessions/whoami
+ * response, which Kratos v26.2.0 strips of metadata_admin. Fail-closed on
+ * null/undefined identity, missing key, or any non-boolean-true value.
+ */
+export function isAdminMarker(identity: Identity | null | undefined): boolean {
+  if (!identity) return false;
+  try {
+    const meta = identity.metadata_admin as Record<string, unknown> | undefined;
+    if (!meta || typeof meta !== 'object' || Array.isArray(meta)) return false;
+    return meta['admin'] === true;
+  } catch {
+    return false;
   }
-  return out;
 }
 
 /**
- * Authoritative admin check. Returns true iff `id` (trimmed, lowercased)
- * is present in OTHALA_ADMIN_IDS. Fail-closed on empty / missing id.
+ * Cosmetic admin-chrome check for SSR pages (ADR 0008).
+ *
+ * Fetches the full identity from the Kratos admin API (which includes
+ * metadata_admin, stripped from /sessions/whoami by Kratos v26.2.0) and
+ * applies isAdminMarker. Fail-closed: any lookup failure returns false.
+ *
+ * NOTE: this adds one Kratos admin-API call per render of pages that call it
+ * (index and apps/[slug]). That is acceptable for cosmetic chrome (the admin
+ * nav link); real authority is enforced by requireAdminSession. A caching
+ * optimization can be added later if render latency becomes a concern.
+ *
+ * The caller must pass the identity id from the session (session.identity.id),
+ * which is always present on an authenticated session.
  */
-export function isAdminId(id: string | null | undefined): boolean {
-  if (!id) return false;
-  const normalized = id.trim().toLowerCase();
-  if (!normalized) return false;
-  return adminIds().has(normalized);
+export async function isAdminBySession(id: string): Promise<boolean> {
+  try {
+    const identity = await getIdentity(id);
+    return isAdminMarker(identity);
+  } catch {
+    return false;
+  }
 }

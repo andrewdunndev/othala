@@ -109,16 +109,16 @@ test('FIX-B: authenticated_at as Date object (SDK-deserialized) within window �
   assert.equal(isSessionFresh(session, WINDOW_HOURS), true);
 });
 
-// ── fail-open: neither source readable ───────────────────────────────────────
+// ── fail-closed: neither source readable (ADR 0008 SP-3) ─────────────────────
 
-test('FIX-B: neither authentication_methods nor authenticated_at → null (fail-open)', () => {
+test('FIX-B: neither authentication_methods nor authenticated_at → false (fail-closed)', () => {
   const session = {};
-  assert.equal(isSessionFresh(session, WINDOW_HOURS), null);
+  assert.equal(isSessionFresh(session, WINDOW_HOURS), false);
 });
 
-test('FIX-B: empty authentication_methods array, no authenticated_at → null (fail-open)', () => {
+test('FIX-B: empty authentication_methods array, no authenticated_at → false (fail-closed)', () => {
   const session = { authentication_methods: [] };
-  assert.equal(isSessionFresh(session, WINDOW_HOURS), null);
+  assert.equal(isSessionFresh(session, WINDOW_HOURS), false);
 });
 
 test('FIX-B: malformed completed_at entry skipped; falls back to authenticated_at → true', () => {
@@ -131,7 +131,7 @@ test('FIX-B: malformed completed_at entry skipped; falls back to authenticated_a
   assert.equal(isSessionFresh(session, WINDOW_HOURS), true);
 });
 
-test('FIX-B: completely missing both sources → null (fail-open)', () => {
+test('FIX-B: completely missing both sources → false (fail-closed)', () => {
   const session = { active: true, identity: { id: 'admin-1' } };
-  assert.equal(isSessionFresh(session, WINDOW_HOURS), null);
+  assert.equal(isSessionFresh(session, WINDOW_HOURS), false);
 });

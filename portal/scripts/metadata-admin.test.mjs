@@ -209,3 +209,61 @@ test('combined: roles only (no groups)', () => {
   assert.equal(result.groups, undefined);
   assert.deepEqual(result.roles, { keep: 'admin' });
 });
+
+// ===== Admin marker =====
+
+test('admin: true accepted (boolean strict)', () => {
+  const result = validateMetadataAdmin({ admin: true });
+  assert.equal(result.admin, true);
+});
+
+test('admin: false accepted (boolean strict)', () => {
+  const result = validateMetadataAdmin({ admin: false });
+  assert.equal(result.admin, false);
+});
+
+test('admin: string "true" rejected (non-boolean)', () => {
+  assert.throws(
+    () => validateMetadataAdmin({ admin: 'true' }),
+    /must be a strict boolean/,
+  );
+});
+
+test('admin: number 1 rejected (non-boolean)', () => {
+  assert.throws(
+    () => validateMetadataAdmin({ admin: 1 }),
+    /must be a strict boolean/,
+  );
+});
+
+test('admin: null rejected (non-boolean)', () => {
+  // null is treated as undefined (key present but null), which triggers the
+  // type check branch because typeof null === 'object' !== 'boolean'.
+  assert.throws(
+    () => validateMetadataAdmin({ admin: null }),
+    /must be a strict boolean/,
+  );
+});
+
+test('admin: object rejected (non-boolean)', () => {
+  assert.throws(
+    () => validateMetadataAdmin({ admin: {} }),
+    /must be a strict boolean/,
+  );
+});
+
+test('admin: absent → not present on output', () => {
+  const result = validateMetadataAdmin({ groups: ['family'] });
+  assert.equal(result.admin, undefined);
+});
+
+test('combined: groups + roles + admin:true', () => {
+  const result = validateMetadataAdmin({
+    groups: ['admin', 'family'],
+    roles: { keep: 'admin' },
+    admin: true,
+  });
+  assert.deepEqual(result.groups, ['admin', 'family']);
+  assert.deepEqual(result.roles, { keep: 'admin' });
+  assert.equal(result.admin, true);
+});

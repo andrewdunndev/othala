@@ -5,10 +5,14 @@
 // lib modules directly. This file is the single bundle entry the build
 // compiles to `dist/server/admin-runtime.mjs` (esbuild, see the
 // build:admin-runtime npm script); listen.mjs lazily imports it at bind
-// time to wire the in-process revoke fan-out + the admin allowlist into
-// the admin-port handlers — WITHOUT delegating to the public Astro
-// handler (the two muxes stay disjoint).
+// time to wire the in-process revoke fan-out into the admin-port handlers
+// — WITHOUT delegating to the public Astro handler (the two muxes stay
+// disjoint).
+//
+// The admin allowlist (isAdminId) is no longer injected here. Admin
+// authority is now determined by the metadata_admin.admin marker in the
+// Kratos webhook payload (ADR 0008); recoveryGateVerdict reads it directly
+// from the payload, so no runtime predicate is needed.
 
 export { revokeSubject, RevokeError } from '../lib/revoke';
 export type { RevokeResult, RevokeDependency } from '../lib/revoke';
-export { isAdminId } from '../lib/admin-auth';

@@ -22,11 +22,13 @@ import Layout from '../../../layouts/Layout.astro';
 import {
   requireAdminSession,
   getIdentity,
+  listIdentities,
   updateIdentity,
   deleteIdentity,
   deactivateIdentity,
   reactivateIdentity,
   getRecoveryLink,
+  patchAdminMarker,
   revokeUserSessions,
   type RevokeUserResult,
 } from '../../../lib/admin';
@@ -92,6 +94,8 @@ let actionResult:
   | { kind: 'deactivated'; username: string }
   | { kind: 'reactivated'; username: string }
   | { kind: 'updated' }
+  | { kind: 'admin-granted'; username: string }
+  | { kind: 'admin-revoked'; username: string }
   | { kind: 'revoked'; result: RevokeUserResult }
   | { kind: 'credential-removed'; credType: string }
   | { kind: 'error'; message: string }
@@ -115,7 +119,7 @@ if (Astro.request.method === 'POST' && identity) {
   // The three actions panel buttons (issue-recovery / force-relogin /
   // deactivate / reactivate) share a single form POST, so each gets its own
   // action-scoped token minted at render time.
-  const actionScopedActions = new Set(['issue-recovery', 'force-relogin', 'deactivate', 'reactivate']);
+  const actionScopedActions = new Set(['issue-recovery', 'force-relogin', 'deactivate', 'reactivate', 'grant-admin', 'revoke-admin']);
   try {
     if (actionScopedActions.has(action)) {
       verifyToken(String(fd.get('csrf_token') ?? ''), adminIdentityId, action);
@@ -163,11 +167,17 @@ if (Astro.request.method === 'POST' && identity) {
         // C4: stored order MUST match canonical order so consent and
         // portal agree on which group wins for role derivation.
         const groups = normalizeGroupOrder([...identityGroups, ...accessGroups]);
+        // ADR 0008: preserve the existing admin marker — an unrelated
+        // groups/roles edit must NOT silently drop it. Read from the
+        // currently-fetched identity (not re-fetched, to avoid TOCTOU on
+        // the write; the patch path handles targeted grant/revoke).
+        const existingAdmin = identity.metadata_admin?.admin;
         await updateIdentity(id, {
           traits,
           metadataAdmin: {
             groups,
             roles: Object.keys(roles).length ? roles : undefined,
+            ...(existingAdmin === true ? { admin: true } : {}),
           },
         });
         identity = await reload();
@@ -218,6 +228,45 @@ if (Astro.request.method === 'POST' && identity) {
       } else {
         await deleteIdentity(id);
         return Astro.redirect('/admin/users?deleted=1');
+      }
+    } else if (action === 'grant-admin') {
+      // ADR 0008: targeted admin marker grant via JSON Patch. Does NOT touch
+      // groups or roles. Guards: self-demote N/A on grant (self-grant is fine
+      // — the acting admin already has authority).
+      const username = identity.traits?.username ?? id;
+      await patchAdminMarker(id, true);
+      identity = await reload();
+      actionResult = { kind: 'admin-granted', username };
+    } else if (action === 'revoke-admin') {
+      // ADR 0008: targeted admin marker revoke. Guards:
+      //   (a) Self-demote guard: block revocation of the acting admin's own
+      //       marker via the UI (break-glass scenario requires another admin
+      //       or console access).
+      //   (b) Last-admin guard: refuse if this would leave zero admins.
+      const username = identity.traits?.username ?? id;
+      if (id === adminIdentityId) {
+        actionResult = {
+          kind: 'error',
+          message:
+            'You cannot revoke your own admin marker via the UI. Have another admin do it, or use the shell break-glass (see docs/runbooks/admin-recovery.md).',
+        };
+      } else {
+        // Count current admins — list all identities and filter on the marker.
+        const all = await listIdentities();
+        const adminCount = all.filter(
+          (ident) => (ident.metadata_admin as Record<string, unknown> | undefined)?.['admin'] === true,
+        ).length;
+        if (adminCount <= 1) {
+          actionResult = {
+            kind: 'error',
+            message:
+              `Refusing to revoke: ${username} is the last admin. Grant admin to another identity first.`,
+          };
+        } else {
+          await patchAdminMarker(id, false);
+          identity = await reload();
+          actionResult = { kind: 'admin-revoked', username };
+        }
       }
     } else if (action === 'remove-credential') {
       // HIGH-C: lost-device eviction. Removes ALL credentials of the given
@@ -292,6 +341,11 @@ const csrfTokenForceRelogin = signToken(adminIdentityId, 'force-relogin');
 const csrfTokenDeactivate = identity?.state === 'inactive'
   ? signToken(adminIdentityId, 'reactivate')
   : signToken(adminIdentityId, 'deactivate');
+// Admin grant/revoke: mutually exclusive by current marker state.
+const isTargetAdmin = identity?.metadata_admin?.admin === true;
+const csrfTokenAdminToggle = isTargetAdmin
+  ? signToken(adminIdentityId, 'revoke-admin')
+  : signToken(adminIdentityId, 'grant-admin');
 // One token per credential-remove form: each form is single-use (CSRF token
 // is single-use 30-min TTL); credential types are enumerated at render time.
 const csrfTokensRemove: Record<string, string> = {};
@@ -365,6 +419,16 @@ const adminNav = [
             </ul>
           </details>
         )}
+      </div>
+    )}
+    {actionResult?.kind === 'admin-granted' && (
+      <div class="notice notice-success">
+        Admin marker granted to <strong>{actionResult.username}</strong>. They will have admin authority on next page load.
+      </div>
+    )}
+    {actionResult?.kind === 'admin-revoked' && (
+      <div class="notice notice-warning">
+        Admin marker revoked from <strong>{actionResult.username}</strong>.
       </div>
     )}
     {actionResult?.kind === 'credential-removed' && (
@@ -490,7 +554,7 @@ const adminNav = [
 
         {id === adminIdentityId && (
           <div class="notice notice-warning">
-            You're editing your own identity. Removing the admin group is cosmetic — admin access is controlled by <code>OTHALA_ADMIN_IDS</code> (identity UUIDs), not group membership.
+            You're editing your own identity. The <code>admin</code> group is display-only — admin access is the <code>metadata_admin.admin</code> marker (ADR 0008), and you can't revoke your own marker here (have another admin do it, or use the shell break-glass).
           </div>
         )}
 
@@ -646,6 +710,31 @@ const adminNav = [
             Force re-login revokes Kratos sessions and asks every supported app to log the user out (OIDC back-channel logout). Apps without that capability keep their local session until the per-app cookie expires.
           </p>
 
+          <div class="admin-marker-row">
+            <span class="muted text-sm">
+              Admin authority:
+              {isTargetAdmin
+                ? <strong class="admin-on"> granted</strong>
+                : <span class="admin-off"> none</span>}
+            </span>
+            <form method="post" class="actions-form">
+              <input type="hidden" name="action" value={isTargetAdmin ? 'revoke-admin' : 'grant-admin'} />
+              <input type="hidden" name="csrf_token" value={csrfTokenAdminToggle} />
+              <button
+                type="submit"
+                class={isTargetAdmin ? 'button button-secondary' : 'button button-secondary'}
+                title={isTargetAdmin
+                  ? 'Revoke admin authority (removes metadata_admin.admin marker).'
+                  : 'Grant admin authority (sets metadata_admin.admin=true).'}
+              >
+                {isTargetAdmin ? 'Revoke admin' : 'Grant admin'}
+              </button>
+            </form>
+          </div>
+          <p class="muted text-xs">
+            Admin authority is the <code>metadata_admin.admin</code> marker (ADR 0008). Grant/revoke is a targeted JSON Patch — groups and roles are not affected. Self-revoke is blocked; use another admin or the shell break-glass. Revoke is blocked if this is the last admin.
+          </p>
+
           <details>
             <summary class="mono text-sm summary-danger">
               Delete identity
@@ -694,4 +783,7 @@ const adminNav = [
     line-height: 1.4;
   }
   .button-danger-sm:hover { background: var(--danger-subtle, #fff0f0); }
+  .admin-marker-row { display: flex; align-items: center; gap: var(--space-3); margin-top: var(--space-2); }
+  .admin-on { color: var(--success, #1a7f37); }
+  .admin-off { color: var(--muted, #6e7781); }
 </style>

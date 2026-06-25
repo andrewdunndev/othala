@@ -16,10 +16,11 @@
  *         → /sessions/whoami returns 401
  *         → /admin redirects to /auth/login
  *   G3 — member's real session cookie used to attempt an admin-only route
- *         → session is valid at Kratos (whoami 200) BUT identity is not on
- *           OTHALA_ADMIN_IDS → /admin redirects to /auth/error?reason=not-admin
- *         (This exercises the allowlist gate at portal/src/lib/admin-auth.ts
- *          via requireAdminSession line 72.)
+ *         → session is valid at Kratos (whoami 200) BUT identity does not
+ *           have metadata_admin.admin=true (ADR 0008 marker) → /admin
+ *           redirects to /auth/error?reason=not-admin (or to AAL2 step-up).
+ *         (This exercises the admin marker gate at portal/src/lib/admin-auth.ts
+ *          via requireAdminSession.)
  *
  * All three must fail closed: no admin page rendered, no session accepted.
  */
@@ -119,15 +120,17 @@ test('G2 — unauthenticated request (no session cookie) is rejected at /admin',
 });
 
 // ─── G3: member's real session used to access admin (identity cross-use) ──────
-test('G3 — member real session cannot access /admin (allowlist gate + reason=not-admin)', async ({
+test('G3 — member real session cannot access /admin (no admin marker → reason=not-admin or step-up)', async ({
   browser,
   baseURL,
   member,
 }) => {
   // bt2@othala.test has a REAL, active Kratos session (Kratos accepts the
-  // cookie, whoami returns 200 active:true). But member is not on
-  // OTHALA_ADMIN_IDS. requireAdminSession (admin.ts):
-  //   if (!isAdminId(session.identity.id)) redirect('/auth/error?reason=not-admin')
+  // cookie, whoami returns 200 active:true). But member does not have
+  // metadata_admin.admin=true (ADR 0008 marker). requireAdminSession (admin.ts)
+  // fires in order: (b) AAL2 check → step-up redirect if AAL1, then (c) marker
+  // check → redirect('/auth/error?reason=not-admin') if no marker.
+  // Either denial is acceptable here.
   //
   // This is the "valid cookie for wrong identity" case: the session is
   // cryptographically genuine but the identity is not authorized for admin.
@@ -144,7 +147,7 @@ test('G3 — member real session cannot access /admin (allowlist gate + reason=n
     ).toBe(true);
     expect(session?.identity?.traits?.email).toBe(member.email);
 
-    // Now attempt /admin — must be denied at the allowlist gate.
+    // Now attempt /admin — must be denied (AAL2 step-up or not-admin marker gate).
     const resp = await ctx.request.get(`${baseURL}/admin`, { maxRedirects: 0 });
     const status = resp.status();
     const loc = resp.headers()['location'] ?? '';

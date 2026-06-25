@@ -3,33 +3,61 @@
 // Kratos admin API wrappers live in `./admin-api.ts`; this file re-exports
 // them so existing call sites that import from `./admin` keep working.
 //
-// AAL2 enforcement happens at the SSR layer because Kratos AAL is
-// per-flow / global, not per-route. Caddy already gates "session present"
-// upstream of this guard.
+// AAL2 enforcement happens at the SSR layer (ADR 0008): Kratos AAL is
+// per-flow / global, not per-route. requireAdminSession enforces the SP-3
+// trinity: active session + AAL2 + admin marker (metadata_admin.admin===true
+// from the admin API). Caddy already gates "session present" upstream; this
+// guard adds the identity-level checks Caddy cannot make.
 
-import { getSession } from './kratos';
-import { isAdminId } from './admin-auth';
+import { getSession, browserFlows } from './kratos';
+import { isAdminMarker } from './admin-auth';
 import { revokeSubject, type RevokeResult } from './revoke';
 import type { Session } from './types';
+import {
+  getIdentity,
+  listIdentities,
+  createIdentity,
+  updateIdentity,
+  deleteIdentity,
+  deactivateIdentity,
+  reactivateIdentity,
+  getRecoveryLink,
+  patchAdminMarker,
+} from './admin-api';
+import type {
+  CreateIdentityInput,
+  UpdateIdentityInput,
+  IdentityTraits,
+  MetadataAdmin,
+  RecoveryLink,
+} from './admin-api';
 
 /**
  * Pure freshness computation extracted from requireAdminSession for testability.
  *
  * Returns:
  *   true  — session authenticated within the window
- *   false — session is stale (confirmed out of window)
- *   null  — indeterminate / fail-open (no parseable timestamp found)
+ *   false — session is stale (confirmed out of window) OR timestamps
+ *           unreadable (fail-CLOSED — changed from the prior fail-open null)
  *
  * Primary source: authentication_methods entries with aal === 'aal2', using
  * the most-recent completed_at timestamp among those entries. Fallback to
  * session.authenticated_at if the array is absent or yields no parseable entry.
- * Only if BOTH sources are unreadable does the function return null (fail-open).
+ * If BOTH sources are unreadable the function returns false (fail-closed).
  *
- * TODO: validate the exact field shapes against a live Kratos session;
- * authentication_methods.completed_at shape and authenticated_at update
- * semantics need live-gate confirmation before tightening.
+ * Decision: this function is NOT wired into the requireAdminSession gate.
+ * The explicit `session.authenticator_assurance_level === 'aal2'` check (with a
+ * step-up redirect on AAL1) is the correct enforcement mechanism per ADR 0008.
+ * isSessionFresh is retained for future use (e.g. a "sudo timeout" freshness
+ * window on destructive actions) and is unit-tested to prove correctness before
+ * that use-case is wired in. When it is wired in, it should augment, not replace,
+ * the explicit AAL check.
+ *
+ * Note: authentication_methods.completed_at shape and authenticated_at update
+ * semantics should be validated against a live Kratos session before wiring
+ * isSessionFresh into any gate.
  */
-export function isSessionFresh(session: Session, windowHours: number): boolean | null {
+export function isSessionFresh(session: Session, windowHours: number): boolean {
   // Primary source: authentication_methods[].completed_at for aal2 entries.
   // Kratos populates this array on every step-up; the most-recent aal2 entry
   // is the canonical "when did the user last satisfy AAL2".
@@ -72,13 +100,13 @@ export function isSessionFresh(session: Session, windowHours: number): boolean |
         if (Number.isFinite(parsed.getTime())) authAt = parsed;
       }
     } catch {
-      // Malformed authenticated_at — fall through to null.
+      // Malformed authenticated_at — fall through.
     }
   }
 
   if (authAt === null) {
-    // Both sources unreadable — fail open (see FAIL-OPEN INVARIANT in caller).
-    return null;
+    // Both sources unreadable — fail closed (deny).
+    return false;
   }
 
   const ageMs = Date.now() - authAt.getTime();
@@ -86,6 +114,7 @@ export function isSessionFresh(session: Session, windowHours: number): boolean |
   return ageMs <= windowMs;
 }
 
+// Re-export admin-API symbols for call sites that import from './admin'.
 export {
   listIdentities,
   getIdentity,
@@ -95,17 +124,22 @@ export {
   deactivateIdentity,
   reactivateIdentity,
   getRecoveryLink,
-} from './admin-api';
-export type {
-  CreateIdentityInput,
-  UpdateIdentityInput,
-  IdentityTraits,
-  MetadataAdmin,
-  RecoveryLink,
-} from './admin-api';
+  patchAdminMarker,
+};
+export type { CreateIdentityInput, UpdateIdentityInput, IdentityTraits, MetadataAdmin, RecoveryLink };
 
 /**
- * SSR guard for /admin/* routes.
+ * SSR guard for /admin/* routes. Enforces the SP-3 trinity (ADR 0008):
+ *
+ *   (a) Active Kratos session with a resolved identity — else redirect to login.
+ *   (b) AAL2 server-side — session.authenticator_assurance_level must equal
+ *       'aal2'. An AAL1 session triggers a step-up redirect to Kratos with
+ *       ?aal=aal2&refresh=true. A 200 from whoami does NOT imply AAL2 (the
+ *       LDAP bridge uses aal1 sessions on the same Kratos instance).
+ *   (c) Admin marker — identity.metadata_admin.admin === true (boolean strict),
+ *       read fresh from the Kratos admin API. The whoami response does NOT carry
+ *       metadata_admin (Kratos v26.2.0 excludes it); the admin-API fetch is
+ *       non-optional.
  *
  *   const guard = await requireAdminSession(Astro);
  *   if (guard instanceof Response) return guard;
@@ -114,6 +148,8 @@ export type {
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 export async function requireAdminSession(astro: any): Promise<Session | Response> {
   const cookie = astro.request.headers.get('cookie') ?? undefined;
+
+  // (a) Active session check.
   let session: Session | null;
   try {
     session = await getSession(cookie);
@@ -121,38 +157,35 @@ export async function requireAdminSession(astro: any): Promise<Session | Respons
     return astro.redirect('/auth/error?reason=auth-unreachable');
   }
 
-  if (!session?.active || !session.identity) {
+  if (!session?.active || !session.identity?.id) {
     const returnTo = encodeURIComponent(astro.url.pathname + astro.url.search);
     return astro.redirect(`/auth/login?return_to=${returnTo}`);
   }
 
-  // CVP-P1: admin authority is the OTHALA_ADMIN_IDS allowlist keyed on the
-  // IMMUTABLE identity `id` (a Kratos UUID), NOT the user-editable email
-  // trait. `session.identity.id` is always present in a valid whoami response
-  // and is never writable via the self-service profile flow, so it cannot be
-  // escalated by editing a trait. The `admin` group is display-only and gates
-  // nothing here.
-  if (!isAdminId(session.identity.id)) {
-    return astro.redirect('/auth/error?reason=not-admin');
+  // (b) AAL2 enforcement — server-side, not inferred from a 200.
+  // session.authenticator_assurance_level is the canonical AAL string from
+  // whoami; it must be exactly 'aal2'. On 'aal1' we redirect to the Kratos
+  // step-up flow (?aal=aal2&refresh=true). Any other value (missing, unknown)
+  // is treated as fail-closed: deny with a redirect to the step-up flow.
+  const aal = (session as unknown as Record<string, unknown>)['authenticator_assurance_level'];
+  if (aal !== 'aal2') {
+    // Step-up: Kratos will re-authenticate the user at AAL2 and return here.
+    const returnTo = encodeURIComponent(astro.url.pathname + astro.url.search);
+    return astro.redirect(browserFlows.login({ aal: 'aal2', refresh: true, returnTo }));
   }
 
-  // ADMIN ELEVATION — Kratos AAL2 step-up REMOVED (2026-06-20).
-  //
-  // Admin elevation is enforced at the EDGE by Caddy basic_auth on /admin/*
-  // (per-admin bcrypt creds), NOT by a Kratos AAL2 step-up. The AAL2 flow was
-  // half-implemented (login.astro never rendered the second-factor methods, so
-  // the step-up page was blank → admin un-enterable via the UI, forcing
-  // terminal/admin-API use to manage the instance) AND redundant with that
-  // basic_auth gate. We meet the security analysis's intent (multi-factor for
-  // privileged access) with an equivalent-or-stronger, reliable control:
-  //   - possession:    a hardware passkey session (the active+identity check above)
-  //   - knowledge:     the /admin/* basic_auth password (edge, per-admin)
-  //   - authorization: the OTHALA_ADMIN_IDS allowlist (the isAdminId check above)
-  // Consciously traded away: the AAL2 freshness / "sudo timeout" (basic_auth
-  // caches for the browser session). Acceptable at family scale; if ever needed,
-  // require a fresh re-auth on destructive actions only. isSessionFresh() is
-  // retained (exported, unit-tested) for that future use. See the dated
-  // security-review doc, §AAL2 deviation.
+  // (c) Admin marker — fetch identity fresh from the admin API (metadata_admin
+  // is NOT present in the whoami response). Fail-closed on lookup error.
+  let adminIdentity;
+  try {
+    adminIdentity = await getIdentity(session.identity.id);
+  } catch {
+    return astro.redirect('/auth/error?reason=auth-unreachable');
+  }
+
+  if (!isAdminMarker(adminIdentity)) {
+    return astro.redirect('/auth/error?reason=not-admin');
+  }
 
   // Prevent admin/identity data from being stored in any intermediate cache.
   // Done here (not in middleware) so it's tightly coupled to the admin guard.

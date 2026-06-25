@@ -239,38 +239,19 @@ selfservice:
       lifespan: 10m
       # aal1 base — the v26.2.0 login flow takes NO `required_aal` property
       # (it's a `settings`/`session` knob, not a login-flow one). AAL2 step-up
-      # is requested per-flow via ?aal=aal2 by the admin SSR pages
-      # (requireAdminSession), never enforced globally here.
+      # is requested per-flow via ?aal=aal2&refresh=true by requireAdminSession
+      # in admin.ts (the SP-3 trinity gate), never enforced globally here.
       #
-      # CVP-P3: gate fires ONLY on the email-code login method (after.code),
-      # interrupting login for admin identities (forces passkey/console). Other
-      # login methods (passkey/password/webauthn) are unaffected. Reuses
-      # RECOVERY_GATE_SECRET — same Kratos→portal admin-port trust domain, no
-      # new secret. can_interrupt: true lets Kratos surface the 403 body to the
-      # user as a flow error rather than treating it as a webhook failure.
-      # NOTE: the `after.code` hook path needs live Kratos v26.2.0 validation
-      # to confirm the exact schema key for code-method after-hooks on the login
-      # flow. The recovery flow uses a flat `after.hooks` (no method sub-key),
-      # but login after-hooks support per-method nesting per Ory docs — verify
-      # against a running Kratos instance before promoting to production.
-      after:
-        code:
-          hooks:
-            - hook: web_hook
-              config:
-                url: "http://${CONSENT_HOST}:4431/admin/login-gate"
-                method: POST
-                auth:
-                  type: api_key
-                  config:
-                    in: header
-                    name: Authorization
-                    value: "Bearer ${RECOVERY_GATE_SECRET}"
-                response:
-                  ignore: false
-                  parse: false
-                body: file:///etc/config/kratos/hooks/login-gate.jsonnet
-                can_interrupt: true
+      # ADR 0008: the A2 email-code interrupt hook (login.after.code.hooks) is
+      # RETIRED. It blocked email-code login for admin identities to force them
+      # through passkey/console. Under ADR 0008 the canonical enforcement is:
+      #   - AAL2 is required by the portal's requireAdminSession server-side check
+      #     (step-up redirect to ?aal=aal2&refresh=true when aal !== 'aal2').
+      #   - Kratos's required_aal: aal2 on the settings flow (CVP-P2) ensures
+      #     that any credential change already requires the highest available AAL.
+      # The hook is the correct Kratos mechanism when per-identity interruption is
+      # needed; replaced here by the app-layer step-up which is simpler and does
+      # not require a webhook round-trip or per-method nesting validation.
 
     registration:
       # Admin-driven onboarding (one-time enrollment URLs); no self-service signup

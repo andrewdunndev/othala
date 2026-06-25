@@ -40,9 +40,17 @@ export function identityGroups(identity: Identity | null | undefined): string[] 
   return raw.filter((g): g is string => typeof g === 'string');
 }
 
-/** Report whether the identity is a member of the named group. */
+/**
+ * Report whether the identity is a member of the named group.
+ * Both the stored group names and the query group are lowercased before
+ * comparison. This is a deny→correct-match fix: an out-of-band admin-API write
+ * with mixed-case group names (e.g. "Access-Grafana") would otherwise silently
+ * fail to match a lowercase query (and vice-versa). Already-lowercase data is
+ * unaffected.
+ */
 export function hasGroup(identity: Identity | null | undefined, group: string): boolean {
-  return identityGroups(identity).includes(group);
+  const needle = group.toLowerCase();
+  return identityGroups(identity).some((g) => g.toLowerCase() === needle);
 }
 
 /** Result of an access-gate evaluation. */

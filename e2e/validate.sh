@@ -18,9 +18,15 @@
 #      othala). Max 4 min total; if any fail the substrate is broken.
 #      NOTE: the LDAP bridge is a separate project (gitlab.com/dunn.dev/
 #      kratos-ldap); no e2e spec exercises LDAP here.
+#   4b. Seed phase (ADR 0008 marker model):
+#       POST admin + recovery-admin identities with metadata_admin.admin=true.
+#       The admin marker is set at identity creation; no UUID readback, no
+#       env rewrite, no portal recreate needed (the portal reads the marker
+#       from the Kratos admin API at request time).
 #   5. Run smoke.sh
-#   6. On failure, dump container logs to artifacts
-#   7. `docker compose down -v` (ephemeral; VM dies anyway, but be
+#   6. Run Playwright browser e2e
+#   7. On failure, dump container logs to artifacts
+#   8. `docker compose down -v` (ephemeral; VM dies anyway, but be
 #      tidy in case the test runs against a longer-lived host)
 #
 # Required env (set by .gitlab-ci.yml e2e job):
@@ -167,6 +173,67 @@ while true; do
     fi
     sleep 5
 done
+
+# Step 4b: seed phase (ADR 0008 marker model).
+#
+# Admin authority is the metadata_admin.admin boolean marker, NOT a UUID allowlist.
+# We seed both admin identities via the Kratos admin API with the admin marker set
+# directly on the create body. No id is supplied — Kratos v26.2.0 hard-rejects a
+# caller-supplied id with 400 "json: unknown field id". The portal reads the marker
+# from the admin API at request time, so no env rewrite and no portal recreate are
+# needed after seeding.
+#
+# The credential values (ADMIN_EMAIL, ADMIN_USERNAME, ADMIN_PASSWORD,
+# RECOVERY_ADMIN_EMAIL, RECOVERY_ADMIN_USERNAME) are already in .env from
+# gen-secrets.sh. The Playwright fixtures read the same vars, so creds are a
+# single source of truth: gen-secrets.sh.
+echo ""
+echo "=== seed phase (admin identities with metadata_admin.admin=true marker) ==="
+
+# The Kratos admin API is reachable from the host on the compose network only
+# via `docker compose exec`. We use the othala container (has Node) to POST
+# via its reachable compose-net hostname kratos:4434, matching the smoke.sh
+# C1 pattern. Program fed on stdin (podman-compose exec argv-safe).
+
+# Helper: seed an identity via Kratos admin API with the admin marker.
+# Usage: seed_admin_identity <email> <username> <display_name> <groups_json> <password>
+# Sets metadata_admin.admin=true (the ADR 0008 marker) in addition to groups.
+seed_admin_identity() {
+    local email="$1" username="$2" display_name="$3" groups_json="$4" password="$5"
+    local result
+    result=$(printf '%s' "fetch('http://kratos:4434/admin/identities',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({schema_id:'family',state:'active',traits:{username:'${username}',email:'${email}',displayName:'${display_name}'},metadata_admin:{admin:true,groups:${groups_json}},credentials:{password:{config:{password:'${password}'}}}})}).then(r=>r.json()).then(j=>{process.stdout.write(j.id||('ERR:'+JSON.stringify(j)));process.exit(0)}).catch(e=>{process.stdout.write('EXC:'+e.message);process.exit(1)})" \
+        | docker compose exec -T othala node 2>/dev/null)
+    # Strip ANSI resets that podman-compose prepends.
+    result=$(printf '%s' "$result" | sed 's/\x1b\[[0-9;]*m//g')
+    printf '%s' "$result"
+}
+
+ADMIN_EMAIL="${ADMIN_EMAIL:-admin@othala.test}"
+ADMIN_USERNAME="${ADMIN_USERNAME:-admin}"
+ADMIN_PASSWORD="${ADMIN_PASSWORD:-othala-testpass-2026}"
+RECOVERY_ADMIN_EMAIL="${RECOVERY_ADMIN_EMAIL:-admin.recovery@othala.test}"
+RECOVERY_ADMIN_USERNAME="${RECOVERY_ADMIN_USERNAME:-admin.recovery}"
+RECOVERY_ADMIN_PASSWORD="${RECOVERY_ADMIN_PASSWORD:-othala-testpass-2026}"
+
+echo "  seeding primary admin: $ADMIN_EMAIL (admin marker + groups) ..."
+ADMIN_ID=$(seed_admin_identity \
+    "$ADMIN_EMAIL" "$ADMIN_USERNAME" "Othala Admin" \
+    "['family','access-grafana','admin']" "$ADMIN_PASSWORD")
+if [[ -z "$ADMIN_ID" || "$ADMIN_ID" == ERR:* || "$ADMIN_ID" == EXC:* ]]; then
+    echo "  ✗ seed admin failed: $ADMIN_ID"; exit 1
+fi
+echo "  ✓ admin seeded: id=$ADMIN_ID (metadata_admin.admin=true)"
+
+echo "  seeding recovery-admin: $RECOVERY_ADMIN_EMAIL (admin marker + groups) ..."
+RECOVERY_ADMIN_ID=$(seed_admin_identity \
+    "$RECOVERY_ADMIN_EMAIL" "$RECOVERY_ADMIN_USERNAME" "Admin Recovery Test" \
+    "['family','admin']" "$RECOVERY_ADMIN_PASSWORD")
+if [[ -z "$RECOVERY_ADMIN_ID" || "$RECOVERY_ADMIN_ID" == ERR:* || "$RECOVERY_ADMIN_ID" == EXC:* ]]; then
+    echo "  ✗ seed recovery-admin failed: $RECOVERY_ADMIN_ID"; exit 1
+fi
+echo "  ✓ recovery-admin seeded: id=$RECOVERY_ADMIN_ID (metadata_admin.admin=true)"
+# No env rewrite or portal recreate needed — the portal reads the admin
+# marker from the Kratos admin API at request time (ADR 0008).
 
 # Step 5: smoke (the API-level suite + browser-free OIDC dance, sections A-G)
 echo ""

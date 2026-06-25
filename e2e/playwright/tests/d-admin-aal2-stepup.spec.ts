@@ -1,12 +1,12 @@
 /**
- * D — Admin → /admin → AAL2 step-up enforced (browser-test.mjs assertion D).
+ * D — Admin → /admin → AAL2 step-up enforced (ADR 0008).
  *
- * An identity on OTHALA_ADMIN_IDS (admin@othala.test) logs in with
- * password only (AAL1) and visits /admin. The requireAdminSession middleware
- * detects AAL1 and redirects to a Kratos login flow requesting AAL2 (step-up
- * with a second factor). The redirect must target auth.othala.test (NOT the
- * old hardcoded dag.dunn.dev — the portability bug noted in browser-test.mjs
- * is fixed by the config convergence pass).
+ * An identity with metadata_admin.admin=true (admin@othala.test, seeded by
+ * validate.sh with the ADR 0008 marker) logs in with password only (AAL1)
+ * and visits /admin. The requireAdminSession middleware detects AAL1 and
+ * redirects to a Kratos login flow requesting AAL2 (step-up with a second
+ * factor). The redirect must target auth.othala.test (NOT the old hardcoded
+ * dag.dunn.dev — the portability bug fixed by the config convergence pass).
  *
  * Assertion: the URL the browser lands on after /admin contains aal=aal2 as a
  * query parameter (the Kratos /self-service/login/browser?aal=aal2 step-up URL).
@@ -17,12 +17,17 @@
  *   - the redirect target is within auth.othala.test (observable by the browser),
  *   - no page.route() intercept for dag.dunn.dev is needed,
  *   - aal=aal2 appears in the URL the browser lands on.
+ *
+ * Note: this spec only verifies the AAL1→step-up redirect (the guard fires
+ * before TOTP enrollment is present). The full AAL2 admin access path
+ * (TOTP enrollment + step-up + /admin render) is exercised by the AAL2
+ * integration specs via adminAal2Context().
  */
 
 import { test, expect } from '../fixtures';
 import { loginViaJsonApi } from '../actions/login';
 
-test('D — allowlisted admin at AAL1 is redirected to AAL2 step-up at /admin', async ({
+test('D — admin with marker at AAL1 is redirected to AAL2 step-up at /admin', async ({
   browser,
   baseURL,
   admin,

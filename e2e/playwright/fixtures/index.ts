@@ -8,12 +8,30 @@
  *   hydraPublicURL       — http://hydra:4444 (Hydra public, inside compose net)
  *   hydraAdminURL        — http://hydra:4445 (Hydra admin, inside compose net)
  *   member               — { id, email, password } seeded identity (bt2@othala.test),
- *                          access-grafana group, NOT on OTHALA_ADMIN_IDS
- *   admin                — { id, email, password } seeded identity (admin@othala.test),
- *                          ON OTHALA_ADMIN_IDS (triggers AAL2 step-up at /admin)
+ *                          access-grafana group, NOT an admin (no admin marker)
+ *   admin                — { id, email, password, aal2Session } identity seeded with
+ *                          metadata_admin.admin=true (ADR 0008 marker) by
+ *                          validate.sh seed phase. The fixture looks up the id,
+ *                          then performs TOTP enrollment + AAL2 step-up so that
+ *                          adminWithAal2() provides an AAL2 BrowserContext ready
+ *                          for /admin access.
  *
  * Both identities are seeded ONCE per worker (scope: 'worker') so the cost is
  * paid at most once across the serial test run.
+ *
+ * AAL2 admin access:
+ *   /admin requires AAL2 (ADR 0008). TOTP CANNOT be pre-seeded via the admin
+ *   API — it must be enrolled via the Kratos settings flow at runtime:
+ *     1. Log in as admin (password → AAL1 session).
+ *     2. Initiate a settings flow, read the TOTP secret from ui.nodes
+ *        (the totp group text/img nodes Kratos emits during enrollment).
+ *     3. Compute a valid TOTP code from the captured secret (RFC-6238,
+ *        HMAC-SHA1, 30s window, 6 digits — built-in helper below, no dep).
+ *     4. Submit the TOTP confirmation code to complete enrollment.
+ *     5. Initiate an AAL2 login flow (?aal=aal2), submit a fresh TOTP code.
+ *        The resulting session carries AAL2 and can access /admin.
+ *   adminAal2Context() encapsulates this; admin specs that need to reach /admin
+ *   call it instead of loginViaJsonApi.
  *
  * virtualAuthenticator / pageCDPSession — test-scoped fixtures for WebAuthn
  *   passkey testing via the Chrome DevTools Protocol (CDP). Ported from Ory
@@ -27,8 +45,278 @@
  */
 
 import { test as base } from '@playwright/test';
-import type { CDPSession } from 'playwright-core';
+import type { BrowserContext, CDPSession } from 'playwright-core';
 import { createIdentityWithPassword, TEST_PASSWORD, type SeedResult } from '../actions/identity';
+import { loginViaJsonApi } from '../actions/login';
+
+// ── Minimal RFC-6238 TOTP implementation ─────────────────────────────────────
+// Used to compute TOTP codes from the secret Kratos returns during enrollment.
+// No external dependency: Node's built-in `crypto` module only.
+// Algorithm: HOTP(secret, T) where T = Math.floor(Date.now() / 1000 / 30).
+// secret is base32-encoded (RFC-4648, no padding required).
+
+/** Base32 decode (RFC-4648, case-insensitive, no padding required). */
+function base32Decode(input: string): Uint8Array {
+  const alphabet = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ234567';
+  const str = input.toUpperCase().replace(/=+$/, '');
+  let bits = 0;
+  let value = 0;
+  let index = 0;
+  const output = new Uint8Array(Math.floor((str.length * 5) / 8));
+  for (let i = 0; i < str.length; i++) {
+    const idx = alphabet.indexOf(str[i]);
+    if (idx === -1) continue; // skip non-alphabet chars (spaces, dashes)
+    value = (value << 5) | idx;
+    bits += 5;
+    if (bits >= 8) {
+      output[index++] = (value >>> (bits - 8)) & 0xff;
+      bits -= 8;
+    }
+  }
+  return output.slice(0, index);
+}
+
+/**
+ * Compute a 6-digit TOTP code (RFC-6238, HMAC-SHA1, 30s step).
+ * @param secret  Base32-encoded TOTP secret (from Kratos settings flow).
+ * @param t       Optional Unix timestamp in seconds (default: now).
+ */
+async function computeTotp(secret: string, t?: number): Promise<string> {
+  const { createHmac } = await import('node:crypto');
+  const keyBytes = base32Decode(secret);
+  const counter = BigInt(Math.floor((t ?? Date.now() / 1000) / 30));
+  // Counter as 8-byte big-endian buffer.
+  const counterBuf = Buffer.alloc(8);
+  counterBuf.writeBigUInt64BE(counter);
+  const hmac = createHmac('sha1', Buffer.from(keyBytes));
+  hmac.update(counterBuf);
+  const digest = hmac.digest();
+  // Dynamic truncation per RFC-4226 §5.4.
+  const offset = digest[digest.length - 1] & 0x0f;
+  const code =
+    ((digest[offset] & 0x7f) << 24) |
+    ((digest[offset + 1] & 0xff) << 16) |
+    ((digest[offset + 2] & 0xff) << 8) |
+    (digest[offset + 3] & 0xff);
+  return String(code % 1_000_000).padStart(6, '0');
+}
+
+/**
+ * Extract a TOTP secret from a Kratos settings flow's ui.nodes.
+ * Kratos emits a text node in group "totp" whose attributes.text.text is the
+ * raw base32 TOTP secret when enrollment is in progress.
+ */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function extractTotpSecret(flowNodes: any[]): string {
+  for (const node of flowNodes ?? []) {
+    if (node?.group !== 'totp') continue;
+    // The secret text node: type=="text" (or node_type=="text") with the secret.
+    const attrs = node?.attributes;
+    if (
+      attrs &&
+      (attrs.node_type === 'text' || node?.type === 'text') &&
+      typeof attrs?.text?.text === 'string' &&
+      // Kratos sets id=1050015 for the TOTP secret node.
+      (attrs.text?.id === 1050015 || /^[A-Z2-7]{16,}$/i.test(attrs.text.text))
+    ) {
+      return attrs.text.text;
+    }
+  }
+  return '';
+}
+
+/**
+ * adminAal2Context — obtain a BrowserContext whose session is at AAL2.
+ *
+ * Sequence:
+ *   1. Log in as admin (password → AAL1).
+ *   2. Initiate a Kratos settings flow (Accept: application/json).
+ *   3. Read the TOTP secret from the flow's ui.nodes (totp group, text node).
+ *   4. Compute a TOTP code from the secret and submit it to enroll TOTP.
+ *   5. Initiate an AAL2 login flow (?aal=aal2), compute a fresh code,
+ *      submit it. The resulting session is at AAL2.
+ *
+ * The caller is responsible for closing the returned context after use.
+ *
+ * Throws if any step fails — a clear error message identifies which step.
+ */
+export async function adminAal2Context(opts: {
+  browser: import('playwright-core').Browser;
+  email: string;
+  password: string;
+  baseURL: string;
+}): Promise<BrowserContext> {
+  const { browser, email, password, baseURL } = opts;
+  const ctx = await browser.newContext();
+
+  try {
+    // Step 1: AAL1 login.
+    await loginViaJsonApi(ctx, { identifier: email, password }, baseURL);
+
+    // Step 2: initiate settings flow to enroll TOTP.
+    const settingsResp = await ctx.request.get(`${baseURL}/self-service/settings/browser`, {
+      headers: { Accept: 'application/json' },
+      maxRedirects: 5,
+    });
+    if (!settingsResp.ok()) {
+      throw new Error(
+        `adminAal2Context: settings flow init failed: ${settingsResp.status()}`,
+      );
+    }
+    const settingsFlow = await settingsResp.json() as {
+      id: string;
+      ui: {
+        action: string;
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        nodes: any[];
+      };
+    };
+
+    // Step 3: extract the TOTP secret. If Kratos doesn't return TOTP nodes
+    // immediately, submit the settings form with method=totp to trigger
+    // enrollment and re-fetch the flow.
+    let totpSecret = extractTotpSecret(settingsFlow.ui?.nodes ?? []);
+    let flowAction: string = settingsFlow.ui?.action ?? '';
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    let flowNodes: any[] = settingsFlow.ui?.nodes ?? [];
+
+    if (!totpSecret) {
+      // Find the CSRF token from the current nodes.
+      let csrfToken = '';
+      for (const node of flowNodes) {
+        if (
+          node?.attributes?.name === 'csrf_token' &&
+          node?.attributes?.type === 'hidden'
+        ) {
+          csrfToken = node.attributes.value ?? '';
+          break;
+        }
+      }
+
+      // Trigger TOTP enrollment by submitting method=totp.
+      const totpTriggerResp = await ctx.request.post(flowAction, {
+        headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+        data: { csrf_token: csrfToken, method: 'totp' },
+        maxRedirects: 5,
+      });
+      const totpFlow = await totpTriggerResp.json() as {
+        ui?: {
+          action?: string;
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          nodes?: any[];
+        };
+      };
+      flowNodes = totpFlow?.ui?.nodes ?? flowNodes;
+      flowAction = totpFlow?.ui?.action ?? flowAction;
+      totpSecret = extractTotpSecret(flowNodes);
+    }
+
+    if (!totpSecret) {
+      throw new Error(
+        'adminAal2Context: TOTP secret not found in settings flow nodes. ' +
+        'Check that the TOTP strategy is enabled in kratos.yml and that the ' +
+        'settings flow returns totp group nodes.',
+      );
+    }
+
+    console.log('[adminAal2] TOTP secret captured (first 6 chars):', totpSecret.slice(0, 6) + '…');
+
+    // Step 4: compute a TOTP code and enroll.
+    const enrollCode = await computeTotp(totpSecret);
+    console.log('[adminAal2] enrollment code:', enrollCode);
+
+    // Find CSRF token in current nodes.
+    let csrfForEnroll = '';
+    for (const node of flowNodes) {
+      if (
+        node?.attributes?.name === 'csrf_token' &&
+        node?.attributes?.type === 'hidden'
+      ) {
+        csrfForEnroll = node.attributes.value ?? '';
+        break;
+      }
+    }
+
+    const enrollResp = await ctx.request.post(flowAction, {
+      headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+      data: { csrf_token: csrfForEnroll, method: 'totp', totp_code: enrollCode },
+      maxRedirects: 5,
+    });
+
+    const enrollStatus = enrollResp.status();
+    console.log('[adminAal2] enrollment response status:', enrollStatus);
+    if (enrollStatus >= 400 && enrollStatus !== 422) {
+      const body = await enrollResp.text().catch(() => '');
+      throw new Error(
+        `adminAal2Context: TOTP enrollment failed: HTTP ${enrollStatus} — ${body.slice(0, 400)}`,
+      );
+    }
+
+    // Step 5: AAL2 step-up login. Initiate a login flow with aal=aal2.
+    const aal2FlowResp = await ctx.request.get(
+      `${baseURL}/self-service/login/browser?aal=aal2&refresh=true`,
+      { headers: { Accept: 'application/json' }, maxRedirects: 5 },
+    );
+    if (!aal2FlowResp.ok()) {
+      throw new Error(
+        `adminAal2Context: AAL2 login flow init failed: ${aal2FlowResp.status()}`,
+      );
+    }
+    const aal2Flow = await aal2FlowResp.json() as {
+      ui: {
+        action: string;
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        nodes: any[];
+      };
+    };
+
+    // Compute a fresh code (step boundary may have advanced).
+    const stepUpCode = await computeTotp(totpSecret);
+    console.log('[adminAal2] step-up code:', stepUpCode);
+
+    let csrfForStepUp = '';
+    for (const node of aal2Flow.ui?.nodes ?? []) {
+      if (
+        node?.attributes?.name === 'csrf_token' &&
+        node?.attributes?.type === 'hidden'
+      ) {
+        csrfForStepUp = node.attributes.value ?? '';
+        break;
+      }
+    }
+
+    const stepUpResp = await ctx.request.post(aal2Flow.ui?.action ?? '', {
+      headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+      data: { csrf_token: csrfForStepUp, method: 'totp', totp_code: stepUpCode },
+      maxRedirects: 5,
+    });
+
+    const stepUpStatus = stepUpResp.status();
+    console.log('[adminAal2] step-up response status:', stepUpStatus);
+    if (!stepUpResp.ok() && stepUpStatus !== 422) {
+      // 422 means the code window advanced; try one more time with a fresh code.
+      const retryCode = await computeTotp(totpSecret);
+      console.log('[adminAal2] retrying step-up with fresh code:', retryCode);
+      const retryResp = await ctx.request.post(aal2Flow.ui?.action ?? '', {
+        headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+        data: { csrf_token: csrfForStepUp, method: 'totp', totp_code: retryCode },
+        maxRedirects: 5,
+      });
+      if (!retryResp.ok()) {
+        const body = await retryResp.text().catch(() => '');
+        throw new Error(
+          `adminAal2Context: AAL2 step-up failed after retry: HTTP ${retryResp.status()} — ${body.slice(0, 400)}`,
+        );
+      }
+    }
+
+    console.log('[adminAal2] AAL2 session established');
+    return ctx;
+  } catch (err) {
+    await ctx.close();
+    throw err;
+  }
+}
 
 // CDP Protocol WebAuthn types are available via playwright-core's protocol.d.ts.
 // We use inline types here to avoid importing the full Protocol namespace (which
@@ -80,9 +368,8 @@ export const test = base.extend<OthalaFixtures>({
     await use(process.env.HYDRA_ADMIN_URL ?? 'http://hydra:4445');
   }, { scope: 'worker' }],
 
-  // member: bt2@othala.test, access-grafana + family groups. Seeded with a
-  // Kratos-assigned random id, so NOT on OTHALA_ADMIN_IDS (only the admin
-  // fixture's pinned 000...001 id is).
+  // member: bt2@othala.test, access-grafana + family groups. No admin marker
+  // (isAdmin not set), so NOT an admin under the ADR 0008 marker model.
   member: [
     async ({ kratosAdminURL }, use) => {
       const result = await createIdentityWithPassword({
@@ -97,22 +384,38 @@ export const test = base.extend<OthalaFixtures>({
     { scope: 'worker' },
   ],
 
-  // admin: seeded with the fixed identity UUID on OTHALA_ADMIN_IDS in
-  // gen-secrets.sh (CVP-P1: admin authority is keyed on the immutable id, not
-  // the email trait). The admin gate (requireAdminSession) checks that list by
-  // id. At AAL1 (password only), visiting /admin triggers the AAL2 step-up.
+  // admin: validate.sh pre-seeds this identity (ADMIN_EMAIL / ADMIN_USERNAME)
+  // with metadata_admin.admin=true (ADR 0008 marker) before Playwright starts.
+  // The fixture looks up the minted id by credentials_identifier. No OTHALA_ADMIN_IDS
+  // env or portal recreate is involved — the portal reads the marker from the
+  // Kratos admin API at request time.
+  //
+  // At AAL1 (password only), visiting /admin triggers an AAL2 step-up redirect.
+  // Use adminAal2Context() for specs that need to reach /admin pages.
   admin: [
     async ({ kratosAdminURL }, use) => {
-      const result = await createIdentityWithPassword({
-        // Keep in sync with OTHALA_ADMIN_IDS in e2e/gen-secrets.sh.
-        id: '00000000-0000-0000-0000-000000000001',
-        email: 'admin@othala.test',
-        username: 'admin',
-        displayName: 'Othala Admin',
-        groups: ['family', 'access-grafana', 'admin'],
-        kratosAdminURL,
-      });
-      await use({ ...result, password: TEST_PASSWORD });
+      const email = process.env.ADMIN_EMAIL ?? 'admin@othala.test';
+      const password = process.env.ADMIN_PASSWORD ?? TEST_PASSWORD;
+      // Look up the pre-seeded admin identity by credentials identifier.
+      // validate.sh already created it with the admin marker; the 409-fallback
+      // path in createIdentityWithPassword also does this lookup, so calling it
+      // with the correct email would work — but issuing the lookup directly
+      // avoids an unnecessary POST attempt.
+      const listResp = await fetch(
+        `${kratosAdminURL}/admin/identities?credentials_identifier=${encodeURIComponent(email)}`,
+      );
+      if (!listResp.ok) {
+        throw new Error(
+          `admin fixture: lookup failed: HTTP ${listResp.status} for ${email}`,
+        );
+      }
+      const list = (await listResp.json()) as Array<{ id: string }>;
+      if (list.length === 0) {
+        throw new Error(
+          `admin fixture: no identity found for ${email} — did validate.sh seed phase run?`,
+        );
+      }
+      await use({ id: list[0].id, email, password });
     },
     { scope: 'worker' },
   ],

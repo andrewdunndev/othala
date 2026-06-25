@@ -157,3 +157,37 @@ test('enforceGroupGate: not a member → deny', () => {
   const r = enforceGroupGate(identity({ metadata_admin: { groups: ['other'] } }), 'access-observe');
   assert.equal(r.allowed, false);
 });
+
+// ── hasGroup case-normalization ───────────────────────────────────────────────
+// An out-of-band admin-API write with mixed-case group names would silently
+// fail to match a lowercase query without normalization (deny→correct-match fix).
+
+test('hasGroup matches when stored group is mixed-case and query is lowercase', () => {
+  const id = identity({ metadata_admin: { groups: ['Access-Grafana'] } });
+  assert.equal(hasGroup(id, 'access-grafana'), true, 'mixed-case stored must match lowercase query');
+});
+
+test('hasGroup matches when stored group is lowercase and query is mixed-case', () => {
+  const id = identity({ metadata_admin: { groups: ['access-grafana'] } });
+  assert.equal(hasGroup(id, 'Access-Grafana'), true, 'lowercase stored must match mixed-case query');
+});
+
+test('hasGroup matches when both stored and query are UPPERCASE', () => {
+  const id = identity({ metadata_admin: { groups: ['ACCESS-GRAFANA'] } });
+  assert.equal(hasGroup(id, 'access-grafana'), true, 'UPPER stored must match lowercase query');
+});
+
+test('hasGroup still rejects non-members after normalization', () => {
+  const id = identity({ metadata_admin: { groups: ['Access-Grafana'] } });
+  assert.equal(hasGroup(id, 'access-immich'), false, 'different group must still deny');
+});
+
+test('enforceGroupGate allows when stored group case differs from query (via hasGroup normalization)', () => {
+  // Integration check: the gate uses hasGroup internally; verify normalization
+  // flows through the full enforce path.
+  const r = enforceGroupGate(
+    identity({ metadata_admin: { groups: ['Access-Observe'] } }),
+    'access-observe',
+  );
+  assert.equal(r.allowed, true);
+});

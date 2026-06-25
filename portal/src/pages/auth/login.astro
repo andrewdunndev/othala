@@ -86,6 +86,17 @@ const isCodeEntry = codeNodes.some((n) => {
   const a = asInput(n);
   return a?.name === 'code' && a.type === 'text';
 });
+
+// AAL2 step-up: when the flow carries ?aal=aal2, Kratos populates second-factor
+// nodes in the totp / webauthn / lookup_secret groups. The primary login tiers
+// (passkey, email-code, password) are absent or inert in a step-up flow — Kratos
+// supplies only the second-factor methods the identity has enrolled. We detect
+// the step-up by the `aal` query param and collect the second-factor node groups.
+const isAal2 = aal === 'aal2';
+const totpNodes = ui ? nodesByGroup(ui.nodes, 'totp') : [];
+const aal2WebauthnNodes = ui ? nodesByGroup(ui.nodes, 'webauthn') : [];
+const lookupNodes = ui ? nodesByGroup(ui.nodes, 'lookup_secret') : [];
+const hasAal2Methods = isAal2 && (totpNodes.length > 0 || aal2WebauthnNodes.length > 0 || lookupNodes.length > 0);
 ---
 <Layout title="Sign in" description={`Sign in to ${siteName}.`} bare>
 
@@ -114,8 +125,141 @@ const isCodeEntry = codeNodes.some((n) => {
 
   <section class="login-card">
 
+    {/* ── AAL2 STEP-UP ─────────────────────────────────────────────────── */}
+    {/*
+      Rendered when ?aal=aal2 is set and Kratos has populated second-factor
+      method nodes (totp, webauthn, lookup_secret). Each method group is a
+      separate form posting to ui.action. The primary tiers (passkey, code,
+      password) are hidden during step-up — the lede already explains why.
+    */}
+    {isAal2 && hasAal2Methods && (
+      <div class="aal2-block">
+
+        {/* ── TOTP ─────────────────────────────────────────────── */}
+        {totpNodes.length > 0 && (
+          <form method="POST" action={ui?.action ?? '#'} class="login-block aal2-form">
+            <input type="hidden" name="csrf_token" value={csrf} />
+            {totpNodes.map((n) => {
+              const a = asInput(n);
+              if (!a) return null;
+              if (a.type === 'hidden') {
+                return <input type="hidden" name={a.name} value={String(a.value ?? '')} />;
+              }
+              if (a.type === 'text' && a.name === 'totp_code') {
+                return (
+                  <div class="field">
+                    <label for="totp-code">{n.meta?.label?.text ?? 'Authenticator code'}</label>
+                    <input
+                      id="totp-code"
+                      name="totp_code"
+                      type="text"
+                      inputmode="numeric"
+                      autocomplete="one-time-code"
+                      required
+                      autofocus
+                      placeholder="123456"
+                    />
+                  </div>
+                );
+              }
+              if (a.type === 'submit') {
+                return (
+                  <button class="button button-primary aal2-submit" type="submit" name={a.name} value={String(a.value ?? '')}>
+                    {n.meta?.label?.text ?? 'Verify code'}
+                  </button>
+                );
+              }
+              return null;
+            })}
+          </form>
+        )}
+
+        {/* ── WebAuthn second-factor ────────────────────────────── */}
+        {aal2WebauthnNodes.length > 0 && (
+          <form method="POST" action={ui?.action ?? '#'} class="login-block aal2-form">
+            <input type="hidden" name="csrf_token" value={csrf} />
+            {aal2WebauthnNodes.map((n) => {
+              const a = asInput(n);
+              if (!a) return null;
+              if (a.type === 'hidden') {
+                return <input type="hidden" name={a.name} value={String(a.value ?? '')} />;
+              }
+              if (a.type === 'submit' || a.type === 'button') {
+                return (
+                  <button
+                    class="button button-secondary aal2-submit"
+                    type={a.type}
+                    name={a.name}
+                    value={String(a.value ?? '')}
+                    onclick={safeOnclick(a)}
+                  >
+                    {n.meta?.label?.text ?? 'Use security key'}
+                  </button>
+                );
+              }
+              return null;
+            })}
+          </form>
+        )}
+
+        {/* ── Backup / lookup_secret ────────────────────────────── */}
+        {lookupNodes.length > 0 && (
+          <details class="password-disclosure">
+            <summary class="password-summary">
+              <span class="password-summary-label">Use a backup code</span>
+              <span class="password-summary-icon" aria-hidden="true">+</span>
+            </summary>
+            <form method="POST" action={ui?.action ?? '#'} class="login-block aal2-form" style="margin-top: var(--space-5)">
+              <input type="hidden" name="csrf_token" value={csrf} />
+              {lookupNodes.map((n) => {
+                const a = asInput(n);
+                if (!a) return null;
+                if (a.type === 'hidden') {
+                  return <input type="hidden" name={a.name} value={String(a.value ?? '')} />;
+                }
+                if (a.type === 'text' && a.name === 'lookup_secret') {
+                  return (
+                    <div class="field">
+                      <label for="lookup-secret">{n.meta?.label?.text ?? 'Backup code'}</label>
+                      <input
+                        id="lookup-secret"
+                        name="lookup_secret"
+                        type="text"
+                        autocomplete="off"
+                        required
+                        placeholder="xxxxxxxxxx"
+                      />
+                    </div>
+                  );
+                }
+                if (a.type === 'submit') {
+                  return (
+                    <button class="button button-secondary aal2-submit" type="submit" name={a.name} value={String(a.value ?? '')}>
+                      {n.meta?.label?.text ?? 'Use backup code'}
+                    </button>
+                  );
+                }
+                return null;
+              })}
+            </form>
+          </details>
+        )}
+
+      </div>
+    )}
+
+    {/* Fallback for AAL2 with no enrolled second factors. Should not happen
+        in production (enrollment is required before admin access), but renders
+        a helpful message rather than a blank form. */}
+    {isAal2 && !hasAal2Methods && flow && (
+      <div class="notice notice-warning">
+        No second-factor methods are enrolled for this account. An administrator
+        must enroll TOTP or a security key before admin access is available.
+      </div>
+    )}
+
     {/* ── TIER 1: Passkey ───────────────────────────────────────────────── */}
-    {hasPasskey && (
+    {!isAal2 && hasPasskey && (
       <form method="POST" action={ui?.action ?? '#'} class="login-block passkey-block">
         <input type="hidden" name="csrf_token" value={csrf} />
         <input type="hidden" name="method" value="passkey" />
@@ -166,8 +310,9 @@ const isCodeEntry = codeNodes.some((n) => {
         but we render it here inside the code form so Kratos receives it.
       - Code entry step (isCodeEntry=true): show the "code" text input +
         Continue + Resend buttons. The identifier is now a hidden in code group.
+      Not rendered during an AAL2 step-up (a step-up only needs second factors).
     */}
-    {hasCode && (
+    {!isAal2 && hasCode && (
       <div class="code-block">
         {!isCodeEntry && (
           <form method="POST" action={ui?.action ?? '#'} class="login-block code-form">
@@ -283,7 +428,8 @@ const isCodeEntry = codeNodes.some((n) => {
     )}
 
     {/* ── TIER 3: Password (legacy) ─────────────────────────────────────── */}
-    {hasPassword && (
+    {/* Not rendered during an AAL2 step-up. */}
+    {!isAal2 && hasPassword && (
       <details class="password-disclosure">
         <summary class="password-summary">
           <span class="password-summary-label">Use a password (legacy)</span>
@@ -376,6 +522,21 @@ const isCodeEntry = codeNodes.some((n) => {
     line-height: 1.5;
     color: var(--text-muted);
     text-align: center;
+  }
+
+  /* AAL2 step-up block: full-width, stacked forms with spacing. */
+  .aal2-block {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-5);
+  }
+  .aal2-form {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-4);
+  }
+  .aal2-submit {
+    width: 100%;
   }
 
   /* Code block: prominent secondary tier, separated by a divider */

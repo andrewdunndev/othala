@@ -136,22 +136,24 @@ LDAP_BASE_DN=dc=othala,dc=test
 LDAP_SERVICE_BIND_DN=cn=ldap-reader,dc=othala,dc=test
 LDAP_SERVICE_BIND_PASSWORD=$(gen_short)
 
-# Converged app admin model (CU3 / CVP-P1). consent is gone; these are the
-# othala app's own secrets:
-#   OTHALA_ADMIN_IDS              the SOLE admin authority — a comma-separated
-#                                 list of Kratos identity UUIDs. The e2e fixtures
-#                                 seed identities with these EXACT UUIDs (via the
-#                                 createIdentity 'id' field) to exercise the admin
-#                                 gate, recovery-gate, and login-gate refuse paths:
-#                                   ...0001 = 'admin' fixture (admin@othala.test)
-#                                   ...0002 = J2 recovery-gate test identity
-#                                 PLACEHOLDER for real deployments: replace with the
-#                                 real admin identity UUID(s) from 'kratos identity
-#                                 list' after first boot.
+# ── Admin identity credentials (shared between validate.sh seed + Playwright fixtures) ────
+# validate.sh seeds these two identities after compose is healthy (ADR 0008 marker model):
+#   - POST /admin/identities with metadata_admin: { admin: true, groups: [...] }
+#     The admin marker IS the authority — no UUID readback or env rewrite needed.
+# The Playwright fixtures read these same env vars to log in as the seeded admin.
+# Passwords are fixed test-only values (≥12 chars; HIBP disabled in the e2e env).
+ADMIN_EMAIL=admin@othala.test
+ADMIN_USERNAME=admin
+ADMIN_PASSWORD=othala-testpass-2026
+RECOVERY_ADMIN_EMAIL=admin.recovery@othala.test
+RECOVERY_ADMIN_USERNAME=admin.recovery
+RECOVERY_ADMIN_PASSWORD=othala-testpass-2026
+
+# Converged app admin model (ADR 0008). Admin authority is the
+# metadata_admin.admin === true boolean marker (set via Kratos admin API),
+# NOT an env-based UUID allowlist. OTHALA_ADMIN_IDS is retired.
 #   OTHALA_ADMIN_ENDPOINT_BEARER  guards POST /admin/revoke-user (loopback)
 #   RECOVERY_GATE_SECRET          guards POST /admin/recovery-gate (loopback)
-#                                 and POST /admin/login-gate (loopback; CVP-P3)
-OTHALA_ADMIN_IDS=00000000-0000-0000-0000-000000000001,00000000-0000-0000-0000-000000000002
 OTHALA_ADMIN_ENDPOINT_BEARER=$(gen)
 RECOVERY_GATE_SECRET=$(gen)
 

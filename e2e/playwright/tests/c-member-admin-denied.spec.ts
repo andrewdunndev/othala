@@ -1,14 +1,14 @@
 /**
  * C — Non-admin member denied at /admin (browser-test.mjs assertion C).
  *
- * A member (bt2@othala.test) who is NOT on OTHALA_ADMIN_IDS visits /admin.
- * The requireAdminSession middleware in the othala app must deny access.
- * Expected: the URL after redirect contains reason=not-admin OR routes to
- * /auth/error (the app's error page for the allowlist gate).
+ * A member (bt2@othala.test) who does NOT have metadata_admin.admin=true
+ * visits /admin. The requireAdminSession middleware in the othala app must
+ * deny access. Expected: the URL after redirect contains reason=not-admin
+ * OR routes to /auth/error (the app's error page for the admin marker gate).
  *
  * The member has a valid Kratos session (AAL1, password) so the check is NOT
- * the "unauthenticated" branch — it is specifically the allowlist check:
- * "authenticated but not on the admin allowlist".
+ * the "unauthenticated" branch — it is specifically the admin marker check
+ * (ADR 0008): "authenticated but not an admin" (no metadata_admin.admin marker).
  */
 
 import { test, expect } from '../fixtures';
@@ -22,7 +22,7 @@ test('C — non-admin member is denied at /admin with reason=not-admin', async (
   const ctx = await browser.newContext();
 
   try {
-    // Login as member (NOT an admin subject).
+    // Login as member (NOT an admin subject — no metadata_admin.admin marker).
     await loginViaJsonApi(
       ctx,
       { identifier: member.email, password: member.password },
@@ -31,9 +31,12 @@ test('C — non-admin member is denied at /admin with reason=not-admin', async (
 
     const page = await ctx.newPage();
 
-    // Navigate to /admin. The requireAdminSession middleware will check the
-    // session's identity id against OTHALA_ADMIN_IDS. bt2's id is not on the
-    // list → redirect to error URL with reason=not-admin.
+    // Navigate to /admin. requireAdminSession checks AAL2 first (AAL1 → step-up
+    // redirect), then the admin marker (ADR 0008: metadata_admin.admin === true
+    // via admin API). bt2 has no admin marker → redirect to error with reason=not-admin.
+    // AAL1 step-up fires first for this member, but since the member is not admin
+    // the marker check will ultimately deny. Either redirect satisfies this test's
+    // intent (denied at /admin).
     await page.goto(`${baseURL}/admin`, { waitUntil: 'networkidle', timeout: 30_000 });
 
     const finalUrl = page.url();
