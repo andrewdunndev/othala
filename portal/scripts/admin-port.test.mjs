@@ -253,7 +253,47 @@ test('POST /admin/recovery-gate is fail-closed when RECOVERY_GATE_SECRET unset (
   assert.equal(res.statusCode, 403);
 });
 
-test('POST /admin/recovery-gate REFUSES recovery when is_admin===true (403)', async () => {
+test('POST /admin/recovery-gate REFUSES recovery when the admin-API marker is true (403)', async () => {
+  // Genuinely exercise the admin-refusal MECHANISM. handleRecoveryGate IGNORES
+  // the payload's is_admin field (Kratos v26 omits metadata_admin from ctx) and
+  // resolves authority via fetchAdminMarker → the Kratos admin API. So we mock
+  // that API to return metadata_admin.admin===true and assert the 403 comes from
+  // the marker, NOT a fail-closed fallback. Sending is_admin:false in the body
+  // proves the verdict ignores the payload. (The prior version of this test left
+  // KRATOS_ADMIN_URL unset, so its 403 came from the admin-api-unavailable
+  // fail-closed path — it passed even if the isAdmin check were inverted.)
+  const mockKratos = http.createServer((req, res) => {
+    res.writeHead(200, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify({ id: ADMIN_UUID, metadata_admin: { admin: true, groups: ['admin', 'family'] } }));
+  });
+  await new Promise((r) => mockKratos.listen(0, '127.0.0.1', r));
+  const { port } = mockKratos.address();
+  process.env.KRATOS_ADMIN_URL = `http://127.0.0.1:${port}`;
+  process.env.RECOVERY_GATE_SECRET = 'gate-secret';
+  try {
+    const res = fakeRes();
+    await handleAdminRequest(
+      fakeReq({
+        method: 'POST',
+        url: '/admin/recovery-gate',
+        headers: { authorization: 'Bearer gate-secret' },
+        body: JSON.stringify({ identity_id: ADMIN_UUID, is_admin: false, traits: { email: 'admin@othala.test' } }),
+      }),
+      res,
+    );
+    assert.equal(res.statusCode, 403, 'admin marker true (from admin API) must refuse recovery');
+    assert.match(res.body, /console-only/, 'refusal must be the admin-marker reason, not a fail-closed fallback');
+  } finally {
+    await new Promise((r) => mockKratos.close(r));
+    delete process.env.KRATOS_ADMIN_URL;
+  }
+});
+
+test('POST /admin/recovery-gate is fail-closed when KRATOS_ADMIN_URL is unset (403, admin-api-unavailable)', async () => {
+  // Explicit coverage of the fail-closed path the old admin-true test relied on
+  // by accident: with no admin API to consult, the marker cannot be verified, so
+  // recovery is refused regardless of the identity. KRATOS_ADMIN_URL is cleared
+  // in beforeEach.
   process.env.RECOVERY_GATE_SECRET = 'gate-secret';
   const res = fakeRes();
   await handleAdminRequest(
@@ -261,11 +301,12 @@ test('POST /admin/recovery-gate REFUSES recovery when is_admin===true (403)', as
       method: 'POST',
       url: '/admin/recovery-gate',
       headers: { authorization: 'Bearer gate-secret' },
-      body: JSON.stringify({ identity_id: ADMIN_UUID, is_admin: true, traits: { email: 'admin@othala.test' } }),
+      body: JSON.stringify({ identity_id: OTHER_UUID, is_admin: false, traits: { email: 'kid@othala.test' } }),
     }),
     res,
   );
-  assert.equal(res.statusCode, 403);
+  assert.equal(res.statusCode, 403, 'unset KRATOS_ADMIN_URL must fail closed');
+  assert.match(res.body, /unavailable/, 'must refuse via the admin-api-unavailable fail-closed path');
 });
 
 test('POST /admin/recovery-gate ALLOWS recovery when is_admin===false (200)', async () => {

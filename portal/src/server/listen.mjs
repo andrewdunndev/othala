@@ -419,9 +419,12 @@ export async function createPublicServer() {
  *   a missing secret is always operator misconfiguration; refuse to boot so the
  *   problem surfaces immediately rather than silently degrading the gate.
  * - OTHALA_ADMIN_ENDPOINT_BEARER empty → same reasoning for /admin/revoke-user.
- * - ADMIN_HOST=0.0.0.0 → admin port would be exposed to the network; the admin
- *   mux has no public-facing auth hardening and must only be reachable on
- *   loopback or a dag-internal address. Wildcard is always a misconfiguration.
+ * - ADMIN_HOST is a wildcard (0.0.0.0, :: or empty "") → admin port would be
+ *   exposed to the network; the admin mux has no public-facing auth hardening
+ *   and must only be reachable on loopback or a dag-internal address. Note the
+ *   `?? '127.0.0.1'` default only catches null/undefined, NOT an empty string —
+ *   ADMIN_HOST="" reaches http.listen as the IPv6 wildcard, and "::" is the
+ *   explicit IPv6 wildcard. Both must be refused alongside 0.0.0.0.
  */
 function assertStartupEnv() {
   const errors = [];
@@ -436,8 +439,8 @@ function assertStartupEnv() {
     errors.push('[portal] FATAL: OTHALA_ADMIN_ENDPOINT_BEARER is not set or empty — refusing to start');
   }
 
-  if (ADMIN_HOST === '0.0.0.0') {
-    errors.push('[portal] FATAL: ADMIN_HOST is 0.0.0.0 (wildcard) — the admin port must be bound to loopback or a dag-internal IP, never a wildcard address');
+  if (ADMIN_HOST === '0.0.0.0' || ADMIN_HOST === '::' || ADMIN_HOST === '') {
+    errors.push(`[portal] FATAL: ADMIN_HOST is a wildcard address (${JSON.stringify(ADMIN_HOST)}) — the admin port must be bound to loopback or a dag-internal IP, never a wildcard (0.0.0.0, :: or empty)`);
   }
 
   if (errors.length > 0) {
