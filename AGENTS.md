@@ -25,9 +25,11 @@ Othala composes three upstream pieces and adds two of its own:
   above: the Kratos self-service UI, the Hydra login/consent/logout challenge
   handlers, the access gate, the id_token claims builder, and an admin surface.
 - **LDAP bridge** — the glauth-kratos Go binary that presents Kratos identities
-  over LDAP for non-OAuth clients (Jellyfin, Apple TV / Infuse SSO) is now a
-  separate sibling project: `gitlab.com/dunn.dev/kratos-ldap`. It no longer
-  lives in this repo.
+  over LDAP for non-OAuth clients is a separate sibling project:
+  `gitlab.com/dunn.dev/kratos-ldap`. It no longer lives in this repo. The bridge
+  is **shelved as of 2026-06-26** (parked, not deleted): Cinema/Jellyfin now
+  uses OIDC; the bridge is available for adopters who need non-OIDC LDAP
+  integration.
 
 Ory ships its services headless and expects you to bring your own UI and your
 own glue. Othala *is* that UI and glue, opinionated for the single-operator,

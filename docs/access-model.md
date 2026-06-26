@@ -62,10 +62,10 @@ binding and the default-fallback are over-opinionated.
 3. **Role binding** — `group_role_map` (already present): arbitrary group →
    role/claim, for apps that consume a role (OIDC `groups`/role claims).
 4. **One gate, three transports** — OIDC (Hydra consent + claims), LDAP
-   (kratos-ldap bridge), forward-auth (the `/api/forward-auth?group=` edge
-   endpoint). All three answer the *same* question against the *same* primitive:
-   membership in a manifest-declared access group, identity `state == active`,
-   fail-closed.
+   (kratos-ldap bridge, currently parked; see Section 13), forward-auth (the
+   `/api/forward-auth?group=` edge endpoint). All three answer the *same*
+   question against the *same* primitive: membership in a manifest-declared
+   access group, identity `state == active`, fail-closed.
 5. **No implicit access** — absence of a binding means no access. There is no
    framework default that silently grants visibility.
 
@@ -325,6 +325,12 @@ CLI, and a non-blocking yellow callout in `/admin/oauth2`. Severity matrix:
   appear without one.
 
 ## 13. LDAP class + cross-class consistency
+
+> **Note (2026-06-26):** The kratos-ldap bridge is a **parked** separate project
+> (`gitlab.com/dunn.dev/kratos-ldap`). It is not currently deployed. Cinema
+> (Jellyfin) moved to OIDC + Jellyfin-local password for native clients
+> (see `docs/per-app-oidc.md`). The LDAP transport class is a parked capability;
+> the analysis below is retained for adopters who deploy the bridge.
 
 kratos-ldap already exposes `metadata_admin.groups` as `memberOf` over SEARCH
 (`handler.go:331`) and filters inactive identities (KL-3, `client.go`). BIND is a

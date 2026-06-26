@@ -16,7 +16,7 @@ tag is imminent (operator/joint). Deploy pending, operator-gated.**
 
 The OSS project is **Othala** ("Ory for your home"); the deployed
 instance host is **dag.dunn.dev**. The stack has converged to a single
-all-TS application fronting upstream Ory plus the Go LDAP bridge:
+all-TS application fronting upstream Ory:
 
 - One Astro Node SSR app (`portal/`) holds the Kratos self-service
   flows (one generic `ui.nodes` renderer, `FlowNodes.astro`; login
@@ -54,8 +54,9 @@ The standalone Go consent service and the `util` runner have been
 
 **Stack:** Ory Kratos + Ory Hydra (OAuth2/OIDC) + Postgres 18 + the
 converged Astro Node SSR Othala app on carmine + custom Caddy edge
-(`registry.gitlab.com/dunn.dev/caddy-estate`) + Go glauth-kratos LDAP
-bridge as a separate sibling project (`gitlab.com/dunn.dev/kratos-ldap`).
+(`registry.gitlab.com/dunn.dev/caddy-estate`). The Go glauth-kratos LDAP
+bridge (`gitlab.com/dunn.dev/kratos-ldap`) is a separate sibling project;
+it is **shelved as of 2026-06-26** (parked, not deleted).
 Estate design tokens via `@dunn.dev/reference`.
 
 ## Pending state
@@ -113,8 +114,8 @@ state, not a regression.
 | **Admin authz** | `metadata_admin.admin` marker (ADR 0008); admin-API-only writable; `admin` group is display-only |
 | Access gate | `access-<clientId>` group AND Kratos state `== active`, fail-closed, on login + consent |
 | Back-channel logout | Hydra-native (Hydra-signed); app holds no signing key at rest |
-| LDAP bridge | Go glauth-kratos binary at `gitlab.com/dunn.dev/kratos-ldap` (separate project; no `.so` plugins); stays Go |
-| LDAP DN | `uid=<username>,ou=users,dc=dunn,dc=dev` |
+| LDAP bridge | Go glauth-kratos binary at `gitlab.com/dunn.dev/kratos-ldap` (separate project; no `.so` plugins); stays Go. **Shelved 2026-06-26; parked, not deleted.** |
+| LDAP DN | `uid=<username>,ou=users,dc=dunn,dc=dev` (bridge parked; retained as capability reference) |
 | Postgres | Single instance (`postgres:18-alpine`), separate `kratos` + `hydra` DBs |
 | Recovery | Code via Fastmail; admin subjects BLOCKED at the recovery-gate (console-only break-glass) |
 | Hydra admin | In-pod only; never public |

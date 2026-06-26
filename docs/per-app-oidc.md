@@ -9,7 +9,7 @@ integration will fail silently in ways that look like provider errors.
 This runbook covers OIDC-based integrations. For the forward-auth apps
 (Navidrome/tune, Sonarr+Radarr/gather) see `docs/per-app-oidc.md`
 "forward auth" note in `ARCHITECTURE.md`. For Cinema's native clients
-(Apple TV / Infuse), see the [Jellyfin LDAP section](#cinema--jellyfin-ldap-not-oidc).
+(Apple TV / Infuse), see [Cinema / Jellyfin](#cinema--jellyfin----oidc-with-a-jellyfin-local-password-for-native-clients).
 
 > **Note for adopters:** every issuer/token/userinfo URL in this
 > document uses `{YOUR_OTHALA_URL}` as a placeholder for your Othala
@@ -474,42 +474,47 @@ link to upstream docs rather than reproduce here.
 
 ---
 
-## Cinema / Jellyfin -- LDAP, not OIDC
+## Cinema / Jellyfin -- OIDC, with a Jellyfin-local password for native clients
 
-Browser logins to Jellyfin use the OIDC path above (client_id: `cinema`,
-plugin: `jellyfin-plugin-sso`). Native clients (Apple TV, Infuse) use
-LDAP via the glauth-kratos bridge co-located in the Jellyfin pod.
+**Updated 2026-06-26.** Cinema (Jellyfin) authenticates via OIDC using the
+Jellyfin SSO plugin (ZL154, `jellyfin-plugin-sso`), client_id: `cinema`. This
+is the same authorization-code flow as every other OIDC app in this runbook.
+The Kratos/dag credential is the OIDC credential; it never enters Jellyfin
+directly.
 
-The bridge maps Kratos identity groups to LDAP `memberOf` attributes.
-The Jellyfin LDAP plugin reads `memberOf` to assign Jellyfin policies.
-The group strings emitted (`jellyfin-admin`, `jellyfin-user`) match the
-OIDC path for consistency.
+### Native clients (Infuse, Apple TV)
 
-Configure the Jellyfin LDAP plugin with:
+Native clients that cannot perform the OAuth browser redirect (Infuse, the Apple
+TV Jellyfin client) use a **Jellyfin-local password**: a credential stored only
+in Jellyfin's own user database. This is a separate, dedicated credential for
+native-client use. The Kratos password is not shared with Jellyfin and is not
+used here.
 
-| Field | Value |
-|---|---|
-| LDAP server | `localhost` (bridge is in the same pod) |
-| LDAP port | `636` (LDAPS) or `389` (LDAP; verify against bridge config) |
-| Bind DN | `cn=ldap-reader,dc=dunn,dc=dev` |
-| Bind password | value of `LDAP_SERVICE_BIND_PASSWORD` from sops |
-| Base DN | `dc=dunn,dc=dev` |
-| User search filter | `(&(objectClass=posixAccount)(memberOf=cn=cinema,ou=groups,dc=dunn,dc=dev))` |
+To set the Jellyfin-local password for a user:
 
-IMPORTANT: anonymous bind now returns an empty result set. The bind DN
-is required. If logins return no users or a 401, the first thing to
-check is whether the bind password is set correctly in the plugin.
+1. Log in to Jellyfin as an admin (via the browser/OIDC path).
+2. Go to Admin Dashboard, then Users, then select the user.
+3. Set a password in the Jellyfin user settings panel.
 
-The LDAP plugin requires the Jellyfin LDAP Authentication plugin to be
-installed from the plugin catalog; it is not bundled. Restart Jellyfin
-after installing and after each config change.
+The user then enters that Jellyfin-local password in Infuse or Apple TV.
 
-PRE-DEPLOY verifiable: `LDAP_SERVICE_BIND_PASSWORD` is in sops,
-bridge container is running, `ldapsearch` from inside the pod with the
-bind DN returns at least one account in the `cinema` group.
+### LDAP (shelved 2026-06-26)
 
-LIVE only: native client login completes and lands the user in the
-correct Jellyfin library.
+A prior approach used the kratos-ldap LDAP bridge (`gitlab.com/dunn.dev/kratos-ldap`)
+co-located in the Jellyfin pod to authenticate native clients over LDAPS. That
+approach is shelved. Jellyfin no longer has the LDAP plugin configured; the
+bridge is not deployed in the cinema pod. The kratos-ldap project is parked (not
+deleted) and remains available to adopters who need non-OIDC LDAP integration.
+
+### Verification
+
+PRE-DEPLOY verifiable: the `cinema` OIDC client is registered in Hydra (the
+`cinema.yaml` manifest has an `oidc:` block), the SSO plugin is installed in
+Jellyfin, and the configured redirect URI matches the manifest entry.
+
+LIVE only: browser login completes the OIDC flow and lands the user in the
+correct Jellyfin library; native client login with the Jellyfin-local password
+succeeds.
 
 ---
 

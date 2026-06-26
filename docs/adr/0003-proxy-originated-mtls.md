@@ -8,6 +8,12 @@ kratos-ldap). See also [0006](0006-two-pki.md) (two-PKI, which establishes
 the step-ca CA whose certs the proxy presents). Reference:
 `campaigns/othala/proxy-mtls-egress-design.md`.
 
+**Amendment (2026-06-26):** The mechanism decision (proxy-originated mTLS with
+step-ca client certs via Caddy sidecar) stands. The kratos-ldap bridge consumer
+cited in Context is shelved; the LDAP bridge is a parked separate project and is
+not currently deployed. The portal is the live consumer of this pattern (reaching
+`dag-kratos-admin-proxy` via its Caddy sidecar egress route).
+
 ## Context
 
 Gate 5 of the hardening roadmap requires client authentication on the

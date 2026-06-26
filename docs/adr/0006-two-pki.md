@@ -9,6 +9,17 @@ internal mesh PKI is a first-class capability, and a hard requirement on it is
 Context and Decision). Forward work: the WAN ACME + EAB roster surface and the SSH
 CA. Reference: `campaigns/othala/step-ca-design.md`.
 
+## Amendment (2026-06-26)
+
+The original forcing function for this decision was the kratos-ldap LDAP outpost
+model (see Context below). That outpost model is now **shelved**: the kratos-ldap
+bridge is a parked separate project (`gitlab.com/dunn.dev/kratos-ldap`), not
+currently deployed. The two-PKI decision stands independently of the LDAP
+outpost. The internal mesh PKI (step-ca) secures all service-to-service hops:
+the portal reaches the Kratos admin API (`dag-kratos-admin-proxy`) over mTLS,
+and the same pattern applies to any future internal hop. Mesh mTLS is not
+contingent on the LDAP use case.
+
 ## Context
 
 The estate has two classes of TLS:
@@ -19,18 +30,20 @@ The estate has two classes of TLS:
    using the Cloudflare API. This is already in production.
 
 2. **Internal service-to-service TLS** for cross-network hops between estate
-   services. The most immediate case: when a kratos-ldap outpost living in
-   `cinema.network` needs to reach the Kratos admin API (`dag-kratos-admin-proxy`,
-   mTLS port `:8445`), it must present a client certificate. That certificate
-   must be issued by a CA that the proxy trusts, and it must not be a
+   services. The most immediate case at decision time: when a kratos-ldap outpost
+   living in `cinema.network` needed to reach the Kratos admin API
+   (`dag-kratos-admin-proxy`, mTLS port `:8445`), it would need to present a
+   client certificate issued by a CA that the proxy trusts, and it must not be a
    browser-trusted CA, because the proxy is not browser-facing.
 
-The forcing function is the LDAP outpost model: moving kratos-ldap into each
-app's pod (rather than running one shared bridge in the dag stack) exposes the
-Kratos admin API across a network boundary. Kratos admin is unauthenticated
-god-mode in Ory OSS (create/delete any identity, read all credential metadata).
-Crossing that boundary without mTLS is strictly worse than the shared bridge;
-mTLS with per-outpost client certs is what makes the outpost model safer.
+The original forcing function was the LDAP outpost model (now shelved): moving
+kratos-ldap into each app's pod (rather than running one shared bridge in the dag
+stack) exposed the Kratos admin API across a network boundary. Kratos admin is
+unauthenticated god-mode in Ory OSS (create/delete any identity, read all
+credential metadata). Crossing that boundary without mTLS was strictly worse than
+the shared bridge; mTLS with per-outpost client certs is what makes the outpost
+model safer. The portal-to-admin-proxy mTLS hop remains the live consumer of this
+pattern regardless of the LDAP outpost status.
 
 3. **Issuance over the WAN, to multiple sites.** The estate is not single-host.
    Compute and consumers will live across more than one machine and more than one
@@ -104,9 +117,9 @@ itself; the EAB roster plus the per-leaf identity are the trust boundary.
 ## Consequences
 
 - step-ca is a dependency for any service that needs internal mTLS. It must be
-  running and reachable before the LDAP outpost, the kratos-admin-proxy, and any
-  future internal mTLS endpoint can operate. Its availability is a pre-condition
-  for the LDAP bridge across a network boundary.
+  running and reachable before the kratos-admin-proxy and any future internal
+  mTLS endpoint can operate. (The LDAP outpost model is shelved; see Amendment
+  above. The kratos-admin-proxy mTLS hop is the live consumer.)
 - Root key custody is sops-backed (not airgapped). If the sops age key and the
   step-ca root key are both compromised simultaneously, all internal certs are
   untrustworthy. Accepted at family scale; document clearly.

@@ -4,7 +4,7 @@
 
 [![license](https://img.shields.io/badge/license-MIT-green)](LICENSE) ![built with GitLab](https://img.shields.io/badge/built_with-GitLab-FC6D26?logo=gitlab)
 
-Ory for your home. Othala is a self-hosted Ory substrate for a personal estate: the on-prem, family-scale analog to Ory Network. One all-TypeScript application (Astro Node SSR) fronts upstream Ory Kratos (identity) + Hydra (OAuth2/OIDC) + Postgres. Passkey-first by design — WebAuthn/passkeys are the primary credential; email code and password are fallback paths. For clients that cannot speak OAuth, a companion Go glauth-kratos LDAP bridge is available as a separate sibling project: `gitlab.com/dunn.dev/kratos-ldap`.
+Ory for your home. Othala is a self-hosted Ory substrate for a personal estate: the on-prem, family-scale analog to Ory Network. One all-TypeScript application (Astro Node SSR) fronts upstream Ory Kratos (identity) + Hydra (OAuth2/OIDC) + Postgres. Passkey-first by design — WebAuthn/passkeys are the primary credential; email code and password are fallback paths. A companion Go glauth-kratos LDAP bridge exists as a separate, currently-parked project (`gitlab.com/dunn.dev/kratos-ldap`) for adopters who need non-OIDC LDAP integration.
 
 The name is the rune ᛟ *othala* (home, inheritance, the estate). Andrew's deployed instance runs on **dag.dunn.dev** (ᛞ *dagaz*, the threshold rune). The login screen renders the motif **ᛞ→ᛟ "door to home"**: through the door (dag), into the home (othala).
 
@@ -13,8 +13,8 @@ The name is the rune ᛟ *othala* (home, inheritance, the estate). Andrew's depl
 One converged application, not a fleet of services:
 
 - **The Othala app** (`portal/`, Astro Node SSR + TypeScript). It renders the Kratos self-service browser flows, acts as Hydra's login + consent + logout provider (Hydra ships no UI by design), holds the access gate and the id_token claims builder, runs the in-process revoke fan-out, and exposes admin endpoints on a separate loopback listener. It reads per-app manifests at runtime from a mounted directory (`MANIFEST_DIR`), so adding an app is a manifest drop, not an image rebuild. It runs as a Node process inside the SSO pod so Kratos's and Hydra's admin ports are reachable directly.
-- **The Ory substrate** (Kratos + Hydra + Postgres). Kratos owns identity (login, recovery, settings, passkeys). Hydra owns OAuth2/OIDC. Single-source-of-truth identity in Kratos; LDAP and OIDC are presentation layers downstream.
-The OSS project is **Othala**; the GitLab project is `dunn.dev/othala`. The app package is `@dunn.dev/othala-portal`; the image publishes at `registry.gitlab.com/dunn.dev/othala`. The companion LDAP bridge lives at `gitlab.com/dunn.dev/kratos-ldap` (Go, separate repo).
+- **The Ory substrate** (Kratos + Hydra + Postgres). Kratos owns identity (login, recovery, settings, passkeys). Hydra owns OAuth2/OIDC. Single-source-of-truth identity in Kratos; OIDC is the primary presentation layer downstream.
+The OSS project is **Othala**; the GitLab project is `dunn.dev/othala`. The app package is `@dunn.dev/othala-portal`; the image publishes at `registry.gitlab.com/dunn.dev/othala`. A companion LDAP bridge exists at `gitlab.com/dunn.dev/kratos-ldap` (Go, separate repo; currently parked).
 
 ## Built for us, open for you
 
@@ -35,7 +35,7 @@ An app is one unified `<slug>.yaml` manifest, read at request time from `MANIFES
 
 A manifest with only `presentation:` (a forward_auth, LDAP, or external tile with no Hydra client) is skipped by the OIDC loader. Because both loaders read the directory at runtime behind a 30-second cache, **adding or removing an app is a manifest-dir change with no image rebuild**.
 
-The generic worked examples live in [`e2e/manifests/`](e2e/manifests/): `grafana` (OIDC + role mapping), `audiobookshelf` (OIDC), `jellyfin` (LDAP via the bridge), `proxywatch` (forward_auth), `statuspage` (external). They double as the release-gate fixtures the smoke harness registers.
+The generic worked examples live in [`e2e/manifests/`](e2e/manifests/): `grafana` (OIDC + role mapping), `audiobookshelf` (OIDC), `jellyfin` (OIDC; the LDAP-bridge variant is in the parked kratos-ldap repo), `proxywatch` (forward_auth), `statuspage` (external). They double as the release-gate fixtures the smoke harness registers.
 
 ## Run it locally
 
@@ -43,7 +43,7 @@ The honest first-run path. Two modes, depending on what you want.
 
 ### Full stack (the e2e compose harness)
 
-The complete worked example is the e2e harness. It stands up Postgres + Kratos + Hydra + Othala + Mailpit behind Caddy, renders the Ory configs, registers the example clients from `e2e/manifests/`, and runs the OIDC dance + smoke matrix. Everything runs on the RFC 6761 reserved test domain `othala.test`, so nothing touches a real domain. The LDAP bridge is a separate project (`gitlab.com/dunn.dev/kratos-ldap`); no e2e spec exercises it here.
+The complete worked example is the e2e harness. It stands up Postgres + Kratos + Hydra + Othala + Mailpit behind Caddy, renders the Ory configs, registers the example clients from `e2e/manifests/`, and runs the OIDC dance + smoke matrix. Everything runs on the RFC 6761 reserved test domain `othala.test`, so nothing touches a real domain. The LDAP bridge is a separate, currently-parked project (`gitlab.com/dunn.dev/kratos-ldap`); no e2e spec exercises it here.
 
 ```sh
 cd e2e
@@ -75,7 +75,7 @@ npm run build     # astro build + bundle the listener / admin / registrar
 - **Cold-start orientation** (the anchor): [`ARCHITECTURE.md`](ARCHITECTURE.md). What the converged app holds, the load-bearing decisions, topology, and trust boundary.
 - **Release / version state**: [`docs/STATUS.md`](docs/STATUS.md). The only place a deployed version is asserted.
 - **Deploy**: [`DEPLOY.md`](DEPLOY.md).
-- **Network segmentation diagram**: [`docs/diagrams/dag-network-segmentation.svg`](docs/diagrams/dag-network-segmentation.svg). The deployed network topology (Envoy SNI router, SSO pod, app pods, LDAP off-path).
+- **Network segmentation diagram**: [`docs/diagrams/dag-network-segmentation.svg`](docs/diagrams/dag-network-segmentation.svg). The deployed network topology (Envoy SNI router, SSO pod, app pods).
 
 This README asserts no version. It is the front door.
 
@@ -87,7 +87,7 @@ This README asserts no version. It is the front door.
 | `kratos/` | Kratos server config + identity schema |
 | `hydra/` | Hydra server config |
 | `portal/` | The Othala application (Astro Node SSR + TS): Kratos self-service flows, Hydra login/consent/logout challenge handlers, the access gate, claims builder, revoke fan-out, dual-listener admin endpoints, the runtime manifest loaders (`tiles.ts` + `manifests.ts`), and the OIDC client registrar. Publishes as the `othala` image. |
-| `gitlab.com/dunn.dev/kratos-ldap` | glauth-kratos LDAP bridge (separate sibling repo). Protocol adapter for non-OAuth clients (Jellyfin / Apple TV). |
+| `gitlab.com/dunn.dev/kratos-ldap` | glauth-kratos LDAP bridge (separate sibling repo, currently parked). Protocol adapter for non-OAuth clients needing LDAP. Not currently deployed. |
 | `e2e/` | QEMU-CI smoke harness: compose stack + smoke scripts + gen-secrets + the generic example manifests (`e2e/manifests/`). Runs on carmine via the `e2e` CI job. |
 
 ## Architecture in brief
@@ -146,6 +146,8 @@ flowchart TB
 
 Cloudflare's role is DNS hosting + DNS-01 ACME via API. It is **not in the auth or app request path**. Visual language via [`@dunn.dev/reference`](https://gitlab.com/dunn.dev/reference) (tokens + site chrome).
 
+> **Note:** The diagram shows the JellyfinPod LDAP bridge path as originally designed. The kratos-ldap bridge is shelved as of 2026-06-26; Cinema/Jellyfin now uses OIDC. The bridge repo (`gitlab.com/dunn.dev/kratos-ldap`) is parked for adopters who need it.
+
 Full topology, request flows, auth patterns, image-pin table, and trust boundary: [`ARCHITECTURE.md`](ARCHITECTURE.md).
 
 ## Validation
@@ -157,7 +159,7 @@ Security review artifacts (adversarial, multi-lens):
 - [`docs/security-review-2026-05-04.md`](docs/security-review-2026-05-04.md) — initial adversarial pass: consent, admin pages, portal lib, Kratos/Hydra config, Caddy, runbooks.
 - [`docs/security-review-2026-06-07.md`](docs/security-review-2026-06-07.md) — second pass: portal middleware (response headers, font loading), application-layer abuse resistance, lost-device recovery.
 
-The LDAP bridge is validated in its own repo (`gitlab.com/dunn.dev/kratos-ldap`).
+The LDAP bridge is validated in its own repo (`gitlab.com/dunn.dev/kratos-ldap`; currently parked).
 
 ## Working conventions
 

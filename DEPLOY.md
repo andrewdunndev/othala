@@ -38,7 +38,7 @@ One Othala pod on carmine, fronted by a Caddy edge. The containers:
 | Quadlet | Image | Role |
 |---|---|---|
 | **dag-portal** | `registry.gitlab.com/dunn.dev/othala` | The converged Astro Node SSR app. Renders the Kratos self-service flows, serves the Hydra login/consent/logout challenge handlers, runs the access-gate, builds id_token claims, and hosts the loopback admin endpoints. See `ARCHITECTURE.md`. |
-| **dag-ldap-bridge** | `registry.gitlab.com/dunn.dev/kratos-ldap` | Go glauth-kratos LDAP bridge (now a separate project). Protocol adapter for non-OAuth native clients (Jellyfin / Apple TV). See `gitlab.com/dunn.dev/kratos-ldap`. |
+| ~~**dag-ldap-bridge**~~ | `registry.gitlab.com/dunn.dev/kratos-ldap` | Go glauth-kratos LDAP bridge. **Shelved 2026-06-26; not deployed.** The bridge is a parked separate project (`gitlab.com/dunn.dev/kratos-ldap`); Cinema/Jellyfin moved to OIDC. Available for adopters who need LDAP. |
 | **dag-kratos** | upstream Ory Kratos | Identity: self-service flows, sessions, recovery. |
 | **dag-hydra** | upstream Ory Hydra | OAuth2/OIDC. Ships no UI by design; the Othala app is its login + consent provider. |
 | **dag-postgres** | `postgres:18-alpine` | Separate `kratos` + `hydra` databases. |
@@ -152,7 +152,7 @@ plane maps each `dag_*` key to the env target below:
 | `OTHALA_ADMIN_IDS` | The **sole admin authz**: an allowlist of admin identity UUIDs (immutable Kratos identity IDs). Checked at `requireAdminSession`, the recovery-gate, and the `/admin/*` page gates. The `admin` group is display-only. |
 | `OTHALA_ADMIN_ENDPOINT_BEARER` | `POST /admin/revoke-user` on the loopback admin port. Constant-time, fail-closed. |
 | `RECOVERY_GATE_SECRET` | `POST /admin/recovery-gate` (the Kratos recovery-hook). Constant-time, fail-closed. |
-| `LDAP_BRIDGE_ADMIN_URL` / `LDAP_BRIDGE_ADMIN_TOKEN` | Best-effort LDAP bind-cache flush in the revoke fan-out. |
+| `LDAP_BRIDGE_ADMIN_URL` / `LDAP_BRIDGE_ADMIN_TOKEN` | Best-effort LDAP bind-cache flush in the revoke fan-out. **Shelved 2026-06-26; not set in current deploy (bridge not deployed).** |
 | `CSRF_SECRET` | CSRF token signing for the self-service flow posts. |
 
 The old secrets are **gone**: `CONSENT_ADMIN_BEARER`, `CONSENT_ADMIN_URL`,
