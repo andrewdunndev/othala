@@ -49,7 +49,11 @@ flowchart LR
 ```
 
 So the engineered choice is the **first-link key**, set explicitly per app
-*before* OIDC is enabled. Email is never a configured link key. Apps fall into
+*before* OIDC is enabled. Email is never a configured link key. Because the
+migration is DB-level (operator 2026-06-27 — move the data stores at the
+filesystem/ZFS layer, no reimport), the on-ramp is executed as a **SQL pre-seed
+of the `sub`** into each app's link record before first login, for apps that
+store one; username-match apps need only consistent usernames. Apps fall into
 three groups (verified per app at pinned versions in
 `account-linking-overrides.md`):
 
@@ -62,10 +66,13 @@ three groups (verified per app at pinned versions in
     (persists `sub` in `extraData.authOpenIDSub`). *No SQL pre-seed* — the
     earlier `openIdIssuer`/`openIdSub` column pre-seed was wrong (the field is
     JSON `extraData.authOpenIDSub`).
-  - Immich / Open WebUI: first-link is by email (Immich one-time adopt;
-    Open WebUI requires `OAUTH_MERGE_ACCOUNTS_BY_EMAIL=true` for the window),
-    then `sub` persists. A fresh receive (no prior accounts) skips straight to
-    `sub` auto-register.
+  - Immich: DB-level migration, no reimport (operator 2026-06-27) → SQL
+    pre-seed `users.oauthId = <kratos sub>` per user before first login. The
+    deterministic path: establishes sub-linking directly, skips the fragile
+    email-adopt fallback.
+  - Open WebUI: SQL pre-seed the `oauth_sub` link (or set
+    `OAUTH_MERGE_ACCOUNTS_BY_EMAIL=true` for the migration window only); `sub`
+    persists thereafter.
   - GitLab: `uid_field` defaults to `sub` (extern_uid); a pre-existing account
     does **not** auto-match by username — link via password-login + connect, or
     pre-seed the `identities` table. Never enable `omniauth_auto_link_user`.
@@ -76,7 +83,8 @@ three groups (verified per app at pinned versions in
 - **Email-forever** (Vaultwarden): the email field is the username *and* the
   master-password KDF salt. Cannot be re-keyed to username or `sub`. After first
   login it stores `{issuer}/{sub}` for matching, but the account stays
-  email-identified. Accepted exception; preserve emails.
+  email-identified. Accepted exception; keyed on the stable `firstname@dunn.dev`
+  convention (operator-confirmed stable), which must not change.
 
 LiteLLM keeps `GENERIC_USER_ID_ATTRIBUTE=sub` set explicitly (resilient to a
 default-value change in a future release) even though it links on `sub` anyway.
@@ -87,7 +95,9 @@ default-value change in a future release) even though it links on `sub` anyway.
   the user's `traits.username` must equal their existing local username in every
   app, matching that app's case rule (Audiobookshelf is case-sensitive; Mealie
   is case-insensitive). One Kratos username matches one spelling — so the same
-  person must carry the same username across all apps.
+  person must carry the same username across all apps. Operator-confirmed
+  (2026-06-27): usernames are historically consistent across apps, so this
+  reconciliation is low-risk.
 - **`sub` is tied to the Kratos identity record, not Hydra.** Rebuilding Hydra
   (e.g. losing `secrets.system`) preserves `sub`. Recreating Kratos identities
   changes every `sub`, breaking every sub-link. The carmine rebuild must either
