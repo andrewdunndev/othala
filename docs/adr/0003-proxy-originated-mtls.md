@@ -14,6 +14,19 @@ cited in Context is shelved; the LDAP bridge is a parked separate project and is
 not currently deployed. The portal is the live consumer of this pattern (reaching
 `dag-kratos-admin-proxy` via its Caddy sidecar egress route).
 
+**Amendment (2026-06-27 — N2 plain-internal exception):** The
+portal→Kratos admin API hop is a **documented plain-internal exception** to
+this ADR. Decision N2 chose Option B: the portal speaks plain HTTP on the shared
+`dag-internal` network; no mTLS client cert is presented on the admin hop. The
+Ory-native security model for the admin API is **isolation, not authentication**
+— the API has no auth by design, and possession of network access (the
+`dag-admin` bridge, which only the admin proxy and `dag-kratos` share) is the
+authorization. This makes the `:4434` bridge-only lockdown (decision N3) the
+load-bearing control; verify with a converge plus a negative test (admin port
+unreachable off the bridge). All other outbound consumer egress (external
+service-to-service, future mesh consumers) continues to follow the
+proxy-originated mTLS model this ADR documents.
+
 ## Context
 
 Gate 5 of the hardening roadmap requires client authentication on the

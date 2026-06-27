@@ -78,14 +78,19 @@ administration.
 ## Consequences
 
 **The authority center of gravity moves onto the Kratos admin-API write
-boundary.** The admin proxy must enforce per-client-cert, per-method
-authorization. A low-value service cert (such as the LDAP bridge's outpost cert)
-must be restricted to GET/HEAD; only the portal's cert may write. This is not
-cosmetic: a compromised LDAP bridge cert that could write `metadata_admin` would
-be able to stamp an admin marker onto any identity. The mTLS proxy rules that
-implement this are a load-bearing security control, not defense-in-depth. The
-LDAP bridge also ships an internal read-only mode, which is defense-in-depth from
-the bridge side.
+boundary. The load-bearing control is network isolation, not per-cert mTLS.**
+Per decision N2 (2026-06-27), the portal→Kratos admin hop is plain HTTP on
+the shared `dag-internal` network — the Ory-native model treats isolation as
+the authorization. `:4434` is only reachable from the `dag-admin` bridge (a
+two-container network shared exclusively by `dag-kratos-admin-proxy` and
+`dag-kratos`), so no other container — including the portal — can reach Kratos
+admin directly. The proxy then forwards to the portal on `dag-internal`. The
+LDAP bridge is shelved; no other write-capable consumer exists. Per decision N3,
+`:4434` must be provably bridge-only (verified by converge + a negative reachability
+test), because that lockdown is now the single barrier. An earlier implementation
+used per-CN+per-method mTLS (SP-1) at the proxy; that mechanism is superseded by
+the N2/N3 isolation model — removing a dependency on a step-ca client cert that
+is not yet operational at rebuild.
 
 **`metadata_admin` must never appear in the public session.** Kratos's
 `/sessions/whoami` response must not expose `metadata_admin`; only `metadata_public`

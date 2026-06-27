@@ -46,6 +46,10 @@ claim is set explicitly before OIDC is enabled:
 - Apps that hardcode `sub` (Immich, Audiobookshelf): the `sub` value is
   pre-seeded into the app's local user record before enabling OIDC, so the
   automatic email fallback never fires.
+- Apps with a configurable link-on-sub attribute (LiteLLM): set
+  `GENERIC_USER_ID_ATTRIBUTE=sub` explicitly in the container environment even
+  when upstream documents `sub` as the default, so the link key is not implicit
+  and is resilient to default-value changes in future releases.
 - Apps that default to `preferred_username` (Jellyfin via the SSO plugin):
   the default is verified and left in place.
 
