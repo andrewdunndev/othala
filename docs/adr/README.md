@@ -26,6 +26,8 @@ end of the status block.
 | [0006](0006-two-pki.md) | Two-PKI: step-ca internal mesh CA + LE edge, never chained | LE for browser-facing FQDNs; step-ca for internal mesh and outpost client certs; the two roots are never chained. |
 | [0007](0007-three-layer-naming.md) | Three-layer naming: Othala / dag.dunn.dev / kratos+hydra | Othala = OSS project, dag.dunn.dev = operator instance, kratos/hydra = Ory functional names; used consistently and never conflated. |
 | [0008](0008-admin-authority-model.md) | Admin authority model: bootstrap floor + `metadata_admin`-managed admins | Two-tier model: `metadata_admin` marker for live admin grant/revoke; Ory-native network admin plane as permanent bootstrap floor and break-glass. Retires the env allowlist and id-pinning dance. |
+| [0009](0009-capability-group-access-model.md) | Capability-group access model | Authorization as `access-<svc>` (member) + `admin-<svc>` (per-service admin) + `root` (estate-wide) capability groups, replacing generic family/friends/kids/admin; path-selective forward-auth, set-union group claim, scope-gated. The OSS ADR captures the model; the concrete roster stays in the instance. |
+| [0010](0010-first-party-skip-consent.md) | skip-consent for trusted first-party clients | `skip_consent: true` per client so the household never sees a consent screen; documented threat-model acceptance (a stolen session yields tokens for all auth-touching surfaces, OK at family scale), revisit at the first banking-tier client. |
 
 ## What ADRs are
 
