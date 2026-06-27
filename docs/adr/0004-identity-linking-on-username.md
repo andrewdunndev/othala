@@ -1,94 +1,118 @@
-# 0004 — Identity linking on username (immutable), never email (mutable)
+# 0004 — Identity linking: username is the migration join key, `sub` is the durable key
 
 ## Status
 
-Accepted. Reference: `campaigns/othala/account-linking-plan.md`.
+Accepted 2026-06-08. **Revised 2026-06-27** (source-verified audit, workflow
+`oidc-linking-audit`): adds the match-once / persist-`sub` convergence model,
+corrects `sub` provenance (Kratos, not Hydra), and replaces the Audiobookshelf
+SQL pre-seed with the admin-UI username match. Reference:
+`campaigns/othala/account-linking-overrides.md` (per-app verdicts) and
+`campaigns/othala/account-linking-plan.md` (migration sequence).
 
 ## Context
 
-When an OIDC-capable app receives a first login from the IDP, it needs to link
-the incoming identity to an existing local account (or create a new one). The
-claim it uses as the linking key determines whether re-linking, orphaning, or
-account takeover is possible.
+When an OIDC-capable app receives a first login from the IdP it must link the
+incoming identity to an existing local account (or create a new one). The claim
+it links on decides whether re-linking, orphaning, or takeover is possible.
 
-Othala issues the following stable claims from Kratos:
+Othala emits three claims to every client (`portal/src/lib/claims.ts`):
 
-- `sub` -- the Hydra-assigned opaque public identifier. Stable for the lifetime
-  of the Hydra database. Immutable.
-- `preferred_username` -- `traits.username`. Operator-assigned at identity
-  creation. Not editable via self-service (no settings-flow mechanism exists).
-  Immutable in practice.
-- `email` -- `traits.email`. Editable by the user via the Kratos settings flow.
-  The settings flow does not revoke the session. Mutable.
+- `sub` — the **Kratos identity UUID** (`subject = session.identity.id` in
+  `portal/src/lib/oauth2-handlers.ts`). Subjects are public, not pairwise, so the
+  token `sub` is the raw identity id. Stable for the life of the Kratos identity
+  record. The most stable key.
+- `preferred_username` — `traits.username` (`first.last`). Read-only in the
+  portal settings UI; stable in practice. **Caveat:** Kratos has no schema-level
+  trait immutability and there is no before-settings hook, so a username change
+  is UI-blocked, not API-blocked (see Consequences).
+- `email` — `traits.email`. User-editable via the Kratos settings flow (no
+  session revoke). Mutable.
 
-The risk: if an app links on `email` and a user changes their email before or
-after OIDC is enabled on that app, the next login either creates a shadow account
-(old email was the stored key, new email does not match) or matches the wrong
-account (another user had the same new email). At family scale, shadow accounts
-are operationally recoverable but require operator intervention. At any scale,
-email-as-linking-key is an unsafe posture when email is user-mutable without a
-re-authentication gate.
-
-Several apps in the estate default to email-based linking (Mealie, GitLab CE)
-or have an email-fallback that must be blocked (Immich -- the email fallback on
-first login stamps `oauthId` permanently; if the fallback fires on the wrong
-email, the binding is wrong for the life of the account).
+The decisive property for **migration**: `sub` is minted when the Kratos identity
+is created and exists *nowhere* in pre-existing app data. It cannot be a *join*
+key against old records — there is nothing to match a fresh UUID to. The only
+key present in *both* the old data and Kratos is the human one: username (or
+email where username is unavailable).
 
 ## Decision
 
-Identity linking uses `preferred_username` as the primary key for apps that
-support configurable claim selection, and `sub` as the key for apps that
-hardcode their link claim. Email is never used as a link key. For each app, the
-claim is set explicitly before OIDC is enabled:
+**`sub` is the durable identity; username is the migration on-ramp.** These are
+not in tension because most apps already converge: they match a returning login
+by a human key on first contact, then persist `sub` and match on it forever
+after.
 
-- Apps defaulting to email (Mealie, GitLab CE): the link claim is reconfigured
-  to `preferred_username` before enabling OIDC.
-- Apps that hardcode `sub` (Immich, Audiobookshelf): the `sub` value is
-  pre-seeded into the app's local user record before enabling OIDC, so the
-  automatic email fallback never fires.
-- Apps with a configurable link-on-sub attribute (LiteLLM): set
-  `GENERIC_USER_ID_ATTRIBUTE=sub` explicitly in the container environment even
-  when upstream documents `sub` as the default, so the link key is not implicit
-  and is resilient to default-value changes in future releases.
-- Apps that default to `preferred_username` (Jellyfin via the SSO plugin):
-  the default is verified and left in place.
+```mermaid
+flowchart LR
+  A[First OIDC login of a<br/>pre-existing account] -->|match by username<br/>or email| B[App writes sub<br/>into the account record]
+  B --> C[Every later login<br/>matches on sub]
+  C -.->|steady state| D[(sub everywhere)]
+```
 
-This policy applies across all estate apps and is a hard gate before flipping
-any app to OIDC.
+So the engineered choice is the **first-link key**, set explicitly per app
+*before* OIDC is enabled. Email is never a configured link key. Apps fall into
+three groups (verified per app at pinned versions in
+`account-linking-overrides.md`):
+
+- **Username-then-`sub`** (Jellyfin, Audiobookshelf, Immich, Open WebUI,
+  GitLab): match once by a human key, then persist `sub`. This *is* "sub
+  everywhere" — earned for free, no per-user `sub` pre-seed.
+  - Jellyfin: provider preset `generic`/`authelia` → `UsernameClaim`
+    defaults to `preferred_username`; persists `sub`.
+  - Audiobookshelf: set admin-UI **"Match existing users by" = Username**
+    (persists `sub` in `extraData.authOpenIDSub`). *No SQL pre-seed* — the
+    earlier `openIdIssuer`/`openIdSub` column pre-seed was wrong (the field is
+    JSON `extraData.authOpenIDSub`).
+  - Immich / Open WebUI: first-link is by email (Immich one-time adopt;
+    Open WebUI requires `OAUTH_MERGE_ACCOUNTS_BY_EMAIL=true` for the window),
+    then `sub` persists. A fresh receive (no prior accounts) skips straight to
+    `sub` auto-register.
+  - GitLab: `uid_field` defaults to `sub` (extern_uid); a pre-existing account
+    does **not** auto-match by username — link via password-login + connect, or
+    pre-seed the `identities` table. Never enable `omniauth_auto_link_user`.
+- **Username-forever** (Mealie `OIDC_USER_CLAIM=preferred_username`, oCIS
+  `PROXY_USER_OIDC_CLAIM=preferred_username`): re-match `preferred_username`
+  every login; never store `sub`. They have **no `sub` safety net**, so username
+  immutability is load-bearing for them specifically.
+- **Email-forever** (Vaultwarden): the email field is the username *and* the
+  master-password KDF salt. Cannot be re-keyed to username or `sub`. After first
+  login it stores `{issuer}/{sub}` for matching, but the account stays
+  email-identified. Accepted exception; preserve emails.
+
+LiteLLM keeps `GENERIC_USER_ID_ATTRIBUTE=sub` set explicitly (resilient to a
+default-value change in a future release) even though it links on `sub` anyway.
 
 ## Consequences
 
-- Each OIDC migration requires a pre-migration audit: enumerate existing local
-  accounts, confirm linking-key values match Kratos traits, execute any
-  DB/config fix, then enable OIDC.
-- For Immich specifically, the pre-seed is an explicit SQL update. The
-  email-fallback auto-link path ("let it link on first login") is not available
-  under this policy, even if email addresses happen to match at migration time.
-- `preferred_username` (format: `first.last`) is immutable by design. The Kratos
-  identity schema has no settings-flow attribute for username. If the estate ever
-  adds a username-change mechanism, this ADR must be revisited.
-- `sub` stability is tied to the Hydra database. If the Hydra DB is rebuilt (the
-  `secrets.system` non-rotatable key is lost), all `sub` values change and every
-  app that links on `sub` must have its pre-seed re-run. Document this in the
-  disaster-recovery runbook.
-- Vaultwarden is a deliberate exception: it links on `{issuer}/{sub}` after
-  first login (which uses email for account provisioning). The first-login email
-  step is a one-time provisioning event, not a recurring link; the permanent key
-  is `iss+sub` (both stable). This is recorded in the account-linking plan as an
-  accepted exception.
+- Each OIDC migration is gated on a **pre-migration username reconciliation**:
+  the user's `traits.username` must equal their existing local username in every
+  app, matching that app's case rule (Audiobookshelf is case-sensitive; Mealie
+  is case-insensitive). One Kratos username matches one spelling — so the same
+  person must carry the same username across all apps.
+- **`sub` is tied to the Kratos identity record, not Hydra.** Rebuilding Hydra
+  (e.g. losing `secrets.system`) preserves `sub`. Recreating Kratos identities
+  changes every `sub`, breaking every sub-link. The carmine rebuild must either
+  preserve Kratos identity IDs (export/import identities *with* their ids) or
+  budget a re-link pass for the Username-then-`sub` group. Record in the DR
+  runbook.
+- **Username immutability is UI-soft.** A direct Kratos settings-API call could
+  change `traits.username`; for the Username-forever group that orphans data with
+  no recovery key. If username self-change is ever exposed, or to harden now, add
+  an API-level guard (a before-settings web-hook rejecting a username delta).
+- Vaultwarden's durability requires `OTHALA_PUBLIC_URL` never changes (it is part
+  of the stored `{issuer}/{sub}` key); a URL rename forces `TRUNCATE sso_users` +
+  re-link.
+- Linking behavior is verified per pinned version. A major upstream bump can
+  change defaults — gate major bumps on a linking re-verify.
 
 ## Alternatives considered
 
-- **Link on email by default.** Simplest for initial setup. Unsafe when email is
-  mutable. Rejected as a policy default even though it would work at migration
-  time if all emails currently match.
-- **Link on sub everywhere.** Universally safe and stable. Apps that cannot
-  configure the link claim are forced onto this path anyway. For apps that
-  support `preferred_username`, using it is preferable because it is
-  human-meaningful to operators (easier to audit which account corresponds to
-  which person).
-- **Restrict email mutability (require re-auth for email changes).** Kratos
-  supports `required_aal: aal2` for the settings flow. This would make email
-  harder to change, not immutable. It does not make email safe as a link key;
-  a passkey-enrolled user with a fresh AAL2 session can still change email. The
-  correct fix is to not use email as a link key.
+- **Link on `sub` everywhere (pre-seed it into every app).** Universally stable
+  but requires writing a fresh UUID into each app's DB per user before first
+  login — fragile, app-specific work that buys nothing the convergence model
+  doesn't already deliver. Reserved for where there is no human on-ramp (GitLab)
+  or to skip an email-adopt (Immich).
+- **Link on email by default.** Works at migration if all emails match, unsafe
+  thereafter because email is mutable. Rejected as a default.
+- **Restrict email mutability (require AAL2 for settings).** Already in place
+  (`required_aal: highest_available`), but harder-to-change is not immutable; it
+  does not make email safe as a link key. The fix is to not link on email.
