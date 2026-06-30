@@ -46,7 +46,7 @@
 
 services:
   postgres:
-    image: docker.io/library/postgres:18-alpine
+    image: docker.io/library/postgres:18-alpine@sha256:1b1689b20d16a014a3d195653381cf2caa75a41a92d93b255a9d6ea29fd353aa
     container_name: lab-postgres
     restart: "no"
     # --- Container hardening (P11) ---
@@ -104,7 +104,7 @@ services:
   # :8025 (smoke.sh Section H queries /api/v1/messages to assert delivery).
   # No auth/TLS: mailpit accepts plain SMTP, matching the e2e connection URI.
   mailpit:
-    image: docker.io/axllent/mailpit:latest
+    image: docker.io/axllent/mailpit:latest@sha256:956d688cbd13dca36c72d8e94c34d6d1cdf4a005aa6aa4ff6edaaac56c34d8df
     container_name: lab-mailpit
     restart: unless-stopped
     # --- Container hardening (P11) ---
@@ -130,7 +130,7 @@ services:
       start_period: 3s
 
   kratos-migrate:
-    image: docker.io/oryd/kratos:v26.2.0
+    image: docker.io/oryd/kratos:v26.2.0@sha256:2a13bb8d362c7a7ae33bd7c0f5168aee46921f15c916a06346db91c06dc76643
     container_name: lab-kratos-migrate
     restart: "no"
     depends_on:
@@ -165,7 +165,7 @@ services:
     command: ["migrate", "sql", "-e", "--yes", "--config", "/etc/config/kratos/kratos.yml"]
 
   kratos:
-    image: docker.io/oryd/kratos:v26.2.0
+    image: docker.io/oryd/kratos:v26.2.0@sha256:2a13bb8d362c7a7ae33bd7c0f5168aee46921f15c916a06346db91c06dc76643
     container_name: lab-kratos
     restart: unless-stopped
     # --- Container hardening (P11) ---
@@ -223,7 +223,7 @@ services:
       start_period: 20s
 
   hydra-migrate:
-    image: docker.io/oryd/hydra:v26.2.0
+    image: docker.io/oryd/hydra:v26.2.0@sha256:ff67c7fb5f95074fa53374d41151713554960504b340cd3f95b09e65deaea2a9
     container_name: lab-hydra-migrate
     restart: "no"
     depends_on:
@@ -236,7 +236,7 @@ services:
     command: ["migrate", "sql", "-e", "--yes"]
 
   hydra:
-    image: docker.io/oryd/hydra:v26.2.0
+    image: docker.io/oryd/hydra:v26.2.0@sha256:ff67c7fb5f95074fa53374d41151713554960504b340cd3f95b09e65deaea2a9
     container_name: lab-hydra
     restart: unless-stopped
     # --- Container hardening (P11) ---
@@ -432,7 +432,7 @@ services:
   # with `docker compose --profile browser up`. Published on the host :8088 so an
   # interactive agent-browser (Playwright) can reach it via an ssh tunnel to the VM.
   caddy:
-    image: docker.io/library/caddy:2-alpine
+    image: docker.io/library/caddy:2-alpine@sha256:5f5c8640aae01df9654968d946d8f1a56c497f1dd5c5cda4cf95ab7c14d58648
     container_name: lab-caddy
     profiles: ["browser"]
     restart: unless-stopped
