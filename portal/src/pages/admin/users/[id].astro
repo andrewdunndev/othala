@@ -378,7 +378,7 @@ const adminNav = [
     ))}
   </nav>
 
-  <main class="stack-lg">
+  <section class="stack-lg">
     {loadError && (
       <div class="notice notice-danger">Failed to load identity: {loadError}</div>
     )}
@@ -592,7 +592,7 @@ const adminNav = [
                           <input type="hidden" name="csrf_token" value={csrfTokensRemove[m.key]} />
                           <button
                             type="submit"
-                            class="button button-danger-sm"
+                            class="button button-danger button-sm"
                             title={`Remove all ${m.label} credentials (lost-device eviction). The user must re-enroll after removal.`}
                           >
                             Remove
@@ -755,8 +755,26 @@ const adminNav = [
         </section>
       </section>
     )}
-  </main>
+  </section>
 </Layout>
+
+<script is:inline>
+  // In-flight feedback: disable the submitter button on every POST form
+  // (save, actions panel, credential remove, delete) so a slow admin
+  // mutation can't be double-clicked into a duplicate request. Every form
+  // here full-page-navigates on completion, so there is no re-enable path
+  // to wire up.
+  document.addEventListener('submit', function (e) {
+    var form = e.target;
+    if (!(form instanceof HTMLFormElement) || form.method.toLowerCase() !== 'post') return;
+    var submitter = e.submitter;
+    if (!submitter || !('disabled' in submitter)) return;
+    submitter.textContent = submitter.textContent + '…';
+    // Defer disabling one tick so the browser still includes the
+    // submitter's name/value in the outgoing FormData.
+    setTimeout(function () { submitter.disabled = true; }, 0);
+  });
+</script>
 
 <style>
   /* Inline form wrappers inside the actions row so each button carries its
@@ -768,22 +786,35 @@ const adminNav = [
   .details-content { margin-top: var(--space-3); }
   .summary-danger { color: var(--danger); cursor: pointer; }
   .cred-list { display: flex; flex-wrap: wrap; gap: var(--space-2); align-items: flex-start; }
-  .cred-item { display: inline-flex; align-items: center; gap: var(--space-1); }
-  .cred-remove-form { display: inline; margin: 0; padding: 0; }
+  /* Credential chip + its Remove action read as ONE compound chip: a single
+   * bordered pill with a hairline divider between the label and the action,
+   * instead of two equal-weight sibling chips. */
+  .cred-item {
+    display: inline-flex;
+    align-items: stretch;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    overflow: hidden;
+  }
+  .cred-item .cred-enrolled {
+    border: none;
+    border-radius: 0;
+    display: inline-flex;
+    align-items: center;
+  }
+  .cred-remove-form { display: inline-flex; margin: 0; padding: 0; }
+  .cred-item .button-danger.button-sm {
+    border: none;
+    border-left: 1px solid var(--border);
+    border-radius: 0;
+  }
   .cred-enrolled { background: var(--success-subtle); border-color: var(--success); }
   .cred-eviction-note { margin-top: var(--space-2); }
-  .button-danger-sm {
-    font-size: var(--text-xs);
-    padding: 0.1rem 0.4rem;
-    background: transparent;
-    border: 1px solid var(--danger);
-    color: var(--danger);
-    border-radius: var(--radius-sm, 3px);
-    cursor: pointer;
-    line-height: 1.4;
-  }
-  .button-danger-sm:hover { background: var(--danger-subtle, #fff0f0); }
   .admin-marker-row { display: flex; align-items: center; gap: var(--space-3); margin-top: var(--space-2); }
   .admin-on { color: var(--success, #1a7f37); }
   .admin-off { color: var(--muted, #6e7781); }
+
+  @media (max-width: 640px) {
+    .dl-grid { grid-template-columns: 1fr; gap: var(--space-1); }
+  }
 </style>

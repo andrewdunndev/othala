@@ -197,7 +197,9 @@ const accessGroups = groups.filter((g) => !isIdentityGroup(groupRegistry, g));
 
   {hasPasskey && (
     <section class="section">
-      <p class="section-subtitle">Passkeys</p>
+      <p class="section-subtitle passkey-subtitle">
+        Passkeys <span class="badge">recommended</span>
+      </p>
       <p class="section-prose">
         Register a passkey on each device you use. With a passkey,
         signing in is one tap, no password to remember.
@@ -220,7 +222,7 @@ const accessGroups = groups.filter((g) => !isIdentityGroup(groupRegistry, g));
 
   {hasPassword && (
     <section class="section">
-      <p class="section-subtitle">Password</p>
+      <p class="section-subtitle">Password (legacy: Jellyfin/AppleTV)</p>
       <p class="section-prose">
         Change the password used as a fallback when a passkey isn't
         available.
@@ -377,7 +379,7 @@ const accessGroups = groups.filter((g) => !isIdentityGroup(groupRegistry, g));
 
   {hasWebAuthn && (
     <section class="section">
-      <p class="section-subtitle">Security key</p>
+      <p class="section-subtitle">Security key (legacy 2FA)</p>
       <p class="section-prose">
         Register a hardware security key (YubiKey or similar) as a second
         factor. This is separate from passkeys — use it if you want a
@@ -467,7 +469,7 @@ const accessGroups = groups.filter((g) => !isIdentityGroup(groupRegistry, g));
         <dt>Identity</dt>
         <dd class="kv-chips">
           {identityGroups.length
-            ? identityGroups.map((g) => <span class="chip">{g}</span>)
+            ? identityGroups.map((g) => <span class="badge">{g}</span>)
             : <span class="muted text-sm">none</span>}
         </dd>
       </div>
@@ -475,7 +477,7 @@ const accessGroups = groups.filter((g) => !isIdentityGroup(groupRegistry, g));
         <dt>App access</dt>
         <dd class="kv-chips">
           {accessGroups.length
-            ? accessGroups.map((g) => <span class="chip chip-muted">{g}</span>)
+            ? accessGroups.map((g) => <span class="badge badge-muted">{g}</span>)
             : <span class="muted text-sm">none</span>}
         </dd>
       </div>
@@ -515,6 +517,13 @@ const accessGroups = groups.filter((g) => !isIdentityGroup(groupRegistry, g));
     display: flex;
     gap: var(--space-3);
     margin-top: var(--space-2);
+  }
+
+  /* Passkey section header: subtitle + "recommended" badge on one line. */
+  .passkey-subtitle {
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
   }
 
   /* TOTP enrollment: QR code centered with a border, secret below it. */
@@ -608,21 +617,6 @@ const accessGroups = groups.filter((g) => !isIdentityGroup(groupRegistry, g));
     display: flex;
     flex-wrap: wrap;
     gap: var(--space-1);
-  }
-  .chip {
-    display: inline-block;
-    padding: var(--space-1) var(--space-2);
-    border: 1px solid var(--border);
-    border-radius: var(--radius-sm);
-    font-family: var(--font-mono);
-    font-size: var(--text-xs);
-    color: var(--text);
-    background: var(--bg);
-    line-height: 1.4;
-  }
-  .chip-muted {
-    color: var(--text-2);
-    background: var(--surface);
   }
 
   .back-link {

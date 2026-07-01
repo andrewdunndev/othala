@@ -107,7 +107,7 @@ const hasAal2Methods = isAal2 && (totpNodes.length > 0 || aal2WebauthnNodes.leng
       ? 'Additional verification is required to continue.'
       : isCodeEntry
         ? 'Check your email for the sign-in code.'
-        : 'Use a passkey for the smoothest sign-in.'}
+        : 'One tap with Face ID or Touch ID. No password to remember.'}
   />
 
   {ui?.messages?.map((m: FlowMessage) => (
@@ -286,7 +286,7 @@ const hasAal2Methods = isAal2 && (totpNodes.length > 0 || aal2WebauthnNodes.leng
                 value={String(a.value ?? '')}
                 onclick={safeOnclick(a)}
               >
-                {n.meta?.label?.text ?? 'Sign in with passkey'}
+                {n.meta?.label?.text ?? 'Sign in with a passkey'}
               </button>
             );
           }
@@ -296,13 +296,12 @@ const hasAal2Methods = isAal2 && (totpNodes.length > 0 || aal2WebauthnNodes.leng
         {!ui && (
           /* Static preview when running dev without Kratos. */
           <button class="button button-primary login-primary" type="button" disabled>
-            Sign in with passkey
+            Sign in with a passkey
           </button>
         )}
 
         <p class="passkey-hint">
-          One tap with your fingerprint, face, or device PIN — no username, no
-          password to remember.
+          Face ID, Touch ID, or your device PIN.
         </p>
       </form>
     )}
@@ -571,7 +570,7 @@ const hasAal2Methods = isAal2 && (totpNodes.length > 0 || aal2WebauthnNodes.leng
   .code-resend {
     width: 100%;
     font-size: var(--text-sm);
-    color: var(--text-muted);
+    color: var(--text-2);
   }
 
   /* Disclosure: collapsed by default. The summary line reads as a quiet

@@ -216,6 +216,15 @@ a.subtle:hover { color: var(--text); }
   text-decoration: none;
 }
 
+/* Size modifier — compose with a color variant, e.g. `button button-danger
+ * button-sm`, for inline actions attached to a chip/badge (credential
+ * remove, table-row actions). Padding/font-size only; color stays with the
+ * variant class so this never needs its own raw-color rules. */
+.button-sm {
+  padding: var(--space-1) var(--space-2);
+  font-size: var(--text-xs);
+}
+
 /* ── Forms ──────────────────────────────────────────────────── */
 .field { display: flex; flex-direction: column; gap: var(--space-2); }
 

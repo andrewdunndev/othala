@@ -103,6 +103,13 @@ const orderedApps = loadTiles();
 // loadGroups() returns an empty Map when the file is absent.
 const groupRegistry = loadGroups();
 
+// First-run passkey nudge: the admin API's includeCredential list (getIdentity,
+// lib/admin-api.ts) already carries `credentials.passkey` when enrolled, so no
+// extra call is needed here. Shown once per browser (dismiss is localStorage-
+// backed, see the inline script below) to steer new accounts toward one-tap
+// Face ID / Touch ID sign-in instead of leaving them on the password fallback.
+const hasPasskeyEnrolled = Boolean(identity?.credentials?.passkey);
+
 const groups = identityGroups(identity);
 // access-model Phase 2: tile visibility reads the manifest's access binding
 // (accessGroups, OR-semantics) via userCanSeeTile — the SAME field the OIDC
@@ -210,6 +217,21 @@ const devLinks = [
           <a href="/auth/logout" class="button button-secondary">Sign out</a>
         </div>
       </PageHero>
+
+      {!hasPasskeyEnrolled && (
+        <div class="passkey-nudge" id="passkey-nudge">
+          <p class="passkey-nudge-text">
+            Set up a passkey for one-tap sign-in with Face ID or Touch ID.
+            <a href="/auth/settings" class="passkey-nudge-link">Set up now →</a>
+          </p>
+          <button
+            type="button"
+            class="passkey-nudge-close mono"
+            data-dismiss-passkey-nudge
+            aria-label="Dismiss"
+          >✕</button>
+        </div>
+      )}
 
       <section class="section">
         <p class="section-subtitle">Your apps</p>
@@ -515,6 +537,35 @@ const devLinks = [
       }, 200);
     });
   })();
+
+  // ── First-run passkey nudge (post-auth dashboard) ─────────────────────
+  // Dismiss is remembered per-browser via localStorage so the banner doesn't
+  // reappear on every visit once the operator has seen and closed it. It
+  // still returns after enrolling a passkey elsewhere makes hasPasskeyEnrolled
+  // true server-side — at that point the banner stops rendering entirely.
+  (function () {
+    var KEY = 'othala-passkey-nudge-dismissed';
+    var nudge = document.getElementById('passkey-nudge');
+    if (!nudge) return;
+
+    try {
+      if (localStorage.getItem(KEY) === '1') {
+        nudge.remove();
+        return;
+      }
+    } catch (e) {
+      // localStorage unavailable (private mode etc.) — leave the banner
+      // showing every visit rather than failing closed on the nudge.
+    }
+
+    var closeBtn = nudge.querySelector('[data-dismiss-passkey-nudge]');
+    if (closeBtn) {
+      closeBtn.addEventListener('click', function () {
+        try { localStorage.setItem(KEY, '1'); } catch (e) {}
+        nudge.remove();
+      });
+    }
+  })();
 </script>
 
 <style>
@@ -526,6 +577,47 @@ const devLinks = [
     padding-top: var(--space-2);
     border-top: 1px solid var(--border);
     margin-top: var(--space-3);
+  }
+
+  /* ── First-run passkey nudge ──
+   * Unobtrusive, dismissible banner between the hero and the tile grid.
+   * Accent-subtle surface (the same token the recommended-action badge
+   * system already uses) keeps it reading as a friendly suggestion, not a
+   * warning or error state. */
+  .passkey-nudge {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--space-4);
+    border: 1px solid var(--accent);
+    background: var(--accent-subtle);
+    border-radius: var(--radius);
+    padding: var(--space-3) var(--space-4);
+    margin-bottom: var(--space-6);
+  }
+  .passkey-nudge-text {
+    margin: 0;
+    font-size: var(--text-sm);
+    color: var(--text);
+  }
+  .passkey-nudge-link {
+    margin-left: var(--space-2);
+    font-weight: 600;
+    white-space: nowrap;
+  }
+  .passkey-nudge-close {
+    all: unset;
+    cursor: pointer;
+    flex-shrink: 0;
+    color: var(--text-muted);
+    padding: var(--space-1) var(--space-2);
+    line-height: 1;
+    transition: color var(--duration-fast) var(--ease-out);
+  }
+  .passkey-nudge-close:hover { color: var(--text); }
+  .passkey-nudge-close:focus-visible {
+    outline: 2px solid var(--input-focus, var(--accent));
+    outline-offset: 2px;
   }
 
   /* ── Hero CTA fragments ── */
@@ -970,6 +1062,15 @@ const devLinks = [
 
   /* ── Mobile ── */
   @media (max-width: 640px) {
+    /* Passkey nudge: stack the message above the close button instead of
+     * squeezing both onto one row. */
+    .passkey-nudge {
+      flex-direction: column;
+      align-items: flex-start;
+      gap: var(--space-2);
+    }
+    .passkey-nudge-close { align-self: flex-end; }
+
     /* Stack post-auth CTA actions full-width with adequate tap height. */
     .cta-row {
       flex-direction: column;

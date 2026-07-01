@@ -4,7 +4,7 @@
 
 [![license](https://img.shields.io/badge/license-MIT-green)](LICENSE) ![built with GitLab](https://img.shields.io/badge/built_with-GitLab-FC6D26?logo=gitlab)
 
-Ory for your home. Othala is a self-hosted Ory substrate for a personal estate: the on-prem, family-scale analog to Ory Network. One all-TypeScript application (Astro Node SSR) fronts upstream Ory Kratos (identity) + Hydra (OAuth2/OIDC) + Postgres. Passkey-first by design — WebAuthn/passkeys are the primary credential; email code and password are fallback paths. A companion Go glauth-kratos LDAP bridge exists as a separate, currently-parked project (`gitlab.com/dunn.dev/kratos-ldap`) for adopters who need non-OIDC LDAP integration.
+Ory for your home. Othala is a self-hosted Ory substrate for a personal estate: the on-prem, family-scale analog to Ory Network. One all-TypeScript application (Astro Node SSR) fronts upstream Ory Kratos (identity) + Hydra (OAuth2/OIDC) + Postgres. Passkey-first by design — passkeys are the primary credential; email code and password are fallback paths. WebAuthn security keys are supported too, but as a legacy second factor, not a peer to passkeys. A companion Go glauth-kratos LDAP bridge exists as a separate, currently-parked project (`gitlab.com/dunn.dev/kratos-ldap`) for adopters who need non-OIDC LDAP integration.
 
 The name is the rune ᛟ *othala* (home, inheritance, the estate). Andrew's deployed instance runs on **dag.dunn.dev** (ᛞ *dagaz*, the threshold rune). The login screen renders the motif **ᛞ→ᛟ "door to home"**: through the door (dag), into the home (othala).
 

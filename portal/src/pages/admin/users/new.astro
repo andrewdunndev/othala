@@ -117,7 +117,7 @@ const csrfToken = signToken(adminIdentityId);
     <a href="/auth/settings">Settings</a>
   </nav>
 
-  <main class="stack-lg">
+  <section class="stack-lg">
 
     {success ? (
       <section class="stack-lg">
@@ -198,5 +198,22 @@ const csrfToken = signToken(adminIdentityId);
         </div>
       </form>
     )}
-  </main>
+  </section>
 </Layout>
+
+<script is:inline>
+  // In-flight feedback: disable the submitter button on POST so the create
+  // action can't be double-clicked into two identities. The page re-renders
+  // on completion (success panel or validation errors), so there is no
+  // re-enable path to wire up.
+  document.addEventListener('submit', function (e) {
+    var form = e.target;
+    if (!(form instanceof HTMLFormElement) || form.method.toLowerCase() !== 'post') return;
+    var submitter = e.submitter;
+    if (!submitter || !('disabled' in submitter)) return;
+    submitter.textContent = submitter.textContent + '…';
+    // Defer disabling one tick so the browser still includes the
+    // submitter's name/value in the outgoing FormData.
+    setTimeout(function () { submitter.disabled = true; }, 0);
+  });
+</script>
