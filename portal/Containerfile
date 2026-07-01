@@ -33,7 +33,13 @@
 # Keep in lockstep with the dunn.dev/pipeline component version in
 # .gitlab-ci.yml — old catalog image tags get GC'd from the registry
 # (2.5.1 vanished and broke the v0.3.0 tag build with "manifest unknown").
-# Renovate does NOT track this ARG today; bump it with the catalog roll.
+# Now tracked by the shared preset's annotated-ARG customManager (see
+# dunn.dev/pipeline:renovate-config.json), pointed at the same
+# gitlab-tags source as the .gitlab-ci.yml component pins below, and
+# grouped with them under the "pipeline catalog" packageRule in
+# renovate.json so one MR moves both (coverage added 2026-07-01; every
+# earlier catalog roll was manual — the last one was MR !52).
+# renovate: datasource=gitlab-tags depName=dunn.dev/pipeline
 ARG CATALOG_VERSION=3.0.0
 
 # ----- Stage 1: build -----

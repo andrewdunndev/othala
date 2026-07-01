@@ -3,10 +3,30 @@
   "extends": ["gitlab>dunn.dev/pipeline:renovate-config"],
   "packageRules": [
     {
-      "description": "Playwright lockstep: the e2e @playwright/test npm package and the mcr.microsoft.com/playwright Docker image MUST stay version-matched (the npm version drives which browser build the image must carry). Group them into one MR and pin so they bump together, never independently.",
+      "description": "Playwright lockstep: the e2e @playwright/test npm package and the mcr.microsoft.com/playwright Docker image MUST stay version-matched (the npm version drives which browser build the image must carry). Group them into one MR and pin so they bump together, never independently. Grouping alone is not sufficient: mcr.microsoft.com publishes the matching Docker tag DAYS after the npm release, so Renovate proposes (and, with automerge on, would silently land) the npm bump alone when no matching image tag exists yet in that run — exactly what happened for 1.61.0 (!34) and 1.61.1 (!46), both npm-only, while the image sat at v1.60.0-noble until manually caught and fixed 2026-07-01. automerge: false forces a human to notice a solo bump and either wait for the image tag or pin it by hand.",
       "matchPackageNames": ["@playwright/test", "mcr.microsoft.com/playwright"],
       "groupName": "playwright",
-      "rangeStrategy": "pin"
+      "rangeStrategy": "pin",
+      "automerge": false
+    },
+    {
+      "description": "Pipeline catalog lockstep: the portal Containerfile's CATALOG_VERSION ARG and the .gitlab-ci.yml component version pins (node-build, container-image) are all cut from the same dunn.dev/pipeline release and must roll together. Before this rule, NEITHER was Renovate-tracked at all: every catalog bump from 2.3.1 through 3.0.0 (7 releases) landed via a manual chore/catalog-* commit, never a Renovate MR — the .gitlab-ci.yml component include has no evidence of ever being proposed by the native gitlabci-component manager, and the Containerfile ARG had no annotated customManager comment. Both are now sourced from the same gitlab-tags dependency (dunn.dev/pipeline) so they bump as one logical dep and land in one MR. automerge: false because a stale ARG breaks the next tag build once the registry GC's the old image tag (2.5.1 GC'd, broke v0.3.0, 2026-07-01) — a human should confirm the new catalog release actually published a matching ci-runtime-node image tag before merging.",
+      "matchPackageNames": ["dunn.dev/pipeline"],
+      "groupName": "pipeline catalog",
+      "automerge": false
+    }
+  ],
+  "customManagers": [
+    {
+      "customType": "regex",
+      "description": "Track the dunn.dev/pipeline CI/CD component version pins in .gitlab-ci.yml's `component:` includes (node-build, container-image). Added as a customManager rather than relying on Renovate's native gitlabci component support because that support has never once fired here: 7 catalog releases (2.3.1 through 3.0.0) all landed via manual chore/catalog-* commits, zero via a renovate/* MR. Datasource + packageName match the portal/Containerfile CATALOG_VERSION ARG (see renovate: comment there) so both are the same logical dependency and group under the \"pipeline catalog\" packageRule.",
+      "managerFilePatterns": ["/(^|/)\\.gitlab-ci\\.yml$/"],
+      "matchStrings": [
+        "component:\\s*gitlab\\.com/dunn\\.dev/pipeline/[\\w-]+@(?<currentValue>[^\\s]+)"
+      ],
+      "depNameTemplate": "dunn.dev/pipeline",
+      "packageNameTemplate": "dunn.dev/pipeline",
+      "datasourceTemplate": "gitlab-tags"
     }
   ]
 }
