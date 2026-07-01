@@ -59,7 +59,7 @@ if (devOverride === 'down' || devOverride === 'pre-auth' || devOverride === 'pos
     //
     // Dev affordance: set OTHALA_DEV_MOCK_GROUPS=admin,family,access-foo
     // (comma-separated) to preview any catalog subset without editing code.
-    const devGroupsEnv = process.env.OTHALA_DEV_MOCK_GROUPS;
+    const devGroupsEnv: string | undefined = import.meta.env.OTHALA_DEV_MOCK_GROUPS;
     const mockGroups = devGroupsEnv
       ? devGroupsEnv.split(',').map((g) => g.trim()).filter(Boolean)
       : ['admin', 'family', 'everyone', 'access-grafana', 'access-audiobookshelf', 'access-jellyfin', 'access-proxywatch', 'access-gather-usenet', 'access-gather-torrent'];
