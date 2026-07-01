@@ -6,13 +6,14 @@ orientation (what the app is, the load-bearing decisions) read
 contract read [`../DEPLOY.md`](../DEPLOY.md). Those files defer to this
 one for version state and assert none of their own.
 
-Updated 2026-06-24.
+Updated 2026-07-01.
 
 ## Where we are
 
-**v0.3.0 release-prep complete on main (CVP hardening pass + access-model +
-OTel tracing + dependency security bumps). 48 commits landed since v0.3.0-rc;
-tag is imminent (operator/joint). Deploy pending, operator-gated.**
+**v0.3.0 TAGGED 2026-07-01 (CVP hardening pass + access-model + OTel tracing
++ portal UX/pristine pass + dependency security bumps; ~100 commits since
+v0.3.0-rc). Deploy pending, operator-gated — the iac dag-portal pin moves off
+its RC digest to v0.3.0.**
 
 The OSS project is **Othala** ("Ory for your home"); the deployed
 instance host is **dag.dunn.dev**. The stack has converged to a single

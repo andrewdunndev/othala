@@ -9,10 +9,27 @@ The git tag is the authoritative version; `portal/package.json` mirrors it.
 
 ## [Unreleased]
 
-## [0.3.0] - 2026-06-24
+## [0.3.0] - 2026-07-01
 
-Security hardening pass (CVP), access-model refactor, and PII-safe
-OpenTelemetry tracing.
+Security hardening pass (CVP), access-model refactor, PII-safe
+OpenTelemetry tracing, and a portal UX/pristine pass.
+
+### Added (post-rc, folded at tag time)
+
+- **Portal UX pass**: passkey-first login copy (Face ID / Touch ID), a
+  dismissible first-run passkey-enrollment nudge, legacy relabeling in
+  settings (security key = legacy 2FA; password = legacy: Jellyfin/AppleTV),
+  in-flight disable-on-submit feedback on admin forms, and a11y/design-system
+  purity fixes (contrast, nested landmarks, raw-color removal, chip/badge
+  unification, mobile reflow).
+- Per-node validation messages rendered in FlowNodes + login step-2/TOTP.
+- Admin-recovery hardening: real recovery-refusal test; `::` and `""` admin
+  wildcards blocked (T2-N/T2-O).
+- Admin recovery switched to `createRecoveryCodeForIdentity` (Kratos
+  v26.2.0+ compatibility).
+- ADR set expanded: migration join-key/durable-key (0004 revisions),
+  capability groups, first-party skip-consent; docs decoupled from the
+  shelved LDAP bridge.
 
 ### Changed
 
