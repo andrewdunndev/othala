@@ -42,7 +42,12 @@
 # configs, browser-out) out of the image. The image is published as the
 # ${CI_REGISTRY_IMAGE}/e2e-tester sub-image.
 
-FROM mcr.microsoft.com/playwright:v1.60.0-noble
+# MUST match e2e/package.json's "@playwright/test" version exactly: the npm
+# package resolves browser builds by its own version and hard-fails when the
+# base image ships another (renovate bumps the npm package but NOT this pin —
+# a 1.61.1-vs-v1.60.0 split failed all 30 browser specs on the first v0.3.0
+# cut, 2026-07-01). Bump both together.
+FROM mcr.microsoft.com/playwright:v1.61.1-noble
 
 # Browsers are already installed in the base image; never let an install
 # step try (and fail) to fetch them.
