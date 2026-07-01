@@ -293,6 +293,13 @@ services:
     image: ${AUTH_REGISTRY}:${AUTH_VERSION}
     container_name: lab-othala
     restart: unless-stopped
+    # Static in-net IP, owned from FIRST creation (smoke phase) so the browser
+    # overlay's ADMIN_HOST=10.89.11.12 recreate can never collide with a
+    # dynamically-allocated address. Requires the default network's subnet
+    # declaration at the bottom of this file.
+    networks:
+      default:
+        ipv4_address: 10.89.11.12
     # --- Container hardening (P11) ---
     security_opt:
       - "no-new-privileges:true"
@@ -533,3 +540,18 @@ services:
     working_dir: /test
     # Deps + specs prebaked at /test; just run the suite. No npm install.
     command: ["npx", "playwright", "test", "--config=playwright.config.ts"]
+
+# The default network is declared HERE (not only in compose.browser.yml) so it
+# is CREATED with this subnet at smoke time. podman-compose reuses an existing
+# network as-is when the browser overlay layers on: without this block the
+# base implicitly created e2e_default on podman's default subnet
+# (10.89.0.0/24), the overlay's static 10.89.11.12 was out-of-subnet, and the
+# browser edge could not start (v0.3.0 first-cut e2e failure, 2026-07-01).
+# Keep in lockstep with compose.browser.yml's networks block.
+networks:
+  default:
+    driver: bridge
+    ipam:
+      driver: default
+      config:
+        - subnet: 10.89.11.0/24

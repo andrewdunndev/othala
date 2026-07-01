@@ -252,11 +252,16 @@ echo ""
 echo "=== browser e2e (Playwright) ==="
 # The browser phase MUST layer compose.browser.yml on top of compose.yml. That
 # override recreates the othala service with:
-#   - ADMIN_HOST=0.0.0.0       so Kratos can reach the recovery-gate webhook at
-#                              othala:4431 (the default 127.0.0.1 loopback bind
-#                              is unreachable from the kratos container; the
-#                              recovery after-hook then fails connection-refused
-#                              and the J recovery specs can never pass).
+#   - ADMIN_HOST=10.89.11.12   (othala's static in-net IP; 0.0.0.0 is FORBIDDEN,
+#                              listen.mjs FATALs on it) so Kratos can reach the
+#                              recovery-gate webhook at othala:4431 — the default
+#                              127.0.0.1 loopback bind is unreachable from the
+#                              kratos container and the J recovery specs then
+#                              fail connection-refused. The static IP requires
+#                              the 10.89.11.0/24 subnet declared on the default
+#                              network in the BASE compose.yml: the network is
+#                              created at smoke time, and an overlay cannot
+#                              re-subnet an existing network.
 #   - KRATOS_PUBLIC_URL=http://auth.othala.test  so browser redirect chains and
 #                              the CSRF cookie domain resolve through the Caddy edge.
 # It is applied ONLY here (not during the smoke phase, which must keep the
