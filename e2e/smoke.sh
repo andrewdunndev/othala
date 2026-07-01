@@ -278,14 +278,20 @@ fi
 echo ""
 echo "D. Recovery-gate (othala :4431 /admin/recovery-gate)"
 #
-# ADR 0008: the gate refuses recovery iff the payload's `is_admin` field is true.
-# `is_admin` is set by recovery-gate.jsonnet from metadata_admin.admin (the
-# tamper-proof marker set only via the Kratos admin API). The retired OTHALA_ADMIN_IDS
-# UUID allowlist is no longer consulted. It fails closed on a missing identity_id
-# and 403s a bad bearer. We probe via `compose exec` because the admin port is
-# loopback-only.
+# ADR 0008, as hardened for Kratos v26.2.0: the gate does NOT trust the
+# payload's `is_admin` field — v26.2.0 omits metadata_admin from ctx.identity
+# in after-hook context (confirmed empirically 2026-06-25) — so it re-fetches
+# the identity from the Kratos admin API and refuses iff metadata_admin.admin
+# === true (fetchAdminMarker, portal/src/server/listen.mjs). ANY lookup
+# failure (unknown identity, admin API down) fails CLOSED. The probes must
+# therefore use REAL seeded identities: a placeholder UUID 403s via
+# fail-closed, which makes an admin-refusal probe pass vacuously and a
+# non-admin-allows probe fail spuriously. The retired OTHALA_ADMIN_IDS UUID
+# allowlist is no longer consulted. We probe via `compose exec` because the
+# admin port is loopback-only.
 #
-# Payload shape: { identity_id, is_admin, groups, traits } (per recovery-gate.jsonnet).
+# Payload shape: { identity_id, is_admin, groups, traits } (per
+# recovery-gate.jsonnet); only identity_id feeds the decision today.
 
 # Helper: POST a recovery-gate body with a bearer, capture HTTP code.
 # Runs inside the othala container (the admin port is loopback there).
@@ -295,21 +301,43 @@ gate_code() {
     printf '%s' "fetch('http://127.0.0.1:4431/admin/recovery-gate',{method:'POST',headers:{'Content-Type':'application/json','Authorization':'Bearer ${bearer}'},body:'${body}'}).then(r=>{process.stdout.write(String(r.status));process.exit(0)}).catch(()=>{process.stdout.write('0');process.exit(1)})" | node_in othala
 }
 
-# D1: is_admin=true → 403 (admin recovery is console-only; marker model).
-admin_code=$(gate_code "${RECOVERY_GATE_SECRET}" '{"identity_id":"00000000-0000-0000-0000-000000000001","is_admin":true,"groups":["admin","family"],"traits":{}}')
-if [[ "$admin_code" == "403" ]]; then
-    pass "D1 recovery-gate refuses is_admin=true (ADR 0008 marker model, admin recovery console-only)"
+# Helper variant: capture "code|body" so a refusal REASON can be asserted
+# (distinguishes marker-refusal from fail-closed refusal).
+gate_resp() {
+    local bearer="$1"; local body="$2"
+    printf '%s' "fetch('http://127.0.0.1:4431/admin/recovery-gate',{method:'POST',headers:{'Content-Type':'application/json','Authorization':'Bearer ${bearer}'},body:'${body}'}).then(async r=>{const t=await r.text();process.stdout.write(r.status+'|'+t);process.exit(0)}).catch(()=>{process.stdout.write('0|');process.exit(1)})" | node_in othala
+}
+
+# D1: seed a REAL identity with metadata_admin.admin=true, then probe. Expect
+# 403 WITH the console-only reason (not just any 403 — a fail-closed 403 must
+# not satisfy this probe). Payload deliberately says is_admin=false to prove
+# the marker outranks the payload field.
+admin_identity_json=$(printf '%s' "fetch('http://kratos:4434/admin/identities',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({schema_id:'family',traits:{username:'lab.admin',email:'lab.admin@${OTHALA_APEX}',displayName:'Lab Admin'},metadata_admin:{admin:true,groups:['admin','family']}})}).then(r=>r.text()).then(t=>{process.stdout.write(t);process.exit(0)}).catch(()=>process.exit(1))" | node_in othala)
+admin_identity_id=$(echo "$admin_identity_json" | python3 -c "import sys,json; print(json.load(sys.stdin).get('id',''))" 2>/dev/null || echo "")
+if [[ -n "$admin_identity_id" ]]; then
+    admin_resp=$(gate_resp "${RECOVERY_GATE_SECRET}" "{\"identity_id\":\"${admin_identity_id}\",\"is_admin\":false,\"groups\":[\"admin\",\"family\"],\"traits\":{}}")
+    admin_code="${admin_resp%%|*}"; admin_body="${admin_resp#*|}"
+    if [[ "$admin_code" == "403" && "$admin_body" == *"console-only"* ]]; then
+        pass "D1 recovery-gate refuses metadata_admin.admin=true identity (console-only; marker outranks payload is_admin=false)"
+    else
+        fail "D1 recovery-gate admin path" "code=$admin_code body=$admin_body want=403 + console-only reason"
+    fi
 else
-    fail "D1 recovery-gate admin path" "code=$admin_code want=403 (is_admin=true must be refused)"
+    fail "D1 seed admin identity" "response: $admin_identity_json"
 fi
 
-# D2: is_admin=false → 200, even if groups includes 'admin' (groups are
-# display-only / observability metadata; is_admin is the sole authority).
-nonadmin_code=$(gate_code "${RECOVERY_GATE_SECRET}" '{"identity_id":"00000000-0000-0000-0000-000000000099","is_admin":false,"groups":["admin","family"],"traits":{}}')
-if [[ "$nonadmin_code" == "200" ]]; then
-    pass "D2 recovery-gate allows is_admin=false (groups field is display-only, not authority)"
+# D2: the REAL non-admin identity from C1 (metadata_admin has groups, no
+# admin marker) → 200, even with groups containing 'admin' (groups are
+# display-only / observability metadata; the marker is the sole authority).
+if [[ -n "$identity_id" ]]; then
+    nonadmin_code=$(gate_code "${RECOVERY_GATE_SECRET}" "{\"identity_id\":\"${identity_id}\",\"is_admin\":false,\"groups\":[\"admin\",\"family\"],\"traits\":{}}")
+    if [[ "$nonadmin_code" == "200" ]]; then
+        pass "D2 recovery-gate allows non-admin identity (marker absent; groups display-only, not authority)"
+    else
+        fail "D2 recovery-gate non-admin path" "code=$nonadmin_code want=200"
+    fi
 else
-    fail "D2 recovery-gate non-admin path" "code=$nonadmin_code want=200"
+    fail "D2 recovery-gate non-admin path" "no C1 identity available to probe with"
 fi
 
 # D3: Missing/unidentifiable identity_id → 403 (fail-closed on a subject the
