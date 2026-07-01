@@ -43,7 +43,7 @@
 set -uo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-cd "$SCRIPT_DIR"
+cd "$SCRIPT_DIR" || exit 1
 
 # Rootful container engine, when available. The crucible CI VM exposes the
 # system (rootful) podman socket group-accessible to the unprivileged `fedora`
