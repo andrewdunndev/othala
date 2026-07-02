@@ -31,7 +31,13 @@
  *     5. Initiate an AAL2 login flow (?aal=aal2), submit a fresh TOTP code.
  *        The resulting session carries AAL2 and can access /admin.
  *   adminAal2Context() encapsulates this; admin specs that need to reach /admin
- *   call it instead of loginViaJsonApi.
+ *   call it instead of loginViaJsonApi. Steps 2-4 are also available standalone
+ *   as enrollTotpSecret() (returns just the secret) + computeTotp() (both
+ *   exported) for specs that need to drive the AAL2 step-up themselves via a
+ *   REAL browser-page navigation instead of adminAal2Context's JSON-API
+ *   shortcut for step 5 — e.g. s-aal2-natural-redirect.spec.ts, which exists
+ *   specifically because the JSON-API shortcut never exercises Kratos's
+ *   actual redirect-drops-the-aal-param behaviour (work item #4).
  *
  * virtualAuthenticator / pageCDPSession — test-scoped fixtures for WebAuthn
  *   passkey testing via the Chrome DevTools Protocol (CDP). Ported from Ory
@@ -80,8 +86,13 @@ function base32Decode(input: string): Uint8Array {
  * Compute a 6-digit TOTP code (RFC-6238, HMAC-SHA1, 30s step).
  * @param secret  Base32-encoded TOTP secret (from Kratos settings flow).
  * @param t       Optional Unix timestamp in seconds (default: now).
+ *
+ * Exported so specs that need to complete their OWN AAL2 step-up (e.g. a
+ * real browser-driven natural-redirect step-up, distinct from the JSON-API
+ * shortcut adminAal2Context takes) can compute a fresh code without
+ * duplicating the RFC-6238 implementation.
  */
-async function computeTotp(secret: string, t?: number): Promise<string> {
+export async function computeTotp(secret: string, t?: number): Promise<string> {
   const { createHmac } = await import('node:crypto');
   const keyBytes = base32Decode(secret);
   const counter = BigInt(Math.floor((t ?? Date.now() / 1000) / 30));
@@ -126,14 +137,136 @@ function extractTotpSecret(flowNodes: any[]): string {
 }
 
 /**
+ * enrollTotpSecret — enroll TOTP for the identity already logged in on `ctx`
+ * (an AAL1 session is required — Kratos's settings flow needs a privileged
+ * session) and return the base32 secret so the caller can compute codes.
+ *
+ * Sequence:
+ *   1. Initiate a Kratos settings flow (Accept: application/json).
+ *   2. Read the TOTP secret from the flow's ui.nodes (totp group, text node).
+ *      If Kratos doesn't return TOTP nodes immediately, submit the settings
+ *      form with method=totp to trigger enrollment and re-fetch the flow.
+ *   3. Compute a TOTP code from the secret and submit it to enroll TOTP.
+ *
+ * Factored out of adminAal2Context so any spec that needs a TOTP-enrolled
+ * identity (e.g. to drive a REAL browser-page AAL2 step-up rather than the
+ * JSON-API shortcut below) can reuse the exact same enrollment path.
+ *
+ * Throws if any step fails — a clear error message identifies which step.
+ */
+export async function enrollTotpSecret(
+  ctx: BrowserContext,
+  baseURL: string,
+): Promise<string> {
+  // Step 1: initiate settings flow to enroll TOTP.
+  const settingsResp = await ctx.request.get(`${baseURL}/self-service/settings/browser`, {
+    headers: { Accept: 'application/json' },
+    maxRedirects: 5,
+  });
+  if (!settingsResp.ok()) {
+    throw new Error(
+      `enrollTotpSecret: settings flow init failed: ${settingsResp.status()}`,
+    );
+  }
+  const settingsFlow = await settingsResp.json() as {
+    id: string;
+    ui: {
+      action: string;
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      nodes: any[];
+    };
+  };
+
+  // Step 2: extract the TOTP secret. If Kratos doesn't return TOTP nodes
+  // immediately, submit the settings form with method=totp to trigger
+  // enrollment and re-fetch the flow.
+  let totpSecret = extractTotpSecret(settingsFlow.ui?.nodes ?? []);
+  let flowAction: string = settingsFlow.ui?.action ?? '';
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  let flowNodes: any[] = settingsFlow.ui?.nodes ?? [];
+
+  if (!totpSecret) {
+    // Find the CSRF token from the current nodes.
+    let csrfToken = '';
+    for (const node of flowNodes) {
+      if (
+        node?.attributes?.name === 'csrf_token' &&
+        node?.attributes?.type === 'hidden'
+      ) {
+        csrfToken = node.attributes.value ?? '';
+        break;
+      }
+    }
+
+    // Trigger TOTP enrollment by submitting method=totp.
+    const totpTriggerResp = await ctx.request.post(flowAction, {
+      headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+      data: { csrf_token: csrfToken, method: 'totp' },
+      maxRedirects: 5,
+    });
+    const totpFlow = await totpTriggerResp.json() as {
+      ui?: {
+        action?: string;
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        nodes?: any[];
+      };
+    };
+    flowNodes = totpFlow?.ui?.nodes ?? flowNodes;
+    flowAction = totpFlow?.ui?.action ?? flowAction;
+    totpSecret = extractTotpSecret(flowNodes);
+  }
+
+  if (!totpSecret) {
+    throw new Error(
+      'enrollTotpSecret: TOTP secret not found in settings flow nodes. ' +
+      'Check that the TOTP strategy is enabled in kratos.yml and that the ' +
+      'settings flow returns totp group nodes.',
+    );
+  }
+
+  console.log('[enrollTotpSecret] TOTP secret captured (first 6 chars):', totpSecret.slice(0, 6) + '…');
+
+  // Step 3: compute a TOTP code and enroll.
+  const enrollCode = await computeTotp(totpSecret);
+  console.log('[enrollTotpSecret] enrollment code:', enrollCode);
+
+  // Find CSRF token in current nodes.
+  let csrfForEnroll = '';
+  for (const node of flowNodes) {
+    if (
+      node?.attributes?.name === 'csrf_token' &&
+      node?.attributes?.type === 'hidden'
+    ) {
+      csrfForEnroll = node.attributes.value ?? '';
+      break;
+    }
+  }
+
+  const enrollResp = await ctx.request.post(flowAction, {
+    headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+    data: { csrf_token: csrfForEnroll, method: 'totp', totp_code: enrollCode },
+    maxRedirects: 5,
+  });
+
+  const enrollStatus = enrollResp.status();
+  console.log('[enrollTotpSecret] enrollment response status:', enrollStatus);
+  if (enrollStatus >= 400 && enrollStatus !== 422) {
+    const body = await enrollResp.text().catch(() => '');
+    throw new Error(
+      `enrollTotpSecret: TOTP enrollment failed: HTTP ${enrollStatus} — ${body.slice(0, 400)}`,
+    );
+  }
+
+  return totpSecret;
+}
+
+/**
  * adminAal2Context — obtain a BrowserContext whose session is at AAL2.
  *
  * Sequence:
  *   1. Log in as admin (password → AAL1).
- *   2. Initiate a Kratos settings flow (Accept: application/json).
- *   3. Read the TOTP secret from the flow's ui.nodes (totp group, text node).
- *   4. Compute a TOTP code from the secret and submit it to enroll TOTP.
- *   5. Initiate an AAL2 login flow (?aal=aal2), compute a fresh code,
+ *   2. enrollTotpSecret() — settings-flow TOTP enrollment (see above).
+ *   3. Initiate an AAL2 login flow (?aal=aal2), compute a fresh code,
  *      submit it. The resulting session is at AAL2.
  *
  * The caller is responsible for closing the returned context after use.
@@ -153,106 +286,10 @@ export async function adminAal2Context(opts: {
     // Step 1: AAL1 login.
     await loginViaJsonApi(ctx, { identifier: email, password }, baseURL);
 
-    // Step 2: initiate settings flow to enroll TOTP.
-    const settingsResp = await ctx.request.get(`${baseURL}/self-service/settings/browser`, {
-      headers: { Accept: 'application/json' },
-      maxRedirects: 5,
-    });
-    if (!settingsResp.ok()) {
-      throw new Error(
-        `adminAal2Context: settings flow init failed: ${settingsResp.status()}`,
-      );
-    }
-    const settingsFlow = await settingsResp.json() as {
-      id: string;
-      ui: {
-        action: string;
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        nodes: any[];
-      };
-    };
+    // Step 2: enroll TOTP (settings flow) and capture the secret.
+    const totpSecret = await enrollTotpSecret(ctx, baseURL);
 
-    // Step 3: extract the TOTP secret. If Kratos doesn't return TOTP nodes
-    // immediately, submit the settings form with method=totp to trigger
-    // enrollment and re-fetch the flow.
-    let totpSecret = extractTotpSecret(settingsFlow.ui?.nodes ?? []);
-    let flowAction: string = settingsFlow.ui?.action ?? '';
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    let flowNodes: any[] = settingsFlow.ui?.nodes ?? [];
-
-    if (!totpSecret) {
-      // Find the CSRF token from the current nodes.
-      let csrfToken = '';
-      for (const node of flowNodes) {
-        if (
-          node?.attributes?.name === 'csrf_token' &&
-          node?.attributes?.type === 'hidden'
-        ) {
-          csrfToken = node.attributes.value ?? '';
-          break;
-        }
-      }
-
-      // Trigger TOTP enrollment by submitting method=totp.
-      const totpTriggerResp = await ctx.request.post(flowAction, {
-        headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
-        data: { csrf_token: csrfToken, method: 'totp' },
-        maxRedirects: 5,
-      });
-      const totpFlow = await totpTriggerResp.json() as {
-        ui?: {
-          action?: string;
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          nodes?: any[];
-        };
-      };
-      flowNodes = totpFlow?.ui?.nodes ?? flowNodes;
-      flowAction = totpFlow?.ui?.action ?? flowAction;
-      totpSecret = extractTotpSecret(flowNodes);
-    }
-
-    if (!totpSecret) {
-      throw new Error(
-        'adminAal2Context: TOTP secret not found in settings flow nodes. ' +
-        'Check that the TOTP strategy is enabled in kratos.yml and that the ' +
-        'settings flow returns totp group nodes.',
-      );
-    }
-
-    console.log('[adminAal2] TOTP secret captured (first 6 chars):', totpSecret.slice(0, 6) + '…');
-
-    // Step 4: compute a TOTP code and enroll.
-    const enrollCode = await computeTotp(totpSecret);
-    console.log('[adminAal2] enrollment code:', enrollCode);
-
-    // Find CSRF token in current nodes.
-    let csrfForEnroll = '';
-    for (const node of flowNodes) {
-      if (
-        node?.attributes?.name === 'csrf_token' &&
-        node?.attributes?.type === 'hidden'
-      ) {
-        csrfForEnroll = node.attributes.value ?? '';
-        break;
-      }
-    }
-
-    const enrollResp = await ctx.request.post(flowAction, {
-      headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
-      data: { csrf_token: csrfForEnroll, method: 'totp', totp_code: enrollCode },
-      maxRedirects: 5,
-    });
-
-    const enrollStatus = enrollResp.status();
-    console.log('[adminAal2] enrollment response status:', enrollStatus);
-    if (enrollStatus >= 400 && enrollStatus !== 422) {
-      const body = await enrollResp.text().catch(() => '');
-      throw new Error(
-        `adminAal2Context: TOTP enrollment failed: HTTP ${enrollStatus} — ${body.slice(0, 400)}`,
-      );
-    }
-
-    // Step 5: AAL2 step-up login. Initiate a login flow with aal=aal2.
+    // Step 3: AAL2 step-up login. Initiate a login flow with aal=aal2.
     const aal2FlowResp = await ctx.request.get(
       `${baseURL}/self-service/login/browser?aal=aal2&refresh=true`,
       { headers: { Accept: 'application/json' }, maxRedirects: 5 },

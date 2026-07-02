@@ -68,14 +68,18 @@ test.describe('I — Passkey register → usernameless login', () => {
   //
   // This is NOT a regression from the AAL2 step-up changes in this landing.
   // Evidence: login.astro's passkey block renders under `{!isAal2 && hasPasskey}`.
-  // `isAal2` is derived from `url.searchParams.get('aal') === 'aal2'`. A primary
-  // login at /auth/login?flow=<id> has no ?aal=aal2 param, so isAal2 is false and
-  // the passkey button renders correctly at AAL1. The AAL2 block only activates
-  // during an explicit step-up (when Kratos passes aal=aal2 in the redirect). The
-  // login.astro change did not alter the passkey block guard. The usernameless flow
-  // null-session failure is upstream of this landing — a known defect in how the
-  // CDP virtual CTAP2 authenticator interacts with Kratos's discoverable-credential
-  // assertion path (navigator.credentials.get with allowCredentials:[]).
+  // `isAal2` is derived from the landed flow object (flow.requested_aal ===
+  // 'aal2', or second-factor totp/webauthn/lookup_secret nodes present — see
+  // work item #4), falling back to `?aal=aal2` only when there's no flow at
+  // all. A primary AAL1 login at /auth/login?flow=<id> carries neither
+  // signal, so isAal2 is false and the passkey button renders correctly. The
+  // AAL2 block only activates during an actual step-up (Kratos primes the
+  // flow with requested_aal:'aal2' and second-factor nodes). Neither the
+  // isAal2-derivation fix nor the earlier login.astro change altered the
+  // passkey block guard. The usernameless flow null-session failure is
+  // upstream of this landing — a known defect in how the CDP virtual CTAP2
+  // authenticator interacts with Kratos's discoverable-credential assertion
+  // path (navigator.credentials.get with allowCredentials:[]).
   //
   // Re-enable when the passkey usernameless session bug is fixed independently.
   test.fixme(
