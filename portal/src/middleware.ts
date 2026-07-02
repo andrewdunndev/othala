@@ -39,7 +39,26 @@ const ERROR_ROUTE_PREFIXES = ['/auth/error', '/404', '/500'];
 function applySecurityHeaders(res: Response): void {
   res.headers.set('X-Frame-Options', 'DENY');
   res.headers.set('X-Content-Type-Options', 'nosniff');
-  res.headers.set('Referrer-Policy', 'no-referrer');
+  // Referrer-Policy: same-origin (not no-referrer — see work item #5).
+  //
+  // Intent this preserves: no-referrer's job was to stop the `flow` /
+  // `consent_challenge` query-param tokens on the login/consent pages from
+  // leaking to a third party in the Referer header (docs/hardening.md §2,
+  // docs/security-review-2026-06-07.md HIGH-A/HIGH-B — originally the Google
+  // Fonts CDN, before fonts were self-hosted). `same-origin` still sends NO
+  // referrer at all to any cross-origin destination, so that leak is fully
+  // closed; it only additionally allows the full referrer on same-origin
+  // navigations, which discloses nothing Othala doesn't already know.
+  //
+  // Bug this fixes (work item #5): `no-referrer` also suppresses the Origin
+  // header Chromium sends on a same-origin form-POST navigation (it arrives
+  // as `Origin: null`). Astro's built-in security.checkOrigin CSRF gate then
+  // 403s the request before any app code runs — every state-changing admin
+  // POST (issue-recovery, force-relogin, deactivate, delete, grant/revoke-
+  // admin, profile save) was unreachable from a real browser. `same-origin`
+  // restores the same-origin Origin header and unblocks checkOrigin while
+  // keeping the cross-origin privacy guarantee intact.
+  res.headers.set('Referrer-Policy', 'same-origin');
   res.headers.set('Permissions-Policy', 'geolocation=(), camera=(), microphone=()');
   res.headers.set('Cross-Origin-Opener-Policy', 'same-origin');
   // HSTS: 2-year max-age + includeSubDomains + preload.

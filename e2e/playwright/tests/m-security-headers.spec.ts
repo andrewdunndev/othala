@@ -14,7 +14,7 @@
  *     Required headers:
  *       x-frame-options: DENY
  *       x-content-type-options: nosniff
- *       referrer-policy: no-referrer
+ *       referrer-policy: same-origin
  *       content-security-policy: contains "frame-ancestors 'none'"
  *
  *     NOTE: script-src is intentionally absent from the CSP (deferred; see
@@ -40,7 +40,11 @@ import { test, expect } from '../fixtures';
 const REQUIRED_HEADERS: Array<[string, string | RegExp]> = [
   ['x-frame-options', 'DENY'],
   ['x-content-type-options', 'nosniff'],
-  ['referrer-policy', 'no-referrer'],
+  // no-referrer → same-origin (work item #5): no-referrer suppressed the
+  // Origin header on same-origin form-POST navigations, 403ing every admin
+  // mutation via Astro's checkOrigin. same-origin still sends no referrer
+  // cross-origin (the original privacy intent), restoring Origin same-origin.
+  ['referrer-policy', 'same-origin'],
   // CSP must contain frame-ancestors 'none' — script-src intentionally absent.
   ['content-security-policy', /frame-ancestors\s+'none'/],
   // CSP must include form-action 'self' (Kratos forms POST to same origin).

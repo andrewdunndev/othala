@@ -82,8 +82,15 @@ token-leak targets in any deployment. Othala sets a security-header baseline on
   CSP is also the standing insurance against any future XSS regression: with no
   CSP, a single mistaken `set:html` on a user-controlled field would execute in an
   admin's session. With it, the blast radius is contained.
-- `X-Content-Type-Options: nosniff`, `Referrer-Policy: no-referrer`,
+- `X-Content-Type-Options: nosniff`, `Referrer-Policy: same-origin`,
   `Permissions-Policy` (deny camera/mic/geo), `Cross-Origin-Opener-Policy: same-origin`.
+  (`Referrer-Policy` was `no-referrer` until work item #5: Chromium sends
+  `Origin: null` on a same-origin form-POST navigation under `no-referrer`,
+  which Astro's `checkOrigin` CSRF gate then rejects before app code runs —
+  every admin mutation was unreachable. `same-origin` still sends no referrer
+  cross-origin — closing the token-leak this section opens with — while
+  restoring the same-origin `Origin` header `checkOrigin` needs. See
+  `portal/src/middleware.ts`.)
 - **No third-party CDN assets.** Fonts and all static assets are self-hosted.
   Loading fonts from an external CDN sends the page's `Referer` — including the
   `flow` / `consent_challenge` identifiers — to that third party, and blocks a
