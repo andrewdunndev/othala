@@ -14,6 +14,12 @@
       "matchPackageNames": ["dunn.dev/pipeline"],
       "groupName": "pipeline catalog",
       "automerge": false
+    },
+    {
+      "description": "Renovate's native dockerfile manager independently extracts the portal Containerfile's second-stage FROM (registry.gitlab.com/dunn.dev/pipeline/ci-runtime-node:${CATALOG_VERSION}) as its OWN docker-datasourced dependency, resolved via the ARG's default value — separate from, and blind to, the annotated-ARG customManager's gitlab-tags dependency (dunn.dev/pipeline, see the 'pipeline catalog' rule above) that is supposed to be the sole tracker of that same ARG line. Verified 2026-07-01 with `extractPackageFile` against the live Containerfile: it emits depName registry.gitlab.com/dunn.dev/pipeline/ci-runtime-node, datasource docker, targeting the exact same ARG CATALOG_VERSION= text. Left alone, that shadow dependency is untouched by the 'pipeline catalog' group/automerge:false gate and would fall through to the estate-wide 'all minor + patch' automerge:true rule — silently re-landing the invisible-drift bug this fix exists to close, just from the other manager. Disable native tracking of this one packageName so the annotated ARG customManager remains the only thing that ever proposes an update to that line.",
+      "matchManagers": ["dockerfile"],
+      "matchPackageNames": ["registry.gitlab.com/dunn.dev/pipeline/ci-runtime-node"],
+      "enabled": false
     }
   ],
   "customManagers": [
