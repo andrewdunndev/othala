@@ -651,8 +651,11 @@ Kratos session cookie (HttpOnly). The browser treats `<othala-host>` and
 `<app>.<parent-domain>` as same-site (shared registrable parent), so:
 
 - Service-worker fetch-with-credentials is blocked at the IDP CORS layer.
-  Kratos `allowed_origins` lists only `https://<othala-host>`; Hydra
-  likewise.
+  Kratos `allowed_origins` lists only `https://<othala-host>`. Hydra's
+  `allowed_origins` is extensible (`OTHALA_CORS_ALLOWED_ORIGINS`, comma-
+  separated) to admit additional browser-SPA client origins (e.g. an oCIS
+  Web instance that fetches Hydra's discovery/token endpoints directly) —
+  each admitted origin is still an explicit allowlist entry, not a wildcard.
 - Form-driven CSRF (HIGH-1): `SameSite=Lax` permits same-site POSTs, so a
   top-level form on `<app>.<parent-domain>` posting to
   `<othala-host>/admin/users/<id>` would carry the session cookie. HIGH-1

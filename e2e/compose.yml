@@ -263,6 +263,7 @@ services:
       # Host routing + instance identity consumed by canonical hydra.yml
       HYDRA_PG_HOST: postgres
       OTHALA_PUBLIC_URL: ${OTHALA_PUBLIC_URL}
+      OTHALA_CORS_ALLOWED_ORIGINS: ${OTHALA_CORS_ALLOWED_ORIGINS}
     volumes:
       - ./hydra.rendered.yml:/etc/config/hydra/hydra.yml:ro,z
     command: ["serve", "all", "--config", "/etc/config/hydra/hydra.yml", "--dev"]

@@ -8,6 +8,16 @@ Ory Hydra server configuration.
 |---|---|
 | `hydra.yml` | Server config: DSN, serve URLs, CORS, login/consent/logout URLs, TTLs, secrets, PKCE off |
 
+## CORS allowlist
+
+`serve.public.cors.allowed_origins` is rendered from `OTHALA_CORS_ALLOWED_ORIGINS`
+(comma-separated, unquoted origins), not hardcoded to one origin. Browser SPA
+clients (e.g. oCIS Web) fetch `/.well-known/openid-configuration` and
+`/oauth2/token` directly from their own origin, so that origin must be
+allowlisted; redirect-flow (server-side) clients never browser-fetch Hydra and
+need no entry. Single-origin instances set this to the same value as
+`OTHALA_PUBLIC_URL`.
+
 OIDC client definitions are **not** stored here. Clients are unified `<slug>.yaml`
 manifests read at runtime from `MANIFEST_DIR` (default `/etc/portal/manifests`).
 Each manifest can carry `presentation:` (tile metadata), `oidc:` (forwarded to

@@ -205,6 +205,7 @@ a warning.
 | `OTHALA_CONTACT_RECIPIENT` | Where the dashboard request form delivers. Required in production (no fallback; `OTHALA_ADMIN_IDS` stores UUIDs, not addresses). |
 | `OTHALA_PASSWORD_MIN_LENGTH`, `OTHALA_HIBP_ENABLED` | Password policy knobs. |
 | `KRATOS_ADMIN_BIND_HOST`, `HYDRA_ADMIN_BIND_HOST` | Admin-API bind addresses (render vars, not portal config). `0.0.0.0` single-network (e2e); segmented deployments bind the admin-plane network IP. |
+| `OTHALA_CORS_ALLOWED_ORIGINS` | Hydra CORS allowlist (render var, not portal config). Comma-separated, unquoted origins — every browser SPA client (e.g. oCIS Web) that fetches Hydra's discovery/token endpoints directly needs its origin here, beyond `OTHALA_PUBLIC_URL` itself. Default: single origin, same as `OTHALA_PUBLIC_URL`. |
 
 **Ory configs are rendered, not natively expanded.** Ory has no native
 `${VAR}` expansion. The `kratos/` and `hydra/` YAML are TEMPLATES whose

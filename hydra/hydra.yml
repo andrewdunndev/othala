@@ -14,8 +14,24 @@ serve:
     port: 4444
     cors:
       enabled: true
-      allowed_origins:
-        - "${OTHALA_PUBLIC_URL}"
+      # allowed_origins is an EXTENSIBLE list, not a single hardcoded entry:
+      # a browser SPA client (e.g. oCIS Web) does its OWN fetch() against
+      # /.well-known/openid-configuration and /oauth2/token — the BROWSER
+      # enforces CORS against THAT origin, so every such origin must be
+      # allowlisted here. A redirect-flow (server-side) client never
+      # browser-fetches Hydra directly and needs no entry regardless of how
+      # many such clients exist.
+      # OTHALA_CORS_ALLOWED_ORIGINS is a comma-separated, UNQUOTED list of
+      # origins substituted straight into this flow sequence. Deliberately
+      # unquoted: render-config.sh's double-quote-escaping contract assumes
+      # every ${VAR} token sits inside a YAML double-quoted scalar, so a
+      # value containing literal quote characters would get its quotes
+      # escaped to `\"` and corrupt this (unquoted) flow sequence. Plain
+      # origins (no YAML-special characters) need no quoting to parse as
+      # valid flow-sequence scalars. Single-origin instances (the e2e lab)
+      # set this to OTHALA_PUBLIC_URL's value, preserving the original
+      # one-origin behavior.
+      allowed_origins: [${OTHALA_CORS_ALLOWED_ORIGINS}]
       # Trim to the methods OIDC/OAuth2 actually requires; DELETE and PUT
       # have no place on the public token/discovery endpoints.
       allowed_methods: [GET, POST]

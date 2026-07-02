@@ -79,6 +79,11 @@ OTHALA_CONTACT_RECIPIENT=ops@othala.test
 # auth.othala.test is the generic test host alias used by the browser-profile
 # Caddy edge. No real DNS; compose net alias resolves it inside the net.
 OTHALA_PUBLIC_URL=http://auth.othala.test
+# Hydra CORS allowlist (render var, hydra/hydra.yml only). Comma-separated,
+# unquoted. Single-origin here preserves the pre-extensibility behavior;
+# a deployment with additional browser-SPA clients appends their origin(s)
+# to this list in its own render environment.
+OTHALA_CORS_ALLOWED_ORIGINS=http://auth.othala.test
 OTHALA_PUBLIC_HOST=auth.othala.test
 OTHALA_APEX=othala.test
 OTHALA_WEBAUTHN_RP_ID=othala.test
