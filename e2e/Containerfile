@@ -47,7 +47,7 @@
 # base image ships another (renovate bumps the npm package but NOT this pin —
 # a 1.61.1-vs-v1.60.0 split failed all 30 browser specs on the first v0.3.0
 # cut, 2026-07-01). Bump both together.
-FROM mcr.microsoft.com/playwright:v1.61.1-noble
+FROM mcr.microsoft.com/playwright:v1.61.1-noble@sha256:5b8f294aff9041b7191c34a4bab3ac270157a28774d4b0660e9743297b697e48
 
 # Browsers are already installed in the base image; never let an install
 # step try (and fail) to fetch them.
