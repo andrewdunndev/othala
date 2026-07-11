@@ -1,0 +1,13 @@
+/*
+ * othala.dunn.dev primary stylesheet.
+ *
+ * Consumes the estate design system (tokens + chrome) from the
+ * published @dunn.dev/reference package — the same two imports the
+ * othala portal uses (portal/src/styles/global.css). Sites in the
+ * estate import these rather than re-deriving the design language, so
+ * othala.dunn.dev, reference.dunn.dev, and the portal share one
+ * surface. Site-local patterns (prose, sidebar, eyebrows) live in
+ * site-local.css and stay out of this file by design.
+ */
+@import '@dunn.dev/reference/tokens/index.css';
+@import '@dunn.dev/reference/site.css';

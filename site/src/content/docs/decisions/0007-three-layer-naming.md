@@ -1,3 +1,5 @@
+<!-- TODO(site-rewrite): Delink `docs/decision.md` (CUT). ARCHITECTURE.md and CHANGELOG.md are repo-root files, not site pages — convert to repo links or drop. This comment is stripped at render time and does not appear on the published page. -->
+
 # 0007 — Three-layer naming: Othala / dag.dunn.dev / kratos+hydra
 
 ## Status

@@ -1,3 +1,5 @@
+<!-- TODO(site-rewrite): Remove/footnote the `campaigns/othala/proxy-mtls-egress-design.md` reference (storr-internal path, dead link on the public site). This comment is stripped at render time and does not appear on the published page. -->
+
 # 0003 — mTLS is proxy-originated, not in-app
 
 ## Status

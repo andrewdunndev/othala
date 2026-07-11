@@ -1,3 +1,5 @@
+<!-- TODO(site-rewrite): The `../access-model.md` link is CUT (superseded design this ADR graduates). Either restore access-model as a page or inline a one-line summary of the superseded design. Also delink `../STATUS.md` (CUT) and the two cross-repo `../../../iac/docs/adr/*` links (the iac repo is not part of this site — link to it on gitlab.com or drop). The `../oidc-standards-audit-2026-06-20.md` link auto-rewrites to /research/oidc-standards-audit-2026-06-20/ — verify it resolves. This comment is stripped at render time and does not appear on the published page. -->
+
 # 0009 — capability-group access model
 
 ## Status

@@ -1,3 +1,5 @@
+<!-- TODO(site-rewrite): The `docs/security-review-2026-06-07.md` (CUT) and `docs/hardening.md` §7 references are inline-code paths, not hyperlinks — decide whether to convert the hardening one to a /guides/hardening/ link and drop the CUT security-review pointer. This comment is stripped at render time and does not appear on the published page. -->
+
 # Lost or stolen device — eviction procedure
 
 This runbook covers the correct response when a family member's device is lost,

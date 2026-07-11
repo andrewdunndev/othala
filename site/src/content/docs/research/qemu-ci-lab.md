@@ -1,3 +1,5 @@
+<!-- TODO(site-rewrite): Strip the internal 'Renamed + converged' history framing (lab/ci -> e2e) and present the harness as its current shape. `e2e/*` are repo paths, not site pages — link to the repo or describe. Re-check the 'implemented in v0.2.0' status line against current state before publish. This comment is stripped at render time and does not appear on the published page. -->
+
 # QEMU-CI lab — design + implementation
 
 Status: **implemented in v0.2.0** (this commit set). Replaces the

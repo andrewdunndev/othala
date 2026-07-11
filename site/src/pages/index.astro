@@ -1,0 +1,87 @@
+---
+import Layout from '../layouts/Layout.astro';
+import { sections } from '../lib/sections';
+
+const markSvg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="othala rune">
+  <g fill="none" stroke="currentColor" stroke-width="4.5" stroke-linecap="round">
+    <line x1="32" y1="8" x2="48" y2="24"/>
+    <line x1="48" y1="24" x2="32" y2="40"/>
+    <line x1="32" y1="40" x2="16" y2="24"/>
+    <line x1="16" y1="24" x2="32" y2="8"/>
+    <line x1="32" y1="40" x2="18" y2="56"/>
+    <line x1="32" y1="40" x2="46" y2="56"/>
+  </g>
+  <circle cx="32" cy="24" r="2.5" fill="currentColor"/>
+</svg>`;
+---
+<Layout title="Home" description="Othala — a self-hosted identity provider for your home, built on Ory Kratos + Hydra. Design decisions, adopter guides, operational runbooks, and the research behind the stack.">
+  <div class="overview-hero">
+    <div class="overview-mark" set:html={markSvg} />
+    <div class="overview-title-block">
+      <p class="page-eyebrow">dunn.dev</p>
+      <h1 class="overview-title">Othala</h1>
+      <p class="overview-lede">
+        Ory for your home. A self-hosted identity provider built on Ory
+        Kratos + Hydra with a custom TypeScript portal for login,
+        consent, and per-app OIDC registration — passkey-first, run at
+        family scale. Othala is the open-source project;
+        <code>dag.dunn.dev</code> is the author's deployed instance. This
+        site collects the design decisions, adopter guides, operational
+        runbooks, and the research behind the stack.
+      </p>
+    </div>
+  </div>
+
+  <section class="section">
+    <p class="section-subtitle">Read</p>
+    <div class="overview-grid">
+      {sections.map(s => (
+        <a href={s.href} class="overview-card">
+          <h2 class="overview-card-title">{s.label}</h2>
+          <p class="overview-card-desc">{s.lede}</p>
+        </a>
+      ))}
+    </div>
+  </section>
+</Layout>
+
+<style>
+  .overview-hero {
+    display: flex;
+    align-items: center;
+    gap: var(--space-6);
+    margin-bottom: var(--space-7);
+  }
+  .overview-mark {
+    flex: none;
+    width: 84px;
+    height: 84px;
+    color: var(--accent);
+  }
+  .overview-mark :global(svg) { width: 100%; height: 100%; }
+  .overview-title-block { flex: 1; }
+  .overview-title {
+    font-family: var(--font-display);
+    font-size: var(--text-4xl);
+    line-height: var(--lh-hero);
+    margin: var(--space-1) 0 var(--space-3);
+    color: var(--text);
+  }
+  .overview-lede {
+    font-size: var(--text-lg);
+    color: var(--text-2);
+    max-width: 62ch;
+    margin: 0;
+  }
+  .section-subtitle {
+    font-family: var(--font-mono);
+    font-size: var(--text-xs);
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--text-muted);
+    margin: 0 0 var(--space-2);
+  }
+  @media (max-width: 640px) {
+    .overview-hero { flex-direction: column; align-items: flex-start; gap: var(--space-4); }
+  }
+</style>

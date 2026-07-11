@@ -1,3 +1,5 @@
+<!-- TODO(site-rewrite): Remove/footnote the `campaigns/othala/step-ca-design.md` reference (storr-internal, dead link). This comment is stripped at render time and does not appear on the published page. -->
+
 # 0006 — Two-PKI: step-ca internal mesh CA + LE edge, never chained
 
 ## Status

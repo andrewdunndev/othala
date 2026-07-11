@@ -1,3 +1,5 @@
+<!-- TODO(site-rewrite): Fix the self-referential link — the 'forward-auth apps' note points at `docs/per-app-oidc.md` (this same file); it should point at the forward-auth section of ARCHITECTURE.md. Confirm every issuer/token/userinfo host uses the {YOUR_OTHALA_URL} placeholder (dag.dunn.dev must only appear in the flagged adopter-note example). Verify the in-page anchor link resolves after marked render. This comment is stripped at render time and does not appear on the published page. -->
+
 # Per-app OIDC integration runbook
 
 First-deploy and first-user pilot guide. Covers the two-sided nature

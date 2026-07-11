@@ -1,3 +1,5 @@
+<!-- TODO(site-rewrite): Remove/footnote the `campaigns/othala/account-linking-overrides.md` and `campaigns/othala/account-linking-plan.md` references (storr-internal, dead links). This comment is stripped at render time and does not appear on the published page. -->
+
 # 0004 — Identity linking: username is the migration join key, `sub` is the durable key
 
 ## Status

@@ -1,3 +1,5 @@
+<!-- TODO(site-rewrite): Delink `docs/decision.md` (CUT — not published); this ADR promotes content out of it, so a pointer back is optional. This comment is stripped at render time and does not appear on the published page. -->
+
 # 0010 — skip-consent for trusted first-party clients
 
 ## Status

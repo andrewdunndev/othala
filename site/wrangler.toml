@@ -1,0 +1,37 @@
+# othala.dunn.dev — Cloudflare Workers deploy (scaffold, INERT).
+#
+# Modelled on reference.dunn.dev/site/wrangler.toml. Pure-static
+# surface served via the [assets] block; no Worker script.
+#
+# NOTE: this file does nothing until a `wrangler deploy` runs it, and
+# no CI job in this repo invokes wrangler yet. The custom-domain route
+# below is therefore inert scaffolding — committing it does not create
+# DNS records or bind a hostname. The coordinator wires the deploy job
+# (drafted separately) and activates this at landing time. GitLab Pages
+# is deliberately NOT used: dotted custom domains (othala.dunn.dev)
+# break Let's Encrypt issuance on Pages, which is why every estate
+# site deploys via the Cloudflare Worker custom-domain path instead.
+
+name = "othala-docs"
+compatibility_date = "2026-05-11"
+workers_dev = false
+
+[assets]
+directory = "./dist"
+not_found_handling = "404-page"
+html_handling = "auto-trailing-slash"
+
+# Canonical hostname binding. On first `wrangler deploy`, wrangler
+# creates the CNAME to *.workers.dev infra and provisions the
+# Cloudflare-managed TLS cert, then keeps the route bound on later
+# pushes. Requires CLOUDFLARE_API_TOKEN with Workers Scripts: Edit,
+# Zone: Read on dunn.dev, DNS: Edit on dunn.dev (same token
+# reference.dunn.dev deploys with).
+[[routes]]
+pattern = "othala.dunn.dev"
+custom_domain = true
+zone_name = "dunn.dev"
+
+[observability]
+enabled = true
+head_sampling_rate = 1

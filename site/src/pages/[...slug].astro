@@ -1,0 +1,93 @@
+---
+import Layout from '../layouts/Layout.astro';
+import { readFileSync } from 'node:fs';
+import { resolve, join } from 'node:path';
+import { sections, docLinkMap, type Section, type SectionPage } from '../lib/sections';
+import { renderMarkdown, cardBlurb } from '../lib/render';
+
+const CONTENT_ROOT = resolve(process.cwd(), 'src/content/docs');
+const linkMap = docLinkMap();
+
+type IndexProps = {
+  kind: 'index';
+  label: string;
+  lede: string;
+  cards: { href: string; label: string; blurb: string }[];
+};
+type DocProps = {
+  kind: 'doc';
+  label: string;
+  sectionHref: string;
+  sectionLabel: string;
+  html: string;
+};
+
+const slugOf = (href: string) => href.replace(/^\/|\/$/g, '');
+
+export function getStaticPaths() {
+  const contentRoot = resolve(process.cwd(), 'src/content/docs');
+  const map = docLinkMap();
+  const paths: { params: { slug: string }; props: IndexProps | DocProps }[] = [];
+
+  for (const section of sections) {
+    const leaves = section.pages.filter((p: SectionPage) => p.file);
+
+    // Section overview — card grid.
+    paths.push({
+      params: { slug: section.href.replace(/^\/|\/$/g, '') },
+      props: {
+        kind: 'index',
+        label: section.label,
+        lede: section.lede,
+        cards: leaves.map((p: SectionPage) => ({
+          href: p.href,
+          label: p.label,
+          blurb: cardBlurb(readFileSync(join(contentRoot, p.file!), 'utf-8')),
+        })),
+      } satisfies IndexProps,
+    });
+
+    // Leaf doc pages.
+    for (const p of leaves) {
+      const raw = readFileSync(join(contentRoot, p.file!), 'utf-8');
+      paths.push({
+        params: { slug: p.href.replace(/^\/|\/$/g, '') },
+        props: {
+          kind: 'doc',
+          label: p.label,
+          sectionHref: section.href,
+          sectionLabel: section.label,
+          html: renderMarkdown(raw, map),
+        } satisfies DocProps,
+      });
+    }
+  }
+  return paths;
+}
+
+const props = Astro.props as IndexProps | DocProps;
+---
+{props.kind === 'index' ? (
+  <Layout title={props.label} description={props.lede}>
+    <header class="page-header">
+      <p class="page-eyebrow">Othala</p>
+      <h1 class="page-title">{props.label}</h1>
+      <p class="page-lede">{props.lede}</p>
+    </header>
+    <section class="section">
+      <div class="overview-grid">
+        {props.cards.map(c => (
+          <a href={c.href} class="overview-card">
+            <h2 class="overview-card-title">{c.label}</h2>
+            <p class="overview-card-desc">{c.blurb}</p>
+          </a>
+        ))}
+      </div>
+    </section>
+  </Layout>
+) : (
+  <Layout title={props.label}>
+    <a href={props.sectionHref} class="page-eyebrow page-eyebrow-link">← {props.sectionLabel}</a>
+    <article set:html={props.html} />
+  </Layout>
+)}

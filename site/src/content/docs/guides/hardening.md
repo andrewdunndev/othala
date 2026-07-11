@@ -1,3 +1,5 @@
+<!-- TODO(site-rewrite): Delink the reference to `docs/security-review-2026-06-07.md` (CUT — not published on the site). Decide how to surface the companion SECURITY.md (repo-root file, not a site page): link to the repo or drop the reference. This comment is stripped at render time and does not appear on the published page. -->
+
 # Hardening & secure-deployment guide
 
 > **Status: first draft (2026-06-07).** Companion to `SECURITY.md` (scope &

@@ -1,3 +1,5 @@
+<!-- TODO(site-rewrite): Delink `docs/decision.md` (CUT — not published); reference the promoted ADRs instead if a pointer is still wanted. `kratos/kratos.yml` is a repo path, not a site page — link to the repo or describe inline. This comment is stripped at render time and does not appear on the published page. -->
+
 # 0005 — Passkey-first auth posture
 
 ## Status
