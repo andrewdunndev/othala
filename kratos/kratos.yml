@@ -1,7 +1,7 @@
 # Kratos configuration — generic Othala instance template
 #
 # All values are ${VAR}-substituted at deploy time. Locked decisions from
-# docs/decision.md and docs/STATUS.md applied. Version-pinned in compose;
+# the ADRs (docs/adr/) applied. Version-pinned in compose;
 # this config targets v1.x current at time of build.
 
 # DSN host is env-substituted so the same file lands in both

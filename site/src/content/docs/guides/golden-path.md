@@ -184,7 +184,7 @@ outside the auth pod; in-pod writes are limited to the portal.
 
 If a second writer is ever added (CLI tool, migration script), the
 validator gets factored out into a shared package so both paths enforce
-the same shape. Documented in `docs/security-review-2026-05-04.md`
+the same shape. Documented in the project's adversarial security review,
 MEDIUM-3.
 
 **To break this**: add a second writer without factoring the validator.

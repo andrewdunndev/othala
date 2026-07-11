@@ -2,8 +2,9 @@
 
 ## Status
 
-Accepted. The naming settled at v0.2.0. Reference: `docs/decision.md` (superseded
-notice), `ARCHITECTURE.md` (current), `CHANGELOG.md` (v0.2.0 "Convergence release").
+Accepted. The naming settled at v0.2.0; the authoritative names live in
+`ARCHITECTURE.md`, and `CHANGELOG.md` records the v0.2.0 "Convergence release"
+rename.
 
 ## Context
 
@@ -44,11 +45,9 @@ instance (not useful to adopters) or too vague to debug. The ARCHITECTURE.md
 "Doc source-of-truth hierarchy" encodes this: each doc has exactly one job, and
 the layer it describes determines which doc owns it.
 
-**Earlier naming confusion.** The original decision doc (`docs/decision.md`)
-described an architecture using `home.dunn.dev` as the user-facing host and
-`auth.dunn.dev` as the IDP. Both were retired. The REVERSED annotations in that
-doc are historical markers, not active guidance. The authoritative names are in
-ARCHITECTURE.md, not the original decision doc.
+**Earlier naming confusion.** An earlier architecture used `home.dunn.dev` as
+the user-facing host and `auth.dunn.dev` as the IDP; both were retired at the
+v0.2.0 rename. The authoritative names now live in ARCHITECTURE.md.
 
 ## Decision
 

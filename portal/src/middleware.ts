@@ -44,7 +44,7 @@ function applySecurityHeaders(res: Response): void {
   // Intent this preserves: no-referrer's job was to stop the `flow` /
   // `consent_challenge` query-param tokens on the login/consent pages from
   // leaking to a third party in the Referer header (docs/hardening.md §2,
-  // docs/security-review-2026-06-07.md HIGH-A/HIGH-B — originally the Google
+  // security-review finding HIGH-A/HIGH-B — originally the Google
   // Fonts CDN, before fonts were self-hosted). `same-origin` still sends NO
   // referrer at all to any cross-origin destination, so that leak is fully
   // closed; it only additionally allows the full referrer on same-origin

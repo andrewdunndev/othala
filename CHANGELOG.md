@@ -5,7 +5,7 @@ All notable changes to Othala are documented here. The format follows
 aims to follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 The git tag is the authoritative version; `portal/package.json` mirrors it.
-`docs/STATUS.md` carries the deployed-instance release state.
+This CHANGELOG and git tags carry the deployed-instance release state.
 
 ## [Unreleased]
 

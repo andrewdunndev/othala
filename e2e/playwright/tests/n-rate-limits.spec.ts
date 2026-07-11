@@ -1,7 +1,7 @@
 /**
  * N — Abuse rate-limiting (gate-time tests, MEDIUM-B finding).
  *
- * Finding reference: docs/security-review-2026-06-07.md MEDIUM-B
+ * Finding reference: MEDIUM-B
  *   "No rate limiting on /self-service/login code requests or wrong-password
  *    attempts. Unlimited rapid requests are accepted without a 429."
  *
@@ -57,7 +57,7 @@ test.describe('N — Abuse rate-limiting (gate-time, MEDIUM-B)', () => {
   test.fixme(
     'N1 — rapid code-requests return 429 before the burst limit (code-request flood)',
     async ({ page, baseURL }) => {
-      // TODO(MEDIUM-B docs/security-review-2026-06-07.md): configure Caddy
+      // TODO(MEDIUM-B): configure Caddy
       // rate_limit or Kratos ratelimit to cap code-request initiations.
       //
       // Implementation sketch:
@@ -110,7 +110,7 @@ test.describe('N — Abuse rate-limiting (gate-time, MEDIUM-B)', () => {
   test.fixme(
     'N2 — rapid wrong-password attempts return 429 before the burst limit (brute-force throttle)',
     async ({ page, baseURL }) => {
-      // TODO(MEDIUM-B docs/security-review-2026-06-07.md): configure Kratos
+      // TODO(MEDIUM-B): configure Kratos
       // password-method rate-limiting or Caddy rate_limit on the submit path.
       //
       // Implementation sketch:

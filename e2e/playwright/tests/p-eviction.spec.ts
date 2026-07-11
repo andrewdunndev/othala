@@ -1,7 +1,7 @@
 /**
  * P — Lost-device / credential eviction (DEFINING test, HIGH-C finding).
  *
- * Finding reference: docs/security-review-2026-06-07.md HIGH-C
+ * Finding reference: HIGH-C
  *   "Session revocation does not remove passkey credentials. An attacker
  *    who obtains device B credentials can log in indefinitely even after
  *    the victim triggers force-logout via revokeSubject. The admin UI has
@@ -33,7 +33,7 @@
  *     (the existing revokeSubject handler).
  *
  * The delete-credential step (P4) requires:
- *   TODO(HIGH-C docs/security-review-2026-06-07.md): Kratos admin
+ *   TODO(HIGH-C): Kratos admin
  *   DELETE /admin/identities/{id}/credentials/{type} endpoint (Kratos ≥ v0.13).
  *   Until that endpoint is plumbed through the admin UI, this step is fixme.
  */
@@ -96,7 +96,7 @@ test.describe('P — Passkey credential eviction (lost-device scenario)', () => 
   test.fixme(
     'P1 — victim enrolls passkey A; thief enrolls passkey B in a second context',
     async ({ browser, page, baseURL, kratosAdminURL, virtualAuthenticator }) => {
-      // TODO(HIGH-C docs/security-review-2026-06-07.md): implement full multi-context
+      // TODO(HIGH-C): implement full multi-context
       // passkey enrollment. Requires two CDP sessions (one per virtual authenticator)
       // and the live compose stack.
       //
@@ -128,7 +128,7 @@ test.describe('P — Passkey credential eviction (lost-device scenario)', () => 
   test.fixme(
     'P2 — admin revokeSubject force-logout; passkey B can STILL log in (documents the gap)',
     async ({ browser, page, baseURL, kratosAdminURL }) => {
-      // TODO(HIGH-C docs/security-review-2026-06-07.md): after P1 enrolls passkey B,
+      // TODO(HIGH-C): after P1 enrolls passkey B,
       // call revokeSubject on the victim's identity and then attempt login with
       // ctx-B's passkey credential. The login MUST SUCCEED (proves the gap):
       //
@@ -152,7 +152,7 @@ test.describe('P — Passkey credential eviction (lost-device scenario)', () => 
   test.fixme(
     'P3 — admin deletes credential B via Kratos admin API; passkey B is locked out (post-fix)',
     async ({ browser, page, baseURL, kratosAdminURL }) => {
-      // TODO(HIGH-C docs/security-review-2026-06-07.md): implement admin
+      // TODO(HIGH-C): implement admin
       // DELETE /admin/identities/{id}/credentials/passkey (or the equivalent
       // per-credential endpoint once the admin UI ships the delete path).
       //

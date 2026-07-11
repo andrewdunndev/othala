@@ -358,7 +358,7 @@ admin badge.
 Tailscale tenant setup is a one-time operation, not a per-deploy step.
 WebFinger for `*@dunn.dev` is served from the dunn.dev apex
 (Cloudflare Pages function); the issuer URL is locked in at that time.
-See `docs/apex-webfinger-followup.md` for the discovery path.
+See ARCHITECTURE.md for the discovery path.
 
 RP-side config: Tailscale admin console > Settings > OIDC. Enter:
 - Issuer URL: `https://{YOUR_OTHALA_URL}/`

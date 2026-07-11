@@ -86,8 +86,8 @@ email-change relink runbook, optionally make `username` admin-only.
   Hydra state destroyed on re-apply; a PUT omitting `client_secret` with
   `allowMissingSecret` can blank the secret. CLI path can't hit it; library API
   can. Fix: pre-PUT diff or `patchOAuth2Client`; guard secret-preserve.
-- **Docs overstate the back-channel guarantee** — `STATUS.md`/`security-review-
-  2026-06-07.md` say `revokeSubject` "fans out back-channel logout"; it posts no
+- **Docs overstate the back-channel guarantee** — project docs say `revokeSubject`
+  "fans out back-channel logout"; it posts no
   logout token (none registered, per H4). Align to the honest admin-UI copy.
 
 ## 4. What othala already gets right (strong base)
@@ -124,7 +124,7 @@ email-change relink runbook, optionally make `username` admin-only.
 3. H4 — `backchannel_logout_uri` on `larder.yaml`.
 4. H3 — wire `revokeSubject` into the portal logout link (or document Kratos-only).
    H3+H4 together + a back-channel-sink e2e make SLO real.
-5. Doc mediums — correct STATUS.md/security-review wording; add the UserInfo e2e.
+5. Doc mediums — correct the back-channel-logout wording; add the UserInfo e2e.
 
 **Wave 3 — design decisions (defer, not release-blocking-as-code):**
 6. H5 — "durable key" doc section + email-change relink runbook + optional

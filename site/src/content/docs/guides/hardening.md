@@ -21,7 +21,7 @@ edge concern." It is now in scope and shipped-mitigated. See `SECURITY.md`.
 
 ## Threat model (summary)
 
-Tiers (full detail in `docs/security-review-2026-05-04.md`):
+Tiers (full detail in the project's adversarial security review):
 
 - **Tier 1 — passive network / CDN:** TLS-terminated; only hostnames leak.
 - **Tier 2 — compromised app container:** the attacker tier most controls

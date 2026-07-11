@@ -14,7 +14,7 @@ for depth.
 Each doc has exactly one job. Follow this when editing or reading:
 
 - **ARCHITECTURE.md** (this file): cold-start orientation + load-bearing decisions. The authoritative anchor; all other docs defer to it.
-- **docs/STATUS.md**: the only place release/version state is asserted. Do not state versions elsewhere.
+- **CHANGELOG.md** and git tags: the only place release/version state is asserted. Do not state versions elsewhere.
 - **README.md**: front door; links the others; asserts no version of its own.
 - **DEPLOY.md**: consumption contract; links ARCHITECTURE.md LB-12 rather than restating it.
 
@@ -24,8 +24,8 @@ This hierarchy is what prevents doc drift from recurring.
 
 1. **Right now (this file)**: what is load-bearing, where to find it, topology + flows.
 2. `docs/golden-path.md`: the upgrade-durability commitments.
-3. `docs/decision.md`: historical substrate rationale (the Ory choice). Architecture section superseded by this file.
-4. `docs/STATUS.md`: current release state + what is next.
+3. the ADRs (`docs/adr/`): historical substrate rationale (the Ory choice). Architecture section superseded by this file.
+4. `CHANGELOG.md` and git tags: current release state + what is next.
 5. `DEPLOY.md`: bidirectional pointer to the deploy repo where production lives.
 
 ## The converged application
@@ -76,8 +76,7 @@ the current architecture; do not reintroduce them.
 
 `kratos/kratos.yml: selfservice.methods.webauthn.config.rp.id`
 (`${OTHALA_WEBAUTHN_RP_ID}`). One-way. Changing this invalidates every
-passkey already enrolled. Documented in `docs/decision.md` "WebAuthn
-rp.id" row.
+passkey already enrolled. Documented in the ADRs (`docs/adr/05-passkey-first-auth.md`).
 
 > **Adopters:** `dunn.dev` is this instance's value, set via
 > `OTHALA_WEBAUTHN_RP_ID`. Substitute your own registrable domain. The
@@ -99,8 +98,8 @@ re-onboarding the consumer.
 > below is about the lock-in once any RP is wired — not about using
 > `dag.dunn.dev` specifically.
 
-Also byte-matches the WebFinger response on the dunn.dev apex (see
-`docs/apex-webfinger-followup.md`).
+Also byte-matches the WebFinger response on the dunn.dev apex (see LB-10
+below).
 
 **If you change it**: re-register every OIDC client and Tailscale
 contacts support to migrate.
@@ -207,7 +206,6 @@ is `dunn.dev/.well-known/webfinger`, served by a Cloudflare Pages function
 in the dunn.dev apex repo. **Not** by Othala, **not** by the app.
 
 Consulted exactly once during Tailscale tenant setup; lock-in afterward.
-See `docs/apex-webfinger-followup.md`.
 
 **If you add a WebFinger handler here**: Tailscale won't find it.
 Spec-violating to put it on a subdomain.
@@ -533,8 +531,7 @@ The Pages function returns `Content-Type: application/jrd+json`,
 `urls.self.issuer` in `hydra/hydra.yml` (`https://dag.dunn.dev/` with
 trailing slash; Tailscale rejects any mismatch). Consulted exactly once
 during tenant setup; the issuer is locked-in afterward and changing it
-requires Tailscale support per KB-1240. See
-`docs/apex-webfinger-followup.md`.
+requires Tailscale support per KB-1240.
 
 ## Auth patterns
 
@@ -703,8 +700,8 @@ things."
 The `othala` image is the converged app; the `kratos-ldap` image is the
 separate LDAP bridge project. The legacy `consent` and `util` images are
 retired. Current pinned versions live in the deploy quadlets (`Image=` lines).
-`docs/STATUS.md` states the deployed version. Do not restate version
-numbers here.
+`CHANGELOG.md` and git tags state the deployed version. Do not restate
+version numbers here.
 
 Bumping pins:
 
@@ -753,7 +750,7 @@ The substantive, real test coverage (from the CV audit):
 | Admin authz | `portal/` admin-auth tests | `OTHALA_ADMIN_IDS` as sole authz; `admin` group not consulted (LB-16) |
 | Client registrar | `portal/scripts/register-clients.test.mjs` | Field mapping, `consent:`-never-forwarded, create/update idempotency |
 | LDAP bridge unit | `gitlab.com/dunn.dev/kratos-ldap` | Bind cache, DN parse + escape (caught a real bug) |
-| E2E smoke evidence | `e2e/` + `docs/security-review-2026-05-04.md` | Live-stack validation |
+| E2E smoke evidence | `e2e/` + the project's adversarial security reviews | Live-stack validation |
 
 Native back-channel logout with no signing key at rest (Hydra signs) is a
 real reduction in attack surface, not a stub.
@@ -769,10 +766,10 @@ those as the build-time / release-gate guards, not a continuous type gate.
 
 | Question | Answer |
 |---|---|
-| "Why does this code exist?" | `git log --follow <file>` first; then `docs/decision.md` for high-level rationale. |
-| "Why is this CHOICE locked-in?" | `docs/golden-path.md` for upgrade-durability choices; `docs/decision.md` for one-time decisions. |
+| "Why does this code exist?" | `git log --follow <file>` first; then the ADRs (`docs/adr/`) for high-level rationale. |
+| "Why is this CHOICE locked-in?" | `docs/golden-path.md` for upgrade-durability choices; the ADRs (`docs/adr/`) for one-time decisions. |
 | "Where does production-X live?" | The deploy repo's service config (e.g. `services/dag/`) for runtime configs; THIS repo for application code. |
-| "What's open vs fixed?" | `docs/STATUS.md` for top-level; the security review for findings. |
+| "What's open vs fixed?" | `CHANGELOG.md` and git tags for top-level; the security review for findings. |
 | "How do I deploy?" | `DEPLOY.md` (this repo's root). |
 | "How do I add a new OIDC client?" | Drop a unified `<slug>.yaml` manifest (`presentation:` + `oidc:` + `consent:`, optional `<slug>.md` education sidecar) into `MANIFEST_DIR`, add `<SLUG>_CLIENT_SECRET` to sops, sync the dir to the host, then run the registrar from the deploy repo. No image rebuild. See `e2e/manifests/` for worked examples and `docs/per-app-oidc.md` for the per-RP runbook. |
 | "How do I rotate a secret?" | `docs/runbooks/*-rotation.md`. |

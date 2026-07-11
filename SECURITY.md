@@ -108,7 +108,7 @@ Out of scope:
   path (report those upstream; Renovate keeps deps current here),
 - findings that require an already-compromised host, the operator's secrets, or
   physical/console access (the recovery break-glass is console-only **by
-  design** — see `docs/STATUS.md` "Locked decisions"),
+  design** — see the ADRs (`docs/adr/`) for locked decisions),
 - the `e2e/` test domain (`othala.test`, an RFC 6761 reserved name) and its
   throwaway per-run secrets,
 - volumetric / network-layer (L3–L4) DDoS that requires upstream capacity to
@@ -118,6 +118,6 @@ Out of scope:
   plus the Ory flow config; see `docs/hardening.md`. It is not delegated to a CDN.
 
 Adversarial security review and its remediation are tracked in
-`docs/security-review-2026-05-04.md`; the fuzz suites
+the project's adversarial security reviews; the fuzz suites
 (`portal/scripts/*.fuzz.test.mjs`) and the `e2e/` harness are part of the
 standing guard against regressions.

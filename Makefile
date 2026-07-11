@@ -4,7 +4,7 @@ help:
 	@echo "dunn.dev/othala — SSO substrate (Ory Kratos + Hydra + Astro UI); glauth-kratos LDAP bridge at gitlab.com/dunn.dev/kratos-ldap"
 	@echo ""
 	@echo "Status:"
-	@echo "  See docs/STATUS.md for current direction."
+	@echo "  See README.md for current direction."
 	@echo ""
 	@echo "Brand:"
 	@echo "  brand         regenerate avatar.png + brand.png from the SVGs"

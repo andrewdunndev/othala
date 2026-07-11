@@ -73,9 +73,9 @@ npm run build     # astro build + bundle the listener / admin / registrar
 ## Where to start
 
 - **Cold-start orientation** (the anchor): [`ARCHITECTURE.md`](ARCHITECTURE.md). What the converged app holds, the load-bearing decisions, topology, and trust boundary.
-- **Release / version state**: [`docs/STATUS.md`](docs/STATUS.md). The only place a deployed version is asserted.
+- **Release / version state**: [`CHANGELOG.md`](CHANGELOG.md) and git tags. The only place a deployed version is asserted.
 - **Deploy**: [`DEPLOY.md`](DEPLOY.md).
-- **Network segmentation diagram**: [`docs/diagrams/dag-network-segmentation.svg`](docs/diagrams/dag-network-segmentation.svg). The deployed network topology (Envoy SNI router, SSO pod, app pods).
+- **Network topology**: see the [Topology section of ARCHITECTURE.md](ARCHITECTURE.md#topology) (Envoy SNI router, SSO pod, app pods).
 
 This README asserts no version. It is the front door.
 
@@ -83,7 +83,7 @@ This README asserts no version. It is the front door.
 
 | Path | Contents |
 |---|---|
-| `docs/` | Architecture decision history, STATUS, security review, Ory ecosystem survey, per-app integration, runbooks |
+| `docs/` | Architecture decision history (ADRs), Ory ecosystem survey, per-app integration, runbooks |
 | `kratos/` | Kratos server config + identity schema |
 | `hydra/` | Hydra server config |
 | `portal/` | The Othala application (Astro Node SSR + TS): Kratos self-service flows, Hydra login/consent/logout challenge handlers, the access gate, claims builder, revoke fan-out, dual-listener admin endpoints, the runtime manifest loaders (`tiles.ts` + `manifests.ts`), and the OIDC client registrar. Publishes as the `othala` image. |
@@ -154,17 +154,12 @@ Full topology, request flows, auth patterns, image-pin table, and trust boundary
 
 The Othala app (flows + login/consent + admin) is validated end-to-end through the QEMU-CI smoke harness (`e2e/`). Adversarial security review remediated HIGH + MEDIUM + LOW + architectural findings across two independent passes; fuzz harnesses caught two real bugs before merge (JWK algorithm allowlist). The fail-closed gate, revoke fan-out, and dual-listener boundary carry substantive unit tests.
 
-Security review artifacts (adversarial, multi-lens):
-
-- [`docs/security-review-2026-05-04.md`](docs/security-review-2026-05-04.md) — initial adversarial pass: consent, admin pages, portal lib, Kratos/Hydra config, Caddy, runbooks.
-- [`docs/security-review-2026-06-07.md`](docs/security-review-2026-06-07.md) — second pass: portal middleware (response headers, font loading), application-layer abuse resistance, lost-device recovery.
-
 The LDAP bridge is validated in its own repo (`gitlab.com/dunn.dev/kratos-ldap`; currently parked).
 
 ## Working conventions
 
 - Push requires explicit human approval per action
-- `docs/STATUS.md` is the only place release state is asserted; cold-start orientation is `ARCHITECTURE.md`
+- `CHANGELOG.md` and git tags are the only place release state is asserted; cold-start orientation is `ARCHITECTURE.md`
 - Apply estate voice in external text: no em-dashes, direct phrasing, no filler
 - `@dunn.dev/reference` is the single source for tokens and site chrome; do not redefine locally
 - Secrets: sops + age, operator-managed and never committed

@@ -309,7 +309,7 @@ test-portal:
 # -----------------------------------------------------------------
 # check-portal: the standing QUALITY GATE.
 #
-# Closes the "no standing linter" caveat in docs/STATUS.md: `astro check`
+# Closes the "no standing linter" caveat: `astro check`
 # (type + content checks across the .astro/.ts tree) was previously NOT
 # gated in CI, so type drift could merge silently. This job runs it on
 # every push + MR + tag, alongside the portal test suite — together they

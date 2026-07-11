@@ -32,8 +32,7 @@
 //
 // Single-use replay defence is in-memory: every consumed nonce is held
 // for the TTL window. The portal runs as a single Node SSR pod (no
-// horizontal replicas in production: see docs/STATUS.md "Astro adapter"
-// row). If we ever scale out, the consumed-nonce store moves to Redis
+// horizontal replicas in production). If we ever scale out, the consumed-nonce store moves to Redis
 // or Postgres; the API is the same.
 
 import { createHmac, randomBytes, timingSafeEqual } from 'node:crypto';

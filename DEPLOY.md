@@ -5,7 +5,7 @@ plane), not from this repo. This document is the consumption contract:
 the deploy shape, the promotion path, and the env/secret set. For what
 the application *is* and the load-bearing decisions behind it, read
 [`ARCHITECTURE.md`](ARCHITECTURE.md). For current release/version
-state, read [`docs/STATUS.md`](docs/STATUS.md). This file does not
+state, read [`CHANGELOG.md`](CHANGELOG.md) and git tags. This file does not
 restate either.
 
 Othala is "Ory for your home": a self-hosted Ory substrate for a
@@ -204,6 +204,6 @@ pinned in the `dag-*` quadlets.
 ## Related docs
 
 - [`ARCHITECTURE.md`](ARCHITECTURE.md) — what the app is + load-bearing decisions (read this for the architecture; this file does not restate it)
-- [`docs/STATUS.md`](docs/STATUS.md) — the only place release/version state is asserted
+- [`CHANGELOG.md`](CHANGELOG.md) and git tags — the only place release/version state is asserted
 - [`docs/per-app-oidc.md`](docs/per-app-oidc.md) — per-RP OIDC integration runbook
 - your deploy repo's docs — service-specific deploy notes and estate conventions

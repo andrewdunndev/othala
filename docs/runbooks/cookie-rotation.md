@@ -118,4 +118,4 @@ honored until its own expiry.
 - `kratos/kratos.yml`, `hydra/hydra.yml`: the env-var indirection.
 - `e2e/gen-secrets.sh`: produces a fresh `_CURRENT` for each secret
   (no `_PREVIOUS` — single-slot / collapsed-key model).
-- `docs/decision.md`: H4 "Hydra cookie-secret rotation" lock.
+- ADRs (`docs/adr/`): H4 "Hydra cookie-secret rotation" lock.

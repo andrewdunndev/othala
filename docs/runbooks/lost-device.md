@@ -1,5 +1,3 @@
-<!-- TODO(site-rewrite): The `docs/security-review-2026-06-07.md` (CUT) and `docs/hardening.md` §7 references are inline-code paths, not hyperlinks — decide whether to convert the hardening one to a /guides/hardening/ link and drop the CUT security-review pointer. This comment is stripped at render time and does not appear on the published page. -->
-
 # Lost or stolen device — eviction procedure
 
 This runbook covers the correct response when a family member's device is lost,
@@ -7,7 +5,7 @@ stolen, or accessed without their knowledge. Follow it in full: skipping steps
 leaves a window where an attacker can regain access even after you believe the
 account is secure.
 
-See also `docs/security-review-2026-06-07.md` (HIGH-C) and
+See also the project's adversarial security reviews (HIGH-C) and
 `docs/hardening.md` §7 for the threat context.
 
 ---
@@ -200,7 +198,7 @@ current password or a privileged recovery session).
 
 - `docs/runbooks/admin-recovery.md` — admin self-recovery (locked out, lost
   device, break-glass ladder).
-- `docs/security-review-2026-06-07.md` HIGH-C — eviction threat analysis.
+- security-review finding HIGH-C — eviction threat analysis.
 - `docs/hardening.md` §7 — sessions & lost-device hardening rationale.
 - `portal/src/lib/admin-api.ts` (`deleteCredential`, `EVICTABLE_CREDENTIAL_TYPES`) —
   the Kratos admin API call.
