@@ -19,7 +19,7 @@ containers on a compose network.
 | `kratos` | `oryd/kratos` | Identity: self-service flows, sessions, recovery (public 4433, admin 4434) |
 | `hydra` | `oryd/hydra` | OAuth2/OIDC; ships no UI (public 4444, admin 4445) |
 | **`othala`** | `${AUTH_REGISTRY}` (registry **root**) | The converged Astro Node SSR app |
-| `ldap-bridge` | `${AUTH_REGISTRY}/ldap-bridge` | Go glauth-kratos LDAP adapter (LDAP 389, admin /healthz 6478) |
+| `mailpit` | `axllent/mailpit` | Dev mail catcher (SMTP + web UI) — proves the Kratos courier and contact-form delivery |
 
 The `othala` app is **one image at the registry root** (no `/portal`
 sub-path, no separate `consent` or `util` container — those roles folded
@@ -36,9 +36,8 @@ into the app). It runs **two listeners in one process**
   this harness the admin probes run via `compose exec` because the port
   is loopback-only.
 
-`${AUTH_REGISTRY}` is the registry root (the app image). The bridge is
-the `${AUTH_REGISTRY}/ldap-bridge` sub-image. `${AUTH_VERSION}` is the
-tag (CI passes the just-built tag; local runs use `latest`).
+`${AUTH_REGISTRY}` is the registry root (the app image). `${AUTH_VERSION}`
+is the tag (CI passes the just-built tag; local runs use `latest`).
 
 ## How it works
 
@@ -52,8 +51,8 @@ VM as `fedora`. `e2e/validate.sh`:
 2. Logs in to the GitLab registry (`$CI_REGISTRY_USER` /
    `$CI_REGISTRY_PASSWORD`, auto-injected)
 3. `docker compose up -d` (the podman-docker bridge translates to podman)
-4. Waits for healthchecks on postgres + kratos + hydra + othala +
-   ldap-bridge (5 long-runners)
+4. Waits for healthchecks on postgres + mailpit + kratos + hydra +
+   othala (5 long-runners)
 5. Runs `smoke.sh`
 6. Tears down
 
@@ -66,7 +65,7 @@ VM dies on job end. Total turnaround: ~3-5 minutes including image pulls.
   openid-configuration with issuer byte-match + jwks.json RS256; the
   othala app admin `/healthz` (loopback `:4431`); the public
   `/oauth2/login` challenge handler is mounted on `:8080`; the admin mux
-  does NOT leak onto the public port; ldap-bridge `/healthz`.
+  does NOT leak onto the public port.
 - **Client registration** — runs the converged app's **in-app registrar**
   (`registerAllClients`, bundled to `dist/server/register-clients.mjs`)
   as a `compose run --rm register-clients` one-shot on the same othala

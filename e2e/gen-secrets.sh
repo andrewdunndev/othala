@@ -136,11 +136,6 @@ HYDRA_SYSTEM_SECRET=$(gen)
 HYDRA_COOKIE_SECRET_CURRENT=${hydra_cookie}
 HYDRA_PAIRWISE_SALT=$(gen_short)
 
-# ── LDAP bridge ───────────────────────────────────────────────────────────────
-LDAP_BASE_DN=dc=othala,dc=test
-LDAP_SERVICE_BIND_DN=cn=ldap-reader,dc=othala,dc=test
-LDAP_SERVICE_BIND_PASSWORD=$(gen_short)
-
 # ── Admin identity credentials (shared between validate.sh seed + Playwright fixtures) ────
 # validate.sh seeds these two identities after compose is healthy (ADR 0008 marker model):
 #   - POST /admin/identities with metadata_admin: { admin: true, groups: [...] }
