@@ -12,7 +12,7 @@ type IndexProps = {
   kind: 'index';
   label: string;
   lede: string;
-  cards: { href: string; label: string; blurb: string }[];
+  cards: { href: string; label: string; blurb: string; external?: boolean }[];
 };
 type DocProps = {
   kind: 'doc';
@@ -31,6 +31,9 @@ export function getStaticPaths() {
 
   for (const section of sections) {
     const leaves = section.pages.filter((p: SectionPage) => p.file);
+    // Cards: every page but the section Overview — file-backed leaves and
+    // external index links alike.
+    const cardPages = section.pages.filter((p: SectionPage) => p.file || p.external);
 
     // Section overview — card grid.
     paths.push({
@@ -39,10 +42,11 @@ export function getStaticPaths() {
         kind: 'index',
         label: section.label,
         lede: section.lede,
-        cards: leaves.map((p: SectionPage) => ({
+        cards: cardPages.map((p: SectionPage) => ({
           href: p.href,
           label: p.label,
-          blurb: cardBlurb(readFileSync(join(contentRoot, p.file!), 'utf-8')),
+          blurb: p.blurb ?? (p.file ? cardBlurb(readFileSync(join(contentRoot, p.file), 'utf-8')) : ''),
+          external: !!p.external,
         })),
       } satisfies IndexProps,
     });
@@ -77,8 +81,8 @@ const props = Astro.props as IndexProps | DocProps;
     <section class="section">
       <div class="overview-grid">
         {props.cards.map(c => (
-          <a href={c.href} class="overview-card">
-            <h2 class="overview-card-title">{c.label}</h2>
+          <a href={c.href} class="overview-card" rel={c.external ? 'external' : undefined}>
+            <h2 class="overview-card-title">{c.label}{c.external ? ' ↗' : ''}</h2>
             <p class="overview-card-desc">{c.blurb}</p>
           </a>
         ))}

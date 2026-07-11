@@ -1,6 +1,4 @@
-<!-- TODO(site-rewrite): Delink `docs/decision.md` (CUT). ARCHITECTURE.md and CHANGELOG.md are repo-root files, not site pages — convert to repo links or drop. This comment is stripped at render time and does not appear on the published page. -->
-
-# 0007 — Three-layer naming: Othala / dag.dunn.dev / kratos+hydra
+# 07 — Three-layer naming: Othala / dag.dunn.dev / kratos+hydra
 
 ## Status
 
@@ -32,9 +30,11 @@ name fits their deploy repo.
 
 **The functional component names: kratos + hydra.** The Ory service names
 (Kratos, Hydra, Postgres) are used for what they are: Ory's service identifiers.
-They appear in config files, network aliases, and log lines without any
-rename. The kratos-ldap bridge retains its descriptive name (it is a Kratos
-LDAP bridge). These names are functional identifiers, not project branding.
+They appear in config-file content (database DSNs, self-referential URLs inside
+`kratos.yml` / `hydra.yml`) and log lines without any rename. These names are
+functional identifiers, not project branding, and not network identities: the
+containers themselves are addressed by their quadlet `ContainerName`
+(`dag-kratos`, `dag-hydra`, ...), not by bare Ory names.
 
 **Why the three-layer distinction matters.** Without it, documentation slides
 between "Othala does X" (the OSS project's behavior), "dag does X" (the
@@ -65,8 +65,13 @@ Three distinct naming layers, each used consistently:
    clearly annotated as instance-specific, with adopter-substitution notes).
 
 3. **kratos / hydra / postgres** -- the Ory functional component names. Used as-is
-   in config files (`kratos.yml`, `hydra.yml`), network aliases (`kratos:4433`),
-   and log analysis. Not renamed to `dag-kratos` or `othala-kratos`.
+   in config-file content (e.g. the postgres DSN role/db names in `kratos.yml`,
+   `hydra.yml`) and in log analysis. Sibling containers do not resolve each
+   other by these bare names: each quadlet sets a `ContainerName` scoped to the
+   instance (`dag-kratos`, `dag-hydra`), and that is the name peers use to reach
+   it on the internal network. Not renamed to `dag-kratos-svc` or
+   `othala-kratos` for branding purposes, but not bare `kratos`/`hydra` at the
+   network layer either.
 
 ## Consequences
 
@@ -85,6 +90,10 @@ Three distinct naming layers, each used consistently:
   adopter note explaining that it is an instance value, not a framework
   constraint. Without the three-layer naming convention, those notes would have
   no coherent frame.
+- Worked examples that show inter-service addressing should reference the
+  `ContainerName`-scoped identity (`dag-kratos:4433`), not a bare Ory name
+  (`kratos:4433`): no `NetworkAlias` is defined in the deployed quadlets, so a
+  bare-name example would not resolve on the wire.
 
 ## Alternatives considered
 

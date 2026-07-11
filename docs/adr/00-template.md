@@ -1,8 +1,8 @@
-# NNNN — Title
+# NN — Title
 
 ## Status
 
-Proposed | Accepted | Superseded by [NNNN](NNNN-title.md) | Deprecated
+Proposed | Accepted | Superseded by [NN](NN-title.md) | Deprecated
 
 ## Context
 

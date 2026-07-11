@@ -5,22 +5,26 @@
 // it through marked). Adding a doc page = adding one row here + moving
 // the markdown under src/content/docs/.
 //
-// `disposition` records how each source file was handled when the docs
-// site was scaffolded (MOVE = lifted as-is; KEEP-REWRITE = lifted with
-// a TODO header for a later prose pass). It is documentation only; the
-// site does not branch on it.
-
-export type Disposition = 'MOVE' | 'KEEP-REWRITE';
+// The site carries the two timeless surfaces: adopter-facing Guides and
+// a Decisions index that links OUT to the repo-canonical ADRs. Operational
+// runbooks and dated research live in the repository (docs/), not on the
+// public site.
 
 export interface SectionPage {
   href: string;
   label: string;
-  /** Path under src/content/docs/ that backs this page. Omitted for
-   *  the section Overview (rendered as a card grid). */
+  /** Path under src/content/docs/ that backs this page. Omitted for the
+   *  section Overview (rendered as a card grid) and for external index
+   *  entries (which link off-site and generate no doc page). */
   file?: string;
+  /** True when `href` points off-site (e.g. an ADR on gitlab.com). No
+   *  doc page is generated; the entry renders as an overview/sidebar link. */
+  external?: boolean;
+  /** Overview-card description for entries without a `file` (external
+   *  links). File-backed pages derive their blurb from the source. */
+  blurb?: string;
   /** Optional sub-heading the sidebar groups this page under. */
   group?: string;
-  disposition?: Disposition;
 }
 
 export interface Section {
@@ -30,64 +34,40 @@ export interface Section {
   pages: SectionPage[];
 }
 
+const ADR = 'https://gitlab.com/dunn.dev/othala/-/blob/main/docs/adr';
+
 export const sections: Section[] = [
   {
     href: '/guides/',
     label: 'Guides',
     lede: 'Operational and adopter-facing guides: the integration commitments that keep the stack durable, how to wire an app to Othala over OIDC, how requests are denied, how to run it securely, and what a family member sees when they sign in.',
     pages: [
-      { href: '/guides/',                     label: 'Overview' },
-      { href: '/guides/golden-path/',         label: 'Golden path',          file: 'guides/golden-path.md',          disposition: 'MOVE' },
-      { href: '/guides/per-app-oidc/',        label: 'Per-app OIDC',         file: 'guides/per-app-oidc.md',         disposition: 'KEEP-REWRITE' },
-      { href: '/guides/error-handling/',      label: 'Error handling',       file: 'guides/error-handling.md',       disposition: 'MOVE' },
-      { href: '/guides/hardening/',           label: 'Hardening',            file: 'guides/hardening.md',            disposition: 'KEEP-REWRITE' },
-      { href: '/guides/family-help/',         label: 'Family help',          file: 'guides/family-help.md',          disposition: 'MOVE' },
-      { href: '/guides/contribution-strategy/', label: 'Contribution strategy', file: 'guides/contribution-strategy.md', disposition: 'MOVE' },
+      { href: '/guides/',                       label: 'Overview' },
+      { href: '/guides/golden-path/',           label: 'Golden path',            file: 'guides/golden-path.md' },
+      { href: '/guides/per-app-oidc/',          label: 'Per-app OIDC',           file: 'guides/per-app-oidc.md' },
+      { href: '/guides/error-handling/',        label: 'Error handling',         file: 'guides/error-handling.md' },
+      { href: '/guides/hardening/',             label: 'Hardening',              file: 'guides/hardening.md' },
+      { href: '/guides/family-help/',           label: 'Family help',            file: 'guides/family-help.md' },
+      { href: '/guides/contribution-strategy/', label: 'Contribution strategy',  file: 'guides/contribution-strategy.md' },
     ],
   },
   {
     href: '/decisions/',
     label: 'Decisions',
-    lede: 'Architecture Decision Records — the choices that shaped Othala and are not obvious from the code alone: what was decided, why the alternatives were real, and what follows.',
+    lede: 'Architecture Decision Records — the choices that shaped Othala and are not obvious from the code alone. The records live in the repository and describe the system as deployed; each card links to the canonical ADR on gitlab.com.',
     pages: [
-      { href: '/decisions/',                            label: 'Overview' },
-      { href: '/decisions/0001-auth-substrate-ory/',            label: '0001 · Auth substrate: Ory',            file: 'decisions/0001-auth-substrate-ory.md',            disposition: 'MOVE' },
-      { href: '/decisions/0002-custom-portal-oidc-registrar/',  label: '0002 · Custom portal + registrar',      file: 'decisions/0002-custom-portal-oidc-registrar.md',  disposition: 'MOVE' },
-      { href: '/decisions/0003-proxy-originated-mtls/',         label: '0003 · Proxy-originated mTLS',          file: 'decisions/0003-proxy-originated-mtls.md',         disposition: 'KEEP-REWRITE' },
-      { href: '/decisions/0004-identity-linking-on-username/',  label: '0004 · Identity linking',               file: 'decisions/0004-identity-linking-on-username.md',  disposition: 'KEEP-REWRITE' },
-      { href: '/decisions/0005-passkey-first-auth/',            label: '0005 · Passkey-first auth',             file: 'decisions/0005-passkey-first-auth.md',            disposition: 'KEEP-REWRITE' },
-      { href: '/decisions/0006-two-pki/',                       label: '0006 · Two-PKI',                        file: 'decisions/0006-two-pki.md',                       disposition: 'KEEP-REWRITE' },
-      { href: '/decisions/0007-three-layer-naming/',            label: '0007 · Three-layer naming',             file: 'decisions/0007-three-layer-naming.md',            disposition: 'KEEP-REWRITE' },
-      { href: '/decisions/0008-admin-authority-model/',         label: '0008 · Admin authority model',          file: 'decisions/0008-admin-authority-model.md',         disposition: 'MOVE' },
-      { href: '/decisions/0009-capability-group-access-model/', label: '0009 · Capability-group access',        file: 'decisions/0009-capability-group-access-model.md', disposition: 'KEEP-REWRITE' },
-      { href: '/decisions/0010-first-party-skip-consent/',      label: '0010 · First-party skip-consent',       file: 'decisions/0010-first-party-skip-consent.md',      disposition: 'KEEP-REWRITE' },
-      { href: '/decisions/format/',       label: 'ADR format',   file: 'decisions/README.md',        group: 'Meta', disposition: 'MOVE' },
-      { href: '/decisions/0000-template/', label: 'Template',    file: 'decisions/0000-template.md', group: 'Meta', disposition: 'MOVE' },
-    ],
-  },
-  {
-    href: '/runbooks/',
-    label: 'Runbooks',
-    lede: 'Break-glass and steady-state operational procedures for running an Othala instance: admin recovery, credential rotation, recovery-email deliverability, lost-device eviction, and Postgres backup/restore.',
-    pages: [
-      { href: '/runbooks/',                  label: 'Overview' },
-      { href: '/runbooks/admin-recovery/',   label: 'Admin recovery',        file: 'runbooks/admin-recovery.md',   disposition: 'MOVE' },
-      { href: '/runbooks/lost-device/',      label: 'Lost or stolen device', file: 'runbooks/lost-device.md',      disposition: 'KEEP-REWRITE' },
-      { href: '/runbooks/cookie-rotation/',  label: 'Cookie / cipher rotation', file: 'runbooks/cookie-rotation.md', disposition: 'MOVE' },
-      { href: '/runbooks/secrets-rotation/', label: 'secrets.system rotation', file: 'runbooks/secrets-rotation.md', disposition: 'MOVE' },
-      { href: '/runbooks/email-recovery/',   label: 'Email recovery',        file: 'runbooks/email-recovery.md',   disposition: 'MOVE' },
-      { href: '/runbooks/postgres-backup/',  label: 'Postgres backup',       file: 'runbooks/postgres-backup.md',  disposition: 'MOVE' },
-    ],
-  },
-  {
-    href: '/research/',
-    label: 'Research',
-    lede: 'Research and audit artifacts behind the design: the Ory ecosystem survey, an OIDC/identity standards-alignment audit, and the QEMU end-to-end CI harness that proves the stack.',
-    pages: [
-      { href: '/research/',                              label: 'Overview' },
-      { href: '/research/ory-ecosystem-survey/',         label: 'Ory ecosystem survey',       file: 'research/ory-ecosystem-survey.md',         disposition: 'MOVE' },
-      { href: '/research/oidc-standards-audit-2026-06-20/', label: 'OIDC standards audit',    file: 'research/oidc-standards-audit-2026-06-20.md', disposition: 'MOVE' },
-      { href: '/research/qemu-ci-lab/',                  label: 'QEMU CI lab',                file: 'research/qemu-ci-lab.md',                  disposition: 'KEEP-REWRITE' },
+      { href: '/decisions/', label: 'Overview' },
+      { href: `${ADR}/01-auth-substrate-ory.md`,             external: true, label: '01 · Auth substrate: Ory',       blurb: 'Six substrates evaluated; Ory wins on BYO-UI, single-binary, Apache-2. Substrate is Kratos + Hydra; the LDAP bridge was never deployed and is retired.' },
+      { href: `${ADR}/02-custom-portal-oidc-registrar.md`,   external: true, label: '02 · Custom portal + registrar', blurb: 'Consent folded into the portal; client registration is a typed TypeScript registrar — create/update-only, never deletes — reconciled on SIGHUP.' },
+      { href: `${ADR}/03-proxy-originated-mtls.md`,          external: true, label: '03 · Proxy-originated mTLS',     blurb: 'Apps talk plain HTTP; a sidecar holds the cert. The dag admin-proxy was reverted (2026-07-01) to a network-isolated direct hop; the pattern survives on the inference path.' },
+      { href: `${ADR}/04-identity-linking-on-username.md`,   external: true, label: '04 · Identity linking',          blurb: 'The durable OIDC subject is the Kratos identity UUID; username is the human migration on-ramp and is user-mutable; email is never a configured link key.' },
+      { href: `${ADR}/05-passkey-first-auth.md`,             external: true, label: '05 · Passkey-first auth',        blurb: 'Three tiers: passkey primary, email one-time-code as a full-login secondary, password demoted to a tertiary recovery on-ramp.' },
+      { href: `${ADR}/06-two-pki.md`,                        external: true, label: '06 · Two-PKI',                  blurb: 'Two never-chained roots estate-wide. dag is single-PKI (Let’s Encrypt edge only) as deployed; the live step-ca consumer is the inference metering hop.' },
+      { href: `${ADR}/07-three-layer-naming.md`,             external: true, label: '07 · Three-layer naming',        blurb: 'Othala (OSS project) / dag.dunn.dev (the instance) / kratos+hydra (Ory functional names) — used consistently, never conflated.' },
+      { href: `${ADR}/08-admin-authority-model.md`,          external: true, label: '08 · Admin authority model',     blurb: 'Live admin grant/revoke via admin-managed metadata + AAL2 step-up, retiring the env allowlist; the Ory-native admin plane is the bootstrap floor. Two honest gaps recorded.' },
+      { href: `${ADR}/09-capability-group-access-model.md`,  external: true, label: '09 · Capability-group access',    blurb: 'access-<svc> / admin-<svc> / root capability groups with path-selective forward-auth and set-union claims; legacy cohorts persist pending migration. The roster stays in the instance.' },
+      { href: `${ADR}/10-first-party-skip-consent.md`,       external: true, label: '10 · First-party skip-consent',   blurb: 'skip_consent per first-party client so the household never sees a consent screen; a documented threat-model acceptance, revisited at the first banking-tier client.' },
+      { href: `${ADR}/README.md`, external: true, label: 'Format & full index', group: 'Meta', blurb: 'The MADR-lite format, the status conventions, and the full index of decision records in the repository.' },
     ],
   },
 ];
@@ -103,11 +83,11 @@ export function sectionForPath(path: string): Section | null {
 }
 
 /** Map every published doc's source basename → its site URL, so
- *  intra-repo Markdown links (`[0002](0002-...md)`, `../decision.md`,
+ *  intra-repo Markdown links (`[golden path](golden-path.md)`,
  *  `docs/per-app-oidc.md`) rewrite to working site links at render
- *  time. Basenames not in the map (CUT docs, storr-internal
- *  campaigns/* paths) are left untouched and 404 — those are the
- *  dead links the KEEP-REWRITE headers call out. */
+ *  time. Basenames not in the map (repo-only docs, external ADRs,
+ *  storr-internal paths) are left untouched — those links resolve
+ *  against the repository, not the site. */
 export function docLinkMap(): Record<string, string> {
   const map: Record<string, string> = {};
   for (const s of sections) {

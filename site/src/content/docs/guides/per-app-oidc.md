@@ -1,5 +1,3 @@
-<!-- TODO(site-rewrite): Fix the self-referential link — the 'forward-auth apps' note points at `docs/per-app-oidc.md` (this same file); it should point at the forward-auth section of ARCHITECTURE.md. Confirm every issuer/token/userinfo host uses the {YOUR_OTHALA_URL} placeholder (dag.dunn.dev must only appear in the flagged adopter-note example). Verify the in-page anchor link resolves after marked render. This comment is stripped at render time and does not appear on the published page. -->
-
 # Per-app OIDC integration runbook
 
 First-deploy and first-user pilot guide. Covers the two-sided nature
@@ -9,8 +7,8 @@ into the app's own config). Both sides must have the same secret or the
 integration will fail silently in ways that look like provider errors.
 
 This runbook covers OIDC-based integrations. For the forward-auth apps
-(Navidrome/tune, Sonarr+Radarr/gather) see `docs/per-app-oidc.md`
-"forward auth" note in `ARCHITECTURE.md`. For Cinema's native clients
+(Navidrome/tune, Sonarr+Radarr/gather) see the `forward_auth` handling in
+`ARCHITECTURE.md`. For Cinema's native clients
 (Apple TV / Infuse), see [Cinema / Jellyfin](#cinema--jellyfin----oidc-with-a-jellyfin-local-password-for-native-clients).
 
 > **Note for adopters:** every issuer/token/userinfo URL in this
@@ -556,7 +554,6 @@ open an upstream issue if the endpoint exists but returns an error.
 ## Related
 
 - `ARCHITECTURE.md` -- issuer URL (LB-2), cookie domain (LB-4), subject types (LB-5)
-- `docs/per-app-oidc.md` -- role/claim contract and role granularity ranking
 - `MANIFEST_DIR` (`/etc/portal/manifests`) -- the runtime manifest set; worked examples in `e2e/manifests/`
 - `docs/runbooks/secrets-rotation.md` -- break-glass if `secrets.system` is compromised
 - `portal/src/lib/register-clients.ts` -- the in-app OIDC client registrar (replaces the legacy `dag-util` / `apply-clients.sh` runner)
