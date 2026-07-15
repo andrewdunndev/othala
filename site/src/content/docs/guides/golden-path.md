@@ -159,9 +159,8 @@ the rename): a DB password, a session secret (Kratos and Hydra cookies),
 a cipher secret (Kratos at-rest encryption), the non-rotatable
 `secrets.system` key (Hydra at-rest encryption), and a pairwise salt.
 The `auth_internal_bearer` key (consent service bearer token) was retired
-with the consent service. Exact key names are in the deploy repo's
-`services/dag/` sops file; the cruft scan confirmed these are `dag_*`,
-not `auth_*` as previously written here.
+with the consent service. Exact key names live in the instance's sops
+store and carry the `dag_*` prefix.
 
 The two-slot cookie rotation pattern (CURRENT + PREVIOUS) is reduced
 to single-value reuse in production. **This trades a small amount of

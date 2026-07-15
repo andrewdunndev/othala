@@ -11,8 +11,8 @@ Folds in the groups-claim findings from the OIDC standards audit of 2026-06-20
 (set-union merge, scope-gating). Sits alongside [08](08-admin-authority-model.md):
 that ADR governs who administers **Othala** (the portal-admin bit); this one
 governs how access to **apps** is expressed. The concrete roster — which services
-exist, who is in which group — is **instance** data and lives only in the private
-deploy repo, never in this ADR.
+exist, who is in which group — is **instance** data and lives in the instance's
+catalog, never in this ADR.
 
 ## Context
 
