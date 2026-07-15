@@ -142,7 +142,7 @@ const tileGroups = Array.from(groupedTilesMap.entries())
     tiles,
     meta: groupRegistry.get(groupName),
   }));
-// ADR 0008: the Admin nav affordance reads metadata_admin.admin from the
+// ADR 08: the Admin nav affordance reads metadata_admin.admin from the
 // admin-API-fetched identity (already in `identity` above — no extra call).
 // The /admin route itself is gated by requireAdminSession (AAL2 + marker);
 // this just keeps the link truthful so a non-admin isn't shown a tile that

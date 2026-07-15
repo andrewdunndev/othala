@@ -221,7 +221,7 @@ lint-jsonnet-hooks:
   script:
     - |
       # 1. Assert the recovery-gate file exists and is non-empty.
-      # (login-gate.jsonnet was RETIRED in ADR 0008 — the after.code login
+      # (login-gate.jsonnet was RETIRED in ADR 08 — the after.code login
       # interrupt is superseded by required_aal: aal2 on /admin.)
       for f in kratos/hooks/recovery-gate.jsonnet; do
         if [ ! -s "$f" ]; then

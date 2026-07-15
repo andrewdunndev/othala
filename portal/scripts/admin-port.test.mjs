@@ -11,7 +11,7 @@
 //   - the admin-endpoint + recovery-gate bearer checks are CONSTANT-TIME and
 //     FAIL-CLOSED (unset secret rejects everything).
 //
-// The login-gate (POST /admin/login-gate) was retired in ADR 0008: the
+// The login-gate (POST /admin/login-gate) was retired in ADR 08: the
 // after.code hook was dropped from kratos.yml; AAL2-on-/admin makes an admin
 // email-code AAL1 session harmless. ADMIN_POST_ROUTES no longer includes it.
 //
@@ -73,7 +73,7 @@ test('admin GET mux serves exactly /healthz and /readyz', () => {
 });
 
 test('admin POST mux serves exactly the CU3 endpoints (login-gate retired)', () => {
-  // Login-gate was retired in ADR 0008; it must NOT be in ADMIN_POST_ROUTES.
+  // Login-gate was retired in ADR 08; it must NOT be in ADMIN_POST_ROUTES.
   assert.deepEqual([...ADMIN_POST_ROUTES].sort(), ['/admin/recovery-gate', '/admin/revoke-user']);
   assert.equal(ADMIN_POST_ROUTES.has('/admin/login-gate'), false, 'login-gate must be retired from POST routes');
 });
@@ -310,7 +310,7 @@ test('POST /admin/recovery-gate is fail-closed when KRATOS_ADMIN_URL is unset (4
 });
 
 test('POST /admin/recovery-gate ALLOWS recovery when is_admin===false (200)', async () => {
-  // fetchAdminMarker calls the Kratos admin API directly (ADR 0008 workaround:
+  // fetchAdminMarker calls the Kratos admin API directly (ADR 08 workaround:
   // Kratos v26.2.0 omits metadata_admin from webhook ctx). Provide a mock
   // Kratos admin API that returns a non-admin identity for OTHER_UUID so the
   // gate can resolve the marker without a live Kratos instance.

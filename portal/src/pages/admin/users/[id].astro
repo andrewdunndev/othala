@@ -167,7 +167,7 @@ if (Astro.request.method === 'POST' && identity) {
         // C4: stored order MUST match canonical order so consent and
         // portal agree on which group wins for role derivation.
         const groups = normalizeGroupOrder([...identityGroups, ...accessGroups]);
-        // ADR 0008: preserve the existing admin marker — an unrelated
+        // ADR 08: preserve the existing admin marker — an unrelated
         // groups/roles edit must NOT silently drop it. Read from the
         // currently-fetched identity (not re-fetched, to avoid TOCTOU on
         // the write; the patch path handles targeted grant/revoke).
@@ -230,7 +230,7 @@ if (Astro.request.method === 'POST' && identity) {
         return Astro.redirect('/admin/users?deleted=1');
       }
     } else if (action === 'grant-admin') {
-      // ADR 0008: targeted admin marker grant via JSON Patch. Does NOT touch
+      // ADR 08: targeted admin marker grant via JSON Patch. Does NOT touch
       // groups or roles. Guards: self-demote N/A on grant (self-grant is fine
       // — the acting admin already has authority).
       const username = identity.traits?.username ?? id;
@@ -238,7 +238,7 @@ if (Astro.request.method === 'POST' && identity) {
       identity = await reload();
       actionResult = { kind: 'admin-granted', username };
     } else if (action === 'revoke-admin') {
-      // ADR 0008: targeted admin marker revoke. Guards:
+      // ADR 08: targeted admin marker revoke. Guards:
       //   (a) Self-demote guard: block revocation of the acting admin's own
       //       marker via the UI (break-glass scenario requires another admin
       //       or console access).
@@ -554,7 +554,7 @@ const adminNav = [
 
         {id === adminIdentityId && (
           <div class="notice notice-warning">
-            You're editing your own identity. The <code>admin</code> group is display-only — admin access is the <code>metadata_admin.admin</code> marker (ADR 0008), and you can't revoke your own marker here (have another admin do it, or use the shell break-glass).
+            You're editing your own identity. The <code>admin</code> group is display-only — admin access is the <code>metadata_admin.admin</code> marker (ADR 08), and you can't revoke your own marker here (have another admin do it, or use the shell break-glass).
           </div>
         )}
 
@@ -732,7 +732,7 @@ const adminNav = [
             </form>
           </div>
           <p class="muted text-xs">
-            Admin authority is the <code>metadata_admin.admin</code> marker (ADR 0008). Grant/revoke is a targeted JSON Patch — groups and roles are not affected. Self-revoke is blocked; use another admin or the shell break-glass. Revoke is blocked if this is the last admin.
+            Admin authority is the <code>metadata_admin.admin</code> marker (ADR 08). Grant/revoke is a targeted JSON Patch — groups and roles are not affected. Self-revoke is blocked; use another admin or the shell break-glass. Revoke is blocked if this is the last admin.
           </p>
 
           <details>

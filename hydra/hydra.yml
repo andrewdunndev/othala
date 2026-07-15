@@ -2,7 +2,7 @@
 #
 # All values are ${VAR}-substituted at deploy time. DSN host is env-substituted
 # so the same file lands in both topologies. Lab compose sets
-# HYDRA_PG_HOST=postgres (compose service name); iac quadlets set
+# HYDRA_PG_HOST=postgres (compose service name); the production quadlets set
 # HYDRA_PG_HOST to the container name on the pod-internal network.
 
 dsn: "postgres://hydra:${HYDRA_PG_PASS}@${HYDRA_PG_HOST}:5432/hydra?sslmode=disable"
@@ -14,13 +14,9 @@ serve:
     port: 4444
     cors:
       enabled: true
-      # allowed_origins is an EXTENSIBLE list, not a single hardcoded entry:
-      # a browser SPA client (e.g. oCIS Web) does its OWN fetch() against
-      # /.well-known/openid-configuration and /oauth2/token — the BROWSER
-      # enforces CORS against THAT origin, so every such origin must be
-      # allowlisted here. A redirect-flow (server-side) client never
-      # browser-fetches Hydra directly and needs no entry regardless of how
-      # many such clients exist.
+      # allowed_origins is an EXTENSIBLE allowlist keyed by client type —
+      # browser-fetching SPA clients need an entry each, redirect-flow
+      # (server-side) clients never do: docs/adr/12-oidc-client-topology.md.
       # OTHALA_CORS_ALLOWED_ORIGINS is a comma-separated, UNQUOTED list of
       # origins substituted straight into this flow sequence. Deliberately
       # unquoted: render-config.sh's double-quote-escaping contract assumes
@@ -53,19 +49,11 @@ urls:
     issuer: "${OTHALA_PUBLIC_URL}/"
     public: "${OTHALA_PUBLIC_URL}/"
 
-  # Topology B (v0.2.0): the entire SSO stack lives on ${OTHALA_PUBLIC_URL}.
-  # Hydra redirects OAuth2 challenge flows to ${OTHALA_PUBLIC_URL}/oauth2/{login,
-  # consent,logout} — the converged Astro API routes that handle the Hydra
-  # challenge protocol. /auth/{login,logout} remain as the Kratos browser-flow
-  # human UI (self-service), which is a separate concern. The old consent
-  # service at /consent (Go, consent:4477) is deleted; all challenge handling
-  # is now in the portal (portal:8080).
-  #
-  # NOTE: the production Caddyfile is iac/services/dag/caddy/Caddyfile. It
-  # already routes the @portal_challenges path set (/oauth2/login,
-  # /oauth2/consent, /oauth2/logout) to dag-portal:8080 before the wider
-  # @hydra /oauth2/* wildcard. No stale caddy/snippets/portal.caddy exists;
-  # that file was removed when the Go consent service was retired.
+  # Topology B: the entire SSO stack lives on ${OTHALA_PUBLIC_URL}; Hydra
+  # redirects challenge flows to /oauth2/{login,consent,logout} — portal API
+  # routes — while /auth/* stays the Kratos self-service human UI. The
+  # fronting proxy must route the challenge path set to the portal BEFORE any
+  # wider /oauth2/* wildcard: docs/adr/12-oidc-client-topology.md.
   login: "${OTHALA_PUBLIC_URL}/oauth2/login"
   consent: "${OTHALA_PUBLIC_URL}/oauth2/consent"
   logout: "${OTHALA_PUBLIC_URL}/oauth2/logout"
@@ -85,33 +73,25 @@ ttl:
   refresh_token: 720h    # 30 days
   id_token: 1h
   auth_code: 10m
-  # Narrowed from 1h: a stolen challenge redirect is usable for the full
-  # window; 30m cuts the stolen-challenge exposure in half with no UX cost
-  # (users are unlikely to leave a browser tab open that long mid-login).
+  # 30m (from 1h) — stolen-challenge exposure tuning:
+  # docs/adr/11-hardening-tuning.md.
   login_consent_request: 30m
 
 oauth2:
   pkce:
     enforced: false                    # Tailscale doesn't do PKCE; Hydra
-                                       # has no per-client PKCE knob, so the
-                                       # global stays off for it.
+                                       # has no per-client knob — posture:
+                                       # docs/adr/11-hardening-tuning.md.
     enforced_for_public_clients: true  # Free hardening: nothing is a public
-                                       # client today (all confidential), so
-                                       # this is a no-op now but blocks a
-                                       # future silent PKCE skip if a public
-                                       # client is ever added.
+                                       # client today; forward guard per
+                                       # docs/adr/11-hardening-tuning.md.
   hashers:
     bcrypt:
-      # Raised from 10: cost 14 (~700ms on modern hardware) meaningfully
-      # raises the bar for offline brute-force of stolen client-secret hashes.
+      # 14 (from 10) — offline brute-force bar: docs/adr/11-hardening-tuning.md.
       cost: 14
-  # NOTE: an explicit `oauth2.strategies` pin (access_token=opaque, scope=exact)
-  # was tried here but Hydra v26.2.0's schema rejects it (additionalProperties
-  # "strategies" not allowed) and the IdP refuses to boot — caught by the live
-  # e2e stand-up. Both values are already the Hydra defaults (the live OIDC
-  # dance confirms correct scope/token behaviour), so we rely on them rather
-  # than gamble on an unverified key location. Revisit if a supported pin
-  # surfaces upstream.
+  # NOTE: an explicit `oauth2.strategies` pin is schema-rejected by Hydra
+  # v26.2.0 (the IdP refuses to boot); the defaults are already correct —
+  # docs/adr/11-hardening-tuning.md (Alternatives considered).
   expose_internal_errors: false
   client_credentials:
     default_grant_allowed_scope: false
@@ -163,7 +143,7 @@ log:
 # Ory v26.2.0's schema rejects a present `tracing:` whose provider is "" — it
 # validates the block's $ref the moment the key exists, so "disabled" must mean
 # "absent", not "present with an empty provider". The e2e harness leaves the
-# provider empty (block drops out; tracing off); iac sets it to "otel" (block
+# provider empty (block drops out; tracing off); production sets it to "otel" (block
 # renders; tracing on). See scripts/render-config.sh for the fence semantics.
 #@if OTHALA_OTLP_PROVIDER
 tracing:

@@ -45,7 +45,7 @@ export interface SeedOptions {
   /** metadata_admin.groups — controls access-<app> group membership */
   groups: string[];
   /**
-   * metadata_admin.admin — the ADR 0008 admin authority marker.
+   * metadata_admin.admin — the ADR 08 admin authority marker.
    * Set to true for admin identities seeded by the admin fixture.
    * Absent (undefined / false) for non-admin member identities.
    */
@@ -84,7 +84,7 @@ export async function createIdentityWithPassword(opts: SeedOptions): Promise<See
       displayName: opts.displayName,
     },
     metadata_admin: {
-      // ADR 0008: admin marker is the sole authority for /admin access.
+      // ADR 08: admin marker is the sole authority for /admin access.
       // Only set when the caller explicitly requests it (admin fixture).
       ...(opts.isAdmin === true ? { admin: true } : {}),
       groups: opts.groups,

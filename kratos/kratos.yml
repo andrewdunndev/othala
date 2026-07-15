@@ -6,7 +6,7 @@
 
 # DSN host is env-substituted so the same file lands in both
 # topologies. Lab compose sets KRATOS_PG_HOST=postgres (compose service
-# name); iac quadlets set KRATOS_PG_HOST=dag-postgres (container name
+# name); the production quadlets set KRATOS_PG_HOST=dag-postgres (container name
 # on the dag-internal network). Same applies to KRATOS_ADMIN_HOST and
 # CONSENT_HOST below.
 dsn: "postgres://kratos:${KRATOS_PG_PASS}@${KRATOS_PG_HOST}:5432/kratos?sslmode=disable"
@@ -63,12 +63,10 @@ selfservice:
         identifier_similarity_check_enabled: true
         min_password_length: ${OTHALA_PASSWORD_MIN_LENGTH}
 
-    # Passkeys — the PRIMARY login method. This is Kratos's dedicated `passkey`
-    # strategy (discoverable credentials + conditional UI), which gives the
-    # usernameless one-tap experience: a family member taps "Sign in with
-    # passkey" and is in, no username typed. This is distinct from the legacy
-    # `webauthn` strategy below — per Ory, use passkey; webauthn is legacy and
-    # has limitations in discoverability/conditional UI.
+    # Passkeys — the PRIMARY login method (docs/adr/05-passkey-first-auth.md):
+    # Kratos's dedicated `passkey` strategy (discoverable credentials +
+    # conditional UI, the usernameless one-tap), distinct from the legacy
+    # `webauthn` strategy below.
     passkey:
       enabled: true
       config:
@@ -81,11 +79,9 @@ selfservice:
           origins:
             - "${OTHALA_WEBAUTHN_RP_ORIGINS}"
 
-    # WebAuthn (legacy strategy) — DEMOTED to a second-factor / hardware-
-    # security-key option only (passwordless: false). Passkeys (above) own the
-    # passwordless primary path; keeping webauthn passwordless would duplicate
-    # the login button. Retained (not disabled) so a hardware key can serve as
-    # an AAL2 second factor alongside totp/lookup_secret.
+    # WebAuthn (legacy strategy) — second-factor / hardware-security-key only
+    # (passwordless: false); passkey above owns the passwordless primary.
+    # Tier model: docs/adr/05-passkey-first-auth.md.
     webauthn:
       enabled: true
       config:
@@ -101,22 +97,17 @@ selfservice:
       config:
         issuer: "${OTHALA_INSTANCE_NAME}"
 
-    # Code strategy: used for recovery AND as a first-class passwordless login
-    # method (email OTP). passwordless_enabled: true makes it available on the
-    # login flow so users on new devices / without a passkey can receive a
-    # one-time code to sign in. This is the promoted second-tier fallback;
-    # it does not weaken security — the code is single-use and expires with
-    # the flow lifespan (10m above).
+    # Code strategy: recovery AND a first-class passwordless login method
+    # (email OTP) — the promoted second-tier fallback of
+    # docs/adr/05-passkey-first-auth.md.
     #
-    # max_submissions: 5 — after 5 wrong attempts Kratos invalidates the flow,
-    # bounding brute-force of the 6-digit code (10^6 space; 5 attempts = 0.0005%
-    # coverage before lockout). lifespan: 15m — code is valid for 15 minutes;
-    # after expiry the flow must be restarted, which forces a new code.
-    # VALIDATION CAVEAT: `lifespan` under selfservice.methods.code.config is
-    # the per-method code validity window (distinct from the flow lifespan set
-    # at flows.login.lifespan). Confirm both keys against a running Kratos
-    # v26.2.0 instance before promoting to production — schema may reject
-    # `lifespan` here if it was moved/renamed in v1.x.
+    # max_submissions: 5 bounds brute-force of the 6-digit code (flow
+    # invalidated after 5 wrong attempts). lifespan: 15m is the per-method
+    # code validity window (distinct from the flow lifespan at
+    # flows.login.lifespan).
+    # VALIDATION CAVEAT: confirm both keys against a running Kratos v26.2.0
+    # instance before promoting to production — schema may reject `lifespan`
+    # here if it was moved/renamed in v1.x.
     code:
       enabled: true
       passwordless_enabled: true
@@ -142,14 +133,12 @@ selfservice:
     settings:
       ui_url: "${OTHALA_PUBLIC_URL}/auth/settings"
       privileged_session_max_age: 15m
-      # CVP-P2: require the highest available AAL before allowing credential
-      # changes. Users with an enrolled AAL2 factor (passkey, TOTP, hardware
-      # key) must step up before modifying passwords, passkeys, or MFA seeds.
-      # Password-only and passkey-only (AAL1-only) users are unaffected —
-      # highest_available resolves to aal1 for them. First-passkey enrollment
-      # is NOT blocked: enrollment is a settings action that requires only aal1
-      # when aal1 is the highest available. This does NOT affect session.whoami
-      # (see below) which must stay aal1 for the LDAP bridge.
+      # Require the highest available AAL before credential changes —
+      # docs/adr/11-hardening-tuning.md (tuning) +
+      # docs/adr/08-admin-authority-model.md (step-up model). AAL1-only
+      # identities are unaffected; first-passkey enrollment is NOT blocked.
+      # This does NOT affect session.whoami (see below) which must stay aal1
+      # for the LDAP bridge.
       required_aal: highest_available
       after:
         password:
@@ -177,14 +166,10 @@ selfservice:
       ui_url: "${OTHALA_PUBLIC_URL}/auth/recovery"
       lifespan: 1h
       notify_unknown_recipients: false
-      # H1 / D3: admin email-recovery is disabled at the application
-      # layer. Kratos calls the recovery-gate webhook before issuing the
-      # privileged settings session; the gate replies 403 if the
-      # identity carries the `admin` group, and 200 otherwise.
-      #
-      # Non-admin members continue to use email recovery. Admins
-      # recover via console (`kratos identities` on the host) per
-      # docs/runbooks/admin-recovery.md.
+      # Admin email-recovery is refused by the recovery-gate webhook before
+      # the privileged settings session is issued
+      # (docs/adr/08-admin-authority-model.md). Non-admin members keep email
+      # recovery; admins recover via console per docs/runbooks/admin-recovery.md.
       after:
         # v26.2.0: recovery after-hooks live directly under `after.hooks`. The
         # `selfServiceAfterRecovery` schema has NO per-method `code:` sub-key
@@ -242,16 +227,10 @@ selfservice:
       # is requested per-flow via ?aal=aal2&refresh=true by requireAdminSession
       # in admin.ts (the SP-3 trinity gate), never enforced globally here.
       #
-      # ADR 0008: the A2 email-code interrupt hook (login.after.code.hooks) is
-      # RETIRED. It blocked email-code login for admin identities to force them
-      # through passkey/console. Under ADR 0008 the canonical enforcement is:
-      #   - AAL2 is required by the portal's requireAdminSession server-side check
-      #     (step-up redirect to ?aal=aal2&refresh=true when aal !== 'aal2').
-      #   - Kratos's required_aal: aal2 on the settings flow (CVP-P2) ensures
-      #     that any credential change already requires the highest available AAL.
-      # The hook is the correct Kratos mechanism when per-identity interruption is
-      # needed; replaced here by the app-layer step-up which is simpler and does
-      # not require a webhook round-trip or per-method nesting validation.
+      # The A2 email-code interrupt hook (login.after.code.hooks) is RETIRED —
+      # canonical enforcement is the portal's AAL2 step-up plus the settings
+      # flow's required_aal (docs/adr/08-admin-authority-model.md; retirement
+      # narrative: docs/adr/05-passkey-first-auth.md, Consequences).
 
     registration:
       # Admin-driven onboarding (one-time enrollment URLs); no self-service signup
@@ -264,13 +243,12 @@ selfservice:
             - hook: session
 
 session:
-  # P8: reduced from 2160h (90 days) to 720h (30 days). The apex-scoped session
-  # cookie is replayable by any compromised subdomain app for the full lifespan;
-  # a 30-day window meaningfully reduces blast radius. Passkey re-login is
-  # low-friction (one tap). The admin UI enforces a much shorter freshness window
-  # independently via SSR (privileged_session_max_age: 15m). Leave
+  # 720h (30 days) — apex-cookie blast-radius tuning:
+  # docs/adr/11-hardening-tuning.md. The admin UI enforces its own 15m
+  # freshness window independently (privileged_session_max_age). Leave
   # session.cookie.persistent and the apex domain unchanged — apex scope is
-  # required for cross-subdomain SSO. Operator-tunable: override in iac inventory.
+  # required for cross-subdomain SSO. Operator-tunable in the deployment's
+  # inventory.
   lifespan: 720h
   cookie:
     # Parent apex domain so the IdP and every subdomain app share the
@@ -304,7 +282,7 @@ courier:
     # portal's contact-form mailer (portal/src/lib/mailer.ts reads the same
     # OTHALA_SMTP_CONNECTION_URI). One URI, one relay — a dashboard request
     # mail travels the exact same outbound path as a recovery/verification
-    # code. gen-secrets.sh / iac default this to the Fastmail implicit-TLS
+    # code. gen-secrets.sh (and the production deployment) default this to the Fastmail implicit-TLS
     # endpoint with the SMTP_USER/SMTP_PASS app-password credentials.
     connection_uri: "${OTHALA_SMTP_CONNECTION_URI}"
     from_address: "${OTHALA_SMTP_FROM_ADDRESS}"
@@ -365,7 +343,7 @@ log:
 # Ory v26.2.0's schema rejects a present `tracing:` whose provider is "" — it
 # validates the block's $ref the moment the key exists, so "disabled" must mean
 # "absent", not "present with an empty provider". The e2e harness leaves the
-# provider empty (block drops out; tracing off); iac sets it to "otel" (block
+# provider empty (block drops out; tracing off); production sets it to "otel" (block
 # renders; tracing on). See scripts/render-config.sh for the fence semantics.
 #@if OTHALA_OTLP_PROVIDER
 tracing:

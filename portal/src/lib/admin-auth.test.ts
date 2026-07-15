@@ -1,5 +1,5 @@
 /**
- * admin-auth.test.ts — unit tests for the admin authority marker (ADR 0008).
+ * admin-auth.test.ts — unit tests for the admin authority marker (ADR 08).
  *
  * Coverage:
  *   isAdminMarker:

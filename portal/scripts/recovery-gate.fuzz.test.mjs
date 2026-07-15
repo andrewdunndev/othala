@@ -1,5 +1,5 @@
 // Property-based / adversarial fuzz harness for recoveryGateVerdict (CVP-P1,
-// updated ADR 0008).
+// updated ADR 08).
 //
 // Run with: tsx --test scripts/recovery-gate.fuzz.test.mjs
 //

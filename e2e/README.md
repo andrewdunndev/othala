@@ -80,7 +80,7 @@ VM dies on job end. Total turnaround: ~3-5 minutes including image pulls.
   `othala:4431/admin/recovery-gate`, `Authorization: Bearer`. Refusal is
   **marker-based** (`is_admin===true` in the webhook payload, derived from
   `metadata_admin.admin` by `recovery-gate.jsonnet`), NOT group- or UUID-based
-  (ADR 0008). An identity with `is_admin=true` → 403; `is_admin=false` → 200
+  (ADR 08). An identity with `is_admin=true` → 403; `is_admin=false` → 200
   (even if groups includes `admin`); a non-boolean `is_admin` → 403 (fail-closed);
   a missing `identity_id` → 403 (fail-closed); a wrong bearer → 401.
 

@@ -11,7 +11,7 @@
 //
 // The admin allowlist (isAdminId) is no longer injected here. Admin
 // authority is now determined by the metadata_admin.admin marker in the
-// Kratos webhook payload (ADR 0008); recoveryGateVerdict reads it directly
+// Kratos webhook payload (ADR 08); recoveryGateVerdict reads it directly
 // from the payload, so no runtime predicate is needed.
 
 export { revokeSubject, RevokeError } from '../lib/revoke';

@@ -66,7 +66,7 @@ This is intentional: an attacker who gains access to the portal UI or a
 family member's self-service flow cannot elevate themselves to admin by editing
 their own identity (email, groups, traits). The only write path for
 `metadata_admin` is the network-gated admin API, which is not reachable from
-the internet. (See ADR 0008 for full rationale.)
+the internet. (See ADR 08 for full rationale.)
 
 For dual-admin setup (recommended), both identities get `metadata_admin.admin=true`
 via the admin UI (Admin → Users → Edit → toggle admin marker) or:

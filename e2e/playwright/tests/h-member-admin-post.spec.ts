@@ -2,7 +2,7 @@
  * H — Non-admin member POSTs to /admin mutation endpoints (INV-1: AAL is necessary).
  *
  * SECURITY INVARIANT (INV-1): An AAL1 session NEVER reaches admin mutation
- * functionality. requireAdminSession enforces checks IN ORDER (ADR 0008):
+ * functionality. requireAdminSession enforces checks IN ORDER (ADR 08):
  *   (a) active session — yes (member has AAL1 password session)
  *   (b) AAL2: aal !== 'aal2' → step-up redirect fires FIRST
  *   (c) admin marker: never reached for an AAL1 session

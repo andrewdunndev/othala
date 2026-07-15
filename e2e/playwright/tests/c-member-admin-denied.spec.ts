@@ -3,13 +3,13 @@
  *
  * SECURITY INVARIANT (INV-1): An AAL1 session — regardless of identity — NEVER
  * reaches admin functionality. requireAdminSession enforces the SP-3 trinity
- * (ADR 0008) in strict order:
+ * (ADR 08) in strict order:
  *   (a) active session — yes (member has an AAL1 password session)
  *   (b) AAL2 server-side — NO → the step-up redirect fires FIRST; the admin
  *       marker check (c) is never reached for an AAL1 session.
  *   (c) admin marker — not evaluated (the gate already fired at (b))
  *
- * This is ADR 0008's "no admin-enumeration oracle at AAL1" property: an attacker
+ * This is ADR 08's "no admin-enumeration oracle at AAL1" property: an attacker
  * cannot learn whether an identity has the admin marker by probing /admin at AAL1,
  * because the step-up fires unconditionally before the marker is ever read.
  *

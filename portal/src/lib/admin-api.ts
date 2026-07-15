@@ -59,7 +59,7 @@ export interface MetadataAdmin {
   /** Per-app role overrides, keyed by client_id. */
   roles?: Record<string, string>;
   /**
-   * Admin authority marker (ADR 0008). Strict boolean; only set via the
+   * Admin authority marker (ADR 08). Strict boolean; only set via the
    * Kratos admin API. Use patchAdminMarker for targeted grant/revoke so
    * groups/roles are never clobbered.
    */
@@ -175,7 +175,7 @@ export async function reactivateIdentity(id: string): Promise<void> {
 }
 
 /**
- * Targeted patch of the `metadata_admin.admin` marker (ADR 0008).
+ * Targeted patch of the `metadata_admin.admin` marker (ADR 08).
  *
  * Uses JSON Patch (RFC 6902) against the Kratos PATCH endpoint so groups
  * and roles are never touched. Grant sets admin=true; revoke removes the key.
@@ -302,7 +302,7 @@ export interface RecoveryLink {
 }
 
 /**
- * One-shot recovery code + link the admin shares out-of-band (ADR 0008).
+ * One-shot recovery code + link the admin shares out-of-band (ADR 08).
  *
  * Uses `createRecoveryCodeForIdentity` (POST /admin/recovery/code, Kratos
  * v26.2.0+). The response includes both a `recovery_link` (URL to the

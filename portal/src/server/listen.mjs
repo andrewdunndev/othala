@@ -278,7 +278,7 @@ export async function fetchAdminMarker(identityId) {
     console.error(`[portal/recovery-gate] admin API response unparseable for ${identityId} — refusing (fail-closed)`);
     return { refuse: true, reason: 'admin-api-unparseable (fail-closed)' };
   }
-  // metadata_admin.admin is the authoritative boolean marker (ADR 0008).
+  // metadata_admin.admin is the authoritative boolean marker (ADR 08).
   // It is writable only via the admin API, never via self-service flows.
   const isAdmin = identity?.metadata_admin?.admin;
   if (isAdmin === true) {

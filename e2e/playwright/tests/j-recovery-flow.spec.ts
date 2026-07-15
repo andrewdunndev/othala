@@ -12,7 +12,7 @@
  * completing recovery (kratos.yml flows.recovery.after.hooks). The webhook
  * body is rendered by recovery-gate.jsonnet:
  *   { identity_id, is_admin, groups, traits: { email, ... } }
- * `is_admin` is derived from metadata_admin.admin (ADR 0008 marker). The gate
+ * `is_admin` is derived from metadata_admin.admin (ADR 08 marker). The gate
  * (othala loopback :4431 /admin/recovery-gate) refuses recovery (403) iff
  * is_admin===true. Kratos interprets a 4xx from the webhook as a flow abort,
  * preventing the privileged session from being issued.

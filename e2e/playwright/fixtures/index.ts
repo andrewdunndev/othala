@@ -10,7 +10,7 @@
  *   member               — { id, email, password } seeded identity (bt2@othala.test),
  *                          access-grafana group, NOT an admin (no admin marker)
  *   admin                — { id, email, password, aal2Session } identity seeded with
- *                          metadata_admin.admin=true (ADR 0008 marker) by
+ *                          metadata_admin.admin=true (ADR 08 marker) by
  *                          validate.sh seed phase. The fixture looks up the id,
  *                          then performs TOTP enrollment + AAL2 step-up so that
  *                          adminWithAal2() provides an AAL2 BrowserContext ready
@@ -20,7 +20,7 @@
  * paid at most once across the serial test run.
  *
  * AAL2 admin access:
- *   /admin requires AAL2 (ADR 0008). TOTP CANNOT be pre-seeded via the admin
+ *   /admin requires AAL2 (ADR 08). TOTP CANNOT be pre-seeded via the admin
  *   API — it must be enrolled via the Kratos settings flow at runtime:
  *     1. Log in as admin (password → AAL1 session).
  *     2. Initiate a settings flow, read the TOTP secret from ui.nodes
@@ -406,7 +406,7 @@ export const test = base.extend<OthalaFixtures>({
   }, { scope: 'worker' }],
 
   // member: bt2@othala.test, access-grafana + family groups. No admin marker
-  // (isAdmin not set), so NOT an admin under the ADR 0008 marker model.
+  // (isAdmin not set), so NOT an admin under the ADR 08 marker model.
   member: [
     async ({ kratosAdminURL }, use) => {
       const result = await createIdentityWithPassword({
@@ -422,7 +422,7 @@ export const test = base.extend<OthalaFixtures>({
   ],
 
   // admin: validate.sh pre-seeds this identity (ADMIN_EMAIL / ADMIN_USERNAME)
-  // with metadata_admin.admin=true (ADR 0008 marker) before Playwright starts.
+  // with metadata_admin.admin=true (ADR 08 marker) before Playwright starts.
   // The fixture looks up the minted id by credentials_identifier. No OTHALA_ADMIN_IDS
   // env or portal recreate is involved — the portal reads the marker from the
   // Kratos admin API at request time.

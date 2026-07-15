@@ -109,7 +109,7 @@ test('FIX-B: authenticated_at as Date object (SDK-deserialized) within window �
   assert.equal(isSessionFresh(session, WINDOW_HOURS), true);
 });
 
-// ── fail-closed: neither source readable (ADR 0008 SP-3) ─────────────────────
+// ── fail-closed: neither source readable (ADR 08 SP-3) ─────────────────────
 
 test('FIX-B: neither authentication_methods nor authenticated_at → false (fail-closed)', () => {
   const session = {};

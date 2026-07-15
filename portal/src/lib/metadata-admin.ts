@@ -17,7 +17,7 @@
 //   - roles: object with keys matching ^[a-z][a-z0-9]*$ mapping to role
 //     names matching ^[a-z][a-z0-9_\-]*$, length 1..64
 //   - admin: strict boolean (true|false); rejects non-boolean (string "true",
-//     number 1, null, etc.) — fail-closed for admin authority (ADR 0008)
+//     number 1, null, etc.) — fail-closed for admin authority (ADR 08)
 //   - no other top-level keys allowed
 //
 // Returns the input on success (typed as MetadataAdmin) or an Error

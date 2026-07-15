@@ -338,7 +338,7 @@ services:
       OTHALA_APEX: ${OTHALA_APEX}
       MANIFEST_DIR: /etc/portal/manifests
       CSRF_SECRET: ${CSRF_SECRET}
-      # ADR 0008 admin model: authority is metadata_admin.admin===true (boolean
+      # ADR 08 admin model: authority is metadata_admin.admin===true (boolean
       # marker in Kratos, set via admin API only). The OTHALA_ADMIN_IDS env var
       # is retired — no UUID allowlist, no portal recreate after seeding.
       # The recovery-gate reads is_admin from the webhook payload (set by

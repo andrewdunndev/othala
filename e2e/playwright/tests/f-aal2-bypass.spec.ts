@@ -7,7 +7,7 @@
  *       if (session.authenticator_assurance_level !== 'aal2')
  *           return astro.redirect(browserFlows.login({ ... aal: 'aal2', ... }))
  *
- * An identity with metadata_admin.admin=true (ADR 0008 marker, admin@othala.test)
+ * An identity with metadata_admin.admin=true (ADR 08 marker, admin@othala.test)
  * with a valid AAL1 session (password-only login, no second factor enrolled or
  * presented) MUST be denied every /admin/* mutation path. No bypass via:
  *   F1 — direct GET /admin (covered by spec D; repeated here in request form)

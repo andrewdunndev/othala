@@ -210,7 +210,7 @@ export function computeEffectiveAccess(
  * so admin recovery is console-only. See
  * docs/runbooks/admin-recovery.md "Console recovery for an admin".
  *
- * ADR 0008: admin status is the `metadata_admin.admin === true` marker
+ * ADR 08: admin status is the `metadata_admin.admin === true` marker
  * (writable only via the Kratos admin API). The caller MUST pass a target
  * identity fetched from the admin API (e.g. via getIdentity) — the public
  * /sessions/whoami response strips metadata_admin (Kratos v26). Refuse iff
