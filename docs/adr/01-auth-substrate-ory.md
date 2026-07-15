@@ -11,9 +11,8 @@ evaluation (structurally blocked, not pursued). See also
 [02](02-custom-portal-oidc-registrar.md) (the portal architecture the BYO-UI
 requirement necessitates), [05](05-passkey-first-auth.md) (the passkey-first
 enrollment this substrate carries), and [10](10-first-party-skip-consent.md)
-(the Hydra skip_consent posture validated below). The estate-side decision to
-retire the LDAP server is recorded in the private deploy repo's own decision
-set.
+(the Hydra skip_consent posture validated below). Retiring the LDAP server
+itself is an instance-level decision, outside this record.
 
 ## Context
 
@@ -97,9 +96,9 @@ Caddy `forward_auth` → Kratos `/sessions/whoami`. A standing LDAPS listener pl
 a privileged Kratos admin BIND was pure attack surface with no remaining
 consumer, and it pinned an unwanted Kratos AAL constraint (whoami forced to
 `aal1`). The `kratos-ldap` code is parked in its own repo, not deleted, for a
-future app that genuinely needs LDAP. This estate-side retirement is recorded
-in the private deploy repo's decision set. No `dag-ldap-bridge` quadlet exists
-in the deployed dag service; the substrate is Kratos + Hydra only.
+future app that genuinely needs LDAP. That retirement is an instance-level
+decision. No `dag-ldap-bridge` quadlet exists in the deployed dag service; the
+substrate is Kratos + Hydra only.
 
 ## Decision
 

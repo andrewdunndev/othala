@@ -18,10 +18,11 @@ considered. See [00-template.md](00-template.md).
 Status values: `Proposed` | `Accepted` | `Superseded by [NN](NN-title.md)` |
 `Deprecated`. A date in the status line records when the decision was accepted,
 amended, or superseded. Cross-references to related ADRs appear at the end of
-the status block. These ADRs stand alone: the operator's deployment is
-referenced only generically ("the deployment", "the private deploy repo",
-"deployment-side") — never by repo name, path, or commit. Anything an adopter
-cannot resolve from this repo does not belong here.
+the status block. These ADRs are written for any adopter and stand alone:
+instance-specific machinery is referenced only generically ("the instance",
+"any deployment", "production") — never by external repo name, path, or
+commit — and bookkeeping that lives outside this repo is simply not cited.
+Anything an adopter cannot resolve from this repo does not belong here.
 
 ## Index
 

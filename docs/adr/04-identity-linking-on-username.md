@@ -7,8 +7,8 @@ Accepted.
 See also [01](01-auth-substrate-ory.md) (the Kratos/Hydra substrate that mints
 the identity and issues the token) and
 [09](09-capability-group-access-model.md) (the `groups` claim carried on the
-same token). The rebuild implications noted in Consequences are governed
-estate-side by the private deploy repo's rebuild-verification decision.
+same token). The rebuild implications noted in Consequences apply to any
+deployment that rebuilds its identity store.
 
 ## Context
 
@@ -108,8 +108,8 @@ change in a future release) even though it links on `sub` anyway.
   (e.g. losing `secrets.system`) preserves `sub`. Recreating Kratos identities
   changes every `sub`, breaking every sub-link. A carmine rebuild must either
   preserve Kratos identity IDs (export/import identities *with* their ids) or
-  budget a re-link pass for the Username-then-`sub` group — recorded in the
-  deployment's break-glass rebuild-verification procedure.
+  budget a re-link pass for the Username-then-`sub` group — a
+  rebuild-verification item for any deployment.
 - **Username is user-mutable — not UI-blocked, not API-immutable.** There is no
   Kratos primitive that freezes a trait: the schema marks no trait immutable and
   no before-settings hook exists. The profile settings form renders an editable

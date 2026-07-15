@@ -8,8 +8,7 @@ identity schema does **not** enumerate the `admin` marker this ADR's day-to-day
 tier relies on — it lists only `groups` and `roles` — so the marker works only
 because Kratos treats `metadata_admin` as opaque; (2) the bootstrap/break-glass
 floor is currently the `root` identity filling the role **by role**, not the
-dedicated `breakglass` identity that the deployment's break-glass decisions
-specify.
+dedicated `breakglass` identity the break-glass design calls for.
 
 See also [03](03-proxy-originated-mtls.md) (the admin-API hop is now a direct
 internal call, not an mTLS proxy — the write-boundary consequence below depends
@@ -102,13 +101,13 @@ shared `dag-internal` network; the Ory-native model treats network isolation as
 the authorization. The admin listener is bound to the `dag-internal` IP and never
 host-published, so `:4434` is unreachable from outside that network. An earlier
 design fronted the admin API with a step-ca-backed per-CN mTLS proxy on a
-dedicated `dag-admin` network; that layer was **removed** (a deployment-side
-revert, 2026-07-01) because no multi-site requirement justified it — see
+dedicated `dag-admin` network; that layer was **removed** (2026-07-01) because
+no multi-site requirement justified it — see
 [03](03-proxy-originated-mtls.md). The isolation is verified statically by the
-deployment's dag contract gate (check `N3`: `:4434` never host-published,
-admin bind pinned to `10.89.11.10`, `dag-admin.network` asserted absent,
-portal carries the direct `KRATOS_ADMIN_URL`). The LDAP bridge is shelved; no
-other write-capable consumer exists.
+instance's contract-gate assertions (N3: `:4434` never host-published, admin
+bind pinned to `10.89.11.10`, `dag-admin.network` asserted absent, portal
+carries the direct `KRATOS_ADMIN_URL`). The LDAP bridge is shelved; no other
+write-capable consumer exists.
 
 **`metadata_admin` must never appear in the public session.** Kratos v26.2.0's
 `/sessions/whoami` response excludes `metadata_admin` (only `metadata_public`
@@ -152,18 +151,17 @@ the gate fails closed (403) when it is absent. Both the end-to-end block and the
 AAL2 mitigation are covered by the browser e2e suite (`j-recovery-flow.spec.ts`).
 
 **HONEST GAP — break-glass is `root`-by-role, not a dedicated identity.** The
-deployment's break-glass decisions call for a dedicated `breakglass` Kratos
-identity, seeded idempotently at deploy from a `dag_breakglass_password` sops
-key. That identity is **not yet deployed**: `dag_breakglass_password` is absent
-from sops (only `dag_root_password` exists), so today the SSO-independent admin
-path is the `root` identity filling the break-glass role by role. The
-deployment's drift ledger carries this exact divergence with a close-condition
-(seed the dedicated `breakglass` identity). Recorded here as the deployed
-state; not resolved.
+intended design is a dedicated `breakglass` Kratos identity, seeded
+idempotently at deploy from a sops-held password. That identity is **not yet
+deployed**: `dag_breakglass_password` is absent from sops (only
+`dag_root_password` exists), so today the SSO-independent admin path is the
+`root` identity filling the break-glass role by role. The instance tracks this
+divergence with a close-condition (seed the dedicated `breakglass` identity).
+Recorded here as the deployed state; not resolved.
 
 **Retired:** the `OTHALA_ADMIN_IDS` env allowlist (gone from portal code — only
-historical comments remain — and asserted absent from the dag quadlets by the
-deployment's preflight checks), the create-read-back-configure-restart id dance, and the bespoke
+historical comments remain — and asserted absent from the deployed quadlets by
+instance preflight checks), the create-read-back-configure-restart id dance, and the bespoke
 Kratos hook that blocked email-code login for admins. The admin AAL2 gate is now
 enforced by the portal SSR step-up plus the canonical Kratos flow config
 (`required_aal: highest_available` on the settings flow), not by custom hook code.
