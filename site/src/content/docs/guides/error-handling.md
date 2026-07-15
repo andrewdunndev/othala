@@ -61,7 +61,7 @@ status + title + message + optional reason badge — **never** internals).
 Because `checkOrigin` short-circuits before user middleware (above), the one
 surface the portal layer cannot brand is the framework `403`. Brand it at the
 **edge** (the reverse proxy's intended pathway — `caddy/Caddyfile` worked
-example + the production `iac/services/dag` Caddyfile), leaving Astro's CSRF
+example + the production dag Caddyfile), leaving Astro's CSRF
 untouched.
 
 Shape (intercept upstream 4xx/5xx, render the branded page, **preserve the

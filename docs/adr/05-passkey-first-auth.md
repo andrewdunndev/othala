@@ -81,14 +81,14 @@ login method, not a factor stacked on a password.
 - **Why password is retained (the LDAP justification is stale).** The LDAP bridge
   is shelved — no `dag-ldap-bridge` unit runs, Jellyfin authenticates via its OIDC
   plugin plus a Jellyfin-local password, and the estate identity's Kratos password
-  is not consumed by any native client (see [01](01-auth-substrate-ory.md); iac
-  `docs/adr/identity/0001-ldap-shelved-service-auth-via-oidc.md`). Password stays
+  is not consumed by any native client (see [01](01-auth-substrate-ory.md); the
+  retirement is recorded in the private deploy repo). Password stays
   enabled for two live reasons: (1) the seeded break-glass / bootstrap-floor
   identity signs in with a SOPS-backed password plus TOTP step-up — the
-  always-available admin recovery path when passkey or email is degraded (iac
-  `docs/adr/identity/0002-break-glass-local-admin-convention.md` and
-  `0003-break-glass-seed-and-rebuild-verification.md`; [08](08-admin-authority-model.md)
-  Tier 2 floor); and (2) a last-resort recovery on-ramp back to passkey for any user.
+  always-available admin recovery path when passkey or email is degraded (the
+  deployment's break-glass convention and rebuild-verification decisions;
+  [08](08-admin-authority-model.md) Tier 2 floor); and (2) a last-resort
+  recovery on-ramp back to passkey for any user.
 - **Admin login-gate hook retired (2026-06-25) — honest residue.** A Kratos
   `login.after.code` webhook (`login-gate.jsonnet`) used to interrupt email-code
   login for admin identities, forcing them through passkey or console so a

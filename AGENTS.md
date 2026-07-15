@@ -211,7 +211,7 @@ a warning.
 `${VAR}` expansion. The `kratos/` and `hydra/` YAML are TEMPLATES whose
 `${VAR}` placeholders are substituted by **`scripts/render-config.sh`** — the
 single canonical render, shared by the e2e harness (`e2e/validate.sh`) and the
-deploy plane (`dunn.dev/iac`). The variable contract is derived from the
+production deploy plane. The variable contract is derived from the
 template itself: render-config.sh fails fast, listing missing variable NAMES
 (never rendered content), if any `${VAR}` token is unset or empty. Only braced
 `${VAR}` tokens are substituted, and only those appearing in the template — a

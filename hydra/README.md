@@ -33,9 +33,9 @@ For the client catalog and per-RP integration details, see
 ## Client registration
 
 Registration is a deliberate one-shot, never triggered on app boot. On the
-iac side `just dag-reload-clients` runs the Othala in-app registrar
+deployment side, the operator invokes the Othala in-app registrar
 (`portal/src/lib/register-clients.ts`, bundled to
-`dist/server/register-clients.mjs`) as a `--rm` container on `dag.network`.
+`dist/server/register-clients.mjs`) as a one-shot `--rm` container on `dag.network`.
 It reads each manifest's `oidc:` block from `MANIFEST_DIR` and resolves
 `<SLUG>_CLIENT_SECRET` from env.
 
@@ -53,6 +53,6 @@ Hydra database.** Break-glass rotation: `docs/runbooks/secrets-rotation.md`.
 
 ## Schema migrations
 
-Hydra does not run schema migrations on startup. The iac quadlet stack and
+Hydra does not run schema migrations on startup. The production quadlet stack and
 the e2e compose stack both include a `hydra-migrate` init step
 (`hydra migrate sql up -e --yes`) that runs before `hydra serve`.

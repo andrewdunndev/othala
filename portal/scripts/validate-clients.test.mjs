@@ -525,8 +525,8 @@ presentation:
 });
 
 // ── e2e/manifests/ is now the canonical on-disk fixture set ────────────────
-// hydra/clients/ was removed at M3 (dual-source-of-truth cleanup). The iac
-// catalog under services/dag/catalog/ is the operator source of truth; the
+// hydra/clients/ was removed at M3 (dual-source-of-truth cleanup). The
+// operator's private catalog is the deployed source of truth; the
 // e2e/manifests/ fixtures here are the OSS-generic worked examples that CI
 // validates. The hydra/clients/ directory no longer exists in this repo.
 

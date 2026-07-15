@@ -3,7 +3,7 @@
 ## Status
 
 Accepted (as a principle). **The dag instantiation was reverted 2026-07-01**
-(iac commit `fc4d8a5`): the specific consumer this ADR was written to justify —
+(a deployment-side revert): the specific consumer this ADR was written to justify —
 a step-ca-backed mTLS admin-proxy (`dag-kratos-admin-proxy`) fronting the Kratos
 admin API on a dedicated `dag-admin` network — was removed because no
 multi-site requirement justified it. The dag admin plane is now a **direct
@@ -66,7 +66,7 @@ What that means as-deployed:
   isolation, not client authentication**: `:4434` is bound to the dag-internal
   IP `10.89.11.10`, is never `PublishPort`ed, and the network is
   `Internal=true`. That lockdown is the load-bearing control, statically guarded
-  by the N3 assertions in the iac contract gate (`dag-admin.network` absent =
+  by the N3 assertions in the deployment's contract gate (`dag-admin.network` absent =
   proxy-removal guard; `KRATOS_ADMIN_BIND_HOST=10.89.11.10` = bind guard;
   `KRATOS_ADMIN_URL=http://10.89.11.10:4434` on the portal = direct-hop guard).
 
@@ -76,8 +76,8 @@ What that means as-deployed:
   speaks plain HTTP to it — the same "proxy holds the cert, app stays plain
   HTTP" shape, though there the boundary is *ingress* TLS-termination plus
   bearer virtual-key auth rather than egress mTLS (that path is deliberately
-  *not* on the private step-ca mesh). See iac
-  `docs/adr/network/0003-inference-serving-topology.md`.
+  *not* on the private step-ca mesh); the full inference topology is recorded
+  deployment-side.
 
 The shelved in-app branches (`buildMtlsFetchApi()`, `buildAdminTransport()`)
 remain discarded. No `undici` direct dependency, and no `KRATOS_ADMIN_TLS_*`
@@ -113,8 +113,9 @@ env vars, exist in the portal.
   TLS use case, when a proxy can hold the cert instead.
 - **Go stdlib crypto/tls (LDAP bridge).** Acceptable in isolation but
   non-uniform — each app owns cert loading and renewal, creating divergent
-  maintenance surfaces. Moot while the LDAP bridge stays parked (see iac
-  `docs/adr/identity/0001-ldap-shelved-service-auth-via-oidc.md`).
+  maintenance surfaces. Moot while the LDAP bridge stays parked
+  ([01](01-auth-substrate-ory.md); the retirement is recorded in the private
+  deploy repo).
 - **Shared egress Envoy on the estate edge.** Rejected: mixing WAN edge and
   intra-service egress in one config couples the edge to internal topology. The
   edge is for WAN; services handle their own TLS boundaries.

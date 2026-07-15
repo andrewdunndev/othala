@@ -6,7 +6,7 @@
 # TEMPLATES whose ${VAR} tokens must be substituted before a container mounts
 # them. This script is the single render used by BOTH:
 #   - the e2e harness (e2e/validate.sh), and
-#   - the deploy plane (dunn.dev/iac renders with sops + inventory values).
+#   - the production deploy plane (renders with sops + inventory values).
 # One render, one variable contract — what e2e validates is byte-identical in
 # mechanism to what production deploys.
 #

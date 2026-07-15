@@ -75,9 +75,8 @@ behind envoy's L4 SNI passthrough. This is the metering data-plane hop; othala i
 deliberately absent from it (bouncer, never meter). The inference edge itself
 (`llm.dunn.dev`) is the **sanctioned LE exception**: it faces iOS/agent clients,
 so it holds an LE device cert rather than a mesh cert — the two-PKI split is
-exactly what lets that edge be LE while the internal metering hop is step-ca. See
-iac `docs/adr/network/0003-inference-serving-topology.md` for the inference
-topology.
+exactly what lets that edge be LE while the internal metering hop is step-ca.
+The full inference topology is recorded deployment-side.
 
 dag is out of the internal-PKI picture entirely: its Caddy edge terminates LE
 (`tls { dns cloudflare }`), and no dag quadlet mounts a step-ca leaf. dag is

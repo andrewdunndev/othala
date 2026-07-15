@@ -36,7 +36,7 @@
 // Secrets: read from process.env per client, named `<CLIENT_ID_UPPER>_CLIENT_SECRET`
 // — the same convention apply-clients.sh used (KEEP_CLIENT_SECRET,
 // LLM_CLIENT_SECRET, …). Those are the `*_oidc_client_secret` sops keys the
-// iac apply target exports into the container env. Never hardcoded, never
+// deployment exports into the container env. Never hardcoded, never
 // derived; a missing secret is a hard error (unless allowMissingSecret is
 // set for dry-run/diff workflows).
 

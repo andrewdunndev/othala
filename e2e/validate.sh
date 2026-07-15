@@ -88,7 +88,7 @@ if [[ -n "${CI_REGISTRY_USER:-}" && -n "${CI_REGISTRY_PASSWORD:-}" ]]; then
 fi
 
 # Render the Ory configs via THE canonical render, scripts/render-config.sh —
-# shared with the deploy plane (dunn.dev/iac), so e2e and production use the
+# shared with the production deploy plane, so e2e and production use the
 # same mechanism and the same template-derived variable contract. Kratos/Hydra
 # do NOT interpolate ${VAR} inside their YAML (they only accept
 # uppercased-dotted env OVERRIDES); the canonical configs are templates that

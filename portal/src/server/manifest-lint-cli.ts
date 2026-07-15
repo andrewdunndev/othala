@@ -14,8 +14,8 @@
 //   2  — directory not found or no manifests found (not an error, prints notice)
 //
 // Intended consumers:
-//   - iac CI: `just manifest-lint carmine` (pre-land gate, runs against the
-//     services/dag/catalog/ directory via MANIFEST_DIR override).
+//   - deployment CI: a pre-land manifest-lint gate (runs against the
+//     operator's catalog directory via MANIFEST_DIR override).
 //   - othala CI: `npm run lint:manifests` (validates e2e/manifests/).
 //   - Operator: `node dist/server/manifest-lint.mjs /path/to/manifests`
 //

@@ -22,8 +22,8 @@
 //   which is the node process running listen.mjs (no init shim). The Node.js
 //   process.on('SIGHUP', ...) handler fires correctly.
 //
-// Known non-delivery class (iac-side, not a code bug):
-//   The pyinfra post_deploy hook in iac/pyinfra/tasks/services/dag.py only
+// Known non-delivery class (deployment-side, not a code bug):
+//   The deploy plane's post_deploy hook only
 //   sends SIGHUP when `_if=manifests_changed()` is true (i.e., at least one
 //   manifest file actually changed on disk, checked via did_change()). If the
 //   deployed manifests are byte-for-byte identical to what is already on disk
@@ -41,7 +41,7 @@
 //   serving (healthz=ok).
 //
 // Fix location: code is correct. The observed "SIGHUP did not reconcile, but
-//   restart did" case is explained by one of the two iac-side behaviors above
+//   restart did" case is explained by one of the two deployment-side behaviors above
 //   (no manifest change on disk = no SIGHUP sent by the hook; OR SIGHUP
 //   arrived while boot reconcile was in-flight). No code change needed here.
 //   Documentation of the delivery contract and the single-flight guard behavior

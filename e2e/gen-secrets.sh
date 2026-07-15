@@ -99,13 +99,13 @@ OTHALA_SMTP_FROM_ADDRESS=noreply@othala.test
 # provider". Because the block is dropped, the ENDPOINT/ENVIRONMENT tokens live only
 # inside dropped lines and are NOT part of the render contract here — they need
 # not be set. They are emitted (commented out below) only as documentation of
-# what the deploy plane (iac) sets when it turns tracing on (provider="otel",
+# what the production deploy plane sets when it turns tracing on (provider="otel",
 # from sops + inventory). No ingest token here — the emitters send
 # unauthenticated to the host alloy receiver, which adds the observe ingest auth
 # and redacts centrally on its forward hop.
 OTHALA_OTLP_PROVIDER=""
-# OTHALA_OTLP_ENDPOINT=localhost:4318   # set by iac when provider="otel"
-# OTHALA_OTLP_ENVIRONMENT=lab           # set by iac when provider="otel"
+# OTHALA_OTLP_ENDPOINT=localhost:4318   # set by production when provider="otel"
+# OTHALA_OTLP_ENVIRONMENT=lab           # set by production when provider="otel"
 
 # ── Password policy: HIBP off for offline VM, min-length 12 ─────────────────
 # haveibeenpwned_enabled=false prevents a network call the CI VM cannot make.
@@ -113,7 +113,7 @@ OTHALA_OTLP_PROVIDER=""
 OTHALA_HIBP_ENABLED=false
 OTHALA_PASSWORD_MIN_LENGTH=12
 
-# ── Host routing (compose service names; iac quadlets use container names) ───
+# ── Host routing (compose service names; production quadlets use container names) ───
 KRATOS_PG_HOST=postgres
 HYDRA_PG_HOST=postgres
 KRATOS_ADMIN_HOST=kratos
@@ -121,7 +121,7 @@ CONSENT_HOST=othala
 
 # ── Admin-plane bind addresses ────────────────────────────────────────────────
 # The e2e harness is single-network, so the admin APIs bind all interfaces.
-# Segmented deployments (iac) set these to the admin-plane network IP so the
+# Segmented (production) deployments set these to the admin-plane network IP so the
 # unauthenticated admin listeners never answer on the edge interface.
 KRATOS_ADMIN_BIND_HOST=0.0.0.0
 HYDRA_ADMIN_BIND_HOST=0.0.0.0

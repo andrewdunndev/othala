@@ -126,9 +126,7 @@ retroactively delete the cohort groups — those persist as a compatibility laye
 
 ---
 
-Related: this model runs the path-selective forward-auth gate in the per-service
-Caddy TLS terminator described in iac
-`docs/adr/network/0001-host-and-estate-networking-topology.md` (the estate
-networking ADR — moved there from the former `docs/adr/0005-…` path). The
-per-service access roster it references lives in the private deploy repo catalog,
-not in this ADR.
+Related: this model runs the path-selective forward-auth gate in the
+per-service Caddy TLS terminator described in the private deploy repo's
+estate-networking decision. The per-service access roster it references lives
+in the private deploy repo catalog, not in this ADR.
