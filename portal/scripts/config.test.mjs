@@ -137,9 +137,9 @@ test('contactRecipient: uses explicit value when set', async () => {
 });
 
 test('contactRecipient: throws in production when OTHALA_CONTACT_RECIPIENT is not set', async () => {
-  // CVP-P1: OTHALA_ADMIN_IDS now stores UUIDs, not emails, so it can no longer
-  // serve as a contact-form recipient fallback. OTHALA_CONTACT_RECIPIENT is
-  // now required in production.
+  // Admin authority is the metadata_admin.admin marker (ADR 08), so no admin
+  // email list exists to serve as a contact-form recipient fallback.
+  // OTHALA_CONTACT_RECIPIENT is required in production.
   await assert.rejects(
     () =>
       loadConfig({

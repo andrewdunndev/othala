@@ -138,8 +138,9 @@ export const smtpConnectionUri: string = requiredVar(
 // ── OTHALA_CONTACT_RECIPIENT ──────────────────────────────────────────────────
 //
 // Where the dashboard contact/request form delivers. A single email address
-// (the operator's inbox). Must be set explicitly — OTHALA_ADMIN_IDS now stores
-// UUIDs (not email addresses) so it can no longer serve as a fallback here.
+// (the operator's inbox). Must be set explicitly — admin authority is the
+// metadata_admin.admin marker (ADR 08), so no admin email list exists to
+// serve as a fallback here.
 //
 // Fail-loud in production when unset.
 
@@ -220,9 +221,9 @@ export const defaultGroup: string = optionalVar(
 // Neutral default: ['admin', 'everyone'] — admin plus the default group;
 // operators extend as needed.
 //
-// NOTE: group membership in metadata_admin.groups is DISPLAY-ONLY (CU3/B2, CVP-P1).
-//       Admin authority is the OTHALA_ADMIN_IDS allowlist (identity UUIDs) in
-//       admin-auth.ts, not this list.
+// NOTE: group membership in metadata_admin.groups is DISPLAY-ONLY.
+//       Admin authority is the metadata_admin.admin marker read by
+//       admin-auth.ts (ADR 08), not this list.
 
 function parseIdentityGroups(): string[] {
   const raw = process.env.OTHALA_IDENTITY_GROUPS ?? '';

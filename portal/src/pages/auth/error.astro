@@ -7,7 +7,7 @@
 // falls through to a generic 400.
 //
 // Known reasons (grep for `/auth/error?reason=` in src/):
-//   not-admin        — user is authenticated but not in the admin allowlist
+//   not-admin        — user is authenticated but lacks the admin marker
 //   not-authorised   — user lacks the required access group for an app
 //   auth-unreachable — Kratos is unreachable or returned an unexpected error
 //

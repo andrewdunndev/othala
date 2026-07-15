@@ -43,7 +43,7 @@ not cohorts:**
   may enter/use it.
 - **`admin-<svc>`** — per-service admin: grants the elevated **app-admin role
   inside `<svc>`** (a role claim the app consumes). It is *not* Othala portal
-  admin — that stays the `OTHALA_ADMIN_IDS` allowlist of
+  admin — that stays the `metadata_admin.admin` marker of
   [08](08-admin-authority-model.md).
 - **`root`** — estate-wide capability: confers the admin role in every service
   (one catalog binds it to the member role instead — reach is per-manifest, not
@@ -91,8 +91,8 @@ retroactively delete the cohort groups — those persist as a compatibility laye
   and a user may be reached by either.
 - **The portal-admin boundary stays clean.** `admin-<svc>` and `root` are *app*
   authority and live in the user-visible group namespace; the security-critical
-  Othala-admin bit stays the `OTHALA_ADMIN_IDS` UUID allowlist
-  ([08](08-admin-authority-model.md)), not a group. `metadata_admin.groups` is
+  Othala-admin bit stays the `metadata_admin.admin` marker, admin-API-writable
+  only ([08](08-admin-authority-model.md)), not a group. `metadata_admin.groups` is
   display/derivation input only.
 - **Public-by-design apps keep working.** Path-selective forward-auth means a
   share link or landing page is reachable while `/admin` stays gated. Obligation:

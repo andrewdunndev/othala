@@ -111,8 +111,9 @@ config data:
   choice); the default-group fallback becomes an explicit opt-in
   (`OTHALA_DEFAULT_GROUP` unset → no fallback, the dag/strict default).
 
-Portal-admin authority stays separate and UUID-based (`OTHALA_ADMIN_IDS`),
-unchanged. App-level `admin-*` groups are about app roles, not portal admin.
+Portal-admin authority stays separate (the `metadata_admin.admin` marker,
+ADR 08), unchanged. App-level `admin-*` groups are about app roles, not
+portal admin.
 
 ## 7. Migration from `access-<slug>`
 

@@ -147,7 +147,7 @@ re-enrolling.
 ### Step C: The other admin recovers you (dual-admin — the primary break-glass)
 
 This is the recommended path when the dual-admin model is active (both
-operator and spouse on `OTHALA_ADMIN_IDS`).
+operator and spouse carrying the `metadata_admin.admin` marker).
 
 **Who does this:** the admin who still has working auth.
 
@@ -298,7 +298,7 @@ break-glass that can also be abused. Get Kratos running and use Step D.
 ## 5. The dual-admin model (recommended)
 
 The safest single-family configuration is two admins: the operator and the
-spouse. Both identity UUIDs on `OTHALA_ADMIN_IDS`.
+spouse. Both identities carry the `metadata_admin.admin` marker.
 
 What this gives you:
 

@@ -59,8 +59,9 @@ small-user-count case.
   `/admin/recovery-gate`) so they are never exposed on the public interface
   (`portal/src/server/listen.mjs`, `portal/src/lib/admin-port.*`).
 
-Admin authority is a single allowlist: the email addresses in
-`OTHALA_ADMIN_IDS` are the only admins. Identity-group membership shown in
+Admin authority is the `metadata_admin.admin` marker on the Kratos
+identity — admin-API-only-writable, read fresh from the admin API on
+every check (ADR 08). Identity-group membership shown in
 the admin UI is display metadata, not an authority gate.
 
 ---
@@ -193,7 +194,6 @@ a warning.
 | --- | --- |
 | `OTHALA_PUBLIC_URL` | Public FQDN / OIDC issuer (no trailing slash). Required in prod. |
 | `OTHALA_APEX` | Registrable parent domain — drives cookie domain and WebAuthn `rp.id`. |
-| `OTHALA_ADMIN_IDS` | Comma-separated Kratos identity UUIDs; the **sole** admin authorization (CVP-P1). |
 | `OTHALA_SITE_NAME` | Brand name in titles/headers. |
 | `OTHALA_INSTANCE_NAME` | TOTP issuer / WebAuthn display / SMTP From label. |
 | `OTHALA_ADMIN_CONTACT` | Contact hint shown to locked-out users. |
@@ -202,7 +202,7 @@ a warning.
 | `OTHALA_WEBAUTHN_RP_ID`, `OTHALA_WEBAUTHN_RP_ORIGINS` | WebAuthn relying-party config. |
 | `OTHALA_SMTP_FROM_ADDRESS` | From address for Kratos courier mail **and** the portal contact form. |
 | `OTHALA_SMTP_CONNECTION_URI` | SMTP relay URI (`smtps://user:pass@host:465`). **Single source** shared by `kratos.yml` courier and the portal contact-form mailer (`lib/mailer.ts`). Required in prod. |
-| `OTHALA_CONTACT_RECIPIENT` | Where the dashboard request form delivers. Required in production (no fallback; `OTHALA_ADMIN_IDS` stores UUIDs, not addresses). |
+| `OTHALA_CONTACT_RECIPIENT` | Where the dashboard request form delivers. Required in production (no fallback — admin authority is a marker, not an email list; ADR 08). |
 | `OTHALA_PASSWORD_MIN_LENGTH`, `OTHALA_HIBP_ENABLED` | Password policy knobs. |
 | `KRATOS_ADMIN_BIND_HOST`, `HYDRA_ADMIN_BIND_HOST` | Admin-API bind addresses (render vars, not portal config). `0.0.0.0` single-network (e2e); segmented deployments bind the admin-plane network IP. |
 | `OTHALA_CORS_ALLOWED_ORIGINS` | Hydra CORS allowlist (render var, not portal config). Comma-separated, unquoted origins — every browser SPA client (e.g. oCIS Web) that fetches Hydra's discovery/token endpoints directly needs its origin here, beyond `OTHALA_PUBLIC_URL` itself. Default: single origin, same as `OTHALA_PUBLIC_URL`. |

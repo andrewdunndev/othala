@@ -44,7 +44,7 @@ The app holds, all in one process:
 - **The id_token claims builder** (`portal/src/lib/claims.ts`).
 - **A dual-listener** (`portal/src/server/listen.mjs`): a public Astro SSR listener and a SEPARATE loopback / pod-only admin listener. Admin endpoints live off the public mux by construction. See LB-14.
 - **The revoke fan-out** (`portal/src/lib/revoke.ts`, `revokeSubject`): in-process, wired to admin force-logout, user sign-out-everywhere, and deactivate. See LB-15.
-- **Admin authority** (`portal/src/lib/admin-auth.ts`): the `OTHALA_ADMIN_IDS` allowlist, the SOLE source of admin authz. See LB-6 and LB-16.
+- **Admin authority** (`portal/src/lib/admin-auth.ts`): the `metadata_admin.admin` marker (admin-API-only-writable, read fresh from the Kratos admin API), the SOLE source of admin authz. See LB-6 and LB-16.
 - **OIDC client registration** (`portal/src/lib/manifests.ts` parser + `register-clients.ts` registrar + the full `validateClients` lint, bundled to `dist/server/register-clients.mjs`). The in-app registrar is the runner: a deliberate `--rm` one-shot (never on app boot, never route-triggered). CI exercises it via the `e2e` harness's `register-clients` compose service against `MANIFEST_DIR`; the deploy repo runs the same bundle via `just dag-reload-clients` (SIGHUP-driven; also runs on boot). The legacy shell `apply-clients.sh` + Go `util` runner were retired at E1.
 
 **The surface split.** Admin / programmatic calls go through the typed
@@ -148,9 +148,10 @@ a new failure mode.
 `portal/src/server/listen.mjs: handleRecoveryGate` +
 `kratos/kratos.yml: selfservice.flows.recovery.after.code.hooks`.
 Kratos posts the in-flight identity to the app's admin-port recovery-gate
-before issuing a public recovery code; the gate returns 403 for any email
-on the `OTHALA_ADMIN_IDS` allowlist (admin recovery is console-only)
-and fail-closed (403) on a payload it cannot identify. The `admin` group
+before issuing a public recovery code; the gate reads the authoritative
+`metadata_admin.admin` marker fresh from the Kratos admin API and returns
+403 for any admin identity (admin recovery is console-only), fail-closed
+(403) on a payload it cannot identify. The `admin` group
 is NOT consulted here (display-only; see LB-16).
 
 **If you add more Kratos hooks**: every new hook is a contract with
@@ -214,7 +215,7 @@ Spec-violating to put it on a subdomain.
 
 The operator's sops-encrypted secrets store. Secrets are sops + age.
 The deploy plane maps the `dag_*` sops keys onto the app's env targets
-(`OTHALA_ADMIN_IDS`, `OTHALA_ADMIN_ENDPOINT_BEARER`,
+(`OTHALA_ADMIN_ENDPOINT_BEARER`,
 `RECOVERY_GATE_SECRET`, `CSRF_SECRET`, `LDAP_BRIDGE_ADMIN_URL` /
 `LDAP_BRIDGE_ADMIN_TOKEN`, plus the Kratos/Hydra admin tokens and the
 per-client `*_CLIENT_SECRET`s). Documented in
@@ -326,25 +327,29 @@ no identity cache to invalidate (see "No identity cache" above).
 **If you reorder steps 1-2**: you open a revoke race. The abort-on-step-2
 behaviour is what makes the cut atomic enough.
 
-### LB-16: OTHALA_ADMIN_IDS is the sole admin authz; the `admin` group is display-only
+### LB-16: metadata_admin.admin is the sole admin authz; the `admin` group is display-only
 
-`portal/src/lib/admin-auth.ts`. Admin authority is an explicit env
-allowlist (`OTHALA_ADMIN_IDS`, comma-separated identity UUIDs (immutable Kratos identity IDs),
-sops-backed), case-folded and trimmed. It is the SOLE authz at
-`requireAdminSession`, the recovery-gate refusal, and the admin page
-gates. Fail-closed: an empty/unset list yields no admins; a missing email
-yields a non-admin.
+`portal/src/lib/admin-auth.ts` (`isAdminMarker`). Admin authority is the
+`metadata_admin.admin` boolean on the Kratos identity: writable ONLY via
+the Kratos admin API (never through self-service flows or OIDC claim
+mapping), absent from the public `whoami` response, and read fresh from
+the admin API on every check. Strict `=== true`; fail-closed on any other
+shape. It is the SOLE authz at `requireAdminSession`, the recovery-gate
+refusal, and the admin page gates. See ADR 08 for the full model (the
+bootstrap floor, and its honest gaps).
 
-This REPLACES every former `metadata_admin.groups.includes('admin')`
-gate. The `admin` group is now DISPLAY-ONLY: it still renders in the admin
+This REPLACES both the former `metadata_admin.groups.includes('admin')`
+gate and the earlier `OTHALA_ADMIN_IDS` env allowlist (retired — ADR 08).
+The `admin` group is DISPLAY-ONLY: it still renders in the admin
 UI's group chips and may drive per-app role derivation, but no code path
 gates admin access, recovery refusal, or admin authority on it. An admin
 removing the `admin` group from their own identity therefore cannot drop
-their own admin authority; the allowlist lives outside Kratos.
+their own admin authority; the marker rides the admin-API write boundary,
+not a user-editable surface.
 
 **If you re-gate admin on the group**: self-demote becomes a lockout
-vector, and an in-Kratos write can grant admin. Keep authz in the
-allowlist.
+vector, and a display-group write can grant admin. Keep authz on the
+marker.
 
 ## Topology
 
@@ -480,8 +485,9 @@ Admin pages live at `<othala-host>/admin/*`. AAL is per-flow in Kratos, so
 the SSR layer is what enforces step-up. The tile dashboard itself
 (non-admin `/`) skips the AAL2 branch and renders from
 `metadata_admin.groups`. Admin authority itself is the
-`OTHALA_ADMIN_IDS` allowlist (LB-16), checked in
-`requireAdminSession`; the AAL2 step-up is an additional factor on top.
+`metadata_admin.admin` marker (LB-16), checked in
+`requireAdminSession` after the AAL2 step-up — the guard enforces the
+trinity: active session + AAL2 + admin marker.
 
 ```mermaid
 sequenceDiagram
@@ -496,14 +502,15 @@ sequenceDiagram
   C->>K: forward_auth /sessions/whoami
   K->>C: 200 (any AAL)
   C->>O: pass through
-  O->>K: getIdentity (admin API, fresh)
-  O->>O: requireAdminSession: id in OTHALA_ADMIN_IDS<br/>check session.aal == aal2
+  O->>O: requireAdminSession: check session.aal == aal2
   alt aal1
     O->>B: 302 /self-service/login/browser?aal=aal2&refresh=true
     B->>K: re-auth with second factor
     K->>B: cookie now aal2
     B->>O: retry /admin/users
   else aal2
+    O->>K: getIdentity (admin API, fresh)
+    O->>O: metadata_admin.admin === true (fail-closed)
     O->>B: render admin UI
   end
 ```
@@ -563,7 +570,7 @@ groups declared in `OTHALA_IDENTITY_GROUPS`, then the default group
 normalizeGroupOrder`); stored order IS the precedence. The `admin` group
 here is DISPLAY-ONLY for authz purposes (LB-16): it renders and may drive
 per-app role derivation, but admin authority is the
-`OTHALA_ADMIN_IDS` allowlist. Adding a new identity group means
+`metadata_admin.admin` marker. Adding a new identity group means
 setting or extending `OTHALA_IDENTITY_GROUPS` — no code change required.
 
 **Access groups**: what you can reach. The tile launcher renders only
@@ -747,7 +754,7 @@ The substantive, real test coverage (from the CV audit):
 | Access gate | `portal/` gate tests | Fail-closed on BOTH group AND state, on login and consent; null-identity denial (LB-13) |
 | Revoke fan-out | `portal/` revoke tests | Step ordering, abort-on-step-2, best-effort step-5 isolation, prescriptive error mapping (LB-15) |
 | Dual-listener | `portal/` listen tests | Admin/public mux disjointness, constant-time fail-closed bearer checks (LB-14) |
-| Admin authz | `portal/` admin-auth tests | `OTHALA_ADMIN_IDS` as sole authz; `admin` group not consulted (LB-16) |
+| Admin authz | `portal/` admin-auth tests | `metadata_admin.admin` marker as sole authz; `admin` group not consulted (LB-16) |
 | Client registrar | `portal/scripts/register-clients.test.mjs` | Field mapping, `consent:`-never-forwarded, create/update idempotency |
 | LDAP bridge unit | `gitlab.com/dunn.dev/kratos-ldap` | Bind cache, DN parse + escape (caught a real bug) |
 | E2E smoke evidence | `e2e/` + the project's adversarial security reviews | Live-stack validation |

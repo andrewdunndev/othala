@@ -332,7 +332,7 @@ export async function handleConsent(req: Request, deps: Deps = {}): Promise<Resp
     }
   }
 
-  // SKIP PATH (coordinator decision 1 — SACRED): curated IdP — the operator
+  // SKIP PATH (docs/adr/10, load-bearing): curated IdP — the operator
   // pre-consents at manifest-authoring time, so a skip_consent:true client
   // auto-accepts with NO grant UI ("never prompts").
   //
@@ -348,7 +348,7 @@ export async function handleConsent(req: Request, deps: Deps = {}): Promise<Resp
     return acceptConsentRequest(challenge, consent, identity!, d, clientId, CONSENT_REMEMBER_FOR_SKIP);
   }
 
-  // PROMPT PATH (coordinator decision 1):
+  // PROMPT PATH (docs/adr/10):
   // When consent.skip === false the user has NOT previously granted consent for
   // this client (or the grant expired). Redirect to the grant screen. The
   // browser renders /auth/consent, the user clicks Allow / Deny, and the form
@@ -445,7 +445,7 @@ export async function handleConsentPost(req: Request, deps: Deps = {}): Promise<
     return new Response('server error', { status: 500 });
   }
 
-  // Subject-mismatch guard (coordinator decision 4).
+  // Subject-mismatch guard: the posting session must be the challenge's subject.
   if (session.identity.id !== consent.subject) {
     try {
       const { redirect_to } = await d.oauth2.rejectOAuth2ConsentRequest({

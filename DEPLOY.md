@@ -149,11 +149,15 @@ plane maps each `dag_*` key to the env target below:
 
 | Env target | Guards / used by |
 |---|---|
-| `OTHALA_ADMIN_IDS` | The **sole admin authz**: an allowlist of admin identity UUIDs (immutable Kratos identity IDs). Checked at `requireAdminSession`, the recovery-gate, and the `/admin/*` page gates. The `admin` group is display-only. |
 | `OTHALA_ADMIN_ENDPOINT_BEARER` | `POST /admin/revoke-user` on the loopback admin port. Constant-time, fail-closed. |
 | `RECOVERY_GATE_SECRET` | `POST /admin/recovery-gate` (the Kratos recovery-hook). Constant-time, fail-closed. |
 | `LDAP_BRIDGE_ADMIN_URL` / `LDAP_BRIDGE_ADMIN_TOKEN` | Best-effort LDAP bind-cache flush in the revoke fan-out. **Shelved 2026-06-26; not set in current deploy (bridge not deployed).** |
 | `CSRF_SECRET` | CSRF token signing for the self-service flow posts. |
+
+Admin authority is deliberately NOT an env target: it is the
+`metadata_admin.admin` marker on the Kratos identity (ADR 08). The former
+`OTHALA_ADMIN_IDS` allowlist is retired and asserted absent from the
+deployed quadlets by deploy preflight.
 
 The old secrets are **gone**: `CONSENT_ADMIN_BEARER`, `CONSENT_ADMIN_URL`,
 `KRATOS_BRIDGE_ADMIN_TOKEN`, and the overloaded `auth_internal_bearer` /
@@ -186,7 +190,7 @@ deleted).
 
 <!-- Deploy cutover completed at E1. dag-consent and the util runner are
      retired; dag-portal is the converged app. Admin env targets
-     (OTHALA_ADMIN_IDS, OTHALA_ADMIN_ENDPOINT_BEARER, RECOVERY_GATE_SECRET)
+     (OTHALA_ADMIN_ENDPOINT_BEARER, RECOVERY_GATE_SECRET)
      and the dual-listener admin port (ADMIN_PORT=4431) are live in the
      dag-portal quadlet. The Kratos recovery-hook points at the Othala admin
      port. Secrets regenerated fresh as dag_* sops keys. -->
