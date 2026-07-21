@@ -160,7 +160,7 @@ include:
 # -----------------------------------------------------------------
 lint-identity-schema:
   stage: verify
-  image: registry.access.redhat.com/ubi9/nodejs-22:9.8@sha256:0905d5a102059b449b95cf3a926e073e026524e06b132b401c36c9c4f7096e37
+  image: registry.access.redhat.com/ubi9/nodejs-22:9.8@sha256:03972e440fc806d71a87982d7044616aa185b7bbe6c821642e9510c418e21a40
   rules:
     - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
     - if: '$CI_PIPELINE_SOURCE == "push"'
@@ -213,7 +213,7 @@ lint-identity-schema:
 # -----------------------------------------------------------------
 lint-jsonnet-hooks:
   stage: verify
-  image: registry.access.redhat.com/ubi9/nodejs-22:9.8@sha256:0905d5a102059b449b95cf3a926e073e026524e06b132b401c36c9c4f7096e37
+  image: registry.access.redhat.com/ubi9/nodejs-22:9.8@sha256:03972e440fc806d71a87982d7044616aa185b7bbe6c821642e9510c418e21a40
   rules:
     - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
     - if: '$CI_PIPELINE_SOURCE == "push"'
@@ -273,7 +273,7 @@ lint-jsonnet-hooks:
 # -----------------------------------------------------------------
 check-purity:
   stage: verify
-  image: registry.access.redhat.com/ubi9/nodejs-22:9.8@sha256:0905d5a102059b449b95cf3a926e073e026524e06b132b401c36c9c4f7096e37
+  image: registry.access.redhat.com/ubi9/nodejs-22:9.8@sha256:03972e440fc806d71a87982d7044616aa185b7bbe6c821642e9510c418e21a40
   rules:
     - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
     - if: '$CI_PIPELINE_SOURCE == "push"'
@@ -295,7 +295,7 @@ check-purity:
 # -----------------------------------------------------------------
 test-portal:
   stage: verify
-  image: registry.access.redhat.com/ubi9/nodejs-22:9.8@sha256:0905d5a102059b449b95cf3a926e073e026524e06b132b401c36c9c4f7096e37
+  image: registry.access.redhat.com/ubi9/nodejs-22:9.8@sha256:03972e440fc806d71a87982d7044616aa185b7bbe6c821642e9510c418e21a40
   rules:
     - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
     - if: '$CI_PIPELINE_SOURCE == "push"'
@@ -326,7 +326,7 @@ test-portal:
 # -----------------------------------------------------------------
 check-portal:
   stage: verify
-  image: registry.access.redhat.com/ubi9/nodejs-22:9.8@sha256:0905d5a102059b449b95cf3a926e073e026524e06b132b401c36c9c4f7096e37
+  image: registry.access.redhat.com/ubi9/nodejs-22:9.8@sha256:03972e440fc806d71a87982d7044616aa185b7bbe6c821642e9510c418e21a40
   rules:
     - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
     - if: '$CI_PIPELINE_SOURCE == "push"'
