@@ -21,13 +21,12 @@
 //     challenge provider is reachable on the admin port — and the public
 //     handler never sees admin paths. The two muxes are disjoint.
 //
-//   Secret model (CU3): the overloaded `auth_internal_bearer` is split into
-//   PURPOSE-NAMED secrets:
+//   Secret model (CU3): the admin port uses two PURPOSE-NAMED secrets:
 //     - OTHALA_ADMIN_ENDPOINT_BEARER  guards POST /admin/revoke-user
 //     - RECOVERY_GATE_SECRET        guards POST /admin/recovery-gate
 //   Both checks are CONSTANT-TIME (timingSafeEqual) and FAIL-CLOSED (an
-//   unset secret rejects every request). The portal->consent admin HTTP hop
-//   and CONSENT_ADMIN_BEARER are gone: the revoke fan-out is in-process.
+//   unset secret rejects every request). The revoke fan-out is in-process;
+//   there is no portal->consent admin HTTP hop.
 //
 // Run with:  node ./dist/server/listen.mjs   (after `npm run build`, which
 // copies this file AND bundles dist/server/admin-runtime.mjs next to the
@@ -304,8 +303,6 @@ export async function fetchAdminMarker(identityId) {
  * allow from the buggy jsonnet context, the gate fetches the authoritative value
  * directly from the admin API using the identity_id forwarded in the payload.
  * The payload's is_admin is not used for the admin-marker decision.
- *
- * The retired OTHALA_ADMIN_IDS allowlist and isAdminId are no longer used.
  */
 export async function handleRecoveryGate(req, res) {
   const expected = process.env.RECOVERY_GATE_SECRET ?? '';

@@ -9,10 +9,9 @@
 // — WITHOUT delegating to the public Astro handler (the two muxes stay
 // disjoint).
 //
-// The admin allowlist (isAdminId) is no longer injected here. Admin
-// authority is now determined by the metadata_admin.admin marker in the
+// Admin authority is determined by the metadata_admin.admin marker in the
 // Kratos webhook payload (ADR 08); recoveryGateVerdict reads it directly
-// from the payload, so no runtime predicate is needed.
+// from the payload, so no runtime predicate is needed here.
 
 export { revokeSubject, RevokeError } from '../lib/revoke';
 export type { RevokeResult, RevokeDependency } from '../lib/revoke';

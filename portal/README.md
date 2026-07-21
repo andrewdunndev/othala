@@ -111,7 +111,7 @@ make start                                            # node ./dist/server/entry
 make image                                            # podman build -t dunn.dev/othala-portal:lab
 ```
 
-`make image` runs `podman build` with `portal/` as the build context. As of v0.2.0 there is no manifest prebuild step: per-app manifests are read at runtime from `MANIFEST_DIR` (default `/etc/portal/manifests`), so the build no longer needs `hydra/clients/` or the larger repo context.
+`make image` runs `podman build` with `portal/` as the build context. Per-app manifests are read at runtime from `MANIFEST_DIR` (default `/etc/portal/manifests`), so the build needs neither `hydra/clients/` nor the larger repo context.
 
 ## prerender flag
 

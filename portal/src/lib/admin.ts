@@ -38,7 +38,7 @@ import type {
  * Returns:
  *   true  — session authenticated within the window
  *   false — session is stale (confirmed out of window) OR timestamps
- *           unreadable (fail-CLOSED — changed from the prior fail-open null)
+ *           unreadable (fail-CLOSED)
  *
  * Primary source: authentication_methods entries with aal === 'aal2', using
  * the most-recent completed_at timestamp among those entries. Fallback to
@@ -197,12 +197,10 @@ export async function requireAdminSession(astro: any): Promise<Session | Respons
 /**
  * Force re-login for an identity (admin "revoke user" trigger).
  *
- * The portal -> consent-service HTTP hop (POST /admin/revoke-user, guarded
- * by the overloaded CONSENT_ADMIN_BEARER) is GONE. The fan-out is now
- * in-process: revokeSubject runs steps 2-5 (Kratos sessions, Hydra login +
- * consent revoke, best-effort LDAP bind-cache flush). deactivate is NOT set
- * here — admin force-logout cuts sessions without marking the identity
- * inactive.
+ * The fan-out is in-process: revokeSubject runs steps 2-5 (Kratos sessions,
+ * Hydra login + consent revoke, best-effort LDAP bind-cache flush). deactivate
+ * is NOT set here — admin force-logout cuts sessions without marking the
+ * identity inactive.
  *
  * Throws a prescriptive RevokeError on a hard-cut (step 2-4) failure; the
  * caller surfaces dependency + next-action without leaking raw upstream

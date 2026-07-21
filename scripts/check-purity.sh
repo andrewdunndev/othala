@@ -143,6 +143,32 @@ fi
 echo ""
 
 # =================================================================
+# Decision-marker resolution family
+# =================================================================
+echo "Decision-marker resolution:"
+
+# adr-pointers-resolve: every ADR pointer a leaf carries (either `ADR NN`
+# or a `docs/adr/NN-` path) must resolve to a real docs/adr/NN-*.md file,
+# NN zero-padded to two digits. Generic scan: discovers the numbers from
+# the tree (excluding the ADR dir itself) and asserts each has a file.
+adr_missing=""
+adr_nums=$(grep -rhoEI --exclude-dir=.git --exclude-dir=node_modules --exclude-dir=adr \
+    'ADR[[:space:]]*[0-9]+|docs/adr/[0-9]+-' . 2>/dev/null \
+    | grep -oE '[0-9]+' | sort -u)
+for n in $adr_nums; do
+    nn=$(printf '%02d' "$((10#$n))")
+    adr_files=( docs/adr/"${nn}"-*.md )
+    [[ -e ${adr_files[0]} ]] || adr_missing="${adr_missing}${adr_missing:+ }${nn}"
+done
+if [[ -n "$adr_missing" ]]; then
+    step_fail "adr-pointers-resolve" "no docs/adr file for: $adr_missing"
+else
+    step_pass "adr-pointers-resolve"
+fi
+
+echo ""
+
+# =================================================================
 # Summary
 # =================================================================
 TOTAL=$((PASS + FAIL))

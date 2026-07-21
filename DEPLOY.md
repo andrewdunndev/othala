@@ -155,18 +155,14 @@ plane maps each `dag_*` key to the env target below:
 | `CSRF_SECRET` | CSRF token signing for the self-service flow posts. |
 
 Admin authority is deliberately NOT an env target: it is the
-`metadata_admin.admin` marker on the Kratos identity (ADR 08). The former
-`OTHALA_ADMIN_IDS` allowlist is retired and asserted absent from the
-deployed quadlets by deploy preflight.
+`metadata_admin.admin` marker on the Kratos identity (ADR 08). Deploy preflight
+asserts `OTHALA_ADMIN_IDS` is absent from the deployed quadlets.
 
-The old secrets are **gone**: `CONSENT_ADMIN_BEARER`, `CONSENT_ADMIN_URL`,
-`KRATOS_BRIDGE_ADMIN_TOKEN`, and the overloaded `auth_internal_bearer` /
-`dag_internal_bearer` are not part of the converged app. The revoke
-fan-out is in-process; there is no app-to-consent admin HTTP hop.
+The revoke fan-out is in-process; there is no app-to-consent admin HTTP
+hop.
 
-Back-channel logout is **Hydra-native** (Hydra signs with its own key,
-as it has since 2019). The app holds **no signing key at rest**; the
-custom private-key signer was deleted.
+Back-channel logout is **Hydra-native** (Hydra signs with its own key).
+The app holds **no signing key at rest**.
 
 ## Client registration
 
@@ -184,16 +180,7 @@ the `manifests.ts` parser + the full `validateClients` lint), bundled to
 `dist/server/register-clients.mjs` and exercised in CI: the `e2e` harness
 runs it as a `compose run --rm register-clients` one-shot against the
 freshly-built image, reading each `<slug>.yaml` `oidc:` block from
-`MANIFEST_DIR` and resolving `<SLUG>_CLIENT_SECRET` from env. The legacy
-shell `apply-clients.sh` + Go `util` runner were retired at E1 (source
-deleted).
-
-<!-- Deploy cutover completed at E1. dag-consent and the util runner are
-     retired; dag-portal is the converged app. Admin env targets
-     (OTHALA_ADMIN_ENDPOINT_BEARER, RECOVERY_GATE_SECRET)
-     and the dual-listener admin port (ADMIN_PORT=4431) are live in the
-     dag-portal quadlet. The Kratos recovery-hook points at the Othala admin
-     port. Secrets regenerated fresh as dag_* sops keys. -->
+`MANIFEST_DIR` and resolving `<SLUG>_CLIENT_SECRET` from env.
 
 ## Why two repos
 

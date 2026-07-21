@@ -1,12 +1,8 @@
 ---
-// /admin/activity has been retired from the shipped product.
-//
-// A real activity log (alloy → Loki archival + a Postgres summary table
-// for the in-UI last-100 view) is out of scope for the public release, so
-// the navigable placeholder it used to render was removed rather than
-// shipped dead. This route is no longer linked from the admin nav; it
-// redirects to the admin overview so any stale bookmark lands somewhere
-// live instead of on a dead page.
+// /admin/activity is out of scope for the public release: a real
+// activity log (alloy → Loki archival + a Postgres summary table for the
+// in-UI last-100 view) is not shipped. This route redirects to the admin
+// overview.
 export const prerender = false;
 
 import { requireAdminSession } from '../../lib/admin';

@@ -236,11 +236,11 @@ export async function registerClient(
  * Runs the full validateClients lint first (unless skipValidation), then
  * registers each client idempotently. Returns the per-client action list.
  *
- * This is the active production registration path (E1 cutover complete).
- * The deploy repo runs this bundle as a deliberate --rm one-shot on boot
- * and on SIGHUP (dag-reload-clients), reading manifests from MANIFEST_DIR
- * and resolving <SLUG>_CLIENT_SECRET from env. The legacy shell
- * apply-clients.sh + Go util runner were retired at E1.
+ * This is the production registration path. The deploy repo runs this
+ * bundle as a deliberate --rm one-shot on boot and on SIGHUP
+ * (dag-reload-clients), reading manifests from MANIFEST_DIR and resolving
+ * <SLUG>_CLIENT_SECRET from env. Registration model decided in
+ * docs/adr/02-custom-portal-oidc-registrar.md.
  */
 export async function registerAllClients(
   opts: RegisterOptions = {},

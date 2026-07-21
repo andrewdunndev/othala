@@ -45,7 +45,7 @@ The app holds, all in one process:
 - **A dual-listener** (`portal/src/server/listen.mjs`): a public Astro SSR listener and a SEPARATE loopback / pod-only admin listener. Admin endpoints live off the public mux by construction. See LB-14.
 - **The revoke fan-out** (`portal/src/lib/revoke.ts`, `revokeSubject`): in-process, wired to admin force-logout, user sign-out-everywhere, and deactivate. See LB-15.
 - **Admin authority** (`portal/src/lib/admin-auth.ts`): the `metadata_admin.admin` marker (admin-API-only-writable, read fresh from the Kratos admin API), the SOLE source of admin authz. See LB-6 and LB-16.
-- **OIDC client registration** (`portal/src/lib/manifests.ts` parser + `register-clients.ts` registrar + the full `validateClients` lint, bundled to `dist/server/register-clients.mjs`). The in-app registrar is the runner: a deliberate `--rm` one-shot (never on app boot, never route-triggered). CI exercises it via the `e2e` harness's `register-clients` compose service against `MANIFEST_DIR`; the deploy repo runs the same bundle via `just dag-reload-clients` (SIGHUP-driven; also runs on boot). The legacy shell `apply-clients.sh` + Go `util` runner were retired at E1.
+- **OIDC client registration** (`portal/src/lib/manifests.ts` parser + `register-clients.ts` registrar + the full `validateClients` lint, bundled to `dist/server/register-clients.mjs`). The in-app registrar is the runner: a deliberate `--rm` one-shot (never on app boot, never route-triggered). CI exercises it via the `e2e` harness's `register-clients` compose service against `MANIFEST_DIR`; the deploy repo runs the same bundle via `just dag-reload-clients` (SIGHUP-driven; also runs on boot).
 
 **The surface split.** Admin / programmatic calls go through the typed
 Ory SDK (`@ory/client-fetch`): `admin-api.ts` (IdentityApi),
@@ -61,14 +61,11 @@ revocation is correct without any in-process identity cache to
 invalidate. Do not add one.
 
 **Back-channel logout is Hydra-native.** Hydra signs back-channel logout
-tokens with its own key (native since 2019). The former custom
-private-key signer was DELETED. The app holds NO signing key at rest.
+tokens with its own key. The app holds NO signing key at rest.
 
-**Legacy, removed.** The Go `consent/` service and `util/` apply runner
-were RETIRED at the deploy cutover (additive convergence: the TS app
-landed alongside them, then the cutover dropped them) and the source
-dirs are now DELETED. Their behaviour lives in the TS app. They are NOT
-the current architecture; do not reintroduce them.
+**Single TS app owns registration.** Do not stand up a separate consent
+or apply-runner service; the converged TS app is the sole registrar.
+Decided in docs/adr/02-custom-portal-oidc-registrar.md.
 
 ## The load-bearing decisions
 
@@ -338,8 +335,6 @@ shape. It is the SOLE authz at `requireAdminSession`, the recovery-gate
 refusal, and the admin page gates. See ADR 08 for the full model (the
 bootstrap floor, and its honest gaps).
 
-This REPLACES both the former `metadata_admin.groups.includes('admin')`
-gate and the earlier `OTHALA_ADMIN_IDS` env allowlist (retired — ADR 08).
 The `admin` group is DISPLAY-ONLY: it still renders in the admin
 UI's group chips and may drive per-app role derivation, but no code path
 gates admin access, recovery refusal, or admin authority on it. An admin
@@ -705,8 +700,8 @@ things."
 | `registry.gitlab.com/dunn.dev/kratos-ldap` | see the deploy quadlets (authoritative) | self-managed (`gitlab.com/dunn.dev/kratos-ldap`) |
 
 The `othala` image is the converged app; the `kratos-ldap` image is the
-separate LDAP bridge project. The legacy `consent` and `util` images are
-retired. Current pinned versions live in the deploy quadlets (`Image=` lines).
+separate LDAP bridge project. Current pinned versions live in the deploy
+quadlets (`Image=` lines).
 `CHANGELOG.md` and git tags state the deployed version. Do not restate
 version numbers here.
 
@@ -786,9 +781,8 @@ those as the build-time / release-gate guards, not a continuous type gate.
 Things that would expand the codebase without obvious value at family
 scale:
 
-- **A full audit-log subsystem**. The `/admin/activity` route was retired
-  rather than shipped dead — it now redirects to `/admin` (admin gate
-  preserved). The audit-ingest path (alloy → Loki for archival, a Postgres
+- **A full audit-log subsystem**. `/admin/activity` redirects to `/admin`
+  (admin gate preserved). The audit-ingest path (alloy → Loki for archival, a Postgres
   summary table for the UI) is out of scope for the public release.
   `journalctl` is the current audit; expand only if family scale requires.
 - **An in-process identity cache**. Revocation is correct without one (see

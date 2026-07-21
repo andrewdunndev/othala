@@ -3,13 +3,13 @@
 // The manifest layer reads `presentation.access:` (adopter-named groups,
 // arbitrary charset, no `access-` prefix required) into a normalized
 // `accessGroups: string[]` field on both the OIDC `ClientManifest` and the
-// dashboard `AppTile`. As of Phase 2 (docs/access-model.md §10/§17) this field
-// is the LOAD-BEARING access binding: the OIDC gate (gate.ts), effective-access
-// view (access.ts), tile visibility (tiles.ts), and the group registry
-// (group-registry.ts) all key off it. The `access-` prefix is no longer a
-// runtime type discriminator — a group's type comes from its binding, derived
-// by group-registry.ts. (The forward-auth GROUP_RE prefix check is the one
-// remaining prefix consumer, relaxed in Phase 3.)
+// dashboard `AppTile`. This field is the LOAD-BEARING access binding
+// (docs/access-model.md): the OIDC gate (gate.ts), effective-access view
+// (access.ts), tile visibility (tiles.ts), and the group registry
+// (group-registry.ts) all key off it. The `access-` prefix is not a runtime
+// type discriminator — a group's type comes from its binding, derived by
+// group-registry.ts. (The forward-auth GROUP_RE prefix check is the one
+// remaining prefix consumer.)
 //
 // Parse precedence (docs/access-model.md §11):
 //   1. presentation.access non-empty list → use it.

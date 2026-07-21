@@ -1,10 +1,8 @@
 // OIDC client manifest loader for SSR pages.
 //
-// v0.2.0: manifests are now read at REQUEST time from a mounted
-// directory (default `/etc/portal/manifests/`). The build-time JSON
-// bundle is gone; the Workers-era reasoning that motivated it
-// (Workers can't read the filesystem at runtime) no longer applies
-// since the portal runs as Astro Node SSR on the SSO host.
+// Manifests are read at REQUEST time from a mounted directory
+// (default `/etc/portal/manifests/`); the portal runs as Astro Node
+// SSR on the SSO host.
 //
 // Why runtime read:
 //

@@ -1,8 +1,13 @@
-# Othala Access Model — Primitives, Not Policy (DRAFT, pending adversarial review)
+# Othala Access Model — Primitives, Not Policy
 
-Status: DRAFT 2026-06-19. Proposes replacing othala's hardcoded `access-<slug>`
-access-group convention with adopter-declared primitives. Written for review;
-nothing is implemented yet.
+Status: Accepted (2026-06-19); implemented and shipped in v0.3.0. Replaced
+othala's hardcoded `access-<slug>` access-group convention with adopter-declared
+primitives: a manifest binds adopter-named groups via `presentation.access`, and
+a group's type (identity / access / role) is derived from its bindings by
+`group-registry.ts`, not from an `access-` name prefix. This document is the
+load-bearing reference for the access-binding layer (the code cites it by
+section); see also ADR 09 (capability-group model) for how the capability
+groups themselves are defined.
 
 ## 1. Problem
 

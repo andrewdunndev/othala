@@ -6,11 +6,9 @@
 //   - user "sign out everywhere" (self-service settings)   -> steps 2-6
 //   - deactivate              (admin deactivate-identity)  -> step 1 THEN 2-6
 //
-// The Go consent service used to own this fan-out behind an HTTP hop
-// (portal -> POST /admin/revoke-user). That boundary is GONE: the fan-out
-// is now in-process here, calling the Kratos + Hydra admin APIs directly
-// through the typed Ory SDK (@ory/client-fetch). No string-interpolated
-// admin URLs.
+// The fan-out is in-process here, calling the Kratos + Hydra admin APIs
+// directly through the typed Ory SDK (@ory/client-fetch). No
+// string-interpolated admin URLs.
 //
 // FAN-OUT ORDER (do not reorder; steps 1-2 are the hard cut):
 //

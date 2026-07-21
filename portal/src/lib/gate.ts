@@ -1,9 +1,7 @@
 // Access gate — the COMPLETE gate (CU1 item 2, C skip_access_check).
 //
-// Ported from consent/handlers.go (enforceAccessGate /
-// enforceAccessGateFromGroups) + consent/manifest.go (identityGroups). Two
-// checks, both FAIL-CLOSED, applied on BOTH the login and consent challenge
-// handlers (oauth2-handlers.ts):
+// Two checks, both FAIL-CLOSED, applied on BOTH the login and consent
+// challenge handlers (oauth2-handlers.ts):
 //
 //   1. identity.state must be exactly "active" — deactivated identities are
 //      denied. The Go service relies on Kratos returning no session for a
@@ -92,13 +90,12 @@ export function enforceGroupGate(
  * Evaluate the access gate for an identity against a client. FAIL-CLOSED:
  * any missing precondition denies. The state check is explicit (CU1 item 2).
  *
- * access-model Phase 2 (docs/access-model.md §10/§16): the access-bearing
- * group(s) come from the manifest BINDING (`manifest.accessGroups`), with
- * OR-semantics — membership in ANY bound group grants entry. The group's
- * access-bearing status is a property of the manifest binding, not its name;
- * there is no derived `access-<clientId>` group anymore. `clientId` is kept in
- * the signature for the caller's logging/parity and is no longer used to derive
- * a group name (the manifest is the source of truth).
+ * access-model (docs/access-model.md): the access-bearing group(s) come from
+ * the manifest BINDING (`manifest.accessGroups`), with OR-semantics —
+ * membership in ANY bound group grants entry. The group's access-bearing
+ * status is a property of the manifest binding, not its name. `clientId` is
+ * retained for the caller's logging/parity; the manifest binding is the sole
+ * source of the access-bearing group.
  *
  * skip_access_check (C): if manifest.skipAccessCheck is true, the group
  * membership check is bypassed. The state===active check is NEVER bypassed —

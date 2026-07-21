@@ -1,18 +1,7 @@
-// Admin authority — metadata_admin marker gate (ADR 08).
-//
-// ADR 08 (accepted 2026-06-25): admin authority moves from an env-based
-// UUID allowlist (OTHALA_ADMIN_IDS) to a tamper-proof marker in Kratos
-// `metadata_admin.admin`. The marker is:
-//   - writable ONLY via the Kratos admin API (never via self-service flows
-//     or OIDC claim mapping, which land in traits only)
-//   - absent from the public /sessions/whoami response (Kratos v26.2.0
-//     excludes metadata_admin from whoami — ADR 08 Consequences)
-//   - read by callers via a fresh admin-API getIdentity call, never from
-//     the session object returned by whoami
-//
-// Authority check: metadata_admin.admin === true (boolean strict equality).
-// Fail-closed: absent key, wrong type (string "true", number 1, null, etc.),
-// or any malformed identity object yields false.
+// Admin authority — the `metadata_admin.admin` marker on the Kratos
+// identity is the sole admin authority: admin-API-only-writable, read fresh
+// via getIdentity, and absent from /sessions/whoami in Kratos v26.2.0.
+// Decided in docs/adr/08-admin-authority-model.md.
 
 import type { Identity } from './types';
 import { getIdentity } from './admin-api';

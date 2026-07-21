@@ -1,10 +1,9 @@
-// OAuth2 challenge handlers (CU1 item 1), ported from consent/handlers.go.
+// OAuth2 challenge handlers (CU1 item 1).
 //
-// These are the Hydra login/consent/logout challenge providers — the role the
-// Go consent service plays at urls.{login,consent,logout}. They are distinct
-// from src/pages/auth/{login,consent,logout}.astro, which render the Kratos
-// browser-flow human UI. The new routes live at /oauth2/{login,consent,logout}
-// (see src/pages/oauth2/*).
+// These are the Hydra login/consent/logout challenge providers. They are
+// distinct from src/pages/auth/{login,consent,logout}.astro, which render the
+// Kratos browser-flow human UI. The routes live at
+// /oauth2/{login,consent,logout} (see src/pages/oauth2/*).
 //
 // Each handler takes a Web Request and returns a Web Response (302 redirect or
 // an error status). The logic is framework-agnostic so the Astro routes are
@@ -332,18 +331,16 @@ export async function handleConsent(req: Request, deps: Deps = {}): Promise<Resp
     }
   }
 
-  // SKIP PATH (docs/adr/10, load-bearing): curated IdP — the operator
-  // pre-consents at manifest-authoring time, so a skip_consent:true client
-  // auto-accepts with NO grant UI ("never prompts").
+  // SKIP PATH (docs/adr/10-first-party-skip-consent.md, load-bearing):
+  // curated IdP — the operator pre-consents at manifest-authoring time, so a
+  // skip_consent:true client auto-accepts with NO grant UI ("never prompts").
   //
-  // The Go original keyed on the CLIENT's skip_consent (consent.Client.SkipConsent,
-  // handlers.go:135). The first TS port regressed to Hydra's `consent.skip` flag,
-  // which is REMEMBER-based — false on the first flow per (subject,client) — so OSS
-  // Hydra v26.2.0 (which does not auto-skip on the client field) sent every "never
-  // prompts" client to the grant UI on first login. Convergence regression caught by
-  // e2e deep-coverage 2026-06-02. Honor the MANIFEST skip_consent (authoritative,
-  // operator-authored), OR Hydra's skip when it is set. Identity is non-null here
-  // (gate denies on null above). remember_for = CONSENT_REMEMBER_FOR_SKIP (3600).
+  // Honor the MANIFEST skip_consent (authoritative, operator-authored) OR
+  // Hydra's remember-based `consent.skip` when set. Why the manifest flag is
+  // authoritative (vs Hydra's client field, which OSS Hydra v26.2.0 does not
+  // auto-skip on): docs/adr/10-first-party-skip-consent.md. Identity is
+  // non-null here (gate denies on null above). remember_for =
+  // CONSENT_REMEMBER_FOR_SKIP (3600).
   if (consent.skip || consentManifest?.skipConsent) {
     return acceptConsentRequest(challenge, consent, identity!, d, clientId, CONSENT_REMEMBER_FOR_SKIP);
   }
