@@ -45,7 +45,7 @@ ARG CATALOG_VERSION=3.1.0
 # ----- Stage 1: build -----
 # Use upstream UBI 9 nodejs-22 (full image with npm + build tools).
 # ci-runtime-node is -minimal and intentionally omits npm.
-FROM registry.access.redhat.com/ubi9/nodejs-22:9.8@sha256:4bcc19fdb67a5f0a568375e45eb8e324ecbbc17431944e213786a537092d812f AS build
+FROM registry.access.redhat.com/ubi9/nodejs-22:9.8@sha256:148f9b515d897c0dba3e7bdb821c8bba3e0c3df946bf082ece9b4f453411e7ab AS build
 
 WORKDIR /src
 USER root
