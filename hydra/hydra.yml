@@ -103,7 +103,7 @@ oauth2:
 
 secrets:
   # CRITICAL: secrets.system is non-rotatable for the life of the Hydra DB.
-  # Generate once, store in sops as carmine.hydra_system_secret. Never
+  # Generate once, store in sops as <host>.hydra_system_secret. Never
   # change without rebuilding the database. Rotation procedure in
   # docs/runbooks/secrets-rotation.md.
   system:
