@@ -14,7 +14,7 @@
     "tough-cookie": "^6.0.0"
   },
   "devDependencies": {
-    "@playwright/test": "1.62.0",
+    "@playwright/test": "1.62.1",
     "@types/node": "24.13.3",
     "@types/tough-cookie": "4.0.5"
   }
