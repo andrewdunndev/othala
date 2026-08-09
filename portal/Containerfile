@@ -40,7 +40,7 @@
 # renovate.json so one MR moves both (coverage added 2026-07-01; every
 # earlier catalog roll was manual — the last one was MR !52).
 # renovate: datasource=gitlab-tags depName=dunn.dev/pipeline
-ARG CATALOG_VERSION=4.3.1
+ARG CATALOG_VERSION=4.4.1
 
 # ----- Stage 1: build -----
 # Use upstream UBI 9 nodejs-22 (full image with npm + build tools).
