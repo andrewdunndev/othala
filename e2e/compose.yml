@@ -3,8 +3,8 @@
 # This is the project's canonical OSS-facing end-to-end example: it shows
 # how Othala ("Ory for your home") stands up on plain `docker compose`
 # from the published images. It doubles as the CI `e2e` gate, consumed by
-# e2e/validate.sh inside a per-job Fedora VM spawned by the carmine GitLab
-# Runner (Custom Executor, tag carmine,qemu). The VM is ephemeral; the
+# e2e/validate.sh inside a per-job Fedora VM spawned by the lodestone GitLab
+# Runner (Custom Executor, tag lodestone,qemu). The VM is ephemeral; the
 # substrate dies with the VM at job end. An adopter can run the same file
 # on a workstation (see README.md "Local operator invocation").
 #
@@ -83,7 +83,7 @@ services:
     # startup, which means any residual writes outside PGDATA (e.g. /run, /etc
     # minor writes by the entrypoint) could silently break startup. Adding
     # read_only: true to postgres risks an opaque startup failure; validate on
-    # carmine before enabling.
+    # lodestone before enabling.
     pids_limit: 512
     environment:
       POSTGRES_USER: postgres
@@ -412,7 +412,7 @@ services:
   # e2e-tester image (Containerfile): the npm deps (@ory/client-fetch,
   # tough-cookie, fetch-cookie, jose) AND the e2e sources are baked in at
   # /test at image-build time, so there is NO runtime `npm install` — the
-  # carmine inner VM can't reach the npm registry (it would stall + exit
+  # lodestone inner VM can't reach the npm registry (it would stall + exit
   # 124). Runs as a one-shot via
   # `docker compose --profile oneshot run --rm --no-deps dance-runner`.
   # smoke.sh Section G's run_dance helper drives this.
@@ -500,7 +500,7 @@ services:
   # (Containerfile, FROM that base) additionally bakes the @playwright/test
   # npm package + the e2e sources into /test at image-build time. There is
   # therefore NO runtime `npm install` — the install happens on the
-  # egress-capable build runner, not in the no-egress carmine inner VM
+  # egress-capable build runner, not in the no-egress lodestone inner VM
   # where a runtime install stalls and times out the gate (exit 124).
   # PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD=1 (also set in the image) prevents a
   # redundant download.

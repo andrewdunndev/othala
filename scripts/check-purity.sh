@@ -53,8 +53,8 @@ else
     step_pass "no-dunn-dev-in-tests"
 fi
 
-# no-instance-identity-in-runbooks: no carmine hostname or personal login names in runbooks.
-if hits=$(grep -rEn '\bcarmine\b|agd@|andrew\.dunn|ashley\.dunn' docs/runbooks/ 2>/dev/null) && [[ -n "$hits" ]]; then
+# no-instance-identity-in-runbooks: no instance hostname (lodestone, or stale carmine) or personal login names in runbooks.
+if hits=$(grep -rEn '\bcarmine\b|\blodestone\b|agd@|andrew\.dunn|ashley\.dunn' docs/runbooks/ 2>/dev/null) && [[ -n "$hits" ]]; then
     step_fail "no-instance-identity-in-runbooks" "$(echo "$hits" | head -3)"
 else
     step_pass "no-instance-identity-in-runbooks"

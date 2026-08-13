@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 # validate.sh — top-level Othala e2e orchestrator.
 #
-# Runs INSIDE the per-job Fedora VM the carmine GitLab Runner spawns
-# (Custom Executor, tag carmine,qemu). The VM has podman + podman-docker
+# Runs INSIDE the per-job Fedora VM the lodestone GitLab Runner spawns
+# (Custom Executor, tag lodestone,qemu). The VM has podman + podman-docker
 # bridge baked into the baser golden image (per the deploy repo's
 # runner config "What pre-bakes into the baser golden image"), so
 # `docker compose` works natively. The same script runs on an operator

@@ -143,7 +143,7 @@ item. Add carefully.
 
 ### 9. `secrets.system` non-rotatable, doubly backed up
 
-Hydra's at-rest encryption key. Stored in sops (`carmine.hydra_system_secret`)
+Hydra's at-rest encryption key. Stored in sops (`lodestone.hydra_system_secret`)
 AND independently backed up via the standing estate backup posture
 (rclone → Backblaze B2 + zfs send to onsite tank). Rotation is
 break-glass-only (full DB rebuild).

@@ -41,8 +41,8 @@ is the tag (CI passes the just-built tag; local runs use `latest`).
 
 ## How it works
 
-In CI, GitLab dispatches the `e2e` job (tagged `[carmine, qemu]`) to the
-carmine GitLab Runner, whose Custom Executor spawns a per-job ephemeral
+In CI, GitLab dispatches the `e2e` job (tagged `[lodestone, qemu]`) to the
+lodestone GitLab Runner, whose Custom Executor spawns a per-job ephemeral
 Fedora VM (qcow2 linked clone from the `baser` golden — podman +
 podman-docker + skopeo + jq + curl pre-baked). The job runs INSIDE the
 VM as `fedora`. `e2e/validate.sh`:
@@ -227,7 +227,7 @@ podman run --rm --platform linux/arm64 \
 
 ## CI invocation
 
-`.gitlab-ci.yml`'s `e2e` job (stage `e2e`), tagged `[carmine, qemu]`.
+`.gitlab-ci.yml`'s `e2e` job (stage `e2e`), tagged `[lodestone, qemu]`.
 Depends on `build-othala` + `build-e2e-tester` so the just-built images
 are pulled at the build tag. Gates the package + release stages.
 

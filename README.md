@@ -88,7 +88,7 @@ This README asserts no version. It is the front door.
 | `hydra/` | Hydra server config |
 | `portal/` | The Othala application (Astro Node SSR + TS): Kratos self-service flows, Hydra login/consent/logout challenge handlers, the access gate, claims builder, revoke fan-out, dual-listener admin endpoints, the runtime manifest loaders (`tiles.ts` + `manifests.ts`), and the OIDC client registrar. Publishes as the `othala` image. |
 | `gitlab.com/dunn.dev/kratos-ldap` | glauth-kratos LDAP bridge (separate sibling repo, currently parked). Protocol adapter for non-OAuth clients needing LDAP. Not currently deployed. |
-| `e2e/` | QEMU-CI smoke harness: compose stack + smoke scripts + gen-secrets + the generic example manifests (`e2e/manifests/`). Runs on carmine via the `e2e` CI job. |
+| `e2e/` | QEMU-CI smoke harness: compose stack + smoke scripts + gen-secrets + the generic example manifests (`e2e/manifests/`). Runs on lodestone via the `e2e` CI job. |
 
 ## Architecture in brief
 

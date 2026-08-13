@@ -80,7 +80,7 @@ reverse_proxy othala:8080 {
 
 > **Needs live validation.** Caddy `handle_response` status-preservation +
 > sub-request behavior is finicky; do not ship this blind. Validate on the
-> carmine stack with a real Caddy in front.
+> lodestone stack with a real Caddy in front.
 
 ## Live-validation checklist (when an operator + stack are available)
 
