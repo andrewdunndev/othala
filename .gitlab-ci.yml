@@ -64,7 +64,7 @@ include:
 
 
   # ----- e2e-tester (prebaked Playwright browser-test image) ------
-  # The browser e2e leg runs inside the carmine inner VM, which can pull
+  # The browser e2e leg runs inside the lodestone inner VM, which can pull
   # container images from the registry but CANNOT reach the npm registry
   # (a runtime `npm install` there stalls and times out the gate, exit
   # 124). This image bakes the @playwright/test deps + the e2e specs into
@@ -343,8 +343,8 @@ check-portal:
 #
 # The project's canonical OSS-facing "stand Othala up on compose"
 # example (e2e/README.md), run here as the release gate. Executes in a
-# fresh Fedora VM spawned by the carmine GitLab Runner (Custom Executor;
-# tag carmine,qemu). The VM has podman + docker bridge pre-baked. Inside
+# fresh Fedora VM spawned by the lodestone GitLab Runner (Custom Executor;
+# tag lodestone,qemu). The VM has podman + docker bridge pre-baked. Inside
 # the VM, e2e/validate.sh:
 #
 #   1. Generates per-run secrets
@@ -374,8 +374,8 @@ check-portal:
 # -----------------------------------------------------------------
 e2e:
   stage: e2e
-  # NOTE: requires a carmine-tagged QEMU runner; forks without one will see this job pending. See docs/qemu-ci-lab.md.
-  tags: [carmine, qemu]
+  # NOTE: requires a lodestone-tagged QEMU runner; forks without one will see this job pending. See docs/qemu-ci-lab.md.
+  tags: [lodestone, qemu]
   needs:
     - build-othala
     # Prebaked browser-test image — pulled by compose.yml's playwright +
@@ -398,11 +398,19 @@ e2e:
     - cd e2e
     - bash validate.sh
   artifacts:
+    # Must be a subpath of $CI_PROJECT_DIR — GitLab Runner refuses any
+    # artifacts:paths entry that resolves outside it ("artifact path is
+    # not a subpath of project directory") and drops the WHOLE archive
+    # when it does, not just the offending entry, so every e2e failure
+    # lost its diagnostics (observed live: job 15871403418) while these
+    # pointed at /tmp. smoke.sh's B1 register-clients output is the one
+    # file this harness still writes to disk (LOG_DIR in smoke.sh); the
+    # smoke-failure and healthcheck-timeout dumps were already moved to
+    # STDOUT/job-trace in prior commits (3fbee74, 4129268) rather than a
+    # file, so there's nothing to point an artifact path at for those.
     when: on_failure
     paths:
-      - /tmp/lab-smoke-failure.log
-      - /tmp/lab-healthcheck-failure.log
-      - /tmp/apply-clients.log
+      - e2e/logs/apply-clients.log
     expire_in: 1 week
   rules:
     # Run on every tag + on-demand (BUILD_CI_IMAGE below). Plain main
@@ -425,7 +433,7 @@ e2e:
     # On-demand pre-tag validation: a branch pipeline triggered with
     # BUILD_CI_IMAGE=true builds the images (container-image @2.5.1 honors
     # the same flag — see its rule 3) and runs e2e against them. Lets us
-    # validate the converged substrate on the carmine runner BEFORE cutting
+    # validate the converged substrate on the lodestone runner BEFORE cutting
     # a tag or merging to main. The builds publish :<short-sha>, which the
     # AUTH_VERSION default ($CI_COMMIT_SHORT_SHA) matches.
     - if: '$BUILD_CI_IMAGE == "true"'

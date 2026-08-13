@@ -42,7 +42,7 @@ community of homelabbers + small-org Kratos deployments has the same gap.
 - **A fork of Ory.** If Ory itself fails us, we revisit substrate, not patch-and-maintain.
 - **A standalone "Ory homelab kit" project.** The `dunn.dev/othala` repo IS the kit, but extracted only as components (the bridge first; the Astro UI is more opinionated and possibly less generally useful). We don't pre-publish the entire kit because:
   - Maintenance treadmill killed every prior Ory homelab kit (prior Ory homelab research retained in git history)
-  - We dogfood on carmine; that's the structural difference vs prior solo maintainers
+  - We dogfood on lodestone; that's the structural difference vs prior solo maintainers
   - If the bridge proves valuable as a standalone, that's where the leverage is — focus there
 
 ## Posture if asked
@@ -53,7 +53,7 @@ If someone asks "can I use your kit?" the answer is: the bridge is open-source, 
 
 - Ory Network commercial trajectory tightens free-tier OSS — currently no signs, but if SCIM, advanced AAL flows, or other features migrate to Network-only, revisit
 - glauth governance health — single-maintainer concern; if the project goes quiet for >6 months, our bridge becomes a maintenance burden we own alone
-- Kratos breaking changes — fast release cadence is the published strength and the latent risk; we pin major versions, test against new versions in lab before bumping carmine
+- Kratos breaking changes — fast release cadence is the published strength and the latent risk; we pin major versions, test against new versions in lab before bumping lodestone
 
 ## Voice for upstream
 

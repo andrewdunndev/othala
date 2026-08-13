@@ -12,8 +12,10 @@
 # 127.0.0.1 inside the container, so admin probes run via `compose exec`
 # against localhost:4431; the public port is probed across the network.
 #
-# Exit 0 on all-green, 1 on any failure. Logs container outputs on
-# failure to /tmp/lab-failure.log for CI artifact upload.
+# Exit 0 on all-green, 1 on any failure. Failure diagnostics (container
+# ps/logs) print to STDOUT for the CI job trace; the one on-disk log this
+# script produces (register-clients output, B1) lands under LOG_DIR for
+# CI artifact upload — see LOG_DIR below for why that can't be /tmp.
 #
 # Pre-conditions:
 #   - `docker compose` (podman-docker bridge) up
@@ -21,6 +23,20 @@
 #   - .env present in cwd
 
 set -uo pipefail   # NOT -e: every probe runs even if some fail.
+
+# LOG_DIR: on-disk logs this script writes MUST live inside the project
+# checkout. GitLab Runner refuses `artifacts:paths` entries that resolve
+# outside $CI_PROJECT_DIR ("artifact path is not a subpath of project
+# directory") and drops the WHOLE on-failure artifact archive when it does
+# — not just the offending entry (observed live: job 15871403418, every
+# e2e failure lost its diagnostics). smoke.sh runs with cwd=e2e/ (validate.sh
+# cd's there before sourcing it), so a plain relative path is enough; SCRIPT_DIR
+# makes that true for direct/local invocation too. Gitignored via the root
+# *.log rule. .gitlab-ci.yml's e2e job artifacts: paths must match this.
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+LOG_DIR="$SCRIPT_DIR/logs"
+mkdir -p "$LOG_DIR"
+APPLY_CLIENTS_LOG="$LOG_DIR/apply-clients.log"
 
 PASS=0
 FAIL=0
@@ -206,14 +222,14 @@ echo "B. client registration (in-app registrar, one-shot)"
 # `up` reconciliation of the service's deps that RECREATES the whole running
 # project (it killed othala + kratos mid-smoke). --no-deps skips that; it is a
 # no-op under docker since `up -d` already started the deps.
-docker compose --profile oneshot run --rm --no-deps register-clients > /tmp/apply-clients.log 2>&1
+docker compose --profile oneshot run --rm --no-deps register-clients > "$APPLY_CLIENTS_LOG" 2>&1
 applycode=$?
 if [[ $applycode -eq 0 ]]; then
     pass "B1 in-app register-clients exited 0"
 else
     fail "B1 register-clients exit code $applycode" "register-clients output below"
-    echo "  ----- register-clients output (/tmp/apply-clients.log) -----"
-    sed 's/^/    | /' /tmp/apply-clients.log 2>/dev/null || true
+    echo "  ----- register-clients output ($APPLY_CLIENTS_LOG) -----"
+    sed 's/^/    | /' "$APPLY_CLIENTS_LOG" 2>/dev/null || true
     echo "  ----- end register-clients output -----"
 fi
 
