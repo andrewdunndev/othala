@@ -9,6 +9,74 @@ This CHANGELOG and git tags carry the deployed-instance release state.
 
 ## [Unreleased]
 
+## [0.4.0] - 2026-08-13
+
+Admin-POST and AAL2 step-up fixes, extensible Hydra CORS for browser-SPA
+clients, the othala.dunn.dev docs site, and an ADR/docs rewrite that stands
+the project alone from the operator's private deployment.
+
+### Fixed
+
+- **Admin POST reachability restored.** `Referrer-Policy: no-referrer` made
+  Chromium send `Origin: null` on same-origin admin-form POSTs (issue-recovery,
+  force-relogin, deactivate, delete, grant/revoke-admin, profile save), which
+  Astro's `checkOrigin` CSRF gate rejected outright — every state-changing
+  admin action 403'd. Changed to `Referrer-Policy: same-origin`, which keeps
+  flow/consent_challenge tokens off cross-origin referrers while restoring the
+  Origin header the gate needs.
+- **AAL2 step-up form now renders on Kratos's natural redirect.** Detection
+  depended on a `?aal=aal2` query param that Kratos's own AAL2-initiator
+  redirect doesn't reliably preserve, so the step-up form (TOTP/webauthn/
+  lookup_secret) never rendered via the natural login flow. Detection now
+  derives from the flow object first (`requested_aal === 'aal2'`, or presence
+  of the second-factor nodes), falling back to the query param only when
+  there's no flow to inspect.
+- Renovate: closed the two config gaps that let a stale pipeline-catalog
+  `CATALOG_VERSION` ARG and a solo Playwright npm bump through undetected at
+  the v0.3.0 tag — the ARG now tracks via an annotated customManager, the
+  Playwright group has automerge off, and a shadow docker-manager dependency
+  on the same ARG (which could have silently rewritten it again) is disabled.
+- CI: e2e runner tags retargeted from `[carmine, qemu]` to `[lodestone, qemu]`
+  after the carmine host was rebuilt as lodestone, which had left the e2e
+  release gate unmatchable; the golden-path docs' sops key path corrected to
+  match (the store's section is `lodestone:`). The e2e job's failure
+  artifacts now upload: the declared paths were absolute `/tmp` paths the
+  runner refuses (two of them dead references with no writer), so every
+  failure lost its diagnostics; the live log moved to `e2e/logs/`.
+
+### Added
+
+- **Extensible Hydra CORS.** `allowed_origins` for browser-SPA clients (e.g.
+  oCIS Web) now renders from `OTHALA_CORS_ALLOWED_ORIGINS`, a comma-separated
+  origin list, instead of a single hardcoded origin. Defaults to
+  `OTHALA_PUBLIC_URL` alone, so e2e/lab behavior is unchanged.
+- **`othala.dunn.dev` docs site**: a public Astro SSG site modelled on
+  reference.dunn.dev (IBM Plex type, light/dark toggle, the estate design
+  system via `@dunn.dev/reference`), deployed as a Cloudflare Worker. Ships a
+  curated Guides section and a Decisions index that links out to the ADRs on
+  gitlab.com.
+
+### Changed
+
+- **ADRs rewritten to deployment accuracy.** An audit compared all 10 ADRs
+  against the deployed system; six had drifted (the LDAP bridge was never
+  deployed, the mTLS admin-proxy was reverted, the admin login-gate hook was
+  retired). Each ADR now describes the system as deployed, including two
+  honest gaps (the admin marker isn't schema-enumerated; break-glass is
+  root-by-role with no dedicated identity yet). ADRs renumbered 2-digit and
+  moved to repo-canonical `docs/adr/`; two new ADRs minted (11: hardening-
+  tuning deviations from Ory defaults; 12: client-CORS/topology model).
+- **Docs stand alone from the operator's private deployment.** Six dated docs
+  removed (decision.md, STATUS.md, three security-review snapshots, the
+  network SVG) with all 44 inbound references repointed; every reference to
+  the operator's private infra repo scrubbed to generic phrasing across ADRs,
+  AGENTS.md, and code comments; the adopter-facing `.env.example` de-drifted
+  (retired `OTHALA_ADMIN_IDS`, LDAP vars moved out); code/doc leaves thinned
+  to current-state facts with resolvable ADR pointers, enforced by a new
+  purity-gate rule that fails on an unresolvable `ADR NN` citation.
+- Bumped the shared `@dunn.dev/reference` design-system package (consumed by
+  the portal and now also the new docs site) from `^0.2.0` to `^0.4.0`.
+
 ## [0.3.0] - 2026-07-01
 
 Security hardening pass (CVP), access-model refactor, PII-safe
@@ -166,5 +234,6 @@ runtime manifest model, plus the rename to **Othala** ("Ory for your home").
 - Smoke harness green on the carmine QEMU runner (incl. the contact-form
   Section H); 459 portal unit tests; `astro check` and `astro build` clean.
 
+[0.4.0]: https://gitlab.com/dunn.dev/othala/-/releases/v0.4.0
 [0.3.0]: https://gitlab.com/dunn.dev/othala/-/releases/v0.3.0
 [0.2.0]: https://gitlab.com/dunn.dev/othala/-/releases/v0.2.0
