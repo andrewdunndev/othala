@@ -124,7 +124,8 @@ cd e2e
 AUTH_VERSION=latest bash validate.sh
 ```
 
-If a probe fails, container logs land at `/tmp/lab-smoke-failure.log`.
+If a probe fails, container ps/logs print to STDOUT; the register-clients
+(B1) output is also saved to `e2e/logs/apply-clients.log`.
 
 ## Running the browser e2e locally (macOS/podman)
 
