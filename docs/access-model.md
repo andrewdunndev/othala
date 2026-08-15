@@ -104,10 +104,12 @@ consent:
 othala ships no naming convention. dag expresses its policy as manifest +
 config data:
 
-- **dag naming**: a bare group name grants use (`memories` → immich); an
-  `admin-`-prefixed group grants elevation (`admin-memories` → immich admin),
-  realised purely as `group_role_map` entries. The `admin-` prefix is dag data,
-  not othala code.
+- **dag naming**: service-first suffixes — `<svc>-access` grants use
+  (`memory-access` → immich) and `<svc>-admin` grants elevation
+  (`memory-admin` → immich admin), realised purely as `group_role_map`
+  entries. Manifests bind BOTH groups in their access list
+  (admin-implies-access), so each person holds exactly one group per
+  service. The suffix convention is dag data, not othala code.
 - **dag policy: explicit access only.** Every gate (including forward-auth)
   requires a specific declared group. dag does not use the session-only
   forward-auth pattern.
