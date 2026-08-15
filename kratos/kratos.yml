@@ -137,8 +137,10 @@ selfservice:
       # docs/adr/11-hardening-tuning.md (tuning) +
       # docs/adr/08-admin-authority-model.md (step-up model). AAL1-only
       # identities are unaffected; first-passkey enrollment is NOT blocked.
-      # This does NOT affect session.whoami (see below) which must stay aal1
-      # for the LDAP bridge.
+      # This does NOT affect session.whoami (see below), which must stay aal1
+      # so the portal's forward-auth gate (portal/src/pages/api/forward-auth.ts)
+      # keeps getting a non-null session.identity for every forward_auth-fronted
+      # catalog app.
       required_aal: highest_available
       after:
         password:
@@ -261,9 +263,12 @@ session:
     same_site: Lax
   whoami:
     # CRITICAL: aal1 not highest_available. highest_available causes
-    # whoami to return session.identity = null for MFA-enabled identities,
-    # which breaks the LDAP bridge BIND path. AAL is enforced per-flow,
-    # not at whoami.
+    # whoami to return session.identity = null for MFA-enabled identities.
+    # The portal's forward-auth gate (portal/src/pages/api/forward-auth.ts)
+    # treats a missing session.identity.id as unauthenticated and 401s, so a
+    # null identity here would lock every forward_auth-fronted catalog app
+    # out from under MFA-enabled users. AAL is enforced per-flow, not at
+    # whoami.
     required_aal: aal1
 
 cookies:
