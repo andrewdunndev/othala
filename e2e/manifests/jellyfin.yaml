@@ -12,5 +12,8 @@ presentation:
   icon: JF
   icon_slug: jellyfin
   auth_kind: ldap
-  access_group: access-jellyfin
+  # Presentation-only tile, so this keeps the SINGULAR `access_group:` compat
+  # shim on purpose — it is the one fixture that exercises precedence rule (2)
+  # in parseAccessGroups (portal/src/lib/access-groups.ts).
+  access_group: jellyfin-access
   order: 50

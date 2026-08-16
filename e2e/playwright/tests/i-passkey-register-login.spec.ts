@@ -106,7 +106,7 @@ test.describe('I — Passkey register → usernameless login', () => {
       email: 'passkey.tester@othala.test',
       username: 'passkey.tester',
       displayName: 'Passkey Tester',
-      groups: ['family'],
+      groups: [],
       kratosAdminURL,
     });
     console.log('[I1] seeded identity:', identity.id, identity.email);

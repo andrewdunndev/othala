@@ -112,7 +112,7 @@ test.describe('P — Passkey credential eviction (lost-device scenario)', () => 
         email: 'evict.victim@othala.test',
         username: 'evict.victim',
         displayName: 'Eviction Victim',
-        groups: ['family'],
+        groups: [],
         kratosAdminURL,
       });
       console.log('[P1] seeded identity:', identity.id);

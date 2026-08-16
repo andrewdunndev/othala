@@ -27,7 +27,8 @@
 //     it can break the Kratos WebAuthn login ceremony (which injects inline
 //     <script> nodes) and the portal's own inline theme/modal scripts. Adding
 //     a strict script-src requires live e2e validation of every auth flow.
-//     Deferred to live-gate validation (tracked in docs/hardening.md §2).
+//     Deferred to live-gate validation (tracked in
+//     site/src/content/docs/guides/hardening.md §2).
 
 import { defineMiddleware } from 'astro:middleware';
 
@@ -43,12 +44,13 @@ function applySecurityHeaders(res: Response): void {
   //
   // Intent this preserves: no-referrer's job was to stop the `flow` /
   // `consent_challenge` query-param tokens on the login/consent pages from
-  // leaking to a third party in the Referer header (docs/hardening.md §2,
-  // security-review finding HIGH-A/HIGH-B — originally the Google
-  // Fonts CDN, before fonts were self-hosted). `same-origin` still sends NO
-  // referrer at all to any cross-origin destination, so that leak is fully
-  // closed; it only additionally allows the full referrer on same-origin
-  // navigations, which discloses nothing Othala doesn't already know.
+  // leaking to a third party in the Referer header
+  // (site/src/content/docs/guides/hardening.md §2, security-review finding
+  // HIGH-A/HIGH-B — originally the Google Fonts CDN, before fonts were
+  // self-hosted). `same-origin` still sends NO referrer at all to any
+  // cross-origin destination, so that leak is fully closed; it only
+  // additionally allows the full referrer on same-origin navigations, which
+  // discloses nothing Othala doesn't already know.
   //
   // Bug this fixes (work item #5): `no-referrer` also suppresses the Origin
   // header Chromium sends on a same-origin form-POST navigation (it arrives
@@ -72,7 +74,8 @@ function applySecurityHeaders(res: Response): void {
   // Allow 'self' + the apex wildcard (https://*.<OTHALA_APEX>) — exactly the
   // estate's own apps; absent OTHALA_APEX, fall back to strict 'self'. Still
   // prevents credential exfiltration to arbitrary off-estate origins.
-  // script-src deferred — see docs/hardening.md §2 and the file-level CSP note.
+  // script-src deferred — see site/src/content/docs/guides/hardening.md §2 and
+  // the file-level CSP note.
   const apex = process.env.OTHALA_APEX?.trim();
   const formAction = apex ? `'self' https://*.${apex}` : "'self'";
   res.headers.set(

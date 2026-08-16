@@ -51,7 +51,7 @@ test('Q — INV-2: non-admin identity at AAL2 is denied at /admin (reason=not-ad
     email: 'aal2.nonadmin@othala.test',
     username: 'aal2.nonadmin',
     displayName: 'AAL2 Non-Admin',
-    groups: ['family'],
+    groups: [],
     kratosAdminURL,
     // isAdmin intentionally omitted — metadata_admin.admin is absent
   });

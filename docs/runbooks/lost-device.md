@@ -6,7 +6,7 @@ leaves a window where an attacker can regain access even after you believe the
 account is secure.
 
 See also the project's adversarial security reviews (HIGH-C) and
-`docs/hardening.md` §7 for the threat context.
+`site/src/content/docs/guides/hardening.md` §7 for the threat context.
 
 ---
 
@@ -199,7 +199,8 @@ current password or a privileged recovery session).
 - `docs/runbooks/admin-recovery.md` — admin self-recovery (locked out, lost
   device, break-glass ladder).
 - security-review finding HIGH-C — eviction threat analysis.
-- `docs/hardening.md` §7 — sessions & lost-device hardening rationale.
+- `site/src/content/docs/guides/hardening.md` §7 — sessions & lost-device
+  hardening rationale (published as `/guides/hardening/`).
 - `portal/src/lib/admin-api.ts` (`deleteCredential`, `EVICTABLE_CREDENTIAL_TYPES`) —
   the Kratos admin API call.
 - `portal/src/lib/admin.ts` (`requireAdminSession`) — AAL2 + freshness gate.

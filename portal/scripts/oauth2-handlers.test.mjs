@@ -20,6 +20,11 @@ if (!process.env.CSRF_SECRET) {
   process.env.CSRF_SECRET = 'test-secret-must-be-at-least-32-chars-long!!';
 }
 
+// The default subject: an ordinary grafana member. Under the converged access
+// model that means holding `grafana-access` and NOTHING else — entry comes from
+// the `<svc>-access` group for everyone, admins included, and `grafana-admin`
+// is a ROLE-only group that grants no entry (docs/access-model.md §6, §10).
+// grafana.yaml maps `grafana-access` → viewer, so this identity is a viewer.
 function activeMember(overrides = {}) {
   return {
     id: 'id-1',
@@ -27,7 +32,7 @@ function activeMember(overrides = {}) {
     schema_id: 'family',
     schema_url: '',
     traits: { username: 'ada', email: 'a@othala.test', displayName: 'Ada' },
-    metadata_admin: { groups: ['access-grafana'] },
+    metadata_admin: { groups: ['grafana-access'] },
     verifiable_addresses: [{ value: 'a@othala.test', verified: true, via: 'email', status: 'completed' }],
     ...overrides,
   };
@@ -69,7 +74,7 @@ function defaultSession(overrides = {}) {
       schema_id: 'family',
       schema_url: '',
       traits: { username: 'ada', email: 'a@othala.test', displayName: 'Ada' },
-      metadata_admin: { groups: ['access-grafana'] },
+      metadata_admin: { groups: ['grafana-access'] },
     },
     authenticator_assurance_level: 'aal1',
     ...overrides,
@@ -93,7 +98,7 @@ test('login accepts an active member (skip path)', async () => {
     getIdentity: async () => activeMember(),
     getSession: defaultSession(),
     // access-model Phase 2: the gate keys off the manifest's accessGroups
-    // binding (grafana.yaml → access-grafana), not a derived name.
+    // binding (grafana.yaml → grafana-access), not a derived name.
     manifest: () => loadManifest('grafana'),
   });
   assert.equal(res.status, 302);
@@ -122,7 +127,7 @@ test('login REJECTS when missing the access group — opaque error_description, 
     // Real reason must appear in the server-side log for operator observability.
     const logged = warnArgs.find((a) => a[0].includes('oauth2/login'));
     assert.ok(logged, 'console.warn must be called for denied login');
-    assert.match(logged[1].reason, /access group\(s\): access-grafana/, 'real reason must be in the server-side log');
+    assert.match(logged[1].reason, /access group\(s\): grafana-access/, 'real reason must be in the server-side log');
   } finally {
     console.warn = origWarn;
   }
@@ -226,7 +231,7 @@ test('consent REJECTS when missing the access group — opaque error_description
     assert.equal(calls.rejectConsentReason, 'access_denied', 'error_description must be opaque');
     const logged = warnArgs.find((a) => a[0].includes('oauth2/consent'));
     assert.ok(logged, 'console.warn must be called for denied consent');
-    assert.match(logged[1].reason, /access group\(s\): access-grafana/, 'real reason must be in the server-side log');
+    assert.match(logged[1].reason, /access group\(s\): grafana-access/, 'real reason must be in the server-side log');
   } finally {
     console.warn = origWarn;
   }
@@ -370,14 +375,14 @@ test('T2: consent skip=false bounces to /auth/consent with challenge', async () 
     {
       oauth2: api,
       getIdentity: async () => activeMember(),
-      // Bind access-grafana (so the gate passes) but DON'T skip consent — this
+      // Bind grafana-access (so the gate passes) but DON'T skip consent — this
       // test asserts the bounce to the grant screen, which the real grafana
       // manifest (skip_consent:true, see T2b) would suppress.
       manifest: () => ({
         clientId: 'grafana',
         clientName: 'grafana',
-        accessGroup: 'access-grafana',
-        accessGroups: ['access-grafana'],
+        accessGroup: 'grafana-access',
+        accessGroups: ['grafana-access'],
         skipConsent: false,
         skipAccessCheck: false,
         roles: [],
@@ -632,9 +637,20 @@ function loadManifest(name) {
 const grafanaManifest = loadManifest('grafana');
 const audiobookshelfManifest = loadManifest('audiobookshelf');
 
-// A4a: audiobookshelf — identity in 'family' group -> user role ->
-// claim_emit.groups = ['user'] is UNIONed with identity groups (H1: additive, not replace).
-test('A4a: audiobookshelf family member gets user role, groups unioned', async () => {
+// A4a: audiobookshelf — the baseline (non-admin) case under the converged
+// access model. The role now comes from the SERVICE ACCESS group the member
+// already holds for entry (`audiobookshelf-access` → user in group_role_map),
+// NOT from a cohort. The old form of this test asserted that the `family`
+// cohort granted the role; cohort groups are gone entirely, and a cohort
+// granting a role is exactly what the model retired (docs/access-model.md §6).
+//
+// The invariant still under test is unchanged and is the reason the case
+// exists: claim_emit.groups = ['user'] is UNIONed with the identity's REAL
+// memberships (H1: additive, never replace). The identity holds two service
+// access groups so the union is asserted over more than one real membership —
+// `grafana-access` is a second service's entry group and maps to no role here,
+// so it can only survive by being preserved.
+test('A4a: audiobookshelf access-group holder gets user role, groups unioned', async () => {
   const { api, calls } = stubOAuth2({
     getOAuth2ConsentRequest: async () => ({
       challenge: 'cc', skip: true, subject: 'id-1',
@@ -644,7 +660,7 @@ test('A4a: audiobookshelf family member gets user role, groups unioned', async (
     }),
   });
   const identity = activeMember({
-    metadata_admin: { groups: ['family', 'access-audiobookshelf'] },
+    metadata_admin: { groups: ['audiobookshelf-access', 'grafana-access'] },
   });
   const res = await handleConsent(
     new Request('https://x/oauth2/consent?consent_challenge=cc'),
@@ -660,15 +676,26 @@ test('A4a: audiobookshelf family member gets user role, groups unioned', async (
   // audiobookshelf user role: claim_emit.groups = ['user'] — UNIONed with identity groups
   // (H1: real memberships preserved; role claim contributes additively)
   assert.ok(Array.isArray(idToken.groups), 'groups must be an array');
-  assert.ok(idToken.groups.includes('family'), 'identity group family must be preserved');
-  assert.ok(idToken.groups.includes('access-audiobookshelf'), 'identity group access-audiobookshelf must be preserved');
+  assert.ok(idToken.groups.includes('audiobookshelf-access'), 'identity group audiobookshelf-access must be preserved');
+  assert.ok(idToken.groups.includes('grafana-access'), 'unrelated identity group grafana-access must be preserved');
   assert.ok(idToken.groups.includes('user'), 'role claim_emit group user must be present');
   assert.equal(idToken.email, 'a@othala.test', 'email must still be present');
 });
 
-// A4b: grafana — identity in 'admin' group -> admin role ->
-// grafana_role=['GrafanaAdmin'], groups UNIONed: ['admin','access-grafana'] deduped with ['admin'].
-test('A4b: grafana admin member gets GrafanaAdmin role, grafana_role claim injected, groups unioned', async () => {
+// A4b: grafana — the ADMIN case under the converged access model. An admin
+// holds BOTH `grafana-access` (entry, for everyone) and `grafana-admin` (role
+// only). The old form of this test gave the identity a bare `admin` cohort
+// group and asserted that it granted the admin role estate-wide; that group and
+// that derivation are both gone (docs/access-model.md §6, ADR 09).
+//
+// The NEW invariant this pins is highest-rank-wins in lookupRole
+// (portal/src/lib/claims.ts step 2): the identity's group SET maps to TWO
+// declared roles — `grafana-admin`→admin (rank 0) and `grafana-access`→viewer
+// (rank 2) — and admin must win. The stored order below is the alphabetical
+// order normalizeGroupOrder actually produces, which puts `grafana-access`
+// FIRST: a first-match-wins walk would hand this admin the viewer role. That is
+// the regression this case catches, and the reason the resolver was changed.
+test('A4b: grafana admin holds both groups, highest-ranked role (admin) wins, groups unioned', async () => {
   const { api, calls } = stubOAuth2({
     getOAuth2ConsentRequest: async () => ({
       challenge: 'cc', skip: true, subject: 'id-1',
@@ -678,7 +705,7 @@ test('A4b: grafana admin member gets GrafanaAdmin role, grafana_role claim injec
     }),
   });
   const identity = activeMember({
-    metadata_admin: { groups: ['admin', 'access-grafana'] },
+    metadata_admin: { groups: ['grafana-access', 'grafana-admin'] },
   });
   const res = await handleConsent(
     new Request('https://x/oauth2/consent?consent_challenge=cc'),
@@ -691,17 +718,28 @@ test('A4b: grafana admin member gets GrafanaAdmin role, grafana_role claim injec
   assert.equal(res.status, 302);
   assert.equal(calls.acceptConsent, 1);
   const idToken = calls.acceptConsentBody.session.id_token;
+  // admin (rank 0) must beat viewer (rank 2) even though `grafana-access` is
+  // stored first. Viewer here would mean first-match-wins came back.
   assert.deepEqual(idToken.grafana_role, ['GrafanaAdmin'], 'grafana_role claim must be injected');
-  // admin role claim_emit.groups = ['admin']; identity already has 'admin' — deduped.
-  // 'access-grafana' is preserved from identity. Union = ['admin','access-grafana'].
+  // admin role claim_emit.groups = ['admin']; both real memberships survive the
+  // union. Union = ['grafana-access','grafana-admin','admin'].
   assert.ok(Array.isArray(idToken.groups), 'groups must be an array');
-  assert.ok(idToken.groups.includes('admin'), 'admin group must be present');
-  assert.ok(idToken.groups.includes('access-grafana'), 'identity group access-grafana must be preserved');
+  assert.ok(idToken.groups.includes('admin'), 'admin role claim_emit group must be present');
+  assert.ok(idToken.groups.includes('grafana-access'), 'identity group grafana-access must be preserved');
+  assert.ok(idToken.groups.includes('grafana-admin'), 'identity group grafana-admin must be preserved');
   assert.equal(idToken.email, 'a@othala.test', 'email must still be present');
 });
 
-// A4c: override beats group_role_map — identity in 'family' + metadata_admin.roles.grafana='admin'
-test('A4c: grafana override (roles.grafana=admin) beats group_role_map for family member', async () => {
+// A4c: override beats group_role_map. Identity holds `grafana-access` (which
+// group_role_map sends to viewer) plus metadata_admin.roles.grafana='admin'.
+// Only the SPELLING of the group supplying the losing role changed here —
+// grafana.yaml renamed the viewer mapping from the `family` cohort to
+// `grafana-access`. The assertion is unchanged and the contest is unchanged:
+// a group-derived viewer competes with an override naming admin, and the
+// override must win (lookupRole step 1 beats step 2, portal/src/lib/claims.ts).
+// Note the identity deliberately does NOT hold `grafana-admin` — if it did, the
+// group walk could reach admin on its own and the override would prove nothing.
+test('A4c: grafana override (roles.grafana=admin) beats group_role_map viewer', async () => {
   const { api, calls } = stubOAuth2({
     getOAuth2ConsentRequest: async () => ({
       challenge: 'cc', skip: true, subject: 'id-1',
@@ -710,10 +748,11 @@ test('A4c: grafana override (roles.grafana=admin) beats group_role_map for famil
       requested_access_token_audience: [],
     }),
   });
-  // Identity is in 'family' (would normally get 'viewer') but has a 'grafana'='admin' override.
+  // Identity holds only `grafana-access` (would normally resolve to 'viewer')
+  // but carries a 'grafana'='admin' override.
   const identity = activeMember({
     metadata_admin: {
-      groups: ['family', 'access-grafana'],
+      groups: ['grafana-access'],
       roles: { grafana: 'admin' },
     },
   });
@@ -793,7 +832,7 @@ test('D3: grafana skip path injects grafana_role from manifest (regression guard
     }),
   });
   const identity = activeMember({
-    metadata_admin: { groups: ['family', 'access-grafana'] },
+    metadata_admin: { groups: ['grafana-access'] },
   });
   const res = await handleConsent(
     new Request('https://x/oauth2/consent?consent_challenge=cc'),
@@ -806,7 +845,7 @@ test('D3: grafana skip path injects grafana_role from manifest (regression guard
   assert.equal(res.status, 302);
   assert.equal(calls.acceptConsent, 1);
   const idToken = calls.acceptConsentBody.session.id_token;
-  // family -> viewer role -> grafana_role: ['Viewer']
+  // grafana-access -> viewer role -> grafana_role: ['Viewer']
   assert.deepEqual(idToken.grafana_role, ['Viewer'], 'grafana_role must be injected for grafana viewer');
   assert.equal(calls.acceptConsentBody.remember_for, 3600, 'skip path must use remember_for=3600');
   assert.deepEqual(calls.acceptConsentBody.grant_scope, ['email', 'profile'], 'grant_scope must match');
@@ -823,7 +862,7 @@ test('C: skip_access_check bypasses access-group check', async () => {
       requested_access_token_audience: [],
     }),
   });
-  // Identity has NO access-grafana group — normally denied.
+  // Identity has NO grafana-access group — normally denied.
   const identity = activeMember({ metadata_admin: { groups: [] } });
   const skipManifest = { ...grafanaManifest, skipAccessCheck: true };
   const res = await handleConsent(
@@ -933,8 +972,11 @@ test('T7b: POST Allow re-gates and rejects an inactive identity', async () => {
       active: true,
       identity: { id: 'id-1', state: 'active', schema_id: 'family', schema_url: '', traits: {} },
     }),
-    // getIdentity returns an inactive identity — re-gate must catch this.
-    getIdentity: async () => activeMember({ state: 'inactive', metadata_admin: { groups: ['access-grafana'] } }),
+    // getIdentity returns an inactive identity that DOES hold the bound access
+    // group (`grafana-access`), so the only thing that can deny is the
+    // state===active check — the group gate is satisfied. That isolation is the
+    // point: with a stale group name this test would pass on the wrong denial.
+    getIdentity: async () => activeMember({ state: 'inactive', metadata_admin: { groups: ['grafana-access'] } }),
     manifest: (id) => id === 'grafana' ? grafanaManifest : undefined,
   });
   // Must reject (gate fires on the allow path), not accept.

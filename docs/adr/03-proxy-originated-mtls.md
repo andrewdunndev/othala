@@ -2,18 +2,24 @@
 
 ## Status
 
-Accepted (as a principle). **The dag instantiation was reverted 2026-07-01**:
-the specific consumer this ADR was written to justify —
-a step-ca-backed mTLS admin-proxy (`dag-kratos-admin-proxy`) fronting the Kratos
-admin API on a dedicated `dag-admin` network — was removed because no
-multi-site requirement justified it. The dag admin plane is now a **direct
-internal hop**: `dag-portal` calls `http://10.89.11.10:4434` (Kratos admin)
-over the `dag-internal` network, with the admin listener bound to that internal
-IP and never host-published.
+Accepted (2026-08-15). Application code speaks plain HTTP and never loads a
+certificate; where a real TLS boundary exists, a Caddy sidecar holds the cert.
+**The dag Kratos-admin hop needs no TLS boundary and has none** — `dag-portal`
+calls the Kratos admin API directly over the `Internal=true`, `isolate=true`
+`dag-internal` bridge. The `dag-kratos-admin-proxy` sidecar and the dedicated
+`dag-admin` network this record was written to justify were removed 2026-07-01
+(`iac` commit `fc4d8a5`); **network isolation, not client authentication, is the
+load-bearing control on that hop.** This record carries no IP literal — the
+authority is the deploy-plane contract gate named in Decision.
 
-The proxy-holds-the-cert *pattern* still stands where a real TLS boundary
-actually exists — see Decision. Cross-ref [06](06-two-pki.md) (two-PKI, the
-step-ca CA whose client certs a proxy would present).
+The proxy-holds-the-cert pattern still stands where a real cert boundary lives.
+That is the inference-serving path, and its PKI facts belong to
+[06](06-two-pki.md) — this record does not restate them.
+
+See also [01](01-auth-substrate-ory.md) (the LDAP bridge, one of the two
+consumers this proxy was designed to serve, retired without ever running) and
+[08](08-admin-authority-model.md) (the admin-API write boundary this hop
+carries).
 
 ## Context
 
@@ -21,8 +27,8 @@ The hardening roadmap called for client authentication on the Kratos admin API,
 which has no auth of its own (Ory's admin API is designed to be reached only
 over a trusted network). The chosen mechanism was mTLS with a step-ca-issued
 client cert, terminated by a `dag-kratos-admin-proxy` sidecar; two consumers
-were to authenticate through it: the portal (Node/Astro) and a parked LDAP
-bridge (Go).
+were to authenticate through it: the portal (Node/Astro) and the glauth→Kratos
+LDAP bridge (Go), which was then still a planned component.
 
 Before landing that proxy, two *in-app* mTLS approaches were explored and
 shelved:
@@ -42,55 +48,63 @@ renewal detection, and TLS error handling — recurring per-consumer surface.
 **The proxy pattern** avoided all of that: the application talks plain HTTP to a
 local sidecar; the sidecar (Caddy `reverse_proxy` + `transport http` with
 `tls_client_auth`) presents the step-ca client cert to the upstream. The app
-imports no TLS libraries and never sees a cert. This generalizes to any
-consumer in any language that can speak plain HTTP to a loopback or pod-internal
-address.
+imports no TLS libraries and never sees a cert. One shape covers any consumer
+that can speak plain HTTP to a sidecar, whatever it is written in — which is
+what made it preferable to two per-language implementations of the same hop.
 
 ## Decision
 
 **TLS is a proxy concern, not an application concern.** Application code speaks
 plain HTTP; when a TLS boundary is required, a sidecar (Caddy) holds the cert
 and terminates or originates TLS on the app's behalf. Applications do not import
-TLS libraries, load certs, or handle cert renewal — renewal is the sidecar's
-job on the existing `step ca renew` timer pattern.
+TLS libraries, load certs, or handle cert renewal. Renewal belongs to the sidecar
+or to the host lifecycle beside it: Caddy renews its own ACME certs, and a
+step-ca mesh leaf is renewed by a host timer that rewrites the sidecar's mounted
+cert files, which Caddy re-reads on the next handshake ([06](06-two-pki.md)).
 
-What that means as-deployed:
+What that means as deployed:
 
-- **The dag admin hop does NOT need this pattern, and no longer uses it.** For a
+- **The dag admin hop does not need this pattern and no longer uses it.** For a
   single-host, single-operator instance there is no multi-site or cross-trust
   boundary between `dag-portal` and `dag-kratos`: both sit on `dag-internal`.
-  Commit `fc4d8a5` removed `dag-kratos-admin-proxy.container`, `dag-admin.network`,
-  the proxy Caddyfile + cert-lifecycle scripts, and the client/proxy cert-renew
-  units. `dag-portal` now sets `KRATOS_ADMIN_URL=http://10.89.11.10:4434` and
-  reaches the admin API directly. The control on the admin API is **network
-  isolation, not client authentication**: `:4434` is bound to the dag-internal
-  IP `10.89.11.10`, is never `PublishPort`ed, and the network is
-  `Internal=true`. That lockdown is the load-bearing control, statically guarded
-  by the instance's contract-gate assertions (N3: `dag-admin.network` absent =
-  proxy-removal guard; `KRATOS_ADMIN_BIND_HOST=10.89.11.10` = bind guard;
-  `KRATOS_ADMIN_URL=http://10.89.11.10:4434` on the portal = direct-hop guard).
+  Commit `fc4d8a5` removed `dag-kratos-admin-proxy.container`,
+  `dag-admin.network`, the proxy Caddyfile and cert-lifecycle scripts, and the
+  client/proxy cert-renew units. `dag-portal` now carries a `KRATOS_ADMIN_URL`
+  pointing at the Kratos admin listener on `dag-internal` and reaches the admin
+  API directly. The control on that API is **network isolation, not client
+  authentication**: the admin listener binds the dag-internal address, `:4434`
+  is never `PublishPort`ed, and the network is `Internal=true`.
+
+  **This record deliberately carries no address literal.** The authority for the
+  bind address, for `:4434` never being host-published, and for
+  `dag-admin.network` staying absent is the deploy-plane contract gate
+  `iac deploy/checks/check_dag_contract.py`, check `N3` — it fails the deploy if
+  any of the three regresses, and it is where an operator or an agent should
+  read the current value. A previous revision of this record pinned the address
+  in five places; the deploy plane renumbered its networks and every one of them
+  became wrong, leaving the ADR contradicting the gate that enforces it. A gate
+  cannot rot silently: it fails.
 
 - **The pattern is retained where a real cert boundary lives: the
-  inference-serving path.** A `litellm-caddy` sidecar terminates TLS (a Let's
-  Encrypt device cert, on its own FQDN) in front of the LiteLLM fabric and then
-  speaks plain HTTP to it — the same "proxy holds the cert, app stays plain
-  HTTP" shape, though there the boundary is *ingress* TLS-termination plus
-  bearer virtual-key auth rather than egress mTLS (that path is deliberately
-  *not* on the private step-ca mesh).
+  inference-serving path.** The `litellm-caddy` sidecar terminates TLS in front
+  of the LiteLLM fabric and then speaks plain HTTP to it — the same "proxy holds
+  the cert, app stays plain HTTP" shape. There the boundary is *ingress*
+  TLS-termination plus bearer virtual-key auth rather than egress mTLS. Which
+  listener holds which CA's cert is [06](06-two-pki.md)'s to state, not this
+  record's; an earlier revision answered it here and answered it wrongly.
 
 The shelved in-app branches (`buildMtlsFetchApi()`, `buildAdminTransport()`)
-remain discarded. No `undici` direct dependency, and no `KRATOS_ADMIN_TLS_*`
-env vars, exist in the portal.
+remain discarded. The portal has no `undici` direct dependency and no
+`KRATOS_ADMIN_TLS_*` env vars.
 
 ## Consequences
 
-- The dag admin plane's security now rests entirely on network isolation of
-  `:4434` to `dag-internal`. This is appropriate for single-host,
-  single-operator scope but is a weaker posture than mTLS: any container on
-  `dag-internal` (postgres, hydra, migrations) can reach the unauthenticated
-  admin API. The N3 gate guards the isolation; it does not add authentication.
-  Re-introducing the proxy is the documented path if a multi-site or
-  reduced-trust requirement returns.
+- The dag admin plane's security rests entirely on network isolation of `:4434`
+  to `dag-internal`. This is appropriate for single-host, single-operator scope
+  but is a weaker posture than mTLS: any container on `dag-internal` (postgres,
+  hydra, migrations) can reach the unauthenticated admin API. The `N3` gate
+  guards the isolation; it does not add authentication. Re-introducing the proxy
+  is the documented path if a multi-site or reduced-trust requirement returns.
 - Removing the proxy deleted two moving parts per would-be consumer (a Caddy
   egress route + a cert-renew unit) and the entire `dag-admin` bridge. Less to
   break, less to renew, fewer failure modes at rebuild.
@@ -112,8 +126,9 @@ env vars, exist in the portal.
   TLS use case, when a proxy can hold the cert instead.
 - **Go stdlib crypto/tls (LDAP bridge).** Acceptable in isolation but
   non-uniform — each app owns cert loading and renewal, creating divergent
-  maintenance surfaces. Moot while the LDAP bridge stays parked
-  ([01](01-auth-substrate-ory.md)).
+  maintenance surfaces. Moot in any case: the LDAP bridge was retired 2026-06-29
+  having never run ([01](01-auth-substrate-ory.md)), and its code sits in an
+  unmaintained reference repo.
 - **Shared egress Envoy on the estate edge.** Rejected: mixing WAN edge and
   intra-service egress in one config couples the edge to internal topology. The
   edge is for WAN; services handle their own TLS boundaries.

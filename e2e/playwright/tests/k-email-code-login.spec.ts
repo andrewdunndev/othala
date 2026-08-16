@@ -266,7 +266,7 @@ test('K1 — email-code login delivers a code and establishes an active session'
     email: 'email-code-login@othala.test',
     username: 'email.code.login',
     displayName: 'Email Code Test',
-    groups: ['family'],
+    groups: [],
     kratosAdminURL,
   });
   console.log('[K1] seeded identity:', identity.id, identity.email);

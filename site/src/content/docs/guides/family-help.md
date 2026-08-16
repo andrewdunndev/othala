@@ -9,7 +9,7 @@ seeing, contact your admin and they can send you a fresh sign-in link.
 ## How you sign in
 
 When you open the app or the website, you'll see a big button that says
-**Sign in with passkey**. Tap it. Your phone will ask you to confirm with
+**Sign in with a passkey**. Tap it. Your phone will ask you to confirm with
 Face ID, Touch ID, or your device PIN — then you're in. That's it. No
 username to remember, no password to type.
 
@@ -38,14 +38,14 @@ What to do:
 
 If iCloud Keychain or Google Password Manager is turned on, it may have
 already copied your passkey to the new phone automatically. Give the
-**Sign in with passkey** button a try first — it might just work.
+**Sign in with a passkey** button a try first; it might just work.
 
 ---
 
 ## I lost my phone
 
 If you have another device (laptop, tablet, old phone) that you've signed
-in on before, start there. Tap Sign in with passkey and you should be
+in on before, start there. Tap Sign in with a passkey and you should be
 through.
 
 If you don't have another device handy:
@@ -57,7 +57,9 @@ If you don't have another device handy:
    using.
 
 If you can't get to your email either, reach out to your admin directly. They
-can send you a fresh link that gets you straight in.
+can send you a fresh sign-in link. It comes with a short code, and you need
+both: the link opens the page, the code proves it is you. If they send only
+the link, ask for the code too.
 
 ---
 
@@ -84,20 +86,26 @@ regularly.
 
 ## I forgot my password / I never had a password
 
-You don't need one. Passwords are a legacy path kept for a specific app
-(Jellyfin / music) — not for everyday sign-in.
+You don't need one for the portal. Use your passkey (the **Sign in with a
+passkey** button), or the email code path via **New device or can't sign
+in?**. Either one gets you into your account without a password.
 
-To get in, use your passkey (the **Sign in with passkey** button), or
-use the email code path via **New device or can't sign in?**. Either one
-gets you into your account without a password.
+### Some apps have their own separate password
 
-If something you're trying to sign in to asks for a username and password
-(like the music app), message your admin and they'll sort out the credentials
-for that specific app.
+A few apps can't hand you off to the portal to sign in. The TV app and
+Infuse (movies), and Subsonic-style music apps, are the usual ones. Those
+ask for a username and password that belong **to that app only**. The app
+keeps its own copy; it is not your portal password, and typing your portal
+password there will not work.
+
+If one of those asks you to sign in, message your admin. They set that
+app's password inside the app itself and can give you the one for it.
 
 ---
 
 ## Still stuck?
 
-Text or message your admin. They can send a one-time link directly to your
-phone that gets you in without needing a passkey or a code.
+Text or message your admin. They can send a one-time sign-in link straight to
+your phone, which gets you in without a passkey. Ask them for the code that
+goes with it: the link and the code are used together, and the link works
+once and then expires.

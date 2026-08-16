@@ -11,24 +11,28 @@ Ory Hydra server configuration.
 ## CORS allowlist
 
 `serve.public.cors.allowed_origins` is rendered from `OTHALA_CORS_ALLOWED_ORIGINS`
-(comma-separated, unquoted origins), not hardcoded to one origin. Browser SPA
-clients (e.g. oCIS Web) fetch `/.well-known/openid-configuration` and
-`/oauth2/token` directly from their own origin, so that origin must be
-allowlisted; redirect-flow (server-side) clients never browser-fetch Hydra and
-need no entry. Single-origin instances set this to the same value as
-`OTHALA_PUBLIC_URL`.
+(comma-separated, unquoted origins), not hardcoded to one origin. A browser-SPA
+client fetches `/.well-known/openid-configuration` and `/oauth2/token` from its
+own origin, so that origin has to be allowlisted; redirect-flow (server-side)
+clients never browser-fetch Hydra and need no entry. With no browser-SPA client
+deployed, this is just `OTHALA_PUBLIC_URL`.
 
 OIDC client definitions are **not** stored here. Clients are unified `<slug>.yaml`
 manifests read at runtime from `MANIFEST_DIR` (default `/etc/portal/manifests`).
-Each manifest can carry `presentation:` (tile metadata), `oidc:` (forwarded to
-Hydra), and `consent:` (role/claim shape read by the Othala app) blocks. A
-manifest with only `presentation:` (forward-auth or LDAP tile, no Hydra client)
-is skipped by the OIDC loader.
+Each manifest can carry `presentation:` (tile metadata **and the access
+binding**), `oidc:` (forwarded to Hydra), and `consent:` (role/claim shape read
+by the Othala app) blocks. A manifest with only `presentation:` (a forward-auth
+tile, no Hydra client) is skipped by the OIDC loader.
+
+The two group-facing fields do different jobs and are not interchangeable:
+`presentation.access:` lists the group(s) that grant **entry** to the app, and
+`consent.group_role_map:` maps a group to a **role** inside it. A role mapping
+never admits anyone; see [`docs/access-model.md`](../docs/access-model.md).
 
 Generic worked examples live in [`e2e/manifests/`](../e2e/manifests/).
 
 For the client catalog and per-RP integration details, see
-[`docs/per-app-oidc.md`](../docs/per-app-oidc.md).
+[`per-app-oidc.md`](../site/src/content/docs/guides/per-app-oidc.md).
 
 ## Client registration
 
@@ -40,10 +44,10 @@ It reads each manifest's `oidc:` block from `MANIFEST_DIR` and resolves
 `<SLUG>_CLIENT_SECRET` from env.
 
 Full registration runbook: [`DEPLOY.md`](../DEPLOY.md) "Client registration"
-and [`docs/per-app-oidc.md`](../docs/per-app-oidc.md).
+and [`per-app-oidc.md`](../site/src/content/docs/guides/per-app-oidc.md).
 
-Adding a new OIDC client: add a `<slug>.yaml` to your operator manifest
-directory, add the sops secret, re-run `just dag-reload-clients`.
+Adding a new OIDC client: add a `<slug>.yaml` to the manifest directory, add
+the sops secret, re-run `just dag-reload-clients`.
 
 ## secrets.system non-rotatable
 

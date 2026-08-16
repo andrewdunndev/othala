@@ -30,7 +30,8 @@ import { getIdentity as defaultGetIdentity } from './admin-api';
 import { getSession as defaultGetSession } from './kratos';
 import { enforceAccessGate, type GateResult } from './gate';
 import { composeIDTokenClaims } from './claims';
-import { getClientManifest, type ClientManifest } from './manifests';
+import type { ClientManifest } from './manifests';
+import { servingManifest } from './manifest-store';
 import { verifyToken, CSRFError } from './csrf';
 
 const LOGIN_REMEMBER_FOR = 86400; // 24h
@@ -101,7 +102,13 @@ export interface Deps {
   getIdentity?: (id: string) => Promise<Identity>;
   getSession?: (cookie?: string) => Promise<Session | null>;
   gate?: (identity: Identity | null, clientId: string, manifest?: ClientManifest) => GateResult;
-  /** Resolve a client manifest by clientId. Used for claims injection (A3) and gate (C). */
+  /**
+   * Resolve a client manifest by clientId. Used for claims injection (A3) and
+   * gate (C). Defaults to the SERVING loader (lib/manifest-store.ts), which
+   * never throws: a manifest set that fails to validate must deny entry, not
+   * 500 every login and consent challenge in the estate at once. An undefined
+   * result is fail-closed at the gate.
+   */
   manifest?: (clientId: string) => ClientManifest | undefined;
 }
 
@@ -111,7 +118,7 @@ function resolve(deps: Deps): Required<Deps> {
     getIdentity: deps.getIdentity ?? defaultGetIdentity,
     getSession: deps.getSession ?? defaultGetSession,
     gate: deps.gate ?? ((identity, clientId, manifest) => enforceAccessGate(identity, clientId, manifest)),
-    manifest: deps.manifest ?? ((clientId) => getClientManifest(clientId)),
+    manifest: deps.manifest ?? ((clientId) => servingManifest(clientId)),
   };
 }
 

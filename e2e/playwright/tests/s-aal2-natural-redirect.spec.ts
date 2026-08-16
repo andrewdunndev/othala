@@ -46,7 +46,7 @@ test('S1 — AAL2 TOTP step-up form renders after the natural (param-dropping) K
     email: 's1.aal2-natural@othala.test',
     username: 's1.aal2.natural',
     displayName: 'S1 AAL2 Natural Redirect',
-    groups: ['family'],
+    groups: [],
     kratosAdminURL,
   });
   console.log('[S1] seeded identity:', identity.id, identity.email);

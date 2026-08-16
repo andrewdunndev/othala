@@ -2,7 +2,9 @@
 //
 // Direct port of consent/claims.go BuildIDTokenClaims, deepMergeClaims,
 // and consent/manifest.go LookupRole, with IDENTICAL semantics except
-// where noted.
+// where noted. Two divergences are noted at their definitions: the array
+// UNION in deepMergeClaims, and the highest-role-wins group walk in
+// lookupRole (Go took the first stored-order match).
 //
 // BuildIDTokenClaims mapping against the family identity schema
 // (traits: username, email, displayName?):
@@ -98,16 +100,59 @@ export function buildIDTokenClaims(identity: Identity | null | undefined): Claim
 }
 
 /**
- * lookupRole — full port of consent/manifest.go Manifest.LookupRole.
+ * lookupRole — port of consent/manifest.go Manifest.LookupRole, with ONE
+ * deliberate divergence in step 2 (highest role wins, not first stored match).
  *
- * Resolution order (matches Go exactly):
+ * Resolution order:
  *   1. Override: metadataAdmin.roles[clientId.toLowerCase()] — if the named
  *      role IS declared in manifest.roles, that role wins. If the override
  *      names an UNDECLARED role, fall through to step 2 (typo-tolerance,
  *      matching Go's "Fall through to derivation rather than emit nothing").
- *   2. Groups walk: metadataAdmin.groups in stored order; first match in
- *      manifest.groupRoleMap whose mapped role IS in manifest.roles wins.
+ *   2. Groups walk: every group in metadataAdmin.groups is mapped through
+ *      manifest.groupRoleMap; of the roles that ARE declared in
+ *      manifest.roles, the HIGHEST-RANKED one wins. Rank is position in
+ *      manifest.roles (index 0 highest) — see RANK below.
  *   3. null — no role resolved.
+ *
+ * WHY step 2 is no longer first-stored-match
+ * ------------------------------------------
+ * Under the converged access model an admin holds BOTH `<svc>-access` and
+ * `<svc>-admin` explicitly — entry comes from `<svc>-access` for everyone,
+ * admins included, and admin-implies-access is abolished. So a single
+ * identity now routinely carries two groups that BOTH map to a role, and the
+ * old "first match in metadata_admin.groups order" rule made the effective
+ * role depend on array order.
+ *
+ * That order is not a safe input. `normalizeGroupOrder` (access.ts) sorts
+ * non-identity groups alphabetically, which puts `cinema-access` BEFORE
+ * `cinema-admin` — a first-match walk hands every admin the `user` role. And
+ * metadata_admin.groups is written through the Kratos admin API, which makes
+ * no ordering promise at all for identities touched outside the admin form.
+ *
+ * This resolver is therefore order-independent: the same group SET yields the
+ * same role in any permutation. `normalizeGroupOrder` is now cosmetic (stable
+ * display / stable diffs); it is NOT what makes role resolution deterministic.
+ *
+ * ENFORCERS (what actually holds this together, so nothing here is folklore)
+ * -------------------------------------------------------------------------
+ * - ENTRY is not decided here at all. It is `manifest.accessGroups` — sourced
+ *   from `presentation.access:` by parseAccessGroups (access-groups.ts, called
+ *   from parseManifest in manifests.ts) — and checked with OR-semantics by
+ *   enforceAccessGate (gate.ts) and computeEffectiveAccess (access.ts). This
+ *   function only decides ROLE. A role mapping never grants entry.
+ * - "Every role named in group_role_map is declared in roles[]" is enforced at
+ *   load time: validateClients (manifests.ts) BLOCKs the reload, and
+ *   lintManifests (manifest-lint.ts) reports it. The `index === -1` skip below
+ *   is defence-in-depth for a manifest that reached us anyway.
+ * - RANK = declaration order in `consent.roles` is a CONVENTION, enforced by
+ *   nobody. Every manifest in the deployed catalog and the e2e fixtures
+ *   declares roles in descending privilege (admin, user; admin, user, guest;
+ *   admin, editor, viewer), and this resolver reads that order rather than
+ *   hardcoding the name "admin" — role names are manifest-authored strings and
+ *   name-based inference is exactly what group-registry.ts retired. A manifest
+ *   that lists roles in ASCENDING privilege gets a downgrade, which is the
+ *   fail-safe direction, but it is silent. If that ever needs to stop being a
+ *   convention, the place to enforce it is manifest-lint.ts.
  *
  * Returns a shallow copy of claimEmit (mirroring Go copyClaimEmit) so
  * callers can deepMergeClaims without aliasing the manifest's storage.
@@ -136,21 +181,35 @@ export function lookupRole(
     }
   }
 
-  // Step 2: groups walk in the identity's stored metadata_admin.groups array
-  // order (not the group_role_map key order). Stored order is normalized at
-  // admin-form save time by normalizeGroupOrder in access.ts.
+  // Step 2: groups walk. Map EVERY stored group through groupRoleMap and keep
+  // the highest-ranked declared role, rather than stopping at the first match.
+  // Rank is the role's index in manifest.roles (0 = highest); see the RANK note
+  // in the doc comment. Because the winner is the minimum index over the set of
+  // matched roles, the result is a pure function of the group SET — stored
+  // order cannot change it. Admins hold both `<svc>-access` and `<svc>-admin`,
+  // so this is a live path, not a hypothetical.
   const rawGroups = meta?.groups;
   const groups: string[] = Array.isArray(rawGroups)
     ? rawGroups.filter((g): g is string => typeof g === 'string')
     : [];
 
+  let bestIndex = -1;
   for (const g of groups) {
     const roleName = manifest.groupRoleMap[g];
     if (!roleName) continue;
-    const role = manifest.roles.find((r) => r.name === roleName);
-    if (role) {
-      return { roleName: role.name, claimEmit: shallowCopyClaimEmit(role.claimEmit) };
-    }
+    // findIndex, not find: we need the rank, and it returns the FIRST
+    // declaration of a duplicated role name, so a malformed manifest still
+    // resolves deterministically.
+    const index = manifest.roles.findIndex((r) => r.name === roleName);
+    // Mapped role is not declared: skip it (validateClients should already have
+    // blocked this manifest at load — see ENFORCERS above).
+    if (index === -1) continue;
+    if (bestIndex === -1 || index < bestIndex) bestIndex = index;
+  }
+
+  if (bestIndex !== -1) {
+    const role = manifest.roles[bestIndex];
+    return { roleName: role.name, claimEmit: shallowCopyClaimEmit(role.claimEmit) };
   }
 
   // Step 3: no match.

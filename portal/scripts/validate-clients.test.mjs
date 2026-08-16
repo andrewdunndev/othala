@@ -568,8 +568,12 @@ test('open-webui.yaml: parses correctly — client_id, access binding, redirect,
   assert.equal(m.clientId, 'openwebui', 'client_id must be openwebui');
   assert.equal(m.presentationOnly, false, 'must be an OIDC client, not presentation-only');
 
-  // Access binding: access-llm group gate.
-  assert.deepEqual(m.accessGroups, ['access-llm'], 'must bind the access-llm group');
+  // ENTRY binding: `prompt-access` and nothing else. `prompt-admin` must NOT
+  // appear here — it is bound for ROLE only (see group_role_map below), and a
+  // second entry would be admin-implies-access coming back.
+  // Group names track the SERVICE slug (prompt.othala.test), not the OAuth2
+  // client_id (`openwebui`) — the name is convention, the binding is what runs.
+  assert.deepEqual(m.accessGroups, ['prompt-access'], 'must bind exactly the prompt-access group');
 
   // OIDC fields.
   assert.deepEqual(m.redirectUris, ['https://prompt.othala.test/oauth/oidc/callback']);
@@ -589,9 +593,11 @@ test('open-webui.yaml: parses correctly — client_id, access binding, redirect,
   assert.ok(adminRole.claimEmit !== null, 'admin role must have claim_emit');
   assert.ok(userRole.claimEmit !== null, 'user role must have claim_emit');
 
-  // group_role_map: admin → admin, family → user.
-  assert.equal(m.groupRoleMap['admin'], 'admin');
-  assert.equal(m.groupRoleMap['family'], 'user');
+  // ROLE binding: exactly two groups per service, prompt-admin → admin and
+  // prompt-access → user. Roles are declared admin-first because lookupRole
+  // ranks by declaration index, so an identity holding both resolves to admin.
+  assert.equal(m.groupRoleMap['prompt-admin'], 'admin');
+  assert.equal(m.groupRoleMap['prompt-access'], 'user');
 
   // Full validation must pass (audience matches redirect origin, roles clean).
   const errs = validateClients([m]);

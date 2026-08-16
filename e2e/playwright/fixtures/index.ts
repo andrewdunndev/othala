@@ -7,8 +7,11 @@
  *   kratosAdminURL       — http://kratos:4434 (admin API, reachable inside compose net)
  *   hydraPublicURL       — http://hydra:4444 (Hydra public, inside compose net)
  *   hydraAdminURL        — http://hydra:4445 (Hydra admin, inside compose net)
- *   member               — { id, email, password } seeded identity (bt2@othala.test),
- *                          access-grafana group, NOT an admin (no admin marker)
+ *   member               — { id, email, password } seeded identity (bt2@othala.test)
+ *                          holding exactly ['grafana-access'] — entry to the
+ *                          grafana fixture, `viewer` role, and NOT an admin
+ *                          anywhere (no metadata_admin.admin marker, no
+ *                          `grafana-admin` group)
  *   admin                — { id, email, password, aal2Session } identity seeded with
  *                          metadata_admin.admin=true (ADR 08 marker) by
  *                          validate.sh seed phase. The fixture looks up the id,
@@ -405,15 +408,24 @@ export const test = base.extend<OthalaFixtures>({
     await use(process.env.HYDRA_ADMIN_URL ?? 'http://hydra:4445');
   }, { scope: 'worker' }],
 
-  // member: bt2@othala.test, access-grafana + family groups. No admin marker
-  // (isAdmin not set), so NOT an admin under the ADR 08 marker model.
+  // member: bt2@othala.test. Holds ONE group, `grafana-access`, which is the
+  // entire basis for it reaching the grafana fixture — the converged access
+  // model answers "can this person get in?" from that single group.
+  //
+  // Two separate non-admin properties, deliberately not conflated:
+  //   - no metadata_admin.admin marker  → not a PORTAL admin (ADR 08), so
+  //     /admin is closed to it (spec C).
+  //   - no `grafana-admin` group        → `viewer` role inside Grafana, not
+  //     admin (grafana.yaml group_role_map).
+  // There are no cohort groups (family/friends/kids) anywhere in this suite;
+  // they were retired with the converged model.
   member: [
     async ({ kratosAdminURL }, use) => {
       const result = await createIdentityWithPassword({
         email: 'bt2@othala.test',
         username: 'bt2',
         displayName: 'Browser Test 2',
-        groups: ['family', 'access-grafana'],
+        groups: ['grafana-access'],
         kratosAdminURL,
       });
       await use({ ...result, password: TEST_PASSWORD });
@@ -422,7 +434,12 @@ export const test = base.extend<OthalaFixtures>({
   ],
 
   // admin: validate.sh pre-seeds this identity (ADMIN_EMAIL / ADMIN_USERNAME)
-  // with metadata_admin.admin=true (ADR 08 marker) before Playwright starts.
+  // with metadata_admin.admin=true (ADR 08 marker) and groups
+  // ['grafana-access','grafana-admin'] before Playwright starts. Both groups
+  // are held EXPLICITLY: `grafana-access` is what admits it to the grafana
+  // fixture (same group ordinary members hold) and `grafana-admin` is what
+  // makes its role admin. Neither is derived from the other, and neither has
+  // anything to do with the metadata_admin.admin marker below.
   // The fixture looks up the minted id by credentials_identifier. No OTHALA_ADMIN_IDS
   // env or portal recreate is involved — the portal reads the marker from the
   // Kratos admin API at request time.

@@ -47,7 +47,7 @@ import {
   type OAuth2Client,
 } from '@ory/client-fetch';
 import {
-  loadClientManifests,
+  oidcClientManifests,
   assertManifestsValid,
   CLIENT_ID_ENV_STEM_RE,
   type ClientManifest,
@@ -245,7 +245,15 @@ export async function registerClient(
 export async function registerAllClients(
   opts: RegisterOptions = {},
 ): Promise<RegisterResult[]> {
-  const manifests = loadClientManifests();
+  // oidcClientManifests, NOT loadClientManifests: since the registry was
+  // widened to carry presentation-only tiles (so their access groups are
+  // grantable in the admin UI), the unfiltered loader returns manifests with
+  // no OIDC client and no secret. registerManifests assumes every manifest it
+  // is handed has both, so an unfiltered set throws on the first tile —
+  // "<CLIENT>_CLIENT_SECRET not set" — at boot and on every SIGHUP, and
+  // registrar.ts swallows it, leaving Hydra with ZERO registered clients.
+  // manifests.ts:517-523 states this narrowing obligation; honour it here.
+  const manifests = oidcClientManifests();
   return registerManifests(manifests, opts);
 }
 

@@ -76,21 +76,37 @@ VM dies on job end. Total turnaround: ~3-5 minutes including image pulls.
   `audiobookshelf`).
 - **Identity admin flow** — create an identity via the Kratos admin API;
   `metadata_admin.groups` round-trips.
+- **The access model** — `playwright/tests/t-access-model.spec.ts`, plus smoke
+  probe G3. Exactly two groups exist per service, `<svc>-access` (entry) and
+  `<svc>-admin` (role), and nothing is derived from anything else:
+  - `<svc>-access` alone → in, user-tier role.
+  - both groups → in, admin role, **in either stored order** (T2 and T3 seed
+    the same set both ways; role resolution must be a function of the set).
+  - `<svc>-admin` **alone → DENIED**, at the OIDC gate (T4, smoke G3) and at
+    the forward\_auth edge (T8). Admin-implies-access is abolished; those are
+    the probes that fail if anyone brings it back.
+  - neither → denied (T5, T9).
+  Enforced by `enforceAccessGate` / `enforceGroupGate`
+  (`portal/src/lib/gate.ts`) over the `presentation.access:` binding, and by
+  `lookupRole` (`portal/src/lib/claims.ts`) over `consent.group_role_map`.
 - **Recovery-gate** — the converged app's loopback endpoint
   `othala:4431/admin/recovery-gate`, `Authorization: Bearer`. Refusal is
   **marker-based** (`is_admin===true` in the webhook payload, derived from
   `metadata_admin.admin` by `recovery-gate.jsonnet`), NOT group- or UUID-based
   (ADR 08). An identity with `is_admin=true` → 403; `is_admin=false` → 200
-  (even if groups includes `admin`); a non-boolean `is_admin` → 403 (fail-closed);
-  a missing `identity_id` → 403 (fail-closed); a wrong bearer → 401.
+  (even when the payload claims an admin-tier group such as `grafana-admin` —
+  group membership is app authorization, never portal admin authority); a
+  non-boolean `is_admin` → 403 (fail-closed); a missing `identity_id` → 403
+  (fail-closed); a wrong bearer → 401.
 
 ## What it does NOT validate
 
 - TLS / Caddy / production DNS. The substrate runs HTTP-only on the
   compose network. Production-shape TLS validation is manual lab work (or
   a future iteration that wires Caddy with `tls internal`).
-- Browser-driven OIDC flows. A Playwright suite is the harness for that;
-  this harness focuses on substrate + endpoint health.
+- LDAP. The bridge is a separate, **unmaintained reference** project
+  (`gitlab.com/dunn.dev/kratos-ldap`); no spec here exercises it, and
+  `glauth.cfg` is kept only as an operator reference.
 
 ## On the in-app registrar (a note for adopters)
 
@@ -110,7 +126,7 @@ which is why `register-clients` is a `profiles: [oneshot]` service that
 | `hydra.yml` | Hydra config (harness-shape: HTTP issuer, expose_internal_errors=true) |
 | `identity.schema.json` | Production identity schema, vendored |
 | `recovery-gate.jsonnet` | Recovery-gate webhook body, vendored |
-| `glauth.cfg` | Example LDAP bridge config for `gitlab.com/dunn.dev/kratos-ldap` (not used by the default compose run; kept as a reference for operators adding LDAP) |
+| `glauth.cfg` | Example LDAP bridge config for `gitlab.com/dunn.dev/kratos-ldap` — an **unmaintained reference** project, not part of this deployment. Not used by the default compose run; kept only so an operator adding LDAP has something to read. |
 | `postgres-init.sh` | DB + extension setup |
 | `gen-secrets.sh` | Per-run secret generator |
 | `smoke.sh` | Probe matrix (pass/fail counters) |

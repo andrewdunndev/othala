@@ -289,6 +289,14 @@ check-purity:
 #   - csrf.test.mjs             (HIGH-1 CSRF token semantics)
 #   - admin-recovery-gate.test.mjs (HIGH-3 admin-recovery refusal)
 #
+# Also runs `npm run test:unit` (vitest, against src/lib/*.test.ts) —
+# the TypeScript-native lib suite that vitest.config.ts has always
+# included but nothing invoked before this job wired it in. Covers
+# admin-auth.test.ts (isAdminMarker, the ADR-08 admin authority
+# function), plus contact/csrf/manifest-store/tiles lib tests. The two
+# harnesses are independent (node --test+tsx vs vitest) and both must
+# pass; see portal/vitest.config.ts for scope notes.
+#
 # Separate from verify-portal (catalog node-build, which runs
 # `npm run build`) because tests gate the change BEFORE the build
 # step. Catches Renovate-bumped breakage at the test layer.
@@ -305,6 +313,7 @@ test-portal:
     - npm ci --include=dev
   script:
     - npm test
+    - npm run test:unit
 
 # -----------------------------------------------------------------
 # check-portal: the standing QUALITY GATE.

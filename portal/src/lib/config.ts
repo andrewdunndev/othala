@@ -221,9 +221,30 @@ export const defaultGroup: string = optionalVar(
 // Neutral default: ['admin', 'everyone'] — admin plus the default group;
 // operators extend as needed.
 //
-// NOTE: group membership in metadata_admin.groups is DISPLAY-ONLY.
-//       Admin authority is the metadata_admin.admin marker read by
-//       admin-auth.ts (ADR 08), not this list.
+// WHAT THIS LIST IS, AND WHAT IT IS NOT — three different things share the
+// word "group" here, and conflating them has produced wrong docs before.
+//
+// 1. THIS list (env) is a TYPE declaration plus selector options. It names
+//    which groups count as `identity` groups rather than app-access groups —
+//    read by group-registry.ts and manifests.ts:785 for classification, by
+//    access.ts (IDENTITY_GROUP_ORDER → normalizeGroupOrder) for a stable
+//    stored order that is cosmetic only, and by the admin UI to render the
+//    identity-group checkboxes. It authorizes nothing on its own.
+//
+// 2. `metadata_admin.groups` ON AN IDENTITY IS ENTRY AUTHORIZATION. It is
+//    NOT display-only. gate.ts:34-38 (`identityGroups(identity)` — same
+//    exported name as the constant below, a different function) is the reader,
+//    and it feeds `enforceGroupGate` (gate.ts:73) for the /api/forward-auth
+//    edge gate and `enforceAccessGate` (gate.ts:109) for the OIDC login and
+//    consent challenges. The same array also drives tile visibility
+//    (tiles.ts `userCanSeeTile`) and role resolution (claims.ts `lookupRole`).
+//    Adding a name to that array admits a person; removing one locks them out.
+//
+// 3. Admin authority is neither: it is the `metadata_admin.admin` marker read
+//    by admin-auth.ts (ADR 08), writable only through the Kratos admin API.
+//    It is not a group and does not appear in `metadata_admin.groups`. A bare
+//    'admin' string prepended to the list below is a NAME in a selector; it
+//    confers no portal authority (docs/access-model.md §6).
 
 function parseIdentityGroups(): string[] {
   const raw = process.env.OTHALA_IDENTITY_GROUPS ?? '';

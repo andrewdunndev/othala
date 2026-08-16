@@ -215,19 +215,33 @@ RECOVERY_ADMIN_EMAIL="${RECOVERY_ADMIN_EMAIL:-admin.recovery@othala.test}"
 RECOVERY_ADMIN_USERNAME="${RECOVERY_ADMIN_USERNAME:-admin.recovery}"
 RECOVERY_ADMIN_PASSWORD="${RECOVERY_ADMIN_PASSWORD:-othala-testpass-2026}"
 
+# Groups under the converged access model: an admin holds BOTH `<svc>-access`
+# and `<svc>-admin`, EXPLICITLY. Entry comes from `grafana-access` — the same
+# group every ordinary member holds — and the admin ROLE comes from
+# `grafana-admin` on top of it. Nothing is derived from anything else, so
+# dropping `grafana-access` here would lock this admin out of the grafana
+# fixture even though it keeps `grafana-admin`. That is the intended behaviour
+# and playwright/tests/t-access-model.spec.ts T4 asserts it.
+#
+# This is ORTHOGONAL to metadata_admin.admin=true set below: that marker is
+# PORTAL admin authority (ADR 0008, /admin), not app role. A group never grants
+# it and it never grants a group.
 echo "  seeding primary admin: $ADMIN_EMAIL (admin marker + groups) ..."
 ADMIN_ID=$(seed_admin_identity \
     "$ADMIN_EMAIL" "$ADMIN_USERNAME" "Othala Admin" \
-    "['family','access-grafana','admin']" "$ADMIN_PASSWORD")
+    "['grafana-access','grafana-admin']" "$ADMIN_PASSWORD")
 if [[ -z "$ADMIN_ID" || "$ADMIN_ID" == ERR:* || "$ADMIN_ID" == EXC:* ]]; then
     echo "  ✗ seed admin failed: $ADMIN_ID"; exit 1
 fi
 echo "  ✓ admin seeded: id=$ADMIN_ID (metadata_admin.admin=true)"
 
+# The recovery-admin exercises the recovery-gate (ADR 0008), which reads the
+# metadata_admin.admin marker only. It needs no app role, so it holds just
+# `grafana-access` — one group, entry, nothing derived.
 echo "  seeding recovery-admin: $RECOVERY_ADMIN_EMAIL (admin marker + groups) ..."
 RECOVERY_ADMIN_ID=$(seed_admin_identity \
     "$RECOVERY_ADMIN_EMAIL" "$RECOVERY_ADMIN_USERNAME" "Admin Recovery Test" \
-    "['family','admin']" "$RECOVERY_ADMIN_PASSWORD")
+    "['grafana-access']" "$RECOVERY_ADMIN_PASSWORD")
 if [[ -z "$RECOVERY_ADMIN_ID" || "$RECOVERY_ADMIN_ID" == ERR:* || "$RECOVERY_ADMIN_ID" == EXC:* ]]; then
     echo "  ✗ seed recovery-admin failed: $RECOVERY_ADMIN_ID"; exit 1
 fi

@@ -8,13 +8,14 @@ the application *is* and the load-bearing decisions behind it, read
 state, read [`CHANGELOG.md`](CHANGELOG.md) and git tags. This file does not
 restate either.
 
-Othala is "Ory for your home": a self-hosted Ory substrate for a
-personal estate, the on-prem analog to Ory Network. The deployed
-instance is **dag.dunn.dev** (dagaz ᛞ, the threshold rune); the login
-screen renders ᛞ→ᛟ, "door to home" (dag→othala). In the deploy repo the instance
-is grouped under **dag** (`services/dag/`, `dag-*` quadlets,
-`dag.network`, `dag_*` sops keys); the functional Ory services keep
-their role names (kratos / hydra / postgres).
+Othala is the single sign-on for one family's house: Ory Kratos and
+Hydra behind a TypeScript portal, run for about five family members and
+a dozen friends. The deployed instance is **dag.dunn.dev** (dagaz ᛞ, the
+threshold rune); the login screen renders ᛞ→ᛟ, "door to home"
+(dag→othala). In the deploy repo the instance is grouped under **dag**
+(`services/dag/`, `dag-*` quadlets, `dag.network`, `dag_*` sops keys);
+the functional Ory services keep their role names (kratos / hydra /
+postgres).
 
 ## Getting started: two entry paths
 
@@ -24,34 +25,31 @@ sops. See `e2e/README.md` for env reference and smoke verification. The
 harness runs the same Othala app image as production; the deploy plane's
 differences are quadlets + sops, not the app itself.
 
-**Option B — production deployment (the operator's deploy repo):** The
-promotion path documented in the rest of this file. Vendor Othala
-configs by tag-pin into your deploy repo, manage secrets with sops +
-age, deploy via quadlets. Full details below.
+**Option B — the production deployment (the deploy repo):** The
+promotion path documented in the rest of this file. The deploy plane
+vendors Othala's configs by tag-pin, keeps secrets in sops + age, and
+runs the containers as quadlets. Full details below.
 
 ---
 
 ## Deploy shape
 
-One Othala pod on carmine, fronted by a Caddy edge. The containers:
+One Othala pod on the estate host, fronted by a Caddy edge. The
+containers:
 
 | Quadlet | Image | Role |
 |---|---|---|
 | **dag-portal** | `registry.gitlab.com/dunn.dev/othala` | The converged Astro Node SSR app. Renders the Kratos self-service flows, serves the Hydra login/consent/logout challenge handlers, runs the access-gate, builds id_token claims, and hosts the loopback admin endpoints. See `ARCHITECTURE.md`. |
-| ~~**dag-ldap-bridge**~~ | `registry.gitlab.com/dunn.dev/kratos-ldap` | Go glauth-kratos LDAP bridge. **Shelved 2026-06-26; not deployed.** The bridge is a parked separate project (`gitlab.com/dunn.dev/kratos-ldap`); Cinema/Jellyfin moved to OIDC. Available for adopters who need LDAP. |
+| ~~**dag-ldap-bridge**~~ | `registry.gitlab.com/dunn.dev/kratos-ldap` | Go glauth-kratos LDAP bridge. **Shelved 2026-06-26; not deployed.** It lives in a separate repo, `gitlab.com/dunn.dev/kratos-ldap`, as an **unmaintained reference** — readable, not maintained, not supported. Cinema/Jellyfin moved to OIDC. |
 | **dag-kratos** | upstream Ory Kratos | Identity: self-service flows, sessions, recovery. |
 | **dag-hydra** | upstream Ory Hydra | OAuth2/OIDC. Ships no UI by design; the Othala app is its login + consent provider. |
 | **dag-postgres** | `postgres:18-alpine` | Separate `kratos` + `hydra` databases. |
 | **dag-caddy** | `registry.gitlab.com/dunn.dev/caddy-estate` | TLS edge for `dag.dunn.dev`. Snippets are volume-mounted, not baked. |
 
-> **Image name reconciled (Wave CP).** The converged app image
-> publishes at the registry **root**:
-> `registry.gitlab.com/dunn.dev/othala` (the oryd/kratos-style
+> **Image name.** The converged app image publishes at the registry
+> **root**: `registry.gitlab.com/dunn.dev/othala` (the oryd/kratos-style
 > namespace/name shape, `publish_at_root: true` in `.gitlab-ci.yml`
-> `build-othala`). The `dag-portal` quadlet pins this root path. The
-> next published tag (`v0.2.0`) is the first to ship under the new name;
-> the live pin reads `…/othala/portal:<tag>` only until that tag
-> publishes.
+> `build-othala`). The `dag-portal` quadlet pins that root path.
 
 ### The dual-listener
 
@@ -90,9 +88,9 @@ will cause a failed or degraded deploy if skipped.
   against the caddy-estate image. If missing, rebuild caddy-estate with
   `xcaddy build --with github.com/mholt/caddy-ratelimit` or add
   `_ "github.com/mholt/caddy-ratelimit"` to its custom `main.go`.
-- [ ] sops keys present for all `carmine.dag_*` secrets (`make dag-preflight`).
+- [ ] sops keys present for all `<host>.dag_*` secrets (`make dag-preflight`).
 - [ ] Registry images reachable and tagged at the pinned version.
-- [ ] SSH connectivity to carmine (`make dag-preflight`).
+- [ ] SSH connectivity to the host (`make dag-preflight`).
 
 ---
 
@@ -101,34 +99,40 @@ will cause a failed or degraded deploy if skipped.
 There is **no submodule and no symlink**. The deploy repo vendors
 Othala's authoritative configs as copies, each pinned to a released
 Othala **tag** with a short provenance header. The promotion path is
-edit, tag, sync, bump, deploy:
+edit, tag, sync, bump, deploy.
+
+Four of those files are vendored **verbatim** and a drift check in the
+deploy repo diffs them byte-for-byte against an Othala checkout at the
+pinned ref: `kratos/kratos.yml`, `hydra/hydra.yml`,
+`kratos/identity.schema.json`, and `kratos/hooks/recovery-gate.jsonnet`.
+Changing any of them here means a re-vendor on the deploy side, not a
+local edit there; a hand-edit on the deploy side fails the gate.
 
 ```sh
 # 1. Tag this repo after CI publishes images.
-git tag v0.1.X
+git tag vX.Y.Z
 git push --tags
 # CI fires (.gitlab-ci.yml): the converged app publishes at the
-# registry root, registry.gitlab.com/dunn.dev/othala:v0.1.X.
-# The LDAP bridge is now a separate project: gitlab.com/dunn.dev/kratos-ldap.
+# registry root, registry.gitlab.com/dunn.dev/othala:vX.Y.Z.
 
 # 2. Sync vendored configs into the deploy repo and review the drift.
-# cd <your-deploy-repo>
+# cd <the-deploy-repo>
 make dag-sync-configs       # diff vendored configs vs othala HEAD
 # Port desired changes manually, then bump each dag-* quadlet Image=
-# pin + provenance SHA to v0.1.X.
+# pin + provenance SHA to vX.Y.Z.
 
 # 3. Provision secrets (if new secrets were added).
-make dag-secrets HOST=carmine
+make dag-secrets HOST=<host>
 
 # 4. Pre-deploy validation, then deploy.
-make dag-preflight HOST=carmine    # sops keys, registry images, drift, SSH
-make dag-deploy HOST=carmine
+make dag-preflight HOST=<host>    # sops keys, registry images, drift, SSH
+make dag-deploy HOST=<host>
 
 # 5. Register OIDC clients (see "Client registration" below).
-just dag-reload-clients carmine
+just dag-reload-clients <host>
 
 # 6. Smoke.
-make dag-smoke HOST=carmine
+make dag-smoke HOST=<host>
 ```
 
 Rollback is purely a deploy-repo change: revert the quadlet commit
@@ -144,14 +148,14 @@ deploy quadlet (`KRATOS_PUBLIC_URL`, `KRATOS_ADMIN_URL`, `HYDRA_PUBLIC_URL`,
 `/etc/portal/manifests`) is the directory the app reads per-app manifests
 from at runtime; the quadlet volume-mounts the synced manifest set there
 read-only. The secrets are sops + age backed in the operator's
-sops-encrypted secrets store under `carmine.dag_*` keys; the deploy
+sops-encrypted secrets store under `<host>.dag_*` keys; the deploy
 plane maps each `dag_*` key to the env target below:
 
 | Env target | Guards / used by |
 |---|---|
 | `OTHALA_ADMIN_ENDPOINT_BEARER` | `POST /admin/revoke-user` on the loopback admin port. Constant-time, fail-closed. |
 | `RECOVERY_GATE_SECRET` | `POST /admin/recovery-gate` (the Kratos recovery-hook). Constant-time, fail-closed. |
-| `LDAP_BRIDGE_ADMIN_URL` / `LDAP_BRIDGE_ADMIN_TOKEN` | Best-effort LDAP bind-cache flush in the revoke fan-out. **Shelved 2026-06-26; not set in current deploy (bridge not deployed).** |
+| `LDAP_BRIDGE_ADMIN_URL` / `LDAP_BRIDGE_ADMIN_TOKEN` | Best-effort LDAP bind-cache flush in the revoke fan-out. **Shelved 2026-06-26; not set in the current deploy** (the bridge is not deployed — see the container table above). |
 | `CSRF_SECRET` | CSRF token signing for the self-service flow posts. |
 
 Admin authority is deliberately NOT an env target: it is the
@@ -171,8 +175,8 @@ boot or triggered by a route. The deploy repo runs the registrar via
 `just dag-reload-clients`, which invokes a `--rm` one-shot runner on
 `dag.network` (the only network that can reach Hydra's admin port)
 against the manifests synced into `MANIFEST_DIR`. See
-[`docs/per-app-oidc.md`](docs/per-app-oidc.md) for the full per-RP
-runbook.
+[`per-app-oidc.md`](site/src/content/docs/guides/per-app-oidc.md) for the
+full per-RP runbook.
 
 The runner is the converged app's **in-app registrar**
 (`portal/src/lib/register-clients.ts` driving the Hydra OAuth2Api, fed by
@@ -196,5 +200,6 @@ pinned in the `dag-*` quadlets.
 
 - [`ARCHITECTURE.md`](ARCHITECTURE.md) — what the app is + load-bearing decisions (read this for the architecture; this file does not restate it)
 - [`CHANGELOG.md`](CHANGELOG.md) and git tags — the only place release/version state is asserted
-- [`docs/per-app-oidc.md`](docs/per-app-oidc.md) — per-RP OIDC integration runbook
-- your deploy repo's docs — service-specific deploy notes and estate conventions
+- [`per-app-oidc.md`](site/src/content/docs/guides/per-app-oidc.md) — per-RP OIDC integration runbook
+- [`docs/access-model.md`](docs/access-model.md) — how entry and role are decided (the model the manifests express)
+- the deploy repo's docs — service-specific deploy notes and estate conventions

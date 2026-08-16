@@ -14,7 +14,10 @@ presentation:
   icon: AB
   icon_slug: audiobookshelf
   auth_kind: oidc
-  access_group: access-audiobookshelf
+  # ENTRY: `audiobookshelf-access` only. `audiobookshelf-admin` is bound for
+  # ROLE under consent.group_role_map and grants no entry by itself.
+  access:
+    - audiobookshelf-access
   order: 40
 
 oidc:
@@ -58,10 +61,8 @@ consent:
       description: "Listen and sync progress."
       claim_emit:
         groups: ["user"]
-  # group_role_map keys are Kratos identity group names. Replace admin/family/
-  # friends/kids with your own group slugs — these are example names only.
+  # Exactly two groups per service; roles declared above in descending
+  # privilege (lookupRole ranks by declaration index, portal/src/lib/claims.ts).
   group_role_map:
-    admin: admin
-    family: user
-    friends: user
-    kids: user
+    audiobookshelf-admin: admin
+    audiobookshelf-access: user

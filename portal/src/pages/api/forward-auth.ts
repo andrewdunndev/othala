@@ -2,15 +2,17 @@
 // NON-OIDC apps that can't participate in the login/consent flow but sit behind
 // the same Caddy edge and the same Kratos session cookie.
 //
-// Caddy is configured roughly as:
+// Caddy is configured roughly as (this repo's own reusable snippet,
+// caddy/snippets/forward-auth.caddy, is the reference shape):
 //
 //   forward_auth othala-portal:PORT {
-//       uri /api/forward-auth?group=access-observe
+//       uri /api/forward-auth?group=observe-access
 //       copy_headers X-Kratos-Authenticated-Identity-Id
-//   }
-//   @denied status 401
-//   handle_response @denied {
-//       redirect https://dag.dunn.dev/auth/login?return_to={uri}
+//
+//       @unauth status 401 403
+//       handle_response @unauth {
+//           redir {env.OTHALA_PUBLIC_URL}/auth/login?return_to={uri} 302
+//       }
 //   }
 //
 // The endpoint decides ALLOW/DENY purely from the Kratos session and the
@@ -19,14 +21,24 @@
 //
 // Status contract (the body is advisory; Caddy keys on the STATUS):
 //   200 "ok"             — valid session, identity active AND in the group
-//   401 "unauthenticated" — no/invalid Kratos session (Caddy → login redirect)
+//   401 "unauthenticated" — no/invalid Kratos session
 //   403 "forbidden"      — everything else: missing/bad group param, identity
 //                          lookup failure, inactive identity, not in the group
 //
-// Why 401 vs 403 matters: 401 is the ONLY status Caddy turns into a login
-// redirect. A logged-in user who simply lacks the group must get 403 (a flat
-// "forbidden"), NOT a redirect loop back through login. So we 401 ONLY when
-// there is no usable session, and 403 for every authorization failure.
+// What this endpoint does NOT control: whether a denial becomes a login
+// redirect. That is the EDGE's decision, made by its `status` matcher plus
+// `handle_response` — a status this endpoint returns is redirected iff the
+// site's matcher lists it. There is no status Caddy redirects on by default,
+// and 401 is NOT privileged; an edge matching `status 401 403` (which is what
+// the snippet above and most sites in the deploy catalog do) redirects on BOTH,
+// while an edge matching `status 401` alone lets a 403 through as a flat deny.
+//
+// Why the endpoint still separates them: it is the only way the edge CAN
+// choose. Collapsing everything to 401 would remove the distinction between
+// "you are not signed in" and "you are signed in and not permitted", and a site
+// that wants the second case to render a flat 403 instead of bouncing an
+// already-signed-in user back through login could no longer express it.
+// Read the site's Caddyfile before reasoning about what a user actually sees.
 //
 // Group source — NEVER trust inbound headers:
 //   - The required group comes from the `group` QUERY PARAM, which is set by
@@ -75,10 +87,12 @@ async function decide(request: Request, url: URL): Promise<Response> {
   }
 
   // 2. Verify the Kratos session from the request's own Cookie header.
-  //    No usable session → 401 (the only status Caddy turns into a login
-  //    redirect). A thrown error (Kratos unreachable) is NOT a 401 — that
-  //    would loop the user through login against a broken backend — so we
-  //    fail closed to 403.
+  //    No usable session → 401, the status that MEANS "send this person to
+  //    login" (whether the edge acts on it is the edge's matcher — see the
+  //    status contract above). A thrown error (Kratos unreachable) is NOT a
+  //    401: it is not a statement about the user, and an edge matching only
+  //    401 would loop them through login against a broken backend. Fail
+  //    closed to 403.
   const cookie = request.headers.get('cookie') ?? undefined;
   let identityId: string | undefined;
   try {

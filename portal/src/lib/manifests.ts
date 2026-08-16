@@ -26,12 +26,21 @@
 //        -> consent container reads via volume mount
 //        -> portal container reads via volume mount
 //
-// A single `<slug>.yaml` serves both loaders: this OIDC client loader
-// reads the `oidc:`/`consent:` blocks, while tiles.ts reads the
-// `presentation:` block (with an optional sibling `<slug>.md` for the
-// per-app detail-page education content). Both read at request time from
+// A single `<slug>.yaml` serves both loaders: this loader reads the
+// `oidc:`/`consent:` blocks, while tiles.ts reads the `presentation:`
+// block (with an optional sibling `<slug>.md` for the per-app
+// detail-page education content). Both read at request time from
 // MANIFEST_DIR — there is no build-time content collection, so adding or
 // removing an app is a manifest-dir change with no portal image rebuild.
+//
+// SCOPE: loadClientManifests() returns EVERY app manifest in MANIFEST_DIR,
+// of every auth_kind — including presentation-only ones (forward_auth /
+// ldap / external tiles that register no OIDC client). It is the app
+// catalog, not the OIDC client list. Consumers that genuinely need the
+// OIDC subset (the Hydra registrar; the OAuth2/consent lookup) narrow it
+// with oidcClientManifests() / getClientManifest(). See the note on
+// loadOne for why the loader used to drop presentation-only manifests and
+// why that filter moved to the consumers.
 
 import { readdirSync, readFileSync, statSync } from 'node:fs';
 import { join } from 'node:path';
@@ -57,11 +66,22 @@ export interface ClientManifest {
   /**
    * True when this manifest carries a `presentation:` block but NO `oidc:`
    * client (a forward_auth / ldap / external tile, e.g. observe.yaml). Such a
-   * manifest still names an access group (so it's an assignable, gate-bearing
-   * binding) but registers no OIDC client, so validateClients must skip the
-   * OIDC-specific rules (audience, redirect/audience match) for it. The OIDC
-   * runtime loader (`loadOne`) skips presentation-only manifests entirely; they
-   * surface only through the parser/validator and the tiles layer.
+   * manifest still names an access group — an assignable, gate-bearing binding
+   * that the registry, the admin UI and computeEffectiveAccess must all see —
+   * but it registers no OIDC client, so the OIDC-specific rules do not apply
+   * to it.
+   *
+   * This flag is the discriminator every OIDC-specific consumer filters on:
+   *
+   *   - validateClients skips the audience / redirect-match / env-var-stem
+   *     rules for it (they only constrain a real Hydra client);
+   *   - oidcClientManifests() narrows the catalog to the registrable subset
+   *     for the Hydra registrar;
+   *   - getClientManifest() refuses to resolve one, so an OAuth2 request can
+   *     never bind a client_id to a tile that was never registered.
+   *
+   * It is NOT filtered by the loader. loadClientManifests() returns
+   * presentation-only manifests alongside OIDC ones (see loadOne).
    */
   presentationOnly: boolean;
   clientName: string;
@@ -233,12 +253,30 @@ function normaliseGroupRoleMap(raw: unknown): Record<string, string> {
 }
 
 /**
- * Load one manifest file as a ClientManifest, or null when it is a
- * presentation-only unified manifest (a tile for a forward_auth / ldap /
- * external app that has NO OIDC client). Those carry a `presentation:`
- * block and no `oidc:` block, and must be skipped by the OIDC client
- * loader rather than throwing. A stale flat manifest (client fields at the
- * top level, no `oidc:`) still throws via parseManifest's flat-shape guard.
+ * Load one manifest file as a ClientManifest. Every well-formed manifest is
+ * returned, of every auth_kind — a presentation-only manifest (a forward_auth /
+ * ldap / external tile with a `presentation:` block and no `oidc:` block) parses
+ * to a ClientManifest with empty OIDC fields and presentationOnly:true. A stale
+ * flat manifest (client fields at the top level, no `oidc:`) still throws via
+ * parseManifest's flat-shape guard; a manifest with neither block also throws.
+ *
+ * WHY THIS USED TO DROP PRESENTATION-ONLY MANIFESTS (B4). Until this change
+ * loadOne returned null for `presentation:`-without-`oidc:`, so the entire
+ * downstream layer — knownAccessGroups(), buildGroupRegistry() (which reads
+ * loadClientManifests()), and therefore every admin group surface — could not
+ * see a single forward_auth or external app's access group. The exclusion had a
+ * real reason: registerAllClients() drives Hydra registration off this same
+ * loader and derives `<CLIENT_ID_UPPER>_CLIENT_SECRET` per manifest, so a tile
+ * that has no client and no secret must never reach it. But that is a REGISTRAR
+ * constraint, not a loader one, and enforcing it here made the admin UI quietly
+ * destructive: groups it could not see had no checkbox, so any identity save
+ * dropped them (admin/users/[id].astro rewrites metadata_admin.groups wholesale
+ * from the rendered boxes).
+ *
+ * The constraint therefore moved to the consumers that actually hold it:
+ * oidcClientManifests() for the registrar, getClientManifest() for the
+ * OAuth2/consent lookup. The loader now returns the whole catalog, which is what
+ * the registry, the access model and the admin UI need.
  *
  * Any read/parse/validate error (ENOENT from a TOCTOU race during manifest
  * sync, YAML syntax error, parseManifest throw) is caught, warned, and
@@ -249,10 +287,6 @@ function normaliseGroupRoleMap(raw: unknown): Record<string, string> {
 function loadOne(file: string, dir: string): ClientManifest | null {
   try {
     const text = readFileSync(join(dir, file), 'utf8');
-    const doc = (parseYaml(text) ?? {}) as { oidc?: unknown; presentation?: unknown };
-    const hasOidc = doc.oidc != null && typeof doc.oidc === 'object';
-    const hasPresentation = doc.presentation != null && typeof doc.presentation === 'object';
-    if (!hasOidc && hasPresentation) return null;
     return parseManifest(text, file);
   } catch (err) {
     console.warn(`manifests: skipping ${file}: ${err}`);
@@ -410,7 +444,15 @@ function freshestMtime(): number {
   }
 }
 
-/** Return all known clients sorted by clientId. Cached 30s + invalidates on mtime change.
+/** Return EVERY app manifest in MANIFEST_DIR, sorted by filename. Cached 30s +
+ * invalidates on mtime change.
+ *
+ * The set spans all auth_kinds: OIDC clients AND presentation-only manifests
+ * (forward_auth / ldap / external tiles). It is the app catalog. Callers that
+ * need only the registrable OIDC subset call oidcClientManifests() on the
+ * result; callers that need the group bindings (group-registry.ts,
+ * knownAccessGroups, computeEffectiveAccess, the admin group surfaces) want the
+ * whole thing — see loadOne for why the loader no longer filters.
  *
  * B (pre-swap validation): runs validateClients on the candidate set BEFORE
  * writing to cache. If validation fails, preserves the prior good cache and
@@ -419,7 +461,9 @@ function freshestMtime(): number {
  *
  * Duplicate client_id detection: if two files declare the same client_id
  * (case-insensitive), throws before swapping. Matches Go:
- * 'duplicate client_id %q in %s and %s'.
+ * 'duplicate client_id %q in %s and %s'. This now spans OIDC and
+ * presentation-only manifests alike, which is what we want: a tile whose slug
+ * collides with a registered client would make getClientManifest ambiguous.
  */
 export function loadClientManifests(): ClientManifest[] {
   const now = Date.now();
@@ -465,12 +509,40 @@ export function loadClientManifests(): ClientManifest[] {
 }
 
 /**
- * Return the manifest for a client_id. Case-insensitive lookup to match
- * Go Manifest.Client(clientID) which calls strings.ToLower(clientID).
+ * The registrable OIDC subset of a manifest set — every manifest that declares
+ * an `oidc:` client. Defaults to the full loaded catalog.
+ *
+ * This is the filter that used to live in loadOne (see the note there). It
+ * belongs HERE because the constraint is the registrar's, not the loader's:
+ * registerAllClients() resolves `<CLIENT_ID_UPPER>_CLIENT_SECRET` for every
+ * manifest it is handed, and a presentation-only tile has no client and no
+ * secret, so handing it one throws. Any caller that pushes manifests at Hydra
+ * — portal/src/lib/register-clients.ts registerAllClients, and the
+ * src/server/register-clients-cli.ts one-shot behind it — must narrow through
+ * this function first.
+ */
+export function oidcClientManifests(
+  set: ClientManifest[] = loadClientManifests(),
+): ClientManifest[] {
+  return set.filter((m) => !m.presentationOnly);
+}
+
+/**
+ * Return the OIDC client manifest for a client_id. Case-insensitive lookup to
+ * match Go Manifest.Client(clientID) which calls strings.ToLower(clientID).
+ *
+ * Presentation-only manifests are NOT resolvable here. They register no Hydra
+ * client, so no OAuth2 authorization or consent request can legitimately name
+ * one; returning a tile from an OIDC lookup would hand oauth2-handlers a
+ * pseudo-client with no redirect_uris and no audience. The lookup stays
+ * OIDC-only so that path is unreachable by construction rather than by
+ * fail-closed accident.
  */
 export function getClientManifest(clientId: string): ClientManifest | undefined {
   const key = clientId.toLowerCase();
-  return loadClientManifests().find((m) => m.clientId.toLowerCase() === key);
+  return loadClientManifests().find(
+    (m) => !m.presentationOnly && m.clientId.toLowerCase() === key,
+  );
 }
 
 /**
@@ -573,7 +645,7 @@ export function validateClients(set: ClientManifest[]): string[] {
       errs.push(`${src}: oidc.client_id is empty`);
     }
 
-    // Rule 1a: client_id must be a valid env-var stem.
+    // Rule 1a: an OIDC client_id must be a valid env-var stem.
     //
     // The registrar derives the secret env var as `<CLIENT_ID_UPPER>_CLIENT_SECRET`
     // (e.g. "openwebui" → "OPENWEBUI_CLIENT_SECRET"). A client_id that contains
@@ -582,9 +654,19 @@ export function validateClients(set: ClientManifest[]): string[] {
     // which either hard-errors (allowMissing=false, the production default) or
     // registers the client without a secret (allowMissing=true, dry-run only).
     //
+    // OIDC-ONLY, deliberately. A presentation-only manifest derives no secret and
+    // never reaches secretEnvVar (oidcClientManifests narrows the registrar's
+    // input), so the rule has nothing to protect there — while firing it would
+    // hard-fail the whole load for a perfectly valid tile whose slug carries a
+    // hyphen (e.g. a `gather-usenet.yaml` forward_auth tile, matching the
+    // gather-usenet-access group naming already in the catalog). That failure
+    // would take EVERY group down with it, which is exactly the blindness this
+    // enforcer exists to prevent. The naming constraint is real only where a
+    // shell variable is really derived.
+    //
     // The expected env var is reported in the error so the operator knows exactly
     // what to look for in the sops file / quadlet Secret= lines.
-    if (cm.clientId !== '' && !CLIENT_ID_ENV_STEM_RE.test(cm.clientId)) {
+    if (!cm.presentationOnly && cm.clientId !== '' && !CLIENT_ID_ENV_STEM_RE.test(cm.clientId)) {
       const wouldBe = `${cm.clientId.toUpperCase()}_CLIENT_SECRET`;
       errs.push(
         `${src}: oidc.client_id ${JSON.stringify(cm.clientId)} contains characters that are ` +
@@ -687,12 +769,17 @@ export function assertManifestsValid(set: ClientManifest[]): void {
   }
 }
 
-/** Distinct identity groups referenced by any client's group_role_map.
+/** Distinct identity groups referenced by any manifest's group_role_map.
  *
  * Seeded from OTHALA_IDENTITY_GROUPS (env-driven, always includes 'admin')
  * so the admin UI shows every configured group even if no manifest references
  * it yet. Additional groups discovered in manifest group_role_map keys are
  * appended. Result is sorted for stable display order.
+ *
+ * Reads the whole catalog. Presentation-only manifests currently parse with an
+ * empty groupRoleMap (they declare no roles), so today they contribute nothing
+ * here — but they are in scope, so a future forward_auth manifest that does map
+ * a role is picked up without another loader change.
  */
 export function knownIdentityGroups(): string[] {
   const set = new Set<string>(identityGroups);
@@ -702,10 +789,19 @@ export function knownIdentityGroups(): string[] {
   return Array.from(set).sort();
 }
 
-/** Distinct access groups across all clients (the access-model Phase 2
- * binding). Derived from each manifest's `accessGroups` list — the same field
- * the gate keys off — so the admin surfaces and the gate agree on the
- * access-bearing group set. */
+/** Distinct access groups across the whole app catalog (the access-model
+ * Phase 2 binding). Derived from each manifest's `accessGroups` list — the same
+ * field the gate keys off — so the admin surfaces and the gate agree on the
+ * access-bearing group set.
+ *
+ * INVARIANT (B4): every group bound by any manifest, of any auth_kind, appears
+ * here. The forward_auth and external tiles are included, so the groups Caddy
+ * actually gates on (observe-access, gather-access, gather-usenet-access,
+ * gather-torrent-access, tune-access, bitwarden-access) are grantable in the
+ * admin UI. When these were invisible, the identity-edit form rendered no
+ * checkbox for them and every save silently dropped them from
+ * metadata_admin.groups. Do not reintroduce an auth_kind filter upstream of
+ * this function. */
 export function knownAccessGroups(): string[] {
   const set = new Set<string>();
   for (const m of loadClientManifests()) {

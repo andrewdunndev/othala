@@ -1,0 +1,78 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 720 454" width="720" height="454" role="img" aria-labelledby="pki-t pki-d" class="dg" font-family="'IBM Plex Sans', Helvetica, Arial, sans-serif">
+<title id="pki-t">Two PKIs: a public root and an internal root, never cross-signed</title>
+<desc id="pki-d">Two trust roots stand side by side with no link between them. On the left, Let's Encrypt, reached by ACME DNS-01 through Cloudflare and terminated by Caddy, issues for every browser- and device-facing FQDN including the dag portal edge, and for infer.dunn.dev as a sanctioned exception because its clients must trust it out of the box. On the right, the Othala Mesh CA — a self-hosted, rootless step-ca with a self-signed root and federatedRoots set to null — issues internal mesh identities behind a JWK provisioner; its live consumer is the inference metering listener on port 8444, whose leaf is renewed on the host by a systemd user timer and which terminates TLS itself because envoy passes SNI through at layer 4. A barrier between the two columns marks that the roots are never cross-signed. Two closing notes: one sidecar holds a certificate from each root in a single Caddyfile, which is what the split buys; and dag itself is single-PKI as deployed, terminating Let's Encrypt only, with its admin plane resting on network isolation rather than mTLS.</desc>
+<style>
+.dg{--paper:#ffffff;--panel:#f4f4f4;--edge:#e0e0e0;--edge2:#b0b0b0;--ink:#0a0a0a;--ink2:#404040;--mut:#707070;--acc:#4a6741;--no:#a8443a;--yes:#4a7a4a}
+@media (prefers-color-scheme:dark){.dg{--paper:#1c1c1e;--panel:#242426;--edge:#303032;--edge2:#48484a;--ink:#f2f2f7;--ink2:#aeaeb2;--mut:#8e8e93;--acc:#6aaa58;--no:#d4736a;--yes:#7aaa7a}:root[data-theme="light"] .dg{--paper:#ffffff;--panel:#f4f4f4;--edge:#e0e0e0;--edge2:#b0b0b0;--ink:#0a0a0a;--ink2:#404040;--mut:#707070;--acc:#4a6741;--no:#a8443a;--yes:#4a7a4a}}
+:root[data-theme="dark"] .dg{--paper:#1c1c1e;--panel:#242426;--edge:#303032;--edge2:#48484a;--ink:#f2f2f7;--ink2:#aeaeb2;--mut:#8e8e93;--acc:#6aaa58;--no:#d4736a;--yes:#7aaa7a}
+.dg .p{fill:var(--paper)}.dg .s{fill:var(--panel)}
+.dg .e{stroke:var(--edge)}.dg .e2{stroke:var(--edge2)}.dg .as{stroke:var(--acc)}.dg .ms{stroke:var(--mut)}.dg .ns{stroke:var(--no)}
+.dg .i{fill:var(--ink)}.dg .i2{fill:var(--ink2)}.dg .m{fill:var(--mut)}.dg .a{fill:var(--acc)}
+.dg .n{fill:var(--no)}.dg .y{fill:var(--yes)}
+</style>
+<g font-family="'IBM Plex Sans', Helvetica, Arial, sans-serif">
+<rect class="p" x="0" y="0" width="720" height="454" fill="#ffffff"/>
+<rect class="p e" x="20" y="20" width="680" height="414" rx="3" fill="#ffffff" stroke="#e0e0e0" stroke-width="1"/>
+<!-- header -->
+<g class="as" stroke="#4a6741" stroke-width="5" stroke-linecap="round" fill="none" transform="translate(37 29) scale(0.3)">
+<line x1="32" y1="8" x2="48" y2="24"/>
+<line x1="48" y1="24" x2="32" y2="40"/>
+<line x1="32" y1="40" x2="16" y2="24"/>
+<line x1="16" y1="24" x2="32" y2="8"/>
+<line x1="32" y1="40" x2="18" y2="56"/>
+<line x1="32" y1="40" x2="46" y2="56"/>
+</g>
+<text class="m" x="60" y="45" font-family="'IBM Plex Mono', Menlo, monospace" font-size="9" font-weight="700" letter-spacing="1.2" fill="#707070">TWO PKIs · TWO ROOTS, NEVER CHAINED</text>
+<text class="m" x="680" y="45" text-anchor="end" font-family="'IBM Plex Mono', Menlo, monospace" font-size="9" font-weight="700" letter-spacing="1.2" fill="#707070">OTHALA</text>
+<line class="e" x1="40" y1="56" x2="680" y2="56" stroke="#e0e0e0" stroke-width="1"/>
+<!-- root eyebrows -->
+<text class="m" x="40" y="78" font-family="'IBM Plex Mono', Menlo, monospace" font-size="8.5" font-weight="700" letter-spacing="1.1" fill="#707070">PUBLIC ROOT</text>
+<text class="m" x="380" y="78" font-family="'IBM Plex Mono', Menlo, monospace" font-size="8.5" font-weight="700" letter-spacing="1.1" fill="#707070">INTERNAL ROOT</text>
+<!-- root boxes -->
+<rect class="s e2" x="40" y="88" width="300" height="76" rx="3" fill="#f4f4f4" stroke="#b0b0b0" stroke-width="1"/>
+<text class="i" x="52" y="107" font-size="14" font-weight="700" letter-spacing="-0.2" fill="#0a0a0a">Let's Encrypt</text>
+<text class="i2" x="52" y="126" font-size="8.5" fill="#404040">ACME DNS-01 through Cloudflare, terminated by Caddy at the</text>
+<text class="i2" x="52" y="137" font-size="8.5" fill="#404040">edge. Trusted by every browser and device out of the box,</text>
+<text class="i2" x="52" y="148" font-size="8.5" fill="#404040">which is the whole reason it is here.</text>
+<rect class="s as" x="380" y="88" width="300" height="76" rx="3" fill="#f4f4f4" stroke="#4a6741" stroke-width="1.4"/>
+<text class="a" x="392" y="107" font-size="14" font-weight="700" letter-spacing="-0.2" fill="#4a6741">Othala Mesh CA</text>
+<text class="i2" x="392" y="126" font-size="8.5" fill="#404040">step-ca, self-hosted and rootless. Self-signed root with</text>
+<text class="i2" x="392" y="137" font-size="8.5" fill="#404040">federatedRoots: null — no federation, no cross-signing.</text>
+<text class="i2" x="392" y="148" font-size="8.5" fill="#404040">Issuance sits behind a JWK provisioner, internal-only.</text>
+<!-- the barrier -->
+<g class="ns" stroke="#a8443a" stroke-width="1.2" stroke-linecap="round" fill="none" stroke-dasharray="4 4">
+<line x1="360" y1="84" x2="360" y2="166"/>
+<line x1="360" y1="190" x2="360" y2="302"/>
+</g>
+<rect class="p ns" x="298" y="168" width="124" height="20" rx="10" fill="#ffffff" stroke="#a8443a" stroke-width="1.2"/>
+<text class="n" x="360" y="182" text-anchor="middle" font-family="'IBM Plex Mono', Menlo, monospace" font-size="8" font-weight="700" letter-spacing="0.9" fill="#a8443a">NEVER CROSS-SIGNED</text>
+<!-- consumers -->
+<text class="m" x="40" y="208" font-family="'IBM Plex Mono', Menlo, monospace" font-size="8.5" font-weight="700" letter-spacing="1.1" fill="#707070">WHO HOLDS A LEAF FROM WHICH ROOT</text>
+<rect class="p e" x="40" y="218" width="300" height="80" rx="3" fill="#ffffff" stroke="#e0e0e0" stroke-width="1"/>
+<text class="i" x="52" y="237" font-family="'IBM Plex Mono', Menlo, monospace" font-size="8.5" fill="#0a0a0a">every browser- or device-facing FQDN</text>
+<text class="i2" x="52" y="254" font-size="8.5" fill="#404040">The dag portal edge is one of them, and so is every other</text>
+<text class="i2" x="52" y="265" font-size="8.5" fill="#404040">public name in the estate. infer.dunn.dev is the sanctioned</text>
+<text class="i2" x="52" y="276" font-size="8.5" fill="#404040">exception: an internal fabric with a public edge, because</text>
+<text class="i2" x="52" y="287" font-size="8.5" fill="#404040">its iOS and agent clients must trust it out of the box.</text>
+<rect class="p e" x="380" y="218" width="300" height="80" rx="3" fill="#ffffff" stroke="#e0e0e0" stroke-width="1"/>
+<text class="i" x="392" y="237" font-family="'IBM Plex Mono', Menlo, monospace" font-size="8.5" fill="#0a0a0a">the inference metering listener, :8444</text>
+<text class="i2" x="392" y="254" font-size="8.5" fill="#404040">Its mesh leaf is issued and renewed on the host by a</text>
+<text class="i2" x="392" y="265" font-size="8.5" fill="#404040">systemd user timer, so a stalled renewal fails dark — the</text>
+<text class="i2" x="392" y="276" font-size="8.5" fill="#404040">deploy verify watches the timer, not the notAfter. envoy</text>
+<text class="i2" x="392" y="287" font-size="8.5" fill="#404040">passes SNI through at L4, so this backend terminates TLS.</text>
+<!-- closing notes -->
+<line class="e" x1="40" y1="316" x2="680" y2="316" stroke="#e0e0e0" stroke-width="1"/>
+<text class="m" x="40" y="336" font-family="'IBM Plex Mono', Menlo, monospace" font-size="9" font-weight="700" letter-spacing="1.2" fill="#707070">THE SPLIT IS BETWEEN ROOTS, NOT BETWEEN MACHINES</text>
+<rect class="s e" x="40" y="346" width="400" height="68" rx="3" fill="#f4f4f4" stroke="#e0e0e0" stroke-width="1"/>
+<text class="i" x="52" y="365" font-family="'IBM Plex Mono', Menlo, monospace" font-size="8" font-weight="700" letter-spacing="1.1" fill="#0a0a0a">ONE SIDECAR HOLDS BOTH</text>
+<text class="i2" x="52" y="382" font-size="8.5" fill="#404040">The infer service's litellm-caddy holds a Let's Encrypt cert on its public</text>
+<text class="i2" x="52" y="393" font-size="8.5" fill="#404040">listener and a mesh leaf on :8444, in one Caddyfile. Neither root learns</text>
+<text class="i2" x="52" y="404" font-size="8.5" fill="#404040">about the other: the only question is browser-facing, or device-facing.</text>
+<rect class="s e" x="460" y="346" width="220" height="68" rx="3" fill="#f4f4f4" stroke="#e0e0e0" stroke-width="1"/>
+<text class="a" x="472" y="365" font-family="'IBM Plex Mono', Menlo, monospace" font-size="8" font-weight="700" letter-spacing="1.1" fill="#4a6741">DAG IS SINGLE-PKI AS DEPLOYED</text>
+<text class="i2" x="472" y="380" font-size="8" fill="#404040">Its edge terminates Let's Encrypt, and no</text>
+<text class="i2" x="472" y="390" font-size="8" fill="#404040">dag quadlet mounts a mesh leaf. The admin</text>
+<text class="i2" x="472" y="400" font-size="8" fill="#404040">plane rests on network isolation, not on</text>
+<text class="i2" x="472" y="410" font-size="8" fill="#404040">the mTLS hop this record was written around.</text>
+</g>
+</svg>

@@ -10,26 +10,46 @@
 //      (`manifest.accessGroups`, OR-semantics) -> no row (no access). This is
 //      the SAME binding the OIDC gate keys off (access-model Phase 2,
 //      docs/access-model.md §10) — no derived `access-<clientId>` group.
-//   2. Look up `metadata_admin.roles[clientId]`. If set, that's the role
-//      and the source is "override".
-//   3. Otherwise, walk the user's identity groups in stored order and
-//      pick the first match in the client's `group_role_map`. Source is
-//      `via <group>`.
-//   4. If the manifest declares no roles at all, the row reports role
+//   2. If the manifest declares no roles at all, the row reports role
 //      `default` with source `no role mapping`.
+//   3. Otherwise the ROLE is whatever `lookupRole(manifest, metadata_admin)`
+//      returns. This file does not resolve roles itself and must not start:
+//      claims.ts is the single implementation, shared with the consent/token
+//      path. Everything below step 3 here is UI LABELLING of an answer that
+//      has already been decided.
 //
-// C4 reconciliation:
+// C4 reconciliation — parity is structural, not a matched walk:
 //
-//   Both this function and the consent/token path (via lookupRole in
-//   claims.ts) walk the user's stored group order. Stored order is
-//   normalized at the admin-form save boundary (see `normalizeGroupOrder`):
-//   identity groups first in canonical order, then access-* groups in
-//   alphabetical order. This guarantees portal "Effective Access" and
-//   the token-injection path issue identical roles for the same input.
+//   The two paths agree because there is ONE resolver, not because two walks
+//   happen to visit groups in the same order. Do not reintroduce a local walk
+//   "for the UI" — that is exactly the dual-source bug C4 closed.
 //
-//   The canonical identity-group order is driven by OTHALA_IDENTITY_GROUPS
-//   (see $lib/config). 'admin' is always first. New identity groups are
-//   added via that env var — no code change required.
+//   How lookupRole resolves (claims.ts is authoritative; this is a summary
+//   that must be re-checked against it, never trusted over it):
+//     - An override in `metadata_admin.roles[clientId.toLowerCase()]` wins IF
+//       it names a role the manifest declares. An override naming an
+//       UNDECLARED role is ignored and resolution falls through — this file
+//       labels that case `override-ignored` so the admin UI is honest about it.
+//     - Otherwise every group in `metadata_admin.groups` is mapped through
+//       `group_role_map`, and among the roles that ARE declared the
+//       HIGHEST-RANKED one wins. Rank is position in `manifest.roles`, index 0
+//       highest. It is NOT the first match in stored order — that rule is
+//       RETIRED, and this comment used to describe it.
+//
+//   Why the retirement matters here: under the converged access model an admin
+//   holds BOTH `<svc>-access` and `<svc>-admin` explicitly (docs/access-model.md
+//   §6), so two role-mapping groups on one identity is the normal case, not an
+//   edge case. `normalizeGroupOrder` sorts non-identity groups alphabetically,
+//   which puts `cinema-access` before `cinema-admin` — a first-match walk would
+//   have handed every admin the lesser role.
+//
+//   `normalizeGroupOrder` (below) is therefore COSMETIC: stable display, stable
+//   diffs in `metadata_admin.groups`. It is not what makes role resolution
+//   deterministic, and role resolution no longer depends on it. The one place
+//   stored order still shows through is the `matchingGroup` label lookup in
+//   computeEffectiveAccess: when two groups map to the same resolved role, the
+//   first in stored order is the one named in "via <group>". That is a caption,
+//   not a decision.
 
 import type { ClientManifest } from './manifests';
 import type { Identity } from './types';
@@ -55,9 +75,10 @@ export interface EffectiveAccessRow {
 
 /**
  * Canonical identity-group order. The admin form writes
- * `metadata_admin.groups` in this order (identity groups first), so
- * stored order == canonical order, and a stored-order walk produces
- * the same answer as a precedence walk.
+ * `metadata_admin.groups` in this order (identity groups first), which makes
+ * the stored array a pure function of the group SET — stable to read, stable
+ * to diff. It does NOT decide any role: `lookupRole` (claims.ts) is
+ * order-independent by construction.
  *
  * Driven by OTHALA_IDENTITY_GROUPS (see $lib/config). Adding a new
  * identity group means setting (or extending) that env var — no code
@@ -79,15 +100,17 @@ export const IDENTITY_GROUP_ORDER: readonly string[] = identityGroups;
  * inputs (determinism proof, §10).
  *
  * Worked example (§10): groups [family-editors, family, admin] with
- * IDENTITY_GROUP_ORDER=[admin, family] → [admin, family, family-editors]; the
- * claims.ts stored-order walk then resolves `family`'s role before
- * `family-editors` (coarser-group-wins, same intent as the pre-refactor code,
- * no prefix needed). To prefer the finer role, don't also assign the coarse
- * group — identical semantics to today.
+ * IDENTITY_GROUP_ORDER=[admin, family] → [admin, family, family-editors].
+ * That is the whole effect: a stable stored array. It does NOT decide which
+ * of `family` and `family-editors` supplies the role — `lookupRole`
+ * (claims.ts) maps both through `group_role_map` and takes the role ranked
+ * highest in `manifest.roles`, in any permutation of the input. To change
+ * which role a person gets, change the manifest's role order or the person's
+ * groups; reordering this array changes nothing but the display.
  *
- * The admin form calls this on every save so the order in
- * `metadata_admin.groups` is deterministic and both code paths (this file and
- * the consent role walk in claims.ts) agree on which group wins.
+ * The admin form calls this on every save so `metadata_admin.groups` has one
+ * canonical shape per group set — readable in the admin UI, quiet in diffs,
+ * and free of the implication that position carries meaning.
  */
 export function normalizeGroupOrder(groups: string[]): string[] {
   const set = new Set(groups);

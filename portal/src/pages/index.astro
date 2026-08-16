@@ -11,18 +11,21 @@
 //                     explaining what's behind the door.
 // State C (post-auth): active session. Hero with greeting + section
 //                     "your apps" — the tile launcher reads the tiles
-//                     via loadTiles (tiles.ts) and filters to entries
-//                     whose `accessGroup` the user's
-//                     `metadata_admin.groups` contains. Admin shortcut
-//                     when the user is in the admin group.
+//                     via loadTiles (tiles.ts) and keeps the ones
+//                     userCanSeeTile admits: OR-semantics over the
+//                     manifest's access binding against the identity's
+//                     `metadata_admin.groups`. The Admin shortcut is NOT
+//                     a group — it reads the `metadata_admin.admin`
+//                     marker (ADR 08); see the note above `isAdmin`.
 //
 // Apps registry = unified per-app manifests read at request time from
 // MANIFEST_DIR (see lib/tiles.ts + lib/manifests.ts). Each `<slug>.yaml`
-// carries a `presentation:` block (name, description, url, icon,
-// access_group, auth_kind, disabled, order); an optional sibling
-// `<slug>.md` is the per-app detail-page content at /apps/<slug>. There
-// is no build-time content collection, so adding or removing an app is a
-// manifest-dir change with no portal image rebuild.
+// carries a `presentation:` block (name, description, url, icon /
+// icon_slug / icon_fallback, `access:` list — singular `access_group:`
+// still parses as compat — auth_kind, group, disabled, order); an
+// optional sibling `<slug>.md` is the per-app detail-page content at
+// /apps/<slug>. There is no build-time content collection, so adding or
+// removing an app is a manifest-dir change with no portal image rebuild.
 //
 // Dev preview: when running `astro dev`, State A also surfaces a small
 // panel of every auth flow link. `?dev-state=` lets the developer force
@@ -54,15 +57,37 @@ if (devOverride === 'down' || devOverride === 'pre-auth' || devOverride === 'pos
   state = devOverride;
   if (state === 'post-auth') {
     // Plausible mocked identity so the post-auth view renders something
-    // realistic in dev without a Kratos session. Groups match the shipped
-    // e2e/manifests/ example set so any adopter gets tiles out of the box.
+    // realistic in dev without a Kratos session.
     //
-    // Dev affordance: set OTHALA_DEV_MOCK_GROUPS=admin,family,access-foo
+    // These names MUST intersect the shipped e2e/manifests/ example set or the
+    // preview renders zero tiles — userCanSeeTile is a plain membership test,
+    // so a mock holding groups nobody binds is indistinguishable from a user
+    // with no access. They are the converged `<svc>-access` entry groups from
+    // those manifests, one per fixture:
+    //   grafana-access, audiobookshelf-access, jellyfin-access,
+    //   proxywatch-access (tile-only), prompt-access (open-webui).
+    // `everyone` covers the default-group fallback fixture (statuspage, which
+    // declares no access binding — see tileDefaultGroup in tiles.ts).
+    // 'admin' is here as an identity group only; the Admin nav link needs the
+    // `metadata_admin.admin` marker, which this mock deliberately omits.
+    //
+    // If a fixture is renamed, this list goes stale silently. Re-derive it from
+    // e2e/manifests/*.yaml (`presentation.access:`) rather than editing by hand.
+    //
+    // Dev affordance: set OTHALA_DEV_MOCK_GROUPS=admin,grafana-access
     // (comma-separated) to preview any catalog subset without editing code.
     const devGroupsEnv: string | undefined = import.meta.env.OTHALA_DEV_MOCK_GROUPS;
     const mockGroups = devGroupsEnv
       ? devGroupsEnv.split(',').map((g) => g.trim()).filter(Boolean)
-      : ['admin', 'family', 'everyone', 'access-grafana', 'access-audiobookshelf', 'access-jellyfin', 'access-proxywatch', 'access-gather-usenet', 'access-gather-torrent'];
+      : [
+          'admin',
+          'everyone',
+          'grafana-access',
+          'audiobookshelf-access',
+          'jellyfin-access',
+          'proxywatch-access',
+          'prompt-access',
+        ];
     identity = {
       id: 'dev-mock',
       traits: { username: 'dev.user', email: 'dev@example.local', displayName: 'Dev User' },

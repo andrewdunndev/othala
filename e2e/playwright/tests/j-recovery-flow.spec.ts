@@ -293,7 +293,7 @@ test('J1 — non-admin recovery flow issues a privileged settings session', asyn
     email: `member.recovery.${uniqueSuffix}@othala.test`,
     username: `member.recovery.${uniqueSuffix}`,
     displayName: 'Recovery Test Member',
-    groups: ['family'],
+    groups: [],
     kratosAdminURL,
   });
   console.log('[J1] seeded non-admin identity:', identity.id, identity.email);
@@ -408,7 +408,7 @@ test('J2 — admin recovery is blocked by the recovery-gate webhook (no privileg
     email: `admin.recovery.${uniqueSuffix}@othala.test`,
     username: `admin.recovery.${uniqueSuffix}`,
     displayName: 'Recovery Admin',
-    groups: ['family', 'admin'],
+    groups: [],
     isAdmin: true,
     kratosAdminURL,
   });
@@ -486,7 +486,7 @@ test('J2 — admin recovery is blocked by the recovery-gate webhook (no privileg
     const probeBody = JSON.stringify({
       identity_id: identity.id,
       is_admin: false, // deliberately false — proves gate ignores payload, uses admin API
-      groups: ['family'],
+      groups: ['grafana-admin'],
       traits: { email: identity.email },
     });
     const probeResp = await fetch(`${gateBase}/admin/recovery-gate`, {

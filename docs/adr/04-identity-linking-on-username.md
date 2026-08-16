@@ -2,13 +2,16 @@
 
 ## Status
 
-Accepted.
+Accepted (2026-08-15). `sub` — the Kratos identity UUID — is the durable
+identity every app should end on; `username` is the one-time migration and
+first-link key; email is never a configured link key. Mealie is the sole
+remaining username-forever consumer, and username is still user-mutable with no
+enforcement, which is the one open obligation this record carries.
 
 See also [01](01-auth-substrate-ory.md) (the Kratos/Hydra substrate that mints
 the identity and issues the token) and
 [09](09-capability-group-access-model.md) (the `groups` claim carried on the
-same token). The rebuild implications noted in Consequences apply to any
-deployment that rebuilds its identity store.
+same token).
 
 ## Context
 
@@ -84,10 +87,14 @@ versions:
   - GitLab: `uid_field` defaults to `sub` (extern_uid); a pre-existing account
     does **not** auto-match by username — link via password-login + connect, or
     seed the `identities` table. Never enable `omniauth_auto_link_user`.
-- **Username-forever** (Mealie `OIDC_USER_CLAIM=preferred_username`, oCIS
-  `PROXY_USER_OIDC_CLAIM=preferred_username`): re-match `preferred_username`
-  every login, never store `sub`. They have **no `sub` safety net**, so username
-  stability is load-bearing for them specifically.
+- **Username-forever** (Mealie, `OIDC_USER_CLAIM=preferred_username`): re-matches
+  `preferred_username` on every login and never stores `sub`. Mealie is the
+  **only** consumer in this group — it has no `sub` safety net, so username
+  stability is load-bearing for it and for nothing else. (An earlier revision of
+  this record listed oCIS here as a second username-forever consumer. oCIS was
+  descoped from the estate on 2026-07-02 and its service, its OIDC client and all
+  its wiring were removed; it is not deployed and no linking config for it is
+  carried here.)
 - **Email-forever** (Vaultwarden): the email field is the username *and* the
   master-password KDF salt, so it cannot be re-keyed to username or `sub`. After
   first login it stores `{issuer}/{sub}` for matching, but the account stays
@@ -104,21 +111,32 @@ change in a future release) even though it links on `sub` anyway.
   app, matching that app's case rule (Audiobookshelf is case-sensitive; Mealie
   is case-insensitive). One Kratos username maps to one spelling, so the same
   person must carry the same username across all apps.
-- **`sub` is tied to the Kratos identity record, not Hydra.** Rebuilding Hydra
-  (e.g. losing `secrets.system`) preserves `sub`. Recreating Kratos identities
-  changes every `sub`, breaking every sub-link. A carmine rebuild must either
-  preserve Kratos identity IDs (export/import identities *with* their ids) or
-  budget a re-link pass for the Username-then-`sub` group — a
-  rebuild-verification item for any deployment.
+  `UNENFORCED — convention only`: nothing checks the reconciliation; it is a
+  per-migration runbook step.
+- **`sub` is tied to the Kratos identity record, not Hydra, and the Kratos
+  database is the only copy of it.** Rebuilding Hydra (e.g. losing
+  `secrets.system`) preserves `sub`. Recreating Kratos identities changes every
+  `sub`, breaking every sub-link in every app in the Username-then-`sub` group.
+  A rebuild must export and import identities **with their ids** or budget a
+  full re-link pass across those apps.
+
+  This consequence is currently **maximal, not theoretical**: as of 2026-08 the
+  Kratos database has no backup. That database holds every `sub` *and* every
+  enrolled passkey — losing it is not "re-run the deploy", it is re-enrolling
+  every person and re-linking every app by hand. Treat the backup gap as the
+  highest-severity open item this record depends on; the re-litigation trigger
+  is the first Kratos backup landing, at which point this paragraph shrinks back
+  to an ordinary rebuild-verification note.
 - **Username is user-mutable — not UI-blocked, not API-immutable.** There is no
   Kratos primitive that freezes a trait: the schema marks no trait immutable and
   no before-settings hook exists. The profile settings form renders an editable
   username input, so a user can rename their own `traits.username` through the
-  ordinary UI — not only via a direct settings-API call. For the Username-forever
-  group (Mealie, oCIS) that silently orphans the account with no recovery key.
-  This is the live risk the ADR's hardening obligation targets: to close it, add
-  an API-level guard — a before-settings web-hook rejecting any `traits.username`
-  delta.
+  ordinary UI — not only via a direct settings-API call. That silently orphans
+  their Mealie account, with no recovery key. The hardening this record owes is
+  a before-settings web-hook rejecting any `traits.username` delta.
+  `UNENFORCED — convention only` until that hook exists; the re-litigation
+  trigger is the first user rename, which will be discovered as a Mealie
+  account that lost its history.
 - Vaultwarden's durability requires `OTHALA_PUBLIC_URL` never changes (it is
   part of the stored `{issuer}/{sub}` key); a URL rename forces
   `TRUNCATE sso_users` + re-link.

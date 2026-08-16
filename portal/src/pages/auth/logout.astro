@@ -2,43 +2,235 @@
 // Logout convenience page.
 //
 // Kratos's logout flow needs a CSRF-bound logout_token. We fetch
-// /self-service/logout/browser to get it, then redirect the user to
-// the logout_url which clears the cookie and 303s back to home.
+// /self-service/logout/browser to get it, then redirect the user to the
+// logout_url, which revokes the session, clears Kratos's cookies and 303s
+// back home.
 //
-// If we already have no session, just bounce home.
+// The invariant this page owes the user: nobody leaves /auth/logout still
+// holding a live session. Either Kratos performs the logout (we hand the
+// browser its logout_url), or we perform it ourselves — revoke server-side
+// over the internal Kratos address and expire the session cookie on the way
+// out. Every branch below ends in one of those two, never in a bare redirect
+// home with the session intact.
 
 export const prerender = false;
 
 import { getLogoutInfo, getSession, kratosBase } from '../../lib/kratos';
+import type { LogoutInfo } from '../../lib/kratos';
+import { publicUrl } from '../../lib/config';
 
 const cookie = Astro.request.headers.get('cookie') ?? undefined;
+
+const REVOKE_TIMEOUT_MS = 2000;
+
+/**
+ * Is this logout_url one of ours?
+ *
+ * Defence-in-depth: a compromised or unexpected Kratos response must not be
+ * able to bounce the user off-instance.
+ *
+ * The URL Kratos returns is built from ITS OWN serve.public.base_url
+ * (kratos/kratos.yml:18, `"${OTHALA_PUBLIC_URL}/"`) — the PUBLIC origin, not
+ * the internal address the portal dials for SSR. Comparing it against
+ * kratosBase() alone is what broke sign-out: in any deployment where the
+ * portal reaches Kratos over an internal container address
+ * (KRATOS_PUBLIC_URL=http://kratos:4433) while Kratos serves the public host,
+ * the two origins can never match. The redirect was refused on every attempt
+ * and the user was sent home still holding the 30-day apex session cookie —
+ * including on a borrowed or shared device.
+ *
+ * WHICH of the two configured origins Kratos answers with is a property of the
+ * topology, so accept either and hardcode neither:
+ *
+ *   publicUrl    (OTHALA_PUBLIC_URL) — Kratos's configured base_url. The
+ *                deployed answer, and the e2e golden run's answer
+ *                (e2e/compose.yml sets the portal's KRATOS_PUBLIC_URL to the
+ *                compose service name while Kratos serves auth.othala.test).
+ *   kratosBase() (KRATOS_PUBLIC_URL) — single-origin setups where the portal
+ *                dials Kratos at the same address Kratos serves publicly:
+ *                local dev, and the e2e browser profile
+ *                (e2e/compose.browser.yml:43).
+ *
+ * Anything else takes the fail-closed path below.
+ */
+function isOurLogoutUrl(raw: string): boolean {
+  let url: URL;
+  try {
+    url = new URL(raw);
+  } catch {
+    return false;
+  }
+  // Non-http(s) schemes have an opaque origin; reject before comparing.
+  if (url.protocol !== 'https:' && url.protocol !== 'http:') return false;
+
+  const allowed = new Set<string>();
+  for (const base of [publicUrl, kratosBase()]) {
+    try {
+      allowed.add(new URL(base).origin);
+    } catch {
+      // Unparseable config value contributes no allowed origin. It must never
+      // widen the check.
+    }
+  }
+  return allowed.has(url.origin);
+}
+
+/**
+ * Complete the logout ourselves, server-side, over the internal Kratos address
+ * the portal already uses for every other SSR call. Reached only when the
+ * returned logout_url could not be validated.
+ *
+ * Raw fetch rather than the SDK's updateLogoutFlow(): the generated client
+ * sends no Accept header, so Kratos answers 303 toward
+ * selfservice.default_browser_return_url (kratos/kratos.yml:49 — the public
+ * origin) and fetch would chase a host the portal's network need not resolve.
+ * With `Accept: application/json` Kratos answers 204 instead; `redirect:
+ * 'manual'` makes sure nothing is followed either way.
+ *
+ * Returns the HTTP status, or null when the call could not be completed.
+ */
+async function revokeServerSide(token: string): Promise<number | null> {
+  const base = kratosBase().replace(/\/+$/, '');
+  const ctl = new AbortController();
+  const t = setTimeout(() => ctl.abort(), REVOKE_TIMEOUT_MS);
+  try {
+    const res = await fetch(
+      `${base}/self-service/logout?token=${encodeURIComponent(token)}`,
+      {
+        method: 'GET',
+        headers: {
+          accept: 'application/json',
+          ...(cookie ? { cookie } : {}),
+        },
+        redirect: 'manual',
+        signal: ctl.signal,
+      },
+    );
+    return res.status;
+  } catch {
+    return null;
+  } finally {
+    clearTimeout(t);
+  }
+}
+
+/**
+ * OTHALA_APEX — the registrable parent domain Kratos scopes its session cookie
+ * to. Same var middleware.ts:76 reads.
+ *
+ * The Node SSR runtime provides `process`, but the portal ships no tsconfig
+ * wiring @types/node and `astro check` is a CI gate (.gitlab-ci.yml runs
+ * `npm run check`), so it is reached through a locally-typed globalThis rather
+ * than the bare global.
+ */
+function apexDomain(): string | undefined {
+  const env = (
+    globalThis as { process?: { env?: Record<string, string | undefined> } }
+  ).process?.env;
+  return env?.OTHALA_APEX?.trim() || undefined;
+}
+
+/**
+ * Redirect home with the Kratos session cookie expired on THIS device.
+ *
+ * Name, Domain and Path mirror the session cookie Kratos issues
+ * (kratos/kratos.yml:255-263 — name `ory_kratos_session`, domain
+ * `${OTHALA_APEX}`, default path `/`). A deletion only lands if it matches the
+ * cookie that was set; browsers key cookies on name/domain/path.
+ *
+ * `Secure` follows the scheme of OTHALA_PUBLIC_URL, not of the incoming
+ * request: behind the edge proxy the portal is reached over plain http even on
+ * an https instance, and a Secure cookie arriving over plain http is discarded
+ * by the browser — which would silently defeat the deletion in the e2e stack.
+ *
+ * Domain is omitted when OTHALA_APEX is unset, leaving a host-only deletion
+ * rather than guessing a parent domain.
+ */
+function signedOutLocally(): Response {
+  const apex = apexDomain();
+  const attrs = [
+    'ory_kratos_session=',
+    'Path=/',
+    'Max-Age=0',
+    'Expires=Thu, 01 Jan 1970 00:00:00 GMT',
+    'HttpOnly',
+    'SameSite=Lax',
+  ];
+  if (apex) attrs.push(`Domain=${apex}`);
+  if (publicUrl.startsWith('https://')) attrs.push('Secure');
+
+  return new Response(null, {
+    status: 303,
+    headers: {
+      Location: '/',
+      'Set-Cookie': attrs.join('; '),
+    },
+  });
+}
 
 let session = null;
 try {
   session = await getSession(cookie);
 } catch {
-  return Astro.redirect('/');
+  // Kratos is unreachable or answering unexpectedly. We cannot revoke
+  // anything, but the user asked to be signed out — drop the cookie on this
+  // device rather than bouncing them home still signed in.
+  console.warn(
+    '[othala/logout] session lookup failed; clearing the session cookie on this device. ' +
+      'The Kratos-side session, if any, is untouched.',
+  );
+  return signedOutLocally();
 }
 
 if (!session?.active) {
-  return Astro.redirect('/');
+  // Kratos reports no live session. Clear any stale cookie on the way home so
+  // the browser stops presenting a dead one.
+  return signedOutLocally();
 }
 
-const info = await getLogoutInfo(cookie);
-if (info) {
-  // Defense-in-depth: assert the logout_url origin matches the configured
-  // Kratos public origin so a compromised/unexpected Kratos response can't
-  // redirect the user off-instance.
-  try {
-    const logoutOrigin = new URL(info.logout_url).origin;
-    const kratosOrigin = new URL(kratosBase()).origin;
-    if (logoutOrigin === kratosOrigin) return Astro.redirect(info.logout_url);
-  } catch {
-    // malformed URL — fall through to '/'
-  }
-  return Astro.redirect('/');
+let info: LogoutInfo | null = null;
+try {
+  info = await getLogoutInfo(cookie);
+} catch {
+  // getLogoutInfo only swallows 401/403; anything else reaching here means
+  // Kratos is unhealthy. Fall through to the local clear rather than 500ing a
+  // page whose whole job is to end a session.
+  console.warn('[othala/logout] could not create a logout flow; clearing locally.');
+  info = null;
 }
 
-return Astro.redirect('/');
+if (!info) {
+  // No logout flow to complete: Kratos declined, or the session went away
+  // between the two calls. Still clear locally.
+  return signedOutLocally();
+}
+
+if (isOurLogoutUrl(info.logout_url)) {
+  // Normal path. Kratos revokes the session and clears its own cookies.
+  return Astro.redirect(info.logout_url);
+}
+
+// Fail closed. The URL is not one of ours, so the browser is not handed to it;
+// we complete the logout ourselves and expire the cookie here.
+let seenOrigin = 'unparseable';
+try {
+  // URL.origin is normalised and cannot carry CR/LF, so it is safe to log.
+  seenOrigin = new URL(info.logout_url).origin;
+} catch {
+  /* keep the placeholder */
+}
+console.warn(
+  `[othala/logout] logout_url origin ${seenOrigin} is neither OTHALA_PUBLIC_URL nor ` +
+    'KRATOS_PUBLIC_URL; refusing the redirect and completing the logout server-side.',
+);
+
+const status = await revokeServerSide(info.logout_token);
+if (status === null || status >= 400) {
+  console.warn(
+    `[othala/logout] server-side revoke did not confirm (status=${status ?? 'no response'}). ` +
+      'The session cookie is cleared on this device, but the Kratos session may still be live.',
+  );
+}
+return signedOutLocally();
 ---
 <!-- never rendered: this page always redirects in the front-matter -->

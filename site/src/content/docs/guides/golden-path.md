@@ -85,9 +85,12 @@ considerations.
 
 ### 5. No in-pod mTLS, but pod-network as trust domain
 
-Plain HTTP across the auth pod (portal -> kratos:4434, portal ->
-hydra:4445). The pod boundary is the trust domain; defense-in-depth
-between in-pod services is partial-and-deliberate. The standalone
+Plain HTTP across the auth pod: the portal reaches Kratos and Hydra,
+including their admin APIs, without TLS. The pod boundary is the trust
+domain; defense-in-depth between in-pod services is partial-and-deliberate.
+Peers are addressed by instance-scoped container name, never by a bare
+`kratos` or `hydra` alias, which resolves nowhere (ADR 07); the addresses
+themselves are deploy-plane values and are not restated here. The standalone
 consent service is retired; there is no longer a kratos -> consent hop.
 
 Ory's roadmap could add mTLS or SPIFFE primitives; we ignore them
@@ -151,24 +154,25 @@ break-glass-only (full DB rebuild).
 The non-rotatable property is Ory's, not ours. We accept it and
 document.
 
-### 10. Substrate secret collapse (homelab simplification)
+### 10. Substrate secrets are collapsed to a small core set
 
-v0.1.3 had 19 sops keys for the auth substrate. v0.2.0 collapses to
-approximately 5 core keys (using the `dag_*` prefix introduced alongside
-the rename): a DB password, a session secret (Kratos and Hydra cookies),
-a cipher secret (Kratos at-rest encryption), the non-rotatable
-`secrets.system` key (Hydra at-rest encryption), and a pairwise salt.
-The `auth_internal_bearer` key (consent service bearer token) was retired
-with the consent service. Exact key names live in the instance's sops
-store and carry the `dag_*` prefix.
+The substrate holds a handful of core secrets: a DB password, a session
+secret (Kratos and Hydra cookies), a cipher secret (Kratos at-rest
+encryption), the non-rotatable `secrets.system` key (Hydra at-rest
+encryption), and a pairwise salt. Earlier revisions of the stack carried
+several times that number, including a bearer token for the standalone
+consent service, which was retired with the service. Exact key names and
+the current count live in the instance's sops store and carry the `dag_*`
+prefix; `CHANGELOG.md` is the only place release state is asserted, so no
+count is restated here.
 
 The two-slot cookie rotation pattern (CURRENT + PREVIOUS) is reduced
 to single-value reuse in production. **This trades a small amount of
 rotation ergonomics for substantial operator clarity.** The two-slot
 pattern is still available in lab and documented in
-`docs/runbooks/cookie-rotation.md` for production-grade environments
-that need rolling rotation; we accept the brief disruption window in
-exchange for simpler sops state.
+`docs/runbooks/cookie-rotation.md` for environments that need rolling
+rotation; we accept the brief disruption window in exchange for simpler
+sops state.
 
 **To break this**: re-introduce the two-slot model. Operator burden:
 the sops file grows; rotation runbook becomes more careful.
@@ -198,8 +202,9 @@ This doc is a contract with future-you. Revisit when:
 - A scale-up genuinely needs one of these doors opened (e.g., a
   second admin operator needs CLI access to write metadata_admin;
   factor the validator).
-- The QEMU-CI lab (forthcoming) makes upgrade re-validation cheap
-  enough that one of these closed doors is worth opening on a per-bump
-  basis.
+- The QEMU-CI lab makes upgrade re-validation cheap enough that one of
+  these closed doors is worth opening on a per-bump basis. It exists and
+  runs the `e2e` job; the question is whether its coverage is good enough
+  to trust a door open.
 
 Each opening is a permanent operator-burden increase. Default closed.

@@ -69,15 +69,37 @@ their own identity (email, groups, traits). The only write path for
 the internet. (See docs/adr/08-admin-authority-model.md for the full rationale.)
 
 For dual-admin setup (recommended), both identities get `metadata_admin.admin=true`
-via the admin UI (Admin → Users → Edit → toggle admin marker) or:
+via the admin UI (Admin → Users → Edit → toggle admin marker) or from the
+console:
 
 ```sh
-# From inside the Kratos container
+# From inside the Kratos container. This endpoint takes a JSON Patch ARRAY,
+# not a merge object — a bare {"metadata_admin": …} body is rejected.
 curl -fsS -X PATCH \
   -H 'Content-Type: application/json' \
-  -d '{"metadata_admin":{"admin":true,"groups":["family","admin"]}}' \
+  -d '[{"op":"add","path":"/metadata_admin/admin","value":true}]' \
   http://localhost:4434/admin/identities/<UUID>
 ```
+
+(That is the same two-op shape the portal itself uses — see `setAdminMarker`
+in `portal/src/lib/admin-api.ts`. If `metadata_admin` is absent entirely, add
+it first: `[{"op":"add","path":"/metadata_admin","value":{"admin":true}}]`.)
+
+Patch the marker and nothing else. Never send a whole `metadata_admin` object
+here: it replaces `groups` as well, and silently stripping an admin's groups
+leaves them able to sign in while every app denies them.
+
+**Groups are separate, and nothing is derived from the marker.** Entry to an
+app comes from holding that app's `<svc>-access` group — for everyone, admins
+included. `<svc>-admin` grants the elevated role *inside* the app and admits
+nobody on its own. So an admin who uses a service holds both, explicitly:
+`["keep-access", "keep-admin"]`. Read the identity before you write it:
+
+```sh
+curl -fsS http://localhost:4434/admin/identities/<UUID> | jq '.metadata_admin'
+```
+
+The full model, and what enforces each half, is in `docs/access-model.md`.
 
 ---
 
@@ -100,6 +122,12 @@ returns HTTP 403 and Kratos (`can_interrupt: true`) aborts the flow — no
 privileged session is issued. This fires even if someone requests a recovery
 code and types it in correctly; the gate blocks the session promotion step.
 
+The gate re-reads that flag from the admin API on **every** attempt
+(`fetchAdminMarker` in `portal/src/server/listen.mjs`). It holds no cached
+copy and no allow-list. That is what makes the console procedure in Section 4
+work: an operator at the Kratos admin API can clear the marker, recover, and
+put it back.
+
 Note: the jsonnet body template (`recovery-gate.jsonnet`) also computes an
 `is_admin` field from `ctx.identity.metadata_admin.admin`, but Kratos v26.2.0
 omits `metadata_admin` from the after-hook template context. The gate ignores
@@ -114,6 +142,16 @@ Non-admin family members are unaffected. They recover via email as normal.
 
 Work from top to bottom. Each step is less convenient and more drastic than
 the one above it.
+
+> **Read before you need it.** Steps A and B are ordinary product paths and
+> are exercised by the e2e suite. Steps C, D and E are console procedures
+> assembled from the Kratos admin API; they have **not** been rehearsed
+> end-to-end against a live stack. Drill them in the QEMU lab before you are
+> relying on them at 2am. Two things they must be drilled against are called
+> out in place below: the recovery **link** strategy is disabled on this
+> instance, and the recovery-gate's admin-403 is wired at the flow level, so
+> the ladder deliberately does not depend on any claim that an admin-issued
+> code "bypasses" it.
 
 ---
 
@@ -151,57 +189,30 @@ operator and spouse carrying the `metadata_admin.admin` marker).
 
 **Who does this:** the admin who still has working auth.
 
-**Why it works:** the portal UI blocks issuing a recovery link for admin
-targets through the normal "Issue enrollment URL" button — it checks the
-`metadata_admin.admin` flag and refuses if the target is an admin.
+**Why the browser cannot do this:** the portal UI refuses to issue a recovery
+URL for an admin target through the "Issue enrollment URL" button — it reads
+the `metadata_admin.admin` flag and stops (`shouldRefuseRecovery` in
+`portal/src/lib/access.ts`). That guard exists so a compromised admin browser
+session cannot issue a recovery URL for the other admin. It is why admin
+recovery is console-only.
 
-The console path (Step D) bypasses this restriction because it calls the
-Kratos admin API directly, not the portal. The portal guard exists to prevent
-a compromised admin browser session from issuing a recovery URL for the other
-admin — it is a defense-in-depth measure, not the only lock.
+**For the operator:** do this from your workstation. It is Step D run against
+someone else's identity, so the mechanics live there — this step is only about
+who runs it and how the result is handed over.
 
-**For the operator:** do this from your workstation.
-
-1. SSH to your host.
-2. Exec into the Kratos container:
-
-   ```sh
-   sudo -u dag XDG_RUNTIME_DIR=/run/user/<service-uid> \
-     podman exec -it dag-kratos sh
-   ```
-
-   (The `dag` user and `<service-uid>` are the quadlet service account on your
-   host. Adjust UID to match your deployment.)
-
-3. Find the identity ID for the locked-out admin:
-
-   ```sh
-   kratos --endpoint http://localhost:4434 identities list \
-     --format json | jq '.[] | select(.traits.email == "spouse@example.com")'
-   ```
-
-4. Issue a recovery URL:
-
-   ```sh
-   curl -fsS -X POST \
-     -H 'Content-Type: application/json' \
-     -d '{"identity_id": "<UUID-from-step-3>", "expires_in": "1h"}' \
-     http://localhost:4434/admin/recovery/link
-   ```
-
-   The response contains a `recovery_link`. Copy it.
-
-5. Send the link via Signal or iMessage to the locked-out admin. Set a 1h
-   time limit on the conversation: "use this within an hour."
-
-6. The locked-out admin opens the link in a clean browser window. It lands
-   them in the settings flow with a privileged session. They re-enroll their
-   passkeys and TOTP before closing the tab.
-
-Note: the recovery link issued from the admin API bypasses the recovery-gate
-webhook. The gate only fires on the public self-service recovery flow
-(`/self-service/recovery/code`), not on admin-API-issued links. This is why
-Step C works when email recovery does not.
+1. Follow **Step D**, steps 1 to 6, using the locked-out admin's identity id
+   at step 3.
+2. Send the `recovery_link` **and** the `recovery_code` to the locked-out
+   admin over a channel you both already trust (Signal, iMessage). Both are
+   needed: the link opens the recovery page, the code is what it asks for.
+3. Say "use this in the next few minutes" — the code's lifetime is short (see
+   the note in Step D, step 5).
+4. They open the link in a clean browser window, enter the code, and land in
+   the settings flow with a privileged session. They re-enroll passkeys and
+   TOTP before closing the tab.
+5. **You then restore their admin marker** (Step D, step 8). Until you do,
+   they are a normal member. Do not walk away from the console between these
+   two steps.
 
 ---
 
@@ -240,36 +251,96 @@ still works.
      podman exec -it dag-kratos sh
    ```
 
-3. Find your identity ID by email:
+3. Find the identity ID by email:
 
    ```sh
    kratos --endpoint http://localhost:4434 identities list \
      --format json | jq '.[] | select(.traits.email == "your@email.com")'
    ```
 
-4. Issue a self-recovery URL:
+4. **Save the current `metadata_admin`, then clear the admin marker.** You are
+   about to run a recovery flow, and the recovery-gate refuses recovery for
+   any identity carrying that marker (Section 3). The gate re-reads the marker
+   live, so clearing it first is what makes the next step land:
+
+   ```sh
+   curl -fsS http://localhost:4434/admin/identities/<UUID> \
+     | jq '.metadata_admin'          # write this down — you restore it at step 8
+
+   curl -fsS -X PATCH \
+     -H 'Content-Type: application/json' \
+     -d '[{"op":"remove","path":"/metadata_admin/admin"}]' \
+     http://localhost:4434/admin/identities/<UUID>
+   ```
+
+   Leave `groups` alone. This patch touches the marker only. (`remove` fails if
+   the key is not there. If the `jq` above shows no `admin` key, there is
+   nothing to clear — skip to step 5, and skip step 8 as well.)
+
+5. Issue a recovery **code**:
 
    ```sh
    curl -fsS -X POST \
      -H 'Content-Type: application/json' \
-     -d '{"identity_id": "<UUID>", "expires_in": "1h"}' \
-     http://localhost:4434/admin/recovery/link
+     -d '{"identity_id": "<UUID>", "expires_in": "15m"}' \
+     http://localhost:4434/admin/recovery/code
    ```
 
-5. Copy the `recovery_link` from the response.
+   The response carries a `recovery_link` **and** a `recovery_code`. You need
+   both. Nothing is emailed — this is the admin API handing you the code
+   directly.
 
-6. Open the link in your browser. You will land in the settings flow with a
-   privileged session. Re-enroll passkeys and TOTP before closing the tab.
+   > It is `/admin/recovery/code`, not `/admin/recovery/link`. The link
+   > (magic-link) strategy is disabled on this instance —
+   > `selfservice.methods.link.enabled: false` in `kratos/kratos.yml` — so the
+   > link endpoint is not a working path here. The code method is the one
+   > that is enabled, and `selfservice.flows.recovery.use: code` is what the
+   > flow runs. Note also that the code's own lifetime is bounded by
+   > `selfservice.methods.code.config.lifespan` in the same file regardless of
+   > the `expires_in` you ask for: treat the window as minutes. If the code is
+   > rejected as expired, issue a fresh one.
 
-7. Record the event in the operator log: note the date and reason in
-   `journalctl` on the host or your ops notes.
+6. Open the `recovery_link` in your browser and enter the `recovery_code`. You
+   land in the settings flow with a privileged session.
+
+7. Re-enroll **in that session**, before the tab closes: at least two passkeys
+   across two devices, a fresh TOTP, and new backup codes saved.
+
+8. **Restore the admin marker.** Back at the console:
+
+   ```sh
+   curl -fsS -X PATCH \
+     -H 'Content-Type: application/json' \
+     -d '[{"op":"add","path":"/metadata_admin/admin","value":true}]' \
+     http://localhost:4434/admin/identities/<UUID>
+   ```
+
+   Then re-read `metadata_admin` and compare it against what you saved at
+   step 4. It takes effect on the next request; no restart.
+
+9. Record the event in the operator log: note the date and reason in
+   `journalctl` on the host or your ops notes. The window in which the marker
+   was off belongs in that note.
 
 **After recovery, verify:**
 
 - Two or more passkeys registered (visible in Settings → Security).
 - TOTP re-enrolled and backup codes saved.
+- The admin marker is back, and `groups` is exactly what step 4 recorded.
+- You can reach `/admin` again (that is the marker actually working, not the
+  patch merely returning 200).
 - Old session cookies invalidated — the settings flow's `revoke_active_sessions`
   hook fires automatically on passkey/password change and handles this.
+
+**Why the marker comes off and goes back on.** The recovery-gate webhook is
+wired at the flow level — `selfservice.flows.recovery.after.hooks` in
+`kratos/kratos.yml`, `can_interrupt: true` — with no exemption for a flow the
+admin API created. An earlier version of this runbook asserted that admin-API
+recovery bypasses the gate; nothing in the config scopes it that way, and it
+has never been drilled. Clearing the marker for the length of the recovery
+makes the procedure work whether the hook fires or not, which is the property
+worth having in a break-glass. It costs nothing: anyone who can call the
+Kratos admin API can already do far more than flip that boolean.
 
 ---
 
@@ -313,10 +384,15 @@ To add the spouse as an admin:
 1. Create an Othala identity for the spouse (Admin → Users → New, or use the
    enrollment URL flow).
 2. In the admin UI, open the spouse's profile and toggle the admin marker on.
-   (Or via the Kratos admin API: `PATCH /admin/identities/<UUID>` with
-   `{"metadata_admin":{"admin":true,"groups":["family","admin"]}}`.)
-3. Have the co-admin sign in and verify they reach the admin dashboard.
-4. Have the co-admin enroll a second passkey and TOTP per Section 1 above.
+   (Or via the Kratos admin API, using the marker-only JSON Patch from
+   Section 2 — never a whole `metadata_admin` object, which would replace
+   their groups.)
+3. Give them the groups they need, in the admin UI or in the same patch style.
+   A portal admin is not automatically admitted anywhere: they need each
+   app's `<svc>-access` group to get in, plus `<svc>-admin` wherever they
+   should hold the elevated role.
+4. Have the co-admin sign in and verify they reach the admin dashboard.
+5. Have the co-admin enroll a second passkey and TOTP per Section 1 above.
 
 No restart required — the admin marker takes effect immediately on the next
 request (the portal reads it from the Kratos admin API on each check).

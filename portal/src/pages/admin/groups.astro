@@ -14,8 +14,9 @@
 export const prerender = false;
 
 import Layout from '../../layouts/Layout.astro';
+import ManifestNotice from '../../components/ManifestNotice.astro';
 import { requireAdminSession, listIdentities } from '../../lib/admin';
-import { loadClientManifests, knownIdentityGroups } from '../../lib/manifests';
+import { servingManifests, servingIdentityGroups, manifestHealth } from '../../lib/manifest-store';
 import { getGroupRegistry } from '../../lib/group-registry';
 import type { Identity } from '../../lib/types';
 
@@ -30,10 +31,14 @@ try {
   loadError = err instanceof Error ? err.message : String(err);
 }
 
-const manifests = loadClientManifests();
+// Manifest reads go through the serving store: a manifest that fails to
+// validate falls back to the last known good set instead of 500-ing this page.
+// ManifestNotice below makes the fallback visible.
+const manifests = servingManifests();
 const registry = getGroupRegistry();
 const clientNameById = new Map(manifests.map((m) => [m.clientId, m.clientName] as const));
-const identityGroups = knownIdentityGroups();
+const identityGroups = servingIdentityGroups();
+const manifestState = manifestHealth();
 
 // access-model Phase 2 (§12): the access section is now a registry-driven
 // Group → Apps view. A group's type is its BINDING, not its name — so an
@@ -97,6 +102,8 @@ function membersOf(group: string): MemberRef[] {
   {loadError && (
     <div class="notice notice-danger">Failed to read identity store: {loadError}</div>
   )}
+
+  <ManifestNotice health={manifestState} />
 
   <section class="section">
     <p class="section-subtitle">Identity groups</p>

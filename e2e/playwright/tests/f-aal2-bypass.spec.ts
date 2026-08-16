@@ -84,7 +84,7 @@ test('F2 — admin at AAL1: POST /admin/users/new is refused (step-up redirect, 
     const resp1 = await ctx.request.post(`${baseURL}/admin/users/new`, {
       maxRedirects: 0,
       headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-      data: 'username=attack.user&email=attack@othala.test&identityGroups=family&csrf_token=fake',
+      data: 'username=attack.user&email=attack@othala.test&identityGroups=grafana-access&csrf_token=fake',
     });
 
     const status1 = resp1.status();
@@ -102,7 +102,7 @@ test('F2 — admin at AAL1: POST /admin/users/new is refused (step-up redirect, 
         'Content-Type': 'application/x-www-form-urlencoded',
         'Origin': origin,
       },
-      data: 'username=attack.user&email=attack@othala.test&identityGroups=family&csrf_token=fake',
+      data: 'username=attack.user&email=attack@othala.test&identityGroups=grafana-access&csrf_token=fake',
     });
 
     const status2 = resp2.status();

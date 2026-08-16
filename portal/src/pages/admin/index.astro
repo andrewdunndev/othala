@@ -12,8 +12,14 @@
 export const prerender = false;
 
 import Layout from '../../layouts/Layout.astro';
+import ManifestNotice from '../../components/ManifestNotice.astro';
 import { requireAdminSession, listIdentities } from '../../lib/admin';
-import { loadClientManifests, knownIdentityGroups, knownAccessGroups } from '../../lib/manifests';
+import {
+  servingManifests,
+  servingIdentityGroups,
+  servingAccessGroups,
+  manifestHealth,
+} from '../../lib/manifest-store';
 
 const guard = await requireAdminSession(Astro);
 if (guard instanceof Response) return guard;
@@ -28,9 +34,13 @@ try {
   loadError = 'Failed to read identity store — check Kratos connectivity.';
 }
 
-const manifests = loadClientManifests();
-const identityGroups = knownIdentityGroups();
-const accessGroups = knownAccessGroups();
+// Manifest reads go through the serving store, which falls back to the last
+// known good set instead of throwing — a manifest that fails to validate must
+// not 500 the page an operator would open to find out why.
+const manifests = servingManifests();
+const identityGroups = servingIdentityGroups();
+const accessGroups = servingAccessGroups();
+const health = manifestHealth();
 
 const adminNav = [
   { href: '/admin',          label: 'Overview' },
@@ -69,6 +79,8 @@ const cards = [
       {loadError}
     </div>
   )}
+
+  <ManifestNotice health={health} />
 
   <section class="section">
     <p class="section-subtitle">At a glance</p>

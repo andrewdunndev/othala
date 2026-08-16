@@ -58,7 +58,8 @@ none, so even admin "sign out everywhere" produces zero RP-side logout. Fix: add
 `backchannel_logout_uri` to `larder.yaml` (Mealie supports it) + future clients.
 
 **H5 — no adopter guidance to key RPs on `sub`; every documented recipe links on
-email/username.** `sub` is a correct immutable UUID, but `docs/per-app-oidc.md`
+email/username.** `sub` is a correct immutable UUID, but
+`site/src/content/docs/guides/per-app-oidc.md`
 wires GitLab/Immich/Mealie on email/username — and both `email` and `username`
 are user-editable Kratos traits. A member changing email keeps the same `sub` but
 orphans every email-linked RP account. Standard: OIDC Core §5.7 (only `sub` is

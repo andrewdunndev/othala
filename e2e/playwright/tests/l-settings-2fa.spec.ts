@@ -109,7 +109,7 @@ test('L1 — settings page renders TOTP QR and secret when TOTP enrollment is ac
     email: 'totp.enroll@othala.test',
     username: 'totp.enroll',
     displayName: 'TOTP Enroll Tester',
-    groups: ['family'],
+    groups: [],
     kratosAdminURL,
   });
   console.log('[L1] seeded identity:', identity.id, identity.email);
@@ -190,7 +190,7 @@ test('L2 — backup codes are visible in the HTML after generating them (regress
     email: 'backup.codes@othala.test',
     username: 'backup.codes',
     displayName: 'Backup Code Tester',
-    groups: ['family'],
+    groups: [],
     kratosAdminURL,
   });
   console.log('[L2] seeded identity:', identity.id, identity.email);

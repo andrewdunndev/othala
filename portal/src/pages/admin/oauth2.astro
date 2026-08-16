@@ -14,13 +14,18 @@
 export const prerender = false;
 
 import Layout from '../../layouts/Layout.astro';
+import ManifestNotice from '../../components/ManifestNotice.astro';
 import { requireAdminSession } from '../../lib/admin';
-import { loadClientManifests } from '../../lib/manifests';
+import { servingManifests, manifestHealth } from '../../lib/manifest-store';
 
 const guard = await requireAdminSession(Astro);
 if (guard instanceof Response) return guard;
 
-const manifests = loadClientManifests();
+// The serving store falls back to the last known good set rather than throwing,
+// so this page still renders when a manifest fails to validate. ManifestNotice
+// says so out loud — a stale catalog must never read as the live one.
+const manifests = servingManifests();
+const health = manifestHealth();
 
 const adminNav = [
   { href: '/admin',          label: 'Overview' },
@@ -46,6 +51,8 @@ const adminNav = [
       <a href={item.href}>{item.label}</a>
     ))}
   </nav>
+
+  <ManifestNotice health={health} />
 
   <section class="section stack-lg">
     {manifests.map((m) => (

@@ -22,8 +22,10 @@
  *   4. Exchange the code for tokens (POST /oauth2/token, client_secret_basic).
  *   5. Decode the id_token with jose (jwtDecrypt / decodeJwt — RS256, public
  *      key via jwks: verify signature against Hydra's JWKS endpoint).
- *   6. Assert grafana_role includes 'Viewer' (family -> viewer per the
- *      grafana consent block's group_role_map).
+ *   6. Assert grafana_role includes 'Viewer' (grafana-access -> viewer per the
+ *      grafana consent block's group_role_map). The member holds ONLY
+ *      `grafana-access`; the admin-tier role would need `grafana-admin` held in
+ *      addition. Spec T covers that pairing and its ordering hazard.
  *
  * The grafana redirect_uri (https://grafana.othala.test/login/generic_oauth)
  * is external; inside the compose net it is unresolvable. We intercept it at
@@ -126,7 +128,7 @@ test('B — OIDC authorize flow issues id_token with grafana_role=[Viewer]', asy
     }));
 
     // Step 6: assert the injected role claim. The grafana consent block maps
-    // family -> viewer -> grafana_role: ['Viewer'].
+    // grafana-access -> viewer -> grafana_role: ['Viewer'].
     const grafanaRole: string[] = (claims['grafana_role'] as string[]) ?? [];
 
     expect(

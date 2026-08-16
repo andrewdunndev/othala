@@ -58,7 +58,7 @@ test('R1 — admin deactivate/reactivate via a real browser click must not 403 (
     email: 'r1.acting-admin@othala.test',
     username: 'r1.acting.admin',
     displayName: 'R1 Acting Admin',
-    groups: ['family'],
+    groups: [],
     isAdmin: true,
     kratosAdminURL,
   });
@@ -66,7 +66,7 @@ test('R1 — admin deactivate/reactivate via a real browser click must not 403 (
     email: 'r1.target@othala.test',
     username: 'r1.target',
     displayName: 'R1 Target',
-    groups: ['family'],
+    groups: [],
     kratosAdminURL,
   });
   console.log('[R1] acting admin:', actingAdmin.id, '| target:', target.id);

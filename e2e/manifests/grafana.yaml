@@ -1,8 +1,21 @@
 # Grafana — grafana.othala.test
 # Generic OSS example fixture for the Othala e2e harness. This is THE
 # role-mapping example: a Grafana generic_oauth client with a JMESPath
-# role attribute (grafana_role) plus a groups claim and an
-# identity-group → Grafana-role map.
+# role attribute (grafana_role) plus a groups claim and a
+# group → Grafana-role map.
+#
+# It is also the fixture the access model is asserted against. Two groups
+# exist for this service and no others:
+#
+#   grafana-access — ENTRY. Held by everyone who may use Grafana at all,
+#                    admins included. Bound under presentation.access below.
+#   grafana-admin  — ROLE ONLY. Bound under consent.group_role_map below.
+#                    It grants NO entry on its own; nothing derives entry
+#                    from it.
+#
+# The names are convention. What is load-bearing is which key each group is
+# listed under — a group's type comes from its binding, never from its
+# spelling (portal/src/lib/group-registry.ts).
 #
 # Grafana 10.2+ supports OIDC back-channel logout in the generic_oauth
 # provider; the logout token is accepted at the standard logout path
@@ -16,7 +29,17 @@ presentation:
   icon: GR
   icon_slug: grafana
   auth_kind: oidc
-  access_group: access-grafana
+  # ENTRY. This list is the whole answer to "can this person get in?" — it
+  # names `grafana-access` and NOTHING else. `grafana-admin` is deliberately
+  # ABSENT: an admin is admitted because they hold `grafana-access` like
+  # everyone else, not because their admin group leaks entry. Adding
+  # `grafana-admin` here is what the converged model abolished; the T4 case in
+  # playwright/tests/t-access-model.spec.ts fails if anyone puts it back.
+  # Enforced by enforceAccessGate (portal/src/lib/gate.ts), reading
+  # accessGroups parsed from this key by parseAccessGroups
+  # (portal/src/lib/access-groups.ts).
+  access:
+    - grafana-access
   order: 110
 
 oidc:
@@ -59,6 +82,15 @@ oidc:
 #   GF_AUTH_GENERIC_OAUTH_GROUPS_ATTRIBUTE_PATH=groups
 #
 # Source: https://grafana.com/docs/grafana/latest/setup-grafana/configure-security/configure-authentication/generic-oauth/
+#
+# ROLE, not entry. Declaration ORDER here is descending privilege
+# (admin, editor, viewer) because lookupRole (portal/src/lib/claims.ts)
+# reads a role's INDEX in this list as its rank and keeps the highest
+# rank matched across the identity's whole group set. That makes the
+# resolution order-independent: `[grafana-access, grafana-admin]` and
+# `[grafana-admin, grafana-access]` both resolve to admin. Descending
+# order is a CONVENTION enforced by nobody today — see the RANK note in
+# claims.ts. T2/T3 in playwright/tests/t-access-model.spec.ts pin it.
 consent:
   emit_groups_claim: true
   roles:
@@ -71,16 +103,25 @@ consent:
       description: "Create and edit dashboards in the default org."
       claim_emit:
         grafana_role: ["Editor"]
-        groups: ["family"]
+        groups: ["editor"]
     viewer:
       description: "Read-only dashboard access."
       claim_emit:
         grafana_role: ["Viewer"]
-        groups: ["family"]
-  # group_role_map keys are Kratos identity group names. Replace admin/family/
-  # friends/kids with your own group slugs — these are example names only.
+        groups: ["viewer"]
+  # group_role_map keys are Kratos group names, exactly two per service:
+  # `<svc>-access` and `<svc>-admin`. Both are listed HERE (role) and only
+  # `grafana-access` is listed under presentation.access (entry) — that split
+  # is the converged model. An identity holding both resolves to admin. An
+  # identity holding only `grafana-admin` never gets as far as this map: the
+  # access binding above denies it at enforceAccessGate, before any claim is
+  # composed. That is the intended outcome — a misconfigured identity, not a
+  # shortcut.
+  #
+  # `editor` is deliberately unmapped: it is reachable only via the per-client
+  # override metadata_admin.roles.grafana="editor" (lookupRole step 1,
+  # portal/src/lib/claims.ts). A declared role with no group is legal —
+  # manifest-lint.ts only BLOCKs the converse (a mapped role that is undeclared).
   group_role_map:
-    admin: admin
-    family: viewer
-    friends: viewer
-    kids: viewer
+    grafana-admin: admin
+    grafana-access: viewer

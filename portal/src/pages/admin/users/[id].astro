@@ -7,7 +7,11 @@
 //           this same URL with `?mode=edit`
 //
 // Actions live behind named POST buttons:
-//   action=issue-recovery -> Kratos getRecoveryLink, render the URL inline
+//   action=issue-recovery -> Kratos getRecoveryLink, render the enrollment
+//                            LINK + CODE inline. Nothing is emailed: the link
+//                            opens the recovery UI with an empty code field,
+//                            so the admin must deliver both values out of
+//                            band (Signal/iMessage) or the recipient is stuck.
 //   action=delete         -> Kratos deleteIdentity (requires `confirm=<username>`)
 //   action=deactivate     -> Kratos deactivateIdentity (soft delete)
 //
@@ -33,7 +37,7 @@ import {
   type RevokeUserResult,
 } from '../../../lib/admin';
 import { deleteCredential, EVICTABLE_CREDENTIAL_TYPES } from '../../../lib/admin-api';
-import { loadClientManifests } from '../../../lib/manifests';
+import { servingManifests } from '../../../lib/manifest-store';
 import {
   computeEffectiveAccess,
   describeSource,
@@ -52,7 +56,9 @@ const adminIdentityId = guard.identity?.id ?? '';
 const { id } = Astro.params;
 if (!id) return new Response('Missing identity id', { status: 400 });
 
-const manifests = loadClientManifests();
+// Serving store, not the strict loader: this page is where an operator grants
+// and revokes access, so it has to stay reachable when a manifest is broken.
+const manifests = servingManifests();
 const registry = getGroupRegistry();
 // Identity-group form labels share the canonical order with access.ts.
 const IDENTITY_GROUPS = [...IDENTITY_GROUP_ORDER];
@@ -71,6 +77,10 @@ const ACCESS_GROUPS = Array.from(registry.values())
   .sort((a, b) => a.group.localeCompare(b.group));
 const USERNAME_RE = /^[a-z0-9]+(?:\.[a-z0-9]+)+$/;
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+// The TTL passed to getRecoveryLink in the issue-recovery action. Named once
+// so the panel copy quotes the window actually requested rather than a second
+// hardcoded literal that can drift.
+const ENROLLMENT_TTL = '24h';
 
 let identity: Identity | null = null;
 let loadError: string | null = null;
@@ -89,7 +99,7 @@ identity = await reload();
 
 let mode: 'read' | 'edit' = Astro.url.searchParams.get('mode') === 'edit' ? 'edit' : 'read';
 let actionResult:
-  | { kind: 'recovery'; url: string; expiresAt: string }
+  | { kind: 'recovery'; url: string; code: string; expiresAt: string }
   | { kind: 'deleted'; username: string }
   | { kind: 'deactivated'; username: string }
   | { kind: 'reactivated'; username: string }
@@ -195,8 +205,16 @@ if (Astro.request.method === 'POST' && identity) {
             'Admin recovery is console-only. See docs/runbooks/admin-recovery.md.',
         };
       } else {
-        const link = await getRecoveryLink(id, '24h');
-        actionResult = { kind: 'recovery', url: link.recovery_link, expiresAt: link.expires_at };
+        const link = await getRecoveryLink(id, ENROLLMENT_TTL);
+        // B1: keep the code. The link lands on the recovery form with an empty
+        // code field — dropping recovery_code here is what used to dead-end
+        // every enrollment.
+        actionResult = {
+          kind: 'recovery',
+          url: link.recovery_link,
+          code: link.recovery_code,
+          expiresAt: link.expires_at,
+        };
       }
     } else if (action === 'force-relogin') {
       // D4: revoke every Kratos session for this identity, invalidate
@@ -355,6 +373,20 @@ for (const { key } of CREDENTIAL_METHODS) {
   }
 }
 
+// The exact bytes the admin pastes into Signal/iMessage. Composed server-side
+// so the visible textarea and the copy button carry identical text, and so the
+// link and the code can never be sent apart by accident.
+const enrollmentShareText =
+  actionResult?.kind === 'recovery'
+    ? [
+        `Set up your account: ${actionResult.url}`,
+        ``,
+        `Recovery code: ${actionResult.code}`,
+        ``,
+        `The code works once and expires ${actionResult.expiresAt}.`,
+      ].join('\n')
+    : '';
+
 const adminNav = [
   { href: '/admin',          label: 'Overview' },
   { href: '/admin/users',    label: 'Users' },
@@ -397,9 +429,53 @@ const adminNav = [
       </div>
     )}
     {actionResult?.kind === 'recovery' && (
-      <div class="notice notice-success">
-        <p><strong>Enrollment URL issued.</strong> Expires {actionResult.expiresAt}.</p>
-        <input type="text" readonly value={actionResult.url} />
+      <div class="notice notice-success stack">
+        <p><strong>Enrollment link and code issued.</strong></p>
+        <p class="text-sm">
+          No email was sent. Send them <strong>both</strong> values yourself,
+          out of band (Signal, iMessage). The link opens the enrollment form
+          with an empty code field, so the link on its own is a dead end.
+        </p>
+        <p class="text-sm">
+          The code works <strong>once</strong> and the pair is valid for
+          {ENROLLMENT_TTL} from issue — it expires
+          <span class="mono">{actionResult.expiresAt}</span>. After that, issue
+          a fresh pair from this page.
+        </p>
+
+        <div class="field">
+          <label for="enrollmentShareText">Message to send (link + code)</label>
+          <textarea id="enrollmentShareText" rows="5" readonly>{enrollmentShareText}</textarea>
+          <div class="copy-actions">
+            <button type="button" class="button button-primary button-sm" data-copy="enrollmentShareText">
+              Copy link + code
+            </button>
+          </div>
+          <span class="field-hint">
+            Together these two values are the credential. Delete the message once they are in.
+          </span>
+        </div>
+
+        <div class="field">
+          <label for="enrollmentUrl">Enrollment link</label>
+          <div class="copy-row">
+            <input id="enrollmentUrl" type="text" readonly value={actionResult.url} />
+            <button type="button" class="button button-secondary button-sm" data-copy="enrollmentUrl">
+              Copy
+            </button>
+          </div>
+        </div>
+
+        <div class="field">
+          <label for="enrollmentCode">Recovery code</label>
+          <div class="copy-row">
+            <input id="enrollmentCode" type="text" class="mono" readonly value={actionResult.code} />
+            <button type="button" class="button button-secondary button-sm" data-copy="enrollmentCode">
+              Copy
+            </button>
+          </div>
+          <span class="field-hint">Sending the link without this is the most common way enrollment dead-ends.</span>
+        </div>
       </div>
     )}
     {actionResult?.kind === 'revoked' && (
@@ -434,7 +510,8 @@ const adminNav = [
     {actionResult?.kind === 'credential-removed' && (
       <div class="notice notice-warning">
         <strong>Credential type removed:</strong> all <span class="mono">{actionResult.credType}</span> credentials
-        have been deleted for this identity. Issue an enrollment URL so the legitimate user can re-enroll.
+        have been deleted for this identity. Issue an enrollment link and code below, and send the
+        legitimate user both, so they can re-enroll.
       </div>
     )}
     {actionResult?.kind === 'error' && (
@@ -607,7 +684,8 @@ const adminNav = [
               </div>
               <p class="cred-eviction-note muted text-xs">
                 Remove evicts the credential type (passkey/webauthn/totp/backup codes) for lost-device response.
-                The user must re-enroll via an enrollment URL. Password cannot be removed here.
+                The user must re-enroll with an enrollment link and code (both, issued from Actions below).
+                Password cannot be removed here.
               </p>
             </dd>
           </dl>
@@ -678,7 +756,7 @@ const adminNav = [
               <input type="hidden" name="action" value="issue-recovery" />
               <input type="hidden" name="csrf_token" value={csrfTokenIssueRecovery} />
               <button type="submit" class="button button-secondary">
-                Issue enrollment URL
+                Issue enrollment link + code
               </button>
             </form>
             <form method="post" class="actions-form">
@@ -776,10 +854,53 @@ const adminNav = [
   });
 </script>
 
+<script is:inline>
+  // Copy-to-clipboard for the enrollment handoff. `data-copy` names the id of
+  // the input/textarea whose value gets copied, so the button can never copy
+  // something other than what the admin is looking at. Falls back to
+  // select + execCommand where the async Clipboard API is unavailable; if even
+  // that fails the text is left selected so ⌘C still works.
+  document.addEventListener('click', function (e) {
+    var target = e.target;
+    var btn = target && target.closest ? target.closest('[data-copy]') : null;
+    if (!btn) return;
+    var src = document.getElementById(btn.getAttribute('data-copy'));
+    if (!src) return;
+    e.preventDefault();
+
+    function flash() {
+      var prev = btn.getAttribute('data-copy-label') || btn.textContent.trim();
+      btn.setAttribute('data-copy-label', prev);
+      btn.textContent = 'Copied';
+      setTimeout(function () { btn.textContent = prev; }, 1500);
+    }
+    function fallback() {
+      if (typeof src.select === 'function') src.select();
+      try {
+        if (document.execCommand('copy')) flash();
+      } catch (_) { /* leave it selected for a manual copy */ }
+    }
+
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(src.value).then(flash, fallback);
+    } else {
+      fallback();
+    }
+  });
+</script>
+
 <style>
   /* Inline form wrappers inside the actions row so each button carries its
    * own action-scoped CSRF token without disrupting the flex layout. */
   .actions-form { display: contents; }
+  /* Enrollment handoff: readonly value + its Copy button on one line. The
+   * value flexes, the button keeps its natural width; min-width:0 lets a long
+   * URL shrink instead of overflowing the notice. */
+  .copy-row { display: flex; align-items: center; gap: var(--space-2); }
+  .copy-row input { flex: 1 1 auto; min-width: 0; }
+  .copy-row .button { flex: 0 0 auto; }
+  .copy-actions { margin-top: var(--space-1); }
+  #enrollmentShareText { resize: vertical; font-family: var(--font-mono); font-size: var(--text-sm); }
   .dl-grid { display: grid; grid-template-columns: 9rem 1fr; gap: var(--space-2) var(--space-4); }
   .edit-action { margin-top: var(--space-2); }
   .badge-row { margin-top: var(--space-1); }

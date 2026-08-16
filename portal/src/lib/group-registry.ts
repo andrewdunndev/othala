@@ -22,7 +22,7 @@
 
 import type { ClientManifest } from './manifests';
 import { identityGroups as envIdentityGroups } from './config';
-import { loadClientManifests } from './manifests';
+import { servingManifests } from './manifest-store';
 
 export type GroupKind = 'identity' | 'access' | 'role';
 
@@ -88,20 +88,27 @@ export function buildGroupRegistry(
 //
 // The registry is a pure function of (manifest set, env identity groups). The
 // env groups are fixed for the process lifetime, so we memoize on the manifest
-// array identity: loadClientManifests() returns the SAME array reference while
-// its 30s/mtime cache is warm and a FRESH one on reload, so an identity compare
-// is a correct, allocation-free cache key.
+// array identity: servingManifests() returns the SAME array reference while the
+// underlying 30s/mtime cache is warm and a FRESH one on reload, so an identity
+// compare is a correct, allocation-free cache key. It also holds one reference
+// steady for the whole duration of a load failure (the last known good set, or
+// the empty set), so a broken manifest does not thrash this memo.
+//
+// The registry reads the SERVING set (lib/manifest-store.ts), not the strict
+// loader: /auth/settings and three admin pages render from it, and a manifest
+// the operator broke a moment ago must not 500 the page they would use to see
+// that it is broken.
 
 let memoManifests: ClientManifest[] | null = null;
 let memoRegistry: GroupRegistry | null = null;
 
 /**
- * The registry for the current manifest set, memoized on the manifest cache
- * key (the loadClientManifests() array identity). Rebuilds transparently when
- * the manifest cache turns over.
+ * The registry for the currently served manifest set, memoized on the manifest
+ * cache key (the servingManifests() array identity). Rebuilds transparently
+ * when the manifest cache turns over. Never throws.
  */
 export function getGroupRegistry(): GroupRegistry {
-  const manifests = loadClientManifests();
+  const manifests = servingManifests();
   if (memoRegistry !== null && memoManifests === manifests) {
     return memoRegistry;
   }

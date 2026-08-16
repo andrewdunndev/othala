@@ -271,7 +271,7 @@ echo "C. Identity admin flow"
 # C1: Create an identity via the Kratos admin API. kratos' busybox wget has
 # no --post-data, so POST from othala's node over the compose network (othala
 # reaches kratos:4434). Program on stdin (podman-compose-safe).
-identity_json=$(printf '%s' "fetch('http://kratos:4434/admin/identities',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({schema_id:'family',traits:{username:'lab.test',email:'lab.test@${OTHALA_APEX}',displayName:'Lab Test'},metadata_admin:{groups:['family','access-grafana','access-audiobookshelf']}})}).then(r=>r.text()).then(t=>{process.stdout.write(t);process.exit(0)}).catch(()=>process.exit(1))" | node_in othala)
+identity_json=$(printf '%s' "fetch('http://kratos:4434/admin/identities',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({schema_id:'family',traits:{username:'lab.test',email:'lab.test@${OTHALA_APEX}',displayName:'Lab Test'},metadata_admin:{groups:['grafana-access','audiobookshelf-access']}})}).then(r=>r.text()).then(t=>{process.stdout.write(t);process.exit(0)}).catch(()=>process.exit(1))" | node_in othala)
 identity_id=$(echo "$identity_json" | python3 -c "import sys,json; print(json.load(sys.stdin).get('id',''))" 2>/dev/null || echo "")
 if [[ -n "$identity_id" ]]; then
     pass "C1 created identity id=$identity_id"
@@ -283,7 +283,7 @@ fi
 if [[ -n "$identity_id" ]]; then
     rt=$(curl_in kratos "http://localhost:4434/admin/identities/$identity_id")
     groups=$(echo "$rt" | python3 -c "import sys,json; d=json.load(sys.stdin); print(','.join(d.get('metadata_admin',{}).get('groups',[])))" 2>/dev/null || echo "")
-    if [[ "$groups" == "family,access-grafana,access-audiobookshelf" ]]; then
+    if [[ "$groups" == "grafana-access,audiobookshelf-access" ]]; then
         pass "C2 identity round-trip preserves metadata_admin.groups"
     else
         fail "C2 metadata_admin.groups round-trip" "got=$groups"
@@ -328,10 +328,10 @@ gate_resp() {
 # 403 WITH the console-only reason (not just any 403 — a fail-closed 403 must
 # not satisfy this probe). Payload deliberately says is_admin=false to prove
 # the marker outranks the payload field.
-admin_identity_json=$(printf '%s' "fetch('http://kratos:4434/admin/identities',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({schema_id:'family',traits:{username:'lab.admin',email:'lab.admin@${OTHALA_APEX}',displayName:'Lab Admin'},metadata_admin:{admin:true,groups:['admin','family']}})}).then(r=>r.text()).then(t=>{process.stdout.write(t);process.exit(0)}).catch(()=>process.exit(1))" | node_in othala)
+admin_identity_json=$(printf '%s' "fetch('http://kratos:4434/admin/identities',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({schema_id:'family',traits:{username:'lab.admin',email:'lab.admin@${OTHALA_APEX}',displayName:'Lab Admin'},metadata_admin:{admin:true,groups:['grafana-access','grafana-admin']}})}).then(r=>r.text()).then(t=>{process.stdout.write(t);process.exit(0)}).catch(()=>process.exit(1))" | node_in othala)
 admin_identity_id=$(echo "$admin_identity_json" | python3 -c "import sys,json; print(json.load(sys.stdin).get('id',''))" 2>/dev/null || echo "")
 if [[ -n "$admin_identity_id" ]]; then
-    admin_resp=$(gate_resp "${RECOVERY_GATE_SECRET}" "{\"identity_id\":\"${admin_identity_id}\",\"is_admin\":false,\"groups\":[\"admin\",\"family\"],\"traits\":{}}")
+    admin_resp=$(gate_resp "${RECOVERY_GATE_SECRET}" "{\"identity_id\":\"${admin_identity_id}\",\"is_admin\":false,\"groups\":[\"grafana-admin\"],\"traits\":{}}")
     admin_code="${admin_resp%%|*}"; admin_body="${admin_resp#*|}"
     if [[ "$admin_code" == "403" && "$admin_body" == *"console-only"* ]]; then
         pass "D1 recovery-gate refuses metadata_admin.admin=true identity (console-only; marker outranks payload is_admin=false)"
@@ -343,12 +343,14 @@ else
 fi
 
 # D2: the REAL non-admin identity from C1 (metadata_admin has groups, no
-# admin marker) → 200, even with groups containing 'admin' (groups are
-# display-only / observability metadata; the marker is the sole authority).
+# admin marker) → 200, even when the PAYLOAD claims an admin-tier group
+# ('grafana-admin'). Group membership is app authorization; PORTAL admin
+# authority is the metadata_admin.admin marker alone, and a payload cannot
+# assert either.
 if [[ -n "$identity_id" ]]; then
-    nonadmin_code=$(gate_code "${RECOVERY_GATE_SECRET}" "{\"identity_id\":\"${identity_id}\",\"is_admin\":false,\"groups\":[\"admin\",\"family\"],\"traits\":{}}")
+    nonadmin_code=$(gate_code "${RECOVERY_GATE_SECRET}" "{\"identity_id\":\"${identity_id}\",\"is_admin\":false,\"groups\":[\"grafana-admin\"],\"traits\":{}}")
     if [[ "$nonadmin_code" == "200" ]]; then
-        pass "D2 recovery-gate allows non-admin identity (marker absent; groups display-only, not authority)"
+        pass "D2 recovery-gate allows non-admin identity (marker absent; no group confers portal admin authority)"
     else
         fail "D2 recovery-gate non-admin path" "code=$nonadmin_code want=200"
     fi
@@ -484,11 +486,12 @@ run_dance() {
     echo "$res"
 }
 
-# G1: active member WITH the access-grafana group -> dance completes, and the ID
-# token carries grafana's manifest-injected role claim (family -> viewer ->
+# G1: active member holding grafana-access -> dance completes, and the ID token
+# carries grafana's manifest-injected role claim (grafana-access -> viewer ->
 # grafana_role=[Viewer]). This is the integration guard for the claims-injection
-# convergence regression.
-g1_id=$(mk_identity active "['family','access-grafana']" g1.activegrafana)
+# convergence regression. The admin pairing and its ordering hazard are asserted
+# in the browser phase (playwright/tests/t-access-model.spec.ts T2/T3).
+g1_id=$(mk_identity active "['grafana-access']" g1.activegrafana)
 g1=$(run_dance "$g1_id")
 if [[ "$g1" == OK* && "$g1" == *'"grafana_role":["Viewer"]'* ]]; then
     pass "G1 OIDC dance issues an ID token with the injected role claim (grafana_role=[Viewer])"
@@ -497,7 +500,7 @@ else
 fi
 
 # G2: INACTIVE identity -> access-gate denies at the consent re-gate (state check).
-g2_id=$(mk_identity inactive "['family','access-grafana']" g2.inactive)
+g2_id=$(mk_identity inactive "['grafana-access']" g2.inactive)
 g2=$(run_dance "$g2_id")
 # error_description is opaque ('access_denied') by design — the precise reason
 # ('identity not active') is logged server-side only and asserted in
@@ -508,15 +511,19 @@ else
     fail "G2 inactive deny" "got: $g2 (want DENIED ... access_denied)"
 fi
 
-# G3: active identity WITHOUT the access-grafana group -> denied at consent (group check).
-g3_id=$(mk_identity active "['family']" g3.nogroup)
+# G3: active identity holding ONLY grafana-admin -> DENIED at the access gate.
+# Admin-implies-access is abolished: entry comes from grafana-access, which this
+# identity does not hold, and NOTHING derives entry from an admin group. The
+# grafana manifest binds only grafana-access under presentation.access; putting
+# grafana-admin back in that list is what would flip this probe.
+g3_id=$(mk_identity active "['grafana-admin']" g3.adminonly)
 g3=$(run_dance "$g3_id")
 # Opaque error_description by design (see G2); precise reason is server-side only.
-# The e2e guard is that the no-group member is DENIED.
+# The e2e guard is that the admin-group-only identity is DENIED.
 if [[ "$g3" == DENIED* && "$g3" == *access_denied* ]]; then
-    pass "G3 OIDC dance DENIES a member missing the access-grafana group (group gate)"
+    pass "G3 OIDC dance DENIES an identity holding ONLY grafana-admin (admin does not imply access)"
 else
-    fail "G3 no-group deny" "got: $g3 (want DENIED ... access_denied)"
+    fail "G3 admin-only deny" "got: $g3 (want DENIED ... access_denied) — admin-implies-access may have been reintroduced"
 fi
 
 # Section H: contact / request form (public SSR /api/request -> shared SMTP).

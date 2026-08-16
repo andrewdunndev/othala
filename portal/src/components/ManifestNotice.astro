@@ -1,0 +1,71 @@
+---
+// ManifestNotice — the admin-visible half of the manifest fallback.
+//
+// The serving loader (lib/manifest-store.ts) keeps the portal up when a
+// manifest fails to validate by continuing to serve the last known good set.
+// That is the right call for availability and the wrong thing to hide: an admin
+// looking at the Apps list must not read a stale catalog as the live one.
+//
+// So every admin page that renders manifest-derived data mounts this. It emits
+// nothing when the set is healthy. The full cause is printed here as well as
+// logged, because the operator is already on this page when they notice the
+// counts look wrong.
+//
+// Deliberately not shown to non-admins: a family member seeing a tile is a
+// yes/no question, and a validation trace is not their problem.
+
+import type { ManifestHealth } from '../lib/manifest-store';
+
+interface Props {
+  health: ManifestHealth;
+}
+
+const { health } = Astro.props;
+
+const brokenForSeconds =
+  health.failingSinceMs === null
+    ? 0
+    : Math.max(0, Math.round((Date.now() - health.failingSinceMs) / 1000));
+
+function describeDuration(seconds: number): string {
+  if (seconds < 60) return `${seconds}s`;
+  if (seconds < 3600) return `${Math.round(seconds / 60)}m`;
+  return `${Math.round(seconds / 3600)}h`;
+}
+---
+{health.status === 'stale' && (
+  <div class="notice notice-danger">
+    <p>
+      <strong>Showing a stale app catalog.</strong> The manifest set has failed
+      to load for {describeDuration(brokenForSeconds)}, so the portal is serving
+      the last known good set ({health.serving} app{health.serving === 1 ? '' : 's'}).
+      What is on disk is not what is running. Logins keep working against the
+      stale set; fix the manifest and the portal picks it up on the next
+      request, with no restart.
+    </p>
+    <pre class="manifest-cause">{health.error}</pre>
+  </div>
+)}
+{health.status === 'unavailable' && (
+  <div class="notice notice-danger">
+    <p>
+      <strong>No app catalog is loaded.</strong> The manifest set failed to load
+      and there was no earlier good set to fall back to, so the portal is
+      serving zero apps — every OIDC login is being denied. Fix the manifest and
+      the portal picks it up on the next request, with no restart.
+    </p>
+    <pre class="manifest-cause">{health.error}</pre>
+  </div>
+)}
+
+<style>
+  /* validateClients joins one line per finding with newlines. Preserve those
+     breaks, but wrap long lines rather than pushing the admin layout sideways. */
+  .manifest-cause {
+    margin: var(--space-3) 0 0;
+    font-family: var(--font-mono, ui-monospace, monospace);
+    font-size: var(--text-xs, 0.8125rem);
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
+  }
+</style>

@@ -22,8 +22,13 @@ presentation:
   icon: AI
   icon_slug: openwebui
   auth_kind: oidc
+  # ENTRY: `prompt-access` and nothing else. `prompt-admin` is bound under
+  # consent.group_role_map only. Group names track the SERVICE slug (this tile
+  # is Prompt at prompt.othala.test), not the OAuth2 client_id (`openwebui`) —
+  # further proof that the name is convention and the BINDING is what the
+  # runtime reads (portal/src/lib/access-groups.ts, group-registry.ts).
   access:
-    - access-llm
+    - prompt-access
   order: 120
 
 oidc:
@@ -73,10 +78,10 @@ consent:
       description: "Household member: chat access across permitted models."
       claim_emit:
         groups: ["user"]
-  # group_role_map keys are Kratos identity group names. Replace admin/family/
-  # friends/kids with your own group slugs — these are example names only.
+  # Exactly two groups for this service. `prompt-admin` appears HERE (role) and
+  # NOT under presentation.access (entry) — holding it alone gets you nothing.
+  # Roles are declared above in descending privilege because lookupRole
+  # (portal/src/lib/claims.ts) ranks by declaration index.
   group_role_map:
-    admin: admin
-    family: user
-    friends: user
-    kids: user
+    prompt-admin: admin
+    prompt-access: user

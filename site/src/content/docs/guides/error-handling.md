@@ -1,8 +1,11 @@
 # Error handling & the two-layer deny model
 
 How Othala denies bad requests, and how every error surface is branded.
-Status: portal layer **implemented** (static-validated); Caddy edge belt +
-live validation **pending**.
+
+The non-obvious part, and the reason this page exists, is that there are two
+independent deny layers and the application can only see one of them. Read it
+before changing anything in `portal/src/middleware.ts` or the error pages,
+because the split is what makes their shape look arbitrary.
 
 ## Two layers of denial
 
@@ -19,15 +22,17 @@ A request to a protected endpoint passes through two independent guards.
    returns early without `next()`), so nothing in app code — including
    `src/middleware.ts` — can see or rebrand it.
    - **Never disable or reimplement `checkOrigin`.** CVE-2024-56140 was a
-     bypass of this exact check (content-type tricks); it's fixed in 4.16.17
-     and we run Astro 6.2.1. Reimplementing risks reintroducing the bypass.
+     bypass of this exact check (content-type tricks), fixed upstream well
+     before the version this portal pins in `portal/package.json`.
+     Reimplementing risks reintroducing the bypass.
 
 2. **Application guards (in the page/route).** Once a request passes
    `checkOrigin`, the app's own guards run:
-   - `requireAdminSession()` (`portal/src/lib/admin.ts`): not in the admin
-     allowlist → `302 /auth/error?reason=not-admin`; session below `aal2` →
-     `302 …/self-service/login/browser?aal=aal2&refresh&return_to=…`
-     (step-up). These fire for **all** HTTP methods.
+   - `requireAdminSession()` (`portal/src/lib/admin.ts`): session below
+     `aal2` → `302 …/self-service/login/browser?aal=aal2&refresh&return_to=…`
+     (step-up); identity without the `metadata_admin.admin` marker (ADR 08)
+     → `302 /auth/error?reason=not-admin`. These fire for **all** HTTP
+     methods.
    - Consent CSRF (`portal/src/lib/oauth2-handlers.ts`): a tampered
      `csrf_token` → `400`.
 
@@ -56,38 +61,20 @@ status + title + message + optional reason badge — **never** internals).
 `auth-unreachable`, `session-expired`, `forbidden`, `unavailable`,
 `not-found`, `rate-limited`, `server-error`, + a generic default.
 
-## Pending: Caddy edge belt for the `checkOrigin` 403
+## The one surface that stays unbranded
 
-Because `checkOrigin` short-circuits before user middleware (above), the one
-surface the portal layer cannot brand is the framework `403`. Brand it at the
-**edge** (the reverse proxy's intended pathway — `caddy/Caddyfile` worked
-example), leaving Astro's CSRF
-untouched.
+Because `checkOrigin` short-circuits before user middleware (above), the
+framework `403` is the one deny the portal cannot brand. It ships bare, and
+that is the current state, not an oversight waiting on a fix.
 
-Shape (intercept upstream 4xx/5xx, render the branded page, **preserve the
-original status**):
+The gap is deliberately small. That 403 is effectively attacker-only, so the
+population that sees it is not the family. Branding it would mean intercepting
+upstream 4xx at the reverse proxy and re-rendering the app's own error page
+while preserving the original status, which is a Caddy `handle_response`
+sub-request pattern that is finicky enough to need validating against a live
+stack before it ships. Nobody has paid that cost, because the surface it
+improves is one an attacker sees.
 
-```caddyfile
-reverse_proxy othala:8080 {
-    @err status 400 401 403 404 405 429 500 502 503 504
-    handle_response @err {
-        # render the app's branded /auth/error, keep the original status
-        # (the exact directive combo — rewrite + reverse_proxy + status
-        #  preservation — must be confirmed against a live Caddy + stack)
-    }
-}
-```
-
-> **Needs live validation.** Caddy `handle_response` status-preservation +
-> sub-request behavior is finicky; do not ship this blind. Validate on the
-> lodestone stack with a real Caddy in front.
-
-## Live-validation checklist (when an operator + stack are available)
-
-- [ ] 404, 500, `/auth/error?reason=<each>` render branded with correct status.
-- [ ] `src/middleware.ts`: a raw non-HTML app 4xx for a navigation rebrands;
-      confirm **loop-safety** and **status preservation** at runtime
-      (rewrite re-entry only shows up live).
-- [ ] e2e `{e,f,h}` specs green (origin-less 403 + same-origin app guard).
-- [ ] Caddy belt brands the `checkOrigin` 403 with the original status, and a
-      portal-down 502/503 has a static fallback (don't sub-request a dead app).
+If it is ever picked up, the acceptance bar is: the branded page carries the
+original status, and a portal-down 502/503 falls back to something static
+rather than sub-requesting a dead app.

@@ -13,5 +13,9 @@ presentation:
   icon_slug: ""
   icon_fallback: serverfault
   auth_kind: forward_auth
-  access_group: access-proxywatch
+  # The group the edge passes as ?group= to /api/forward-auth. Under the
+  # converged model the edge passes `<svc>-access` for EVERYONE including
+  # admins, because entry is never derived from `proxywatch-admin`.
+  # playwright/tests/t-access-model.spec.ts T6-T9 assert that endpoint directly.
+  access_group: proxywatch-access
   order: 120

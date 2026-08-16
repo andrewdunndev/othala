@@ -4,11 +4,15 @@
 // Flow:
 //   GET  -> render form, manifest-driven group/role checkboxes
 //   POST -> validate -> Kratos createIdentity -> Kratos getRecoveryLink
-//        -> render the one-time enrollment URL for the admin to copy
+//        -> render the one-time enrollment LINK + CODE for the admin to copy
 //
-// The recovery link is the canonical onboarding handoff: admin texts it
-// over Signal/iMessage, recipient lands on the recovery flow and sets up
-// password + passkey. No password ever transits a channel.
+// Nothing is emailed. getRecoveryLink() uses Kratos'
+// createRecoveryCodeForIdentity (see src/lib/admin-api.ts), which hands back
+// a `recovery_link` pointing at the recovery UI with an EMPTY code field and
+// the `recovery_code` that fills it. The link alone is a dead end, so both
+// values are rendered together and copyable as one pasteable message —
+// the admin texts that message over Signal/iMessage and the recipient sets
+// up password + passkey. No password ever transits a channel.
 //
 // Validation is server-side (the source of truth) with light client-side
 // hints. Kratos itself rejects malformed traits, but we surface friendlier
@@ -39,9 +43,19 @@ const empty: FormState = {
   recoveryEmail: '',
 };
 
+// The TTL passed to getRecoveryLink below. Named once so the UI copy and the
+// Kratos call can never drift apart — the panel quotes this, it does not
+// hardcode a second literal.
+const ENROLLMENT_TTL = '24h';
+
 let form: FormState = empty;
 let errors: Record<string, string> = {};
-let success: { recoveryUrl: string; expiresAt: string; username: string } | null = null;
+let success: {
+  recoveryUrl: string;
+  recoveryCode: string;
+  expiresAt: string;
+  username: string;
+} | null = null;
 
 const USERNAME_RE = /^[a-z0-9]+(?:\.[a-z0-9]+)+$/;
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -87,9 +101,10 @@ if (Astro.request.method === 'POST') {
           groups: [defaultGroup],
         },
       });
-      const link = await getRecoveryLink(created.id, '24h');
+      const link = await getRecoveryLink(created.id, ENROLLMENT_TTL);
       success = {
         recoveryUrl: link.recovery_link,
+        recoveryCode: link.recovery_code,
         expiresAt: link.expires_at,
         username: form.username,
       };
@@ -101,12 +116,28 @@ if (Astro.request.method === 'POST') {
 
 // HIGH-1: per-request CSRF token, single-use.
 const csrfToken = signToken(adminIdentityId);
+
+// The exact bytes the admin pastes into Signal/iMessage. Composed server-side
+// so the visible textarea and the copy button are guaranteed to carry the same
+// text, and so link and code can never be sent apart by accident.
+const shareText = success
+  ? [
+      `Set up your account: ${success.recoveryUrl}`,
+      ``,
+      `Recovery code: ${success.recoveryCode}`,
+      ``,
+      `The code works once and expires ${success.expiresAt}.`,
+    ].join('\n')
+  : '';
 ---
 <Layout title="New user — Admin">
   <header class="page-header">
     <p class="page-eyebrow">administration · users</p>
     <h1 class="page-title">New user</h1>
-    <p class="page-lede">Create a new identity and generate an enrollment URL to share out of band.</p>
+    <p class="page-lede">
+      Create a new identity and issue its one-time enrollment link and code.
+      Nothing is emailed — you deliver both to them yourself.
+    </p>
   </header>
 
   <nav class="nav-bar" aria-label="Admin">
@@ -124,15 +155,53 @@ const csrfToken = signToken(adminIdentityId);
         <div class="notice notice-success">
           <p><strong>Identity created for {success.username}.</strong></p>
           <p class="text-sm">
-            Share this enrollment URL with them out of band (Signal, iMessage).
-            It expires {success.expiresAt}.
+            No email was sent. Send them <strong>both</strong> the link and the
+            code yourself, out of band (Signal, iMessage). The link opens the
+            enrollment form with an empty code field, so the link on its own is
+            a dead end.
+          </p>
+          <p class="text-sm">
+            The code works <strong>once</strong> and the pair is valid for
+            {ENROLLMENT_TTL} from issue — it expires
+            <span class="mono">{success.expiresAt}</span>. After that, issue a
+            fresh pair from the user's page.
           </p>
         </div>
+
         <div class="field">
-          <label for="recoveryUrl">Enrollment URL</label>
-          <input id="recoveryUrl" type="text" readonly value={success.recoveryUrl} />
-          <span class="field-hint">Single-use. Do not paste in chat history that syncs to backups.</span>
+          <label for="shareText">Message to send (link + code)</label>
+          <textarea id="shareText" rows="5" readonly>{shareText}</textarea>
+          <div class="copy-actions">
+            <button type="button" class="button button-primary" data-copy="shareText">
+              Copy link + code
+            </button>
+          </div>
+          <span class="field-hint">
+            Together these two values are the credential. Delete the message once they are in.
+          </span>
         </div>
+
+        <div class="field">
+          <label for="recoveryUrl">Enrollment link</label>
+          <div class="copy-row">
+            <input id="recoveryUrl" type="text" readonly value={success.recoveryUrl} />
+            <button type="button" class="button button-secondary button-sm" data-copy="recoveryUrl">
+              Copy
+            </button>
+          </div>
+        </div>
+
+        <div class="field">
+          <label for="recoveryCode">Recovery code</label>
+          <div class="copy-row">
+            <input id="recoveryCode" type="text" class="mono" readonly value={success.recoveryCode} />
+            <button type="button" class="button button-secondary button-sm" data-copy="recoveryCode">
+              Copy
+            </button>
+          </div>
+          <span class="field-hint">Sending the link without this is the most common way enrollment dead-ends.</span>
+        </div>
+
         <div class="cta-row">
           <a href="/admin/users" class="button button-secondary">Back to users</a>
           <a href="/admin/users/new" class="button button-primary">Create another</a>
@@ -192,7 +261,7 @@ const csrfToken = signToken(adminIdentityId);
 
         <div class="cta-row">
           <button type="submit" class="button button-primary">
-            Create + send enrollment URL
+            Create identity + issue link and code
           </button>
           <a href="/admin/users" class="button button-secondary">Cancel</a>
         </div>
@@ -217,3 +286,49 @@ const csrfToken = signToken(adminIdentityId);
     setTimeout(function () { submitter.disabled = true; }, 0);
   });
 </script>
+
+<script is:inline>
+  // Copy-to-clipboard for the enrollment handoff. `data-copy` names the id of
+  // the input/textarea whose value gets copied, so the button can never copy
+  // something other than what the admin is looking at. Falls back to
+  // select + execCommand where the async Clipboard API is unavailable; if even
+  // that fails the text is left selected so ⌘C still works.
+  document.addEventListener('click', function (e) {
+    var target = e.target;
+    var btn = target && target.closest ? target.closest('[data-copy]') : null;
+    if (!btn) return;
+    var src = document.getElementById(btn.getAttribute('data-copy'));
+    if (!src) return;
+    e.preventDefault();
+
+    function flash() {
+      var prev = btn.getAttribute('data-copy-label') || btn.textContent.trim();
+      btn.setAttribute('data-copy-label', prev);
+      btn.textContent = 'Copied';
+      setTimeout(function () { btn.textContent = prev; }, 1500);
+    }
+    function fallback() {
+      if (typeof src.select === 'function') src.select();
+      try {
+        if (document.execCommand('copy')) flash();
+      } catch (_) { /* leave it selected for a manual copy */ }
+    }
+
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(src.value).then(flash, fallback);
+    } else {
+      fallback();
+    }
+  });
+</script>
+
+<style>
+  /* Readonly value + its Copy button on one line; the value flexes, the
+   * button stays its natural width. min-width:0 lets a long URL shrink
+   * instead of overflowing the row. */
+  .copy-row { display: flex; align-items: center; gap: var(--space-2); }
+  .copy-row input { flex: 1 1 auto; min-width: 0; }
+  .copy-row .button { flex: 0 0 auto; }
+  .copy-actions { margin-top: var(--space-1); }
+  #shareText { resize: vertical; font-family: var(--font-mono); font-size: var(--text-sm); }
+</style>

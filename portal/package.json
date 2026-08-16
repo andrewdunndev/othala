@@ -17,6 +17,7 @@
     "preview": "astro preview",
     "start": "node ./dist/server/listen.mjs",
     "test": "tsx --test scripts/*.test.mjs",
+    "test:unit": "vitest run",
     "purity": "cd .. && bash scripts/check-purity.sh"
   },
   "dependencies": {

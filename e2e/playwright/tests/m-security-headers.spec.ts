@@ -18,7 +18,8 @@
  *       content-security-policy: contains "frame-ancestors 'none'"
  *
  *     NOTE: script-src is intentionally absent from the CSP (deferred; see
- *     middleware.ts CSP note + docs/hardening.md §2). Do NOT assert it.
+ *     middleware.ts CSP note + site/src/content/docs/guides/hardening.md §2).
+ *     Do NOT assert it.
  *
  *   M6 (self-hosted fonts guard):
  *     IBM Plex fonts moved from Google CDN to local /fonts/. The auth pages

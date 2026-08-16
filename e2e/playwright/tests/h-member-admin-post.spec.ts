@@ -33,7 +33,7 @@ import { getSession } from '../actions/session';
  *  fires before any body is read; the body just satisfies HTTP POST semantics. */
 const DUMMY_FORM_BODY =
   'action=save&username=attack.user&email=attack%40othala.test' +
-  '&identityGroups=family&csrf_token=garbage-token';
+  '&identityGroups=grafana-access&csrf_token=garbage-token';
 
 /** A plausible but non-existent UUID (the [id] route param). */
 const FAKE_UUID = '00000000-0000-4000-a000-000000000001';
