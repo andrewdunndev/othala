@@ -222,3 +222,72 @@ export async function getLogoutInfo(cookie?: string): Promise<LogoutInfo | null>
     throw e;
   }
 }
+
+/**
+ * D1: drive Kratos's OWN self-service recovery flow, server-side, for a
+ * single address — the Kratos-native email delivery path for the
+ * admin-triggered invite email. Kratos's courier sends the code; this adds
+ * zero new mail machinery to the portal (nodemailer/mailer.ts is untouched).
+ *
+ * Uses the API flow type (`/self-service/recovery/api`), not the browser
+ * flow: an API-flow submission needs no anti-CSRF cookie ("Sending the
+ * anti-csrf token is only required for browser login flows" — the Ory SDK's
+ * UpdateRecoveryFlowWithCodeMethod doc comment), so this is a clean two-call
+ * server-to-server sequence with no cookie jar to thread through. The CSRF
+ * hazard Kratos's own docs warn about ("MUST NOT use this endpoint in
+ * server-side browser applications") is about handing an API flow to an
+ * untrusted BROWSER; here the flow id is minted and redeemed inside this one
+ * server-side call and never reaches a browser, so it does not apply.
+ *
+ * Bare fetch, not the @ory/client-fetch SDK: every SDK method throws
+ * ResponseError on any non-2xx, but Kratos v26.2.x returns HTTP 400 for this
+ * exact submission once the flow has moved past `choose_method` — a normal
+ * state transition (the body is still the valid re-rendered flow), not a
+ * failure. This is the same quirk e2e/playwright/tests/j-recovery-flow.spec.ts
+ * and k-email-code-login.spec.ts already work around by treating
+ * {200, 400, 422} as the single "accepted" outcome — mirrored here so
+ * production and the e2e suite agree on what "sent" means.
+ *
+ * What success here does NOT prove: that the email left the SMTP relay.
+ * Kratos queues courier messages and dispatches them on its own worker,
+ * decoupled from this request/response — identical to the guarantee an
+ * ordinary "Forgot access?" recovery already gives a member today. A
+ * misconfigured OTHALA_SMTP_CONNECTION_URI on the Kratos side fails silently
+ * from here (see D1 in DECISIONS.md and the admin-panel notice copy).
+ *
+ * Throws on a genuine failure (Kratos unreachable, malformed flow response,
+ * or a status outside the accepted set). Never logs `email` — the caller
+ * (portal/src/pages/admin/users/[id].astro) is responsible for keeping the
+ * address out of server logs on both the success and error paths.
+ */
+export async function sendInviteRecoveryEmail(email: string): Promise<void> {
+  const base = kratosBase();
+
+  const initResp = await fetch(`${base}/self-service/recovery/api`, {
+    method: 'GET',
+    headers: { Accept: 'application/json' },
+  });
+  if (!initResp.ok) {
+    throw new Error(`recovery flow init failed: HTTP ${initResp.status}`);
+  }
+  const flow = (await initResp.json()) as { id?: string };
+  if (!flow.id) {
+    throw new Error('recovery flow init returned no flow id');
+  }
+
+  const submitResp = await fetch(
+    `${base}/self-service/recovery?flow=${encodeURIComponent(flow.id)}`,
+    {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+      body: JSON.stringify({ method: 'code', email }),
+    },
+  );
+  // 200 / 422 — standard re-render (code sent). 400 — Kratos v26
+  // choose_method -> sent_email "flow state mismatch", which is STILL the
+  // success path (see the function doc comment above). Anything else is a
+  // real failure: Kratos down, the flow expired before we could submit, etc.
+  if (submitResp.status !== 200 && submitResp.status !== 400 && submitResp.status !== 422) {
+    throw new Error(`recovery email submit failed: HTTP ${submitResp.status}`);
+  }
+}

@@ -225,11 +225,14 @@ export function computeEffectiveAccess(
 }
 
 /**
- * HIGH-3 gate: refuse admin-to-admin recovery via the UI. The Kratos
- * admin-issued recovery link bypasses the recovery-gate webhook (the
- * gate only fires for the public /self-service/recovery/code flow),
- * so admin recovery is console-only. See
- * docs/runbooks/admin-recovery.md "Console recovery for an admin".
+ * HIGH-3 gate: refuse admin-to-admin recovery via the UI. Defense in depth
+ * that does NOT depend on whether the recovery-gate webhook also fires for
+ * an admin-API-issued flow — the runbook deliberately treats that as
+ * unproven and works around it by clearing the marker first regardless (see
+ * "Why the marker comes off and goes back on" under Step D,
+ * docs/runbooks/admin-recovery.md "## 4. Admin recovery ladder"). Admin
+ * recovery stays console-only; see the same runbook's
+ * "## 3. Why admin email-recovery is intentionally blocked".
  *
  * Admin status is the `metadata_admin.admin === true` marker
  * (writable only via the Kratos admin API). The caller MUST pass a target

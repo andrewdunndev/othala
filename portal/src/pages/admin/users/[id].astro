@@ -12,11 +12,21 @@
 // it via planGroupSave rather than by composing submitted checkboxes.
 //
 // Actions live behind named POST buttons:
-//   action=issue-recovery -> Kratos getRecoveryLink, render the enrollment
+//   action=issue-recovery    -> Kratos getRecoveryLink, render the enrollment
 //                            LINK + CODE inline. Nothing is emailed: the link
 //                            opens the recovery UI with an empty code field,
 //                            so the admin must deliver both values out of
 //                            band (Signal/iMessage) or the recipient is stuck.
+//   action=send-invite-email -> D1 addendum (DECISIONS.md, "No password ever
+//                            transits a channel"). Drives Kratos's OWN
+//                            self-service recovery flow
+//                            (sendInviteRecoveryEmail, src/lib/kratos.ts) for
+//                            this identity's on-file email — Kratos's courier
+//                            sends a CODE ONLY, never a link with the code
+//                            embedded, so this message alone is never the
+//                            complete credential (same two-channel shape as
+//                            issue-recovery's link+code pair, just delivered
+//                            over a different channel for the secret half).
 //   action=delete         -> Kratos deleteIdentity (requires `confirm=<username>`)
 //   action=deactivate     -> Kratos deactivateIdentity (soft delete)
 //
@@ -42,6 +52,7 @@ import {
   type RevokeUserResult,
 } from '../../../lib/admin';
 import { deleteCredential, EVICTABLE_CREDENTIAL_TYPES } from '../../../lib/admin-api';
+import { sendInviteRecoveryEmail } from '../../../lib/kratos';
 import { servingManifests } from '../../../lib/manifest-store';
 import {
   computeEffectiveAccess,
@@ -106,6 +117,7 @@ identity = await reload();
 let mode: 'read' | 'edit' = Astro.url.searchParams.get('mode') === 'edit' ? 'edit' : 'read';
 let actionResult:
   | { kind: 'recovery'; url: string; code: string; expiresAt: string }
+  | { kind: 'invite-email'; email: string }
   | { kind: 'deleted'; username: string }
   | { kind: 'deactivated'; username: string }
   | { kind: 'reactivated'; username: string }
@@ -135,7 +147,7 @@ if (Astro.request.method === 'POST' && identity) {
   // The three actions panel buttons (issue-recovery / force-relogin /
   // deactivate / reactivate) share a single form POST, so each gets its own
   // action-scoped token minted at render time.
-  const actionScopedActions = new Set(['issue-recovery', 'force-relogin', 'deactivate', 'reactivate', 'grant-admin', 'revoke-admin']);
+  const actionScopedActions = new Set(['issue-recovery', 'send-invite-email', 'force-relogin', 'deactivate', 'reactivate', 'grant-admin', 'revoke-admin']);
   try {
     if (actionScopedActions.has(action)) {
       verifyToken(String(fd.get('csrf_token') ?? ''), adminIdentityId, action);
@@ -238,6 +250,37 @@ if (Astro.request.method === 'POST' && identity) {
           code: link.recovery_code,
           expiresAt: link.expires_at,
         };
+      }
+    } else if (action === 'send-invite-email') {
+      // D1: same HIGH-3 gate as issue-recovery — an admin target is refused
+      // regardless of whether the recovery-gate webhook also covers this
+      // path (see the corrected note in access.ts: it does, but this check
+      // does not depend on that being true).
+      const target = await getIdentity(id);
+      if (shouldRefuseRecovery(target)) {
+        actionResult = {
+          kind: 'error',
+          message:
+            'Admin recovery is console-only. See docs/runbooks/admin-recovery.md.',
+        };
+      } else {
+        const targetEmail = target.traits?.email;
+        if (!targetEmail) {
+          actionResult = { kind: 'error', message: 'Identity has no email trait on file.' };
+        } else {
+          try {
+            await sendInviteRecoveryEmail(targetEmail);
+            actionResult = { kind: 'invite-email', email: targetEmail };
+          } catch (err) {
+            // Never interpolate the address into the surfaced message —
+            // sendInviteRecoveryEmail's own errors are status-code-only, but
+            // guard here too in case that contract ever drifts.
+            actionResult = {
+              kind: 'error',
+              message: `Invite email failed: ${err instanceof Error ? err.message : 'unknown error'}`,
+            };
+          }
+        }
       }
     } else if (action === 'force-relogin') {
       // D4: revoke every Kratos session for this identity, invalidate
@@ -383,6 +426,7 @@ const formValues = {
 const csrfTokenSave = signToken(adminIdentityId);
 const csrfTokenDelete = signToken(adminIdentityId);
 const csrfTokenIssueRecovery = signToken(adminIdentityId, 'issue-recovery');
+const csrfTokenInviteEmail = signToken(adminIdentityId, 'send-invite-email');
 const csrfTokenForceRelogin = signToken(adminIdentityId, 'force-relogin');
 // Deactivate/reactivate are mutually exclusive at render time; only one
 // button will be shown, so only one token is needed.
@@ -515,6 +559,24 @@ const adminNav = [
           </div>
           <span class="field-hint">Sending the link without this is the most common way enrollment dead-ends.</span>
         </div>
+      </div>
+    )}
+    {actionResult?.kind === 'invite-email' && (
+      <div class="notice notice-success stack">
+        <p>
+          <strong>Invite email sent</strong> to <span class="mono">{actionResult.email}</span> via
+          the Kratos courier.
+        </p>
+        <p class="text-sm">
+          It carries a recovery <strong>code only</strong> — Kratos's code-recovery template never
+          embeds a link with the code, so this message alone can never complete enrollment. Tell
+          them where to go separately (the portal's recovery page is a fixed public URL, not a
+          secret) — Signal, iMessage, or however you'd already planned to reach them.
+        </p>
+        <p class="text-sm muted">
+          This confirms Kratos accepted the request, not that the mail left the relay — identical
+          to what an ordinary "Forgot access?" recovery already promises.
+        </p>
       </div>
     )}
     {actionResult?.kind === 'revoked' && (
@@ -845,6 +907,13 @@ const adminNav = [
               <input type="hidden" name="csrf_token" value={csrfTokenIssueRecovery} />
               <button type="submit" class="button button-secondary">
                 Issue enrollment link + code
+              </button>
+            </form>
+            <form method="post" class="actions-form">
+              <input type="hidden" name="action" value="send-invite-email" />
+              <input type="hidden" name="csrf_token" value={csrfTokenInviteEmail} />
+              <button type="submit" class="button button-secondary" title="Sends a recovery CODE ONLY via the Kratos courier — never a link with the code embedded.">
+                Send invite email
               </button>
             </form>
             <form method="post" class="actions-form">

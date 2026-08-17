@@ -148,6 +148,12 @@ user started should not.
 **Enforced by.** `portal/src/lib/admin-api.ts` (identity created with no credentials block; link and
 code minted together). The both-values rendering at the admin call sites is UNENFORCED.
 
+**D1 addendum (0.5.x).** An admin can also trigger the code by email instead of hand-delivering it:
+`sendInviteRecoveryEmail` (`portal/src/lib/kratos.ts`) drives Kratos's own self-service recovery flow
+for the identity's on-file address, so the Kratos courier — not the portal — sends a CODE ONLY, never a
+link with the code embedded, keeping the same two-channel shape. Enforced by
+`e2e/playwright/tests/u-admin-invite-email.spec.ts`.
+
 ## TLS is a network boundary, not an application concern
 
 **Decided.** Applications speak plain HTTP and never load a certificate; where a real boundary exists, a
