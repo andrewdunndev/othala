@@ -20,35 +20,30 @@ fixtures, so the docs and the tests agree by construction. Judging what else
 serves a stranger is a habit: nothing checks it.
 
 **2. Docs state WHY; code states WHAT.** Never restate code behaviour in prose:
-it rots on the next code change, and it produced five consecutive review rounds
-finding 3, 7, 8, 9 and 7 defects. Where behaviour must be referenced, point at
+it rots on the next code change. Where behaviour must be referenced, point at
 the TEST that enforces it. A rule with no named enforcer is a habit, and must be
 labelled one — starting with this rule, which nothing but review enforces.
 
 ## Citations
 
 Reference a **file plus a symbol**: a function, constant, directive or heading.
-Never a line number, and never an ADR number. The deleted ADR corpus accumulated
-243 citations of which roughly 31% of the line pins were already wrong before
-anyone noticed. `docs/adr/` and `docs/access-model.md` no longer exist, so every
-reference to them dangles.
+Never a line number, and never an ADR number. `docs/adr/` and
+`docs/access-model.md` no longer exist, so every reference to them dangles.
 
 `scripts/check-purity.sh` enforces the line-pin half of this for the vendored
 files (`no-line-pins-into-vendored-files`). The rest is a habit, and on you.
 
 The worked example, and the reason this file exists in this shape: the canonical
 group-name policy is `GROUP_RE` in `portal/src/lib/access-groups.ts`. Name it and
-stop. A previous version of this file spelled the regex out as a literal; the
-code changed, the literal did not, and the rule it stated was false for as long
-as anyone believed it.
+stop.
 
 ## The prose budget
 
 Tracked prose is capped, and the cap is enforced. **Adding documentation means
-removing documentation, in the same commit.** The corpus was cut by half because
-it had grown past what one maintainer and a model can hold in context; growing
-it back is the failure mode, not the fix. If you cannot name what a new page
-displaces, do not write it.
+removing documentation, in the same commit.** Prose grows past what one
+maintainer and a model can hold in context; the cap prevents it, and growing
+the corpus back toward that ceiling is the failure mode, not the fix. If you
+cannot name what a new page displaces, do not write it.
 
 The `prose-budget` check in `scripts/check-purity.sh` fails the build when the
 total exceeds `PROSE_CEILING_BYTES`, and prints the current total, the ceiling
@@ -84,9 +79,8 @@ Two local scripts. CI runs the same checks and more.
 worktree, so the corpus is identical locally and in CI. Each check names and
 explains itself at its call site; that is the list, and it is not repeated here.
 Three of them take the whole index as their corpus — instance names, personal
-names, private-stack application names — because the earlier narrow pathspecs
-reported all-clear over an instance name in `.gitlab-ci.yml` and application
-names in `DEPLOY.md`, a runbook and two published diagrams.
+names, private-stack application names — because a pathspec-scoped check cannot
+catch what is outside its glob.
 
 Its anti-vacuity contract at the top of the file is the point of it: a check that
 scanned zero files, weighed zero bytes, whose pattern no longer fires on its own

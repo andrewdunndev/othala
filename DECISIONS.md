@@ -14,10 +14,9 @@ that changes credentials.
 endpoint can never gate on AAL: step-up had to move into the application. Raising the pin tightens
 nothing — it makes the session endpoint stop returning a usable identity for exactly the people who
 enrolled a second factor, and that identity id is the gate's only input for group lookup, so every gated
-app locks out at once. The meta-lesson outlasts the setting: this pin was nearly deleted because its only
-written justification named a retired component. A live setting whose stated reason has expired is the
-most dangerous line in a config file, and Ory config here is host-mounted rather than baked into an
-image, so its consumer may not be in this repository at all.
+app locks out at once. A live setting whose stated reason has expired is the most dangerous line in a
+config file, and Ory config here is host-mounted rather than baked into an image, so its consumer may
+not be in this repository at all.
 
 **Enforced by.** `portal/scripts/forward-auth.test.mjs` holds the coupling (a session with no identity
 id is 401). The pinned value in `kratos/kratos.yml` is UNENFORCED.
@@ -27,15 +26,13 @@ id is 401). The pinned value in `kratos/kratos.yml` is UNENFORCED.
 **Decided.** The forward-auth endpoint answers 200 / 401 / 403 / 503, with 503 reserved for "could not
 establish the facts". Every non-200 denies; the statuses tell the edge which kind of failure occurred.
 
-**Why.** The outage case used to be a 403, so an edge matching `401 403` and redirecting turned an
+**Why.** Were 503 folded into 403, an edge matching `401 403` and redirecting would turn an
 identity-provider outage into an infinite login loop: the gate denies because it cannot reach the IdP,
-and the edge bounces the browser to a login page served by the same process that is down. Collapsing to
-one status loses either the flat "forbidden" for an already-signed-in user or the "needs to sign in"
-signal. No status is privileged: an edge redirects on exactly the statuses its own matcher lists, so an
-edge listing 503 rebuilds the loop this split exists to prevent. Two further constraints are equally
-invisible: the required group arrives as an operator-set query parameter, not a header, because anything
-reaching the endpoint internally can forge a header; and HEAD reuses the GET decision verbatim, because
-a HEAD that 200s where GET would 403 is a bypass.
+and the edge bounces the browser to a login page served by the same process that is down.
+`ARCHITECTURE.md`'s status contract ("Why 503 is separate at all") carries the full argument. Two
+further constraints are equally invisible: the required group arrives as an operator-set query
+parameter, not a header, because anything reaching the endpoint internally can forge a header; and HEAD
+reuses the GET decision verbatim, because a HEAD that 200s where GET would 403 is a bypass.
 
 **Enforced by.** `portal/scripts/forward-auth.test.mjs`
 
@@ -72,19 +69,18 @@ enforces nothing.
 for everyone, admins included. An elevated role comes from additionally holding a role-mapped group. A
 group's type comes from its bindings, never from its name.
 
-**Why.** Both halves reverse shipped models. Entry was derived twice: first from an estate-wide
-capability group conferring a role everywhere, then from binding the admin group alongside the access
-group so that holding admin granted entry as a side effect. Each was defensible alone and each cost the
-same thing: someone reading a service's access list did not have the whole answer. A rule that must be
-remembered will be misremembered, so reconstructibility from one artifact is a requirement of the model;
-the price, knowingly paid, is two group assignments per admin per service. Dropping the derivation
-created a hazard paid for properly rather than dodged: an admin now holds two role-mapped groups,
-normalization sorts alphabetically, and a first-match walk would have silently handed every admin the
-low role, so the resolver takes the highest-ranked declared role over the whole set. The second half is
-a near-miss: an earlier naming prefix was doing double duty as convention and runtime type
-discriminator, and dropping it without replacing that duty would have broken role precedence. Binding
-and role mapping stay separate fields for a case the collapse loses: everyone in a group may enter while
-only a second earns the editor role.
+**Why.** Both halves resist a tempting shortcut. Deriving entry from a role — a capability group
+conferring access as a side effect, or the admin group implicitly granting it — means someone reading a
+service's access list does not have the whole answer: entry lives partly in a different table. A rule
+that must be remembered will be misremembered, so reconstructibility from one artifact is a requirement
+of the model; the price, knowingly paid, is two group assignments per admin per service. That price
+carries its own hazard: an admin holds two role-mapped groups, normalization sorts alphabetically, and a
+first-match walk would silently hand every admin the low role, so the resolver takes the highest-ranked
+declared role over the whole set instead. The second half carries the same hazard in miniature: a naming
+prefix cannot double as both convention and runtime type discriminator, because dropping the convention
+without replacing the discriminator breaks role precedence. Binding and role mapping stay separate
+fields for a case the collapse loses: everyone in a group may enter while only a second earns the editor
+role.
 
 **Enforced by.** `portal/src/lib/gate.ts`, `portal/src/lib/claims.ts` (highest-rank resolution),
 `portal/src/lib/group-registry.ts` (binding-derived typing), `portal/scripts/gate-property.test.mjs`,
@@ -117,9 +113,7 @@ assert it.
 ranked above password. Username plus password is the tertiary recovery on-ramp and the credential the
 break-glass floor identities carry.
 
-**Why.** This corrects the first implementation, which wired WebAuthn the conventional way — a second
-factor stacked on a password — because that is what tooling, examples and model priors all default to.
-Kratos's dedicated passkey strategy and its legacy webauthn strategy differ: the former gives
+**Why.** Kratos's dedicated passkey strategy and its legacy webauthn strategy differ: the former gives
 discoverable credentials and conditional UI (the usernameless one-tap flow); the latter is kept only as
 a hardware second factor with passwordless disabled, so it never duplicates the primary. The fallback
 ordering is deliberate: email one-time-code sits above password so a user on a new or borrowed device
@@ -145,12 +139,11 @@ Having the identity service email the code is rejected for a reason specific to 
 the address is an unverified trait the admin just typed, so a mailed code is a delivery guess and a
 mistyped address misroutes the secret in motion. An admin-chosen initial password is refused outright —
 it is exactly a password in transit, and it creates the credential most likely to be reused elsewhere
-and least likely to be replaced. The failure this design hit is worth more than the design: both link
-and code are required, because the link lands on a form with an empty code field. Keeping only the link
-produced an enrollment that looked fine from the admin's side and dead-ended for every invitee —
-invisible from the side performing the action, surfacing only as someone saying "this doesn't work".
-Also deliberate and easy to "correct": the admin-minted code expires slowly while self-service recovery
-expires fast. An enrollment message may sit unread overnight; a recovery the user started should not.
+and least likely to be replaced. Both link and code are required: the link alone lands on a form with an
+empty code field, so a link with no code is an enrollment that looks fine from the admin's side and
+dead-ends for every invitee. Also deliberate and easy to "correct": the admin-minted code expires slowly
+while self-service recovery expires fast. An enrollment message may sit unread overnight; a recovery the
+user started should not.
 
 **Enforced by.** `portal/src/lib/admin-api.ts` (identity created with no credentials block; link and
 code minted together). The both-values rendering at the admin call sites is UNENFORCED.
@@ -162,14 +155,14 @@ sidecar holds the cert. A hop between mutually trusted services on one private n
 isolation instead of mTLS or transport encryption. Issuer choice follows one question — must a browser
 or device trust this out of the box — and the two roots are never cross-signed.
 
-**Why.** One rule applied three times. Both in-app alternatives were implemented and rejected: a Node
-TLS agent took a transport library as a direct dependency for one hop; per-language stdlib TLS made
-every app own cert loading, renewal and error handling. The mTLS proxy fronting the identity service's
-admin API was built and then removed: mTLS earns its keep across a trust boundary, and there was none
-between two containers on one isolated bridge, so it cost a network, a proxy container and two
-cert-lifecycle units to protect a hop nobody could reach. The same argument is why database connections
-run without transport encryption: it would only protect against an attacker who can already read frames
-on that private network, and such an attacker also reaches an unauthenticated admin API there. The cost
+**Why.** One rule applied three times. In-app TLS is rejected on cost: a Node TLS agent would take a
+transport library as a direct dependency for one hop, and per-language stdlib TLS would make every app
+own cert loading, renewal and error handling. An mTLS proxy in front of the identity service's admin API
+is rejected the same way: mTLS earns its keep across a trust boundary, and there is none between two
+containers on one isolated bridge, so it would cost a network, a proxy container and two cert-lifecycle
+units to protect a hop nobody can reach. The same argument is why database connections run without
+transport encryption: it would only protect against an attacker who can already read frames on that
+private network, and such an attacker also reaches an unauthenticated admin API there. The cost
 is recorded, not hidden — "is on this network" is weaker than "presents a rostered client certificate".
 Chaining an internal root under a public one fails on feasibility and blast radius alike: a public CA
 will not sign intermediates for non-public use, and if it did, compromising the internal CA would
@@ -184,9 +177,7 @@ publications, so nothing fails when the isolation the argument rests on regresse
 **Decided.** Trusted first-party clients are registered with consent skipped, declared per client in
 that client's manifest rather than as a server-wide default.
 
-**Why.** The per-client-versus-default argument is the whole decision, and it currently makes no
-behavioural difference — every registered client carries the flag, so a server default would be
-indistinguishable today, which is precisely why it needs writing down. It stays per-client for two
+**Why.** The per-client-versus-default argument is the whole decision. It stays per-client for two
 reasons unrecoverable from the config: it keeps "which apps skip consent?" answerable by grepping
 manifests rather than by reading server config and inferring "all of them, always"; and it is a
 tripwire, because a default grants the skip silently to whatever gets registered next, while per-client
@@ -221,8 +212,7 @@ can read.
 ## PKCE enforcement is all-or-nothing, so it is a deliberate hold
 
 **Decided.** Global PKCE enforcement stays off, with enforcement for public clients on as a forward
-guard — held deliberately rather than flipped now that the relying party which originally forced the
-relaxation is gone.
+guard — held deliberately rather than flipped.
 
 **Why.** The authorization server has no per-client PKCE knob, and that absence is the constraint that
 makes this a decision at all — the choice is global, which you discover only after looking for one. The
@@ -242,8 +232,7 @@ clients send a challenge, which is exactly the gap that makes flipping it danger
 **Decided.** The login, consent and challenge UI runs inside the same private network as the identity
 and authorization services, not on an edge or serverless runtime.
 
-**Why.** This reverses a shipped design — the portal originally targeted a serverless edge adapter — and
-the constraint that killed it is structural, not a limitation of one platform. The Ory admin APIs have
+**Why.** The constraint is structural, not a limitation of one platform. The Ory admin APIs have
 no authentication of their own; network position *is* the authorization, so they must be bound to a
 private network, and no edge function can reach one: "reaches the admin API" and "runs at the edge" are
 jointly inconsistent, and not obviously so until you try. Any BYO-UI project inherits it: reading
@@ -267,10 +256,11 @@ got its own defensible answer with nothing to say whether the next was consisten
 is the second: a uniform edge gate is only uniform until the first native client, because such a client
 carries a bearer credential rather than the browser's session cookie and the gate simply rejects it — so
 the carve-out is scoped to that client's paths, not the whole service, and thereafter a "uniform" gate
-is a uniform gate plus an undocumented exception. That rung is also why an LDAP bridge was designed and
-never deployed: a browser app without OIDC sits behind forward-auth, a native client uses an app-local
-credential, and neither justifies an LDAPS listener plus a privileged admin bind. The endpoint reads a
-single group per call, so "entry AND role" is two gates on one site; a second parameter on that
+is a uniform gate plus an undocumented exception. That rung also rules out a dedicated bridge for any
+native-auth protocol a browser app doesn't need: a browser app without OIDC sits behind forward-auth, a
+native client uses an app-local credential, and neither justifies standing up a privileged listener
+whose only job is bridging one to the other. The endpoint reads a single group per call, so "entry AND
+role" is two gates on one site; a second parameter on that
 security-sensitive route, to save a proxy config block, was rejected because two ordinary gates already
 compose to the same decision. Finally, an ungated surface is an assignment a rung made, not an omission,
 and the comment beside it is usually the only place that reason is written.
@@ -285,13 +275,10 @@ agreement between a declared binding and what a service's edge config gates is u
 and every normative "must" either names the file that fails when it is violated or carries an explicit
 unenforced marker.
 
-**Why.** The failures that taught this rule are no longer visible, because the wrong text was deleted.
-An address pinned in five places inside one document all rotted in a single renumbering, leaving the
-document contradicting the very gate that enforced it. A claim about how many clients skipped consent
-was false in both halves, one describing a population that had never existed. The general form: counts,
-addresses, hostnames, rosters, tallies and line numbers rot silently, while a gate cannot — it fails.
-The counterintuitive half matters more: claiming an enforcer that does not exist is worse than admitting
-there is none, because the next maintainer will "fix" correct code to satisfy a rule nothing checked.
+**Why.** Counts, addresses, hostnames, rosters, tallies and line numbers rot silently, while a gate
+cannot — it fails. The counterintuitive half matters more: claiming an enforcer that does not exist is
+worse than admitting there is none, because the next maintainer will "fix" correct code to satisfy a
+rule nothing checked.
 
 **Enforced by.** `scripts/check-purity.sh`, over the whole index. Each check states its own scope at
 its call site, and restating that list here would be the rot this entry is about. The
