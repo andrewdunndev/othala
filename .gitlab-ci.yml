@@ -27,13 +27,9 @@ default:
   interruptible: true
 
 workflow:
-  # Prevent duplicate pipelines: when a branch has an open MR, suppress
-  # the redundant push pipeline and let the merge_request_event pipeline
-  # be the only pipeline for that commit. This fixes the 0-job
-  # merge_request_event pipelines caused by GitLab spawning BOTH a push
-  # pipeline and an MR-event pipeline for the same commit; without this
-  # rule the MR-event pipeline was immediately failed (0 jobs, started_at
-  # null) because the e2e job's `needs` reference jobs that have no
+  # Suppress the push pipeline when a branch has an open MR so the
+  # merge_request_event pipeline is the only one for that commit — GitLab
+  # otherwise spawns both, and the duplicate push pipeline's jobs lack
   # merge_request_event rules in the container-image component.
   rules:
     - if: $CI_PIPELINE_SOURCE == "merge_request_event"
@@ -458,27 +454,17 @@ e2e:
       - e2e/logs/apply-clients.log
     expire_in: 1 week
   rules:
-    # Run on every tag + on-demand (BUILD_CI_IMAGE below). Plain main
-    # pushes and merge_request_event are intentionally absent: the
-    # container-image component jobs that populate `needs` (build-othala,
-    # build-ldap-bridge, build-e2e-tester) fire on main only when their
-    # Containerfile changes — and e2e needs ALL THREE images at the same
-    # short-sha tag. Any rule that puts e2e into a pipeline where those
-    # builds are absent makes GitLab fail the whole pipeline at creation
-    # (0 jobs, unresolvable needs) — that kept main red 2026-06-05→06-10.
-    # Renovate-bump verification is covered by verify-* and
-    # test-/check-portal; full-substrate e2e gates tags (all builds fire
-    # via tag_pipeline) and the BUILD_CI_IMAGE pre-tag path.
-    # Tag pipelines pull the v-tag image — override the SHA default above.
-    # (GitLab variables: do NOT honor bash ${VAR:-default}, so tag pipelines
-    # override AUTH_VERSION in rules:.)
+    # Absent from plain main/MR pushes: the QEMU runner is expensive and
+    # hardware-bound, so e2e runs only where it gates — tag pipelines (full
+    # substrate, all images built via tag_pipeline) and the on-demand
+    # BUILD_CI_IMAGE path. Push/MR is already covered by verify-* and
+    # test-/check-portal.
+    #
+    # GitLab variables don't honor bash ${VAR:-default}, so tag pipelines
+    # must override AUTH_VERSION here to pull the v-tag image.
     - if: '$CI_COMMIT_TAG'
       variables:
         AUTH_VERSION: "$CI_COMMIT_TAG"
-    # On-demand pre-tag validation: a branch pipeline triggered with
-    # BUILD_CI_IMAGE=true builds the images (container-image @2.5.1 honors
-    # the same flag — see its rule 3) and runs e2e against them. Lets us
-    # validate the converged substrate on the QEMU runner BEFORE cutting
-    # a tag or merging to main. The builds publish :<short-sha>, which the
-    # AUTH_VERSION default ($CI_COMMIT_SHORT_SHA) matches.
+    # BUILD_CI_IMAGE=true builds the images and runs e2e against them for
+    # pre-tag validation before cutting a tag or merging to main.
     - if: '$BUILD_CI_IMAGE == "true"'
