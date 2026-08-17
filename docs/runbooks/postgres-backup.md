@@ -35,17 +35,17 @@ panic; it's the worst single-failure outcome in the auth substrate.
      one each. Decide based on restore drill ergonomics.
    - Retention: 30 daily + 12 monthly. Configurable.
 
-2. **ZFS snapshot integration**
-   - The `pg_data` dataset gets snapshotted by the existing SSO host
-     ZFS snapshot policy (sanoid or estate equivalent).
-   - Snapshots live alongside dumps for two-tier recovery (quick
-     rollback via ZFS, long-term archive via pg_dump).
+2. **Filesystem snapshot integration (if the data volume supports it)**
+   - The Postgres data volume gets snapshotted by whatever snapshot
+     policy the host already runs.
+   - Snapshots live alongside dumps for two-tier recovery: quick
+     rollback via snapshot, long-term archive via pg_dump.
 
 3. **Off-host copy**
-   - Dumps copied to two destinations: an onsite zpool on a different
-     host (synthetic-tank or similar), AND Backblaze B2 via rclone for
-     offsite durability. The estate's standing backup posture is
-     "once onsite, once offsite."
+   - Dumps copied off the host to at least one destination outside the
+     blast radius of a single-host failure — two independent
+     destinations (e.g. onsite-to-another-host plus offsite/cloud) is
+     stronger than one.
    - `secrets.system` lives in sops (the `hydra_system_secret` entry), not
      in the dump (it's an env var). On restore from a fresh DB, the
      operator pulls `secrets.system` from sops into the env and only
@@ -70,15 +70,14 @@ panic; it's the worst single-failure outcome in the auth substrate.
 
 ## Where it lives
 
-The backup runner is deploy-plane work, not auth-project code: a
-service for the backup runner (pg_dump cron + rclone push to B2 + zfs
-send to the onsite tank). Posture: rclone → Backblaze B2 offsite + zfs
-send to an onsite tank pool; both fire from a single backup quadlet.
-Roughly a day of configuration plus one restore drill; no auth-project
-changes needed. The security review tracks the gating item as A6 (and
-H11 from the earlier review); this runbook is the contract it points at.
+The backup runner is deploy-plane work, not auth-project code — the
+cron/quadlet that runs pg_dump, the off-host copy mechanism and
+destinations, and the on-host snapshot policy are all deploy-plane
+choices. This runbook is the contract those choices must satisfy: the
+required posture above, and the restore drill and partial-state
+response below.
 
-## Partial-state restore (A6)
+## Partial-state restore
 
 Postgres point-in-time consistency is per-database. The auth substrate
 touches both `kratos` and `hydra` databases in different transactions,
@@ -114,7 +113,8 @@ post-restore operator doesn't waste hours hunting for orphan rows.
 
 ## Related
 
-- `docs/runbooks/secrets-rotation.md`: A2 break-glass rotation.
+- `docs/runbooks/secrets-rotation.md`: break-glass rotation of
+  `secrets.system` itself.
 - `docs/runbooks/cookie-rotation.md`: separate runbook for the
   rotatable secrets.
 - `docs/runbooks/admin-recovery.md`: the recovery path that depends on

@@ -1,204 +1,139 @@
 # Deploy
 
-Othala is **deployed by a separate vendor-pin config repo** (the deploy
-plane), not from this repo. This document is the consumption contract:
-the deploy shape, the promotion path, and the env/secret set. For what
-the application *is* and the load-bearing decisions behind it, read
-[`ARCHITECTURE.md`](ARCHITECTURE.md). For current release/version
-state, read [`CHANGELOG.md`](CHANGELOG.md) and git tags. This file does not
-restate either.
-
-Othala is the single sign-on for one family's house: Ory Kratos and
-Hydra behind a TypeScript portal, run for about five family members and
-a dozen friends. The deployed instance is **dag.dunn.dev** (dagaz ᛞ, the
-threshold rune); the login screen renders ᛞ→ᛟ, "door to home"
-(dag→othala). In the deploy repo the instance is grouped under **dag**
-(`services/dag/`, `dag-*` quadlets, `dag.network`, `dag_*` sops keys);
-the functional Ory services keep their role names (kratos / hydra /
-postgres).
+Othala ships one container image; a deploy plane is the operator-owned
+config, secrets, and runtime topology that turns that image into a running
+instance. This document is the consumption contract: what a deploy plane
+must provide, not how any particular one provides it. For what the
+application *is* and the load-bearing decisions behind it, read
+[`ARCHITECTURE.md`](ARCHITECTURE.md). For release/version state, read
+[`CHANGELOG.md`](CHANGELOG.md) and git tags. This file does not restate
+either.
 
 ## Getting started: two entry paths
 
 **Option A — E2E smoke harness (`e2e/`):** The fastest way to validate
-Othala locally against a running substrate, without a deploy repo or
-sops. See `e2e/README.md` for env reference and smoke verification. The
-harness runs the same Othala app image as production; the deploy plane's
-differences are quadlets + sops, not the app itself.
+Othala locally against a running substrate, without any deploy plane. See
+`e2e/README.md` for env reference and smoke verification. The harness runs
+the same app image production would; a deploy plane's job is the topology
+and secrets around it, not a different app.
 
-**Option B — the production deployment (the deploy repo):** The
-promotion path documented in the rest of this file. The deploy plane
-vendors Othala's configs by tag-pin, keeps secrets in sops + age, and
-runs the containers as quadlets. Full details below.
+**Option B — a real deploy plane:** vendor Othala's configs by tag-pin,
+supply the env contract below, and run the containers however your
+platform runs containers. The contract is the same regardless of mechanism
+— quadlets, compose, Kubernetes.
 
----
+## Images
 
-## Deploy shape
+One image per release, tagged at the git tag and published at the registry
+root (`registry.gitlab.com/dunn.dev/othala:vX.Y.Z`, `publish_at_root: true`
+in `.gitlab-ci.yml`). A deploy plane pins by tag or digest; registry tags
+are immutable, so pinning by tag is already deterministic. Kratos and Hydra
+are upstream Ory images — this repo does not build or publish them.
 
-One Othala pod on the estate host, fronted by a Caddy edge. The
-containers:
+## The dual-listener
 
-| Quadlet | Image | Role |
-|---|---|---|
-| **dag-portal** | `registry.gitlab.com/dunn.dev/othala` | The converged Astro Node SSR app. Renders the Kratos self-service flows, serves the Hydra login/consent/logout challenge handlers, runs the access-gate, builds id_token claims, and hosts the loopback admin endpoints. See `ARCHITECTURE.md`. |
-| **dag-kratos** | upstream Ory Kratos | Identity: self-service flows, sessions, recovery. |
-| **dag-hydra** | upstream Ory Hydra | OAuth2/OIDC. Ships no UI by design; the Othala app is its login + consent provider. |
-| **dag-postgres** | `postgres:18-alpine` | Separate `kratos` + `hydra` databases. |
-| **dag-caddy** | `registry.gitlab.com/dunn.dev/caddy-estate` | TLS edge for `dag.dunn.dev`. Snippets are volume-mounted, not baked. |
-
-> **Image name.** The converged app image publishes at the registry
-> **root**: `registry.gitlab.com/dunn.dev/othala` (the oryd/kratos-style
-> namespace/name shape, `publish_at_root: true` in `.gitlab-ci.yml`
-> `build-othala`). The `dag-portal` quadlet pins that root path.
-
-### The dual-listener
-
-The Othala container runs **two HTTP listeners in one process**
+The app runs **two HTTP listeners in one process**
 (`portal/src/server/listen.mjs`):
 
-- **Public SSR port** (`PORT`, container default `8080`, bound on
-  `HOST=0.0.0.0`). Serves the Astro handler: the Kratos self-service
-  UIs, the family tile dashboard + `/auth/*` + `/admin/*` pages, and the
-  OAuth2 challenge providers (`/oauth2/{login,consent,logout}`). This is
-  the only handler reachable from the network. Caddy fronts this port.
-- **Admin port** (`ADMIN_PORT`, container default `4431`, bound on
-  `ADMIN_HOST=127.0.0.1`, loopback / pod-only). A separate
-  `http.createServer` with its own disjoint mux: `GET /healthz`,
-  `GET /readyz`, `POST /admin/revoke-user`, `POST /admin/recovery-gate`.
-  It never delegates to the SSR handler, and the SSR handler never sees
-  these paths. The admin surface is off the public mux **by
-  construction**, not by routing rule.
+- **Public SSR port** (`PORT`, default `8080`, `HOST=0.0.0.0`). The Astro
+  handler: Kratos self-service UIs, the family tile dashboard, `/auth/*` +
+  `/admin/*` pages, and the OAuth2 challenge providers
+  (`/oauth2/{login,consent,logout}`). The only port a deploy plane should
+  expose to the network.
+- **Admin port** (`ADMIN_PORT`, default `4431`, `ADMIN_HOST=127.0.0.1`,
+  loopback only). A separate `http.createServer` with its own disjoint mux:
+  `GET /healthz`, `GET /readyz`, `POST /admin/revoke-user`,
+  `POST /admin/recovery-gate`. It never delegates to the SSR handler, and
+  the SSR handler never sees these paths — off the public mux **by
+  construction**, not by routing rule. Both bearer-guarded routes are
+  constant-time and fail-closed: an unset secret rejects every request.
 
-Only the public port is `EXPOSE`d. The admin port stays on loopback
-inside the pod. Both bearer-guarded admin routes are constant-time and
-fail-closed (an unset secret rejects every request).
+A deploy plane that publishes the admin port to the network, or to any
+network segment reachable from outside the pod/host, has broken the trust
+boundary this app is built around (`ARCHITECTURE.md` § Trust boundary).
 
-## Pre-deploy checklist
+## Vendored configs and the drift-check obligation
 
-Run through this list before `make dag-deploy`. Items marked **BLOCKER**
-will cause a failed or degraded deploy if skipped.
+Four files are byte-canonical here and must be vendored **verbatim**, not
+hand-edited, by any deploy plane: `kratos/kratos.yml`, `hydra/hydra.yml`,
+`kratos/identity.schema.json`, and `kratos/hooks/recovery-gate.jsonnet`. A
+deploy plane that diverges from these has diverged from behavior this repo
+tests and documents — the gate handler's own guarantees (Section 3 of
+`docs/runbooks/admin-recovery.md`), the identity schema, and the recovery
+flow config all assume these bytes. Run a byte-diff check against the
+pinned Othala ref on every promotion; treat any diff as something to port
+upstream to this repo, never a local patch.
 
-- [ ] **BLOCKER** — `caddy-estate` image includes the `caddy-ratelimit`
-  module (`github.com/mholt/caddy-ratelimit`). The production Caddyfile
-  (vendored from `caddy/Caddyfile`) uses the `rate_limit` directive to
-  block email-bombing on Kratos self-service paths. If the module is absent
-  from the Caddy binary, **Caddy fails to start** (config-load error:
-  "unrecognized directive: rate_limit") and the entire dag edge goes down.
-  Verify: `caddy list-modules 2>/dev/null | grep -q rate_limit && echo OK`
-  against the caddy-estate image. If missing, rebuild caddy-estate with
-  `xcaddy build --with github.com/mholt/caddy-ratelimit` or add
-  `_ "github.com/mholt/caddy-ratelimit"` to its custom `main.go`.
-- [ ] sops keys present for all `<host>.dag_*` secrets (`make dag-preflight`).
-- [ ] Registry images reachable and tagged at the pinned version.
-- [ ] SSH connectivity to the host (`make dag-preflight`).
+Topology values inside those files (service hostnames, bind addresses) are
+expected to be templated (`${ENV}` substitution or equivalent) and
+supplied by the deploy plane at render time — that is not divergence.
 
----
+## Environment contract
 
-## Promotion path
+[`.env.example`](.env.example) is the full, authoritative variable list —
+every var the app reads, annotated. This section covers only what needs
+context beyond that file:
 
-There is **no submodule and no symlink**. The deploy repo vendors
-Othala's authoritative configs as copies, each pinned to a released
-Othala **tag** with a short provenance header. The promotion path is
-edit, tag, sync, bump, deploy.
-
-Four of those files are vendored **verbatim** and a drift check in the
-deploy repo diffs them byte-for-byte against an Othala checkout at the
-pinned ref: `kratos/kratos.yml`, `hydra/hydra.yml`,
-`kratos/identity.schema.json`, and `kratos/hooks/recovery-gate.jsonnet`.
-Changing any of them here means a re-vendor on the deploy side, not a
-local edit there; a hand-edit on the deploy side fails the gate.
-
-```sh
-# 1. Tag this repo after CI publishes images.
-git tag vX.Y.Z
-git push --tags
-# CI fires (.gitlab-ci.yml): the converged app publishes at the
-# registry root, registry.gitlab.com/dunn.dev/othala:vX.Y.Z.
-
-# 2. Sync vendored configs into the deploy repo and review the drift.
-# cd <the-deploy-repo>
-make dag-sync-configs       # diff vendored configs vs othala HEAD
-# Port desired changes manually, then bump each dag-* quadlet Image=
-# pin + provenance SHA to vX.Y.Z.
-
-# 3. Provision secrets (if new secrets were added).
-make dag-secrets HOST=<host>
-
-# 4. Pre-deploy validation, then deploy.
-make dag-preflight HOST=<host>    # sops keys, registry images, drift, SSH
-make dag-deploy HOST=<host>
-
-# 5. Register OIDC clients (see "Client registration" below).
-just dag-reload-clients <host>
-
-# 6. Smoke.
-make dag-smoke HOST=<host>
-```
-
-Rollback is purely a deploy-repo change: revert the quadlet commit
-(re-pinning the previous tag) and `make dag-deploy` again. Registry
-tags are immutable, so the rollback is deterministic.
-
-## Environment and secrets
-
-The Othala container's runtime env. The Ory upstream URLs are set by the
-deploy quadlet (`KRATOS_PUBLIC_URL`, `KRATOS_ADMIN_URL`, `HYDRA_PUBLIC_URL`,
-`HYDRA_ADMIN_URL`, `HYDRA_ISSUER_URL`); the listener ports default to
-`PORT=8080` / `ADMIN_PORT=4431`. `MANIFEST_DIR` (default
-`/etc/portal/manifests`) is the directory the app reads per-app manifests
-from at runtime; the quadlet volume-mounts the synced manifest set there
-read-only. The secrets are sops + age backed in the operator's
-sops-encrypted secrets store under `<host>.dag_*` keys; the deploy
-plane maps each `dag_*` key to the env target below:
-
-| Env target | Guards / used by |
-|---|---|
-| `OTHALA_ADMIN_ENDPOINT_BEARER` | `POST /admin/revoke-user` on the loopback admin port. Constant-time, fail-closed. |
-| `RECOVERY_GATE_SECRET` | `POST /admin/recovery-gate` (the Kratos recovery-hook). Constant-time, fail-closed. |
-| `LDAP_BRIDGE_ADMIN_URL` / `LDAP_BRIDGE_ADMIN_TOKEN` | Optional. Best-effort LDAP bind-cache flush in the revoke fan-out, for a deployment fronting a directory-backed app. Unset here; the step is a silent no-op when the URL is absent (`portal/src/lib/revoke.ts`, pinned by `portal/scripts/revoke.test.mjs`). |
-| `CSRF_SECRET` | CSRF token signing for the self-service flow posts. |
-
-Admin authority is deliberately NOT an env target: it is the
-`metadata_admin.admin` marker on the Kratos identity. Deploy preflight
-asserts `OTHALA_ADMIN_IDS` is absent from the deployed quadlets.
-
-The revoke fan-out is in-process; there is no app-to-consent admin HTTP
-hop.
-
-Back-channel logout is **Hydra-native** (Hydra signs with its own key).
-The app holds **no signing key at rest**.
+- The Ory upstream URLs (`KRATOS_PUBLIC_URL`, `KRATOS_ADMIN_URL`,
+  `HYDRA_PUBLIC_URL`, `HYDRA_ADMIN_URL`, `HYDRA_ISSUER_URL`) and the
+  listener ports are set by the deploy plane, not baked into the image.
+- `MANIFEST_DIR` (default `/etc/portal/manifests`) is the directory the app
+  reads per-app manifests from at runtime. A deploy plane mounts its
+  synced manifest set there, read-only.
+- Secrets come from whatever secret store the deploy plane uses (sops,
+  Vault, a platform's native secret objects) — never committed, never baked
+  into the image.
+- Admin authority is deliberately **not** an env target: it is the
+  `metadata_admin.admin` marker on the Kratos identity
+  (`docs/runbooks/admin-recovery.md` § 2). A deploy plane that adds an env
+  var admin allowlist has reintroduced the exact bypass this design avoids.
 
 ## Client registration
 
 OIDC client registration is a deliberate **one-shot**, never run on app
-boot or triggered by a route. The deploy repo runs the registrar via
-`just dag-reload-clients`, which invokes a `--rm` one-shot runner on
-`dag.network` (the only network that can reach Hydra's admin port)
-against the manifests synced into `MANIFEST_DIR`. See
+boot or triggered by a route. The registrar is the app's own
+`portal/src/lib/register-clients.ts`, driving the Hydra OAuth2Api, fed by
+the `manifests.ts` parser and the full `validateClients` lint, bundled to
+`dist/server/register-clients.mjs`. A deploy plane runs it as a one-shot
+against the built image after manifests are in place — the `e2e` harness's
+`compose run --rm register-clients` is the worked example. See
 [`per-app-oidc.md`](site/src/content/docs/guides/per-app-oidc.md) for the
 full per-RP runbook.
 
-The runner is the converged app's **in-app registrar**
-(`portal/src/lib/register-clients.ts` driving the Hydra OAuth2Api, fed by
-the `manifests.ts` parser + the full `validateClients` lint), bundled to
-`dist/server/register-clients.mjs` and exercised in CI: the `e2e` harness
-runs it as a `compose run --rm register-clients` one-shot against the
-freshly-built image, reading each `<slug>.yaml` `oidc:` block from
-`MANIFEST_DIR` and resolving `<SLUG>_CLIENT_SECRET` from env.
+## Promotion path
+
+1. Tag this repo after CI publishes images (`git tag vX.Y.Z && git push
+   --tags`).
+2. The deploy plane re-vendors the four config files (previous section) at
+   the new ref and reviews what changed.
+3. Bump the pinned image tag/digest for the app, plus Kratos/Hydra if their
+   pins changed.
+4. Provision any new secrets, then deploy.
+5. Register OIDC clients (previous section) if manifests changed.
+6. Smoke: `/healthz`, `/readyz`, and the OIDC discovery document all
+   answer; a real login round-trips.
+
+Rollback is purely a deploy-plane change: revert to the previous pinned
+tag and redeploy. Registry tags are immutable, so rollback is
+deterministic.
 
 ## Why two repos
 
-`dunn.dev/othala` is the **application** and its authoritative configs.
-The **deploy repo** is the operator concern: secrets, runtime topology,
-sops + age, ZFS pools, every other host service. The deploy repo is the
-primary deployment view; it vendors Othala's configs by tag-pin so the
+`dunn.dev/othala` is the **application** and its authoritative configs. The
+deploy plane is the operator concern: secrets, runtime topology, storage,
+every other host service. It vendors Othala's configs by tag-pin so the
 open-sourceable application stays decoupled from private infrastructure
-decisions. Othala versions independently; the Othala tag is what gets
-pinned in the `dag-*` quadlets.
+decisions. Othala versions independently of any instance running it.
 
 ## Related docs
 
-- [`ARCHITECTURE.md`](ARCHITECTURE.md) — what the app is + load-bearing decisions (read this for the architecture; this file does not restate it)
-- [`CHANGELOG.md`](CHANGELOG.md) and git tags — the only place release/version state is asserted
-- [`per-app-oidc.md`](site/src/content/docs/guides/per-app-oidc.md) — per-RP OIDC integration runbook
-- `portal/src/lib/gate.ts` — how entry and role are decided (the model the manifests express)
-- the deploy repo's docs — service-specific deploy notes and estate conventions
+- [`ARCHITECTURE.md`](ARCHITECTURE.md) — what the app is + load-bearing
+  decisions (this file does not restate it)
+- [`CHANGELOG.md`](CHANGELOG.md) and git tags — the only place
+  release/version state is asserted
+- [`per-app-oidc.md`](site/src/content/docs/guides/per-app-oidc.md) —
+  per-RP OIDC integration runbook
+- [`docs/runbooks/admin-recovery.md`](docs/runbooks/admin-recovery.md) —
+  the admin-authority model and the recovery ladder
+- `portal/src/lib/gate.ts` — how entry and role are decided (the model the
+  manifests express)
