@@ -124,7 +124,7 @@ git -C "$FIX" -c user.name=probe -c user.email=probe@invalid \
 # The fixture is the index, asserted rather than assumed. A silently partial
 # materialisation would leave every probe below reporting on a corpus smaller
 # than the one being committed — the narrowness vacuity, one level up.
-if ! cmp -s <(git ls-files) <(git -C "$FIX" ls-files); then
+if [ "$(git ls-files | git hash-object --stdin)" != "$(git -C "$FIX" ls-files | git hash-object --stdin)" ]; then
     printf 'FATAL: the fixture file list differs from the index it was built from — the probes\n' >&2
     printf '       would be reporting on a corpus that is not the one about to be committed.\n' >&2
     exit 1
@@ -138,7 +138,7 @@ git show HEAD:scripts/check-purity.sh >"$TMP/baseline.sh" || {
 # the author is reading their unstaged edits is the kind of quiet mismatch this
 # whole suite exists to refuse.
 for s in check-purity probe-check-purity; do
-    if ! git show ":scripts/$s.sh" 2>/dev/null | cmp -s - "$REPO_ROOT/scripts/$s.sh"; then
+    if [ "$(git show ":scripts/$s.sh" 2>/dev/null | git hash-object --stdin)" != "$(git hash-object "$REPO_ROOT/scripts/$s.sh")" ]; then
         printf '  \033[33mscripts/%s.sh is not staged as it stands in the worktree.\033[0m\n' "$s"
         printf '      The fixture CORPUS is the index; the SCRIPTS are copied in from the worktree,\n'
         printf '      so this run probes your unstaged edits against the staged tree.\n\n'
@@ -150,7 +150,7 @@ done
 # clean tree — the "baseline" column is the same script answering the same
 # question, so the baseline expectations are recorded rather than asserted.
 BASELINE_IS_CANDIDATE=0
-if cmp -s "$REPO_ROOT/scripts/check-purity.sh" "$TMP/baseline.sh"; then
+if [ "$(git hash-object "$REPO_ROOT/scripts/check-purity.sh")" = "$(git hash-object "$TMP/baseline.sh")" ]; then
     BASELINE_IS_CANDIDATE=1
     printf '  \033[33mbaseline == candidate\033[0m — the worktree gate is byte-identical to HEAD.\n'
     printf '      Baseline verdicts are printed for context and NOT asserted; there is no delta\n'
