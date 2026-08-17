@@ -379,11 +379,11 @@ check-portal:
 # The LDAP bridge is now the standalone gitlab.com/dunn.dev/kratos-ldap
 # project; e2e/compose.yml no longer pulls it.
 #
-# See e2e/README.md + docs/qemu-ci-lab.md.
+# See e2e/README.md + docs/research/qemu-ci-lab.md.
 # -----------------------------------------------------------------
 e2e:
   stage: e2e
-  # NOTE: requires a lodestone-tagged QEMU runner; forks without one will see this job pending. See docs/qemu-ci-lab.md.
+  # NOTE: requires a lodestone-tagged QEMU runner; forks without one will see this job pending. See docs/research/qemu-ci-lab.md.
   tags: [lodestone, qemu]
   needs:
     - build-othala

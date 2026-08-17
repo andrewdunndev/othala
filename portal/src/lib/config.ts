@@ -265,18 +265,23 @@ export const identityGroups: string[] = parseIdentityGroups();
 
 // ── OTHALA_ADMIN_FRESHNESS_HOURS ──────────────────────────────────────────────
 //
-// Maximum age (in hours) of the most recent successful authentication before
-// requireAdminSession redirects the admin back to the step-up (AAL2 refresh)
-// login flow. This catches the "stolen admin browser with a 90-day session"
-// threat: even with an existing AAL2 session the admin must have authenticated
-// recently.
+// A session-age window in hours. Parsed here, but NOT enforced by any gate:
+// nothing outside this file reads `adminFreshnessHours`.
 //
-// The check is on `session.authenticated_at`, which Kratos updates on every
-// `refresh=true` re-authentication. A value of 0 disables the freshness check
-// (not recommended for production).
+// The portal's only freshness computation is `isSessionFresh` in lib/admin.ts,
+// whose docblock records the decision — "this function is NOT wired into the
+// requireAdminSession gate" — and flags that its timestamp semantics "should be
+// validated against a live Kratos session before wiring isSessionFresh into any
+// gate". Do not describe this var as active until that wiring lands.
 //
-// Neutral default: 8 (hours). Operators may tighten (4 for high-assurance) or
-// loosen (24 for light-touch family instances).
+// What requireAdminSession actually enforces (ADR 08) is the SP-3 trinity:
+// active session, `session.authenticator_assurance_level === 'aal2'` (anything
+// else redirects to the Kratos step-up login flow with aal=aal2 & refresh=true),
+// and the metadata_admin.admin marker read fresh from the admin API. There is
+// no session-age check. See site/src/content/docs/guides/hardening.md §5, which
+// carries the same statement for operators.
+//
+// Default: 8 (hours) when unset, blank, or not a non-negative integer.
 
 function parseAdminFreshnessHours(): number {
   const raw = process.env.OTHALA_ADMIN_FRESHNESS_HOURS;

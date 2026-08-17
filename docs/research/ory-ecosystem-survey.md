@@ -105,7 +105,7 @@ OIDC; Polis handles the SAML mess.
 - We run the IdP (Kratos + Hydra). We are not a relying party for
   someone else's SAML.
 - The 14 apps in the family stack speak OIDC or LDAP. Polis would only
-  be relevant if we needed to accept logins from, say, Andrew's
+  be relevant if we needed to accept logins from, say, the operator's
   employer's Okta, and wanted to translate that into our local OIDC.
   Not the use case.
 - The closest match for "import an external IdP" we might one day want

@@ -2,7 +2,7 @@
 //
 // v0.2.0: tiles are read at REQUEST time from the unified manifest
 // directory (MANIFEST_DIR, default `/etc/portal/manifests`) — the same
-// directory the OIDC client loader (manifests.ts) reads. Each
+// directory the OIDC client loader (portal/src/lib/manifests.ts) reads. Each
 // `<slug>.yaml` carries a `presentation:` block (tile metadata); an
 // optional sibling `<slug>.md` is the education content rendered on the
 // `/apps/<slug>` detail page.
@@ -10,15 +10,13 @@
 // This replaces the build-time Astro Content Collection
 // (portal/src/content/apps/), so adding/removing an app is a
 // manifest-dir change with NO image rebuild — matching how OIDC clients
-// already work. A unified manifest serves both loaders: manifests.ts
-// reads its `oidc:`/`consent:` blocks (ignoring `presentation:`), this
-// loader reads `presentation:` (ignoring `oidc:`).
+// already work. A unified manifest serves both loaders:
+// portal/src/lib/manifests.ts reads its `oidc:`/`consent:` blocks (ignoring
+// `presentation:`), this loader reads `presentation:` (ignoring `oidc:`).
 //
 // groups.yaml (optional, in MANIFEST_DIR): maps group name → { title,
 // description, order }. Loaded by loadGroups(); excluded from the tile
 // manifest iteration so it never triggers a "skipping" warning.
-//
-// Productionized from the /preview prototype loader (preview-loader.ts).
 
 import { readdirSync, readFileSync, existsSync, statSync } from 'node:fs';
 import { join } from 'node:path';
@@ -114,17 +112,18 @@ export interface AppTile {
   iconHref?: string;
   authKind: AuthKind;
   /**
-   * The group that gates this tile on the dashboard. Sourced from the
-   * manifest's `presentation.access_group`; falls back to the configured
-   * default group (OTHALA_DEFAULT_GROUP) when the field is absent.
+   * Fallback group, used only when `accessGroups` is empty (see
+   * tileAccessGroups). Sourced from the manifest's
+   * `presentation.access_group`; falls back to the configured default group
+   * (OTHALA_DEFAULT_GROUP) when the field is absent.
    */
   accessGroup: string;
   /**
-   * Normalized adopter-named access groups (access-model Phase 1 — dual-read).
-   * Sourced from `presentation.access:` (list) with a `[access_group]` compat
-   * fallback; `[]` when neither is present. ADDITIVE and parallel to the
-   * singular `accessGroup` field above — no gate logic consumes it yet
-   * (Phase 2/3, docs/access-model.md §17). No `everyone` fallback applied here.
+   * Normalized access-group binding, parsed by parseAccessGroups
+   * (portal/src/lib/access-groups.ts) from `presentation.access:` (a list)
+   * with a `[access_group]` compat fallback; `[]` when neither is present —
+   * no `everyone` fallback applied here. tileAccessGroups prefers this over
+   * the singular `accessGroup`, and userCanSeeTile gates on the result.
    */
   accessGroups: string[];
   /**
@@ -150,8 +149,9 @@ function manifestDir(): string {
  * The fallback access group for tiles whose manifest omits `access_group`.
  * Read at call time (not module load) so runtime env overrides take effect
  * immediately without a module reload — consistent with manifestDir().
- * Mirrors config.ts `defaultGroup` (same env var, same 'everyone' fallback,
- * lowercased like every group in OTHALA_IDENTITY_GROUPS).
+ * Mirrors portal/src/lib/config.ts `defaultGroup` (same env var, same
+ * 'everyone' fallback, lowercased like every group in
+ * OTHALA_IDENTITY_GROUPS).
  */
 function tileDefaultGroup(): string {
   return process.env.OTHALA_DEFAULT_GROUP?.trim().toLowerCase() || 'everyone';
@@ -191,8 +191,8 @@ function freshestMtime(dir: string): number {
  * OIDC-only manifest, or a non-manifest file). Any access_group value is
  * accepted as declared; when the field is absent the tile gates on the
  * default group (OTHALA_DEFAULT_GROUP — see tileDefaultGroup(), which
- * mirrors config.ts `defaultGroup`) rather than on a phantom per-slug
- * group.
+ * mirrors portal/src/lib/config.ts `defaultGroup`) rather than on a phantom
+ * per-slug group.
  *
  * Every tile in Othala gates on group membership — there is no ungated
  * or bypass path. Omitting `access_group` from a manifest is the
@@ -213,9 +213,9 @@ function parseTile(slug: string, doc: Record<string, unknown>, dir: string): App
   // default group.
   const accessGroup = p['access_group'] ? String(p['access_group']) : tileDefaultGroup();
 
-  // Phase 1 dual-read: parse the new `access:` list (with `[access_group]`
-  // compat fallback) into a normalized list, in parallel to the singular
-  // accessGroup above. No consumer gates off this yet — additive only.
+  // Parse `presentation.access:` (with the `[access_group]` compat fallback)
+  // into the normalized binding. tileAccessGroups prefers it over the singular
+  // accessGroup above; `[]` here means the fallback applies.
   const accessGroups = parseAccessGroups(p);
 
   const url = String(p['url'] ?? '');
@@ -365,9 +365,16 @@ export function tileAccessGroups(tile: AppTile): string[] {
 
 /**
  * Whether a user holding `userGroups` may see `tile` on the dashboard.
- * OR-semantics over the tile's access binding (tileAccessGroups). Mirrors the
- * OIDC gate's membership check (gate.ts enforceAccessGate) so the tile shows
- * iff the gate would let the user enter.
+ * OR-semantics over the tile's access binding (tileAccessGroups): visible
+ * iff the user holds at least one of the bound groups (or the default
+ * group, per tileAccessGroups' fallback, when the manifest binds none).
+ *
+ * This does NOT mirror portal/src/lib/gate.ts's `consent.skip_access_check`
+ * bypass (enforceAccessGate) — parseTile (above) only ever reads a manifest's
+ * `presentation:` block, never `consent:`, so a skip_access_check manifest
+ * gates dashboard visibility on its access binding exactly like any other
+ * tile, even though the OIDC gate itself would admit any active identity
+ * to that app.
  */
 export function userCanSeeTile(tile: AppTile, userGroups: string[]): boolean {
   return tileAccessGroups(tile).some((g) => userGroups.includes(g));

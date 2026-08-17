@@ -579,13 +579,9 @@ yes or no. There are two shapes, and the difference matters:
   request's own Cookie header, fetches the identity fresh from the Kratos
   admin API, and applies `enforceGroupGate`: `state === 'active'` AND
   membership in the named group. Fail-closed throughout. The 401/403 split is
-  load-bearing: 401 is the only status Caddy turns into a login redirect, so
-  it is returned ONLY when there is no usable session. Every authorization
-  failure — bad `group` param, identity lookup failure, inactive identity,
-  not in the group, Kratos unreachable — is a flat 403, because redirecting a
-  logged-in user to log in again is a loop. Edge configs pass the app's
-  `<svc>-access` group here, which now admits admins too because they hold it
-  explicitly.
+  load-bearing: 401 is returned ONLY when there is no usable session. Every
+  authorization failure — bad `group` param, identity lookup failure, inactive
+  identity, not in the group, Kratos unreachable — is a flat 403.
 
 The `group` param is operator-controlled config, and the charset check on it
 is an input guard, not a naming policy: `observe-access` and bare `observe`
@@ -605,10 +601,10 @@ that `kratos.yml` is byte-vendored (LB-12), so touching this is a re-vendor.
 ```mermaid
 flowchart LR
   b[Browser] -->|request| c[Caddy at the app edge]
-  c -->|forward_auth /api/forward-auth?group=svc-access| o[Othala app]
+  c -->|forward_auth /api/forward-auth?group=&lt;group&gt;| o[Othala app]
   o -->|session from Cookie| k[Kratos public]
   o -->|identity fresh| ka[Kratos admin]
-  o -->|200 allow / 403 deny / 401 to login| c
+  o -->|200 allow / 403 forbidden / 401 unauthenticated| c
   c -->|on 200| app[App upstream]
 ```
 

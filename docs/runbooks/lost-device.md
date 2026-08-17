@@ -43,9 +43,7 @@ burns the session before you can audit what credentials need removing.
 Navigate to **/admin/users/\<id\>** for the affected identity.
 
 You must have an active admin session at AAL2. If you are prompted for your
-second factor (TOTP), complete it before continuing. The admin guard now also
-enforces a freshness window (default 8 hours, `OTHALA_ADMIN_FRESHNESS_HOURS`):
-if your AAL2 session is stale, you will be re-prompted automatically.
+second factor (TOTP), complete it before continuing.
 
 ### Step 2 — Audit enrolled credentials
 
@@ -160,7 +158,7 @@ current password or a privileged recovery session).
 ## Summary checklist
 
 ```
-[ ] 1. Open /admin/users/<id>  (confirm AAL2 + freshness gate passed)
+[ ] 1. Open /admin/users/<id>  (confirm AAL2 gate passed)
 [ ] 2. Audit the credential chips — note which types were on the lost device
 [ ] 2b. Check the recoveryEmail trait — clear any address the user doesn't recognise
 [ ] 3. Remove each affected evictable type (passkey / webauthn / totp / backup codes)
@@ -177,11 +175,6 @@ current password or a privileged recovery session).
 - **AAL2 requirement** — the admin user-detail page requires a Kratos session
   at authenticator assurance level 2 (passkey + TOTP). An attacker with only
   the admin's password cannot reach it.
-
-- **AAL2 freshness** — `requireAdminSession` additionally checks that the
-  AAL2 elevation happened within `OTHALA_ADMIN_FRESHNESS_HOURS` (default 8 h).
-  A stolen admin browser with a stale AAL2 session is redirected to the TOTP
-  step-up before any admin action is possible. See `portal/src/lib/admin.ts`.
 
 - **CSRF protection** — every Remove action carries a per-render, per-type,
   per-admin-identity CSRF token (30-min TTL, single-use). A cross-site form
@@ -203,5 +196,5 @@ current password or a privileged recovery session).
   hardening rationale (published as `/guides/hardening/`).
 - `portal/src/lib/admin-api.ts` (`deleteCredential`, `EVICTABLE_CREDENTIAL_TYPES`) —
   the Kratos admin API call.
-- `portal/src/lib/admin.ts` (`requireAdminSession`) — AAL2 + freshness gate.
+- `portal/src/lib/admin.ts` (`requireAdminSession`) — AAL2 gate.
 - `portal/src/pages/admin/users/[id].astro` — Remove action handler and UI.

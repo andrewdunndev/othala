@@ -17,7 +17,7 @@ is listed here as a load-bearing commitment.
 Read this doc when you're tempted to widen the integration surface
 ("should we turn on OIDC self-service registration?"). The choices
 below are the upgrade-burden tradeoffs we already paid for; reverting
-them costs the next future-Andrew time and money on every Ory bump.
+them costs time and money on every Ory bump.
 
 ## The choices
 
@@ -36,14 +36,19 @@ Kratos's registration-flow node-group changes on every bump.
 
 ### 2. Admin pagination uses cap-and-render, not total-count
 
-`portal/src/lib/admin-api.ts` calls `/admin/identities?per_page=250`
-and renders whatever comes back. No reliance on the `x-total-count`
-header.
+`portal/src/lib/admin-api.ts`'s `listIdentities` calls the Ory SDK with
+`{ perPage: 250 }` and renders whatever comes back. No reliance on the
+`x-total-count` header — the string appears nowhere in the portal.
 
 v25.4 removed `x-total-count` from `/admin/sessions`. We never read
 it, so we didn't bite. Future Ory changes to pagination semantics
 (cursor-based, total-counts on/off per endpoint) won't break us as
 long as we keep capping at a fixed per_page.
+
+The cost of the cap is stated in the code, not hidden: the Kratos identities
+endpoint paginates via a `Link` header and this call does **not** follow it, so
+the listing truncates past the cap. That is deliberate at family scale and is
+the thing to revisit first if the identity count ever grows.
 
 **To break this**: add pagination UI that displays "Page 3 of 47."
 That requires reading total-count, exposing us to its presence-or-not
@@ -88,10 +93,12 @@ considerations.
 Plain HTTP across the auth pod: the portal reaches Kratos and Hydra,
 including their admin APIs, without TLS. The pod boundary is the trust
 domain; defense-in-depth between in-pod services is partial-and-deliberate.
-Peers are addressed by instance-scoped container name, never by a bare
-`kratos` or `hydra` alias, which resolves nowhere (ADR 07); the addresses
-themselves are deploy-plane values and are not restated here. The standalone
-consent service is retired; there is no longer a kratos -> consent hop.
+Othala hard-codes no peer address: every host in `kratos/kratos.yml` and
+`hydra/hydra.yml` is a `${VAR}` token, "so the same file lands in both
+topologies" — the compose harness and a production deployment supply different
+names for the same slot, and the naming layers are ADR 07's. The standalone
+consent service is retired; consent is folded into the app, so there is no
+longer a kratos -> consent hop.
 
 Ory's roadmap could add mTLS or SPIFFE primitives; we ignore them
 because the family-scale single-tenant homelab doesn't justify the
@@ -118,9 +125,13 @@ it. Operationally fine but a one-way change for that client.
 
 The auth pod is one security domain. Documented in
 `ARCHITECTURE.md` "Trust boundary." Network isolation
-is the gate, not service-level auth. The recovery-gate webhook (Kratos
-to portal `:4431/admin/recovery-gate`) is secret-gated via
-`X-Webhook-Auth`. Cross-pod traffic is podman-network-isolated.
+is the gate, not service-level auth. The one exception is the
+recovery-gate webhook (Kratos to the app's `:4431/admin/recovery-gate`),
+which is secret-gated: Kratos webhooks support only `api_key` and
+`basic_auth`, so `kratos.yml` uses `type: api_key` with header name
+`Authorization` and value `Bearer ${RECOVERY_GATE_SECRET}`, and
+`handleRecoveryGate` constant-time compares that bearer before reading
+the body, failing closed on a missing or wrong secret.
 
 Ory will continue to ship per-service auth primitives (Hydra admin
 bearer tokens, Kratos session validators, etc.); we use them where
@@ -146,10 +157,12 @@ item. Add carefully.
 
 ### 9. `secrets.system` non-rotatable, doubly backed up
 
-Hydra's at-rest encryption key. Stored in sops (`lodestone.hydra_system_secret`)
-AND independently backed up via the standing estate backup posture
-(rclone → Backblaze B2 + zfs send to onsite tank). Rotation is
-break-glass-only (full DB rebuild).
+Hydra's at-rest encryption key. `hydra/hydra.yml` states the contract in-file:
+"secrets.system is non-rotatable for the life of the Hydra DB. Generate once,
+store in sops as `<host>.hydra_system_secret`. Never change without rebuilding
+the database." The deployment is responsible for backing it up independently of
+the running host; rotation is break-glass-only (full DB rebuild), and the
+procedure is `docs/runbooks/secrets-rotation.md`.
 
 The non-rotatable property is Ory's, not ours. We accept it and
 document.
@@ -162,17 +175,19 @@ encryption), the non-rotatable `secrets.system` key (Hydra at-rest
 encryption), and a pairwise salt. Earlier revisions of the stack carried
 several times that number, including a bearer token for the standalone
 consent service, which was retired with the service. Exact key names and
-the current count live in the instance's sops store and carry the `dag_*`
-prefix; `CHANGELOG.md` is the only place release state is asserted, so no
+the current count live in the deployment's own secret store;
+`CHANGELOG.md` is the only place release state is asserted, so no
 count is restated here.
 
-The two-slot cookie rotation pattern (CURRENT + PREVIOUS) is reduced
-to single-value reuse in production. **This trades a small amount of
-rotation ergonomics for substantial operator clarity.** The two-slot
-pattern is still available in lab and documented in
-`docs/runbooks/cookie-rotation.md` for environments that need rolling
-rotation; we accept the brief disruption window in exchange for simpler
-sops state.
+Each rotation slot is collapsed to a single value — one key per slot, no
+`_PREVIOUS` at rest.
+**This trades a small amount of rotation ergonomics for substantial operator
+clarity.** It is also the only shape the substrate accepts at rest: Kratos and
+Hydra enforce `uniqueItems` on their secrets arrays, so a single active secret
+is a single-element array and two identical slots is a config error. Rolling
+rotation is still available, as a prepend-a-distinct-entry procedure rather
+than a standing second slot; it is documented in
+`docs/runbooks/cookie-rotation.md`.
 
 **To break this**: re-introduce the two-slot model. Operator burden:
 the sops file grows; rotation runbook becomes more careful.
@@ -196,7 +211,7 @@ without obvious cause.
 
 ## When to revisit
 
-This doc is a contract with future-you. Revisit when:
+Revisit when:
 
 - An Ory release breaks one of these choices and we have to adapt.
 - A scale-up genuinely needs one of these doors opened (e.g., a

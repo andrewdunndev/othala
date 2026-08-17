@@ -140,9 +140,11 @@ test('matrix: manifest with empty accessGroups, no skip → DENY (no implicit ac
   assert.equal(enforceAccessGate(id, 'immich', m).allowed, false);
 });
 
-// access-observe regression: a flat (prefixed) name is still a valid binding.
-// The live dag binds `access-observe`; a member must still get in through the
-// rerouted gate so the deploy does not regress.
+// A flat `access-`-prefixed name is an ordinary binding: the manifest binds
+// `access-observe`, the identity holds `access-observe`, the gate ALLOWS. The
+// gate compares bound names against identity groups verbatim
+// (portal/src/lib/gate.ts: `accessGroups.some((g) => userGroups.includes(g))`)
+// and derives nothing from clientId, so the prefix gets no special handling.
 test('regression: access-observe is a valid flat binding → ALLOW', () => {
   const m = manifest('observe', { accessGroups: ['access-observe'] });
   const id = identity(['access-observe']);

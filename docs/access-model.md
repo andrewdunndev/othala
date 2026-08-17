@@ -93,10 +93,13 @@ that were over-opinionated.
    question: identity `state == active` AND membership in the required group,
    fail-closed. They differ in where the required group is **declared**. OIDC
    reads it from the manifest's `accessGroups`. Forward-auth is told by the
-   caller: the edge site's Caddyfile passes `?group=<svc>-access`, and
-   `enforceGroupGate` checks that one group. The parameter is charset-guarded,
-   not prefix-checked, so the Caddyfile is the binding site for that transport
-   and has to be kept in step with the manifest by hand.
+   caller: the group arrives as the `group` query param, "set by Caddy's static
+   config (operator-controlled), not by the client", and `enforceGroupGate`
+   checks that one group. The param is charset-guarded, not prefix-checked
+   (`GROUP_RE = /^[a-z0-9][a-z0-9-]*$/`), and an absent or off-charset value is
+   a 403 before any session lookup runs. Whether a given edge passes a group at
+   all is the edge's own choice; §6 covers othala's shipped snippets, which do
+   not.
 5. **No implicit access** — absence of a binding means no access. There is no
    default that silently grants entry. Enforced at `gate.ts` (an empty
    `accessGroups` returns `allowed: false` with a reason, before any group
@@ -152,10 +155,13 @@ for.
 - `<svc>-access` grants entry. `keep-access` gets you into Keep.
 - `<svc>-admin` grants the elevated role inside that service.
 
-**Both are held explicitly. Admin does not imply access.** An identity that
-holds only `<svc>-admin` is **not admitted**. That is a misconfigured identity,
-not a supported shortcut. An admin who uses a service holds
-`["keep-access", "keep-admin"]`.
+**Both are held explicitly, because othala's gate reads the manifest binding.**
+`enforceAccessGate` (`portal/src/lib/gate.ts`) denies when
+`!accessGroups.some((g) => userGroups.includes(g))`, and `accessGroups` is
+`manifest?.accessGroups ?? []` — so a manifest whose access list names
+`<svc>-access` and nothing else does not admit an identity holding only
+`<svc>-admin`. That is a misconfigured identity, not a supported shortcut. An
+admin who uses a service holds `["keep-access", "keep-admin"]`.
 
 This is the deliberate reversal of the earlier rule, in which a manifest listed
 both groups in its access binding so that holding `<svc>-admin` alone let you
@@ -193,38 +199,55 @@ Two adjacent facts, so they are not re-derived from the naming:
   in `metadata_admin.groups`, and it admits nobody to any downstream app.
   `<svc>-admin` is an app role; `metadata_admin.admin` is portal authority.
   They are unrelated. A bare `admin` string can still turn up in a group
-  selector, because `config.ts` prepends it to `OTHALA_IDENTITY_GROUPS`. It is
-  a name in a list. It confers nothing, here or anywhere.
+  selector, because `config.ts` prepends it to `OTHALA_IDENTITY_GROUPS`. That
+  file calls it what it is: "a NAME in a selector; it confers no portal
+  authority". Like any other group name, it opens an app only where a manifest
+  binds it under `access:`.
 
-Most gates here are explicit: an edge site names a specific group, and
-`/api/forward-auth` checks it. **Two are not.** As deployed, the `memory`
-(Immich) and `tune` (Navidrome) edges point `forward_auth` at Kratos
-`/sessions/whoami` directly — no `group` parameter, and not through this portal
-at all. That is the session-only ("any authenticated user") pattern, and it IS
-in use. An earlier version of this paragraph said it was not; that was false,
-and the correction is the point of this note.
+A group-named gate is one shape an edge can take: it passes `?group=` and
+`/api/forward-auth` checks it. **None of othala's own Caddy snippets take that
+shape.** `caddy/snippets/forward-auth.caddy` points `forward_auth kratos:4433`
+at `uri /sessions/whoami` — not at this portal — and says so in its own header:
+"This snippet establishes ONLY that a valid Kratos session exists".
+`caddy/snippets/admin-session.caddy` uses the same two lines. No file under
+`caddy/` contains a `group=` parameter at all. That is the session-only ("any
+authenticated user") archetype, and othala ships it as a reusable snippet. The
+snippet's own header says a group check is a separate thing you add: per-app
+group enforcement "must be done one of two ways" — the portal's OIDC
+access-gate, or "a dedicated forward_auth endpoint that resolves group
+membership server-side via the Kratos admin API and returns 200/403".
+`/api/forward-auth` is that second thing.
 
-What session-only means at those two sites, stated in both directions because it
+What the session-only archetype means, stated in both directions because it
 lands wrong at both ends:
 
-- Every enrolled identity with a valid session reaches those apps in **full**.
-  No `memory-access` / `tune-access` membership is consulted, so nothing in this
-  model separates one household member from another's library there — the apps'
-  own internal permissions are the entire boundary.
-- Nobody **without** a session reaches them at all, including a stranger holding
-  a share link the app itself generated, because the gate fires before the app
-  ever sees the path.
+- Every identity with a valid Kratos session is admitted, in **full**. No
+  `<svc>-access` membership is consulted — the snippet passes no group — so
+  nothing in this model separates one member from another there. The app's own
+  internal permissions are the entire boundary.
+- Nobody **without** a valid session is admitted on any path the snippet covers:
+  `forward_auth` runs before the snippet's `reverse_proxy`, so the app never
+  sees the request. Which paths it covers is the deploying site's choice; the
+  worked example in `caddy/snippets/README.md` shows a site handling selected
+  path prefixes outside the snippet, for clients that authenticate by HTTP Basic
+  rather than a session.
+
+Being unconsulted at an edge does not make a group inert inside othala.
+`userCanSeeTile` in `portal/src/lib/tiles.ts` gates dashboard visibility on the
+tile's access binding — `return tileAccessGroups(tile).some((g) =>
+userGroups.includes(g))` — so `<svc>-access` still decides whether that app's
+tile shows at all. What a session-only edge decides, on its own, is only whether
+a browser reaching that edge directly is admitted without any group check
+running.
 
 **This is an open design question owned by the operator, and this document does
-not prescribe the fix.** Both services have public-share surfaces, and what those
-surfaces are allowed to do is a decision about those services rather than a
-defect in this access model. Recorded here so the state is not rediscovered as a
-finding a fourth time.
+not prescribe the fix.** Which archetype a given app sits behind is a deployment
+decision. Recorded here so the state is not rediscovered as a finding a fourth
+time.
 
 *UNENFORCED — nothing here checks this*: which `forward_auth` URI an edge picks
-is the deploy plane's choice, expressed in that service's own Caddyfile. othala
-neither imposes nor validates it, and no lint, test, or gate in this repo will
-report a session-only edge.
+is the deploy plane's choice. othala neither imposes nor validates it, and no
+lint, test, or gate in this repo will report a session-only edge.
 
 One fallback does still exist, on the tile path only, and §11 says exactly where.
 
@@ -388,11 +411,8 @@ the tile path.** Be precise about which, because the two disagree:
   `everyone`. The original plan was to make an unset variable mean "no
   fallback". That was not implemented.
 
-The gap only reaches a manifest that declares no binding at all. An OIDC
-manifest like that is BLOCKed at load, so what is left is presentation-only
-tiles (forward-auth or external links), where entry is enforced at the edge by
-the group named in that site's Caddyfile rather than by the tile. The tile can
-therefore be visible to someone the edge will still refuse. That is documented
+The gap only reaches a manifest that declares no binding at all. The tile can
+be visible to someone the edge will still refuse. That is documented
 here rather than quietly tolerated, because a tile that shows and an app that
 refuses is a support call.
 

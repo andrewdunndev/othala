@@ -68,6 +68,7 @@ is the live example: the title changed, the filename did not.
 |---|---|
 | [03](03-proxy-originated-mtls.md) | mTLS is proxy-originated, not in-app |
 | [06](06-two-pki.md) | Two-PKI: step-ca internal mesh CA + LE edge, never chained |
+| [16](16-sslmode-disable-db-hop.md) | `sslmode=disable` on the Ory → Postgres DSNs |
 
 ### Identity and credentials
 

@@ -1,4 +1,4 @@
-// Tests for src/lib/gate.ts — the COMPLETE access gate (CU1 item 2).
+// Tests for portal/src/lib/gate.ts — the COMPLETE access gate (CU1 item 2).
 //
 // Run with: tsx --test scripts/gate.test.mjs
 //
@@ -6,7 +6,7 @@
 // keys off the manifest's bound access groups (manifest.accessGroups,
 // OR-semantics) AND state==active, both fail-closed — NOT a derived
 // `access-<clientId>` name (docs/access-model.md §10). The exhaustive
-// fail-closed property lives in scripts/gate-property.test.mjs (§16).
+// fail-closed property lives in portal/scripts/gate-property.test.mjs (§16).
 
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -133,9 +133,15 @@ test('state check precedes group check', () => {
   assert.equal(r.reason, 'identity not active');
 });
 
-// access-observe regression: a flat (prefixed) name is a valid binding. The
-// live dag binds `access-observe`; a member must still get in through the
-// rerouted gate (DoD: live dag must not regress).
+// A flat `access-`-prefixed name is an ordinary binding. This asserts the gate
+// ALLOWS when the manifest binds `access-observe` AND the identity holds
+// `access-observe` — both sides carry the same name, so what is pinned is that
+// the prefix gets no special handling, not that a stale group name is remapped
+// onto a renamed binding. The gate compares bound names against identity groups
+// verbatim (portal/src/lib/gate.ts:
+// `accessGroups.some((g) => userGroups.includes(g))`) and derives nothing from
+// clientId. Retained across the `<svc>-access` rename, which docs/access-model.md
+// §17 step 4 records as cosmetic, forcing no data migration.
 test('regression: access-observe flat binding still admits a member', () => {
   const r = enforceAccessGate(
     identity({ metadata_admin: { groups: ['access-observe'] } }),

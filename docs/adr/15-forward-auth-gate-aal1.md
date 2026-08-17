@@ -76,31 +76,35 @@ simply lacks the group is distinguishable from one who has no session at all.
 where the `GET` would 403 is an authorization bypass.
 
 **What the endpoint does not decide: whether a denial becomes a redirect.**
-Caddy redirects on no status by default; 401 is not privileged. A site redirects
-exactly the statuses its own matcher names, so the user-visible behaviour is a
-property of the edge Caddyfile, not of this route. Both shapes are in use in the
-deploy catalog today:
+There is no status Caddy redirects on by default, and 401 is not privileged: a
+status this endpoint returns is redirected iff the edge's own `status` matcher
+lists it. Three shapes follow from that, and which one a deploying edge uses is a
+property of the deployment, not of this route:
 
-| edge matcher | what a group-miss looks like |
+| edge matcher | what a denial looks like |
 |---|---|
-| `@unauth status 401 403` | bounced to the portal login |
-| `@unauth status 401` | flat 403 from Caddy, no redirect |
+| `status 401 403` | both statuses redirect — a group miss bounces to login the same as a session miss |
+| `status 401` alone | the 401 redirects; a 403 passes through as a flat deny |
+| no status matcher, no `handle_response` | no status is listed, so nothing redirects, on any status |
 
-The `401 403` form is the majority — it is what this repo's own reusable snippet
-(`caddy/snippets/forward-auth.caddy:39`) ships, and most gated sites in the
-catalog follow it. Two do not. Neither shape is wrong; they are different
-answers to "should someone who lacks the group be offered a login they have
-already completed, or told plainly no". What IS wrong is reading this record and
-concluding that a 403 cannot produce a redirect. It can, and usually does. Check
-the site's Caddyfile before predicting behaviour, and treat the redirect-loop
-argument below as the reason the endpoint keeps the statuses distinct — not as a
-guarantee about what any particular edge does with them.
+Neither of the first two is wrong; they are different answers to "should a denied
+visitor be offered a login they may have already completed, or told plainly no",
+and the matcher keys off the status code alone, never off *why* the denial
+happened. What IS wrong is reading this record and concluding that a 403 cannot
+produce a redirect. Read the deploying edge's own Caddyfile before predicting
+what a user sees, and treat the redirect-loop argument below as the reason the
+endpoint keeps the statuses distinct — not as a guarantee about what any
+particular edge does with them.
+
+This repo ships no Caddy snippet for this route. `caddy/snippets/forward-auth.caddy`
+is a session-only gate: its `forward_auth` targets Kratos directly (`uri
+/sessions/whoami`), and its own header sends non-OIDC apps that need group checks
+to "a dedicated forward_auth endpoint that resolves group membership server-side
+via the Kratos admin API and returns 200/403". Nothing under `caddy/` passes a
+`group` parameter — `grep -rn "group=" caddy/` returns nothing — so there is no
+in-repo example of the shape described above.
 
 ![The forward-auth request path: a browser carrying the apex-scoped session cookie reaches the estate edge and the service's Caddy, which sub-requests the portal's /api/forward-auth with the required group before proxying; the portal verifies the session, re-resolves the identity through the Kratos admin API, and answers 200, 401 or 403.](../../site/public/diagrams/forward-auth-request-path.svg)
-
-The deny arrow in that map is drawn as the majority `401 403` edge shape; read it
-against the matcher table above, which is the authority on what a given site
-actually does with a denial.
 
 **Why `whoami` must stay `aal1`.** The gate's session check is:
 
@@ -125,9 +129,9 @@ become a bounce to login that returns the user to exactly the same state, so it
 loops; at a site matching `401` only, the 401 loops and the 403 is a hard wall.
 There is no third outcome where the gate recovers.
 
-The blast radius is every `forward_auth`-fronted app in the deploy catalog, at
-once, and it lands **only** on users who enrolled a second factor: the people who
-did the right thing.
+The blast radius is every app fronted by this gate, at once, and it lands
+**only** on users who enrolled a second factor: the people who did the right
+thing.
 
 **AAL is enforced per flow instead, never at `whoami`:** AAL2 step-up on `/admin`
 in the portal's server-side guard ([08](08-admin-authority-model.md)), and
@@ -172,11 +176,12 @@ guard re-checks for itself.
   isolation ([03](03-proxy-originated-mtls.md)) matters to this path too. Kratos
   admin unreachable is a 403 for every gated app.
 
-- **The required group is edge configuration, not app configuration.** Which group
-  fronts which app lives in the deploy plane's Caddy config and catalog manifests;
-  those are the enforcing artifacts and this record deliberately restates none of
-  them. A path-scoped gate (admin group required only under `/admin`) is expressed
-  the same way, as a second `forward_auth` block with a different `group`.
+- **The required group is edge configuration, not app configuration.** The route
+  reads it from the query param the deploying edge sets; which group fronts which
+  app is therefore a property of that edge's config, and this record deliberately
+  restates none of it. A path-scoped gate (admin group required only under
+  `/admin`) is expressed the same way, as a second `forward_auth` block with a
+  different `group`.
 
 **Depends on:** `portal/src/pages/api/forward-auth.ts` (treats a missing
 `session.identity.id` as 401) and `portal/src/lib/gate.ts` (`enforceGroupGate`).

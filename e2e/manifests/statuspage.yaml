@@ -1,15 +1,32 @@
 # Statuspage — status.othala.test (external SaaS tile)
 # Generic example fixture for the Othala e2e harness. A stand-in for an
-# external, hosted service that the portal links to but does not
-# authenticate — auth_kind: external. Presentation ONLY; no oidc:/
-# consent: block. There is no SSO session on our side.
+# external, hosted service the portal links out to — auth_kind: external.
+# It declares no `oidc:` block, so it loads as presentationOnly:true
+# (portal/src/lib/manifests.ts) and oidcClientManifests filters it out of
+# the registrable set (`set.filter((m) => !m.presentationOnly)`). The
+# `consent:` block below carries nothing but skip_access_check.
 #
-# skip_access_check: true is set because auth_kind: external tiles are links
-# to public or externally-authenticated services — there is no othala-managed
-# SSO gate on the link target. The tile is shown to all logged-in portal users
-# regardless of group membership (they are already authenticated to reach the
-# dashboard). To restrict visibility, set consent.skip_access_check: false and
-# add an access binding in presentation.access.
+# What skip_access_check: true does HERE: this manifest declares neither
+# presentation.access nor presentation.access_group, so parseAccessGroups
+# returns [] (portal/src/lib/access-groups.ts). Without the flag,
+# validateClients reports "presentation.access is empty and
+# consent.skip_access_check is not set" (portal/src/lib/manifests.ts:
+# `if (cm.accessGroups.length === 0 && !cm.skipAccessCheck)`), and
+# loadClientManifests throws on any finding — failing the whole catalog
+# load, not just this file. The flag suppresses that BLOCK. The same field
+# is also the group-check bypass in enforceAccessGate
+# (portal/src/lib/gate.ts: `if (manifest?.skipAccessCheck) return { allowed:
+# true };`), which sits after the state check and so never bypasses it.
+#
+# It has NO effect on dashboard tile visibility: the tile loader
+# (portal/src/lib/tiles.ts, parseTile) only ever reads `doc['presentation']`,
+# never `consent:`. Visibility is decided by userCanSeeTile over
+# tileAccessGroups; with no access binding declared, that falls back to the
+# singular accessGroup, which parseTile sets to the configured default group
+# (OTHALA_DEFAULT_GROUP, via tileDefaultGroup()) — so the tile is visible
+# only to identities holding that group, not to every logged-in user. To
+# bind it to a specific group, add access_group or access: [...] under
+# presentation.
 
 presentation:
   name: Statuspage

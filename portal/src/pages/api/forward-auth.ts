@@ -2,18 +2,23 @@
 // NON-OIDC apps that can't participate in the login/consent flow but sit behind
 // the same Caddy edge and the same Kratos session cookie.
 //
-// Caddy is configured roughly as (this repo's own reusable snippet,
-// caddy/snippets/forward-auth.caddy, is the reference shape):
+// An edge that uses this endpoint points `forward_auth` at the portal and
+// passes the required group as a static query param, roughly:
 //
-//   forward_auth othala-portal:PORT {
-//       uri /api/forward-auth?group=observe-access
+//   forward_auth <portal-upstream> {
+//       uri /api/forward-auth?group=<group>
 //       copy_headers X-Kratos-Authenticated-Identity-Id
 //
 //       @unauth status 401 403
-//       handle_response @unauth {
-//           redir {env.OTHALA_PUBLIC_URL}/auth/login?return_to={uri} 302
-//       }
+//       handle_response @unauth { ... }
 //   }
+//
+// othala ships NO snippet of that shape. caddy/snippets/forward-auth.caddy
+// points `forward_auth kratos:4433` at `uri /sessions/whoami` and "establishes
+// ONLY that a valid Kratos session exists" — it passes no group and never
+// reaches this route.
+// That is the session-only archetype; this endpoint is the session-AND-group
+// one, and the edge config that calls it is written per site.
 //
 // The endpoint decides ALLOW/DENY purely from the Kratos session and the
 // admin-managed access group. It is SECURITY-SENSITIVE AUTHZ and FAILS CLOSED:
@@ -28,10 +33,9 @@
 // What this endpoint does NOT control: whether a denial becomes a login
 // redirect. That is the EDGE's decision, made by its `status` matcher plus
 // `handle_response` — a status this endpoint returns is redirected iff the
-// site's matcher lists it. There is no status Caddy redirects on by default,
-// and 401 is NOT privileged; an edge matching `status 401 403` (which is what
-// the snippet above and most sites in the deploy catalog do) redirects on BOTH,
-// while an edge matching `status 401` alone lets a 403 through as a flat deny.
+// site's matcher lists it. An edge matching `status 401 403` redirects on
+// BOTH, while an edge matching `status 401` alone lets a 403 through as a flat
+// deny.
 //
 // Why the endpoint still separates them: it is the only way the edge CAN
 // choose. Collapsing everything to 401 would remove the distinction between
@@ -57,10 +61,10 @@ import type { Identity } from '../../lib/types';
 export const prerender = false;
 
 // Operator-set access group name. This is an INPUT GUARD (SSRF/charset), not a
-// naming policy: othala imposes no group-naming convention (access-model Phase
-// 3, docs/access-model.md §10/§11). Any adopter-named group passes as long as it
-// matches the safe charset; the group's MEANING comes from a manifest binding,
-// never its name. (`access-observe` and bare `observe` both pass.)
+// naming policy: "Group names carry no meaning to the code", and a group's
+// type "comes from its bindings, never its name" (docs/access-model.md §6,
+// §10). Any name passes as long as it matches the safe charset.
+// (`access-observe` and bare `observe` both pass.)
 const GROUP_RE = /^[a-z0-9][a-z0-9-]*$/;
 
 const ID_HEADER = 'X-Kratos-Authenticated-Identity-Id';
