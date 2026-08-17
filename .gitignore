@@ -26,3 +26,7 @@ venv/
 
 # Local maintainability backlog (working notes; synthesist is the eventual home)
 /TODO.md
+
+# UX-scan/audit residue (screenshots, reports); e2e/.gitignore also covers
+# this relative to e2e/, this entry is the root-relative belt-and-suspenders
+e2e/browser-out/
