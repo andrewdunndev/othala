@@ -158,7 +158,7 @@ export function getVerificationFlow(
  * when no flow ID is present (or the flow is gone).
  *
  * These MUST be browser-relative (same-origin), NOT kratosBase(): kratosBase()
- * is the SERVER-side Kratos URL (e.g. http://dag-kratos:4433 inside the pod),
+ * is the SERVER-side Kratos URL (e.g. http://kratos:4433 inside the pod),
  * which the browser cannot resolve. The portal and Kratos's public API are the
  * same public origin (Caddy routes /self-service/* to Kratos), so a relative
  * path resolves correctly in the browser regardless of the deployment's

@@ -1,11 +1,18 @@
-# Reusable Caddy snippet — LDAP-bound app (Jellyfin)
+# Reusable Caddy snippet — LDAP-bound app
 #
 # Usage:
-#   import ldap-app jellyfin 8096
+#   import ldap-app grafana 3000
 #
-# Same shape as oidc-app from Caddy's perspective: plain reverse proxy.
-# The LDAP traffic flows app -> glauth-kratos bridge (co-located in pod
-# in production), not through Caddy. Caddy never sees LDAP.
+# For an app you bind to the LDAP bridge instead of wiring it to Hydra as
+# an OIDC client (Grafana speaks both; you pick one).
+#
+# Identical to oidc-app from Caddy's perspective: a plain reverse proxy.
+# The LDAP traffic flows app -> glauth-kratos bridge, typically co-located
+# with the app. Caddy never sees LDAP.
+#
+# Args:
+#   $1 = upstream container name
+#   $2 = upstream port
 
 (ldap-app) {
 	tls {

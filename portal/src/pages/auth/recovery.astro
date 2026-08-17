@@ -105,8 +105,6 @@ const phase: 'request' | 'sent' = flow?.state === 'sent_email' ? 'sent' : 'reque
 
   <footer class="recover-footer">
     <a href="/auth/login" class="recover-foot-link">Back to sign in</a>
-    <span class="recover-foot-sep" aria-hidden="true">·</span>
-    <a href="/docs/family-help" class="recover-foot-link">Need help?</a>
   </footer>
 
 </Layout>
@@ -154,7 +152,6 @@ const phase: 'request' | 'sent' = flow?.state === 'sent_email' ? 'sent' : 'reque
   }
   .recover-foot-link { color: var(--text-muted); text-decoration: none; }
   .recover-foot-link:hover { color: var(--accent); text-decoration: none; }
-  .recover-foot-sep { color: var(--border); }
 
   @media (max-width: 640px) {
     .recover-card { padding: var(--space-5); }

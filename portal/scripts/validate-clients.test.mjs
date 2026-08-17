@@ -26,18 +26,17 @@ function fromYaml(yamlText, filename = 'crafted.yaml') {
 }
 
 // ── Rule 1a: client_id must be a valid env-var stem ───────────────────────
-// Root cause: S08 staleness ledger; overnight Tasks 1+2.
-// A hyphenated client_id ("open-webui") produces "OPEN-WEBUI_CLIENT_SECRET"
+// A hyphenated client_id ("prompt-desk") produces "PROMPT-DESK_CLIENT_SECRET"
 // which is not a valid POSIX env var and silently fails to resolve.
 
 test('CLIENT_ID_ENV_STEM_RE: valid stems pass', () => {
-  for (const id of ['keep', 'openwebui', 'llm', 'my_app', '_app', 'App123']) {
+  for (const id of ['keep', 'promptdesk', 'llm', 'my_app', '_app', 'App123']) {
     assert.ok(CLIENT_ID_ENV_STEM_RE.test(id), `expected ${JSON.stringify(id)} to be a valid stem`);
   }
 });
 
 test('CLIENT_ID_ENV_STEM_RE: invalid stems are rejected (hyphens, dots, leading digits)', () => {
-  for (const id of ['open-webui', 'my.app', '1app', 'app-', 'a b']) {
+  for (const id of ['prompt-desk', 'my.app', '1app', 'app-', 'a b']) {
     assert.ok(!CLIENT_ID_ENV_STEM_RE.test(id), `expected ${JSON.stringify(id)} to be rejected`);
   }
 });
@@ -45,11 +44,11 @@ test('CLIENT_ID_ENV_STEM_RE: invalid stems are rejected (hyphens, dots, leading 
 test('rule 1a: hyphenated client_id fires the env-var-stem error', () => {
   const m = fromYaml(`
 oidc:
-  client_id: open-webui
+  client_id: prompt-desk
   redirect_uris:
-    - https://open-webui.othala.test/cb
+    - https://prompt-desk.othala.test/cb
   audience:
-    - https://open-webui.othala.test
+    - https://prompt-desk.othala.test
 consent:
   skip_access_check: true
 `);
@@ -57,9 +56,9 @@ consent:
   assert.ok(
     errs.some(
       (e) =>
-        e.includes('open-webui') &&
+        e.includes('prompt-desk') &&
         e.includes('POSIX env var') &&
-        e.includes('OPEN-WEBUI_CLIENT_SECRET'),
+        e.includes('PROMPT-DESK_CLIENT_SECRET'),
     ),
     `expected env-var-stem error, got:\n${errs.join('\n')}`,
   );
@@ -100,11 +99,11 @@ consent:
 test('rule 1a: valid client_id without hyphens does NOT fire the env-var-stem error', () => {
   const m = fromYaml(`
 oidc:
-  client_id: openwebui
+  client_id: promptdesk
   redirect_uris:
-    - https://openwebui.othala.test/cb
+    - https://promptdesk.othala.test/cb
   audience:
-    - https://openwebui.othala.test
+    - https://promptdesk.othala.test
 presentation:
   access:
     - access-llm
@@ -114,18 +113,18 @@ consent: {}
   assert.equal(
     errs.filter((e) => e.includes('POSIX env var')).length,
     0,
-    `openwebui should not trigger the env-var-stem rule:\n${errs.join('\n')}`,
+    `promptdesk should not trigger the env-var-stem rule:\n${errs.join('\n')}`,
   );
 });
 
 test('rule 1a: assertManifestsValid surfaces the env-var-stem error in the thrown message', () => {
   const m = fromYaml(`
 oidc:
-  client_id: open-webui
+  client_id: prompt-desk
   redirect_uris:
-    - https://open-webui.othala.test/cb
+    - https://prompt-desk.othala.test/cb
   audience:
-    - https://open-webui.othala.test
+    - https://prompt-desk.othala.test
 consent:
   skip_access_check: true
 `);
@@ -134,7 +133,7 @@ consent:
     (err) =>
       /manifest validation failed/.test(err.message) &&
       /POSIX env var/.test(err.message) &&
-      /OPEN-WEBUI_CLIENT_SECRET/.test(err.message),
+      /PROMPT-DESK_CLIENT_SECRET/.test(err.message),
   );
 });
 
@@ -329,11 +328,11 @@ consent:
 test('rule: emit_groups_claim:false WITHOUT a role groups claim does NOT fire M10', () => {
   const m = fromYaml(`
 oidc:
-  client_id: tailscale
+  client_id: meshvpn
   redirect_uris:
-    - https://login.tailscale.com/cb
+    - https://login.meshvpn.example/cb
   audience:
-    - https://login.tailscale.com
+    - https://login.meshvpn.example
 consent:
   emit_groups_claim: false
   roles:
@@ -524,11 +523,9 @@ presentation:
   assert.ok(errs.some((e) => e.includes('unreachable')), errs.join('\n'));
 });
 
-// ── e2e/manifests/ is now the canonical on-disk fixture set ────────────────
-// hydra/clients/ was removed at M3 (dual-source-of-truth cleanup). The
-// operator's private catalog is the deployed source of truth; the
-// e2e/manifests/ fixtures here are the OSS-generic worked examples that CI
-// validates. The hydra/clients/ directory no longer exists in this repo.
+// ── e2e/manifests/ is the canonical on-disk fixture set ───────────────────
+// These are the generic worked examples CI validates; an adopter's own
+// catalog lives wherever MANIFEST_DIR points.
 
 // ── e2e fixture set must be clean (mirrors the hydra/clients check above) ──
 
@@ -559,20 +556,20 @@ test('every e2e/manifests/*.yaml round-trips AND the set passes validateClients'
   assert.deepEqual(errs, [], `e2e fixtures should be clean:\n${errs.join('\n')}`);
 });
 
-// ── open-webui.yaml (Open WebUI SSO) parses correctly and validates clean ───
+// ── promptdesk.yaml parses correctly and validates clean ──────────────────
 
-test('open-webui.yaml: parses correctly — client_id, access binding, redirect, audience, roles', () => {
-  const yaml = readFileSync(join(e2eClientsDir, 'open-webui.yaml'), 'utf8');
-  const m = parseManifest(yaml, 'open-webui.yaml');
+test('promptdesk.yaml: parses correctly — client_id, access binding, redirect, audience, roles', () => {
+  const yaml = readFileSync(join(e2eClientsDir, 'promptdesk.yaml'), 'utf8');
+  const m = parseManifest(yaml, 'promptdesk.yaml');
 
-  assert.equal(m.clientId, 'openwebui', 'client_id must be openwebui');
+  assert.equal(m.clientId, 'promptdesk', 'client_id must be promptdesk');
   assert.equal(m.presentationOnly, false, 'must be an OIDC client, not presentation-only');
 
   // ENTRY binding: `prompt-access` and nothing else. `prompt-admin` must NOT
   // appear here — it is bound for ROLE only (see group_role_map below), and a
   // second entry would be admin-implies-access coming back.
   // Group names track the SERVICE slug (prompt.othala.test), not the OAuth2
-  // client_id (`openwebui`) — the name is convention, the binding is what runs.
+  // client_id (`promptdesk`) — the name is convention, the binding is what runs.
   assert.deepEqual(m.accessGroups, ['prompt-access'], 'must bind exactly the prompt-access group');
 
   // OIDC fields.
@@ -601,5 +598,5 @@ test('open-webui.yaml: parses correctly — client_id, access binding, redirect,
 
   // Full validation must pass (audience matches redirect origin, roles clean).
   const errs = validateClients([m]);
-  assert.deepEqual(errs, [], `open-webui.yaml must validate clean:\n${errs.join('\n')}`);
+  assert.deepEqual(errs, [], `promptdesk.yaml must validate clean:\n${errs.join('\n')}`);
 });

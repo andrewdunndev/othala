@@ -150,8 +150,8 @@ try {
   console.error('[othala/settings] getIdentity failed; showing no groups:', lookupErr);
 }
 const displayName = traits.displayName || traits.username || '';
-// access-model Phase 2: split the user's own groups by the registry's
-// binding-derived type, not an `access-` name prefix (docs/access-model.md §10).
+// Split the user's own groups by the registry's binding-derived type, not an
+// `access-` name prefix.
 const groupRegistry = getGroupRegistry();
 const identityGroups = groups.filter((g) => isIdentityGroup(groupRegistry, g));
 const accessGroups = groups.filter((g) => !isIdentityGroup(groupRegistry, g));
@@ -222,7 +222,7 @@ const accessGroups = groups.filter((g) => !isIdentityGroup(groupRegistry, g));
 
   {hasPassword && (
     <section class="section">
-      <p class="section-subtitle">Password (legacy: Jellyfin/AppleTV)</p>
+      <p class="section-subtitle">Password (legacy clients only)</p>
       <p class="section-prose">
         Change the password used as a fallback when a passkey isn't
         available.

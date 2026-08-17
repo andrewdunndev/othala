@@ -12,8 +12,8 @@ This CHANGELOG and git tags carry the deployed-instance release state.
 ## [0.4.0] - 2026-08-13
 
 Admin-POST and AAL2 step-up fixes, extensible Hydra CORS for browser-SPA
-clients, the othala.dunn.dev docs site, and an ADR/docs rewrite that stands
-the project alone from the operator's private deployment.
+clients, the othala.dunn.dev docs site, and a decisions/docs rewrite that
+stands the project alone from the operator's private deployment.
 
 ### Fixed
 
@@ -36,10 +36,10 @@ the project alone from the operator's private deployment.
   the v0.3.0 tag — the ARG now tracks via an annotated customManager, the
   Playwright group has automerge off, and a shadow docker-manager dependency
   on the same ARG (which could have silently rewritten it again) is disabled.
-- CI: e2e runner tags retargeted from `[carmine, qemu]` to `[lodestone, qemu]`
-  after the carmine host was rebuilt as lodestone, which had left the e2e
-  release gate unmatchable; the golden-path docs' sops key path corrected to
-  match (the store's section is `lodestone:`). The e2e job's failure
+- CI: the e2e job's runner tags retargeted after the QEMU runner host was
+  rebuilt under a new label, which had left the e2e release gate unmatchable;
+  the golden-path docs' secret-store key path corrected to match. The e2e
+  job's failure
   artifacts now upload: the declared paths were absolute `/tmp` paths the
   runner refuses (two of them dead references with no writer), so every
   failure lost its diagnostics; the live log moved to `e2e/logs/`.
@@ -53,27 +53,28 @@ the project alone from the operator's private deployment.
 - **`othala.dunn.dev` docs site**: a public Astro SSG site modelled on
   reference.dunn.dev (IBM Plex type, light/dark toggle, the estate design
   system via `@dunn.dev/reference`), deployed as a Cloudflare Worker. Ships a
-  curated Guides section and a Decisions index that links out to the ADRs on
-  gitlab.com.
+  curated Guides section and, at the time, a Decisions index; the decision
+  corpus it indexed was removed in a later pass.
 
 ### Changed
 
-- **ADRs rewritten to deployment accuracy.** An audit compared all 10 ADRs
-  against the deployed system; six had drifted (the LDAP bridge was never
-  deployed, the mTLS admin-proxy was reverted, the admin login-gate hook was
-  retired). Each ADR now describes the system as deployed, including two
-  honest gaps (the admin marker isn't schema-enumerated; break-glass is
-  root-by-role with no dedicated identity yet). ADRs renumbered 2-digit and
-  moved to repo-canonical `docs/adr/`; two new ADRs minted (11: hardening-
-  tuning deviations from Ory defaults; 12: client-CORS/topology model).
+- **Decision records rewritten to deployment accuracy.** An audit compared the
+  recorded decisions against the deployed system; six had drifted (the LDAP
+  bridge was never deployed, the mTLS admin-proxy was reverted, the admin
+  login-gate hook was retired). Two gaps were recorded rather than papered
+  over: the admin marker isn't schema-enumerated, and break-glass is
+  root-by-role with no dedicated identity. Two decisions were newly recorded —
+  the hardening deviations from Ory defaults, and the client-CORS/topology
+  model.
 - **Docs stand alone from the operator's private deployment.** Six dated docs
   removed (decision.md, STATUS.md, three security-review snapshots, the
   network SVG) with all 44 inbound references repointed; every reference to
-  the operator's private infra repo scrubbed to generic phrasing across ADRs,
-  AGENTS.md, and code comments; the adopter-facing `.env.example` de-drifted
-  (retired `OTHALA_ADMIN_IDS`, LDAP vars moved out); code/doc leaves thinned
-  to current-state facts with resolvable ADR pointers, enforced by a new
-  purity-gate rule that fails on an unresolvable `ADR NN` citation.
+  the operator's private infra repo scrubbed to generic phrasing across the
+  decision records, AGENTS.md, and code comments; the adopter-facing
+  `.env.example` de-drifted (retired `OTHALA_ADMIN_IDS`, LDAP vars moved out);
+  code/doc leaves thinned to current-state facts. The decision corpus, and the
+  purity-gate rule that checked pointers into it, were both removed in a later
+  pass.
 - Bumped the shared `@dunn.dev/reference` design-system package (consumed by
   the portal and now also the new docs site) from `^0.2.0` to `^0.4.0`.
 
@@ -86,7 +87,7 @@ OpenTelemetry tracing, and a portal UX/pristine pass.
 
 - **Portal UX pass**: passkey-first login copy (Face ID / Touch ID), a
   dismissible first-run passkey-enrollment nudge, legacy relabeling in
-  settings (security key = legacy 2FA; password = legacy: Jellyfin/AppleTV),
+  settings (security key = legacy 2FA; password = legacy clients only),
   in-flight disable-on-submit feedback on admin forms, and a11y/design-system
   purity fixes (contrast, nested landmarks, raw-color removal, chip/badge
   unification, mobile reflow).
@@ -95,9 +96,9 @@ OpenTelemetry tracing, and a portal UX/pristine pass.
   wildcards blocked (T2-N/T2-O).
 - Admin recovery switched to `createRecoveryCodeForIdentity` (Kratos
   v26.2.0+ compatibility).
-- ADR set expanded: migration join-key/durable-key (0004 revisions),
-  capability groups, first-party skip-consent; docs decoupled from the
-  shelved LDAP bridge.
+- Decision records expanded: migration join-key/durable-key, capability
+  groups, first-party skip-consent; docs decoupled from the shelved LDAP
+  bridge.
 
 ### Changed
 
@@ -119,7 +120,7 @@ OpenTelemetry tracing, and a portal UX/pristine pass.
   a central group registry (`access-model` primitives). Each app manifest
   declares an `access_group`; the portal builds derived groups and enforces
   them at the forward-auth gate, replacing the ad-hoc per-tile logic. Includes
-  per-app forward-auth gating for Gather, Open WebUI, and Observe tiles.
+  per-app forward-auth gating for the deployment's own tiles.
 - **AAL2 step-up removed from the admin gate**: admin authority is enforced by
   the `OTHALA_ADMIN_IDS` allowlist + a basic-auth + passkey session check
   instead of the Kratos AAL2 step-up challenge, eliminating the dead-end UX
@@ -148,8 +149,8 @@ OpenTelemetry tracing, and a portal UX/pristine pass.
 - **In-app OIDC client registrar** (`register-clients.mjs`): replaces the
   legacy `dag-apply-clients` shell script. Boots on startup and reconciles on
   `SIGHUP`; CI exercises it against the e2e manifest set.
-- **Open WebUI OIDC manifest** (`access-llm` gate) and **Gather forward-auth
-  tile** (`access-gather` gate) as shipped example manifests.
+- An **OIDC manifest** and a **forward-auth tile** shipped as example
+  manifests, each gated on its own access group.
 - **Env-var-name hardening**: manifest-lint rule 1a enforces uppercase env-var
   names; the registrar fails loudly on malformed entries; `SIGHUP` analysis
   added to the config module.
@@ -188,8 +189,8 @@ runtime manifest model, plus the rename to **Othala** ("Ory for your home").
   leak to the client.
 - **Generic OSS example manifests** in `e2e/manifests/`, which double as the
   release-gate smoke fixtures: `grafana` (OIDC + role mapping),
-  `audiobookshelf` (OIDC), `jellyfin` (LDAP via the bridge), `proxywatch`
-  (forward_auth), and `statuspage` (external).
+  `audiobookshelf` (OIDC), a directory-backed presentation-only tile,
+  `proxywatch` (forward_auth), and `statuspage` (external).
 - **Caddy worked example** (`caddy/`): a reference Caddyfile and per-pattern
   snippets (oidc-app, ldap-app, forward-auth, admin-session).
 - **e2e mailpit catcher** plus smoke Section H, proving the contact form sends,
@@ -231,7 +232,7 @@ runtime manifest model, plus the rename to **Othala** ("Ory for your home").
 
 ### Validation
 
-- Smoke harness green on the carmine QEMU runner (incl. the contact-form
+- Smoke harness green on the QEMU runner (incl. the contact-form
   Section H); 459 portal unit tests; `astro check` and `astro build` clean.
 
 [0.4.0]: https://gitlab.com/dunn.dev/othala/-/releases/v0.4.0

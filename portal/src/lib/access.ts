@@ -8,8 +8,8 @@
 // Algorithm per client:
 //   1. If user is not in ANY of the manifest's bound access groups
 //      (`manifest.accessGroups`, OR-semantics) -> no row (no access). This is
-//      the SAME binding the OIDC gate keys off (access-model Phase 2,
-//      docs/access-model.md §10) — no derived `access-<clientId>` group.
+//      the SAME binding the OIDC gate keys off — no derived
+//      `access-<clientId>` group.
 //   2. If the manifest declares no roles at all, the row reports role
 //      `default` with source `no role mapping`.
 //   3. Otherwise the ROLE is whatever `lookupRole(manifest, metadata_admin)`
@@ -36,12 +36,11 @@
 //       highest. It is NOT the first match in stored order — that rule is
 //       RETIRED, and this comment used to describe it.
 //
-//   Why the retirement matters here: under the converged access model an admin
-//   holds BOTH `<svc>-access` and `<svc>-admin` explicitly (docs/access-model.md
-//   §6), so two role-mapping groups on one identity is the normal case, not an
-//   edge case. `normalizeGroupOrder` sorts non-identity groups alphabetically,
-//   which puts `cinema-access` before `cinema-admin` — a first-match walk would
-//   have handed every admin the lesser role.
+//   Why the retirement matters here: an admin holds BOTH `<svc>-access` and
+//   `<svc>-admin` explicitly, so two role-mapping groups on one identity is the
+//   normal case, not an edge case. `normalizeGroupOrder` sorts non-identity
+//   groups alphabetically, which puts `grafana-access` before `grafana-admin` —
+//   a first-match walk would have handed every admin the lesser role.
 //
 //   `normalizeGroupOrder` (below) is therefore COSMETIC: stable display, stable
 //   diffs in `metadata_admin.groups`. It is not what makes role resolution
@@ -87,8 +86,7 @@ export interface EffectiveAccessRow {
 export const IDENTITY_GROUP_ORDER: readonly string[] = identityGroups;
 
 /**
- * Sort an unordered list of groups into the canonical stored shape
- * (access-model Phase 2 — docs/access-model.md §10):
+ * Sort an unordered list of groups into the canonical stored shape:
  *   1. Identity groups (those in IDENTITY_GROUP_ORDER) in that fixed order.
  *   2. All remaining groups in alphabetical order.
  *
@@ -151,8 +149,8 @@ export function computeEffectiveAccess(
   const rows: EffectiveAccessRow[] = [];
 
   for (const m of manifests) {
-    // access-model Phase 2: gate on the manifest's bound access groups
-    // (OR-semantics), the SAME field the OIDC entry gate uses — not a derived
+    // Gate on the manifest's bound access groups (OR-semantics), the SAME
+    // field the OIDC entry gate uses — not a derived
     // `access-<clientId>` name. skip_access_check grants access without a group.
     const hasAccess =
       m.skipAccessCheck || m.accessGroups.some((g) => userGroups.includes(g));
@@ -233,7 +231,7 @@ export function computeEffectiveAccess(
  * so admin recovery is console-only. See
  * docs/runbooks/admin-recovery.md "Console recovery for an admin".
  *
- * ADR 08: admin status is the `metadata_admin.admin === true` marker
+ * Admin status is the `metadata_admin.admin === true` marker
  * (writable only via the Kratos admin API). The caller MUST pass a target
  * identity fetched from the admin API (e.g. via getIdentity) — the public
  * /sessions/whoami response strips metadata_admin (Kratos v26). Refuse iff

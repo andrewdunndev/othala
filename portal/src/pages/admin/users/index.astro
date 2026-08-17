@@ -22,8 +22,8 @@ import type { Identity } from '../../../lib/types';
 const guard = await requireAdminSession(Astro);
 if (guard instanceof Response) return guard;
 
-// access-model Phase 2: split user group chips by the registry's binding-derived
-// type, not an `access-` name prefix (docs/access-model.md §10).
+// Split user group chips by the registry's binding-derived type, not an
+// `access-` name prefix.
 const registry = getGroupRegistry();
 
 const url = Astro.url;

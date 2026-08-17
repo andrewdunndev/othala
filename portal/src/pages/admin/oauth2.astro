@@ -70,8 +70,8 @@ const adminNav = [
         <dl class="dl-grid">
           <dt class="muted mono">access group{m.accessGroups.length === 1 ? '' : 's'}</dt>
           <dd>
-            {/* access-model Phase 2: show the actual access binding (accessGroups),
-                the field the gate keys off — not the singular conventional name. */}
+            {/* Show the actual access binding (accessGroups), the field the
+                gate keys off — not the singular conventional name. */}
             {m.accessGroups.map((g) => <span class="badge badge-muted">{g}</span>)}
           </dd>
 

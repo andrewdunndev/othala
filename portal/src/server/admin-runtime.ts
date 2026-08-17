@@ -1,4 +1,4 @@
-// Admin-listener runtime surface (DAG CU3).
+// Admin-listener runtime surface (CU3).
 //
 // The dual-listener's admin port (src/server/listen.mjs) is plain ESM and
 // runs under bare `node` (npm start), so it cannot import the TypeScript
@@ -10,7 +10,7 @@
 // disjoint).
 //
 // Admin authority is determined by the metadata_admin.admin marker in the
-// Kratos webhook payload (ADR 08); recoveryGateVerdict reads it directly
+// Kratos webhook payload; recoveryGateVerdict reads it directly
 // from the payload, so no runtime predicate is needed here.
 
 export { revokeSubject, RevokeError } from '../lib/revoke';

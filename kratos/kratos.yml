@@ -1,13 +1,11 @@
 # Kratos configuration — generic Othala instance template
 #
-# All values are ${VAR}-substituted at deploy time. Locked decisions from
-# the ADRs (docs/adr/) applied. Version-pinned in compose;
-# this config targets v1.x current at time of build.
+# All values are ${VAR}-substituted at deploy time. Version-pinned in compose.
 
 # DSN host is env-substituted so the same file lands in both
 # topologies. Lab compose sets KRATOS_PG_HOST=postgres (compose service
-# name); the production quadlets set KRATOS_PG_HOST=dag-postgres (container name
-# on the dag-internal network). Same applies to KRATOS_ADMIN_HOST and
+# name); a quadlet deployment sets it to the Postgres container's name on
+# the pod-internal network. Same applies to KRATOS_ADMIN_HOST and
 # CONSENT_HOST below.
 dsn: "postgres://kratos:${KRATOS_PG_PASS}@${KRATOS_PG_HOST}:5432/kratos?sslmode=disable"
 # NOTE: the DB password (KRATOS_PG_PASS) must be URL-safe (percent-encoded) —
@@ -42,13 +40,25 @@ serve:
     port: 4434
 
 selfservice:
-  # LOW-3: trailing slash is load-bearing. Kratos allowed_return_urls
-  # uses a prefix match; without the slash, ${OTHALA_PUBLIC_URL} would
-  # accept a prefixed evil cousin host. Every entry MUST end in `/` (or
-  # a deeper path).
+  # How Kratos matches an entry (x/redir/secure_redirect.go): scheme exactly,
+  # path by PREFIX, and host exactly UNLESS the entry's host starts with `*` —
+  # then it is a suffix match. Two consequences this list is written to:
+  #   - the `.` in `*.` is load-bearing: `*apex.tld` would suffix-match the
+  #     attacker-registrable `evilapex.tld`. (Kratos also drops a wildcard that
+  #     is not a whole leading label bounded at a registrable domain, but do not
+  #     lean on that.)
+  #   - every entry ends in `/` so the path prefix cannot admit a longer
+  #     sibling: an entry ending `/app` would also match `/apple`.
+  #
+  # The apex wildcard is what makes return_to work at all: a gated sibling
+  # service sends the user here and gets them back. It is exactly as wide as the
+  # session cookie's `domain` below, so it admits no host that is not already
+  # handed the session — widening it past the apex would be an open redirect.
+  # https only; the edge terminates TLS and serves nothing in plaintext.
   default_browser_return_url: "${OTHALA_PUBLIC_URL}/"
   allowed_return_urls:
     - "${OTHALA_PUBLIC_URL}/"
+    - "https://*.${OTHALA_APEX}/"
 
   methods:
     password:
@@ -63,10 +73,9 @@ selfservice:
         identifier_similarity_check_enabled: true
         min_password_length: ${OTHALA_PASSWORD_MIN_LENGTH}
 
-    # Passkeys — the PRIMARY login method (docs/adr/05-passkey-first-auth.md):
-    # Kratos's dedicated `passkey` strategy (discoverable credentials +
-    # conditional UI, the usernameless one-tap), distinct from the legacy
-    # `webauthn` strategy below.
+    # Passkeys — the PRIMARY login method: Kratos's dedicated `passkey` strategy
+    # (discoverable credentials + conditional UI, the usernameless one-tap),
+    # distinct from the legacy `webauthn` strategy below.
     passkey:
       enabled: true
       config:
@@ -81,7 +90,6 @@ selfservice:
 
     # WebAuthn (legacy strategy) — second-factor / hardware-security-key only
     # (passwordless: false); passkey above owns the passwordless primary.
-    # Tier model: docs/adr/05-passkey-first-auth.md.
     webauthn:
       enabled: true
       config:
@@ -98,8 +106,7 @@ selfservice:
         issuer: "${OTHALA_INSTANCE_NAME}"
 
     # Code strategy: recovery AND a first-class passwordless login method
-    # (email OTP) — the promoted second-tier fallback of
-    # docs/adr/05-passkey-first-auth.md.
+    # (email OTP) — the fallback for a device that has no passkey enrolled.
     #
     # max_submissions: 5 bounds brute-force of the 6-digit code (flow
     # invalidated after 5 wrong attempts). lifespan: 15m is the per-method
@@ -133,10 +140,10 @@ selfservice:
     settings:
       ui_url: "${OTHALA_PUBLIC_URL}/auth/settings"
       privileged_session_max_age: 15m
-      # Require the highest available AAL before credential changes —
-      # docs/adr/11-hardening-tuning.md (tuning) +
-      # docs/adr/08-admin-authority-model.md (step-up model). AAL1-only
-      # identities are unaffected; first-passkey enrollment is NOT blocked.
+      # Require the highest available AAL before credential changes, so a
+      # stolen AAL1 session cannot swap out the second factor it does not have.
+      # AAL1-only identities are unaffected; first-passkey enrollment is NOT
+      # blocked.
       # This does NOT affect session.whoami (see below), which must stay aal1
       # so the portal's forward-auth gate (portal/src/pages/api/forward-auth.ts)
       # keeps getting a non-null session.identity for every forward_auth-fronted
@@ -168,10 +175,10 @@ selfservice:
       ui_url: "${OTHALA_PUBLIC_URL}/auth/recovery"
       lifespan: 1h
       notify_unknown_recipients: false
-      # Admin email-recovery is refused by the recovery-gate webhook before
-      # the privileged settings session is issued
-      # (docs/adr/08-admin-authority-model.md). Non-admin members keep email
-      # recovery; admins recover via console per docs/runbooks/admin-recovery.md.
+      # Admin email-recovery is refused by the recovery-gate webhook below,
+      # before the privileged settings session is issued: a compromised mailbox
+      # must not be a path to admin authority. Non-admin members keep email
+      # recovery; admins recover via console (docs/runbooks/admin-recovery.md).
       after:
         # v26.2.0: recovery after-hooks live directly under `after.hooks`. The
         # `selfServiceAfterRecovery` schema has NO per-method `code:` sub-key
@@ -227,12 +234,9 @@ selfservice:
       # aal1 base — the v26.2.0 login flow takes NO `required_aal` property
       # (it's a `settings`/`session` knob, not a login-flow one). AAL2 step-up
       # is requested per-flow via ?aal=aal2&refresh=true by requireAdminSession
-      # in admin.ts (the SP-3 trinity gate), never enforced globally here.
-      #
-      # The A2 email-code interrupt hook (login.after.code.hooks) is RETIRED —
-      # canonical enforcement is the portal's AAL2 step-up plus the settings
-      # flow's required_aal (docs/adr/08-admin-authority-model.md; retirement
-      # narrative: docs/adr/05-passkey-first-auth.md, Consequences).
+      # in admin.ts, never enforced globally here — a global AAL2 would lock out
+      # every identity that has not enrolled a second factor yet, including on
+      # the very flow it would use to enrol one.
 
     registration:
       # Admin-driven onboarding (one-time enrollment URLs); no self-service signup
@@ -245,12 +249,10 @@ selfservice:
             - hook: session
 
 session:
-  # 720h (30 days) — apex-cookie blast-radius tuning:
-  # docs/adr/11-hardening-tuning.md. The admin UI enforces its own 15m
-  # freshness window independently (privileged_session_max_age). Leave
-  # session.cookie.persistent and the apex domain unchanged — apex scope is
-  # required for cross-subdomain SSO. Operator-tunable in the deployment's
-  # inventory.
+  # 720h (30 days). This is the blast-radius knob: the cookie below is
+  # apex-scoped, so a stolen one is good on every subdomain until it expires.
+  # The admin UI enforces its own 15m freshness window independently
+  # (privileged_session_max_age). Operator-tunable per deployment.
   lifespan: 720h
   cookie:
     # Parent apex domain so the IdP and every subdomain app share the

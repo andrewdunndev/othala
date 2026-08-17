@@ -139,7 +139,7 @@ export const smtpConnectionUri: string = requiredVar(
 //
 // Where the dashboard contact/request form delivers. A single email address
 // (the operator's inbox). Must be set explicitly — admin authority is the
-// metadata_admin.admin marker (ADR 08), so no admin email list exists to
+// metadata_admin.admin marker, so no admin email list exists to
 // serve as a fallback here.
 //
 // Fail-loud in production when unset.
@@ -226,25 +226,27 @@ export const defaultGroup: string = optionalVar(
 //
 // 1. THIS list (env) is a TYPE declaration plus selector options. It names
 //    which groups count as `identity` groups rather than app-access groups —
-//    read by group-registry.ts and manifests.ts:785 for classification, by
-//    access.ts (IDENTITY_GROUP_ORDER → normalizeGroupOrder) for a stable
-//    stored order that is cosmetic only, and by the admin UI to render the
-//    identity-group checkboxes. It authorizes nothing on its own.
+//    read by group-registry.ts and manifests.ts `knownIdentityGroups` for
+//    classification, by access.ts (IDENTITY_GROUP_ORDER → normalizeGroupOrder)
+//    for a stable stored order that is cosmetic only, and by the admin UI to
+//    render the identity-group checkboxes. It authorizes nothing on its own.
 //
 // 2. `metadata_admin.groups` ON AN IDENTITY IS ENTRY AUTHORIZATION. It is
-//    NOT display-only. gate.ts:34-38 (`identityGroups(identity)` — same
-//    exported name as the constant below, a different function) is the reader,
-//    and it feeds `enforceGroupGate` (gate.ts:73) for the /api/forward-auth
-//    edge gate and `enforceAccessGate` (gate.ts:109) for the OIDC login and
-//    consent challenges. The same array also drives tile visibility
+//    NOT display-only. `identityGroups(identity)` in gate.ts (same exported
+//    name as the constant below, a different function) is the reader, and it
+//    feeds `enforceGroupGate` for the /api/forward-auth edge gate and
+//    `enforceAccessGate` for the OIDC login and consent challenges — both of
+//    which also refuse an identity carrying any stored group outside
+//    GROUP_RE (access-groups.ts), via gate.ts `refuseNonCanonical`, above the
+//    `skip_access_check` hatch. The same array also drives tile visibility
 //    (tiles.ts `userCanSeeTile`) and role resolution (claims.ts `lookupRole`).
 //    Adding a name to that array admits a person; removing one locks them out.
 //
 // 3. Admin authority is neither: it is the `metadata_admin.admin` marker read
-//    by admin-auth.ts (ADR 08), writable only through the Kratos admin API.
+//    by admin-auth.ts `isAdminMarker`, writable only through the Kratos admin API.
 //    It is not a group and does not appear in `metadata_admin.groups`. A bare
 //    'admin' string prepended to the list below is a NAME in a selector; it
-//    confers no portal authority (docs/access-model.md §6).
+//    confers no portal authority.
 
 function parseIdentityGroups(): string[] {
   const raw = process.env.OTHALA_IDENTITY_GROUPS ?? '';
@@ -274,11 +276,11 @@ export const identityGroups: string[] = parseIdentityGroups();
 // validated against a live Kratos session before wiring isSessionFresh into any
 // gate". Do not describe this var as active until that wiring lands.
 //
-// What requireAdminSession actually enforces (ADR 08) is the SP-3 trinity:
+// What requireAdminSession actually enforces is the SP-3 trinity:
 // active session, `session.authenticator_assurance_level === 'aal2'` (anything
 // else redirects to the Kratos step-up login flow with aal=aal2 & refresh=true),
 // and the metadata_admin.admin marker read fresh from the admin API. There is
-// no session-age check. See site/src/content/docs/guides/hardening.md §5, which
+// no session-age check. See site/src/content/docs/guides/hardening.md §7, which
 // carries the same statement for operators.
 //
 // Default: 8 (hours) when unset, blank, or not a non-negative integer.

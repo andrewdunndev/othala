@@ -8,12 +8,12 @@
 # Plain HTTP (no TLS): the e2e issuer is http and Hydra runs --dev, so a browser can
 # complete the OAuth2 flow over HTTP without cert friction.
 #
-# NOTE (finding 2026-06-03): the PRODUCTION Caddyfile (iac/services/dag/caddy/
-# Caddyfile) routes its DEFAULT to Kratos and only names / /auth* /admin* /apps* for
-# the portal — so the app's STATIC ASSETS (/_astro/*.css, manifest.webmanifest,
-# favicon.ico) fall through to Kratos and 404 / serve as text/plain → UNSTYLED UI.
-# This edge routes the APP as the default and names the Kratos browser paths
-# explicitly, which is the correct shape; production needs the same fix.
+# ROUTING ORDER MATTERS. An edge that defaults to Kratos and names only
+# / /auth* /admin* /apps* for the portal drops the app's STATIC ASSETS
+# (/_astro/*.css, manifest.webmanifest, favicon.ico) through to Kratos, which
+# 404s them or serves them as text/plain → an unstyled UI. This edge routes the
+# APP as the default and names the Kratos browser paths explicitly, which is the
+# shape a deployment should copy.
 {
 	auto_https off
 	admin off

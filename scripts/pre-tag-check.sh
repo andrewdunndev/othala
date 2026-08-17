@@ -1,17 +1,21 @@
 #!/usr/bin/env bash
 # pre-tag-check.sh — local gate run before tagging a release.
 #
-# Runs every test + lint + build that CI runs, locally. If this is
-# green, the tag pipeline is unlikely to surprise. If anything fails,
-# fix before tagging.
+# The container builds, the SBOM/release stages and the e2e harness are NOT
+# run here — they need a registry and the QEMU runner. If anything
+# fails, fix before tagging.
 #
 # What it runs:
 #   - portal: npm test
+#   - portal: npm run test:unit (vitest, src/lib/*.test.ts)
 #   - portal: npm run check (Astro typecheck)
 #   - portal: npm run build (full SSR build)
+#   - site:   npm run build (docs-site Astro build)
 #   - e2e shell-scripts: bash -n syntax check + shellcheck
 #   - tracked plain-YAML: python yaml parse
 #   - scripts/check-purity.sh
+#   - identity-schema drift: e2e/ vs kratos/ identity.schema.json
+#   - jsonnet-hook drift: e2e/ vs kratos/hooks/ recovery-gate.jsonnet
 #
 # Usage:
 #   bash scripts/pre-tag-check.sh
@@ -62,7 +66,7 @@ SKIPPED_STEPS=()
 
 # Number of steps that must execute. Bump it in the same commit that adds or
 # removes a step; see the step-inventory assertion at the end.
-EXPECTED_STEPS=7
+EXPECTED_STEPS=11
 STEPS_RUN=0
 # step_begin: called once at the top of every step block, so deleting a block
 # deletes its increment and the inventory assertion below catches the shortfall.
@@ -192,6 +196,36 @@ else
 fi
 cd "$REPO_ROOT" || exit 1
 
+# ----- Portal: vitest unit suite -----
+#
+# The test-portal job in .gitlab-ci.yml runs `npm test` AND `npm run test:unit`.
+# Only the first was gated here, so a tag could be cut on a tree whose vitest
+# suite was red — the local gate was a strict subset of CI, which is the shape
+# that lets a green local run precede a red pipeline.
+step_begin
+if cd portal && npm run test:unit >/tmp/pre-tag-portal-testunit.log 2>&1; then
+    # Same rule as `npm test` above: the exit status is not evidence the suite
+    # ran, the reported test count is. The summary line is isolated FIRST
+    # because vitest prints two "<n> passed" lines — "Test Files  6 passed (6)"
+    # precedes "Tests  66 passed (66)", and count_from takes the first match in
+    # the file, which would silently measure files instead of tests.
+    grep -E '^[[:space:]]*Tests[[:space:]]' /tmp/pre-tag-portal-testunit.log \
+        >"$TMP/vitest-summary" 2>/dev/null
+    vpassed=$(count_from "$TMP/vitest-summary" 'passed')
+    if [[ -z "$vpassed" ]]; then
+        step_error "portal npm run test:unit" \
+            "exited 0 but no 'Tests <n> passed' count could be extracted — an unparseable result is not a zero-failure result; see /tmp/pre-tag-portal-testunit.log"
+    elif (( vpassed > 0 )); then
+        step_pass "portal npm run test:unit ($vpassed passed)"
+    else
+        step_error "portal npm run test:unit" \
+            "exited 0 but reported 0 passing tests — a suite that ran nothing is not a green suite; see /tmp/pre-tag-portal-testunit.log"
+    fi
+else
+    step_fail "portal npm run test:unit" "/tmp/pre-tag-portal-testunit.log"
+fi
+cd "$REPO_ROOT" || exit 1
+
 # ----- Portal: typecheck -----
 step_begin
 if cd portal && npm run check >/tmp/pre-tag-portal-check.log 2>&1; then
@@ -218,6 +252,21 @@ if cd portal && npm run build >/tmp/pre-tag-portal-build.log 2>&1; then
     step_pass "portal astro build"
 else
     step_fail "portal astro build" "/tmp/pre-tag-portal-build.log"
+fi
+cd "$REPO_ROOT" || exit 1
+echo ""
+
+# ----- Docs site: build -----
+#
+# The cloudflare-worker component in .gitlab-ci.yml builds site/ with
+# `npx astro build` (build_command / npm_dir inputs). Nothing gated that here,
+# so a docs-site build break could reach main untested by this gate.
+echo "Site:"
+step_begin
+if cd site && npm run build >/tmp/pre-tag-site-build.log 2>&1; then
+    step_pass "site astro build"
+else
+    step_fail "site astro build" "/tmp/pre-tag-site-build.log"
 fi
 cd "$REPO_ROOT" || exit 1
 echo ""
@@ -330,10 +379,117 @@ case "$purity_rc" in
 esac
 echo ""
 
+# ----- Vendored-copy drift guards -----
+#
+# The lint-identity-schema and lint-jsonnet-hooks jobs in .gitlab-ci.yml run on
+# every push, MR and tag; neither was gated here. Both compare a tracked pair of
+# files, so both go through tracked_set() — a comparison whose corpus is missing
+# is step_error, never a pass — and both get a purpose-written program with
+# DISTINCT exit codes (0 in sync / 1 diverged / 3 corpus unusable), so the
+# verdict is read from a result, not from a bare non-zero status.
+#
+# NOTE: kratos/identity.schema.json and kratos/hooks/recovery-gate.jsonnet are
+# byte-vendored into the deploy repo. These steps only READ them.
+echo "Vendored-copy drift:"
+
+step_begin
+if ! command -v node >/dev/null 2>&1; then
+    step_error "lint-identity-schema" "node not on PATH — no schema comparison was made"
+elif tracked_set "lint-identity-schema" e2e/identity.schema.json kratos/identity.schema.json; then
+    if (( ${#TRACKED[@]} != 2 )); then
+        step_error "lint-identity-schema" \
+            "expected the 2 schema files the CI job diffs, found ${#TRACKED[@]} tracked — an incomplete pair cannot be compared"
+    else
+        cat >"$TMP/schemadiff.mjs" <<'JS'
+import fs from 'node:fs';
+const sort = (v) => Array.isArray(v) ? v.map(sort)
+  : v && typeof v === 'object'
+    ? Object.fromEntries(Object.keys(v).sort().map((k) => [k, sort(v[k])]))
+    : v;
+let a, b;
+try {
+  a = JSON.stringify(sort(JSON.parse(fs.readFileSync('e2e/identity.schema.json', 'utf8'))), null, 2);
+  b = JSON.stringify(sort(JSON.parse(fs.readFileSync('kratos/identity.schema.json', 'utf8'))), null, 2);
+} catch (exc) {
+  console.error(String(exc));
+  process.exit(3);
+}
+// An empty or scalar schema normalizes to something no comparison should call
+// "in sync": two null documents are byte-identical and prove nothing.
+if (a === 'null' || b === 'null' || a === '{}' || b === '{}') {
+  console.error('a schema normalized to an empty document — nothing was compared');
+  process.exit(3);
+}
+if (a !== b) {
+  console.error('e2e/identity.schema.json and kratos/identity.schema.json have diverged.');
+  console.error('Reconcile by copying kratos/identity.schema.json to e2e/identity.schema.json.');
+  process.exit(1);
+}
+console.log('OK: identity schemas are in sync.');
+JS
+        node "$TMP/schemadiff.mjs" >/tmp/pre-tag-schema-drift.log 2>&1
+        schema_rc=$?
+        case "$schema_rc" in
+            0) step_pass "lint-identity-schema (e2e + kratos identity schemas in sync)" ;;
+            1) step_fail "lint-identity-schema (schemas diverged)" "/tmp/pre-tag-schema-drift.log" ;;
+            *) step_error "lint-identity-schema" \
+                   "comparison exited $schema_rc (not a drift verdict); see /tmp/pre-tag-schema-drift.log" ;;
+        esac
+    fi
+fi
+
+step_begin
+if ! command -v node >/dev/null 2>&1; then
+    step_error "lint-jsonnet-hooks" "node not on PATH — no hook comparison was made"
+elif tracked_set "lint-jsonnet-hooks" e2e/recovery-gate.jsonnet kratos/hooks/recovery-gate.jsonnet; then
+    if (( ${#TRACKED[@]} != 2 )); then
+        step_error "lint-jsonnet-hooks" \
+            "expected the 2 hook files the CI job diffs, found ${#TRACKED[@]} tracked — an incomplete pair cannot be compared"
+    else
+        cat >"$TMP/hookdiff.mjs" <<'JS'
+import fs from 'node:fs';
+const paths = ['e2e/recovery-gate.jsonnet', 'kratos/hooks/recovery-gate.jsonnet'];
+// Comment-only differences are allowed; the function body must be identical.
+const strip = (p) => fs.readFileSync(p, 'utf8')
+  .split('\n')
+  .filter((l) => !l.trim().startsWith('//') && l.trim() !== '')
+  .join('\n');
+let bodies;
+try {
+  bodies = paths.map(strip);
+} catch (exc) {
+  console.error(String(exc));
+  process.exit(3);
+}
+// Two empty bodies compare equal. The CI job asserts the production hook is
+// non-empty for exactly this reason, so an empty body is a corpus error here.
+if (bodies.some((b) => b.trim() === '')) {
+  console.error('a recovery-gate hook is empty once comments are stripped — nothing was compared');
+  process.exit(3);
+}
+if (bodies[0] !== bodies[1]) {
+  console.error('e2e/recovery-gate.jsonnet and kratos/hooks/recovery-gate.jsonnet have diverged.');
+  console.error('Reconcile by updating e2e/recovery-gate.jsonnet to match the production hook body.');
+  process.exit(1);
+}
+console.log('OK: recovery-gate.jsonnet function bodies are in sync.');
+JS
+        node "$TMP/hookdiff.mjs" >/tmp/pre-tag-hook-drift.log 2>&1
+        hook_rc=$?
+        case "$hook_rc" in
+            0) step_pass "lint-jsonnet-hooks (recovery-gate bodies in sync)" ;;
+            1) step_fail "lint-jsonnet-hooks (hooks diverged)" "/tmp/pre-tag-hook-drift.log" ;;
+            *) step_error "lint-jsonnet-hooks" \
+                   "comparison exited $hook_rc (not a drift verdict); see /tmp/pre-tag-hook-drift.log" ;;
+        esac
+    fi
+fi
+echo ""
+
 # ----- Summary -----
 # Step inventory, the same guard scripts/check-purity.sh applies to its checks.
 # Without it, deleting a whole step block shrinks the checklist silently and the
-# gate still prints an all-passed line — over six steps instead of seven.
+# gate still prints an all-passed line — over one step fewer than EXPECTED_STEPS.
 # Two assertions, because a step can go missing in two ways: the block can be
 # deleted (STEPS_RUN falls short of the constant), or it can run and return
 # without reaching any verdict (fewer verdicts than steps).

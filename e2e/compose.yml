@@ -3,12 +3,13 @@
 # This is the project's canonical OSS-facing end-to-end example: it shows
 # how Othala ("Ory for your home") stands up on plain `docker compose`
 # from the published images. It doubles as the CI `e2e` gate, consumed by
-# e2e/validate.sh inside a per-job Fedora VM spawned by the lodestone GitLab
-# Runner (Custom Executor, tag lodestone,qemu). The VM is ephemeral; the
+# e2e/validate.sh inside a per-job Fedora VM spawned by a QEMU GitLab Runner
+# (Custom Executor); see the `tags:` on the e2e job in .gitlab-ci.yml. The VM
+# is ephemeral; the
 # substrate dies with the VM at job end. An adopter can run the same file
 # on a workstation (see README.md "Local operator invocation").
 #
-# Converged topology (mirrors what the deploy repo's services/dag now models):
+# Converged topology:
 #   - postgres (kratos + hydra dbs)
 #   - kratos-migrate (oneshot)
 #   - kratos (public 4433, admin 4434)
@@ -61,8 +62,8 @@ services:
     # those startup steps fail with "chown: Operation not permitted" — even as
     # real root on the rootful socket, because dropping ALL removes CAP_CHOWN /
     # CAP_DAC_OVERRIDE / CAP_FOWNER, and the setpriv to postgres needs
-    # CAP_SETUID / CAP_SETGID. (Proven on carmine: cap_drop:[ALL] alone fails
-    # the chown; adding these five reaches "ready to accept connections".)
+    # CAP_SETUID / CAP_SETGID. (Observed: cap_drop:[ALL] alone fails the
+    # chown; adding these five reaches "ready to accept connections".)
     # These are init-time only; postgres holds none of them once it has dropped
     # to its unprivileged user.
     cap_drop:
@@ -73,7 +74,7 @@ services:
       - FOWNER
       - SETUID
       - SETGID
-    # NEEDS-CARMINE-VALIDATION: read_only on postgres is deliberately omitted.
+    # NEEDS-VALIDATION: read_only on postgres is deliberately omitted.
     # Postgres writes to: its PGDATA directory (named volume / bind), the
     # pg_wal directory, temporary sort files under /tmp, Unix socket files
     # under /var/run/postgresql, and various lock files. While tmpfs mounts
@@ -83,7 +84,7 @@ services:
     # startup, which means any residual writes outside PGDATA (e.g. /run, /etc
     # minor writes by the entrypoint) could silently break startup. Adding
     # read_only: true to postgres risks an opaque startup failure; validate on
-    # lodestone before enabling.
+    # a real deployment before enabling.
     pids_limit: 512
     environment:
       POSTGRES_USER: postgres
@@ -114,7 +115,7 @@ services:
       - ALL
     # read_only: mailpit writes UI state / message storage to an in-process
     # sqlite DB (default /data/mailpit.db). If run without a named volume for
-    # /data it writes to rootfs. NEEDS-CARMINE-VALIDATION: add read_only: true
+    # /data it writes to rootfs. NEEDS-VALIDATION: add read_only: true
     # plus tmpfs: [/tmp] once the data path is confirmed (either a named volume
     # or confirmed to be irrelevant for the e2e ephemeral run).
     pids_limit: 256
@@ -288,7 +289,8 @@ services:
   # admin-route smoke probes run via `compose exec` against
   # localhost:4431 INSIDE the container — they are not reachable across
   # the compose network (production-faithful: only Caddy fronts 8080).
-  # ADMIN_PORT=4431 aligns with the portal code default (listen.mjs:40)
+  # ADMIN_PORT=4431 aligns with the portal code default (`ADMIN_PORT` in
+  # listen.mjs)
   # and the deployed quadlet — single admin-port convention across envs.
   othala:
     image: ${AUTH_REGISTRY}:${AUTH_VERSION}
@@ -315,7 +317,7 @@ services:
     # Node.js writes temp files under /tmp (e.g. form upload scratch, V8
     # snapshot files). The manifests volume is mounted read-only. No other
     # rootfs paths are written at runtime.
-    # NEEDS-CARMINE-VALIDATION: confirm that the Astro SSR adapter (Node
+    # NEEDS-VALIDATION: confirm that the Astro SSR adapter (Node
     # standalone) does not write to /app or any other non-/tmp rootfs path at
     # startup (e.g. compiled route caches). If it does, add that path to tmpfs.
     pids_limit: 512
@@ -338,7 +340,7 @@ services:
       OTHALA_APEX: ${OTHALA_APEX}
       MANIFEST_DIR: /etc/portal/manifests
       CSRF_SECRET: ${CSRF_SECRET}
-      # ADR 08 admin model: authority is metadata_admin.admin===true (boolean
+      # Admin model: authority is metadata_admin.admin===true (boolean
       # marker in Kratos, set via admin API only). The OTHALA_ADMIN_IDS env var
       # is retired — no UUID allowlist, no portal recreate after seeding.
       # The recovery-gate reads is_admin from the webhook payload (set by
@@ -371,7 +373,7 @@ services:
   # bundled into the image at dist/server/register-clients.mjs
   # (npm run build:register-clients, same esbuild pattern as admin-runtime).
   # In production the deploy repo runs this as a --rm one-shot on boot and on
-  # SIGHUP (dag-reload-clients). The e2e activates it as a `compose run --rm`
+  # SIGHUP. The e2e activates it as a `compose run --rm`
   # one-shot on the SAME othala image to prove the registrar registers every
   # manifest in MANIFEST_DIR=/etc/portal/manifests (mounted from
   # e2e/manifests/) against Hydra admin. See smoke.sh section B.
@@ -399,10 +401,10 @@ services:
       OTHALA_CONTACT_RECIPIENT: ${OTHALA_CONTACT_RECIPIENT}
       # Per-client secrets for every fixture with an oidc: block. The
       # generic example set registers three OIDC clients: grafana,
-      # audiobookshelf, openwebui (client_id "openwebui").
+      # audiobookshelf, promptdesk (client_id "promptdesk").
       GRAFANA_CLIENT_SECRET: ${GRAFANA_CLIENT_SECRET}
       AUDIOBOOKSHELF_CLIENT_SECRET: ${AUDIOBOOKSHELF_CLIENT_SECRET}
-      OPENWEBUI_CLIENT_SECRET: ${OPENWEBUI_CLIENT_SECRET}
+      PROMPTDESK_CLIENT_SECRET: ${PROMPTDESK_CLIENT_SECRET}
     volumes:
       - ./manifests:/etc/portal/manifests:ro,z
     command: ["node", "./dist/server/register-clients.mjs"]
@@ -412,7 +414,7 @@ services:
   # e2e-tester image (Containerfile): the npm deps (@ory/client-fetch,
   # tough-cookie, fetch-cookie, jose) AND the e2e sources are baked in at
   # /test at image-build time, so there is NO runtime `npm install` — the
-  # lodestone inner VM can't reach the npm registry (it would stall + exit
+  # inner VM can't reach the npm registry (it would stall + exit
   # 124). Runs as a one-shot via
   # `docker compose --profile oneshot run --rm --no-deps dance-runner`.
   # smoke.sh Section G's run_dance helper drives this.
@@ -454,7 +456,7 @@ services:
     # bind it without running as root. Caddy's Alpine image drops to a
     # non-root user after startup; if it doesn't, check the image. Add
     # NET_BIND_SERVICE conservatively.
-    # NEEDS-CARMINE-VALIDATION: confirm Caddy in caddy:2-alpine uses a
+    # NEEDS-VALIDATION: confirm Caddy in caddy:2-alpine uses a
     # non-root user (UID != 0). If it runs as root, NET_BIND_SERVICE is
     # redundant (root can bind any port) but harmless. If non-root, it is
     # required to bind :80.
@@ -500,7 +502,7 @@ services:
   # (Containerfile, FROM that base) additionally bakes the @playwright/test
   # npm package + the e2e sources into /test at image-build time. There is
   # therefore NO runtime `npm install` — the install happens on the
-  # egress-capable build runner, not in the no-egress lodestone inner VM
+  # egress-capable build runner, not in the no-egress inner VM
   # where a runtime install stalls and times out the gate (exit 124).
   # PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD=1 (also set in the image) prevents a
   # redundant download.

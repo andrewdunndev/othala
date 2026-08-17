@@ -16,7 +16,7 @@ serve:
       enabled: true
       # allowed_origins is an EXTENSIBLE allowlist keyed by client type —
       # browser-fetching SPA clients need an entry each, redirect-flow
-      # (server-side) clients never do: docs/adr/12-oidc-client-topology.md.
+      # (server-side) clients never do.
       # OTHALA_CORS_ALLOWED_ORIGINS is a comma-separated, UNQUOTED list of
       # origins substituted straight into this flow sequence. Deliberately
       # unquoted: render-config.sh's double-quote-escaping contract assumes
@@ -49,11 +49,11 @@ urls:
     issuer: "${OTHALA_PUBLIC_URL}/"
     public: "${OTHALA_PUBLIC_URL}/"
 
-  # Topology B: the entire SSO stack lives on ${OTHALA_PUBLIC_URL}; Hydra
-  # redirects challenge flows to /oauth2/{login,consent,logout} — portal API
-  # routes — while /auth/* stays the Kratos self-service human UI. The
-  # fronting proxy must route the challenge path set to the portal BEFORE any
-  # wider /oauth2/* wildcard: docs/adr/12-oidc-client-topology.md.
+  # The whole SSO stack lives on ${OTHALA_PUBLIC_URL}: Hydra redirects challenge
+  # flows to /oauth2/{login,consent,logout} — portal API routes — while /auth/*
+  # stays the Kratos self-service human UI. The fronting proxy must route this
+  # challenge path set to the portal BEFORE any wider /oauth2/* rule, or the
+  # wider rule swallows the challenges and every OAuth2 flow dead-ends.
   login: "${OTHALA_PUBLIC_URL}/oauth2/login"
   consent: "${OTHALA_PUBLIC_URL}/oauth2/consent"
   logout: "${OTHALA_PUBLIC_URL}/oauth2/logout"
@@ -73,25 +73,27 @@ ttl:
   refresh_token: 720h    # 30 days
   id_token: 1h
   auth_code: 10m
-  # 30m (from 1h) — stolen-challenge exposure tuning:
-  # docs/adr/11-hardening-tuning.md.
+  # 30m, down from Hydra's 1h default — bounds how long a stolen login or
+  # consent challenge stays redeemable.
   login_consent_request: 30m
 
 oauth2:
   pkce:
-    enforced: false                    # Tailscale doesn't do PKCE; Hydra
-                                       # has no per-client knob — posture:
-                                       # docs/adr/11-hardening-tuning.md.
-    enforced_for_public_clients: true  # Free hardening: nothing is a public
-                                       # client today; forward guard per
-                                       # docs/adr/11-hardening-tuning.md.
+    # Global switch — Hydra has no per-client PKCE knob, so turning this on
+    # breaks every confidential client in the deployment that cannot do PKCE.
+    # Revisit whenever the client set changes.
+    enforced: false
+    # Free hardening: costs nothing while there are no public clients, and
+    # forecloses code interception the day one is registered.
+    enforced_for_public_clients: true
   hashers:
     bcrypt:
-      # 14 (from 10) — offline brute-force bar: docs/adr/11-hardening-tuning.md.
+      # 14, up from Hydra's default 10 — raises the offline brute-force cost of
+      # a leaked client-secret hash. Not on a hot path; clients authenticate
+      # far less often than users log in.
       cost: 14
   # NOTE: an explicit `oauth2.strategies` pin is schema-rejected by Hydra
-  # v26.2.0 (the IdP refuses to boot); the defaults are already correct —
-  # docs/adr/11-hardening-tuning.md (Alternatives considered).
+  # v26.2.0 (the IdP refuses to boot); the defaults are already correct.
   expose_internal_errors: false
   client_credentials:
     default_grant_allowed_scope: false

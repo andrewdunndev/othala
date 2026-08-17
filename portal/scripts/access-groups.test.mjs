@@ -2,7 +2,7 @@
 //
 // Run with: tsx --test scripts/access-groups.test.mjs
 //
-// Phase 1 (dual-read) parse precedence (docs/access-model.md §11):
+// Dual-read parse precedence:
 //   1. presentation.access non-empty list → use it.
 //   2. else presentation.access_group non-empty → [access_group] (compat shim).
 //   3. else [] (no `everyone` fallback at this layer).
@@ -28,7 +28,7 @@ test('parseAccessGroups: multi-element access list preserves declared order', ()
 
 test('parseAccessGroups: access list wins over access_group', () => {
   assert.deepEqual(
-    parseAccessGroups({ access: ['memories'], access_group: 'access-immich' }),
+    parseAccessGroups({ access: ['memories'], access_group: 'access-photos' }),
     ['memories'],
     'a non-empty access: list supersedes the compat access_group field',
   );
@@ -52,8 +52,8 @@ test('parseAccessGroups: duplicates within access list are de-duped, order kept'
 
 test('parseAccessGroups: only access_group → one-element list (compat shim)', () => {
   assert.deepEqual(
-    parseAccessGroups({ access_group: 'access-immich' }),
-    ['access-immich'],
+    parseAccessGroups({ access_group: 'access-photos' }),
+    ['access-photos'],
     'the access-<slug> name is a valid group name; no prefix validation applied',
   );
 });

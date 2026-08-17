@@ -26,9 +26,20 @@
 		uri /sessions/whoami
 		copy_headers X-Kratos-Authenticated-Identity-Id
 
+		# return_to must be ABSOLUTE. forward-auth.caddy explains why a
+		# path-only value silently returns the user to the portal rather than
+		# to this admin path, and why the `allowed_return_urls` allowlist in
+		# kratos.yml is what bounds a host taken from the request.
+		#
+		# The two redirects are NOT identical: forward-auth.caddy appends
+		# {http.request.uri.path}, this one appends {http.request.uri} — path
+		# AND query, unencoded — so an `&` in the gated request's own query
+		# can add parameters to the portal's login URL. Pre-existing, low
+		# impact (return_to stays allowlist-bounded), and left as-is here
+		# rather than changed without saying so.
 		@unauthorized status 401 403
 		handle_response @unauthorized {
-			redir {env.OTHALA_PUBLIC_URL}/auth/login?return_to={http.request.uri} 302
+			redir {env.OTHALA_PUBLIC_URL}/auth/login?return_to={http.request.scheme}://{http.request.host}{http.request.uri} 302
 		}
 	}
 	# Strip spoofable inbound identity headers before the caller's reverse_proxy

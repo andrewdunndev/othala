@@ -1,4 +1,4 @@
-# dunn.dev/othala-portal -- Astro Node SSR for carmine.
+# othala-portal -- Astro Node SSR.
 #
 # Two-stage: UBI 9 nodejs-22 (full image with npm) for build, UBI 9
 # nodejs-22-minimal via ci-runtime-node for runtime. Astro Node

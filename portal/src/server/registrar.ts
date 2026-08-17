@@ -17,8 +17,8 @@
 // test suite pass a stub without importing a live Hydra SDK.
 //
 // ── SIGHUP delivery mechanism (S08 / overnight-2026-06-23 Task 2) ──────────
-// Signal delivery:  `podman kill --signal HUP dag-portal` (justfile
-//   dag-reload-clients recipe) sends SIGHUP to PID 1 INSIDE the container,
+// Signal delivery:  `podman kill --signal HUP <portal-container>` sends
+//   SIGHUP to PID 1 INSIDE the container,
 //   which is the node process running listen.mjs (no init shim). The Node.js
 //   process.on('SIGHUP', ...) handler fires correctly.
 //
@@ -29,7 +29,7 @@
 //   deployed manifests are byte-for-byte identical to what is already on disk
 //   (e.g., a re-deploy without manifest edits), no SIGHUP is sent. This is
 //   correct "idempotent deploy" behavior — not a bug — but it means a manual
-//   `just dag-reload-clients carmine` is required to force reconciliation when
+//   an explicit operator-triggered reload is required to force reconciliation when
 //   manifests have not changed but Hydra state is stale (e.g., after a Hydra
 //   DB wipe or if the boot reconcile was exhausted).
 //

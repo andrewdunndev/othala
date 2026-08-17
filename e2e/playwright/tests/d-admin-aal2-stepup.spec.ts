@@ -3,7 +3,7 @@
  *
  * D1 (INV-1): An identity with metadata_admin.admin=true at AAL1 (password only)
  *   visits /admin and is redirected to the AAL2 step-up. The step-up must target
- *   the configured host (not the old hardcoded dag.dunn.dev).
+ *   the CONFIGURED origin, never a host baked into the source.
  *
  * D2 (INV-3): An admin who completes AAL2 (TOTP enrollment + step-up via
  *   adminAal2Context) ACTUALLY reaches /admin (200 + admin page content).
@@ -49,12 +49,15 @@ test('D1 — INV-1: admin at AAL1 is redirected to AAL2 step-up (marker alone in
       `D1 (INV-1): admin at AAL1 must be redirected to AAL2 step-up; got ${resp.status()} ${loc}`,
     ).toBe(true);
 
-    // Portability: the step-up must use the configured host, not the old
-    // hardcoded dag.dunn.dev (the admin.ts portability bug fixed in the config pass).
+    // Portability: admin.ts once carried a hardcoded host, so every deployment
+    // was step-upped to somebody else's instance. The invariant is stated
+    // positively rather than as a ban on one string: a relative Location is
+    // fine, and an absolute one must not leave the configured origin.
+    const expectedOrigin = new URL(String(baseURL)).origin;
     expect(
-      loc.includes('dag.dunn.dev'),
-      `D1 (portability): step-up must not target dag.dunn.dev; got ${loc}`,
-    ).toBe(false);
+      /^https?:\/\//.test(loc) ? new URL(loc).origin : expectedOrigin,
+      `D1 (portability): step-up must stay on the configured origin; got ${loc}`,
+    ).toBe(expectedOrigin);
   } finally {
     await ctx.close();
   }

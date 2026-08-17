@@ -2,9 +2,9 @@
  * E — Consent POST CSRF-tamper attacks (adversarial / negative).
  *
  * Guard under attack:
- *   portal/src/lib/oauth2-handlers.ts:handleConsentPost (line 365)
- *   portal/src/lib/csrf.ts:verifyToken (line 96)
- *   Route:  POST /oauth2/consent  (portal/src/pages/oauth2/consent.ts:20)
+ *   portal/src/lib/oauth2-handlers.ts  handleConsentPost
+ *   portal/src/lib/csrf.ts             verifyToken
+ *   Route:  POST /oauth2/consent  (the `POST` export in portal/src/pages/oauth2/consent.ts)
  *
  * The grafana client is the only fully-wired OIDC client in the e2e fixture
  * set whose consent flow is exercisable end-to-end via ctx.request (the same
@@ -25,7 +25,7 @@
  *   E1 — missing csrf_token field entirely  → 400
  *   E2 — garbage CSRF token (malformed)     → 400
  *   E3 — CSRF token signed for a DIFFERENT identity (cross-identity replay)
- *        → 400 (bound to a different identity, verifyToken line 123)
+ *        → 400 (verifyToken throws CSRFError 'CSRF token bound to a different identity')
  *
  * All three must be rejected — no grant issued, no Location: pointing to a
  * redirect_uri with ?code=.  Fail-closed: the system returns 4xx and no auth
@@ -142,7 +142,7 @@ test('E1 — consent POST with MISSING csrf_token is rejected (400)', async ({
     // reaches the app's CSRF guard (verifyToken(null, ...) throws CSRFError → 400).
     // Attempt the POST with no csrf_token at all.  Even without a real
     // consent_challenge this exercises the CSRF guard (verifyToken is called
-    // before Hydra is contacted — handleConsentPost line 422-429).
+    // before Hydra is contacted — handleConsentPost's 'no active session' branch).
     const resp2 = await ctx.request.post(`${baseURL}/oauth2/consent`, {
       maxRedirects: 0,
       headers: {
@@ -167,7 +167,8 @@ test('E1 — consent POST with MISSING csrf_token is rejected (400)', async ({
     ).toBe(false);
 
     // Primary assertion: the CSRF guard fires before Hydra contact when the
-    // session resolves but the token is absent (handleConsentPost line 422:
+    // session resolves but the token is absent (handleConsentPost, after the
+    // 'no active session' branch:
     // verifyToken(null, ...) throws CSRFError → 400).
     // When the Hydra challenge lookup fails first (fake challenge → 502),
     // that is also a closed gate.  Either way the code must not be issued.
@@ -256,7 +257,7 @@ test('E3 — consent POST with CROSS-IDENTITY csrf_token is rejected (400)', asy
   //   <ts>.<admin.id>.<nonce>.<fake-sig>
   // The presented identity.id will be admin.id but the session subject is
   // member.id, so verifyToken(token, member.id) will throw
-  // "CSRF token bound to a different identity" (csrf.ts line 123-125)
+  // "CSRF token bound to a different identity" (thrown by csrf.ts verifyToken)
   // even before it reaches the signature check.
   //
   // The admin identity.id is available via admin.id from the fixture.
@@ -270,7 +271,7 @@ test('E3 — consent POST with CROSS-IDENTITY csrf_token is rejected (400)', asy
     const ts = Math.floor(Date.now() / 1000);
     // Use the admin's identity id as the token's identity, even though the
     // browser session belongs to member.  verifyToken checks
-    // presentedIdentityId !== identityId (line 123); since the session's
+    // presentedIdentityId !== identityId; since the session's
     // identity.id === member.id this mismatch fires immediately.
     const crossToken = `${ts}.${admin.id}.crossnonce.INVALIDSIGNATURE`;
 

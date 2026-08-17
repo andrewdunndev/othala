@@ -30,7 +30,7 @@ const REVOKE_TIMEOUT_MS = 2000;
  * able to bounce the user off-instance.
  *
  * The URL Kratos returns is built from ITS OWN serve.public.base_url
- * (kratos/kratos.yml:18, `"${OTHALA_PUBLIC_URL}/"`) — the PUBLIC origin, not
+ * (kratos/kratos.yml, `"${OTHALA_PUBLIC_URL}/"`) — the PUBLIC origin, not
  * the internal address the portal dials for SSR. Comparing it against
  * kratosBase() alone is what broke sign-out: in any deployment where the
  * portal reaches Kratos over an internal container address
@@ -49,7 +49,7 @@ const REVOKE_TIMEOUT_MS = 2000;
  *   kratosBase() (KRATOS_PUBLIC_URL) — single-origin setups where the portal
  *                dials Kratos at the same address Kratos serves publicly:
  *                local dev, and the e2e browser profile
- *                (e2e/compose.browser.yml:43).
+ *                (the `KRATOS_PUBLIC_URL` override in e2e/compose.browser.yml).
  *
  * Anything else takes the fail-closed path below.
  */
@@ -82,7 +82,7 @@ function isOurLogoutUrl(raw: string): boolean {
  *
  * Raw fetch rather than the SDK's updateLogoutFlow(): the generated client
  * sends no Accept header, so Kratos answers 303 toward
- * selfservice.default_browser_return_url (kratos/kratos.yml:49 — the public
+ * selfservice.default_browser_return_url (kratos/kratos.yml — the public
  * origin) and fetch would chase a host the portal's network need not resolve.
  * With `Accept: application/json` Kratos answers 204 instead; `redirect:
  * 'manual'` makes sure nothing is followed either way.
@@ -116,7 +116,7 @@ async function revokeServerSide(token: string): Promise<number | null> {
 
 /**
  * OTHALA_APEX — the registrable parent domain Kratos scopes its session cookie
- * to. Same var middleware.ts:76 reads.
+ * to. Same var middleware.ts reads to build the CSP `form-action` allowlist.
  *
  * The Node SSR runtime provides `process`, but the portal ships no tsconfig
  * wiring @types/node and `astro check` is a CI gate (.gitlab-ci.yml runs
@@ -134,7 +134,7 @@ function apexDomain(): string | undefined {
  * Redirect home with the Kratos session cookie expired on THIS device.
  *
  * Name, Domain and Path mirror the session cookie Kratos issues
- * (kratos/kratos.yml:255-263 — name `ory_kratos_session`, domain
+ * (kratos/kratos.yml: session.cookie — name `ory_kratos_session`, domain
  * `${OTHALA_APEX}`, default path `/`). A deletion only lands if it matches the
  * cookie that was set; browsers key cookies on name/domain/path.
  *

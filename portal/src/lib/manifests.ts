@@ -99,15 +99,15 @@ export interface ClientManifest {
   scope: string;
   audience: string[];
   grantTypes: string[];
-  /** `oidc.response_types`; empty for client_credentials clients (vLLM). */
+  /** `oidc.response_types`; empty for client_credentials clients. */
   responseTypes: string[];
   /** `oidc.token_endpoint_auth_method`; empty string when the yaml omits it. */
   tokenEndpointAuthMethod: string;
   skipConsent: boolean;
   /**
    * OIDC Back-Channel Logout 1.0 endpoint, when the app supports it.
-   * Empty string when the yaml leaves the field absent (Tailscale, vLLM,
-   * BookLore, current Jellyfin SSO plugin). The admin "Force re-login"
+   * Empty string when the yaml leaves the field absent — plenty of RPs never
+   * implemented back-channel logout. The admin "Force re-login"
    * action posts a signed logout token to this URI per supported app.
    */
   backchannelLogoutUri: string;
@@ -117,7 +117,7 @@ export interface ClientManifest {
    */
   backchannelLogoutSessionRequired: boolean;
   /**
-   * The LOAD-BEARING access binding (access-model Phase 2). Adopter-named groups
+   * The LOAD-BEARING access binding. Adopter-named groups
    * (arbitrary charset, no `access-` prefix required) whose members may enter
    * this app — OR-semantics. Sourced from `presentation.access:` (list) with a
    * `[access_group]` compat shim. Absence of a binding yields `[]` — there is NO
@@ -126,7 +126,7 @@ export interface ClientManifest {
    * and no `skip_access_check` is a load-time BLOCK (validateClients). The gate
    * (gate.ts), effective-access view (access.ts), tile visibility
    * (tiles.ts/index.astro), and the group registry (group-registry.ts) all read
-   * THIS field. See docs/access-model.md §10/§11/§16.
+   * THIS field.
    */
   accessGroups: string[];
   /** Declared role enum for the app; may be empty if the yaml has no `roles:` block. */
@@ -325,10 +325,10 @@ export function parseManifest(yamlText: string, filename: string): ClientManifes
     throw new Error(`${file}: pre-namespace flat shape detected. Migrate to oidc:/consent: blocks.`);
   }
 
-  // access-model Phase 2: `accessGroups` is the LOAD-BEARING access binding (the
-  // gate, computeEffectiveAccess, tiles, and the registry all key off it — see
-  // docs/access-model.md §10/§16). It is sourced from `presentation.access:` (a
-  // list) with a `[access_group]` compat shim (parseAccessGroups, §11). Absence
+  // `accessGroups` is the LOAD-BEARING access binding: the gate,
+  // computeEffectiveAccess, tiles, and the registry all key off it. It is
+  // sourced from `presentation.access:` (a list) with a `[access_group]` compat
+  // shim (parseAccessGroups). Absence
   // of a binding yields `[]` — there is NO implicit `access-<clientId>` fallback
   // (othala primitive #5: no framework default silently grants visibility). A
   // bare manifest (`[]`, no skip_access_check) is a load-time BLOCK rejected by
@@ -336,7 +336,8 @@ export function parseManifest(yamlText: string, filename: string): ClientManifes
   const accessGroups = parseAccessGroups(p);
 
   // Presentation-only manifest (forward_auth / ldap / external tile, e.g.
-  // observe.yaml): a `presentation:` block with NO `oidc:` client. It registers
+  // e2e/manifests/proxywatch.yaml): a `presentation:` block with NO `oidc:`
+  // client. It registers
   // no OIDC client but still names an assignable access group, so it parses as a
   // valid ClientManifest with empty OIDC fields and presentationOnly:true. The
   // OIDC-specific validateClients rules (audience, redirect/audience match) are
@@ -605,7 +606,7 @@ function originOf(raw: string): string | null {
  *
  * The registrar derives `<CLIENT_ID_UPPER>_CLIENT_SECRET` from the client_id.
  * POSIX env var names must match `[A-Za-z_][A-Za-z0-9_]*`; a hyphenated id
- * (e.g. "open-webui") becomes "OPEN-WEBUI_CLIENT_SECRET" which is an INVALID
+ * (e.g. "prompt-desk") becomes "PROMPT-DESK_CLIENT_SECRET" which is an INVALID
  * env var name and silently fails to resolve. This regex enforces the valid
  * stem at load time so the linter rejects the bad manifest before it can crash
  * the registrar.
@@ -648,7 +649,7 @@ export function validateClients(set: ClientManifest[]): string[] {
     // Rule 1a: an OIDC client_id must be a valid env-var stem.
     //
     // The registrar derives the secret env var as `<CLIENT_ID_UPPER>_CLIENT_SECRET`
-    // (e.g. "openwebui" → "OPENWEBUI_CLIENT_SECRET"). A client_id that contains
+    // (e.g. "promptdesk" → "PROMPTDESK_CLIENT_SECRET"). A client_id that contains
     // hyphens, dots, or starts with a digit produces an INVALID env var name
     // (POSIX: [A-Za-z_][A-Za-z0-9_]*). The env lookup silently returns undefined,
     // which either hard-errors (allowMissing=false, the production default) or
@@ -658,14 +659,14 @@ export function validateClients(set: ClientManifest[]): string[] {
     // never reaches secretEnvVar (oidcClientManifests narrows the registrar's
     // input), so the rule has nothing to protect there — while firing it would
     // hard-fail the whole load for a perfectly valid tile whose slug carries a
-    // hyphen (e.g. a `gather-usenet.yaml` forward_auth tile, matching the
-    // gather-usenet-access group naming already in the catalog). That failure
+    // hyphen (e.g. a `media-server.yaml` forward_auth tile, matching a
+    // `media-server-access` group name). That failure
     // would take EVERY group down with it, which is exactly the blindness this
     // enforcer exists to prevent. The naming constraint is real only where a
     // shell variable is really derived.
     //
     // The expected env var is reported in the error so the operator knows exactly
-    // what to look for in the sops file / quadlet Secret= lines.
+    // what to look for in whatever supplies the container its secrets.
     if (!cm.presentationOnly && cm.clientId !== '' && !CLIENT_ID_ENV_STEM_RE.test(cm.clientId)) {
       const wouldBe = `${cm.clientId.toUpperCase()}_CLIENT_SECRET`;
       errs.push(
@@ -701,7 +702,7 @@ export function validateClients(set: ClientManifest[]): string[] {
     }
 
     // OIDC-only rules: a presentation-only manifest (forward_auth / ldap tile,
-    // no oidc: client — e.g. observe.yaml) registers no OAuth2 client, so the
+    // no oidc: client) registers no OAuth2 client, so the
     // audience / redirect-match rules do not apply to it. The access-binding
     // BLOCK above still governs it (a presentation-only tile must still name a
     // group or it is unreachable).
@@ -789,16 +790,17 @@ export function knownIdentityGroups(): string[] {
   return Array.from(set).sort();
 }
 
-/** Distinct access groups across the whole app catalog (the access-model
- * Phase 2 binding). Derived from each manifest's `accessGroups` list — the same
+/** Distinct access groups across the whole app catalog. Derived from each
+ * manifest's `accessGroups` list — the same
  * field the gate keys off — so the admin surfaces and the gate agree on the
  * access-bearing group set.
  *
  * INVARIANT (B4): every group bound by any manifest, of any auth_kind, appears
- * here. The forward_auth and external tiles are included, so the groups Caddy
- * actually gates on (observe-access, gather-access, gather-usenet-access,
- * gather-torrent-access, tune-access, bitwarden-access) are grantable in the
- * admin UI. When these were invisible, the identity-edit form rendered no
+ * here. The forward_auth and external tiles are included, so the groups the
+ * reverse proxy actually gates on are grantable in the admin UI — those tiles
+ * register no OAuth2 client, and an auth_kind filter upstream of this function
+ * is exactly what once made them invisible. When these were invisible, the
+ * identity-edit form rendered no
  * checkbox for them and every save silently dropped them from
  * metadata_admin.groups. Do not reintroduce an auth_kind filter upstream of
  * this function. */

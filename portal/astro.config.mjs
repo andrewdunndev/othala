@@ -2,7 +2,8 @@ import { defineConfig } from 'astro/config';
 import node from '@astrojs/node';
 import tailwindcss from '@tailwindcss/vite';
 
-// Astro 6: Node standalone SSR for the carmine deployment.
+// Astro 6: Node standalone SSR — the portal ships as a container that serves
+// itself, with no separate web server in front of the Node process.
 //
 // `output: 'server'` ships SSR-by-default. Pages opt OUT of SSR with
 // `export const prerender = true`. Static assets and prerendered HTML

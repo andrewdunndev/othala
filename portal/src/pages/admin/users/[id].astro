@@ -6,6 +6,11 @@
 //   - Edit: same form layout as /admin/users/new, pre-populated, posts to
 //           this same URL with `?mode=edit`
 //
+// This page is also the REPAIR surface for the state refuseNonCanonical
+// (src/lib/gate.ts) denies at every app: a stored group name that misses the
+// canonical policy gets its own row in both modes, and the save path decides
+// it via planGroupSave rather than by composing submitted checkboxes.
+//
 // Actions live behind named POST buttons:
 //   action=issue-recovery -> Kratos getRecoveryLink, render the enrollment
 //                            LINK + CODE inline. Nothing is emailed: the link
@@ -46,6 +51,7 @@ import {
   shouldRefuseRecovery,
 } from '../../../lib/access';
 import { getGroupRegistry, isIdentityGroup } from '../../../lib/group-registry';
+import { nonCanonicalGroups, planGroupSave } from '../../../lib/gate';
 import { signToken, verifyToken, CSRFError } from '../../../lib/csrf';
 import type { Identity } from '../../../lib/types';
 
@@ -62,8 +68,8 @@ const manifests = servingManifests();
 const registry = getGroupRegistry();
 // Identity-group form labels share the canonical order with access.ts.
 const IDENTITY_GROUPS = [...IDENTITY_GROUP_ORDER];
-// access-model Phase 2: the "App access" checkboxes are the access-BEARING
-// groups derived from the registry (a group's type is its binding, not its
+// The "App access" checkboxes are the access-BEARING groups derived from the
+// registry (a group's type is its binding, not its
 // name), each annotated with the app(s) it grants entry to. One checkbox per
 // bound access group — multi-group `access:` lists surface every option, and a
 // group bound by several apps lists all of them.
@@ -103,7 +109,7 @@ let actionResult:
   | { kind: 'deleted'; username: string }
   | { kind: 'deactivated'; username: string }
   | { kind: 'reactivated'; username: string }
-  | { kind: 'updated' }
+  | { kind: 'updated'; removed: string[] }
   | { kind: 'admin-granted'; username: string }
   | { kind: 'admin-revoked'; username: string }
   | { kind: 'revoked'; result: RevokeUserResult }
@@ -159,6 +165,21 @@ if (Astro.request.method === 'POST' && identity) {
       const accessGroups = fd.getAll('accessGroups').map(String).filter(Boolean);
       if (identityGroups.length === 0) formErrors.identityGroups = 'Pick at least one identity group.';
 
+      // The repair surface for refuseNonCanonical (src/lib/gate.ts). Same
+      // shape as the existingAdmin preserve below: a value this form does not
+      // own is decided from the CURRENTLY-FETCHED identity, never from what
+      // the browser sent. `clearNonCanonical` carries only the operator's
+      // affirmative removal ticks, so a submission that omits the field —
+      // an older render, any form that never grew the row — removes nothing.
+      // planGroupSave also drops any non-canonical name smuggled into the
+      // checkbox fields: this is a repair surface, not a creation surface.
+      const groupPlan = planGroupSave(
+        identity,
+        [...identityGroups, ...accessGroups],
+        fd.getAll('clearNonCanonical').map(String),
+      );
+      if (groupPlan.refusal) formErrors.nonCanonicalGroups = groupPlan.refusal;
+
       const knownClientIds = new Set(manifests.map((m) => m.clientId));
       const roles: Record<string, string> = {};
       for (const m of manifests) {
@@ -175,9 +196,11 @@ if (Astro.request.method === 'POST' && identity) {
 
       if (Object.keys(formErrors).length === 0) {
         // C4: stored order MUST match canonical order so consent and
-        // portal agree on which group wins for role derivation.
-        const groups = normalizeGroupOrder([...identityGroups, ...accessGroups]);
-        // ADR 08: preserve the existing admin marker — an unrelated
+        // portal agree on which group wins for role derivation. The names
+        // come from groupPlan, which is what makes a stored non-canonical
+        // group a refusal above rather than a silent drop here.
+        const groups = normalizeGroupOrder(groupPlan.groups);
+        // Preserve the existing admin marker — an unrelated
         // groups/roles edit must NOT silently drop it. Read from the
         // currently-fetched identity (not re-fetched, to avoid TOCTOU on
         // the write; the patch path handles targeted grant/revoke).
@@ -191,7 +214,7 @@ if (Astro.request.method === 'POST' && identity) {
           },
         });
         identity = await reload();
-        actionResult = { kind: 'updated' };
+        actionResult = { kind: 'updated', removed: groupPlan.removed };
         mode = 'read';
       }
     } else if (action === 'issue-recovery') {
@@ -220,7 +243,7 @@ if (Astro.request.method === 'POST' && identity) {
       // D4: revoke every Kratos session for this identity, invalidate
       // the consent service's identity cache, and emit OIDC back-channel
       // logout to every RP that supports it. Apps without back-channel
-      // logout (Tailscale, vLLM, BookLore, Jellyfin SSO plugin v3.x)
+      // logout (any RP whose manifest declares no backchannel_logout_uri)
       // surface in result.failures so the operator knows where the
       // local-session gap is.
       const result = await revokeUserSessions(id);
@@ -248,7 +271,7 @@ if (Astro.request.method === 'POST' && identity) {
         return Astro.redirect('/admin/users?deleted=1');
       }
     } else if (action === 'grant-admin') {
-      // ADR 08: targeted admin marker grant via JSON Patch. Does NOT touch
+      // Targeted admin marker grant via JSON Patch. Does NOT touch
       // groups or roles. Guards: self-demote N/A on grant (self-grant is fine
       // — the acting admin already has authority).
       const username = identity.traits?.username ?? id;
@@ -256,7 +279,7 @@ if (Astro.request.method === 'POST' && identity) {
       identity = await reload();
       actionResult = { kind: 'admin-granted', username };
     } else if (action === 'revoke-admin') {
-      // ADR 08: targeted admin marker revoke. Guards:
+      // Targeted admin marker revoke. Guards:
       //   (a) Self-demote guard: block revocation of the acting admin's own
       //       marker via the UI (break-glass scenario requires another admin
       //       or console access).
@@ -309,13 +332,20 @@ if (Astro.request.method === 'POST' && identity) {
 }
 
 const groups = identity?.metadata_admin?.groups ?? [];
-// access-model Phase 2: split membership into identity vs access columns by the
-// registry's binding-derived type, NOT by an `access-` name prefix (a group
-// named `memories` would otherwise be mis-filed and its access invisible —
-// docs/access-model.md §9 R1). A group the registry types as `identity` lands
+// Split membership into identity vs access columns by the registry's
+// binding-derived type, NOT by an `access-` name prefix — a group named
+// `memories` would otherwise be mis-filed and its access invisible. A group the
+// registry types as `identity` lands
 // in the identity column; everything else (access/role/unknown) is "access".
-const identityGroupMembership = groups.filter((g) => isIdentityGroup(registry, g));
-const accessGroupMembership = groups.filter((g) => !isIdentityGroup(registry, g));
+// Stored names that miss the canonical policy get their OWN row in both modes.
+// Filing them under "access" would be a lie twice over: they grant nothing,
+// and they are the reason every app denies this identity (refuseNonCanonical,
+// src/lib/gate.ts). Read from the identity, so the row and the save path agree
+// on what is actually stored.
+const nonCanonical = nonCanonicalGroups(identity);
+const nonCanonicalSet = new Set(nonCanonical);
+const identityGroupMembership = groups.filter((g) => !nonCanonicalSet.has(g) && isIdentityGroup(registry, g));
+const accessGroupMembership = groups.filter((g) => !nonCanonicalSet.has(g) && !isIdentityGroup(registry, g));
 const roleOverrides = (identity?.metadata_admin?.roles ?? {}) as Record<string, string>;
 const effective = identity ? computeEffectiveAccess(identity, manifests) : [];
 
@@ -416,7 +446,16 @@ const adminNav = [
     )}
 
     {actionResult?.kind === 'updated' && (
-      <div class="notice notice-success">Identity updated.</div>
+      <div class="notice notice-success">
+        Identity updated.
+        {actionResult.removed.length > 0 && (
+          <span>
+            {' '}Removed unrecognised group(s):{' '}
+            <span class="mono">{actionResult.removed.join(', ')}</span>. If this
+            person still needs access, confirm the correct group is ticked.
+          </span>
+        )}
+      </div>
     )}
     {actionResult?.kind === 'deactivated' && (
       <div class="notice notice-warning">
@@ -600,6 +639,42 @@ const adminNav = [
           </div>
         </div>
 
+        {/* The repair surface. These names cannot appear in either checkbox
+            set above — both are built from vocabularies this codebase owns —
+            so without this row they are invisible here and vanish on save.
+            Removal is an affirmative tick; leaving one alone keeps it. */}
+        {nonCanonical.length > 0 && (
+          <div class="field">
+            <label>Unrecognised groups</label>
+            <p class="notice notice-danger text-sm">
+              Stored on this identity but not a canonical group name
+              (<code>GROUP_RE</code>, <code>src/lib/access-groups.ts</code>). No write
+              path here can produce one, so these were set straight through the Kratos
+              admin API. While any is present, <strong>every app denies this person</strong>
+              — <code>refuseNonCanonical</code>, <code>src/lib/gate.ts</code>.
+            </p>
+            <div class="checkbox-grid">
+              {nonCanonical.map((g) => (
+                <label>
+                  <input type="checkbox" name="clearNonCanonical" value={g} />
+                  <span class="mono">{g}</span>
+                  <span class="muted text-xs">remove</span>
+                </label>
+              ))}
+            </div>
+            <span class="field-hint">
+              Left unticked, the name is kept and the save is <strong>refused</strong>
+              rather than dropping it — the write path validator
+              (<code>validateGroups</code>, <code>src/lib/metadata-admin.ts</code>)
+              rejects the name too, so it cannot be stored again from here. To restore
+              this person's access, tick Remove and pick the correct group above.
+            </span>
+            {formErrors.nonCanonicalGroups && (
+              <span class="field-error">{formErrors.nonCanonicalGroups}</span>
+            )}
+          </div>
+        )}
+
         <details class="panel">
           <summary class="mono text-sm">Per-app role overrides</summary>
           <div class="stack details-content">
@@ -631,7 +706,7 @@ const adminNav = [
 
         {id === adminIdentityId && (
           <div class="notice notice-warning">
-            You're editing your own identity. The <code>admin</code> group is display-only — admin access is the <code>metadata_admin.admin</code> marker (ADR 08), and you can't revoke your own marker here (have another admin do it, or use the shell break-glass).
+            You're editing your own identity. The <code>admin</code> group is display-only — admin access is the <code>metadata_admin.admin</code> marker, and you can't revoke your own marker here (have another admin do it, or use the shell break-glass).
           </div>
         )}
 
@@ -712,6 +787,19 @@ const adminNav = [
                 : <span class="muted text-sm">none</span>}
             </div>
           </div>
+          {nonCanonical.length > 0 && (
+            <div>
+              <p class="muted text-xs mono">unrecognised</p>
+              <div class="badge-row">
+                {nonCanonical.map((g) => <span class="badge badge-danger">{g}</span>)}
+              </div>
+              <p class="text-xs">
+                Not canonical group names, so <strong>every app denies this identity</strong>
+                (<code>refuseNonCanonical</code>, <code>src/lib/gate.ts</code>). Repair them
+                under <a href={`/admin/users/${id}?mode=edit`}>Edit</a>.
+              </p>
+            </div>
+          )}
         </section>
 
         <section class="panel stack">
@@ -810,7 +898,7 @@ const adminNav = [
             </form>
           </div>
           <p class="muted text-xs">
-            Admin authority is the <code>metadata_admin.admin</code> marker (ADR 08). Grant/revoke is a targeted JSON Patch — groups and roles are not affected. Self-revoke is blocked; use another admin or the shell break-glass. Revoke is blocked if this is the last admin.
+            Admin authority is the <code>metadata_admin.admin</code> marker. Grant/revoke is a targeted JSON Patch — groups and roles are not affected. Self-revoke is blocked; use another admin or the shell break-glass. Revoke is blocked if this is the last admin.
           </p>
 
           <details>

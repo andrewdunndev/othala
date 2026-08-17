@@ -105,7 +105,7 @@ export interface AppTile {
   /** simple-icons fallback slug for products not in simple-icons. */
   iconFallback?: string;
   /**
-   * Web path to the vendored SVG glyph (e.g. `/icons/bitwarden.svg`).
+   * Web path to the vendored SVG glyph (e.g. `/icons/grafana.svg`).
    * Resolved at load time via existsSync against public/icons/. Set only
    * when the file is present — renders a CSS-mask glyph; absent = monogram.
    */
@@ -135,7 +135,7 @@ export interface AppTile {
   order: number;
   /** Hidden from the dashboard, but the detail page still resolves. */
   disabled: boolean;
-  /** Hostname from presentation.url (e.g. "observe.othala.test"). */
+  /** Hostname from presentation.url (e.g. "grafana.othala.test"). */
   fqdn: string;
   /** Rendered HTML from the sibling `<slug>.md`, or undefined if absent. */
   educationHtml?: string;
@@ -351,10 +351,10 @@ export function getTile(slug: string): AppTile | undefined {
 }
 
 /**
- * The access-bearing group(s) that gate this tile's visibility (access-model
- * Phase 2). Returns the manifest's `accessGroups` binding — the SAME field the
- * OIDC entry gate keys off, killing the tile-vs-gate dual-source divergence the
- * review flagged (docs/access-model.md §9 R1, §10). Falls back to the singular
+ * The access-bearing group(s) that gate this tile's visibility. Returns the
+ * manifest's `accessGroups` binding — the SAME field the OIDC entry gate keys
+ * off, so a tile can never be visible to someone the gate would deny. Falls
+ * back to the singular
  * `accessGroup` (which carries the OTHALA_DEFAULT_GROUP fallback) only for
  * presentation-only tiles that declare no `access:`/`access_group:` binding, so
  * the default-group/statuspage pattern keeps working.

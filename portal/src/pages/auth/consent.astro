@@ -58,7 +58,7 @@ if (!challenge) {
       fetchError = true;
     } else if (session.identity.id !== consent.subject) {
       // Render-time ownership check (mirrors POST-time subject-match in
-      // handleConsentPost ~line 420): logged-in user is NOT the subject of
+      // handleConsentPost's 'session subject mismatch' guard): logged-in user is NOT the subject of
       // this consent challenge. Do NOT disclose client name or scope list.
       ownershipError = true;
     } else {

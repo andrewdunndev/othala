@@ -124,8 +124,8 @@ export function buildIDTokenClaims(identity: Identity | null | undefined): Claim
  * role depend on array order.
  *
  * That order is not a safe input. `normalizeGroupOrder` (access.ts) sorts
- * non-identity groups alphabetically, which puts `cinema-access` BEFORE
- * `cinema-admin` — a first-match walk hands every admin the `user` role. And
+ * non-identity groups alphabetically, which puts `grafana-access` BEFORE
+ * `grafana-admin` — a first-match walk hands every admin the `user` role. And
  * metadata_admin.groups is written through the Kratos admin API, which makes
  * no ordering promise at all for identities touched outside the admin form.
  *

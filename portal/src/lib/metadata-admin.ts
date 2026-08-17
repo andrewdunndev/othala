@@ -9,15 +9,19 @@
 // for metadata_admin is documentation; runtime enforcement has to live
 // at the write paths in this portal.
 //
-// Contract (matches identity.schema.json metadata_admin):
+// Contract:
 //   { groups?: string[]; roles?: Record<string, string>; admin?: boolean }
 // where:
-//   - groups: array of lowercase-dash-strings, length 1..64, no
-//     duplicates, regex ^[a-z][a-z0-9.\-]*$
+//   - groups: array of names matching the canonical group-name policy
+//     (GROUP_RE, portal/src/lib/access-groups.ts), length 1..64, no
+//     duplicates. This is the write side of that one canonical form; the
+//     read side is gate.ts nonCanonicalGroups. identity.schema.json's
+//     `metadata_admin.groups` pattern is the same expression, but it is
+//     documentation only — Kratos does not validate metadata_admin.
 //   - roles: object with keys matching ^[a-z][a-z0-9]*$ mapping to role
 //     names matching ^[a-z][a-z0-9_\-]*$, length 1..64
 //   - admin: strict boolean (true|false); rejects non-boolean (string "true",
-//     number 1, null, etc.) — fail-closed for admin authority (ADR 08)
+//     number 1, null, etc.) — fail-closed for admin authority
 //   - no other top-level keys allowed
 //
 // Returns the input on success (typed as MetadataAdmin) or an Error
@@ -26,8 +30,8 @@
 // of a validator dependency is not worth it.
 
 import type { MetadataAdmin } from './admin-api';
+import { GROUP_RE } from './access-groups';
 
-const GROUP_NAME_RE = /^[a-z][a-z0-9.\-]*$/;
 const CLIENT_ID_RE = /^[a-z][a-z0-9]*$/;
 const ROLE_NAME_RE = /^[a-z][a-z0-9_\-]*$/;
 const MAX_LEN = 64;
@@ -98,9 +102,9 @@ function validateGroups(value: unknown): string[] {
         `metadata_admin.groups[${i}] length must be 1..${MAX_LEN}.`,
       );
     }
-    if (!GROUP_NAME_RE.test(item)) {
+    if (!GROUP_RE.test(item)) {
       throw new MetadataAdminError(
-        `metadata_admin.groups[${i}] "${item}" must match ${GROUP_NAME_RE}.`,
+        `metadata_admin.groups[${i}] "${item}" must match ${GROUP_RE}.`,
       );
     }
     if (seen.has(item)) {

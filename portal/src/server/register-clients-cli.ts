@@ -4,7 +4,7 @@
 // only as a library (src/lib/register-clients.ts -> registerAllClients).
 // Registration is a deliberate one-shot step — never on app boot or route:
 //
-//   - In production, the deploy repo's `just dag-reload-clients <host>`
+//   - In production, the deploy repo's reload recipe
 //     invokes this bundle as a --rm one-shot on the internal network
 //     (the only network that can reach Hydra's admin port).
 //     The registrar also runs on app boot via the SIGHUP-driven reconcile.

@@ -2,7 +2,7 @@
 //
 // GET  /oauth2/consent?consent_challenge=...
 //   Called by Hydra when it redirects the browser to the consent provider.
-//   For skip_consent:true clients (the first-party default — docs/adr/10),
+//   For skip_consent:true clients (the first-party default),
 //   handleConsent auto-accepts (skip path). For clients with
 //   skip_consent:false, handleConsent 302-bounces to /auth/consent to
 //   render the grant screen.

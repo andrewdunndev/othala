@@ -7,7 +7,7 @@
  *       if (session.authenticator_assurance_level !== 'aal2')
  *           return astro.redirect(browserFlows.login({ ... aal: 'aal2', ... }))
  *
- * An identity with metadata_admin.admin=true (ADR 08 marker, admin@othala.test)
+ * An identity with metadata_admin.admin=true (the admin marker, admin@othala.test)
  * with a valid AAL1 session (password-only login, no second factor enrolled or
  * presented) MUST be denied every /admin/* mutation path. No bypass via:
  *   F1 — direct GET /admin (covered by spec D; repeated here in request form)
@@ -65,7 +65,8 @@ test('F2 — admin at AAL1: POST /admin/users/new is refused (step-up redirect, 
   baseURL,
   admin,
 }) => {
-  // requireAdminSession runs BEFORE any POST body is read (line 26 of new.astro:
+  // requireAdminSession runs BEFORE any POST body is read (the guard at the top
+  // of new.astro's frontmatter:
   //   const guard = await requireAdminSession(Astro);
   //   if (guard instanceof Response) return guard;
   // so an AAL1 admin hits the guard before the CSRF check or identity creation).
@@ -131,7 +132,7 @@ test('F3 — return_to param on step-up URL cannot be forged to skip re-check at
   baseURL,
   admin,
 }) => {
-  // The step-up redirect (requireAdminSession line 80-81) is:
+  // The step-up redirect (requireAdminSession, the `aal !== 'aal2'` branch) is:
   //   astro.redirect(browserFlows.login({ refresh:true, aal:'aal2', returnTo: ... }))
   // where returnTo is constructed from publicUrl + astro.url.pathname — not
   // from any user-supplied input. An attacker cannot inject an arbitrary
@@ -186,7 +187,8 @@ test('F4 — supplying aal=aal2 in the /admin query string does not bypass step-
   admin,
 }) => {
   // requireAdminSession reads the AAL from session.authenticator_assurance_level
-  // (the Kratos session field, portal/src/lib/admin.ts line 76), NOT from the
+  // (the Kratos session field, read in requireAdminSession in
+  // portal/src/lib/admin.ts), NOT from the
   // HTTP request query string. An attacker appending ?aal=aal2 to the /admin
   // URL must still be redirected to the step-up flow.
   const ctx = await browser.newContext();

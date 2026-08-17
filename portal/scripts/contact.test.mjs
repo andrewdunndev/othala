@@ -20,9 +20,9 @@ beforeEach(() => {
 // ── validateContact ────────────────────────────────────────────────────────
 
 test('accepts a well-formed submission and normalizes whitespace', () => {
-  const r = validateContact({ name: '  Ashley ', type: 'access', message: '  please grant access  ' });
+  const r = validateContact({ name: '  Robin ', type: 'access', message: '  please grant access  ' });
   assert.equal(r.ok, true);
-  assert.deepEqual(r.value, { name: 'Ashley', type: 'access', message: 'please grant access' });
+  assert.deepEqual(r.value, { name: 'Robin', type: 'access', message: 'please grant access' });
 });
 
 test('rejects an empty name', () => {

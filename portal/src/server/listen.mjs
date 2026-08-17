@@ -277,7 +277,7 @@ export async function fetchAdminMarker(identityId) {
     console.error(`[portal/recovery-gate] admin API response unparseable for ${identityId} — refusing (fail-closed)`);
     return { refuse: true, reason: 'admin-api-unparseable (fail-closed)' };
   }
-  // metadata_admin.admin is the authoritative boolean marker (ADR 08).
+  // metadata_admin.admin is the authoritative boolean marker.
   // It is writable only via the admin API, never via self-service flows.
   const isAdmin = identity?.metadata_admin?.admin;
   if (isAdmin === true) {
@@ -418,7 +418,7 @@ export async function createPublicServer() {
  * - OTHALA_ADMIN_ENDPOINT_BEARER empty → same reasoning for /admin/revoke-user.
  * - ADMIN_HOST is a wildcard (0.0.0.0, :: or empty "") → admin port would be
  *   exposed to the network; the admin mux has no public-facing auth hardening
- *   and must only be reachable on loopback or a dag-internal address. Note the
+ *   and must only be reachable on loopback or a pod-internal address. Note the
  *   `?? '127.0.0.1'` default only catches null/undefined, NOT an empty string —
  *   ADMIN_HOST="" reaches http.listen as the IPv6 wildcard, and "::" is the
  *   explicit IPv6 wildcard. Both must be refused alongside 0.0.0.0.
@@ -437,7 +437,7 @@ function assertStartupEnv() {
   }
 
   if (ADMIN_HOST === '0.0.0.0' || ADMIN_HOST === '::' || ADMIN_HOST === '') {
-    errors.push(`[portal] FATAL: ADMIN_HOST is a wildcard address (${JSON.stringify(ADMIN_HOST)}) — the admin port must be bound to loopback or a dag-internal IP, never a wildcard (0.0.0.0, :: or empty)`);
+    errors.push(`[portal] FATAL: ADMIN_HOST is a wildcard address (${JSON.stringify(ADMIN_HOST)}) — the admin port must be bound to loopback or a pod-internal IP, never a wildcard (0.0.0.0, :: or empty)`);
   }
 
   if (errors.length > 0) {

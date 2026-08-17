@@ -59,7 +59,7 @@
 #   - github.com/caddyserver/caddy/v2/modules/standard
 #   - github.com/caddy-dns/cloudflare
 # caddy-estate MUST be rebuilt with github.com/mholt/caddy-ratelimit added
-# before this Caddyfile is used in the iac dag-caddy quadlet deployment.
+# before this Caddyfile is used in a quadlet deployment.
 # See the pre-deploy checklist in DEPLOY.md.
 #
 # FALLBACK — if caddy-ratelimit cannot be added to the production image:

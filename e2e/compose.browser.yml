@@ -30,8 +30,9 @@
 #   is scoped to othala.test, and the login/settings/recovery redirect chains
 #   resolve correctly.
 #
-# NOTE: this is the codification of the TODO left in compose.yml line 385-388.
-# The fix belongs in the OSS harness (any adopter running the browser profile
+# NOTE: the base compose.yml cannot fix this on its own — it must keep
+# KRATOS_PUBLIC_URL pointing at the internal container name for the browser-free
+# smoke path. The fix belongs in the OSS harness (any adopter running the browser profile
 # hits the same split-horizon issue), so it ships as a committed override file.
 # The golden smoke path (no -f compose.browser.yml) is unaffected.
 
@@ -44,7 +45,7 @@ services:
       # Override: ADMIN_HOST binds the portal's loopback admin port (4431)
       # to the othala container's static IP on the e2e network — mirroring
       # production, where portal and Kratos are SEPARATE containers on the
-      # same dag-internal bridge (10.89.11.0/24): the portal binds to its
+      # same pod-internal bridge (10.89.11.0/24): the portal binds to its
       # own static IP (10.89.11.12) and Kratos reaches it via the `othala`
       # service hostname (DNS → 10.89.11.12). They do NOT share a loopback
       # namespace. The wildcard 0.0.0.0 is FORBIDDEN: listen.mjs asserts

@@ -68,24 +68,24 @@ import {
 
 // ── fixtures ────────────────────────────────────────────────────────────────
 //
-// Shaped after the live catalog: `presentation.access:` names ONLY
-// `<svc>-access`; `<svc>-admin` exists solely as a group_role_map key.
+// House shape: `presentation.access:` names ONLY `<svc>-access`;
+// `<svc>-admin` exists solely as a group_role_map key.
 
 /** auth_kind: oidc — a real Hydra client, admin role mapped separately. */
-const CINEMA = `
+const GRAFANA = `
 presentation:
-  name: Cinema
-  url: https://cinema.example.test
+  name: Grafana
+  url: https://grafana.example.test
   auth_kind: oidc
   access:
-    - cinema-access
+    - grafana-access
 oidc:
-  client_id: cinema
-  client_name: Cinema
+  client_id: grafana
+  client_name: Grafana
   redirect_uris:
-    - https://cinema.example.test/sso/callback
+    - https://grafana.example.test/sso/callback
   audience:
-    - https://cinema.example.test
+    - https://grafana.example.test
   scope: openid profile email groups
 consent:
   roles:
@@ -98,8 +98,8 @@ consent:
       claim_emit:
         role: User
   group_role_map:
-    cinema-admin: admin
-    cinema-access: user
+    grafana-admin: admin
+    grafana-access: user
 `;
 
 /** auth_kind: oidc+ldap — still an OIDC client as far as this loader cares. */
@@ -135,9 +135,9 @@ consent:
 
 /**
  * auth_kind: forward_auth — presentation-only, and written with the SINGULAR
- * `access_group:` compat shim, which is how most live forward_auth tiles are
- * written. Caddy gates this app on the group named here; if the registry cannot
- * see it, the admin UI cannot grant it.
+ * `access_group:` compat shim, which is how most forward_auth tiles are
+ * written. The reverse proxy gates this app on the group named here; if the
+ * registry cannot see it, the admin UI cannot grant it.
  */
 const OBSERVE = `
 presentation:
@@ -147,21 +147,21 @@ presentation:
   access_group: observe-access
 `;
 
-/** Two forward_auth tiles sharing ONE access group — the live gather shape. */
-const SABNZBD = `
+/** Two forward_auth tiles sharing ONE access group. */
+const FETCHER = `
 presentation:
   name: Usenet downloader
-  url: https://gather.example.test/sabnzbd
+  url: https://downloads.example.test/fetcher
   auth_kind: forward_auth
-  access_group: gather-usenet-access
+  access_group: downloads-usenet-access
 `;
 
-const SONARR = `
+const SERIES = `
 presentation:
   name: Series manager
-  url: https://gather.example.test/sonarr
+  url: https://downloads.example.test/series
   auth_kind: forward_auth
-  access_group: gather-usenet-access
+  access_group: downloads-usenet-access
 `;
 
 /** auth_kind: ldap — presentation-only, plural binding. */
@@ -175,13 +175,13 @@ presentation:
 `;
 
 /** auth_kind: external — someone else's auth, but still OUR access binding. */
-const BITWARDEN = `
+const VAULT = `
 presentation:
   name: Vault
   url: https://vault.example.test
   auth_kind: external
   access:
-    - bitwarden-access
+    - vault-access
 `;
 
 /**
@@ -237,14 +237,14 @@ consent:
 
 /** The whole fixture catalog, by filename — one manifest of every auth_kind. */
 const CATALOG: Record<string, string> = {
-  'bitwarden.yaml': BITWARDEN,
-  'cinema.yaml': CINEMA,
+  'fetcher.yaml': FETCHER,
+  'grafana.yaml': GRAFANA,
   'larder.yaml': LARDER,
   'observe.yaml': OBSERVE,
-  'sabnzbd.yaml': SABNZBD,
-  'sonarr.yaml': SONARR,
+  'series.yaml': SERIES,
   'statuspage.yaml': STATUSPAGE,
   'tune.yaml': TUNE,
+  'vault.yaml': VAULT,
 };
 
 /**
@@ -252,18 +252,18 @@ const CATALOG: Record<string, string> = {
  *
  * Deliberately not derived from CATALOG: this list is what makes the
  * completeness tests non-vacuous. Four of the six entries come from manifests
- * that register no OIDC client at all (observe / sabnzbd+sonarr / tune /
- * bitwarden — forward_auth, forward_auth, ldap, external). If any upstream
+ * that register no OIDC client at all (observe / fetcher+series / tune /
+ * vault — forward_auth, forward_auth, ldap, external). If any upstream
  * filter ever drops presentation-only manifests again, this list is what
  * notices. statuspage contributes nothing: it declares no binding.
  */
 const EXPECTED_ACCESS = [
-  'bitwarden-access',
-  'cinema-access',
-  'gather-usenet-access',
+  'downloads-usenet-access',
+  'grafana-access',
   'larder-access',
   'observe-access',
   'tune-access',
+  'vault-access',
 ];
 
 /**
@@ -272,7 +272,7 @@ const EXPECTED_ACCESS = [
  * and the key that maps an ordinary member to the `user` role. `<svc>-admin`
  * appears ONLY here, which is the converged model stated as data.
  */
-const EXPECTED_ROLE = ['cinema-access', 'cinema-admin', 'larder-access', 'larder-admin'];
+const EXPECTED_ROLE = ['grafana-access', 'grafana-admin', 'larder-access', 'larder-admin'];
 
 // ── helpers ─────────────────────────────────────────────────────────────────
 
@@ -331,19 +331,19 @@ describe('buildGroupRegistry — type comes from the binding, not the name', () 
   });
 
   it('does not let <svc>-admin become an access group (entry stays explicit)', () => {
-    const reg = buildGroupRegistry([parse('cinema.yaml', CINEMA)], []);
+    const reg = buildGroupRegistry([parse('grafana.yaml', GRAFANA)], []);
 
-    // Entry: cinema-access, held by everyone who may enter, admins included.
-    expect(isAccessGroup(reg, 'cinema-access')).toBe(true);
-    expect(reg.get('cinema-access')?.kinds).toEqual(new Set(['access', 'role']));
+    // Entry: grafana-access, held by everyone who may enter, admins included.
+    expect(isAccessGroup(reg, 'grafana-access')).toBe(true);
+    expect(reg.get('grafana-access')?.kinds).toEqual(new Set(['access', 'role']));
 
-    // Role: cinema-admin, and role ONLY. Holding it grants no entry, and
-    // nothing derives entry from it. An identity holding only cinema-admin is
+    // Role: grafana-admin, and role ONLY. Holding it grants no entry, and
+    // nothing derives entry from it. An identity holding only grafana-admin is
     // misconfigured, not privileged.
-    expect(reg.get('cinema-admin')?.kinds).toEqual(new Set(['role']));
-    expect(isAccessGroup(reg, 'cinema-admin')).toBe(false);
-    expect(reg.get('cinema-admin')?.accessFor).toEqual([]);
-    expect(reg.get('cinema-admin')?.roleFor).toEqual(['cinema']);
+    expect(reg.get('grafana-admin')?.kinds).toEqual(new Set(['role']));
+    expect(isAccessGroup(reg, 'grafana-admin')).toBe(false);
+    expect(reg.get('grafana-admin')?.accessFor).toEqual([]);
+    expect(reg.get('grafana-admin')?.roleFor).toEqual(['grafana']);
   });
 
   it('unions the kinds when one group carries several bindings', () => {
@@ -370,12 +370,12 @@ presentation:
 
   it('records every app that binds a shared group, in load order, without duplicates', () => {
     const reg = buildGroupRegistry(
-      [parse('sabnzbd.yaml', SABNZBD), parse('sonarr.yaml', SONARR)],
+      [parse('fetcher.yaml', FETCHER), parse('series.yaml', SERIES)],
       [],
     );
 
-    expect(reg.get('gather-usenet-access')?.accessFor).toEqual(['sabnzbd', 'sonarr']);
-    expect(reg.get('gather-usenet-access')?.kinds).toEqual(new Set(['access']));
+    expect(reg.get('downloads-usenet-access')?.accessFor).toEqual(['fetcher', 'series']);
+    expect(reg.get('downloads-usenet-access')?.kinds).toEqual(new Set(['access']));
   });
 
   it('invents nothing for a manifest with no binding at all', () => {
@@ -389,14 +389,14 @@ presentation:
   });
 
   it('reports an unbound name as unknown rather than guessing its kind', () => {
-    const reg = buildGroupRegistry([parse('cinema.yaml', CINEMA)], ['admin']);
+    const reg = buildGroupRegistry([parse('grafana.yaml', GRAFANA)], ['admin']);
 
     // A typo'd group is what the lint has to catch. It must be absent, not
     // silently typed by the shape of its name.
-    expect(reg.has('cinema-acess')).toBe(false);
-    expect(isAccessGroup(reg, 'cinema-acess')).toBe(false);
-    expect(isIdentityGroup(reg, 'cinema-acess')).toBe(false);
-    expect(knownGroupNames(reg).has('cinema-acess')).toBe(false);
+    expect(reg.has('grafana-acess')).toBe(false);
+    expect(isAccessGroup(reg, 'grafana-acess')).toBe(false);
+    expect(isIdentityGroup(reg, 'grafana-acess')).toBe(false);
+    expect(knownGroupNames(reg).has('grafana-acess')).toBe(false);
   });
 
   it('knownGroupNames covers every bound name, of every kind', () => {
@@ -437,14 +437,14 @@ describe('getGroupRegistry — completeness over the real loader', () => {
     // assertions below would agree with a registry that had lost the same
     // class. This is the check that refuses to agree.
     expect(loadClientManifests().map((m) => m.clientId).sort()).toEqual([
-      'bitwarden',
-      'cinema',
+      'fetcher',
+      'grafana',
       'larder',
       'observe',
-      'sabnzbd',
-      'sonarr',
+      'series',
       'statuspage',
       'tune',
+      'vault',
     ]);
 
     const reg = getGroupRegistry();
@@ -458,13 +458,13 @@ describe('getGroupRegistry — completeness over the real loader', () => {
 
     // forward_auth (singular shim), forward_auth (shared), ldap, external.
     // Every one of these registers no OIDC client, and every one of them is a
-    // group Caddy really gates on — so every one must be visible here or the
-    // admin UI drops it on the next identity save.
+    // group the reverse proxy really gates on — so every one must be visible
+    // here or the admin UI drops it on the next identity save.
     for (const group of [
       'observe-access',
-      'gather-usenet-access',
+      'downloads-usenet-access',
       'tune-access',
-      'bitwarden-access',
+      'vault-access',
     ]) {
       expect(isAccessGroup(reg, group), `${group} must be an access group`).toBe(true);
       expect(knownAccessGroups(), `${group} must be grantable in the admin UI`).toContain(group);
@@ -492,22 +492,22 @@ describe('getGroupRegistry — completeness over the real loader', () => {
     expect(getGroupRegistry()).toBe(first);
 
     // A second access group added to an existing binding.
-    write('cinema.yaml', CINEMA.replace('    - cinema-access\n', '    - cinema-access\n    - cinema-guest\n'));
+    write('grafana.yaml', GRAFANA.replace('    - grafana-access\n', '    - grafana-access\n    - grafana-guest\n'));
 
     const second = getGroupRegistry();
     expect(second).not.toBe(first);
-    expect(isAccessGroup(second, 'cinema-guest')).toBe(true);
-    expect(accessFor(second, 'cinema-guest')).toEqual(['cinema']);
+    expect(isAccessGroup(second, 'grafana-guest')).toBe(true);
+    expect(accessFor(second, 'grafana-guest')).toEqual(['grafana']);
   });
 
   it('never throws when the catalog breaks, and keeps serving the last good registry', () => {
     writeCatalog();
     const good = getGroupRegistry();
-    expect(isAccessGroup(good, 'cinema-access')).toBe(true);
+    expect(isAccessGroup(good, 'grafana-access')).toBe(true);
 
     // A group_role_map pointing at an undeclared role: a SEMANTIC error, which
     // the strict loader treats as fatal for the WHOLE set.
-    write('cinema.yaml', CINEMA.replace('cinema-access: user', 'cinema-access: editor'));
+    write('grafana.yaml', GRAFANA.replace('grafana-access: user', 'grafana-access: editor'));
 
     expect(() => getGroupRegistry()).not.toThrow();
     const after = getGroupRegistry();

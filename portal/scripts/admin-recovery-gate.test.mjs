@@ -1,11 +1,11 @@
-// Test for the admin-to-admin recovery refusal gate (CU3 B2 / ADR 08).
+// Test for the admin-to-admin recovery refusal gate.
 //
 // Run with: tsx --test scripts/admin-recovery-gate.test.mjs
 //
 // The gate logic lives in src/lib/access.ts (shouldRefuseRecovery) and is
 // consumed by src/pages/admin/users/[id].astro action=issue-recovery.
 //
-// ADR 08: admin authority is now the `metadata_admin.admin === true` marker
+// Admin authority is the `metadata_admin.admin === true` marker
 // (admin-API-only-writable boolean). shouldRefuseRecovery refuses iff the
 // TARGET identity carries the admin marker. The retired OTHALA_ADMIN_IDS UUID
 // allowlist is no longer consulted. The caller must pass an admin-API-fetched

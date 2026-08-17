@@ -1,5 +1,5 @@
-// Manifest lint — the guardrail the flat-string access model otherwise lacks
-// (access-model §11, R3). With no enforced naming convention, a typo'd group
+// Manifest lint — the guardrail the flat-string access model otherwise lacks.
+// With no enforced naming convention, a typo'd group
 // (`access: [memmories]`) silently locks everyone out (fail-closed, no error)
 // and a brand-new user sees a blank dashboard with no explanation. The lint
 // cross-checks every group a manifest references against the known-group set
@@ -17,7 +17,8 @@
 //     - a group named in access:/group_role_map that is not in the known set
 //       (typo → silent lockout).
 //     - access_group present alongside access: (the shim is ignored).
-//     - a group name that misses the safe charset.
+//     - a group name — in access: or in a group_role_map key — that misses
+//       the canonical form (access-groups.ts GROUP_RE).
 //
 // Phase 2 scope (work order): the FUNCTION + its tests are the must-have. The
 // three §11 surfaces (a `just lint` CI job, an `othala lint` CLI, and a yellow
@@ -30,7 +31,7 @@
 // shadowing, charset misses) for the not-yet-built advisory surfaces.
 
 import type { ClientManifest } from './manifests';
-import { ACCESS_GROUP_NAME_RE } from './access-groups';
+import { GROUP_RE } from './access-groups';
 
 export type LintSeverity = 'block' | 'warn';
 
@@ -92,12 +93,15 @@ export function lintManifests(
       }
     }
 
-    // WARN: charset miss on any access-binding name.
-    for (const g of m.accessGroups) {
-      if (!ACCESS_GROUP_NAME_RE.test(g)) {
+    // WARN: charset miss on ANY group name this manifest declares — both the
+    // access binding and the `group_role_map` keys. A key that misses the
+    // canonical form (access-groups.ts GROUP_RE) can never match a stored
+    // group, so the role it maps is dead: no identity can ever receive it.
+    for (const g of [...m.accessGroups, ...Object.keys(m.groupRoleMap)]) {
+      if (!GROUP_RE.test(g)) {
         warn(
-          `access group ${JSON.stringify(g)} does not match the safe charset ` +
-            `${ACCESS_GROUP_NAME_RE.source}`,
+          `group ${JSON.stringify(g)} does not match the safe charset ` +
+            `${GROUP_RE.source}`,
         );
       }
     }
@@ -126,8 +130,8 @@ export function lintBlockers(set: ClientManifest[], knownGroups: Iterable<string
   return lintManifests(set, knownGroups).filter((f) => f.severity === 'block');
 }
 
-// TODO(access-model §11 — Phase 2 follow-up): wire lintManifests into the three
-// surfaces the spec calls for, none of which exist yet in this repo:
+// TODO: wire lintManifests into the three surfaces below, none of which exist
+// yet in this repo:
 //   1. A CI `lint-manifests` job (`just lint`) that fails on BLOCK findings.
 //   2. An `othala lint` CLI subcommand over MANIFEST_DIR.
 //   3. A non-blocking yellow callout (.notice-warn) on /admin/oauth2 surfacing

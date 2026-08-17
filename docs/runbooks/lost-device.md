@@ -56,7 +56,7 @@ with a chip:
 | `webauthn ✓` | Legacy WebAuthn keys registered |
 | `totp ✓` | TOTP authenticator app enrolled |
 | `backup codes ✓` | Single-use recovery codes generated |
-| `password ✓` | Password set (Jellyfin/LDAP path) |
+| `password ✓` | Password set (directory-backed / password-auth path) |
 | `— ` (muted) | Not enrolled |
 
 Ask the user which devices or credential types they had on the lost/stolen
@@ -108,8 +108,8 @@ admin API. The legitimate user re-enrolls with new keys after recovery.
 
 **Not evictable from this UI:**
 - `password` — Kratos rejects admin deletion of the password credential.
-  If a password-authenticated path (Jellyfin LDAP) is in use, change the
-  password via the Jellyfin/LDAP admin path instead.
+  Where a directory-backed app authenticates by password, rotate it in that
+  app's own admin console instead.
 
 Each Remove action is CSRF-protected and requires an active AAL2 admin session.
 The confirmation banner after each removal tells you which type was removed.
@@ -144,10 +144,9 @@ new one.
 
 ### Step 6 — Optionally rotate the password (if password auth is in use)
 
-If the identity has a `password ✓` chip and the user uses the Jellyfin or
-LDAP path, the password may also be compromised (if the attacker had access
-to the device's saved credentials). Rotate it via the Jellyfin/LDAP admin
-console.
+If the identity has a `password ✓` chip and reaches a directory-backed app by
+password, that password may also be compromised (the device may have had it
+saved). Rotate it in that app's own admin console.
 
 The portal does not expose a password-reset path for the admin-on-behalf-of-user
 case by design (Kratos does not allow admin-set passwords without the user's
@@ -164,7 +163,7 @@ current password or a privileged recovery session).
 [ ] 3. Remove each affected evictable type (passkey / webauthn / totp / backup codes)
 [ ] 4. Force re-login  (revoke sessions)
 [ ] 5. Issue enrollment URL  — share via Signal/iMessage
-[ ] 6. If password in use: rotate via Jellyfin/LDAP admin
+[ ] 6. If password in use: rotate in the directory-backed app's admin
 [ ] 7. Follow up with the user once they confirm re-enrollment
 ```
 

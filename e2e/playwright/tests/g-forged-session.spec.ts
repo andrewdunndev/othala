@@ -17,7 +17,7 @@
  *         → /admin redirects to /auth/login
  *   G3 — member's real session cookie used to attempt an admin-only route
  *         → session is valid at Kratos (whoami 200) BUT identity does not
- *           have metadata_admin.admin=true (ADR 08 marker) → /admin
+ *           have metadata_admin.admin=true (the admin marker) → /admin
  *           redirects to /auth/error?reason=not-admin (or to AAL2 step-up).
  *         (This exercises the admin marker gate at portal/src/lib/admin-auth.ts
  *          via requireAdminSession.)
@@ -109,7 +109,7 @@ test('G2 — unauthenticated request (no session cookie) is rejected at /admin',
       `G2: /admin must not return 200 without a session; got ${status}`,
     ).not.toBe(200);
 
-    // requireAdminSession line 52-54: no session → redirect to /auth/login.
+    // requireAdminSession's active-session check (a): no session → redirect to /auth/login.
     expect(
       /\/auth\/login/.test(loc),
       `G2: /admin must redirect to /auth/login; got ${status} ${loc}`,
@@ -132,7 +132,7 @@ test('G3 — INV-1: member real session (valid Kratos cookie, AAL1) never reache
   // cryptographically genuine Kratos cookie — NEVER reaches admin functionality.
   // requireAdminSession check (b) fires BEFORE check (c): the step-up redirect
   // fires before the marker is consulted. This is the "no admin enumeration
-  // oracle at AAL1" property (ADR 08).
+  // oracle at AAL1" property.
   const ctx = await browser.newContext();
   try {
     await loginViaJsonApi(ctx, { identifier: member.email, password: member.password }, baseURL);

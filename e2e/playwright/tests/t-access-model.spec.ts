@@ -46,7 +46,7 @@
  * NOT ASSERTED HERE, DELIBERATELY: that admin implies access. That behaviour is
  * gone. A test for it would be a test for the bug.
  *
- * ORTHOGONAL, DO NOT CONFLATE: metadata_admin.admin (ADR 0008) is PORTAL admin
+ * ORTHOGONAL, DO NOT CONFLATE: metadata_admin.admin is PORTAL admin
  * authority and gates /admin. It is a marker, not a group. No group grants it
  * and it grants no group. Specs C, Q and R cover it; none of these identities
  * carry it.

@@ -7,7 +7,7 @@
 // alongside identity.schema.json's metadata_admin shape:
 //   { groups?: string[]; roles?: Record<string, string> }
 //   - groups: array of lowercase-dash-strings, 1..64 chars,
-//             regex ^[a-z][a-z0-9.\-]*$, no duplicates
+//             regex ^[a-z][a-z0-9-]*$, no duplicates
 //   - roles: object with keys ^[a-z][a-z0-9]*$ → values matching
 //            ^[a-z][a-z0-9_\-]*$ length 1..64
 //   - no other top-level keys allowed
@@ -90,11 +90,15 @@ test('groups: regex violation → error', () => {
     /must match/,
   );
   assert.throws(
-    () => validateMetadataAdmin({ groups: ['0invalid'] }), // starts with digit
+    () => validateMetadataAdmin({ groups: ['has space'] }), // space
     /must match/,
   );
   assert.throws(
-    () => validateMetadataAdmin({ groups: ['has space'] }), // space
+    () => validateMetadataAdmin({ groups: ['under_score'] }), // underscore
+    /must match/,
+  );
+  assert.throws(
+    () => validateMetadataAdmin({ groups: ['-leading'] }), // leading hyphen
     /must match/,
   );
 });
@@ -106,9 +110,32 @@ test('groups: duplicate → error', () => {
   );
 });
 
-test('groups: allows dots and hyphens in middle', () => {
-  const result = validateMetadataAdmin({ groups: ['family.beta', 'access-keep-v2'] });
-  assert.deepEqual(result.groups, ['family.beta', 'access-keep-v2']);
+// The write path validates against the ONE canonical group-name policy
+// (GROUP_RE, src/lib/access-groups.ts), which is what every group comparison
+// in src/ assumes and what gate.ts refuses on read. identity.schema.json's
+// documentary `metadata_admin.groups` pattern is the same expression; it
+// enforces nothing, since Kratos validates `traits` only.
+test('groups: hyphens in the middle are allowed', () => {
+  const result = validateMetadataAdmin({ groups: ['access-keep-v2'] });
+  assert.deepEqual(result.groups, ['access-keep-v2']);
+});
+
+test('groups: a dot is rejected — the canonical form has no dot', () => {
+  assert.throws(
+    () => validateMetadataAdmin({ groups: ['family.beta'] }),
+    /must match/,
+  );
+});
+
+// Both ends of the reconciled charset. A leading digit used to be accepted here
+// while identity.schema.json forbade it; the two are now the intersection
+// (^[a-z][a-z0-9-]*$), so a name the schema advertises can never be one the
+// read gate refuses.
+test('groups: a leading digit is rejected — the canonical form starts with a letter', () => {
+  assert.throws(
+    () => validateMetadataAdmin({ groups: ['2fa-required'] }),
+    /must match/,
+  );
 });
 
 test('groups: empty array → empty result', () => {

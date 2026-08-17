@@ -149,7 +149,7 @@ presentation:
     'empty access_group must fall back to the default group');
 });
 
-// ── accessGroups dual-read (access-model Phase 1) ─────────────────────────────
+// ── accessGroups dual-read: plural `access:` and singular `access_group:` ────
 
 test('parseTile: presentation.access list populates accessGroups', async () => {
   const tile = await parseSingleTile(`

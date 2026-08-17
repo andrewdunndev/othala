@@ -1,11 +1,10 @@
-// Group registry — the derived type-tag for groups (access-model §10).
+// Group registry — the derived type-tag for groups.
 //
-// Before the access-model refactor, a group's *type* (identity / access /
-// role) was inferred from its NAME: anything matching `access-*` was treated
-// as an access group, everything else as an identity group. That overloaded the
-// `access-` prefix as both a naming convention AND a runtime discriminator
-// (docs/access-model.md §9 R1). This registry retires that hidden duty: a
-// group's type comes from its BINDINGS, never its name.
+// Earlier revisions inferred a group's *type* (identity / access / role) from
+// its NAME: anything matching `access-*` was treated as an access group,
+// everything else as an identity group. That overloaded the `access-` prefix as
+// both a naming convention AND a runtime discriminator. This registry retires
+// that hidden duty: a group's type comes from its BINDINGS, never its name.
 //
 //   - `identity` — the group is listed in OTHALA_IDENTITY_GROUPS (env).
 //   - `access`   — some manifest's `accessGroups` binds it (grants entry).

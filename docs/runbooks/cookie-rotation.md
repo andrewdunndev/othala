@@ -70,7 +70,7 @@ removed. The `.env.example` and `gen-secrets.sh` reflect this: only
 
    ```sh
    curl -fsS https://<your-othala-host>/health/ready
-   # run your operator smoke suite, e.g.: make dag-smoke HOST=<sso-host>
+   # then run your deployment's smoke suite against <sso-host>
    ```
 
 5. Active sessions: still valid. Existing cookies were signed with the
@@ -118,4 +118,3 @@ honored until its own expiry.
 - `kratos/kratos.yml`, `hydra/hydra.yml`: the env-var indirection.
 - `e2e/gen-secrets.sh`: produces a fresh `_CURRENT` for each secret
   (no `_PREVIOUS` — single-slot / collapsed-key model).
-- ADRs (`docs/adr/`): H4 "Hydra cookie-secret rotation" lock.

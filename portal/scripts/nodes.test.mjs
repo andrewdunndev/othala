@@ -123,10 +123,10 @@ test('scriptNodes: empty when no scripts present', () => {
 // ===== inputProps =====
 
 test('inputProps: basic input → name + type + value', () => {
-  const props = inputProps({ node_type: 'input', name: 'identifier', type: 'text', value: 'andrew' });
+  const props = inputProps({ node_type: 'input', name: 'identifier', type: 'text', value: 'a.user' });
   assert.equal(props.name, 'identifier');
   assert.equal(props.type, 'text');
-  assert.equal(props.value, 'andrew');
+  assert.equal(props.value, 'a.user');
 });
 
 test('inputProps: submit input → carries button label in value', () => {

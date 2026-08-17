@@ -1,6 +1,6 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 720 436" width="720" height="436" role="img" aria-labelledby="gbd-t gbd-d" class="dg" font-family="'IBM Plex Sans', Helvetica, Arial, sans-serif">
 <title id="gbd-t">Group, binding, decision: what a group actually does in Othala</title>
-<desc id="gbd-d">Three columns. Left: a Kratos identity holds the groups everyone, cinema-access and cinema-admin in metadata_admin.groups, which is admin-API only and absent from whoami. Middle: the app manifest carries two separate bindings — presentation.access lists only cinema-access and is the ENTRY binding, parsed by access-groups.ts; consent.group_role_map maps cinema-admin to admin and cinema-access to user and is the ROLE binding, ranked by the order of consent.roles. Right: gate.ts enforceAccessGate admits the identity because it holds a group in the access list, and claims.ts lookupRole resolves the role admin because the highest-ranked matched role wins regardless of stored group order. A bottom band gives three consequences: holding cinema-admin alone grants no entry because presentation.access does not list it; a group no manifest binds grants nothing at all; and a group named bananas listed in presentation.access grants entry, because the access- prefix is enforced nowhere.</desc>
+<desc id="gbd-d">Three columns. Left: a Kratos identity holds the groups everyone, audiobookshelf-access and audiobookshelf-admin in metadata_admin.groups, which is admin-API only and absent from whoami. Middle: the app manifest carries two separate bindings — presentation.access lists only audiobookshelf-access and is the ENTRY binding, read by parseAccessGroups; consent.group_role_map maps audiobookshelf-admin to admin and audiobookshelf-access to user and is the ROLE binding, ranked by the declaration order of consent.roles. Right: the ENTRY decision is admitted, by gate.ts enforceAccessGate as an OR over the bound list, and the ROLE decision is admin, by claims.ts lookupRole, where the highest-ranked match wins in any stored order. A bottom band, headed that the name is convention and the binding is the mechanism, gives three cases: audiobookshelf-admin held alone is NO ENTRY, because presentation.access does not list it and admin never implies access; a group nothing binds GRANTS NOTHING, because group-registry.ts types a group from its bindings; and a group named bananas GRANTS ENTRY if a manifest binds it, because the only rule on a name is a safe charset and no code requires the access- prefix.</desc>
 <style>
 .dg{--paper:#ffffff;--panel:#f4f4f4;--edge:#e0e0e0;--edge2:#b0b0b0;--ink:#0a0a0a;--ink2:#404040;--mut:#707070;--acc:#4a6741;--no:#a8443a;--yes:#4a7a4a}
 @media (prefers-color-scheme:dark){.dg{--paper:#1c1c1e;--panel:#242426;--edge:#303032;--edge2:#48484a;--ink:#f2f2f7;--ink2:#aeaeb2;--mut:#8e8e93;--acc:#6aaa58;--no:#d4736a;--yes:#7aaa7a}:root[data-theme="light"] .dg{--paper:#ffffff;--panel:#f4f4f4;--edge:#e0e0e0;--edge2:#b0b0b0;--ink:#0a0a0a;--ink2:#404040;--mut:#707070;--acc:#4a6741;--no:#a8443a;--yes:#4a7a4a}}
@@ -35,9 +35,9 @@
 <rect class="p e" x="52" y="114" width="136" height="20" rx="2" fill="#ffffff" stroke="#e0e0e0" stroke-width="1"/>
 <text class="i2" x="60" y="128" font-family="'IBM Plex Mono', Menlo, monospace" font-size="9.5" fill="#404040">everyone</text>
 <rect class="p e" x="52" y="140" width="136" height="20" rx="2" fill="#ffffff" stroke="#e0e0e0" stroke-width="1"/>
-<text class="i" x="60" y="154" font-family="'IBM Plex Mono', Menlo, monospace" font-size="9.5" fill="#0a0a0a">cinema-access</text>
+<text class="i" x="60" y="154" font-family="'IBM Plex Mono', Menlo, monospace" font-size="9.5" fill="#0a0a0a">audiobookshelf-access</text>
 <rect class="p e" x="52" y="166" width="136" height="20" rx="2" fill="#ffffff" stroke="#e0e0e0" stroke-width="1"/>
-<text class="i" x="60" y="180" font-family="'IBM Plex Mono', Menlo, monospace" font-size="9.5" fill="#0a0a0a">cinema-admin</text>
+<text class="i" x="60" y="180" font-family="'IBM Plex Mono', Menlo, monospace" font-size="9.5" fill="#0a0a0a">audiobookshelf-admin</text>
 <text class="m" x="52" y="200" font-size="8" fill="#707070">Admin-API only. Not in the</text>
 <text class="m" x="52" y="211" font-size="8" fill="#707070">public whoami response.</text>
 <!-- arrows: identity → bindings -->
@@ -51,13 +51,13 @@
 <rect class="p as" x="250" y="88" width="230" height="76" rx="3" fill="#ffffff" stroke="#4a6741" stroke-width="1.4"/>
 <text class="a" x="262" y="105" font-family="'IBM Plex Mono', Menlo, monospace" font-size="8" font-weight="700" letter-spacing="1.1" fill="#4a6741">ENTRY BINDING</text>
 <text class="i" x="262" y="123" font-family="'IBM Plex Mono', Menlo, monospace" font-size="9.5" fill="#0a0a0a">presentation.access:</text>
-<text class="i" x="274" y="138" font-family="'IBM Plex Mono', Menlo, monospace" font-size="9.5" fill="#0a0a0a">- cinema-access</text>
+<text class="i" x="274" y="138" font-family="'IBM Plex Mono', Menlo, monospace" font-size="9.5" fill="#0a0a0a">- audiobookshelf-access</text>
 <text class="m" x="262" y="155" font-size="8" fill="#707070">Only the access group. Read by parseAccessGroups.</text>
 <rect class="p e2" x="250" y="178" width="230" height="92" rx="3" fill="#ffffff" stroke="#b0b0b0" stroke-width="1"/>
 <text class="m" x="262" y="195" font-family="'IBM Plex Mono', Menlo, monospace" font-size="8" font-weight="700" letter-spacing="1.1" fill="#707070">ROLE BINDING</text>
 <text class="i" x="262" y="213" font-family="'IBM Plex Mono', Menlo, monospace" font-size="9.5" fill="#0a0a0a">consent.group_role_map:</text>
-<text class="i" x="274" y="228" font-family="'IBM Plex Mono', Menlo, monospace" font-size="9.5" fill="#0a0a0a">cinema-admin: admin</text>
-<text class="i" x="274" y="243" font-family="'IBM Plex Mono', Menlo, monospace" font-size="9.5" fill="#0a0a0a">cinema-access: user</text>
+<text class="i" x="274" y="228" font-family="'IBM Plex Mono', Menlo, monospace" font-size="9.5" fill="#0a0a0a">audiobookshelf-admin: admin</text>
+<text class="i" x="274" y="243" font-family="'IBM Plex Mono', Menlo, monospace" font-size="9.5" fill="#0a0a0a">audiobookshelf-access: user</text>
 <text class="m" x="262" y="261" font-size="8" fill="#707070">Rank is the declaration order of consent.roles.</text>
 <!-- arrows: bindings → decisions -->
 <g class="ms" stroke="#707070" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" fill="none">
@@ -82,7 +82,7 @@
 <line class="e" x1="40" y1="288" x2="680" y2="288" stroke="#e0e0e0" stroke-width="1"/>
 <text class="m" x="40" y="308" font-family="'IBM Plex Mono', Menlo, monospace" font-size="9" font-weight="700" letter-spacing="1.2" fill="#707070">THE NAME IS CONVENTION · THE BINDING IS THE MECHANISM</text>
 <rect class="s e" x="40" y="318" width="200" height="82" rx="3" fill="#f4f4f4" stroke="#e0e0e0" stroke-width="1"/>
-<text class="i" x="52" y="337" font-family="'IBM Plex Mono', Menlo, monospace" font-size="9" fill="#0a0a0a">cinema-admin, held alone</text>
+<text class="i" x="52" y="337" font-family="'IBM Plex Mono', Menlo, monospace" font-size="9" fill="#0a0a0a">audiobookshelf-admin, held alone</text>
 <text class="i2" x="52" y="354" font-size="8.5" fill="#404040">presentation.access does not list</text>
 <text class="i2" x="52" y="365" font-size="8.5" fill="#404040">it, so it admits nobody. Admin</text>
 <text class="i2" x="52" y="376" font-size="8.5" fill="#404040">never implies access.</text>

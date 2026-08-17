@@ -338,21 +338,22 @@ export async function handleConsent(req: Request, deps: Deps = {}): Promise<Resp
     }
   }
 
-  // SKIP PATH (docs/adr/10-first-party-skip-consent.md, load-bearing):
+  // SKIP PATH (load-bearing):
   // curated IdP — the operator pre-consents at manifest-authoring time, so a
   // skip_consent:true client auto-accepts with NO grant UI ("never prompts").
   //
   // Honor the MANIFEST skip_consent (authoritative, operator-authored) OR
   // Hydra's remember-based `consent.skip` when set. Why the manifest flag is
   // authoritative (vs Hydra's client field, which OSS Hydra v26.2.0 does not
-  // auto-skip on): docs/adr/10-first-party-skip-consent.md. Identity is
+  // auto-skip on): the manifest is the operator's pre-consent record and
+  // survives a client re-registration that resets Hydra's own field. Identity is
   // non-null here (gate denies on null above). remember_for =
   // CONSENT_REMEMBER_FOR_SKIP (3600).
   if (consent.skip || consentManifest?.skipConsent) {
     return acceptConsentRequest(challenge, consent, identity!, d, clientId, CONSENT_REMEMBER_FOR_SKIP);
   }
 
-  // PROMPT PATH (docs/adr/10):
+  // PROMPT PATH:
   // When consent.skip === false the user has NOT previously granted consent for
   // this client (or the grant expired). Redirect to the grant screen. The
   // browser renders /auth/consent, the user clicks Allow / Deny, and the form

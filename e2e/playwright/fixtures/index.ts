@@ -13,7 +13,7 @@
  *                          anywhere (no metadata_admin.admin marker, no
  *                          `grafana-admin` group)
  *   admin                — { id, email, password, aal2Session } identity seeded with
- *                          metadata_admin.admin=true (ADR 08 marker) by
+ *                          metadata_admin.admin=true (the admin marker) by
  *                          validate.sh seed phase. The fixture looks up the id,
  *                          then performs TOTP enrollment + AAL2 step-up so that
  *                          adminWithAal2() provides an AAL2 BrowserContext ready
@@ -23,7 +23,7 @@
  * paid at most once across the serial test run.
  *
  * AAL2 admin access:
- *   /admin requires AAL2 (ADR 08). TOTP CANNOT be pre-seeded via the admin
+ *   /admin requires AAL2. TOTP CANNOT be pre-seeded via the admin
  *   API — it must be enrolled via the Kratos settings flow at runtime:
  *     1. Log in as admin (password → AAL1 session).
  *     2. Initiate a settings flow, read the TOTP secret from ui.nodes
@@ -413,7 +413,7 @@ export const test = base.extend<OthalaFixtures>({
   // model answers "can this person get in?" from that single group.
   //
   // Two separate non-admin properties, deliberately not conflated:
-  //   - no metadata_admin.admin marker  → not a PORTAL admin (ADR 08), so
+  //   - no metadata_admin.admin marker  → not a PORTAL admin, so
   //     /admin is closed to it (spec C).
   //   - no `grafana-admin` group        → `viewer` role inside Grafana, not
   //     admin (grafana.yaml group_role_map).
@@ -434,7 +434,7 @@ export const test = base.extend<OthalaFixtures>({
   ],
 
   // admin: validate.sh pre-seeds this identity (ADMIN_EMAIL / ADMIN_USERNAME)
-  // with metadata_admin.admin=true (ADR 08 marker) and groups
+  // with metadata_admin.admin=true (the admin marker) and groups
   // ['grafana-access','grafana-admin'] before Playwright starts. Both groups
   // are held EXPLICITLY: `grafana-access` is what admits it to the grafana
   // fixture (same group ordinary members hold) and `grafana-admin` is what

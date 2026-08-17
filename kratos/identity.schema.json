@@ -2,7 +2,7 @@
   "$id": "urn:othala:identity:schema:family",
   "$schema": "http://json-schema.org/draft-07/schema#",
   "title": "Family member",
-  "description": "Identity schema for the dunn.dev family SSO. Traits are user-visible; group membership lives in metadata_admin and is admin-managed only.",
+  "description": "Identity schema for an Othala instance. Traits are user-visible; group membership lives in metadata_admin and is admin-managed only.",
   "type": "object",
   "properties": {
     "traits": {
@@ -92,10 +92,10 @@
         "groups": {
           "type": "array",
           "title": "Groups",
-          "description": "Membership groups. Order matters when deriving per-app roles via group_role_map (first matching group wins). The admin form is responsible for writing groups in the canonical order documented in portal/src/lib/access.ts.",
+          "description": "Membership groups. Order matters when deriving per-app roles via group_role_map (first matching group wins). The admin form is responsible for writing groups in the canonical order documented in portal/src/lib/access.ts. Kratos validates traits only, so this pattern enforces nothing at write time: it must stay byte-identical to GROUP_RE in portal/src/lib/access-groups.ts, which IS enforced, and on read denies any identity holding a group that misses it.",
           "items": {
             "type": "string",
-            "pattern": "^[a-z][a-z0-9.\\-]*$",
+            "pattern": "^[a-z][a-z0-9-]*$",
             "maxLength": 64
           },
           "uniqueItems": true

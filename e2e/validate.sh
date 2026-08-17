@@ -1,8 +1,9 @@
 #!/usr/bin/env bash
 # validate.sh — top-level Othala e2e orchestrator.
 #
-# Runs INSIDE the per-job Fedora VM the lodestone GitLab Runner spawns
-# (Custom Executor, tag lodestone,qemu). The VM has podman + podman-docker
+# Runs INSIDE the per-job Fedora VM a QEMU GitLab Runner spawns (Custom
+# Executor; see the `tags:` on the e2e job in .gitlab-ci.yml). The VM has
+# podman + podman-docker
 # bridge baked into the baser golden image (per the deploy repo's
 # runner config "What pre-bakes into the baser golden image"), so
 # `docker compose` works natively. The same script runs on an operator
@@ -18,7 +19,7 @@
 #      othala). Max 4 min total; if any fail the substrate is broken.
 #      NOTE: the LDAP bridge is a separate project (gitlab.com/dunn.dev/
 #      kratos-ldap); no e2e spec exercises LDAP here.
-#   4b. Seed phase (ADR 0008 marker model):
+#   4b. Seed phase (marker model):
 #       POST admin + recovery-admin identities with metadata_admin.admin=true.
 #       The admin marker is set at identity creation; no UUID readback, no
 #       env rewrite, no portal recreate needed (the portal reads the marker
@@ -45,7 +46,7 @@ set -uo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 cd "$SCRIPT_DIR" || exit 1
 
-# Rootful container engine, when available. The crucible CI VM exposes the
+# Rootful container engine, when available. The CI VM exposes the
 # system (rootful) podman socket group-accessible to the unprivileged `fedora`
 # user. postgres:18-alpine chowns PGDATA as real root, which fails under
 # rootless userns ("Operation not permitted") — against the rootful socket the
@@ -174,7 +175,7 @@ while true; do
     sleep 5
 done
 
-# Step 4b: seed phase (ADR 0008 marker model).
+# Step 4b: seed phase (marker model).
 #
 # Admin authority is the metadata_admin.admin boolean marker, NOT a UUID allowlist.
 # We seed both admin identities via the Kratos admin API with the admin marker set
@@ -197,7 +198,7 @@ echo "=== seed phase (admin identities with metadata_admin.admin=true marker) ==
 
 # Helper: seed an identity via Kratos admin API with the admin marker.
 # Usage: seed_admin_identity <email> <username> <display_name> <groups_json> <password>
-# Sets metadata_admin.admin=true (the ADR 0008 marker) in addition to groups.
+# Sets metadata_admin.admin=true (the admin-authority marker) in addition to groups.
 seed_admin_identity() {
     local email="$1" username="$2" display_name="$3" groups_json="$4" password="$5"
     local result
@@ -224,7 +225,7 @@ RECOVERY_ADMIN_PASSWORD="${RECOVERY_ADMIN_PASSWORD:-othala-testpass-2026}"
 # and playwright/tests/t-access-model.spec.ts T4 asserts it.
 #
 # This is ORTHOGONAL to metadata_admin.admin=true set below: that marker is
-# PORTAL admin authority (ADR 0008, /admin), not app role. A group never grants
+# PORTAL admin authority (/admin), not app role. A group never grants
 # it and it never grants a group.
 echo "  seeding primary admin: $ADMIN_EMAIL (admin marker + groups) ..."
 ADMIN_ID=$(seed_admin_identity \
@@ -235,7 +236,7 @@ if [[ -z "$ADMIN_ID" || "$ADMIN_ID" == ERR:* || "$ADMIN_ID" == EXC:* ]]; then
 fi
 echo "  ✓ admin seeded: id=$ADMIN_ID (metadata_admin.admin=true)"
 
-# The recovery-admin exercises the recovery-gate (ADR 0008), which reads the
+# The recovery-admin exercises the recovery-gate, which reads the
 # metadata_admin.admin marker only. It needs no app role, so it holds just
 # `grafana-access` — one group, entry, nothing derived.
 echo "  seeding recovery-admin: $RECOVERY_ADMIN_EMAIL (admin marker + groups) ..."
@@ -247,7 +248,7 @@ if [[ -z "$RECOVERY_ADMIN_ID" || "$RECOVERY_ADMIN_ID" == ERR:* || "$RECOVERY_ADM
 fi
 echo "  ✓ recovery-admin seeded: id=$RECOVERY_ADMIN_ID (metadata_admin.admin=true)"
 # No env rewrite or portal recreate needed — the portal reads the admin
-# marker from the Kratos admin API at request time (ADR 0008).
+# marker from the Kratos admin API at request time.
 
 # Step 5: smoke (the API-level suite + browser-free OIDC dance, sections A-G)
 echo ""

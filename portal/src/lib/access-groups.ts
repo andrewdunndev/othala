@@ -1,17 +1,16 @@
-// Access-group parsing for unified manifests (access-model — group binding).
+// Access-group parsing for unified manifests — the group binding.
 //
 // The manifest layer reads `presentation.access:` (adopter-named groups,
 // arbitrary charset, no `access-` prefix required) into a normalized
 // `accessGroups: string[]` field on both the OIDC `ClientManifest` and the
-// dashboard `AppTile`. This field is the LOAD-BEARING access binding
-// (docs/access-model.md): the OIDC gate (gate.ts), effective-access view
+// dashboard `AppTile`. This field is the LOAD-BEARING access binding: the
+// OIDC gate (gate.ts), effective-access view
 // (access.ts), tile visibility (tiles.ts), and the group registry
 // (group-registry.ts) all key off it. The `access-` prefix is not a runtime
 // type discriminator — a group's type comes from its binding, derived by
-// group-registry.ts. (The forward-auth GROUP_RE prefix check is the one
-// remaining prefix consumer.)
+// group-registry.ts.
 //
-// Parse precedence (docs/access-model.md §11):
+// Parse precedence:
 //   1. presentation.access non-empty list → use it.
 //   2. else presentation.access_group non-empty → [access_group] (compat shim,
 //      NO prefix validation applied here).
@@ -21,15 +20,37 @@
 //      verbatim, and a bare manifest with `[]` + no skip_access_check is a
 //      load-time BLOCK in validateClients).
 //
-// Validation here is non-throwing: names that miss the safe charset are
-// skipped, not rejected. Hard validation is the lint in manifest-lint.ts (§11).
+// Validation here is non-throwing: names that miss the canonical form are
+// skipped, not rejected. Hard validation is the lint in manifest-lint.ts.
 
-/** Safe group-name charset (docs/access-model.md §5): no prefix required. */
-export const ACCESS_GROUP_NAME_RE = /^[a-z0-9][a-z0-9-]*$/;
+/**
+ * THE canonical group-name policy. Not an input guard on one parameter: this
+ * is the one form a group name may take anywhere in the portal, so that the
+ * group comparisons scattered across src/ can compare raw strings and agree by
+ * construction instead of by staying in sync. No prefix is required.
+ *
+ * The boundaries that enforce it:
+ *   - portal/src/lib/metadata-admin.ts `validateGroups` — the identity write
+ *     path (createIdentity / updateIdentity in portal/src/lib/admin-api.ts).
+ *   - `parseAccessGroups` below — manifest load (`presentation.access`,
+ *     `presentation.access_group`).
+ *   - portal/src/lib/manifest-lint.ts — WARNs on an access-binding name or a
+ *     `group_role_map` key that misses it.
+ *   - portal/src/pages/api/forward-auth.ts — the operator-set `?group=` param.
+ *   - portal/src/lib/gate.ts `nonCanonicalGroups` — the READ boundary we do
+ *     NOT own: a group stored straight through the Kratos admin API.
+ *
+ * kratos/identity.schema.json is NOT an enforcer of it — Kratos validates
+ * `traits` only, so that file's `metadata_admin.groups` pattern is
+ * documentation. It is nevertheless kept byte-identical to this one: when the
+ * two diverged, the schema advertised names (leading digit, dot) that gate.ts
+ * then refused on read, which is a lockout with no error message anywhere.
+ */
+export const GROUP_RE = /^[a-z][a-z0-9-]*$/;
 
-/** True when `name` is a non-empty string within the safe access-group charset. */
+/** True when `name` is a non-empty string matching the canonical policy. */
 export function isValidAccessGroupName(name: unknown): name is string {
-  return typeof name === 'string' && ACCESS_GROUP_NAME_RE.test(name);
+  return typeof name === 'string' && GROUP_RE.test(name);
 }
 
 /**

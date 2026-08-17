@@ -23,7 +23,7 @@ if (!process.env.CSRF_SECRET) {
 // The default subject: an ordinary grafana member. Under the converged access
 // model that means holding `grafana-access` and NOTHING else — entry comes from
 // the `<svc>-access` group for everyone, admins included, and `grafana-admin`
-// is a ROLE-only group that grants no entry (docs/access-model.md §6, §10).
+// is a ROLE-only group that grants no entry.
 // grafana.yaml maps `grafana-access` → viewer, so this identity is a viewer.
 function activeMember(overrides = {}) {
   return {
@@ -53,11 +53,11 @@ function stubOAuth2(over = {}) {
       ?? (async () => ({ challenge: 'cc', skip: true, subject: 'id-1', client: { client_id: 'grafana' }, requested_scope: ['email', 'profile'], requested_access_token_audience: [] })),
     getOAuth2LogoutRequest: over.getOAuth2LogoutRequest
       ?? (async () => ({ challenge: 'gc', subject: 'id-1', client: { client_id: 'grafana' } })),
-    acceptOAuth2LoginRequest: async (p) => { calls.acceptLogin++; calls.acceptLoginBody = p.acceptOAuth2LoginRequest; return { redirect_to: 'https://dag.othala.test/after-login' }; },
-    rejectOAuth2LoginRequest: async (p) => { calls.rejectLogin++; calls.rejectLoginReason = p.rejectOAuth2Request?.error_description; return { redirect_to: 'https://dag.othala.test/login-rejected' }; },
-    acceptOAuth2ConsentRequest: async (p) => { calls.acceptConsent++; calls.acceptConsentBody = p.acceptOAuth2ConsentRequest; return { redirect_to: 'https://dag.othala.test/after-consent' }; },
-    rejectOAuth2ConsentRequest: async (p) => { calls.rejectConsent++; calls.rejectConsentReason = p.rejectOAuth2Request?.error_description; return { redirect_to: 'https://dag.othala.test/consent-rejected' }; },
-    acceptOAuth2LogoutRequest: async () => { calls.acceptLogout++; return { redirect_to: 'https://dag.othala.test/after-logout' }; },
+    acceptOAuth2LoginRequest: async (p) => { calls.acceptLogin++; calls.acceptLoginBody = p.acceptOAuth2LoginRequest; return { redirect_to: 'https://sso.othala.test/after-login' }; },
+    rejectOAuth2LoginRequest: async (p) => { calls.rejectLogin++; calls.rejectLoginReason = p.rejectOAuth2Request?.error_description; return { redirect_to: 'https://sso.othala.test/login-rejected' }; },
+    acceptOAuth2ConsentRequest: async (p) => { calls.acceptConsent++; calls.acceptConsentBody = p.acceptOAuth2ConsentRequest; return { redirect_to: 'https://sso.othala.test/after-consent' }; },
+    rejectOAuth2ConsentRequest: async (p) => { calls.rejectConsent++; calls.rejectConsentReason = p.rejectOAuth2Request?.error_description; return { redirect_to: 'https://sso.othala.test/consent-rejected' }; },
+    acceptOAuth2LogoutRequest: async () => { calls.acceptLogout++; return { redirect_to: 'https://sso.othala.test/after-logout' }; },
   };
   return { api, calls };
 }
@@ -97,12 +97,12 @@ test('login accepts an active member (skip path)', async () => {
     oauth2: api,
     getIdentity: async () => activeMember(),
     getSession: defaultSession(),
-    // access-model Phase 2: the gate keys off the manifest's accessGroups
-    // binding (grafana.yaml → grafana-access), not a derived name.
+    // The gate keys off the manifest's accessGroups binding
+    // (grafana.yaml → grafana-access), not a derived name.
     manifest: () => loadManifest('grafana'),
   });
   assert.equal(res.status, 302);
-  assert.equal(res.headers.get('location'), 'https://dag.othala.test/after-login');
+  assert.equal(res.headers.get('location'), 'https://sso.othala.test/after-login');
   assert.equal(calls.acceptLogin, 1);
   assert.equal(calls.rejectLogin, 0);
 });
@@ -120,7 +120,7 @@ test('login REJECTS when missing the access group — opaque error_description, 
       manifest: () => loadManifest('grafana'),
     });
     assert.equal(res.status, 302);
-    assert.equal(res.headers.get('location'), 'https://dag.othala.test/login-rejected');
+    assert.equal(res.headers.get('location'), 'https://sso.othala.test/login-rejected');
     assert.equal(calls.acceptLogin, 0);
     // Client-facing error_description must be opaque — NOT the raw group name.
     assert.equal(calls.rejectLoginReason, 'access_denied', 'error_description must be opaque');
@@ -186,7 +186,7 @@ test('login bounces to RELATIVE return_to when not authenticated (skip=false, no
   assert.equal(res.status, 302);
   const loc = res.headers.get('location');
   // The return_to query param must be a relative path.
-  const u = new URL(loc, 'https://dag.othala.test');
+  const u = new URL(loc, 'https://sso.othala.test');
   assert.equal(u.pathname, '/auth/login');
   assert.equal(u.searchParams.get('return_to'), '/oauth2/login?login_challenge=lc');
 });
@@ -206,7 +206,7 @@ test('consent accepts an active member and grants scope + injects id_token', asy
     manifest: () => loadManifest('grafana'),
   });
   assert.equal(res.status, 302);
-  assert.equal(res.headers.get('location'), 'https://dag.othala.test/after-consent');
+  assert.equal(res.headers.get('location'), 'https://sso.othala.test/after-consent');
   assert.deepEqual(calls.acceptConsentBody.grant_scope, ['email', 'profile']);
   assert.equal(calls.acceptConsentBody.session.id_token.email, 'a@othala.test');
   // Default stub requested_scope is ['email','profile'] — no 'groups' scope, so groups
@@ -288,7 +288,7 @@ test('logout accepts and redirects', async () => {
   const { api, calls } = stubOAuth2();
   const res = await handleLogout(new Request('https://x/oauth2/logout?logout_challenge=gc'), { oauth2: api });
   assert.equal(res.status, 302);
-  assert.equal(res.headers.get('location'), 'https://dag.othala.test/after-logout');
+  assert.equal(res.headers.get('location'), 'https://sso.othala.test/after-logout');
   assert.equal(calls.acceptLogout, 1);
 });
 
@@ -327,7 +327,7 @@ test('T1: consent skip=true auto-accepts (REGRESSION GUARD)', async () => {
   );
   // Must accept (redirect_to = after-consent URL), NOT bounce to /auth/consent.
   assert.equal(res.status, 302);
-  assert.equal(res.headers.get('location'), 'https://dag.othala.test/after-consent');
+  assert.equal(res.headers.get('location'), 'https://sso.othala.test/after-consent');
   assert.equal(calls.acceptConsent, 1, 'acceptConsent must be called once');
   assert.equal(calls.rejectConsent, 0, 'rejectConsent must NOT be called');
   // Regression: must NOT redirect to /auth/consent.
@@ -426,7 +426,7 @@ test('T2b: consent skip=false but manifest skip_consent:true AUTO-ACCEPTS', asyn
     },
   );
   assert.equal(res.status, 302);
-  assert.equal(res.headers.get('location'), 'https://dag.othala.test/after-consent');
+  assert.equal(res.headers.get('location'), 'https://sso.othala.test/after-consent');
   assert.equal(calls.acceptConsent, 1, 'manifest skip_consent:true must auto-accept');
   assert.equal(calls.rejectConsent, 0, 'must not reject');
   assert.ok(
@@ -465,7 +465,7 @@ test('T3: POST Allow accepts with remember=true, 30-day remember_for, claims', a
     manifest: () => loadManifest('grafana'),
   });
   assert.equal(res.status, 302);
-  assert.equal(res.headers.get('location'), 'https://dag.othala.test/after-consent');
+  assert.equal(res.headers.get('location'), 'https://sso.othala.test/after-consent');
   assert.equal(calls.acceptConsent, 1, 'acceptConsent must be called once');
   assert.equal(calls.acceptConsentBody.remember, true, 'remember must be true');
   assert.equal(calls.acceptConsentBody.remember_for, 2_592_000, 'remember_for must be 30 days (2592000s)');
@@ -502,7 +502,7 @@ test('T4: POST Deny rejects and redirects', async () => {
     }),
   });
   assert.equal(res.status, 302);
-  assert.equal(res.headers.get('location'), 'https://dag.othala.test/consent-rejected');
+  assert.equal(res.headers.get('location'), 'https://sso.othala.test/consent-rejected');
   assert.equal(calls.rejectConsent, 1, 'rejectConsent must be called once');
   assert.equal(calls.acceptConsent, 0, 'acceptConsent must NOT be called on deny');
 });
@@ -642,7 +642,7 @@ const audiobookshelfManifest = loadManifest('audiobookshelf');
 // already holds for entry (`audiobookshelf-access` → user in group_role_map),
 // NOT from a cohort. The old form of this test asserted that the `family`
 // cohort granted the role; cohort groups are gone entirely, and a cohort
-// granting a role is exactly what the model retired (docs/access-model.md §6).
+// granting a role is exactly what the converged model retired.
 //
 // The invariant still under test is unchanged and is the reason the case
 // exists: claim_emit.groups = ['user'] is UNIONed with the identity's REAL
@@ -686,7 +686,7 @@ test('A4a: audiobookshelf access-group holder gets user role, groups unioned', a
 // holds BOTH `grafana-access` (entry, for everyone) and `grafana-admin` (role
 // only). The old form of this test gave the identity a bare `admin` cohort
 // group and asserted that it granted the admin role estate-wide; that group and
-// that derivation are both gone (docs/access-model.md §6, ADR 09).
+// that derivation are both gone.
 //
 // The NEW invariant this pins is highest-rank-wins in lookupRole
 // (portal/src/lib/claims.ts step 2): the identity's group SET maps to TWO
@@ -774,8 +774,8 @@ test('A4c: grafana override (roles.grafana=admin) beats group_role_map viewer', 
 // A4e: a manifest that binds access but declares NO roles -> base claims only
 // (no deepMerge, groups emitted by default).
 //
-// access-model Phase 2: a TRULY missing manifest is now fail-closed (no binding
-// = no access — there is no implicit prefix-derived group anymore), so this
+// A TRULY missing manifest is fail-closed (no binding = no access — there is no
+// implicit prefix-derived group), so this
 // test supplies a minimal manifest that binds the user's access group but maps
 // no roles. The claim-composition behaviour under test (base claims, groups
 // emitted, zero role injection) is unchanged.
@@ -918,7 +918,7 @@ test('C: skip_access_check still enforces state===active', async () => {
 // ── Session-presence guard on the POST path ───────────────────────────────────
 
 // T7a: POST rejects when there is no active session (getSession returns null).
-// Covers the no-active-session branch in handleConsentPost (~lines 390-405).
+// Covers handleConsentPost's 'no active session' rejection branch.
 test('T7a: POST rejects when there is no active session (getSession returns null)', async () => {
   _resetForTests();
   const { api, calls } = stubOAuth2({
@@ -947,7 +947,7 @@ test('T7a: POST rejects when there is no active session (getSession returns null
 });
 
 // T7b: POST Allow re-gates and rejects when the identity is inactive (access-denied
-// on the allow path re-gate). Covers the allow-path gate at ~lines 454-472.
+// on the allow path re-gate). Covers handleConsentPost's allow-path gate call.
 test('T7b: POST Allow re-gates and rejects an inactive identity', async () => {
   _resetForTests();
   const csrfToken = signToken('id-1', 'consent');
@@ -1059,7 +1059,7 @@ test('FIX-A: login skip=true with NO live Kratos session redirects to login UI',
   assert.equal(res.status, 302, 'must redirect');
   assert.equal(calls.acceptLogin, 0, 'acceptLogin must NOT be called when no session');
   const loc = res.headers.get('location');
-  const u = new URL(loc, 'https://dag.othala.test');
+  const u = new URL(loc, 'https://sso.othala.test');
   assert.equal(u.pathname, '/auth/login', 'must redirect to login UI');
   assert.equal(u.searchParams.get('return_to'), '/oauth2/login?login_challenge=lc',
     'return_to must be the relative login challenge path');
@@ -1083,7 +1083,7 @@ test('FIX-A: login skip=true with session whose identity.id !== login.subject re
   assert.equal(res.status, 302, 'must redirect');
   assert.equal(calls.acceptLogin, 0, 'acceptLogin must NOT be called on subject mismatch');
   const loc = res.headers.get('location');
-  const u = new URL(loc, 'https://dag.othala.test');
+  const u = new URL(loc, 'https://sso.othala.test');
   assert.equal(u.pathname, '/auth/login', 'must redirect to login UI on subject mismatch');
 });
 
@@ -1105,7 +1105,7 @@ test('FIX-A: login skip=true with matching live active session accepts', async (
   });
   assert.equal(res.status, 302, 'must redirect');
   assert.equal(calls.acceptLogin, 1, 'acceptLogin must be called when session matches');
-  assert.equal(res.headers.get('location'), 'https://dag.othala.test/after-login');
+  assert.equal(res.headers.get('location'), 'https://sso.othala.test/after-login');
 });
 
 test('FIX-A: login skip=true with Kratos upstream error returns 502', async () => {
@@ -1184,7 +1184,7 @@ test('FIX-F: logout subject mismatch (live session belongs to different user) re
   const { api, calls } = stubOAuth2({
     getOAuth2LogoutRequest: async () => ({ challenge: 'gc', subject: 'id-1' }),
   });
-  process.env.OTHALA_PUBLIC_URL = 'https://dag.othala.test';
+  process.env.OTHALA_PUBLIC_URL = 'https://sso.othala.test';
   try {
     const res = await handleLogout(
       new Request('https://x/oauth2/logout?logout_challenge=gc', {

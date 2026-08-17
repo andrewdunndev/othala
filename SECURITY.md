@@ -1,135 +1,153 @@
-# Security Policy
+# Security
 
-Othala is an authentication substrate — it issues the tokens and gates the
-access that everything downstream of it trusts. A flaw here is a flaw in the
-front door. Reports are taken seriously and triaged ahead of feature work.
+Othala issues the tokens and gates the access that everything downstream of it
+trusts. A flaw here is a flaw in the front door. This document states where the
+trust boundary sits, what is defended and by which file, and what is knowingly
+not defended.
 
 ## Reporting a vulnerability
 
-**Do not open a public issue or merge request for a suspected vulnerability.**
-A public report tells everyone watching the repository how to exploit the
-problem before there is a fix.
+Do not open a public issue or merge request. Open a **confidential issue** at
+<https://gitlab.com/dunn.dev/othala/-/issues>, ticking "This issue is
+confidential" before you submit; those are visible only to project members.
+Include the affected component and the commit or tag, what an attacker gains,
+reproduction steps, and any deployment specifics that matter (edge proxy, OIDC
+client config, manifest set). A flaw in upstream Ory Kratos or Hydra rather than
+in this glue goes to Ory (<https://www.ory.sh/docs/ecosystem/security>); a note
+here is still welcome so the affected version can be pinned.
 
-Report privately through one of these channels:
+Expect acknowledgement within 3 business days and an assessment within 10. One
+maintainer, no bounty, coordinated disclosure: fixed privately, released, then
+published, with credit unless you decline it. Fixes land on the newest tag; older
+tags are not backported.
 
-- **Email** — `andrew@dunn.dev`. Use the subject prefix `[othala-security]`.
-  If you want to encrypt the report, say so in a first contact email and a key
-  will be exchanged.
-- **GitLab confidential issue** — open an issue at
-  <https://gitlab.com/dunn.dev/othala/-/issues> and tick **"This issue is
-  confidential"** before submitting. Confidential issues are visible only to
-  project members.
+## The trust boundary
 
-Please include enough to reproduce:
+**Trusted:** the host, the pod network, Postgres, the operator's shell, and
+anything that can reach the Kratos or Hydra admin APIs. Lose one of those and
+everything is lost; no control here is written to survive it.
 
-- the affected component (`portal/`, the `kratos/` or `hydra/` config, or the
-  `e2e/` harness) and version or commit,
-- a description of the impact (what an attacker gains — e.g. access-gate
-  bypass, token-claim injection, admin-port exposure),
-- concrete reproduction steps or a proof-of-concept, and
-- any deployment specifics that matter (reverse proxy, OIDC client config,
-  manifest set).
+**Untrusted:** every HTTP request, inbound header, cookie, manifest field, and
+value a downstream app hands back.
 
-If a finding is in **upstream Ory Kratos or Hydra** rather than in Othala's own
-glue, report it to the Ory project (<https://www.ory.sh/docs/ecosystem/security>)
-— but a heads-up here is welcome so the affected version can be pinned or
-mitigated downstream.
+Two facts about the boundary explain the shape of every control below.
 
-## What to expect
+- **The Ory admin APIs authenticate nobody.** They are protected by bind address
+  (`KRATOS_ADMIN_BIND_HOST` in `kratos/kratos.yml`, `HYDRA_ADMIN_BIND_HOST` in
+  `hydra/hydra.yml`) and by network reachability, and by nothing else. Exposing
+  either port is total compromise, not a degraded posture.
+- **`metadata_admin` is writable only through the Kratos admin API.** Every
+  authority decision reads from it, which is why it is always fetched fresh from
+  the admin API and never taken from a session payload (`/sessions/whoami` omits
+  it).
 
-This is a small, single-maintainer open-source project, not a vendor with a
-24/7 security desk. Best-effort timelines:
+## Controls
 
-- **Acknowledgement** of your report within **3 business days**.
-- **Initial assessment** (severity, whether it reproduces, intended fix path)
-  within **10 business days**.
-- **Coordinated disclosure**: a fix is prepared privately, released, and only
-  then is the issue made public, crediting you unless you ask otherwise.
-  Please hold public disclosure until a fixed release is available, or for
-  90 days, whichever comes first.
+Each names its enforcer and the test that fails if the enforcer stops working.
 
-There is no paid bug-bounty program. Credit in the release notes and the fixing
-commit is offered for valid reports.
+- **Entry gate, fail-closed.** `enforceAccessGate` / `enforceGroupGate`,
+  `portal/src/lib/gate.ts`: state exactly `active`, plus membership in at least
+  one group the app's own manifest binds (OR-semantics). No manifest, an empty
+  binding, or a failed lookup denies; a group's name, a role mapping and the
+  admin marker admit nobody. Tests: `portal/scripts/gate-property.test.mjs`,
+  `e2e/playwright/tests/t-access-model.spec.ts`.
+- **Read-boundary refusal.** `refuseNonCanonical`, `portal/src/lib/gate.ts`:
+  denies every app, loudly, when a stored group name could not have been written
+  by any path this codebase owns (`GROUP_RE`, `portal/src/lib/access-groups.ts`);
+  coercing or ignoring it would admit an identity no owned boundary created.
+  Test: `portal/scripts/noncanonical-repair.test.mjs`.
+- **Portal admin authority.** `requireAdminSession`, `portal/src/lib/admin.ts`:
+  active session, assurance level exactly `aal2`, and the `metadata_admin.admin`
+  marker read fresh from the admin API (`isAdminMarker`,
+  `portal/src/lib/admin-auth.ts`). No group grants it. Tests:
+  `portal/src/lib/admin-auth.test.ts`, `e2e/playwright/tests/f-aal2-bypass.spec.ts`.
+- **Loopback admin listener.** `portal/src/server/listen.mjs`: privileged routes
+  on a separate loopback listener whose mux is disjoint from the public one,
+  guarded by two purpose-named bearer secrets compared with `bearerMatches`
+  (constant-time, fail-closed on an unset secret). Test:
+  `portal/scripts/public-mux-disjoint.test.mjs`.
+- **Recovery is not a path to admin.** The recovery `after` hook in
+  `kratos/kratos.yml` posts `kratos/hooks/recovery-gate.jsonnet` to that loopback
+  gate before the privileged settings session issues; `shouldRefuseRecovery`
+  (`portal/src/lib/access.ts`) refuses an admin-marked target, so a compromised
+  mailbox does not become admin authority. Tests:
+  `portal/scripts/recovery-gate.fuzz.test.mjs`, `e2e/playwright/tests/j-recovery-flow.spec.ts`.
+- **Claims decide role, never entry.** `composeIDTokenClaims` / `lookupRole`,
+  `portal/src/lib/claims.ts`: a per-app role, every claim gated on the granted
+  scope, and `deepMergeClaims` skipping `__proto__`, `constructor`, `prototype`.
+  Tests: `portal/scripts/claims-inject.fuzz.test.mjs`, `e2e/playwright/tests/b-oidc-claims.spec.ts`.
+- **Manifest validation, fail-closed.** `validateClients` and
+  `audienceMatchesRedirect`, `portal/src/lib/manifests.ts`, reject a duplicate
+  `client_id`, an empty audience, an audience with no exact-origin redirect
+  match, an undeclared role in `group_role_map`, an empty access binding;
+  `portal/src/lib/manifest-store.ts` then serves the last known good set, or the
+  empty set on a cold start, which denies everywhere. Tests:
+  `portal/scripts/manifest-validate.fuzz.test.mjs`, `portal/src/lib/manifest-store.test.ts`.
+- **forward_auth never trusts a header.** `portal/src/pages/api/forward-auth.ts`
+  takes the required group from an operator-set query parameter and the user's
+  groups from the admin API; no inbound identity header is read, and `HEAD`
+  reuses the `GET` decision verbatim. It separates "cannot establish the facts"
+  (503) from "not permitted" (403); both deny, and every non-2xx does, so what
+  the split buys is that an outage never reads as a refusal on the merits, which
+  is what lets an edge redirect on 401 without looping an outage through login.
+  Test:
+  `portal/scripts/forward-auth.test.mjs`.
+- **Browser hardening.** `applySecurityHeaders`, `portal/src/middleware.ts`:
+  frame-ancestors and `X-Frame-Options`, `nosniff`, `Referrer-Policy`,
+  `Cross-Origin-Opener-Policy`, HSTS, and a `form-action` bounded to the
+  configured apex. CSRF on state-changing POSTs is Astro's `security.checkOrigin`
+  (`portal/astro.config.mjs`) plus `portal/src/lib/csrf.ts`. Tests:
+  `e2e/playwright/tests/m-security-headers.spec.ts`,
+  `e2e/playwright/tests/e-consent-csrf-tamper.spec.ts`.
+- **Abuse resistance ships with the install.** `caddy/Caddyfile` rate-limits the
+  Kratos self-service paths keyed on the socket peer and overwrites
+  `X-Forwarded-For` at every `reverse_proxy`, so a client cannot mint a fresh
+  bucket per request; `kratos/kratos.yml` bounds password-hash work
+  (`hashers.argon2`) and code guessing (`max_submissions`, `lifespan`). Test:
+  `e2e/playwright/tests/n-rate-limits.spec.ts`.
+- **Credential and session hygiene.** Self-registration is disabled in
+  `kratos/kratos.yml`, so enrolment is admin-initiated; breach checking and a
+  minimum length gate passwords; every credential change fires
+  `revoke_active_sessions`; force-logout is `revokeSubject`
+  (`portal/src/lib/revoke.ts`). Test: `e2e/playwright/tests/p-eviction.spec.ts`.
+- **Telemetry carries no secrets.** `portal/src/server/otel.mjs` scrubs session
+  cookies, CSRF tokens, bearer headers, challenge ids and one-time codes out of
+  spans before export. Test: `portal/scripts/otel-redaction.test.mjs`.
 
-## Supported versions
+## Accepted risks
 
-Fixes land on `main` and ship in a new tagged release. Only the **latest
-released minor** receives security fixes; older tags are not backported. Run a
-current release.
+Live properties of the deployed shape, stated rather than omitted.
 
-| Version        | Supported            |
-| -------------- | -------------------- |
-| latest `0.x`   | ✅ security fixes     |
-| older `0.x`    | ❌ upgrade to latest  |
+- **Plaintext inside the trusted host.** Both Postgres DSNs set
+  `sslmode=disable` and both tracing exporters set `insecure: true`
+  (`kratos/kratos.yml`, `hydra/hydra.yml`). Each assumes the hop stays inside one
+  pod on one host; on a segmented network, fix them before deploying.
+- **The CSP carries no `script-src`** (`portal/src/middleware.ts`). A strict one
+  breaks the WebAuthn ceremony's injected inline scripts and the portal's inline
+  theme script, so an XSS in the portal is not contained by CSP. See
+  `site/src/content/docs/guides/hardening.md`.
+- **Rate limiting depends on a third-party Caddy module.** A binary built without
+  it refuses to load `caddy/Caddyfile` at all, so the failure is a refusal to
+  start rather than a silently unlimited edge. Confirm it is compiled in.
+- **forward_auth is satisfied by a first-factor session.** It checks state and
+  group membership, not assurance level. An app needing a second factor must
+  enforce it itself or sit behind an OIDC client that does.
+- **Sessions are long-lived and `whoami` answers at the first assurance level**
+  (`kratos/kratos.yml`, `session`). A stolen cookie stays valuable for the
+  configured lifespan; revocation, not expiry, is what ends it.
+- **Role rank is a convention no code enforces.** `lookupRole`
+  (`portal/src/lib/claims.ts`) reads declaration order in `consent.roles` as
+  descending privilege, so a manifest listing roles ascending silently downgrades
+  its users. The direction is fail-safe; the silence is not.
+- **One maintainer.** The times above are best effort; there is no on-call.
 
-Othala is pre-1.0: minor versions can carry behavioral changes alongside
-security fixes. The deploy shape and the upgrade-durability contract are
-documented in
-[`golden-path.md`](site/src/content/docs/guides/golden-path.md); the upgrade
-path is to pull the new image tag and re-run the `e2e/` harness against it.
+## Out of scope
 
-## Scope and posture
-
-What this project treats as in-scope security surface:
-
-- the **fail-closed access gate** (`portal/src/lib/gate.ts`, `access.ts`) —
-  entry requires an active Kratos identity **and** membership in a group the
-  app's own manifest binds under `presentation.access:`
-  (`portal/src/lib/access-groups.ts` parses that binding, `gate.ts` checks it
-  with OR-semantics). Nothing else admits: not a group's name, not a role
-  mapping, not the admin marker. Any path that grants entry without both
-  conditions is a vulnerability,
-- the **`metadata_admin.admin` marker** as the sole *portal*-admin authority
-  (admin-API-only-writable; ADR 08) — it governs `/admin/*` in this app and
-  nothing else; it is not an entry path to any downstream app,
-- the **loopback-only admin listener** (`:4431`) — privileged routes
-  (`/admin/*`) must never resolve on the public mux (`:8080`),
-- the **id_token claims builder** (`claims.ts`) — per-app role/claim mapping
-  must not leak claims or roles across apps, and `lookupRole` decides a
-  **role only**: a `group_role_map` entry must never become an entry path,
-- the **manifest loader/validator** (`manifests.ts`, `manifest-store.ts`) — it
-  fails closed on a bad manifest set (duplicate `client_id`, audience/redirect
-  mismatch, undeclared role, empty access binding) and serves the last known
-  good set rather than a partially-validated one,
-- **secret handling** — the project holds no OAuth signing key at rest
-  (back-channel logout is Hydra-signed); report any path that persists or
-  exposes a secret it shouldn't,
-- **application-layer abuse resistance** — the bundled reverse-proxy
-  `rate_limit` on the self-service flows (email-code / recovery / verification /
-  password) and a bound on concurrent password-hash work ship **with the
-  install**, not as an edge add-on. A path that lets unauthenticated volume
-  flood a family inbox, brute-force a credential, or exhaust host memory via
-  argon2 is in scope. A CDN or edge WAF is optional defence-in-depth here,
-  never the load-bearing control — this install is built to stand without
-  one,
-- **browser hardening of the auth UI** — anti-clickjacking (`frame-ancestors` /
-  `X-Frame-Options`) on the login and consent pages, a Content-Security-Policy,
-  `nosniff`, a tight `Referrer-Policy`, and self-hosted assets (no third-party
-  CDN that could leak `flow` / `consent_challenge` identifiers via `Referer`);
-  a missing, weak, or bypassable header here is in scope.
-
-Out of scope:
-
-- the **LDAP bridge** (`gitlab.com/dunn.dev/kratos-ldap`) — a separate repo,
-  shelved 2026-06-26 and not deployed here. It is kept public as an
-  **unmaintained reference**: read it, copy it, but it is not maintained and
-  findings against it are not triaged on the timelines above,
-- vulnerabilities in third-party dependencies with no Othala-specific exploit
-  path (report those upstream; Renovate keeps deps current here),
-- findings that require an already-compromised host, the operator's secrets, or
-  physical/console access (the recovery break-glass is console-only **by
-  design** — see the ADRs (`docs/adr/`) for locked decisions),
-- the `e2e/` test domain (`othala.test`, an RFC 6761 reserved name) and its
-  throwaway per-run secrets,
-- volumetric / network-layer (L3–L4) DDoS that requires upstream capacity to
-  absorb — that remains a host/edge concern. **Application-layer** abuse
-  (email-code/recovery flooding, credential brute-force, password-hash CPU/memory
-  exhaustion) is **in scope** and ships mitigated by the bundled Caddy `rate_limit`
-  plus the Ory flow config; see
-  [`hardening.md`](site/src/content/docs/guides/hardening.md). It is not
-  delegated to a CDN.
-
-Adversarial security review and its remediation are tracked in
-the project's adversarial security reviews; the fuzz suites
-(`portal/scripts/*.fuzz.test.mjs`) and the `e2e/` harness are part of the
-standing guard against regressions.
+- Anything that first requires a compromised host, the operator's shell, or
+  reachability to the Ory admin APIs. Break-glass recovery is console-only.
+- Dependency CVEs with no exploit path through this code. Report those upstream.
+- The `e2e/` harness: RFC 6761 reserved domain `othala.test`, throwaway secrets.
+- Volumetric network-layer flooding, which needs upstream capacity to absorb;
+  application-layer abuse is in scope and listed under Controls.
+- `gitlab.com/dunn.dev/kratos-ldap`: a separate, unmaintained reference, and not
+  deployed here.

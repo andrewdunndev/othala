@@ -2,11 +2,10 @@
 //
 // Run with: tsx --test scripts/gate.test.mjs
 //
-// Imports the canonical implementation directly. access-model Phase 2: the gate
-// keys off the manifest's bound access groups (manifest.accessGroups,
-// OR-semantics) AND state==active, both fail-closed — NOT a derived
-// `access-<clientId>` name (docs/access-model.md §10). The exhaustive
-// fail-closed property lives in portal/scripts/gate-property.test.mjs (§16).
+// Imports the canonical implementation directly. The gate keys off the
+// manifest's bound access groups (manifest.accessGroups, OR-semantics) AND
+// state==active, both fail-closed — NOT a derived `access-<clientId>` name. The
+// exhaustive fail-closed property lives in portal/scripts/gate-property.test.mjs.
 
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -15,6 +14,7 @@ import {
   enforceGroupGate,
   hasGroup,
   identityGroups,
+  nonCanonicalGroups,
 } from '../src/lib/gate.ts';
 
 function identity(overrides = {}) {
@@ -52,7 +52,7 @@ test('identityGroups / hasGroup read metadata_admin.groups defensively', () => {
 });
 
 test('gate ALLOWS an active member of a bound access group', () => {
-  const r = enforceAccessGate(identity(), 'immich', manifest('immich', { accessGroups: ['memories'] }));
+  const r = enforceAccessGate(identity(), 'photos', manifest('photos', { accessGroups: ['memories'] }));
   assert.equal(r.allowed, true);
   assert.equal(r.reason, undefined);
 });
@@ -60,8 +60,8 @@ test('gate ALLOWS an active member of a bound access group', () => {
 test('gate ALLOWS via OR-semantics when the user is in any one bound group', () => {
   const r = enforceAccessGate(
     identity({ metadata_admin: { groups: ['memories'] } }),
-    'immich',
-    manifest('immich', { accessGroups: ['admin-memories', 'memories'] }),
+    'photos',
+    manifest('photos', { accessGroups: ['admin-memories', 'memories'] }),
   );
   assert.equal(r.allowed, true);
 });
@@ -69,41 +69,41 @@ test('gate ALLOWS via OR-semantics when the user is in any one bound group', () 
 test('gate DENIES when the user is in NONE of the bound groups', () => {
   const r = enforceAccessGate(
     identity({ metadata_admin: { groups: ['other'] } }),
-    'immich',
-    manifest('immich', { accessGroups: ['memories'] }),
+    'photos',
+    manifest('photos', { accessGroups: ['memories'] }),
   );
   assert.equal(r.allowed, false);
   assert.match(r.reason, /not in any of the access group/);
 });
 
 test('gate DENIES when the manifest binds no access groups (no implicit access)', () => {
-  const r = enforceAccessGate(identity(), 'immich', manifest('immich', { accessGroups: [] }));
+  const r = enforceAccessGate(identity(), 'photos', manifest('photos', { accessGroups: [] }));
   assert.equal(r.allowed, false);
   assert.match(r.reason, /no access group bound/);
 });
 
 test('gate DENIES when no manifest is supplied (fail-closed)', () => {
-  const r = enforceAccessGate(identity(), 'immich', undefined);
+  const r = enforceAccessGate(identity(), 'photos', undefined);
   assert.equal(r.allowed, false);
 });
 
 test('skip_access_check bypasses the group check for an active identity', () => {
   const r = enforceAccessGate(
     identity({ metadata_admin: { groups: [] } }),
-    'immich',
-    manifest('immich', { accessGroups: [], skipAccessCheck: true }),
+    'photos',
+    manifest('photos', { accessGroups: [], skipAccessCheck: true }),
   );
   assert.equal(r.allowed, true);
 });
 
 test('gate DENIES when state is inactive (deactivated identity)', () => {
-  const r = enforceAccessGate(identity({ state: 'inactive' }), 'immich', manifest('immich', { accessGroups: ['memories'] }));
+  const r = enforceAccessGate(identity({ state: 'inactive' }), 'photos', manifest('photos', { accessGroups: ['memories'] }));
   assert.equal(r.allowed, false);
   assert.equal(r.reason, 'identity not active');
 });
 
 test('gate DENIES when state is missing (fail-closed)', () => {
-  const r = enforceAccessGate(identity({ state: undefined }), 'immich', manifest('immich', { accessGroups: ['memories'] }));
+  const r = enforceAccessGate(identity({ state: undefined }), 'photos', manifest('photos', { accessGroups: ['memories'] }));
   assert.equal(r.allowed, false);
   assert.equal(r.reason, 'identity not active');
 });
@@ -111,15 +111,15 @@ test('gate DENIES when state is missing (fail-closed)', () => {
 test('skip_access_check NEVER bypasses the state check', () => {
   const r = enforceAccessGate(
     identity({ state: 'inactive' }),
-    'immich',
-    manifest('immich', { accessGroups: [], skipAccessCheck: true }),
+    'photos',
+    manifest('photos', { accessGroups: [], skipAccessCheck: true }),
   );
   assert.equal(r.allowed, false);
   assert.equal(r.reason, 'identity not active');
 });
 
 test('gate DENIES on null identity (lookup failure, fail-closed)', () => {
-  const r = enforceAccessGate(null, 'immich', manifest('immich', { accessGroups: ['memories'] }));
+  const r = enforceAccessGate(null, 'photos', manifest('photos', { accessGroups: ['memories'] }));
   assert.equal(r.allowed, false);
   assert.equal(r.reason, 'identity lookup failed');
 });
@@ -127,8 +127,8 @@ test('gate DENIES on null identity (lookup failure, fail-closed)', () => {
 test('state check precedes group check', () => {
   const r = enforceAccessGate(
     identity({ state: 'inactive', metadata_admin: { groups: [] } }),
-    'immich',
-    manifest('immich', { accessGroups: ['memories'] }),
+    'photos',
+    manifest('photos', { accessGroups: ['memories'] }),
   );
   assert.equal(r.reason, 'identity not active');
 });
@@ -140,8 +140,8 @@ test('state check precedes group check', () => {
 // onto a renamed binding. The gate compares bound names against identity groups
 // verbatim (portal/src/lib/gate.ts:
 // `accessGroups.some((g) => userGroups.includes(g))`) and derives nothing from
-// clientId. Retained across the `<svc>-access` rename, which docs/access-model.md
-// §17 step 4 records as cosmetic, forcing no data migration.
+// clientId. Retained across the `<svc>-access` rename: that rename was cosmetic
+// and forced no data migration, so a flat legacy binding must still admit.
 test('regression: access-observe flat binding still admits a member', () => {
   const r = enforceAccessGate(
     identity({ metadata_admin: { groups: ['access-observe'] } }),
@@ -151,9 +151,8 @@ test('regression: access-observe flat binding still admits a member', () => {
   assert.equal(r.allowed, true);
 });
 
-// enforceGroupGate (forward-auth's arbitrary-group path) is UNCHANGED in
-// Phase 2: it still takes a single required group. Phase 3 relaxes the
-// forward-auth GROUP_RE; this gate function itself does not.
+// enforceGroupGate is forward-auth's arbitrary-group path: a single required
+// group, no manifest, no skip_access_check hatch.
 test('enforceGroupGate: active member of the named group → allow', () => {
   const r = enforceGroupGate(identity({ metadata_admin: { groups: ['access-observe'] } }), 'access-observe');
   assert.equal(r.allowed, true);
@@ -164,36 +163,75 @@ test('enforceGroupGate: not a member → deny', () => {
   assert.equal(r.allowed, false);
 });
 
-// ── hasGroup case-normalization ───────────────────────────────────────────────
-// An out-of-band admin-API write with mixed-case group names would silently
-// fail to match a lowercase query without normalization (deny→correct-match fix).
+// ── group names are compared VERBATIM ────────────────────────────────────────
+// hasGroup used to lowercase both sides — the only one of the group
+// comparisons in portal/src that did, and the most permissive of them. There is
+// one canonical form (GROUP_RE, src/lib/access-groups.ts) validated at every
+// boundary this codebase owns, so a case fold could only ever match a name no
+// owned boundary could have written.
 
-test('hasGroup matches when stored group is mixed-case and query is lowercase', () => {
+test('hasGroup does NOT match a mixed-case stored group against a lowercase query', () => {
   const id = identity({ metadata_admin: { groups: ['Access-Grafana'] } });
-  assert.equal(hasGroup(id, 'access-grafana'), true, 'mixed-case stored must match lowercase query');
+  assert.equal(hasGroup(id, 'access-grafana'), false);
 });
 
-test('hasGroup matches when stored group is lowercase and query is mixed-case', () => {
+test('hasGroup does NOT match a lowercase stored group against a mixed-case query', () => {
   const id = identity({ metadata_admin: { groups: ['access-grafana'] } });
-  assert.equal(hasGroup(id, 'Access-Grafana'), true, 'lowercase stored must match mixed-case query');
+  assert.equal(hasGroup(id, 'Access-Grafana'), false);
 });
 
-test('hasGroup matches when both stored and query are UPPERCASE', () => {
+test('hasGroup does NOT match an UPPERCASE stored group against a lowercase query', () => {
   const id = identity({ metadata_admin: { groups: ['ACCESS-GRAFANA'] } });
-  assert.equal(hasGroup(id, 'access-grafana'), true, 'UPPER stored must match lowercase query');
+  assert.equal(hasGroup(id, 'access-grafana'), false);
 });
 
-test('hasGroup still rejects non-members after normalization', () => {
-  const id = identity({ metadata_admin: { groups: ['Access-Grafana'] } });
-  assert.equal(hasGroup(id, 'access-immich'), false, 'different group must still deny');
+test('hasGroup rejects a different group name', () => {
+  const id = identity({ metadata_admin: { groups: ['access-grafana'] } });
+  assert.equal(hasGroup(id, 'access-photos'), false);
 });
 
-test('enforceGroupGate allows when stored group case differs from query (via hasGroup normalization)', () => {
-  // Integration check: the gate uses hasGroup internally; verify normalization
-  // flows through the full enforce path.
+// ── the READ boundary we do not own ──────────────────────────────────────────
+
+test('nonCanonicalGroups reports exactly the stored names that miss GROUP_RE', () => {
+  const id = identity({ metadata_admin: { groups: ['access-observe', 'Access-Grafana', 'has space'] } });
+  assert.deepEqual(nonCanonicalGroups(id), ['Access-Grafana', 'has space']);
+  assert.deepEqual(nonCanonicalGroups(identity()), []);
+  assert.deepEqual(nonCanonicalGroups(null), []);
+});
+
+test('enforceGroupGate DENIES when a stored group is non-canonical, naming it', () => {
   const r = enforceGroupGate(
     identity({ metadata_admin: { groups: ['Access-Observe'] } }),
     'access-observe',
   );
-  assert.equal(r.allowed, true);
+  assert.equal(r.allowed, false);
+  assert.match(r.reason, /non-canonical/);
+  assert.match(r.reason, /Access-Observe/);
+});
+
+test('enforceGroupGate DENIES a group the identity legitimately holds when ANOTHER is non-canonical', () => {
+  const r = enforceGroupGate(
+    identity({ metadata_admin: { groups: ['access-observe', 'Access-Grafana'] } }),
+    'access-observe',
+  );
+  assert.equal(r.allowed, false);
+  assert.match(r.reason, /Access-Grafana/);
+});
+
+test('enforceAccessGate DENIES on a non-canonical stored group, even with skip_access_check', () => {
+  const r = enforceAccessGate(
+    identity({ metadata_admin: { groups: ['Access-Observe'] } }),
+    'photos',
+    manifest('photos', { accessGroups: [], skipAccessCheck: true }),
+  );
+  assert.equal(r.allowed, false);
+  assert.match(r.reason, /non-canonical/);
+});
+
+test('the state check still precedes the non-canonical refusal', () => {
+  const r = enforceGroupGate(
+    identity({ state: 'inactive', metadata_admin: { groups: ['Access-Observe'] } }),
+    'access-observe',
+  );
+  assert.equal(r.reason, 'identity not active');
 });

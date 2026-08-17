@@ -114,7 +114,6 @@ post-restore operator doesn't waste hours hunting for orphan rows.
 
 ## Related
 
-- ADRs (`docs/adr/`): H4 row covers `secrets.system` non-rotatability.
 - `docs/runbooks/secrets-rotation.md`: A2 break-glass rotation.
 - `docs/runbooks/cookie-rotation.md`: separate runbook for the
   rotatable secrets.

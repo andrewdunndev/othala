@@ -3,7 +3,7 @@
 // Kratos admin API wrappers live in `./admin-api.ts`; this file re-exports
 // them so existing call sites that import from `./admin` keep working.
 //
-// AAL2 enforcement happens at the SSR layer (ADR 08): Kratos AAL is
+// AAL2 enforcement happens at the SSR layer: Kratos AAL is
 // per-flow / global, not per-route. requireAdminSession enforces the SP-3
 // trinity: active session + AAL2 + admin marker (metadata_admin.admin===true
 // from the admin API). Caddy already gates "session present" upstream; this
@@ -47,7 +47,7 @@ import type {
  *
  * Decision: this function is NOT wired into the requireAdminSession gate.
  * The explicit `session.authenticator_assurance_level === 'aal2'` check (with a
- * step-up redirect on AAL1) is the correct enforcement mechanism per ADR 08.
+ * step-up redirect on AAL1) is the correct enforcement mechanism.
  * isSessionFresh is retained for future use (e.g. a "sudo timeout" freshness
  * window on destructive actions) and is unit-tested to prove correctness before
  * that use-case is wired in. When it is wired in, it should augment, not replace,
@@ -129,7 +129,7 @@ export {
 export type { CreateIdentityInput, UpdateIdentityInput, IdentityTraits, MetadataAdmin, RecoveryLink };
 
 /**
- * SSR guard for /admin/* routes. Enforces the SP-3 trinity (ADR 08):
+ * SSR guard for /admin/* routes. Enforces the SP-3 trinity:
  *
  *   (a) Active Kratos session with a resolved identity — else redirect to login.
  *   (b) AAL2 server-side — session.authenticator_assurance_level must equal

@@ -20,8 +20,7 @@ exposure, on-disk leak, accidental commit).
 ## What rotation costs
 
 - Every Hydra-stored OAuth2 client secret becomes unreadable. Apps
-  re-receive new client_secret values when the in-app registrar re-runs
-  (`just dag-reload-clients <host>`).
+  re-receive new client_secret values when the in-app registrar re-runs.
 - Outstanding consent challenges (in-flight OAuth2 flows) become
   invalid. Users mid-flow see an error and re-attempt.
 - Hydra's signing keys (id_token JWKS) are unaffected; they live in a
@@ -52,62 +51,45 @@ key).
 3. Stop Hydra on the SSO host:
 
    ```sh
-   ssh <operator>@<sso-host> 'systemctl --user stop dag-hydra.service'
+   ssh <operator>@<sso-host> 'systemctl --user stop <hydra-unit>'
    ```
 
 4. Drop and recreate the Hydra schema (Postgres-side):
 
    ```sh
    ssh <operator>@<sso-host> '
-     systemctl --user stop dag-hydra-migrate.service;
-     podman exec -it dag-postgres psql -U postgres -c \
+     systemctl --user stop <hydra-migrate-unit>;
+     podman exec -it <postgres-container> psql -U postgres -c \
        "DROP DATABASE hydra; CREATE DATABASE hydra OWNER hydra;"
    '
    ```
 
-5. Re-provision podman secrets on the SSO host so the new sops value lands:
+5. Re-provision podman secrets on the SSO host so the new sops value lands,
+   using your deploy tooling.
 
-   ```sh
-   # using your operator tooling, e.g.:
-   make dag-secrets HOST=<sso-host>
-   ```
+6. Re-run the Hydra migration and restart the substrate, again with your
+   deploy tooling. Order matters: Postgres up, then the migration (which
+   populates a fresh schema under the new secret), then Hydra.
 
-6. Re-run the Hydra migration + restart Hydra:
-
-   ```sh
-   make dag-deploy HOST=<sso-host>
-   ```
-
-   The deploy restarts dag-postgres, dag-hydra-migrate (populates
-   fresh schema under the new secret), and dag-hydra.
-
-7. Re-issue every client secret:
-
-   ```sh
-   just dag-reload-clients <sso-host>
-   ```
-
-   This runs the Othala in-app registrar as a `--rm` one-shot, which
-   walks the manifests in `MANIFEST_DIR` and re-creates each Hydra client
-   with its sops-sourced `<SLUG>_CLIENT_SECRET`.
+7. Re-issue every client secret by running the Othala in-app registrar as a
+   `--rm` one-shot. It walks the manifests in `MANIFEST_DIR` and re-creates
+   each Hydra client with its sops-sourced `<SLUG>_CLIENT_SECRET`.
 
 8. Update consumer-service podman secrets if any `<slug>_oidc_client_secret`
    changed, then redeploy each affected consumer (operator-side, e.g.
    `make <consumer>-secrets HOST=<sso-host> && make <consumer>-deploy HOST=<sso-host>`).
 
-9. Verify a known OIDC flow end-to-end before clearing the runbook:
-
-   ```sh
-   make dag-smoke HOST=<sso-host>
-   ```
+9. Verify a known OIDC flow end-to-end, via your deployment's smoke suite,
+   before clearing the runbook.
 
 ## Verification
 
 After rotation:
 
-- `just dag-reload-clients <host>` exited 0 for every manifest in `MANIFEST_DIR`.
+- The registrar one-shot exited 0 for every manifest in `MANIFEST_DIR`.
 - A test login through any OIDC client completes.
-- Hydra logs show no decryption errors: `journalctl --user -u dag-hydra.service -n 50`.
+- Hydra logs show no decryption errors:
+  `journalctl --user -u <hydra-unit> -n 50`.
 - The sops file has only the new `hydra_system_secret` value.
 
 ## What this does NOT cover
@@ -117,7 +99,7 @@ After rotation:
   `/admin/keys/.../rotate` handles that without touching
   `secrets.system`; Hydra signs natively, so the Othala app holds no
   signing key at rest and there is no app-side cache to refresh.
-- Postgres credential rotation (the `dag_db_password` sops entry).
+- Postgres credential rotation (the database-password sops entry).
   Separate procedure: stop the substrate, rotate the password,
   re-deploy. No db rebuild needed since the password is independent
   of at-rest encryption.
@@ -128,4 +110,3 @@ After rotation:
 - `docs/runbooks/cookie-rotation.md`
 - `docs/runbooks/admin-recovery.md`
 - `hydra/hydra.yml` `secrets.system` field
-- the deploy repo's `services/dag/` — deploy plane

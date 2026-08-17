@@ -49,7 +49,7 @@ function stubApi(existing = new Set()) {
 const KEEP_YAML = `
 oidc:
   client_id: keep
-  client_name: Vaultwarden
+  client_name: Vault
   grant_types:
     - authorization_code
     - refresh_token
@@ -86,7 +86,7 @@ test('buildClientBody maps every oidc field exactly as apply-clients.sh did', ()
   const body = buildClientBody(m, 's3cr3t');
 
   assert.equal(body.client_id, 'keep');
-  assert.equal(body.client_name, 'Vaultwarden');
+  assert.equal(body.client_name, 'Vault');
   assert.deepEqual(body.grant_types, ['authorization_code', 'refresh_token']);
   assert.deepEqual(body.response_types, ['code']);
   // scope is the on-the-wire space-separated string, not an array.
@@ -178,20 +178,20 @@ test('buildClientBody omits client_secret when undefined (dry-run posture)', () 
 test('secretEnvVar uppercases the client_id (apply-clients.sh convention)', () => {
   assert.equal(secretEnvVar('keep'), 'KEEP_CLIENT_SECRET');
   assert.equal(secretEnvVar('llm'), 'LLM_CLIENT_SECRET');
-  assert.equal(secretEnvVar('openwebui'), 'OPENWEBUI_CLIENT_SECRET');
+  assert.equal(secretEnvVar('promptdesk'), 'PROMPTDESK_CLIENT_SECRET');
   assert.equal(secretEnvVar('my_app'), 'MY_APP_CLIENT_SECRET');
 });
 
 test('secretEnvVar throws loudly on a hyphenated client_id (fail-loud contract)', () => {
-  // "open-webui" → "OPEN-WEBUI_CLIENT_SECRET" is an INVALID POSIX env var.
+  // "prompt-desk" → "PROMPT-DESK_CLIENT_SECRET" is an INVALID POSIX env var.
   // The function must throw with a clear message naming the client_id and the
   // would-be env var name, NOT silently return the broken string.
   assert.throws(
-    () => secretEnvVar('open-webui'),
+    () => secretEnvVar('prompt-desk'),
     (err) =>
       /POSIX env-var stem/.test(err.message) &&
-      /open-webui/.test(err.message) &&
-      /OPEN-WEBUI_CLIENT_SECRET/.test(err.message),
+      /prompt-desk/.test(err.message) &&
+      /PROMPT-DESK_CLIENT_SECRET/.test(err.message),
     'expected a loud throw, not a silent invalid env var name',
   );
 });

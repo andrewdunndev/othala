@@ -14,7 +14,7 @@
 //   - normalizeGroupOrder: identity groups first in OTHALA_IDENTITY_GROUPS
 //     order, then ALL remaining groups alphabetically. The `access-` prefix
 //     partition is RETIRED — a group's position is a function of its name
-//     alone (docs/access-model.md §10).
+//     alone.
 //   - computeEffectiveAccess:
 //     * access gate (in none of manifest.accessGroups = no row)
 //     * override wins over group-map
@@ -40,8 +40,8 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { normalizeGroupOrder, computeEffectiveAccess } from '../src/lib/access.ts';
 
-// Helper: build a manifest fixture. access-model Phase 2: computeEffectiveAccess
-// gates on accessGroups (the load-bearing binding), defaulting to the
+// Helper: build a manifest fixture. computeEffectiveAccess gates on
+// accessGroups (the load-bearing binding), defaulting to the
 // conventional [access-<clientId>] so the existing fixtures (which assign
 // `access-<slug>` identity groups) keep exercising the access gate.
 function manifest(clientId, opts = {}) {
@@ -81,12 +81,12 @@ test('normalizeGroupOrder: identity groups in canonical order', () => {
   );
 });
 
-// access-model Phase 2: the `access-` prefix no longer partitions group order.
+// The `access-` prefix no longer partitions group order.
 // The split is identity-vs-everything (identity = OTHALA_IDENTITY_GROUPS, which
 // in the test env is just ['admin', <default>]); identity groups come first in
 // env order, then ALL remaining groups alphabetically — names like `access-*`,
 // `family`, `elder` are sorted together, their position a function of the name
-// alone, not a prefix (docs/access-model.md §10).
+// alone, not a prefix.
 test('normalizeGroupOrder: non-identity groups sort alphabetically after identity groups', () => {
   assert.deepEqual(
     normalizeGroupOrder(['access-tune', 'admin', 'access-keep', 'family']),

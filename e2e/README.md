@@ -41,11 +41,11 @@ is the tag (CI passes the just-built tag; local runs use `latest`).
 
 ## How it works
 
-In CI, GitLab dispatches the `e2e` job (tagged `[lodestone, qemu]`) to the
-lodestone GitLab Runner, whose Custom Executor spawns a per-job ephemeral
-Fedora VM (qcow2 linked clone from the `baser` golden — podman +
-podman-docker + skopeo + jq + curl pre-baked). The job runs INSIDE the
-VM as `fedora`. `e2e/validate.sh`:
+In CI, GitLab dispatches the `e2e` job to a QEMU GitLab Runner selected by
+the job's `tags:`, whose Custom Executor spawns a per-job ephemeral Fedora
+VM (qcow2 linked clone from a golden image — podman + podman-docker +
+skopeo + jq + curl pre-baked). The job runs INSIDE the VM as `fedora`.
+`e2e/validate.sh`:
 
 1. Generates per-run substrate secrets (`gen-secrets.sh > .env`)
 2. Logs in to the GitLab registry (`$CI_REGISTRY_USER` /
@@ -93,7 +93,7 @@ VM dies on job end. Total turnaround: ~3-5 minutes including image pulls.
   `othala:4431/admin/recovery-gate`, `Authorization: Bearer`. Refusal is
   **marker-based** (`is_admin===true` in the webhook payload, derived from
   `metadata_admin.admin` by `recovery-gate.jsonnet`), NOT group- or UUID-based
-  (ADR 08). An identity with `is_admin=true` → 403; `is_admin=false` → 200
+  An identity with `is_admin=true` → 403; `is_admin=false` → 200
   (even when the payload claims an admin-tier group such as `grafana-admin` —
   group membership is app authorization, never portal admin authority); a
   non-boolean `is_admin` → 403 (fail-closed); a missing `identity_id` → 403
@@ -112,8 +112,8 @@ VM dies on job end. Total turnaround: ~3-5 minutes including image pulls.
 
 The app does **not** self-register clients on boot, and no route triggers
 registration. Registration is a deliberate **one-shot**: in production,
-the deploy repo runs `just dag-reload-clients` (SIGHUP-driven; also runs
-on boot) on the network that can reach Hydra's admin port (see the repo
+the deploy repo SIGHUPs the app (which also reloads on boot) from the
+network that can reach Hydra's admin port (see the repo
 `DEPLOY.md`). This harness does the same against the freshly-built image,
 which is why `register-clients` is a `profiles: [oneshot]` service that
 `smoke.sh` invokes explicitly rather than starting in the `up` set.
@@ -231,9 +231,9 @@ podman run --rm --platform linux/arm64 \
 
 - **ADMIN_HOST=10.89.11.12** — `compose.browser.yml` gives `othala` a
   static IP on the `10.89.11.0/24` e2e subnet and binds the admin port to
-  that IP, mirroring production (where portal binds to its dag-internal IP
+  that IP, mirroring production (where portal binds to its pod-internal IP
   and Kratos reaches it by hostname). `0.0.0.0` is FATAL at startup by
-  design (`listen.mjs:354`).
+  design (`listen.mjs` `assertStartupEnv`).
 - **KRATOS_PUBLIC_URL override** — set to `http://auth.othala.test` so the
   portal's SSR browser-flow helpers build URLs that Chromium can resolve
   through the Caddy edge alias. The smoke path keeps `http://kratos:4433`.
@@ -244,13 +244,17 @@ podman run --rm --platform linux/arm64 \
 
 ## CI invocation
 
-`.gitlab-ci.yml`'s `e2e` job (stage `e2e`), tagged `[lodestone, qemu]`.
-Depends on `build-othala` + `build-e2e-tester` so the just-built images
-are pulled at the build tag. Gates the package + release stages.
+`.gitlab-ci.yml`'s `e2e` job (stage `e2e`). Its `tags:` are real runner
+labels selecting a QEMU Custom Executor. The host label is the project
+CI/CD variable `E2E_RUNNER_TAG` (unprotected, unmasked, no default) —
+set it to your own runner's label or the job sits pending forever.
+Depends on `build-othala` +
+`build-e2e-tester` so the just-built images are pulled at the build tag.
+Gates the package + release stages.
 
 ## When to evolve
 
 When an Ory upgrade lands, this harness validates the substrate in CI
-before the bump reaches carmine. Grow the smoke matrix with each
+before the bump reaches a deployment. Grow the smoke matrix with each
 Ory-surface change worth catching — e.g., when a new admin API endpoint
 shape lands, add a probe.

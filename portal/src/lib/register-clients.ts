@@ -101,8 +101,8 @@ export interface RegisterResult {
  * Env var name carrying a client's secret, e.g. keep -> KEEP_CLIENT_SECRET.
  *
  * Fails loudly if `clientId` is not a valid POSIX env-var stem
- * (^[A-Za-z_][A-Za-z0-9_]*$). A hyphenated id such as "open-webui" would
- * produce "OPEN-WEBUI_CLIENT_SECRET" — an invalid shell variable that never
+ * (^[A-Za-z_][A-Za-z0-9_]*$). A hyphenated id such as "prompt-desk" would
+ * produce "PROMPT-DESK_CLIENT_SECRET" — an invalid shell variable that never
  * resolves. Rather than silently returning a broken name we throw immediately
  * with a clear message naming the offending client_id and the env var the
  * operator should look for.
@@ -237,10 +237,10 @@ export async function registerClient(
  * registers each client idempotently. Returns the per-client action list.
  *
  * This is the production registration path. The deploy repo runs this
- * bundle as a deliberate --rm one-shot on boot and on SIGHUP
- * (dag-reload-clients), reading manifests from MANIFEST_DIR and resolving
- * <SLUG>_CLIENT_SECRET from env. Registration model decided in
- * docs/adr/02-custom-portal-oidc-registrar.md.
+ * bundle as a deliberate --rm one-shot on boot and on SIGHUP,
+ * reading manifests from MANIFEST_DIR and resolving
+ * <SLUG>_CLIENT_SECRET from env. Registration is create-or-update only and
+ * never deletes, so a decommissioned client survives until removed by hand.
  */
 export async function registerAllClients(
   opts: RegisterOptions = {},
@@ -252,7 +252,8 @@ export async function registerAllClients(
   // is handed has both, so an unfiltered set throws on the first tile —
   // "<CLIENT>_CLIENT_SECRET not set" — at boot and on every SIGHUP, and
   // registrar.ts swallows it, leaving Hydra with ZERO registered clients.
-  // manifests.ts:517-523 states this narrowing obligation; honour it here.
+  // manifests.ts `oidcClientManifests` states this narrowing obligation in its
+  // doc comment; honour it here.
   const manifests = oidcClientManifests();
   return registerManifests(manifests, opts);
 }

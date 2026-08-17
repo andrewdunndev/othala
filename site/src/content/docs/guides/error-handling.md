@@ -1,80 +1,51 @@
-# Error handling & the two-layer deny model
+# Error handling and the two-layer deny model
 
-How Othala denies bad requests, and how every error surface is branded.
+An identity provider denies requests at two layers, and the application can only
+see one of them. That split is why the error surfaces look asymmetric. Read this
+before changing `portal/src/middleware.ts` or any error page.
 
-The non-obvious part, and the reason this page exists, is that there are two
-independent deny layers and the application can only see one of them. Read it
-before changing anything in `portal/src/middleware.ts` or the error pages,
-because the split is what makes their shape look arbitrary.
+## The two layers
 
-## Two layers of denial
+**Framework CSRF, before app code.** Astro's `security.checkOrigin` is on by
+default: for form-content-type mutations it compares `Origin` against the
+request host and returns a bare `403` without rendering. It is sequenced ahead
+of user middleware and returns without calling `next()`, so nothing in
+application code — middleware included — can observe or rebrand it. Never
+disable or reimplement it; the historical bypass of this exact check
+(CVE-2024-56140) turned on content-type handling, and a hand-rolled equivalent
+is a good way to reintroduce it.
 
-A request to a protected endpoint passes through two independent guards.
-**Both are intentional defense-in-depth — neither replaces the other.**
+**Application guards, inside the route.** Past `checkOrigin`,
+`requireAdminSession` in `portal/src/lib/admin.ts` redirects a session below
+`aal2` into the Kratos step-up flow and redirects an identity without the admin
+marker to a branded error page; consent CSRF tampering answers `400`. The
+distinction that matters: application-layer denials are structured,
+human-meaningful, and reachable by real users, while the `checkOrigin` 403 is
+effectively attacker-only because a normal browser always sends a matching
+`Origin`. Both layers are asserted together in
+`e2e/playwright/tests/r-admin-post-origin.spec.ts` and
+`h-member-admin-post.spec.ts` — an origin-less POST gets the framework 403, a
+same-origin POST gets the application's structured deny.
 
-1. **Framework CSRF (Astro `security.checkOrigin`, default-on).** For
-   `POST/PATCH/PUT/DELETE` with a form content-type
-   (`application/x-www-form-urlencoded`, `multipart/form-data`, `text/plain`),
-   Astro checks the `Origin` header against the request host. A forged
-   cross-origin or origin-less form POST gets a bare **`403`** and the page
-   never renders. This runs **before** user middleware (sequenced first in
-   `astro/dist/core/base-pipeline.js` via `unshift` + `sequence`, and it
-   returns early without `next()`), so nothing in app code — including
-   `src/middleware.ts` — can see or rebrand it.
-   - **Never disable or reimplement `checkOrigin`.** CVE-2024-56140 was a
-     bypass of this exact check (content-type tricks), fixed upstream well
-     before the version this portal pins in `portal/package.json`.
-     Reimplementing risks reintroducing the bypass.
+## One branded surface, not many
 
-2. **Application guards (in the page/route).** Once a request passes
-   `checkOrigin`, the app's own guards run:
-   - `requireAdminSession()` (`portal/src/lib/admin.ts`): session below
-     `aal2` → `302 …/self-service/login/browser?aal=aal2&refresh&return_to=…`
-     (step-up); identity without the `metadata_admin.admin` marker (ADR 08)
-     → `302 /auth/error?reason=not-admin`. These fire for **all** HTTP
-     methods.
-   - Consent CSRF (`portal/src/lib/oauth2-handlers.ts`): a tampered
-     `csrf_token` → `400`.
-
-These are structured, human-meaningful denials and are the ones a real user
-might encounter. The `checkOrigin` 403 is effectively **attacker-only** —
-a normal browser always sends a matching `Origin`.
-
-The e2e specs (`e2e/playwright/tests/{e,f,h}*.spec.ts`) assert **both** layers:
-an origin-less POST → `403`, and a same-origin POST → the app's structured
-deny.
-
-## Branded error surfaces (portal)
-
-So users never see raw framework output. Single source of truth:
-`portal/src/components/StatusPage.astro` (house-style tokens/classes; renders
-status + title + message + optional reason badge — **never** internals).
-
-| Surface | File | Notes |
-|---|---|---|
-| Not found | `src/pages/404.astro` | Astro native; sets status 404 |
-| Server error | `src/pages/500.astro` | Astro native; **evaluates `error`, logs server-side, leaks nothing** |
-| Denials / auth errors | `src/pages/auth/error.astro` | The redirect target for `reason=` denials; maps reason → (status, copy) |
-| Stray app 4xx/5xx | `src/middleware.ts` | Rebrands **raw non-HTML** app errors for **HTML navigations only** (API/JSON untouched); already-HTML responses pass through so the native pages stand; **preserves the original status**; loop-guarded |
-
-`reason` values (`auth/error.astro`): `not-admin`, `not-authorised`,
-`auth-unreachable`, `session-expired`, `forbidden`, `unavailable`,
-`not-found`, `rate-limited`, `server-error`, + a generic default.
+Every branded status page renders through
+`portal/src/components/StatusPage.astro` — status, title, message, an optional
+reason badge, never any internals. Denials redirect to
+`portal/src/pages/auth/error.astro` carrying a `reason` that page maps to copy;
+middleware rebrands raw non-HTML application errors for HTML navigations only,
+preserves the original status, and leaves API responses alone. The single source
+exists so that adding a denial reason is a data change rather than a new page.
 
 ## The one surface that stays unbranded
 
-Because `checkOrigin` short-circuits before user middleware (above), the
-framework `403` is the one deny the portal cannot brand. It ships bare, and
-that is the current state, not an oversight waiting on a fix.
-
-The gap is deliberately small. That 403 is effectively attacker-only, so the
-population that sees it is not the family. Branding it would mean intercepting
-upstream 4xx at the reverse proxy and re-rendering the app's own error page
-while preserving the original status, which is a Caddy `handle_response`
-sub-request pattern that is finicky enough to need validating against a live
-stack before it ships. Nobody has paid that cost, because the surface it
-improves is one an attacker sees.
-
-If it is ever picked up, the acceptance bar is: the branded page carries the
-original status, and a portal-down 502/503 falls back to something static
-rather than sub-requesting a dead app.
+Because `checkOrigin` short-circuits before user middleware, the framework `403`
+is the one deny the portal cannot brand. It ships bare, and that is the current
+state rather than an oversight awaiting a fix. Branding it means intercepting
+upstream 4xx at the reverse proxy and
+re-rendering the application's own error page while preserving the status — a
+sub-request pattern finicky enough to need validating against a live stack, and
+nobody has paid that cost because the population it helps is attackers. If it is
+ever picked up, the acceptance bar is: the branded page carries the original
+status, and a portal-down 502 or 503 falls back to something static rather than
+sub-requesting a dead application.

@@ -46,14 +46,14 @@ test('accessGroups dual-read: presentation.access list populates accessGroups', 
   const out = parseManifest(
     `
 oidc:
-  client_id: immich
+  client_id: photos
   scope: openid
 presentation:
   access:
     - memories
     - admin-memories
 `,
-    'immich.yaml',
+    'photos.yaml',
   );
   assert.deepEqual(out.accessGroups, ['memories', 'admin-memories']);
 });
@@ -62,29 +62,29 @@ test('accessGroups dual-read: presentation.access_group compat shim', () => {
   const out = parseManifest(
     `
 oidc:
-  client_id: immich
+  client_id: photos
   scope: openid
 presentation:
-  access_group: access-immich
+  access_group: access-photos
 `,
-    'immich.yaml',
+    'photos.yaml',
   );
-  assert.deepEqual(out.accessGroups, ['access-immich']);
+  assert.deepEqual(out.accessGroups, ['access-photos']);
 });
 
 test('accessGroups: no declared binding → [] (no implicit access)', () => {
-  // othala primitive #5 (access-model.md §4/§11 step 3): absence of a binding
-  // means NO access. A manifest that declares neither presentation.access: nor
+  // othala primitive #5: absence of a binding means NO access.
+  // A manifest that declares neither presentation.access: nor
   // access_group: yields accessGroups: [] — there is NO implicit
   // [access-<clientId>] fallback. Such a bare manifest is a load-time BLOCK in
   // validateClients (covered in validate-clients.test.mjs).
   const out = parseManifest(
     `
 oidc:
-  client_id: immich
+  client_id: photos
   scope: openid
 `,
-    'immich.yaml',
+    'photos.yaml',
   );
   assert.deepEqual(out.accessGroups, []);
 });
@@ -194,7 +194,7 @@ test('presentation-only manifest (forward_auth, no oidc:) parses with the access
   // observe.yaml shape: a presentation: block, no oidc: client. It must parse
   // (not throw), flag presentationOnly, derive clientId from the filename slug,
   // and carry the access binding through. This is the first-class
-  // forward_auth / ldap tile type (access-model.md §11).
+  // forward_auth / ldap tile type.
   const out = parseManifest(
     `
 presentation:
@@ -230,10 +230,10 @@ test('backchannel_logout_uri defaults to empty string when absent', () => {
   const out = parseManifest(
     `
 oidc:
-  client_id: tailscale
+  client_id: meshvpn
 consent: {}
 `,
-    'tailscale.yaml',
+    'meshvpn.yaml',
   );
   assert.equal(out.backchannelLogoutUri, '');
 });

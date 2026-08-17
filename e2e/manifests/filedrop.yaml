@@ -1,0 +1,21 @@
+# Filedrop — filedrop.othala.test
+# Generic example fixture for the Othala e2e harness. A stand-in for an
+# app that authenticates against a directory (LDAP) rather than OIDC, so
+# it declares NO oidc:/consent: block and is presentation ONLY. This
+# exercises the loader's presentation-only-skip path: the OIDC client
+# loader returns null for a manifest carrying presentation: and no oidc:.
+
+presentation:
+  name: Filedrop
+  description: Internal file share that authenticates against the directory, not OIDC.
+  url: https://filedrop.othala.test
+  icon: FD
+  icon_slug: ""
+  icon_fallback: folder
+  auth_kind: ldap
+  # Presentation-only tile written with the SINGULAR `access_group:` compat
+  # shim on purpose — it exercises precedence rule (2) in parseAccessGroups
+  # (portal/src/lib/access-groups.ts), which the plural `access:` fixtures
+  # never reach.
+  access_group: filedrop-access
+  order: 50

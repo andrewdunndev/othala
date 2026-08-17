@@ -1,7 +1,7 @@
 ---
-// HeroLockup — the canonical dag → othala brand lockup.
+// HeroLockup — the canonical dagaz → othala brand lockup.
 //
-// Renders the horizontal SVG row: dag mark → arrow → othala mark, with an
+// Renders the horizontal SVG row: dagaz mark → arrow → othala mark, with an
 // optional "door to home" gloss line beneath. Used by the pre-auth hero on
 // index.astro and by every auth-flow page hero so the brand reads identically
 // from first touch through sign-in.
@@ -9,7 +9,7 @@
 // Props
 //   gloss  (boolean, default true) — show/hide the "door to home" gloss line.
 
-import dagSvg  from '../marks/dag.svg?raw';
+import dagazSvg  from '../marks/dagaz.svg?raw';
 import markSvg from '../marks/mark.svg?raw';
 
 interface Props {
@@ -20,15 +20,15 @@ interface Props {
 const { gloss = true } = Astro.props;
 ---
 
-<div class="hero-lockup" role="img" aria-label="dag to othala — door to home">
-  <span class="lockup-mark" set:html={dagSvg} />
+<div class="hero-lockup" role="img" aria-label="dagaz to othala — door to home">
+  <span class="lockup-mark" set:html={dagazSvg} />
   <span class="lockup-arrow" aria-hidden="true">→</span>
   <span class="lockup-mark" set:html={markSvg} />
   {gloss && <p class="lockup-gloss">door to home</p>}
 </div>
 
 <style>
-  /* Horizontal dag → arrow → othala row.
+  /* Horizontal dagaz → arrow → othala row.
    * Marks inherit --accent (moss); arrow and gloss are secondary. */
   .hero-lockup {
     display: flex;

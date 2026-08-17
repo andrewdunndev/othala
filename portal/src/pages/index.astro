@@ -16,7 +16,7 @@
 //                     manifest's access binding against the identity's
 //                     `metadata_admin.groups`. The Admin shortcut is NOT
 //                     a group — it reads the `metadata_admin.admin`
-//                     marker (ADR 08); see the note above `isAdmin`.
+//                     marker; see the note above `isAdmin`.
 //
 // Apps registry = unified per-app manifests read at request time from
 // MANIFEST_DIR (see lib/tiles.ts + lib/manifests.ts). Each `<slug>.yaml`
@@ -64,8 +64,8 @@ if (devOverride === 'down' || devOverride === 'pre-auth' || devOverride === 'pos
     // so a mock holding groups nobody binds is indistinguishable from a user
     // with no access. They are the converged `<svc>-access` entry groups from
     // those manifests, one per fixture:
-    //   grafana-access, audiobookshelf-access, jellyfin-access,
-    //   proxywatch-access (tile-only), prompt-access (open-webui).
+    //   grafana-access, audiobookshelf-access, filedrop-access,
+    //   proxywatch-access (tile-only), prompt-access.
     // `everyone` covers the default-group fallback fixture (statuspage, which
     // declares no access binding — see tileDefaultGroup in tiles.ts).
     // 'admin' is here as an identity group only; the Admin nav link needs the
@@ -84,7 +84,7 @@ if (devOverride === 'down' || devOverride === 'pre-auth' || devOverride === 'pos
           'everyone',
           'grafana-access',
           'audiobookshelf-access',
-          'jellyfin-access',
+          'filedrop-access',
           'proxywatch-access',
           'prompt-access',
         ];
@@ -136,10 +136,9 @@ const groupRegistry = loadGroups();
 const hasPasskeyEnrolled = Boolean(identity?.credentials?.passkey);
 
 const groups = identityGroups(identity);
-// access-model Phase 2: tile visibility reads the manifest's access binding
-// (accessGroups, OR-semantics) via userCanSeeTile — the SAME field the OIDC
-// entry gate uses, so the tile shows iff the gate would admit the user. Kills
-// the prior tile-vs-gate dual source (docs/access-model.md §10).
+// Tile visibility reads the manifest's access binding (accessGroups,
+// OR-semantics) via userCanSeeTile — the SAME field the OIDC entry gate uses,
+// so the tile shows iff the gate would admit the user. One source, not two.
 const visibleTiles =
   state === 'post-auth'
     ? orderedApps.filter((a: AppTile) => userCanSeeTile(a, groups))
@@ -167,7 +166,7 @@ const tileGroups = Array.from(groupedTilesMap.entries())
     tiles,
     meta: groupRegistry.get(groupName),
   }));
-// ADR 08: the Admin nav affordance reads metadata_admin.admin from the
+// The Admin nav affordance reads metadata_admin.admin from the
 // admin-API-fetched identity (already in `identity` above — no extra call).
 // The /admin route itself is gated by requireAdminSession (AAL2 + marker);
 // this just keeps the link truthful so a non-admin isn't shown a tile that
@@ -368,7 +367,7 @@ const devLinks = [
             <form class="request-form" id="request-form" method="post" action="/api/request" novalidate>
               <label class="form-field">
                 <span class="form-label">Your name</span>
-                <input class="form-input" type="text" name="name" autocomplete="name" maxlength="80" required placeholder="e.g. Ashley" />
+                <input class="form-input" type="text" name="name" autocomplete="name" maxlength="80" required placeholder="e.g. Robin" />
               </label>
 
               <label class="form-field">

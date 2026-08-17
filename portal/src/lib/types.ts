@@ -39,7 +39,7 @@ export type Identity = Omit<SdkIdentity, 'metadata_admin'> & {
     /** Per-app role overrides keyed by OIDC client_id. */
     roles?: Record<string, string>;
     /**
-     * Admin authority marker (ADR 08). Set to `true` (boolean strict) via
+     * Admin authority marker. Set to `true` (boolean strict) via
      * the Kratos admin API only — never through self-service flows. The portal
      * reads this only from admin-API-fetched identities; Kratos v26.2.0
      * excludes metadata_admin from the public /sessions/whoami response.

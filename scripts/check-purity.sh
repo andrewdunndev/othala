@@ -1,11 +1,13 @@
 #!/usr/bin/env bash
-# check-purity.sh — OSS purity + no-deprecated + dated-debt detection gate.
+# check-purity.sh — OSS purity + no-deprecated + dated-debt + prose-budget gate.
 #
 # Detects families of violations:
 #
 #   Othala-purity:        instance-specific strings leaked into configs/tests/docs
 #   No-referenced-deprecated: references to deleted commands / DORMANT markers
 #   Dated-debt:           intentional-failure markers that should have been removed
+#   Vendored-citation:    line-number pins into the byte-vendored config files
+#   Prose-budget:         tracked documentation past its byte ceiling
 #
 # Usage:
 #   bash scripts/check-purity.sh
@@ -30,12 +32,24 @@
 #      lines, grep exits 1, and the check reports PASS forever. Vacuity at
 #      the pattern level rather than the corpus level.
 #   4. A check carried one canary per alternative but nothing tied a canary
-#      to the branch it proved. Deleting the `agd@` canary from the
-#      five-branch runbook check left the other four canaries matched, so
-#      the positive control still passed — and the now-unproven branch could
-#      then be typo'd to match nothing, still passing, while a real
-#      `ssh agd@bastion` line in docs/runbooks/ went undetected. An
-#      unproven branch is a dead branch that has not been noticed yet.
+#      to the branch it proved. Deleting one canary from a five-branch check
+#      left the other four canaries matched, so the positive control still
+#      passed — and the now-unproven branch could then be typo'd to match
+#      nothing, still passing, while a real violation of that branch went
+#      undetected. An unproven branch is a dead branch that has not been
+#      noticed yet.
+#   5. A check scanned a real corpus with a proven pattern, and the corpus was
+#      a fraction of the surface the rule was written about. The purity family
+#      greped docs/runbooks/, site/src/content/docs/, two config files and
+#      portal/scripts/ — nothing looked at ARCHITECTURE.md, AGENTS.md,
+#      README.md, .gitlab-ci.yml, e2e/ or caddy/, and the instance-name branch
+#      list named two hosts out of ten. A clone reported ALL 12 CHECKS PASSED
+#      with an instance name sitting in .gitlab-ci.yml and a private-stack
+#      application name sitting in DEPLOY.md, docs/runbooks/ and two published
+#      diagrams. Narrowness is the fourth vacuity: honest scanning of the wrong
+#      corpus is still a green that means nothing. The three whole-tree checks
+#      below take the ENTIRE index as their pathspec for exactly this reason,
+#      and every path exemption is written with the assertion that bounds it.
 #
 # This file therefore enforces:
 #
@@ -59,6 +73,10 @@
 #     files is step_error, never step_pass.
 #   * Every file in the set is asserted present and readable BEFORE grep
 #     runs, so an unreadable target cannot masquerade as a clean one.
+#   * The BYTES offered to grep are counted and asserted > 0, and any member
+#     that contributes zero bytes is itself an ERROR. A file count is a count
+#     of things that exist; emptying a scanned file leaves the count intact
+#     while the corpus goes silent, so presence is asserted by weight.
 #   * The verdict is decided from the captured hits, with grep's exit status
 #     split three ways: 0 = hits (FAIL), 1 = genuinely clean (PASS),
 #     anything else = ERROR. Exit 2 is never treated as exit 1.
@@ -66,15 +84,25 @@
 #     of files examined is identical locally and in CI. A worktree walk is
 #     not: site/dist/ and node_modules/ exist on a developer machine and
 #     not in a fresh CI clone.
+#   * The CONTENT grepped comes from the index too: the blobs are checked
+#     out into a scratch tree with `git checkout-index` and grep reads those.
+#     Naming files from the index and then reading their bytes from the
+#     worktree is two different corpora wearing one file list — a violation
+#     staged but not written to the worktree is in what CI will see and was
+#     invisible to a worktree read.
 #   * The number of checks that reported a verdict is asserted against
 #     EXPECTED_CHECKS, so deleting a check (and with it its canaries) cannot
 #     quietly shrink the gate while leaving it green.
 #
-# A canary is a violating string, so it must not itself become a violation:
-# no check's pathspec covers scripts/, which is why the canaries below can
-# be written as literals. The one exception is the ADR check, whose corpus
-# is the whole index including this file; its canaries are assembled at
-# runtime so no resolvable pointer appears in this source.
+# A canary is a violating string, so it must not itself become a violation.
+# Four checks now take the whole index as their corpus — this file included —
+# so their canaries are assembled from fragments at runtime by jn(), and their
+# branches are written so that no branch matches its own source text: each
+# spells a literal as something that is not itself, an escaped dot for the
+# vendored paths and a bracketed first letter for the names. If that ever
+# stops holding, the gate fails on its own source, which is the safe
+# direction to fail in. Only the narrowly-scoped checks, whose pathspecs do
+# not reach scripts/, still spell their canaries as literals.
 # -----------------------------------------------------------------------
 
 # NOTE ON `set -e`: it is deliberately NOT enabled. Every check here must
@@ -94,26 +122,33 @@ PASS=0; FAIL=0; ERROR=0; FAILED_STEPS=()
 
 # Number of checks that must report a verdict. Bump it in the same commit
 # that adds or removes a check; see the check-inventory assertion at the end.
-EXPECTED_CHECKS=12
+EXPECTED_CHECKS=13
 
+# step_pass <name> <file-count> <byte-count>. Both numbers are reported: a
+# file count alone cannot distinguish a scanned corpus from an empty one.
 step_pass() {
     PASS=$((PASS+1))
-    printf "  \033[32m✓\033[0m %s \033[2m(%s files scanned)\033[0m\n" "$1" "${2:-?}"
+    printf "  \033[32m✓\033[0m %s \033[2m(%s files / %s bytes scanned)\033[0m\n" "$1" "${2:-?}" "${3:-?}"
 }
+# step_fail <name> <detail>. <detail> may be multi-line; every line is indented,
+# because a detail block whose first line alone is indented reads as one hit
+# with noise after it.
 step_fail() {
+    local l
     FAIL=$((FAIL+1))
     FAILED_STEPS+=("$1")
     printf "  \033[31m✗\033[0m %s\n" "$1"
     if [[ -n "${2:-}" ]]; then
-        printf "      %s\n" "$2"
+        while IFS= read -r l; do printf "      %s\n" "$l"; done <<<"$2"
     fi
 }
 # step_error: the check could not be performed honestly — one of its branches
 # no longer matches its own canary, a branch has no canary of its own, the
-# branch set changed size unannounced, its scan set was empty, a target was
-# missing or unreadable, or grep failed with an I/O or usage error. This is
-# NEVER a pass: neither an unexamined corpus nor an unproven pattern is a
-# clean result. Counts toward FAIL so the gate still exits non-zero.
+# branch set changed size unannounced, its scan set was empty, its corpus
+# weighed zero bytes, a target was missing or unreadable, or grep failed with
+# an I/O or usage error. This is NEVER a pass: neither an unexamined corpus nor
+# an unproven pattern is a clean result. Counts toward FAIL so the gate still
+# exits non-zero.
 step_error() {
     ERROR=$((ERROR+1))
     FAIL=$((FAIL+1))
@@ -132,6 +167,18 @@ step_error() {
 # cannot pass arrays. A trailing empty element is impossible: the herestring
 # supplies the final newline, and empty elements are rejected by the caller.
 # ---------------------------------------------------------------------
+# ---------------------------------------------------------------------
+# jn <fragment>...
+#
+# Joins its arguments with no separator. Every banned name in the whole-tree
+# checks is spelled in FRAGMENTS and rejoined here, because this file is
+# inside the corpus those checks scan: a canary written as a literal would be
+# the exact leak it exists to detect, and the gate would fail on its own
+# source. The fragments are meaningless apart; the join happens in memory and
+# never reaches the tree.
+# ---------------------------------------------------------------------
+jn() { local IFS=''; printf '%s' "$*"; }
+
 SPLIT_OUT=()
 split_lines() {
     local line
@@ -267,21 +314,36 @@ assert_fires() {
 # ---------------------------------------------------------------------
 # build_scan_set <check-name> <pathspec>...
 #
-# Populates the global array SCAN_FILES with the tracked files under the
-# given pathspecs, then asserts the set is non-empty and every member is
-# present and readable on disk. Returns 1 (having recorded step_error) if
-# any of that fails, so callers gate on it before grepping.
+# Populates three globals and asserts the corpus is real:
+#
+#   SCAN_FILES  repo-relative paths of the tracked files under <pathspec>...
+#   SCAN_BLOBS  the same files materialised from the INDEX under $TMP/idx,
+#               index-for-index with SCAN_FILES. These are what callers grep.
+#   SCAN_BYTES  the total size of SCAN_BLOBS, i.e. the bytes grep is offered.
+#
+# Returns 1 (having recorded step_error) if the set is empty, if any member
+# is absent or unreadable in the worktree, if the index blobs cannot be
+# materialised, or if any member — or the corpus as a whole — weighs zero
+# bytes. Callers gate on it before grepping.
 #
 # `git ls-files` (the index) rather than a worktree walk: the index is the
 # same object in CI and locally, so a check cannot scan a different corpus
-# in the two places.
+# in the two places. `git checkout-index` for the CONTENT, for the same
+# reason carried one step further: the file list and the bytes must come from
+# one source, or a violation that is staged and not yet written to the
+# worktree is named by the list and missed by the read.
 # ---------------------------------------------------------------------
 SCAN_FILES=()
+SCAN_BLOBS=()
+SCAN_BYTES=0
+SCAN_ROOT="$TMP/idx/"
 build_scan_set() {
     local name="$1"; shift
     SCAN_FILES=()
+    SCAN_BLOBS=()
+    SCAN_BYTES=0
 
-    local rc f
+    local rc f i
     git ls-files -z -- "$@" >"$TMP/scanset" 2>"$TMP/err"
     rc=$?
     if (( rc != 0 )); then
@@ -324,6 +386,69 @@ build_scan_set() {
         return 1
     fi
 
+    # Materialise the INDEX content of exactly those files into a scratch tree
+    # and hand grep that. The list above came from the index; reading the
+    # worktree instead would let a staged violation — the very bytes CI is
+    # about to check out — go unread, and a worktree edit that is not staged
+    # be reported against a file list that does not describe it.
+    rm -rf "$TMP/idx"
+    git checkout-index -f -z --stdin --prefix="$SCAN_ROOT" <"$TMP/scanset" 2>"$TMP/err"
+    rc=$?
+    if (( rc != 0 )); then
+        step_error "$name" \
+            "git checkout-index exited $rc materialising ${#SCAN_FILES[@]} indexed file(s) for [$*]: $(head -1 "$TMP/err")"
+        return 1
+    fi
+
+    for (( i = 0; i < ${#SCAN_FILES[@]}; i++ )); do
+        SCAN_BLOBS+=("${SCAN_ROOT}${SCAN_FILES[i]}")
+    done
+
+    local absent_blob=()
+    for (( i = 0; i < ${#SCAN_BLOBS[@]}; i++ )); do
+        if [[ ! -f "${SCAN_BLOBS[i]}" || ! -r "${SCAN_BLOBS[i]}" ]]; then
+            absent_blob+=("${SCAN_FILES[i]}")
+        fi
+    done
+    if (( ${#absent_blob[@]} > 0 )); then
+        step_error "$name" \
+            "${#absent_blob[@]}/${#SCAN_FILES[@]} indexed file(s) did not materialise, e.g. ${absent_blob[0]} — the corpus grep would read is not the corpus that was listed"
+        return 1
+    fi
+
+    # Weight, not headcount. A file that exists and holds nothing is a file the
+    # count claims was scanned and grep read nothing from; the asymmetry the
+    # absent-file check keeps applies here for the same reason — a corpus where
+    # 32 of 33 members went empty is not a clean corpus, it is an unread one.
+    local empty=()
+    for (( i = 0; i < ${#SCAN_BLOBS[@]}; i++ )); do
+        [[ -s "${SCAN_BLOBS[i]}" ]] || empty+=("${SCAN_FILES[i]}")
+    done
+    if (( ${#empty[@]} > 0 )); then
+        step_error "$name" \
+            "${#empty[@]}/${#SCAN_FILES[@]} file(s) in the scan set are ZERO BYTES in the index, e.g. ${empty[0]} — grep would read nothing from them while the file count still counted them as scanned"
+        return 1
+    fi
+
+    cat -- "${SCAN_BLOBS[@]}" >"$TMP/corpus" 2>"$TMP/err"
+    rc=$?
+    if (( rc != 0 )); then
+        step_error "$name" \
+            "could not read the materialised index corpus (cat exited $rc): $(head -1 "$TMP/err")"
+        return 1
+    fi
+    SCAN_BYTES=$(wc -c <"$TMP/corpus")
+    SCAN_BYTES=${SCAN_BYTES//[^0-9]/}
+
+    # The corpus-level assertion, kept alongside the per-file one: if the
+    # per-file rule is ever relaxed, "the check examined zero bytes" must still
+    # be an error rather than a pass.
+    if [[ -z "$SCAN_BYTES" ]] || (( SCAN_BYTES == 0 )); then
+        step_error "$name" \
+            "scan corpus is ZERO BYTES across ${#SCAN_FILES[@]} tracked file(s) under [$*] — the files exist but there is nothing in them to scan"
+        return 1
+    fi
+
     return 0
 }
 
@@ -332,26 +457,42 @@ build_scan_set() {
 #
 # The only sanctioned way to run a content check. Proves every branch fires
 # on its own canary and no other, builds and validates the scan set, greps
-# the explicit file list with the branch set assembled by assert_fires, and
-# decides the verdict from the captured hits with grep's exit status
-# classified three ways — hits / clean / error.
+# the index content of that explicit file list with the branch set assembled
+# by assert_fires, and decides the verdict from the captured hits with grep's
+# exit status classified three ways — hits / clean / error.
 #
 # The branch-count, branch and canary arguments are positional and mandatory.
 # Omitting any of them shifts a pathspec into its place, and a pathspec is
 # neither a count nor a violating string, so the check errors instead of
 # quietly running without a positive control.
+#
+# ON REPORTING THE SIZE OF A FINDING. A failing check states its TOTAL hit
+# count, always; the listing is capped for readability only, with the cap named
+# in the same line ("showing the first N of M"). Not cosmetic: an earlier
+# revision piped the hits through `head -3` and printed no total, so a run that
+# found ELEVEN private-stack application names — seven of them in one diagram —
+# reported three and swallowed eight. An operator fixes what the gate shows and
+# believes they are done. Misreporting the size of a finding is the same defect
+# class as scanning nothing: both hand back a number that is not about the
+# corpus.
 # ---------------------------------------------------------------------
+# How many hit lines a failing check lists before it stops. The total is always
+# reported regardless, so raising or lowering this changes readability only.
+HIT_CAP=25
 scan() {
     local name="$1" expected="$2" branches="$3" canaries="$4"; shift 4
     assert_fires "$name" "$expected" "$branches" "$canaries" || return 1
     build_scan_set "$name" "$@" || return 1
 
-    local out rc
+    local out rc nhits
     # Declaration and assignment are split: `local out=$(...)` would make
     # $? the exit status of `local`, not of grep, and the classification
     # below would read a constant 0.
-    out=$(grep -nHE -e "$PATTERN" -- "${SCAN_FILES[@]}" 2>"$TMP/greperr")
+    out=$(grep -nHE -e "$PATTERN" -- "${SCAN_BLOBS[@]}" 2>"$TMP/greperr")
     rc=$?
+    # Report the repo-relative path, not the scratch path the blobs were
+    # materialised at.
+    out=${out//"$SCAN_ROOT"/}
 
     if (( rc > 1 )); then
         # An exit that is neither 0 nor 1 means grep could not complete: an
@@ -360,11 +501,17 @@ scan() {
         step_error "$name" \
             "grep exited $rc (I/O or usage error, NOT 'no match'): $(head -1 "$TMP/greperr")"
     elif [[ -n "$out" ]]; then
-        step_fail "$name" "$(printf '%s\n' "$out" | head -3)"
+        nhits=$(grep -c '' <<<"$out")
+        if (( nhits > HIT_CAP )); then
+            step_fail "$name" \
+                "$nhits hit(s) — showing the first $HIT_CAP of $nhits:"$'\n'"$(head -n "$HIT_CAP" <<<"$out")"
+        else
+            step_fail "$name" "$nhits hit(s):"$'\n'"$out"
+        fi
     elif (( rc == 0 )); then
         step_error "$name" "grep reported a match but emitted no output"
     else
-        step_pass "$name" "${#SCAN_FILES[@]}"
+        step_pass "$name" "${#SCAN_FILES[@]}" "$SCAN_BYTES"
     fi
     return 0
 }
@@ -390,30 +537,179 @@ scan "no-dunn-dev-in-tests" 1 \
     'fetch("https://portal.dunn.dev/api/health")' \
     portal/scripts/
 
-# no-instance-identity-in-runbooks: no instance hostname (lodestone, or stale
-# carmine) or personal login names, in either the internal runbooks (docs/runbooks/)
-# or the public docs site content tree (site/src/content/docs/) — both are
-# published doc surfaces content can land in.
+# ---------------------------------------------------------------------
+# THE THREE WHOLE-TREE CHECKS
 #
-# Five branches, five canaries, paired by index: each canary is fired by exactly
-# one branch, so deleting either half of a pair is reported rather than absorbed
-# by the other four.
-scan "no-instance-identity-in-runbooks" 5 \
-    $'\\bcarmine\\b\n\\blodestone\\b\nagd@\nandrew\\.dunn\nashley\\.dunn' \
-    $'the retired carmine host\nreboot lodestone after the upgrade\nssh agd@bastion\naccount andrew.dunn\naccount ashley.dunn' \
-    docs/runbooks/ site/src/content/docs/
+# These replace three narrower checks that scanned docs/runbooks/,
+# site/src/content/docs/ and one guide page. Their corpus is `.` — every
+# tracked file — because the rule they enforce has no path qualifier: a
+# stranger reading this repo to learn Ory patterns must not be able to
+# reconstruct one maintainer's network from it, and the reconstruction works
+# just as well from a CI runner tag or an SVG label as from a runbook.
+#
+# On the pathspec being `.` and not a list: a list is a claim about where
+# violations can appear, and that claim was wrong. The names below leaked into
+# .gitlab-ci.yml and into two published diagrams, neither of which any earlier
+# pathspec named. There is no file in this repo it would be acceptable to find
+# them in, so there is no file to leave out.
+#
+# ON THE FOUR BYTE-VENDORED FILES, which the widening was expected to have to
+# exempt: they are NOT exempt, because the reason for exempting them does not
+# hold. The expectation was that they carry the deployment's public URL. They
+# do not — kratos/kratos.yml and hydra/hydra.yml carry ${OTHALA_PUBLIC_URL},
+# a token substituted at deploy time, and identity.schema.json and
+# recovery-gate.jsonnet carry no host at all. All four scan clean against all
+# three checks. An exemption written for a reason that turns out to be false
+# is just a hole, so none was added; do not add one back without first
+# checking what is actually in the files.
+#
+# On the branches being bracketed rather than grep -i: case-insensitivity is
+# written into the PATTERN, not passed as a flag, for two reasons. It keeps
+# assert_fires' discrimination rule meaningful — a flag would apply to the
+# positive control too, collapsing branches that differ only by case — and it
+# is what stops each branch from matching its own source text, since `[Ll]`
+# is not the letter it accepts.
+# ---------------------------------------------------------------------
 
-# no-personal-names-in-docs: no real operator names in any doc or diagram,
-# across both the internal docs tree (docs/) and the public docs site content
-# tree (site/src/content/docs/). Matches bare first names, not just the
-# dotted andrew.dunn/ashley.dunn form — a bare name is exactly what "no real
-# operator names" means. The bare-name and dotted-name branches stay
-# discriminating because grep is case-sensitive here: \bAndrew\b does not fire
-# on the lowercase andrew.dunn canary, and vice versa.
-scan "no-personal-names-in-docs" 4 \
-    $'\\bAndrew\\b\n\\bAshley\\b\nandrew\\.dunn\nashley\\.dunn' \
-    $'reviewed by Andrew before merge\nAshley approved the change\naccount andrew.dunn\naccount ashley.dunn' \
-    docs/ site/src/content/docs/
+# no-instance-names: the hosts in the maintainer's private estate. None of them
+# means anything to an adopter, and each one is a line on somebody's network
+# map. Ten branches, ten canaries, paired by index.
+#
+# THE PUBLIC PORTAL'S OWN NAME IS NOT HERE, and the omission is recorded so it
+# is not "fixed" by the next reader. This project IS that portal; naming it is
+# the showcase working, not a leak, and the recorded posture for this repo is a
+# clean showcase rather than an anonymisation. A branch for it was written and
+# removed: three letters that sit inside ordinary English words needed a
+# hand-chosen boundary instead of `\b`, and it fired on this gate's own
+# deleted-command branches below, which had to be de-literalised to survive it.
+# Both costs bought nothing. Private hosts are what this check is for.
+scan "no-instance-names" 10 \
+    "$(printf '%s\n' \
+        '\b[Ll]odestone\b' \
+        '\b[Cc]armine\b' \
+        '\b[Cc]orbel\b' \
+        '\b[Cc]rimson\b' \
+        '\b[Ss]torr\b' \
+        '\b[Oo]aktimbers\b' \
+        '\b[Tt]yr\b' \
+        '\b[Aa]nvil\b' \
+        '\b[Cc]rucible\b' \
+        '\b[Nn]orn\b' \
+        )" \
+    "$(printf '%s\n' \
+        "reboot $(jn lode stone) after the upgrade" \
+        "the retired $(jn car mine) host" \
+        "deployed to $(jn cor bel) last week" \
+        "$(jn crim son) holds the replica" \
+        "rsync from $(jn sto rr) nightly" \
+        "the $(jn oak timbers) box is the spare" \
+        "$(jn ty r) runs the QEMU executor" \
+        "the $(jn an vil) runner is tagged" \
+        "$(jn cru cible) builds the images" \
+        "$(jn no rn) serves the metrics" \
+        )" \
+    .
+
+# no-personal-names: real people. LICENSE is the single path exemption in this
+# gate, and it is bounded rather than trusted — a copyright notice is a legal
+# instrument that must name its holder, which is not what "no personal names"
+# was ever about, but an exempted path is a hole unless something asserts what
+# may live in it. license_exemption_is_bounded() below asserts that every
+# personal-name hit in LICENSE sits on a copyright line, so the exemption
+# cannot widen into a place to put prose.
+#
+# The dotted first.last login forms get no branch of their own: a dot is a word
+# boundary, so the bare-name branches already fire on them. Adding them back
+# would break assert_fires' discrimination rule, which is the rule doing the
+# real work here.
+personal_names() {
+    local name="no-personal-names" rc unbounded
+    local pat='\b[Aa]ndrew\b|\b[Aa]shley\b|agd[@]'
+
+    # The exemption, bounded. LICENSE is read from the INDEX for the same
+    # reason every other corpus here is, and a LICENSE that is missing,
+    # unreadable or empty is an ERROR rather than a vacuously-satisfied
+    # assertion: "nothing in it violates the rule" is not a claim you can make
+    # about a file you could not read.
+    if ! git show :LICENSE >"$TMP/license" 2>"$TMP/err"; then
+        step_error "$name" \
+            "LICENSE is exempted from this check but could not be read from the index ($(head -1 "$TMP/err")) — an exemption over an unreadable file asserts nothing"
+        return 0
+    fi
+    if [[ ! -s "$TMP/license" ]]; then
+        step_error "$name" \
+            "LICENSE is exempted from this check and is ZERO BYTES in the index — an exemption over an empty file is an unguarded hole"
+        return 0
+    fi
+    # Every personal-name hit in the exempted file must sit on a copyright
+    # line. That is the whole of what the exemption is for; anything else in
+    # there is prose hiding behind a legal notice.
+    unbounded=$(grep -E -e "$pat" "$TMP/license" | grep -vE '^Copyright ')
+    rc=$?
+    if (( rc > 1 )); then
+        step_error "$name" "bounding grep over LICENSE exited $rc (I/O or usage error)"
+        return 0
+    fi
+    if [[ -n "$unbounded" ]]; then
+        step_error "$name" \
+            "LICENSE is exempted only for the copyright notice, but carries a personal name off a copyright line: $(printf '%s' "$unbounded" | head -1)"
+        return 0
+    fi
+
+    scan "$name" 3 \
+        "$(printf '%s\n' \
+            '\b[Aa]ndrew\b' \
+            '\b[Aa]shley\b' \
+            'agd[@]' \
+            )" \
+        "$(printf '%s\n' \
+            "reviewed by $(jn And rew) before merge" \
+            "$(jn Ash ley) approved the change" \
+            "ssh $(jn agd '@' bastion)" \
+            )" \
+        . ':!LICENSE'
+}
+personal_names
+
+# no-private-stack-apps: the applications running on that private stack. They
+# are not example applications; they are an inventory of what one household
+# runs. Grafana and Audiobookshelf are the only sanctioned examples, and they
+# are already the e2e fixtures under e2e/manifests/, so the docs and the tests
+# agree by construction rather than by anyone remembering to keep them aligned.
+#
+# GitLab is deliberately NOT a branch here, and the omission is named rather
+# than left to be rediscovered: this repo is hosted on GitLab and built by
+# GitLab CI, so `.gitlab-ci.yml`, `registry.gitlab.com` and "GitLab Runner" are
+# structural facts of the project, not leaked inventory. A bare-string ban on
+# the word cannot tell the forge from an example app. The constraint that
+# matters — GitLab must not appear as an example APPLICATION — is carried by
+# the manifest fixtures being Grafana and Audiobookshelf, not by this pattern.
+scan "no-private-stack-apps" 10 \
+    "$(printf '%s\n' \
+        '\b[Ii]mmich\b' \
+        '\b[Jj]ellyfin\b' \
+        '\b[Cc]inema\b' \
+        '\b[Vv]aultwarden\b' \
+        '\b[Nn]avidrome\b' \
+        '\b[Ss]onarr\b' \
+        '\b[Rr]adarr\b' \
+        '\b[Mm]ealie\b' \
+        '[Oo]pen ?[Ww]eb ?UI' \
+        '[Ll]ite[Ll][Ll][Mm]' \
+        )" \
+    "$(printf '%s\n' \
+        "photos live in $(jn Imm ich)" \
+        "$(jn Jelly fin) uses the LDAP path" \
+        "the $(jn cin ema) tile is gated" \
+        "$(jn Vault warden) issues the client" \
+        "$(jn Navi drome) streams over forward-auth" \
+        "$(jn Son arr) polls the indexer" \
+        "$(jn Rad arr) polls the same one" \
+        "$(jn Mea lie) holds the recipes" \
+        "$(jn Open ' ' WebUI) proxies the model" \
+        "$(jn Lite LLM) fronts the inference" \
+        )" \
+    .
 
 # no-dunn-dev-in-e2e-manifests: no instance domain leaked into compose manifests.
 scan "no-dunn-dev-in-e2e-manifests" 1 \
@@ -427,12 +723,11 @@ scan "no-stale-llm-client-id" 1 \
     'client_id: llm' \
     portal/scripts/
 
-# no-personal-name-in-help: family-help.md must not address operator by first
-# name. Lives in the public docs site content tree, not docs/.
-scan "no-personal-name-in-help" 1 \
-    '\bAndrew\b' \
-    'ask Andrew if you get stuck' \
-    site/src/content/docs/guides/family-help.md
+# A fourth purity check lived here — no-personal-name-in-help, one branch over
+# site/src/content/docs/guides/family-help.md. That page was deleted in the
+# convergence, so the check's scan set became empty and it would have reported
+# step_error forever. It is gone rather than repointed: no-personal-names above
+# already covers every path it covered, and every other path besides.
 
 echo ""
 
@@ -441,11 +736,18 @@ echo ""
 # =================================================================
 echo "No-referenced-deprecated:"
 
-# no-deleted-commands-in-docs: dag-apply-clients and dag-sync-manifests were
-# removed; their names must not survive in docs or source. The sibling gate
-# iac/deploy/checks/check_deleted_commands.sh carries the same branch/canary
-# pairing over the same two commands; keep the idiom aligned when either
-# side changes.
+# no-deleted-commands-in-docs: the two removed client-reconciliation commands,
+# whose names carried the instance prefix; they must not survive in docs or
+# source. The sibling gate in the deploy repo carries the same branch/canary
+# pairing over the same two commands; keep the idiom aligned when either side
+# changes.
+#
+# Branches and canaries are plain literals here, unlike the whole-tree checks.
+# They can be: this check's pathspec does not reach scripts/, so its canaries
+# are not inside its own corpus, and no whole-tree branch fires on these
+# strings. (They were briefly written as bracketed first letters and jn()
+# fragments, purely to survive an instance-name branch that has since been
+# removed. A literal is easier to read, so the literal is back.)
 scan "no-deleted-commands-in-docs" 2 \
     $'dag-apply-clients\ndag-sync-manifests' \
     $'run dag-apply-clients on the host\nrun dag-sync-manifests afterwards' \
@@ -482,110 +784,210 @@ scan "no-intentionally-fails-comment" 1 \
 echo ""
 
 # =================================================================
-# Decision-marker resolution family
+# Vendored-citation family
 # =================================================================
-echo "Decision-marker resolution:"
+echo "Vendored-citation:"
 
-# adr-pointers-resolve: every ADR pointer anywhere in the tree — space,
-# hyphen or underscore separated, with or without leading zeroes, or written as
-# a docs/adr path — must resolve to a tracked file under docs/adr/ whose
-# basename starts NN- and ends .md, NN zero-padded to two digits. The resolver
-# matches on basename, so an ADR filed in a subdirectory of docs/adr/ resolves
-# too.
+# no-line-pins-into-vendored-files: nothing anywhere in the tree may cite a
+# byte-vendored file by LINE NUMBER — neither the single-line form nor the
+# range form.
 #
-# The prose here deliberately spells no concrete ADR number: this file is
-# itself part of the citation corpus, and an example number in a comment would
-# be indistinguishable from a real pointer.
-adr_pointers_resolve() {
-    local name="adr-pointers-resolve"
+# The four vendored files are byte-enforced by the sibling deploy repo's drift
+# check, so this repo cannot edit them; their line numbers move under any
+# upstream bump, and a citation that carries one is a value that goes stale
+# without anything noticing. The rot is demonstrable, and it happened during the
+# pass that added this check: a document cited ARCHITECTURE.md's "mTLS gap (A7)"
+# paragraph by line range, a concurrent edit in the same diff added five lines
+# above it, and the range was wrong before the pass ended. The estate rule is
+# that a stale value is replaced by a pointer to the enforcing artifact, never
+# by a fresher value — so cite the file, name the key or heading, and drop the
+# number.
+#
+# Four branches, four canaries, paired by index: each canary names exactly one
+# of the four vendored paths, so no branch fires on another branch's canary and
+# dropping either half of a pair is reported rather than absorbed by a
+# neighbour.
+#
+# The canaries are assembled from fragments at runtime because the corpus here
+# is the whole index, this file included, so a pinned citation written out as a literal would be a violation
+# of the rule it is meant to prove. The branch patterns are safe as literals
+# because each spells its dot as an escaped dot, which is a backslash in this
+# source text and so does not match itself.
+vendored_line_pins() {
+    local name="no-line-pins-into-vendored-files"
+    local c=":" k="kratos/kratos" h="hydra/hydra" i="kratos/identity"
+    local g="kratos/hooks/recovery-gate" y=".yml" s=".schema.json" j=".jsonnet"
 
-    # The separator forms are split into one branch per LEADING separator
-    # character rather than left as a single character class, so each form has
-    # a canary that only it fires. The union is unchanged: a pointer either has
-    # no separator or begins with a space, a hyphen or an underscore, and each
-    # of those branches still accepts the full run of separators after the
-    # first. The zero-separator form gains a canary it never had.
-    #
-    # The canaries are built by concatenation because this file is inside the
-    # citation corpus: a literal pointer here would be indistinguishable from a
-    # real one and would demand a matching ADR file.
-    local a="AD" d="adr"
-    assert_fires "$name" 5 \
-        $'ADR[[:space:]][[:space:]_-]*[0-9]+\nADR-[[:space:]_-]*[0-9]+\nADR_[[:space:]_-]*[0-9]+\nADR[0-9]+\ndocs/adr/[0-9]+-' \
-        "see ${a}R 07 for rationale"$'\n'"superseded by ${a}R-07"$'\n'"noted in ${a}R_07"$'\n'"tracked as ${a}R07 today"$'\n'"defined in docs/${d}/07-example-decision.md" \
-        || return 1
+    # The range form needs no branch of its own: a range begins with a number,
+    # so the single-number branch already fires on it.
+    scan "$name" 4 \
+        $'kratos/kratos\\.yml:[0-9]+\nhydra/hydra\\.yml:[0-9]+\nkratos/identity\\.schema\\.json:[0-9]+\nkratos/hooks/recovery-gate\\.jsonnet:[0-9]+' \
+        "session block at ${k}${y}${c}264-272"$'\n'"DSN comment at ${h}${y}${c}135"$'\n'"trait at ${i}${s}${c}12"$'\n'"branch at ${g}${j}${c}7" \
+        .
+}
+vendored_line_pins
 
-    # Citation corpus: every tracked file. Deliberately the index and not a
-    # worktree walk — site/dist/ and site/node_modules/ exist locally and not
-    # in a fresh CI clone, so a walk would scan a different corpus in the two
-    # places. docs/adr/ is included: an ADR citing another ADR must resolve too.
-    build_scan_set "$name" . || return 1
+echo ""
 
-    # -I skips binary files (the repo carries PNG brand artwork): without it,
-    # grep emits "Binary file ... matches" and the number extractor below would
-    # read digits out of that sentence. The reported file count is therefore the
-    # corpus offered to grep, of which the binaries contribute no citations. A
-    # corpus that yielded no citation at all is caught as an error below, so
-    # this cannot degrade into a silent no-op.
-    #
-    # PATTERN is the join assert_fires just proved, so the citations extracted
-    # here are exactly the forms with a live canary — the extractor cannot drift
-    # away from the control.
-    local cites rc
-    cites=$(grep -IhoE -e "$PATTERN" -- "${SCAN_FILES[@]}" 2>"$TMP/greperr")
+# =================================================================
+# Prose-budget family
+# =================================================================
+echo "Prose-budget:"
+
+# ---------------------------------------------------------------------
+# prose-budget — total tracked documentation, capped in bytes.
+#
+# WHY THERE IS A CEILING AT ALL, recorded here because a number with no
+# reason attached gets raised the first time it is inconvenient:
+#
+# This corpus reached 504,832 bytes across 50 files. At that size, orienting
+# in the documentation cost more context than doing the work the documentation
+# described — every task began by spending the budget it needed to finish.
+# Nearly 20% of one week's model budget went to curating it rather than to
+# building anything. Half of it was deleted in a single pass, including a
+# 16-document decision corpus and the 243-node citation web that held it
+# together, roughly a third of whose line pins were already wrong.
+#
+# "Keep the documentation short" is an intention, and intentions lose to the
+# next plausible page. A ceiling is a build failure, which does not. The rule
+# it makes operational is the one in AGENTS.md: adding documentation means
+# removing documentation, in the same commit.
+#
+# RAISING IT is a legitimate act and deliberately an awkward one — it is an
+# edit to this constant, in a commit whose message has to say what grew and
+# why it earned the room. That is the whole mechanism. What must not happen is
+# the ceiling drifting upward one convenient commit at a time, which is why it
+# is a literal here and not a high-water mark computed from the tree.
+#
+# The CHANGELOG is inside the budget, and that is a choice rather than an
+# oversight: an agent orienting in this repo reads it like anything else, so
+# it costs what everything else costs. It grows monotonically, so it will one
+# day be the thing pushing against the ceiling. When it is, trim the old
+# entries — releases are in the tags — or raise the ceiling on purpose.
+# ---------------------------------------------------------------------
+
+# The ceiling, in bytes. Set to the surviving corpus plus 10% headroom at the
+# convergence that created this check.
+PROSE_CEILING_BYTES=191957
+
+# What the corpus weighed when it became unmanageable. The ceiling is asserted
+# below to be under this, so "raise the ceiling" cannot quietly become "restore
+# the state that made the ceiling necessary".
+PROSE_HIGH_WATER_BYTES=504832
+
+# THE DEFINITION OF PROSE, kept as data because it is printed on every run:
+# a future maintainer reading a failure must be able to see what was counted
+# without reading this file.
+PROSE_GLOBS=('*.md' '*.mdx' '*.markdown')
+
+# Doc trees whose every tracked file must be counted by the globs above. This
+# is the coverage assertion: renaming a page out of the counted extensions is
+# the obvious way to dodge a byte budget, and it would otherwise look like the
+# corpus shrinking. A file here that the definition does not count is an ERROR
+# that names the file, so widening the definition — or moving the file — is a
+# deliberate act rather than an accident.
+PROSE_COVERED_TREES=(docs/ site/src/content/docs/)
+
+# over_budget <bytes> — the single comparison this check makes. It exists as a
+# function so the positive control below can exercise the same code the verdict
+# uses; a control that re-implements the comparison proves nothing about it.
+over_budget() { (( $1 > PROSE_CEILING_BYTES )); }
+
+prose_budget() {
+    local name="prose-budget" rc f i
+    local defn total ceiling headroom pct
+    local -a missing=()
+
+    defn="$(printf '%s ' "${PROSE_GLOBS[@]}")"
+    defn="${defn% }"
+
+    # --- the constants are sane ---------------------------------------
+    if [[ ! "$PROSE_CEILING_BYTES" =~ ^[0-9]+$ ]] || (( PROSE_CEILING_BYTES == 0 )); then
+        step_error "$name" \
+            "PROSE_CEILING_BYTES is '$PROSE_CEILING_BYTES' — a ceiling that is not a positive integer is not a ceiling"
+        return 0
+    fi
+    if (( PROSE_CEILING_BYTES >= PROSE_HIGH_WATER_BYTES )); then
+        step_error "$name" \
+            "PROSE_CEILING_BYTES ($PROSE_CEILING_BYTES) is at or above the $PROSE_HIGH_WATER_BYTES bytes this corpus weighed when it became unmanageable — a ceiling set there permits exactly the state it exists to prevent"
+        return 0
+    fi
+    if (( ${#PROSE_GLOBS[@]} == 0 )); then
+        step_error "$name" "PROSE_GLOBS is empty — the check would define prose as nothing and pass forever"
+        return 0
+    fi
+
+    # --- positive control ---------------------------------------------
+    # The budget analogue of a canary. A comparison hard-wired to "under", or
+    # inverted, or reading a variable that is no longer the one being set, is
+    # the exact vacuity the pattern checks guard against with canaries: it
+    # scans a real corpus and always reports clean. So the comparator is fired
+    # at a value that must be over and a value that must not be.
+    if ! over_budget $((PROSE_CEILING_BYTES + 1)); then
+        step_error "$name" \
+            "POSITIVE CONTROL FAILED: over_budget() reports $((PROSE_CEILING_BYTES + 1)) bytes as within a $PROSE_CEILING_BYTES-byte ceiling — the comparison cannot fail, so its green means nothing"
+        return 0
+    fi
+    if over_budget "$PROSE_CEILING_BYTES"; then
+        step_error "$name" \
+            "POSITIVE CONTROL FAILED: over_budget() reports exactly $PROSE_CEILING_BYTES bytes as over a $PROSE_CEILING_BYTES-byte ceiling — the comparison is off by one against the corpus it is supposed to admit"
+        return 0
+    fi
+
+    # --- the corpus, from the index, weighed ---------------------------
+    # build_scan_set does the whole anti-vacuity job here: empty set, absent or
+    # unreadable member, zero-byte member and zero-byte corpus are all ERROR,
+    # and SCAN_BYTES is measured over blobs materialised from the index rather
+    # than over the worktree.
+    build_scan_set "$name" "${PROSE_GLOBS[@]}" || return 0
+
+    # --- coverage ------------------------------------------------------
+    printf '%s\n' "${SCAN_FILES[@]}" >"$TMP/proseset"
+    git ls-files -z -- "${PROSE_COVERED_TREES[@]}" >"$TMP/covered" 2>"$TMP/err"
     rc=$?
-    case "$rc" in
-        0) : ;;
-        1)  step_error "$name" \
-                "no ADR citation matched across ${#SCAN_FILES[@]} tracked files — the resolver would have verified nothing"
-            return 1 ;;
-        *)  step_error "$name" \
-                "citation grep exited $rc (I/O or usage error, NOT 'no match'): $(head -1 "$TMP/greperr")"
-            return 1 ;;
-    esac
-
-    # Normalise every captured number to two digits BEFORE de-duplicating, so a
-    # four-digit-padded citation and a two-digit one collapse to one lookup.
-    # 10# forces base-10: without it, a leading zero would be read as octal.
-    local raw nums=""
-    while IFS= read -r raw; do
-        [[ -n "$raw" ]] || continue
-        nums+="$(printf '%02d' "$((10#$raw))")"$'\n'
-    done < <(printf '%s\n' "$cites" | grep -oE '[0-9]+')
-    nums=$(printf '%s' "$nums" | sort -u)
-    if [[ -z "$nums" ]]; then
-        step_error "$name" "citations matched but no ADR number could be extracted"
-        return 1
+    if (( rc != 0 )); then
+        step_error "$name" \
+            "git ls-files exited $rc enumerating the covered doc trees [${PROSE_COVERED_TREES[*]}]: $(head -1 "$TMP/err")"
+        return 0
+    fi
+    i=0
+    while IFS= read -r -d '' f; do
+        i=$((i+1))
+        grep -qxF -- "$f" "$TMP/proseset" || missing+=("$f")
+    done <"$TMP/covered"
+    if (( i == 0 )); then
+        step_error "$name" \
+            "0 tracked files under the covered doc trees [${PROSE_COVERED_TREES[*]}] — the coverage assertion has nothing to assert, so either a tree moved or this list is stale"
+        return 0
+    fi
+    if (( ${#missing[@]} > 0 )); then
+        step_error "$name" \
+            "${#missing[@]}/$i file(s) in the covered doc trees are NOT counted as prose, e.g. ${missing[0]} — either it was renamed out of [$defn] to dodge the budget, or the definition needs widening; both are deliberate acts, so make one"
+        return 0
     fi
 
-    # Resolution corpus: tracked files under docs/adr/.
-    local adr_index
-    adr_index=$(git ls-files -- docs/adr/)
-    if [[ -z "$adr_index" ]]; then
-        step_error "$name" "no tracked files under docs/adr/ — resolver has no corpus"
-        return 1
-    fi
+    # --- the numbers, printed on every run -----------------------------
+    # Passing or failing. A budget nobody can see is a budget nobody manages,
+    # and the run where the headroom went from comfortable to thin is the run
+    # worth noticing — not the one after it, where the gate is already red.
+    total=$SCAN_BYTES
+    ceiling=$PROSE_CEILING_BYTES
+    headroom=$((ceiling - total))
+    pct=$(( total * 100 / ceiling ))
+    printf "      \033[2mprose = tracked %s over the whole index (%s files)\033[0m\n" \
+        "$defn" "${#SCAN_FILES[@]}"
+    printf "      \033[2mcurrent %s B / ceiling %s B (%s%%) — headroom %s B\033[0m\n" \
+        "$total" "$ceiling" "$pct" "$headroom"
 
-    local nn missing="" grc
-    for nn in $nums; do
-        printf '%s\n' "$adr_index" | grep -qE "(^|/)${nn}-[^/]*\.md$"
-        grc=$?
-        case "$grc" in
-            0) : ;;
-            1) missing="${missing}${missing:+ }${nn}" ;;
-            *) step_error "$name" "resolver grep exited $grc while looking up ADR ${nn}"
-               return 1 ;;
-        esac
-    done
-
-    if [[ -n "$missing" ]]; then
-        step_fail "$name" "cited but no tracked docs/adr file for: $missing"
+    if over_budget "$total"; then
+        step_fail "$name" \
+            "tracked prose is $total bytes, over the $ceiling-byte ceiling by $((-headroom)) — remove documentation, or raise PROSE_CEILING_BYTES in scripts/check-purity.sh in a commit that says what grew and why"
     else
-        step_pass "$name" "${#SCAN_FILES[@]}"
+        step_pass "$name" "${#SCAN_FILES[@]}" "$total"
     fi
     return 0
 }
-adr_pointers_resolve
+prose_budget
 
 echo ""
 

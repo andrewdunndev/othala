@@ -7,7 +7,8 @@
 #                  via publish_at_root: true (the oryd/kratos-style
 #                  namespace/name shape).
 # caddy lives in the separate dunn.dev/caddy-estate repo; the
-# production Caddyfile snippets live in the deploy repo's services/dag/.
+# production Caddyfile snippets are assembled by whatever deploy repo
+# stands the instance up. caddy/snippets/ here is the reference copy.
 #
 # The legacy consent/ (Go) and util/ (Bash) modules were retired at the
 # E1 cutover: their roles converged into the othala app. The LDAP bridge
@@ -64,7 +65,7 @@ include:
 
 
   # ----- e2e-tester (prebaked Playwright browser-test image) ------
-  # The browser e2e leg runs inside the lodestone inner VM, which can pull
+  # The browser e2e leg runs inside the e2e job's inner VM, which can pull
   # container images from the registry but CANNOT reach the npm registry
   # (a runtime `npm install` there stalls and times out the gate, exit
   # 124). This image bakes the @playwright/test deps + the e2e specs into
@@ -221,8 +222,8 @@ lint-jsonnet-hooks:
   script:
     - |
       # 1. Assert the recovery-gate file exists and is non-empty.
-      # (login-gate.jsonnet was RETIRED in ADR 08 — the after.code login
-      # interrupt is superseded by required_aal: aal2 on /admin.)
+      # (login-gate.jsonnet was RETIRED — the after.code login interrupt is
+      # superseded by required_aal: aal2 on /admin.)
       for f in kratos/hooks/recovery-gate.jsonnet; do
         if [ ! -s "$f" ]; then
           echo "ERROR: $f missing or empty — gate webhook file must exist."
@@ -263,13 +264,31 @@ lint-jsonnet-hooks:
       echo "OK: recovery-gate.jsonnet function bodies are in sync."
 
 # -----------------------------------------------------------------
-# check-purity: OSS purity + no-deprecated + dated-debt detection gate.
+# check-purity: OSS purity + no-deprecated + dated-debt + prose-budget gate.
 #
-# Runs scripts/check-purity.sh against the repo tree to detect instance-
-# specific strings (dunn.dev in configs/tests/docs), references to deleted
-# commands (dag-apply-clients, dag-sync-manifests), lingering DORMANT/
-# (pending) markers, and intentional-failure stubs. No npm deps needed —
-# pure bash + grep.
+# Runs scripts/check-purity.sh over the git index. WHAT it checks is not
+# restated here — the script names and explains every check, and a list kept
+# in two places goes stale in one of them. No npm deps needed: pure bash,
+# git and grep.
+#
+# Three of its checks take the WHOLE index as their corpus (instance names,
+# personal names, private-stack application names) and one caps total tracked
+# prose in bytes. Both properties are about this file too: the gate scans
+# .gitlab-ci.yml like everything else, so a runner tag or a comment naming a
+# private host fails the pipeline that reads it.
+#
+# scripts/probe-check-purity.sh runs in the SAME job, ahead of the gate. It is
+# the mutation harness that proves the gate still fails the way it claims to,
+# and a probe suite nobody runs decays into the same defect class as a gate
+# that scans nothing. Both run unconditionally and the job is red if either is,
+# so a passing gate never hides a rotted probe or the reverse.
+#
+# Dependencies beyond the gate's: none. The harness builds its fixture from the
+# git index and rewrites files with sed and grep, so it needs exactly what the
+# gate needs. scripts/probe-check-purity.sh asserts each with `command -v` on
+# startup and exits non-zero if any is missing, rather than skipping — so a
+# runner image that stops carrying them fails the job loudly instead of
+# reporting on probes that did not run.
 # -----------------------------------------------------------------
 check-purity:
   stage: verify
@@ -279,7 +298,11 @@ check-purity:
     - if: '$CI_PIPELINE_SOURCE == "push"'
     - if: '$CI_COMMIT_TAG'
   script:
-    - bash scripts/check-purity.sh
+    - |
+      rc=0
+      bash scripts/probe-check-purity.sh || rc=1
+      bash scripts/check-purity.sh || rc=1
+      exit $rc
 
 # -----------------------------------------------------------------
 # test-portal: v0.2.0 portal test suite. Runs `npm test` which
@@ -292,8 +315,8 @@ check-purity:
 # Also runs `npm run test:unit` (vitest, against src/lib/*.test.ts) —
 # the TypeScript-native lib suite that vitest.config.ts has always
 # included but nothing invoked before this job wired it in. Covers
-# admin-auth.test.ts (isAdminMarker, the ADR-08 admin authority
-# function), plus contact/csrf/manifest-store/tiles lib tests. The two
+# admin-auth.test.ts (isAdminMarker, the admin authority function),
+# plus contact/csrf/manifest-store/tiles lib tests. The two
 # harnesses are independent (node --test+tsx vs vitest) and both must
 # pass; see portal/vitest.config.ts for scope notes.
 #
@@ -352,9 +375,9 @@ check-portal:
 #
 # The project's canonical OSS-facing "stand Othala up on compose"
 # example (e2e/README.md), run here as the release gate. Executes in a
-# fresh Fedora VM spawned by the lodestone GitLab Runner (Custom Executor;
-# tag lodestone,qemu). The VM has podman + docker bridge pre-baked. Inside
-# the VM, e2e/validate.sh:
+# fresh Fedora VM spawned by a QEMU GitLab Runner (Custom Executor), selected
+# by the `tags:` on the job below. The VM has podman + docker bridge pre-baked.
+# Inside the VM, e2e/validate.sh:
 #
 #   1. Generates per-run secrets
 #   2. podman login to the GitLab registry
@@ -379,12 +402,25 @@ check-portal:
 # The LDAP bridge is now the standalone gitlab.com/dunn.dev/kratos-ldap
 # project; e2e/compose.yml no longer pulls it.
 #
-# See e2e/README.md + docs/research/qemu-ci-lab.md.
+# See e2e/README.md.
 # -----------------------------------------------------------------
 e2e:
   stage: e2e
-  # NOTE: requires a lodestone-tagged QEMU runner; forks without one will see this job pending. See docs/research/qemu-ci-lab.md.
-  tags: [lodestone, qemu]
+  # These are REAL runner labels, not descriptions: they select the QEMU
+  # Custom Executor that spawns the per-job VM. A fork without a runner
+  # carrying both labels will see this job sit pending forever.
+  #
+  # The first label names ONE MACHINE, which is deployment configuration and
+  # not something a public repo can carry, so it is a project CI/CD variable
+  # and this file only references it. There is deliberately NO default: GitLab
+  # does not honor `${VAR:-fallback}` in `tags:`, and any literal fallback
+  # would put a host name back in the file — which is the leak, not a
+  # convenience. Set E2E_RUNNER_TAG (unprotected, unmasked) to your own
+  # runner's host label BEFORE this job first runs; an unset variable expands
+  # to an empty tag and the job sits pending forever. `qemu` stays literal: it
+  # names an executor CLASS, which is a property of the harness rather than of
+  # anyone's estate. See e2e/README.md.
+  tags: ["$E2E_RUNNER_TAG", qemu]
   needs:
     - build-othala
     # Prebaked browser-test image — pulled by compose.yml's playwright +
@@ -442,7 +478,7 @@ e2e:
     # On-demand pre-tag validation: a branch pipeline triggered with
     # BUILD_CI_IMAGE=true builds the images (container-image @2.5.1 honors
     # the same flag — see its rule 3) and runs e2e against them. Lets us
-    # validate the converged substrate on the lodestone runner BEFORE cutting
+    # validate the converged substrate on the QEMU runner BEFORE cutting
     # a tag or merging to main. The builds publish :<short-sha>, which the
     # AUTH_VERSION default ($CI_COMMIT_SHORT_SHA) matches.
     - if: '$BUILD_CI_IMAGE == "true"'

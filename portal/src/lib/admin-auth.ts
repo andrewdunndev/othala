@@ -1,13 +1,12 @@
 // Admin authority — the `metadata_admin.admin` marker on the Kratos
 // identity is the sole admin authority: admin-API-only-writable, read fresh
 // via getIdentity, and absent from /sessions/whoami in Kratos v26.2.0.
-// Decided in docs/adr/08-admin-authority-model.md.
 
 import type { Identity } from './types';
 import { getIdentity } from './admin-api';
 
 /**
- * Authoritative admin marker check (ADR 08 Tier 1).
+ * Authoritative admin marker check — the sole admin authority.
  *
  * Returns true iff `identity.metadata_admin.admin === true` (boolean strict
  * equality). The caller MUST supply an identity fetched fresh from the Kratos
@@ -27,7 +26,7 @@ export function isAdminMarker(identity: Identity | null | undefined): boolean {
 }
 
 /**
- * Cosmetic admin-chrome check for SSR pages (ADR 08).
+ * Cosmetic admin-chrome check for SSR pages. Never an authority check.
  *
  * Fetches the full identity from the Kratos admin API (which includes
  * metadata_admin, stripped from /sessions/whoami by Kratos v26.2.0) and

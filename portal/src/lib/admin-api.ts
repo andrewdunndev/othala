@@ -59,7 +59,7 @@ export interface MetadataAdmin {
   /** Per-app role overrides, keyed by client_id. */
   roles?: Record<string, string>;
   /**
-   * Admin authority marker (ADR 08). Strict boolean; only set via the
+   * Admin authority marker. Strict boolean; only set via the
    * Kratos admin API. Use patchAdminMarker for targeted grant/revoke so
    * groups/roles are never clobbered.
    */
@@ -175,7 +175,7 @@ export async function reactivateIdentity(id: string): Promise<void> {
 }
 
 /**
- * Targeted patch of the `metadata_admin.admin` marker (ADR 08).
+ * Targeted patch of the `metadata_admin.admin` marker.
  *
  * Uses JSON Patch (RFC 6902) against the Kratos PATCH endpoint so groups
  * and roles are never touched. Grant sets admin=true; revoke removes the key.
@@ -264,7 +264,7 @@ export const EVICTABLE_CREDENTIAL_TYPES = new Set<string>([
  * Endpoint: DELETE /admin/identities/{id}/credentials/{type}
  *
  * NOTE: The exact endpoint shape and 404 behaviour need live gate validation
- * against the deployed Kratos version. Confirm via `make dag-e2e` or manual
+ * against the deployed Kratos version. Confirm via the e2e harness or manual
  * curl before relying in production.
  */
 export async function deleteCredential(
@@ -302,7 +302,7 @@ export interface RecoveryLink {
 }
 
 /**
- * One-shot recovery code + link the admin shares out-of-band (ADR 08).
+ * One-shot recovery code + link the admin shares out-of-band.
  *
  * Uses `createRecoveryCodeForIdentity` (POST /admin/recovery/code, Kratos
  * v26.2.0+). The response includes both a `recovery_link` (URL to the

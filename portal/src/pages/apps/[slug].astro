@@ -42,10 +42,10 @@ if (!entry) {
   return new Response('App not found', { status: 404 });
 }
 
-// ADR 08: admin authority is the metadata_admin.admin marker (admin-API-only-
+// Admin authority is the metadata_admin.admin marker (admin-API-only-
 // writable boolean). Admins see every app's detail page; everyone else needs
-// membership in one of the tile's bound access groups (access-model Phase 2 —
-// userCanSeeTile reads the same accessGroups binding as the gate).
+// membership in one of the tile's bound access groups (userCanSeeTile reads
+// the same accessGroups binding as the gate).
 // The public whoami does NOT expose metadata_admin, so both the user's groups
 // and admin status come from a re-fetch of the FULL identity via the ADMIN API.
 // FAIL-CLOSED: any lookup failure → empty groups → the access gate denies;

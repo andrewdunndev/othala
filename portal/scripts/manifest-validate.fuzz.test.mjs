@@ -235,8 +235,8 @@ test('property: audienceMatchesRedirect is fail-closed when origins differ', () 
       fc.constantFrom(
         'https://app.example.com',
         'https://keep.othala.test',
-        'https://jellyfin.othala.test',
-        'https://login.tailscale.com',
+        'https://filedrop.othala.test',
+        'https://login.example.net',
       ),
       // A crafted redirect whose parsed origin is DIFFERENT from the audience
       fc.oneof(
@@ -300,7 +300,7 @@ test('property: audienceMatchesRedirect accepts when every audience origin is co
           base: fc.constantFrom(
             'https://app.example.com',
             'https://keep.othala.test',
-            'https://jellyfin.othala.test',
+            'https://filedrop.othala.test',
           ),
           audPath: fc.stringMatching(/^[a-z0-9\-]{0,8}$/),
           redPath: fc.stringMatching(/^[a-z0-9\/\-]{0,16}$/),

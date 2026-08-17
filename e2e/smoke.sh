@@ -235,7 +235,7 @@ fi
 
 # B2: Hydra admin lists EXACTLY the clients with an oidc: block. The count
 # is DATA-DRIVEN from the fixtures: grep the manifest dir for files that
-# declare a top-level `oidc:` block (presentation-only tiles — jellyfin,
+# declare a top-level `oidc:` block (presentation-only tiles — filedrop,
 # proxywatch, statuspage — have none and register no client). No hardcoded
 # number; add/remove an OIDC fixture and this re-derives.
 oidc_fixture_count=$(grep -lE '^oidc:' ./manifests/*.yaml 2>/dev/null | wc -l | tr -d ' ')
@@ -294,7 +294,7 @@ fi
 echo ""
 echo "D. Recovery-gate (othala :4431 /admin/recovery-gate)"
 #
-# ADR 0008, as hardened for Kratos v26.2.0: the gate does NOT trust the
+# As hardened for Kratos v26.2.0: the gate does NOT trust the
 # payload's `is_admin` field — v26.2.0 omits metadata_admin from ctx.identity
 # in after-hook context (confirmed empirically 2026-06-25) — so it re-fetches
 # the identity from the Kratos admin API and refuses iff metadata_admin.admin

@@ -1,4 +1,4 @@
-// revokeSubject — the in-process revocation fan-out (DAG CU3 / B1).
+// revokeSubject — the in-process revocation fan-out (CU3 / B1).
 //
 // One function, called by all three revocation triggers:
 //

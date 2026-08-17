@@ -1,73 +1,47 @@
 # caddy/snippets — reusable patterns
 
-Generic Caddyfile snippets for the four ways an app can sit behind Othala.
-Each `*.caddy` file defines a named snippet (parens syntax, e.g.
-`(forward-auth)`) that a top-level Caddyfile imports with
-`import <name> <args>`.
+Four named Caddyfile snippets, one per way an app can sit behind Othala.
+Copy them; nothing here is tied to a particular deployment. The three that
+proxy take the upstream as `{args[0]}:{args[1]}`, so you pass your own
+container name and port at import time. `admin-session` takes no arguments and
+proxies nothing (see below).
 
-These are an **integration reference for adopters to copy**, not deploy
-config. They are deliberately generic: `kratos:4433` for the Kratos public
-API, `{env.OTHALA_PUBLIC_URL}` for the login redirect, and
-`{args[0]}:{args[1]}` for the upstream backend. Pass your own container
-name and port at import time.
+| Snippet | For an app that… |
+|---|---|
+| `oidc-app` | speaks OIDC itself — Caddy is only TLS + reverse proxy |
+| `ldap-app` | binds to the LDAP bridge instead — also only TLS + reverse proxy |
+| `forward-auth` | has no SSO you want to use — Caddy's built-in `forward_auth` checks the Kratos session first |
+| `admin-session` | exposes an admin path needing *a* session; AAL2 step-up stays at the app's SSR layer |
 
-The **Apps** column below lists how the maintainer's instance
-(`dag.dunn.dev`) uses each pattern — a worked example, not a requirement.
+Only `forward-auth` and `admin-session` involve Kratos at request time. The
+one plugin any of them assume is `caddy-dns/cloudflare`, and only for DNS-01
+TLS — swap that block for whatever issues your certificates.
 
-| Snippet | Use case | Apps (example) |
-|---|---|---|
-| `oidc-app` | OIDC-native app, plain reverse proxy | Vaultwarden, Mealie, Audiobookshelf, Immich, oCIS, BookLore, GitLab, Grafana |
-| `ldap-app` | App with an LDAP plugin, plain reverse proxy (LDAP traffic goes pod-internal to the bridge) | Jellyfin |
-| `forward-auth` | App without native SSO, gated by Caddy `forward_auth` → Kratos session | Navidrome, Sonarr, Radarr, qBittorrent, sabnzbd, Prowlarr |
-| `admin-session` | Admin path: requires a Kratos session (any AAL); AAL2 step-up enforced at the app's SSR layer | `<host>/admin/*` |
+## Importing
 
-The headline pattern is `forward-auth`: it uses Caddy's **built-in**
-`forward_auth` directive (no plugin) to verify a Kratos session before
-proxying. The only plugin any of these assume is `caddy-dns/cloudflare`,
-and only for DNS-01 TLS — see `../README.md`.
-
-## Putting it together
-
-A top-level Caddyfile imports the snippets it needs, then references them
-per host:
+`import` the files once, then invoke the snippet inside each site block:
 
 ```caddyfile
-import oidc-app.caddy
-import ldap-app.caddy
-import forward-auth.caddy
-import admin-session.caddy
+import snippets/*.caddy
 
-keep.example.com {
-    import oidc-app vaultwarden 80
+metrics.example.com {
+	import oidc-app grafana 3000
 }
 
-cinema.example.com {
-    import ldap-app jellyfin 8096
-}
-
-tune.example.com {
-    # Bypass SSO for API paths whose clients use HTTP Basic, not a session
-    @api path /rest/* /share/*
-    handle @api {
-        reverse_proxy navidrome:4533
-    }
-    # Web UI: forward-auth via Kratos
-    handle {
-        import forward-auth navidrome 4533
-    }
+listen.example.com {
+	import forward-auth audiobookshelf 13378
 }
 ```
 
-## A note on rate limiting
+`oidc-app`, `ldap-app`, and `forward-auth` proxy to the upstream themselves.
+`admin-session` deliberately does not — it gates the request and leaves the
+site block to add its own `reverse_proxy`, so you can gate one path of an app
+you route several ways.
 
-The snippets assume a Caddy build with a single plugin —
-`caddy-dns/cloudflare` for DNS-01 ACME — and **no** `caddy-ratelimit`. The
-reasoning, if you're deciding whether to add it:
-
-- Bcrypt's natural CPU cost is the primary brute-force defense on auth paths.
-- For DDoS-style spam, Caddy's built-in connection limits are sufficient at
-  household/family scale.
-- A separate plugin adds attack surface and a second maintenance vector.
-
-If a specific attack surfaces that warrants it, add the plugin then — not
-by default.
+Give each site block a concrete host. `forward-auth` and `admin-session`
+build the post-login `return_to` from the request's own scheme and host, and
+a site block with a real host address is what pins that host down.
+`allowed_return_urls` in `kratos/kratos.yml` is the backstop — and because
+those entries are `https`-only, an edge that sees plain `http` (TLS
+terminated somewhere upstream) produces a value Kratos refuses, and the user
+lands on the portal rather than back at the service.

@@ -5,9 +5,7 @@ How to put an app behind Othala's Kratos session using
 
 This directory is a **reference for adopters**, not deploy config. Othala
 does not ship or run a Caddy container — these are copy-and-adapt patterns
-you drop into your own reverse proxy in front of your own apps. The
-maintainer's instance (`dag.dunn.dev`) wires them up the way shown here;
-yours can differ.
+you drop into your own reverse proxy in front of your own apps.
 
 ## What it shows
 
@@ -26,7 +24,7 @@ yours can differ.
 | File | What it is |
 |---|---|
 | `Caddyfile` | A worked top-level Caddyfile for a single Othala instance: how to route the Kratos browser surface, the Hydra OAuth2 surface, and the app itself behind one hostname. |
-| `snippets/` | Reusable, generic Caddyfile snippets for the four ways an app sits behind Othala (OIDC-native, LDAP-bound, forward-auth, admin session). See `snippets/README.md`. |
+| `snippets/` | Reusable, generic Caddyfile snippets for the four ways an app sits behind Othala. Each `*.caddy` file defines one named snippet (parens syntax, e.g. `(forward-auth)`) that a top-level Caddyfile imports with `import <name> <args>`: `oidc-app` (OIDC-native app, plain reverse proxy), `ldap-app` (app with an LDAP plugin), `forward-auth` (no native SSO, gated by Caddy `forward_auth` against the Kratos session), `admin-session` (admin path requiring a Kratos session, with AAL2 step-up enforced at the app's SSR layer). |
 
 The snippets are written generically — `kratos:4433`,
 `{env.OTHALA_PUBLIC_URL}`, and `{args[0]}:{args[1]}` backends — so you

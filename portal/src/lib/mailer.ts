@@ -9,7 +9,7 @@
 // The transport is built LAZILY and cached: the module imports cleanly without
 // opening a socket, so `astro build` and unit tests don't need a live relay.
 //
-// Error discipline (DAG posture): on a send failure the caller surfaces a
+// Error discipline (project posture): on a send failure the caller surfaces a
 // generic 5xx. This module throws a MailerError whose message is safe to LOG
 // server-side but the API route never echoes SMTP internals to the client.
 

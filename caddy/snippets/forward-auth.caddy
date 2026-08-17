@@ -1,7 +1,7 @@
 # Reusable Caddy snippet — forward-auth via Kratos /sessions/whoami
 #
 # Usage in a per-app Caddyfile:
-#   import forward-auth navidrome 4533
+#   import forward-auth audiobookshelf 13378
 #
 # Caddy's built-in forward_auth directive calls Kratos to verify the user's
 # session. If valid (200 from whoami), proxies to the upstream with identity
@@ -18,7 +18,11 @@
 #       from Hydra carry authoritative group membership).
 #   (b) Non-OIDC apps needing group checks: add a dedicated forward_auth
 #       endpoint that resolves group membership server-side via the Kratos
-#       admin API and returns 200/403 — never trust a passed header.
+#       admin API and returns 200/401/403/503 — never trust a passed header.
+#       That endpoint is portal/src/pages/api/forward-auth.ts; its header
+#       comment is the status contract. 503 is not decoration: it is what
+#       separates "the identity provider did not answer" from "you are
+#       refused", so an edge can keep an outage out of its redirect arm.
 #
 # Args:
 #   $1 = upstream container name
@@ -35,10 +39,33 @@
 
 		# Kratos /sessions/whoami returns 200 with full session JSON if
 		# valid, 401 if not. Caddy treats non-2xx as "not authorized"
-		# and falls through to the handle_response below.
+		# and falls through to the handle_response below. 403 is listed
+		# too because getSession (portal/src/lib/kratos.ts) treats both
+		# the same way: "e.response.status === 401 || e.response.status
+		# === 403" → a null session.
+		#
+		# 503 is deliberately absent, and must stay absent in any edge
+		# copied from this snippet. handle_response below redirects to
+		# the portal's login flow; matching 503 into that arm would send
+		# a visitor to the login page of the very portal that just failed
+		# to answer, and bounce them there on every retry — the infinite
+		# login loop the four-status contract in
+		# portal/src/pages/api/forward-auth.ts exists to prevent. An
+		# outage must stay a flat error, not a redirect.
+		#
+		# return_to must be ABSOLUTE. A path-only value resolves against
+		# the portal's own host, so the user lands back on the portal
+		# instead of the service they were trying to reach — which defeats
+		# the apex wildcard in kratos.yml `allowed_return_urls`. Scheme and
+		# host are taken from the request being gated.
+		#
+		# That allowlist, not this snippet, is what bounds the value: a
+		# request carrying a Host outside the apex yields a return_to Kratos
+		# refuses, and the user is sent to `default_browser_return_url`
+		# instead — degraded, never an off-apex redirect.
 		@unauthorized status 401 403
 		handle_response @unauthorized {
-			redir {env.OTHALA_PUBLIC_URL}/auth/login?return_to={http.request.uri.path}&domain={http.request.host} 302
+			redir {env.OTHALA_PUBLIC_URL}/auth/login?return_to={http.request.scheme}://{http.request.host}{http.request.uri.path} 302
 		}
 	}
 

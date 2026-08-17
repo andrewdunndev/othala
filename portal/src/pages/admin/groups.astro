@@ -4,8 +4,8 @@
 // Two sections:
 //   - Identity groups (admin / family / kids / friends + any other group
 //     a manifest references via group_role_map). Each card lists members.
-//   - Access groups: registry-derived Group → Apps view (access-model §12). A
-//     group's type comes from its manifest BINDING, not its name; each card
+//   - Access groups: registry-derived Group → Apps view. A group's type comes
+//     from its manifest BINDING, not its name; each card
 //     names the apps it grants entry to / maps a role in, and lists members.
 //
 // Editing happens on the per-user page. This is a navigation aid: spot
@@ -40,8 +40,8 @@ const clientNameById = new Map(manifests.map((m) => [m.clientId, m.clientName] a
 const identityGroups = servingIdentityGroups();
 const manifestState = manifestHealth();
 
-// access-model Phase 2 (§12): the access section is now a registry-driven
-// Group → Apps view. A group's type is its BINDING, not its name — so an
+// The access section is a registry-driven Group → Apps view. A group's type is
+// its BINDING, not its name — so an
 // access group named `memories` shows up correctly. Each row names the apps the
 // group grants ENTRY to (accessFor) and the apps it maps a ROLE in (roleFor).
 const appLabel = (id: string) => clientNameById.get(id) ?? id;

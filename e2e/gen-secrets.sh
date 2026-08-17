@@ -137,7 +137,7 @@ HYDRA_COOKIE_SECRET_CURRENT=${hydra_cookie}
 HYDRA_PAIRWISE_SALT=$(gen_short)
 
 # ── Admin identity credentials (shared between validate.sh seed + Playwright fixtures) ────
-# validate.sh seeds these two identities after compose is healthy (ADR 0008 marker model):
+# validate.sh seeds these two identities after compose is healthy (marker model):
 #   - POST /admin/identities with metadata_admin: { admin: true, groups: [...] }
 #     The admin marker IS the authority — no UUID readback or env rewrite needed.
 # The Playwright fixtures read these same env vars to log in as the seeded admin.
@@ -149,7 +149,7 @@ RECOVERY_ADMIN_EMAIL=admin.recovery@othala.test
 RECOVERY_ADMIN_USERNAME=admin.recovery
 RECOVERY_ADMIN_PASSWORD=othala-testpass-2026
 
-# Converged app admin model (ADR 0008). Admin authority is the
+# Converged app admin model. Admin authority is the
 # metadata_admin.admin === true boolean marker (set via Kratos admin API),
 # NOT an env-based UUID allowlist. OTHALA_ADMIN_IDS is retired.
 #   OTHALA_ADMIN_ENDPOINT_BEARER  guards POST /admin/revoke-user (loopback)
@@ -166,10 +166,11 @@ CSRF_SECRET=$(gen)
 # manifest's client_id upper-cased (see portal register-clients.ts
 # envVarName: client_id.toUpperCase() + "_CLIENT_SECRET"). The generic
 # example set has three OIDC clients: grafana, audiobookshelf, and
-# openwebui (client_id "openwebui", manifest open-webui.yaml). The
-# presentation-only fixtures (jellyfin/proxywatch/statuspage) have no
+# promptdesk (client_id "promptdesk", manifest promptdesk.yaml — note the
+# client_id differs from the prompt.othala.test service slug). The
+# presentation-only fixtures (filedrop/proxywatch/statuspage) have no
 # oidc: block and need no secret.
 GRAFANA_CLIENT_SECRET=$(gen)
 AUDIOBOOKSHELF_CLIENT_SECRET=$(gen)
-OPENWEBUI_CLIENT_SECRET=$(gen)
+PROMPTDESK_CLIENT_SECRET=$(gen)
 EOF

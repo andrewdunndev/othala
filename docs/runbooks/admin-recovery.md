@@ -66,7 +66,7 @@ This is intentional: an attacker who gains access to the portal UI or a
 family member's self-service flow cannot elevate themselves to admin by editing
 their own identity (email, groups, traits). The only write path for
 `metadata_admin` is the network-gated admin API, which is not reachable from
-the internet. (See docs/adr/08-admin-authority-model.md for the full rationale.)
+the internet.
 
 For dual-admin setup (recommended), both identities get `metadata_admin.admin=true`
 via the admin UI (Admin → Users → Edit → toggle admin marker) or from the
@@ -99,7 +99,8 @@ nobody on its own. So an admin who uses a service holds both, explicitly:
 curl -fsS http://localhost:4434/admin/identities/<UUID> | jq '.metadata_admin'
 ```
 
-The full model, and what enforces each half, is in `docs/access-model.md`.
+The full model, and what enforces each half, is `portal/src/lib/gate.ts` and
+`portal/src/lib/admin-auth.ts`.
 
 ---
 
@@ -247,8 +248,8 @@ still works.
 2. Exec into the Kratos container:
 
    ```sh
-   sudo -u dag XDG_RUNTIME_DIR=/run/user/<service-uid> \
-     podman exec -it dag-kratos sh
+   sudo -u <service-user> XDG_RUNTIME_DIR=/run/user/<service-uid> \
+     podman exec -it <kratos-container> sh
    ```
 
 3. Find the identity ID by email:
@@ -450,8 +451,6 @@ recovery to confirm the gate still allows it.
   audit credentials, remove affected types, force re-login, issue enrollment URL.
   Read this first when responding to a lost device — force re-login alone is
   insufficient if a credential was enrolled on the device.
-- `docs/runbooks/email-recovery.md` — deliverability ops for non-admin
-  family recovery.
 - `docs/runbooks/cookie-rotation.md` — rotate session cookies after a
   console recovery.
 - `docs/runbooks/secrets-rotation.md` — break-glass rotation of `secrets.system`.

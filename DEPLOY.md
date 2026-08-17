@@ -40,7 +40,6 @@ containers:
 | Quadlet | Image | Role |
 |---|---|---|
 | **dag-portal** | `registry.gitlab.com/dunn.dev/othala` | The converged Astro Node SSR app. Renders the Kratos self-service flows, serves the Hydra login/consent/logout challenge handlers, runs the access-gate, builds id_token claims, and hosts the loopback admin endpoints. See `ARCHITECTURE.md`. |
-| ~~**dag-ldap-bridge**~~ | `registry.gitlab.com/dunn.dev/kratos-ldap` | Go glauth-kratos LDAP bridge. **Shelved 2026-06-26; not deployed.** It lives in a separate repo, `gitlab.com/dunn.dev/kratos-ldap`, as an **unmaintained reference** — readable, not maintained, not supported. Cinema/Jellyfin moved to OIDC. |
 | **dag-kratos** | upstream Ory Kratos | Identity: self-service flows, sessions, recovery. |
 | **dag-hydra** | upstream Ory Hydra | OAuth2/OIDC. Ships no UI by design; the Othala app is its login + consent provider. |
 | **dag-postgres** | `postgres:18-alpine` | Separate `kratos` + `hydra` databases. |
@@ -155,11 +154,11 @@ plane maps each `dag_*` key to the env target below:
 |---|---|
 | `OTHALA_ADMIN_ENDPOINT_BEARER` | `POST /admin/revoke-user` on the loopback admin port. Constant-time, fail-closed. |
 | `RECOVERY_GATE_SECRET` | `POST /admin/recovery-gate` (the Kratos recovery-hook). Constant-time, fail-closed. |
-| `LDAP_BRIDGE_ADMIN_URL` / `LDAP_BRIDGE_ADMIN_TOKEN` | Best-effort LDAP bind-cache flush in the revoke fan-out. **Shelved 2026-06-26; not set in the current deploy** (the bridge is not deployed — see the container table above). |
+| `LDAP_BRIDGE_ADMIN_URL` / `LDAP_BRIDGE_ADMIN_TOKEN` | Optional. Best-effort LDAP bind-cache flush in the revoke fan-out, for a deployment fronting a directory-backed app. Unset here; the step is a silent no-op when the URL is absent (`portal/src/lib/revoke.ts`, pinned by `portal/scripts/revoke.test.mjs`). |
 | `CSRF_SECRET` | CSRF token signing for the self-service flow posts. |
 
 Admin authority is deliberately NOT an env target: it is the
-`metadata_admin.admin` marker on the Kratos identity (ADR 08). Deploy preflight
+`metadata_admin.admin` marker on the Kratos identity. Deploy preflight
 asserts `OTHALA_ADMIN_IDS` is absent from the deployed quadlets.
 
 The revoke fan-out is in-process; there is no app-to-consent admin HTTP
@@ -201,5 +200,5 @@ pinned in the `dag-*` quadlets.
 - [`ARCHITECTURE.md`](ARCHITECTURE.md) — what the app is + load-bearing decisions (read this for the architecture; this file does not restate it)
 - [`CHANGELOG.md`](CHANGELOG.md) and git tags — the only place release/version state is asserted
 - [`per-app-oidc.md`](site/src/content/docs/guides/per-app-oidc.md) — per-RP OIDC integration runbook
-- [`docs/access-model.md`](docs/access-model.md) — how entry and role are decided (the model the manifests express)
+- `portal/src/lib/gate.ts` — how entry and role are decided (the model the manifests express)
 - the deploy repo's docs — service-specific deploy notes and estate conventions
