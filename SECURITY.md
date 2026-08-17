@@ -86,11 +86,9 @@ Each names its enforcer and the test that fails if the enforcer stops working.
 - **forward_auth never trusts a header.** `portal/src/pages/api/forward-auth.ts`
   takes the required group from an operator-set query parameter and the user's
   groups from the admin API; no inbound identity header is read, and `HEAD`
-  reuses the `GET` decision verbatim. It separates "cannot establish the facts"
-  (503) from "not permitted" (403); both deny, and every non-2xx does, so what
-  the split buys is that an outage never reads as a refusal on the merits, which
-  is what lets an edge redirect on 401 without looping an outage through login.
-  Test:
+  reuses the `GET` decision verbatim. The status contract (200/401/403/503) and
+  why 503 stays separate from 403 are [`ARCHITECTURE.md`](ARCHITECTURE.md) §
+  The forward-auth request path → The status contract. Test:
   `portal/scripts/forward-auth.test.mjs`.
 - **Browser hardening.** `applySecurityHeaders`, `portal/src/middleware.ts`:
   frame-ancestors and `X-Frame-Options`, `nosniff`, `Referrer-Policy`,

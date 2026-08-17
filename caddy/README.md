@@ -31,5 +31,5 @@ The snippets are written generically — `kratos:4433`,
 import them and pass your own container name and port. Nothing here is
 hard-coded to a specific deployment.
 
-See [`../ARCHITECTURE.md`](../ARCHITECTURE.md) ("Auth patterns") for how
-each pattern fits the overall Othala topology.
+See [`../ARCHITECTURE.md`](../ARCHITECTURE.md) ("The forward-auth request
+path") for how each pattern fits the overall Othala topology.

@@ -16,21 +16,23 @@ containers on a compose network.
 | Service | Image | Role |
 |---|---|---|
 | `postgres` | `postgres:18-alpine` | Separate `kratos` + `hydra` DBs |
-| `kratos` | `oryd/kratos` | Identity: self-service flows, sessions, recovery (public 4433, admin 4434) |
-| `hydra` | `oryd/hydra` | OAuth2/OIDC; ships no UI (public 4444, admin 4445) |
+| `kratos` | `oryd/kratos` | Identity: self-service flows, sessions, recovery |
+| `hydra` | `oryd/hydra` | OAuth2/OIDC; ships no UI |
 | **`othala`** | `${AUTH_REGISTRY}` (registry **root**) | The converged Astro Node SSR app |
 | `mailpit` | `axllent/mailpit` | Dev mail catcher (SMTP + web UI) — proves the Kratos courier and contact-form delivery |
+
+Port mappings for every service are in `e2e/compose.yml`'s header comment.
 
 The `othala` app is **one image at the registry root** (no `/portal`
 sub-path, no separate `consent` or `util` container — those roles folded
 into the app). It runs **two listeners in one process**
 (`portal/src/server/listen.mjs`):
 
-- **Public SSR port `8080`** — the family UI, `/auth/*` + `/admin/*`
+- **Public SSR listener** — the family UI, `/auth/*` + `/admin/*`
   pages, and the Hydra login/consent/logout challenge handlers at
-  `/oauth2/{login,consent,logout}`. The only port fronted by Caddy in
+  `/oauth2/{login,consent,logout}`. The only listener fronted by Caddy in
   production.
-- **Loopback admin port `4431`** (`127.0.0.1`, pod-only) — a disjoint
+- **Loopback admin listener** (`127.0.0.1`, pod-only) — a disjoint
   mux: `GET /healthz`, `GET /readyz`, `POST /admin/revoke-user`,
   `POST /admin/recovery-gate`. Never delegates to the SSR handler. In
   this harness the admin probes run via `compose exec` because the port
@@ -76,19 +78,9 @@ VM dies on job end. Total turnaround: ~3-5 minutes including image pulls.
   `audiobookshelf`).
 - **Identity admin flow** — create an identity via the Kratos admin API;
   `metadata_admin.groups` round-trips.
-- **The access model** — `playwright/tests/t-access-model.spec.ts`, plus smoke
-  probe G3. Exactly two groups exist per service, `<svc>-access` (entry) and
-  `<svc>-admin` (role), and nothing is derived from anything else:
-  - `<svc>-access` alone → in, user-tier role.
-  - both groups → in, admin role, **in either stored order** (T2 and T3 seed
-    the same set both ways; role resolution must be a function of the set).
-  - `<svc>-admin` **alone → DENIED**, at the OIDC gate (T4, smoke G3) and at
-    the forward\_auth edge (T8). Admin-implies-access is abolished; those are
-    the probes that fail if anyone brings it back.
-  - neither → denied (T5, T9).
-  Enforced by `enforceAccessGate` / `enforceGroupGate`
-  (`portal/src/lib/gate.ts`) over the `presentation.access:` binding, and by
-  `lookupRole` (`portal/src/lib/claims.ts`) over `consent.group_role_map`.
+- **The access model** — `ARCHITECTURE.md` § The access model is canonical.
+  Enforced here by `playwright/tests/t-access-model.spec.ts`, cases T1
+  through T10, plus smoke probe G3.
 - **Recovery-gate** — the converged app's loopback endpoint
   `othala:4431/admin/recovery-gate`, `Authorization: Bearer`. Refusal is
   **marker-based** (`is_admin===true` in the webhook payload, derived from
@@ -155,10 +147,9 @@ The browser profile adds Caddy + a Playwright container. It drives the J
 
 ### Build the othala image from current source
 
-The browser specs exercise `ADMIN_HOST`-gated startup logic that changed
-in recent commits. You **must** build from current source — a stale cached
-image predates the `ADMIN_HOST=0.0.0.0` FATAL assert and will give false
-results.
+The browser specs exercise `ADMIN_HOST`-gated startup logic. You **must**
+build from current source — a stale cached image predates the
+`ADMIN_HOST=0.0.0.0` FATAL assert and will give false results.
 
 ```sh
 # from the auth repo root

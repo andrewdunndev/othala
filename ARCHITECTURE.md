@@ -96,9 +96,9 @@ Steps 2 and 3 sit *above* the escape hatch on purpose. They are facts about the 
 one app's binding, so no manifest may waive them. `skip_access_check` waives the group check alone.
 
 **The group-name policy.** `GROUP_RE` in `portal/src/lib/access-groups.ts` is the one canonical form
-a group name may take anywhere in the app: `/^[a-z][a-z0-9-]*$/`. No prefix is required, and that one
-canonical definition is what lets the group comparisons scattered across the app compare raw strings
-and agree by construction. Every write path enforces it (`validateGroups` in
+a group name may take anywhere in the app. No prefix is required, and that one canonical definition
+is what lets the group comparisons scattered across the app compare raw strings and agree by
+construction. Every write path enforces it (`validateGroups` in
 `portal/src/lib/metadata-admin.ts`, the manifest loader, the lint, the forward-auth query parameter).
 Step 3 above is the *read* boundary, and it exists because Kratos's admin API is a write path this
 codebase does not own: a name that no owned boundary could have produced means the record was written

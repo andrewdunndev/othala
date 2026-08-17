@@ -94,17 +94,11 @@ application's OIDC documentation for **when** it reads the role, not just where
 
 **Forward-auth.** Applications with no usable OIDC client sit behind a reverse
 proxy calling `portal/src/pages/api/forward-auth.ts` with a required group as a
-query parameter. The status contract is the whole design: 401 only for "no
-usable session", 503 when Kratos did not answer, and 403 for either a refusal
-on the merits or a missing or malformed `group` parameter, rejected before the
-session is checked at all: that one is a broken edge config, not a statement
-about the user. Every branch denies, but only 503 says the portal never learned
-the facts — an edge that turns 503 into a login redirect has converted an outage
-into a credential prompt. It is also why session lookup must stay at `aal1`:
-under `highest_available`, whoami returns a null identity for an MFA-enrolled
-user, and this gate would read that as no session and lock out exactly the
-people who enrolled a second factor. `portal/scripts/forward-auth.test.mjs`
-pins all four.
+query parameter: `200` proxies the request through, `401` is the one status
+safe to redirect to login, and `403`/`503` both deny but must never be matched
+into that redirect — a `503` means Kratos never answered, not that the user was
+refused. `ARCHITECTURE.md` § The forward-auth request path has the full status
+contract; `portal/scripts/forward-auth.test.mjs` pins it.
 
 <figure class="diagram">
   <img src="/diagrams/forward-auth-request-path.svg" alt="A browser carrying the apex-scoped session cookie reaches the edge, which routes at L4 by SNI without decrypting, then the service's own proxy — the door, where forward_auth runs before any reverse_proxy. The proxy issues a sub-request to the portal's forward-auth endpoint with the required group as a query parameter set by the edge config, never an inbound header. The portal verifies the session cookie, re-resolves the identity through the Kratos admin API because group metadata is absent from whoami, and applies enforceGroupGate — identity active, every stored group canonical, and in the named group — failing closed at every step. It answers one of four statuses: 200 proxy through with the identity header set from the server-verified session; 401 no usable session, the one status an edge can safely turn into a login redirect; 403 refused on the merits; and 503 when Kratos did not answer, which denies like a 403 but must never be matched into a redirect. The application sees only the identity header.">
@@ -114,10 +108,9 @@ pins all four.
 **Service-local passwords.** Some native clients cannot run the OAuth browser
 redirect at all, so they use a credential in the application's own user
 database, set by an admin there; it is not the Kratos password and the two are
-never shared. This is load-bearing, not a fallback waiting to be simplified
-away. An LDAP bridge built for exactly this problem was retired before it ever
-ran in production, and survives as an unmaintained reference at
-`gitlab.com/dunn.dev/kratos-ldap`.
+never shared. This is the supported pattern for those clients, not a fallback
+waiting to be simplified away. An LDAP bridge for the same problem exists as
+an unmaintained reference at `gitlab.com/dunn.dev/kratos-ldap`.
 
 ## Troubleshooting
 
