@@ -75,16 +75,17 @@ the application gets `<svc>-admin` **as well**, not instead.
 Both live in `e2e/manifests/`, exercised by CI, so neither can drift silently.
 
 **`audiobookshelf.yaml` — the minimal well-behaved relying party.** A `groups`
-claim and a two-entry `group_role_map`; no JMESPath, no nested claim shapes. Its
-`presentation.access` comment states why the admin group is absent. Start here.
+claim and a two-entry `group_role_map`; no JMESPath, no nested claim shapes.
+Every field carries its constraint and enforcer as a comment; `ARCHITECTURE.md`
+and `DECISIONS.md` § Nothing is derived hold the why. Start here.
 
 **`grafana.yaml` — role mapping under an application-specific claim contract.**
 A JMESPath role attribute and three declared roles, one reachable only by
-per-client override. Its `consent.roles` comment explains why declaration order
-is descending privilege: `lookupRole` in `portal/src/lib/claims.ts` reads a
-role's index as its rank and keeps the highest rank matched across the whole
-group set, which makes resolution independent of storage order. Grafana also
-shows the class of quirk that costs time: its role expression is evaluated
+per-client override. Its `consent.roles` comment carries the ordering
+constraint: `lookupRole` in `portal/src/lib/claims.ts` reads a role's index as
+its rank and keeps the highest rank matched across the whole group set, which
+makes resolution independent of storage order. Grafana also shows the class of
+quirk that costs time: its role expression is evaluated
 application-side, and a separate flag must be enabled or the server-admin role
 silently resolves to org-admin only. The general lesson is to read an
 application's OIDC documentation for **when** it reads the role, not just where

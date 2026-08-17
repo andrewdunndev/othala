@@ -17,19 +17,14 @@ own origin, so that origin has to be allowlisted; redirect-flow (server-side)
 clients never browser-fetch Hydra and need no entry. With no browser-SPA client
 deployed, this is just `OTHALA_PUBLIC_URL`.
 
-OIDC client definitions are **not** stored here. Clients are unified `<slug>.yaml`
-manifests read at runtime from `MANIFEST_DIR` (default `/etc/portal/manifests`).
-Each manifest can carry `presentation:` (tile metadata **and the access
-binding**), `oidc:` (forwarded to Hydra), and `consent:` (role/claim shape read
-by the Othala app) blocks. A manifest with only `presentation:` (a forward-auth
-tile, no Hydra client) is skipped by the OIDC loader.
-
-The two group-facing fields do different jobs and are not interchangeable:
-`presentation.access:` lists the group(s) that grant **entry** to the app, and
-`consent.group_role_map:` maps a group to a **role** inside it. A role mapping
-never admits anyone; see `../portal/src/lib/gate.ts`.
-
-Generic worked examples live in [`e2e/manifests/`](../e2e/manifests/).
+OIDC client definitions are **not** stored here — see ["An app is a
+manifest"](../README.md#an-app-is-a-manifest) for the three blocks. A manifest with only
+`presentation:` (a forward-auth tile, no Hydra client) is skipped by the OIDC loader.
+[`e2e/manifests/grafana.yaml`](../e2e/manifests/grafana.yaml) and
+[`e2e/manifests/audiobookshelf.yaml`](../e2e/manifests/audiobookshelf.yaml) are the annotated spec for
+every field, including the `presentation.access:` (entry) vs `consent.group_role_map:` (role) split;
+`validateClients` (`../portal/src/lib/manifests.ts`) and `../portal/src/lib/manifest-lint.ts` are what
+is enforced.
 
 For the client catalog and per-RP integration details, see
 [`per-app-oidc.md`](../site/src/content/docs/guides/per-app-oidc.md).

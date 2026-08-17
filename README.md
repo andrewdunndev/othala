@@ -72,16 +72,15 @@ npm run build     # astro build + the listener, admin, and registrar bundles
 ## An app is a manifest
 
 One `<slug>.yaml` per app, read at request time from `MANIFEST_DIR`, carrying up to three blocks:
+`presentation:` (tile metadata and the entry binding), `oidc:` (the OAuth2 client forwarded to
+Hydra), and `consent:` (roles, the group-to-role map, claim emission).
 
-| Block | What it declares | Parsed by / consumed by |
-|---|---|---|
-| `presentation:` | Tile metadata and the **entry** binding (`access:`) | `portal/src/lib/access-groups.ts`, `portal/src/lib/tiles.ts` |
-| `oidc:` | The OAuth2 client fields forwarded to Hydra | `portal/src/lib/manifests.ts` → `portal/src/lib/register-clients.ts` |
-| `consent:` | Declared roles, the group-to-role map, claim emission | `portal/src/lib/manifests.ts` → `portal/src/lib/claims.ts` |
-
-A manifest with only `presentation:` registers no OIDC client; it is a tile for an app gated some
-other way. The worked examples in [`e2e/manifests/`](e2e/manifests/) double as the release-gate
-fixtures, so the documented behaviour and the tested behaviour are the same files.
+[`e2e/manifests/grafana.yaml`](e2e/manifests/grafana.yaml) and
+[`e2e/manifests/audiobookshelf.yaml`](e2e/manifests/audiobookshelf.yaml) are the annotated spec —
+every field's constraint and enforcer is a comment on the line, so the documented behaviour and the
+tested behaviour are the same file. `validateClients` and `lintManifests`
+(`portal/src/lib/manifests.ts`, `portal/src/lib/manifest-lint.ts`) are the enforcement; `npm run
+lint:manifests` (in `portal/`) checks a manifest directory.
 
 ## Repository map
 
