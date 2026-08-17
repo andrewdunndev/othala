@@ -92,7 +92,7 @@
         "groups": {
           "type": "array",
           "title": "Groups",
-          "description": "Membership groups. Order matters when deriving per-app roles via group_role_map (first matching group wins). The admin form is responsible for writing groups in the canonical order documented in portal/src/lib/access.ts. Kratos validates traits only, so this pattern enforces nothing at write time: it must stay byte-identical to GROUP_RE in portal/src/lib/access-groups.ts, which IS enforced, and on read denies any identity holding a group that misses it.",
+          "description": "Membership groups: each string must match this array's own pattern. Kratos validates traits only, so this pattern enforces nothing at write time: it must stay byte-identical to GROUP_RE in portal/src/lib/access-groups.ts, which IS enforced, and on read denies any identity holding a group that misses it. Role resolution (portal/src/lib/claims.ts, lookupRole) is order-independent; stored order here is a cosmetic diff-stability concern (portal/src/lib/access.ts), not part of how a role is decided.",
           "items": {
             "type": "string",
             "pattern": "^[a-z][a-z0-9-]*$",
