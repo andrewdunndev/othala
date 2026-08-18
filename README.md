@@ -63,8 +63,7 @@ Other `OTHALA_*` values fall back to dev defaults with a warning. The OIDC and c
 Kratos and Hydra, so they only work in the full-stack mode above.
 
 ```sh
-npm test          # node test runner over scripts/*.test.mjs, incl. fuzz suites
-npm run test:unit # vitest over src/**/*.test.ts
+npm test          # vitest run: src/lib/*.test.ts + scripts/*.test.mjs, incl. fuzz suites
 npm run check     # astro check
 npm run build     # astro build + the listener, admin, and registrar bundles
 ```
@@ -101,7 +100,8 @@ lint:manifests` (in `portal/`) checks a manifest directory.
   access model, the forward-auth request path, client registration.
 - [`.env.example`](.env.example) — the runtime contract, every variable annotated.
 - [`DEPLOY.md`](DEPLOY.md) — the deploy shape and the promotion path.
-- [`site/src/content/docs/guides/`](site/src/content/docs/guides/) — the longer operator guides.
+- [`site/src/content/docs/guides/`](site/src/content/docs/guides/) — the longer operator guides,
+  illustrated at [othala.dunn.dev](https://othala.dunn.dev) (architecture, login flow, trust boundary).
 - [`SECURITY.md`](SECURITY.md) — report vulnerabilities privately, never in a public issue.
 - [`CHANGELOG.md`](CHANGELOG.md) and the git tags — the only place release state is asserted.
 
