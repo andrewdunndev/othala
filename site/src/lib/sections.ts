@@ -5,7 +5,11 @@
 // it through marked). Adding a doc page = adding one row here + moving
 // the markdown under src/content/docs/.
 //
-// The site carries the Guides only. Operational runbooks live in the
+// The site carries the Guides (content-collection-backed, below) plus
+// a standalone Architecture overview at src/pages/architecture.astro —
+// hand-authored rather than markdown, so it costs nothing against the
+// prose budget. `extraNav` is how it reaches the header nav without a
+// `Section` entry of its own. Operational runbooks live in the
 // repository (docs/), not on the public site.
 
 export interface SectionPage {
@@ -45,6 +49,14 @@ export const sections: Section[] = [
       { href: '/guides/hardening/',             label: 'Hardening',              file: 'guides/hardening.md' },
     ],
   },
+];
+
+/** Top-level nav entries that are not content-collection sections.
+ *  Layout.astro renders these ahead of the `sections`-derived entries,
+ *  so a standalone page (Architecture) is reachable from every page's
+ *  header nav without inventing a `Section` with no doc pages. */
+export const extraNav: { href: string; label: string }[] = [
+  { href: '/architecture/', label: 'Architecture' },
 ];
 
 /** Pick the section that owns a URL path (drives sidebar rendering). */

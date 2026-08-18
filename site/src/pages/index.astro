@@ -13,8 +13,27 @@ const markSvg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" rol
   </g>
   <circle cx="32" cy="24" r="2.5" fill="currentColor"/>
 </svg>`;
+
+// Entry points below the story: Architecture is a standalone page (not
+// a content-collection section, see lib/sections.ts), Guides comes from
+// `sections` so it stays in sync with the one place that lists them,
+// and Source is the repo this site is a reading copy of.
+const entryPoints = [
+  {
+    href: '/architecture/',
+    label: 'Architecture',
+    desc: 'How Kratos, Hydra, the portal, and the edge fit together, told through six diagrams and the reasoning between them.',
+  },
+  ...sections.map(s => ({ href: s.href, label: s.label, desc: s.lede })),
+  {
+    href: 'https://gitlab.com/dunn.dev/othala',
+    label: 'Source',
+    desc: 'The code, the tests, and the decisions log this site is a reading copy of.',
+    external: true,
+  },
+];
 ---
-<Layout title="Home" description="Othala is one family's home single sign-on, built on Ory Kratos and Hydra with a TypeScript portal. Public so it can be read and copied. Guides and decisions from a single-maintainer homelab.">
+<Layout title="Home" description="Othala is one family's home single sign-on, built on Ory Kratos and Hydra with a TypeScript portal and a Caddy forward-auth endpoint. Public so it can be read and copied. Architecture, guides, and decisions from a single-maintainer homelab.">
   <div class="overview-hero">
     <div class="overview-mark" set:html={markSvg} />
     <div class="overview-title-block">
@@ -23,22 +42,39 @@ const markSvg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" rol
       <p class="overview-lede">
         Othala is the single sign-on for one family's house: Ory Kratos and
         Hydra behind a TypeScript portal that supplies the login provider,
-        consent provider, and access gate they ship without. Passkey-first,
-        running for a handful of people. This
-        site is the reading copy: the guides that describe how it is wired,
-        and the decisions behind it. It is public to be read and copied, not
-        adopted. One maintainer, no support.
+        consent provider, and access gate they ship without, plus a Caddy
+        forward-auth endpoint for the apps that speak no OIDC at all.
+        Passkey-first, running for a handful of people. This site is the
+        reading copy: an architecture walkthrough of why it is wired the way
+        it is, the guides for how, and the decisions behind both.
       </p>
     </div>
   </div>
 
   <section class="section">
-    <p class="section-subtitle">Read</p>
+    <p class="overview-prose">
+      It is public because a deployment with no support contract has nothing
+      to lose by being readable, and because most of what makes an Ory
+      integration hard has no complete worked example in the open. This one
+      does, with the reasoning kept next to the code. Read it, copy it, lift
+      a file out whole. It is not a pitch: no roadmap, no adoption path, one
+      maintainer.
+    </p>
+    <p class="overview-prose">
+      Every application it fronts is one manifest file: what the tile says,
+      what OAuth2 client Hydra sees, and which group grants entry versus
+      which one grants a role. Adding an app is a file drop, not an image
+      rebuild.
+    </p>
+  </section>
+
+  <section class="section">
+    <p class="section-subtitle">Start here</p>
     <div class="overview-grid">
-      {sections.map(s => (
-        <a href={s.href} class="overview-card">
-          <h2 class="overview-card-title">{s.label}</h2>
-          <p class="overview-card-desc">{s.lede}</p>
+      {entryPoints.map(e => (
+        <a href={e.href} class="overview-card" rel={e.external ? 'external' : undefined}>
+          <h2 class="overview-card-title">{e.label}{e.external ? ' ↗' : ''}</h2>
+          <p class="overview-card-desc">{e.desc}</p>
         </a>
       ))}
     </div>
@@ -81,6 +117,14 @@ const markSvg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" rol
     color: var(--text-muted);
     margin: 0 0 var(--space-2);
   }
+  .overview-prose {
+    font-size: var(--text-md);
+    line-height: var(--lh-base);
+    color: var(--text-2);
+    max-width: 62ch;
+    margin: 0 0 var(--space-4);
+  }
+  .overview-prose:last-child { margin-bottom: 0; }
   @media (max-width: 640px) {
     .overview-hero { flex-direction: column; align-items: flex-start; gap: var(--space-4); }
   }

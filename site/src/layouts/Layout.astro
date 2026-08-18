@@ -1,7 +1,7 @@
 ---
 import '../styles/global.css';
 import '../styles/site-local.css';
-import { sections, sectionForPath } from '../lib/sections';
+import { sections, sectionForPath, extraNav } from '../lib/sections';
 
 interface Props {
   title: string;
@@ -28,7 +28,7 @@ const markSvg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" rol
   <circle cx="32" cy="24" r="2.75" fill="currentColor"/>
 </svg>`;
 
-const nav = sections.map(s => ({ href: s.href, label: s.label }));
+const nav = [...extraNav, ...sections.map(s => ({ href: s.href, label: s.label }))];
 
 const path = Astro.url.pathname.replace(/\/$/, '') || '/';
 const isActive = (href: string) => {
