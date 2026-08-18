@@ -244,6 +244,22 @@ export function shouldRefuseRecovery(identity: Identity | undefined | null): boo
   return isAdminMarker(identity);
 }
 
+/**
+ * D1 best-practice bundle: send-time address confirmation for
+ * send-invite-email. A UI-only check is not an invariant — this is the
+ * SERVER-SIDE half, called from the action handler in
+ * portal/src/pages/admin/users/[id].astro BEFORE sendInviteRecoveryEmail is
+ * ever reached, never trusted to the rendered form alone.
+ *
+ * Byte-equal, not case-folded: Kratos treats the `email` trait as the literal
+ * string on file (kratos/identity.schema.json), so a case-insensitive match
+ * here could accept a confirmation value Kratos itself would treat as a
+ * different address.
+ */
+export function confirmsInviteAddress(confirm: string, targetEmail: string): boolean {
+  return confirm === targetEmail;
+}
+
 /** Pretty-print an access source for the admin UI. */
 export function describeSource(s: AccessSource): string {
   switch (s.kind) {

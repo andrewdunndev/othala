@@ -27,6 +27,11 @@
 //                            complete credential (same two-channel shape as
 //                            issue-recovery's link+code pair, just delivered
 //                            over a different channel for the secret half).
+//                            Requires server-checked send-time address
+//                            confirmation (confirmsInviteAddress,
+//                            src/lib/access.ts) before Kratos is ever called
+//                            — the re-typed address form field alone proves
+//                            nothing.
 //   action=delete         -> Kratos deleteIdentity (requires `confirm=<username>`)
 //   action=deactivate     -> Kratos deactivateIdentity (soft delete)
 //
@@ -56,6 +61,7 @@ import { sendInviteRecoveryEmail } from '../../../lib/kratos';
 import { servingManifests } from '../../../lib/manifest-store';
 import {
   computeEffectiveAccess,
+  confirmsInviteAddress,
   describeSource,
   IDENTITY_GROUP_ORDER,
   normalizeGroupOrder,
@@ -268,17 +274,30 @@ if (Astro.request.method === 'POST' && identity) {
         if (!targetEmail) {
           actionResult = { kind: 'error', message: 'Identity has no email trait on file.' };
         } else {
-          try {
-            await sendInviteRecoveryEmail(targetEmail);
-            actionResult = { kind: 'invite-email', email: targetEmail };
-          } catch (err) {
-            // Never interpolate the address into the surfaced message —
-            // sendInviteRecoveryEmail's own errors are status-code-only, but
-            // guard here too in case that contract ever drifts.
+          // Best-practice bundle (adversarial review, DECISIONS.md D1
+          // addendum): send-time address confirmation, SERVER-enforced. The
+          // admin re-types the target address in the form; a UI-only check is
+          // not an invariant, so the byte-equal comparison runs here, before
+          // Kratos is ever called, not just in the browser.
+          const confirmEmail = String(fd.get('confirmEmail') ?? '');
+          if (!confirmsInviteAddress(confirmEmail, targetEmail)) {
             actionResult = {
               kind: 'error',
-              message: `Invite email failed: ${err instanceof Error ? err.message : 'unknown error'}`,
+              message: 'Confirmation address does not match the address on file. Nothing was sent.',
             };
+          } else {
+            try {
+              await sendInviteRecoveryEmail(targetEmail);
+              actionResult = { kind: 'invite-email', email: targetEmail };
+            } catch (err) {
+              // Never interpolate the address into the surfaced message —
+              // sendInviteRecoveryEmail's own errors are status-code-only, but
+              // guard here too in case that contract ever drifts.
+              actionResult = {
+                kind: 'error',
+                message: `Invite email failed: ${err instanceof Error ? err.message : 'unknown error'}`,
+              };
+            }
           }
         }
       }
@@ -912,7 +931,16 @@ const adminNav = [
             <form method="post" class="actions-form">
               <input type="hidden" name="action" value="send-invite-email" />
               <input type="hidden" name="csrf_token" value={csrfTokenInviteEmail} />
-              <button type="submit" class="button button-secondary" title="Sends a recovery CODE ONLY via the Kratos courier — never a link with the code embedded.">
+              <input
+                type="email"
+                name="confirmEmail"
+                class="invite-confirm-input"
+                placeholder="re-type address to confirm"
+                aria-label="Re-type the identity's email address to confirm the invite send"
+                autocomplete="off"
+                required
+              />
+              <button type="submit" class="button button-secondary" title="Sends a recovery CODE ONLY via the Kratos courier — never a link with the code embedded. The address above must byte-match the one on file, checked server-side.">
                 Send invite email
               </button>
             </form>
@@ -1050,6 +1078,25 @@ const adminNav = [
   /* Inline form wrappers inside the actions row so each button carries its
    * own action-scoped CSRF token without disrupting the flex layout. */
   .actions-form { display: contents; }
+  /* Send-time address confirmation (D1 addendum, DECISIONS.md): small,
+   * inline re-type field that sits next to the "Send invite email" button
+   * inside its own .actions-form. Sized to a typical address, not the
+   * form-wide .field input which is width:100%. */
+  .invite-confirm-input {
+    padding: var(--space-2) var(--space-3);
+    font: inherit;
+    font-size: var(--text-sm);
+    background: var(--input-bg);
+    color: var(--text);
+    border: 1px solid var(--input-border);
+    border-radius: var(--radius);
+    width: 14rem;
+  }
+  .invite-confirm-input:focus {
+    outline: none;
+    border-color: var(--input-focus);
+    box-shadow: 0 0 0 3px var(--accent-subtle);
+  }
   /* Enrollment handoff: readonly value + its Copy button on one line. The
    * value flexes, the button keeps its natural width; min-width:0 lets a long
    * URL shrink instead of overflowing the notice. */

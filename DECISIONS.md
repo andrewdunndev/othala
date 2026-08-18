@@ -151,8 +151,22 @@ code minted together). The both-values rendering at the admin call sites is UNEN
 **D1 addendum (0.5.x).** An admin can also trigger the code by email instead of hand-delivering it:
 `sendInviteRecoveryEmail` (`portal/src/lib/kratos.ts`) drives Kratos's own self-service recovery flow
 for the identity's on-file address, so the Kratos courier — not the portal — sends a CODE ONLY, never a
-link with the code embedded, keeping the same two-channel shape. Enforced by
-`e2e/playwright/tests/u-admin-invite-email.spec.ts`.
+link with the code embedded, keeping the same two-channel shape. The parent decision's misrouting
+rationale still applies here — the address is an admin-typed trait, and a typo sends the code to the
+wrong mailbox — so this path is accepted with that risk bounded, not waived. The code is single-use and
+expires within `selfservice.flows.recovery.lifespan: 1h` (`kratos/kratos.yml`), so a misdelivered message
+goes stale fast. A successful misroute's blast radius is one fresh identity holding only its own intended
+group grants, never more, because admin-marked targets are refused outright before Kratos is ever asked
+(`shouldRefuseRecovery`, `portal/src/lib/access.ts`; `portal/scripts/admin-recovery-gate.test.mjs`). The
+send itself requires server-checked address confirmation: the admin re-types the target address, and
+`confirmsInviteAddress` (`portal/src/lib/access.ts`) rejects any submission that does not byte-equal the
+on-file trait before the Kratos call — a UI-only check is not an invariant, so the comparison runs in the
+action handler. Redemption then proves mailbox control: only whoever holds the addressed inbox — mistyped
+or not — can complete the code. Rate limiting on this send path is not one of those bounds: the MEDIUM-B
+gap already tracked for login/recovery code floods (`e2e/playwright/tests/n-rate-limits.spec.ts`,
+fixme'd pending a Caddy/Kratos config) covers invite email too once fixed, not a separate gap to
+rediscover. Enforced by `e2e/playwright/tests/u-admin-invite-email.spec.ts` and
+`portal/scripts/admin-recovery-gate.test.mjs`.
 
 ## TLS is a network boundary, not an application concern
 

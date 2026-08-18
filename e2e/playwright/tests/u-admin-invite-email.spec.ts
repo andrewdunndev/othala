@@ -22,10 +22,21 @@
  *       transits a channel" two-channel invariant requires that this
  *       message alone can never be the complete credential (link + code).
  *
+ * U2 and U3 cover the two refusal branches added by the D1 addendum's
+ * best-practice bundle (adversarial review; DECISIONS.md):
+ *   - U2: the target carries the admin marker. shouldRefuseRecovery
+ *     (src/lib/access.ts) refuses before Kratos is ever asked — same
+ *     HIGH-3 gate as issue-recovery — and mailpit must receive nothing.
+ *   - U3: the confirm-address field does not byte-equal the target's
+ *     on-file email. confirmsInviteAddress (src/lib/access.ts) refuses
+ *     server-side before Kratos is ever asked, and mailpit must receive
+ *     nothing.
+ *
  * Cookie-jar / mailpit conventions mirrored from j-recovery-flow.spec.ts and
  * r-admin-post-origin.spec.ts: a per-run unique invitee email (so retries and
  * prior runs never collide on a stale mailpit message), and an `afterMs`
- * guard on the mailpit poll.
+ * guard on the mailpit poll (waitForInviteEmail for the positive case,
+ * assertNoInviteEmail for U2/U3's negative case).
  *
  * Live-stack requirements:
  *   - Kratos recovery flow enabled with `use: code` (kratos.yml).
@@ -87,6 +98,44 @@ async function waitForInviteEmail(
   throw new Error(`Timed out waiting for invite email to ${toAddress} after ${MAIL_TIMEOUT_MS}ms`);
 }
 
+// Bounded window for a NEGATIVE mail assertion. U2/U3 exercise refusal
+// branches that never call sendInviteRecoveryEmail at all (the confirm check
+// / admin gate short-circuits before the Kratos call), so there is nothing to
+// race — this window only guards against a regression that starts calling
+// Kratos on a refused submission. Short on purpose: a real positive case
+// (U1) proves mail delivery works within MAIL_TIMEOUT_MS, so silence for a
+// fraction of that window is already meaningful, not just "didn't wait long
+// enough."
+const NO_MAIL_WINDOW_MS = 4_000;
+
+/**
+ * Assert mailpit does NOT receive a recovery-code message for `toAddress`
+ * within `NO_MAIL_WINDOW_MS`. Throws immediately on the first matching hit
+ * (fail fast) rather than waiting out the full window.
+ */
+async function assertNoInviteEmail(toAddress: string, afterMs: number): Promise<void> {
+  const deadline = Date.now() + NO_MAIL_WINDOW_MS;
+  while (Date.now() < deadline) {
+    const resp = await fetch(`${MAILPIT_API}/api/v1/messages`);
+    if (!resp.ok) throw new Error(`mailpit /api/v1/messages returned ${resp.status}`);
+    const data = (await resp.json()) as {
+      messages?: Array<{ Subject: string; To: Array<{ Address: string }>; Created: string }>;
+    };
+    const hit = (data.messages ?? []).find(
+      (m) =>
+        m.To.some((t) => t.Address.toLowerCase() === toAddress.toLowerCase()) &&
+        /recover/i.test(m.Subject) &&
+        new Date(m.Created).getTime() >= afterMs - 5_000,
+    );
+    if (hit) {
+      throw new Error(
+        `mailpit received an unexpected recovery message for ${toAddress} (subject: "${hit.Subject}") — this branch must never call Kratos`,
+      );
+    }
+    await new Promise((r) => setTimeout(r, MAIL_POLL_INTERVAL_MS));
+  }
+}
+
 test('U1 — admin "Send invite email" delivers a code-only message via the Kratos courier', async ({
   browser,
   baseURL,
@@ -131,6 +180,11 @@ test('U1 — admin "Send invite email" delivers a code-only message via the Krat
     const sendBtn = page.getByRole('button', { name: 'Send invite email' });
     await expect(sendBtn, 'U1: "Send invite email" button must be visible').toBeVisible({ timeout: 10_000 });
 
+    // D-addendum best-practice bundle: send-time address confirmation is a
+    // required, server-checked field on this same form now — re-type the
+    // invitee's own address so U1 continues to exercise the happy path.
+    await page.locator('input[name="confirmEmail"]').fill(invitee.email);
+
     const [postResp] = await Promise.all([
       page.waitForResponse((r) => r.url() === targetUrl && r.request().method() === 'POST'),
       sendBtn.click(),
@@ -162,6 +216,143 @@ test('U1 — admin "Send invite email" delivers a code-only message via the Krat
     ).toBe(false);
 
     console.log('[U1] PASS — invite email delivered a code-only message for', invitee.email);
+  } finally {
+    await ctx.close();
+  }
+});
+
+test('U2 — "Send invite email" against an admin-marked target is refused console-only, and mailpit receives nothing', async ({
+  browser,
+  baseURL,
+}) => {
+  // Same HIGH-3 gate as issue-recovery (shouldRefuseRecovery, src/lib/access.ts):
+  // the target carries metadata_admin.admin===true, so the action handler
+  // refuses BEFORE the confirm-address check and BEFORE sendInviteRecoveryEmail
+  // is ever called. The confirm field is still filled with the CORRECT address
+  // so the only thing under test is the admin-marked refusal, not a mismatch.
+  const uniqueSuffix = Date.now();
+  const actingAdmin = await createIdentityWithPassword({
+    email: `u2.acting-admin.${uniqueSuffix}@othala.test`,
+    username: `u2.acting.admin.${uniqueSuffix}`,
+    displayName: 'U2 Acting Admin',
+    groups: [],
+    isAdmin: true,
+    kratosAdminURL: process.env.KRATOS_ADMIN_URL ?? 'http://kratos:4434',
+  });
+  const adminTarget = await createIdentityWithPassword({
+    email: `u2.admin-target.${uniqueSuffix}@othala.test`,
+    username: `u2.admin.target.${uniqueSuffix}`,
+    displayName: 'U2 Admin Target',
+    groups: [],
+    isAdmin: true,
+    kratosAdminURL: process.env.KRATOS_ADMIN_URL ?? 'http://kratos:4434',
+  });
+  console.log('[U2] acting admin:', actingAdmin.id, '| admin target:', adminTarget.id, adminTarget.email);
+
+  const ctx = await adminAal2Context({
+    browser,
+    email: actingAdmin.email,
+    password: TEST_PASSWORD,
+    baseURL: baseURL!,
+  });
+
+  try {
+    const startTime = Date.now();
+    const page = await ctx.newPage();
+    const targetUrl = `${baseURL}/admin/users/${adminTarget.id}`;
+
+    await page.goto(targetUrl, { waitUntil: 'networkidle' });
+    await expect(page.locator('h1'), 'U2: admin page must render the admin-target identity').toContainText('u2.admin.target');
+
+    const sendBtn = page.getByRole('button', { name: 'Send invite email' });
+    await expect(sendBtn, 'U2: "Send invite email" button must be visible').toBeVisible({ timeout: 10_000 });
+    await page.locator('input[name="confirmEmail"]').fill(adminTarget.email);
+
+    const [postResp] = await Promise.all([
+      page.waitForResponse((r) => r.url() === targetUrl && r.request().method() === 'POST'),
+      sendBtn.click(),
+    ]);
+    console.log('[U2] send-invite-email POST →', postResp.status());
+
+    expect(postResp.status(), 'U2: refusal is a normal same-page re-render, not a 403').toBe(200);
+
+    await expect(
+      page.getByText(/admin recovery is console-only/i),
+      'U2: page must show the console-only refusal notice',
+    ).toBeVisible();
+
+    // Ground truth: the refusal happened before Kratos was ever asked.
+    await assertNoInviteEmail(adminTarget.email, startTime);
+
+    console.log('[U2] PASS — admin-marked target refused console-only; mailpit received nothing');
+  } finally {
+    await ctx.close();
+  }
+});
+
+test('U3 — "Send invite email" with a mismatched confirm-address is refused, and mailpit receives nothing', async ({
+  browser,
+  baseURL,
+}) => {
+  // Best-practice bundle (D1 addendum, DECISIONS.md): send-time address
+  // confirmation, server-enforced. A non-admin target so the ONLY thing
+  // under test is confirmsInviteAddress rejecting the mismatch — the
+  // admin-marked gate never enters into it.
+  const uniqueSuffix = Date.now();
+  const actingAdmin = await createIdentityWithPassword({
+    email: `u3.acting-admin.${uniqueSuffix}@othala.test`,
+    username: `u3.acting.admin.${uniqueSuffix}`,
+    displayName: 'U3 Acting Admin',
+    groups: [],
+    isAdmin: true,
+    kratosAdminURL: process.env.KRATOS_ADMIN_URL ?? 'http://kratos:4434',
+  });
+  const invitee = await createIdentityWithPassword({
+    email: `u3.invitee.${uniqueSuffix}@othala.test`,
+    username: `u3.invitee.${uniqueSuffix}`,
+    displayName: 'U3 Invitee',
+    groups: [],
+    kratosAdminURL: process.env.KRATOS_ADMIN_URL ?? 'http://kratos:4434',
+  });
+  console.log('[U3] acting admin:', actingAdmin.id, '| invitee:', invitee.id, invitee.email);
+
+  const ctx = await adminAal2Context({
+    browser,
+    email: actingAdmin.email,
+    password: TEST_PASSWORD,
+    baseURL: baseURL!,
+  });
+
+  try {
+    const startTime = Date.now();
+    const page = await ctx.newPage();
+    const targetUrl = `${baseURL}/admin/users/${invitee.id}`;
+
+    await page.goto(targetUrl, { waitUntil: 'networkidle' });
+    await expect(page.locator('h1'), 'U3: admin page must render the invitee identity').toContainText('u3.invitee');
+
+    const sendBtn = page.getByRole('button', { name: 'Send invite email' });
+    await expect(sendBtn, 'U3: "Send invite email" button must be visible').toBeVisible({ timeout: 10_000 });
+    // Deliberately wrong — one character off from the invitee's real address.
+    await page.locator('input[name="confirmEmail"]').fill(`wrong.${invitee.email}`);
+
+    const [postResp] = await Promise.all([
+      page.waitForResponse((r) => r.url() === targetUrl && r.request().method() === 'POST'),
+      sendBtn.click(),
+    ]);
+    console.log('[U3] send-invite-email POST →', postResp.status());
+
+    expect(postResp.status(), 'U3: refusal is a normal same-page re-render, not a 403').toBe(200);
+
+    await expect(
+      page.getByText(/confirmation address does not match/i),
+      'U3: page must show the confirm-address mismatch notice',
+    ).toBeVisible();
+
+    // Ground truth: the mismatch was refused before Kratos was ever asked.
+    await assertNoInviteEmail(invitee.email, startTime);
+
+    console.log('[U3] PASS — mismatched confirm-address refused; mailpit received nothing');
   } finally {
     await ctx.close();
   }
