@@ -1,5 +1,5 @@
 /**
- * P — Lost-device / credential eviction (DEFINING test, HIGH-C finding).
+ * P — Lost-device / credential eviction (DESIGNED test, HIGH-C finding).
  *
  * Finding reference: HIGH-C
  *   "Session revocation does not remove passkey credentials. An attacker
@@ -7,35 +7,38 @@
  *    the victim triggers force-logout via revokeSubject. The admin UI has
  *    no delete-credential path."
  *
- * This spec DEFINES the correct post-fix behaviour and gates the fix.
- * Steps that require the live stack are marked test.fixme() with clear
- * TODO comments; the overall test structure PARSES cleanly under
- * `playwright test --list`.
+ * Status: NOT LIVE. Every test below is test.fixme() — none run. The whole
+ * describe block is fixme'd, not just the individual steps, because P1-P3
+ * share state across two virtual-authenticator contexts and only make sense
+ * run together against the live compose stack; splitting the fixme finer
+ * would let a partial run report a false pass. The structure still PARSES
+ * cleanly under `playwright test --list`, so this file documents the
+ * intended coverage without claiming to exercise it.
  *
- * Scenario: Lost Device
- *   1. Seed a victim identity.
- *   2. Victim enrolls passkey A in virtual-authenticator ctx-A.
- *   3. Thief enrolls passkey B in a SECOND virtual-authenticator ctx-B.
- *      (Simulates a session-hijack or co-enrollment scenario.)
- *   4. Admin calls revokeSubject (force-logout) for the victim's identity.
- *   5. CURRENT BEHAVIOUR assertion:
- *      Passkey B can STILL log in after revoke — proves revoke ≠ credential
- *      removal. This step passes NOW (documents the gap, not the fix).
- *   6. POST-FIX assertion (test.fixme):
- *      Admin calls the Kratos admin delete-credential API to remove passkey B.
- *      B is then locked out (credentials.get() finds no credential; login fails).
+ * Scenario order (P1-P3) proves the FINDING, and deliberately does not match
+ * the recommended admin sequence. P2 revokes before P3 deletes, to show that
+ * revoke-first leaves the attacker's credential live — that is the bug. The
+ * correct operator order is the opposite: audit credentials, delete the
+ * affected type, THEN revoke (`docs/runbooks/lost-device.md`), because
+ * revoking first burns the session before you can see what needs auditing.
  *
- * Live-stack requirements (for the non-fixme steps):
+ *   P1. Seed a victim identity; victim enrolls passkey A in
+ *       virtual-authenticator ctx-A; a thief enrolls passkey B in a second
+ *       virtual-authenticator ctx-B (simulates hijack or co-enrollment).
+ *   P2. Admin calls revokeSubject (force-logout). Passkey B can STILL log
+ *       in afterward — revoke does not remove credentials.
+ *   P3. Admin calls the Kratos admin delete-credential API to remove
+ *       passkey B; B is then locked out (login fails, no session issued).
+ *
+ * Live-stack requirements once un-fixme'd:
  *   - Kratos passkey strategy enabled, rp.id = othala.test.
  *   - Chromium (CDP required for virtual authenticators).
  *   - Playwright container on the compose net.
  *   - The othala admin revoke endpoint reachable at {baseURL}/admin/api/revoke
  *     (the existing revokeSubject handler).
- *
- * The delete-credential step (P4) requires:
- *   TODO(HIGH-C): Kratos admin
- *   DELETE /admin/identities/{id}/credentials/{type} endpoint (Kratos ≥ v0.13).
- *   Until that endpoint is plumbed through the admin UI, this step is fixme.
+ *   - P3 also needs Kratos admin DELETE
+ *     /admin/identities/{id}/credentials/{type} plumbed through the admin
+ *     UI (TODO(HIGH-C)); until then P3 stays fixme even once P1/P2 are wired.
  */
 
 import { test, expect } from '../fixtures';
@@ -80,9 +83,9 @@ async function clearSession(
 }
 
 test.describe('P — Passkey credential eviction (lost-device scenario)', () => {
-  // P1 + P2 + P3 run against the live stack; they document the CURRENT GAP
-  // (revoke does not remove credentials). These are the assertions that
-  // PASS NOW and prove the finding is real.
+  // P1 + P2 + P3 are DESIGNED to run against the live stack and document the
+  // CURRENT GAP (revoke does not remove credentials), but none run today —
+  // see the file docblock's Status note.
   //
   // NOTE: P1–P3 require two independent virtual authenticators on two separate
   // browser contexts. The virtualAuthenticator fixture is test-scoped and

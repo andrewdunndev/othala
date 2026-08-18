@@ -107,7 +107,10 @@ Each names its enforcer and the test that fails if the enforcer stops working.
   `kratos/kratos.yml`, so enrolment is admin-initiated; breach checking and a
   minimum length gate passwords; every credential change fires
   `revoke_active_sessions`; force-logout is `revokeSubject`
-  (`portal/src/lib/revoke.ts`). Test: `e2e/playwright/tests/p-eviction.spec.ts`.
+  (`portal/src/lib/revoke.ts`). Full eviction (audit, delete credential, then
+  revoke) is documented in `docs/runbooks/lost-device.md`;
+  `e2e/playwright/tests/p-eviction.spec.ts` designs the coverage but every
+  case is still `test.fixme()`.
 - **Telemetry carries no secrets.** `portal/src/server/otel.mjs` scrubs session
   cookies, CSRF tokens, bearer headers, challenge ids and one-time codes out of
   spans before export. Test: `portal/scripts/otel-redaction.test.mjs`.

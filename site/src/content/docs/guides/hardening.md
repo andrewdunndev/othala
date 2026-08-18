@@ -120,10 +120,11 @@ unit-tested against the day it is.
 not delete enrolled credentials, so someone with a brief session can enrol
 *their own* passkey and it survives both the revoke and a password reset. The
 order is: audit credentials, delete the affected credential **type**, then
-revoke — `e2e/playwright/tests/p-eviction.spec.ts` walks it. Note the unit: the
-admin API has no per-credential removal, so deleting a type removes **every**
-credential of that kind, which is why the procedure ends in re-enrolment out of
-band. Runbooks are under `docs/runbooks/`.
+revoke, per `docs/runbooks/lost-device.md`.
+`e2e/playwright/tests/p-eviction.spec.ts` designs that coverage, not yet live
+(`test.fixme()`). Note the unit: the admin API has no per-credential removal,
+so deleting a type removes **every** credential of that kind, which is why the
+procedure ends in re-enrolment out of band.
 
 Revoking itself is one fan-out, and it shares an invariant with the login
 path's own skip=true handling — Hydra's memory is never trusted on its own:
