@@ -5,17 +5,28 @@
 # run here — they need a registry and the QEMU runner. If anything
 # fails, fix before tagging.
 #
-# What it runs:
-#   - portal: npm test
-#   - portal: npm run test:unit (vitest, src/lib/*.test.ts)
-#   - portal: npm run check (Astro typecheck)
-#   - portal: npm run build (full SSR build)
-#   - site:   npm run build (docs-site Astro build)
-#   - e2e shell-scripts: bash -n syntax check + shellcheck
-#   - tracked plain-YAML: python yaml parse
-#   - scripts/check-purity.sh
-#   - identity-schema drift: e2e/ vs kratos/ identity.schema.json
-#   - jsonnet-hook drift: e2e/ vs kratos/hooks/ recovery-gate.jsonnet
+# What it runs, and what CI already gates on every push/MR/tag vs what is
+# manual-only pre-tag ritual — CI runs the same checks and more (AGENTS.md
+# "The gates"), so this list is honest about which line is redundant with a
+# standing CI job and which is not:
+#   - portal: npm test                        — CI: check-portal
+#   - portal: npm run test:unit (vitest)       — CI: check-portal
+#   - portal: npm run check (Astro typecheck)  — CI: check-portal
+#   - portal: npm run build (full SSR build)   — CI: verify-othala (node-build)
+#   - site:   npm run build (docs-site build)  — CI: the cloudflare-worker job
+#   - e2e/*.sh: bash -n syntax check            — CI: check-purity, over ALL
+#     tracked .sh files (broader than this script's e2e/*.sh-only loop)
+#   - e2e/*.sh: shellcheck                      — MANUAL-ONLY: shellcheck is
+#     not in the CI image, and nothing here curl-installs a linter
+#   - tracked plain-YAML: python yaml parse     — CI: check-portal, via node
+#     + the `yaml` package — same invariant, different tool
+#   - scripts/check-purity.sh                   — CI: check-purity
+#   - identity-schema drift (e2e/ vs kratos/)   — CI: lint-identity-schema
+#   - jsonnet-hook drift (e2e/ vs kratos/hooks/) — CI: lint-jsonnet-hooks
+#
+# shellcheck is the one step above with no CI equivalent. Everything else
+# CI already runs on every push; this script's value over CI is running all
+# of it in one shot, once, right before cutting a tag.
 #
 # Usage:
 #   bash scripts/pre-tag-check.sh

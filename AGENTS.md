@@ -100,6 +100,13 @@ document, are both errors. Both scripts also assert their own size
 (`EXPECTED_CHECKS`, `EXPECTED_STEPS`): adding or removing a check means bumping
 the constant in the same commit, or the gate errors instead of quietly shrinking.
 
+Ten of those 11 steps also run in CI on every push, MR and tag — the two
+`check-portal` and `check-purity` jobs, plus the `lint-*` drift jobs, cover the
+same ground `pre-tag-check.sh` documents itself as gating. `shellcheck` is the
+one step CI does not run: it is not in the `check-purity`/`check-portal` image,
+and nothing here curl-installs a linter, so it stays a manual, pre-tag-only
+step. See `pre-tag-check.sh`'s own header for the full per-step CI mapping.
+
 ## Conventions that hold the design together
 
 - **Manifests are the API for apps.** Apps are read at request time from

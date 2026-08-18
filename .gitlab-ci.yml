@@ -260,7 +260,8 @@ lint-jsonnet-hooks:
       echo "OK: recovery-gate.jsonnet function bodies are in sync."
 
 # -----------------------------------------------------------------
-# check-purity: OSS purity + no-deprecated + dated-debt + prose-budget gate.
+# check-purity: OSS purity + no-deprecated + dated-debt + prose-budget gate,
+# plus a tracked-shell-script syntax check.
 #
 # Runs scripts/check-purity.sh over the git index. WHAT it checks is not
 # restated here — the script names and explains every check, and a list kept
@@ -276,6 +277,12 @@ lint-jsonnet-hooks:
 # The gate proves its own patterns inline, per check, before it scans
 # anything (selftest() in the script) — there is no separate probe/mutation
 # job to keep green.
+#
+# The trailing `bash -n` step closes half of the pre-tag-check.sh /
+# AGENTS.md gap: pre-tag-check.sh documented itself as the pre-tag gate but
+# CI never ran a syntax check on tracked shell scripts. shellcheck itself
+# stays out — it is not in this image and nothing here curl-installs a
+# linter — so it remains scripts/pre-tag-check.sh's manual-only step.
 # -----------------------------------------------------------------
 check-purity:
   stage: verify
@@ -291,58 +298,50 @@ check-purity:
     - git config --global --add safe.directory "$CI_PROJECT_DIR"
   script:
     - bash scripts/check-purity.sh
+    - |
+      echo "=== bash -n: tracked shell scripts ==="
+      FILES=()
+      while IFS= read -r -d '' f; do FILES+=("$f"); done < <(git ls-files -z -- '*.sh')
+      if [ "${#FILES[@]}" -eq 0 ]; then
+        echo "ERROR: 0 tracked .sh files — bash -n would check nothing"
+        exit 1
+      fi
+      rc=0
+      for f in "${FILES[@]}"; do
+        bash -n "$f" || { echo "FAIL: bash -n $f"; rc=1; }
+      done
+      [ "$rc" -eq 0 ] && echo "OK: bash -n clean on ${#FILES[@]} scripts"
+      exit $rc
 
 # -----------------------------------------------------------------
-# test-portal: v0.2.0 portal test suite. Runs `npm test` which
-# invokes node --test against scripts/*.test.mjs. Covers:
-#   - manifests-loader.test.mjs (YAML namespace split + parsing)
-#   - apps-collection.test.mjs  (Content Collection frontmatter shape)
-#   - csrf.test.mjs             (HIGH-1 CSRF token semantics)
-#   - admin-recovery-gate.test.mjs (HIGH-3 admin-recovery refusal)
+# check-portal: the portal quality gate — one `npm ci`, then astro check,
+# both test suites, and a tracked-plain-YAML well-formedness parse. Merges
+# the former test-portal + check-portal jobs, which ran identical rules on
+# the identical image and each paid their own npm ci for overlapping
+# coverage.
 #
-# Also runs `npm run test:unit` (vitest, against src/lib/*.test.ts) —
-# the TypeScript-native lib suite that vitest.config.ts has always
-# included but nothing invoked before this job wired it in. Covers
-# admin-auth.test.ts (isAdminMarker, the admin authority function),
-# plus contact/csrf/manifest-store/tiles lib tests. The two
-# harnesses are independent (node --test+tsx vs vitest) and both must
-# pass; see portal/vitest.config.ts for scope notes.
+# Covers:
+#   - npm run check      astro check: type + content checks across the
+#                         .astro/.ts tree. Fails only on type ERRORS;
+#                         residual hints do not fail the job.
+#   - npm test            node --test over scripts/*.test.mjs, incl. the
+#                         fuzz + fast-check suites (manifests-loader, csrf,
+#                         admin-recovery-gate, etc.)
+#   - npm run test:unit   vitest over src/lib/*.test.ts (admin-auth,
+#                         contact, csrf, manifest-store, tiles).
+#   - YAML parse          the other half of the pre-tag-check.sh /
+#                         AGENTS.md gap: a well-formedness parse of the
+#                         tracked plain-YAML set (.gitlab-ci.yml,
+#                         e2e/compose*.yml, e2e/manifests/*.yaml) that CI
+#                         never ran. Uses the `yaml` package this job's own
+#                         `npm ci` already installed rather than adding a
+#                         second install elsewhere. kratos/kratos.yml and
+#                         hydra/hydra.yml are excluded — they are ${VAR}
+#                         templates, not parseable YAML until rendered.
 #
-# Separate from verify-portal (catalog node-build, which runs
-# `npm run build`) because tests gate the change BEFORE the build
-# step. Catches Renovate-bumped breakage at the test layer.
-# -----------------------------------------------------------------
-test-portal:
-  stage: verify
-  image: registry.access.redhat.com/ubi9/nodejs-22:9.8@sha256:0e4e66a6fa295e7d7c13c94d1b4f39cb058a97843ac01e555e72721ac31eefa8
-  rules:
-    - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
-    - if: '$CI_PIPELINE_SOURCE == "push"'
-    - if: '$CI_COMMIT_TAG'
-  before_script:
-    - cd portal
-    - npm ci --include=dev
-  script:
-    - npm test
-    - npm run test:unit
-
-# -----------------------------------------------------------------
-# check-portal: the standing QUALITY GATE.
-#
-# Closes the "no standing linter" caveat: `astro check`
-# (type + content checks across the .astro/.ts tree) was previously NOT
-# gated in CI, so type drift could merge silently. This job runs it on
-# every push + MR + tag, alongside the portal test suite — together they
-# are the portal quality gate: `npm run check` is the type/lint half,
-# test-portal's `npm test` is the behavioral half.
-#
-# Same shape as test-portal (ubi9 nodejs-22, cd portal, npm ci) so the
-# two jobs share one mental model. `npm test` is run here too so the gate
-# is self-contained as a single quality checkpoint; it is cheap (node
-# --test over scripts/*.test.mjs) and the redundancy with test-portal is
-# intentional belt-and-suspenders, not a mistake. astro check fails the
-# job only on type ERRORS; the current tree's residual hints (the
-# "handful of type hints" the caveat names) do not fail it.
+# Separate from verify-othala (catalog node-build, which runs `npm run
+# build`) because these gate the change BEFORE the build step, catching
+# Renovate-bumped breakage at the test layer.
 # -----------------------------------------------------------------
 check-portal:
   stage: verify
@@ -357,6 +356,35 @@ check-portal:
   script:
     - npm run check
     - npm test
+    - npm run test:unit
+    - |
+      echo "=== YAML parse: tracked plain-YAML ==="
+      FILES=()
+      while IFS= read -r -d '' f; do FILES+=("../$f"); done < <(git -C .. ls-files -z -- .gitlab-ci.yml 'e2e/compose*.yml' 'e2e/manifests/*.yaml')
+      if [ "${#FILES[@]}" -eq 0 ]; then
+        echo "ERROR: 0 tracked plain-YAML files — nothing was parsed"
+        exit 1
+      fi
+      node -e '
+        const fs = require("fs");
+        const YAML = require("yaml");
+        const files = process.argv.slice(1);
+        let bad = 0;
+        for (const f of files) {
+          try {
+            const doc = YAML.parse(fs.readFileSync(f, "utf8"));
+            const empty = doc === null || doc === undefined ||
+              (typeof doc === "object" && !Array.isArray(doc) && Object.keys(doc).length === 0) ||
+              (Array.isArray(doc) && doc.length === 0);
+            if (empty) { console.error(`FAIL: ${f} parsed to an empty document`); bad = 1; }
+          } catch (e) {
+            console.error(`FAIL: ${f}: ${e.message}`);
+            bad = 1;
+          }
+        }
+        if (!bad) console.log(`OK: ${files.length} tracked YAML files parse to non-empty documents`);
+        process.exit(bad);
+      ' "${FILES[@]}"
 
 # -----------------------------------------------------------------
 # e2e: QEMU-runner end-to-end harness.
@@ -450,7 +478,7 @@ e2e:
     # hardware-bound, so e2e runs only where it gates — tag pipelines (full
     # substrate, all images built via tag_pipeline) and the on-demand
     # BUILD_CI_IMAGE path. Push/MR is already covered by verify-* and
-    # test-/check-portal.
+    # check-portal.
     #
     # GitLab variables don't honor bash ${VAR:-default}, so tag pipelines
     # must override AUTH_VERSION here to pull the v-tag image.
