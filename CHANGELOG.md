@@ -9,13 +9,6 @@ This CHANGELOG and git tags carry the deployed-instance release state.
 
 ## [Unreleased]
 
-### Added
-
-- **Architecture page** (`othala.dunn.dev/architecture/`): the six diagrams
-  in narrative order with connective prose between them. The landing page
-  now tells the project story and links Architecture, Guides, and the repo
-  as entry points.
-
 ## [0.5.0] - 2026-08-18
 
 Docs convergence (corpus cut two-thirds, 16 ADRs folded into one
@@ -33,6 +26,10 @@ now live on othala.dunn.dev.
 - **Six at-a-glance SVG diagrams** (trust boundary, session revocation,
   first credential, OIDC login, plus two prior) now live on
   othala.dunn.dev.
+- **Architecture page** (`othala.dunn.dev/architecture/`): the six diagrams
+  in narrative order with connective prose. The landing page now tells the
+  project story and links Architecture, Guides, and the repo as entry
+  points.
 
 ### Changed
 
