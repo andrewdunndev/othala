@@ -81,7 +81,7 @@ cd "$REPO_ROOT" || exit 1
 #
 # A missing dependency must stop the harness loudly and non-zero: a probe suite
 # that quietly skips itself is precisely the vacuity it exists to catch.
-for dep in git sed grep cmp; do
+for dep in git sed grep; do
     command -v "$dep" >/dev/null 2>&1 || {
         printf 'FATAL: probe harness requires `%s`, which is not on PATH — refusing to report on probes that did not run.\n' \
             "$dep" >&2
