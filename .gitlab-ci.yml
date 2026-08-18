@@ -267,24 +267,15 @@ lint-jsonnet-hooks:
 # in two places goes stale in one of them. No npm deps needed: pure bash,
 # git and grep.
 #
-# Three of its checks take the WHOLE index as their corpus (instance names,
-# personal names, private-stack application names) and one caps total tracked
-# prose in bytes. Both properties are about this file too: the gate scans
-# .gitlab-ci.yml like everything else, so a runner tag or a comment naming a
-# private host fails the pipeline that reads it.
+# Four of its checks take the WHOLE index as their corpus (instance names,
+# personal names, private-stack application names, vendored line-pins) and
+# one caps total tracked prose in bytes. That property is about this file
+# too: the gate scans .gitlab-ci.yml like everything else, so a runner tag or
+# a comment naming a private host fails the pipeline that reads it.
 #
-# scripts/probe-check-purity.sh runs in the SAME job, ahead of the gate. It is
-# the mutation harness that proves the gate still fails the way it claims to,
-# and a probe suite nobody runs decays into the same defect class as a gate
-# that scans nothing. Both run unconditionally and the job is red if either is,
-# so a passing gate never hides a rotted probe or the reverse.
-#
-# Dependencies beyond the gate's: none. The harness builds its fixture from the
-# git index and rewrites files with sed and grep, so it needs exactly what the
-# gate needs. scripts/probe-check-purity.sh asserts each with `command -v` on
-# startup and exits non-zero if any is missing, rather than skipping — so a
-# runner image that stops carrying them fails the job loudly instead of
-# reporting on probes that did not run.
+# The gate proves its own patterns inline, per check, before it scans
+# anything (selftest() in the script) — there is no separate probe/mutation
+# job to keep green.
 # -----------------------------------------------------------------
 check-purity:
   stage: verify
@@ -299,11 +290,7 @@ check-purity:
     # anti-vacuity design (correctly) refuses to report a verdict.
     - git config --global --add safe.directory "$CI_PROJECT_DIR"
   script:
-    - |
-      rc=0
-      bash scripts/probe-check-purity.sh || rc=1
-      bash scripts/check-purity.sh || rc=1
-      exit $rc
+    - bash scripts/check-purity.sh
 
 # -----------------------------------------------------------------
 # test-portal: v0.2.0 portal test suite. Runs `npm test` which

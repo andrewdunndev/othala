@@ -76,18 +76,18 @@ the hook; `scripts/pre-tag-check.sh` fails if either drifts.
 Two local scripts. CI runs the same checks and more.
 
 **`scripts/check-purity.sh`** runs its checks over the git **index**, not the
-worktree, so the corpus is identical locally and in CI. Each check names and
-explains itself at its call site; that is the list, and it is not repeated here.
-Three of them take the whole index as their corpus — instance names, personal
-names, private-stack application names — because a pathspec-scoped check cannot
-catch what is outside its glob.
+worktree, so the corpus is identical locally and in CI. Every check is a row in
+a data table — pattern branches, canaries, pathspec — and `scan()` plus the loop
+over that table is the whole runner. Four rows take the whole index as their
+corpus — instance names, personal names, private-stack application names,
+vendored line-pins — because a pathspec-scoped check cannot catch what is
+outside its glob.
 
-Its anti-vacuity contract at the top of the file is the point of it: a check that
-scanned zero files, weighed zero bytes, whose pattern no longer fires on its own
-canary, or whose `grep` exited with an I/O error is an ERROR, never a pass.
-`scripts/probe-check-purity.sh` mutation-tests the gate — one probe per pattern
-branch, each planted in a real file — and CI runs both in one job so neither can
-hide a rotted other.
+Each row proves itself against its own embedded canary before it scans
+anything (`selftest()`), inline on every run, so there is no separate probe or
+mutation-test script to keep in sync with the gate. A check that scanned zero
+files, weighed zero bytes, whose pattern no longer fires on its own canary, or
+whose `grep` exited with an I/O error is an ERROR, never a pass.
 
 **`scripts/pre-tag-check.sh`** runs 11 steps before a tag: portal `npm test`,
 `npm run test:unit`, `npm run check` and `npm run build`; the docs-site build;
