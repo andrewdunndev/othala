@@ -1,7 +1,7 @@
 // Tests for src/lib/kratos.ts sendInviteRecoveryEmail (D1: admin-triggered
 // invite email).
 //
-// Run with: tsx --test scripts/kratos-invite-email.test.mjs
+// Run with: npx vitest run scripts/kratos-invite-email.test.mjs
 //
 // Imports the real TS function directly (it uses bare fetch, not the @ory
 // SDK) and stubs globalThis.fetch — same style as forward-auth.test.mjs /
@@ -22,7 +22,7 @@
 //   - KRATOS_PUBLIC_URL override is honoured (same env contract as the rest
 //     of kratos.ts)
 
-import { test, beforeEach, afterEach } from 'node:test';
+import { test, beforeEach, afterEach } from 'vitest';
 import assert from 'node:assert/strict';
 import { sendInviteRecoveryEmail } from '../src/lib/kratos.ts';
 

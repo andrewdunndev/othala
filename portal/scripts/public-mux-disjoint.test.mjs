@@ -1,7 +1,7 @@
 // Static guard: the public (Astro) mux must NOT expose the admin-listener
 // POST endpoints.
 //
-// Run with: tsx --test scripts/public-mux-disjoint.test.mjs
+// Run with: npx vitest run scripts/public-mux-disjoint.test.mjs
 //
 // /admin/revoke-user, /admin/recovery-gate, and /admin/login-gate are served
 // ONLY by the admin listener (src/server/listen.mjs), bearer-guarded and bound
@@ -19,7 +19,7 @@
 // Astro route each file would serve, then asserts none of them is one of the
 // admin-listener-only paths.
 
-import { test } from 'node:test';
+import { test } from 'vitest';
 import assert from 'node:assert/strict';
 import { readdirSync, statSync } from 'node:fs';
 import { join, dirname, relative, sep } from 'node:path';

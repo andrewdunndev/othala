@@ -1,6 +1,6 @@
 // Tests for portal/src/lib/tiles.ts — parseTile access_group fallback.
 //
-// Run with: tsx --test scripts/tiles.test.mjs
+// Run with: npx vitest run scripts/tiles.test.mjs
 //
 // Coverage:
 //   - explicit access_group passes through unchanged
@@ -10,7 +10,7 @@
 //   - non-presentation manifest (no presentation: block) returns null
 //   - disabled tile parses correctly
 
-import { test } from 'node:test';
+import { test } from 'vitest';
 import assert from 'node:assert/strict';
 import { mkdtempSync, writeFileSync, rmSync } from 'node:fs';
 import { join } from 'node:path';
@@ -34,8 +34,15 @@ async function withTilesModule(env, callback) {
   }
   Object.assign(process.env, env);
   try {
-    const bust = `?bust=${Date.now()}-${Math.random()}`;
-    const mod = await import(`../src/lib/tiles.ts${bust}`);
+    // Base36, not the raw float: Math.random()'s decimal point trips
+    // Vite's extension-sniffing regex (/\.\w+$/), which then transforms
+    // this module as plain JS instead of TS and fails on type syntax.
+    const bust = `?bust=${Date.now()}-${Math.random().toString(36).slice(2)}`;
+    // @vite-ignore: bust is a runtime cache-buster (forces a fresh module
+    // instance per call), not a build-time-resolvable specifier — vitest's
+    // Vite pipeline needs this annotation to skip static import analysis
+    // and pass the computed specifier straight to the runtime loader.
+    const mod = await import(/* @vite-ignore */ `../src/lib/tiles.ts${bust}`);
     return await callback(mod);
   } finally {
     for (const key of Object.keys(process.env)) {

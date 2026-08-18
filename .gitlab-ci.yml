@@ -315,29 +315,31 @@ check-purity:
 
 # -----------------------------------------------------------------
 # check-portal: the portal quality gate — one `npm ci`, then astro check,
-# both test suites, and a tracked-plain-YAML well-formedness parse. Merges
+# the test suite, and a tracked-plain-YAML well-formedness parse. Merges
 # the former test-portal + check-portal jobs, which ran identical rules on
 # the identical image and each paid their own npm ci for overlapping
 # coverage.
 #
 # Covers:
-#   - npm run check      astro check: type + content checks across the
-#                         .astro/.ts tree. Fails only on type ERRORS;
-#                         residual hints do not fail the job.
-#   - npm test            node --test over scripts/*.test.mjs, incl. the
-#                         fuzz + fast-check suites (manifests-loader, csrf,
-#                         admin-recovery-gate, etc.)
-#   - npm run test:unit   vitest over src/lib/*.test.ts (admin-auth,
-#                         contact, csrf, manifest-store, tiles).
-#   - YAML parse          the other half of the pre-tag-check.sh /
-#                         AGENTS.md gap: a well-formedness parse of the
-#                         tracked plain-YAML set (.gitlab-ci.yml,
-#                         e2e/compose*.yml, e2e/manifests/*.yaml) that CI
-#                         never ran. Uses the `yaml` package this job's own
-#                         `npm ci` already installed rather than adding a
-#                         second install elsewhere. kratos/kratos.yml and
-#                         hydra/hydra.yml are excluded — they are ${VAR}
-#                         templates, not parseable YAML until rendered.
+#   - npm run check   astro check: type + content checks across the
+#                      .astro/.ts tree. Fails only on type ERRORS;
+#                      residual hints do not fail the job.
+#   - npm test         vitest over both src/lib/*.test.ts (admin-auth,
+#                      contact, csrf, manifest-store, tiles) and
+#                      scripts/*.test.mjs (manifests-loader,
+#                      admin-recovery-gate, etc.), incl. the fuzz +
+#                      fast-check suites. One runner; tsx is no longer a
+#                      test dependency (it remains for the separate
+#                      lint:manifests CLI).
+#   - YAML parse       the other half of the pre-tag-check.sh / AGENTS.md
+#                      gap: a well-formedness parse of the tracked
+#                      plain-YAML set (.gitlab-ci.yml, e2e/compose*.yml,
+#                      e2e/manifests/*.yaml) that CI never ran. Uses the
+#                      `yaml` package this job's own `npm ci` already
+#                      installed rather than adding a second install
+#                      elsewhere. kratos/kratos.yml and hydra/hydra.yml are
+#                      excluded — they are ${VAR} templates, not parseable
+#                      YAML until rendered.
 #
 # Separate from verify-othala (catalog node-build, which runs `npm run
 # build`) because these gate the change BEFORE the build step, catching
@@ -356,7 +358,6 @@ check-portal:
   script:
     - npm run check
     - npm test
-    - npm run test:unit
     - |
       echo "=== YAML parse: tracked plain-YAML ==="
       FILES=()

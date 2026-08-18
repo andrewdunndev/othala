@@ -23,10 +23,9 @@
 //       inject an undeclared role: the override value must name a role in
 //       manifest.roles[].
 //
-// Run: tsx --test scripts/claims-inject.fuzz.test.mjs
-//      node --test scripts/claims-inject.fuzz.test.mjs  (with tsx loader via package.json test script)
+// Run: npx vitest run scripts/claims-inject.fuzz.test.mjs
 
-import { test } from 'node:test';
+import { test } from 'vitest';
 import assert from 'node:assert/strict';
 import * as fc from 'fast-check';
 import { lookupRole, deepMergeClaims, composeIDTokenClaims, buildIDTokenClaims } from '../src/lib/claims.ts';

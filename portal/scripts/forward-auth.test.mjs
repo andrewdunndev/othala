@@ -1,6 +1,6 @@
 // Tests for src/pages/api/forward-auth.ts — the Caddy forward_auth group-gate.
 //
-// Run with: tsx --test scripts/forward-auth.test.mjs
+// Run with: npx vitest run scripts/forward-auth.test.mjs
 //
 // This is SECURITY-SENSITIVE AUTHZ. The endpoint must FAIL CLOSED. We import
 // the real GET/HEAD handlers and drive them through the real Kratos/Admin SDK
@@ -25,7 +25,7 @@
 // protected upstream. The tests below assert the status is non-2xx for every
 // failure path, which is the property the edge actually keys on.
 
-import { test, beforeEach, afterEach } from 'node:test';
+import { test, beforeEach, afterEach } from 'vitest';
 import assert from 'node:assert/strict';
 import { GET, HEAD } from '../src/pages/api/forward-auth.ts';
 

@@ -1,6 +1,6 @@
 // Tests for src/lib/revoke.ts — the in-process revocation fan-out (CU3 B1).
 //
-// Run with: tsx --test scripts/revoke.test.mjs
+// Run with: npx vitest run scripts/revoke.test.mjs
 //
 // Proves the fan-out contract with injected SDK stubs (no live Kratos/Hydra):
 //   - ORDER: step 1 (state->inactive, deactivate only) precedes step 2
@@ -13,7 +13,7 @@
 //     the injected flush stub here; the env-skip path is the default helper).
 //   - prescriptive errors name the dependency for hydra-admin failures too.
 
-import { test } from 'node:test';
+import { test } from 'vitest';
 import assert from 'node:assert/strict';
 import { revokeSubject, RevokeError } from '../src/lib/revoke.ts';
 import { ResponseError } from '@ory/client-fetch';

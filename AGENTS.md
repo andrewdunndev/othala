@@ -89,18 +89,19 @@ mutation-test script to keep in sync with the gate. A check that scanned zero
 files, weighed zero bytes, whose pattern no longer fires on its own canary, or
 whose `grep` exited with an I/O error is an ERROR, never a pass.
 
-**`scripts/pre-tag-check.sh`** runs 11 steps before a tag: portal `npm test`,
-`npm run test:unit`, `npm run check` and `npm run build`; the docs-site build;
-`bash -n` plus shellcheck over `e2e/*.sh`; a YAML parse of the tracked plain-YAML
-set; the purity gate; and the two vendored-copy drift comparisons. It does NOT
-run the container builds, the SBOM and release stages, or the `e2e/` harness,
-which need a registry and the QEMU runner. Every step decides from a RESULT, not
-an exit status: a suite reporting zero tests, and a YAML file parsing to an empty
+**`scripts/pre-tag-check.sh`** runs 10 steps before a tag: portal `npm test`
+(vitest, over both `src/lib/*.test.ts` and `scripts/*.test.mjs`), `npm run
+check` and `npm run build`; the docs-site build; `bash -n` plus shellcheck
+over `e2e/*.sh`; a YAML parse of the tracked plain-YAML set; the purity gate;
+and the two vendored-copy drift comparisons. It does NOT run the container
+builds, the SBOM and release stages, or the `e2e/` harness, which need a
+registry and the QEMU runner. Every step decides from a RESULT, not an exit
+status: a suite reporting zero tests, and a YAML file parsing to an empty
 document, are both errors. Both scripts also assert their own size
 (`EXPECTED_CHECKS`, `EXPECTED_STEPS`): adding or removing a check means bumping
 the constant in the same commit, or the gate errors instead of quietly shrinking.
 
-Ten of those 11 steps also run in CI on every push, MR and tag — the two
+Nine of those 10 steps also run in CI on every push, MR and tag — the two
 `check-portal` and `check-purity` jobs, plus the `lint-*` drift jobs, cover the
 same ground `pre-tag-check.sh` documents itself as gating. `shellcheck` is the
 one step CI does not run: it is not in the `check-purity`/`check-portal` image,
@@ -142,8 +143,7 @@ step. See `pre-tag-check.sh`'s own header for the full per-step CI mapping.
 ## Commands
 
 ```sh
-cd portal && npm test           # scripts/*.test.mjs, incl. the fuzz suites
-cd portal && npm run test:unit  # src/lib/*.test.ts; BOTH suites are required
+cd portal && npm test           # vitest: src/lib/*.test.ts + scripts/*.test.mjs, incl. the fuzz suites
 cd portal && npm run check      # type + content check
 cd portal && npm run dev        # UI iteration without the full stack
 cd e2e && ./gen-secrets.sh && bash validate.sh   # full compose stand-up

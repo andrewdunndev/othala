@@ -1,16 +1,18 @@
 // Render tests for src/components/FlowNodes.astro (CU5 output-equivalence).
 //
-// Run with: tsx --test scripts/flownodes-render.test.mjs
+// Run with: npx vitest run scripts/flownodes-render.test.mjs
 //
 // nodes.ts (the attribute policy) is unit-tested in nodes.test.mjs; this
 // suite closes the gap by asserting the COMPONENT'S RENDERED HTML — the
 // shape the recovery / verification / settings pages actually emit.
 //
-// The component is a real .astro SFC, so it can't be imported by plain
-// node/tsx (no .astro loader). We drive Astro's own Container API through
-// a Vite SSR pipeline configured from the project's astro config — the
-// same machinery `vitest + getViteConfig` uses, here invoked directly so
-// the existing `tsx --test scripts/*.test.mjs` runner stays unchanged.
+// The component is a real .astro SFC with no plain-node import path. We
+// drive Astro's own Container API through a Vite SSR pipeline configured
+// from the project's astro config — the same machinery `vitest +
+// getViteConfig` uses, here invoked directly rather than reused from the
+// runner's own Vite instance. Runs fine as a second, independent Vite
+// server inside vitest's process; left this way since this migration is a
+// mechanical runner swap, not a rewrite of how the file drives Astro.
 //
 // Coverage:
 //   - hidden node  -> <input type="hidden"> with name + value (CSRF token
@@ -20,7 +22,7 @@
 //   - labeled input reads node.meta.label.text for the <label>
 //   - value attribute suppressed when passValue=false
 
-import { test, before, after } from 'node:test';
+import { test, beforeAll, afterAll } from 'vitest';
 import assert from 'node:assert/strict';
 import { getViteConfig } from 'astro/config';
 import { createServer } from 'vite';
@@ -29,7 +31,7 @@ let server;
 let AstroContainer;
 let FlowNodes;
 
-before(async () => {
+beforeAll(async () => {
   const inline = await getViteConfig({ server: { middlewareMode: true } })({
     command: 'serve',
     mode: 'test',
@@ -45,7 +47,7 @@ before(async () => {
   FlowNodes = (await server.ssrLoadModule('/src/components/FlowNodes.astro')).default;
 });
 
-after(async () => {
+afterAll(async () => {
   if (server) await server.close();
 });
 

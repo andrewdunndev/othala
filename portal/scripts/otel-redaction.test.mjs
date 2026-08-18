@@ -1,6 +1,6 @@
 // Tests for src/server/otel.mjs — the PII redaction contract (review finding H1).
 //
-// Run with: tsx --test scripts/otel-redaction.test.mjs
+// Run with: npx vitest run scripts/otel-redaction.test.mjs
 //
 // This is the IdP telemetry path: spans must never carry session cookies, CSRF
 // tokens, bearer headers, OAuth challenge ids, recovery/login codes, or one-time
@@ -8,7 +8,7 @@
 // do NOT call startTelemetry / stand up the SDK (importing the module is a no-op
 // because OTEL_EXPORTER_OTLP_ENDPOINT is unset in the test env).
 
-import { test } from 'node:test';
+import { test } from 'vitest';
 import assert from 'node:assert/strict';
 import {
   scrubUrl,

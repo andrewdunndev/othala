@@ -3,9 +3,9 @@
 // proven to fire on a crafted bad manifest, and the real on-disk manifest
 // set is proven clean.
 //
-// Run with: tsx --test scripts/validate-clients.test.mjs
+// Run with: npx vitest run scripts/validate-clients.test.mjs
 
-import { test } from 'node:test';
+import { test } from 'vitest';
 import assert from 'node:assert/strict';
 import { readdirSync, readFileSync } from 'node:fs';
 import { join, dirname } from 'node:path';

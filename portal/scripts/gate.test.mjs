@@ -1,13 +1,13 @@
 // Tests for portal/src/lib/gate.ts — the COMPLETE access gate (CU1 item 2).
 //
-// Run with: tsx --test scripts/gate.test.mjs
+// Run with: npx vitest run scripts/gate.test.mjs
 //
 // Imports the canonical implementation directly. The gate keys off the
 // manifest's bound access groups (manifest.accessGroups, OR-semantics) AND
 // state==active, both fail-closed — NOT a derived `access-<clientId>` name. The
 // exhaustive fail-closed property lives in portal/scripts/gate-property.test.mjs.
 
-import { test } from 'node:test';
+import { test } from 'vitest';
 import assert from 'node:assert/strict';
 import {
   enforceAccessGate,

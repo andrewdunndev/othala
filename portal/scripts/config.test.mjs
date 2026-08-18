@@ -1,6 +1,6 @@
 // Tests for src/lib/config.ts — the Othala portal env-config module.
 //
-// Run with: tsx --test scripts/config.test.mjs
+// Run with: npx vitest run scripts/config.test.mjs
 //
 // Coverage:
 //   - required-no-default vars throw in production when absent
@@ -11,7 +11,7 @@
 //   - OTHALA_IDENTITY_GROUPS: parsing, ordering, 'admin' invariant
 //   - trailing-slash normalisation on OTHALA_PUBLIC_URL
 
-import { test, beforeEach } from 'node:test';
+import { test, beforeEach } from 'vitest';
 import assert from 'node:assert/strict';
 
 // ── helpers ───────────────────────────────────────────────────────────────────
@@ -31,8 +31,15 @@ async function loadConfig(env = {}) {
   Object.assign(process.env, env);
 
   try {
-    const bust = `?bust=${Date.now()}-${Math.random()}`;
-    const mod = await import(`../src/lib/config.ts${bust}`);
+    // Base36, not the raw float: Math.random()'s decimal point trips
+    // Vite's extension-sniffing regex (/\.\w+$/), which then transforms
+    // this module as plain JS instead of TS and fails on type syntax.
+    const bust = `?bust=${Date.now()}-${Math.random().toString(36).slice(2)}`;
+    // @vite-ignore: bust is a runtime cache-buster (forces a fresh module
+    // instance per call), not a build-time-resolvable specifier — vitest's
+    // Vite pipeline needs this annotation to skip static import analysis
+    // and pass the computed specifier straight to the runtime loader.
+    const mod = await import(/* @vite-ignore */ `../src/lib/config.ts${bust}`);
     return mod;
   } finally {
     // Restore original env

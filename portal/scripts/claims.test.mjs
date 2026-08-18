@@ -1,11 +1,11 @@
 // Tests for src/lib/claims.ts — id_token claim mapping (CU1 item 3).
 //
-// Run with: tsx --test scripts/claims.test.mjs
+// Run with: npx vitest run scripts/claims.test.mjs
 //
 // Mirrors BuildIDTokenClaims in consent/claims.go against the family
 // identity schema (traits: username/email/displayName).
 
-import { test } from 'node:test';
+import { test } from 'vitest';
 import assert from 'node:assert/strict';
 import { buildIDTokenClaims, deepMergeClaims, composeIDTokenClaims } from '../src/lib/claims.ts';
 

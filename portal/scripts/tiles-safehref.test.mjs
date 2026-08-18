@@ -1,6 +1,6 @@
 // Tests for the safeHref() helper added in FIX-G (tiles.ts).
 //
-// Run with: tsx --test scripts/tiles-safehref.test.mjs
+// Run with: npx vitest run scripts/tiles-safehref.test.mjs
 //
 // Coverage:
 //   - http:  URL → allowed (returned as-is)
@@ -13,7 +13,7 @@
 //   - vbscript: → '#'
 //   - blob: → '#'
 
-import { test } from 'node:test';
+import { test } from 'vitest';
 import assert from 'node:assert/strict';
 import { safeHref } from '../src/lib/tiles.ts';
 

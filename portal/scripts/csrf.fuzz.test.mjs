@@ -1,6 +1,6 @@
 // Property-based / adversarial fuzz test for csrf.ts + bearerMatches/parseBearer.
 //
-// Run with:  cd portal && node --test scripts/csrf.fuzz.test.mjs
+// Run with:  cd portal && npx vitest run scripts/csrf.fuzz.test.mjs
 //
 // SECURITY INVARIANT under test:
 //   verifyToken accepts a token ONLY if it was signToken-ed for the SAME
@@ -11,7 +11,7 @@
 //
 // fast-check is the property-based engine; ~1000 runs per property.
 
-import { test, beforeEach } from 'node:test';
+import { test, beforeEach } from 'vitest';
 import assert from 'node:assert/strict';
 import * as fc from 'fast-check';
 import { createHmac } from 'node:crypto';

@@ -4,12 +4,12 @@
 // manifests are read from disk. Delays are passed as baseDelayMs=1 so the
 // retry tests run in milliseconds.
 //
-// Run with: tsx --test scripts/registrar.test.mjs
+// Run with: npx vitest run scripts/registrar.test.mjs
 
-import { test, beforeEach } from 'node:test';
+import { test, beforeEach } from 'vitest';
 import assert from 'node:assert/strict';
 
-// Import the reconciler under test via tsx (TypeScript, not the built .mjs).
+// Imports the reconciler's TypeScript source directly (not the built .mjs).
 import {
   reconcileClients,
   reconcileOnBoot,

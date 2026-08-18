@@ -1,6 +1,6 @@
 // Contract tests for the D-listener admin mux (CU1 item 4/6, extended CU3).
 //
-// Run with: tsx --test scripts/admin-port.test.mjs
+// Run with: npx vitest run scripts/admin-port.test.mjs
 //
 // Asserts:
 //   - the admin port serves /healthz + /readyz (GET) and the CU3 admin
@@ -18,7 +18,7 @@
 // Imports the pure helpers from listen.mjs without binding any socket or
 // loading the SSR handler / runtime bundle.
 
-import { test, beforeEach } from 'node:test';
+import { test, beforeEach } from 'vitest';
 import assert from 'node:assert/strict';
 import http from 'node:http';
 import { Readable } from 'node:stream';

@@ -1,6 +1,6 @@
 // Tests for src/lib/admin-api.ts — Kratos admin API wrappers.
 //
-// Run with: node --test scripts/admin-api.test.mjs
+// Run with: npx vitest run scripts/admin-api.test.mjs
 //
 // The TS source is canonical; this test re-ports the API surface in JS
 // form and asserts observable network behaviour (URL shape, method,
@@ -20,7 +20,7 @@
 //   - getRecoveryLink: POST body shape + response parsing
 //   - ok helper: throws on non-2xx with status in message
 
-import { test, beforeEach } from 'node:test';
+import { test, beforeEach } from 'vitest';
 import assert from 'node:assert/strict';
 
 // ─── env setup ────────────────────────────────────────────────────────────────
@@ -36,10 +36,10 @@ function defaultSchemaId() {
 }
 
 // ─── JS port of admin-api.ts ──────────────────────────────────────────────────
-// Re-ports the functions verbatim so we can run node --test without tsx.
-// If/when tsx is wired in, replace this block with:
-//   import { ... } from '../src/lib/admin-api.ts';
-// and keep tests identical.
+// Re-ports the functions verbatim rather than importing admin-api.ts directly.
+// The runner is now vitest (which reads .ts natively, no loader needed), but
+// switching this file to a direct import is a separate change from the
+// runner migration — left as-is here to keep the conversion mechanical.
 
 function adminBase() {
   return process.env.KRATOS_ADMIN_URL ?? DEFAULT_BASE;

@@ -1,13 +1,12 @@
 /**
- * Vitest configuration for portal/src/lib unit tests.
+ * Vitest configuration for the whole portal test suite.
  *
- * Scope: src/lib/*.test.ts (TypeScript-native unit tests that import the
- * lib directly without going through the Astro build pipeline).
- *
- * These complement the existing scripts/*.test.mjs suite (Node --test +
- * tsx), which covers integration-style tests against the built artefacts.
- * The two harnesses run independently; vitest is faster for authoring new
- * lib tests because it handles TypeScript without a separate transpile step.
+ * Scope: src/lib/**\/*.test.ts (TypeScript-native lib unit tests) AND
+ * scripts/*.test.mjs (integration-style tests against the built artefacts,
+ * incl. the fast-check fuzz/property suites). One runner for both — the
+ * former node --test + tsx harness over scripts/*.test.mjs was retired;
+ * vitest handles TypeScript natively, so tsx is no longer a test dependency
+ * (it remains a devDependency for `npm run lint:manifests`'s CLI runtime).
  *
  * Run: npx vitest run   (from portal/)
  *
@@ -20,8 +19,9 @@ import { defineConfig } from 'vitest/config';
 export default defineConfig({
   test: {
     environment: 'node',
-    include: ['src/lib/**/*.test.ts'],
-    // Run serially to avoid cross-test module-level state (rate-limiter Map).
+    include: ['src/lib/**/*.test.ts', 'scripts/*.test.mjs'],
+    // Run serially to avoid cross-test module-level state (rate-limiter Map,
+    // process.env mutation in config.test.mjs/tiles.test.mjs).
     // (poolOptions was removed in Vitest 4; singleFork is now a top-level option.)
     pool: 'forks',
     singleFork: true,

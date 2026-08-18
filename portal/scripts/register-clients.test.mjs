@@ -4,9 +4,9 @@
 // update branching, secret resolution, the consent-block exclusion, and the
 // pre-flight lint are all exercised.
 //
-// Run with: tsx --test scripts/register-clients.test.mjs
+// Run with: npx vitest run scripts/register-clients.test.mjs
 
-import { test } from 'node:test';
+import { test } from 'vitest';
 import assert from 'node:assert/strict';
 import { parseManifest } from '../src/lib/manifests.ts';
 import {

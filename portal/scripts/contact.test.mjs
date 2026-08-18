@@ -1,9 +1,9 @@
 // Tests for src/lib/contact.ts (validation + rate limit) and the SMTP-URI
 // parser in src/lib/mailer.ts.
 //
-// Run with: tsx --test scripts/contact.test.mjs
+// Run with: npx vitest run scripts/contact.test.mjs
 
-import { test, beforeEach } from 'node:test';
+import { test, beforeEach } from 'vitest';
 import assert from 'node:assert/strict';
 
 const {

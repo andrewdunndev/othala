@@ -2,12 +2,12 @@
 // providers (CU1 item 1) and the gate applied on BOTH login and consent
 // (CU1 item 6).
 //
-// Run with: tsx --test scripts/oauth2-handlers.test.mjs
+// Run with: npx vitest run scripts/oauth2-handlers.test.mjs
 //
 // Drives the framework-agnostic handlers with a stub OAuth2Api + stub identity
 // lookup, asserting accept/reject behaviour and the relative return_to bounce.
 
-import { test } from 'node:test';
+import { test } from 'vitest';
 import assert from 'node:assert/strict';
 import { handleLogin, handleConsent, handleConsentPost, handleLogout, buildLoginReturnTo } from '../src/lib/oauth2-handlers.ts';
 import { describeScopeList, SCOPE_DESCRIPTIONS } from '../src/lib/scope-descriptions.ts';

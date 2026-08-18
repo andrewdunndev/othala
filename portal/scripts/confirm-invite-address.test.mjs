@@ -1,7 +1,7 @@
 // Tests for src/lib/access.ts confirmsInviteAddress (D1 best-practice
 // bundle: send-time address confirmation for send-invite-email).
 //
-// Run with: tsx --test scripts/confirm-invite-address.test.mjs
+// Run with: npx vitest run scripts/confirm-invite-address.test.mjs
 //
 // Same style as admin-recovery-gate.test.mjs: imports the real TS function
 // directly and exercises it as a pure predicate — no Kratos, no HTTP, no
@@ -16,7 +16,7 @@
 //     the comparison is byte-equal, not case-folded or trimmed
 //   - empty confirmation (field left blank / omitted) returns false
 
-import { test } from 'node:test';
+import { test } from 'vitest';
 import assert from 'node:assert/strict';
 import { confirmsInviteAddress } from '../src/lib/access.ts';
 

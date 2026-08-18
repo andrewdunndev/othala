@@ -1,7 +1,7 @@
 // Tests for src/lib/metadata-admin.ts — the load-bearing validator
 // (LB-8 / MEDIUM-3 in the security review).
 //
-// Run with: tsx --test scripts/metadata-admin.test.mjs
+// Run with: npx vitest run scripts/metadata-admin.test.mjs
 //
 // Imports the canonical validator directly. The schema mirror lives
 // alongside identity.schema.json's metadata_admin shape:
@@ -12,7 +12,7 @@
 //            ^[a-z][a-z0-9_\-]*$ length 1..64
 //   - no other top-level keys allowed
 
-import { test } from 'node:test';
+import { test } from 'vitest';
 import assert from 'node:assert/strict';
 import { validateMetadataAdmin, MetadataAdminError } from '../src/lib/metadata-admin.ts';
 

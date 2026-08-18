@@ -1,6 +1,6 @@
 // Tests for portal/src/lib/access-groups.ts — parseAccessGroups precedence.
 //
-// Run with: tsx --test scripts/access-groups.test.mjs
+// Run with: npx vitest run scripts/access-groups.test.mjs
 //
 // Dual-read parse precedence:
 //   1. presentation.access non-empty list → use it.
@@ -9,7 +9,7 @@
 //
 // Phase 1 is non-breaking: bad charset names are skipped, never thrown.
 
-import { test } from 'node:test';
+import { test } from 'vitest';
 import assert from 'node:assert/strict';
 import { parseAccessGroups } from '../src/lib/access-groups.ts';
 

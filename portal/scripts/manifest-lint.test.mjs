@@ -1,13 +1,13 @@
 // Tests for src/lib/manifest-lint.ts.
 //
-// Run with: tsx --test scripts/manifest-lint.test.mjs
+// Run with: npx vitest run scripts/manifest-lint.test.mjs
 //
 // Covers the severity matrix:
 //   BLOCK: empty accessGroups w/o skipAccessCheck; duplicate group in a
 //          manifest; group_role_map key with no declared role.
 //   WARN:  group referenced but not in the known set; charset miss.
 
-import { test } from 'node:test';
+import { test } from 'vitest';
 import assert from 'node:assert/strict';
 import { lintManifests, lintBlockers } from '../src/lib/manifest-lint.ts';
 

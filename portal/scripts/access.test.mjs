@@ -1,6 +1,6 @@
 // Tests for src/lib/access.ts — Effective Access computation.
 //
-// Run with: tsx --test scripts/access.test.mjs
+// Run with: npx vitest run scripts/access.test.mjs
 //
 // Imports the canonical implementation directly. There is no longer a second
 // implementation to reconcile against: computeEffectiveAccess and the
@@ -36,7 +36,7 @@
 // resolver from the retired one and is worth nothing here; reverting
 // claims.ts `lookupRole` to a first-match walk must turn that block RED.
 
-import { test } from 'node:test';
+import { test } from 'vitest';
 import assert from 'node:assert/strict';
 import { normalizeGroupOrder, computeEffectiveAccess } from '../src/lib/access.ts';
 

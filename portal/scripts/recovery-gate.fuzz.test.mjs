@@ -1,6 +1,6 @@
 // Property-based / adversarial fuzz harness for recoveryGateVerdict.
 //
-// Run with: tsx --test scripts/recovery-gate.fuzz.test.mjs
+// Run with: npx vitest run scripts/recovery-gate.fuzz.test.mjs
 //
 // SECURITY INVARIANT (what an attacker wants to break):
 //   recoveryGateVerdict NEVER returns { refuse: false } for a payload whose
@@ -15,7 +15,7 @@
 // A violation means an attacker can construct a Kratos webhook payload that
 // lets an admin account receive a recovery email instead of being refused.
 
-import { test } from 'node:test';
+import { test } from 'vitest';
 import assert from 'node:assert/strict';
 import fc from 'fast-check';
 import { recoveryGateVerdict } from '../src/server/listen.mjs';

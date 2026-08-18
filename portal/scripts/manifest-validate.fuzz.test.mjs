@@ -7,9 +7,9 @@
 //   ONLY — no substring/prefix match, no fragment confusion, no credential
 //   injection (user:pass@), no subdomain suffix confusion.
 //
-// Run with: tsx --test scripts/manifest-validate.fuzz.test.mjs
+// Run with: npx vitest run scripts/manifest-validate.fuzz.test.mjs
 
-import { test } from 'node:test';
+import { test } from 'vitest';
 import assert from 'node:assert/strict';
 import fc from 'fast-check';
 import { audienceMatchesRedirect, validateClients, parseManifest } from '../src/lib/manifests.ts';

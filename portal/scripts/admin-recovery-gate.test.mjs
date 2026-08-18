@@ -1,6 +1,6 @@
 // Test for the admin-to-admin recovery refusal gate.
 //
-// Run with: tsx --test scripts/admin-recovery-gate.test.mjs
+// Run with: npx vitest run scripts/admin-recovery-gate.test.mjs
 //
 // The gate logic lives in src/lib/access.ts (shouldRefuseRecovery) and is
 // consumed by src/pages/admin/users/[id].astro action=issue-recovery.
@@ -11,7 +11,7 @@
 // allowlist is no longer consulted. The caller must pass an admin-API-fetched
 // identity (metadata_admin present).
 
-import { test } from 'node:test';
+import { test } from 'vitest';
 import assert from 'node:assert/strict';
 import { shouldRefuseRecovery } from '../src/lib/access.ts';
 

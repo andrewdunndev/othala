@@ -1,12 +1,12 @@
 // Tests for src/lib/csrf.ts.
 //
-// Run with: tsx --test scripts/csrf.test.mjs
+// Run with: npx vitest run scripts/csrf.test.mjs
 //
 // Imports the canonical signer directly. Sets CSRF_SECRET before
 // invoking signToken/verifyToken; the module reads process.env lazily,
 // so an early process.env.CSRF_SECRET assignment is sufficient.
 
-import { test, beforeEach } from 'node:test';
+import { test, beforeEach } from 'vitest';
 import assert from 'node:assert/strict';
 import { createHmac } from 'node:crypto';
 

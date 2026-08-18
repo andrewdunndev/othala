@@ -1,6 +1,6 @@
 // Tests for the isSessionFresh() helper extracted in FIX-B from admin.ts.
 //
-// Run with: tsx --test scripts/admin-freshness.test.mjs
+// Run with: npx vitest run scripts/admin-freshness.test.mjs
 //
 // Coverage:
 //   - aal2 authentication_methods entry within window → true
@@ -14,7 +14,7 @@
 //   - malformed completed_at entry skipped, falls back to authenticated_at
 //   - non-aal2 entries are ignored, falls back to authenticated_at
 
-import { test } from 'node:test';
+import { test } from 'vitest';
 import assert from 'node:assert/strict';
 import { isSessionFresh } from '../src/lib/admin.ts';
 

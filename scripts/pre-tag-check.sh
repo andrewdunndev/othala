@@ -9,8 +9,8 @@
 # manual-only pre-tag ritual — CI runs the same checks and more (AGENTS.md
 # "The gates"), so this list is honest about which line is redundant with a
 # standing CI job and which is not:
-#   - portal: npm test                        — CI: check-portal
-#   - portal: npm run test:unit (vitest)       — CI: check-portal
+#   - portal: npm test (vitest; src/lib/*.test.ts +
+#     scripts/*.test.mjs, one runner)          — CI: check-portal
 #   - portal: npm run check (Astro typecheck)  — CI: check-portal
 #   - portal: npm run build (full SSR build)   — CI: verify-othala (node-build)
 #   - site:   npm run build (docs-site build)  — CI: the cloudflare-worker job
@@ -77,7 +77,7 @@ SKIPPED_STEPS=()
 
 # Number of steps that must execute. Bump it in the same commit that adds or
 # removes a step; see the step-inventory assertion at the end.
-EXPECTED_STEPS=11
+EXPECTED_STEPS=10
 STEPS_RUN=0
 # step_begin: called once at the top of every step block, so deleting a block
 # deletes its increment and the inventory assertion below catches the shortfall.
@@ -187,15 +187,25 @@ echo ""
 # no longer part of this pre-tag check.
 
 # ----- Portal: tests -----
+#
+# One vitest run over both src/lib/*.test.ts and scripts/*.test.mjs (incl.
+# the fuzz + fast-check suites) — the former separate node --test+tsx and
+# vitest harnesses were consolidated onto vitest; see portal/vitest.config.ts.
 echo "Portal:"
 step_begin
 if cd portal && npm test >/tmp/pre-tag-portal-test.log 2>&1; then
     # A runner that matched no test files exits 0. Exit status alone is
     # therefore not evidence the suite ran; the count of reported passes is.
-    passed=$(grep -c '^✔' /tmp/pre-tag-portal-test.log)
-    if [[ ! "$passed" =~ ^[0-9]+$ ]]; then
+    # The summary line is isolated FIRST because vitest prints two "<n>
+    # passed" lines — "Test Files  N passed (N)" precedes "Tests  N passed
+    # (N)" — and count_from takes the first match in the file, which would
+    # silently measure files instead of tests.
+    grep -E '^[[:space:]]*Tests[[:space:]]' /tmp/pre-tag-portal-test.log \
+        >"$TMP/vitest-summary" 2>/dev/null
+    passed=$(count_from "$TMP/vitest-summary" 'passed')
+    if [[ -z "$passed" ]]; then
         step_error "portal npm test" \
-            "no pass count could be extracted from the runner output — an uncountable result is not a green suite; see /tmp/pre-tag-portal-test.log"
+            "exited 0 but no 'Tests <n> passed' count could be extracted — an unparseable result is not a zero-failure result; see /tmp/pre-tag-portal-test.log"
     elif (( passed > 0 )); then
         step_pass "portal npm test ($passed passed)"
     else
@@ -204,36 +214,6 @@ if cd portal && npm test >/tmp/pre-tag-portal-test.log 2>&1; then
     fi
 else
     step_fail "portal npm test" "/tmp/pre-tag-portal-test.log"
-fi
-cd "$REPO_ROOT" || exit 1
-
-# ----- Portal: vitest unit suite -----
-#
-# The test-portal job in .gitlab-ci.yml runs `npm test` AND `npm run test:unit`.
-# Only the first was gated here, so a tag could be cut on a tree whose vitest
-# suite was red — the local gate was a strict subset of CI, which is the shape
-# that lets a green local run precede a red pipeline.
-step_begin
-if cd portal && npm run test:unit >/tmp/pre-tag-portal-testunit.log 2>&1; then
-    # Same rule as `npm test` above: the exit status is not evidence the suite
-    # ran, the reported test count is. The summary line is isolated FIRST
-    # because vitest prints two "<n> passed" lines — "Test Files  6 passed (6)"
-    # precedes "Tests  66 passed (66)", and count_from takes the first match in
-    # the file, which would silently measure files instead of tests.
-    grep -E '^[[:space:]]*Tests[[:space:]]' /tmp/pre-tag-portal-testunit.log \
-        >"$TMP/vitest-summary" 2>/dev/null
-    vpassed=$(count_from "$TMP/vitest-summary" 'passed')
-    if [[ -z "$vpassed" ]]; then
-        step_error "portal npm run test:unit" \
-            "exited 0 but no 'Tests <n> passed' count could be extracted — an unparseable result is not a zero-failure result; see /tmp/pre-tag-portal-testunit.log"
-    elif (( vpassed > 0 )); then
-        step_pass "portal npm run test:unit ($vpassed passed)"
-    else
-        step_error "portal npm run test:unit" \
-            "exited 0 but reported 0 passing tests — a suite that ran nothing is not a green suite; see /tmp/pre-tag-portal-testunit.log"
-    fi
-else
-    step_fail "portal npm run test:unit" "/tmp/pre-tag-portal-testunit.log"
 fi
 cd "$REPO_ROOT" || exit 1
 

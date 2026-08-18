@@ -1,7 +1,7 @@
 // The fail-closed PROPERTY TEST — the load-bearing guarantee of the whole
 // access model: no path through the gate admits without an explicit binding.
 //
-// Run with: tsx --test scripts/gate-property.test.mjs
+// Run with: npx vitest run scripts/gate-property.test.mjs
 //
 // WHAT CHANGED, AND WHY. This file used to test `enforceAccessGate` with a
 // generator whose whole pool was nine hardcoded lowercase literals, against an
@@ -37,7 +37,7 @@
 // "no case folding" law below goes RED. A suite that survives that mutation
 // has not tested anything.
 
-import { test } from 'node:test';
+import { test } from 'vitest';
 import assert from 'node:assert/strict';
 import fc from 'fast-check';
 import { enforceAccessGate, enforceGroupGate, hasGroup } from '../src/lib/gate.ts';

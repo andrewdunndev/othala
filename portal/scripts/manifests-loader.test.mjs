@@ -1,6 +1,6 @@
 // Tests for the runtime YAML manifest reader.
 //
-// Run with: tsx --test scripts/manifests-loader.test.mjs
+// Run with: npx vitest run scripts/manifests-loader.test.mjs
 //
 // The portal's manifest loader (src/lib/manifests.ts) reads
 // hydra/clients/*.yaml from a mounted directory at request time +
@@ -16,7 +16,7 @@
 //   - accessGroup convention: `access-<clientId>`.
 //   - Directory walk: sorted by filename, picks up yaml + yml.
 
-import { test } from 'node:test';
+import { test } from 'vitest';
 import assert from 'node:assert/strict';
 import { mkdtempSync, writeFileSync, rmSync, readdirSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';

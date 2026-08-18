@@ -1,6 +1,6 @@
 // Tests for the non-canonical group REPAIR surface.
 //
-// Run with: tsx --test scripts/noncanonical-repair.test.mjs
+// Run with: npx vitest run scripts/noncanonical-repair.test.mjs
 //
 // What this covers. refuseNonCanonical (src/lib/gate.ts) denies an identity
 // holding any group that misses GROUP_RE (src/lib/access-groups.ts), at every
@@ -18,7 +18,7 @@
 // keeping one refuses the save (nothing written, identity unchanged), and
 // removing one takes an affirmative per-name tick.
 
-import { test } from 'node:test';
+import { test } from 'vitest';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';

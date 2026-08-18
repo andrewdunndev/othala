@@ -1,12 +1,12 @@
 // Tests for src/lib/nodes.ts — Kratos UI node helpers.
 //
-// Run with: tsx --test scripts/nodes.test.mjs
+// Run with: npx vitest run scripts/nodes.test.mjs
 //
 // Imports the canonical helpers directly. These helpers shape Kratos
 // flow.ui.nodes arrays into the form fragments Astro renders; a bug
 // here lands as a missing CSRF input or a broken passkey button.
 
-import { test } from 'node:test';
+import { test } from 'vitest';
 import assert from 'node:assert/strict';
 import {
   nodesByGroup,

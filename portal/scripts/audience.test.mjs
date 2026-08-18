@@ -1,12 +1,12 @@
 // Tests for audienceMatchesRedirect in src/lib/manifests.ts (CU1 item 5/6).
 //
-// Run with: tsx --test scripts/audience.test.mjs
+// Run with: npx vitest run scripts/audience.test.mjs
 //
 // The tightened validator requires EXACT-ORIGIN match and is fail-closed: it
 // drops the Go version's HasPrefix-style host compare and its silent
 // `return true` paths.
 
-import { test } from 'node:test';
+import { test } from 'vitest';
 import assert from 'node:assert/strict';
 import { audienceMatchesRedirect } from '../src/lib/manifests.ts';
 
