@@ -43,18 +43,18 @@ import {
 /** A manifest that passes every validateClients rule. */
 const VALID_APP = `
 oidc:
-  client_id: observe
-  client_name: Observe
+  client_id: proxywatch
+  client_name: Proxywatch
   redirect_uris:
-    - https://observe.example.test/login/generic_oauth
+    - https://proxywatch.example.test/login/generic_oauth
   audience:
-    - https://observe.example.test
+    - https://proxywatch.example.test
   scope: openid profile email groups
 presentation:
-  name: Observe
-  url: https://observe.example.test
+  name: Proxywatch
+  url: https://proxywatch.example.test
   access:
-    - observe-access
+    - proxywatch-access
 consent:
   roles:
     - name: viewer
@@ -62,7 +62,7 @@ consent:
       claim_emit:
         role: Viewer
   group_role_map:
-    observe-access: viewer
+    proxywatch-access: viewer
 `;
 
 /**
@@ -70,16 +70,16 @@ consent:
  * declared. validateClients rejects the WHOLE set for this, which is what makes
  * one bad file an estate-wide outage without the store in front of it.
  */
-const BROKEN_APP = VALID_APP.replace('observe-access: viewer', 'observe-access: editor');
+const BROKEN_APP = VALID_APP.replace('proxywatch-access: viewer', 'proxywatch-access: editor');
 
 /** A presentation-only tile: a real access binding, no OIDC client. */
 const TILE_ONLY = `
 presentation:
-  name: Gather
-  url: https://gather.example.test
+  name: Audiobookshelf
+  url: https://audiobookshelf.example.test
   auth_kind: forward_auth
   access:
-    - gather-access
+    - audiobookshelf-access
 `;
 
 let dir: string;
@@ -112,10 +112,10 @@ afterEach(() => {
 
 describe('servingManifests — healthy set', () => {
   it('loads the set and reports ok', () => {
-    write('observe.yaml', VALID_APP);
+    write('proxywatch.yaml', VALID_APP);
 
     const set = servingManifests();
-    expect(set.map((m) => m.clientId)).toEqual(['observe']);
+    expect(set.map((m) => m.clientId)).toEqual(['proxywatch']);
     expect(manifestHealth().status).toBe('ok');
     expect(manifestHealth().error).toBeNull();
   });
@@ -123,25 +123,25 @@ describe('servingManifests — healthy set', () => {
 
 describe('servingManifests — a manifest breaks under it', () => {
   it('keeps serving the last known good set instead of throwing', () => {
-    write('observe.yaml', VALID_APP);
+    write('proxywatch.yaml', VALID_APP);
     const good = servingManifests();
     expect(good).toHaveLength(1);
 
-    write('observe.yaml', BROKEN_APP);
+    write('proxywatch.yaml', BROKEN_APP);
 
     expect(() => servingManifests()).not.toThrow();
     const served = servingManifests();
-    expect(served.map((m) => m.clientId)).toEqual(['observe']);
+    expect(served.map((m) => m.clientId)).toEqual(['proxywatch']);
     // The role map that is actually served is the LAST GOOD one, not the
     // broken one now on disk.
-    expect(served[0]?.groupRoleMap).toEqual({ 'observe-access': 'viewer' });
+    expect(served[0]?.groupRoleMap).toEqual({ 'proxywatch-access': 'viewer' });
   });
 
   it('reports stale, names the cause, and logs it', () => {
-    write('observe.yaml', VALID_APP);
+    write('proxywatch.yaml', VALID_APP);
     servingManifests();
 
-    write('observe.yaml', BROKEN_APP);
+    write('proxywatch.yaml', BROKEN_APP);
     servingManifests();
 
     const health = manifestHealth();
@@ -156,18 +156,18 @@ describe('servingManifests — a manifest breaks under it', () => {
   });
 
   it('recovers on the next call once the manifest is fixed — no restart', () => {
-    write('observe.yaml', VALID_APP);
+    write('proxywatch.yaml', VALID_APP);
     servingManifests();
-    write('observe.yaml', BROKEN_APP);
+    write('proxywatch.yaml', BROKEN_APP);
     servingManifests();
     expect(manifestHealth().status).toBe('stale');
 
     // A different, still-valid set: the role is renamed in BOTH the declaration
     // and the map, so this one validates.
-    write('observe.yaml', VALID_APP.replaceAll('viewer', 'reader'));
+    write('proxywatch.yaml', VALID_APP.replaceAll('viewer', 'reader'));
 
     const set = servingManifests();
-    expect(set[0]?.groupRoleMap).toEqual({ 'observe-access': 'reader' });
+    expect(set[0]?.groupRoleMap).toEqual({ 'proxywatch-access': 'reader' });
     expect(manifestHealth().status).toBe('ok');
     expect(logged.some((line) => line.includes('[portal:manifests] RECOVERED'))).toBe(true);
   });
@@ -175,7 +175,7 @@ describe('servingManifests — a manifest breaks under it', () => {
 
 describe('servingManifests — cold start onto a broken set', () => {
   it('serves the empty set and reports unavailable', () => {
-    write('observe.yaml', BROKEN_APP);
+    write('proxywatch.yaml', BROKEN_APP);
 
     expect(servingManifests()).toEqual([]);
 
@@ -186,24 +186,24 @@ describe('servingManifests — cold start onto a broken set', () => {
   });
 
   it('resolves no client, so the gate denies rather than the page 500-ing', () => {
-    write('observe.yaml', BROKEN_APP);
+    write('proxywatch.yaml', BROKEN_APP);
 
-    expect(servingManifest('observe')).toBeUndefined();
+    expect(servingManifest('proxywatch')).toBeUndefined();
     expect(servingAccessGroups()).toEqual([]);
   });
 });
 
 describe('servingManifest — lookup rules match the strict loader', () => {
   it('is case-insensitive', () => {
-    write('observe.yaml', VALID_APP);
-    expect(servingManifest('OBSERVE')?.clientId).toBe('observe');
+    write('proxywatch.yaml', VALID_APP);
+    expect(servingManifest('PROXYWATCH')?.clientId).toBe('proxywatch');
   });
 
   it('refuses presentation-only manifests', () => {
-    write('gather.yaml', TILE_ONLY);
+    write('audiobookshelf.yaml', TILE_ONLY);
     // The tile is in the catalog…
-    expect(servingManifests().map((m) => m.clientId)).toContain('gather');
+    expect(servingManifests().map((m) => m.clientId)).toContain('audiobookshelf');
     // …but it registers no Hydra client, so no OAuth2 request may resolve it.
-    expect(servingManifest('gather')).toBeUndefined();
+    expect(servingManifest('audiobookshelf')).toBeUndefined();
   });
 });

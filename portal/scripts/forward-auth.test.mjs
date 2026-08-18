@@ -88,7 +88,7 @@ function ctx(group, cookie = 'ory_kratos_session=abc') {
 
 const ACTIVE_IN_GROUP = {
   status: 200,
-  body: { id: 'id-1', state: 'active', metadata_admin: { groups: ['access-observe', 'family'] } },
+  body: { id: 'id-1', state: 'active', metadata_admin: { groups: ['access-proxywatch', 'family'] } },
 };
 const SESSION_OK = {
   status: 200,
@@ -128,13 +128,13 @@ test('non-prefixed group, NOT a member → 403 (gate, not format)', async () => 
 
 test('bad group format (uppercase) → 403', async () => {
   installFetch({ whoami: SESSION_OK, identity: ACTIVE_IN_GROUP });
-  const res = await GET(ctx('access-Observe'));
+  const res = await GET(ctx('access-Proxywatch'));
   assert.equal(res.status, 403);
 });
 
 test('bad group format (injection chars) → 403', async () => {
   installFetch({ whoami: SESSION_OK, identity: ACTIVE_IN_GROUP });
-  const res = await GET(ctx('access-observe; rm -rf'));
+  const res = await GET(ctx('access-proxywatch; rm -rf'));
   assert.equal(res.status, 403);
 });
 
@@ -142,26 +142,26 @@ test('bad group format (injection chars) → 403', async () => {
 
 test('no session (401 from whoami) → 401 unauthenticated', async () => {
   installFetch({ whoami: { status: 401, body: { error: { code: 401 } } } });
-  const res = await GET(ctx('access-observe'));
+  const res = await GET(ctx('access-proxywatch'));
   assert.equal(res.status, 401);
   assert.equal(await res.text(), 'unauthenticated');
 });
 
 test('invalid session (403 from whoami) → 401 unauthenticated', async () => {
   installFetch({ whoami: { status: 403, body: { error: { code: 403 } } } });
-  const res = await GET(ctx('access-observe'));
+  const res = await GET(ctx('access-proxywatch'));
   assert.equal(res.status, 401);
 });
 
 test('no cookie at all → 401 unauthenticated', async () => {
   installFetch({ whoami: { status: 401, body: { error: { code: 401 } } } });
-  const res = await GET(ctx('access-observe', null));
+  const res = await GET(ctx('access-proxywatch', null));
   assert.equal(res.status, 401);
 });
 
 test('inactive session (active:false) → 401', async () => {
   installFetch({ whoami: { status: 200, body: { active: false, identity: { id: 'id-1' } } } });
-  const res = await GET(ctx('access-observe'));
+  const res = await GET(ctx('access-proxywatch'));
   assert.equal(res.status, 401);
 });
 
@@ -188,7 +188,7 @@ test('active session with NO identity id → 401, and the admin API is never cal
     if (url.includes('/admin/identities/')) adminCalls += 1;
     return inner(input);
   };
-  const res = await GET(ctx('access-observe'));
+  const res = await GET(ctx('access-proxywatch'));
   assert.equal(res.status, 401);
   assert.equal(await res.text(), 'unauthenticated');
   assert.equal(adminCalls, 0);
@@ -199,20 +199,20 @@ test('active session with an empty-string identity id → 401 (falsy, not merely
     whoami: { status: 200, body: { active: true, identity: { id: '', traits: {} } } },
     identity: ACTIVE_IN_GROUP,
   });
-  const res = await GET(ctx('access-observe'));
+  const res = await GET(ctx('access-proxywatch'));
   assert.equal(res.status, 401);
 });
 
 test('kratos unreachable → 503 (NOT 401 — avoids login-redirect loop)', async () => {
   installFetch({ whoamiThrow: true });
-  const res = await GET(ctx('access-observe'));
+  const res = await GET(ctx('access-proxywatch'));
   assert.equal(res.status, 503);
   assert.equal(await res.text(), 'unavailable');
 });
 
 test('kratos unreachable → NOT 403 (an outage must not read as a denial)', async () => {
   installFetch({ whoamiThrow: true });
-  const res = await GET(ctx('access-observe'));
+  const res = await GET(ctx('access-proxywatch'));
   assert.notEqual(res.status, 403);
 });
 
@@ -220,7 +220,7 @@ test('kratos unreachable → NOT 403 (an outage must not read as a denial)', asy
 
 test('active identity IN group → 200 + identity-id header', async () => {
   installFetch({ whoami: SESSION_OK, identity: ACTIVE_IN_GROUP });
-  const res = await GET(ctx('access-observe'));
+  const res = await GET(ctx('access-proxywatch'));
   assert.equal(res.status, 200);
   assert.equal(await res.text(), 'ok');
   assert.equal(res.headers.get('X-Kratos-Authenticated-Identity-Id'), 'id-1');
@@ -231,7 +231,7 @@ test('active identity NOT in group → 403', async () => {
     whoami: SESSION_OK,
     identity: { status: 200, body: { id: 'id-1', state: 'active', metadata_admin: { groups: ['family'] } } },
   });
-  const res = await GET(ctx('access-observe'));
+  const res = await GET(ctx('access-proxywatch'));
   assert.equal(res.status, 403);
   assert.equal(res.headers.get('X-Kratos-Authenticated-Identity-Id'), null);
 });
@@ -239,30 +239,30 @@ test('active identity NOT in group → 403', async () => {
 test('inactive identity IN group → 403 (fail-closed state check)', async () => {
   installFetch({
     whoami: SESSION_OK,
-    identity: { status: 200, body: { id: 'id-1', state: 'inactive', metadata_admin: { groups: ['access-observe'] } } },
+    identity: { status: 200, body: { id: 'id-1', state: 'inactive', metadata_admin: { groups: ['access-proxywatch'] } } },
   });
-  const res = await GET(ctx('access-observe'));
+  const res = await GET(ctx('access-proxywatch'));
   assert.equal(res.status, 403);
 });
 
 test('identity missing state field IN group → 403 (fail-closed)', async () => {
   installFetch({
     whoami: SESSION_OK,
-    identity: { status: 200, body: { id: 'id-1', metadata_admin: { groups: ['access-observe'] } } },
+    identity: { status: 200, body: { id: 'id-1', metadata_admin: { groups: ['access-proxywatch'] } } },
   });
-  const res = await GET(ctx('access-observe'));
+  const res = await GET(ctx('access-proxywatch'));
   assert.equal(res.status, 403);
 });
 
 test('admin lookup failure (404) → 503 (state/groups never learned)', async () => {
   installFetch({ whoami: SESSION_OK, identity: { status: 404, body: { error: 'not found' } } });
-  const res = await GET(ctx('access-observe'));
+  const res = await GET(ctx('access-proxywatch'));
   assert.equal(res.status, 503);
 });
 
 test('admin lookup failure (500) → 503 (fail-closed)', async () => {
   installFetch({ whoami: SESSION_OK, identity: { status: 500, body: { error: 'boom' } } });
-  const res = await GET(ctx('access-observe'));
+  const res = await GET(ctx('access-proxywatch'));
   assert.equal(res.status, 503);
   assert.equal(await res.text(), 'unavailable');
 });
@@ -270,17 +270,17 @@ test('admin lookup failure (500) → 503 (fail-closed)', async () => {
 // ─── the read boundary we do NOT own ────────────────────────────────────────
 
 test('non-canonical stored group → 403, even when the required group matches its case fold', async () => {
-  // Only a raw Kratos admin-API write can store "Access-Observe"; every portal
+  // Only a raw Kratos admin-API write can store "Access-Proxywatch"; every portal
   // write path rejects it (metadata-admin.ts validateGroups). The gate must
   // refuse rather than case-fold it into a match.
   installFetch({
     whoami: SESSION_OK,
     identity: {
       status: 200,
-      body: { id: 'id-1', state: 'active', metadata_admin: { groups: ['Access-Observe'] } },
+      body: { id: 'id-1', state: 'active', metadata_admin: { groups: ['Access-Proxywatch'] } },
     },
   });
-  const res = await GET(ctx('access-observe'));
+  const res = await GET(ctx('access-proxywatch'));
   assert.equal(res.status, 403);
   assert.equal(res.headers.get('X-Kratos-Authenticated-Identity-Id'), null);
 });
@@ -293,11 +293,11 @@ test('one non-canonical group denies a group the identity legitimately holds', a
       body: {
         id: 'id-1',
         state: 'active',
-        metadata_admin: { groups: ['access-observe', 'Access-Grafana'] },
+        metadata_admin: { groups: ['access-proxywatch', 'Access-Grafana'] },
       },
     },
   });
-  const res = await GET(ctx('access-observe'));
+  const res = await GET(ctx('access-proxywatch'));
   assert.equal(res.status, 403);
 });
 
@@ -306,9 +306,9 @@ test('one non-canonical group denies a group the identity legitimately holds', a
 test('no failure path returns 2xx (Caddy forward_auth @good status 2xx)', async () => {
   const cases = [
     [{ whoami: SESSION_OK, identity: ACTIVE_IN_GROUP }, 'photos'],
-    [{ whoami: { status: 401, body: {} } }, 'access-observe'],
-    [{ whoamiThrow: true }, 'access-observe'],
-    [{ whoami: SESSION_OK, identity: { status: 500, body: {} } }, 'access-observe'],
+    [{ whoami: { status: 401, body: {} } }, 'access-proxywatch'],
+    [{ whoamiThrow: true }, 'access-proxywatch'],
+    [{ whoami: SESSION_OK, identity: { status: 500, body: {} } }, 'access-proxywatch'],
     [{ whoami: SESSION_OK, identity: ACTIVE_IN_GROUP }, 'BAD-CASE'],
   ];
   for (const [fetchOpts, group] of cases) {
@@ -325,7 +325,7 @@ test('no denial body echoes the required group or the identity id', async () => 
     status: 200,
     body: { id: 'id-1', state: 'active', metadata_admin: { groups: [] } },
   };
-  for (const group of ['access-observe', 'BAD-CASE']) {
+  for (const group of ['access-proxywatch', 'BAD-CASE']) {
     installFetch({ whoami: SESSION_OK, identity: noGroups });
     const res = await GET(ctx(group));
     const body = await res.text();
@@ -338,7 +338,7 @@ test('no denial body echoes the required group or the identity id', async () => 
 
 test('HEAD applies the same decision: allowed → 200', async () => {
   installFetch({ whoami: SESSION_OK, identity: ACTIVE_IN_GROUP });
-  const res = await HEAD(ctx('access-observe'));
+  const res = await HEAD(ctx('access-proxywatch'));
   assert.equal(res.status, 200);
   assert.equal(res.headers.get('X-Kratos-Authenticated-Identity-Id'), 'id-1');
 });
@@ -348,13 +348,13 @@ test('HEAD applies the same decision: not in group → 403', async () => {
     whoami: SESSION_OK,
     identity: { status: 200, body: { id: 'id-1', state: 'active', metadata_admin: { groups: [] } } },
   });
-  const res = await HEAD(ctx('access-observe'));
+  const res = await HEAD(ctx('access-proxywatch'));
   assert.equal(res.status, 403);
 });
 
 test('HEAD with no session → 401', async () => {
   installFetch({ whoami: { status: 401, body: { error: { code: 401 } } } });
-  const res = await HEAD(ctx('access-observe'));
+  const res = await HEAD(ctx('access-proxywatch'));
   assert.equal(res.status, 401);
 });
 
@@ -362,6 +362,6 @@ test('HEAD with no session → 401', async () => {
 
 test('responses carry Cache-Control: no-store', async () => {
   installFetch({ whoami: SESSION_OK, identity: ACTIVE_IN_GROUP });
-  const res = await GET(ctx('access-observe'));
+  const res = await GET(ctx('access-proxywatch'));
   assert.match(res.headers.get('Cache-Control') ?? '', /no-store/);
 });

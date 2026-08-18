@@ -48,7 +48,7 @@ test('non-admin identity (no admin marker) is allowed', () => {
   const identity = {
     id: '22222222-2222-2222-2222-222222222222',
     traits: { email: 'kid@othala.test' },
-    metadata_admin: { groups: ['family', 'access-keep'] },
+    metadata_admin: { groups: ['family', 'access-filedrop'] },
   };
   assert.equal(shouldRefuseRecovery(identity), false);
 });

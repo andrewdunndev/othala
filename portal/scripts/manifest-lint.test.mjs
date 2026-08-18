@@ -36,7 +36,7 @@ function manifest(clientId, opts = {}) {
   };
 }
 
-const known = ['admin', 'family', 'memories', 'access-photos', 'access-observe'];
+const known = ['admin', 'family', 'memories', 'access-photos', 'access-proxywatch'];
 
 // ── BLOCK cases ──────────────────────────────────────────────────────────
 
@@ -149,7 +149,7 @@ test('lintBlockers returns only BLOCK findings', () => {
   assert.equal(f.length, 0);
 });
 
-test('access-observe is a known flat name — no typo warning', () => {
-  const f = lintManifests([manifest('observe', { accessGroups: ['access-observe'] })], known);
+test('access-proxywatch is a known flat name — no typo warning', () => {
+  const f = lintManifests([manifest('proxywatch', { accessGroups: ['access-proxywatch'] })], known);
   assert.deepEqual(f.filter((x) => /locks everyone out/.test(x.message)), []);
 });

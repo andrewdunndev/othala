@@ -30,7 +30,7 @@ function fromYaml(yamlText, filename = 'crafted.yaml') {
 // which is not a valid POSIX env var and silently fails to resolve.
 
 test('CLIENT_ID_ENV_STEM_RE: valid stems pass', () => {
-  for (const id of ['keep', 'promptdesk', 'llm', 'my_app', '_app', 'App123']) {
+  for (const id of ['filedrop', 'promptdesk', 'llm', 'my_app', '_app', 'App123']) {
     assert.ok(CLIENT_ID_ENV_STEM_RE.test(id), `expected ${JSON.stringify(id)} to be a valid stem`);
   }
 });
@@ -349,11 +349,11 @@ consent:
 test('rule: emit_groups_claim:true + role groups claim is fine (no contradiction)', () => {
   const m = fromYaml(`
 oidc:
-  client_id: keep
+  client_id: filedrop
   redirect_uris:
-    - https://keep.othala.test/cb
+    - https://filedrop.othala.test/cb
   audience:
-    - https://keep.othala.test
+    - https://filedrop.othala.test
 consent:
   emit_groups_claim: true
   roles:
@@ -500,15 +500,15 @@ consent: {}
 });
 
 test('presentation-only manifest is valid WITHOUT an oidc: block (audience rule skipped)', () => {
-  // observe.yaml shape: forward_auth tile, no OIDC client. It must validate
+  // proxywatch.yaml shape: forward_auth tile, no OIDC client. It must validate
   // clean — the audience / redirect rules do not apply — as long as it names an
   // access group (which it does, satisfying the binding BLOCK).
   const m = fromYaml(`
 presentation:
-  name: Observe
+  name: Proxywatch
   auth_kind: forward_auth
-  access_group: access-observe
-`, 'observe.yaml');
+  access_group: access-proxywatch
+`, 'proxywatch.yaml');
   assert.equal(m.presentationOnly, true);
   assert.deepEqual(validateClients([m]), []);
 });

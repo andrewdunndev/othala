@@ -65,7 +65,7 @@ export interface ClientManifest {
   clientId: string;
   /**
    * True when this manifest carries a `presentation:` block but NO `oidc:`
-   * client (a forward_auth / ldap / external tile, e.g. observe.yaml). Such a
+   * client (a forward_auth / ldap / external tile, e.g. proxywatch.yaml). Such a
    * manifest still names an access group — an assignable, gate-bearing binding
    * that the registry, the admin UI and computeEffectiveAccess must all see —
    * but it registers no OIDC client, so the OIDC-specific rules do not apply

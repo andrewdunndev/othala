@@ -43,7 +43,7 @@ import { normalizeGroupOrder, computeEffectiveAccess } from '../src/lib/access.t
 // Helper: build a manifest fixture. computeEffectiveAccess gates on
 // accessGroups (the load-bearing binding), defaulting to the
 // conventional [access-<clientId>] so the existing fixtures (which assign
-// `access-<slug>` identity groups) keep exercising the access gate.
+// `access-<slug>` identity groups) filedrop exercising the access gate.
 function manifest(clientId, opts = {}) {
   return {
     clientId,
@@ -89,8 +89,8 @@ test('normalizeGroupOrder: identity groups in canonical order', () => {
 // alone, not a prefix.
 test('normalizeGroupOrder: non-identity groups sort alphabetically after identity groups', () => {
   assert.deepEqual(
-    normalizeGroupOrder(['access-tune', 'admin', 'access-keep', 'family']),
-    ['admin', 'access-keep', 'access-tune', 'family'],
+    normalizeGroupOrder(['access-statuspage', 'admin', 'access-filedrop', 'family']),
+    ['admin', 'access-filedrop', 'access-statuspage', 'family'],
   );
 });
 
@@ -102,7 +102,7 @@ test('normalizeGroupOrder: all non-identity groups (access-* and bare) interleav
 });
 
 test('normalizeGroupOrder: idempotent', () => {
-  const once = normalizeGroupOrder(['kids', 'family', 'access-memory']);
+  const once = normalizeGroupOrder(['kids', 'family', 'access-promptdesk']);
   const twice = normalizeGroupOrder(once);
   assert.deepEqual(twice, once);
 });
@@ -114,48 +114,48 @@ test('normalizeGroupOrder: empty input → empty output', () => {
 // ===== computeEffectiveAccess: access gate =====
 
 test('access: no access-<slug> group → no row for that client', () => {
-  const m = [manifest('keep', { roles: [{ name: 'user', description: '' }] })];
-  const id = identity(['family']); // no access-keep
+  const m = [manifest('filedrop', { roles: [{ name: 'user', description: '' }] })];
+  const id = identity(['family']); // no access-filedrop
   assert.deepEqual(computeEffectiveAccess(id, m), []);
 });
 
 test('access: access-<slug> present → row appears', () => {
-  const m = [manifest('keep', { roles: [{ name: 'user', description: '' }] })];
-  const id = identity(['family', 'access-keep']);
+  const m = [manifest('filedrop', { roles: [{ name: 'user', description: '' }] })];
+  const id = identity(['family', 'access-filedrop']);
   const rows = computeEffectiveAccess(id, m);
   assert.equal(rows.length, 1);
-  assert.equal(rows[0].clientId, 'keep');
+  assert.equal(rows[0].clientId, 'filedrop');
 });
 
 // ===== override path =====
 
 test('override: metadata_admin.roles[clientId] wins over group-map', () => {
-  const m = [manifest('keep', {
+  const m = [manifest('filedrop', {
     roles: [{ name: 'admin', description: '' }, { name: 'user', description: '' }],
     groupRoleMap: { family: 'user' },
   })];
-  const id = identity(['family', 'access-keep'], { keep: 'admin' });
+  const id = identity(['family', 'access-filedrop'], { filedrop: 'admin' });
   const rows = computeEffectiveAccess(id, m);
   assert.equal(rows[0].role, 'admin');
   assert.equal(rows[0].source.kind, 'override');
 });
 
 test('override: empty roles object is ignored (group-map applies)', () => {
-  const m = [manifest('keep', {
+  const m = [manifest('filedrop', {
     roles: [{ name: 'user', description: '' }],
     groupRoleMap: { family: 'user' },
   })];
-  const id = identity(['family', 'access-keep'], {});
+  const id = identity(['family', 'access-filedrop'], {});
   const rows = computeEffectiveAccess(id, m);
   assert.equal(rows[0].source.kind, 'group');
 });
 
 test('override: non-string role value is dropped', () => {
-  const m = [manifest('keep', {
+  const m = [manifest('filedrop', {
     roles: [{ name: 'user', description: '' }],
     groupRoleMap: { family: 'user' },
   })];
-  const id = identity(['family', 'access-keep'], { keep: 123 });
+  const id = identity(['family', 'access-filedrop'], { filedrop: 123 });
   const rows = computeEffectiveAccess(id, m);
   // Non-string roles ignored; group map kicks in.
   assert.equal(rows[0].source.kind, 'group');
@@ -171,52 +171,52 @@ test('override: non-string role value is dropped', () => {
 // under both resolvers and prove nothing.
 
 test('group-map: highest-ranked role wins over the first stored match (admin holds both groups)', () => {
-  // The live shape: entry comes from `keep-access` for EVERYONE, admins
-  // included, and an admin is additionally assigned `keep-admin` by hand. Both
+  // The live shape: entry comes from `filedrop-access` for EVERYONE, admins
+  // included, and an admin is additionally assigned `filedrop-admin` by hand. Both
   // groups map to a role, so two roles are in play for one identity. Mirrors
   // e2e/manifests/grafana.yaml, where group_role_map binds both
   // `grafana-access` and `grafana-admin` but only `grafana-access` grants entry.
-  const m = [manifest('keep', {
-    accessGroups: ['keep-access'],
+  const m = [manifest('filedrop', {
+    accessGroups: ['filedrop-access'],
     // Descending privilege — the declaration-order convention lookupRole reads.
     roles: [{ name: 'admin', description: '' }, { name: 'user', description: '' }],
-    groupRoleMap: { 'keep-access': 'user', 'keep-admin': 'admin' },
+    groupRoleMap: { 'filedrop-access': 'user', 'filedrop-admin': 'admin' },
   })];
   // normalizeGroupOrder sorts non-identity groups alphabetically, which stores
   // the LOWER-ranked group first. Pinned, because that ordering is precisely
   // what makes this fixture able to fail.
-  const stored = normalizeGroupOrder(['keep-admin', 'keep-access']);
-  assert.deepEqual(stored, ['keep-access', 'keep-admin']);
+  const stored = normalizeGroupOrder(['filedrop-admin', 'filedrop-access']);
+  assert.deepEqual(stored, ['filedrop-access', 'filedrop-admin']);
 
   const rows = computeEffectiveAccess(identity(stored), m);
-  // First stored match: keep-access -> 'user' (rank 1). Rank resolution
+  // First stored match: filedrop-access -> 'user' (rank 1). Rank resolution
   // takes 'admin' (rank 0).
   assert.equal(rows[0].role, 'admin');
   assert.equal(rows[0].source.kind, 'group');
-  assert.equal(rows[0].source.group, 'keep-admin');
+  assert.equal(rows[0].source.group, 'filedrop-admin');
 });
 
 test('group-map: highest rank wins when a lower-ranked group sorts first (no override, no admin)', () => {
-  const m = [manifest('keep', {
-    accessGroups: ['keep-access'],
+  const m = [manifest('filedrop', {
+    accessGroups: ['filedrop-access'],
     roles: [
       { name: 'editor', description: '' },
       { name: 'viewer', description: '' },
       { name: 'guest', description: '' },
     ],
-    groupRoleMap: { 'keep-access': 'guest', family: 'viewer', 'keep-editors': 'editor' },
+    groupRoleMap: { 'filedrop-access': 'guest', family: 'viewer', 'filedrop-editors': 'editor' },
   })];
   // None of these are identity groups, so all three sort alphabetically: the
   // winner is the LAST group stored, and two lower-ranked matches precede it.
-  const stored = normalizeGroupOrder(['keep-editors', 'family', 'keep-access']);
-  assert.deepEqual(stored, ['family', 'keep-access', 'keep-editors']);
+  const stored = normalizeGroupOrder(['filedrop-editors', 'family', 'filedrop-access']);
+  assert.deepEqual(stored, ['family', 'filedrop-access', 'filedrop-editors']);
 
   const rows = computeEffectiveAccess(identity(stored), m);
   // First stored match: family -> 'viewer' (rank 1). Rank resolution takes
   // 'editor' (rank 0) from the last group in the list.
   assert.equal(rows[0].role, 'editor');
   assert.equal(rows[0].source.kind, 'group');
-  assert.equal(rows[0].source.group, 'keep-editors');
+  assert.equal(rows[0].source.group, 'filedrop-editors');
 });
 
 test('group-map: role is a function of the group SET — every permutation agrees', () => {
@@ -225,21 +225,21 @@ test('group-map: role is a function of the group SET — every permutation agree
   // is a requirement, not belt-and-braces. `admin` is an identity group and is
   // therefore stored FIRST unconditionally — here it maps to the LOWER-ranked
   // role, so identity-group primacy must not win either.
-  const m = [manifest('keep', {
-    accessGroups: ['keep-access'],
+  const m = [manifest('filedrop', {
+    accessGroups: ['filedrop-access'],
     roles: [{ name: 'admin', description: '' }, { name: 'user', description: '' }],
-    groupRoleMap: { 'keep-access': 'user', admin: 'user', 'keep-admin': 'admin' },
+    groupRoleMap: { 'filedrop-access': 'user', admin: 'user', 'filedrop-admin': 'admin' },
   })];
   const permutations = [
-    ['keep-access', 'keep-admin'],
-    ['keep-admin', 'keep-access'],
-    normalizeGroupOrder(['keep-admin', 'keep-access', 'admin']),
-    ['keep-admin', 'admin', 'keep-access'],
-    ['admin', 'keep-access', 'keep-admin'],
+    ['filedrop-access', 'filedrop-admin'],
+    ['filedrop-admin', 'filedrop-access'],
+    normalizeGroupOrder(['filedrop-admin', 'filedrop-access', 'admin']),
+    ['filedrop-admin', 'admin', 'filedrop-access'],
+    ['admin', 'filedrop-access', 'filedrop-admin'],
   ];
   // The canonical stored form leads with the identity group, whose mapping is
   // rank 1 — the hostile case for a first-match walk.
-  assert.deepEqual(permutations[2], ['admin', 'keep-access', 'keep-admin']);
+  assert.deepEqual(permutations[2], ['admin', 'filedrop-access', 'filedrop-admin']);
 
   for (const groups of permutations) {
     const label = `permutation [${groups.join(', ')}]`;
@@ -247,15 +247,15 @@ test('group-map: role is a function of the group SET — every permutation agree
     assert.equal(rows.length, 1, label);
     assert.equal(rows[0].role, 'admin', label);
     assert.equal(rows[0].source.kind, 'group', label);
-    assert.equal(rows[0].source.group, 'keep-admin', label);
+    assert.equal(rows[0].source.group, 'filedrop-admin', label);
   }
 });
 
 // ===== no-roles manifest =====
 
 test('no-roles: manifest with empty roles → default role + no-roles source', () => {
-  const m = [manifest('keep', { roles: [], groupRoleMap: {} })];
-  const id = identity(['family', 'access-keep']);
+  const m = [manifest('filedrop', { roles: [], groupRoleMap: {} })];
+  const id = identity(['family', 'access-filedrop']);
   const rows = computeEffectiveAccess(id, m);
   assert.equal(rows[0].role, 'default');
   assert.equal(rows[0].source.kind, 'no-roles');
@@ -264,11 +264,11 @@ test('no-roles: manifest with empty roles → default role + no-roles source', (
 // ===== access granted, no group match =====
 
 test('access granted but no group match → first declared role', () => {
-  const m = [manifest('keep', {
+  const m = [manifest('filedrop', {
     roles: [{ name: 'admin', description: '' }, { name: 'user', description: '' }],
     groupRoleMap: { admin: 'admin' },
   })];
-  const id = identity(['family', 'access-keep']); // not in admin group
+  const id = identity(['family', 'access-filedrop']); // not in admin group
   const rows = computeEffectiveAccess(id, m);
   assert.equal(rows[0].role, 'admin'); // first declared role
   assert.equal(rows[0].source.kind, 'no-roles');
@@ -278,12 +278,12 @@ test('access granted but no group match → first declared role', () => {
 
 test('multi-manifest: rows only for accessible clients, preserves order', () => {
   const m = [
-    manifest('keep', { roles: [{ name: 'user', description: '' }], groupRoleMap: { family: 'user' } }),
-    manifest('observe', { roles: [{ name: 'viewer', description: '' }], groupRoleMap: { family: 'viewer' } }),
-    manifest('forge', { roles: [{ name: 'admin', description: '' }], groupRoleMap: { admin: 'admin' } }),
+    manifest('filedrop', { roles: [{ name: 'user', description: '' }], groupRoleMap: { family: 'user' } }),
+    manifest('proxywatch', { roles: [{ name: 'viewer', description: '' }], groupRoleMap: { family: 'viewer' } }),
+    manifest('audiobookshelf', { roles: [{ name: 'admin', description: '' }], groupRoleMap: { admin: 'admin' } }),
   ];
-  // Has keep + observe but not forge access.
-  const id = identity(['family', 'access-keep', 'access-observe']);
+  // Has filedrop + proxywatch but not audiobookshelf access.
+  const id = identity(['family', 'access-filedrop', 'access-proxywatch']);
   const rows = computeEffectiveAccess(id, m);
-  assert.deepEqual(rows.map((r) => r.clientId), ['keep', 'observe']);
+  assert.deepEqual(rows.map((r) => r.clientId), ['filedrop', 'proxywatch']);
 });

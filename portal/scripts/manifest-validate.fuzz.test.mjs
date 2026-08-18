@@ -56,8 +56,8 @@ function originOf(raw) {
 
 // ─── Catalogue of known adversarial patterns (deterministic) ─────────────────
 
-const TRUSTED_ORIGIN = 'https://keep.othala.test';
-const TRUSTED_REDIRECT = 'https://keep.othala.test/callback';
+const TRUSTED_ORIGIN = 'https://proxywatch.othala.test';
+const TRUSTED_REDIRECT = 'https://proxywatch.othala.test/callback';
 
 /**
  * Each entry: { label, audience, redirectUris, shouldPass }
@@ -69,67 +69,67 @@ const ADVERSARIAL_CASES = [
   // --- Cases the validator should REJECT (audience origin ≠ redirect origin) ---
   {
     label: 'credential injection: user:pass@host hides the real host',
-    audience: ['https://keep.othala.test:443@evil.com'],
+    audience: ['https://proxywatch.othala.test:443@evil.com'],
     redirectUris: [TRUSTED_REDIRECT],
     shouldPass: false,
   },
   {
     label: 'credential injection: trusted host as username, evil host',
-    audience: ['https://keep.othala.test@evil.com'],
+    audience: ['https://proxywatch.othala.test@evil.com'],
     redirectUris: [TRUSTED_REDIRECT],
     shouldPass: false,
   },
   {
     label: 'subdomain suffix: evil.com suffix on trusted host',
-    audience: ['https://keep.othala.test.evil.com'],
+    audience: ['https://proxywatch.othala.test.evil.com'],
     redirectUris: [TRUSTED_REDIRECT],
     shouldPass: false,
   },
   {
     label: 'fragment confusion: trusted origin in fragment of evil URL',
-    audience: ['https://evil.com#keep.othala.test'],
+    audience: ['https://evil.com#proxywatch.othala.test'],
     redirectUris: [TRUSTED_REDIRECT],
     shouldPass: false,
   },
   {
     label: 'scheme mismatch: http vs https',
-    audience: ['http://keep.othala.test'],
+    audience: ['http://proxywatch.othala.test'],
     redirectUris: [TRUSTED_REDIRECT],
     shouldPass: false,
   },
   {
     label: 'port mismatch: unexpected port',
-    audience: ['https://keep.othala.test:8443'],
+    audience: ['https://proxywatch.othala.test:8443'],
     redirectUris: [TRUSTED_REDIRECT],
     shouldPass: false,
   },
   {
     label: 'path appended to audience does not hide the wrong host',
-    audience: ['https://evil.com/keep.othala.test'],
+    audience: ['https://evil.com/proxywatch.othala.test'],
     redirectUris: [TRUSTED_REDIRECT],
     shouldPass: false,
   },
   {
     label: 'null-byte in audience: URL parse throws → fail-closed (null origin)',
-    audience: ['https://keep.othala.test\x00.evil.com'],
+    audience: ['https://proxywatch.othala.test\x00.evil.com'],
     redirectUris: [TRUSTED_REDIRECT],
     shouldPass: false,
   },
   {
     label: 'unicode lookalike: cyrillic е punycodes to different origin',
-    audience: ['https://keep.dunn.dеv'],   // Cyrillic е (U+0435) → xn--dv-nlc, not ASCII e
+    audience: ['https://proxywatch.dunn.dеv'],   // Cyrillic е (U+0435) → xn--dv-nlc, not ASCII e
     redirectUris: [TRUSTED_REDIRECT],
     shouldPass: false,
   },
   {
     label: 'IPv6 with embedded trusted host: URL parse throws → fail-closed',
-    audience: ['https://[::1]keep.othala.test'],
+    audience: ['https://[::1]proxywatch.othala.test'],
     redirectUris: [TRUSTED_REDIRECT],
     shouldPass: false,
   },
   // NOTE: WHATWG URL normalises scheme-relative and backslash forms to canonical origin.
-  // https:keep.othala.test  → origin: https://keep.othala.test  (matches; not a bypass)
-  // https:\\keep.othala.test → origin: https://keep.othala.test (matches; not a bypass)
+  // https:proxywatch.othala.test  → origin: https://proxywatch.othala.test  (matches; not a bypass)
+  // https:\\proxywatch.othala.test → origin: https://proxywatch.othala.test (matches; not a bypass)
   // These are NOT attack vectors: the URL parser resolves them to the same origin as the
   // trusted redirect, so the validator correctly accepts them.
   // The residual risk is the stored audience string is non-canonical (e.g. "https:app.example.com"
@@ -140,22 +140,22 @@ const ADVERSARIAL_CASES = [
   {
     label: 'redirect with user:pass@trusted does NOT give the trusted origin',
     audience: [TRUSTED_ORIGIN],
-    redirectUris: ['https://evil.com:443@keep.othala.test/cb'],
-    // originOf('https://evil.com:443@keep.othala.test/cb') = 'https://keep.othala.test'
-    // So this SHOULD pass — the redirect is keep.othala.test and audience is keep.othala.test
+    redirectUris: ['https://evil.com:443@proxywatch.othala.test/cb'],
+    // originOf('https://evil.com:443@proxywatch.othala.test/cb') = 'https://proxywatch.othala.test'
+    // So this SHOULD pass — the redirect is proxywatch.othala.test and audience is proxywatch.othala.test
     // This is NOT an attack (the manifest operator controls redirect_uris)
     shouldPass: true,
   },
   {
     label: 'redirect with evil subdomain does NOT match trusted audience',
     audience: [TRUSTED_ORIGIN],
-    redirectUris: ['https://keep.othala.test.evil.com/cb'],
+    redirectUris: ['https://proxywatch.othala.test.evil.com/cb'],
     shouldPass: false,
   },
   {
     label: 'redirect with scheme mismatch does NOT match trusted audience',
     audience: [TRUSTED_ORIGIN],
-    redirectUris: ['http://keep.othala.test/cb'],
+    redirectUris: ['http://proxywatch.othala.test/cb'],
     shouldPass: false,
   },
 
@@ -168,10 +168,10 @@ const ADVERSARIAL_CASES = [
   },
   {
     label: 'explicit port 443 in redirect matches audience without port',
-    // new URL('https://keep.othala.test:443/cb').origin === 'https://keep.othala.test'
+    // new URL('https://proxywatch.othala.test:443/cb').origin === 'https://proxywatch.othala.test'
     // (WHATWG URL normalises default ports away)
     audience: [TRUSTED_ORIGIN],
-    redirectUris: ['https://keep.othala.test:443/callback'],
+    redirectUris: ['https://proxywatch.othala.test:443/callback'],
     shouldPass: true,
   },
   {
@@ -195,7 +195,7 @@ const ADVERSARIAL_CASES = [
   {
     label: 'fragment in redirect normalised away by WHATWG URL — origin still matches',
     audience: [TRUSTED_ORIGIN],
-    redirectUris: ['https://keep.othala.test/callback#section'],
+    redirectUris: ['https://proxywatch.othala.test/callback#section'],
     shouldPass: true,
   },
 ];
@@ -234,7 +234,7 @@ test('property: audienceMatchesRedirect is fail-closed when origins differ', () 
       // A known-good audience URL
       fc.constantFrom(
         'https://app.example.com',
-        'https://keep.othala.test',
+        'https://proxywatch.othala.test',
         'https://filedrop.othala.test',
         'https://login.example.net',
       ),
@@ -299,7 +299,7 @@ test('property: audienceMatchesRedirect accepts when every audience origin is co
         fc.record({
           base: fc.constantFrom(
             'https://app.example.com',
-            'https://keep.othala.test',
+            'https://proxywatch.othala.test',
             'https://filedrop.othala.test',
           ),
           audPath: fc.stringMatching(/^[a-z0-9\-]{0,8}$/),
@@ -327,13 +327,13 @@ test('property: audienceMatchesRedirect accepts when every audience origin is co
 
 // ─── Property 3: crafted hostnames that embed a trusted string must not pass ──
 //
-// Generates adversarial hostnames that CONTAIN "keep.othala.test" as a substring
+// Generates adversarial hostnames that CONTAIN "proxywatch.othala.test" as a substring
 // but are not equal to it. Verifies the validator rejects them as audiences
-// when the redirect is the real keep.othala.test.
+// when the redirect is the real proxywatch.othala.test.
 
 test('property: substring-embedded trusted host in audience does not pass', () => {
-  const trustedRedirect = 'https://keep.othala.test/callback';
-  const trustedOrigin = 'https://keep.othala.test';
+  const trustedRedirect = 'https://proxywatch.othala.test/callback';
+  const trustedOrigin = 'https://proxywatch.othala.test';
 
   fc.assert(
     fc.property(
@@ -342,17 +342,17 @@ test('property: substring-embedded trusted host in audience does not pass', () =
         prefix: fc.stringMatching(/^[a-z0-9\-]{0,12}$/),
         suffix: fc.constantFrom('.evil.com', '.attacker.net', '.phish.io', ''),
         scheme: fc.constantFrom('https://', 'http://'),
-        userInfo: fc.constantFrom('', 'keep.othala.test@', 'keep.othala.test:443@'),
+        userInfo: fc.constantFrom('', 'proxywatch.othala.test@', 'proxywatch.othala.test:443@'),
       }),
       ({ prefix, suffix, scheme, userInfo }) => {
         // Build candidate audience URL
         let host;
         if (prefix && suffix) {
-          host = `${prefix}.keep.othala.test${suffix}`;
+          host = `${prefix}.proxywatch.othala.test${suffix}`;
         } else if (prefix) {
-          host = `${prefix}.keep.othala.test`;
+          host = `${prefix}.proxywatch.othala.test`;
         } else if (suffix) {
-          host = `keep.othala.test${suffix}`;
+          host = `proxywatch.othala.test${suffix}`;
         } else {
           // No wrapping — this is the legitimate case, skip
           return;
@@ -455,8 +455,8 @@ test('audienceMatchesRedirect is false when manifest has no redirect_uris (no us
 
 test('validateClients rule 3 fires if ANY audience entry has no matching redirect origin', () => {
   const manifest = makeManifest({
-    redirectUris: ['https://keep.othala.test/cb'],
-    audience: ['https://keep.othala.test', 'https://evil.com'],
+    redirectUris: ['https://proxywatch.othala.test/cb'],
+    audience: ['https://proxywatch.othala.test', 'https://evil.com'],
   });
   const errs = validateClients([manifest]);
   assert.ok(
@@ -472,19 +472,19 @@ test('validateClients rule 3 fires if ANY audience entry has no matching redirec
 // The WHATWG URL parser normalises several non-canonical URL forms to the same
 // origin as the canonical form. Examples:
 //
-//   https:keep.othala.test      → origin: https://keep.othala.test  (scheme-relative missing //)
-//   HTTPS://keep.othala.test    → origin: https://keep.othala.test  (uppercase scheme)
-//   https:\\keep.othala.test    → origin: https://keep.othala.test  (backslash separator)
-//   https://keep.othala.test:443 → origin: https://keep.othala.test (default port elided)
+//   https:proxywatch.othala.test      → origin: https://proxywatch.othala.test  (scheme-relative missing //)
+//   HTTPS://proxywatch.othala.test    → origin: https://proxywatch.othala.test  (uppercase scheme)
+//   https:\\proxywatch.othala.test    → origin: https://proxywatch.othala.test  (backslash separator)
+//   https://proxywatch.othala.test:443 → origin: https://proxywatch.othala.test (default port elided)
 //
 // The validator ACCEPTS these because originOf() correctly sees them as the
 // same origin — and they ARE the same origin from a browser security model
 // perspective. This is NOT a security bypass.
 //
-// However, the non-canonical string (e.g. "https:keep.othala.test") is stored
+// However, the non-canonical string (e.g. "https:proxywatch.othala.test") is stored
 // verbatim as the audience value and placed into the id_token's aud claim.
 // An OIDC client doing string-literal audience comparison
-// (e.g. aud === "https://keep.othala.test") would FAIL verification at runtime.
+// (e.g. aud === "https://proxywatch.othala.test") would FAIL verification at runtime.
 // This is a consistency/correctness bug, not an access-control bypass.
 //
 // Mitigation: the manifest validator could optionally warn when an audience
@@ -495,10 +495,10 @@ test('validateClients rule 3 fires if ANY audience entry has no matching redirec
 
 test('WHATWG URL: non-canonical scheme forms normalise to same origin (not a bypass)', () => {
   const nonCanonical = [
-    'https:keep.othala.test',           // missing //
-    'HTTPS://keep.othala.test',          // uppercase scheme
-    'https:\\\\keep.othala.test',        // backslash separator (Node normalises)
-    'https://keep.othala.test:443',      // explicit default port (elided by URL)
+    'https:proxywatch.othala.test',           // missing //
+    'HTTPS://proxywatch.othala.test',          // uppercase scheme
+    'https:\\\\proxywatch.othala.test',        // backslash separator (Node normalises)
+    'https://proxywatch.othala.test:443',      // explicit default port (elided by URL)
   ];
   for (const nc of nonCanonical) {
     const o = originOf(nc);

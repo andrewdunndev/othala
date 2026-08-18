@@ -44,7 +44,7 @@ test('unknown top-level field → error (catches typos like "grupos")', () => {
     /unknown field "grupos"/,
   );
   assert.throws(
-    () => validateMetadataAdmin({ groups: ['admin'], role: { keep: 'admin' } }),
+    () => validateMetadataAdmin({ groups: ['admin'], role: { filedrop: 'admin' } }),
     /unknown field "role"/,
   );
 });
@@ -52,8 +52,8 @@ test('unknown top-level field → error (catches typos like "grupos")', () => {
 // ===== Groups =====
 
 test('groups: well-formed array round-trips', () => {
-  const result = validateMetadataAdmin({ groups: ['admin', 'family', 'access-keep'] });
-  assert.deepEqual(result.groups, ['admin', 'family', 'access-keep']);
+  const result = validateMetadataAdmin({ groups: ['admin', 'family', 'access-filedrop'] });
+  assert.deepEqual(result.groups, ['admin', 'family', 'access-filedrop']);
 });
 
 test('groups: non-array → error', () => {
@@ -116,8 +116,8 @@ test('groups: duplicate → error', () => {
 // documentary `metadata_admin.groups` pattern is the same expression; it
 // enforces nothing, since Kratos validates `traits` only.
 test('groups: hyphens in the middle are allowed', () => {
-  const result = validateMetadataAdmin({ groups: ['access-keep-v2'] });
-  assert.deepEqual(result.groups, ['access-keep-v2']);
+  const result = validateMetadataAdmin({ groups: ['access-filedrop-v2'] });
+  assert.deepEqual(result.groups, ['access-filedrop-v2']);
 });
 
 test('groups: a dot is rejected — the canonical form has no dot', () => {
@@ -146,8 +146,8 @@ test('groups: empty array → empty result', () => {
 // ===== Roles =====
 
 test('roles: well-formed object round-trips', () => {
-  const result = validateMetadataAdmin({ roles: { keep: 'admin', observe: 'viewer' } });
-  assert.deepEqual(result.roles, { keep: 'admin', observe: 'viewer' });
+  const result = validateMetadataAdmin({ roles: { filedrop: 'admin', proxywatch: 'viewer' } });
+  assert.deepEqual(result.roles, { filedrop: 'admin', proxywatch: 'viewer' });
 });
 
 test('roles: non-object → error', () => {
@@ -163,8 +163,8 @@ test('roles: non-object → error', () => {
 
 test('roles: invalid client_id key → error', () => {
   assert.throws(
-    () => validateMetadataAdmin({ roles: { 'Keep-V2': 'admin' } }), // hyphen + capital
-    /client_id "Keep-V2"/,
+    () => validateMetadataAdmin({ roles: { 'Filedrop-V2': 'admin' } }), // hyphen + capital
+    /client_id "Filedrop-V2"/,
   );
   assert.throws(
     () => validateMetadataAdmin({ roles: { '0bad': 'admin' } }), // starts with digit
@@ -174,39 +174,39 @@ test('roles: invalid client_id key → error', () => {
 
 test('roles: non-string role value → error', () => {
   assert.throws(
-    () => validateMetadataAdmin({ roles: { keep: 42 } }),
+    () => validateMetadataAdmin({ roles: { filedrop: 42 } }),
     /must be a string/,
   );
 });
 
 test('roles: empty role value → error', () => {
   assert.throws(
-    () => validateMetadataAdmin({ roles: { keep: '' } }),
+    () => validateMetadataAdmin({ roles: { filedrop: '' } }),
     /length must be 1\.\.64/,
   );
 });
 
 test('roles: too-long role value → error', () => {
   assert.throws(
-    () => validateMetadataAdmin({ roles: { keep: 'a'.repeat(65) } }),
+    () => validateMetadataAdmin({ roles: { filedrop: 'a'.repeat(65) } }),
     /length must be 1\.\.64/,
   );
 });
 
 test('roles: role value regex violation → error', () => {
   assert.throws(
-    () => validateMetadataAdmin({ roles: { keep: 'Admin' } }), // uppercase
+    () => validateMetadataAdmin({ roles: { filedrop: 'Admin' } }), // uppercase
     /role name "Admin"/,
   );
   assert.throws(
-    () => validateMetadataAdmin({ roles: { keep: 'has space' } }),
+    () => validateMetadataAdmin({ roles: { filedrop: 'has space' } }),
     /role name "has space"/,
   );
 });
 
 test('roles: allows underscores and hyphens', () => {
-  const result = validateMetadataAdmin({ roles: { keep: 'org_admin', observe: 'read-only' } });
-  assert.deepEqual(result.roles, { keep: 'org_admin', observe: 'read-only' });
+  const result = validateMetadataAdmin({ roles: { filedrop: 'org_admin', proxywatch: 'read-only' } });
+  assert.deepEqual(result.roles, { filedrop: 'org_admin', proxywatch: 'read-only' });
 });
 
 test('roles: empty object → empty result', () => {
@@ -218,11 +218,11 @@ test('roles: empty object → empty result', () => {
 
 test('combined: groups + roles', () => {
   const result = validateMetadataAdmin({
-    groups: ['admin', 'family', 'access-keep'],
-    roles: { keep: 'admin' },
+    groups: ['admin', 'family', 'access-filedrop'],
+    roles: { filedrop: 'admin' },
   });
-  assert.deepEqual(result.groups, ['admin', 'family', 'access-keep']);
-  assert.deepEqual(result.roles, { keep: 'admin' });
+  assert.deepEqual(result.groups, ['admin', 'family', 'access-filedrop']);
+  assert.deepEqual(result.roles, { filedrop: 'admin' });
 });
 
 test('combined: groups only (no roles)', () => {
@@ -232,9 +232,9 @@ test('combined: groups only (no roles)', () => {
 });
 
 test('combined: roles only (no groups)', () => {
-  const result = validateMetadataAdmin({ roles: { keep: 'admin' } });
+  const result = validateMetadataAdmin({ roles: { filedrop: 'admin' } });
   assert.equal(result.groups, undefined);
-  assert.deepEqual(result.roles, { keep: 'admin' });
+  assert.deepEqual(result.roles, { filedrop: 'admin' });
 });
 
 // ===== Admin marker =====
@@ -287,10 +287,10 @@ test('admin: absent → not present on output', () => {
 test('combined: groups + roles + admin:true', () => {
   const result = validateMetadataAdmin({
     groups: ['admin', 'family'],
-    roles: { keep: 'admin' },
+    roles: { filedrop: 'admin' },
     admin: true,
   });
   assert.deepEqual(result.groups, ['admin', 'family']);
-  assert.deepEqual(result.roles, { keep: 'admin' });
+  assert.deepEqual(result.roles, { filedrop: 'admin' });
   assert.equal(result.admin, true);
 });

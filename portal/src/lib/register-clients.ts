@@ -98,7 +98,7 @@ export interface RegisterResult {
 }
 
 /**
- * Env var name carrying a client's secret, e.g. keep -> KEEP_CLIENT_SECRET.
+ * Env var name carrying a client's secret, e.g. grafana -> GRAFANA_CLIENT_SECRET.
  *
  * Fails loudly if `clientId` is not a valid POSIX env-var stem
  * (^[A-Za-z_][A-Za-z0-9_]*$). A hyphenated id such as "prompt-desk" would

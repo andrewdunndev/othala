@@ -103,20 +103,20 @@ consent:
 `;
 
 /** auth_kind: oidc+ldap — still an OIDC client as far as this loader cares. */
-const LARDER = `
+const PROMPTDESK = `
 presentation:
-  name: Larder
-  url: https://larder.example.test
+  name: Promptdesk
+  url: https://promptdesk.example.test
   auth_kind: oidc+ldap
   access:
-    - larder-access
+    - promptdesk-access
 oidc:
-  client_id: larder
-  client_name: Larder
+  client_id: promptdesk
+  client_name: Promptdesk
   redirect_uris:
-    - https://larder.example.test/oauth/callback
+    - https://promptdesk.example.test/oauth/callback
   audience:
-    - https://larder.example.test
+    - https://promptdesk.example.test
   scope: openid profile email groups
 consent:
   roles:
@@ -129,8 +129,8 @@ consent:
       claim_emit:
         role: User
   group_role_map:
-    larder-admin: admin
-    larder-access: user
+    promptdesk-admin: admin
+    promptdesk-access: user
 `;
 
 /**
@@ -139,12 +139,12 @@ consent:
  * written. The reverse proxy gates this app on the group named here; if the
  * registry cannot see it, the admin UI cannot grant it.
  */
-const OBSERVE = `
+const PROXYWATCH = `
 presentation:
-  name: Observe
-  url: https://observe.example.test
+  name: Proxywatch
+  url: https://proxywatch.example.test
   auth_kind: forward_auth
-  access_group: observe-access
+  access_group: proxywatch-access
 `;
 
 /** Two forward_auth tiles sharing ONE access group. */
@@ -165,23 +165,23 @@ presentation:
 `;
 
 /** auth_kind: ldap — presentation-only, plural binding. */
-const TUNE = `
+const FILEDROP = `
 presentation:
-  name: Tune
-  url: https://tune.example.test
+  name: Filedrop
+  url: https://filedrop.example.test
   auth_kind: ldap
   access:
-    - tune-access
+    - filedrop-access
 `;
 
 /** auth_kind: external — someone else's auth, but still OUR access binding. */
-const VAULT = `
+const AUDIOBOOKSHELF = `
 presentation:
-  name: Vault
-  url: https://vault.example.test
+  name: Audiobookshelf
+  url: https://audiobookshelf.example.test
   auth_kind: external
   access:
-    - vault-access
+    - audiobookshelf-access
 `;
 
 /**
@@ -237,14 +237,14 @@ consent:
 
 /** The whole fixture catalog, by filename — one manifest of every auth_kind. */
 const CATALOG: Record<string, string> = {
+  'audiobookshelf.yaml': AUDIOBOOKSHELF,
   'fetcher.yaml': FETCHER,
+  'filedrop.yaml': FILEDROP,
   'grafana.yaml': GRAFANA,
-  'larder.yaml': LARDER,
-  'observe.yaml': OBSERVE,
+  'promptdesk.yaml': PROMPTDESK,
+  'proxywatch.yaml': PROXYWATCH,
   'series.yaml': SERIES,
   'statuspage.yaml': STATUSPAGE,
-  'tune.yaml': TUNE,
-  'vault.yaml': VAULT,
 };
 
 /**
@@ -252,18 +252,18 @@ const CATALOG: Record<string, string> = {
  *
  * Deliberately not derived from CATALOG: this list is what makes the
  * completeness tests non-vacuous. Four of the six entries come from manifests
- * that register no OIDC client at all (observe / fetcher+series / tune /
- * vault — forward_auth, forward_auth, ldap, external). If any upstream
+ * that register no OIDC client at all (proxywatch / fetcher+series / filedrop /
+ * audiobookshelf — forward_auth, forward_auth, ldap, external). If any upstream
  * filter ever drops presentation-only manifests again, this list is what
  * notices. statuspage contributes nothing: it declares no binding.
  */
 const EXPECTED_ACCESS = [
+  'audiobookshelf-access',
   'downloads-usenet-access',
+  'filedrop-access',
   'grafana-access',
-  'larder-access',
-  'observe-access',
-  'tune-access',
-  'vault-access',
+  'promptdesk-access',
+  'proxywatch-access',
 ];
 
 /**
@@ -272,7 +272,7 @@ const EXPECTED_ACCESS = [
  * and the key that maps an ordinary member to the `user` role. `<svc>-admin`
  * appears ONLY here, which is the converged model stated as data.
  */
-const EXPECTED_ROLE = ['grafana-access', 'grafana-admin', 'larder-access', 'larder-admin'];
+const EXPECTED_ROLE = ['grafana-access', 'grafana-admin', 'promptdesk-access', 'promptdesk-admin'];
 
 // ── helpers ─────────────────────────────────────────────────────────────────
 
@@ -437,14 +437,14 @@ describe('getGroupRegistry — completeness over the real loader', () => {
     // assertions below would agree with a registry that had lost the same
     // class. This is the check that refuses to agree.
     expect(loadClientManifests().map((m) => m.clientId).sort()).toEqual([
+      'audiobookshelf',
       'fetcher',
+      'filedrop',
       'grafana',
-      'larder',
-      'observe',
+      'promptdesk',
+      'proxywatch',
       'series',
       'statuspage',
-      'tune',
-      'vault',
     ]);
 
     const reg = getGroupRegistry();
@@ -461,10 +461,10 @@ describe('getGroupRegistry — completeness over the real loader', () => {
     // group the reverse proxy really gates on — so every one must be visible
     // here or the admin UI drops it on the next identity save.
     for (const group of [
-      'observe-access',
+      'proxywatch-access',
       'downloads-usenet-access',
-      'tune-access',
-      'vault-access',
+      'filedrop-access',
+      'audiobookshelf-access',
     ]) {
       expect(isAccessGroup(reg, group), `${group} must be an access group`).toBe(true);
       expect(knownAccessGroups(), `${group} must be grantable in the admin UI`).toContain(group);

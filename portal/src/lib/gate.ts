@@ -103,7 +103,7 @@ export interface GateResult {
  * Evaluate the access gate for an identity against an ARBITRARY required
  * group (not derived from a clientId). FAIL-CLOSED: any missing precondition
  * denies. Used by /api/forward-auth, where the required group arrives as a
- * query param (e.g. "access-observe") rather than from a client manifest.
+ * query param (e.g. "access-proxywatch") rather than from a client manifest.
  *
  * Same checks as enforceAccessGate, in the same order, with NO
  * skip_access_check escape hatch (forward_auth has no manifest):

@@ -134,19 +134,19 @@ test('state check precedes group check', () => {
 });
 
 // A flat `access-`-prefixed name is an ordinary binding. This asserts the gate
-// ALLOWS when the manifest binds `access-observe` AND the identity holds
-// `access-observe` — both sides carry the same name, so what is pinned is that
+// ALLOWS when the manifest binds `access-proxywatch` AND the identity holds
+// `access-proxywatch` — both sides carry the same name, so what is pinned is that
 // the prefix gets no special handling, not that a stale group name is remapped
 // onto a renamed binding. The gate compares bound names against identity groups
 // verbatim (portal/src/lib/gate.ts:
 // `accessGroups.some((g) => userGroups.includes(g))`) and derives nothing from
 // clientId. Retained across the `<svc>-access` rename: that rename was cosmetic
 // and forced no data migration, so a flat legacy binding must still admit.
-test('regression: access-observe flat binding still admits a member', () => {
+test('regression: access-proxywatch flat binding still admits a member', () => {
   const r = enforceAccessGate(
-    identity({ metadata_admin: { groups: ['access-observe'] } }),
-    'observe',
-    manifest('observe', { accessGroups: ['access-observe'] }),
+    identity({ metadata_admin: { groups: ['access-proxywatch'] } }),
+    'proxywatch',
+    manifest('proxywatch', { accessGroups: ['access-proxywatch'] }),
   );
   assert.equal(r.allowed, true);
 });
@@ -154,12 +154,12 @@ test('regression: access-observe flat binding still admits a member', () => {
 // enforceGroupGate is forward-auth's arbitrary-group path: a single required
 // group, no manifest, no skip_access_check hatch.
 test('enforceGroupGate: active member of the named group → allow', () => {
-  const r = enforceGroupGate(identity({ metadata_admin: { groups: ['access-observe'] } }), 'access-observe');
+  const r = enforceGroupGate(identity({ metadata_admin: { groups: ['access-proxywatch'] } }), 'access-proxywatch');
   assert.equal(r.allowed, true);
 });
 
 test('enforceGroupGate: not a member → deny', () => {
-  const r = enforceGroupGate(identity({ metadata_admin: { groups: ['other'] } }), 'access-observe');
+  const r = enforceGroupGate(identity({ metadata_admin: { groups: ['other'] } }), 'access-proxywatch');
   assert.equal(r.allowed, false);
 });
 
@@ -193,7 +193,7 @@ test('hasGroup rejects a different group name', () => {
 // ── the READ boundary we do not own ──────────────────────────────────────────
 
 test('nonCanonicalGroups reports exactly the stored names that miss GROUP_RE', () => {
-  const id = identity({ metadata_admin: { groups: ['access-observe', 'Access-Grafana', 'has space'] } });
+  const id = identity({ metadata_admin: { groups: ['access-proxywatch', 'Access-Grafana', 'has space'] } });
   assert.deepEqual(nonCanonicalGroups(id), ['Access-Grafana', 'has space']);
   assert.deepEqual(nonCanonicalGroups(identity()), []);
   assert.deepEqual(nonCanonicalGroups(null), []);
@@ -201,18 +201,18 @@ test('nonCanonicalGroups reports exactly the stored names that miss GROUP_RE', (
 
 test('enforceGroupGate DENIES when a stored group is non-canonical, naming it', () => {
   const r = enforceGroupGate(
-    identity({ metadata_admin: { groups: ['Access-Observe'] } }),
-    'access-observe',
+    identity({ metadata_admin: { groups: ['Access-Proxywatch'] } }),
+    'access-proxywatch',
   );
   assert.equal(r.allowed, false);
   assert.match(r.reason, /non-canonical/);
-  assert.match(r.reason, /Access-Observe/);
+  assert.match(r.reason, /Access-Proxywatch/);
 });
 
 test('enforceGroupGate DENIES a group the identity legitimately holds when ANOTHER is non-canonical', () => {
   const r = enforceGroupGate(
-    identity({ metadata_admin: { groups: ['access-observe', 'Access-Grafana'] } }),
-    'access-observe',
+    identity({ metadata_admin: { groups: ['access-proxywatch', 'Access-Grafana'] } }),
+    'access-proxywatch',
   );
   assert.equal(r.allowed, false);
   assert.match(r.reason, /Access-Grafana/);
@@ -220,7 +220,7 @@ test('enforceGroupGate DENIES a group the identity legitimately holds when ANOTH
 
 test('enforceAccessGate DENIES on a non-canonical stored group, even with skip_access_check', () => {
   const r = enforceAccessGate(
-    identity({ metadata_admin: { groups: ['Access-Observe'] } }),
+    identity({ metadata_admin: { groups: ['Access-Proxywatch'] } }),
     'photos',
     manifest('photos', { accessGroups: [], skipAccessCheck: true }),
   );
@@ -230,8 +230,8 @@ test('enforceAccessGate DENIES on a non-canonical stored group, even with skip_a
 
 test('the state check still precedes the non-canonical refusal', () => {
   const r = enforceGroupGate(
-    identity({ state: 'inactive', metadata_admin: { groups: ['Access-Observe'] } }),
-    'access-observe',
+    identity({ state: 'inactive', metadata_admin: { groups: ['Access-Proxywatch'] } }),
+    'access-proxywatch',
   );
   assert.equal(r.reason, 'identity not active');
 });

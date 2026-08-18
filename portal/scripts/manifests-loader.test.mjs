@@ -27,16 +27,16 @@ test('namespace split: minimal yaml with oidc + consent blocks parses', () => {
   const out = parseManifest(
     `
 oidc:
-  client_id: keep
+  client_id: filedrop
   scope: openid email profile
 consent:
   roles:
     user:
       description: viewer
 `,
-    'keep.yaml',
+    'filedrop.yaml',
   );
-  assert.equal(out.clientId, 'keep');
+  assert.equal(out.clientId, 'filedrop');
   assert.deepEqual(out.scopes, ['openid', 'email', 'profile']);
   assert.equal(out.roles.length, 1);
   assert.equal(out.roles[0].name, 'user');
@@ -92,11 +92,11 @@ oidc:
 test('pre-namespace flat shape is rejected', () => {
   assert.throws(() => parseManifest(
     `
-client_id: keep
+client_id: filedrop
 roles:
   - name: admin
 `,
-    'keep.yaml',
+    'filedrop.yaml',
   ));
 });
 
@@ -191,22 +191,22 @@ consent:
 });
 
 test('presentation-only manifest (forward_auth, no oidc:) parses with the access binding', () => {
-  // observe.yaml shape: a presentation: block, no oidc: client. It must parse
+  // proxywatch.yaml shape: a presentation: block, no oidc: client. It must parse
   // (not throw), flag presentationOnly, derive clientId from the filename slug,
   // and carry the access binding through. This is the first-class
   // forward_auth / ldap tile type.
   const out = parseManifest(
     `
 presentation:
-  name: Observe
+  name: Proxywatch
   auth_kind: forward_auth
-  access_group: access-observe
+  access_group: access-proxywatch
 `,
-    'observe.yaml',
+    'proxywatch.yaml',
   );
   assert.equal(out.presentationOnly, true);
-  assert.equal(out.clientId, 'observe');
-  assert.deepEqual(out.accessGroups, ['access-observe']);
+  assert.equal(out.clientId, 'proxywatch');
+  assert.deepEqual(out.accessGroups, ['access-proxywatch']);
 });
 
 test('manifest with neither oidc: nor presentation: throws', () => {
@@ -217,13 +217,13 @@ test('backchannel_logout_uri preserved when present', () => {
   const out = parseManifest(
     `
 oidc:
-  client_id: keep
-  backchannel_logout_uri: https://keep.othala.test/identity/connect/oidc-logout
+  client_id: filedrop
+  backchannel_logout_uri: https://filedrop.othala.test/identity/connect/oidc-logout
 consent: {}
 `,
-    'keep.yaml',
+    'filedrop.yaml',
   );
-  assert.equal(out.backchannelLogoutUri, 'https://keep.othala.test/identity/connect/oidc-logout');
+  assert.equal(out.backchannelLogoutUri, 'https://filedrop.othala.test/identity/connect/oidc-logout');
 });
 
 test('backchannel_logout_uri defaults to empty string when absent', () => {
@@ -242,15 +242,15 @@ test('audience array of strings preserved', () => {
   const out = parseManifest(
     `
 oidc:
-  client_id: keep
+  client_id: filedrop
   audience:
-    - https://keep.othala.test
-    - https://api.keep.othala.test
+    - https://filedrop.othala.test
+    - https://api.filedrop.othala.test
 consent: {}
 `,
-    'keep.yaml',
+    'filedrop.yaml',
   );
-  assert.deepEqual(out.audience, ['https://keep.othala.test', 'https://api.keep.othala.test']);
+  assert.deepEqual(out.audience, ['https://filedrop.othala.test', 'https://api.filedrop.othala.test']);
 });
 
 test('skipConsent default is false', () => {
@@ -269,11 +269,11 @@ test('skipConsent true when set', () => {
   const out = parseManifest(
     `
 oidc:
-  client_id: keep
+  client_id: filedrop
   skip_consent: true
 consent: {}
 `,
-    'keep.yaml',
+    'filedrop.yaml',
   );
   assert.equal(out.skipConsent, true);
 });

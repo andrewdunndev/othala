@@ -134,32 +134,32 @@ test('deepMergeClaims: prototype key is silently dropped (no pollution)', () => 
  */
 function manifest({ group, roleClaimEmit, emitGroupsClaim = null } = {}) {
   return {
-    clientId: 'larder',
+    clientId: 'filedrop',
     presentationOnly: false,
-    clientName: 'Larder',
-    redirectUris: ['https://larder.othala.test/'],
+    clientName: 'Filedrop',
+    redirectUris: ['https://filedrop.othala.test/'],
     postLogoutRedirectUris: [],
     scopes: ['openid', 'email', 'profile', 'groups'],
     scope: 'openid email profile groups',
-    audience: ['https://larder.othala.test'],
+    audience: ['https://filedrop.othala.test'],
     grantTypes: ['authorization_code'],
     responseTypes: ['code'],
     tokenEndpointAuthMethod: '',
     skipConsent: false,
     backchannelLogoutUri: '',
     backchannelLogoutSessionRequired: false,
-    accessGroups: [group ?? 'larder'],
+    accessGroups: [group ?? 'filedrop'],
     roles: [
       {
         name: 'member',
-        description: 'Larder member',
-        claimEmit: roleClaimEmit ?? { groups: ['larder-user'] },
+        description: 'Filedrop member',
+        claimEmit: roleClaimEmit ?? { groups: ['filedrop-user'] },
       },
     ],
-    groupRoleMap: { [group ?? 'larder']: 'member' },
+    groupRoleMap: { [group ?? 'filedrop']: 'member' },
     emitGroupsClaim,
     skipAccessCheck: false,
-    sourcePath: 'larder.yaml',
+    sourcePath: 'filedrop.yaml',
   };
 }
 
@@ -170,36 +170,36 @@ function identityWithGroups(groups) {
 
 // ── composeIDTokenClaims H1: real memberships survive role claim_emit ─────
 
-test('composeIDTokenClaims H1: larder member only — groups is union of real + role', () => {
-  const id = identityWithGroups(['larder']);
-  const m = manifest({ group: 'larder', roleClaimEmit: { groups: ['larder-user'] } });
+test('composeIDTokenClaims H1: filedrop member only — groups is union of real + role', () => {
+  const id = identityWithGroups(['filedrop']);
+  const m = manifest({ group: 'filedrop', roleClaimEmit: { groups: ['filedrop-user'] } });
   const c = composeIDTokenClaims(id, m);
   assert.ok(Array.isArray(c.groups), 'groups is an array');
   // Real membership preserved; role claim additive
-  assert.ok(c.groups.includes('larder'), 'larder preserved');
-  assert.ok(c.groups.includes('larder-user'), 'larder-user added');
+  assert.ok(c.groups.includes('filedrop'), 'filedrop preserved');
+  assert.ok(c.groups.includes('filedrop-user'), 'filedrop-user added');
 });
 
-test('composeIDTokenClaims H1: larder-admin only — admin membership preserved', () => {
-  const id = identityWithGroups(['larder-admin']);
-  const m = manifest({ group: 'larder-admin', roleClaimEmit: { groups: ['larder-user'] } });
+test('composeIDTokenClaims H1: filedrop-admin only — admin membership preserved', () => {
+  const id = identityWithGroups(['filedrop-admin']);
+  const m = manifest({ group: 'filedrop-admin', roleClaimEmit: { groups: ['filedrop-user'] } });
   const c = composeIDTokenClaims(id, m);
-  assert.ok(c.groups.includes('larder-admin'), 'larder-admin preserved');
-  assert.ok(c.groups.includes('larder-user'), 'larder-user added');
+  assert.ok(c.groups.includes('filedrop-admin'), 'filedrop-admin preserved');
+  assert.ok(c.groups.includes('filedrop-user'), 'filedrop-user added');
 });
 
-test('composeIDTokenClaims H1: larder+larder-admin — both preserved, no duplicates', () => {
-  // groupRoleMap: larder → member, larder-admin → member (same role, first match wins)
-  const id = identityWithGroups(['larder', 'larder-admin']);
+test('composeIDTokenClaims H1: filedrop+filedrop-admin — both preserved, no duplicates', () => {
+  // groupRoleMap: filedrop → member, filedrop-admin → member (same role, first match wins)
+  const id = identityWithGroups(['filedrop', 'filedrop-admin']);
   const m = {
-    ...manifest({ group: 'larder', roleClaimEmit: { groups: ['larder-user'] } }),
-    groupRoleMap: { larder: 'member', 'larder-admin': 'member' },
-    accessGroups: ['larder', 'larder-admin'],
+    ...manifest({ group: 'filedrop', roleClaimEmit: { groups: ['filedrop-user'] } }),
+    groupRoleMap: { filedrop: 'member', 'filedrop-admin': 'member' },
+    accessGroups: ['filedrop', 'filedrop-admin'],
   };
   const c = composeIDTokenClaims(id, m);
-  assert.ok(c.groups.includes('larder'), 'larder preserved');
-  assert.ok(c.groups.includes('larder-admin'), 'larder-admin preserved');
-  assert.ok(c.groups.includes('larder-user'), 'larder-user additive');
+  assert.ok(c.groups.includes('filedrop'), 'filedrop preserved');
+  assert.ok(c.groups.includes('filedrop-admin'), 'filedrop-admin preserved');
+  assert.ok(c.groups.includes('filedrop-user'), 'filedrop-user additive');
   // No duplicates
   const groups = c.groups;
   assert.equal(groups.length, new Set(groups).size, 'no duplicates');
@@ -208,7 +208,7 @@ test('composeIDTokenClaims H1: larder+larder-admin — both preserved, no duplic
 // ── composeIDTokenClaims H2: scope-gate ───────────────────────────────────
 
 test('composeIDTokenClaims H2: requestedScope [openid] — no email/name/groups', () => {
-  const id = identityWithGroups(['larder']);
+  const id = identityWithGroups(['filedrop']);
   const m = manifest();
   const c = composeIDTokenClaims(id, m, ['openid']);
   assert.equal('email' in c, false, 'email absent');
@@ -219,7 +219,7 @@ test('composeIDTokenClaims H2: requestedScope [openid] — no email/name/groups'
 });
 
 test('composeIDTokenClaims H2: requestedScope [openid, email] — email present, name/groups absent', () => {
-  const id = identityWithGroups(['larder']);
+  const id = identityWithGroups(['filedrop']);
   const m = manifest();
   const c = composeIDTokenClaims(id, m, ['openid', 'email']);
   assert.equal(c.email, 'a@othala.test');
@@ -230,7 +230,7 @@ test('composeIDTokenClaims H2: requestedScope [openid, email] — email present,
 });
 
 test('composeIDTokenClaims H2: requestedScope [openid, email, profile, groups] — all claims present', () => {
-  const id = identityWithGroups(['larder']);
+  const id = identityWithGroups(['filedrop']);
   const m = manifest();
   const c = composeIDTokenClaims(id, m, ['openid', 'email', 'profile', 'groups']);
   assert.equal(c.email, 'a@othala.test');
@@ -243,7 +243,7 @@ test('composeIDTokenClaims H2: requestedScope [openid, email, profile, groups] �
 // ── composeIDTokenClaims back-compat: omitting requestedScope emits all ───
 
 test('composeIDTokenClaims back-compat: no requestedScope → all claims emitted', () => {
-  const id = identityWithGroups(['larder']);
+  const id = identityWithGroups(['filedrop']);
   const m = manifest();
   const c = composeIDTokenClaims(id, m);
   assert.equal(c.email, 'a@othala.test');

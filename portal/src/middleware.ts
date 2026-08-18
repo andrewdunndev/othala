@@ -70,7 +70,7 @@ function applySecurityHeaders(res: Response): void {
   // but an OIDC login's post-login redirect lands on the requesting app's
   // domain — a subdomain of the estate apex — and form-action governs a form
   // submission's REDIRECT CHAIN, not just its action URL. So 'self' alone blocks
-  // every OIDC app login (the redirect to e.g. larder.dunn.dev violates it).
+  // every OIDC app login (the redirect to e.g. grafana.dunn.dev violates it).
   // Allow 'self' + the apex wildcard (https://*.<OTHALA_APEX>) — exactly the
   // estate's own apps; absent OTHALA_APEX, fall back to strict 'self'. Still
   // prevents credential exfiltration to arbitrary off-estate origins.

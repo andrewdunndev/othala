@@ -129,7 +129,7 @@ test('reloadOnSighup invalidates the manifest cache then calls the injected regi
   // We can't easily observe the cache pointer directly from outside the module,
   // but we can confirm: (1) reloadOnSighup calls register (= reconcileClients ran),
   // and (2) it does not throw even when register rejects.
-  const reg = stubRegister([{ action: 'updated', clientId: 'keep' }]);
+  const reg = stubRegister([{ action: 'updated', clientId: 'filedrop' }]);
 
   const origLog = console.log;
   console.log = () => {};

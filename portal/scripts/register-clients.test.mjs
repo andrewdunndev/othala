@@ -46,10 +46,10 @@ function stubApi(existing = new Set()) {
   };
 }
 
-const KEEP_YAML = `
+const FILEDROP_YAML = `
 oidc:
-  client_id: keep
-  client_name: Vault
+  client_id: filedrop
+  client_name: Statuspage
   grant_types:
     - authorization_code
     - refresh_token
@@ -57,17 +57,17 @@ oidc:
     - code
   scope: openid email profile groups offline_access
   redirect_uris:
-    - https://keep.othala.test/identity/connect/oidc-signin
+    - https://filedrop.othala.test/identity/connect/oidc-signin
   post_logout_redirect_uris:
-    - https://keep.othala.test/
+    - https://filedrop.othala.test/
   token_endpoint_auth_method: client_secret_basic
   audience:
-    - https://keep.othala.test
+    - https://filedrop.othala.test
   skip_consent: true
-  backchannel_logout_uri: https://keep.othala.test/identity/connect/oidc-logout
+  backchannel_logout_uri: https://filedrop.othala.test/identity/connect/oidc-logout
 presentation:
   access:
-    - keep
+    - filedrop
 consent:
   emit_groups_claim: true
   roles:
@@ -82,29 +82,29 @@ consent:
 // ── buildClientBody field mapping ──────────────────────────────────────────
 
 test('buildClientBody maps every oidc field exactly as apply-clients.sh did', () => {
-  const m = parseManifest(KEEP_YAML, 'keep.yaml');
+  const m = parseManifest(FILEDROP_YAML, 'filedrop.yaml');
   const body = buildClientBody(m, 's3cr3t');
 
-  assert.equal(body.client_id, 'keep');
-  assert.equal(body.client_name, 'Vault');
+  assert.equal(body.client_id, 'filedrop');
+  assert.equal(body.client_name, 'Statuspage');
   assert.deepEqual(body.grant_types, ['authorization_code', 'refresh_token']);
   assert.deepEqual(body.response_types, ['code']);
   // scope is the on-the-wire space-separated string, not an array.
   assert.equal(body.scope, 'openid email profile groups offline_access');
-  assert.deepEqual(body.redirect_uris, ['https://keep.othala.test/identity/connect/oidc-signin']);
-  assert.deepEqual(body.post_logout_redirect_uris, ['https://keep.othala.test/']);
+  assert.deepEqual(body.redirect_uris, ['https://filedrop.othala.test/identity/connect/oidc-signin']);
+  assert.deepEqual(body.post_logout_redirect_uris, ['https://filedrop.othala.test/']);
   assert.equal(body.token_endpoint_auth_method, 'client_secret_basic');
-  assert.deepEqual(body.audience, ['https://keep.othala.test']);
+  assert.deepEqual(body.audience, ['https://filedrop.othala.test']);
   assert.equal(body.skip_consent, true);
   assert.equal(
     body.backchannel_logout_uri,
-    'https://keep.othala.test/identity/connect/oidc-logout',
+    'https://filedrop.othala.test/identity/connect/oidc-logout',
   );
   assert.equal(body.client_secret, 's3cr3t');
 });
 
 test('buildClientBody NEVER forwards any consent: block field to Hydra', () => {
-  const m = parseManifest(KEEP_YAML, 'keep.yaml');
+  const m = parseManifest(FILEDROP_YAML, 'filedrop.yaml');
   const body = buildClientBody(m, 's3cr3t');
   const keys = Object.keys(body);
   for (const forbidden of [
@@ -149,19 +149,19 @@ consent:
 });
 
 test('buildClientBody sets backchannel_logout_session_required only when true', () => {
-  const off = buildClientBody(parseManifest(KEEP_YAML, 'keep.yaml'), 'x');
+  const off = buildClientBody(parseManifest(FILEDROP_YAML, 'filedrop.yaml'), 'x');
   assert.ok(!('backchannel_logout_session_required' in off));
 
   const on = buildClientBody(
     parseManifest(
       `
 oidc:
-  client_id: keep
+  client_id: filedrop
   backchannel_logout_session_required: true
-  audience: [https://keep.othala.test]
+  audience: [https://filedrop.othala.test]
 consent: {}
 `,
-      'keep.yaml',
+      'filedrop.yaml',
     ),
     'x',
   );
@@ -169,14 +169,14 @@ consent: {}
 });
 
 test('buildClientBody omits client_secret when undefined (dry-run posture)', () => {
-  const body = buildClientBody(parseManifest(KEEP_YAML, 'keep.yaml'), undefined);
+  const body = buildClientBody(parseManifest(FILEDROP_YAML, 'filedrop.yaml'), undefined);
   assert.ok(!('client_secret' in body));
 });
 
 // ── secretEnvVar naming ────────────────────────────────────────────────────
 
 test('secretEnvVar uppercases the client_id (apply-clients.sh convention)', () => {
-  assert.equal(secretEnvVar('keep'), 'KEEP_CLIENT_SECRET');
+  assert.equal(secretEnvVar('filedrop'), 'FILEDROP_CLIENT_SECRET');
   assert.equal(secretEnvVar('llm'), 'LLM_CLIENT_SECRET');
   assert.equal(secretEnvVar('promptdesk'), 'PROMPTDESK_CLIENT_SECRET');
   assert.equal(secretEnvVar('my_app'), 'MY_APP_CLIENT_SECRET');
@@ -214,22 +214,22 @@ test('secretEnvVar throws on a client_id starting with a digit', () => {
 
 test('registerClient CREATES when the client does not exist (404)', async () => {
   const api = stubApi(new Set());
-  const m = parseManifest(KEEP_YAML, 'keep.yaml');
+  const m = parseManifest(FILEDROP_YAML, 'filedrop.yaml');
   const res = await registerClient(api, m, 'sec');
   assert.equal(res.action, 'created');
   assert.equal(api.calls.create.length, 1);
   assert.equal(api.calls.set.length, 0);
-  assert.equal(api.calls.create[0].client_id, 'keep');
+  assert.equal(api.calls.create[0].client_id, 'filedrop');
 });
 
 test('registerClient UPDATES when the client already exists (200)', async () => {
-  const api = stubApi(new Set(['keep']));
-  const m = parseManifest(KEEP_YAML, 'keep.yaml');
+  const api = stubApi(new Set(['filedrop']));
+  const m = parseManifest(FILEDROP_YAML, 'filedrop.yaml');
   const res = await registerClient(api, m, 'sec');
   assert.equal(res.action, 'updated');
   assert.equal(api.calls.set.length, 1);
   assert.equal(api.calls.create.length, 0);
-  assert.equal(api.calls.set[0].id, 'keep');
+  assert.equal(api.calls.set[0].id, 'filedrop');
 });
 
 test('registerClient rethrows a non-404 error (does not silently create)', async () => {
@@ -245,33 +245,33 @@ test('registerClient rethrows a non-404 error (does not silently create)', async
       throw new Error('should not be called');
     },
   };
-  await assert.rejects(() => registerClient(api, parseManifest(KEEP_YAML, 'keep.yaml'), 'sec'));
+  await assert.rejects(() => registerClient(api, parseManifest(FILEDROP_YAML, 'filedrop.yaml'), 'sec'));
 });
 
 // ── registerManifests: secret resolution + lint pre-flight ─────────────────
 
 test('registerManifests reads each secret from the injected env', async () => {
   const api = stubApi(new Set());
-  const m = parseManifest(KEEP_YAML, 'keep.yaml');
+  const m = parseManifest(FILEDROP_YAML, 'filedrop.yaml');
   await registerManifests([m], {
     api,
-    env: { KEEP_CLIENT_SECRET: 'env-secret' },
+    env: { FILEDROP_CLIENT_SECRET: 'env-secret' },
   });
   assert.equal(api.calls.create[0].client_secret, 'env-secret');
 });
 
 test('registerManifests throws when a required secret is missing', async () => {
   const api = stubApi(new Set());
-  const m = parseManifest(KEEP_YAML, 'keep.yaml');
+  const m = parseManifest(FILEDROP_YAML, 'filedrop.yaml');
   await assert.rejects(
     () => registerManifests([m], { api, env: {} }),
-    /KEEP_CLIENT_SECRET not set/,
+    /FILEDROP_CLIENT_SECRET not set/,
   );
 });
 
 test('registerManifests tolerates a missing secret with allowMissingSecret (dry run)', async () => {
   const api = stubApi(new Set());
-  const m = parseManifest(KEEP_YAML, 'keep.yaml');
+  const m = parseManifest(FILEDROP_YAML, 'filedrop.yaml');
   await registerManifests([m], { api, env: {}, allowMissingSecret: true });
   assert.ok(!('client_secret' in api.calls.create[0]));
 });

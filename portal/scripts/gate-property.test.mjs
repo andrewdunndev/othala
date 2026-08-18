@@ -157,14 +157,14 @@ test('matrix: manifest with empty accessGroups, no skip → DENY (no implicit ac
 });
 
 // A flat `access-`-prefixed name is an ordinary binding: the manifest binds
-// `access-observe`, the identity holds `access-observe`, the gate ALLOWS. The
+// `access-proxywatch`, the identity holds `access-proxywatch`, the gate ALLOWS. The
 // gate compares bound names against identity groups verbatim
 // (portal/src/lib/gate.ts: `accessGroups.some((g) => userGroups.includes(g))`)
 // and derives nothing from clientId, so the prefix gets no special handling.
-test('regression: access-observe is a valid flat binding → ALLOW', () => {
-  const m = manifest('observe', { accessGroups: ['access-observe'] });
-  const id = identity(['access-observe']);
-  assert.equal(enforceAccessGate(id, 'observe', m).allowed, true);
+test('regression: access-proxywatch is a valid flat binding → ALLOW', () => {
+  const m = manifest('proxywatch', { accessGroups: ['access-proxywatch'] });
+  const id = identity(['access-proxywatch']);
+  assert.equal(enforceAccessGate(id, 'proxywatch', m).allowed, true);
 });
 
 // ─── generators ─────────────────────────────────────────────────────────────
@@ -179,14 +179,14 @@ test('regression: access-observe is a valid flat binding → ALLOW', () => {
  * literals stopped biting.
  */
 const canonicalName = fc.constantFrom(
-  'memories', 'admin-memories', 'family', 'access-photos', 'access-observe',
-  'friends', 'kids', 'admin', 'observe', 'grafana-access',
+  'memories', 'admin-memories', 'family', 'access-photos', 'access-proxywatch',
+  'friends', 'kids', 'admin', 'proxywatch', 'grafana-access',
   'trailing-',
 );
 
 /** Names a raw Kratos admin-API write can store and no owned boundary can. */
 const nonCanonicalName = fc.constantFrom(
-  'Memories', 'ACCESS-OBSERVE', 'Access-Photos', 'Family', 'aDmIn',
+  'Memories', 'ACCESS-PROXYWATCH', 'Access-Photos', 'Family', 'aDmIn',
   'has space', 'under_score', '-leading', 'dotted.name', '2fa-required', '',
 );
 
