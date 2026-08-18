@@ -18,6 +18,14 @@ unauthenticated caller can create an identity, so there is no registration
 flood to rate-limit. **Cost of opening it:** track registration-flow node-group
 changes on every bump, and build the abuse resistance self-service implies.
 
+That out-of-band handoff is also how the invariant in DECISIONS.md § No
+password ever transits a channel gets kept in practice:
+
+<figure class="diagram">
+  <img src="/diagrams/first-credential.svg" alt="An admin creates the identity through the admin API with no credentials block at all. Two channels can then carry the enrolment secret, and both keep link and code apart from any password. Hand-delivery: the admin mints a one-time recovery link and code together and hands both over on a conversation that already exists with that person. Email, the D1 addendum: the admin re-types the target address and the server checks it byte-equal against the identity's own trait before anything is sent; Kratos's own courier then sends a code alone, never a link with the code embedded. Either way the recipient's own browser is where a password and a passkey first get set. One branch refuses outright: when the target carries the admin marker, shouldRefuseRecovery refuses before Kratos is ever asked, console-only.">
+  <figcaption class="diagram-caption">Not "no password exists" — no password ever transits a channel</figcaption>
+</figure>
+
 ## 2. Admin listings cap and render; they never read a total count
 
 `listIdentities` in `portal/src/lib/admin-api.ts` asks for a fixed page size

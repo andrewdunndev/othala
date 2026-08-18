@@ -79,6 +79,13 @@ OAuth2 client at once. What is gated is `/admin`, where `requireAdminSession` in
 marker on every request — `e2e/playwright/tests/d-admin-aal2-stepup.spec.ts` and
 `f-aal2-bypass.spec.ts` hold that line.
 
+The shape of that boundary, laid out end to end:
+
+<figure class="diagram">
+  <img src="/diagrams/trust-boundary.svg" alt="A browser reaches one hostname at the edge proxy, which terminates TLS. Inside one trust domain the admin APIs never leave: the app runs two listeners, a public SSR listener the edge reaches and a loopback admin listener bound to ADMIN_HOST that the edge never touches; Kratos and Hydra each expose the edge a public API — self-service and sessions for Kratos, authorize, token and discovery for Hydra — while the app alone calls their admin APIs. Kratos and Hydra each keep a separate Postgres database. Admin APIs are reachable only from the app, never from the edge, enforced by scripts/render-config.sh, requireAdminSession, and pinned by d-admin-aal2-stepup.spec.ts and f-aal2-bypass.spec.ts.">
+  <figcaption class="diagram-caption">Three ports on the network; the admin APIs are not among them</figcaption>
+</figure>
+
 ## Secrets and the shipped baseline
 
 **Ory's secrets are file-mounted; the portal's come from the process
@@ -117,6 +124,14 @@ revoke — `e2e/playwright/tests/p-eviction.spec.ts` walks it. Note the unit: th
 admin API has no per-credential removal, so deleting a type removes **every**
 credential of that kind, which is why the procedure ends in re-enrolment out of
 band. Runbooks are under `docs/runbooks/`.
+
+Revoking itself is one fan-out, and it shares an invariant with the login
+path's own skip=true handling — Hydra's memory is never trusted on its own:
+
+<figure class="diagram">
+  <img src="/diagrams/session-revocation.svg" alt="Two panels. Left: when Hydra reports skip=true because it remembers a subject, the login handler re-verifies that a live Kratos session exists whose identity.id equals the remembered subject before honouring the skip; no live match forces interactive re-authentication, pinned by the FIX-A cases in portal/scripts/oauth2-handlers.test.mjs. Right: revokeSubject is the one in-process revocation fan-out, triggered by admin force-logout, sign-out-everywhere, or deactivate. Kratos sessions, Hydra's login-session and Hydra's consent-session are all revoked in a fixed order; this cuts sessions and remembered logins but not enrolled credentials, which is why the full eviction procedure above audits credentials and deletes the affected type before it revokes.">
+  <figcaption class="diagram-caption">Hydra remembers; Kratos authenticates — and revoking cuts both</figcaption>
+</figure>
 
 **No notification on email-code login.** A message to a secondary address would
 collapse the detection window from "whenever the victim notices" to minutes.

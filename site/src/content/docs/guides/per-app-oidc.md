@@ -15,7 +15,13 @@ per application, read at runtime from `MANIFEST_DIR`, so adding one is a
 manifest drop rather than an image rebuild. A manifest carries up to three
 namespaces: `presentation:` (tile metadata and the access binding), `oidc:`
 (forwarded to Hydra), and `consent:` (role and claim shape, read by the portal
-and never sent to Hydra).
+and never sent to Hydra). That shape produces one login, shown next end to end
+before the deeper dives below take its pieces apart.
+
+<figure class="diagram">
+  <img src="/diagrams/oidc-login-path.svg" alt="A sequence across four lifelines — browser, Hydra, the Othala app and Kratos — for an example relying party, Grafana. The browser is redirected to Hydra's authorize endpoint, which opens a login challenge on the app; with no session yet the app bounces the browser to Kratos, which runs the passkey challenge, the primary credential. Kratos sets the session cookie and resumes at Hydra, which opens a consent challenge; the app gates again, composes id_token claims with groups mapped to claims, and accepts. Hydra redirects the browser back to Grafana with a code, exchanged server-side for tokens: signed in. A remembered subject takes a different first step, re-verifying a live Kratos session before honouring Hydra's skip.">
+  <figcaption class="diagram-caption">One code exchange, four parties, one live Kratos session underneath it</figcaption>
+</figure>
 
 ## Entry and role are different bindings
 

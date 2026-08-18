@@ -1,0 +1,102 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 720 580" width="720" height="580" role="img" aria-labelledby="tb-t tb-d" class="dg" font-family="'IBM Plex Sans', Helvetica, Arial, sans-serif">
+<title id="tb-t">The trust boundary: what the network can actually reach</title>
+<desc id="tb-d">A browser reaches one hostname at the edge proxy, which terminates TLS. Inside one trust domain the admin APIs never leave: the app runs two listeners, a public SSR listener the edge reaches and a loopback admin listener bound to ADMIN_HOST that the edge never touches; Kratos and Hydra each expose the edge a public API — self-service and sessions for Kratos, authorize, token and discovery for Hydra — while the app alone calls their admin APIs. Kratos and Hydra each keep a separate Postgres database. The callout: admin APIs are reachable only from the app, never from the edge, enforced by scripts/render-config.sh failing the config render when the admin bind-address token is unset, by requireAdminSession in portal/src/lib/admin.ts gating everything under /admin on an active session, aal2 and the admin marker together, and pinned end to end by e2e/playwright/tests/d-admin-aal2-stepup.spec.ts and f-aal2-bypass.spec.ts.</desc>
+<style>
+.dg{--paper:#ffffff;--panel:#f4f4f4;--edge:#e0e0e0;--edge2:#b0b0b0;--ink:#0a0a0a;--ink2:#404040;--mut:#707070;--acc:#4a6741;--no:#a8443a;--yes:#4a7a4a}
+@media (prefers-color-scheme:dark){.dg{--paper:#1c1c1e;--panel:#242426;--edge:#303032;--edge2:#48484a;--ink:#f2f2f7;--ink2:#aeaeb2;--mut:#8e8e93;--acc:#6aaa58;--no:#d4736a;--yes:#7aaa7a}:root[data-theme="light"] .dg{--paper:#ffffff;--panel:#f4f4f4;--edge:#e0e0e0;--edge2:#b0b0b0;--ink:#0a0a0a;--ink2:#404040;--mut:#707070;--acc:#4a6741;--no:#a8443a;--yes:#4a7a4a}}
+:root[data-theme="dark"] .dg{--paper:#1c1c1e;--panel:#242426;--edge:#303032;--edge2:#48484a;--ink:#f2f2f7;--ink2:#aeaeb2;--mut:#8e8e93;--acc:#6aaa58;--no:#d4736a;--yes:#7aaa7a}
+.dg .p{fill:var(--paper)}.dg .s{fill:var(--panel)}
+.dg .e{stroke:var(--edge)}.dg .e2{stroke:var(--edge2)}.dg .as{stroke:var(--acc)}.dg .ms{stroke:var(--mut)}.dg .ns{stroke:var(--no)}
+.dg .i{fill:var(--ink)}.dg .i2{fill:var(--ink2)}.dg .m{fill:var(--mut)}.dg .a{fill:var(--acc)}
+.dg .n{fill:var(--no)}.dg .y{fill:var(--yes)}
+</style>
+<g font-family="'IBM Plex Sans', Helvetica, Arial, sans-serif">
+<rect class="p" x="0" y="0" width="720" height="580" fill="#ffffff"/>
+<rect class="p e" x="20" y="20" width="680" height="540" rx="3" fill="#ffffff" stroke="#e0e0e0" stroke-width="1"/>
+<!-- header -->
+<g class="as" stroke="#4a6741" stroke-width="5" stroke-linecap="round" fill="none" transform="translate(37 29) scale(0.3)">
+<line x1="32" y1="8" x2="48" y2="24"/>
+<line x1="48" y1="24" x2="32" y2="40"/>
+<line x1="32" y1="40" x2="16" y2="24"/>
+<line x1="16" y1="24" x2="32" y2="8"/>
+<line x1="32" y1="40" x2="18" y2="56"/>
+<line x1="32" y1="40" x2="46" y2="56"/>
+</g>
+<text class="m" x="60" y="45" font-family="'IBM Plex Mono', Menlo, monospace" font-size="9" font-weight="700" letter-spacing="1.2" fill="#707070">TRUST BOUNDARY · WHAT THE NETWORK CAN ACTUALLY REACH</text>
+<text class="m" x="680" y="45" text-anchor="end" font-family="'IBM Plex Mono', Menlo, monospace" font-size="9" font-weight="700" letter-spacing="1.2" fill="#707070">OTHALA</text>
+<line class="e" x1="40" y1="56" x2="680" y2="56" stroke="#e0e0e0" stroke-width="1"/>
+<text class="m" x="40" y="78" font-family="'IBM Plex Mono', Menlo, monospace" font-size="8.5" font-weight="700" letter-spacing="1.1" fill="#707070">THE NETWORK SEES THREE PORTS</text>
+<!-- outside the boundary -->
+<rect class="s e" x="40" y="88" width="100" height="54" rx="3" fill="#f4f4f4" stroke="#e0e0e0" stroke-width="1"/>
+<text class="m" x="52" y="106" font-family="'IBM Plex Mono', Menlo, monospace" font-size="8" font-weight="700" letter-spacing="1.1" fill="#707070">BROWSER</text>
+<text class="i2" x="52" y="121" font-size="8.5" fill="#404040">reaches one</text>
+<text class="i2" x="52" y="132" font-size="8.5" fill="#404040">hostname per app</text>
+<rect class="p as" x="170" y="88" width="170" height="54" rx="3" fill="#ffffff" stroke="#4a6741" stroke-width="1.4"/>
+<text class="a" x="182" y="106" font-family="'IBM Plex Mono', Menlo, monospace" font-size="8" font-weight="700" letter-spacing="0.8" fill="#4a6741">EDGE PROXY</text>
+<text class="i" x="182" y="121" font-family="'IBM Plex Mono', Menlo, monospace" font-size="8.5" fill="#0a0a0a">one hostname, TLS —</text>
+<text class="i" x="182" y="132" font-family="'IBM Plex Mono', Menlo, monospace" font-size="8.5" fill="#0a0a0a">routes to three ports</text>
+<g class="ms" stroke="#707070" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" fill="none">
+<line x1="140" y1="115" x2="164" y2="115"/>
+<polyline points="158,110.5 164,115 158,119.5"/>
+</g>
+<!-- fan-out labels, floating in the gap above the trust domain -->
+<text class="m" x="130" y="158" text-anchor="middle" font-size="7.5" fill="#707070">self-service, sessions</text>
+<text class="m" x="360" y="158" text-anchor="middle" font-size="7.5" fill="#707070">public SSR</text>
+<text class="m" x="590" y="158" text-anchor="middle" font-size="7.5" fill="#707070">authorize, token, discovery</text>
+<!-- trust domain group -->
+<rect class="p as" x="40" y="190" width="640" height="270" rx="3" fill="#ffffff" stroke="#4a6741" stroke-width="1.4" stroke-dasharray="5 3"/>
+<text class="a" x="52" y="210" font-family="'IBM Plex Mono', Menlo, monospace" font-size="8.5" font-weight="700" letter-spacing="1.1" fill="#4a6741">ONE TRUST DOMAIN · THE ADMIN APIS NEVER LEAVE IT</text>
+<!-- fan-out from the edge to each public API -->
+<g class="ms" stroke="#707070" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" fill="none">
+<line x1="205" y1="142" x2="155" y2="248"/>
+<polyline points="150.8,240.6 155,248 146.9,246.8"/>
+<line x1="255" y1="142" x2="360" y2="248"/>
+<polyline points="354.4,241.3 360,248 351.9,249.2"/>
+<line x1="305" y1="142" x2="565" y2="248"/>
+<polyline points="559,242.4 565,248 556.7,248.8"/>
+</g>
+<!-- node row: kratos / app / hydra -->
+<rect class="s e" x="80" y="252" width="140" height="90" rx="3" fill="#f4f4f4" stroke="#e0e0e0" stroke-width="1"/>
+<text class="m" x="92" y="270" font-family="'IBM Plex Mono', Menlo, monospace" font-size="8" font-weight="700" letter-spacing="1.1" fill="#707070">KRATOS</text>
+<text class="i2" x="92" y="288" font-size="8.5" fill="#404040">Self-service login,</text>
+<text class="i2" x="92" y="299" font-size="8.5" fill="#404040">recovery, settings</text>
+<rect class="p as" x="250" y="252" width="220" height="90" rx="3" fill="#ffffff" stroke="#4a6741" stroke-width="1.4"/>
+<text class="a" x="262" y="270" font-family="'IBM Plex Mono', Menlo, monospace" font-size="8" font-weight="700" letter-spacing="1.1" fill="#4a6741">THE APP</text>
+<line class="e" x1="262" y1="298" x2="458" y2="298" stroke="#e0e0e0" stroke-width="1"/>
+<text class="i" x="262" y="282" font-family="'IBM Plex Mono', Menlo, monospace" font-size="7.5" font-weight="700" letter-spacing="0.6" fill="#0a0a0a">PUBLIC SSR</text>
+<text class="m" x="262" y="292" font-size="7.5" fill="#707070">challenge providers, UI</text>
+<text class="a" x="262" y="312" font-family="'IBM Plex Mono', Menlo, monospace" font-size="7.5" font-weight="700" letter-spacing="0.6" fill="#4a6741">ADMIN · LOOPBACK</text>
+<text class="m" x="262" y="322" font-size="7.5" fill="#707070">ADMIN_HOST mux — not</text>
+<text class="m" x="262" y="332" font-size="7.5" fill="#707070">the Astro handler</text>
+<rect class="s e" x="500" y="252" width="140" height="90" rx="3" fill="#f4f4f4" stroke="#e0e0e0" stroke-width="1"/>
+<text class="m" x="512" y="270" font-family="'IBM Plex Mono', Menlo, monospace" font-size="8" font-weight="700" letter-spacing="1.1" fill="#707070">HYDRA</text>
+<text class="i2" x="512" y="288" font-size="8.5" fill="#404040">OAuth2 / OIDC —</text>
+<text class="i2" x="512" y="299" font-size="8.5" fill="#404040">issues tokens, no UI</text>
+<!-- admin API arrows: app to kratos, app to hydra -->
+<g class="as" stroke="#4a6741" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" fill="none">
+<line x1="250" y1="278" x2="226" y2="278"/>
+<polyline points="232,273.5 226,278 232,282.5"/>
+<line x1="470" y1="278" x2="494" y2="278"/>
+<polyline points="488,273.5 494,278 488,282.5"/>
+</g>
+<text class="a" x="235" y="272" text-anchor="middle" font-size="7" fill="#4a6741">admin API</text>
+<text class="a" x="482" y="272" text-anchor="middle" font-size="7" fill="#4a6741">admin API</text>
+<!-- postgres, fed diagonally from kratos and hydra -->
+<g class="ms" stroke="#707070" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" fill="none">
+<line x1="220" y1="342" x2="272" y2="364"/>
+<polyline points="264.5,360.5 272,364 269,371.5"/>
+<line x1="500" y1="342" x2="448" y2="364"/>
+<polyline points="455.5,360.5 448,364 451,371.5"/>
+</g>
+<rect class="s e2" x="275" y="366" width="170" height="64" rx="3" fill="#f4f4f4" stroke="#b0b0b0" stroke-width="1"/>
+<text class="m" x="287" y="384" font-family="'IBM Plex Mono', Menlo, monospace" font-size="8" font-weight="700" letter-spacing="1.1" fill="#707070">POSTGRES</text>
+<text class="i2" x="287" y="402" font-size="8.5" fill="#404040">separate databases —</text>
+<text class="i2" x="287" y="413" font-size="8.5" fill="#404040">Kratos, Hydra</text>
+<!-- callout -->
+<line class="e" x1="40" y1="480" x2="680" y2="480" stroke="#e0e0e0" stroke-width="1"/>
+<text class="m" x="40" y="500" font-family="'IBM Plex Mono', Menlo, monospace" font-size="9" font-weight="700" letter-spacing="1.2" fill="#707070">ADMIN-API ISOLATION</text>
+<text class="a" x="40" y="520" font-size="11" font-weight="700" fill="#4a6741">Admin APIs are reachable only from the app — never from the edge.</text>
+<text class="m" x="40" y="538" font-size="8" fill="#707070">Enforced by scripts/render-config.sh (fails the render when the admin bind-address token is unset),</text>
+<text class="m" x="40" y="550" font-size="8" fill="#707070">requireAdminSession (portal/src/lib/admin.ts), and pinned by d-admin-aal2-stepup.spec.ts + f-aal2-bypass.spec.ts.</text>
+</g>
+</svg>
