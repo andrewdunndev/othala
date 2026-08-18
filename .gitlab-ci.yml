@@ -353,6 +353,10 @@ check-portal:
     - if: '$CI_PIPELINE_SOURCE == "push"'
     - if: '$CI_COMMIT_TAG'
   before_script:
+    # Same fix as check-purity: the runner's checkout is owned by a
+    # different uid than the job user, so the YAML-parse step's
+    # `git -C .. ls-files` below exits "dubious ownership" without this.
+    - git config --global --add safe.directory "$CI_PROJECT_DIR"
     - cd portal
     - npm ci --include=dev
   script:
