@@ -9,6 +9,51 @@ This CHANGELOG and git tags carry the deployed-instance release state.
 
 ## [Unreleased]
 
+## [0.5.0] - 2026-08-18
+
+Docs convergence (corpus cut two-thirds, 16 ADRs folded into one
+DECISIONS.md, gated by a prose-budget ceiling and a whole-index purity
+scan), a truth pass, admin-triggered invite email (D1), a purity-gate
+rewrite, CI/test consolidation onto vitest, and six at-a-glance diagrams
+now live on othala.dunn.dev.
+
+### Added
+
+- **Admin-triggered invite email (D1)**: one button drives Kratos's own
+  recovery flow server-side, no new mail machinery. Server-checked
+  send-time address confirmation guards against misrouting; the decision
+  record states and bounds the residual risk.
+- **Six at-a-glance SVG diagrams** (trust boundary, session revocation,
+  first credential, OIDC login, plus two prior) now live on
+  othala.dunn.dev.
+
+### Changed
+
+- **Docs converged**: corpus cut two-thirds (50 files/9.3K lines ->
+  24/3.3K); 16 ADRs and a duplicate access-model doc collapsed into one
+  flat DECISIONS.md. New gates: a prose-budget ceiling and a whole-index
+  purity scan on every push.
+- **Truth pass**: the identity schema's stale group-order claim corrected
+  to match the ranked resolver it describes; operator runbook mechanics
+  moved to the deploy plane; DECISIONS.md/AGENTS.md rewritten
+  present-tense; duplicated derivations collapsed to one canonical
+  statement plus pointers.
+- **check-purity.sh rewritten** as a data table (1769 -> 293 lines); the
+  probe-harness suite retired for an inline self-test. Prose ceiling
+  ratcheted to 175000 bytes.
+- **Tests consolidated onto vitest** (portal drops node:test+tsx); one
+  merged CI job replaces the split portal jobs; the pre-tag-check gap CI
+  never ran is now wired shut. 740 portal tests green.
+
+### Fixed
+
+- **Private-catalog codenames purged** from test fixtures; the purity
+  gate's app-name check hardened 10 -> 18 branches on violation shape,
+  not literal words.
+- CI: a runner checkout ownership mismatch was silently erroring the
+  purity/portal-check jobs (VACUOUS, not green); `safe.directory` fixes
+  it, and the now-unused `cmp` dependency is retired.
+
 ## [0.4.0] - 2026-08-13
 
 Admin-POST and AAL2 step-up fixes, extensible Hydra CORS for browser-SPA
@@ -235,6 +280,7 @@ runtime manifest model, plus the rename to **Othala** ("Ory for your home").
 - Smoke harness green on the QEMU runner (incl. the contact-form
   Section H); 459 portal unit tests; `astro check` and `astro build` clean.
 
+[0.5.0]: https://gitlab.com/dunn.dev/othala/-/releases/v0.5.0
 [0.4.0]: https://gitlab.com/dunn.dev/othala/-/releases/v0.4.0
 [0.3.0]: https://gitlab.com/dunn.dev/othala/-/releases/v0.3.0
 [0.2.0]: https://gitlab.com/dunn.dev/othala/-/releases/v0.2.0
