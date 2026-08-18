@@ -7,7 +7,12 @@
 
 import { test } from 'vitest';
 import assert from 'node:assert/strict';
-import { buildIDTokenClaims, deepMergeClaims, composeIDTokenClaims } from '../src/lib/claims.ts';
+import {
+  buildIDTokenClaims,
+  deepMergeClaims,
+  composeIDTokenClaims,
+  lookupRole,
+} from '../src/lib/claims.ts';
 
 function base(overrides = {}) {
   return {
@@ -250,4 +255,35 @@ test('composeIDTokenClaims back-compat: no requestedScope → all claims emitted
   assert.equal(c.name, 'Ada Lovelace');
   assert.equal(c.preferred_username, 'ada');
   assert.ok(Array.isArray(c.groups), 'groups is an array');
+});
+
+// ── issue #7: lookupRole resolves by RANK, not stored group order ────────
+//
+// Issue #7 claimed lookupRole takes the FIRST match in metadata_admin.groups
+// stored order, so an identity holding both <svc>-access and <svc>-admin
+// could resolve 'user' whenever access is stored first (which
+// normalizeGroupOrder's alphabetical sort always does — "access" < "admin").
+// That is not what the code does: lookupRole walks EVERY stored group and
+// keeps the LOWEST role index (highest rank) over the whole matched set (see
+// its "WHY step 2 is no longer first-stored-match" doc comment), so the
+// result is a pure function of the group SET, not its order. Both storage
+// orders below must resolve the same higher-ranked 'admin' role.
+
+const rankedManifest = {
+  ...manifest({ group: 'filedrop-access' }),
+  roles: [
+    { name: 'admin', description: '', claimEmit: { groups: ['filedrop-admin-claim'] } },
+    { name: 'user', description: '', claimEmit: { groups: ['filedrop-user-claim'] } },
+  ],
+  groupRoleMap: { 'filedrop-access': 'user', 'filedrop-admin': 'admin' },
+};
+
+test('lookupRole: access-then-admin storage order resolves the higher-ranked admin role', () => {
+  const result = lookupRole(rankedManifest, { groups: ['filedrop-access', 'filedrop-admin'] });
+  assert.equal(result?.roleName, 'admin');
+});
+
+test('lookupRole: admin-then-access storage order resolves the SAME higher-ranked admin role', () => {
+  const result = lookupRole(rankedManifest, { groups: ['filedrop-admin', 'filedrop-access'] });
+  assert.equal(result?.roleName, 'admin');
 });
