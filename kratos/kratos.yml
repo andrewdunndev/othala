@@ -112,9 +112,8 @@ selfservice:
     # invalidated after 5 wrong attempts). lifespan: 15m is the per-method
     # code validity window (distinct from the flow lifespan at
     # flows.login.lifespan).
-    # VALIDATION CAVEAT: confirm both keys against a running Kratos v26.2.0
-    # instance before promoting to production — schema may reject `lifespan`
-    # here if it was moved/renamed in v1.x.
+    # Both keys confirmed schema-valid against the pinned oryd/kratos
+    # v26.2.0 embedded config schema.
     code:
       enabled: true
       passwordless_enabled: true
