@@ -35,7 +35,8 @@ import Layout from '../../layouts/Layout.astro';
 import PageHero from '../../components/PageHero.astro';
 import { browserFlows, getLoginFlow } from '../../lib/kratos';
 import { siteName } from '../../lib/config';
-import { csrfToken, hasMethod, nodesByGroup, asInput, scriptNodes, safeOnclick } from '../../lib/nodes';
+import { csrfToken, nodesByGroup, asInput, scriptNodes, safeOnclick } from '../../lib/nodes';
+import { deriveLoginTiers } from '../../lib/login-tiers';
 import type { FlowMessage } from '../../lib/types';
 
 const url = Astro.url;
@@ -65,9 +66,6 @@ if (flowId && (!result || result.kind !== 'ok') && !isDev) {
 const flow = result && result.kind === 'ok' ? result.flow : null;
 const ui = flow?.ui;
 const csrf = ui ? csrfToken(ui.nodes) : '';
-const hasPasskey = ui ? hasMethod(ui.nodes, 'passkey') : true;
-const hasCode = ui ? hasMethod(ui.nodes, 'code') : true;
-const hasPassword = ui ? hasMethod(ui.nodes, 'password') : true;
 const scripts = ui ? scriptNodes(ui.nodes) : [];
 
 // Identifier input: in identifier_first flows it lives in the default group.
@@ -92,35 +90,13 @@ const isCodeEntry = codeNodes.some((n) => {
   return a?.name === 'code' && a.type === 'text';
 });
 
-// AAL2 step-up: when Kratos wants a second factor, it populates second-factor
-// nodes in the totp / webauthn / lookup_secret groups, and the FLOW ITSELF
-// carries requested_aal: 'aal2'. Both signals live on the flow object — the
-// authoritative source — and are checked first. The primary login tiers
-// (passkey, email-code, password) are absent or inert in a step-up flow —
-// Kratos supplies only the second-factor methods the identity has enrolled.
-//
-// The `?aal=aal2` query param is a SECONDARY hint only, used solely as a
-// fallback when there's no flow to inspect at all (e.g. the dev preview with
-// no live Kratos). Trusting the query param as the primary signal left the
-// step-up form unreachable via the natural flow: Kratos's redirect from the
-// login-browser AAL2 initiator drops the param on its way back to this page,
-// even though the landed flow is correctly primed for AAL2 (work item #4).
-// Input nodes only (asInput() !== null): the webauthn group's script tag
-// (<script src=".../webauthn.js">, present on EVERY flow that offers passkey
-// or webauthn, not just a step-up) has group 'webauthn' too. Counting it
-// unfiltered made hasSecondFactorNodes — and so isAal2 — true for every
-// ordinary AAL1 login, hiding the passkey/code/password tiers behind an
-// empty step-up card (bug: e2e/playwright/tests/i-passkey-register-login.spec.ts
-// I1, discovered via the rendered page — every other login-path spec drives
-// the JSON API directly and never rendered this page).
-const totpNodes = ui ? nodesByGroup(ui.nodes, 'totp').filter((n) => asInput(n)) : [];
-const aal2WebauthnNodes = ui ? nodesByGroup(ui.nodes, 'webauthn').filter((n) => asInput(n)) : [];
-const lookupNodes = ui ? nodesByGroup(ui.nodes, 'lookup_secret').filter((n) => asInput(n)) : [];
-const flowRequestsAal2 = flow?.requested_aal === 'aal2';
-const hasSecondFactorNodes =
-  totpNodes.length > 0 || aal2WebauthnNodes.length > 0 || lookupNodes.length > 0;
-const isAal2 = flow ? (flowRequestsAal2 || hasSecondFactorNodes) : aal === 'aal2';
-const hasAal2Methods = isAal2 && hasSecondFactorNodes;
+// Tier presence (passkey/code/password) and AAL2 step-up derivation live in
+// login-tiers.ts — rationale, the `?aal=aal2` fallback, and the asInput()
+// filter that fixed the v0.5.0 outage (webauthn glue-script node miscounted
+// as a second factor) are documented there, with a unit guard in
+// login-tiers.test.ts built from a captured production flow.
+const { hasPasskey, hasCode, hasPassword, totpNodes, aal2WebauthnNodes, lookupNodes, isAal2, hasAal2Methods } =
+  deriveLoginTiers(flow, aal);
 ---
 <Layout title="Sign in" description={`Sign in to ${siteName}.`} bare>
 

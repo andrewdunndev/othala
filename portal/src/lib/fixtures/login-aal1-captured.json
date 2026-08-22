@@ -1,0 +1,147 @@
+{
+  "id": "FLOW_ID_PLACEHOLDER",
+  "organization_id": null,
+  "type": "browser",
+  "expires_at": "2026-08-22T14:29:25.601307Z",
+  "issued_at": "2026-08-22T14:19:25.601307Z",
+  "request_url": "https://dag.dunn.dev:8440/self-service/login/browser",
+  "ui": {
+    "action": "https://dag.dunn.dev/self-service/login?flow=FLOW_ID_PLACEHOLDER",
+    "method": "POST",
+    "nodes": [
+      {
+        "type": "input",
+        "group": "default",
+        "attributes": {
+          "name": "csrf_token",
+          "type": "hidden",
+          "value": "CSRF_TOKEN_PLACEHOLDER",
+          "required": true,
+          "disabled": false,
+          "node_type": "input"
+        },
+        "messages": [],
+        "meta": {}
+      },
+      {
+        "type": "input",
+        "group": "default",
+        "attributes": {
+          "name": "identifier",
+          "type": "text",
+          "value": "",
+          "required": true,
+          "autocomplete": "username webauthn",
+          "disabled": false,
+          "node_type": "input"
+        },
+        "messages": [],
+        "meta": { "label": { "id": 1070004, "text": "ID", "type": "info" } }
+      },
+      {
+        "type": "script",
+        "group": "webauthn",
+        "attributes": {
+          "src": "https://dag.dunn.dev/.well-known/ory/webauthn.js",
+          "async": true,
+          "referrerpolicy": "no-referrer",
+          "crossorigin": "anonymous",
+          "integrity": "sha512-Dg0gN3fy+JoKxRp9Zda/4KYn3SlMdaKjs3fK5g6nDVQ/CVakD1dfMQyvRtJeiAtzSMEFviJbBLcVSrsBPGsFBA==",
+          "type": "text/javascript",
+          "id": "webauthn_script",
+          "nonce": "NONCE_PLACEHOLDER",
+          "node_type": "script"
+        },
+        "messages": [],
+        "meta": {}
+      },
+      {
+        "type": "input",
+        "group": "passkey",
+        "attributes": {
+          "name": "passkey_login_trigger",
+          "type": "button",
+          "value": "",
+          "disabled": false,
+          "onclick": "window.oryPasskeyLogin()",
+          "onclickTrigger": "oryPasskeyLogin",
+          "node_type": "input"
+        },
+        "messages": [],
+        "meta": { "label": { "id": 1010021, "text": "Sign in with passkey", "type": "info" } }
+      },
+      {
+        "type": "input",
+        "group": "passkey",
+        "attributes": {
+          "name": "passkey_login",
+          "type": "hidden",
+          "disabled": false,
+          "onload": "window.oryPasskeyLoginAutocompleteInit()",
+          "onloadTrigger": "oryPasskeyLoginAutocompleteInit",
+          "node_type": "input"
+        },
+        "messages": [],
+        "meta": {}
+      },
+      {
+        "type": "input",
+        "group": "passkey",
+        "attributes": {
+          "name": "passkey_challenge",
+          "type": "hidden",
+          "value": "{\"publicKey\":{\"challenge\":\"CHALLENGE_PLACEHOLDER\",\"timeout\":300000,\"rpId\":\"dunn.dev\",\"userVerification\":\"preferred\"}}",
+          "disabled": false,
+          "node_type": "input"
+        },
+        "messages": [],
+        "meta": {}
+      },
+      {
+        "type": "input",
+        "group": "code",
+        "attributes": {
+          "name": "method",
+          "type": "submit",
+          "value": "code",
+          "disabled": false,
+          "node_type": "input"
+        },
+        "messages": [],
+        "meta": { "label": { "id": 1010015, "text": "Send sign in code", "type": "info" } }
+      },
+      {
+        "type": "input",
+        "group": "password",
+        "attributes": {
+          "name": "password",
+          "type": "password",
+          "required": true,
+          "autocomplete": "current-password",
+          "disabled": false,
+          "node_type": "input"
+        },
+        "messages": [],
+        "meta": { "label": { "id": 1070001, "text": "Password", "type": "info" } }
+      },
+      {
+        "type": "input",
+        "group": "password",
+        "attributes": {
+          "name": "method",
+          "type": "submit",
+          "value": "password",
+          "disabled": false,
+          "node_type": "input"
+        },
+        "messages": [],
+        "meta": { "label": { "id": 1010022, "text": "Sign in with password", "type": "info" } }
+      }
+    ]
+  },
+  "created_at": "2026-08-22T14:19:25.604862Z",
+  "updated_at": "2026-08-22T14:19:25.604862Z",
+  "refresh": false,
+  "requested_aal": "aal1",
+  "state": "choose_method"
+}
