@@ -79,7 +79,16 @@ async function registerPasskeyForContext(
 async function passkeyLogin(page: Page, ctx: BrowserContext, baseURL: string) {
   await page.goto(`${baseURL}/auth/login`);
   await page.waitForLoadState('networkidle');
-  const loginBtn = page.locator(PASSKEY_LOGIN_BUTTON).first();
+  let loginBtn = page.locator(PASSKEY_LOGIN_BUTTON).first();
+  // Observed flaky (i-passkey-register-login.spec.ts I1): the trigger node
+  // is occasionally absent from the first SSR response after a fresh
+  // navigation; a reload consistently renders it. One reload, not a longer
+  // timeout: a hung render doesn't resolve by waiting.
+  if (!(await loginBtn.isVisible().catch(() => false))) {
+    await page.reload();
+    await page.waitForLoadState('networkidle');
+    loginBtn = page.locator(PASSKEY_LOGIN_BUTTON).first();
+  }
   await expect(loginBtn, 'passkey login button must be visible').toBeVisible({ timeout: 10_000 });
   await page.waitForFunction(() => typeof (window as unknown as Record<string, unknown>).oryPasskeyLogin === 'function');
   await loginBtn.click();

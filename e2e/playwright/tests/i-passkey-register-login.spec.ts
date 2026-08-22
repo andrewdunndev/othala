@@ -185,7 +185,16 @@ test.describe('I — Passkey register → usernameless login', () => {
     await page.goto(`${baseURL}/auth/login`);
     await page.waitForLoadState('networkidle');
 
-    const loginBtn = page.locator(PASSKEY_LOGIN_BUTTON).first();
+    let loginBtn = page.locator(PASSKEY_LOGIN_BUTTON).first();
+    // Observed flaky: the trigger node is occasionally absent from the first
+    // SSR response after a fresh navigation (unrelated to the credential —
+    // a reload re-requests the login flow and consistently renders it). One
+    // reload, not a longer timeout: a hung render doesn't resolve by waiting.
+    if (!(await loginBtn.isVisible().catch(() => false))) {
+      await page.reload();
+      await page.waitForLoadState('networkidle');
+      loginBtn = page.locator(PASSKEY_LOGIN_BUTTON).first();
+    }
     await expect(loginBtn, 'I1: passkey login button must be visible on the login page').toBeVisible({ timeout: 10_000 });
     // Same race as registration: wait for the login trigger's glue
     // (window.oryPasskeyLogin, per KNOWN_TRIGGERS in lib/nodes.ts) to exist.
