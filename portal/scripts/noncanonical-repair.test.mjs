@@ -5,10 +5,11 @@
 // What this covers. refuseNonCanonical (src/lib/gate.ts) denies an identity
 // holding any group that misses GROUP_RE (src/lib/access-groups.ts), at every
 // app, on every request. src/pages/admin/users/[id].astro is the only surface
-// that can repair such an identity, and it does so through planGroupSave —
-// tested here as a pure function, plus source assertions binding the page to
-// it (an .astro page cannot be imported into this harness, so the wiring is
-// asserted against the file's bytes).
+// that can repair such an identity; the save action's planGroupSave wiring
+// lives in src/lib/admin-actions.ts (extracted from the page) — tested here
+// as a pure function, plus source assertions binding both files to it (an
+// .astro page cannot be imported into this harness, so the wiring is
+// asserted against file bytes).
 //
 // The invariant under test is NOT "the group is preserved in the store" — no
 // write path this codebase owns can re-write a non-canonical name, because
@@ -26,6 +27,8 @@ import { planGroupSave, nonCanonicalGroups } from '../src/lib/gate.ts';
 
 const PAGE = fileURLToPath(new URL('../src/pages/admin/users/[id].astro', import.meta.url));
 const pageSource = readFileSync(PAGE, 'utf8');
+const LIB = fileURLToPath(new URL('../src/lib/admin-actions.ts', import.meta.url));
+const libSource = readFileSync(LIB, 'utf8');
 
 function identity(groups) {
   return {
@@ -147,33 +150,33 @@ test('a null identity has nothing to repair', () => {
 // here. They are what keeps the pure tests above from passing while the save
 // path quietly goes back to composing submitted checkboxes.
 
-test('the save path writes planGroupSave output, not the raw submitted lists', () => {
-  assert.match(pageSource, /planGroupSave\(/, 'page must call planGroupSave');
+test('saveAction writes planGroupSave output, not the raw submitted lists', () => {
+  assert.match(libSource, /planGroupSave\(/, 'saveAction must call planGroupSave');
   assert.match(
-    pageSource,
+    libSource,
     /normalizeGroupOrder\(groupPlan\.groups\)/,
     'the stored list must come from the plan',
   );
   assert.doesNotMatch(
-    pageSource,
+    libSource,
     /normalizeGroupOrder\(\[\.\.\.identityGroups, \.\.\.accessGroups\]\)/,
     'the old submitted-checkboxes-only composition must be gone',
   );
 });
 
-test('a refusal blocks the write by joining formErrors', () => {
+test('a refusal blocks the write by returning formErrors instead of updating', () => {
   assert.match(
-    pageSource,
+    libSource,
     /if \(groupPlan\.refusal\) formErrors\.nonCanonicalGroups = groupPlan\.refusal;/,
   );
-  // The existing guard that gates updateIdentity on an empty formErrors.
-  assert.match(pageSource, /if \(Object\.keys\(formErrors\)\.length === 0\) \{/);
+  // The existing guard clause that skips updateIdentity when any formError is set.
+  assert.match(libSource, /if \(Object\.keys\(formErrors\)\.length > 0\) \{\s*\n\s*return \{ formErrors, refetch: false \};/);
 });
 
 test('the edit form renders the stored non-canonical names with a removal control', () => {
   assert.match(pageSource, /const nonCanonical = nonCanonicalGroups\(identity\);/);
   assert.match(pageSource, /name="clearNonCanonical"/);
-  assert.match(pageSource, /fd\.getAll\('clearNonCanonical'\)/);
+  assert.match(libSource, /fd\.getAll\('clearNonCanonical'\)/, 'saveAction must read the clear ticks');
 });
 
 test('the removal control is unchecked by default (removal is affirmative)', () => {

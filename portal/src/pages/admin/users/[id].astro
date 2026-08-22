@@ -11,29 +11,9 @@
 // canonical policy gets its own row in both modes, and the save path decides
 // it via planGroupSave rather than by composing submitted checkboxes.
 //
-// Actions live behind named POST buttons:
-//   action=issue-recovery    -> Kratos getRecoveryLink, render the enrollment
-//                            LINK + CODE inline. Nothing is emailed: the link
-//                            opens the recovery UI with an empty code field,
-//                            so the admin must deliver both values out of
-//                            band (Signal/iMessage) or the recipient is stuck.
-//   action=send-invite-email -> D1 addendum (DECISIONS.md, "No password ever
-//                            transits a channel"). Drives Kratos's OWN
-//                            self-service recovery flow
-//                            (sendInviteRecoveryEmail, src/lib/kratos.ts) for
-//                            this identity's on-file email — Kratos's courier
-//                            sends a CODE ONLY, never a link with the code
-//                            embedded, so this message alone is never the
-//                            complete credential (same two-channel shape as
-//                            issue-recovery's link+code pair, just delivered
-//                            over a different channel for the secret half).
-//                            Requires server-checked send-time address
-//                            confirmation (confirmsInviteAddress,
-//                            src/lib/access.ts) before Kratos is ever called
-//                            — the re-typed address form field alone proves
-//                            nothing.
-//   action=delete         -> Kratos deleteIdentity (requires `confirm=<username>`)
-//   action=deactivate     -> Kratos deactivateIdentity (soft delete)
+// The 10 action=<name> POST handlers live in src/lib/admin-actions.ts —
+// this page only verifies the per-request CSRF token (action-scoped, so a
+// captured token cannot be replayed to a different action) then dispatches.
 //
 // Effective Access mirrors the consent-service algorithm: per app, look
 // up override-or-derive role, render the row + source. Apps the user has
@@ -43,32 +23,13 @@
 export const prerender = false;
 
 import Layout from '../../../layouts/Layout.astro';
-import {
-  requireAdminSession,
-  getIdentity,
-  listIdentities,
-  updateIdentity,
-  deleteIdentity,
-  deactivateIdentity,
-  reactivateIdentity,
-  getRecoveryLink,
-  patchAdminMarker,
-  revokeUserSessions,
-  type RevokeUserResult,
-} from '../../../lib/admin';
-import { deleteCredential, EVICTABLE_CREDENTIAL_TYPES } from '../../../lib/admin-api';
-import { sendInviteRecoveryEmail } from '../../../lib/kratos';
+import { requireAdminSession, getIdentity } from '../../../lib/admin';
+import { ADMIN_ACTIONS, ENROLLMENT_TTL, type ActionResult } from '../../../lib/admin-actions';
+import { EVICTABLE_CREDENTIAL_TYPES } from '../../../lib/admin-api';
 import { servingManifests } from '../../../lib/manifest-store';
-import {
-  computeEffectiveAccess,
-  confirmsInviteAddress,
-  describeSource,
-  IDENTITY_GROUP_ORDER,
-  normalizeGroupOrder,
-  shouldRefuseRecovery,
-} from '../../../lib/access';
+import { computeEffectiveAccess, describeSource, IDENTITY_GROUP_ORDER } from '../../../lib/access';
 import { getGroupRegistry, isIdentityGroup } from '../../../lib/group-registry';
-import { nonCanonicalGroups, planGroupSave } from '../../../lib/gate';
+import { nonCanonicalGroups } from '../../../lib/gate';
 import { signToken, verifyToken, CSRFError } from '../../../lib/csrf';
 import type { Identity } from '../../../lib/types';
 
@@ -98,13 +59,6 @@ const ACCESS_GROUPS = Array.from(registry.values())
     apps: e.accessFor.map((id) => ({ clientId: id, clientName: clientNameById.get(id) ?? id })),
   }))
   .sort((a, b) => a.group.localeCompare(b.group));
-const USERNAME_RE = /^[a-z0-9]+(?:\.[a-z0-9]+)+$/;
-const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-// The TTL passed to getRecoveryLink in the issue-recovery action. Named once
-// so the panel copy quotes the window actually requested rather than a second
-// hardcoded literal that can drift.
-const ENROLLMENT_TTL = '24h';
-
 let identity: Identity | null = null;
 let loadError: string | null = null;
 
@@ -121,26 +75,14 @@ async function reload(): Promise<Identity | null> {
 identity = await reload();
 
 let mode: 'read' | 'edit' = Astro.url.searchParams.get('mode') === 'edit' ? 'edit' : 'read';
-let actionResult:
-  | { kind: 'recovery'; url: string; code: string; expiresAt: string }
-  | { kind: 'invite-email'; email: string }
-  | { kind: 'deleted'; username: string }
-  | { kind: 'deactivated'; username: string }
-  | { kind: 'reactivated'; username: string }
-  | { kind: 'updated'; removed: string[] }
-  | { kind: 'admin-granted'; username: string }
-  | { kind: 'admin-revoked'; username: string }
-  | { kind: 'revoked'; result: RevokeUserResult }
-  | { kind: 'credential-removed'; credType: string }
-  | { kind: 'error'; message: string }
-  | null = null;
+let actionResult: ActionResult | null = null;
 let formErrors: Record<string, string> = {};
 
 if (Astro.request.method === 'POST' && identity) {
   const fd = await Astro.request.formData();
   const action = String(fd.get('action') ?? 'save');
 
-    // HIGH-1: every state-changing admin POST must carry a per-request CSRF
+  // HIGH-1: every state-changing admin POST must carry a per-request CSRF
   // token bound to the active admin's identity. Action-scoped tokens (minted
   // with signToken(id, action)) additionally verify that the submitted action
   // matches the one the token was issued for — a captured token from the
@@ -167,229 +109,18 @@ if (Astro.request.method === 'POST' && identity) {
     throw err;
   }
 
-  try {
-    if (action === 'save') {
-      const rawRecoveryEmail = String(fd.get('recoveryEmail') ?? '').trim();
-      const traits = {
-        username: String(fd.get('username') ?? '').trim().toLowerCase(),
-        email: String(fd.get('email') ?? '').trim(),
-        displayName: String(fd.get('displayName') ?? '').trim() || undefined,
-        recoveryEmail: rawRecoveryEmail && EMAIL_RE.test(rawRecoveryEmail) ? rawRecoveryEmail : undefined,
-      };
-      if (rawRecoveryEmail && !EMAIL_RE.test(rawRecoveryEmail)) formErrors.recoveryEmail = 'Invalid recovery email address.';
-      if (!USERNAME_RE.test(traits.username)) formErrors.username = 'Invalid username pattern.';
-      if (!EMAIL_RE.test(traits.email)) formErrors.email = 'Invalid email.';
-      const identityGroups = fd.getAll('identityGroups').map(String).filter(Boolean);
-      const accessGroups = fd.getAll('accessGroups').map(String).filter(Boolean);
-      if (identityGroups.length === 0) formErrors.identityGroups = 'Pick at least one identity group.';
-
-      // The repair surface for refuseNonCanonical (src/lib/gate.ts). Same
-      // shape as the existingAdmin preserve below: a value this form does not
-      // own is decided from the CURRENTLY-FETCHED identity, never from what
-      // the browser sent. `clearNonCanonical` carries only the operator's
-      // affirmative removal ticks, so a submission that omits the field —
-      // an older render, any form that never grew the row — removes nothing.
-      // planGroupSave also drops any non-canonical name smuggled into the
-      // checkbox fields: this is a repair surface, not a creation surface.
-      const groupPlan = planGroupSave(
-        identity,
-        [...identityGroups, ...accessGroups],
-        fd.getAll('clearNonCanonical').map(String),
-      );
-      if (groupPlan.refusal) formErrors.nonCanonicalGroups = groupPlan.refusal;
-
-      const knownClientIds = new Set(manifests.map((m) => m.clientId));
-      const roles: Record<string, string> = {};
-      for (const m of manifests) {
-        const v = String(fd.get(`role:${m.clientId}`) ?? '').trim();
-        if (v) roles[m.clientId] = v;
-      }
-      // LOW-1: cross-check role keys against the manifest set so a
-      // retired client_id can't accumulate in metadata_admin.roles.
-      for (const clientId of Object.keys(roles)) {
-        if (!knownClientIds.has(clientId)) {
-          delete roles[clientId];
-        }
-      }
-
-      if (Object.keys(formErrors).length === 0) {
-        // C4: stored order MUST match canonical order so consent and
-        // portal agree on which group wins for role derivation. The names
-        // come from groupPlan, which is what makes a stored non-canonical
-        // group a refusal above rather than a silent drop here.
-        const groups = normalizeGroupOrder(groupPlan.groups);
-        // Preserve the existing admin marker — an unrelated
-        // groups/roles edit must NOT silently drop it. Read from the
-        // currently-fetched identity (not re-fetched, to avoid TOCTOU on
-        // the write; the patch path handles targeted grant/revoke).
-        const existingAdmin = identity.metadata_admin?.admin;
-        await updateIdentity(id, {
-          traits,
-          metadataAdmin: {
-            groups,
-            roles: Object.keys(roles).length ? roles : undefined,
-            ...(existingAdmin === true ? { admin: true } : {}),
-          },
-        });
-        identity = await reload();
-        actionResult = { kind: 'updated', removed: groupPlan.removed };
-        mode = 'read';
-      }
-    } else if (action === 'issue-recovery') {
-      // HIGH-3 gate: refuse admin-to-admin recovery via the UI. See
-      // shouldRefuseRecovery in src/lib/access.ts for the rationale.
-      const target = await getIdentity(id);
-      if (shouldRefuseRecovery(target)) {
-        actionResult = {
-          kind: 'error',
-          message:
-            'Admin recovery is console-only. See docs/runbooks/admin-recovery.md.',
-        };
-      } else {
-        const link = await getRecoveryLink(id, ENROLLMENT_TTL);
-        // B1: keep the code. The link lands on the recovery form with an empty
-        // code field — dropping recovery_code here is what used to dead-end
-        // every enrollment.
-        actionResult = {
-          kind: 'recovery',
-          url: link.recovery_link,
-          code: link.recovery_code,
-          expiresAt: link.expires_at,
-        };
-      }
-    } else if (action === 'send-invite-email') {
-      // D1: same HIGH-3 gate as issue-recovery — an admin target is refused
-      // regardless of whether the recovery-gate webhook also covers this
-      // path (see the corrected note in access.ts: it does, but this check
-      // does not depend on that being true).
-      const target = await getIdentity(id);
-      if (shouldRefuseRecovery(target)) {
-        actionResult = {
-          kind: 'error',
-          message:
-            'Admin recovery is console-only. See docs/runbooks/admin-recovery.md.',
-        };
-      } else {
-        const targetEmail = target.traits?.email;
-        if (!targetEmail) {
-          actionResult = { kind: 'error', message: 'Identity has no email trait on file.' };
-        } else {
-          // Best-practice bundle (adversarial review, DECISIONS.md D1
-          // addendum): send-time address confirmation, SERVER-enforced. The
-          // admin re-types the target address in the form; a UI-only check is
-          // not an invariant, so the byte-equal comparison runs here, before
-          // Kratos is ever called, not just in the browser.
-          const confirmEmail = String(fd.get('confirmEmail') ?? '');
-          if (!confirmsInviteAddress(confirmEmail, targetEmail)) {
-            actionResult = {
-              kind: 'error',
-              message: 'Confirmation address does not match the address on file. Nothing was sent.',
-            };
-          } else {
-            try {
-              await sendInviteRecoveryEmail(targetEmail);
-              actionResult = { kind: 'invite-email', email: targetEmail };
-            } catch (err) {
-              // Never interpolate the address into the surfaced message —
-              // sendInviteRecoveryEmail's own errors are status-code-only, but
-              // guard here too in case that contract ever drifts.
-              actionResult = {
-                kind: 'error',
-                message: `Invite email failed: ${err instanceof Error ? err.message : 'unknown error'}`,
-              };
-            }
-          }
-        }
-      }
-    } else if (action === 'force-relogin') {
-      // D4: revoke every Kratos session for this identity, invalidate
-      // the consent service's identity cache, and emit OIDC back-channel
-      // logout to every RP that supports it. Apps without back-channel
-      // logout (any RP whose manifest declares no backchannel_logout_uri)
-      // surface in result.failures so the operator knows where the
-      // local-session gap is.
-      const result = await revokeUserSessions(id);
-      actionResult = { kind: 'revoked', result };
-    } else if (action === 'deactivate') {
-      const username = identity.traits?.username ?? id;
-      await deactivateIdentity(id);
-      identity = await reload();
-      actionResult = { kind: 'deactivated', username };
-    } else if (action === 'reactivate') {
-      const username = identity.traits?.username ?? id;
-      await reactivateIdentity(id);
-      identity = await reload();
-      actionResult = { kind: 'reactivated', username };
-    } else if (action === 'delete') {
-      const expected = identity.traits?.username ?? '';
-      const confirm = String(fd.get('confirm') ?? '').trim();
-      if (confirm !== expected) {
-        actionResult = {
-          kind: 'error',
-          message: `Type the username (${expected}) to confirm deletion.`,
-        };
-      } else {
-        await deleteIdentity(id);
-        return Astro.redirect('/admin/users?deleted=1');
-      }
-    } else if (action === 'grant-admin') {
-      // Targeted admin marker grant via JSON Patch. Does NOT touch
-      // groups or roles. Guards: self-demote N/A on grant (self-grant is fine
-      // — the acting admin already has authority).
-      const username = identity.traits?.username ?? id;
-      await patchAdminMarker(id, true);
-      identity = await reload();
-      actionResult = { kind: 'admin-granted', username };
-    } else if (action === 'revoke-admin') {
-      // Targeted admin marker revoke. Guards:
-      //   (a) Self-demote guard: block revocation of the acting admin's own
-      //       marker via the UI (break-glass scenario requires another admin
-      //       or console access).
-      //   (b) Last-admin guard: refuse if this would leave zero admins.
-      const username = identity.traits?.username ?? id;
-      if (id === adminIdentityId) {
-        actionResult = {
-          kind: 'error',
-          message:
-            'You cannot revoke your own admin marker via the UI. Have another admin do it, or use the shell break-glass (see docs/runbooks/admin-recovery.md).',
-        };
-      } else {
-        // Count current admins — list all identities and filter on the marker.
-        const all = await listIdentities();
-        const adminCount = all.filter(
-          (ident) => (ident.metadata_admin as Record<string, unknown> | undefined)?.['admin'] === true,
-        ).length;
-        if (adminCount <= 1) {
-          actionResult = {
-            kind: 'error',
-            message:
-              `Refusing to revoke: ${username} is the last admin. Grant admin to another identity first.`,
-          };
-        } else {
-          await patchAdminMarker(id, false);
-          identity = await reload();
-          actionResult = { kind: 'admin-revoked', username };
-        }
-      }
-    } else if (action === 'remove-credential') {
-      // HIGH-C: lost-device eviction. Removes ALL credentials of the given
-      // type for this identity so any thief-enrolled credential is evicted.
-      // The legitimate user re-enrolls via the recovery/enrollment URL.
-      // Allowlist-validated: only eviction-relevant types are accepted.
-      const credType = String(fd.get('cred_type') ?? '').trim();
-      if (!EVICTABLE_CREDENTIAL_TYPES.has(credType)) {
-        actionResult = {
-          kind: 'error',
-          message: `Invalid credential type '${credType}'. Evictable types: passkey, webauthn, totp, lookup_secret.`,
-        };
-      } else {
-        await deleteCredential(id, credType);
-        identity = await reload();
-        actionResult = { kind: 'credential-removed', credType };
-      }
+  const handler = ADMIN_ACTIONS[action];
+  if (handler) {
+    try {
+      const outcome = await handler(fd, { id, identity, adminIdentityId, manifests });
+      if (outcome instanceof Response) return outcome;
+      if (outcome.actionResult) actionResult = outcome.actionResult;
+      if (outcome.formErrors) formErrors = outcome.formErrors;
+      if (outcome.mode) mode = outcome.mode;
+      if (outcome.refetch) identity = await reload();
+    } catch (err) {
+      actionResult = { kind: 'error', message: err instanceof Error ? err.message : String(err) };
     }
-  } catch (err) {
-    actionResult = { kind: 'error', message: err instanceof Error ? err.message : String(err) };
   }
 }
 
