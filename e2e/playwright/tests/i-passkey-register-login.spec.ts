@@ -127,6 +127,12 @@ test.describe('I — Passkey register → usernameless login', () => {
     // and the page reloads showing success.
     const registerBtn = page.locator(PASSKEY_REGISTER_BUTTON).first();
     await expect(registerBtn, 'I1: passkey register button must be visible on settings page').toBeVisible({ timeout: 10_000 });
+    // The button's onclick calls window.oryPasskeySettingsRegistration(), but
+    // that glue is defined by a <script> node rendered at the page bottom
+    // (settings.astro scriptNodes) — a real page load wins that race, a
+    // synthetic click the instant the button exists does not. Wait for the
+    // function to actually exist before clicking.
+    await page.waitForFunction(() => typeof (window as unknown as Record<string, unknown>).oryPasskeySettingsRegistration === 'function');
     await registerBtn.click();
 
     // Wait for Kratos to confirm the registration. The settings page will show
@@ -193,6 +199,9 @@ test.describe('I — Passkey register → usernameless login', () => {
 
     const loginBtn = page.locator(PASSKEY_LOGIN_BUTTON).first();
     await expect(loginBtn, 'I1: passkey login button must be visible on the login page').toBeVisible({ timeout: 10_000 });
+    // Same race as registration: wait for the login trigger's glue
+    // (window.oryPasskeyLogin, per KNOWN_TRIGGERS in lib/nodes.ts) to exist.
+    await page.waitForFunction(() => typeof (window as unknown as Record<string, unknown>).oryPasskeyLogin === 'function');
     await loginBtn.click();
 
     // Wait for the redirect back to the app (Kratos issues the session cookie
