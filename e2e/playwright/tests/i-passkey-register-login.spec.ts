@@ -59,34 +59,15 @@ const PASSKEY_REGISTER_BUTTON = 'button[name="passkey_register_trigger"]';
 const PASSKEY_LOGIN_BUTTON = 'button[name="passkey_login_trigger"]';
 
 test.describe('I — Passkey register → usernameless login', () => {
-  // I1 KNOWN PRE-EXISTING BUG: the CDP virtual authenticator successfully registers
-  // the passkey via the settings flow, but the subsequent usernameless login attempt
-  // fails to complete — after clicking the passkey_login_trigger button the browser
-  // stays on /auth/login (Kratos does not issue a session). The symptom is:
-  //   post-passkey-login URL: …/auth/login   (login didn't redirect away)
-  //   getSession → null   (no session cookie)
-  //
-  // This is NOT a regression from the AAL2 step-up changes in this landing.
-  // Evidence: login.astro's passkey block renders under `{!isAal2 && hasPasskey}`.
-  // `isAal2` is derived from the landed flow object (flow.requested_aal ===
-  // 'aal2', or second-factor totp/webauthn/lookup_secret nodes present — see
-  // work item #4), falling back to `?aal=aal2` only when there's no flow at
-  // all. A primary AAL1 login at /auth/login?flow=<id> carries neither
-  // signal, so isAal2 is false and the passkey button renders correctly. The
-  // AAL2 block only activates during an actual step-up (Kratos primes the
-  // flow with requested_aal:'aal2' and second-factor nodes). Neither the
-  // isAal2-derivation fix nor the earlier login.astro change altered the
-  // passkey block guard. The usernameless flow null-session failure is
-  // upstream of this landing — a known defect in how the CDP virtual CTAP2
-  // authenticator interacts with Kratos's discoverable-credential assertion
-  // path (navigator.credentials.get with allowCredentials:[]).
-  //
-  // Re-enable when the passkey usernameless session bug is fixed independently.
-  test.fixme(
-    true,
-    'I1: pre-existing bug — virtual authenticator passkey login does not issue a session ' +
-    '(Kratos discoverable-credential assertion path; unrelated to AAL2 step-up changes)',
-  );
+  // I1: both ceremonies call navigator.credentials, which Chromium gates
+  // behind [SecureContext] — https, or an origin explicitly trusted via
+  // --unsafely-treat-insecure-origin-as-secure (see playwright.config.ts).
+  // The e2e edge is deliberately plaintext HTTP (D10 / e2e/caddy.Caddyfile:
+  // auto_https off), so without that flag WebAuthn was silently blocked for
+  // BOTH registration and login — not a Kratos discoverable-credential bug.
+  // Registration's failure was masked because its old assertion only checked
+  // the settings page for an error string, which still passed with no
+  // credential ever created; it's now backed by a server-side check.
   test('I1 — register a passkey via settings, then log in usernameless', async ({
     browser,
     baseURL,
@@ -152,6 +133,14 @@ test.describe('I — Passkey register → usernameless login', () => {
       pageText,
       'I1: settings page must not show an error after passkey registration',
     ).not.toMatch(/error|something went wrong/i);
+
+    // Server-side proof the credential was actually persisted — the page
+    // check above would also pass if credentials.create() silently no-op'd.
+    const registered = await fetch(`${kratosAdminURL}/admin/identities/${identity.id}`).then((r) => r.json());
+    expect(
+      registered?.credentials?.passkey?.identifiers?.length ?? 0,
+      'I1: identity must have a passkey credential recorded server-side after registration',
+    ).toBeGreaterThan(0);
 
     // Step 4: Log out to clear the session. We need a clean state for the
     // usernameless login assertion to prove the passkey is genuinely usable

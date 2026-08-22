@@ -36,7 +36,15 @@ export default defineConfig({
   projects: [
     {
       name: 'chromium',
-      use: { ...devices['Desktop Chrome'] },
+      use: {
+        ...devices['Desktop Chrome'],
+        launchOptions: {
+          // Blink's [SecureContext] gate blocks navigator.credentials on
+          // plaintext http:// origins (the e2e edge is deliberately not
+          // TLS'd — see e2e/caddy.Caddyfile); this allowlists it for WebAuthn.
+          args: ['--unsafely-treat-insecure-origin-as-secure=http://auth.othala.test'],
+        },
+      },
     },
   ],
 });
