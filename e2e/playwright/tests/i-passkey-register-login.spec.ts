@@ -128,6 +128,15 @@ test.describe('I — Passkey register → usernameless login', () => {
     await page.waitForLoadState('networkidle');
     const settingsScripts = await page.evaluate(() => Array.from(document.scripts).map((s) => s.src));
     console.log('[I1] settings page <script> srcs:', JSON.stringify(settingsScripts));
+    // Confirm the launchOptions flag actually took effect at the browser
+    // level (not just that the script loaded), and see whether webauthn.js
+    // defined ANY window.ory* global under a name we're not expecting.
+    const secureCtxProbe = await page.evaluate(() => ({
+      isSecureContext: window.isSecureContext,
+      hasPublicKeyCredential: typeof (window as unknown as Record<string, unknown>).PublicKeyCredential !== 'undefined',
+      oryGlobals: Object.keys(window).filter((k) => k.startsWith('ory')),
+    }));
+    console.log('[I1] secure-context probe:', JSON.stringify(secureCtxProbe));
 
     // Click the passkey registration trigger. Kratos renders a button with
     // name="passkey_register_trigger" (identifiers.go PasskeyRegisterTrigger).
