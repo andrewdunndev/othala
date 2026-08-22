@@ -81,6 +81,15 @@ test.describe('I — Passkey register → usernameless login', () => {
     // will be intercepted by the virtual authenticator.
     console.log('[I1] virtual authenticator id:', virtualAuthenticator.authenticatorId);
 
+    // Surface browser-side failures directly — a WebAuthn ceremony that
+    // throws (e.g. the SecureContext gate, an RP ID mismatch) fails inside
+    // page JS and would otherwise only show up as Kratos silently not
+    // persisting a credential, with nothing in the test log to explain why.
+    page.on('pageerror', (err) => console.log('[I1] page error:', err.message));
+    page.on('console', (msg) => {
+      if (msg.type() === 'error') console.log('[I1] console error:', msg.text());
+    });
+
     // Step 1: Seed a fresh identity for this spec (unique localpart to avoid
     // conflicts with the shared `member`/`admin` worker-scoped fixtures).
     const identity = await createIdentityWithPassword({
