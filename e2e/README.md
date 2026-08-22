@@ -218,6 +218,27 @@ podman run --rm --platform linux/arm64 \
   bash -lc 'npm ci && npx playwright test j-recovery-flow.spec.ts'
 ```
 
+### Audit capture scripts (manual, not part of the automated gate)
+
+`audit-capture.mjs` and `audit-admin-capture.mjs` are standalone diagnostic
+tools, not specs: full-page screenshots (desktop + mobile) and an axe-core
+scan across the unauth/member/admin surfaces, including the AAL2 TOTP
+step-up needed to reach `/admin/*`. Run them against the browser-profile
+stack started above, via the same `playwright` service (env vars + the
+`/out` mount are already wired on it — only the command changes):
+
+```sh
+docker-compose -f compose.yml -f compose.browser.yml \
+  --profile browser --env-file=.env \
+  run --rm --no-deps playwright node audit-capture.mjs
+
+docker-compose -f compose.yml -f compose.browser.yml \
+  --profile browser --env-file=.env \
+  run --rm --no-deps playwright node audit-admin-capture.mjs
+```
+
+Output: PNGs + `axe-results*.json` in `browser-out/audit/`.
+
 ### Key facts about the browser profile
 
 - **ADMIN_HOST=10.89.11.12** — `compose.browser.yml` gives `othala` a
