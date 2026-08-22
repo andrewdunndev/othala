@@ -1,5 +1,5 @@
 /**
- * P — Lost-device / credential eviction (DESIGNED test, HIGH-C finding).
+ * P — Lost-device / credential eviction (HIGH-C finding).
  *
  * Finding reference: HIGH-C
  *   "Session revocation does not remove passkey credentials. An attacker
@@ -7,41 +7,46 @@
  *    the victim triggers force-logout via revokeSubject. The admin UI has
  *    no delete-credential path."
  *
- * Status: NOT LIVE. Every test below is test.fixme() — none run. The whole
- * describe block is fixme'd, not just the individual steps, because P1-P3
- * share state across two virtual-authenticator contexts and only make sense
- * run together against the live compose stack; splitting the fixme finer
- * would let a partial run report a false pass. The structure still PARSES
- * cleanly under `playwright test --list`, so this file documents the
- * intended coverage without claiming to exercise it.
+ * That last sentence is now STALE: deleteCredential IS wired into the admin
+ * UI (portal/src/lib/admin-actions.ts removeCredentialAction, the
+ * 'remove-credential' form action on /admin/users/[id].astro; unit-tested in
+ * admin-actions.test.ts). P3 below drives the same Kratos admin endpoint
+ * that action calls, proving the eviction primitive end-to-end against the
+ * live stack rather than re-testing the already-covered portal wiring.
  *
- * Scenario order (P1-P3) proves the FINDING, and deliberately does not match
- * the recommended admin sequence. P2 revokes before P3 deletes, to show that
- * revoke-first leaves the attacker's credential live — that is the bug. The
- * correct operator order is the opposite: audit credentials, delete the
- * affected type, THEN revoke (`docs/runbooks/lost-device.md`), because
- * revoking first burns the session before you can see what needs auditing.
+ * P1-P3 share state (one identity, one second browser context with its own
+ * CDP virtual authenticator) across module-scoped variables below — they run
+ * serially in one worker (playwright.config.ts workers: 1) and only prove
+ * the finding run together. Running a subset via --grep skips gracefully
+ * (test.skip) rather than reporting a false pass.
  *
- *   P1. Seed a victim identity; victim enrolls passkey A in
- *       virtual-authenticator ctx-A; a thief enrolls passkey B in a second
- *       virtual-authenticator ctx-B (simulates hijack or co-enrollment).
- *   P2. Admin calls revokeSubject (force-logout). Passkey B can STILL log
- *       in afterward — revoke does not remove credentials.
- *   P3. Admin calls the Kratos admin delete-credential API to remove
- *       passkey B; B is then locked out (login fails, no session issued).
+ *   P1. Seed a victim identity; the victim enrolls passkey A in ctx-A (the
+ *       test's own page/virtualAuthenticator); a second context ctx-B with
+ *       its own CDP virtual authenticator enrolls passkey B under the SAME
+ *       identity (simulates a second device — lost, or an attacker who
+ *       briefly had the account — enrolling its own key). Both sessions are
+ *       cleared afterward.
+ *   P2. Admin calls the revoke-user admin endpoint (force-logout fan-out to
+ *       Kratos + Hydra — same endpoint smoke.sh Section E drives). Passkey B
+ *       can STILL log in afterward — revoke does not remove credentials.
+ *   P3. Admin calls the Kratos admin credential-delete endpoint to remove
+ *       the identity's passkey credentials; passkey B is then locked out
+ *       (login fails, no session issued).
  *
- * Live-stack requirements once un-fixme'd:
+ * Live-stack requirements:
  *   - Kratos passkey strategy enabled, rp.id = othala.test.
  *   - Chromium (CDP required for virtual authenticators).
  *   - Playwright container on the compose net.
- *   - The othala admin revoke endpoint reachable at {baseURL}/admin/api/revoke
- *     (the existing revokeSubject handler).
- *   - P3 also needs Kratos admin DELETE
- *     /admin/identities/{id}/credentials/{type} plumbed through the admin
- *     UI (TODO(HIGH-C)); until then P3 stays fixme even once P1/P2 are wired.
+ *   - P2 needs OTHALA_ADMIN_ENDPOINT_BEARER (e2e/compose.yml playwright
+ *     service) to call {OTHALA_ADMIN_URL}/admin/revoke-user — the loopback
+ *     admin port, reachable from the playwright container only because the
+ *     browser profile binds it to othala's static IP (compose.browser.yml),
+ *     not 127.0.0.1. NOT {baseURL}/admin/api/revoke — that path doesn't
+ *     exist; the admin surface is never routed through the public Caddy edge.
  */
 
 import { test, expect } from '../fixtures';
+import type { BrowserContext, CDPSession, Page } from 'playwright-core';
 import { createIdentityWithPassword, TEST_PASSWORD } from '../actions/identity';
 import { loginViaJsonApi } from '../actions/login';
 import { getSession } from '../actions/session';
@@ -49,11 +54,11 @@ import { getSession } from '../actions/session';
 const PASSKEY_REGISTER_BUTTON = 'button[name="passkey_register_trigger"]';
 const PASSKEY_LOGIN_BUTTON = 'button[name="passkey_login_trigger"]';
 
-// Helper: register a passkey for `identity` using the provided browser context
-// (which has a virtual authenticator attached via CDP).
-// Requires `ctx` to already have an active privileged session cookie.
+// Helper: register a passkey for `identity` using the provided page (whose
+// context has a virtual authenticator attached via CDP). Requires the page's
+// context to already hold an active privileged session cookie.
 async function registerPasskeyForContext(
-  page: import('@playwright/test').Page,
+  page: Page,
   baseURL: string,
   identity: { id: string; email: string },
 ): Promise<void> {
@@ -61,16 +66,29 @@ async function registerPasskeyForContext(
   await page.waitForLoadState('networkidle');
   const btn = page.locator(PASSKEY_REGISTER_BUTTON).first();
   await expect(btn, 'passkey register button must be visible').toBeVisible({ timeout: 10_000 });
+  // Same race as I1: the trigger's onclick glue is a bottom-of-page <script>
+  // node; wait for it to exist before a synthetic click.
+  await page.waitForFunction(() => typeof (window as unknown as Record<string, unknown>).oryPasskeySettingsRegistration === 'function');
   await btn.click();
   await page.waitForLoadState('networkidle');
   console.log(`[P] passkey registered for ${identity.email} at URL:`, page.url());
 }
 
+// Helper: attempt a usernameless passkey login on `page` and return the
+// resulting session (null if login failed).
+async function passkeyLogin(page: Page, ctx: BrowserContext, baseURL: string) {
+  await page.goto(`${baseURL}/auth/login`);
+  await page.waitForLoadState('networkidle');
+  const loginBtn = page.locator(PASSKEY_LOGIN_BUTTON).first();
+  await expect(loginBtn, 'passkey login button must be visible').toBeVisible({ timeout: 10_000 });
+  await page.waitForFunction(() => typeof (window as unknown as Record<string, unknown>).oryPasskeyLogin === 'function');
+  await loginBtn.click();
+  await page.waitForLoadState('networkidle');
+  return getSession(ctx, baseURL);
+}
+
 // Helper: clear the session from a browser context (logout + cookie clear).
-async function clearSession(
-  ctx: import('@playwright/test').BrowserContext,
-  baseURL: string,
-): Promise<void> {
+async function clearSession(ctx: BrowserContext, baseURL: string): Promise<void> {
   const logoutResp = await ctx.request.get(`${baseURL}/self-service/logout/browser`, {
     headers: { Accept: 'application/json' },
   });
@@ -82,106 +100,131 @@ async function clearSession(
   await ctx.clearCookies();
 }
 
+// ── Module-scoped state shared across P1 → P2 → P3 (see file docblock) ──────
+let sharedIdentity: { id: string; email: string } | null = null;
+let ctxB: BrowserContext | null = null;
+let pageB: Page | null = null;
+let cdpB: CDPSession | null = null;
+let authenticatorIdB = '';
+
 test.describe('P — Passkey credential eviction (lost-device scenario)', () => {
-  // P1 + P2 + P3 are DESIGNED to run against the live stack and document the
-  // CURRENT GAP (revoke does not remove credentials), but none run today —
-  // see the file docblock's Status note.
-  //
-  // NOTE: P1–P3 require two independent virtual authenticators on two separate
-  // browser contexts. The virtualAuthenticator fixture is test-scoped and
-  // attached to `page` (one context). For a second authenticator we would need
-  // a second browser.newContext() with its own CDP session. That multi-context
-  // pattern is feasible but requires the live compose stack; marking the full
-  // describe block as fixme below to avoid false passes outside the live gate.
-  //
-  // The STRUCTURE of every step is defined here so `--list` parses correctly.
+  test.afterAll(async () => {
+    if (ctxB) await ctxB.close().catch(() => {});
+  });
 
-  test.fixme(
-    'P1 — victim enrolls passkey A; thief enrolls passkey B in a second context',
-    async ({ browser, page, baseURL, kratosAdminURL, virtualAuthenticator }) => {
-      // TODO(HIGH-C): implement full multi-context
-      // passkey enrollment. Requires two CDP sessions (one per virtual authenticator)
-      // and the live compose stack.
-      //
-      // Sketch:
-      //   1. seed victim identity
-      //   2. login in ctx-A (page.context()), register passkey A via virtualAuthenticator
-      //   3. open ctx-B = browser.newContext(); attach CDP; add second virtual authenticator
-      //   4. login in ctx-B with same credentials, register passkey B
-      //   5. clear both sessions
-      void virtualAuthenticator; // fixture referenced to satisfy the fixture dependency graph
+  test('P1 — victim enrolls passkey A; a second context enrolls passkey B', async ({
+    browser,
+    page,
+    baseURL,
+    kratosAdminURL,
+    virtualAuthenticator,
+  }) => {
+    void virtualAuthenticator; // attached to `page` by the fixture; used implicitly by ctx-A's registration
 
-      const identity = await createIdentityWithPassword({
-        email: 'evict.victim@othala.test',
-        username: 'evict.victim',
-        displayName: 'Eviction Victim',
-        groups: [],
-        kratosAdminURL,
-      });
-      console.log('[P1] seeded identity:', identity.id);
+    const identity = await createIdentityWithPassword({
+      email: 'evict.victim@othala.test',
+      username: 'evict.victim',
+      displayName: 'Eviction Victim',
+      groups: [],
+      kratosAdminURL,
+    });
+    console.log('[P1] seeded identity:', identity.id);
 
-      // Login in ctx-A and register passkey A.
-      const ctxA = page.context();
-      await loginViaJsonApi(ctxA, { identifier: identity.email, password: TEST_PASSWORD }, baseURL);
-      await registerPasskeyForContext(page, baseURL, identity);
-      // P1 is fixme — stop here until multi-context is wired.
-    },
-  );
+    // ctx-A: the test's own page/context. Login + register passkey A.
+    const ctxA = page.context();
+    await loginViaJsonApi(ctxA, { identifier: identity.email, password: TEST_PASSWORD }, baseURL);
+    await registerPasskeyForContext(page, baseURL, identity);
 
-  test.fixme(
-    'P2 — admin revokeSubject force-logout; passkey B can STILL log in (documents the gap)',
-    async ({ browser, page, baseURL, kratosAdminURL }) => {
-      // TODO(HIGH-C): after P1 enrolls passkey B,
-      // call revokeSubject on the victim's identity and then attempt login with
-      // ctx-B's passkey credential. The login MUST SUCCEED (proves the gap):
-      //
-      //   const revokeResp = await page.context().request.post(
-      //     `${baseURL}/admin/api/revoke`,
-      //     { data: { subject: identity.id } },
-      //   );
-      //   expect(revokeResp.ok()).toBe(true);
-      //
-      //   // Navigate to login page in ctx-B and assert passkey login succeeds.
-      //   await pageB.goto(`${baseURL}/auth/login`);
-      //   const loginBtn = pageB.locator(PASSKEY_LOGIN_BUTTON).first();
-      //   await loginBtn.click();
-      //   await pageB.waitForLoadState('networkidle');
-      //   const session = await getSession(ctxB, baseURL);
-      //   expect(session?.active, 'P2: passkey B must STILL work after revoke (gap)').toBe(true);
-      void browser; void page; void baseURL; void kratosAdminURL;
-    },
-  );
+    // ctx-B: a second browser context with its OWN CDP virtual authenticator
+    // — the fixture's virtualAuthenticator is test-scoped to `page` (ctx-A),
+    // so a second device needs its own context + CDP session.
+    ctxB = await browser.newContext();
+    pageB = await ctxB.newPage();
+    cdpB = await ctxB.newCDPSession(pageB);
+    await cdpB.send('WebAuthn.enable', { enableUI: false });
+    const { authenticatorId } = await cdpB.send('WebAuthn.addVirtualAuthenticator', {
+      options: {
+        protocol: 'ctap2',
+        transport: 'internal',
+        hasResidentKey: true,
+        hasUserVerification: true,
+        isUserVerified: true,
+      },
+    });
+    authenticatorIdB = authenticatorId;
+    console.log('[P1] second virtual authenticator id:', authenticatorIdB);
 
-  test.fixme(
-    'P3 — admin deletes credential B via Kratos admin API; passkey B is locked out (post-fix)',
-    async ({ browser, page, baseURL, kratosAdminURL }) => {
-      // TODO(HIGH-C): implement admin
-      // DELETE /admin/identities/{id}/credentials/passkey (or the equivalent
-      // per-credential endpoint once the admin UI ships the delete path).
-      //
-      // Kratos admin endpoint (v0.13+):
-      //   DELETE {kratosAdminURL}/admin/identities/{identityId}/credentials/{type}
-      //   where {type} = "passkey" (or the credential ID if the API takes a
-      //   per-credential endpoint — verify against the Kratos version in compose.yml).
-      //
-      // Post-delete assertion:
-      //   - Attempt login with ctx-B's virtual authenticator.
-      //   - credentials.get() finds no stored credential → login fails.
-      //   - getSession(ctxB) must return null.
-      //
-      //   const deleteResp = await fetch(
-      //     `${kratosAdminURL}/admin/identities/${identity.id}/credentials/passkey`,
-      //     { method: 'DELETE' },
-      //   );
-      //   expect(deleteResp.status).toBe(204);
-      //
-      //   await pageB.goto(`${baseURL}/auth/login`);
-      //   const loginBtn = pageB.locator(PASSKEY_LOGIN_BUTTON).first();
-      //   await loginBtn.click();
-      //   await pageB.waitForLoadState('networkidle');
-      //   const sessionAfter = await getSession(ctxB, baseURL);
-      //   expect(sessionAfter, 'P3: passkey B must be locked out after credential deletion').toBeNull();
-      void browser; void page; void baseURL; void kratosAdminURL;
-    },
-  );
+    await loginViaJsonApi(ctxB, { identifier: identity.email, password: TEST_PASSWORD }, baseURL);
+    await registerPasskeyForContext(pageB, baseURL, identity);
+
+    // Server-side proof both passkeys were persisted.
+    const registered = await fetch(`${kratosAdminURL}/admin/identities/${identity.id}`).then((r) => r.json());
+    console.log('[P1] passkey credential record:', JSON.stringify(registered?.credentials?.passkey));
+    expect(registered?.credentials?.passkey, 'P1: identity must have passkey credentials after both enrollments').toBeTruthy();
+
+    // Clear both sessions — P2's "still works after revoke" assertion needs
+    // a FRESH login, not a residual cookie.
+    await clearSession(ctxA, baseURL);
+    await clearSession(ctxB, baseURL);
+
+    sharedIdentity = identity;
+  });
+
+  test('P2 — admin revokeSubject force-logout; passkey B can STILL log in (documents the gap)', async ({ baseURL }) => {
+    if (!sharedIdentity || !ctxB || !pageB) {
+      test.skip(true, 'P2: requires P1 to have run first in this worker (shared module state)');
+      return;
+    }
+    const identity = sharedIdentity;
+    const contextB = ctxB;
+    const loginPageB = pageB;
+    const bearer = process.env.OTHALA_ADMIN_ENDPOINT_BEARER;
+    if (!bearer) {
+      test.skip(true, 'P2: OTHALA_ADMIN_ENDPOINT_BEARER not set — compose.yml playwright service env');
+      return;
+    }
+    const adminBase = process.env.OTHALA_ADMIN_URL ?? 'http://othala:4431';
+
+    const revokeResp = await fetch(`${adminBase}/admin/revoke-user`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${bearer}` },
+      body: JSON.stringify({ subject: identity.id }),
+    });
+    expect(revokeResp.ok, 'P2: revoke-user call must succeed').toBe(true);
+    console.log('[P2] revoke-user response:', await revokeResp.text());
+
+    const session = await passkeyLogin(loginPageB, contextB, baseURL);
+    expect(session?.active, 'P2: passkey B must STILL work after revoke (documents the gap)').toBe(true);
+  });
+
+  test('P3 — admin deletes the passkey credential type; passkey B is locked out (post-fix)', async ({ baseURL, kratosAdminURL }) => {
+    if (!sharedIdentity || !ctxB || !pageB) {
+      test.skip(true, 'P3: requires P1 to have run first in this worker (shared module state)');
+      return;
+    }
+    const identity = sharedIdentity;
+    const contextB = ctxB;
+    const loginPageB = pageB;
+
+    // Log out first: a fresh login attempt is what proves the credential is
+    // gone, not just that P2's already-issued session cookie still works.
+    await clearSession(contextB, baseURL);
+
+    // Same endpoint portal/src/lib/admin-api.ts deleteCredential() calls
+    // (identityApi().deleteIdentityCredentials) — the primitive the admin
+    // UI's 'remove-credential' action already wires up.
+    const deleteResp = await fetch(
+      `${kratosAdminURL}/admin/identities/${identity.id}/credentials/passkey`,
+      { method: 'DELETE' },
+    );
+    expect(deleteResp.status, 'P3: credential deletion must succeed').toBe(204);
+
+    const sessionAfter = await passkeyLogin(loginPageB, contextB, baseURL);
+    expect(sessionAfter, 'P3: passkey B must be locked out after credential deletion').toBeNull();
+
+    if (cdpB) {
+      await cdpB.send('WebAuthn.removeVirtualAuthenticator', { authenticatorId: authenticatorIdB }).catch(() => {});
+      await cdpB.detach().catch(() => {});
+    }
+  });
 });

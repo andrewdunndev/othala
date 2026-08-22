@@ -20,6 +20,39 @@
 }
 
 auth.othala.test:80 {
+	# ── Rate limiting (MEDIUM-B gate: n-rate-limits.spec.ts) ──────────────────
+	# Zone shape copied from the production dag Caddyfile
+	# (iac deploy/hosts/lodestone/services/dag/caddy/Caddyfile). Unlike
+	# production, every request in THIS harness shares one client IP (the
+	# playwright container), so a path-only zone would also catch the ~20
+	# other specs' legitimate self-service calls earlier in the same serial
+	# run. Each zone additionally requires the X-E2E-Flood-Probe marker
+	# header the flood tests set, so only their own synthetic bursts are
+	# counted; no proxy_protocol wrapper is needed (no envoy hop in this
+	# harness), so {client_ip} already resolves to the real peer.
+	rate_limit {
+		zone e2e_code_request {
+			match {
+				method GET
+				path   /self-service/login/browser
+				header X-E2E-Flood-Probe n1
+			}
+			key    {client_ip}
+			window 1m
+			events 5
+		}
+		zone e2e_wrong_password {
+			match {
+				method POST
+				path   /self-service/login*
+				header X-E2E-Flood-Probe n2
+			}
+			key    {client_ip}
+			window 1m
+			events 10
+		}
+	}
+
 	# Hydra public OAuth2 surface + OIDC discovery.
 	@hydra path /oauth2/auth /oauth2/token /oauth2/revoke /oauth2/fallbacks/* /.well-known/openid-configuration /.well-known/jwks.json /userinfo
 	handle @hydra {

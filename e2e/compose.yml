@@ -442,7 +442,12 @@ services:
   # with `docker compose --profile browser up`. Published on the host :8088 so an
   # interactive agent-browser (Playwright) can reach it via an ssh tunnel to the VM.
   caddy:
-    image: docker.io/library/caddy:2-alpine@sha256:5f5c8640aae01df9654968d946d8f1a56c497f1dd5c5cda4cf95ab7c14d58648
+    # dunn.dev/caddy, not stock caddy:2-alpine: N1/N2 (n-rate-limits.spec.ts)
+    # need the `rate_limit` directive (mholt/caddy-ratelimit), which stock
+    # Caddy does not ship. Same tag@digest production pins
+    # (iac dag-caddy.container); re-resolve via
+    # `skopeo inspect docker://registry.gitlab.com/dunn.dev/caddy:v2.11.4-3`.
+    image: registry.gitlab.com/dunn.dev/caddy:v2.11.4-3@sha256:78e84240c3c703bb374aa003424c56143376c621a0b7e17cc6bcf009eec86446
     container_name: lab-caddy
     profiles: ["browser"]
     restart: unless-stopped
@@ -453,13 +458,9 @@ services:
       - ALL
     # This e2e Caddy binds port 80 INSIDE the container (published as 8088 on
     # the host). Port 80 is < 1024, so the process needs NET_BIND_SERVICE to
-    # bind it without running as root. Caddy's Alpine image drops to a
-    # non-root user after startup; if it doesn't, check the image. Add
+    # bind it without running as root. dunn.dev/caddy's UBI-micro runtime
+    # drops to a non-root user; if it doesn't, check the image. Add
     # NET_BIND_SERVICE conservatively.
-    # NEEDS-VALIDATION: confirm Caddy in caddy:2-alpine uses a
-    # non-root user (UID != 0). If it runs as root, NET_BIND_SERVICE is
-    # redundant (root can bind any port) but harmless. If non-root, it is
-    # required to bind :80.
     cap_add:
       - NET_BIND_SERVICE
     read_only: true
@@ -533,6 +534,9 @@ services:
       # hostname resolves to that IP inside the compose net.
       OTHALA_ADMIN_URL: http://othala:4431
       RECOVERY_GATE_SECRET: ${RECOVERY_GATE_SECRET}
+      # P2 (p-eviction.spec.ts): admin revokeSubject force-logout, bearer-guarded
+      # like RECOVERY_GATE_SECRET above.
+      OTHALA_ADMIN_ENDPOINT_BEARER: ${OTHALA_ADMIN_ENDPOINT_BEARER}
       GRAFANA_CLIENT_SECRET: ${GRAFANA_CLIENT_SECRET}
       PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD: "1"
     volumes:

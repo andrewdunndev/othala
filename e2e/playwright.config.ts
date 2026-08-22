@@ -38,6 +38,11 @@ export default defineConfig({
       name: 'chromium',
       use: {
         ...devices['Desktop Chrome'],
+        // channel: 'chromium' forces the full Chromium binary instead of the
+        // default headless-shell — the shell ignores
+        // --unsafely-treat-insecure-origin-as-secure entirely (playwright#22944),
+        // which silently defeated the flag below.
+        channel: 'chromium',
         launchOptions: {
           // Blink's [SecureContext] gate blocks navigator.credentials on
           // plaintext http:// origins (the e2e edge is deliberately not

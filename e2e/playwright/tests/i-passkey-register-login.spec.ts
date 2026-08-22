@@ -59,25 +59,6 @@ const PASSKEY_REGISTER_BUTTON = 'button[name="passkey_register_trigger"]';
 const PASSKEY_LOGIN_BUTTON = 'button[name="passkey_login_trigger"]';
 
 test.describe('I — Passkey register → usernameless login', () => {
-  // I1 CONFIRMED (not a Kratos bug): page.evaluate() on the live settings
-  // page shows isSecureContext:false and zero window.ory* globals even
-  // though webauthn.js loads with a 200 — Chromium's [SecureContext] gate
-  // is really blocking the ceremony, exactly as suspected. But the fix
-  // attempted here — chromium launchOptions.args
-  // --unsafely-treat-insecure-origin-as-secure=http://auth.othala.test in
-  // playwright.config.ts — does NOT flip isSecureContext in this harness;
-  // why is undiagnosed (tracked in the issue below). The flag, the
-  // server-side registration assertion, and the diagnostic listeners below
-  // all stay: they're correct and will start proving the real path the
-  // moment the launch-flag gap is closed.
-  //
-  // See: https://gitlab.com/dunn.dev/othala/-/work_items/8 for the
-  // isSecureContext:false trace evidence and next steps.
-  test.fixme(
-    true,
-    'I1: SecureContext gate confirmed real (isSecureContext:false on the live page), ' +
-    'but the launchOptions insecure-origin flag is not taking effect in this harness — see linked issue',
-  );
   test('I1 — register a passkey via settings, then log in usernameless', async ({
     browser,
     baseURL,
@@ -92,20 +73,10 @@ test.describe('I — Passkey register → usernameless login', () => {
     console.log('[I1] virtual authenticator id:', virtualAuthenticator.authenticatorId);
 
     // Surface browser-side failures directly — a WebAuthn ceremony that
-    // throws (e.g. the SecureContext gate, an RP ID mismatch) fails inside
-    // page JS and would otherwise only show up as Kratos silently not
-    // persisting a credential, with nothing in the test log to explain why.
+    // throws (e.g. an RP ID mismatch) fails inside page JS and would
+    // otherwise only show up as Kratos silently not persisting a
+    // credential, with nothing in the test log to explain why.
     page.on('pageerror', (err) => console.log('[I1] page error:', err.message));
-    page.on('console', (msg) => {
-      if (msg.type() === 'error') console.log('[I1] console error:', msg.text());
-    });
-    // A <script src> load failure (404, blocked) does NOT fire pageerror —
-    // it's a resource-load event, not a JS exception. Watch responses too.
-    page.on('response', (res) => {
-      if (res.url().includes('webauthn.js') || res.url().includes('/.well-known/ory')) {
-        console.log('[I1] response:', res.status(), res.url());
-      }
-    });
 
     // Step 1: Seed a fresh identity for this spec (unique localpart to avoid
     // conflicts with the shared `member`/`admin` worker-scoped fixtures).
@@ -136,17 +107,6 @@ test.describe('I — Passkey register → usernameless login', () => {
     // virtual authenticator intercepts and produces a resident credential.
     await page.goto(`${baseURL}/auth/settings`);
     await page.waitForLoadState('networkidle');
-    const settingsScripts = await page.evaluate(() => Array.from(document.scripts).map((s) => s.src));
-    console.log('[I1] settings page <script> srcs:', JSON.stringify(settingsScripts));
-    // Confirm the launchOptions flag actually took effect at the browser
-    // level (not just that the script loaded), and see whether webauthn.js
-    // defined ANY window.ory* global under a name we're not expecting.
-    const secureCtxProbe = await page.evaluate(() => ({
-      isSecureContext: window.isSecureContext,
-      hasPublicKeyCredential: typeof (window as unknown as Record<string, unknown>).PublicKeyCredential !== 'undefined',
-      oryGlobals: Object.keys(window).filter((k) => k.startsWith('ory')),
-    }));
-    console.log('[I1] secure-context probe:', JSON.stringify(secureCtxProbe));
 
     // Click the passkey registration trigger. Kratos renders a button with
     // name="passkey_register_trigger" (identifiers.go PasskeyRegisterTrigger).
