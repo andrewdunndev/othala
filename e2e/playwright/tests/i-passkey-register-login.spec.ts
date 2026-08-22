@@ -89,6 +89,13 @@ test.describe('I — Passkey register → usernameless login', () => {
     page.on('console', (msg) => {
       if (msg.type() === 'error') console.log('[I1] console error:', msg.text());
     });
+    // A <script src> load failure (404, blocked) does NOT fire pageerror —
+    // it's a resource-load event, not a JS exception. Watch responses too.
+    page.on('response', (res) => {
+      if (res.url().includes('webauthn.js') || res.url().includes('/.well-known/ory')) {
+        console.log('[I1] response:', res.status(), res.url());
+      }
+    });
 
     // Step 1: Seed a fresh identity for this spec (unique localpart to avoid
     // conflicts with the shared `member`/`admin` worker-scoped fixtures).
@@ -119,6 +126,8 @@ test.describe('I — Passkey register → usernameless login', () => {
     // virtual authenticator intercepts and produces a resident credential.
     await page.goto(`${baseURL}/auth/settings`);
     await page.waitForLoadState('networkidle');
+    const settingsScripts = await page.evaluate(() => Array.from(document.scripts).map((s) => s.src));
+    console.log('[I1] settings page <script> srcs:', JSON.stringify(settingsScripts));
 
     // Click the passkey registration trigger. Kratos renders a button with
     // name="passkey_register_trigger" (identifiers.go PasskeyRegisterTrigger).
