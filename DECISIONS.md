@@ -122,9 +122,9 @@ Passkey-only was genuinely attractive and is blocked by one thing — the break-
 passkey enrollment and email delivery are both degraded, so a password credential type stays enabled
 even though almost nobody types one.
 
-**Enforced by.** `e2e/playwright/tests/i-passkey-register-login.spec.ts` and
-`e2e/playwright/tests/k-email-code-login.spec.ts` — each method must work end to end. The tier
-ORDER, and the legacy strategy's disabled passwordless, are UNENFORCED: `kratos/kratos.yml` holds
+**Enforced by.** `e2e/playwright/tests/k-email-code-login.spec.ts` end to end. The passkey leg
+(`i-passkey-register-login.spec.ts`) is fixme'd pending #8 (e2e secure-context gap): UNENFORCED,
+like the tier ORDER and the legacy strategy's disabled passwordless — `kratos/kratos.yml` holds
 those values and nothing fails when they change.
 
 ## No password ever transits a channel
