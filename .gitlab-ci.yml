@@ -26,6 +26,11 @@
 default:
   interruptible: true
 
+# Force-build interface for e2e + both container-image builds (see e2e's
+# rules: below); pinned true globally.
+variables:
+  BUILD_CI_IMAGE: "true"
+
 workflow:
   # Suppress the push pipeline when a branch has an open MR so the
   # merge_request_event pipeline is the only one for that commit — GitLab
@@ -484,17 +489,15 @@ e2e:
       - e2e/browser-out
     expire_in: 1 week
   rules:
-    # Absent from plain main/MR pushes: the QEMU runner is expensive and
-    # hardware-bound, so e2e runs only where it gates — tag pipelines (full
-    # substrate, all images built via tag_pipeline) and the on-demand
-    # BUILD_CI_IMAGE path. Push/MR is already covered by verify-* and
-    # check-portal.
+    # e2e and both image builds run in EVERY pipeline — push, MR, main, tag.
+    # BUILD_CI_IMAGE is the component's force-build interface, pinned true
+    # globally above. Operator decision after v0.5.0 shipped a login outage
+    # through green tag-gated pipelines: release must never be the first e2e
+    # run.
     #
     # GitLab variables don't honor bash ${VAR:-default}, so tag pipelines
     # must override AUTH_VERSION here to pull the v-tag image.
     - if: '$CI_COMMIT_TAG'
       variables:
         AUTH_VERSION: "$CI_COMMIT_TAG"
-    # BUILD_CI_IMAGE=true builds the images and runs e2e against them for
-    # pre-tag validation before cutting a tag or merging to main.
     - if: '$BUILD_CI_IMAGE == "true"'
