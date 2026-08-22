@@ -59,33 +59,24 @@ const PASSKEY_REGISTER_BUTTON = 'button[name="passkey_register_trigger"]';
 const PASSKEY_LOGIN_BUTTON = 'button[name="passkey_login_trigger"]';
 
 test.describe('I — Passkey register → usernameless login', () => {
-  // I1 KNOWN PRE-EXISTING BUG: the CDP virtual authenticator successfully registers
-  // the passkey via the settings flow, but the subsequent usernameless login attempt
-  // fails to complete — after clicking the passkey_login_trigger button the browser
-  // stays on /auth/login (Kratos does not issue a session). The symptom is:
-  //   post-passkey-login URL: …/auth/login   (login didn't redirect away)
-  //   getSession → null   (no session cookie)
+  // I1 CONFIRMED (not a Kratos bug): page.evaluate() on the live settings
+  // page shows isSecureContext:false and zero window.ory* globals even
+  // though webauthn.js loads with a 200 — Chromium's [SecureContext] gate
+  // is really blocking the ceremony, exactly as suspected. But the fix
+  // attempted here — chromium launchOptions.args
+  // --unsafely-treat-insecure-origin-as-secure=http://auth.othala.test in
+  // playwright.config.ts — does NOT flip isSecureContext in this harness;
+  // why is undiagnosed (tracked in the issue below). The flag, the
+  // server-side registration assertion, and the diagnostic listeners below
+  // all stay: they're correct and will start proving the real path the
+  // moment the launch-flag gap is closed.
   //
-  // This is NOT a regression from the AAL2 step-up changes in this landing.
-  // Evidence: login.astro's passkey block renders under `{!isAal2 && hasPasskey}`.
-  // `isAal2` is derived from the landed flow object (flow.requested_aal ===
-  // 'aal2', or second-factor totp/webauthn/lookup_secret nodes present — see
-  // work item #4), falling back to `?aal=aal2` only when there's no flow at
-  // all. A primary AAL1 login at /auth/login?flow=<id> carries neither
-  // signal, so isAal2 is false and the passkey button renders correctly. The
-  // AAL2 block only activates during an actual step-up (Kratos primes the
-  // flow with requested_aal:'aal2' and second-factor nodes). Neither the
-  // isAal2-derivation fix nor the earlier login.astro change altered the
-  // passkey block guard. The usernameless flow null-session failure is
-  // upstream of this landing — a known defect in how the CDP virtual CTAP2
-  // authenticator interacts with Kratos's discoverable-credential assertion
-  // path (navigator.credentials.get with allowCredentials:[]).
-  //
-  // Re-enable when the passkey usernameless session bug is fixed independently.
+  // See: https://gitlab.com/dunn.dev/othala/-/work_items/8 for the
+  // isSecureContext:false trace evidence and next steps.
   test.fixme(
     true,
-    'I1: pre-existing bug — virtual authenticator passkey login does not issue a session ' +
-    '(Kratos discoverable-credential assertion path; unrelated to AAL2 step-up changes)',
+    'I1: SecureContext gate confirmed real (isSecureContext:false on the live page), ' +
+    'but the launchOptions insecure-origin flag is not taking effect in this harness — see linked issue',
   );
   test('I1 — register a passkey via settings, then log in usernameless', async ({
     browser,
@@ -99,6 +90,22 @@ test.describe('I — Passkey register → usernameless login', () => {
     // resident keys is active. Any credentials.create/get call on this page
     // will be intercepted by the virtual authenticator.
     console.log('[I1] virtual authenticator id:', virtualAuthenticator.authenticatorId);
+
+    // Surface browser-side failures directly — a WebAuthn ceremony that
+    // throws (e.g. the SecureContext gate, an RP ID mismatch) fails inside
+    // page JS and would otherwise only show up as Kratos silently not
+    // persisting a credential, with nothing in the test log to explain why.
+    page.on('pageerror', (err) => console.log('[I1] page error:', err.message));
+    page.on('console', (msg) => {
+      if (msg.type() === 'error') console.log('[I1] console error:', msg.text());
+    });
+    // A <script src> load failure (404, blocked) does NOT fire pageerror —
+    // it's a resource-load event, not a JS exception. Watch responses too.
+    page.on('response', (res) => {
+      if (res.url().includes('webauthn.js') || res.url().includes('/.well-known/ory')) {
+        console.log('[I1] response:', res.status(), res.url());
+      }
+    });
 
     // Step 1: Seed a fresh identity for this spec (unique localpart to avoid
     // conflicts with the shared `member`/`admin` worker-scoped fixtures).
@@ -129,6 +136,17 @@ test.describe('I — Passkey register → usernameless login', () => {
     // virtual authenticator intercepts and produces a resident credential.
     await page.goto(`${baseURL}/auth/settings`);
     await page.waitForLoadState('networkidle');
+    const settingsScripts = await page.evaluate(() => Array.from(document.scripts).map((s) => s.src));
+    console.log('[I1] settings page <script> srcs:', JSON.stringify(settingsScripts));
+    // Confirm the launchOptions flag actually took effect at the browser
+    // level (not just that the script loaded), and see whether webauthn.js
+    // defined ANY window.ory* global under a name we're not expecting.
+    const secureCtxProbe = await page.evaluate(() => ({
+      isSecureContext: window.isSecureContext,
+      hasPublicKeyCredential: typeof (window as unknown as Record<string, unknown>).PublicKeyCredential !== 'undefined',
+      oryGlobals: Object.keys(window).filter((k) => k.startsWith('ory')),
+    }));
+    console.log('[I1] secure-context probe:', JSON.stringify(secureCtxProbe));
 
     // Click the passkey registration trigger. Kratos renders a button with
     // name="passkey_register_trigger" (identifiers.go PasskeyRegisterTrigger).
@@ -137,6 +155,12 @@ test.describe('I — Passkey register → usernameless login', () => {
     // and the page reloads showing success.
     const registerBtn = page.locator(PASSKEY_REGISTER_BUTTON).first();
     await expect(registerBtn, 'I1: passkey register button must be visible on settings page').toBeVisible({ timeout: 10_000 });
+    // The button's onclick calls window.oryPasskeySettingsRegistration(), but
+    // that glue is defined by a <script> node rendered at the page bottom
+    // (settings.astro scriptNodes) — a real page load wins that race, a
+    // synthetic click the instant the button exists does not. Wait for the
+    // function to actually exist before clicking.
+    await page.waitForFunction(() => typeof (window as unknown as Record<string, unknown>).oryPasskeySettingsRegistration === 'function');
     await registerBtn.click();
 
     // Wait for Kratos to confirm the registration. The settings page will show
@@ -152,6 +176,19 @@ test.describe('I — Passkey register → usernameless login', () => {
       pageText,
       'I1: settings page must not show an error after passkey registration',
     ).not.toMatch(/error|something went wrong/i);
+
+    // Server-side proof the credential was actually persisted — the page
+    // check above would also pass if credentials.create() silently no-op'd.
+    // No credentials.passkey entry exists on the identity until a passkey is
+    // registered (the seed body only set credentials.password), so presence
+    // alone is the non-vacuous signal; log the raw record as evidence rather
+    // than guessing at Kratos's internal credential-config shape.
+    const registered = await fetch(`${kratosAdminURL}/admin/identities/${identity.id}`).then((r) => r.json());
+    console.log('[I1] passkey credential record:', JSON.stringify(registered?.credentials?.passkey));
+    expect(
+      registered?.credentials?.passkey,
+      'I1: identity must have a passkey credential recorded server-side after registration',
+    ).toBeTruthy();
 
     // Step 4: Log out to clear the session. We need a clean state for the
     // usernameless login assertion to prove the passkey is genuinely usable
@@ -190,6 +227,9 @@ test.describe('I — Passkey register → usernameless login', () => {
 
     const loginBtn = page.locator(PASSKEY_LOGIN_BUTTON).first();
     await expect(loginBtn, 'I1: passkey login button must be visible on the login page').toBeVisible({ timeout: 10_000 });
+    // Same race as registration: wait for the login trigger's glue
+    // (window.oryPasskeyLogin, per KNOWN_TRIGGERS in lib/nodes.ts) to exist.
+    await page.waitForFunction(() => typeof (window as unknown as Record<string, unknown>).oryPasskeyLogin === 'function');
     await loginBtn.click();
 
     // Wait for the redirect back to the app (Kratos issues the session cookie
