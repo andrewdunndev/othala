@@ -105,9 +105,17 @@ const isCodeEntry = codeNodes.some((n) => {
 // step-up form unreachable via the natural flow: Kratos's redirect from the
 // login-browser AAL2 initiator drops the param on its way back to this page,
 // even though the landed flow is correctly primed for AAL2 (work item #4).
-const totpNodes = ui ? nodesByGroup(ui.nodes, 'totp') : [];
-const aal2WebauthnNodes = ui ? nodesByGroup(ui.nodes, 'webauthn') : [];
-const lookupNodes = ui ? nodesByGroup(ui.nodes, 'lookup_secret') : [];
+// Input nodes only (asInput() !== null): the webauthn group's script tag
+// (<script src=".../webauthn.js">, present on EVERY flow that offers passkey
+// or webauthn, not just a step-up) has group 'webauthn' too. Counting it
+// unfiltered made hasSecondFactorNodes — and so isAal2 — true for every
+// ordinary AAL1 login, hiding the passkey/code/password tiers behind an
+// empty step-up card (bug: e2e/playwright/tests/i-passkey-register-login.spec.ts
+// I1, discovered via the rendered page — every other login-path spec drives
+// the JSON API directly and never rendered this page).
+const totpNodes = ui ? nodesByGroup(ui.nodes, 'totp').filter((n) => asInput(n)) : [];
+const aal2WebauthnNodes = ui ? nodesByGroup(ui.nodes, 'webauthn').filter((n) => asInput(n)) : [];
+const lookupNodes = ui ? nodesByGroup(ui.nodes, 'lookup_secret').filter((n) => asInput(n)) : [];
 const flowRequestsAal2 = flow?.requested_aal === 'aal2';
 const hasSecondFactorNodes =
   totpNodes.length > 0 || aal2WebauthnNodes.length > 0 || lookupNodes.length > 0;
