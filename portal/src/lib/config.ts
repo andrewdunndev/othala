@@ -226,10 +226,10 @@ export const defaultGroup: string = optionalVar(
 //
 // 1. THIS list (env) is a TYPE declaration plus selector options. It names
 //    which groups count as `identity` groups rather than app-access groups —
-//    read by group-registry.ts and manifests.ts `knownIdentityGroups` for
-//    classification, by access.ts (IDENTITY_GROUP_ORDER → normalizeGroupOrder)
-//    for a stable stored order that is cosmetic only, and by the admin UI to
-//    render the identity-group checkboxes. It authorizes nothing on its own.
+//    read by group-registry.ts for classification, by access.ts
+//    (IDENTITY_GROUP_ORDER → normalizeGroupOrder) for a stable stored order
+//    that is cosmetic only, and by the admin UI to render the identity-group
+//    checkboxes. It authorizes nothing on its own.
 //
 // 2. `metadata_admin.groups` ON AN IDENTITY IS ENTRY AUTHORIZATION. It is
 //    NOT display-only. `identityGroups(identity)` in gate.ts (same exported
@@ -267,56 +267,23 @@ export const identityGroups: string[] = parseIdentityGroups();
 
 // ── OTHALA_ADMIN_FRESHNESS_HOURS ──────────────────────────────────────────────
 //
-// A session-age window in hours. Parsed here, but NOT enforced by any gate:
-// nothing outside this file reads `adminFreshnessHours`.
+// A session-age window in hours. Enforced by requireAdminSession
+// (lib/admin.ts) via isSessionFresh, as a step-up gate alongside AAL2.
 //
-// The portal's only freshness computation is `isSessionFresh` in lib/admin.ts,
-// whose docblock records the decision — "this function is NOT wired into the
-// requireAdminSession gate" — and flags that its timestamp semantics "should be
-// validated against a live Kratos session before wiring isSessionFresh into any
-// gate". Do not describe this var as active until that wiring lands.
-//
-// What requireAdminSession actually enforces is the SP-3 trinity:
-// active session, `session.authenticator_assurance_level === 'aal2'` (anything
-// else redirects to the Kratos step-up login flow with aal=aal2 & refresh=true),
-// and the metadata_admin.admin marker read fresh from the admin API. There is
-// no session-age check. See site/src/content/docs/guides/hardening.md §7, which
-// carries the same statement for operators.
-//
-// Default: 8 (hours) when unset, blank, or not a non-negative integer.
+// Default: 1 (hour) when unset, blank, or not a non-negative integer.
 
 function parseAdminFreshnessHours(): number {
   const raw = process.env.OTHALA_ADMIN_FRESHNESS_HOURS;
-  if (raw === undefined || raw.trim() === '') return 8;
+  if (raw === undefined || raw.trim() === '') return 1;
   const n = parseInt(raw.trim(), 10);
   if (!Number.isFinite(n) || n < 0) {
     console.warn(
       `[othala/config] OTHALA_ADMIN_FRESHNESS_HOURS="${raw}" is not a valid non-negative integer; ` +
-        'using default 8.',
+        'using default 1.',
     );
-    return 8;
+    return 1;
   }
   return n;
 }
 
 export const adminFreshnessHours: number = parseAdminFreshnessHours();
-
-// ── aggregate export for consumers that want the full config object ───────────
-//
-// Named individual exports above are the primary API and are tree-shakeable.
-// This object is a convenience for logging/debug and template-level spread.
-
-export const config = {
-  publicUrl,
-  siteName,
-  adminContact,
-  instanceName,
-  defaultSchemaId,
-  defaultGroup,
-  identityGroups,
-  contactRecipient,
-  smtpFromAddress,
-  adminFreshnessHours,
-  // smtpConnectionUri intentionally OMITTED from the debug/log object: it
-  // carries the SMTP password. Consumers import it by name when they need it.
-} as const;

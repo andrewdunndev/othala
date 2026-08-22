@@ -137,3 +137,11 @@ export function isAccessGroup(reg: GroupRegistry, name: string): boolean {
 export function knownGroupNames(reg: GroupRegistry): Set<string> {
   return new Set(reg.keys());
 }
+
+/** Every group name typed `kind`, sorted. */
+export function namesOfKind(reg: GroupRegistry, kind: GroupKind): string[] {
+  return Array.from(reg.values())
+    .filter((e) => e.kinds.has(kind))
+    .map((e) => e.name)
+    .sort();
+}

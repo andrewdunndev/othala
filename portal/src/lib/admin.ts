@@ -5,13 +5,15 @@
 //
 // AAL2 enforcement happens at the SSR layer: Kratos AAL is
 // per-flow / global, not per-route. requireAdminSession enforces the SP-3
-// trinity: active session + AAL2 + admin marker (metadata_admin.admin===true
-// from the admin API). Caddy already gates "session present" upstream; this
-// guard adds the identity-level checks Caddy cannot make.
+// trinity plus a freshness gate: active session + AAL2 + freshness (1h
+// default) + admin marker (metadata_admin.admin===true from the admin API).
+// Caddy already gates "session present" upstream; this guard adds the
+// identity-level checks Caddy cannot make.
 
 import { getSession, browserFlows } from './kratos';
 import { isAdminMarker } from './admin-auth';
 import { revokeSubject, type RevokeResult } from './revoke';
+import { adminFreshnessHours } from './config';
 import type { Session } from './types';
 import {
   getIdentity,
@@ -45,17 +47,9 @@ import type {
  * session.authenticated_at if the array is absent or yields no parseable entry.
  * If BOTH sources are unreadable the function returns false (fail-closed).
  *
- * Decision: this function is NOT wired into the requireAdminSession gate.
- * The explicit `session.authenticator_assurance_level === 'aal2'` check (with a
- * step-up redirect on AAL1) is the correct enforcement mechanism.
- * isSessionFresh is retained for future use (e.g. a "sudo timeout" freshness
- * window on destructive actions) and is unit-tested to prove correctness before
- * that use-case is wired in. When it is wired in, it should augment, not replace,
- * the explicit AAL check.
- *
- * Note: authentication_methods.completed_at shape and authenticated_at update
- * semantics should be validated against a live Kratos session before wiring
- * isSessionFresh into any gate.
+ * Wired into requireAdminSession as a step-up gate alongside the explicit
+ * `session.authenticator_assurance_level === 'aal2'` check — it augments,
+ * not replaces, that AAL check.
  */
 export function isSessionFresh(session: Session, windowHours: number): boolean {
   // Primary source: authentication_methods[].completed_at for aal2 entries.
@@ -134,9 +128,11 @@ export type { CreateIdentityInput, UpdateIdentityInput, IdentityTraits, Metadata
  *   (a) Active Kratos session with a resolved identity — else redirect to login.
  *   (b) AAL2 server-side — session.authenticator_assurance_level must equal
  *       'aal2'. An AAL1 session triggers a step-up redirect to Kratos with
- *       ?aal=aal2&refresh=true. A 200 from whoami does NOT imply AAL2 (the
- *       LDAP bridge uses aal1 sessions on the same Kratos instance).
- *   (c) Admin marker — identity.metadata_admin.admin === true (boolean strict),
+ *       ?aal=aal2&refresh=true. A 200 from whoami does NOT imply AAL2.
+ *   (c) Freshness — isSessionFresh(session, adminFreshnessHours) (default 1h,
+ *       OTHALA_ADMIN_FRESHNESS_HOURS). Stale sessions get the same aal2+refresh
+ *       step-up redirect as (b), before the admin-marker fetch.
+ *   (d) Admin marker — identity.metadata_admin.admin === true (boolean strict),
  *       read fresh from the Kratos admin API. The whoami response does NOT carry
  *       metadata_admin (Kratos v26.2.0 excludes it); the admin-API fetch is
  *       non-optional.
@@ -174,7 +170,15 @@ export async function requireAdminSession(astro: any): Promise<Session | Respons
     return astro.redirect(browserFlows.login({ aal: 'aal2', refresh: true, returnTo }));
   }
 
-  // (c) Admin marker — fetch identity fresh from the admin API (metadata_admin
+  // (c) Freshness gate — same step-up as (b) when AAL2 was satisfied too long
+  // ago (OTHALA_ADMIN_FRESHNESS_HOURS, default 1h). Checked before the
+  // admin-marker fetch.
+  if (!isSessionFresh(session, adminFreshnessHours)) {
+    const returnTo = encodeURIComponent(astro.url.pathname + astro.url.search);
+    return astro.redirect(browserFlows.login({ aal: 'aal2', refresh: true, returnTo }));
+  }
+
+  // (d) Admin marker — fetch identity fresh from the admin API (metadata_admin
   // is NOT present in the whoami response). Fail-closed on lookup error.
   let adminIdentity;
   try {

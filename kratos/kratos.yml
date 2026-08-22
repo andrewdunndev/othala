@@ -250,8 +250,8 @@ selfservice:
 session:
   # 720h (30 days). This is the blast-radius knob: the cookie below is
   # apex-scoped, so a stolen one is good on every subdomain until it expires.
-  # The admin UI enforces its own 15m freshness window independently
-  # (privileged_session_max_age). Operator-tunable per deployment.
+  # Admin freshness is enforced portal-side (requireAdminSession,
+  # OTHALA_ADMIN_FRESHNESS_HOURS, default 1h).
   lifespan: 720h
   cookie:
     # Parent apex domain so the IdP and every subdomain app share the

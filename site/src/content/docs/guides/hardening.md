@@ -109,12 +109,12 @@ image, not of this repository.
 
 ## Sessions and eviction
 
-**The admin gate checks assurance, not freshness.** Session lifetime is
-deliberately long, because passkey-first daily use should not be miserable, and
-`/admin` requires `aal2` plus the admin marker on every request but never checks
-*when* that assurance was established. `isSessionFresh` exists in
-`portal/src/lib/admin.ts`, is deliberately not wired into the gate, and is
-unit-tested against the day it is.
+**The admin gate checks assurance AND freshness.** Session lifetime is
+deliberately long, because passkey-first daily use should not be miserable, so
+`/admin` additionally gates on *when* `aal2` was established: `isSessionFresh`
+(`portal/src/lib/admin.ts`) redirects a stale session to the same step-up flow
+as a missing `aal2`, before the admin-marker fetch. Window: 1h default,
+`OTHALA_ADMIN_FRESHNESS_HOURS`.
 
 **Eviction must remove credentials, not just sessions.** Revoking sessions does
 not delete enrolled credentials, so someone with a brief session can enrol

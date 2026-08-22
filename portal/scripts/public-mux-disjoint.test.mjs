@@ -3,10 +3,11 @@
 //
 // Run with: npx vitest run scripts/public-mux-disjoint.test.mjs
 //
-// /admin/revoke-user, /admin/recovery-gate, and /admin/login-gate are served
-// ONLY by the admin listener (src/server/listen.mjs), bearer-guarded and bound
-// to the admin port. They are deliberately absent from src/pages/, so the
-// public port never routes them.
+// /admin/revoke-user and /admin/recovery-gate are served ONLY by the admin
+// listener (src/server/listen.mjs), bearer-guarded and bound to the admin
+// port. They are deliberately absent from src/pages/, so the public port
+// never routes them. /admin/login-gate is retired but stays in
+// FORBIDDEN_ROUTES below, defensively.
 //
 // The risk this test fences off: a future `src/pages/admin/revoke-user.ts`
 // (or .astro, or a revoke-user/index.* directory route) would make Astro

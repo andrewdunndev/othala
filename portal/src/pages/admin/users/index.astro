@@ -15,7 +15,6 @@ export const prerender = false;
 
 import Layout from '../../../layouts/Layout.astro';
 import { requireAdminSession, listIdentities } from '../../../lib/admin';
-import { servingIdentityGroups, servingAccessGroups } from '../../../lib/manifest-store';
 import { getGroupRegistry, isIdentityGroup } from '../../../lib/group-registry';
 import type { Identity } from '../../../lib/types';
 
@@ -58,7 +57,7 @@ filtered.sort((a, b) =>
 // Serving store, not the strict loader: the group filter is a convenience, and
 // a manifest that fails to validate must not take the user directory down with
 // it. A stale filter list is worth far more than a 500 here.
-const allGroups = [...servingIdentityGroups(), ...servingAccessGroups()];
+const allGroups = [...registry.keys()].sort();
 
 const adminNav = [
   { href: '/admin',          label: 'Overview' },

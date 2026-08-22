@@ -48,7 +48,6 @@
 // surfaces so nobody reads a stale app list as the live one.
 
 import { loadClientManifests, type ClientManifest } from './manifests';
-import { identityGroups as envIdentityGroups } from './config';
 
 /** Log tag; matches the `[portal:registrar]` convention in server/registrar.ts. */
 const TAG = '[portal:manifests]';
@@ -133,22 +132,6 @@ export function servingManifest(clientId: string): ClientManifest | undefined {
   return servingManifests().find(
     (m) => !m.presentationOnly && m.clientId.toLowerCase() === key,
   );
-}
-
-/**
- * Identity groups across the served set: OTHALA_IDENTITY_GROUPS plus every
- * group_role_map key any manifest references, sorted.
- *
- * Same derivation as manifests.ts knownIdentityGroups(), over the served set
- * instead of the strict load — that function throws, and the admin UI is
- * precisely the surface that must stay up when a manifest breaks.
- */
-export function servingIdentityGroups(): string[] {
-  const set = new Set<string>(envIdentityGroups);
-  for (const m of servingManifests()) {
-    for (const g of Object.keys(m.groupRoleMap)) set.add(g);
-  }
-  return Array.from(set).sort();
 }
 
 /**

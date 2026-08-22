@@ -16,7 +16,6 @@
 //   WARN (never blocks — adopters may already run nonstandard names):
 //     - a group named in access:/group_role_map that is not in the known set
 //       (typo → silent lockout).
-//     - access_group present alongside access: (the shim is ignored).
 //     - a group name — in access: or in a group_role_map key — that misses
 //       the canonical form (access-groups.ts GROUP_RE).
 //

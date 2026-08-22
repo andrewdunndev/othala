@@ -45,7 +45,6 @@
 import { readdirSync, readFileSync, statSync } from 'node:fs';
 import { join } from 'node:path';
 import { parse as parseYaml } from 'yaml';
-import { identityGroups } from './config';
 import { parseAccessGroups } from './access-groups';
 
 export interface ClientRole {
@@ -768,26 +767,6 @@ export function assertManifestsValid(set: ClientManifest[]): void {
       `manifest validation failed (${errs.length} finding(s)):\n  - ${errs.join('\n  - ')}`,
     );
   }
-}
-
-/** Distinct identity groups referenced by any manifest's group_role_map.
- *
- * Seeded from OTHALA_IDENTITY_GROUPS (env-driven, always includes 'admin')
- * so the admin UI shows every configured group even if no manifest references
- * it yet. Additional groups discovered in manifest group_role_map keys are
- * appended. Result is sorted for stable display order.
- *
- * Reads the whole catalog. Presentation-only manifests currently parse with an
- * empty groupRoleMap (they declare no roles), so today they contribute nothing
- * here — but they are in scope, so a future forward_auth manifest that does map
- * a role is picked up without another loader change.
- */
-export function knownIdentityGroups(): string[] {
-  const set = new Set<string>(identityGroups);
-  for (const m of loadClientManifests()) {
-    for (const g of Object.keys(m.groupRoleMap)) set.add(g);
-  }
-  return Array.from(set).sort();
 }
 
 /** Distinct access groups across the whole app catalog. Derived from each

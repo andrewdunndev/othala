@@ -63,6 +63,7 @@ import {
   isAccessGroup,
   isIdentityGroup,
   knownGroupNames,
+  namesOfKind,
   type GroupRegistry,
 } from './group-registry.js';
 
@@ -278,13 +279,6 @@ const EXPECTED_ROLE = ['grafana-access', 'grafana-admin', 'promptdesk-access', '
 
 function parse(file: string, body: string): ClientManifest {
   return parseManifest(body, file);
-}
-
-function namesOfKind(reg: GroupRegistry, kind: 'identity' | 'access' | 'role'): string[] {
-  return Array.from(reg.values())
-    .filter((e) => e.kinds.has(kind))
-    .map((e) => e.name)
-    .sort();
 }
 
 function accessFor(reg: GroupRegistry, name: string): string[] {

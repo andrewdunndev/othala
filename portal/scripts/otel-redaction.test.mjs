@@ -88,7 +88,7 @@ test('isAdminSpan is true for /admin/ targets and absolute admin URLs', () => {
   assert.equal(isAdminSpan({ 'http.target': '/admin/revoke-user' }), true);
   assert.equal(isAdminSpan({ 'http.route': '/admin/recovery-gate' }), true);
   assert.equal(
-    isAdminSpan({ 'http.url': 'https://host/admin/login-gate' }),
+    isAdminSpan({ 'http.url': 'https://host/admin/revoke-user' }),
     true,
   );
 });

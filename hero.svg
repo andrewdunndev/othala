@@ -6,7 +6,7 @@
   <line x1="60" y1="48" x2="1140" y2="48" stroke="#e0e0e0" stroke-width="1"/>
   <text x="60" y="138" font-size="72" font-weight="700" fill="#4a6741" letter-spacing="-2">othala</text>
   <text x="60" y="172" font-size="16" font-style="italic" fill="#404040">Ory for your home.</text>
-  <text x="60" y="202" font-size="14" fill="#404040">Kratos + Hydra + glauth-kratos bridge that hold the home's identity.</text>
+  <text x="60" y="202" font-size="14" fill="#404040">Kratos + Hydra that hold the home's identity.</text>
   <text x="60" y="222" font-size="14" fill="#404040">config-as-code is the only path to an identity change.</text>
   <g transform="translate(110 246)" font-family="IBM Plex Mono, Menlo, monospace">
     <!-- door (dagaz ᛞ) → home (othala ᛟ), geometric runic line-art coherent with mark/ -->
@@ -62,15 +62,15 @@
   <rect x="560" y="224" width="270" height="130" rx="3" fill="#ffffff" stroke="#e0e0e0" stroke-width="1"/>
   <text x="578" y="246" font-size="10" font-weight="700" font-family="IBM Plex Mono, Menlo, monospace" fill="#707070" letter-spacing="1.4">OUT</text>
   <text x="578" y="292" font-size="32" font-weight="700" fill="#4a6741" letter-spacing="-0.5">idp</text>
-  <text x="578" y="318" font-size="11" fill="#404040">OIDC + LDAP + forward-auth for every consumer in the home</text>
-  <text x="578" y="340" font-size="9" font-family="IBM Plex Mono, Menlo, monospace" fill="#707070" letter-spacing="0.6">OIDC · LDAP · FORWARD-AUTH</text>
+  <text x="578" y="318" font-size="11" fill="#404040">OIDC + forward-auth for every consumer in the home</text>
+  <text x="578" y="340" font-size="9" font-family="IBM Plex Mono, Menlo, monospace" fill="#707070" letter-spacing="0.6">OIDC · FORWARD-AUTH</text>
   <rect x="850" y="224" width="270" height="130" rx="3" fill="#ffffff" stroke="#e0e0e0" stroke-width="1"/>
   <text x="868" y="246" font-size="10" font-weight="700" font-family="IBM Plex Mono, Menlo, monospace" fill="#707070" letter-spacing="1.4">LIFETIME</text>
   <text x="868" y="292" font-size="32" font-weight="700" fill="#4a6741" letter-spacing="-0.5">auditable</text>
   <text x="868" y="318" font-size="11" fill="#404040">every grant flows from a committed config</text>
   <text x="868" y="340" font-size="9" font-family="IBM Plex Mono, Menlo, monospace" fill="#707070" letter-spacing="0.6">GIT LOG · CONFIG TIMELINE</text>
   <line x1="60" y1="386" x2="1140" y2="386" stroke="#e0e0e0" stroke-width="1"/>
-  <text x="60" y="412" font-size="10" font-weight="600" font-family="IBM Plex Mono, Menlo, monospace" fill="#707070" letter-spacing="1.4">ORY · KRATOS · HYDRA · OIDC · LDAP</text>
+  <text x="60" y="412" font-size="10" font-weight="600" font-family="IBM Plex Mono, Menlo, monospace" fill="#707070" letter-spacing="1.4">ORY · KRATOS · HYDRA · OIDC</text>
   <text x="1140" y="412" text-anchor="end" font-size="10" font-weight="600" font-family="IBM Plex Mono, Menlo, monospace" fill="#707070" letter-spacing="1.4">MIT · GITLAB.COM/DUNN.DEV/othala</text>
   </g>
 </svg>

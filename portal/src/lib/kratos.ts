@@ -13,7 +13,6 @@ import type {
   FlowResult,
   LoginFlow,
   RecoveryFlow,
-  RegistrationFlow,
   Session,
   SettingsFlow,
   VerificationFlow,
@@ -106,17 +105,6 @@ export function getLoginFlow(flowId: string, cookie?: string): Promise<FlowResul
     frontendApi()
       .getLoginFlow({ id: flowId, cookie })
       .then((f) => f as unknown as LoginFlow),
-  );
-}
-
-export function getRegistrationFlow(
-  flowId: string,
-  cookie?: string,
-): Promise<FlowResult<RegistrationFlow>> {
-  return wrapFlowResult(() =>
-    frontendApi()
-      .getRegistrationFlow({ id: flowId, cookie })
-      .then((f) => f as unknown as RegistrationFlow),
   );
 }
 

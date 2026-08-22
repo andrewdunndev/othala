@@ -41,7 +41,7 @@
     <circle cx="32" cy="24" r="2" stroke-width="1.9"/>
   </g>
   <line x1="40" y1="200" x2="216" y2="200" stroke="#e0e0e0" stroke-width="1"/>
-  <text x="128" y="218" text-anchor="middle" font-size="9" font-weight="600" fill="#0a0a0a">kratos · hydra · oidc · ldap</text>
+  <text x="128" y="218" text-anchor="middle" font-size="9" font-weight="600" fill="#0a0a0a">kratos · hydra · oidc</text>
   <text x="128" y="232" text-anchor="middle" font-size="8" fill="#707070">door to home · self-hosted · idp</text>
   </g>
 </svg>

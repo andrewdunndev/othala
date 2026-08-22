@@ -29,6 +29,7 @@ import {
   parseBearer,
   handleAdminRequest,
   recoveryGateVerdict,
+  startupEnvErrors,
   ADMIN_ROUTES,
   ADMIN_GET_ROUTES,
   ADMIN_POST_ROUTES,
@@ -157,6 +158,22 @@ test('bearerMatches accepts only the exact secret (constant-time path)', () => {
   assert.equal(bearerMatches('s3creT', 's3cret'), false);
   assert.equal(bearerMatches('s3cre', 's3cret'), false); // length mismatch
   assert.equal(bearerMatches('s3cretX', 's3cret'), false);
+});
+
+// ── startup checks (32-byte floor, CRYPTO-2) ────────────────────────────────
+
+test('startup fails when RECOVERY_GATE_SECRET is set but shorter than 32 bytes', () => {
+  process.env.RECOVERY_GATE_SECRET = 'short-secret';
+  process.env.OTHALA_ADMIN_ENDPOINT_BEARER = 'x'.repeat(32);
+  const errors = startupEnvErrors();
+  assert.ok(errors.some((e) => /RECOVERY_GATE_SECRET/.test(e) && /32 bytes/.test(e)));
+});
+
+test('startup fails when OTHALA_ADMIN_ENDPOINT_BEARER is set but shorter than 32 bytes', () => {
+  process.env.RECOVERY_GATE_SECRET = 'x'.repeat(32);
+  process.env.OTHALA_ADMIN_ENDPOINT_BEARER = 'short-secret';
+  const errors = startupEnvErrors();
+  assert.ok(errors.some((e) => /OTHALA_ADMIN_ENDPOINT_BEARER/.test(e) && /32 bytes/.test(e)));
 });
 
 // ── revoke-user endpoint auth ──────────────────────────────────────────────

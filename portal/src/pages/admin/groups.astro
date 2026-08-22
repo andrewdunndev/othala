@@ -16,8 +16,8 @@ export const prerender = false;
 import Layout from '../../layouts/Layout.astro';
 import ManifestNotice from '../../components/ManifestNotice.astro';
 import { requireAdminSession, listIdentities } from '../../lib/admin';
-import { servingManifests, servingIdentityGroups, manifestHealth } from '../../lib/manifest-store';
-import { getGroupRegistry } from '../../lib/group-registry';
+import { servingManifests, manifestHealth } from '../../lib/manifest-store';
+import { getGroupRegistry, namesOfKind } from '../../lib/group-registry';
 import type { Identity } from '../../lib/types';
 
 const guard = await requireAdminSession(Astro);
@@ -37,7 +37,7 @@ try {
 const manifests = servingManifests();
 const registry = getGroupRegistry();
 const clientNameById = new Map(manifests.map((m) => [m.clientId, m.clientName] as const));
-const identityGroups = servingIdentityGroups();
+const identityGroups = namesOfKind(registry, 'identity');
 const manifestState = manifestHealth();
 
 // The access section is a registry-driven Group → Apps view. A group's type is

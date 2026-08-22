@@ -16,7 +16,6 @@
 //       GET  /healthz, /readyz        — liveness/readiness probes
 //       POST /admin/revoke-user       — admin force-logout fan-out (CU3 B1)
 //       POST /admin/recovery-gate     — Kratos recovery-gate webhook (CU3)
-//       POST /admin/login-gate        — Kratos login-gate webhook (CVP-P3)
 //     It NEVER delegates to the Astro `handler`, so no public route and no
 //     challenge provider is reachable on the admin port — and the public
 //     handler never sees admin paths. The two muxes are disjoint.
@@ -408,14 +407,15 @@ export async function createPublicServer() {
 }
 
 /**
- * Fail-closed startup assertions. Called before binding any socket; fatal-exits
- * if any required secret is unset/empty or if ADMIN_HOST is the wildcard address.
+ * Fail-closed startup checks (pure; test helper). Empty/short secret or a
+ * wildcard ADMIN_HOST each push a FATAL message; caller decides what to do.
  *
- * - RECOVERY_GATE_SECRET empty → bearer check on /admin/recovery-gate and
- *   /admin/login-gate would reject every request (fail-closed is correct), but
- *   a missing secret is always operator misconfiguration; refuse to boot so the
+ * - RECOVERY_GATE_SECRET empty or <32 bytes UTF-8 → bearer check on
+ *   /admin/recovery-gate would reject every request (fail-closed is correct),
+ *   but that is always operator misconfiguration; refuse to boot so the
  *   problem surfaces immediately rather than silently degrading the gate.
- * - OTHALA_ADMIN_ENDPOINT_BEARER empty → same reasoning for /admin/revoke-user.
+ *   32-byte floor mirrors csrf.ts's CSRF_SECRET check (CRYPTO-2).
+ * - OTHALA_ADMIN_ENDPOINT_BEARER: same reasoning for /admin/revoke-user.
  * - ADMIN_HOST is a wildcard (0.0.0.0, :: or empty "") → admin port would be
  *   exposed to the network; the admin mux has no public-facing auth hardening
  *   and must only be reachable on loopback or a pod-internal address. Note the
@@ -423,23 +423,33 @@ export async function createPublicServer() {
  *   ADMIN_HOST="" reaches http.listen as the IPv6 wildcard, and "::" is the
  *   explicit IPv6 wildcard. Both must be refused alongside 0.0.0.0.
  */
-function assertStartupEnv() {
+export function startupEnvErrors() {
   const errors = [];
 
   const recoverySecret = process.env.RECOVERY_GATE_SECRET ?? '';
   if (!recoverySecret.trim()) {
     errors.push('[portal] FATAL: RECOVERY_GATE_SECRET is not set or empty — refusing to start');
+  } else if (Buffer.byteLength(recoverySecret, 'utf8') < 32) {
+    errors.push('[portal] FATAL: RECOVERY_GATE_SECRET is shorter than 32 bytes (UTF-8) — refusing to start');
   }
 
   const adminBearer = process.env.OTHALA_ADMIN_ENDPOINT_BEARER ?? '';
   if (!adminBearer.trim()) {
     errors.push('[portal] FATAL: OTHALA_ADMIN_ENDPOINT_BEARER is not set or empty — refusing to start');
+  } else if (Buffer.byteLength(adminBearer, 'utf8') < 32) {
+    errors.push('[portal] FATAL: OTHALA_ADMIN_ENDPOINT_BEARER is shorter than 32 bytes (UTF-8) — refusing to start');
   }
 
   if (ADMIN_HOST === '0.0.0.0' || ADMIN_HOST === '::' || ADMIN_HOST === '') {
     errors.push(`[portal] FATAL: ADMIN_HOST is a wildcard address (${JSON.stringify(ADMIN_HOST)}) — the admin port must be bound to loopback or a pod-internal IP, never a wildcard (0.0.0.0, :: or empty)`);
   }
 
+  return errors;
+}
+
+/** Fatal-exits if startupEnvErrors() finds anything. Called before binding any socket. */
+function assertStartupEnv() {
+  const errors = startupEnvErrors();
   if (errors.length > 0) {
     for (const msg of errors) console.error(msg);
     process.exit(1);

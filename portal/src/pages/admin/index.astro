@@ -14,12 +14,8 @@ export const prerender = false;
 import Layout from '../../layouts/Layout.astro';
 import ManifestNotice from '../../components/ManifestNotice.astro';
 import { requireAdminSession, listIdentities } from '../../lib/admin';
-import {
-  servingManifests,
-  servingIdentityGroups,
-  servingAccessGroups,
-  manifestHealth,
-} from '../../lib/manifest-store';
+import { servingManifests, manifestHealth } from '../../lib/manifest-store';
+import { getGroupRegistry, namesOfKind } from '../../lib/group-registry';
 
 const guard = await requireAdminSession(Astro);
 if (guard instanceof Response) return guard;
@@ -38,8 +34,9 @@ try {
 // known good set instead of throwing — a manifest that fails to validate must
 // not 500 the page an operator would open to find out why.
 const manifests = servingManifests();
-const identityGroups = servingIdentityGroups();
-const accessGroups = servingAccessGroups();
+const registry = getGroupRegistry();
+const identityGroups = namesOfKind(registry, 'identity');
+const accessGroups = namesOfKind(registry, 'access');
 const health = manifestHealth();
 
 const adminNav = [

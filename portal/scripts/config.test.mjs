@@ -334,19 +334,3 @@ test('identityGroups: default group (everyone) appended to bare ["admin"] defaul
   const { identityGroups } = await loadConfig({ NODE_ENV: 'test' });
   assert.deepEqual(identityGroups, ['admin', 'everyone']);
 });
-
-// ── aggregate config object ───────────────────────────────────────────────────
-
-test('config object mirrors individual exports', async () => {
-  const mod = await loadConfig({
-    NODE_ENV: 'test',
-    OTHALA_SITE_NAME: 'Test Site',
-  });
-  assert.equal(mod.config.siteName, mod.siteName);
-  assert.equal(mod.config.publicUrl, mod.publicUrl);
-  assert.equal(mod.config.adminContact, mod.adminContact);
-  assert.equal(mod.config.instanceName, mod.instanceName);
-  assert.equal(mod.config.defaultSchemaId, mod.defaultSchemaId);
-  assert.equal(mod.config.defaultGroup, mod.defaultGroup);
-  assert.deepEqual(mod.config.identityGroups, mod.identityGroups);
-});
