@@ -10,6 +10,11 @@
 .dg .i{fill:var(--ink)}.dg .i2{fill:var(--ink2)}.dg .m{fill:var(--mut)}.dg .a{fill:var(--acc)}
 .dg .n{fill:var(--no)}.dg .y{fill:var(--yes)}
 </style>
+<defs>
+<marker id="sr-arrow" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto">
+<path d="M0,0 L0,6 L8,3 z" fill="#707070"/>
+</marker>
+</defs>
 <g font-family="'IBM Plex Sans', Helvetica, Arial, sans-serif">
 <rect class="p" x="0" y="0" width="720" height="414" fill="#ffffff"/>
 <rect class="p e" x="20" y="20" width="680" height="374" rx="3" fill="#ffffff" stroke="#e0e0e0" stroke-width="1"/>
@@ -33,8 +38,7 @@
 <text class="m" x="52" y="106" font-family="'IBM Plex Mono', Menlo, monospace" font-size="8" font-weight="700" letter-spacing="1.1" fill="#707070">HYDRA · skip = true</text>
 <text class="i2" x="52" y="122" font-size="8.5" fill="#404040">remembers this subject (login.subject)</text>
 <g class="ms" stroke="#707070" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" fill="none">
-<line x1="190" y1="136" x2="190" y2="158"/>
-<polyline points="185.5,158 190,163 194.5,158"/>
+<line x1="190" y1="136" x2="190" y2="161" marker-end="url(#sr-arrow)"/>
 </g>
 <text class="m" x="200" y="152" font-size="7.5" fill="#707070">re-verify</text>
 <rect class="p as" x="40" y="163" width="300" height="60" rx="3" fill="#ffffff" stroke="#4a6741" stroke-width="1.4"/>
@@ -42,10 +46,8 @@
 <text class="i" x="52" y="197" font-size="8.5" fill="#0a0a0a">session.active AND</text>
 <text class="i" x="52" y="209" font-size="8.5" fill="#0a0a0a">session.identity.id === login.subject</text>
 <g class="ms" stroke="#707070" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" fill="none">
-<line x1="150" y1="223" x2="110" y2="248"/>
-<polyline points="102.9,244.8 110,248 108.4,255.7"/>
-<line x1="230" y1="223" x2="270" y2="248"/>
-<polyline points="271.6,255.7 270,248 277.1,244.8"/>
+<line x1="150" y1="223" x2="111.7" y2="246.9" marker-end="url(#sr-arrow)"/>
+<line x1="230" y1="223" x2="268.3" y2="246.9" marker-end="url(#sr-arrow)"/>
 </g>
 <text class="n" x="93" y="245" text-anchor="end" font-size="8" font-weight="700" fill="#a8443a">no match</text>
 <text class="y" x="287" y="245" text-anchor="start" font-size="8" font-weight="700" fill="#4a7a4a">match</text>
@@ -70,18 +72,14 @@
 <rect class="s e" x="586" y="88" width="94" height="34" rx="3" fill="#f4f4f4" stroke="#e0e0e0" stroke-width="1"/>
 <text class="i2" x="633" y="109" text-anchor="middle" font-family="'IBM Plex Mono', Menlo, monospace" font-size="7" fill="#404040">DEACTIVATE</text>
 <g class="ms" stroke="#707070" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" fill="none">
-<line x1="426.5" y1="122" x2="500" y2="146"/>
-<line x1="529.5" y1="122" x2="529.5" y2="146"/>
-<line x1="633" y1="122" x2="560" y2="146"/>
-<polyline points="495,138.8 500,146 492,145.4"/>
-<polyline points="525,141 529.5,146 534,141"/>
-<polyline points="568,145.4 560,146 565,138.8"/>
+<line x1="426.5" y1="122" x2="498.1" y2="145.4" marker-end="url(#sr-arrow)"/>
+<line x1="529.5" y1="122" x2="529.5" y2="144" marker-end="url(#sr-arrow)"/>
+<line x1="633" y1="122" x2="561.9" y2="145.4" marker-end="url(#sr-arrow)"/>
 </g>
 <rect class="p as" x="440" y="146" width="180" height="32" rx="3" fill="#ffffff" stroke="#4a6741" stroke-width="1.4"/>
 <text class="a" x="530" y="166" text-anchor="middle" font-family="'IBM Plex Mono', Menlo, monospace" font-size="8.5" font-weight="700" fill="#4a6741">revokeSubject(subject)</text>
 <g class="ms" stroke="#707070" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" fill="none">
-<line x1="530" y1="178" x2="530" y2="196"/>
-<polyline points="525.5,196 530,201 534.5,196"/>
+<line x1="530" y1="178" x2="530" y2="199" marker-end="url(#sr-arrow)"/>
 </g>
 <rect class="p as" x="380" y="201" width="300" height="122" rx="3" fill="#ffffff" stroke="#4a6741" stroke-width="1.4"/>
 <text class="i2" x="392" y="219" font-size="8.5" fill="#404040">1 · state → inactive (deactivate trigger only,</text>

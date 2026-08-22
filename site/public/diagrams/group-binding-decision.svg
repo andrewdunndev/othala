@@ -10,6 +10,11 @@
 .dg .i{fill:var(--ink)}.dg .i2{fill:var(--ink2)}.dg .m{fill:var(--mut)}.dg .a{fill:var(--acc)}
 .dg .n{fill:var(--no)}.dg .y{fill:var(--yes)}
 </style>
+<defs>
+<marker id="gbd-arrow" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto">
+<path d="M0,0 L0,6 L8,3 z" fill="#707070"/>
+</marker>
+</defs>
 <g font-family="'IBM Plex Sans', Helvetica, Arial, sans-serif">
 <rect class="p" x="0" y="0" width="720" height="436" fill="#ffffff"/>
 <rect class="p e" x="20" y="20" width="680" height="396" rx="3" fill="#ffffff" stroke="#e0e0e0" stroke-width="1"/>
@@ -42,10 +47,8 @@
 <text class="m" x="52" y="211" font-size="8" fill="#707070">public whoami response.</text>
 <!-- arrows: identity → bindings -->
 <g class="ms" stroke="#707070" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" fill="none">
-<line x1="204" y1="126" x2="242" y2="126"/>
-<polyline points="236,121.5 242,126 236,130.5"/>
-<line x1="204" y1="214" x2="242" y2="214"/>
-<polyline points="236,209.5 242,214 236,218.5"/>
+<line x1="204" y1="126" x2="240" y2="126" marker-end="url(#gbd-arrow)"/>
+<line x1="204" y1="214" x2="240" y2="214" marker-end="url(#gbd-arrow)"/>
 </g>
 <!-- column 2: the bindings -->
 <rect class="p as" x="250" y="88" width="230" height="76" rx="3" fill="#ffffff" stroke="#4a6741" stroke-width="1.4"/>
@@ -61,10 +64,8 @@
 <text class="m" x="262" y="261" font-size="8" fill="#707070">Rank is the declaration order of consent.roles.</text>
 <!-- arrows: bindings → decisions -->
 <g class="ms" stroke="#707070" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" fill="none">
-<line x1="484" y1="126" x2="512" y2="126"/>
-<polyline points="506,121.5 512,126 506,130.5"/>
-<line x1="484" y1="214" x2="512" y2="214"/>
-<polyline points="506,209.5 512,214 506,218.5"/>
+<line x1="484" y1="126" x2="510" y2="126" marker-end="url(#gbd-arrow)"/>
+<line x1="484" y1="214" x2="510" y2="214" marker-end="url(#gbd-arrow)"/>
 </g>
 <!-- column 3: the decisions -->
 <rect class="s as" x="520" y="88" width="160" height="76" rx="3" fill="#f4f4f4" stroke="#4a6741" stroke-width="1.4"/>
