@@ -59,15 +59,25 @@ const PASSKEY_REGISTER_BUTTON = 'button[name="passkey_register_trigger"]';
 const PASSKEY_LOGIN_BUTTON = 'button[name="passkey_login_trigger"]';
 
 test.describe('I — Passkey register → usernameless login', () => {
-  // I1: both ceremonies call navigator.credentials, which Chromium gates
-  // behind [SecureContext] — https, or an origin explicitly trusted via
-  // --unsafely-treat-insecure-origin-as-secure (see playwright.config.ts).
-  // The e2e edge is deliberately plaintext HTTP (D10 / e2e/caddy.Caddyfile:
-  // auto_https off), so without that flag WebAuthn was silently blocked for
-  // BOTH registration and login — not a Kratos discoverable-credential bug.
-  // Registration's failure was masked because its old assertion only checked
-  // the settings page for an error string, which still passed with no
-  // credential ever created; it's now backed by a server-side check.
+  // I1 CONFIRMED (not a Kratos bug): page.evaluate() on the live settings
+  // page shows isSecureContext:false and zero window.ory* globals even
+  // though webauthn.js loads with a 200 — Chromium's [SecureContext] gate
+  // is really blocking the ceremony, exactly as suspected. But the fix
+  // attempted here — chromium launchOptions.args
+  // --unsafely-treat-insecure-origin-as-secure=http://auth.othala.test in
+  // playwright.config.ts — does NOT flip isSecureContext in this harness;
+  // why is undiagnosed (tracked in the issue below). The flag, the
+  // server-side registration assertion, and the diagnostic listeners below
+  // all stay: they're correct and will start proving the real path the
+  // moment the launch-flag gap is closed.
+  //
+  // See: https://gitlab.com/dunn.dev/othala/-/work_items/8 for the
+  // isSecureContext:false trace evidence and next steps.
+  test.fixme(
+    true,
+    'I1: SecureContext gate confirmed real (isSecureContext:false on the live page), ' +
+    'but the launchOptions insecure-origin flag is not taking effect in this harness — see linked issue',
+  );
   test('I1 — register a passkey via settings, then log in usernameless', async ({
     browser,
     baseURL,
