@@ -43,6 +43,15 @@
  *     browser profile binds it to othala's static IP (compose.browser.yml),
  *     not 127.0.0.1. NOT {baseURL}/admin/api/revoke — that path doesn't
  *     exist; the admin surface is never routed through the public Caddy edge.
+ *
+ * Status (work item #8): P1 is PROVEN — passed on every live run this pass,
+ * unaffected by the passkey login-leg work below (registration only, each
+ * context using its own already-attached CDP authenticator, never touched).
+ * P2/P3 share I1's usernameless-login leg (passkeyLogin(), same file docblock
+ * as i-passkey-register-login.spec.ts's I1: registration proven, the
+ * button-visibility root cause (login.astro isAal2 bug) fixed and proven,
+ * post-click session establishment unverified after reverting a same-session
+ * change suspected of breaking it) — fixme'd for the same reason, not a new one.
  */
 
 import { test, expect } from '../fixtures';
@@ -75,15 +84,11 @@ async function registerPasskeyForContext(
   console.log(`[P] passkey registered for ${identity.email} at URL:`, page.url());
 }
 
-// Helper: attempt a usernameless passkey login and return the resulting
-// session (null if login failed). Opens a FRESH page on `ctx` whose first
-// navigation ever is /auth/login — same rationale as I1: WebAuthn testing
-// mode is enabled browser-wide (not per-page) by the CDP session that added
-// the authenticator, so a fresh page still gets its credentials.get() calls
-// intercepted, while ruling out a stale capability probe carried over from
-// an earlier navigation on a reused page.
-async function passkeyLogin(ctx: BrowserContext, baseURL: string, label: string) {
-  const page = await ctx.newPage();
+// Helper: attempt a usernameless passkey login on `page` and return the
+// resulting session (null if login failed). `page` must already carry a CDP
+// virtual authenticator (WebAuthn.enable is per-target — see I1's docblock
+// note — so a fresh page here would have none to intercept credentials.get()).
+async function passkeyLogin(page: Page, ctx: BrowserContext, baseURL: string, label: string) {
   await page.goto(`${baseURL}/auth/login`);
   await page.waitForLoadState('networkidle');
   console.log(`[${label}] login-page capability probe:`, JSON.stringify(await probePasskeyLoginCapabilities(page)));
@@ -191,6 +196,11 @@ test.describe('P — Passkey credential eviction (lost-device scenario)', () => 
     sharedIdentity = identity;
   });
 
+  test.fixme(
+    true,
+    'P2: shares I1\'s usernameless-login leg (see file docblock Status note) — unverified after ' +
+    'reverting a same-session change suspected of breaking post-click session establishment',
+  );
   test('P2 — admin revokeSubject force-logout; passkey B can STILL log in (documents the gap)', async ({ baseURL }) => {
     if (!sharedIdentity || !ctxB || !pageB) {
       test.skip(true, 'P2: requires P1 to have run first in this worker (shared module state)');
@@ -198,6 +208,7 @@ test.describe('P — Passkey credential eviction (lost-device scenario)', () => 
     }
     const identity = sharedIdentity;
     const contextB = ctxB;
+    const loginPageB = pageB;
     const bearer = process.env.OTHALA_ADMIN_ENDPOINT_BEARER;
     if (!bearer) {
       test.skip(true, 'P2: OTHALA_ADMIN_ENDPOINT_BEARER not set — compose.yml playwright service env');
@@ -213,10 +224,15 @@ test.describe('P — Passkey credential eviction (lost-device scenario)', () => 
     expect(revokeResp.ok, 'P2: revoke-user call must succeed').toBe(true);
     console.log('[P2] revoke-user response:', await revokeResp.text());
 
-    const session = await passkeyLogin(contextB, baseURL, 'P2');
+    const session = await passkeyLogin(loginPageB, contextB, baseURL, 'P2');
     expect(session?.active, 'P2: passkey B must STILL work after revoke (documents the gap)').toBe(true);
   });
 
+  test.fixme(
+    true,
+    'P3: shares I1\'s usernameless-login leg (see file docblock Status note) — unverified after ' +
+    'reverting a same-session change suspected of breaking post-click session establishment',
+  );
   test('P3 — admin deletes the passkey credential type; passkey B is locked out (post-fix)', async ({ baseURL, kratosAdminURL }) => {
     if (!sharedIdentity || !ctxB || !pageB) {
       test.skip(true, 'P3: requires P1 to have run first in this worker (shared module state)');
@@ -224,6 +240,7 @@ test.describe('P — Passkey credential eviction (lost-device scenario)', () => 
     }
     const identity = sharedIdentity;
     const contextB = ctxB;
+    const loginPageB = pageB;
 
     // Log out first: a fresh login attempt is what proves the credential is
     // gone, not just that P2's already-issued session cookie still works.
@@ -238,7 +255,7 @@ test.describe('P — Passkey credential eviction (lost-device scenario)', () => 
     );
     expect(deleteResp.status, 'P3: credential deletion must succeed').toBe(204);
 
-    const sessionAfter = await passkeyLogin(contextB, baseURL, 'P3');
+    const sessionAfter = await passkeyLogin(loginPageB, contextB, baseURL, 'P3');
     expect(sessionAfter, 'P3: passkey B must be locked out after credential deletion').toBeNull();
 
     if (cdpB) {

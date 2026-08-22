@@ -122,10 +122,15 @@ Passkey-only was genuinely attractive and is blocked by one thing — the break-
 passkey enrollment and email delivery are both degraded, so a password credential type stays enabled
 even though almost nobody types one.
 
-**Enforced by.** `e2e/playwright/tests/i-passkey-register-login.spec.ts` and
-`e2e/playwright/tests/k-email-code-login.spec.ts` — each method must work end to end. The tier
-ORDER, and the legacy strategy's disabled passwordless, are UNENFORCED: `kratos/kratos.yml` holds
-those values and nothing fails when they change.
+**Enforced by.** `e2e/playwright/tests/k-email-code-login.spec.ts` end to end. The passkey leg
+(`i-passkey-register-login.spec.ts` I1) is split: registration is proven — a real discoverable
+credential lands server-side every run — but usernameless login is fixme'd pending #8's remaining
+step (the CDP virtual authenticator must live on the same page/CDP session throughout, confirmed
+by the credential-persisting-server-side + click-succeeding evidence; the reload it needed to find
+the trigger button at all was a real portal bug, `portal/src/pages/auth/login.astro`, now fixed —
+see DECISIONS.md history and the linked issue for the ceremony-completion gap that remains).
+UNENFORCED, like the tier ORDER and the legacy strategy's disabled passwordless — `kratos/kratos.yml`
+holds those values and nothing fails when they change.
 
 ## No password ever transits a channel
 
