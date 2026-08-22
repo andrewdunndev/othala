@@ -477,6 +477,11 @@ e2e:
     when: on_failure
     paths:
       - e2e/logs/apply-clients.log
+      # Playwright html-report/test-results/screenshots + the diagnostics/
+      # capture (actions/diagnostics.ts) — bind-mounted from the playwright
+      # container's /out at e2e/compose.yml's ./browser-out:/out, so this
+      # host-side path already holds everything by the time the job ends.
+      - e2e/browser-out
     expire_in: 1 week
   rules:
     # Absent from plain main/MR pushes: the QEMU runner is expensive and

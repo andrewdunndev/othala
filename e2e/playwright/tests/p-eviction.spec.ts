@@ -50,6 +50,7 @@ import type { BrowserContext, CDPSession, Page } from 'playwright-core';
 import { createIdentityWithPassword, TEST_PASSWORD } from '../actions/identity';
 import { loginViaJsonApi } from '../actions/login';
 import { getSession } from '../actions/session';
+import { capturePasskeyLoginDiagnostics, probePasskeyLoginCapabilities } from '../actions/diagnostics';
 
 const PASSKEY_REGISTER_BUTTON = 'button[name="passkey_register_trigger"]';
 const PASSKEY_LOGIN_BUTTON = 'button[name="passkey_login_trigger"]';
@@ -74,11 +75,19 @@ async function registerPasskeyForContext(
   console.log(`[P] passkey registered for ${identity.email} at URL:`, page.url());
 }
 
-// Helper: attempt a usernameless passkey login on `page` and return the
-// resulting session (null if login failed).
-async function passkeyLogin(page: Page, ctx: BrowserContext, baseURL: string) {
+// Helper: attempt a usernameless passkey login and return the resulting
+// session (null if login failed). Opens a FRESH page on `ctx` whose first
+// navigation ever is /auth/login — same rationale as I1: WebAuthn testing
+// mode is enabled browser-wide (not per-page) by the CDP session that added
+// the authenticator, so a fresh page still gets its credentials.get() calls
+// intercepted, while ruling out a stale capability probe carried over from
+// an earlier navigation on a reused page.
+async function passkeyLogin(ctx: BrowserContext, baseURL: string, label: string) {
+  const page = await ctx.newPage();
   await page.goto(`${baseURL}/auth/login`);
   await page.waitForLoadState('networkidle');
+  console.log(`[${label}] login-page capability probe:`, JSON.stringify(await probePasskeyLoginCapabilities(page)));
+
   let loginBtn = page.locator(PASSKEY_LOGIN_BUTTON).first();
   // Observed flaky (i-passkey-register-login.spec.ts I1): the trigger node
   // is occasionally absent from the first SSR response after a fresh
@@ -88,6 +97,9 @@ async function passkeyLogin(page: Page, ctx: BrowserContext, baseURL: string) {
     await page.reload();
     await page.waitForLoadState('networkidle');
     loginBtn = page.locator(PASSKEY_LOGIN_BUTTON).first();
+  }
+  if (!(await loginBtn.isVisible().catch(() => false))) {
+    await capturePasskeyLoginDiagnostics(page, `${label}-login-missing`);
   }
   await expect(loginBtn, 'passkey login button must be visible').toBeVisible({ timeout: 10_000 });
   await page.waitForFunction(() => typeof (window as unknown as Record<string, unknown>).oryPasskeyLogin === 'function');
@@ -186,7 +198,6 @@ test.describe('P — Passkey credential eviction (lost-device scenario)', () => 
     }
     const identity = sharedIdentity;
     const contextB = ctxB;
-    const loginPageB = pageB;
     const bearer = process.env.OTHALA_ADMIN_ENDPOINT_BEARER;
     if (!bearer) {
       test.skip(true, 'P2: OTHALA_ADMIN_ENDPOINT_BEARER not set — compose.yml playwright service env');
@@ -202,7 +213,7 @@ test.describe('P — Passkey credential eviction (lost-device scenario)', () => 
     expect(revokeResp.ok, 'P2: revoke-user call must succeed').toBe(true);
     console.log('[P2] revoke-user response:', await revokeResp.text());
 
-    const session = await passkeyLogin(loginPageB, contextB, baseURL);
+    const session = await passkeyLogin(contextB, baseURL, 'P2');
     expect(session?.active, 'P2: passkey B must STILL work after revoke (documents the gap)').toBe(true);
   });
 
@@ -213,7 +224,6 @@ test.describe('P — Passkey credential eviction (lost-device scenario)', () => 
     }
     const identity = sharedIdentity;
     const contextB = ctxB;
-    const loginPageB = pageB;
 
     // Log out first: a fresh login attempt is what proves the credential is
     // gone, not just that P2's already-issued session cookie still works.
@@ -228,7 +238,7 @@ test.describe('P — Passkey credential eviction (lost-device scenario)', () => 
     );
     expect(deleteResp.status, 'P3: credential deletion must succeed').toBe(204);
 
-    const sessionAfter = await passkeyLogin(loginPageB, contextB, baseURL);
+    const sessionAfter = await passkeyLogin(contextB, baseURL, 'P3');
     expect(sessionAfter, 'P3: passkey B must be locked out after credential deletion').toBeNull();
 
     if (cdpB) {

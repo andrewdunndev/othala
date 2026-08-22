@@ -45,6 +45,7 @@ import { test, expect } from '../fixtures';
 import { createIdentityWithPassword, TEST_PASSWORD } from '../actions/identity';
 import { loginViaJsonApi } from '../actions/login';
 import { getSession } from '../actions/session';
+import { capturePasskeyLoginDiagnostics, probePasskeyLoginCapabilities } from '../actions/diagnostics';
 
 // The passkey settings page selector for the "Add a passkey" / "Register" trigger.
 // Kratos renders a button node with name="passkey_register_trigger" for the
@@ -173,38 +174,47 @@ test.describe('I — Passkey register → usernameless login', () => {
       'I1 precondition (post-logout): session must be gone before usernameless login',
     ).toBeNull();
 
-    // Step 5: Usernameless login via the passkey button. Navigate to the login
-    // page and click the passkey login trigger (no identifier typed). The browser
-    // calls credentials.get() with allowCredentials:[] (discoverable credential
-    // request). The virtual authenticator returns the resident key stored in
-    // step 3. Kratos verifies the assertion and issues a new session.
-    //
-    // The trigger is button[name="passkey_login_trigger"] (passkey_login.go).
-    // This is the visible "Sign in with a passkey" button — not the hidden
-    // passkey_login field used by oryPasskeyLoginAutocompleteInit.
-    await page.goto(`${baseURL}/auth/login`);
-    await page.waitForLoadState('networkidle');
+    // Step 5: Usernameless login via the passkey button. A FRESH page (same
+    // context, same cookies-cleared jar) whose FIRST navigation ever is
+    // /auth/login — the virtual authenticator (WebAuthn testing mode, enabled
+    // browser-wide by the fixture's WebAuthn.enable, not per-page) still
+    // intercepts credentials.get() on it. Ruling out: a stale capability
+    // probe cached from the settings page's navigation, which reusing `page`
+    // could not distinguish from a server-side omission.
+    const loginPage = await ctx.newPage();
+    await loginPage.goto(`${baseURL}/auth/login`);
+    await loginPage.waitForLoadState('networkidle');
 
-    let loginBtn = page.locator(PASSKEY_LOGIN_BUTTON).first();
+    // Capability probe: the button is a SERVER-rendered node (login.astro
+    // renders it iff Kratos's flow.ui.nodes has a `passkey` group — see
+    // hasMethod() in lib/nodes.ts), not something client JS shows or hides.
+    // If conditional mediation / the trigger glue is missing, the fault is
+    // upstream of anything this page can retry into existing.
+    console.log('[I1] login-page capability probe:', JSON.stringify(await probePasskeyLoginCapabilities(loginPage)));
+
+    let loginBtn = loginPage.locator(PASSKEY_LOGIN_BUTTON).first();
     // Observed flaky: the trigger node is occasionally absent from the first
     // SSR response after a fresh navigation (unrelated to the credential —
     // a reload re-requests the login flow and consistently renders it). One
     // reload, not a longer timeout: a hung render doesn't resolve by waiting.
     if (!(await loginBtn.isVisible().catch(() => false))) {
-      await page.reload();
-      await page.waitForLoadState('networkidle');
-      loginBtn = page.locator(PASSKEY_LOGIN_BUTTON).first();
+      await loginPage.reload();
+      await loginPage.waitForLoadState('networkidle');
+      loginBtn = loginPage.locator(PASSKEY_LOGIN_BUTTON).first();
+    }
+    if (!(await loginBtn.isVisible().catch(() => false))) {
+      await capturePasskeyLoginDiagnostics(loginPage, 'I1-login-missing');
     }
     await expect(loginBtn, 'I1: passkey login button must be visible on the login page').toBeVisible({ timeout: 10_000 });
     // Same race as registration: wait for the login trigger's glue
     // (window.oryPasskeyLogin, per KNOWN_TRIGGERS in lib/nodes.ts) to exist.
-    await page.waitForFunction(() => typeof (window as unknown as Record<string, unknown>).oryPasskeyLogin === 'function');
+    await loginPage.waitForFunction(() => typeof (window as unknown as Record<string, unknown>).oryPasskeyLogin === 'function');
     await loginBtn.click();
 
     // Wait for the redirect back to the app (Kratos issues the session cookie
     // and redirects to the return_to URL or the default post-login destination).
-    await page.waitForLoadState('networkidle');
-    console.log('[I1] post-passkey-login URL:', page.url());
+    await loginPage.waitForLoadState('networkidle');
+    console.log('[I1] post-passkey-login URL:', loginPage.url());
 
     // Step 6: Verify the session. The session must be active and tied to the
     // identity we registered the passkey for.
