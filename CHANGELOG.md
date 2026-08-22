@@ -9,6 +9,45 @@ This CHANGELOG and git tags carry the deployed-instance release state.
 
 ## [Unreleased]
 
+## [0.6.0] - 2026-08-22
+
+The outage-ending release: 0.5.0's broken login page fixed, e2e gated into
+every pipeline (not just tags) so the gap that let it ship stays closed, and
+an admin-hardening batch (session freshness, delete-lockout, secret-strength).
+
+### Fixed
+
+- **Login page rendered an empty step-up card for every anonymous login.**
+  The webauthn glue `<script>` node Kratos emits on every flow was miscounted
+  as a second-factor node, so an ordinary AAL1 login looked like an AAL2
+  step-up with nothing in it — nobody could sign in. Shipped broken in
+  0.5.0; this release ends the outage.
+- CI: e2e and both image builds now run in **every** pipeline, not just
+  tag-gated ones — the gap that let the login bug above ship green.
+- Admin session freshness now enforced (`OTHALA_ADMIN_FRESHNESS_HOURS`,
+  default 1h, fail-closed): a stale admin session steps up again instead of
+  being trusted indefinitely.
+- Identity delete refuses admin-marked targets (revoke first, which enforces
+  last-admin) — closes a delete-the-last-admin lockout path.
+- 32-byte minimum enforced on admin-port bearer secrets at boot.
+
+### Changed
+
+- Admin action handlers extracted to a dispatch table (behavior-preserving).
+- Group classification single-sourced onto the group registry; `/admin/groups`
+  identity groups are now env-seeded only.
+- e2e: rate-limit zones N1/N2 and multi-context eviction P1 now proven live;
+  the production Caddy image joined the test substrate; failure artifacts
+  upload; Chromium runs its real channel (was silently the headless-shell).
+- Routine dependency bumps (vitest, the pipeline component, mailpit and
+  nodejs base-image digests).
+
+### Known limitation
+
+- Passkey click-to-session completion is still unproven end to end (I1/P2/P3
+  fixme'd) — the first live passkey login discriminates whether the
+  authenticator survives the click. #8 open.
+
 ## [0.5.0] - 2026-08-18
 
 Docs convergence (corpus cut two-thirds, 16 ADRs folded into one
@@ -284,6 +323,7 @@ runtime manifest model, plus the rename to **Othala** ("Ory for your home").
 - Smoke harness green on the QEMU runner (incl. the contact-form
   Section H); 459 portal unit tests; `astro check` and `astro build` clean.
 
+[0.6.0]: https://gitlab.com/dunn.dev/othala/-/releases/v0.6.0
 [0.5.0]: https://gitlab.com/dunn.dev/othala/-/releases/v0.5.0
 [0.4.0]: https://gitlab.com/dunn.dev/othala/-/releases/v0.4.0
 [0.3.0]: https://gitlab.com/dunn.dev/othala/-/releases/v0.3.0
