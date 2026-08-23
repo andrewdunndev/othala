@@ -273,7 +273,11 @@ test.describe('P — Passkey credential eviction (lost-device scenario)', () => 
       `${kratosAdminURL}/admin/identities/${identity.id}/credentials/passkey`,
       { method: 'DELETE' },
     );
-    expect(deleteResp.status, 'P3: credential deletion must succeed').toBe(204);
+    // Never retry-mask a non-204: this is the exact primitive the admin UI
+    // calls, so an intermittent refusal is product-relevant — surface the
+    // server's reason instead.
+    const deleteReason = deleteResp.status === 204 ? '' : ` — ${await deleteResp.text().catch(() => '(unreadable body)')}`;
+    expect(deleteResp.status, `P3: credential deletion must succeed${deleteReason}`).toBe(204);
 
     const sessionAfter = await passkeyLogin(loginPageB, contextB, baseURL, 'P3');
     expect(sessionAfter, 'P3: passkey B must be locked out after credential deletion').toBeNull();
