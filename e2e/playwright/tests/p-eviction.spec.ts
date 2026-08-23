@@ -187,10 +187,19 @@ test.describe('P — Passkey credential eviction (lost-device scenario)', () => 
     await loginViaJsonApi(ctxB, { identifier: identity.email, password: TEST_PASSWORD }, baseURL);
     await registerPasskeyForContext(pageB, baseURL, identity);
 
-    // Server-side proof both passkeys were persisted.
-    const registered = await fetch(`${kratosAdminURL}/admin/identities/${identity.id}`).then((r) => r.json());
+    // Server-side proof both passkeys were persisted. Poll — same race
+    // class as #8/I1: the second ceremony's CDP resolve can return before
+    // Kratos finishes writing that credential.
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    let registered: any;
+    await expect.poll(
+      async () => {
+        registered = await fetch(`${kratosAdminURL}/admin/identities/${identity.id}`).then((r) => r.json());
+        return registered?.credentials?.passkey;
+      },
+      { timeout: 10_000, message: 'P1: identity must have passkey credentials after both enrollments' },
+    ).toBeTruthy();
     console.log('[P1] passkey credential record:', JSON.stringify(registered?.credentials?.passkey));
-    expect(registered?.credentials?.passkey, 'P1: identity must have passkey credentials after both enrollments').toBeTruthy();
 
     // Clear both sessions — P2's "still works after revoke" assertion needs
     // a FRESH login, not a residual cookie.
@@ -245,6 +254,17 @@ test.describe('P — Passkey credential eviction (lost-device scenario)', () => 
     // Log out first: a fresh login attempt is what proves the credential is
     // gone, not just that P2's already-issued session cookie still works.
     await clearSession(contextB, baseURL);
+
+    // Confirm the credential actually landed server-side before deleting it
+    // — same race class as P1/I1: a 400 below would mean the DELETE ran
+    // ahead of Kratos's write, not that eviction is broken.
+    await expect.poll(
+      async () => {
+        const r = await fetch(`${kratosAdminURL}/admin/identities/${identity.id}`).then((res) => res.json());
+        return r?.credentials?.passkey;
+      },
+      { timeout: 10_000, message: 'P3: passkey credential must be recorded server-side before deletion' },
+    ).toBeTruthy();
 
     // Same endpoint portal/src/lib/admin-api.ts deleteCredential() calls
     // (identityApi().deleteIdentityCredentials) — the primitive the admin
