@@ -489,15 +489,19 @@ e2e:
       - e2e/browser-out
     expire_in: 1 week
   rules:
-    # e2e and both image builds run in EVERY pipeline — push, MR, main, tag.
-    # BUILD_CI_IMAGE is the component's force-build interface, pinned true
-    # globally above. Operator decision after v0.5.0 shipped a login outage
-    # through green tag-gated pipelines: release must never be the first e2e
-    # run.
+    # e2e fires on the merge-relevant pipelines — MR, main, tag — plus the
+    # RUN_E2E=true manual lever for proving an ad-hoc branch. Source-keyed
+    # rules, deliberately NOT a branch-name convention (a misspelled name
+    # would skip the gate silently). Image builds stay always-on via the
+    # global BUILD_CI_IMAGE (SaaS runners, no anvil load); the QEMU cost is
+    # this job alone. The captured-flow unit fixture in check-portal still
+    # guards the v0.5.0 bug class on every push everywhere.
     #
     # GitLab variables don't honor bash ${VAR:-default}, so tag pipelines
     # must override AUTH_VERSION here to pull the v-tag image.
     - if: '$CI_COMMIT_TAG'
       variables:
         AUTH_VERSION: "$CI_COMMIT_TAG"
-    - if: '$BUILD_CI_IMAGE == "true"'
+    - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
+    - if: '$CI_COMMIT_BRANCH == "main"'
+    - if: '$RUN_E2E == "true"'
