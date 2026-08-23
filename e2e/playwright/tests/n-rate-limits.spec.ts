@@ -107,13 +107,11 @@ test.describe('N — Abuse rate-limiting (gate-time, MEDIUM-B)', () => {
     async ({ page, baseURL }) => {
       const ctx = page.context();
 
-      // Step 1: initiate the flow once.
-      const flowResp = await ctx.request.get(`${baseURL}/self-service/login/browser`, {
-        headers: { Accept: 'application/json' },
-        maxRedirects: 5,
-      });
-      expect(flowResp.ok(), 'N2: login flow init must succeed').toBe(true);
-      const flow = await flowResp.json() as {
+      // Step 1: initiate the flow. Retried, never skipped — the harness
+      // guarantees stack readiness by this point in the suite (workers:1;
+      // every earlier spec already exercised this exact flow init), so a
+      // scrape failure here is a bug to surface, not a reason to skip.
+      type LoginBrowserFlow = {
         ui?: {
           action?: string;
           nodes?: Array<{
@@ -122,22 +120,34 @@ test.describe('N — Abuse rate-limiting (gate-time, MEDIUM-B)', () => {
           }>;
         };
       };
-      const action: string = flow?.ui?.action ?? '';
+      let action = '';
       let csrfToken = '';
-      for (const node of flow?.ui?.nodes ?? []) {
-        if (
-          node?.attributes?.name === 'csrf_token' &&
-          node?.attributes?.type === 'hidden'
-        ) {
-          csrfToken = String(node.attributes.value ?? '');
-          break;
+      let lastFlow: LoginBrowserFlow | null = null;
+      for (let attempt = 1; attempt <= 3; attempt++) {
+        const flowResp = await ctx.request.get(`${baseURL}/self-service/login/browser`, {
+          headers: { Accept: 'application/json' },
+          maxRedirects: 5,
+        });
+        expect(flowResp.ok(), `N2: login flow init must succeed (attempt ${attempt}/3)`).toBe(true);
+        const flow = await flowResp.json() as LoginBrowserFlow;
+        lastFlow = flow;
+        action = flow?.ui?.action ?? '';
+        for (const node of flow?.ui?.nodes ?? []) {
+          if (node?.attributes?.name === 'csrf_token' && node?.attributes?.type === 'hidden') {
+            csrfToken = String(node.attributes.value ?? '');
+            break;
+          }
         }
+        if (action) break;
+        console.log(`[N2] attempt ${attempt}/3: ui.action missing from flow response, retrying...`);
+        await new Promise((r) => setTimeout(r, 300 * attempt));
       }
 
-      if (!action) {
-        test.skip(true, 'N2: could not extract login flow action — stack not ready');
-        return;
-      }
+      expect(
+        action,
+        'N2: login flow ui.action missing after 3 attempts — a stack-readiness bug, not a legitimate ' +
+        `skip reason; last flow: ${JSON.stringify(lastFlow).slice(0, 400)}`,
+      ).toBeTruthy();
 
       // Step 2: submit wrong passwords rapidly.
       let got429 = false;

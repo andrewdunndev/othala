@@ -5,8 +5,9 @@
  * glue-script node (<script src=".../webauthn.js">, present on EVERY login
  * flow that offers passkey or webauthn — not just a step-up) got counted as
  * a second-factor node, so hasSecondFactorNodes — and isAal2 — came back
- * true for every anonymous AAL1 login. The e2e suite never caught this: its
- * Kratos stack never emits the glue script node on login flows. Fixture (a)
+ * true for every anonymous AAL1 login. The e2e suite never caught this: 20
+ * of 21 specs bypass login.astro via the JSON-API login path (the Kratos
+ * stack DOES emit the glue script node — work item #9). Fixture (a)
  * below is the REAL flow shape captured from the live v0.5.0 instance (see
  * fixtures/login-aal1-captured.json), values sanitised (csrf_token, flow id,
  * script nonce, passkey challenge) but node structure/groups/types/attributes

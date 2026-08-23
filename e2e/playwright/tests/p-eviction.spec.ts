@@ -44,14 +44,11 @@
  *     not 127.0.0.1. NOT {baseURL}/admin/api/revoke — that path doesn't
  *     exist; the admin surface is never routed through the public Caddy edge.
  *
- * Status (work item #8): P1 is PROVEN — passed on every live run this pass,
- * unaffected by the passkey login-leg work below (registration only, each
- * context using its own already-attached CDP authenticator, never touched).
- * P2/P3 share I1's usernameless-login leg (passkeyLogin(), same file docblock
- * as i-passkey-register-login.spec.ts's I1: registration proven, the
- * button-visibility root cause (login.astro isAal2 bug) fixed and proven,
- * post-click session establishment unverified after reverting a same-session
- * change suspected of breaking it) — fixme'd for the same reason, not a new one.
+ * Status (work item #8, RESOLVED): P1-P3 all run. P2/P3 share I1's
+ * usernameless-login leg (passkeyLogin() below) — the prior "session null
+ * after click" symptom was a harness race (networkidle satisfied mid-
+ * ceremony by the CDP virtual authenticator's zero-network-traffic resolve,
+ * before the session cookie landed), fixed by waiting on navigation instead.
  */
 
 import { test, expect } from '../fixtures';
@@ -109,7 +106,14 @@ async function passkeyLogin(page: Page, ctx: BrowserContext, baseURL: string, la
   await expect(loginBtn, 'passkey login button must be visible').toBeVisible({ timeout: 10_000 });
   await page.waitForFunction(() => typeof (window as unknown as Record<string, unknown>).oryPasskeyLogin === 'function');
   await loginBtn.click();
-  await page.waitForLoadState('networkidle');
+  // Deterministic wait (work item #8 root cause, same as I1): the CDP
+  // virtual authenticator resolves credentials.get() with ZERO network
+  // traffic, so networkidle was satisfied before Kratos's follow-up POST +
+  // redirect landed the session cookie. Wait on the actual navigation
+  // instead — bounded, and tolerant of the P3 case where login is
+  // EXPECTED to fail (no redirect ever happens there; the caller's own
+  // assertion on the returned session proves that outcome, not this wait).
+  await page.waitForURL((u) => !u.pathname.startsWith('/auth/login'), { timeout: 15_000 }).catch(() => {});
   return getSession(ctx, baseURL);
 }
 
@@ -196,11 +200,9 @@ test.describe('P — Passkey credential eviction (lost-device scenario)', () => 
     sharedIdentity = identity;
   });
 
-  test.fixme(
-    true,
-    'P2: shares I1\'s usernameless-login leg (see file docblock Status note) — unverified after ' +
-    'reverting a same-session change suspected of breaking post-click session establishment',
-  );
+  // P2 shares I1's usernameless-login leg (passkeyLogin() above); resolved
+  // per the file docblock Status note — was a networkidle wait race, not a
+  // product bug.
   test('P2 — admin revokeSubject force-logout; passkey B can STILL log in (documents the gap)', async ({ baseURL }) => {
     if (!sharedIdentity || !ctxB || !pageB) {
       test.skip(true, 'P2: requires P1 to have run first in this worker (shared module state)');
@@ -228,11 +230,9 @@ test.describe('P — Passkey credential eviction (lost-device scenario)', () => 
     expect(session?.active, 'P2: passkey B must STILL work after revoke (documents the gap)').toBe(true);
   });
 
-  test.fixme(
-    true,
-    'P3: shares I1\'s usernameless-login leg (see file docblock Status note) — unverified after ' +
-    'reverting a same-session change suspected of breaking post-click session establishment',
-  );
+  // P3 shares I1's usernameless-login leg (passkeyLogin() above); resolved
+  // per the file docblock Status note — was a networkidle wait race, not a
+  // product bug.
   test('P3 — admin deletes the passkey credential type; passkey B is locked out (post-fix)', async ({ baseURL, kratosAdminURL }) => {
     if (!sharedIdentity || !ctxB || !pageB) {
       test.skip(true, 'P3: requires P1 to have run first in this worker (shared module state)');

@@ -60,35 +60,15 @@ const PASSKEY_REGISTER_BUTTON = 'button[name="passkey_register_trigger"]';
 const PASSKEY_LOGIN_BUTTON = 'button[name="passkey_login_trigger"]';
 
 test.describe('I — Passkey register → usernameless login', () => {
-  // I1 status (work item #8): registration is PROVEN — the credential lands
-  // server-side every run (see the assertion below; it is not gated by this
-  // fixme). Two bugs were found and fixed this pass:
-  //   1. playwright.config.ts channel:'chromium' — headless-shell silently
-  //      ignored --unsafely-treat-insecure-origin-as-secure (playwright#22944).
-  //   2. portal/src/pages/auth/login.astro — nodesByGroup(ui.nodes,'webauthn')
-  //      counted the ALWAYS-present <script src=".../webauthn.js"> node as a
-  //      second factor, making isAal2 true (and so hiding the passkey/code/
-  //      password tiers behind an empty step-up card) on every ordinary AAL1
-  //      login. Proven via capturePasskeyLoginDiagnostics: capability probe
-  //      clean (conditionalMediationAvailable true, all ory* triggers
-  //      defined) and the flow's own ui.nodes carried a passkey group node —
-  //      ruling out both a client-capability gate and a Kratos-side omission
-  //      before the DOM/screenshot capture showed the actual step-up card.
-  // Remaining, NOT yet fixed: after that fix, the button is found and
-  // clicked, but the resulting session is null (getSession returns nothing
-  // after the click) — the WebAuthn ceremony itself isn't completing. An
-  // earlier revision of this test moved the login leg to a fresh
-  // browser.newPage() chasing a (now-disproven) capability-timing theory;
-  // that page has no CDP virtual authenticator of its own (WebAuthn.enable
-  // is per-target, confirmed by P1's ctx-B needing its own CDP session) and
-  // is the suspected cause — reverted back to reusing `page` here, but that
-  // combination (both fixes + the revert together) has not been run live.
-  test.fixme(
-    true,
-    'I1: registration proven; the button-visibility root cause (login.astro isAal2 bug) is fixed and ' +
-    'proven, but the post-click session establishment is unverified after reverting a same-session ' +
-    'change that broke it — see the docblock above and work item #8',
-  );
+  // I1 status (work item #8, RESOLVED): the button-visibility bug
+  // (login.astro's webauthn glue-script node miscounted as a second
+  // factor) and the playwright.config.ts channel:'chromium' headless-shell
+  // flag bug are both fixed and proven. The remaining "session null after
+  // click" symptom was a harness race, not a product bug: the CDP virtual
+  // authenticator resolves navigator.credentials.get() with zero network
+  // traffic, so networkidle was satisfied mid-ceremony, before Kratos's
+  // follow-up POST + redirect landed the session cookie — fixed below by
+  // waiting on the actual navigation instead of networkidle.
   test('I1 — register a passkey via settings, then log in usernameless', async ({
     browser,
     baseURL,
@@ -240,17 +220,25 @@ test.describe('I — Passkey register → usernameless login', () => {
     await page.waitForFunction(() => typeof (window as unknown as Record<string, unknown>).oryPasskeyLogin === 'function');
     await loginBtn.click();
 
-    // Wait for the redirect back to the app (Kratos issues the session cookie
-    // and redirects to the return_to URL or the default post-login destination).
-    await page.waitForLoadState('networkidle');
+    // Deterministic wait (work item #8 root cause): the CDP virtual
+    // authenticator resolves credentials.get() with ZERO network traffic,
+    // so networkidle returns before Kratos's follow-up POST + redirect
+    // land the session cookie. Wait for the actual navigation away from
+    // /auth/login instead, then poll for the session (the cookie can land
+    // a beat after the URL changes).
+    await page.waitForURL((u) => !u.pathname.startsWith('/auth/login'), { timeout: 15_000 });
     console.log('[I1] post-passkey-login URL:', page.url());
 
     // Step 6: Verify the session. The session must be active and tied to the
     // identity we registered the passkey for.
-    const finalSession = await getSession(ctx, baseURL);
-
-    expect(finalSession, 'I1: active session must exist after usernameless passkey login').not.toBeNull();
-    expect(finalSession!.active, 'I1: session must be active').toBe(true);
+    let finalSession: Awaited<ReturnType<typeof getSession>> = null;
+    await expect.poll(
+      async () => {
+        finalSession = await getSession(ctx, baseURL);
+        return finalSession?.active ?? false;
+      },
+      { timeout: 10_000, message: 'I1: session must become active after usernameless passkey login' },
+    ).toBe(true);
     expect(
       finalSession!.identity?.traits?.email,
       'I1: session identity must match the passkey-registered identity',
