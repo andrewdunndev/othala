@@ -266,17 +266,36 @@ test.describe('P — Passkey credential eviction (lost-device scenario)', () => 
       { timeout: 10_000, message: 'P3: passkey credential must be recorded server-side before deletion' },
     ).toBeTruthy();
 
-    // Same endpoint portal/src/lib/admin-api.ts deleteCredential() calls
-    // (identityApi().deleteIdentityCredentials) — the primitive the admin
-    // UI's 'remove-credential' action already wires up.
-    const deleteResp = await fetch(
+    // TELEMETRY (temporary, this branch only): resolve the 400-vs-204
+    // contradiction — source says DELETE type=passkey is an unconditional
+    // 400 in this Kratos, yet playwright retries observed 204s. Log the
+    // credential map (types + identifier counts only) and double-tap the
+    // DELETE so one CI run answers whether the endpoint is deterministic.
+    const credSnapshot = async () => {
+      const r = await fetch(`${kratosAdminURL}/admin/identities/${identity.id}`).then((res) => res.json());
+      const creds = r?.credentials ?? {};
+      return Object.fromEntries(Object.entries(creds).map(([t, c]) => [t, (c as { identifiers?: string[] }).identifiers?.length ?? 0]));
+    };
+    console.log(`[P3-telemetry] pre-delete credentials: ${JSON.stringify(await credSnapshot())}`);
+    const doDelete = () => fetch(
       `${kratosAdminURL}/admin/identities/${identity.id}/credentials/passkey`,
       { method: 'DELETE' },
     );
+    const deleteResp = await doDelete();
+    const body1 = deleteResp.status === 204 ? '' : await deleteResp.text().catch(() => '(unreadable body)');
+    console.log(`[P3-telemetry] delete#1 status=${deleteResp.status} body=${body1}`);
+    if (deleteResp.status !== 204) {
+      const second = await doDelete();
+      const body2 = second.status === 204 ? '' : await second.text().catch(() => '(unreadable body)');
+      console.log(`[P3-telemetry] delete#2 status=${second.status} body=${body2}`);
+      console.log(`[P3-telemetry] post-delete#2 credentials: ${JSON.stringify(await credSnapshot())}`);
+    } else {
+      console.log(`[P3-telemetry] post-delete credentials: ${JSON.stringify(await credSnapshot())}`);
+    }
     // Never retry-mask a non-204: this is the exact primitive the admin UI
     // calls, so an intermittent refusal is product-relevant — surface the
     // server's reason instead.
-    const deleteReason = deleteResp.status === 204 ? '' : ` — ${await deleteResp.text().catch(() => '(unreadable body)')}`;
+    const deleteReason = deleteResp.status === 204 ? '' : ` — ${body1}`;
     expect(deleteResp.status, `P3: credential deletion must succeed${deleteReason}`).toBe(204);
 
     const sessionAfter = await passkeyLogin(loginPageB, contextB, baseURL, 'P3');
