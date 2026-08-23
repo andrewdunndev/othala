@@ -166,6 +166,7 @@ lint-identity-schema:
   rules:
     - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
     - if: '$CI_PIPELINE_SOURCE == "push"'
+    - if: '$CI_PIPELINE_SOURCE == "api"'
     - if: '$CI_COMMIT_TAG'
   script:
     - |
@@ -219,6 +220,7 @@ lint-jsonnet-hooks:
   rules:
     - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
     - if: '$CI_PIPELINE_SOURCE == "push"'
+    - if: '$CI_PIPELINE_SOURCE == "api"'
     - if: '$CI_COMMIT_TAG'
   script:
     - |
@@ -295,6 +297,7 @@ check-purity:
   rules:
     - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
     - if: '$CI_PIPELINE_SOURCE == "push"'
+    - if: '$CI_PIPELINE_SOURCE == "api"'
     - if: '$CI_COMMIT_TAG'
   before_script:
     # The runner's checkout is owned by a different uid than the job user;
@@ -356,6 +359,7 @@ check-portal:
   rules:
     - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
     - if: '$CI_PIPELINE_SOURCE == "push"'
+    - if: '$CI_PIPELINE_SOURCE == "api"'
     - if: '$CI_COMMIT_TAG'
   before_script:
     # Same fix as check-purity: the runner's checkout is owned by a
@@ -479,7 +483,9 @@ e2e:
     # smoke-failure and healthcheck-timeout dumps were already moved to
     # STDOUT/job-trace in prior commits (3fbee74, 4129268) rather than a
     # file, so there's nothing to point an artifact path at for those.
-    when: on_failure
+    # `always`, not on_failure: a flaky-then-green run keeps its first-attempt
+    # failure evidence (2782513958's P2 flake left nothing to diagnose).
+    when: always
     paths:
       - e2e/logs/apply-clients.log
       # Playwright html-report/test-results/screenshots + the diagnostics/

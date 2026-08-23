@@ -97,7 +97,12 @@ async function registerPasskeyForContext(
 // virtual authenticator (WebAuthn.enable is per-target — see I1's docblock
 // note — so a fresh page here would have none to intercept credentials.get()).
 async function passkeyLogin(page: Page, ctx: BrowserContext, baseURL: string, label: string) {
-  await page.goto(`${baseURL}/auth/login`);
+  // /auth/login server-redirects through Kratos before settling on ?flow=<id>;
+  // the second hop can cancel a bare goto() mid-'load' ("interrupted by
+  // another navigation" — flaked pipeline 2782513958). Commit, then wait for
+  // the settled flow URL — same class as the post-click wait below.
+  await page.goto(`${baseURL}/auth/login`, { waitUntil: 'commit' }).catch(() => {});
+  await page.waitForURL(/\/auth\/login\?flow=/, { timeout: 10_000 });
   await page.waitForLoadState('networkidle');
   console.log(`[${label}] login-page capability probe:`, JSON.stringify(await probePasskeyLoginCapabilities(page)));
 
