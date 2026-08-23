@@ -233,11 +233,24 @@ export async function revokeAdminAction(_fd: FormData, ctx: ActionContext): Prom
   return { actionResult: { kind: 'admin-revoked', username }, refetch: true };
 }
 
+// Kratos upstream cannot admin-delete a passkey credential (identity/handler.go
+// deleteIdentityCredentials, v26.2.0 — no passkey case, unconditional 400; see
+// issue #10 and admin-api.ts EVICTABLE_CREDENTIAL_TYPES). Refuse it here too,
+// server-side, in case a stale form ever submits cred_type=passkey — the
+// message matches the note rendered next to the passkey chip.
+const PASSKEY_REFUSAL: ActionResult = {
+  kind: 'error',
+  message: 'Passkeys cannot be admin-deleted (Kratos upstream limitation). Revoke sessions, then have the user self-remove the credential at /auth/settings — or delete the identity as a last resort.',
+};
+
 export async function removeCredentialAction(fd: FormData, ctx: ActionContext): Promise<ActionOutcome> {
   const credType = String(fd.get('cred_type') ?? '').trim();
+  if (credType === 'passkey') {
+    return { actionResult: PASSKEY_REFUSAL, refetch: false };
+  }
   if (!EVICTABLE_CREDENTIAL_TYPES.has(credType)) {
     return {
-      actionResult: { kind: 'error', message: `Invalid credential type '${credType}'. Evictable types: passkey, webauthn, totp, lookup_secret.` },
+      actionResult: { kind: 'error', message: `Invalid credential type '${credType}'. Evictable types: webauthn, totp, lookup_secret.` },
       refetch: false,
     };
   }

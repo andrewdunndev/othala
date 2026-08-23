@@ -16,6 +16,8 @@
  *   - happy path: patchAdminMarker(id, false) called
  *   removeCredentialAction:
  *   - non-allowlisted type refused, deleteCredential never called
+ *   - passkey refused server-side (upstream 400 — Kratos cannot admin-delete
+ *     it), deleteCredential never called
  *   - happy path: deleteCredential called
  *   grantAdminAction:
  *   - happy path: patchAdminMarker(id, true) called
@@ -160,10 +162,20 @@ describe('removeCredentialAction', () => {
     expect(outcome.actionResult?.kind).toBe('error');
   });
 
-  it('happy path: calls deleteCredential with the identity id and type', async () => {
-    const outcome = await removeCredentialAction(fd({ cred_type: 'passkey' }), makeCtx({ id: 'target-1' }));
+  it('refuses passkey server-side (Kratos upstream cannot admin-delete it) and never calls deleteCredential', async () => {
+    const outcome = await removeCredentialAction(fd({ cred_type: 'passkey' }), makeCtx());
 
-    expect(deleteCredentialMock).toHaveBeenCalledWith('target-1', 'passkey');
+    expect(deleteCredentialMock).not.toHaveBeenCalled();
+    if (outcome instanceof Response) throw new Error('unreachable');
+    expect(outcome.actionResult?.kind).toBe('error');
+    if (outcome.actionResult?.kind !== 'error') throw new Error('unreachable');
+    expect(outcome.actionResult.message).toMatch(/self-remove/);
+  });
+
+  it('happy path: calls deleteCredential with the identity id and type', async () => {
+    const outcome = await removeCredentialAction(fd({ cred_type: 'webauthn' }), makeCtx({ id: 'target-1' }));
+
+    expect(deleteCredentialMock).toHaveBeenCalledWith('target-1', 'webauthn');
     if (outcome instanceof Response) throw new Error('unreachable');
     expect(outcome.actionResult?.kind).toBe('credential-removed');
     expect(outcome.refetch).toBe(true);

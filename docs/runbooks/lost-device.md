@@ -95,12 +95,10 @@ Click it for each affected type.
 
 **What Remove does:** it calls the Kratos admin API
 `DELETE /admin/identities/{id}/credentials/{type}` and removes **all**
-credentials of that type from the identity record. For passkeys, this means
-every registered passkey — Kratos does not expose per-instance removal on the
-admin API. The legitimate user re-enrolls with new keys after recovery.
+credentials of that type from the identity record. The legitimate user
+re-enrolls with new keys after recovery.
 
 **Evictable types (Remove button present):**
-- `passkey` — all FIDO2 passkeys
 - `webauthn` — all legacy WebAuthn keys
 - `totp` — the TOTP shared secret (the authenticator app binding)
 - `lookup_secret` (backup codes) — the set of backup codes
@@ -109,6 +107,22 @@ admin API. The legitimate user re-enrolls with new keys after recovery.
 - `password` — Kratos rejects admin deletion of the password credential.
   Where a directory-backed app authenticates by password, rotate it in that
   app's own admin console instead.
+- `passkey` — Kratos's admin API cannot delete a passkey credential at all,
+  even the whole type (upstream limitation, not a missing UI feature); no
+  Remove button is shown. See Step 3b.
+
+### Step 3b — Passkey: self-service removal
+
+Kratos exposes per-credential passkey removal only through the user's own
+`/auth/settings` — each enrolled key is listed separately with its own
+label; the victim removes the one matching the lost or stolen device. If
+they still hold a session, have them do it directly. If they're locked out,
+issue the enrollment URL (Step 5) first — it lands them in a privileged
+settings session to remove the compromised key and enroll a new one.
+
+If the victim can't be reached and urgency requires full lockout now, the
+last resort is **Delete** on this identity (Actions panel): the user
+re-registers from scratch.
 
 Each Remove action is CSRF-protected and requires an active AAL2 admin session.
 The confirmation banner after each removal tells you which type was removed.
@@ -159,7 +173,8 @@ current password or a privileged recovery session).
 [ ] 1. Open /admin/users/<id>  (confirm AAL2 gate passed)
 [ ] 2. Audit the credential chips — note which types were on the lost device
 [ ] 2b. Check the recoveryEmail trait — clear any address the user doesn't recognise
-[ ] 3. Remove each affected evictable type (passkey / webauthn / totp / backup codes)
+[ ] 3. Remove each affected evictable type (webauthn / totp / backup codes)
+[ ] 3b. Passkey: victim self-removes at /auth/settings, or Delete identity as last resort
 [ ] 4. Force re-login  (revoke sessions)
 [ ] 5. Issue enrollment URL  — share via Signal/iMessage
 [ ] 6. If password in use: rotate in the directory-backed app's admin

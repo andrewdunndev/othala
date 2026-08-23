@@ -119,18 +119,22 @@ as a missing `aal2`, before the admin-marker fetch. Window: 1h default,
 **Eviction must remove credentials, not just sessions.** Revoking sessions does
 not delete enrolled credentials, so someone with a brief session can enrol
 *their own* passkey and it survives both the revoke and a password reset. The
-order is: audit credentials, delete the affected credential **type**, then
-revoke, per `docs/runbooks/lost-device.md`.
-`e2e/playwright/tests/p-eviction.spec.ts` designs that coverage, not yet live
-(`test.fixme()`). Note the unit: the admin API has no per-credential removal,
-so deleting a type removes **every** credential of that kind, which is why the
-procedure ends in re-enrolment out of band.
+ladder, per `docs/runbooks/lost-device.md`: contain (admin revoke, cuts the
+session now) → recover (self-service `/auth/recovery` if the victim is
+locked out) → self-remove (the victim deletes the lost device's own
+credential at `/auth/settings`) → last resort (delete the identity). For
+webauthn/totp/lookup_secret the admin API can also delete the whole
+credential **type** in one call — but NOT for passkey: Kratos's admin API
+has no per-passkey removal and unconditionally refuses the type-delete too
+(upstream limitation, not a gap we can close). Self-remove is therefore the
+only passkey eviction path, and it is targeted — one credential, not the
+whole type — proven end-to-end by `e2e/playwright/tests/p-eviction.spec.ts` P3.
 
 Revoking itself is one fan-out, and it shares an invariant with the login
 path's own skip=true handling — Hydra's memory is never trusted on its own:
 
 <figure class="diagram">
-  <img src="/diagrams/session-revocation.svg" alt="Two panels. Left: when Hydra reports skip=true because it remembers a subject, the login handler re-verifies that a live Kratos session exists whose identity.id equals the remembered subject before honouring the skip; no live match forces interactive re-authentication, pinned by the FIX-A cases in portal/scripts/oauth2-handlers.test.mjs. Right: revokeSubject is the one in-process revocation fan-out, triggered by admin force-logout, sign-out-everywhere, or deactivate. Kratos sessions, Hydra's login-session and Hydra's consent-session are all revoked in a fixed order; this cuts sessions and remembered logins but not enrolled credentials, which is why the full eviction procedure above audits credentials and deletes the affected type before it revokes.">
+  <img src="/diagrams/session-revocation.svg" alt="Two panels. Left: when Hydra reports skip=true because it remembers a subject, the login handler re-verifies that a live Kratos session exists whose identity.id equals the remembered subject before honouring the skip; no live match forces interactive re-authentication, pinned by the FIX-A cases in portal/scripts/oauth2-handlers.test.mjs. Right: revokeSubject is the one in-process revocation fan-out, triggered by admin force-logout, sign-out-everywhere, or deactivate. Kratos sessions, Hydra's login-session and Hydra's consent-session are all revoked in a fixed order; this cuts sessions and remembered logins but not enrolled credentials, which is why the full eviction procedure above audits credentials and removes the affected one before it revokes.">
   <figcaption class="diagram-caption">Hydra remembers; Kratos authenticates — and revoking cuts both</figcaption>
 </figure>
 

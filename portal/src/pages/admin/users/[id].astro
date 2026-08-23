@@ -563,6 +563,14 @@ const adminNav = [
                           </button>
                         </form>
                       )}
+                      {m.key === 'passkey' && (
+                        <span
+                          class="cred-note muted text-xs"
+                          title="Kratos cannot admin-delete a passkey (upstream limitation). Revoke sessions, then the user self-removes it at /auth/settings — or delete the identity as a last resort."
+                        >
+                          self-remove only
+                        </span>
+                      )}
                     </span>
                   ) : (
                     <span class="badge badge-muted">{m.label} —</span>
@@ -570,9 +578,11 @@ const adminNav = [
                 ))}
               </div>
               <p class="cred-eviction-note muted text-xs">
-                Remove evicts the credential type (passkey/webauthn/totp/backup codes) for lost-device response.
+                Remove evicts the credential type (webauthn/totp/backup codes) for lost-device response.
                 The user must re-enroll with an enrollment link and code (both, issued from Actions below).
-                Password cannot be removed here.
+                Password cannot be removed here. Passkeys cannot be admin-deleted (Kratos upstream
+                limitation) — the user self-removes the lost device's key at /auth/settings; identity
+                deletion is the last resort.
               </p>
             </dd>
           </dl>
@@ -863,6 +873,12 @@ const adminNav = [
     border: none;
     border-left: 1px solid var(--border);
     border-radius: 0;
+  }
+  .cred-note {
+    display: inline-flex;
+    align-items: center;
+    padding: 0 var(--space-2);
+    border-left: 1px solid var(--border);
   }
   .cred-enrolled { background: var(--success-subtle); border-color: var(--success); }
   .cred-eviction-note { margin-top: var(--space-2); }

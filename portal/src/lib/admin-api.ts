@@ -238,12 +238,18 @@ export async function patchAdminMarker(id: string, grant: boolean): Promise<void
  * it is not a lost-device eviction factor (the attacker can't enrol a new
  * password without knowing the current one and we do not expose that surface).
  *
- * Eviction-relevant types: passkey and webauthn (possession factors a thief
- * could have enrolled), totp and lookup_secret (codes stored on or extracted
- * from a lost device).
+ * `passkey` is excluded too, but for a different reason: Kratos v26.2.0
+ * identity/handler.go deleteIdentityCredentials has no passkey case and
+ * unconditionally 400s ("Credentials type passkey cannot be deleted.",
+ * confirmed against the pinned tag and master — see issue #10). The
+ * canonical passkey eviction is self-service per-credential removal at
+ * /auth/settings (proven by e2e/playwright/tests/p-eviction.spec.ts P3).
+ *
+ * Eviction-relevant types: webauthn (a possession factor a thief could have
+ * enrolled), totp and lookup_secret (codes stored on or extracted from a
+ * lost device).
  */
 export const EVICTABLE_CREDENTIAL_TYPES = new Set<string>([
-  'passkey',
   'webauthn',
   'totp',
   'lookup_secret',
@@ -253,10 +259,10 @@ export const EVICTABLE_CREDENTIAL_TYPES = new Set<string>([
  * Delete ALL credentials of `type` for an identity.
  *
  * This is the lost-device eviction primitive. Kratos does not expose per-instance
- * passkey removal on the admin API — the unit of deletion is the credential type.
+ * removal on the admin API — the unit of deletion is the credential type.
  * Removing the type evicts every registered credential of that kind; the
  * legitimate user re-enrolls via the recovery/enrollment URL issued in the
- * same admin action.
+ * same admin action. NOT valid for passkey — see EVICTABLE_CREDENTIAL_TYPES.
  *
  * 404 from Kratos is treated as success (type not enrolled — nothing to evict).
  * All other non-2xx statuses propagate as errors to the caller.
