@@ -493,7 +493,7 @@ e2e:
     # RUN_E2E=true manual lever for proving an ad-hoc branch. Source-keyed
     # rules, deliberately NOT a branch-name convention (a misspelled name
     # would skip the gate silently). Image builds stay always-on via the
-    # global BUILD_CI_IMAGE (SaaS runners, no anvil load); the QEMU cost is
+    # global BUILD_CI_IMAGE (SaaS runners, no QEMU load); the QEMU cost is
     # this job alone. The captured-flow unit fixture in check-portal still
     # guards the v0.5.0 bug class on every push everywhere.
     #
