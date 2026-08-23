@@ -81,7 +81,7 @@ if (!challenge) {
   />
 
   {(fetchError || ownershipError) ? (
-    <section class="consent-card">
+    <section class="panel consent-card">
       <p class="consent-error">
         {!challenge
           ? 'No consent challenge was provided. This page should only be reached via an OAuth2 flow.'
@@ -91,7 +91,7 @@ if (!challenge) {
       </p>
     </section>
   ) : (
-    <section class="consent-card">
+    <section class="panel consent-card">
       <div class="consent-client">
         <p class="section-subtitle">Application requesting access</p>
         <p class="consent-client-name">{clientName}</p>
@@ -139,14 +139,11 @@ if (!challenge) {
 </Layout>
 
 <style>
-  /* Consent card: same geometry as login-card in login.astro. */
+  /* Consent card: same geometry as login-card in login.astro; surface via .panel. */
   .consent-card {
     max-width: 32rem;
     margin: 0 auto;
     padding: var(--space-6);
-    border: 1px solid var(--border);
-    border-radius: var(--radius);
-    background: var(--surface);
     display: flex;
     flex-direction: column;
     gap: var(--space-5);

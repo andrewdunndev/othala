@@ -63,8 +63,7 @@ auth.othala.test:80 {
 	# Matched before the app default so they're explicit/auditable.
 	@portal_challenges path /oauth2/login /oauth2/consent /oauth2/logout
 	handle @portal_challenges {
-		# DOS-1: overwrite inbound X-Forwarded-For with the real socket peer
-		# so the portal rate-limiter sees the actual client IP, not a spoofed one.
+		# DOS-1: XFF rewrite, same as below — see caddy/Caddyfile.
 		reverse_proxy othala:8080 {
 			header_up X-Forwarded-For {remote_host}
 		}
@@ -80,10 +79,7 @@ auth.othala.test:80 {
 	# Default -> the app: family UI, /auth/* + /admin/* pages, AND the static assets
 	# (/_astro/*, favicon, webmanifest). The app is the catch-all, not Kratos.
 	#
-	# DOS-1: overwrite any client-supplied X-Forwarded-For with the real
-	# socket peer IP. @astrojs/node resolves ctx.clientAddress from the leftmost
-	# XFF entry; without this, an attacker can prepend a fake IP per request
-	# and land in a fresh rate-limit bucket.
+	# DOS-1: XFF rewrite — rationale in caddy/Caddyfile.
 	reverse_proxy othala:8080 {
 		header_up X-Forwarded-For {remote_host}
 	}

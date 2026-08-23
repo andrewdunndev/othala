@@ -63,7 +63,7 @@ const phase: 'request' | 'sent' = flow?.state === 'sent_email' ? 'sent' : 'reque
     </div>
   )}
 
-  <section class="verify-card">
+  <section class="panel verify-card">
 
     {hasCode && ui && (
       <form method="POST" action={ui.action} class="verify-form">
@@ -99,13 +99,11 @@ const phase: 'request' | 'sent' = flow?.state === 'sent_email' ? 'sent' : 'reque
 </Layout>
 
 <style>
+  /* Surface via .panel. */
   .verify-card {
     max-width: 32rem;
     margin: 0 auto;
     padding: var(--space-6);
-    border: 1px solid var(--border);
-    border-radius: var(--radius);
-    background: var(--surface);
   }
   .verify-form {
     display: flex;

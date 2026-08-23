@@ -1,0 +1,55 @@
+---
+// Shared inline behavior for admin/users/new.astro and admin/users/[id].astro:
+// submit-disable guard + copy-to-clipboard. is:inline (no module bundling).
+---
+<script is:inline>
+  // In-flight feedback: disable the submitter button on POST so a slow
+  // admin mutation can't be double-clicked into a duplicate request. Each
+  // page here re-renders or full-page-navigates on completion, so there is
+  // no re-enable path to wire up.
+  document.addEventListener('submit', function (e) {
+    var form = e.target;
+    if (!(form instanceof HTMLFormElement) || form.method.toLowerCase() !== 'post') return;
+    var submitter = e.submitter;
+    if (!submitter || !('disabled' in submitter)) return;
+    submitter.textContent = submitter.textContent + '…';
+    // Defer disabling one tick so the browser still includes the
+    // submitter's name/value in the outgoing FormData.
+    setTimeout(function () { submitter.disabled = true; }, 0);
+  });
+</script>
+
+<script is:inline>
+  // Copy-to-clipboard for the enrollment handoff. `data-copy` names the id of
+  // the input/textarea whose value gets copied, so the button can never copy
+  // something other than what the admin is looking at. Falls back to
+  // select + execCommand where the async Clipboard API is unavailable; if even
+  // that fails the text is left selected so ⌘C still works.
+  document.addEventListener('click', function (e) {
+    var target = e.target;
+    var btn = target && target.closest ? target.closest('[data-copy]') : null;
+    if (!btn) return;
+    var src = document.getElementById(btn.getAttribute('data-copy'));
+    if (!src) return;
+    e.preventDefault();
+
+    function flash() {
+      var prev = btn.getAttribute('data-copy-label') || btn.textContent.trim();
+      btn.setAttribute('data-copy-label', prev);
+      btn.textContent = 'Copied';
+      setTimeout(function () { btn.textContent = prev; }, 1500);
+    }
+    function fallback() {
+      if (typeof src.select === 'function') src.select();
+      try {
+        if (document.execCommand('copy')) flash();
+      } catch (_) { /* leave it selected for a manual copy */ }
+    }
+
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(src.value).then(flash, fallback);
+    } else {
+      fallback();
+    }
+  });
+</script>

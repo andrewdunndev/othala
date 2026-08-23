@@ -123,7 +123,7 @@ const { hasPasskey, hasCode, hasPassword, totpNodes, aal2WebauthnNodes, lookupNo
     </div>
   )}
 
-  <section class="login-card">
+  <section class="panel login-card">
 
     {/* ── AAL2 STEP-UP ─────────────────────────────────────────────────── */}
     {/*
@@ -506,15 +506,12 @@ const { hasPasskey, hasCode, hasPassword, totpNodes, aal2WebauthnNodes, lookupNo
 
 <style>
   /* The login card is the focal element on the page; the hero sets the
-   * tone and the card holds the work. Hairline border, generous interior
+   * tone and the card holds the work. Surface via .panel; generous interior
    * padding, single accent button. */
   .login-card {
     max-width: 32rem;
     margin: 0 auto;
     padding: var(--space-6);
-    border: 1px solid var(--border);
-    border-radius: var(--radius);
-    background: var(--surface);
   }
   .login-block {
     display: flex;

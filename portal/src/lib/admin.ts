@@ -69,7 +69,7 @@ export function isSessionFresh(session: Session, windowHours: number): boolean {
         let candidate: Date | null = null;
         if (completedAt instanceof Date && Number.isFinite(completedAt.getTime())) {
           candidate = completedAt;
-        } else if (typeof completedAt === 'string' && completedAt.trim() !== '') {
+        } else if (typeof completedAt === 'string') {
           const parsed = new Date(completedAt);
           if (Number.isFinite(parsed.getTime())) candidate = parsed;
         }
@@ -89,7 +89,7 @@ export function isSessionFresh(session: Session, windowHours: number): boolean {
       const rawAuthAt = (session as unknown as Record<string, unknown>)['authenticated_at'];
       if (rawAuthAt instanceof Date && Number.isFinite(rawAuthAt.getTime())) {
         authAt = rawAuthAt;
-      } else if (typeof rawAuthAt === 'string' && rawAuthAt.trim() !== '') {
+      } else if (typeof rawAuthAt === 'string') {
         const parsed = new Date(rawAuthAt);
         if (Number.isFinite(parsed.getTime())) authAt = parsed;
       }

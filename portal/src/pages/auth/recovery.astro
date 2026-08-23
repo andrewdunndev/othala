@@ -73,7 +73,7 @@ const phase: 'request' | 'sent' = flow?.state === 'sent_email' ? 'sent' : 'reque
     </p>
   )}
 
-  <section class="recover-card">
+  <section class="panel recover-card">
 
     {hasCode && ui && (
       <form method="POST" action={ui.action} class="recover-form">
@@ -119,13 +119,11 @@ const phase: 'request' | 'sent' = flow?.state === 'sent_email' ? 'sent' : 'reque
     line-height: 1.5;
   }
 
+  /* Surface via .panel. */
   .recover-card {
     max-width: 32rem;
     margin: 0 auto;
     padding: var(--space-6);
-    border: 1px solid var(--border);
-    border-radius: var(--radius);
-    background: var(--surface);
   }
   .recover-form {
     display: flex;
