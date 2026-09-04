@@ -9,6 +9,35 @@ This CHANGELOG and git tags carry the deployed-instance release state.
 
 ## [Unreleased]
 
+## [0.6.1] - 2026-09-04
+
+Evidence release: the login-tier logic that 0.5.0's outage slipped past is now
+proven against the captured production flow on every push, passkey eviction is
+corrected to the model Kratos actually allows, and e2e keeps its evidence.
+
+### Changed
+
+- **Passkey eviction is self-service, never an admin action.** Kratos refuses
+  an admin DELETE of a passkey credential (400, upstream default), so the admin
+  UI no longer offers it. The documented path is contain, recover, self-remove,
+  delete-identity; the e2e P-block proves the real eviction (the victim removes
+  the lost passkey in settings, the other session survives).
+- Login tier derivation extracted into `deriveLoginTiers`, unit-tested against
+  the real captured production flow and mutation-proven red on the 0.5.0 logic.
+- Auth pages share one panel style; both admin user forms share one script
+  component; `isSessionFresh` drops a guard that never changed the outcome.
+
+### Fixed
+
+- e2e renders the login journey in a real browser and hard-asserts all three
+  tiers; passkey login is no longer fixme'd; CDP ceremonies wait
+  deterministically; the N2 scrape retries then fails instead of skipping.
+- e2e runs on MR, main and tag pipelines; verify and lint ride api pipelines so
+  a lever run can never read greener than the push; flaky-then-green runs keep
+  their first-attempt artifacts.
+- The DOS-2 flood test carries a 60s budget: 8-9s on a SaaS small runner,
+  27s under contention, which reddened a green merge.
+
 ## [0.6.0] - 2026-08-22
 
 The outage-ending release: 0.5.0's broken login page fixed, e2e gated into
@@ -323,6 +352,7 @@ runtime manifest model, plus the rename to **Othala** ("Ory for your home").
 - Smoke harness green on the QEMU runner (incl. the contact-form
   Section H); 459 portal unit tests; `astro check` and `astro build` clean.
 
+[0.6.1]: https://gitlab.com/dunn.dev/othala/-/releases/v0.6.1
 [0.6.0]: https://gitlab.com/dunn.dev/othala/-/releases/v0.6.0
 [0.5.0]: https://gitlab.com/dunn.dev/othala/-/releases/v0.5.0
 [0.4.0]: https://gitlab.com/dunn.dev/othala/-/releases/v0.4.0
