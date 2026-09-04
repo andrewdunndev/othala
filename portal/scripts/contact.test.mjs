@@ -120,11 +120,12 @@ test('the window slides — old hits expire', () => {
 
 // ── DOS-2: hard cap on Map size ──────────────────────────────────────────────
 
-// 22,000 rateLimit() calls is real CPU work (~4.5s observed), and vitest's
-// default per-test timeout is 5000ms — node:test's was unbounded (no
-// --test-timeout flag was ever passed), so this ran under no deadline
-// before. Explicit timeout, not a global testTimeout bump, so only this
-// genuinely slow flood test gets the extra budget.
+// 22,000 rateLimit() calls is real CPU work: 8-9s on a SaaS small runner,
+// 27s observed under contention on the same runner class. vitest's default
+// per-test timeout is 5000ms — node:test's was unbounded (no --test-timeout
+// flag was ever passed), so this ran under no deadline before. Explicit
+// timeout with a 3x margin over the contended case, not a global
+// testTimeout bump, so only this genuinely slow flood test gets the budget.
 test('DOS-2: hits Map does not exceed HITS_MAP_MAX under many distinct keys', () => {
   // Import the internals we need. HITS_MAP_MAX is 10_000 in the source;
   // we simulate a flood of 11_000 distinct keys with a fake timestamp so
@@ -150,7 +151,7 @@ test('DOS-2: hits Map does not exceed HITS_MAP_MAX under many distinct keys', ()
   }
   // After the clear, the sentinel bucket is gone — a fresh call should be allowed.
   assert.equal(rateLimit(key, now).allowed, true, 'Map cap clear must reset all buckets including sentinel');
-}, 20_000);
+}, 60_000);
 
 // ── parseSmtpUri ─────────────────────────────────────────────────────────────
 
