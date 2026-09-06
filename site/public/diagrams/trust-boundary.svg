@@ -1,6 +1,5 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 720 580" width="720" height="580" role="img" aria-labelledby="tb-t tb-d" class="dg" font-family="'IBM Plex Sans', Helvetica, Arial, sans-serif">
-<title id="tb-t">The trust boundary: what the network can actually reach</title>
-<desc id="tb-d">A browser reaches one hostname at the edge proxy, which terminates TLS. Inside one trust domain the admin APIs never leave: the app runs two listeners, a public SSR listener the edge reaches and a loopback admin listener bound to ADMIN_HOST that the edge never touches; Kratos and Hydra each expose the edge a public API — self-service and sessions for Kratos, authorize, token and discovery for Hydra — while the app alone calls their admin APIs. Kratos and Hydra each keep a separate Postgres database. The callout: admin APIs are reachable only from the app, never from the edge, enforced by scripts/render-config.sh failing the config render when the admin bind-address token is unset, by requireAdminSession in portal/src/lib/admin.ts gating everything under /admin on an active session, aal2 and the admin marker together, and pinned end to end by e2e/playwright/tests/d-admin-aal2-stepup.spec.ts and f-aal2-bypass.spec.ts.</desc>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 720 580" width="720" height="580" role="img" class="dg" font-family="'IBM Plex Sans', Helvetica, Arial, sans-serif">
+<title>The trust boundary: what the network can actually reach</title>
 <style>
 .dg{--paper:#ffffff;--panel:#f4f4f4;--edge:#e0e0e0;--edge2:#b0b0b0;--ink:#0a0a0a;--ink2:#404040;--mut:#707070;--acc:#4a6741;--no:#a8443a;--yes:#4a7a4a}
 @media (prefers-color-scheme:dark){.dg{--paper:#1c1c1e;--panel:#242426;--edge:#303032;--edge2:#48484a;--ink:#f2f2f7;--ink2:#aeaeb2;--mut:#8e8e93;--acc:#6aaa58;--no:#d4736a;--yes:#7aaa7a}:root[data-theme="light"] .dg{--paper:#ffffff;--panel:#f4f4f4;--edge:#e0e0e0;--edge2:#b0b0b0;--ink:#0a0a0a;--ink2:#404040;--mut:#707070;--acc:#4a6741;--no:#a8443a;--yes:#4a7a4a}}
@@ -59,6 +58,13 @@
 <line x1="255" y1="142" x2="358.6" y2="246.6" marker-end="url(#tb-arrow-mut)"/>
 <line x1="305" y1="142" x2="563.1" y2="247.2" marker-end="url(#tb-arrow-mut)"/>
 </g>
+<!-- forbidden ingress: the edge route to the admin APIs, stopped at the boundary -->
+<g class="ms" stroke="#707070" stroke-width="1.4" stroke-linecap="butt" stroke-linejoin="round" fill="none">
+<path d="M340,115 H654 Q660,115 660,121 V182" stroke-dasharray="4 3"/>
+<line x1="648" y1="182" x2="672" y2="182" stroke-width="2.5"/>
+</g>
+<rect class="p" x="434" y="107" width="140" height="15" fill="#ffffff"/>
+<text class="m" x="504" y="119" text-anchor="middle" font-size="7.5" fill="#707070">admin API · no route from the edge</text>
 <!-- node row: kratos / app / hydra -->
 <rect class="s e" x="80" y="252" width="140" height="90" rx="3" fill="#f4f4f4" stroke="#e0e0e0" stroke-width="1"/>
 <text class="m" x="92" y="270" font-family="'IBM Plex Mono', Menlo, monospace" font-size="8" font-weight="700" letter-spacing="1.1" fill="#707070">KRATOS</text>

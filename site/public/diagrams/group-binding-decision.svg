@@ -1,6 +1,5 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 720 436" width="720" height="436" role="img" aria-labelledby="gbd-t gbd-d" class="dg" font-family="'IBM Plex Sans', Helvetica, Arial, sans-serif">
-<title id="gbd-t">Group, binding, decision: what a group actually does in Othala</title>
-<desc id="gbd-d">Three columns. Left: a Kratos identity holds the groups everyone, audiobookshelf-access and audiobookshelf-admin in metadata_admin.groups, which is admin-API only and absent from whoami. Middle: the app manifest carries two separate bindings — presentation.access lists only audiobookshelf-access and is the ENTRY binding, read by parseAccessGroups; consent.group_role_map maps audiobookshelf-admin to admin and audiobookshelf-access to user and is the ROLE binding, ranked by the declaration order of consent.roles. Right: the ENTRY decision is admitted, by gate.ts enforceAccessGate as an OR over the bound list, and the ROLE decision is admin, by claims.ts lookupRole, where the highest-ranked match wins in any stored order. A bottom band, headed that the name is convention and the binding is the mechanism, gives three cases: audiobookshelf-admin held alone is NO ENTRY, because presentation.access does not list it and admin never implies access; a group nothing binds GRANTS NOTHING, because group-registry.ts types a group from its bindings; and a group named bananas GRANTS ENTRY if a manifest binds it, because the only rule on a name is a safe charset and no code requires the access- prefix.</desc>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 720 436" width="720" height="436" role="img" class="dg" font-family="'IBM Plex Sans', Helvetica, Arial, sans-serif">
+<title>Group, binding, decision: what a group actually does in Othala</title>
 <style>
 .dg{--paper:#ffffff;--panel:#f4f4f4;--edge:#e0e0e0;--edge2:#b0b0b0;--ink:#0a0a0a;--ink2:#404040;--mut:#707070;--acc:#4a6741;--no:#a8443a;--yes:#4a7a4a}
 @media (prefers-color-scheme:dark){.dg{--paper:#1c1c1e;--panel:#242426;--edge:#303032;--edge2:#48484a;--ink:#f2f2f7;--ink2:#aeaeb2;--mut:#8e8e93;--acc:#6aaa58;--no:#d4736a;--yes:#7aaa7a}:root[data-theme="light"] .dg{--paper:#ffffff;--panel:#f4f4f4;--edge:#e0e0e0;--edge2:#b0b0b0;--ink:#0a0a0a;--ink2:#404040;--mut:#707070;--acc:#4a6741;--no:#a8443a;--yes:#4a7a4a}}
@@ -47,8 +46,8 @@
 <text class="m" x="52" y="211" font-size="8" fill="#707070">public whoami response.</text>
 <!-- arrows: identity → bindings -->
 <g class="ms" stroke="#707070" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" fill="none">
-<line x1="204" y1="126" x2="240" y2="126" marker-end="url(#gbd-arrow)"/>
-<line x1="204" y1="214" x2="240" y2="214" marker-end="url(#gbd-arrow)"/>
+<path d="M204,150 H216 Q222,150 222,144 V132 Q222,126 228,126 H240" marker-end="url(#gbd-arrow)"/>
+<path d="M204,176 H216 Q222,176 222,182 V208 Q222,214 228,214 H240" marker-end="url(#gbd-arrow)"/>
 </g>
 <!-- column 2: the bindings -->
 <rect class="p as" x="250" y="88" width="230" height="76" rx="3" fill="#ffffff" stroke="#4a6741" stroke-width="1.4"/>
