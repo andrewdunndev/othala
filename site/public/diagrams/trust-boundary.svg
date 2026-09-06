@@ -63,7 +63,7 @@
 <path d="M340,115 H654 Q660,115 660,121 V182" stroke-dasharray="4 3"/>
 <line x1="648" y1="182" x2="672" y2="182" stroke-width="2.5"/>
 </g>
-<rect class="p" x="434" y="107" width="140" height="15" fill="#ffffff"/>
+<rect class="p" x="430" y="107" width="150" height="15" fill="#ffffff"/>
 <text class="m" x="504" y="119" text-anchor="middle" font-size="7.5" fill="#707070">admin API · no route from the edge</text>
 <!-- node row: kratos / app / hydra -->
 <rect class="s e" x="80" y="252" width="140" height="90" rx="3" fill="#f4f4f4" stroke="#e0e0e0" stroke-width="1"/>
