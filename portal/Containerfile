@@ -30,18 +30,6 @@
 #     -e HYDRA_ADMIN_URL=http://hydra:4445 \
 #     dunn.dev/othala-portal:lab
 
-# Keep in lockstep with the dunn.dev/pipeline component version in
-# .gitlab-ci.yml — old catalog image tags get GC'd from the registry
-# (2.5.1 vanished and broke the v0.3.0 tag build with "manifest unknown").
-# Now tracked by the shared preset's annotated-ARG customManager (see
-# dunn.dev/pipeline:renovate-config.json), pointed at the same
-# gitlab-tags source as the .gitlab-ci.yml component pins below, and
-# grouped with them under the "pipeline catalog" packageRule in
-# renovate.json so one MR moves both (coverage added 2026-07-01; every
-# earlier catalog roll was manual — the last one was MR !52).
-# renovate: datasource=gitlab-tags depName=dunn.dev/pipeline
-ARG CATALOG_VERSION=4.6.0
-
 # ----- Stage 1: build -----
 # Use upstream UBI 9 nodejs-22 (full image with npm + build tools).
 # ci-runtime-node is -minimal and intentionally omits npm.
@@ -69,7 +57,15 @@ RUN cd portal \
     && npm prune --omit=dev
 
 # ----- Stage 2: runtime -----
-FROM registry.gitlab.com/dunn.dev/pipeline/ci-runtime-node:${CATALOG_VERSION}
+# Base pin is literal, not an ARG: the estate container-publishing
+# standard asserts the pinned ci-runtime-* reference on the FROM line
+# itself. Keep in lockstep with the dunn.dev/pipeline component pins
+# in .gitlab-ci.yml; old catalog image tags get GC'd from the registry
+# (2.5.1 vanished and broke the v0.3.0 tag build with "manifest
+# unknown"). Renovate tracks this line through the native dockerfile
+# manager, grouped with those component pins under the "pipeline
+# catalog" packageRule in renovate.json so one MR moves both.
+FROM registry.gitlab.com/dunn.dev/pipeline/ci-runtime-node:4.6.0
 
 WORKDIR /app
 

@@ -10,22 +10,23 @@
       "automerge": false
     },
     {
-      "description": "The Containerfile's CATALOG_VERSION ARG and the .gitlab-ci.yml component pins track the same dunn.dev/pipeline release and must bump together in one MR; automerge stays off because a stale ARG breaks the next tag build once the old image tag is registry-GC'd.",
+      "description": "The .gitlab-ci.yml component pins track a single dunn.dev/pipeline release and must bump together in one MR with the portal/Containerfile runtime base; automerge stays off because a stale base pin breaks the next tag build once the old image tag is registry-GC'd.",
       "matchPackageNames": ["dunn.dev/pipeline"],
       "groupName": "pipeline catalog",
       "automerge": false
     },
     {
-      "description": "The native dockerfile manager would also track this same ARG as its own unguarded dependency, bypassing the pipeline catalog rule's automerge:false gate; disabled so the annotated-ARG customManager is the only thing that ever proposes an update to that line.",
+      "description": "portal/Containerfile pins the ci-runtime-node base literally on its FROM line, because the container-publishing standard asserts the pin there and an ARG indirection hides it. The native dockerfile manager owns that line; group it with the component pins and keep automerge off so one MR still moves both and a base bump never lands unmatched.",
       "matchManagers": ["dockerfile"],
       "matchPackageNames": ["registry.gitlab.com/dunn.dev/pipeline/ci-runtime-node"],
-      "enabled": false
+      "groupName": "pipeline catalog",
+      "automerge": false
     }
   ],
   "customManagers": [
     {
       "customType": "regex",
-      "description": "Tracks the dunn.dev/pipeline component version pins in .gitlab-ci.yml's `component:` includes via regex, since Renovate's native gitlabci component support does not pick them up; matches the same gitlab-tags dependency as the Containerfile's CATALOG_VERSION ARG so both group under the \"pipeline catalog\" rule.",
+      "description": "Tracks the dunn.dev/pipeline component version pins in .gitlab-ci.yml's `component:` includes via regex, since Renovate's native gitlabci component support does not pick them up; groups under the \"pipeline catalog\" rule alongside the Containerfile's runtime base pin.",
       "managerFilePatterns": ["/(^|/)\\.gitlab-ci\\.yml$/"],
       "matchStrings": [
         "component:\\s*gitlab\\.com/dunn\\.dev/pipeline/[\\w-]+@(?<currentValue>[^\\s]+)"
