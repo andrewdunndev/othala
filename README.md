@@ -75,8 +75,8 @@ One `<slug>.yaml` per app, read at request time from `MANIFEST_DIR`, carrying up
 Hydra), and `consent:` (roles, the group-to-role map, claim emission).
 
 [`e2e/manifests/grafana.yaml`](e2e/manifests/grafana.yaml) and
-[`e2e/manifests/audiobookshelf.yaml`](e2e/manifests/audiobookshelf.yaml) are the annotated spec —
-every field's constraint and enforcer is a comment on the line, so the documented behaviour and the
+[`e2e/manifests/audiobookshelf.yaml`](e2e/manifests/audiobookshelf.yaml) are the annotated spec.
+Every field's constraint and enforcer is a comment on the line, so the documented behaviour and the
 tested behaviour are the same file. `validateClients` and `lintManifests`
 (`portal/src/lib/manifests.ts`, `portal/src/lib/manifest-lint.ts`) are the enforcement; `npm run
 lint:manifests` (in `portal/`) checks a manifest directory.
@@ -96,14 +96,14 @@ lint:manifests` (in `portal/`) checks a manifest directory.
 
 ## Where to look next
 
-- [`ARCHITECTURE.md`](ARCHITECTURE.md) — how the pieces fit and why: topology, trust boundary,
+- [`ARCHITECTURE.md`](ARCHITECTURE.md): how the pieces fit and why. Topology, trust boundary,
   access model, the forward-auth request path, client registration.
-- [`.env.example`](.env.example) — the runtime contract, every variable annotated.
-- [`DEPLOY.md`](DEPLOY.md) — the deploy shape and the promotion path.
-- [`site/src/content/docs/guides/`](site/src/content/docs/guides/) — the longer operator guides,
+- [`.env.example`](.env.example): the runtime contract, every variable annotated.
+- [`DEPLOY.md`](DEPLOY.md): the deploy shape and the promotion path.
+- [`site/src/content/docs/guides/`](site/src/content/docs/guides/): the longer operator guides,
   illustrated at [othala.dunn.dev](https://othala.dunn.dev) (architecture, login flow, trust boundary).
-- [`SECURITY.md`](SECURITY.md) — report vulnerabilities privately, never in a public issue.
-- [`CHANGELOG.md`](CHANGELOG.md) and the git tags — the only place release state is asserted.
+- [`SECURITY.md`](SECURITY.md): report vulnerabilities privately, never in a public issue.
+- [`CHANGELOG.md`](CHANGELOG.md) and the git tags: the only place release state is asserted.
 
 ## Copying this
 

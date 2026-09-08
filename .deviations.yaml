@@ -1,7 +1,0 @@
-# .deviations.yaml — declared exceptions to the dunn.dev reference
-# standards. Format per reference.dunn.dev/deviations/.
-
-# (none currently — auth's container-publishing + package-publishing +
-#  pipeline + design-system + repository standards are all satisfied
-#  as of 2026-05-24 via portal's @dunn.dev/reference import and the
-#  three container-image catalog includes in .gitlab-ci.yml.)
