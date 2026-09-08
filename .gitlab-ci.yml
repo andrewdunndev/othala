@@ -47,6 +47,7 @@ workflow:
     on_job_failure: all
 
 stages:
+  - lint
   - verify
   - build
   - e2e
@@ -55,6 +56,15 @@ stages:
   - release
 
 include:
+  # ----- reference-check: dunn.dev/reference conformance (advisory) -
+  # Estate-wide rollout runs advisory (fail_on_violation: false) in
+  # every consumer first; flips to enforcing per repo once verified
+  # clean, same sequencing as reference.dunn.dev itself.
+  - component: gitlab.com/dunn.dev/pipeline/reference-check@4.6.0
+    inputs:
+      reference_ref: main
+      fail_on_violation: false
+
   # ----- Verify (push + MR): per-service build clean ---------------
   # Closes the Renovate-MR-without-CI gap. The catalog's node-build
   # component fires on every push and MR event.
