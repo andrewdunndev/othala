@@ -123,19 +123,6 @@ include:
       package_name: auth
       sbom_filename: othala-container.sbom.json
 
-  # ----- SLSA provenance: tag-only ---------------------------------
-  # slsa-attest is binary-shaped, like release-create below: it walks
-  # the dist/ artifacts of binary_job. Pointing binary_job at the
-  # container build resolves the needs: dependency; container builds
-  # emit no dist/, so the job records provenance for whatever the
-  # build leaves there and the image itself stays cosign-signed by
-  # digest inside build-othala. Job name is the component default
-  # (attest), which is what release-create's attest_job already
-  # expects.
-  - component: gitlab.com/dunn.dev/pipeline/slsa-attest@4.6.0
-    inputs:
-      binary_job: build-othala
-
   # ----- GitLab Release: link SBOMs from the built images -------
   # release-create is binary-shaped (expects binary_job + dist/
   # artifacts). We point binary_job at one container-image build
