@@ -172,7 +172,7 @@ include:
 # -----------------------------------------------------------------
 lint-identity-schema:
   stage: verify
-  image: registry.access.redhat.com/ubi9/nodejs-22:9.8@sha256:130884e8be8170676be0c660fb63333ad68b496455cc075e1cb7b3fa596681a6
+  image: registry.access.redhat.com/ubi10/nodejs-22:10.1@sha256:11cb113000c9bf315fbda26d2cdd817396bb17eaf57abff922680441ce7f80b0
   rules:
     - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
     - if: '$CI_PIPELINE_SOURCE == "push"'
@@ -226,7 +226,7 @@ lint-identity-schema:
 # -----------------------------------------------------------------
 lint-jsonnet-hooks:
   stage: verify
-  image: registry.access.redhat.com/ubi9/nodejs-22:9.8@sha256:130884e8be8170676be0c660fb63333ad68b496455cc075e1cb7b3fa596681a6
+  image: registry.access.redhat.com/ubi10/nodejs-22:10.1@sha256:11cb113000c9bf315fbda26d2cdd817396bb17eaf57abff922680441ce7f80b0
   rules:
     - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
     - if: '$CI_PIPELINE_SOURCE == "push"'
@@ -303,7 +303,7 @@ lint-jsonnet-hooks:
 # -----------------------------------------------------------------
 check-purity:
   stage: verify
-  image: registry.access.redhat.com/ubi9/nodejs-22:9.8@sha256:130884e8be8170676be0c660fb63333ad68b496455cc075e1cb7b3fa596681a6
+  image: registry.access.redhat.com/ubi10/nodejs-22:10.1@sha256:11cb113000c9bf315fbda26d2cdd817396bb17eaf57abff922680441ce7f80b0
   rules:
     - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
     - if: '$CI_PIPELINE_SOURCE == "push"'
@@ -365,7 +365,7 @@ check-purity:
 # -----------------------------------------------------------------
 check-portal:
   stage: verify
-  image: registry.access.redhat.com/ubi9/nodejs-22:9.8@sha256:130884e8be8170676be0c660fb63333ad68b496455cc075e1cb7b3fa596681a6
+  image: registry.access.redhat.com/ubi10/nodejs-22:10.1@sha256:11cb113000c9bf315fbda26d2cdd817396bb17eaf57abff922680441ce7f80b0
   rules:
     - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
     - if: '$CI_PIPELINE_SOURCE == "push"'
