@@ -33,7 +33,7 @@
 # ----- Stage 1: build -----
 # Use upstream UBI 9 nodejs-22 (full image with npm + build tools).
 # ci-runtime-node is -minimal and intentionally omits npm.
-FROM registry.access.redhat.com/ubi10/nodejs-22:10.1@sha256:11cb113000c9bf315fbda26d2cdd817396bb17eaf57abff922680441ce7f80b0 AS build
+FROM registry.access.redhat.com/ubi10/nodejs-22:10.2@sha256:cd5097d51d897cb098c7e2b487684c6e59c108aeabeaa2d475e895954c13b630 AS build
 
 WORKDIR /src
 USER root
