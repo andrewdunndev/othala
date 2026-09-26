@@ -15,6 +15,11 @@ serve:
   public:
     base_url: "${OTHALA_PUBLIC_URL}/"
     port: 4433
+    request_log:
+      # Probes fire every few seconds; each would write an access-log line,
+      # burying real ones (and landing at err priority wherever container
+      # stderr is journalled). Metrics still count them.
+      disable_for_health: true
     cors:
       enabled: true
       allowed_origins:
@@ -38,6 +43,10 @@ serve:
     # Single-network deployments (the e2e harness) use 0.0.0.0.
     host: "${KRATOS_ADMIN_BIND_HOST}"
     port: 4434
+    request_log:
+      # Silences only the /admin-prefixed health paths: this listener logs
+      # before it adds the prefix, so probe /admin/health/ready here.
+      disable_for_health: true
 
 selfservice:
   # How Kratos matches an entry (x/redir/secure_redirect.go): scheme exactly,
