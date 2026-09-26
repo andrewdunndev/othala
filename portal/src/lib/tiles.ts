@@ -193,17 +193,8 @@ function freshestMtime(dir: string): number {
  * survive (USE_PROFILES: { svg: true }); that same width is what a hostile
  * manifest gets to work with.
  *
- * FORBID_TAGS closes what the html/svg profiles leave open past
- * script/handler/scheme stripping: `style` (no style-src in the CSP, so an
- * un-forbidden style element can restyle the whole page or the dashboard
- * modal) and the interactive form surface `form`/`input`/`button`/`select`/
- * `textarea` (form-action can post to any apex subdomain, so a manifest
- * author could plant a credential-looking form). Purely inert
- * form-associated tags (label, fieldset, option, optgroup, datalist,
- * output) are left allowed: with the controls above gone they render as
- * plain boxed/listed text, carrying no submission or restyling surface of
- * their own, so forbidding them would only shrink prose for no security
- * gain.
+ * FORBID_TAGS removes `style` (the CSP has no style-src, so it could restyle
+ * the page) and form controls (form-action reaches every apex subdomain).
  */
 export function sanitizeEducationMarkdown(raw: string): string {
   const html = marked.parse(raw, { async: false }) as string;
