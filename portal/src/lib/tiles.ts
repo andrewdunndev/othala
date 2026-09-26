@@ -186,6 +186,20 @@ function freshestMtime(dir: string): number {
 }
 
 /**
+ * Render an operator-supplied `<slug>.md` to sanitized HTML for `set:html`
+ * injection on the /apps/<slug> detail page. Exported so the test corpus
+ * (tiles.test.ts) exercises this exact path rather than a copy of it.
+ * SVG + common child tags are allowed so inline cat-explainer diagrams
+ * survive (USE_PROFILES: { svg: true }); that same width is what a hostile
+ * manifest gets to work with, so both profiles are on for every case in the
+ * test corpus too.
+ */
+export function sanitizeEducationMarkdown(raw: string): string {
+  const html = marked.parse(raw, { async: false }) as string;
+  return DOMPurify.sanitize(html, { USE_PROFILES: { html: true, svg: true } });
+}
+
+/**
  * Parse one unified manifest's `presentation:` block into an AppTile.
  * Returns null when the file carries no `presentation:` block (an
  * OIDC-only manifest, or a non-manifest file). Any access_group value is
@@ -229,10 +243,7 @@ function parseTile(slug: string, doc: Record<string, unknown>, dir: string): App
   let educationHtml: string | undefined;
   const mdPath = join(dir, `${slug}.md`);
   if (existsSync(mdPath)) {
-    const raw = marked.parse(readFileSync(mdPath, 'utf8'), { async: false }) as string;
-    // Sanitize before set:html injection. Allow SVG + common child tags so
-    // inline cat-explainer diagrams survive (USE_PROFILES: { svg: true }).
-    educationHtml = DOMPurify.sanitize(raw, { USE_PROFILES: { html: true, svg: true } });
+    educationHtml = sanitizeEducationMarkdown(readFileSync(mdPath, 'utf8'));
   }
 
   const tile: AppTile = {
