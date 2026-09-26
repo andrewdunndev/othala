@@ -191,8 +191,7 @@ function freshestMtime(dir: string): number {
  * (tiles.test.ts) exercises this exact path rather than a copy of it.
  * SVG + common child tags are allowed so inline cat-explainer diagrams
  * survive (USE_PROFILES: { svg: true }); that same width is what a hostile
- * manifest gets to work with, so both profiles are on for every case in the
- * test corpus too.
+ * manifest gets to work with.
  */
 export function sanitizeEducationMarkdown(raw: string): string {
   const html = marked.parse(raw, { async: false }) as string;

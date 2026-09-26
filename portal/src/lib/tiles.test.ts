@@ -120,6 +120,14 @@ const hostileCorpus: HostileCase[] = [
     forbidden: [/data:text\/html/i, /<script/i, new RegExp(MARK)],
   },
   {
+    // No markup in the attribute value, so only the URI policy stands
+    // between this href and a navigable data: document.
+    category: 'data-url',
+    name: 'base64 data:text/html anchor',
+    raw: `<a href="data:text/html;base64,${Buffer.from(`<script>window.${MARK}=1</script>`).toString('base64')}">click</a>`,
+    forbidden: [/data:text\/html/i],
+  },
+  {
     category: 'data-url',
     name: 'data: SVG payload via object',
     raw: `<object data="data:image/svg+xml,<svg onload=window.${MARK}=1>"></object>`,
@@ -157,21 +165,21 @@ const hostileCorpus: HostileCase[] = [
   },
   {
     // No shipped browser executes a javascript: scheme reached via a CSS
-    // url() value (that was an IE-only behavior); DOMPurify's html profile
-    // accordingly passes the `style` attribute's text through unparsed.
-    // The enforceable property here is containment: a hostile style value
-    // must not escape into a new element or handler outside the attribute.
+    // url() value (that was an IE-only behavior), so DOMPurify passes CSS
+    // text through unparsed, in a `style` attribute and in a `<style>`
+    // element alike. The enforceable property is containment: markup
+    // carried inside CSS must not come out as a live element or handler.
     category: 'style-css-url',
-    name: 'style attribute css url() does not escape into new markup',
-    raw: `<div style="background:url(javascript:window.${MARK}=1)">x</div>`,
-    forbidden: [/<script/i, /\bon\w+\s*=/i],
-    mustContain: [/<div/, />x<\/div>/],
+    name: 'style element whose text carries markup',
+    raw: `Prose.\n\n<style><img src=x onerror="window.${MARK}=1"></style>\n\nMore prose.`,
+    forbidden: [/onerror/i, new RegExp(MARK)],
+    mustContain: [/More prose/],
   },
   {
     category: 'style-css-url',
-    name: 'style tag css url() javascript scheme',
-    raw: `<style>body{background:url("javascript:window.${MARK}=1")}</style>x`,
-    forbidden: [/javascript:/i, new RegExp(MARK)],
+    name: 'style inside svg parsing its text as markup',
+    raw: `<svg><style><img src=x onerror="window.${MARK}=1"></style></svg>`,
+    forbidden: [/onerror/i, new RegExp(MARK)],
   },
   {
     category: 'mxss',
@@ -184,6 +192,66 @@ const hostileCorpus: HostileCase[] = [
     name: 'math/mglyph namespace-confusion payload',
     raw: `<math><mtext><table><mglyph><style><!--</style><img title="--><img src=x onerror=window.${MARK}=1>"></mglyph></table></mtext></math>`,
     forbidden: [/onerror/i, new RegExp(MARK)],
+  },
+  {
+    category: 'namespace-confusion',
+    name: 'nested form with math/svg re-parent payload',
+    raw: `<form><math><mtext></form><form><mglyph><svg><mtext><textarea><path id="</textarea><img onerror=window.${MARK}=1 src=1>">`,
+    forbidden: [/onerror/i, new RegExp(MARK)],
+  },
+  {
+    category: 'namespace-confusion',
+    name: 'annotation-xml switching math to html',
+    raw: `<math><annotation-xml encoding="text/html"><img src=x onerror="window.${MARK}=1"></annotation-xml></math>`,
+    forbidden: [/onerror/i, new RegExp(MARK)],
+  },
+  {
+    category: 'comment',
+    name: 'unclosed comment after prose',
+    raw: `Prose.\n\n<!--<img src=x onerror="window.${MARK}=1">`,
+    forbidden: [/onerror/i, new RegExp(MARK)],
+  },
+  {
+    category: 'comment',
+    name: 'comment closed by --!>',
+    raw: `<!-- --!><img src=x onerror="window.${MARK}=1"> -->`,
+    forbidden: [/onerror/i, new RegExp(MARK)],
+  },
+  {
+    category: 'comment',
+    name: 'comment opener inside an attribute value',
+    raw: `<p title="<!--"><img src=x onerror="window.${MARK}=1">--></p>`,
+    forbidden: [/onerror/i, new RegExp(MARK)],
+  },
+  {
+    category: 'raw-text-breakout',
+    name: 'textarea closed from inside an attribute value',
+    raw: `<textarea><img title="</textarea><img src=x onerror=window.${MARK}=1>"></textarea>`,
+    forbidden: [/onerror/i, new RegExp(MARK)],
+  },
+  {
+    category: 'svg-use-xlink',
+    name: 'svg anchor xlink:href targeting javascript:',
+    raw: `<svg><a xlink:href="javascript:window.${MARK}=1"><text>click</text></a></svg>`,
+    forbidden: [/javascript:/i, new RegExp(MARK)],
+  },
+  {
+    category: 'svg-animate-set',
+    name: 'onbegin on an allowed animation element',
+    raw: `<svg><animateTransform attributeName="transform" onbegin="window.${MARK}=1"/></svg>`,
+    forbidden: [/onbegin/i, new RegExp(MARK)],
+  },
+  {
+    category: 'event-handler',
+    name: 'self-firing ontoggle on details',
+    raw: `<details open ontoggle="window.${MARK}=1">x</details>`,
+    forbidden: [/ontoggle/i, new RegExp(MARK)],
+  },
+  {
+    category: 'form-meta-base-iframe-object-embed',
+    name: 'form action javascript:',
+    raw: `<form action="javascript:window.${MARK}=1"><input type="submit"></form>`,
+    forbidden: [/javascript:/i, new RegExp(MARK)],
   },
   {
     category: 'form-meta-base-iframe-object-embed',
@@ -248,7 +316,19 @@ const hostileCorpus: HostileCase[] = [
   {
     category: 'unicode-entity-obfuscation',
     name: 'non-breaking-space obfuscated scheme',
-    raw: `<a href="java script:window.${MARK}=1">click</a>`,
+    raw: `<a href="java\u00a0script:window.${MARK}=1">click</a>`,
+    forbidden: [/javascript:/i, new RegExp(MARK)],
+  },
+  {
+    category: 'unicode-entity-obfuscation',
+    name: 'named-entity colon in the scheme',
+    raw: `<a href="javascript&colon;window.${MARK}=1">click</a>`,
+    forbidden: [/javascript/i, new RegExp(MARK)],
+  },
+  {
+    category: 'unicode-entity-obfuscation',
+    name: 'leading space and control character before the scheme',
+    raw: `<a href=" \u0001javascript:window.${MARK}=1">click</a>`,
     forbidden: [/javascript:/i, new RegExp(MARK)],
   },
   {
@@ -258,9 +338,36 @@ const hostileCorpus: HostileCase[] = [
     forbidden: [/<script/i, new RegExp(MARK)],
     mustContain: [/Title/, /More prose/],
   },
+  {
+    category: 'markdown-html-passthrough',
+    name: 'inline HTML handler inside a markdown paragraph',
+    raw: `Text <img src="x" onerror="window.${MARK}=1"> more.`,
+    forbidden: [/onerror/i, new RegExp(MARK)],
+    mustContain: [/more\./],
+  },
+  {
+    category: 'markdown-html-passthrough',
+    name: 'reference-style link to javascript:',
+    raw: `[click][a]\n\n[a]: javascript:window.${MARK}=1`,
+    forbidden: [/javascript:/i, new RegExp(MARK)],
+  },
+  {
+    category: 'markdown-html-passthrough',
+    name: 'markdown image with a javascript: src',
+    raw: `![x](javascript:window.${MARK}=1)`,
+    forbidden: [/javascript:/i, new RegExp(MARK)],
+  },
+  {
+    // The autolink's visible text is the URL itself, so only the href is
+    // a survival marker here.
+    category: 'markdown-html-passthrough',
+    name: 'autolink to javascript:',
+    raw: `<javascript:window.${MARK}=1>`,
+    forbidden: [/href\s*=\s*["']?\s*javascript:/i],
+  },
 ];
 
-describe('tiles.ts: hostile-input corpus (othala#11) — nothing executable survives', () => {
+describe('tiles.ts: hostile-input corpus — nothing executable survives', () => {
   for (const c of hostileCorpus) {
     it(`[${c.category}] ${c.name}`, () => {
       const out = sanitizeEducationMarkdown(c.raw);
