@@ -12,6 +12,12 @@ dsn: "postgres://hydra:${HYDRA_PG_PASS}@${HYDRA_PG_HOST}:5432/hydra?sslmode=disa
 serve:
   public:
     port: 4444
+    request_log:
+      # Liveness/readiness probes fire every few seconds and log at info
+      # priority by default, drowning out real errors in severity-keyed
+      # collection. Health requests still count in metrics; only the
+      # per-request log line is suppressed.
+      disable_for_health: true
     cors:
       enabled: true
       # allowed_origins is an EXTENSIBLE allowlist keyed by client type —
@@ -43,6 +49,9 @@ serve:
     # Single-network deployments (the e2e harness) use 0.0.0.0.
     # NEVER expose publicly.
     host: "${HYDRA_ADMIN_BIND_HOST}"
+    request_log:
+      # Same rationale as serve.public.request_log above.
+      disable_for_health: true
 
 urls:
   self:
