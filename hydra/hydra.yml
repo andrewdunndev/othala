@@ -12,6 +12,12 @@ dsn: "postgres://hydra:${HYDRA_PG_PASS}@${HYDRA_PG_HOST}:5432/hydra?sslmode=disa
 serve:
   public:
     port: 4444
+    request_log:
+      # Probes fire every few seconds; each would write an access-log line,
+      # burying real ones (and landing at err priority wherever container
+      # stderr is journalled). Metrics still count them. Health probes
+      # target THIS listener: see serve.admin.request_log.
+      disable_for_health: true
     cors:
       enabled: true
       # allowed_origins is an EXTENSIBLE allowlist keyed by client type —
@@ -43,6 +49,12 @@ serve:
     # Single-network deployments (the e2e harness) use 0.0.0.0.
     # NEVER expose publicly.
     host: "${HYDRA_ADMIN_BIND_HOST}"
+    request_log:
+      # Silences /admin/metrics/prometheus but never a health probe: Hydra
+      # rewrites every admin path to /admin/... before logging, then matches
+      # the unprefixed /health/* paths. Probe the public listener instead;
+      # its /health/ready runs the same readiness checks.
+      disable_for_health: true
 
 urls:
   self:

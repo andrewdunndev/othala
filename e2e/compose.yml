@@ -269,7 +269,9 @@ services:
       - ./hydra.rendered.yml:/etc/config/hydra/hydra.yml:ro,z
     command: ["serve", "all", "--config", "/etc/config/hydra/hydra.yml", "--dev"]
     healthcheck:
-      test: ["CMD-SHELL", "wget -qO- http://localhost:4445/health/ready || exit 1"]
+      # Public listener: the only one whose request_log.disable_for_health
+      # silences a health probe (hydra.yml serve.admin.request_log).
+      test: ["CMD-SHELL", "wget -qO- http://localhost:4444/health/ready || exit 1"]
       interval: 5s
       timeout: 3s
       retries: 18
