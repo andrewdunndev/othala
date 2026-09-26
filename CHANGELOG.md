@@ -9,6 +9,10 @@ This CHANGELOG and git tags carry the deployed-instance release state.
 
 ## [Unreleased]
 
+### Security
+
+- Education markdown drops `<style>`/form tags (no style-src; form-action open).
+
 ## [0.6.1] - 2026-09-04
 
 Evidence release: the login-tier logic that 0.5.0's outage slipped past is now

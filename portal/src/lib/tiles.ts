@@ -192,10 +192,25 @@ function freshestMtime(dir: string): number {
  * SVG + common child tags are allowed so inline cat-explainer diagrams
  * survive (USE_PROFILES: { svg: true }); that same width is what a hostile
  * manifest gets to work with.
+ *
+ * FORBID_TAGS closes what the html/svg profiles leave open past
+ * script/handler/scheme stripping: `style` (no style-src in the CSP, so an
+ * un-forbidden style element can restyle the whole page or the dashboard
+ * modal) and the interactive form surface `form`/`input`/`button`/`select`/
+ * `textarea` (form-action can post to any apex subdomain, so a manifest
+ * author could plant a credential-looking form). Purely inert
+ * form-associated tags (label, fieldset, option, optgroup, datalist,
+ * output) are left allowed: with the controls above gone they render as
+ * plain boxed/listed text, carrying no submission or restyling surface of
+ * their own, so forbidding them would only shrink prose for no security
+ * gain.
  */
 export function sanitizeEducationMarkdown(raw: string): string {
   const html = marked.parse(raw, { async: false }) as string;
-  return DOMPurify.sanitize(html, { USE_PROFILES: { html: true, svg: true } });
+  return DOMPurify.sanitize(html, {
+    USE_PROFILES: { html: true, svg: true },
+    FORBID_TAGS: ['style', 'form', 'input', 'button', 'select', 'textarea'],
+  });
 }
 
 /**

