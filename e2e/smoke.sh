@@ -104,6 +104,34 @@ echo "=== smoke matrix ==="
 echo ""
 echo "A. Substrate sanity"
 
+# A0: healthcheck probes write no access-log line (request_log.
+# disable_for_health on the listener each compose healthcheck targets). Runs
+# before any probe below touches a health path. Each service fires its own
+# healthcheck, then a request that IS logged; once that control line shows,
+# the probe's line would show too, so zero health lines is a real zero.
+for row in "kratos http://localhost:4433/.well-known/ory/webauthn.js" \
+           "hydra http://localhost:4444/.well-known/openid-configuration"; do
+    svc="${row%% *}"; control="${row#* }"
+    control_path="/${control#http://*/}"
+    podman healthcheck run "lab-$svc" >/dev/null 2>&1
+    curl_code_in "$svc" "$control" >/dev/null
+    seen=0
+    for _ in 1 2 3 4 5; do
+        logs=$(podman logs "lab-$svc" 2>&1)
+        seen=$(grep -cF "\"path\":\"$control_path\"" <<<"$logs")
+        [[ "$seen" -gt 0 ]] && break
+        sleep 1
+    done
+    health=$(grep -cE '"path":"(/admin)?/health/(alive|ready)"' <<<"$logs")
+    if [[ "$seen" -eq 0 ]]; then
+        fail "A0 $svc health probes unlogged" "control $control_path never logged; log unreadable"
+    elif [[ "$health" -ne 0 ]]; then
+        fail "A0 $svc health probes unlogged" "$health health-path access-log lines"
+    else
+        pass "A0 $svc health probes unlogged"
+    fi
+done
+
 # A1: postgres reachable + kratos + hydra DBs exist
 out=$(docker compose exec -T postgres psql -U postgres -t -A -c "SELECT datname FROM pg_database WHERE datname IN ('kratos','hydra');" 2>/dev/null | _strip_ansi | sort | tr '\n' ',' )
 if [[ "$out" == "hydra,kratos," ]]; then

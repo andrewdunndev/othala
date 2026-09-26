@@ -12,7 +12,9 @@ This CHANGELOG and git tags carry the deployed-instance release state.
 ### Changed
 
 - `kratos.yml`/`hydra.yml` set `request_log.disable_for_health: true` on both
-  listeners, so health probes stop logging at error-obscuring volume.
+  listeners, so health probes stop writing access-log lines. Hydra's admin
+  listener logs them regardless: probe Hydra's public `/health/ready`, as e2e
+  does (smoke A0).
 
 ## [0.6.1] - 2026-09-04
 
