@@ -9,11 +9,18 @@ This CHANGELOG and git tags carry the deployed-instance release state.
 
 ## [Unreleased]
 
+## [0.6.2] - 2026-09-26
+
+Quieter health-probe logs, a markdown-sanitizer gap closed, and three
+routine dependency majors.
+
 ### Changed
 
 - `kratos.yml`/`hydra.yml` set `request_log.disable_for_health: true` on both
   listeners, so health probes stop logging. Hydra's admin listener logs them
   anyway: probe Hydra's public `/health/ready`, as e2e does (smoke A0).
+- Base image UBI 9 -> UBI 10; isomorphic-dompurify v4 (jsdom 30); nodemailer
+  v10.
 
 ### Security
 
