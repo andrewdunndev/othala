@@ -12,9 +12,12 @@ This CHANGELOG and git tags carry the deployed-instance release state.
 ### Changed
 
 - `kratos.yml`/`hydra.yml` set `request_log.disable_for_health: true` on both
-  listeners, so health probes stop writing access-log lines. Hydra's admin
-  listener logs them regardless: probe Hydra's public `/health/ready`, as e2e
-  does (smoke A0).
+  listeners, so health probes stop logging. Hydra's admin listener logs them
+  anyway: probe Hydra's public `/health/ready`, as e2e does (smoke A0).
+
+### Security
+
+- Education markdown drops `<style>` and form controls.
 
 ## [0.6.1] - 2026-09-04
 
