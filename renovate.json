@@ -22,18 +22,5 @@
       "groupName": "pipeline catalog",
       "automerge": false
     }
-  ],
-  "customManagers": [
-    {
-      "customType": "regex",
-      "description": "Tracks the dunn.dev/pipeline component version pins in .gitlab-ci.yml's `component:` includes via regex, since Renovate's native gitlabci component support does not pick them up; groups under the \"pipeline catalog\" rule alongside the Containerfile's runtime base pin.",
-      "managerFilePatterns": ["/(^|/)\\.gitlab-ci\\.yml$/"],
-      "matchStrings": [
-        "component:\\s*gitlab\\.com/dunn\\.dev/pipeline/[\\w-]+@(?<currentValue>[^\\s]+)"
-      ],
-      "depNameTemplate": "dunn.dev/pipeline",
-      "packageNameTemplate": "dunn.dev/pipeline",
-      "datasourceTemplate": "gitlab-tags"
-    }
   ]
 }
