@@ -105,7 +105,7 @@ services:
   # :8025 (smoke.sh Section H queries /api/v1/messages to assert delivery).
   # No auth/TLS: mailpit accepts plain SMTP, matching the e2e connection URI.
   mailpit:
-    image: docker.io/axllent/mailpit:latest@sha256:74d609a42ec279aa63c6b4622a6fa9b5408d1ad5b1d76a1c4be40a265ce0863d
+    image: docker.io/axllent/mailpit:latest@sha256:ed9b00c609e77e99c79b93f1178255ebc271868920f2c69a8d166bd5634ed10d
     container_name: lab-mailpit
     restart: unless-stopped
     # --- Container hardening (P11) ---
