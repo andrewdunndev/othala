@@ -83,13 +83,12 @@ VM dies on job end. Total turnaround: ~3-5 minutes including image pulls.
   through T10, plus smoke probe G3.
 - **Recovery-gate** — the converged app's loopback endpoint
   `othala:4431/admin/recovery-gate`, `Authorization: Bearer`. Refusal is
-  **marker-based** (`is_admin===true` in the webhook payload, derived from
-  `metadata_admin.admin` by `recovery-gate.jsonnet`), NOT group- or UUID-based
-  An identity with `is_admin=true` → 403; `is_admin=false` → 200
-  (even when the payload claims an admin-tier group such as `grafana-admin` —
-  group membership is app authorization, never portal admin authority); a
-  non-boolean `is_admin` → 403 (fail-closed); a missing `identity_id` → 403
-  (fail-closed); a wrong bearer → 401.
+  **marker-based** (`metadata_admin.admin` read from the admin API by
+  `identity_id`), NOT group- or UUID-based. An admin-marked identity → 403; a
+  non-admin → 200 (even when the payload claims an admin-tier group such as
+  `grafana-admin` — group membership is app authorization, never portal admin
+  authority); an unknown or missing `identity_id` → 403 (fail-closed); a wrong
+  bearer → 401.
 
 ## What it does NOT validate
 
@@ -115,9 +114,6 @@ which is why `register-clients` is a `profiles: [oneshot]` service that
 | File | Purpose |
 |---|---|
 | `compose.yml` | docker-compose for the converged substrate |
-| `hydra.yml` | Hydra config (harness-shape: HTTP issuer, expose_internal_errors=true) |
-| `identity.schema.json` | Production identity schema, vendored |
-| `recovery-gate.jsonnet` | Recovery-gate webhook body, vendored |
 | `glauth.cfg` | Example LDAP bridge config for `gitlab.com/dunn.dev/kratos-ldap` — an **unmaintained reference** project, not part of this deployment. Not used by the default compose run; kept only so an operator adding LDAP has something to read. |
 | `postgres-init.sh` | DB + extension setup |
 | `gen-secrets.sh` | Per-run secret generator |

@@ -71,7 +71,7 @@ Each names its enforcer and the test that fails if the enforcer stops working.
   gate before the privileged settings session issues; `shouldRefuseRecovery`
   (`portal/src/lib/access.ts`) refuses an admin-marked target, so a compromised
   mailbox does not become admin authority. Tests:
-  `portal/scripts/recovery-gate.fuzz.test.mjs`, `e2e/playwright/tests/j-recovery-flow.spec.ts`.
+  `portal/scripts/admin-port.test.mjs`, `e2e/playwright/tests/j-recovery-flow.spec.ts`.
 - **Claims decide role, never entry.** `composeIDTokenClaims` / `lookupRole`,
   `portal/src/lib/claims.ts`: a per-app role, every claim gated on the granted
   scope, and `deepMergeClaims` skipping `__proto__`, `constructor`, `prototype`.

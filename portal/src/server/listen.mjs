@@ -98,52 +98,6 @@ export function parseBearer(authHeader) {
   return m ? m[1] : '';
 }
 
-/**
- * Decide the recovery-gate verdict for a Kratos webhook payload (pure).
- *
- * Kratos posts the in-flight identity to the gate before issuing a public
- * recovery code. We REFUSE recovery for any identity whose metadata_admin.admin
- * marker is true (admin recovery is console-only, defense-in-depth).
- *
- * The webhook payload shape is { identity_id, is_admin, groups, traits } (see
- * kratos/hooks/recovery-gate.jsonnet). `is_admin` is set by the jsonnet from
- * metadata_admin.admin (admin-API-only-writable boolean). The id is read from
- * identity_id at the top level, falling back to identity.id for compatibility.
- *
- * FAIL-CLOSED on a malformed payload:
- *   - If we cannot read a non-empty id: refuse (unidentifiable subject).
- *   - If is_admin is not a boolean: treat as refuse AND log an error. The
- *     jsonnet always sets is_admin via std.get (defaulting to false), so a
- *     non-boolean is_admin indicates a payload tampering or a bug; protecting
- *     the admin path and surfacing the error loudly is the right response.
- *
- * @param payload parsed JSON body
- * @returns { refuse: boolean, reason: string }
- */
-export function recoveryGateVerdict(payload) {
-  const id = payload?.identity_id ?? payload?.identity?.id;
-  // Fail-closed: reject anything that is not a non-empty, non-whitespace-only
-  // string. An unidentifiable subject must not pass.
-  if (typeof id !== 'string' || id.trim().length === 0) {
-    return { refuse: true, reason: 'unidentifiable subject (fail-closed)' };
-  }
-  const isAdmin = payload?.is_admin;
-  if (typeof isAdmin !== 'boolean') {
-    // The jsonnet always emits a boolean via std.get default=false.
-    // A non-boolean value indicates payload tampering or a gate bug — refuse
-    // (protect the admin) and surface it loudly so an operator notices.
-    console.error(
-      `[portal/recovery-gate] WARN: is_admin is not a boolean (got ${JSON.stringify(isAdmin)}` +
-      ` for identity_id=${JSON.stringify(id)}) — refusing as fail-safe; check the recovery-gate.jsonnet output`,
-    );
-    return { refuse: true, reason: 'malformed is_admin field (fail-closed)' };
-  }
-  if (isAdmin === true) {
-    return { refuse: true, reason: 'admin recovery is console-only' };
-  }
-  return { refuse: false, reason: '' };
-}
-
 /** Read a request body to a string (bounded). */
 function readBody(req, limitBytes = 1_000_000) {
   return new Promise((resolve, reject) => {
@@ -239,19 +193,8 @@ export async function handleRevokeUser(req, res, runtime) {
 /**
  * Look up an identity's admin marker directly from the Kratos admin API.
  *
- * Kratos v26.2.0 does not include `metadata_admin` in the body-template context
- * available to recovery after-hook jsonnet templates (`ctx.identity`). The
- * field is present in the full admin API identity response but is serialised
- * out of the hook context at the Ory layer. Until an upstream fix is available,
- * the gate fetches the identity from the admin API using the `identity_id`
- * forwarded in the webhook payload to obtain the authoritative admin marker.
- *
- * Upstream reference: metadata_admin absent from recovery after-hook context
- * in Kratos v26.2.0 — confirmed empirically against a live stack 2026-06-25.
- * When Ory fixes the serialisation, the jsonnet's is_admin field will match
- * the admin API value and this lookup becomes a no-op round-trip (same result,
- * slightly more latency). The lookup can then be removed in favour of the
- * payload's is_admin once the upstream fix is verified.
+ * The hook payload carries only the identity id; the authoritative admin marker
+ * is fetched from the admin API.
  *
  * Fail-closed: any error (network, 4xx, malformed body) returns
  * `{ refuse: true, reason }` so a degraded admin API conservatively blocks
@@ -325,15 +268,6 @@ export function loginCodeRefusalText(verdict) {
  *
  * Admin authority is verified by fetching the identity from the Kratos admin
  * API (KRATOS_ADMIN_URL/admin/identities/:id) and reading metadata_admin.admin.
- *
- * WHY NOT the jsonnet payload's is_admin field:
- * Kratos v26.2.0 does not include metadata_admin in ctx.identity within
- * recovery after-hook jsonnet templates. The field is serialised out at the Ory
- * layer, so recovery-gate.jsonnet always computes is_admin=false regardless of
- * the identity's actual admin marker. Rather than silently accepting a false
- * allow from the buggy jsonnet context, the gate fetches the authoritative value
- * directly from the admin API using the identity_id forwarded in the payload.
- * The payload's is_admin is not used for the admin-marker decision.
  */
 export function handleRecoveryGate(req, res) {
   return handleAdminMarkerGate(req, res, (verdict) => `recovery refused: ${verdict.reason}`);
@@ -378,9 +312,6 @@ async function handleAdminMarkerGate(req, res, refusalText) {
   }
 
   // Phase 2: fetch the authoritative admin marker from the Kratos admin API.
-  // The jsonnet payload's is_admin field is NOT used for this decision because
-  // Kratos v26.2.0 omits metadata_admin from ctx.identity in after-hook context
-  // (confirmed empirically 2026-06-25 against a live v26.2.0 stack).
   const adminVerdict = await fetchAdminMarker(id);
   if (adminVerdict.refuse) {
     sendJson(res, 403, {

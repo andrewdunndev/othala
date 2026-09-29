@@ -10,11 +10,6 @@
 # production Caddyfile snippets are assembled by whatever deploy repo
 # stands the instance up. caddy/snippets/ here is the reference copy.
 #
-# The legacy consent/ (Go) and util/ (Bash) modules were retired at the
-# E1 cutover: their roles converged into the othala app. The LDAP bridge
-# (glauth-kratos) has been extracted to a separate standalone repo:
-# gitlab.com/dunn.dev/kratos-ldap. Its source no longer lives here.
-#
 # Per-image release flow on every tag:
 #   build       container-image  ->  push :TAG + :latest + cosign sig
 #   package     container-sbom   ->  syft scan, upload CycloneDX
@@ -292,11 +287,7 @@ lint-jsonnet-hooks:
 # anything (selftest() in the script) — there is no separate probe/mutation
 # job to keep green.
 #
-# The trailing `bash -n` step closes half of the pre-tag-check.sh /
-# AGENTS.md gap: pre-tag-check.sh documented itself as the pre-tag gate but
-# CI never ran a syntax check on tracked shell scripts. shellcheck itself
-# stays out — it is not in this image and nothing here curl-installs a
-# linter — so it remains scripts/pre-tag-check.sh's manual-only step.
+# The trailing `bash -n` step syntax-checks tracked shell scripts.
 # -----------------------------------------------------------------
 check-purity:
   stage: verify
@@ -339,15 +330,14 @@ check-purity:
 #   - npm run check   astro check: type + content checks across the
 #                      .astro/.ts tree. Fails only on type ERRORS;
 #                      residual hints do not fail the job.
-#   - npm test         vitest over both src/lib/*.test.ts (admin-auth,
+#   - npm test         vitest over both src/**/*.test.ts (admin-auth,
 #                      contact, csrf, manifest-store, tiles) and
 #                      scripts/*.test.mjs (manifests-loader,
 #                      admin-recovery-gate, etc.), incl. the fuzz +
 #                      fast-check suites. One runner; tsx is no longer a
 #                      test dependency (it remains for the separate
 #                      lint:manifests CLI).
-#   - YAML parse       the other half of the pre-tag-check.sh / AGENTS.md
-#                      gap: a well-formedness parse of the tracked
+#   - YAML parse       a well-formedness parse of the tracked
 #                      plain-YAML set (.gitlab-ci.yml, e2e/compose*.yml,
 #                      e2e/manifests/*.yaml) that CI never ran. Uses the
 #                      `yaml` package this job's own `npm ci` already

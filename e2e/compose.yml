@@ -345,8 +345,7 @@ services:
       # Admin model: authority is metadata_admin.admin===true (boolean
       # marker in Kratos, set via admin API only). The OTHALA_ADMIN_IDS env var
       # is retired — no UUID allowlist, no portal recreate after seeding.
-      # The recovery-gate reads is_admin from the webhook payload (set by
-      # recovery-gate.jsonnet from the metadata_admin.admin field).
+      # The recovery-gate reads the marker from the admin API.
       OTHALA_ADMIN_ENDPOINT_BEARER: ${OTHALA_ADMIN_ENDPOINT_BEARER}
       RECOVERY_GATE_SECRET: ${RECOVERY_GATE_SECRET}
       # Contact-form mailer: SAME courier connection Kratos uses (mailpit in

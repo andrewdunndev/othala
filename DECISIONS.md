@@ -60,8 +60,7 @@ Self-service recovery refuses admin identities for the same reason.
 `portal/src/lib/admin-auth.ts`, `portal/src/lib/admin.ts` (AAL2 guard),
 `portal/src/pages/admin/users/[id].astro` (last-admin, self-revoke), `portal/src/server/listen.mjs`
 (recovery refused on an admin marker the gate fetches itself). `kratos/hooks/recovery-gate.jsonnet`
-carries only the identity id; by the serialization gap above its `is_admin` is always false, so it
-enforces nothing.
+carries only the identity id and the admin marker is read from the admin API.
 
 ## Nothing is derived — not entry from a role, not a type from a name
 

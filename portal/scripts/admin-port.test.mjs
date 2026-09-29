@@ -24,7 +24,6 @@ import {
   bearerMatches,
   parseBearer,
   handleAdminRequest,
-  recoveryGateVerdict,
   LOGIN_CODE_ADMIN_REFUSAL,
   LOGIN_CODE_UNAVAILABLE,
   USERNAME_CHANGE_REFUSAL,
@@ -264,14 +263,8 @@ test('POST /admin/recovery-gate is fail-closed when RECOVERY_GATE_SECRET unset (
 });
 
 test('POST /admin/recovery-gate REFUSES recovery when the admin-API marker is true (403)', async () => {
-  // Genuinely exercise the admin-refusal MECHANISM. handleRecoveryGate IGNORES
-  // the payload's is_admin field (Kratos v26 omits metadata_admin from ctx) and
-  // resolves authority via fetchAdminMarker → the Kratos admin API. So we mock
-  // that API to return metadata_admin.admin===true and assert the 403 comes from
-  // the marker, NOT a fail-closed fallback. Sending is_admin:false in the body
-  // proves the verdict ignores the payload. (The prior version of this test left
-  // KRATOS_ADMIN_URL unset, so its 403 came from the admin-api-unavailable
-  // fail-closed path — it passed even if the isAdmin check were inverted.)
+  // handleRecoveryGate resolves authority via fetchAdminMarker (the Kratos admin API), so mock
+  // that API to return metadata_admin.admin===true and assert the 403 comes from the marker.
   const mockKratos = http.createServer((req, res) => {
     res.writeHead(200, { 'Content-Type': 'application/json' });
     res.end(JSON.stringify({ id: ADMIN_UUID, metadata_admin: { admin: true, groups: ['admin', 'family'] } }));
@@ -319,7 +312,7 @@ test('POST /admin/recovery-gate is fail-closed when KRATOS_ADMIN_URL is unset (4
   assert.match(res.body, /unavailable/, 'must refuse via the admin-api-unavailable fail-closed path');
 });
 
-test('POST /admin/recovery-gate ALLOWS recovery when is_admin===false (200)', async () => {
+test('POST /admin/recovery-gate ALLOWS recovery for a non-admin identity (200)', async () => {
   // fetchAdminMarker calls the Kratos admin API directly, because Kratos
   // v26.2.0 omits metadata_admin from the webhook ctx. Provide a mock
   // Kratos admin API that returns a non-admin identity for OTHER_UUID so the
@@ -350,7 +343,7 @@ test('POST /admin/recovery-gate ALLOWS recovery when is_admin===false (200)', as
   }
 });
 
-test('POST /admin/recovery-gate refuses when is_admin is missing (malformed, fail-closed)', async () => {
+test('POST /admin/recovery-gate refuses an unknown identity (403)', async () => {
   process.env.RECOVERY_GATE_SECRET = 'gate-secret';
   const res = fakeRes();
   await handleAdminRequest(
@@ -362,10 +355,10 @@ test('POST /admin/recovery-gate refuses when is_admin is missing (malformed, fai
     }),
     res,
   );
-  assert.equal(res.statusCode, 403, 'missing is_admin must refuse (fail-closed)');
+  assert.equal(res.statusCode, 403, 'unknown identity must refuse (fail-closed)');
 });
 
-test('POST /admin/recovery-gate refuses when is_admin is string "true" (non-boolean, fail-closed)', async () => {
+test('POST /admin/recovery-gate refuses an unknown identity whatever the payload says (403)', async () => {
   process.env.RECOVERY_GATE_SECRET = 'gate-secret';
   const res = fakeRes();
   await handleAdminRequest(
@@ -377,22 +370,7 @@ test('POST /admin/recovery-gate refuses when is_admin is string "true" (non-bool
     }),
     res,
   );
-  assert.equal(res.statusCode, 403, 'non-boolean is_admin must refuse (fail-closed)');
-});
-
-test('recoveryGateVerdict is FAIL-CLOSED on a malformed payload (no identity_id)', () => {
-  assert.equal(recoveryGateVerdict({}).refuse, true);
-  assert.equal(recoveryGateVerdict({ traits: {}, is_admin: false }).refuse, true);
-  assert.equal(recoveryGateVerdict({ identity: {}, is_admin: false }).refuse, true);
-});
-
-test('recoveryGateVerdict reads identity_id at top level OR identity.id under .identity', () => {
-  // top-level identity_id (canonical jsonnet shape)
-  assert.equal(recoveryGateVerdict({ identity_id: ADMIN_UUID, is_admin: true, traits: {} }).refuse, true);
-  // fallback: identity.id
-  assert.equal(recoveryGateVerdict({ identity: { id: ADMIN_UUID }, is_admin: true }).refuse, true);
-  // non-admin
-  assert.equal(recoveryGateVerdict({ identity_id: OTHER_UUID, is_admin: false, traits: {} }).refuse, false);
+  assert.equal(res.statusCode, 403, 'unknown identity must refuse (fail-closed)');
 });
 
 // ── Security: bearer rejection MUST be 403, never 401 (Kratos can_interrupt) ─

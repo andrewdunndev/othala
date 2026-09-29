@@ -66,7 +66,7 @@ plainly. **Cost of opening it:** operator time, permanently.
 
 One handler in `portal/src/server/listen.mjs` refuses admin identities email
 recovery and sign-in by emailed code, so email alone never yields admin
-authority. `portal/scripts/recovery-gate.fuzz.test.mjs` fuzzes it. **Cost of
+authority. `portal/scripts/admin-port.test.mjs` and spec j cover it. **Cost of
 opening it:** every additional webhook is another contract with Kratos's
 webhook schema to re-verify on each bump. Add carefully.
 

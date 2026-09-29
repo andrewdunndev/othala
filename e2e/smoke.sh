@@ -406,13 +406,12 @@ else
     fail "D4 recovery-gate wrong bearer" "code=$wrong_code want=403"
 fi
 
-# D5: Malformed is_admin (non-boolean) → 403 (fail-closed; jsonnet always
-# emits a boolean, so a non-boolean signals tampering or a gate bug).
-malformed_code=$(gate_code "${RECOVERY_GATE_SECRET}" '{"identity_id":"00000000-0000-0000-0000-000000000099","is_admin":"true","groups":[],"traits":{}}')
+# D5: unknown identity → 403 (fail-closed; the admin API has no such id).
+malformed_code=$(gate_code "${RECOVERY_GATE_SECRET}" '{"identity_id":"00000000-0000-0000-0000-000000000099","traits":{}}')
 if [[ "$malformed_code" == "403" ]]; then
-    pass "D5 recovery-gate refuses malformed is_admin (non-boolean → fail-closed)"
+    pass "D5 recovery-gate refuses an unknown identity (fail-closed)"
 else
-    fail "D5 recovery-gate malformed is_admin" "code=$malformed_code want=403 (non-boolean is_admin must be refused)"
+    fail "D5 recovery-gate unknown identity" "code=$malformed_code want=403"
 fi
 
 # Section E: revoke fan-out (admin endpoint, LIVE Kratos + Hydra)
