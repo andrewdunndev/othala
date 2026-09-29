@@ -15,6 +15,7 @@ This CHANGELOG and git tags carry the deployed-instance release state.
 - Removing a group or changing a role revokes the member's app grants.
 - Signing out of an app also ends the portal session.
 - An app sign-in is remembered for as long as the portal session lasts.
+- The reference edge snippets pass the verified identity id to the upstream and remove the Kratos session cookie from app-bound requests; `.env.example` documents the admin bind hosts.
 - Only an administrator can change a username; profile settings show it read-only.
 - Saving profile settings ends the account's other sessions.
 - `email_verified` reflects only the account's own email address.

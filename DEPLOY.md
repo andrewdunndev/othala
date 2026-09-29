@@ -80,6 +80,7 @@ context beyond that file:
 - `MANIFEST_DIR` (default `/etc/portal/manifests`) is the directory the app
   reads per-app manifests from at runtime. A deploy plane mounts its
   synced manifest set there, read-only.
+- `KRATOS_ADMIN_BIND_HOST` and `HYDRA_ADMIN_BIND_HOST` have no default: bind each to an address on the internal network the edge is not attached to.
 - Secrets come from whatever secret store the deploy plane uses (sops,
   Vault, a platform's native secret objects) — never committed, never baked
   into the image.

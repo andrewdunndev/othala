@@ -33,6 +33,11 @@
 		dns cloudflare {env.CF_API_TOKEN}
 	}
 
+	# Drop any client-supplied identity id before the auth call, so the only
+	# value that can reach the upstream is the one copy_headers takes from
+	# the whoami response.
+	request_header -X-Kratos-Authenticated-Identity-Id
+
 	forward_auth kratos:4433 {
 		uri /sessions/whoami
 		copy_headers X-Kratos-Authenticated-Identity-Id
@@ -80,10 +85,9 @@
 		# user could otherwise inject X-Kratos-Groups: admin (or any
 		# equivalent) and bypass per-app group enforcement at the app layer.
 		#
-		# X-Kratos-Authenticated-Identity-Id is re-added from whoami by the
-		# copy_headers directive above (belt-and-suspenders: strip then re-set
-		# from the auth response so the value is always authoritative).
-		header_up -X-Kratos-Authenticated-Identity-Id
+		# X-Kratos-Authenticated-Identity-Id is stripped by request_header
+		# before forward_auth and set from the whoami response by copy_headers,
+		# so it is deliberately not removed here.
 		header_up -X-Kratos-Groups
 		header_up -X-Remote-User
 		header_up -X-Remote-Groups
