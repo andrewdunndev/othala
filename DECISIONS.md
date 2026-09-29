@@ -6,20 +6,22 @@ alone and names the file that fails when it is violated, or says UNENFORCED.
 
 ## Assurance level is per-flow, so the session check stays aal1
 
-**Decided.** `session.whoami.required_aal` stays `aal1`. Step-up is enforced at the privileged surfaces
-instead: a server-side guard on the admin UI, and `required_aal: highest_available` on the settings flow
-that changes credentials.
+**Decided.** `session.whoami.required_aal` stays `aal1`. Step-up lives in the application instead:
+the admin UI guard, `required_aal: highest_available` on the settings flow, and app sign-in and
+forward-auth for accounts holding totp, webauthn or the admin marker (`portal/src/lib/step-up.ts`).
+Admins cannot sign in by emailed code, nor hold the marker without a second factor.
 
-**Why.** Kratos enforces assurance level per flow, never per route, so an edge check reading the session
-endpoint can never gate on AAL: step-up had to move into the application. Raising the pin tightens
-nothing — it makes the session endpoint stop returning a usable identity for exactly the people who
-enrolled a second factor, and that identity id is the gate's only input for group lookup, so every gated
-app locks out at once. A live setting whose stated reason has expired is the most dangerous line in a
-config file, and Ory config here is host-mounted rather than baked into an image, so its consumer may
-not be in this repository at all.
+**Why.** Kratos enforces assurance level per flow, never per route, so step-up belongs in the
+application, which reads the session's AAL itself. Raising the pin tightens nothing: the session endpoint
+stops returning a usable identity for exactly the people who enrolled a second factor, and that identity
+id is the gate's only input, so every gated app locks out at once. Ory config here is
+host-mounted, not baked into an image, so a stale setting's consumer may not be in this
+repository.
 
 **Enforced by.** `portal/scripts/forward-auth.test.mjs` holds the coupling (a session with no identity
-id is 401). The pinned value in `kratos/kratos.yml` is UNENFORCED.
+id is 401). Step-up: `step-up.test.ts`, `oauth2-handlers.test.mjs`, `admin-port.test.mjs`,
+`admin-actions.test.ts`, `e2e/playwright/tests/v-app-stepup.spec.ts`. The pinned value in
+`kratos/kratos.yml` is UNENFORCED.
 
 ## An outage is not a denial
 
