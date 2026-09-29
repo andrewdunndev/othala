@@ -118,7 +118,7 @@ async function seedPair(tag: string) {
     email: `${username}@othala.test`,
     username,
     displayName: `${tag.toUpperCase()} Member`,
-    groups: ['family', 'grafana-access'],
+    groups: ['everyone', 'grafana-access'],
     kratosAdminURL: KRATOS_ADMIN_URL,
   });
   return { admin, member: { ...member, username } };

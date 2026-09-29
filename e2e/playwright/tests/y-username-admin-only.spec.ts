@@ -69,7 +69,7 @@ test.describe('Y — username is admin-only', () => {
       expect(html).toContain('Only an administrator can change your username.');
 
       const before = await storedTraits(ctx.request, kratosAdminURL, seeded.id);
-      const { status, body } = await submitProfile(ctx, baseURL, { ...before, username: `${username}.accepted` });
+      const { status, body } = await submitProfile(ctx, baseURL, { ...before, username: `rename.accepted.${Date.now()}` });
       expect(status, 'refused profile submission answers 400 with the flow').toBe(400);
       expect(usernameNodeMessages(body)).toContain(USERNAME_CHANGE_REFUSAL);
 
