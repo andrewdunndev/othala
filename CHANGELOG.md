@@ -7,12 +7,12 @@ aims to follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 The git tag is the authoritative version; `portal/package.json` mirrors it.
 This CHANGELOG and git tags carry the deployed-instance release state.
 
-## [Unreleased]
+## [0.6.3] - 2026-09-29
 
 ### Changed
 
 - Signing in to connected apps now completes second-factor verification for
-  accounts that have one enrolled, and for admin accounts. Admin accounts sign
+  accounts with one enrolled, and for admin accounts. Admin accounts sign
   in with a passkey or password rather than an emailed code. Granting admin
   requires an enrolled second factor.
 
