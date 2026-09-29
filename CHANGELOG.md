@@ -140,6 +140,8 @@ Security hardening pass (CVP), access-model refactor, PII-safe OpenTelemetry tra
 
 The convergence release: a breaking move from a build-time app catalog to a runtime manifest model, plus the rename to **Othala** ("Ory for your home").
 
+[0.6.3]: https://gitlab.com/dunn.dev/othala/-/releases/v0.6.3
+[0.6.2]: https://gitlab.com/dunn.dev/othala/-/releases/v0.6.2
 [0.6.1]: https://gitlab.com/dunn.dev/othala/-/releases/v0.6.1
 [0.6.0]: https://gitlab.com/dunn.dev/othala/-/releases/v0.6.0
 [0.5.0]: https://gitlab.com/dunn.dev/othala/-/releases/v0.5.0

@@ -31,7 +31,7 @@ identity-provider outage into an infinite login loop: the gate denies because it
 and the edge bounces the browser to a login page served by the same process that is down.
 `ARCHITECTURE.md`'s status contract ("Why 503 is separate at all") carries the full argument. The required group arrives as an operator-set query
 parameter, not a header, because anything reaching the endpoint internally can forge a header; and HEAD
-reuses the GET decision verbatim.
+reuses the GET decision verbatim: a HEAD answered 200 where GET would answer 403 would admit a request GET refuses.
 
 **Enforced by.** `portal/scripts/forward-auth.test.mjs`
 
@@ -203,8 +203,8 @@ endpoints needs an entry; a redirect-flow server-side client never does.
 breaks every login — the challenge paths get proxied to the authorization server, which does not
 implement them — and the failure is total, with no degraded state to notice first. A redirect-flow
 client's browser never issues a cross-origin request to the authorization server, so its origin in the
-allowlist adds nothing, and credentials are allowed on the CORS config, so extra origins are not
-cosmetic.
+allowlist adds nothing, and credentials are allowed on the CORS config, so each extra origin widens who
+can reach the token endpoint.
 
 **Enforced by.** UNENFORCED — the constraint holds only in the deployed proxy config, which no gate here
 can read.
@@ -250,7 +250,10 @@ got its own defensible answer. The non-obvious rung
 is the second: a uniform edge gate is only uniform until the first native client, because such a client
 carries a bearer credential rather than the browser's session cookie and the gate simply rejects it — so
 the carve-out is scoped to that client's paths, not the whole service, and thereafter a "uniform" gate
-is a uniform gate plus an undocumented exception. The endpoint reads a single group per call, so "entry AND
+is a uniform gate plus an undocumented exception. That rung also rules out a dedicated bridge for any
+native-auth protocol a browser app doesn't need: a browser app without OIDC sits behind forward-auth, a
+native client uses an app-local credential, and neither justifies standing up a privileged listener
+whose only job is bridging one to the other. The endpoint reads a single group per call, so "entry AND
 role" is two gates on one site. Finally, an ungated surface is an assignment a rung made, not an omission,
 and the comment beside it is usually the only place that reason is written.
 
