@@ -19,6 +19,7 @@ import {
   type CreateIdentityBody,
   type UpdateIdentityBody,
   type DeleteIdentityCredentialsTypeEnum,
+  type GetIdentityIncludeCredentialEnum,
 } from '@ory/client-fetch';
 import type { Identity } from './types';
 import { validateMetadataAdmin } from './metadata-admin';
@@ -90,13 +91,15 @@ export async function listIdentities(): Promise<Identity[]> {
   return identityApi().listIdentities({ perPage: 250 });
 }
 
+// Credential types whose config the admin API returns. 'lookup_secret' must be
+// included or the backup-codes credential is never fetched: the admin user page
+// keys its badge on it, and updateIdentity would drop it on a PUT round-trip.
+export const INCLUDED_CREDENTIALS: GetIdentityIncludeCredentialEnum[] = ['password', 'webauthn', 'passkey', 'totp', 'lookup_secret'];
+
 export async function getIdentity(id: string): Promise<Identity> {
   return identityApi().getIdentity({
     id,
-    // 'lookup_secret' must be included or the backup-codes credential is never
-    // fetched: the admin user page keyed the badge on it and would always show
-    // "not enrolled" without this entry.
-    includeCredential: ['password', 'webauthn', 'passkey', 'totp', 'lookup_secret'],
+    includeCredential: INCLUDED_CREDENTIALS,
   });
 }
 
@@ -125,10 +128,7 @@ export async function updateIdentity(id: string, input: UpdateIdentityInput): Pr
   const api = identityApi();
   const current = await api.getIdentity({
     id,
-    // Keep consistent with getIdentity: 'lookup_secret' must be present so
-    // updateIdentity preserves the current backup-codes credential rather
-    // than losing it on a PUT round-trip.
-    includeCredential: ['password', 'webauthn', 'passkey', 'totp', 'lookup_secret'],
+    includeCredential: INCLUDED_CREDENTIALS,
   });
   const updateIdentityBody: UpdateIdentityBody = {
     schema_id: current.schema_id,

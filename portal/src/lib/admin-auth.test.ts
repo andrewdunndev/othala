@@ -21,18 +21,10 @@
 import { describe, it, expect } from 'vitest';
 import { isAdminMarker } from './admin-auth.js';
 import type { Identity } from './types.js';
-
-// ── Minimal Identity fixture builder ─────────────────────────────────────────
+import { identity } from './test-builders.js';
 
 function makeIdentity(metadataAdmin?: Record<string, unknown>): Identity {
-  return {
-    id: 'aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee',
-    schema_id: 'family',
-    schema_url: 'http://kratos:4434/schemas/family',
-    state: 'active',
-    traits: { username: 'testuser', email: 'test@example.com' },
-    metadata_admin: metadataAdmin as Identity['metadata_admin'],
-  };
+  return identity({ metadataAdmin: metadataAdmin as Identity['metadata_admin'] });
 }
 
 // ── isAdminMarker ─────────────────────────────────────────────────────────────

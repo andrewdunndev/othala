@@ -14,6 +14,10 @@ import { describeScopeList, SCOPE_DESCRIPTIONS } from '../src/lib/scope-descript
 import { parseManifest } from '../src/lib/manifests.ts';
 import { signToken, _resetForTests } from '../src/lib/csrf.ts';
 import { deepMergeClaims } from '../src/lib/claims.ts';
+import {
+  identity, session, whoamiIdentity, withTotp, withWebauthnKey, withPasskey, withLookupSecret,
+  oauth2LoginRequest, oauth2ConsentRequest, oauth2LogoutRequest,
+} from '../src/lib/test-builders.ts';
 
 // Ensure CSRF_SECRET is set for tests that exercise CSRF verification.
 if (!process.env.CSRF_SECRET) {
@@ -27,13 +31,7 @@ if (!process.env.CSRF_SECRET) {
 // grafana.yaml maps `grafana-access` → viewer, so this identity is a viewer.
 function activeMember(overrides = {}) {
   return {
-    id: 'id-1',
-    state: 'active',
-    schema_id: 'family',
-    schema_url: '',
-    traits: { username: 'ada', email: 'a@othala.test', displayName: 'Ada' },
-    metadata_admin: { groups: ['grafana-access'] },
-    verifiable_addresses: [{ value: 'a@othala.test', verified: true, via: 'email', status: 'completed' }],
+    ...identity({ id: 'id-1', username: 'ada', email: 'a@othala.test', displayName: 'Ada', metadataAdmin: { groups: ['grafana-access'] } }),
     ...overrides,
   };
 }
@@ -46,13 +44,13 @@ function stubOAuth2(over = {}) {
   const calls = { acceptLogin: 0, rejectLogin: 0, acceptConsent: 0, rejectConsent: 0, acceptLogout: 0 };
   const api = {
     getOAuth2LoginRequest: over.getOAuth2LoginRequest
-      ?? (async () => ({ challenge: 'lc', skip: true, subject: 'id-1', client: { client_id: 'grafana' } })),
+      ?? (async () => oauth2LoginRequest({ skip: true, subject: 'id-1' })),
     getOAuth2ConsentRequest: over.getOAuth2ConsentRequest
       // Default: skip_consent:true client — auto-accept path. Tests that exercise
       // the prompt path supply their own getOAuth2ConsentRequest with skip:false.
-      ?? (async () => ({ challenge: 'cc', skip: true, subject: 'id-1', client: { client_id: 'grafana' }, requested_scope: ['email', 'profile'], requested_access_token_audience: [] })),
+      ?? (async () => oauth2ConsentRequest({ skip: true, subject: 'id-1', requested_scope: ['email', 'profile'] })),
     getOAuth2LogoutRequest: over.getOAuth2LogoutRequest
-      ?? (async () => ({ challenge: 'gc', subject: 'id-1', client: { client_id: 'grafana' } })),
+      ?? (async () => oauth2LogoutRequest({ subject: 'id-1' })),
     acceptOAuth2LoginRequest: async (p) => { calls.acceptLogin++; calls.acceptLoginBody = p.acceptOAuth2LoginRequest; return { redirect_to: 'https://sso.othala.test/after-login' }; },
     rejectOAuth2LoginRequest: async (p) => { calls.rejectLogin++; calls.rejectLoginReason = p.rejectOAuth2Request?.error_description; return { redirect_to: 'https://sso.othala.test/login-rejected' }; },
     acceptOAuth2ConsentRequest: async (p) => { calls.acceptConsent++; calls.acceptConsentBody = p.acceptOAuth2ConsentRequest; return { redirect_to: 'https://sso.othala.test/after-consent' }; },
@@ -66,19 +64,7 @@ function stubOAuth2(over = {}) {
 // matching the default subject 'id-1'. Tests that need a different session
 // (including the FIX-A specific tests) supply their own getSession override.
 function defaultSession(overrides = {}) {
-  return async () => ({
-    active: true,
-    identity: {
-      id: 'id-1',
-      state: 'active',
-      schema_id: 'family',
-      schema_url: '',
-      traits: { username: 'ada', email: 'a@othala.test', displayName: 'Ada' },
-      metadata_admin: { groups: ['grafana-access'] },
-    },
-    authenticator_assurance_level: 'aal1',
-    ...overrides,
-  });
+  return async () => session('aal1', ['password'], { identity: whoamiIdentity(activeMember()), ...overrides });
 }
 
 // ── return_to hardening (CU1 item 5) ──────────────────────────────────────
@@ -177,7 +163,7 @@ test('login REJECTS when identity lookup fails (fail-closed) — opaque error_de
 
 test('login bounces to RELATIVE return_to when not authenticated (skip=false, no session)', async () => {
   const { api } = stubOAuth2({
-    getOAuth2LoginRequest: async () => ({ challenge: 'lc', skip: false, subject: '', client: { client_id: 'grafana' } }),
+    getOAuth2LoginRequest: async () => oauth2LoginRequest(),
   });
   const res = await handleLogin(new Request('https://x/oauth2/login?login_challenge=lc'), {
     oauth2: api,
@@ -198,17 +184,13 @@ test('login 400 on missing challenge', async () => {
 
 // ── second-factor step-up at app sign-in ───────────────────────────────────
 
-// Enrolled configs as the Kratos admin API returns them (lib/step-up.ts).
-const ENROLLED_CONFIG = {
-  totp: { totp_url: 'otpauth://totp/othala:a?secret=JBSWY3DPEHPK3PXP' },
-  webauthn: { credentials: [{ id: 'w', is_passwordless: false }] },
-};
+const ADD = { password: (i) => i, totp: withTotp, webauthn: (i) => withWebauthnKey(i), passkey: withPasskey, lookup_secret: withLookupSecret };
 
 function withCreds(...types) {
-  return Object.fromEntries(types.map((t) => [t, { type: t, identifiers: ['a'], config: ENROLLED_CONFIG[t] ?? {} }]));
+  return types.reduce((i, t) => ADD[t](i), activeMember()).credentials;
 }
 
-const FRESH = async () => ({ challenge: 'lc', skip: false, subject: '', client: { client_id: 'grafana' } });
+const FRESH = async () => oauth2LoginRequest();
 
 for (const [branch, getReq] of [['skip', undefined], ['fresh', FRESH]]) {
   test(`login (${branch}) steps an aal1 totp holder up to aal2 and never accepts`, async () => {

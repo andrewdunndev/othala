@@ -1,36 +1,29 @@
 import { describe, it, expect } from 'vitest';
 import { needsStepUp, hasSecondFactor } from './step-up';
 import type { Identity } from './types';
+import { identity as buildIdentity, withCredential, withLookupSecret, withPasskey, withTotp, withWebauthnKey } from './test-builders';
 
-// Credentials as the Kratos admin API returns them with configs included. The
-// schema gives every identity a webauthn entry with identifiers and no keys.
-const CREDENTIALS: Record<string, object> = {
-  password: { type: 'password', identifiers: ['a'], config: {} },
-  passkey: { type: 'passkey', identifiers: ['k'], config: { credentials: [{ id: 'k' }] } },
-  totp: { type: 'totp', identifiers: ['a'], config: { totp_url: 'otpauth://totp/othala:a?secret=JBSWY3DPEHPK3PXP' } },
-  webauthn: { type: 'webauthn', identifiers: ['a'], config: { credentials: [{ id: 'w', is_passwordless: false }] } },
-  lookup_secret: { type: 'lookup_secret', identifiers: ['a'], config: { recovery_codes: [{ code: 'x' }] } },
-  'webauthn-schema-only': { type: 'webauthn', identifiers: ['a'], config: {} },
-  'webauthn-no-keys': { type: 'webauthn', identifiers: ['a'], config: { credentials: [] } },
-  'webauthn-passwordless-only': { type: 'webauthn', identifiers: ['a'], config: { credentials: [{ id: 'w', is_passwordless: true }] } },
-  'totp-no-url': { type: 'totp', identifiers: ['a'], config: {} },
+// Credential variants over the builder's admin-API identity, which always
+// carries the schema's password and webauthn entries (identifiers, no keys).
+const APPLY: Record<string, (i: Identity) => Identity> = {
+  password: (i) => i,
+  passkey: withPasskey,
+  totp: withTotp,
+  webauthn: (i) => withWebauthnKey(i),
+  lookup_secret: withLookupSecret,
+  'webauthn-schema-only': (i) => i,
+  'webauthn-no-keys': (i) => withCredential(i, 'webauthn', { credentials: [] }),
+  'webauthn-passwordless-only': (i) => withWebauthnKey(i, { passwordless: true }),
+  'totp-no-url': (i) => withCredential(i, 'totp', {}),
 };
 
 function identity(types: string[], admin?: boolean): Identity {
-  return {
+  const base = buildIdentity({
     id: 'id-1',
-    schema_id: 'family',
-    schema_url: '',
-    state: 'active',
-    traits: {},
-    credentials: Object.fromEntries(
-      types.map((t) => {
-        const cred = CREDENTIALS[t] as { type: string };
-        return [cred.type, cred];
-      }),
-    ) as Identity['credentials'],
-    ...(admin === undefined ? {} : { metadata_admin: { admin } }),
-  };
+    password: types.includes('password'),
+    ...(admin === undefined ? {} : { metadataAdmin: { admin } }),
+  });
+  return types.reduce((i, t) => APPLY[t](i), base);
 }
 
 describe('needsStepUp', () => {

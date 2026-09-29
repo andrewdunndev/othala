@@ -36,11 +36,13 @@ vi.mock('./admin-api', async (importOriginal) => {
 
 import { isSessionFresh, requireAdminSession } from './admin.js';
 import type { Session } from './types.js';
+import type { SessionAuthenticationMethod } from '@ory/client-fetch';
+import { identity, session as buildSession, whoamiIdentity } from './test-builders.js';
 
 const HOUR = 60 * 60 * 1000;
 
 function withMethods(...methods: Array<{ aal?: unknown; completed_at?: unknown }>): Session {
-  return { id: 's', authentication_methods: methods } as unknown as Session;
+  return buildSession('aal2', methods as SessionAuthenticationMethod[], { authenticated_at: undefined });
 }
 
 // ── isSessionFresh ───────────────────────────────────────────────────────────
@@ -76,12 +78,12 @@ describe('isSessionFresh — multiple aal2 entries: most-recent wins', () => {
 
 describe('isSessionFresh — fallback to authenticated_at when no aal2 entries', () => {
   it('within window (no authentication_methods)', () => {
-    const session = { id: 's', authenticated_at: new Date(Date.now() - HOUR) } as unknown as Session;
+    const session = buildSession('aal1', [], { authentication_methods: undefined, authenticated_at: new Date(Date.now() - HOUR) });
     expect(isSessionFresh(session, 2)).toBe(true);
   });
 
   it('outside window (no authentication_methods)', () => {
-    const session = { id: 's', authenticated_at: new Date(Date.now() - 3 * HOUR) } as unknown as Session;
+    const session = buildSession('aal1', [], { authentication_methods: undefined, authenticated_at: new Date(Date.now() - 3 * HOUR) });
     expect(isSessionFresh(session, 2)).toBe(false);
   });
 
@@ -94,7 +96,7 @@ describe('isSessionFresh — fallback to authenticated_at when no aal2 entries',
 
 describe('isSessionFresh — both sources unreadable → fail-closed false', () => {
   it('no authentication_methods, no authenticated_at', () => {
-    expect(isSessionFresh({ id: 's' } as Session, 24)).toBe(false);
+    expect(isSessionFresh(buildSession('aal1', [], { authentication_methods: undefined, authenticated_at: undefined }), 24)).toBe(false);
   });
 
   it('authenticated_at present but unparseable', () => {
@@ -137,13 +139,17 @@ beforeEach(() => {
 
 describe('requireAdminSession — aal2-but-stale redirects before the admin-marker fetch', () => {
   it('redirects to the aal2+refresh step-up and never calls getIdentity', async () => {
-    getSessionMock.mockResolvedValue({
-      id: 'sess-1',
-      active: true,
-      identity: { id: 'user-1' },
-      authenticator_assurance_level: 'aal2',
-      authenticated_at: new Date(Date.now() - 100 * HOUR), // far outside any sane window
-    } as unknown as Session);
+    const stale = new Date(Date.now() - 100 * HOUR); // far outside any sane window
+    getSessionMock.mockResolvedValue(
+      buildSession(
+        'aal2',
+        [
+          { method: 'password', aal: 'aal1', completed_at: stale },
+          { method: 'totp', aal: 'aal2', completed_at: stale },
+        ],
+        { identity: whoamiIdentity(identity({ id: 'user-1' })), authenticated_at: stale },
+      ),
+    );
 
     const astro = fakeAstro('/admin', '');
     const result = await requireAdminSession(astro);

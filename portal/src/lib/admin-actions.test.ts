@@ -48,31 +48,22 @@ vi.mock('./admin-api', async (importOriginal) => {
 
 import { deleteAction, revokeAdminAction, removeCredentialAction, grantAdminAction, type ActionContext } from './admin-actions.js';
 import type { Identity } from './types.js';
+import { identity, withLookupSecret, withPasskey, withTotp, withWebauthnKey } from './test-builders.js';
 
 function makeIdentity(username: string, admin?: boolean): Identity {
-  return {
-    id: 'aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee',
-    schema_id: 'family',
-    schema_url: 'http://kratos:4434/schemas/family',
-    state: 'active',
-    traits: { username, email: `${username}@example.com` },
-    metadata_admin: admin === undefined ? undefined : ({ admin } as Identity['metadata_admin']),
-  };
+  return identity({ username, ...(admin === undefined ? {} : { metadataAdmin: { admin } }) });
 }
 
-// Enrolled configs as the Kratos admin API returns them (lib/step-up.ts).
-const ENROLLED_CONFIG: Record<string, object> = {
-  totp: { totp_url: 'otpauth://totp/othala:a?secret=JBSWY3DPEHPK3PXP' },
-  webauthn: { credentials: [{ id: 'w', is_passwordless: false }] },
+const ADD: Record<string, (i: Identity) => Identity> = {
+  password: (i) => i,
+  totp: withTotp,
+  webauthn: (i) => withWebauthnKey(i),
+  passkey: withPasskey,
+  lookup_secret: withLookupSecret,
 };
 
-function withCreds(identity: Identity, ...types: string[]): Identity {
-  return {
-    ...identity,
-    credentials: Object.fromEntries(
-      types.map((t) => [t, { type: t, identifiers: ['a'], config: ENROLLED_CONFIG[t] ?? {} }]),
-    ) as Identity['credentials'],
-  };
+function withCreds(i: Identity, ...types: string[]): Identity {
+  return types.reduce((acc, t) => ADD[t](acc), i);
 }
 
 function makeCtx(overrides: Partial<ActionContext> = {}): ActionContext {
