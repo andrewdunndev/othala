@@ -1453,3 +1453,57 @@ test('logout with no live session accepts without a revoke', async () => {
   assert.equal(calls.acceptLogout, 1);
   assert.equal(res.status, 302);
 });
+
+test('logout with an empty subject revokes the live session, then accepts', async () => {
+  const live = session();
+  const order = [];
+  const { api, calls } = stubOAuth2({
+    getOAuth2LogoutRequest: async () => oauth2LogoutRequest({ subject: '' }),
+  });
+  const accept = api.acceptOAuth2LogoutRequest;
+  api.acceptOAuth2LogoutRequest = async (p) => { order.push('accept'); return accept(p); };
+  const revoked = [];
+  const res = await handleLogout(logoutRequest(), {
+    oauth2: api,
+    getSession: async () => live,
+    revokeSession: async (id) => { order.push('revoke'); revoked.push(id); },
+  });
+  assert.deepEqual(revoked, [live.id]);
+  assert.deepEqual(order, ['revoke', 'accept']);
+  assert.equal(res.status, 302);
+  assert.equal(calls.acceptLogout, 1);
+});
+
+test('logout with an empty subject and no session accepts without a revoke', async () => {
+  const { api, calls } = stubOAuth2({
+    getOAuth2LogoutRequest: async () => oauth2LogoutRequest({ subject: '' }),
+  });
+  let revokes = 0;
+  const res = await handleLogout(logoutRequest(), {
+    oauth2: api,
+    getSession: async () => null,
+    revokeSession: async () => { revokes++; },
+  });
+  assert.equal(revokes, 0);
+  assert.equal(calls.acceptLogout, 1);
+  assert.equal(res.status, 302);
+});
+
+test('logout with an empty subject does not accept when the revoke fails', async () => {
+  const live = session();
+  const { api, calls } = stubOAuth2({
+    getOAuth2LogoutRequest: async () => oauth2LogoutRequest({ subject: '' }),
+  });
+  process.env.OTHALA_PUBLIC_URL = 'https://sso.othala.test';
+  try {
+    const res = await handleLogout(logoutRequest(), {
+      oauth2: api,
+      getSession: async () => live,
+      revokeSession: async () => { throw new Error('kratos admin 500'); },
+    });
+    assert.equal(calls.acceptLogout, 0);
+    assert.equal(res.headers.get('location'), 'https://sso.othala.test/auth/error?reason=auth-unreachable');
+  } finally {
+    delete process.env.OTHALA_PUBLIC_URL;
+  }
+});

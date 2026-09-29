@@ -581,7 +581,7 @@ export async function handleLogout(req: Request, deps: Deps = {}): Promise<Respo
   // or the browser has no cookie, both of which are expected on a legitimate
   // logout flow initiated by Hydra post-revocation).
   const logoutSubject = _logout.subject;
-  if (logoutSubject) {
+  {
     let session: Session | null;
     try {
       session = await d.getSession(req.headers.get('cookie') ?? undefined);
@@ -590,7 +590,7 @@ export async function handleLogout(req: Request, deps: Deps = {}): Promise<Respo
       // more dangerous than accepting, and blocking on infra failure is worse).
       session = null;
     }
-    if (session?.active && session.identity && session.identity.id !== logoutSubject) {
+    if (logoutSubject && session?.active && session.identity && session.identity.id !== logoutSubject) {
       // Live session belongs to a DIFFERENT user than the logout subject.
       // Refuse to auto-accept — redirect to the portal home instead.
       const publicUrlBase = process.env.OTHALA_PUBLIC_URL ?? '';
