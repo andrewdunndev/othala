@@ -198,8 +198,14 @@ test('login 400 on missing challenge', async () => {
 
 // ── second-factor step-up at app sign-in ───────────────────────────────────
 
+// Enrolled configs as the Kratos admin API returns them (lib/step-up.ts).
+const ENROLLED_CONFIG = {
+  totp: { totp_url: 'otpauth://totp/othala:a?secret=JBSWY3DPEHPK3PXP' },
+  webauthn: { credentials: [{ id: 'w', is_passwordless: false }] },
+};
+
 function withCreds(...types) {
-  return Object.fromEntries(types.map((t) => [t, { type: t }]));
+  return Object.fromEntries(types.map((t) => [t, { type: t, identifiers: ['a'], config: ENROLLED_CONFIG[t] ?? {} }]));
 }
 
 const FRESH = async () => ({ challenge: 'lc', skip: false, subject: '', client: { client_id: 'grafana' } });
@@ -252,6 +258,26 @@ for (const [branch, getReq] of [['skip', undefined], ['fresh', FRESH]]) {
     const res = await handleLogin(new Request('https://x/oauth2/login?login_challenge=lc'), {
       oauth2: api,
       getIdentity: async () => activeMember({ credentials: withCreds('passkey', 'lookup_secret') }),
+      getSession: defaultSession(),
+      manifest: () => loadManifest('grafana'),
+    });
+    assert.equal(res.headers.get('location'), 'https://sso.othala.test/after-login');
+    assert.equal(calls.acceptLogin, 1);
+    assert.equal(calls.acceptLoginBody.acr, 'aal1');
+  });
+
+  test(`login (${branch}) accepts a password member whose webauthn entry holds no keys`, async () => {
+    // The identity schema gives every identity a webauthn entry (identifiers,
+    // empty config); that entry is not an enrolled second factor.
+    const { api, calls } = stubOAuth2(getReq ? { getOAuth2LoginRequest: getReq } : {});
+    const res = await handleLogin(new Request('https://x/oauth2/login?login_challenge=lc'), {
+      oauth2: api,
+      getIdentity: async () => activeMember({
+        credentials: {
+          password: { type: 'password', identifiers: ['a'], config: {} },
+          webauthn: { type: 'webauthn', identifiers: ['a'], config: {} },
+        },
+      }),
       getSession: defaultSession(),
       manifest: () => loadManifest('grafana'),
     });

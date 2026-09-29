@@ -375,12 +375,18 @@ function sessionAt(aal) {
   return { status: 200, body: { active: true, authenticator_assurance_level: aal, identity: { id: 'id-1', traits: {} } } };
 }
 
+// Enrolled configs as the Kratos admin API returns them (lib/step-up.ts).
+const ENROLLED_CONFIG = {
+  totp: { totp_url: 'otpauth://totp/othala:a?secret=JBSWY3DPEHPK3PXP' },
+  webauthn: { credentials: [{ id: 'w', is_passwordless: false }] },
+};
+
 function inGroupWith(...types) {
   return {
     status: 200,
     body: {
       ...ACTIVE_IN_GROUP.body,
-      credentials: Object.fromEntries(types.map((t) => [t, { type: t, identifiers: ['a'] }])),
+      credentials: Object.fromEntries(types.map((t) => [t, { type: t, identifiers: ['a'], config: ENROLLED_CONFIG[t] ?? {} }])),
     },
   };
 }
@@ -412,6 +418,14 @@ test('aal2 session, identity holds totp → 200', async () => {
 
 test('aal1 session, passkey-only identity → 200 (no second factor to ask for)', async () => {
   installFetch({ whoami: sessionAt('aal1'), identity: inGroupWith('passkey', 'lookup_secret') });
+  const res = await GET(ctx('access-proxywatch'));
+  assert.equal(res.status, 200);
+});
+
+test('aal1 session, password identity with the schema webauthn entry and no keys → 200', async () => {
+  const base = inGroupWith('password');
+  const credentials = { ...base.body.credentials, webauthn: { type: 'webauthn', identifiers: ['a'], config: {} } };
+  installFetch({ whoami: sessionAt('aal1'), identity: { status: 200, body: { ...base.body, credentials } } });
   const res = await GET(ctx('access-proxywatch'));
   assert.equal(res.status, 200);
 });

@@ -109,9 +109,12 @@ async function seedWithTotp(
   slug: string,
   isAdmin: boolean,
 ): Promise<{ email: string; secret: string }> {
-  const email = `${slug}@othala.test`;
+  // A fresh identity per attempt: a retry that reused one already holding TOTP
+  // would meet the settings flow's highest_available AAL at aal1 (403).
+  const username = `${slug}.${Date.now()}`;
+  const email = `${username}@othala.test`;
   await createIdentityWithPassword({
-    email, username: slug, displayName: `V ${slug}`, groups: ['grafana-access'], isAdmin, kratosAdminURL,
+    email, username, displayName: `V ${slug}`, groups: ['grafana-access'], isAdmin, kratosAdminURL,
   });
   const ctx = await browser.newContext();
   try {
@@ -139,7 +142,8 @@ test('V2 — a TOTP member signed in by code steps up before app sign-in and for
   const { email, secret } = await seedWithTotp(browser, kratosAdminURL, baseURL, 'v2.member', false);
   const ctx = await browser.newContext();
   try {
-    await codeLogin(ctx, baseURL, email);
+    const login = await codeLogin(ctx, baseURL, email);
+    expect(login.status, `V2: code login; body ${login.body.slice(0, 300)}`).toBe(200);
     const session = await getSession(ctx, baseURL);
     expect(session?.authenticator_assurance_level, 'V2: code login yields aal1').toBe('aal1');
 

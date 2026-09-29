@@ -60,8 +60,19 @@ function makeIdentity(username: string, admin?: boolean): Identity {
   };
 }
 
+// Enrolled configs as the Kratos admin API returns them (lib/step-up.ts).
+const ENROLLED_CONFIG: Record<string, object> = {
+  totp: { totp_url: 'otpauth://totp/othala:a?secret=JBSWY3DPEHPK3PXP' },
+  webauthn: { credentials: [{ id: 'w', is_passwordless: false }] },
+};
+
 function withCreds(identity: Identity, ...types: string[]): Identity {
-  return { ...identity, credentials: Object.fromEntries(types.map((t) => [t, { type: t }])) as Identity['credentials'] };
+  return {
+    ...identity,
+    credentials: Object.fromEntries(
+      types.map((t) => [t, { type: t, identifiers: ['a'], config: ENROLLED_CONFIG[t] ?? {} }]),
+    ) as Identity['credentials'],
+  };
 }
 
 function makeCtx(overrides: Partial<ActionContext> = {}): ActionContext {
