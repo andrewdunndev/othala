@@ -64,7 +64,7 @@ if (!session?.active || !session.identity) {
 // Self-service "sign out everywhere" (CU3 B1 trigger). Routes through the
 // in-process revoke fan-out (steps 2-6) on the CALLER'S OWN identity — NOT
 // the Kratos browser-logout, which only drops the local Kratos session and
-// leaves Hydra's 24h remembered-login window open. deactivate is false: the
+// leaves Hydra's remembered login open. deactivate is false: the
 // user is signing out, not deactivating themselves.
 let signOutError: string | null = null;
 if (Astro.request.method === 'POST') {

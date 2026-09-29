@@ -421,7 +421,7 @@ echo "E. Revoke fan-out (othala :4431 /admin/revoke-user)"
 #
 # D3: the admin force-logout endpoint runs revokeSubject() against LIVE Kratos
 # + Hydra — delete Kratos sessions + revoke Hydra login/consent sessions
-# (closes the ≤24h deactivated-user token gap). The unit tests only STUB the
+# (closes the deactivated-user token gap). The unit tests only STUB the
 # SDK; this is the first probe that drives the fan-out end-to-end. Loopback
 # admin port, so via node_in. Uses the identity C1 created.
 

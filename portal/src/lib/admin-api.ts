@@ -165,7 +165,7 @@ export async function revokeSession(id: string): Promise<void> {
  * Kratos sessions, Hydra login + consent revoke, best-effort LDAP bind-cache
  * flush. Step 2 failure aborts (prescriptive RevokeError); step 5 is
  * best-effort. This completes the old patch+delete-sessions pair, which left
- * the Hydra 24h login window and the granted consent open after a "deactivate".
+ * the Hydra remembered login and the granted consent open after a "deactivate".
  */
 export async function deactivateIdentity(id: string): Promise<void> {
   await revokeSubject(id, { deactivate: true });

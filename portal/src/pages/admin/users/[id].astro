@@ -335,7 +335,7 @@ const adminNav = [
         <p>
           <strong>Force re-login complete.</strong>
           Kratos sessions revoked; Hydra login + consent sessions revoked
-          (the 24h remembered-login window is cut){actionResult.result.bestEffortFailures.length ? `; ${actionResult.result.bestEffortFailures.length} best-effort step(s) failed` : ''}.
+          (the remembered login is cut){actionResult.result.bestEffortFailures.length ? `; ${actionResult.result.bestEffortFailures.length} best-effort step(s) failed` : ''}.
         </p>
         {actionResult.result.bestEffortFailures.length > 0 && (
           <details>
