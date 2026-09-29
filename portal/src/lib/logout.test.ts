@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach } from 'vitest';
-import { logoutAuthorized, signLogoutToken } from './logout.js';
+import { logoutAuthorized, sameOriginRequest, signLogoutToken } from './logout.js';
 import { signToken, _resetForTests } from './csrf.js';
 import { session } from './test-builders.js';
 
@@ -55,5 +55,28 @@ describe('logoutAuthorized', () => {
     const t = signLogoutToken(self);
     delete process.env['CSRF_SECRET'];
     expect(logoutAuthorized('POST', t, self)).toBe(false);
+  });
+});
+
+describe('sameOriginRequest', () => {
+  const own = 'https://auth.example.test';
+
+  it('accepts a matching Origin', () => {
+    expect(sameOriginRequest(own, null, own)).toBe(true);
+  });
+
+  it('refuses a different or opaque Origin even with a same-origin Referer', () => {
+    expect(sameOriginRequest('https://other.example.test', `${own}/x`, own)).toBe(false);
+    expect(sameOriginRequest('null', `${own}/x`, own)).toBe(false);
+  });
+
+  it('accepts no Origin with a same-origin Referer', () => {
+    expect(sameOriginRequest(null, `${own}/auth/logout`, own)).toBe(true);
+  });
+
+  it('refuses no Origin with a missing, foreign or malformed Referer', () => {
+    expect(sameOriginRequest(null, null, own)).toBe(false);
+    expect(sameOriginRequest(null, 'https://other.example.test/', own)).toBe(false);
+    expect(sameOriginRequest(null, 'not a url', own)).toBe(false);
   });
 });

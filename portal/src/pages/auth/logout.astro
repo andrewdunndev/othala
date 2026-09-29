@@ -22,7 +22,7 @@ import PageHero from '../../components/PageHero.astro';
 import { getLogoutInfo, getSession, kratosBase } from '../../lib/kratos';
 import type { LogoutInfo } from '../../lib/kratos';
 import { publicUrl } from '../../lib/config';
-import { logoutAuthorized, signLogoutToken } from '../../lib/logout';
+import { logoutAuthorized, sameOriginRequest, signLogoutToken } from '../../lib/logout';
 
 const cookie = Astro.request.headers.get('cookie') ?? undefined;
 
@@ -191,7 +191,15 @@ try {
   lookupFailed = true;
 }
 
-if (lookupFailed && isPost) {
+if (
+  lookupFailed &&
+  isPost &&
+  sameOriginRequest(
+    Astro.request.headers.get('origin'),
+    Astro.request.headers.get('referer'),
+    new URL(publicUrl).origin,
+  )
+) {
   // Kratos is unreachable or answering unexpectedly, so no token can be
   // checked and nothing can be revoked. The user asked to be signed out:
   // drop the cookie on this device rather than leaving them signed in.
@@ -260,7 +268,14 @@ if (identityId && logoutAuthorized(Astro.request.method, form?.get('csrf_token')
 
 // Confirm form. With Kratos unreachable there is no identity to bind a token
 // to; the form then posts without one and the POST clears this device.
-const csrfToken = identityId ? signLogoutToken(identityId) : '';
+let csrfToken = '';
+if (identityId) {
+  try {
+    csrfToken = signLogoutToken(identityId);
+  } catch {
+    csrfToken = '';
+  }
+}
 const retry = isPost;
 ---
 <Layout title="Sign out" description="Sign out of this device." bare>
