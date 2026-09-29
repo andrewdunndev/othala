@@ -267,3 +267,27 @@ export async function revokeSubject(
 
   return result;
 }
+
+/**
+ * Revoke only the subject's Hydra consent sessions, for every client
+ * (step 4 on its own). Used when an admin narrows a subject's groups, roles
+ * or admin marker: the grants and refresh tokens issued under the old access
+ * stop working, and the next sign-in re-runs consent against the new record.
+ * Kratos and Hydra login sessions are left alone. Idempotent.
+ */
+export async function revokeConsentSessions(
+  subject: string,
+  deps: Partial<Pick<RevokeDeps, 'oauth2Api'>> = {},
+): Promise<void> {
+  const oauth2Api = deps.oauth2Api ?? buildOAuth2Api();
+  try {
+    await oauth2Api.revokeOAuth2ConsentSessions({ subject, all: true });
+  } catch (err) {
+    throw new RevokeError(
+      'hydra-admin',
+      'revoke-consent-sessions',
+      'Hydra consent + associated tokens persist. Verify HYDRA_ADMIN_URL, then use Force re-login on this identity.',
+      err,
+    );
+  }
+}

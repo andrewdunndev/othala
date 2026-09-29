@@ -10,10 +10,14 @@
  *     delete-the-last-admin lockout; covers self-delete since self is admin)
  *   - wrong confirm refused, deleteIdentity never called
  *   - happy path: deleteIdentity called, 303 redirect Response returned
+ *   - revokeSubject runs before deleteIdentity; a revoke failure keeps the identity
+ *   saveAction:
+ *   - a removed group or changed role revokes consent sessions after the write
+ *   - an unchanged or widened save does not revoke; a revoke failure says the save stood
  *   revokeAdminAction:
  *   - self-demote refused, patchAdminMarker never called
  *   - last-admin refused (listIdentities → adminCount 1), patchAdminMarker never called
- *   - happy path: patchAdminMarker(id, false) called
+ *   - happy path: patchAdminMarker(id, false) called, then consent sessions revoked
  *   removeCredentialAction:
  *   - non-allowlisted type refused, deleteCredential never called
  *   - passkey refused server-side (upstream 400 — Kratos cannot admin-delete
@@ -29,7 +33,18 @@
 
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
-const { deleteIdentityMock, listIdentitiesMock, patchAdminMarkerMock, deleteCredentialMock } = vi.hoisted(() => ({
+const {
+  deleteIdentityMock,
+  listIdentitiesMock,
+  patchAdminMarkerMock,
+  deleteCredentialMock,
+  updateIdentityMock,
+  revokeSubjectMock,
+  revokeConsentSessionsMock,
+} = vi.hoisted(() => ({
+  updateIdentityMock: vi.fn(),
+  revokeSubjectMock: vi.fn(),
+  revokeConsentSessionsMock: vi.fn(),
   deleteIdentityMock: vi.fn(),
   listIdentitiesMock: vi.fn(),
   patchAdminMarkerMock: vi.fn(),
@@ -38,7 +53,18 @@ const { deleteIdentityMock, listIdentitiesMock, patchAdminMarkerMock, deleteCred
 
 vi.mock('./admin', async (importOriginal) => {
   const actual = await importOriginal<typeof import('./admin.js')>();
-  return { ...actual, deleteIdentity: deleteIdentityMock, listIdentities: listIdentitiesMock, patchAdminMarker: patchAdminMarkerMock };
+  return {
+    ...actual,
+    deleteIdentity: deleteIdentityMock,
+    listIdentities: listIdentitiesMock,
+    patchAdminMarker: patchAdminMarkerMock,
+    updateIdentity: updateIdentityMock,
+  };
+});
+
+vi.mock('./revoke', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('./revoke.js')>();
+  return { ...actual, revokeSubject: revokeSubjectMock, revokeConsentSessions: revokeConsentSessionsMock };
 });
 
 vi.mock('./admin-api', async (importOriginal) => {
@@ -46,8 +72,9 @@ vi.mock('./admin-api', async (importOriginal) => {
   return { ...actual, deleteCredential: deleteCredentialMock };
 });
 
-import { deleteAction, revokeAdminAction, removeCredentialAction, grantAdminAction, type ActionContext } from './admin-actions.js';
+import { deleteAction, saveAction, revokeAdminAction, removeCredentialAction, grantAdminAction, type ActionContext } from './admin-actions.js';
 import type { Identity } from './types.js';
+import { RevokeError } from './revoke.js';
 import { identity, withLookupSecret, withPasskey, withTotp, withWebauthnKey } from './test-builders.js';
 
 function makeIdentity(username: string, admin?: boolean): Identity {
@@ -87,6 +114,9 @@ beforeEach(() => {
   listIdentitiesMock.mockReset().mockResolvedValue([]);
   patchAdminMarkerMock.mockReset().mockResolvedValue(undefined);
   deleteCredentialMock.mockReset().mockResolvedValue(undefined);
+  updateIdentityMock.mockReset().mockResolvedValue(undefined);
+  revokeSubjectMock.mockReset().mockResolvedValue(undefined);
+  revokeConsentSessionsMock.mockReset().mockResolvedValue(undefined);
 });
 
 // ── deleteAction ──────────────────────────────────────────────────────────────
@@ -122,6 +152,84 @@ describe('deleteAction', () => {
     expect(outcome.status).toBe(303);
     expect(outcome.headers.get('Location')).toBe('/admin/users?deleted=1');
   });
+
+  it('revokes the subject before deleting it', async () => {
+    const identity = makeIdentity('alice');
+    await deleteAction(fd({ confirm: 'alice' }), makeCtx({ id: 'target-1', identity }));
+
+    expect(revokeSubjectMock).toHaveBeenCalledWith('target-1');
+    expect(revokeSubjectMock.mock.invocationCallOrder[0]).toBeLessThan(deleteIdentityMock.mock.invocationCallOrder[0]);
+  });
+
+  it('keeps the identity when revocation fails', async () => {
+    revokeSubjectMock.mockRejectedValue(new RevokeError('hydra-admin', 'revoke-consent-sessions', 'Verify HYDRA_ADMIN_URL.'));
+    const identity = makeIdentity('alice');
+    const outcome = await deleteAction(fd({ confirm: 'alice' }), makeCtx({ id: 'target-1', identity }));
+
+    expect(deleteIdentityMock).not.toHaveBeenCalled();
+    if (outcome instanceof Response) throw new Error('unreachable');
+    expect(outcome.actionResult?.kind).toBe('error');
+    expect(outcome.actionResult && 'message' in outcome.actionResult ? outcome.actionResult.message : '').toMatch(/not deleted/i);
+  });
+});
+
+// ── saveAction ────────────────────────────────────────────────────────────────
+
+describe('saveAction', () => {
+  const MANIFESTS = [{ clientId: 'wiki' }] as unknown as ActionContext['manifests'];
+
+  function saveForm(groups: string[], role?: string): FormData {
+    const f = fd({ username: 'alice.smith', email: 'alice.smith@othala.test' });
+    for (const g of groups) f.append('identityGroups', g);
+    if (role) f.set('role:wiki', role);
+    return f;
+  }
+
+  function stored(groups: string[], roles?: Record<string, string>): Identity {
+    return identity({ username: 'alice.smith', metadataAdmin: { groups, ...(roles ? { roles } : {}) } });
+  }
+
+  it('revokes consent sessions after the write when a group is removed', async () => {
+    const outcome = await saveAction(saveForm(['family']), makeCtx({ identity: stored(['family', 'media']), manifests: MANIFESTS }));
+
+    expect(updateIdentityMock).toHaveBeenCalledTimes(1);
+    expect(revokeConsentSessionsMock).toHaveBeenCalledWith('target-1');
+    expect(updateIdentityMock.mock.invocationCallOrder[0]).toBeLessThan(revokeConsentSessionsMock.mock.invocationCallOrder[0]);
+    expect(outcome.actionResult?.kind).toBe('updated');
+  });
+
+  it('revokes consent sessions when a stored role changes', async () => {
+    await saveAction(saveForm(['family'], 'viewer'), makeCtx({ identity: stored(['family'], { wiki: 'editor' }), manifests: MANIFESTS }));
+
+    expect(revokeConsentSessionsMock).toHaveBeenCalledWith('target-1');
+  });
+
+  it('does not revoke when groups and roles are unchanged', async () => {
+    const outcome = await saveAction(
+      saveForm(['family'], 'editor'),
+      makeCtx({ identity: stored(['family'], { wiki: 'editor' }), manifests: MANIFESTS }),
+    );
+
+    expect(updateIdentityMock).toHaveBeenCalledTimes(1);
+    expect(revokeConsentSessionsMock).not.toHaveBeenCalled();
+    expect(outcome.actionResult?.kind).toBe('updated');
+  });
+
+  it('does not revoke when a group is only added', async () => {
+    await saveAction(saveForm(['family', 'media']), makeCtx({ identity: stored(['family']), manifests: MANIFESTS }));
+
+    expect(revokeConsentSessionsMock).not.toHaveBeenCalled();
+  });
+
+  it('reports a revocation failure as an error after the save stood', async () => {
+    revokeConsentSessionsMock.mockRejectedValue(new RevokeError('hydra-admin', 'revoke-consent-sessions', 'Verify HYDRA_ADMIN_URL.'));
+    const outcome = await saveAction(saveForm(['family']), makeCtx({ identity: stored(['family', 'media']), manifests: MANIFESTS }));
+
+    expect(updateIdentityMock).toHaveBeenCalledTimes(1);
+    expect(outcome.actionResult?.kind).toBe('error');
+    expect(outcome.actionResult && 'message' in outcome.actionResult ? outcome.actionResult.message : '').toMatch(/^Saved, but/);
+    expect(outcome.refetch).toBe(true);
+  });
 });
 
 // ── revokeAdminAction ─────────────────────────────────────────────────────────
@@ -153,6 +261,7 @@ describe('revokeAdminAction', () => {
     const outcome = await revokeAdminAction(fd(), makeCtx({ id: 'target-1', identity, adminIdentityId: 'admin-1' }));
 
     expect(patchAdminMarkerMock).toHaveBeenCalledWith('target-1', false);
+    expect(revokeConsentSessionsMock).toHaveBeenCalledWith('target-1');
     if (outcome instanceof Response) throw new Error('unreachable');
     expect(outcome.actionResult?.kind).toBe('admin-revoked');
     expect(outcome.refetch).toBe(true);

@@ -7,6 +7,13 @@ aims to follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 The git tag is the authoritative version; `portal/package.json` mirrors it.
 This CHANGELOG and git tags carry the deployed-instance release state.
 
+## [Unreleased]
+
+### Changed
+
+- Deleting an identity revokes its sessions and app grants first.
+- Removing a group or changing a role revokes the member's app grants.
+
 ## [0.6.3] - 2026-09-29
 
 ### Changed
@@ -129,17 +136,13 @@ now live on othala.dunn.dev.
   24/3.3K); 16 ADRs and a duplicate access-model doc collapsed into one
   flat DECISIONS.md. New gates: a prose-budget ceiling and a whole-index
   purity scan on every push.
-- **Truth pass**: the identity schema's stale group-order claim corrected
-  to match the ranked resolver it describes; operator runbook mechanics
-  moved to the deploy plane; DECISIONS.md/AGENTS.md rewritten
-  present-tense; duplicated derivations collapsed to one canonical
-  statement plus pointers.
+- **Truth pass**: stale claims corrected; DECISIONS.md/AGENTS.md rewritten
+  present-tense; duplicated derivations collapsed.
 - **check-purity.sh rewritten** as a data table (1769 -> 293 lines); the
   probe-harness suite retired for an inline self-test. Prose ceiling
   ratcheted to 175000 bytes.
-- **Tests consolidated onto vitest** (portal drops node:test+tsx); one
-  merged CI job replaces the split portal jobs; the pre-tag-check gap CI
-  never ran is now wired shut. 740 portal tests green.
+- **Tests consolidated onto vitest**; one merged CI job replaces the split
+  portal jobs.
 
 ### Fixed
 

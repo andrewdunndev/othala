@@ -26,6 +26,7 @@ import { hasSecondFactor } from './step-up';
 import { sendInviteRecoveryEmail } from './kratos';
 import { confirmsInviteAddress, normalizeGroupOrder, shouldRefuseRecovery } from './access';
 import { planGroupSave } from './gate';
+import { revokeConsentSessions, revokeSubject } from './revoke';
 import type { ClientManifest } from './manifests';
 import type { Identity } from './types';
 
@@ -114,15 +115,42 @@ export async function saveAction(fd: FormData, ctx: ActionContext): Promise<Acti
   // not silently drop it. Read from the pre-dispatch identity, not re-fetched
   // (avoids a TOCTOU on the write; grant/revoke are the targeted paths).
   const existingAdmin = identity.metadata_admin?.admin;
+  const groups = normalizeGroupOrder(groupPlan.groups);
   await updateIdentity(id, {
     traits,
     metadataAdmin: {
-      groups: normalizeGroupOrder(groupPlan.groups),
+      groups,
       roles: Object.keys(roles).length ? roles : undefined,
       ...(existingAdmin === true ? { admin: true } : {}),
     },
   });
+  // The Kratos write has landed; now end grants issued under the old access.
+  // A failure here cannot roll the save back, so it is reported as an error
+  // that says the save stood.
+  if (narrowsAccess(identity, groups, roles)) {
+    const failure = await revokeGrants(id);
+    if (failure) return { actionResult: failure, mode: 'read', refetch: true };
+  }
   return { actionResult: { kind: 'updated', removed: groupPlan.removed }, mode: 'read', refetch: true };
+}
+
+/** True when the save drops a stored group or changes or drops a stored role. */
+export function narrowsAccess(identity: Identity, groups: readonly string[], roles: Record<string, string>): boolean {
+  const stored = identity.metadata_admin;
+  if ((stored?.groups ?? []).some((g) => !groups.includes(g))) return true;
+  return Object.entries(stored?.roles ?? {}).some(([clientId, role]) => roles[clientId] !== role);
+}
+
+async function revokeGrants(id: string): Promise<ActionResult | null> {
+  try {
+    await revokeConsentSessions(id);
+    return null;
+  } catch (err) {
+    return {
+      kind: 'error',
+      message: `Saved, but existing app grants could not be revoked: ${err instanceof Error ? err.message : 'unknown error'}`,
+    };
+  }
 }
 
 export async function issueRecoveryAction(_fd: FormData, ctx: ActionContext): Promise<ActionOutcome> {
@@ -197,6 +225,19 @@ export async function deleteAction(fd: FormData, ctx: ActionContext): Promise<Ac
   if (confirm !== expected) {
     return { actionResult: { kind: 'error', message: `Type the username (${expected}) to confirm deletion.` }, refetch: false };
   }
+  // Cut sessions and Hydra grants first: Hydra keeps consent and refresh
+  // tokens by subject, and nothing reaches them once the identity is gone.
+  try {
+    await revokeSubject(id);
+  } catch (err) {
+    return {
+      actionResult: {
+        kind: 'error',
+        message: `Not deleted: sessions and app grants could not be revoked first. ${err instanceof Error ? err.message : 'unknown error'}`,
+      },
+      refetch: false,
+    };
+  }
   await deleteIdentity(id);
   return new Response(null, { status: 303, headers: { Location: '/admin/users?deleted=1' } });
 }
@@ -241,6 +282,8 @@ export async function revokeAdminAction(_fd: FormData, ctx: ActionContext): Prom
     };
   }
   await patchAdminMarker(id, false);
+  const failure = await revokeGrants(id);
+  if (failure) return { actionResult: failure, refetch: true };
   return { actionResult: { kind: 'admin-revoked', username }, refetch: true };
 }
 

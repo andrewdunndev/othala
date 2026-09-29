@@ -121,8 +121,8 @@ issue the enrollment URL (Step 5) first — it lands them in a privileged
 settings session to remove the compromised key and enroll a new one.
 
 If the victim can't be reached and urgency requires full lockout now, the
-last resort is **Delete** on this identity (Actions panel): the user
-re-registers from scratch.
+last resort is **Delete** on this identity (Actions panel): it revokes
+sessions and app grants first, covering Step 4, and the user re-registers.
 
 Each Remove action is CSRF-protected and requires an active AAL2 admin session.
 The confirmation banner after each removal tells you which type was removed.
