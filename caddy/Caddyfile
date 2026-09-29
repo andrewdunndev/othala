@@ -28,60 +28,8 @@
 # challenge handlers served by the converged app, not by Hydra itself.
 # They are matched explicitly so they don't fall into the @hydra block.
 #
-# ---------------------------------------------------------------------------
-# RATE LIMITING — DEPLOY BLOCKER: caddy-estate MUST include caddy-ratelimit
-#
-# !! BLOCKER — DO NOT DEPLOY THIS CADDYFILE UNTIL THE MODULE IS IN THE IMAGE !!
-#
-# The `rate_limit` directive below is provided by the third-party module
-# mholt/caddy-ratelimit (https://github.com/mholt/caddy-ratelimit).
-# It is NOT part of Caddy's standard distribution and is NOT included in
-# github.com/caddyserver/caddy/v2/modules/standard.
-#
-# If this Caddyfile is loaded by a Caddy binary that does NOT include the
-# module, Caddy will FAIL TO START with a config-load error:
-#   "unrecognized directive: rate_limit"
-# This is a deploy-time outage, not a degraded-mode fallback. Caddy refuses
-# to serve ANY traffic until the config loads cleanly.
-#
-# To include the module, build Caddy with it compiled in, e.g.:
-#
-#   xcaddy build --with github.com/mholt/caddy-ratelimit
-#
-# or, if you maintain a custom main.go (like caddy-estate does), add:
-#
-#   _ "github.com/mholt/caddy-ratelimit"
-#
-# to the import block and run `go get github.com/mholt/caddy-ratelimit`.
-#
-# STATUS: the estate's Caddy image (dunn.dev/caddy-estate) does NOT currently
-# include this module. Its Containerfile imports only:
-#   - github.com/caddyserver/caddy/v2/modules/standard
-#   - github.com/caddy-dns/cloudflare
-# caddy-estate MUST be rebuilt with github.com/mholt/caddy-ratelimit added
-# before this Caddyfile is used in a quadlet deployment.
-# See the pre-deploy checklist in DEPLOY.md.
-#
-# FALLBACK — if caddy-ratelimit cannot be added to the production image:
-#   - Rate-limit at the edge (Cloudflare WAF rate-limiting rules on
-#     /self-service/* paths) — zero-build-cost if Cloudflare is already the
-#     DNS/proxy provider (as it is for dunn.dev).
-#   - Alternatively, if traffic passes through an Envoy sidecar, use Envoy's
-#     local_ratelimit filter on the Kratos cluster.
-#   - Kratos does not natively support per-IP rate limiting as of v1.x.
-#
-# RATIONALE for chosen limit (10 requests / 1 minute / IP):
-#   A family member completing a sign-in with email code makes at most 3-4
-#   requests in the self-service flow (GET /self-service/login/browser,
-#   POST /self-service/login, GET/POST code-submit). A burst to 10 per minute
-#   gives a generous margin for retries and tab-switching while still blocking
-#   an attacker from firing dozens of code-request calls per minute to
-#   email-bomb a victim address. At family scale (5-25 users behind trusted
-#   IPs) false positives from shared NAT are not a concern.
-# ---------------------------------------------------------------------------
-#
-# The `order` global option registers the directive's position in Caddy's
-# handler chain — rate_limit must run before basicauth.
+# rate_limit is mholt/caddy-ratelimit, compiled into the estate Caddy image;
+# `order` runs it before basicauth.
 
 {
 	order rate_limit before basicauth

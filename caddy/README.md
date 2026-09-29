@@ -24,7 +24,7 @@ you drop into your own reverse proxy in front of your own apps.
 | File | What it is |
 |---|---|
 | `Caddyfile` | A worked top-level Caddyfile for a single Othala instance: how to route the Kratos browser surface, the Hydra OAuth2 surface, and the app itself behind one hostname. |
-| `snippets/` | Reusable, generic Caddyfile snippets for the four ways an app sits behind Othala. Each `*.caddy` file defines one named snippet (parens syntax, e.g. `(forward-auth)`) that a top-level Caddyfile imports with `import <name> <args>`: `oidc-app` (OIDC-native app, plain reverse proxy), `ldap-app` (app with an LDAP plugin), `forward-auth` (no native SSO, gated by Caddy `forward_auth` against the Kratos session), `admin-session` (admin path requiring a Kratos session, with AAL2 step-up enforced at the app's SSR layer). |
+| `snippets/` | Reusable, generic Caddyfile snippets for the two ways an app sits behind Othala. Each `*.caddy` file defines one named snippet (parens syntax, e.g. `(forward-auth)`) that a top-level Caddyfile imports with `import <name> <args>`: `oidc-app` (OIDC-native app, plain reverse proxy), `forward-auth` (no native SSO, gated by Caddy `forward_auth` against the Kratos session). |
 
 The snippets are written generically — `kratos:4433`,
 `{env.OTHALA_PUBLIC_URL}`, and `{args[0]}:{args[1]}` backends — so you
