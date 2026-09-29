@@ -18,6 +18,8 @@ This CHANGELOG and git tags carry the deployed-instance release state.
 - Only an administrator can change a username; profile settings show it read-only.
 - Saving profile settings ends the account's other sessions.
 - `email_verified` reflects only the account's own email address.
+- The request form requires a signed-in account; the mail names the account, and the rate limit is per account.
+- The error page shows only reasons it recognises.
 
 ## [0.6.3] - 2026-09-29
 
@@ -232,12 +234,7 @@ OpenTelemetry tracing, and a portal UX/pristine pass.
 
 ### Added (post-rc, folded at tag time)
 
-- **Portal UX pass**: passkey-first login copy (Face ID / Touch ID), a
-  dismissible first-run passkey-enrollment nudge, legacy relabeling in
-  settings (security key = legacy 2FA; password = legacy clients only),
-  in-flight disable-on-submit feedback on admin forms, and a11y/design-system
-  purity fixes (contrast, nested landmarks, raw-color removal, chip/badge
-  unification, mobile reflow).
+- **Portal UX pass**: passkey-first login copy, a first-run passkey nudge, legacy relabeling in settings, and a11y/design-system fixes.
 - Per-node validation messages rendered in FlowNodes + login step-2/TOTP.
 - Admin-recovery hardening: real recovery-refusal test; `::` and `""` admin
   wildcards blocked (T2-N/T2-O).
