@@ -31,6 +31,8 @@
 //     site/src/content/docs/guides/hardening.md §2).
 
 import { defineMiddleware } from 'astro:middleware';
+import { contentSecurityPolicy } from './lib/csp';
+import { kratosBase } from './lib/kratos';
 
 // Routes that are themselves error pages — rewriting these would loop.
 const ERROR_ROUTE_PREFIXES = ['/auth/error', '/404', '/500'];
@@ -66,21 +68,16 @@ function applySecurityHeaders(res: Response): void {
   // HSTS: 2-year max-age + includeSubDomains + preload.
   // The IdP is HTTPS-only behind Caddy and serves both the apex and subdomains.
   res.headers.set('Strict-Transport-Security', 'max-age=63072000; includeSubDomains; preload');
-  // form-action: Kratos self-service forms POST to the portal origin ('self'),
-  // but an OIDC login's post-login redirect lands on the requesting app's
-  // domain — a subdomain of the estate apex — and form-action governs a form
-  // submission's REDIRECT CHAIN, not just its action URL. So 'self' alone blocks
-  // every OIDC app login (the redirect to e.g. grafana.dunn.dev violates it).
-  // Allow 'self' + the apex wildcard (https://*.<OTHALA_APEX>) — exactly the
-  // estate's own apps; absent OTHALA_APEX, fall back to strict 'self'. Still
-  // prevents credential exfiltration to arbitrary off-estate origins.
-  // script-src deferred — see site/src/content/docs/guides/hardening.md §2 and
-  // the file-level CSP note.
-  const apex = process.env.OTHALA_APEX?.trim();
-  const formAction = apex ? `'self' https://*.${apex}` : "'self'";
+  // form-action: 'self', the apex wildcard for OIDC app redirects, and the
+  // Kratos origins sign-out's 303 lands on. See lib/csp.ts. script-src
+  // deferred — see site/src/content/docs/guides/hardening.md §2 and the
+  // file-level CSP note.
   res.headers.set(
     'Content-Security-Policy',
-    `frame-ancestors 'none'; object-src 'none'; base-uri 'self'; form-action ${formAction}`,
+    contentSecurityPolicy({
+      apex: process.env.OTHALA_APEX,
+      kratosUrls: [process.env.OTHALA_PUBLIC_URL, kratosBase()],
+    }),
   );
 }
 
