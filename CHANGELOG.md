@@ -15,6 +15,7 @@ This CHANGELOG and git tags carry the deployed-instance release state.
 - Removing a group or changing a role revokes the member's app grants.
 - Signing out of an app also ends the portal session.
 - An app sign-in is remembered for as long as the portal session lasts.
+- `email_verified` reflects only the account's own email address.
 
 ## [0.6.3] - 2026-09-29
 
@@ -124,9 +125,7 @@ now live on othala.dunn.dev.
   recovery flow server-side, no new mail machinery. Server-checked
   send-time address confirmation guards against misrouting; the decision
   record states and bounds the residual risk.
-- **Six at-a-glance SVG diagrams** (trust boundary, session revocation,
-  first credential, OIDC login, plus two prior) now live on
-  othala.dunn.dev.
+- **Six at-a-glance SVG diagrams** now live on othala.dunn.dev.
 - **Architecture page** (`othala.dunn.dev/architecture/`): the six diagrams
   in narrative order with connective prose. The landing page now tells the
   project story and links Architecture, Guides, and the repo as entry
