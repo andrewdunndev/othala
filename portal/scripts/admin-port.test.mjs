@@ -3,17 +3,13 @@
 // Run with: npx vitest run scripts/admin-port.test.mjs
 //
 // Asserts:
-//   - the admin port serves /healthz + /readyz (GET) and the CU3 admin
-//     endpoints /admin/revoke-user + /admin/recovery-gate (POST), and that
+//   - the admin port serves /healthz + /readyz (GET) and the admin endpoints
+//     /admin/revoke-user, /admin/recovery-gate, /admin/login-code-gate (POST), and that
 //     every public/challenge path 404s there (the two muxes are disjoint);
 //   - the revoke-user + recovery-gate paths are NOT public GET routes (the
 //     public mux never sees them via the admin helpers);
 //   - the admin-endpoint + recovery-gate bearer checks are CONSTANT-TIME and
 //     FAIL-CLOSED (unset secret rejects everything).
-//
-// The login-gate (POST /admin/login-gate) was retired: the
-// after.code hook was dropped from kratos.yml; AAL2-on-/admin makes an admin
-// email-code AAL1 session harmless. ADMIN_POST_ROUTES no longer includes it.
 //
 // Imports the pure helpers from listen.mjs without binding any socket or
 // loading the SSR handler / runtime bundle.
@@ -29,6 +25,8 @@ import {
   parseBearer,
   handleAdminRequest,
   recoveryGateVerdict,
+  LOGIN_CODE_ADMIN_REFUSAL,
+  LOGIN_CODE_UNAVAILABLE,
   startupEnvErrors,
   ADMIN_ROUTES,
   ADMIN_GET_ROUTES,
@@ -73,22 +71,14 @@ test('admin GET mux serves exactly /healthz and /readyz', () => {
   assert.equal(isAdminRoute('GET', '/readyz'), true);
 });
 
-test('admin POST mux serves exactly the CU3 endpoints (login-gate retired)', () => {
-  // Login-gate was retired; it must NOT be in ADMIN_POST_ROUTES.
-  assert.deepEqual([...ADMIN_POST_ROUTES].sort(), ['/admin/recovery-gate', '/admin/revoke-user']);
-  assert.equal(ADMIN_POST_ROUTES.has('/admin/login-gate'), false, 'login-gate must be retired from POST routes');
+test('admin POST mux serves exactly the admin endpoints', () => {
+  assert.deepEqual([...ADMIN_POST_ROUTES].sort(), ['/admin/login-code-gate', '/admin/recovery-gate', '/admin/revoke-user']);
 });
 
-test('revoke-user + recovery-gate are NOT public GET routes (disjoint from public mux)', () => {
-  for (const p of ['/admin/revoke-user', '/admin/recovery-gate']) {
+test('admin POST paths are NOT public GET routes (disjoint from public mux)', () => {
+  for (const p of ADMIN_POST_ROUTES) {
     assert.equal(isAdminRoute('GET', p), false, `${p} must not be a public GET admin route`);
   }
-});
-
-test('login-gate is not an admin GET or POST route (fully retired)', () => {
-  assert.equal(isAdminRoute('GET', '/admin/login-gate'), false);
-  assert.equal(isAdminEndpoint('GET', '/admin/login-gate'), false);
-  assert.equal(isAdminEndpoint('POST', '/admin/login-gate'), false);
 });
 
 test('admin mux does NOT serve any public/challenge path', () => {
@@ -113,15 +103,6 @@ test('challenge + public paths 404 on the admin port', async () => {
   }
 });
 
-test('login-gate POST 404s on the admin port (retired route)', async () => {
-  const res = fakeRes();
-  await handleAdminRequest(
-    fakeReq({ method: 'POST', url: '/admin/login-gate', body: '{}' }),
-    res,
-  );
-  assert.equal(res.statusCode, 404, '/admin/login-gate must 404 (retired)');
-});
-
 test('healthz/readyz return 200 ok on the admin port', async () => {
   for (const p of ['/healthz', '/readyz']) {
     const res = fakeRes();
@@ -132,7 +113,7 @@ test('healthz/readyz return 200 ok on the admin port', async () => {
 });
 
 test('a served admin POST path on the wrong method (GET) 404s', async () => {
-  for (const p of ['/admin/revoke-user', '/admin/recovery-gate']) {
+  for (const p of ADMIN_POST_ROUTES) {
     const res = fakeRes();
     await handleAdminRequest(fakeReq({ method: 'GET', url: p }), res);
     assert.equal(res.statusCode, 404, `GET ${p} should 404`);
@@ -427,4 +408,78 @@ test('bearer rejection on revoke-user is 403 (not 401)', async () => {
   );
   assert.equal(res.statusCode, 403, 'must be 403, not 401');
   assert.notEqual(res.statusCode, 401, 'must NOT be 401');
+});
+
+// ── login-code-gate: login.after.code webhook ──────────────────────────────
+
+async function withMockKratos(respond, fn) {
+  const mockKratos = http.createServer(respond);
+  await new Promise((r) => mockKratos.listen(0, '127.0.0.1', r));
+  process.env.KRATOS_ADMIN_URL = `http://127.0.0.1:${mockKratos.address().port}`;
+  process.env.RECOVERY_GATE_SECRET = 'gate-secret';
+  try {
+    await fn();
+  } finally {
+    await new Promise((r) => mockKratos.close(r));
+    delete process.env.KRATOS_ADMIN_URL;
+  }
+}
+
+function postLoginCodeGate(body, bearer = 'gate-secret') {
+  return fakeReq({
+    method: 'POST',
+    url: '/admin/login-code-gate',
+    headers: { authorization: `Bearer ${bearer}` },
+    body: JSON.stringify(body),
+  });
+}
+
+function identityServer(metadataAdmin) {
+  return (req, res) => {
+    res.writeHead(200, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify({ id: ADMIN_UUID, metadata_admin: metadataAdmin }));
+  };
+}
+
+test('login-code-gate REFUSES an admin-marked identity with the neutral message (403)', async () => {
+  await withMockKratos(identityServer({ admin: true }), async () => {
+    const res = fakeRes();
+    await handleAdminRequest(postLoginCodeGate({ identity_id: ADMIN_UUID, is_admin: false }), res);
+    assert.equal(res.statusCode, 403);
+    assert.equal(JSON.parse(res.body).messages[0].messages[0].text, LOGIN_CODE_ADMIN_REFUSAL);
+  });
+});
+
+test('login-code-gate ALLOWS a member (200)', async () => {
+  await withMockKratos(identityServer({ groups: ['family'], admin: false }), async () => {
+    const res = fakeRes();
+    await handleAdminRequest(postLoginCodeGate({ identity_id: OTHER_UUID, is_admin: false }), res);
+    assert.equal(res.statusCode, 200);
+  });
+});
+
+test('login-code-gate REFUSES when the admin API fails (fail-closed, 403)', async () => {
+  await withMockKratos((req, res) => { res.writeHead(500); res.end(); }, async () => {
+    const res = fakeRes();
+    await handleAdminRequest(postLoginCodeGate({ identity_id: OTHER_UUID, is_admin: false }), res);
+    assert.equal(res.statusCode, 403);
+    assert.equal(JSON.parse(res.body).messages[0].messages[0].text, LOGIN_CODE_UNAVAILABLE);
+  });
+});
+
+test('login-code-gate REFUSES when KRATOS_ADMIN_URL is unset or the id is missing (403)', async () => {
+  process.env.RECOVERY_GATE_SECRET = 'gate-secret';
+  for (const body of [{ identity_id: OTHER_UUID }, { is_admin: false }]) {
+    const res = fakeRes();
+    await handleAdminRequest(postLoginCodeGate(body), res);
+    assert.equal(res.statusCode, 403);
+  }
+});
+
+test('login-code-gate rejects a wrong bearer with 403 before reading the body', async () => {
+  process.env.RECOVERY_GATE_SECRET = 'gate-secret';
+  const res = fakeRes();
+  await handleAdminRequest(postLoginCodeGate({ identity_id: OTHER_UUID }, 'wrong'), res);
+  assert.equal(res.statusCode, 403);
+  assert.deepEqual(JSON.parse(res.body), { error: 'forbidden' });
 });

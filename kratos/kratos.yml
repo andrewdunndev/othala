@@ -245,6 +245,28 @@ selfservice:
       # in admin.ts, never enforced globally here — a global AAL2 would lock out
       # every identity that has not enrolled a second factor yet, including on
       # the very flow it would use to enrol one.
+      after:
+        # Admin accounts never get a session from an emailed code: the gate
+        # refuses an admin-marked identity and Kratos then issues no cookie.
+        # Same endpoint family, secret and body as the recovery gate above.
+        # Per-method hooks replace global login hooks; none are defined.
+        code:
+          hooks:
+            - hook: web_hook
+              config:
+                url: "http://${CONSENT_HOST}:4431/admin/login-code-gate"
+                method: POST
+                auth:
+                  type: api_key
+                  config:
+                    in: header
+                    name: Authorization
+                    value: "Bearer ${RECOVERY_GATE_SECRET}"
+                response:
+                  ignore: false
+                  parse: false
+                body: file:///etc/config/kratos/hooks/recovery-gate.jsonnet
+                can_interrupt: true
 
     registration:
       # Admin-driven onboarding (one-time enrollment URLs); no self-service signup
