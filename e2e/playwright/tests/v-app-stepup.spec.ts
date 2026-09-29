@@ -148,6 +148,13 @@ test('V2 — a TOTP member signed in by code steps up before app sign-in and for
     expect(stepped.searchParams.get('aal')).toBe('aal2');
     expect((await forwardAuth(ctx, baseURL)).status(), 'V2: aal1 forward-auth').toBe(401);
 
+    // Opening the login page with no aal param promotes it to an aal2 flow.
+    const plain = await ctx.request.get(`${baseURL}/auth/login?return_to=${encodeURIComponent(`${baseURL}/`)}`, { maxRedirects: 0 });
+    const promoted = new URL(plain.headers()['location'] ?? '', baseURL);
+    expect(promoted.pathname, `V2: login page redirect, got ${promoted}`).toBe('/self-service/login/browser');
+    expect(promoted.searchParams.get('aal'), 'V2: aal1 session without aal param is promoted').toBe('aal2');
+    expect(promoted.searchParams.get('return_to')).toBe(`${baseURL}/`);
+
     const flow = await initFlow(ctx.request, `${baseURL}/self-service/login/browser?aal=aal2`);
     const totp = await ctx.request.post(flow.ui.action, {
       headers: { 'Content-Type': 'application/json', Accept: 'application/json' },

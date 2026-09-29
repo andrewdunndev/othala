@@ -393,6 +393,17 @@ test('aal1 session, identity holds totp → 401 (step up)', async () => {
   assert.equal((await HEAD(ctx('access-proxywatch'))).status, 401);
 });
 
+test('aal1 session, admin-marked identity with no second factor → 401 (step up)', async () => {
+  const base = inGroupWith('password');
+  installFetch({
+    whoami: sessionAt('aal1'),
+    identity: { status: 200, body: { ...base.body, metadata_admin: { ...base.body.metadata_admin, admin: true } } },
+  });
+  const res = await GET(ctx('access-proxywatch'));
+  assert.equal(res.status, 401);
+  assert.equal(res.headers.get('X-Kratos-Authenticated-Identity-Id'), null);
+});
+
 test('aal2 session, identity holds totp → 200', async () => {
   installFetch({ whoami: sessionAt('aal2'), identity: inGroupWith('password', 'totp') });
   const res = await GET(ctx('access-proxywatch'));
