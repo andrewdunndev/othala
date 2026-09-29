@@ -81,8 +81,8 @@
 		}
 
 		reverse_proxy {args[0]}:{args[1]} {
-			# Strip the Kratos session cookie before forwarding to upstream
-			# so it doesn't leak into app logs.
+			# Forward-auth upstreams get no cookies: this strips every
+			# cookie, the Kratos session cookie included.
 			header_up -Cookie
 
 			# Strip spoofable inbound identity headers before they reach the

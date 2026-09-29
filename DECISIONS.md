@@ -14,7 +14,9 @@ Admins cannot sign in by emailed code, hold the marker without a second factor, 
 **Why.** Kratos enforces assurance level per flow, never per route, so step-up belongs in the
 application, which reads the session's AAL itself. Raising the pin tightens nothing: the session endpoint
 stops returning a usable identity for exactly the people who enrolled a second factor, and that identity
-id is the gate's only input, so every gated app locks out at once.
+id is the gate's only input, so every gated app locks out at once. Ory config here is
+host-mounted, not baked into an image, so a stale setting's consumer may not be in this
+repository.
 
 **Enforced by.** `portal/scripts/forward-auth.test.mjs` holds the coupling (a session with no identity
 id is 401). Step-up: `step-up.test.ts`, `oauth2-handlers.test.mjs`, `admin-port.test.mjs`,
@@ -74,7 +76,9 @@ that must be remembered will be misremembered, so reconstructibility from one ar
 of the model; the price, knowingly paid, is two group assignments per admin per service. That price
 carries its own hazard: an admin holds two role-mapped groups, normalization sorts alphabetically, and a
 first-match walk would silently hand every admin the low role, so the resolver takes the highest-ranked
-declared role over the whole set instead. A naming prefix cannot double as both convention and runtime type discriminator.
+declared role over the whole set instead. A naming prefix cannot double as both convention and runtime type discriminator. Binding and role mapping stay separate
+fields for a case the collapse loses: everyone in a group may enter while only a second earns the editor
+role.
 
 **Enforced by.** `portal/src/lib/gate.ts`, `portal/src/lib/claims.ts` (highest-rank resolution),
 `portal/src/lib/group-registry.ts` (binding-derived typing), `portal/scripts/gate-property.test.mjs`,

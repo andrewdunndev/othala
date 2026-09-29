@@ -25,7 +25,7 @@ This CHANGELOG and git tags carry the deployed-instance release state.
 - The error page shows only reasons it recognises.
 - Admin accounts keep at least one authenticator app or security key through settings.
 - The admin console refuses to deactivate your own identity or the last active admin, and to remove your own last authenticator app or security key.
-- Signing out takes a form post with a per-page token; opening `/auth/logout` shows a confirm button.
+- Signing out takes a form post with a a token bound to the signed-in identity; opening `/auth/logout` shows a confirm button.
 - Saving an identity in the admin console keeps stored groups that have no checkbox (role-mapped or not configured); removing one is an explicit tick.
 - The reference forward-auth snippet runs its header strip, session check and proxy in a `route` block, so the verified identity id reaches the upstream.
 - The portal's `form-action` policy admits the Kratos origin, so signing out works when Kratos is on another host.
