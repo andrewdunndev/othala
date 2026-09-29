@@ -78,7 +78,8 @@ selfservice:
         # validation (the render is text-substitution, so source quoting carries
         # through). Keep these values unquoted.
         haveibeenpwned_enabled: ${OTHALA_HIBP_ENABLED}
-        max_breaches: 1
+        max_breaches: 0
+        ignore_network_errors: false
         identifier_similarity_check_enabled: true
         min_password_length: ${OTHALA_PASSWORD_MIN_LENGTH}
 

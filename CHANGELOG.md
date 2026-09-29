@@ -11,6 +11,8 @@ This CHANGELOG and git tags carry the deployed-instance release state.
 
 ### Changed
 
+- Password policy rejects any known-breached password and no longer accepts a password when the check cannot be completed.
+- Trace spans no longer carry the return_to value.
 - Deleting an identity deactivates it and revokes its sessions and app grants first; a failed delete reports the inactive identity.
 - Removing a group or changing a role revokes the member's app grants.
 - Signing out of an app also ends the portal session.

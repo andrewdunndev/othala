@@ -46,9 +46,9 @@ test('scrubUrl redacts every sensitive value in a ?-bearing http.url', () => {
 });
 
 test('scrubUrl preserves non-sensitive params and a relative http.target shape', () => {
-  const out = scrubUrl('/auth/login?token=secret&return_to=/dashboard&foo=bar');
+  const out = scrubUrl('/auth/login?token=secret&next=/dashboard&foo=bar');
   assert.match(out, /token=\[REDACTED\]/);
-  assert.match(out, /return_to=\/dashboard/);
+  assert.match(out, /next=\/dashboard/);
   assert.match(out, /foo=bar/);
   assert.ok(out.startsWith('/auth/login?'));
 });
@@ -195,4 +195,18 @@ test('RedactingSpanProcessor forwards a non-admin span ONCE with scrubbed attrs'
   assert.match(forwarded.attributes['http.target'], /token=\[REDACTED\]/);
   assert.match(forwarded.attributes['http.target'], /foo=bar/);
   assert.equal(forwarded.attributes['http.request.header.cookie'], REDACTED);
+});
+
+test('scrubUrl redacts return_to including nested challenge ids', () => {
+  const nested = encodeURIComponent('/oauth2/auth?login_challenge=abc123&x=1');
+  const out = scrubUrl(`/auth/login?return_to=${nested}&foo=bar`);
+  assert.match(out, /return_to=\[REDACTED\]/);
+  assert.equal(out.includes('abc123'), false);
+  assert.match(out, /foo=bar/);
+});
+
+test('scrubQuery redacts return_to carrying a consent challenge', () => {
+  const nested = encodeURIComponent('/consent?consent_challenge=zzz999');
+  const out = scrubQuery(`return_to=${nested}`);
+  assert.equal(out, 'return_to=[REDACTED]');
 });
