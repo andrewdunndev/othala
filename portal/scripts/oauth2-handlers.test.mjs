@@ -196,6 +196,71 @@ test('login 400 on missing challenge', async () => {
   assert.equal(res.status, 400);
 });
 
+// ── second-factor step-up at app sign-in ───────────────────────────────────
+
+function withCreds(...types) {
+  return Object.fromEntries(types.map((t) => [t, { type: t }]));
+}
+
+const FRESH = async () => ({ challenge: 'lc', skip: false, subject: '', client: { client_id: 'grafana' } });
+
+for (const [branch, getReq] of [['skip', undefined], ['fresh', FRESH]]) {
+  test(`login (${branch}) steps an aal1 totp holder up to aal2 and never accepts`, async () => {
+    const { api, calls } = stubOAuth2(getReq ? { getOAuth2LoginRequest: getReq } : {});
+    const res = await handleLogin(new Request('https://x/oauth2/login?login_challenge=lc'), {
+      oauth2: api,
+      getIdentity: async () => activeMember({ credentials: withCreds('password', 'totp') }),
+      getSession: defaultSession(),
+      manifest: () => loadManifest('grafana'),
+    });
+    assert.equal(res.status, 302);
+    const u = new URL(res.headers.get('location'), 'https://sso.othala.test');
+    assert.equal(u.pathname, '/auth/login');
+    assert.equal(u.searchParams.get('aal'), 'aal2');
+    assert.equal(u.searchParams.get('return_to'), '/oauth2/login?login_challenge=lc');
+    assert.equal(calls.acceptLogin, 0);
+    assert.equal(calls.rejectLogin, 0);
+  });
+
+  test(`login (${branch}) steps an aal1 admin-marked identity up even without a second factor`, async () => {
+    const { api, calls } = stubOAuth2(getReq ? { getOAuth2LoginRequest: getReq } : {});
+    const res = await handleLogin(new Request('https://x/oauth2/login?login_challenge=lc'), {
+      oauth2: api,
+      getIdentity: async () => activeMember({ metadata_admin: { groups: ['grafana-access'], admin: true } }),
+      getSession: defaultSession(),
+      manifest: () => loadManifest('grafana'),
+    });
+    assert.equal(new URL(res.headers.get('location'), 'https://x').searchParams.get('aal'), 'aal2');
+    assert.equal(calls.acceptLogin, 0);
+  });
+
+  test(`login (${branch}) accepts an aal2 session with acr aal2`, async () => {
+    const { api, calls } = stubOAuth2(getReq ? { getOAuth2LoginRequest: getReq } : {});
+    const res = await handleLogin(new Request('https://x/oauth2/login?login_challenge=lc'), {
+      oauth2: api,
+      getIdentity: async () => activeMember({ credentials: withCreds('password', 'totp') }),
+      getSession: defaultSession({ authenticator_assurance_level: 'aal2' }),
+      manifest: () => loadManifest('grafana'),
+    });
+    assert.equal(res.headers.get('location'), 'https://sso.othala.test/after-login');
+    assert.equal(calls.acceptLogin, 1);
+    assert.equal(calls.acceptLoginBody.acr, 'aal2');
+  });
+
+  test(`login (${branch}) accepts a passkey-only aal1 session without step-up`, async () => {
+    const { api, calls } = stubOAuth2(getReq ? { getOAuth2LoginRequest: getReq } : {});
+    const res = await handleLogin(new Request('https://x/oauth2/login?login_challenge=lc'), {
+      oauth2: api,
+      getIdentity: async () => activeMember({ credentials: withCreds('passkey', 'lookup_secret') }),
+      getSession: defaultSession(),
+      manifest: () => loadManifest('grafana'),
+    });
+    assert.equal(res.headers.get('location'), 'https://sso.othala.test/after-login');
+    assert.equal(calls.acceptLogin, 1);
+    assert.equal(calls.acceptLoginBody.acr, 'aal1');
+  });
+}
+
 // ── CONSENT ─────────────────────────────────────────────────────────────────
 
 test('consent accepts an active member and grants scope + injects id_token', async () => {

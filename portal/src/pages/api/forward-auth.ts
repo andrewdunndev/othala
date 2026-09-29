@@ -26,7 +26,8 @@
 //
 // Status contract (the body is advisory; Caddy keys on the STATUS):
 //   200 "ok"             — valid session, identity active AND in the group
-//   401 "unauthenticated" — no/invalid Kratos session
+//   401 "unauthenticated" — no/invalid Kratos session, or an aal1 session
+//                          that must step up to aal2 (lib/step-up.ts)
 //   403 "forbidden"      — the request was refused on its merits: inactive
 //                          identity, a NON-CANONICAL STORED GROUP on the
 //                          identity (refuseNonCanonical in
@@ -78,7 +79,8 @@ import { getSession } from '../../lib/kratos';
 import { getIdentity } from '../../lib/admin';
 import { enforceGroupGate } from '../../lib/gate';
 import { GROUP_RE } from '../../lib/access-groups';
-import type { Identity } from '../../lib/types';
+import { needsStepUp } from '../../lib/step-up';
+import type { Identity, Session } from '../../lib/types';
 
 export const prerender = false;
 
@@ -121,8 +123,9 @@ async function decide(request: Request, url: URL): Promise<Response> {
   //    closed to 503.
   const cookie = request.headers.get('cookie') ?? undefined;
   let identityId: string | undefined;
+  let session: Session | null;
   try {
-    const session = await getSession(cookie);
+    session = await getSession(cookie);
     if (!session?.active || !session.identity?.id) {
       return text(401, 'unauthenticated');
     }
@@ -153,7 +156,13 @@ async function decide(request: Request, url: URL): Promise<Response> {
     return text(403, 'forbidden');
   }
 
-  // 5. Allow. Surface the identity id for downstream apps that consume it.
+  // 5. Step-up: the same rule as app sign-in. 401 sends the person back to
+  //    the login page, which asks for the second factor (auth/login.astro).
+  if (needsStepUp(session, identity)) {
+    return text(401, 'unauthenticated');
+  }
+
+  // 6. Allow. Surface the identity id for downstream apps that consume it.
   //    We only ever SET this header from a server-verified id; the endpoint
   //    never reads/trusts an inbound identity header.
   return text(200, 'ok', { [ID_HEADER]: identityId });
