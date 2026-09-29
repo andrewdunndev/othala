@@ -11,20 +11,7 @@
 import { test, expect } from '../fixtures';
 import { createIdentityWithPassword, TEST_PASSWORD } from '../actions/identity';
 import { loginViaJsonApi } from '../actions/login';
-
-const MAILPIT_API = process.env.MAILPIT_API ?? 'http://mailpit:8025';
-
-async function mailBodies(marker: string): Promise<string[]> {
-  const list = await fetch(`${MAILPIT_API}/api/v1/search?query=${encodeURIComponent(marker)}`);
-  expect(list.ok, 'mailpit search').toBe(true);
-  const { messages = [] } = (await list.json()) as { messages?: Array<{ ID: string }> };
-  const out: string[] = [];
-  for (const m of messages) {
-    const msg = await fetch(`${MAILPIT_API}/api/v1/message/${m.ID}`);
-    out.push(((await msg.json()) as { Text?: string }).Text ?? '');
-  }
-  return out;
-}
+import { searchMailBodies as mailBodies } from '../actions/mail';
 
 test.describe('Z — contact form requires a session', () => {
   test('Z1 — no session: 401 and nothing sent', async ({ playwright, baseURL }) => {

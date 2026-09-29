@@ -34,16 +34,11 @@
 
 import { test, expect } from '../fixtures';
 import { adminAal2Context } from '../fixtures';
-import { createIdentityWithPassword, TEST_PASSWORD } from '../actions/identity';
+import { createIdentityWithPassword, readIdentity, TEST_PASSWORD } from '../actions/identity';
 
 /** Read an identity's `state` via the Kratos admin API (ground truth for "the effect"). */
 async function getIdentityState(kratosAdminURL: string, id: string): Promise<string> {
-  const resp = await fetch(`${kratosAdminURL}/admin/identities/${id}`);
-  if (!resp.ok) {
-    throw new Error(`getIdentityState: HTTP ${resp.status} for ${id}`);
-  }
-  const body = (await resp.json()) as { state?: string };
-  return body.state ?? 'active';
+  return ((await readIdentity(kratosAdminURL, id)) as { state?: string }).state ?? 'active';
 }
 
 test('R1 — admin deactivate/reactivate via a real browser click must not 403 (regression for #5)', async ({

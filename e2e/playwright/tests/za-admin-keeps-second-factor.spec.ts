@@ -13,7 +13,7 @@
 
 import type { BrowserContext } from 'playwright-core';
 import { test, expect, adminAal2Context } from '../fixtures';
-import { createIdentityWithPassword, TEST_PASSWORD } from '../actions/identity';
+import { createIdentityWithPassword, readIdentity, TEST_PASSWORD } from '../actions/identity';
 import { findCsrfToken } from '../actions/login';
 
 const SECOND_FACTOR_KEEP = 'Admin accounts keep at least one authenticator app or security key.';
@@ -24,9 +24,7 @@ interface StoredCredentials {
 }
 
 async function storedCredentials(kratosAdminURL: string, id: string): Promise<StoredCredentials> {
-  const resp = await fetch(`${kratosAdminURL}/admin/identities/${id}?include_credential=totp&include_credential=webauthn`);
-  expect(resp.ok, 'admin API identity read').toBe(true);
-  return ((await resp.json()) as { credentials?: StoredCredentials }).credentials ?? {};
+  return ((await readIdentity(kratosAdminURL, id, ['totp', 'webauthn'])) as { credentials?: StoredCredentials }).credentials ?? {};
 }
 
 const totpEnrolled = (c: StoredCredentials) => Boolean(c.totp?.config?.totp_url);

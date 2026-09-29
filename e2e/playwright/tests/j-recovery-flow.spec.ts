@@ -76,70 +76,7 @@ import type { APIRequestContext } from '@playwright/test';
 import { test, expect } from '../fixtures';
 import { createIdentityWithPassword } from '../actions/identity';
 import { getSession } from '../actions/session';
-
-// The mailpit HTTP API is reachable inside the compose net on the compose
-// service hostname. From the playwright container (same network), use:
-const MAILPIT_API = process.env.MAILPIT_API ?? 'http://mailpit:8025';
-
-// How long to wait for Kratos to send the recovery email (Kratos enqueues
-// the courier job; delivery is near-instant in the compose env).
-const MAIL_TIMEOUT_MS = 15_000;
-const MAIL_POLL_INTERVAL_MS = 500;
-
-/**
- * Poll mailpit for a recovery code email sent to `toAddress`.
- * Uses bare globalThis.fetch — mailpit has no session state so this is safe.
- * Returns { messageId, code } once the email arrives, or throws on timeout.
- */
-async function waitForRecoveryCode(
-  toAddress: string,
-  afterMs: number = Date.now(),
-): Promise<{ messageId: string; code: string }> {
-  const deadline = Date.now() + MAIL_TIMEOUT_MS;
-  while (Date.now() < deadline) {
-    const resp = await fetch(`${MAILPIT_API}/api/v1/messages`);
-    if (!resp.ok) throw new Error(`mailpit /api/v1/messages returned ${resp.status}`);
-    const data = await resp.json() as {
-      messages?: Array<{
-        ID: string;
-        Subject: string;
-        To: Array<{ Address: string }>;
-        // Mailpit v1 API uses `Created` (ISO 8601), NOT `Date`.
-        Created: string;
-      }>;
-    };
-    const messages = data.messages ?? [];
-    // Find the most-recent message addressed to `toAddress` that arrived after
-    // our flow started AND has "recovery" in the subject.
-    // IMPORTANT: the `afterMs` guard is required — mailpit accumulates emails
-    // across test runs in the same lab session. Without the date filter the
-    // function returns a code from a PREVIOUS run that has already been used,
-    // the code submit returns 200-with-error (not a session), and the test fails.
-    const candidates = messages
-      .filter((m) =>
-        m.To.some((t) => t.Address.toLowerCase() === toAddress.toLowerCase()) &&
-        /recover/i.test(m.Subject) &&
-        new Date(m.Created).getTime() >= afterMs - 5_000, // 5s grace for clock skew
-      )
-      .sort((a, b) => new Date(b.Created).getTime() - new Date(a.Created).getTime());
-
-    const match = candidates[0];
-    if (match) {
-      // Fetch the raw message text to extract the 6-digit code.
-      const msgResp = await fetch(`${MAILPIT_API}/api/v1/message/${match.ID}`);
-      if (!msgResp.ok) throw new Error(`mailpit message fetch returned ${msgResp.status}`);
-      const msgData = await msgResp.json() as { Text?: string; HTML?: string };
-      const body = msgData.Text ?? msgData.HTML ?? '';
-      // Kratos recovery codes are 6-digit numeric codes.
-      const codeMatch = body.match(/\b(\d{6})\b/);
-      if (codeMatch) {
-        return { messageId: match.ID, code: codeMatch[1] };
-      }
-    }
-    await new Promise((r) => setTimeout(r, MAIL_POLL_INTERVAL_MS));
-  }
-  throw new Error(`Timed out waiting for recovery email to ${toAddress} after ${MAIL_TIMEOUT_MS}ms`);
-}
+import { waitForMessage, forRecipient } from '../actions/mail';
 
 /**
  * Initiate a Kratos recovery flow using the provided APIRequestContext.
@@ -345,7 +282,7 @@ test('J1 — non-admin recovery flow issues a privileged settings session', asyn
 
     // Step 3: Wait for the recovery code to arrive in mailpit.
     // waitForRecoveryCode uses bare fetch (mailpit has no session state).
-    const { code, messageId } = await waitForRecoveryCode(identity.email, startTime);
+    const { code, id: messageId } = await waitForMessage(forRecipient(identity.email, startTime, /recover/i));
     console.log('[J1] recovery code received, message id:', messageId, 'code:', code);
 
     // Step 4: Submit the recovery code ONCE via ctx.request (the same cookie
@@ -435,9 +372,9 @@ test('J2 — admin recovery is blocked by the recovery-gate webhook (no privileg
     // after the code is validated, not at initiation). So we DO expect an email.
     let code: string;
     try {
-      const result = await waitForRecoveryCode(identity.email, startTime);
+      const result = await waitForMessage(forRecipient(identity.email, startTime, /recover/i));
       code = result.code;
-      console.log('[J2] admin recovery code received:', result.messageId);
+      console.log('[J2] admin recovery code received:', result.id);
     } catch (e) {
       // If no email arrived, Kratos may have blocked at initiation — that is
       // also acceptable (the gate may fire earlier in some Kratos versions).

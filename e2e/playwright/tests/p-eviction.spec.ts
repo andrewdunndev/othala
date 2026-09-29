@@ -64,7 +64,7 @@
 
 import { test, expect } from '../fixtures';
 import type { BrowserContext, CDPSession, Page } from 'playwright-core';
-import { createIdentityWithPassword, TEST_PASSWORD } from '../actions/identity';
+import { createIdentityWithPassword, readIdentity, TEST_PASSWORD } from '../actions/identity';
 import { loginViaJsonApi } from '../actions/login';
 import { getSession } from '../actions/session';
 import { capturePasskeyLoginDiagnostics, probePasskeyLoginCapabilities } from '../actions/diagnostics';
@@ -230,7 +230,7 @@ test.describe.serial('P — Passkey credential eviction (lost-device scenario)',
     let registered: any;
     await expect.poll(
       async () => {
-        registered = await fetch(`${kratosAdminURL}/admin/identities/${identity.id}`).then((r) => r.json());
+        registered = await readIdentity(kratosAdminURL, identity.id);
         return registered?.credentials?.passkey;
       },
       { timeout: 10_000, message: 'P1: identity must have passkey credentials after both enrollments' },

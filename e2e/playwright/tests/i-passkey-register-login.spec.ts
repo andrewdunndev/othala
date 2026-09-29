@@ -42,7 +42,7 @@
  */
 
 import { test, expect } from '../fixtures';
-import { createIdentityWithPassword, TEST_PASSWORD } from '../actions/identity';
+import { createIdentityWithPassword, readIdentity, TEST_PASSWORD } from '../actions/identity';
 import { loginViaJsonApi } from '../actions/login';
 import { getSession } from '../actions/session';
 import { capturePasskeyLoginDiagnostics, probePasskeyLoginCapabilities } from '../actions/diagnostics';
@@ -158,7 +158,7 @@ test.describe('I — Passkey register → usernameless login', () => {
     let registered: any;
     await expect.poll(
       async () => {
-        registered = await fetch(`${kratosAdminURL}/admin/identities/${identity.id}`).then((r) => r.json());
+        registered = await readIdentity(kratosAdminURL, identity.id);
         return registered?.credentials?.passkey;
       },
       { timeout: 10_000, message: 'I1: identity must have a passkey credential recorded server-side after registration' },

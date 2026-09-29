@@ -47,92 +47,16 @@
 import { test, expect } from '../fixtures';
 import { adminAal2Context } from '../fixtures';
 import { createIdentityWithPassword, TEST_PASSWORD } from '../actions/identity';
+import { listMail, waitForMessage, forRecipient } from '../actions/mail';
 
-const MAILPIT_API = process.env.MAILPIT_API ?? 'http://mailpit:8025';
-const MAIL_TIMEOUT_MS = 15_000;
-const MAIL_POLL_INTERVAL_MS = 500;
-
-/**
- * Poll mailpit for the invite-email message sent to `toAddress`.
- * Returns { messageId, code, body } once it arrives, throws on timeout.
- * Mirrors waitForRecoveryCode in j-recovery-flow.spec.ts.
- */
-async function waitForInviteEmail(
-  toAddress: string,
-  afterMs: number,
-): Promise<{ messageId: string; code: string; body: string }> {
-  const deadline = Date.now() + MAIL_TIMEOUT_MS;
-  while (Date.now() < deadline) {
-    const resp = await fetch(`${MAILPIT_API}/api/v1/messages`);
-    if (!resp.ok) throw new Error(`mailpit /api/v1/messages returned ${resp.status}`);
-    const data = (await resp.json()) as {
-      messages?: Array<{
-        ID: string;
-        Subject: string;
-        To: Array<{ Address: string }>;
-        Created: string; // mailpit v1 API field name (not `Date`)
-      }>;
-    };
-    const candidates = (data.messages ?? [])
-      .filter(
-        (m) =>
-          m.To.some((t) => t.Address.toLowerCase() === toAddress.toLowerCase()) &&
-          /recover/i.test(m.Subject) &&
-          new Date(m.Created).getTime() >= afterMs - 5_000,
-      )
-      .sort((a, b) => new Date(b.Created).getTime() - new Date(a.Created).getTime());
-
-    const match = candidates[0];
-    if (match) {
-      const msgResp = await fetch(`${MAILPIT_API}/api/v1/message/${match.ID}`);
-      if (!msgResp.ok) throw new Error(`mailpit message fetch returned ${msgResp.status}`);
-      const msgData = (await msgResp.json()) as { Text?: string; HTML?: string };
-      const body = msgData.Text ?? msgData.HTML ?? '';
-      const codeMatch = body.match(/\b(\d{6})\b/);
-      if (codeMatch) {
-        return { messageId: match.ID, code: codeMatch[1], body };
-      }
-    }
-    await new Promise((r) => setTimeout(r, MAIL_POLL_INTERVAL_MS));
-  }
-  throw new Error(`Timed out waiting for invite email to ${toAddress} after ${MAIL_TIMEOUT_MS}ms`);
-}
-
-// Bounded window for a NEGATIVE mail assertion. U2/U3 exercise refusal
-// branches that never call sendInviteRecoveryEmail at all (the confirm check
-// / admin gate short-circuits before the Kratos call), so there is nothing to
-// race — this window only guards against a regression that starts calling
-// Kratos on a refused submission. Short on purpose: a real positive case
-// (U1) proves mail delivery works within MAIL_TIMEOUT_MS, so silence for a
-// fraction of that window is already meaningful, not just "didn't wait long
-// enough."
-const NO_MAIL_WINDOW_MS = 4_000;
-
-/**
- * Assert mailpit does NOT receive a recovery-code message for `toAddress`
- * within `NO_MAIL_WINDOW_MS`. Throws immediately on the first matching hit
- * (fail fast) rather than waiting out the full window.
- */
+// Negative assertion: the refusal branches short-circuit before Kratos, so a
+// short window suffices; U1 proves delivery within the longer timeout.
 async function assertNoInviteEmail(toAddress: string, afterMs: number): Promise<void> {
-  const deadline = Date.now() + NO_MAIL_WINDOW_MS;
+  const deadline = Date.now() + 4_000;
   while (Date.now() < deadline) {
-    const resp = await fetch(`${MAILPIT_API}/api/v1/messages`);
-    if (!resp.ok) throw new Error(`mailpit /api/v1/messages returned ${resp.status}`);
-    const data = (await resp.json()) as {
-      messages?: Array<{ Subject: string; To: Array<{ Address: string }>; Created: string }>;
-    };
-    const hit = (data.messages ?? []).find(
-      (m) =>
-        m.To.some((t) => t.Address.toLowerCase() === toAddress.toLowerCase()) &&
-        /recover/i.test(m.Subject) &&
-        new Date(m.Created).getTime() >= afterMs - 5_000,
-    );
-    if (hit) {
-      throw new Error(
-        `mailpit received an unexpected recovery message for ${toAddress} (subject: "${hit.Subject}") — this branch must never call Kratos`,
-      );
-    }
-    await new Promise((r) => setTimeout(r, MAIL_POLL_INTERVAL_MS));
+    const hit = (await listMail()).find(forRecipient(toAddress, afterMs, /recover/i));
+    if (hit) throw new Error(`unexpected recovery message for ${toAddress} (subject: "${hit.subject}")`);
+    await new Promise((r) => setTimeout(r, 500));
   }
 }
 
@@ -200,7 +124,7 @@ test('U1 — admin "Send invite email" delivers a code-only message via the Krat
     ).toBeVisible();
 
     // Ground truth: the message actually landed in the courier's relay.
-    const { code, body, messageId } = await waitForInviteEmail(invitee.email, startTime);
+    const { code, body, id: messageId } = await waitForMessage(forRecipient(invitee.email, startTime, /recover/i));
     console.log('[U1] invite email received, message id:', messageId, 'code:', code);
 
     expect(code, 'U1: the delivered message must carry a 6-digit recovery code').toMatch(/^\d{6}$/);

@@ -49,68 +49,7 @@ import { test, expect } from '../fixtures';
 import type { APIRequestContext } from '@playwright/test';
 import { createIdentityWithPassword } from '../actions/identity';
 import { getSession } from '../actions/session';
-
-// Mailpit HTTP API endpoint — reachable from inside the compose net.
-const MAILPIT_API = process.env.MAILPIT_API ?? 'http://mailpit:8025';
-
-// Timeout + polling interval for waiting on the code email.
-const MAIL_TIMEOUT_MS = 15_000;
-const MAIL_POLL_INTERVAL_MS = 500;
-
-/**
- * Poll mailpit for a sign-in code email addressed to `toAddress`.
- * Returns { messageId, code } when it arrives, throws on timeout.
- *
- * Kratos login code email subjects typically contain "sign" or "login" or
- * "verification". We match broadly (any email to that address after startMs).
- */
-async function waitForLoginCode(
-  toAddress: string,
-  startMs: number = Date.now(),
-): Promise<{ messageId: string; code: string }> {
-  const deadline = Date.now() + MAIL_TIMEOUT_MS;
-  while (Date.now() < deadline) {
-    const resp = await fetch(`${MAILPIT_API}/api/v1/messages`);
-    if (!resp.ok) throw new Error(`mailpit /api/v1/messages returned ${resp.status}`);
-    const data = (await resp.json()) as {
-      messages?: Array<{
-        ID: string;
-        Subject: string;
-        To: Array<{ Address: string }>;
-        // Mailpit v1 API uses `Created` (ISO 8601), NOT `Date`.
-        Created: string;
-      }>;
-    };
-    const messages = data.messages ?? [];
-
-    // Find the most-recent email to this address that arrived after startMs.
-    // We sort by Created descending so we always pick up the latest code if Kratos
-    // sent multiple (e.g. a re-send).
-    const candidates = messages
-      .filter((m) =>
-        m.To.some((t) => t.Address.toLowerCase() === toAddress.toLowerCase()) &&
-        new Date(m.Created).getTime() >= startMs - 5_000, // 5s grace for clock skew
-      )
-      .sort((a, b) => new Date(b.Created).getTime() - new Date(a.Created).getTime());
-
-    if (candidates.length > 0) {
-      const match = candidates[0];
-      const msgResp = await fetch(`${MAILPIT_API}/api/v1/message/${match.ID}`);
-      if (!msgResp.ok) throw new Error(`mailpit message fetch returned ${msgResp.status}`);
-      const msgData = (await msgResp.json()) as { Text?: string; HTML?: string };
-      const body = msgData.Text ?? msgData.HTML ?? '';
-      // Kratos login codes are 6-digit numeric tokens.
-      const codeMatch = body.match(/\b(\d{6})\b/);
-      if (codeMatch) {
-        return { messageId: match.ID, code: codeMatch[1] };
-      }
-    }
-    await new Promise((r) => setTimeout(r, MAIL_POLL_INTERVAL_MS));
-  }
-  throw new Error(
-    `Timed out waiting for login code email to ${toAddress} after ${MAIL_TIMEOUT_MS}ms`,
-  );
-}
+import { waitForMessage, forRecipient } from '../actions/mail';
 
 /**
  * Initiate a Kratos browser login flow via the JSON API path.
@@ -305,7 +244,7 @@ test('K1 — email-code login delivers a code and establishes an active session'
     );
 
     // Step 3: wait for the sign-in code email in mailpit.
-    const { code, messageId } = await waitForLoginCode(identity.email, startTime);
+    const { code, id: messageId } = await waitForMessage(forRecipient(identity.email, startTime));
     console.log('[K1] received sign-in code:', code, 'message id:', messageId);
 
     // Step 4: submit the code via ctx.request (single call — codes are single-use).

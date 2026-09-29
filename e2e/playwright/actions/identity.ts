@@ -132,3 +132,16 @@ export async function createIdentityWithPassword(opts: SeedOptions): Promise<See
     `createIdentity failed for ${opts.email}: HTTP ${resp.status} — ${text.slice(0, 400)}`,
   );
 }
+
+/** Read an identity from the Kratos admin API (ground truth for "the effect"). */
+export async function readIdentity(
+  kratosAdminURL: string,
+  id: string,
+  credentials: string[] = [],
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+): Promise<any> {
+  const query = credentials.map((c) => `include_credential=${c}`).join('&');
+  const resp = await fetch(`${kratosAdminURL}/admin/identities/${id}${query ? `?${query}` : ''}`);
+  if (!resp.ok) throw new Error(`admin API identity read: HTTP ${resp.status} for ${id}`);
+  return resp.json();
+}

@@ -10,17 +10,15 @@
  *        the one that saved.
  */
 
-import type { APIRequestContext, BrowserContext } from 'playwright-core';
+import type { BrowserContext } from 'playwright-core';
 import { test, expect } from '../fixtures';
-import { createIdentityWithPassword, TEST_PASSWORD } from '../actions/identity';
+import { createIdentityWithPassword, readIdentity, TEST_PASSWORD } from '../actions/identity';
 import { findCsrfToken, loginViaJsonApi } from '../actions/login';
 
 const USERNAME_CHANGE_REFUSAL = 'Your username can only be changed by an administrator.';
 
-async function storedTraits(req: APIRequestContext, kratosAdminURL: string, id: string) {
-  const resp = await req.get(`${kratosAdminURL}/admin/identities/${id}`);
-  expect(resp.ok(), 'admin API identity read').toBe(true);
-  return (await resp.json()).traits as { username: string; email: string; displayName?: string };
+async function storedTraits(kratosAdminURL: string, id: string) {
+  return (await readIdentity(kratosAdminURL, id)).traits as { username: string; email: string; displayName?: string };
 }
 
 /** Submit the profile method of a fresh settings flow as JSON; returns status + body. */
@@ -68,12 +66,12 @@ test.describe('Y — username is admin-only', () => {
       expect(html).toMatch(/id="username-readonly"[^>]*readonly/);
       expect(html).toContain('Only an administrator can change your username.');
 
-      const before = await storedTraits(ctx.request, kratosAdminURL, seeded.id);
+      const before = await storedTraits(kratosAdminURL, seeded.id);
       const { status, body } = await submitProfile(ctx, baseURL, { ...before, username: `rename.accepted.${Date.now()}` });
       expect(status, 'refused profile submission answers 400 with the flow').toBe(400);
       expect(usernameNodeMessages(body)).toContain(USERNAME_CHANGE_REFUSAL);
 
-      const after = await storedTraits(ctx.request, kratosAdminURL, seeded.id);
+      const after = await storedTraits(kratosAdminURL, seeded.id);
       expect(after.username).toBe(username);
     } finally {
       await ctx.close();
@@ -96,11 +94,11 @@ test.describe('Y — username is admin-only', () => {
       await loginViaJsonApi(other, { identifier: seeded.email, password: TEST_PASSWORD }, baseURL);
       await loginViaJsonApi(ctx, { identifier: seeded.email, password: TEST_PASSWORD }, baseURL);
 
-      const before = await storedTraits(ctx.request, kratosAdminURL, seeded.id);
+      const before = await storedTraits(kratosAdminURL, seeded.id);
       const { status } = await submitProfile(ctx, baseURL, { ...before, email: changed });
       expect(status, 'email change accepted').toBe(200);
 
-      const after = await storedTraits(ctx.request, kratosAdminURL, seeded.id);
+      const after = await storedTraits(kratosAdminURL, seeded.id);
       expect(after.email).toBe(changed);
       expect(after.username).toBe(username);
 

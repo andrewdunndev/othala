@@ -23,8 +23,8 @@ import type { BrowserContext } from 'playwright-core';
 import { createIdentityWithPassword, TEST_PASSWORD } from '../actions/identity';
 import { loginViaJsonApi } from '../actions/login';
 import { getSession } from '../actions/session';
+import { waitForMessage, forRecipient } from '../actions/mail';
 
-const MAILPIT_API = process.env.MAILPIT_API ?? 'http://mailpit:8025';
 const GRAFANA_REDIRECT_URI = 'https://grafana.othala.test/login/generic_oauth';
 const ADMIN_CODE_REFUSAL = 'Admin accounts sign in with a passkey or password.';
 
@@ -42,25 +42,6 @@ async function initFlow(request: APIRequestContext, url: string): Promise<Flow> 
   return (await resp.json()) as Flow;
 }
 
-async function waitForCode(to: string, since: number): Promise<string> {
-  const deadline = Date.now() + 15_000;
-  while (Date.now() < deadline) {
-    const list = (await (await fetch(`${MAILPIT_API}/api/v1/messages`)).json()) as {
-      messages?: Array<{ ID: string; To: Array<{ Address: string }>; Created: string }>;
-    };
-    const hit = (list.messages ?? [])
-      .filter((m) => m.To.some((t) => t.Address.toLowerCase() === to) && Date.parse(m.Created) >= since - 5_000)
-      .sort((a, b) => Date.parse(b.Created) - Date.parse(a.Created))[0];
-    if (hit) {
-      const msg = (await (await fetch(`${MAILPIT_API}/api/v1/message/${hit.ID}`)).json()) as { Text?: string };
-      const m = (msg.Text ?? '').match(/\b(\d{6})\b/);
-      if (m) return m[1];
-    }
-    await new Promise((r) => setTimeout(r, 500));
-  }
-  throw new Error(`no sign-in code for ${to}`);
-}
-
 /** Email-code login in `ctx`; returns the final flow response (JSON). */
 async function codeLogin(ctx: BrowserContext, baseURL: string, email: string) {
   const since = Date.now();
@@ -71,7 +52,7 @@ async function codeLogin(ctx: BrowserContext, baseURL: string, email: string) {
     maxRedirects: 5,
   });
   const step2 = (await step1.json()) as Flow;
-  const code = await waitForCode(email, since);
+  const { code } = await waitForMessage(forRecipient(email, since));
   const resp = await ctx.request.post(step2.ui?.action ?? flow.ui.action, {
     headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
     data: { identifier: email, code, method: 'code', csrf_token: csrfOf(step2) || csrfOf(flow) },
