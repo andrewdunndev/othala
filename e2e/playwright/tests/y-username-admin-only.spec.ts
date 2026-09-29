@@ -5,8 +5,9 @@
  *   Y2 — a profile-settings submission that changes the username is refused
  *        with the neutral message, and the admin API still reports the old
  *        username.
- *   Y3 — an email change through the same form is saved, and it ends the
- *        member's other sessions.
+ *   Y3 — an email change through the same form is saved; the post-save
+ *        profile-sessions webhook ends the member's other sessions and keeps
+ *        the one that saved.
  */
 
 import type { APIRequestContext, BrowserContext } from 'playwright-core';
@@ -49,9 +50,10 @@ test.describe('Y — username is admin-only', () => {
     baseURL,
     kratosAdminURL,
   }) => {
+    const username = `rename.refused.${Date.now()}`;
     const seeded = await createIdentityWithPassword({
-      email: 'rename.refused@othala.test',
-      username: 'rename.refused',
+      email: `${username}@othala.test`,
+      username,
       displayName: 'Rename Refused',
       groups: [],
       kratosAdminURL,
@@ -67,21 +69,23 @@ test.describe('Y — username is admin-only', () => {
       expect(html).toContain('Only an administrator can change your username.');
 
       const before = await storedTraits(ctx.request, kratosAdminURL, seeded.id);
-      const { status, body } = await submitProfile(ctx, baseURL, { ...before, username: 'rename.accepted' });
+      const { status, body } = await submitProfile(ctx, baseURL, { ...before, username: `${username}.accepted` });
       expect(status, 'refused profile submission answers 400 with the flow').toBe(400);
       expect(usernameNodeMessages(body)).toContain(USERNAME_CHANGE_REFUSAL);
 
       const after = await storedTraits(ctx.request, kratosAdminURL, seeded.id);
-      expect(after.username).toBe('rename.refused');
+      expect(after.username).toBe(username);
     } finally {
       await ctx.close();
     }
   });
 
   test('Y3 — an email change is saved and ends the other sessions', async ({ browser, baseURL, kratosAdminURL }) => {
+    const username = `address.change.${Date.now()}`;
+    const changed = `${username}.new@othala.test`;
     const seeded = await createIdentityWithPassword({
-      email: 'address.change@othala.test',
-      username: 'address.change',
+      email: `${username}@othala.test`,
+      username,
       displayName: 'Address Change',
       groups: [],
       kratosAdminURL,
@@ -93,12 +97,12 @@ test.describe('Y — username is admin-only', () => {
       await loginViaJsonApi(ctx, { identifier: seeded.email, password: TEST_PASSWORD }, baseURL);
 
       const before = await storedTraits(ctx.request, kratosAdminURL, seeded.id);
-      const { status } = await submitProfile(ctx, baseURL, { ...before, email: 'address.changed@othala.test' });
+      const { status } = await submitProfile(ctx, baseURL, { ...before, email: changed });
       expect(status, 'email change accepted').toBe(200);
 
       const after = await storedTraits(ctx.request, kratosAdminURL, seeded.id);
-      expect(after.email).toBe('address.changed@othala.test');
-      expect(after.username).toBe('address.change');
+      expect(after.email).toBe(changed);
+      expect(after.username).toBe(username);
 
       const whoOther = await other.request.get(`${baseURL}/sessions/whoami`, { headers: { Accept: 'application/json' } });
       expect(whoOther.status(), 'the other session ended').toBe(401);

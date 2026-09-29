@@ -214,8 +214,9 @@ selfservice:
         # account on it at sign-in would lose the link on a self-service
         # rename. An interrupting web_hook runs before Kratos persists the new
         # traits; the gate refuses any username other than the stored one.
-        # revoke_active_sessions runs after persist, so a changed email
-        # address ends every other session.
+        # The schema allows no revoke_active_sessions here; the second,
+        # non-interrupting web_hook runs after persist and ends the account's
+        # other sessions, keeping the one that saved.
         profile:
           hooks:
             - hook: web_hook
@@ -233,7 +234,21 @@ selfservice:
                   parse: false
                 body: file:///etc/config/kratos/hooks/recovery-gate.jsonnet
                 can_interrupt: true
-            - hook: revoke_active_sessions
+            - hook: web_hook
+              config:
+                url: "http://${CONSENT_HOST}:4431/admin/profile-sessions"
+                method: POST
+                auth:
+                  type: api_key
+                  config:
+                    in: header
+                    name: Authorization
+                    value: "Bearer ${RECOVERY_GATE_SECRET}"
+                response:
+                  ignore: false
+                  parse: false
+                body: file:///etc/config/kratos/hooks/recovery-gate.jsonnet
+                can_interrupt: false
 
     recovery:
       enabled: true

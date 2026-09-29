@@ -35,7 +35,7 @@ import {
   ADMIN_GET_ROUTES,
   ADMIN_POST_ROUTES,
 } from '../src/server/listen.mjs';
-import { asAdmin, identity, withTotp, withWebauthnKey } from '../src/lib/test-builders.ts';
+import { asAdmin, identity, session, withTotp, withWebauthnKey } from '../src/lib/test-builders.ts';
 import * as secondFactorRuntime from '../src/lib/second-factor-gate.ts';
 
 const ADMIN_UUID = '11111111-1111-1111-1111-111111111111';
@@ -79,6 +79,7 @@ test('admin GET mux serves exactly /healthz and /readyz', () => {
 test('admin POST mux serves exactly the admin endpoints', () => {
   assert.deepEqual([...ADMIN_POST_ROUTES].sort(), [
     '/admin/login-code-gate',
+    '/admin/profile-sessions',
     '/admin/recovery-gate',
     '/admin/revoke-user',
     '/admin/second-factor-gate',
@@ -651,6 +652,83 @@ test('second-factor-gate rejects a wrong bearer with 403 before reading the body
   process.env.RECOVERY_GATE_SECRET = 'gate-secret';
   const res = fakeRes();
   await handleAdminRequest(postSecondFactorGate('totp', { identity_id: OTHER_UUID }, 'wrong'), res, secondFactorRuntime);
+  assert.equal(res.statusCode, 403);
+  assert.deepEqual(JSON.parse(res.body), { error: 'forbidden' });
+});
+
+// ── profile-sessions: settings.after.profile post-save webhook ──────────────
+
+const SAVING = session('aal1', ['password'], { id: 'aaaaaaaa-0000-0000-0000-000000000001' });
+const OTHER_A = session('aal1', ['password'], { id: 'aaaaaaaa-0000-0000-0000-000000000002' });
+const OTHER_B = session('aal1', ['code'], { id: 'aaaaaaaa-0000-0000-0000-000000000003' });
+
+function postProfileSessions(body, bearer = 'gate-secret') {
+  return fakeReq({
+    method: 'POST',
+    url: '/admin/profile-sessions',
+    headers: { authorization: `Bearer ${bearer}` },
+    body: JSON.stringify(body),
+  });
+}
+
+// A Kratos admin API that lists `listed` (or answers `listStatus`) and records
+// every request it serves.
+function sessionsServer(calls, listed, listStatus = 200) {
+  return (req, res) => {
+    calls.push(`${req.method} ${req.url}`);
+    if (req.method === 'GET') {
+      res.writeHead(listStatus, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify(listed));
+      return;
+    }
+    res.writeHead(204);
+    res.end();
+  };
+}
+
+test('profile-sessions ends every other active session and keeps the saving one (200)', async () => {
+  const calls = [];
+  await withMockKratos(sessionsServer(calls, [SAVING, OTHER_A, OTHER_B]), async () => {
+    const res = fakeRes();
+    await handleAdminRequest(postProfileSessions({ ...profilePayload(STORED.traits), session_id: SAVING.id }), res);
+    assert.equal(res.statusCode, 200);
+    assert.deepEqual(JSON.parse(res.body), { ended: 2 });
+  });
+  assert.deepEqual(calls, [
+    `GET /admin/identities/${STORED.id}/sessions?active=true&per_page=1000`,
+    `DELETE /admin/sessions/${OTHER_A.id}`,
+    `DELETE /admin/sessions/${OTHER_B.id}`,
+  ]);
+});
+
+test('profile-sessions ends nothing without a session_id, so the saving session survives (200)', async () => {
+  const calls = [];
+  await withMockKratos(sessionsServer(calls, [SAVING, OTHER_A]), async () => {
+    for (const session_id of [undefined, '', '  ']) {
+      const res = fakeRes();
+      await handleAdminRequest(postProfileSessions({ ...profilePayload(STORED.traits), session_id }), res);
+      assert.equal(res.statusCode, 200);
+      assert.deepEqual(JSON.parse(res.body), { ended: 0 });
+    }
+  });
+  assert.deepEqual(calls, []);
+});
+
+test('profile-sessions answers 200 when the session list fails, since the profile already saved', async () => {
+  const calls = [];
+  await withMockKratos(sessionsServer(calls, { error: 'down' }, 500), async () => {
+    const res = fakeRes();
+    await handleAdminRequest(postProfileSessions({ ...profilePayload(STORED.traits), session_id: SAVING.id }), res);
+    assert.equal(res.statusCode, 200);
+    assert.deepEqual(JSON.parse(res.body), { ended: 0 });
+  });
+  assert.equal(calls.length, 1);
+});
+
+test('profile-sessions rejects a wrong bearer with 403 before reading the body', async () => {
+  process.env.RECOVERY_GATE_SECRET = 'gate-secret';
+  const res = fakeRes();
+  await handleAdminRequest(postProfileSessions({ identity_id: STORED.id, session_id: SAVING.id }, 'wrong'), res);
   assert.equal(res.statusCode, 403);
   assert.deepEqual(JSON.parse(res.body), { error: 'forbidden' });
 });

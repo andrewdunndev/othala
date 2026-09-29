@@ -46,9 +46,10 @@ test.describe('Z — contact form requires a session', () => {
     baseURL,
     kratosAdminURL,
   }) => {
+    const username = `contact.member.${Date.now()}`;
     const seeded = await createIdentityWithPassword({
-      email: 'contact.member@othala.test',
-      username: 'contact.member',
+      email: `${username}@othala.test`,
+      username,
       displayName: 'Contact Member',
       groups: [],
       kratosAdminURL,
@@ -70,7 +71,7 @@ test.describe('Z — contact form requires a session', () => {
 
       const bodies = await mailBodies(marker);
       expect(bodies).toHaveLength(1);
-      expect(bodies[0]).toContain('contact.member');
+      expect(bodies[0]).toContain(username);
       expect(bodies[0]).toContain(seeded.id);
     } finally {
       await ctx.close();

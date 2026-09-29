@@ -13,4 +13,5 @@ function(ctx) {
   is_admin: std.get(std.get(ctx.identity, 'metadata_admin', {}), 'admin', false),
   groups: std.get(std.get(ctx.identity, 'metadata_admin', {}), 'groups', []),
   traits: ctx.identity.traits,
+  session_id: std.get(std.get(ctx, 'session', {}), 'id', ''),
 }
