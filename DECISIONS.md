@@ -90,24 +90,22 @@ role.
 
 ## The durable identity key cannot be the migration key
 
-**Decided.** The identity UUID is the durable key every relying party should end on, but the first-link
-key is set explicitly per app before OIDC is enabled, and it is the human username. Email is never a
-configured link key.
+**Decided.** The identity UUID (`sub`) is the durable key every relying party links on and must end on.
+The username is only the first-link key, set per app before OIDC is enabled, and only an administrator
+can change it. Email is never a link key.
 
-**Why.** The UUID is minted at identity creation, so it exists nowhere in pre-existing application data
-and cannot be a join key against old records; the only key present in both the old data and the identity
-service is the human one. Most relying parties converge anyway — match once by a human key, persist the
-UUID, match on it forever after — which is why the two answers are not in tension and why pre-seeding a
-UUID buys nothing. Email is rejected as a default because it is mutable, and making it harder to change
-is not the same as making it safe. The UUID lives only in the identity database, so a rebuild that
-recreates identities breaks every link in every app: import identities with their ids, or budget a
-re-link pass. And Kratos offers no primitive to freeze a trait — no schema keyword marks one immutable,
-no before-settings hook exists by default — so a username is user-mutable through the ordinary profile
-form, silently orphaning the account in any relying party that re-matches on username every login and
-stores no UUID. That is why such apps are kept near zero.
+**Why.** The UUID is minted at identity creation, so it exists nowhere in pre-existing application data;
+the only key present in both the old data and the identity service is the human one. Most relying parties
+converge anyway: match once by username, persist the UUID, match on it after. Email is rejected because
+it is mutable. The UUID lives only in the identity database, so a rebuild that recreates identities breaks
+every link: import identities with their ids, or budget a re-link pass. Kratos has no primitive to freeze
+a trait, and an app that still re-matches on username at every sign-in would silently orphan the account
+on a self-service rename, so the profile flow refuses one before it is saved.
 
-**Enforced by.** UNENFORCED — the link key is relying-party configuration; nothing here can observe or
-assert it.
+**Enforced by.** `handleUsernameGate` in `portal/src/server/listen.mjs` on
+`selfservice.flows.settings.after.profile` in `kratos/kratos.yml`; `portal/scripts/admin-port.test.mjs`,
+`e2e/playwright/tests/y-username-admin-only.spec.ts`. Which key each app links on is relying-party
+configuration, unenforced here.
 
 ## The passkey is the primary credential, not a second factor
 

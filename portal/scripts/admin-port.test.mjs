@@ -27,11 +27,15 @@ import {
   recoveryGateVerdict,
   LOGIN_CODE_ADMIN_REFUSAL,
   LOGIN_CODE_UNAVAILABLE,
+  USERNAME_CHANGE_REFUSAL,
+  PROFILE_UPDATE_UNAVAILABLE,
+  usernameChangeVerdict,
   startupEnvErrors,
   ADMIN_ROUTES,
   ADMIN_GET_ROUTES,
   ADMIN_POST_ROUTES,
 } from '../src/server/listen.mjs';
+import { identity } from '../src/lib/test-builders.ts';
 
 const ADMIN_UUID = '11111111-1111-1111-1111-111111111111';
 const OTHER_UUID = '22222222-2222-2222-2222-222222222222';
@@ -72,7 +76,12 @@ test('admin GET mux serves exactly /healthz and /readyz', () => {
 });
 
 test('admin POST mux serves exactly the admin endpoints', () => {
-  assert.deepEqual([...ADMIN_POST_ROUTES].sort(), ['/admin/login-code-gate', '/admin/recovery-gate', '/admin/revoke-user']);
+  assert.deepEqual([...ADMIN_POST_ROUTES].sort(), [
+    '/admin/login-code-gate',
+    '/admin/recovery-gate',
+    '/admin/revoke-user',
+    '/admin/username-gate',
+  ]);
 });
 
 test('admin POST paths are NOT public GET routes (disjoint from public mux)', () => {
@@ -480,6 +489,94 @@ test('login-code-gate rejects a wrong bearer with 403 before reading the body', 
   process.env.RECOVERY_GATE_SECRET = 'gate-secret';
   const res = fakeRes();
   await handleAdminRequest(postLoginCodeGate({ identity_id: OTHER_UUID }, 'wrong'), res);
+  assert.equal(res.statusCode, 403);
+  assert.deepEqual(JSON.parse(res.body), { error: 'forbidden' });
+});
+
+// ── username-gate: settings.after.profile webhook ───────────────────────────
+
+const STORED = identity({ id: OTHER_UUID, username: 'ada.lovelace' });
+
+function postUsernameGate(body, bearer = 'gate-secret') {
+  return fakeReq({
+    method: 'POST',
+    url: '/admin/username-gate',
+    headers: { authorization: `Bearer ${bearer}` },
+    body: JSON.stringify(body),
+  });
+}
+
+// The recovery-gate.jsonnet body as Kratos renders it for a settings submission:
+// ctx.identity carries the submitted traits, not the stored ones.
+function profilePayload(traits) {
+  return { identity_id: STORED.id, is_admin: false, groups: [], traits };
+}
+
+function storedIdentityServer(stored) {
+  return (req, res) => {
+    res.writeHead(200, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify(stored));
+  };
+}
+
+function refusalText(res) {
+  const [msg] = JSON.parse(res.body).messages;
+  assert.equal(msg.instance_ptr, '#/traits/username');
+  return msg.messages[0].text;
+}
+
+test('usernameChangeVerdict refuses a rename and allows the stored username', () => {
+  assert.deepEqual(usernameChangeVerdict(STORED, 'ada.lovelace'), { refuse: false });
+  assert.deepEqual(usernameChangeVerdict(STORED, 'ada.byron'), { refuse: true, text: USERNAME_CHANGE_REFUSAL });
+  assert.deepEqual(usernameChangeVerdict(STORED, 'Ada.Lovelace'), { refuse: true, text: USERNAME_CHANGE_REFUSAL });
+});
+
+test('usernameChangeVerdict refuses when either side is not a username', () => {
+  assert.equal(usernameChangeVerdict(STORED, undefined).text, PROFILE_UPDATE_UNAVAILABLE);
+  assert.equal(usernameChangeVerdict({ ...STORED, traits: {} }, 'ada.lovelace').text, PROFILE_UPDATE_UNAVAILABLE);
+  assert.equal(usernameChangeVerdict(null, 'ada.lovelace').refuse, true);
+});
+
+test('username-gate REFUSES a username change with the neutral message (403)', async () => {
+  await withMockKratos(storedIdentityServer(STORED), async () => {
+    const res = fakeRes();
+    await handleAdminRequest(postUsernameGate(profilePayload({ ...STORED.traits, username: 'ada.byron' })), res);
+    assert.equal(res.statusCode, 403);
+    assert.equal(refusalText(res), USERNAME_CHANGE_REFUSAL);
+  });
+});
+
+test('username-gate ALLOWS a profile update that keeps the username (200)', async () => {
+  await withMockKratos(storedIdentityServer(STORED), async () => {
+    const res = fakeRes();
+    await handleAdminRequest(postUsernameGate(profilePayload({ ...STORED.traits, email: 'ada@example.test' })), res);
+    assert.equal(res.statusCode, 200);
+  });
+});
+
+test('username-gate REFUSES when the stored identity cannot be read (fail-closed, 403)', async () => {
+  await withMockKratos((req, res) => { res.writeHead(500); res.end(); }, async () => {
+    const res = fakeRes();
+    await handleAdminRequest(postUsernameGate(profilePayload(STORED.traits)), res);
+    assert.equal(res.statusCode, 403);
+    assert.equal(refusalText(res), PROFILE_UPDATE_UNAVAILABLE);
+  });
+});
+
+test('username-gate REFUSES when KRATOS_ADMIN_URL is unset or the id is missing (403)', async () => {
+  process.env.RECOVERY_GATE_SECRET = 'gate-secret';
+  for (const body of [profilePayload(STORED.traits), { traits: STORED.traits }]) {
+    const res = fakeRes();
+    await handleAdminRequest(postUsernameGate(body), res);
+    assert.equal(res.statusCode, 403);
+    assert.equal(refusalText(res), PROFILE_UPDATE_UNAVAILABLE);
+  }
+});
+
+test('username-gate rejects a wrong bearer with 403 before reading the body', async () => {
+  process.env.RECOVERY_GATE_SECRET = 'gate-secret';
+  const res = fakeRes();
+  await handleAdminRequest(postUsernameGate(profilePayload(STORED.traits), 'wrong'), res);
   assert.equal(res.statusCode, 403);
   assert.deepEqual(JSON.parse(res.body), { error: 'forbidden' });
 });

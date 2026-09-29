@@ -201,7 +201,7 @@ lint-identity-schema:
 # -----------------------------------------------------------------
 # lint-jsonnet-hooks: webhook jsonnet drift + existence guard.
 #
-# The Kratos recovery-gate and login-code-gate webhooks share one body,
+# The Kratos recovery-, login-code- and username-gate webhooks share one body,
 # kratos/hooks/recovery-gate.jsonnet, which the e2e harness mounts DIRECTLY
 # into the kratos container (see e2e/compose.yml). The sole separate copy
 # is e2e/recovery-gate.jsonnet (a structural mirror kept for the e2e
