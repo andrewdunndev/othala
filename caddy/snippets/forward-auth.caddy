@@ -33,67 +33,78 @@
 		dns cloudflare {env.CF_API_TOKEN}
 	}
 
-	forward_auth kratos:4433 {
-		uri /sessions/whoami
-		copy_headers X-Kratos-Authenticated-Identity-Id
+	# route runs its handlers in the order written. Outside it, Caddy sorts
+	# directives by its default order, which puts forward_auth before
+	# request_header: the strip would then run after copy_headers and delete
+	# the verified id. Written order here: strip the inbound id, verify the
+	# session and copy the id from whoami, then proxy.
+	route {
+		# Drop any client-supplied identity id before the auth call, so the
+		# only value that can reach the upstream is the one copy_headers takes
+		# from the whoami response.
+		request_header -X-Kratos-Authenticated-Identity-Id
 
-		# Kratos /sessions/whoami returns 200 with full session JSON if
-		# valid, 401 if not. Caddy treats non-2xx as "not authorized"
-		# and falls through to the handle_response below. 403 is listed
-		# too because getSession (portal/src/lib/kratos.ts) treats both
-		# the same way: "e.response.status === 401 || e.response.status
-		# === 403" → a null session.
-		#
-		# 503 is deliberately absent, and must stay absent in any edge
-		# copied from this snippet. handle_response below redirects to
-		# the portal's login flow; matching 503 into that arm would send
-		# a visitor to the login page of the very portal that just failed
-		# to answer, and bounce them there on every retry — the infinite
-		# login loop the four-status contract in
-		# portal/src/pages/api/forward-auth.ts exists to prevent. An
-		# outage must stay a flat error, not a redirect.
-		#
-		# return_to must be ABSOLUTE. A path-only value resolves against
-		# the portal's own host, so the user lands back on the portal
-		# instead of the service they were trying to reach — which defeats
-		# the apex wildcard in kratos.yml `allowed_return_urls`. Scheme and
-		# host are taken from the request being gated.
-		#
-		# That allowlist, not this snippet, is what bounds the value: a
-		# request carrying a Host outside the apex yields a return_to Kratos
-		# refuses, and the user is sent to `default_browser_return_url`
-		# instead — degraded, never an off-apex redirect.
-		@unauthorized status 401 403
-		handle_response @unauthorized {
-			redir {env.OTHALA_PUBLIC_URL}/auth/login?return_to={http.request.scheme}://{http.request.host}{http.request.uri.path} 302
+		forward_auth kratos:4433 {
+			uri /sessions/whoami
+			copy_headers X-Kratos-Authenticated-Identity-Id
+
+			# Kratos /sessions/whoami returns 200 with full session JSON if
+			# valid, 401 if not. Caddy treats non-2xx as "not authorized"
+			# and falls through to the handle_response below. 403 is listed
+			# too because getSession (portal/src/lib/kratos.ts) treats both
+			# the same way: "e.response.status === 401 || e.response.status
+			# === 403" → a null session.
+			#
+			# 503 is deliberately absent, and must stay absent in any edge
+			# copied from this snippet. handle_response below redirects to
+			# the portal's login flow; matching 503 into that arm would send
+			# a visitor to the login page of the very portal that just failed
+			# to answer, and bounce them there on every retry — the infinite
+			# login loop the four-status contract in
+			# portal/src/pages/api/forward-auth.ts exists to prevent. An
+			# outage must stay a flat error, not a redirect.
+			#
+			# return_to must be ABSOLUTE. A path-only value resolves against
+			# the portal's own host, so the user lands back on the portal
+			# instead of the service they were trying to reach — which defeats
+			# the apex wildcard in kratos.yml `allowed_return_urls`. Scheme and
+			# host are taken from the request being gated.
+			#
+			# That allowlist, not this snippet, is what bounds the value: a
+			# request carrying a Host outside the apex yields a return_to Kratos
+			# refuses, and the user is sent to `default_browser_return_url`
+			# instead — degraded, never an off-apex redirect.
+			@unauthorized status 401 403
+			handle_response @unauthorized {
+				redir {env.OTHALA_PUBLIC_URL}/auth/login?return_to={http.request.scheme}://{http.request.host}{http.request.uri.path} 302
+			}
 		}
-	}
 
-	reverse_proxy {args[0]}:{args[1]} {
-		# Strip the Kratos session cookie before forwarding to upstream
-		# so it doesn't leak into app logs.
-		header_up -Cookie
+		reverse_proxy {args[0]}:{args[1]} {
+			# Forward-auth upstreams get no cookies: this strips every
+			# cookie, the Kratos session cookie included.
+			header_up -Cookie
 
-		# Strip spoofable inbound identity headers before they reach the
-		# upstream. Caddy forward_auth does NOT strip headers the client
-		# sends; only copy_headers-sourced values are trusted. A logged-in
-		# user could otherwise inject X-Kratos-Groups: admin (or any
-		# equivalent) and bypass per-app group enforcement at the app layer.
-		#
-		# X-Kratos-Authenticated-Identity-Id is re-added from whoami by the
-		# copy_headers directive above (belt-and-suspenders: strip then re-set
-		# from the auth response so the value is always authoritative).
-		header_up -X-Kratos-Authenticated-Identity-Id
-		header_up -X-Kratos-Groups
-		header_up -X-Remote-User
-		header_up -X-Remote-Groups
-		header_up -X-Remote-Email
-		header_up -X-Remote-Name
-		header_up -X-Forwarded-User
-		header_up -X-Forwarded-Groups
-		header_up -X-Forwarded-Email
-		header_up -X-Auth-Request-User
-		header_up -X-Auth-Request-Groups
-		header_up -X-Auth-Request-Email
+			# Strip spoofable inbound identity headers before they reach the
+			# upstream. Caddy forward_auth does NOT strip headers the client
+			# sends; only copy_headers-sourced values are trusted. A logged-in
+			# user could otherwise inject X-Kratos-Groups: admin (or any
+			# equivalent) and pass per-app group checks at the app layer.
+			#
+			# X-Kratos-Authenticated-Identity-Id is stripped by request_header
+			# ahead of forward_auth in this route and set from the whoami
+			# response by copy_headers, so it is deliberately not removed here.
+			header_up -X-Kratos-Groups
+			header_up -X-Remote-User
+			header_up -X-Remote-Groups
+			header_up -X-Remote-Email
+			header_up -X-Remote-Name
+			header_up -X-Forwarded-User
+			header_up -X-Forwarded-Groups
+			header_up -X-Forwarded-Email
+			header_up -X-Auth-Request-User
+			header_up -X-Auth-Request-Groups
+			header_up -X-Auth-Request-Email
+		}
 	}
 }

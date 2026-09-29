@@ -22,6 +22,13 @@
 
 import { test, beforeEach } from 'vitest';
 import assert from 'node:assert/strict';
+import { identity } from '../src/lib/test-builders.ts';
+
+// An admin-API identity body with the listed fields as given. A field set to
+// undefined is absent on the wire (JSON.stringify drops it).
+function kratosIdentity(fields) {
+  return { ...identity({ id: fields.id }), ...fields };
+}
 
 // ─── env setup ────────────────────────────────────────────────────────────────
 // Set env BEFORE porting so the helpers read the right value in each test.
@@ -200,7 +207,7 @@ async function patchAdminMarker(id, grant) {
 
 let capturedCalls = [];
 
-function mockFetch(responseBody = { id: 'mock-id', traits: {}, metadata_admin: {} }, status = 200) {
+function mockFetch(responseBody = kratosIdentity({ id: 'mock-id', traits: {}, metadata_admin: {} }), status = 200) {
   capturedCalls = [];
   globalThis.fetch = async (url, opts) => {
     capturedCalls.push({ url: String(url), opts });
@@ -315,13 +322,13 @@ test('listIdentities: uses correct base URL', async () => {
 // ─── getIdentity ─────────────────────────────────────────────────────────────
 
 test('getIdentity: GETs /admin/identities/<id>', async () => {
-  mockFetch({ id: 'abc123', traits: {}, schema_id: 'family', state: 'active' });
+  mockFetch(kratosIdentity({ id: 'abc123', traits: {}, schema_id: 'family', state: 'active' }));
   await getIdentity('abc123');
   assert.match(capturedCalls[0].url, /\/admin\/identities\/abc123/);
 });
 
 test('getIdentity: includes credential include query params', async () => {
-  mockFetch({ id: 'abc123', traits: {} });
+  mockFetch(kratosIdentity({ id: 'abc123', traits: {} }));
   await getIdentity('abc123');
   assert.match(capturedCalls[0].url, /include_credential=password/);
   assert.match(capturedCalls[0].url, /webauthn/);
@@ -330,7 +337,7 @@ test('getIdentity: includes credential include query params', async () => {
 });
 
 test('getIdentity: URL-encodes special characters in id', async () => {
-  mockFetch({ id: 'id/with/slash', traits: {} });
+  mockFetch(kratosIdentity({ id: 'id/with/slash', traits: {} }));
   await getIdentity('id/with/slash');
   assert.match(capturedCalls[0].url, /id%2Fwith%2Fslash/);
 });
@@ -389,7 +396,7 @@ test('createIdentity: includes metadata_admin in request body', async () => {
 });
 
 test('createIdentity: returns parsed response body', async () => {
-  mockFetch({ id: 'new-id', traits: { username: 'alice' }, metadata_admin: {} });
+  mockFetch(kratosIdentity({ id: 'new-id', traits: { username: 'alice' }, metadata_admin: {} }));
   const result = await createIdentity({
     traits: { username: 'alice', email: 'alice@example.com' },
     metadataAdmin: {},
@@ -401,8 +408,8 @@ test('createIdentity: returns parsed response body', async () => {
 
 test('updateIdentity: fetches current identity first (GET before PUT)', async () => {
   mockFetchSequence([
-    { body: { id: 'id-1', traits: {}, schema_id: 'family', state: 'active' } },
-    { body: { id: 'id-1', traits: {}, metadata_admin: {} } },
+    { body: kratosIdentity({ id: 'id-1', traits: {}, schema_id: 'family', state: 'active' }) },
+    { body: kratosIdentity({ id: 'id-1', traits: {}, metadata_admin: {} }) },
   ]);
   await updateIdentity('id-1', { traits: { username: 'alice', email: 'alice@example.com' }, metadataAdmin: {} });
   assert.equal(capturedCalls.length, 2);
@@ -415,8 +422,8 @@ test('updateIdentity: fetches current identity first (GET before PUT)', async ()
 
 test('updateIdentity: PUTs to /admin/identities/<id>', async () => {
   mockFetchSequence([
-    { body: { id: 'id-1', traits: {}, schema_id: 'family', state: 'active' } },
-    { body: { id: 'id-1', traits: {}, metadata_admin: {} } },
+    { body: kratosIdentity({ id: 'id-1', traits: {}, schema_id: 'family', state: 'active' }) },
+    { body: kratosIdentity({ id: 'id-1', traits: {}, metadata_admin: {} }) },
   ]);
   await updateIdentity('id-1', { traits: { username: 'bob', email: 'bob@example.com' }, metadataAdmin: {} });
   assert.match(capturedCalls[1].url, /\/admin\/identities\/id-1$/);
@@ -424,8 +431,8 @@ test('updateIdentity: PUTs to /admin/identities/<id>', async () => {
 
 test('updateIdentity: carries schema_id + state from current identity', async () => {
   mockFetchSequence([
-    { body: { id: 'id-1', traits: {}, schema_id: 'employee', state: 'inactive' } },
-    { body: { id: 'id-1', traits: {}, metadata_admin: {} } },
+    { body: kratosIdentity({ id: 'id-1', traits: {}, schema_id: 'employee', state: 'inactive' }) },
+    { body: kratosIdentity({ id: 'id-1', traits: {}, metadata_admin: {} }) },
   ]);
   await updateIdentity('id-1', { traits: { username: 'bob', email: 'bob@example.com' }, metadataAdmin: {} });
   const putBody = JSON.parse(capturedCalls[1].opts.body);
@@ -435,8 +442,8 @@ test('updateIdentity: carries schema_id + state from current identity', async ()
 
 test('updateIdentity: defaults state to "active" when current has none', async () => {
   mockFetchSequence([
-    { body: { id: 'id-1', traits: {}, schema_id: 'family' /* no state */ } },
-    { body: { id: 'id-1', traits: {}, metadata_admin: {} } },
+    { body: kratosIdentity({ id: 'id-1', traits: {}, schema_id: 'family', state: undefined }) },
+    { body: kratosIdentity({ id: 'id-1', traits: {}, metadata_admin: {} }) },
   ]);
   await updateIdentity('id-1', { traits: { username: 'bob', email: 'bob@example.com' }, metadataAdmin: {} });
   const putBody = JSON.parse(capturedCalls[1].opts.body);
@@ -445,8 +452,8 @@ test('updateIdentity: defaults state to "active" when current has none', async (
 
 test('updateIdentity: new traits + metadata_admin replace old in PUT body', async () => {
   mockFetchSequence([
-    { body: { id: 'id-1', traits: { username: 'old' }, schema_id: 'family', state: 'active' } },
-    { body: { id: 'id-1', traits: {}, metadata_admin: {} } },
+    { body: kratosIdentity({ id: 'id-1', traits: { username: 'old' }, schema_id: 'family', state: 'active' }) },
+    { body: kratosIdentity({ id: 'id-1', traits: {}, metadata_admin: {} }) },
   ]);
   const newTraits = { username: 'new-alice', email: 'new@example.com' };
   const newMeta = { groups: ['admin'] };
@@ -458,8 +465,8 @@ test('updateIdentity: new traits + metadata_admin replace old in PUT body', asyn
 
 test('updateIdentity: URL-encodes id with special characters', async () => {
   mockFetchSequence([
-    { body: { id: 'id/slash', traits: {}, schema_id: 'family', state: 'active' } },
-    { body: { id: 'id/slash', traits: {}, metadata_admin: {} } },
+    { body: kratosIdentity({ id: 'id/slash', traits: {}, schema_id: 'family', state: 'active' }) },
+    { body: kratosIdentity({ id: 'id/slash', traits: {}, metadata_admin: {} }) },
   ]);
   await updateIdentity('id/slash', { traits: { username: 'a', email: 'a@a.com' }, metadataAdmin: {} });
   assert.match(capturedCalls[1].url, /id%2Fslash/);
@@ -617,8 +624,8 @@ test('getRecoveryLink: throws on non-2xx and includes label in message', async (
 test('patchAdminMarker/grant: GET then PATCH add when metadata_admin absent', async () => {
   // First call = GET identity (no metadata_admin). Second = PATCH.
   mockFetchSequence([
-    { body: { id: 'u1', traits: {}, schema_id: 'family', state: 'active' /* no metadata_admin */ } },
-    { body: { id: 'u1', traits: {}, metadata_admin: { admin: true } } },
+    { body: kratosIdentity({ id: 'u1', traits: {}, schema_id: 'family', state: 'active' /* no metadata_admin */ }) },
+    { body: kratosIdentity({ id: 'u1', traits: {}, metadata_admin: { admin: true } }) },
   ]);
   await patchAdminMarker('u1', true);
   assert.equal(capturedCalls.length, 2);
@@ -635,8 +642,8 @@ test('patchAdminMarker/grant: GET then PATCH add when metadata_admin absent', as
 
 test('patchAdminMarker/grant: add /metadata_admin/admin when metadata_admin exists without admin key', async () => {
   mockFetchSequence([
-    { body: { id: 'u2', traits: {}, metadata_admin: { groups: ['family'] } } },
-    { body: { id: 'u2', traits: {}, metadata_admin: { groups: ['family'], admin: true } } },
+    { body: kratosIdentity({ id: 'u2', traits: {}, metadata_admin: { groups: ['family'] } }) },
+    { body: kratosIdentity({ id: 'u2', traits: {}, metadata_admin: { groups: ['family'], admin: true } }) },
   ]);
   await patchAdminMarker('u2', true);
   const patch = JSON.parse(capturedCalls[1].opts.body);
@@ -647,8 +654,8 @@ test('patchAdminMarker/grant: add /metadata_admin/admin when metadata_admin exis
 
 test('patchAdminMarker/grant: replace /metadata_admin/admin when admin key already exists', async () => {
   mockFetchSequence([
-    { body: { id: 'u3', traits: {}, metadata_admin: { groups: ['family'], admin: false } } },
-    { body: { id: 'u3', traits: {}, metadata_admin: { groups: ['family'], admin: true } } },
+    { body: kratosIdentity({ id: 'u3', traits: {}, metadata_admin: { groups: ['family'], admin: false } }) },
+    { body: kratosIdentity({ id: 'u3', traits: {}, metadata_admin: { groups: ['family'], admin: true } }) },
   ]);
   await patchAdminMarker('u3', true);
   const patch = JSON.parse(capturedCalls[1].opts.body);
@@ -659,8 +666,8 @@ test('patchAdminMarker/grant: replace /metadata_admin/admin when admin key alrea
 
 test('patchAdminMarker/revoke: GET then PATCH remove when admin key present', async () => {
   mockFetchSequence([
-    { body: { id: 'u4', traits: {}, metadata_admin: { groups: ['family'], admin: true } } },
-    { body: { id: 'u4', traits: {}, metadata_admin: { groups: ['family'] } } },
+    { body: kratosIdentity({ id: 'u4', traits: {}, metadata_admin: { groups: ['family'], admin: true } }) },
+    { body: kratosIdentity({ id: 'u4', traits: {}, metadata_admin: { groups: ['family'] } }) },
   ]);
   await patchAdminMarker('u4', false);
   assert.equal(capturedCalls.length, 2);
@@ -673,7 +680,7 @@ test('patchAdminMarker/revoke: GET then PATCH remove when admin key present', as
 test('patchAdminMarker/revoke: no-op (no PATCH) when admin key already absent', async () => {
   // metadata_admin exists but no admin key.
   mockFetchSequence([
-    { body: { id: 'u5', traits: {}, metadata_admin: { groups: ['family'] } } },
+    { body: kratosIdentity({ id: 'u5', traits: {}, metadata_admin: { groups: ['family'] } }) },
   ]);
   await patchAdminMarker('u5', false);
   // Only the GET call; no PATCH issued.
@@ -682,7 +689,7 @@ test('patchAdminMarker/revoke: no-op (no PATCH) when admin key already absent', 
 
 test('patchAdminMarker/revoke: no-op when metadata_admin absent entirely', async () => {
   mockFetchSequence([
-    { body: { id: 'u6', traits: {} } },
+    { body: kratosIdentity({ id: 'u6', traits: {} }) },
   ]);
   await patchAdminMarker('u6', false);
   assert.equal(capturedCalls.length, 1);
@@ -692,8 +699,8 @@ test('patchAdminMarker/revoke: no-op when metadata_admin absent entirely', async
 
 test('updateIdentity: includes admin:true when provided in metadataAdmin', async () => {
   mockFetchSequence([
-    { body: { id: 'id-admin', traits: {}, schema_id: 'family', state: 'active', metadata_admin: { groups: ['family'], admin: true } } },
-    { body: { id: 'id-admin', traits: {}, metadata_admin: { groups: ['family'], admin: true } } },
+    { body: kratosIdentity({ id: 'id-admin', traits: {}, schema_id: 'family', state: 'active', metadata_admin: { groups: ['family'], admin: true } }) },
+    { body: kratosIdentity({ id: 'id-admin', traits: {}, metadata_admin: { groups: ['family'], admin: true } }) },
   ]);
   const newTraits = { username: 'alice', email: 'alice@example.com' };
   // Caller preserves admin marker by including it in metadataAdmin input.
@@ -708,8 +715,8 @@ test('updateIdentity: omitting admin from metadataAdmin does NOT include it in P
   // the existing admin value. This test confirms the low-level API is not
   // silently preserving it (the contract is explicit, not magic).
   mockFetchSequence([
-    { body: { id: 'id-noadmin', traits: {}, schema_id: 'family', state: 'active', metadata_admin: { groups: ['family'] } } },
-    { body: { id: 'id-noadmin', traits: {}, metadata_admin: { groups: ['family'] } } },
+    { body: kratosIdentity({ id: 'id-noadmin', traits: {}, schema_id: 'family', state: 'active', metadata_admin: { groups: ['family'] } }) },
+    { body: kratosIdentity({ id: 'id-noadmin', traits: {}, metadata_admin: { groups: ['family'] } }) },
   ]);
   await updateIdentity('id-noadmin', { traits: { username: 'bob', email: 'bob@example.com' }, metadataAdmin: { groups: ['family'] } });
   const putBody = JSON.parse(capturedCalls[1].opts.body);

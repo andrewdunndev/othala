@@ -13,7 +13,7 @@
 // Flow mirrors the Go service:
 //   login   -> resolve subject (skip-remembered or whoami), gate, accept/reject
 //   consent -> re-gate, build id_token claims, accept with consent session
-//   logout  -> accept (Kratos session invalidation is the portal's job)
+//   logout  -> revoke the subject's live Kratos session, then accept
 //
 // SDK usage: we reuse the class-based @ory/client-fetch OAuth2Api and the
 // C1 admin-api getIdentity / kratos getSession helpers, rather than
@@ -26,7 +26,7 @@ import type {
   OAuth2LogoutRequest,
 } from '@ory/client-fetch';
 import type { Identity, Session } from './types';
-import { getIdentity as defaultGetIdentity } from './admin-api';
+import { getIdentity as defaultGetIdentity, revokeSession as defaultRevokeSession } from './admin-api';
 import { getSession as defaultGetSession } from './kratos';
 import { enforceAccessGate, type GateResult } from './gate';
 import { composeIDTokenClaims } from './claims';
@@ -35,7 +35,20 @@ import { servingManifest } from './manifest-store';
 import { verifyToken, CSRFError } from './csrf';
 import { needsStepUp } from './step-up';
 
-const LOGIN_REMEMBER_FOR = 86400; // 24h
+// Hydra remembers an app sign-in for as long as the Kratos session lives, so
+// a later app sign-out still reaches handleLogout and ends that session.
+// Hydra v26.2.0 sets its login cookie Max-Age to remember_for when > 0 and
+// clamps the stored expiry to ttl.authentication_session (default 720h)
+// (consent/strategy_default.go:441-489). The fallback is the Kratos
+// session.lifespan (kratos/kratos.yml, 720h).
+const KRATOS_SESSION_LIFESPAN = 2_592_000; // 30 days
+
+/** Seconds until the Kratos session expires; the configured lifespan when unknown. */
+export function loginRememberFor(session: Session, now: number = Date.now()): number {
+  const expires = session.expires_at ? new Date(session.expires_at).getTime() : NaN;
+  if (!Number.isFinite(expires)) return KRATOS_SESSION_LIFESPAN;
+  return Math.max(1, Math.ceil((expires - now) / 1000));
+}
 
 // CONSENT_REMEMBER_FOR_SKIP: 1 hour — matches Go consentRememberFor (3600).
 // Used on the skip auto-accept path (all current skip_consent:true clients).
@@ -47,7 +60,7 @@ const CONSENT_REMEMBER_FOR_SKIP = 3600; // 1h — matches Go consentRememberFor
 // CONSENT_REMEMBER_FOR_PROMPT: 30 days (2 592 000 s).
 // Used on the interactive Allow POST path only. Goal: a prompted client
 // asks ONCE PER USER, then is silent on subsequent logins (coordinator
-// decision 2). Chosen to outlive LOGIN_REMEMBER_FOR (24 h) and align
+// decision 2). Matches the login memory (the Kratos session, 30 d) and aligns
 // with Hydra's refresh_token TTL (720 h / 30 d). NOT applied on the
 // skip path — skip path uses CONSENT_REMEMBER_FOR_SKIP to match Go.
 const CONSENT_REMEMBER_FOR_PROMPT = 2_592_000; // 30 days
@@ -102,6 +115,8 @@ export interface Deps {
   >;
   getIdentity?: (id: string) => Promise<Identity>;
   getSession?: (cookie?: string) => Promise<Session | null>;
+  /** Revoke one Kratos session by id (logout). Resolves when the session is gone. */
+  revokeSession?: (sessionId: string) => Promise<void>;
   gate?: (identity: Identity | null, clientId: string, manifest?: ClientManifest) => GateResult;
   /**
    * Resolve a client manifest by clientId. Used for claims injection (A3) and
@@ -118,6 +133,7 @@ function resolve(deps: Deps): Required<Deps> {
     oauth2: deps.oauth2 ?? defaultOAuth2Api(),
     getIdentity: deps.getIdentity ?? defaultGetIdentity,
     getSession: deps.getSession ?? defaultGetSession,
+    revokeSession: deps.revokeSession ?? defaultRevokeSession,
     gate: deps.gate ?? ((identity, clientId, manifest) => enforceAccessGate(identity, clientId, manifest)),
     manifest: deps.manifest ?? ((clientId) => servingManifest(clientId)),
   };
@@ -170,7 +186,6 @@ export async function handleLogin(req: Request, deps: Deps = {}): Promise<Respon
 
   // Resolve the authenticated subject.
   let subject: string;
-  let remember = false;
   let acr: string | undefined;
   let liveSession: Session;
 
@@ -209,7 +224,6 @@ export async function handleLogin(req: Request, deps: Deps = {}): Promise<Respon
     }
     subject = session.identity.id;
     liveSession = session;
-    remember = true;
     acr = session.authenticator_assurance_level ?? undefined;
   }
 
@@ -251,7 +265,10 @@ export async function handleLogin(req: Request, deps: Deps = {}): Promise<Respon
       loginChallenge: challenge,
       acceptOAuth2LoginRequest: {
         subject,
-        ...(remember ? { remember: true, remember_for: LOGIN_REMEMBER_FOR } : {}),
+        remember: true,
+        remember_for: loginRememberFor(liveSession),
+        // On a remembered login Hydra keeps its cookie unless asked to renew it.
+        ...(login.skip ? { extend_session_lifespan: true } : {}),
         ...(acr ? { acr } : {}),
       },
     });
@@ -564,7 +581,7 @@ export async function handleLogout(req: Request, deps: Deps = {}): Promise<Respo
   // or the browser has no cookie, both of which are expected on a legitimate
   // logout flow initiated by Hydra post-revocation).
   const logoutSubject = _logout.subject;
-  if (logoutSubject) {
+  {
     let session: Session | null;
     try {
       session = await d.getSession(req.headers.get('cookie') ?? undefined);
@@ -573,11 +590,24 @@ export async function handleLogout(req: Request, deps: Deps = {}): Promise<Respo
       // more dangerous than accepting, and blocking on infra failure is worse).
       session = null;
     }
-    if (session?.active && session.identity && session.identity.id !== logoutSubject) {
+    if (logoutSubject && session?.active && session.identity && session.identity.id !== logoutSubject) {
       // Live session belongs to a DIFFERENT user than the logout subject.
       // Refuse to auto-accept — redirect to the portal home instead.
       const publicUrlBase = process.env.OTHALA_PUBLIC_URL ?? '';
       return redirect(`${publicUrlBase}/`);
+    }
+    // The live session is the subject's: signing out of an app ends the SSO
+    // session, so revoke it before Hydra forgets the login. A failed revoke
+    // must not accept, or the next authorize would sign straight back in.
+    if (session?.active && session.identity) {
+      try {
+        if (!session.id) throw new Error('session without id');
+        await d.revokeSession(session.id);
+      } catch (e) {
+        console.warn('[oauth2/logout] session revoke failed', { subject: logoutSubject, error: String(e) });
+        const publicUrlBase = process.env.OTHALA_PUBLIC_URL ?? '';
+        return redirect(`${publicUrlBase}/auth/error?reason=auth-unreachable`);
+      }
     }
   }
 

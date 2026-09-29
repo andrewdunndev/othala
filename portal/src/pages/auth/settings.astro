@@ -7,7 +7,7 @@
 // 303s back here with a fresh flow id).
 //
 // Renders sections from flow.ui.nodes per method group:
-//   - profile:       username, email, displayName, recoveryEmail
+//   - profile:       email, displayName, recoveryEmail; username read-only
 //   - passkey:       list enrolled credentials + register new
 //   - password:      change password
 //   - totp:          authenticator app QR + verify code (enroll / already enrolled)
@@ -64,7 +64,7 @@ if (!session?.active || !session.identity) {
 // Self-service "sign out everywhere" (CU3 B1 trigger). Routes through the
 // in-process revoke fan-out (steps 2-6) on the CALLER'S OWN identity — NOT
 // the Kratos browser-logout, which only drops the local Kratos session and
-// leaves Hydra's 24h remembered-login window open. deactivate is false: the
+// leaves Hydra's remembered login open. deactivate is false: the
 // user is signing out, not deactivating themselves.
 let signOutError: string | null = null;
 if (Astro.request.method === 'POST') {
@@ -150,6 +150,12 @@ try {
   console.error('[othala/settings] getIdentity failed; showing no groups:', lookupErr);
 }
 const displayName = traits.displayName || traits.username || '';
+// Username is admin-controlled: shown read-only and left out of the editable
+// profile nodes. The schema requires it, so the stored value rides along
+// hidden; the username gate (listen.mjs handleUsernameGate) refuses any other.
+const isUsernameNode = (n: (typeof ui.nodes)[number]) => asInput(n)?.name === 'traits.username';
+const profileNodes = ui.nodes.filter((n) => !isUsernameNode(n));
+const usernameMessages = ui.nodes.find(isUsernameNode)?.messages ?? [];
 // Split the user's own groups by the registry's binding-derived type, not an
 // `access-` name prefix.
 const groupRegistry = getGroupRegistry();
@@ -177,14 +183,23 @@ const accessGroups = groups.filter((g) => !isIdentityGroup(groupRegistry, g));
     <section class="section">
       <p class="section-subtitle">Profile</p>
       <p class="section-prose">
-        Your display name, email address, and username. Email changes
-        require verification before they take effect.
+        Your display name and email address. A new email address is saved
+        at once and sent a verification code.
       </p>
       <form method="POST" action={ui.action} class="settings-form">
         <input type="hidden" name="csrf_token" value={csrf} />
         <input type="hidden" name="method" value="profile" />
+        <input type="hidden" name="traits.username" value={traits.username} />
+        <div class="field">
+          <label for="username-readonly">Username</label>
+          <input id="username-readonly" type="text" value={traits.username} readonly aria-describedby="username-hint" />
+          <p id="username-hint" class="field-hint">Only an administrator can change your username.</p>
+          {usernameMessages.map((m) => (
+            <div class={`notice notice-${m.type === 'error' ? 'danger' : 'warning'}`}>{m.text}</div>
+          ))}
+        </div>
         <FlowNodes
-          nodes={ui.nodes}
+          nodes={profileNodes}
           group="profile"
           buttonClass="button button-primary"
           submitLabel="Save changes"

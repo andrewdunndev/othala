@@ -21,7 +21,7 @@
 //      still hold a remembered Hydra login / live access tokens, which is the
 //      very case "sign out everywhere" must cut.
 //   3. Hydra login-session revoke   revokeOAuth2LoginSessions({subject})
-//      Cuts the 24h loginRememberFor window so a remembered subject cannot
+//      Cuts the remembered login so a remembered subject cannot
 //      skip-login a fresh token. Idempotent.
 //   4. Hydra consent-session revoke revokeOAuth2ConsentSessions({subject,all})
 //      Invalidates granted consent + associated access tokens. Idempotent.
@@ -234,7 +234,7 @@ export async function revokeSubject(
     throw new RevokeError(
       'hydra-admin',
       'revoke-login-sessions',
-      'Kratos sessions are cut, but Hydra still remembers the login (24h loginRememberFor window open — a fresh token could skip-login). Verify HYDRA_ADMIN_URL, then re-run the revoke (it is idempotent).',
+      'Kratos sessions are cut, but Hydra still remembers the login (remembered login still open — a fresh token could skip-login). Verify HYDRA_ADMIN_URL, then re-run the revoke (it is idempotent).',
       err,
     );
   }
@@ -266,4 +266,28 @@ export async function revokeSubject(
   }
 
   return result;
+}
+
+/**
+ * Revoke only the subject's Hydra consent sessions, for every client
+ * (step 4 on its own). Used when an admin narrows a subject's groups, roles
+ * or admin marker: the grants and refresh tokens issued under the old access
+ * stop working, and the next sign-in re-runs consent against the new record.
+ * Kratos and Hydra login sessions are left alone. Idempotent.
+ */
+export async function revokeConsentSessions(
+  subject: string,
+  deps: Partial<Pick<RevokeDeps, 'oauth2Api'>> = {},
+): Promise<void> {
+  const oauth2Api = deps.oauth2Api ?? buildOAuth2Api();
+  try {
+    await oauth2Api.revokeOAuth2ConsentSessions({ subject, all: true });
+  } catch (err) {
+    throw new RevokeError(
+      'hydra-admin',
+      'revoke-consent-sessions',
+      'Hydra consent + associated tokens persist. Verify HYDRA_ADMIN_URL, then use Force re-login on this identity.',
+      err,
+    );
+  }
 }

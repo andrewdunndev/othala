@@ -29,7 +29,7 @@ import { ADMIN_ACTIONS, ENROLLMENT_TTL, type ActionResult } from '../../../lib/a
 import { EVICTABLE_CREDENTIAL_TYPES } from '../../../lib/admin-api';
 import { servingManifests } from '../../../lib/manifest-store';
 import { computeEffectiveAccess, describeSource, IDENTITY_GROUP_ORDER } from '../../../lib/access';
-import { getGroupRegistry, isIdentityGroup } from '../../../lib/group-registry';
+import { getGroupRegistry, isIdentityGroup, unconfiguredGroups } from '../../../lib/group-registry';
 import { nonCanonicalGroups } from '../../../lib/gate';
 import { signToken, verifyToken, CSRFError } from '../../../lib/csrf';
 import type { Identity } from '../../../lib/types';
@@ -140,6 +140,9 @@ const nonCanonical = nonCanonicalGroups(identity);
 const nonCanonicalSet = new Set(nonCanonical);
 const identityGroupMembership = groups.filter((g) => !nonCanonicalSet.has(g) && isIdentityGroup(registry, g));
 const accessGroupMembership = groups.filter((g) => !nonCanonicalSet.has(g) && !isIdentityGroup(registry, g));
+// Stored names no checkbox below offers. The save keeps them unless ticked
+// for removal (saveAction, src/lib/admin-actions.ts).
+const unconfigured = unconfiguredGroups(registry, groups);
 const roleOverrides = (identity?.metadata_admin?.roles ?? {}) as Record<string, string>;
 const effective = identity ? computeEffectiveAccess(identity, manifests) : [];
 
@@ -335,7 +338,7 @@ const adminNav = [
         <p>
           <strong>Force re-login complete.</strong>
           Kratos sessions revoked; Hydra login + consent sessions revoked
-          (the 24h remembered-login window is cut){actionResult.result.bestEffortFailures.length ? `; ${actionResult.result.bestEffortFailures.length} best-effort step(s) failed` : ''}.
+          (the remembered login is cut){actionResult.result.bestEffortFailures.length ? `; ${actionResult.result.bestEffortFailures.length} best-effort step(s) failed` : ''}.
         </p>
         {actionResult.result.bestEffortFailures.length > 0 && (
           <details>
@@ -451,6 +454,27 @@ const adminNav = [
             ))}
           </div>
         </div>
+
+        {unconfigured.length > 0 && (
+          <div class="field">
+            <label>Other stored groups</label>
+            <div class="checkbox-grid">
+              {unconfigured.map((g) => (
+                <label>
+                  <input type="checkbox" name="clearUnconfigured" value={g} />
+                  <span class="mono">{g}</span>
+                  <span class="muted text-xs">remove</span>
+                </label>
+              ))}
+            </div>
+            <span class="field-hint">
+              Stored on this identity with no checkbox here (role-mapped or not
+              configured): not a configured identity group
+              (<code>OTHALA_IDENTITY_GROUPS</code>) and not an app's access group. Saving
+              keeps them; tick remove to drop one. They do not count as an identity group.
+            </span>
+          </div>
+        )}
 
         {/* The repair surface. These names cannot appear in either checkbox
             set above — both are built from vocabularies this codebase owns —
@@ -737,7 +761,7 @@ const adminNav = [
             </form>
           </div>
           <p class="muted text-xs">
-            Admin authority is the <code>metadata_admin.admin</code> marker. Grant/revoke is a targeted JSON Patch — groups and roles are not affected. Self-revoke is blocked; use another admin or the shell break-glass. Revoke is blocked if this is the last admin.
+            Admin authority is the <code>metadata_admin.admin</code> marker. Grant/revoke is a targeted JSON Patch — groups and roles are not affected. Self-revoke is blocked; use another admin or the shell break-glass. Revoke and deactivate are blocked if this is the last active admin.
           </p>
 
           <details>

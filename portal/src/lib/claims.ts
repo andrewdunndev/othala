@@ -2,15 +2,16 @@
 //
 // Direct port of consent/claims.go BuildIDTokenClaims, deepMergeClaims,
 // and consent/manifest.go LookupRole, with IDENTICAL semantics except
-// where noted. Two divergences are noted at their definitions: the array
-// UNION in deepMergeClaims, and the highest-role-wins group walk in
-// lookupRole (Go took the first stored-order match).
+// where noted. Three divergences are noted at their definitions: the array
+// UNION in deepMergeClaims, the highest-role-wins group walk in lookupRole
+// (Go took the first stored-order match), and emailVerified, which reads only
+// the email trait's own address (Go fell back to the first address).
 //
 // BuildIDTokenClaims mapping against the family identity schema
 // (traits: username, email, displayName?):
 //
 //   email              = traits.email                            (if present)
-//   email_verified     = verifiable_addresses[email].verified    (if any record)
+//   email_verified     = verifiable_addresses[email].verified    (false if none matches)
 //   preferred_username = traits.username                         (if present)
 //   name               = traits.displayName, fallback traits.username
 //   groups             = metadata_admin.groups (string array)    (if present)
@@ -47,17 +48,17 @@ function extractGroups(meta: unknown): string[] | undefined {
 }
 
 /**
- * email_verified from verifiable_addresses: the entry matching the email
- * trait, else the first entry. Returns undefined when there are no addresses
- * (so the claim is omitted), matching emailVerified() in claims.go.
+ * email_verified from verifiable_addresses: the verified flag of the entry
+ * holding the email trait's own address, compared case-insensitively. Another
+ * address's status never stands in for it: no matching entry is false. No
+ * addresses at all returns undefined, so the claim is omitted.
  */
 function emailVerified(identity: Identity, email: string): boolean | undefined {
   const addrs = identity.verifiable_addresses;
   if (!Array.isArray(addrs) || addrs.length === 0) return undefined;
-  for (const a of addrs) {
-    if (a.value === email) return a.verified;
-  }
-  return addrs[0].verified;
+  const want = email.toLowerCase();
+  const own = addrs.find((a) => typeof a.value === 'string' && a.value.toLowerCase() === want);
+  return own?.verified === true;
 }
 
 /**

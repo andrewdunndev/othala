@@ -75,6 +75,8 @@ const SENSITIVE_QUERY_PARAMS = new Set([
   'consent_challenge',
   'logout_challenge',
   'flow',
+  // return_to can carry a nested URL that itself holds a challenge id.
+  'return_to',
 ]);
 
 /** Is this a header attribute we must redact? Case-insensitive suffix match. */

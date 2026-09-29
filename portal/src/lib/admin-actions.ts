@@ -24,8 +24,10 @@ import { deleteCredential, EVICTABLE_CREDENTIAL_TYPES } from './admin-api';
 import { isAdminMarker } from './admin-auth';
 import { hasSecondFactor } from './step-up';
 import { sendInviteRecoveryEmail } from './kratos';
-import { confirmsInviteAddress, normalizeGroupOrder, shouldRefuseRecovery } from './access';
-import { planGroupSave } from './gate';
+import { confirmsInviteAddress, IDENTITY_GROUP_ORDER, normalizeGroupOrder, shouldRefuseRecovery } from './access';
+import { identityGroups as storedGroups, planGroupSave } from './gate';
+import { buildGroupRegistry, unconfiguredGroups } from './group-registry';
+import { revokeConsentSessions, revokeSubject } from './revoke';
 import type { ClientManifest } from './manifests';
 import type { Identity } from './types';
 
@@ -91,9 +93,21 @@ export async function saveAction(fd: FormData, ctx: ActionContext): Promise<Acti
   const accessGroups = fd.getAll('accessGroups').map(String).filter(Boolean);
   if (identityGroups.length === 0) formErrors.identityGroups = 'Pick at least one identity group.';
 
+  // Stored groups the form renders no checkbox for stay unless removed by an
+  // explicit tick. They never count toward the identity-group minimum above.
+  const clearUnconfigured = new Set(fd.getAll('clearUnconfigured').map(String));
+  const keptUnconfigured = unconfiguredGroups(
+    buildGroupRegistry(manifests, IDENTITY_GROUP_ORDER),
+    storedGroups(identity),
+  ).filter((g) => !clearUnconfigured.has(g));
+
   // Repair surface for refuseNonCanonical (gate.ts): planGroupSave decides
   // the write from the STORED identity, never from submitted checkboxes.
-  const groupPlan = planGroupSave(identity, [...identityGroups, ...accessGroups], fd.getAll('clearNonCanonical').map(String));
+  const groupPlan = planGroupSave(
+    identity,
+    [...identityGroups, ...accessGroups, ...keptUnconfigured],
+    fd.getAll('clearNonCanonical').map(String),
+  );
   if (groupPlan.refusal) formErrors.nonCanonicalGroups = groupPlan.refusal;
 
   const knownClientIds = new Set(manifests.map((m) => m.clientId));
@@ -114,15 +128,42 @@ export async function saveAction(fd: FormData, ctx: ActionContext): Promise<Acti
   // not silently drop it. Read from the pre-dispatch identity, not re-fetched
   // (avoids a TOCTOU on the write; grant/revoke are the targeted paths).
   const existingAdmin = identity.metadata_admin?.admin;
+  const groups = normalizeGroupOrder(groupPlan.groups);
   await updateIdentity(id, {
     traits,
     metadataAdmin: {
-      groups: normalizeGroupOrder(groupPlan.groups),
+      groups,
       roles: Object.keys(roles).length ? roles : undefined,
       ...(existingAdmin === true ? { admin: true } : {}),
     },
   });
+  // The Kratos write has landed; now end grants issued under the old access.
+  // A failure here cannot roll the save back, so it is reported as an error
+  // that says the save stood.
+  if (narrowsAccess(identity, groups, roles)) {
+    const failure = await revokeGrants(id);
+    if (failure) return { actionResult: failure, mode: 'read', refetch: true };
+  }
   return { actionResult: { kind: 'updated', removed: groupPlan.removed }, mode: 'read', refetch: true };
+}
+
+/** True when the save drops a stored group or changes or drops a stored role. */
+export function narrowsAccess(identity: Identity, groups: readonly string[], roles: Record<string, string>): boolean {
+  const stored = identity.metadata_admin;
+  if ((stored?.groups ?? []).some((g) => !groups.includes(g))) return true;
+  return Object.entries(stored?.roles ?? {}).some(([clientId, role]) => roles[clientId] !== role);
+}
+
+async function revokeGrants(id: string): Promise<ActionResult | null> {
+  try {
+    await revokeConsentSessions(id);
+    return null;
+  } catch (err) {
+    return {
+      kind: 'error',
+      message: `Saved, but existing app grants could not be revoked: ${err instanceof Error ? err.message : 'unknown error'}`,
+    };
+  }
 }
 
 export async function issueRecoveryAction(_fd: FormData, ctx: ActionContext): Promise<ActionOutcome> {
@@ -165,8 +206,34 @@ export async function forceReloginAction(_fd: FormData, ctx: ActionContext): Pro
   return { actionResult: { kind: 'revoked', result }, refetch: false };
 }
 
+function isActiveAdmin(identity: Identity): boolean {
+  return isAdminMarker(identity) && identity.state !== 'inactive';
+}
+
+/** True when taking `target` out of service would leave no active admin. */
+async function leavesNoActiveAdmin(target: Identity): Promise<boolean> {
+  if (!isActiveAdmin(target)) return false;
+  const active = (await listIdentities()).filter(isActiveAdmin).length;
+  return active <= 1;
+}
+
 export async function deactivateAction(_fd: FormData, ctx: ActionContext): Promise<ActionOutcome> {
   const username = ctx.identity.traits?.username ?? ctx.id;
+  if (ctx.id === ctx.adminIdentityId) {
+    return {
+      actionResult: {
+        kind: 'error',
+        message: 'You cannot deactivate your own identity via the UI. Have another admin do it.',
+      },
+      refetch: false,
+    };
+  }
+  if (await leavesNoActiveAdmin(ctx.identity)) {
+    return {
+      actionResult: { kind: 'error', message: `Refusing to deactivate: ${username} is the last active admin. Grant admin to another identity first.` },
+      refetch: false,
+    };
+  }
   await deactivateIdentity(ctx.id);
   return { actionResult: { kind: 'deactivated', username }, refetch: true };
 }
@@ -197,7 +264,31 @@ export async function deleteAction(fd: FormData, ctx: ActionContext): Promise<Ac
   if (confirm !== expected) {
     return { actionResult: { kind: 'error', message: `Type the username (${expected}) to confirm deletion.` }, refetch: false };
   }
-  await deleteIdentity(id);
+  // Deactivate and cut sessions and Hydra grants first: Hydra keeps consent
+  // and refresh tokens by subject, and nothing reaches them once the identity
+  // is gone. A failed delete then leaves an inactive identity the gate denies.
+  try {
+    await revokeSubject(id, { deactivate: true });
+  } catch (err) {
+    return {
+      actionResult: {
+        kind: 'error',
+        message: `Not deleted: sessions and app grants could not be revoked first. ${err instanceof Error ? err.message : 'unknown error'}`,
+      },
+      refetch: false,
+    };
+  }
+  try {
+    await deleteIdentity(id);
+  } catch (err) {
+    return {
+      actionResult: {
+        kind: 'error',
+        message: `Revoked and deactivated, but not deleted: ${err instanceof Error ? err.message : 'unknown error'}`,
+      },
+      refetch: true,
+    };
+  }
   return new Response(null, { status: 303, headers: { Location: '/admin/users?deleted=1' } });
 }
 
@@ -206,6 +297,11 @@ export async function deleteAction(fd: FormData, ctx: ActionContext): Promise<Ac
 const SECOND_FACTOR_REQUIRED: ActionResult = {
   kind: 'error',
   message: 'Admin accounts need an authenticator app or security key enrolled.',
+};
+
+const OWN_SECOND_FACTOR_REQUIRED: ActionResult = {
+  kind: 'error',
+  message: 'You cannot remove your own last authenticator app or security key. Enroll another one first.',
 };
 
 export async function grantAdminAction(_fd: FormData, ctx: ActionContext): Promise<ActionOutcome> {
@@ -231,16 +327,16 @@ export async function revokeAdminAction(_fd: FormData, ctx: ActionContext): Prom
       refetch: false,
     };
   }
-  // Last-admin guard: refuse if this would leave zero admins.
-  const all = await listIdentities();
-  const adminCount = all.filter((i) => (i.metadata_admin as Record<string, unknown> | undefined)?.['admin'] === true).length;
-  if (adminCount <= 1) {
+  // Last-admin guard: refuse if this would leave zero active admins.
+  if (await leavesNoActiveAdmin(identity)) {
     return {
-      actionResult: { kind: 'error', message: `Refusing to revoke: ${username} is the last admin. Grant admin to another identity first.` },
+      actionResult: { kind: 'error', message: `Refusing to revoke: ${username} is the last active admin. Grant admin to another identity first.` },
       refetch: false,
     };
   }
   await patchAdminMarker(id, false);
+  const failure = await revokeGrants(id);
+  if (failure) return { actionResult: failure, refetch: true };
   return { actionResult: { kind: 'admin-revoked', username }, refetch: true };
 }
 
@@ -265,11 +361,12 @@ export async function removeCredentialAction(fd: FormData, ctx: ActionContext): 
       refetch: false,
     };
   }
-  if (isAdminMarker(ctx.identity)) {
+  const self = ctx.id === ctx.adminIdentityId;
+  if (self || isAdminMarker(ctx.identity)) {
     const creds = { ...(ctx.identity.credentials ?? {}) } as Record<string, unknown>;
     delete creds[credType];
     if (!hasSecondFactor({ ...ctx.identity, credentials: creds as Identity['credentials'] })) {
-      return { actionResult: SECOND_FACTOR_REQUIRED, refetch: false };
+      return { actionResult: self ? OWN_SECOND_FACTOR_REQUIRED : SECOND_FACTOR_REQUIRED, refetch: false };
     }
   }
   await deleteCredential(ctx.id, credType);

@@ -24,6 +24,8 @@
 //                         in v26.2.0 after-hook context — see note above)
 //   - ctx.flow          : the recovery flow object
 //   - ctx.request_url   : the originating request URL
+//   - ctx.session       : the current session, where the flow has one; the
+//                         profile-sessions hook keeps it and ends the rest
 function(ctx) {
   identity_id: ctx.identity.id,
   // NOTE: always false in Kratos v26.2.0 (metadata_admin absent from ctx.identity
@@ -31,4 +33,5 @@ function(ctx) {
   is_admin: std.get(std.get(ctx.identity, 'metadata_admin', {}), 'admin', false),
   groups: std.get(std.get(ctx.identity, 'metadata_admin', {}), 'groups', []),
   traits: ctx.identity.traits,
+  session_id: std.get(std.get(ctx, 'session', {}), 'id', ''),
 }

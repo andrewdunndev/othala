@@ -13,6 +13,7 @@ import {
   composeIDTokenClaims,
   lookupRole,
 } from '../src/lib/claims.ts';
+import { identity } from '../src/lib/test-builders.ts';
 
 function base(overrides = {}) {
   return {
@@ -39,11 +40,27 @@ test('email_verified omitted when no verifiable_addresses', () => {
   assert.equal('email_verified' in c, false);
 });
 
-test('email_verified falls back to first address when no exact match', () => {
-  const c = buildIDTokenClaims(base({
-    verifiable_addresses: [{ value: 'other@othala.test', verified: false, via: 'email', status: 'completed' }],
-  }));
+test('email_verified is false when no address matches the email trait, even if another is verified', () => {
+  const i = identity({ email: 'ada@othala.test', recoveryEmail: 'other@othala.test', verified: true });
+  const c = buildIDTokenClaims({
+    ...i,
+    verifiable_addresses: i.verifiable_addresses.filter((a) => a.value === 'other@othala.test'),
+  });
+  assert.equal(c.email, 'ada@othala.test');
   assert.equal(c.email_verified, false);
+});
+
+test('email_verified reads the email trait\'s own address, not the first entry', () => {
+  const i = identity({ email: 'ada@othala.test', recoveryEmail: 'other@othala.test', verified: false });
+  const [own, other] = i.verifiable_addresses;
+  const c = buildIDTokenClaims({ ...i, verifiable_addresses: [{ ...other, verified: true }, own] });
+  assert.equal(c.email_verified, false);
+});
+
+test('email_verified matches the address case-insensitively', () => {
+  const i = identity({ email: 'ada@othala.test', verified: true });
+  const c = buildIDTokenClaims({ ...i, traits: { ...i.traits, email: 'Ada@Othala.TEST' } });
+  assert.equal(c.email_verified, true);
 });
 
 test('preferred_username = traits.username', () => {

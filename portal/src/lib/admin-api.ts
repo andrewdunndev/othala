@@ -16,9 +16,11 @@
 import {
   Configuration,
   IdentityApi,
+  ResponseError,
   type CreateIdentityBody,
   type UpdateIdentityBody,
   type DeleteIdentityCredentialsTypeEnum,
+  type GetIdentityIncludeCredentialEnum,
 } from '@ory/client-fetch';
 import type { Identity } from './types';
 import { validateMetadataAdmin } from './metadata-admin';
@@ -90,13 +92,15 @@ export async function listIdentities(): Promise<Identity[]> {
   return identityApi().listIdentities({ perPage: 250 });
 }
 
+// Credential types whose config the admin API returns. 'lookup_secret' must be
+// included or the backup-codes credential is never fetched: the admin user page
+// keys its badge on it, and updateIdentity would drop it on a PUT round-trip.
+export const INCLUDED_CREDENTIALS: GetIdentityIncludeCredentialEnum[] = ['password', 'webauthn', 'passkey', 'totp', 'lookup_secret'];
+
 export async function getIdentity(id: string): Promise<Identity> {
   return identityApi().getIdentity({
     id,
-    // 'lookup_secret' must be included or the backup-codes credential is never
-    // fetched: the admin user page keyed the badge on it and would always show
-    // "not enrolled" without this entry.
-    includeCredential: ['password', 'webauthn', 'passkey', 'totp', 'lookup_secret'],
+    includeCredential: INCLUDED_CREDENTIALS,
   });
 }
 
@@ -125,10 +129,7 @@ export async function updateIdentity(id: string, input: UpdateIdentityInput): Pr
   const api = identityApi();
   const current = await api.getIdentity({
     id,
-    // Keep consistent with getIdentity: 'lookup_secret' must be present so
-    // updateIdentity preserves the current backup-codes credential rather
-    // than losing it on a PUT round-trip.
-    includeCredential: ['password', 'webauthn', 'passkey', 'totp', 'lookup_secret'],
+    includeCredential: INCLUDED_CREDENTIALS,
   });
   const updateIdentityBody: UpdateIdentityBody = {
     schema_id: current.schema_id,
@@ -144,6 +145,19 @@ export async function deleteIdentity(id: string): Promise<void> {
 }
 
 /**
+ * Revoke one Kratos session by id (DELETE /admin/sessions/{id}). A 404 means
+ * the session is already gone, which is the postcondition; anything else throws.
+ */
+export async function revokeSession(id: string): Promise<void> {
+  try {
+    await identityApi().disableSession({ id });
+  } catch (e) {
+    if (e instanceof ResponseError && e.response.status === 404) return;
+    throw e;
+  }
+}
+
+/**
  * Mark the identity inactive AND run the full revocation fan-out.
  *
  * deactivate is the only trigger that runs step 1 (state -> inactive)
@@ -151,7 +165,7 @@ export async function deleteIdentity(id: string): Promise<void> {
  * Kratos sessions, Hydra login + consent revoke, best-effort LDAP bind-cache
  * flush. Step 2 failure aborts (prescriptive RevokeError); step 5 is
  * best-effort. This completes the old patch+delete-sessions pair, which left
- * the Hydra 24h login window and the granted consent open after a "deactivate".
+ * the Hydra remembered login and the granted consent open after a "deactivate".
  */
 export async function deactivateIdentity(id: string): Promise<void> {
   await revokeSubject(id, { deactivate: true });

@@ -421,7 +421,7 @@ echo "E. Revoke fan-out (othala :4431 /admin/revoke-user)"
 #
 # D3: the admin force-logout endpoint runs revokeSubject() against LIVE Kratos
 # + Hydra — delete Kratos sessions + revoke Hydra login/consent sessions
-# (closes the ≤24h deactivated-user token gap). The unit tests only STUB the
+# (closes the deactivated-user token gap). The unit tests only STUB the
 # SDK; this is the first probe that drives the fan-out end-to-end. Loopback
 # admin port, so via node_in. Uses the identity C1 created.
 
@@ -554,54 +554,32 @@ else
     fail "G3 admin-only deny" "got: $g3 (want DENIED ... access_denied) — admin-implies-access may have been reintroduced"
 fi
 
-# Section H: contact / request form (public SSR /api/request -> shared SMTP).
+# Section H: contact / request form (SSR /api/request, signed-in only).
 echo ""
 echo "H. Contact form (othala :8080 /api/request -> mailpit)"
 #
-# The dashboard contact form POSTs to /api/request, which validates, rate-
-# limits, and delivers via the SAME courier connection Kratos uses
-# (OTHALA_SMTP_CONNECTION_URI -> mailpit:1025 in the e2e). We POST from inside
-# the othala container (it has node; reaches its own :8080 and mailpit's HTTP
-# API), then query mailpit to assert the message landed addressed to the
-# configured recipient. This is the release-gate proof that the form is
-# FUNCTIONAL end-to-end, not a mockup.
+# Probes run from inside the othala container (it has node; reaches :8080
+# and mailpit's HTTP API).
 
-# H1: a VALID submission returns 200 {ok:true}.
+# Signed-in behaviour (200 + delivery, validation, rate limit keyed on the
+# identity) is covered by Playwright spec z-contact-form; smoke has no session
+# cookie, so it holds the signed-out edge.
+
+# H1: a POST without a session is refused (401) and sends nothing.
 H_MARKER="smoke-contact-$(date +%s)-$$"
-h1=$(printf '%s' "fetch('http://localhost:8080/api/request',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({name:'Smoke Tester',type:'access',message:'${H_MARKER} please grant access to an app'})}).then(r=>r.text().then(t=>{process.stdout.write(r.status+'|'+t);process.exit(0)})).catch(()=>{process.stdout.write('0|');process.exit(1)})" | node_in othala)
-h1_code="${h1%%|*}"
-h1_body="${h1#*|}"
-if [[ "$h1_code" == "200" && "$h1_body" == *'"ok":true'* ]]; then
-    pass "H1 /api/request accepts a valid submission (200 ok:true)"
+h1=$(printf '%s' "fetch('http://localhost:8080/api/request',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({name:'Smoke Tester',type:'access',message:'${H_MARKER} please grant access to an app'})}).then(r=>{process.stdout.write(String(r.status));process.exit(0)}).catch(()=>{process.stdout.write('0');process.exit(1)})" | node_in othala)
+if [[ "$h1" == "401" ]]; then
+    pass "H1 /api/request refuses a submission without a session (401)"
 else
-    fail "H1 /api/request valid submission" "code=$h1_code body=$h1_body"
+    fail "H1 /api/request without a session" "code=$h1 want=401"
 fi
 
-# H2: the message actually LANDED in mailpit, addressed to the configured
-# recipient (OTHALA_CONTACT_RECIPIENT). Query mailpit's HTTP API from othala.
-# Match on the unique marker in the subject/snippet so we don't race other mail.
-RECIP="${OTHALA_CONTACT_RECIPIENT:-ops@othala.test}"
-h2=$(printf '%s' "fetch('http://mailpit:8025/api/v1/messages').then(r=>r.json()).then(d=>{const m=(d.messages||[]).find(x=>(x.Subject||'').includes('access')&&(x.To||[]).some(t=>t.Address==='${RECIP}'));process.stdout.write(m?'FOUND':'NONE:'+JSON.stringify((d.messages||[]).map(x=>({s:x.Subject,to:x.To}))));process.exit(0)}).catch(e=>{process.stdout.write('ERR:'+e.message);process.exit(1)})" | node_in othala)
-if [[ "$h2" == "FOUND" ]]; then
-    pass "H2 contact mail delivered to mailpit, addressed to $RECIP (shared courier SMTP works)"
+# H2: nothing from that submission reached the mail catcher.
+h2=$(printf '%s' "fetch('http://mailpit:8025/api/v1/search?query=${H_MARKER}').then(r=>r.json()).then(d=>{process.stdout.write(String(d.messages_count??(d.messages||[]).length));process.exit(0)}).catch(e=>{process.stdout.write('ERR:'+e.message);process.exit(1)})" | node_in othala)
+if [[ "$h2" == "0" ]]; then
+    pass "H2 the refused submission sent no mail"
 else
-    fail "H2 contact mail not in catcher" "got=$h2 recipient=$RECIP"
-fi
-
-# H3: validation rejects an empty/short submission with 400 (no mail sent).
-h3=$(printf '%s' "fetch('http://localhost:8080/api/request',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({name:'',type:'access',message:''})}).then(r=>{process.stdout.write(String(r.status));process.exit(0)}).catch(()=>{process.stdout.write('0');process.exit(1)})" | node_in othala)
-if [[ "$h3" == "400" ]]; then
-    pass "H3 /api/request rejects an invalid submission (400, fail-closed validation)"
-else
-    fail "H3 /api/request validation" "code=$h3 want=400"
-fi
-
-# H4: an unknown request type is rejected (400) — the type allowlist holds.
-h4=$(printf '%s' "fetch('http://localhost:8080/api/request',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({name:'X',type:'evil',message:'a valid length message'})}).then(r=>{process.stdout.write(String(r.status));process.exit(0)}).catch(()=>{process.stdout.write('0');process.exit(1)})" | node_in othala)
-if [[ "$h4" == "400" ]]; then
-    pass "H4 /api/request rejects an unknown request type (400, allowlist)"
-else
-    fail "H4 /api/request type allowlist" "code=$h4 want=400"
+    fail "H2 refused submission left mail in the catcher" "got=$h2"
 fi
 
 # ----- Summary -----

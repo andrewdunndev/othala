@@ -9,11 +9,15 @@
 
 import { test } from 'vitest';
 import assert from 'node:assert/strict';
-import { handleLogin, handleConsent, handleConsentPost, handleLogout, buildLoginReturnTo } from '../src/lib/oauth2-handlers.ts';
+import { handleLogin, loginRememberFor, handleConsent, handleConsentPost, handleLogout, buildLoginReturnTo } from '../src/lib/oauth2-handlers.ts';
 import { describeScopeList, SCOPE_DESCRIPTIONS } from '../src/lib/scope-descriptions.ts';
 import { parseManifest } from '../src/lib/manifests.ts';
 import { signToken, _resetForTests } from '../src/lib/csrf.ts';
 import { deepMergeClaims } from '../src/lib/claims.ts';
+import {
+  identity, session, whoamiIdentity, withTotp, withWebauthnKey, withPasskey, withLookupSecret,
+  oauth2LoginRequest, oauth2ConsentRequest, oauth2LogoutRequest,
+} from '../src/lib/test-builders.ts';
 
 // Ensure CSRF_SECRET is set for tests that exercise CSRF verification.
 if (!process.env.CSRF_SECRET) {
@@ -27,13 +31,7 @@ if (!process.env.CSRF_SECRET) {
 // grafana.yaml maps `grafana-access` → viewer, so this identity is a viewer.
 function activeMember(overrides = {}) {
   return {
-    id: 'id-1',
-    state: 'active',
-    schema_id: 'family',
-    schema_url: '',
-    traits: { username: 'ada', email: 'a@othala.test', displayName: 'Ada' },
-    metadata_admin: { groups: ['grafana-access'] },
-    verifiable_addresses: [{ value: 'a@othala.test', verified: true, via: 'email', status: 'completed' }],
+    ...identity({ id: 'id-1', username: 'ada', email: 'a@othala.test', displayName: 'Ada', metadataAdmin: { groups: ['grafana-access'] } }),
     ...overrides,
   };
 }
@@ -46,13 +44,13 @@ function stubOAuth2(over = {}) {
   const calls = { acceptLogin: 0, rejectLogin: 0, acceptConsent: 0, rejectConsent: 0, acceptLogout: 0 };
   const api = {
     getOAuth2LoginRequest: over.getOAuth2LoginRequest
-      ?? (async () => ({ challenge: 'lc', skip: true, subject: 'id-1', client: { client_id: 'grafana' } })),
+      ?? (async () => oauth2LoginRequest({ skip: true, subject: 'id-1' })),
     getOAuth2ConsentRequest: over.getOAuth2ConsentRequest
       // Default: skip_consent:true client — auto-accept path. Tests that exercise
       // the prompt path supply their own getOAuth2ConsentRequest with skip:false.
-      ?? (async () => ({ challenge: 'cc', skip: true, subject: 'id-1', client: { client_id: 'grafana' }, requested_scope: ['email', 'profile'], requested_access_token_audience: [] })),
+      ?? (async () => oauth2ConsentRequest({ skip: true, subject: 'id-1', requested_scope: ['email', 'profile'] })),
     getOAuth2LogoutRequest: over.getOAuth2LogoutRequest
-      ?? (async () => ({ challenge: 'gc', subject: 'id-1', client: { client_id: 'grafana' } })),
+      ?? (async () => oauth2LogoutRequest({ subject: 'id-1' })),
     acceptOAuth2LoginRequest: async (p) => { calls.acceptLogin++; calls.acceptLoginBody = p.acceptOAuth2LoginRequest; return { redirect_to: 'https://sso.othala.test/after-login' }; },
     rejectOAuth2LoginRequest: async (p) => { calls.rejectLogin++; calls.rejectLoginReason = p.rejectOAuth2Request?.error_description; return { redirect_to: 'https://sso.othala.test/login-rejected' }; },
     acceptOAuth2ConsentRequest: async (p) => { calls.acceptConsent++; calls.acceptConsentBody = p.acceptOAuth2ConsentRequest; return { redirect_to: 'https://sso.othala.test/after-consent' }; },
@@ -66,19 +64,7 @@ function stubOAuth2(over = {}) {
 // matching the default subject 'id-1'. Tests that need a different session
 // (including the FIX-A specific tests) supply their own getSession override.
 function defaultSession(overrides = {}) {
-  return async () => ({
-    active: true,
-    identity: {
-      id: 'id-1',
-      state: 'active',
-      schema_id: 'family',
-      schema_url: '',
-      traits: { username: 'ada', email: 'a@othala.test', displayName: 'Ada' },
-      metadata_admin: { groups: ['grafana-access'] },
-    },
-    authenticator_assurance_level: 'aal1',
-    ...overrides,
-  });
+  return async () => session('aal1', ['password'], { identity: whoamiIdentity(activeMember()), ...overrides });
 }
 
 // ── return_to hardening (CU1 item 5) ──────────────────────────────────────
@@ -177,7 +163,7 @@ test('login REJECTS when identity lookup fails (fail-closed) — opaque error_de
 
 test('login bounces to RELATIVE return_to when not authenticated (skip=false, no session)', async () => {
   const { api } = stubOAuth2({
-    getOAuth2LoginRequest: async () => ({ challenge: 'lc', skip: false, subject: '', client: { client_id: 'grafana' } }),
+    getOAuth2LoginRequest: async () => oauth2LoginRequest(),
   });
   const res = await handleLogin(new Request('https://x/oauth2/login?login_challenge=lc'), {
     oauth2: api,
@@ -198,17 +184,13 @@ test('login 400 on missing challenge', async () => {
 
 // ── second-factor step-up at app sign-in ───────────────────────────────────
 
-// Enrolled configs as the Kratos admin API returns them (lib/step-up.ts).
-const ENROLLED_CONFIG = {
-  totp: { totp_url: 'otpauth://totp/othala:a?secret=JBSWY3DPEHPK3PXP' },
-  webauthn: { credentials: [{ id: 'w', is_passwordless: false }] },
-};
+const ADD = { password: (i) => i, totp: withTotp, webauthn: (i) => withWebauthnKey(i), passkey: withPasskey, lookup_secret: withLookupSecret };
 
 function withCreds(...types) {
-  return Object.fromEntries(types.map((t) => [t, { type: t, identifiers: ['a'], config: ENROLLED_CONFIG[t] ?? {} }]));
+  return types.reduce((i, t) => ADD[t](i), activeMember()).credentials;
 }
 
-const FRESH = async () => ({ challenge: 'lc', skip: false, subject: '', client: { client_id: 'grafana' } });
+const FRESH = async () => oauth2LoginRequest();
 
 for (const [branch, getReq] of [['skip', undefined], ['fresh', FRESH]]) {
   test(`login (${branch}) steps an aal1 totp holder up to aal2 and never accepts`, async () => {
@@ -286,6 +268,49 @@ for (const [branch, getReq] of [['skip', undefined], ['fresh', FRESH]]) {
     assert.equal(calls.acceptLoginBody.acr, 'aal1');
   });
 }
+
+// ── login memory follows the Kratos session ──────────────────────────────
+
+const IN_20_DAYS = () => new Date(Date.now() + 20 * 86_400_000);
+
+test('login (fresh) remembers the login until the Kratos session expires, without renewing', async () => {
+  const { api, calls } = stubOAuth2({ getOAuth2LoginRequest: FRESH });
+  await handleLogin(new Request('https://x/oauth2/login?login_challenge=lc'), {
+    oauth2: api,
+    getIdentity: async () => activeMember(),
+    getSession: defaultSession({ expires_at: IN_20_DAYS() }),
+    manifest: () => loadManifest('grafana'),
+  });
+  assert.equal(calls.acceptLogin, 1);
+  assert.equal(calls.acceptLoginBody.remember, true);
+  assert.ok(Math.abs(calls.acceptLoginBody.remember_for - 20 * 86_400) <= 2, `remember_for ${calls.acceptLoginBody.remember_for}`);
+  assert.equal(calls.acceptLoginBody.extend_session_lifespan, undefined);
+});
+
+test('login (skip) re-accepts with remember and renews the remembered login', async () => {
+  const { api, calls } = stubOAuth2();
+  await handleLogin(new Request('https://x/oauth2/login?login_challenge=lc'), {
+    oauth2: api,
+    getIdentity: async () => activeMember(),
+    getSession: defaultSession({ expires_at: IN_20_DAYS() }),
+    manifest: () => loadManifest('grafana'),
+  });
+  assert.equal(calls.acceptLogin, 1);
+  assert.equal(calls.acceptLoginBody.remember, true);
+  assert.ok(Math.abs(calls.acceptLoginBody.remember_for - 20 * 86_400) <= 2, `remember_for ${calls.acceptLoginBody.remember_for}`);
+  assert.equal(calls.acceptLoginBody.extend_session_lifespan, true);
+});
+
+test('loginRememberFor falls back to the Kratos lifespan without expires_at', () => {
+  const s = session('aal1', ['password'], { expires_at: undefined });
+  assert.equal(loginRememberFor(s), 2_592_000);
+});
+
+test('loginRememberFor rounds up and reads a string expires_at', () => {
+  const now = Date.UTC(2026, 0, 1);
+  assert.equal(loginRememberFor(session('aal1', ['password'], { expires_at: new Date(now + 1500) }), now), 2);
+  assert.equal(loginRememberFor({ ...session(), expires_at: new Date(now + 3_600_000).toISOString() }, now), 3600);
+});
 
 // ── CONSENT ─────────────────────────────────────────────────────────────────
 
@@ -1310,9 +1335,11 @@ test('FIX-F: logout with matching session subject accepts normally', async () =>
     {
       oauth2: api,
       getSession: async () => ({
+        id: 's1',
         active: true,
         identity: { id: 'id-1', state: 'active', schema_id: 'family', schema_url: '', traits: {} },
       }),
+      revokeSession: async () => {},
     },
   );
   assert.equal(res.status, 302, 'matching session must accept');
@@ -1332,4 +1359,151 @@ test('FIX-F: logout with no live session accepts normally (expected on post-Krat
   );
   assert.equal(res.status, 302, 'no-session logout must accept');
   assert.equal(calls.acceptLogout, 1, 'acceptLogout must be called when no session present');
+});
+
+// ── logout ends the SSO session ───────────────────────────────────────────────
+
+function logoutRequest() {
+  return new Request('https://x/oauth2/logout?logout_challenge=gc', { headers: { cookie: 'ory_kratos_session=s' } });
+}
+
+test('logout revokes the subject\'s Kratos session before accepting', async () => {
+  const live = session();
+  const order = [];
+  const { api, calls } = stubOAuth2({
+    getOAuth2LogoutRequest: async () => oauth2LogoutRequest({ subject: live.identity.id }),
+  });
+  const accept = api.acceptOAuth2LogoutRequest;
+  api.acceptOAuth2LogoutRequest = async (p) => { order.push('accept'); return accept(p); };
+  const revoked = [];
+  const res = await handleLogout(logoutRequest(), {
+    oauth2: api,
+    getSession: async () => live,
+    revokeSession: async (id) => { order.push('revoke'); revoked.push(id); },
+  });
+  assert.deepEqual(revoked, [live.id], 'the live session is revoked by id');
+  assert.deepEqual(order, ['revoke', 'accept'], 'revoke happens before accept');
+  assert.equal(res.status, 302);
+  assert.equal(res.headers.get('location'), 'https://sso.othala.test/after-logout');
+  assert.equal(calls.acceptLogout, 1);
+});
+
+test('logout does not accept when the session revoke fails', async () => {
+  const live = session();
+  const { api, calls } = stubOAuth2({
+    getOAuth2LogoutRequest: async () => oauth2LogoutRequest({ subject: live.identity.id }),
+  });
+  process.env.OTHALA_PUBLIC_URL = 'https://sso.othala.test';
+  try {
+    const res = await handleLogout(logoutRequest(), {
+      oauth2: api,
+      getSession: async () => live,
+      revokeSession: async () => { throw new Error('kratos admin 500'); },
+    });
+    assert.equal(calls.acceptLogout, 0, 'acceptLogout must NOT be called when revoke fails');
+    assert.equal(res.status, 302);
+    assert.equal(res.headers.get('location'), 'https://sso.othala.test/auth/error?reason=auth-unreachable');
+  } finally {
+    delete process.env.OTHALA_PUBLIC_URL;
+  }
+});
+
+test('logout does not accept when the live session carries no id', async () => {
+  const live = session('aal1', ['password'], { id: undefined });
+  const { api, calls } = stubOAuth2({
+    getOAuth2LogoutRequest: async () => oauth2LogoutRequest({ subject: live.identity.id }),
+  });
+  let revokes = 0;
+  const res = await handleLogout(logoutRequest(), {
+    oauth2: api,
+    getSession: async () => live,
+    revokeSession: async () => { revokes++; },
+  });
+  assert.equal(revokes, 0);
+  assert.equal(calls.acceptLogout, 0);
+  assert.match(res.headers.get('location') ?? '', /\/auth\/error\?reason=auth-unreachable$/);
+});
+
+test('logout subject mismatch neither revokes nor accepts', async () => {
+  const live = session('aal1', ['password'], { identity: whoamiIdentity(identity({ id: 'id-2' })) });
+  const { api, calls } = stubOAuth2({
+    getOAuth2LogoutRequest: async () => oauth2LogoutRequest({ subject: 'id-1' }),
+  });
+  let revokes = 0;
+  const res = await handleLogout(logoutRequest(), {
+    oauth2: api,
+    getSession: async () => live,
+    revokeSession: async () => { revokes++; },
+  });
+  assert.equal(revokes, 0, 'another user\'s session is never revoked');
+  assert.equal(calls.acceptLogout, 0);
+  assert.equal(res.status, 302);
+  assert.ok(res.headers.get('location')?.endsWith('/'));
+});
+
+test('logout with no live session accepts without a revoke', async () => {
+  const { api, calls } = stubOAuth2();
+  let revokes = 0;
+  const res = await handleLogout(logoutRequest(), {
+    oauth2: api,
+    getSession: async () => null,
+    revokeSession: async () => { revokes++; },
+  });
+  assert.equal(revokes, 0);
+  assert.equal(calls.acceptLogout, 1);
+  assert.equal(res.status, 302);
+});
+
+test('logout with an empty subject revokes the live session, then accepts', async () => {
+  const live = session();
+  const order = [];
+  const { api, calls } = stubOAuth2({
+    getOAuth2LogoutRequest: async () => oauth2LogoutRequest({ subject: '' }),
+  });
+  const accept = api.acceptOAuth2LogoutRequest;
+  api.acceptOAuth2LogoutRequest = async (p) => { order.push('accept'); return accept(p); };
+  const revoked = [];
+  const res = await handleLogout(logoutRequest(), {
+    oauth2: api,
+    getSession: async () => live,
+    revokeSession: async (id) => { order.push('revoke'); revoked.push(id); },
+  });
+  assert.deepEqual(revoked, [live.id]);
+  assert.deepEqual(order, ['revoke', 'accept']);
+  assert.equal(res.status, 302);
+  assert.equal(calls.acceptLogout, 1);
+});
+
+test('logout with an empty subject and no session accepts without a revoke', async () => {
+  const { api, calls } = stubOAuth2({
+    getOAuth2LogoutRequest: async () => oauth2LogoutRequest({ subject: '' }),
+  });
+  let revokes = 0;
+  const res = await handleLogout(logoutRequest(), {
+    oauth2: api,
+    getSession: async () => null,
+    revokeSession: async () => { revokes++; },
+  });
+  assert.equal(revokes, 0);
+  assert.equal(calls.acceptLogout, 1);
+  assert.equal(res.status, 302);
+});
+
+test('logout with an empty subject does not accept when the revoke fails', async () => {
+  const live = session();
+  const { api, calls } = stubOAuth2({
+    getOAuth2LogoutRequest: async () => oauth2LogoutRequest({ subject: '' }),
+  });
+  process.env.OTHALA_PUBLIC_URL = 'https://sso.othala.test';
+  try {
+    const res = await handleLogout(logoutRequest(), {
+      oauth2: api,
+      getSession: async () => live,
+      revokeSession: async () => { throw new Error('kratos admin 500'); },
+    });
+    assert.equal(calls.acceptLogout, 0);
+    assert.equal(res.headers.get('location'), 'https://sso.othala.test/auth/error?reason=auth-unreachable');
+  } finally {
+    delete process.env.OTHALA_PUBLIC_URL;
+  }
 });

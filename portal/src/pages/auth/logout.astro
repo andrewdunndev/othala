@@ -1,23 +1,28 @@
 ---
-// Logout convenience page.
+// Sign-out page.
 //
-// Kratos's logout flow needs a CSRF-bound logout_token. We fetch
-// /self-service/logout/browser to get it, then redirect the user to the
+// A GET renders a confirm form; only a POST carrying a sign-out token bound
+// to the caller's identity (lib/logout.ts) ends the session. A GET or a POST
+// whose token fails re-renders the form and changes nothing.
+//
+// Kratos's logout flow needs a CSRF-bound logout_token. On a verified POST we
+// fetch /self-service/logout/browser to get it, then 303 the browser to the
 // logout_url, which revokes the session, clears Kratos's cookies and 303s
 // back home.
 //
-// The invariant this page owes the user: nobody leaves /auth/logout still
-// holding a live session. Either Kratos performs the logout (we hand the
-// browser its logout_url), or we perform it ourselves — revoke server-side
-// over the internal Kratos address and expire the session cookie on the way
-// out. Every branch below ends in one of those two, never in a bare redirect
-// home with the session intact.
+// The invariant a verified POST owes the user: nobody leaves it still holding
+// a live session. Either Kratos performs the logout (we hand the browser its
+// logout_url), or we perform it ourselves — revoke server-side over the
+// internal Kratos address and expire the session cookie on the way out.
 
 export const prerender = false;
 
+import Layout from '../../layouts/Layout.astro';
+import PageHero from '../../components/PageHero.astro';
 import { getLogoutInfo, getSession, kratosBase } from '../../lib/kratos';
 import type { LogoutInfo } from '../../lib/kratos';
 import { publicUrl } from '../../lib/config';
+import { logoutAuthorized, sameOriginRequest, signLogoutToken } from '../../lib/logout';
 
 const cookie = Astro.request.headers.get('cookie') ?? undefined;
 
@@ -168,13 +173,36 @@ function signedOutLocally(): Response {
   });
 }
 
+const isPost = Astro.request.method.toUpperCase() === 'POST';
+let form: FormData | null = null;
+if (isPost) {
+  try {
+    form = await Astro.request.formData();
+  } catch {
+    form = null;
+  }
+}
+
 let session = null;
+let lookupFailed = false;
 try {
   session = await getSession(cookie);
 } catch {
-  // Kratos is unreachable or answering unexpectedly. We cannot revoke
-  // anything, but the user asked to be signed out — drop the cookie on this
-  // device rather than bouncing them home still signed in.
+  lookupFailed = true;
+}
+
+if (
+  lookupFailed &&
+  isPost &&
+  sameOriginRequest(
+    Astro.request.headers.get('origin'),
+    Astro.request.headers.get('referer'),
+    new URL(publicUrl).origin,
+  )
+) {
+  // Kratos is unreachable or answering unexpectedly, so no token can be
+  // checked and nothing can be revoked. The user asked to be signed out:
+  // drop the cookie on this device rather than leaving them signed in.
   console.warn(
     '[othala/logout] session lookup failed; clearing the session cookie on this device. ' +
       'The Kratos-side session, if any, is untouched.',
@@ -182,55 +210,97 @@ try {
   return signedOutLocally();
 }
 
-if (!session?.active) {
+const identityId = session?.active ? session.identity?.id : undefined;
+
+if (!lookupFailed && !identityId) {
   // Kratos reports no live session. Clear any stale cookie on the way home so
   // the browser stops presenting a dead one.
   return signedOutLocally();
 }
 
-let info: LogoutInfo | null = null;
-try {
-  info = await getLogoutInfo(cookie);
-} catch {
-  // getLogoutInfo only swallows 401/403; anything else reaching here means
-  // Kratos is unhealthy. Fall through to the local clear rather than 500ing a
-  // page whose whole job is to end a session.
-  console.warn('[othala/logout] could not create a logout flow; clearing locally.');
-  info = null;
-}
+if (identityId && logoutAuthorized(Astro.request.method, form?.get('csrf_token'), identityId)) {
+  let info: LogoutInfo | null = null;
+  try {
+    info = await getLogoutInfo(cookie);
+  } catch {
+    // getLogoutInfo only swallows 401/403; anything else reaching here means
+    // Kratos is unhealthy. Fall through to the local clear rather than 500ing
+    // a request whose whole job is to end a session.
+    console.warn('[othala/logout] could not create a logout flow; clearing locally.');
+    info = null;
+  }
 
-if (!info) {
-  // No logout flow to complete: Kratos declined, or the session went away
-  // between the two calls. Still clear locally.
+  if (!info) {
+    // No logout flow to complete: Kratos declined, or the session went away
+    // between the two calls. Still clear locally.
+    return signedOutLocally();
+  }
+
+  if (isOurLogoutUrl(info.logout_url)) {
+    // Normal path. Kratos revokes the session and clears its own cookies.
+    // 303 so the browser follows with a GET after the POST.
+    return Astro.redirect(info.logout_url, 303);
+  }
+
+  // Fail closed. The URL is not one of ours, so the browser is not handed to
+  // it; we complete the logout ourselves and expire the cookie here.
+  let seenOrigin = 'unparseable';
+  try {
+    // URL.origin is normalised and cannot carry CR/LF, so it is safe to log.
+    seenOrigin = new URL(info.logout_url).origin;
+  } catch {
+    /* keep the placeholder */
+  }
+  console.warn(
+    `[othala/logout] logout_url origin ${seenOrigin} is neither OTHALA_PUBLIC_URL nor ` +
+      'KRATOS_PUBLIC_URL; refusing the redirect and completing the logout server-side.',
+  );
+
+  const status = await revokeServerSide(info.logout_token);
+  if (status === null || status >= 400) {
+    console.warn(
+      `[othala/logout] server-side revoke did not confirm (status=${status ?? 'no response'}). ` +
+        'The session cookie is cleared on this device, but the Kratos session may still be live.',
+    );
+  }
   return signedOutLocally();
 }
 
-if (isOurLogoutUrl(info.logout_url)) {
-  // Normal path. Kratos revokes the session and clears its own cookies.
-  return Astro.redirect(info.logout_url);
+// Confirm form. With Kratos unreachable there is no identity to bind a token
+// to; the form then posts without one and the POST clears this device.
+let csrfToken = '';
+if (identityId) {
+  try {
+    csrfToken = signLogoutToken(identityId);
+  } catch {
+    csrfToken = '';
+  }
 }
-
-// Fail closed. The URL is not one of ours, so the browser is not handed to it;
-// we complete the logout ourselves and expire the cookie here.
-let seenOrigin = 'unparseable';
-try {
-  // URL.origin is normalised and cannot carry CR/LF, so it is safe to log.
-  seenOrigin = new URL(info.logout_url).origin;
-} catch {
-  /* keep the placeholder */
-}
-console.warn(
-  `[othala/logout] logout_url origin ${seenOrigin} is neither OTHALA_PUBLIC_URL nor ` +
-    'KRATOS_PUBLIC_URL; refusing the redirect and completing the logout server-side.',
-);
-
-const status = await revokeServerSide(info.logout_token);
-if (status === null || status >= 400) {
-  console.warn(
-    `[othala/logout] server-side revoke did not confirm (status=${status ?? 'no response'}). ` +
-      'The session cookie is cleared on this device, but the Kratos session may still be live.',
-  );
-}
-return signedOutLocally();
+const retry = isPost;
 ---
-<!-- never rendered: this page always redirects in the front-matter -->
+<Layout title="Sign out" description="Sign out of this device." bare>
+  <PageHero
+    title="Sign out?"
+    eyebrow="sign out"
+    lede={retry
+      ? 'That sign-out request could not be confirmed. Press the button to sign out of this device.'
+      : lookupFailed
+      ? 'The sign-in service did not answer. Signing out clears this device only.'
+      : 'Sign out of this device.'}
+  >
+    <form method="POST" action="/auth/logout" class="logout-form">
+      <input type="hidden" name="csrf_token" value={csrfToken} />
+      <button type="submit" class="button button-primary">Sign out</button>
+      <a href="/" class="button button-secondary">Cancel</a>
+    </form>
+  </PageHero>
+</Layout>
+
+<style>
+  .logout-form {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--space-3);
+    margin-top: var(--space-4);
+  }
+</style>

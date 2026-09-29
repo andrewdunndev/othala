@@ -34,7 +34,7 @@ export interface Credentials {
  * The CSRF node is a hidden input with name='csrf_token'.
  */
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-function findCsrfToken(nodes: any[]): string {
+export function findCsrfToken(nodes: any[]): string {
   for (const node of nodes ?? []) {
     if (
       node?.type === 'input' &&

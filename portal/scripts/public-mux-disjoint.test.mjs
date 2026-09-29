@@ -30,7 +30,14 @@ const pagesDir = join(here, '..', 'src', 'pages');
 
 // The admin-listener-only POST paths (mirror of ADMIN_POST_ROUTES in
 // src/server/listen.mjs). No Astro page may resolve to any of these.
-const FORBIDDEN_ROUTES = new Set(['/admin/revoke-user', '/admin/recovery-gate', '/admin/login-code-gate']);
+const FORBIDDEN_ROUTES = new Set([
+  '/admin/revoke-user',
+  '/admin/recovery-gate',
+  '/admin/login-code-gate',
+  '/admin/username-gate',
+  '/admin/second-factor-gate',
+  '/admin/profile-sessions',
+]);
 
 // Astro page-file extensions that produce a route.
 const PAGE_EXT = /\.(astro|ts|js|mjs|md|mdx)$/;

@@ -78,7 +78,8 @@ selfservice:
         # validation (the render is text-substitution, so source quoting carries
         # through). Keep these values unquoted.
         haveibeenpwned_enabled: ${OTHALA_HIBP_ENABLED}
-        max_breaches: 1
+        max_breaches: 0
+        ignore_network_errors: false
         identifier_similarity_check_enabled: true
         min_password_length: ${OTHALA_PASSWORD_MIN_LENGTH}
 
@@ -164,18 +165,91 @@ selfservice:
         passkey:
           hooks:
             - hook: revoke_active_sessions
+        # An admin-marked identity keeps a second factor: the interrupting
+        # web_hook runs before Kratos persists a totp or webauthn change, and
+        # the gate refuses one that could leave no authenticator app and no
+        # security key.
         webauthn:
           hooks:
             - hook: revoke_active_sessions
+            - hook: web_hook
+              config:
+                url: "http://${CONSENT_HOST}:4431/admin/second-factor-gate?method=webauthn"
+                method: POST
+                auth:
+                  type: api_key
+                  config:
+                    in: header
+                    name: Authorization
+                    value: "Bearer ${RECOVERY_GATE_SECRET}"
+                response:
+                  ignore: false
+                  parse: false
+                body: file:///etc/config/kratos/hooks/recovery-gate.jsonnet
+                can_interrupt: true
         # An attacker who swaps a TOTP seed or rotates backup codes gains a
         # re-entry path through any other surviving session. Revoke on change
         # to close that window — mirrors the credential-swap logic above.
         totp:
           hooks:
             - hook: revoke_active_sessions
+            - hook: web_hook
+              config:
+                url: "http://${CONSENT_HOST}:4431/admin/second-factor-gate?method=totp"
+                method: POST
+                auth:
+                  type: api_key
+                  config:
+                    in: header
+                    name: Authorization
+                    value: "Bearer ${RECOVERY_GATE_SECRET}"
+                response:
+                  ignore: false
+                  parse: false
+                body: file:///etc/config/kratos/hooks/recovery-gate.jsonnet
+                can_interrupt: true
         lookup_secret:
           hooks:
             - hook: revoke_active_sessions
+        # Username is admin-controlled: relying parties that still match an
+        # account on it at sign-in would lose the link on a self-service
+        # rename. An interrupting web_hook runs before Kratos persists the new
+        # traits; the gate refuses any username other than the stored one.
+        # The schema allows no revoke_active_sessions here; the second,
+        # non-interrupting web_hook runs after persist and ends the account's
+        # other sessions, keeping the one that saved.
+        profile:
+          hooks:
+            - hook: web_hook
+              config:
+                url: "http://${CONSENT_HOST}:4431/admin/username-gate"
+                method: POST
+                auth:
+                  type: api_key
+                  config:
+                    in: header
+                    name: Authorization
+                    value: "Bearer ${RECOVERY_GATE_SECRET}"
+                response:
+                  ignore: false
+                  parse: false
+                body: file:///etc/config/kratos/hooks/recovery-gate.jsonnet
+                can_interrupt: true
+            - hook: web_hook
+              config:
+                url: "http://${CONSENT_HOST}:4431/admin/profile-sessions"
+                method: POST
+                auth:
+                  type: api_key
+                  config:
+                    in: header
+                    name: Authorization
+                    value: "Bearer ${RECOVERY_GATE_SECRET}"
+                response:
+                  ignore: false
+                  parse: false
+                body: file:///etc/config/kratos/hooks/recovery-gate.jsonnet
+                can_interrupt: false
 
     recovery:
       enabled: true

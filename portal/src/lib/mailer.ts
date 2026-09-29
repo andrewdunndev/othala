@@ -79,6 +79,10 @@ function transport(): Transporter {
 export interface ContactMail {
   /** Resolved recipient (config.contactRecipient). */
   to: string;
+  /** Verified Kratos identity id of the signed-in sender. */
+  identityId: string;
+  /** Verified username of the signed-in sender. */
+  username: string;
   /** Submitter-provided display name (already validated + length-capped). */
   fromName: string;
   /** Request category (already validated against the allowlist). */
@@ -99,6 +103,7 @@ export async function sendContactRequest(mail: ContactMail): Promise<void> {
   const subject = `[${instanceName}] ${mail.requestType} request from ${mail.fromName}`;
   const text =
     `A request came in from the ${instanceName} dashboard.\n\n` +
+    `Account: ${mail.username} (${mail.identityId})\n` +
     `Name:    ${mail.fromName}\n` +
     `Type:    ${mail.requestType}\n` +
     `\nMessage:\n${mail.message}\n`;
