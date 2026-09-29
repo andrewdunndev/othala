@@ -13,6 +13,7 @@ This CHANGELOG and git tags carry the deployed-instance release state.
 
 - Deleting an identity revokes its sessions and app grants first.
 - Removing a group or changing a role revokes the member's app grants.
+- Signing out of an app also ends the portal session.
 
 ## [0.6.3] - 2026-09-29
 

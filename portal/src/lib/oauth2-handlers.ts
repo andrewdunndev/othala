@@ -13,7 +13,7 @@
 // Flow mirrors the Go service:
 //   login   -> resolve subject (skip-remembered or whoami), gate, accept/reject
 //   consent -> re-gate, build id_token claims, accept with consent session
-//   logout  -> accept (Kratos session invalidation is the portal's job)
+//   logout  -> revoke the subject's live Kratos session, then accept
 //
 // SDK usage: we reuse the class-based @ory/client-fetch OAuth2Api and the
 // C1 admin-api getIdentity / kratos getSession helpers, rather than
@@ -26,7 +26,7 @@ import type {
   OAuth2LogoutRequest,
 } from '@ory/client-fetch';
 import type { Identity, Session } from './types';
-import { getIdentity as defaultGetIdentity } from './admin-api';
+import { getIdentity as defaultGetIdentity, revokeSession as defaultRevokeSession } from './admin-api';
 import { getSession as defaultGetSession } from './kratos';
 import { enforceAccessGate, type GateResult } from './gate';
 import { composeIDTokenClaims } from './claims';
@@ -102,6 +102,8 @@ export interface Deps {
   >;
   getIdentity?: (id: string) => Promise<Identity>;
   getSession?: (cookie?: string) => Promise<Session | null>;
+  /** Revoke one Kratos session by id (logout). Resolves when the session is gone. */
+  revokeSession?: (sessionId: string) => Promise<void>;
   gate?: (identity: Identity | null, clientId: string, manifest?: ClientManifest) => GateResult;
   /**
    * Resolve a client manifest by clientId. Used for claims injection (A3) and
@@ -118,6 +120,7 @@ function resolve(deps: Deps): Required<Deps> {
     oauth2: deps.oauth2 ?? defaultOAuth2Api(),
     getIdentity: deps.getIdentity ?? defaultGetIdentity,
     getSession: deps.getSession ?? defaultGetSession,
+    revokeSession: deps.revokeSession ?? defaultRevokeSession,
     gate: deps.gate ?? ((identity, clientId, manifest) => enforceAccessGate(identity, clientId, manifest)),
     manifest: deps.manifest ?? ((clientId) => servingManifest(clientId)),
   };
@@ -578,6 +581,19 @@ export async function handleLogout(req: Request, deps: Deps = {}): Promise<Respo
       // Refuse to auto-accept — redirect to the portal home instead.
       const publicUrlBase = process.env.OTHALA_PUBLIC_URL ?? '';
       return redirect(`${publicUrlBase}/`);
+    }
+    // The live session is the subject's: signing out of an app ends the SSO
+    // session, so revoke it before Hydra forgets the login. A failed revoke
+    // must not accept, or the next authorize would sign straight back in.
+    if (session?.active && session.identity) {
+      try {
+        if (!session.id) throw new Error('session without id');
+        await d.revokeSession(session.id);
+      } catch (e) {
+        console.warn('[oauth2/logout] session revoke failed', { subject: logoutSubject, error: String(e) });
+        const publicUrlBase = process.env.OTHALA_PUBLIC_URL ?? '';
+        return redirect(`${publicUrlBase}/auth/error?reason=auth-unreachable`);
+      }
     }
   }
 

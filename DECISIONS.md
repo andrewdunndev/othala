@@ -141,8 +141,7 @@ passkey in their own browser.
 Having the identity service email the code is rejected for a reason specific to enrollment: at creation
 the address is an unverified trait the admin just typed, so a mailed code is a delivery guess and a
 mistyped address misroutes the secret in motion. An admin-chosen initial password is refused outright —
-it is exactly a password in transit, and it creates the credential most likely to be reused elsewhere
-and least likely to be replaced. Both link and code are required: the link alone lands on a form with an
+it is exactly a password in transit. Both link and code are required: the link alone lands on a form with an
 empty code field, so a link with no code is an enrollment that looks fine from the admin's side and
 dead-ends for every invitee. Also deliberate and easy to "correct": the admin-minted code expires slowly
 while self-service recovery expires fast. An enrollment message may sit unread overnight; a recovery the

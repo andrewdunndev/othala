@@ -16,6 +16,7 @@
 import {
   Configuration,
   IdentityApi,
+  ResponseError,
   type CreateIdentityBody,
   type UpdateIdentityBody,
   type DeleteIdentityCredentialsTypeEnum,
@@ -141,6 +142,19 @@ export async function updateIdentity(id: string, input: UpdateIdentityInput): Pr
 
 export async function deleteIdentity(id: string): Promise<void> {
   await identityApi().deleteIdentity({ id });
+}
+
+/**
+ * Revoke one Kratos session by id (DELETE /admin/sessions/{id}). A 404 means
+ * the session is already gone, which is the postcondition; anything else throws.
+ */
+export async function revokeSession(id: string): Promise<void> {
+  try {
+    await identityApi().disableSession({ id });
+  } catch (e) {
+    if (e instanceof ResponseError && e.response.status === 404) return;
+    throw e;
+  }
 }
 
 /**

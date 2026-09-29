@@ -1292,9 +1292,11 @@ test('FIX-F: logout with matching session subject accepts normally', async () =>
     {
       oauth2: api,
       getSession: async () => ({
+        id: 's1',
         active: true,
         identity: { id: 'id-1', state: 'active', schema_id: 'family', schema_url: '', traits: {} },
       }),
+      revokeSession: async () => {},
     },
   );
   assert.equal(res.status, 302, 'matching session must accept');
@@ -1314,4 +1316,97 @@ test('FIX-F: logout with no live session accepts normally (expected on post-Krat
   );
   assert.equal(res.status, 302, 'no-session logout must accept');
   assert.equal(calls.acceptLogout, 1, 'acceptLogout must be called when no session present');
+});
+
+// ── logout ends the SSO session ───────────────────────────────────────────────
+
+function logoutRequest() {
+  return new Request('https://x/oauth2/logout?logout_challenge=gc', { headers: { cookie: 'ory_kratos_session=s' } });
+}
+
+test('logout revokes the subject\'s Kratos session before accepting', async () => {
+  const live = session();
+  const order = [];
+  const { api, calls } = stubOAuth2({
+    getOAuth2LogoutRequest: async () => oauth2LogoutRequest({ subject: live.identity.id }),
+  });
+  const accept = api.acceptOAuth2LogoutRequest;
+  api.acceptOAuth2LogoutRequest = async (p) => { order.push('accept'); return accept(p); };
+  const revoked = [];
+  const res = await handleLogout(logoutRequest(), {
+    oauth2: api,
+    getSession: async () => live,
+    revokeSession: async (id) => { order.push('revoke'); revoked.push(id); },
+  });
+  assert.deepEqual(revoked, [live.id], 'the live session is revoked by id');
+  assert.deepEqual(order, ['revoke', 'accept'], 'revoke happens before accept');
+  assert.equal(res.status, 302);
+  assert.equal(res.headers.get('location'), 'https://sso.othala.test/after-logout');
+  assert.equal(calls.acceptLogout, 1);
+});
+
+test('logout does not accept when the session revoke fails', async () => {
+  const live = session();
+  const { api, calls } = stubOAuth2({
+    getOAuth2LogoutRequest: async () => oauth2LogoutRequest({ subject: live.identity.id }),
+  });
+  process.env.OTHALA_PUBLIC_URL = 'https://sso.othala.test';
+  try {
+    const res = await handleLogout(logoutRequest(), {
+      oauth2: api,
+      getSession: async () => live,
+      revokeSession: async () => { throw new Error('kratos admin 500'); },
+    });
+    assert.equal(calls.acceptLogout, 0, 'acceptLogout must NOT be called when revoke fails');
+    assert.equal(res.status, 302);
+    assert.equal(res.headers.get('location'), 'https://sso.othala.test/auth/error?reason=auth-unreachable');
+  } finally {
+    delete process.env.OTHALA_PUBLIC_URL;
+  }
+});
+
+test('logout does not accept when the live session carries no id', async () => {
+  const live = session('aal1', ['password'], { id: undefined });
+  const { api, calls } = stubOAuth2({
+    getOAuth2LogoutRequest: async () => oauth2LogoutRequest({ subject: live.identity.id }),
+  });
+  let revokes = 0;
+  const res = await handleLogout(logoutRequest(), {
+    oauth2: api,
+    getSession: async () => live,
+    revokeSession: async () => { revokes++; },
+  });
+  assert.equal(revokes, 0);
+  assert.equal(calls.acceptLogout, 0);
+  assert.match(res.headers.get('location') ?? '', /\/auth\/error\?reason=auth-unreachable$/);
+});
+
+test('logout subject mismatch neither revokes nor accepts', async () => {
+  const live = session('aal1', ['password'], { identity: whoamiIdentity(identity({ id: 'id-2' })) });
+  const { api, calls } = stubOAuth2({
+    getOAuth2LogoutRequest: async () => oauth2LogoutRequest({ subject: 'id-1' }),
+  });
+  let revokes = 0;
+  const res = await handleLogout(logoutRequest(), {
+    oauth2: api,
+    getSession: async () => live,
+    revokeSession: async () => { revokes++; },
+  });
+  assert.equal(revokes, 0, 'another user\'s session is never revoked');
+  assert.equal(calls.acceptLogout, 0);
+  assert.equal(res.status, 302);
+  assert.ok(res.headers.get('location')?.endsWith('/'));
+});
+
+test('logout with no live session accepts without a revoke', async () => {
+  const { api, calls } = stubOAuth2();
+  let revokes = 0;
+  const res = await handleLogout(logoutRequest(), {
+    oauth2: api,
+    getSession: async () => null,
+    revokeSession: async () => { revokes++; },
+  });
+  assert.equal(revokes, 0);
+  assert.equal(calls.acceptLogout, 1);
+  assert.equal(res.status, 302);
 });
