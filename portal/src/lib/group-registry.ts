@@ -22,6 +22,7 @@
 import type { ClientManifest } from './manifests';
 import { identityGroups as envIdentityGroups } from './config';
 import { servingManifests } from './manifest-store';
+import { GROUP_RE } from './access-groups';
 
 export type GroupKind = 'identity' | 'access' | 'role';
 
@@ -144,4 +145,14 @@ export function namesOfKind(reg: GroupRegistry, kind: GroupKind): string[] {
     .filter((e) => e.kinds.has(kind))
     .map((e) => e.name)
     .sort();
+}
+
+/**
+ * Stored groups the admin edit form offers no checkbox for: canonical names
+ * that are neither a configured identity group nor bound for access by any
+ * served manifest (a role-only binding, or a group whose config was removed).
+ * The save carries these through unless the operator removes one explicitly.
+ */
+export function unconfiguredGroups(reg: GroupRegistry, stored: readonly string[]): string[] {
+  return stored.filter((g) => GROUP_RE.test(g) && !isIdentityGroup(reg, g) && !isAccessGroup(reg, g));
 }

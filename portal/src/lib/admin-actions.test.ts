@@ -15,16 +15,20 @@
  *   saveAction:
  *   - a removed group or changed role revokes consent sessions after the write
  *   - an unchanged or widened save does not revoke; a revoke failure says the save stood
+ *   - a stored group with no checkbox is kept unless its removal is ticked,
+ *     and never counts toward the identity-group minimum
+ *   deactivateAction:
+ *   - self refused; the last active admin refused; a member needs no count
  *   revokeAdminAction:
  *   - self-demote refused, patchAdminMarker never called
- *   - last-admin refused (listIdentities → adminCount 1), patchAdminMarker never called
+ *   - last active admin refused (an inactive admin does not count), patchAdminMarker never called
  *   - happy path: patchAdminMarker(id, false) called, then consent sessions revoked
  *   removeCredentialAction:
  *   - non-allowlisted type refused, deleteCredential never called
  *   - passkey refused server-side (upstream 400 — Kratos cannot admin-delete
  *     it), deleteCredential never called
  *   - happy path: deleteCredential called
- *   - admin-marked target keeps a totp or webauthn credential
+ *   - admin-marked target, and the acting admin, keep a totp or webauthn credential
  *   grantAdminAction:
  *   - refused without a totp or webauthn credential
  *   - happy path: patchAdminMarker(id, true) called
@@ -39,6 +43,7 @@ const {
   listIdentitiesMock,
   patchAdminMarkerMock,
   deleteCredentialMock,
+  deactivateIdentityMock,
   updateIdentityMock,
   revokeSubjectMock,
   revokeConsentSessionsMock,
@@ -50,6 +55,7 @@ const {
   listIdentitiesMock: vi.fn(),
   patchAdminMarkerMock: vi.fn(),
   deleteCredentialMock: vi.fn(),
+  deactivateIdentityMock: vi.fn(),
 }));
 
 vi.mock('./admin', async (importOriginal) => {
@@ -60,6 +66,7 @@ vi.mock('./admin', async (importOriginal) => {
     listIdentities: listIdentitiesMock,
     patchAdminMarker: patchAdminMarkerMock,
     updateIdentity: updateIdentityMock,
+    deactivateIdentity: deactivateIdentityMock,
   };
 });
 
@@ -73,13 +80,21 @@ vi.mock('./admin-api', async (importOriginal) => {
   return { ...actual, deleteCredential: deleteCredentialMock };
 });
 
-import { deleteAction, saveAction, revokeAdminAction, removeCredentialAction, grantAdminAction, type ActionContext } from './admin-actions.js';
+import {
+  deleteAction,
+  deactivateAction,
+  saveAction,
+  revokeAdminAction,
+  removeCredentialAction,
+  grantAdminAction,
+  type ActionContext,
+} from './admin-actions.js';
 import type { Identity } from './types.js';
 import { RevokeError } from './revoke.js';
 import { identity, withLookupSecret, withPasskey, withTotp, withWebauthnKey } from './test-builders.js';
 
-function makeIdentity(username: string, admin?: boolean): Identity {
-  return identity({ username, ...(admin === undefined ? {} : { metadataAdmin: { admin } }) });
+function makeIdentity(username: string, admin?: boolean, state?: 'active' | 'inactive'): Identity {
+  return identity({ username, state, ...(admin === undefined ? {} : { metadataAdmin: { admin } }) });
 }
 
 const ADD: Record<string, (i: Identity) => Identity> = {
@@ -115,6 +130,7 @@ beforeEach(() => {
   listIdentitiesMock.mockReset().mockResolvedValue([]);
   patchAdminMarkerMock.mockReset().mockResolvedValue(undefined);
   deleteCredentialMock.mockReset().mockResolvedValue(undefined);
+  deactivateIdentityMock.mockReset().mockResolvedValue(undefined);
   updateIdentityMock.mockReset().mockResolvedValue(undefined);
   revokeSubjectMock.mockReset().mockResolvedValue(undefined);
   revokeConsentSessionsMock.mockReset().mockResolvedValue(undefined);
@@ -191,7 +207,8 @@ describe('deleteAction', () => {
 // ── saveAction ────────────────────────────────────────────────────────────────
 
 describe('saveAction', () => {
-  const MANIFESTS = [{ clientId: 'wiki' }] as unknown as ActionContext['manifests'];
+  // Both groups are offered as access checkboxes, as the form renders them.
+  const MANIFESTS = [{ clientId: 'wiki', accessGroups: ['family', 'media'], groupRoleMap: {} }] as unknown as ActionContext['manifests'];
 
   function saveForm(groups: string[], role?: string): FormData {
     const f = fd({ username: 'alice.smith', email: 'alice.smith@othala.test' });
@@ -236,6 +253,39 @@ describe('saveAction', () => {
     expect(revokeConsentSessionsMock).not.toHaveBeenCalled();
   });
 
+  it('keeps a stored group the form offers no checkbox for', async () => {
+    const outcome = await saveAction(saveForm(['family']), makeCtx({ identity: stored(['family', 'garden']), manifests: MANIFESTS }));
+
+    expect(updateIdentityMock.mock.calls[0][1].metadataAdmin.groups).toEqual(['family', 'garden']);
+    expect(revokeConsentSessionsMock).not.toHaveBeenCalled();
+    expect(outcome.actionResult?.kind).toBe('updated');
+  });
+
+  it('keeps a stored group bound only as a role key', async () => {
+    const manifests = [
+      { clientId: 'wiki', accessGroups: ['family'], groupRoleMap: { 'wiki-admin': 'admin' } },
+    ] as unknown as ActionContext['manifests'];
+    await saveAction(saveForm(['family']), makeCtx({ identity: stored(['family', 'wiki-admin']), manifests }));
+
+    expect(updateIdentityMock.mock.calls[0][1].metadataAdmin.groups).toEqual(['family', 'wiki-admin']);
+  });
+
+  it('drops a stored unconfigured group only when its removal is ticked, then revokes', async () => {
+    const f = saveForm(['family']);
+    f.append('clearUnconfigured', 'garden');
+    await saveAction(f, makeCtx({ identity: stored(['family', 'garden']), manifests: MANIFESTS }));
+
+    expect(updateIdentityMock.mock.calls[0][1].metadataAdmin.groups).toEqual(['family']);
+    expect(revokeConsentSessionsMock).toHaveBeenCalledWith('target-1');
+  });
+
+  it('does not count a kept unconfigured group toward the identity-group minimum', async () => {
+    const outcome = await saveAction(saveForm([]), makeCtx({ identity: stored(['garden']), manifests: MANIFESTS }));
+
+    expect(updateIdentityMock).not.toHaveBeenCalled();
+    expect(outcome.formErrors?.identityGroups).toBeDefined();
+  });
+
   it('reports a revocation failure as an error after the save stood', async () => {
     revokeConsentSessionsMock.mockRejectedValue(new RevokeError('hydra-admin', 'revoke-consent-sessions', 'Verify HYDRA_ADMIN_URL.'));
     const outcome = await saveAction(saveForm(['family']), makeCtx({ identity: stored(['family', 'media']), manifests: MANIFESTS }));
@@ -264,6 +314,15 @@ describe('revokeAdminAction', () => {
     listIdentitiesMock.mockResolvedValue([makeIdentity('sole-admin', true)]);
     const identity = makeIdentity('sole-admin', true);
     const outcome = await revokeAdminAction(fd(), makeCtx({ id: 'target-1', identity, adminIdentityId: 'admin-1' }));
+
+    expect(patchAdminMarkerMock).not.toHaveBeenCalled();
+    if (outcome instanceof Response) throw new Error('unreachable');
+    expect(outcome.actionResult?.kind).toBe('error');
+  });
+
+  it('refuses when the only other admin is inactive', async () => {
+    listIdentitiesMock.mockResolvedValue([makeIdentity('other-admin', true, 'inactive'), makeIdentity('target', true)]);
+    const outcome = await revokeAdminAction(fd(), makeCtx({ identity: makeIdentity('target', true) }));
 
     expect(patchAdminMarkerMock).not.toHaveBeenCalled();
     if (outcome instanceof Response) throw new Error('unreachable');
@@ -331,10 +390,64 @@ describe('removeCredentialAction', () => {
     expect(outcome.actionResult?.kind).toBe('credential-removed');
   });
 
+  it('refuses removing the acting admin\'s own last second factor', async () => {
+    const identity = withCreds(makeIdentity('self'), 'webauthn');
+    const outcome = await removeCredentialAction(
+      fd({ cred_type: 'webauthn' }),
+      makeCtx({ id: 'admin-1', identity, adminIdentityId: 'admin-1' }),
+    );
+
+    expect(deleteCredentialMock).not.toHaveBeenCalled();
+    if (outcome instanceof Response) throw new Error('unreachable');
+    expect(outcome.actionResult && 'message' in outcome.actionResult ? outcome.actionResult.message : '').toMatch(/your own last/);
+  });
+
+  it('allows the acting admin to remove one second factor while another remains', async () => {
+    const identity = withCreds(makeIdentity('self', true), 'totp', 'webauthn');
+    await removeCredentialAction(fd({ cred_type: 'webauthn' }), makeCtx({ id: 'admin-1', identity, adminIdentityId: 'admin-1' }));
+    expect(deleteCredentialMock).toHaveBeenCalledWith('admin-1', 'webauthn');
+  });
+
   it('allows removing backup codes of an admin-marked target that keeps totp', async () => {
     const identity = withCreds(makeIdentity('root', true), 'totp', 'lookup_secret');
     await removeCredentialAction(fd({ cred_type: 'lookup_secret' }), makeCtx({ identity }));
     expect(deleteCredentialMock).toHaveBeenCalled();
+  });
+});
+
+// ── deactivateAction ────────────────────────────────────────────────────────
+
+describe('deactivateAction', () => {
+  it('refuses self-deactivation and never calls deactivateIdentity', async () => {
+    listIdentitiesMock.mockResolvedValue([makeIdentity('admin', true), makeIdentity('other', true)]);
+    const outcome = await deactivateAction(fd(), makeCtx({ id: 'admin-1', identity: makeIdentity('admin', true), adminIdentityId: 'admin-1' }));
+
+    expect(deactivateIdentityMock).not.toHaveBeenCalled();
+    expect(outcome.actionResult?.kind).toBe('error');
+  });
+
+  it('refuses the last active admin, counting an inactive admin as absent', async () => {
+    listIdentitiesMock.mockResolvedValue([makeIdentity('target', true), makeIdentity('dormant', true, 'inactive')]);
+    const outcome = await deactivateAction(fd(), makeCtx({ identity: makeIdentity('target', true) }));
+
+    expect(deactivateIdentityMock).not.toHaveBeenCalled();
+    expect(outcome.actionResult?.kind).toBe('error');
+  });
+
+  it('deactivates an admin while another active admin remains', async () => {
+    listIdentitiesMock.mockResolvedValue([makeIdentity('target', true), makeIdentity('other', true)]);
+    const outcome = await deactivateAction(fd(), makeCtx({ identity: makeIdentity('target', true) }));
+
+    expect(deactivateIdentityMock).toHaveBeenCalledWith('target-1');
+    expect(outcome.actionResult?.kind).toBe('deactivated');
+  });
+
+  it('deactivates a member without an admin count', async () => {
+    const outcome = await deactivateAction(fd(), makeCtx());
+
+    expect(listIdentitiesMock).not.toHaveBeenCalled();
+    expect(deactivateIdentityMock).toHaveBeenCalledWith('target-1');
+    expect(outcome.actionResult?.kind).toBe('deactivated');
   });
 });
 

@@ -24,8 +24,9 @@ import { deleteCredential, EVICTABLE_CREDENTIAL_TYPES } from './admin-api';
 import { isAdminMarker } from './admin-auth';
 import { hasSecondFactor } from './step-up';
 import { sendInviteRecoveryEmail } from './kratos';
-import { confirmsInviteAddress, normalizeGroupOrder, shouldRefuseRecovery } from './access';
-import { planGroupSave } from './gate';
+import { confirmsInviteAddress, IDENTITY_GROUP_ORDER, normalizeGroupOrder, shouldRefuseRecovery } from './access';
+import { identityGroups as storedGroups, planGroupSave } from './gate';
+import { buildGroupRegistry, unconfiguredGroups } from './group-registry';
 import { revokeConsentSessions, revokeSubject } from './revoke';
 import type { ClientManifest } from './manifests';
 import type { Identity } from './types';
@@ -92,9 +93,21 @@ export async function saveAction(fd: FormData, ctx: ActionContext): Promise<Acti
   const accessGroups = fd.getAll('accessGroups').map(String).filter(Boolean);
   if (identityGroups.length === 0) formErrors.identityGroups = 'Pick at least one identity group.';
 
+  // Stored groups the form renders no checkbox for stay unless removed by an
+  // explicit tick. They never count toward the identity-group minimum above.
+  const clearUnconfigured = new Set(fd.getAll('clearUnconfigured').map(String));
+  const keptUnconfigured = unconfiguredGroups(
+    buildGroupRegistry(manifests, IDENTITY_GROUP_ORDER),
+    storedGroups(identity),
+  ).filter((g) => !clearUnconfigured.has(g));
+
   // Repair surface for refuseNonCanonical (gate.ts): planGroupSave decides
   // the write from the STORED identity, never from submitted checkboxes.
-  const groupPlan = planGroupSave(identity, [...identityGroups, ...accessGroups], fd.getAll('clearNonCanonical').map(String));
+  const groupPlan = planGroupSave(
+    identity,
+    [...identityGroups, ...accessGroups, ...keptUnconfigured],
+    fd.getAll('clearNonCanonical').map(String),
+  );
   if (groupPlan.refusal) formErrors.nonCanonicalGroups = groupPlan.refusal;
 
   const knownClientIds = new Set(manifests.map((m) => m.clientId));
@@ -193,8 +206,34 @@ export async function forceReloginAction(_fd: FormData, ctx: ActionContext): Pro
   return { actionResult: { kind: 'revoked', result }, refetch: false };
 }
 
+function isActiveAdmin(identity: Identity): boolean {
+  return isAdminMarker(identity) && identity.state !== 'inactive';
+}
+
+/** True when taking `target` out of service would leave no active admin. */
+async function leavesNoActiveAdmin(target: Identity): Promise<boolean> {
+  if (!isActiveAdmin(target)) return false;
+  const active = (await listIdentities()).filter(isActiveAdmin).length;
+  return active <= 1;
+}
+
 export async function deactivateAction(_fd: FormData, ctx: ActionContext): Promise<ActionOutcome> {
   const username = ctx.identity.traits?.username ?? ctx.id;
+  if (ctx.id === ctx.adminIdentityId) {
+    return {
+      actionResult: {
+        kind: 'error',
+        message: 'You cannot deactivate your own identity via the UI. Have another admin do it.',
+      },
+      refetch: false,
+    };
+  }
+  if (await leavesNoActiveAdmin(ctx.identity)) {
+    return {
+      actionResult: { kind: 'error', message: `Refusing to deactivate: ${username} is the last active admin. Grant admin to another identity first.` },
+      refetch: false,
+    };
+  }
   await deactivateIdentity(ctx.id);
   return { actionResult: { kind: 'deactivated', username }, refetch: true };
 }
@@ -260,6 +299,11 @@ const SECOND_FACTOR_REQUIRED: ActionResult = {
   message: 'Admin accounts need an authenticator app or security key enrolled.',
 };
 
+const OWN_SECOND_FACTOR_REQUIRED: ActionResult = {
+  kind: 'error',
+  message: 'You cannot remove your own last authenticator app or security key. Enroll another one first.',
+};
+
 export async function grantAdminAction(_fd: FormData, ctx: ActionContext): Promise<ActionOutcome> {
   const username = ctx.identity.traits?.username ?? ctx.id;
   if (!hasSecondFactor(ctx.identity)) {
@@ -283,12 +327,10 @@ export async function revokeAdminAction(_fd: FormData, ctx: ActionContext): Prom
       refetch: false,
     };
   }
-  // Last-admin guard: refuse if this would leave zero admins.
-  const all = await listIdentities();
-  const adminCount = all.filter((i) => (i.metadata_admin as Record<string, unknown> | undefined)?.['admin'] === true).length;
-  if (adminCount <= 1) {
+  // Last-admin guard: refuse if this would leave zero active admins.
+  if (await leavesNoActiveAdmin(identity)) {
     return {
-      actionResult: { kind: 'error', message: `Refusing to revoke: ${username} is the last admin. Grant admin to another identity first.` },
+      actionResult: { kind: 'error', message: `Refusing to revoke: ${username} is the last active admin. Grant admin to another identity first.` },
       refetch: false,
     };
   }
@@ -319,11 +361,12 @@ export async function removeCredentialAction(fd: FormData, ctx: ActionContext): 
       refetch: false,
     };
   }
-  if (isAdminMarker(ctx.identity)) {
+  const self = ctx.id === ctx.adminIdentityId;
+  if (self || isAdminMarker(ctx.identity)) {
     const creds = { ...(ctx.identity.credentials ?? {}) } as Record<string, unknown>;
     delete creds[credType];
     if (!hasSecondFactor({ ...ctx.identity, credentials: creds as Identity['credentials'] })) {
-      return { actionResult: SECOND_FACTOR_REQUIRED, refetch: false };
+      return { actionResult: self ? OWN_SECOND_FACTOR_REQUIRED : SECOND_FACTOR_REQUIRED, refetch: false };
     }
   }
   await deleteCredential(ctx.id, credType);
