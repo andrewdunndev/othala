@@ -7,7 +7,9 @@ aims to follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 The git tag is the authoritative version; `portal/package.json` mirrors it.
 This CHANGELOG and git tags carry the deployed-instance release state.
 
-## [Unreleased]
+## [0.6.4] - 2026-09-29
+
+Session and profile lifecycle: access ends where it should, identity fields apps key on are admin-controlled, and admin accounts cannot lock themselves out.
 
 ### Changed
 
@@ -25,7 +27,7 @@ This CHANGELOG and git tags carry the deployed-instance release state.
 - The error page shows only reasons it recognises.
 - Admin accounts keep at least one authenticator app or security key through settings.
 - The admin console refuses to deactivate your own identity or the last active admin, and to remove your own last authenticator app or security key.
-- Signing out takes a form post with a a token bound to the signed-in identity; opening `/auth/logout` shows a confirm button.
+- Signing out takes a form post with a token bound to the signed-in identity; opening `/auth/logout` shows a confirm button.
 - Saving an identity in the admin console keeps stored groups that have no checkbox (role-mapped or not configured); removing one is an explicit tick.
 - The reference forward-auth snippet runs its header strip, session check and proxy in a `route` block, so the verified identity id reaches the upstream.
 - The portal's `form-action` policy admits the Kratos origin, so signing out works when Kratos is on another host.
@@ -140,6 +142,7 @@ Security hardening pass (CVP), access-model refactor, PII-safe OpenTelemetry tra
 
 The convergence release: a breaking move from a build-time app catalog to a runtime manifest model, plus the rename to **Othala** ("Ory for your home").
 
+[0.6.4]: https://gitlab.com/dunn.dev/othala/-/releases/v0.6.4
 [0.6.3]: https://gitlab.com/dunn.dev/othala/-/releases/v0.6.3
 [0.6.2]: https://gitlab.com/dunn.dev/othala/-/releases/v0.6.2
 [0.6.1]: https://gitlab.com/dunn.dev/othala/-/releases/v0.6.1
