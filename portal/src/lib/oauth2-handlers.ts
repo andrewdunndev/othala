@@ -33,6 +33,7 @@ import { composeIDTokenClaims } from './claims';
 import type { ClientManifest } from './manifests';
 import { servingManifest } from './manifest-store';
 import { verifyToken, CSRFError } from './csrf';
+import { needsStepUp } from './step-up';
 
 const LOGIN_REMEMBER_FOR = 86400; // 24h
 
@@ -171,6 +172,7 @@ export async function handleLogin(req: Request, deps: Deps = {}): Promise<Respon
   let subject: string;
   let remember = false;
   let acr: string | undefined;
+  let liveSession: Session;
 
   if (login.skip) {
     // Hydra remembers this subject, but Kratos is the authentication authority.
@@ -189,6 +191,7 @@ export async function handleLogin(req: Request, deps: Deps = {}): Promise<Respon
       return redirect(loginURL);
     }
     subject = login.subject;
+    liveSession = session;
     acr = session.authenticator_assurance_level ?? undefined;
   } else {
     let session: Session | null;
@@ -205,6 +208,7 @@ export async function handleLogin(req: Request, deps: Deps = {}): Promise<Respon
       return redirect(loginURL);
     }
     subject = session.identity.id;
+    liveSession = session;
     remember = true;
     acr = session.authenticator_assurance_level ?? undefined;
   }
@@ -232,6 +236,14 @@ export async function handleLogin(req: Request, deps: Deps = {}): Promise<Respon
     } catch {
       return new Response('upstream error', { status: 502 });
     }
+  }
+
+  // Second-factor step-up: an account with totp/webauthn, or the admin marker,
+  // completes aal2 before any app sign-in is accepted. Kratos returns to this
+  // challenge afterwards and the aal2 session is accepted with acr aal2.
+  if (needsStepUp(liveSession, identity)) {
+    const returnTo = buildLoginReturnTo(challenge);
+    return redirect(`${loginUIBase()}?aal=aal2&return_to=${encodeURIComponent(returnTo)}`);
   }
 
   try {

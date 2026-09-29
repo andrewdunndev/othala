@@ -151,9 +151,9 @@ The body is advisory; the edge keys on the status.
 | Status | Meaning |
 |---|---|
 | **200** | Allow. |
-| **401** | No usable session. |
+| **401** | No usable session, or aal2 step-up due. |
 | **403** | Refused. Either **on the merits** (inactive identity, a non-canonical stored group, or a group miss) **or** a missing or malformed `group` parameter. **403 therefore does not mean exactly one thing.** |
-| **503** | The identity service or its admin API did not answer. |
+| **503** | Kratos or its admin API did not answer. |
 
 The odd member is the malformed parameter, and it is deliberate: that is a broken deployment, static
 per site, denying every request to that site rather than one person's. It is not an outage, so it

@@ -9,6 +9,13 @@ This CHANGELOG and git tags carry the deployed-instance release state.
 
 ## [Unreleased]
 
+### Changed
+
+- Signing in to connected apps now completes second-factor verification for
+  accounts that have one enrolled, and for admin accounts. Admin accounts sign
+  in with a passkey or password rather than an emailed code. Granting admin
+  requires an enrolled second factor.
+
 ## [0.6.2] - 2026-09-26
 
 Quieter health-probe logs, a markdown-sanitizer gap closed, and three

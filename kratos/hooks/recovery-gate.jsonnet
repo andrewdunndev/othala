@@ -5,7 +5,8 @@
 // Bearer RECOVERY_GATE_SECRET) after the recovery code is verified,
 // BEFORE issuing the privileged settings session. The gate refuses
 // recovery for admin identities, so a compromised mailbox is not a path to
-// admin authority.
+// admin authority. The login-by-code gate (/admin/login-code-gate, on
+// selfservice.flows.login.after.code) posts this same body.
 //
 // Kratos v26.2.0 serialization gap: ctx.identity omits `metadata_admin` in the
 // after-hook body-template context, so `is_admin` below always evaluates to

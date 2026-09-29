@@ -365,3 +365,73 @@ test('responses carry Cache-Control: no-store', async () => {
   const res = await GET(ctx('access-proxywatch'));
   assert.match(res.headers.get('Cache-Control') ?? '', /no-store/);
 });
+
+// ─── second-factor step-up ──────────────────────────────────────────────────
+//
+// Same rule as app sign-in (lib/step-up.ts): an aal1 session of an identity
+// holding totp/webauthn (or the admin marker) is sent back to login (401).
+
+function sessionAt(aal) {
+  return { status: 200, body: { active: true, authenticator_assurance_level: aal, identity: { id: 'id-1', traits: {} } } };
+}
+
+// Enrolled configs as the Kratos admin API returns them (lib/step-up.ts).
+const ENROLLED_CONFIG = {
+  totp: { totp_url: 'otpauth://totp/othala:a?secret=JBSWY3DPEHPK3PXP' },
+  webauthn: { credentials: [{ id: 'w', is_passwordless: false }] },
+};
+
+function inGroupWith(...types) {
+  return {
+    status: 200,
+    body: {
+      ...ACTIVE_IN_GROUP.body,
+      credentials: Object.fromEntries(types.map((t) => [t, { type: t, identifiers: ['a'], config: ENROLLED_CONFIG[t] ?? {} }])),
+    },
+  };
+}
+
+test('aal1 session, identity holds totp → 401 (step up)', async () => {
+  installFetch({ whoami: sessionAt('aal1'), identity: inGroupWith('password', 'totp') });
+  const res = await GET(ctx('access-proxywatch'));
+  assert.equal(res.status, 401);
+  assert.equal(res.headers.get('X-Kratos-Authenticated-Identity-Id'), null);
+  assert.equal((await HEAD(ctx('access-proxywatch'))).status, 401);
+});
+
+test('aal1 session, admin-marked identity with no second factor → 401 (step up)', async () => {
+  const base = inGroupWith('password');
+  installFetch({
+    whoami: sessionAt('aal1'),
+    identity: { status: 200, body: { ...base.body, metadata_admin: { ...base.body.metadata_admin, admin: true } } },
+  });
+  const res = await GET(ctx('access-proxywatch'));
+  assert.equal(res.status, 401);
+  assert.equal(res.headers.get('X-Kratos-Authenticated-Identity-Id'), null);
+});
+
+test('aal2 session, identity holds totp → 200', async () => {
+  installFetch({ whoami: sessionAt('aal2'), identity: inGroupWith('password', 'totp') });
+  const res = await GET(ctx('access-proxywatch'));
+  assert.equal(res.status, 200);
+});
+
+test('aal1 session, passkey-only identity → 200 (no second factor to ask for)', async () => {
+  installFetch({ whoami: sessionAt('aal1'), identity: inGroupWith('passkey', 'lookup_secret') });
+  const res = await GET(ctx('access-proxywatch'));
+  assert.equal(res.status, 200);
+});
+
+test('aal1 session, password identity with the schema webauthn entry and no keys → 200', async () => {
+  const base = inGroupWith('password');
+  const credentials = { ...base.body.credentials, webauthn: { type: 'webauthn', identifiers: ['a'], config: {} } };
+  installFetch({ whoami: sessionAt('aal1'), identity: { status: 200, body: { ...base.body, credentials } } });
+  const res = await GET(ctx('access-proxywatch'));
+  assert.equal(res.status, 200);
+});
+
+test('aal1 session, identity NOT in group but holds totp → 403 (the gate answers first)', async () => {
+  installFetch({ whoami: sessionAt('aal1'), identity: inGroupWith('totp') });
+  const res = await GET(ctx('photos'));
+  assert.equal(res.status, 403);
+});

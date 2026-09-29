@@ -33,7 +33,9 @@ export const prerender = false;
 
 import Layout from '../../layouts/Layout.astro';
 import PageHero from '../../components/PageHero.astro';
-import { browserFlows, getLoginFlow } from '../../lib/kratos';
+import { browserFlows, getLoginFlow, getSession } from '../../lib/kratos';
+import { getIdentity } from '../../lib/admin-api';
+import { needsStepUp } from '../../lib/step-up';
 import { siteName } from '../../lib/config';
 import { csrfToken, nodesByGroup, asInput, scriptNodes, safeOnclick } from '../../lib/nodes';
 import { deriveLoginTiers } from '../../lib/login-tiers';
@@ -41,10 +43,25 @@ import type { FlowMessage } from '../../lib/types';
 
 const url = Astro.url;
 const flowId = url.searchParams.get('flow');
-const aal = (url.searchParams.get('aal') as 'aal1' | 'aal2' | null) ?? undefined;
+let aal = (url.searchParams.get('aal') as 'aal1' | 'aal2' | null) ?? undefined;
 const refresh = url.searchParams.get('refresh') === 'true';
 const returnTo = url.searchParams.get('return_to') ?? undefined;
 const isDev = import.meta.env.DEV;
+const cookie = Astro.request.headers.get('cookie') ?? undefined;
+
+// A live aal1 session that must step up (lib/step-up.ts) gets an aal2 flow.
+// Without this, Kratos answers "already signed in" and returns the browser to
+// return_to, which a forward-auth 401 sends straight back here.
+if (!flowId && !aal && !isDev) {
+  try {
+    const session = await getSession(cookie);
+    if (session?.active && session.identity?.id && needsStepUp(session, await getIdentity(session.identity.id))) {
+      aal = 'aal2';
+    }
+  } catch {
+    // No step-up decision without Kratos; the plain flow below still works.
+  }
+}
 
 // Dev fallback: when Kratos isn't reachable from `npm run dev`, the
 // browser-flow redirect would leave the page on a dead URL. Skip the
@@ -52,8 +69,6 @@ const isDev = import.meta.env.DEV;
 if (!flowId && !isDev) {
   return Astro.redirect(browserFlows.login({ aal, refresh, returnTo }));
 }
-
-const cookie = Astro.request.headers.get('cookie') ?? undefined;
 
 const result = flowId ? await getLoginFlow(flowId, cookie).catch(() => null) : null;
 

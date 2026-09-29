@@ -62,13 +62,11 @@ and for a segmented deployment. This is the commitment most worth re-examining
 as a deployment grows, and [Hardening](hardening.md) states its residual risk
 plainly. **Cost of opening it:** operator time, permanently.
 
-## 6. Exactly one place where a Kratos flow is extended
+## 6. One admin-marker gate extends Kratos flows
 
-The recovery-gate webhook is the only interception point. It exists because
-mailbox compromise into admin takeover is the worst-case footgun, so admin
-identities are refused email recovery at the gate. Webhooks are a stable
-primitive with a bounded config surface; `portal/src/lib/access.ts` holds the
-handler and `portal/scripts/recovery-gate.fuzz.test.mjs` fuzzes it. **Cost of
+One handler in `portal/src/server/listen.mjs` refuses admin identities email
+recovery and sign-in by emailed code, so email alone never yields admin
+authority. `portal/scripts/recovery-gate.fuzz.test.mjs` fuzzes it. **Cost of
 opening it:** every additional webhook is another contract with Kratos's
 webhook schema to re-verify on each bump. Add carefully.
 

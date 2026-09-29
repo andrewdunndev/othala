@@ -16,13 +16,14 @@
 //       GET  /healthz, /readyz        — liveness/readiness probes
 //       POST /admin/revoke-user       — admin force-logout fan-out (CU3 B1)
 //       POST /admin/recovery-gate     — Kratos recovery-gate webhook (CU3)
+//       POST /admin/login-code-gate   — Kratos login-by-code webhook
 //     It NEVER delegates to the Astro `handler`, so no public route and no
 //     challenge provider is reachable on the admin port — and the public
 //     handler never sees admin paths. The two muxes are disjoint.
 //
 //   Secret model (CU3): the admin port uses two PURPOSE-NAMED secrets:
 //     - OTHALA_ADMIN_ENDPOINT_BEARER  guards POST /admin/revoke-user
-//     - RECOVERY_GATE_SECRET        guards POST /admin/recovery-gate
+//     - RECOVERY_GATE_SECRET        guards both webhook gates above
 //   Both checks are CONSTANT-TIME (timingSafeEqual) and FAIL-CLOSED (an
 //   unset secret rejects every request). The revoke fan-out is in-process;
 //   there is no portal->consent admin HTTP hop.
@@ -42,7 +43,7 @@ const ADMIN_HOST = process.env.ADMIN_HOST ?? '127.0.0.1';
 /** GET routes the admin mux serves. Disjoint from the public routes. */
 export const ADMIN_GET_ROUTES = new Set(['/healthz', '/readyz']);
 /** POST routes the admin mux serves. Disjoint from the public routes. */
-export const ADMIN_POST_ROUTES = new Set(['/admin/revoke-user', '/admin/recovery-gate']);
+export const ADMIN_POST_ROUTES = new Set(['/admin/revoke-user', '/admin/recovery-gate', '/admin/login-code-gate']);
 
 /** Back-compat: the GET probe routes (CU1 contract test imports this name). */
 export const ADMIN_ROUTES = ADMIN_GET_ROUTES;
@@ -280,9 +281,20 @@ export async function fetchAdminMarker(identityId) {
   // It is writable only via the admin API, never via self-service flows.
   const isAdmin = identity?.metadata_admin?.admin;
   if (isAdmin === true) {
-    return { refuse: true, reason: 'admin recovery is console-only' };
+    return { refuse: true, admin: true, reason: 'admin recovery is console-only' };
   }
   return { refuse: false, reason: '' };
+}
+
+/**
+ * The login-by-code gate's user-facing text. An admin marker refuses with the
+ * first line; any fail-closed path (no id, admin API unreachable) the second.
+ */
+export const LOGIN_CODE_ADMIN_REFUSAL = 'Admin accounts sign in with a passkey or password.';
+export const LOGIN_CODE_UNAVAILABLE = 'Sign-in by code is unavailable right now. Use a passkey or password.';
+
+export function loginCodeRefusalText(verdict) {
+  return verdict?.admin === true ? LOGIN_CODE_ADMIN_REFUSAL : LOGIN_CODE_UNAVAILABLE;
 }
 
 /**
@@ -303,7 +315,20 @@ export async function fetchAdminMarker(identityId) {
  * directly from the admin API using the identity_id forwarded in the payload.
  * The payload's is_admin is not used for the admin-marker decision.
  */
-export async function handleRecoveryGate(req, res) {
+export function handleRecoveryGate(req, res) {
+  return handleAdminMarkerGate(req, res, (verdict) => `recovery refused: ${verdict.reason}`);
+}
+
+/**
+ * Handle POST /admin/login-code-gate: the same bearer, payload and admin-API
+ * lookup as the recovery gate, wired to selfservice.flows.login.after.code.
+ * An admin-marked identity is refused a session from an emailed code.
+ */
+export function handleLoginCodeGate(req, res) {
+  return handleAdminMarkerGate(req, res, loginCodeRefusalText);
+}
+
+async function handleAdminMarkerGate(req, res, refusalText) {
   const expected = process.env.RECOVERY_GATE_SECRET ?? '';
   if (!bearerMatches(parseBearer(req.headers?.authorization), expected)) {
     // 403 not 401: Kratos webhooks use can_interrupt: true; a non-403 response
@@ -318,7 +343,7 @@ export async function handleRecoveryGate(req, res) {
   } catch {
     // Fail-closed: an unparseable webhook body refuses recovery.
     sendJson(res, 403, {
-      messages: [{ messages: [{ type: 'error', text: 'recovery refused: malformed payload' }] }],
+      messages: [{ messages: [{ type: 'error', text: refusalText({ reason: 'malformed payload' }) }] }],
     });
     return;
   }
@@ -327,7 +352,7 @@ export async function handleRecoveryGate(req, res) {
   const id = body?.identity_id ?? body?.identity?.id;
   if (typeof id !== 'string' || id.trim().length === 0) {
     sendJson(res, 403, {
-      messages: [{ messages: [{ type: 'error', text: 'recovery refused: unidentifiable subject (fail-closed)' }] }],
+      messages: [{ messages: [{ type: 'error', text: refusalText({ reason: 'unidentifiable subject (fail-closed)' }) }] }],
     });
     return;
   }
@@ -339,7 +364,7 @@ export async function handleRecoveryGate(req, res) {
   const adminVerdict = await fetchAdminMarker(id);
   if (adminVerdict.refuse) {
     sendJson(res, 403, {
-      messages: [{ messages: [{ type: 'error', text: `recovery refused: ${adminVerdict.reason}` }] }],
+      messages: [{ messages: [{ type: 'error', text: refusalText(adminVerdict) }] }],
     });
     return;
   }
@@ -362,6 +387,10 @@ export async function handleAdminRequest(req, res, runtime) {
   }
   if (method === 'POST' && path === '/admin/recovery-gate') {
     await handleRecoveryGate(req, res);
+    return;
+  }
+  if (method === 'POST' && path === '/admin/login-code-gate') {
+    await handleLoginCodeGate(req, res);
     return;
   }
 
