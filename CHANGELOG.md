@@ -22,6 +22,7 @@ This CHANGELOG and git tags carry the deployed-instance release state.
 - The error page shows only reasons it recognises.
 - Admin accounts keep at least one authenticator app or security key through settings.
 - The admin console refuses to deactivate your own identity or the last active admin, and to remove your own last authenticator app or security key.
+- Signing out takes a form post with a per-page token; opening `/auth/logout` shows a confirm button.
 - Saving an identity in the admin console keeps stored groups that are not configured; removing one is an explicit tick.
 
 ## [0.6.3] - 2026-09-29
