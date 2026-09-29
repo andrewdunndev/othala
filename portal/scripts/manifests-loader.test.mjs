@@ -194,7 +194,7 @@ test('presentation-only manifest (forward_auth, no oidc:) parses with the access
   // proxywatch.yaml shape: a presentation: block, no oidc: client. It must parse
   // (not throw), flag presentationOnly, derive clientId from the filename slug,
   // and carry the access binding through. This is the first-class
-  // forward_auth / ldap tile type.
+  // forward_auth tile type.
   const out = parseManifest(
     `
 presentation:

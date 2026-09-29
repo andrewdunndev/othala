@@ -21,8 +21,6 @@ venv/
 
 # Build artifacts (Go binaries; rebuilt locally / in CI)
 /consent/consent
-# ldap-bridge was extracted to gitlab.com/dunn.dev/kratos-ldap; its
-# build artifacts no longer live here.
 
 # Local maintainability backlog (working notes; synthesist is the eventual home)
 /TODO.md

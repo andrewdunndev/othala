@@ -13,7 +13,7 @@
  *     in BOTH directions, and assert the binding wins every time.
  *
  *   EVERY auth_kind COUNTS (B4). The loader used to drop presentation-only
- *     manifests, so every forward_auth / ldap / external tile's access group was
+ *     manifests, so every forward_auth / external tile's access group was
  *     invisible to the registry. Invisible meant no checkbox in the
  *     identity-edit form, and admin/users/[id].astro rewrites
  *     metadata_admin.groups wholesale from the rendered boxes — so every save
@@ -103,12 +103,12 @@ consent:
     grafana-access: user
 `;
 
-/** auth_kind: oidc+ldap — still an OIDC client as far as this loader cares. */
+/** auth_kind: oidc, plural binding. */
 const PROMPTDESK = `
 presentation:
   name: Promptdesk
   url: https://promptdesk.example.test
-  auth_kind: oidc+ldap
+  auth_kind: oidc
   access:
     - promptdesk-access
 oidc:
@@ -165,12 +165,12 @@ presentation:
   access_group: downloads-usenet-access
 `;
 
-/** auth_kind: ldap — presentation-only, plural binding. */
+/** auth_kind: forward_auth — presentation-only, plural binding. */
 const FILEDROP = `
 presentation:
   name: Filedrop
   url: https://filedrop.example.test
-  auth_kind: ldap
+  auth_kind: forward_auth
   access:
     - filedrop-access
 `;
@@ -254,7 +254,7 @@ const CATALOG: Record<string, string> = {
  * Deliberately not derived from CATALOG: this list is what makes the
  * completeness tests non-vacuous. Four of the six entries come from manifests
  * that register no OIDC client at all (proxywatch / fetcher+series / filedrop /
- * audiobookshelf — forward_auth, forward_auth, ldap, external). If any upstream
+ * audiobookshelf — forward_auth, forward_auth, forward_auth, external). If any upstream
  * filter ever drops presentation-only manifests again, this list is what
  * notices. statuspage contributes nothing: it declares no binding.
  */
@@ -450,7 +450,7 @@ describe('getGroupRegistry — completeness over the real loader', () => {
     writeCatalog();
     const reg = getGroupRegistry();
 
-    // forward_auth (singular shim), forward_auth (shared), ldap, external.
+    // forward_auth (singular shim), forward_auth (shared), forward_auth (plural), external.
     // Every one of these registers no OIDC client, and every one of them is a
     // group the reverse proxy really gates on — so every one must be visible
     // here or the admin UI drops it on the next identity save.

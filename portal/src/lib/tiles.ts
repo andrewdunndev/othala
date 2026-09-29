@@ -54,7 +54,7 @@ function resolveIconHref(iconSlug: string | undefined): string | undefined {
   return existsSync(candidate) ? `/icons/${iconSlug}.svg` : undefined;
 }
 
-export type AuthKind = 'oidc' | 'oidc+ldap' | 'forward_auth' | 'ldap' | 'external';
+export type AuthKind = 'oidc' | 'forward_auth' | 'external';
 
 /** Metadata for a named tile group, sourced from groups.yaml. */
 export interface GroupMeta {

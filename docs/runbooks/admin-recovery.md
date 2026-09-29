@@ -44,7 +44,7 @@ authenticator app, and backup codes saved.
 
 Admin status is the `metadata_admin.admin` flag on a Kratos identity — a
 boolean set only via the Kratos admin API, never through self-service flows,
-OIDC claims, or LDAP attributes. The portal reads this flag fresh on every
+or OIDC claims. The portal reads this flag fresh on every
 request via `GET /admin/identities/:id`.
 
 This is deliberate: an attacker who gains access to the portal UI or a family

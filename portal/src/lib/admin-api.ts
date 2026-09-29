@@ -85,9 +85,8 @@ export interface UpdateIdentityInput {
 // identities) this is fine and the truncation never bites.
 //
 // If the estate ever grows bot/service identities, mirror the
-// pagination loop pattern from gitlab.com/dunn.dev/kratos-ldap and
-// follow `next` Link headers until exhausted. Today it's deliberately
-// unimplemented.
+// pagination loop pattern and follow `next` Link headers until exhausted.
+// Today it is deliberately unimplemented.
 export async function listIdentities(): Promise<Identity[]> {
   return identityApi().listIdentities({ perPage: 250 });
 }
@@ -161,10 +160,9 @@ export async function revokeSession(id: string): Promise<void> {
  * Mark the identity inactive AND run the full revocation fan-out.
  *
  * deactivate is the only trigger that runs step 1 (state -> inactive)
- * before the rest; revokeSubject({deactivate:true}) does step 1 then 2-5:
- * Kratos sessions, Hydra login + consent revoke, best-effort LDAP bind-cache
- * flush. Step 2 failure aborts (prescriptive RevokeError); step 5 is
- * best-effort. This completes the old patch+delete-sessions pair, which left
+ * before the rest; revokeSubject({deactivate:true}) does step 1 then 2-4:
+ * Kratos sessions, Hydra login + consent revoke. A step 2 failure aborts
+ * (prescriptive RevokeError). This completes the old patch+delete-sessions pair, which left
  * the Hydra remembered login and the granted consent open after a "deactivate".
  */
 export async function deactivateIdentity(id: string): Promise<void> {

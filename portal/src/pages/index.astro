@@ -65,7 +65,7 @@ if (devOverride === 'down' || devOverride === 'pre-auth' || devOverride === 'pos
     // so a mock holding groups nobody binds is indistinguishable from a user
     // with no access. They are the converged `<svc>-access` entry groups from
     // those manifests, one per fixture:
-    //   grafana-access, audiobookshelf-access, filedrop-access,
+    //   grafana-access, audiobookshelf-access,
     //   proxywatch-access (tile-only), prompt-access.
     // `everyone` covers the default-group fallback fixture (statuspage, which
     // declares no access binding — see tileDefaultGroup in tiles.ts).
@@ -85,7 +85,6 @@ if (devOverride === 'down' || devOverride === 'pre-auth' || devOverride === 'pos
           'everyone',
           'grafana-access',
           'audiobookshelf-access',
-          'filedrop-access',
           'proxywatch-access',
           'prompt-access',
         ];

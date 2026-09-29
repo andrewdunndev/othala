@@ -95,9 +95,6 @@ VM dies on job end. Total turnaround: ~3-5 minutes including image pulls.
 - TLS / Caddy / production DNS. The substrate runs HTTP-only on the
   compose network. Production-shape TLS validation is manual lab work (or
   a future iteration that wires Caddy with `tls internal`).
-- LDAP. The bridge is a separate, **unmaintained reference** project
-  (`gitlab.com/dunn.dev/kratos-ldap`); no spec here exercises it, and
-  `glauth.cfg` is kept only as an operator reference.
 
 ## On the in-app registrar (a note for adopters)
 
@@ -114,7 +111,6 @@ which is why `register-clients` is a `profiles: [oneshot]` service that
 | File | Purpose |
 |---|---|
 | `compose.yml` | docker-compose for the converged substrate |
-| `glauth.cfg` | Example LDAP bridge config for `gitlab.com/dunn.dev/kratos-ldap` — an **unmaintained reference** project, not part of this deployment. Not used by the default compose run; kept only so an operator adding LDAP has something to read. |
 | `postgres-init.sh` | DB + extension setup |
 | `gen-secrets.sh` | Per-run secret generator |
 | `smoke.sh` | Probe matrix (pass/fail counters) |

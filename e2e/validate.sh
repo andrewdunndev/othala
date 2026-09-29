@@ -17,8 +17,6 @@
 #   3. `docker compose up -d` (pulls the othala app at $AUTH_VERSION)
 #   4. Wait for healthchecks (postgres → migrate → kratos + hydra →
 #      othala). Max 4 min total; if any fail the substrate is broken.
-#      NOTE: the LDAP bridge is a separate project (gitlab.com/dunn.dev/
-#      kratos-ldap); no e2e spec exercises LDAP here.
 #   4b. Seed phase (marker model):
 #       POST admin + recovery-admin identities with metadata_admin.admin=true.
 #       The admin marker is set at identity creation; no UUID readback, no
@@ -164,8 +162,7 @@ while true; do
     # status column under both engines — count that instead.
     healthy=$(docker compose ps 2>/dev/null | grep -c '(healthy)')
     # Expecting 5 healthy long-runners: postgres, kratos, hydra, othala,
-    # mailpit. consent + util are gone (folded into the othala app); the
-    # LDAP bridge is now at gitlab.com/dunn.dev/kratos-ldap, no spec here.
+    # mailpit. consent + util are gone (folded into the othala app).
     # The othala healthcheck hits its loopback admin /healthz (:4431);
     # mailpit answers `readyz` — gating on all surfaces a broken service.
     if [[ "${healthy:-0}" -ge 5 ]]; then

@@ -30,7 +30,6 @@ gen_alnum() {
 # itself (registry.gitlab.com/dunn.dev/othala). AUTH_VERSION is the tag.
 # In CI: AUTH_REGISTRY=$CI_REGISTRY_IMAGE, AUTH_VERSION=the just-built
 # tag (v-tag or short-SHA). Local operator runs use :latest.
-# NOTE: the LDAP bridge is now gitlab.com/dunn.dev/kratos-ldap (separate).
 AUTH_REGISTRY="${AUTH_REGISTRY:-registry.gitlab.com/dunn.dev/othala}"
 AUTH_VERSION="${AUTH_VERSION:-latest}"
 

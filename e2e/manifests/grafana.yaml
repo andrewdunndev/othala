@@ -15,7 +15,7 @@ presentation:
   url: https://grafana.othala.test  # tile link + fqdn source (tiles.ts)
   icon: GR                          # optional 2-char fallback glyph; default "??" (tiles.ts)
   icon_slug: grafana                # optional vendored-icon lookup key (tiles.ts resolveIconHref)
-  auth_kind: oidc                   # oidc|oidc+ldap|forward_auth|ldap|external (tiles.ts
+  auth_kind: oidc                   # oidc|forward_auth|external (tiles.ts
                                      # AuthKind) — NOT runtime-validated; a typo silently casts
   # REQUIRED list, ≥1 canonical name (GROUP_RE, access-groups.ts); empty +
   # no consent.skip_access_check => load-time BLOCK (validateClients,

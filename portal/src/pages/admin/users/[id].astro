@@ -338,18 +338,8 @@ const adminNav = [
         <p>
           <strong>Force re-login complete.</strong>
           Kratos sessions revoked; Hydra login + consent sessions revoked
-          (the remembered login is cut){actionResult.result.bestEffortFailures.length ? `; ${actionResult.result.bestEffortFailures.length} best-effort step(s) failed` : ''}.
+          (the remembered login is cut).
         </p>
-        {actionResult.result.bestEffortFailures.length > 0 && (
-          <details>
-            <summary class="text-sm">Best-effort failures (the hard cut already landed; these are advisory)</summary>
-            <ul class="stack">
-              {actionResult.result.bestEffortFailures.map((f) => (
-                <li class="mono text-xs">{f.dependency} / {f.step}: {f.error}</li>
-              ))}
-            </ul>
-          </details>
-        )}
       </div>
     )}
     {actionResult?.kind === 'admin-granted' && (

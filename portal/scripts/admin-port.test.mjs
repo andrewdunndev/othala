@@ -198,7 +198,7 @@ test('POST /admin/revoke-user with a valid bearer routes through revokeSubject',
   const runtime = {
     async revokeSubject(subject) {
       revokedSubject = subject;
-      return { subject, kratosSessionsRevoked: true, bestEffortFailures: [] };
+      return { subject, kratosSessionsRevoked: true };
     },
   };
   const res = fakeRes();

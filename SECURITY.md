@@ -149,5 +149,3 @@ Live properties of the deployed shape, stated rather than omitted.
 - The `e2e/` harness: RFC 6761 reserved domain `othala.test`, throwaway secrets.
 - Volumetric network-layer flooding, which needs upstream capacity to absorb;
   application-layer abuse is in scope and listed under Controls.
-- `gitlab.com/dunn.dev/kratos-ldap`: a separate, unmaintained reference, and not
-  deployed here.

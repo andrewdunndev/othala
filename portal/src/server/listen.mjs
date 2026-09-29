@@ -128,7 +128,7 @@ function sendJson(res, code, obj) {
  */
 function statusForRevokeError(err) {
   const dep = err?.dependency;
-  if (dep === 'hydra-admin' || dep === 'kratos-admin' || dep === 'ldap-bridge') return 502;
+  if (dep === 'hydra-admin' || dep === 'kratos-admin') return 502;
   return 500;
 }
 

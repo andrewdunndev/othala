@@ -25,17 +25,11 @@
 //      skip-login a fresh token. Idempotent.
 //   4. Hydra consent-session revoke revokeOAuth2ConsentSessions({subject,all})
 //      Invalidates granted consent + associated access tokens. Idempotent.
-//   5. LDAP bind-cache flush (BEST-EFFORT)
-//      POST {LDAP_BRIDGE_ADMIN_URL}/admin/flush-bind-cache?subject={id}
-//      Skipped silently when LDAP_BRIDGE_ADMIN_URL is unset.
 //
 // There is no in-process identity cache to invalidate: the hot login/consent
 // path always fetches a fresh identity (oauth2-handlers -> admin-api.getIdentity),
 // so a revoked/deactivated subject fails the gate's state-check on the next
 // fetch — revocation is correct without a cache.
-//
-// Step 5 is best-effort: a failure there NEVER aborts/rolls back 1-4.
-// The hard cut (1-4) has already landed by the time we touch step 5.
 //
 // Prescriptive errors: an upstream failure on steps 1-4 throws a
 // RevokeError naming WHICH dependency failed (hydra-admin / kratos-admin)
@@ -50,7 +44,7 @@ import {
 } from '@ory/client-fetch';
 
 /** Which upstream dependency a revoke step failed against. */
-export type RevokeDependency = 'kratos-admin' | 'hydra-admin' | 'ldap-bridge';
+export type RevokeDependency = 'kratos-admin' | 'hydra-admin';
 
 /**
  * Prescriptive revoke failure. Names the dependency and the operator's
@@ -83,8 +77,6 @@ function isNotFound(err: unknown): boolean {
 export interface RevokeDeps {
   identityApi: IdentityApi;
   oauth2Api: OAuth2Api;
-  /** Best-effort LDAP bind-cache flush. Injected for tests. */
-  flushLdapBindCache: (subject: string) => Promise<void>;
 }
 
 export interface RevokeOptions {
@@ -102,8 +94,6 @@ export interface RevokeResult {
   kratosSessionsRevoked: boolean;
   hydraLoginRevoked: boolean;
   hydraConsentRevoked: boolean;
-  /** Best-effort steps that failed (step 5); never aborts the fan-out. */
-  bestEffortFailures: Array<{ dependency: RevokeDependency; step: string; error: string }>;
 }
 
 function kratosAdminBase(): string {
@@ -135,34 +125,11 @@ function buildOAuth2Api(): OAuth2Api {
 }
 
 /**
- * Best-effort LDAP bind-cache flush (step 6). POSTs to the kratos-ldap
- * admin endpoint (gitlab.com/dunn.dev/kratos-ldap) with a bearer. Skipped
- * silently when LDAP_BRIDGE_ADMIN_URL is unset. Never throws to the fan-out
- * — the caller wraps it.
- */
-async function defaultFlushLdapBindCache(subject: string): Promise<void> {
-  const base = process.env.LDAP_BRIDGE_ADMIN_URL ?? '';
-  if (!base) return; // not configured -> skip silently
-  const bearer = process.env.LDAP_BRIDGE_ADMIN_TOKEN ?? '';
-  const url = `${base.replace(/\/$/, '')}/admin/flush-bind-cache?subject=${encodeURIComponent(subject)}`;
-  const res = await fetch(url, {
-    method: 'POST',
-    headers: {
-      ...(bearer ? { Authorization: `Bearer ${bearer}` } : {}),
-      Accept: 'application/json',
-    },
-  });
-  if (!res.ok) {
-    throw new Error(`ldap-bridge flush-bind-cache: ${res.status}`);
-  }
-}
-
 /** Resolve injected deps, defaulting to the live SDK clients + helpers. */
 function resolveDeps(deps: Partial<RevokeDeps> = {}): RevokeDeps {
   return {
     identityApi: deps.identityApi ?? buildIdentityApi(),
     oauth2Api: deps.oauth2Api ?? buildOAuth2Api(),
-    flushLdapBindCache: deps.flushLdapBindCache ?? defaultFlushLdapBindCache,
   };
 }
 
@@ -170,8 +137,7 @@ function resolveDeps(deps: Partial<RevokeDeps> = {}): RevokeDeps {
  * Run the revocation fan-out for one subject (the Kratos identity id).
  *
  * Steps 1-4 are the hard cut and throw a prescriptive RevokeError on the
- * first failure (the cut aborts — earlier steps already landed). Step 5
- * is best-effort and collected into result.bestEffortFailures.
+ * first failure (the cut aborts — earlier steps already landed).
  */
 export async function revokeSubject(
   subject: string,
@@ -185,7 +151,6 @@ export async function revokeSubject(
     kratosSessionsRevoked: false,
     hydraLoginRevoked: false,
     hydraConsentRevoked: false,
-    bestEffortFailures: [],
   };
 
   // ── Step 1 (deactivate trigger ONLY): Kratos state -> inactive ──────────
@@ -250,19 +215,6 @@ export async function revokeSubject(
       'Login sessions are cut, but Hydra consent + associated access tokens persist. Verify HYDRA_ADMIN_URL, then re-run the revoke (it is idempotent).',
       err,
     );
-  }
-
-  // ── Step 5 (all, BEST-EFFORT): LDAP bind-cache flush ────────────────────
-  // Never aborts/rolls back 1-4. Skipped silently when LDAP_BRIDGE_ADMIN_URL
-  // is unset (the default helper returns without a request).
-  try {
-    await d.flushLdapBindCache(subject);
-  } catch (err) {
-    result.bestEffortFailures.push({
-      dependency: 'ldap-bridge',
-      step: 'flush-bind-cache',
-      error: err instanceof Error ? err.message : String(err),
-    });
   }
 
   return result;

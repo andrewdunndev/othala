@@ -228,13 +228,6 @@ else
     fail "A9b admin route leaked onto public port" "code=$code (expected 404; admin /healthz must be loopback-only)"
 fi
 
-# A10: ldap-bridge /healthz — SKIPPED. The LDAP bridge is now a
-# separate project (gitlab.com/dunn.dev/kratos-ldap); no bridge
-# service is pulled in this compose harness since no e2e spec exercises
-# LDAP. Operators who extend this harness with LDAP can add A10 back
-# against the kratos-ldap service.
-# pass "A10 ldap-bridge /healthz (implies LDAP :389 bound)" -- not wired
-
 # Section B: client registration (converged in-app registrar)
 echo ""
 echo "B. client registration (in-app registrar, one-shot)"

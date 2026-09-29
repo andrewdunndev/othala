@@ -199,16 +199,16 @@ export async function requireAdminSession(astro: any): Promise<Session | Respons
 }
 
 /**
- * Force re-login for an identity (admin "revoke user" trigger).
  *
- * The fan-out is in-process: revokeSubject runs steps 2-5 (Kratos sessions,
- * Hydra login + consent revoke, best-effort LDAP bind-cache flush). deactivate
+ * Force re-login for an identity (admin "revoke user" trigger).
+ * The fan-out is in-process: revokeSubject runs steps 2-4 (Kratos sessions,
+ * Hydra login + consent revoke). deactivate
  * is NOT set here — admin force-logout cuts sessions without marking the
  * identity inactive.
  *
  * Throws a prescriptive RevokeError on a hard-cut (step 2-4) failure; the
  * caller surfaces dependency + next-action without leaking raw upstream
- * errors. Best-effort step 5 failures land in result.bestEffortFailures.
+ * errors.
  */
 export type RevokeUserResult = RevokeResult;
 

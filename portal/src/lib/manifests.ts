@@ -35,7 +35,7 @@
 //
 // SCOPE: loadClientManifests() returns EVERY app manifest in MANIFEST_DIR,
 // of every auth_kind — including presentation-only ones (forward_auth /
-// ldap / external tiles that register no OIDC client). It is the app
+// external tiles that register no OIDC client). It is the app
 // catalog, not the OIDC client list. Consumers that genuinely need the
 // OIDC subset (the Hydra registrar; the OAuth2/consent lookup) narrow it
 // with oidcClientManifests() / getClientManifest(). See the note on
@@ -64,7 +64,7 @@ export interface ClientManifest {
   clientId: string;
   /**
    * True when this manifest carries a `presentation:` block but NO `oidc:`
-   * client (a forward_auth / ldap / external tile, e.g. proxywatch.yaml). Such a
+   * client (a forward_auth / external tile, e.g. proxywatch.yaml). Such a
    * manifest still names an access group — an assignable, gate-bearing binding
    * that the registry, the admin UI and computeEffectiveAccess must all see —
    * but it registers no OIDC client, so the OIDC-specific rules do not apply
@@ -254,7 +254,7 @@ function normaliseGroupRoleMap(raw: unknown): Record<string, string> {
 /**
  * Load one manifest file as a ClientManifest. Every well-formed manifest is
  * returned, of every auth_kind — a presentation-only manifest (a forward_auth /
- * ldap / external tile with a `presentation:` block and no `oidc:` block) parses
+ * external tile with a `presentation:` block and no `oidc:` block) parses
  * to a ClientManifest with empty OIDC fields and presentationOnly:true. A stale
  * flat manifest (client fields at the top level, no `oidc:`) still throws via
  * parseManifest's flat-shape guard; a manifest with neither block also throws.
@@ -334,7 +334,7 @@ export function parseManifest(yamlText: string, filename: string): ClientManifes
   // validateClients, so it is loudly surfaced, never silently dark.
   const accessGroups = parseAccessGroups(p);
 
-  // Presentation-only manifest (forward_auth / ldap / external tile, e.g.
+  // Presentation-only manifest (forward_auth / external tile, e.g.
   // e2e/manifests/proxywatch.yaml): a `presentation:` block with NO `oidc:`
   // client. It registers
   // no OIDC client but still names an assignable access group, so it parses as a
@@ -448,7 +448,7 @@ function freshestMtime(): number {
  * invalidates on mtime change.
  *
  * The set spans all auth_kinds: OIDC clients AND presentation-only manifests
- * (forward_auth / ldap / external tiles). It is the app catalog. Callers that
+ * (forward_auth / external tiles). It is the app catalog. Callers that
  * need only the registrable OIDC subset call oidcClientManifests() on the
  * result; callers that need the group bindings (group-registry.ts,
  * knownAccessGroups, computeEffectiveAccess, the admin group surfaces) want the
@@ -700,7 +700,7 @@ export function validateClients(set: ClientManifest[]): string[] {
       seenGroups.add(g);
     }
 
-    // OIDC-only rules: a presentation-only manifest (forward_auth / ldap tile,
+    // OIDC-only rules: a presentation-only manifest (forward_auth tile,
     // no oidc: client) registers no OAuth2 client, so the
     // audience / redirect-match rules do not apply to it. The access-binding
     // BLOCK above still governs it (a presentation-only tile must still name a

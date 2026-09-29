@@ -21,10 +21,6 @@
 #     handlers at /oauth2/{login,consent,logout}. A SEPARATE loopback
 #     admin port 4431 serves /healthz, /readyz, /admin/revoke-user and
 #     /admin/recovery-gate. The two muxes are disjoint by construction.
-#   NOTE: the LDAP bridge (glauth-kratos) is now a separate standalone
-#   project at gitlab.com/dunn.dev/kratos-ldap. No e2e spec exercises
-#   LDAP, so no ldap-bridge service is pulled here. Operators who need
-#   LDAP in their lab compose can add the kratos-ldap image directly.
 #
 # Convergence note: the legacy `consent` (Go) and `util` (Bash) services
 # are GONE. Their roles folded INTO the othala app: consent's challenge
@@ -392,7 +388,7 @@ services:
       MANIFEST_DIR: /etc/portal/manifests
       # register-clients.mjs imports the app config module (config.ts), which
       # requires OTHALA_PUBLIC_URL at load (required-no-default in production).
-      # The othala/ldap services already get it; the one-shot registrar needs it too.
+      # The othala service already gets it; the one-shot registrar needs it too.
       OTHALA_PUBLIC_URL: http://auth.othala.test
       # config.ts also requires OTHALA_SMTP_CONNECTION_URI (the contact-form
       # mailer). The registrar doesn't send mail but shares the image + its
