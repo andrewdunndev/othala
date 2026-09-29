@@ -17,7 +17,7 @@ test('ZB1 — deactivating your own identity is refused', async ({ browser, base
   const suffix = `zb1.${Date.now()}`;
   const admin = await createIdentityWithPassword({
     email: `self.deactivate.${suffix}@othala.test`,
-    username: `self.deactivate.${suffix}`,
+    username: `selfdeact.${suffix}`,
     displayName: 'Self Deactivate',
     groups: [],
     isAdmin: true,
