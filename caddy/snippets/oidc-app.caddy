@@ -18,6 +18,7 @@
 	tls {
 		dns cloudflare {env.CF_API_TOKEN}
 	}
-	request_header Cookie "\s*ory_kratos_session=[^;]*;?\s*" ""
+	# ory_kratos_session is session.cookie.name in kratos/kratos.yml; keep in step.
+	request_header Cookie "(^|;\s*)ory_kratos_session=[^;]*" ""
 	reverse_proxy {args[0]}:{args[1]}
 }

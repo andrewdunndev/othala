@@ -53,7 +53,9 @@ no secret is configured, so a misconfigured deployment refuses rather than opens
 **Inbound headers are never an identity claim.** Group membership and identity id come from Kratos,
 never from a request header. `caddy/snippets/forward-auth.caddy` strips the whole `X-Remote-*` /
 `X-Forwarded-User` / `X-Auth-Request-*` family before proxying, and clears the inbound identity id
-before the auth call so the upstream receives only the value taken from the auth response. The
+before the auth call so the upstream receives only the value taken from the auth response. Those
+steps sit in a `route` block, because Caddy's default directive order would otherwise run
+`forward_auth` ahead of `request_header` and strip the verified id. The
 `oidc-app` snippet removes only the Kratos session cookie and leaves the app's own cookies.
 
 **Admin authority is a marker, not a group.** Kratos strips `metadata_admin` from
