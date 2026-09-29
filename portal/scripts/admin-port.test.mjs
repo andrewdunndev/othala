@@ -35,7 +35,8 @@ import {
   ADMIN_GET_ROUTES,
   ADMIN_POST_ROUTES,
 } from '../src/server/listen.mjs';
-import { identity } from '../src/lib/test-builders.ts';
+import { asAdmin, identity, withTotp, withWebauthnKey } from '../src/lib/test-builders.ts';
+import * as secondFactorRuntime from '../src/lib/second-factor-gate.ts';
 
 const ADMIN_UUID = '11111111-1111-1111-1111-111111111111';
 const OTHER_UUID = '22222222-2222-2222-2222-222222222222';
@@ -80,6 +81,7 @@ test('admin POST mux serves exactly the admin endpoints', () => {
     '/admin/login-code-gate',
     '/admin/recovery-gate',
     '/admin/revoke-user',
+    '/admin/second-factor-gate',
     '/admin/username-gate',
   ]);
 });
@@ -577,6 +579,78 @@ test('username-gate rejects a wrong bearer with 403 before reading the body', as
   process.env.RECOVERY_GATE_SECRET = 'gate-secret';
   const res = fakeRes();
   await handleAdminRequest(postUsernameGate(profilePayload(STORED.traits), 'wrong'), res);
+  assert.equal(res.statusCode, 403);
+  assert.deepEqual(JSON.parse(res.body), { error: 'forbidden' });
+});
+
+// ── second-factor-gate: settings.after.{totp,webauthn} webhook ──────────────
+
+function postSecondFactorGate(method, body, bearer = 'gate-secret') {
+  return fakeReq({
+    method: 'POST',
+    url: `/admin/second-factor-gate?method=${method}`,
+    headers: { authorization: `Bearer ${bearer}` },
+    body: JSON.stringify(body),
+  });
+}
+
+function secondFactorText(res) {
+  const [msg] = JSON.parse(res.body).messages;
+  assert.equal(msg.instance_ptr, '#/');
+  return msg.messages[0].text;
+}
+
+const ADMIN_TOTP_ONLY = withTotp(asAdmin(identity({ id: OTHER_UUID })));
+
+test('second-factor-gate REFUSES an admin unlinking the only totp (403)', async () => {
+  let requested = '';
+  const server = (req, res) => {
+    requested = req.url;
+    storedIdentityServer(ADMIN_TOTP_ONLY)(req, res);
+  };
+  await withMockKratos(server, async () => {
+    const res = fakeRes();
+    await handleAdminRequest(postSecondFactorGate('totp', { identity_id: OTHER_UUID }), res, secondFactorRuntime);
+    assert.equal(res.statusCode, 403);
+    assert.equal(secondFactorText(res), secondFactorRuntime.SECOND_FACTOR_KEEP);
+  });
+  assert.match(requested, /include_credential=totp&include_credential=webauthn$/);
+});
+
+test('second-factor-gate ALLOWS an admin with totp and a key to change keys (200)', async () => {
+  await withMockKratos(storedIdentityServer(withWebauthnKey(ADMIN_TOTP_ONLY)), async () => {
+    const res = fakeRes();
+    await handleAdminRequest(postSecondFactorGate('webauthn', { identity_id: OTHER_UUID }), res, secondFactorRuntime);
+    assert.equal(res.statusCode, 200);
+  });
+});
+
+test('second-factor-gate REFUSES without a method, id, readable identity or runtime (403)', async () => {
+  const unavailable = secondFactorRuntime.SECOND_FACTOR_UNAVAILABLE;
+  await withMockKratos(storedIdentityServer(ADMIN_TOTP_ONLY), async () => {
+    for (const [method, body, runtime] of [
+      ['', { identity_id: OTHER_UUID }, secondFactorRuntime],
+      ['totp', {}, secondFactorRuntime],
+      ['totp', { identity_id: OTHER_UUID }, {}],
+    ]) {
+      const res = fakeRes();
+      await handleAdminRequest(postSecondFactorGate(method, body), res, runtime);
+      assert.equal(res.statusCode, 403);
+      assert.equal(secondFactorText(res), unavailable);
+    }
+  });
+  await withMockKratos((req, res) => { res.writeHead(500); res.end(); }, async () => {
+    const res = fakeRes();
+    await handleAdminRequest(postSecondFactorGate('webauthn', { identity_id: OTHER_UUID }), res, secondFactorRuntime);
+    assert.equal(res.statusCode, 403);
+    assert.equal(secondFactorText(res), unavailable);
+  });
+});
+
+test('second-factor-gate rejects a wrong bearer with 403 before reading the body', async () => {
+  process.env.RECOVERY_GATE_SECRET = 'gate-secret';
+  const res = fakeRes();
+  await handleAdminRequest(postSecondFactorGate('totp', { identity_id: OTHER_UUID }, 'wrong'), res, secondFactorRuntime);
   assert.equal(res.statusCode, 403);
   assert.deepEqual(JSON.parse(res.body), { error: 'forbidden' });
 });

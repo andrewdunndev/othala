@@ -20,6 +20,7 @@ This CHANGELOG and git tags carry the deployed-instance release state.
 - `email_verified` reflects only the account's own email address.
 - The request form requires a signed-in account; the mail names the account, and the rate limit is per account.
 - The error page shows only reasons it recognises.
+- Admin accounts keep at least one authenticator app or security key through settings.
 
 ## [0.6.3] - 2026-09-29
 
@@ -131,9 +132,7 @@ now live on othala.dunn.dev.
   record states and bounds the residual risk.
 - **Six at-a-glance SVG diagrams** now live on othala.dunn.dev.
 - **Architecture page** (`othala.dunn.dev/architecture/`): the six diagrams
-  in narrative order with connective prose. The landing page now tells the
-  project story and links Architecture, Guides, and the repo as entry
-  points.
+  in narrative order.
 
 ### Changed
 
@@ -155,8 +154,7 @@ now live on othala.dunn.dev.
   gate's app-name check hardened 10 -> 18 branches on violation shape,
   not literal words.
 - CI: a runner checkout ownership mismatch was silently erroring the
-  purity/portal-check jobs (VACUOUS, not green); `safe.directory` fixes
-  it, and the now-unused `cmp` dependency is retired.
+  purity/portal-check jobs; `safe.directory` fixes it.
 
 ## [0.4.0] - 2026-08-13
 

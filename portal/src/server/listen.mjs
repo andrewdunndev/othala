@@ -18,13 +18,14 @@
 //       POST /admin/recovery-gate     — Kratos recovery-gate webhook (CU3)
 //       POST /admin/login-code-gate   — Kratos login-by-code webhook
 //       POST /admin/username-gate     — Kratos profile-settings webhook
+//       POST /admin/second-factor-gate — Kratos totp/webauthn-settings webhook
 //     It NEVER delegates to the Astro `handler`, so no public route and no
 //     challenge provider is reachable on the admin port — and the public
 //     handler never sees admin paths. The two muxes are disjoint.
 //
 //   Secret model (CU3): the admin port uses two PURPOSE-NAMED secrets:
 //     - OTHALA_ADMIN_ENDPOINT_BEARER  guards POST /admin/revoke-user
-//     - RECOVERY_GATE_SECRET        guards the three webhook gates above
+//     - RECOVERY_GATE_SECRET        guards the four webhook gates above
 //   Both checks are CONSTANT-TIME (timingSafeEqual) and FAIL-CLOSED (an
 //   unset secret rejects every request). The revoke fan-out is in-process;
 //   there is no portal->consent admin HTTP hop.
@@ -49,6 +50,7 @@ export const ADMIN_POST_ROUTES = new Set([
   '/admin/recovery-gate',
   '/admin/login-code-gate',
   '/admin/username-gate',
+  '/admin/second-factor-gate',
 ]);
 
 /** Back-compat: the GET probe routes (CU1 contract test imports this name). */
@@ -274,7 +276,7 @@ export async function fetchAdminMarker(identityId) {
  * Fail-closed: an unset URL, network error, non-2xx or unparseable body
  * returns `{ refuse: true, reason }`; success returns `{ refuse: false, identity }`.
  */
-async function fetchStoredIdentity(identityId, tag) {
+async function fetchStoredIdentity(identityId, tag, query = '') {
   const kratosAdminURL = process.env.KRATOS_ADMIN_URL ?? '';
   if (!kratosAdminURL) {
     console.error(`[portal/${tag}] KRATOS_ADMIN_URL unset — cannot read the stored identity; refusing (fail-closed)`);
@@ -282,7 +284,7 @@ async function fetchStoredIdentity(identityId, tag) {
   }
   let resp;
   try {
-    resp = await fetch(`${kratosAdminURL}/admin/identities/${encodeURIComponent(identityId)}`, {
+    resp = await fetch(`${kratosAdminURL}/admin/identities/${encodeURIComponent(identityId)}${query}`, {
       headers: { Accept: 'application/json' },
     });
   } catch (err) {
@@ -452,6 +454,64 @@ export async function handleUsernameGate(req, res) {
   sendJson(res, 200, { ok: true });
 }
 
+function refuseSecondFactor(res, text) {
+  sendJson(res, 403, { messages: [{ instance_ptr: '#/', messages: [{ id: 4000001, type: 'error', text }] }] });
+}
+
+/**
+ * Handle POST /admin/second-factor-gate?method=totp|webauthn, wired to
+ * selfservice.flows.settings.after.{totp,webauthn} with can_interrupt, which
+ * Kratos runs before it persists the change. Same bearer and body as the
+ * other gates. The stored identity is read with its totp and webauthn configs
+ * and judged by secondFactorChangeVerdict (lib/second-factor-gate.ts, via the
+ * runtime bundle); a failed read, a missing id or a runtime that will not
+ * load refuses the change.
+ */
+export async function handleSecondFactorGate(req, res, runtime) {
+  const expected = process.env.RECOVERY_GATE_SECRET ?? '';
+  if (!bearerMatches(parseBearer(req.headers?.authorization), expected)) {
+    sendJson(res, 403, { error: 'forbidden' });
+    return;
+  }
+  let rt;
+  try {
+    rt = runtime ?? (await loadRuntime());
+  } catch (err) {
+    console.error('[portal/second-factor-gate] runtime bundle failed to load:', err?.message ?? err);
+  }
+  const unavailable = rt?.SECOND_FACTOR_UNAVAILABLE ?? 'This change is unavailable right now. Try again later.';
+  if (typeof rt?.secondFactorChangeVerdict !== 'function') {
+    refuseSecondFactor(res, unavailable);
+    return;
+  }
+  let body;
+  try {
+    body = JSON.parse((await readBody(req)) || '{}');
+  } catch {
+    refuseSecondFactor(res, unavailable);
+    return;
+  }
+  const id = body?.identity_id;
+  if (typeof id !== 'string' || id.trim().length === 0) {
+    refuseSecondFactor(res, unavailable);
+    return;
+  }
+  const method = new URLSearchParams((req.url ?? '').split('?')[1] ?? '').get('method') ?? '';
+  const fetched = await fetchStoredIdentity(
+    id,
+    'second-factor-gate',
+    '?include_credential=totp&include_credential=webauthn',
+  );
+  const verdict = fetched.refuse
+    ? { refuse: true, text: unavailable }
+    : rt.secondFactorChangeVerdict(fetched.identity, method);
+  if (verdict.refuse) {
+    refuseSecondFactor(res, verdict.text);
+    return;
+  }
+  sendJson(res, 200, { ok: true });
+}
+
 /** Handle one admin-port request. Writes to res; never touches the SSR handler. */
 export async function handleAdminRequest(req, res, runtime) {
   const method = req.method;
@@ -475,6 +535,10 @@ export async function handleAdminRequest(req, res, runtime) {
   }
   if (method === 'POST' && path === '/admin/username-gate') {
     await handleUsernameGate(req, res);
+    return;
+  }
+  if (method === 'POST' && path === '/admin/second-factor-gate') {
+    await handleSecondFactorGate(req, res, runtime);
     return;
   }
 

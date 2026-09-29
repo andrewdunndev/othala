@@ -9,9 +9,10 @@
 // — WITHOUT delegating to the public Astro handler (the two muxes stay
 // disjoint).
 //
-// Admin authority is determined by the metadata_admin.admin marker in the
-// Kratos webhook payload; recoveryGateVerdict reads it directly
-// from the payload, so no runtime predicate is needed here.
+// The recovery and username gates read the stored identity themselves; the
+// second-factor gate's verdict lives here because it shares hasSecondFactor
+// with the step-up check.
 
 export { revokeSubject, RevokeError } from '../lib/revoke';
 export type { RevokeResult, RevokeDependency } from '../lib/revoke';
+export { secondFactorChangeVerdict, SECOND_FACTOR_KEEP, SECOND_FACTOR_UNAVAILABLE } from '../lib/second-factor-gate';

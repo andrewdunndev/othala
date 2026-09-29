@@ -35,6 +35,7 @@ const FORBIDDEN_ROUTES = new Set([
   '/admin/recovery-gate',
   '/admin/login-code-gate',
   '/admin/username-gate',
+  '/admin/second-factor-gate',
 ]);
 
 // Astro page-file extensions that produce a route.
