@@ -218,7 +218,7 @@ echo "B. client registration (boot reconcile)"
 
 # B2: Hydra admin lists EXACTLY the clients with an oidc: block. The count
 # is DATA-DRIVEN from the fixtures: grep the manifest dir for files that
-# declare a top-level `oidc:` block (presentation-only tiles — filedrop,
+# declare a top-level `oidc:` block (presentation-only tiles —
 # proxywatch, statuspage — have none and register no client). No hardcoded
 # number; add/remove an OIDC fixture and this re-derives.
 oidc_fixture_count=$(grep -lE '^oidc:' ./manifests/*.yaml 2>/dev/null | wc -l | tr -d ' ')

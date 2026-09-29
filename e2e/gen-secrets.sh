@@ -166,7 +166,7 @@ CSRF_SECRET=$(gen)
 # example set has three OIDC clients: grafana, audiobookshelf, and
 # promptdesk (client_id "promptdesk", manifest promptdesk.yaml — note the
 # client_id differs from the prompt.othala.test service slug). The
-# presentation-only fixtures (filedrop/proxywatch/statuspage) have no
+# presentation-only fixtures (proxywatch/statuspage) have no
 # oidc: block and need no secret.
 GRAFANA_CLIENT_SECRET=$(gen)
 AUDIOBOOKSHELF_CLIENT_SECRET=$(gen)
