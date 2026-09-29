@@ -457,20 +457,21 @@ const adminNav = [
 
         {unconfigured.length > 0 && (
           <div class="field">
-            <label>Groups not configured here</label>
+            <label>Other stored groups</label>
             <div class="checkbox-grid">
               {unconfigured.map((g) => (
                 <label>
                   <input type="checkbox" name="clearUnconfigured" value={g} />
                   <span class="mono">{g}</span>
-                  <span class="muted text-xs">not configured · remove</span>
+                  <span class="muted text-xs">remove</span>
                 </label>
               ))}
             </div>
             <span class="field-hint">
-              Stored on this identity, but neither a configured identity group
-              (<code>OTHALA_IDENTITY_GROUPS</code>) nor bound for access by an app. Saving
-              keeps them; tick Remove to drop one. They do not count as an identity group.
+              Stored on this identity with no checkbox here (role-mapped or not
+              configured): not a configured identity group
+              (<code>OTHALA_IDENTITY_GROUPS</code>) and not an app's access group. Saving
+              keeps them; tick remove to drop one. They do not count as an identity group.
             </span>
           </div>
         )}

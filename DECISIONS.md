@@ -48,7 +48,8 @@ Kratos validates the identity schema against `traits` only, so the schema's `met
 executes: it is documentation, the application's validator is the sole runtime enforcement, and a
 deployed schema can fail to enumerate the very key the application reads as authority. Kratos also omits
 `metadata_admin` from the identity passed to after-hook body templates, so a hook needing to know
-whether an identity is an admin must call the admin API, not read its own context. Admin authority is not a group: groups are user-visible display data carried in OIDC claims. The floor exists so the live
+whether an identity is an admin must call the admin API, not read its own context. Admin authority is not a group: groups are user-visible display data carried in OIDC claims, and an
+admin bit there would let an unprivileged session probe its own admin status. The floor exists so the live
 mechanism can carry hard guards — refusing to demote the last admin, blocking self-revoke — without
 becoming a lockout, and because an identity provider's break-glass cannot route through itself.
 Self-service recovery refuses admin identities for the same reason.
@@ -125,7 +126,7 @@ conversation that already exists with that person. The recipient establishes the
 passkey in their own browser.
 
 **Why.** The invariant is not "no password exists" — it is that no password ever transits a channel.
-A code emailed at creation is a delivery guess: the address is an unverified trait the admin just typed, so a mailed code is a delivery guess and a
+A code emailed at creation is a delivery guess: the address is an unverified trait the admin just typed, and a
 mistyped address misroutes the secret in motion. An admin-chosen initial password is refused outright —
 it is exactly a password in transit. Both link and code are required: the link alone lands on a form with an
 empty code field, so a link with no code is an enrollment that looks fine from the admin's side and
