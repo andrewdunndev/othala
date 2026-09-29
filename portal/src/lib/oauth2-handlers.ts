@@ -35,7 +35,20 @@ import { servingManifest } from './manifest-store';
 import { verifyToken, CSRFError } from './csrf';
 import { needsStepUp } from './step-up';
 
-const LOGIN_REMEMBER_FOR = 86400; // 24h
+// Hydra remembers an app sign-in for as long as the Kratos session lives, so
+// a later app sign-out still reaches handleLogout and ends that session.
+// Hydra v26.2.0 sets its login cookie Max-Age to remember_for when > 0 and
+// clamps the stored expiry to ttl.authentication_session (default 720h)
+// (consent/strategy_default.go:441-489). The fallback is the Kratos
+// session.lifespan (kratos/kratos.yml, 720h).
+const KRATOS_SESSION_LIFESPAN = 2_592_000; // 30 days
+
+/** Seconds until the Kratos session expires; the configured lifespan when unknown. */
+export function loginRememberFor(session: Session, now: number = Date.now()): number {
+  const expires = session.expires_at ? new Date(session.expires_at).getTime() : NaN;
+  if (!Number.isFinite(expires)) return KRATOS_SESSION_LIFESPAN;
+  return Math.max(1, Math.ceil((expires - now) / 1000));
+}
 
 // CONSENT_REMEMBER_FOR_SKIP: 1 hour — matches Go consentRememberFor (3600).
 // Used on the skip auto-accept path (all current skip_consent:true clients).
@@ -47,7 +60,7 @@ const CONSENT_REMEMBER_FOR_SKIP = 3600; // 1h — matches Go consentRememberFor
 // CONSENT_REMEMBER_FOR_PROMPT: 30 days (2 592 000 s).
 // Used on the interactive Allow POST path only. Goal: a prompted client
 // asks ONCE PER USER, then is silent on subsequent logins (coordinator
-// decision 2). Chosen to outlive LOGIN_REMEMBER_FOR (24 h) and align
+// decision 2). Matches the login memory (the Kratos session, 30 d) and aligns
 // with Hydra's refresh_token TTL (720 h / 30 d). NOT applied on the
 // skip path — skip path uses CONSENT_REMEMBER_FOR_SKIP to match Go.
 const CONSENT_REMEMBER_FOR_PROMPT = 2_592_000; // 30 days
@@ -173,7 +186,6 @@ export async function handleLogin(req: Request, deps: Deps = {}): Promise<Respon
 
   // Resolve the authenticated subject.
   let subject: string;
-  let remember = false;
   let acr: string | undefined;
   let liveSession: Session;
 
@@ -212,7 +224,6 @@ export async function handleLogin(req: Request, deps: Deps = {}): Promise<Respon
     }
     subject = session.identity.id;
     liveSession = session;
-    remember = true;
     acr = session.authenticator_assurance_level ?? undefined;
   }
 
@@ -254,7 +265,10 @@ export async function handleLogin(req: Request, deps: Deps = {}): Promise<Respon
       loginChallenge: challenge,
       acceptOAuth2LoginRequest: {
         subject,
-        ...(remember ? { remember: true, remember_for: LOGIN_REMEMBER_FOR } : {}),
+        remember: true,
+        remember_for: loginRememberFor(liveSession),
+        // On a remembered login Hydra keeps its cookie unless asked to renew it.
+        ...(login.skip ? { extend_session_lifespan: true } : {}),
         ...(acr ? { acr } : {}),
       },
     });

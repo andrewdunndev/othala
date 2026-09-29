@@ -11,9 +11,10 @@ This CHANGELOG and git tags carry the deployed-instance release state.
 
 ### Changed
 
-- Deleting an identity revokes its sessions and app grants first.
+- Deleting an identity deactivates it and revokes its sessions and app grants first; a failed delete reports the inactive identity.
 - Removing a group or changing a role revokes the member's app grants.
 - Signing out of an app also ends the portal session.
+- An app sign-in is remembered for as long as the portal session lasts.
 
 ## [0.6.3] - 2026-09-29
 
@@ -325,13 +326,7 @@ runtime manifest model, plus the rename to **Othala** ("Ory for your home").
   register the OAuth2 client and compute role-to-claim mappings. Both cache
   ~30s and invalidate on mtime, so adding, changing, or removing an app is a
   manifest-dir change with **no image rebuild**.
-- **Functional dashboard contact form.** The dashboard request form is now
-  real: `POST /api/request` (`lib/contact.ts` validation, rate-limit, and
-  header-injection guard) sends over the shared SMTP relay via `lib/mailer.ts`
-  (nodemailer). `OTHALA_SMTP_CONNECTION_URI` is the single relay shared by the
-  Kratos courier and the form; the recipient is `OTHALA_CONTACT_RECIPIENT`,
-  falling back to the first `OTHALA_ADMIN_SUBJECTS` entry. SMTP internals never
-  leak to the client.
+- **Functional dashboard contact form** over the shared SMTP relay (`POST /api/request`).
 - **Generic OSS example manifests** in `e2e/manifests/`, which double as the
   release-gate smoke fixtures: `grafana` (OIDC + role mapping),
   `audiobookshelf` (OIDC), a directory-backed presentation-only tile,

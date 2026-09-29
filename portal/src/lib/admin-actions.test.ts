@@ -10,7 +10,8 @@
  *     delete-the-last-admin lockout; covers self-delete since self is admin)
  *   - wrong confirm refused, deleteIdentity never called
  *   - happy path: deleteIdentity called, 303 redirect Response returned
- *   - revokeSubject runs before deleteIdentity; a revoke failure keeps the identity
+ *   - revokeSubject (deactivating) runs before deleteIdentity; a revoke failure
+ *     keeps the identity; a delete failure after it is a neutral error
  *   saveAction:
  *   - a removed group or changed role revokes consent sessions after the write
  *   - an unchanged or widened save does not revoke; a revoke failure says the save stood
@@ -157,7 +158,7 @@ describe('deleteAction', () => {
     const identity = makeIdentity('alice');
     await deleteAction(fd({ confirm: 'alice' }), makeCtx({ id: 'target-1', identity }));
 
-    expect(revokeSubjectMock).toHaveBeenCalledWith('target-1');
+    expect(revokeSubjectMock).toHaveBeenCalledWith('target-1', { deactivate: true });
     expect(revokeSubjectMock.mock.invocationCallOrder[0]).toBeLessThan(deleteIdentityMock.mock.invocationCallOrder[0]);
   });
 
@@ -170,6 +171,20 @@ describe('deleteAction', () => {
     if (outcome instanceof Response) throw new Error('unreachable');
     expect(outcome.actionResult?.kind).toBe('error');
     expect(outcome.actionResult && 'message' in outcome.actionResult ? outcome.actionResult.message : '').toMatch(/not deleted/i);
+  });
+
+  it('reports a delete failure after revocation as an error, not a 500', async () => {
+    deleteIdentityMock.mockRejectedValue(new Error('kratos admin unavailable'));
+    const identity = makeIdentity('alice');
+    const outcome = await deleteAction(fd({ confirm: 'alice' }), makeCtx({ id: 'target-1', identity }));
+
+    expect(revokeSubjectMock).toHaveBeenCalledWith('target-1', { deactivate: true });
+    expect(deleteIdentityMock).toHaveBeenCalledWith('target-1');
+    if (outcome instanceof Response) throw new Error('unreachable');
+    expect(outcome.actionResult?.kind).toBe('error');
+    expect(outcome.actionResult && 'message' in outcome.actionResult ? outcome.actionResult.message : '').toBe(
+      'Revoked and deactivated, but not deleted: kratos admin unavailable',
+    );
   });
 });
 

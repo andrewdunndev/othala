@@ -225,10 +225,11 @@ export async function deleteAction(fd: FormData, ctx: ActionContext): Promise<Ac
   if (confirm !== expected) {
     return { actionResult: { kind: 'error', message: `Type the username (${expected}) to confirm deletion.` }, refetch: false };
   }
-  // Cut sessions and Hydra grants first: Hydra keeps consent and refresh
-  // tokens by subject, and nothing reaches them once the identity is gone.
+  // Deactivate and cut sessions and Hydra grants first: Hydra keeps consent
+  // and refresh tokens by subject, and nothing reaches them once the identity
+  // is gone. A failed delete then leaves an inactive identity the gate denies.
   try {
-    await revokeSubject(id);
+    await revokeSubject(id, { deactivate: true });
   } catch (err) {
     return {
       actionResult: {
@@ -238,7 +239,17 @@ export async function deleteAction(fd: FormData, ctx: ActionContext): Promise<Ac
       refetch: false,
     };
   }
-  await deleteIdentity(id);
+  try {
+    await deleteIdentity(id);
+  } catch (err) {
+    return {
+      actionResult: {
+        kind: 'error',
+        message: `Revoked and deactivated, but not deleted: ${err instanceof Error ? err.message : 'unknown error'}`,
+      },
+      refetch: true,
+    };
+  }
   return new Response(null, { status: 303, headers: { Location: '/admin/users?deleted=1' } });
 }
 

@@ -9,7 +9,7 @@
 
 import { test } from 'vitest';
 import assert from 'node:assert/strict';
-import { handleLogin, handleConsent, handleConsentPost, handleLogout, buildLoginReturnTo } from '../src/lib/oauth2-handlers.ts';
+import { handleLogin, loginRememberFor, handleConsent, handleConsentPost, handleLogout, buildLoginReturnTo } from '../src/lib/oauth2-handlers.ts';
 import { describeScopeList, SCOPE_DESCRIPTIONS } from '../src/lib/scope-descriptions.ts';
 import { parseManifest } from '../src/lib/manifests.ts';
 import { signToken, _resetForTests } from '../src/lib/csrf.ts';
@@ -268,6 +268,49 @@ for (const [branch, getReq] of [['skip', undefined], ['fresh', FRESH]]) {
     assert.equal(calls.acceptLoginBody.acr, 'aal1');
   });
 }
+
+// ── login memory follows the Kratos session ──────────────────────────────
+
+const IN_20_DAYS = () => new Date(Date.now() + 20 * 86_400_000);
+
+test('login (fresh) remembers the login until the Kratos session expires, without renewing', async () => {
+  const { api, calls } = stubOAuth2({ getOAuth2LoginRequest: FRESH });
+  await handleLogin(new Request('https://x/oauth2/login?login_challenge=lc'), {
+    oauth2: api,
+    getIdentity: async () => activeMember(),
+    getSession: defaultSession({ expires_at: IN_20_DAYS() }),
+    manifest: () => loadManifest('grafana'),
+  });
+  assert.equal(calls.acceptLogin, 1);
+  assert.equal(calls.acceptLoginBody.remember, true);
+  assert.ok(Math.abs(calls.acceptLoginBody.remember_for - 20 * 86_400) <= 2, `remember_for ${calls.acceptLoginBody.remember_for}`);
+  assert.equal(calls.acceptLoginBody.extend_session_lifespan, undefined);
+});
+
+test('login (skip) re-accepts with remember and renews the remembered login', async () => {
+  const { api, calls } = stubOAuth2();
+  await handleLogin(new Request('https://x/oauth2/login?login_challenge=lc'), {
+    oauth2: api,
+    getIdentity: async () => activeMember(),
+    getSession: defaultSession({ expires_at: IN_20_DAYS() }),
+    manifest: () => loadManifest('grafana'),
+  });
+  assert.equal(calls.acceptLogin, 1);
+  assert.equal(calls.acceptLoginBody.remember, true);
+  assert.ok(Math.abs(calls.acceptLoginBody.remember_for - 20 * 86_400) <= 2, `remember_for ${calls.acceptLoginBody.remember_for}`);
+  assert.equal(calls.acceptLoginBody.extend_session_lifespan, true);
+});
+
+test('loginRememberFor falls back to the Kratos lifespan without expires_at', () => {
+  const s = session('aal1', ['password'], { expires_at: undefined });
+  assert.equal(loginRememberFor(s), 2_592_000);
+});
+
+test('loginRememberFor rounds up and reads a string expires_at', () => {
+  const now = Date.UTC(2026, 0, 1);
+  assert.equal(loginRememberFor(session('aal1', ['password'], { expires_at: new Date(now + 1500) }), now), 2);
+  assert.equal(loginRememberFor({ ...session(), expires_at: new Date(now + 3_600_000).toISOString() }, now), 3600);
+});
 
 // ── CONSENT ─────────────────────────────────────────────────────────────────
 
