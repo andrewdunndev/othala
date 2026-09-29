@@ -13,9 +13,7 @@
 # against localhost:4431; the public port is probed across the network.
 #
 # Exit 0 on all-green, 1 on any failure. Failure diagnostics (container
-# ps/logs) print to STDOUT for the CI job trace; the one on-disk log this
-# script produces (register-clients output, B1) lands under LOG_DIR for
-# CI artifact upload — see LOG_DIR below for why that can't be /tmp.
+# ps/logs) print to STDOUT for the CI job trace.
 #
 # Pre-conditions:
 #   - `docker compose` (podman-docker bridge) up
@@ -23,20 +21,6 @@
 #   - .env present in cwd
 
 set -uo pipefail   # NOT -e: every probe runs even if some fail.
-
-# LOG_DIR: on-disk logs this script writes MUST live inside the project
-# checkout. GitLab Runner refuses `artifacts:paths` entries that resolve
-# outside $CI_PROJECT_DIR ("artifact path is not a subpath of project
-# directory") and drops the WHOLE on-failure artifact archive when it does
-# — not just the offending entry (observed live: job 15871403418, every
-# e2e failure lost its diagnostics). smoke.sh runs with cwd=e2e/ (validate.sh
-# cd's there before sourcing it), so a plain relative path is enough; SCRIPT_DIR
-# makes that true for direct/local invocation too. Gitignored via the root
-# *.log rule. .gitlab-ci.yml's e2e job artifacts: paths must match this.
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-LOG_DIR="$SCRIPT_DIR/logs"
-mkdir -p "$LOG_DIR"
-APPLY_CLIENTS_LOG="$LOG_DIR/apply-clients.log"
 
 PASS=0
 FAIL=0
@@ -228,31 +212,9 @@ else
     fail "A9b admin route leaked onto public port" "code=$code (expected 404; admin /healthz must be loopback-only)"
 fi
 
-# Section B: client registration (converged in-app registrar)
+# Section B: client registration (boot reconcile in the othala service)
 echo ""
-echo "B. client registration (in-app registrar, one-shot)"
-
-# B1: Run the converged app's in-app registrar as a `compose run` one-shot
-# on the SAME othala image (dist/server/register-clients.mjs ->
-# registerAllClients). This is the successor to the deleted util/
-# apply-clients.sh: it reads hydra/clients/*.yaml from MANIFEST_DIR,
-# resolves each <SLUG>_CLIENT_SECRET from env, and POST/PUTs every client
-# to Hydra admin. Expect exit 0 with every manifest registered.
-#
-# --no-deps is REQUIRED under podman-compose: a bare `compose run` does an
-# `up` reconciliation of the service's deps that RECREATES the whole running
-# project (it killed othala + kratos mid-smoke). --no-deps skips that; it is a
-# no-op under docker since `up -d` already started the deps.
-docker compose --profile oneshot run --rm --no-deps register-clients > "$APPLY_CLIENTS_LOG" 2>&1
-applycode=$?
-if [[ $applycode -eq 0 ]]; then
-    pass "B1 in-app register-clients exited 0"
-else
-    fail "B1 register-clients exit code $applycode" "register-clients output below"
-    echo "  ----- register-clients output ($APPLY_CLIENTS_LOG) -----"
-    sed 's/^/    | /' "$APPLY_CLIENTS_LOG" 2>/dev/null || true
-    echo "  ----- end register-clients output -----"
-fi
+echo "B. client registration (boot reconcile)"
 
 # B2: Hydra admin lists EXACTLY the clients with an oidc: block. The count
 # is DATA-DRIVEN from the fixtures: grep the manifest dir for files that
@@ -260,8 +222,14 @@ fi
 # proxywatch, statuspage — have none and register no client). No hardcoded
 # number; add/remove an OIDC fixture and this re-derives.
 oidc_fixture_count=$(grep -lE '^oidc:' ./manifests/*.yaml 2>/dev/null | wc -l | tr -d ' ')
-clients_json=$(curl_in hydra http://localhost:4445/admin/clients)
-client_count=$(echo "$clients_json" | python3 -c "import sys,json; print(len(json.load(sys.stdin)))" 2>/dev/null || echo "0")
+# The boot reconcile runs behind hydra's healthcheck (5 x 2 s), so poll.
+client_count=0
+for _ in $(seq 1 30); do
+    clients_json=$(curl_in hydra http://localhost:4445/admin/clients)
+    client_count=$(echo "$clients_json" | python3 -c "import sys,json; print(len(json.load(sys.stdin)))" 2>/dev/null || echo "0")
+    [[ "$client_count" == "$oidc_fixture_count" ]] && break
+    sleep 2
+done
 if [[ "$client_count" == "$oidc_fixture_count" ]]; then
     pass "B2 hydra admin lists $client_count clients (== $oidc_fixture_count oidc: fixtures)"
 else

@@ -26,8 +26,8 @@
 # are GONE. Their roles folded INTO the othala app: consent's challenge
 # handlers + recovery-gate are now the app's /oauth2/* public routes and
 # its /admin/recovery-gate loopback route; util's apply-clients is the
-# app's in-process registrar (the e2e invokes it as a one-shot — see
-# smoke.sh section B). No consent/util CONTAINER or image is pulled.
+# app's boot-time registrar (see smoke.sh section B).
+# No consent/util CONTAINER or image is pulled.
 #
 # What's intentionally absent vs production:
 #   - No Caddy / TLS / public DNS. Smoke probes hit container HTTP ports
@@ -256,7 +256,6 @@ services:
       HYDRA_PG_PASS: ${HYDRA_PG_PASS}
       HYDRA_SYSTEM_SECRET: ${HYDRA_SYSTEM_SECRET}
       HYDRA_COOKIE_SECRET_CURRENT: ${HYDRA_COOKIE_SECRET_CURRENT}
-      HYDRA_PAIRWISE_SALT: ${HYDRA_PAIRWISE_SALT}
       # Host routing + instance identity consumed by canonical hydra.yml
       HYDRA_PG_HOST: postgres
       OTHALA_PUBLIC_URL: ${OTHALA_PUBLIC_URL}
@@ -349,6 +348,10 @@ services:
       OTHALA_SMTP_CONNECTION_URI: ${OTHALA_SMTP_CONNECTION_URI}
       OTHALA_SMTP_FROM_ADDRESS: ${OTHALA_SMTP_FROM_ADDRESS}
       OTHALA_CONTACT_RECIPIENT: ${OTHALA_CONTACT_RECIPIENT}
+      # Per-client secrets the boot reconcile resolves for each oidc: fixture.
+      GRAFANA_CLIENT_SECRET: ${GRAFANA_CLIENT_SECRET}
+      AUDIOBOOKSHELF_CLIENT_SECRET: ${AUDIOBOOKSHELF_CLIENT_SECRET}
+      PROMPTDESK_CLIENT_SECRET: ${PROMPTDESK_CLIENT_SECRET}
       HOST: 0.0.0.0
       PORT: "8080"
       ADMIN_HOST: 127.0.0.1
@@ -363,48 +366,6 @@ services:
       timeout: 3s
       retries: 12
       start_period: 10s
-
-  # Client registration — the active production registration path (E1 cutover
-  # complete). util/apply-clients.sh is deleted; its role is now the in-process
-  # registrar (portal/src/lib/register-clients.ts -> registerAllClients),
-  # bundled into the image at dist/server/register-clients.mjs
-  # (npm run build:register-clients, same esbuild pattern as admin-runtime).
-  # In production the deploy repo runs this as a --rm one-shot on boot and on
-  # SIGHUP. The e2e activates it as a `compose run --rm`
-  # one-shot on the SAME othala image to prove the registrar registers every
-  # manifest in MANIFEST_DIR=/etc/portal/manifests (mounted from
-  # e2e/manifests/) against Hydra admin. See smoke.sh section B.
-  # `profiles: [oneshot]` keeps it out of the up/healthcheck loop —
-  # smoke runs it explicitly via `compose run`.
-  register-clients:
-    image: ${AUTH_REGISTRY}:${AUTH_VERSION}
-    container_name: lab-register-clients
-    profiles: ["oneshot"]
-    depends_on:
-      hydra:
-        condition: service_healthy
-    environment:
-      HYDRA_ADMIN_URL: http://hydra:4445
-      MANIFEST_DIR: /etc/portal/manifests
-      # register-clients.mjs imports the app config module (config.ts), which
-      # requires OTHALA_PUBLIC_URL at load (required-no-default in production).
-      # The othala service already gets it; the one-shot registrar needs it too.
-      OTHALA_PUBLIC_URL: http://auth.othala.test
-      # config.ts also requires OTHALA_SMTP_CONNECTION_URI (the contact-form
-      # mailer). The registrar doesn't send mail but shares the image + its
-      # config contract, so it sets the same relay the othala service does.
-      OTHALA_SMTP_CONNECTION_URI: ${OTHALA_SMTP_CONNECTION_URI}
-      # config.ts resolves a contact recipient at load. Same image, same config contract.
-      OTHALA_CONTACT_RECIPIENT: ${OTHALA_CONTACT_RECIPIENT}
-      # Per-client secrets for every fixture with an oidc: block. The
-      # generic example set registers three OIDC clients: grafana,
-      # audiobookshelf, promptdesk (client_id "promptdesk").
-      GRAFANA_CLIENT_SECRET: ${GRAFANA_CLIENT_SECRET}
-      AUDIOBOOKSHELF_CLIENT_SECRET: ${AUDIOBOOKSHELF_CLIENT_SECRET}
-      PROMPTDESK_CLIENT_SECRET: ${PROMPTDESK_CLIENT_SECRET}
-    volumes:
-      - ./manifests:/etc/portal/manifests:ro,z
-    command: ["node", "./dist/server/register-clients.mjs"]
 
   # OIDC dance runner (profile: oneshot) — Section G of smoke.sh.
   # Runs oidc-dance.mjs from inside the compose net using the PREBAKED

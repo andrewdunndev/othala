@@ -31,19 +31,14 @@ For the client catalog and per-RP integration details, see
 
 ## Client registration
 
-Registration is a deliberate one-shot, never triggered on app boot. On the
-deployment side, the operator invokes the Othala in-app registrar
-(`portal/src/lib/register-clients.ts`, bundled to
-`dist/server/register-clients.mjs`) as a one-shot `--rm` container on the
-network that can reach Hydra's admin port.
-It reads each manifest's `oidc:` block from `MANIFEST_DIR` and resolves
-`<SLUG>_CLIENT_SECRET` from env.
+The Othala app registers each manifest's `oidc:` block from `MANIFEST_DIR` on
+boot and on SIGHUP, resolving `<SLUG>_CLIENT_SECRET` from env.
 
 Full registration runbook: [`DEPLOY.md`](../DEPLOY.md) "Client registration"
 and [`per-app-oidc.md`](../site/src/content/docs/guides/per-app-oidc.md).
 
 Adding a new OIDC client: add a `<slug>.yaml` to the manifest directory, add
-the secret, and re-run the registrar one-shot.
+the secret, and SIGHUP the app.
 
 ## secrets.system non-rotatable
 

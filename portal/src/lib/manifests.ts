@@ -517,9 +517,8 @@ export function loadClientManifests(): ClientManifest[] {
  * registerAllClients() resolves `<CLIENT_ID_UPPER>_CLIENT_SECRET` for every
  * manifest it is handed, and a presentation-only tile has no client and no
  * secret, so handing it one throws. Any caller that pushes manifests at Hydra
- * — portal/src/lib/register-clients.ts registerAllClients, and the
- * src/server/register-clients-cli.ts one-shot behind it — must narrow through
- * this function first.
+ * — portal/src/lib/register-clients.ts registerAllClients — must narrow
+ * through this function first.
  */
 export function oidcClientManifests(
   set: ClientManifest[] = loadClientManifests(),

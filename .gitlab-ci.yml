@@ -468,21 +468,10 @@ e2e:
     - cd e2e
     - bash validate.sh
   artifacts:
-    # Must be a subpath of $CI_PROJECT_DIR — GitLab Runner refuses any
-    # artifacts:paths entry that resolves outside it ("artifact path is
-    # not a subpath of project directory") and drops the WHOLE archive
-    # when it does, not just the offending entry, so every e2e failure
-    # lost its diagnostics (observed live: job 15871403418) while these
-    # pointed at /tmp. smoke.sh's B1 register-clients output is the one
-    # file this harness still writes to disk (LOG_DIR in smoke.sh); the
-    # smoke-failure and healthcheck-timeout dumps were already moved to
-    # STDOUT/job-trace in prior commits (3fbee74, 4129268) rather than a
-    # file, so there's nothing to point an artifact path at for those.
     # `always`, not on_failure: a flaky-then-green run keeps its first-attempt
     # failure evidence (2782513958's P2 flake left nothing to diagnose).
     when: always
     paths:
-      - e2e/logs/apply-clients.log
       # Playwright html-report/test-results/screenshots + the diagnostics/
       # capture (actions/diagnostics.ts) — bind-mounted from the playwright
       # container's /out at e2e/compose.yml's ./browser-out:/out, so this

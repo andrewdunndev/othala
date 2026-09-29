@@ -127,9 +127,8 @@ export const instanceName: string =
 // have a working relay without secrets. (The e2e mailpit listens on :1025.)
 
 // A required image-config parameter (the app sends mail). Exposed
-// explicitly and set wherever the othala image runs — including the
-// register-clients one-shot, which shares the image + this config contract
-// even though it doesn't itself send mail (same pattern as OTHALA_PUBLIC_URL).
+// explicitly and set wherever the othala image runs (same pattern as
+// OTHALA_PUBLIC_URL).
 export const smtpConnectionUri: string = requiredVar(
   'OTHALA_SMTP_CONNECTION_URI',
   'smtp://lab:lab@localhost:1025',

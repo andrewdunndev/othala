@@ -64,8 +64,8 @@ inference was retired.
 Generate a client secret, store it, and write the manifest with
 `presentation.access` naming only the access group and `consent.group_role_map`
 naming both. Then register the client with Hydra:
-`portal/src/lib/register-clients.ts` runs as a one-shot on the network that can
-reach the admin port, and it creates and updates but **never deletes**, so
+the app's boot reconcile (and SIGHUP) registers it through the Hydra admin
+port, and it creates and updates but **never deletes**, so
 retiring a service leaves a ghost registration until an operator removes it by
 hand. Everything to that point is verifiable without the application running.
 

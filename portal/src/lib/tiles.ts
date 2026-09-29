@@ -35,7 +35,7 @@ import { parseAccessGroups } from './access-groups';
 const _cwd = process.cwd();
 const _iconsDir = (() => {
   // import.meta.env is Astro/Vite-specific; guard it so the module loads
-  // cleanly in plain Node (tests, register-clients one-shot, etc.).
+  // cleanly in plain Node (tests, etc.).
   const isDev = typeof import.meta.env !== 'undefined' && import.meta.env.DEV;
   if (isDev) {
     // Always use the source tree in dev; never let a stale dist/ shadow it.

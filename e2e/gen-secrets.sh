@@ -133,7 +133,6 @@ KRATOS_CIPHER_SECRET_CURRENT=${kratos_cipher}
 # Hydra
 HYDRA_SYSTEM_SECRET=$(gen)
 HYDRA_COOKIE_SECRET_CURRENT=${hydra_cookie}
-HYDRA_PAIRWISE_SALT=$(gen_short)
 
 # ── Admin identity credentials (shared between validate.sh seed + Playwright fixtures) ────
 # validate.sh seeds these two identities after compose is healthy (marker model):
@@ -159,7 +158,7 @@ RECOVERY_GATE_SECRET=$(gen)
 # App CSRF tokens (HIGH-1)
 CSRF_SECRET=$(gen)
 
-# Per-client OIDC secrets for the register-clients smoke. Every fixture
+# Per-client OIDC secrets for the boot-reconcile smoke. Every fixture
 # in e2e/manifests/ that carries an oidc: block (and so gets registered
 # against Hydra) needs a <SLUG>_CLIENT_SECRET env var, where <SLUG> is the
 # manifest's client_id upper-cased (see portal register-clients.ts

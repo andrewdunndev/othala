@@ -76,9 +76,6 @@ oidc:
   subject_identifiers:
     supported_types:
       - public
-    pairwise:
-      # Required by config schema even when pairwise is unused
-      salt: "${HYDRA_PAIRWISE_SALT}"
 
 ttl:
   access_token: 1h

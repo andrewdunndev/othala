@@ -21,7 +21,7 @@ set -uo pipefail  # NOT -e: every check classifies grep's exit itself (0/1/>1).
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"; REPO_ROOT="$(dirname "$SCRIPT_DIR")"
 cd "$REPO_ROOT" || exit 1  # pathspecs below are repo-root-relative
 TMP="$(mktemp -d)"; trap 'rm -rf "$TMP"' EXIT
-EXPECTED_CHECKS=13  # bump in the same commit that adds/removes a row or special check
+EXPECTED_CHECKS=12  # bump in the same commit that adds/removes a row or special check
 PASS=0; FAIL=0; ERROR=0; FAILED_STEPS=()
 
 step_pass() {  # <name> <files> <bytes> — both counts, so an empty corpus can't hide behind a nonzero file count
@@ -186,8 +186,7 @@ row "no-stale-llm-client-id" 1 'client_id: llm' 'client_id: llm' 'portal/scripts
 row "no-deleted-commands-in-docs" 2 \
     "$(printf '%s\n' 'dag-apply-clients' 'dag-sync-manifests')" \
     "$(printf '%s\n' 'run dag-apply-clients on the host' 'run dag-sync-manifests afterwards')" \
-    'DEPLOY.md hydra/README.md ARCHITECTURE.md e2e/README.md portal/src/server/register-clients-cli.ts docs/runbooks/ portal/src/ portal/scripts/'
-row "no-dormant-cutover-comment" 1 '\bDORMANT\b' '// DORMANT until the cutover lands' 'portal/src/server/register-clients-cli.ts e2e/compose.yml'
+    'DEPLOY.md hydra/README.md ARCHITECTURE.md e2e/README.md docs/runbooks/ portal/src/ portal/scripts/'
 row "no-pending-cutover-section" 1 '\(pending\)' '## Cutover (pending)' 'DEPLOY.md'
 
 # Dated-debt

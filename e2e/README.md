@@ -68,14 +68,11 @@ VM dies on job end. Total turnaround: ~3-5 minutes including image pulls.
   othala app admin `/healthz` (loopback `:4431`); the public
   `/oauth2/login` challenge handler is mounted on `:8080`; the admin mux
   does NOT leak onto the public port.
-- **Client registration** — runs the converged app's **in-app registrar**
-  (`registerAllClients`, bundled to `dist/server/register-clients.mjs`)
-  as a `compose run --rm register-clients` one-shot on the same othala
-  image. It reads manifests from `MANIFEST_DIR=/etc/portal/manifests`
-  (mounted from `e2e/manifests/`), resolves each `<SLUG>_CLIENT_SECRET`
-  from env, and POST/PUTs every client to Hydra admin; the smoke asserts
-  the full set registered (specific checks for `grafana` and
-  `audiobookshelf`).
+- **Client registration** — the othala service's boot reconcile registers
+  every manifest from `MANIFEST_DIR=/etc/portal/manifests` (mounted from
+  `e2e/manifests/`, secrets from `<SLUG>_CLIENT_SECRET` env); the smoke polls
+  Hydra admin until the count matches the fixtures (specific checks for
+  `grafana` and `audiobookshelf`).
 - **Identity admin flow** — create an identity via the Kratos admin API;
   `metadata_admin.groups` round-trips.
 - **The access model** — `ARCHITECTURE.md` § The access model is canonical.
@@ -96,16 +93,6 @@ VM dies on job end. Total turnaround: ~3-5 minutes including image pulls.
   compose network. Production-shape TLS validation is manual lab work (or
   a future iteration that wires Caddy with `tls internal`).
 
-## On the in-app registrar (a note for adopters)
-
-The app does **not** self-register clients on boot, and no route triggers
-registration. Registration is a deliberate **one-shot**: in production,
-the deploy repo SIGHUPs the app (which also reloads on boot) from the
-network that can reach Hydra's admin port (see the repo
-`DEPLOY.md`). This harness does the same against the freshly-built image,
-which is why `register-clients` is a `profiles: [oneshot]` service that
-`smoke.sh` invokes explicitly rather than starting in the `up` set.
-
 ## Files
 
 | File | Purpose |
@@ -124,8 +111,7 @@ cd e2e
 AUTH_VERSION=latest bash validate.sh
 ```
 
-If a probe fails, container ps/logs print to STDOUT; the register-clients
-(B1) output is also saved to `e2e/logs/apply-clients.log`.
+If a probe fails, container ps/logs print to STDOUT.
 
 ## Running the browser e2e locally (macOS/podman)
 
