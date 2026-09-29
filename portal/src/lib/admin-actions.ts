@@ -22,6 +22,7 @@ import {
 } from './admin';
 import { deleteCredential, EVICTABLE_CREDENTIAL_TYPES } from './admin-api';
 import { isAdminMarker } from './admin-auth';
+import { hasSecondFactor } from './step-up';
 import { sendInviteRecoveryEmail } from './kratos';
 import { confirmsInviteAddress, normalizeGroupOrder, shouldRefuseRecovery } from './access';
 import { planGroupSave } from './gate';
@@ -200,8 +201,18 @@ export async function deleteAction(fd: FormData, ctx: ActionContext): Promise<Ac
   return new Response(null, { status: 303, headers: { Location: '/admin/users?deleted=1' } });
 }
 
+// Admin accounts always step up at app sign-in, so the marker requires a totp
+// or webauthn credential to step up with, and keeps requiring one.
+const SECOND_FACTOR_REQUIRED: ActionResult = {
+  kind: 'error',
+  message: 'Admin accounts need an authenticator app or security key enrolled.',
+};
+
 export async function grantAdminAction(_fd: FormData, ctx: ActionContext): Promise<ActionOutcome> {
   const username = ctx.identity.traits?.username ?? ctx.id;
+  if (!hasSecondFactor(ctx.identity)) {
+    return { actionResult: SECOND_FACTOR_REQUIRED, refetch: false };
+  }
   await patchAdminMarker(ctx.id, true);
   return { actionResult: { kind: 'admin-granted', username }, refetch: true };
 }
@@ -253,6 +264,13 @@ export async function removeCredentialAction(fd: FormData, ctx: ActionContext): 
       actionResult: { kind: 'error', message: `Invalid credential type '${credType}'. Evictable types: webauthn, totp, lookup_secret.` },
       refetch: false,
     };
+  }
+  if (isAdminMarker(ctx.identity)) {
+    const creds = { ...(ctx.identity.credentials ?? {}) } as Record<string, unknown>;
+    delete creds[credType];
+    if (!hasSecondFactor({ ...ctx.identity, credentials: creds as Identity['credentials'] })) {
+      return { actionResult: SECOND_FACTOR_REQUIRED, refetch: false };
+    }
   }
   await deleteCredential(ctx.id, credType);
   return { actionResult: { kind: 'credential-removed', credType }, refetch: true };

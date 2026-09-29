@@ -19,7 +19,9 @@
  *   - passkey refused server-side (upstream 400 — Kratos cannot admin-delete
  *     it), deleteCredential never called
  *   - happy path: deleteCredential called
+ *   - admin-marked target keeps a totp or webauthn credential
  *   grantAdminAction:
+ *   - refused without a totp or webauthn credential
  *   - happy path: patchAdminMarker(id, true) called
  *
  * Run: npx vitest run   (from portal/)
@@ -56,6 +58,10 @@ function makeIdentity(username: string, admin?: boolean): Identity {
     traits: { username, email: `${username}@example.com` },
     metadata_admin: admin === undefined ? undefined : ({ admin } as Identity['metadata_admin']),
   };
+}
+
+function withCreds(identity: Identity, ...types: string[]): Identity {
+  return { ...identity, credentials: Object.fromEntries(types.map((t) => [t, { type: t }])) as Identity['credentials'] };
 }
 
 function makeCtx(overrides: Partial<ActionContext> = {}): ActionContext {
@@ -180,13 +186,50 @@ describe('removeCredentialAction', () => {
     expect(outcome.actionResult?.kind).toBe('credential-removed');
     expect(outcome.refetch).toBe(true);
   });
+
+  it('refuses removing the last second factor of an admin-marked target', async () => {
+    const identity = withCreds(makeIdentity('root', true), 'password', 'totp', 'lookup_secret');
+    const outcome = await removeCredentialAction(fd({ cred_type: 'totp' }), makeCtx({ identity }));
+
+    expect(deleteCredentialMock).not.toHaveBeenCalled();
+    if (outcome instanceof Response) throw new Error('unreachable');
+    expect(outcome.actionResult?.kind).toBe('error');
+  });
+
+  it('allows removing one second factor of an admin-marked target while another remains', async () => {
+    const identity = withCreds(makeIdentity('root', true), 'totp', 'webauthn');
+    const outcome = await removeCredentialAction(fd({ cred_type: 'totp' }), makeCtx({ id: 'target-1', identity }));
+
+    expect(deleteCredentialMock).toHaveBeenCalledWith('target-1', 'totp');
+    if (outcome instanceof Response) throw new Error('unreachable');
+    expect(outcome.actionResult?.kind).toBe('credential-removed');
+  });
+
+  it('allows removing backup codes of an admin-marked target that keeps totp', async () => {
+    const identity = withCreds(makeIdentity('root', true), 'totp', 'lookup_secret');
+    await removeCredentialAction(fd({ cred_type: 'lookup_secret' }), makeCtx({ identity }));
+    expect(deleteCredentialMock).toHaveBeenCalled();
+  });
 });
 
 // ── grantAdminAction ─────────────────────────────────────────────────────────
 
 describe('grantAdminAction', () => {
-  it('happy path: calls patchAdminMarker(id, true)', async () => {
-    const outcome = await grantAdminAction(fd(), makeCtx({ id: 'target-1' }));
+  it.each([[[]], [['password', 'passkey']], [['lookup_secret']]])(
+    'refuses a target holding only %j and never calls patchAdminMarker',
+    async (types: string[]) => {
+      const identity = withCreds(makeIdentity('member'), ...types);
+      const outcome = await grantAdminAction(fd(), makeCtx({ identity }));
+
+      expect(patchAdminMarkerMock).not.toHaveBeenCalled();
+      if (outcome instanceof Response) throw new Error('unreachable');
+      expect(outcome.actionResult?.kind).toBe('error');
+    },
+  );
+
+  it.each(['totp', 'webauthn'])('happy path with %s: calls patchAdminMarker(id, true)', async (t) => {
+    const identity = withCreds(makeIdentity('member'), 'password', t);
+    const outcome = await grantAdminAction(fd(), makeCtx({ id: 'target-1', identity }));
 
     expect(patchAdminMarkerMock).toHaveBeenCalledWith('target-1', true);
     if (outcome instanceof Response) throw new Error('unreachable');
