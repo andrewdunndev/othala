@@ -1,24 +1,8 @@
-// POST /api/request — the dashboard contact/request form backend.
-//
-// Flow:
-//   1. Require an active Kratos session (401 otherwise).
-//   2. Rate-limit by identity id (in-process sliding window, lib/contact.ts).
-//   3. Parse the submission (urlencoded form OR JSON; name, type, message), then validate + normalize (lib/contact.ts) — fail-closed on anything bad.
-//   4. Send to the operator via the SHARED courier SMTP (lib/mailer.ts, which
-//      reads OTHALA_SMTP_CONNECTION_URI — the same URI kratos.yml's courier
-//      uses). Recipient = config.contactRecipient (OTHALA_CONTACT_RECIPIENT,
-//      required in production — set explicitly).
-//
-// Responses:
-//   401 { ok: false, error }                  — no active session
-//   200 { ok: true }                          — accepted + sent
-//   400 { ok: false, error }                  — validation failure (safe reason)
-//   429 { ok: false, error } + Retry-After    — rate limited
-//   415 { ok: false, error }                  — unsupported content type
-//   500 { ok: false, error: 'send failed' }   — transport failure (NO internals)
-//
-// SMTP internals are never leaked: a MailerError is logged server-side and the
-// client gets a generic 500. This mirrors the admin endpoints' error discipline.
+// POST /api/request: the dashboard contact form backend. Requires a Kratos
+// session (401), rate-limits by identity (429), validates form or JSON input
+// (400/415), then mails the operator over the shared courier SMTP (lib/mailer.ts).
+// Responses are { ok, error? }; a MailerError is logged and the client gets a
+// generic 500 'send failed'.
 
 import type { APIRoute } from 'astro';
 import { validateContact, rateLimit } from '../../lib/contact';

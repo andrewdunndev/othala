@@ -1,13 +1,7 @@
-// The 10 admin POST actions from pages/admin/users/[id].astro, extracted so
-// the page's frontmatter is a thin dispatch. CSRF verification is
-// action-name-keyed and stays page-level, BEFORE any handler here runs.
-//
-// Every handler takes the raw FormData plus an ActionContext (the identity
-// already loaded pre-dispatch — never re-fetched here) and returns an
-// ActionOutcome for the page to apply to its render locals. `refetch` tells
-// the page to re-run its own reload() after a mutation; none of the values
-// in ActionResult depend on the reloaded identity, so deferring the reload
-// to the page changes nothing observable.
+// The 10 admin POST actions from pages/admin/users/[id].astro, so the page is a
+// thin dispatch. CSRF verification stays page-level, before any handler runs.
+// Each handler takes the FormData plus an ActionContext (the identity already
+// loaded) and returns an ActionOutcome; `refetch` asks the page to reload().
 
 import {
   listIdentities,

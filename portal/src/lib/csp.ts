@@ -1,14 +1,8 @@
-// Content-Security-Policy builder for the portal's response headers.
-//
-// form-action governs a form submission's whole redirect chain, not only its
-// action URL. Two chains leave the portal origin:
-//   - an OIDC login's post-login redirect lands on the requesting app, a
-//     subdomain of the estate apex (https://*.<OTHALA_APEX>);
-//   - sign-out POSTs to /auth/logout, which answers 303 to Kratos's logout_url.
-//     That URL is on OTHALA_PUBLIC_URL (Kratos's base_url) or KRATOS_PUBLIC_URL,
-//     the same two origins /auth/logout accepts, so both are listed here. Without
-//     them, a Kratos on another host with OTHALA_APEX unset blocks sign-out.
-// Unparseable or non-http(s) values contribute nothing.
+// Content-Security-Policy builder. form-action covers a form's whole redirect
+// chain: an OIDC login lands on a subdomain of the apex (https://*.<OTHALA_APEX>),
+// and sign-out 303s to Kratos's logout_url on OTHALA_PUBLIC_URL or
+// KRATOS_PUBLIC_URL, the two origins /auth/logout accepts. Unparseable or
+// non-http(s) values contribute nothing.
 
 function httpOrigin(raw: string | undefined): string | null {
   if (!raw) return null;

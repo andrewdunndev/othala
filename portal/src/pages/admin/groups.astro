@@ -1,15 +1,8 @@
 ---
-// Admin: groups overview (read-only).
-//
-// Two sections:
-//   - Identity groups: OTHALA_IDENTITY_GROUPS env names (admin / family /
-//     kids / friends) — not manifest-derived. Each card lists members.
-//   - Access groups: registry-derived Group → Apps view. A group's type comes
-//     from its manifest BINDING, not its name; each card
-//     names the apps it grants entry to / maps a role in, and lists members.
-//
-// Editing happens on the per-user page. This is a navigation aid: spot
-// who's in `kids`, who can reach a given app, etc.
+// Admin: groups overview (read-only). Identity groups are the
+// OTHALA_IDENTITY_GROUPS names; access groups are the registry-derived
+// Group -> Apps view (type comes from manifest binding, not name). Each card
+// lists members. Editing happens on the per-user page.
 
 export const prerender = false;
 

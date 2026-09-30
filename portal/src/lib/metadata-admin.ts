@@ -1,33 +1,8 @@
-// Application-level validator for `metadata_admin` writes.
-//
-// Why this exists (J1):
-//
-// Kratos identity-schema `additionalProperties: false` only enforces
-// against `traits`. The `metadata_admin` block is admin-controlled and
-// the schema validator treats it as opaque, so a typo (`grupos` instead
-// of `groups`) is silently accepted and stored. The schema declaration
-// for metadata_admin is documentation; runtime enforcement has to live
-// at the write paths in this portal.
-//
-// Contract:
-//   { groups?: string[]; roles?: Record<string, string>; admin?: boolean }
-// where:
-//   - groups: array of names matching the canonical group-name policy
-//     (GROUP_RE, portal/src/lib/access-groups.ts), length 1..64, no
-//     duplicates. This is the write side of that one canonical form; the
-//     read side is gate.ts nonCanonicalGroups. identity.schema.json's
-//     `metadata_admin.groups` pattern is the same expression, but it is
-//     documentation only — Kratos does not validate metadata_admin.
-//   - roles: object with keys matching ^[a-z][a-z0-9]*$ mapping to role
-//     names matching ^[a-z][a-z0-9_\-]*$, length 1..64
-//   - admin: strict boolean (true|false); rejects non-boolean (string "true",
-//     number 1, null, etc.) — fail-closed for admin authority
-//   - no other top-level keys allowed
-//
-// Returns the input on success (typed as MetadataAdmin) or an Error
-// the caller surfaces as a notice. Hand-rolled, no schema-validator
-// dependency: family-scale identity admin runs once a week, the cost
-// of a validator dependency is not worth it.
+// Validator for `metadata_admin` writes. Kratos does not validate that block
+// (its schema only covers traits), so a typo would be stored silently.
+// Contract: { groups?: string[]; roles?: Record<string,string>; admin?: boolean }
+// with canonical group names (GROUP_RE), a strict boolean admin, and no other
+// keys. Hand-rolled, no validator dependency; returns the input or an Error.
 
 import type { MetadataAdmin } from './admin-api';
 import { GROUP_RE } from './access-groups';

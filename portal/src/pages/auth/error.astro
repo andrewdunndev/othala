@@ -1,20 +1,8 @@
 ---
-// /auth/error — branded denial / auth error page.
-//
-// This is the redirect target for access-denied and auth-failure flows
-// throughout the portal. The `reason` query param drives the status code,
-// title, and message. Known reasons are mapped below; an unknown reason
-// falls through to a generic 400.
-//
-// Known reasons (grep for `/auth/error?reason=` in src/):
-//   not-admin        — user is authenticated but lacks the admin marker
-//   not-authorised   — user lacks the required access group for an app
-//   auth-unreachable — Kratos is unreachable or returned an unexpected error
-//
-// Additional well-known reasons defined here:
-//   session-expired  — session is invalid or timed out
-//   forbidden        — generic 403 when a more specific reason is unavailable
-//   unavailable      — upstream dependency temporarily unavailable
+// /auth/error: branded denial page. The `reason` query param drives status,
+// title and message; unknown reasons fall through to a generic 400. Reasons:
+// not-admin, not-authorised, auth-unreachable, session-expired, forbidden,
+// unavailable (grep `/auth/error?reason=` in src/).
 
 export const prerender = false;
 

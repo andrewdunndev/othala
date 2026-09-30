@@ -1,15 +1,8 @@
 ---
-// Admin: list users.
-//
-// Pulls every identity from Kratos admin, filters client-side by group
-// and search query (kept tiny: ~20 family identities total). Server-side
-// rendering reads filter / search params from the URL so deep links and
-// reloads stay stable.
-//
-// `last_authenticated_at` is not in the Identity schema; Kratos exposes
-// it via the session list, which is more API-cost than this page wants
-// at every render. The column is shown when the identity carries it
-// (e.g. via a future enrichment) and falls back to "—" otherwise.
+// Admin: list users. Pulls every identity from Kratos admin and filters
+// client-side by group and search (about 20 identities); filter params come
+// from the URL so deep links stay stable. `last_authenticated_at` is not in
+// the Identity schema, so the column shows "—" unless the identity carries it.
 
 export const prerender = false;
 

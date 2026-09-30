@@ -1,13 +1,8 @@
 ---
-// Email verification flow handler — mirrors recovery's two-phase code form.
-//
-// Phase 1: the user enters an email; Kratos sends a numeric code via Fastmail.
-// Phase 2: the user enters the code; Kratos marks the address verified and
-//          303s back to the configured `default_browser_return_url`.
-//
-// Verification is disabled in production (`kratos.yml: flows.verification.enabled`
-// is conditional on the deployment), but the page is here so the lab and any
-// future re-enablement don't land users on a dead route.
+// Email verification flow handler, the two-phase code form mirroring recovery:
+// enter an email, then the code, then Kratos 303s to default_browser_return_url.
+// Disabled in production (flows.verification.enabled is per deployment), kept
+// so the lab and any re-enablement don't hit a dead route.
 
 export const prerender = false;
 

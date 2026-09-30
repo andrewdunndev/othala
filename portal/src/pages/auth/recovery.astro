@@ -1,18 +1,7 @@
 ---
-// Recovery flow handler — code strategy.
-//
-// Audience: family members on a new device, with a lost passkey, or who
-// have never set a password. The promoted path is email → one-time code →
-// privileged session → /auth/settings where they can register a passkey
-// on the current device.
-//
-// Phase 1: user enters email; Kratos sends a numeric code via Fastmail.
-// Phase 2: user enters the code; Kratos issues a privileged session and
-//          303s to /auth/settings to set a new password / register a passkey.
-//
-// Same template handles both phases: Kratos's flow.ui.nodes describes
-// which inputs to surface (email -> code) so the rendering stays
-// shape-driven.
+// Recovery flow handler, code strategy: email -> one-time code -> privileged
+// session -> /auth/settings, where the user can set a password or register a
+// passkey. One template serves both phases; flow.ui.nodes drives the inputs.
 
 export const prerender = false;
 

@@ -1,34 +1,8 @@
-// Othala portal middleware.
-//
-// After the page/route handler runs, inspects the response and rebrands
-// HTML 4xx/5xx responses with the portal's error pages.
-//
-// Rules:
-//   - Only rebrands HTML navigation requests (Accept: text/html).
-//     API / OAuth2 / programmatic callers keep their machine responses.
-//   - Only intercepts 4xx and 5xx responses.
-//   - Does NOT rewrite requests already headed to /auth/error or /404 or /500
-//     to prevent infinite loops.
-//   - Uses context.rewrite() to a parameterless route so no request body is
-//     re-consumed (avoids the "body already consumed" error on POST pages).
-//
-// Security notes:
-//   - Security response headers are applied to EVERY response (2xx, 3xx,
-//     4xx, 5xx) after all other processing, including rebranded error pages.
-//   - The Astro checkOrigin (security.checkOrigin) 403 fires BEFORE user
-//     middleware and returns early, so this handler never sees it.
-//     That case is handled at the Caddy edge layer — out of scope here.
-//   - Never inject error details, stack traces, or upstream messages into
-//     the rebranded response.
-//
-// CSP note:
-//   - The CSP header below intentionally contains ONLY frame-ancestors,
-//     object-src, and base-uri. A strict script-src is deliberately omitted:
-//     it can break the Kratos WebAuthn login ceremony (which injects inline
-//     <script> nodes) and the portal's own inline theme/modal scripts. Adding
-//     a strict script-src requires live e2e validation of every auth flow.
-//     Deferred to live-gate validation (tracked in
-//     site/src/content/docs/guides/hardening.md §2).
+// Portal middleware. Rebrands HTML 4xx/5xx responses with the portal's error
+// pages via context.rewrite() (no body re-consumed), skipping non-HTML callers
+// and the error routes themselves, and applies security headers to every
+// response. The CSP omits script-src deliberately: a strict one breaks the
+// Kratos WebAuthn ceremony and the portal's inline scripts.
 
 import { defineMiddleware } from 'astro:middleware';
 import { contentSecurityPolicy } from './lib/csp';
@@ -37,41 +11,20 @@ import { kratosBase } from './lib/kratos';
 // Routes that are themselves error pages — rewriting these would loop.
 const ERROR_ROUTE_PREFIXES = ['/auth/error', '/404', '/500'];
 
-// Security response headers applied to every response.
-// See CSP note in the file header for why script-src is absent.
+// Security response headers applied to every response (see the CSP note above).
 function applySecurityHeaders(res: Response): void {
   res.headers.set('X-Frame-Options', 'DENY');
   res.headers.set('X-Content-Type-Options', 'nosniff');
-  // Referrer-Policy: same-origin (not no-referrer — see work item #5).
-  //
-  // Intent this preserves: no-referrer's job was to stop the `flow` /
-  // `consent_challenge` query-param tokens on the login/consent pages from
-  // leaking to a third party in the Referer header
-  // (site/src/content/docs/guides/hardening.md §2, security-review finding
-  // HIGH-A/HIGH-B — originally the Google Fonts CDN, before fonts were
-  // self-hosted). `same-origin` still sends NO referrer at all to any
-  // cross-origin destination, so that leak is fully closed; it only
-  // additionally allows the full referrer on same-origin navigations, which
-  // discloses nothing Othala doesn't already know.
-  //
-  // Bug this fixes (work item #5): `no-referrer` also suppresses the Origin
-  // header Chromium sends on a same-origin form-POST navigation (it arrives
-  // as `Origin: null`). Astro's built-in security.checkOrigin CSRF gate then
-  // 403s the request before any app code runs — every state-changing admin
-  // POST (issue-recovery, force-relogin, deactivate, delete, grant/revoke-
-  // admin, profile save) was unreachable from a real browser. `same-origin`
-  // restores the same-origin Origin header and unblocks checkOrigin while
-  // keeping the cross-origin privacy guarantee intact.
+  // same-origin, not no-referrer: no-referrer makes Chromium send `Origin: null`
+  // on same-origin form POSTs, which Astro's checkOrigin then rejects. Nothing
+  // still leaks cross-origin.
   res.headers.set('Referrer-Policy', 'same-origin');
   res.headers.set('Permissions-Policy', 'geolocation=(), camera=(), microphone=()');
   res.headers.set('Cross-Origin-Opener-Policy', 'same-origin');
   // HSTS: 2-year max-age + includeSubDomains + preload.
   // The IdP is HTTPS-only behind Caddy and serves both the apex and subdomains.
   res.headers.set('Strict-Transport-Security', 'max-age=63072000; includeSubDomains; preload');
-  // form-action: 'self', the apex wildcard for OIDC app redirects, and the
-  // Kratos origins sign-out's 303 lands on. See lib/csp.ts. script-src
-  // deferred — see site/src/content/docs/guides/hardening.md §2 and the
-  // file-level CSP note.
+  // form-action allowlist: see lib/csp.ts.
   res.headers.set(
     'Content-Security-Policy',
     contentSecurityPolicy({
@@ -81,10 +34,7 @@ function applySecurityHeaders(res: Response): void {
   );
 }
 
-// Map from HTTP status code to the /auth/error reason param.
-// Entries here cover the most common app-emitted codes. Unknown status codes
-// fall back to the generic 'forbidden' entry (which itself falls back to
-// DEFAULT_ENTRY in /auth/error.astro).
+// HTTP status to /auth/error reason; unknown codes fall back to 'forbidden'.
 const STATUS_REASON: Record<number, string> = {
   400: 'forbidden',
   401: 'session-expired',
@@ -120,24 +70,17 @@ export const onRequest = defineMiddleware(async (context, next) => {
     return res;
   }
 
-  // Guard 4: don't rewrite if the response is already branded HTML
-  // (another middleware or an upstream forward has already handled it).
+  // Guard 4: don't rewrite an already-branded HTML response.
   const contentType = res.headers.get('content-type') ?? '';
   if (contentType.includes('text/html')) {
-    // It's already HTML — let it through as-is; the page itself set the
-    // status and rendered the branded response (e.g. 404.astro, 500.astro).
+    // Already branded HTML (e.g. 404.astro, 500.astro); let it through.
     applySecurityHeaders(res);
     return res;
   }
 
-  // Rewrite to the branded /auth/error page, but PRESERVE the original status
-  // code. /auth/error derives a status from the reason; we override it so a raw
-  // 500 doesn't get downgraded to the reason's status (e.g. 403). The reason
-  // only drives the human copy; res.status stays authoritative.
-  //
-  // Note: the branded Response is reconstructed via new Response(...) because
-  // Response objects returned by context.rewrite() are immutable; we must build
-  // a fresh mutable Response to apply security headers.
+  // Rewrite to the branded /auth/error page but keep the original status; the
+  // reason only drives the copy. The rewritten Response is immutable, so build
+  // a fresh one to apply security headers.
   const reason = STATUS_REASON[res.status] ?? 'forbidden';
   const branded = await context.rewrite(`/auth/error?reason=${reason}`);
   const final = new Response(branded.body, {

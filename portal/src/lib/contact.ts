@@ -1,13 +1,7 @@
-// Contact/request-form validation + in-process rate limiting (pure).
-//
-// Kept SEPARATE from the API route and the mailer so it is unit-testable
-// without an HTTP request or a live SMTP relay. The route parses the form,
-// calls validateContact(), checks rateLimit(), then hands the clean payload
-// to lib/mailer.sendContactRequest().
-//
-// Fail-closed posture: anything ambiguous (missing field, over-length, an
-// unknown request type, a body that is all whitespace or all links) is
-// rejected with a stable, client-safe reason.
+// Contact form validation + in-process rate limiting (pure, so testable without
+// HTTP or SMTP). The route calls validateContact(), checks rateLimit(), then
+// hands the payload to lib/mailer.sendContactRequest(). Fail closed: anything
+// ambiguous is rejected with a stable, client-safe reason.
 
 /** The request-type allowlist — mirrors the dashboard <select> options. */
 export const REQUEST_TYPES = ['access', 'new', 'problem', 'other'] as const;

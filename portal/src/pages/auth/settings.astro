@@ -1,25 +1,12 @@
 ---
-// Settings flow handler.
-//
-// Requires an active session: redirects to /auth/login if absent.
-// Reads ?flow=<id>; if absent or expired, redirects to Kratos's
-// settings/browser initiator (which sets the anti-CSRF cookie and
-// 303s back here with a fresh flow id).
-//
-// Renders sections from flow.ui.nodes per method group:
-//   - profile:       email, displayName, recoveryEmail; username read-only
-//   - passkey:       list enrolled credentials + register new
-//   - password:      change password
-//   - totp:          authenticator app QR + verify code (enroll / already enrolled)
-//   - lookup_secret: generate / reveal backup recovery codes
-//   - webauthn:      register a hardware security key (MFA second factor)
-//
-// Plus a logout-everywhere button sourced from /self-service/logout/browser.
+// Settings flow handler. Needs an active session (else /auth/login); reads
+// ?flow=<id> or redirects to Kratos's settings initiator. Renders profile,
+// passkey, password, totp, lookup_secret and webauthn sections from
+// flow.ui.nodes, plus a sign-out-everywhere button.
 
 export const prerender = false;
 
-// Bug fix: TOTP QR/secret and backup codes must not sit in the browser
-// back/forward cache. Set no-store so every navigation fetches fresh.
+// Keep TOTP QR/secret and backup codes out of the back/forward cache.
 Astro.response.headers.set('Cache-Control', 'no-store, max-age=0');
 Astro.response.headers.set('Pragma', 'no-cache');
 
@@ -61,18 +48,13 @@ if (!session?.active || !session.identity) {
   return Astro.redirect('/auth/login?return_to=' + encodeURIComponent('/auth/settings'));
 }
 
-// Self-service "sign out everywhere" (CU3 B1 trigger). Routes through the
-// in-process revoke fan-out (steps 2-6) on the CALLER'S OWN identity — NOT
-// the Kratos browser-logout, which only drops the local Kratos session and
-// leaves Hydra's remembered login open. deactivate is false: the
-// user is signing out, not deactivating themselves.
+// "Sign out everywhere": revokes the caller's own identity through the in-process
+// fan-out, which, unlike Kratos's browser logout, also closes Hydra's remembered login.
 let signOutError: string | null = null;
 if (Astro.request.method === 'POST') {
   const fd = await Astro.request.formData();
   if (String(fd.get('action') ?? '') === 'sign-out-everywhere') {
-    // Match the admin POST pattern: every state-changing POST carries a
-    // per-request CSRF token bound to the caller's own identity. Verify
-    // before any side effect; fails closed.
+    // Verify the CSRF token bound to the caller's identity before any side effect.
     try {
       verifyToken(String(fd.get('csrf_token') ?? ''), session.identity.id, 'sign-out-everywhere');
     } catch (err) {
@@ -120,11 +102,8 @@ const hasWebAuthn = hasMethod(ui.nodes, 'webauthn');
 const logoutInfo = await getLogoutInfo(cookie);
 const csrfSignOut = signToken(session.identity.id, 'sign-out-everywhere');
 const traits = session.identity.traits;
-// The public whoami does NOT expose metadata_admin, so the user's real groups
-// must come from a re-fetch of the FULL identity via the ADMIN API (same
-// pattern as /api/forward-auth). This is DISPLAY-ONLY (the Membership chips),
-// but we still re-fetch so the user sees their actual groups instead of an
-// always-empty list. FAIL-CLOSED: on lookup failure show no groups.
+// whoami omits metadata_admin, so the Membership chips re-fetch the full
+// identity via the admin API (display only). Fail closed: no groups on error.
 let groups: string[] = [];
 // The email inputs go read-only when the profile gate would refuse a change
 // from this session (display only; the gate stays the control). An unreadable
@@ -138,16 +117,14 @@ try {
   console.error('[othala/settings] getIdentity failed; showing no groups:', lookupErr);
 }
 const displayName = traits.displayName || traits.username || '';
-// Username is admin-controlled: shown read-only and left out of the editable
-// profile nodes. The schema requires it, so the stored value rides along
-// hidden; the profile gate (listen.mjs handleProfileGate) refuses any other.
+// Username is admin-controlled: read-only, carried hidden because the schema
+// requires it; the profile gate (listen.mjs handleProfileGate) refuses changes.
 const isUsernameNode = (n: (typeof ui.nodes)[number]) => asInput(n)?.name === 'traits.username';
 const isEmailNode = (n: (typeof ui.nodes)[number]) => ['traits.email', 'traits.recoveryEmail'].includes(asInput(n)?.name ?? '');
 const profileNodes = ui.nodes.filter((n) => !isUsernameNode(n) && !(emailLocked && isEmailNode(n)));
 const changeEmailHref = browserFlows.login({ refresh: true, returnTo: '/auth/settings' });
 const usernameMessages = ui.nodes.find(isUsernameNode)?.messages ?? [];
-// Split the user's own groups by the registry's binding-derived type, not an
-// `access-` name prefix.
+// Split the user's groups by the registry's binding-derived type.
 const groupRegistry = getGroupRegistry();
 const identityGroups = groups.filter((g) => isIdentityGroup(groupRegistry, g));
 const accessGroups = groups.filter((g) => !isIdentityGroup(groupRegistry, g));
@@ -353,10 +330,7 @@ const accessGroups = groups.filter((g) => !isIdentityGroup(groupRegistry, g));
         <input type="hidden" name="csrf_token" value={csrf} />
         <input type="hidden" name="method" value="lookup_secret" />
         {nodesByGroup(ui.nodes, 'lookup_secret').map((n) => {
-          // Bug fix: text nodes carry the actual backup codes in
-          // attributes.text.text — FlowNodes/asInput() returns null for
-          // node_type:"text", silently dropping them. Render them explicitly
-          // so the generated codes are always shown to the user.
+          // Text nodes carry the backup codes in attributes.text.text; asInput() drops them.
           if (n.attributes.node_type === 'text') {
             const a = n.attributes as NodeTextAttributes;
             return (
@@ -421,8 +395,7 @@ const accessGroups = groups.filter((g) => !isIdentityGroup(groupRegistry, g));
           if (inp.type === 'hidden') {
             return <input type="hidden" name={inp.name} value={String(inp.value ?? '')} />;
           }
-          // safeOnclick validates against the shared KNOWN_TRIGGERS allowlist
-          // before emitting window.<fn>(). Never pass inp.onclick raw to the DOM.
+          // safeOnclick validates against KNOWN_TRIGGERS; never emit inp.onclick raw.
           if (inp.type === 'button' || inp.type === 'submit') {
             return (
               <div class="form-actions">

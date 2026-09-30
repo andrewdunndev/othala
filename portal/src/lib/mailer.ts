@@ -1,17 +1,7 @@
-// SMTP mailer for portal-originated mail (the dashboard contact/request form).
-//
-// Reuses the SAME courier connection Kratos uses: OTHALA_SMTP_CONNECTION_URI is
-// the single source of truth for the SMTP relay, consumed by both
-// kratos/kratos.yml (`courier.smtp.connection_uri`) and this module. One URI,
-// one relay — a contact-form mail travels the exact same outbound path as a
-// recovery/verification code.
-//
-// The transport is built LAZILY and cached: the module imports cleanly without
-// opening a socket, so `astro build` and unit tests don't need a live relay.
-//
-// Error discipline (project posture): on a send failure the caller surfaces a
-// generic 5xx. This module throws a MailerError whose message is safe to LOG
-// server-side but the API route never echoes SMTP internals to the client.
+// SMTP mailer for portal-originated mail (the contact form). Reuses Kratos's
+// courier relay: OTHALA_SMTP_CONNECTION_URI is the single source for both. The
+// transport is built lazily, so build and tests need no relay. A send failure
+// throws a MailerError, safe to log, which the API route never echoes.
 
 import nodemailer from 'nodemailer';
 import type { Transporter } from 'nodemailer';

@@ -1,27 +1,8 @@
-// Access-group parsing for unified manifests — the group binding.
-//
-// The manifest layer reads `presentation.access:` (adopter-named groups,
-// arbitrary charset, no `access-` prefix required) into a normalized
-// `accessGroups: string[]` field on both the OIDC `ClientManifest` and the
-// dashboard `AppTile`. This field is the LOAD-BEARING access binding: the
-// OIDC gate (gate.ts), effective-access view
-// (access.ts), tile visibility (tiles.ts), and the group registry
-// (group-registry.ts) all key off it. The `access-` prefix is not a runtime
-// type discriminator — a group's type comes from its binding, derived by
-// group-registry.ts.
-//
-// Parse precedence:
-//   1. presentation.access non-empty list → use it.
-//   2. else presentation.access_group non-empty → [access_group] (compat shim,
-//      NO prefix validation applied here).
-//   3. else [] (no fallback of any kind — absence is absence. othala primitive
-//      #5: absence of a binding means NO access; there is no framework default
-//      that silently grants visibility. manifests.ts carries the `[]` through
-//      verbatim, and a bare manifest with `[]` + no skip_access_check is a
-//      load-time BLOCK in validateClients).
-//
-// Validation here is non-throwing: names that miss the canonical form are
-// skipped, not rejected. Hard validation is the lint in manifest-lint.ts.
+// Access-group parsing: reads `presentation.access` (else the `access_group`
+// compat shim, else []) into `accessGroups`, the load-bearing access binding
+// used by gate, access, tiles and the group registry. Absence means no access.
+// Non-throwing: names missing the canonical form are skipped; hard validation
+// is manifest-lint.ts.
 
 /**
  * THE canonical group-name policy. Not an input guard on one parameter: this

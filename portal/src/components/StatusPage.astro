@@ -1,16 +1,7 @@
 ---
-// StatusPage — branded error / status page component.
-//
-// Single source of truth for all error rendering in the portal. The HTTP
-// status code is the visual hero (large accent mono), sitting above the
-// title and explanatory message.
-//
-// Props
-//   status   (number, required) — HTTP status code, e.g. 404, 403, 500.
-//   title    (string, required) — Short title, e.g. "Not found".
-//   message  (string, required) — Human-readable paragraph shown to the user.
-//   reason   (string, optional) — Reason token shown as a badge (e.g. "not-admin").
-//                                 Never include raw error messages or stack traces here.
+// Branded error / status page, the single source for error rendering. Props:
+// status (number, the visual hero), title, message (human-readable), reason
+// (optional badge token; never raw errors or stack traces).
 
 import Layout from '../layouts/Layout.astro';
 

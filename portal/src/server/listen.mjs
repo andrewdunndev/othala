@@ -1,7 +1,6 @@
-// Dual listener. PUBLIC (PORT 4321, HOST 0.0.0.0): the lazily imported Astro SSR handler for the OAuth2 challenge
-// providers, /auth/* and /admin/* pages. ADMIN (ADMIN_PORT 4431, ADMIN_HOST 127.0.0.1): a separate server with its own
-// mux for /healthz, /readyz and the five Kratos webhooks (recovery-gate, login-code-gate, profile-gate,
-// second-factor-gate, profile-sessions); it never delegates to the Astro handler, so the muxes are disjoint.
+// Dual listener. PUBLIC (PORT 4321, HOST 0.0.0.0): the lazily imported Astro SSR handler (OAuth2 providers, /auth/*, /admin/*).
+// ADMIN (ADMIN_PORT 4431, ADMIN_HOST 127.0.0.1): its own mux for /healthz, /readyz and the five Kratos webhooks
+// (recovery-gate, login-code-gate, profile-gate, second-factor-gate, profile-sessions); never delegates to Astro.
 // RECOVERY_GATE_SECRET guards the webhooks: constant-time compare, fail-closed when unset.
 // Run with `node ./dist/server/listen.mjs` after `npm run build`.
 

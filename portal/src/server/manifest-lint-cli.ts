@@ -1,26 +1,8 @@
-// Manifest lint CLI — standalone entry point for the manifest linter.
-//
-// Runs validateClients over every *.yaml manifest in MANIFEST_DIR (or a
-// directory passed as the first CLI argument), then prints findings and exits
-// non-zero if any BLOCK-class errors are present.
-//
-// Usage:
+// Manifest lint CLI: runs validateClients over every *.yaml in MANIFEST_DIR (or
+// the first argument), prints findings, exits 1 on BLOCK-class errors, 2 when
+// no directory or manifests are found.
 //   node dist/server/manifest-lint.mjs [<manifest-dir>]
-//   MANIFEST_DIR=/etc/portal/manifests node dist/server/manifest-lint.mjs
-//
-// Exit codes:
-//   0  — all manifests valid (no BLOCK-class errors)
-//   1  — one or more manifests contain BLOCK-class errors
-//   2  — directory not found or no manifests found (not an error, prints notice)
-//
-// Intended consumers:
-//   - deployment CI: a pre-land manifest-lint gate (runs against the
-//     operator's catalog directory via MANIFEST_DIR override).
-//   - othala CI: `npm run lint:manifests` (validates e2e/manifests/).
-//   - Operator: `node dist/server/manifest-lint.mjs /path/to/manifests`
-//
-// Built by:  npm run build:manifest-lint  (esbuild, same shape as registrar).
-// Source:    src/server/manifest-lint-cli.ts
+// Built by `npm run build:manifest-lint` (esbuild, same shape as registrar).
 
 import { readdirSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';

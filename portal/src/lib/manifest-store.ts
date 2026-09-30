@@ -1,11 +1,8 @@
-// Serving-path manifest access. STRICT callers (registrar, lint CLI) use manifests.ts directly and must throw on an
-// invalid set; SERVING callers (/oauth2/* handlers, admin UI, group registry) use this module, which never throws.
-// loadClientManifests() throws on any set-wide semantic error, which would 500 every login and the admin UI. This
-// module holds the last known good set outside manifests.ts's mtime check (the breaking edit changed the mtime) and
-// across invalidateManifestCache() (SIGHUP). On failure it serves that set, or the EMPTY set on a cold start (fail-closed:
-// gate.ts denies a missing manifest); logs `[portal:manifests]` in full on the first failure or a changed error, then a
-// periodic reminder; and retries on every call, so a fixed manifest logs RECOVERED with no restart.
-// manifestHealth() drives the admin banner so a stale list is never read as live.
+// Serving-path manifest access, which never throws. STRICT callers (registrar, lint CLI) use manifests.ts directly;
+// SERVING callers (/oauth2/*, admin UI, group registry) use this, because a set-wide error would otherwise 500 every
+// login. It keeps the last known good set across mtime checks and SIGHUP, serves the EMPTY set on a cold start
+// (fail-closed), logs `[portal:manifests]` on the first or changed failure, and retries each call so a fix logs
+// RECOVERED. manifestHealth() drives the admin banner.
 
 import { loadClientManifests, type ClientManifest } from './manifests';
 

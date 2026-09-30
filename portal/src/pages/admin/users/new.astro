@@ -1,22 +1,9 @@
 ---
-// Admin: create a new identity.
-//
-// Flow:
-//   GET  -> render form, manifest-driven group/role checkboxes
-//   POST -> validate -> Kratos createIdentity -> Kratos getRecoveryLink
-//        -> render the one-time enrollment LINK + CODE for the admin to copy
-//
-// Nothing is emailed. getRecoveryLink() uses Kratos'
-// createRecoveryCodeForIdentity (see src/lib/admin-api.ts), which hands back
-// a `recovery_link` pointing at the recovery UI with an EMPTY code field and
-// the `recovery_code` that fills it. The link alone is a dead end, so both
-// values are rendered together and copyable as one pasteable message —
-// the admin texts that message over Signal/iMessage and the recipient sets
-// up password + passkey. No password ever transits a channel.
-//
-// Validation is server-side (the source of truth) with light client-side
-// hints. Kratos itself rejects malformed traits, but we surface friendlier
-// messages first.
+// Admin: create a new identity. GET renders the manifest-driven group/role form;
+// POST validates, calls Kratos createIdentity and getRecoveryLink, and renders
+// the one-time recovery LINK + CODE together for the admin to copy (the link
+// alone leaves the code field empty). Nothing is emailed. Validation is
+// server-side; client hints are cosmetic.
 
 export const prerender = false;
 

@@ -1,13 +1,6 @@
 ---
-// Admin landing.
-//
-// Three cards: Users / Groups / Apps. Each card shows the live count and
-// links to its index page. Counts are computed from Kratos identities and
-// the manifest catalog so the home admin always sees the truth, not a
-// hard-coded number.
-//
-// AAL2 enforcement happens in requireAdminSession; pages that fail the
-// guard redirect to a refresh login.
+// Admin landing: Users / Groups / Apps cards with live counts from Kratos
+// identities and the manifest catalog. requireAdminSession enforces AAL2.
 
 export const prerender = false;
 

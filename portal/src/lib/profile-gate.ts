@@ -1,11 +1,8 @@
-// Verdict for the email part of the settings.after.profile web_hook.
-//
-// An account with a passkey or password changes its email addresses only from
-// a session whose newest first-factor (aal1) sign-in used one of them; an
-// emailed code proves the mailbox, not the person. An identity with neither
-// key keeps today's behaviour. The stored identity comes from the admin API
-// (credentials included); the session's authentication_methods come from the
-// hook body. Missing or unreadable session data on a keyed identity refuses.
+// Verdict for the email part of the settings.after.profile web_hook. An account
+// with a passkey or password changes its emails only from a session whose newest
+// aal1 sign-in used one of them (an emailed code proves the mailbox, not the
+// person); identities with neither are unchanged. Stored identity comes from the
+// admin API, authentication_methods from the hook body; missing data on a keyed identity refuses.
 
 import type { Identity } from './types';
 

@@ -1,11 +1,6 @@
-// Admin SSR guard + Hydra read-only wrapper.
-//
-// AAL2 enforcement happens at the SSR layer: Kratos AAL is
-// per-flow / global, not per-route. requireAdminSession enforces the SP-3
-// trinity plus a freshness gate: active session + AAL2 + freshness (1h
-// default) + admin marker (metadata_admin.admin===true from the admin API).
-// Caddy already gates "session present" upstream; this guard adds the
-// identity-level checks Caddy cannot make.
+// Admin SSR guard + Hydra read-only wrapper. requireAdminSession enforces
+// session + AAL2 + freshness + admin marker at the SSR layer, the
+// identity-level checks the upstream proxy cannot make.
 
 import { getSession, browserFlows } from './kratos';
 import { isAdminMarker } from './admin-auth';
@@ -15,26 +10,12 @@ import type { Session } from './types';
 import { getIdentity } from './admin-api';
 
 /**
- * Pure freshness computation extracted from requireAdminSession for testability.
- *
- * Returns:
- *   true  — session authenticated within the window
- *   false — session is stale (confirmed out of window) OR timestamps
- *           unreadable (fail-CLOSED)
- *
- * Primary source: authentication_methods entries with aal === 'aal2', using
- * the most-recent completed_at timestamp among those entries. Fallback to
- * session.authenticated_at if the array is absent or yields no parseable entry.
- * If BOTH sources are unreadable the function returns false (fail-closed).
- *
- * Wired into requireAdminSession as a step-up gate alongside the explicit
- * `session.authenticator_assurance_level === 'aal2'` check — it augments,
- * not replaces, that AAL check.
+ * Pure freshness computation behind requireAdminSession. True when the newest
+ * aal2 completed_at (falling back to authenticated_at) is within the window;
+ * false when stale or when both timestamps are unreadable (fail closed).
  */
 export function isSessionFresh(session: Session, windowHours: number): boolean {
-  // Primary source: authentication_methods[].completed_at for aal2 entries.
-  // Kratos populates this array on every step-up; the most-recent aal2 entry
-  // is the canonical "when did the user last satisfy AAL2".
+  // Primary source: the most recent completed_at among aal2 authentication_methods.
   let authAt: Date | null = null;
 
   try {
@@ -53,17 +34,17 @@ export function isSessionFresh(session: Session, windowHours: number): boolean {
           const parsed = new Date(completedAt);
           if (Number.isFinite(parsed.getTime())) candidate = parsed;
         }
-        // Keep the most-recent parseable completed_at among all aal2 entries.
+        // Keep the most recent parseable completed_at.
         if (candidate !== null && (authAt === null || candidate > authAt)) {
           authAt = candidate;
         }
       }
     }
   } catch {
-    // Malformed authentication_methods — skip, fall back below.
+    // Malformed authentication_methods: fall back below.
   }
 
-  // Fallback: authenticated_at on the session itself (SDK may deserialise as Date).
+  // Fallback: the session's own authenticated_at.
   if (authAt === null) {
     try {
       const rawAuthAt = (session as unknown as Record<string, unknown>)['authenticated_at'];
@@ -79,7 +60,6 @@ export function isSessionFresh(session: Session, windowHours: number): boolean {
   }
 
   if (authAt === null) {
-    // Both sources unreadable — fail closed (deny).
     return false;
   }
 
@@ -89,23 +69,12 @@ export function isSessionFresh(session: Session, windowHours: number): boolean {
 }
 
 /**
- * SSR guard for /admin/* routes. Enforces the SP-3 trinity:
- *
- *   (a) Active Kratos session with a resolved identity — else redirect to login.
- *   (b) AAL2 server-side — session.authenticator_assurance_level must equal
- *       'aal2'. An AAL1 session triggers a step-up redirect to Kratos with
- *       ?aal=aal2&refresh=true. A 200 from whoami does NOT imply AAL2.
- *   (c) Freshness — isSessionFresh(session, adminFreshnessHours) (default 1h,
- *       OTHALA_ADMIN_FRESHNESS_HOURS). Stale sessions get the same aal2+refresh
- *       step-up redirect as (b), before the admin-marker fetch.
- *   (d) Admin marker — identity.metadata_admin.admin === true (boolean strict),
- *       read fresh from the Kratos admin API. The whoami response does NOT carry
- *       metadata_admin (Kratos v26.2.0 excludes it); the admin-API fetch is
- *       non-optional.
+ * SSR guard for /admin/* routes, in order: (a) active session, else login
+ * redirect; (b) AAL2, else step-up redirect; (c) freshness, same step-up;
+ * (d) metadata_admin.admin === true read from the admin API.
  *
  *   const guard = await requireAdminSession(Astro);
  *   if (guard instanceof Response) return guard;
- *   const session = guard;
  */
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 export async function requireAdminSession(astro: any): Promise<Session | Response> {
@@ -124,28 +93,20 @@ export async function requireAdminSession(astro: any): Promise<Session | Respons
     return astro.redirect(`/auth/login?return_to=${returnTo}`);
   }
 
-  // (b) AAL2 enforcement — server-side, not inferred from a 200.
-  // session.authenticator_assurance_level is the canonical AAL string from
-  // whoami; it must be exactly 'aal2'. On 'aal1' we redirect to the Kratos
-  // step-up flow (?aal=aal2&refresh=true). Any other value (missing, unknown)
-  // is treated as fail-closed: deny with a redirect to the step-up flow.
+  // (b) AAL2 server-side; anything but exactly 'aal2' steps up.
   const aal = (session as unknown as Record<string, unknown>)['authenticator_assurance_level'];
   if (aal !== 'aal2') {
-    // Step-up: Kratos will re-authenticate the user at AAL2 and return here.
     const returnTo = encodeURIComponent(astro.url.pathname + astro.url.search);
     return astro.redirect(browserFlows.login({ aal: 'aal2', refresh: true, returnTo }));
   }
 
-  // (c) Freshness gate — same step-up as (b) when AAL2 was satisfied too long
-  // ago (OTHALA_ADMIN_FRESHNESS_HOURS, default 1h). Checked before the
-  // admin-marker fetch.
+  // (c) Freshness gate: same step-up as (b), before the admin-marker fetch.
   if (!isSessionFresh(session, adminFreshnessHours)) {
     const returnTo = encodeURIComponent(astro.url.pathname + astro.url.search);
     return astro.redirect(browserFlows.login({ aal: 'aal2', refresh: true, returnTo }));
   }
 
-  // (d) Admin marker — fetch identity fresh from the admin API (metadata_admin
-  // is NOT present in the whoami response). Fail-closed on lookup error.
+  // (d) Admin marker, read fresh from the admin API (whoami omits metadata_admin); fail closed.
   let adminIdentity;
   try {
     adminIdentity = await getIdentity(session.identity.id);
@@ -157,24 +118,16 @@ export async function requireAdminSession(astro: any): Promise<Session | Respons
     return astro.redirect('/auth/error?reason=not-admin');
   }
 
-  // Prevent admin/identity data from being stored in any intermediate cache.
-  // Done here (not in middleware) so it's tightly coupled to the admin guard.
+  // Keep admin/identity data out of intermediate caches.
   astro.response.headers.set('Cache-Control', 'no-store, max-age=0');
 
   return session;
 }
 
 /**
- *
- * Force re-login for an identity (admin "revoke user" trigger).
- * The fan-out is in-process: revokeSubject runs steps 2-4 (Kratos sessions,
- * Hydra login + consent revoke). deactivate
- * is NOT set here — admin force-logout cuts sessions without marking the
- * identity inactive.
- *
- * Throws a prescriptive RevokeError on a hard-cut (step 2-4) failure; the
- * caller surfaces dependency + next-action without leaking raw upstream
- * errors.
+ * Force re-login for an identity (admin "revoke user"): revokeSubject cuts
+ * Kratos sessions and Hydra login + consent, without deactivating the identity.
+ * Throws a prescriptive RevokeError on a hard-cut failure.
  */
 export type RevokeUserResult = RevokeResult;
 

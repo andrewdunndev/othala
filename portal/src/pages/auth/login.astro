@@ -1,33 +1,9 @@
 ---
-// Login flow handler.
-//
-// Reads ?flow=<id> from the URL. If absent or expired, redirects to
-// Kratos's browser flow initiator which sets the anti-CSRF cookie and
-// redirects back here with a fresh ?flow=...
-//
-// Three-tier sign-in, in priority order:
-//   1. PRIMARY  — passkey (passkey group). One-tap biometric/PIN, no username.
-//                 Wired up by /.well-known/ory/webauthn.js; conditional UI fires
-//                 on the identifier input when the browser sees a discoverable
-//                 credential.
-//   2. SECONDARY — email code (code group). Two-step: submit identifier →
-//                 Kratos emails a one-time code → submit the code. Promoted
-//                 fallback for new devices and lost passkeys.
-//   3. TERTIARY  — password (password group): username + password, collapsed
-//                 into a disclosure. Directory-backed apps depend on this path;
-//                 it stays enabled but de-emphasised.
-//
-// Code flow state detection: Kratos advances the same flow through two UI
-// shapes. Step 1 (identifier): code group has only a submit; the identifier
-// input is in the default group. Step 2 (code entry): code group gains a
-// text input named "code". We detect state by presence of that node.
-//
-// AAL2 step-up: ?aal=aal2 / ?refresh=true pass through to Kratos when WE
-// initiate the flow. Kratos's own redirect back to this page does not
-// reliably carry ?aal=aal2, so rendering the step-up form derives isAal2 from
-// the landed FLOW OBJECT (requested_aal / second-factor node presence) —
-// see the isAal2 block below — and only falls back to the query param when
-// there is no flow to inspect at all (work item #4).
+// Login flow handler. Reads ?flow=<id>; if absent or expired, redirects to
+// Kratos's browser flow initiator. Three tiers: passkey (primary), email code
+// (secondary; step 2 is detected by a "code" text node), password (tertiary,
+// collapsed). ?aal=aal2 / ?refresh=true pass through to Kratos; the step-up
+// form derives isAal2 from the landed flow, using the query only with no flow.
 
 export const prerender = false;
 
@@ -49,9 +25,8 @@ const returnTo = url.searchParams.get('return_to') ?? undefined;
 const isDev = import.meta.env.DEV;
 const cookie = Astro.request.headers.get('cookie') ?? undefined;
 
-// A live aal1 session that must step up (lib/step-up.ts) gets an aal2 flow.
-// Without this, Kratos answers "already signed in" and returns the browser to
-// return_to, which a forward-auth 401 sends straight back here.
+// A live aal1 session that must step up (lib/step-up.ts) gets an aal2 flow;
+// otherwise Kratos returns the browser to return_to and forward-auth loops.
 if (!flowId && !aal && !isDev) {
   try {
     const session = await getSession(cookie);
@@ -63,9 +38,7 @@ if (!flowId && !aal && !isDev) {
   }
 }
 
-// Dev fallback: when Kratos isn't reachable from `npm run dev`, the
-// browser-flow redirect would leave the page on a dead URL. Skip the
-// redirect in dev so the layout work is visible without the substrate.
+// In dev, skip the flow redirect when Kratos is unreachable.
 if (!flowId && !isDev) {
   return Astro.redirect(browserFlows.login({ aal, refresh, returnTo }));
 }
@@ -76,16 +49,13 @@ if (flowId && (!result || result.kind !== 'ok') && !isDev) {
   return Astro.redirect(browserFlows.login({ aal, refresh, returnTo }));
 }
 
-// Guard: dev mode without a real flow renders a static preview of the
-// page. No real form posts will work but the chrome and rhythm do.
+// Dev without a real flow renders a static preview.
 const flow = result && result.kind === 'ok' ? result.flow : null;
 const ui = flow?.ui;
 const csrf = ui ? csrfToken(ui.nodes) : '';
 const scripts = ui ? scriptNodes(ui.nodes) : [];
 
-// Identifier input: in identifier_first flows it lives in the default group.
-// In single-step flows it shows up under password. Either way we surface it
-// once and reuse the value across forms.
+// The identifier input sits in the default group (identifier_first) or under password.
 const identifierInput = ui ? (
   nodesByGroup(ui.nodes, 'default').map(asInput).find((a) => a?.name === 'identifier') ||
   nodesByGroup(ui.nodes, 'password').map(asInput).find((a) => a?.name === 'identifier') ||
@@ -96,20 +66,14 @@ const passwordInput = ui
   ? nodesByGroup(ui.nodes, 'password').map(asInput).find((a) => a?.name === 'password') || null
   : null;
 
-// Code flow state detection. Step 1: no "code" text input in the code group.
-// Step 2: "code" text input present — Kratos has sent the email and now wants
-// the user to enter the 6-digit code.
+// Step 1 has no "code" text input in the code group; step 2 (email sent) has one.
 const codeNodes = ui ? nodesByGroup(ui.nodes, 'code') : [];
 const isCodeEntry = codeNodes.some((n) => {
   const a = asInput(n);
   return a?.name === 'code' && a.type === 'text';
 });
 
-// Tier presence (passkey/code/password) and AAL2 step-up derivation live in
-// login-tiers.ts — rationale, the `?aal=aal2` fallback, and the asInput()
-// filter that fixed the v0.5.0 outage (webauthn glue-script node miscounted
-// as a second factor) are documented there, with a unit guard in
-// login-tiers.test.ts built from a captured production flow.
+// Tier presence and AAL2 derivation live in login-tiers.ts (see there).
 const { hasPasskey, hasCode, hasPassword, totpNodes, aal2WebauthnNodes, lookupNodes, isAal2, hasAal2Methods } =
   deriveLoginTiers(flow, aal);
 ---
@@ -141,14 +105,7 @@ const { hasPasskey, hasCode, hasPassword, totpNodes, aal2WebauthnNodes, lookupNo
   <section class="panel login-card">
 
     {/* ── AAL2 STEP-UP ─────────────────────────────────────────────────── */}
-    {/*
-      Rendered when the flow itself signals a step-up (requested_aal:'aal2'
-      or second-factor nodes already present) and Kratos has populated
-      second-factor method nodes (totp, webauthn, lookup_secret). Each method
-      group is a separate form posting to ui.action. The primary tiers
-      (passkey, code, password) are hidden during step-up — the lede already
-      explains why.
-    */}
+    {/* One form per second-factor method, posting to ui.action; the primary tiers are hidden. */}
     {isAal2 && hasAal2Methods && (
       <div class="aal2-block">
 
@@ -270,9 +227,7 @@ const { hasPasskey, hasCode, hasPassword, totpNodes, aal2WebauthnNodes, lookupNo
       </div>
     )}
 
-    {/* Fallback for AAL2 with no enrolled second factors. Should not happen
-        in production (enrollment is required before admin access), but renders
-        a helpful message rather than a blank form. */}
+    {/* Should not happen: enrollment precedes admin access. */}
     {isAal2 && !hasAal2Methods && flow && (
       <div class="notice notice-warning">
         No second-factor methods are enrolled for this account. An administrator

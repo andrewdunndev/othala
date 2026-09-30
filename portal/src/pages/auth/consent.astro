@@ -1,19 +1,8 @@
 ---
-// OAuth2 consent grant screen.
-//
-// Rendered when Hydra redirects to the consent provider and the client does
-// NOT have skip_consent: true (handleConsent skip=false path). The user sees
-// the client's display name, a plain-language scope list, and Allow / Deny.
-//
-// Form POSTs to /oauth2/consent which validates signed CSRF token
-// (verifyToken, same mechanism as admin pages) + subject-match and calls
-// acceptOAuth2ConsentRequest or rejectOAuth2ConsentRequest.
-//
-// Design: clone of login.astro visual language — Layout bare=true, PageHero
-// banner, consent-card idiom.
-//
-// NOTE: FlowNodes.astro is intentionally NOT used here — consent is not a
-// Kratos flow and has no flow.ui.nodes to render.
+// OAuth2 consent grant screen, shown when Hydra redirects here for a client
+// without skip_consent. Lists the client name and scopes with Allow / Deny,
+// posting to /oauth2/consent (signed CSRF token + subject match). Consent is
+// not a Kratos flow, so FlowNodes is not used.
 
 export const prerender = false;
 
