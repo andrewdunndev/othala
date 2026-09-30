@@ -1,94 +1,52 @@
-# Audiobookshelf — audiobookshelf.othala.test
-# Generic OSS fixture: the minimal well-behaved generic_oauth client (no
-# JMESPath, no resource_access nesting) AND the access-model test fixture —
-# see e2e/playwright/tests/t-access-model.spec.ts and the walkthrough at
-# site/src/content/docs/guides/per-app-oidc.md. Entry-vs-role WHY: DECISIONS.md
-# § Nothing is derived — not entry from a role, not a type from a name.
-#
-# Audiobookshelf supports OIDC back-channel logout; the logout token is
-# accepted at the OpenID callback's logout path.
+# Audiobookshelf: the minimal generic_oauth client and the access-model fixture
+# (t-access-model.spec.ts; site guides/per-app-oidc.md; DECISIONS.md § Nothing is derived).
 
 presentation:
-  name: Audiobookshelf                      # tile display name (tiles.ts AppTile.name)
+  name: Audiobookshelf
   description: Self-hosted audiobook and podcast server with multi-user progress sync.
-  # ^ tile subtitle; free text, no enforcer (tiles.ts AppTile.description)
-  url: https://audiobookshelf.othala.test   # tile link + fqdn source (tiles.ts)
-  icon: AB                                   # optional 2-char fallback glyph; default "??" (tiles.ts)
-  icon_slug: audiobookshelf                  # optional vendored-icon lookup key (tiles.ts resolveIconHref)
-  auth_kind: oidc                            # oidc|forward_auth|external (tiles.ts
-                                              # AuthKind) — NOT runtime-validated; a typo silently casts
-  # REQUIRED list, ≥1 canonical name (GROUP_RE, access-groups.ts); empty +
-  # no consent.skip_access_check => load-time BLOCK (validateClients,
-  # manifests.ts). ENTRY only — `audiobookshelf-admin` (role, below) is
-  # deliberately ABSENT here. Enforced: enforceAccessGate
-  # (portal/src/lib/gate.ts); parsed: parseAccessGroups (access-groups.ts);
-  # WARNs on typo/charset/duplicate: lintManifests (manifest-lint.ts).
+  url: https://audiobookshelf.othala.test
+  icon: AB
+  icon_slug: audiobookshelf
+  auth_kind: oidc
+  # Entry only; audiobookshelf-admin is a role and is deliberately absent here.
   access:
     - audiobookshelf-access
-  order: 40                                  # optional tile sort key, ascending; default 999 (tiles.ts)
+  order: 40
 
 oidc:
-  client_id: audiobookshelf          # REQUIRED; must match ^[A-Za-z_][A-Za-z0-9_]*$
-                                      # (CLIENT_ID_ENV_STEM_RE, manifests.ts) — derives
-                                      # AUDIOBOOKSHELF_CLIENT_SECRET (register-clients.ts)
-  client_name: Audiobookshelf         # forwarded verbatim to Hydra client_name (register-clients.ts)
+  client_id: audiobookshelf
+  client_name: Audiobookshelf
   grant_types:
     - authorization_code
-    - refresh_token                   # needs `offline_access` in scope below, else Hydra
-                                       # silently omits the refresh token even when
-                                       # refresh_token is listed here
+    - refresh_token
   response_types:
-    - code                            # forwarded verbatim (register-clients.ts); empty only for
-                                       # client_credentials clients (manifests.ts ClientManifest doc)
-  # offline_access is required for Hydra to honour the refresh_token grant
-  # type; without it Hydra silently omits the refresh token even when
-  # refresh_token is listed in grant_types above.
+    - code
+  # offline_access is required or Hydra silently omits the refresh token.
   scope: openid email profile groups offline_access
-  # ^ forwarded verbatim as OAuth2Client.scope (register-clients.ts). `groups`
-  # is required for the groups claim to clear the OIDC Core §5.4 scope-gate
-  # (composeIDTokenClaims, portal/src/lib/claims.ts).
   redirect_uris:
     - https://audiobookshelf.othala.test/auth/openid/callback
-  # ^ origin must match an oidc.audience entry below (rule 3,
-  # audienceMatchesRedirect / validateClients, manifests.ts), else load-time BLOCK.
   post_logout_redirect_uris:
-    - https://audiobookshelf.othala.test/   # forwarded verbatim; used for RP-initiated logout
+    - https://audiobookshelf.othala.test/
   token_endpoint_auth_method: client_secret_basic
-  # ^ forwarded verbatim; optional, empty string if omitted (manifests.ts)
   audience:
-    - https://audiobookshelf.othala.test    # REQUIRED non-empty (validateClients rule 2, manifests.ts)
-  skip_consent: true                         # per-client only, never a server default (DECISIONS.md
-                                              # § Consent is skipped per client, never as a server default)
+    - https://audiobookshelf.othala.test
+  skip_consent: true
   backchannel_logout_uri: https://audiobookshelf.othala.test/auth/openid/logout
-  # ^ optional; when set, admin "Force re-login" (admin/users/[id].astro) posts
-  # a signed logout token here.
 
-# Audiobookshelf reads a configurable group claim and maps its values to its
-# own admin/user/guest account types — not a manifest field, informational
-# for wiring the app side. Per-collection permissions are managed inside
-# Audiobookshelf itself. Source:
+# Audiobookshelf maps a configurable group claim to its own account types:
 # https://www.audiobookshelf.org/guides/oidc_authentication/
 consent:
-  emit_groups_claim: true             # optional bool, default true (manifests.ts readEmitGroups);
-                                       # explicit false + a role claim_emit.groups is a load-time
-                                       # BLOCK (M10, validateClients rule 6, manifests.ts)
+  emit_groups_claim: true
   roles:
-    # Declaration order is RANK, descending privilege (lookupRole,
-    # portal/src/lib/claims.ts) — see grafana.yaml's roles: comment for the
-    # ordering-hazard tests; WHY: DECISIONS.md § Nothing is derived....
+    # Declaration order is rank, descending privilege (see grafana.yaml).
     admin:
-      description: "Server admin: users, libraries, settings."  # optional, display only
-      claim_emit:                     # REQUIRED map (else BLOCK: validateClients rule 5);
-                                       # merged into the id_token when this role resolves
+      description: "Server admin: users, libraries, settings."
+      claim_emit:
         groups: ["admin"]
     user:
       description: "Listen and sync progress."
       claim_emit:
         groups: ["user"]
-  # REQUIRED: every value here must name a role declared above, else BLOCK
-  # (validateClients rule 4, manifests.ts). Keys should be canonical (GROUP_RE)
-  # and in the known-group set — lintManifests WARNs otherwise
-  # (manifest-lint.ts).
   group_role_map:
     audiobookshelf-admin: admin
     audiobookshelf-access: user

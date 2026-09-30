@@ -1,51 +1,9 @@
 #!/usr/bin/env bash
-# render-config.sh — THE canonical Ory-config render.
-#
-# Ory (Kratos/Hydra) has no native ${VAR} expansion in YAML: it validates the
-# literal placeholder text and dies. The kratos/ + hydra/ configs are therefore
-# TEMPLATES whose ${VAR} tokens must be substituted before a container mounts
-# them. This script is the single render used by BOTH:
-#   - the e2e harness (e2e/validate.sh), and
-#   - the production deploy plane (renders with sops + inventory values).
-# One render, one variable contract — what e2e validates is byte-identical in
-# mechanism to what production deploys.
-#
-# Usage:
-#   render-config.sh <template> <output>
-# Variables are read from the environment (caller sources its .env / exports
-# its sops+inventory values first).
-#
-# Semantics (deliberately stricter than os.path.expandvars):
-#   - The variable contract is DERIVED FROM THE TEMPLATE: every ${NAME} token
-#     found in it must be SET in the environment, else we fail fast listing the
-#     missing NAMES (names only — never file content, which after partial
-#     substitution could carry secrets into CI logs). An exported-but-EMPTY
-#     value is permitted on purpose: it is a valid intentional signal (e.g.
-#     OTHALA_OTLP_PROVIDER="" disables Ory tracing — the tracer no-ops on an
-#     empty provider). Only a wholly UNSET var is a contract violation. The
-#     empty value is still run through the control-char + escaping guards below,
-#     so an empty string renders as an empty YAML scalar, never a broken one.
-#   - Only braced ${NAME} tokens are substituted. Unbraced $name is left
-#     alone (expandvars would mangle it), and nothing outside the template's
-#     own token set is consulted — no accidental ${HOME}-style pickup from a
-#     wide caller environment.
-#   - By construction there can be no un-rendered token left in the output,
-#     so no post-render grep is needed.
-#
-# Conditional blocks (#@if / #@endif):
-#   - A region fenced by a line whose only content is `#@if NAME` and a closing
-#     `#@endif` line is INCLUDED verbatim (fence lines removed) when env var
-#     NAME is set and NON-EMPTY, and DROPPED ENTIRELY when NAME is unset or
-#     empty. This exists for Ory v26's schema, which rejects a present-but-
-#     half-populated optional block: the `tracing:` block must be wholly ABSENT
-#     when tracing is disabled (OTHALA_OTLP_PROVIDER="") but wholly PRESENT and
-#     valid when enabled (provider="otel"). A simple empty-scalar render is not
-#     enough — the schema validates the block's $ref the moment the key exists.
-#   - Conditional stripping happens BEFORE token derivation, so ${VAR} tokens
-#     that live ONLY inside a dropped block are not required in the environment.
-#     (When tracing is off, OTHALA_OTLP_ENDPOINT/ENVIRONMENT need not be set.)
-#   - The gating NAME on an #@if is itself a required-when-present signal, not a
-#     substituted token; it is matched against the environment directly.
+# render-config.sh: the Ory-config render shared by e2e/validate.sh and the deploy plane.
+# Usage: render-config.sh <template> <output>, variables from the environment. Every ${NAME}
+# left after #@if resolution and comment stripping must be SET (names-only error); exported-
+# empty is allowed (OTHALA_OTLP_PROVIDER="" disables tracing). #@if NAME ... #@endif keeps the
+# block when NAME is non-empty and drops it otherwise (Ory v26 rejects a half-populated block).
 set -euo pipefail
 
 if [[ $# -ne 2 ]]; then
@@ -74,12 +32,7 @@ IF_RE = re.compile(r"^\s*#@if\s+([A-Za-z_][A-Za-z0-9_]*)\s*$")
 ENDIF_RE = re.compile(r"^\s*#@endif\s*$")
 
 
-# Resolve conditional blocks FIRST, before token derivation, so tokens that
-# live only inside a dropped block are not part of the required contract.
-# `#@if NAME` ... `#@endif`: keep the inner lines (drop the two fence lines)
-# when NAME is set and non-empty; drop the whole region (fences + body) when
-# NAME is unset or empty. Blocks do not nest (a nested #@if inside an open
-# block is a template authoring error and is rejected).
+# Resolve #@if blocks first so tokens only inside a dropped block are not required. Blocks do not nest.
 def resolve_conditionals(text):
     out = []
     gate = None  # active gating var name, or None when outside a block
@@ -110,7 +63,6 @@ def resolve_conditionals(text):
         print(f"render-config: {template_path}: unterminated #@if '{gate}' "
               f"(missing #@endif)", file=sys.stderr)
         sys.exit(1)
-    # Preserve a trailing newline if the source had one.
     result = '\n'.join(out)
     if text.endswith('\n'):
         result += '\n'
@@ -119,13 +71,8 @@ def resolve_conditionals(text):
 
 src = resolve_conditionals(src)
 
-# Derive required tokens from a comment-stripped view so that ${VAR} tokens
-# that appear only inside YAML comments don't become phantom required vars.
-# Heuristic: strip from the first unquoted ' #' (space-hash) on each line, or
-# from the start of lines whose first non-whitespace character is '#'. This is
-# intentionally simple — it will miss '#' inside quoted strings, but no
-# template value legitimately embeds a '#' in a comment context. Substitution
-# itself runs against the full source so comment text is preserved verbatim.
+# Derive required tokens from a comment-stripped view so ${VAR} inside comments is not a phantom
+# requirement. Simple heuristic (misses '#' inside quoted strings); substitution uses the full source.
 def strip_comments(text):
     out = []
     for line in text.splitlines():
@@ -133,19 +80,13 @@ def strip_comments(text):
         if stripped.startswith('#'):
             out.append('')
             continue
-        # Remove inline comment: space-hash not inside quotes. A full parser
-        # is out of scope; the space requirement avoids fragment-URIs like
-        # https://host/#anchor. Limitation: '#' inside a quoted YAML scalar
-        # that follows a space is also stripped — acceptable for this codebase.
+        # Strip an inline comment (space-hash, so fragment URIs survive).
         pos = line.find(' #')
         out.append(line[:pos] if pos != -1 else line)
     return '\n'.join(out)
 
 needed = sorted(set(TOKEN.findall(strip_comments(src))))
 
-# UNSET is the contract violation, not empty. An exported empty value (e.g.
-# OTHALA_OTLP_PROVIDER="") is a deliberate "off" signal and renders as an empty
-# YAML scalar (the control-char + escaping guards below still apply to it).
 missing = [n for n in needed if n not in os.environ]
 if missing:
     print(f"render-config: {template_path}: missing render variable(s):",
@@ -154,12 +95,7 @@ if missing:
         print(f"  {n}", file=sys.stderr)
     sys.exit(1)
 
-# Control-character injection guard: a substituted value containing any
-# control character (ord < 0x20, including \r, \n, and other non-printables)
-# can break YAML structure or produce unparseable output. Fail closed before
-# writing any output. \n (newline) would shift content out of its scalar
-# context; \r produces ambiguous line endings; other controls are never
-# legitimate in YAML scalar values in this codebase.
+# Control-character guard: fail closed before writing output (a newline or CR breaks scalars).
 for name in needed:
     val = os.environ[name]
     bad = [c for c in val if ord(c) < 0x20]
@@ -171,21 +107,13 @@ for name in needed:
               file=sys.stderr)
         sys.exit(1)
 
-# Double-quote-context escaping contract:
-# All ${VAR} tokens in the templates are wrapped in YAML double-quoted scalars
-# (e.g. dsn: "postgres://...${PASS}..."). Inside a YAML double-quoted scalar,
-# backslash is the escape character and double-quote terminates the scalar.
-# A raw value injected verbatim would break the scalar if it contains either
-# character. Escape order matters: backslash first (so the introduced \ in the
-# \" escapes is not re-escaped), then double-quote.
+# All tokens sit in YAML double-quoted scalars: escape backslash first, then double-quote.
 def escape_for_double_quoted_yaml(val):
     val = val.replace('\\', '\\\\')   # \ → \\ (must be first)
     val = val.replace('"', '\\"')     # " → \"
     return val
 
-# Substitute only tokens that are in `needed` (the non-comment set).
-# Comment-only tokens are left as literal ${VAR} text in the output,
-# which is harmless — they remain comments in the rendered YAML.
+# Substitute only the needed (non-comment) tokens; comment-only tokens stay literal.
 needed_set = set(needed)
 rendered = TOKEN.sub(
     lambda m: escape_for_double_quoted_yaml(os.environ[m.group(1)])
@@ -195,12 +123,8 @@ rendered = TOKEN.sub(
 with open(output_path, "w") as f:
     f.write(rendered)
 
-# Post-render YAML validation: parse the rendered output to confirm it is
-# structurally valid YAML. A substituted value that still breaks YAML (e.g. a
-# lone colon at the start, tab characters, or other edge cases not caught by
-# the escaping above) is caught here before the file reaches a container mount.
-# If pyyaml is not available in the environment, skip with a warning — do not
-# hard-fail on a missing module.
+# Post-render YAML parse catches values that still break YAML; skipped with a warning if
+# pyyaml is missing.
 try:
     import yaml
     try:

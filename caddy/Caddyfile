@@ -1,35 +1,8 @@
-# Worked top-level Caddyfile for a single Othala instance.
-#
-# This is an integration example for adopters, not a drop-in deploy file:
-# it shows how to route one hostname across the three upstreams that make
-# up an Othala instance — Kratos (browser auth surface), Hydra (OAuth2
-# surface), and the converged app.
-#
-# The site address is read from $OTHALA_PUBLIC_HOST (e.g. "auth.example.com").
-# Set it in the Caddy environment (systemd unit, compose env, etc.); don't
-# hard-code a hostname here.
-#
-# TLS is issued via DNS-01 ACME using the caddy-dns/cloudflare plugin and a
-# Cloudflare API token in CF_API_TOKEN. Swap the tls block if you use a
-# different DNS provider, an HTTP-01 solver, or terminate TLS upstream.
-#
-# Routing shape — why the default backend is the app, not Kratos:
-#   The catch-all is the Othala app (othala:8080) so static assets
-#   (/_astro/*, manifest.webmanifest, favicon.ico) are served with the
-#   correct Content-Type. The Kratos browser paths and the Hydra OAuth2
-#   surface are matched first and routed to their respective upstreams.
-#   Routing the default to Kratos instead causes static assets to 404 or
-#   be served with the wrong Content-Type, yielding an unstyled UI.
-#
-# Container names used below (adapt to your own service names):
-#   Kratos: kratos:4433   Hydra: hydra:4444   App: othala:8080
-#
-# Note: /oauth2/login, /oauth2/consent, and /oauth2/logout are Hydra
-# challenge handlers served by the converged app, not by Hydra itself.
-# They are matched explicitly so they don't fall into the @hydra block.
-#
-# rate_limit is mholt/caddy-ratelimit, compiled into the estate Caddy image;
-# `order` runs it before basicauth.
+# Worked Caddyfile for one Othala instance (an adopter example, not a drop-in deploy file).
+# Site address: $OTHALA_PUBLIC_HOST. TLS: DNS-01 via caddy-dns/cloudflare and CF_API_TOKEN; swap the
+# tls block for another solver. Upstreams: kratos:4433, hydra:4444, othala:8080.
+# The default backend is the app so static assets (/_astro/*, favicon, manifest) keep their
+# Content-Type; /oauth2/{login,consent,logout} are app challenge handlers. rate_limit is mholt/caddy-ratelimit.
 
 {
 	order rate_limit before basicauth
@@ -46,22 +19,17 @@
 		reverse_proxy hydra:4444
 	}
 
-	# The converged app owns the Hydra login/consent/logout challenge handlers.
-	# Matched before the app default so they are explicit and auditable.
+	# App-owned Hydra challenge handlers.
 	@portal_challenges path /oauth2/login /oauth2/consent /oauth2/logout
 	handle @portal_challenges {
-		# DOS-1: same XFF fix as the default backend — see note below.
+		# XFF overwrite: see the default backend below.
 		reverse_proxy othala:8080 {
 			header_up X-Forwarded-For {remote_host}
 		}
 	}
 
-	# Kratos browser endpoints: well-known ceremony scripts, self-service flow
-	# APIs, session endpoints, and identity schemas.
-	#
-	# Rate-limit applied here to prevent email-bombing via repeated sign-in
-	# code requests (/self-service/login with method=code). Keyed by client IP
-	# ({remote_host}). See build-dependency note at the top of this file.
+	# Kratos browser endpoints. Rate-limited per client IP against email-bombing via repeated
+	# sign-in code requests.
 	@kratos path /.well-known/ory/* /self-service/* /sessions/* /schemas/*
 	handle @kratos {
 		rate_limit {
@@ -74,16 +42,9 @@
 		reverse_proxy kratos:4433
 	}
 
-	# Default -> the app: portal UI, /auth/* + /admin/* pages, AND static
-	# assets (/_astro/*, favicon.ico, manifest.webmanifest). The app is the
-	# catch-all; routing the default to Kratos mis-serves static assets.
-	#
-	# DOS-1: overwrite any client-supplied X-Forwarded-For with the real
-	# socket peer IP before forwarding to the portal. @astrojs/node resolves
-	# ctx.clientAddress from the LEFTMOST XFF entry; without this, an
-	# attacker can prepend a fresh fake IP on every request and land in a
-	# new rate-limit bucket. header_up replaces the entire incoming header
-	# so only the immediate peer IP reaches the app.
+	# Default -> the app (UI, pages, static assets). Overwrite any client-supplied X-Forwarded-For
+	# with the socket peer: @astrojs/node reads the leftmost entry, so a spoofed prefix would land
+	# in a fresh rate-limit bucket on every request.
 	reverse_proxy othala:8080 {
 		header_up X-Forwarded-For {remote_host}
 	}

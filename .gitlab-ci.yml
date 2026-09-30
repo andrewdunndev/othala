@@ -1,36 +1,17 @@
 # dunn.dev/othala -- container build + release pipeline.
-#
-# One custom image builds via the dunn.dev/pipeline container-image
-# template:
-#   - othala       the converged Astro Node SSR app, published at the
-#                  registry root (registry.gitlab.com/dunn.dev/othala)
-#                  via publish_at_root: true (the oryd/kratos-style
-#                  namespace/name shape).
-# caddy lives in the separate dunn.dev/caddy-estate repo; the
-# production Caddyfile snippets are assembled by whatever deploy repo
-# stands the instance up. caddy/snippets/ here is the reference copy.
-#
-# Per-image release flow on every tag:
-#   build       container-image  ->  push :TAG + :latest + cosign sig
-#   package     container-sbom   ->  syft scan, upload CycloneDX
-#   release     release-create   ->  GitLab Release with SBOM links
-#
-# Container rebuilds also fire on main + Containerfile change
-# (image tagged :short-sha + :latest); release stages are tag-only.
+# build-othala publishes at the registry root; the production Caddyfile
+# snippets live in dunn.dev/caddy-estate (caddy/snippets/ is a reference copy).
+# Tags run build, sbom, release; main + Containerfile changes rebuild :short-sha.
 
 default:
   interruptible: true
 
-# Force-build interface for e2e + both container-image builds (see e2e's
-# rules: below); pinned true globally.
+# Forces the image builds (e2e needs them).
 variables:
   BUILD_CI_IMAGE: "true"
 
 workflow:
-  # Suppress the push pipeline when a branch has an open MR so the
-  # merge_request_event pipeline is the only one for that commit — GitLab
-  # otherwise spawns both, and the duplicate push pipeline's jobs lack
-  # merge_request_event rules in the container-image component.
+  # One pipeline per commit: the MR pipeline wins over the push pipeline.
   rules:
     - if: $CI_PIPELINE_SOURCE == "merge_request_event"
     - if: $CI_COMMIT_BRANCH && $CI_OPEN_MERGE_REQUESTS && $CI_PIPELINE_SOURCE == "push"
@@ -51,18 +32,12 @@ stages:
   - release
 
 include:
-  # ----- reference-check: dunn.dev/reference conformance (advisory) -
-  # Estate-wide rollout runs advisory (fail_on_violation: false) in
-  # every consumer first; flips to enforcing per repo once verified
-  # clean, same sequencing as reference.dunn.dev itself.
+  # Advisory until verified clean (fail_on_violation: false).
   - component: gitlab.com/dunn.dev/pipeline/reference-check@4
     inputs:
       reference_ref: main
       fail_on_violation: false
 
-  # ----- Verify (push + MR): per-service build clean ---------------
-  # Closes the Renovate-MR-without-CI gap. The catalog's node-build
-  # component fires on every push and MR event.
   - component: gitlab.com/dunn.dev/pipeline/node-build@4
     inputs:
       stage: verify
@@ -70,20 +45,8 @@ include:
       package_path: portal
 
 
-  # ----- e2e-tester (prebaked Playwright browser-test image) ------
-  # The browser e2e leg runs inside the e2e job's inner VM, which can pull
-  # container images from the registry but CANNOT reach the npm registry
-  # (a runtime `npm install` there stalls and times out the gate, exit
-  # 124). This image bakes the @playwright/test deps + the e2e specs into
-  # a thin layer over the playwright base at BUILD time (npm ci against
-  # e2e/package-lock.json, on the egress-capable build runner), so the
-  # inner VM only PULLS it — no runtime npm install. compose.yml's
-  # playwright + dance-runner services consume it as the
-  # ${AUTH_REGISTRY}/e2e-tester sub-image. tag_pipeline: true keeps its
-  # tag set (v-tag on tags, short-sha on main / BUILD_CI_IMAGE) in lockstep
-  # with build-othala + build-e2e-tester, so AUTH_VERSION resolves the
-  # same tag for both in the e2e job. No SBOM/release: this is a
-  # test-only image, not a shipped artifact.
+  # e2e-tester: prebaked Playwright image. The e2e inner VM cannot reach npm, so
+  # deps are baked at build time. Test-only: no SBOM or release.
   - component: gitlab.com/dunn.dev/pipeline/container-image@4
     inputs:
       job_name: build-e2e-tester
@@ -93,15 +56,7 @@ include:
       tag_pipeline: true
       sign_image: false
 
-  # ----- othala (converged Astro Node SSR app) --------------------
-  # Published at the registry ROOT (registry.gitlab.com/dunn.dev/othala)
-  # via publish_at_root: true — the oryd/kratos-style namespace/name
-  # shape. Mirrors dunn.dev/caddy-estate: publish_at_root: true, no
-  # image_tag.
-  #
-  # Context is repo root (legacy from when build needed hydra/clients/;
-  # v0.2.0 reads manifests at runtime, but context: . is kept stable
-  # because the build is light and changing it requires a CI dance).
+  # othala: context stays at the repo root because changing it needs a CI dance.
   - component: gitlab.com/dunn.dev/pipeline/container-image@4
     inputs:
       job_name: build-othala
@@ -118,13 +73,8 @@ include:
       package_name: auth
       sbom_filename: othala-container.sbom.json
 
-  # ----- GitLab Release: link SBOMs from the built images -------
-  # release-create is binary-shaped (expects binary_job + dist/
-  # artifacts). We point binary_job at one container-image build
-  # job so the needs: dependency resolves; the dist/ artifact slot
-  # stays empty because container builds don't produce one. The
-  # value is the GitLab Release record itself plus links to each
-  # service's SBOM in the generic package registry.
+  # release-create expects binary_job; it points at the image build and the
+  # dist/ slot stays empty.
   - component: gitlab.com/dunn.dev/pipeline/release-create@4
     inputs:
       package_name: auth
@@ -132,13 +82,7 @@ include:
       binary_job: build-othala
       sbom_job: sbom-othala
 
-  # ----- Docs site: othala.dunn.dev (main + MR) ---------------------
-  # Astro site under site/, styled by @dunn.dev/reference (see
-  # site/.npmrc for the anonymous group-registry scope mapping).
-  # Deployed as a Cloudflare Worker against site/wrangler.toml — NOT
-  # GitLab Pages (dotted custom domains break Pages LE issuance).
-  # Same group CI vars as reference.dunn.dev: CLOUDFLARE_API_TOKEN,
-  # CLOUDFLARE_ACCOUNT_ID.
+  # Docs site as a Cloudflare Worker (not GitLab Pages: dotted domains break LE).
   - component: gitlab.com/dunn.dev/pipeline/cloudflare-worker@4
     inputs:
       wrangler_config: site/wrangler.toml
@@ -149,29 +93,9 @@ include:
       production_url: https://othala.dunn.dev
 
 
-# -----------------------------------------------------------------
-# Standalone jobs (not catalog components).
-#
-# check-purity: OSS purity + no-deprecated + dated-debt + prose-budget gate,
-# plus a tracked-shell-script syntax check.
-#
-# Runs scripts/check-purity.sh over the git index. WHAT it checks is not
-# restated here — the script names and explains every check, and a list kept
-# in two places goes stale in one of them. No npm deps needed: pure bash,
-# git and grep.
-#
-# Four of its checks take the WHOLE index as their corpus (instance names,
-# personal names, private-stack application names, vendored line-pins) and
-# one caps total tracked prose in bytes. That property is about this file
-# too: the gate scans .gitlab-ci.yml like everything else, so a runner tag or
-# a comment naming a private host fails the pipeline that reads it.
-#
-# The gate proves its own patterns inline, per check, before it scans
-# anything (selftest() in the script) — there is no separate probe/mutation
-# job to keep green.
-#
-# The trailing `bash -n` step syntax-checks tracked shell scripts.
-# -----------------------------------------------------------------
+# check-purity: OSS purity, deprecated, dated-debt and prose-budget gate, plus a
+# bash -n over tracked shell scripts. The script names every check; the gate
+# scans this file too, so a runner tag or comment naming a private host fails.
 check-purity:
   stage: verify
   image: registry.access.redhat.com/ubi10/nodejs-22:10.2@sha256:82e625f94f6f3313adc2f0dc1b2744af5b85e4674fc31b9440be0898b3ee2680
@@ -181,9 +105,7 @@ check-purity:
     - if: '$CI_PIPELINE_SOURCE == "api"'
     - if: '$CI_COMMIT_TAG'
   before_script:
-    # The runner's checkout is owned by a different uid than the job user;
-    # without this, every `git ls-files` in the gates exits 128 and the
-    # anti-vacuity design (correctly) refuses to report a verdict.
+    # Checkout uid differs from the job user; without this git ls-files exits 128.
     - git config --global --add safe.directory "$CI_PROJECT_DIR"
   script:
     - bash scripts/check-purity.sh
@@ -202,37 +124,9 @@ check-purity:
       [ "$rc" -eq 0 ] && echo "OK: bash -n clean on ${#FILES[@]} scripts"
       exit $rc
 
-# -----------------------------------------------------------------
-# check-portal: the portal quality gate — one `npm ci`, then astro check,
-# the test suite, and a tracked-plain-YAML well-formedness parse. Merges
-# the former test-portal + check-portal jobs, which ran identical rules on
-# the identical image and each paid their own npm ci for overlapping
-# coverage.
-#
-# Covers:
-#   - npm run check   astro check: type + content checks across the
-#                      .astro/.ts tree. Fails only on type ERRORS;
-#                      residual hints do not fail the job.
-#   - npm test         vitest over both src/**/*.test.ts (admin-auth,
-#                      contact, csrf, manifest-store, tiles) and
-#                      scripts/*.test.mjs (manifests-loader,
-#                      admin-recovery-gate, etc.), incl. the fuzz +
-#                      fast-check suites. One runner; tsx is no longer a
-#                      test dependency (it remains for the separate
-#                      lint:manifests CLI).
-#   - YAML parse       a well-formedness parse of the tracked
-#                      plain-YAML set (.gitlab-ci.yml, e2e/compose*.yml,
-#                      e2e/manifests/*.yaml) that CI never ran. Uses the
-#                      `yaml` package this job's own `npm ci` already
-#                      installed rather than adding a second install
-#                      elsewhere. kratos/kratos.yml and hydra/hydra.yml are
-#                      excluded — they are ${VAR} templates, not parseable
-#                      YAML until rendered.
-#
-# Separate from verify-othala (catalog node-build, which runs `npm run
-# build`) because these gate the change BEFORE the build step, catching
-# Renovate-bumped breakage at the test layer.
-# -----------------------------------------------------------------
+# check-portal: one npm ci, then astro check, vitest (src and scripts), and a
+# well-formedness parse of the tracked plain-YAML set. kratos.yml and hydra.yml
+# are  templates, so they are excluded.
 check-portal:
   stage: verify
   image: registry.access.redhat.com/ubi10/nodejs-22:10.2@sha256:82e625f94f6f3313adc2f0dc1b2744af5b85e4674fc31b9440be0898b3ee2680
@@ -242,9 +136,7 @@ check-portal:
     - if: '$CI_PIPELINE_SOURCE == "api"'
     - if: '$CI_COMMIT_TAG'
   before_script:
-    # Same fix as check-purity: the runner's checkout is owned by a
-    # different uid than the job user, so the YAML-parse step's
-    # `git -C .. ls-files` below exits "dubious ownership" without this.
+    # Same safe.directory fix as check-purity.
     - git config --global --add safe.directory "$CI_PROJECT_DIR"
     - cd portal
     - npm ci --include=dev
@@ -280,69 +172,26 @@ check-portal:
         process.exit(bad);
       ' "${FILES[@]}"
 
-# -----------------------------------------------------------------
-# e2e: QEMU-runner end-to-end harness.
-#
-# The project's canonical OSS-facing "stand Othala up on compose"
-# example (e2e/README.md), run here as the release gate. Executes in a
-# fresh Fedora VM spawned by a QEMU GitLab Runner (Custom Executor), selected
-# by the `tags:` on the job below. The VM has podman + docker bridge pre-baked.
-# Inside the VM, e2e/validate.sh:
-#
-#   1. Generates per-run secrets
-#   2. podman login to the GitLab registry
-#   3. docker compose up the converged substrate (postgres, kratos,
-#      hydra, the othala app — consent + util are folded into the othala
-#      app, no separate containers)
-#   4. Waits for healthchecks
-#   5. Runs e2e/smoke.sh — substrate sanity, in-app client registration,
-#      identity admin flow, recovery-gate semantics (the converged app's
-#      /oauth2/* public challenge handlers + /admin/* loopback endpoints)
-#   6. Tears down (VM dies anyway, but be tidy)
-#
-# Sequence: gates the package + release stages. Build images first
-# (stage: build), validate them end-to-end (stage: e2e), then SBOM +
-# release. The CI/MR feedback loop catches Ory-upgrade regressions +
-# Renovate-bump breakage before tag.
-#
-# AUTH_REGISTRY=${CI_REGISTRY_IMAGE} is the registry ROOT — the converged
-# othala app image itself (publish_at_root: true). AUTH_VERSION resolves
-# to $CI_COMMIT_TAG on tag pipelines or $CI_COMMIT_SHORT_SHA on push —
-# either way the harness validates the just-built image, not :latest.
-#
-# See e2e/README.md.
-# -----------------------------------------------------------------
+# e2e: QEMU-runner harness, the release gate (e2e/README.md). validate.sh
+# generates secrets, brings up the compose stack, waits for health, runs smoke.sh.
+# AUTH_REGISTRY is the registry root; AUTH_VERSION is the tag or short sha, so
+# the just-built image is validated, not :latest.
 e2e:
   stage: e2e
-  # These are REAL runner labels, not descriptions: they select the QEMU
-  # Custom Executor that spawns the per-job VM. A fork without a runner
-  # carrying both labels will see this job sit pending forever.
-  #
-  # The first label names ONE MACHINE, which is deployment configuration and
-  # not something a public repo can carry, so it is a project CI/CD variable
-  # and this file only references it. There is deliberately NO default: GitLab
-  # does not honor `${VAR:-fallback}` in `tags:`, and any literal fallback
-  # would put a host name back in the file — which is the leak, not a
-  # convenience. Set E2E_RUNNER_TAG (unprotected, unmasked) to your own
-  # runner's host label BEFORE this job first runs; an unset variable expands
-  # to an empty tag and the job sits pending forever. `qemu` stays literal: it
-  # names an executor CLASS, which is a property of the harness rather than of
-  # anyone's estate. See e2e/README.md.
+  # Real runner labels selecting the QEMU executor; a fork needs both. The first
+  # names one machine, so it is a project CI/CD variable with no default:
+  # tags: ignores ${VAR:-fallback} and a literal would put a host name here.
   tags: ["$E2E_RUNNER_TAG", qemu]
   needs:
     - build-othala
-    # Prebaked browser-test image — pulled by compose.yml's playwright +
-    # dance-runner services. Same VERSION tag as the app image above.
+    # Pulled by compose.yml's playwright + dance-runner services.
     - build-e2e-tester
   variables:
     AUTH_REGISTRY: "${CI_REGISTRY_IMAGE}"
-    # Default to the commit short-SHA (what container-image @2.5.1 publishes
-    # for non-tag / BUILD_CI_IMAGE builds). GitLab variables: do NOT honor
-    # bash ${VAR:-default}, so tag pipelines override AUTH_VERSION in rules:.
+    # GitLab variables ignore ${VAR:-default}; tag pipelines override in rules:.
     AUTH_VERSION: "$CI_COMMIT_SHORT_SHA"
   before_script:
-    # The baser golden has podman + podman-docker. Verify here so
-    # missing tools fail loudly at job start, not mid-compose.
+    # Fail loudly at job start if a tool is missing.
     - podman --version
     - docker --version
     - jq --version || true
@@ -351,27 +200,14 @@ e2e:
     - cd e2e
     - bash validate.sh
   artifacts:
-    # `always`, not on_failure: a flaky-then-green run keeps its first-attempt
-    # failure evidence (2782513958's P2 flake left nothing to diagnose).
+      # Bind-mounted from the playwright container's /out.
     when: always
     paths:
-      # Playwright html-report/test-results/screenshots + the diagnostics/
-      # capture (actions/diagnostics.ts) — bind-mounted from the playwright
-      # container's /out at e2e/compose.yml's ./browser-out:/out, so this
-      # host-side path already holds everything by the time the job ends.
+      # Playwright report, screenshots and diagnostics.
       - e2e/browser-out
     expire_in: 1 week
   rules:
-    # e2e fires on the merge-relevant pipelines — MR, main, tag — plus the
-    # RUN_E2E=true manual lever for proving an ad-hoc branch. Source-keyed
-    # rules, deliberately NOT a branch-name convention (a misspelled name
-    # would skip the gate silently). Image builds stay always-on via the
-    # global BUILD_CI_IMAGE (SaaS runners, no QEMU load); the QEMU cost is
-    # this job alone. The captured-flow unit fixture in check-portal still
-    # guards the v0.5.0 bug class on every push everywhere.
-    #
-    # GitLab variables don't honor bash ${VAR:-default}, so tag pipelines
-    # must override AUTH_VERSION here to pull the v-tag image.
+    # MR, main, tag, or RUN_E2E=true; source-keyed, not branch names.
     - if: '$CI_COMMIT_TAG'
       variables:
         AUTH_VERSION: "$CI_COMMIT_TAG"

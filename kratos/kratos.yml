@@ -1,24 +1,16 @@
-# Kratos configuration — generic Othala instance template
-#
-# All values are ${VAR}-substituted at deploy time. Version-pinned in compose.
+# Kratos configuration: generic Othala instance template, ${VAR}-substituted by
+# scripts/render-config.sh. KRATOS_PG_HOST, KRATOS_ADMIN_HOST and CONSENT_HOST are compose service
+# names in the lab and container names in production.
 
-# DSN host is env-substituted so the same file lands in both
-# topologies. Lab compose sets KRATOS_PG_HOST=postgres (compose service
-# name); a quadlet deployment sets it to the Postgres container's name on
-# the pod-internal network. Same applies to KRATOS_ADMIN_HOST and
-# CONSENT_HOST below.
 dsn: "postgres://kratos:${KRATOS_PG_PASS}@${KRATOS_PG_HOST}:5432/kratos?sslmode=disable"
-# NOTE: the DB password (KRATOS_PG_PASS) must be URL-safe (percent-encoded) —
-# that is a URL constraint; YAML double-quoting cannot fix invalid URL characters.
+# KRATOS_PG_PASS must be URL-safe (percent-encoded): YAML quoting cannot fix a URL.
 
 serve:
   public:
     base_url: "${OTHALA_PUBLIC_URL}/"
     port: 4433
     request_log:
-      # Probes fire every few seconds; each would write an access-log line,
-      # burying real ones (and landing at err priority wherever container
-      # stderr is journalled). Metrics still count them.
+      # Probes would write an access-log line every few seconds, burying real ones. Metrics still count them.
       disable_for_health: true
     cors:
       enabled: true
@@ -37,33 +29,20 @@ serve:
 
   admin:
     base_url: "http://${KRATOS_ADMIN_HOST}:4434/"
-    # Admin-plane bind address. The admin API is unauthenticated by design
-    # (Ory's model: the network IS the control), so segmented deployments
-    # bind it to an address only the admin-plane network can reach.
-    # Single-network deployments (the e2e harness) use 0.0.0.0.
+    # Admin-plane bind address. The admin API is unauthenticated by design (the network is the
+    # control): segmented deployments bind an admin-plane address, the e2e harness uses 0.0.0.0.
     host: "${KRATOS_ADMIN_BIND_HOST}"
     port: 4434
     request_log:
-      # Silences only the /admin-prefixed health paths: this listener logs
-      # before it adds the prefix, so probe /admin/health/ready here.
+      # This listener logs before adding the prefix, so probe /admin/health/ready here.
       disable_for_health: true
 
 selfservice:
-  # How Kratos matches an entry (x/redir/secure_redirect.go): scheme exactly,
-  # path by PREFIX, and host exactly UNLESS the entry's host starts with `*` —
-  # then it is a suffix match. Two consequences this list is written to:
-  #   - the `.` in `*.` is load-bearing: `*apex.tld` would suffix-match the
-  #     attacker-registrable `evilapex.tld`. (Kratos also drops a wildcard that
-  #     is not a whole leading label bounded at a registrable domain, but do not
-  #     lean on that.)
-  #   - every entry ends in `/` so the path prefix cannot admit a longer
-  #     sibling: an entry ending `/app` would also match `/apple`.
-  #
-  # The apex wildcard is what makes return_to work at all: a gated sibling
-  # service sends the user here and gets them back. It is exactly as wide as the
-  # session cookie's `domain` below, so it admits no host that is not already
-  # handed the session — widening it past the apex would be an open redirect.
-  # https only; the edge terminates TLS and serves nothing in plaintext.
+  # Kratos matches an entry by exact scheme, path PREFIX, and exact host unless the host starts
+  # with `*` (suffix match). The `.` in `*.` is load-bearing (`*apex.tld` would match the
+  # registrable `evilapex.tld`); every entry ends in `/` so `/app` cannot admit `/apple`. The apex
+  # wildcard is as wide as the session cookie's domain below, so it admits no host that is not
+  # already handed the session; widening it would be an open redirect. https only.
   default_browser_return_url: "${OTHALA_PUBLIC_URL}/"
   allowed_return_urls:
     - "${OTHALA_PUBLIC_URL}/"
@@ -73,33 +52,27 @@ selfservice:
     password:
       enabled: true
       config:
-        # Unquoted: kratos v26.2.0 schema types these as bool/int — a quoted
-        # template token renders to the string "true"/"12" and fails config
-        # validation (the render is text-substitution, so source quoting carries
-        # through). Keep these values unquoted.
+        # Unquoted: the schema types these as bool/int, and a quoted token renders to a string.
         haveibeenpwned_enabled: ${OTHALA_HIBP_ENABLED}
         max_breaches: 0
         ignore_network_errors: false
         identifier_similarity_check_enabled: true
         min_password_length: ${OTHALA_PASSWORD_MIN_LENGTH}
 
-    # Passkeys — the PRIMARY login method: Kratos's dedicated `passkey` strategy
-    # (discoverable credentials + conditional UI, the usernameless one-tap),
-    # distinct from the legacy `webauthn` strategy below.
+    # Passkeys: the PRIMARY login method (discoverable credentials, usernameless), distinct from
+    # the legacy webauthn strategy below.
     passkey:
       enabled: true
       config:
         rp:
-          # CRITICAL one-way decision: registrable parent so passkeys are
-          # assertable from any *.example.com origin (registrable parent RP ID).
-          # Changing this id invalidates every enrolled passkey. (Shared with the webauthn RP below.)
+          # CRITICAL one-way decision: the registrable parent, so passkeys work from any subdomain
+          # origin. Changing it invalidates every enrolled passkey (shared with the webauthn RP below).
           id: "${OTHALA_WEBAUTHN_RP_ID}"
           display_name: "${OTHALA_INSTANCE_NAME}"
           origins:
             - "${OTHALA_WEBAUTHN_RP_ORIGINS}"
 
-    # WebAuthn (legacy strategy) — second-factor / hardware-security-key only
-    # (passwordless: false); passkey above owns the passwordless primary.
+    # WebAuthn (legacy): second factor / security key only; passkey owns passwordless.
     webauthn:
       enabled: true
       config:
@@ -115,15 +88,9 @@ selfservice:
       config:
         issuer: "${OTHALA_INSTANCE_NAME}"
 
-    # Code strategy: recovery AND a first-class passwordless login method
-    # (email OTP) — the fallback for a device that has no passkey enrolled.
-    #
-    # max_submissions: 5 bounds brute-force of the 6-digit code (flow
-    # invalidated after 5 wrong attempts). lifespan: 15m is the per-method
-    # code validity window (distinct from the flow lifespan at
-    # flows.login.lifespan).
-    # Both keys confirmed schema-valid against the pinned oryd/kratos
-    # v26.2.0 embedded config schema.
+    # Code strategy: recovery AND passwordless email-OTP login (fallback for a device without a
+    # passkey). max_submissions: 5 bounds brute force of the 6-digit code; lifespan: 15m is the
+    # per-method validity, distinct from flows.login.lifespan.
     code:
       enabled: true
       passwordless_enabled: true
@@ -131,7 +98,6 @@ selfservice:
         max_submissions: 5
         lifespan: 15m
 
-    # We don't use these but enable explicitly to document the choice
     profile:
       enabled: true
 
@@ -149,14 +115,9 @@ selfservice:
     settings:
       ui_url: "${OTHALA_PUBLIC_URL}/auth/settings"
       privileged_session_max_age: 5m
-      # Require the highest available AAL before credential changes, so a
-      # stolen AAL1 session cannot swap out the second factor it does not have.
-      # AAL1-only identities are unaffected; first-passkey enrollment is NOT
-      # blocked.
-      # This does NOT affect session.whoami (see below), which must stay aal1
-      # so the portal's forward-auth gate (portal/src/pages/api/forward-auth.ts)
-      # keeps getting a non-null session.identity for every forward_auth-fronted
-      # catalog app.
+      # Require the highest available AAL before credential changes, so a stolen AAL1 session
+      # cannot swap the second factor. AAL1-only identities and first-passkey enrollment are
+      # unaffected. This does NOT touch session.whoami, which must stay aal1 (forward-auth.ts).
       required_aal: highest_available
       after:
         password:
@@ -165,10 +126,8 @@ selfservice:
         passkey:
           hooks:
             - hook: revoke_active_sessions
-        # An admin-marked identity keeps a second factor: the interrupting
-        # web_hook runs before Kratos persists a totp or webauthn change, and
-        # the gate refuses one that could leave no authenticator app and no
-        # security key.
+        # An admin keeps a second factor: this interrupting hook refuses a change that could leave
+        # no authenticator app and no security key.
         webauthn:
           hooks:
             - hook: revoke_active_sessions
@@ -187,9 +146,8 @@ selfservice:
                   parse: false
                 body: file:///etc/config/kratos/hooks/recovery-gate.jsonnet
                 can_interrupt: true
-        # An attacker who swaps a TOTP seed or rotates backup codes gains a
-        # re-entry path through any other surviving session. Revoke on change
-        # to close that window — mirrors the credential-swap logic above.
+        # Revoke on change: a swapped TOTP seed or rotated backup codes is a re-entry path through
+        # any other surviving session.
         totp:
           hooks:
             - hook: revoke_active_sessions
@@ -211,13 +169,9 @@ selfservice:
         lookup_secret:
           hooks:
             - hook: revoke_active_sessions
-        # Username is admin-controlled: relying parties that still match an
-        # account on it at sign-in would lose the link on a self-service
-        # rename. An interrupting web_hook runs before Kratos persists the new
-        # traits; the gate refuses any username other than the stored one.
-        # The schema allows no revoke_active_sessions here; the second,
-        # non-interrupting web_hook runs after persist and ends the account's
-        # other sessions, keeping the one that saved.
+        # Username is admin-controlled: an interrupting hook refuses any username other than the
+        # stored one. The schema allows no revoke_active_sessions here, so a second non-interrupting
+        # hook ends the account's other sessions, keeping the one that saved.
         profile:
           hooks:
             - hook: web_hook
@@ -257,36 +211,20 @@ selfservice:
       ui_url: "${OTHALA_PUBLIC_URL}/auth/recovery"
       lifespan: 1h
       notify_unknown_recipients: false
-      # Admin email-recovery is refused by the recovery-gate webhook below,
-      # before the privileged settings session is issued: a compromised mailbox
-      # must not be a path to admin authority. Non-admin members keep email
-      # recovery; admins recover via console (docs/runbooks/admin-recovery.md).
+      # Admin email-recovery is refused by the recovery-gate webhook before the privileged settings
+      # session is issued; admins recover via console (docs/runbooks/admin-recovery.md).
       after:
-        # v26.2.0: recovery after-hooks live directly under `after.hooks`. The
-        # `selfServiceAfterRecovery` schema has NO per-method `code:` sub-key
-        # (that method nesting is valid for login/registration `after`, not
-        # recovery) — a `code:` wrapper here fails config validation at startup.
+        # v26.2.0: recovery after-hooks sit directly under `after.hooks`; a `code:` wrapper fails validation.
         hooks:
           - hook: web_hook
             config:
-              # MEDIUM-1 listener split: webhook URL points at the
-              # admin port (:4431), not the public SSR port (:8080).
-              # The admin listener binds on loopback (127.0.0.1) inside
-              # the container; within the compose/pod network the host
-              # is CONSENT_HOST (= othala). MEDIUM-2: auth block carries
-              # the shared bearer secret; the app's handleRecoveryGate
-              # constant-time compares Authorization: Bearer before
-              # reading the body. Fails closed on missing/wrong secret.
-              # 4431 = portal code default (listen.mjs:40) + deployed
-              # quadlet; single admin-port convention across envs.
+              # Webhook to the loopback admin port (:4431, host CONSENT_HOST), not the public port.
+              # The app constant-time compares the bearer and fails closed on a missing or wrong secret.
               url: "http://${CONSENT_HOST}:4431/admin/recovery-gate"
               method: POST
               auth:
-                # Kratos webhooks support only api_key | basic_auth (NO `bearer`
-                # type). Use api_key with header name `Authorization` and a
-                # `Bearer <secret>` value — valid Kratos config that ALSO produces
-                # the exact `Authorization: Bearer …` header the app's
-                # handleRecoveryGate (parseBearer) expects. Satisfies both sides.
+                # Kratos webhooks support only api_key | basic_auth: api_key with header
+                # Authorization and a `Bearer <secret>` value yields the header the app parses.
                 type: api_key
                 config:
                   in: header
@@ -313,17 +251,12 @@ selfservice:
     login:
       ui_url: "${OTHALA_PUBLIC_URL}/auth/login"
       lifespan: 10m
-      # aal1 base — the v26.2.0 login flow takes NO `required_aal` property
-      # (it's a `settings`/`session` knob, not a login-flow one). AAL2 step-up
-      # is requested per-flow via ?aal=aal2&refresh=true by requireAdminSession
-      # in admin.ts, never enforced globally here — a global AAL2 would lock out
-      # every identity that has not enrolled a second factor yet, including on
-      # the very flow it would use to enrol one.
+      # aal1 base: the login flow takes no required_aal. AAL2 step-up is requested per flow by
+      # requireAdminSession (admin.ts); a global AAL2 would lock out identities with no second factor.
       after:
-        # Admin accounts never get a session from an emailed code: the gate
-        # refuses an admin-marked identity and Kratos then issues no cookie.
-        # Same endpoint family, secret and body as the recovery gate above.
-        # Per-method hooks replace global login hooks; none are defined.
+        # Admin accounts never get a session from an emailed code: the gate refuses an admin-marked
+        # identity (same endpoint, secret and body as the recovery gate above). Per-method hooks
+        # replace global login hooks; none are defined.
         code:
           hooks:
             - hook: web_hook
@@ -353,28 +286,19 @@ selfservice:
             - hook: session
 
 session:
-  # 720h (30 days). This is the blast-radius knob: the cookie below is
-  # apex-scoped, so a stolen one is good on every subdomain until it expires.
-  # Admin freshness is enforced portal-side (requireAdminSession,
-  # OTHALA_ADMIN_FRESHNESS_HOURS, default 1h).
+  # 720h is the blast-radius knob: the cookie is apex-scoped, so a stolen one is good on every
+  # subdomain until it expires. Admin freshness is enforced portal-side (requireAdminSession).
   lifespan: 720h
   cookie:
-    # Parent apex domain so the IdP and every subdomain app share the
-    # same session cookie. SameSite=Lax permits same-site POSTs across
-    # subdomains; HIGH-1 CSRF mitigation is per-request tokens in the
-    # portal (portal/src/lib/csrf.ts).
+    # Apex domain so the IdP and every subdomain app share the session cookie. SameSite=Lax permits
+    # same-site POSTs; CSRF mitigation is per-request tokens in the portal (csrf.ts).
     domain: "${OTHALA_APEX}"
     name: ory_kratos_session
     persistent: true
     same_site: Lax
   whoami:
-    # CRITICAL: aal1 not highest_available. highest_available causes
-    # whoami to return session.identity = null for MFA-enabled identities.
-    # The portal's forward-auth gate (portal/src/pages/api/forward-auth.ts)
-    # treats a missing session.identity.id as unauthenticated and 401s, so a
-    # null identity here would lock every forward_auth-fronted catalog app
-    # out from under MFA-enabled users. AAL is enforced per-flow, not at
-    # whoami.
+    # CRITICAL: aal1, not highest_available, which makes whoami return session.identity = null for
+    # MFA identities and forward-auth.ts would 401 them. AAL is enforced per flow.
     required_aal: aal1
 
 cookies:
@@ -389,38 +313,19 @@ identity:
 
 courier:
   smtp:
-    # SINGLE source of truth for the courier connection, shared with the
-    # portal's contact-form mailer (portal/src/lib/mailer.ts reads the same
-    # OTHALA_SMTP_CONNECTION_URI). One URI, one relay — a dashboard request
-    # mail travels the exact same outbound path as a recovery/verification
-    # code. gen-secrets.sh (and the production deployment) default this to the Fastmail implicit-TLS
-    # endpoint with the SMTP_USER/SMTP_PASS app-password credentials.
+    # Single courier connection, shared with the portal contact-form mailer
+    # (OTHALA_SMTP_CONNECTION_URI): one URI, one outbound path.
     connection_uri: "${OTHALA_SMTP_CONNECTION_URI}"
     from_address: "${OTHALA_SMTP_FROM_ADDRESS}"
     from_name: "${OTHALA_INSTANCE_NAME}"
     # local_name: leave default; Fastmail accepts standard HELO
 
-  # Templates default to Kratos built-ins; override later if needed.
-  # templates:
-  #   recovery_code:
-  #     valid:
-  #       email:
-  #         subject: Your ${OTHALA_INSTANCE_NAME} recovery code
 
 secrets:
-  # Cookie signing + at-rest cipher secrets. Ory's secrets arrays model
-  # rotation via DISTINCT entries (the first signs/encrypts; older entries
-  # still verify/decrypt). Kratos v26.2.0 enforces uniqueItems, so a single
-  # active secret is a SINGLE-element array — never two identical slots. The
-  # collapsed-key deployment (one sops key per slot, golden-path LB#10) is
-  # exactly this single-element shape.
-  #
-  # Rotation runbook (docs/runbooks/cookie-rotation.md):
-  #   1. PREPEND the new secret as a distinct first entry (old becomes 2nd):
-  #        cookie: [<new>, <current>]
-  #   2. Restart Kratos (new signs; old still verifies).
-  #   3. After the session lifespan elapses (30 days default), DROP the old
-  #      entry — back to a single-element array. Restart again.
+  # Cookie signing + at-rest cipher secrets. The first entry signs/encrypts; older ones still
+  # verify. v26.2.0 enforces uniqueItems, so one active secret is a SINGLE-element array.
+  # Rotation (docs/runbooks/cookie-rotation.md): prepend the new secret as a distinct first entry,
+  # restart, then after the session lifespan drop the old entry and restart again.
   cookie:
     - "${KRATOS_COOKIE_SECRET_CURRENT}"
 
@@ -432,30 +337,10 @@ log:
   format: json
   leak_sensitive_values: false
 
-# Distributed tracing (OpenTelemetry). OPT-IN and DEFAULT-OFF: the provider is
-# empty unless OTHALA_OTLP_PROVIDER renders to "otel", so the e2e harness (which
-# defaults it to "") stands the stack up with tracing disabled and undisturbed.
-#
-# Ory v26.2.0 specifics that this block is built to:
-#   - OTLP transport is HTTP/protobuf ONLY (collector port 4318, path
-#     /v1/traces) — NOT gRPC (4317). server_url is a bare host:port.
-#   - Ory IGNORES OTEL_* environment variables; it reads only this `tracing:`
-#     block. We emit to the host alloy OTLP receiver (no auth header on this
-#     hop); alloy adds the observe ingest auth, redacts centrally, and forwards
-#     to observe. The emitter therefore carries no ingestion key.
-#   - insecure: true = plaintext to the host alloy receiver. Same accepted-risk
-#     posture as the sslmode=disable DSN above: the hop reaches only the
-#     firewall-scoped host OTLP port, so TLS would only protect an already-
-#     trusted segment.
-#   - sampling_ratio 0.1 = trace 10% of requests (head sampling) to bound volume.
-#
-# CONDITIONAL BLOCK (render-config.sh #@if): the entire tracing block is OMITTED
-# when OTHALA_OTLP_PROVIDER is empty/unset, and emitted verbatim when it is set.
-# Ory v26.2.0's schema rejects a present `tracing:` whose provider is "" — it
-# validates the block's $ref the moment the key exists, so "disabled" must mean
-# "absent", not "present with an empty provider". The e2e harness leaves the
-# provider empty (block drops out; tracing off); production sets it to "otel" (block
-# renders; tracing on). See scripts/render-config.sh for the fence semantics.
+# Tracing (OpenTelemetry), opt-in: the block below is OMITTED when OTHALA_OTLP_PROVIDER is empty
+# (Ory v26.2.0 rejects a present block with provider "") and emitted when it is "otel".
+# OTLP is HTTP/protobuf only (port 4318), Ory ignores OTEL_* env vars, insecure: true is
+# plaintext to the firewall-scoped host alloy receiver, sampling_ratio 0.1 bounds volume.
 #@if OTHALA_OTLP_PROVIDER
 tracing:
   service_name: kratos
