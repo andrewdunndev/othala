@@ -228,7 +228,7 @@ echo ""
 # intention (AGENTS.md "The prose budget"). RATCHET: moves DOWN only. Raising
 # it is a deliberate edit to the constant, in a commit saying what grew and
 # why it earned the room — never a high-water mark computed live.
-PROSE_CEILING_BYTES=175300
+PROSE_CEILING_BYTES=153000
 PROSE_HIGH_WATER_BYTES=504832  # size when the corpus became unmanageable; ceiling must stay under this
 PROSE_GLOBS=('*.md' '*.mdx' '*.markdown')
 PROSE_COVERED_TREES=(docs/ site/src/content/docs/)  # every tracked file here must be counted by the globs above
