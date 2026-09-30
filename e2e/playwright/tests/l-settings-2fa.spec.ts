@@ -34,7 +34,7 @@
  *   - Kratos TOTP strategy + lookup_secret strategy enabled in kratos.yml.
  *   - The `browser` + `kratos` + `othala` compose services are running.
  *   - The identity schema allows both TOTP and lookup_secret credentials.
- *   - privileged_session_max_age ≥ 15m (default in othala's kratos.yml).
+ *   - privileged_session_max_age ≥ 5m (othala's kratos.yml).
  *
  * Node-shape assumptions (live confirmation recommended):
  *   - TOTP enrollment: Kratos emits a node_type:"img" (QR) and a

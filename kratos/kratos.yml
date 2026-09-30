@@ -148,7 +148,7 @@ selfservice:
 
     settings:
       ui_url: "${OTHALA_PUBLIC_URL}/auth/settings"
-      privileged_session_max_age: 15m
+      privileged_session_max_age: 5m
       # Require the highest available AAL before credential changes, so a
       # stolen AAL1 session cannot swap out the second factor it does not have.
       # AAL1-only identities are unaffected; first-passkey enrollment is NOT

@@ -7,13 +7,17 @@
  *        username.
  *   Y3 — an email change through the same form is saved; the post-save
  *        profile-sessions webhook ends the member's other sessions and keeps
- *        the one that saved.
+ *        the one that saved; the new address is unverified and gets a
+ *        verification mail.
+ *   Y4 — after an email change, a refresh login by code mails the new address
+ *        and nothing goes to the old one.
  */
 
 import type { BrowserContext } from 'playwright-core';
 import { test, expect } from '../fixtures';
 import { createIdentityWithPassword, readIdentity, TEST_PASSWORD } from '../actions/identity';
 import { findCsrfToken, loginViaJsonApi } from '../actions/login';
+import { forRecipient, waitForMessage } from '../actions/mail';
 
 const USERNAME_CHANGE_REFUSAL = 'Your username can only be changed by an administrator.';
 
@@ -91,6 +95,7 @@ test.describe('Y — username is admin-only', () => {
     const other = await browser.newContext();
     const ctx = await browser.newContext();
     try {
+      const since = Date.now();
       await loginViaJsonApi(other, { identifier: seeded.email, password: TEST_PASSWORD }, baseURL);
       await loginViaJsonApi(ctx, { identifier: seeded.email, password: TEST_PASSWORD }, baseURL);
 
@@ -101,6 +106,9 @@ test.describe('Y — username is admin-only', () => {
       const after = await storedTraits(kratosAdminURL, seeded.id);
       expect(after.email).toBe(changed);
       expect(after.username).toBe(username);
+      const addresses = (await readIdentity(kratosAdminURL, seeded.id)).verifiable_addresses as Array<{ value: string; verified: boolean }>;
+      expect(addresses.find((a) => a.value === changed)?.verified, 'new address unverified').toBe(false);
+      await waitForMessage(forRecipient(changed, since));
 
       const whoOther = await other.request.get(`${baseURL}/sessions/whoami`, { headers: { Accept: 'application/json' } });
       expect(whoOther.status(), 'the other session ended').toBe(401);
@@ -109,6 +117,48 @@ test.describe('Y — username is admin-only', () => {
     } finally {
       await ctx.close();
       await other.close();
+    }
+  });
+
+  test('Y4 — a refresh login by code mails the new address, not the old one', async ({ browser, baseURL, kratosAdminURL }) => {
+    const username = `refresh.code.${Date.now()}`;
+    const changed = `${username}.new@othala.test`;
+    const seeded = await createIdentityWithPassword({
+      email: `${username}@othala.test`,
+      username,
+      displayName: 'Refresh Code',
+      groups: [],
+      kratosAdminURL,
+    });
+    const ctx = await browser.newContext();
+    try {
+      await loginViaJsonApi(ctx, { identifier: seeded.email, password: TEST_PASSWORD }, baseURL);
+      const before = await storedTraits(kratosAdminURL, seeded.id);
+      expect((await submitProfile(ctx, baseURL, { ...before, email: changed })).status).toBe(200);
+
+      const refreshByCode = async (identifier: string) => {
+        const flowResp = await ctx.request.get(`${baseURL}/self-service/login/browser?refresh=true`, {
+          headers: { Accept: 'application/json' },
+          maxRedirects: 5,
+        });
+        expect(flowResp.ok(), 'refresh login flow init').toBe(true);
+        const flow = await flowResp.json();
+        await ctx.request.post(flow.ui.action, {
+          headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+          data: { method: 'code', identifier, csrf_token: findCsrfToken(flow.ui.nodes) },
+          maxRedirects: 0,
+        });
+      };
+
+      const since = Date.now();
+      await refreshByCode(changed);
+      await waitForMessage(forRecipient(changed, since));
+
+      const sinceOld = Date.now();
+      await refreshByCode(seeded.email);
+      await expect(waitForMessage(forRecipient(seeded.email, sinceOld), 5_000)).rejects.toThrow(/Timed out/);
+    } finally {
+      await ctx.close();
     }
   });
 });

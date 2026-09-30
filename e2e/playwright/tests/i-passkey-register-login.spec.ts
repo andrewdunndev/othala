@@ -100,7 +100,7 @@ test.describe('I — Passkey register → usernameless login', () => {
     console.log('[I1] seeded identity:', identity.id, identity.email);
 
     // Step 2: Obtain a privileged session. Kratos requires a privileged session
-    // (within privileged_session_max_age: 15m) for the settings flow. Log in via
+    // (within privileged_session_max_age: 5m) for the settings flow. Log in via
     // the JSON-API path to set the session cookie in the BrowserContext, then
     // navigate to /auth/settings on the live page (same context = same cookie jar).
     const ctx = page.context();

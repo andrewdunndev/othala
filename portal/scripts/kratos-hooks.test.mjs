@@ -42,3 +42,11 @@ test('every kratos.yml hook is one the v26.2.0 schema allows at its placement', 
     for (const h of hooks) assert.ok(ALLOWED[path].includes(h.hook), `${path}: ${h.hook} is not allowed here`);
   }
 });
+
+test('the privileged settings window is at most 5 minutes', () => {
+  const file = fileURLToPath(new URL('../../kratos/kratos.yml', import.meta.url));
+  const age = parse(readFileSync(file, 'utf8')).selfservice.flows.settings.privileged_session_max_age;
+  const m = /^(\d+)([smh])$/.exec(String(age));
+  assert.ok(m, `unparseable privileged_session_max_age: ${age}`);
+  assert.ok(Number(m[1]) * { s: 1, m: 60, h: 3600 }[m[2]] <= 300, `privileged_session_max_age ${age} exceeds 5m`);
+});
