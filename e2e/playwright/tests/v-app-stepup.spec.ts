@@ -123,3 +123,18 @@ test('V2 — a TOTP member signed in by code steps up before app sign-in and for
   expect(done.searchParams.get('code')).toBeTruthy();
   expect((await forwardAuth(ctx, baseURL)).status(), 'V2: aal2 forward-auth').toBe(200);
 });
+
+test('V3 — a non-admin holding an elevated app role steps up before app sign-in and forward-auth', async ({ ctx, baseURL, kratosAdminURL }) => {
+  const username = `v3.elevated.${Date.now()}`;
+  const email = `${username}@othala.test`;
+  await createIdentityWithPassword({
+    email, username, displayName: 'V v3.elevated', groups: ['grafana-access', 'grafana-admin'], kratosAdminURL,
+  });
+  await loginViaJsonApi(ctx, { identifier: email, password: TEST_PASSWORD }, baseURL);
+  expect((await getSession(ctx, baseURL))?.authenticator_assurance_level, 'V3: password login yields aal1').toBe('aal1');
+
+  const stepped = await walkAuthorize(ctx, baseURL);
+  expect(stepped.pathname, `V3: must land on the login page, got ${stepped}`).toBe('/auth/login');
+  expect(stepped.searchParams.get('aal')).toBe('aal2');
+  expect((await forwardAuth(ctx, baseURL)).status(), 'V3: aal1 forward-auth').toBe(401);
+});
