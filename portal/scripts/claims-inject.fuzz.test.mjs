@@ -21,6 +21,7 @@ function manifest({ clientId = 'myapp', roles = [], groupRoleMap = {}, emitGroup
     backchannelLogoutUri: '',
     backchannelLogoutSessionRequired: false,
     accessGroup: `access-${clientId}`,
+    accessGroups: [`access-${clientId}`],
     roles,
     groupRoleMap,
     emitGroupsClaim,
@@ -282,7 +283,7 @@ test('P6b: emit_groups_claim:true (default null) keeps groups claim in output', 
 
   const claims = composeIDTokenClaims(id, m);
   assert.ok('groups' in claims, 'groups claim must be present when emitGroupsClaim is null (default true)');
-  assert.deepEqual(claims.groups, ['access-myapp', 'eng']);
+  assert.deepEqual(claims.groups, ['access-myapp']);
 });
 
 test('P7a: override stored with lowercase clientId key resolves the declared role', () => {
@@ -477,7 +478,7 @@ test('adversarial: null manifest → no claimEmit injection', () => {
   const claims = composeIDTokenClaims(id, null);
   assert.equal('role' in claims, false, 'No role key should appear with null manifest');
   assert.equal('permissions' in claims, false);
-  assert.ok('groups' in claims, 'groups claim should appear with null manifest');
+  assert.equal('groups' in claims, false, 'groups claim must be omitted with null manifest');
 });
 
 test('adversarial: claimEmit that tries to overwrite email claim via deepMergeClaims', () => {

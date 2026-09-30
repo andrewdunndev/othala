@@ -192,7 +192,7 @@ distinctions do not travel out through Hydra into the RP redirect.
 
 On consent, the gate runs **again** rather than trusting that login just passed, and the id_token
 claims are composed by `composeIDTokenClaims` (`portal/src/lib/claims.ts`): identity claims, then the
-groups claim dropped unless the manifest opts in, then the resolved role's `claim_emit` merged in,
+groups claim dropped unless the manifest opts in and narrowed to the groups that manifest binds, then the resolved role's `claim_emit` merged in,
 then any claim whose required scope was not requested removed.
 
 Revocation is one in-process fan-out, `revokeSubject` (`portal/src/lib/revoke.ts`), shared by admin

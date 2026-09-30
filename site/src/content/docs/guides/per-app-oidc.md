@@ -52,7 +52,8 @@ claim is composed; that is a misconfigured identity, not a shortcut.
 `e2e/playwright/tests/t-access-model.spec.ts` pin it. Group **names** are
 convention only: a group's type comes from which manifest key binds it, never
 from its spelling — `portal/src/lib/group-registry.ts` records why name-based
-inference was retired.
+inference was retired. An app's `groups` claim carries only the groups its own manifest binds,
+plus its role's `claim_emit`.
 
 <figure class="diagram">
   <img src="/diagrams/group-binding-decision.svg" alt="Three columns. The identity holds groups in admin-API-only metadata. The manifest binds them twice: presentation.access is the entry binding, consent.group_role_map is the role binding. The code then decides — the access gate admits on the entry binding, and lookupRole resolves a role from the highest-ranked match. Holding only the admin group admits nobody, and a group no manifest binds grants nothing.">

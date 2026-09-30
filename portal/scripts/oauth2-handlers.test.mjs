@@ -643,7 +643,7 @@ test('A4a: audiobookshelf access-group holder gets user role, groups unioned', a
   const idToken = calls.acceptConsentBody.session.id_token;
   assert.ok(Array.isArray(idToken.groups), 'groups must be an array');
   assert.ok(idToken.groups.includes('audiobookshelf-access'), 'identity group audiobookshelf-access must be preserved');
-  assert.ok(idToken.groups.includes('grafana-access'), 'unrelated identity group grafana-access must be preserved');
+  assert.ok(!idToken.groups.includes('grafana-access'), 'another app\'s group must not be sent');
   assert.ok(idToken.groups.includes('user'), 'role claim_emit group user must be present');
   assert.equal(idToken.email, 'a@othala.test', 'email must still be present');
 });
