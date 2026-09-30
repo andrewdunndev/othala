@@ -4,8 +4,13 @@
 # The default backend is the app so static assets (/_astro/*, favicon, manifest) keep their
 # Content-Type; /oauth2/{login,consent,logout} are app challenge handlers. rate_limit is mholt/caddy-ratelimit.
 
+# {client_ip} is the socket peer unless the peer is in OTHALA_TRUSTED_PROXIES (comma- or space-separated
+# CIDRs of the proxies in front of this Caddy), then the address from X-Forwarded-For.
 {
 	order rate_limit before basicauth
+	servers {
+		trusted_proxies static {$OTHALA_TRUSTED_PROXIES}
+	}
 }
 
 {$OTHALA_PUBLIC_HOST} {
@@ -24,7 +29,7 @@
 	handle @portal_challenges {
 		# XFF overwrite: see the default backend below.
 		reverse_proxy othala:8080 {
-			header_up X-Forwarded-For {remote_host}
+			header_up X-Forwarded-For {client_ip}
 		}
 	}
 
@@ -34,7 +39,8 @@
 	handle @kratos {
 		rate_limit {
 			zone othala_selfservice {
-				key    {remote_host}
+				key    {client_ip}
+				ipv6_prefix 64
 				events 10
 				window 1m
 			}
@@ -43,9 +49,9 @@
 	}
 
 	# Default -> the app (UI, pages, static assets). Overwrite any client-supplied X-Forwarded-For
-	# with the socket peer: @astrojs/node reads the leftmost entry, so a spoofed prefix would land
+	# with the real client address: @astrojs/node reads the leftmost entry, so a spoofed prefix would land
 	# in a fresh rate-limit bucket on every request.
 	reverse_proxy othala:8080 {
-		header_up X-Forwarded-For {remote_host}
+		header_up X-Forwarded-For {client_ip}
 	}
 }
