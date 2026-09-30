@@ -13,7 +13,7 @@ Release hardening: rate limits key on the real client, and release jobs wait for
 
 ### Changed
 
-- Self-service rate limits key on the client address, grouping IPv6 by /64; `OTHALA_TRUSTED_PROXIES` names the proxies whose `X-Forwarded-For` is trusted.
+- Self-service rate limits key on the client address, grouping IPv6 by /64, trusting `X-Forwarded-For` only from private-range proxies.
 - The SBOM and release jobs run only after e2e passes.
 - Pipeline components pin to 4.8.0, the reference docs to `v0.6.0`, and the portal runtime image to a digest.
 - Leftover source-comment headers are trimmed, and the unused `axe-core` e2e dependency is removed.

@@ -4,12 +4,11 @@
 # The default backend is the app so static assets (/_astro/*, favicon, manifest) keep their
 # Content-Type; /oauth2/{login,consent,logout} are app challenge handlers. rate_limit is mholt/caddy-ratelimit.
 
-# {client_ip} is the socket peer unless the peer is in OTHALA_TRUSTED_PROXIES (comma- or space-separated
-# CIDRs of the proxies in front of this Caddy), then the address from X-Forwarded-For.
+# {client_ip} is the socket peer, or X-Forwarded-For when the peer is a private-range proxy.
 {
 	order rate_limit before basicauth
 	servers {
-		trusted_proxies static {$OTHALA_TRUSTED_PROXIES}
+		trusted_proxies static private_ranges
 	}
 }
 
