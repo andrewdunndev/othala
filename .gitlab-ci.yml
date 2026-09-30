@@ -98,7 +98,7 @@ include:
 # scans this file too, so a runner tag or comment naming a private host fails.
 check-purity:
   stage: verify
-  image: registry.access.redhat.com/ubi10/nodejs-22:10.2@sha256:82e625f94f6f3313adc2f0dc1b2744af5b85e4674fc31b9440be0898b3ee2680
+  image: registry.access.redhat.com/ubi10/nodejs-22:10.2@sha256:d7435fba7435fbc5e6749c319caff8dce19926ca4681f3fa6638274645a6348d
   rules:
     - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
     - if: '$CI_PIPELINE_SOURCE == "push"'
@@ -129,7 +129,7 @@ check-purity:
 # are  templates, so they are excluded.
 check-portal:
   stage: verify
-  image: registry.access.redhat.com/ubi10/nodejs-22:10.2@sha256:82e625f94f6f3313adc2f0dc1b2744af5b85e4674fc31b9440be0898b3ee2680
+  image: registry.access.redhat.com/ubi10/nodejs-22:10.2@sha256:d7435fba7435fbc5e6749c319caff8dce19926ca4681f3fa6638274645a6348d
   rules:
     - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
     - if: '$CI_PIPELINE_SOURCE == "push"'
