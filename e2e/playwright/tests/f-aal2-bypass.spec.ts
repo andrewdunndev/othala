@@ -104,7 +104,7 @@ test('F4 — supplying aal=aal2 in the /admin query string does not bypass step-
 
   expect(
     /aal=aal2/.test(loc),
-    `F4: /admin?aal=aal2 must not bypass step-up; got ${status} ${loc}`,
+    `F4: /admin?aal=aal2 must not bypass step-up; got ${resp.status()} ${loc}`,
   ).toBe(true);
 
   expect(
