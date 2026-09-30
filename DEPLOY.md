@@ -113,8 +113,7 @@ full per-RP runbook.
    answer; a real login round-trips.
 
 Rollback is purely a deploy-plane change: revert to the previous pinned
-tag and redeploy. Registry tags are immutable, so rollback is
-deterministic.
+digest and redeploy.
 
 ## Why two repos
 
