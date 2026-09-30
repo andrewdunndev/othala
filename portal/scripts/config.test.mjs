@@ -47,6 +47,7 @@ test('publicUrl: returns dev default in test when absent', async () => {
 });
 
 const PROD_REQUIRED = {
+  OTHALA_APEX: 'example.com',
   OTHALA_SMTP_CONNECTION_URI: 'smtps://u:p@smtp.example.com:465',
   OTHALA_CONTACT_RECIPIENT: 'ops@example.com',
 };
@@ -80,7 +81,7 @@ test('publicUrl: strips multiple trailing slashes', async () => {
 
 test('smtpConnectionUri: throws in production when absent', async () => {
   await assert.rejects(
-    () => loadConfig({ NODE_ENV: 'production', OTHALA_PUBLIC_URL: 'https://a.example.com' }),
+    () => loadConfig({ NODE_ENV: 'production', OTHALA_PUBLIC_URL: 'https://a.example.com', OTHALA_APEX: 'example.com' }),
     /OTHALA_SMTP_CONNECTION_URI/,
   );
 });
@@ -112,6 +113,7 @@ test('contactRecipient: throws in production when OTHALA_CONTACT_RECIPIENT is no
       loadConfig({
         NODE_ENV: 'production',
         OTHALA_PUBLIC_URL: 'https://a.example.com',
+        OTHALA_APEX: 'example.com',
         OTHALA_SMTP_CONNECTION_URI: 'smtps://u:p@relay:465',
       }),
     /contact recipient/,
@@ -166,17 +168,34 @@ test('instanceName: uses explicit OTHALA_INSTANCE_NAME when set', async () => {
   assert.equal(instanceName, 'Acme SSO');
 });
 
-test('defaultSchemaId: defaults to "default" when unset', async () => {
-  const { defaultSchemaId } = await loadConfig({ NODE_ENV: 'test' });
-  assert.equal(defaultSchemaId, 'default');
+test('apex: throws in production when OTHALA_APEX is absent or blank', async () => {
+  const env = { NODE_ENV: 'production', OTHALA_PUBLIC_URL: 'https://auth.example.com' };
+  await assert.rejects(() => loadConfig(env), /OTHALA_APEX/);
+  await assert.rejects(() => loadConfig({ ...env, OTHALA_APEX: '  ' }), /OTHALA_APEX/);
 });
 
-test('defaultSchemaId: uses explicit value', async () => {
-  const { defaultSchemaId } = await loadConfig({
+test('apex: dev default outside production, explicit value otherwise', async () => {
+  assert.equal((await loadConfig({ NODE_ENV: 'test' })).apex, 'localhost');
+  assert.equal((await loadConfig({ NODE_ENV: 'test', OTHALA_APEX: 'example.org' })).apex, 'example.org');
+});
+
+test('smtpFromAddress: derived as noreply@<OTHALA_APEX>', async () => {
+  const { smtpFromAddress } = await loadConfig({ NODE_ENV: 'test', OTHALA_APEX: 'example.org' });
+  assert.equal(smtpFromAddress, 'noreply@example.org');
+});
+
+test('smtpFromAddress: OTHALA_SMTP_FROM_ADDRESS overrides the derived value', async () => {
+  const { smtpFromAddress } = await loadConfig({
     NODE_ENV: 'test',
-    OTHALA_DEFAULT_SCHEMA_ID: 'family',
+    OTHALA_APEX: 'example.org',
+    OTHALA_SMTP_FROM_ADDRESS: 'sso@mail.example.org',
   });
-  assert.equal(defaultSchemaId, 'family');
+  assert.equal(smtpFromAddress, 'sso@mail.example.org');
+});
+
+test('config no longer exports a default schema id', async () => {
+  const mod = await loadConfig({ NODE_ENV: 'test', OTHALA_DEFAULT_SCHEMA_ID: 'family' });
+  assert.equal('defaultSchemaId' in mod, false);
 });
 
 test('identityGroups: defaults to ["admin", "everyone"] when unset (admin + default group)', async () => {

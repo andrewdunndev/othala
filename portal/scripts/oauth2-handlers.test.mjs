@@ -7,6 +7,7 @@ import { describeScopeList, SCOPE_DESCRIPTIONS } from '../src/lib/scope-descript
 import { parseManifest } from '../src/lib/manifests.ts';
 import { signToken, _resetForTests } from '../src/lib/csrf.ts';
 import { deepMergeClaims } from '../src/lib/claims.ts';
+import { publicUrl } from '../src/lib/config.ts';
 import {
   identity, session, whoamiIdentity, withTotp, withWebauthnKey, withPasskey, withLookupSecret,
   oauth2LoginRequest, oauth2ConsentRequest, oauth2LogoutRequest,
@@ -1023,27 +1024,22 @@ test('FIX-F: logout subject mismatch (live session belongs to different user) re
   const { api, calls } = stubOAuth2({
     getOAuth2LogoutRequest: async () => oauth2LogoutRequest({ subject: 'id-1' }),
   });
-  process.env.OTHALA_PUBLIC_URL = 'https://sso.othala.test';
-  try {
-    const res = await handleLogout(
-      new Request('https://x/oauth2/logout?logout_challenge=gc', {
-        headers: { cookie: 'session=s2' },
+  const res = await handleLogout(
+    new Request('https://x/oauth2/logout?logout_challenge=gc', {
+      headers: { cookie: 'session=s2' },
+    }),
+    {
+      oauth2: api,
+      getSession: async () => ({
+        active: true,
+        identity: { id: 'id-2', state: 'active', schema_id: 'family', schema_url: '', traits: {} },
       }),
-      {
-        oauth2: api,
-        getSession: async () => ({
-          active: true,
-          identity: { id: 'id-2', state: 'active', schema_id: 'family', schema_url: '', traits: {} },
-        }),
-      },
-    );
-    assert.equal(res.status, 302, 'subject mismatch must redirect');
-    assert.equal(calls.acceptLogout, 0, 'acceptLogout must NOT be called on subject mismatch');
-    const loc = res.headers.get('location');
-    assert.ok(loc?.endsWith('/'), 'must redirect to portal home');
-  } finally {
-    delete process.env.OTHALA_PUBLIC_URL;
-  }
+    },
+  );
+  assert.equal(res.status, 302, 'subject mismatch must redirect');
+  assert.equal(calls.acceptLogout, 0, 'acceptLogout must NOT be called on subject mismatch');
+  const loc = res.headers.get('location');
+  assert.ok(loc?.endsWith('/'), 'must redirect to portal home');
 });
 
 test('FIX-F: logout with matching session subject accepts normally', async () => {
@@ -1113,19 +1109,14 @@ test('logout does not accept when the session revoke fails', async () => {
   const { api, calls } = stubOAuth2({
     getOAuth2LogoutRequest: async () => oauth2LogoutRequest({ subject: live.identity.id }),
   });
-  process.env.OTHALA_PUBLIC_URL = 'https://sso.othala.test';
-  try {
-    const res = await handleLogout(logoutRequest(), {
-      oauth2: api,
-      getSession: async () => live,
-      revokeSession: async () => { throw new Error('kratos admin 500'); },
-    });
-    assert.equal(calls.acceptLogout, 0, 'acceptLogout must NOT be called when revoke fails');
-    assert.equal(res.status, 302);
-    assert.equal(res.headers.get('location'), 'https://sso.othala.test/auth/error?reason=auth-unreachable');
-  } finally {
-    delete process.env.OTHALA_PUBLIC_URL;
-  }
+  const res = await handleLogout(logoutRequest(), {
+    oauth2: api,
+    getSession: async () => live,
+    revokeSession: async () => { throw new Error('kratos admin 500'); },
+  });
+  assert.equal(calls.acceptLogout, 0, 'acceptLogout must NOT be called when revoke fails');
+  assert.equal(res.status, 302);
+  assert.equal(res.headers.get('location'), `${publicUrl}/auth/error?reason=auth-unreachable`);
 });
 
 test('logout does not accept when the live session carries no id', async () => {
@@ -1214,18 +1205,13 @@ test('logout with an empty subject does not accept when the revoke fails', async
   const { api, calls } = stubOAuth2({
     getOAuth2LogoutRequest: async () => oauth2LogoutRequest({ subject: '' }),
   });
-  process.env.OTHALA_PUBLIC_URL = 'https://sso.othala.test';
-  try {
-    const res = await handleLogout(logoutRequest(), {
-      oauth2: api,
-      getSession: async () => live,
-      revokeSession: async () => { throw new Error('kratos admin 500'); },
-    });
-    assert.equal(calls.acceptLogout, 0);
-    assert.equal(res.headers.get('location'), 'https://sso.othala.test/auth/error?reason=auth-unreachable');
-  } finally {
-    delete process.env.OTHALA_PUBLIC_URL;
-  }
+  const res = await handleLogout(logoutRequest(), {
+    oauth2: api,
+    getSession: async () => live,
+    revokeSession: async () => { throw new Error('kratos admin 500'); },
+  });
+  assert.equal(calls.acceptLogout, 0);
+  assert.equal(res.headers.get('location'), `${publicUrl}/auth/error?reason=auth-unreachable`);
 });
 
 test('logout with rp_initiated:false bounces to the portal logout and neither revokes nor accepts', async () => {
@@ -1234,34 +1220,24 @@ test('logout with rp_initiated:false bounces to the portal logout and neither re
     getOAuth2LogoutRequest: async () => oauth2LogoutRequest({ subject: live.identity.id, rp_initiated: false }),
   });
   const revoked = [];
-  process.env.OTHALA_PUBLIC_URL = 'https://sso.othala.test';
-  try {
-    const res = await handleLogout(logoutRequest(), {
-      oauth2: api,
-      getSession: async () => live,
-      revokeSession: async (id) => { revoked.push(id); },
-    });
-    assert.equal(res.status, 302);
-    assert.equal(res.headers.get('location'), 'https://sso.othala.test/auth/logout');
-    assert.deepEqual(revoked, []);
-    assert.equal(calls.acceptLogout, 0);
-  } finally {
-    delete process.env.OTHALA_PUBLIC_URL;
-  }
+  const res = await handleLogout(logoutRequest(), {
+    oauth2: api,
+    getSession: async () => live,
+    revokeSession: async (id) => { revoked.push(id); },
+  });
+  assert.equal(res.status, 302);
+  assert.equal(res.headers.get('location'), `${publicUrl}/auth/logout`);
+  assert.deepEqual(revoked, []);
+  assert.equal(calls.acceptLogout, 0);
 });
 
 test('logout redirects to auth-unreachable, accepting nothing, when the session lookup throws', async () => {
   const { api, calls } = stubOAuth2();
-  process.env.OTHALA_PUBLIC_URL = 'https://sso.othala.test';
-  try {
-    const res = await handleLogout(logoutRequest(), {
-      oauth2: api,
-      getSession: async () => { throw new Error('kratos down'); },
-    });
-    assert.equal(res.status, 302);
-    assert.equal(res.headers.get('location'), 'https://sso.othala.test/auth/error?reason=auth-unreachable');
-    assert.equal(calls.acceptLogout, 0);
-  } finally {
-    delete process.env.OTHALA_PUBLIC_URL;
-  }
+  const res = await handleLogout(logoutRequest(), {
+    oauth2: api,
+    getSession: async () => { throw new Error('kratos down'); },
+  });
+  assert.equal(res.status, 302);
+  assert.equal(res.headers.get('location'), `${publicUrl}/auth/error?reason=auth-unreachable`);
+  assert.equal(calls.acceptLogout, 0);
 });

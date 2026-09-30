@@ -414,6 +414,13 @@ export function startupEnvErrors() {
     errors.push('[portal] FATAL: CSRF_SECRET is shorter than 32 bytes (UTF-8) — refusing to start');
   }
 
+  // Production only: config.ts throws on these at first import, this surfaces it at boot instead of on the first request.
+  if (process.env.NODE_ENV === 'production') {
+    for (const name of ['OTHALA_PUBLIC_URL', 'OTHALA_APEX']) {
+      if (!(process.env[name] ?? '').trim()) errors.push(`[portal] FATAL: ${name} is not set or empty — refusing to start`);
+    }
+  }
+
   if (ADMIN_HOST === '0.0.0.0' || ADMIN_HOST === '::' || ADMIN_HOST === '') {
     errors.push(`[portal] FATAL: ADMIN_HOST is a wildcard address (${JSON.stringify(ADMIN_HOST)}) — the admin port must be bound to loopback or a pod-internal IP, never a wildcard (0.0.0.0, :: or empty)`);
   }

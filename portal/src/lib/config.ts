@@ -36,6 +36,9 @@ export const publicUrl: string = requiredVar(
   'http://localhost:4321',
 ).replace(/\/+$/, ''); // strip trailing slash regardless of source
 
+// ── OTHALA_APEX ── registrable parent domain: the Kratos cookie domain and the WebAuthn RP id; required in production.
+export const apex: string = requiredVar('OTHALA_APEX', 'localhost');
+
 // ── OTHALA_SITE_NAME ── brand name in titles, headers and footers.
 export const siteName: string = optionalVar('OTHALA_SITE_NAME', 'Othala');
 
@@ -75,16 +78,10 @@ function resolveContactRecipient(): string {
 
 export const contactRecipient: string = resolveContactRecipient();
 
-// From address for portal-originated mail.
+// ── OTHALA_SMTP_FROM_ADDRESS ── From: address for portal mail; defaults to noreply@<OTHALA_APEX>.
 export const smtpFromAddress: string = optionalVar(
   'OTHALA_SMTP_FROM_ADDRESS',
-  'noreply@localhost',
-);
-
-// ── OTHALA_DEFAULT_SCHEMA_ID ── Kratos schema_id for identities the portal creates.
-export const defaultSchemaId: string = optionalVar(
-  'OTHALA_DEFAULT_SCHEMA_ID',
-  'default',
+  `noreply@${apex}`,
 );
 
 // ── OTHALA_DEFAULT_GROUP ── default identity group, appended to identityGroups; membership is never auto-assigned.

@@ -684,3 +684,27 @@ test('emailChangeLocked follows the verdict for the stored identity and session'
   assert.equal(emailChangeLocked(KEYED, [entry('code', 0), entry('password', 1)]), false);
   assert.equal(emailChangeLocked(KEYLESS, [entry('code', 0)]), false);
 });
+
+test('startup fails in production when OTHALA_PUBLIC_URL or OTHALA_APEX is unset', () => {
+  process.env.RECOVERY_GATE_SECRET = 'x'.repeat(32);
+  const saved = { node: process.env.NODE_ENV, url: process.env.OTHALA_PUBLIC_URL, apex: process.env.OTHALA_APEX };
+  const restore = (k, v) => (v === undefined ? delete process.env[k] : (process.env[k] = v));
+  try {
+    process.env.NODE_ENV = 'production';
+    delete process.env.OTHALA_PUBLIC_URL;
+    delete process.env.OTHALA_APEX;
+    const errors = startupEnvErrors();
+    assert.ok(errors.some((e) => /OTHALA_PUBLIC_URL/.test(e)));
+    assert.ok(errors.some((e) => /OTHALA_APEX/.test(e)));
+    process.env.OTHALA_PUBLIC_URL = 'https://auth.example.com';
+    process.env.OTHALA_APEX = 'example.com';
+    assert.ok(!startupEnvErrors().some((e) => /OTHALA_(PUBLIC_URL|APEX)/.test(e)));
+    process.env.NODE_ENV = 'test';
+    delete process.env.OTHALA_APEX;
+    assert.ok(!startupEnvErrors().some((e) => /OTHALA_APEX/.test(e)), 'dev and test keep their defaults');
+  } finally {
+    restore('NODE_ENV', saved.node);
+    restore('OTHALA_PUBLIC_URL', saved.url);
+    restore('OTHALA_APEX', saved.apex);
+  }
+});

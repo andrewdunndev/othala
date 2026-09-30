@@ -18,6 +18,7 @@ import type { ClientManifest } from './manifests';
 import { servingManifest } from './manifest-store';
 import { verifyToken, CSRFError } from './csrf';
 import { needsStepUp } from './step-up';
+import { publicUrl } from './config';
 
 // Hydra remembers a sign-in as long as the Kratos session lives so a later app sign-out still reaches handleLogout;
 // the fallback is the Kratos session.lifespan (720h).
@@ -468,7 +469,7 @@ export async function handleLogout(req: Request, deps: Deps = {}): Promise<Respo
 
   // A logout that Hydra did not initiate for the RP is the portal's own.
   if (_logout.rp_initiated === false) {
-    return redirect(`${process.env.OTHALA_PUBLIC_URL ?? ''}/auth/logout`);
+    return redirect(`${publicUrl}/auth/logout`);
   }
 
   // Subject binding (logout-CSRF hardening): a live session for a different identity is refused; no live session proceeds.
@@ -478,12 +479,11 @@ export async function handleLogout(req: Request, deps: Deps = {}): Promise<Respo
     try {
       session = await d.getSession(req.headers.get('cookie') ?? undefined);
     } catch {
-      return redirect(`${process.env.OTHALA_PUBLIC_URL ?? ''}/auth/error?reason=auth-unreachable`);
+      return redirect(`${publicUrl}/auth/error?reason=auth-unreachable`);
     }
     if (logoutSubject && session?.active && session.identity && session.identity.id !== logoutSubject) {
       // Live session is a different user's: refuse to auto-accept and redirect home.
-      const publicUrlBase = process.env.OTHALA_PUBLIC_URL ?? '';
-      return redirect(`${publicUrlBase}/`);
+      return redirect(`${publicUrl}/`);
     }
     // The live session is the subject's: revoke it before Hydra forgets the login; a failed revoke must not accept,
     // or the next authorize would sign straight back in.
@@ -493,8 +493,7 @@ export async function handleLogout(req: Request, deps: Deps = {}): Promise<Respo
         await d.revokeSession(session.id);
       } catch (e) {
         console.warn('[oauth2/logout] session revoke failed', { subject: logoutSubject, error: String(e) });
-        const publicUrlBase = process.env.OTHALA_PUBLIC_URL ?? '';
-        return redirect(`${publicUrlBase}/auth/error?reason=auth-unreachable`);
+        return redirect(`${publicUrl}/auth/error?reason=auth-unreachable`);
       }
     }
   }

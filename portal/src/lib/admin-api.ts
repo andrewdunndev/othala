@@ -15,7 +15,6 @@ import {
 import type { Identity } from './types';
 import { validateMetadataAdmin } from './metadata-admin';
 import { revokeSubject } from './revoke';
-import { defaultSchemaId } from './config';
 
 function adminBase(): string {
   return process.env.KRATOS_ADMIN_URL ?? 'http://kratos:4434';
@@ -58,7 +57,6 @@ export interface MetadataAdmin {
 export interface CreateIdentityInput {
   traits: IdentityTraits;
   metadataAdmin: MetadataAdmin;
-  schemaId?: string;
 }
 
 export interface UpdateIdentityInput {
@@ -85,11 +83,12 @@ export async function getIdentity(id: string): Promise<Identity> {
 export async function createIdentity(input: CreateIdentityInput): Promise<Identity> {
   // J1: enforce the metadata_admin shape here; the Kratos schema validates only `traits`, so a typo would be stored.
   const validated = validateMetadataAdmin(input.metadataAdmin);
-  const createIdentityBody: CreateIdentityBody = {
-    schema_id: input.schemaId ?? defaultSchemaId,
+  // schema_id is omitted on purpose: Kratos applies identity.default_schema_id, the single source of truth. The SDK
+  // types the field as required, so the cast is the price of not duplicating that setting here.
+  const createIdentityBody = {
     traits: input.traits,
     metadata_admin: validated,
-  };
+  } as CreateIdentityBody;
   return identityApi().createIdentity({ createIdentityBody });
 }
 

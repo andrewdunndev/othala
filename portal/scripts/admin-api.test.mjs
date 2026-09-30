@@ -10,11 +10,6 @@ function kratosIdentity(fields) {
 
 const DEFAULT_BASE = 'http://kratos:4434';
 
-function defaultSchemaId() {
-  const v = process.env.OTHALA_DEFAULT_SCHEMA_ID;
-  return v !== undefined && v.trim() !== '' ? v.trim() : 'default';
-}
-
 function adminBase() {
   return process.env.KRATOS_ADMIN_URL ?? DEFAULT_BASE;
 }
@@ -65,7 +60,6 @@ async function createIdentity(input) {
     method: 'POST',
     headers: authHeaders({ 'Content-Type': 'application/json' }),
     body: JSON.stringify({
-      schema_id: input.schemaId ?? defaultSchemaId(),
       traits: input.traits,
       metadata_admin: validated,
     }),
@@ -188,7 +182,6 @@ function mockFetchSequence(responses) {
 beforeEach(() => {
   delete process.env.KRATOS_ADMIN_URL;
   delete process.env.KRATOS_ADMIN_TOKEN;
-  delete process.env.OTHALA_DEFAULT_SCHEMA_ID;
   mockFetch();
 });
 
@@ -299,31 +292,6 @@ test('createIdentity: sets Content-Type application/json', async () => {
   await createIdentity({ traits: { username: 'alice', email: 'alice@example.com' }, metadataAdmin: {} });
   const headers = capturedCalls[0].opts.headers;
   assert.equal(headers['Content-Type'], 'application/json');
-});
-
-test('createIdentity: defaults schema_id to OTHALA_DEFAULT_SCHEMA_ID (neutral default "default")', async () => {
-  delete process.env.OTHALA_DEFAULT_SCHEMA_ID;
-  await createIdentity({ traits: { username: 'alice', email: 'alice@example.com' }, metadataAdmin: {} });
-  const body = JSON.parse(capturedCalls[0].opts.body);
-  assert.equal(body.schema_id, 'default');
-});
-
-test('createIdentity: OTHALA_DEFAULT_SCHEMA_ID env var overrides neutral default', async () => {
-  process.env.OTHALA_DEFAULT_SCHEMA_ID = 'family';
-  await createIdentity({ traits: { username: 'alice', email: 'alice@example.com' }, metadataAdmin: {} });
-  const body = JSON.parse(capturedCalls[0].opts.body);
-  assert.equal(body.schema_id, 'family');
-  delete process.env.OTHALA_DEFAULT_SCHEMA_ID;
-});
-
-test('createIdentity: passes through explicit schemaId', async () => {
-  await createIdentity({
-    traits: { username: 'alice', email: 'alice@example.com' },
-    metadataAdmin: {},
-    schemaId: 'guest',
-  });
-  const body = JSON.parse(capturedCalls[0].opts.body);
-  assert.equal(body.schema_id, 'guest');
 });
 
 test('createIdentity: includes traits in request body', async () => {
