@@ -78,11 +78,8 @@ function resolveContactRecipient(): string {
 
 export const contactRecipient: string = resolveContactRecipient();
 
-// ── OTHALA_SMTP_FROM_ADDRESS ── From: address for portal mail; defaults to noreply@<OTHALA_APEX>.
-export const smtpFromAddress: string = optionalVar(
-  'OTHALA_SMTP_FROM_ADDRESS',
-  `noreply@${apex}`,
-);
+// From: address for portal mail; always noreply@<OTHALA_APEX>, matching the kratos.yml courier.
+export const smtpFromAddress: string = `noreply@${apex}`;
 
 // ── OTHALA_DEFAULT_GROUP ── default identity group, appended to identityGroups; membership is never auto-assigned.
 export const defaultGroup: string = optionalVar(

@@ -184,15 +184,6 @@ test('smtpFromAddress: derived as noreply@<OTHALA_APEX>', async () => {
   assert.equal(smtpFromAddress, 'noreply@example.org');
 });
 
-test('smtpFromAddress: OTHALA_SMTP_FROM_ADDRESS overrides the derived value', async () => {
-  const { smtpFromAddress } = await loadConfig({
-    NODE_ENV: 'test',
-    OTHALA_APEX: 'example.org',
-    OTHALA_SMTP_FROM_ADDRESS: 'sso@mail.example.org',
-  });
-  assert.equal(smtpFromAddress, 'sso@mail.example.org');
-});
-
 test('config no longer exports a default schema id', async () => {
   const mod = await loadConfig({ NODE_ENV: 'test', OTHALA_DEFAULT_SCHEMA_ID: 'family' });
   assert.equal('defaultSchemaId' in mod, false);

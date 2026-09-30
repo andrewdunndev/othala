@@ -49,7 +49,6 @@ OTHALA_CORS_ALLOWED_ORIGINS=http://auth.othala.test
 OTHALA_PUBLIC_HOST=auth.othala.test
 OTHALA_APEX=othala.test
 OTHALA_INSTANCE_NAME='Othala Lab'
-OTHALA_SMTP_FROM_ADDRESS=noreply@othala.test
 
 # Tracing is OFF: an empty OTHALA_OTLP_PROVIDER makes render-config.sh drop the whole tracing
 # block (# fence), because Ory v26.2.0 rejects a present-but-empty provider.

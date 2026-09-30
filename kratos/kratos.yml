@@ -8,7 +8,6 @@ dsn: "postgres://kratos:${KRATOS_PG_PASS}@${KRATOS_PG_HOST}:5432/kratos?sslmode=
 serve:
   public:
     base_url: "${OTHALA_PUBLIC_URL}/"
-    port: 4433
     request_log:
       # Probes would write an access-log line every few seconds, burying real ones. Metrics still count them.
       disable_for_health: true
@@ -18,7 +17,6 @@ serve:
     # Admin-plane bind address. The admin API is unauthenticated by design (the network is the
     # control): segmented deployments bind an admin-plane address, the e2e harness uses 0.0.0.0.
     host: "${KRATOS_ADMIN_BIND_HOST}"
-    port: 4434
     request_log:
       # This listener logs before adding the prefix, so probe /admin/health/ready here.
       disable_for_health: true
@@ -268,7 +266,6 @@ session:
 
 cookies:
   domain: "${OTHALA_APEX}"
-  same_site: Lax
 
 identity:
   default_schema_id: family
@@ -281,7 +278,7 @@ courier:
     # Single courier connection, shared with the portal contact-form mailer
     # (OTHALA_SMTP_CONNECTION_URI): one URI, one outbound path.
     connection_uri: "${OTHALA_SMTP_CONNECTION_URI}"
-    from_address: "${OTHALA_SMTP_FROM_ADDRESS}"
+    from_address: "noreply@${OTHALA_APEX}"
     from_name: "${OTHALA_INSTANCE_NAME}"
     # local_name: leave default; Fastmail accepts standard HELO
 
