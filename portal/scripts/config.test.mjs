@@ -179,8 +179,8 @@ test('apex: dev default outside production, explicit value otherwise', async () 
   assert.equal((await loadConfig({ NODE_ENV: 'test', OTHALA_APEX: 'example.org' })).apex, 'example.org');
 });
 
-test('smtpFromAddress: derived as noreply@<OTHALA_APEX>', async () => {
-  const { smtpFromAddress } = await loadConfig({ NODE_ENV: 'test', OTHALA_APEX: 'example.org' });
+test('smtpFromAddress: always noreply@<OTHALA_APEX>, the old override is ignored', async () => {
+  const { smtpFromAddress } = await loadConfig({ NODE_ENV: 'test', OTHALA_APEX: 'example.org', OTHALA_SMTP_FROM_ADDRESS: 'other@x.test' });
   assert.equal(smtpFromAddress, 'noreply@example.org');
 });
 

@@ -15,11 +15,12 @@ Fewer env vars and Ory keys: values that only restated upstream defaults are gon
 
 - `OTHALA_DEFAULT_SCHEMA_ID`: the portal omits `schema_id` when creating an identity and Kratos applies `identity.default_schema_id`. Delete it from the deploy environment.
 - `OTHALA_WEBAUTHN_RP_ID` and `OTHALA_WEBAUTHN_RP_ORIGINS`: `kratos.yml` uses `OTHALA_APEX` and `OTHALA_PUBLIC_URL`, which always held the same values. Delete both from the deploy environment.
+- `OTHALA_SMTP_FROM_ADDRESS`: Kratos and portal mail send from `noreply@<OTHALA_APEX>`. Delete it from the deploy environment.
 
 ### Changed
 
 - The portal refuses to start in production when `OTHALA_PUBLIC_URL` or `OTHALA_APEX` is unset.
-- The From address of Kratos and portal mail is `noreply@<OTHALA_APEX>`; `OTHALA_SMTP_FROM_ADDRESS` is removed, so delete it from the deploy environment. `KRATOS_PUBLIC_URL` defaults to `OTHALA_PUBLIC_URL`.
+- `KRATOS_PUBLIC_URL` defaults to `OTHALA_PUBLIC_URL`.
 - The Kratos login flow lifespan is the 1h default, up from 10m.
 - Kratos public CORS is off: the portal shares the origin, so no cross-origin browser client is served.
 - The reference Caddy `othala_selfservice` rate limit is 30 events per minute, up from 10, because a household shares one IP.
