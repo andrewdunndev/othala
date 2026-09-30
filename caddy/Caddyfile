@@ -39,7 +39,7 @@
 		rate_limit {
 			zone othala_selfservice {
 				key    {client_ip}
-				events 10
+				events 30
 				window 1m
 			}
 		}
