@@ -7,6 +7,18 @@ aims to follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 The git tag is the authoritative version; `portal/package.json` mirrors it.
 This CHANGELOG and git tags carry the deployed-instance release state.
 
+## [0.7.1] - 2026-09-30
+
+Release hardening: rate limits key on the real client, and release jobs wait for e2e.
+
+### Changed
+
+- Self-service rate limits key on the client address, grouping IPv6 by /64; `OTHALA_TRUSTED_PROXIES` names the proxies whose `X-Forwarded-For` is trusted.
+- The SBOM and release jobs run only after e2e passes.
+- Pipeline components pin to 4.8.0, the reference docs to `v0.6.0`, and the portal runtime image to a digest.
+- Leftover source-comment headers are trimmed, and the unused `axe-core` e2e dependency is removed.
+- Renovate: lock file maintenance, and the `ubi10/nodejs-22` 10.2 image digest.
+
 ## [0.7.0] - 2026-09-30
 
 Fewer moving parts: one registration lane, one Kratos client, one logout path.
