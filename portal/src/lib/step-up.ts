@@ -1,20 +1,8 @@
-// Second-factor step-up for app sign-in and forward-auth.
-//
-// A session below aal2 must step up when the identity holds a second factor
-// (totp or webauthn) or carries the admin marker. Passkey, password, email
-// code and backup codes alone never force a step-up: backup codes are a
-// recovery path for a second factor, not one to be asked for on their own.
-//
-// A key in the credentials map is not an enrolment. The identity schema marks
-// the username and email as webauthn identifiers, so Kratos keeps a webauthn
-// entry with an empty config on every identity. The checks below count what
-// Kratos itself counts as a second factor: a totp entry with a totp_url, and a
-// webauthn entry holding at least one key that is not passwordless.
-//
-// The identity MUST come from the admin API with the totp and webauthn
-// configs included (lib/admin-api.ts getIdentity); credentials and
-// metadata_admin are absent from /sessions/whoami. A missing AAL counts as
-// below aal2.
+// Second-factor step-up for app sign-in and forward-auth: a session below aal2
+// steps up when the identity holds a second factor or the admin marker. Count
+// what Kratos counts: a totp entry with a totp_url, or a webauthn entry with a
+// non-passwordless key (an empty webauthn entry is not enrolment). The identity
+// must come from the admin API (getIdentity); a missing AAL counts as below aal2.
 
 import type { Identity, Session } from './types';
 import { isAdminMarker } from './admin-auth';

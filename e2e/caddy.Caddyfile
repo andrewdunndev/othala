@@ -5,11 +5,14 @@
 {
 	auto_https off
 	admin off
+	servers {
+		trusted_proxies static private_ranges
+	}
 }
 
 auth.othala.test:80 {
-	# Rate limiting (n-rate-limits.spec.ts). Every request here shares one client IP, so each zone
-	# also requires the X-E2E-Flood-Probe header the flood tests set; only their bursts count.
+	# Rate limiting (n-rate-limits.spec.ts). Requests share one socket peer; the tests vary the client address through
+	# X-Forwarded-For (the peer is trusted above). Each zone also requires the X-E2E-Flood-Probe header the flood tests set; only their bursts count.
 	rate_limit {
 		zone e2e_code_request {
 			match {
@@ -44,7 +47,7 @@ auth.othala.test:80 {
 	handle @portal_challenges {
 		# XFF overwrite: see caddy/Caddyfile.
 		reverse_proxy othala:8080 {
-			header_up X-Forwarded-For {remote_host}
+			header_up X-Forwarded-For {client_ip}
 		}
 	}
 
@@ -56,6 +59,6 @@ auth.othala.test:80 {
 
 	# Default -> the app (UI, pages, static assets). XFF overwrite: rationale in caddy/Caddyfile.
 	reverse_proxy othala:8080 {
-		header_up X-Forwarded-For {remote_host}
+		header_up X-Forwarded-For {client_ip}
 	}
 }

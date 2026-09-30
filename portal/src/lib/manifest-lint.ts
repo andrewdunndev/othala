@@ -1,33 +1,8 @@
-// Manifest lint — the guardrail the flat-string access model otherwise lacks.
-// With no enforced naming convention, a typo'd group
-// (`access: [memmories]`) silently locks everyone out (fail-closed, no error)
-// and a brand-new user sees a blank dashboard with no explanation. The lint
-// cross-checks every group a manifest references against the known-group set
-// and flags structural problems, so those footguns surface as findings instead
-// of silent denials.
-//
-// Severity matrix (§11), exactly:
-//
-//   BLOCK (reload-blocking; joins validateClients' hard-fails):
-//     - accessGroups empty AND not skipAccessCheck (definitionally
-//       unreachable — the app can never be entered).
-//     - a group listed twice within one manifest's access binding.
-//     - a group_role_map key that maps to a role NOT declared in roles[].
-//   WARN (never blocks — adopters may already run nonstandard names):
-//     - a group named in access:/group_role_map that is not in the known set
-//       (typo → silent lockout).
-//     - a group name — in access: or in a group_role_map key — that misses
-//       the canonical form (access-groups.ts GROUP_RE).
-//
-// Phase 2 scope (work order): the FUNCTION + its tests are the must-have. The
-// three §11 surfaces (a `just lint` CI job, an `othala lint` CLI, and a yellow
-// callout in /admin/oauth2) are deliberately NOT built out here — see the TODO
-// at the bottom. The LOAD-TIME BLOCK path IS wired: validateClients
-// (manifests.ts) now runs every BLOCK-class check from this matrix (empty
-// access binding, duplicate group, undeclared group_role_map role), so a bare
-// or contradictory manifest is rejected at reload (R3 feedback loop). This
-// function additionally surfaces the WARN dimensions (known-group typos, shim
-// shadowing, charset misses) for the not-yet-built advisory surfaces.
+// Manifest lint: cross-checks every group a manifest references against the
+// known-group set so a typo'd group surfaces as a finding, not a silent lockout.
+// BLOCK (also enforced by validateClients at load): empty accessGroups without
+// skipAccessCheck, a duplicated group, an undeclared group_role_map role.
+// WARN: a group missing from the known set, or missing the canonical form.
 
 import type { ClientManifest } from './manifests';
 import { GROUP_RE } from './access-groups';

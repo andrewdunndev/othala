@@ -1,20 +1,7 @@
-// In-process OIDC client reconciler — driven by boot reconcile + SIGHUP.
-//
-// Called on BOOT (reconcileOnBoot) and on SIGHUP (reloadOnSighup), both wired
-// in src/server/listen.mjs. The reconciler is resilient: it never crashes the
-// portal listeners regardless of Hydra availability.
-//
-// Boot reconcile: bounded retry+backoff so a cold start with Hydra still
-// initialising still succeeds after a few attempts. After the retry budget is
-// exhausted the portal logs a clear operator notice and keeps serving (an
-// operator can SIGHUP to retry once Hydra is ready).
-//
-// SIGHUP reconcile: drops the manifest cache (so the next load re-reads from
-// disk), then re-registers all clients. Errors are swallowed and logged
-// loudly — the portal continues serving on SIGHUP errors too.
-//
-// Injectable `register` parameter (defaults to registerAllClients) lets the
-// test suite pass a stub without importing a live Hydra SDK.
+// In-process OIDC client reconciler, run on boot (bounded retry+backoff for a
+// cold Hydra) and on SIGHUP (drops the manifest cache, re-registers all
+// clients); both are wired in listen.mjs. It never crashes the listeners: errors
+// are logged and the portal keeps serving. `register` is injectable for tests.
 import { registerAllClients, type RegisterOptions } from '../lib/register-clients';
 import { invalidateManifestCache } from '../lib/manifests';
 

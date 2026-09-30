@@ -1,24 +1,9 @@
 ---
-// Generic Kratos self-service node renderer.
-//
-// One dispatch loop, shared by the recovery / verification / settings flow
-// pages. It walks a single method group's nodes and emits:
-//   - hidden input  → <input type="hidden"> (covers the per-method `method`
-//                      marker and any flow-issued hidden state; the CSRF token
-//                      lives in the `default` group and is rendered by the page)
-//   - submit/button  → <button> honoring a per-call button class (settings'
-//                      primary/secondary styling) and, optionally, an onclick
-//                      (the passkey trigger Kratos wires up)
-//   - other input    → labeled <input>, label sourced from node.meta.label.text
-//
-// The per-input attribute set is built by lib/nodes.ts `inputProps`, so the
-// hidden/labeled/button attribute policy lives in one tested place. The props
-// below are the small, deliberate differences each page needs while keeping
-// rendered output identical to the hand-rolled loops they replace.
-//
-// Pages keep their own copy/strings/structure; ONLY this inner node-dispatch
-// loop is shared. login.astro is intentionally NOT a consumer — its
-// passkey-first / password-in-disclosure UX is bespoke.
+// Generic Kratos node renderer shared by the recovery, verification and
+// settings pages: one dispatch loop per method group emitting hidden inputs,
+// buttons (per-call class, optional onclick) and labeled inputs. Attribute
+// policy lives in lib/nodes.ts inputProps; pages keep their own copy and
+// structure. login.astro is deliberately not a consumer.
 
 import { asInput, inputProps, safeOnclick } from '../lib/nodes';
 import type { FlowNode, FlowMessage } from '../lib/types';

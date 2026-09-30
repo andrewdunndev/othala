@@ -9,7 +9,6 @@
   },
   "dependencies": {
     "@ory/client-fetch": "^1.22.0",
-    "axe-core": "^4.13.0",
     "fetch-cookie": "^3.1.0",
     "jose": "^6.0.0",
     "tough-cookie": "^6.0.0"

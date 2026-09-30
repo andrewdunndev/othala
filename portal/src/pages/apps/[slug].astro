@@ -1,17 +1,8 @@
 ---
-// Per-app detail page rendering the education content sourced from the
-// app's unified manifest (the optional sibling `<slug>.md`, read at
-// request time via getTile in lib/tiles.ts).
-//
-// Session-gated like the home page: not in `access-<slug>` group =
-// redirect to /auth/error?reason=not-authorised. Admins see every
-// app's detail page regardless of access group.
-//
-// Adding a new app: drop a `<slug>.yaml` (with a `presentation:` block,
-// and an optional sibling `<slug>.md`) into MANIFEST_DIR. The route is
-// SSR (prerender=false) and resolves the slug at request time via
-// getTile, so there is no getStaticPaths and no portal image rebuild
-// when manifests change.
+// Per-app detail page: education content from the app's manifest (optional
+// sibling `<slug>.md`, read via getTile in lib/tiles.ts). Session-gated; outside
+// the app's access group redirects to /auth/error?reason=not-authorised, admins
+// see every app. SSR resolves the slug per request, so new manifests need no rebuild.
 
 export const prerender = false;
 

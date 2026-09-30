@@ -1,12 +1,6 @@
-// Login page tier/step-up derivation — extracted from login.astro (af6927f)
-// so the v0.5.0 outage class (an unfiltered webauthn glue-script node
-// counted as a second factor, forcing every AAL1 login into an empty
-// step-up card) has a push-gated unit guard. See login-tiers.test.ts.
-//
-// LITERAL extraction: the expressions below are unchanged from login.astro
-// — same operators, same order, same ternaries. login.astro imports
-// deriveLoginTiers() and destructures its result in place of the const
-// block that used to compute these locally.
+// Login tier/step-up derivation, extracted verbatim from login.astro so the
+// v0.5.0 outage class (an unfiltered webauthn glue-script node counted as a
+// second factor) has a unit guard in login-tiers.test.ts.
 
 import { hasMethod, nodesByGroup, asInput } from './nodes';
 import type { FlowNode, LoginFlow } from './types';

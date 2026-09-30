@@ -1,32 +1,13 @@
-// Helpers for working with Kratos UI node arrays.
-//
-// A flow.ui.nodes array is a flat list of inputs, scripts, anchors, images,
-// and text. Pages render these grouped by `group` (default | password |
-// passkey | webauthn | totp | code | profile | lookup_secret | oidc).
+// Helpers for Kratos UI node arrays: flat lists of inputs, scripts, anchors,
+// images and text, rendered grouped by `group`.
 
 import type { FlowNode, NodeInputAttributes, NodeScriptAttributes } from './types';
 
-// ── Onclick guard ────────────────────────────────────────────────────────────
-//
-// Kratos passkey/webauthn nodes carry an `onclickTrigger` attribute naming the
-// /.well-known/ory/webauthn.js function to call (e.g. "oryPasskeyLogin").
-// Some older Kratos versions (and the legacy webauthn strategy) also send a raw
-// `onclick` string that already contains the full window.<fn>() call — these
-// are generated server-side by Ory and are safe to use as-is, but the raw
-// value still comes from untrusted flow JSON.
-//
-// Policy (HIGH-1 fix, centralised here so both login.astro and settings.astro
-// use the same logic):
-//   1. If `onclickTrigger` is set AND it is in KNOWN_TRIGGERS → emit
-//      `window.<trigger>()`. This is the preferred, explicit path.
-//   2. Else if `onclick` is set AND it starts with one of the known trigger
-//      call prefixes (`window.ory...()`) → allow it through unchanged.
-//      This preserves compatibility with Kratos builds that emit the full call.
-//   3. Otherwise → return undefined (omit the handler; form submit fallback).
-//
-// The allowlist covers every trigger name from Kratos v26.2.0 passkey/webauthn
-// strategy code (ui/node/identifiers.go).
-
+// Onclick guard. Kratos passkey/webauthn nodes carry `onclickTrigger` naming a
+// /.well-known/ory/webauthn.js function; older builds send a raw `onclick`,
+// which is untrusted flow JSON. safeOnclick emits `window.<trigger>()` only for
+// a trigger in KNOWN_TRIGGERS, passes through an `onclick` that is exactly such
+// a call, and otherwise returns undefined (form-submit fallback).
 export const KNOWN_TRIGGERS = new Set([
   'oryWebAuthnRegistration',
   'oryWebAuthnLogin',
@@ -100,18 +81,11 @@ export function findInput(nodes: FlowNode[], name: string): NodeInputAttributes 
 }
 
 /**
- * Pull the script tag(s) Kratos returns for the passkey/webauthn flows.
- * The response includes a <script src="/.well-known/ory/webauthn.js"> node
- * that wires up the trigger button + conditional UI on the identifier input.
- *
- * Carries SRI-related attributes (integrity, crossorigin, referrerpolicy,
- * nonce) when Kratos supplies them — all four are optional; forward-compat
- * with Kratos adding SRI in a future version. Pages render them conditionally
- * (undefined-safe).
+ * The script nodes Kratos returns for passkey/webauthn flows
+ * (/.well-known/ory/webauthn.js), with optional SRI attributes.
  */
-// HTMLAttributeReferrerPolicy is the narrow union Astro/TSX expects on
-// <script referrerpolicy>. We redeclare the relevant members here so that
-// ScriptNodeData is assignable without a DOM lib import in every consumer.
+// Redeclared so ScriptNodeData is assignable to <script referrerpolicy> without
+// a DOM lib import in every consumer.
 type ReferrerPolicy =
   | ''
   | 'no-referrer'
@@ -128,7 +102,7 @@ export interface ScriptNodeData {
   src: string;
   integrity?: string;
   crossorigin?: string;
-  /** Typed as the narrow HTMLAttributeReferrerPolicy union so Astro <script> can consume it directly. */
+  /** Narrow union so Astro <script> can consume it directly. */
   referrerpolicy?: ReferrerPolicy;
   nonce?: string;
 }
@@ -141,13 +115,10 @@ export function scriptNodes(nodes: FlowNode[]): ScriptNodeData[] {
       out.push({
         id: a.id,
         src: a.src,
-        // Carry SRI attrs when present; undefined when absent (Kratos v26.2.0
-        // does not send them yet, but the type already has them).
+        // SRI attrs: undefined when Kratos omits them.
         integrity: a.integrity,
         crossorigin: a.crossorigin,
-        // NodeScriptAttributes.referrerpolicy is string | undefined; cast to
-        // the narrow ReferrerPolicy union so <script referrerpolicy> in Astro
-        // templates is assignable without a per-site DOM lib cast.
+        // The narrow union lets <script referrerpolicy> accept it without a cast.
         referrerpolicy: a.referrerpolicy as ReferrerPolicy | undefined,
         nonce: a.nonce,
       });
@@ -156,11 +127,10 @@ export function scriptNodes(nodes: FlowNode[]): ScriptNodeData[] {
   return out;
 }
 
-/** Map a Kratos input attribute to a DOM-safe attribute set for HTML rendering.
- *
- * NOTE: `onclick` is intentionally excluded. Callers that need a button
- * handler must call `safeOnclick(a)` directly — raw Kratos onclick strings
- * must never pass through to the DOM without trigger-allowlist validation.
+/**
+ * Map a Kratos input attribute to a DOM-safe attribute set. `onclick` is
+ * excluded on purpose: callers use safeOnclick(a) so a raw string never
+ * reaches the DOM unvalidated.
  */
 export function inputProps(a: NodeInputAttributes): Record<string, string | boolean> {
   const props: Record<string, string | boolean> = {
@@ -170,7 +140,7 @@ export function inputProps(a: NodeInputAttributes): Record<string, string | bool
   if (a.value !== undefined && a.value !== null && a.type !== 'submit') {
     props.value = String(a.value);
   } else if (a.value !== undefined && a.type === 'submit') {
-    // submit buttons carry their button text in `value`
+    // submit buttons carry their text in `value`
     props.value = String(a.value);
   }
   if (a.required) props.required = true;

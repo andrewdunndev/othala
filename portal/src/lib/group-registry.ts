@@ -1,23 +1,8 @@
-// Group registry — the derived type-tag for groups.
-//
-// Earlier revisions inferred a group's *type* (identity / access / role) from
-// its NAME: anything matching `access-*` was treated as an access group,
-// everything else as an identity group. That overloaded the `access-` prefix as
-// both a naming convention AND a runtime discriminator. This registry retires
-// that hidden duty: a group's type comes from its BINDINGS, never its name.
-//
-//   - `identity` — the group is listed in OTHALA_IDENTITY_GROUPS (env).
-//   - `access`   — some manifest's `accessGroups` binds it (grants entry).
-//   - `role`     — some manifest's `group_role_map` references it (grants role).
-//
-// A single group can carry multiple kinds (e.g. `family` could be an identity
-// group that is ALSO bound for access by an app). The registry is the one
-// source of truth for: the admin-UI identity/access column split, the lint's
-// known-group set, and admin discoverability (Group → Apps).
-//
-// It is derived purely from the already-cached manifest set + the env identity
-// groups, so it is cheap to rebuild; callers memoize on the manifest cache key
-// (see getGroupRegistry) to avoid recomputing per request.
+// Group registry: a group's type comes from its bindings, never its name.
+// `identity`: listed in OTHALA_IDENTITY_GROUPS. `access`: a manifest's
+// `accessGroups` binds it. `role`: a manifest's `group_role_map` references it.
+// A group can carry several kinds; derived from the cached manifests plus env
+// groups, it feeds the admin UI split and the lint.
 
 import type { ClientManifest } from './manifests';
 import { identityGroups as envIdentityGroups } from './config';
@@ -48,15 +33,10 @@ function entryFor(reg: GroupRegistry, name: string): GroupEntry {
 }
 
 /**
- * Build the registry from the manifest set + the configured identity groups.
- *
- * Seeds the `identity` kind from `OTHALA_IDENTITY_GROUPS`; then, per manifest,
- * marks every `accessGroups[]` entry as `access` (recording the clientId in
- * `accessFor`) and every `group_role_map` key as `role` (recording it in
- * `roleFor`). A group's type is the UNION of its bindings — never its name.
- *
- * O(M×G); cheap enough to rebuild, but callers should prefer getGroupRegistry()
- * which memoizes on the manifest cache key.
+ * Build the registry: seed `identity` from OTHALA_IDENTITY_GROUPS, then per
+ * manifest mark `accessGroups[]` entries `access` and `group_role_map` keys
+ * `role`. A group's type is the union of its bindings. Prefer the memoized
+ * getGroupRegistry().
  */
 export function buildGroupRegistry(
   manifests: ClientManifest[],
@@ -84,29 +64,14 @@ export function buildGroupRegistry(
   return reg;
 }
 
-// ── memoized accessor ─────────────────────────────────────────────────────
-//
-// The registry is a pure function of (manifest set, env identity groups). The
-// env groups are fixed for the process lifetime, so we memoize on the manifest
-// array identity: servingManifests() returns the SAME array reference while the
-// underlying 30s/mtime cache is warm and a FRESH one on reload, so an identity
-// compare is a correct, allocation-free cache key. It also holds one reference
-// steady for the whole duration of a load failure (the last known good set, or
-// the empty set), so a broken manifest does not thrash this memo.
-//
-// The registry reads the SERVING set (lib/manifest-store.ts), not the strict
-// loader: /auth/settings and three admin pages render from it, and a manifest
-// the operator broke a moment ago must not 500 the page they would use to see
-// that it is broken.
-
+// Memoized on the servingManifests() array identity: the same reference while
+// the manifest cache is warm (and through a load failure), a fresh one on
+// reload. It reads the serving set, not the strict loader, so a broken manifest
+// cannot 500 the pages the operator uses to see that it is broken.
 let memoManifests: ClientManifest[] | null = null;
 let memoRegistry: GroupRegistry | null = null;
 
-/**
- * The registry for the currently served manifest set, memoized on the manifest
- * cache key (the servingManifests() array identity). Rebuilds transparently
- * when the manifest cache turns over. Never throws.
- */
+/** The registry for the served manifest set, memoized on the servingManifests() array identity. Never throws. */
 export function getGroupRegistry(): GroupRegistry {
   const manifests = servingManifests();
   if (memoRegistry !== null && memoManifests === manifests) {
@@ -128,12 +93,9 @@ export function isAccessGroup(reg: GroupRegistry, name: string): boolean {
 }
 
 /**
- * The set of all KNOWN group names — every group the registry has any binding
- * for. The lint cross-checks manifest references against this set to flag a
- * typo'd group that would silently lock everyone out (fail-closed). A group
- * known ONLY because a manifest references it (access/role) is still "known";
- * the lint's job is to catch names referenced by NO binding at all relative to
- * a caller-supplied baseline (see lintManifests).
+ * Every group name with any binding. The lint cross-checks manifest references
+ * against a caller-supplied baseline to flag a typo'd group that would lock
+ * everyone out.
  */
 export function knownGroupNames(reg: GroupRegistry): Set<string> {
   return new Set(reg.keys());

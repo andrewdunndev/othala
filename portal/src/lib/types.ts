@@ -1,19 +1,7 @@
-// Portal type surface.
-//
-// Surface split (D1): the ADMIN / programmatic types come straight from
-// the Ory SDK (`@ory/client-fetch`) — Identity, Session, OAuth2Client —
-// because those shapes correspond 1:1 with what the admin APIs return
-// and we now call them through the SDK.
-//
-// The browser-flow / UI-node rendering types below stay hand-maintained.
-// Reason: the self-service flow wrappers in `kratos.ts` call the SDK's
-// FrontendApi but cast the return to these local types. The SDK deserialises
-// `expires_at` / `issued_at` as `Date` and types `ui.nodes` as `UiNode`,
-// neither of which matches the raw-JSON shapes the renderer (`nodes.ts` +
-// the flow pages) expects. Keeping these local types preserves the
-// browser-flow boundary the portal deliberately holds opaque; the cast in
-// kratos.ts is safe because the portal only reads `flow.id`, `flow.ui.*`,
-// and similar fields whose wire shape is unchanged.
+// Portal type surface. Admin types (Identity, Session, OAuth2Client) come from
+// the Ory SDK. The browser-flow / UI-node types stay hand-maintained: the SDK
+// deserialises dates and UiNode differently from the raw JSON the renderer
+// reads, and the casts in kratos.ts are safe because only unchanged fields are read.
 
 import type {
   AuthenticatorAssuranceLevel as SdkAAL,

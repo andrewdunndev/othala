@@ -124,4 +124,24 @@ test.describe('N — Abuse rate-limiting (gate-time, MEDIUM-B)', () => {
       ).toBe(true);
     },
   );
+
+  test(
+    'N3 — buckets key on the client address: distinct addresses are separate',
+    async ({ page, baseURL }) => {
+      const ctx = page.context();
+      const probe = (xff: string) =>
+        ctx.request.get(`${baseURL}/self-service/login/browser`, {
+          headers: { Accept: 'application/json', 'X-E2E-Flood-Probe': 'n1', 'X-Forwarded-For': xff },
+          maxRedirects: 0,
+        }).then((r) => r.status());
+
+      const exhaust = async (xff: string) => {
+        for (let i = 0; i < CODE_REQUEST_BURST + 2; i++) if ((await probe(xff)) === 429) return true;
+        return false;
+      };
+
+      expect(await exhaust('203.0.113.1'), 'N3: first client must reach 429').toBe(true);
+      expect(await probe('203.0.113.2'), 'N3: a different IPv4 client must have its own bucket').not.toBe(429);
+    },
+  );
 });

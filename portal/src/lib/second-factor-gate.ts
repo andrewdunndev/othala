@@ -1,22 +1,8 @@
-// Verdict for the settings.after.totp and settings.after.webauthn web_hooks.
-//
-// An admin-marked identity keeps at least one second factor through
-// self-service settings. Kratos runs the interrupting hook before it persists
-// the change, but the hook context carries the identity without credentials
-// and not the submitted form, so the verdict works from the stored identity
-// (admin API, totp and webauthn configs included) and the method alone:
-//
-//   totp      Kratos unlinks when a totp is enrolled and links otherwise
-//             (selfservice/strategy/totp/settings.go continueSettingsFlow),
-//             so the outcome is known.
-//   webauthn  the submission either adds a key or removes one of the stored
-//             keys, and the hook cannot tell which. Every removal is
-//             considered; if any would leave no second factor, the change is
-//             refused, so an admin whose only second factor is one security
-//             key adds an authenticator app before touching keys.
-//
-// "Second factor" is hasSecondFactor's: an enrolled totp, or a webauthn key
-// that is not passwordless. An identity without one has nothing to keep.
+// Verdict for the settings.after.totp and settings.after.webauthn web_hooks:
+// an admin-marked identity keeps at least one second factor. The hook context
+// lacks credentials and the form, so the verdict uses the stored identity and
+// the method: totp is known (Kratos unlinks when enrolled); a webauthn change
+// is refused if any key removal would leave no second factor (hasSecondFactor).
 
 import type { Identity } from './types';
 import { isAdminMarker } from './admin-auth';

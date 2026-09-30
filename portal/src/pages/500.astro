@@ -1,10 +1,6 @@
 ---
-// 500 — Unexpected error.
-//
-// Astro's special 500.astro receives the `error` prop when an unhandled
-// exception propagates from a page or middleware. The error MUST NOT be
-// surfaced to the client — show a generic branded message only. Log
-// server-side so the operator can diagnose without exposing internals.
+// 500: Astro's special page for an unhandled exception. The error prop MUST NOT
+// reach the client; show a generic branded message and log server-side.
 
 export const prerender = false;
 

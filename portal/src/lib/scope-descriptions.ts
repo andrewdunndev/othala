@@ -1,10 +1,5 @@
-// Human-readable descriptions for well-known OIDC/OAuth2 scopes.
-//
-// Used by the consent grant screen (/auth/consent) to show a plain-language
-// list of what the client is requesting access to.
-//
-// Scope names that do not appear in this table fall back to the raw scope
-// name itself (no silent omission).
+// Plain-language descriptions of well-known OIDC/OAuth2 scopes for the consent
+// screen (/auth/consent). Unlisted scopes fall back to the raw scope name.
 
 export const SCOPE_DESCRIPTIONS: Record<string, string> = {
   openid: 'your identity (required)',

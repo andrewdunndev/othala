@@ -1,17 +1,7 @@
 ---
-// PageHero — injectable hero section used by every page in the portal.
-//
-// Renders the canonical dagaz→othala lockup as a banner above the page title
-// and lede. All auth-flow pages and index.astro states route through here
-// so the hero chrome is defined exactly once.
-//
-// Props
-//   title    (string, required) — the page <h1>.
-//   lede     (string, optional) — subtitle paragraph beneath the title.
-//   eyebrow  (string, optional) — small mono label above the title (e.g.
-//            "sign in", "signed in · Name").
-//
-// Slot: any CTA row or extra content to render below the lede.
+// Hero section for every portal page: the dagaz->othala lockup banner above the
+// title and lede, defined once. Props: title (required h1), lede (subtitle),
+// eyebrow (small mono label above the title). The slot renders below the lede.
 
 import HeroLockup from './HeroLockup.astro';
 

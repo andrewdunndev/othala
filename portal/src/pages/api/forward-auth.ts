@@ -1,11 +1,8 @@
-// GET/HEAD /api/forward-auth: Caddy `forward_auth` endpoint for NON-OIDC apps behind the same edge and Kratos cookie;
-// the edge passes the required group as a static `?group=` param (the shipped session-only snippet never reaches this
-// route). SECURITY-SENSITIVE and FAILS CLOSED, from the Kratos session and admin-managed groups only, never inbound headers.
-// Status (Caddy keys on it; any non-2xx denies): 200 valid session, active identity in the group; 401 no/invalid
-// session or aal1 needing step-up; 403 refused on merits (inactive, non-canonical stored group, not in the group,
-// or a missing/malformed `group` param); 503 Kratos or its admin API did not answer, so a 403 never means an outage
-// and an edge matching `status 401 403` does not bounce an outage into a login loop. Whether a denial becomes a
-// login redirect is the edge's `status` matcher, so read the site's Caddyfile.
+// GET/HEAD /api/forward-auth: Caddy `forward_auth` endpoint for non-OIDC apps; the edge passes the required group as
+// `?group=`. SECURITY-SENSITIVE, fails closed, trusts only the Kratos session and admin-managed groups, never inbound headers.
+// Status (Caddy keys on it): 200 valid session, active identity in the group; 401 no/invalid session or aal1 needing
+// step-up; 403 refused on merits (inactive, non-canonical stored group, not in the group, bad `group` param);
+// 503 Kratos or its admin API did not answer, so a 403 never means an outage. Login redirects are the edge's matcher.
 
 import type { APIRoute } from 'astro';
 import { getSession } from '../../lib/kratos';

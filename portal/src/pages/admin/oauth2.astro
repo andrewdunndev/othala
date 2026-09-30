@@ -1,15 +1,8 @@
 ---
-// Admin: OAuth2 clients (read-only).
-//
-// Source of truth is the unified per-app manifests (`<slug>.yaml`) in
-// MANIFEST_DIR; the in-app registrar syncs their `oidc:`/`consent:`
-// blocks to Hydra. This page renders the loaded manifest set; editing
-// happens by changing a manifest, not here.
-//
-// Editing is by-manifest, not in-page: each card names the source file
-// (`<clientId>.yaml`) so the admin knows where to make changes. Roles +
-// group_role_map come from the manifest; when an app's manifest has no
-// roles block, the table shows "(none)" so the absence is visible.
+// Admin: OAuth2 clients (read-only). The per-app manifests (`<slug>.yaml`) in
+// MANIFEST_DIR are the source of truth and the registrar syncs them to Hydra;
+// each card names its source file, since editing happens there. An app with no
+// roles block shows "(none)".
 
 export const prerender = false;
 
