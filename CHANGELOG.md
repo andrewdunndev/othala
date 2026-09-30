@@ -7,6 +7,27 @@ aims to follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 The git tag is the authoritative version; `portal/package.json` mirrors it.
 This CHANGELOG and git tags carry the deployed-instance release state.
 
+## [0.7.0] - 2026-09-30
+
+Fewer moving parts: one registration lane, one Kratos client, one logout path.
+
+### Changed
+
+- Profile changes need a sign-in from the last 5 minutes (was 15).
+- An account with a passkey or password changes its email or recovery email only from a session whose newest sign-in used a passkey or password; the profile hook is now `/admin/profile-gate`.
+- Signing in to an app after another account signed out of the shared browser starts a fresh app sign-in; a sign-out an app did not start goes through the portal's own sign-out.
+- Every state-changing portal form carries a token bound to its action; the portal refuses to start without a `CSRF_SECRET` of at least 32 bytes.
+- Client registration runs only in the portal, on boot; the one-shot registration command, its compose service and its docs are gone.
+- The portal image builds on `ci-runtime-node` 4.8.0.
+- Source comments and docs are trimmed, and the tracked-prose ceiling drops to 153,000 bytes.
+
+### Removed
+
+- `POST /admin/revoke-user` and `OTHALA_ADMIN_ENDPOINT_BEARER`; the admin console covers the same ground.
+- `HYDRA_PAIRWISE_SALT` and the Hydra pairwise block.
+- LDAP remnants: the `ldap-app` snippet, the lab `glauth.cfg` and `filedrop` fixture, the LDAP bridge settings, and the `ldap` and `oidc+ldap` tile kinds.
+- The `admin-session` snippet, `scripts/pre-tag-check.sh`, the two CI jobs that compared mirrored copies, and the `is_admin` and `groups` fields of the gate webhook body; the gates read the admin API.
+
 ## [0.6.4] - 2026-09-29
 
 Session and profile lifecycle: access ends where it should, identity fields apps key on are admin-controlled, and admin accounts cannot lock themselves out.
@@ -142,6 +163,7 @@ Security hardening pass (CVP), access-model refactor, PII-safe OpenTelemetry tra
 
 The convergence release: a breaking move from a build-time app catalog to a runtime manifest model, plus the rename to **Othala** ("Ory for your home").
 
+[0.7.0]: https://gitlab.com/dunn.dev/othala/-/releases/v0.7.0
 [0.6.4]: https://gitlab.com/dunn.dev/othala/-/releases/v0.6.4
 [0.6.3]: https://gitlab.com/dunn.dev/othala/-/releases/v0.6.3
 [0.6.2]: https://gitlab.com/dunn.dev/othala/-/releases/v0.6.2

@@ -65,7 +65,7 @@ RUN cd portal \
 # unknown"). Renovate tracks this line through the native dockerfile
 # manager, grouped with those component pins under the "pipeline
 # catalog" packageRule in renovate.json so one MR moves both.
-FROM registry.gitlab.com/dunn.dev/pipeline/ci-runtime-node:4.7.0
+FROM registry.gitlab.com/dunn.dev/pipeline/ci-runtime-node:4.8.0
 
 WORKDIR /app
 

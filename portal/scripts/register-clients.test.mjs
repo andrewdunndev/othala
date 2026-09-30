@@ -1,10 +1,4 @@
-// Tests for the in-app OIDC client registrar in src/lib/register-clients.ts
-// (CU2 item 2). Field-mapping (manifest oidc: → Hydra OAuth2Client body) is
-// proven against a STUB OAuth2Api — no live Hydra is contacted. Create vs
-// update branching, secret resolution, the consent-block exclusion, and the
-// pre-flight lint are all exercised.
-//
-// Run with: npx vitest run scripts/register-clients.test.mjs
+// Invariant: manifest oidc: entries map to Hydra client bodies without contacting a live Hydra.
 
 import { test } from 'vitest';
 import assert from 'node:assert/strict';
@@ -16,16 +10,12 @@ import {
   secretEnvVar,
 } from '../src/lib/register-clients.ts';
 
-// A 404-shaped error the registrar treats as "client does not exist".
-// Mirrors @ory/client-fetch ResponseError: instanceof check + .response.status.
 import { ResponseError } from '@ory/client-fetch';
 
 function notFound() {
   return new ResponseError(new Response('', { status: 404 }), 'Not Found');
 }
 
-// Stub OAuth2Api recording calls. `existing` is the set of client_ids that
-// already exist (so getOAuth2Client resolves); everything else 404s.
 function stubApi(existing = new Set()) {
   const calls = { get: [], create: [], set: [] };
   return {
@@ -79,8 +69,6 @@ consent:
     family: user
 `;
 
-// ── buildClientBody field mapping ──────────────────────────────────────────
-
 test('buildClientBody maps every oidc field exactly as apply-clients.sh did', () => {
   const m = parseManifest(FILEDROP_YAML, 'filedrop.yaml');
   const body = buildClientBody(m, 's3cr3t');
@@ -89,7 +77,6 @@ test('buildClientBody maps every oidc field exactly as apply-clients.sh did', ()
   assert.equal(body.client_name, 'Statuspage');
   assert.deepEqual(body.grant_types, ['authorization_code', 'refresh_token']);
   assert.deepEqual(body.response_types, ['code']);
-  // scope is the on-the-wire space-separated string, not an array.
   assert.equal(body.scope, 'openid email profile groups offline_access');
   assert.deepEqual(body.redirect_uris, ['https://filedrop.othala.test/identity/connect/oidc-signin']);
   assert.deepEqual(body.post_logout_redirect_uris, ['https://filedrop.othala.test/']);
@@ -141,7 +128,6 @@ consent:
   const body = buildClientBody(m, 'apisecret');
   assert.equal(body.scope, 'api');
   assert.deepEqual(body.grant_types, ['client_credentials']);
-  // No redirect_uris / response_types / post_logout / backchannel for a c_c client.
   assert.ok(!('redirect_uris' in body));
   assert.ok(!('response_types' in body));
   assert.ok(!('post_logout_redirect_uris' in body));
@@ -173,8 +159,6 @@ test('buildClientBody omits client_secret when undefined (dry-run posture)', () 
   assert.ok(!('client_secret' in body));
 });
 
-// ── secretEnvVar naming ────────────────────────────────────────────────────
-
 test('secretEnvVar uppercases the client_id (apply-clients.sh convention)', () => {
   assert.equal(secretEnvVar('filedrop'), 'FILEDROP_CLIENT_SECRET');
   assert.equal(secretEnvVar('llm'), 'LLM_CLIENT_SECRET');
@@ -183,9 +167,6 @@ test('secretEnvVar uppercases the client_id (apply-clients.sh convention)', () =
 });
 
 test('secretEnvVar throws loudly on a hyphenated client_id (fail-loud contract)', () => {
-  // "prompt-desk" → "PROMPT-DESK_CLIENT_SECRET" is an INVALID POSIX env var.
-  // The function must throw with a clear message naming the client_id and the
-  // would-be env var name, NOT silently return the broken string.
   assert.throws(
     () => secretEnvVar('prompt-desk'),
     (err) =>
@@ -209,8 +190,6 @@ test('secretEnvVar throws on a client_id starting with a digit', () => {
     (err) => /POSIX env-var stem/.test(err.message),
   );
 });
-
-// ── create vs update branching ─────────────────────────────────────────────
 
 test('registerClient CREATES when the client does not exist (404)', async () => {
   const api = stubApi(new Set());
@@ -248,8 +227,6 @@ test('registerClient rethrows a non-404 error (does not silently create)', async
   await assert.rejects(() => registerClient(api, parseManifest(FILEDROP_YAML, 'filedrop.yaml'), 'sec'));
 });
 
-// ── registerManifests: secret resolution + lint pre-flight ─────────────────
-
 test('registerManifests reads each secret from the injected env', async () => {
   const api = stubApi(new Set());
   const m = parseManifest(FILEDROP_YAML, 'filedrop.yaml');
@@ -278,7 +255,6 @@ test('registerManifests tolerates a missing secret with allowMissingSecret (dry 
 
 test('registerManifests runs the validateClients lint pre-flight and ABORTS on a bad set', async () => {
   const api = stubApi(new Set());
-  // Missing audience → validateClients fails → nothing is registered.
   const bad = parseManifest(
     `
 oidc:

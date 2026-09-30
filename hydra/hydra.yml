@@ -1,41 +1,25 @@
-# Hydra configuration — generic Othala instance template
-#
-# All values are ${VAR}-substituted at deploy time. DSN host is env-substituted
-# so the same file lands in both topologies. Lab compose sets
-# HYDRA_PG_HOST=postgres (compose service name); the production quadlets set
-# HYDRA_PG_HOST to the container name on the pod-internal network.
+# Hydra configuration: generic Othala instance template, ${VAR}-substituted by
+# scripts/render-config.sh. HYDRA_PG_HOST is the compose service name in the lab and the
+# container name in production.
 
 dsn: "postgres://hydra:${HYDRA_PG_PASS}@${HYDRA_PG_HOST}:5432/hydra?sslmode=disable"
-# NOTE: the DB password (HYDRA_PG_PASS) must be URL-safe (percent-encoded) —
-# that is a URL constraint; YAML double-quoting cannot fix invalid URL characters.
+# HYDRA_PG_PASS must be URL-safe (percent-encoded): YAML quoting cannot fix a URL.
 
 serve:
   public:
     port: 4444
     request_log:
-      # Probes fire every few seconds; each would write an access-log line,
-      # burying real ones (and landing at err priority wherever container
-      # stderr is journalled). Metrics still count them. Health probes
-      # target THIS listener: see serve.admin.request_log.
+      # Health probes target this listener (see serve.admin.request_log); each would write
+      # an access-log line, burying real ones. Metrics still count them.
       disable_for_health: true
     cors:
       enabled: true
-      # allowed_origins is an EXTENSIBLE allowlist keyed by client type —
-      # browser-fetching SPA clients need an entry each, redirect-flow
-      # (server-side) clients never do.
-      # OTHALA_CORS_ALLOWED_ORIGINS is a comma-separated, UNQUOTED list of
-      # origins substituted straight into this flow sequence. Deliberately
-      # unquoted: render-config.sh's double-quote-escaping contract assumes
-      # every ${VAR} token sits inside a YAML double-quoted scalar, so a
-      # value containing literal quote characters would get its quotes
-      # escaped to `\"` and corrupt this (unquoted) flow sequence. Plain
-      # origins (no YAML-special characters) need no quoting to parse as
-      # valid flow-sequence scalars. Single-origin instances (the e2e lab)
-      # set this to OTHALA_PUBLIC_URL's value, preserving the original
-      # one-origin behavior.
+      # Extensible allowlist: browser-fetching SPA clients need an entry each, redirect-flow
+      # clients never do. OTHALA_CORS_ALLOWED_ORIGINS is comma-separated and UNQUOTED on purpose:
+      # render-config.sh escapes quotes on the assumption every token sits in a double-quoted
+      # scalar, which would corrupt this flow sequence.
       allowed_origins: [${OTHALA_CORS_ALLOWED_ORIGINS}]
-      # Trim to the methods OIDC/OAuth2 actually requires; DELETE and PUT
-      # have no place on the public token/discovery endpoints.
+      # Only the methods OIDC/OAuth2 requires.
       allowed_methods: [GET, POST]
       allowed_headers:
         - Authorization
@@ -43,17 +27,13 @@ serve:
       allow_credentials: true
   admin:
     port: 4445
-    # Admin-plane bind address. The admin API is unauthenticated by design
-    # (Ory's model: the network IS the control), so segmented deployments
-    # bind it to an address only the admin-plane network can reach.
-    # Single-network deployments (the e2e harness) use 0.0.0.0.
+    # Admin-plane bind address. The admin API is unauthenticated by design (the network is the
+    # control): segmented deployments bind an admin-plane address, the e2e harness uses 0.0.0.0.
     # NEVER expose publicly.
     host: "${HYDRA_ADMIN_BIND_HOST}"
     request_log:
-      # Silences /admin/metrics/prometheus but never a health probe: Hydra
-      # rewrites every admin path to /admin/... before logging, then matches
-      # the unprefixed /health/* paths. Probe the public listener instead;
-      # its /health/ready runs the same readiness checks.
+      # Silences /admin/metrics/prometheus but never a health probe (Hydra rewrites admin
+      # paths to /admin/... before matching /health/*); probe the public listener instead.
       disable_for_health: true
 
 urls:
@@ -61,11 +41,9 @@ urls:
     issuer: "${OTHALA_PUBLIC_URL}/"
     public: "${OTHALA_PUBLIC_URL}/"
 
-  # The whole SSO stack lives on ${OTHALA_PUBLIC_URL}: Hydra redirects challenge
-  # flows to /oauth2/{login,consent,logout} — portal API routes — while /auth/*
-  # stays the Kratos self-service human UI. The fronting proxy must route this
-  # challenge path set to the portal BEFORE any wider /oauth2/* rule, or the
-  # wider rule swallows the challenges and every OAuth2 flow dead-ends.
+  # Hydra redirects challenge flows to /oauth2/{login,consent,logout} (portal routes; /auth/*
+  # stays the Kratos UI). The proxy must route these to the portal BEFORE any wider /oauth2/*
+  # rule, or every OAuth2 flow dead-ends.
   login: "${OTHALA_PUBLIC_URL}/oauth2/login"
   consent: "${OTHALA_PUBLIC_URL}/oauth2/consent"
   logout: "${OTHALA_PUBLIC_URL}/oauth2/logout"
@@ -76,36 +54,26 @@ oidc:
   subject_identifiers:
     supported_types:
       - public
-    pairwise:
-      # Required by config schema even when pairwise is unused
-      salt: "${HYDRA_PAIRWISE_SALT}"
 
 ttl:
   access_token: 1h
   refresh_token: 720h    # 30 days
   id_token: 1h
   auth_code: 10m
-  # 30m, down from Hydra's 1h default — bounds how long a stolen login or
-  # consent challenge stays redeemable.
+  # 30m (default 1h): bounds how long a stolen login or consent challenge stays redeemable.
   login_consent_request: 30m
 
 oauth2:
   pkce:
-    # Global switch — Hydra has no per-client PKCE knob, so turning this on
-    # breaks every confidential client in the deployment that cannot do PKCE.
-    # Revisit whenever the client set changes.
+    # Global switch (no per-client PKCE knob): breaks any confidential client that cannot do PKCE.
     enforced: false
-    # Free hardening: costs nothing while there are no public clients, and
-    # forecloses code interception the day one is registered.
+    # Free hardening while there are no public clients.
     enforced_for_public_clients: true
   hashers:
     bcrypt:
-      # 14, up from Hydra's default 10 — raises the offline brute-force cost of
-      # a leaked client-secret hash. Not on a hot path; clients authenticate
-      # far less often than users log in.
+      # 14 (default 10): raises the offline brute-force cost of a leaked client-secret hash.
       cost: 14
-  # NOTE: an explicit `oauth2.strategies` pin is schema-rejected by Hydra
-  # v26.2.0 (the IdP refuses to boot); the defaults are already correct.
+  # An explicit oauth2.strategies pin is schema-rejected by Hydra v26.2.0; defaults are correct.
   expose_internal_errors: false
   client_credentials:
     default_grant_allowed_scope: false
@@ -116,17 +84,12 @@ oauth2:
       jti_optional: false
 
 secrets:
-  # CRITICAL: secrets.system is non-rotatable for the life of the Hydra DB.
-  # Generate once, store in sops as <host>.hydra_system_secret. Never
-  # change without rebuilding the database. Rotation procedure in
-  # docs/runbooks/secrets-rotation.md.
+  # CRITICAL: secrets.system is non-rotatable for the life of the Hydra DB. Generate once and
+  # store in sops as <host>.hydra_system_secret (docs/runbooks/secrets-rotation.md).
   system:
     - "${HYDRA_SYSTEM_SECRET}"
 
-  # Single active cookie secret. hydra v26.2.0 enforces uniqueItems; rotate
-  # by prepending a distinct entry, restart, then drop the old one once
-  # sessions signed under it have expired (mirror of the Kratos shape, one
-  # shared runbook: docs/runbooks/cookie-rotation.md).
+  # Single active cookie secret (v26.2.0 enforces uniqueItems); rotation: docs/runbooks/cookie-rotation.md.
   cookie:
     - "${HYDRA_COOKIE_SECRET_CURRENT}"
 
@@ -135,30 +98,10 @@ log:
   format: json
   leak_sensitive_values: false
 
-# Distributed tracing (OpenTelemetry). OPT-IN and DEFAULT-OFF: the provider is
-# empty unless OTHALA_OTLP_PROVIDER renders to "otel", so the e2e harness (which
-# defaults it to "") stands the stack up with tracing disabled and undisturbed.
-#
-# Ory v26.2.0 specifics that this block is built to:
-#   - OTLP transport is HTTP/protobuf ONLY (collector port 4318, path
-#     /v1/traces) — NOT gRPC (4317). server_url is a bare host:port.
-#   - Ory IGNORES OTEL_* environment variables; it reads only this `tracing:`
-#     block. We emit to the host alloy OTLP receiver (no auth header on this
-#     hop); alloy adds the observe ingest auth, redacts centrally, and forwards
-#     to observe. The emitter therefore carries no ingestion key.
-#   - insecure: true = plaintext to the host alloy receiver. Same accepted-risk
-#     posture as the sslmode=disable DSN above: the hop reaches only the
-#     firewall-scoped host OTLP port, so TLS would only protect an already-
-#     trusted segment.
-#   - sampling_ratio 0.1 = trace 10% of requests (head sampling) to bound volume.
-#
-# CONDITIONAL BLOCK (render-config.sh #@if): the entire tracing block is OMITTED
-# when OTHALA_OTLP_PROVIDER is empty/unset, and emitted verbatim when it is set.
-# Ory v26.2.0's schema rejects a present `tracing:` whose provider is "" — it
-# validates the block's $ref the moment the key exists, so "disabled" must mean
-# "absent", not "present with an empty provider". The e2e harness leaves the
-# provider empty (block drops out; tracing off); production sets it to "otel" (block
-# renders; tracing on). See scripts/render-config.sh for the fence semantics.
+# Tracing (OpenTelemetry), opt-in: the block below is OMITTED when OTHALA_OTLP_PROVIDER is empty
+# (Ory v26.2.0 rejects a present block with provider "") and emitted when it is "otel".
+# OTLP is HTTP/protobuf only (port 4318), Ory ignores OTEL_* env vars, insecure: true is
+# plaintext to the firewall-scoped host alloy receiver, sampling_ratio 0.1 bounds volume.
 #@if OTHALA_OTLP_PROVIDER
 tracing:
   service_name: hydra

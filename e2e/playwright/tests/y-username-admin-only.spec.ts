@@ -1,29 +1,17 @@
-/**
- * Y — username is admin-controlled; email stays self-service.
- *
- *   Y1 — the settings page shows the username read-only.
- *   Y2 — a profile-settings submission that changes the username is refused
- *        with the neutral message, and the admin API still reports the old
- *        username.
- *   Y3 — an email change through the same form is saved; the post-save
- *        profile-sessions webhook ends the member's other sessions and keeps
- *        the one that saved.
- */
+// Y — the username is admin-controlled; email stays self-service.
 
-import type { APIRequestContext, BrowserContext } from 'playwright-core';
+import type { BrowserContext } from 'playwright-core';
 import { test, expect } from '../fixtures';
-import { createIdentityWithPassword, TEST_PASSWORD } from '../actions/identity';
+import { createIdentityWithPassword, readIdentity, TEST_PASSWORD } from '../actions/identity';
 import { findCsrfToken, loginViaJsonApi } from '../actions/login';
+import { forRecipient, waitForMessage } from '../actions/mail';
 
 const USERNAME_CHANGE_REFUSAL = 'Your username can only be changed by an administrator.';
 
-async function storedTraits(req: APIRequestContext, kratosAdminURL: string, id: string) {
-  const resp = await req.get(`${kratosAdminURL}/admin/identities/${id}`);
-  expect(resp.ok(), 'admin API identity read').toBe(true);
-  return (await resp.json()).traits as { username: string; email: string; displayName?: string };
+async function storedTraits(kratosAdminURL: string, id: string) {
+  return (await readIdentity(kratosAdminURL, id)).traits as { username: string; email: string; displayName?: string };
 }
 
-/** Submit the profile method of a fresh settings flow as JSON; returns status + body. */
 async function submitProfile(ctx: BrowserContext, baseURL: string, traits: Record<string, string>) {
   const flowResp = await ctx.request.get(`${baseURL}/self-service/settings/browser`, {
     headers: { Accept: 'application/json' },
@@ -68,12 +56,12 @@ test.describe('Y — username is admin-only', () => {
       expect(html).toMatch(/id="username-readonly"[^>]*readonly/);
       expect(html).toContain('Only an administrator can change your username.');
 
-      const before = await storedTraits(ctx.request, kratosAdminURL, seeded.id);
+      const before = await storedTraits(kratosAdminURL, seeded.id);
       const { status, body } = await submitProfile(ctx, baseURL, { ...before, username: `rename.accepted.${Date.now()}` });
       expect(status, 'refused profile submission answers 400 with the flow').toBe(400);
       expect(usernameNodeMessages(body)).toContain(USERNAME_CHANGE_REFUSAL);
 
-      const after = await storedTraits(ctx.request, kratosAdminURL, seeded.id);
+      const after = await storedTraits(kratosAdminURL, seeded.id);
       expect(after.username).toBe(username);
     } finally {
       await ctx.close();
@@ -93,16 +81,20 @@ test.describe('Y — username is admin-only', () => {
     const other = await browser.newContext();
     const ctx = await browser.newContext();
     try {
+      const since = Date.now();
       await loginViaJsonApi(other, { identifier: seeded.email, password: TEST_PASSWORD }, baseURL);
       await loginViaJsonApi(ctx, { identifier: seeded.email, password: TEST_PASSWORD }, baseURL);
 
-      const before = await storedTraits(ctx.request, kratosAdminURL, seeded.id);
+      const before = await storedTraits(kratosAdminURL, seeded.id);
       const { status } = await submitProfile(ctx, baseURL, { ...before, email: changed });
       expect(status, 'email change accepted').toBe(200);
 
-      const after = await storedTraits(ctx.request, kratosAdminURL, seeded.id);
+      const after = await storedTraits(kratosAdminURL, seeded.id);
       expect(after.email).toBe(changed);
       expect(after.username).toBe(username);
+      const addresses = (await readIdentity(kratosAdminURL, seeded.id)).verifiable_addresses as Array<{ value: string; verified: boolean }>;
+      expect(addresses.find((a) => a.value === changed)?.verified, 'new address unverified').toBe(false);
+      await waitForMessage(forRecipient(changed, since, /verif/i));
 
       const whoOther = await other.request.get(`${baseURL}/sessions/whoami`, { headers: { Accept: 'application/json' } });
       expect(whoOther.status(), 'the other session ended').toBe(401);
@@ -111,6 +103,51 @@ test.describe('Y — username is admin-only', () => {
     } finally {
       await ctx.close();
       await other.close();
+    }
+  });
+
+  test('Y4 — a refresh login by code mails the new address, not the old one', async ({ browser, baseURL, kratosAdminURL }) => {
+    const username = `refresh.code.${Date.now()}`;
+    const changed = `${username}.new@othala.test`;
+    const seeded = await createIdentityWithPassword({
+      email: `${username}@othala.test`,
+      username,
+      displayName: 'Refresh Code',
+      groups: [],
+      kratosAdminURL,
+    });
+    const ctx = await browser.newContext();
+    try {
+      await loginViaJsonApi(ctx, { identifier: seeded.email, password: TEST_PASSWORD }, baseURL);
+      const before = await storedTraits(kratosAdminURL, seeded.id);
+      expect((await submitProfile(ctx, baseURL, { ...before, email: changed })).status).toBe(200);
+
+      const refreshByCode = async (identifier: string) => {
+        const flowResp = await ctx.request.get(`${baseURL}/self-service/login/browser?refresh=true`, {
+          headers: { Accept: 'application/json' },
+          maxRedirects: 5,
+        });
+        expect(flowResp.ok(), 'refresh login flow init').toBe(true);
+        const flow = await flowResp.json();
+        return ctx.request.post(flow.ui.action, {
+          headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+          data: { method: 'code', identifier, csrf_token: findCsrfToken(flow.ui.nodes) },
+          maxRedirects: 0,
+        });
+      };
+
+      const since = Date.now();
+      const sent = await refreshByCode(changed);
+      expect(sent.status(), 'code sent').toBe(400);
+      const sentIds = ((await sent.json()).ui?.messages ?? []).map((m: { id: number }) => m.id);
+      expect(sentIds, 'code-sent message').toContain(1010014);
+      await waitForMessage(forRecipient(changed, since, /to log in/i));
+
+      const sinceOld = Date.now();
+      await refreshByCode(seeded.email);
+      await expect(waitForMessage(forRecipient(seeded.email, sinceOld, /to log in/i), 5_000)).rejects.toThrow(/Timed out/);
+    } finally {
+      await ctx.close();
     }
   });
 });

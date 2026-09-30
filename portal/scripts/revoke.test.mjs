@@ -1,17 +1,4 @@
-// Tests for src/lib/revoke.ts — the in-process revocation fan-out (CU3 B1).
-//
-// Run with: npx vitest run scripts/revoke.test.mjs
-//
-// Proves the fan-out contract with injected SDK stubs (no live Kratos/Hydra):
-//   - ORDER: step 1 (state->inactive, deactivate only) precedes step 2
-//     (delete-sessions); steps 3-4 are the Hydra login+consent revoke.
-//   - deactivate trigger runs step 1; admin/sign-out triggers do NOT.
-//   - step-2 failure ABORTS the fan-out (Hydra steps never fire) and throws
-//     a prescriptive RevokeError naming kratos-admin.
-//   - step 5 (LDAP) failure does NOT abort (collected into bestEffortFailures).
-//   - LDAP step is skipped silently when LDAP_BRIDGE_ADMIN_URL is unset (via
-//     the injected flush stub here; the env-skip path is the default helper).
-//   - prescriptive errors name the dependency for hydra-admin failures too.
+// Invariant: revocation runs its steps in order and a failed session-delete step aborts the fan-out.
 
 import { test } from 'vitest';
 import assert from 'node:assert/strict';
@@ -39,14 +26,11 @@ function makeDeps() {
           calls.push(['revokeOAuth2ConsentSessions', args]);
         },
       },
-      flushLdapBindCache: async (subject) => {
-        calls.push(['flushLdapBindCache', subject]);
-      },
     },
   };
 }
 
-test('admin/sign-out trigger runs steps 2-5 in order (no step 1)', async () => {
+test('admin/sign-out trigger runs steps 2-4 in order (no step 1)', async () => {
   const { calls, deps } = makeDeps();
   const result = await revokeSubject('sub-1', {}, deps);
 
@@ -55,13 +39,11 @@ test('admin/sign-out trigger runs steps 2-5 in order (no step 1)', async () => {
     'deleteIdentitySessions',
     'revokeOAuth2LoginSessions',
     'revokeOAuth2ConsentSessions',
-    'flushLdapBindCache',
   ]);
   assert.equal(result.deactivated, false);
   assert.equal(result.kratosSessionsRevoked, true);
   assert.equal(result.hydraLoginRevoked, true);
   assert.equal(result.hydraConsentRevoked, true);
-  assert.equal(result.bestEffortFailures.length, 0);
 });
 
 test('deactivate trigger runs step 1 (state->inactive) BEFORE step 2', async () => {
@@ -74,9 +56,7 @@ test('deactivate trigger runs step 1 (state->inactive) BEFORE step 2', async () 
     'deleteIdentitySessions',
     'revokeOAuth2LoginSessions',
     'revokeOAuth2ConsentSessions',
-    'flushLdapBindCache',
   ]);
-  // The state flip is the documented [{op:replace,path:/state,value:inactive}].
   assert.deepEqual(calls[0][1].jsonPatch, [
     { op: 'replace', path: '/state', value: 'inactive' },
   ]);
@@ -104,28 +84,21 @@ test('step-2 (delete-sessions) failure ABORTS the fan-out', async () => {
       assert.ok(err instanceof RevokeError);
       assert.equal(err.dependency, 'kratos-admin');
       assert.equal(err.step, 'delete-sessions');
-      // Prescriptive: names the dependency + next action, not the raw error.
       assert.match(err.message, /kratos-admin/);
       assert.doesNotMatch(err.message, /kratos 500/);
       return true;
     },
   );
-  // Hydra steps + best-effort steps must NOT have fired after the abort.
   const order = calls.map((c) => c[0]);
   assert.ok(!order.includes('revokeOAuth2LoginSessions'));
-  assert.ok(!order.includes('flushLdapBindCache'));
 });
 
 test('step-2 (delete-sessions) 404 = no active sessions: TOLERATED, fan-out continues to Hydra', async () => {
   const { calls, deps } = makeDeps();
   deps.identityApi.deleteIdentitySessions = async () => {
-    // Kratos v26 returns 404 (not 204) from DELETE sessions when the subject
-    // has no active sessions. "Nothing to revoke" is the success postcondition.
     throw new ResponseError(new Response(null, { status: 404 }), 'Not Found');
   };
 
-  // MUST NOT throw: a subject with no live Kratos session can still hold a
-  // remembered Hydra login / live tokens, which "sign out everywhere" must cut.
   const result = await revokeSubject('sub-1', {}, deps);
   const order = calls.map((c) => c[0]);
   assert.ok(order.includes('revokeOAuth2LoginSessions'), 'Hydra login revoke must run after a 404');
@@ -142,7 +115,6 @@ test('step-2 failure under deactivate still runs step 1 first then aborts', asyn
     throw new Error('boom');
   };
   await assert.rejects(() => revokeSubject('sub-1', { deactivate: true }, deps), RevokeError);
-  // state flip happened (step 1), session delete attempted (step 2), no Hydra.
   const order = calls.map((c) => c[0]);
   assert.deepEqual(order, ['patchIdentity', 'deleteIdentitySessions']);
 });
@@ -160,7 +132,6 @@ test('step-1 (state->inactive) failure throws prescriptive kratos-admin error', 
       return true;
     },
   );
-  // Nothing after step 1 ran.
   assert.equal(calls.length, 0);
 });
 
@@ -179,44 +150,4 @@ test('Hydra login-revoke failure throws prescriptive hydra-admin error', async (
       return true;
     },
   );
-});
-
-test('best-effort step 5 (LDAP) failure does NOT abort; collected', async () => {
-  const { deps } = makeDeps();
-  deps.flushLdapBindCache = async () => {
-    throw new Error('ldap unreachable');
-  };
-  const result = await revokeSubject('sub-1', {}, deps);
-  // The hard cut still completed.
-  assert.equal(result.kratosSessionsRevoked, true);
-  assert.equal(result.hydraLoginRevoked, true);
-  assert.equal(result.hydraConsentRevoked, true);
-  assert.equal(result.bestEffortFailures.length, 1);
-  assert.equal(result.bestEffortFailures[0].dependency, 'ldap-bridge');
-  assert.equal(result.bestEffortFailures[0].step, 'flush-bind-cache');
-});
-
-test('default LDAP flush is a silent no-op when LDAP_BRIDGE_ADMIN_URL is unset', async () => {
-  // Exercise the real default helper (no flush injected) so the env-skip path
-  // is covered. Stub fetch to detect an unexpected request.
-  const prevUrl = process.env.LDAP_BRIDGE_ADMIN_URL;
-  delete process.env.LDAP_BRIDGE_ADMIN_URL;
-  const origFetch = globalThis.fetch;
-  let fetched = false;
-  globalThis.fetch = async () => {
-    fetched = true;
-    return { ok: true };
-  };
-  try {
-    const { deps } = makeDeps();
-    // remove the injected flush so the default helper is used
-    delete deps.flushLdapBindCache;
-    const result = await revokeSubject('sub-1', {}, deps);
-    assert.equal(fetched, false, 'no LDAP request when URL unset');
-    assert.equal(result.bestEffortFailures.length, 0);
-  } finally {
-    globalThis.fetch = origFetch;
-    if (prevUrl === undefined) delete process.env.LDAP_BRIDGE_ADMIN_URL;
-    else process.env.LDAP_BRIDGE_ADMIN_URL = prevUrl;
-  }
 });

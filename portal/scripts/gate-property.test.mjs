@@ -1,41 +1,4 @@
-// The fail-closed PROPERTY TEST — the load-bearing guarantee of the whole
-// access model: no path through the gate admits without an explicit binding.
-//
-// Run with: npx vitest run scripts/gate-property.test.mjs
-//
-// WHAT CHANGED, AND WHY. This file used to test `enforceAccessGate` with a
-// generator whose whole pool was nine hardcoded lowercase literals, against an
-// oracle that was a textual copy of the implementation. It therefore could not
-// (a) exercise the path /api/forward-auth actually calls, (b) ever produce a
-// case mismatch, or (c) fail when the implementation was wrong — only when it
-// was DIFFERENT. All three are fixed here:
-//
-//   (a) The property section below drives `enforceGroupGate`/`hasGroup` — the
-//       pair `portal/src/pages/api/forward-auth.ts` calls — and re-runs the
-//       same laws against `enforceAccessGate` where they hold.
-//   (b) The generator emits mixed-case and charset-violating names alongside
-//       canonical ones, so a comparison that folds case is reachable.
-//   (c) The oracle is gone. In its place are directional LAWS, each of which
-//       is a statement about the gate that can be checked without knowing how
-//       the gate is written. A law says "allowed IMPLIES x" or "y IMPLIES
-//       denied"; none of them recomputes the decision.
-//
-// The invariant, for ALL (identity, required group):
-//
-//   enforceGroupGate(identity, group).allowed === true
-//     IMPLIES identity != null
-//         AND identity.state === 'active'
-//         AND every stored group matches GROUP_RE
-//         AND the stored groups contain `group` VERBATIM
-//
-// and, in the other direction, those four together imply allowed. Names are
-// compared with no case folding and no coercion of any kind: there is ONE
-// canonical form (GROUP_RE, portal/src/lib/access-groups.ts) and every
-// boundary this codebase owns validates against it.
-//
-// MUTATION PROBE: reintroduce `.toLowerCase()` in gate.ts `hasGroup` and the
-// "no case folding" law below goes RED. A suite that survives that mutation
-// has not tested anything.
+// Invariant: no path through the gate admits without an explicit binding (fail closed).
 
 import { test } from 'vitest';
 import assert from 'node:assert/strict';
@@ -43,9 +6,6 @@ import fc from 'fast-check';
 import { enforceAccessGate, enforceGroupGate, hasGroup } from '../src/lib/gate.ts';
 import { GROUP_RE } from '../src/lib/access-groups.ts';
 
-// ─── fixtures ────────────────────────────────────────────────────────────────
-
-/** Build a manifest fixture. accessGroups defaults to the prefix-free binding. */
 function manifest(clientId, opts = {}) {
   return {
     clientId,
@@ -71,7 +31,6 @@ function manifest(clientId, opts = {}) {
   };
 }
 
-/** Build an identity fixture. `groups`==null models a failed lookup (null id). */
 function identity(groups, state = 'active') {
   if (groups === null) return null;
   return {
@@ -83,8 +42,6 @@ function identity(groups, state = 'active') {
     metadata_admin: { groups },
   };
 }
-
-// ─── §16 enumerated matrix (enforceAccessGate — the OIDC path) ──────────────
 
 test('matrix: null id → DENY', () => {
   const m = manifest('photos', { accessGroups: ['memories'] });
@@ -104,9 +61,6 @@ test('matrix: active, NOT in the bound group → DENY', () => {
 });
 
 test('matrix: active in an UNBOUND group → DENY (group not in accessGroups)', () => {
-  // User is in `access-photos` (the OLD prefix-derived name) but the manifest
-  // binds `memories`. The prefix-based gate would ALLOW here; the new gate must
-  // DENY — this case is the one that flips the matrix.
   const m = manifest('photos', { accessGroups: ['memories'] });
   const id = identity(['access-photos']);
   assert.equal(enforceAccessGate(id, 'photos', m).allowed, false);
@@ -131,8 +85,6 @@ test('matrix: skipAccessCheck + INACTIVE → DENY (state never bypassed)', () =>
 });
 
 test('matrix: skipAccessCheck + a non-canonical stored group → DENY', () => {
-  // The read-boundary refusal is a fact about the identity record, not about
-  // this app's binding, so the escape hatch does not bypass it.
   const m = manifest('photos', { accessGroups: [], skipAccessCheck: true });
   const id = identity(['Anything']);
   assert.equal(enforceAccessGate(id, 'photos', m).allowed, false);
@@ -156,35 +108,18 @@ test('matrix: manifest with empty accessGroups, no skip → DENY (no implicit ac
   assert.equal(enforceAccessGate(id, 'photos', m).allowed, false);
 });
 
-// A flat `access-`-prefixed name is an ordinary binding: the manifest binds
-// `access-proxywatch`, the identity holds `access-proxywatch`, the gate ALLOWS. The
-// gate compares bound names against identity groups verbatim
-// (portal/src/lib/gate.ts: `accessGroups.some((g) => userGroups.includes(g))`)
-// and derives nothing from clientId, so the prefix gets no special handling.
 test('regression: access-proxywatch is a valid flat binding → ALLOW', () => {
   const m = manifest('proxywatch', { accessGroups: ['access-proxywatch'] });
   const id = identity(['access-proxywatch']);
   assert.equal(enforceAccessGate(id, 'proxywatch', m).allowed, true);
 });
 
-// ─── generators ─────────────────────────────────────────────────────────────
-//
-// Three pools, deliberately overlapping in their case folds so that a gate
-// which folds case is DISTINGUISHABLE from one which does not.
-
-/**
- * Names that satisfy GROUP_RE — the only names any owned boundary can write.
- * `trailing-` is in here on purpose: GROUP_RE permits a trailing hyphen, and a
- * fixture list that quietly assumed otherwise is how the old pool of nine tidy
- * literals stopped biting.
- */
 const canonicalName = fc.constantFrom(
   'memories', 'admin-memories', 'family', 'access-photos', 'access-proxywatch',
   'friends', 'kids', 'admin', 'proxywatch', 'grafana-access',
   'trailing-',
 );
 
-/** Names a raw Kratos admin-API write can store and no owned boundary can. */
 const nonCanonicalName = fc.constantFrom(
   'Memories', 'ACCESS-PROXYWATCH', 'Access-Photos', 'Family', 'aDmIn',
   'has space', 'under_score', '-leading', 'dotted.name', '2fa-required', '',
@@ -192,14 +127,8 @@ const nonCanonicalName = fc.constantFrom(
 
 const anyName = fc.oneof(canonicalName, nonCanonicalName);
 
-/** An identity's stored group list, or null for a failed lookup. */
 const storedGroups = fc.option(fc.array(anyName, { maxLength: 5 }), { nil: null });
-// NOT `undefined`: identity() defaults an omitted state to 'active', so a
-// generated `undefined` would silently produce an ACTIVE identity. The missing
-// -state case is covered explicitly below instead.
 const anyState = fc.constantFrom('active', 'inactive', 'pending');
-
-// ─── LAWS: enforceGroupGate — the path /api/forward-auth calls ───────────────
 
 test('law: ALLOWED implies the stored list contains the required name VERBATIM', () => {
   fc.assert(
@@ -230,17 +159,12 @@ test('law: ALLOWED implies an identity, state==="active", and an all-canonical s
 });
 
 test('law: NO CASE FOLDING — a name differing only in case never matches', () => {
-  // The mutation probe's target. Reintroduce `.toLowerCase()` in hasGroup and
-  // this law fails on the first pair it generates.
   fc.assert(
     fc.property(canonicalName, (lower) => {
       const upper = lower.toUpperCase();
       assert.notEqual(lower, upper, 'fixture must actually differ in case');
-      // Required name upper-cased: stored is canonical, the needle is not.
       assert.equal(enforceGroupGate(identity([lower]), upper).allowed, false);
-      // Stored name upper-cased: the needle is canonical, the record is not.
       assert.equal(enforceGroupGate(identity([upper]), lower).allowed, false);
-      // And directly at hasGroup, below the state/refusal checks.
       assert.equal(hasGroup(identity([lower]), upper), false);
       assert.equal(hasGroup(identity([upper]), lower), false);
     }),
@@ -306,8 +230,6 @@ test('law: a null identity implies DENY for every required name', () => {
     { numRuns: 200 },
   );
 });
-
-// ─── the same laws where they hold for enforceAccessGate (the OIDC path) ────
 
 test('law: enforceAccessGate — ALLOWED without skip implies a verbatim binding match', () => {
   fc.assert(

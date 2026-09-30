@@ -1,9 +1,4 @@
-// Tests for the full validateClients lint port in src/lib/manifests.ts
-// (CU2 item 3). Every rule from consent/manifest.go's validateClients is
-// proven to fire on a crafted bad manifest, and the real on-disk manifest
-// set is proven clean.
-//
-// Run with: npx vitest run scripts/validate-clients.test.mjs
+// Invariant: every validateClients rule fires on a crafted bad manifest and the real manifest set is clean.
 
 import { test } from 'vitest';
 import assert from 'node:assert/strict';
@@ -24,10 +19,6 @@ const clientsDir = join(here, '..', '..', 'hydra', 'clients');
 function fromYaml(yamlText, filename = 'crafted.yaml') {
   return parseManifest(yamlText, filename);
 }
-
-// ── Rule 1a: client_id must be a valid env-var stem ───────────────────────
-// A hyphenated client_id ("prompt-desk") produces "PROMPT-DESK_CLIENT_SECRET"
-// which is not a valid POSIX env var and silently fails to resolve.
 
 test('CLIENT_ID_ENV_STEM_RE: valid stems pass', () => {
   for (const id of ['filedrop', 'promptdesk', 'llm', 'my_app', '_app', 'App123']) {
@@ -137,8 +128,6 @@ consent:
   );
 });
 
-// ── Rule 2 + 3: audience presence + audienceMatchesRedirect ────────────────
-
 test('rule: empty audience fires (every client needs an audience)', () => {
   const m = fromYaml(`
 oidc:
@@ -203,8 +192,6 @@ consent: {}
   assert.deepEqual(errs, [], errs.join('\n'));
 });
 
-// ── Rule 4: group_role_map points at an undeclared role ────────────────────
-
 test('rule: group_role_map referencing an undeclared role fires', () => {
   const m = fromYaml(`
 oidc:
@@ -255,8 +242,6 @@ consent:
   assert.deepEqual(validateClients([m]), []);
 });
 
-// ── Rule 5: declared role missing claim_emit ───────────────────────────────
-
 test('rule: declared role with no claim_emit key fires', () => {
   const m = fromYaml(`
 oidc:
@@ -294,8 +279,6 @@ consent:
   const errs = validateClients([m]);
   assert.equal(errs.filter((e) => e.includes('claim_emit')).length, 0, errs.join('\n'));
 });
-
-// ── Rule 6: M10 emit_groups_claim:false + role claim_emit.groups ───────────
 
 test('rule: M10 contradiction (emit_groups_claim:false + role groups claim) fires', () => {
   const m = fromYaml(`
@@ -368,8 +351,6 @@ consent:
   assert.equal(errs.filter((e) => e.includes('emit_groups_claim')).length, 0, errs.join('\n'));
 });
 
-// ── shouldEmitGroups default semantics ─────────────────────────────────────
-
 test('shouldEmitGroups: absent emit_groups_claim defaults true', () => {
   const m = fromYaml(`
 oidc:
@@ -390,8 +371,6 @@ consent:
   assert.equal(m.emitGroupsClaim, false);
   assert.equal(shouldEmitGroups(m), false);
 });
-
-// ── assertManifestsValid throws on violation ───────────────────────────────
 
 test('assertManifestsValid throws on a bad set, with all findings in the message', () => {
   const bad = fromYaml(`
@@ -435,12 +414,7 @@ consent:
   assert.doesNotThrow(() => assertManifestsValid([good]));
 });
 
-// ── access-binding BLOCK wired into the load-time hard-fail (§11, primitive #5) ─
-
 test('BLOCK: bare manifest (no access binding, no skip) is a load-time hard-fail', () => {
-  // othala primitive #5: absence of a binding means NO access. A manifest with
-  // accessGroups: [] and no skip_access_check is definitionally unreachable and
-  // must be LOUDLY rejected at load (not silently dark).
   const m = fromYaml(`
 oidc:
   client_id: novel
@@ -456,7 +430,6 @@ consent: {}
     errs.some((e) => e.includes('presentation.access is empty') && e.includes('unreachable')),
     errs.join('\n'),
   );
-  // And the hard-fail surfaces through assertManifestsValid.
   assert.throws(() => assertManifestsValid([m]), /manifest validation failed/);
 });
 
@@ -489,8 +462,6 @@ presentation:
     - memories
 consent: {}
 `);
-  // parseAccessGroups de-dupes, so craft the duplicate directly on the object to
-  // prove validateClients' guard bites regardless of how it got there.
   m.accessGroups = ['memories', 'memories'];
   const errs = validateClients([m]);
   assert.ok(
@@ -500,9 +471,6 @@ consent: {}
 });
 
 test('presentation-only manifest is valid WITHOUT an oidc: block (audience rule skipped)', () => {
-  // proxywatch.yaml shape: forward_auth tile, no OIDC client. It must validate
-  // clean — the audience / redirect rules do not apply — as long as it names an
-  // access group (which it does, satisfying the binding BLOCK).
   const m = fromYaml(`
 presentation:
   name: Proxywatch
@@ -523,12 +491,6 @@ presentation:
   assert.ok(errs.some((e) => e.includes('unreachable')), errs.join('\n'));
 });
 
-// ── e2e/manifests/ is the canonical on-disk fixture set ───────────────────
-// These are the generic worked examples CI validates; an adopter's own
-// catalog lives wherever MANIFEST_DIR points.
-
-// ── e2e fixture set must be clean (mirrors the hydra/clients check above) ──
-
 const e2eClientsDir = join(here, '..', '..', 'e2e', 'manifests');
 
 test('every e2e/manifests/*.yaml round-trips AND the set passes validateClients', () => {
@@ -537,7 +499,6 @@ test('every e2e/manifests/*.yaml round-trips AND the set passes validateClients'
     files = readdirSync(e2eClientsDir)
       .filter((f) => (f.endsWith('.yaml') || f.endsWith('.yml')) && f !== 'groups.yaml');
   } catch {
-    // e2e/manifests/ not in this checkout — skip.
     return;
   }
   assert.ok(files.length > 0, 'expected at least one e2e fixture manifest');
@@ -549,14 +510,10 @@ test('every e2e/manifests/*.yaml round-trips AND the set passes validateClients'
         return null;
       }
     })
-    // presentation-only manifests (no oidc: block) are returned null by
-    // loadOne; filter them out for the OIDC-client validateClients pass.
     .filter((m) => m !== null && !m.presentationOnly);
   const errs = validateClients(manifests);
   assert.deepEqual(errs, [], `e2e fixtures should be clean:\n${errs.join('\n')}`);
 });
-
-// ── promptdesk.yaml parses correctly and validates clean ──────────────────
 
 test('promptdesk.yaml: parses correctly — client_id, access binding, redirect, audience, roles', () => {
   const yaml = readFileSync(join(e2eClientsDir, 'promptdesk.yaml'), 'utf8');
@@ -565,14 +522,8 @@ test('promptdesk.yaml: parses correctly — client_id, access binding, redirect,
   assert.equal(m.clientId, 'promptdesk', 'client_id must be promptdesk');
   assert.equal(m.presentationOnly, false, 'must be an OIDC client, not presentation-only');
 
-  // ENTRY binding: `prompt-access` and nothing else. `prompt-admin` must NOT
-  // appear here — it is bound for ROLE only (see group_role_map below), and a
-  // second entry would be admin-implies-access coming back.
-  // Group names track the SERVICE slug (prompt.othala.test), not the OAuth2
-  // client_id (`promptdesk`) — the name is convention, the binding is what runs.
   assert.deepEqual(m.accessGroups, ['prompt-access'], 'must bind exactly the prompt-access group');
 
-  // OIDC fields.
   assert.deepEqual(m.redirectUris, ['https://prompt.othala.test/oauth/oidc/callback']);
   assert.deepEqual(m.postLogoutRedirectUris, ['https://prompt.othala.test/']);
   assert.deepEqual(m.audience, ['https://prompt.othala.test']);
@@ -581,7 +532,6 @@ test('promptdesk.yaml: parses correctly — client_id, access binding, redirect,
   assert.ok(m.scopes.includes('offline_access'), 'must request offline_access for refresh_token');
   assert.ok(m.scopes.includes('groups'), 'must request groups scope for role claim');
 
-  // Consent: roles declared with claim_emit; emit_groups_claim active.
   assert.ok(m.emitGroupsClaim !== false, 'emit_groups_claim must not be suppressed');
   const adminRole = m.roles.find((r) => r.name === 'admin');
   const userRole = m.roles.find((r) => r.name === 'user');
@@ -590,13 +540,9 @@ test('promptdesk.yaml: parses correctly — client_id, access binding, redirect,
   assert.ok(adminRole.claimEmit !== null, 'admin role must have claim_emit');
   assert.ok(userRole.claimEmit !== null, 'user role must have claim_emit');
 
-  // ROLE binding: exactly two groups per service, prompt-admin → admin and
-  // prompt-access → user. Roles are declared admin-first because lookupRole
-  // ranks by declaration index, so an identity holding both resolves to admin.
   assert.equal(m.groupRoleMap['prompt-admin'], 'admin');
   assert.equal(m.groupRoleMap['prompt-access'], 'user');
 
-  // Full validation must pass (audience matches redirect origin, roles clean).
   const errs = validateClients([m]);
   assert.deepEqual(errs, [], `promptdesk.yaml must validate clean:\n${errs.join('\n')}`);
 });

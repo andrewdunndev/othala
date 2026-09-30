@@ -21,7 +21,7 @@ set -uo pipefail  # NOT -e: every check classifies grep's exit itself (0/1/>1).
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"; REPO_ROOT="$(dirname "$SCRIPT_DIR")"
 cd "$REPO_ROOT" || exit 1  # pathspecs below are repo-root-relative
 TMP="$(mktemp -d)"; trap 'rm -rf "$TMP"' EXIT
-EXPECTED_CHECKS=13  # bump in the same commit that adds/removes a row or special check
+EXPECTED_CHECKS=12  # bump in the same commit that adds/removes a row or special check
 PASS=0; FAIL=0; ERROR=0; FAILED_STEPS=()
 
 step_pass() {  # <name> <files> <bytes> — both counts, so an empty corpus can't hide behind a nonzero file count
@@ -177,7 +177,7 @@ row "no-instance-names" 10 \
 # which prose never produces by accident.
 row "no-private-stack-apps" 18 \
     "$(printf '%s\n' '\b[Ii]mmich\b' '\b[Jj]ellyfin\b' '\b[Cc]inema\b' '\b[Vv]aultwarden\b' '\b[Nn]avidrome\b' '\b[Ss]onarr\b' '\b[Rr]adarr\b' '\b[Mm]ealie\b' '[Oo]pen ?[Ww]eb ?UI' '[Ll]ite[Ll][Ll][Mm]' '\b[Ll]arder-access\b|\baccess-[Ll]arder\b|\b[Ll]arder-admin\b|\b[Ll]arder\.(dunn\.dev|othala\.test|example\.test)\b' '\b[Kk]eep-access\b|\baccess-[Kk]eep\b|\b[Kk]eep-admin\b|\b[Kk]eep\.(dunn\.dev|othala\.test|example\.test)\b' '\b[Oo]bserve-access\b|\baccess-[Oo]bserve\b|\b[Oo]bserve-admin\b|\b[Oo]bserve\.(dunn\.dev|othala\.test|example\.test)\b' '\b[Tt]une-access\b|\baccess-[Tt]une\b|\b[Tt]une-admin\b|\b[Tt]une\.(dunn\.dev|othala\.test|example\.test)\b' '\b[Vv]ault-access\b|\baccess-[Vv]ault\b|\b[Vv]ault-admin\b|\b[Vv]ault\.(dunn\.dev|othala\.test|example\.test)\b' '\b[Ff]orge-access\b|\baccess-[Ff]orge\b|\b[Ff]orge-admin\b|\b[Ff]orge\.(dunn\.dev|othala\.test|example\.test)\b' '\b[Gg]ather-access\b|\baccess-[Gg]ather\b|\b[Gg]ather-admin\b|\b[Gg]ather\.(dunn\.dev|othala\.test|example\.test)\b' '\b[Mm]emory-access\b|\baccess-[Mm]emory\b|\b[Mm]emory-admin\b|\b[Mm]emory\.(dunn\.dev|othala\.test|example\.test)\b')" \
-    "$(printf '%s\n' "photos live in $(jn Imm ich)" "$(jn Jelly fin) uses the LDAP path" "the $(jn cin ema) tile is gated" "$(jn Vault warden) issues the client" "$(jn Navi drome) streams over forward-auth" "$(jn Son arr) polls the indexer" "$(jn Rad arr) polls the same one" "$(jn Mea lie) holds the recipes" "$(jn Open ' ' WebUI) proxies the model" "$(jn Lite LLM) fronts the inference" "granted entry via access-$(jn lar der)" "the tile binds $(jn ke ep)-access for entry" "reachable once the identity holds access-$(jn ob serve)" "the manifest grants access-$(jn tu ne) to members" "the client resolves $(jn va ult)-access from the group map" "the manifest binds access-$(jn for ge) for entry" "the tile carries $(jn gat her)-access as its binding" "the identity already holds access-$(jn mem ory)")" \
+    "$(printf '%s\n' "photos live in $(jn Imm ich)" "$(jn Jelly fin) uses the code path" "the $(jn cin ema) tile is gated" "$(jn Vault warden) issues the client" "$(jn Navi drome) streams over forward-auth" "$(jn Son arr) polls the indexer" "$(jn Rad arr) polls the same one" "$(jn Mea lie) holds the recipes" "$(jn Open ' ' WebUI) proxies the model" "$(jn Lite LLM) fronts the inference" "granted entry via access-$(jn lar der)" "the tile binds $(jn ke ep)-access for entry" "reachable once the identity holds access-$(jn ob serve)" "the manifest grants access-$(jn tu ne) to members" "the client resolves $(jn va ult)-access from the group map" "the manifest binds access-$(jn for ge) for entry" "the tile carries $(jn gat her)-access as its binding" "the identity already holds access-$(jn mem ory)")" \
     .
 row "no-dunn-dev-in-e2e-manifests" 1 'dunn\.dev' '  redirect_uri: https://app.dunn.dev/callback' 'e2e/manifests/'
 row "no-stale-llm-client-id" 1 'client_id: llm' 'client_id: llm' 'portal/scripts/'
@@ -186,8 +186,7 @@ row "no-stale-llm-client-id" 1 'client_id: llm' 'client_id: llm' 'portal/scripts
 row "no-deleted-commands-in-docs" 2 \
     "$(printf '%s\n' 'dag-apply-clients' 'dag-sync-manifests')" \
     "$(printf '%s\n' 'run dag-apply-clients on the host' 'run dag-sync-manifests afterwards')" \
-    'DEPLOY.md hydra/README.md ARCHITECTURE.md e2e/README.md portal/src/server/register-clients-cli.ts docs/runbooks/ portal/src/ portal/scripts/'
-row "no-dormant-cutover-comment" 1 '\bDORMANT\b' '// DORMANT until the cutover lands' 'portal/src/server/register-clients-cli.ts e2e/compose.yml'
+    'DEPLOY.md hydra/README.md ARCHITECTURE.md e2e/README.md docs/runbooks/ portal/src/ portal/scripts/'
 row "no-pending-cutover-section" 1 '\(pending\)' '## Cutover (pending)' 'DEPLOY.md'
 
 # Dated-debt
@@ -229,7 +228,7 @@ echo ""
 # intention (AGENTS.md "The prose budget"). RATCHET: moves DOWN only. Raising
 # it is a deliberate edit to the constant, in a commit saying what grew and
 # why it earned the room — never a high-water mark computed live.
-PROSE_CEILING_BYTES=175300
+PROSE_CEILING_BYTES=153000
 PROSE_HIGH_WATER_BYTES=504832  # size when the corpus became unmanageable; ceiling must stay under this
 PROSE_GLOBS=('*.md' '*.mdx' '*.markdown')
 PROSE_COVERED_TREES=(docs/ site/src/content/docs/)  # every tracked file here must be counted by the globs above

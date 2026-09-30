@@ -1,9 +1,4 @@
-# Proxywatch — proxywatch.othala.test
-# Generic example fixture for the Othala e2e harness. A stand-in for an
-# internal tool that has NO native OIDC support and is instead gated at
-# the reverse proxy via forward-auth (Caddy / Traefik forward_auth):
-# the proxy makes a subrequest to the auth provider before passing the
-# request through. Presentation ONLY — no oidc:/consent: block.
+# Proxywatch: no native OIDC, gated at the edge via forward-auth. Presentation only.
 
 presentation:
   name: Proxywatch
@@ -13,9 +8,6 @@ presentation:
   icon_slug: ""
   icon_fallback: serverfault
   auth_kind: forward_auth
-  # The group the edge passes as ?group= to /api/forward-auth. Under the
-  # converged model the edge passes `<svc>-access` for EVERYONE including
-  # admins, because entry is never derived from `proxywatch-admin`.
-  # playwright/tests/t-access-model.spec.ts T6-T9 assert that endpoint directly.
+  # The edge passes <svc>-access for everyone, admins included (t-access-model.spec.ts T6-T9).
   access_group: proxywatch-access
   order: 120

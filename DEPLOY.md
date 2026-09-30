@@ -42,7 +42,7 @@ The app runs **two HTTP listeners in one process**
   expose to the network.
 - **Admin port** (`ADMIN_PORT`, default `4431`, `ADMIN_HOST=127.0.0.1`,
   loopback only). A separate `http.createServer` with its own disjoint mux:
-  `GET /healthz`, `GET /readyz`, `POST /admin/revoke-user`,
+  `GET /healthz`, `GET /readyz`,
   `POST /admin/{recovery,login-code}-gate`. It never delegates to the SSR
   handler, which never sees these paths — off the public mux **by
   construction**, not by routing rule. The bearer-guarded routes are
@@ -92,13 +92,10 @@ context beyond that file:
 
 ## Client registration
 
-OIDC client registration is a deliberate **one-shot**, never run on app
-boot or triggered by a route. The registrar is the app's own
-`portal/src/lib/register-clients.ts`, driving the Hydra OAuth2Api, fed by
-the `manifests.ts` parser and the full `validateClients` lint, bundled to
-`dist/server/register-clients.mjs`. A deploy plane runs it as a one-shot
-against the built image after manifests are in place — the `e2e` harness's
-`compose run --rm register-clients` is the worked example. See
+The app registers OIDC clients itself: `portal/src/server/registrar.ts` runs
+`registerAllClients` (`portal/src/lib/register-clients.ts`, fed by the
+`manifests.ts` parser and the full `validateClients` lint) on boot and on
+SIGHUP against Hydra's admin port. See
 [`per-app-oidc.md`](site/src/content/docs/guides/per-app-oidc.md) for the
 full per-RP runbook.
 
@@ -111,7 +108,7 @@ full per-RP runbook.
 3. Bump the pinned image tag/digest for the app, plus Kratos/Hydra if their
    pins changed.
 4. Provision any new secrets, then deploy.
-5. Register OIDC clients (previous section) if manifests changed.
+5. SIGHUP the app if manifests changed (previous section).
 6. Smoke: `/healthz`, `/readyz`, and the OIDC discovery document all
    answer; a real login round-trips.
 

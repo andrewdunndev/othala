@@ -1,32 +1,16 @@
 ---
-// Admin: user detail / edit / actions.
-//
-// Two modes (`?mode=edit` vs read):
-//   - Read: profile, group memberships, Effective Access table, action panel
-//   - Edit: same form layout as /admin/users/new, pre-populated, posts to
-//           this same URL with `?mode=edit`
-//
-// This page is also the REPAIR surface for the state refuseNonCanonical
-// (src/lib/gate.ts) denies at every app: a stored group name that misses the
-// canonical policy gets its own row in both modes, and the save path decides
-// it via planGroupSave rather than by composing submitted checkboxes.
-//
-// The 10 action=<name> POST handlers live in src/lib/admin-actions.ts —
-// this page only verifies the per-request CSRF token (action-scoped, so a
-// captured token cannot be replayed to a different action) then dispatches.
-//
-// Effective Access mirrors the consent-service algorithm: per app, look
-// up override-or-derive role, render the row + source. Apps the user has
-// no access to don't appear (this is the "what can they actually use"
-// view, not the catalog).
+// Admin: user detail, edit and actions (`?mode=edit` for the form). Also the REPAIR surface for stored group names
+// that refuseNonCanonical (gate.ts) denies: each gets its own row and the save path decides it via planGroupSave.
+// The action=<name> POST handlers live in src/lib/admin-actions.ts; this page verifies the action-scoped CSRF token
+// and dispatches. Effective Access lists only apps the user can use, with the resolved role and its source.
 
 export const prerender = false;
 
 import Layout from '../../../layouts/Layout.astro';
 import AdminFormScripts from '../../../components/AdminFormScripts.astro';
-import { requireAdminSession, getIdentity } from '../../../lib/admin';
+import { requireAdminSession } from '../../../lib/admin';
+import { getIdentity, EVICTABLE_CREDENTIAL_TYPES } from '../../../lib/admin-api';
 import { ADMIN_ACTIONS, ENROLLMENT_TTL, type ActionResult } from '../../../lib/admin-actions';
-import { EVICTABLE_CREDENTIAL_TYPES } from '../../../lib/admin-api';
 import { servingManifests } from '../../../lib/manifest-store';
 import { computeEffectiveAccess, describeSource, IDENTITY_GROUP_ORDER } from '../../../lib/access';
 import { getGroupRegistry, isIdentityGroup, unconfiguredGroups } from '../../../lib/group-registry';
@@ -41,17 +25,13 @@ const adminIdentityId = guard.identity?.id ?? '';
 const { id } = Astro.params;
 if (!id) return new Response('Missing identity id', { status: 400 });
 
-// Serving store, not the strict loader: this page is where an operator grants
-// and revokes access, so it has to stay reachable when a manifest is broken.
+// Serving store, not the strict loader: operators grant and revoke access here, so it must survive a broken manifest.
 const manifests = servingManifests();
 const registry = getGroupRegistry();
 // Identity-group form labels share the canonical order with access.ts.
 const IDENTITY_GROUPS = [...IDENTITY_GROUP_ORDER];
-// The "App access" checkboxes are the access-BEARING groups derived from the
-// registry (a group's type is its binding, not its
-// name), each annotated with the app(s) it grants entry to. One checkbox per
-// bound access group — multi-group `access:` lists surface every option, and a
-// group bound by several apps lists all of them.
+// "App access" checkboxes: one per access-BEARING group bound in the registry (type is the binding, not the name),
+// each annotated with the app(s) it grants.
 const clientNameById = new Map(manifests.map((m) => [m.clientId, m.clientName] as const));
 const ACCESS_GROUPS = Array.from(registry.values())
   .filter((e) => e.kinds.has('access'))
@@ -83,26 +63,10 @@ if (Astro.request.method === 'POST' && identity) {
   const fd = await Astro.request.formData();
   const action = String(fd.get('action') ?? 'save');
 
-  // HIGH-1: every state-changing admin POST must carry a per-request CSRF
-  // token bound to the active admin's identity. Action-scoped tokens (minted
-  // with signToken(id, action)) additionally verify that the submitted action
-  // matches the one the token was issued for — a captured token from the
-  // "issue-recovery" form cannot fire "deactivate".
-  //
-  // The save / delete actions use identity-only tokens (no action binding)
-  // because those forms post to a distinct action value not shared with the
-  // multi-button actions panel.
-  //
-  // The three actions panel buttons (issue-recovery / force-relogin /
-  // deactivate / reactivate) share a single form POST, so each gets its own
-  // action-scoped token minted at render time.
-  const actionScopedActions = new Set(['issue-recovery', 'send-invite-email', 'force-relogin', 'deactivate', 'reactivate', 'grant-admin', 'revoke-admin']);
+  // Every state-changing admin POST carries a CSRF token bound to the admin identity and the action.
   try {
-    if (actionScopedActions.has(action)) {
-      verifyToken(String(fd.get('csrf_token') ?? ''), adminIdentityId, action);
-    } else {
-      verifyToken(String(fd.get('csrf_token') ?? ''), adminIdentityId);
-    }
+    const tokenAction = action === 'remove-credential' ? `remove-${String(fd.get('cred_type') ?? '')}` : action;
+    verifyToken(String(fd.get('csrf_token') ?? ''), adminIdentityId, tokenAction);
   } catch (err) {
     if (err instanceof CSRFError) {
       return new Response(`CSRF: ${err.message}`, { status: 403 });
@@ -126,30 +90,19 @@ if (Astro.request.method === 'POST' && identity) {
 }
 
 const groups = identity?.metadata_admin?.groups ?? [];
-// Split membership into identity vs access columns by the registry's
-// binding-derived type, NOT by an `access-` name prefix — a group named
-// `memories` would otherwise be mis-filed and its access invisible. A group the
-// registry types as `identity` lands
-// in the identity column; everything else (access/role/unknown) is "access".
-// Stored names that miss the canonical policy get their OWN row in both modes.
-// Filing them under "access" would be a lie twice over: they grant nothing,
-// and they are the reason every app denies this identity (refuseNonCanonical,
-// src/lib/gate.ts). Read from the identity, so the row and the save path agree
-// on what is actually stored.
+// Split membership by the registry's binding-derived type, not an `access-` name prefix: identity-typed groups go in
+// the identity column, everything else in "access". Stored names that miss the canonical policy get their OWN row in
+// both modes (they grant nothing and are why every app denies this identity, see refuseNonCanonical).
 const nonCanonical = nonCanonicalGroups(identity);
 const nonCanonicalSet = new Set(nonCanonical);
 const identityGroupMembership = groups.filter((g) => !nonCanonicalSet.has(g) && isIdentityGroup(registry, g));
 const accessGroupMembership = groups.filter((g) => !nonCanonicalSet.has(g) && !isIdentityGroup(registry, g));
-// Stored names no checkbox below offers. The save keeps them unless ticked
-// for removal (saveAction, src/lib/admin-actions.ts).
+// Stored names no checkbox offers; the save keeps them unless ticked for removal (saveAction).
 const unconfigured = unconfiguredGroups(registry, groups);
 const roleOverrides = (identity?.metadata_admin?.roles ?? {}) as Record<string, string>;
 const effective = identity ? computeEffectiveAccess(identity, manifests) : [];
 
-// P2: derive credential enrollment display from the identity's credentials
-// object. The Kratos admin API returns credentials when `includeCredential`
-// is passed (done in getIdentity). Keys present = method enrolled.
-// Robust to the field being absent (list-identities doesn't include them).
+// Credential enrollment from the identity's credentials object (present when getIdentity passes `includeCredential`); tolerates absence.
 const CREDENTIAL_METHODS: Array<{ key: string; label: string }> = [
   { key: 'passkey',       label: 'passkey' },
   { key: 'password',      label: 'password' },
@@ -169,21 +122,13 @@ const formValues = {
   roleOverrides,
 };
 
-// HIGH-1: mint a fresh CSRF token per render. Each <form> on this page
-// gets its own token: tokens are single-use, so two forms cannot share
-// one. The TTL is 30 min (matches typical admin session of a few
-// minutes); a stale page can re-render to refresh.
-//
-// The three actions panel buttons (issue-recovery, force-relogin,
-// deactivate/reactivate) each get an action-scoped token so a captured
-// token for one action cannot be replayed to trigger a different one.
-const csrfTokenSave = signToken(adminIdentityId);
-const csrfTokenDelete = signToken(adminIdentityId);
+// Mint a fresh CSRF token per form (tokens are single-use, 30 min TTL), each scoped to its action.
+const csrfTokenSave = signToken(adminIdentityId, 'save');
+const csrfTokenDelete = signToken(adminIdentityId, 'delete');
 const csrfTokenIssueRecovery = signToken(adminIdentityId, 'issue-recovery');
 const csrfTokenInviteEmail = signToken(adminIdentityId, 'send-invite-email');
 const csrfTokenForceRelogin = signToken(adminIdentityId, 'force-relogin');
-// Deactivate/reactivate are mutually exclusive at render time; only one
-// button will be shown, so only one token is needed.
+// Deactivate/reactivate are mutually exclusive, so one token.
 const csrfTokenDeactivate = identity?.state === 'inactive'
   ? signToken(adminIdentityId, 'reactivate')
   : signToken(adminIdentityId, 'deactivate');
@@ -192,18 +137,15 @@ const isTargetAdmin = identity?.metadata_admin?.admin === true;
 const csrfTokenAdminToggle = isTargetAdmin
   ? signToken(adminIdentityId, 'revoke-admin')
   : signToken(adminIdentityId, 'grant-admin');
-// One token per credential-remove form: each form is single-use (CSRF token
-// is single-use 30-min TTL); credential types are enumerated at render time.
+// One token per credential-remove form; types are enumerated at render time.
 const csrfTokensRemove: Record<string, string> = {};
 for (const { key } of CREDENTIAL_METHODS) {
   if (EVICTABLE_CREDENTIAL_TYPES.has(key) && credentialMap[key]) {
-    csrfTokensRemove[key] = signToken(adminIdentityId);
+    csrfTokensRemove[key] = signToken(adminIdentityId, `remove-${key}`);
   }
 }
 
-// The exact bytes the admin pastes into Signal/iMessage. Composed server-side
-// so the visible textarea and the copy button carry identical text, and so the
-// link and the code can never be sent apart by accident.
+// The exact text the admin pastes, composed server-side so the textarea and the copy button match and link and code travel together.
 const enrollmentShareText =
   actionResult?.kind === 'recovery'
     ? [
@@ -338,18 +280,8 @@ const adminNav = [
         <p>
           <strong>Force re-login complete.</strong>
           Kratos sessions revoked; Hydra login + consent sessions revoked
-          (the remembered login is cut){actionResult.result.bestEffortFailures.length ? `; ${actionResult.result.bestEffortFailures.length} best-effort step(s) failed` : ''}.
+          (the remembered login is cut).
         </p>
-        {actionResult.result.bestEffortFailures.length > 0 && (
-          <details>
-            <summary class="text-sm">Best-effort failures (the hard cut already landed; these are advisory)</summary>
-            <ul class="stack">
-              {actionResult.result.bestEffortFailures.map((f) => (
-                <li class="mono text-xs">{f.dependency} / {f.step}: {f.error}</li>
-              ))}
-            </ul>
-          </details>
-        )}
       </div>
     )}
     {actionResult?.kind === 'admin-granted' && (
@@ -790,13 +722,9 @@ const adminNav = [
 <AdminFormScripts />
 
 <style>
-  /* Inline form wrappers inside the actions row so each button carries its
-   * own action-scoped CSRF token without disrupting the flex layout. */
+  /* Inline form wrappers so each action button carries its own CSRF token without breaking the flex layout. */
   .actions-form { display: contents; }
-  /* Send-time address confirmation (D1 addendum, DECISIONS.md): small,
-   * inline re-type field that sits next to the "Send invite email" button
-   * inside its own .actions-form. Sized to a typical address, not the
-   * form-wide .field input which is width:100%. */
+  /* Send-time address confirmation: a re-type field beside "Send invite email", sized to an address. */
   .invite-confirm-input {
     padding: var(--space-2) var(--space-3);
     font: inherit;
@@ -812,9 +740,7 @@ const adminNav = [
     border-color: var(--input-focus);
     box-shadow: 0 0 0 3px var(--accent-subtle);
   }
-  /* Enrollment handoff: readonly value + its Copy button on one line. The
-   * value flexes, the button keeps its natural width; min-width:0 lets a long
-   * URL shrink instead of overflowing the notice. */
+  /* Enrollment handoff: readonly value and Copy button on one line; min-width:0 lets a long URL shrink. */
   .copy-row { display: flex; align-items: center; gap: var(--space-2); }
   .copy-row input { flex: 1 1 auto; min-width: 0; }
   .copy-row .button { flex: 0 0 auto; }
@@ -826,9 +752,7 @@ const adminNav = [
   .details-content { margin-top: var(--space-3); }
   .summary-danger { color: var(--danger); cursor: pointer; }
   .cred-list { display: flex; flex-wrap: wrap; gap: var(--space-2); align-items: flex-start; }
-  /* Credential chip + its Remove action read as ONE compound chip: a single
-   * bordered pill with a hairline divider between the label and the action,
-   * instead of two equal-weight sibling chips. */
+  /* Credential chip and its Remove action read as one bordered pill with a hairline divider. */
   .cred-item {
     display: inline-flex;
     align-items: stretch;

@@ -33,22 +33,3 @@ export function logoutAuthorized(
     throw err;
   }
 }
-
-/**
- * A tokenless sign-out is only honoured when the browser says the request
- * came from this portal: an Origin equal to `ownOrigin`, or no Origin and a
- * Referer on `ownOrigin`.
- */
-export function sameOriginRequest(
-  origin: string | null,
-  referer: string | null,
-  ownOrigin: string,
-): boolean {
-  if (origin !== null) return origin === ownOrigin;
-  if (!referer) return false;
-  try {
-    return new URL(referer).origin === ownOrigin;
-  } catch {
-    return false;
-  }
-}

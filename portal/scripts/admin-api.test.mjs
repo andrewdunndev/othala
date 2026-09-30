@@ -1,52 +1,19 @@
-// Tests for src/lib/admin-api.ts — Kratos admin API wrappers.
-//
-// Run with: npx vitest run scripts/admin-api.test.mjs
-//
-// The TS source is canonical; this test re-ports the API surface in JS
-// form and asserts observable network behaviour (URL shape, method,
-// request body, response parsing) by stubbing globalThis.fetch.
-//
-// Coverage:
-//   - adminBase: env-driven URL construction (default + override)
-//   - authHeaders: bearer token optional
-//   - createIdentity: method, URL, body shape, schema_id default + override
-//   - updateIdentity: GET then PUT, body carries schema_id + state from
-//     current, traits + metadata_admin from input
-//   - deleteIdentity: DELETE method + URL
-//   - deactivateIdentity: PATCH (JSON-Patch state→inactive) + DELETE sessions
-//   - deleteIdentitySessions: (via deactivateIdentity path)
-//   - listIdentities: GET with per_page=250 cap
-//   - getIdentity: GET with credential includes in query string
-//   - getRecoveryLink: POST body shape + response parsing
-//   - ok helper: throws on non-2xx with status in message
+// Invariant: Kratos admin API wrappers send the right requests and fail closed on error.
 
 import { test, beforeEach } from 'vitest';
 import assert from 'node:assert/strict';
 import { identity } from '../src/lib/test-builders.ts';
 
-// An admin-API identity body with the listed fields as given. A field set to
-// undefined is absent on the wire (JSON.stringify drops it).
 function kratosIdentity(fields) {
   return { ...identity({ id: fields.id }), ...fields };
 }
 
-// ─── env setup ────────────────────────────────────────────────────────────────
-// Set env BEFORE porting so the helpers read the right value in each test.
-// We manipulate process.env per test to cover both default and override paths.
-
 const DEFAULT_BASE = 'http://kratos:4434';
 
-// Mirror config.ts optionalVar for OTHALA_DEFAULT_SCHEMA_ID.
 function defaultSchemaId() {
   const v = process.env.OTHALA_DEFAULT_SCHEMA_ID;
   return v !== undefined && v.trim() !== '' ? v.trim() : 'default';
 }
-
-// ─── JS port of admin-api.ts ──────────────────────────────────────────────────
-// Re-ports the functions verbatim rather than importing admin-api.ts directly.
-// The runner is now vitest (which reads .ts natively, no loader needed), but
-// switching this file to a direct import is a separate change from the
-// runner migration — left as-is here to keep the conversion mechanical.
 
 function adminBase() {
   return process.env.KRATOS_ADMIN_URL ?? DEFAULT_BASE;
@@ -70,8 +37,6 @@ async function ok(res, label) {
   throw new Error(`${label}: ${res.status} ${body.slice(0, 240)}`);
 }
 
-// Minimal metadata_admin passthrough (mirrors validateMetadataAdmin at
-// the portal level — the test focuses on network shape, not validation).
 function validateMetadataAdmin(input) {
   if (input === null || input === undefined) return {};
   return input;
@@ -158,10 +123,7 @@ async function getRecoveryLink(id, expiresIn = '1h') {
   return await res.json();
 }
 
-// JS port of patchAdminMarker from admin-api.ts.
-// Uses raw fetch (not the SDK) to keep this test self-contained.
 async function patchAdminMarker(id, grant) {
-  // Fetch current identity.
   const getUrl =
     `${adminBase()}/admin/identities/${encodeURIComponent(id)}` +
     `?include_credential=password,webauthn,passkey,totp,lookup_secret`;
@@ -191,7 +153,6 @@ async function patchAdminMarker(id, grant) {
   } else {
     const meta = current.metadata_admin;
     if (!meta || !('admin' in meta)) {
-      // Already absent — no-op.
       return;
     }
     const patchRes = await fetch(`${adminBase()}/admin/identities/${encodeURIComponent(id)}`, {
@@ -203,8 +164,6 @@ async function patchAdminMarker(id, grant) {
   }
 }
 
-// ─── Fetch stub infrastructure ────────────────────────────────────────────────
-
 let capturedCalls = [];
 
 function mockFetch(responseBody = kratosIdentity({ id: 'mock-id', traits: {}, metadata_admin: {} }), status = 200) {
@@ -215,8 +174,6 @@ function mockFetch(responseBody = kratosIdentity({ id: 'mock-id', traits: {}, me
   };
 }
 
-// For updateIdentity: first call (getIdentity) returns currentIdentity,
-// second call (PUT) returns updated identity.
 function mockFetchSequence(responses) {
   capturedCalls = [];
   let i = 0;
@@ -235,8 +192,6 @@ beforeEach(() => {
   mockFetch();
 });
 
-// ─── adminBase ────────────────────────────────────────────────────────────────
-
 test('adminBase: defaults to http://kratos:4434', () => {
   assert.equal(adminBase(), DEFAULT_BASE);
 });
@@ -246,8 +201,6 @@ test('adminBase: KRATOS_ADMIN_URL overrides default', () => {
   assert.equal(adminBase(), 'http://custom-host:4434');
   delete process.env.KRATOS_ADMIN_URL;
 });
-
-// ─── authHeaders ─────────────────────────────────────────────────────────────
 
 test('authHeaders: no token → no Authorization header', () => {
   const h = authHeaders();
@@ -267,8 +220,6 @@ test('authHeaders: extra headers are merged', () => {
   assert.equal(h['Content-Type'], 'application/json');
   assert.equal(h.Accept, 'application/json');
 });
-
-// ─── ok helper ───────────────────────────────────────────────────────────────
 
 test('ok: does not throw on 2xx response', async () => {
   const res = new Response('{}', { status: 200 });
@@ -295,8 +246,6 @@ test('ok: throws on 5xx', async () => {
   );
 });
 
-// ─── listIdentities ───────────────────────────────────────────────────────────
-
 test('listIdentities: GETs /admin/identities', async () => {
   mockFetch([]);
   await listIdentities();
@@ -319,8 +268,6 @@ test('listIdentities: uses correct base URL', async () => {
   delete process.env.KRATOS_ADMIN_URL;
 });
 
-// ─── getIdentity ─────────────────────────────────────────────────────────────
-
 test('getIdentity: GETs /admin/identities/<id>', async () => {
   mockFetch(kratosIdentity({ id: 'abc123', traits: {}, schema_id: 'family', state: 'active' }));
   await getIdentity('abc123');
@@ -341,8 +288,6 @@ test('getIdentity: URL-encodes special characters in id', async () => {
   await getIdentity('id/with/slash');
   assert.match(capturedCalls[0].url, /id%2Fwith%2Fslash/);
 });
-
-// ─── createIdentity ───────────────────────────────────────────────────────────
 
 test('createIdentity: POSTs to /admin/identities', async () => {
   await createIdentity({ traits: { username: 'alice', email: 'alice@example.com' }, metadataAdmin: {} });
@@ -404,8 +349,6 @@ test('createIdentity: returns parsed response body', async () => {
   assert.equal(result.id, 'new-id');
 });
 
-// ─── updateIdentity ───────────────────────────────────────────────────────────
-
 test('updateIdentity: fetches current identity first (GET before PUT)', async () => {
   mockFetchSequence([
     { body: kratosIdentity({ id: 'id-1', traits: {}, schema_id: 'family', state: 'active' }) },
@@ -413,10 +356,8 @@ test('updateIdentity: fetches current identity first (GET before PUT)', async ()
   ]);
   await updateIdentity('id-1', { traits: { username: 'alice', email: 'alice@example.com' }, metadataAdmin: {} });
   assert.equal(capturedCalls.length, 2);
-  // First call is the GET
   assert.match(capturedCalls[0].url, /\/admin\/identities\/id-1/);
   assert.equal(capturedCalls[0].opts?.method, undefined); // GET
-  // Second call is the PUT
   assert.equal(capturedCalls[1].opts.method, 'PUT');
 });
 
@@ -472,12 +413,9 @@ test('updateIdentity: URL-encodes id with special characters', async () => {
   assert.match(capturedCalls[1].url, /id%2Fslash/);
 });
 
-// ─── deleteIdentity ───────────────────────────────────────────────────────────
-
 test('deleteIdentity: DELETEs /admin/identities/<id>', async () => {
   globalThis.fetch = async (url, opts) => {
     capturedCalls.push({ url: String(url), opts });
-    // Use 200 — Node's undici rejects 204 in new Response(); ok() only checks res.ok
     return new Response('{}', { status: 200 });
   };
   await deleteIdentity('del-id');
@@ -493,14 +431,6 @@ test('deleteIdentity: URL-encodes id', async () => {
   await deleteIdentity('id with spaces');
   assert.match(capturedCalls[0].url, /id%20with%20spaces/);
 });
-
-// ─── deactivate: Kratos-side primitives (steps 1-2 of the CU3 fan-out) ────────
-//
-// CU3: the real deactivateIdentity now delegates to revokeSubject({deactivate:
-// true}), which adds Hydra login+consent revoke + best-effort cache/LDAP steps
-// (proven end-to-end in revoke.test.mjs). This re-port still pins the Kratos
-// wire contract those first two steps depend on: PATCH state->inactive THEN
-// DELETE sessions, with the session-delete failure aborting (prescriptive).
 
 test('deactivate (Kratos primitive): first request is PATCH with JSON-Patch content type', async () => {
   globalThis.fetch = async (url, opts) => {
@@ -534,9 +464,6 @@ test('deactivateIdentity: second request DELETEs sessions', async () => {
 });
 
 test('deactivateIdentity: throws when sessions DELETE fails (half-deactivated guard)', async () => {
-  // PATCH succeeds, sessions DELETE fails (500). Without the ok() check on
-  // sessRes the caller saw silent success and the identity stayed in a
-  // half-deactivated state (marked inactive, sessions still live).
   let call = 0;
   globalThis.fetch = async (url, opts) => {
     capturedCalls.push({ url: String(url), opts });
@@ -553,8 +480,6 @@ test('deactivateIdentity: throws when sessions DELETE fails (half-deactivated gu
     },
   );
 });
-
-// ─── getRecoveryLink ─────────────────────────────────────────────────────────
 
 test('getRecoveryLink: POSTs to /admin/recovery/code', async () => {
   mockFetch({ recovery_link: 'https://example.com/link', recovery_code: '123456', expires_at: '2026-01-01T00:00:00Z' });
@@ -592,8 +517,6 @@ test('getRecoveryLink: returns parsed recovery_link + recovery_code + expires_at
   assert.equal(result.expires_at, '2026-06-01T00:00:00Z');
 });
 
-// ─── error propagation ────────────────────────────────────────────────────────
-
 test('listIdentities: throws on non-2xx response', async () => {
   globalThis.fetch = async () => new Response('forbidden', { status: 403 });
   await assert.rejects(() => listIdentities(), /403/);
@@ -619,20 +542,15 @@ test('getRecoveryLink: throws on non-2xx and includes label in message', async (
   );
 });
 
-// ─── patchAdminMarker ─────────────────────────────────────────────────────────
-
 test('patchAdminMarker/grant: GET then PATCH add when metadata_admin absent', async () => {
-  // First call = GET identity (no metadata_admin). Second = PATCH.
   mockFetchSequence([
     { body: kratosIdentity({ id: 'u1', traits: {}, schema_id: 'family', state: 'active' /* no metadata_admin */ }) },
     { body: kratosIdentity({ id: 'u1', traits: {}, metadata_admin: { admin: true } }) },
   ]);
   await patchAdminMarker('u1', true);
   assert.equal(capturedCalls.length, 2);
-  // First call: GET
   assert.match(capturedCalls[0].url, /\/admin\/identities\/u1/);
   assert.equal(capturedCalls[0].opts?.method, undefined);
-  // Second call: PATCH
   assert.equal(capturedCalls[1].opts.method, 'PATCH');
   const patch = JSON.parse(capturedCalls[1].opts.body);
   assert.equal(patch[0].op, 'add');
@@ -678,12 +596,10 @@ test('patchAdminMarker/revoke: GET then PATCH remove when admin key present', as
 });
 
 test('patchAdminMarker/revoke: no-op (no PATCH) when admin key already absent', async () => {
-  // metadata_admin exists but no admin key.
   mockFetchSequence([
     { body: kratosIdentity({ id: 'u5', traits: {}, metadata_admin: { groups: ['family'] } }) },
   ]);
   await patchAdminMarker('u5', false);
-  // Only the GET call; no PATCH issued.
   assert.equal(capturedCalls.length, 1);
 });
 
@@ -695,25 +611,18 @@ test('patchAdminMarker/revoke: no-op when metadata_admin absent entirely', async
   assert.equal(capturedCalls.length, 1);
 });
 
-// ─── updateIdentity: admin marker preservation ────────────────────────────────
-
 test('updateIdentity: includes admin:true when provided in metadataAdmin', async () => {
   mockFetchSequence([
     { body: kratosIdentity({ id: 'id-admin', traits: {}, schema_id: 'family', state: 'active', metadata_admin: { groups: ['family'], admin: true } }) },
     { body: kratosIdentity({ id: 'id-admin', traits: {}, metadata_admin: { groups: ['family'], admin: true } }) },
   ]);
   const newTraits = { username: 'alice', email: 'alice@example.com' };
-  // Caller preserves admin marker by including it in metadataAdmin input.
   await updateIdentity('id-admin', { traits: newTraits, metadataAdmin: { groups: ['family'], admin: true } });
   const putBody = JSON.parse(capturedCalls[1].opts.body);
   assert.equal(putBody.metadata_admin.admin, true);
 });
 
 test('updateIdentity: omitting admin from metadataAdmin does NOT include it in PUT (caller must explicitly preserve)', async () => {
-  // This test documents the contract: the validator only passes through what is
-  // given. The [id].astro save handler is responsible for reading + forwarding
-  // the existing admin value. This test confirms the low-level API is not
-  // silently preserving it (the contract is explicit, not magic).
   mockFetchSequence([
     { body: kratosIdentity({ id: 'id-noadmin', traits: {}, schema_id: 'family', state: 'active', metadata_admin: { groups: ['family'] } }) },
     { body: kratosIdentity({ id: 'id-noadmin', traits: {}, metadata_admin: { groups: ['family'] } }) },

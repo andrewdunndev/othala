@@ -1,71 +1,19 @@
-# Othala end-to-end harness — converged substrate for compose.
-#
-# This is the project's canonical OSS-facing end-to-end example: it shows
-# how Othala ("Ory for your home") stands up on plain `docker compose`
-# from the published images. It doubles as the CI `e2e` gate, consumed by
-# e2e/validate.sh inside a per-job Fedora VM spawned by a QEMU GitLab Runner
-# (Custom Executor); see the `tags:` on the e2e job in .gitlab-ci.yml. The VM
-# is ephemeral; the
-# substrate dies with the VM at job end. An adopter can run the same file
-# on a workstation (see README.md "Local operator invocation").
-#
-# Converged topology:
-#   - postgres (kratos + hydra dbs)
-#   - kratos-migrate (oneshot)
-#   - kratos (public 4433, admin 4434)
-#   - hydra-migrate (oneshot)
-#   - hydra (public 4444, admin 4445)
-#   - othala (the converged Astro Node SSR app, ONE image at the registry
-#     ROOT ${AUTH_REGISTRY}). Public SSR port 8080 serves the family UI +
-#     /auth/* + /admin/* pages + the Hydra login/consent/logout challenge
-#     handlers at /oauth2/{login,consent,logout}. A SEPARATE loopback
-#     admin port 4431 serves /healthz, /readyz, /admin/revoke-user and
-#     /admin/recovery-gate. The two muxes are disjoint by construction.
-#   NOTE: the LDAP bridge (glauth-kratos) is now a separate standalone
-#   project at gitlab.com/dunn.dev/kratos-ldap. No e2e spec exercises
-#   LDAP, so no ldap-bridge service is pulled here. Operators who need
-#   LDAP in their lab compose can add the kratos-ldap image directly.
-#
-# Convergence note: the legacy `consent` (Go) and `util` (Bash) services
-# are GONE. Their roles folded INTO the othala app: consent's challenge
-# handlers + recovery-gate are now the app's /oauth2/* public routes and
-# its /admin/recovery-gate loopback route; util's apply-clients is the
-# app's in-process registrar (the e2e invokes it as a one-shot — see
-# smoke.sh section B). No consent/util CONTAINER or image is pulled.
-#
-# What's intentionally absent vs production:
-#   - No Caddy / TLS / public DNS. Smoke probes hit container HTTP ports
-#     directly via the compose default network. Production-shape TLS +
-#     issuer-byte-match is validated separately (manual lab on real DNS,
-#     or a future iteration that wires Caddy with `tls internal`).
-#
-# Image versions: ${AUTH_VERSION} comes from the environment. In CI the
-# `e2e` job declares `needs: [build-othala, build-e2e-tester]`, so
-# AUTH_VERSION resolves to the just-built tag (v-tag on tags, short-SHA
-# on push). Local operator runs use AUTH_VERSION=latest. The app image is
-# ${AUTH_REGISTRY} at the registry root.
+# Othala end-to-end harness: the converged substrate on plain docker compose, and the
+# CI e2e gate (driven by e2e/validate.sh; local runs: README.md).
+# Absent vs production: Caddy, TLS and DNS; smoke probes hit container ports directly.
+# AUTH_VERSION comes from the environment (CI: the just-built tag; local: latest);
+# the app image is ${AUTH_REGISTRY} at the registry root.
 
 services:
   postgres:
     image: docker.io/library/postgres:18-alpine@sha256:77f585114c32fbca283dc835b0596f4e52b51b4c6662d7810b2f4084f60a1873
     container_name: lab-postgres
     restart: "no"
-    # --- Container hardening (P11) ---
-    # no-new-privileges: safe on all OCI runtimes; prevents any setuid
-    # binary inside the container from elevating past the container user.
+    # Container hardening: no-new-privileges, drop all caps.
     security_opt:
       - "no-new-privileges:true"
-    # Drop ALL Linux capabilities, then add back ONLY what the postgres
-    # entrypoint needs DURING INITIALIZATION. The container starts as root,
-    # chowns/chmods PGDATA + /var/run/postgresql, then setuid-drops to the
-    # postgres user (it does not bind a port < 1024). Under cap_drop: [ALL]
-    # those startup steps fail with "chown: Operation not permitted" — even as
-    # real root on the rootful socket, because dropping ALL removes CAP_CHOWN /
-    # CAP_DAC_OVERRIDE / CAP_FOWNER, and the setpriv to postgres needs
-    # CAP_SETUID / CAP_SETGID. (Observed: cap_drop:[ALL] alone fails the
-    # chown; adding these five reaches "ready to accept connections".)
-    # These are init-time only; postgres holds none of them once it has dropped
-    # to its unprivileged user.
+    # cap_add is init-time only: the entrypoint chowns PGDATA, then drops to postgres;
+    # cap_drop ALL alone fails with "chown: Operation not permitted".
     cap_drop:
       - ALL
     cap_add:
@@ -74,17 +22,7 @@ services:
       - FOWNER
       - SETUID
       - SETGID
-    # NEEDS-VALIDATION: read_only on postgres is deliberately omitted.
-    # Postgres writes to: its PGDATA directory (named volume / bind), the
-    # pg_wal directory, temporary sort files under /tmp, Unix socket files
-    # under /var/run/postgresql, and various lock files. While tmpfs mounts
-    # can cover /tmp and /var/run/postgresql, the PGDATA tree is a named volume
-    # (not rootfs) so it would not be blocked by read_only — BUT the postgres
-    # entrypoint script also writes init markers and pg_hba.conf into PGDATA at
-    # startup, which means any residual writes outside PGDATA (e.g. /run, /etc
-    # minor writes by the entrypoint) could silently break startup. Adding
-    # read_only: true to postgres risks an opaque startup failure; validate on
-    # a real deployment before enabling.
+    # NEEDS-VALIDATION: read_only omitted; the entrypoint may write outside PGDATA.
     pids_limit: 512
     environment:
       POSTGRES_USER: postgres
@@ -99,31 +37,22 @@ services:
       timeout: 3s
       retries: 12
 
-  # Mail catcher — proves the courier path (Kratos recovery/verification) AND
-  # the portal contact form actually deliver. SMTP on :1025 (what both Kratos
-  # and the portal mailer dial via OTHALA_SMTP_CONNECTION_URI), HTTP API on
-  # :8025 (smoke.sh Section H queries /api/v1/messages to assert delivery).
-  # No auth/TLS: mailpit accepts plain SMTP, matching the e2e connection URI.
+  # Mail catcher: SMTP :1025 for Kratos and the portal mailer, HTTP API :8025 for
+  # smoke.sh Section H.
   mailpit:
     image: docker.io/axllent/mailpit:latest@sha256:ed9b00c609e77e99c79b93f1178255ebc271868920f2c69a8d166bd5634ed10d
     container_name: lab-mailpit
     restart: unless-stopped
-    # --- Container hardening (P11) ---
     security_opt:
       - "no-new-privileges:true"
     cap_drop:
       - ALL
-    # read_only: mailpit writes UI state / message storage to an in-process
-    # sqlite DB (default /data/mailpit.db). If run without a named volume for
-    # /data it writes to rootfs. NEEDS-VALIDATION: add read_only: true
-    # plus tmpfs: [/tmp] once the data path is confirmed (either a named volume
-    # or confirmed to be irrelevant for the e2e ephemeral run).
+    # NEEDS-VALIDATION: read_only + tmpfs [/tmp] once the /data path is confirmed.
     pids_limit: 256
     environment:
       MP_SMTP_AUTH_ACCEPT_ANY: "1"
       MP_SMTP_AUTH_ALLOW_INSECURE: "1"
     healthcheck:
-      # mailpit ships a built-in healthcheck helper on its own binary.
       test: ["CMD", "/mailpit", "readyz"]
       interval: 5s
       timeout: 3s
@@ -139,8 +68,7 @@ services:
         condition: service_healthy
     environment:
       DSN: postgres://kratos:${KRATOS_PG_PASS}@postgres:5432/kratos?sslmode=disable
-      # All vars consumed by the canonical kratos/kratos.yml after the scripts/render-config.sh render.
-      # Instance identity
+      # Vars consumed by kratos.yml after scripts/render-config.sh.
       OTHALA_PUBLIC_URL: ${OTHALA_PUBLIC_URL}
       OTHALA_APEX: ${OTHALA_APEX}
       OTHALA_WEBAUTHN_RP_ID: ${OTHALA_WEBAUTHN_RP_ID}
@@ -169,19 +97,14 @@ services:
     image: docker.io/oryd/kratos:v26.2.0@sha256:2a13bb8d362c7a7ae33bd7c0f5168aee46921f15c916a06346db91c06dc76643
     container_name: lab-kratos
     restart: unless-stopped
-    # --- Container hardening (P11) ---
     security_opt:
       - "no-new-privileges:true"
     cap_drop:
       - ALL
-    # Kratos binds ports 4433/4434 (both > 1024) so NET_BIND_SERVICE is NOT
-    # needed. No cap_add required.
     read_only: true
     tmpfs:
       - /tmp
-    # Kratos writes only to /tmp at runtime (temp flow files, session state
-    # is in postgres). Its config + identity schema are mounted read-only
-    # above. No additional tmpfs paths needed.
+    # Writes only to /tmp at runtime; config is mounted read-only.
     pids_limit: 512
     depends_on:
       postgres:
@@ -190,8 +113,7 @@ services:
         condition: service_completed_successfully
     environment:
       DSN: postgres://kratos:${KRATOS_PG_PASS}@postgres:5432/kratos?sslmode=disable
-      # All vars consumed by the canonical kratos/kratos.yml after the scripts/render-config.sh render.
-      # Instance identity
+      # Vars consumed by kratos.yml after scripts/render-config.sh.
       OTHALA_PUBLIC_URL: ${OTHALA_PUBLIC_URL}
       OTHALA_APEX: ${OTHALA_APEX}
       OTHALA_WEBAUTHN_RP_ID: ${OTHALA_WEBAUTHN_RP_ID}
@@ -240,17 +162,14 @@ services:
     image: docker.io/oryd/hydra:v26.2.0@sha256:ff67c7fb5f95074fa53374d41151713554960504b340cd3f95b09e65deaea2a9
     container_name: lab-hydra
     restart: unless-stopped
-    # --- Container hardening (P11) ---
     security_opt:
       - "no-new-privileges:true"
     cap_drop:
       - ALL
-    # Hydra binds ports 4444/4445 (both > 1024). No cap_add required.
     read_only: true
     tmpfs:
       - /tmp
-    # Hydra writes only to /tmp at runtime (crypto scratch, temp JWK files).
-    # Its config is mounted read-only; JWKS material is stored in postgres.
+    # Writes only to /tmp at runtime; config is mounted read-only.
     pids_limit: 512
     depends_on:
       hydra-migrate:
@@ -260,7 +179,6 @@ services:
       HYDRA_PG_PASS: ${HYDRA_PG_PASS}
       HYDRA_SYSTEM_SECRET: ${HYDRA_SYSTEM_SECRET}
       HYDRA_COOKIE_SECRET_CURRENT: ${HYDRA_COOKIE_SECRET_CURRENT}
-      HYDRA_PAIRWISE_SALT: ${HYDRA_PAIRWISE_SALT}
       # Host routing + instance identity consumed by canonical hydra.yml
       HYDRA_PG_HOST: postgres
       OTHALA_PUBLIC_URL: ${OTHALA_PUBLIC_URL}
@@ -277,51 +195,26 @@ services:
       retries: 18
       start_period: 20s
 
-  # The converged Othala app — ONE image at the registry ROOT
-  # (${AUTH_REGISTRY}, e.g. registry.gitlab.com/dunn.dev/othala). No
-  # /portal sub-path, no separate consent/util container. The single
-  # process binds two listeners (portal/src/server/listen.mjs):
-  #   - PUBLIC SSR port 8080: family UI + /auth/* + /admin/* pages + the
-  #     Hydra login/consent/logout challenge handlers /oauth2/{login,
-  #     consent,logout}.
-  #   - ADMIN port 4431 (bound on loopback 127.0.0.1 inside the
-  #     container): /healthz, /readyz, /admin/revoke-user,
-  #     /admin/recovery-gate. Disjoint from the public mux.
-  # The admin port is loopback-only, so the healthcheck and the
-  # admin-route smoke probes run via `compose exec` against
-  # localhost:4431 INSIDE the container — they are not reachable across
-  # the compose network (production-faithful: only Caddy fronts 8080).
-  # ADMIN_PORT=4431 aligns with the portal code default (`ADMIN_PORT` in
-  # listen.mjs)
-  # and the deployed quadlet — single admin-port convention across envs.
+  # The converged app: one image, two listeners (portal/src/server/listen.mjs): public SSR
+  # 8080 and a loopback-only admin port 4431 (/healthz, /readyz, Kratos webhooks), so the
+  # healthcheck and admin smoke probes run via `compose exec` inside the container.
   othala:
     image: ${AUTH_REGISTRY}:${AUTH_VERSION}
     container_name: lab-othala
     restart: unless-stopped
-    # Static in-net IP, owned from FIRST creation (smoke phase) so the browser
-    # overlay's ADMIN_HOST=10.89.11.12 recreate can never collide with a
-    # dynamically-allocated address. Requires the default network's subnet
-    # declaration at the bottom of this file.
+    # Static in-net IP from first creation so the browser overlay's ADMIN_HOST recreate
+    # cannot collide; needs the subnet declared at the bottom.
     networks:
       default:
         ipv4_address: 10.89.11.12
-    # --- Container hardening (P11) ---
     security_opt:
       - "no-new-privileges:true"
     cap_drop:
       - ALL
-    # Othala binds ports 8080 (public SSR) and 4431 (loopback admin) — both
-    # > 1024. No NET_BIND_SERVICE needed. The Node.js process does not require
-    # any other capability.
     read_only: true
     tmpfs:
       - /tmp
-    # Node.js writes temp files under /tmp (e.g. form upload scratch, V8
-    # snapshot files). The manifests volume is mounted read-only. No other
-    # rootfs paths are written at runtime.
-    # NEEDS-VALIDATION: confirm that the Astro SSR adapter (Node
-    # standalone) does not write to /app or any other non-/tmp rootfs path at
-    # startup (e.g. compiled route caches). If it does, add that path to tmpfs.
+    # NEEDS-VALIDATION: confirm the SSR adapter writes nothing outside /tmp at startup.
     pids_limit: 512
     depends_on:
       kratos:
@@ -342,18 +235,16 @@ services:
       OTHALA_APEX: ${OTHALA_APEX}
       MANIFEST_DIR: /etc/portal/manifests
       CSRF_SECRET: ${CSRF_SECRET}
-      # Admin model: authority is metadata_admin.admin===true (boolean
-      # marker in Kratos, set via admin API only). The OTHALA_ADMIN_IDS env var
-      # is retired — no UUID allowlist, no portal recreate after seeding.
-      # The recovery-gate reads is_admin from the webhook payload (set by
-      # recovery-gate.jsonnet from the metadata_admin.admin field).
-      OTHALA_ADMIN_ENDPOINT_BEARER: ${OTHALA_ADMIN_ENDPOINT_BEARER}
+      # Admin authority is metadata_admin.admin===true, set via the Kratos admin API only.
       RECOVERY_GATE_SECRET: ${RECOVERY_GATE_SECRET}
-      # Contact-form mailer: SAME courier connection Kratos uses (mailpit in
-      # the e2e). The portal contact form (/api/request) delivers here.
+      # Contact-form mailer: the same courier connection Kratos uses.
       OTHALA_SMTP_CONNECTION_URI: ${OTHALA_SMTP_CONNECTION_URI}
       OTHALA_SMTP_FROM_ADDRESS: ${OTHALA_SMTP_FROM_ADDRESS}
       OTHALA_CONTACT_RECIPIENT: ${OTHALA_CONTACT_RECIPIENT}
+      # Per-client secrets the boot reconcile resolves for each oidc: fixture.
+      GRAFANA_CLIENT_SECRET: ${GRAFANA_CLIENT_SECRET}
+      AUDIOBOOKSHELF_CLIENT_SECRET: ${AUDIOBOOKSHELF_CLIENT_SECRET}
+      PROMPTDESK_CLIENT_SECRET: ${PROMPTDESK_CLIENT_SECRET}
       HOST: 0.0.0.0
       PORT: "8080"
       ADMIN_HOST: 127.0.0.1
@@ -361,70 +252,19 @@ services:
     volumes:
       - ./manifests:/etc/portal/manifests:ro,z
     healthcheck:
-      # /healthz lives on the loopback ADMIN port (4431), not the public
-      # SSR port. Probe it from inside the container.
+      # /healthz is on the loopback admin port; probe inside the container.
       test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:4431/healthz').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
       interval: 5s
       timeout: 3s
       retries: 12
       start_period: 10s
 
-  # Client registration — the active production registration path (E1 cutover
-  # complete). util/apply-clients.sh is deleted; its role is now the in-process
-  # registrar (portal/src/lib/register-clients.ts -> registerAllClients),
-  # bundled into the image at dist/server/register-clients.mjs
-  # (npm run build:register-clients, same esbuild pattern as admin-runtime).
-  # In production the deploy repo runs this as a --rm one-shot on boot and on
-  # SIGHUP. The e2e activates it as a `compose run --rm`
-  # one-shot on the SAME othala image to prove the registrar registers every
-  # manifest in MANIFEST_DIR=/etc/portal/manifests (mounted from
-  # e2e/manifests/) against Hydra admin. See smoke.sh section B.
-  # `profiles: [oneshot]` keeps it out of the up/healthcheck loop —
-  # smoke runs it explicitly via `compose run`.
-  register-clients:
-    image: ${AUTH_REGISTRY}:${AUTH_VERSION}
-    container_name: lab-register-clients
-    profiles: ["oneshot"]
-    depends_on:
-      hydra:
-        condition: service_healthy
-    environment:
-      HYDRA_ADMIN_URL: http://hydra:4445
-      MANIFEST_DIR: /etc/portal/manifests
-      # register-clients.mjs imports the app config module (config.ts), which
-      # requires OTHALA_PUBLIC_URL at load (required-no-default in production).
-      # The othala/ldap services already get it; the one-shot registrar needs it too.
-      OTHALA_PUBLIC_URL: http://auth.othala.test
-      # config.ts also requires OTHALA_SMTP_CONNECTION_URI (the contact-form
-      # mailer). The registrar doesn't send mail but shares the image + its
-      # config contract, so it sets the same relay the othala service does.
-      OTHALA_SMTP_CONNECTION_URI: ${OTHALA_SMTP_CONNECTION_URI}
-      # config.ts resolves a contact recipient at load. Same image, same config contract.
-      OTHALA_CONTACT_RECIPIENT: ${OTHALA_CONTACT_RECIPIENT}
-      # Per-client secrets for every fixture with an oidc: block. The
-      # generic example set registers three OIDC clients: grafana,
-      # audiobookshelf, promptdesk (client_id "promptdesk").
-      GRAFANA_CLIENT_SECRET: ${GRAFANA_CLIENT_SECRET}
-      AUDIOBOOKSHELF_CLIENT_SECRET: ${AUDIOBOOKSHELF_CLIENT_SECRET}
-      PROMPTDESK_CLIENT_SECRET: ${PROMPTDESK_CLIENT_SECRET}
-    volumes:
-      - ./manifests:/etc/portal/manifests:ro,z
-    command: ["node", "./dist/server/register-clients.mjs"]
-
-  # OIDC dance runner (profile: oneshot) — Section G of smoke.sh.
-  # Runs oidc-dance.mjs from inside the compose net using the PREBAKED
-  # e2e-tester image (Containerfile): the npm deps (@ory/client-fetch,
-  # tough-cookie, fetch-cookie, jose) AND the e2e sources are baked in at
-  # /test at image-build time, so there is NO runtime `npm install` — the
-  # inner VM can't reach the npm registry (it would stall + exit
-  # 124). Runs as a one-shot via
-  # `docker compose --profile oneshot run --rm --no-deps dance-runner`.
-  # smoke.sh Section G's run_dance helper drives this.
-  # Uses othala:8080 (service name) as APP since it is NOT inside the othala container.
+  # OIDC dance runner (profile: oneshot), smoke.sh Section G. Runs oidc-dance.mjs against
+  # othala:8080 from the prebaked e2e-tester image (deps + sources at /test; the inner
+  # VM has no npm egress).
   dance-runner:
     image: ${AUTH_REGISTRY}/e2e-tester:${AUTH_VERSION}
-    # No container_name: compose run --rm creates ephemeral unique names;
-    # a fixed name would conflict when G1/G2/G3 run in sequence.
+    # No container_name: a fixed name would conflict across G1/G2/G3.
     profiles: ["oneshot"]
     depends_on:
       othala:
@@ -434,42 +274,28 @@ services:
     environment:
       OTHALA_URL: http://othala:8080
     working_dir: /test
-    # Deps + sources are prebaked at /test; just run node. smoke.sh passes
-    # the substituted dance script via stdin.
+    # smoke.sh passes the dance script via stdin.
     entrypoint: ["node"]
 
-  # Browser-test edge (profile: browser ONLY). Fronts app + Kratos + Hydra on ONE
-  # host so a real browser can drive the integrated login -> consent -> token flow.
-  # NOT part of the golden run (D10: the edge is operator-out-of-scope) — starts only
-  # with `docker compose --profile browser up`. Published on the host :8088 so an
-  # interactive agent-browser (Playwright) can reach it via an ssh tunnel to the VM.
+  # Browser-test edge (profile: browser only, not the golden run): fronts app, Kratos
+  # and Hydra on one host at :8088 so a browser can drive login, consent and token.
   caddy:
-    # dunn.dev/caddy, not stock caddy:2-alpine: N1/N2 (n-rate-limits.spec.ts)
-    # need the `rate_limit` directive (mholt/caddy-ratelimit), which stock
-    # Caddy does not ship. Same tag@digest production pins
-    # (iac dag-caddy.container); re-resolve via
-    # `skopeo inspect docker://registry.gitlab.com/dunn.dev/caddy:v2.11.4-3`.
+    # dunn.dev/caddy, not stock caddy: n-rate-limits.spec.ts needs rate_limit. Same
+    # tag as production (iac dag-caddy.container); re-resolve via skopeo inspect.
     image: registry.gitlab.com/dunn.dev/caddy:v2.11.4-3@sha256:78e84240c3c703bb374aa003424c56143376c621a0b7e17cc6bcf009eec86446
     container_name: lab-caddy
     profiles: ["browser"]
     restart: unless-stopped
-    # --- Container hardening (P11) ---
     security_opt:
       - "no-new-privileges:true"
     cap_drop:
       - ALL
-    # This e2e Caddy binds port 80 INSIDE the container (published as 8088 on
-    # the host). Port 80 is < 1024, so the process needs NET_BIND_SERVICE to
-    # bind it without running as root. dunn.dev/caddy's UBI-micro runtime
-    # drops to a non-root user; if it doesn't, check the image. Add
-    # NET_BIND_SERVICE conservatively.
+    # Binds port 80 (< 1024), so NET_BIND_SERVICE is added.
     cap_add:
       - NET_BIND_SERVICE
     read_only: true
     tmpfs:
-      # Caddy writes its ACME/cert state and auto-HTTPS data here. In this
-      # e2e context it uses plain HTTP (port 80, no TLS), but Caddy still
-      # writes a data dir at startup.
+      # ACME/cert data dir (plain HTTP here, but Caddy still writes it).
       - /data
       - /config
       - /tmp
@@ -487,35 +313,14 @@ services:
       - "8088:80"
     networks:
       default:
-        # ONE public host that resolves to the edge from inside the net — both the
-        # in-net browser AND the app's server-side use it (the production split-
-        # horizon shape: browser -> Caddy, server-side -> Caddy, one host). MUST be a
-        # subdomain of the Kratos cookie domain (othala.test) or the CSRF cookie is
-        # never sent back and the login flow redirect-loops (finding 2026-06-03).
+        # One public host resolving to the edge for browser and server-side alike; MUST be
+        # a subdomain of the Kratos cookie domain (othala.test) or the CSRF cookie is never sent.
         aliases:
           - auth.othala.test
 
-  # Browser e2e test runner (profile: browser ONLY). Runs INSIDE the compose net,
-  # resolves auth.othala.test → Caddy, drives the four human-flow assertions (A/B/C/D)
-  # via @playwright/test specs (e2e/playwright/tests/*.spec.ts). Screenshots + test
-  # output land in ./browser-out for CI artifact upload.
-  #
-  # The base mcr.microsoft.com/playwright image ships Chromium + all browser
-  # binaries pre-installed at /ms-playwright. The PREBAKED e2e-tester image
-  # (Containerfile, FROM that base) additionally bakes the @playwright/test
-  # npm package + the e2e sources into /test at image-build time. There is
-  # therefore NO runtime `npm install` — the install happens on the
-  # egress-capable build runner, not in the no-egress inner VM
-  # where a runtime install stalls and times out the gate (exit 124).
-  # PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD=1 (also set in the image) prevents a
-  # redundant download.
-  #
-  # Split-horizon fix: compose.browser.yml overrides othala
-  # KRATOS_PUBLIC_URL=http://auth.othala.test for the browser profile. The golden
-  # run keeps the internal kratos:4433 (fast, no Caddy hop); the browser profile
-  # needs the public host so browserFlows redirect URLs resolve in Chromium and
-  # ory_kratos_session is scoped to othala.test. See compose.browser.yml for the
-  # full rationale (finding 2026-06-10).
+  # Browser e2e runner (profile: browser only): resolves auth.othala.test to Caddy and runs
+  # the /test specs from the prebaked e2e-tester image (no runtime npm install;
+  # the inner VM has no egress). compose.browser.yml overrides KRATOS_PUBLIC_URL to the public host.
   playwright:
     image: ${AUTH_REGISTRY}/e2e-tester:${AUTH_VERSION}
     container_name: lab-playwright
@@ -530,33 +335,19 @@ services:
       KRATOS_ADMIN_URL: http://kratos:4434
       HYDRA_PUBLIC_URL: http://hydra:4444
       HYDRA_ADMIN_URL: http://hydra:4445
-      # J2 direct probe: recovery-gate on the othala admin port.
-      # In the browser profile othala binds :4431 to its static internal IP
-      # (ADMIN_HOST override in compose.browser.yml); the `othala` service
-      # hostname resolves to that IP inside the compose net.
+      # J2: recovery-gate on the othala admin port (static IP via ADMIN_HOST in compose.browser.yml).
       OTHALA_ADMIN_URL: http://othala:4431
       RECOVERY_GATE_SECRET: ${RECOVERY_GATE_SECRET}
-      # P2 (p-eviction.spec.ts): admin revokeSubject force-logout, bearer-guarded
-      # like RECOVERY_GATE_SECRET above.
-      OTHALA_ADMIN_ENDPOINT_BEARER: ${OTHALA_ADMIN_ENDPOINT_BEARER}
       GRAFANA_CLIENT_SECRET: ${GRAFANA_CLIENT_SECRET}
       PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD: "1"
     volumes:
-      # Only the artifact sink is mounted: specs + node_modules are baked
-      # into the image at /test. browser-out captures screenshots + the
-      # html report for CI artifact upload.
+      # Only the artifact sink is mounted; specs are baked in at /test.
       - ./browser-out:/out:z
     working_dir: /test
-    # Deps + specs prebaked at /test; just run the suite. No npm install.
     command: ["npx", "playwright", "test", "--config=playwright.config.ts"]
 
-# The default network is declared HERE (not only in compose.browser.yml) so it
-# is CREATED with this subnet at smoke time. podman-compose reuses an existing
-# network as-is when the browser overlay layers on: without this block the
-# base implicitly created e2e_default on podman's default subnet
-# (10.89.0.0/24), the overlay's static 10.89.11.12 was out-of-subnet, and the
-# browser edge could not start (v0.3.0 first-cut e2e failure, 2026-07-01).
-# Keep in lockstep with compose.browser.yml's networks block.
+# Declared here so the default network is created with this subnet at smoke time (the
+# overlay's static 10.89.11.12 must be in-subnet). Keep in lockstep with compose.browser.yml.
 networks:
   default:
     driver: bridge

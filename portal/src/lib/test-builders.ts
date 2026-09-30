@@ -1,8 +1,4 @@
-// Typed builders for Kratos and Hydra shapes in unit tests.
-//
-// Defaults reproduce what Kratos v26.2.0 and Hydra return to the portal, so a
-// fixture starts realistic and a test states only what it varies. Kratos
-// source references are paths in ory/kratos at v26.2.0.
+// Invariant: builders reproduce Kratos v26.2.0 and Hydra shapes; tests state only what they vary.
 
 import type {
   IdentityCredentials,
@@ -38,24 +34,11 @@ export interface IdentityOptions {
   displayName?: string;
   schemaId?: string;
   state?: 'active' | 'inactive';
-  /** false: the password entry carries identifiers only (no password set). */
   password?: boolean;
   verified?: boolean;
   metadataAdmin?: Identity['metadata_admin'];
 }
 
-/**
- * An identity as the admin API returns it from getIdentity (credentials
- * included for the types admin-api.ts requests).
- *
- * The schema marks username as a password and webauthn identifier and email
- * as a password and code identifier, so every identity carries all three
- * entries whether or not the member enrolled anything
- * (identity/extension_credentials.go:35-52, :66-122). An entry stored without
- * config is persisted as {} (persistence/sql/identity/persister_identity.go:302)
- * and returned as {} when requested; a type not requested comes back without
- * config (identity/identity.go:479-483). 'code' is not requested.
- */
 export function identity(opts: IdentityOptions = {}): Identity {
   const id = opts.id ?? 'aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee';
   const username = opts.username ?? 'ada.lovelace';
@@ -100,7 +83,6 @@ export function identity(opts: IdentityOptions = {}): Identity {
   };
 }
 
-/** Replace (or add) one credential entry. For variants the helpers below do not cover. */
 export function withCredential(i: Identity, type: string, config: object, identifiers?: string[]): Identity {
   const prior = i.credentials?.[type];
   return {
@@ -112,13 +94,11 @@ export function withCredential(i: Identity, type: string, config: object, identi
   };
 }
 
-/** TOTP enrolled via settings: identifier is the identity id (selfservice/strategy/totp/settings.go:205). */
 export function withTotp(i: Identity): Identity {
   return withCredential(i, 'totp', { totp_url: `otpauth://totp/othala:${String(i.traits?.username ?? '')}?secret=JBSWY3DPEHPK3PXP&issuer=othala` }, [i.id]);
 }
 
 function webauthnKey(n: number, passwordless: boolean): object {
-  // identity/credentials_webauthn.go:139-150; byte fields marshal as base64.
   return {
     id: Buffer.from(`key-${n}`).toString('base64'),
     public_key: 'cHVibGljLWtleQ==',
@@ -132,7 +112,6 @@ function webauthnKey(n: number, passwordless: boolean): object {
 
 type WebauthnConfig = { credentials?: object[]; user_handle?: string };
 
-/** A security key on the schema's webauthn entry; identifiers stay the username. */
 export function withWebauthnKey(i: Identity, { passwordless = false }: { passwordless?: boolean } = {}): Identity {
   const prior = (i.credentials?.webauthn?.config ?? {}) as WebauthnConfig;
   const keys = prior.credentials ?? [];
@@ -142,13 +121,11 @@ export function withWebauthnKey(i: Identity, { passwordless = false }: { passwor
   });
 }
 
-/** A passkey: identifier is the WebAuthn user handle (selfservice/strategy/passkey/passkey_registration.go:184). */
 export function withPasskey(i: Identity): Identity {
   const handle = Buffer.from(i.id).toString('base64');
   return withCredential(i, 'passkey', { credentials: [webauthnKey(1, true)], user_handle: handle }, [handle]);
 }
 
-/** Backup codes: identifier is the identity id (selfservice/strategy/lookup/settings.go:304). */
 export function withLookupSecret(i: Identity): Identity {
   return withCredential(i, 'lookup_secret', { recovery_codes: [{ code: 'aaaa-bbbb' }, { code: 'cccc-dddd' }] }, [i.id]);
 }
@@ -157,7 +134,6 @@ export function asAdmin(i: Identity): Identity {
   return { ...i, metadata_admin: { ...i.metadata_admin, admin: true } };
 }
 
-/** The identity as /sessions/whoami embeds it: no credentials, no metadata_admin (identity/identity.go:361-370). */
 export function whoamiIdentity(i: Identity): Identity {
   const { credentials: _c, metadata_admin: _m, ...rest } = i;
   return rest;
@@ -165,11 +141,6 @@ export function whoamiIdentity(i: Identity): Identity {
 
 type MethodName = NonNullable<SessionAuthenticationMethod['method']>;
 
-/**
- * A /sessions/whoami session (session/session.go:76-127). A method given by
- * name completes now; the first counts as aal1 and later ones as aal2, the
- * order of a step-up.
- */
 export function session(
   aal: AAL = 'aal1',
   methods: Array<MethodName | SessionAuthenticationMethod> = ['password'],

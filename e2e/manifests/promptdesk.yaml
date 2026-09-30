@@ -1,16 +1,6 @@
-# Promptdesk — prompt.othala.test
-# Generic example fixture for the Othala e2e harness. It exists to make one
-# point the other OIDC fixtures cannot: the SERVICE slug and the OAuth2
-# client_id are allowed to differ. Everything user-facing here is `prompt`
-# (prompt.othala.test, prompt-access, prompt-admin) while the registered
-# client_id is `promptdesk` — further proof that a group name is convention
-# and the BINDING is what the runtime reads (portal/src/lib/access-groups.ts,
-# group-registry.ts).
-#
-# It also carries the shape most role-mapping RPs want: a configurable roles
-# claim (here `groups`) whose values the app maps to its own admin/user model,
-# and no back-channel logout — plenty of RPs never implemented it, and this
-# fixture is the one that leaves `backchannel_logout_uri` absent.
+# Promptdesk: the service slug (prompt) and the OAuth2 client_id (promptdesk) may differ;
+# the binding is what the runtime reads (access-groups.ts, group-registry.ts). It also
+# carries a configurable roles claim (groups) and no back-channel logout.
 
 presentation:
   name: Prompt
@@ -20,8 +10,6 @@ presentation:
   icon_slug: ""
   icon_fallback: chat
   auth_kind: oidc
-  # ENTRY: `prompt-access` and nothing else. `prompt-admin` is bound under
-  # consent.group_role_map only.
   access:
     - prompt-access
   order: 120
@@ -34,8 +22,7 @@ oidc:
     - refresh_token
   response_types:
     - code
-  # offline_access is required for Hydra to issue a refresh_token alongside
-  # the access_token; without it the refresh_token grant type is a no-op.
+  # offline_access is required for Hydra to issue a refresh token.
   scope: openid email profile groups offline_access
   redirect_uris:
     - https://prompt.othala.test/oauth/oidc/callback
@@ -47,11 +34,7 @@ oidc:
     - https://prompt.othala.test
   skip_consent: true
 
-# Consent claim shape for this client.
-#
-# The RP is configured to read its role from the `groups` claim and map the
-# values to its own account types: admins receive `admin`, everyone else
-# `user`. Per-object permissions stay inside the app.
+# The RP reads its role from the groups claim: admins get admin, everyone else user.
 consent:
   emit_groups_claim: true
   roles:
@@ -63,10 +46,8 @@ consent:
       description: "Member: chat access across permitted models."
       claim_emit:
         groups: ["user"]
-  # Exactly two groups for this service. `prompt-admin` appears HERE (role) and
-  # NOT under presentation.access (entry) — holding it alone gets you nothing.
-  # Roles are declared above in descending privilege because lookupRole
-  # (portal/src/lib/claims.ts) ranks by declaration index.
+  # prompt-admin is a role only: it is absent from presentation.access, so it grants no entry.
+  # Roles are declared in descending privilege because lookupRole ranks by declaration index.
   group_role_map:
     prompt-admin: admin
     prompt-access: user

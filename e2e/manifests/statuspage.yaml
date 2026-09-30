@@ -1,32 +1,7 @@
-# Statuspage — status.othala.test (external SaaS tile)
-# Generic example fixture for the Othala e2e harness. A stand-in for an
-# external, hosted service the portal links out to — auth_kind: external.
-# It declares no `oidc:` block, so it loads as presentationOnly:true
-# (portal/src/lib/manifests.ts) and oidcClientManifests filters it out of
-# the registrable set (`set.filter((m) => !m.presentationOnly)`). The
-# `consent:` block below carries nothing but skip_access_check.
-#
-# What skip_access_check: true does HERE: this manifest declares neither
-# presentation.access nor presentation.access_group, so parseAccessGroups
-# returns [] (portal/src/lib/access-groups.ts). Without the flag,
-# validateClients reports "presentation.access is empty and
-# consent.skip_access_check is not set" (portal/src/lib/manifests.ts:
-# `if (cm.accessGroups.length === 0 && !cm.skipAccessCheck)`), and
-# loadClientManifests throws on any finding — failing the whole catalog
-# load, not just this file. The flag suppresses that BLOCK. The same field
-# is also the group-check bypass in enforceAccessGate
-# (portal/src/lib/gate.ts: `if (manifest?.skipAccessCheck) return { allowed:
-# true };`), which sits after the state check and so never bypasses it.
-#
-# It has NO effect on dashboard tile visibility: the tile loader
-# (portal/src/lib/tiles.ts, parseTile) only ever reads `doc['presentation']`,
-# never `consent:`. Visibility is decided by userCanSeeTile over
-# tileAccessGroups; with no access binding declared, that falls back to the
-# singular accessGroup, which parseTile sets to the configured default group
-# (OTHALA_DEFAULT_GROUP, via tileDefaultGroup()) — so the tile is visible
-# only to identities holding that group, not to every logged-in user. To
-# bind it to a specific group, add access_group or access: [...] under
-# presentation.
+# Statuspage: an external hosted service (auth_kind: external), presentation only.
+# skip_access_check suppresses the load-time BLOCK for a manifest with no access binding;
+# it does not affect tile visibility (parseTile reads presentation only, so the tile falls
+# back to OTHALA_DEFAULT_GROUP). Add access or access_group to bind it.
 
 presentation:
   name: Statuspage

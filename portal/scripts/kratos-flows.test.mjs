@@ -1,10 +1,4 @@
-// Tests for src/lib/kratos.ts browserFlows URL builders.
-//
-// Run with: KRATOS_PUBLIC_URL=https://test.example npx vitest run scripts/kratos-flows.test.mjs
-//
-// Imports the canonical builders directly. browserFlows now emits
-// SAME-ORIGIN RELATIVE paths (the browser cannot resolve the internal
-// server-side Kratos host), so the expected base is the empty string.
+// Invariant: browserFlows URL builders target the configured public URL.
 
 import { test } from 'vitest';
 import assert from 'node:assert/strict';
@@ -22,21 +16,16 @@ test('login: aal2', () => {
 
 test('login: aal2 + refresh', () => {
   const url = browserFlows.login({ aal: 'aal2', refresh: true });
-  // Query order is insertion order for URLSearchParams; assert both keys present.
   assert.ok(url.includes('aal=aal2'));
   assert.ok(url.includes('refresh=true'));
 });
 
 test('login: aal2 + refresh + returnTo with reserved chars', () => {
-  // The admin AAL2 step-up flow passes the current page as return_to.
-  // Reserved chars (=, &, /) MUST be encoded so Kratos sees them as
-  // values, not query separators.
   const url = browserFlows.login({
     aal: 'aal2',
     refresh: true,
     returnTo: 'https://sso.othala.test/admin/users/abc-123?tab=overview',
   });
-  // URLSearchParams encodes : / ? = & properly
   assert.ok(url.includes('return_to=https%3A%2F%2Fsso.othala.test%2Fadmin%2Fusers%2Fabc-123%3Ftab%3Doverview'));
 });
 
@@ -79,7 +68,6 @@ test('logout: with returnTo', () => {
 });
 
 test('all builders: omit query string when no opts', () => {
-  // Defensive: don't emit "?" alone when there's nothing to add.
   assert.ok(!browserFlows.login().includes('?'));
   assert.ok(!browserFlows.registration().includes('?'));
   assert.ok(!browserFlows.settings().includes('?'));

@@ -1,26 +1,4 @@
-// Tests for src/lib/kratos.ts sendInviteRecoveryEmail (D1: admin-triggered
-// invite email).
-//
-// Run with: npx vitest run scripts/kratos-invite-email.test.mjs
-//
-// Imports the real TS function directly (it uses bare fetch, not the @ory
-// SDK) and stubs globalThis.fetch — same style as forward-auth.test.mjs /
-// revoke.test.mjs, which prove this pattern also works through the @ory SDK's
-// fetch usage. No network, no live Kratos required.
-//
-// Coverage:
-//   - two-call shape: GET .../self-service/recovery/api, then
-//     POST .../self-service/recovery?flow=<id> with { method: 'code', email }
-//   - Accept: application/json on the init call (so Kratos returns JSON, not
-//     a 303 redirect to the recovery UI)
-//   - success treated as {200, 400, 422} on the submit call — the Kratos v26
-//     "flow state mismatch" 400 is a normal transition, not a failure (same
-//     contract e2e/playwright/tests/j-recovery-flow.spec.ts and
-//     k-email-code-login.spec.ts assert against a live stack)
-//   - throws on a genuine submit failure (e.g. 500)
-//   - throws when the init call itself fails, or returns no flow id
-//   - KRATOS_PUBLIC_URL override is honoured (same env contract as the rest
-//     of kratos.ts)
+// Invariant: sendInviteRecoveryEmail targets only the confirmed identity address.
 
 import { test, beforeEach, afterEach } from 'vitest';
 import assert from 'node:assert/strict';
@@ -35,7 +13,6 @@ function jsonResponse(body, status = 200) {
   });
 }
 
-/** Records every call { url, method, headers, body } for assertion. */
 function installFetch({ initStatus = 200, flowId = 'flow-abc', submitStatus = 200 } = {}) {
   const calls = [];
   globalThis.fetch = async (input, init = {}) => {

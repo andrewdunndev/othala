@@ -18,9 +18,9 @@ export const prerender = false;
 import Layout from '../../layouts/Layout.astro';
 import { getTile, safeHref, userCanSeeTile } from '../../lib/tiles';
 import { getSession } from '../../lib/kratos';
-import { getIdentity } from '../../lib/admin';
+import { getIdentity } from '../../lib/admin-api';
 import { identityGroups } from '../../lib/gate';
-import { isAdminBySession } from '../../lib/admin-auth';
+import { isAdminMarker } from '../../lib/admin-auth';
 
 const { slug } = Astro.params;
 if (!slug) {
@@ -48,21 +48,16 @@ if (!entry) {
 // the same accessGroups binding as the gate).
 // The public whoami does NOT expose metadata_admin, so both the user's groups
 // and admin status come from a re-fetch of the FULL identity via the ADMIN API.
-// FAIL-CLOSED: any lookup failure → empty groups → the access gate denies;
-// isAdminBySession is also fail-closed (returns false on any error).
-//
-// NOTE: isAdminBySession adds one Kratos admin-API call per render of this page
-// (in addition to the getIdentity call for groups). This is acceptable for
-// cosmetic chrome — real authority is enforced by requireAdminSession on /admin.
-// A shared admin-API fetch (caching identity across both lookups) can be added
-// later if render latency becomes a concern.
+// FAIL-CLOSED: any lookup failure → empty groups and not admin → the access gate denies.
 let groups: string[] = [];
+let isAdmin = false;
 try {
-  groups = identityGroups(await getIdentity(session.identity.id));
+  const identity = await getIdentity(session.identity.id);
+  groups = identityGroups(identity);
+  isAdmin = isAdminMarker(identity);
 } catch (lookupErr) {
   console.error('[othala/apps] getIdentity failed; denying (no groups):', lookupErr);
 }
-const isAdmin = await isAdminBySession(session.identity.id);
 const hasAccess = isAdmin || userCanSeeTile(entry, groups);
 if (!hasAccess) {
   return Astro.redirect('/auth/error?reason=not-authorised');

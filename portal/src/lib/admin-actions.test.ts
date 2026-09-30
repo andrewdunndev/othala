@@ -1,40 +1,4 @@
-/**
- * admin-actions.test.ts — destructive-invariant tests for the admin POST
- * action handlers.
- *
- * Coverage (deliberately NOT re-testing lib-level primitives that already
- * have their own suites — gate.ts's planGroupSave, access.ts's
- * confirmsInviteAddress/shouldRefuseRecovery, revoke.ts):
- *   deleteAction:
- *   - admin-marked target refused, deleteIdentity never called (closes the
- *     delete-the-last-admin lockout; covers self-delete since self is admin)
- *   - wrong confirm refused, deleteIdentity never called
- *   - happy path: deleteIdentity called, 303 redirect Response returned
- *   - revokeSubject (deactivating) runs before deleteIdentity; a revoke failure
- *     keeps the identity; a delete failure after it is a neutral error
- *   saveAction:
- *   - a removed group or changed role revokes consent sessions after the write
- *   - an unchanged or widened save does not revoke; a revoke failure says the save stood
- *   - a stored group with no checkbox is kept unless its removal is ticked,
- *     and never counts toward the identity-group minimum
- *   deactivateAction:
- *   - self refused; the last active admin refused; a member needs no count
- *   revokeAdminAction:
- *   - self-demote refused, patchAdminMarker never called
- *   - last active admin refused (an inactive admin does not count), patchAdminMarker never called
- *   - happy path: patchAdminMarker(id, false) called, then consent sessions revoked
- *   removeCredentialAction:
- *   - non-allowlisted type refused, deleteCredential never called
- *   - passkey refused server-side (upstream 400 — Kratos cannot admin-delete
- *     it), deleteCredential never called
- *   - happy path: deleteCredential called
- *   - admin-marked target, and the acting admin, keep a totp or webauthn credential
- *   grantAdminAction:
- *   - refused without a totp or webauthn credential
- *   - happy path: patchAdminMarker(id, true) called
- *
- * Run: npx vitest run   (from portal/)
- */
+// Invariant: destructive admin actions refuse unsafe targets and never call the API after a failed guard.
 
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
@@ -58,18 +22,6 @@ const {
   deactivateIdentityMock: vi.fn(),
 }));
 
-vi.mock('./admin', async (importOriginal) => {
-  const actual = await importOriginal<typeof import('./admin.js')>();
-  return {
-    ...actual,
-    deleteIdentity: deleteIdentityMock,
-    listIdentities: listIdentitiesMock,
-    patchAdminMarker: patchAdminMarkerMock,
-    updateIdentity: updateIdentityMock,
-    deactivateIdentity: deactivateIdentityMock,
-  };
-});
-
 vi.mock('./revoke', async (importOriginal) => {
   const actual = await importOriginal<typeof import('./revoke.js')>();
   return { ...actual, revokeSubject: revokeSubjectMock, revokeConsentSessions: revokeConsentSessionsMock };
@@ -77,7 +29,15 @@ vi.mock('./revoke', async (importOriginal) => {
 
 vi.mock('./admin-api', async (importOriginal) => {
   const actual = await importOriginal<typeof import('./admin-api.js')>();
-  return { ...actual, deleteCredential: deleteCredentialMock };
+  return {
+    ...actual,
+    deleteIdentity: deleteIdentityMock,
+    listIdentities: listIdentitiesMock,
+    patchAdminMarker: patchAdminMarkerMock,
+    updateIdentity: updateIdentityMock,
+    deactivateIdentity: deactivateIdentityMock,
+    deleteCredential: deleteCredentialMock,
+  };
 });
 
 import {
@@ -135,8 +95,6 @@ beforeEach(() => {
   revokeSubjectMock.mockReset().mockResolvedValue(undefined);
   revokeConsentSessionsMock.mockReset().mockResolvedValue(undefined);
 });
-
-// ── deleteAction ──────────────────────────────────────────────────────────────
 
 describe('deleteAction', () => {
   it('refuses an admin-marked target and never calls deleteIdentity', async () => {
@@ -204,10 +162,7 @@ describe('deleteAction', () => {
   });
 });
 
-// ── saveAction ────────────────────────────────────────────────────────────────
-
 describe('saveAction', () => {
-  // Both groups are offered as access checkboxes, as the form renders them.
   const MANIFESTS = [{ clientId: 'wiki', accessGroups: ['family', 'media'], groupRoleMap: {} }] as unknown as ActionContext['manifests'];
 
   function saveForm(groups: string[], role?: string): FormData {
@@ -297,8 +252,6 @@ describe('saveAction', () => {
   });
 });
 
-// ── revokeAdminAction ─────────────────────────────────────────────────────────
-
 describe('revokeAdminAction', () => {
   it('refuses self-demote and never calls patchAdminMarker', async () => {
     const identity = makeIdentity('admin', true);
@@ -341,8 +294,6 @@ describe('revokeAdminAction', () => {
     expect(outcome.refetch).toBe(true);
   });
 });
-
-// ── removeCredentialAction ──────────────────────────────────────────────────
 
 describe('removeCredentialAction', () => {
   it('refuses a non-allowlisted credential type and never calls deleteCredential', async () => {
@@ -415,8 +366,6 @@ describe('removeCredentialAction', () => {
   });
 });
 
-// ── deactivateAction ────────────────────────────────────────────────────────
-
 describe('deactivateAction', () => {
   it('refuses self-deactivation and never calls deactivateIdentity', async () => {
     listIdentitiesMock.mockResolvedValue([makeIdentity('admin', true), makeIdentity('other', true)]);
@@ -450,8 +399,6 @@ describe('deactivateAction', () => {
     expect(outcome.actionResult?.kind).toBe('deactivated');
   });
 });
-
-// ── grantAdminAction ─────────────────────────────────────────────────────────
 
 describe('grantAdminAction', () => {
   it.each([[[]], [['password', 'passkey']], [['lookup_secret']]])(

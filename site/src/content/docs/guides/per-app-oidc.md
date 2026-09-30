@@ -64,8 +64,8 @@ inference was retired.
 Generate a client secret, store it, and write the manifest with
 `presentation.access` naming only the access group and `consent.group_role_map`
 naming both. Then register the client with Hydra:
-`portal/src/lib/register-clients.ts` runs as a one-shot on the network that can
-reach the admin port, and it creates and updates but **never deletes**, so
+the app's boot reconcile (and SIGHUP) registers it through the Hydra admin
+port, and it creates and updates but **never deletes**, so
 retiring a service leaves a ghost registration until an operator removes it by
 hand. Everything to that point is verifiable without the application running.
 
@@ -116,8 +116,7 @@ contract; `portal/scripts/forward-auth.test.mjs` pins it.
 redirect at all, so they use a credential in the application's own user
 database, set by an admin there; it is not the Kratos password and the two are
 never shared. This is the supported pattern for those clients, not a fallback
-waiting to be simplified away. An LDAP bridge for the same problem exists as
-an unmaintained reference at `gitlab.com/dunn.dev/kratos-ldap`.
+waiting to be simplified away.
 
 ## Troubleshooting
 

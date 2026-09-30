@@ -1,7 +1,7 @@
 .PHONY: help brand
 
 help:
-	@echo "dunn.dev/othala — SSO substrate (Ory Kratos + Hydra + Astro UI); glauth-kratos LDAP bridge at gitlab.com/dunn.dev/kratos-ldap"
+	@echo "dunn.dev/othala — SSO substrate (Ory Kratos + Hydra + Astro UI)"
 	@echo ""
 	@echo "Status:"
 	@echo "  See README.md for current direction."

@@ -1,22 +1,8 @@
-// Tests for src/lib/metadata-admin.ts — the load-bearing validator
-// (LB-8 / MEDIUM-3 in the security review).
-//
-// Run with: npx vitest run scripts/metadata-admin.test.mjs
-//
-// Imports the canonical validator directly. The schema mirror lives
-// alongside identity.schema.json's metadata_admin shape:
-//   { groups?: string[]; roles?: Record<string, string> }
-//   - groups: array of lowercase-dash-strings, 1..64 chars,
-//             regex ^[a-z][a-z0-9-]*$, no duplicates
-//   - roles: object with keys ^[a-z][a-z0-9]*$ → values matching
-//            ^[a-z][a-z0-9_\-]*$ length 1..64
-//   - no other top-level keys allowed
+// Invariant: metadata_admin input is validated strictly; unknown fields and wrong types are errors.
 
 import { test } from 'vitest';
 import assert from 'node:assert/strict';
 import { validateMetadataAdmin, MetadataAdminError } from '../src/lib/metadata-admin.ts';
-
-// ===== Top-level shape =====
 
 test('null/undefined → empty object', () => {
   assert.deepEqual(validateMetadataAdmin(null), {});
@@ -38,7 +24,6 @@ test('array input → error', () => {
 });
 
 test('unknown top-level field → error (catches typos like "grupos")', () => {
-  // The whole point of LB-8: typos must fail loud.
   assert.throws(
     () => validateMetadataAdmin({ grupos: ['admin'] }),
     /unknown field "grupos"/,
@@ -48,8 +33,6 @@ test('unknown top-level field → error (catches typos like "grupos")', () => {
     /unknown field "role"/,
   );
 });
-
-// ===== Groups =====
 
 test('groups: well-formed array round-trips', () => {
   const result = validateMetadataAdmin({ groups: ['admin', 'family', 'access-filedrop'] });
@@ -110,11 +93,6 @@ test('groups: duplicate → error', () => {
   );
 });
 
-// The write path validates against the ONE canonical group-name policy
-// (GROUP_RE, src/lib/access-groups.ts), which is what every group comparison
-// in src/ assumes and what gate.ts refuses on read. identity.schema.json's
-// documentary `metadata_admin.groups` pattern is the same expression; it
-// enforces nothing, since Kratos validates `traits` only.
 test('groups: hyphens in the middle are allowed', () => {
   const result = validateMetadataAdmin({ groups: ['access-filedrop-v2'] });
   assert.deepEqual(result.groups, ['access-filedrop-v2']);
@@ -127,10 +105,6 @@ test('groups: a dot is rejected — the canonical form has no dot', () => {
   );
 });
 
-// Both ends of the reconciled charset. A leading digit used to be accepted here
-// while identity.schema.json forbade it; the two are now the intersection
-// (^[a-z][a-z0-9-]*$), so a name the schema advertises can never be one the
-// read gate refuses.
 test('groups: a leading digit is rejected — the canonical form starts with a letter', () => {
   assert.throws(
     () => validateMetadataAdmin({ groups: ['2fa-required'] }),
@@ -142,8 +116,6 @@ test('groups: empty array → empty result', () => {
   const result = validateMetadataAdmin({ groups: [] });
   assert.deepEqual(result.groups, []);
 });
-
-// ===== Roles =====
 
 test('roles: well-formed object round-trips', () => {
   const result = validateMetadataAdmin({ roles: { filedrop: 'admin', proxywatch: 'viewer' } });
@@ -214,8 +186,6 @@ test('roles: empty object → empty result', () => {
   assert.deepEqual(result.roles, {});
 });
 
-// ===== Combined =====
-
 test('combined: groups + roles', () => {
   const result = validateMetadataAdmin({
     groups: ['admin', 'family', 'access-filedrop'],
@@ -236,8 +206,6 @@ test('combined: roles only (no groups)', () => {
   assert.equal(result.groups, undefined);
   assert.deepEqual(result.roles, { filedrop: 'admin' });
 });
-
-// ===== Admin marker =====
 
 test('admin: true accepted (boolean strict)', () => {
   const result = validateMetadataAdmin({ admin: true });
@@ -264,8 +232,6 @@ test('admin: number 1 rejected (non-boolean)', () => {
 });
 
 test('admin: null rejected (non-boolean)', () => {
-  // null is treated as undefined (key present but null), which triggers the
-  // type check branch because typeof null === 'object' !== 'boolean'.
   assert.throws(
     () => validateMetadataAdmin({ admin: null }),
     /must be a strict boolean/,

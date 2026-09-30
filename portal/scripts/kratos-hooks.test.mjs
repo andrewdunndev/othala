@@ -1,9 +1,5 @@
-// Every hook list in kratos/kratos.yml against the hook names the Kratos
-// v26.2.0 config schema allows at that placement (embedx/config.schema.json:
-// selfServiceAfterSettingsAuthMethod, selfServiceAfterSettingsProfileMethod,
-// selfServiceAfterDefaultLoginMethodHooks, selfServiceAfterRegistrationMethod,
-// selfServiceAfterRecoveryHooks). Kratos refuses to start on a mismatch; this
-// catches it without a container. A placement missing here fails too.
+// Invariant: every hook list in kratos.yml uses hook names the Kratos config schema allows.
+
 import { test } from 'vitest';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
@@ -41,4 +37,12 @@ test('every kratos.yml hook is one the v26.2.0 schema allows at its placement', 
     assert.ok(ALLOWED[path], `${path}: placement not in the schema table`);
     for (const h of hooks) assert.ok(ALLOWED[path].includes(h.hook), `${path}: ${h.hook} is not allowed here`);
   }
+});
+
+test('the privileged settings window is at most 5 minutes', () => {
+  const file = fileURLToPath(new URL('../../kratos/kratos.yml', import.meta.url));
+  const age = parse(readFileSync(file, 'utf8')).selfservice.flows.settings.privileged_session_max_age;
+  const m = /^(\d+)([smh])$/.exec(String(age));
+  assert.ok(m, `unparseable privileged_session_max_age: ${age}`);
+  assert.ok(Number(m[1]) * { s: 1, m: 60, h: 3600 }[m[2]] <= 300, `privileged_session_max_age ${age} exceeds 5m`);
 });

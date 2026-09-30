@@ -1,8 +1,5 @@
 // Admin SSR guard + Hydra read-only wrapper.
 //
-// Kratos admin API wrappers live in `./admin-api.ts`; this file re-exports
-// them so existing call sites that import from `./admin` keep working.
-//
 // AAL2 enforcement happens at the SSR layer: Kratos AAL is
 // per-flow / global, not per-route. requireAdminSession enforces the SP-3
 // trinity plus a freshness gate: active session + AAL2 + freshness (1h
@@ -15,24 +12,7 @@ import { isAdminMarker } from './admin-auth';
 import { revokeSubject, type RevokeResult } from './revoke';
 import { adminFreshnessHours } from './config';
 import type { Session } from './types';
-import {
-  getIdentity,
-  listIdentities,
-  createIdentity,
-  updateIdentity,
-  deleteIdentity,
-  deactivateIdentity,
-  reactivateIdentity,
-  getRecoveryLink,
-  patchAdminMarker,
-} from './admin-api';
-import type {
-  CreateIdentityInput,
-  UpdateIdentityInput,
-  IdentityTraits,
-  MetadataAdmin,
-  RecoveryLink,
-} from './admin-api';
+import { getIdentity } from './admin-api';
 
 /**
  * Pure freshness computation extracted from requireAdminSession for testability.
@@ -107,20 +87,6 @@ export function isSessionFresh(session: Session, windowHours: number): boolean {
   const windowMs = windowHours * 60 * 60 * 1000;
   return ageMs <= windowMs;
 }
-
-// Re-export admin-API symbols for call sites that import from './admin'.
-export {
-  listIdentities,
-  getIdentity,
-  createIdentity,
-  updateIdentity,
-  deleteIdentity,
-  deactivateIdentity,
-  reactivateIdentity,
-  getRecoveryLink,
-  patchAdminMarker,
-};
-export type { CreateIdentityInput, UpdateIdentityInput, IdentityTraits, MetadataAdmin, RecoveryLink };
 
 /**
  * SSR guard for /admin/* routes. Enforces the SP-3 trinity:
@@ -199,16 +165,16 @@ export async function requireAdminSession(astro: any): Promise<Session | Respons
 }
 
 /**
- * Force re-login for an identity (admin "revoke user" trigger).
  *
- * The fan-out is in-process: revokeSubject runs steps 2-5 (Kratos sessions,
- * Hydra login + consent revoke, best-effort LDAP bind-cache flush). deactivate
+ * Force re-login for an identity (admin "revoke user" trigger).
+ * The fan-out is in-process: revokeSubject runs steps 2-4 (Kratos sessions,
+ * Hydra login + consent revoke). deactivate
  * is NOT set here — admin force-logout cuts sessions without marking the
  * identity inactive.
  *
  * Throws a prescriptive RevokeError on a hard-cut (step 2-4) failure; the
  * caller surfaces dependency + next-action without leaking raw upstream
- * errors. Best-effort step 5 failures land in result.bestEffortFailures.
+ * errors.
  */
 export type RevokeUserResult = RevokeResult;
 

@@ -112,12 +112,10 @@ skipping it would make the group behave as if it were never stored. The admin fo
 while a non-canonical name is still held, because a write path that could re-emit one would retire the
 property that makes the check meaningful.
 
-That literal is written out twice more, in `kratos/identity.schema.json` and its vendored copy
-`e2e/identity.schema.json`. Neither enforces it (Kratos validates `traits` only), but both must still
-match: when they last diverged, the schema advertised names the read gate then refused, which is a
-lockout with no error message anywhere. `lint-identity-schema` in `.gitlab-ci.yml` and
-`scripts/pre-tag-check.sh` diff the two schemas against *each other*; nothing checks either against
-`GROUP_RE`, so that agreement is UNENFORCED and held by hand.
+That literal is written out once more, in `kratos/identity.schema.json`. It does not enforce it
+(Kratos validates `traits` only), but it must still match: when the two diverged, the schema advertised
+names the read gate then refused, which is a lockout with no error message anywhere. Nothing checks
+the schema against `GROUP_RE`, so that agreement is UNENFORCED and held by hand.
 
 **Role resolution is order-independent.** `lookupRole` (`portal/src/lib/claims.ts`) takes a per-client
 override if it names a declared role, and otherwise maps every held group through `group_role_map`

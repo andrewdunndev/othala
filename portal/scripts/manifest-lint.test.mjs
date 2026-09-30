@@ -1,11 +1,4 @@
-// Tests for src/lib/manifest-lint.ts.
-//
-// Run with: npx vitest run scripts/manifest-lint.test.mjs
-//
-// Covers the severity matrix:
-//   BLOCK: empty accessGroups w/o skipAccessCheck; duplicate group in a
-//          manifest; group_role_map key with no declared role.
-//   WARN:  group referenced but not in the known set; charset miss.
+// Invariant: manifest lint blocks or warns on each access-binding mistake it is built to catch.
 
 import { test } from 'vitest';
 import assert from 'node:assert/strict';
@@ -37,8 +30,6 @@ function manifest(clientId, opts = {}) {
 }
 
 const known = ['admin', 'family', 'memories', 'access-photos', 'access-proxywatch'];
-
-// ── BLOCK cases ──────────────────────────────────────────────────────────
 
 test('BLOCK: empty accessGroups without skip_access_check', () => {
   const f = lintManifests([manifest('photos', { accessGroups: [] })], known);
@@ -81,8 +72,6 @@ test('BLOCK: group_role_map key maps to an undeclared role', () => {
   assert.match(b[0].message, /not declared/);
 });
 
-// ── WARN cases ───────────────────────────────────────────────────────────
-
 test('WARN: a group referenced but not in the known set (typo → lockout)', () => {
   const f = lintManifests([manifest('photos', { accessGroups: ['memmories'] })], known);
   const w = f.filter((x) => x.severity === 'warn');
@@ -96,8 +85,6 @@ test('WARN: charset miss', () => {
 });
 
 test('WARN: charset miss on a group_role_map KEY', () => {
-  // A key outside the canonical form can never match a stored group, so the
-  // role it maps is unreachable for every identity.
   const f = lintManifests(
     [
       manifest('photos', {
@@ -124,8 +111,6 @@ test('a canonical group_role_map key does NOT fire the charset warn', () => {
   );
   assert.equal(f.filter((x) => /safe charset/.test(x.message)).length, 0);
 });
-
-// ── clean + helper ─────────────────────────────────────────────────────────
 
 test('clean manifest with a known bound group yields no findings', () => {
   const f = lintManifests(

@@ -1,35 +1,8 @@
 ---
-// Othala portal — session-gated tile dashboard.
-//
-// v0.2.0 architecture (Topology B + runtime unified-manifest tiles):
-//
-// State A (down):     Kratos unreachable. Holding panel: mark + short
-//                     message + thin technical line. Reads as "auth
-//                     services starting up", not 404.
-// State B (pre-auth): Kratos reachable, no session. Hero with mark +
-//                     welcome lede + Sign In CTA. Below: a thin section
-//                     explaining what's behind the door.
-// State C (post-auth): active session. Hero with greeting + section
-//                     "your apps" — the tile launcher reads the tiles
-//                     via loadTiles (tiles.ts) and keeps the ones
-//                     userCanSeeTile admits: OR-semantics over the
-//                     manifest's access binding against the identity's
-//                     `metadata_admin.groups`. The Admin shortcut is NOT
-//                     a group — it reads the `metadata_admin.admin`
-//                     marker; see the note above `isAdmin`.
-//
-// Apps registry = unified per-app manifests read at request time from
-// MANIFEST_DIR (see lib/tiles.ts + lib/manifests.ts). Each `<slug>.yaml`
-// carries a `presentation:` block (name, description, url, icon /
-// icon_slug / icon_fallback, `access:` list — singular `access_group:`
-// still parses as compat — auth_kind, group, disabled, order); an
-// optional sibling `<slug>.md` is the per-app detail-page content at
-// /apps/<slug>. There is no build-time content collection, so adding or
-// removing an app is a manifest-dir change with no portal image rebuild.
-//
-// Dev preview: when running `astro dev`, State A also surfaces a small
-// panel of every auth flow link. `?dev-state=` lets the developer force
-// a state without running Kratos.
+// Session-gated tile dashboard. State A (down): Kratos unreachable, holding panel. State B (pre-auth): hero and Sign In
+// CTA. State C (post-auth): greeting and the tiles userCanSeeTile admits against `metadata_admin.groups` (the Admin
+// shortcut reads the `metadata_admin.admin` marker instead; see `isAdmin`). Tiles come from the manifests in
+// MANIFEST_DIR (lib/tiles.ts). In `astro dev`, `?dev-state=` forces a state without Kratos.
 
 export const prerender = false;
 
@@ -37,7 +10,7 @@ import Layout from '../layouts/Layout.astro';
 import PageHero from '../components/PageHero.astro';
 import { loadTiles, loadGroups, safeHref, userCanSeeTile, type AppTile } from '../lib/tiles';
 import { getSession, isReachable } from '../lib/kratos';
-import { getIdentity } from '../lib/admin';
+import { getIdentity } from '../lib/admin-api';
 import { identityGroups } from '../lib/gate';
 import { isAdminMarker } from '../lib/admin-auth';
 import { signLogoutToken } from '../lib/logout';
@@ -57,26 +30,10 @@ let downReason = 'Kratos /health/alive unreachable; retrying.';
 if (devOverride === 'down' || devOverride === 'pre-auth' || devOverride === 'post-auth') {
   state = devOverride;
   if (state === 'post-auth') {
-    // Plausible mocked identity so the post-auth view renders something
-    // realistic in dev without a Kratos session.
-    //
-    // These names MUST intersect the shipped e2e/manifests/ example set or the
-    // preview renders zero tiles — userCanSeeTile is a plain membership test,
-    // so a mock holding groups nobody binds is indistinguishable from a user
-    // with no access. They are the converged `<svc>-access` entry groups from
-    // those manifests, one per fixture:
-    //   grafana-access, audiobookshelf-access, filedrop-access,
-    //   proxywatch-access (tile-only), prompt-access.
-    // `everyone` covers the default-group fallback fixture (statuspage, which
-    // declares no access binding — see tileDefaultGroup in tiles.ts).
-    // 'admin' is here as an identity group only; the Admin nav link needs the
-    // `metadata_admin.admin` marker, which this mock deliberately omits.
-    //
-    // If a fixture is renamed, this list goes stale silently. Re-derive it from
-    // e2e/manifests/*.yaml (`presentation.access:`) rather than editing by hand.
-    //
-    // Dev affordance: set OTHALA_DEV_MOCK_GROUPS=admin,grafana-access
-    // (comma-separated) to preview any catalog subset without editing code.
+    // Mock identity for the dev post-auth view. Its groups must intersect the e2e/manifests/ `presentation.access:`
+    // groups or zero tiles render (re-derive them from there if a fixture is renamed). `everyone` covers the
+    // default-group fixture; 'admin' is an identity group only, since the mock omits the `metadata_admin.admin` marker.
+    // OTHALA_DEV_MOCK_GROUPS=admin,grafana-access overrides the list.
     const devGroupsEnv: string | undefined = import.meta.env.OTHALA_DEV_MOCK_GROUPS;
     const mockGroups = devGroupsEnv
       ? devGroupsEnv.split(',').map((g) => g.trim()).filter(Boolean)
@@ -85,7 +42,6 @@ if (devOverride === 'down' || devOverride === 'pre-auth' || devOverride === 'pos
           'everyone',
           'grafana-access',
           'audiobookshelf-access',
-          'filedrop-access',
           'proxywatch-access',
           'prompt-access',
         ];
@@ -100,12 +56,8 @@ if (devOverride === 'down' || devOverride === 'pre-auth' || devOverride === 'pos
     const session = await getSession(cookie);
     if (session?.active && session.identity) {
       state = 'post-auth';
-      // The public whoami does NOT expose metadata_admin (it's admin-only), so
-      // session.identity.metadata_admin.groups is always empty for real
-      // sessions. Re-fetch the FULL identity via the ADMIN API (same pattern as
-      // /api/forward-auth) to read accurate groups. FAIL-CLOSED: on lookup
-      // failure fall back to the whoami identity (no metadata_admin → no groups
-      // → no tiles), never fail-open.
+      // The public whoami omits metadata_admin, so re-fetch the full identity via the admin API for groups; on
+      // failure fall back to the whoami identity (no groups, no tiles), never fail-open.
       try {
         identity = await getIdentity(session.identity.id);
       } catch (lookupErr) {
@@ -120,34 +72,24 @@ if (devOverride === 'down' || devOverride === 'pre-auth' || devOverride === 'pos
   }
 }
 
-// Apps registry — read at REQUEST time from the unified manifest dir
-// (MANIFEST_DIR), the same source the OIDC client loader reads.
-// loadTiles() returns enabled tiles sorted by order then name.
+// Enabled tiles from MANIFEST_DIR, sorted by order then name.
 const orderedApps = loadTiles();
 
-// Group registry — optional groups.yaml in MANIFEST_DIR.
-// loadGroups() returns an empty Map when the file is absent.
+// Optional groups.yaml registry; an empty Map when absent.
 const groupRegistry = loadGroups();
 
-// First-run passkey nudge: the admin API's includeCredential list (getIdentity,
-// lib/admin-api.ts) already carries `credentials.passkey` when enrolled, so no
-// extra call is needed here. Shown once per browser (dismiss is localStorage-
-// backed, see the inline script below) to steer new accounts toward one-tap
-// Face ID / Touch ID sign-in instead of leaving them on the password fallback.
+// First-run passkey nudge: getIdentity's includeCredential list already carries `credentials.passkey`; the dismiss
+// is remembered per browser in localStorage (inline script below).
 const hasPasskeyEnrolled = Boolean(identity?.credentials?.passkey);
 
 const groups = identityGroups(identity);
-// Tile visibility reads the manifest's access binding (accessGroups,
-// OR-semantics) via userCanSeeTile — the SAME field the OIDC entry gate uses,
-// so the tile shows iff the gate would admit the user. One source, not two.
+// Visibility reads the same access binding (accessGroups, OR) as the OIDC entry gate, so a tile shows iff the gate admits.
 const visibleTiles =
   state === 'post-auth'
     ? orderedApps.filter((a: AppTile) => userCanSeeTile(a, groups))
     : [];
 
-// Partition visibleTiles into ungrouped (no group field) and grouped sections.
-// Groups are ordered by: groups.yaml `order` (preferred) → min tile order
-// within the group (fallback when a group has no registry entry).
+// Split visibleTiles into ungrouped and grouped sections, ordered by groups.yaml `order`, else min tile order.
 const ungroupedTiles = visibleTiles.filter((t: AppTile) => !t.group);
 const groupedTilesMap = new Map<string, AppTile[]>();
 for (const tile of visibleTiles.filter((t: AppTile) => !!t.group)) {
@@ -155,7 +97,7 @@ for (const tile of visibleTiles.filter((t: AppTile) => !!t.group)) {
   if (!groupedTilesMap.has(g)) groupedTilesMap.set(g, []);
   groupedTilesMap.get(g)!.push(tile);
 }
-// Sort group boxes: registry order < min-tile-order fallback.
+// Group boxes: registry order, else min tile order.
 const tileGroups = Array.from(groupedTilesMap.entries())
   .sort(([nameA, tilesA], [nameB, tilesB]) => {
     const orderA = groupRegistry.get(nameA)?.order ?? Math.min(...tilesA.map((t) => t.order));
@@ -167,17 +109,12 @@ const tileGroups = Array.from(groupedTilesMap.entries())
     tiles,
     meta: groupRegistry.get(groupName),
   }));
-// The Admin nav affordance reads metadata_admin.admin from the
-// admin-API-fetched identity (already in `identity` above — no extra call).
-// The /admin route itself is gated by requireAdminSession (AAL2 + marker);
-// this just keeps the link truthful so a non-admin isn't shown a tile that
-// bounces. Fail-closed: isAdminMarker returns false on any error or missing
-// marker (acceptable for cosmetic chrome).
+// Admin link: the metadata_admin.admin marker of the admin-API identity; /admin itself is gated by
+// requireAdminSession. isAdminMarker is false on any error or missing marker, which is fine for cosmetic chrome.
 const isAdmin = state === 'post-auth' && isAdminMarker(identity);
 
-// Sign-out is a POST carrying a token for this identity (lib/logout.ts). If
-// minting fails the button still posts; /auth/logout then shows its confirm
-// form rather than ending the session.
+// Sign-out is a POST carrying a token for this identity (lib/logout.ts); if minting fails the button still posts
+// and /auth/logout shows its confirm form.
 let logoutToken = '';
 if (state === 'post-auth' && identity?.id) {
   try {
@@ -438,10 +375,7 @@ const devLinks = [
 </Layout>
 
 <script is:inline>
-  // ── Request / contact form (post-auth dashboard) ──────────────────────
-  // Progressive enhancement: the <form> has a real method/action so it works
-  // without JS; this handler intercepts to POST via fetch and render inline
-  // success / error states against the live /api/request endpoint.
+  // Request/contact form: a plain <form> that this handler upgrades to a fetch POST against /api/request with inline states.
   (function () {
     var modal = document.getElementById('request-modal');
     var openBtn = document.getElementById('open-request-form');
@@ -519,10 +453,7 @@ const devLinks = [
     });
   })();
 
-  // ── App education modal (post-auth dashboard) ─────────────────────────
-  // Each [data-app-learn] button opens the app-modal and populates it from
-  // the matching hidden <template data-app-edu> element. Close on ×,
-  // backdrop click, and Esc (native <dialog> behaviour).
+  // App education modal: [data-app-learn] buttons populate it from the hidden <template data-app-edu>.
   (function () {
     var appModal = document.getElementById('app-modal');
     if (!appModal) return;
@@ -578,11 +509,7 @@ const devLinks = [
     });
   })();
 
-  // ── First-run passkey nudge (post-auth dashboard) ─────────────────────
-  // Dismiss is remembered per-browser via localStorage so the banner doesn't
-  // reappear on every visit once the operator has seen and closed it. It
-  // still returns after enrolling a passkey elsewhere makes hasPasskeyEnrolled
-  // true server-side — at that point the banner stops rendering entirely.
+  // First-run passkey nudge: dismiss is remembered per browser; the banner stops rendering once a passkey is enrolled.
   (function () {
     var KEY = 'othala-passkey-nudge-dismissed';
     var nudge = document.getElementById('passkey-nudge');
@@ -619,11 +546,7 @@ const devLinks = [
     margin-top: var(--space-3);
   }
 
-  /* ── First-run passkey nudge ──
-   * Unobtrusive, dismissible banner between the hero and the tile grid.
-   * Accent-subtle surface (the same token the recommended-action badge
-   * system already uses) keeps it reading as a friendly suggestion, not a
-   * warning or error state. */
+  /* First-run passkey nudge: dismissible banner between hero and tile grid, in the accent-subtle surface. */
   .passkey-nudge {
     display: flex;
     align-items: center;
@@ -678,9 +601,7 @@ const devLinks = [
   }
   .cta-link:hover { color: var(--accent); text-decoration: none; }
 
-  /* ── Tile grid ──
-   * Each tile is an <article> with an inner launch anchor (icon+name+desc)
-   * and a sibling "learn more" anchor — no nested anchors. */
+  /* Tile grid: each tile is an <article> with a launch anchor and a sibling "learn more" anchor (no nesting). */
   .tile-grid {
     display: grid;
     grid-template-columns: repeat(2, 1fr);
@@ -774,10 +695,7 @@ const devLinks = [
     outline-offset: -2px;
   }
 
-  /* ── Grouped tile sections ──
-   * A lightly-bordered labeled section: heading + description above the
-   * tile grid. No background fill so grouped tiles look identical to
-   * ungrouped tiles. Border provides the grouping affordance. */
+  /* Grouped tile sections: a bordered labeled section with heading and description above the grid. */
   .tile-group {
     margin-top: var(--space-6);
     border: 1px solid var(--border);
@@ -843,10 +761,7 @@ const devLinks = [
     .dev-list li { grid-template-columns: 1fr; gap: var(--space-1); }
   }
 
-  /* ── Request / contact form modal ──
-   * Adapted from the /preview prototype, trimmed to the post-auth dashboard.
-   * Explicit centering — does not rely on inset:0 + margin:auto, which some
-   * global dialog rules override. */
+  /* Request / contact form modal: explicit centering, not inset:0 + margin:auto, which global dialog rules override. */
   .request-modal {
     position: fixed;
     top: 50%;
@@ -947,10 +862,7 @@ const devLinks = [
   }
   .request-thanks-note { font-size: var(--text-xs); color: var(--text-muted); }
 
-  /* ── App education modal ──
-   * Mirrors request-modal sizing conventions; wider reading pane (46rem)
-   * with a scrollable body. Prose rules copied from apps/[slug].astro so
-   * the education content renders identically inside the modal. */
+  /* App education modal: wider (46rem) scrollable reading pane; prose rules copied from apps/[slug].astro. */
   .app-modal {
     position: fixed;
     top: 50%;
@@ -968,8 +880,7 @@ const devLinks = [
     box-shadow: 0 8px 32px rgba(0, 0, 0, 0.22);
     overflow: hidden;
   }
-  /* Native <dialog> is display:none until .showModal() sets [open]; scope the
-     flex column layout to [open] so the modal stays hidden when closed. */
+  /* <dialog> is display:none until [open]; scope the flex layout to [open]. */
   .app-modal[open] {
     display: flex;
     flex-direction: column;

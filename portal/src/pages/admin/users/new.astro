@@ -22,7 +22,8 @@ export const prerender = false;
 
 import Layout from '../../../layouts/Layout.astro';
 import AdminFormScripts from '../../../components/AdminFormScripts.astro';
-import { requireAdminSession, createIdentity, getRecoveryLink } from '../../../lib/admin';
+import { requireAdminSession } from '../../../lib/admin';
+import { createIdentity, getRecoveryLink } from '../../../lib/admin-api';
 import { signToken, verifyToken, CSRFError } from '../../../lib/csrf';
 import { defaultGroup } from '../../../lib/config';
 
@@ -66,7 +67,7 @@ if (Astro.request.method === 'POST') {
 
   // HIGH-1: verify per-request CSRF token before any side effect.
   try {
-    verifyToken(String(fd.get('csrf_token') ?? ''), adminIdentityId);
+    verifyToken(String(fd.get('csrf_token') ?? ''), adminIdentityId, 'create-user');
   } catch (err) {
     if (err instanceof CSRFError) {
       return new Response(`CSRF: ${err.message}`, { status: 403 });
@@ -116,7 +117,7 @@ if (Astro.request.method === 'POST') {
 }
 
 // HIGH-1: per-request CSRF token, single-use.
-const csrfToken = signToken(adminIdentityId);
+const csrfToken = signToken(adminIdentityId, 'create-user');
 
 // The exact bytes the admin pastes into Signal/iMessage. Composed server-side
 // so the visible textarea and the copy button are guaranteed to carry the same
@@ -227,7 +228,7 @@ const shareText = success
             pattern="[a-z0-9]+(\.[a-z0-9]+)+"
             placeholder="first.last"
           />
-          <span class="field-hint">lowercase, dot-separated (becomes the LDAP uid).</span>
+          <span class="field-hint">lowercase, dot-separated.</span>
           {errors.username && <span class="field-error">{errors.username}</span>}
         </div>
 

@@ -1,70 +1,42 @@
-# Grafana — grafana.othala.test
-# Generic OSS fixture: a role-mapping example (JMESPath grafana_role + a
-# groups claim) AND the access-model test fixture — see
-# e2e/playwright/tests/t-access-model.spec.ts (T1-T4) and the walkthrough at
-# site/src/content/docs/guides/per-app-oidc.md. Entry-vs-role WHY: DECISIONS.md
-# § Nothing is derived — not entry from a role, not a type from a name.
-#
-# Grafana 10.2+ supports OIDC back-channel logout in the generic_oauth
-# provider; the logout token is accepted at /login/generic_oauth/logout.
+# Grafana: the role-mapping example (JMESPath grafana_role plus a groups claim) and the
+# access-model fixture (t-access-model.spec.ts T1-T4; site guides/per-app-oidc.md;
+# DECISIONS.md § Nothing is derived).
 
 presentation:
-  name: Grafana                     # tile display name (tiles.ts AppTile.name)
+  name: Grafana
   description: Dashboards and metrics — CPU, disk, network, and service health at a glance.
-  # ^ tile subtitle; free text, no enforcer (tiles.ts AppTile.description)
-  url: https://grafana.othala.test  # tile link + fqdn source (tiles.ts)
-  icon: GR                          # optional 2-char fallback glyph; default "??" (tiles.ts)
-  icon_slug: grafana                # optional vendored-icon lookup key (tiles.ts resolveIconHref)
-  auth_kind: oidc                   # oidc|oidc+ldap|forward_auth|ldap|external (tiles.ts
-                                     # AuthKind) — NOT runtime-validated; a typo silently casts
-  # REQUIRED list, ≥1 canonical name (GROUP_RE, access-groups.ts); empty +
-  # no consent.skip_access_check => load-time BLOCK (validateClients,
-  # manifests.ts). ENTRY only — `grafana-admin` (role, below) is deliberately
-  # ABSENT here; T4 (t-access-model.spec.ts) fails if it's added back.
-  # Enforced: enforceAccessGate (portal/src/lib/gate.ts); parsed:
-  # parseAccessGroups (access-groups.ts); WARNs on typo/charset/duplicate:
-  # lintManifests (manifest-lint.ts).
+  url: https://grafana.othala.test
+  icon: GR
+  icon_slug: grafana
+  auth_kind: oidc
+  # Entry only; grafana-admin is a role and is deliberately absent (T4 fails if added back).
   access:
     - grafana-access
-  order: 110                        # optional tile sort key, ascending; default 999 (tiles.ts)
+  order: 110
 
 oidc:
-  client_id: grafana                 # REQUIRED; must match ^[A-Za-z_][A-Za-z0-9_]*$
-                                      # (CLIENT_ID_ENV_STEM_RE, manifests.ts) — derives
-                                      # GRAFANA_CLIENT_SECRET (register-clients.ts)
-  client_name: Grafana                # forwarded verbatim to Hydra client_name (register-clients.ts)
+  client_id: grafana
+  client_name: Grafana
   grant_types:
     - authorization_code
-    - refresh_token                   # needs `offline_access` in scope below, else Hydra
-                                       # silently omits the refresh token
+    - refresh_token
   response_types:
-    - code                            # forwarded verbatim (register-clients.ts); empty only for
-                                       # client_credentials clients (manifests.ts ClientManifest doc)
+    - code
+  # offline_access is required or Hydra silently omits the refresh token; groups is
+  # required for the groups claim to clear the OIDC Core 5.4 scope gate.
   scope: openid email profile groups offline_access
-  # ^ forwarded verbatim as OAuth2Client.scope (register-clients.ts). `groups`
-  # is required for the groups claim to clear the OIDC Core §5.4 scope-gate
-  # (composeIDTokenClaims, portal/src/lib/claims.ts).
   redirect_uris:
     - https://grafana.othala.test/login/generic_oauth
-  # ^ origin must match an oidc.audience entry below (rule 3,
-  # audienceMatchesRedirect / validateClients, manifests.ts), else load-time BLOCK.
   post_logout_redirect_uris:
-    - https://grafana.othala.test/    # forwarded verbatim; used for RP-initiated logout
+    - https://grafana.othala.test/
   token_endpoint_auth_method: client_secret_basic
-  # ^ forwarded verbatim; optional, empty string if omitted (manifests.ts)
   audience:
-    - https://grafana.othala.test     # REQUIRED non-empty (validateClients rule 2, manifests.ts)
-  skip_consent: true                   # per-client only, never a server default (DECISIONS.md
-                                        # § Consent is skipped per client, never as a server default)
+    - https://grafana.othala.test
+  skip_consent: true
   backchannel_logout_uri: https://grafana.othala.test/login/generic_oauth/logout
-  # ^ optional; when set, admin "Force re-login" (admin/users/[id].astro) posts
-  # a signed logout token here.
 
-# Grafana-side config, not a manifest field (grafana.ini / env on the Grafana
-# side). role_attribute_path is a JMESPath evaluated against the id_token,
-# userinfo response, and access token in that order; result must be one of
-# None/Viewer/Editor/Admin/GrafanaAdmin. groups_attribute_path feeds Team Sync
-# (Enterprise only; on OSS the groups claim is emitted but ignored). Source:
+# Grafana-side config, not a manifest field. role_attribute_path is a JMESPath over the
+# id_token; groups_attribute_path feeds Team Sync (Enterprise only):
 # https://grafana.com/docs/grafana/latest/setup-grafana/configure-security/configure-authentication/generic-oauth/
 #   GF_AUTH_GENERIC_OAUTH_ROLE_ATTRIBUTE_PATH=
 #     contains(grafana_role[*], 'GrafanaAdmin') && 'GrafanaAdmin'
@@ -74,19 +46,13 @@ oidc:
 #   GF_AUTH_GENERIC_OAUTH_ALLOW_ASSIGN_GRAFANA_ADMIN=true
 #   GF_AUTH_GENERIC_OAUTH_GROUPS_ATTRIBUTE_PATH=groups
 consent:
-  emit_groups_claim: true            # optional bool, default true (manifests.ts readEmitGroups);
-                                      # explicit false + a role claim_emit.groups is a load-time
-                                      # BLOCK (M10, validateClients rule 6, manifests.ts)
+  emit_groups_claim: true
   roles:
-    # Declaration order is RANK, descending privilege: lookupRole
-    # (portal/src/lib/claims.ts) keeps the highest-index-ranked role matched
-    # across the identity's whole group set, so resolution is
-    # order-independent over stored group order. T2/T3 (t-access-model.spec.ts)
-    # pin it; WHY: DECISIONS.md § Nothing is derived....
+    # Declaration order is rank, descending privilege; lookupRole keeps the highest match,
+    # so resolution is independent of stored group order (T2/T3 pin it).
     admin:
-      description: "Instance + org admin (GrafanaAdmin)."   # optional, display only
-      claim_emit:                     # REQUIRED map (else BLOCK: validateClients rule 5);
-                                       # merged into the id_token when this role resolves
+      description: "Instance + org admin (GrafanaAdmin)."
+      claim_emit:
         grafana_role: ["GrafanaAdmin"]
         groups: ["admin"]
     editor:
@@ -99,12 +65,7 @@ consent:
       claim_emit:
         grafana_role: ["Viewer"]
         groups: ["viewer"]
-  # REQUIRED: every value here must name a role declared above, else BLOCK
-  # (validateClients rule 4, manifests.ts). Keys should be canonical (GROUP_RE)
-  # and in the known-group set — lintManifests WARNs otherwise
-  # (manifest-lint.ts). `editor` is deliberately unmapped: reachable only via
-  # the per-client override metadata_admin.roles.grafana (lookupRole step 1,
-  # claims.ts) — a declared role with no group is legal.
+  # editor is deliberately unmapped: reachable only via metadata_admin.roles.grafana.
   group_role_map:
     grafana-admin: admin
     grafana-access: viewer

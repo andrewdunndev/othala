@@ -4,7 +4,7 @@ means the link points off-instance — a public status page, a vendor console, a
 SaaS dashboard — where sign-in (if any) is handled entirely by the third party.
 
 It exists in the catalog purely as a convenience launch point. There is no
-OAuth client and no LDAP bind. The portal's tile filter gates all tiles on
+OAuth client and no other credential. The portal's tile filter gates all tiles on
 group membership regardless of `auth_kind`, so this tile (like every other)
 requires the user to be in an appropriate group.
 

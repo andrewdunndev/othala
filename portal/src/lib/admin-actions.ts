@@ -17,10 +17,10 @@ import {
   reactivateIdentity,
   getRecoveryLink,
   patchAdminMarker,
-  revokeUserSessions,
-  type RevokeUserResult,
-} from './admin';
-import { deleteCredential, EVICTABLE_CREDENTIAL_TYPES } from './admin-api';
+  deleteCredential,
+  EVICTABLE_CREDENTIAL_TYPES,
+} from './admin-api';
+import { revokeUserSessions, type RevokeUserResult } from './admin';
 import { isAdminMarker } from './admin-auth';
 import { hasSecondFactor } from './step-up';
 import { sendInviteRecoveryEmail } from './kratos';

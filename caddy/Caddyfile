@@ -1,87 +1,8 @@
-# Worked top-level Caddyfile for a single Othala instance.
-#
-# This is an integration example for adopters, not a drop-in deploy file:
-# it shows how to route one hostname across the three upstreams that make
-# up an Othala instance — Kratos (browser auth surface), Hydra (OAuth2
-# surface), and the converged app.
-#
-# The site address is read from $OTHALA_PUBLIC_HOST (e.g. "auth.example.com").
-# Set it in the Caddy environment (systemd unit, compose env, etc.); don't
-# hard-code a hostname here.
-#
-# TLS is issued via DNS-01 ACME using the caddy-dns/cloudflare plugin and a
-# Cloudflare API token in CF_API_TOKEN. Swap the tls block if you use a
-# different DNS provider, an HTTP-01 solver, or terminate TLS upstream.
-#
-# Routing shape — why the default backend is the app, not Kratos:
-#   The catch-all is the Othala app (othala:8080) so static assets
-#   (/_astro/*, manifest.webmanifest, favicon.ico) are served with the
-#   correct Content-Type. The Kratos browser paths and the Hydra OAuth2
-#   surface are matched first and routed to their respective upstreams.
-#   Routing the default to Kratos instead causes static assets to 404 or
-#   be served with the wrong Content-Type, yielding an unstyled UI.
-#
-# Container names used below (adapt to your own service names):
-#   Kratos: kratos:4433   Hydra: hydra:4444   App: othala:8080
-#
-# Note: /oauth2/login, /oauth2/consent, and /oauth2/logout are Hydra
-# challenge handlers served by the converged app, not by Hydra itself.
-# They are matched explicitly so they don't fall into the @hydra block.
-#
-# ---------------------------------------------------------------------------
-# RATE LIMITING — DEPLOY BLOCKER: caddy-estate MUST include caddy-ratelimit
-#
-# !! BLOCKER — DO NOT DEPLOY THIS CADDYFILE UNTIL THE MODULE IS IN THE IMAGE !!
-#
-# The `rate_limit` directive below is provided by the third-party module
-# mholt/caddy-ratelimit (https://github.com/mholt/caddy-ratelimit).
-# It is NOT part of Caddy's standard distribution and is NOT included in
-# github.com/caddyserver/caddy/v2/modules/standard.
-#
-# If this Caddyfile is loaded by a Caddy binary that does NOT include the
-# module, Caddy will FAIL TO START with a config-load error:
-#   "unrecognized directive: rate_limit"
-# This is a deploy-time outage, not a degraded-mode fallback. Caddy refuses
-# to serve ANY traffic until the config loads cleanly.
-#
-# To include the module, build Caddy with it compiled in, e.g.:
-#
-#   xcaddy build --with github.com/mholt/caddy-ratelimit
-#
-# or, if you maintain a custom main.go (like caddy-estate does), add:
-#
-#   _ "github.com/mholt/caddy-ratelimit"
-#
-# to the import block and run `go get github.com/mholt/caddy-ratelimit`.
-#
-# STATUS: the estate's Caddy image (dunn.dev/caddy-estate) does NOT currently
-# include this module. Its Containerfile imports only:
-#   - github.com/caddyserver/caddy/v2/modules/standard
-#   - github.com/caddy-dns/cloudflare
-# caddy-estate MUST be rebuilt with github.com/mholt/caddy-ratelimit added
-# before this Caddyfile is used in a quadlet deployment.
-# See the pre-deploy checklist in DEPLOY.md.
-#
-# FALLBACK — if caddy-ratelimit cannot be added to the production image:
-#   - Rate-limit at the edge (Cloudflare WAF rate-limiting rules on
-#     /self-service/* paths) — zero-build-cost if Cloudflare is already the
-#     DNS/proxy provider (as it is for dunn.dev).
-#   - Alternatively, if traffic passes through an Envoy sidecar, use Envoy's
-#     local_ratelimit filter on the Kratos cluster.
-#   - Kratos does not natively support per-IP rate limiting as of v1.x.
-#
-# RATIONALE for chosen limit (10 requests / 1 minute / IP):
-#   A family member completing a sign-in with email code makes at most 3-4
-#   requests in the self-service flow (GET /self-service/login/browser,
-#   POST /self-service/login, GET/POST code-submit). A burst to 10 per minute
-#   gives a generous margin for retries and tab-switching while still blocking
-#   an attacker from firing dozens of code-request calls per minute to
-#   email-bomb a victim address. At family scale (5-25 users behind trusted
-#   IPs) false positives from shared NAT are not a concern.
-# ---------------------------------------------------------------------------
-#
-# The `order` global option registers the directive's position in Caddy's
-# handler chain — rate_limit must run before basicauth.
+# Worked Caddyfile for one Othala instance (an adopter example, not a drop-in deploy file).
+# Site address: $OTHALA_PUBLIC_HOST. TLS: DNS-01 via caddy-dns/cloudflare and CF_API_TOKEN; swap the
+# tls block for another solver. Upstreams: kratos:4433, hydra:4444, othala:8080.
+# The default backend is the app so static assets (/_astro/*, favicon, manifest) keep their
+# Content-Type; /oauth2/{login,consent,logout} are app challenge handlers. rate_limit is mholt/caddy-ratelimit.
 
 {
 	order rate_limit before basicauth
@@ -98,22 +19,17 @@
 		reverse_proxy hydra:4444
 	}
 
-	# The converged app owns the Hydra login/consent/logout challenge handlers.
-	# Matched before the app default so they are explicit and auditable.
+	# App-owned Hydra challenge handlers.
 	@portal_challenges path /oauth2/login /oauth2/consent /oauth2/logout
 	handle @portal_challenges {
-		# DOS-1: same XFF fix as the default backend — see note below.
+		# XFF overwrite: see the default backend below.
 		reverse_proxy othala:8080 {
 			header_up X-Forwarded-For {remote_host}
 		}
 	}
 
-	# Kratos browser endpoints: well-known ceremony scripts, self-service flow
-	# APIs, session endpoints, and identity schemas.
-	#
-	# Rate-limit applied here to prevent email-bombing via repeated sign-in
-	# code requests (/self-service/login with method=code). Keyed by client IP
-	# ({remote_host}). See build-dependency note at the top of this file.
+	# Kratos browser endpoints. Rate-limited per client IP against email-bombing via repeated
+	# sign-in code requests.
 	@kratos path /.well-known/ory/* /self-service/* /sessions/* /schemas/*
 	handle @kratos {
 		rate_limit {
@@ -126,16 +42,9 @@
 		reverse_proxy kratos:4433
 	}
 
-	# Default -> the app: portal UI, /auth/* + /admin/* pages, AND static
-	# assets (/_astro/*, favicon.ico, manifest.webmanifest). The app is the
-	# catch-all; routing the default to Kratos mis-serves static assets.
-	#
-	# DOS-1: overwrite any client-supplied X-Forwarded-For with the real
-	# socket peer IP before forwarding to the portal. @astrojs/node resolves
-	# ctx.clientAddress from the LEFTMOST XFF entry; without this, an
-	# attacker can prepend a fresh fake IP on every request and land in a
-	# new rate-limit bucket. header_up replaces the entire incoming header
-	# so only the immediate peer IP reaches the app.
+	# Default -> the app (UI, pages, static assets). Overwrite any client-supplied X-Forwarded-For
+	# with the socket peer: @astrojs/node reads the leftmost entry, so a spoofed prefix would land
+	# in a fresh rate-limit bucket on every request.
 	reverse_proxy othala:8080 {
 		header_up X-Forwarded-For {remote_host}
 	}

@@ -63,7 +63,7 @@ Each names its enforcer and the test that fails if the enforcer stops working.
   `portal/src/lib/admin-auth.test.ts`, `e2e/playwright/tests/f-aal2-bypass.spec.ts`.
 - **Loopback admin listener.** `portal/src/server/listen.mjs`: privileged routes
   on a separate loopback listener whose mux is disjoint from the public one,
-  guarded by two purpose-named bearer secrets compared with `bearerMatches`
+  guarded by one bearer secret compared with `bearerMatches`
   (constant-time, fail-closed on an unset secret). Test:
   `portal/scripts/public-mux-disjoint.test.mjs`.
 - **Recovery is not a path to admin.** The recovery `after` hook in
@@ -71,7 +71,7 @@ Each names its enforcer and the test that fails if the enforcer stops working.
   gate before the privileged settings session issues; `shouldRefuseRecovery`
   (`portal/src/lib/access.ts`) refuses an admin-marked target, so a compromised
   mailbox does not become admin authority. Tests:
-  `portal/scripts/recovery-gate.fuzz.test.mjs`, `e2e/playwright/tests/j-recovery-flow.spec.ts`.
+  `portal/scripts/admin-port.test.mjs`, `e2e/playwright/tests/j-recovery-flow.spec.ts`.
 - **Claims decide role, never entry.** `composeIDTokenClaims` / `lookupRole`,
   `portal/src/lib/claims.ts`: a per-app role, every claim gated on the granted
   scope, and `deepMergeClaims` skipping `__proto__`, `constructor`, `prototype`.
@@ -149,5 +149,3 @@ Live properties of the deployed shape, stated rather than omitted.
 - The `e2e/` harness: RFC 6761 reserved domain `othala.test`, throwaway secrets.
 - Volumetric network-layer flooding, which needs upstream capacity to absorb;
   application-layer abuse is in scope and listed under Controls.
-- `gitlab.com/dunn.dev/kratos-ldap`: a separate, unmaintained reference, and not
-  deployed here.

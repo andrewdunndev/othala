@@ -1,35 +1,15 @@
-# Browser-test edge for the e2e harness ONLY (compose `browser` profile).
-#
-# Othala's golden e2e is deliberately EDGELESS (D10: the edge — Caddy/TLS/DNS — is
-# an operator concern, outside Othala). But driving the HUMAN flow through a real
-# browser needs everything on ONE host with routing. This minimal Caddy provides
-# that, with the e2e compose service names. It exists only under `--profile browser`.
-#
-# Plain HTTP (no TLS): the e2e issuer is http and Hydra runs --dev, so a browser can
-# complete the OAuth2 flow over HTTP without cert friction.
-#
-# ROUTING ORDER MATTERS. An edge that defaults to Kratos and names only
-# / /auth* /admin* /apps* for the portal drops the app's STATIC ASSETS
-# (/_astro/*.css, manifest.webmanifest, favicon.ico) through to Kratos, which
-# 404s them or serves them as text/plain → an unstyled UI. This edge routes the
-# APP as the default and names the Kratos browser paths explicitly, which is the
-# shape a deployment should copy.
+# Browser-test edge for the e2e harness only (compose `browser` profile): one host in front of
+# the app, Kratos and Hydra so a real browser can drive the human flow. Plain HTTP (the e2e
+# issuer is http and Hydra runs --dev). Routing shape to copy: the app is the default and the
+# Kratos browser paths are named, else static assets fall through to Kratos and 404.
 {
 	auto_https off
 	admin off
 }
 
 auth.othala.test:80 {
-	# ── Rate limiting (MEDIUM-B gate: n-rate-limits.spec.ts) ──────────────────
-	# Zone shape mirrors this project's own production dag.dunn.dev deploy
-	# (a private operator repo, not published here). Unlike that deployment,
-	# every request in THIS harness shares one client IP (the playwright
-	# container), so a path-only zone would also catch the ~20 other specs'
-	# legitimate self-service calls earlier in the same serial run. Each zone
-	# additionally requires the X-E2E-Flood-Probe marker header the flood
-	# tests set, so only their own synthetic bursts are counted; no
-	# proxy_protocol wrapper is needed (no envoy hop in this harness), so
-	# {client_ip} already resolves to the real peer.
+	# Rate limiting (n-rate-limits.spec.ts). Every request here shares one client IP, so each zone
+	# also requires the X-E2E-Flood-Probe header the flood tests set; only their bursts count.
 	rate_limit {
 		zone e2e_code_request {
 			match {
@@ -59,27 +39,22 @@ auth.othala.test:80 {
 		reverse_proxy hydra:4444
 	}
 
-	# The converged app owns the Hydra login/consent/logout CHALLENGE handlers.
-	# Matched before the app default so they're explicit/auditable.
+	# App-owned Hydra challenge handlers.
 	@portal_challenges path /oauth2/login /oauth2/consent /oauth2/logout
 	handle @portal_challenges {
-		# DOS-1: XFF rewrite, same as below — see caddy/Caddyfile.
+		# XFF overwrite: see caddy/Caddyfile.
 		reverse_proxy othala:8080 {
 			header_up X-Forwarded-For {remote_host}
 		}
 	}
 
-	# Kratos browser endpoints: well-known ceremony scripts + the self-service flow
-	# APIs the rendered forms POST to + session/schema endpoints.
+	# Kratos browser endpoints.
 	@kratos path /.well-known/ory/* /self-service/* /sessions/* /schemas/*
 	handle @kratos {
 		reverse_proxy kratos:4433
 	}
 
-	# Default -> the app: family UI, /auth/* + /admin/* pages, AND the static assets
-	# (/_astro/*, favicon, webmanifest). The app is the catch-all, not Kratos.
-	#
-	# DOS-1: XFF rewrite — rationale in caddy/Caddyfile.
+	# Default -> the app (UI, pages, static assets). XFF overwrite: rationale in caddy/Caddyfile.
 	reverse_proxy othala:8080 {
 		header_up X-Forwarded-For {remote_host}
 	}

@@ -13,7 +13,8 @@ export const prerender = false;
 
 import Layout from '../../layouts/Layout.astro';
 import ManifestNotice from '../../components/ManifestNotice.astro';
-import { requireAdminSession, listIdentities } from '../../lib/admin';
+import { requireAdminSession } from '../../lib/admin';
+import { listIdentities } from '../../lib/admin-api';
 import { servingManifests, manifestHealth } from '../../lib/manifest-store';
 import { getGroupRegistry, namesOfKind } from '../../lib/group-registry';
 
