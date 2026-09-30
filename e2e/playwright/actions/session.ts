@@ -28,10 +28,6 @@ export interface WhoAmI {
   [key: string]: unknown;
 }
 
-/**
- * hasSession — returns true iff the context's session cookie is accepted by
- * Kratos (i.e. /sessions/whoami responds 200 with active:true).
- */
 export async function hasSession(ctx: BrowserContext, base: string): Promise<boolean> {
   try {
     const resp = await ctx.request.get(`${base}/sessions/whoami`, {
@@ -45,10 +41,6 @@ export async function hasSession(ctx: BrowserContext, base: string): Promise<boo
   }
 }
 
-/**
- * getSession — fetch the full /sessions/whoami payload.
- * Returns null on 401 or network error.
- */
 export async function getSession(ctx: BrowserContext, base: string): Promise<WhoAmI | null> {
   try {
     const resp = await ctx.request.get(`${base}/sessions/whoami`, {
@@ -59,4 +51,13 @@ export async function getSession(ctx: BrowserContext, base: string): Promise<Who
   } catch {
     return null;
   }
+}
+
+/** GET /admin without following redirects; the first hop is the gate's answer. */
+export async function probeAdmin(
+  ctx: BrowserContext,
+  baseURL: string,
+): Promise<{ status: number; loc: string }> {
+  const resp = await ctx.request.get(`${baseURL}/admin`, { maxRedirects: 0 });
+  return { status: resp.status(), loc: resp.headers()['location'] ?? '' };
 }

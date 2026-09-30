@@ -1,23 +1,9 @@
-/**
- * X — signing out of an app ends the SSO session.
- *
- * A member signs in to grafana, then grafana starts an RP-initiated logout at
- * Hydra's end-session endpoint with the id_token as id_token_hint. Hydra hands
- * the logout challenge to the portal, which revokes the member's Kratos session
- * before accepting. Afterwards:
- *
- *   - /sessions/whoami with the pre-logout cookies answers 401, and
- *   - a fresh authorize bounces to the login UI instead of issuing a code.
- */
+// X — signing out of an app ends the SSO session.
 
-import { test, expect } from '../fixtures';
+import { test, expect, GRAFANA_CLIENT_ID, GRAFANA_REDIRECT_URI, KRATOS_ADMIN_URL } from '../fixtures';
 import { createIdentityWithPassword, TEST_PASSWORD } from '../actions/identity';
 import { loginViaJsonApi } from '../actions/login';
 import { walk } from '../actions/oidc';
-
-const GRAFANA_CLIENT_ID = 'grafana';
-const GRAFANA_REDIRECT_URI = 'https://grafana.othala.test/login/generic_oauth';
-const KRATOS_ADMIN_URL = process.env.KRATOS_ADMIN_URL ?? 'http://kratos:4434';
 
 function clientSecret(): string {
   const secret = process.env.GRAFANA_CLIENT_SECRET;
@@ -56,7 +42,6 @@ test('X — RP-initiated logout ends the Kratos session and the next authorize r
   try {
     await loginViaJsonApi(ctx, { identifier: member.email, password: TEST_PASSWORD }, baseURL!);
 
-    // Sign in to grafana and exchange the code for an id_token.
     const signIn = await walk(ctx, baseURL!, authorizeURL(baseURL!), (loc) => loc.href.startsWith('https://grafana.othala.test'));
     const terminus = signIn.at(-1);
     const code = terminus?.searchParams.get('code');
@@ -70,11 +55,9 @@ test('X — RP-initiated logout ends the Kratos session and the next authorize r
     const idToken = (await exchange.json()).id_token as string | undefined;
     expect(idToken, 'openid scope must yield an id_token').toBeTruthy();
 
-    // Keep the pre-logout cookies (Kratos session + Hydra login session).
     const before = await ctx.cookies();
     expect(before.some((c) => c.name === 'ory_kratos_session'), 'Kratos session cookie present').toBe(true);
 
-    // RP-initiated logout through the edge, as grafana's browser would do it.
     const logout = await walk(
       ctx,
       baseURL!,
@@ -85,14 +68,12 @@ test('X — RP-initiated logout ends the Kratos session and the next authorize r
     expect(logout.some((loc) => loc.pathname === '/oauth2/logout'), `logout must reach the portal; chain: ${chain}`).toBe(true);
     expect(logout.at(-1)?.pathname, `logout must finish at the post-logout page; chain: ${chain}`).toBe('/');
 
-    // The pre-logout Kratos cookie no longer authenticates.
     const replay = await browser.newContext();
     try {
       await replay.addCookies(before);
       const whoami = await replay.request.get(`${baseURL}/sessions/whoami`, { headers: { Accept: 'application/json' } });
       expect(whoami.status(), 'whoami with the pre-logout cookie must be 401').toBe(401);
 
-      // A new authorize with the same cookies must ask for login, not issue a code.
       const again = await walk(
         replay,
         baseURL!,

@@ -1,12 +1,4 @@
-/**
- * Z — the contact form is for signed-in members; the error page shows only known reasons.
- *
- *   Z1 — a POST without a session answers 401 and no mail is sent.
- *   Z2 — a signed-in POST answers 200 and the mail names the account
- *        (username and identity id).
- *   Z3 — an invalid submission from a signed-in member answers 400.
- *   Z4 — /auth/error does not echo an arbitrary reason value.
- */
+// Z — the contact form is for signed-in members; the error page shows only known reasons.
 
 import { test, expect } from '../fixtures';
 import { createIdentityWithPassword, TEST_PASSWORD } from '../actions/identity';

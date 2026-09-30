@@ -1,15 +1,4 @@
-/**
- * ZA — an admin account keeps a second factor through self-service settings.
- *
- *   ZA1 — an admin whose only second factor is an authenticator app submits
- *         totp_unlink; the change is refused with the neutral message and the
- *         admin API still reports the app enrolled.
- *   ZA2 — an admin with an authenticator app and a security key removes the
- *         key; the change is saved and the app stays enrolled.
- *
- * Each test seeds its own admin (unique per run) so enrolment state never
- * carries across runs.
- */
+// ZA — an admin keeps a second factor through self-service settings.
 
 import type { BrowserContext } from 'playwright-core';
 import { test, expect, adminAal2Context } from '../fixtures';
@@ -40,12 +29,10 @@ async function seedAdmin(browser: import('playwright-core').Browser, baseURL: st
     isAdmin: true,
     kratosAdminURL,
   });
-  // Password sign-in, authenticator-app enrolment through settings, aal2 step-up.
   const ctx = await adminAal2Context({ browser, email: seeded.email, password: TEST_PASSWORD, baseURL });
   return { seeded, ctx };
 }
 
-/** Submit one settings method of a fresh flow as JSON; returns status + body. */
 async function submitSettings(ctx: BrowserContext, baseURL: string, data: Record<string, unknown>) {
   const flowResp = await ctx.request.get(`${baseURL}/self-service/settings/browser`, {
     headers: { Accept: 'application/json' },
@@ -84,7 +71,6 @@ test.describe('ZA — admin keeps a second factor', () => {
   test('ZA2 — with an app and a key, removing the key is saved', async ({ browser, baseURL, kratosAdminURL }) => {
     const { seeded, ctx } = await seedAdmin(browser, baseURL, kratosAdminURL, 'key');
     try {
-      // Register a security key through the settings page with a CDP virtual authenticator.
       const page = await ctx.newPage();
       const cdp = await ctx.newCDPSession(page);
       await cdp.send('WebAuthn.enable', { enableUI: false });

@@ -1,12 +1,4 @@
-/**
- * ZB — the admin console refuses to deactivate the acting admin.
- *
- *   ZB1 — an admin opens their own identity and presses Deactivate; the page
- *         shows the neutral refusal and the admin API still reports the
- *         identity active.
- *
- * The admin is seeded per run so the refusal never depends on another admin.
- */
+// ZB — the admin console refuses to deactivate the acting admin.
 
 import { test, expect, adminAal2Context } from '../fixtures';
 import { createIdentityWithPassword, readIdentity, TEST_PASSWORD } from '../actions/identity';

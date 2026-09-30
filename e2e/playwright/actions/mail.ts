@@ -3,7 +3,7 @@
  * every predicate must bound on `created` (forRecipient does, with 5s of skew).
  */
 
-const MAILPIT_API = process.env.MAILPIT_API ?? 'http://mailpit:8025';
+export const MAILPIT_API = process.env.MAILPIT_API ?? 'http://mailpit:8025';
 
 export interface MailSummary {
   id: string;

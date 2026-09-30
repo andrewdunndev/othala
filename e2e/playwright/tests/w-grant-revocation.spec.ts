@@ -1,26 +1,9 @@
-/**
- * W — admin changes end a subject's refresh tokens.
- *
- * A member signs in to grafana with offline_access and holds a refresh token.
- * The refresh grant works once (control), then an admin acts on the member
- * through /admin/users/<id>:
- *
- *   W1  Delete permanently  — the portal revokes sessions and Hydra grants
- *                             before deleting the identity.
- *   W2  Save without the app's access group — the portal revokes the
- *                             subject's Hydra consent sessions after the write.
- *
- * Either way the next refresh grant must fail at Hydra's token endpoint.
- */
+// W — admin changes end a subject's refresh tokens.
 
 import type { BrowserContext, Page } from 'playwright-core';
-import { test, expect, adminAal2Context } from '../fixtures';
+import { test, expect, adminAal2Context, GRAFANA_CLIENT_ID, GRAFANA_REDIRECT_URI, KRATOS_ADMIN_URL } from '../fixtures';
 import { createIdentityWithPassword, TEST_PASSWORD } from '../actions/identity';
 import { loginViaJsonApi } from '../actions/login';
-
-const GRAFANA_CLIENT_ID = 'grafana';
-const GRAFANA_REDIRECT_URI = 'https://grafana.othala.test/login/generic_oauth';
-const KRATOS_ADMIN_URL = process.env.KRATOS_ADMIN_URL ?? 'http://kratos:4434';
 
 function clientSecret(): string {
   const secret = process.env.GRAFANA_CLIENT_SECRET;
@@ -28,7 +11,6 @@ function clientSecret(): string {
   return secret;
 }
 
-/** Walk the authorize chain (spec B's walk) with offline_access and return the code. */
 async function authorizeOffline(ctx: BrowserContext, baseURL: string): Promise<string> {
   let url =
     `${baseURL}/oauth2/auth` +
@@ -54,7 +36,6 @@ async function authorizeOffline(ctx: BrowserContext, baseURL: string): Promise<s
   throw new Error(`authorize chain did not terminate in 10 hops (last: ${url})`);
 }
 
-/** POST a grant to Hydra's token endpoint with client_secret_basic. */
 async function tokenGrant(ctx: BrowserContext, hydraPublicURL: string, form: Record<string, string>) {
   const basic = Buffer.from(`${GRAFANA_CLIENT_ID}:${clientSecret()}`).toString('base64');
   return ctx.request.post(`${hydraPublicURL}/oauth2/token`, {
@@ -63,7 +44,6 @@ async function tokenGrant(ctx: BrowserContext, hydraPublicURL: string, form: Rec
   });
 }
 
-/** Sign the member in, obtain a refresh token, and prove one refresh works. Returns the rotated token. */
 async function liveRefreshToken(opts: {
   browser: import('playwright-core').Browser;
   baseURL: string;
@@ -143,7 +123,6 @@ test('W1 — deleting an identity ends its refresh tokens', async ({ browser, ba
     await page.goto(targetUrl, { waitUntil: 'networkidle' });
     await page.locator('summary', { hasText: 'Delete identity' }).click();
     await page.locator('input[name="confirm"]').fill(member.username);
-    // The delete action answers 303 to /admin/users?deleted=1.
     await submitAndExpectStatus(page, targetUrl, () => page.getByRole('button', { name: 'Delete permanently' }).click(), [303]);
     await page.waitForURL(/\/admin\/users\?deleted=1/);
   } finally {

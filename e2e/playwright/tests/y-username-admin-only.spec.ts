@@ -1,17 +1,4 @@
-/**
- * Y — username is admin-controlled; email stays self-service.
- *
- *   Y1 — the settings page shows the username read-only.
- *   Y2 — a profile-settings submission that changes the username is refused
- *        with the neutral message, and the admin API still reports the old
- *        username.
- *   Y3 — an email change through the same form is saved; the post-save
- *        profile-sessions webhook ends the member's other sessions and keeps
- *        the one that saved; the new address is unverified and gets a
- *        verification mail.
- *   Y4 — after an email change, a refresh login by code mails the new address
- *        and nothing goes to the old one.
- */
+// Y — the username is admin-controlled; email stays self-service.
 
 import type { BrowserContext } from 'playwright-core';
 import { test, expect } from '../fixtures';
@@ -25,7 +12,6 @@ async function storedTraits(kratosAdminURL: string, id: string) {
   return (await readIdentity(kratosAdminURL, id)).traits as { username: string; email: string; displayName?: string };
 }
 
-/** Submit the profile method of a fresh settings flow as JSON; returns status + body. */
 async function submitProfile(ctx: BrowserContext, baseURL: string, traits: Record<string, string>) {
   const flowResp = await ctx.request.get(`${baseURL}/self-service/settings/browser`, {
     headers: { Accept: 'application/json' },

@@ -1,91 +1,21 @@
-/**
- * T — The converged access model, asserted end to end.
- *
- * THE MODEL
- * ---------
- * Exactly two groups exist per service:
- *
- *   `<svc>-access`  ENTRY. Everyone who may use the service holds it —
- *                   ordinary members and admins alike.
- *   `<svc>-admin`   ROLE. Held IN ADDITION to `<svc>-access` by admins.
- *
- * Nothing is derived from anything else. "Can this person get in?" is answered
- * by looking at ONE group, with no rule to remember. In particular
- * admin-implies-access is ABOLISHED: an identity holding only `<svc>-admin` is
- * NOT admitted. That is a misconfigured identity, not a supported shortcut.
- *
- * WHY THIS FILE EXISTS
- * --------------------
- * Before it, the suite encoded the retired cohort model (family/friends/kids)
- * and no fixture bound two groups at all, so every invariant below could be
- * deleted from the product and the suite would stay green. These cases are the
- * ones that fail when the model is walked back:
- *
- *   T4  fails if anyone reintroduces admin-implies-access.
- *   T8  fails if anyone reintroduces it at the forward_auth edge.
- *   T2  fails if role resolution reverts to first-match-wins on stored order
- *       (the alphabetical order an admin actually gets: access before admin).
- *   T3  fails if it reverts to LAST-match-wins, the mirror bug.
- *
- * WHAT ENFORCES WHAT (no folklore — each claim names its enforcer)
- * ---------------------------------------------------------------
- *   ENTRY, OIDC apps  enforceAccessGate  portal/src/lib/gate.ts, over
- *                     manifest.accessGroups, which parseAccessGroups
- *                     (portal/src/lib/access-groups.ts) reads from
- *                     `presentation.access:`. e2e/manifests/grafana.yaml lists
- *                     ONLY `grafana-access` there. That one-entry list IS the
- *                     abolition — a second entry would restore the old grant.
- *   ENTRY, edge apps  enforceGroupGate (gate.ts) via /api/forward-auth, over
- *                     the single group the edge passes as ?group=. The edge
- *                     passes `<svc>-access` for everyone, admins included.
- *   ROLE              lookupRole  portal/src/lib/claims.ts, over
- *                     consent.group_role_map, ranked by declaration index in
- *                     consent.roles (highest rank wins across the whole group
- *                     SET, so stored order cannot change the answer).
- *
- * NOT ASSERTED HERE, DELIBERATELY: that admin implies access. That behaviour is
- * gone. A test for it would be a test for the bug.
- *
- * ORTHOGONAL, DO NOT CONFLATE: metadata_admin.admin is PORTAL admin
- * authority and gates /admin. It is a marker, not a group. No group grants it
- * and it grants no group. Specs C, Q and R cover it; none of these identities
- * carry it.
- */
+// T — the converged access model, asserted end to end.
 
-import { test, expect } from '../fixtures';
+import { test, expect, GRAFANA_CLIENT_ID, GRAFANA_REDIRECT_URI } from '../fixtures';
 import { loginViaJsonApi } from '../actions/login';
 import { createIdentityWithPassword, TEST_PASSWORD } from '../actions/identity';
 import { decodeJwt } from 'jose';
 import type { BrowserContext } from 'playwright-core';
 
-const GRAFANA_CLIENT_ID = 'grafana';
-const GRAFANA_REDIRECT_URI = 'https://grafana.othala.test/login/generic_oauth';
-
-/** Result of walking the OAuth2 authorize chain to its terminus. */
 interface AuthorizeOutcome {
-  /** Set when the flow completed: the authorization code. */
   code?: string;
-  /** Set when the flow was denied: the OAuth2 `error` param. */
   error?: string;
-  /** The Location the walk terminated on, for failure messages. */
   terminus: string;
 }
 
-/**
- * Walk the authorize redirect chain with the session already in `ctx`'s jar and
- * report the terminus. Mirrors spec B's walk (grafana.othala.test is
- * unresolvable inside the compose net, so we read the code/error out of the
- * Location header rather than letting the browser navigate there), with one
- * addition: a denial can surface as an `error` param on any hop, so we check
- * every hop instead of only the final one.
- */
 async function walkAuthorize(
   ctx: BrowserContext,
   baseURL: string,
 ): Promise<AuthorizeOutcome> {
-  // `groups` is requested so the groups claim survives the OIDC Core §5.4
-  // scope-gate in composeIDTokenClaims; grafana_role is manifest-injected and
-  // is not scope-gated. Matches spec B's request.
   let url =
     `${baseURL}/oauth2/auth` +
     `?client_id=${GRAFANA_CLIENT_ID}` +
@@ -115,7 +45,6 @@ async function walkAuthorize(
   throw new Error(`authorize chain did not terminate in 10 hops (last: ${url})`);
 }
 
-/** Exchange an authorization code and return the decoded id_token claims. */
 async function idTokenClaims(
   ctx: BrowserContext,
   hydraPublicURL: string,
@@ -140,16 +69,6 @@ async function idTokenClaims(
   return decodeJwt(body.id_token as string) as Record<string, unknown>;
 }
 
-/**
- * Seed an identity holding EXACTLY `groups` and return a logged-in context.
- * The caller closes the context.
- *
- * Groups are written straight through the Kratos admin API, so the array lands
- * in metadata_admin.groups in exactly the order given — which is what makes the
- * T2/T3 ordering pair meaningful. (normalizeGroupOrder in
- * portal/src/lib/access.ts only runs on the admin FORM write path; it is
- * cosmetic and is not what makes role resolution deterministic.)
- */
 async function seedAndLogin(opts: {
   browser: import('playwright-core').Browser;
   kratosAdminURL: string;
@@ -175,8 +94,6 @@ async function seedAndLogin(opts: {
     throw err;
   }
 }
-
-// ══ Part 1: OIDC apps — entry from the manifest access binding ═══════════════
 
 test('T1 — `grafana-access` alone grants entry and the user-tier role', async ({
   browser,
@@ -224,9 +141,6 @@ test('T2 — both groups, access FIRST: entry, and the role resolves to ADMIN', 
   const secret = process.env.GRAFANA_CLIENT_SECRET;
   if (!secret) throw new Error('GRAFANA_CLIENT_SECRET not set — inject from compose environment');
 
-  // ['grafana-access', 'grafana-admin'] — alphabetical, i.e. the order a real
-  // admin's groups actually sit in after normalizeGroupOrder. A first-match-wins
-  // resolver silently hands this identity the VIEWER role.
   const ctx = await seedAndLogin({
     browser, kratosAdminURL, baseURL,
     slug: 't2.access-then-admin',
@@ -268,9 +182,6 @@ test('T3 — both groups, admin FIRST: same entry, same ADMIN role (order-indepe
   const secret = process.env.GRAFANA_CLIENT_SECRET;
   if (!secret) throw new Error('GRAFANA_CLIENT_SECRET not set — inject from compose environment');
 
-  // The SAME set as T2, stored in the opposite order. T2 and T3 must agree;
-  // that agreement is the whole assertion. metadata_admin.groups is written
-  // through the Kratos admin API, which makes no ordering promise at all.
   const ctx = await seedAndLogin({
     browser, kratosAdminURL, baseURL,
     slug: 't3.admin-then-access',
@@ -361,20 +272,6 @@ test('T5 — NEITHER group is DENIED', async ({ browser, baseURL, kratosAdminURL
     await ctx.close();
   }
 });
-
-// ══ Part 2: edge apps — the same model through forward_auth ══════════════════
-//
-// Apps with no OIDC support are gated at the reverse proxy: Caddy subrequests
-// /api/forward-auth?group=<svc>-access and keys on the STATUS. The e2e fixture
-// for this shape is proxywatch (e2e/manifests/proxywatch.yaml).
-//
-// The edge passes ONE group and it is always `<svc>-access` — that is the whole
-// point of the converged model: it works for everyone including admins, so no
-// Caddyfile needs to know about admin groups. T7 is what proves the edge config
-// does not need a second group; T8 is what stops the derivation coming back.
-//
-// Status contract (portal/src/pages/api/forward-auth.ts):
-//   200 in the group · 401 no session · 403 every authorization failure
 
 const FA = (baseURL: string, group: string) =>
   `${baseURL}/api/forward-auth?group=${encodeURIComponent(group)}`;
@@ -470,16 +367,11 @@ test('T9 — forward_auth: NEITHER group → 403', async ({ browser, baseURL, kr
   }
 });
 
-test('T10 — forward_auth: no session at all → 401', async ({ browser, baseURL }) => {
-  const ctx = await browser.newContext();
-  try {
-    const resp = await ctx.request.get(FA(baseURL, 'proxywatch-access'), { maxRedirects: 0 });
-    expect(
-      resp.status(),
-      'T10: with no Kratos session the gate must 401 so the edge sends the user to ' +
-        `login; got ${resp.status()}`,
-    ).toBe(401);
-  } finally {
-    await ctx.close();
-  }
+test('T10 — forward_auth: no session at all → 401', async ({ ctx, baseURL }) => {
+  const resp = await ctx.request.get(FA(baseURL, 'proxywatch-access'), { maxRedirects: 0 });
+  expect(
+    resp.status(),
+    'T10: with no Kratos session the gate must 401 so the edge sends the user to ' +
+      `login; got ${resp.status()}`,
+  ).toBe(401);
 });

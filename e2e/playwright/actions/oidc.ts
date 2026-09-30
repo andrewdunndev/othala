@@ -1,9 +1,6 @@
 import type { BrowserContext } from 'playwright-core';
 
-/**
- * Follow redirects by hand from `start` until `stop(location)` holds or no
- * Location is returned. Returns every Location seen, in order.
- */
+/** Follow redirects by hand until stop(location) holds; returns every Location seen. */
 export async function walk(ctx: BrowserContext, baseURL: string, start: string, stop: (loc: URL) => boolean): Promise<URL[]> {
   const seen: URL[] = [];
   let url = start;
