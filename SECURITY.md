@@ -63,7 +63,7 @@ Each names its enforcer and the test that fails if the enforcer stops working.
   `portal/src/lib/admin-auth.test.ts`, `e2e/playwright/tests/f-aal2-bypass.spec.ts`.
 - **Loopback admin listener.** `portal/src/server/listen.mjs`: privileged routes
   on a separate loopback listener whose mux is disjoint from the public one,
-  guarded by two purpose-named bearer secrets compared with `bearerMatches`
+  guarded by one bearer secret compared with `bearerMatches`
   (constant-time, fail-closed on an unset secret). Test:
   `portal/scripts/public-mux-disjoint.test.mjs`.
 - **Recovery is not a path to admin.** The recovery `after` hook in

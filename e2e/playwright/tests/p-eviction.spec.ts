@@ -19,7 +19,7 @@
  * lost device's key by hand. P3 proves both halves: the admin 400, then
  * the real per-credential removal end-to-end.
  *
- * P1-P3 share state (one identity, two browser contexts each with its own
+ * P1 and P3 share state (one identity, two browser contexts each with its own
  * CDP virtual authenticator) across module-scoped variables below — they run
  * serially in one worker (playwright.config.ts workers: 1, and this describe
  * block is .serial so a mid-chain failure retries the whole chain rather than
@@ -31,9 +31,6 @@
  *       its own CDP virtual authenticator, simulating a second device (lost,
  *       or an attacker who briefly had the account enrolling its own key)
  *       under the SAME identity. Both sessions are cleared afterward.
- *   P2. Admin calls the revoke-user admin endpoint (force-logout fan-out to
- *       Kratos + Hydra — same endpoint smoke.sh Section E drives). Passkey B
- *       can STILL log in afterward — revoke does not remove credentials.
  *   P3. (a) The admin credential-delete endpoint 400s on type=passkey —
  *       documented, not worked around. (b) The victim (ctx-A) logs in,
  *       opens /auth/settings, and self-removes passkey B via its rendered
@@ -44,18 +41,12 @@
  *   - Kratos passkey strategy enabled, rp.id = othala.test.
  *   - Chromium (CDP required for virtual authenticators).
  *   - Playwright container on the compose net.
- *   - P2 needs OTHALA_ADMIN_ENDPOINT_BEARER (e2e/compose.yml playwright
- *     service) to call {OTHALA_ADMIN_URL}/admin/revoke-user — the loopback
- *     admin port, reachable from the playwright container only because the
- *     browser profile binds it to othala's static IP (compose.browser.yml),
- *     not 127.0.0.1. NOT {baseURL}/admin/api/revoke — that path doesn't
- *     exist; the admin surface is never routed through the public Caddy edge.
  *
- * Status (issue #10, RESOLVED): P1-P3 all run against the canonical model.
+ * Status (issue #10, RESOLVED): P1 and P3 run against the canonical model.
  * ctx-A is now manually created (browser.newContext(), same as ctx-B) rather
  * than sourced from the test-scoped `page`/`virtualAuthenticator` fixtures,
  * which Playwright tears down at the end of P1 — P3 needs ctx-A alive to
- * prove passkey A survives. P2/P3 share I1's usernameless-login leg
+ * prove passkey A survives. P3 shares I1's usernameless-login leg
  * (passkeyLogin() below) — the prior "session null after click" symptom was
  * a harness race (networkidle satisfied mid-ceremony by the CDP virtual
  * authenticator's zero-network-traffic resolve, before the session cookie
@@ -146,7 +137,7 @@ async function clearSession(ctx: BrowserContext, baseURL: string): Promise<void>
   await ctx.clearCookies();
 }
 
-// ── Module-scoped state shared across P1 → P2 → P3 (see file docblock) ──────
+// ── Module-scoped state shared across P1 → P3 (see file docblock) ──────
 let sharedIdentity: { id: string; email: string } | null = null;
 let ctxA: BrowserContext | null = null;
 let pageA: Page | null = null;
@@ -237,42 +228,11 @@ test.describe.serial('P — Passkey credential eviction (lost-device scenario)',
     ).toBeTruthy();
     console.log('[P1] passkey credential record:', JSON.stringify(registered?.credentials?.passkey));
 
-    // Clear both sessions — P2's "still works after revoke" assertion needs
-    // a FRESH login, not a residual cookie.
+    // Clear both sessions — P3 needs a FRESH login, not a residual cookie.
     await clearSession(ctxA, baseURL);
     await clearSession(ctxB, baseURL);
 
     sharedIdentity = identity;
-  });
-
-  // P2 shares I1's usernameless-login leg (passkeyLogin() above); resolved
-  // per the file docblock Status note — was a networkidle wait race, not a
-  // product bug.
-  test('P2 — admin revokeSubject force-logout; passkey B can STILL log in (documents the gap)', async ({ baseURL }) => {
-    if (!sharedIdentity || !ctxB || !pageB) {
-      test.skip(true, 'P2: requires P1 to have run first in this worker (shared module state)');
-      return;
-    }
-    const identity = sharedIdentity;
-    const contextB = ctxB;
-    const loginPageB = pageB;
-    const bearer = process.env.OTHALA_ADMIN_ENDPOINT_BEARER;
-    if (!bearer) {
-      test.skip(true, 'P2: OTHALA_ADMIN_ENDPOINT_BEARER not set — compose.yml playwright service env');
-      return;
-    }
-    const adminBase = process.env.OTHALA_ADMIN_URL ?? 'http://othala:4431';
-
-    const revokeResp = await fetch(`${adminBase}/admin/revoke-user`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${bearer}` },
-      body: JSON.stringify({ subject: identity.id }),
-    });
-    expect(revokeResp.ok, 'P2: revoke-user call must succeed').toBe(true);
-    console.log('[P2] revoke-user response:', await revokeResp.text());
-
-    const session = await passkeyLogin(loginPageB, contextB, baseURL, 'P2');
-    expect(session?.active, 'P2: passkey B must STILL work after revoke (documents the gap)').toBe(true);
   });
 
   // P3 shares I1's usernameless-login leg (passkeyLogin() above); resolved
@@ -290,7 +250,7 @@ test.describe.serial('P — Passkey credential eviction (lost-device scenario)',
     const loginPageB = pageB;
 
     // Log out ctx-B first: a fresh login attempt is what proves the
-    // credential is gone, not just that P2's issued session still works.
+    // credential is gone, not just that a residual session still works.
     await clearSession(contextB, baseURL);
 
     // (a) The upstream limitation, documented rather than worked around:

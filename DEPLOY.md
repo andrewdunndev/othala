@@ -42,7 +42,7 @@ The app runs **two HTTP listeners in one process**
   expose to the network.
 - **Admin port** (`ADMIN_PORT`, default `4431`, `ADMIN_HOST=127.0.0.1`,
   loopback only). A separate `http.createServer` with its own disjoint mux:
-  `GET /healthz`, `GET /readyz`, `POST /admin/revoke-user`,
+  `GET /healthz`, `GET /readyz`,
   `POST /admin/{recovery,login-code}-gate`. It never delegates to the SSR
   handler, which never sees these paths — off the public mux **by
   construction**, not by routing rule. The bearer-guarded routes are

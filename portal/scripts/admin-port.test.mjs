@@ -3,13 +3,13 @@
 // Run with: npx vitest run scripts/admin-port.test.mjs
 //
 // Asserts:
-//   - the admin port serves /healthz + /readyz (GET) and the admin endpoints
-//     /admin/revoke-user, /admin/recovery-gate, /admin/login-code-gate (POST), and that
-//     every public/challenge path 404s there (the two muxes are disjoint);
-//   - the revoke-user + recovery-gate paths are NOT public GET routes (the
-//     public mux never sees them via the admin helpers);
-//   - the admin-endpoint + recovery-gate bearer checks are CONSTANT-TIME and
-//     FAIL-CLOSED (unset secret rejects everything).
+//   - the admin port serves /healthz + /readyz (GET) and the webhook endpoints
+//     (POST), and every public/challenge path 404s there (the two muxes are
+//     disjoint);
+//   - the webhook paths are NOT public GET routes;
+//   - the bearer check is CONSTANT-TIME and FAIL-CLOSED (unset secret rejects
+//     everything);
+//   - every gate and the session sweep read Kratos through the injected runtime.
 //
 // Imports the pure helpers from listen.mjs without binding any socket or
 // loading the SSR handler / runtime bundle.
@@ -30,12 +30,17 @@ import {
   PROFILE_UPDATE_UNAVAILABLE,
   usernameChangeVerdict,
   startupEnvErrors,
-  ADMIN_ROUTES,
   ADMIN_GET_ROUTES,
   ADMIN_POST_ROUTES,
 } from '../src/server/listen.mjs';
 import { asAdmin, identity, session, withTotp, withWebauthnKey } from '../src/lib/test-builders.ts';
 import * as secondFactorRuntime from '../src/lib/second-factor-gate.ts';
+import { getIdentity, listSessions, revokeSession } from '../src/lib/admin-api.ts';
+import { isAdminMarker } from '../src/lib/admin-auth.ts';
+
+// The runtime the built bundle provides, over the real SDK client (mock Kratos).
+const runtime = { ...secondFactorRuntime, getIdentity, listSessions, revokeSession, isAdminMarker };
+const handle = (req, res, rt = runtime) => handleAdminRequest(req, res, rt);
 
 const ADMIN_UUID = '11111111-1111-1111-1111-111111111111';
 const OTHER_UUID = '22222222-2222-2222-2222-222222222222';
@@ -61,7 +66,6 @@ function fakeReq({ method = 'GET', url = '/', headers = {}, body = '' } = {}) {
 }
 
 beforeEach(() => {
-  delete process.env.OTHALA_ADMIN_ENDPOINT_BEARER;
   delete process.env.RECOVERY_GATE_SECRET;
   delete process.env.KRATOS_ADMIN_URL;
 });
@@ -70,7 +74,6 @@ beforeEach(() => {
 
 test('admin GET mux serves exactly /healthz and /readyz', () => {
   assert.deepEqual([...ADMIN_GET_ROUTES].sort(), ['/healthz', '/readyz']);
-  assert.deepEqual([...ADMIN_ROUTES].sort(), ['/healthz', '/readyz']);
   assert.equal(isAdminRoute('GET', '/healthz'), true);
   assert.equal(isAdminRoute('GET', '/readyz'), true);
 });
@@ -80,7 +83,6 @@ test('admin POST mux serves exactly the admin endpoints', () => {
     '/admin/login-code-gate',
     '/admin/profile-sessions',
     '/admin/recovery-gate',
-    '/admin/revoke-user',
     '/admin/second-factor-gate',
     '/admin/username-gate',
   ]);
@@ -109,7 +111,7 @@ test('challenge + public paths 404 on the admin port', async () => {
   ];
   for (const p of paths) {
     const res = fakeRes();
-    await handleAdminRequest(fakeReq({ method: 'GET', url: p }), res);
+    await handle(fakeReq({ method: 'GET', url: p }), res);
     assert.equal(res.statusCode, 404, `${p} should 404 on admin port`);
   }
 });
@@ -117,7 +119,7 @@ test('challenge + public paths 404 on the admin port', async () => {
 test('healthz/readyz return 200 ok on the admin port', async () => {
   for (const p of ['/healthz', '/readyz']) {
     const res = fakeRes();
-    await handleAdminRequest(fakeReq({ method: 'GET', url: p }), res);
+    await handle(fakeReq({ method: 'GET', url: p }), res);
     assert.equal(res.statusCode, 200);
     assert.deepEqual(JSON.parse(res.body), { status: 'ok' });
   }
@@ -126,7 +128,7 @@ test('healthz/readyz return 200 ok on the admin port', async () => {
 test('a served admin POST path on the wrong method (GET) 404s', async () => {
   for (const p of ADMIN_POST_ROUTES) {
     const res = fakeRes();
-    await handleAdminRequest(fakeReq({ method: 'GET', url: p }), res);
+    await handle(fakeReq({ method: 'GET', url: p }), res);
     assert.equal(res.statusCode, 404, `GET ${p} should 404`);
   }
 });
@@ -156,97 +158,8 @@ test('bearerMatches accepts only the exact secret (constant-time path)', () => {
 
 test('startup fails when RECOVERY_GATE_SECRET is set but shorter than 32 bytes', () => {
   process.env.RECOVERY_GATE_SECRET = 'short-secret';
-  process.env.OTHALA_ADMIN_ENDPOINT_BEARER = 'x'.repeat(32);
   const errors = startupEnvErrors();
   assert.ok(errors.some((e) => /RECOVERY_GATE_SECRET/.test(e) && /32 bytes/.test(e)));
-});
-
-test('startup fails when OTHALA_ADMIN_ENDPOINT_BEARER is set but shorter than 32 bytes', () => {
-  process.env.RECOVERY_GATE_SECRET = 'x'.repeat(32);
-  process.env.OTHALA_ADMIN_ENDPOINT_BEARER = 'short-secret';
-  const errors = startupEnvErrors();
-  assert.ok(errors.some((e) => /OTHALA_ADMIN_ENDPOINT_BEARER/.test(e) && /32 bytes/.test(e)));
-});
-
-// ── revoke-user endpoint auth ──────────────────────────────────────────────
-
-test('POST /admin/revoke-user 403s with no/wrong bearer (fail-closed unset)', async () => {
-  // unset secret -> every request rejected
-  // 403 not 401: Kratos can_interrupt webhooks must see 403 to abort the flow;
-  // a 401 risks skip-and-continue (fail-open).
-  const res = fakeRes();
-  await handleAdminRequest(
-    fakeReq({ method: 'POST', url: '/admin/revoke-user', headers: { authorization: 'Bearer x' }, body: '{"subject":"s"}' }),
-    res,
-  );
-  assert.equal(res.statusCode, 403);
-});
-
-test('POST /admin/revoke-user 403s with a wrong bearer when secret IS set', async () => {
-  process.env.OTHALA_ADMIN_ENDPOINT_BEARER = 'right-secret';
-  const res = fakeRes();
-  await handleAdminRequest(
-    fakeReq({ method: 'POST', url: '/admin/revoke-user', headers: { authorization: 'Bearer wrong' }, body: '{"subject":"s"}' }),
-    res,
-  );
-  assert.equal(res.statusCode, 403);
-});
-
-test('POST /admin/revoke-user with a valid bearer routes through revokeSubject', async () => {
-  process.env.OTHALA_ADMIN_ENDPOINT_BEARER = 'right-secret';
-  let revokedSubject = null;
-  const runtime = {
-    async revokeSubject(subject) {
-      revokedSubject = subject;
-      return { subject, kratosSessionsRevoked: true };
-    },
-  };
-  const res = fakeRes();
-  await handleAdminRequest(
-    fakeReq({ method: 'POST', url: '/admin/revoke-user', headers: { authorization: 'Bearer right-secret' }, body: '{"subject":"sub-9"}' }),
-    res,
-    runtime,
-  );
-  assert.equal(res.statusCode, 200);
-  assert.equal(revokedSubject, 'sub-9');
-  assert.equal(JSON.parse(res.body).kratosSessionsRevoked, true);
-});
-
-test('POST /admin/revoke-user returns prescriptive error (dependency + action), no raw upstream leak', async () => {
-  process.env.OTHALA_ADMIN_ENDPOINT_BEARER = 'right-secret';
-  class FakeRevokeError extends Error {
-    constructor() {
-      super('revoke step "delete-sessions" failed against kratos-admin: re-run the revoke.');
-      this.dependency = 'kratos-admin';
-      this.step = 'delete-sessions';
-    }
-  }
-  const runtime = {
-    async revokeSubject() { throw new FakeRevokeError(); },
-  };
-  const res = fakeRes();
-  await handleAdminRequest(
-    fakeReq({ method: 'POST', url: '/admin/revoke-user', headers: { authorization: 'Bearer right-secret' }, body: '{"subject":"s"}' }),
-    res,
-    runtime,
-  );
-  assert.equal(res.statusCode, 502); // kratos-admin -> upstream dependency
-  const out = JSON.parse(res.body);
-  assert.equal(out.dependency, 'kratos-admin');
-  assert.equal(out.step, 'delete-sessions');
-  assert.match(out.action, /re-run the revoke/);
-});
-
-test('POST /admin/revoke-user 400s on a missing subject', async () => {
-  process.env.OTHALA_ADMIN_ENDPOINT_BEARER = 'right-secret';
-  const runtime = { async revokeSubject() { throw new Error('should not run'); } };
-  const res = fakeRes();
-  await handleAdminRequest(
-    fakeReq({ method: 'POST', url: '/admin/revoke-user', headers: { authorization: 'Bearer right-secret' }, body: '{}' }),
-    res,
-    runtime,
-  );
-  assert.equal(res.statusCode, 400);
 });
 
 // ── recovery-gate endpoint auth + verdict ──────────────────────────────────
@@ -255,7 +168,7 @@ test('POST /admin/recovery-gate is fail-closed when RECOVERY_GATE_SECRET unset (
   // 403 not 401: Kratos can_interrupt webhooks must see 403 to abort the flow;
   // a 401 risks skip-and-continue (fail-open).
   const res = fakeRes();
-  await handleAdminRequest(
+  await handle(
     fakeReq({ method: 'POST', url: '/admin/recovery-gate', headers: { authorization: 'Bearer x' }, body: '{}' }),
     res,
   );
@@ -275,7 +188,7 @@ test('POST /admin/recovery-gate REFUSES recovery when the admin-API marker is tr
   process.env.RECOVERY_GATE_SECRET = 'gate-secret';
   try {
     const res = fakeRes();
-    await handleAdminRequest(
+    await handle(
       fakeReq({
         method: 'POST',
         url: '/admin/recovery-gate',
@@ -299,7 +212,7 @@ test('POST /admin/recovery-gate is fail-closed when KRATOS_ADMIN_URL is unset (4
   // in beforeEach.
   process.env.RECOVERY_GATE_SECRET = 'gate-secret';
   const res = fakeRes();
-  await handleAdminRequest(
+  await handle(
     fakeReq({
       method: 'POST',
       url: '/admin/recovery-gate',
@@ -327,7 +240,7 @@ test('POST /admin/recovery-gate ALLOWS recovery for a non-admin identity (200)',
   process.env.RECOVERY_GATE_SECRET = 'gate-secret';
   try {
     const res = fakeRes();
-    await handleAdminRequest(
+    await handle(
       fakeReq({
         method: 'POST',
         url: '/admin/recovery-gate',
@@ -346,7 +259,7 @@ test('POST /admin/recovery-gate ALLOWS recovery for a non-admin identity (200)',
 test('POST /admin/recovery-gate refuses an unknown identity (403)', async () => {
   process.env.RECOVERY_GATE_SECRET = 'gate-secret';
   const res = fakeRes();
-  await handleAdminRequest(
+  await handle(
     fakeReq({
       method: 'POST',
       url: '/admin/recovery-gate',
@@ -361,7 +274,7 @@ test('POST /admin/recovery-gate refuses an unknown identity (403)', async () => 
 test('POST /admin/recovery-gate refuses an unknown identity whatever the payload says (403)', async () => {
   process.env.RECOVERY_GATE_SECRET = 'gate-secret';
   const res = fakeRes();
-  await handleAdminRequest(
+  await handle(
     fakeReq({
       method: 'POST',
       url: '/admin/recovery-gate',
@@ -381,23 +294,12 @@ test('bearer rejection on recovery-gate is 403 (not 401) — Kratos can_interrup
   // = fail-open), whereas 403 reliably aborts the flow.
   process.env.RECOVERY_GATE_SECRET = 'correct';
   const res = fakeRes();
-  await handleAdminRequest(
+  await handle(
     fakeReq({ method: 'POST', url: '/admin/recovery-gate', headers: { authorization: 'Bearer wrong' }, body: '{}' }),
     res,
   );
   assert.equal(res.statusCode, 403, 'must be 403, not 401');
   assert.notEqual(res.statusCode, 401, 'must NOT be 401 (would be fail-open under can_interrupt)');
-});
-
-test('bearer rejection on revoke-user is 403 (not 401)', async () => {
-  process.env.OTHALA_ADMIN_ENDPOINT_BEARER = 'correct';
-  const res = fakeRes();
-  await handleAdminRequest(
-    fakeReq({ method: 'POST', url: '/admin/revoke-user', headers: { authorization: 'Bearer wrong' }, body: '{"subject":"s"}' }),
-    res,
-  );
-  assert.equal(res.statusCode, 403, 'must be 403, not 401');
-  assert.notEqual(res.statusCode, 401, 'must NOT be 401');
 });
 
 // ── login-code-gate: login.after.code webhook ──────────────────────────────
@@ -434,7 +336,7 @@ function identityServer(metadataAdmin) {
 test('login-code-gate REFUSES an admin-marked identity with the neutral message (403)', async () => {
   await withMockKratos(identityServer({ admin: true }), async () => {
     const res = fakeRes();
-    await handleAdminRequest(postLoginCodeGate({ identity_id: ADMIN_UUID, is_admin: false }), res);
+    await handle(postLoginCodeGate({ identity_id: ADMIN_UUID, is_admin: false }), res);
     assert.equal(res.statusCode, 403);
     assert.equal(JSON.parse(res.body).messages[0].messages[0].text, LOGIN_CODE_ADMIN_REFUSAL);
   });
@@ -443,7 +345,7 @@ test('login-code-gate REFUSES an admin-marked identity with the neutral message 
 test('login-code-gate ALLOWS a member (200)', async () => {
   await withMockKratos(identityServer({ groups: ['family'], admin: false }), async () => {
     const res = fakeRes();
-    await handleAdminRequest(postLoginCodeGate({ identity_id: OTHER_UUID, is_admin: false }), res);
+    await handle(postLoginCodeGate({ identity_id: OTHER_UUID, is_admin: false }), res);
     assert.equal(res.statusCode, 200);
   });
 });
@@ -451,7 +353,7 @@ test('login-code-gate ALLOWS a member (200)', async () => {
 test('login-code-gate REFUSES when the admin API fails (fail-closed, 403)', async () => {
   await withMockKratos((req, res) => { res.writeHead(500); res.end(); }, async () => {
     const res = fakeRes();
-    await handleAdminRequest(postLoginCodeGate({ identity_id: OTHER_UUID, is_admin: false }), res);
+    await handle(postLoginCodeGate({ identity_id: OTHER_UUID, is_admin: false }), res);
     assert.equal(res.statusCode, 403);
     assert.equal(JSON.parse(res.body).messages[0].messages[0].text, LOGIN_CODE_UNAVAILABLE);
   });
@@ -461,7 +363,7 @@ test('login-code-gate REFUSES when KRATOS_ADMIN_URL is unset or the id is missin
   process.env.RECOVERY_GATE_SECRET = 'gate-secret';
   for (const body of [{ identity_id: OTHER_UUID }, { is_admin: false }]) {
     const res = fakeRes();
-    await handleAdminRequest(postLoginCodeGate(body), res);
+    await handle(postLoginCodeGate(body), res);
     assert.equal(res.statusCode, 403);
   }
 });
@@ -469,7 +371,7 @@ test('login-code-gate REFUSES when KRATOS_ADMIN_URL is unset or the id is missin
 test('login-code-gate rejects a wrong bearer with 403 before reading the body', async () => {
   process.env.RECOVERY_GATE_SECRET = 'gate-secret';
   const res = fakeRes();
-  await handleAdminRequest(postLoginCodeGate({ identity_id: OTHER_UUID }, 'wrong'), res);
+  await handle(postLoginCodeGate({ identity_id: OTHER_UUID }, 'wrong'), res);
   assert.equal(res.statusCode, 403);
   assert.deepEqual(JSON.parse(res.body), { error: 'forbidden' });
 });
@@ -521,7 +423,7 @@ test('usernameChangeVerdict refuses when either side is not a username', () => {
 test('username-gate REFUSES a username change with the neutral message (403)', async () => {
   await withMockKratos(storedIdentityServer(STORED), async () => {
     const res = fakeRes();
-    await handleAdminRequest(postUsernameGate(profilePayload({ ...STORED.traits, username: 'ada.byron' })), res);
+    await handle(postUsernameGate(profilePayload({ ...STORED.traits, username: 'ada.byron' })), res);
     assert.equal(res.statusCode, 403);
     assert.equal(refusalText(res), USERNAME_CHANGE_REFUSAL);
   });
@@ -530,7 +432,7 @@ test('username-gate REFUSES a username change with the neutral message (403)', a
 test('username-gate ALLOWS a profile update that keeps the username (200)', async () => {
   await withMockKratos(storedIdentityServer(STORED), async () => {
     const res = fakeRes();
-    await handleAdminRequest(postUsernameGate(profilePayload({ ...STORED.traits, email: 'ada@example.test' })), res);
+    await handle(postUsernameGate(profilePayload({ ...STORED.traits, email: 'ada@example.test' })), res);
     assert.equal(res.statusCode, 200);
   });
 });
@@ -538,7 +440,7 @@ test('username-gate ALLOWS a profile update that keeps the username (200)', asyn
 test('username-gate REFUSES when the stored identity cannot be read (fail-closed, 403)', async () => {
   await withMockKratos((req, res) => { res.writeHead(500); res.end(); }, async () => {
     const res = fakeRes();
-    await handleAdminRequest(postUsernameGate(profilePayload(STORED.traits)), res);
+    await handle(postUsernameGate(profilePayload(STORED.traits)), res);
     assert.equal(res.statusCode, 403);
     assert.equal(refusalText(res), PROFILE_UPDATE_UNAVAILABLE);
   });
@@ -548,7 +450,7 @@ test('username-gate REFUSES when KRATOS_ADMIN_URL is unset or the id is missing 
   process.env.RECOVERY_GATE_SECRET = 'gate-secret';
   for (const body of [profilePayload(STORED.traits), { traits: STORED.traits }]) {
     const res = fakeRes();
-    await handleAdminRequest(postUsernameGate(body), res);
+    await handle(postUsernameGate(body), res);
     assert.equal(res.statusCode, 403);
     assert.equal(refusalText(res), PROFILE_UPDATE_UNAVAILABLE);
   }
@@ -557,7 +459,7 @@ test('username-gate REFUSES when KRATOS_ADMIN_URL is unset or the id is missing 
 test('username-gate rejects a wrong bearer with 403 before reading the body', async () => {
   process.env.RECOVERY_GATE_SECRET = 'gate-secret';
   const res = fakeRes();
-  await handleAdminRequest(postUsernameGate(profilePayload(STORED.traits), 'wrong'), res);
+  await handle(postUsernameGate(profilePayload(STORED.traits), 'wrong'), res);
   assert.equal(res.statusCode, 403);
   assert.deepEqual(JSON.parse(res.body), { error: 'forbidden' });
 });
@@ -589,17 +491,18 @@ test('second-factor-gate REFUSES an admin unlinking the only totp (403)', async 
   };
   await withMockKratos(server, async () => {
     const res = fakeRes();
-    await handleAdminRequest(postSecondFactorGate('totp', { identity_id: OTHER_UUID }), res, secondFactorRuntime);
+    await handle(postSecondFactorGate('totp', { identity_id: OTHER_UUID }), res);
     assert.equal(res.statusCode, 403);
     assert.equal(secondFactorText(res), secondFactorRuntime.SECOND_FACTOR_KEEP);
   });
-  assert.match(requested, /include_credential=totp&include_credential=webauthn$/);
+  assert.match(requested, /include_credential=totp/);
+  assert.match(requested, /include_credential=webauthn/);
 });
 
 test('second-factor-gate ALLOWS an admin with totp and a key to change keys (200)', async () => {
   await withMockKratos(storedIdentityServer(withWebauthnKey(ADMIN_TOTP_ONLY)), async () => {
     const res = fakeRes();
-    await handleAdminRequest(postSecondFactorGate('webauthn', { identity_id: OTHER_UUID }), res, secondFactorRuntime);
+    await handle(postSecondFactorGate('webauthn', { identity_id: OTHER_UUID }), res);
     assert.equal(res.statusCode, 200);
   });
 });
@@ -608,19 +511,19 @@ test('second-factor-gate REFUSES without a method, id, readable identity or runt
   const unavailable = secondFactorRuntime.SECOND_FACTOR_UNAVAILABLE;
   await withMockKratos(storedIdentityServer(ADMIN_TOTP_ONLY), async () => {
     for (const [method, body, runtime] of [
-      ['', { identity_id: OTHER_UUID }, secondFactorRuntime],
-      ['totp', {}, secondFactorRuntime],
+      ['', { identity_id: OTHER_UUID }, runtime],
+      ['totp', {}, runtime],
       ['totp', { identity_id: OTHER_UUID }, {}],
     ]) {
       const res = fakeRes();
-      await handleAdminRequest(postSecondFactorGate(method, body), res, runtime);
+      await handle(postSecondFactorGate(method, body), res, runtime);
       assert.equal(res.statusCode, 403);
       assert.equal(secondFactorText(res), unavailable);
     }
   });
   await withMockKratos((req, res) => { res.writeHead(500); res.end(); }, async () => {
     const res = fakeRes();
-    await handleAdminRequest(postSecondFactorGate('webauthn', { identity_id: OTHER_UUID }), res, secondFactorRuntime);
+    await handle(postSecondFactorGate('webauthn', { identity_id: OTHER_UUID }), res);
     assert.equal(res.statusCode, 403);
     assert.equal(secondFactorText(res), unavailable);
   });
@@ -629,7 +532,7 @@ test('second-factor-gate REFUSES without a method, id, readable identity or runt
 test('second-factor-gate rejects a wrong bearer with 403 before reading the body', async () => {
   process.env.RECOVERY_GATE_SECRET = 'gate-secret';
   const res = fakeRes();
-  await handleAdminRequest(postSecondFactorGate('totp', { identity_id: OTHER_UUID }, 'wrong'), res, secondFactorRuntime);
+  await handle(postSecondFactorGate('totp', { identity_id: OTHER_UUID }, 'wrong'), res);
   assert.equal(res.statusCode, 403);
   assert.deepEqual(JSON.parse(res.body), { error: 'forbidden' });
 });
@@ -668,7 +571,7 @@ test('profile-sessions ends every other active session and keeps the saving one 
   const calls = [];
   await withMockKratos(sessionsServer(calls, [SAVING, OTHER_A, OTHER_B]), async () => {
     const res = fakeRes();
-    await handleAdminRequest(postProfileSessions({ ...profilePayload(STORED.traits), session_id: SAVING.id }), res);
+    await handle(postProfileSessions({ ...profilePayload(STORED.traits), session_id: SAVING.id }), res);
     assert.equal(res.statusCode, 200);
     assert.deepEqual(JSON.parse(res.body), { ended: 2 });
   });
@@ -684,7 +587,7 @@ test('profile-sessions ends nothing without a session_id, so the saving session 
   await withMockKratos(sessionsServer(calls, [SAVING, OTHER_A]), async () => {
     for (const session_id of [undefined, '', '  ']) {
       const res = fakeRes();
-      await handleAdminRequest(postProfileSessions({ ...profilePayload(STORED.traits), session_id }), res);
+      await handle(postProfileSessions({ ...profilePayload(STORED.traits), session_id }), res);
       assert.equal(res.statusCode, 200);
       assert.deepEqual(JSON.parse(res.body), { ended: 0 });
     }
@@ -696,7 +599,7 @@ test('profile-sessions answers 200 when the session list fails, since the profil
   const calls = [];
   await withMockKratos(sessionsServer(calls, { error: 'down' }, 500), async () => {
     const res = fakeRes();
-    await handleAdminRequest(postProfileSessions({ ...profilePayload(STORED.traits), session_id: SAVING.id }), res);
+    await handle(postProfileSessions({ ...profilePayload(STORED.traits), session_id: SAVING.id }), res);
     assert.equal(res.statusCode, 200);
     assert.deepEqual(JSON.parse(res.body), { ended: 0 });
   });
@@ -706,7 +609,32 @@ test('profile-sessions answers 200 when the session list fails, since the profil
 test('profile-sessions rejects a wrong bearer with 403 before reading the body', async () => {
   process.env.RECOVERY_GATE_SECRET = 'gate-secret';
   const res = fakeRes();
-  await handleAdminRequest(postProfileSessions({ identity_id: STORED.id, session_id: SAVING.id }, 'wrong'), res);
+  await handle(postProfileSessions({ identity_id: STORED.id, session_id: SAVING.id }, 'wrong'), res);
   assert.equal(res.statusCode, 403);
   assert.deepEqual(JSON.parse(res.body), { error: 'forbidden' });
+});
+
+// ── one Kratos client: every gate and the sweep go through runtime.getIdentity ─
+
+test('recovery, username and second-factor gates and profile-sessions read the identity via the runtime', async () => {
+  process.env.RECOVERY_GATE_SECRET = 'gate-secret';
+  process.env.KRATOS_ADMIN_URL = 'http://kratos.invalid:4434';
+  const read = [];
+  const recorder = {
+    ...runtime,
+    async getIdentity(id) { read.push(id); return identity({ id }); },
+    async listSessions(id) { read.push(id); return []; },
+  };
+  const post = (url, body) => fakeReq({
+    method: 'POST', url, headers: { authorization: 'Bearer gate-secret' }, body: JSON.stringify(body),
+  });
+  for (const [url, body] of [
+    ['/admin/recovery-gate', { identity_id: 'r' }],
+    ['/admin/username-gate', { identity_id: 'u', traits: {} }],
+    ['/admin/second-factor-gate?method=totp', { identity_id: 's' }],
+    ['/admin/profile-sessions', { identity_id: 'p', session_id: 'keep' }],
+  ]) {
+    await handle(post(url, body), fakeRes(), recorder);
+  }
+  assert.deepEqual(read, ['r', 'u', 's', 'p']);
 });

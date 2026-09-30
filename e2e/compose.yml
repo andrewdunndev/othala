@@ -19,8 +19,9 @@
 #     ROOT ${AUTH_REGISTRY}). Public SSR port 8080 serves the family UI +
 #     /auth/* + /admin/* pages + the Hydra login/consent/logout challenge
 #     handlers at /oauth2/{login,consent,logout}. A SEPARATE loopback
-#     admin port 4431 serves /healthz, /readyz, /admin/revoke-user and
-#     /admin/recovery-gate. The two muxes are disjoint by construction.
+#     admin port 4431 serves /healthz, /readyz and the Kratos webhooks
+#     (/admin/recovery-gate and the other gates). The two muxes are
+#     disjoint by construction.
 #
 # Convergence note: the legacy `consent` (Go) and `util` (Bash) services
 # are GONE. Their roles folded INTO the othala app: consent's challenge
@@ -280,8 +281,8 @@ services:
   #     Hydra login/consent/logout challenge handlers /oauth2/{login,
   #     consent,logout}.
   #   - ADMIN port 4431 (bound on loopback 127.0.0.1 inside the
-  #     container): /healthz, /readyz, /admin/revoke-user,
-  #     /admin/recovery-gate. Disjoint from the public mux.
+  #     container): /healthz, /readyz, the Kratos webhooks
+  #     (/admin/recovery-gate and the other gates). Disjoint from the public mux.
   # The admin port is loopback-only, so the healthcheck and the
   # admin-route smoke probes run via `compose exec` against
   # localhost:4431 INSIDE the container — they are not reachable across
@@ -341,7 +342,6 @@ services:
       # marker in Kratos, set via admin API only). The OTHALA_ADMIN_IDS env var
       # is retired — no UUID allowlist, no portal recreate after seeding.
       # The recovery-gate reads the marker from the admin API.
-      OTHALA_ADMIN_ENDPOINT_BEARER: ${OTHALA_ADMIN_ENDPOINT_BEARER}
       RECOVERY_GATE_SECRET: ${RECOVERY_GATE_SECRET}
       # Contact-form mailer: SAME courier connection Kratos uses (mailpit in
       # the e2e). The portal contact form (/api/request) delivers here.
@@ -492,9 +492,6 @@ services:
       # hostname resolves to that IP inside the compose net.
       OTHALA_ADMIN_URL: http://othala:4431
       RECOVERY_GATE_SECRET: ${RECOVERY_GATE_SECRET}
-      # P2 (p-eviction.spec.ts): admin revokeSubject force-logout, bearer-guarded
-      # like RECOVERY_GATE_SECRET above.
-      OTHALA_ADMIN_ENDPOINT_BEARER: ${OTHALA_ADMIN_ENDPOINT_BEARER}
       GRAFANA_CLIENT_SECRET: ${GRAFANA_CLIENT_SECRET}
       PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD: "1"
     volumes:

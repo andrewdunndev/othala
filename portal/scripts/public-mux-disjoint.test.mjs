@@ -3,15 +3,15 @@
 //
 // Run with: npx vitest run scripts/public-mux-disjoint.test.mjs
 //
-// /admin/revoke-user and /admin/recovery-gate are served ONLY by the admin
-// listener (src/server/listen.mjs), bearer-guarded and bound to the admin
-// port. They are deliberately absent from src/pages/, so the public port
-// never routes them. The same holds for /admin/login-code-gate.
+// /admin/recovery-gate and the other webhook paths are served ONLY by the
+// admin listener (src/server/listen.mjs), bearer-guarded and bound to the
+// admin port. They are deliberately absent from src/pages/, so the public
+// port never routes them.
 //
-// The risk this test fences off: a future `src/pages/admin/revoke-user.ts`
-// (or .astro, or a revoke-user/index.* directory route) would make Astro
-// serve POST /admin/revoke-user on the PUBLIC port — silently re-exposing
-// the unauthenticated fan-out the listener guards with a bearer. A static
+// The risk this test fences off: a future `src/pages/admin/recovery-gate.ts`
+// (or .astro, or a recovery-gate/index.* directory route) would make Astro
+// serve POST /admin/recovery-gate on the PUBLIC port — silently re-exposing
+// the webhook the listener guards with a bearer. A static
 // filesystem check fails the build the moment such a file appears, long
 // before it can ship.
 //
@@ -31,7 +31,6 @@ const pagesDir = join(here, '..', 'src', 'pages');
 // The admin-listener-only POST paths (mirror of ADMIN_POST_ROUTES in
 // src/server/listen.mjs). No Astro page may resolve to any of these.
 const FORBIDDEN_ROUTES = new Set([
-  '/admin/revoke-user',
   '/admin/recovery-gate',
   '/admin/login-code-gate',
   '/admin/username-gate',
@@ -57,8 +56,8 @@ function walk(dir) {
 
 // Map a page FILE to the Astro ROUTE path it serves. Mirrors Astro's
 // file-based routing for the cases relevant here:
-//   pages/admin/revoke-user.ts          -> /admin/revoke-user
-//   pages/admin/revoke-user/index.astro -> /admin/revoke-user
+//   pages/admin/recovery-gate.ts        -> /admin/recovery-gate
+//   pages/admin/recovery-gate/index.astro -> /admin/recovery-gate
 //   pages/admin/recovery-gate.astro     -> /admin/recovery-gate
 // (Dynamic [param] segments can't statically equal a literal forbidden
 // path, so they're left as-is; an exact-literal collision is what matters.)
@@ -94,10 +93,10 @@ test('no src/pages/ file resolves to an admin-listener-only POST route', () => {
 test('the route-mapping helper actually maps the dangerous filenames', () => {
   // Guards the guard: prove the mapping would CATCH the bad files, so a
   // future regression in routeForFile can't silently pass the suite.
-  assert.equal(routeForFile(join(pagesDir, 'admin', 'revoke-user.ts')), '/admin/revoke-user');
+  assert.equal(routeForFile(join(pagesDir, 'admin', 'recovery-gate.ts')), '/admin/recovery-gate');
   assert.equal(
-    routeForFile(join(pagesDir, 'admin', 'revoke-user', 'index.astro')),
-    '/admin/revoke-user',
+    routeForFile(join(pagesDir, 'admin', 'recovery-gate', 'index.astro')),
+    '/admin/recovery-gate',
   );
   assert.equal(
     routeForFile(join(pagesDir, 'admin', 'recovery-gate.astro')),
@@ -107,7 +106,7 @@ test('the route-mapping helper actually maps the dangerous filenames', () => {
     routeForFile(join(pagesDir, 'admin', 'login-code-gate.astro')),
     '/admin/login-code-gate',
   );
-  for (const r of ['/admin/revoke-user', '/admin/recovery-gate', '/admin/login-code-gate']) {
+  for (const r of ['/admin/recovery-gate', '/admin/login-code-gate']) {
     assert.ok(FORBIDDEN_ROUTES.has(r));
   }
 });

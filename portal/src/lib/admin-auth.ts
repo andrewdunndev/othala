@@ -3,7 +3,6 @@
 // via getIdentity, and absent from /sessions/whoami in Kratos v26.2.0.
 
 import type { Identity } from './types';
-import { getIdentity } from './admin-api';
 
 /**
  * Authoritative admin marker check — the sole admin authority.
@@ -20,30 +19,6 @@ export function isAdminMarker(identity: Identity | null | undefined): boolean {
     const meta = identity.metadata_admin as Record<string, unknown> | undefined;
     if (!meta || typeof meta !== 'object' || Array.isArray(meta)) return false;
     return meta['admin'] === true;
-  } catch {
-    return false;
-  }
-}
-
-/**
- * Cosmetic admin-chrome check for SSR pages. Never an authority check.
- *
- * Fetches the full identity from the Kratos admin API (which includes
- * metadata_admin, stripped from /sessions/whoami by Kratos v26.2.0) and
- * applies isAdminMarker. Fail-closed: any lookup failure returns false.
- *
- * NOTE: this adds one Kratos admin-API call per render of pages that call it
- * (index and apps/[slug]). That is acceptable for cosmetic chrome (the admin
- * nav link); real authority is enforced by requireAdminSession. A caching
- * optimization can be added later if render latency becomes a concern.
- *
- * The caller must pass the identity id from the session (session.identity.id),
- * which is always present on an authenticated session.
- */
-export async function isAdminBySession(id: string): Promise<boolean> {
-  try {
-    const identity = await getIdentity(id);
-    return isAdminMarker(identity);
   } catch {
     return false;
   }

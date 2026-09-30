@@ -138,7 +138,7 @@ export function scrubUrl(value) {
 export function isAdminSpan(attributes) {
   if (!attributes) return false;
   // Prefer the parsed route/target; fall back to scanning the URL attrs. The
-  // admin mux serves /admin/revoke-user, /admin/recovery-gate
+  // admin mux serves /admin/recovery-gate and the other webhooks
   // (see listen.mjs) — any /admin/ prefix is dropped wholesale.
   const candidates = [
     attributes['http.route'],

@@ -21,6 +21,7 @@ import {
   type UpdateIdentityBody,
   type DeleteIdentityCredentialsTypeEnum,
   type GetIdentityIncludeCredentialEnum,
+  type Session,
 } from '@ory/client-fetch';
 import type { Identity } from './types';
 import { validateMetadataAdmin } from './metadata-admin';
@@ -152,6 +153,16 @@ export async function revokeSession(id: string): Promise<void> {
     await identityApi().disableSession({ id });
   } catch (e) {
     if (e instanceof ResponseError && e.response.status === 404) return;
+    throw e;
+  }
+}
+
+/** Active Kratos sessions of an identity. A 404 means it has none left. */
+export async function listSessions(id: string): Promise<Session[]> {
+  try {
+    return await identityApi().listIdentitySessions({ id, active: true, perPage: 1000 });
+  } catch (e) {
+    if (e instanceof ResponseError && e.response.status === 404) return [];
     throw e;
   }
 }

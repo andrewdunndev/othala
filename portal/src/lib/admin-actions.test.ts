@@ -58,18 +58,6 @@ const {
   deactivateIdentityMock: vi.fn(),
 }));
 
-vi.mock('./admin', async (importOriginal) => {
-  const actual = await importOriginal<typeof import('./admin.js')>();
-  return {
-    ...actual,
-    deleteIdentity: deleteIdentityMock,
-    listIdentities: listIdentitiesMock,
-    patchAdminMarker: patchAdminMarkerMock,
-    updateIdentity: updateIdentityMock,
-    deactivateIdentity: deactivateIdentityMock,
-  };
-});
-
 vi.mock('./revoke', async (importOriginal) => {
   const actual = await importOriginal<typeof import('./revoke.js')>();
   return { ...actual, revokeSubject: revokeSubjectMock, revokeConsentSessions: revokeConsentSessionsMock };
@@ -77,7 +65,15 @@ vi.mock('./revoke', async (importOriginal) => {
 
 vi.mock('./admin-api', async (importOriginal) => {
   const actual = await importOriginal<typeof import('./admin-api.js')>();
-  return { ...actual, deleteCredential: deleteCredentialMock };
+  return {
+    ...actual,
+    deleteIdentity: deleteIdentityMock,
+    listIdentities: listIdentitiesMock,
+    patchAdminMarker: patchAdminMarkerMock,
+    updateIdentity: updateIdentityMock,
+    deactivateIdentity: deactivateIdentityMock,
+    deleteCredential: deleteCredentialMock,
+  };
 });
 
 import {

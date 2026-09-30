@@ -85,10 +85,10 @@ test('scrubQuery is case-insensitive on the key and keeps bare flags', () => {
 
 test('isAdminSpan is true for /admin/ targets and absolute admin URLs', () => {
   assert.equal(isAdminSpan({ 'http.target': '/admin/' }), true);
-  assert.equal(isAdminSpan({ 'http.target': '/admin/revoke-user' }), true);
+  assert.equal(isAdminSpan({ 'http.target': '/admin/username-gate' }), true);
   assert.equal(isAdminSpan({ 'http.route': '/admin/recovery-gate' }), true);
   assert.equal(
-    isAdminSpan({ 'http.url': 'https://host/admin/revoke-user' }),
+    isAdminSpan({ 'http.url': 'https://host/admin/username-gate' }),
     true,
   );
 });
@@ -174,7 +174,7 @@ function fakeDelegate() {
 test('RedactingSpanProcessor DROPS an admin span (delegate.onEnd not called)', () => {
   const delegate = fakeDelegate();
   const proc = new RedactingSpanProcessor(delegate);
-  proc.onEnd({ attributes: { 'http.target': '/admin/revoke-user' } });
+  proc.onEnd({ attributes: { 'http.target': '/admin/username-gate' } });
   assert.equal(delegate.calls.onEnd.length, 0, 'admin span was forwarded');
 });
 

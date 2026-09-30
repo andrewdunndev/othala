@@ -37,7 +37,7 @@ import Layout from '../layouts/Layout.astro';
 import PageHero from '../components/PageHero.astro';
 import { loadTiles, loadGroups, safeHref, userCanSeeTile, type AppTile } from '../lib/tiles';
 import { getSession, isReachable } from '../lib/kratos';
-import { getIdentity } from '../lib/admin';
+import { getIdentity } from '../lib/admin-api';
 import { identityGroups } from '../lib/gate';
 import { isAdminMarker } from '../lib/admin-auth';
 import { signLogoutToken } from '../lib/logout';

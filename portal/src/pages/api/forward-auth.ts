@@ -76,7 +76,7 @@
 
 import type { APIRoute } from 'astro';
 import { getSession } from '../../lib/kratos';
-import { getIdentity } from '../../lib/admin';
+import { getIdentity } from '../../lib/admin-api';
 import { enforceGroupGate } from '../../lib/gate';
 import { GROUP_RE } from '../../lib/access-groups';
 import { needsStepUp } from '../../lib/step-up';

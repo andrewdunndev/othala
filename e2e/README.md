@@ -33,7 +33,7 @@ into the app). It runs **two listeners in one process**
   `/oauth2/{login,consent,logout}`. The only listener fronted by Caddy in
   production.
 - **Loopback admin listener** (`127.0.0.1`, pod-only) — a disjoint
-  mux: `GET /healthz`, `GET /readyz`, `POST /admin/revoke-user`,
+  mux: `GET /healthz`, `GET /readyz`,
   `POST /admin/recovery-gate`. Never delegates to the SSR handler. In
   this harness the admin probes run via `compose exec` because the port
   is loopback-only.

@@ -150,9 +150,7 @@ RECOVERY_ADMIN_PASSWORD=othala-testpass-2026
 # Converged app admin model. Admin authority is the
 # metadata_admin.admin === true boolean marker (set via Kratos admin API),
 # NOT an env-based UUID allowlist. OTHALA_ADMIN_IDS is retired.
-#   OTHALA_ADMIN_ENDPOINT_BEARER  guards POST /admin/revoke-user (loopback)
-#   RECOVERY_GATE_SECRET          guards POST /admin/recovery-gate (loopback)
-OTHALA_ADMIN_ENDPOINT_BEARER=$(gen)
+#   RECOVERY_GATE_SECRET  guards the Kratos webhooks on the admin port (loopback)
 RECOVERY_GATE_SECRET=$(gen)
 
 # App CSRF tokens (HIGH-1)

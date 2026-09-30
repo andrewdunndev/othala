@@ -22,7 +22,8 @@ export const prerender = false;
 
 import Layout from '../../../layouts/Layout.astro';
 import AdminFormScripts from '../../../components/AdminFormScripts.astro';
-import { requireAdminSession, createIdentity, getRecoveryLink } from '../../../lib/admin';
+import { requireAdminSession } from '../../../lib/admin';
+import { createIdentity, getRecoveryLink } from '../../../lib/admin-api';
 import { signToken, verifyToken, CSRFError } from '../../../lib/csrf';
 import { defaultGroup } from '../../../lib/config';
 

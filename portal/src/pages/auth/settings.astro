@@ -43,7 +43,7 @@ import type { NodeImageAttributes, NodeTextAttributes } from '../../lib/types';
 import FlowNodes from '../../components/FlowNodes.astro';
 import { revokeSubject, RevokeError } from '../../lib/revoke';
 import { getGroupRegistry, isIdentityGroup } from '../../lib/group-registry';
-import { getIdentity } from '../../lib/admin';
+import { getIdentity } from '../../lib/admin-api';
 import { identityGroups as readIdentityGroups } from '../../lib/gate';
 import { publicUrl } from '../../lib/config';
 import { signToken, verifyToken, CSRFError } from '../../lib/csrf';

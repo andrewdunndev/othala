@@ -8,7 +8,7 @@
 # The othala app is ONE service: public SSR port 8080 (family UI +
 # /auth/* + /admin/* + the /oauth2/{login,consent,logout} challenge
 # handlers) and a loopback admin port 4431 (/healthz, /readyz,
-# /admin/revoke-user, /admin/recovery-gate). The admin port binds
+# /admin/recovery-gate). The admin port binds
 # 127.0.0.1 inside the container, so admin probes run via `compose exec`
 # against localhost:4431; the public port is probed across the network.
 #
@@ -373,59 +373,6 @@ if [[ "$malformed_code" == "403" ]]; then
     pass "D5 recovery-gate refuses an unknown identity (fail-closed)"
 else
     fail "D5 recovery-gate unknown identity" "code=$malformed_code want=403"
-fi
-
-# Section E: revoke fan-out (admin endpoint, LIVE Kratos + Hydra)
-echo ""
-echo "E. Revoke fan-out (othala :4431 /admin/revoke-user)"
-#
-# D3: the admin force-logout endpoint runs revokeSubject() against LIVE Kratos
-# + Hydra — delete Kratos sessions + revoke Hydra login/consent sessions
-# (closes the deactivated-user token gap). The unit tests only STUB the
-# SDK; this is the first probe that drives the fan-out end-to-end. Loopback
-# admin port, so via node_in. Uses the identity C1 created.
-
-# revoke_body <bearer> <subject> — POST /admin/revoke-user, return JSON body.
-revoke_body() {
-    local bearer="$1"; local subject="$2"
-    printf '%s' "fetch('http://127.0.0.1:4431/admin/revoke-user',{method:'POST',headers:{'Content-Type':'application/json','Authorization':'Bearer ${bearer}'},body:JSON.stringify({subject:'${subject}'})}).then(r=>r.text()).then(t=>{process.stdout.write(t);process.exit(0)}).catch(()=>process.exit(1))" | node_in othala
-}
-# revoke_code <bearer> <body-json> — POST /admin/revoke-user, return HTTP code.
-revoke_code() {
-    local bearer="$1"; local body="$2"
-    printf '%s' "fetch('http://127.0.0.1:4431/admin/revoke-user',{method:'POST',headers:{'Content-Type':'application/json','Authorization':'Bearer ${bearer}'},body:'${body}'}).then(r=>{process.stdout.write(String(r.status));process.exit(0)}).catch(()=>{process.stdout.write('0');process.exit(1)})" | node_in othala
-}
-
-# E1: wrong bearer → 403 (fail-closed, mirrors D4; bearer checked before body).
-e1=$(revoke_code "wrong-secret" '{"subject":"anything"}')
-if [[ "$e1" == "403" ]]; then
-    pass "E1 revoke-user rejects wrong bearer (403, fail-closed)"
-else
-    fail "E1 revoke-user wrong bearer" "code=$e1 want=403"
-fi
-
-# E2: valid bearer, missing subject → 400.
-e2=$(revoke_code "${OTHALA_ADMIN_ENDPOINT_BEARER}" '{}')
-if [[ "$e2" == "400" ]]; then
-    pass "E2 revoke-user 400 on missing subject"
-else
-    fail "E2 revoke-user missing subject" "code=$e2 want=400"
-fi
-
-# E3: valid bearer + the real C1 subject → 200 + the live fan-out flags. Drives
-# revokeSubject against LIVE Kratos + Hydra (the integration the stubs can't prove).
-if [[ -n "${identity_id:-}" ]]; then
-    rb=$(revoke_body "${OTHALA_ADMIN_ENDPOINT_BEARER}" "$identity_id")
-    flags=$(echo "$rb" | python3 -c "import sys,json
-d=json.load(sys.stdin)
-print('%s,%s,%s' % (d.get('kratosSessionsRevoked'), d.get('hydraLoginRevoked'), d.get('hydraConsentRevoked')))" 2>/dev/null || echo "parse-fail")
-    if [[ "$flags" == "True,True,True" ]]; then
-        pass "E3 revoke-user fan-out landed (kratos sessions + hydra login + hydra consent revoked)"
-    else
-        fail "E3 revoke-user fan-out" "flags(kratos,hydraLogin,hydraConsent)=$flags body=$rb"
-    fi
-else
-    fail "E3 revoke-user fan-out" "no identity_id from C1 to revoke"
 fi
 
 # Section F: dual-listener boundary (the reverse of A9b)

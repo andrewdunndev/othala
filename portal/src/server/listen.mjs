@@ -14,7 +14,6 @@
 //     127.0.0.1 — loopback / pod-only)
 //     A SEPARATE http.createServer with its own tiny mux. It serves:
 //       GET  /healthz, /readyz        — liveness/readiness probes
-//       POST /admin/revoke-user       — admin force-logout fan-out (CU3 B1)
 //       POST /admin/recovery-gate     — Kratos recovery-gate webhook (CU3)
 //       POST /admin/login-code-gate   — Kratos login-by-code webhook
 //       POST /admin/username-gate     — Kratos profile-settings webhook
@@ -24,12 +23,9 @@
 //     challenge provider is reachable on the admin port — and the public
 //     handler never sees admin paths. The two muxes are disjoint.
 //
-//   Secret model (CU3): the admin port uses two PURPOSE-NAMED secrets:
-//     - OTHALA_ADMIN_ENDPOINT_BEARER  guards POST /admin/revoke-user
-//     - RECOVERY_GATE_SECRET        guards the five Kratos webhooks above
-//   Both checks are CONSTANT-TIME (timingSafeEqual) and FAIL-CLOSED (an
-//   unset secret rejects every request). The revoke fan-out is in-process;
-//   there is no portal->consent admin HTTP hop.
+//   Secret model: RECOVERY_GATE_SECRET guards the five Kratos webhooks
+//   above. The check is CONSTANT-TIME (timingSafeEqual) and FAIL-CLOSED (an
+//   unset secret rejects every request).
 //
 // Run with:  node ./dist/server/listen.mjs   (after `npm run build`, which
 // copies this file AND bundles dist/server/admin-runtime.mjs next to the
@@ -47,16 +43,12 @@ const ADMIN_HOST = process.env.ADMIN_HOST ?? '127.0.0.1';
 export const ADMIN_GET_ROUTES = new Set(['/healthz', '/readyz']);
 /** POST routes the admin mux serves. Disjoint from the public routes. */
 export const ADMIN_POST_ROUTES = new Set([
-  '/admin/revoke-user',
   '/admin/recovery-gate',
   '/admin/login-code-gate',
   '/admin/username-gate',
   '/admin/second-factor-gate',
   '/admin/profile-sessions',
 ]);
-
-/** Back-compat: the GET probe routes (CU1 contract test imports this name). */
-export const ADMIN_ROUTES = ADMIN_GET_ROUTES;
 
 function pathOf(url) {
   return (url ?? '/').split('?')[0];
@@ -123,18 +115,9 @@ function sendJson(res, code, obj) {
 }
 
 /**
- * Map a RevokeError dependency to an HTTP status. hydra/kratos admin
- * failures are upstream-dependency failures (502); anything else is 500.
- */
-function statusForRevokeError(err) {
-  const dep = err?.dependency;
-  if (dep === 'hydra-admin' || dep === 'kratos-admin') return 502;
-  return 500;
-}
-
-/**
- * Lazily load the runtime bundle (revokeSubject), compiled from
- * src/server/admin-runtime.ts to dist/server/admin-runtime.mjs by the build.
+ * Lazily load the runtime bundle (the Kratos admin client and the
+ * second-factor verdict), compiled from src/server/admin-runtime.ts to
+ * dist/server/admin-runtime.mjs by the build.
  * Cached after first import. Injected in tests so the admin handlers can be
  * exercised without the bundle.
  */
@@ -143,51 +126,6 @@ async function loadRuntime() {
   if (_runtime) return _runtime;
   _runtime = await import('./admin-runtime.mjs');
   return _runtime;
-}
-
-/**
- * Handle POST /admin/revoke-user. Bearer: OTHALA_ADMIN_ENDPOINT_BEARER.
- * Body: { subject: string }. Runs the in-process revoke fan-out (steps 2-6,
- * deactivate=false). Prescriptive on upstream failure (dependency +
- * next-action), never leaking raw upstream errors.
- *
- * `runtime` is injectable for tests; defaults to the built bundle.
- */
-export async function handleRevokeUser(req, res, runtime) {
-  const expected = process.env.OTHALA_ADMIN_ENDPOINT_BEARER ?? '';
-  if (!bearerMatches(parseBearer(req.headers?.authorization), expected)) {
-    // 403 not 401: Kratos webhooks use can_interrupt: true; a non-403 response
-    // (e.g. 401) risks being treated as a non-interrupting webhook error
-    // (skip-and-continue = fail-open), whereas 403 reliably aborts the flow.
-    sendJson(res, 403, { error: 'forbidden' });
-    return;
-  }
-  let body;
-  try {
-    body = JSON.parse((await readBody(req)) || '{}');
-  } catch {
-    sendJson(res, 400, { error: 'invalid JSON body' });
-    return;
-  }
-  const subject = typeof body?.subject === 'string' ? body.subject.trim() : '';
-  if (!subject) {
-    sendJson(res, 400, { error: 'missing "subject"' });
-    return;
-  }
-  const rt = runtime ?? (await loadRuntime());
-  try {
-    const result = await rt.revokeSubject(subject);
-    sendJson(res, 200, result);
-  } catch (err) {
-    // Prescriptive: surface dependency + the operator next-action carried by
-    // RevokeError.message; never echo the raw upstream error/stack.
-    sendJson(res, statusForRevokeError(err), {
-      error: 'revoke failed',
-      dependency: err?.dependency ?? 'unknown',
-      step: err?.step ?? 'unknown',
-      action: err?.message ?? 'retry the revoke',
-    });
-  }
 }
 
 /**
@@ -201,51 +139,34 @@ export async function handleRevokeUser(req, res, runtime) {
  * recovery rather than silently allowing it.
  *
  * @param {string} identityId Kratos identity UUID from the webhook payload.
+ * @param {object} [runtime] injectable; defaults to the built bundle.
  * @returns {{ refuse: boolean, reason: string }}
  */
-export async function fetchAdminMarker(identityId) {
-  const fetched = await fetchStoredIdentity(identityId, 'recovery-gate');
+export async function fetchAdminMarker(identityId, runtime) {
+  const fetched = await fetchStoredIdentity(runtime, identityId, 'recovery-gate');
   if (fetched.refuse) return fetched;
-  const { identity } = fetched;
-  // metadata_admin.admin is the authoritative boolean marker.
-  // It is writable only via the admin API, never via self-service flows.
-  const isAdmin = identity?.metadata_admin?.admin;
-  if (isAdmin === true) {
+  if (fetched.rt.isAdminMarker(fetched.identity)) {
     return { refuse: true, admin: true, reason: 'admin recovery is console-only' };
   }
   return { refuse: false, reason: '' };
 }
 
 /**
- * Fetch the stored identity from the Kratos admin API (KRATOS_ADMIN_URL).
- * Fail-closed: an unset URL, network error, non-2xx or unparseable body
- * returns `{ refuse: true, reason }`; success returns `{ refuse: false, identity }`.
+ * Fetch the stored identity through the runtime's Kratos admin client.
+ * Fail-closed: an unset KRATOS_ADMIN_URL, an unloadable runtime or any client
+ * error returns `{ refuse: true, reason }`; success returns `{ refuse: false, identity, rt }`.
  */
-async function fetchStoredIdentity(identityId, tag, query = '') {
-  const kratosAdminURL = process.env.KRATOS_ADMIN_URL ?? '';
-  if (!kratosAdminURL) {
+async function fetchStoredIdentity(runtime, identityId, tag) {
+  if (!process.env.KRATOS_ADMIN_URL) {
     console.error(`[portal/${tag}] KRATOS_ADMIN_URL unset — cannot read the stored identity; refusing (fail-closed)`);
     return { refuse: true, reason: 'admin-api-unavailable (fail-closed)' };
   }
-  let resp;
   try {
-    resp = await fetch(`${kratosAdminURL}/admin/identities/${encodeURIComponent(identityId)}${query}`, {
-      headers: { Accept: 'application/json' },
-    });
+    const rt = runtime ?? (await loadRuntime());
+    return { refuse: false, identity: await rt.getIdentity(identityId), rt };
   } catch (err) {
-    console.error(`[portal/${tag}] admin API fetch failed for ${identityId}:`, err?.message ?? err);
+    console.error(`[portal/${tag}] admin API read failed for ${identityId}:`, err?.message ?? err);
     return { refuse: true, reason: 'admin-api-unreachable (fail-closed)' };
-  }
-  if (!resp.ok) {
-    // 404 = identity not found (race with deletion); any error → refuse.
-    console.error(`[portal/${tag}] admin API returned ${resp.status} for identity ${identityId} — refusing (fail-closed)`);
-    return { refuse: true, reason: `admin-api-error-${resp.status} (fail-closed)` };
-  }
-  try {
-    return { refuse: false, identity: await resp.json() };
-  } catch {
-    console.error(`[portal/${tag}] admin API response unparseable for ${identityId} — refusing (fail-closed)`);
-    return { refuse: true, reason: 'admin-api-unparseable (fail-closed)' };
   }
 }
 
@@ -269,8 +190,8 @@ export function loginCodeRefusalText(verdict) {
  * Admin authority is verified by fetching the identity from the Kratos admin
  * API (KRATOS_ADMIN_URL/admin/identities/:id) and reading metadata_admin.admin.
  */
-export function handleRecoveryGate(req, res) {
-  return handleAdminMarkerGate(req, res, (verdict) => `recovery refused: ${verdict.reason}`);
+export function handleRecoveryGate(req, res, runtime) {
+  return handleAdminMarkerGate(req, res, runtime, (verdict) => `recovery refused: ${verdict.reason}`);
 }
 
 /**
@@ -278,11 +199,11 @@ export function handleRecoveryGate(req, res) {
  * lookup as the recovery gate, wired to selfservice.flows.login.after.code.
  * An admin-marked identity is refused a session from an emailed code.
  */
-export function handleLoginCodeGate(req, res) {
-  return handleAdminMarkerGate(req, res, loginCodeRefusalText);
+export function handleLoginCodeGate(req, res, runtime) {
+  return handleAdminMarkerGate(req, res, runtime, loginCodeRefusalText);
 }
 
-async function handleAdminMarkerGate(req, res, refusalText) {
+async function handleAdminMarkerGate(req, res, runtime, refusalText) {
   const expected = process.env.RECOVERY_GATE_SECRET ?? '';
   if (!bearerMatches(parseBearer(req.headers?.authorization), expected)) {
     // 403 not 401: Kratos webhooks use can_interrupt: true; a non-403 response
@@ -312,7 +233,7 @@ async function handleAdminMarkerGate(req, res, refusalText) {
   }
 
   // Phase 2: fetch the authoritative admin marker from the Kratos admin API.
-  const adminVerdict = await fetchAdminMarker(id);
+  const adminVerdict = await fetchAdminMarker(id, runtime);
   if (adminVerdict.refuse) {
     sendJson(res, 403, {
       messages: [{ messages: [{ type: 'error', text: refusalText(adminVerdict) }] }],
@@ -358,7 +279,7 @@ function refuseUsername(res, text) {
  * gates; the stored username is read from the admin API, so a failed read
  * refuses the whole profile update.
  */
-export async function handleUsernameGate(req, res) {
+export async function handleUsernameGate(req, res, runtime) {
   const expected = process.env.RECOVERY_GATE_SECRET ?? '';
   if (!bearerMatches(parseBearer(req.headers?.authorization), expected)) {
     sendJson(res, 403, { error: 'forbidden' });
@@ -376,7 +297,7 @@ export async function handleUsernameGate(req, res) {
     refuseUsername(res, PROFILE_UPDATE_UNAVAILABLE);
     return;
   }
-  const fetched = await fetchStoredIdentity(id, 'username-gate');
+  const fetched = await fetchStoredIdentity(runtime, id, 'username-gate');
   const verdict = fetched.refuse
     ? { refuse: true, text: PROFILE_UPDATE_UNAVAILABLE }
     : usernameChangeVerdict(fetched.identity, body?.traits?.username);
@@ -430,11 +351,7 @@ export async function handleSecondFactorGate(req, res, runtime) {
     return;
   }
   const method = new URLSearchParams((req.url ?? '').split('?')[1] ?? '').get('method') ?? '';
-  const fetched = await fetchStoredIdentity(
-    id,
-    'second-factor-gate',
-    '?include_credential=totp&include_credential=webauthn',
-  );
+  const fetched = await fetchStoredIdentity(rt, id, 'second-factor-gate');
   const verdict = fetched.refuse
     ? { refuse: true, text: unavailable }
     : rt.secondFactorChangeVerdict(fetched.identity, method);
@@ -455,7 +372,7 @@ export async function handleSecondFactorGate(req, res, runtime) {
  * would only show the member an error for a saved change. Without a
  * `session_id` nothing is ended, so the saving session is never cut.
  */
-export async function handleProfileSessions(req, res) {
+export async function handleProfileSessions(req, res, runtime) {
   const expected = process.env.RECOVERY_GATE_SECRET ?? '';
   if (!bearerMatches(parseBearer(req.headers?.authorization), expected)) {
     sendJson(res, 403, { error: 'forbidden' });
@@ -478,18 +395,15 @@ export async function handleProfileSessions(req, res) {
   }
   let ended = 0;
   try {
-    const listed = await fetch(
-      `${kratosAdminURL}/admin/identities/${encodeURIComponent(id)}/sessions?active=true&per_page=1000`,
-      { headers: { Accept: 'application/json' } },
-    );
-    // 404: the identity has no active sessions left.
-    const sessions = listed.status === 404 ? [] : listed.ok ? await listed.json() : null;
-    if (!Array.isArray(sessions)) throw new Error(`session list answered ${listed.status}`);
-    for (const s of sessions) {
+    const rt = runtime ?? (await loadRuntime());
+    for (const s of await rt.listSessions(id)) {
       if (typeof s?.id !== 'string' || s.id === keep) continue;
-      const del = await fetch(`${kratosAdminURL}/admin/sessions/${encodeURIComponent(s.id)}`, { method: 'DELETE' });
-      if (del.ok || del.status === 404) ended += 1;
-      else console.error(`${tag} ending session for identity_id=${JSON.stringify(id)} answered ${del.status}`);
+      try {
+        await rt.revokeSession(s.id);
+        ended += 1;
+      } catch (err) {
+        console.error(`${tag} ending session for identity_id=${JSON.stringify(id)} failed:`, err?.message ?? err);
+      }
     }
   } catch (err) {
     console.error(`${tag} could not end other sessions for identity_id=${JSON.stringify(id)}:`, err?.message ?? err);
@@ -506,20 +420,16 @@ export async function handleAdminRequest(req, res, runtime) {
     sendJson(res, 200, { status: 'ok' });
     return;
   }
-  if (method === 'POST' && path === '/admin/revoke-user') {
-    await handleRevokeUser(req, res, runtime);
-    return;
-  }
   if (method === 'POST' && path === '/admin/recovery-gate') {
-    await handleRecoveryGate(req, res);
+    await handleRecoveryGate(req, res, runtime);
     return;
   }
   if (method === 'POST' && path === '/admin/login-code-gate') {
-    await handleLoginCodeGate(req, res);
+    await handleLoginCodeGate(req, res, runtime);
     return;
   }
   if (method === 'POST' && path === '/admin/username-gate') {
-    await handleUsernameGate(req, res);
+    await handleUsernameGate(req, res, runtime);
     return;
   }
   if (method === 'POST' && path === '/admin/second-factor-gate') {
@@ -527,7 +437,7 @@ export async function handleAdminRequest(req, res, runtime) {
     return;
   }
   if (method === 'POST' && path === '/admin/profile-sessions') {
-    await handleProfileSessions(req, res);
+    await handleProfileSessions(req, res, runtime);
     return;
   }
 
@@ -581,7 +491,6 @@ export async function createPublicServer() {
  *   but that is always operator misconfiguration; refuse to boot so the
  *   problem surfaces immediately rather than silently degrading the gate.
  *   32-byte floor mirrors csrf.ts's CSRF_SECRET check (CRYPTO-2).
- * - OTHALA_ADMIN_ENDPOINT_BEARER: same reasoning for /admin/revoke-user.
  * - ADMIN_HOST is a wildcard (0.0.0.0, :: or empty "") → admin port would be
  *   exposed to the network; the admin mux has no public-facing auth hardening
  *   and must only be reachable on loopback or a pod-internal address. Note the
@@ -597,13 +506,6 @@ export function startupEnvErrors() {
     errors.push('[portal] FATAL: RECOVERY_GATE_SECRET is not set or empty — refusing to start');
   } else if (Buffer.byteLength(recoverySecret, 'utf8') < 32) {
     errors.push('[portal] FATAL: RECOVERY_GATE_SECRET is shorter than 32 bytes (UTF-8) — refusing to start');
-  }
-
-  const adminBearer = process.env.OTHALA_ADMIN_ENDPOINT_BEARER ?? '';
-  if (!adminBearer.trim()) {
-    errors.push('[portal] FATAL: OTHALA_ADMIN_ENDPOINT_BEARER is not set or empty — refusing to start');
-  } else if (Buffer.byteLength(adminBearer, 'utf8') < 32) {
-    errors.push('[portal] FATAL: OTHALA_ADMIN_ENDPOINT_BEARER is shorter than 32 bytes (UTF-8) — refusing to start');
   }
 
   if (ADMIN_HOST === '0.0.0.0' || ADMIN_HOST === '::' || ADMIN_HOST === '') {

@@ -24,9 +24,9 @@ export const prerender = false;
 
 import Layout from '../../../layouts/Layout.astro';
 import AdminFormScripts from '../../../components/AdminFormScripts.astro';
-import { requireAdminSession, getIdentity } from '../../../lib/admin';
+import { requireAdminSession } from '../../../lib/admin';
+import { getIdentity, EVICTABLE_CREDENTIAL_TYPES } from '../../../lib/admin-api';
 import { ADMIN_ACTIONS, ENROLLMENT_TTL, type ActionResult } from '../../../lib/admin-actions';
-import { EVICTABLE_CREDENTIAL_TYPES } from '../../../lib/admin-api';
 import { servingManifests } from '../../../lib/manifest-store';
 import { computeEffectiveAccess, describeSource, IDENTITY_GROUP_ORDER } from '../../../lib/access';
 import { getGroupRegistry, isIdentityGroup, unconfiguredGroups } from '../../../lib/group-registry';
