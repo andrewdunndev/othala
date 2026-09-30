@@ -429,6 +429,12 @@ test('emailChangeVerdict table', () => {
   assert.equal(refuse(KEYED, NEW_EMAIL, undefined), true, 'missing session data');
   assert.equal(refuse(KEYED, NEW_EMAIL, []), true, 'empty session data');
   assert.equal(refuse(KEYED, STORED.traits, [entry('code', 0)]), false, 'unchanged email');
+  assert.equal(refuse(KEYED, NEW_EMAIL, [entry('password', 0), entry('code_recovery', 1)]), true, 'a recovery session is not a first factor');
+  assert.equal(refuse(KEYED, { ...STORED.traits, email: STORED.traits.email.toUpperCase() }, [entry('code', 0)]), true, 'a case variant is a change');
+  assert.equal(refuse(KEYED, { ...STORED.traits, email: ` ${STORED.traits.email}` }, [entry('code', 0)]), true, 'a whitespace variant is a change');
+  assert.equal(refuse(KEYED, { ...STORED.traits, recoveryEmail: 'r@example.test' }, [entry('code', 0)]), true, 'recoveryEmail alone');
+  const withRecovery = { ...KEYED, traits: { ...STORED.traits, recoveryEmail: 'r@example.test' } };
+  assert.equal(refuse(withRecovery, STORED.traits, [entry('code', 0)]), true, 'dropping recoveryEmail is a change');
   assert.equal(refuse(KEYED, { ...STORED.traits, recoveryEmail: '' }, [entry('code', 0)]), false, 'absent equals empty');
   const changed = emailChangeVerdict(KEYED, { ...NEW_EMAIL, recoveryEmail: 'r@example.test' }, [entry('code', 0)]);
   assert.deepEqual(changed.pointers, ['#/traits/email', '#/traits/recoveryEmail']);

@@ -140,7 +140,7 @@ try {
 const displayName = traits.displayName || traits.username || '';
 // Username is admin-controlled: shown read-only and left out of the editable
 // profile nodes. The schema requires it, so the stored value rides along
-// hidden; the username gate (listen.mjs handleProfileGate) refuses any other.
+// hidden; the profile gate (listen.mjs handleProfileGate) refuses any other.
 const isUsernameNode = (n: (typeof ui.nodes)[number]) => asInput(n)?.name === 'traits.username';
 const isEmailNode = (n: (typeof ui.nodes)[number]) => ['traits.email', 'traits.recoveryEmail'].includes(asInput(n)?.name ?? '');
 const profileNodes = ui.nodes.filter((n) => !isUsernameNode(n) && !(emailLocked && isEmailNode(n)));
