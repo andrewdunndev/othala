@@ -30,12 +30,6 @@ export function loginRememberFor(session: Session, now: number = Date.now()): nu
   return Math.max(1, Math.ceil((expires - now) / 1000));
 }
 
-// Skip auto-accept path: 1 hour (Go consentRememberFor); a short window limits blast radius if a group changes mid-session.
-const CONSENT_REMEMBER_FOR_SKIP = 3600; // 1h
-
-// Interactive Allow path: 30 days, so a prompted client asks once per user (matches the login memory and refresh-token TTL).
-const CONSENT_REMEMBER_FOR_PROMPT = 2_592_000; // 30 days
-
 function hydraAdminBase(): string {
   return process.env.HYDRA_ADMIN_URL ?? 'http://hydra:4445';
 }
@@ -232,9 +226,9 @@ export async function handleLogin(req: Request, deps: Deps = {}): Promise<Respon
 }
 
 /**
- * Accept a consent request with full claims and remember=true; shared by the skip auto-accept in handleConsent and
- * the POST in /oauth2/consent.ts. Callers have passed the gate, so identity is non-null. `rememberFor` is
- * CONSENT_REMEMBER_FOR_SKIP (default) or CONSENT_REMEMBER_FOR_PROMPT; `clientId` resolves the manifest for claims.
+ * Accept a consent request with full claims; shared by the skip auto-accept in handleConsent and the POST in
+ * /oauth2/consent.ts. Consent is not remembered, so every authorize passes the gate again. Callers have passed the
+ * gate, so identity is non-null; `clientId` resolves the manifest for claims.
  */
 export async function acceptConsentRequest(
   challenge: string,
@@ -242,7 +236,6 @@ export async function acceptConsentRequest(
   identity: Identity,
   d: Required<Deps>,
   clientId: string,
-  rememberFor: number = CONSENT_REMEMBER_FOR_SKIP,
 ): Promise<Response> {
   const manifest = d.manifest(clientId);
   const idTokenClaims = composeIDTokenClaims(identity, manifest, consent.requested_scope);
@@ -252,8 +245,7 @@ export async function acceptConsentRequest(
       acceptOAuth2ConsentRequest: {
         grant_scope: consent.requested_scope,
         grant_access_token_audience: consent.requested_access_token_audience,
-        remember: true,
-        remember_for: rememberFor,
+        remember: false,
         session: {
           id_token: idTokenClaims,
           access_token: {},
@@ -309,7 +301,7 @@ export async function handleConsent(req: Request, deps: Deps = {}): Promise<Resp
   // SKIP PATH: the manifest's skip_consent (the operator's pre-consent record, which survives client re-registration)
   // or Hydra's consent.skip auto-accepts with no grant UI. Identity is non-null: the gate denies null above.
   if (consent.skip || consentManifest?.skipConsent) {
-    return acceptConsentRequest(challenge, consent, identity!, d, clientId, CONSENT_REMEMBER_FOR_SKIP);
+    return acceptConsentRequest(challenge, consent, identity!, d, clientId);
   }
 
   // PROMPT PATH: redirect to /auth/consent; its POST to /oauth2/consent completes the challenge.
@@ -450,8 +442,8 @@ export async function handleConsentPost(req: Request, deps: Deps = {}): Promise<
     }
   }
 
-  // remember_for is the 30d prompt window. The nonce is spent, so a 502 from Hydra redirects to the grant screen for a fresh token.
-  const allowResponse = await acceptConsentRequest(challenge, consent, identity!, d, clientId, CONSENT_REMEMBER_FOR_PROMPT);
+  // The nonce is spent, so a 502 from Hydra redirects to the grant screen for a fresh token.
+  const allowResponse = await acceptConsentRequest(challenge, consent, identity!, d, clientId);
   if (allowResponse.status === 502) {
     const qs = new URLSearchParams({ consent_challenge: challenge });
     return redirect(`${consentUIBase()}?${qs.toString()}`);

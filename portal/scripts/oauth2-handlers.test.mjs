@@ -391,11 +391,6 @@ test('T1: consent skip=true auto-accepts (REGRESSION GUARD)', async () => {
     !res.headers.get('location')?.includes('/auth/consent'),
     'skip=true must NOT bounce to the grant screen',
   );
-  assert.equal(
-    calls.acceptConsentBody.remember_for,
-    3600,
-    'skip path must use remember_for=3600 (Go consentRememberFor), not 30d',
-  );
   assert.deepEqual(
     calls.acceptConsentBody.grant_scope,
     ['email', 'profile'],
@@ -406,11 +401,7 @@ test('T1: consent skip=true auto-accepts (REGRESSION GUARD)', async () => {
     'a@othala.test',
     'id_token.email must be set on skip path',
   );
-  assert.equal(
-    calls.acceptConsentBody.remember,
-    true,
-    'remember must be true',
-  );
+  assert.equal(calls.acceptConsentBody.remember, false, 'consent must not be remembered');
 });
 
 test('T2: consent skip=false bounces to /auth/consent with challenge', async () => {
@@ -464,7 +455,7 @@ test('T2b: consent skip=false but manifest skip_consent:true AUTO-ACCEPTS', asyn
   );
 });
 
-test('T3: POST Allow accepts with remember=true, 30-day remember_for, claims', async () => {
+test('T3: POST Allow accepts without remembering consent, with claims', async () => {
   _resetForTests();
   const csrfToken = signToken('id-1', 'consent');
   const { api, calls } = stubOAuth2({
@@ -488,8 +479,8 @@ test('T3: POST Allow accepts with remember=true, 30-day remember_for, claims', a
   assert.equal(res.status, 302);
   assert.equal(res.headers.get('location'), 'https://sso.othala.test/after-consent');
   assert.equal(calls.acceptConsent, 1, 'acceptConsent must be called once');
-  assert.equal(calls.acceptConsentBody.remember, true, 'remember must be true');
-  assert.equal(calls.acceptConsentBody.remember_for, 2_592_000, 'remember_for must be 30 days (2592000s)');
+  assert.equal(calls.acceptConsentBody.remember, false, 'consent must not be remembered');
+  assert.equal(calls.acceptConsentBody.remember_for, undefined);
   assert.deepEqual(calls.acceptConsentBody.grant_scope, ['email', 'profile'], 'grant_scope must match requested_scope');
   assert.equal(calls.acceptConsentBody.session.id_token.email, 'a@othala.test', 'id_token.email must be set');
 });
@@ -751,7 +742,7 @@ test('D3: grafana skip path injects grafana_role from manifest (regression guard
   assert.equal(calls.acceptConsent, 1);
   const idToken = calls.acceptConsentBody.session.id_token;
   assert.deepEqual(idToken.grafana_role, ['Viewer'], 'grafana_role must be injected for grafana viewer');
-  assert.equal(calls.acceptConsentBody.remember_for, 3600, 'skip path must use remember_for=3600');
+  assert.equal(calls.acceptConsentBody.remember, false);
   assert.deepEqual(calls.acceptConsentBody.grant_scope, ['email', 'profile'], 'grant_scope must match');
   assert.equal(idToken.email, 'a@othala.test', 'id_token.email must be set');
 });
