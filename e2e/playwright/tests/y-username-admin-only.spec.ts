@@ -108,7 +108,7 @@ test.describe('Y — username is admin-only', () => {
       expect(after.username).toBe(username);
       const addresses = (await readIdentity(kratosAdminURL, seeded.id)).verifiable_addresses as Array<{ value: string; verified: boolean }>;
       expect(addresses.find((a) => a.value === changed)?.verified, 'new address unverified').toBe(false);
-      await waitForMessage(forRecipient(changed, since));
+      await waitForMessage(forRecipient(changed, since, /verif/i));
 
       const whoOther = await other.request.get(`${baseURL}/sessions/whoami`, { headers: { Accept: 'application/json' } });
       expect(whoOther.status(), 'the other session ended').toBe(401);
@@ -143,7 +143,7 @@ test.describe('Y — username is admin-only', () => {
         });
         expect(flowResp.ok(), 'refresh login flow init').toBe(true);
         const flow = await flowResp.json();
-        await ctx.request.post(flow.ui.action, {
+        return ctx.request.post(flow.ui.action, {
           headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
           data: { method: 'code', identifier, csrf_token: findCsrfToken(flow.ui.nodes) },
           maxRedirects: 0,
@@ -151,12 +151,15 @@ test.describe('Y — username is admin-only', () => {
       };
 
       const since = Date.now();
-      await refreshByCode(changed);
-      await waitForMessage(forRecipient(changed, since));
+      const sent = await refreshByCode(changed);
+      expect(sent.status(), 'code sent').toBe(400);
+      const sentIds = ((await sent.json()).ui?.messages ?? []).map((m: { id: number }) => m.id);
+      expect(sentIds, 'code-sent message').toContain(1010014);
+      await waitForMessage(forRecipient(changed, since, /login|sign in/i));
 
       const sinceOld = Date.now();
       await refreshByCode(seeded.email);
-      await expect(waitForMessage(forRecipient(seeded.email, sinceOld), 5_000)).rejects.toThrow(/Timed out/);
+      await expect(waitForMessage(forRecipient(seeded.email, sinceOld, /login|sign in/i), 5_000)).rejects.toThrow(/Timed out/);
     } finally {
       await ctx.close();
     }

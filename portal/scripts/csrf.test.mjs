@@ -37,7 +37,7 @@ test('rejects missing token', () => {
 test('rejects a 4-part token without an action', () => {
   const body = `${Math.floor(Date.now() / 1000)}.admin-1.nonce`;
   const sig = createHmac('sha256', Buffer.from(process.env.CSRF_SECRET, 'utf8')).update(body).digest('base64url');
-  assert.throws(() => verifyToken(`${body}.${sig}`, 'admin-1', 'save'), /malformed/);
+  assert.throws(() => verifyToken(`${body}.${sig}`, 'admin-1'), /malformed/);
 });
 
 test('signToken requires an action', () => {

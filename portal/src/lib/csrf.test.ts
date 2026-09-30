@@ -11,6 +11,7 @@
  * Run: npx vitest run   (from portal/)
  */
 
+import { createHmac } from 'node:crypto';
 import { describe, it, expect, beforeEach } from 'vitest';
 import { signToken, verifyToken, CSRFError, _resetForTests } from './csrf.js';
 
@@ -42,9 +43,10 @@ describe('signToken / verifyToken — errors', () => {
   });
 
   it('rejects a 4-part token without an action', () => {
-    const tok = signToken(IDENTITY, 'save');
-    const [ts, id, nonce, , sig] = tok.split('.');
-    expect(() => verifyToken(`${ts}.${id}.${nonce}.${sig}`, IDENTITY, 'save')).toThrow(CSRFError);
+    const body = `${Math.floor(Date.now() / 1000)}.${IDENTITY}.nonce`;
+    const sig = createHmac('sha256', Buffer.from(process.env['CSRF_SECRET']!, 'utf8')).update(body).digest('base64url');
+    const tok = `${body}.${sig}`;
+    expect(() => (verifyToken as (t: string, i: string, a?: string) => void)(tok, IDENTITY)).toThrow(CSRFError);
   });
 
   it('requires an action to sign', () => {

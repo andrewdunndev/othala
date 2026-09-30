@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach } from 'vitest';
-import { logoutAuthorized, sameOriginRequest, signLogoutToken } from './logout.js';
+import { logoutAuthorized, signLogoutToken } from './logout.js';
 import { signToken, _resetForTests } from './csrf.js';
 import { session } from './test-builders.js';
 

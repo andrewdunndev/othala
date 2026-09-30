@@ -22,7 +22,7 @@ import PageHero from '../../components/PageHero.astro';
 import { getLogoutInfo, getSession, kratosBase } from '../../lib/kratos';
 import type { LogoutInfo } from '../../lib/kratos';
 import { publicUrl } from '../../lib/config';
-import { logoutAuthorized, sameOriginRequest, signLogoutToken } from '../../lib/logout';
+import { logoutAuthorized, signLogoutToken } from '../../lib/logout';
 
 const cookie = Astro.request.headers.get('cookie') ?? undefined;
 

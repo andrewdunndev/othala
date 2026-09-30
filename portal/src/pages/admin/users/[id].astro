@@ -87,7 +87,8 @@ if (Astro.request.method === 'POST' && identity) {
   // bound to the active admin's identity and to the submitted action: a token
   // captured from the "issue-recovery" form cannot fire "deactivate".
   try {
-    verifyToken(String(fd.get('csrf_token') ?? ''), adminIdentityId, action);
+    const tokenAction = action === 'remove-credential' ? `remove-${String(fd.get('cred_type') ?? '')}` : action;
+    verifyToken(String(fd.get('csrf_token') ?? ''), adminIdentityId, tokenAction);
   } catch (err) {
     if (err instanceof CSRFError) {
       return new Response(`CSRF: ${err.message}`, { status: 403 });
@@ -182,7 +183,7 @@ const csrfTokenAdminToggle = isTargetAdmin
 const csrfTokensRemove: Record<string, string> = {};
 for (const { key } of CREDENTIAL_METHODS) {
   if (EVICTABLE_CREDENTIAL_TYPES.has(key) && credentialMap[key]) {
-    csrfTokensRemove[key] = signToken(adminIdentityId, 'remove-credential');
+    csrfTokensRemove[key] = signToken(adminIdentityId, `remove-${key}`);
   }
 }
 
