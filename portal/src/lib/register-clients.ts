@@ -1,44 +1,7 @@
-// In-app OIDC client registration — the TS successor to util/apply-clients.sh.
-//
-// CU2 item 2. apply-clients.sh read the per-app <slug>.yaml manifests, extracted the
-// `oidc:` block, injects a per-client secret from the environment, and
-// POST/PUTs each client to Hydra's admin API (/admin/clients). This module
-// does the same through the C1 @ory/client-fetch OAuth2Api with a TYPED
-// body — no `yq -j` string concatenation, no shell interpolation of the
-// secret into a JSON string.
-//
-// Field mapping (manifest oidc: → Hydra OAuth2Client), matching exactly
-// what apply-clients.sh forwarded (it sent the whole `oidc:` mapping
-// verbatim plus `client_secret`):
-//
-//   client_id                        -> client_id
-//   client_name                      -> client_name
-//   grant_types                      -> grant_types
-//   response_types                   -> response_types
-//   scope (space-joined string)      -> scope
-//   redirect_uris                    -> redirect_uris
-//   post_logout_redirect_uris        -> post_logout_redirect_uris
-//   audience                         -> audience
-//   token_endpoint_auth_method       -> token_endpoint_auth_method
-//   skip_consent                     -> skip_consent
-//   backchannel_logout_uri           -> backchannel_logout_uri
-//   backchannel_logout_session_required -> backchannel_logout_session_required
-//   <SLUG>_CLIENT_SECRET (env)       -> client_secret
-//
-// Anything under `consent:` is NEVER forwarded — same namespace boundary
-// the shell enforced (it extracted `.oidc` only).
-//
-// Idempotency: getOAuth2Client(client_id) decides create vs update. A 404
-// (ResponseError) means "create" (POST/createOAuth2Client); a 200 means
-// "update" (PUT/setOAuth2Client). This mirrors the shell's HTTP-status
-// branch.
-//
-// Secrets: read from process.env per client, named `<CLIENT_ID_UPPER>_CLIENT_SECRET`
-// — the same convention apply-clients.sh used (KEEP_CLIENT_SECRET,
-// LLM_CLIENT_SECRET, …). Those are the `*_oidc_client_secret` sops keys the
-// deployment exports into the container env. Never hardcoded, never
-// derived; a missing secret is a hard error (unless allowMissingSecret is
-// set for dry-run/diff workflows).
+// In-app OIDC client registration, the TS successor to util/apply-clients.sh. Each manifest's `oidc:` block (never
+// `consent:`) is pushed to Hydra as a typed OAuth2Client body via OAuth2Api, with the secret from
+// `<CLIENT_ID_UPPER>_CLIENT_SECRET` in env (never hardcoded; a missing one is a hard error unless allowMissingSecret).
+// Idempotent: getOAuth2Client decides create (404) versus update (200).
 
 import {
   Configuration,
@@ -53,11 +16,7 @@ import {
   type ClientManifest,
 } from './manifests';
 
-/**
- * Minimal slice of the OAuth2Api the registrar needs. Declaring it here
- * lets the unit tests inject a stub without standing up a live Hydra, and
- * documents exactly which SDK calls cross the wire.
- */
+/** The slice of OAuth2Api the registrar needs, so tests can inject a stub. */
 export interface OAuth2ClientApi {
   getOAuth2Client(req: { id: string }): Promise<OAuth2Client>;
   createOAuth2Client(req: { oAuth2Client: OAuth2Client }): Promise<OAuth2Client>;
@@ -65,30 +24,13 @@ export interface OAuth2ClientApi {
 }
 
 export interface RegisterOptions {
-  /**
-   * Inject a stub/mock for unit tests. Defaults to a real OAuth2Api bound
-   * to HYDRA_ADMIN_URL (+ optional HYDRA_ADMIN_TOKEN bearer), matching
-   * admin.ts's oauth2Api() construction.
-   */
+  /** Stub for tests; defaults to a real OAuth2Api on HYDRA_ADMIN_URL (+ optional HYDRA_ADMIN_TOKEN). */
   api?: OAuth2ClientApi;
-  /**
-   * Source of per-client secrets. Defaults to process.env. Injectable so
-   * tests don't have to mutate the global environment.
-   */
+  /** Per-client secret source; defaults to process.env. */
   env?: Record<string, string | undefined>;
-  /**
-   * Skip the validateClients lint before registering. Default false — the
-   * registrar refuses to push a manifest set that fails the lint, so a bad
-   * audience or undeclared role can't half-register. Tests that exercise
-   * field-mapping on a single crafted manifest set this true.
-   */
+  /** Skip the validateClients lint; default false so a bad manifest set cannot half-register. */
   skipValidation?: boolean;
-  /**
-   * When true, a missing `<SLUG>_CLIENT_SECRET` is tolerated and the
-   * client is registered without a secret in the body (dry-run / diff
-   * posture, like apply-clients.sh DRY_RUN=1). Default false: a missing
-   * secret is a hard error, matching the shell's non-dry-run branch.
-   */
+  /** Tolerate a missing `<SLUG>_CLIENT_SECRET` and register without it (dry-run); default false is a hard error. */
   allowMissingSecret?: boolean;
 }
 
@@ -98,24 +40,9 @@ export interface RegisterResult {
 }
 
 /**
- * Env var name carrying a client's secret, e.g. grafana -> GRAFANA_CLIENT_SECRET.
- *
- * Fails loudly if `clientId` is not a valid POSIX env-var stem
- * (^[A-Za-z_][A-Za-z0-9_]*$). A hyphenated id such as "prompt-desk" would
- * produce "PROMPT-DESK_CLIENT_SECRET" — an invalid shell variable that never
- * resolves. Rather than silently returning a broken name we throw immediately
- * with a clear message naming the offending client_id and the env var the
- * operator should look for.
- *
- * The durable fix is validateClients (manifest-lint rule 1a), which rejects
- * an invalid client_id at manifest load time — well before the registrar
- * reaches this function. This guard is a belt-and-suspenders defence-in-depth
- * check for callers that bypass assertManifestsValid (e.g. skipValidation).
- *
- * Contract: fail-loud validate, NOT silent sanitize. Hyphens are not
- * silently mapped to underscores because that would hide a manifest the linter
- * correctly rejects. The clean contract is: linter rejects → registrar never
- * reaches this code for an invalid id. If it does reach here, it throws.
+ * Env var name for a client's secret, e.g. grafana -> GRAFANA_CLIENT_SECRET. Throws if `clientId` is not a valid
+ * POSIX env-var stem (a hyphenated id gives an unresolvable name); validateClients rule 1a rejects it at load, so this
+ * is defence in depth for callers that skip validation. Fail loud, never silently sanitize.
  */
 export function secretEnvVar(clientId: string): string {
   if (!CLIENT_ID_ENV_STEM_RE.test(clientId)) {
@@ -145,15 +72,7 @@ function defaultApi(): OAuth2ClientApi {
   ) as unknown as OAuth2ClientApi;
 }
 
-/**
- * Build the Hydra OAuth2Client body from a parsed manifest + secret.
- *
- * Only `oidc:`-derived fields are set; the `consent:` block never reaches
- * Hydra. Optional fields are omitted when empty so the body matches what
- * apply-clients.sh produced (it forwarded only the keys present in the
- * yaml). The secret is set as a typed field, not concatenated into a JSON
- * string — the injection-safety requirement.
- */
+/** Build the Hydra OAuth2Client body from a manifest + secret: only `oidc:` fields, optional ones omitted when empty, the secret as a typed field. */
 export function buildClientBody(
   m: ClientManifest,
   secret: string | undefined,
@@ -182,7 +101,7 @@ export function buildClientBody(
   return body;
 }
 
-/** Resolve a per-client secret from the env, applying the apply-clients.sh policy. */
+/** Resolve a per-client secret from env. */
 function resolveSecret(
   m: ClientManifest,
   env: Record<string, string | undefined>,
@@ -202,10 +121,7 @@ function isNotFound(err: unknown): boolean {
   return err instanceof ResponseError && err.response?.status === 404;
 }
 
-/**
- * Register (create or update) a single client in Hydra. Exposed for the
- * tests and for targeted re-apply; registerAllClients drives the full set.
- */
+/** Register (create or update) one client in Hydra; exposed for tests and targeted re-apply. */
 export async function registerClient(
   api: OAuth2ClientApi,
   m: ClientManifest,
@@ -231,38 +147,19 @@ export async function registerClient(
 }
 
 /**
- * Register every client from the loaded manifest set against Hydra.
- *
- * Runs the full validateClients lint first (unless skipValidation), then
- * registers each client idempotently. Returns the per-client action list.
- *
- * This is the production registration path. The deploy repo runs this
- * bundle as a deliberate --rm one-shot on boot and on SIGHUP,
- * reading manifests from MANIFEST_DIR and resolving
- * <SLUG>_CLIENT_SECRET from env. Registration is create-or-update only and
- * never deletes, so a decommissioned client survives until removed by hand.
+ * Run validateClients (unless skipValidation), then register every manifest idempotently, returning the per-client
+ * actions. Create-or-update only, never deletes, so a decommissioned client survives until removed by hand.
  */
 export async function registerAllClients(
   opts: RegisterOptions = {},
 ): Promise<RegisterResult[]> {
-  // oidcClientManifests, NOT loadClientManifests: since the registry was
-  // widened to carry presentation-only tiles (so their access groups are
-  // grantable in the admin UI), the unfiltered loader returns manifests with
-  // no OIDC client and no secret. registerManifests assumes every manifest it
-  // is handed has both, so an unfiltered set throws on the first tile —
-  // "<CLIENT>_CLIENT_SECRET not set" — at boot and on every SIGHUP, and
-  // registrar.ts swallows it, leaving Hydra with ZERO registered clients.
-  // manifests.ts `oidcClientManifests` states this narrowing obligation in its
-  // doc comment; honour it here.
+  // Narrow through oidcClientManifests: presentation-only tiles have no client or secret, so an unfiltered set would
+  // throw at boot and on every SIGHUP (swallowed by registrar.ts), leaving Hydra with zero clients.
   const manifests = oidcClientManifests();
   return registerManifests(manifests, opts);
 }
 
-/**
- * Register an explicit manifest set. Split out from registerAllClients so
- * callers (and tests) can register a crafted set without touching the
- * on-disk loader.
- */
+/** Register an explicit manifest set, without the on-disk loader (for callers and tests). */
 export async function registerManifests(
   manifests: ClientManifest[],
   opts: RegisterOptions = {},

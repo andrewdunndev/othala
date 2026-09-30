@@ -1,39 +1,7 @@
-// revokeSubject — the in-process revocation fan-out (CU3 / B1).
-//
-// One function, called by all three revocation triggers:
-//
-//   - admin force-logout      (admin "revoke user")        -> steps 2-6
-//   - user "sign out everywhere" (self-service settings)   -> steps 2-6
-//   - deactivate              (admin deactivate-identity)  -> step 1 THEN 2-6
-//
-// The fan-out is in-process here, calling the Kratos + Hydra admin APIs
-// directly through the typed Ory SDK (@ory/client-fetch). No
-// string-interpolated admin URLs.
-//
-// FAN-OUT ORDER (do not reorder; steps 1-2 are the hard cut):
-//
-//   1. Kratos state -> inactive  (deactivate trigger ONLY; MUST precede 2)
-//      PATCH /admin/identities/{id} [{op:replace,path:/state,value:inactive}]
-//   2. Kratos sessions revoke    DELETE /admin/identities/{id}/sessions
-//      A REAL failure (Kratos unreachable / 5xx) ABORTS the fan-out. But a
-//      404 ("no active sessions") is the SUCCESS postcondition, not a failure
-//      — tolerate it and CONTINUE: a subject with no live Kratos session can
-//      still hold a remembered Hydra login / live access tokens, which is the
-//      very case "sign out everywhere" must cut.
-//   3. Hydra login-session revoke   revokeOAuth2LoginSessions({subject})
-//      Cuts the remembered login so a remembered subject cannot
-//      skip-login a fresh token. Idempotent.
-//   4. Hydra consent-session revoke revokeOAuth2ConsentSessions({subject,all})
-//      Invalidates granted consent + associated access tokens. Idempotent.
-//
-// There is no in-process identity cache to invalidate: the hot login/consent
-// path always fetches a fresh identity (oauth2-handlers -> admin-api.getIdentity),
-// so a revoked/deactivated subject fails the gate's state-check on the next
-// fetch — revocation is correct without a cache.
-//
-// Prescriptive errors: an upstream failure on steps 1-4 throws a
-// RevokeError naming WHICH dependency failed (hydra-admin / kratos-admin)
-// and WHAT to do next. Raw upstream errors are never surfaced to callers.
+// revokeSubject: the in-process revocation fan-out for admin force-logout, self-service sign-out-everywhere and
+// deactivate, via the typed Ory SDK. Order is fixed: (1) deactivate only: Kratos state -> inactive, before 2;
+// (2) Kratos sessions revoke, where 404 (no sessions) is success and continues; (3) Hydra login sessions;
+// (4) Hydra consent sessions. A real failure throws a RevokeError naming the dependency and next action.
 
 import {
   Configuration,
@@ -46,11 +14,7 @@ import {
 /** Which upstream dependency a revoke step failed against. */
 export type RevokeDependency = 'kratos-admin' | 'hydra-admin';
 
-/**
- * Prescriptive revoke failure. Names the dependency and the operator's
- * next action; never leaks the raw upstream error to the caller's surface
- * (the raw cause is attached for server-side logging only).
- */
+/** Prescriptive revoke failure: names the dependency and next action; the raw cause is for server logs only. */
 export class RevokeError extends Error {
   readonly dependency: RevokeDependency;
   readonly step: string;
@@ -64,11 +28,7 @@ export class RevokeError extends Error {
   }
 }
 
-/**
- * True iff the SDK error is an HTTP 404. Kratos returns 404 from
- * DELETE /admin/identities/{id}/sessions when the subject has NO active
- * sessions — "nothing to revoke", the success postcondition, not a failure.
- */
+/** True for an HTTP 404; Kratos returns it from DELETE .../sessions when the subject has no active sessions. */
 function isNotFound(err: unknown): boolean {
   return err instanceof ResponseError && err.response?.status === 404;
 }
@@ -80,14 +40,11 @@ export interface RevokeDeps {
 }
 
 export interface RevokeOptions {
-  /**
-   * deactivate trigger: run step 1 (state -> inactive) before step 2.
-   * admin force-logout + sign-out-everywhere leave this false.
-   */
+  /** deactivate trigger: run step 1 (state -> inactive) before step 2. */
   deactivate?: boolean;
 }
 
-/** Per-step outcome, returned so the UI can report what landed. */
+/** Per-step outcome for the UI. */
 export interface RevokeResult {
   subject: string;
   deactivated: boolean;
@@ -124,8 +81,7 @@ function buildOAuth2Api(): OAuth2Api {
   );
 }
 
-/**
-/** Resolve injected deps, defaulting to the live SDK clients + helpers. */
+/** Resolve injected deps, defaulting to the live SDK clients. */
 function resolveDeps(deps: Partial<RevokeDeps> = {}): RevokeDeps {
   return {
     identityApi: deps.identityApi ?? buildIdentityApi(),
@@ -133,12 +89,7 @@ function resolveDeps(deps: Partial<RevokeDeps> = {}): RevokeDeps {
   };
 }
 
-/**
- * Run the revocation fan-out for one subject (the Kratos identity id).
- *
- * Steps 1-4 are the hard cut and throw a prescriptive RevokeError on the
- * first failure (the cut aborts — earlier steps already landed).
- */
+/** Run the fan-out for one subject (Kratos identity id); steps 1-4 abort on the first failure. */
 export async function revokeSubject(
   subject: string,
   options: RevokeOptions = {},
@@ -153,9 +104,7 @@ export async function revokeSubject(
     hydraConsentRevoked: false,
   };
 
-  // ── Step 1 (deactivate trigger ONLY): Kratos state -> inactive ──────────
-  // MUST precede step 2: flip state first so a session re-minted in the
-  // race window is itself for an inactive identity (the gate then denies).
+  // Step 1 (deactivate only): flip state first so a session re-minted in the race window is for an inactive identity.
   if (options.deactivate) {
     const patch: Array<JsonPatch> = [{ op: 'replace', path: '/state', value: 'inactive' }];
     try {
@@ -171,10 +120,7 @@ export async function revokeSubject(
     }
   }
 
-  // ── Step 2 (all triggers): Kratos sessions revoke. ─────────────────────
-  // A 404 means the subject has no active sessions (Kratos v26 returns 404,
-  // not 204, in that case): nothing to revoke == revoked. Tolerate it and
-  // continue to the Hydra cut. Only a REAL failure aborts the fan-out.
+  // Step 2: a 404 means no active sessions, which counts as revoked; only a real failure aborts.
   try {
     await d.identityApi.deleteIdentitySessions({ id: subject });
     result.kratosSessionsRevoked = true;
@@ -191,7 +137,7 @@ export async function revokeSubject(
     }
   }
 
-  // ── Step 3 (all triggers): Hydra login-session revoke. Idempotent. ──────
+  // Step 3: Hydra login-session revoke.
   try {
     await d.oauth2Api.revokeOAuth2LoginSessions({ subject });
     result.hydraLoginRevoked = true;
@@ -204,7 +150,7 @@ export async function revokeSubject(
     );
   }
 
-  // ── Step 4 (all triggers): Hydra consent-session revoke. Idempotent. ────
+  // Step 4: Hydra consent-session revoke.
   try {
     await d.oauth2Api.revokeOAuth2ConsentSessions({ subject, all: true });
     result.hydraConsentRevoked = true;
@@ -221,11 +167,8 @@ export async function revokeSubject(
 }
 
 /**
- * Revoke only the subject's Hydra consent sessions, for every client
- * (step 4 on its own). Used when an admin narrows a subject's groups, roles
- * or admin marker: the grants and refresh tokens issued under the old access
- * stop working, and the next sign-in re-runs consent against the new record.
- * Kratos and Hydra login sessions are left alone. Idempotent.
+ * Step 4 alone: revoke the subject's Hydra consent sessions for every client, used when an admin narrows groups,
+ * roles or the admin marker so old grants and refresh tokens stop working. Login sessions are left alone.
  */
 export async function revokeConsentSessions(
   subject: string,

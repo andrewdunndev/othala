@@ -1,23 +1,7 @@
-// OAuth2 challenge handlers (CU1 item 1).
-//
-// These are the Hydra login/consent/logout challenge providers. They are
-// distinct from src/pages/auth/{login,consent,logout}.astro, which render the
-// Kratos browser-flow human UI. The routes live at
-// /oauth2/{login,consent,logout} (see src/pages/oauth2/*).
-//
-// Each handler takes a Web Request and returns a Web Response (302 redirect or
-// an error status). The logic is framework-agnostic so the Astro routes are
-// thin wrappers and the handlers can be exercised directly in contract tests
-// with stubbed dependencies (see Deps).
-//
-// Flow mirrors the Go service:
-//   login   -> resolve subject (skip-remembered or whoami), gate, accept/reject
-//   consent -> re-gate, build id_token claims, accept with consent session
-//   logout  -> revoke the subject's live Kratos session, then accept
-//
-// SDK usage: we reuse the class-based @ory/client-fetch OAuth2Api and the
-// C1 admin-api getIdentity / kratos getSession helpers, rather than
-// re-hand-rolling fetch.
+// Hydra login/consent/logout challenge providers at /oauth2/{login,consent,logout} (not the Kratos UI pages in
+// src/pages/auth/). Each handler takes a Web Request and returns a Web Response, so routes stay thin and tests inject Deps.
+// login: resolve subject (remembered or whoami), gate, accept/reject; consent: re-gate, build claims, accept;
+// logout: revoke the subject's live Kratos session, then accept.
 
 import { Configuration, OAuth2Api } from '@ory/client-fetch';
 import type {
@@ -35,12 +19,8 @@ import { servingManifest } from './manifest-store';
 import { verifyToken, CSRFError } from './csrf';
 import { needsStepUp } from './step-up';
 
-// Hydra remembers an app sign-in for as long as the Kratos session lives, so
-// a later app sign-out still reaches handleLogout and ends that session.
-// Hydra v26.2.0 sets its login cookie Max-Age to remember_for when > 0 and
-// clamps the stored expiry to ttl.authentication_session (default 720h)
-// (consent/strategy_default.go:441-489). The fallback is the Kratos
-// session.lifespan (kratos/kratos.yml, 720h).
+// Hydra remembers a sign-in as long as the Kratos session lives so a later app sign-out still reaches handleLogout;
+// the fallback is the Kratos session.lifespan (720h).
 const KRATOS_SESSION_LIFESPAN = 2_592_000; // 30 days
 
 /** Seconds until the Kratos session expires; the configured lifespan when unknown. */
@@ -50,19 +30,10 @@ export function loginRememberFor(session: Session, now: number = Date.now()): nu
   return Math.max(1, Math.ceil((expires - now) / 1000));
 }
 
-// CONSENT_REMEMBER_FOR_SKIP: 1 hour — matches Go consentRememberFor (3600).
-// Used on the skip auto-accept path (all current skip_consent:true clients).
-// Go comment: "Trusted clients all skip_consent anyway, so remember is
-// mostly belt and suspenders. Short window keeps blast radius small if a
-// group changes mid-session."
-const CONSENT_REMEMBER_FOR_SKIP = 3600; // 1h — matches Go consentRememberFor
+// Skip auto-accept path: 1 hour (Go consentRememberFor); a short window limits blast radius if a group changes mid-session.
+const CONSENT_REMEMBER_FOR_SKIP = 3600; // 1h
 
-// CONSENT_REMEMBER_FOR_PROMPT: 30 days (2 592 000 s).
-// Used on the interactive Allow POST path only. Goal: a prompted client
-// asks ONCE PER USER, then is silent on subsequent logins (coordinator
-// decision 2). Matches the login memory (the Kratos session, 30 d) and aligns
-// with Hydra's refresh_token TTL (720 h / 30 d). NOT applied on the
-// skip path — skip path uses CONSENT_REMEMBER_FOR_SKIP to match Go.
+// Interactive Allow path: 30 days, so a prompted client asks once per user (matches the login memory and refresh-token TTL).
 const CONSENT_REMEMBER_FOR_PROMPT = 2_592_000; // 30 days
 
 function hydraAdminBase(): string {
@@ -79,28 +50,17 @@ export function defaultOAuth2Api(): OAuth2Api {
   );
 }
 
-/**
- * The login-UI base the no-session path bounces to. Production points at the
- * portal's own Kratos browser-flow login page.
- */
+/** Login-UI base for the no-session bounce (the portal's Kratos login page). */
 function loginUIBase(): string {
   return process.env.PORTAL_LOGIN_URL ?? '/auth/login';
 }
 
-/**
- * The consent grant-screen base. Production points at /auth/consent (the
- * Astro page that renders the Allow / Deny UI). Overridable via
- * PORTAL_CONSENT_URL for test / lab environments.
- */
+/** Consent grant-screen base (/auth/consent); overridable via PORTAL_CONSENT_URL. */
 function consentUIBase(): string {
   return process.env.PORTAL_CONSENT_URL ?? '/auth/consent';
 }
 
-/**
- * Injectable dependencies. Production wiring uses the real SDK + C1 helpers;
- * contract tests pass stubs. All optional so callers override only what they
- * need.
- */
+/** Injectable dependencies; tests pass stubs for what they need. */
 export interface Deps {
   oauth2?: Pick<
     OAuth2Api,
@@ -116,16 +76,11 @@ export interface Deps {
   >;
   getIdentity?: (id: string) => Promise<Identity>;
   getSession?: (cookie?: string) => Promise<Session | null>;
-  /** Revoke one Kratos session by id (logout). Resolves when the session is gone. */
+  /** Revoke one Kratos session by id (logout). */
   revokeSession?: (sessionId: string) => Promise<void>;
   gate?: (identity: Identity | null, clientId: string, manifest?: ClientManifest) => GateResult;
-  /**
-   * Resolve a client manifest by clientId. Used for claims injection (A3) and
-   * gate (C). Defaults to the SERVING loader (lib/manifest-store.ts), which
-   * never throws: a manifest set that fails to validate must deny entry, not
-   * 500 every login and consent challenge in the estate at once. An undefined
-   * result is fail-closed at the gate.
-   */
+  /** Resolve a client manifest. Defaults to the SERVING loader (manifest-store.ts), which never throws, so an invalid
+   * manifest set denies entry instead of 500ing every challenge; undefined is fail-closed at the gate. */
   manifest?: (clientId: string) => ClientManifest | undefined;
 }
 
@@ -140,17 +95,12 @@ function resolve(deps: Deps): Required<Deps> {
   };
 }
 
-/** 302 redirect helper. */
+/** 302 redirect. */
 function redirect(location: string): Response {
   return new Response(null, { status: 302, headers: { Location: location } });
 }
 
-/**
- * Build the relative return_to path for the Kratos login bounce (CU1 item 5,
- * hardening). ALWAYS a server-side RELATIVE path — no scheme/host — so it can
- * never redirect the browser cross-origin even if the challenge value is
- * attacker-influenced (it is URL-encoded regardless).
- */
+/** Relative return_to path for the Kratos login bounce: never a scheme or host, so it cannot redirect cross-origin. */
 export function buildLoginReturnTo(challenge: string): string {
   const qs = new URLSearchParams({ login_challenge: challenge });
   return `/oauth2/login?${qs.toString()}`;
@@ -191,10 +141,8 @@ export async function handleLogin(req: Request, deps: Deps = {}): Promise<Respon
   let liveSession: Session;
 
   if (login.skip) {
-    // Hydra remembers this subject, but Kratos is the authentication authority.
-    // Do NOT silently re-SSO on a remembered Hydra login when the Kratos session
-    // is gone (e.g. the user logged out). Re-verify a live Kratos session whose
-    // subject matches before honoring the skip; otherwise force interactive login.
+    // Hydra remembers this subject but Kratos is the authority: honor the skip only with a live Kratos session for
+    // the same subject; otherwise force interactive login.
     let session: Session | null;
     try {
       session = await d.getSession(req.headers.get('cookie') ?? undefined);
@@ -202,9 +150,7 @@ export async function handleLogin(req: Request, deps: Deps = {}): Promise<Respon
       return new Response('upstream error', { status: 502 });
     }
     if (session?.active && session.identity && session.identity.id !== login.subject) {
-      // A different user's live session: Hydra's remembered login is someone
-      // else's. End that one login session and let Hydra re-issue the
-      // challenge without skip. Never fall back to a subject-wide revoke.
+      // A different user's live session: end that one Hydra login session so Hydra re-issues without skip; never a subject-wide revoke.
       if (!login.session_id) return new Response('upstream error', { status: 502 });
       try {
         await d.oauth2.revokeOAuth2LoginSessions({ sid: login.session_id });
@@ -229,8 +175,7 @@ export async function handleLogin(req: Request, deps: Deps = {}): Promise<Respon
       return new Response('upstream error', { status: 502 });
     }
     if (!session?.active || !session.identity) {
-      // Not authenticated — bounce to the (relative) login UI with a relative
-      // return_to so we come back here after Kratos mints a session.
+      // Not authenticated: bounce to the login UI with a relative return_to.
       const returnTo = buildLoginReturnTo(challenge);
       const loginURL = `${loginUIBase()}?return_to=${encodeURIComponent(returnTo)}`;
       return redirect(loginURL);
@@ -240,15 +185,12 @@ export async function handleLogin(req: Request, deps: Deps = {}): Promise<Respon
     acr = session.authenticator_assurance_level ?? undefined;
   }
 
-  // Enforce the access gate (state + group), fail-closed on lookup failure.
+  // Access gate (state + group), fail-closed on lookup failure.
   const identity = await safeGetIdentity(d, subject);
   const loginManifest = d.manifest(clientId);
   const result = d.gate(identity, clientId, loginManifest);
   if (!result.allowed) {
-    // Log the real denial reason server-side for operator observability, then
-    // send an opaque error_description to the client (Hydra forwards it into
-    // the RP redirect) to avoid leaking internal group names or identity state
-    // distinguishers to relying parties.
+    // Log the real reason server-side; send Hydra an opaque error_description so RPs learn no group names or identity state.
     console.warn('[oauth2/login] access denied', { clientId, subject, reason: result.reason });
     try {
       const { redirect_to } = await d.oauth2.rejectOAuth2LoginRequest({
@@ -265,9 +207,7 @@ export async function handleLogin(req: Request, deps: Deps = {}): Promise<Respon
     }
   }
 
-  // Second-factor step-up: an account with totp/webauthn, or the admin marker,
-  // completes aal2 before any app sign-in is accepted. Kratos returns to this
-  // challenge afterwards and the aal2 session is accepted with acr aal2.
+  // Second-factor step-up: accounts with totp/webauthn, or the admin marker, complete aal2 first; Kratos returns to this challenge.
   if (needsStepUp(liveSession, identity)) {
     const returnTo = buildLoginReturnTo(challenge);
     return redirect(`${loginUIBase()}?aal=aal2&return_to=${encodeURIComponent(returnTo)}`);
@@ -280,7 +220,7 @@ export async function handleLogin(req: Request, deps: Deps = {}): Promise<Respon
         subject,
         remember: true,
         remember_for: loginRememberFor(liveSession),
-        // On a remembered login Hydra keeps its cookie unless asked to renew it.
+        // Hydra keeps its cookie on a remembered login unless asked to renew it.
         ...(login.skip ? { extend_session_lifespan: true } : {}),
         ...(acr ? { acr } : {}),
       },
@@ -292,20 +232,9 @@ export async function handleLogin(req: Request, deps: Deps = {}): Promise<Respon
 }
 
 /**
- * Accept a consent request with full claims and remember=true.
- *
- * Extracted so both the skip=true auto-accept path in handleConsent AND the
- * POST handler in /oauth2/consent.ts share one call site (DRY). The identity
- * is non-null here — callers must have already passed the gate (which denies
- * on null identity).
- *
- * rememberFor: callers pass CONSENT_REMEMBER_FOR_SKIP (3600, matches Go) for
- * the skip auto-accept path, and CONSENT_REMEMBER_FOR_PROMPT (30d) for the
- * interactive Allow POST path. Default is CONSENT_REMEMBER_FOR_SKIP (skip
- * path is the common case for all current skip_consent:true clients).
- *
- * clientId: threaded in to resolve the client manifest for claims injection
- * (A3: composeIDTokenClaims applies emit_groups + lookupRole deepMergeClaims).
+ * Accept a consent request with full claims and remember=true; shared by the skip auto-accept in handleConsent and
+ * the POST in /oauth2/consent.ts. Callers have passed the gate, so identity is non-null. `rememberFor` is
+ * CONSENT_REMEMBER_FOR_SKIP (default) or CONSENT_REMEMBER_FOR_PROMPT; `clientId` resolves the manifest for claims.
  */
 export async function acceptConsentRequest(
   challenge: string,
@@ -355,15 +284,12 @@ export async function handleConsent(req: Request, deps: Deps = {}): Promise<Resp
   const subject = consent.subject ?? '';
   const clientId = consent.client?.client_id ?? '';
 
-  // Re-enforce the access gate at consent time (state + group), fail-closed.
-  // Consent must gate even when login was remembered (skip), and the consent
-  // challenge always fires for skip_consent clients.
+  // Re-gate at consent time (state + group), fail-closed; it must gate even when login was remembered.
   const identity = await safeGetIdentity(d, subject);
   const consentManifest = d.manifest(clientId);
   const result = d.gate(identity, clientId, consentManifest);
   if (!result.allowed) {
-    // Log the real denial reason server-side; send an opaque error_description
-    // to the client to avoid leaking internal group names / identity state.
+    // Log the real reason server-side; send an opaque error_description.
     console.warn('[oauth2/consent] access denied', { clientId, subject, reason: result.reason });
     try {
       const { redirect_to } = await d.oauth2.rejectOAuth2ConsentRequest({
@@ -380,49 +306,21 @@ export async function handleConsent(req: Request, deps: Deps = {}): Promise<Resp
     }
   }
 
-  // SKIP PATH (load-bearing):
-  // curated IdP — the operator pre-consents at manifest-authoring time, so a
-  // skip_consent:true client auto-accepts with NO grant UI ("never prompts").
-  //
-  // Honor the MANIFEST skip_consent (authoritative, operator-authored) OR
-  // Hydra's remember-based `consent.skip` when set. Why the manifest flag is
-  // authoritative (vs Hydra's client field, which OSS Hydra v26.2.0 does not
-  // auto-skip on): the manifest is the operator's pre-consent record and
-  // survives a client re-registration that resets Hydra's own field. Identity is
-  // non-null here (gate denies on null above). remember_for =
-  // CONSENT_REMEMBER_FOR_SKIP (3600).
+  // SKIP PATH: the manifest's skip_consent (the operator's pre-consent record, which survives client re-registration)
+  // or Hydra's consent.skip auto-accepts with no grant UI. Identity is non-null: the gate denies null above.
   if (consent.skip || consentManifest?.skipConsent) {
     return acceptConsentRequest(challenge, consent, identity!, d, clientId, CONSENT_REMEMBER_FOR_SKIP);
   }
 
-  // PROMPT PATH:
-  // When consent.skip === false the user has NOT previously granted consent for
-  // this client (or the grant expired). Redirect to the grant screen. The
-  // browser renders /auth/consent, the user clicks Allow / Deny, and the form
-  // POSTs to /oauth2/consent which completes the challenge.
+  // PROMPT PATH: redirect to /auth/consent; its POST to /oauth2/consent completes the challenge.
   const qs = new URLSearchParams({ consent_challenge: challenge });
   return redirect(`${consentUIBase()}?${qs.toString()}`);
 }
 
 /**
- * Handle POST /oauth2/consent — Allow/Deny from the grant screen.
- *
- * Called by the <form method="POST" action="/oauth2/consent"> in
- * /auth/consent.astro. Validates signed CSRF token (verifyToken) + subject-
- * match, then either accepts (with full claims + remember=true) or rejects
- * the consent challenge.
- *
- * Integrity model:
- *   - Signed CSRF token: csrf_token is verified via verifyToken(token, identityId)
- *     from csrf.ts — same mechanism as the admin pages. Fail-closed: CSRFError
- *     returns 400. The token is emitted as a hidden input in consent.astro and
- *     tied to the session's identity.id.
- *   - The consent_challenge is re-fetched from Hydra on every POST. Hydra
- *     single-use challenges prevent replay: a challenge that has already been
- *     accepted/rejected returns an error, so old form submissions are inert.
- *   - The current Kratos session's identity.id MUST equal consent.subject.
- *     A mismatch means a different user's browser session is trying to
- *     consent on someone else's challenge — reject with access_denied.
+ * Handle POST /oauth2/consent (Allow/Deny from /auth/consent.astro). Verifies the signed, consent-scoped CSRF token
+ * (CSRFError returns 400, fail-closed), re-fetches the challenge from Hydra (single-use, so stale posts are inert),
+ * and requires the Kratos session's identity.id to equal consent.subject, else access_denied.
  */
 export async function handleConsentPost(req: Request, deps: Deps = {}): Promise<Response> {
   const d = resolve(deps);
@@ -445,8 +343,7 @@ export async function handleConsentPost(req: Request, deps: Deps = {}): Promise<
     return new Response('invalid action', { status: 400 });
   }
 
-  // Re-fetch the consent request from Hydra (single-use integrity — validates
-  // the challenge is still open and binds to the correct subject).
+  // Re-fetch from Hydra: single-use integrity, binds to the subject.
   let consent: OAuth2ConsentRequest;
   try {
     consent = await d.oauth2.getOAuth2ConsentRequest({ consentChallenge: challenge });
@@ -454,7 +351,7 @@ export async function handleConsentPost(req: Request, deps: Deps = {}): Promise<
     return new Response('upstream error', { status: 502 });
   }
 
-  // Resolve the current Kratos session and assert subject match.
+  // Resolve the Kratos session and assert subject match.
   let session: Session | null;
   try {
     session = await d.getSession(req.headers.get('cookie') ?? undefined);
@@ -463,7 +360,7 @@ export async function handleConsentPost(req: Request, deps: Deps = {}): Promise<
   }
 
   if (!session?.active || !session.identity) {
-    // No active session — cannot safely consent on behalf of any user.
+    // No active session: cannot consent for anyone.
     try {
       const { redirect_to } = await d.oauth2.rejectOAuth2ConsentRequest({
         consentChallenge: challenge,
@@ -479,9 +376,7 @@ export async function handleConsentPost(req: Request, deps: Deps = {}): Promise<
     }
   }
 
-  // CSRF verification (D1): verify the signed CSRF token emitted by consent.astro.
-  // The token is action-scoped to 'consent' (FIX-E): a token minted for any other
-  // action (e.g. 'force-relogin', 'deactivate') cannot be replayed here.
+  // CSRF: the token is scoped to 'consent', so one minted for another action cannot be replayed here.
   const csrfToken = body.get('csrf_token');
   try {
     verifyToken(csrfToken, session.identity.id, 'consent');
@@ -505,8 +400,7 @@ export async function handleConsentPost(req: Request, deps: Deps = {}): Promise<
       });
       return redirect(redirect_to);
     } catch {
-      // Hydra reject failed after CSRF nonce was consumed. Redirect back to
-      // the grant screen so the user gets a fresh token and can retry.
+      // Reject failed after the nonce was consumed: back to the grant screen for a fresh token.
       const qs = new URLSearchParams({ consent_challenge: challenge });
       return redirect(`${consentUIBase()}?${qs.toString()}`);
     }
@@ -525,21 +419,19 @@ export async function handleConsentPost(req: Request, deps: Deps = {}): Promise<
       });
       return redirect(redirect_to);
     } catch {
-      // Hydra reject failed after CSRF nonce was consumed. Redirect back to
-      // the grant screen so the user gets a fresh token and can retry.
+      // Reject failed after the nonce was consumed: back to the grant screen for a fresh token.
       const qs = new URLSearchParams({ consent_challenge: challenge });
       return redirect(`${consentUIBase()}?${qs.toString()}`);
     }
   }
 
-  // Allow path — re-enforce the access gate before accepting.
+  // Allow path: re-gate before accepting.
   const clientId = consent.client?.client_id ?? '';
   const identity = await safeGetIdentity(d, consent.subject ?? '');
   const allowManifest = d.manifest(clientId);
   const result = d.gate(identity, clientId, allowManifest);
   if (!result.allowed) {
-    // Log the real denial reason server-side; send an opaque error_description
-    // to the client to avoid leaking internal group names / identity state.
+    // Log the real reason server-side; send an opaque error_description.
     console.warn('[oauth2/consent/post] access denied', { clientId, subject: consent.subject, reason: result.reason });
     try {
       const { redirect_to } = await d.oauth2.rejectOAuth2ConsentRequest({
@@ -552,18 +444,13 @@ export async function handleConsentPost(req: Request, deps: Deps = {}): Promise<
       });
       return redirect(redirect_to);
     } catch {
-      // Hydra reject failed after CSRF nonce was consumed. Redirect back to
-      // the grant screen so the user gets a fresh token and can retry.
+      // Reject failed after the nonce was consumed: back to the grant screen for a fresh token.
       const qs = new URLSearchParams({ consent_challenge: challenge });
       return redirect(`${consentUIBase()}?${qs.toString()}`);
     }
   }
 
-  // identity is non-null here: gate denies on null identity above.
-  // remember_for = CONSENT_REMEMBER_FOR_PROMPT (30d) for the interactive Allow path.
-  // acceptConsentRequest has its own try/catch; on Hydra failure it returns 502.
-  // The CSRF nonce was already consumed above, so on accept failure redirect back
-  // to the grant screen for a fresh token rather than stranding the user.
+  // remember_for is the 30d prompt window. The nonce is spent, so a 502 from Hydra redirects to the grant screen for a fresh token.
   const allowResponse = await acceptConsentRequest(challenge, consent, identity!, d, clientId, CONSENT_REMEMBER_FOR_PROMPT);
   if (allowResponse.status === 502) {
     const qs = new URLSearchParams({ consent_challenge: challenge });
@@ -592,12 +479,7 @@ export async function handleLogout(req: Request, deps: Deps = {}): Promise<Respo
     return redirect(`${process.env.OTHALA_PUBLIC_URL ?? ''}/auth/logout`);
   }
 
-  // FIX-F: subject-binding defence-in-depth (logout-CSRF hardening).
-  // If a live Kratos session is present, its identity must match the logout
-  // subject. A mismatch means a cross-user forced-logout attempt — refuse it.
-  // If there is no live session the logout proceeds (the session is already gone
-  // or the browser has no cookie, both of which are expected on a legitimate
-  // logout flow initiated by Hydra post-revocation).
+  // Subject binding (logout-CSRF hardening): a live session for a different identity is refused; no live session proceeds.
   const logoutSubject = _logout.subject;
   {
     let session: Session | null;
@@ -607,14 +489,12 @@ export async function handleLogout(req: Request, deps: Deps = {}): Promise<Respo
       return redirect(`${process.env.OTHALA_PUBLIC_URL ?? ''}/auth/error?reason=auth-unreachable`);
     }
     if (logoutSubject && session?.active && session.identity && session.identity.id !== logoutSubject) {
-      // Live session belongs to a DIFFERENT user than the logout subject.
-      // Refuse to auto-accept — redirect to the portal home instead.
+      // Live session is a different user's: refuse to auto-accept and redirect home.
       const publicUrlBase = process.env.OTHALA_PUBLIC_URL ?? '';
       return redirect(`${publicUrlBase}/`);
     }
-    // The live session is the subject's: signing out of an app ends the SSO
-    // session, so revoke it before Hydra forgets the login. A failed revoke
-    // must not accept, or the next authorize would sign straight back in.
+    // The live session is the subject's: revoke it before Hydra forgets the login; a failed revoke must not accept,
+    // or the next authorize would sign straight back in.
     if (session?.active && session.identity) {
       try {
         if (!session.id) throw new Error('session without id');

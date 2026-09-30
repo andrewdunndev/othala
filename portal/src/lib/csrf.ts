@@ -1,35 +1,7 @@
-// Per-request CSRF tokens for /admin/* form POSTs.
-//
-// Why (HIGH-1):
-//
-//   The Kratos session cookie is SameSite=Lax with the parent-domain
-//   cookie domain. Browsers consider the Othala host and any sibling
-//   app subdomain same-site (shared registrable parent), so a
-//   compromised app on `<app>.<parent-domain>` can host a top-level
-//   form that POSTs to `<othala-host>/admin/users/<id>` and the browser
-//   includes the session cookie. The admin UI's `requireAdminSession`
-//   already passed AAL2 for the active admin, so the malicious form
-//   rides that.
-//
-//   Mitigation: a per-request signed token tied to identity_id. Token
-//   embedded in every admin form, verified server-side on POST. Single-
-//   use (consumed on verify), 30-minute TTL, fails closed.
-//
-// Token shape:
-//
-//   <ts>.<identityId>.<nonce>.<action>.<sig>
-//
-//   - ts:        unix seconds at issuance
-//   - identityId: the admin's identity id; binds the token to one user
-//   - nonce:     16 bytes from randomBytes (URL-safe base64)
-//   - action:    verb that limits which POST action the token can authorise
-//                (e.g. "issue-recovery", "deactivate")
-//   - sig:       HMAC-SHA256(secret, <everything before the sig dot>) base64url
-//
-// Single-use replay defence is in-memory: every consumed nonce is held
-// for the TTL window. The portal runs as a single Node SSR pod (no
-// horizontal replicas in production). If we ever scale out, the consumed-nonce store moves to Redis
-// or Postgres; the API is the same.
+// Per-request CSRF tokens for /admin/* form POSTs. The Kratos session cookie is SameSite=Lax on the parent domain,
+// so a sibling app subdomain can post a cross-site form that rides an admin session; each admin form carries a signed token.
+// Shape: <ts>.<identityId>.<nonce>.<action>.<sig>, sig = HMAC-SHA256 base64url over the rest. Single-use, 30 min TTL,
+// fails closed. The consumed-nonce store is in-memory (single Node pod); scaling out moves it to Redis or Postgres.
 
 import { createHmac, randomBytes, timingSafeEqual } from 'node:crypto';
 
@@ -37,17 +9,10 @@ const TOKEN_TTL_MS = 30 * 60 * 1000; // 30 min
 
 const SECRET_ENV = 'CSRF_SECRET';
 
-/**
- * Lazily resolve the signing secret. Failing-closed if unset is
- * deliberate: an admin POST without a working CSRF gate is the exact
- * shape this finding flagged.
- */
+/** Lazily resolve the signing secret; fails closed when unset. */
 function secret(): Buffer {
   const v = process.env[SECRET_ENV];
-  // CRYPTO-2: check UTF-8 byte length, not character count. A secret composed
-  // of multi-byte characters (e.g. emoji) can satisfy v.length < 32 while
-  // providing far fewer than 32 bytes of entropy. Buffer.byteLength is the
-  // correct measure for a secret used as HMAC key material.
+  // 32-byte floor by UTF-8 byte length, not character count (multi-byte characters would undercount entropy).
   if (!v || Buffer.byteLength(v, 'utf8') < 32) {
     throw new CSRFError(
       `${SECRET_ENV} is unset or shorter than 32 bytes (UTF-8). ` +
@@ -57,11 +22,7 @@ function secret(): Buffer {
   return Buffer.from(v, 'utf8');
 }
 
-/**
- * In-memory consumed-nonce store. Single-process portal at family scale
- * is the production posture. Each entry holds an expiry timestamp; a
- * sweep on insert keeps the store from growing unboundedly.
- */
+/** In-memory consumed-nonce store (single-process portal); swept on insert. */
 const consumedNonces = new Map<string, number>();
 
 function sweepExpired(now: number): void {
@@ -78,21 +39,14 @@ export class CSRFError extends Error {
 }
 
 /**
- * Mint a CSRF token for the given admin identity. Embed in a hidden
- * form input named `csrf_token`. The token expires 30 min after issue.
- *
- * @param identityId  The admin's Kratos identity id.
- * @param action      Action verb (e.g. "issue-recovery"): verifyToken rejects
- *                    the token unless the same action is expected.
+ * Mint a token for an admin identity, embedded in a hidden `csrf_token` input; verifyToken rejects it unless the
+ * same `action` is expected.
  */
 export function signToken(identityId: string, action: string): string {
   if (!identityId || !identityId.trim()) {
     throw new CSRFError('identityId is required to sign a CSRF token');
   }
-  // CRYPTO-1: the signing body uses '.' as a field separator. A '.' in
-  // identityId or action would shift the field boundaries and make verifyToken
-  // parse the token incorrectly. Fail closed at sign time so the invariant is
-  // enforced where it's cheapest to catch rather than at verify time under load.
+  // '.' is the field separator; refuse it in identityId or action so verifyToken cannot mis-parse.
   if (identityId.includes('.')) {
     throw new CSRFError('identityId must not contain a dot (would corrupt token structure)');
   }
@@ -104,23 +58,15 @@ export function signToken(identityId: string, action: string): string {
   }
   const ts = Math.floor(Date.now() / 1000);
   const nonce = randomBytes(16).toString('base64url');
-  // The action is in the signed body so it cannot be stripped or swapped
-  // without invalidating the HMAC.
+  // The action is signed, so it cannot be stripped or swapped.
   const body = `${ts}.${identityId}.${nonce}.${action}`;
   const sig = createHmac('sha256', secret()).update(body).digest('base64url');
   return `${body}.${sig}`;
 }
 
 /**
- * Verify a CSRF token against the active admin's identity id. Throws
- * CSRFError on missing, malformed, expired, replayed, or wrong-identity
- * tokens. On success, the nonce is recorded as consumed: the token
- * cannot be replayed.
- *
- * @param presented   The token string from the form submission.
- * @param identityId  The admin's Kratos identity id.
- * @param action      Expected action string: the token must have been
- *                    minted with the same action.
+ * Verify a token against the admin's identity id and expected action. Throws CSRFError when missing, malformed,
+ * expired, replayed, or bound to another identity or action; records the nonce as consumed on success.
  */
 export function verifyToken(
   presented: string | null | undefined,
@@ -135,8 +81,7 @@ export function verifyToken(
   }
   const parts = presented.split('.');
 
-  // ts.identity.nonce.action.sig: action strings are simple verbs and cannot
-  // contain dots, so the split is unambiguous.
+  // Action verbs contain no dots, so the split is unambiguous.
   if (parts.length !== 5) {
     throw new CSRFError('CSRF token malformed');
   }
@@ -162,12 +107,7 @@ export function verifyToken(
     throw new CSRFError('CSRF token bound to a different identity');
   }
 
-  // Verify the action matches before checking the signature so the error is
-  // informative. Timing-safe: action mismatch
-  // is not a secret; the HMAC mismatch below is the definitive gate.
-  // FIX-H: sanitize the reflected presentedAction to prevent attacker-controlled
-  // input from appearing verbatim in the 403 body (defence-in-depth; text/plain,
-  // but still reduces reflection surface). Cap to 32 chars of safe characters.
+  // Reflect only a sanitized, capped presentedAction in the 403 body; the HMAC below is the definitive gate.
   if (presentedAction !== action) {
     const safePresented = presentedAction
       ? presentedAction.replace(/[^a-z0-9:-]/gi, '').slice(0, 32)

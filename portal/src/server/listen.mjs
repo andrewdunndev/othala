@@ -1,35 +1,9 @@
-// Dual-listener (D-listener) — CU1 item 4, extended in CU3, CVP-P3.
-//
-// Two in-process HTTP listeners, bound separately:
-//
-//   PUBLIC port (PORT, default 4321, bound on HOST default 0.0.0.0)
-//     Serves the Astro SSR `handler` (the @astrojs/node middleware-mode
-//     handler): the OAuth2 challenge providers (/oauth2/{login,consent,
-//     logout}) AND the family UI + /auth/* + /admin/* pages. This is the
-//     only handler exposed to the network. The SSR entry is imported LAZILY
-//     so this module's pure admin mux can be unit-tested without a prior
-//     `astro build`.
-//
-//   ADMIN port (ADMIN_PORT, default 4431, bound on ADMIN_HOST default
-//     127.0.0.1 — loopback / pod-only)
-//     A SEPARATE http.createServer with its own tiny mux. It serves:
-//       GET  /healthz, /readyz        — liveness/readiness probes
-//       POST /admin/recovery-gate     — Kratos recovery-gate webhook (CU3)
-//       POST /admin/login-code-gate   — Kratos login-by-code webhook
-//       POST /admin/username-gate     — Kratos profile-settings webhook
-//       POST /admin/second-factor-gate — Kratos totp/webauthn-settings webhook
-//       POST /admin/profile-sessions  — Kratos profile-settings post-save webhook
-//     It NEVER delegates to the Astro `handler`, so no public route and no
-//     challenge provider is reachable on the admin port — and the public
-//     handler never sees admin paths. The two muxes are disjoint.
-//
-//   Secret model: RECOVERY_GATE_SECRET guards the five Kratos webhooks
-//   above. The check is CONSTANT-TIME (timingSafeEqual) and FAIL-CLOSED (an
-//   unset secret rejects every request).
-//
-// Run with:  node ./dist/server/listen.mjs   (after `npm run build`, which
-// copies this file AND bundles dist/server/admin-runtime.mjs next to the
-// built dist/server/entry.mjs).
+// Dual listener. PUBLIC (PORT 4321, HOST 0.0.0.0): the lazily imported Astro SSR handler for the OAuth2 challenge
+// providers, /auth/* and /admin/* pages. ADMIN (ADMIN_PORT 4431, ADMIN_HOST 127.0.0.1): a separate server with its own
+// mux for /healthz, /readyz and the five Kratos webhooks (recovery-gate, login-code-gate, username-gate,
+// second-factor-gate, profile-sessions); it never delegates to the Astro handler, so the muxes are disjoint.
+// RECOVERY_GATE_SECRET guards the webhooks: constant-time compare, fail-closed when unset.
+// Run with `node ./dist/server/listen.mjs` after `npm run build`.
 
 import http from 'node:http';
 import { timingSafeEqual } from 'node:crypto';
@@ -67,13 +41,7 @@ export function isAdminEndpoint(method, url) {
   return false;
 }
 
-/**
- * Constant-time bearer comparison. FAIL-CLOSED: an unset/empty expected
- * secret rejects every request (returns false) even against an empty
- * presented token, so a misconfigured deployment never accidentally
- * authorizes. Length-mismatch is rejected without a content compare, but
- * the present-vs-expected compare itself is timing-safe.
- */
+/** Constant-time bearer compare; an unset or empty secret rejects everything, even an empty token. */
 export function bearerMatches(presented, expected) {
   if (!expected) return false; // fail-closed: no secret configured
   if (typeof presented !== 'string' || presented.length === 0) return false;
@@ -114,13 +82,7 @@ function sendJson(res, code, obj) {
   res.end(JSON.stringify(obj));
 }
 
-/**
- * Lazily load the runtime bundle (the Kratos admin client and the
- * second-factor verdict), compiled from src/server/admin-runtime.ts to
- * dist/server/admin-runtime.mjs by the build.
- * Cached after first import. Injected in tests so the admin handlers can be
- * exercised without the bundle.
- */
+/** Lazily load dist/server/admin-runtime.mjs (Kratos admin client, second-factor verdict); cached, injectable in tests. */
 let _runtime = null;
 async function loadRuntime() {
   if (_runtime) return _runtime;
@@ -129,15 +91,8 @@ async function loadRuntime() {
 }
 
 /**
- * Look up an identity's admin marker directly from the Kratos admin API.
- *
- * The hook payload carries only the identity id; the authoritative admin marker
- * is fetched from the admin API.
- *
- * Fail-closed: any error (network, 4xx, malformed body) returns
- * `{ refuse: true, reason }` so a degraded admin API conservatively blocks
- * recovery rather than silently allowing it.
- *
+ * Read an identity's admin marker from the Kratos admin API (the hook payload carries only the id).
+ * Fail-closed: any error returns `{ refuse: true, reason }`.
  * @param {string} identityId Kratos identity UUID from the webhook payload.
  * @param {object} [runtime] injectable; defaults to the built bundle.
  * @returns {{ refuse: boolean, reason: string }}
@@ -151,11 +106,7 @@ export async function fetchAdminMarker(identityId, runtime) {
   return { refuse: false, reason: '' };
 }
 
-/**
- * Fetch the stored identity through the runtime's Kratos admin client.
- * Fail-closed: an unset KRATOS_ADMIN_URL, an unloadable runtime or any client
- * error returns `{ refuse: true, reason }`; success returns `{ refuse: false, identity, rt }`.
- */
+/** Fetch the stored identity via the runtime's Kratos admin client; fail-closed with `{ refuse: true, reason }` on an unset KRATOS_ADMIN_URL, unloadable runtime or client error. */
 async function fetchStoredIdentity(runtime, identityId, tag) {
   if (!process.env.KRATOS_ADMIN_URL) {
     console.error(`[portal/${tag}] KRATOS_ADMIN_URL unset — cannot read the stored identity; refusing (fail-closed)`);
@@ -170,10 +121,7 @@ async function fetchStoredIdentity(runtime, identityId, tag) {
   }
 }
 
-/**
- * The login-by-code gate's user-facing text. An admin marker refuses with the
- * first line; any fail-closed path (no id, admin API unreachable) the second.
- */
+/** Login-by-code gate text: the first line for an admin marker, the second for any fail-closed path. */
 export const LOGIN_CODE_ADMIN_REFUSAL = 'Admin accounts sign in with a passkey or password.';
 export const LOGIN_CODE_UNAVAILABLE = 'Sign-in by code is unavailable right now. Use a passkey or password.';
 
@@ -182,23 +130,14 @@ export function loginCodeRefusalText(verdict) {
 }
 
 /**
- * Handle POST /admin/recovery-gate. Bearer: RECOVERY_GATE_SECRET (constant-
- * time, fail-closed). Refuses recovery for admin identities; fail-closed on a
- * malformed payload or admin API error. Returns the Kratos-webhook error shape
- * on refusal (HTTP 403 + messages), 200 on allow.
- *
- * Admin authority is verified by fetching the identity from the Kratos admin
- * API (KRATOS_ADMIN_URL/admin/identities/:id) and reading metadata_admin.admin.
+ * POST /admin/recovery-gate. Bearer RECOVERY_GATE_SECRET; refuses recovery for admin identities, fail-closed on a
+ * malformed payload or admin API error. Refusal is the Kratos-webhook error shape (403 + messages), allow is 200.
  */
 export function handleRecoveryGate(req, res, runtime) {
   return handleAdminMarkerGate(req, res, runtime, (verdict) => `recovery refused: ${verdict.reason}`);
 }
 
-/**
- * Handle POST /admin/login-code-gate: the same bearer, payload and admin-API
- * lookup as the recovery gate, wired to selfservice.flows.login.after.code.
- * An admin-marked identity is refused a session from an emailed code.
- */
+/** POST /admin/login-code-gate: recovery-gate's bearer, payload and lookup, wired to login.after.code; an admin-marked identity gets no session from an emailed code. */
 export function handleLoginCodeGate(req, res, runtime) {
   return handleAdminMarkerGate(req, res, runtime, loginCodeRefusalText);
 }
@@ -206,9 +145,7 @@ export function handleLoginCodeGate(req, res, runtime) {
 async function handleAdminMarkerGate(req, res, runtime, refusalText) {
   const expected = process.env.RECOVERY_GATE_SECRET ?? '';
   if (!bearerMatches(parseBearer(req.headers?.authorization), expected)) {
-    // 403 not 401: Kratos webhooks use can_interrupt: true; a non-403 response
-    // (e.g. 401) risks being treated as a non-interrupting webhook error
-    // (skip-and-continue = fail-open), whereas 403 reliably aborts the flow.
+    // 403, not 401: with can_interrupt a non-403 may be treated as a non-interrupting error (fail-open).
     sendJson(res, 403, { error: 'forbidden' });
     return;
   }
@@ -216,14 +153,12 @@ async function handleAdminMarkerGate(req, res, runtime, refusalText) {
   try {
     body = JSON.parse((await readBody(req)) || '{}');
   } catch {
-    // Fail-closed: an unparseable webhook body refuses recovery.
     sendJson(res, 403, {
       messages: [{ messages: [{ type: 'error', text: refusalText({ reason: 'malformed payload' }) }] }],
     });
     return;
   }
 
-  // Phase 1: fail-closed structural check (identity_id must be present).
   const id = body?.identity_id ?? body?.identity?.id;
   if (typeof id !== 'string' || id.trim().length === 0) {
     sendJson(res, 403, {
@@ -232,7 +167,6 @@ async function handleAdminMarkerGate(req, res, runtime, refusalText) {
     return;
   }
 
-  // Phase 2: fetch the authoritative admin marker from the Kratos admin API.
   const adminVerdict = await fetchAdminMarker(id, runtime);
   if (adminVerdict.refuse) {
     sendJson(res, 403, {
@@ -244,19 +178,11 @@ async function handleAdminMarkerGate(req, res, runtime, refusalText) {
   sendJson(res, 200, { ok: true });
 }
 
-/**
- * The username gate's user-facing text. The username is the key some apps
- * match an account on at sign-in, so only an administrator changes it.
- */
+/** Username gate text: the username keys some apps' accounts, so only an administrator changes it. */
 export const USERNAME_CHANGE_REFUSAL = 'Your username can only be changed by an administrator.';
 export const PROFILE_UPDATE_UNAVAILABLE = 'Profile changes are unavailable right now. Try again later.';
 
-/**
- * Decide the username-gate verdict (pure). `stored` is the identity as the
- * admin API returns it (the value before this settings submission is
- * persisted); `proposed` is the username in the submitted traits. Anything but
- * an exact match of two non-empty strings refuses.
- */
+/** Username-gate verdict (pure): refuse unless `stored` (pre-save) and `proposed` are the same non-empty string. */
 export function usernameChangeVerdict(stored, proposed) {
   const current = stored?.traits?.username;
   if (typeof current !== 'string' || current.length === 0 || typeof proposed !== 'string') {
@@ -272,13 +198,7 @@ function refuseUsername(res, text) {
   });
 }
 
-/**
- * Handle POST /admin/username-gate, wired to
- * selfservice.flows.settings.after.profile with can_interrupt, which Kratos
- * runs before it persists the new traits. Same bearer and body as the other
- * gates; the stored username is read from the admin API, so a failed read
- * refuses the whole profile update.
- */
+/** POST /admin/username-gate, wired to settings.after.profile with can_interrupt; a failed identity read refuses the update. */
 export async function handleUsernameGate(req, res, runtime) {
   const expected = process.env.RECOVERY_GATE_SECRET ?? '';
   if (!bearerMatches(parseBearer(req.headers?.authorization), expected)) {
@@ -312,15 +232,7 @@ function refuseSecondFactor(res, text) {
   sendJson(res, 403, { messages: [{ instance_ptr: '#/', messages: [{ id: 4000001, type: 'error', text }] }] });
 }
 
-/**
- * Handle POST /admin/second-factor-gate?method=totp|webauthn, wired to
- * selfservice.flows.settings.after.{totp,webauthn} with can_interrupt, which
- * Kratos runs before it persists the change. Same bearer and body as the
- * other gates. The stored identity is read with its totp and webauthn configs
- * and judged by secondFactorChangeVerdict (lib/second-factor-gate.ts, via the
- * runtime bundle); a failed read, a missing id or a runtime that will not
- * load refuses the change.
- */
+/** POST /admin/second-factor-gate?method=totp|webauthn, wired to settings.after.{totp,webauthn} with can_interrupt; a failed read, missing id or unloadable runtime refuses the change. */
 export async function handleSecondFactorGate(req, res, runtime) {
   const expected = process.env.RECOVERY_GATE_SECRET ?? '';
   if (!bearerMatches(parseBearer(req.headers?.authorization), expected)) {
@@ -363,14 +275,9 @@ export async function handleSecondFactorGate(req, res, runtime) {
 }
 
 /**
- * Handle POST /admin/profile-sessions, wired to
- * selfservice.flows.settings.after.profile without can_interrupt, which Kratos
- * runs after it persists the new traits. Same bearer and body as the gates;
- * `session_id` is the session that saved. Every other active session of the
- * identity is ended through the admin API. The profile change has already
- * persisted, so a failure here is logged and still answered 200: a non-2xx
- * would only show the member an error for a saved change. Without a
- * `session_id` nothing is ended, so the saving session is never cut.
+ * POST /admin/profile-sessions, wired to settings.after.profile without can_interrupt: ends every other session of
+ * the identity. Failures are logged and still answered 200 (the change already saved); without `session_id`
+ * nothing is ended.
  */
 export async function handleProfileSessions(req, res, runtime) {
   const expected = process.env.RECOVERY_GATE_SECRET ?? '';
@@ -441,8 +348,7 @@ export async function handleAdminRequest(req, res, runtime) {
     return;
   }
 
-  // Anything else (including every public/challenge path, and a served admin
-  // path on the wrong method) is not found on the admin port.
+  // Everything else, including public paths and a served path on the wrong method, is 404 here.
   res.writeHead(404, { 'Content-Type': 'text/plain' });
   res.end('not found');
 }
@@ -461,16 +367,12 @@ export function createAdminServer() {
 
 /** Build the public server, lazily importing the built Astro SSR handler. */
 export async function createPublicServer() {
-  // The standalone entry.mjs auto-binds its OWN server on import unless this
-  // is set: @astrojs/node's start() is a no-op when ASTRO_NODE_AUTOSTART is
-  // "disabled". We want only this module to bind sockets (public + admin), so
-  // disable the adapter's auto-start and drive the exported `handler` directly.
+  // Stop entry.mjs auto-binding its own server (ASTRO_NODE_AUTOSTART=disabled); this module drives `handler` itself.
   process.env.ASTRO_NODE_AUTOSTART = 'disabled';
   const { handler: ssrHandler } = await import('./entry.mjs');
   return http.createServer((req, res) => {
     ssrHandler(req, res, (err) => {
-      // `next` for unmatched routes / errors: the middleware handler did not
-      // produce a response. Emit a plain 404/500 rather than hanging.
+      // Unmatched route or error: emit a plain 404/500 rather than hang.
       if (err) {
         res.writeHead(500, { 'Content-Type': 'text/plain' });
         res.end('internal server error');
@@ -483,24 +385,12 @@ export async function createPublicServer() {
 }
 
 /**
- * Fail-closed startup checks (pure; test helper). Empty/short secret or a
- * wildcard ADMIN_HOST each push a FATAL message; caller decides what to do.
- *
- * - RECOVERY_GATE_SECRET empty or <32 bytes UTF-8 → bearer check on
- *   /admin/recovery-gate would reject every request (fail-closed is correct),
- *   but that is always operator misconfiguration; refuse to boot so the
- *   problem surfaces immediately rather than silently degrading the gate.
- *   32-byte floor mirrors csrf.ts's CSRF_SECRET check (CRYPTO-2).
- * - ADMIN_HOST is a wildcard (0.0.0.0, :: or empty "") → admin port would be
- *   exposed to the network; the admin mux has no public-facing auth hardening
- *   and must only be reachable on loopback or a pod-internal address. Note the
- *   `?? '127.0.0.1'` default only catches null/undefined, NOT an empty string —
- *   ADMIN_HOST="" reaches http.listen as the IPv6 wildcard, and "::" is the
- *   explicit IPv6 wildcard. Both must be refused alongside 0.0.0.0.
+ * Fail-closed startup checks (pure; test helper): a missing or short secret, or a wildcard ADMIN_HOST, each push a
+ * FATAL message. An empty ADMIN_HOST is a wildcard too (the `?? '127.0.0.1'` default only catches null/undefined).
  */
 export function startupEnvErrors() {
   const errors = [];
-
+  // 32-byte UTF-8 floor on both secrets, duplicated from csrf.ts (CRYPTO-2) because this .mjs cannot import TS.
   const recoverySecret = process.env.RECOVERY_GATE_SECRET ?? '';
   if (!recoverySecret.trim()) {
     errors.push('[portal] FATAL: RECOVERY_GATE_SECRET is not set or empty — refusing to start');
@@ -531,8 +421,7 @@ function assertStartupEnv() {
   }
 }
 
-// Bind both listeners only when run as the entrypoint (not when imported by
-// tests, which exercise the pure admin mux above).
+// Bind both listeners only when run as the entrypoint (tests import the pure mux).
 if (import.meta.url === `file://${process.argv[1]}`) {
   assertStartupEnv();
 
@@ -546,17 +435,9 @@ if (import.meta.url === `file://${process.argv[1]}`) {
     console.log(`[portal] admin listener on http://${ADMIN_HOST}:${ADMIN_PORT}`);
   });
 
-  // ── In-process OIDC client reconciler ────────────────────────────────────
-  // In-process OIDC client reconciler. Both listeners are
-  // already bound (healthz is green) BEFORE reconciliation begins, so a slow
-  // or failing Hydra never delays the portal coming up.
-  //
-  // Boot: bounded retry+backoff (reconcileOnBoot). After the retry budget is
-  // exhausted the portal logs a clear operator notice and keeps serving; an
-  // operator SIGHUP retries once Hydra is ready.
-  //
-  // SIGHUP: drops the manifest cache (re-reads from disk) then reconciles.
-  // Errors are swallowed — the portal always continues serving.
+  // In-process OIDC client reconciler, started after both listeners are bound so a slow Hydra never delays boot.
+  // Boot retries with backoff, then logs an operator notice and keeps serving; SIGHUP drops the manifest cache and
+  // reconciles again.
   const registrar = await import('./registrar.mjs');
   registrar.reconcileOnBoot().catch((e) => console.error('[portal] boot reconcile error', e));
   process.on('SIGHUP', () => {
