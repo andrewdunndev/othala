@@ -39,7 +39,6 @@
 		rate_limit {
 			zone othala_selfservice {
 				key    {client_ip}
-				ipv6_prefix 64
 				events 10
 				window 1m
 			}

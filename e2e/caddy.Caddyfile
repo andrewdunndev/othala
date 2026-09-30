@@ -21,7 +21,6 @@ auth.othala.test:80 {
 				header X-E2E-Flood-Probe n1
 			}
 			key    {client_ip}
-			ipv6_prefix 64
 			window 1m
 			events 5
 		}
@@ -32,7 +31,6 @@ auth.othala.test:80 {
 				header X-E2E-Flood-Probe n2
 			}
 			key    {client_ip}
-			ipv6_prefix 64
 			window 1m
 			events 10
 		}
