@@ -20,56 +20,66 @@ beforeEach(() => {
 });
 
 test('signs a token whose round-trip verifies', () => {
-  const tok = signToken('admin-1');
-  assert.doesNotThrow(() => verifyToken(tok, 'admin-1'));
+  const tok = signToken('admin-1', 'save');
+  assert.doesNotThrow(() => verifyToken(tok, 'admin-1', 'save'));
 });
 
 test('rejects token bound to a different identity', () => {
-  const tok = signToken('admin-1');
-  assert.throws(() => verifyToken(tok, 'admin-2'), /different identity/);
+  const tok = signToken('admin-1', 'save');
+  assert.throws(() => verifyToken(tok, 'admin-2', 'save'), /different identity/);
 });
 
 test('rejects missing token', () => {
-  assert.throws(() => verifyToken('', 'admin-1'), /missing/);
-  assert.throws(() => verifyToken(null, 'admin-1'), /missing/);
+  assert.throws(() => verifyToken('', 'admin-1', 'save'), /missing/);
+  assert.throws(() => verifyToken(null, 'admin-1', 'save'), /missing/);
+});
+
+test('rejects a 4-part token without an action', () => {
+  const body = `${Math.floor(Date.now() / 1000)}.admin-1.nonce`;
+  const sig = createHmac('sha256', Buffer.from(process.env.CSRF_SECRET, 'utf8')).update(body).digest('base64url');
+  assert.throws(() => verifyToken(`${body}.${sig}`, 'admin-1', 'save'), /malformed/);
+});
+
+test('signToken requires an action', () => {
+  assert.throws(() => signToken('admin-1'), /action is required/);
 });
 
 test('rejects malformed token', () => {
-  assert.throws(() => verifyToken('not-a-token', 'admin-1'), /malformed/);
-  assert.throws(() => verifyToken('a.b.c', 'admin-1'), /malformed/);
+  assert.throws(() => verifyToken('not-a-token', 'admin-1', 'save'), /malformed/);
+  assert.throws(() => verifyToken('a.b.c', 'admin-1', 'save'), /malformed/);
 });
 
 test('rejects replayed token (single-use)', () => {
-  const tok = signToken('admin-1');
-  verifyToken(tok, 'admin-1');
-  assert.throws(() => verifyToken(tok, 'admin-1'), /already used/);
+  const tok = signToken('admin-1', 'save');
+  verifyToken(tok, 'admin-1', 'save');
+  assert.throws(() => verifyToken(tok, 'admin-1', 'save'), /already used/);
 });
 
 test('rejects expired token', () => {
   // Forge an old timestamp + matching signature so we exercise the
   // expiry branch deterministically (no fake timers).
-  const tok = signToken('admin-1');
+  const tok = signToken('admin-1', 'save');
   const parts = tok.split('.');
   const oldTs = Math.floor(Date.now() / 1000) - 31 * 60;
-  const body = `${oldTs}.${parts[1]}.${parts[2]}`;
+  const body = `${oldTs}.${parts[1]}.${parts[2]}.${parts[3]}`;
   const sig = createHmac('sha256', Buffer.from(process.env.CSRF_SECRET, 'utf8'))
     .update(body)
     .digest('base64url');
   const old = `${body}.${sig}`;
-  assert.throws(() => verifyToken(old, 'admin-1'), /expired/);
+  assert.throws(() => verifyToken(old, 'admin-1', 'save'), /expired/);
 });
 
 test('rejects token with tampered signature', () => {
-  const tok = signToken('admin-1');
+  const tok = signToken('admin-1', 'save');
   const tampered = tok.slice(0, -4) + 'xxxx';
-  assert.throws(() => verifyToken(tampered, 'admin-1'), /signature/);
+  assert.throws(() => verifyToken(tampered, 'admin-1', 'save'), /signature/);
 });
 
 // ── CRYPTO-1: dot invariant enforced at sign time ────────────────────────────
 
 test('CRYPTO-1: signToken throws on dotted identityId', () => {
   assert.throws(
-    () => signToken('admin.1'),
+    () => signToken('admin.1', 'save'),
     /dot/,
     'signToken must throw when identityId contains a dot',
   );
@@ -94,7 +104,7 @@ test('CRYPTO-2: a 32-ASCII-char secret passes the byte-length gate', () => {
   process.env.CSRF_SECRET = 'a'.repeat(32);
   // Importing the module is already done; the secret() fn is lazy — we just need
   // to call signToken which invokes secret() internally.
-  assert.doesNotThrow(() => signToken('admin-1'));
+  assert.doesNotThrow(() => signToken('admin-1', 'save'));
   process.env.CSRF_SECRET = 'a'.repeat(64); // restore
 });
 

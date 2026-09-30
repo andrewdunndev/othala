@@ -50,21 +50,6 @@ export function loginRememberFor(session: Session, now: number = Date.now()): nu
   return Math.max(1, Math.ceil((expires - now) / 1000));
 }
 
-// CONSENT_REMEMBER_FOR_SKIP: 1 hour — matches Go consentRememberFor (3600).
-// Used on the skip auto-accept path (all current skip_consent:true clients).
-// Go comment: "Trusted clients all skip_consent anyway, so remember is
-// mostly belt and suspenders. Short window keeps blast radius small if a
-// group changes mid-session."
-const CONSENT_REMEMBER_FOR_SKIP = 3600; // 1h — matches Go consentRememberFor
-
-// CONSENT_REMEMBER_FOR_PROMPT: 30 days (2 592 000 s).
-// Used on the interactive Allow POST path only. Goal: a prompted client
-// asks ONCE PER USER, then is silent on subsequent logins (coordinator
-// decision 2). Matches the login memory (the Kratos session, 30 d) and aligns
-// with Hydra's refresh_token TTL (720 h / 30 d). NOT applied on the
-// skip path — skip path uses CONSENT_REMEMBER_FOR_SKIP to match Go.
-const CONSENT_REMEMBER_FOR_PROMPT = 2_592_000; // 30 days
-
 function hydraAdminBase(): string {
   return process.env.HYDRA_ADMIN_URL ?? 'http://hydra:4445';
 }
@@ -112,6 +97,7 @@ export interface Deps {
     | 'rejectOAuth2ConsentRequest'
     | 'getOAuth2LogoutRequest'
     | 'acceptOAuth2LogoutRequest'
+    | 'revokeOAuth2LoginSessions'
   >;
   getIdentity?: (id: string) => Promise<Identity>;
   getSession?: (cookie?: string) => Promise<Session | null>;
@@ -200,7 +186,19 @@ export async function handleLogin(req: Request, deps: Deps = {}): Promise<Respon
     } catch {
       return new Response('upstream error', { status: 502 });
     }
-    if (!session?.active || !session.identity || session.identity.id !== login.subject) {
+    if (session?.active && session.identity && session.identity.id !== login.subject) {
+      // A different user's live session: Hydra's remembered login is someone
+      // else's. End that one login session and let Hydra re-issue the
+      // challenge without skip. Never fall back to a subject-wide revoke.
+      if (!login.session_id) return new Response('upstream error', { status: 502 });
+      try {
+        await d.oauth2.revokeOAuth2LoginSessions({ sid: login.session_id });
+      } catch {
+        return new Response('upstream error', { status: 502 });
+      }
+      return redirect(login.request_url);
+    }
+    if (!session?.active || !session.identity) {
       const returnTo = buildLoginReturnTo(challenge);
       const loginURL = `${loginUIBase()}?return_to=${encodeURIComponent(returnTo)}`;
       return redirect(loginURL);
@@ -286,10 +284,8 @@ export async function handleLogin(req: Request, deps: Deps = {}): Promise<Respon
  * is non-null here — callers must have already passed the gate (which denies
  * on null identity).
  *
- * rememberFor: callers pass CONSENT_REMEMBER_FOR_SKIP (3600, matches Go) for
- * the skip auto-accept path, and CONSENT_REMEMBER_FOR_PROMPT (30d) for the
- * interactive Allow POST path. Default is CONSENT_REMEMBER_FOR_SKIP (skip
- * path is the common case for all current skip_consent:true clients).
+ * rememberFor: callers pass loginRememberFor(session), so Hydra remembers the
+ * consent exactly as long as the Kratos session it was granted under.
  *
  * clientId: threaded in to resolve the client manifest for claims injection
  * (A3: composeIDTokenClaims applies emit_groups + lookupRole deepMergeClaims).
@@ -300,7 +296,7 @@ export async function acceptConsentRequest(
   identity: Identity,
   d: Required<Deps>,
   clientId: string,
-  rememberFor: number = CONSENT_REMEMBER_FOR_SKIP,
+  rememberFor: number,
 ): Promise<Response> {
   const manifest = d.manifest(clientId);
   const idTokenClaims = composeIDTokenClaims(identity, manifest, consent.requested_scope);
@@ -376,10 +372,17 @@ export async function handleConsent(req: Request, deps: Deps = {}): Promise<Resp
   // authoritative (vs Hydra's client field, which OSS Hydra v26.2.0 does not
   // auto-skip on): the manifest is the operator's pre-consent record and
   // survives a client re-registration that resets Hydra's own field. Identity is
-  // non-null here (gate denies on null above). remember_for =
-  // CONSENT_REMEMBER_FOR_SKIP (3600).
+  // non-null here (gate denies on null above). remember_for follows the live
+  // Kratos session, as at login.
   if (consent.skip || consentManifest?.skipConsent) {
-    return acceptConsentRequest(challenge, consent, identity!, d, clientId, CONSENT_REMEMBER_FOR_SKIP);
+    let session: Session | null = null;
+    try {
+      session = await d.getSession(req.headers.get('cookie') ?? undefined);
+    } catch {
+      /* treated as no session below */
+    }
+    if (!session?.active) return new Response('upstream error', { status: 502 });
+    return acceptConsentRequest(challenge, consent, identity!, d, clientId, loginRememberFor(session));
   }
 
   // PROMPT PATH:
@@ -547,11 +550,11 @@ export async function handleConsentPost(req: Request, deps: Deps = {}): Promise<
   }
 
   // identity is non-null here: gate denies on null identity above.
-  // remember_for = CONSENT_REMEMBER_FOR_PROMPT (30d) for the interactive Allow path.
+  // remember_for follows the posting Kratos session (verified active above).
   // acceptConsentRequest has its own try/catch; on Hydra failure it returns 502.
   // The CSRF nonce was already consumed above, so on accept failure redirect back
   // to the grant screen for a fresh token rather than stranding the user.
-  const allowResponse = await acceptConsentRequest(challenge, consent, identity!, d, clientId, CONSENT_REMEMBER_FOR_PROMPT);
+  const allowResponse = await acceptConsentRequest(challenge, consent, identity!, d, clientId, loginRememberFor(session));
   if (allowResponse.status === 502) {
     const qs = new URLSearchParams({ consent_challenge: challenge });
     return redirect(`${consentUIBase()}?${qs.toString()}`);
@@ -574,6 +577,11 @@ export async function handleLogout(req: Request, deps: Deps = {}): Promise<Respo
     return new Response('upstream error', { status: 502 });
   }
 
+  // A logout that Hydra did not initiate for the RP is the portal's own.
+  if (_logout.rp_initiated === false) {
+    return redirect(`${process.env.OTHALA_PUBLIC_URL ?? ''}/auth/logout`);
+  }
+
   // FIX-F: subject-binding defence-in-depth (logout-CSRF hardening).
   // If a live Kratos session is present, its identity must match the logout
   // subject. A mismatch means a cross-user forced-logout attempt — refuse it.
@@ -586,9 +594,7 @@ export async function handleLogout(req: Request, deps: Deps = {}): Promise<Respo
     try {
       session = await d.getSession(req.headers.get('cookie') ?? undefined);
     } catch {
-      // Kratos unreachable — fail safe: proceed with accept (logout is never
-      // more dangerous than accepting, and blocking on infra failure is worse).
-      session = null;
+      return redirect(`${process.env.OTHALA_PUBLIC_URL ?? ''}/auth/error?reason=auth-unreachable`);
     }
     if (logoutSubject && session?.active && session.identity && session.identity.id !== logoutSubject) {
       // Live session belongs to a DIFFERENT user than the logout subject.

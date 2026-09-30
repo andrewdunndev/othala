@@ -9,7 +9,7 @@
 
 import { test } from 'vitest';
 import assert from 'node:assert/strict';
-import { handleLogin, loginRememberFor, handleConsent, handleConsentPost, handleLogout, buildLoginReturnTo } from '../src/lib/oauth2-handlers.ts';
+import { handleLogin, loginRememberFor, handleConsent as handleConsentRaw, handleConsentPost, handleLogout, buildLoginReturnTo } from '../src/lib/oauth2-handlers.ts';
 import { describeScopeList, SCOPE_DESCRIPTIONS } from '../src/lib/scope-descriptions.ts';
 import { parseManifest } from '../src/lib/manifests.ts';
 import { signToken, _resetForTests } from '../src/lib/csrf.ts';
@@ -56,6 +56,8 @@ function stubOAuth2(over = {}) {
     acceptOAuth2ConsentRequest: async (p) => { calls.acceptConsent++; calls.acceptConsentBody = p.acceptOAuth2ConsentRequest; return { redirect_to: 'https://sso.othala.test/after-consent' }; },
     rejectOAuth2ConsentRequest: async (p) => { calls.rejectConsent++; calls.rejectConsentReason = p.rejectOAuth2Request?.error_description; return { redirect_to: 'https://sso.othala.test/consent-rejected' }; },
     acceptOAuth2LogoutRequest: async () => { calls.acceptLogout++; return { redirect_to: 'https://sso.othala.test/after-logout' }; },
+    revokeOAuth2LoginSessions: over.revokeOAuth2LoginSessions
+      ?? (async (p) => { calls.revokeLoginSessions = (calls.revokeLoginSessions ?? []).concat([p]); }),
   };
   return { api, calls };
 }
@@ -66,6 +68,9 @@ function stubOAuth2(over = {}) {
 function defaultSession(overrides = {}) {
   return async () => session('aal1', ['password'], { identity: whoamiIdentity(activeMember()), ...overrides });
 }
+
+// The consent skip path reads remember_for from the live Kratos session.
+const handleConsent = (req, deps = {}) => handleConsentRaw(req, { getSession: defaultSession(), ...deps });
 
 // ── return_to hardening (CU1 item 5) ──────────────────────────────────────
 
@@ -420,7 +425,7 @@ test('logout 400 on missing challenge', async () => {
 // T1: REGRESSION GUARD — skip=true must auto-accept (no bounce to /auth/consent).
 // This is the path all 11 current estate clients take. Must be behaviorally
 // unchanged after the prompt-path addition.
-// D3: assert FULL payload — remember_for===3600 (skip path matches Go), grant_scope,
+// D3: assert FULL payload — remember_for follows the Kratos session, grant_scope,
 // id_token.email set. This guard fails if the payload regresses.
 test('T1: consent skip=true auto-accepts (REGRESSION GUARD)', async () => {
   const { api, calls } = stubOAuth2({
@@ -438,6 +443,7 @@ test('T1: consent skip=true auto-accepts (REGRESSION GUARD)', async () => {
     {
       oauth2: api,
       getIdentity: async () => activeMember(),
+      getSession: defaultSession({ expires_at: IN_20_DAYS() }),
       manifest: () => loadManifest('grafana'),
     },
   );
@@ -452,10 +458,9 @@ test('T1: consent skip=true auto-accepts (REGRESSION GUARD)', async () => {
     'skip=true must NOT bounce to the grant screen',
   );
   // D3: assert FULL payload shape — regression guard.
-  assert.equal(
-    calls.acceptConsentBody.remember_for,
-    3600,
-    'skip path must use remember_for=3600 (Go consentRememberFor), not 30d',
+  assert.ok(
+    Math.abs(calls.acceptConsentBody.remember_for - 20 * 86_400) <= 2,
+    `skip path remember_for follows the Kratos session, got ${calls.acceptConsentBody.remember_for}`,
   );
   assert.deepEqual(
     calls.acceptConsentBody.grant_scope,
@@ -472,6 +477,18 @@ test('T1: consent skip=true auto-accepts (REGRESSION GUARD)', async () => {
     true,
     'remember must be true',
   );
+});
+
+
+test('consent skip path is 502 without a live Kratos session, and accepts nothing', async () => {
+  const { api, calls } = stubOAuth2();
+  for (const getSession of [async () => null, async () => { throw new Error('kratos down'); }]) {
+    const res = await handleConsent(new Request('https://x/oauth2/consent?consent_challenge=cc'), {
+      oauth2: api, getIdentity: async () => activeMember(), manifest: () => loadManifest('grafana'), getSession,
+    });
+    assert.equal(res.status, 502);
+  }
+  assert.equal(calls.acceptConsent, 0);
 });
 
 // T2: skip=false -> 302 bounce to /auth/consent?consent_challenge=cc.
@@ -963,7 +980,6 @@ test('D3: grafana skip path injects grafana_role from manifest (regression guard
   const idToken = calls.acceptConsentBody.session.id_token;
   // grafana-access -> viewer role -> grafana_role: ['Viewer']
   assert.deepEqual(idToken.grafana_role, ['Viewer'], 'grafana_role must be injected for grafana viewer');
-  assert.equal(calls.acceptConsentBody.remember_for, 3600, 'skip path must use remember_for=3600');
   assert.deepEqual(calls.acceptConsentBody.grant_scope, ['email', 'profile'], 'grant_scope must match');
   assert.equal(idToken.email, 'a@othala.test', 'id_token.email must be set');
 });
@@ -1181,26 +1197,40 @@ test('FIX-A: login skip=true with NO live Kratos session redirects to login UI',
     'return_to must be the relative login challenge path');
 });
 
-test('FIX-A: login skip=true with session whose identity.id !== login.subject redirects to login UI', async () => {
-  const { api, calls } = stubOAuth2({
-    getOAuth2LoginRequest: async () => ({
-      challenge: 'lc', skip: true, subject: 'id-1', client: { client_id: 'grafana' },
-    }),
-  });
-  const res = await handleLogin(new Request('https://x/oauth2/login?login_challenge=lc'), {
-    oauth2: api,
-    // Session is active but for a DIFFERENT user (id-2 vs login.subject id-1).
-    getSession: async () => ({
-      active: true,
-      identity: { id: 'id-2', state: 'active', schema_id: 'family', schema_url: '', traits: {} },
-    }),
-    getIdentity: async () => activeMember(),
-  });
-  assert.equal(res.status, 302, 'must redirect');
+const otherUserSession = async () => ({
+  active: true,
+  identity: { id: 'id-2', state: 'active', schema_id: 'family', schema_url: '', traits: {} },
+});
+const mismatchLogin = (over = {}) => async () => ({
+  challenge: 'lc', skip: true, subject: 'id-1', client: { client_id: 'grafana' },
+  session_id: 'sid-1', request_url: 'https://hydra.othala.test/oauth2/auth?client_id=grafana', ...over,
+});
+const loginReq = () => new Request('https://x/oauth2/login?login_challenge=lc');
+
+test('login skip=true with another user\'s live session revokes that login session by sid and re-enters the request', async () => {
+  const { api, calls } = stubOAuth2({ getOAuth2LoginRequest: mismatchLogin() });
+  const res = await handleLogin(loginReq(), { oauth2: api, getSession: otherUserSession, getIdentity: async () => activeMember() });
+  assert.equal(res.status, 302);
+  assert.equal(res.headers.get('location'), 'https://hydra.othala.test/oauth2/auth?client_id=grafana');
+  assert.deepEqual(calls.revokeLoginSessions, [{ sid: 'sid-1' }], 'revoke by sid only, never subject-wide');
   assert.equal(calls.acceptLogin, 0, 'acceptLogin must NOT be called on subject mismatch');
-  const loc = res.headers.get('location');
-  const u = new URL(loc, 'https://sso.othala.test');
-  assert.equal(u.pathname, '/auth/login', 'must redirect to login UI on subject mismatch');
+});
+
+test('login skip=true subject mismatch without a session_id is 502 and revokes nothing', async () => {
+  const { api, calls } = stubOAuth2({ getOAuth2LoginRequest: mismatchLogin({ session_id: undefined }) });
+  const res = await handleLogin(loginReq(), { oauth2: api, getSession: otherUserSession, getIdentity: async () => activeMember() });
+  assert.equal(res.status, 502);
+  assert.equal(calls.revokeLoginSessions, undefined);
+});
+
+test('login skip=true subject mismatch is 502 when the sid revoke throws', async () => {
+  const { api, calls } = stubOAuth2({
+    getOAuth2LoginRequest: mismatchLogin(),
+    revokeOAuth2LoginSessions: async () => { throw new Error('hydra down'); },
+  });
+  const res = await handleLogin(loginReq(), { oauth2: api, getSession: otherUserSession, getIdentity: async () => activeMember() });
+  assert.equal(res.status, 502);
+  assert.equal(calls.acceptLogin, 0);
 });
 
 test('FIX-A: login skip=true with matching live active session accepts', async () => {
@@ -1241,11 +1271,11 @@ test('FIX-A: login skip=true with Kratos upstream error returns 502', async () =
 
 // ── FIX-E: consent CSRF token must be action-scoped to 'consent' ──────────────
 
-test('FIX-E: POST Allow with identity-only (non-action-scoped) csrf_token returns 400', async () => {
+test('FIX-E: POST Allow with an action-less 4-part csrf_token returns 400', async () => {
   _resetForTests();
-  // signToken without action → identity-only 4-part token.
-  // verifyToken now requires action='consent' → 5-part token → malformed error → 400.
-  const csrfToken = signToken('id-1');   // no action — identity-only
+  // Strip the action segment (ts.id.nonce.action.sig -> ts.id.nonce.sig).
+  const [ts, id, nonce, , sig] = signToken('id-1', 'consent').split('.');
+  const csrfToken = [ts, id, nonce, sig].join('.');
   const { api } = stubOAuth2({
     getOAuth2ConsentRequest: async () => ({
       challenge: 'cc', skip: false, subject: 'id-1',
@@ -1265,7 +1295,7 @@ test('FIX-E: POST Allow with identity-only (non-action-scoped) csrf_token return
       identity: { id: 'id-1', state: 'active', schema_id: 'family', schema_url: '', traits: {} },
     }),
   });
-  assert.equal(res.status, 400, 'identity-only token must be rejected when action scope is required');
+  assert.equal(res.status, 400, '4-part token must be rejected');
 });
 
 test('FIX-E: POST Allow with wrong action-scoped csrf_token returns 400', async () => {
@@ -1503,6 +1533,44 @@ test('logout with an empty subject does not accept when the revoke fails', async
     });
     assert.equal(calls.acceptLogout, 0);
     assert.equal(res.headers.get('location'), 'https://sso.othala.test/auth/error?reason=auth-unreachable');
+  } finally {
+    delete process.env.OTHALA_PUBLIC_URL;
+  }
+});
+
+test('logout with rp_initiated:false bounces to the portal logout and neither revokes nor accepts', async () => {
+  const live = session();
+  const { api, calls } = stubOAuth2({
+    getOAuth2LogoutRequest: async () => oauth2LogoutRequest({ subject: live.identity.id, rp_initiated: false }),
+  });
+  const revoked = [];
+  process.env.OTHALA_PUBLIC_URL = 'https://sso.othala.test';
+  try {
+    const res = await handleLogout(logoutRequest(), {
+      oauth2: api,
+      getSession: async () => live,
+      revokeSession: async (id) => { revoked.push(id); },
+    });
+    assert.equal(res.status, 302);
+    assert.equal(res.headers.get('location'), 'https://sso.othala.test/auth/logout');
+    assert.deepEqual(revoked, []);
+    assert.equal(calls.acceptLogout, 0);
+  } finally {
+    delete process.env.OTHALA_PUBLIC_URL;
+  }
+});
+
+test('logout redirects to auth-unreachable, accepting nothing, when the session lookup throws', async () => {
+  const { api, calls } = stubOAuth2();
+  process.env.OTHALA_PUBLIC_URL = 'https://sso.othala.test';
+  try {
+    const res = await handleLogout(logoutRequest(), {
+      oauth2: api,
+      getSession: async () => { throw new Error('kratos down'); },
+    });
+    assert.equal(res.status, 302);
+    assert.equal(res.headers.get('location'), 'https://sso.othala.test/auth/error?reason=auth-unreachable');
+    assert.equal(calls.acceptLogout, 0);
   } finally {
     delete process.env.OTHALA_PUBLIC_URL;
   }

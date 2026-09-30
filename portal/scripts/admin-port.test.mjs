@@ -162,6 +162,22 @@ test('startup fails when RECOVERY_GATE_SECRET is set but shorter than 32 bytes',
   assert.ok(errors.some((e) => /RECOVERY_GATE_SECRET/.test(e) && /32 bytes/.test(e)));
 });
 
+test('startup fails when CSRF_SECRET is unset or shorter than 32 bytes', () => {
+  process.env.RECOVERY_GATE_SECRET = 'x'.repeat(32);
+  const saved = process.env.CSRF_SECRET;
+  try {
+    process.env.CSRF_SECRET = 'x'.repeat(10);
+    assert.ok(startupEnvErrors().some((e) => /CSRF_SECRET/.test(e) && /32 bytes/.test(e)));
+    delete process.env.CSRF_SECRET;
+    assert.ok(startupEnvErrors().some((e) => /CSRF_SECRET/.test(e)));
+    process.env.CSRF_SECRET = 'x'.repeat(32);
+    assert.ok(!startupEnvErrors().some((e) => /CSRF_SECRET/.test(e)));
+  } finally {
+    if (saved === undefined) delete process.env.CSRF_SECRET;
+    else process.env.CSRF_SECRET = saved;
+  }
+});
+
 // ── recovery-gate endpoint auth + verdict ──────────────────────────────────
 
 test('POST /admin/recovery-gate is fail-closed when RECOVERY_GATE_SECRET unset (403)', async () => {

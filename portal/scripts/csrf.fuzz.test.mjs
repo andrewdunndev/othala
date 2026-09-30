@@ -28,11 +28,13 @@ const { bearerMatches, parseBearer } = await import(
 
 // Shared helpers -----------------------------------------------------------
 
-/** Sign a fresh token for `id` and split into its four parts. */
+const ACTION = 'fuzz';
+
+/** Sign a fresh token for `id` and split into its five parts. */
 function signParts(id) {
-  const tok = signToken(id);
-  const [ts, identityId, nonce, sig] = tok.split('.');
-  return { tok, ts, identityId, nonce, sig };
+  const tok = signToken(id, ACTION);
+  const [ts, identityId, nonce, action, sig] = tok.split('.');
+  return { tok, ts, identityId, nonce, action, sig };
 }
 
 /** Re-sign body with the current test secret. */
@@ -45,7 +47,7 @@ function resign(body) {
 /** Reject if verifyToken does NOT throw. */
 function assertRejects(token, identityId, msgHint) {
   assert.throws(
-    () => verifyToken(token, identityId),
+    () => verifyToken(token, identityId, ACTION),
     (err) => {
       assert.match(err.name, /CSRFError/, `expected CSRFError: ${msgHint}`);
       return true;
@@ -66,9 +68,9 @@ test('prop: fresh token always verifies for the correct identity', () => {
       fc.uuid(), // random admin identity IDs
       (id) => {
         _resetForTests();
-        const tok = signToken(id);
+        const tok = signToken(id, ACTION);
         // Should not throw
-        verifyToken(tok, id);
+        verifyToken(tok, id, ACTION);
       },
     ),
     { numRuns: 1000 },
@@ -88,7 +90,7 @@ test('prop: token for id-A never verifies for a different id-B', () => {
         // Skip when fast-check happens to generate the same uuid twice
         fc.pre(idA !== idB);
         _resetForTests();
-        const tok = signToken(idA);
+        const tok = signToken(idA, ACTION);
         assertRejects(tok, idB, 'cross-identity');
       },
     ),
@@ -114,7 +116,7 @@ test('prop: token with wrong dot-segment count is rejected', () => {
   fc.assert(
     fc.property(
       fc.string({ minLength: 0, maxLength: 200 }),
-      fc.integer({ min: 0, max: 10 }).filter((n) => n !== 4),
+      fc.integer({ min: 0, max: 10 }).filter((n) => n !== 5),
       (chunk, segCount) => {
         // Build a token with exactly `segCount` segments, none of which
         // is a valid signed token.
@@ -134,13 +136,13 @@ test('prop: single-byte bit-flip in sig always rejects', () => {
   fc.assert(
     fc.property(fc.uuid(), (id) => {
       _resetForTests();
-      const { ts, identityId, nonce, sig } = signParts(id);
+      const { ts, identityId, nonce, action, sig } = signParts(id);
       // Decode, flip one byte, re-encode
       const sigBuf = Buffer.from(sig, 'base64url');
       const idx = Math.floor(sigBuf.length / 2);
       sigBuf[idx] ^= 0xff;
       const badSig = sigBuf.toString('base64url');
-      const tampered = `${ts}.${identityId}.${nonce}.${badSig}`;
+      const tampered = `${ts}.${identityId}.${nonce}.${action}.${badSig}`;
       assertRejects(tampered, id, 'bit-flip in sig');
     }),
     { numRuns: 1000 },
@@ -157,9 +159,9 @@ test('prop: truncated signature (length mismatch) always rejects', () => {
       fc.integer({ min: 0, max: 31 }),
       (id, keepBytes) => {
         _resetForTests();
-        const { ts, identityId, nonce, sig } = signParts(id);
+        const { ts, identityId, nonce, action, sig } = signParts(id);
         const truncSig = Buffer.from(sig, 'base64url').slice(0, keepBytes).toString('base64url');
-        const tampered = `${ts}.${identityId}.${nonce}.${truncSig}`;
+        const tampered = `${ts}.${identityId}.${nonce}.${action}.${truncSig}`;
         assertRejects(tampered, id, `truncated sig (${keepBytes} bytes)`);
       },
     ),
@@ -175,9 +177,9 @@ test('prop: token with different identityId field (sig still over old body) reje
     fc.property(fc.uuid(), fc.uuid(), (id, otherId) => {
       fc.pre(id !== otherId);
       _resetForTests();
-      const { ts, nonce, sig } = signParts(id);
+      const { ts, nonce, action, sig } = signParts(id);
       // Swap the identity field but keep the original signature
-      const tampered = `${ts}.${otherId}.${nonce}.${sig}`;
+      const tampered = `${ts}.${otherId}.${nonce}.${action}.${sig}`;
       // Should fail because sig was computed over the original identity
       assertRejects(tampered, otherId, 'swapped identity, old sig');
     }),
@@ -192,8 +194,8 @@ test('prop: replayed token always rejected on second presentation', () => {
   fc.assert(
     fc.property(fc.uuid(), (id) => {
       _resetForTests();
-      const tok = signToken(id);
-      verifyToken(tok, id); // first use: should pass
+      const tok = signToken(id, ACTION);
+      verifyToken(tok, id, ACTION); // first use: should pass
       assertRejects(tok, id, 'replay'); // second use: must fail
     }),
     { numRuns: 500 },
@@ -210,7 +212,7 @@ test('prop: expired token (ts > 30 min) always rejects even with valid sig', () 
       _resetForTests();
       // forge a fresh nonce but an old ts; sign correctly so we reach the expiry check
       const nonce = 'AAAAAAAAAAAAAAAAAAAAAAAA'; // static for test simplicity
-      const body = `${oldTs}.${id}.${nonce}`;
+      const body = `${oldTs}.${id}.${nonce}.${ACTION}`;
       const sig = resign(body);
       const tok = `${body}.${sig}`;
       assertRejects(tok, id, 'expired');
@@ -228,7 +230,7 @@ test('prop: future timestamp (> 60s clock skew) always rejects', () => {
     fc.property(fc.uuid(), (id) => {
       _resetForTests();
       const nonce = 'AAAAAAAAAAAAAAAAAAAAAAAA';
-      const body = `${futureTs}.${id}.${nonce}`;
+      const body = `${futureTs}.${id}.${nonce}.${ACTION}`;
       const sig = resign(body);
       const tok = `${body}.${sig}`;
       assertRejects(tok, id, 'future timestamp');
@@ -238,11 +240,11 @@ test('prop: future timestamp (> 60s clock skew) always rejects', () => {
 });
 
 // ══════════════════════════════════════════════════════════════════════════
-// 11. RANDOM GARBAGE — arbitrary strings with 4 segments
+// 11. RANDOM GARBAGE — arbitrary strings with 5 segments
 //     The sig compare will almost never match; this hunts for any path that
 //     could return without throwing.
 // ══════════════════════════════════════════════════════════════════════════
-test('prop: random four-segment strings never verify', () => {
+test('prop: random five-segment strings never verify', () => {
   fc.assert(
     fc.property(
       fc.uuid(),
@@ -251,11 +253,11 @@ test('prop: random four-segment strings never verify', () => {
       fc.string({ minLength: 0, maxLength: 200 }),
       (id, seg1, seg2, seg3) => {
         _resetForTests();
-        const tok = `${seg1}.${id}.${seg2}.${seg3}`;
+        const tok = `${seg1}.${id}.${seg2}.${ACTION}.${seg3}`;
         // It's valid for verifyToken to throw for any reason; it must never succeed.
         let threw = false;
         try {
-          verifyToken(tok, id);
+          verifyToken(tok, id, ACTION);
         } catch {
           threw = true;
         }
@@ -273,9 +275,9 @@ test('prop: mutated nonce field (sig still valid for original nonce) rejects', (
   fc.assert(
     fc.property(fc.uuid(), fc.string({ minLength: 1, maxLength: 30 }), (id, fakeNonce) => {
       _resetForTests();
-      const { ts, identityId, nonce, sig } = signParts(id);
+      const { ts, identityId, nonce, action, sig } = signParts(id);
       fc.pre(fakeNonce !== nonce); // different nonce
-      const tampered = `${ts}.${identityId}.${fakeNonce}.${sig}`;
+      const tampered = `${ts}.${identityId}.${fakeNonce}.${action}.${sig}`;
       assertRejects(tampered, id, 'mutated nonce');
     }),
     { numRuns: 1000 },
@@ -294,14 +296,14 @@ test('explicit: ts-shifted resign outside window rejects', () => {
   // Shift to way in the future
   const futureTs = Math.floor(Date.now() / 1000) + 3600;
   const nonce = 'BBBBBBBBBBBBBBBBBBBBBBBB';
-  const body = `${futureTs}.${id}.${nonce}`;
+  const body = `${futureTs}.${id}.${nonce}.${ACTION}`;
   const sig = resign(body);
   assertRejects(`${body}.${sig}`, id, 'ts shifted to future');
 
   // Shift to expired past
   _resetForTests();
   const pastTs = Math.floor(Date.now() / 1000) - 7200;
-  const body2 = `${pastTs}.${id}.${nonce}`;
+  const body2 = `${pastTs}.${id}.${nonce}.${ACTION}`;
   const sig2 = resign(body2);
   assertRejects(`${body2}.${sig2}`, id, 'ts shifted to past');
 });
@@ -401,7 +403,7 @@ test('prop: parseBearer returns empty string for non-Bearer or missing headers',
 
 // ══════════════════════════════════════════════════════════════════════════
 // 16. ADVERSARIAL IDENTITY ID EDGE CASES
-//     Dots in identity IDs could confuse the 4-segment split.
+//     Dots in identity IDs could confuse the 5-segment split.
 // ══════════════════════════════════════════════════════════════════════════
 test('explicit: identityId containing dots is safe (no ambiguity in split)', () => {
   // CRYPTO-1: signToken now throws at sign time when identityId contains a dot,
@@ -409,7 +411,7 @@ test('explicit: identityId containing dots is safe (no ambiguity in split)', () 
   const dottyId = 'admin.user.with.dots';
   _resetForTests();
   assert.throws(
-    () => signToken(dottyId),
+    () => signToken(dottyId, ACTION),
     /dot/,
     'signToken must throw on a dotted identityId (CRYPTO-1)',
   );
@@ -421,7 +423,7 @@ test('explicit: identityId with dot — document whether roundtrip is accepted',
   const dottyId = 'a.b';
   _resetForTests();
   assert.throws(
-    () => signToken(dottyId),
+    () => signToken(dottyId, ACTION),
     /dot/,
     'signToken must throw for dotty identityId (fail-closed, CRYPTO-1)',
   );
@@ -432,8 +434,8 @@ test('explicit: identityId with dot — document whether roundtrip is accepted',
 // ══════════════════════════════════════════════════════════════════════════
 test('explicit: empty identity segment in token always rejects', () => {
   _resetForTests();
-  const { ts, nonce } = signParts('real-admin');
-  const body = `${ts}..${nonce}`;
+  const { ts, nonce, action } = signParts('real-admin');
+  const body = `${ts}..${nonce}.${action}`;
   const sig = resign(body);
   const tok = `${body}.${sig}`;
   // Could match '' against 'real-admin'? Must not.
@@ -451,7 +453,7 @@ test('explicit: NaN and Infinity timestamp strings are rejected', () => {
     _resetForTests();
     const id = 'admin-ts-edge';
     const nonce = 'CCCCCCCCCCCCCCCCCCCCCCCC';
-    const body = `${tsStr}.${id}.${nonce}`;
+    const body = `${tsStr}.${id}.${nonce}.${ACTION}`;
     const sig = resign(body);
     const tok = `${body}.${sig}`;
     assertRejects(tok, id, `bad ts: ${tsStr}`);
@@ -468,7 +470,7 @@ test('explicit: short CSRF_SECRET causes signToken to throw CSRFError', () => {
   // already cached. The secret() function is lazy and re-reads env each call.
   try {
     assert.throws(
-      () => signToken('admin'),
+      () => signToken('admin', ACTION),
       (err) => err.name === 'CSRFError' || err.message.includes('shorter than 32'),
       'short secret must throw CSRFError',
     );
@@ -483,8 +485,8 @@ test('explicit: short CSRF_SECRET causes signToken to throw CSRFError', () => {
 test('explicit: reordered segments with valid sig for original order reject', () => {
   _resetForTests();
   const id = 'fuzz-reorder';
-  const { ts, identityId, nonce, sig } = signParts(id);
+  const { ts, identityId, nonce, action, sig } = signParts(id);
   // Swap identityId and nonce positions
-  const reordered = `${ts}.${nonce}.${identityId}.${sig}`;
+  const reordered = `${ts}.${nonce}.${identityId}.${action}.${sig}`;
   assertRejects(reordered, id, 'reordered segments');
 });

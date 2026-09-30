@@ -29,7 +29,6 @@ import {
   getLogoutInfo,
   getSession,
   getSettingsFlow,
-  kratosBase,
 } from '../../lib/kratos';
 import {
   csrfToken,
@@ -74,7 +73,7 @@ if (Astro.request.method === 'POST') {
     // per-request CSRF token bound to the caller's own identity. Verify
     // before any side effect; fails closed.
     try {
-      verifyToken(String(fd.get('csrf_token') ?? ''), session.identity.id);
+      verifyToken(String(fd.get('csrf_token') ?? ''), session.identity.id, 'sign-out-everywhere');
     } catch (err) {
       if (err instanceof CSRFError) {
         return new Response(`CSRF: ${err.message}`, { status: 403 });
@@ -90,26 +89,8 @@ if (Astro.request.method === 'POST') {
           ? err.message
           : 'Could not sign out everywhere; please retry.';
     }
-    if (!signOutError) {
-      // Cut landed: bounce the caller's own browser session through Kratos
-      // logout so the current cookie is dropped too.
-      const info = await getLogoutInfo(cookie);
-      if (info) {
-        // Defense-in-depth: validate logout_url origin against the Kratos
-        // public origin before redirecting, then append the token.
-        try {
-          const logoutUrl = new URL(info.logout_url);
-          const kratosOrigin = new URL(kratosBase()).origin;
-          if (logoutUrl.origin === kratosOrigin) {
-            logoutUrl.searchParams.set('token', info.logout_token);
-            return Astro.redirect(logoutUrl.toString());
-          }
-        } catch {
-          // malformed URL — fall through to login
-        }
-      }
-      return Astro.redirect('/auth/login');
-    }
+    // revokeSubject ended every session, this browser's included.
+    if (!signOutError) return Astro.redirect('/auth/login');
   }
 }
 
@@ -136,7 +117,7 @@ const hasLookupSecret = hasMethod(ui.nodes, 'lookup_secret');
 const hasWebAuthn = hasMethod(ui.nodes, 'webauthn');
 
 const logoutInfo = await getLogoutInfo(cookie);
-const csrfSignOut = signToken(session.identity.id);
+const csrfSignOut = signToken(session.identity.id, 'sign-out-everywhere');
 const traits = session.identity.traits;
 // The public whoami does NOT expose metadata_admin, so the user's real groups
 // must come from a re-fetch of the FULL identity via the ADMIN API (same

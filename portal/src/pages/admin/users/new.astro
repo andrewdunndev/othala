@@ -67,7 +67,7 @@ if (Astro.request.method === 'POST') {
 
   // HIGH-1: verify per-request CSRF token before any side effect.
   try {
-    verifyToken(String(fd.get('csrf_token') ?? ''), adminIdentityId);
+    verifyToken(String(fd.get('csrf_token') ?? ''), adminIdentityId, 'create-user');
   } catch (err) {
     if (err instanceof CSRFError) {
       return new Response(`CSRF: ${err.message}`, { status: 403 });
@@ -117,7 +117,7 @@ if (Astro.request.method === 'POST') {
 }
 
 // HIGH-1: per-request CSRF token, single-use.
-const csrfToken = signToken(adminIdentityId);
+const csrfToken = signToken(adminIdentityId, 'create-user');
 
 // The exact bytes the admin pastes into Signal/iMessage. Composed server-side
 // so the visible textarea and the copy button are guaranteed to carry the same

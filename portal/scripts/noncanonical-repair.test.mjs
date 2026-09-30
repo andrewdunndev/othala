@@ -201,15 +201,9 @@ test('the repair row rides the existing save form, under its CSRF token', () => 
   assert.match(saveForm, /name="clearNonCanonical"/, 'the repair field must live inside the save form');
   assert.doesNotMatch(saveForm, /<form /, 'no nested form under the save form');
 
-  // The handler's action-scoped set carries no verb THIS (repair-checkbox)
-  // feature didn't put there: "save" stays on the identity-only branch. The
-  // literal below is intentionally the full set (not just the repair-era
-  // subset) so a future PR that adds a genuine new action-scoped verb updates
-  // this list deliberately rather than this test silently going stale.
-  assert.match(
-    pageSource,
-    /const actionScopedActions = new Set\(\['issue-recovery', 'send-invite-email', 'force-relogin', 'deactivate', 'reactivate', 'grant-admin', 'revoke-admin'\]\);/,
-  );
+  // Every POST verifies against the submitted action; no special-cased set.
+  assert.doesNotMatch(pageSource, /actionScopedActions/);
+  assert.match(pageSource, /verifyToken\(String\(fd\.get\('csrf_token'\) \?\? ''\), adminIdentityId, action\)/);
 });
 
 test('the non-canonical names are rendered escaped, never via set:html', () => {

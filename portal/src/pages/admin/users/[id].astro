@@ -83,26 +83,11 @@ if (Astro.request.method === 'POST' && identity) {
   const fd = await Astro.request.formData();
   const action = String(fd.get('action') ?? 'save');
 
-  // HIGH-1: every state-changing admin POST must carry a per-request CSRF
-  // token bound to the active admin's identity. Action-scoped tokens (minted
-  // with signToken(id, action)) additionally verify that the submitted action
-  // matches the one the token was issued for — a captured token from the
-  // "issue-recovery" form cannot fire "deactivate".
-  //
-  // The save / delete actions use identity-only tokens (no action binding)
-  // because those forms post to a distinct action value not shared with the
-  // multi-button actions panel.
-  //
-  // The three actions panel buttons (issue-recovery / force-relogin /
-  // deactivate / reactivate) share a single form POST, so each gets its own
-  // action-scoped token minted at render time.
-  const actionScopedActions = new Set(['issue-recovery', 'send-invite-email', 'force-relogin', 'deactivate', 'reactivate', 'grant-admin', 'revoke-admin']);
+  // HIGH-1: every state-changing admin POST carries a per-request CSRF token
+  // bound to the active admin's identity and to the submitted action: a token
+  // captured from the "issue-recovery" form cannot fire "deactivate".
   try {
-    if (actionScopedActions.has(action)) {
-      verifyToken(String(fd.get('csrf_token') ?? ''), adminIdentityId, action);
-    } else {
-      verifyToken(String(fd.get('csrf_token') ?? ''), adminIdentityId);
-    }
+    verifyToken(String(fd.get('csrf_token') ?? ''), adminIdentityId, action);
   } catch (err) {
     if (err instanceof CSRFError) {
       return new Response(`CSRF: ${err.message}`, { status: 403 });
@@ -177,8 +162,8 @@ const formValues = {
 // The three actions panel buttons (issue-recovery, force-relogin,
 // deactivate/reactivate) each get an action-scoped token so a captured
 // token for one action cannot be replayed to trigger a different one.
-const csrfTokenSave = signToken(adminIdentityId);
-const csrfTokenDelete = signToken(adminIdentityId);
+const csrfTokenSave = signToken(adminIdentityId, 'save');
+const csrfTokenDelete = signToken(adminIdentityId, 'delete');
 const csrfTokenIssueRecovery = signToken(adminIdentityId, 'issue-recovery');
 const csrfTokenInviteEmail = signToken(adminIdentityId, 'send-invite-email');
 const csrfTokenForceRelogin = signToken(adminIdentityId, 'force-relogin');
@@ -197,7 +182,7 @@ const csrfTokenAdminToggle = isTargetAdmin
 const csrfTokensRemove: Record<string, string> = {};
 for (const { key } of CREDENTIAL_METHODS) {
   if (EVICTABLE_CREDENTIAL_TYPES.has(key) && credentialMap[key]) {
-    csrfTokensRemove[key] = signToken(adminIdentityId);
+    csrfTokensRemove[key] = signToken(adminIdentityId, 'remove-credential');
   }
 }
 

@@ -35,9 +35,8 @@ describe('logoutAuthorized', () => {
     expect(logoutAuthorized('POST', signLogoutToken(other), self)).toBe(false);
   });
 
-  it('refuses a token minted for another action or none', () => {
+  it('refuses a token minted for another action', () => {
     expect(logoutAuthorized('POST', signToken(self, 'consent'), self)).toBe(false);
-    expect(logoutAuthorized('POST', signToken(self), self)).toBe(false);
   });
 
   it('refuses a replayed token', () => {
@@ -55,28 +54,5 @@ describe('logoutAuthorized', () => {
     const t = signLogoutToken(self);
     delete process.env['CSRF_SECRET'];
     expect(logoutAuthorized('POST', t, self)).toBe(false);
-  });
-});
-
-describe('sameOriginRequest', () => {
-  const own = 'https://auth.example.test';
-
-  it('accepts a matching Origin', () => {
-    expect(sameOriginRequest(own, null, own)).toBe(true);
-  });
-
-  it('refuses a different or opaque Origin even with a same-origin Referer', () => {
-    expect(sameOriginRequest('https://other.example.test', `${own}/x`, own)).toBe(false);
-    expect(sameOriginRequest('null', `${own}/x`, own)).toBe(false);
-  });
-
-  it('accepts no Origin with a same-origin Referer', () => {
-    expect(sameOriginRequest(null, `${own}/auth/logout`, own)).toBe(true);
-  });
-
-  it('refuses no Origin with a missing, foreign or malformed Referer', () => {
-    expect(sameOriginRequest(null, null, own)).toBe(false);
-    expect(sameOriginRequest(null, 'https://other.example.test/', own)).toBe(false);
-    expect(sameOriginRequest(null, 'not a url', own)).toBe(false);
   });
 });
