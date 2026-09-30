@@ -1,6 +1,6 @@
 // revokeSubject: the in-process revocation fan-out for admin force-logout, self-service sign-out-everywhere and
 // deactivate, via the typed Ory SDK. Order is fixed: (1) deactivate only: Kratos state -> inactive, before 2;
-// (2) Kratos sessions revoke, where 404 (no sessions) is success and continues; (3) Hydra login sessions;
+// (2) Kratos sessions revoke, where 404 (no sessions) is success and continues; (3) Hydra login sessions, by sid then by subject;
 // (4) Hydra consent sessions. A real failure throws a RevokeError naming the dependency and next action.
 
 import {
@@ -89,6 +89,22 @@ function resolveDeps(deps: Partial<RevokeDeps> = {}): RevokeDeps {
   };
 }
 
+/** Distinct login-session ids named by the subject's consent rows, following the Link rel=next pages. */
+async function listLoginSessionIds(oauth2Api: OAuth2Api, subject: string): Promise<string[]> {
+  const sids = new Set<string>();
+  let pageToken: string | undefined;
+  do {
+    const res = await oauth2Api.listOAuth2ConsentSessionsRaw({ subject, pageSize: 250, pageToken });
+    for (const row of await res.value()) {
+      const sid = row.consent_request?.login_session_id;
+      if (sid) sids.add(sid);
+    }
+    const next = /<([^>]*)>\s*;\s*rel="?next"?/.exec(res.raw.headers.get('link') ?? '');
+    pageToken = next ? (new URL(next[1], 'http://hydra').searchParams.get('page_token') ?? undefined) : undefined;
+  } while (pageToken);
+  return [...sids];
+}
+
 /** Run the fan-out for one subject (Kratos identity id); steps 1-4 abort on the first failure. */
 export async function revokeSubject(
   subject: string,
@@ -137,14 +153,22 @@ export async function revokeSubject(
     }
   }
 
-  // Step 3: Hydra login-session revoke.
+  // Step 3: Hydra login-session revoke. Each session the subject's consent rows name is revoked by its own sid so Hydra
+  // posts the back-channel logout token to that session's clients; the {subject} delete then sweeps sessions with no
+  // row. Per-sid must precede step 4, which deletes the rows Hydra selects those clients from.
+  let phase = 'list-consent-sessions';
   try {
+    for (const sid of await listLoginSessionIds(d.oauth2Api, subject)) {
+      phase = 'revoke-login-sessions';
+      await d.oauth2Api.revokeOAuth2LoginSessions({ sid });
+    }
+    phase = 'revoke-login-sessions';
     await d.oauth2Api.revokeOAuth2LoginSessions({ subject });
     result.hydraLoginRevoked = true;
   } catch (err) {
     throw new RevokeError(
       'hydra-admin',
-      'revoke-login-sessions',
+      phase,
       'Kratos sessions are cut, but Hydra still remembers the login (remembered login still open — a fresh token could skip-login). Verify HYDRA_ADMIN_URL, then re-run the revoke (it is idempotent).',
       err,
     );

@@ -227,11 +227,11 @@ const { hasPasskey, hasCode, hasPassword, totpNodes, aal2WebauthnNodes, lookupNo
       </div>
     )}
 
-    {/* Should not happen: enrollment precedes admin access. */}
+    {/* An account that must step up but has no second factor enrols one in Settings. */}
     {isAal2 && !hasAal2Methods && flow && (
       <div class="notice notice-warning">
-        No second-factor methods are enrolled for this account. An administrator
-        must enroll TOTP or a security key before admin access is available.
+        No second-factor methods are enrolled for this account. Enroll TOTP or a
+        security key in <a href="/auth/settings">Settings</a>, then sign in again.
       </div>
     )}
 

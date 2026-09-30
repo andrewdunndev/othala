@@ -194,6 +194,21 @@ test('composeIDTokenClaims H1: filedrop+filedrop-admin — both preserved, no du
   assert.equal(groups.length, new Set(groups).size, 'no duplicates');
 });
 
+test('composeIDTokenClaims binds groups: identity and other apps groups dropped, role-map-only key kept', () => {
+  const id = identityWithGroups(['admin', 'everyone', 'other-access', 'filedrop-admin', 'filedrop']);
+  const m = {
+    ...manifest({ group: 'filedrop', roleClaimEmit: { groups: ['filedrop-user'] } }),
+    groupRoleMap: { filedrop: 'member', 'filedrop-admin': 'member' },
+  };
+  assert.deepEqual(composeIDTokenClaims(id, m).groups, ['filedrop-admin', 'filedrop', 'filedrop-user']);
+});
+
+test('composeIDTokenClaims binds groups: nothing bound omits the claim, null manifest omits it', () => {
+  const id = identityWithGroups(['admin', 'everyone']);
+  assert.equal('groups' in composeIDTokenClaims(id, manifest({ group: 'filedrop' })), false);
+  assert.equal('groups' in composeIDTokenClaims(id, null), false);
+});
+
 test('composeIDTokenClaims H2: requestedScope [openid] — no email/name/groups', () => {
   const id = identityWithGroups(['filedrop']);
   const m = manifest();

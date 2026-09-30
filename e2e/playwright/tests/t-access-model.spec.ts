@@ -1,6 +1,6 @@
 // T — the converged access model, asserted end to end.
 
-import { test, expect, GRAFANA_CLIENT_ID, GRAFANA_REDIRECT_URI } from '../fixtures';
+import { test, expect, adminAal2Context, GRAFANA_CLIENT_ID, GRAFANA_REDIRECT_URI } from '../fixtures';
 import { loginViaJsonApi } from '../actions/login';
 import { createIdentityWithPassword, TEST_PASSWORD } from '../actions/identity';
 import { decodeJwt } from 'jose';
@@ -75,8 +75,10 @@ async function seedAndLogin(opts: {
   baseURL: string;
   slug: string;
   groups: string[];
+  /** Enrol TOTP and step up: an identity holding `<svc>-admin` signs in at aal2. */
+  aal2?: boolean;
 }): Promise<BrowserContext> {
-  const { browser, kratosAdminURL, baseURL, slug, groups } = opts;
+  const { browser, kratosAdminURL, baseURL, slug, groups, aal2 } = opts;
   const email = `${slug}@othala.test`;
   await createIdentityWithPassword({
     email,
@@ -85,6 +87,7 @@ async function seedAndLogin(opts: {
     groups,
     kratosAdminURL,
   });
+  if (aal2) return adminAal2Context({ browser, email, password: TEST_PASSWORD, baseURL });
   const ctx = await browser.newContext();
   try {
     await loginViaJsonApi(ctx, { identifier: email, password: TEST_PASSWORD }, baseURL);
@@ -145,6 +148,7 @@ test('T2 — both groups, access FIRST: entry, and the role resolves to ADMIN', 
     browser, kratosAdminURL, baseURL,
     slug: 't2.access-then-admin',
     groups: ['grafana-access', 'grafana-admin'],
+    aal2: true,
   });
   try {
     const outcome = await walkAuthorize(ctx, baseURL);
@@ -186,6 +190,7 @@ test('T3 — both groups, admin FIRST: same entry, same ADMIN role (order-indepe
     browser, kratosAdminURL, baseURL,
     slug: 't3.admin-then-access',
     groups: ['grafana-admin', 'grafana-access'],
+    aal2: true,
   });
   try {
     const outcome = await walkAuthorize(ctx, baseURL);

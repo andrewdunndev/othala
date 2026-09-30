@@ -33,7 +33,7 @@ oidc:
   audience:
     - https://grafana.othala.test
   skip_consent: true
-  backchannel_logout_uri: https://grafana.othala.test/login/generic_oauth/logout
+  backchannel_logout_uri: http://playwright:4500/backchannel
 
 # Grafana-side config, not a manifest field. role_attribute_path is a JMESPath over the
 # id_token; groups_attribute_path feeds Team Sync (Enterprise only):

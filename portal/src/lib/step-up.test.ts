@@ -1,7 +1,8 @@
 // Invariant: hasSecondFactor reflects enrolled credentials only.
 
 import { describe, it, expect } from 'vitest';
-import { needsStepUp, hasSecondFactor } from './step-up';
+import { needsStepUp, hasSecondFactor, holdsElevatedRole } from './step-up';
+import type { ClientManifest } from './manifests';
 import type { Identity } from './types';
 import { identity as buildIdentity, withCredential, withLookupSecret, withPasskey, withTotp, withWebauthnKey } from './test-builders';
 
@@ -61,5 +62,34 @@ describe('needsStepUp', () => {
 describe('hasSecondFactor', () => {
   it('reads an identity with no credentials map as none', () => {
     expect(hasSecondFactor({ ...identity([]), credentials: undefined })).toBe(false);
+  });
+});
+
+describe('holdsElevatedRole', () => {
+  const role = (name: string) => ({ name, claimEmit: {} });
+  const manifest = (clientId: string, roles: string[], groupRoleMap: Record<string, string>, accessGroups: string[]) =>
+    ({ clientId, roles: roles.map(role), groupRoleMap, accessGroups }) as unknown as ClientManifest;
+  const x = manifest('x', ['admin', 'user'], { 'x-admin': 'admin', 'x-access': 'user' }, ['x-access']);
+  const listen = manifest('listen', ['admin', 'user', 'guest'], { 'listen-admin': 'admin', 'listen-access': 'user' }, ['listen-access']);
+  const grafana = manifest('grafana', ['admin', 'editor', 'viewer'], { 'grafana-admin': 'admin', 'grafana-access': 'viewer' }, ['grafana-access']);
+  const held = (manifests: ClientManifest[], groups: string[], roles?: Record<string, string>) =>
+    holdsElevatedRole(buildIdentity({ metadataAdmin: { groups, ...(roles ? { roles } : {}) } }), manifests);
+
+  it('a role above the entry role holds elevation', () => {
+    expect(held([x], ['x-admin'])).toBe(true);
+    expect(held([listen], ['listen-admin'])).toBe(true);
+  });
+  it('the entry role and below do not', () => {
+    expect(held([x], ['x-access'])).toBe(false);
+    expect(held([listen], ['listen-access'])).toBe(false);
+    expect(held([x, listen], [])).toBe(false);
+    expect(holdsElevatedRole(null, [x])).toBe(false);
+  });
+  it('an override resolves through the same ranking', () => {
+    expect(held([grafana], ['grafana-access'], { grafana: 'editor' })).toBe(true);
+    expect(held([grafana], ['grafana-admin'], { grafana: 'viewer' })).toBe(false);
+  });
+  it('a manifest without roles is never elevated', () => {
+    expect(held([manifest('y', [], {}, ['y-access'])], ['y-access'])).toBe(false);
   });
 });

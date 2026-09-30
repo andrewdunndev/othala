@@ -5,7 +5,7 @@ import assert from 'node:assert/strict';
 import { revokeSubject, RevokeError } from '../src/lib/revoke.ts';
 import { ResponseError } from '@ory/client-fetch';
 
-function makeDeps() {
+function makeDeps(sids = []) {
   const calls = [];
   return {
     calls,
@@ -19,6 +19,13 @@ function makeDeps() {
         },
       },
       oauth2Api: {
+        async listOAuth2ConsentSessionsRaw(args) {
+          calls.push(['listOAuth2ConsentSessionsRaw', args]);
+          return {
+            raw: new Response(null),
+            value: async () => sids.map((sid) => ({ consent_request: { login_session_id: sid } })),
+          };
+        },
         async revokeOAuth2LoginSessions(args) {
           calls.push(['revokeOAuth2LoginSessions', args]);
         },
@@ -37,6 +44,7 @@ test('admin/sign-out trigger runs steps 2-4 in order (no step 1)', async () => {
   const order = calls.map((c) => c[0]);
   assert.deepEqual(order, [
     'deleteIdentitySessions',
+    'listOAuth2ConsentSessionsRaw',
     'revokeOAuth2LoginSessions',
     'revokeOAuth2ConsentSessions',
   ]);
@@ -54,6 +62,7 @@ test('deactivate trigger runs step 1 (state->inactive) BEFORE step 2', async () 
   assert.deepEqual(order, [
     'patchIdentity',
     'deleteIdentitySessions',
+    'listOAuth2ConsentSessionsRaw',
     'revokeOAuth2LoginSessions',
     'revokeOAuth2ConsentSessions',
   ]);
@@ -67,6 +76,7 @@ test('Hydra revoke targets the subject (typed args, no string interpolation)', a
   const { calls, deps } = makeDeps();
   await revokeSubject('sub-xyz', {}, deps);
   const login = calls.find((c) => c[0] === 'revokeOAuth2LoginSessions');
+  assert.deepEqual(calls.find((c) => c[0] === 'listOAuth2ConsentSessionsRaw')[1], { subject: 'sub-xyz', pageSize: 250, pageToken: undefined });
   const consent = calls.find((c) => c[0] === 'revokeOAuth2ConsentSessions');
   assert.deepEqual(login[1], { subject: 'sub-xyz' });
   assert.deepEqual(consent[1], { subject: 'sub-xyz', all: true });
@@ -150,4 +160,65 @@ test('Hydra login-revoke failure throws prescriptive hydra-admin error', async (
       return true;
     },
   );
+});
+
+test('each login session is revoked by sid, then the subject sweep, all before the consent revoke', async () => {
+  const { calls, deps } = makeDeps(['s1', 's2', 's1', null]);
+  await revokeSubject('sub-1', {}, deps);
+  assert.deepEqual(
+    calls.slice(2),
+    [
+      ['revokeOAuth2LoginSessions', { sid: 's1' }],
+      ['revokeOAuth2LoginSessions', { sid: 's2' }],
+      ['revokeOAuth2LoginSessions', { subject: 'sub-1' }],
+      ['revokeOAuth2ConsentSessions', { subject: 'sub-1', all: true }],
+    ],
+  );
+});
+
+test('consent listing follows Link rel=next pages', async () => {
+  const { calls, deps } = makeDeps();
+  const pages = [
+    {
+      link: '</admin/oauth2/auth/sessions/consent?page_size=250&page_token=t1>; rel="first",</admin/oauth2/auth/sessions/consent?page_size=250&page_token=t2>; rel="next"',
+      sids: ['a'],
+    },
+    { link: '</admin/oauth2/auth/sessions/consent?page_size=250&page_token=t1>; rel="first"', sids: ['b'] },
+  ];
+  deps.oauth2Api.listOAuth2ConsentSessionsRaw = async (args) => {
+    const p = pages[args.pageToken === 't2' ? 1 : 0];
+    return {
+      raw: new Response(null, { headers: { link: p.link } }),
+      value: async () => p.sids.map((sid) => ({ consent_request: { login_session_id: sid } })),
+    };
+  };
+  await revokeSubject('sub-1', {}, deps);
+  const sids = calls.filter((c) => c[0] === 'revokeOAuth2LoginSessions').map((c) => c[1]);
+  assert.deepEqual(sids, [{ sid: 'a' }, { sid: 'b' }, { subject: 'sub-1' }]);
+});
+
+test('consent listing failure aborts before any Hydra revoke', async () => {
+  const { calls, deps } = makeDeps();
+  deps.oauth2Api.listOAuth2ConsentSessionsRaw = async () => {
+    throw new Error('hydra 500');
+  };
+  await assert.rejects(
+    () => revokeSubject('sub-1', {}, deps),
+    (err) => err instanceof RevokeError && err.dependency === 'hydra-admin' && err.step === 'list-consent-sessions',
+  );
+  assert.ok(!calls.some((c) => c[0].startsWith('revokeOAuth2')));
+});
+
+test('a per-sid revoke failure aborts before the subject sweep and the consent revoke', async () => {
+  const { calls, deps } = makeDeps(['s1']);
+  deps.oauth2Api.revokeOAuth2LoginSessions = async (args) => {
+    calls.push(['revokeOAuth2LoginSessions', args]);
+    if (args.sid) throw new Error('hydra 500');
+  };
+  await assert.rejects(
+    () => revokeSubject('sub-1', {}, deps),
+    (err) => err instanceof RevokeError && err.step === 'revoke-login-sessions',
+  );
+  assert.ok(!calls.some((c) => c[0] === 'revokeOAuth2LoginSessions' && c[1].subject));
+  assert.ok(!calls.some((c) => c[0] === 'revokeOAuth2ConsentSessions'));
 });

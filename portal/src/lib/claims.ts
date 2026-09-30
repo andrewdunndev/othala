@@ -1,7 +1,7 @@
 // ID-token claim construction, ported from consent/claims.go and consent/manifest.go. Divergences from Go: array
 // UNION in deepMergeClaims, highest-role-wins in lookupRole, and emailVerified reading only the email trait's own address.
 // Missing claims are omitted, never null. composeIDTokenClaims order: build identity claims, drop groups when the
-// manifest suppresses them, merge the role's claim_emit, then drop claims whose scope was not granted.
+// manifest suppresses them, keep only the groups it binds, merge the role's claim_emit, then drop claims whose scope was not granted.
 
 import type { Identity } from './types';
 import type { ClientManifest } from './manifests';
@@ -188,7 +188,7 @@ const SCOPE_CLAIMS: Record<string, string[]> = {
 
 /**
  * The emission sequence acceptConsentRequest calls: identity claims, drop groups if the manifest suppresses them,
- * merge the role's claim_emit (arrays unioned), then, when requestedScope is given, drop claims whose scope
+ * keep only the groups the manifest binds, merge the role's claim_emit (arrays unioned), then, when requestedScope is given, drop claims whose scope
  * (OIDC Core §5.4) was not granted. Omitting requestedScope emits everything. `sub` is Hydra's.
  */
 export function composeIDTokenClaims(
@@ -200,6 +200,14 @@ export function composeIDTokenClaims(
 
   if (manifest && !shouldEmitGroups(manifest)) {
     delete claims.groups;
+  }
+
+  // An app learns only the stored groups its own manifest binds; the role's claim_emit is merged below.
+  if (Array.isArray(claims.groups)) {
+    const bound = manifest ? new Set([...manifest.accessGroups, ...Object.keys(manifest.groupRoleMap)]) : new Set<string>();
+    const kept = (claims.groups as string[]).filter((g) => bound.has(g));
+    if (kept.length > 0) claims.groups = kept;
+    else delete claims.groups;
   }
 
   if (identity) {
