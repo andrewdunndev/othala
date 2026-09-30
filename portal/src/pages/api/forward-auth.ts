@@ -10,6 +10,7 @@ import { getIdentity } from '../../lib/admin-api';
 import { enforceGroupGate } from '../../lib/gate';
 import { GROUP_RE } from '../../lib/access-groups';
 import { needsStepUp } from '../../lib/step-up';
+import { manifestHealth } from '../../lib/manifest-store';
 import type { Identity, Session } from '../../lib/types';
 
 export const prerender = false;
@@ -67,7 +68,11 @@ async function decide(request: Request, url: URL): Promise<Response> {
     return text(403, 'forbidden');
   }
 
-  // 5. Step-up, same rule as app sign-in: 401 sends the person to login for the second factor.
+  // 5. Step-up, same rule as app sign-in: 401 sends the person to login for the second factor. With no manifest set
+  //    the role rule cannot be evaluated, so an aal1 session gets 503.
+  if (session.authenticator_assurance_level !== 'aal2' && manifestHealth().status === 'unavailable') {
+    return text(503, 'unavailable');
+  }
   if (needsStepUp(session, identity)) {
     return text(401, 'unauthenticated');
   }

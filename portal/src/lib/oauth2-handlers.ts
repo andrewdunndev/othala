@@ -201,7 +201,7 @@ export async function handleLogin(req: Request, deps: Deps = {}): Promise<Respon
     }
   }
 
-  // Second-factor step-up: accounts with totp/webauthn, or the admin marker, complete aal2 first; Kratos returns to this challenge.
+  // Second-factor step-up: accounts with totp/webauthn, the admin marker, or a role above an app's entry role, complete aal2 first; Kratos returns to this challenge.
   if (needsStepUp(liveSession, identity)) {
     const returnTo = buildLoginReturnTo(challenge);
     return redirect(`${loginUIBase()}?aal=aal2&return_to=${encodeURIComponent(returnTo)}`);

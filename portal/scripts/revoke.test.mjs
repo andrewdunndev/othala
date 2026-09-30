@@ -179,13 +179,16 @@ test('each login session is revoked by sid, then the subject sweep, all before t
 test('consent listing follows Link rel=next pages', async () => {
   const { calls, deps } = makeDeps();
   const pages = [
-    { link: '</admin/oauth2/auth/sessions/consent?page_size=250&page_token=t2>; rel="next"', sids: ['a'] },
-    { link: null, sids: ['b'] },
+    {
+      link: '</admin/oauth2/auth/sessions/consent?page_size=250&page_token=t1>; rel="first",</admin/oauth2/auth/sessions/consent?page_size=250&page_token=t2>; rel="next"',
+      sids: ['a'],
+    },
+    { link: '</admin/oauth2/auth/sessions/consent?page_size=250&page_token=t1>; rel="first"', sids: ['b'] },
   ];
   deps.oauth2Api.listOAuth2ConsentSessionsRaw = async (args) => {
-    const p = pages[args.pageToken ? 1 : 0];
+    const p = pages[args.pageToken === 't2' ? 1 : 0];
     return {
-      raw: new Response(null, p.link ? { headers: { link: p.link } } : {}),
+      raw: new Response(null, { headers: { link: p.link } }),
       value: async () => p.sids.map((sid) => ({ consent_request: { login_session_id: sid } })),
     };
   };
@@ -204,4 +207,18 @@ test('consent listing failure aborts before any Hydra revoke', async () => {
     (err) => err instanceof RevokeError && err.dependency === 'hydra-admin' && err.step === 'list-consent-sessions',
   );
   assert.ok(!calls.some((c) => c[0].startsWith('revokeOAuth2')));
+});
+
+test('a per-sid revoke failure aborts before the subject sweep and the consent revoke', async () => {
+  const { calls, deps } = makeDeps(['s1']);
+  deps.oauth2Api.revokeOAuth2LoginSessions = async (args) => {
+    calls.push(['revokeOAuth2LoginSessions', args]);
+    if (args.sid) throw new Error('hydra 500');
+  };
+  await assert.rejects(
+    () => revokeSubject('sub-1', {}, deps),
+    (err) => err instanceof RevokeError && err.step === 'revoke-login-sessions',
+  );
+  assert.ok(!calls.some((c) => c[0] === 'revokeOAuth2LoginSessions' && c[1].subject));
+  assert.ok(!calls.some((c) => c[0] === 'revokeOAuth2ConsentSessions'));
 });
