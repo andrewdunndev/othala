@@ -48,8 +48,6 @@ OTHALA_PUBLIC_URL=http://auth.othala.test
 OTHALA_CORS_ALLOWED_ORIGINS=http://auth.othala.test
 OTHALA_PUBLIC_HOST=auth.othala.test
 OTHALA_APEX=othala.test
-OTHALA_WEBAUTHN_RP_ID=othala.test
-OTHALA_WEBAUTHN_RP_ORIGINS=http://auth.othala.test
 OTHALA_INSTANCE_NAME='Othala Lab'
 OTHALA_SMTP_FROM_ADDRESS=noreply@othala.test
 

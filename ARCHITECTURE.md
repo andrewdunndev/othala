@@ -239,13 +239,12 @@ variable set from the template itself and fails listing missing *names* only, ne
 that could carry a secret into a log. The e2e harness and the deploy plane call the same render, so
 what is validated and what is deployed differ in values, not in mechanism.
 
-Four settings become commitments the moment anyone enrols a credential against them, and should be
+Three settings become commitments the moment anyone enrols a credential against them, and should be
 chosen deliberately rather than discovered later:
 
-- **`OTHALA_WEBAUTHN_RP_ID`** — changing it invalidates every enrolled passkey.
 - **`OTHALA_PUBLIC_URL`** — Hydra's issuer. Every client's discovery and every issued token carry it.
-- **`OTHALA_APEX`** — the Kratos cookie domain, and the ceiling on which hostnames can share the
-  session.
+- **`OTHALA_APEX`** — the Kratos cookie domain and the WebAuthn RP id, and the ceiling on which
+  hostnames can share the session. Changing it invalidates every enrolled passkey.
 - **Hydra's `subject_identifiers`** — `public` subjects mean the subject id is the identity id
   everywhere; switching to pairwise later changes every downstream app's notion of who a user is.
 
