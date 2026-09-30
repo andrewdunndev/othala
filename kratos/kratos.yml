@@ -12,20 +12,6 @@ serve:
     request_log:
       # Probes would write an access-log line every few seconds, burying real ones. Metrics still count them.
       disable_for_health: true
-    cors:
-      enabled: true
-      allowed_origins:
-        - "${OTHALA_PUBLIC_URL}"
-      allowed_methods: [GET, POST, PUT, PATCH, DELETE]
-      allowed_headers:
-        - Authorization
-        - Content-Type
-        - X-Session-Token
-        - Cookie
-        - X-CSRF-Token
-      exposed_headers: [Content-Type, Set-Cookie]
-      allow_credentials: true
-      max_age: 0
 
   admin:
     base_url: "http://${KRATOS_ADMIN_HOST}:4434/"
@@ -50,13 +36,10 @@ selfservice:
 
   methods:
     password:
-      enabled: true
       config:
         # Unquoted: the schema types these as bool/int, and a quoted token renders to a string.
         haveibeenpwned_enabled: ${OTHALA_HIBP_ENABLED}
-        max_breaches: 0
         ignore_network_errors: false
-        identifier_similarity_check_enabled: true
         min_password_length: ${OTHALA_PASSWORD_MIN_LENGTH}
 
     # Passkeys: the PRIMARY login method (discoverable credentials, usernameless), distinct from
@@ -90,20 +73,13 @@ selfservice:
 
     # Code strategy: recovery AND passwordless email-OTP login (fallback for a device without a
     # passkey). max_submissions: 5 bounds brute force of the 6-digit code; lifespan: 15m is the
-    # per-method validity, distinct from flows.login.lifespan.
+    # per-method validity, distinct from the login flow lifespan.
     code:
       enabled: true
       passwordless_enabled: true
       config:
         max_submissions: 5
         lifespan: 15m
-
-    profile:
-      enabled: true
-
-    link:
-      # Magic link recovery is deprecated; use 'code' method above
-      enabled: false
 
     lookup_secret:
       enabled: true
@@ -209,9 +185,7 @@ selfservice:
 
     recovery:
       enabled: true
-      use: code
       ui_url: "${OTHALA_PUBLIC_URL}/auth/recovery"
-      lifespan: 1h
       notify_unknown_recipients: false
       # Admin email-recovery is refused by the recovery-gate webhook before the privileged settings
       # session is issued; admins recover via console (docs/runbooks/admin-recovery.md).
@@ -240,9 +214,7 @@ selfservice:
 
     verification:
       enabled: true
-      use: code
       ui_url: "${OTHALA_PUBLIC_URL}/auth/verification"
-      lifespan: 1h
       after:
         default_browser_return_url: "${OTHALA_PUBLIC_URL}/"
 
@@ -252,7 +224,6 @@ selfservice:
 
     login:
       ui_url: "${OTHALA_PUBLIC_URL}/auth/login"
-      lifespan: 10m
       # aal1 base: the login flow takes no required_aal. AAL2 step-up is requested per flow by
       # requireAdminSession (admin.ts); a global AAL2 would lock out identities with no second factor.
       after:
@@ -281,11 +252,6 @@ selfservice:
       # Admin-driven onboarding (one-time enrollment URLs); no self-service signup
       enabled: false
       ui_url: "${OTHALA_PUBLIC_URL}/auth/registration"
-      lifespan: 1h
-      after:
-        password:
-          hooks:
-            - hook: session
 
 session:
   # 720h is the blast-radius knob: the cookie is apex-scoped, so a stolen one is good on every
@@ -295,9 +261,6 @@ session:
     # Apex domain so the IdP and every subdomain app share the session cookie. SameSite=Lax permits
     # same-site POSTs; CSRF mitigation is per-request tokens in the portal (csrf.ts).
     domain: "${OTHALA_APEX}"
-    name: ory_kratos_session
-    persistent: true
-    same_site: Lax
   whoami:
     # CRITICAL: aal1, not highest_available, which makes whoami return session.identity = null for
     # MFA identities and forward-auth.ts would 401 them. AAL is enforced per flow.
@@ -335,13 +298,11 @@ secrets:
     - "${KRATOS_CIPHER_SECRET_CURRENT}"
 
 log:
-  level: info
   format: json
-  leak_sensitive_values: false
 
 # Tracing (OpenTelemetry), opt-in: the block below is OMITTED when OTHALA_OTLP_PROVIDER is empty
 # (Ory v26.2.0 rejects a present block with provider "") and emitted when it is "otel".
-# OTLP is HTTP/protobuf only (port 4318), Ory ignores OTEL_* env vars, insecure: true is
+# OTLP is HTTP/protobuf only, Ory ignores OTEL_* env vars, insecure: true is
 # plaintext to the firewall-scoped host alloy receiver, sampling_ratio 0.1 bounds volume.
 #@if OTHALA_OTLP_PROVIDER
 tracing:
@@ -366,7 +327,3 @@ hashers:
 
 ciphers:
   algorithm: xchacha20-poly1305
-
-feature_flags:
-  # Account verification flow as a separate UI; we want it.
-  cacheable_sessions: false
