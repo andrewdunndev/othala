@@ -1,6 +1,6 @@
 // Dual listener. PUBLIC (PORT 4321, HOST 0.0.0.0): the lazily imported Astro SSR handler for the OAuth2 challenge
 // providers, /auth/* and /admin/* pages. ADMIN (ADMIN_PORT 4431, ADMIN_HOST 127.0.0.1): a separate server with its own
-// mux for /healthz, /readyz and the five Kratos webhooks (recovery-gate, login-code-gate, username-gate,
+// mux for /healthz, /readyz and the five Kratos webhooks (recovery-gate, login-code-gate, profile-gate,
 // second-factor-gate, profile-sessions); it never delegates to the Astro handler, so the muxes are disjoint.
 // RECOVERY_GATE_SECRET guards the webhooks: constant-time compare, fail-closed when unset.
 // Run with `node ./dist/server/listen.mjs` after `npm run build`.
@@ -19,7 +19,7 @@ export const ADMIN_GET_ROUTES = new Set(['/healthz', '/readyz']);
 export const ADMIN_POST_ROUTES = new Set([
   '/admin/recovery-gate',
   '/admin/login-code-gate',
-  '/admin/username-gate',
+  '/admin/profile-gate',
   '/admin/second-factor-gate',
   '/admin/profile-sessions',
 ]);
@@ -192,14 +192,14 @@ export function usernameChangeVerdict(stored, proposed) {
   return { refuse: false };
 }
 
-function refuseUsername(res, text) {
+function refuseProfile(res, text, pointers = ['#/traits/username']) {
   sendJson(res, 403, {
-    messages: [{ instance_ptr: '#/traits/username', messages: [{ id: 4000001, type: 'error', text }] }],
+    messages: pointers.map((instance_ptr) => ({ instance_ptr, messages: [{ id: 4000001, type: 'error', text }] })),
   });
 }
 
-/** POST /admin/username-gate, wired to settings.after.profile with can_interrupt; a failed identity read refuses the update. */
-export async function handleUsernameGate(req, res, runtime) {
+/** POST /admin/profile-gate, wired to settings.after.profile with can_interrupt; a failed identity read refuses the update. Username stays fixed; an email change needs a first-factor sign-in when the account has a key. */
+export async function handleProfileGate(req, res, runtime) {
   const expected = process.env.RECOVERY_GATE_SECRET ?? '';
   if (!bearerMatches(parseBearer(req.headers?.authorization), expected)) {
     sendJson(res, 403, { error: 'forbidden' });
@@ -209,20 +209,30 @@ export async function handleUsernameGate(req, res, runtime) {
   try {
     body = JSON.parse((await readBody(req)) || '{}');
   } catch {
-    refuseUsername(res, PROFILE_UPDATE_UNAVAILABLE);
+    refuseProfile(res, PROFILE_UPDATE_UNAVAILABLE);
     return;
   }
   const id = body?.identity_id;
   if (typeof id !== 'string' || id.trim().length === 0) {
-    refuseUsername(res, PROFILE_UPDATE_UNAVAILABLE);
+    refuseProfile(res, PROFILE_UPDATE_UNAVAILABLE);
     return;
   }
-  const fetched = await fetchStoredIdentity(runtime, id, 'username-gate');
-  const verdict = fetched.refuse
-    ? { refuse: true, text: PROFILE_UPDATE_UNAVAILABLE }
-    : usernameChangeVerdict(fetched.identity, body?.traits?.username);
+  const fetched = await fetchStoredIdentity(runtime, id, 'profile-gate');
+  if (fetched.refuse) {
+    refuseProfile(res, PROFILE_UPDATE_UNAVAILABLE);
+    return;
+  }
+  const verdict = usernameChangeVerdict(fetched.identity, body?.traits?.username);
   if (verdict.refuse) {
-    refuseUsername(res, verdict.text);
+    refuseProfile(res, verdict.text);
+    return;
+  }
+  const emailVerdict =
+    typeof fetched.rt.emailChangeVerdict === 'function'
+      ? fetched.rt.emailChangeVerdict(fetched.identity, body?.traits, body?.authentication_methods)
+      : { refuse: true, text: PROFILE_UPDATE_UNAVAILABLE, pointers: ['#/traits/email'] };
+  if (emailVerdict.refuse) {
+    refuseProfile(res, emailVerdict.text, emailVerdict.pointers);
     return;
   }
   sendJson(res, 200, { ok: true });
@@ -335,8 +345,8 @@ export async function handleAdminRequest(req, res, runtime) {
     await handleLoginCodeGate(req, res, runtime);
     return;
   }
-  if (method === 'POST' && path === '/admin/username-gate') {
-    await handleUsernameGate(req, res, runtime);
+  if (method === 'POST' && path === '/admin/profile-gate') {
+    await handleProfileGate(req, res, runtime);
     return;
   }
   if (method === 'POST' && path === '/admin/second-factor-gate') {

@@ -171,12 +171,14 @@ selfservice:
             - hook: revoke_active_sessions
         # Username is admin-controlled: an interrupting hook refuses any username other than the
         # stored one. The schema allows no revoke_active_sessions here, so a second non-interrupting
-        # hook ends the account's other sessions, keeping the one that saved.
+        # hook ends the account's other sessions, keeping the one that saved. An account with a passkey
+        # or password changes its email addresses only from a session whose newest sign-in used one; an
+        # emailed code proves the mailbox, not the person.
         profile:
           hooks:
             - hook: web_hook
               config:
-                url: "http://${CONSENT_HOST}:4431/admin/username-gate"
+                url: "http://${CONSENT_HOST}:4431/admin/profile-gate"
                 method: POST
                 auth:
                   type: api_key

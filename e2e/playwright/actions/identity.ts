@@ -23,6 +23,15 @@ export interface SeedResult {
 }
 
 export async function createIdentityWithPassword(opts: SeedOptions): Promise<SeedResult> {
+  return seedIdentity(opts, true);
+}
+
+/** An identity with no password and no passkey: it can only sign in by emailed code. */
+export async function createIdentityCodeOnly(opts: SeedOptions): Promise<SeedResult> {
+  return seedIdentity(opts, false);
+}
+
+async function seedIdentity(opts: SeedOptions, withPassword: boolean): Promise<SeedResult> {
   const body = {
     schema_id: 'family',
     state: 'active',
@@ -35,13 +44,7 @@ export async function createIdentityWithPassword(opts: SeedOptions): Promise<See
       ...(opts.isAdmin === true ? { admin: true } : {}),
       groups: opts.groups,
     },
-    credentials: {
-      password: {
-        config: {
-          password: TEST_PASSWORD,
-        },
-      },
-    },
+    ...(withPassword ? { credentials: { password: { config: { password: TEST_PASSWORD } } } } : {}),
   };
 
   const resp = await fetch(`${opts.kratosAdminURL}/admin/identities`, {

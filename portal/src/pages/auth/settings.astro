@@ -43,6 +43,7 @@ import FlowNodes from '../../components/FlowNodes.astro';
 import { revokeSubject, RevokeError } from '../../lib/revoke';
 import { getGroupRegistry, isIdentityGroup } from '../../lib/group-registry';
 import { getIdentity } from '../../lib/admin-api';
+import { emailChangeLocked } from '../../lib/profile-gate';
 import { identityGroups as readIdentityGroups } from '../../lib/gate';
 import { publicUrl } from '../../lib/config';
 import { signToken, verifyToken, CSRFError } from '../../lib/csrf';
@@ -125,17 +126,25 @@ const traits = session.identity.traits;
 // but we still re-fetch so the user sees their actual groups instead of an
 // always-empty list. FAIL-CLOSED: on lookup failure show no groups.
 let groups: string[] = [];
+// The email inputs go read-only when the profile gate would refuse a change
+// from this session (display only; the gate stays the control). An unreadable
+// identity leaves them editable and the gate decides.
+let emailLocked = false;
 try {
-  groups = readIdentityGroups(await getIdentity(session.identity.id));
+  const stored = await getIdentity(session.identity.id);
+  groups = readIdentityGroups(stored);
+  emailLocked = emailChangeLocked(stored, session.authentication_methods);
 } catch (lookupErr) {
   console.error('[othala/settings] getIdentity failed; showing no groups:', lookupErr);
 }
 const displayName = traits.displayName || traits.username || '';
 // Username is admin-controlled: shown read-only and left out of the editable
 // profile nodes. The schema requires it, so the stored value rides along
-// hidden; the username gate (listen.mjs handleUsernameGate) refuses any other.
+// hidden; the username gate (listen.mjs handleProfileGate) refuses any other.
 const isUsernameNode = (n: (typeof ui.nodes)[number]) => asInput(n)?.name === 'traits.username';
-const profileNodes = ui.nodes.filter((n) => !isUsernameNode(n));
+const isEmailNode = (n: (typeof ui.nodes)[number]) => ['traits.email', 'traits.recoveryEmail'].includes(asInput(n)?.name ?? '');
+const profileNodes = ui.nodes.filter((n) => !isUsernameNode(n) && !(emailLocked && isEmailNode(n)));
+const changeEmailHref = browserFlows.login({ refresh: true, returnTo: '/auth/settings' });
 const usernameMessages = ui.nodes.find(isUsernameNode)?.messages ?? [];
 // Split the user's own groups by the registry's binding-derived type, not an
 // `access-` name prefix.
@@ -179,6 +188,26 @@ const accessGroups = groups.filter((g) => !isIdentityGroup(groupRegistry, g));
             <div class={`notice notice-${m.type === 'error' ? 'danger' : 'warning'}`}>{m.text}</div>
           ))}
         </div>
+        {emailLocked && (
+          <>
+            <input type="hidden" name="traits.email" value={traits.email} />
+            {traits.recoveryEmail && <input type="hidden" name="traits.recoveryEmail" value={traits.recoveryEmail} />}
+            <div class="field">
+              <label for="email-readonly">Email</label>
+              <input id="email-readonly" type="text" value={traits.email} readonly aria-describedby="email-hint" />
+              {traits.recoveryEmail && (
+                <>
+                  <label for="recovery-email-readonly">Recovery email</label>
+                  <input id="recovery-email-readonly" type="text" value={traits.recoveryEmail} readonly aria-describedby="email-hint" />
+                </>
+              )}
+              <p id="email-hint" class="field-hint">
+                To change an email address, sign in again with your passkey or password.{' '}
+                <a href={changeEmailHref}>Change email address</a>
+              </p>
+            </div>
+          </>
+        )}
         <FlowNodes
           nodes={profileNodes}
           group="profile"

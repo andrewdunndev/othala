@@ -14,6 +14,7 @@ Fewer moving parts: one registration lane, one Kratos client, one logout path.
 ### Changed
 
 - Profile changes need a sign-in from the last 5 minutes (was 15).
+- An account with a passkey or password changes its email or recovery email only from a session whose newest sign-in used a passkey or password; the profile hook is now `/admin/profile-gate`.
 - Signing in to an app after another account signed out of the shared browser starts a fresh app sign-in; a sign-out an app did not start goes through the portal's own sign-out.
 - Every state-changing portal form carries a token bound to its action; the portal refuses to start without a `CSRF_SECRET` of at least 32 bytes.
 - Client registration runs only in the portal, on boot; the one-shot registration command, its compose service and its docs are gone.

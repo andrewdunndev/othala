@@ -13,3 +13,4 @@
 export { getIdentity, listSessions, revokeSession } from '../lib/admin-api';
 export { isAdminMarker } from '../lib/admin-auth';
 export { secondFactorChangeVerdict, SECOND_FACTOR_KEEP, SECOND_FACTOR_UNAVAILABLE } from '../lib/second-factor-gate';
+export { emailChangeVerdict, EMAIL_CHANGE_REFUSAL } from '../lib/profile-gate';

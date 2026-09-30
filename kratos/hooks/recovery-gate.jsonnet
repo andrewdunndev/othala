@@ -22,4 +22,5 @@ function(ctx) {
   identity_id: ctx.identity.id,
   traits: ctx.identity.traits,
   session_id: std.get(std.get(ctx, 'session', {}), 'id', ''),
+  authentication_methods: std.get(std.get(ctx, 'session', {}), 'authentication_methods', []),
 }

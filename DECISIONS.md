@@ -97,7 +97,7 @@ every link: import identities with their ids, or budget a re-link pass. Kratos h
 a trait, and an app that still re-matches on username at every sign-in would silently orphan the account
 on a self-service rename, so the profile flow refuses one before it is saved.
 
-**Enforced by.** `handleUsernameGate` in `portal/src/server/listen.mjs` on
+**Enforced by.** `handleProfileGate` in `portal/src/server/listen.mjs` on
 `selfservice.flows.settings.after.profile` in `kratos/kratos.yml`; `portal/scripts/admin-port.test.mjs`,
 `e2e/playwright/tests/y-username-admin-only.spec.ts`. Which key each app links on is relying-party
 configuration, unenforced here.

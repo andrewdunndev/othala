@@ -12,7 +12,7 @@ const pagesDir = join(here, '..', 'src', 'pages');
 const FORBIDDEN_ROUTES = new Set([
   '/admin/recovery-gate',
   '/admin/login-code-gate',
-  '/admin/username-gate',
+  '/admin/profile-gate',
   '/admin/second-factor-gate',
   '/admin/profile-sessions',
 ]);

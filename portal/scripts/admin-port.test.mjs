@@ -19,12 +19,13 @@ import {
   ADMIN_GET_ROUTES,
   ADMIN_POST_ROUTES,
 } from '../src/server/listen.mjs';
-import { asAdmin, identity, session, withTotp, withWebauthnKey } from '../src/lib/test-builders.ts';
+import { asAdmin, identity, session, withPasskey, withTotp, withWebauthnKey } from '../src/lib/test-builders.ts';
 import * as secondFactorRuntime from '../src/lib/second-factor-gate.ts';
+import { emailChangeLocked, emailChangeVerdict, EMAIL_CHANGE_REFUSAL } from '../src/lib/profile-gate.ts';
 import { getIdentity, listSessions, revokeSession } from '../src/lib/admin-api.ts';
 import { isAdminMarker } from '../src/lib/admin-auth.ts';
 
-const runtime = { ...secondFactorRuntime, getIdentity, listSessions, revokeSession, isAdminMarker };
+const runtime = { ...secondFactorRuntime, emailChangeVerdict, getIdentity, listSessions, revokeSession, isAdminMarker };
 const handle = (req, res, rt = runtime) => handleAdminRequest(req, res, rt);
 
 const ADMIN_UUID = '11111111-1111-1111-1111-111111111111';
@@ -63,10 +64,10 @@ test('admin GET mux serves exactly /healthz and /readyz', () => {
 test('admin POST mux serves exactly the admin endpoints', () => {
   assert.deepEqual([...ADMIN_POST_ROUTES].sort(), [
     '/admin/login-code-gate',
+    '/admin/profile-gate',
     '/admin/profile-sessions',
     '/admin/recovery-gate',
     '/admin/second-factor-gate',
-    '/admin/username-gate',
   ]);
 });
 
@@ -351,10 +352,10 @@ test('login-code-gate rejects a wrong bearer with 403 before reading the body', 
 
 const STORED = identity({ id: OTHER_UUID, username: 'ada.lovelace' });
 
-function postUsernameGate(body, bearer = 'gate-secret') {
+function postProfileGate(body, bearer = 'gate-secret') {
   return fakeReq({
     method: 'POST',
-    url: '/admin/username-gate',
+    url: '/admin/profile-gate',
     headers: { authorization: `Bearer ${bearer}` },
     body: JSON.stringify(body),
   });
@@ -389,46 +390,96 @@ test('usernameChangeVerdict refuses when either side is not a username', () => {
   assert.equal(usernameChangeVerdict(null, 'ada.lovelace').refuse, true);
 });
 
-test('username-gate REFUSES a username change with the neutral message (403)', async () => {
+test('profile-gate REFUSES a username change with the neutral message (403)', async () => {
   await withMockKratos(storedIdentityServer(STORED), async () => {
     const res = fakeRes();
-    await handle(postUsernameGate(profilePayload({ ...STORED.traits, username: 'ada.byron' })), res);
+    await handle(postProfileGate(profilePayload({ ...STORED.traits, username: 'ada.byron' })), res);
     assert.equal(res.statusCode, 403);
     assert.equal(refusalText(res), USERNAME_CHANGE_REFUSAL);
   });
 });
 
-test('username-gate ALLOWS a profile update that keeps the username (200)', async () => {
+test('profile-gate ALLOWS a profile update that keeps the username (200)', async () => {
   await withMockKratos(storedIdentityServer(STORED), async () => {
     const res = fakeRes();
-    await handle(postUsernameGate(profilePayload({ ...STORED.traits, email: 'ada@example.test' })), res);
+    await handle(postProfileGate({ ...profilePayload({ ...STORED.traits, displayName: 'Ada' }), authentication_methods: [] }), res);
     assert.equal(res.statusCode, 200);
   });
 });
 
-test('username-gate REFUSES when the stored identity cannot be read (fail-closed, 403)', async () => {
+const KEYLESS = { ...STORED, credentials: { code: STORED.credentials.code } };
+const KEYED = STORED;
+const at = (n) => new Date(Date.UTC(2026, 0, 1, 0, n)).toISOString();
+const entry = (method, n, aal = 'aal1') => ({ method, aal, completed_at: at(n) });
+const NEW_EMAIL = { ...STORED.traits, email: 'new@example.test' };
+
+test('emailChangeVerdict table', () => {
+  const refuse = (stored, traits, methods) => emailChangeVerdict(stored, traits, methods).refuse;
+  assert.equal(refuse(KEYLESS, NEW_EMAIL, [entry('code', 0)]), false, 'keyless with code');
+  assert.equal(refuse(KEYED, NEW_EMAIL, [entry('password', 0), entry('code', 1)]), true, 'password then code');
+  assert.equal(refuse(KEYED, NEW_EMAIL, [entry('code', 0), entry('password', 1)]), false, 'code then password');
+  assert.equal(refuse(KEYED, NEW_EMAIL, [entry('password', 1), entry('code', 0)]), false, 'order of the array is not the order of time');
+  assert.equal(refuse(KEYED, NEW_EMAIL, [entry('code', 0), entry('totp', 1, 'aal2')]), true, 'aal2 never counts');
+  assert.equal(refuse(KEYED, NEW_EMAIL, [entry('password', 0), entry('code', 1), entry('totp', 2, 'aal2')]), true, 'aal2 newer than code');
+  assert.equal(refuse(KEYED, NEW_EMAIL, [entry('code', 0), entry('webauthn', 1)]), false, 'webauthn newest');
+  assert.equal(refuse(withPasskey(KEYLESS), NEW_EMAIL, [entry('code', 0), entry('passkey', 1)]), false, 'passkey newest');
+  assert.equal(refuse(withPasskey(KEYLESS), NEW_EMAIL, [entry('passkey', 0), entry('code', 1)]), true, 'passkey account, code newest');
+  assert.equal(refuse(KEYED, NEW_EMAIL, [{ method: 'password', aal: 'aal1', completed_at: 'not a date' }]), true, 'unparseable');
+  assert.equal(refuse(KEYED, NEW_EMAIL, [{ method: 'password', aal: 'aal1' }]), true, 'missing completed_at');
+  assert.equal(refuse(KEYED, NEW_EMAIL, undefined), true, 'missing session data');
+  assert.equal(refuse(KEYED, NEW_EMAIL, []), true, 'empty session data');
+  assert.equal(refuse(KEYED, STORED.traits, [entry('code', 0)]), false, 'unchanged email');
+  assert.equal(refuse(KEYED, { ...STORED.traits, recoveryEmail: '' }, [entry('code', 0)]), false, 'absent equals empty');
+  const changed = emailChangeVerdict(KEYED, { ...NEW_EMAIL, recoveryEmail: 'r@example.test' }, [entry('code', 0)]);
+  assert.deepEqual(changed.pointers, ['#/traits/email', '#/traits/recoveryEmail']);
+  assert.equal(changed.text, EMAIL_CHANGE_REFUSAL);
+});
+
+test('profile-gate refuses an email change from a code session on the changed trait (403)', async () => {
+  await withMockKratos(storedIdentityServer(KEYED), async () => {
+    const res = fakeRes();
+    await handle(postProfileGate({ ...profilePayload({ ...STORED.traits, recoveryEmail: 'r@example.test' }), authentication_methods: [entry('password', 0), entry('code', 1)] }), res);
+    assert.equal(res.statusCode, 403);
+    const [msg] = JSON.parse(res.body).messages;
+    assert.equal(msg.instance_ptr, '#/traits/recoveryEmail');
+    assert.equal(msg.messages[0].text, EMAIL_CHANGE_REFUSAL);
+  });
+});
+
+test('profile-gate allows an email change from a password session (200) and refuses without session data (403)', async () => {
+  await withMockKratos(storedIdentityServer(KEYED), async () => {
+    const ok = fakeRes();
+    await handle(postProfileGate({ ...profilePayload(NEW_EMAIL), authentication_methods: [entry('code', 0), entry('password', 1)] }), ok);
+    assert.equal(ok.statusCode, 200);
+    const bare = fakeRes();
+    await handle(postProfileGate(profilePayload(NEW_EMAIL)), bare);
+    assert.equal(bare.statusCode, 403);
+  });
+});
+
+test('profile-gate REFUSES when the stored identity cannot be read (fail-closed, 403)', async () => {
   await withMockKratos((req, res) => { res.writeHead(500); res.end(); }, async () => {
     const res = fakeRes();
-    await handle(postUsernameGate(profilePayload(STORED.traits)), res);
+    await handle(postProfileGate(profilePayload(STORED.traits)), res);
     assert.equal(res.statusCode, 403);
     assert.equal(refusalText(res), PROFILE_UPDATE_UNAVAILABLE);
   });
 });
 
-test('username-gate REFUSES when KRATOS_ADMIN_URL is unset or the id is missing (403)', async () => {
+test('profile-gate REFUSES when KRATOS_ADMIN_URL is unset or the id is missing (403)', async () => {
   process.env.RECOVERY_GATE_SECRET = 'gate-secret';
   for (const body of [profilePayload(STORED.traits), { traits: STORED.traits }]) {
     const res = fakeRes();
-    await handle(postUsernameGate(body), res);
+    await handle(postProfileGate(body), res);
     assert.equal(res.statusCode, 403);
     assert.equal(refusalText(res), PROFILE_UPDATE_UNAVAILABLE);
   }
 });
 
-test('username-gate rejects a wrong bearer with 403 before reading the body', async () => {
+test('profile-gate rejects a wrong bearer with 403 before reading the body', async () => {
   process.env.RECOVERY_GATE_SECRET = 'gate-secret';
   const res = fakeRes();
-  await handle(postUsernameGate(profilePayload(STORED.traits), 'wrong'), res);
+  await handle(postProfileGate(profilePayload(STORED.traits), 'wrong'), res);
   assert.equal(res.statusCode, 403);
   assert.deepEqual(JSON.parse(res.body), { error: 'forbidden' });
 });
@@ -597,11 +648,17 @@ test('recovery, username and second-factor gates and profile-sessions read the i
   });
   for (const [url, body] of [
     ['/admin/recovery-gate', { identity_id: 'r' }],
-    ['/admin/username-gate', { identity_id: 'u', traits: {} }],
+    ['/admin/profile-gate', { identity_id: 'u', traits: {} }],
     ['/admin/second-factor-gate?method=totp', { identity_id: 's' }],
     ['/admin/profile-sessions', { identity_id: 'p', session_id: 'keep' }],
   ]) {
     await handle(post(url, body), fakeRes(), recorder);
   }
   assert.deepEqual(read, ['r', 'u', 's', 'p']);
+});
+
+test('emailChangeLocked follows the verdict for the stored identity and session', () => {
+  assert.equal(emailChangeLocked(KEYED, [entry('password', 0), entry('code', 1)]), true);
+  assert.equal(emailChangeLocked(KEYED, [entry('code', 0), entry('password', 1)]), false);
+  assert.equal(emailChangeLocked(KEYLESS, [entry('code', 0)]), false);
 });
