@@ -7,6 +7,20 @@ aims to follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 The git tag is the authoritative version; `portal/package.json` mirrors it.
 This CHANGELOG and git tags carry the deployed-instance release state.
 
+## [0.8.0] - 2026-09-30
+
+Apps receive only the groups they bind, privileged roles sign in at aal2, and revoking a person reaches apps by back-channel logout.
+
+### Changed
+
+- An app's `groups` claim carries only the groups its manifest binds (`presentation.access` and `group_role_map` keys) plus its role's `claim_emit`; identity groups and other apps' groups are no longer sent.
+- An identity that resolves to a role above an app's entry role signs in to apps and forward-auth edges at aal2, as admin-marked identities already do.
+- While no manifest set has loaded, forward-auth answers 503 to an aal1 session.
+- The step-up notice for an account without a second factor points to Settings to enrol one.
+- Force re-login, delete and sign out everywhere revoke each Hydra login session by id, so apps with a `backchannel_logout_uri` receive a logout token.
+- Consent is no longer remembered in Hydra; the manifest's `skip_consent` decides whether the grant screen is shown.
+- Refresh tokens issued before 0.8.0 keep their claims until their consent sessions are revoked; revoke consent for every subject once after deploying.
+
 ## [0.7.1] - 2026-09-30
 
 Release hardening: rate limits key on the real client, and release jobs wait for e2e.
