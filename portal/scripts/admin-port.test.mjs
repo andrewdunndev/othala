@@ -526,13 +526,13 @@ test('second-factor-gate ALLOWS an admin with totp and a key to change keys (200
 test('second-factor-gate REFUSES without a method, id, readable identity or runtime (403)', async () => {
   const unavailable = secondFactorRuntime.SECOND_FACTOR_UNAVAILABLE;
   await withMockKratos(storedIdentityServer(ADMIN_TOTP_ONLY), async () => {
-    for (const [method, body, runtime] of [
+    for (const [method, body, rt] of [
       ['', { identity_id: OTHER_UUID }, runtime],
       ['totp', {}, runtime],
       ['totp', { identity_id: OTHER_UUID }, {}],
     ]) {
       const res = fakeRes();
-      await handle(postSecondFactorGate(method, body), res, runtime);
+      await handle(postSecondFactorGate(method, body), res, rt);
       assert.equal(res.statusCode, 403);
       assert.equal(secondFactorText(res), unavailable);
     }
@@ -591,7 +591,13 @@ test('profile-sessions ends every other active session and keeps the saving one 
     assert.equal(res.statusCode, 200);
     assert.deepEqual(JSON.parse(res.body), { ended: 2 });
   });
-  assert.deepEqual(calls, [
+  const canon = (c) => {
+    const [verb, target] = c.split(' ');
+    const u = new URL(target, 'http://x');
+    u.searchParams.sort();
+    return `${verb} ${u.pathname}${u.search}`;
+  };
+  assert.deepEqual(calls.map(canon), [
     `GET /admin/identities/${STORED.id}/sessions?active=true&per_page=1000`,
     `DELETE /admin/sessions/${OTHER_A.id}`,
     `DELETE /admin/sessions/${OTHER_B.id}`,

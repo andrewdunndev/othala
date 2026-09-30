@@ -404,7 +404,7 @@ test('consent 400 on missing challenge', async () => {
 
 test('logout accepts and redirects', async () => {
   const { api, calls } = stubOAuth2();
-  const res = await handleLogout(new Request('https://x/oauth2/logout?logout_challenge=gc'), { oauth2: api });
+  const res = await handleLogout(new Request('https://x/oauth2/logout?logout_challenge=gc'), { oauth2: api, getSession: async () => null });
   assert.equal(res.status, 302);
   assert.equal(res.headers.get('location'), 'https://sso.othala.test/after-logout');
   assert.equal(calls.acceptLogout, 1);

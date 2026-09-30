@@ -203,7 +203,8 @@ test('the repair row rides the existing save form, under its CSRF token', () => 
 
   // Every POST verifies against the submitted action; no special-cased set.
   assert.doesNotMatch(pageSource, /actionScopedActions/);
-  assert.match(pageSource, /verifyToken\(String\(fd\.get\('csrf_token'\) \?\? ''\), adminIdentityId, action\)/);
+  assert.match(pageSource, /verifyToken\(String\(fd\.get\('csrf_token'\) \?\? ''\), adminIdentityId, tokenAction\)/);
+  assert.match(pageSource, /const tokenAction = action === 'remove-credential' \? `remove-\$\{String\(fd\.get\('cred_type'\) \?\? ''\)\}` : action;/);
 });
 
 test('the non-canonical names are rendered escaped, never via set:html', () => {
