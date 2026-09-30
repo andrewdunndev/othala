@@ -19,7 +19,7 @@ import {
   ADMIN_GET_ROUTES,
   ADMIN_POST_ROUTES,
 } from '../src/server/listen.mjs';
-import { asAdmin, identity, session, withPasskey, withTotp, withWebauthnKey } from '../src/lib/test-builders.ts';
+import { asAdmin, identity, session, withCredential, withPasskey, withTotp, withWebauthnKey } from '../src/lib/test-builders.ts';
 import * as secondFactorRuntime from '../src/lib/second-factor-gate.ts';
 import { emailChangeLocked, emailChangeVerdict, EMAIL_CHANGE_REFUSAL } from '../src/lib/profile-gate.ts';
 import { getIdentity, listSessions, revokeSession } from '../src/lib/admin-api.ts';
@@ -439,6 +439,22 @@ test('emailChangeVerdict table', () => {
   const changed = emailChangeVerdict(KEYED, { ...NEW_EMAIL, recoveryEmail: 'r@example.test' }, [entry('code', 0)]);
   assert.deepEqual(changed.pointers, ['#/traits/email', '#/traits/recoveryEmail']);
   assert.equal(changed.text, EMAIL_CHANGE_REFUSAL);
+});
+
+test('emailChangeVerdict counts a key only when the credential holds a secret', () => {
+  const afterCode = (stored) => emailChangeVerdict(stored, NEW_EMAIL, [entry('code', 0)]).refuse;
+  const schemaOnly = identity({ id: OTHER_UUID, username: 'ada.lovelace', password: false });
+  assert.equal(afterCode(schemaOnly), false, 'password entry with empty config');
+  assert.equal(afterCode(withCredential(schemaOnly, 'password', { hashed_password: '' })), false, 'empty hash');
+  assert.equal(afterCode(KEYED), true, 'password with a hashed_password');
+  assert.equal(afterCode(withCredential(schemaOnly, 'passkey', { credentials: [] })), false, 'passkey entry with empty credentials');
+  assert.equal(afterCode(withCredential(schemaOnly, 'passkey', {})), false, 'passkey entry with empty config');
+  assert.equal(afterCode(withPasskey(schemaOnly)), true, 'passkey with one credential');
+  assert.equal(afterCode(withWebauthnKey(schemaOnly)), false, 'second-factor webauthn key');
+  assert.equal(afterCode(withWebauthnKey(schemaOnly, { passwordless: true })), true, 'passwordless webauthn key');
+  const { credentials: _c, ...bare } = schemaOnly;
+  assert.equal(afterCode(bare), true, 'credentials missing');
+  assert.equal(afterCode(null), true, 'no stored identity');
 });
 
 test('profile-gate refuses an email change from a code session on the changed trait (403)', async () => {
