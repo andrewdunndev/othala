@@ -4,7 +4,7 @@ import type { BrowserContext } from 'playwright-core';
 import { test, expect } from '../fixtures';
 import { createIdentityWithPassword, readIdentity, TEST_PASSWORD } from '../actions/identity';
 import { findCsrfToken, loginViaJsonApi } from '../actions/login';
-import { forRecipient, waitForMessage } from '../actions/mail';
+import { forRecipient, listMail, waitForMessage } from '../actions/mail';
 
 const USERNAME_CHANGE_REFUSAL = 'Your username can only be changed by an administrator.';
 
@@ -141,6 +141,9 @@ test.describe('Y — username is admin-only', () => {
       expect(sent.status(), 'code sent').toBe(400);
       const sentIds = ((await sent.json()).ui?.messages ?? []).map((m: { id: number }) => m.id);
       expect(sentIds, 'code-sent message').toContain(1010014);
+      await new Promise((r) => setTimeout(r, 8_000));
+      const after = (await listMail()).filter((m) => m.created >= since - 1_000);
+      console.log('Y4 mail after refresh:', JSON.stringify(after.map((m) => ({ to: m.to, subject: m.subject }))));
       await waitForMessage(forRecipient(changed, since, /login|sign in/i));
 
       const sinceOld = Date.now();
