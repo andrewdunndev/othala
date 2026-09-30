@@ -1,22 +1,4 @@
-/**
- * admin-auth.test.ts — unit tests for the admin authority marker.
- *
- * Coverage:
- *   isAdminMarker:
- *   - marker true (boolean) → admin
- *   - marker absent (undefined metadata_admin) → not admin
- *   - marker absent (empty object) → not admin
- *   - marker false → not admin
- *   - marker string "true" (wrong type) → not admin (strict equality)
- *   - marker number 1 (wrong type) → not admin
- *   - marker null → not admin
- *   - null identity → not admin
- *   - undefined identity → not admin
- *   - malformed metadata_admin (array) → not admin
- *   - metadata_admin with extra keys and admin:true → admin
- *
- * Run: npx vitest run   (from portal/)
- */
+// Invariant: only a strict boolean true admin marker confers admin.
 
 import { describe, it, expect } from 'vitest';
 import { isAdminMarker } from './admin-auth.js';
@@ -26,8 +8,6 @@ import { identity } from './test-builders.js';
 function makeIdentity(metadataAdmin?: Record<string, unknown>): Identity {
   return identity({ metadataAdmin: metadataAdmin as Identity['metadata_admin'] });
 }
-
-// ── isAdminMarker ─────────────────────────────────────────────────────────────
 
 describe('isAdminMarker — marker present and true', () => {
   it('returns true when metadata_admin.admin === true (boolean)', () => {
@@ -102,7 +82,6 @@ describe('isAdminMarker — null/undefined identity (fail-closed)', () => {
 
 describe('isAdminMarker — malformed metadata_admin', () => {
   it('returns false when metadata_admin is an array (not an object)', () => {
-    // Force a structurally invalid shape to test the guard.
     const identity = { ...makeIdentity(), metadata_admin: [{ admin: true }] as unknown as Identity['metadata_admin'] };
     expect(isAdminMarker(identity)).toBe(false);
   });

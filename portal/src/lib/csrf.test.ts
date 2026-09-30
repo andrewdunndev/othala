@@ -1,15 +1,4 @@
-/**
- * csrf.test.ts — unit tests for the CSRF token signing and verification logic.
- *
- * Coverage:
- *   - Basic sign/verify round-trip.
- *   - Action-scoped sign/verify round-trip.
- *   - Action-binding: token minted for action A rejects on action B.
- *   - Existing error paths: missing token, bad identity, expired, replayed,
- *     wrong-identity, future-dated.
- *
- * Run: npx vitest run   (from portal/)
- */
+// Invariant: a token verifies only for its identity and action, once, before expiry, and only if its HMAC holds.
 
 import { createHmac } from 'node:crypto';
 import { describe, it, expect, beforeEach } from 'vitest';
@@ -19,12 +8,9 @@ const IDENTITY = 'aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee';
 const OTHER_IDENTITY = 'ffffffff-1111-2222-3333-444444444444';
 
 beforeEach(() => {
-  // Clear the consumed-nonce store between tests so replay tests are isolated.
   _resetForTests();
   process.env['CSRF_SECRET'] = 'a-test-secret-that-is-at-least-32-chars!!';
 });
-
-// ── Round-trip and error paths ───────────────────────────────────────────────
 
 describe('signToken / verifyToken — errors', () => {
   it('round-trips', () => {
@@ -40,6 +26,8 @@ describe('signToken / verifyToken — errors', () => {
 
   it('rejects malformed token', () => {
     expect(() => verifyToken('ts.id.nonce', IDENTITY, 'save')).toThrow(CSRFError);
+    expect(() => verifyToken('not-a-token', IDENTITY, 'save')).toThrow(CSRFError);
+    expect(() => verifyToken('a.b.c', IDENTITY, 'save')).toThrow(CSRFError);
   });
 
   it('rejects a 4-part token without an action', () => {
@@ -60,8 +48,8 @@ describe('signToken / verifyToken — errors', () => {
 
   it('rejects replay', () => {
     const tok = signToken(IDENTITY, 'save');
-    verifyToken(tok, IDENTITY, 'save'); // first use: OK
-    expect(() => verifyToken(tok, IDENTITY, 'save')).toThrow(CSRFError); // second use: replay
+    verifyToken(tok, IDENTITY, 'save');
+    expect(() => verifyToken(tok, IDENTITY, 'save')).toThrow(CSRFError);
   });
 
   it('rejects a tampered signature', () => {
@@ -71,8 +59,6 @@ describe('signToken / verifyToken — errors', () => {
     expect(() => verifyToken(parts.join('.'), IDENTITY, 'save')).toThrow(CSRFError);
   });
 });
-
-// ── Action-scoped tokens ─────────────────────────────────────────────────────
 
 describe('signToken / verifyToken — action-scoped', () => {
   it('issues and verifies a valid action-scoped token', () => {
@@ -105,13 +91,8 @@ describe('signToken / verifyToken — action-scoped', () => {
 
   it('rejects a tampered action in the token body', () => {
     const tok = signToken(IDENTITY, 'issue-recovery');
-    // Replace the action segment (index 3 in a 5-part token) with a different
-    // action. The HMAC was computed over 'issue-recovery', not 'deactivate',
-    // so the signature check must fail.
     const parts = tok.split('.');
     parts[3] = 'deactivate';
-    // verifyToken with action='deactivate' would see action-match pass, but
-    // the HMAC must catch the tampering.
     expect(() => verifyToken(parts.join('.'), IDENTITY, 'deactivate')).toThrow(CSRFError);
   });
 
@@ -122,5 +103,55 @@ describe('signToken / verifyToken — action-scoped', () => {
     expect(() => verifyToken(tokA, IDENTITY, 'issue-recovery')).not.toThrow();
     expect(() => verifyToken(tokB, IDENTITY, 'force-relogin')).not.toThrow();
     expect(() => verifyToken(tokC, IDENTITY, 'deactivate')).not.toThrow();
+  });
+});
+
+describe('signToken / verifyToken — expiry, dots, secret, message hygiene', () => {
+  it('rejects an expired token', () => {
+    const parts = signToken(IDENTITY, 'save').split('.');
+    const body = `${Math.floor(Date.now() / 1000) - 31 * 60}.${parts[1]}.${parts[2]}.${parts[3]}`;
+    const sig = createHmac('sha256', Buffer.from(process.env['CSRF_SECRET']!, 'utf8')).update(body).digest('base64url');
+    expect(() => verifyToken(`${body}.${sig}`, IDENTITY, 'save')).toThrow(/expired/);
+  });
+
+  it('CRYPTO-1: signToken throws on a dotted identityId', () => {
+    expect(() => signToken('admin.1', 'save')).toThrow(/dot/);
+  });
+
+  it('CRYPTO-1: signToken throws on a dotted action', () => {
+    expect(() => signToken('admin-1', 'issue.recovery')).toThrow(/dot/);
+  });
+
+  it('CRYPTO-1: signToken accepts dot-free identityId and action', () => {
+    expect(() => signToken('admin-1', 'issue-recovery')).not.toThrow();
+  });
+
+  it('CRYPTO-2: a 32-ASCII-char secret passes the byte-length gate', () => {
+    process.env['CSRF_SECRET'] = 'a'.repeat(32);
+    expect(() => signToken('admin-1', 'save')).not.toThrow();
+  });
+
+  it('FIX-H: action mismatch message never reflects raw attacker characters', () => {
+    const parts = signToken('admin-1', 'consent').split('.');
+    parts[3] = '<script>alert(1)</script>' + 'A'.repeat(100);
+    let msg = '';
+    try {
+      verifyToken(parts.join('.'), 'admin-1', 'consent');
+    } catch (e) {
+      msg = (e as Error).message;
+    }
+    expect(msg).not.toMatch(/[<>]/);
+    expect(msg).toContain("'consent'");
+  });
+
+  it('FIX-H: a safe presented action stays readable in the mismatch message', () => {
+    let msg = '';
+    try {
+      verifyToken(signToken('admin-1', 'deactivate'), 'admin-1', 'consent');
+    } catch (e) {
+      msg = (e as Error).message;
+    }
+    expect(msg).toContain("'consent'");
+    expect(msg).toContain("'deactivate'");
   });
 });

@@ -1,28 +1,62 @@
-/**
- * contact.test.ts — rate-limiter regression tests using _resetForTests.
- *
- * Coverage: src/lib/contact.ts rateLimit() + _resetForTests().
- *
- * These complement the existing scripts/contact.test.mjs suite (which also
- * covers validateContact() + parseSmtpUri()). This file focuses on the
- * rate-limiter boundary cases that are most likely to regress:
- *
- *   1. Window capacity: 5 allowed, 6th blocked.
- *   2. Reset clears state — after _resetForTests() the budget is fresh.
- *   3. Per-key isolation — exhausting one key does not affect another.
- *   4. retryAfterSec is positive on block.
- *
- * The `_resetForTests` hook is called in beforeEach so tests are isolated
- * from each other's rate-limit state (the hits Map is module-level).
- *
- * Run: npx vitest run   (from portal/)
- */
+// Invariant: contact input is validated (name is header-bound, message is body-only), submissions are rate-limited per key, and SMTP URIs parse strictly.
 
 import { describe, it, expect, beforeEach } from 'vitest';
 import { rateLimit, _resetForTests, validateContact, LIMITS } from './contact.js';
+import { parseSmtpUri, MailerError } from './mailer.js';
 
 beforeEach(() => {
   _resetForTests();
+});
+
+describe('validateContact()', () => {
+  it('accepts a well-formed submission and normalizes whitespace', () => {
+    const r = validateContact({ name: '  Robin ', type: 'access', message: '  please grant access  ' });
+    expect(r.ok).toBe(true);
+    expect(r.ok && r.value).toEqual({ name: 'Robin', type: 'access', message: 'please grant access' });
+  });
+
+  it('rejects an empty name', () => {
+    expect(validateContact({ name: '   ', type: 'access', message: 'a real message' }).ok).toBe(false);
+  });
+
+  it('rejects an over-length name', () => {
+    expect(validateContact({ name: 'x'.repeat(LIMITS.nameMax + 1), type: 'access', message: 'a real message' }).ok).toBe(false);
+  });
+
+  it('rejects an unknown request type (allowlist)', () => {
+    expect(validateContact({ name: 'X', type: 'evil', message: 'a real message' }).ok).toBe(false);
+  });
+
+  it('rejects a too-short message', () => {
+    expect(validateContact({ name: 'X', type: 'other', message: 'hi' }).ok).toBe(false);
+  });
+
+  it('rejects an over-length message', () => {
+    expect(validateContact({ name: 'X', type: 'other', message: 'm'.repeat(LIMITS.messageMax + 1) }).ok).toBe(false);
+  });
+
+  it('rejects header-injection control characters', () => {
+    expect(validateContact({ name: 'X\r\nBcc: evil@x', type: 'other', message: 'a real message body' }).ok).toBe(false);
+  });
+
+  it('name rejects CR/LF (header injection guard)', () => {
+    expect(validateContact({ name: 'Alice\r\nBcc: evil@x', type: 'other', message: 'a real message body' }).ok).toBe(false);
+  });
+
+  it('message allows embedded newlines (body-only, not header-bound)', () => {
+    const r = validateContact({ name: 'Alice', type: 'problem', message: 'Line one.\r\nLine two.\nLine three.' });
+    expect(r.ok).toBe(true);
+    expect(r.ok && r.value.message).toContain('\n');
+  });
+
+  it('rejects a body that is mostly links (spam)', () => {
+    const message = 'http://a.com http://b.com http://c.com http://d.com';
+    expect(validateContact({ name: 'X', type: 'other', message }).ok).toBe(false);
+  });
+
+  it('rejects non-string fields', () => {
+    expect(validateContact({ name: 123, type: ['access'], message: {} } as never).ok).toBe(false);
+  });
 });
 
 describe('rateLimit()', () => {
@@ -35,62 +69,71 @@ describe('rateLimit()', () => {
     }
   });
 
-  it('blocks the 6th attempt', () => {
+  it('blocks the 6th attempt with a positive retry hint', () => {
     const key = 'test-key-2';
     for (let i = 0; i < 5; i++) rateLimit(key);
     const blocked = rateLimit(key);
-    expect(blocked.allowed, '6th attempt must be blocked').toBe(false);
-    expect(blocked.retryAfterSec, 'blocked caller must receive a positive retry hint').toBeGreaterThan(0);
+    expect(blocked.allowed).toBe(false);
+    expect(blocked.retryAfterSec).toBeGreaterThan(0);
   });
 
-  it('_resetForTests clears state — budget is fresh after reset', () => {
+  it('_resetForTests clears state', () => {
     const key = 'test-key-3';
-    // Exhaust the budget.
     for (let i = 0; i < 5; i++) rateLimit(key);
-    expect(rateLimit(key).allowed, 'must be blocked before reset').toBe(false);
-
-    // Reset — beforeEach fires before each test, but this inline reset tests
-    // the _resetForTests semantics directly (the hook clears the hits Map).
+    expect(rateLimit(key).allowed).toBe(false);
     _resetForTests();
-
-    // Budget must be fresh.
-    expect(rateLimit(key).allowed, 'must be allowed after reset').toBe(true);
+    expect(rateLimit(key).allowed).toBe(true);
   });
 
-  it('per-key isolation — exhausting key A does not affect key B', () => {
-    const keyA = 'addr-a';
-    const keyB = 'addr-b';
-    for (let i = 0; i < 5; i++) rateLimit(keyA);
-    expect(rateLimit(keyA).allowed, 'keyA must be blocked').toBe(false);
-    expect(rateLimit(keyB).allowed, 'keyB must still be allowed').toBe(true);
+  it('per-key isolation', () => {
+    for (let i = 0; i < 5; i++) rateLimit('addr-a');
+    expect(rateLimit('addr-a').allowed).toBe(false);
+    expect(rateLimit('addr-b').allowed).toBe(true);
   });
 
-  it('sliding window — attempts outside the 10-min window expire', () => {
-    const key = 'test-key-slide';
-    const t0 = 1_000_000_000_000; // fixed epoch
-    for (let i = 0; i < 5; i++) rateLimit(key, t0);
-    expect(rateLimit(key, t0).allowed, 'must be blocked within window').toBe(false);
-    // 11 minutes later the window has slid past all earlier timestamps.
-    const t1 = t0 + 11 * 60 * 1000;
-    expect(rateLimit(key, t1).allowed, 'must be allowed after window expiry').toBe(true);
+  it('sliding window: attempts outside the 10-min window expire', () => {
+    const t0 = 1_000_000_000_000;
+    for (let i = 0; i < 5; i++) rateLimit('test-key-slide', t0);
+    expect(rateLimit('test-key-slide', t0).allowed).toBe(false);
+    expect(rateLimit('test-key-slide', t0 + 11 * 60 * 1000).allowed).toBe(true);
   });
+
+  it('DOS-2: hits Map does not exceed HITS_MAP_MAX under many distinct keys', () => {
+    const now = Date.now();
+    for (let i = 0; i < 11_000; i++) rateLimit(`flood-key-${i}`, now);
+    _resetForTests();
+    const key = 'sentinel';
+    for (let i = 0; i < 5; i++) rateLimit(key, now);
+    expect(rateLimit(key, now).allowed, 'sentinel blocked before clear').toBe(false);
+    for (let i = 0; i < 11_000; i++) rateLimit(`flood2-${i}`, now);
+    expect(rateLimit(key, now).allowed, 'cap clear resets all buckets').toBe(true);
+  }, 60_000);
 });
 
-describe('validateContact() — smoke (mirrors scripts/contact.test.mjs)', () => {
-  it('accepts a valid submission', () => {
-    const r = validateContact({ name: 'Alice', type: 'access', message: 'please grant access' });
-    expect(r.ok).toBe(true);
+describe('parseSmtpUri()', () => {
+  it('parses an smtps URI as secure with auth', () => {
+    expect(parseSmtpUri('smtps://user%40d:p%40ss@smtp.example.com:465')).toEqual({
+      host: 'smtp.example.com',
+      port: 465,
+      secure: true,
+      auth: { user: 'user@d', pass: 'p@ss' },
+    });
   });
 
-  it('rejects an empty name', () => {
-    expect(validateContact({ name: '', type: 'access', message: 'some message' }).ok).toBe(false);
+  it('parses a plain smtp URI as non-secure, no auth', () => {
+    expect(parseSmtpUri('smtp://mailpit:1025')).toEqual({ host: 'mailpit', port: 1025, secure: false });
   });
 
-  it('rejects an over-length name', () => {
-    expect(validateContact({ name: 'x'.repeat(LIMITS.nameMax + 1), type: 'access', message: 'msg' }).ok).toBe(false);
+  it('defaults the port by scheme when absent', () => {
+    expect(parseSmtpUri('smtps://h').port).toBe(465);
+    expect(parseSmtpUri('smtp://h').port).toBe(587);
   });
 
-  it('rejects unknown request type', () => {
-    expect(validateContact({ name: 'Alice', type: 'hack', message: 'a real message' }).ok).toBe(false);
+  it('rejects an unsupported scheme', () => {
+    expect(() => parseSmtpUri('http://h:80')).toThrow(MailerError);
+  });
+
+  it('rejects a non-URL', () => {
+    expect(() => parseSmtpUri('not a uri')).toThrow(MailerError);
   });
 });

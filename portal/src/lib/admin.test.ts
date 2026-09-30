@@ -1,24 +1,7 @@
-/**
- * admin.test.ts — isSessionFresh + requireAdminSession freshness wiring.
- *
- * Coverage:
- *   isSessionFresh:
- *   - aal2 authentication_methods entry within/outside the window
- *   - multiple aal2 entries: most-recent completed_at wins
- *   - no authentication_methods: falls back to authenticated_at,
- *     within/outside the window
- *   - both sources unreadable → false (fail-closed)
- *   - malformed entries (non-object, wrong aal, bad completed_at) skipped
- *   requireAdminSession:
- *   - aal2-but-stale session redirects to the aal2+refresh step-up BEFORE
- *     the admin-marker fetch (order asserted via a not-called mock)
- *
- * Run: npx vitest run   (from portal/)
- */
+// Invariant: a stale aal2 session is redirected to step-up before any admin fetch.
 
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
-// vi.mock is hoisted above imports; referenced mocks must be too.
 const { getSessionMock, getIdentityMock } = vi.hoisted(() => ({
   getSessionMock: vi.fn(),
   getIdentityMock: vi.fn(),
@@ -44,8 +27,6 @@ const HOUR = 60 * 60 * 1000;
 function withMethods(...methods: Array<{ aal?: unknown; completed_at?: unknown }>): Session {
   return buildSession('aal2', methods as SessionAuthenticationMethod[], { authenticated_at: undefined });
 }
-
-// ── isSessionFresh ───────────────────────────────────────────────────────────
 
 describe('isSessionFresh — aal2 authentication_methods, within/outside window', () => {
   it.each([
@@ -120,8 +101,6 @@ describe('isSessionFresh — malformed entries are skipped, not fatal', () => {
     expect(isSessionFresh(session, 2)).toBe(true);
   });
 });
-
-// ── requireAdminSession — freshness gate ordering ───────────────────────────
 
 function fakeAstro(pathname = '/admin', search = '') {
   return {

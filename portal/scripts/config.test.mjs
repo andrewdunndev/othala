@@ -1,56 +1,26 @@
-// Tests for src/lib/config.ts — the Othala portal env-config module.
-//
-// Run with: npx vitest run scripts/config.test.mjs
-//
-// Coverage:
-//   - required-no-default vars throw in production when absent
-//   - required-no-default vars return dev defaults outside production
-//   - neutral-default vars return their documented defaults when unset
-//   - explicit env values override every default
-//   - OTHALA_INSTANCE_NAME falls back to OTHALA_SITE_NAME
-//   - OTHALA_IDENTITY_GROUPS: parsing, ordering, 'admin' invariant
-//   - trailing-slash normalisation on OTHALA_PUBLIC_URL
+// Invariant: portal env config validates required values and rejects unsafe ones at load.
 
 import { test, beforeEach } from 'vitest';
 import assert from 'node:assert/strict';
 
-// ── helpers ───────────────────────────────────────────────────────────────────
-
-/**
- * Import config.ts with a controlled env snapshot. Each call re-imports the
- * module in a fresh context (bypassing Node's ESM cache) by appending a
- * bust parameter so the module-load-time code re-runs.
- */
 async function loadConfig(env = {}) {
-  // Snapshot + override
   const saved = { ...process.env };
-  // Clear all OTHALA_* vars first so stale values don't leak between tests.
   for (const key of Object.keys(process.env)) {
     if (key.startsWith('OTHALA_') || key === 'NODE_ENV') delete process.env[key];
   }
   Object.assign(process.env, env);
 
   try {
-    // Base36, not the raw float: Math.random()'s decimal point trips
-    // Vite's extension-sniffing regex (/\.\w+$/), which then transforms
-    // this module as plain JS instead of TS and fails on type syntax.
     const bust = `?bust=${Date.now()}-${Math.random().toString(36).slice(2)}`;
-    // @vite-ignore: bust is a runtime cache-buster (forces a fresh module
-    // instance per call), not a build-time-resolvable specifier — vitest's
-    // Vite pipeline needs this annotation to skip static import analysis
-    // and pass the computed specifier straight to the runtime loader.
     const mod = await import(/* @vite-ignore */ `../src/lib/config.ts${bust}`);
     return mod;
   } finally {
-    // Restore original env
     for (const key of Object.keys(process.env)) {
       if (key.startsWith('OTHALA_') || key === 'NODE_ENV') delete process.env[key];
     }
     Object.assign(process.env, saved);
   }
 }
-
-// ── OTHALA_PUBLIC_URL ─────────────────────────────────────────────────────────
 
 test('publicUrl: throws in production when OTHALA_PUBLIC_URL is absent', async () => {
   await assert.rejects(
@@ -76,9 +46,6 @@ test('publicUrl: returns dev default in test when absent', async () => {
   assert.equal(publicUrl, 'http://localhost:4321');
 });
 
-// The other required-in-prod vars must also be present or module load throws
-// before reaching the publicUrl assertion. Bundle them into the prod-success
-// env so these cases isolate the publicUrl behaviour under test.
 const PROD_REQUIRED = {
   OTHALA_SMTP_CONNECTION_URI: 'smtps://u:p@smtp.example.com:465',
   OTHALA_CONTACT_RECIPIENT: 'ops@example.com',
@@ -111,8 +78,6 @@ test('publicUrl: strips multiple trailing slashes', async () => {
   assert.equal(publicUrl, 'https://auth.example.com');
 });
 
-// ── OTHALA_SMTP_CONNECTION_URI ────────────────────────────────────────────────
-
 test('smtpConnectionUri: throws in production when absent', async () => {
   await assert.rejects(
     () => loadConfig({ NODE_ENV: 'production', OTHALA_PUBLIC_URL: 'https://a.example.com' }),
@@ -133,8 +98,6 @@ test('smtpConnectionUri: uses explicit value', async () => {
   assert.equal(smtpConnectionUri, 'smtps://x:y@relay:465');
 });
 
-// ── OTHALA_CONTACT_RECIPIENT ──────────────────────────────────────────────────
-
 test('contactRecipient: uses explicit value when set', async () => {
   const { contactRecipient } = await loadConfig({
     NODE_ENV: 'test',
@@ -144,9 +107,6 @@ test('contactRecipient: uses explicit value when set', async () => {
 });
 
 test('contactRecipient: throws in production when OTHALA_CONTACT_RECIPIENT is not set', async () => {
-  // Admin authority is the metadata_admin.admin marker, so no admin
-  // email list exists to serve as a contact-form recipient fallback.
-  // OTHALA_CONTACT_RECIPIENT is required in production.
   await assert.rejects(
     () =>
       loadConfig({
@@ -157,8 +117,6 @@ test('contactRecipient: throws in production when OTHALA_CONTACT_RECIPIENT is no
     /contact recipient/,
   );
 });
-
-// ── OTHALA_SITE_NAME ──────────────────────────────────────────────────────────
 
 test('siteName: defaults to "Othala" when unset', async () => {
   const { siteName } = await loadConfig({ NODE_ENV: 'test' });
@@ -173,8 +131,6 @@ test('siteName: uses explicit value', async () => {
   assert.equal(siteName, 'Acme Portal');
 });
 
-// ── OTHALA_ADMIN_CONTACT ──────────────────────────────────────────────────────
-
 test('adminContact: defaults to "your administrator" when unset', async () => {
   const { adminContact } = await loadConfig({ NODE_ENV: 'test' });
   assert.equal(adminContact, 'your administrator');
@@ -187,8 +143,6 @@ test('adminContact: uses explicit value', async () => {
   });
   assert.equal(adminContact, 'helpdesk@example.com');
 });
-
-// ── OTHALA_INSTANCE_NAME ──────────────────────────────────────────────────────
 
 test('instanceName: falls back to siteName default when neither is set', async () => {
   const { instanceName, siteName } = await loadConfig({ NODE_ENV: 'test' });
@@ -212,8 +166,6 @@ test('instanceName: uses explicit OTHALA_INSTANCE_NAME when set', async () => {
   assert.equal(instanceName, 'Acme SSO');
 });
 
-// ── OTHALA_DEFAULT_SCHEMA_ID ──────────────────────────────────────────────────
-
 test('defaultSchemaId: defaults to "default" when unset', async () => {
   const { defaultSchemaId } = await loadConfig({ NODE_ENV: 'test' });
   assert.equal(defaultSchemaId, 'default');
@@ -227,8 +179,6 @@ test('defaultSchemaId: uses explicit value', async () => {
   assert.equal(defaultSchemaId, 'family');
 });
 
-// ── OTHALA_IDENTITY_GROUPS ────────────────────────────────────────────────────
-
 test('identityGroups: defaults to ["admin", "everyone"] when unset (admin + default group)', async () => {
   const { identityGroups } = await loadConfig({ NODE_ENV: 'test' });
   assert.deepEqual(identityGroups, ['admin', 'everyone']);
@@ -239,7 +189,6 @@ test('identityGroups: parses comma-separated list with admin first, default grou
     NODE_ENV: 'test',
     OTHALA_IDENTITY_GROUPS: 'admin,family,friends,work',
   });
-  // 'everyone' (default OTHALA_DEFAULT_GROUP) is appended automatically.
   assert.deepEqual(identityGroups, ['admin', 'family', 'friends', 'work', 'everyone']);
 });
 
@@ -280,8 +229,6 @@ test('identityGroups: trims whitespace around group names', async () => {
   assert.ok(identityGroups.includes('friends'));
   assert.ok(!identityGroups.includes(' family '));
 });
-
-// ── OTHALA_DEFAULT_GROUP ──────────────────────────────────────────────────────
 
 test('defaultGroup: defaults to "everyone" when unset', async () => {
   const { defaultGroup } = await loadConfig({ NODE_ENV: 'test' });
@@ -329,8 +276,6 @@ test('identityGroups: custom default group appended automatically', async () => 
 });
 
 test('identityGroups: default group (everyone) appended to bare ["admin"] default', async () => {
-  // When OTHALA_IDENTITY_GROUPS is unset the list starts as ['admin'];
-  // defaultGroup ('everyone') must be appended.
   const { identityGroups } = await loadConfig({ NODE_ENV: 'test' });
   assert.deepEqual(identityGroups, ['admin', 'everyone']);
 });

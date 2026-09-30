@@ -1,12 +1,4 @@
-// Tests for src/server/otel.mjs — the PII redaction contract (review finding H1).
-//
-// Run with: npx vitest run scripts/otel-redaction.test.mjs
-//
-// This is the IdP telemetry path: spans must never carry session cookies, CSRF
-// tokens, bearer headers, OAuth challenge ids, recovery/login codes, or one-time
-// tokens. We import ONLY the exported pure functions + the processor class — we
-// do NOT call startTelemetry / stand up the SDK (importing the module is a no-op
-// because OTEL_EXPORTER_OTLP_ENDPOINT is unset in the test env).
+// Invariant: scrubUrl and scrubQuery redact every sensitive value and leave the rest intact.
 
 import { test } from 'vitest';
 import assert from 'node:assert/strict';
@@ -19,8 +11,6 @@ import {
 } from '../src/server/otel.mjs';
 
 const REDACTED = '[REDACTED]';
-
-// ── scrubUrl: '?'-bearing URLs ──────────────────────────────────────────────
 
 test('scrubUrl redacts every sensitive value in a ?-bearing http.url', () => {
   const url =
@@ -38,7 +28,6 @@ test('scrubUrl redacts every sensitive value in a ?-bearing http.url', () => {
   ]) {
     assert.match(out, new RegExp(`${k}=\\[REDACTED\\]`), `${k} not redacted`);
   }
-  // Path is preserved; no raw sensitive value survives.
   assert.ok(out.startsWith('https://auth.example.test/auth/login?'));
   for (const v of ['t1', 'c1', 's1', 'lc1', 'cc1', 'gc1', 'f1']) {
     assert.equal(out.includes(`=${v}`), false, `raw value ${v} leaked`);
@@ -67,8 +56,6 @@ test('scrubUrl returns a ?-less string unchanged', () => {
   assert.equal(scrubUrl(undefined), undefined);
 });
 
-// ── scrubQuery: the bare-query path (url.query, no leading '?') ──────────────
-
 test('scrubQuery scrubs a bare query string (no leading ?)', () => {
   const out = scrubQuery('token=abc&foo=bar');
   assert.match(out, /token=\[REDACTED\]/);
@@ -80,8 +67,6 @@ test('scrubQuery is case-insensitive on the key and keeps bare flags', () => {
   assert.match(scrubQuery('TOKEN=abc'), /TOKEN=\[REDACTED\]/);
   assert.equal(scrubQuery('debug&foo=bar'), 'debug&foo=bar');
 });
-
-// ── isAdminSpan ─────────────────────────────────────────────────────────────
 
 test('isAdminSpan is true for /admin/ targets and absolute admin URLs', () => {
   assert.equal(isAdminSpan({ 'http.target': '/admin/' }), true);
@@ -100,8 +85,6 @@ test('isAdminSpan is false for non-admin routes and empty/missing attrs', () => 
   assert.equal(isAdminSpan(null), false);
 });
 
-// ── redactAttributes: headers (incl. array-valued) + url attrs ──────────────
-
 test('redactAttributes redacts sensitive request/response header attrs', () => {
   const attrs = {
     'http.request.header.cookie': 'ory_kratos_session=abc',
@@ -115,7 +98,6 @@ test('redactAttributes redacts sensitive request/response header attrs', () => {
   assert.equal(attrs['http.request.header.authorization'], REDACTED);
   assert.equal(attrs['http.request.header.x-csrf-token'], REDACTED);
   assert.equal(attrs['http.response.header.set-cookie'], REDACTED);
-  // Non-sensitive header untouched.
   assert.equal(attrs['http.request.header.accept'], 'text/html');
 });
 
@@ -141,15 +123,11 @@ test('redactAttributes scrubs ?-bearing url attrs and the bare url.query', () =>
   assert.match(attrs['http.url'], /foo=bar/);
   assert.match(attrs['http.target'], /consent_challenge=\[REDACTED\]/);
   assert.match(attrs['url.full'], /code=\[REDACTED\]/);
-  // The bare-query path — must be scrubbed even with no '?' (finding M2).
   assert.match(attrs['url.query'], /flow=\[REDACTED\]/);
   assert.match(attrs['url.query'], /keep=1/);
   assert.equal(attrs['url.query'].includes('=f&'), false, 'raw flow leaked');
 });
 
-// ── RedactingSpanProcessor.onEnd ────────────────────────────────────────────
-
-// Fake delegate capturing the lifecycle calls the processor forwards.
 function fakeDelegate() {
   const calls = { onStart: [], onEnd: [], forceFlush: 0, shutdown: 0 };
   return {
@@ -191,7 +169,6 @@ test('RedactingSpanProcessor forwards a non-admin span ONCE with scrubbed attrs'
   assert.equal(delegate.calls.onEnd.length, 1, 'non-admin span not forwarded once');
   const forwarded = delegate.calls.onEnd[0];
   assert.strictEqual(forwarded, span, 'forwarded a different span object');
-  // Redaction happened in place before the delegate saw it.
   assert.match(forwarded.attributes['http.target'], /token=\[REDACTED\]/);
   assert.match(forwarded.attributes['http.target'], /foo=bar/);
   assert.equal(forwarded.attributes['http.request.header.cookie'], REDACTED);

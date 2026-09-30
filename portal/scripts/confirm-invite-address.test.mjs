@@ -1,20 +1,4 @@
-// Tests for src/lib/access.ts confirmsInviteAddress (D1 best-practice
-// bundle: send-time address confirmation for send-invite-email).
-//
-// Run with: npx vitest run scripts/confirm-invite-address.test.mjs
-//
-// Same style as admin-recovery-gate.test.mjs: imports the real TS function
-// directly and exercises it as a pure predicate — no Kratos, no HTTP, no
-// Astro. The function is the SERVER-SIDE half of the confirmation check
-// (portal/src/pages/admin/users/[id].astro calls it in the action handler
-// before sendInviteRecoveryEmail is ever reached); a UI-only check is not
-// an invariant, so this is the half that has to be provably correct.
-//
-// Coverage:
-//   - exact match returns true
-//   - any byte difference (case, whitespace, substring) returns false —
-//     the comparison is byte-equal, not case-folded or trimmed
-//   - empty confirmation (field left blank / omitted) returns false
+// Invariant: an invite email is sent only to a confirmed address.
 
 import { test } from 'vitest';
 import assert from 'node:assert/strict';

@@ -1,11 +1,4 @@
-// Tests for portal/src/lib/gate.ts — the COMPLETE access gate (CU1 item 2).
-//
-// Run with: npx vitest run scripts/gate.test.mjs
-//
-// Imports the canonical implementation directly. The gate keys off the
-// manifest's bound access groups (manifest.accessGroups, OR-semantics) AND
-// state==active, both fail-closed — NOT a derived `access-<clientId>` name. The
-// exhaustive fail-closed property lives in portal/scripts/gate-property.test.mjs.
+// Invariant: the access gate admits only active identities holding the bound group.
 
 import { test } from 'vitest';
 import assert from 'node:assert/strict';
@@ -29,7 +22,6 @@ function identity(overrides = {}) {
   };
 }
 
-// A manifest fixture: accessGroups is the load-bearing binding.
 function manifest(clientId, opts = {}) {
   return {
     clientId,
@@ -133,15 +125,6 @@ test('state check precedes group check', () => {
   assert.equal(r.reason, 'identity not active');
 });
 
-// A flat `access-`-prefixed name is an ordinary binding. This asserts the gate
-// ALLOWS when the manifest binds `access-proxywatch` AND the identity holds
-// `access-proxywatch` — both sides carry the same name, so what is pinned is that
-// the prefix gets no special handling, not that a stale group name is remapped
-// onto a renamed binding. The gate compares bound names against identity groups
-// verbatim (portal/src/lib/gate.ts:
-// `accessGroups.some((g) => userGroups.includes(g))`) and derives nothing from
-// clientId. Retained across the `<svc>-access` rename: that rename was cosmetic
-// and forced no data migration, so a flat legacy binding must still admit.
 test('regression: access-proxywatch flat binding still admits a member', () => {
   const r = enforceAccessGate(
     identity({ metadata_admin: { groups: ['access-proxywatch'] } }),
@@ -151,8 +134,6 @@ test('regression: access-proxywatch flat binding still admits a member', () => {
   assert.equal(r.allowed, true);
 });
 
-// enforceGroupGate is forward-auth's arbitrary-group path: a single required
-// group, no manifest, no skip_access_check hatch.
 test('enforceGroupGate: active member of the named group → allow', () => {
   const r = enforceGroupGate(identity({ metadata_admin: { groups: ['access-proxywatch'] } }), 'access-proxywatch');
   assert.equal(r.allowed, true);
@@ -162,13 +143,6 @@ test('enforceGroupGate: not a member → deny', () => {
   const r = enforceGroupGate(identity({ metadata_admin: { groups: ['other'] } }), 'access-proxywatch');
   assert.equal(r.allowed, false);
 });
-
-// ── group names are compared VERBATIM ────────────────────────────────────────
-// hasGroup used to lowercase both sides — the only one of the group
-// comparisons in portal/src that did, and the most permissive of them. There is
-// one canonical form (GROUP_RE, src/lib/access-groups.ts) validated at every
-// boundary this codebase owns, so a case fold could only ever match a name no
-// owned boundary could have written.
 
 test('hasGroup does NOT match a mixed-case stored group against a lowercase query', () => {
   const id = identity({ metadata_admin: { groups: ['Access-Grafana'] } });
@@ -189,8 +163,6 @@ test('hasGroup rejects a different group name', () => {
   const id = identity({ metadata_admin: { groups: ['access-grafana'] } });
   assert.equal(hasGroup(id, 'access-photos'), false);
 });
-
-// ── the READ boundary we do not own ──────────────────────────────────────────
 
 test('nonCanonicalGroups reports exactly the stored names that miss GROUP_RE', () => {
   const id = identity({ metadata_admin: { groups: ['access-proxywatch', 'Access-Grafana', 'has space'] } });

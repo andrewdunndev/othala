@@ -1,9 +1,5 @@
-// Every hook list in kratos/kratos.yml against the hook names the Kratos
-// v26.2.0 config schema allows at that placement (embedx/config.schema.json:
-// selfServiceAfterSettingsAuthMethod, selfServiceAfterSettingsProfileMethod,
-// selfServiceAfterDefaultLoginMethodHooks, selfServiceAfterRegistrationMethod,
-// selfServiceAfterRecoveryHooks). Kratos refuses to start on a mismatch; this
-// catches it without a container. A placement missing here fails too.
+// Invariant: every hook list in kratos.yml uses hook names the Kratos config schema allows.
+
 import { test } from 'vitest';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';

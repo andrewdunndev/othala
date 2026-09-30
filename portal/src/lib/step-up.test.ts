@@ -1,10 +1,10 @@
+// Invariant: hasSecondFactor reflects enrolled credentials only.
+
 import { describe, it, expect } from 'vitest';
 import { needsStepUp, hasSecondFactor } from './step-up';
 import type { Identity } from './types';
 import { identity as buildIdentity, withCredential, withLookupSecret, withPasskey, withTotp, withWebauthnKey } from './test-builders';
 
-// Credential variants over the builder's admin-API identity, which always
-// carries the schema's password and webauthn entries (identifiers, no keys).
 const APPLY: Record<string, (i: Identity) => Identity> = {
   password: (i) => i,
   passkey: withPasskey,

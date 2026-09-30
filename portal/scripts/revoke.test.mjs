@@ -1,14 +1,4 @@
-// Tests for src/lib/revoke.ts — the in-process revocation fan-out (CU3 B1).
-//
-// Run with: npx vitest run scripts/revoke.test.mjs
-//
-// Proves the fan-out contract with injected SDK stubs (no live Kratos/Hydra):
-//   - ORDER: step 1 (state->inactive, deactivate only) precedes step 2
-//     (delete-sessions); steps 3-4 are the Hydra login+consent revoke.
-//   - deactivate trigger runs step 1; admin/sign-out triggers do NOT.
-//   - step-2 failure ABORTS the fan-out (Hydra steps never fire) and throws
-//     a prescriptive RevokeError naming kratos-admin.
-//   - prescriptive errors name the dependency for hydra-admin failures too.
+// Invariant: revocation runs its steps in order and a failed session-delete step aborts the fan-out.
 
 import { test } from 'vitest';
 import assert from 'node:assert/strict';
@@ -67,7 +57,6 @@ test('deactivate trigger runs step 1 (state->inactive) BEFORE step 2', async () 
     'revokeOAuth2LoginSessions',
     'revokeOAuth2ConsentSessions',
   ]);
-  // The state flip is the documented [{op:replace,path:/state,value:inactive}].
   assert.deepEqual(calls[0][1].jsonPatch, [
     { op: 'replace', path: '/state', value: 'inactive' },
   ]);
@@ -95,13 +84,11 @@ test('step-2 (delete-sessions) failure ABORTS the fan-out', async () => {
       assert.ok(err instanceof RevokeError);
       assert.equal(err.dependency, 'kratos-admin');
       assert.equal(err.step, 'delete-sessions');
-      // Prescriptive: names the dependency + next action, not the raw error.
       assert.match(err.message, /kratos-admin/);
       assert.doesNotMatch(err.message, /kratos 500/);
       return true;
     },
   );
-  // Hydra steps must NOT have fired after the abort.
   const order = calls.map((c) => c[0]);
   assert.ok(!order.includes('revokeOAuth2LoginSessions'));
 });
@@ -109,13 +96,9 @@ test('step-2 (delete-sessions) failure ABORTS the fan-out', async () => {
 test('step-2 (delete-sessions) 404 = no active sessions: TOLERATED, fan-out continues to Hydra', async () => {
   const { calls, deps } = makeDeps();
   deps.identityApi.deleteIdentitySessions = async () => {
-    // Kratos v26 returns 404 (not 204) from DELETE sessions when the subject
-    // has no active sessions. "Nothing to revoke" is the success postcondition.
     throw new ResponseError(new Response(null, { status: 404 }), 'Not Found');
   };
 
-  // MUST NOT throw: a subject with no live Kratos session can still hold a
-  // remembered Hydra login / live tokens, which "sign out everywhere" must cut.
   const result = await revokeSubject('sub-1', {}, deps);
   const order = calls.map((c) => c[0]);
   assert.ok(order.includes('revokeOAuth2LoginSessions'), 'Hydra login revoke must run after a 404');
@@ -132,7 +115,6 @@ test('step-2 failure under deactivate still runs step 1 first then aborts', asyn
     throw new Error('boom');
   };
   await assert.rejects(() => revokeSubject('sub-1', { deactivate: true }, deps), RevokeError);
-  // state flip happened (step 1), session delete attempted (step 2), no Hydra.
   const order = calls.map((c) => c[0]);
   assert.deepEqual(order, ['patchIdentity', 'deleteIdentitySessions']);
 });
@@ -150,7 +132,6 @@ test('step-1 (state->inactive) failure throws prescriptive kratos-admin error', 
       return true;
     },
   );
-  // Nothing after step 1 ran.
   assert.equal(calls.length, 0);
 });
 

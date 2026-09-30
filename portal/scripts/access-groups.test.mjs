@@ -1,19 +1,8 @@
-// Tests for portal/src/lib/access-groups.ts — parseAccessGroups precedence.
-//
-// Run with: npx vitest run scripts/access-groups.test.mjs
-//
-// Dual-read parse precedence:
-//   1. presentation.access non-empty list → use it.
-//   2. else presentation.access_group non-empty → [access_group] (compat shim).
-//   3. else [] (no `everyone` fallback at this layer).
-//
-// Phase 1 is non-breaking: bad charset names are skipped, never thrown.
+// Invariant: parseAccessGroups prefers the access list over access_group, keeps declared order and de-dupes.
 
 import { test } from 'vitest';
 import assert from 'node:assert/strict';
 import { parseAccessGroups } from '../src/lib/access-groups.ts';
-
-// ── (1) the `access:` list path ───────────────────────────────────────────────
 
 test('parseAccessGroups: single-element access list is used', () => {
   assert.deepEqual(parseAccessGroups({ access: ['memories'] }), ['memories']);
@@ -48,8 +37,6 @@ test('parseAccessGroups: duplicates within access list are de-duped, order kept'
   );
 });
 
-// ── (2) the [access_group] compat path ────────────────────────────────────────
-
 test('parseAccessGroups: only access_group → one-element list (compat shim)', () => {
   assert.deepEqual(
     parseAccessGroups({ access_group: 'access-photos' }),
@@ -61,8 +48,6 @@ test('parseAccessGroups: only access_group → one-element list (compat shim)', 
 test('parseAccessGroups: compat shim trims whitespace', () => {
   assert.deepEqual(parseAccessGroups({ access_group: '  memories  ' }), ['memories']);
 });
-
-// ── (3) the empty [] path ─────────────────────────────────────────────────────
 
 test('parseAccessGroups: neither field present → []', () => {
   assert.deepEqual(parseAccessGroups({}), []);
@@ -83,8 +68,6 @@ test('parseAccessGroups: empty access list falls back to access_group', () => {
 test('parseAccessGroups: empty access_group string → []', () => {
   assert.deepEqual(parseAccessGroups({ access_group: '' }), []);
 });
-
-// ── non-breaking charset handling (Phase 1: skip, never throw) ─────────────────
 
 test('parseAccessGroups: bad-charset name in access list is skipped, not thrown', () => {
   assert.deepEqual(

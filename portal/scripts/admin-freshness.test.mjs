@@ -1,18 +1,4 @@
-// Tests for the isSessionFresh() helper extracted in FIX-B from admin.ts.
-//
-// Run with: npx vitest run scripts/admin-freshness.test.mjs
-//
-// Coverage:
-//   - aal2 authentication_methods entry within window → true
-//   - aal2 entry outside window → false
-//   - multiple aal2 entries, most-recent within window → true
-//   - multiple aal2 entries, most-recent outside window → false
-//   - aal2 entry with Date object (SDK deserialization) → works
-//   - no aal2 entries, falls back to authenticated_at within window → true
-//   - no aal2 entries, falls back to authenticated_at outside window → false
-//   - neither field present → null (fail-open)
-//   - malformed completed_at entry skipped, falls back to authenticated_at
-//   - non-aal2 entries are ignored, falls back to authenticated_at
+// Invariant: isSessionFresh fails closed when freshness cannot be read.
 
 import { test } from 'vitest';
 import assert from 'node:assert/strict';
@@ -21,12 +7,9 @@ import { isSessionFresh } from '../src/lib/admin.ts';
 const WINDOW_HOURS = 8;
 const WINDOW_MS = WINDOW_HOURS * 60 * 60 * 1000;
 
-/** ISO timestamp offset from now by delta ms (negative = in the past). */
 function ts(deltaMs) {
   return new Date(Date.now() + deltaMs).toISOString();
 }
-
-// ── authentication_methods primary source ─────────────────────────────────────
 
 test('FIX-B: aal2 method completed_at within window → true', () => {
   const session = {
@@ -82,11 +65,8 @@ test('FIX-B: non-aal2 entries are ignored; falls back to authenticated_at within
     ],
     authenticated_at: ts(-(WINDOW_MS - 120_000)),
   };
-  // aal2 entries: none → fall back to authenticated_at (within window) → true
   assert.equal(isSessionFresh(session, WINDOW_HOURS), true);
 });
-
-// ── authenticated_at fallback ─────────────────────────────────────────────────
 
 test('FIX-B: no authentication_methods array — falls back to authenticated_at within window → true', () => {
   const session = {
@@ -108,8 +88,6 @@ test('FIX-B: authenticated_at as Date object (SDK-deserialized) within window �
   };
   assert.equal(isSessionFresh(session, WINDOW_HOURS), true);
 });
-
-// ── fail-closed: neither source readable ───────────────────────────────────
 
 test('FIX-B: neither authentication_methods nor authenticated_at → false (fail-closed)', () => {
   const session = {};

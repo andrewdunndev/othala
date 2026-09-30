@@ -1,9 +1,4 @@
-// Tests for src/lib/claims.ts — id_token claim mapping (CU1 item 3).
-//
-// Run with: npx vitest run scripts/claims.test.mjs
-//
-// Mirrors BuildIDTokenClaims in consent/claims.go against the family
-// identity schema (traits: username/email/displayName).
+// Invariant: id_token claims map only from real memberships and declared roles.
 
 import { test } from 'vitest';
 import assert from 'node:assert/strict';
@@ -92,8 +87,6 @@ test('null identity yields empty claims', () => {
   assert.deepEqual(buildIDTokenClaims(null), {});
 });
 
-// ── deepMergeClaims (H1) ──────────────────────────────────────────────────
-
 test('deepMergeClaims: array conflict becomes union, dst order preserved', () => {
   const dst = { groups: ['a', 'b'] };
   const src = { groups: ['b', 'c'] };
@@ -108,32 +101,21 @@ test('deepMergeClaims: scalar conflict still src-wins', () => {
   assert.equal(dst.x, 2);
 });
 
-// ── Prototype-pollution guard ─────────────────────────────────────────────────
-
 test('deepMergeClaims: __proto__ key is silently dropped (no pollution)', () => {
-  // JSON.parse produces a parsed object where __proto__ is a plain string key.
-  // Without the guard, dst["__proto__"] = ... writes onto Object.prototype.
   const src = JSON.parse('{"__proto__":{"polluted":true},"safe":"value"}');
   const dst = { existing: 1 };
   deepMergeClaims(dst, src);
-  // __proto__ key must not have been written
   assert.equal(Object.prototype.polluted, undefined, '__proto__ must not pollute Object.prototype');
-  // Other keys are still merged normally
   assert.equal(dst.safe, 'value');
   assert.equal(dst.existing, 1);
 });
 
 test('deepMergeClaims: constructor key is silently dropped (no pollution)', () => {
-  // A crafted src with a "constructor" key: without the guard, recursive merge
-  // into dst.constructor (a function) would throw or corrupt prototype state.
   const src = { constructor: { prototype: { polluted: 'constructor-path' } }, safe: 'ok' };
   const dst = { existing: 2 };
   deepMergeClaims(dst, src);
-  // constructor key must not have been written onto dst
   assert.equal(Object.prototype.polluted, undefined, 'constructor path must not pollute prototype');
-  // dst.constructor must still be the normal Object constructor
   assert.equal(dst.constructor, Object);
-  // Other keys are still merged normally
   assert.equal(dst.safe, 'ok');
 });
 
@@ -141,19 +123,10 @@ test('deepMergeClaims: prototype key is silently dropped (no pollution)', () => 
   const src = { prototype: { polluted: 'prototype-path' }, safe: 'also-ok' };
   const dst = {};
   deepMergeClaims(dst, src);
-  // prototype key must not appear on dst
   assert.equal(Object.getOwnPropertyDescriptor(dst, 'prototype'), undefined);
   assert.equal(dst.safe, 'also-ok');
 });
 
-// ── Minimal manifest helper for composeIDTokenClaims tests ────────────────
-
-/**
- * Build a minimal ClientManifest sufficient for composeIDTokenClaims:
- * emit_groups_claim defaults true (null = absent → default true),
- * a single role "member" with the given claim_emit, and groupRoleMap
- * mapping the provided group to that role.
- */
 function manifest({ group, roleClaimEmit, emitGroupsClaim = null } = {}) {
   return {
     clientId: 'filedrop',
@@ -185,19 +158,15 @@ function manifest({ group, roleClaimEmit, emitGroupsClaim = null } = {}) {
   };
 }
 
-/** Identity with given groups in metadata_admin. */
 function identityWithGroups(groups) {
   return base({ metadata_admin: { groups } });
 }
-
-// ── composeIDTokenClaims H1: real memberships survive role claim_emit ─────
 
 test('composeIDTokenClaims H1: filedrop member only — groups is union of real + role', () => {
   const id = identityWithGroups(['filedrop']);
   const m = manifest({ group: 'filedrop', roleClaimEmit: { groups: ['filedrop-user'] } });
   const c = composeIDTokenClaims(id, m);
   assert.ok(Array.isArray(c.groups), 'groups is an array');
-  // Real membership preserved; role claim additive
   assert.ok(c.groups.includes('filedrop'), 'filedrop preserved');
   assert.ok(c.groups.includes('filedrop-user'), 'filedrop-user added');
 });
@@ -211,7 +180,6 @@ test('composeIDTokenClaims H1: filedrop-admin only — admin membership preserve
 });
 
 test('composeIDTokenClaims H1: filedrop+filedrop-admin — both preserved, no duplicates', () => {
-  // groupRoleMap: filedrop → member, filedrop-admin → member (same role, first match wins)
   const id = identityWithGroups(['filedrop', 'filedrop-admin']);
   const m = {
     ...manifest({ group: 'filedrop', roleClaimEmit: { groups: ['filedrop-user'] } }),
@@ -222,12 +190,9 @@ test('composeIDTokenClaims H1: filedrop+filedrop-admin — both preserved, no du
   assert.ok(c.groups.includes('filedrop'), 'filedrop preserved');
   assert.ok(c.groups.includes('filedrop-admin'), 'filedrop-admin preserved');
   assert.ok(c.groups.includes('filedrop-user'), 'filedrop-user additive');
-  // No duplicates
   const groups = c.groups;
   assert.equal(groups.length, new Set(groups).size, 'no duplicates');
 });
-
-// ── composeIDTokenClaims H2: scope-gate ───────────────────────────────────
 
 test('composeIDTokenClaims H2: requestedScope [openid] — no email/name/groups', () => {
   const id = identityWithGroups(['filedrop']);
@@ -262,8 +227,6 @@ test('composeIDTokenClaims H2: requestedScope [openid, email, profile, groups] �
   assert.ok(Array.isArray(c.groups), 'groups is an array');
 });
 
-// ── composeIDTokenClaims back-compat: omitting requestedScope emits all ───
-
 test('composeIDTokenClaims back-compat: no requestedScope → all claims emitted', () => {
   const id = identityWithGroups(['filedrop']);
   const m = manifest();
@@ -273,18 +236,6 @@ test('composeIDTokenClaims back-compat: no requestedScope → all claims emitted
   assert.equal(c.preferred_username, 'ada');
   assert.ok(Array.isArray(c.groups), 'groups is an array');
 });
-
-// ── issue #7: lookupRole resolves by RANK, not stored group order ────────
-//
-// Issue #7 claimed lookupRole takes the FIRST match in metadata_admin.groups
-// stored order, so an identity holding both <svc>-access and <svc>-admin
-// could resolve 'user' whenever access is stored first (which
-// normalizeGroupOrder's alphabetical sort always does — "access" < "admin").
-// That is not what the code does: lookupRole walks EVERY stored group and
-// keeps the LOWEST role index (highest rank) over the whole matched set (see
-// its "WHY step 2 is no longer first-stored-match" doc comment), so the
-// result is a pure function of the group SET, not its order. Both storage
-// orders below must resolve the same higher-ranked 'admin' role.
 
 const rankedManifest = {
   ...manifest({ group: 'filedrop-access' }),

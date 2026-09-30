@@ -1,26 +1,4 @@
-// Render tests for src/components/FlowNodes.astro (CU5 output-equivalence).
-//
-// Run with: npx vitest run scripts/flownodes-render.test.mjs
-//
-// nodes.ts (the attribute policy) is unit-tested in nodes.test.mjs; this
-// suite closes the gap by asserting the COMPONENT'S RENDERED HTML — the
-// shape the recovery / verification / settings pages actually emit.
-//
-// The component is a real .astro SFC with no plain-node import path. We
-// drive Astro's own Container API through a Vite SSR pipeline configured
-// from the project's astro config — the same machinery `vitest +
-// getViteConfig` uses, here invoked directly rather than reused from the
-// runner's own Vite instance. Runs fine as a second, independent Vite
-// server inside vitest's process; left this way since this migration is a
-// mechanical runner swap, not a rewrite of how the file drives Astro.
-//
-// Coverage:
-//   - hidden node  -> <input type="hidden"> with name + value (CSRF token
-//     rides through the same hidden path)
-//   - submit node  -> <button> with the right buttonClass; onclick gated by
-//     passOnclick (present when true, absent when false)
-//   - labeled input reads node.meta.label.text for the <label>
-//   - value attribute suppressed when passValue=false
+// Invariant: FlowNodes renders Kratos flow nodes equivalently to the reference output.
 
 import { test, beforeAll, afterAll } from 'vitest';
 import assert from 'node:assert/strict';
@@ -56,8 +34,6 @@ async function render(props) {
   return container.renderToString(FlowNodes, { props });
 }
 
-// Strip Astro's dev-only source-map data attributes so assertions read the
-// real attribute policy, not the debug annotations.
 function clean(html) {
   return html.replace(/\s+data-astro-source-(?:file|loc)="[^"]*"/g, '');
 }
@@ -94,7 +70,6 @@ test('submit node renders a button with the given buttonClass', async () => {
     submitLabel: 'Fallback',
   }));
   assert.match(html, /<button class="button button-secondary" type="submit" name="method"/);
-  // Button text comes from meta.label.text, not the submitLabel fallback.
   assert.match(html, />Submit code<\/button>/);
   assert.doesNotMatch(html, />Fallback<\/button>/);
 });
@@ -181,7 +156,6 @@ test('passValue=false suppresses the value attribute (password fields)', async (
     passValue: false,
     defaultAutocomplete: 'new-password',
   }));
-  // No value attribute at all, and certainly not the secret.
   assert.doesNotMatch(html, /value="leak-me"/);
   assert.doesNotMatch(html, /<input id="password"[^>]*\svalue=/);
   assert.match(html, /autocomplete="new-password"/);
@@ -215,8 +189,6 @@ test('only nodes in the requested group are rendered', async () => {
     buttonClass: 'button button-primary',
     submitLabel: 'Go',
   }));
-  // The default-group CSRF node is NOT rendered by a group="code" pass
-  // (the page renders the CSRF hidden input itself).
   assert.doesNotMatch(html, /name="csrf_token"/);
   assert.match(html, /name="code"/);
 });

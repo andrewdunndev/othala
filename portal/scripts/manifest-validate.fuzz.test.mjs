@@ -1,25 +1,10 @@
-// Adversarial property-based fuzz test for the manifest-validate security surface.
-//
-// SECURITY INVARIANT:
-//   validateClients MUST reject any OIDC client whose audience entries do not
-//   have exact-origin matches in the redirect_uri set (rule 3).
-//   audienceMatchesRedirect MUST compare by parsed ORIGIN (scheme://host[:port])
-//   ONLY — no substring/prefix match, no fragment confusion, no credential
-//   injection (user:pass@), no subdomain suffix confusion.
-//
-// Run with: npx vitest run scripts/manifest-validate.fuzz.test.mjs
+// Invariant: validateClients rejects any OIDC client whose audience entries are not bound to its own redirects.
 
 import { test } from 'vitest';
 import assert from 'node:assert/strict';
 import fc from 'fast-check';
 import { audienceMatchesRedirect, validateClients, parseManifest } from '../src/lib/manifests.ts';
 
-// ─── Helpers ──────────────────────────────────────────────────────────────────
-
-/**
- * Build a minimal ClientManifest object for testing, bypassing YAML parsing so
- * we can inject precise values that parseManifest might sanitise.
- */
 function makeManifest({ clientId = 'test-client', redirectUris = [], audience = [] } = {}) {
   return {
     clientId,
@@ -45,7 +30,6 @@ function makeManifest({ clientId = 'test-client', redirectUris = [], audience = 
   };
 }
 
-/** originOf mirrors the private function in manifests.ts. */
 function originOf(raw) {
   try {
     return new URL(raw).origin;
@@ -54,19 +38,10 @@ function originOf(raw) {
   }
 }
 
-// ─── Catalogue of known adversarial patterns (deterministic) ─────────────────
-
 const TRUSTED_ORIGIN = 'https://proxywatch.othala.test';
 const TRUSTED_REDIRECT = 'https://proxywatch.othala.test/callback';
 
-/**
- * Each entry: { label, audience, redirectUris, shouldPass }
- *
- * shouldPass = true  → validator must NOT fire rule 3.
- * shouldPass = false → validator MUST fire rule 3.
- */
 const ADVERSARIAL_CASES = [
-  // --- Cases the validator should REJECT (audience origin ≠ redirect origin) ---
   {
     label: 'credential injection: user:pass@host hides the real host',
     audience: ['https://proxywatch.othala.test:443@evil.com'],
@@ -127,23 +102,11 @@ const ADVERSARIAL_CASES = [
     redirectUris: [TRUSTED_REDIRECT],
     shouldPass: false,
   },
-  // NOTE: WHATWG URL normalises scheme-relative and backslash forms to canonical origin.
-  // https:proxywatch.othala.test  → origin: https://proxywatch.othala.test  (matches; not a bypass)
-  // https:\\proxywatch.othala.test → origin: https://proxywatch.othala.test (matches; not a bypass)
-  // These are NOT attack vectors: the URL parser resolves them to the same origin as the
-  // trusted redirect, so the validator correctly accepts them.
-  // The residual risk is the stored audience string is non-canonical (e.g. "https:app.example.com"
-  // in the token), which would cause client-side aud verification to fail at runtime — a
-  // consistency/correctness issue, not a security bypass. Documented below under notes.
 
-  // --- Redirect-side crafting: redirect_uri looks like it matches but does not ---
   {
     label: 'redirect with user:pass@trusted does NOT give the trusted origin',
     audience: [TRUSTED_ORIGIN],
     redirectUris: ['https://evil.com:443@proxywatch.othala.test/cb'],
-    // originOf('https://evil.com:443@proxywatch.othala.test/cb') = 'https://proxywatch.othala.test'
-    // So this SHOULD pass — the redirect is proxywatch.othala.test and audience is proxywatch.othala.test
-    // This is NOT an attack (the manifest operator controls redirect_uris)
     shouldPass: true,
   },
   {
@@ -159,7 +122,6 @@ const ADVERSARIAL_CASES = [
     shouldPass: false,
   },
 
-  // --- Cases the validator SHOULD accept ---
   {
     label: 'exact match: audience origin == redirect origin (happy path)',
     audience: [TRUSTED_ORIGIN],
@@ -168,8 +130,6 @@ const ADVERSARIAL_CASES = [
   },
   {
     label: 'explicit port 443 in redirect matches audience without port',
-    // new URL('https://proxywatch.othala.test:443/cb').origin === 'https://proxywatch.othala.test'
-    // (WHATWG URL normalises default ports away)
     audience: [TRUSTED_ORIGIN],
     redirectUris: ['https://proxywatch.othala.test:443/callback'],
     shouldPass: true,
@@ -200,8 +160,6 @@ const ADVERSARIAL_CASES = [
   },
 ];
 
-// ─── Deterministic adversarial test cases ────────────────────────────────────
-
 test('adversarial catalogue: each case meets its shouldPass expectation', () => {
   for (const { label, audience, redirectUris, shouldPass } of ADVERSARIAL_CASES) {
     const manifest = makeManifest({ redirectUris, audience });
@@ -224,37 +182,26 @@ test('adversarial catalogue: each case meets its shouldPass expectation', () => 
   }
 });
 
-// ─── Property 1: origin-exact matching is never a substring match ─────────────
-//
-// If parsed origin of audience != parsed origin of every redirect, rule 3 must fire.
-
 test('property: audienceMatchesRedirect is fail-closed when origins differ', () => {
   fc.assert(
     fc.property(
-      // A known-good audience URL
       fc.constantFrom(
         'https://app.example.com',
         'https://proxywatch.othala.test',
         'https://filedrop.othala.test',
         'https://login.example.net',
       ),
-      // A crafted redirect whose parsed origin is DIFFERENT from the audience
       fc.oneof(
-        // Subdomain suffix: audience + extra suffix
         fc.constantFrom('.evil.com', '.attacker.net', '.phish.io').map(
           (suffix) => `https://app.example.com${suffix}/cb`,
         ),
-        // Credential injection: trusted host as user info
         fc.constantFrom('evil.com', 'attacker.net').map(
           (host) => `https://app.example.com@${host}/cb`,
         ),
-        // Scheme change
         fc.constantFrom('http://', 'ftp://').map((scheme) => `${scheme}app.example.com/cb`),
-        // Port change
         fc.constantFrom(':8080', ':9443', ':3000').map(
           (port) => `https://app.example.com${port}/cb`,
         ),
-        // Random non-matching URL
         fc
           .webUrl({ withQueryParameters: false })
           .filter((u) => {
@@ -266,7 +213,6 @@ test('property: audienceMatchesRedirect is fail-closed when origins differ', () 
         const audienceOrigin = originOf(audience);
         const redirectOrigin = originOf(redirect);
 
-        // Precondition: origins must genuinely differ for the invariant to apply.
         if (audienceOrigin === null || redirectOrigin === null) return;
         if (audienceOrigin === redirectOrigin) return; // same origin → valid, skip
 
@@ -286,15 +232,9 @@ test('property: audienceMatchesRedirect is fail-closed when origins differ', () 
   );
 });
 
-// ─── Property 2: origin match is sufficient (no false rejections) ─────────────
-//
-// If every audience entry's origin IS in the redirect_uri origin set, rule 3
-// must NOT fire. This guards against regressions that tighten the check too far.
-
 test('property: audienceMatchesRedirect accepts when every audience origin is covered', () => {
   fc.assert(
     fc.property(
-      // Generate matching (audience, redirect) pairs from a common base URL
       fc.array(
         fc.record({
           base: fc.constantFrom(
@@ -311,7 +251,6 @@ test('property: audienceMatchesRedirect accepts when every audience origin is co
         const audience = pairs.map(({ base, audPath }) => `${base}/${audPath}`);
         const redirectUris = pairs.map(({ base, redPath }) => `${base}/${redPath}`);
 
-        // All audience origins are covered by redirect_uri origins by construction.
         const manifest = makeManifest({ redirectUris, audience });
         const result = audienceMatchesRedirect(manifest, audience);
         assert.equal(
@@ -325,19 +264,12 @@ test('property: audienceMatchesRedirect accepts when every audience origin is co
   );
 });
 
-// ─── Property 3: crafted hostnames that embed a trusted string must not pass ──
-//
-// Generates adversarial hostnames that CONTAIN "proxywatch.othala.test" as a substring
-// but are not equal to it. Verifies the validator rejects them as audiences
-// when the redirect is the real proxywatch.othala.test.
-
 test('property: substring-embedded trusted host in audience does not pass', () => {
   const trustedRedirect = 'https://proxywatch.othala.test/callback';
   const trustedOrigin = 'https://proxywatch.othala.test';
 
   fc.assert(
     fc.property(
-      // Generate a prefix and suffix that wrap the trusted host in various ways
       fc.record({
         prefix: fc.stringMatching(/^[a-z0-9\-]{0,12}$/),
         suffix: fc.constantFrom('.evil.com', '.attacker.net', '.phish.io', ''),
@@ -345,7 +277,6 @@ test('property: substring-embedded trusted host in audience does not pass', () =
         userInfo: fc.constantFrom('', 'proxywatch.othala.test@', 'proxywatch.othala.test:443@'),
       }),
       ({ prefix, suffix, scheme, userInfo }) => {
-        // Build candidate audience URL
         let host;
         if (prefix && suffix) {
           host = `${prefix}.proxywatch.othala.test${suffix}`;
@@ -354,14 +285,12 @@ test('property: substring-embedded trusted host in audience does not pass', () =
         } else if (suffix) {
           host = `proxywatch.othala.test${suffix}`;
         } else {
-          // No wrapping — this is the legitimate case, skip
           return;
         }
 
         const candidate = `${scheme}${userInfo}${host}/path`;
         const candidateOrigin = originOf(candidate);
 
-        // Only assert on parseable URLs that differ from the trusted origin
         if (candidateOrigin === null || candidateOrigin === trustedOrigin) return;
 
         const manifest = makeManifest({
@@ -382,11 +311,6 @@ test('property: substring-embedded trusted host in audience does not pass', () =
   );
 });
 
-// ─── Property 4: random (audience, redirect) pairs satisfy origin-equality ────
-//
-// For any two parseable URLs: audienceMatchesRedirect(m, [aud]) === true
-// if and only if originOf(aud) is in { originOf(r) : r in m.redirectUris }.
-
 test('property: audienceMatchesRedirect is equivalent to set-membership on origins', () => {
   fc.assert(
     fc.property(
@@ -401,7 +325,6 @@ test('property: audienceMatchesRedirect is equivalent to set-membership on origi
         );
 
         if (redirectOrigins.size === 0) {
-          // No usable redirect origins: should be fail-closed (false)
           assert.equal(result, false, 'Expected false when no usable redirect origins');
           return;
         }
@@ -422,8 +345,6 @@ test('property: audienceMatchesRedirect is equivalent to set-membership on origi
   );
 });
 
-// ─── Explicit: null/undefined manifest is fail-closed ─────────────────────────
-
 test('audienceMatchesRedirect(undefined, ...) is always false', () => {
   fc.assert(
     fc.property(
@@ -436,22 +357,16 @@ test('audienceMatchesRedirect(undefined, ...) is always false', () => {
   );
 });
 
-// ─── Explicit: empty audience is always true for a known client ───────────────
-
 test('audienceMatchesRedirect(manifest, []) is always true (nothing to constrain)', () => {
   const manifest = makeManifest({ redirectUris: [TRUSTED_REDIRECT], audience: [TRUSTED_ORIGIN] });
   assert.equal(audienceMatchesRedirect(manifest, []), true);
   assert.equal(audienceMatchesRedirect(manifest, undefined), true);
 });
 
-// ─── Explicit: no-redirect-uris + non-empty audience is fail-closed ───────────
-
 test('audienceMatchesRedirect is false when manifest has no redirect_uris (no usable origins)', () => {
   const manifest = makeManifest({ redirectUris: [], audience: [TRUSTED_ORIGIN] });
   assert.equal(audienceMatchesRedirect(manifest, [TRUSTED_ORIGIN]), false);
 });
-
-// ─── Explicit: multi-audience, one bad entry fails the whole check ────────────
 
 test('validateClients rule 3 fires if ANY audience entry has no matching redirect origin', () => {
   const manifest = makeManifest({
@@ -465,34 +380,6 @@ test('validateClients rule 3 fires if ANY audience entry has no matching redirec
   );
 });
 
-// ─── Explicit: non-canonical URL forms normalised by WHATWG URL parser ────────
-//
-// FINDING (low severity / correctness, not security bypass):
-//
-// The WHATWG URL parser normalises several non-canonical URL forms to the same
-// origin as the canonical form. Examples:
-//
-//   https:proxywatch.othala.test      → origin: https://proxywatch.othala.test  (scheme-relative missing //)
-//   HTTPS://proxywatch.othala.test    → origin: https://proxywatch.othala.test  (uppercase scheme)
-//   https:\\proxywatch.othala.test    → origin: https://proxywatch.othala.test  (backslash separator)
-//   https://proxywatch.othala.test:443 → origin: https://proxywatch.othala.test (default port elided)
-//
-// The validator ACCEPTS these because originOf() correctly sees them as the
-// same origin — and they ARE the same origin from a browser security model
-// perspective. This is NOT a security bypass.
-//
-// However, the non-canonical string (e.g. "https:proxywatch.othala.test") is stored
-// verbatim as the audience value and placed into the id_token's aud claim.
-// An OIDC client doing string-literal audience comparison
-// (e.g. aud === "https://proxywatch.othala.test") would FAIL verification at runtime.
-// This is a consistency/correctness bug, not an access-control bypass.
-//
-// Mitigation: the manifest validator could optionally warn when an audience
-// or redirect_uri is not in canonical form (i.e. `new URL(raw).href !== raw`).
-// Tracked as a low-severity lint improvement.
-//
-// These tests document the current (correct) behavior for the normalised cases:
-
 test('WHATWG URL: non-canonical scheme forms normalise to same origin (not a bypass)', () => {
   const nonCanonical = [
     'https:proxywatch.othala.test',           // missing //
@@ -502,13 +389,11 @@ test('WHATWG URL: non-canonical scheme forms normalise to same origin (not a byp
   ];
   for (const nc of nonCanonical) {
     const o = originOf(nc);
-    // These all parse to the trusted origin — not a bypass, but non-canonical
     assert.equal(
       o,
       TRUSTED_ORIGIN,
       `Expected ${nc} to normalise to ${TRUSTED_ORIGIN}, got ${o}`,
     );
-    // And validator accepts them (correct — origin IS the trusted origin)
     const manifest = makeManifest({ redirectUris: [TRUSTED_REDIRECT], audience: [nc] });
     const errs = validateClients([manifest]);
     const rule3Fired = errs.some((e) => e.includes('no oidc.audience origin matches'));
@@ -520,15 +405,9 @@ test('WHATWG URL: non-canonical scheme forms normalise to same origin (not a byp
   }
 });
 
-// ─── Property 5: validateClients rule 3 correctness under random generation ───
-//
-// For random manifests where audience origins are NOT all in redirect origins:
-// validateClients MUST return at least one error mentioning "audience origin".
-
 test('property: validateClients rule 3 fires whenever audience origins are not covered', () => {
   fc.assert(
     fc.property(
-      // Use distinct base domains to guarantee disjoint origins
       fc.record({
         redirectBase: fc.constantFrom('https://redirect.example.com', 'https://redirect2.example.com'),
         audienceBase: fc.constantFrom('https://aud.different.net', 'https://aud2.different.net'),

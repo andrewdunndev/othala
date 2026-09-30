@@ -1,39 +1,8 @@
-// Tests for src/pages/api/forward-auth.ts — the Caddy forward_auth group-gate.
-//
-// Run with: npx vitest run scripts/forward-auth.test.mjs
-//
-// This is SECURITY-SENSITIVE AUTHZ. The endpoint must FAIL CLOSED. We import
-// the real GET/HEAD handlers and drive them through the real Kratos/Admin SDK
-// code paths, stubbing only globalThis.fetch — routing by URL to the whoami
-// (public, :4433) vs. admin identities (:4434) endpoints. This mirrors the
-// fetch-stub style in admin-api.test.mjs / revoke.test.mjs and keeps the gate,
-// session, and admin-resolution logic exactly as it runs in production.
-//
-// Status contract under test:
-//   no group param        → 403 (fail-closed)
-//   bad group format      → 403 (fail-closed)
-//   no/invalid session    → 401 (Caddy → login redirect)
-//   active + in group     → 200 (+ X-Kratos-Authenticated-Identity-Id)
-//   active + NOT in group → 403
-//   inactive + in group   → 403 (state check, fail-closed)
-//   non-canonical stored group → 403 (read-boundary refusal, fail-closed)
-//   admin lookup fails    → 503 (we never learned state/groups)
-//   kratos unreachable    → 503 (an outage is not an authz answer)
-//
-// 503 is still a DENY: Caddy's forward_auth matches `@good status 2xx` and
-// copies any other response back to the client instead of proxying to the
-// protected upstream. The tests below assert the status is non-2xx for every
-// failure path, which is the property the edge actually keys on.
+// Invariant: forward_auth admits only requests whose groups match an explicit binding.
 
 import { test, beforeEach, afterEach } from 'vitest';
 import assert from 'node:assert/strict';
 import { GET, HEAD } from '../src/pages/api/forward-auth.ts';
-
-// ─── fetch stub ────────────────────────────────────────────────────────────
-//
-// Two upstreams to distinguish:
-//   - whoami:  GET /sessions/whoami        (Kratos public, default :4433)
-//   - admin:   GET /admin/identities/<id>  (Kratos admin,  default :4434)
 
 const realFetch = globalThis.fetch;
 
@@ -44,12 +13,6 @@ function jsonResponse(body, status = 200) {
   });
 }
 
-/**
- * Install a fetch stub.
- *   opts.whoami   — { status, body } for /sessions/whoami (body = Session)
- *   opts.identity — { status, body } for /admin/identities/<id> (body = Identity)
- *   opts.whoamiThrow — if true, the whoami fetch rejects (network error)
- */
 function installFetch(opts) {
   globalThis.fetch = async (input) => {
     const url = String(typeof input === 'string' ? input : input?.url ?? input);
@@ -76,7 +39,6 @@ afterEach(() => {
   globalThis.fetch = realFetch;
 });
 
-// Build an APIContext-like arg for the handler (request + url, the only fields read).
 function ctx(group, cookie = 'ory_kratos_session=abc') {
   const base = 'https://sso.othala.test/api/forward-auth';
   const url = new URL(group === undefined ? base : `${base}?group=${encodeURIComponent(group)}`);
@@ -95,8 +57,6 @@ const SESSION_OK = {
   body: { active: true, identity: { id: 'id-1', traits: {} } },
 };
 
-// ─── group-param validation (fail closed before any network) ────────────────
-
 test('no group param → 403', async () => {
   installFetch({ whoami: SESSION_OK, identity: ACTIVE_IN_GROUP });
   const res = await GET(ctx(undefined));
@@ -111,9 +71,6 @@ test('empty group param → 403', async () => {
 });
 
 test('non-prefixed group, member → 200 (Phase 3: no access- prefix required)', async () => {
-  // ACTIVE_IN_GROUP is in `family` (a bare, non-prefixed adopter group). Under
-  // the relaxed charset regex this now passes the input guard and the gate
-  // ALLOWS on membership. (Pre-Phase-3 this 403'd on the prefix check.)
   installFetch({ whoami: SESSION_OK, identity: ACTIVE_IN_GROUP });
   const res = await GET(ctx('family'));
   assert.equal(res.status, 200);
@@ -137,8 +94,6 @@ test('bad group format (injection chars) → 403', async () => {
   const res = await GET(ctx('access-proxywatch; rm -rf'));
   assert.equal(res.status, 403);
 });
-
-// ─── session verification ───────────────────────────────────────────────────
 
 test('no session (401 from whoami) → 401 unauthenticated', async () => {
   installFetch({ whoami: { status: 401, body: { error: { code: 401 } } } });
@@ -166,17 +121,6 @@ test('inactive session (active:false) → 401', async () => {
 });
 
 test('active session with NO identity id → 401, and the admin API is never called', async () => {
-  // TWO independent assertions here, and only the STATUS one detects a dropped
-  // `!session.identity?.id` guard. Without the guard the undefined id reaches
-  // getIdentity, where the Ory SDK's own required-parameter check rejects it
-  // BEFORE issuing any fetch; that throw lands in the 503 branch, so 401
-  // becomes 503 and the status line below fails. `adminCalls` CANNOT fail
-  // here — the same pre-fetch reject means no admin hop happens with the guard
-  // or without it. Keep it regardless: "no admin API call for a session with no
-  // identity" is a real invariant worth pinning, it is simply not the detector.
-  // The genuinely unguarded ALLOW lives in the sibling empty-string test below,
-  // where '' survives the SDK's null check, the lookup really is issued, and
-  // the gate really does 200.
   let adminCalls = 0;
   installFetch({
     whoami: { status: 200, body: { active: true, identity: { traits: {} } } },
@@ -215,8 +159,6 @@ test('kratos unreachable → NOT 403 (an outage must not read as a denial)', asy
   const res = await GET(ctx('access-proxywatch'));
   assert.notEqual(res.status, 403);
 });
-
-// ─── admin resolution + gate ────────────────────────────────────────────────
 
 test('active identity IN group → 200 + identity-id header', async () => {
   installFetch({ whoami: SESSION_OK, identity: ACTIVE_IN_GROUP });
@@ -267,12 +209,7 @@ test('admin lookup failure (500) → 503 (fail-closed)', async () => {
   assert.equal(await res.text(), 'unavailable');
 });
 
-// ─── the read boundary we do NOT own ────────────────────────────────────────
-
 test('non-canonical stored group → 403, even when the required group matches its case fold', async () => {
-  // Only a raw Kratos admin-API write can store "Access-Proxywatch"; every portal
-  // write path rejects it (metadata-admin.ts validateGroups). The gate must
-  // refuse rather than case-fold it into a match.
   installFetch({
     whoami: SESSION_OK,
     identity: {
@@ -301,8 +238,6 @@ test('one non-canonical group denies a group the identity legitimately holds', a
   assert.equal(res.status, 403);
 });
 
-// ─── every failure path denies at the edge (non-2xx) ────────────────────────
-
 test('no failure path returns 2xx (Caddy forward_auth @good status 2xx)', async () => {
   const cases = [
     [{ whoami: SESSION_OK, identity: ACTIVE_IN_GROUP }, 'photos'],
@@ -318,8 +253,6 @@ test('no failure path returns 2xx (Caddy forward_auth @good status 2xx)', async 
   }
 });
 
-// ─── the body never names the group or the identity ─────────────────────────
-
 test('no denial body echoes the required group or the identity id', async () => {
   const noGroups = {
     status: 200,
@@ -333,8 +266,6 @@ test('no denial body echoes the required group or the identity id', async () => 
     assert.equal(body.includes('id-1'), false);
   }
 });
-
-// ─── HEAD parity (a HEAD that 200s where GET 403s is an auth bypass) ─────────
 
 test('HEAD applies the same decision: allowed → 200', async () => {
   installFetch({ whoami: SESSION_OK, identity: ACTIVE_IN_GROUP });
@@ -358,24 +289,16 @@ test('HEAD with no session → 401', async () => {
   assert.equal(res.status, 401);
 });
 
-// ─── responses are never cached ──────────────────────────────────────────────
-
 test('responses carry Cache-Control: no-store', async () => {
   installFetch({ whoami: SESSION_OK, identity: ACTIVE_IN_GROUP });
   const res = await GET(ctx('access-proxywatch'));
   assert.match(res.headers.get('Cache-Control') ?? '', /no-store/);
 });
 
-// ─── second-factor step-up ──────────────────────────────────────────────────
-//
-// Same rule as app sign-in (lib/step-up.ts): an aal1 session of an identity
-// holding totp/webauthn (or the admin marker) is sent back to login (401).
-
 function sessionAt(aal) {
   return { status: 200, body: { active: true, authenticator_assurance_level: aal, identity: { id: 'id-1', traits: {} } } };
 }
 
-// Enrolled configs as the Kratos admin API returns them (lib/step-up.ts).
 const ENROLLED_CONFIG = {
   totp: { totp_url: 'otpauth://totp/othala:a?secret=JBSWY3DPEHPK3PXP' },
   webauthn: { credentials: [{ id: 'w', is_passwordless: false }] },

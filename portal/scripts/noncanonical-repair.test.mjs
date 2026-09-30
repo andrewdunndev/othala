@@ -1,23 +1,4 @@
-// Tests for the non-canonical group REPAIR surface.
-//
-// Run with: npx vitest run scripts/noncanonical-repair.test.mjs
-//
-// What this covers. refuseNonCanonical (src/lib/gate.ts) denies an identity
-// holding any group that misses GROUP_RE (src/lib/access-groups.ts), at every
-// app, on every request. src/pages/admin/users/[id].astro is the only surface
-// that can repair such an identity; the save action's planGroupSave wiring
-// lives in src/lib/admin-actions.ts (extracted from the page) — tested here
-// as a pure function, plus source assertions binding both files to it (an
-// .astro page cannot be imported into this harness, so the wiring is
-// asserted against file bytes).
-//
-// The invariant under test is NOT "the group is preserved in the store" — no
-// write path this codebase owns can re-write a non-canonical name, because
-// updateIdentity (src/lib/admin-api.ts) hands every list to validateGroups
-// (src/lib/metadata-admin.ts) and the same GROUP_RE rejects it. The invariant
-// is that an unrelated save can never MUTATE those names as a side effect:
-// keeping one refuses the save (nothing written, identity unchanged), and
-// removing one takes an affirmative per-name tick.
+// Invariant: non-canonical groups are repaired only through the explicit repair path.
 
 import { test } from 'vitest';
 import assert from 'node:assert/strict';
@@ -41,12 +22,7 @@ function identity(groups) {
   };
 }
 
-// ── round trip: an unrelated save cannot silently mutate the stored name ─────
-
 test('an unrelated save with the name KEPT is refused, so the identity is unchanged', () => {
-  // The operator edited only the display name. The checkbox sets can never
-  // contain "Access-Grafana", so the submission carries the canonical groups
-  // alone — exactly the shape that used to drop it.
   const stored = identity(['family', 'Access-Grafana']);
   const plan = planGroupSave(stored, ['family'], []);
 
@@ -54,14 +30,11 @@ test('an unrelated save with the name KEPT is refused, so the identity is unchan
   assert.match(plan.refusal, /Access-Grafana/);
   assert.deepEqual(plan.kept, ['Access-Grafana']);
   assert.deepEqual(plan.removed, []);
-  // Round trip: the stored state is untouched by planning a refused save.
   assert.deepEqual(nonCanonicalGroups(stored), ['Access-Grafana']);
   assert.deepEqual(stored.metadata_admin.groups, ['family', 'Access-Grafana']);
 });
 
 test('a submission that omits the clear field entirely removes nothing', () => {
-  // An older render, or any form that never grew the row, submits no
-  // clearNonCanonical values at all. Absence must PRESERVE.
   const plan = planGroupSave(identity(['family', 'has space']), ['family'], []);
   assert.deepEqual(plan.removed, []);
   assert.deepEqual(plan.kept, ['has space']);
@@ -77,8 +50,6 @@ test('the refusal names EVERY kept group, not just the first', () => {
   assert.match(plan.refusal, /Access-Grafana/);
   assert.match(plan.refusal, /has space/);
 });
-
-// ── explicit removal ─────────────────────────────────────────────────────────
 
 test('an explicit tick removes the name and lets the save through', () => {
   const plan = planGroupSave(
@@ -103,8 +74,6 @@ test('clearing SOME of several still refuses on the rest', () => {
   assert.notEqual(plan.refusal, null);
   assert.doesNotMatch(plan.refusal, /Access-Grafana/);
 });
-
-// ── repair surface, not a creation surface ───────────────────────────────────
 
 test('a non-canonical name submitted through the checkbox fields is NOT written', () => {
   const plan = planGroupSave(identity(['family']), ['family', 'Access-Grafana'], []);
@@ -144,12 +113,6 @@ test('a null identity has nothing to repair', () => {
   assert.deepEqual(plan.groups, ['family']);
 });
 
-// ── the page is actually wired to it ─────────────────────────────────────────
-//
-// These assert the bytes of [id].astro because the page cannot be imported
-// here. They are what keeps the pure tests above from passing while the save
-// path quietly goes back to composing submitted checkboxes.
-
 test('saveAction writes planGroupSave output, not the raw submitted lists', () => {
   assert.match(libSource, /planGroupSave\(/, 'saveAction must call planGroupSave');
   assert.match(
@@ -169,7 +132,6 @@ test('a refusal blocks the write by returning formErrors instead of updating', (
     libSource,
     /if \(groupPlan\.refusal\) formErrors\.nonCanonicalGroups = groupPlan\.refusal;/,
   );
-  // The existing guard clause that skips updateIdentity when any formError is set.
   assert.match(libSource, /if \(Object\.keys\(formErrors\)\.length > 0\) \{\s*\n\s*return \{ formErrors, refetch: false \};/);
 });
 
@@ -185,10 +147,6 @@ test('the removal control is unchecked by default (removal is affirmative)', () 
 });
 
 test('the repair row rides the existing save form, under its CSRF token', () => {
-  // The row adds a FIELD to the one save form rather than a second mutating
-  // surface: no new action value, no new token, nothing for the POST handler's
-  // CSRF branch to grow a case for. Slice the save <form> and prove the field
-  // is inside it, next to csrfTokenSave.
   const openTag = '<form method="post" class="stack-lg" novalidate>';
   const open = pageSource.indexOf(openTag);
   assert.notEqual(open, -1, 'save form not found');
@@ -201,15 +159,12 @@ test('the repair row rides the existing save form, under its CSRF token', () => 
   assert.match(saveForm, /name="clearNonCanonical"/, 'the repair field must live inside the save form');
   assert.doesNotMatch(saveForm, /<form /, 'no nested form under the save form');
 
-  // Every POST verifies against the submitted action; no special-cased set.
   assert.doesNotMatch(pageSource, /actionScopedActions/);
   assert.match(pageSource, /verifyToken\(String\(fd\.get\('csrf_token'\) \?\? ''\), adminIdentityId, tokenAction\)/);
   assert.match(pageSource, /const tokenAction = action === 'remove-credential' \? `remove-\$\{String\(fd\.get\('cred_type'\) \?\? ''\)\}` : action;/);
 });
 
 test('the non-canonical names are rendered escaped, never via set:html', () => {
-  // Astro escapes {expr} in both text and attribute position; the only way to
-  // lose that on this page is an explicit set:html, which must not exist.
   assert.doesNotMatch(pageSource, /set:html/);
 });
 

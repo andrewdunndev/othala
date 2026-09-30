@@ -1,18 +1,4 @@
-// Contract tests for the D-listener admin mux (CU1 item 4/6, extended CU3).
-//
-// Run with: npx vitest run scripts/admin-port.test.mjs
-//
-// Asserts:
-//   - the admin port serves /healthz + /readyz (GET) and the webhook endpoints
-//     (POST), and every public/challenge path 404s there (the two muxes are
-//     disjoint);
-//   - the webhook paths are NOT public GET routes;
-//   - the bearer check is CONSTANT-TIME and FAIL-CLOSED (unset secret rejects
-//     everything);
-//   - every gate and the session sweep read Kratos through the injected runtime.
-//
-// Imports the pure helpers from listen.mjs without binding any socket or
-// loading the SSR handler / runtime bundle.
+// Invariant: the admin listener serves only admin routes and refuses to boot on weak secrets.
 
 import { test, beforeEach } from 'vitest';
 import assert from 'node:assert/strict';
@@ -38,7 +24,6 @@ import * as secondFactorRuntime from '../src/lib/second-factor-gate.ts';
 import { getIdentity, listSessions, revokeSession } from '../src/lib/admin-api.ts';
 import { isAdminMarker } from '../src/lib/admin-auth.ts';
 
-// The runtime the built bundle provides, over the real SDK client (mock Kratos).
 const runtime = { ...secondFactorRuntime, getIdentity, listSessions, revokeSession, isAdminMarker };
 const handle = (req, res, rt = runtime) => handleAdminRequest(req, res, rt);
 
@@ -56,7 +41,6 @@ function fakeRes() {
   };
 }
 
-// A minimal request: a readable stream carrying the body + method/url/headers.
 function fakeReq({ method = 'GET', url = '/', headers = {}, body = '' } = {}) {
   const req = Readable.from(body ? [Buffer.from(body)] : []);
   req.method = method;
@@ -69,8 +53,6 @@ beforeEach(() => {
   delete process.env.RECOVERY_GATE_SECRET;
   delete process.env.KRATOS_ADMIN_URL;
 });
-
-// ── CU1 disjointness ──────────────────────────────────────────────────────────
 
 test('admin GET mux serves exactly /healthz and /readyz', () => {
   assert.deepEqual([...ADMIN_GET_ROUTES].sort(), ['/healthz', '/readyz']);
@@ -133,8 +115,6 @@ test('a served admin POST path on the wrong method (GET) 404s', async () => {
   }
 });
 
-// ── constant-time, fail-closed bearer ──────────────────────────────────────
-
 test('parseBearer extracts the token', () => {
   assert.equal(parseBearer('Bearer abc123'), 'abc123');
   assert.equal(parseBearer('bearer abc'), '');
@@ -153,8 +133,6 @@ test('bearerMatches accepts only the exact secret (constant-time path)', () => {
   assert.equal(bearerMatches('s3cre', 's3cret'), false); // length mismatch
   assert.equal(bearerMatches('s3cretX', 's3cret'), false);
 });
-
-// ── startup checks (32-byte floor, CRYPTO-2) ────────────────────────────────
 
 test('startup fails when RECOVERY_GATE_SECRET is set but shorter than 32 bytes', () => {
   process.env.RECOVERY_GATE_SECRET = 'short-secret';
@@ -178,11 +156,7 @@ test('startup fails when CSRF_SECRET is unset or shorter than 32 bytes', () => {
   }
 });
 
-// ── recovery-gate endpoint auth + verdict ──────────────────────────────────
-
 test('POST /admin/recovery-gate is fail-closed when RECOVERY_GATE_SECRET unset (403)', async () => {
-  // 403 not 401: Kratos can_interrupt webhooks must see 403 to abort the flow;
-  // a 401 risks skip-and-continue (fail-open).
   const res = fakeRes();
   await handle(
     fakeReq({ method: 'POST', url: '/admin/recovery-gate', headers: { authorization: 'Bearer x' }, body: '{}' }),
@@ -192,8 +166,6 @@ test('POST /admin/recovery-gate is fail-closed when RECOVERY_GATE_SECRET unset (
 });
 
 test('POST /admin/recovery-gate REFUSES recovery when the admin-API marker is true (403)', async () => {
-  // handleRecoveryGate resolves authority via fetchAdminMarker (the Kratos admin API), so mock
-  // that API to return metadata_admin.admin===true and assert the 403 comes from the marker.
   const mockKratos = http.createServer((req, res) => {
     res.writeHead(200, { 'Content-Type': 'application/json' });
     res.end(JSON.stringify({ id: ADMIN_UUID, metadata_admin: { admin: true, groups: ['admin', 'family'] } }));
@@ -222,10 +194,6 @@ test('POST /admin/recovery-gate REFUSES recovery when the admin-API marker is tr
 });
 
 test('POST /admin/recovery-gate is fail-closed when KRATOS_ADMIN_URL is unset (403, admin-api-unavailable)', async () => {
-  // Explicit coverage of the fail-closed path the old admin-true test relied on
-  // by accident: with no admin API to consult, the marker cannot be verified, so
-  // recovery is refused regardless of the identity. KRATOS_ADMIN_URL is cleared
-  // in beforeEach.
   process.env.RECOVERY_GATE_SECRET = 'gate-secret';
   const res = fakeRes();
   await handle(
@@ -242,10 +210,6 @@ test('POST /admin/recovery-gate is fail-closed when KRATOS_ADMIN_URL is unset (4
 });
 
 test('POST /admin/recovery-gate ALLOWS recovery for a non-admin identity (200)', async () => {
-  // fetchAdminMarker calls the Kratos admin API directly, because Kratos
-  // v26.2.0 omits metadata_admin from the webhook ctx. Provide a mock
-  // Kratos admin API that returns a non-admin identity for OTHER_UUID so the
-  // gate can resolve the marker without a live Kratos instance.
   const mockKratos = http.createServer((req, res) => {
     res.writeHead(200, { 'Content-Type': 'application/json' });
     res.end(JSON.stringify({ id: OTHER_UUID, metadata_admin: {} }));
@@ -302,12 +266,7 @@ test('POST /admin/recovery-gate refuses an unknown identity whatever the payload
   assert.equal(res.statusCode, 403, 'unknown identity must refuse (fail-closed)');
 });
 
-// ── Security: bearer rejection MUST be 403, never 401 (Kratos can_interrupt) ─
-
 test('bearer rejection on recovery-gate is 403 (not 401) — Kratos can_interrupt safety', async () => {
-  // Kratos webhooks use can_interrupt: true; a non-403 response (e.g. 401)
-  // risks being treated as a non-interrupting webhook error (skip-and-continue
-  // = fail-open), whereas 403 reliably aborts the flow.
   process.env.RECOVERY_GATE_SECRET = 'correct';
   const res = fakeRes();
   await handle(
@@ -317,8 +276,6 @@ test('bearer rejection on recovery-gate is 403 (not 401) — Kratos can_interrup
   assert.equal(res.statusCode, 403, 'must be 403, not 401');
   assert.notEqual(res.statusCode, 401, 'must NOT be 401 (would be fail-open under can_interrupt)');
 });
-
-// ── login-code-gate: login.after.code webhook ──────────────────────────────
 
 async function withMockKratos(respond, fn) {
   const mockKratos = http.createServer(respond);
@@ -392,8 +349,6 @@ test('login-code-gate rejects a wrong bearer with 403 before reading the body', 
   assert.deepEqual(JSON.parse(res.body), { error: 'forbidden' });
 });
 
-// ── username-gate: settings.after.profile webhook ───────────────────────────
-
 const STORED = identity({ id: OTHER_UUID, username: 'ada.lovelace' });
 
 function postUsernameGate(body, bearer = 'gate-secret') {
@@ -405,8 +360,6 @@ function postUsernameGate(body, bearer = 'gate-secret') {
   });
 }
 
-// The recovery-gate.jsonnet body as Kratos renders it for a settings submission:
-// ctx.identity carries the submitted traits, not the stored ones.
 function profilePayload(traits) {
   return { identity_id: STORED.id, is_admin: false, groups: [], traits };
 }
@@ -480,8 +433,6 @@ test('username-gate rejects a wrong bearer with 403 before reading the body', as
   assert.deepEqual(JSON.parse(res.body), { error: 'forbidden' });
 });
 
-// ── second-factor-gate: settings.after.{totp,webauthn} webhook ──────────────
-
 function postSecondFactorGate(method, body, bearer = 'gate-secret') {
   return fakeReq({
     method: 'POST',
@@ -553,8 +504,6 @@ test('second-factor-gate rejects a wrong bearer with 403 before reading the body
   assert.deepEqual(JSON.parse(res.body), { error: 'forbidden' });
 });
 
-// ── profile-sessions: settings.after.profile post-save webhook ──────────────
-
 const SAVING = session('aal1', ['password'], { id: 'aaaaaaaa-0000-0000-0000-000000000001' });
 const OTHER_A = session('aal1', ['password'], { id: 'aaaaaaaa-0000-0000-0000-000000000002' });
 const OTHER_B = session('aal1', ['code'], { id: 'aaaaaaaa-0000-0000-0000-000000000003' });
@@ -568,8 +517,6 @@ function postProfileSessions(body, bearer = 'gate-secret') {
   });
 }
 
-// A Kratos admin API that lists `listed` (or answers `listStatus`) and records
-// every request it serves.
 function sessionsServer(calls, listed, listStatus = 200) {
   return (req, res) => {
     calls.push(`${req.method} ${req.url}`);
@@ -635,8 +582,6 @@ test('profile-sessions rejects a wrong bearer with 403 before reading the body',
   assert.equal(res.statusCode, 403);
   assert.deepEqual(JSON.parse(res.body), { error: 'forbidden' });
 });
-
-// ── one Kratos client: every gate and the sweep go through runtime.getIdentity ─
 
 test('recovery, username and second-factor gates and profile-sessions read the identity via the runtime', async () => {
   process.env.RECOVERY_GATE_SECRET = 'gate-secret';

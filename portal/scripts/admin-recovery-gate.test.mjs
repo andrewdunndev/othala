@@ -1,15 +1,4 @@
-// Test for the admin-to-admin recovery refusal gate.
-//
-// Run with: npx vitest run scripts/admin-recovery-gate.test.mjs
-//
-// The gate logic lives in src/lib/access.ts (shouldRefuseRecovery) and is
-// consumed by src/pages/admin/users/[id].astro action=issue-recovery.
-//
-// Admin authority is the `metadata_admin.admin === true` marker
-// (admin-API-only-writable boolean). shouldRefuseRecovery refuses iff the
-// TARGET identity carries the admin marker. The retired OTHALA_ADMIN_IDS UUID
-// allowlist is no longer consulted. The caller must pass an admin-API-fetched
-// identity (metadata_admin present).
+// Invariant: an identity carrying the admin marker is never issued a recovery link.
 
 import { test } from 'vitest';
 import assert from 'node:assert/strict';
@@ -25,7 +14,6 @@ test('identity with metadata_admin.admin===true is refused', () => {
 });
 
 test('identity with metadata_admin.admin===true is refused even without admin group', () => {
-  // Defense-in-depth: the marker is authoritative; group membership is irrelevant.
   const identity = {
     id: '33333333-3333-3333-3333-333333333333',
     traits: { email: 'ops@othala.test' },
@@ -38,7 +26,6 @@ test('identity with metadata_admin.admin===false is allowed (marker present but 
   const identity = {
     id: '22222222-2222-2222-2222-222222222222',
     traits: { email: 'imposter@othala.test' },
-    // has admin group but marker is false — group is display-only
     metadata_admin: { admin: false, groups: ['admin', 'family'] },
   };
   assert.equal(shouldRefuseRecovery(identity), false);

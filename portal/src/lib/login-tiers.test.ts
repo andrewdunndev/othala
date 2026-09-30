@@ -1,28 +1,4 @@
-/**
- * login-tiers.test.ts — deriveLoginTiers() step-up / tier-presence guard.
- *
- * Built to catch the v0.5.0 outage class: an unfiltered webauthn-group
- * glue-script node (<script src=".../webauthn.js">, present on EVERY login
- * flow that offers passkey or webauthn — not just a step-up) got counted as
- * a second-factor node, so hasSecondFactorNodes — and isAal2 — came back
- * true for every anonymous AAL1 login. The e2e suite never caught this: 20
- * of 21 specs bypass login.astro via the JSON-API login path (the Kratos
- * stack DOES emit the glue script node — work item #9). Fixture (a)
- * below is the REAL flow shape captured from the live v0.5.0 instance (see
- * fixtures/login-aal1-captured.json), values sanitised (csrf_token, flow id,
- * script nonce, passkey challenge) but node structure/groups/types/attributes
- * verbatim.
- *
- * Coverage:
- *   (a) captured production AAL1 flow, webauthn script node included —
- *       NOT a step-up; passkey + code + password tiers all present.
- *   (b) genuine AAL2 step-up flow (requested_aal: 'aal2', an asInput()-
- *       passing totp input node) — IS a step-up.
- *   (c) fresh AAL1 flow with no webauthn/totp/lookup_secret nodes at all —
- *       not a step-up; tiers read off whatever nodes it does carry.
- *
- * Run: npx vitest run   (from portal/)
- */
+// Invariant: deriveLoginTiers never counts non-credential nodes as a second factor.
 
 import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
@@ -38,8 +14,6 @@ function loadFixture(name: string): LoginFlow {
   const raw = readFileSync(join(__dirname, 'fixtures', name), 'utf-8');
   return JSON.parse(raw) as unknown as LoginFlow;
 }
-
-// ── (a) captured production AAL1 flow — the flow shape that broke v0.5.0 ───
 
 describe('deriveLoginTiers — captured production AAL1 flow (webauthn glue script present)', () => {
   const flow = loadFixture('login-aal1-captured.json');
@@ -64,8 +38,6 @@ describe('deriveLoginTiers — captured production AAL1 flow (webauthn glue scri
     expect(tiers.lookupNodes).toHaveLength(0);
   });
 });
-
-// ── (b) genuine AAL2 step-up flow ───────────────────────────────────────────
 
 function aal2Flow(): LoginFlow {
   return {
@@ -132,8 +104,6 @@ describe('deriveLoginTiers — genuine AAL2 step-up flow', () => {
     expect(tiers.totpNodes.length).toBeGreaterThan(0);
   });
 });
-
-// ── (c) fresh AAL1 flow, no webauthn method at all ──────────────────────────
 
 function freshAal1FlowNoWebauthn(): LoginFlow {
   return {

