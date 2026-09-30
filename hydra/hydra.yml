@@ -7,7 +7,6 @@ dsn: "postgres://hydra:${HYDRA_PG_PASS}@${HYDRA_PG_HOST}:5432/hydra?sslmode=disa
 
 serve:
   public:
-    port: 4444
     request_log:
       # Health probes target this listener (see serve.admin.request_log); each would write
       # an access-log line, burying real ones. Metrics still count them.
@@ -24,9 +23,7 @@ serve:
       allowed_headers:
         - Authorization
         - Content-Type
-      allow_credentials: true
   admin:
-    port: 4445
     # Admin-plane bind address. The admin API is unauthenticated by design (the network is the
     # control): segmented deployments bind an admin-plane address, the e2e harness uses 0.0.0.0.
     # NEVER expose publicly.
@@ -39,7 +36,6 @@ serve:
 urls:
   self:
     issuer: "${OTHALA_PUBLIC_URL}/"
-    public: "${OTHALA_PUBLIC_URL}/"
 
   # Hydra redirects challenge flows to /oauth2/{login,consent,logout} (portal routes; /auth/*
   # stays the Kratos UI). The proxy must route these to the portal BEFORE any wider /oauth2/*
@@ -50,18 +46,8 @@ urls:
   error: "${OTHALA_PUBLIC_URL}/auth/error"
   post_logout_redirect: "${OTHALA_PUBLIC_URL}/"
 
-oidc:
-  subject_identifiers:
-    supported_types:
-      - public
-
 ttl:
-  access_token: 1h
   refresh_token: 720h    # 30 days
-  id_token: 1h
-  auth_code: 10m
-  # 30m (default 1h): bounds how long a stolen login or consent challenge stays redeemable.
-  login_consent_request: 30m
 
 oauth2:
   pkce:
@@ -74,14 +60,8 @@ oauth2:
       # 14 (default 10): raises the offline brute-force cost of a leaked client-secret hash.
       cost: 14
   # An explicit oauth2.strategies pin is schema-rejected by Hydra v26.2.0; defaults are correct.
-  expose_internal_errors: false
   client_credentials:
     default_grant_allowed_scope: false
-  grant:
-    jwt:
-      max_ttl: 720h
-      iat_optional: false
-      jti_optional: false
 
 secrets:
   # CRITICAL: secrets.system is non-rotatable for the life of the Hydra DB. Generate once and
@@ -94,13 +74,11 @@ secrets:
     - "${HYDRA_COOKIE_SECRET_CURRENT}"
 
 log:
-  level: info
   format: json
-  leak_sensitive_values: false
 
 # Tracing (OpenTelemetry), opt-in: the block below is OMITTED when OTHALA_OTLP_PROVIDER is empty
 # (Ory v26.2.0 rejects a present block with provider "") and emitted when it is "otel".
-# OTLP is HTTP/protobuf only (port 4318), Ory ignores OTEL_* env vars, insecure: true is
+# OTLP is HTTP/protobuf only, Ory ignores OTEL_* env vars, insecure: true is
 # plaintext to the firewall-scoped host alloy receiver, sampling_ratio 0.1 bounds volume.
 #@if OTHALA_OTLP_PROVIDER
 tracing:
