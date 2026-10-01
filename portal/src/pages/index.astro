@@ -7,7 +7,6 @@
 export const prerender = false;
 
 import Layout from '../layouts/Layout.astro';
-import PageHero from '../components/PageHero.astro';
 import TileCard from '../components/TileCard.astro';
 import AppBadges from '../components/AppBadges.astro';
 import PrereqCard from '../components/PrereqCard.astro';
@@ -137,6 +136,11 @@ const devLinks = [
   { href: '/?dev-state=down',      label: 'State A: down (substrate offline)' },
   { href: '/?dev-state=pre-auth',  label: 'State B: pre-auth (sign in)' },
   { href: '/?dev-state=post-auth', label: 'State C: post-auth (mocked identity)' },
+  { href: '/auth/login?dev-state=wrong-password', label: 'Login (also code, aal2)' },
+  { href: '/auth/recovery?dev-state=code-prefilled', label: 'Recovery (also request, code, code-wrong)' },
+  { href: '/auth/verification?dev-state=code', label: 'Verification (also request)' },
+  { href: '/auth/consent?dev-state=consent', label: 'Consent (also consent-unknown-app, consent-error)' },
+  { href: '/auth/error?reason=not-authorised', label: 'Error page (reasons in lib/error-reasons.ts)' },
   { href: '/auth/login',           label: 'Login flow' },
   { href: '/auth/settings',        label: 'Settings flow' },
   { href: '/auth/recovery',        label: 'Recovery flow' },
@@ -145,7 +149,7 @@ const devLinks = [
   { href: '/admin',                label: 'Admin (requires AAL2)' },
 ];
 ---
-<Layout title="Home" description={`Single sign-on for ${instanceName}.`} compact={state === 'post-auth'}>
+<Layout title="Home" description={`Single sign-on for ${instanceName}.`} compact={state === 'post-auth'} narrow={state !== 'post-auth'}>
 
   {state === 'post-auth' && (
     <Fragment slot="header-actions">
@@ -154,35 +158,27 @@ const devLinks = [
   )}
 
   {state === 'down' && (
-    <PageHero
-      title="Auth services starting up"
-      lede={`The substrate is offline or unreachable. This page will pick the session back up as soon as it returns. If it persists, contact your administrator.`}
-    >
-      <p class="holding-tech">{downReason}</p>
-    </PageHero>
+    <>
+    <header class="page-header">
+      <h1 class="page-title">Sign-in is starting up</h1>
+      <p class="page-lede">This usually takes a minute. Refresh in a moment, and tell an admin if it keeps happening.</p>
+    </header>
+    {isDev && <p class="holding-tech">{downReason}</p>}
+    </>
   )}
 
   {state === 'pre-auth' && (
     <>
-      <PageHero title="Welcome" lede={`Single sign-on for ${instanceName}. One sign-in, every app.`}>
-        <div class="cta-row">
-          <a href="/auth/login" class="button button-primary">Sign in</a>
-          <a href="/auth/recovery" class="button button-secondary">Recover access</a>
-          <span class="cta-note mono">passkey or password</span>
-        </div>
-      </PageHero>
-
-      <section class="section">
-        <p class="section-subtitle">What's behind this door</p>
-        <p class="section-prose">
-          A small set of self-hosted services. Photos,
-          films, music, books, recipes, files. A handful of tools for
-          the people who run the place. Each app respects the same
-          identity, so signing in once is enough.
-        </p>
-        <p class="section-prose">
-          If you don't have an account yet, ask whoever invited you.
-        </p>
+      <header class="page-header">
+        <h1 class="page-title">Welcome home</h1>
+        <p class="page-lede">One sign-in for every app in your household.</p>
+      </header>
+      <section class="panel focus-card">
+        <a href="/auth/login" class="button button-primary focus-btn">Sign in</a>
+        <p class="focus-note">Use the passkey on this device, or get a code by email.</p>
+        <p class="focus-or" aria-hidden="true">or</p>
+        <a href="/auth/recovery" class="button button-secondary focus-btn">I have a setup link or code</a>
+        <p class="focus-note">New here? Ask whoever invited you to send a setup link.</p>
       </section>
     </>
   )}

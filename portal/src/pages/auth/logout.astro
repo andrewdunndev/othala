@@ -7,8 +7,7 @@
 
 export const prerender = false;
 
-import Layout from '../../layouts/Layout.astro';
-import PageHero from '../../components/PageHero.astro';
+import FocusPage from '../../components/FocusPage.astro';
 import { getLogoutInfo, getSession, kratosBase } from '../../lib/kratos';
 import type { LogoutInfo } from '../../lib/kratos';
 import { publicUrl } from '../../lib/config';
@@ -195,29 +194,18 @@ if (identityId && logoutAuthorized(Astro.request.method, form?.get('csrf_token')
 const csrfToken = identityId ? signLogoutToken(identityId) : '';
 const retry = isPost;
 ---
-<Layout title="Sign out" description="Sign out of this device." bare>
-  <PageHero
-    title="Sign out?"
-    eyebrow="sign out"
-    lede={retry
+<FocusPage
+  title="Sign out?"
+  description="Sign out of this device."
+  lede={retry
       ? 'That sign-out request could not be confirmed. Press the button to sign out of this device.'
       : lookupFailed
       ? 'The sign-in service did not answer. Signing out clears this device only.'
       : 'Sign out of this device.'}
-  >
-    <form method="POST" action="/auth/logout" class="logout-form">
-      <input type="hidden" name="csrf_token" value={csrfToken} />
-      <button type="submit" class="button button-primary">Sign out</button>
-      <a href="/" class="button button-secondary">Cancel</a>
-    </form>
-  </PageHero>
-</Layout>
-
-<style>
-  .logout-form {
-    display: flex;
-    flex-wrap: wrap;
-    gap: var(--space-3);
-    margin-top: var(--space-4);
-  }
-</style>
+>
+  <form method="POST" action="/auth/logout" class="status-actions">
+    <input type="hidden" name="csrf_token" value={csrfToken} />
+    <button type="submit" class="button button-primary">Sign out</button>
+    <a href="/" class="button button-secondary">Cancel</a>
+  </form>
+</FocusPage>
