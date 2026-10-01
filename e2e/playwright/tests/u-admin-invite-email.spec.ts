@@ -134,8 +134,8 @@ test('U2 — an admin-marked target is offered no invite email or setup link, a 
     await page.goto(targetUrl, { waitUntil: 'networkidle' });
     await expect(page.locator('h1'), 'U2: admin page must render the admin-target identity').toContainText('U2 Admin Target');
 
-    // The page withholds email and setup-link actions from an admin-marked target and points at the console runbook.
-    await expect(page.getByText(/admins get back in through the console/i), 'U2: the console-only note is shown').toBeVisible();
+    // The page withholds email and setup-link actions from an admin-marked target and says so.
+    await expect(page.getByText(/A household admin cannot be sent a setup link here/i), 'U2: the no-setup-link note is shown').toBeVisible();
     await expect(page.getByRole('button', { name: 'Send invite email' }), 'U2: no invite email action is offered').toHaveCount(0);
     await expect(page.getByRole('button', { name: 'Send setup link' }), 'U2: no setup link action is offered').toHaveCount(0);
 
@@ -153,7 +153,7 @@ test('U2 — an admin-marked target is offered no invite email or setup link, a 
 
     await assertNoInviteEmail(adminTarget.email, startTime);
 
-    console.log('[U2] PASS — admin-marked target offered console-only recovery; mailpit received nothing');
+    console.log('[U2] PASS — admin-marked target offered no setup link; mailpit received nothing');
   } finally {
     await ctx.close();
   }

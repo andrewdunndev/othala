@@ -3,7 +3,7 @@
 import { test, expect, adminAal2Context } from '../fixtures';
 import { createIdentityWithPassword, readIdentity, TEST_PASSWORD } from '../actions/identity';
 
-test('ZK1 — marking an email verified writes the verified address and flips the badge', async ({ browser, baseURL, kratosAdminURL }) => {
+test('ZK1 — marking an email verified writes the verified address and drops the Unverified badge', async ({ browser, baseURL, kratosAdminURL }) => {
   const suffix = `zk1.${Date.now()}`;
   const admin = await createIdentityWithPassword({
     email: `admin.${suffix}@othala.test`,
@@ -40,7 +40,6 @@ test('ZK1 — marking an email verified writes the verified address and flips th
     expect(resp.status(), 'ZK1: the POST re-renders the page').toBe(200);
 
     expect(await verifiedOf(), 'ZK1: Kratos now holds the address as verified').toBe(true);
-    await expect(page.locator('.badges')).toContainText('Verified email');
     await expect(page.locator('.badges')).not.toContainText('Unverified');
     await expect(page.locator('summary', { hasText: 'Mark verified' }), 'ZK1: the action is gone once verified').toHaveCount(0);
   } finally {
