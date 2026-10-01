@@ -16,6 +16,10 @@ export const DEV_SETTINGS_STATES = [
   'reauth',
   'unverified',
   'rename-error',
+  'codes-reveal',
+  'codes-new',
+  'replaced',
+  'enrolled-admin',
 ] as const;
 export type DevSettingsState = (typeof DEV_SETTINGS_STATES)[number];
 
@@ -35,6 +39,8 @@ export interface DevSettings {
   flash: string | null;
   /** A refused passkey rename, as the page reads it from the one-shot cookie. */
   renameError: { id: string; text: string } | null;
+  /** The identity carries the admin marker, so the second-factor gate refuses to drop its only second factor. */
+  admin: boolean;
 }
 
 type Group = FlowNode['group'];
@@ -128,8 +134,32 @@ const totpEnrolledNodes = (): FlowNode[] => [
   input('totp', 'totp_unlink', 'submit', { value: 'true' }, 'Unlink TOTP Authenticator App'),
 ];
 
-function lookupNodes(enrolled: boolean): FlowNode[] {
-  return enrolled
+const CODES = ['k3m9-x2pq', 'b7wd-4nht', 'q8ze-j5cr', 'v2fa-m6ys', 'h4tk-p9ub', 'n5gx-c3ld', 'r6ja-w8eo', 'd9sv-y2mi', 's1pz-t7kh', 'e3uc-a4nf', 'x8lq-g6bw', 'z5ro-f1jd'];
+
+/** The codes as Kratos serves them: one text node, joined with ", ", the per-code messages under context.secrets. */
+function codesNode(): FlowNode {
+  const secrets = CODES.map((c) => ({ id: 1050015, text: c, type: 'info', context: { secret: c } }));
+  return {
+    type: 'text',
+    group: 'lookup_secret',
+    attributes: { node_type: 'text', id: 'lookup_secret_codes', text: { id: 1050014, text: CODES.join(', '), type: 'info', context: { secrets } } },
+    messages: [],
+    meta: { label: { id: 1050013, text: 'These are your back up recovery codes. Please keep them in a safe place!' } },
+  } as FlowNode;
+}
+
+function lookupNodes(mode: boolean | 'reveal' | 'new'): FlowNode[] {
+  if (mode === 'reveal') {
+    return [
+      codesNode(),
+      input('lookup_secret', 'lookup_secret_regenerate', 'submit', { value: 'true' }, 'Generate new backup recovery codes'),
+      input('lookup_secret', 'lookup_secret_disable', 'submit', { value: 'true' }, 'Disable this method'),
+    ];
+  }
+  if (mode === 'new') {
+    return [codesNode(), input('lookup_secret', 'lookup_secret_confirm', 'submit', { value: 'true' }, 'Confirm backup recovery codes')];
+  }
+  return mode
     ? [
         input('lookup_secret', 'lookup_secret_reveal', 'submit', { value: 'true' }, 'Reveal backup recovery codes'),
         input('lookup_secret', 'lookup_secret_disable', 'submit', { value: 'true' }, 'Disable this method'),
@@ -141,11 +171,11 @@ interface Spec {
   passkeys: Array<[string, string, string]>;
   keys: Array<[string, string, string]>;
   totp: 'none' | 'qr' | 'wrong' | 'enrolled';
-  lookup: boolean;
+  lookup: boolean | 'reveal' | 'new';
   next: DevSettingsState;
 }
 
-function build(spec: Spec, state: DevSettingsState, extra: { success?: boolean; verified?: boolean; reauth?: boolean; names?: PasskeyNames; setupOpen?: boolean; flash?: string; renameError?: DevSettings['renameError'] } = {}): DevSettings {
+function build(spec: Spec, state: DevSettingsState, extra: { success?: boolean; verified?: boolean; reauth?: boolean; names?: PasskeyNames; setupOpen?: boolean; admin?: boolean; flash?: string; renameError?: DevSettings['renameError'] } = {}): DevSettings {
   const nodes: FlowNode[] = [
     csrf,
     ...profileNodes(),
@@ -177,6 +207,7 @@ function build(spec: Spec, state: DevSettingsState, extra: { success?: boolean; 
     setupOpen: extra.setupOpen === true,
     flash: extra.flash ?? null,
     renameError: extra.renameError ?? null,
+    admin: extra.admin === true,
   };
 }
 
@@ -204,6 +235,14 @@ export function devSettings(state: DevSettingsState): DevSettings {
       return build({ passkeys: [PK_A, PK_B], keys: [], totp: 'enrolled', lookup: true, next: 'rename-error' }, state, {
         renameError: { id: PASSKEY_B, text: RENAME_ERRORS.name },
       });
+    case 'codes-reveal':
+      return build({ passkeys: [PK_A, PK_B], keys: [], totp: 'enrolled', lookup: 'reveal', next: 'codes-reveal' }, state);
+    case 'codes-new':
+      return build({ passkeys: [PK_A, PK_B], keys: [], totp: 'enrolled', lookup: 'new', next: 'enrolled' }, state, { flash: 'lookup_secret_regenerate' });
+    case 'replaced':
+      return build({ passkeys: [PK_A], keys: [], totp: 'qr', lookup: false, next: 'totp-wrong-code' }, state, { setupOpen: true, flash: 'totp_replace' });
+    case 'enrolled-admin':
+      return build({ passkeys: [PK_A, PK_B], keys: [], totp: 'enrolled', lookup: true, next: 'enrolled-admin' }, state, { admin: true });
     case 'unverified':
       return build({ passkeys: [PK_A, PK_B], keys: [], totp: 'enrolled', lookup: true, next: 'unverified' }, state, { verified: false });
   }

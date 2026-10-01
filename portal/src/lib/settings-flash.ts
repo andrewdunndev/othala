@@ -4,6 +4,8 @@
 export const FLASH: Record<string, string> = {
   'method:totp': 'Authenticator app added.',
   totp_unlink: 'Authenticator app removed.',
+  totp_replace: 'Old app removed. Scan the new code below, then enter the code your app shows.',
+  passkey_rename: 'Name saved.',
   passkey_remove: 'Passkey removed.',
   webauthn_remove: 'Security key removed.',
   passkey_register_trigger: 'Passkey added.',
@@ -14,6 +16,9 @@ export const FLASH: Record<string, string> = {
   lookup_secret_confirm: 'Backup codes saved.',
   lookup_secret_disable: 'Backup codes turned off.',
 };
+
+/** Removals after which a lost device may still be signed in somewhere: the saved line offers to sign out everywhere. */
+export const LOST_KEYS = new Set(['passkey_remove', 'webauthn_remove', 'totp_unlink']);
 
 export const flashKey = (name: string, value: string): string => (name === 'method' ? `method:${value}` : name);
 

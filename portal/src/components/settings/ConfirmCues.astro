@@ -1,0 +1,19 @@
+---
+// The two lines a removal confirm may add under its question: the privileged window has lapsed (the change would bounce
+// to sign-in), and a lost device may still be signed in elsewhere (removing a credential no longer ends other sessions).
+
+interface Props {
+  reauth?: boolean;
+  reauthHref?: string;
+  /** Offer "Also sign out everywhere", opening the Sessions confirm. */
+  lost?: boolean;
+}
+
+const { reauth = false, reauthHref = '#', lost = false } = Astro.props as Props;
+---
+{(reauth || lost) && (
+  <p class="panel-cues">
+    {reauth && <span class="cue-reauth">Confirm it's you first, or this change sends you to sign in. <a href={reauthHref} data-astro-reload>Confirm it's you</a></span>}
+    {lost && <span class="cue-lost">Lost it? <a href="#signout-all" data-open="signout-all">Also sign out everywhere</a></span>}
+  </p>
+)}

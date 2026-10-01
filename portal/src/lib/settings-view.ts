@@ -93,11 +93,25 @@ export interface LookupView {
   enrolled: boolean;
   /** The codes, when this flow shows them. */
   codes: string | null;
+  /** The codes one by one: Kratos joins them into one string, so the list comes from context.secrets when it has it. */
+  list: Array<{ code: string; used: boolean }>;
   codesLabel: string | null;
 }
 
+/** Split the codes Kratos sends: per-code messages in context.secrets, else the comma-joined text. */
+export function splitCodes(text: string, context?: Record<string, unknown>): Array<{ code: string; used: boolean }> {
+  const secrets = context?.secrets;
+  if (Array.isArray(secrets) && secrets.length > 0) {
+    return secrets.map((m) => {
+      const c = (m as { context?: { secret?: unknown } })?.context?.secret;
+      return typeof c === 'string' && c ? { code: c, used: false } : { code: '', used: true };
+    });
+  }
+  return text.split(',').map((c) => c.trim()).filter(Boolean).map((c) => ({ code: c, used: c === 'used' }));
+}
+
 export function lookupView(nodes: FlowNode[]): LookupView {
-  const view: LookupView = { enrolled: false, codes: null, codesLabel: null };
+  const view: LookupView = { enrolled: false, codes: null, list: [], codesLabel: null };
   for (const n of nodes) {
     if (n.group !== 'lookup_secret') continue;
     const a = asInput(n);
@@ -106,6 +120,7 @@ export function lookupView(nodes: FlowNode[]): LookupView {
       const t = n.attributes as NodeTextAttributes;
       if (t.id === 'lookup_secret_codes' || t.text?.text) {
         view.codes = t.text?.text ?? null;
+        view.list = splitCodes(t.text?.text ?? '', t.text?.context);
         view.codesLabel = n.meta?.label?.text ?? null;
       }
     }

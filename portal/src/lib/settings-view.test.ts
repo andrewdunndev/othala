@@ -1,7 +1,7 @@
 // Invariant: the settings view model reads each recorded fixture state the way the page presents it.
 
 import { describe, it, expect } from 'vitest';
-import { credentialItems, totpView, lookupView, securityStatus, emailVerified, formatAdded } from './settings-view';
+import { splitCodes, credentialItems, totpView, lookupView, securityStatus, emailVerified, formatAdded } from './settings-view';
 import { devSettings, DEV_SETTINGS_STATES, isDevSettingsState } from './settings-fixtures';
 
 const nodesOf = (s: Parameters<typeof devSettings>[0]) => devSettings(s).flow.ui.nodes;
@@ -63,5 +63,21 @@ describe('settings view over the fixtures', () => {
     expect(emailVerified({ traits: { email: 'a@x.test' }, verifiable_addresses: [] })).toBeNull();
     expect(securityStatus([], { emailVerified: false }).emailUnverified).toBe(true);
     expect(securityStatus([], { emailVerified: null }).emailUnverified).toBe(false);
+  });
+
+  it('reads backup codes one by one from the revealed and the new-codes states', () => {
+    for (const st of ['codes-reveal', 'codes-new'] as const) {
+      const l = lookupView(nodesOf(st));
+      expect(l.list).toHaveLength(12);
+      expect(l.list.every((c) => c.code && !c.used)).toBe(true);
+    }
+    expect(securityStatus(nodesOf('codes-new'), { emailVerified: true }).backupCodes).toBe(false);
+  });
+
+  it('splits the comma-joined text when the per-code messages are absent, and marks used codes', () => {
+    expect(splitCodes('aaaa-bbbb, cccc-dddd, used')).toEqual([
+      { code: 'aaaa-bbbb', used: false }, { code: 'cccc-dddd', used: false }, { code: 'used', used: true },
+    ]);
+    expect(splitCodes('x', { secrets: [{ context: { secret: 'one' } }, { context: {} }] })).toEqual([{ code: 'one', used: false }, { code: '', used: true }]);
   });
 });

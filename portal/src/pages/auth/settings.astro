@@ -22,6 +22,8 @@ import {
 import { csrfToken, nodesByGroup, asInput, scriptNodes, safeOnclick } from '../../lib/nodes';
 import type { FlowNode, Session, SettingsFlow } from '../../lib/types';
 import CredentialRows from '../../components/settings/CredentialRows.astro';
+import ConfirmCues from '../../components/settings/ConfirmCues.astro';
+import { SECOND_FACTOR_KEEP } from '../../lib/second-factor-gate';
 import HeaderActions from '../../components/HeaderActions.astro';
 import { revokeSubject, RevokeError } from '../../lib/revoke';
 import { getIdentity } from '../../lib/admin-api';
@@ -41,7 +43,7 @@ import {
   totpView,
 } from '../../lib/settings-view';
 import { devSettings, isDevSettingsState } from '../../lib/settings-fixtures';
-import { FLASH, RENAME_ERROR_COOKIE, RENAME_ERRORS, groupKey, messageText } from '../../lib/settings-flash';
+import { FLASH, LOST_KEYS, RENAME_ERROR_COOKIE, RENAME_ERRORS, groupKey, messageText } from '../../lib/settings-flash';
 
 const cookie = Astro.request.headers.get('cookie') ?? undefined;
 const devParam = import.meta.env.DEV ? Astro.url.searchParams.get('dev-state') : null;
@@ -73,7 +75,7 @@ if (dev) {
       id: 'dev-mock',
       traits: { username: 'sam', email, displayName: 'Sam Rivera' },
       verifiable_addresses: [{ value: email, verified: dev.emailVerified }],
-      metadata_admin: { passkeyNames: dev.names },
+      metadata_admin: { passkeyNames: dev.names, ...(dev.admin ? { admin: true } : {}) },
     },
   } as unknown as Session;
   flow = dev.flow;
@@ -188,6 +190,10 @@ const setupOpen = totp.codeMessages.length > 0 || (dev?.setupOpen ?? false);
 const pwOpen = nodesByGroup(nodes, 'password').some((n) => (n.messages?.length ?? 0) > 0);
 // The saved line belongs in the card that was edited. Script fills it on a live swap; the dev fixture renders it here.
 const devFlash = dev?.flash ? FLASH[dev.flash] : null;
+const devFlashCard = dev?.flash?.startsWith('lookup') ? 'recovery' : 'two-step';
+// Admins keep one second factor: the gate refuses dropping the app when it is their only one, so say so up front.
+const keepSecondFactor = isAdmin && status.securityKeys === 0;
+const lookupConfirm = nodesByGroup(nodes, 'lookup_secret').some((n) => asInput(n)?.name === 'lookup_secret_confirm');
 const lookupOff = nodesByGroup(nodes, 'lookup_secret').map(asInput).find((a) => a?.name === 'lookup_secret_disable') ?? null;
 
 const csrfSignOut = mint(identity.id, 'sign-out-everywhere');
@@ -228,6 +234,12 @@ const lookupLabel: Record<string, string> = {
         <div class={`notice notice-${kind(m.type)}`} data-flow-success={m.type === 'success' ? '' : undefined}>{messageText(m)}</div>
       ))}
       {signOutError && <div class="notice notice-danger">{signOutError}</div>}
+      {reauth && (
+        <div class="notice notice-warning" data-testid="reauth-notice">
+          Changing how you sign in asks you to confirm it's you first, and it has been a while.
+          <div class="actions"><a class="button button-primary button-sm" href={reauthHref} data-astro-reload>Confirm it's you</a></div>
+        </div>
+      )}
       {status.passkeys === 1 && (
         <div class="notice notice-warning">You have one passkey. Add one on your other devices too, so losing this one doesn't lock you out.</div>
       )}
@@ -238,12 +250,6 @@ const lookupLabel: Record<string, string> = {
         </div>
       )}
     </div>
-    {reauth && (
-      <p class="field-hint settings-hint" data-testid="reauth-notice">
-        Changing how you sign in asks you to confirm it's you first. <a href={reauthHref} data-astro-reload>Confirm now</a>
-      </p>
-    )}
-
     <div class="cards">
       <section class="panel card" id="sign-in" data-card aria-labelledby="h-signin">
         <h2 id="h-signin">Sign-in</h2>
@@ -261,7 +267,7 @@ const lookupLabel: Record<string, string> = {
                 if (a?.type === 'hidden') return <input type="hidden" name={a.name} value={String(a.value ?? '')} />;
                 return null;
               })}
-              <CredentialRows items={passkeys} kind="passkey" noun="passkey" fallbackName="Passkey" rename={passkeys.length > 0} renameError={renameError} />
+              <CredentialRows items={passkeys} kind="passkey" noun="passkey" fallbackName="Passkey" rename={passkeys.length > 0} renameError={renameError} reauth={reauth} reauthHref={reauthHref} />
               {nodesByGroup(nodes, 'passkey').map((n) => {
                 const a = asInput(n);
                 // safeOnclick validates against KNOWN_TRIGGERS; never emit a.onclick raw.
@@ -293,6 +299,7 @@ const lookupLabel: Record<string, string> = {
             <form method="POST" action={ui.action} class="settings-form">
               <input type="hidden" name="csrf_token" value={csrf} />
               <input type="hidden" name="method" value="password" />
+              <input type="text" class="sr-only" readonly tabindex="-1" aria-hidden="true" autocomplete="username" value={traits.username} />
               <input type="checkbox" class="disclose cb-setup" id="pw-open" checked={pwOpen} />
               <div class="form-actions">
                 <label for="pw-open" class="button button-secondary button-sm toggle-label lbl-setup"><span class="on-closed">Change password</span><span class="on-open">Cancel</span></label>
@@ -325,7 +332,7 @@ const lookupLabel: Record<string, string> = {
 
       <section class="panel card" id="two-step" data-card aria-labelledby="h-2sv">
         <h2 id="h-2sv">Two-step verification</h2>
-        <div class="card-flash" data-flash tabindex="-1" role="status">{devFlash && <div class="notice notice-success">{devFlash}</div>}</div>
+        <div class="card-flash" data-flash tabindex="-1" role="status">{devFlash && devFlashCard === 'two-step' && <div class="notice notice-success">{devFlash}{LOST_KEYS.has(dev?.flash ?? '') && <> Lost it? <a href="#signout-all" data-open="signout-all">Also sign out everywhere</a></>}</div>}</div>
         <p class="lede">A second check keeps others out even if they learn your password.</p>
         {showBackupPrompt && (
           <>
@@ -344,7 +351,7 @@ const lookupLabel: Record<string, string> = {
 
         {has('totp') && (
           <div class="group">
-            <h3>Authenticator app {totp.enrolled && <span class="badge">on</span>}</h3>
+            <h3>Authenticator app</h3>
             <form method="POST" action={ui.action} class="settings-form wide">
               <input type="hidden" name="csrf_token" value={csrf} />
               <input type="hidden" name="method" value="totp" />
@@ -353,7 +360,7 @@ const lookupLabel: Record<string, string> = {
                   <p>An app on your phone shows a new 6-digit code every 30 seconds.</p>
                   <ul class="items">
                     <li>
-                      <div class="item-id"><span class="item-name">Authenticator app</span></div>
+                      <div class="item-id"><span class="item-name">Your app</span><span class="badge">on</span></div>
                       <input type="checkbox" class="disclose cb-replace" id="totp-replace" aria-label="Replace authenticator app" />
                       <input type="checkbox" class="disclose cb-remove" id="totp-remove" aria-label="Remove authenticator app" />
                       <div class="item-actions">
@@ -361,12 +368,26 @@ const lookupLabel: Record<string, string> = {
                         <label for="totp-remove" class="button button-secondary button-sm toggle-label lbl-remove"><span class="on-closed">Remove</span><span class="on-open">Keep it</span></label>
                       </div>
                       <div class="panel-row panel-replace">
-                        <span>Replace the app? The current one stops working and you scan a new code next.</span>
-                        <button type="submit" name={totp.unlink.name} value={totp.unlink.value} class="button button-danger button-sm">Replace app</button>
+                        {keepSecondFactor ? (
+                          <span>{SECOND_FACTOR_KEEP} Add a security key first, then replace the app.</span>
+                        ) : (
+                          <>
+                            <span>Replace the app? The current one stops working, then you scan a new code.</span>
+                            <button type="submit" name={totp.unlink.name} value={totp.unlink.value} class="button button-danger button-sm" data-flash-key="totp_replace">Replace app</button>
+                            <ConfirmCues reauth={reauth} reauthHref={reauthHref} lost />
+                          </>
+                        )}
                       </div>
                       <div class="panel-row panel-remove">
-                        <span>Remove the app? You won't be able to use it for the second step anymore.</span>
-                        <button type="submit" name={totp.unlink.name} value={totp.unlink.value} class="button button-danger button-sm" aria-label="Remove authenticator app">Remove app</button>
+                        {keepSecondFactor ? (
+                          <span>{SECOND_FACTOR_KEEP} Add a security key first, then remove the app.</span>
+                        ) : (
+                          <>
+                            <span>Remove the app? You won't be able to use it for the second step anymore.</span>
+                            <button type="submit" name={totp.unlink.name} value={totp.unlink.value} class="button button-danger button-sm" aria-label="Remove authenticator app">Remove app</button>
+                            <ConfirmCues reauth={reauth} reauthHref={reauthHref} lost />
+                          </>
+                        )}
                       </div>
                     </li>
                   </ul>
@@ -375,23 +396,26 @@ const lookupLabel: Record<string, string> = {
               {!totp.enrolled && (
                 <>
                   <input type="checkbox" class="disclose cb-setup" id="totp-setup" checked={setupOpen} />
-                  <p>Not set up. An authenticator app on your phone shows a new 6-digit code every 30 seconds.</p>
-                  <div class="form-actions">
-                    <label for="totp-setup" class="button button-secondary button-sm toggle-label lbl-setup"><span class="on-closed">Set up authenticator app</span><span class="on-open">Cancel</span></label>
+                  <p class="when-closed">Not set up. An authenticator app on your phone shows a new 6-digit code every 30 seconds.</p>
+                  <div class="form-actions when-closed">
+                    <label for="totp-setup" class="button button-secondary button-sm toggle-label lbl-setup">Set up authenticator app</label>
                   </div>
                   <ol class="steps panel-block panel-setup">
                     {totp.qr && (
                       <li>
                         <h4>Scan the code</h4>
                         <p>Scan this into your authenticator app. Scan it into every app you want to use now; each shows the same codes.</p>
-                        <p class="field-hint narrow-only">On this phone? Open "Can't scan?" below and copy the setup key into your app.</p>
+                        <p class="field-hint narrow-only">On this phone? Copy the setup key below into your app.</p>
                         <div class="totp-qr">
                           <img src={totp.qr.src} alt={totp.qr.alt} width={totp.qr.width} height={totp.qr.height} />
                         </div>
                         {totp.secret && (
                           <details data-open-narrow>
                             <summary>Can't scan? Show setup key</summary>
-                            <code class="totp-secret-value mono">{groupKey(totp.secret)}</code>
+                            <div class="secret-row">
+                              <code class="totp-secret-value mono" id="totp-secret">{groupKey(totp.secret)}</code>
+                              <button type="button" class="button button-secondary button-sm" data-copy="totp-secret" hidden>Copy key</button>
+                            </div>
                             <p class="field-hint">Type this key into your app instead. Spaces don't matter.</p>
                           </details>
                         )}
@@ -423,6 +447,7 @@ const lookupLabel: Record<string, string> = {
                         {totp.save && (
                           <div class="form-actions">
                             <button class="button button-primary button-sm" type="submit" name={totp.save.name} value={totp.save.value}>Verify and add</button>
+                            <label for="totp-setup" class="button button-secondary button-sm toggle-label lbl-setup">Cancel</label>
                           </div>
                         )}
                       </li>
@@ -441,7 +466,7 @@ const lookupLabel: Record<string, string> = {
             <form method="POST" action={ui.action} class="settings-form wide">
               <input type="hidden" name="csrf_token" value={csrf} />
               <input type="hidden" name="method" value="webauthn" />
-              <CredentialRows items={keys} kind="webauthn" noun="security key" fallbackName="Security key" />
+              <CredentialRows items={keys} kind="webauthn" noun="security key" fallbackName="Security key" reauth={reauth} reauthHref={reauthHref} />
               <input type="checkbox" class="disclose cb-setup" id="key-add" checked={nodesByGroup(nodes, 'webauthn').some((n) => (n.messages?.length ?? 0) > 0)} />
               <div class="form-actions">
                 <label for="key-add" class="button button-secondary button-sm toggle-label lbl-setup"><span class="on-closed">{keys.length > 0 ? 'Add another security key' : 'Add a security key'}</span><span class="on-open">Cancel</span></label>
@@ -478,7 +503,7 @@ const lookupLabel: Record<string, string> = {
 
       <section class="panel card" id="recovery" data-card aria-labelledby="h-rec">
         <h2 id="h-rec">Recovery</h2>
-        <div class="card-flash" data-flash tabindex="-1" role="status">{null}</div>
+        <div class="card-flash" data-flash tabindex="-1" role="status">{devFlash && devFlashCard === 'recovery' && <div class="notice notice-success">{devFlash}</div>}</div>
         <p class="lede">For the day a phone is lost or broken.</p>
 
         {has('lookup_secret') && (
@@ -488,10 +513,21 @@ const lookupLabel: Record<string, string> = {
             <form method="POST" action={ui.action} class="settings-form wide">
               <input type="hidden" name="csrf_token" value={csrf} />
               <input type="hidden" name="method" value="lookup_secret" />
-              {lookup.codes && (
-                <div class="lookup-codes">
-                  <p class="lookup-codes-label">{lookup.codesLabel ?? 'Backup codes. Save these somewhere safe.'}</p>
-                  <code class="lookup-codes-value mono" data-testid="backup-codes">{lookup.codes}</code>
+              {lookup.list.length > 0 && (
+                <div class="lookup-codes" id="lookup-codes">
+                  <p class="lookup-codes-label">{lookup.codesLabel ?? 'Backup codes. Save these somewhere safe.'} Each works once.</p>
+                  <ol class="lookup-grid" data-testid="backup-codes">
+                    {lookup.list.map((c) => (
+                      <li class={c.used ? 'used' : ''}>{c.used ? <span class="mono">used</span> : <code class="mono">{c.code}</code>}</li>
+                    ))}
+                  </ol>
+                  <div class="form-actions" data-codes-tools hidden>
+                    <button type="button" class="button button-secondary button-sm" data-copy-codes="lookup-codes">Copy codes</button>
+                    <button type="button" class="button button-secondary button-sm" data-print-codes>Print</button>
+                  </div>
+                  {lookupConfirm && (
+                    <div class="notice notice-warning">These codes only work after you press <strong>I've saved these codes</strong>. Until then, the old ones stay in use.</div>
+                  )}
                 </div>
               )}
               {lookupOff && <input type="checkbox" class="disclose cb-remove" id="lookup-off" aria-label="Turn off backup codes" />}
@@ -551,7 +587,7 @@ const lookupLabel: Record<string, string> = {
                   <input type="hidden" name="traits.recoveryEmail" value={value('traits.recoveryEmail')} />
                   <div class="static">
                     <span class="static-label" id="recovery-email-label">Recovery email address</span>
-                    <span class="static-value" aria-labelledby="recovery-email-label">{value('traits.recoveryEmail') || 'Not set'}</span>
+                    <span class="static-value" aria-labelledby="recovery-email-label">{value('traits.recoveryEmail') || <span class="static-empty">None yet</span>}</span>
                   </div>
                   <div class="form-actions"><a class="button button-secondary button-sm" href={reauthHref} data-astro-reload>Confirm it's you to change it</a></div>
                 </>

@@ -119,7 +119,7 @@ export interface NodeImageAttributes {
 export interface NodeTextAttributes {
   node_type: 'text';
   id?: string;
-  text: { id?: number; text: string; type?: MessageType };
+  text: { id?: number; text: string; type?: MessageType; context?: Record<string, unknown> };
 }
 
 export type NodeAttributes =
