@@ -14,6 +14,7 @@ import {
 } from '@ory/client-fetch';
 import type { Identity } from './types';
 import { validateMetadataAdmin } from './metadata-admin';
+import { passkeyCredentialIds, pruneNames, readPasskeyNames } from './passkey-names';
 import { revokeSubject } from './revoke';
 import { KRATOS_ADMIN_URL } from './constants';
 
@@ -42,6 +43,8 @@ export interface MetadataAdmin {
    * Written only by patchPrerequisites, a targeted patch, so a groups/roles save never clobbers it.
    */
   prerequisites?: string[];
+  /** Passkey names keyed by hex credential id. Written only by patchPasskeyName and prunePasskeyNames, targeted patches. */
+  passkeyNames?: Record<string, string>;
   admin?: boolean;
 }
 
@@ -206,6 +209,47 @@ export async function patchPrerequisites(id: string, names: string[]): Promise<v
     patch = [{ op: hasKey ? 'replace' : 'add', path: '/metadata_admin/prerequisites', value: prerequisites }];
   }
   await api.patchIdentity({ id, jsonPatch: patch });
+}
+
+type PatchOp = { op: 'add' | 'replace' | 'remove'; path: string; value?: unknown };
+
+/**
+ * Targeted JSON-Patch that sets one entry of `metadata_admin.passkeyNames`, leaving every other key untouched (never a
+ * full-record PUT). Creates /metadata_admin and /metadata_admin/passkeyNames when absent; `add` on an existing member
+ * replaces it.
+ */
+export async function patchPasskeyName(id: string, credentialId: string, name: string): Promise<void> {
+  const names = validateMetadataAdmin({ passkeyNames: { [credentialId]: name } }).passkeyNames ?? {};
+  const api = identityApi();
+  const current = await api.getIdentity({ id });
+  const meta = current.metadata_admin as Record<string, unknown> | null | undefined;
+  let patch: PatchOp[];
+  if (meta == null || typeof meta !== 'object') {
+    patch = [{ op: 'add', path: '/metadata_admin', value: { passkeyNames: names } }];
+  } else if (!('passkeyNames' in meta)) {
+    patch = [{ op: 'add', path: '/metadata_admin/passkeyNames', value: names }];
+  } else {
+    patch = [{ op: 'add', path: `/metadata_admin/passkeyNames/${credentialId}`, value: names[credentialId] }];
+  }
+  await api.patchIdentity({ id, jsonPatch: patch });
+}
+
+/**
+ * Drop passkey names whose credential is no longer on the identity (run by the settings.after.passkey hook). Reads the
+ * stored identity and patches only metadata_admin.passkeyNames; returns how many names were dropped.
+ */
+export async function prunePasskeyNames(id: string): Promise<number> {
+  const api = identityApi();
+  const current = await api.getIdentity({ id, includeCredential: INCLUDED_CREDENTIALS });
+  const names = readPasskeyNames(current.metadata_admin);
+  const kept = pruneNames(names, passkeyCredentialIds(current as unknown as Identity));
+  if (kept === null) return 0;
+  const patch: PatchOp[] =
+    Object.keys(kept).length === 0
+      ? [{ op: 'remove', path: '/metadata_admin/passkeyNames' }]
+      : [{ op: 'replace', path: '/metadata_admin/passkeyNames', value: kept }];
+  await api.patchIdentity({ id, jsonPatch: patch });
+  return Object.keys(names).length - Object.keys(kept).length;
 }
 
 /**

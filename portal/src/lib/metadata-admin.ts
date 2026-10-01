@@ -1,11 +1,12 @@
 // Validator for `metadata_admin` writes. Kratos does not validate that block
 // (its schema only covers traits), so a typo would be stored silently.
-// Contract: { groups?: string[]; roles?: Record<string,string>; admin?: boolean; prerequisites?: string[] }
+// Contract: { groups?: string[]; roles?: Record<string,string>; admin?: boolean; prerequisites?: string[]; passkeyNames?: Record<string,string> }
 // with canonical group names (GROUP_RE), a strict boolean admin, and no other
 // keys. Hand-rolled, no validator dependency; returns the input or an Error.
 
 import type { MetadataAdmin } from './admin-api';
 import { GROUP_RE } from './access-groups';
+import { CREDENTIAL_ID_RE, cleanPasskeyName } from './passkey-names';
 
 const CLIENT_ID_RE = /^[a-z][a-z0-9]*$/;
 const ROLE_NAME_RE = /^[a-z][a-z0-9_\-]*$/;
@@ -18,7 +19,7 @@ export class MetadataAdminError extends Error {
   }
 }
 
-const ALLOWED_KEYS = new Set(['groups', 'roles', 'admin', 'prerequisites']);
+const ALLOWED_KEYS = new Set(['groups', 'roles', 'admin', 'prerequisites', 'passkeyNames']);
 const PREREQUISITE_RE = /^[a-z][a-z0-9-]{0,39}$/;
 
 export function validateMetadataAdmin(input: unknown): MetadataAdmin {
@@ -32,7 +33,7 @@ export function validateMetadataAdmin(input: unknown): MetadataAdmin {
   for (const key of Object.keys(input)) {
     if (!ALLOWED_KEYS.has(key)) {
       throw new MetadataAdminError(
-        `metadata_admin: unknown field "${key}". Allowed: groups, roles, admin, prerequisites.`,
+        `metadata_admin: unknown field "${key}". Allowed: groups, roles, admin, prerequisites, passkeyNames.`,
       );
     }
   }
@@ -52,6 +53,10 @@ export function validateMetadataAdmin(input: unknown): MetadataAdmin {
     out.prerequisites = validatePrerequisites(obj.prerequisites);
   }
 
+  if ('passkeyNames' in obj && obj.passkeyNames !== undefined) {
+    out.passkeyNames = validatePasskeyNames(obj.passkeyNames);
+  }
+
   if ('admin' in obj && obj.admin !== undefined) {
     if (typeof obj.admin !== 'boolean') {
       throw new MetadataAdminError(
@@ -61,6 +66,21 @@ export function validateMetadataAdmin(input: unknown): MetadataAdmin {
     out.admin = obj.admin;
   }
 
+  return out;
+}
+
+function validatePasskeyNames(value: unknown): Record<string, string> {
+  if (typeof value !== 'object' || value === null || Array.isArray(value)) {
+    throw new MetadataAdminError('metadata_admin.passkeyNames must be an object keyed by credential id.');
+  }
+  const out: Record<string, string> = {};
+  for (const [id, name] of Object.entries(value as Record<string, unknown>)) {
+    const clean = cleanPasskeyName(name);
+    if (!CREDENTIAL_ID_RE.test(id) || clean === null) {
+      throw new MetadataAdminError(`metadata_admin.passkeyNames["${id}"]: needs a hex credential id and a short name.`);
+    }
+    out[id] = clean;
+  }
   return out;
 }
 

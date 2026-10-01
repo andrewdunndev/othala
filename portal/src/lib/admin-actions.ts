@@ -123,6 +123,7 @@ export async function saveAction(fd: FormData, ctx: ActionContext): Promise<Acti
   // (avoids a TOCTOU on the write; grant/revoke are the targeted paths).
   const existingAdmin = identity.metadata_admin?.admin;
   const existingPrerequisites = identity.metadata_admin?.prerequisites;
+  const existingPasskeyNames = identity.metadata_admin?.passkeyNames;
   const groups = normalizeGroupOrder(groupPlan.groups);
   await updateIdentity(id, {
     traits,
@@ -131,6 +132,7 @@ export async function saveAction(fd: FormData, ctx: ActionContext): Promise<Acti
       roles: Object.keys(roles).length ? roles : undefined,
       ...(existingAdmin === true ? { admin: true } : {}),
       ...(existingPrerequisites?.length ? { prerequisites: existingPrerequisites } : {}),
+      ...(existingPasskeyNames && Object.keys(existingPasskeyNames).length ? { passkeyNames: existingPasskeyNames } : {}),
     },
   });
   // The Kratos write has landed; now end grants issued under the old access.
