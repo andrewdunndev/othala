@@ -26,8 +26,8 @@ const grafana = {
   roles: [role('admin'), role('viewer')], groupRoleMap: { 'grafana-admin': 'admin' }, skipAccessCheck: false,
 } as unknown as ClientManifest;
 const statuspage = {
-  clientId: 'statuspage', clientName: 'Status page', sourcePath: 'statuspage.yaml', accessGroups: ['everyone'],
-  roles: [], groupRoleMap: {}, skipAccessCheck: false,
+  clientId: 'statuspage', clientName: 'Status page', sourcePath: 'statuspage.yaml', accessGroups: [],
+  roles: [], groupRoleMap: {}, skipAccessCheck: true,
 } as unknown as ClientManifest;
 const apps = joinApps([grafana, statuspage], []);
 

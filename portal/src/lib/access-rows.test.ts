@@ -32,10 +32,10 @@ const proxywatch = {
 
 const statuspage = {
   clientId: 'statuspage',
-  accessGroups: ['everyone'],
+  accessGroups: [],
   roles: [],
   groupRoleMap: {},
-  skipAccessCheck: false,
+  skipAccessCheck: true,
 } as unknown as ClientManifest;
 
 const MANIFESTS = [grafana, proxywatch, statuspage];
@@ -133,6 +133,13 @@ describe('accessToStorage', () => {
     const next = accessToStorage([grafana, shared], { grafana: 'none' }, stored(['grafana-access']));
     expect(next.groups).toEqual(['grafana-access']);
     expect(next.unmet).toEqual([{ clientId: 'grafana', group: 'grafana-access', sharedWith: ['other'] }]);
+  });
+
+  it('lists only apps outside the changed set as sharing a blocked group', () => {
+    const changedSibling = { ...proxywatch, clientId: 'sibling', clientName: 'Sibling', accessGroups: ['grafana-access'] } as unknown as ClientManifest;
+    const kept = { ...proxywatch, clientId: 'other', clientName: 'Other', accessGroups: ['grafana-access'] } as unknown as ClientManifest;
+    const next = accessToStorage([grafana, changedSibling, kept], { grafana: 'none', sibling: 'none' }, stored(['grafana-access']));
+    expect(next.unmet[0].sharedWith).toEqual(['Other']);
   });
 
   it('writes an explicit entry-level override when a shared role group would outrank it', () => {

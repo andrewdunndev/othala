@@ -479,7 +479,7 @@ export function validateClients(set: ClientManifest[]): string[] {
       if (IDENTITY_GROUPS.includes(g)) {
         errs.push(
           `${src}: ${JSON.stringify(g)} is an identity group and cannot appear in presentation.access or ` +
-            `consent.group_role_map (use skip_access_check for an app open to everyone)`,
+            `consent.group_role_map (omitting access leaves the app unreachable; set consent.skip_access_check to open it to everyone)`,
         );
       }
     }

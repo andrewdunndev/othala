@@ -4,7 +4,7 @@
 
 import type { ClientManifest } from './manifests';
 import { lookupRole } from './claims';
-import { DEFAULT_GROUP, IDENTITY_GROUPS } from './constants';
+import { IDENTITY_GROUPS } from './constants';
 
 export const NO_ACCESS = 'none';
 export const CAN_USE = 'use';
@@ -26,9 +26,9 @@ function capitalise(s: string): string {
   return s.charAt(0).toUpperCase() + s.slice(1);
 }
 
-/** Open to everyone: the default group enters it (or the gate is off), so no per-person level applies. */
+/** Open to everyone: the gate is off (skip_access_check), so no per-person level applies. Identity groups never appear in a loaded binding. */
 export function isOpenToEveryone(m: ClientManifest): boolean {
-  return m.skipAccessCheck || m.accessGroups.includes(DEFAULT_GROUP);
+  return m.skipAccessCheck;
 }
 
 /** The levels above No access, least to most privilege, each with its role description as a hint. */
@@ -119,7 +119,7 @@ export function accessToStorage(
     if (choices[m.clientId] !== NO_ACCESS) continue;
     const group = m.accessGroups.find((g) => groups.has(g));
     if (group === undefined) continue;
-    const sharedWith = manifests.filter((o) => o !== m && appGroups(o).includes(group)).map((o) => o.clientName || o.clientId);
+    const sharedWith = manifests.filter((o) => !changed.includes(o) && appGroups(o).includes(group)).map((o) => o.clientName || o.clientId);
     unmet.push({ clientId: m.clientId, group, sharedWith });
   }
   return { groups: [...groups], roles, unmet };
