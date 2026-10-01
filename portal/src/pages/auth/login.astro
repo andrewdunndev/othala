@@ -97,7 +97,9 @@ const { hasPasskey, hasCode, hasPassword, totpNodes, aal2WebauthnNodes, lookupNo
       ? 'Enter the code from your authenticator app to finish signing in.'
       : 'Confirm it is you with your security key to finish signing in.'
     : isCodeEntry
-      ? 'We emailed you a sign-in code. Enter it below.'
+      ? identifierInput?.value
+        ? `We emailed a sign-in code to ${String(identifierInput.value)}. Enter it below.`
+        : 'We emailed you a sign-in code. Enter it below.'
       : 'Use the passkey on this device, or get a code by email.'}
   description={`Sign in to ${instanceName}.`}
 >
@@ -396,10 +398,7 @@ const { hasPasskey, hasCode, hasPassword, totpNodes, aal2WebauthnNodes, lookupNo
           <input type="hidden" name="method" value="password" />
 
           {passwordFailed && identifierInput?.value ? (
-            <div class="field">
-              <p class="focus-note">Signing in as <strong>{String(identifierInput.value)}</strong></p>
-              <input type="hidden" name="identifier" value={String(identifierInput.value)} />
-            </div>
+            <input type="hidden" name="identifier" value={String(identifierInput.value)} />
           ) : (
             <div class="field">
               <label for="pw-identifier">Email or username</label>
@@ -440,7 +439,7 @@ const { hasPasskey, hasCode, hasPassword, totpNodes, aal2WebauthnNodes, lookupNo
 
   <nav class="focus-links" aria-label="Other options">
     {isAal2
-      ? <span class="focus-aside">Lost your second step? Ask a household admin to reset it.</span>
+      ? <span class="focus-aside">Lost your second step?&nbsp;<a href={`/?ask=problem&msg=${encodeURIComponent('I lost my second sign-in step. Please reset it.')}#get-in-touch`}>Ask a household admin</a>&nbsp;to reset it.</span>
       : isCodeEntry
       ? <a href="/auth/login" data-astro-reload>Use a different way to sign in</a>
       : null}

@@ -126,7 +126,7 @@
       extra.forEach(function (li) { li.hidden = false; });
       more.closest('li').remove();
       // The button removed itself: focus lands on the first app it revealed.
-      var target = extra[0] && (extra[0].firstElementChild || extra[0]);
+      var target = extra[0] && (extra[0].querySelector(':scope > span:not(.app-icon)') || extra[0]);
       if (target) { target.tabIndex = -1; target.focus(); }
     });
 

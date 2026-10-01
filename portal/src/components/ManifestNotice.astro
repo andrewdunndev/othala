@@ -26,7 +26,7 @@ function describeDuration(seconds: number): string {
   <div class="notice notice-danger">
     <p>
       <strong>Some app changes are not live yet.</strong> The newest app settings could not be read
-      for {describeDuration(brokenForSeconds)}, so the {health.serving} <a href="/admin/oauth2">app{health.serving === 1 ? '' : 's'}</a>
+      for {describeDuration(brokenForSeconds)}, so the {health.serving} <a href="/admin/oauth2">app{health.serving === 1 ? '' : 's'}</a>{' '}
       {health.serving === 1 ? 'is' : 'are'} served from the last settings that worked. Signing in keeps working.
       As an admin you can read what went wrong under Technical details, correct that app settings file on the server, and this
       page updates by itself afterwards.

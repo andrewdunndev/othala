@@ -9,9 +9,11 @@ interface Props {
   guide: Guide;
   /** Shown when the guide has no content at all. */
   emptyNote?: string;
+  /** The app or requirement name, so the help link opens the request form with a message about it. */
+  topic?: string;
 }
 
-const { guide, emptyNote } = Astro.props;
+const { guide, emptyNote, topic } = Astro.props;
 const empty = !guide.lead && guide.sections.length === 0;
 ---
 
@@ -25,6 +27,9 @@ const empty = !guide.lead && guide.sections.length === 0;
           {s.title}
         </h3>
         <div class="guide-prose" set:html={s.html} />
+        {s.id === 'help' && (
+          <p class="guide-ask"><a href={`/?ask=problem&msg=${encodeURIComponent(`I need help with ${topic ?? 'this app'}.`)}#get-in-touch`}>Ask a household admin</a></p>
+        )}
       </section>
     ))
   }
@@ -210,6 +215,8 @@ const empty = !guide.lead && guide.sections.length === 0;
     padding-top: var(--space-4);
     border-top: 1px solid var(--border);
   }
+
+  .guide-ask { margin: var(--space-3) 0 0; font-size: var(--text-sm); }
 
   /* Callout: a markdown blockquote */
   .guide-prose :global(blockquote) {

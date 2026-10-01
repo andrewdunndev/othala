@@ -36,6 +36,14 @@ const csrf = ui ? csrfToken(ui.nodes) : '';
 const hasCode = ui ? hasMethod(ui.nodes, 'code') : true;
 const phase: 'request' | 'sent' = flow?.state === 'sent_email' ? 'sent' : 'request';
 // The "a code was sent" info line is noise on a setup link: the person is already holding the code.
+// The address the code went to, when the flow carries it (the resend node's value).
+const sentTo = (() => {
+  for (const n of ui?.nodes ?? []) {
+    const a = n.attributes as { name?: string; value?: unknown };
+    if (a.name === 'email' && typeof a.value === 'string' && a.value) return a.value;
+  }
+  return '';
+})();
 const messages = (ui?.messages ?? []).filter((m: FlowMessage) => !(phase === 'sent' && m.type === 'info'));
 ---
 <FocusPage
@@ -43,7 +51,7 @@ const messages = (ui?.messages ?? []).filter((m: FlowMessage) => !(phase === 'se
   title={phase === 'request' ? 'Get back in' : 'Enter your code'}
   lede={phase === 'request'
     ? "Enter your email and we'll send you a one-time code. No password needed."
-    : 'Enter the code from your email, or from the setup message that brought you here. It works once and expires soon.'}
+    : `${sentTo ? `We emailed a code to ${sentTo}. ` : ''}Enter the code from your email, or from the setup message that brought you here. It works once and expires soon.`}
   description="Start or regain access with a one-time code."
 >
 

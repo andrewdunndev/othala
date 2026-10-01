@@ -191,7 +191,7 @@ const devLinks = [
       {!hasPasskeyEnrolled && (
         <div class="passkey-nudge" id="passkey-nudge">
           <p class="passkey-nudge-text">
-            Set up a passkey for one-tap sign-in.
+            Set up a passkey for one-tap <span style="white-space: nowrap">sign-in</span>.
             <a href="/auth/settings" class="passkey-nudge-link">Set up now</a>
           </p>
           <button
@@ -271,7 +271,7 @@ const devLinks = [
               ))}
             </div>
             <div data-slot="body">
-              <GuideSections guide={v.guide} />
+              <GuideSections guide={v.guide} topic={t.name} />
               <p class="app-modal-more mono"><a href={`/apps/${encodeURIComponent(t.slug)}`}>Open as a page →</a></p>
             </div>
           </template>

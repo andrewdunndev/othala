@@ -96,7 +96,7 @@ const guide = splitGuide(entry.educationHtml);
     </header>
 
     <section class="app-body" aria-label={`Guide for ${entry.name}`}>
-      <GuideSections guide={guide} />
+      <GuideSections guide={guide} topic={entry.name} />
       <CopyChips />
     </section>
   </article>
