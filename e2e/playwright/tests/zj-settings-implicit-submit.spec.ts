@@ -77,7 +77,7 @@ test('ZJ2 — Enter in the new key name never removes an enrolled key', async ({
     });
     await page.goto(`${baseURL}/auth/settings`);
     await page.waitForLoadState('networkidle');
-    await page.locator('label.lbl-setup, button[data-disclose]', { hasText: /Add (a|another) security key/ }).first().click();
+    await page.locator('.lbl-setup', { hasText: /Add (a|another) security key/ }).first().click();
     await page.locator('input[name="webauthn_register_displayname"]').fill('ZJ2 first');
     await page.waitForFunction(() => typeof (window as unknown as Record<string, unknown>).oryWebAuthnRegistration === 'function');
     await page.locator('button[name="webauthn_register_trigger"]').first().click();
@@ -87,7 +87,7 @@ test('ZJ2 — Enter in the new key name never removes an enrolled key', async ({
     await cdp.send('WebAuthn.removeVirtualAuthenticator', { authenticatorId });
     await page.goto(`${baseURL}/auth/settings`);
     await page.waitForLoadState('networkidle');
-    await page.locator('label.lbl-setup, button[data-disclose]', { hasText: /Add (a|another) security key/ }).first().click();
+    await page.locator('.lbl-setup', { hasText: /Add (a|another) security key/ }).first().click();
     const posts: string[] = [];
     page.on('request', (r) => { if (r.method() === 'POST') posts.push(r.url()); });
     const name = page.locator('input[name="webauthn_register_displayname"]');

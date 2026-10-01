@@ -79,7 +79,7 @@ test.describe('ZA — admin keeps a second factor', () => {
       });
       await page.goto(`${baseURL}/auth/settings`);
       await page.waitForLoadState('networkidle');
-      await page.locator('label.lbl-setup', { hasText: /Add (a|another) security key/ }).click();
+      await page.locator('.lbl-setup', { hasText: /Add (a|another) security key/ }).click();
       const displayName = page.locator('input[name="webauthn_register_displayname"]');
       if (await displayName.count()) await displayName.fill('ZA2 key');
       const trigger = page.locator('button[name="webauthn_register_trigger"]').first();

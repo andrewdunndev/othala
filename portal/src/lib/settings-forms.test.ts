@@ -1,6 +1,7 @@
 // A text input must never share a form with a destructive submit: Enter in the input would press the first submit in
 // tree order, which used to be a Remove. Destructive buttons point at their own hidden form (`form="..."`).
-import { readFileSync } from 'node:fs';
+import { readdirSync, readFileSync } from 'node:fs';
+import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 
 const read = (p: string) => readFileSync(new URL(p, import.meta.url), 'utf8');
@@ -48,5 +49,18 @@ describe('settings forms', () => {
     }
     expect(seen).toBeGreaterThan(6);
     expect(sources['settings.astro']).toMatch(/<form id="disclosures"[^>]*hidden><\/form>/);
+  });
+
+  it('e2e specs reach a disclosure toggle by its class, since the script swaps each label for a button', () => {
+    const enhance = read('../scripts/settings-enhance.ts');
+    expect(enhance).toMatch(/b\.className = label\.className/);
+    expect(enhance).toMatch(/label\.replaceWith\(b\)/);
+    const dir = join(process.cwd(), '..', 'e2e', 'playwright', 'tests');
+    const specs = readdirSync(dir).filter((f) => f.endsWith('.ts'));
+    expect(specs.length).toBeGreaterThan(10);
+    for (const f of specs) {
+      const hit = readFileSync(join(dir, f), 'utf8').match(/label\.(?:lbl-\w+|toggle-label)\b/);
+      expect(hit?.[0], `${f} selects a disclosure label the script replaces; use the class alone`).toBeUndefined();
+    }
   });
 });

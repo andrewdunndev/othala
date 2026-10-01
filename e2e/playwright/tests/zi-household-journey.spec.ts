@@ -79,7 +79,7 @@ test('ZI1 — admin adds a person; they redeem, enrol a passkey and TOTP, and si
   // The save replaced the settings flow, so open a fresh one: its setup key is the one the form will verify.
   await page.goto(`${baseURL}/auth/settings`, { waitUntil: 'networkidle' });
 
-  await page.locator('label.lbl-setup', { hasText: 'Set up authenticator app' }).click();
+  await page.locator('.lbl-setup', { hasText: 'Set up authenticator app' }).click();
   const totpForm = page.locator('form:has(.totp-secret-value)');
   const secret = ((await totpForm.locator('.totp-secret-value').textContent()) ?? '').replace(/\s+/g, '');
   expect(secret, 'ZI1: the setup key is a base32 secret').toMatch(/^[A-Z2-7]{16,}$/i);
