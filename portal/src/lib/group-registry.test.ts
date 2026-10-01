@@ -5,15 +5,12 @@ import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
-vi.hoisted(() => {
-  process.env['OTHALA_IDENTITY_GROUPS'] = 'admin,housemates';
-});
-
 import {
   parseManifest,
   loadClientManifests,
   invalidateManifestCache,
   knownAccessGroups,
+  setManifestDir,
   type ClientManifest,
 } from './manifests.js';
 import {
@@ -293,7 +290,7 @@ presentation:
 describe('getGroupRegistry — completeness over the real loader', () => {
   beforeEach(() => {
     dir = mkdtempSync(join(tmpdir(), 'othala-group-registry-'));
-    process.env['MANIFEST_DIR'] = dir;
+    setManifestDir(dir);
     invalidateManifestCache();
     vi.spyOn(console, 'error').mockImplementation(() => {});
     vi.spyOn(console, 'warn').mockImplementation(() => {});
@@ -301,7 +298,7 @@ describe('getGroupRegistry — completeness over the real loader', () => {
 
   afterEach(() => {
     vi.restoreAllMocks();
-    delete process.env['MANIFEST_DIR'];
+    setManifestDir(undefined);
     rmSync(dir, { recursive: true, force: true });
   });
 
@@ -342,12 +339,12 @@ describe('getGroupRegistry — completeness over the real loader', () => {
     expect(namesOfKind(reg, 'access')).toEqual(knownAccessGroups());
   });
 
-  it('carries the configured identity groups through without typing them access', () => {
+  it('carries the fixed identity groups through without typing them access', () => {
     writeCatalog();
     const reg = getGroupRegistry();
 
-    expect(isIdentityGroup(reg, 'housemates')).toBe(true);
-    expect(isAccessGroup(reg, 'housemates')).toBe(false);
+    expect(isIdentityGroup(reg, 'everyone')).toBe(true);
+    expect(isAccessGroup(reg, 'everyone')).toBe(false);
     expect(isIdentityGroup(reg, 'admin')).toBe(true);
     expect(isAccessGroup(reg, 'admin')).toBe(false);
   });
@@ -384,6 +381,6 @@ describe('getGroupRegistry — completeness over the real loader', () => {
 
     expect(namesOfKind(reg, 'access')).toEqual([]);
     expect(namesOfKind(reg, 'role')).toEqual([]);
-    expect(isIdentityGroup(reg, 'housemates')).toBe(true);
+    expect(isIdentityGroup(reg, 'everyone')).toBe(true);
   });
 });

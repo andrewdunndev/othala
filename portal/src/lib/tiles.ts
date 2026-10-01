@@ -1,4 +1,4 @@
-// Runtime app-tile loader. Reads each `<slug>.yaml` `presentation:` block from MANIFEST_DIR at request time (manifests.ts
+// Runtime app-tile loader. Reads each `<slug>.yaml` `presentation:` block from the manifest dir at request time (manifests.ts
 // reads `oidc:`/`consent:` from the same files); an optional `<slug>.md` is the /apps/<slug> detail content.
 // groups.yaml (optional) maps group name to { title, description, order } via loadGroups() and is skipped as a tile.
 
@@ -8,6 +8,8 @@ import { parse as parseYaml } from 'yaml';
 import { marked } from 'marked';
 import DOMPurify from 'isomorphic-dompurify';
 import { parseAccessGroups } from './access-groups';
+import { manifestDir } from './manifests';
+import { DEFAULT_GROUP } from './constants';
 
 // Vendored icons directory: public/icons/ in dev (a stale dist/ must not shadow it), dist/client/icons/ in prod.
 const _cwd = process.cwd();
@@ -94,15 +96,6 @@ export interface AppTile {
   educationHtml?: string;
 }
 
-function manifestDir(): string {
-  return process.env.MANIFEST_DIR ?? '/etc/portal/manifests';
-}
-
-/** Fallback group for tiles omitting `access_group`; read at call time and mirrors config.ts `defaultGroup`. */
-function tileDefaultGroup(): string {
-  return process.env.OTHALA_DEFAULT_GROUP?.trim().toLowerCase() || 'everyone';
-}
-
 interface CacheEntry {
   tiles: AppTile[];
   mtimeMs: number;
@@ -146,7 +139,7 @@ export function sanitizeEducationMarkdown(raw: string): string {
 
 /**
  * Parse one manifest's `presentation:` block into an AppTile; null when it has none. An absent `access_group` gates
- * on the default group (tileDefaultGroup), never on a per-slug group or every authenticated user.
+ * on the default group (DEFAULT_GROUP), never on a per-slug group or every authenticated user.
  */
 function parseTile(slug: string, doc: Record<string, unknown>, dir: string): AppTile | null {
   const pBlock = doc['presentation'];
@@ -154,7 +147,7 @@ function parseTile(slug: string, doc: Record<string, unknown>, dir: string): App
   const p = pBlock as Record<string, unknown>;
 
   // Absent access_group falls back to the default group, which admins assign explicitly.
-  const accessGroup = p['access_group'] ? String(p['access_group']) : tileDefaultGroup();
+  const accessGroup = p['access_group'] ? String(p['access_group']) : DEFAULT_GROUP;
 
   // Normalized `presentation.access:` binding; `[]` means the accessGroup fallback applies.
   const accessGroups = parseAccessGroups(p);

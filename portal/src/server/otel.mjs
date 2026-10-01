@@ -1,12 +1,12 @@
 // OpenTelemetry bootstrap, PII-safe by construction: spans never carry cookies, CSRF tokens, bearer headers,
 // challenge ids, codes or bodies. Loaded via NODE_OPTIONS="--import ./otel.mjs" so http is patched before listen.mjs
-// runs. OFF unless OTEL_EXPORTER_OTLP_ENDPOINT is set; otherwise the standard OTEL_* env applies, plus
-// OTLP_INGEST_TOKEN (composed into Authorization; an explicit OTEL_EXPORTER_OTLP_HEADERS wins).
+// runs. OFF unless OTHALA_OTLP_ENDPOINT (host:port, plaintext HTTP to the collector, as Kratos and Hydra use it) is
+// set; service name, environment and sampling are fixed.
 // A telemetry failure must never take down the IdP: the bootstrap is try/catch-wrapped and logs one stderr line.
 
 import { NodeSDK } from '@opentelemetry/sdk-node';
 import { OTLPTraceExporter } from '@opentelemetry/exporter-trace-otlp-http';
-import { BatchSpanProcessor } from '@opentelemetry/sdk-trace-base';
+import { BatchSpanProcessor, ParentBasedSampler, TraceIdRatioBasedSampler } from '@opentelemetry/sdk-trace-base';
 import { HttpInstrumentation } from '@opentelemetry/instrumentation-http';
 import { resourceFromAttributes } from '@opentelemetry/resources';
 import { ATTR_SERVICE_NAME } from '@opentelemetry/semantic-conventions';
@@ -149,28 +149,30 @@ export class RedactingSpanProcessor {
 
 // ── Bootstrap ──
 
-/** Start the OTel Node SDK iff a collector endpoint is set; returns the SDK, or null when disabled or init failed. Never throws. */
+const SERVICE_NAME = 'othala-portal';
+const SAMPLING_RATIO = 0.1; // matches the Kratos and Hydra tracing blocks
+
+/** The exporter URL for OTHALA_OTLP_ENDPOINT, or null when tracing is off (unset or blank). */
+export function otlpTracesUrl(env = process.env) {
+  const endpoint = (env.OTHALA_OTLP_ENDPOINT ?? '').trim();
+  return endpoint ? `http://${endpoint}/v1/traces` : null;
+}
+
+/** Start the OTel Node SDK iff OTHALA_OTLP_ENDPOINT is set; returns the SDK, or null when disabled or init failed. Never throws. */
 export function startTelemetry(env = process.env) {
-  const endpoint = (env.OTEL_EXPORTER_OTLP_ENDPOINT ?? '').trim();
-  if (!endpoint) {
-    log('disabled (OTEL_EXPORTER_OTLP_ENDPOINT unset) — no spans exported');
+  const url = otlpTracesUrl(env);
+  if (!url) {
+    log('disabled (OTHALA_OTLP_ENDPOINT unset) — no spans exported');
     return null;
   }
 
   try {
-    const serviceName = env.OTEL_SERVICE_NAME?.trim() || 'othala-portal';
-    // deployment.environment arrives via OTEL_RESOURCE_ATTRIBUTES, which the SDK env detector merges.
-    const resource = resourceFromAttributes({ [ATTR_SERVICE_NAME]: serviceName });
+    const resource = resourceFromAttributes({
+      [ATTR_SERVICE_NAME]: SERVICE_NAME,
+      'deployment.environment': 'production',
+    });
 
-    // HTTP/protobuf exporter. A bare OTLP_INGEST_TOKEN (podman Secret=) becomes `Authorization: Bearer`;
-    // explicit OTEL_EXPORTER_OTLP_HEADERS takes precedence.
-    const ingestToken = (env.OTLP_INGEST_TOKEN ?? '').trim();
-    const explicitHeaders = (env.OTEL_EXPORTER_OTLP_HEADERS ?? '').trim();
-    const exporterOpts = {};
-    if (ingestToken && ingestToken !== 'disabled' && !explicitHeaders) {
-      exporterOpts.headers = { authorization: `Bearer ${ingestToken}` };
-    }
-    const traceExporter = new OTLPTraceExporter(exporterOpts);
+    const traceExporter = new OTLPTraceExporter({ url });
 
     // Batch, then redact: every exported span is scrubbed and admin spans never leave the process.
     const spanProcessor = new RedactingSpanProcessor(new BatchSpanProcessor(traceExporter));
@@ -189,11 +191,11 @@ export function startTelemetry(env = process.env) {
           },
         }),
       ],
-      // Sampler left unset: the SDK resolves it from OTEL_TRACES_SAMPLER(_ARG).
+      sampler: new ParentBasedSampler({ root: new TraceIdRatioBasedSampler(SAMPLING_RATIO) }),
     });
 
     sdk.start();
-    log(`enabled — service=${serviceName} endpoint=${endpoint} (HTTP/protobuf, redaction on)`);
+    log(`enabled — service=${SERVICE_NAME} url=${url} (HTTP/protobuf, redaction on)`);
 
     // Flush the final batch on shutdown, best-effort.
     const shutdown = () => {

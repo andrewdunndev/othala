@@ -15,6 +15,8 @@ import {
   CLIENT_ID_ENV_STEM_RE,
   type ClientManifest,
 } from './manifests';
+import { HYDRA_ADMIN_URL } from './constants';
+import { clientSecretEnv } from './config';
 
 /** The slice of OAuth2Api the registrar needs, so tests can inject a stub. */
 export interface OAuth2ClientApi {
@@ -24,9 +26,9 @@ export interface OAuth2ClientApi {
 }
 
 export interface RegisterOptions {
-  /** Stub for tests; defaults to a real OAuth2Api on HYDRA_ADMIN_URL (+ optional HYDRA_ADMIN_TOKEN). */
+  /** Stub for tests; defaults to a real OAuth2Api on the Hydra admin URL. */
   api?: OAuth2ClientApi;
-  /** Per-client secret source; defaults to process.env. */
+  /** Per-client secret source; defaults to the process environment. */
   env?: Record<string, string | undefined>;
   /** Skip the validateClients lint; default false so a bad manifest set cannot half-register. */
   skipValidation?: boolean;
@@ -58,18 +60,8 @@ export function secretEnvVar(clientId: string): string {
   return `${clientId.toUpperCase()}_CLIENT_SECRET`;
 }
 
-function hydraAdminBase(): string {
-  return process.env.HYDRA_ADMIN_URL ?? 'http://hydra:4445';
-}
-
 function defaultApi(): OAuth2ClientApi {
-  const token = process.env.HYDRA_ADMIN_TOKEN ?? '';
-  return new OAuth2Api(
-    new Configuration({
-      basePath: hydraAdminBase(),
-      ...(token ? { accessToken: token } : {}),
-    }),
-  ) as unknown as OAuth2ClientApi;
+  return new OAuth2Api(new Configuration({ basePath: HYDRA_ADMIN_URL })) as unknown as OAuth2ClientApi;
 }
 
 /** Build the Hydra OAuth2Client body from a manifest + secret: only `oidc:` fields, optional ones omitted when empty, the secret as a typed field. */
@@ -164,7 +156,7 @@ export async function registerManifests(
   manifests: ClientManifest[],
   opts: RegisterOptions = {},
 ): Promise<RegisterResult[]> {
-  const env = opts.env ?? process.env;
+  const env = opts.env ?? clientSecretEnv();
   const api = opts.api ?? defaultApi();
 
   if (!opts.skipValidation) {

@@ -1,6 +1,6 @@
 // Invariant: forward_auth admits only requests whose groups match an explicit binding.
 
-import { test, beforeEach, afterEach } from 'vitest';
+import { test, afterEach } from 'vitest';
 import assert from 'node:assert/strict';
 import { GET, HEAD } from '../src/pages/api/forward-auth.ts';
 
@@ -28,12 +28,6 @@ function installFetch(opts) {
     throw new Error(`unexpected fetch to ${url}`);
   };
 }
-
-beforeEach(() => {
-  delete process.env.KRATOS_PUBLIC_URL;
-  delete process.env.KRATOS_ADMIN_URL;
-  delete process.env.KRATOS_ADMIN_TOKEN;
-});
 
 afterEach(() => {
   globalThis.fetch = realFetch;

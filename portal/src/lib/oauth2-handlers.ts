@@ -19,6 +19,7 @@ import { servingManifest } from './manifest-store';
 import { verifyToken, CSRFError } from './csrf';
 import { needsStepUp } from './step-up';
 import { publicUrl } from './config';
+import { HYDRA_ADMIN_URL } from './constants';
 
 // Hydra remembers a sign-in as long as the Kratos session lives so a later app sign-out still reaches handleLogout;
 // the fallback is the Kratos session.lifespan (720h).
@@ -31,29 +32,15 @@ export function loginRememberFor(session: Session, now: number = Date.now()): nu
   return Math.max(1, Math.ceil((expires - now) / 1000));
 }
 
-function hydraAdminBase(): string {
-  return process.env.HYDRA_ADMIN_URL ?? 'http://hydra:4445';
-}
-
 export function defaultOAuth2Api(): OAuth2Api {
-  const token = process.env.HYDRA_ADMIN_TOKEN ?? '';
-  return new OAuth2Api(
-    new Configuration({
-      basePath: hydraAdminBase(),
-      ...(token ? { accessToken: token } : {}),
-    }),
-  );
+  return new OAuth2Api(new Configuration({ basePath: HYDRA_ADMIN_URL }));
 }
 
 /** Login-UI base for the no-session bounce (the portal's Kratos login page). */
-function loginUIBase(): string {
-  return process.env.PORTAL_LOGIN_URL ?? '/auth/login';
-}
+const LOGIN_UI_BASE = '/auth/login';
 
-/** Consent grant-screen base (/auth/consent); overridable via PORTAL_CONSENT_URL. */
-function consentUIBase(): string {
-  return process.env.PORTAL_CONSENT_URL ?? '/auth/consent';
-}
+/** Consent grant-screen base. */
+const CONSENT_UI_BASE = '/auth/consent';
 
 /** Injectable dependencies; tests pass stubs for what they need. */
 export interface Deps {
@@ -156,7 +143,7 @@ export async function handleLogin(req: Request, deps: Deps = {}): Promise<Respon
     }
     if (!session?.active || !session.identity) {
       const returnTo = buildLoginReturnTo(challenge);
-      const loginURL = `${loginUIBase()}?return_to=${encodeURIComponent(returnTo)}`;
+      const loginURL = `${LOGIN_UI_BASE}?return_to=${encodeURIComponent(returnTo)}`;
       return redirect(loginURL);
     }
     subject = login.subject;
@@ -172,7 +159,7 @@ export async function handleLogin(req: Request, deps: Deps = {}): Promise<Respon
     if (!session?.active || !session.identity) {
       // Not authenticated: bounce to the login UI with a relative return_to.
       const returnTo = buildLoginReturnTo(challenge);
-      const loginURL = `${loginUIBase()}?return_to=${encodeURIComponent(returnTo)}`;
+      const loginURL = `${LOGIN_UI_BASE}?return_to=${encodeURIComponent(returnTo)}`;
       return redirect(loginURL);
     }
     subject = session.identity.id;
@@ -205,7 +192,7 @@ export async function handleLogin(req: Request, deps: Deps = {}): Promise<Respon
   // Second-factor step-up: accounts with totp/webauthn, the admin marker, or a role above an app's entry role, complete aal2 first; Kratos returns to this challenge.
   if (needsStepUp(liveSession, identity)) {
     const returnTo = buildLoginReturnTo(challenge);
-    return redirect(`${loginUIBase()}?aal=aal2&return_to=${encodeURIComponent(returnTo)}`);
+    return redirect(`${LOGIN_UI_BASE}?aal=aal2&return_to=${encodeURIComponent(returnTo)}`);
   }
 
   try {
@@ -307,7 +294,7 @@ export async function handleConsent(req: Request, deps: Deps = {}): Promise<Resp
 
   // PROMPT PATH: redirect to /auth/consent; its POST to /oauth2/consent completes the challenge.
   const qs = new URLSearchParams({ consent_challenge: challenge });
-  return redirect(`${consentUIBase()}?${qs.toString()}`);
+  return redirect(`${CONSENT_UI_BASE}?${qs.toString()}`);
 }
 
 /**
@@ -395,7 +382,7 @@ export async function handleConsentPost(req: Request, deps: Deps = {}): Promise<
     } catch {
       // Reject failed after the nonce was consumed: back to the grant screen for a fresh token.
       const qs = new URLSearchParams({ consent_challenge: challenge });
-      return redirect(`${consentUIBase()}?${qs.toString()}`);
+      return redirect(`${CONSENT_UI_BASE}?${qs.toString()}`);
     }
   }
 
@@ -414,7 +401,7 @@ export async function handleConsentPost(req: Request, deps: Deps = {}): Promise<
     } catch {
       // Reject failed after the nonce was consumed: back to the grant screen for a fresh token.
       const qs = new URLSearchParams({ consent_challenge: challenge });
-      return redirect(`${consentUIBase()}?${qs.toString()}`);
+      return redirect(`${CONSENT_UI_BASE}?${qs.toString()}`);
     }
   }
 
@@ -439,7 +426,7 @@ export async function handleConsentPost(req: Request, deps: Deps = {}): Promise<
     } catch {
       // Reject failed after the nonce was consumed: back to the grant screen for a fresh token.
       const qs = new URLSearchParams({ consent_challenge: challenge });
-      return redirect(`${consentUIBase()}?${qs.toString()}`);
+      return redirect(`${CONSENT_UI_BASE}?${qs.toString()}`);
     }
   }
 
@@ -447,7 +434,7 @@ export async function handleConsentPost(req: Request, deps: Deps = {}): Promise<
   const allowResponse = await acceptConsentRequest(challenge, consent, identity!, d, clientId);
   if (allowResponse.status === 502) {
     const qs = new URLSearchParams({ consent_challenge: challenge });
-    return redirect(`${consentUIBase()}?${qs.toString()}`);
+    return redirect(`${CONSENT_UI_BASE}?${qs.toString()}`);
   }
   return allowResponse;
 }

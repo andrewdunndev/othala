@@ -1,6 +1,6 @@
 // Kratos public-API client for Astro SSR pages. Flow GETs forward the user's
 // Cookie header so Kratos can read the anti-CSRF cookie (else 403).
-// KRATOS_PUBLIC_URL defaults to OTHALA_PUBLIC_URL (single origin).
+// The Kratos public base is OTHALA_PUBLIC_URL (single origin).
 
 import { Configuration, FrontendApi, ResponseError } from '@ory/client-fetch';
 import { publicUrl } from './config';
@@ -14,7 +14,7 @@ import type {
 } from './types';
 
 export function kratosBase(): string {
-  return process.env.KRATOS_PUBLIC_URL?.trim() || publicUrl;
+  return publicUrl;
 }
 
 const HEALTH_TIMEOUT_MS = 2000;

@@ -1,5 +1,5 @@
 // Kratos admin API wrappers for /admin/* SSR pages, via the Ory SDK IdentityApi. The admin port (http://kratos:4434)
-// has no auth; network isolation is the gate, and KRATOS_ADMIN_TOKEN, if set, is forwarded as a bearer.
+// has no auth; network isolation is the gate.
 // The state flip uses RFC 6902 JSON-Patch. Non-2xx surfaces as a ResponseError for callers to render.
 
 import {
@@ -15,24 +15,10 @@ import {
 import type { Identity } from './types';
 import { validateMetadataAdmin } from './metadata-admin';
 import { revokeSubject } from './revoke';
+import { KRATOS_ADMIN_URL } from './constants';
 
-function adminBase(): string {
-  return process.env.KRATOS_ADMIN_URL ?? 'http://kratos:4434';
-}
-
-function adminToken(): string {
-  return process.env.KRATOS_ADMIN_TOKEN ?? '';
-}
-
-// The SDK sends the bearer on every request when `accessToken` is set, so configure it only when a token exists.
 function identityApi(): IdentityApi {
-  const token = adminToken();
-  return new IdentityApi(
-    new Configuration({
-      basePath: adminBase(),
-      ...(token ? { accessToken: token } : {}),
-    }),
-  );
+  return new IdentityApi(new Configuration({ basePath: KRATOS_ADMIN_URL }));
 }
 
 export interface IdentityTraits {

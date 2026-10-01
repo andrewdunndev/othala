@@ -24,14 +24,6 @@ import tailwindcss from '@tailwindcss/vite';
 // We do NOT use Astro's Sessions API. Identity sessions live in the
 // Kratos cookie on `.dunn.dev`, not in any Astro-managed store.
 
-// Build-time `site` (canonical URL — affects sitemaps and metadata) reads the
-// same env var the runtime lib/config.ts uses. It is host-specific by nature,
-// but it does NOT gate any security control: a default-localhost `site` baked
-// into an OSS image only mislabels canonical metadata, which the runtime can't
-// fix anyway. The SECURITY-bearing host resolution (allowedDomains) is host-
-// AGNOSTIC — see below — so the published image carries no baked host.
-const PUBLIC_URL = process.env.OTHALA_PUBLIC_URL ?? 'http://localhost:4321';
-
 // security.allowedDomains — HOST-AGNOSTIC by design. We pass a single empty
 // pattern `[{}]`, which matchPattern() treats as a match-anything wildcard
 // (an undefined hostname/protocol/port/pathname each short-circuits to true,
@@ -66,10 +58,6 @@ export default defineConfig({
   // flood of large POST bodies cannot exhaust heap before rate-limiting fires.
   adapter: node({ mode: 'standalone', trustProxy: true, bodySizeLimit: 262144 }),
   integrations: [],
-  // Canonical URL for metadata/sitemaps only (no security weight). Defaults to
-  // localhost for a bare/OSS build; operators who care about canonical links
-  // set OTHALA_PUBLIC_URL at build time, but it is not required.
-  site: PUBLIC_URL,
   security: {
     // Host-agnostic wildcard — see the allowedDomains comment above. Keeps
     // checkOrigin meaningful behind a trustProxy reverse proxy WITHOUT baking

@@ -1,4 +1,4 @@
-// Invariant: the Kratos public base URL defaults to the portal's own public URL (single-origin) and KRATOS_PUBLIC_URL overrides it.
+// Invariant: the Kratos public base URL is the portal's own public URL (single origin); KRATOS_PUBLIC_URL is not read.
 
 import { test, beforeEach, afterEach } from 'vitest';
 import assert from 'node:assert/strict';
@@ -16,13 +16,11 @@ afterEach(() => {
   else process.env.KRATOS_PUBLIC_URL = saved;
 });
 
-test('kratosBase: defaults to OTHALA_PUBLIC_URL when KRATOS_PUBLIC_URL is unset or blank', () => {
-  assert.equal(kratosBase(), publicUrl);
-  process.env.KRATOS_PUBLIC_URL = '  ';
+test('kratosBase: is OTHALA_PUBLIC_URL', () => {
   assert.equal(kratosBase(), publicUrl);
 });
 
-test('kratosBase: KRATOS_PUBLIC_URL overrides the default', () => {
+test('kratosBase: ignores KRATOS_PUBLIC_URL', () => {
   process.env.KRATOS_PUBLIC_URL = 'http://kratos:4433';
-  assert.equal(kratosBase(), 'http://kratos:4433');
+  assert.equal(kratosBase(), publicUrl);
 });

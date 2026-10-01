@@ -1,5 +1,5 @@
-// Dual listener. PUBLIC (PORT 4321, HOST 0.0.0.0): the lazily imported Astro SSR handler (OAuth2 providers, /auth/*, /admin/*).
-// ADMIN (ADMIN_PORT 4431, ADMIN_HOST 127.0.0.1): its own mux for /healthz, /readyz and the five Kratos webhooks
+// Dual listener. PUBLIC (8080 on 0.0.0.0): the lazily imported Astro SSR handler (OAuth2 providers, /auth/*, /admin/*).
+// ADMIN (4431 on ADMIN_HOST, default 127.0.0.1): its own mux for /healthz, /readyz and the five Kratos webhooks
 // (recovery-gate, login-code-gate, profile-gate, second-factor-gate, profile-sessions); never delegates to Astro.
 // RECOVERY_GATE_SECRET guards the webhooks: constant-time compare, fail-closed when unset.
 // Run with `node ./dist/server/listen.mjs` after `npm run build`.
@@ -7,9 +7,9 @@
 import http from 'node:http';
 import { timingSafeEqual } from 'node:crypto';
 
-const PORT = Number(process.env.PORT ?? 4321);
-const HOST = process.env.HOST ?? '0.0.0.0';
-const ADMIN_PORT = Number(process.env.ADMIN_PORT ?? 4431);
+const PORT = 8080;
+const HOST = '0.0.0.0';
+const ADMIN_PORT = 4431; // Kratos webhooks in kratos.yml target this port
 const ADMIN_HOST = process.env.ADMIN_HOST ?? '127.0.0.1';
 
 /** GET routes the admin mux serves. Disjoint from the public routes. */
@@ -105,12 +105,8 @@ export async function fetchAdminMarker(identityId, runtime) {
   return { refuse: false, reason: '' };
 }
 
-/** Fetch the stored identity via the runtime's Kratos admin client; fail-closed with `{ refuse: true, reason }` on an unset KRATOS_ADMIN_URL, unloadable runtime or client error. */
+/** Fetch the stored identity via the runtime's Kratos admin client; fail-closed with `{ refuse: true, reason }` on an unloadable runtime or client error. */
 async function fetchStoredIdentity(runtime, identityId, tag) {
-  if (!process.env.KRATOS_ADMIN_URL) {
-    console.error(`[portal/${tag}] KRATOS_ADMIN_URL unset — cannot read the stored identity; refusing (fail-closed)`);
-    return { refuse: true, reason: 'admin-api-unavailable (fail-closed)' };
-  }
   try {
     const rt = runtime ?? (await loadRuntime());
     return { refuse: false, identity: await rt.getIdentity(identityId), rt };
@@ -303,9 +299,8 @@ export async function handleProfileSessions(req, res, runtime) {
   }
   const id = body?.identity_id;
   const keep = body?.session_id;
-  const kratosAdminURL = process.env.KRATOS_ADMIN_URL ?? '';
-  if (typeof id !== 'string' || !id.trim() || typeof keep !== 'string' || !keep.trim() || !kratosAdminURL) {
-    console.error(`${tag} identity_id, session_id or KRATOS_ADMIN_URL missing; other sessions left active`);
+  if (typeof id !== 'string' || !id.trim() || typeof keep !== 'string' || !keep.trim()) {
+    console.error(`${tag} identity_id or session_id missing; other sessions left active`);
     sendJson(res, 200, { ended: 0 });
     return;
   }
@@ -416,7 +411,7 @@ export function startupEnvErrors() {
 
   // Production only: config.ts throws on these at first import, this surfaces it at boot instead of on the first request.
   if (process.env.NODE_ENV === 'production') {
-    for (const name of ['OTHALA_PUBLIC_URL', 'OTHALA_APEX']) {
+    for (const name of ['OTHALA_PUBLIC_URL', 'OTHALA_APEX', 'OTHALA_INSTANCE_NAME']) {
       if (!(process.env[name] ?? '').trim()) errors.push(`[portal] FATAL: ${name} is not set or empty — refusing to start`);
     }
   }
