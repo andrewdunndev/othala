@@ -140,6 +140,6 @@ export interface DevConsent {
 export function devConsent(state: (typeof DEV_CONSENT_STATES)[number]): DevConsent {
   const scopes = ['openid', 'profile', 'email', 'groups'];
   if (state === 'consent-unknown-app') return { clientId: 'new-app', clientName: 'New app', scopes };
-  if (state === 'consent-error') return { clientId: 'cinema', clientName: 'Cinema', scopes, fetchError: true };
-  return { clientId: 'cinema', clientName: 'Cinema', scopes };
+  if (state === 'consent-error') return { clientId: 'dev-app', clientName: 'Dev app', scopes, fetchError: true };
+  return { clientId: 'dev-app', clientName: 'Dev app', scopes };
 }

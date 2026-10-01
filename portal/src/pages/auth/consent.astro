@@ -27,8 +27,10 @@ let ownershipError = false;
 let csrfToken = '';
 
 if (dev) {
-  clientId = dev.clientId;
-  clientName = dev.clientName;
+  // The first app in the dev catalog stands in, so its real logo and description render.
+  const stand = dev.clientId === 'dev-app' ? loadTiles().find((t) => t.authKind === 'oidc') : undefined;
+  clientId = stand?.slug ?? dev.clientId;
+  clientName = stand?.name ?? dev.clientName;
   scopeDescriptions = describeScopeList(dev.scopes);
   fetchError = !!dev.fetchError;
 } else if (!challenge) {
