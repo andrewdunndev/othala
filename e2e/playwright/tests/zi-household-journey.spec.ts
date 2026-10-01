@@ -117,6 +117,7 @@ test('ZI1 — admin adds a person; they redeem, enrol a passkey and TOTP, and si
   const claims = JSON.parse(Buffer.from(idToken.split('.')[1], 'base64url').toString('utf8'));
   expect(claims.sub, 'ZI1: id_token names the person').toBeTruthy();
   expect(claims.email, 'ZI1: id_token carries the person\'s email').toBe(person.email);
+  expect(claims.email_verified, 'ZI1: the admin vouched for the address, so the id_token says verified').toBe(true);
   expect(claims.groups, 'ZI1: id_token carries the granted app group').toContain('grafana-access');
 
   await page.goto(`${baseURL}/`, { waitUntil: 'networkidle' });

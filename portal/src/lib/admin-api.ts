@@ -74,6 +74,16 @@ export async function createIdentity(input: CreateIdentityInput): Promise<Identi
   const createIdentityBody = {
     traits: input.traits,
     metadata_admin: validated,
+    // The admin vouches for the address: Kratos keeps a pre-declared entry that matches the trait (same via and
+    // lowercased value), so the person is verified without a mail round trip and the id_token says so.
+    verifiable_addresses: [
+      {
+        value: input.traits.email.toLowerCase(),
+        via: 'email',
+        verified: true,
+        status: 'completed',
+      },
+    ],
   } as CreateIdentityBody;
   return identityApi().createIdentity({ createIdentityBody });
 }

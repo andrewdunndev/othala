@@ -43,6 +43,10 @@ Delete each from the deploy environment; none is read any more.
 - `kratos.yml` and `hydra.yml` drop keys that restated upstream defaults.
 - The e2e suite creates an identity through the admin form, turns the breach check off by overlay, and always runs the Caddy edge.
 
+### Fixed
+
+- `/admin/users/new` creates the identity email-verified, so the id_token carries `email_verified: true`.
+
 ## [0.8.0] - 2026-09-30
 
 Apps receive only the groups they bind, privileged roles sign in at aal2, and revoking a person reaches apps by back-channel logout.
