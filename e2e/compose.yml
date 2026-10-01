@@ -149,7 +149,7 @@ services:
     image: ${AUTH_REGISTRY}:${AUTH_VERSION}
     container_name: lab-othala
     restart: unless-stopped
-    # Static in-net IP from first creation so the browser overlay's ADMIN_HOST recreate
+    # Static in-net IP from first creation so the browser overlay's PORTAL_ADMIN_BIND_HOST recreate
     # cannot collide; needs the subnet declared at the bottom.
     networks:
       default:
@@ -185,7 +185,7 @@ services:
       GRAFANA_CLIENT_SECRET: ${GRAFANA_CLIENT_SECRET}
       AUDIOBOOKSHELF_CLIENT_SECRET: ${AUDIOBOOKSHELF_CLIENT_SECRET}
       PROMPTDESK_CLIENT_SECRET: ${PROMPTDESK_CLIENT_SECRET}
-      ADMIN_HOST: 127.0.0.1
+      PORTAL_ADMIN_BIND_HOST: 127.0.0.1
     volumes:
       - ./manifests:/etc/portal/manifests:ro,z
     healthcheck:
@@ -269,7 +269,7 @@ services:
         condition: service_healthy
     environment:
       BASE: http://auth.othala.test
-      # J2: recovery-gate on the othala admin port (static IP via ADMIN_HOST in compose.browser.yml).
+      # J2: recovery-gate on the othala admin port (static IP via PORTAL_ADMIN_BIND_HOST in compose.browser.yml).
       OTHALA_ADMIN_URL: http://othala:4431
       RECOVERY_GATE_SECRET: ${RECOVERY_GATE_SECRET}
       GRAFANA_CLIENT_SECRET: ${GRAFANA_CLIENT_SECRET}

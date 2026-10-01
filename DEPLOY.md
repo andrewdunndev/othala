@@ -40,17 +40,15 @@ The app runs **two HTTP listeners in one process**
   `/admin/*` pages, and the OAuth2 challenge providers
   (`/oauth2/{login,consent,logout}`). The only port a deploy plane should
   expose to the network.
-- **Admin port** (`4431`, bound to `ADMIN_HOST`, default `127.0.0.1`,
-  loopback only). A separate `http.createServer` with its own disjoint mux:
+- **Admin port** (`4431`, bound to `PORTAL_ADMIN_BIND_HOST`,
+  internal network only). A separate `http.createServer` with its own disjoint mux:
   `GET /healthz`, `GET /readyz`,
   `POST /admin/{recovery,login-code}-gate`. It never delegates to the SSR
-  handler, which never sees these paths — off the public mux **by
-  construction**, not by routing rule. The bearer-guarded routes are
-  constant-time and fail-closed: an unset secret rejects every request.
+  handler: off the public mux by construction. The bearer-guarded routes
+  are constant-time and fail-closed: an unset secret rejects every request.
 
-A deploy plane that publishes the admin port to the network, or to any
-network segment reachable from outside the pod/host, has broken the trust
-boundary this app is built around (`ARCHITECTURE.md` § Trust boundary).
+A deploy plane that publishes the admin port to any network segment reachable
+from outside the pod or host has broken the trust boundary (`ARCHITECTURE.md`).
 
 ## Vendored configs and the drift-check obligation
 
@@ -75,7 +73,7 @@ section covers only what needs context beyond that file:
 - Service names (`kratos`, `hydra`, `postgres`, `othala`), ports and the Ory
   admin URLs are fixed, and the admin APIs take no bearer: the network is the
   control. A deploy plane mounts its manifests at `/etc/portal/manifests`.
-- `KRATOS_ADMIN_BIND_HOST` and `HYDRA_ADMIN_BIND_HOST` have no default: bind each to an address on the internal network the edge is not attached to.
+- `KRATOS_ADMIN_BIND_HOST`, `HYDRA_ADMIN_BIND_HOST` and `PORTAL_ADMIN_BIND_HOST` have no production default (the portal refuses to start without its own): bind each to an address on the internal network the edge is not attached to.
 - The breach check is always on: an HIBP outage blocks setting a password (registration, settings, after recovery); admin-API and shell break-glass paths still work.
 - Secrets come from the deploy plane's secret store, never the image.
 - Admin authority is deliberately **not** an env target: it is the

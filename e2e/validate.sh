@@ -156,7 +156,7 @@ SMOKE_EXIT=$?
 echo ""
 echo "=== browser e2e (Playwright) ==="
 # compose.browser.yml is layered only here (smoke keeps the loopback admin bind). It recreates
-# othala with ADMIN_HOST=10.89.11.12 (0.0.0.0 is FATAL in listen.mjs; loopback is unreachable from
+# othala with PORTAL_ADMIN_BIND_HOST=10.89.11.12 (0.0.0.0 is FATAL in listen.mjs; loopback is unreachable from
 # kratos, so the J recovery specs would fail; needs the subnet in compose.yml).
 BROWSER_EXIT=0
 BROWSER_COMPOSE=(docker compose -f compose.yml -f compose.browser.yml --profile browser --env-file=.env)

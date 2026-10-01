@@ -1,5 +1,5 @@
 // Dual listener. PUBLIC (8080 on 0.0.0.0): the lazily imported Astro SSR handler (OAuth2 providers, /auth/*, /admin/*).
-// ADMIN (4431 on ADMIN_HOST, default 127.0.0.1): its own mux for /healthz, /readyz and the five Kratos webhooks
+// ADMIN (4431 on PORTAL_ADMIN_BIND_HOST, default 127.0.0.1 outside production): its own mux for /healthz, /readyz and the five Kratos webhooks
 // (recovery-gate, login-code-gate, profile-gate, second-factor-gate, profile-sessions); never delegates to Astro.
 // RECOVERY_GATE_SECRET guards the webhooks: constant-time compare, fail-closed when unset.
 // Run with `node ./dist/server/listen.mjs` after `npm run build`.
@@ -10,7 +10,9 @@ import { timingSafeEqual } from 'node:crypto';
 const PORT = 8080;
 const HOST = '0.0.0.0';
 const ADMIN_PORT = 4431; // Kratos webhooks in kratos.yml target this port
-const ADMIN_HOST = process.env.ADMIN_HOST ?? '127.0.0.1';
+const isProd = () => process.env.NODE_ENV === 'production';
+/** The admin bind address: required in production, loopback in dev and test. Read lazily so tests can set it. */
+const adminBindHost = () => process.env.PORTAL_ADMIN_BIND_HOST ?? (isProd() ? '' : '127.0.0.1');
 
 /** GET routes the admin mux serves. Disjoint from the public routes. */
 export const ADMIN_GET_ROUTES = new Set(['/healthz', '/readyz']);
@@ -389,8 +391,8 @@ export async function createPublicServer() {
 }
 
 /**
- * Fail-closed startup checks (pure; test helper): a missing or short secret, or a wildcard ADMIN_HOST, each push a
- * FATAL message. An empty ADMIN_HOST is a wildcard too (the `?? '127.0.0.1'` default only catches null/undefined).
+ * Fail-closed startup checks (pure; test helper): a missing or short secret, or a wildcard PORTAL_ADMIN_BIND_HOST, each push a
+ * FATAL message. In production PORTAL_ADMIN_BIND_HOST must be set; elsewhere it defaults to loopback.
  */
 export function startupEnvErrors() {
   const errors = [];
@@ -410,14 +412,17 @@ export function startupEnvErrors() {
   }
 
   // Production only: config.ts throws on these at first import, this surfaces it at boot instead of on the first request.
-  if (process.env.NODE_ENV === 'production') {
+  if (isProd()) {
     for (const name of ['OTHALA_PUBLIC_URL', 'OTHALA_APEX', 'OTHALA_INSTANCE_NAME']) {
       if (!(process.env[name] ?? '').trim()) errors.push(`[portal] FATAL: ${name} is not set or empty — refusing to start`);
     }
   }
 
-  if (ADMIN_HOST === '0.0.0.0' || ADMIN_HOST === '::' || ADMIN_HOST === '') {
-    errors.push(`[portal] FATAL: ADMIN_HOST is a wildcard address (${JSON.stringify(ADMIN_HOST)}) — the admin port must be bound to loopback or a pod-internal IP, never a wildcard (0.0.0.0, :: or empty)`);
+  const bind = adminBindHost();
+  if (isProd() && !bind.trim()) {
+    errors.push('[portal] FATAL: PORTAL_ADMIN_BIND_HOST is not set or empty — refusing to start');
+  } else if (bind === '0.0.0.0' || bind === '::' || bind === '') {
+    errors.push(`[portal] FATAL: PORTAL_ADMIN_BIND_HOST is a wildcard address (${JSON.stringify(bind)}) — the admin port must be bound to an internal-network address, never a wildcard (0.0.0.0, :: or empty)`);
   }
 
   return errors;
@@ -442,8 +447,8 @@ if (import.meta.url === `file://${process.argv[1]}`) {
   });
 
   const adminServer = createAdminServer();
-  adminServer.listen(ADMIN_PORT, ADMIN_HOST, () => {
-    console.log(`[portal] admin listener on http://${ADMIN_HOST}:${ADMIN_PORT}`);
+  adminServer.listen(ADMIN_PORT, adminBindHost(), () => {
+    console.log(`[portal] admin listener on http://${adminBindHost()}:${ADMIN_PORT}`);
   });
 
   // In-process OIDC client reconciler, started after both listeners are bound so a slow Hydra never delays boot.

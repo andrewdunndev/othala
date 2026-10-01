@@ -3,7 +3,7 @@
 #   docker compose -f compose.yml -f compose.browser.yml --profile browser up -d
 #
 # The recovery webhooks reach the portal's admin port from the kratos container, so it cannot
-# stay on loopback, and listen.mjs FATALs on a wildcard ADMIN_HOST. Production has the same shape:
+# stay on loopback, and listen.mjs FATALs on a wildcard PORTAL_ADMIN_BIND_HOST. Production has the same shape:
 # portal and Kratos are separate containers on one internal bridge, the portal binds its own
 # static IP and Kratos reaches it via the `othala` hostname. The smoke run keeps loopback since
 # it never exercises the cross-container webhook path.
@@ -11,7 +11,7 @@
 services:
   othala:
     environment:
-      ADMIN_HOST: "10.89.11.12"
+      PORTAL_ADMIN_BIND_HOST: "10.89.11.12"
     networks:
       default:
         ipv4_address: 10.89.11.12

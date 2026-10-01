@@ -66,7 +66,6 @@ FROM registry.gitlab.com/dunn.dev/pipeline/ci-runtime-node:4.8.0@sha256:29d519f7
 WORKDIR /app
 
 ENV NODE_ENV=production \
-    ADMIN_HOST=127.0.0.1 \
     # OpenTelemetry bootstrap (PII-safe; src/server/otel.mjs, copied to
     # dist/otel.mjs by `npm run copy:otel`). --import runs it BEFORE
     # listen.mjs so the http instrumentation patches node:http first. The
@@ -87,11 +86,11 @@ COPY --from=build --chown=1001:0 /src/portal/package.json ./package.json
 USER 1001
 
 # Only the public port is EXPOSEd. The admin port (4431) binds to
-# loopback (ADMIN_HOST=127.0.0.1) and is pod-only by design (D-listener,
+# PORTAL_ADMIN_BIND_HOST, required, and is pod-only by design (D-listener,
 # CU1 item 4); revoke + recovery-gate routes land on it in CU3.
 EXPOSE 8080
 
-# listen.mjs binds the public SSR handler on PORT and the loopback admin mux
+# listen.mjs binds the public SSR handler on PORT and the admin mux
 # on ADMIN_PORT in one process (see src/server/listen.mjs). Standalone
 # entry.mjs is imported by listen.mjs for its exported `handler`, not run
 # directly, so it never auto-binds its own server.
