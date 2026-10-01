@@ -103,7 +103,12 @@ test('a null identity has nothing to repair', () => {
   assert.deepEqual(plan.groups, ['family']);
 });
 
-// Markup-only: no spec drives this page, so one source check stays.
+// Markup-only: no spec drives this page, so these source checks stay.
 test('the non-canonical names are rendered escaped, never via set:html', () => {
   assert.doesNotMatch(pageSource, /set:html/);
+});
+
+test('every POST verifies its CSRF token against the action it names', () => {
+  assert.match(pageSource, /verifyToken\(String\(fd\.get\('csrf_token'\) \?\? ''\), adminId, tokenAction\)/);
+  assert.match(pageSource, /const tokenAction = action === 'remove-credential' \? `remove-\$\{String\(fd\.get\('cred_type'\) \?\? ''\)\}` : action;/);
 });

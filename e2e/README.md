@@ -94,7 +94,7 @@ podman run --rm --platform linux/arm64 \
 - **PORTAL_ADMIN_BIND_HOST=10.89.11.12** — `compose.browser.yml` gives `othala` a
   static IP on the `10.89.11.0/24` e2e subnet and binds the admin port to
   it, as production does. `0.0.0.0` is FATAL at startup by design
-  (`listen.mjs` `assertStartupEnv`).
+  (`listen.ts` `assertStartupEnv`).
 - **Caddy alias** — `auth.othala.test` resolves to the Caddy container via
   `networks.default.aliases`; the portal and Chromium both use it.
 - **Breach check** — `kratos.e2e.yml`, merged after the rendered config, turns it off.
