@@ -84,6 +84,14 @@ function sendJson(res, code, obj) {
   res.end(JSON.stringify(obj));
 }
 
+/** Every webhook's auth: answer 403 and return true unless the request carries the RECOVERY_GATE_SECRET bearer. */
+function refuseUnlessHookBearer(req, res) {
+  if (bearerMatches(parseBearer(req.headers?.authorization), process.env.RECOVERY_GATE_SECRET ?? '')) return false;
+  // 403, not 401: with can_interrupt a non-403 may be treated as a non-interrupting error (fail-open).
+  sendJson(res, 403, { error: 'forbidden' });
+  return true;
+}
+
 /** Lazily load dist/server/admin-runtime.mjs (Kratos admin client, second-factor verdict); cached, injectable in tests. */
 let _runtime = null;
 async function loadRuntime() {
@@ -141,12 +149,7 @@ export function handleLoginCodeGate(req, res, runtime) {
 }
 
 async function handleAdminMarkerGate(req, res, runtime, refusalText) {
-  const expected = process.env.RECOVERY_GATE_SECRET ?? '';
-  if (!bearerMatches(parseBearer(req.headers?.authorization), expected)) {
-    // 403, not 401: with can_interrupt a non-403 may be treated as a non-interrupting error (fail-open).
-    sendJson(res, 403, { error: 'forbidden' });
-    return;
-  }
+  if (refuseUnlessHookBearer(req, res)) return;
   let body;
   try {
     body = JSON.parse((await readBody(req)) || '{}');
@@ -198,11 +201,7 @@ function refuseProfile(res, text, pointers = ['#/traits/username']) {
 
 /** POST /admin/profile-gate, wired to settings.after.profile with can_interrupt; a failed identity read refuses the update. Username stays fixed; an email change needs a first-factor sign-in when the account has a key. */
 export async function handleProfileGate(req, res, runtime) {
-  const expected = process.env.RECOVERY_GATE_SECRET ?? '';
-  if (!bearerMatches(parseBearer(req.headers?.authorization), expected)) {
-    sendJson(res, 403, { error: 'forbidden' });
-    return;
-  }
+  if (refuseUnlessHookBearer(req, res)) return;
   let body;
   try {
     body = JSON.parse((await readBody(req)) || '{}');
@@ -242,11 +241,7 @@ function refuseSecondFactor(res, text) {
 
 /** POST /admin/second-factor-gate?method=totp|webauthn, wired to settings.after.{totp,webauthn} with can_interrupt; a failed read, missing id or unloadable runtime refuses the change. */
 export async function handleSecondFactorGate(req, res, runtime) {
-  const expected = process.env.RECOVERY_GATE_SECRET ?? '';
-  if (!bearerMatches(parseBearer(req.headers?.authorization), expected)) {
-    sendJson(res, 403, { error: 'forbidden' });
-    return;
-  }
+  if (refuseUnlessHookBearer(req, res)) return;
   let rt;
   try {
     rt = runtime ?? (await loadRuntime());
@@ -288,11 +283,7 @@ export async function handleSecondFactorGate(req, res, runtime) {
  * nothing is ended.
  */
 export async function handleProfileSessions(req, res, runtime) {
-  const expected = process.env.RECOVERY_GATE_SECRET ?? '';
-  if (!bearerMatches(parseBearer(req.headers?.authorization), expected)) {
-    sendJson(res, 403, { error: 'forbidden' });
-    return;
-  }
+  if (refuseUnlessHookBearer(req, res)) return;
   const tag = '[portal/profile-sessions]';
   let body;
   try {
@@ -330,11 +321,7 @@ export async function handleProfileSessions(req, res, runtime) {
  * credential is gone. Bad auth is 403; every other failure is logged and still answered 200, the change already saved.
  */
 export async function handlePasskeyPrune(req, res, runtime) {
-  const expected = process.env.RECOVERY_GATE_SECRET ?? '';
-  if (!bearerMatches(parseBearer(req.headers?.authorization), expected)) {
-    sendJson(res, 403, { error: 'forbidden' });
-    return;
-  }
+  if (refuseUnlessHookBearer(req, res)) return;
   const tag = '[portal/passkey-prune]';
   let id;
   try {

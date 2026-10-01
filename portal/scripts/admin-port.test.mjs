@@ -196,6 +196,7 @@ test('POST /admin/recovery-gate is fail-closed when RECOVERY_GATE_SECRET unset (
     res,
   );
   assert.equal(res.statusCode, 403);
+  assert.deepEqual(JSON.parse(res.body), { error: 'forbidden' });
 });
 
 test('POST /admin/recovery-gate REFUSES recovery when the admin-API marker is true (403)', async () => {
@@ -292,6 +293,7 @@ test('bearer rejection on recovery-gate is 403 (not 401) — Kratos can_interrup
   );
   assert.equal(res.statusCode, 403, 'must be 403, not 401');
   assert.notEqual(res.statusCode, 401, 'must NOT be 401 (would be fail-open under can_interrupt)');
+  assert.deepEqual(JSON.parse(res.body), { error: 'forbidden' });
 });
 
 async function withMockKratos(respond, fn) {
