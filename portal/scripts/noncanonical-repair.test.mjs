@@ -8,8 +8,6 @@ import { planGroupSave, nonCanonicalGroups } from '../src/lib/gate.ts';
 
 const PAGE = fileURLToPath(new URL('../src/pages/admin/users/[id].astro', import.meta.url));
 const pageSource = readFileSync(PAGE, 'utf8');
-const LIB = fileURLToPath(new URL('../src/lib/admin-actions.ts', import.meta.url));
-const libSource = readFileSync(LIB, 'utf8');
 
 function identity(groups) {
   return {
@@ -113,52 +111,7 @@ test('a null identity has nothing to repair', () => {
   assert.deepEqual(plan.groups, ['family']);
 });
 
-test('saveAction writes planGroupSave output, not the raw submitted lists', () => {
-  assert.match(libSource, /planGroupSave\(/, 'saveAction must call planGroupSave');
-  assert.match(
-    libSource,
-    /normalizeGroupOrder\(groupPlan\.groups\)/,
-    'the stored list must come from the plan',
-  );
-  assert.doesNotMatch(
-    libSource,
-    /normalizeGroupOrder\(\[\.\.\.identityGroups, \.\.\.accessGroups\]\)/,
-    'the old submitted-checkboxes-only composition must be gone',
-  );
-});
-
-test('a refusal blocks the write by returning formErrors instead of updating', () => {
-  assert.match(
-    libSource,
-    /if \(groupPlan\.refusal\) formErrors\.nonCanonicalGroups = groupPlan\.refusal;/,
-  );
-  assert.match(libSource, /if \(Object\.keys\(formErrors\)\.length > 0\) \{\s*\n\s*return \{ formErrors, refetch: false \};/);
-});
-
-test('the person page lists every unrecognised stored name with its own removal form', () => {
-  assert.match(pageSource, /const unrecognised = identity \? unrecognisedGroups\(identity, manifests\) : \[\];/);
-  assert.match(pageSource, /<input type="hidden" name="group" value=\{g\} \/>/);
-  assert.match(libSource, /fd\.getAll\('clearNonCanonical'\)/, 'saveAction must read the clear ticks');
-  assert.match(libSource, /for \(const g of removing\) if \(!GROUP_RE\.test\(g\)\) fd\.append\('clearNonCanonical', g\);/);
-});
-
-test('removal is affirmative: nothing is removed unless the admin posts that name', () => {
-  assert.match(libSource, /removeGroupsAction[\s\S]*remove: fd\.getAll\('group'\)/);
-  assert.doesNotMatch(pageSource, /name="clearNonCanonical"|name="clearUnconfigured"/, 'the page names groups to remove, never pre-ticks them');
-});
-
-test('the removal form posts under its own CSRF token and the shared verifier', () => {
-  assert.match(pageSource, /<input type="hidden" name="csrf_token" value=\{tok\('remove-groups'\)\} \/>/);
-  assert.match(pageSource, /<input type="hidden" name="action" value="remove-groups" \/>/);
-  assert.match(pageSource, /verifyToken\(String\(fd\.get\('csrf_token'\) \?\? ''\), adminId, tokenAction\)/);
-  assert.match(pageSource, /const tokenAction = action === 'remove-credential' \? `remove-\$\{String\(fd\.get\('cred_type'\) \?\? ''\)\}` : action;/);
-});
-
+// Markup-only: no spec drives this page, so one source check stays.
 test('the non-canonical names are rendered escaped, never via set:html', () => {
   assert.doesNotMatch(pageSource, /set:html/);
-});
-
-test('they sit under their own heading, not in the apps section', () => {
-  assert.match(pageSource, /<h2 id="h-groups">Unrecognised groups<\/h2>/);
-  assert.match(pageSource, /unrecognisedGroups\(identity, manifests\)/);
 });

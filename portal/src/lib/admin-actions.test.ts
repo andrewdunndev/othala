@@ -257,6 +257,22 @@ describe('saveAction', () => {
     expect(outcome.formErrors?.identityGroups).toBeDefined();
   });
 
+  it('refuses a save that would keep a non-canonical group, leaving the identity unwritten', async () => {
+    const outcome = await saveAction(saveForm(['family']), makeCtx({ identity: stored(['family', 'Bad Name']), manifests: MANIFESTS }));
+
+    expect(updateIdentityMock).not.toHaveBeenCalled();
+    expect(outcome.formErrors?.nonCanonicalGroups).toMatch(/Bad Name/);
+    expect(outcome.refetch).toBe(false);
+  });
+
+  it('drops a non-canonical group only when its clear tick is posted', async () => {
+    const f = saveForm(['family']);
+    f.append('clearNonCanonical', 'Bad Name');
+    await saveAction(f, makeCtx({ identity: stored(['family', 'Bad Name']), manifests: MANIFESTS }));
+
+    expect(updateIdentityMock.mock.calls[0][1].metadataAdmin.groups).toEqual(['family']);
+  });
+
   it('reports a revocation failure as an error after the save stood', async () => {
     revokeConsentSessionsMock.mockRejectedValue(new RevokeError('hydra-admin', 'revoke-consent-sessions', 'Verify HYDRA_ADMIN_URL.'));
     const outcome = await saveAction(saveForm(['family']), makeCtx({ identity: stored(['family', 'media']), manifests: MANIFESTS }));
