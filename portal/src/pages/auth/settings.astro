@@ -183,7 +183,7 @@ const lookupLabel: Record<string, string> = {
   lookup_secret_confirm: "I've saved these codes",
 };
 ---
-<Layout title="Settings" description="Account settings." compact>
+<Layout title="Settings" description="Account settings." compact router>
   <Fragment slot="header-actions">
     <HeaderActions identityId={identity.id} isAdmin={isAdmin} />
   </Fragment>
@@ -606,3 +606,7 @@ const lookupLabel: Record<string, string> = {
   ))}
 
 </Layout>
+
+<script>
+  import '../../scripts/settings-enhance';
+</script>
