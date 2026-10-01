@@ -119,7 +119,7 @@ upload-release-assets:
 # scans this file too, so a runner tag or comment naming a private host fails.
 check-purity:
   stage: verify
-  image: registry.access.redhat.com/ubi10/nodejs-22:10.2@sha256:d7435fba7435fbc5e6749c319caff8dce19926ca4681f3fa6638274645a6348d
+  image: registry.access.redhat.com/ubi10/nodejs-22:10.2@sha256:717ad679e570b99d51c36ec735332222b85cc2dc492fd560d4708dc6a18a051b
   rules:
     - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
     - if: '$CI_PIPELINE_SOURCE == "push"'
@@ -150,7 +150,7 @@ check-purity:
 # are  templates, so they are excluded.
 check-portal:
   stage: verify
-  image: registry.access.redhat.com/ubi10/nodejs-22:10.2@sha256:d7435fba7435fbc5e6749c319caff8dce19926ca4681f3fa6638274645a6348d
+  image: registry.access.redhat.com/ubi10/nodejs-22:10.2@sha256:717ad679e570b99d51c36ec735332222b85cc2dc492fd560d4708dc6a18a051b
   rules:
     - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
     - if: '$CI_PIPELINE_SOURCE == "push"'
