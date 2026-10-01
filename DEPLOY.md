@@ -26,8 +26,8 @@ platform runs containers. The contract is the same regardless of mechanism
 
 One image per release, tagged at the git tag and published at the registry
 root (`registry.gitlab.com/dunn.dev/othala:vX.Y.Z`, `publish_at_root: true`
-in `.gitlab-ci.yml`). A deploy plane pins by tag or digest; registry tags
-are immutable, so pinning by tag is already deterministic. Kratos and Hydra
+in `.gitlab-ci.yml`). A deploy plane pins by tag and digest: `v*` registry
+tags are protected, not immutable. Kratos and Hydra
 are upstream Ory images — this repo does not build or publish them.
 
 Each release image is signed by digest with keyless cosign, from the tag

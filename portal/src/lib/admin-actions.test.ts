@@ -614,7 +614,9 @@ describe('admin action audit line', () => {
 
   it('records a thrown mutation as error and rethrows', async () => {
     deactivateIdentityMock.mockRejectedValue(new Error('boom'));
-    const lines = await audit('deactivate', makeCtx());
-    expect(JSON.parse(lines[0]).result).toBe('error');
+    const log = vi.spyOn(console, 'log').mockImplementation(() => {});
+    await expect(ADMIN_ACTIONS.deactivate(fd(), makeCtx())).rejects.toThrow('boom');
+    expect(JSON.parse(log.mock.calls[0][0]).result).toBe('error');
+    log.mockRestore();
   });
 });
