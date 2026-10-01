@@ -1,4 +1,4 @@
-// The 10 admin POST actions from pages/admin/users/[id].astro, so the page is a
+// The admin POST actions from pages/admin/users/[id].astro, so the page is a
 // thin dispatch. CSRF verification stays page-level, before any handler runs.
 // Each handler takes the FormData plus an ActionContext (the identity already
 // loaded) and returns an ActionOutcome; `refetch` asks the page to reload().
@@ -11,6 +11,8 @@ import {
   reactivateIdentity,
   getRecoveryLink,
   patchAdminMarker,
+  patchPrerequisites,
+  markEmailVerified,
   deleteCredential,
   EVICTABLE_CREDENTIAL_TYPES,
 } from './admin-api';
@@ -19,8 +21,11 @@ import { isAdminMarker } from './admin-auth';
 import { hasSecondFactor } from './step-up';
 import { sendInviteRecoveryEmail } from './kratos';
 import { confirmsInviteAddress, IDENTITY_GROUP_ORDER, normalizeGroupOrder, shouldRefuseRecovery } from './access';
+import { accessToStorage, choicesFromForm } from './access-rows';
+import { GROUP_RE } from './access-groups';
+import { HOUSEHOLD_GROUPS } from './constants';
 import { identityGroups as storedGroups, planGroupSave } from './gate';
-import { buildGroupRegistry, unconfiguredGroups } from './group-registry';
+import { buildGroupRegistry, isIdentityGroup, unconfiguredGroups } from './group-registry';
 import { revokeConsentSessions, revokeSubject } from './revoke';
 import type { ClientManifest } from './manifests';
 import type { Identity } from './types';
@@ -40,6 +45,8 @@ export type ActionResult =
   | { kind: 'admin-granted'; username: string }
   | { kind: 'admin-revoked'; username: string }
   | { kind: 'revoked'; result: RevokeUserResult }
+  | { kind: 'email-verified' }
+  | { kind: 'prerequisites-saved' }
   | { kind: 'credential-removed'; credType: string }
   | { kind: 'error'; message: string };
 
@@ -59,6 +66,8 @@ export interface ActionContext {
   identity: Identity;
   adminIdentityId: string;
   manifests: ClientManifest[];
+  /** Names defined under requirements/, the only prerequisites an admin can mark. */
+  requirements?: readonly string[];
 }
 
 type ActionHandler = (fd: FormData, ctx: ActionContext) => Promise<ActionOutcome | Response>;
@@ -143,6 +152,108 @@ export async function saveAction(fd: FormData, ctx: ActionContext): Promise<Acti
     if (failure) return { actionResult: failure, mode: 'read', refetch: true };
   }
   return { actionResult: { kind: 'updated', removed: groupPlan.removed }, mode: 'read', refetch: true };
+}
+
+interface SectionEdit {
+  /** Replaces the identity's traits; absent keeps the stored ones. */
+  profile?: { username: string; email: string; displayName: string; recoveryEmail: string };
+  /** Replaces the household groups the page offers; absent keeps the stored ones. */
+  household?: readonly string[];
+  /** Replaces the app groups and role overrides; absent keeps the stored ones. */
+  access?: { groups: readonly string[]; roles: Readonly<Record<string, string>> };
+  /** Stored groups to remove outright. */
+  remove?: readonly string[];
+}
+
+/**
+ * The person page saves one section at a time. Each section builds the full form saveAction already guards (traits,
+ * groups, roles) from what is stored plus its own edit, so every section keeps the same narrowing revocation and
+ * repair rules and no section can clobber another's data.
+ */
+function sectionSave(ctx: ActionContext, edit: SectionEdit): Promise<ActionOutcome> {
+  const { identity, manifests } = ctx;
+  const registry = buildGroupRegistry(manifests, IDENTITY_GROUP_ORDER);
+  const stored = storedGroups(identity);
+  const storedUnconfigured = unconfiguredGroups(registry, stored);
+  const desired = edit.access ? [...edit.access.groups] : [...stored];
+  const roles = edit.access ? edit.access.roles : (identity.metadata_admin?.roles ?? {});
+  const traits = identity.traits;
+
+  const fd = new FormData();
+  fd.set('username', edit.profile?.username ?? String(traits?.username ?? ''));
+  fd.set('email', edit.profile?.email ?? String(traits?.email ?? ''));
+  fd.set('displayName', edit.profile?.displayName ?? String(traits?.displayName ?? ''));
+  fd.set('recoveryEmail', edit.profile?.recoveryEmail ?? String(traits?.recoveryEmail ?? ''));
+
+  // Identity groups the page does not offer (the legacy `admin` group) ride along unchanged.
+  const unoffered = stored.filter((g) => isIdentityGroup(registry, g) && !HOUSEHOLD_GROUPS.includes(g));
+  const household = edit.household
+    ? [...edit.household.filter((g) => HOUSEHOLD_GROUPS.includes(g)), ...unoffered]
+    : desired.filter((g) => isIdentityGroup(registry, g));
+  for (const g of household) fd.append('identityGroups', g);
+
+  const removing = new Set(edit.remove ?? []);
+  for (const g of desired) {
+    if (isIdentityGroup(registry, g) || storedUnconfigured.includes(g) || removing.has(g)) continue;
+    fd.append('accessGroups', g);
+  }
+  // A stored group the access edit dropped goes through the explicit clear path saveAction guards.
+  for (const g of storedUnconfigured) {
+    if (removing.has(g) || (edit.access && !desired.includes(g))) fd.append('clearUnconfigured', g);
+  }
+  for (const g of removing) if (!GROUP_RE.test(g)) fd.append('clearNonCanonical', g);
+  for (const [clientId, role] of Object.entries(roles)) fd.set(`role:${clientId}`, role);
+  return saveAction(fd, ctx);
+}
+
+const TRAIT_FIELDS = ['username', 'email', 'displayName', 'recoveryEmail'] as const;
+
+/** Save the apps section: the submitted app -> level choices become groups and role overrides. */
+export function saveAccessAction(fd: FormData, ctx: ActionContext): Promise<ActionOutcome> {
+  const roles = { ...(ctx.identity.metadata_admin?.roles ?? {}) };
+  const access = accessToStorage(ctx.manifests, choicesFromForm(fd), { groups: storedGroups(ctx.identity), roles });
+  return sectionSave(ctx, { access });
+}
+
+/** Save the household section: the ticked household groups. */
+export function saveHouseholdAction(fd: FormData, ctx: ActionContext): Promise<ActionOutcome> {
+  return sectionSave(ctx, { household: fd.getAll('identityGroups').map(String) });
+}
+
+/** Save the profile: name, username, email and recovery email. */
+export function saveProfileAction(fd: FormData, ctx: ActionContext): Promise<ActionOutcome> {
+  const [username, email, displayName, recoveryEmail] = TRAIT_FIELDS.map((k) => String(fd.get(k) ?? '').trim());
+  return sectionSave(ctx, { profile: { username: username.toLowerCase(), email, displayName, recoveryEmail } });
+}
+
+/** Remove unrecognised stored groups, each named by the admin who sees the raw string in the warning card. */
+export function removeGroupsAction(fd: FormData, ctx: ActionContext): Promise<ActionOutcome> {
+  return sectionSave(ctx, { remove: fd.getAll('group').map(String).filter(Boolean) });
+}
+
+/** Admin vouches for the email trait's address; the only write is that one address. */
+export async function markVerifiedAction(_fd: FormData, ctx: ActionContext): Promise<ActionOutcome> {
+  if (!ctx.identity.traits?.email) {
+    return { actionResult: { kind: 'error', message: 'This person has no email address on file.' }, refetch: false };
+  }
+  await markEmailVerified(ctx.id);
+  return { actionResult: { kind: 'email-verified' }, refetch: true };
+}
+
+/** The prerequisites to store: marks for names that are no longer defined stay, defined names follow the submitted ticks. */
+export function nextPrerequisites(stored: readonly string[], known: readonly string[], submitted: readonly string[]): string[] {
+  return [...stored.filter((n) => !known.includes(n)), ...known.filter((n) => submitted.includes(n))];
+}
+
+/** Save which prerequisites the admin has marked set up for this person, a targeted patch that touches nothing else. */
+export async function setPrerequisitesAction(fd: FormData, ctx: ActionContext): Promise<ActionOutcome> {
+  const next = nextPrerequisites(
+    ctx.identity.metadata_admin?.prerequisites ?? [],
+    ctx.requirements ?? [],
+    fd.getAll('prerequisite').map(String),
+  );
+  await patchPrerequisites(ctx.id, next);
+  return { actionResult: { kind: 'prerequisites-saved' }, refetch: true };
 }
 
 /** True when the save drops a stored group or changes or drops a stored role. */
@@ -311,17 +422,14 @@ export async function grantAdminAction(_fd: FormData, ctx: ActionContext): Promi
   return { actionResult: { kind: 'admin-granted', username }, refetch: true };
 }
 
-export async function revokeAdminAction(_fd: FormData, ctx: ActionContext): Promise<ActionOutcome> {
+export async function revokeAdminAction(fd: FormData, ctx: ActionContext): Promise<ActionOutcome | Response> {
   const { id, identity, adminIdentityId } = ctx;
   const username = identity.traits?.username ?? id;
-  // Self-demote guard: break-glass scenario requires another admin or console access.
-  if (id === adminIdentityId) {
+  const self = id === adminIdentityId;
+  // Giving up your own admin access is allowed, but only by typing your own username, so it cannot happen by a stray click.
+  if (self && String(fd.get('confirm') ?? '').trim() !== username) {
     return {
-      actionResult: {
-        kind: 'error',
-        message:
-          'You cannot revoke your own admin marker via the UI. Have another admin do it, or use the shell break-glass (see docs/runbooks/admin-recovery.md).',
-      },
+      actionResult: { kind: 'error', message: `Type your username (${username}) to give up your own admin access.` },
       refetch: false,
     };
   }
@@ -334,6 +442,7 @@ export async function revokeAdminAction(_fd: FormData, ctx: ActionContext): Prom
   }
   await patchAdminMarker(id, false);
   const failure = await revokeGrants(id);
+  if (self) return new Response(null, { status: 303, headers: { Location: '/' } });
   if (failure) return { actionResult: failure, refetch: true };
   return { actionResult: { kind: 'admin-revoked', username }, refetch: true };
 }
@@ -373,7 +482,12 @@ export async function removeCredentialAction(fd: FormData, ctx: ActionContext): 
 
 /** Dispatch table keyed by the form's `action` field — the page's whole switch. */
 export const ADMIN_ACTIONS: Record<string, ActionHandler> = {
-  save: saveAction,
+  'save-access': saveAccessAction,
+  'save-household': saveHouseholdAction,
+  'save-profile': saveProfileAction,
+  'remove-groups': removeGroupsAction,
+  'mark-verified': markVerifiedAction,
+  'set-prerequisites': setPrerequisitesAction,
   'issue-recovery': issueRecoveryAction,
   'send-invite-email': sendInviteEmailAction,
   'force-relogin': forceReloginAction,
