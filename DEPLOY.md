@@ -73,7 +73,7 @@ section covers only what needs context beyond that file:
 - Service names (`kratos`, `hydra`, `postgres`, `othala`), ports and the Ory
   admin URLs are fixed, and the admin APIs take no bearer: the network is the
   control. A deploy plane mounts its manifests at `/etc/portal/manifests`.
-- `KRATOS_ADMIN_BIND_HOST`, `HYDRA_ADMIN_BIND_HOST` and `PORTAL_ADMIN_BIND_HOST` have no production default (the portal refuses to start without its own): bind each to an address on the internal network the edge is not attached to.
+- `KRATOS_ADMIN_BIND_HOST`, `HYDRA_ADMIN_BIND_HOST` and `PORTAL_ADMIN_BIND_HOST` have no production default; the portal and the Ory render refuse empty or wildcard binds. Bind each to an internal-network address the edge cannot reach.
 - The breach check is always on: an HIBP outage blocks setting a password (registration, settings, after recovery); admin-API and shell break-glass paths still work.
 - Secrets come from the deploy plane's secret store, never the image.
 - Admin authority is deliberately **not** an env target: it is the

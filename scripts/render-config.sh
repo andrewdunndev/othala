@@ -95,6 +95,13 @@ if missing:
         print(f"  {n}", file=sys.stderr)
     sys.exit(1)
 
+# The Ory admin APIs must bind a specific address: an empty value or a wildcard exposes them on every interface.
+for name in ("KRATOS_ADMIN_BIND_HOST", "HYDRA_ADMIN_BIND_HOST"):
+    if name in needed and os.environ[name].strip() in ("", "0.0.0.0", "::", "[::]"):
+        print(f"render-config: {template_path}: {name} must be a specific address, "
+              f"not empty or a wildcard — refusing to render", file=sys.stderr)
+        sys.exit(1)
+
 # Control-character guard: fail closed before writing output (a newline or CR breaks scalars).
 for name in needed:
     val = os.environ[name]
