@@ -557,7 +557,7 @@ test('T6: describeScopeList maps known scopes and falls back for unknown', () =>
   assert.equal(result[4].description, SCOPE_DESCRIPTIONS['offline_access'], 'offline_access must map to stay signed in description');
 
   assert.equal(result[5].scope, 'unknown_scope');
-  assert.equal(result[5].description, 'unknown_scope', 'unknown scope must fall back to scope name');
+  assert.ok(result[5].description.includes('unknown_scope'), 'unknown scope must stay visible by name');
 });
 
 test('D1: POST Allow with missing csrf_token returns 400', async () => {

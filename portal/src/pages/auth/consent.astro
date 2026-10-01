@@ -1,57 +1,56 @@
 ---
-// OAuth2 consent grant screen, shown when Hydra redirects here for a client
-// without skip_consent. Lists the client name and scopes with Allow / Deny,
-// posting to /oauth2/consent (signed CSRF token + subject match). Consent is
-// not a Kratos flow, so FlowNodes is not used.
+// OAuth2 consent grant screen, shown when Hydra redirects here for a client without skip_consent. Names the app (logo and
+// name from its manifest), says in plain words what it will see, and offers Allow or Deny, posting to /oauth2/consent
+// (signed CSRF token + subject match). Consent is not a Kratos flow. In `astro dev`, `?dev-state=` renders a recorded
+// request (lib/journey-fixtures.ts) with no Hydra.
 
 export const prerender = false;
 
-import Layout from '../../layouts/Layout.astro';
-import PageHero from '../../components/PageHero.astro';
+import FocusPage from '../../components/FocusPage.astro';
+import AppIcon from '../../components/AppIcon.astro';
 import { describeScopeList } from '../../lib/scope-descriptions';
 import { getSession } from '../../lib/kratos';
 import { signToken } from '../../lib/csrf';
 import { defaultOAuth2Api } from '../../lib/oauth2-handlers';
+import { loadTiles } from '../../lib/tiles';
+import { DEV_CONSENT_STATES, devConsent, isIn } from '../../lib/journey-fixtures';
 
 const challenge = Astro.url.searchParams.get('consent_challenge');
+const devState = import.meta.env.DEV ? Astro.url.searchParams.get('dev-state') : null;
+const dev = isIn(DEV_CONSENT_STATES, devState) ? devConsent(devState) : null;
 
-// Re-fetch the consent request server-side so we can show the client name
-// and requested scopes. Uses the shared defaultOAuth2Api factory from
-// oauth2-handlers.ts.
-
-let clientName = 'Unknown application';
+let clientId = '';
+let clientName = '';
 let scopeDescriptions: Array<{ scope: string; description: string }> = [];
 let fetchError = false;
 let ownershipError = false;
 let csrfToken = '';
 
-if (!challenge) {
+if (dev) {
+  clientId = dev.clientId;
+  clientName = dev.clientName;
+  scopeDescriptions = describeScopeList(dev.scopes);
+  fetchError = !!dev.fetchError;
+} else if (!challenge) {
   fetchError = true;
 } else {
   try {
     const oauth2 = defaultOAuth2Api();
     const consent = await oauth2.getOAuth2ConsentRequest({ consentChallenge: challenge });
 
-    // Resolve the Kratos session server-side. Both the session AND the consent
-    // request must be resolved before we can render anything — the ownership
-    // check below compares session.identity.id against consent.subject to
-    // prevent user A seeing user B's client name / scope list.
-    //
-    // If session resolution fails (Kratos down), fall to fetchError: the form
-    // will not render, so no CSRF token is needed (fail-closed).
+    // Both the session AND the consent request must resolve before anything renders: the ownership check compares
+    // session.identity.id with consent.subject so user A never sees user B's client name or scope list. If the session
+    // cannot be resolved (Kratos down) the form does not render, so no CSRF token is needed (fail-closed).
     const cookie = Astro.request.headers.get('cookie') ?? undefined;
     const session = await getSession(cookie);
     if (!session?.active || !session.identity?.id) {
-      // No active session at render time — degrade to fetchError (form won't render).
       fetchError = true;
     } else if (session.identity.id !== consent.subject) {
-      // Render-time ownership check (mirrors POST-time subject-match in
-      // handleConsentPost's 'session subject mismatch' guard): logged-in user is NOT the subject of
-      // this consent challenge. Do NOT disclose client name or scope list.
+      // Mirrors the POST-time subject match in handleConsentPost. Do NOT disclose the client name or scope list.
       ownershipError = true;
     } else {
-      // Session is active and owns the challenge — safe to render.
-      clientName = consent.client?.client_name ?? consent.client?.client_id ?? 'Unknown application';
+      clientId = consent.client?.client_id ?? '';
+      clientName = consent.client?.client_name ?? clientId;
       scopeDescriptions = describeScopeList(consent.requested_scope ?? []);
       csrfToken = signToken(session.identity.id, 'consent');
     }
@@ -59,168 +58,66 @@ if (!challenge) {
     fetchError = true;
   }
 }
+
+const failed = fetchError || ownershipError;
+// The app as the household knows it: logo, name and one-line description from its manifest, else a monogram.
+const tile = !failed ? loadTiles().find((t) => t.slug === clientId) : undefined;
+const appName = tile?.name ?? (clientName || 'This app');
+const plate = tile ?? { iconHref: undefined, icon: appName.slice(0, 2).toUpperCase(), iconBleed: false };
 ---
-<Layout title="Authorize" description="Grant or deny access to your account." bare>
+<FocusPage
+  title={failed ? "That request can't be used" : `Let ${appName} use your account?`}
+  lede={failed ? undefined : 'You are signed in. This app is asking before it can sign you in.'}
+  tabTitle="Allow access"
+  description="Allow or deny an app's request to use your account."
+>
 
-  <PageHero
-    title="Grant access?"
-    eyebrow="authorize"
-    lede="Review what this application is asking for before you proceed."
-  />
-
-  {(fetchError || ownershipError) ? (
-    <section class="panel consent-card">
-      <p class="consent-error">
-        {!challenge
-          ? 'No consent challenge was provided. This page should only be reached via an OAuth2 flow.'
+  {failed ? (
+    <section class="panel focus-card">
+      <p class="focus-note">
+        {!challenge && !dev
+          ? 'This page opens from an app that wants to sign you in. Open the app and choose sign in, and it will bring you here.'
           : ownershipError
-          ? "This authorization request isn’t yours or could not be loaded."
-          : 'Unable to retrieve the consent request. The challenge may have expired or already been handled.'}
+          ? 'This request belongs to someone else, or has timed out. Go back to the app and start sign-in again.'
+          : 'This request has timed out or was already answered. Go back to the app and start sign-in again.'}
       </p>
+      <a href="/" class="button button-primary focus-btn" data-astro-reload>Go home</a>
     </section>
   ) : (
-    <section class="panel consent-card">
-      <div class="consent-client">
-        <p class="section-subtitle">Application requesting access</p>
-        <p class="consent-client-name">{clientName}</p>
+    <section class="panel focus-card">
+      <div class="consent-app">
+        <AppIcon tile={plate} size="lg" />
+        <div>
+          <p class="consent-app-name">{appName}</p>
+          {tile?.description && <p class="consent-app-desc">{tile.description}</p>}
+        </div>
       </div>
 
       {scopeDescriptions.length > 0 && (
-        <div class="consent-scopes">
-          <p class="section-subtitle">This application is requesting access to</p>
-          <ul class="consent-scope-list">
-            {scopeDescriptions.map(({ scope, description }) => (
-              <li class="consent-scope-item">
-                <span class="consent-scope-desc">{description}</span>
-                <span class="consent-scope-name">{scope}</span>
-              </li>
-            ))}
+        <div>
+          <p class="focus-note"><strong>{appName} will see</strong></p>
+          <ul class="consent-list">
+            {scopeDescriptions.map(({ description }) => <li>{description}</li>)}
           </ul>
         </div>
       )}
 
       <div class="consent-actions">
-        <form method="POST" action="/oauth2/consent" class="consent-form">
-          <input type="hidden" name="consent_challenge" value={challenge!} />
+        <form method="POST" action="/oauth2/consent">
+          <input type="hidden" name="consent_challenge" value={challenge ?? ''} />
           <input type="hidden" name="action" value="allow" />
           <input type="hidden" name="csrf_token" value={csrfToken} />
-          <button type="submit" class="button button-primary consent-btn">
-            Allow
-          </button>
+          <button type="submit" class="button button-primary focus-btn">Allow</button>
         </form>
-        <form method="POST" action="/oauth2/consent" class="consent-form">
-          <input type="hidden" name="consent_challenge" value={challenge!} />
+        <form method="POST" action="/oauth2/consent">
+          <input type="hidden" name="consent_challenge" value={challenge ?? ''} />
           <input type="hidden" name="action" value="deny" />
           <input type="hidden" name="csrf_token" value={csrfToken} />
-          <button type="submit" class="button button-secondary consent-btn">
-            Deny
-          </button>
+          <button type="submit" class="button button-secondary focus-btn">Deny</button>
         </form>
       </div>
+      <p class="focus-note">Allow signs you in this time only, so you'll be asked again next time. Deny returns you to the app without signing in.</p>
     </section>
   )}
 
-  <footer class="login-footer">
-    <a href="/" class="login-foot-link">Back home</a>
-  </footer>
-
-</Layout>
-
-<style>
-  /* Consent card: same geometry as login-card in login.astro; surface via .panel. */
-  .consent-card {
-    max-width: 32rem;
-    margin: 0 auto;
-    padding: var(--space-6);
-    display: flex;
-    flex-direction: column;
-    gap: var(--space-5);
-  }
-
-  .consent-client-name {
-    font-size: var(--text-lg);
-    font-weight: 600;
-    color: var(--text);
-    margin: 0;
-  }
-
-  .consent-scopes {
-    padding-top: var(--space-5);
-    border-top: 1px solid var(--border);
-  }
-
-  .consent-scope-list {
-    list-style: none;
-    margin: 0;
-    padding: 0;
-    display: flex;
-    flex-direction: column;
-    gap: var(--space-2);
-  }
-
-  .consent-scope-item {
-    display: flex;
-    align-items: baseline;
-    justify-content: space-between;
-    gap: var(--space-3);
-  }
-
-  .consent-scope-desc {
-    color: var(--text);
-    font-size: var(--text-base);
-  }
-
-  .consent-scope-name {
-    font-family: var(--font-mono);
-    font-size: var(--text-xs);
-    color: var(--text-muted);
-    white-space: nowrap;
-  }
-
-  .consent-actions {
-    display: flex;
-    gap: var(--space-3);
-    padding-top: var(--space-5);
-    border-top: 1px solid var(--border);
-  }
-
-  .consent-form {
-    flex: 1;
-  }
-
-  .consent-btn {
-    width: 100%;
-    padding: var(--space-3) var(--space-5);
-    font-size: var(--text-base);
-  }
-
-  .consent-error {
-    color: var(--danger);
-    font-size: var(--text-sm);
-    margin: 0;
-  }
-
-  /* Footer links: same pattern as login.astro. */
-  .login-footer {
-    max-width: 32rem;
-    margin: var(--space-5) auto 0;
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    gap: var(--space-3);
-    font-family: var(--font-mono);
-    font-size: var(--text-xs);
-    text-transform: uppercase;
-    letter-spacing: 0.08em;
-  }
-  .login-foot-link {
-    color: var(--text-muted);
-    text-decoration: none;
-  }
-  .login-foot-link:hover { color: var(--accent); text-decoration: none; }
-
-  @media (max-width: 640px) {
-    .consent-card { padding: var(--space-5); }
-    .consent-actions { flex-direction: column; }
-  }
-</style>
+</FocusPage>
