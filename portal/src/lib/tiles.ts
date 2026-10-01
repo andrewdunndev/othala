@@ -9,8 +9,6 @@ import { parse as parseYaml } from 'yaml';
 import { marked } from 'marked';
 import DOMPurify from 'isomorphic-dompurify';
 import { parseAccessGroups } from './access-groups';
-import { parseManifest, type ClientManifest } from './manifests';
-import { lookupRole } from './claims';
 
 // Vendored icons directory: public/icons/ in dev (a stale dist/ must not shadow it), dist/client/icons/ in prod.
 const _cwd = process.cwd();
@@ -97,8 +95,6 @@ export interface AppTile {
   educationHtml?: string;
   /** Prerequisite names from `presentation.requires` (lowercase, deduplicated; malformed names dropped). */
   requires: string[];
-  /** The parsed oidc/consent manifest, kept so roles resolve through lookupRole; undefined when it does not parse. */
-  manifest?: ClientManifest;
 }
 
 /** A requirement name is a filename stem under requirements/, so it must stay a plain slug. */
@@ -289,13 +285,6 @@ export function parseRequires(raw: unknown): string[] {
   return out;
 }
 
-/** Whether the person's resolved role for this app is its top-ranked one; an app with fewer than two roles has none. */
-export function holdsTopRole(tile: AppTile, metadataAdmin: unknown): boolean {
-  const m = tile.manifest;
-  if (!m || m.roles.length < 2) return false;
-  return lookupRole(m, metadataAdmin)?.roleName === m.roles[0]?.name;
-}
-
 export type TileReadiness = 'none' | 'ready' | 'needs';
 
 /** Prerequisite state for a person: `none` when the app requires nothing, `ready` when the admin marked every
@@ -309,7 +298,7 @@ export function tileReadiness(tile: AppTile, marked: readonly string[]): TileRea
  * Parse one manifest's `presentation:` block into an AppTile; null when it has none. An absent `access_group` gates
  * on the default group (tileDefaultGroup), never on a per-slug group or every authenticated user.
  */
-function parseTile(slug: string, doc: Record<string, unknown>, dir: string, manifest?: ClientManifest): AppTile | null {
+function parseTile(slug: string, doc: Record<string, unknown>, dir: string): AppTile | null {
   const pBlock = doc['presentation'];
   if (!pBlock || typeof pBlock !== 'object' || Array.isArray(pBlock)) return null;
   const p = pBlock as Record<string, unknown>;
@@ -348,7 +337,6 @@ function parseTile(slug: string, doc: Record<string, unknown>, dir: string, mani
     fqdn,
     educationHtml,
     requires: parseRequires(p['requires']),
-    manifest,
   };
 
   const groupVal = p['group'];
@@ -391,13 +379,7 @@ function loadFromDisk(): AppTile[] {
     }
     if (!doc || typeof doc !== 'object' || Array.isArray(doc)) continue;
     try {
-      let manifest: ClientManifest | undefined;
-      try {
-        manifest = parseManifest(text, f);
-      } catch {
-        // a manifest that fails oidc/consent parsing still gets a tile; it just has no roles
-      }
-      const tile = parseTile(slug, doc as Record<string, unknown>, dir, manifest);
+      const tile = parseTile(slug, doc as Record<string, unknown>, dir);
       if (tile) tiles.push(tile);
     } catch (err) {
       console.warn(`tiles: skipping ${f}: ${err}`);

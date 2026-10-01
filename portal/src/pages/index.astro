@@ -11,6 +11,7 @@ import PageHero from '../components/PageHero.astro';
 import TileCard from '../components/TileCard.astro';
 import AppBadges from '../components/AppBadges.astro';
 import PrereqCard from '../components/PrereqCard.astro';
+import AppActions from '../components/AppActions.astro';
 import GuideSections from '../components/GuideSections.astro';
 import {
   loadTiles,
@@ -18,7 +19,6 @@ import {
   loadRequirements,
   requirementsFor,
   splitGuide,
-  holdsTopRole,
   tileReadiness,
   safeHref,
   userCanSeeTile,
@@ -86,7 +86,7 @@ const visibleTiles =
     : [];
 
 // Per-tile presentation for this person: prerequisite state (the admin's marks), requirement definitions, the guide
-// outline, and whether they hold the app's top role.
+// outline.
 const requirementSet = loadRequirements();
 const markedPrerequisites = identity?.metadata_admin?.prerequisites ?? [];
 const views = new Map(
@@ -98,7 +98,6 @@ const views = new Map(
         requirements,
         readiness: tileReadiness(t, markedPrerequisites),
         titles: requirements.map((r) => r.title),
-        admin: holdsTopRole(t, identity?.metadata_admin),
         guide: splitGuide(t.educationHtml),
       },
     ] as const;
@@ -234,7 +233,7 @@ const devLinks = [
               <div class="tile-grid">
                 {ungroupedTiles.map((t: AppTile) => {
                   const v = views.get(t.slug)!;
-                  return <TileCard tile={t} readiness={v.readiness} requirementTitles={v.titles} admin={v.admin} />;
+                  return <TileCard tile={t} readiness={v.readiness} requirementTitles={v.titles} />;
                 })}
               </div>
             )}
@@ -249,7 +248,7 @@ const devLinks = [
                 <div class="tile-grid">
                   {tiles.map((t: AppTile) => {
                     const v = views.get(t.slug)!;
-                    return <TileCard tile={t} readiness={v.readiness} requirementTitles={v.titles} admin={v.admin} />;
+                    return <TileCard tile={t} readiness={v.readiness} requirementTitles={v.titles} />;
                   })}
                 </div>
               </div>
@@ -264,10 +263,9 @@ const devLinks = [
       </section>
 
       {/* ── Per-app documentation: one hidden <template> per visible tile, three slots. The dialog script clones
-          them into the header (badges), the action band (prerequisite card + Open) and the scrolling guide body. */}
+          them into the header (actions), the prerequisite strip and the scrolling guide body. */}
       {visibleTiles.map((t: AppTile) => {
         const v = views.get(t.slug)!;
-        const href = safeHref(t.url);
         return (
           <template
             data-app-edu={t.slug}
@@ -276,14 +274,13 @@ const devLinks = [
             data-app-icon={t.iconHref ?? ''}
             data-app-mono={t.icon}
           >
-            <div data-slot="badges">
-              <AppBadges readiness={v.readiness} titles={v.titles} admin={v.admin} />
-            </div>
             <div data-slot="actions">
+              <AppActions name={t.name} href={safeHref(t.url)} requirements={v.requirements} ready={v.readiness === 'ready'} />
+            </div>
+            <div data-slot="prereq">
               {v.requirements.map((r) => (
                 <PrereqCard requirement={r} ready={v.readiness === 'ready'} />
               ))}
-              <a class="button button-primary app-modal-open" href={href} rel="noopener">Open {t.name} ↗</a>
             </div>
             <div data-slot="body">
               <GuideSections guide={v.guide} />
@@ -297,18 +294,18 @@ const devLinks = [
           open time from the hidden <template data-app-edu> elements above. */}
       <dialog class="app-modal" id="app-modal" aria-labelledby="app-modal-title">
         <div class="app-modal-inner">
+          <button class="app-modal-close" type="button" data-close-app-modal aria-label="Close guide">
+            <svg viewBox="0 0 16 16" width="16" height="16" aria-hidden="true" focusable="false"><path d="M3.5 3.5l9 9m0-9l-9 9" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>
+          </button>
           <header class="app-modal-header">
             <span class="app-modal-icon" data-slot-icon></span>
             <div class="app-modal-header-text">
               <h2 class="app-modal-title" id="app-modal-title"></h2>
               <p class="app-modal-desc"></p>
-              <div class="app-modal-badges" data-slot-badges></div>
             </div>
-            <button class="app-modal-close" type="button" data-close-app-modal aria-label="Close guide">
-              <svg viewBox="0 0 16 16" width="16" height="16" aria-hidden="true" focusable="false"><path d="M3.5 3.5l9 9m0-9l-9 9" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>
-            </button>
+            <div class="app-modal-actions" data-slot-actions></div>
           </header>
-          <div class="app-modal-actions" data-slot-actions></div>
+          <div class="app-modal-prereq" data-slot-prereq></div>
           <div class="app-modal-body" data-slot-body tabindex="0" role="region" aria-label="Guide"></div>
         </div>
       </dialog>
@@ -472,9 +469,10 @@ const devLinks = [
     var titleEl = appModal.querySelector('.app-modal-title');
     var descEl = appModal.querySelector('.app-modal-desc');
     var iconEl = appModal.querySelector('[data-slot-icon]');
-    var badgesEl = appModal.querySelector('[data-slot-badges]');
+    var prereqEl = appModal.querySelector('[data-slot-prereq]');
     var actionsEl = appModal.querySelector('[data-slot-actions]');
     var bodyEl = appModal.querySelector('[data-slot-body]');
+    var innerEl = appModal.querySelector('.app-modal-inner');
     var opener = null;
 
     function slot(tpl, name) {
@@ -508,12 +506,14 @@ const devLinks = [
       titleEl.textContent = tpl.dataset.appName || slug;
       descEl.textContent = tpl.dataset.appDesc || '';
       iconEl.replaceChildren(logo(tpl));
-      fill(badgesEl, slot(tpl, 'badges'));
       fill(actionsEl, slot(tpl, 'actions'));
+      fill(prereqEl, slot(tpl, 'prereq'));
       fill(bodyEl, slot(tpl, 'body'));
-      actionsEl.hidden = !actionsEl.firstChild;
-      bodyEl.scrollTop = 0;
+      prereqEl.hidden = !prereqEl.firstChild;
       appModal.showModal();
+      // Scroll positions only take once the dialog is displayed: the body (desktop) and the whole sheet (phone).
+      bodyEl.scrollTop = 0;
+      innerEl.scrollTop = 0;
     }
 
     document.addEventListener('click', function (e) {
@@ -540,7 +540,7 @@ const devLinks = [
         titleEl.textContent = '';
         descEl.textContent = '';
         iconEl.replaceChildren();
-        badgesEl.replaceChildren();
+        prereqEl.replaceChildren();
         actionsEl.replaceChildren();
         bodyEl.replaceChildren();
       }, 200);
@@ -852,6 +852,7 @@ const devLinks = [
   :global(body:has(.app-modal[open])) { overflow: hidden; }
 
   .app-modal-inner {
+    position: relative;
     display: flex;
     flex-direction: column;
     min-height: 0;
@@ -860,10 +861,10 @@ const devLinks = [
   }
   .app-modal-header {
     display: grid;
-    grid-template-columns: auto 1fr auto;
+    grid-template-columns: auto minmax(0, 1fr) auto;
     gap: var(--space-4);
-    align-items: start;
-    padding: var(--space-5);
+    align-items: center;
+    padding: var(--space-4) calc(var(--space-4) + 44px + var(--space-2)) var(--space-4) var(--space-5);
     background: var(--surface);
     border-bottom: 1px solid var(--border);
     flex-shrink: 0;
@@ -895,7 +896,7 @@ const devLinks = [
     font-weight: 700;
     color: var(--text);
     line-height: 1.2;
-    margin: 0 0 var(--space-1);
+    margin: 0 0 2px;
   }
   .app-modal-desc {
     font-size: var(--text-sm);
@@ -903,19 +904,21 @@ const devLinks = [
     line-height: 1.4;
     margin: 0;
   }
-  .app-modal-badges { margin-top: var(--space-2); }
-  .app-modal-badges:empty { display: none; }
+  /* Close sits over the header's right edge; on phones the whole sheet scrolls and the button stays pinned. */
   .app-modal-close {
+    position: absolute;
+    top: var(--space-3);
+    right: var(--space-3);
+    z-index: 3;
     display: inline-flex;
     align-items: center;
     justify-content: center;
     width: 44px;
     height: 44px;
-    margin: calc(var(--space-2) * -1) calc(var(--space-2) * -1) 0 0;
-    background: transparent;
-    border: 1px solid transparent;
-    border-radius: var(--radius);
-    color: var(--text-muted);
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 50%;
+    color: var(--text-2);
     cursor: pointer;
     transition:
       color var(--duration-fast) var(--ease-out),
@@ -927,22 +930,9 @@ const devLinks = [
     outline-offset: 1px;
   }
 
-  /* Action band: prerequisite card above the Open button; always visible. */
-  .app-modal-actions {
-    display: flex;
-    flex-direction: column;
-    gap: var(--space-3);
-    padding: var(--space-4) var(--space-5);
-    border-bottom: 1px solid var(--border);
-    flex-shrink: 0;
-  }
-  .app-modal-actions[hidden] { display: none; }
-  .app-modal-actions :global(.app-modal-open) {
-    align-self: flex-start;
-    min-height: 44px;
-    display: inline-flex;
-    align-items: center;
-  }
+  .app-modal-actions[hidden],
+  .app-modal-prereq[hidden] { display: none; }
+  .app-modal-prereq { flex-shrink: 0; }
   .app-modal-body {
     padding: var(--space-5) var(--space-5) var(--space-6);
     overflow-y: auto;
@@ -970,10 +960,18 @@ const devLinks = [
       border-radius: 0;
     }
     .app-modal[open] { animation-name: app-modal-sheet; }
-    .app-modal-header { padding: var(--space-4); gap: var(--space-3); }
-    .app-modal-actions { padding: var(--space-3) var(--space-4); }
-    .app-modal-actions :global(.app-modal-open) { align-self: stretch; justify-content: center; }
-    .app-modal-body { padding: var(--space-4) var(--space-4) var(--space-6); }
+    /* One scroller: header, strip and guide all move together, so the chrome never eats the viewport. */
+    .app-modal-inner { overflow-y: auto; overscroll-behavior: contain; }
+    .app-modal-header {
+      grid-template-columns: auto minmax(0, 1fr);
+      gap: var(--space-3);
+      padding: var(--space-4) calc(var(--space-4) + 44px) var(--space-3) var(--space-4);
+      align-items: start;
+    }
+    .app-modal-header :global(.app-actions-row) { grid-column: 1 / -1; }
+    .app-modal-actions { grid-column: 1 / -1; }
+    .app-modal-body { overflow: visible; flex: none; padding: var(--space-4) var(--space-4) var(--space-6); }
+    .app-modal-close { position: sticky; top: var(--space-2); right: auto; flex-shrink: 0; align-self: flex-end; margin: var(--space-2) var(--space-2) -52px 0; }
     .app-modal :global(.app-modal-logo) { width: 3rem; height: 3rem; }
   }
   @keyframes app-modal-sheet {
@@ -987,6 +985,8 @@ const devLinks = [
 
   /* ── Mobile ── */
   @media (max-width: 640px) {
+    .tile-grid { gap: var(--space-2); }
+    .tile-group { padding: var(--space-3); margin-top: var(--space-4); }
     /* Passkey nudge: stack the message above the close button instead of
      * squeezing both onto one row. */
     .passkey-nudge {

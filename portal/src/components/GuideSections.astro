@@ -141,31 +141,33 @@ const empty = !guide.lead && guide.sections.length === 0;
   .guide-sec-first-time .guide-prose :global(li > p) { margin: 0; }
   .guide-sec-first-time .guide-prose :global(li > p + p) { margin-top: var(--space-2); }
 
-  /* Good to know: callout list */
+  /* Good to know: one list under a single rule, body type size. */
   .guide-sec-good-to-know .guide-prose :global(ul) {
     list-style: none;
-    padding: 0;
-    display: flex;
-    flex-direction: column;
-    gap: var(--space-2);
-  }
-  .guide-sec-good-to-know .guide-prose :global(ul > li) {
     margin: 0;
-    padding: var(--space-3) var(--space-4);
-    border-left: 3px solid var(--accent);
-    background: var(--accent-subtle);
-    border-radius: 0 var(--radius) var(--radius) 0;
+    padding: 0 0 0 var(--space-4);
+    border-left: 2px solid var(--accent);
+  }
+  .guide-sec-good-to-know .guide-prose :global(ul > li) { margin: 0; padding: 0; }
+  .guide-sec-good-to-know .guide-prose :global(ul > li + li) { margin-top: var(--space-3); }
+
+  /* Getting help: the same type step as the rest, set off by a rule above. */
+  .guide-sec-help {
+    padding-top: var(--space-4);
+    border-top: 1px solid var(--border);
   }
 
-  /* Getting help: quiet closing block */
-  .guide-sec-help .guide-prose {
+  /* Callout: a markdown blockquote */
+  .guide-prose :global(blockquote) {
+    margin: var(--space-4) 0;
     padding: var(--space-3) var(--space-4);
     border: 1px solid var(--border);
+    border-left: 4px solid var(--accent);
     border-radius: var(--radius);
-    background: var(--surface);
-    color: var(--text-2);
-    font-size: var(--text-sm);
+    background: var(--accent-subtle);
   }
+  .guide-prose :global(blockquote > :first-child) { margin-top: 0; }
+  .guide-prose :global(blockquote > :last-child) { margin-bottom: 0; }
 
   /* Explainer figures (inline SVG in a guide) */
   .guide :global(.cat-explainer) {

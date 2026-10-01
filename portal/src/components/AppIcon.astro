@@ -15,7 +15,7 @@ const { tile, size = 'md' } = Astro.props;
 <span class:list={['app-icon', `app-icon-${size}`]} aria-hidden="true">
   {
     tile.iconHref ? (
-      <img class="app-icon-img" src={tile.iconHref} alt="" loading="lazy" decoding="async" />
+      <img class="app-icon-img" src={tile.iconHref} alt="" decoding="async" />
     ) : (
       <span class="app-icon-mono mono">{tile.icon}</span>
     )

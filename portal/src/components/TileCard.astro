@@ -1,6 +1,6 @@
 ---
 // One dashboard tile. The whole card body is a link that launches the app; a separate Guide button opens the
-// documentation dialog (index.astro wires [data-app-learn]). Badges show this person's prerequisite state and top role.
+// documentation dialog (index.astro wires [data-app-learn]). Badges show this person's prerequisite state for this person.
 // The two controls are siblings, never nested.
 
 import AppIcon from './AppIcon.astro';
@@ -11,19 +11,18 @@ interface Props {
   tile: AppTile;
   readiness: TileReadiness;
   requirementTitles: string[];
-  admin: boolean;
 }
 
-const { tile, readiness, requirementTitles, admin } = Astro.props;
+const { tile, readiness, requirementTitles } = Astro.props;
 ---
 
 <article class="tile" data-slug={tile.slug}>
   <a class="tile-launch" href={safeHref(tile.url)}>
-    <span class="tile-top">
-      <AppIcon tile={tile} />
-      <AppBadges readiness={readiness} titles={requirementTitles} admin={admin} />
+    <AppIcon tile={tile} />
+    <span class="tile-title">
+      <span class="tile-name">{tile.name}</span>
+      <AppBadges readiness={readiness} titles={requirementTitles} />
     </span>
-    <span class="tile-name">{tile.name}</span>
     <span class="tile-desc">{tile.description}</span>
   </a>
   <div class="tile-foot">
@@ -35,10 +34,10 @@ const { tile, readiness, requirementTitles, admin } = Astro.props;
       aria-haspopup="dialog"
       aria-label={`Guide for ${tile.name}`}
     >
-      <svg class="tile-guide-icon" viewBox="0 0 16 16" width="14" height="14" aria-hidden="true" focusable="false">
+      <svg class="tile-guide-icon" viewBox="0 0 16 16" width="16" height="16" aria-hidden="true" focusable="false">
         <path d="M2.5 3h4.2c.8 0 1.3.4 1.3 1v8.5c0-.6-.5-1-1.3-1H2.5z M13.5 3H9.3c-.8 0-1.3.4-1.3 1v8.5c0-.6.5-1 1.3-1h4.2z" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"/>
       </svg>
-      Guide
+      <span class="tile-guide-label">Guide</span>
     </button>
   </div>
 </article>
@@ -49,6 +48,7 @@ const { tile, readiness, requirementTitles, admin } = Astro.props;
     display: flex;
     flex-direction: column;
     height: 100%;
+    padding: 0;
     background: var(--surface);
     border: 1px solid var(--border);
     border-radius: var(--radius);
@@ -79,15 +79,13 @@ const { tile, readiness, requirementTitles, admin } = Astro.props;
     outline-offset: -3px;
     border-radius: var(--radius);
   }
-  .tile-top {
+  .tile-title {
     display: flex;
-    align-items: flex-start;
-    justify-content: space-between;
-    gap: var(--space-2);
-    width: 100%;
-    margin-bottom: var(--space-2);
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--space-1) var(--space-2);
+    margin-top: var(--space-2);
   }
-  .tile-top :global(.app-badges) { justify-content: flex-end; }
   .tile-name {
     font-size: var(--text-base);
     font-weight: 600;
@@ -97,11 +95,6 @@ const { tile, readiness, requirementTitles, admin } = Astro.props;
     font-size: var(--text-sm);
     color: var(--text-2);
     line-height: 1.4;
-    display: -webkit-box;
-    -webkit-line-clamp: 2;
-    -webkit-box-orient: vertical;
-    overflow: hidden;
-    min-height: calc(1.4em * 2);
   }
   .tile-foot {
     display: flex;
@@ -149,22 +142,40 @@ const { tile, readiness, requirementTitles, admin } = Astro.props;
     outline: 2px solid var(--input-focus, var(--accent));
     outline-offset: 1px;
   }
-  /* Phone: one column; the logo sits beside the text so the description gets the full row. */
+  /* Phone: a compact row. Logo left, name + status + description beside it, a round icon-only Guide button pinned right.
+     The row is still one launch link; the button is its sibling, so nothing nests. */
   @media (max-width: 640px) {
+    .tile { height: auto; min-height: 5.5rem; }
     .tile-launch {
       display: grid;
       grid-template-columns: auto 1fr;
       column-gap: var(--space-3);
-      align-items: start;
-      padding: var(--space-3) var(--space-3) var(--space-2);
+      align-items: center;
+      padding: var(--space-3) calc(var(--space-3) + 44px + var(--space-1)) var(--space-3) var(--space-3);
+      min-height: 5.5rem;
     }
-    .tile-top { display: contents; }
-    .tile-top :global(.app-icon) { grid-column: 1; grid-row: 1 / span 3; }
-    .tile-name { grid-column: 2; grid-row: 1; }
-    .tile-desc { grid-column: 2; grid-row: 2; min-height: 0; -webkit-line-clamp: 3; }
-    .tile-top :global(.app-badges) { grid-column: 2; grid-row: 3; margin-top: var(--space-1); }
-    .tile-host { display: none; }
-    .tile-foot { justify-content: flex-end; padding-left: var(--space-3); }
+    .tile-launch :global(.app-icon) { grid-row: 1 / span 2; }
+    .tile-title { margin-top: 0; align-self: end; }
+    .tile-desc { align-self: start; }
+    .tile-foot {
+      position: absolute;
+      top: 0;
+      right: var(--space-1);
+      bottom: 0;
+      border: 0;
+      padding: 0;
+      min-height: 0;
+    }
+    .tile-host, .tile-guide-label { display: none; }
+    .tile-guide {
+      width: 44px;
+      min-height: 44px;
+      padding: 0;
+      justify-content: center;
+      border-color: var(--border);
+      border-radius: 50%;
+      background: var(--bg);
+    }
   }
   @media (prefers-reduced-motion: reduce) {
     .tile { transition: none; }

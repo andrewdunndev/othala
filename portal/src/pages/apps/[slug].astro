@@ -10,13 +10,13 @@ import Layout from '../../layouts/Layout.astro';
 import AppIcon from '../../components/AppIcon.astro';
 import AppBadges from '../../components/AppBadges.astro';
 import PrereqCard from '../../components/PrereqCard.astro';
+import AppActions from '../../components/AppActions.astro';
 import GuideSections from '../../components/GuideSections.astro';
 import {
   getTile,
   loadRequirements,
   requirementsFor,
   splitGuide,
-  holdsTopRole,
   tileReadiness,
   safeHref,
   userCanSeeTile,
@@ -71,7 +71,6 @@ const meta = identity?.metadata_admin;
 const requirements = requirementsFor(entry, loadRequirements());
 const readiness = tileReadiness(entry, meta?.prerequisites ?? []);
 const guide = splitGuide(entry.educationHtml);
-const topRole = holdsTopRole(entry, meta);
 ---
 <Layout title={entry.name} description={entry.description}>
   <article class="app-detail">
@@ -81,13 +80,17 @@ const topRole = holdsTopRole(entry, meta);
       <div class="app-header-text">
         <h1 class="app-title">{entry.name}</h1>
         <p class="app-lede">{entry.description}</p>
-        <AppBadges readiness={readiness} titles={requirements.map((r) => r.title)} admin={topRole} />
+        <AppBadges readiness={readiness} titles={requirements.map((r) => r.title)} />
       </div>
     </header>
 
     <div class="app-actions">
-      {requirements.map((r) => <PrereqCard requirement={r} ready={readiness === 'ready'} />)}
-      <a class="button button-primary app-open" href={safeHref(entry.url)} rel="noopener">Open {entry.name} ↗</a>
+      <AppActions name={entry.name} href={safeHref(entry.url)} requirements={requirements} ready={readiness === 'ready'} />
+      {requirements.length > 0 && (
+        <div class="app-prereqs">
+          {requirements.map((r) => <PrereqCard requirement={r} ready={readiness === 'ready'} />)}
+        </div>
+      )}
     </div>
 
     <section class="app-body" aria-label={`Guide for ${entry.name}`}>
@@ -133,15 +136,14 @@ const topRole = holdsTopRole(entry, meta);
     padding: var(--space-4) 0;
     border-bottom: 1px solid var(--border);
   }
-  .app-actions :global(.app-open) {
-    align-self: flex-start;
-    min-height: 44px;
-    display: inline-flex;
-    align-items: center;
+  .app-prereqs {
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    overflow: hidden;
   }
+  .app-prereqs :global(.prereq:last-child) { border-bottom: 0; }
   .app-body { padding: var(--space-5) 0; }
   @media (max-width: 640px) {
     .app-title { font-size: var(--text-2xl); }
-    .app-actions :global(.app-open) { align-self: stretch; justify-content: center; }
   }
 </style>

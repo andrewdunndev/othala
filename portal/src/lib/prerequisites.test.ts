@@ -11,7 +11,6 @@ import {
   parseRequirement,
   parseRequires,
   splitGuide,
-  holdsTopRole,
   tileReadiness,
   type AppTile,
 } from './tiles';
@@ -129,36 +128,6 @@ describe('per-person readiness', () => {
     expect(tileReadiness(tile(['tailscale']), [])).toBe('needs');
     expect(tileReadiness(tile(['tailscale']), ['tailscale'])).toBe('ready');
     expect(tileReadiness(tile(['tailscale', 'vpn']), ['tailscale'])).toBe('needs');
-  });
-});
-
-describe('holdsTopRole', () => {
-  const yaml = `oidc:
-  client_id: grafana
-  client_name: Grafana
-  redirect_uris: [https://g.example.test/cb]
-  audience: [https://g.example.test]
-presentation:
-  name: Grafana
-  access: [grafana-access]
-consent:
-  roles:
-    admin: { description: Admin, claim_emit: { r: [a] } }
-    viewer: { description: View, claim_emit: { r: [v] } }
-  group_role_map:
-    grafana-admin: admin
-    grafana-access: viewer
-`;
-  const t = { manifest: parseManifest(yaml, 'grafana.yaml'), requires: [] } as unknown as AppTile;
-  it('is true only when the resolved role is the first declared one', () => {
-    expect(holdsTopRole(t, { groups: ['grafana-access', 'grafana-admin'] })).toBe(true);
-    expect(holdsTopRole(t, { groups: ['grafana-access'] })).toBe(false);
-    expect(holdsTopRole(t, { groups: ['grafana-access'], roles: { grafana: 'admin' } })).toBe(true);
-  });
-  it('is false for an app with no manifest or a single role', () => {
-    expect(holdsTopRole({ requires: [] } as unknown as AppTile, {})).toBe(false);
-    const one = parseManifest(yaml.replace(/    viewer:.*\n/, ''), 'grafana.yaml');
-    expect(holdsTopRole({ manifest: one, requires: [] } as unknown as AppTile, { groups: ['grafana-admin'] })).toBe(false);
   });
 });
 

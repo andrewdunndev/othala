@@ -1,5 +1,5 @@
 ---
-// Status badges for a tile or a guide header: prerequisite state for this person and the top-role marker.
+// Status badge for a tile or a guide header: this person's prerequisite state.
 // `needs` names the requirement titles the person has not been marked ready for; `ready` means every requirement is set up.
 
 import type { TileReadiness } from '../lib/tiles';
@@ -8,16 +8,14 @@ interface Props {
   readiness: TileReadiness;
   /** Titles of the app's requirements, in declared order. */
   titles: string[];
-  /** The person's resolved role for this app is its top-ranked one. */
-  admin: boolean;
 }
 
-const { readiness, titles, admin } = Astro.props;
+const { readiness, titles } = Astro.props;
 const needsLabel = titles.length > 1 ? `Needs ${titles[0]} +${titles.length - 1}` : `Needs ${titles[0] ?? 'setup'}`;
 ---
 
 {
-  (readiness !== 'none' || admin) && (
+  readiness !== 'none' && (
     <span class="app-badges">
       {readiness === 'needs' && (
         <span class="app-badge app-badge-needs">
@@ -31,7 +29,6 @@ const needsLabel = titles.length > 1 ? `Needs ${titles[0]} +${titles.length - 1}
           Ready for you
         </span>
       )}
-      {admin && <span class="app-badge app-badge-admin">Admin</span>}
     </span>
   )
 }
@@ -72,8 +69,4 @@ const needsLabel = titles.length > 1 ? `Needs ${titles[0]} +${titles.length - 1}
     border-color: var(--success);
   }
   .app-badge-ready .app-badge-dot { background: var(--success); }
-  .app-badge-admin {
-    background: var(--accent-subtle);
-    border-color: var(--accent);
-  }
 </style>
