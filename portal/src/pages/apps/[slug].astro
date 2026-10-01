@@ -1,17 +1,32 @@
 ---
-// Per-app detail page: education content from the app's manifest (optional
-// sibling `<slug>.md`, read via getTile in lib/tiles.ts). Session-gated; outside
-// the app's access group redirects to /auth/error?reason=not-authorised, admins
-// see every app. SSR resolves the slug per request, so new manifests need no rebuild.
+// Per-app guide page: the same content as the dashboard dialog. The app's optional sibling `<slug>.md` is split into the
+// fixed guide outline (lib/tiles.ts), with a prerequisite card above Open when the manifest declares `requires`.
+// Session-gated; outside the app's access group redirects to /auth/error?reason=not-authorised, admins see every app.
+// SSR resolves the slug per request, so new manifests need no rebuild. In `astro dev`, `?dev-state=post-auth` skips Kratos.
 
 export const prerender = false;
 
 import Layout from '../../layouts/Layout.astro';
-import { getTile, safeHref, userCanSeeTile } from '../../lib/tiles';
+import AppIcon from '../../components/AppIcon.astro';
+import AppBadges from '../../components/AppBadges.astro';
+import PrereqCard from '../../components/PrereqCard.astro';
+import GuideSections from '../../components/GuideSections.astro';
+import {
+  getTile,
+  loadRequirements,
+  requirementsFor,
+  splitGuide,
+  holdsTopRole,
+  tileReadiness,
+  safeHref,
+  userCanSeeTile,
+} from '../../lib/tiles';
 import { getSession } from '../../lib/kratos';
 import { getIdentity } from '../../lib/admin-api';
 import { identityGroups } from '../../lib/gate';
 import { isAdminMarker } from '../../lib/admin-auth';
+import { devMockIdentity } from '../../lib/dev-mock';
+import type { Identity } from '../../lib/types';
 
 const { slug } = Astro.params;
 if (!slug) {
@@ -22,10 +37,21 @@ if (!slug) {
 // An unauthenticated visitor must not be able to distinguish a valid slug from
 // an invalid one (enumeration defence: the tile-existence 404 runs only after
 // we know the caller is authenticated).
-const cookie = Astro.request.headers.get('cookie') ?? undefined;
-const session = await getSession(cookie).catch(() => null);
-if (!session?.active || !session.identity) {
-  return Astro.redirect(`/auth/login?return_to=${encodeURIComponent(Astro.url.pathname)}`);
+const devIdentity = Astro.url.searchParams.get('dev-state') === 'post-auth' ? devMockIdentity(Astro.url) : null;
+let identity: Identity | null = devIdentity;
+if (!identity) {
+  const cookie = Astro.request.headers.get('cookie') ?? undefined;
+  const session = await getSession(cookie).catch(() => null);
+  if (!session?.active || !session.identity) {
+    return Astro.redirect(`/auth/login?return_to=${encodeURIComponent(Astro.url.pathname)}`);
+  }
+  // The public whoami does NOT expose metadata_admin, so groups, admin status and prerequisites come from a re-fetch
+  // of the FULL identity via the ADMIN API. FAIL-CLOSED: any lookup failure leaves no groups and not admin.
+  try {
+    identity = await getIdentity(session.identity.id);
+  } catch (lookupErr) {
+    console.error('[othala/apps] getIdentity failed; denying (no groups):', lookupErr);
+  }
 }
 
 const entry = getTile(slug);
@@ -33,136 +59,89 @@ if (!entry) {
   return new Response('App not found', { status: 404 });
 }
 
-// Admin authority is the metadata_admin.admin marker (admin-API-only-
-// writable boolean). Admins see every app's detail page; everyone else needs
-// membership in one of the tile's bound access groups (userCanSeeTile reads
-// the same accessGroups binding as the gate).
-// The public whoami does NOT expose metadata_admin, so both the user's groups
-// and admin status come from a re-fetch of the FULL identity via the ADMIN API.
-// FAIL-CLOSED: any lookup failure → empty groups and not admin → the access gate denies.
-let groups: string[] = [];
-let isAdmin = false;
-try {
-  const identity = await getIdentity(session.identity.id);
-  groups = identityGroups(identity);
-  isAdmin = isAdminMarker(identity);
-} catch (lookupErr) {
-  console.error('[othala/apps] getIdentity failed; denying (no groups):', lookupErr);
-}
-const hasAccess = isAdmin || userCanSeeTile(entry, groups);
-if (!hasAccess) {
+// Admin authority is the metadata_admin.admin marker (admin-API-only-writable boolean). Admins see every app's page;
+// everyone else needs membership in one of the tile's bound access groups (userCanSeeTile reads the gate's binding).
+const groups = identity ? identityGroups(identity) : [];
+const isAdmin = identity ? isAdminMarker(identity) : false;
+if (!(isAdmin || userCanSeeTile(entry, groups))) {
   return Astro.redirect('/auth/error?reason=not-authorised');
 }
+
+const meta = identity?.metadata_admin;
+const requirements = requirementsFor(entry, loadRequirements());
+const readiness = tileReadiness(entry, meta?.prerequisites ?? []);
+const guide = splitGuide(entry.educationHtml);
+const topRole = holdsTopRole(entry, meta);
 ---
 <Layout title={entry.name} description={entry.description}>
   <article class="app-detail">
+    <p class="app-back mono"><a href="/">← All apps</a></p>
     <header class="app-header">
-      <p class="app-eyebrow mono">{entry.icon} · {entry.authKind}</p>
-      <h1 class="app-title">{entry.name}</h1>
-      <p class="app-lede">{entry.description}</p>
-      <div class="app-cta">
-        <a class="button button-primary" href={safeHref(entry.url)} rel="noopener">Open {entry.name} ↗</a>
-        <a class="cta-link mono" href="/">Back to dashboard</a>
+      <AppIcon tile={entry} size="lg" />
+      <div class="app-header-text">
+        <h1 class="app-title">{entry.name}</h1>
+        <p class="app-lede">{entry.description}</p>
+        <AppBadges readiness={readiness} titles={requirements.map((r) => r.title)} admin={topRole} />
       </div>
     </header>
 
-    <section class="app-body">
-      <div class="edu-prose" set:html={entry.educationHtml ?? ''} />
+    <div class="app-actions">
+      {requirements.map((r) => <PrereqCard requirement={r} ready={readiness === 'ready'} />)}
+      <a class="button button-primary app-open" href={safeHref(entry.url)} rel="noopener">Open {entry.name} ↗</a>
+    </div>
+
+    <section class="app-body" aria-label={`Guide for ${entry.name}`}>
+      <GuideSections guide={guide} />
     </section>
   </article>
 </Layout>
 
 <style>
   .app-detail {
-    max-width: 1100px;
+    max-width: 46rem;
     margin: 0 auto;
+    padding-bottom: var(--space-7);
   }
+  .app-back { margin: var(--space-5) 0 0; font-size: var(--text-xs); }
   .app-header {
-    padding: var(--space-6) 0;
+    display: flex;
+    gap: var(--space-4);
+    align-items: flex-start;
+    padding: var(--space-5) 0;
     border-bottom: 1px solid var(--border);
   }
-  .app-eyebrow {
-    font-size: var(--text-xs);
-    text-transform: uppercase;
-    letter-spacing: 0.1em;
-    color: var(--text-muted);
-  }
+  .app-header-text { min-width: 0; }
   .app-title {
     font-family: var(--font-display);
     font-size: var(--text-3xl);
     font-weight: 800;
     letter-spacing: -0.02em;
     line-height: var(--lh-tight);
-    margin: var(--space-2) 0 var(--space-3);
+    margin: 0 0 var(--space-2);
   }
   .app-lede {
-    font-size: var(--text-lg);
-    color: var(--text-2);
-    line-height: 1.6;
-    max-width: 56ch;
-    margin-bottom: var(--space-4);
-  }
-  .app-cta {
-    display: flex;
-    gap: var(--space-3);
-    align-items: baseline;
-    flex-wrap: wrap;
-  }
-  .app-body {
-    padding: var(--space-6) 0;
     font-size: var(--text-base);
-    line-height: 1.6;
-    color: var(--text);
+    color: var(--text-2);
+    line-height: 1.5;
+    max-width: 56ch;
+    margin: 0 0 var(--space-3);
   }
-  .app-body :global(h2) {
-    font-family: var(--font-mono);
-    font-size: var(--text-xl);
-    font-weight: 600;
-    margin: var(--space-5) 0 var(--space-2);
+  .app-actions {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-3);
+    padding: var(--space-4) 0;
+    border-bottom: 1px solid var(--border);
   }
-  .app-body :global(h3) {
-    font-family: var(--font-mono);
-    font-size: var(--text-lg);
-    font-weight: 600;
-    margin: var(--space-4) 0 var(--space-2);
+  .app-actions :global(.app-open) {
+    align-self: flex-start;
+    min-height: 44px;
+    display: inline-flex;
+    align-items: center;
   }
-  .app-body :global(p) {
-    margin: var(--space-3) 0;
+  .app-body { padding: var(--space-5) 0; }
+  @media (max-width: 640px) {
+    .app-title { font-size: var(--text-2xl); }
+    .app-actions :global(.app-open) { align-self: stretch; justify-content: center; }
   }
-  .app-body :global(ul),
-  .app-body :global(ol) {
-    margin: var(--space-3) 0;
-    padding-left: var(--space-5);
-  }
-  .app-body :global(code) {
-    font-family: var(--font-mono);
-    font-size: var(--text-sm);
-    background: var(--surface);
-    padding: 0.1em 0.4em;
-    border-radius: 4px;
-  }
-  .app-body :global(pre) {
-    font-family: var(--font-mono);
-    font-size: var(--text-sm);
-    background: var(--surface);
-    border: 1px solid var(--border);
-    padding: var(--space-3);
-    border-radius: var(--radius);
-    overflow-x: auto;
-  }
-  .app-body :global(pre) :global(code) {
-    background: transparent;
-    padding: 0;
-  }
-  .app-body :global(a) {
-    color: var(--accent);
-    text-decoration: underline;
-  }
-  .cta-link {
-    font-size: var(--text-xs);
-    text-transform: uppercase;
-    letter-spacing: 0.08em;
-    color: var(--text-muted);
-  }
-  .cta-link:hover { color: var(--accent); text-decoration: none; }
 </style>

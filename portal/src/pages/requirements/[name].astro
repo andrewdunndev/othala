@@ -1,0 +1,100 @@
+---
+// Setup guide for one shared prerequisite (requirements/<name>.md in MANIFEST_DIR), linked from the prerequisite card on
+// a tile or app page. Any signed-in person may read it; it shows whether the admin has marked them set up. In `astro dev`,
+// `?dev-state=post-auth` skips Kratos and `?dev-prereqs=` sets the marks.
+
+export const prerender = false;
+
+import Layout from '../../layouts/Layout.astro';
+import GuideSections from '../../components/GuideSections.astro';
+import { loadRequirements, splitGuide, REQUIREMENT_NAME_RE } from '../../lib/tiles';
+import { getSession } from '../../lib/kratos';
+import { getIdentity } from '../../lib/admin-api';
+import { devMockIdentity } from '../../lib/dev-mock';
+import type { Identity } from '../../lib/types';
+
+const { name } = Astro.params;
+if (!name || !REQUIREMENT_NAME_RE.test(name)) {
+  return Astro.redirect('/');
+}
+
+// Session gate first, as on /apps/<slug>: an unauthenticated visitor cannot tell a real name from a missing one.
+const devIdentity = Astro.url.searchParams.get('dev-state') === 'post-auth' ? devMockIdentity(Astro.url) : null;
+let identity: Identity | null = devIdentity;
+if (!identity) {
+  const cookie = Astro.request.headers.get('cookie') ?? undefined;
+  const session = await getSession(cookie).catch(() => null);
+  if (!session?.active || !session.identity) {
+    return Astro.redirect(`/auth/login?return_to=${encodeURIComponent(Astro.url.pathname)}`);
+  }
+  try {
+    identity = await getIdentity(session.identity.id);
+  } catch (lookupErr) {
+    console.error('[othala/requirements] getIdentity failed; showing as not set up:', lookupErr);
+  }
+}
+
+const requirement = loadRequirements().get(name);
+if (!requirement) {
+  return new Response('Not found', { status: 404 });
+}
+
+const ready = (identity?.metadata_admin?.prerequisites ?? []).includes(name);
+const guide = splitGuide(requirement.html);
+---
+<Layout title={`Set up ${requirement.title}`} description={requirement.why}>
+  <article class="req-detail">
+    <p class="req-back mono"><a href="/">← All apps</a></p>
+    <header class="req-header">
+      <p class="req-eyebrow mono">Setup guide</p>
+      <h1 class="req-title">{requirement.title}</h1>
+      {requirement.why && <p class="req-lede">{requirement.why}</p>}
+      <p class:list={['req-state', ready ? 'req-state-ready' : 'req-state-needs']}>
+        <span class="req-state-dot" aria-hidden="true"></span>
+        {ready ? 'The household admin has marked you set up.' : 'Not marked as set up for you yet. Follow the steps, then tell the household admin.'}
+      </p>
+    </header>
+    <section class="req-body" aria-label={`${requirement.title} setup guide`}>
+      <GuideSections guide={guide} emptyNote="No setup steps have been written yet. Ask the household admin." />
+    </section>
+  </article>
+</Layout>
+
+<style>
+  .req-detail { max-width: 46rem; margin: 0 auto; padding-bottom: var(--space-7); }
+  .req-back { margin: var(--space-5) 0 0; font-size: var(--text-xs); }
+  .req-header { padding: var(--space-5) 0; border-bottom: 1px solid var(--border); }
+  .req-eyebrow {
+    margin: 0;
+    font-size: var(--text-xs);
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    color: var(--text-muted);
+  }
+  .req-title {
+    font-family: var(--font-display);
+    font-size: var(--text-3xl);
+    font-weight: 800;
+    letter-spacing: -0.02em;
+    line-height: var(--lh-tight);
+    margin: var(--space-2) 0 var(--space-3);
+  }
+  .req-lede { font-size: var(--text-base); color: var(--text-2); max-width: 56ch; margin: 0 0 var(--space-3); }
+  .req-state {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--space-2);
+    margin: 0;
+    padding: var(--space-2) var(--space-3);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    font-size: var(--text-sm);
+  }
+  .req-state-dot { width: 0.5rem; height: 0.5rem; border-radius: 50%; flex-shrink: 0; }
+  .req-state-needs { background: var(--warning-subtle); border-color: var(--warning); }
+  .req-state-needs .req-state-dot { background: var(--warning); }
+  .req-state-ready { background: var(--success-subtle); border-color: var(--success); }
+  .req-state-ready .req-state-dot { background: var(--success); }
+  .req-body { padding: var(--space-5) 0; }
+  @media (max-width: 640px) { .req-title { font-size: var(--text-2xl); } }
+</style>

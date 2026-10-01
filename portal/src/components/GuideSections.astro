@@ -168,6 +168,22 @@ const empty = !guide.lead && guide.sections.length === 0;
   }
 
   /* Explainer figures (inline SVG in a guide) */
-  .guide :global(.cat-explainer) { margin: var(--space-4) 0; }
-  .guide :global(.cat-explainer svg) { margin: 0 auto; }
+  .guide :global(.cat-explainer) {
+    width: fit-content;
+    max-width: 100%;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: var(--space-2);
+    margin: var(--space-4) 0;
+    clear: both;
+  }
+  .guide :global(.cat-explainer svg) { display: block; width: 660px; max-width: 100%; height: auto; margin: 0; }
+  .guide :global(.cat-explainer p) {
+    margin: var(--space-3) 0 0;
+    padding: 0 var(--space-2) var(--space-1);
+    font-size: var(--text-sm);
+    color: var(--text-2);
+    max-width: 70ch;
+  }
 </style>
