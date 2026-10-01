@@ -12,6 +12,6 @@ describe('describeScopeList', () => {
   });
 
   it('names the app for the groups scope', () => {
-    expect(describeScopeList(['groups'], 'Jellyfin')[0].description).toBe('Your access level in Jellyfin');
+    expect(describeScopeList(['groups'], 'Statuspage')[0].description).toBe('Your access level in Statuspage');
   });
 });
