@@ -186,11 +186,6 @@ export function attentionItems(rows: readonly PersonRow[]): Attention[] {
   return items;
 }
 
-/** Plain access-level label for a person's level on an app, e.g. for the app page's "Who can use it" chips. */
-export function levelLabel(m: ClientManifest, level: string): string {
-  return levelsFor(m).find((l) => l.value === level)?.label ?? level;
-}
-
 /** The household groups a person page offers, with a plain label. */
 export function householdChoices(): { value: string; label: string }[] {
   return HOUSEHOLD_GROUPS.map((g) => ({ value: g, label: g === 'everyone' ? 'Everyone in the household' : g }));

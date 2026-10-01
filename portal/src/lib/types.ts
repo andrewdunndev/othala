@@ -171,10 +171,6 @@ export interface LoginFlow extends BaseFlow {
   oauth2_login_challenge?: string;
 }
 
-export interface RegistrationFlow extends BaseFlow {
-  oauth2_login_challenge?: string;
-}
-
 export interface SettingsFlow extends BaseFlow {
   identity: Identity;
   state: 'show_form' | 'success';
