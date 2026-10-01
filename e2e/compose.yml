@@ -24,6 +24,7 @@ services:
       - SETGID
     # NEEDS-VALIDATION: read_only omitted; the entrypoint may write outside PGDATA.
     pids_limit: 512
+    mem_limit: 1g
     environment:
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
@@ -49,6 +50,7 @@ services:
       - ALL
     # NEEDS-VALIDATION: read_only + tmpfs [/tmp] once the /data path is confirmed.
     pids_limit: 256
+    mem_limit: 256m
     environment:
       MP_SMTP_AUTH_ACCEPT_ANY: "1"
       MP_SMTP_AUTH_ALLOW_INSECURE: "1"
@@ -85,6 +87,7 @@ services:
       - /tmp
     # Writes only to /tmp at runtime; config is mounted read-only.
     pids_limit: 512
+    mem_limit: 512m
     depends_on:
       postgres:
         condition: service_healthy
@@ -127,6 +130,7 @@ services:
       - /tmp
     # Writes only to /tmp at runtime; config is mounted read-only.
     pids_limit: 512
+    mem_limit: 512m
     depends_on:
       hydra-migrate:
         condition: service_completed_successfully
@@ -163,6 +167,7 @@ services:
       - /tmp
     # NEEDS-VALIDATION: confirm the SSR adapter writes nothing outside /tmp at startup.
     pids_limit: 512
+    mem_limit: 512m
     depends_on:
       kratos:
         condition: service_healthy
@@ -236,6 +241,7 @@ services:
       - /config
       - /tmp
     pids_limit: 256
+    mem_limit: 256m
     depends_on:
       othala:
         condition: service_healthy

@@ -101,8 +101,9 @@ drop is load-bearing, and the file carries the scar proving it: without
 `CAP_DAC_OVERRIDE` a 0600 config owned by one uid is unreadable by the image's
 own user and every Ory service exits.
 
-Not built: **no memory bound anywhere**, so the hash-exhaustion lever above is
-unbounded at the container layer too; **the CI gate scans lockfiles, not the
+Every long-running service carries a `mem_limit` (Kratos 512m, sized for several
+concurrent argon2 hashes), so hash exhaustion is bounded at the container layer.
+Not built: **the CI gate scans lockfiles, not the
 shipped image**, so a known CVE in a base image fails nothing; and
 **nothing verifies a signature before use** — a property of whatever runs the
 image, not of this repository.
