@@ -26,10 +26,10 @@ Delete each from the deploy environment.
 - `OTHALA_SMTP_FROM_ADDRESS`: mail comes from `noreply@<OTHALA_APEX>`.
 - `OTHALA_SITE_NAME`: `OTHALA_INSTANCE_NAME` is the brand name, now required.
 - `OTHALA_ADMIN_CONTACT`: the dashboard says "your administrator".
-- `OTHALA_DEFAULT_GROUP` and `OTHALA_IDENTITY_GROUPS`: fixed at `admin` and `everyone`.
+- `OTHALA_DEFAULT_GROUP`, `OTHALA_IDENTITY_GROUPS`: fixed at `admin` and `everyone`.
 - `OTHALA_ADMIN_FRESHNESS_HOURS`: step-up is 1h.
 - `OTHALA_HIBP_ENABLED`, `OTHALA_PASSWORD_MIN_LENGTH`: breach check on, minimum 12.
-- `OTHALA_CORS_ALLOWED_ORIGINS`: Hydra CORS allows `OTHALA_PUBLIC_URL`.
+- `OTHALA_CORS_ALLOWED_ORIGINS`: Hydra allows `OTHALA_PUBLIC_URL`.
 - `OTHALA_PUBLIC_HOST`: the Caddyfile uses `OTHALA_PUBLIC_URL`.
 - `OTHALA_OTLP_PROVIDER`, `OTHALA_OTLP_ENVIRONMENT`, `OTEL_*`, `OTLP_INGEST_TOKEN`: use `OTHALA_OTLP_ENDPOINT`.
 - `KRATOS_PUBLIC_URL`, `HYDRA_PUBLIC_URL`, `KRATOS_ADMIN_URL`, `HYDRA_ADMIN_URL`, `KRATOS_ADMIN_TOKEN` and `HYDRA_ADMIN_TOKEN`: fixed at `kratos:4433`, `kratos:4434`, `hydra:4445`, no bearer.
