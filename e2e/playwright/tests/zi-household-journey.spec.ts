@@ -66,7 +66,7 @@ test('ZI1 — admin adds a person; they redeem, enrol a passkey and TOTP, and si
   const ctx = page.context();
   await page.goto(link, { waitUntil: 'networkidle' });
   await page.locator('input[name="code"]').fill(code);
-  await page.getByRole('button', { name: /Verify code/ }).click();
+  await page.locator('form:has(input[name="code"]) button[type="submit"]').click();
   await page.waitForURL((u) => !u.pathname.startsWith('/auth/recovery'), { timeout: 15_000 });
 
   // (c) A passkey, then an authenticator app whose secret is read from the settings page.
