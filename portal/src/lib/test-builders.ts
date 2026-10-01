@@ -130,6 +130,18 @@ export function withLookupSecret(i: Identity): Identity {
   return withCredential(i, 'lookup_secret', { recovery_codes: [{ code: 'aaaa-bbbb' }, { code: 'cccc-dddd' }] }, [i.id]);
 }
 
+const CREDENTIAL_ADDERS: Record<string, (i: Identity) => Identity> = {
+  password: (i) => i,
+  totp: withTotp,
+  webauthn: (i) => withWebauthnKey(i),
+  passkey: withPasskey,
+  lookup_secret: withLookupSecret,
+};
+
+export function withCredentials(i: Identity, ...types: string[]): Identity {
+  return types.reduce((acc, t) => CREDENTIAL_ADDERS[t](acc), i);
+}
+
 export function asAdmin(i: Identity): Identity {
   return { ...i, metadata_admin: { ...i.metadata_admin, admin: true } };
 }
