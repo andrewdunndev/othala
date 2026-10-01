@@ -18,6 +18,7 @@
 
 .focus-links { display: flex; flex-wrap: wrap; gap: var(--space-1) var(--space-4); margin-top: var(--space-4); font-size: var(--text-sm); }
 .focus-links a { color: var(--text-2); display: inline-flex; align-items: center; min-height: 44px; }
+.focus-aside { display: inline-flex; align-items: center; min-height: 44px; color: var(--text-muted); }
 .focus-links a:hover { color: var(--accent); }
 
 /* A one-time code: large, numeric, spaced so six digits read at a glance. */
@@ -46,6 +47,7 @@
 .consent-app { display: flex; align-items: center; gap: var(--space-3); }
 .consent-app-name { margin: 0; font-size: var(--text-lg); font-weight: 600; color: var(--text); }
 .consent-app-desc { margin: 0; font-size: var(--text-sm); color: var(--text-muted); }
+.consent-label { margin: 0 0 var(--space-2); font-size: var(--text-sm); font-weight: 600; color: var(--text); }
 .consent-list { list-style: none; margin: 0; padding: 0; border-top: 1px solid var(--border); }
 .consent-list li { padding: var(--space-3) 0; border-bottom: 1px solid var(--border); font-size: var(--text-base); }
 .consent-actions { display: flex; flex-direction: column; gap: var(--space-2); }

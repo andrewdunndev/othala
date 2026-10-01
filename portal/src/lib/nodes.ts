@@ -160,6 +160,11 @@ export interface NodeSpec {
   /** A secondary submit (resend) must not be blocked by an empty required field. */
   formnovalidate?: boolean;
   hint?: string;
+  /** Length and shape of a one-time code, so a stray character or a long paste is caught before the round trip. */
+  maxlength?: number;
+  pattern?: string;
+  /** Start empty after a refused value, so the next try is typed over nothing. */
+  clearOnError?: boolean;
 }
 export type NodeSpecs = Record<string, NodeSpec>;
 

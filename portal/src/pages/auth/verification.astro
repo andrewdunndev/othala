@@ -50,24 +50,31 @@ const codeNodes = (ui?.nodes ?? []).map((n) => {
 });
 // Kratos verification flow states: choose_method, sent_email, passed_challenge.
 // Map to the two UI shapes recovery uses.
-const phase: 'request' | 'sent' = flow?.state === 'sent_email' ? 'sent' : 'request';
+const phase: 'request' | 'sent' | 'done' = flow?.state === 'passed_challenge' ? 'done' : flow?.state === 'sent_email' ? 'sent' : 'request';
 ---
 <FocusPage
-  title={phase === 'request' ? 'Verify your email' : 'Enter your code'}
-  lede={phase === 'request'
+  title={phase === 'done' ? 'Email verified' : phase === 'request' ? 'Verify your email' : 'Enter your code'}
+  lede={phase === 'done'
+    ? 'Thanks. You can use this address to get back in if you ever lose a device.'
+    : phase === 'request'
     ? 'Enter the address you want verified and we will email you a one-time code.'
     : 'We emailed you a code. Enter it to confirm this address.'}
   description="Verify your email address."
 >
 
-  {(ui?.messages ?? []).filter((m: FlowMessage) => !(phase === 'sent' && m.type === 'info')).map((m: FlowMessage) => (
+  {(ui?.messages ?? []).filter((m: FlowMessage) => !(phase !== 'request' && m.type !== 'error')).map((m: FlowMessage) => (
     <div class={noticeClass(m.type)}>{journeyText(m)}</div>
   ))}
 
   {!flow && isDev && (
-    <div class="notice notice-warning">Dev preview: no flow. Add <code>?dev-state=request|code</code>.</div>
+    <div class="notice notice-warning">Dev preview: no flow. Add <code>?dev-state=request|code|code-wrong|done</code>.</div>
   )}
 
+  {phase === 'done' ? (
+    <div class="status-actions">
+      <a href="/auth/settings" class="button button-primary" data-astro-reload>Continue</a>
+    </div>
+  ) : (
   <section class="panel focus-card">
     {hasCode && ui && (
       <form method="POST" action={ui.action} class="focus-form verify-form">
@@ -86,9 +93,12 @@ const phase: 'request' | 'sent' = flow?.state === 'sent_email' ? 'sent' : 'reque
     )}
     {phase === 'sent' && <p class="focus-next">Once it checks out you'll go straight back to where you were.</p>}
   </section>
+  )}
 
-  <nav class="focus-links" aria-label="Other options">
-    <a href="/">Back home</a>
-  </nav>
+  {phase !== 'done' && (
+    <nav class="focus-links" aria-label="Other options">
+      <a href="/">Back home</a>
+    </nav>
+  )}
 
 </FocusPage>

@@ -33,3 +33,11 @@ describe('settings flash', () => {
     expect(Object.keys(RENAME_ERRORS).sort()).toEqual(['busy', 'csrf', 'name', 'unknown']);
   });
 });
+
+describe('recovery landing message', () => {
+  it("says the setup code worked and names the passkey step, not Kratos's raw text", () => {
+    const t = messageText({ id: 1060001, text: 'You successfully recovered your account. ... (e.g. social sign in) within the next 15.00 minutes.' });
+    expect(t).toMatch(/passkey/i);
+    expect(t).not.toMatch(/social|15\.00/);
+  });
+});

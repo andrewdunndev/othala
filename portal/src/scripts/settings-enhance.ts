@@ -12,7 +12,7 @@ const KEY = 'othala:settings-edit';
 const cardOf = (el: EventTarget | null) => (el instanceof Element ? el.closest<HTMLElement>('[data-card]') : null);
 const remember = (el: EventTarget | null, action: string) => {
   // Backup-code results belong to Recovery, wherever the button that asked for them sits.
-  const card = action.startsWith('lookup_secret') ? 'recovery' : cardOf(el)?.id;
+  const card = action.startsWith('lookup_secret') ? 'recovery' : (cardOf(el)?.id ?? 'sign-in');
   if (!card) return;
   try { sessionStorage.setItem(KEY, JSON.stringify({ card, action })); } catch { /* storage unavailable */ }
 };

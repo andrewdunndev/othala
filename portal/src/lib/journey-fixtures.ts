@@ -31,7 +31,7 @@ function base(path: string, nodes: FlowNode[], messages: FlowMessage[] = []) {
 }
 
 export const DEV_RECOVERY_STATES = ['request', 'code', 'code-prefilled', 'code-wrong'] as const;
-export const DEV_VERIFICATION_STATES = ['request', 'code'] as const;
+export const DEV_VERIFICATION_STATES = ['request', 'code', 'code-wrong', 'done'] as const;
 export const DEV_LOGIN_STATES = ['code', 'aal2', 'wrong-password'] as const;
 export const DEV_CONSENT_STATES = ['consent', 'consent-unknown-app', 'consent-error'] as const;
 
@@ -72,10 +72,19 @@ export function devVerification(state: (typeof DEV_VERIFICATION_STATES)[number])
       active: 'code',
     };
   }
+  if (state === 'done') {
+    return {
+      ...base('/auth/verification', [csrf], [{ id: 1080002, text: 'You successfully verified your email address.', type: 'success' }]),
+      state: 'passed_challenge',
+      active: 'code',
+    };
+  }
+  const wrong = state === 'code-wrong';
   return {
     ...base('/auth/verification', [
       csrf,
-      node('code', 'code', 'text', { required: true }, 'Verification code'),
+      node('code', 'code', 'text', { required: true, ...(wrong ? { value: '000000' } : {}) }, 'Verification code',
+        wrong ? [error('The verification code is invalid or has already been used. Please try again.', 4070006)] : []),
       node('code', 'method', 'submit', { value: 'code' }, 'Continue'),
       node('code', 'email', 'submit', { value: 'dev@example.test' }, 'Resend code'),
     ]),

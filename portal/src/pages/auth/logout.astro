@@ -195,6 +195,7 @@ const csrfToken = identityId ? signLogoutToken(identityId) : '';
 const retry = isPost;
 ---
 <FocusPage
+  viewer={null}
   title="Sign out?"
   description="Sign out of this device."
   lede={retry

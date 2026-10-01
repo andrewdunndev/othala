@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { journeyText, noticeClass, recoverySpecs, verificationSpecs } from './journey';
+import { journeyText, noticeClass, passwordRefused, recoverySpecs, verificationSpecs } from './journey';
 import { nodeLabel, specKey } from './nodes';
 import { REASON_MAP, DEFAULT_ENTRY } from './error-reasons';
 
@@ -46,5 +46,21 @@ describe('error reasons', () => {
       expect(e.message).toMatch(/\b(try|sign in|contact|ask|go|use)\b/i);
       expect(e.message).not.toMatch(/dependency|resource|substrate|Kratos|OAuth/i);
     }
+  });
+});
+
+describe('code inputs', () => {
+  it('cap a code at six digits and start empty after a refused one', () => {
+    for (const s of [recoverySpecs('sent'), verificationSpecs('sent')]) {
+      expect(s.code).toMatchObject({ maxlength: 6, pattern: '[0-9]{6}', clearOnError: true });
+    }
+  });
+});
+
+describe('passwordRefused', () => {
+  it('is true only for the refused-credentials message', () => {
+    expect(passwordRefused([4000006])).toBe(true);
+    expect(passwordRefused([4010008, 1])).toBe(false);
+    expect(passwordRefused([])).toBe(false);
   });
 });

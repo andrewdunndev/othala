@@ -25,6 +25,7 @@ export const flashKey = (name: string, value: string): string => (name === 'meth
 /** Kratos messages worth saying in the house voice, by message id. Anything else passes through. */
 const MESSAGES: Record<number, string> = {
   1050001: 'Saved.',
+  1060001: "You're signed in with your setup code. Add a passkey now so signing in takes one tap.",
   4000008: "That code didn't work. Codes change every 30 seconds, so try the one showing now.",
 };
 export const messageText = (m: { id: number; text: string }): string => MESSAGES[m.id] ?? m.text;

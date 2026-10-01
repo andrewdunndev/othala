@@ -17,13 +17,20 @@ const MESSAGES: Record<number, string> = {
   4070005: 'This verification page timed out. Start again below.',
 };
 
+/** A password attempt that was refused: the login page opens the password form again so the person can retry in place. */
+export const PASSWORD_REFUSED = 4000006;
+export const passwordRefused = (ids: number[]): boolean => ids.includes(PASSWORD_REFUSED);
+
 export const journeyText = (m: Pick<FlowMessage, 'id' | 'text'>): string => MESSAGES[m.id] ?? m.text;
 
 export const noticeClass = (type: FlowMessage['type']): string =>
   `notice notice-${type === 'error' ? 'danger' : type === 'success' ? 'success' : 'warning'}`;
 
+/** The six digits Kratos and authenticator apps issue. */
+export const CODE_SHAPE = { maxlength: 6, pattern: '[0-9]{6}' } as const;
+
 /** A one-time code input: large, numeric, offered to the phone's code autofill. */
-const CODE_INPUT = { inputmode: 'numeric', autocomplete: 'one-time-code', autofocus: true, class: 'code-input', placeholder: '123456' } as const;
+const CODE_INPUT = { inputmode: 'numeric', autocomplete: 'one-time-code', autofocus: true, class: 'code-input', placeholder: '123456', ...CODE_SHAPE, clearOnError: true } as const;
 const EMAIL_INPUT = { inputmode: 'email', autocomplete: 'email', placeholder: 'you@example.com', label: 'Email address' } as const;
 
 /** Recovery (setup link or emailed code) wording by flow phase, keyed as FlowNodes expects. */

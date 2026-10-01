@@ -92,6 +92,7 @@ const labelText = (node: FlowNode, fallback: string): string => {
     // then apply the page's render policy (which optional attrs to surface).
     const props = inputProps(a);
     const spec = specs[specKey(a)];
+    const refused = node.messages?.some((m: FlowMessage) => m.type === 'error') ?? false;
     const id = a.name.replace(/[^a-zA-Z0-9]+/g, '-');
     const autocomplete = spec?.autocomplete ?? (props.autocomplete as string | undefined) ?? defaultAutocomplete;
     return (
@@ -101,13 +102,15 @@ const labelText = (node: FlowNode, fallback: string): string => {
           id={id}
           name={a.name}
           type={a.type}
-          value={passValue ? ('value' in props ? String(props.value) : '') : undefined}
+          value={passValue ? (refused && spec?.clearOnError ? '' : 'value' in props ? String(props.value) : '') : undefined}
           required={passRequired ? (props.required as boolean | undefined) : undefined}
           disabled={passDisabled ? (props.disabled as boolean | undefined) : undefined}
           autocomplete={autocomplete}
           inputmode={spec?.inputmode}
           placeholder={spec?.placeholder}
           autofocus={spec?.autofocus}
+          maxlength={spec?.maxlength}
+          pattern={spec?.pattern}
           class={spec?.class}
         />
         {spec?.hint && <div class="field-hint">{spec.hint}</div>}

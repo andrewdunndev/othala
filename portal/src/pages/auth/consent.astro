@@ -13,6 +13,8 @@ import { getSession } from '../../lib/kratos';
 import { signToken } from '../../lib/csrf';
 import { defaultOAuth2Api } from '../../lib/oauth2-handlers';
 import { loadTiles } from '../../lib/tiles';
+import { devViewer } from '../../lib/viewer';
+import { monogram } from '../../lib/monogram';
 import { DEV_CONSENT_STATES, devConsent, isIn } from '../../lib/journey-fixtures';
 
 const challenge = Astro.url.searchParams.get('consent_challenge');
@@ -65,26 +67,25 @@ const failed = fetchError || ownershipError;
 // The app as the household knows it: logo, name and one-line description from its manifest, else a monogram.
 const tile = !failed ? loadTiles().find((t) => t.slug === clientId) : undefined;
 const appName = tile?.name ?? (clientName || 'This app');
-const plate = tile ?? { iconHref: undefined, icon: appName.slice(0, 2).toUpperCase(), iconBleed: false };
+const failMessage = !challenge && !dev
+  ? 'This page opens from an app that wants to sign you in. Open the app and choose sign in, and it will bring you here.'
+  : ownershipError
+  ? 'This request belongs to someone else, or has timed out. Go back to the app and start sign-in again.'
+  : 'This request has timed out or was already answered. Go back to the app and start sign-in again.';
+const plate = tile ?? { iconHref: undefined, icon: monogram(appName), iconBleed: false };
 ---
 <FocusPage
+  viewer={dev ? devViewer(true, 'member') : undefined}
   title={failed ? "That request can't be used" : `Let ${appName} use your account?`}
-  lede={failed ? undefined : 'You are signed in. This app is asking before it can sign you in.'}
+  lede={failed ? failMessage : 'You are signed in. This app is asking before it can sign you in.'}
   tabTitle="Allow access"
   description="Allow or deny an app's request to use your account."
 >
 
   {failed ? (
-    <section class="panel focus-card">
-      <p class="focus-note">
-        {!challenge && !dev
-          ? 'This page opens from an app that wants to sign you in. Open the app and choose sign in, and it will bring you here.'
-          : ownershipError
-          ? 'This request belongs to someone else, or has timed out. Go back to the app and start sign-in again.'
-          : 'This request has timed out or was already answered. Go back to the app and start sign-in again.'}
-      </p>
-      <a href="/" class="button button-primary focus-btn" data-astro-reload>Go home</a>
-    </section>
+    <div class="status-actions">
+      <a href="/" class="button button-primary" data-astro-reload>Go home</a>
+    </div>
   ) : (
     <section class="panel focus-card">
       <div class="consent-app">
@@ -97,7 +98,7 @@ const plate = tile ?? { iconHref: undefined, icon: appName.slice(0, 2).toUpperCa
 
       {scopeDescriptions.length > 0 && (
         <div>
-          <p class="focus-note"><strong>{appName} will see</strong></p>
+          <p class="consent-label">{appName} will see</p>
           <ul class="consent-list">
             {scopeDescriptions.map(({ description }) => <li>{description}</li>)}
           </ul>

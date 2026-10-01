@@ -20,6 +20,7 @@ export const DEV_SETTINGS_STATES = [
   'codes-new',
   'replaced',
   'enrolled-admin',
+  'welcome',
 ] as const;
 export type DevSettingsState = (typeof DEV_SETTINGS_STATES)[number];
 
@@ -176,7 +177,7 @@ interface Spec {
   next: DevSettingsState;
 }
 
-function build(spec: Spec, state: DevSettingsState, extra: { success?: boolean; verified?: boolean; reauth?: boolean; names?: PasskeyNames; setupOpen?: boolean; admin?: boolean; flash?: string; renameError?: DevSettings['renameError'] } = {}): DevSettings {
+function build(spec: Spec, state: DevSettingsState, extra: { recovered?: boolean; success?: boolean; verified?: boolean; reauth?: boolean; names?: PasskeyNames; setupOpen?: boolean; admin?: boolean; flash?: string; renameError?: DevSettings['renameError'] } = {}): DevSettings {
   const nodes: FlowNode[] = [
     csrf,
     ...profileNodes(),
@@ -188,7 +189,9 @@ function build(spec: Spec, state: DevSettingsState, extra: { success?: boolean; 
     ...spec.keys.map(([id, name, at]) => removeNode('webauthn', id, name, at)),
     ...webauthnTail(),
   ];
-  const messages: FlowMessage[] = extra.success ? [{ id: 1050001, text: 'Your changes have been saved!', type: 'success' }] : [];
+  const messages: FlowMessage[] = extra.recovered
+    ? [{ id: 1060001, text: 'You successfully recovered your account. Please change your password or set up an alternative login method (e.g. social sign in) within the next 15.00 minutes.', type: 'success' }]
+    : extra.success ? [{ id: 1050001, text: 'Your changes have been saved!', type: 'success' }] : [];
   const flow: SettingsFlow = {
     id: `dev-flow-${state}`,
     type: 'browser',
@@ -222,6 +225,8 @@ export function devSettings(state: DevSettingsState): DevSettings {
   switch (state) {
     case 'fresh':
       return build({ passkeys: [], keys: [], totp: 'qr', lookup: false, next: 'fresh' }, state);
+    case 'welcome':
+      return build({ passkeys: [], keys: [], totp: 'qr', lookup: false, next: 'welcome' }, state, { recovered: true });
     case 'enrolled':
       return build({ passkeys: [PK_A, PK_B, PK_C], keys: [KEY], totp: 'enrolled', lookup: true, next: 'enrolled' }, state, {
         names: { [PASSKEY_B]: 'Pixel phone' },

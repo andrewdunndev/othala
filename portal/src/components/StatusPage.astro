@@ -1,8 +1,11 @@
 ---
 // Friendly error and not-found page, the single source for error rendering: what happened in a sentence, what to do
-// next, and a way home. Never raw errors or stack traces. `status` appears as a small quiet code for support.
+// next, and a way home. Never raw errors or stack traces. `status` appears as a small quiet code for support. Actions
+// follow lib/status-actions.ts: Try again for a hiccup, Sign in only for someone signed out.
 
 import FocusPage from './FocusPage.astro';
+import { currentViewer } from '../lib/viewer';
+import { statusActions } from '../lib/status-actions';
 
 interface Props {
   /** HTTP status code, shown small as a reference for whoever helps. */
@@ -12,16 +15,19 @@ interface Props {
   message: string;
   /** Machine token for the response; kept as a data attribute for tests, not shown. */
   reason?: string;
-  /** Offer sign-in beside Home. */
-  signIn?: boolean;
+  /** Where Try again leads; default is this same address (right for 404 and 500, which keep the failed URL). */
+  retryHref?: string;
 }
 
-const { status, title, message, reason, signIn = true } = Astro.props;
+const { status, title, message, reason, retryHref } = Astro.props;
+const viewer = await currentViewer(Astro.request, Astro.url);
+const actions = statusActions(status, viewer !== null, retryHref ?? Astro.url.pathname + Astro.url.search);
 ---
-<FocusPage title={title} lede={message} tabTitle={`${status} ${title}`}>
+<FocusPage title={title} lede={message} tabTitle={`${status} ${title}`} viewer={viewer}>
   <div class="status-actions" data-reason={reason}>
-    <a href="/" class:list={['button', status === 401 ? 'button-secondary' : 'button-primary']} data-astro-reload>Go home</a>
-    {signIn && <a href="/auth/login" class:list={['button', status === 401 ? 'button-primary' : 'button-secondary']} data-astro-reload>Sign in</a>}
+    {actions.map((a) => (
+      <a href={a.href} class:list={['button', a.primary ? 'button-primary' : 'button-secondary']} data-astro-reload>{a.label}</a>
+    ))}
   </div>
   <p class="status-code">Error {status}</p>
 </FocusPage>
