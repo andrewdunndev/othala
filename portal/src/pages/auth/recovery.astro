@@ -39,6 +39,7 @@ const phase: 'request' | 'sent' = flow?.state === 'sent_email' ? 'sent' : 'reque
 const messages = (ui?.messages ?? []).filter((m: FlowMessage) => !(phase === 'sent' && m.type === 'info'));
 ---
 <FocusPage
+  back={{ href: '/auth/login', label: 'Sign in' }}
   title={phase === 'request' ? 'Get back in' : 'Enter your code'}
   lede={phase === 'request'
     ? "Enter your email and we'll send you a one-time code. No password needed."
@@ -77,8 +78,5 @@ const messages = (ui?.messages ?? []).filter((m: FlowMessage) => !(phase === 'se
     )}
   </section>
 
-  <nav class="focus-links" aria-label="Other options">
-    <a href="/auth/login">Back to sign in</a>
-  </nav>
 
 </FocusPage>

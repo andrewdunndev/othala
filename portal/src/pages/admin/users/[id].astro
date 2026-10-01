@@ -175,7 +175,7 @@ const removable = methods.filter((m) => m.enrolled && EVICTABLE_CREDENTIAL_TYPES
 const roleNote = Object.keys(roleOverrides).length;
 ---
 <AdminLayout title={who || 'Person'} description="One person: apps, household, sign-in." identityId={adminId}>
-  <a class="back" href={peopleHref}>People</a>
+  <a class="back-link" href={peopleHref}>← People</a>
 
   {loadError && <div class="notice notice-danger" role="alert">{loadError}</div>}
   <ManifestNotice health={health} />

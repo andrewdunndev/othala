@@ -32,6 +32,7 @@ import { isAdminMarker } from '../lib/admin-auth';
 import HeaderActions from '../components/HeaderActions.astro';
 import type { Identity } from '../lib/types';
 import { instanceName } from '../lib/config';
+import { emailVerified } from '../lib/settings-view';
 
 type State = 'down' | 'pre-auth' | 'post-auth';
 
@@ -77,6 +78,8 @@ const groupRegistry = loadGroups();
 // First-run passkey nudge: getIdentity's includeCredential list already carries `credentials.passkey`; the dismiss
 // is remembered per browser in localStorage (inline script below).
 const hasPasskeyEnrolled = Boolean(identity?.credentials?.passkey);
+// A second, undismissable nudge: an unverified recovery address is a lockout waiting to happen.
+const emailUnverified = state === 'post-auth' && emailVerified(identity) === false;
 
 const groups = identityGroups(identity);
 // Visibility reads the same access binding (accessGroups, OR) as the OIDC entry gate, so a tile shows iff the gate admits.
@@ -189,7 +192,7 @@ const devLinks = [
         <div class="passkey-nudge" id="passkey-nudge">
           <p class="passkey-nudge-text">
             Set up a passkey for one-tap sign-in.
-            <a href="/auth/settings" class="passkey-nudge-link">Set up now →</a>
+            <a href="/auth/settings" class="passkey-nudge-link">Set up now</a>
           </p>
           <button
             type="button"
@@ -197,6 +200,15 @@ const devLinks = [
             data-dismiss-passkey-nudge
             aria-label="Dismiss"
           >✕</button>
+        </div>
+      )}
+
+      {emailUnverified && (
+        <div class="passkey-nudge" id="email-nudge">
+          <p class="passkey-nudge-text">
+            Your email is not verified yet, so it cannot rescue your account.
+            <a href="/auth/settings" class="passkey-nudge-link">Verify it</a>
+          </p>
         </div>
       )}
 
@@ -581,6 +593,9 @@ const devLinks = [
     color: var(--text);
   }
   .passkey-nudge-link {
+    display: inline-flex;
+    align-items: center;
+    min-height: 2.75rem;
     margin-left: var(--space-2);
     font-weight: 600;
     white-space: nowrap;
@@ -602,9 +617,8 @@ const devLinks = [
 
   /* Signed-in home: a one-line greeting, then the apps. */
   .greeting {
-    font-size: var(--text-md);
-    font-weight: 600;
-    line-height: 1.4;
+    font-size: var(--text-2xl);
+    line-height: 1.2;
     margin: 0 0 var(--space-4);
   }
   .greeting-sub { font-weight: 400; color: var(--text-2); font-size: var(--text-sm); margin-left: var(--space-2); }
@@ -1040,7 +1054,7 @@ const devLinks = [
     }
     .passkey-nudge-text { line-height: 1.4; }
     .passkey-nudge-link { margin-left: var(--space-1); }
-    .passkey-nudge-text { font-size: var(--text-xs); }
+    .passkey-nudge-text { font-size: var(--text-sm); }
     .passkey-nudge-close { min-width: 44px; min-height: 44px; display: flex; align-items: center; justify-content: center; }
 
     /* Stack post-auth CTA actions full-width with adequate tap height. */

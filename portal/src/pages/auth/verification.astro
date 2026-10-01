@@ -53,6 +53,7 @@ const codeNodes = (ui?.nodes ?? []).map((n) => {
 const phase: 'request' | 'sent' | 'done' = flow?.state === 'passed_challenge' ? 'done' : flow?.state === 'sent_email' ? 'sent' : 'request';
 ---
 <FocusPage
+  back={phase === 'done' ? undefined : { href: '/', label: 'Home' }}
   title={phase === 'done' ? 'Email verified' : phase === 'request' ? 'Verify your email' : 'Enter your code'}
   lede={phase === 'done'
     ? 'Thanks. You can use this address to get back in if you ever lose a device.'
@@ -95,10 +96,5 @@ const phase: 'request' | 'sent' | 'done' = flow?.state === 'passed_challenge' ? 
   </section>
   )}
 
-  {phase !== 'done' && (
-    <nav class="focus-links" aria-label="Other options">
-      <a href="/">Back home</a>
-    </nav>
-  )}
 
 </FocusPage>

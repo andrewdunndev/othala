@@ -78,7 +78,7 @@ const guide = splitGuide(entry.educationHtml);
     <HeaderActions identityId={identity?.id} isAdmin={isAdmin} />
   </Fragment>
   <article class="app-detail">
-    <p class="app-back mono"><a href="/">← All apps</a></p>
+    <a class="back-link" href="/">← Home</a>
     <header class="app-header">
       <div class="app-heading">
         <AppIcon tile={entry} size="lg" />
@@ -108,7 +108,6 @@ const guide = splitGuide(entry.educationHtml);
     margin: 0 auto;
     padding-bottom: var(--space-7);
   }
-  .app-back { margin: var(--space-5) 0 0; font-size: var(--text-xs); }
   .app-header {
     display: flex;
     flex-direction: column;

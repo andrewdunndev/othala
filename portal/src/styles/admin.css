@@ -10,12 +10,11 @@ html:has(.admin) { scroll-padding-top: calc(var(--space-7) + var(--space-3)); }
 .admin .button { display: inline-flex; align-items: center; justify-content: center; min-height: var(--hit); }
 .admin .button-sm { min-height: var(--hit); padding: 0 var(--space-3); }
 .admin .button[disabled] { opacity: .5; cursor: not-allowed; }
-.admin .back { display: inline-flex; align-items: center; min-height: var(--hit); font-size: var(--text-sm); color: var(--text-2); }
 
 /* Title row: heading with a muted count, a lede, and the page's one primary action */
 .admin .title-row { display: flex; flex-wrap: wrap; align-items: flex-end; gap: var(--space-3) var(--space-4); margin-bottom: var(--space-5); }
 .admin .title-row > div { flex: 1 1 20rem; min-width: 0; }
-.admin .title-row h1 { font-size: var(--text-2xl); line-height: var(--lh-tight); margin: 0; overflow-wrap: anywhere; }
+.admin .title-row h1 { line-height: var(--lh-tight); margin: 0; overflow-wrap: anywhere; }
 .admin .title-row .count { color: var(--text-muted); font-weight: 400; }
 .admin .title-row .lede { color: var(--text-2); font-size: var(--text-sm); margin: var(--space-1) 0 0; overflow-wrap: anywhere; }
 .admin .title-row .badges { margin-top: var(--space-2); }
@@ -168,7 +167,6 @@ html:has(.admin) { scroll-padding-top: calc(var(--header-h, 65px) + var(--space-
 .admin .ask > summary { display: inline-flex; align-items: center; font-family: var(--font-mono); font-weight: 500; border-radius: var(--radius); }
 .admin .ask.primary > summary:hover { background: var(--accent-hover); border-color: var(--accent-hover); }
 .admin .badge { white-space: nowrap; }
-.admin .badge-accent { background: var(--accent); border-color: var(--accent); color: var(--accent-contrast); }
 .admin .chip { display: inline-flex; align-items: center; gap: var(--space-2); }
 .admin .chip .app-icon { --plate: 1.5rem; }
 .admin .person-name { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-1) var(--space-2); }

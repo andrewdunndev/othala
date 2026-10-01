@@ -18,9 +18,11 @@ interface Props {
   tabTitle?: string;
   /** Already resolved by the page (null = signed out); looked up here when omitted. */
   viewer?: Viewer | null;
+  /** A top back link, the one place every page puts it. */
+  back?: { href: string; label: string };
 }
 
-const { title, lede, description, tabTitle } = Astro.props;
+const { title, lede, description, tabTitle, back } = Astro.props;
 const viewer = Astro.props.viewer === undefined ? await currentViewer(Astro.request, Astro.url) : Astro.props.viewer;
 ---
 <Layout title={tabTitle ?? title} description={description} narrow>
@@ -29,6 +31,7 @@ const viewer = Astro.props.viewer === undefined ? await currentViewer(Astro.requ
       <HeaderActions identityId={viewer.identityId} isAdmin={viewer.isAdmin} />
     </Fragment>
   )}
+  {back && <a class="back-link" href={back.href} data-astro-reload>← {back.label}</a>}
   <header class="page-header">
     <h1 class="page-title">{title}</h1>
     {lede && <p class="page-lede">{lede}</p>}

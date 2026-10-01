@@ -120,7 +120,7 @@ const devState = dev ? Astro.url.searchParams.get('dev-state') : null;
 const peopleHref = devState ? `/admin/users?dev-state=${devState}` : '/admin/users';
 ---
 <AdminLayout title={success ? `${success.first} is ready` : 'Add person'} description="Add someone to your household." identityId={adminId}>
-  <a class="back" href={peopleHref}>People</a>
+  <a class="back-link" href={peopleHref}>← People</a>
   <ManifestNotice health={health} />
 
   {success ? (
@@ -178,7 +178,7 @@ const peopleHref = devState ? `/admin/users?dev-state=${devState}` : '/admin/use
 
         <div class="row-actions">
           <button class="button button-primary" type="submit">Add person</button>
-          <a href={peopleHref}>Cancel</a>
+          <a class="button button-secondary" href={peopleHref}>Cancel</a>
         </div>
       </form>
     </>

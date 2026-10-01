@@ -45,7 +45,7 @@ const guide = splitGuide(requirement.html);
 ---
 <Layout title={`Set up ${requirement.title}`} description={requirement.why}>
   <article class="req-detail">
-    <p class="req-back mono"><a href="/">← All apps</a></p>
+    <a class="back-link" href="/">← Home</a>
     <header class="req-header">
       <p class="req-eyebrow mono">Setup guide</p>
       <h1 class="req-title">{requirement.title}</h1>
@@ -64,7 +64,6 @@ const guide = splitGuide(requirement.html);
 
 <style>
   .req-detail { max-width: 46rem; margin: 0 auto; padding-bottom: var(--space-7); }
-  .req-back { margin: var(--space-5) 0 0; font-size: var(--text-xs); }
   .req-header { padding: var(--space-5) 0; border-bottom: 1px solid var(--border); }
   .req-eyebrow {
     margin: 0;

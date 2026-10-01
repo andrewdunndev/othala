@@ -220,6 +220,7 @@ const lookupLabel: Record<string, string> = {
   <div class="settings">
     {/* Owner of every disclosure checkbox: Enter on one submits this inert form, never the form it sits inside. */}
     <form id="disclosures" method="dialog" data-astro-reload hidden></form>
+    <a class="back-link" href="/" data-astro-reload>← Home</a>
     <header class="page-header">
       <h1 class="page-title">Settings</h1>
       <p class="page-lede">
@@ -392,8 +393,8 @@ const lookupLabel: Record<string, string> = {
                       <input type="checkbox" form="disclosures" class="disclose cb-replace" id="totp-replace" aria-label="Replace authenticator app" />
                       <input type="checkbox" form="disclosures" class="disclose cb-remove" id="totp-remove" aria-label="Remove authenticator app" />
                       <div class="item-actions">
-                        <label for="totp-replace" class="button button-secondary button-sm toggle-label lbl-replace"><span class="on-closed">Replace</span><span class="on-open">Keep it</span></label>
-                        <label for="totp-remove" class="button button-secondary button-sm toggle-label lbl-remove"><span class="on-closed">Remove</span><span class="on-open">Keep it</span></label>
+                        <label for="totp-replace" class="button button-secondary button-sm toggle-label lbl-replace"><span class="on-closed">Replace</span></label>
+                        <label for="totp-remove" class="button button-secondary button-sm toggle-label lbl-remove"><span class="on-closed">Remove</span></label>
                       </div>
                       <div class="panel-row panel-replace">
                         {keepSecondFactor ? (
@@ -405,6 +406,7 @@ const lookupLabel: Record<string, string> = {
                             <ConfirmCues reauth={reauth} reauthHref={reauthHref} lost />
                           </>
                         )}
+                        <label for="totp-replace" class="button button-secondary button-sm toggle-label">Keep it</label>
                       </div>
                       <div class="panel-row panel-remove">
                         {keepSecondFactor ? (
@@ -416,6 +418,7 @@ const lookupLabel: Record<string, string> = {
                             <ConfirmCues reauth={reauth} reauthHref={reauthHref} lost />
                           </>
                         )}
+                        <label for="totp-remove" class="button button-secondary button-sm toggle-label">Keep it</label>
                       </div>
                     </li>
                   </ul>
@@ -591,13 +594,14 @@ const lookupLabel: Record<string, string> = {
                   );
                 })}
                 {lookupOff && (
-                  <label for="lookup-off" class="button button-secondary button-sm toggle-label lbl-remove"><span class="on-closed">Turn off</span><span class="on-open">Keep them</span></label>
+                  <label for="lookup-off" class="button button-secondary button-sm toggle-label lbl-remove"><span class="on-closed">Turn off</span></label>
                 )}
               </div>
               {lookupOff && (
                 <div class="panel-row panel-remove">
                   <span>Turn off backup codes? Any you saved stop working.</span>
                   <button type="submit" form="lookup-off-form" name={lookupOff.name} value={String(lookupOff.value ?? '')} class="button button-danger button-sm">Turn off backup codes</button>
+                  <label for="lookup-off" class="button button-secondary button-sm toggle-label">Keep it</label>
                 </div>
               )}
             </form>
@@ -706,11 +710,12 @@ const lookupLabel: Record<string, string> = {
           <div class="settings-form">
             <input type="checkbox" form="disclosures" class="disclose cb-remove" id="signout-all" aria-label="Sign out everywhere" />
             <div class="form-actions">
-              <label for="signout-all" class="button button-secondary button-sm toggle-label lbl-remove"><span class="on-closed">Sign out everywhere</span><span class="on-open">Cancel</span></label>
+              <label for="signout-all" class="button button-secondary button-sm toggle-label lbl-remove"><span class="on-closed">Sign out everywhere</span></label>
             </div>
             <div class="panel-row panel-remove">
               <span>Sign out of every device and app, this one included?</span>
               <button class="button button-danger button-sm" type="submit" form="signout-form">Sign out everywhere</button>
+              <label for="signout-all" class="button button-secondary button-sm toggle-label">Keep it</label>
             </div>
           </div>
           {!logoutInfo && <p class="field-hint">Local logout endpoint unavailable; the revoke still runs.</p>}
@@ -728,10 +733,6 @@ const lookupLabel: Record<string, string> = {
       </section>
     </div>
 
-    <p class="settings-back">
-      <a href="/" data-astro-reload>Back home</a>
-      {isAdmin && <a href="/admin" data-astro-reload>Back to admin</a>}
-    </p>
   </div>
 
   {scripts.map((s) => (

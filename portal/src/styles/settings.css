@@ -66,7 +66,7 @@
 .narrow-only { display: none; }
 
 /* One compact density across the cards. */
-.settings .field input { padding: var(--space-2) var(--space-3); font-size: var(--text-sm); }
+.settings .field input { padding: var(--space-2) var(--space-3); }
 .settings .field label { font-size: var(--text-xs); }
 .static-empty { font-family: var(--font-sans, inherit); color: var(--text-muted); }
 
@@ -93,7 +93,7 @@
 .totp-secret-value { display: block; margin-top: var(--space-2); padding: var(--space-2) var(--space-3); background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-sm); font-size: var(--text-sm); word-break: break-all; color: var(--text); user-select: all; }
 .codeinput { max-width: 12rem; font-family: var(--font-mono); letter-spacing: 0.2em; }
 .field.bad input, .field.bad input:focus, .panel-row input[aria-invalid='true'], .panel-row input[aria-invalid='true']:focus { border-color: var(--danger); }
-.field.bad input:focus, .panel-row input[aria-invalid='true']:focus { box-shadow: 0 0 0 3px var(--danger-subtle); }
+.field.bad input:focus, .panel-row input[aria-invalid='true']:focus { outline-color: var(--danger); }
 .steps p.field-error, .group p.field-error { color: var(--danger); }
 .steps .field { margin-top: var(--space-3); }
 
@@ -128,7 +128,6 @@
 @media (max-width: 640px) {
   .kv > div { grid-template-columns: 1fr; gap: var(--space-1); }
   .settings .page-title { font-size: var(--text-2xl); }
-  .settings .button { min-height: 2.75rem; }
   .narrow-only { display: block; }
   /* On the phone the setup key comes before the QR, which that phone cannot scan. */
   .steps > li { display: flex; flex-direction: column; }
@@ -144,3 +143,6 @@
 .welcome > p:not(.welcome-step) { margin: 0 0 var(--space-3); color: var(--text-2); max-width: 36rem; }
 .welcome .settings-form { margin-top: 0; }
 .welcome-btn { align-self: flex-start; min-height: 48px; padding: var(--space-3) var(--space-5); font-size: var(--text-base); }
+
+/* The confirm box carries its own Keep it; the opener steps aside while it is open. */
+.cb-remove:checked ~ * .lbl-remove, .cb-replace:checked ~ * .lbl-replace { display: none; }

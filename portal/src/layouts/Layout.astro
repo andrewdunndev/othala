@@ -118,6 +118,24 @@ const pageTitle = isHome ? instanceName : `${title} — ${instanceName}`;
       }
     })();
   </script>
+  {import.meta.env.DEV && (
+    <script is:inline>
+      (() => {
+        const carry = () => {
+          const here = new URL(location.href);
+          const keep = [...here.searchParams].filter(([k]) => k.startsWith('dev-'));
+          if (!keep.length) return;
+          document.querySelectorAll('a[href^="/"]').forEach((a) => {
+            const u = new URL(a.getAttribute('href'), location.origin);
+            for (const [k, v] of keep) if (!u.searchParams.has(k)) u.searchParams.set(k, v);
+            a.setAttribute('href', u.pathname + u.search + u.hash);
+          });
+        };
+        carry();
+        document.addEventListener('astro:page-load', carry);
+      })();
+    </script>
+  )}
   <script>
     import '../scripts/code-input';
   </script>
