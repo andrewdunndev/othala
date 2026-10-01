@@ -4,7 +4,7 @@
 
 import { getSession } from './kratos';
 import { getIdentity } from './admin-api';
-import { isAdminMarker } from './admin-auth';
+import { parseIdentity } from './identity-facts';
 
 export interface Viewer {
   identityId: string;
@@ -28,7 +28,7 @@ export async function currentViewer(request: Request, url: URL): Promise<Viewer 
     const session = await getSession(cookie);
     const id = session?.active ? session.identity?.id : undefined;
     if (!id) return null;
-    const isAdmin = await getIdentity(id).then(isAdminMarker, () => false);
+    const isAdmin = await getIdentity(id).then((i) => parseIdentity(i).isAdmin, () => false);
     return { identityId: id, isAdmin };
   })();
   const timeout = new Promise<null>((resolve) => setTimeout(() => resolve(null), LOOKUP_MS));

@@ -2,7 +2,7 @@
 // check. What access a person holds on an app is read by access-rows.ts through the consent resolver (claims.ts lookupRole).
 
 import type { Identity } from './types';
-import { isAdminMarker } from './admin-auth';
+import { parseIdentity } from './identity-facts';
 import { IDENTITY_GROUPS } from './constants';
 
 /**
@@ -35,7 +35,7 @@ export function normalizeGroupOrder(groups: string[]): string[] {
  * pass an admin-API identity, since public whoami strips metadata_admin.
  */
 export function shouldRefuseRecovery(identity: Identity | undefined | null): boolean {
-  return isAdminMarker(identity);
+  return parseIdentity(identity).isAdmin;
 }
 
 /**

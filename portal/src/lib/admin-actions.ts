@@ -17,14 +17,13 @@ import {
   EVICTABLE_CREDENTIAL_TYPES,
 } from './admin-api';
 import { revokeUserSessions, type RevokeUserResult } from './admin';
-import { isAdminMarker } from './admin-auth';
-import { hasSecondFactor } from './step-up';
+import { parseIdentity } from './identity-facts';
 import { sendInviteRecoveryEmail } from './kratos';
 import { confirmsInviteAddress, IDENTITY_GROUP_ORDER, normalizeGroupOrder, shouldRefuseRecovery } from './access';
 import { accessToStorage, choicesFromForm } from './access-rows';
 import { GROUP_RE } from './access-groups';
 import { HOUSEHOLD_GROUPS } from './constants';
-import { identityGroups as storedGroups, planGroupSave } from './gate';
+import { planGroupSave } from './gate';
 import { buildGroupRegistry, isIdentityGroup, unconfiguredGroups } from './group-registry';
 import { revokeConsentSessions, revokeSubject } from './revoke';
 import type { ClientManifest } from './manifests';
@@ -101,7 +100,7 @@ export async function saveAction(fd: FormData, ctx: ActionContext): Promise<Acti
   const clearUnconfigured = new Set(fd.getAll('clearUnconfigured').map(String));
   const keptUnconfigured = unconfiguredGroups(
     buildGroupRegistry(manifests, IDENTITY_GROUP_ORDER),
-    storedGroups(identity),
+    parseIdentity(identity).groups,
   ).filter((g) => !clearUnconfigured.has(g));
 
   // Repair surface for refuseNonCanonical (gate.ts): planGroupSave decides
@@ -173,7 +172,7 @@ interface SectionEdit {
 function sectionSave(ctx: ActionContext, edit: SectionEdit): Promise<ActionOutcome> {
   const { identity, manifests } = ctx;
   const registry = buildGroupRegistry(manifests, IDENTITY_GROUP_ORDER);
-  const stored = storedGroups(identity);
+  const stored = parseIdentity(identity).groups;
   const storedUnconfigured = unconfiguredGroups(registry, stored);
   const desired = edit.access ? [...edit.access.groups] : [...stored];
   const roles = edit.access ? edit.access.roles : (identity.metadata_admin?.roles ?? {});
@@ -211,7 +210,7 @@ const TRAIT_FIELDS = ['username', 'email', 'displayName', 'recoveryEmail'] as co
 /** Save the apps section: the submitted app -> level choices become groups and role overrides. */
 export function saveAccessAction(fd: FormData, ctx: ActionContext): Promise<ActionOutcome> {
   const roles = { ...(ctx.identity.metadata_admin?.roles ?? {}) };
-  const access = accessToStorage(ctx.manifests, choicesFromForm(fd), { groups: storedGroups(ctx.identity), roles });
+  const access = accessToStorage(ctx.manifests, choicesFromForm(fd), { groups: parseIdentity(ctx.identity).groups, roles });
   const [blocked] = access.unmet;
   if (blocked) {
     const app = ctx.manifests.find((m) => m.clientId === blocked.clientId);
@@ -335,7 +334,7 @@ export async function forceReloginAction(_fd: FormData, ctx: ActionContext): Pro
 }
 
 function isActiveAdmin(identity: Identity): boolean {
-  return isAdminMarker(identity) && identity.state !== 'inactive';
+  return parseIdentity(identity).isAdmin && identity.state !== 'inactive';
 }
 
 /** True when taking `target` out of service would leave no active admin. */
@@ -378,7 +377,7 @@ export async function deleteAction(fd: FormData, ctx: ActionContext): Promise<Ac
   // self is admin): an admin-marked target must be revoke-admin'd first,
   // which enforces the last-admin guard. Checked before the confirm text so
   // an admin target is refused regardless of what was typed.
-  if (isAdminMarker(identity)) {
+  if (parseIdentity(identity).isAdmin) {
     return {
       actionResult: {
         kind: 'error',
@@ -434,7 +433,7 @@ const OWN_SECOND_FACTOR_REQUIRED: ActionResult = {
 
 export async function grantAdminAction(_fd: FormData, ctx: ActionContext): Promise<ActionOutcome> {
   const username = ctx.identity.traits?.username ?? ctx.id;
-  if (!hasSecondFactor(ctx.identity)) {
+  if (!parseIdentity(ctx.identity).hasSecondFactor) {
     return { actionResult: SECOND_FACTOR_REQUIRED, refetch: false };
   }
   await patchAdminMarker(ctx.id, true);
@@ -490,10 +489,10 @@ export async function removeCredentialAction(fd: FormData, ctx: ActionContext): 
     };
   }
   const self = ctx.id === ctx.adminIdentityId;
-  if (self || isAdminMarker(ctx.identity)) {
+  if (self || parseIdentity(ctx.identity).isAdmin) {
     const creds = { ...(ctx.identity.credentials ?? {}) } as Record<string, unknown>;
     delete creds[credType];
-    if (!hasSecondFactor({ ...ctx.identity, credentials: creds as Identity['credentials'] })) {
+    if (!parseIdentity({ ...ctx.identity, credentials: creds as Identity['credentials'] }).hasSecondFactor) {
       return { actionResult: self ? OWN_SECOND_FACTOR_REQUIRED : SECOND_FACTOR_REQUIRED, refetch: false };
     }
   }

@@ -58,9 +58,9 @@ Each names its enforcer and the test that fails if the enforcer stops working.
   Test: `portal/scripts/noncanonical-repair.test.mjs`.
 - **Portal admin authority.** `requireAdminSession`, `portal/src/lib/admin.ts`:
   active session, assurance level exactly `aal2`, and the `metadata_admin.admin`
-  marker read fresh from the admin API (`isAdminMarker`,
-  `portal/src/lib/admin-auth.ts`). No group grants it. Tests:
-  `portal/src/lib/admin-auth.test.ts`, `e2e/playwright/tests/f-aal2-bypass.spec.ts`.
+  marker read fresh from the admin API (`parseIdentity`,
+  `portal/src/lib/identity-facts.ts`). No group grants it. Tests:
+  `portal/src/lib/identity-facts.test.ts`, `e2e/playwright/tests/f-aal2-bypass.spec.ts`.
 - **Internal-network admin listener (PORTAL_ADMIN_BIND_HOST).** `portal/src/server/listen.mjs`: privileged routes
   on a separate internal-network listener whose mux is disjoint from the public one,
   guarded by one bearer secret compared with `bearerMatches`

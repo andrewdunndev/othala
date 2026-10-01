@@ -6,25 +6,18 @@
 import type { Identity } from './types';
 import type { ClientManifest } from './manifests';
 import { GROUP_RE } from './access-groups';
+import { parseIdentity } from './identity-facts';
 
 const LEGACY_ADMIN_GROUP = 'admin';
 
-/** Read metadata_admin.groups defensively (tolerates any/undefined shape). */
-export function identityGroups(identity: Identity | null | undefined): string[] {
-  const meta = identity?.metadata_admin as { groups?: unknown } | undefined;
-  const raw = meta?.groups;
-  if (!Array.isArray(raw)) return [];
-  return raw.filter((g): g is string => typeof g === 'string');
-}
-
 /** Whether the identity holds the group. Compared VERBATIM: GROUP_RE is the one canonical form, so a case fold would only match names no owned boundary could write. */
 export function hasGroup(identity: Identity | null | undefined, group: string): boolean {
-  return identityGroups(identity).some((g) => g === group);
+  return parseIdentity(identity).groups.some((g) => g === group);
 }
 
 /** Stored group names that violate GROUP_RE; every owned write path rejects them, so a hit means the identity was written through the Kratos admin API. */
 export function nonCanonicalGroups(identity: Identity | null | undefined): string[] {
-  return identityGroups(identity).filter((g) => !GROUP_RE.test(g));
+  return parseIdentity(identity).groups.filter((g) => !GROUP_RE.test(g));
 }
 
 /**
@@ -105,7 +98,7 @@ export function enforceAccessGate(
   }
 
   // OR-semantics over the bound groups.
-  const userGroups = identityGroups(identity);
+  const userGroups = parseIdentity(identity).groups;
   if (!accessGroups.some((g) => userGroups.includes(g))) {
     const list = accessGroups.join(', ');
     return { allowed: false, reason: `User is not in any of the access group(s): ${list}` };

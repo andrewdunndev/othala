@@ -6,21 +6,13 @@ import {
   enforceAccessGate,
   enforceGroupGate,
   hasGroup,
-  identityGroups,
   nonCanonicalGroups,
 } from '../src/lib/gate.ts';
+import { parseIdentity } from '../src/lib/identity-facts.ts';
+import { identity as buildIdentity } from '../src/lib/test-builders.ts';
 
-function identity(overrides = {}) {
-  return {
-    id: 'id-1',
-    state: 'active',
-    schema_id: 'family',
-    schema_url: '',
-    traits: { username: 'tester', email: 'a@othala.test' },
-    metadata_admin: { groups: ['memories'] },
-    ...overrides,
-  };
-}
+const identity = (overrides = {}) => ({ ...buildIdentity({ metadataAdmin: { groups: ['memories'] } }), ...overrides });
+const identityGroups = (i) => parseIdentity(i).groups;
 
 function manifest(clientId, opts = {}) {
   return {

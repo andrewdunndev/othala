@@ -102,7 +102,7 @@ async function loadRuntime() {
 export async function fetchAdminMarker(identityId, runtime) {
   const fetched = await fetchStoredIdentity(runtime, identityId, 'recovery-gate');
   if (fetched.refuse) return fetched;
-  if (fetched.rt.isAdminMarker(fetched.identity)) {
+  if (fetched.rt.parseIdentity(fetched.identity).isAdmin) {
     return { refuse: true, admin: true, reason: 'admin recovery is console-only' };
   }
   return { refuse: false, reason: '' };

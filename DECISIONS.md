@@ -58,7 +58,7 @@ becoming a lockout, and because an identity provider's break-glass cannot route 
 Self-service recovery refuses admin identities for the same reason.
 
 **Enforced by.** `portal/src/lib/metadata-admin.ts` (strict-boolean, allowed-key validation),
-`portal/src/lib/admin-auth.ts`, `portal/src/lib/admin.ts` (AAL2 guard),
+`portal/src/lib/identity-facts.ts`, `portal/src/lib/admin.ts` (AAL2 guard),
 `portal/src/pages/admin/users/[id].astro` (last-admin, self-revoke), `portal/src/server/listen.mjs`
 (recovery refused on an admin marker the gate fetches itself). `kratos/hooks/recovery-gate.jsonnet`
 carries only the identity id and the admin marker is read from the admin API.

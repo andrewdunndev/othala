@@ -59,8 +59,8 @@ steps sit in a `route` block, because Caddy's default directive order would othe
 `oidc-app` snippet removes only the Kratos session cookie and leaves the app's own cookies.
 
 **Admin authority is a marker, not a group.** Kratos strips `metadata_admin` from
-`/sessions/whoami`, so it can only be written and read through the admin API. `isAdminMarker`
-(`portal/src/lib/admin-auth.ts`) is the sole authority check, and it must be handed an identity
+`/sessions/whoami`, so it can only be written and read through the admin API. `parseIdentity`
+(`portal/src/lib/identity-facts.ts`) is the sole authority check, fed only an identity
 fetched fresh from the admin API. A string named `admin` inside `metadata_admin.groups` confers
 nothing. `requireAdminSession` (`portal/src/lib/admin.ts`) demands three things together: an active
 session, `authenticator_assurance_level === 'aal2'`, and the marker.

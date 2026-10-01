@@ -1,7 +1,8 @@
-// Invariant: hasSecondFactor reflects enrolled credentials only.
+// Invariant: step-up follows enrolled second factors, the admin marker and elevated roles only.
 
 import { describe, it, expect } from 'vitest';
-import { needsStepUp, hasSecondFactor, holdsElevatedRole } from './step-up';
+import { needsStepUp, holdsElevatedRole } from './step-up';
+import { parseIdentity } from './identity-facts';
 import type { ClientManifest } from './manifests';
 import type { Identity } from './types';
 import { identity as buildIdentity, withCredential, withLookupSecret, withPasskey, withTotp, withWebauthnKey } from './test-builders';
@@ -59,9 +60,9 @@ describe('needsStepUp', () => {
   });
 });
 
-describe('hasSecondFactor', () => {
+describe('parseIdentity hasSecondFactor', () => {
   it('reads an identity with no credentials map as none', () => {
-    expect(hasSecondFactor({ ...identity([]), credentials: undefined })).toBe(false);
+    expect(parseIdentity({ ...identity([]), credentials: undefined }).hasSecondFactor).toBe(false);
   });
 });
 

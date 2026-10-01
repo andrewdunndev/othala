@@ -70,7 +70,7 @@ admin's app access while they can still sign in.
 app comes from holding that app's `<svc>-access` group, admins included;
 `<svc>-admin` grants the elevated role *inside* an app and admits nobody on
 its own. An admin who also uses a service holds both, explicitly. The full
-model is `portal/src/lib/gate.ts` and `portal/src/lib/admin-auth.ts`.
+model is `portal/src/lib/gate.ts` and `portal/src/lib/identity-facts.ts`.
 
 ---
 

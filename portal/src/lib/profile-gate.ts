@@ -5,6 +5,7 @@
 // admin API, authentication_methods from the hook body; missing data on a keyed identity refuses.
 
 import type { Identity } from './types';
+import { parseIdentity } from './identity-facts';
 
 export const EMAIL_CHANGE_REFUSAL = 'To change an email address, sign in again with your passkey or password.';
 
@@ -17,32 +18,6 @@ type AuthMethod = { method?: unknown; aal?: unknown; completed_at?: unknown };
 
 function asString(v: unknown): string {
   return typeof v === 'string' ? v : '';
-}
-
-function configOf(creds: Record<string, unknown>, type: string): Record<string, unknown> | null {
-  const config = (creds[type] as { config?: unknown } | undefined)?.config;
-  return config && typeof config === 'object' && !Array.isArray(config) ? (config as Record<string, unknown>) : null;
-}
-
-function keysOf(creds: Record<string, unknown>, type: string): unknown[] {
-  const keys = configOf(creds, type)?.['credentials'];
-  return Array.isArray(keys) ? keys.filter(Boolean) : [];
-}
-
-/**
- * True when the stored identity holds a password hash, a passkey, or a passwordless webauthn key. Kratos keeps
- * a password and a webauthn entry with an empty config on every identity (schema identifiers), so an entry
- * alone is not a key. Missing credentials count as keyed: the read did not carry them.
- */
-export function hasFirstFactorKey(identity: Identity | null | undefined): boolean {
-  const creds = identity?.credentials as Record<string, unknown> | undefined;
-  if (!creds || typeof creds !== 'object') return true;
-  const hash = configOf(creds, 'password')?.['hashed_password'];
-  return (
-    (typeof hash === 'string' && hash.length > 0) ||
-    keysOf(creds, 'passkey').length > 0 ||
-    keysOf(creds, 'webauthn').some((k) => (k as { is_passwordless?: unknown }).is_passwordless === true)
-  );
 }
 
 /** Method of the newest aal1 entry with a parseable completed_at, or null. */
@@ -71,7 +46,7 @@ export function emailChangeVerdict(
 ): EmailChangeVerdict {
   const current = (stored?.traits ?? {}) as Record<string, unknown>;
   const pointers = EMAIL_TRAITS.filter((t) => asString(proposed?.[t]) !== asString(current[t])).map((t) => `#/traits/${t}`);
-  if (pointers.length === 0 || !hasFirstFactorKey(stored)) return { refuse: false };
+  if (pointers.length === 0 || !parseIdentity(stored).firstFactorKey) return { refuse: false };
   const newest = newestFirstFactorMethod(methods);
   if (newest !== null && FIRST_FACTOR_METHODS.has(newest)) return { refuse: false };
   return { refuse: true, text: EMAIL_CHANGE_REFUSAL, pointers };

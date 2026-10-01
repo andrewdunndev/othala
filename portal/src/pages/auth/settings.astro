@@ -29,8 +29,7 @@ import HeaderActions from '../../components/HeaderActions.astro';
 import { revokeSubject, RevokeError } from '../../lib/revoke';
 import { getIdentity } from '../../lib/admin-api';
 import { emailChangeLocked } from '../../lib/profile-gate';
-import { isAdminMarker } from '../../lib/admin-auth';
-import { identityGroups as readIdentityGroups } from '../../lib/gate';
+import { parseIdentity } from '../../lib/identity-facts';
 import { loadTiles, userCanSeeTile } from '../../lib/tiles';
 import { publicUrl } from '../../lib/config';
 import { signToken, verifyToken, CSRFError } from '../../lib/csrf';
@@ -164,7 +163,7 @@ const displayName = traits.displayName || traits.username || '';
 // The email inputs go read-only when the profile gate would refuse a change from this session (display only; the gate
 // stays the control). An unreadable identity leaves them editable and the gate decides.
 const emailLocked = stored ? emailChangeLocked(stored, session!.authentication_methods) : false;
-const isAdmin = isAdminMarker(stored);
+const isAdmin = parseIdentity(stored).isAdmin;
 const names = readPasskeyNames(stored?.metadata_admin);
 const passkeys = credentialItems(nodes, 'passkey_remove', names);
 const keys = credentialItems(nodes, 'webauthn_remove');
@@ -203,7 +202,7 @@ const csrfSignOut = mint(identity.id, 'sign-out-everywhere');
 const renameTokens = passkeys.map(() => mint(identity.id, 'passkey-name'));
 
 // Your apps: the tiles this person's groups open, read-only.
-const groups = readIdentityGroups(stored ?? undefined);
+const groups = parseIdentity(stored).groups;
 const yourApps = dev ? [] : loadTiles().filter((t) => userCanSeeTile(t, groups));
 
 const lookupLabel: Record<string, string> = {

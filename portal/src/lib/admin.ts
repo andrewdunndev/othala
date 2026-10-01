@@ -3,7 +3,7 @@
 // identity-level checks the upstream proxy cannot make.
 
 import { getSession, browserFlows } from './kratos';
-import { isAdminMarker } from './admin-auth';
+import { parseIdentity } from './identity-facts';
 import { revokeSubject, type RevokeResult } from './revoke';
 import { ADMIN_FRESHNESS_HOURS } from './constants';
 import type { Session } from './types';
@@ -114,7 +114,7 @@ export async function requireAdminSession(astro: any): Promise<Session | Respons
     return astro.redirect('/auth/error?reason=auth-unreachable');
   }
 
-  if (!isAdminMarker(adminIdentity)) {
+  if (!parseIdentity(adminIdentity).isAdmin) {
     return astro.redirect('/auth/error?reason=not-admin');
   }
 

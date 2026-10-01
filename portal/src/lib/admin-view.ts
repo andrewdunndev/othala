@@ -7,8 +7,7 @@ import type { Identity } from './types';
 import { HOUSEHOLD_GROUPS, IDENTITY_GROUPS } from './constants';
 import { GROUP_RE } from './access-groups';
 import { currentLevel, isOpenToEveryone, isTopLevel, levelsFor, NO_ACCESS } from './access-rows';
-import { isAdminMarker } from './admin-auth';
-import { authenticatorEnrolled, hasSecondFactor, securityKeyCount } from './step-up';
+import { parseIdentity } from './identity-facts';
 
 export const ADMIN_NAV = [
   { href: '/admin/users', label: 'People' },
@@ -128,7 +127,7 @@ export function personRow(i: Identity, apps: readonly AdminApp[]): PersonRow {
     name: personName(i),
     sub: [t?.username, t?.email].filter(Boolean).join(' · '),
     chips,
-    admin: isAdminMarker(i),
+    admin: parseIdentity(i).isAdmin,
     off: i.state === 'inactive',
     verified: emailIsVerified(i),
     unrecognised: unrecognisedGroups(i, apps.map((a) => a.manifest)),
@@ -245,10 +244,10 @@ function passkeyCount(i: Identity): number {
 /** How a person signs in, one row per method, in the words of the account settings page. */
 export function signInMethods(i: Identity): SignInMethod[] {
   const passkeys = passkeyCount(i);
-  const keys = securityKeyCount(i);
+  const keys = parseIdentity(i).securityKeys;
   const password = configOf(i, 'password');
   const passwordSet = password !== undefined && (Object.keys(password).length === 0 || Boolean(password.hashed_password));
-  const totp = authenticatorEnrolled(i);
+  const totp = parseIdentity(i).authenticator;
   const codes = configOf(i, 'lookup_secret') !== undefined;
   return [
     { key: 'passkey', label: 'Passkeys', value: passkeys > 0 ? String(passkeys) : 'None', enrolled: passkeys > 0 },
@@ -272,7 +271,7 @@ export interface PersonLimits {
 export function personLimits(i: Identity, o: { first: string; isSelf: boolean; lastAdmin: boolean }): PersonLimits {
   const only = o.isSelf ? "You're the only household admin." : `${o.first} is the only household admin.`;
   return {
-    grant: hasSecondFactor(i) ? null : `Needs an authenticator app or security key first. Send a setup link so ${o.first} can add one.`,
+    grant: parseIdentity(i).hasSecondFactor ? null : `Needs an authenticator app or security key first. Send a setup link so ${o.first} can add one.`,
     revoke: o.lastAdmin ? `${only} Make someone else an admin first.` : null,
     deactivate: o.isSelf
       ? "You can't turn off your own sign-in. Ask another admin."
@@ -284,9 +283,9 @@ export function personLimits(i: Identity, o: { first: string; isSelf: boolean; l
 
 /** Why a sign-in method can't be removed (it is an admin's last second factor), or null when it can. */
 export function removalBlock(i: Identity, credType: string, isSelf: boolean): string | null {
-  if (!isSelf && !isAdminMarker(i)) return null;
+  if (!isSelf && !parseIdentity(i).isAdmin) return null;
   const creds = { ...((i.credentials ?? {}) as Record<string, unknown>) };
   delete creds[credType];
-  if (hasSecondFactor({ ...i, credentials: creds as Identity['credentials'] })) return null;
+  if (parseIdentity({ ...i, credentials: creds as Identity['credentials'] }).hasSecondFactor) return null;
   return 'Admins keep at least one authenticator app or security key.';
 }
