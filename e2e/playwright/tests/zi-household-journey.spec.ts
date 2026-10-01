@@ -42,22 +42,22 @@ test('ZI1 — admin adds a person; they redeem, enrol a passkey and TOTP, and si
     const admin = await adminCtx.newPage();
     const formUrl = `${baseURL}/admin/users/new`;
     await admin.goto(formUrl, { waitUntil: 'networkidle' });
-    await admin.locator('#username').fill(person.username);
+    await admin.locator('#displayName').fill('ZI1 Person');
     await admin.locator('#email').fill(person.email);
-    await admin.getByRole('button', { name: /Create identity/ }).click();
-    await expect(admin.getByText(`Identity created for ${person.username}.`), 'ZI1: creation notice').toBeVisible();
+    await admin.locator('summary', { hasText: 'More options' }).click();
+    await admin.locator('#username').fill(person.username);
+    await admin.getByRole('button', { name: 'Add person' }).click();
+    await expect(admin.getByRole('heading', { name: 'ZI1 is ready' }), 'ZI1: creation card').toBeVisible();
     link = await admin.locator('#recoveryUrl').inputValue();
     code = await admin.locator('#recoveryCode').inputValue();
     expect(link, 'ZI1: an enrollment link is shown').toMatch(/^https?:\/\//);
     expect(code, 'ZI1: a recovery code is shown').toMatch(/^\d{6}$/);
 
-    await admin.goto(`${baseURL}/admin/users?q=${encodeURIComponent(person.username)}`, { waitUntil: 'networkidle' });
-    await admin.locator('a.users-username-link', { hasText: person.username }).click();
-    await admin.getByRole('link', { name: 'Edit', exact: true }).first().click();
-    await admin.locator('input[name="accessGroups"][value="grafana-access"]').check();
-    await admin.locator('input[name="accessGroups"][value="proxywatch-access"]').check();
-    await admin.getByRole('button', { name: 'Save' }).click();
-    await expect(admin.getByText('Identity updated.'), 'ZI1: access grant saved').toBeVisible();
+    await admin.getByRole('link', { name: 'View ZI1' }).click();
+    await admin.locator('input[name="level:grafana"][value="viewer"]').check();
+    await admin.locator('input[name="level:proxywatch"][value="use"]').check();
+    await admin.getByRole('button', { name: 'Save access' }).click();
+    await expect(admin.getByText('Access saved.'), 'ZI1: access grant saved').toBeVisible();
   } finally {
     await adminCtx.close();
   }

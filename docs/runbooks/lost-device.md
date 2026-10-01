@@ -11,7 +11,7 @@ See also `site/src/content/docs/guides/hardening.md` §7 for the threat context.
 
 ## Why `revokeSubject` (force re-login) alone is insufficient
 
-The **Force re-login** action in the admin UI calls `revokeSubject`, which
+The **Sign out everywhere** action in the admin UI calls `revokeSubject`, which
 deletes the identity's active Kratos sessions and invalidates Hydra login/consent
 grants. This cuts the attacker's current session — they are logged out
 immediately.
@@ -80,7 +80,7 @@ procedure and stays usable for future account recovery.
 the family member whether they recognise it. If they don't, or if it looks like
 an address they do not own, clear it:
 
-1. Click **Edit** (top of the Profile section).
+1. Click **Edit profile**.
 2. Clear the **Recovery email** field (leave it blank, or replace it with an
    address the family member controls).
 3. Click **Save**.
@@ -127,9 +127,9 @@ sessions and app grants first, covering Step 4, and the user re-registers.
 Each Remove action is CSRF-protected and requires an active AAL2 admin session.
 The confirmation banner after each removal tells you which type was removed.
 
-### Step 4 — Force re-login (revoke sessions)
+### Step 4 — Sign out everywhere (revoke sessions)
 
-After removing the attacker's credentials, click **Force re-login** in the
+After removing the attacker's credentials, click **Sign out everywhere** in the
 Actions panel. This:
 
 - Deletes all active Kratos sessions for the identity.
@@ -141,7 +141,7 @@ cannot log in.
 
 ### Step 5 — Issue a recovery/enrollment URL
 
-Click **Issue enrollment URL** to generate a one-shot Kratos recovery URL.
+Click **Send setup link** to generate a one-shot Kratos recovery URL.
 Share it with the legitimate user out-of-band (Signal, iMessage, or another
 trusted channel — not the compromised email account if that was the attack
 vector).
@@ -175,8 +175,8 @@ current password or a privileged recovery session).
 [ ] 2b. Check the recoveryEmail trait — clear any address the user doesn't recognise
 [ ] 3. Remove each affected evictable type (webauthn / totp / backup codes)
 [ ] 3b. Passkey: victim self-removes at /auth/settings, or Delete identity as last resort
-[ ] 4. Force re-login  (revoke sessions)
-[ ] 5. Issue enrollment URL  — share via Signal/iMessage
+[ ] 4. Sign out everywhere  (revoke sessions)
+[ ] 5. Send setup link  — share via Signal/iMessage
 [ ] 6. If password in use: rotate in the directory-backed app's admin
 [ ] 7. Follow up with the user once they confirm re-enrollment
 ```

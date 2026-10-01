@@ -20,9 +20,11 @@ test('ZB1 — deactivating your own identity is refused', async ({ browser, base
     const page = await ctx.newPage();
     const targetUrl = `${baseURL}/admin/users/${admin.id}`;
     await page.goto(targetUrl, { waitUntil: 'networkidle' });
+    await page.locator('summary', { hasText: 'Danger zone' }).click();
+    await page.locator('summary', { hasText: 'Turn off sign-in' }).click();
     const [resp] = await Promise.all([
       page.waitForResponse((r) => r.url().startsWith(targetUrl) && r.request().method() === 'POST'),
-      page.getByRole('button', { name: 'Deactivate', exact: true }).click(),
+      page.locator('form.confirm').getByRole('button', { name: 'Turn off sign-in' }).click(),
     ]);
     expect(resp.status(), 'refusal re-renders the page').toBe(200);
     await expect(page.getByText(SELF_DEACTIVATE_REFUSAL)).toBeVisible();

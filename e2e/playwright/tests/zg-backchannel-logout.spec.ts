@@ -62,9 +62,10 @@ test('ZG — force re-login delivers a logout token carrying the session sid', a
     const page = await adminCtx.newPage();
     const targetUrl = `${baseURL}/admin/users/${member.id}`;
     await page.goto(targetUrl, { waitUntil: 'networkidle' });
+    await page.locator('summary', { hasText: 'Sign out everywhere' }).click();
     const [resp] = await Promise.all([
       page.waitForResponse((r) => r.url().startsWith(targetUrl) && r.request().method() === 'POST'),
-      page.getByRole('button', { name: 'Force re-login' }).click(),
+      page.locator('form.confirm').getByRole('button', { name: 'Sign out everywhere' }).click(),
     ]);
     expect([200, 303], `force re-login status ${resp.status()}`).toContain(resp.status());
 

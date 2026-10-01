@@ -1,4 +1,4 @@
-// ZH — the admin console's "New user" form creates an identity and issues an enrollment link and code.
+// ZH — the admin console's "Add person" form creates an identity and issues an enrollment link and code.
 // The portal sends no schema_id, so this only passes when Kratos applies identity.default_schema_id itself.
 
 import { test, expect, adminAal2Context } from '../fixtures';
@@ -26,16 +26,18 @@ test('ZH1 — creating an identity through /admin/users/new succeeds and issues 
     const formUrl = `${baseURL}/admin/users/new`;
     await page.goto(formUrl, { waitUntil: 'networkidle' });
 
-    await page.locator('#username').fill(newUser.username);
+    await page.locator('#displayName').fill('ZH1 Created');
     await page.locator('#email').fill(newUser.email);
+    await page.locator('summary', { hasText: 'More options' }).click();
+    await page.locator('#username').fill(newUser.username);
     const [resp] = await Promise.all([
       page.waitForResponse((r) => r.url() === formUrl && r.request().method() === 'POST'),
-      page.getByRole('button', { name: /Create identity/ }).click(),
+      page.getByRole('button', { name: 'Add person' }).click(),
     ]);
     expect(resp.status(), 'ZH1: create POST must re-render the page, not 403 or 500').toBe(200);
 
     await expect(
-      page.getByText(`Identity created for ${newUser.username}.`),
+      page.getByRole('heading', { name: 'ZH1 is ready' }),
       'ZH1: page must show the success notice, not an error notice',
     ).toBeVisible();
     await expect(page.locator('.notice-danger'), 'ZH1: no error notice').toHaveCount(0);

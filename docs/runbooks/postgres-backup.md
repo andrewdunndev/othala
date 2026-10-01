@@ -100,8 +100,8 @@ At family scale the recovery is NOT "fix the row." Instead:
    TRUNCATE hydra_oauth2_authentication_session;
    ```
 
-3. Force re-login from the admin UI for every active family member
-   (`/admin/users/<id>` → "Force re-login" button). This drops
+3. Sign out everywhere from the admin UI for every active family member
+   (`/admin/users/<id>` → "Sign out everywhere" button). This drops
    their Kratos session and any RP-side state.
 
 4. Each member re-authenticates at their next app visit. The cost is

@@ -49,8 +49,9 @@ test('U1 — admin "Send invite email" delivers a code-only message via the Krat
     const targetUrl = `${baseURL}/admin/users/${invitee.id}`;
 
     await page.goto(targetUrl, { waitUntil: 'networkidle' });
-    await expect(page.locator('h1'), 'U1: admin page must render the invitee identity').toContainText('u1.invitee');
+    await expect(page.locator('h1'), 'U1: admin page must render the invitee identity').toContainText('U1 Invitee');
 
+    await page.locator('summary', { hasText: 'Email a code instead' }).click();
     const sendBtn = page.getByRole('button', { name: 'Send invite email' });
     await expect(sendBtn, 'U1: "Send invite email" button must be visible').toBeVisible({ timeout: 10_000 });
 
@@ -87,7 +88,7 @@ test('U1 — admin "Send invite email" delivers a code-only message via the Krat
   }
 });
 
-test('U2 — "Send invite email" against an admin-marked target is refused console-only, and mailpit receives nothing', async ({
+test('U2 — an admin-marked target is offered no invite email or setup link (console-only), and mailpit receives nothing', async ({
   browser,
   baseURL,
 }) => {
@@ -123,28 +124,16 @@ test('U2 — "Send invite email" against an admin-marked target is refused conso
     const targetUrl = `${baseURL}/admin/users/${adminTarget.id}`;
 
     await page.goto(targetUrl, { waitUntil: 'networkidle' });
-    await expect(page.locator('h1'), 'U2: admin page must render the admin-target identity').toContainText('u2.admin.target');
+    await expect(page.locator('h1'), 'U2: admin page must render the admin-target identity').toContainText('U2 Admin Target');
 
-    const sendBtn = page.getByRole('button', { name: 'Send invite email' });
-    await expect(sendBtn, 'U2: "Send invite email" button must be visible').toBeVisible({ timeout: 10_000 });
-    await page.locator('input[name="confirmEmail"]').fill(adminTarget.email);
-
-    const [postResp] = await Promise.all([
-      page.waitForResponse((r) => r.url() === targetUrl && r.request().method() === 'POST'),
-      sendBtn.click(),
-    ]);
-    console.log('[U2] send-invite-email POST →', postResp.status());
-
-    expect(postResp.status(), 'U2: refusal is a normal same-page re-render, not a 403').toBe(200);
-
-    await expect(
-      page.getByText(/admin recovery is console-only/i),
-      'U2: page must show the console-only refusal notice',
-    ).toBeVisible();
+    // The page withholds email and setup-link actions from an admin-marked target and points at the console runbook.
+    await expect(page.getByText(/admins get back in through the console/i), 'U2: the console-only note is shown').toBeVisible();
+    await expect(page.getByRole('button', { name: 'Send invite email' }), 'U2: no invite email action is offered').toHaveCount(0);
+    await expect(page.getByRole('button', { name: 'Send setup link' }), 'U2: no setup link action is offered').toHaveCount(0);
 
     await assertNoInviteEmail(adminTarget.email, startTime);
 
-    console.log('[U2] PASS — admin-marked target refused console-only; mailpit received nothing');
+    console.log('[U2] PASS — admin-marked target offered console-only recovery; mailpit received nothing');
   } finally {
     await ctx.close();
   }
@@ -185,8 +174,9 @@ test('U3 — "Send invite email" with a mismatched confirm-address is refused, a
     const targetUrl = `${baseURL}/admin/users/${invitee.id}`;
 
     await page.goto(targetUrl, { waitUntil: 'networkidle' });
-    await expect(page.locator('h1'), 'U3: admin page must render the invitee identity').toContainText('u3.invitee');
+    await expect(page.locator('h1'), 'U3: admin page must render the invitee identity').toContainText('U3 Invitee');
 
+    await page.locator('summary', { hasText: 'Email a code instead' }).click();
     const sendBtn = page.getByRole('button', { name: 'Send invite email' });
     await expect(sendBtn, 'U3: "Send invite email" button must be visible').toBeVisible({ timeout: 10_000 });
     await page.locator('input[name="confirmEmail"]').fill(`wrong.${invitee.email}`);
