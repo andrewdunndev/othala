@@ -186,22 +186,27 @@ function freshestMtime(dir: string): number {
  * form controls (form-action reaches every apex subdomain).
  */
 export function sanitizeEducationMarkdown(raw: string): string {
-  const html = marked.parse(raw, { async: false }) as string;
+  return sanitizeGuideHtml(marked.parse(raw, { async: false }) as string);
+}
+
+function sanitizeGuideHtml(html: string): string {
   return DOMPurify.sanitize(html, {
     USE_PROFILES: { html: true, svg: true },
     FORBID_TAGS: ['style', 'form', 'input', 'button', 'select', 'textarea'],
   });
 }
 
-/** Plain text of an HTML fragment's tags removed, for matching a heading against the outline. */
+/** Plain text of an HTML fragment for matching a heading against the outline: the sanitizer keeps text only. */
 function headingText(html: string): string {
-  return html.replace(/<[^>]*>/g, '').replace(/&#39;|&rsquo;|&apos;/g, "'").replace(/&amp;/g, '&').trim();
+  const text = DOMPurify.sanitize(html, { ALLOWED_TAGS: [] });
+  return text.replace(/&#39;|&rsquo;|&apos;/g, "'").replace(/&amp;/g, '&').trim();
 }
 
 /**
- * Split sanitized guide HTML into the fixed outline. Each `<h2>` opens a section, matched to an outline slot by its
+ * Split guide HTML into the fixed outline. Each `<h2>` opens a section, matched to an outline slot by its
  * text; a slot's first heading wins and later or unmatched headings follow as `extra` sections in source order. The
  * section title is the outline's, so the page reads the same for every app. A guide with no `<h2>` is all `lead`.
+ * The split is textual, so each piece is sanitised after it, never trusted as the earlier sanitising left it.
  */
 export function splitGuide(html: string | undefined): Guide {
   if (!html || !html.trim()) return { lead: '', sections: [] };
@@ -216,7 +221,7 @@ export function splitGuide(html: string | undefined): Guide {
       continue;
     }
     const text = headingText(m[1] ?? '');
-    const body = (m[2] ?? '').trim();
+    const body = sanitizeGuideHtml((m[2] ?? '').trim());
     const slot = GUIDE_OUTLINE.find((o) => o.match.test(text));
     if (slot && !slots.has(slot.id)) {
       slots.set(slot.id, { id: slot.id, title: slot.title, html: body });
@@ -228,7 +233,7 @@ export function splitGuide(html: string | undefined): Guide {
     ...GUIDE_OUTLINE.flatMap((o) => (slots.has(o.id) ? [slots.get(o.id) as GuideSection] : [])),
     ...extras,
   ];
-  return { lead: lead.trim(), sections };
+  return { lead: sanitizeGuideHtml(lead.trim()), sections };
 }
 
 /** Split `---` YAML front matter off a markdown file; a missing or malformed block yields empty data and the whole text. */

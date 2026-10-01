@@ -170,3 +170,13 @@ describe('e2e fixtures', () => {
     expect(splitGuide(t?.educationHtml).sections.map((s) => s.id)).toEqual(['purpose', 'first-time', 'good-to-know', 'help']);
   });
 });
+
+describe('splitGuide: markup hidden in an attribute value', () => {
+  it('sanitises each section after the split, so a split inside an attribute cannot revive markup', () => {
+    const html = '<h2>First time</h2><p title="<h2>x</h2><img src=x onerror=alert(1)>">hi</p>';
+    const g = splitGuide(html);
+    const out = [g.lead, ...g.sections.map((s) => s.html)].join('');
+    expect(out).not.toContain('onerror');
+    expect(g.sections.length).toBeGreaterThan(0);
+  });
+});
