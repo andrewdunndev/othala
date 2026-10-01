@@ -31,6 +31,8 @@ stages:
   - package
   - deploy
   - release
+  - verdict
+  - automerge-gate
 
 include:
   # Advisory until verified clean (fail_on_violation: false).
@@ -38,6 +40,16 @@ include:
     inputs:
       reference_ref: v0.6.0
       fail_on_violation: false
+
+  # Verdict jobs feed the terminal automerge-gate; osv diffs against the merge
+  # base, secret-verdict reddens the pipeline on its own.
+  - component: gitlab.com/dunn.dev/pipeline/osv-verdict@4.8.0
+  - component: gitlab.com/dunn.dev/pipeline/secret-verdict@4.8.0
+  - component: gitlab.com/dunn.dev/pipeline/automerge-gate@4.8.0
+    inputs:
+      stage: automerge-gate
+      required-checks: "osv,secret"
+  - component: gitlab.com/dunn.dev/pipeline/pin-audit@4.8.0
 
   - component: gitlab.com/dunn.dev/pipeline/node-build@4.8.0
     inputs:

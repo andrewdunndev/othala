@@ -102,8 +102,8 @@ drop is load-bearing, and the file carries the scar proving it: without
 own user and every Ory service exits.
 
 Not built: **no memory bound anywhere**, so the hash-exhaustion lever above is
-unbounded at the container layer too; **nothing evaluates the SBOM** that ships
-with each release, so a known CVE in a shipped image fails nothing; and
+unbounded at the container layer too; **the CI gate scans lockfiles, not the
+shipped image**, so a known CVE in a base image fails nothing; and
 **nothing verifies a signature before use** — a property of whatever runs the
 image, not of this repository.
 
