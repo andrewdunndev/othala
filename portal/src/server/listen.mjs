@@ -357,13 +357,48 @@ export async function handlePasskeyPrune(req, res, runtime) {
   sendJson(res, 200, { pruned });
 }
 
+const READY_TIMEOUT_MS = 2000;
+
+/** Readiness: Kratos and Hydra both answer ready within the timeout; 503 names the dependencies that do not. */
+async function handleReadyz(res, runtime) {
+  let rt;
+  try {
+    rt = runtime ?? (await loadRuntime());
+  } catch (err) {
+    console.error('[portal/readyz] runtime bundle failed to load:', err?.message ?? err);
+    sendJson(res, 503, { status: 'unavailable', failed: ['runtime'] });
+    return;
+  }
+  const probes = {
+    kratos: `${rt.KRATOS_ADMIN_URL}/admin/health/ready`,
+    hydra: `${rt.HYDRA_ADMIN_URL}/health/ready`,
+  };
+  const failed = [];
+  await Promise.all(
+    Object.entries(probes).map(async ([name, url]) => {
+      try {
+        const r = await fetch(url, { signal: AbortSignal.timeout(READY_TIMEOUT_MS) });
+        if (!r.ok) failed.push(name);
+      } catch {
+        failed.push(name);
+      }
+    }),
+  );
+  if (failed.length) sendJson(res, 503, { status: 'unavailable', failed: failed.sort() });
+  else sendJson(res, 200, { status: 'ok' });
+}
+
 /** Handle one admin-port request. Writes to res; never touches the SSR handler. */
 export async function handleAdminRequest(req, res, runtime) {
   const method = req.method;
   const path = pathOf(req.url);
 
-  if (method === 'GET' && ADMIN_GET_ROUTES.has(path)) {
+  if (method === 'GET' && path === '/healthz') {
     sendJson(res, 200, { status: 'ok' });
+    return;
+  }
+  if (method === 'GET' && path === '/readyz') {
+    await handleReadyz(res, runtime);
     return;
   }
   if (method === 'POST' && path === '/admin/recovery-gate') {

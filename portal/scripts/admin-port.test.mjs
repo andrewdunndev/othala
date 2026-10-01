@@ -25,7 +25,7 @@ import { emailChangeLocked, emailChangeVerdict, EMAIL_CHANGE_REFUSAL } from '../
 import { getIdentity, listSessions, revokeSession } from '../src/lib/admin-api.ts';
 import { isAdminMarker } from '../src/lib/admin-auth.ts';
 
-const runtime = { ...secondFactorRuntime, emailChangeVerdict, getIdentity, listSessions, revokeSession, isAdminMarker };
+const runtime = { KRATOS_ADMIN_URL: 'http://kratos.test', HYDRA_ADMIN_URL: 'http://hydra.test', ...secondFactorRuntime, emailChangeVerdict, getIdentity, listSessions, revokeSession, isAdminMarker };
 const handle = (req, res, rt = runtime) => handleAdminRequest(req, res, rt);
 
 const ADMIN_UUID = '11111111-1111-1111-1111-111111111111';
@@ -111,12 +111,32 @@ test('challenge + public paths 404 on the admin port', async () => {
   }
 });
 
-test('healthz/readyz return 200 ok on the admin port', async () => {
-  for (const p of ['/healthz', '/readyz']) {
+test('healthz is liveness only: 200 with no dependency call', async () => {
+  const res = fakeRes();
+  await handle(fakeReq({ method: 'GET', url: '/healthz' }), res);
+  assert.equal(res.statusCode, 200);
+  assert.deepEqual(JSON.parse(res.body), { status: 'ok' });
+});
+
+test('readyz is 200 when Kratos and Hydra are ready, 503 naming the one that is not', async () => {
+  const realFetch = globalThis.fetch;
+  try {
+    for (const [down, status, failed] of [[null, 200, undefined], ['hydra', 503, ['hydra']], ['kratos', 503, ['kratos']]]) {
+      globalThis.fetch = async (url) => {
+        if (down && String(url).includes(down)) throw new Error('refused');
+        return { ok: true };
+      };
+      const res = fakeRes();
+      await handle(fakeReq({ method: 'GET', url: '/readyz' }), res);
+      assert.equal(res.statusCode, status);
+      assert.deepEqual(JSON.parse(res.body).failed, failed);
+    }
+    globalThis.fetch = async () => ({ ok: false });
     const res = fakeRes();
-    await handle(fakeReq({ method: 'GET', url: p }), res);
-    assert.equal(res.statusCode, 200);
-    assert.deepEqual(JSON.parse(res.body), { status: 'ok' });
+    await handle(fakeReq({ method: 'GET', url: '/readyz' }), res);
+    assert.deepEqual(JSON.parse(res.body).failed, ['hydra', 'kratos']);
+  } finally {
+    globalThis.fetch = realFetch;
   }
 });
 

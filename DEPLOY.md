@@ -52,7 +52,7 @@ The app runs **two HTTP listeners in one process**
   expose to the network.
 - **Admin port** (`4431`, bound to `PORTAL_ADMIN_BIND_HOST`,
   internal network only). A separate `http.createServer` with its own disjoint mux:
-  `GET /healthz`, `GET /readyz`,
+  `GET /healthz` (liveness), `GET /readyz` (503 unless Kratos and Hydra report ready),
   `POST /admin/{recovery,login-code}-gate`. It never delegates to the SSR
   handler: off the public mux by construction. The bearer-guarded routes
   are constant-time and fail-closed: an unset secret rejects every request.
