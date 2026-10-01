@@ -6,6 +6,6 @@ test('ZL2 — admin-only routes are not served through the edge', async ({ ctx, 
   for (const path of ['/healthz', '/readyz', '/admin/identities', '/admin/clients', '/admin/health/ready']) {
     const resp = await ctx.request.get(`${baseURL}${path}`, { maxRedirects: 0 });
     const json = (resp.headers()['content-type'] ?? '').includes('json');
-    expect(resp.status() === 200 && json, `${path}: got ${resp.status()} JSON from the edge`).toBe(false);
+    expect(json, `${path}: got ${resp.status()} JSON from the edge`).toBe(false);
   }
 });

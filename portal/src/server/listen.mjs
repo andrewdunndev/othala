@@ -379,6 +379,7 @@ async function handleReadyz(res, runtime) {
       try {
         const r = await fetch(url, { signal: AbortSignal.timeout(READY_TIMEOUT_MS) });
         if (!r.ok) failed.push(name);
+        await r.body?.cancel();
       } catch {
         failed.push(name);
       }
