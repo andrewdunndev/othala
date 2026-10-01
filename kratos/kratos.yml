@@ -1,8 +1,7 @@
 # Kratos configuration: generic Othala instance template, ${VAR}-substituted by
-# scripts/render-config.sh. KRATOS_PG_HOST, KRATOS_ADMIN_HOST and CONSENT_HOST are compose service
-# names in the lab and container names in production.
+# scripts/render-config.sh. Service hosts (postgres, kratos, othala) are the golden topology, literal.
 
-dsn: "postgres://kratos:${KRATOS_PG_PASS}@${KRATOS_PG_HOST}:5432/kratos?sslmode=disable"
+dsn: "postgres://kratos:${KRATOS_PG_PASS}@postgres:5432/kratos?sslmode=disable"
 # KRATOS_PG_PASS must be URL-safe (percent-encoded): YAML quoting cannot fix a URL.
 
 serve:
@@ -13,9 +12,9 @@ serve:
       disable_for_health: true
 
   admin:
-    base_url: "http://${KRATOS_ADMIN_HOST}:4434/"
+    base_url: "http://kratos:4434/"
     # Admin-plane bind address. The admin API is unauthenticated by design (the network is the
-    # control): segmented deployments bind an admin-plane address, the e2e harness uses 0.0.0.0.
+    # control): bind an admin-plane address, never one on a network shared with other services.
     host: "${KRATOS_ADMIN_BIND_HOST}"
     request_log:
       # This listener logs before adding the prefix, so probe /admin/health/ready here.
@@ -35,10 +34,9 @@ selfservice:
   methods:
     password:
       config:
-        # Unquoted: the schema types these as bool/int, and a quoted token renders to a string.
-        haveibeenpwned_enabled: ${OTHALA_HIBP_ENABLED}
+        haveibeenpwned_enabled: true
         ignore_network_errors: false
-        min_password_length: ${OTHALA_PASSWORD_MIN_LENGTH}
+        min_password_length: 12
 
     # Passkeys: the PRIMARY login method (discoverable credentials, usernameless), distinct from
     # the legacy webauthn strategy below.
@@ -107,7 +105,7 @@ selfservice:
             - hook: revoke_active_sessions
             - hook: web_hook
               config:
-                url: "http://${CONSENT_HOST}:4431/admin/second-factor-gate?method=webauthn"
+                url: "http://othala:4431/admin/second-factor-gate?method=webauthn"
                 method: POST
                 auth:
                   type: api_key
@@ -127,7 +125,7 @@ selfservice:
             - hook: revoke_active_sessions
             - hook: web_hook
               config:
-                url: "http://${CONSENT_HOST}:4431/admin/second-factor-gate?method=totp"
+                url: "http://othala:4431/admin/second-factor-gate?method=totp"
                 method: POST
                 auth:
                   type: api_key
@@ -152,7 +150,7 @@ selfservice:
           hooks:
             - hook: web_hook
               config:
-                url: "http://${CONSENT_HOST}:4431/admin/profile-gate"
+                url: "http://othala:4431/admin/profile-gate"
                 method: POST
                 auth:
                   type: api_key
@@ -167,7 +165,7 @@ selfservice:
                 can_interrupt: true
             - hook: web_hook
               config:
-                url: "http://${CONSENT_HOST}:4431/admin/profile-sessions"
+                url: "http://othala:4431/admin/profile-sessions"
                 method: POST
                 auth:
                   type: api_key
@@ -192,9 +190,9 @@ selfservice:
         hooks:
           - hook: web_hook
             config:
-              # Webhook to the loopback admin port (:4431, host CONSENT_HOST), not the public port.
+              # Webhook to the loopback admin port (othala:4431), not the public port.
               # The app constant-time compares the bearer and fails closed on a missing or wrong secret.
-              url: "http://${CONSENT_HOST}:4431/admin/recovery-gate"
+              url: "http://othala:4431/admin/recovery-gate"
               method: POST
               auth:
                 # Kratos webhooks support only api_key | basic_auth: api_key with header
@@ -232,7 +230,7 @@ selfservice:
           hooks:
             - hook: web_hook
               config:
-                url: "http://${CONSENT_HOST}:4431/admin/login-code-gate"
+                url: "http://othala:4431/admin/login-code-gate"
                 method: POST
                 auth:
                   type: api_key
@@ -297,19 +295,18 @@ secrets:
 log:
   format: json
 
-# Tracing (OpenTelemetry), opt-in: the block below is OMITTED when OTHALA_OTLP_PROVIDER is empty
-# (Ory v26.2.0 rejects a present block with provider "") and emitted when it is "otel".
-# OTLP is HTTP/protobuf only, Ory ignores OTEL_* env vars, insecure: true is
-# plaintext to the firewall-scoped host alloy receiver, sampling_ratio 0.1 bounds volume.
-#@if OTHALA_OTLP_PROVIDER
+# Tracing (OpenTelemetry), opt-in: the block is OMITTED unless OTHALA_OTLP_ENDPOINT (host:port) is set.
+# OTLP is HTTP/protobuf only, Ory ignores OTEL_* env vars, insecure: true is plaintext to the
+# firewall-scoped collector, sampling_ratio 0.1 bounds volume.
+#@if OTHALA_OTLP_ENDPOINT
 tracing:
   service_name: kratos
-  deployment_environment: ${OTHALA_OTLP_ENVIRONMENT}
-  provider: ${OTHALA_OTLP_PROVIDER}     # "otel" when enabled (deploy)
+  deployment_environment: production
+  provider: otel
   providers:
     otlp:
-      server_url: ${OTHALA_OTLP_ENDPOINT}   # host:port, HTTP — host alloy OTLP receiver
-      insecure: true                         # plaintext to the host alloy receiver
+      server_url: ${OTHALA_OTLP_ENDPOINT}
+      insecure: true
       sampling:
         sampling_ratio: 0.1
 #@endif

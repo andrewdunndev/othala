@@ -1,8 +1,7 @@
 # Hydra configuration: generic Othala instance template, ${VAR}-substituted by
-# scripts/render-config.sh. HYDRA_PG_HOST is the compose service name in the lab and the
-# container name in production.
+# scripts/render-config.sh. The Postgres host is the golden service name, literal.
 
-dsn: "postgres://hydra:${HYDRA_PG_PASS}@${HYDRA_PG_HOST}:5432/hydra?sslmode=disable"
+dsn: "postgres://hydra:${HYDRA_PG_PASS}@postgres:5432/hydra?sslmode=disable"
 # HYDRA_PG_PASS must be URL-safe (percent-encoded): YAML quoting cannot fix a URL.
 
 serve:
@@ -13,11 +12,8 @@ serve:
       disable_for_health: true
     cors:
       enabled: true
-      # Extensible allowlist: browser-fetching SPA clients need an entry each, redirect-flow
-      # clients never do. OTHALA_CORS_ALLOWED_ORIGINS is comma-separated and UNQUOTED on purpose:
-      # render-config.sh escapes quotes on the assumption every token sits in a double-quoted
-      # scalar, which would corrupt this flow sequence.
-      allowed_origins: [${OTHALA_CORS_ALLOWED_ORIGINS}]
+      allowed_origins:
+        - "${OTHALA_PUBLIC_URL}"
       # Only the methods OIDC/OAuth2 requires.
       allowed_methods: [GET, POST]
       allowed_headers:
@@ -25,7 +21,7 @@ serve:
         - Content-Type
   admin:
     # Admin-plane bind address. The admin API is unauthenticated by design (the network is the
-    # control): segmented deployments bind an admin-plane address, the e2e harness uses 0.0.0.0.
+    # control): bind an admin-plane address, never one on a network shared with other services.
     # NEVER expose publicly.
     host: "${HYDRA_ADMIN_BIND_HOST}"
     request_log:
@@ -76,19 +72,18 @@ secrets:
 log:
   format: json
 
-# Tracing (OpenTelemetry), opt-in: the block below is OMITTED when OTHALA_OTLP_PROVIDER is empty
-# (Ory v26.2.0 rejects a present block with provider "") and emitted when it is "otel".
-# OTLP is HTTP/protobuf only, Ory ignores OTEL_* env vars, insecure: true is
-# plaintext to the firewall-scoped host alloy receiver, sampling_ratio 0.1 bounds volume.
-#@if OTHALA_OTLP_PROVIDER
+# Tracing (OpenTelemetry), opt-in: the block is OMITTED unless OTHALA_OTLP_ENDPOINT (host:port) is set.
+# OTLP is HTTP/protobuf only, Ory ignores OTEL_* env vars, insecure: true is plaintext to the
+# firewall-scoped collector, sampling_ratio 0.1 bounds volume.
+#@if OTHALA_OTLP_ENDPOINT
 tracing:
   service_name: hydra
-  deployment_environment: ${OTHALA_OTLP_ENVIRONMENT}
-  provider: ${OTHALA_OTLP_PROVIDER}     # "otel" when enabled (deploy)
+  deployment_environment: production
+  provider: otel
   providers:
     otlp:
-      server_url: ${OTHALA_OTLP_ENDPOINT}   # host:port, HTTP — host alloy OTLP receiver
-      insecure: true                         # plaintext to the host alloy receiver
+      server_url: ${OTHALA_OTLP_ENDPOINT}
+      insecure: true
       sampling:
         sampling_ratio: 0.1
 #@endif
