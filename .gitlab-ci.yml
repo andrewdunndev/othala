@@ -145,7 +145,7 @@ check-purity:
       [ "$rc" -eq 0 ] && echo "OK: bash -n clean on ${#FILES[@]} scripts"
       exit $rc
 
-# check-portal: one npm ci, then astro check, vitest (src and scripts), and a
+# check-portal: one npm ci, then astro check, vitest (src and scripts), the manifest lint, and a
 # well-formedness parse of the tracked plain-YAML set. kratos.yml and hydra.yml
 # are  templates, so they are excluded.
 check-portal:
@@ -164,6 +164,7 @@ check-portal:
   script:
     - npm run check
     - npm test
+    - npm run lint:manifests
     - |
       echo "=== YAML parse: tracked plain-YAML ==="
       FILES=()
