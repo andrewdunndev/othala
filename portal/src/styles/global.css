@@ -418,16 +418,16 @@ a.subtle:hover { color: var(--text); }
   margin-bottom: var(--space-2);
 }
 
-/* App logos are drawn for light grounds (Keep and Prompt are black marks). In dark mode their plate stays the
- * light palette white, so every logo reads the same in both themes. */
-:root[data-theme="dark"] .app-icon,
-:root[data-theme="dark"] .app-modal-logo:not(.app-modal-logo-mono) {
+/* Logo plates use the page tokens in both themes. Marks drawn as dark strokes with no ground of their own would vanish
+ * on a dark plate, so in dark mode those few (data-icon, the logo file's name) keep the light palette white. */
+:root[data-theme="dark"] :is(.app-icon, .app-modal-logo)[data-icon="vaultwarden"],
+:root[data-theme="dark"] :is(.app-icon, .app-modal-logo)[data-icon="owncloud"] {
   background: var(--dd-earth-50);
   border-color: var(--dd-earth-50);
 }
 @media (prefers-color-scheme: dark) {
-  :root:not([data-theme="light"]) .app-icon,
-  :root:not([data-theme="light"]) .app-modal-logo:not(.app-modal-logo-mono) {
+  :root:not([data-theme="light"]) :is(.app-icon, .app-modal-logo)[data-icon="vaultwarden"],
+  :root:not([data-theme="light"]) :is(.app-icon, .app-modal-logo)[data-icon="owncloud"] {
     background: var(--dd-earth-50);
     border-color: var(--dd-earth-50);
   }

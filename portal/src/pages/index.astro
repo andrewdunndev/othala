@@ -239,7 +239,7 @@ const devLinks = [
               </div>
             )}
             {tileGroups.map(({ groupName, tiles, meta }) => (
-              <div class:list={['tile-group', tiles.length === 2 && 'tile-group-pair']}>
+              <div class="tile-group">
                 <div class="tile-group-header">
                   <p class="tile-group-title">{meta?.title ?? groupName}</p>
                   {(meta?.description) && (
@@ -494,6 +494,7 @@ const devLinks = [
         img.src = href;
         img.alt = '';
         span.appendChild(img);
+        span.dataset.icon = href.split('/').pop().replace(/\.svg$/, '');
       } else {
         span.textContent = tpl.dataset.appMono || '';
         span.classList.add('app-modal-logo-mono');
@@ -652,8 +653,7 @@ const devLinks = [
   @media (min-width: 900px)  { .tile-grid { grid-template-columns: repeat(3, 1fr); } }
 
   /* Grouped tile sections: no frame, so the tiles sit on the same columns as the ungrouped grid. The title uses the
-     page's eyebrow type, with the group's description under it. A group of two puts its header in the empty third
-     cell on wide screens instead of leaving a hole. */
+     page's eyebrow type, with the group's description under it, full width above its tiles. */
   .tile-group { margin-top: var(--space-6); }
   .tile-group-header { margin-bottom: var(--space-3); }
   .tile-group-title {
@@ -670,16 +670,6 @@ const devLinks = [
     max-width: 60ch;
     margin: 0;
     line-height: 1.5;
-  }
-  @media (min-width: 900px) {
-    .tile-group-pair {
-      display: grid;
-      grid-template-columns: repeat(3, 1fr);
-      gap: var(--space-3);
-      align-items: stretch;
-    }
-    .tile-group-pair .tile-grid { display: contents; }
-    .tile-group-pair .tile-group-header { margin: 0; align-self: center; padding-right: var(--space-3); }
   }
 
   /* ── Dev preview ── */
@@ -862,9 +852,9 @@ const devLinks = [
   .app-modal-inner {
     position: relative;
     display: grid;
-    grid-template-columns: minmax(0, 1fr) auto;
-    grid-template-rows: auto auto minmax(0, 1fr);
-    grid-template-areas: "head actions" "prereq prereq" "body body";
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: auto auto auto minmax(0, 1fr);
+    grid-template-areas: "head" "prereq" "actions" "body";
     min-height: 0;
     flex: 1;
     overflow: hidden;
@@ -875,7 +865,7 @@ const devLinks = [
     grid-template-columns: auto minmax(0, 1fr);
     gap: var(--space-4);
     align-items: center;
-    padding: var(--space-4) var(--space-3) var(--space-4) var(--space-5);
+    padding: var(--space-4) calc(var(--space-5) + 44px + var(--space-2)) var(--space-4) var(--space-5);
     background: var(--surface);
     border-bottom: 1px solid var(--border);
   }
@@ -887,7 +877,7 @@ const devLinks = [
     height: 3.5rem;
     padding: 0.55rem;
     box-sizing: border-box;
-    background: var(--bg);
+    background: var(--surface);
     border: 1px solid var(--border);
     border-radius: var(--radius);
   }
@@ -946,7 +936,7 @@ const devLinks = [
     grid-area: actions;
     display: flex;
     align-items: center;
-    padding: var(--space-4) calc(var(--space-3) + 44px + var(--space-3)) var(--space-4) var(--space-3);
+    padding: var(--space-3) var(--space-5);
     background: var(--surface);
     border-bottom: 1px solid var(--border);
   }
@@ -992,12 +982,12 @@ const devLinks = [
       top: 0;
       z-index: 2;
       gap: var(--space-3);
-      padding: var(--space-2) calc(var(--space-3) + 44px + var(--space-2)) var(--space-2) var(--space-3);
+      padding: var(--space-3) calc(var(--space-3) + 44px + var(--space-2)) var(--space-3) var(--space-3);
       min-height: 4rem;
     }
     .app-modal-desc {
       display: -webkit-box;
-      -webkit-line-clamp: 1;
+      -webkit-line-clamp: 2;
       -webkit-box-orient: vertical;
       overflow: hidden;
     }

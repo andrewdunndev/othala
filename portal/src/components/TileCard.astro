@@ -1,7 +1,7 @@
 ---
 // One dashboard tile. The whole card body is a link that launches the app; a separate Guide button opens the
 // documentation dialog (index.astro wires [data-app-learn]). Badges show this person's prerequisite state for this person.
-// The two controls are siblings, never nested.
+// The two controls are siblings, never nested; the launch link covers the card except the Guide button.
 
 import AppIcon from './AppIcon.astro';
 import AppBadges from './AppBadges.astro';
@@ -74,10 +74,17 @@ const { tile, readiness, requirementTitles } = Astro.props;
     text-decoration: none;
   }
   .tile-launch:hover { color: var(--text); text-decoration: none; }
-  .tile-launch:focus-visible {
+  /* The link's ::after stretches over the whole card so every pixel but the Guide button launches the app. */
+  .tile-launch::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    border-radius: var(--radius);
+  }
+  .tile-launch:focus-visible { outline: none; }
+  .tile-launch:focus-visible::after {
     outline: 2px solid var(--input-focus, var(--accent));
     outline-offset: -3px;
-    border-radius: var(--radius);
   }
   .tile-title {
     display: flex;
@@ -117,6 +124,8 @@ const { tile, readiness, requirementTitles } = Astro.props;
     display: inline-flex;
     align-items: center;
     gap: var(--space-1);
+    position: relative;
+    z-index: 1;
     flex-shrink: 0;
     min-height: 36px;
     padding: 0 var(--space-3);

@@ -10,9 +10,10 @@ interface Props {
 }
 
 const { tile, size = 'md' } = Astro.props;
+const iconSlug = tile.iconHref?.split('/').pop()?.replace(/\.svg$/, '');
 ---
 
-<span class:list={['app-icon', `app-icon-${size}`]} aria-hidden="true">
+<span class:list={['app-icon', `app-icon-${size}`]} data-icon={iconSlug} aria-hidden="true">
   {
     tile.iconHref ? (
       <img class="app-icon-img" src={tile.iconHref} alt="" decoding="async" />
@@ -28,7 +29,7 @@ const { tile, size = 'md' } = Astro.props;
     align-items: center;
     justify-content: center;
     flex-shrink: 0;
-    background: var(--bg);
+    background: var(--surface);
     border: 1px solid var(--border);
     border-radius: var(--radius);
     --plate: 2.75rem;
