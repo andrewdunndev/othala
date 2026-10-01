@@ -3,7 +3,7 @@
 // belongs to that form, not to the one it sits in).
 
 import { test, expect } from '../fixtures';
-import { createIdentityWithPassword, TEST_PASSWORD } from '../actions/identity';
+import { createIdentityWithPassword, readIdentity, TEST_PASSWORD } from '../actions/identity';
 import { loginViaJsonApi } from '../actions/login';
 
 const attr = (tag: string, name: string) => tag.match(new RegExp(`\\s${name}="([^"]*)"`))?.[1];
@@ -52,4 +52,51 @@ test('ZJ1 — no settings text input has a removal as its default button', async
   }
   const anyDestructiveShared = owners.filter((o) => o.kind === 'submit' && DESTRUCTIVE.test(attr(o.tag, 'name') ?? '')).some((b) => texts.some((t) => t.owner === b.owner));
   expect(anyDestructiveShared, 'a removal shares a form with a text input').toBe(false);
+});
+
+test('ZJ2 — Enter in the new key name never removes an enrolled key', async ({ browser, baseURL, kratosAdminURL }) => {
+  const identity = await createIdentityWithPassword({
+    email: 'implicit.enter@othala.test',
+    username: 'implicit.enter',
+    displayName: 'Implicit Enter Tester',
+    groups: [],
+    kratosAdminURL,
+  });
+  const ctx = await browser.newContext();
+  const keyCount = async () => {
+    const c = ((await readIdentity(kratosAdminURL, identity.id, ['webauthn'])) as { credentials?: { webauthn?: { config?: { credentials?: unknown[] } } } }).credentials;
+    return c?.webauthn?.config?.credentials?.length ?? 0;
+  };
+  try {
+    await loginViaJsonApi(ctx, { identifier: identity.email, password: TEST_PASSWORD }, baseURL);
+    const page = await ctx.newPage();
+    const cdp = await ctx.newCDPSession(page);
+    await cdp.send('WebAuthn.enable', { enableUI: false });
+    const { authenticatorId } = await cdp.send('WebAuthn.addVirtualAuthenticator', {
+      options: { protocol: 'ctap2', transport: 'usb', hasResidentKey: false, hasUserVerification: true, isUserVerified: true },
+    });
+    await page.goto(`${baseURL}/auth/settings`);
+    await page.waitForLoadState('networkidle');
+    await page.locator('label.lbl-setup, button[data-disclose]', { hasText: /Add (a|another) security key/ }).first().click();
+    await page.locator('input[name="webauthn_register_displayname"]').fill('ZJ2 first');
+    await page.waitForFunction(() => typeof (window as unknown as Record<string, unknown>).oryWebAuthnRegistration === 'function');
+    await page.locator('button[name="webauthn_register_trigger"]').first().click();
+    await expect.poll(keyCount, { timeout: 15_000, message: 'the first key is stored' }).toBe(1);
+
+    // With no authenticator left, a ceremony started by Enter cannot add a key; a removal would drop the count to 0.
+    await cdp.send('WebAuthn.removeVirtualAuthenticator', { authenticatorId });
+    await page.goto(`${baseURL}/auth/settings`);
+    await page.waitForLoadState('networkidle');
+    await page.locator('label.lbl-setup, button[data-disclose]', { hasText: /Add (a|another) security key/ }).first().click();
+    const posts: string[] = [];
+    page.on('request', (r) => { if (r.method() === 'POST') posts.push(r.url()); });
+    const name = page.locator('input[name="webauthn_register_displayname"]');
+    await name.fill('ZJ2 second');
+    await name.press('Enter');
+    await page.waitForTimeout(1500);
+    expect(posts, 'Enter posted nothing').toEqual([]);
+    expect(await keyCount(), 'the enrolled key is still there').toBe(1);
+  } finally {
+    await ctx.close();
+  }
 });

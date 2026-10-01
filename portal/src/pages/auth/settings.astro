@@ -518,7 +518,6 @@ const lookupLabel: Record<string, string> = {
               <input type="hidden" name="method" value="lookup_secret" />
               {lookup.list.length > 0 && (
                 <div class="lookup-codes" id="lookup-codes">
-                  <p class="lookup-codes-label">Your backup codes. Keep them somewhere safe; each works once.</p>
                   <ol class="lookup-grid" data-testid="backup-codes">
                     {lookup.list.map((c) => (
                       <li class={c.used ? 'used' : ''}>{c.used ? <span class="mono">used</span> : <code class="mono">{c.code}</code>}</li>
@@ -671,18 +670,20 @@ const lookupLabel: Record<string, string> = {
         <div class="group">
           <h3>Sessions</h3>
           <p>"Sign out everywhere" ends every session and the remembered logins, so no app can quietly sign you back in.</p>
-          <form method="POST" action="/auth/settings" class="settings-form" data-astro-reload>
+          <form id="signout-form" method="POST" action="/auth/settings" data-astro-reload hidden>
             <input type="hidden" name="action" value="sign-out-everywhere" />
             <input type="hidden" name="csrf_token" value={csrfSignOut} />
+          </form>
+          <div class="settings-form">
             <input type="checkbox" class="disclose cb-remove" id="signout-all" aria-label="Sign out everywhere" />
             <div class="form-actions">
               <label for="signout-all" class="button button-secondary button-sm toggle-label lbl-remove"><span class="on-closed">Sign out everywhere</span><span class="on-open">Cancel</span></label>
             </div>
             <div class="panel-row panel-remove">
               <span>Sign out of every device and app, this one included?</span>
-              <button class="button button-danger button-sm" type="submit">Sign out everywhere</button>
+              <button class="button button-danger button-sm" type="submit" form="signout-form">Sign out everywhere</button>
             </div>
-          </form>
+          </div>
           {!logoutInfo && <p class="field-hint">Local logout endpoint unavailable; the revoke still runs.</p>}
         </div>
         <div class="group">

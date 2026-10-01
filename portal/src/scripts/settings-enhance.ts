@@ -37,7 +37,7 @@ const focusStep = () => {
   const h = document.querySelector<HTMLElement>('#two-step .panel-setup h4');
   if (!h) return;
   h.focus({ preventScroll: true });
-  h.scrollIntoView({ block: 'start', behavior: matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth' });
+  (h.closest<HTMLElement>('.group') ?? h).scrollIntoView({ block: 'start', behavior: matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth' });
 };
 
 // Disclosures are checkbox-and-label so they work without script. With script each label becomes a real button
@@ -56,6 +56,14 @@ const enhanceDisclosures = () => {
     b.type = 'button';
     b.className = label.className;
     b.dataset.disclose = box.id;
+    // The checkbox carried the item's name ("Remove passkey Work laptop"); the button now speaks for it.
+    const name = box.getAttribute('aria-label');
+    if (name) b.setAttribute('aria-label', name);
+    const panel = box.parentElement?.querySelector<HTMLElement>(box.classList.contains('cb-rename') ? '.panel-rename' : box.classList.contains('cb-remove') ? '.panel-remove' : '.panel-setup');
+    if (panel) {
+      panel.id ||= `${box.id}-panel`;
+      b.setAttribute('aria-controls', panel.id);
+    }
     b.append(...label.childNodes);
     label.replaceWith(b);
     box.tabIndex = -1;
@@ -145,6 +153,7 @@ document.addEventListener('click', (e) => {
       grid.hidden = !grid.hidden;
       hide.textContent = grid.hidden ? 'Show codes' : 'Hide codes';
       hide.setAttribute('aria-expanded', String(!grid.hidden));
+      hide.parentElement?.querySelectorAll<HTMLElement>('[data-copy-codes], [data-print-codes]').forEach((b) => { b.hidden = grid.hidden; });
     }
     return;
   }
@@ -156,7 +165,7 @@ document.addEventListener('click', (e) => {
       box.checked = true;
       syncExpanded();
       box.closest('[data-card]')?.scrollIntoView({ block: 'center' });
-      box.closest('form')?.querySelector<HTMLElement>('.panel-remove button')?.focus({ preventScroll: true });
+      box.parentElement?.querySelector<HTMLElement>('.panel-remove button')?.focus({ preventScroll: true });
     }
     return;
   }

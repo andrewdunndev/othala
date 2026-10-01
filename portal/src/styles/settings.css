@@ -18,12 +18,12 @@
 }
 .card > h2 { font-size: var(--text-lg); box-shadow: none; margin-bottom: var(--space-1); }
 .card > .lede { color: var(--text-2); font-size: var(--text-sm); margin-bottom: var(--space-3); }
-.group { padding-top: var(--space-3); margin-top: var(--space-3); border-top: 1px solid var(--border); }
+.group { scroll-margin-top: 5rem; padding-top: var(--space-3); margin-top: var(--space-3); border-top: 1px solid var(--border); }
 .group:first-of-type { border-top: none; margin-top: 0; padding-top: 0; }
 .group > h3 { font-size: var(--text-base); box-shadow: none; display: flex; gap: var(--space-2); align-items: center; flex-wrap: wrap; }
 .group > p, .group form > p { font-size: var(--text-sm); color: var(--text-2); margin-top: var(--space-1); }
 .group .notice { margin: var(--space-3) 0 0; }
-.group .badge + .badge { margin-left: 0; }
+.group .badge + .badge, .settings-status .badge + .badge { margin-left: 0; }
 
 .settings-form { display: flex; flex-direction: column; gap: var(--space-4); max-width: 32rem; margin-top: var(--space-2); }
 .settings-form.wide { max-width: none; }
@@ -42,6 +42,7 @@
 .disclose { position: absolute; opacity: 0; width: 1px; height: 1px; pointer-events: none; }
 .toggle-label { cursor: pointer; }
 .settings .button { display: inline-flex; align-items: center; justify-content: center; }
+.settings [hidden] { display: none !important; }
 .cb-remove:focus-visible ~ * .lbl-remove, .cb-rename:focus-visible ~ * .lbl-rename, .cb-replace:focus-visible ~ * .lbl-replace, .cb-setup:focus-visible ~ * .lbl-setup, .cb-dismiss:focus-visible ~ .prompt .toggle-label { outline: 2px solid var(--input-focus); outline-offset: 2px; }
 .toggle-label .on-open { display: none; }
 .cb-remove:checked ~ * .lbl-remove .on-closed, .cb-rename:checked ~ * .lbl-rename .on-closed, .cb-replace:checked ~ * .lbl-replace .on-closed, .cb-setup:checked ~ * .lbl-setup .on-closed { display: none; }
@@ -91,13 +92,12 @@
 .steps summary { cursor: pointer; color: var(--accent); }
 .totp-secret-value { display: block; margin-top: var(--space-2); padding: var(--space-2) var(--space-3); background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-sm); font-size: var(--text-sm); word-break: break-all; color: var(--text); user-select: all; }
 .codeinput { max-width: 12rem; font-family: var(--font-mono); letter-spacing: 0.2em; }
-.field.bad input, .field.bad input:focus { border-color: var(--danger); }
-.field.bad input:focus { box-shadow: 0 0 0 3px var(--danger-subtle); }
+.field.bad input, .field.bad input:focus, .panel-row input[aria-invalid='true'], .panel-row input[aria-invalid='true']:focus { border-color: var(--danger); }
+.field.bad input:focus, .panel-row input[aria-invalid='true']:focus { box-shadow: 0 0 0 3px var(--danger-subtle); }
 .steps p.field-error, .group p.field-error { color: var(--danger); }
 .steps .field { margin-top: var(--space-3); }
 
 .lookup-codes { margin-top: var(--space-3); }
-.lookup-codes-label { font-size: var(--text-sm); color: var(--text-2); margin-bottom: var(--space-1); }
 .lookup-grid { list-style: none; padding: var(--space-3); margin: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(8rem, 1fr)); gap: var(--space-2) var(--space-3); background: var(--bg); border: 1px solid var(--border); border-radius: var(--radius-sm); }
 .lookup-grid[hidden] { display: none; }
 .lookup-grid li { font-size: var(--text-sm); letter-spacing: 0.04em; }
@@ -130,4 +130,9 @@
   .settings .page-title { font-size: var(--text-2xl); }
   .settings .button { min-height: 2.75rem; }
   .narrow-only { display: block; }
+  /* On the phone the setup key comes before the QR, which that phone cannot scan. */
+  .steps > li { display: flex; flex-direction: column; }
+  .steps > li > details { order: 1; }
+  .steps > li > .totp-qr { order: 2; }
+  .totp-secret-value { display: flex; align-items: center; min-height: 2.75rem; }
 }
