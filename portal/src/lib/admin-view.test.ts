@@ -18,7 +18,7 @@ import {
 } from './admin-view';
 import type { ClientManifest } from './manifests';
 import { asAdmin, identity, withCredential, withLookupSecret, withPasskey, withTotp, withWebauthnKey } from './test-builders';
-import { hasSecondFactor } from './step-up';
+import { parseIdentity } from './identity-facts';
 
 const role = (name: string) => ({ name, description: '', claimEmit: {} });
 const grafana = {
@@ -150,16 +150,16 @@ describe('sign-in status agrees with the second-factor rule', () => {
   it('does not count an empty webauthn entry as a security key', () => {
     const i = withCredential(identity(), 'webauthn', {});
     expect(status(i)).toMatchObject({ 'Security keys': 'None' });
-    expect(hasSecondFactor(i)).toBe(false);
+    expect(parseIdentity(i).hasSecondFactor).toBe(false);
   });
 
-  it('counts a security key and an authenticator app exactly when hasSecondFactor does', () => {
+  it('counts a security key and an authenticator app exactly when parseIdentity counts a second factor', () => {
     const key = withWebauthnKey(identity());
     expect(status(key)).toMatchObject({ 'Security keys': '1', 'Authenticator app': 'Not set' });
-    expect(hasSecondFactor(key)).toBe(true);
+    expect(parseIdentity(key).hasSecondFactor).toBe(true);
     const app = withTotp(identity());
     expect(status(app)).toMatchObject({ 'Authenticator app': 'Set' });
-    expect(hasSecondFactor(app)).toBe(true);
+    expect(parseIdentity(app).hasSecondFactor).toBe(true);
     expect(status(withCredential(identity(), 'totp', {}))).toMatchObject({ 'Authenticator app': 'Not set' });
   });
 });

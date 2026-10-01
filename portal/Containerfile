@@ -18,8 +18,8 @@
 # build-time bundled via Astro Content Collections. Adding an app's
 # education content is an image rebuild; OIDC manifest edits are not.
 #
-# CI build context: auth repo root (see .gitlab-ci.yml build-portal job).
-# Local build (from auth repo root):
+# CI build context: repo root (see .gitlab-ci.yml build-portal job).
+# Local build (from repo root):
 #   podman build -t dunn.dev/othala-portal:lab -f portal/Containerfile .
 # Run:
 #   podman run --rm -p 8080:8080 \

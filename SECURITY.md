@@ -58,9 +58,9 @@ Each names its enforcer and the test that fails if the enforcer stops working.
   Test: `portal/scripts/noncanonical-repair.test.mjs`.
 - **Portal admin authority.** `requireAdminSession`, `portal/src/lib/admin.ts`:
   active session, assurance level exactly `aal2`, and the `metadata_admin.admin`
-  marker read fresh from the admin API (`isAdminMarker`,
-  `portal/src/lib/admin-auth.ts`). No group grants it. Tests:
-  `portal/src/lib/admin-auth.test.ts`, `e2e/playwright/tests/f-aal2-bypass.spec.ts`.
+  marker read fresh from the admin API (`parseIdentity`,
+  `portal/src/lib/identity-facts.ts`). No group grants it. Tests:
+  `portal/src/lib/identity-facts.test.ts`, `e2e/playwright/tests/f-aal2-bypass.spec.ts`.
 - **Internal-network admin listener (PORTAL_ADMIN_BIND_HOST).** `portal/src/server/listen.mjs`: privileged routes
   on a separate internal-network listener whose mux is disjoint from the public one,
   guarded by one bearer secret compared with `bearerMatches`
@@ -129,9 +129,6 @@ Live properties of the deployed shape, stated rather than omitted.
 - **Rate limiting depends on a third-party Caddy module.** A binary built without
   it refuses to load `caddy/Caddyfile` at all, so the failure is a refusal to
   start rather than a silently unlimited edge. Confirm it is compiled in.
-- **forward_auth is satisfied by a first-factor session.** It checks state and
-  group membership, not assurance level. An app needing a second factor must
-  enforce it itself or sit behind an OIDC client that does.
 - **Sessions are long-lived and `whoami` answers at the first assurance level**
   (`kratos/kratos.yml`, `session`). A stolen cookie stays valuable for the
   configured lifespan; revocation, not expiry, is what ends it.

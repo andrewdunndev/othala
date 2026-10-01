@@ -3,7 +3,7 @@
 // identity-level checks the upstream proxy cannot make.
 
 import { getSession, browserFlows } from './kratos';
-import { isAdminMarker } from './admin-auth';
+import { decideAccess } from './gate';
 import { revokeSubject, type RevokeResult } from './revoke';
 import { ADMIN_FRESHNESS_HOURS } from './constants';
 import type { Session } from './types';
@@ -93,15 +93,9 @@ export async function requireAdminSession(astro: any): Promise<Session | Respons
     return astro.redirect(`/auth/login?return_to=${returnTo}`);
   }
 
-  // (b) AAL2 server-side; anything but exactly 'aal2' steps up.
-  const aal = (session as unknown as Record<string, unknown>)['authenticator_assurance_level'];
-  if (aal !== 'aal2') {
-    const returnTo = encodeURIComponent(astro.url.pathname + astro.url.search);
-    return astro.redirect(browserFlows.login({ aal: 'aal2', refresh: true, returnTo }));
-  }
-
-  // (c) Freshness gate: same step-up as (b), before the admin-marker fetch.
-  if (!isSessionFresh(session, ADMIN_FRESHNESS_HOURS)) {
+  // (b, c) AAL2 within the freshness window (gate.ts decideAccess), settled before the admin-marker fetch.
+  const facts = { ...session, fresh: isSessionFresh(session, ADMIN_FRESHNESS_HOURS) };
+  if ('stepUp' in decideAccess(null, 'admin', facts)) {
     const returnTo = encodeURIComponent(astro.url.pathname + astro.url.search);
     return astro.redirect(browserFlows.login({ aal: 'aal2', refresh: true, returnTo }));
   }
@@ -114,7 +108,7 @@ export async function requireAdminSession(astro: any): Promise<Session | Respons
     return astro.redirect('/auth/error?reason=auth-unreachable');
   }
 
-  if (!isAdminMarker(adminIdentity)) {
+  if (!('allow' in decideAccess(adminIdentity, 'admin', facts))) {
     return astro.redirect('/auth/error?reason=not-admin');
   }
 

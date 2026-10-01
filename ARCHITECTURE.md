@@ -59,8 +59,8 @@ steps sit in a `route` block, because Caddy's default directive order would othe
 `oidc-app` snippet removes only the Kratos session cookie and leaves the app's own cookies.
 
 **Admin authority is a marker, not a group.** Kratos strips `metadata_admin` from
-`/sessions/whoami`, so it can only be written and read through the admin API. `isAdminMarker`
-(`portal/src/lib/admin-auth.ts`) is the sole authority check, and it must be handed an identity
+`/sessions/whoami`, so it can only be written and read through the admin API. `parseIdentity`
+(`portal/src/lib/identity-facts.ts`) is the sole authority check, fed only an identity
 fetched fresh from the admin API. A string named `admin` inside `metadata_admin.groups` confers
 nothing. `requireAdminSession` (`portal/src/lib/admin.ts`) demands three things together: an active
 session, `authenticator_assurance_level === 'aal2'`, and the marker.
@@ -123,7 +123,7 @@ and keeps the role ranked highest by its index in `manifest.roles`. It is not a 
 stored order. Holding both the entry group and the role group is the normal case, not an edge case,
 and a first-match walk over an alphabetically sorted array would have handed those identities the
 lesser role. There is exactly one resolver: the consent path and the admin UI's effective-access view
-(`computeEffectiveAccess`, `portal/src/lib/access.ts`) both call it, so they agree structurally rather
+both call it, so they agree structurally rather
 than by two walks staying in sync.
 
 ## The forward-auth request path

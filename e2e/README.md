@@ -28,7 +28,7 @@ The browser profile adds Caddy and a Playwright container.
 Build from current source; a stale image gives false results.
 
 ```sh
-# from the auth repo root
+# from the repo root
 podman build -t registry.gitlab.com/dunn.dev/othala:lab \
   -f portal/Containerfile .
 ```

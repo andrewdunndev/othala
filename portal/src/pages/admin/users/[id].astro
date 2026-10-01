@@ -20,9 +20,8 @@ import { bannerFor } from '../../../lib/admin-banner';
 import { currentLevel, NO_ACCESS } from '../../../lib/access-rows';
 import { emailIsVerified, householdChoices, PEOPLE_LOAD_ERROR, personLimits, personName, removalBlock, signInMethods, unrecognisedGroups } from '../../../lib/admin-view';
 import { devActionResult } from '../../../lib/admin-fixtures';
-import { isAdminMarker } from '../../../lib/admin-auth';
+import { parseIdentity } from '../../../lib/identity-facts';
 import { shouldRefuseRecovery } from '../../../lib/access';
-import { hasSecondFactor } from '../../../lib/step-up';
 import { loadRequirements } from '../../../lib/tiles';
 import { signToken, verifyToken, CSRFError } from '../../../lib/csrf';
 import type { Identity } from '../../../lib/types';
@@ -134,10 +133,10 @@ const meta = identity?.metadata_admin;
 const username = identity?.traits?.username ?? '';
 const email = identity?.traits?.email ?? '';
 const isSelf = id === adminId;
-const isTargetAdmin = identity ? isAdminMarker(identity) : false;
+const isTargetAdmin = parseIdentity(identity).isAdmin;
 const isOff = identity?.state === 'inactive';
 const verified = identity ? emailIsVerified(identity) : false;
-const twoStep = identity ? hasSecondFactor(identity) : false;
+const twoStep = parseIdentity(identity).hasSecondFactor;
 const methods = identity ? signInMethods(identity) : [];
 const unrecognised = identity ? unrecognisedGroups(identity, manifests) : [];
 const currentLevels: Record<string, string> = {};
@@ -152,7 +151,7 @@ let lastAdmin = false;
 if (isTargetAdmin && !isOff) {
   try {
     const all = dev ? dev.identities : await listIdentities();
-    lastAdmin = all.filter((i) => isAdminMarker(i) && i.state !== 'inactive').length <= 1;
+    lastAdmin = all.filter((i) => parseIdentity(i).isAdmin && i.state !== 'inactive').length <= 1;
   } catch {
     lastAdmin = false;
   }

@@ -2,11 +2,10 @@
 // an admin-marked identity keeps at least one second factor. The hook context
 // lacks credentials and the form, so the verdict uses the stored identity and
 // the method: totp is known (Kratos unlinks when enrolled); a webauthn change
-// is refused if any key removal would leave no second factor (hasSecondFactor).
+// is refused if any key removal would leave no second factor (parseIdentity).
 
 import type { Identity } from './types';
-import { isAdminMarker } from './admin-auth';
-import { hasSecondFactor } from './step-up';
+import { parseIdentity } from './identity-facts';
 
 export const SECOND_FACTOR_KEEP = 'Admin accounts keep at least one authenticator app or security key.';
 export const SECOND_FACTOR_UNAVAILABLE = 'This change is unavailable right now. Try again later.';
@@ -28,7 +27,7 @@ function without(creds: Creds, type: string): Creds {
 /** Each credential map the submission can produce by removing something. */
 function removalOutcomes(stored: Identity, creds: Creds, method: 'totp' | 'webauthn'): Creds[] {
   if (method === 'totp') {
-    const totpOnly = hasSecondFactor(withCreds(stored, { totp: creds.totp }));
+    const totpOnly = parseIdentity(withCreds(stored, { totp: creds.totp })).hasSecondFactor;
     return totpOnly ? [without(creds, 'totp')] : [];
   }
   const entry = creds.webauthn as { config?: { credentials?: unknown } } | undefined;
@@ -49,7 +48,7 @@ export function secondFactorChangeVerdict(stored: Identity | null | undefined, m
   if (!stored || typeof stored !== 'object' || (method !== 'totp' && method !== 'webauthn')) {
     return { refuse: true, text: SECOND_FACTOR_UNAVAILABLE };
   }
-  if (!isAdminMarker(stored)) return { refuse: false };
+  if (!parseIdentity(stored).isAdmin) return { refuse: false };
   // A totp or webauthn entry without its config means the read did not
   // include credential configs, and proves nothing about enrolment.
   const creds = stored.credentials as Creds | undefined;
@@ -60,7 +59,7 @@ export function secondFactorChangeVerdict(stored: Identity | null | undefined, m
       return { refuse: true, text: SECOND_FACTOR_UNAVAILABLE };
     }
   }
-  if (!hasSecondFactor(stored)) return { refuse: false };
-  const losesLast = removalOutcomes(stored, creds, method).some((after) => !hasSecondFactor(withCreds(stored, after)));
+  if (!parseIdentity(stored).hasSecondFactor) return { refuse: false };
+  const losesLast = removalOutcomes(stored, creds, method).some((after) => !parseIdentity(withCreds(stored, after)).hasSecondFactor);
   return losesLast ? { refuse: true, text: SECOND_FACTOR_KEEP } : { refuse: false };
 }

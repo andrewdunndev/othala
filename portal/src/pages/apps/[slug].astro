@@ -24,8 +24,7 @@ import {
 } from '../../lib/tiles';
 import { getSession } from '../../lib/kratos';
 import { getIdentity } from '../../lib/admin-api';
-import { identityGroups } from '../../lib/gate';
-import { isAdminMarker } from '../../lib/admin-auth';
+import { parseIdentity } from '../../lib/identity-facts';
 import { devMockIdentity } from '../../lib/dev-mock';
 import type { Identity } from '../../lib/types';
 
@@ -62,8 +61,8 @@ if (!entry) {
 
 // Admin authority is the metadata_admin.admin marker (admin-API-only-writable boolean). Admins see every app's page;
 // everyone else needs membership in one of the tile's bound access groups (userCanSeeTile reads the gate's binding).
-const groups = identity ? identityGroups(identity) : [];
-const isAdmin = identity ? isAdminMarker(identity) : false;
+const groups = parseIdentity(identity).groups;
+const isAdmin = parseIdentity(identity).isAdmin;
 if (!(isAdmin || userCanSeeTile(entry, groups))) {
   return Astro.redirect('/auth/error?reason=not-authorised');
 }

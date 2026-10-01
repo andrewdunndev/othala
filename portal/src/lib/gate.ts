@@ -1,30 +1,26 @@
-// Access gate, FAIL-CLOSED, applied on the login and consent challenges: (1) identity.state is exactly "active";
+// Access policy, FAIL-CLOSED. decideAccess decides app sign-in, forward-auth and the admin pages; the consent
+// challenge re-runs only the gate: (1) identity.state is exactly "active";
 // (2) the identity holds ANY group in manifest.accessGroups (OR), read from metadata_admin.groups; (3) every stored
 // group matches GROUP_RE (refuseNonCanonical). consent.skip_access_check bypasses only (2), never (1) or (3).
 // Pure functions over a fetched identity; a failed lookup passes null and is denied.
 
-import type { Identity } from './types';
+import type { Identity, Session } from './types';
 import type { ClientManifest } from './manifests';
 import { GROUP_RE } from './access-groups';
+import { parseIdentity } from './identity-facts';
+import { lookupRole } from './claims';
+import { servingManifests } from './manifest-store';
 
 const LEGACY_ADMIN_GROUP = 'admin';
 
-/** Read metadata_admin.groups defensively (tolerates any/undefined shape). */
-export function identityGroups(identity: Identity | null | undefined): string[] {
-  const meta = identity?.metadata_admin as { groups?: unknown } | undefined;
-  const raw = meta?.groups;
-  if (!Array.isArray(raw)) return [];
-  return raw.filter((g): g is string => typeof g === 'string');
-}
-
 /** Whether the identity holds the group. Compared VERBATIM: GROUP_RE is the one canonical form, so a case fold would only match names no owned boundary could write. */
 export function hasGroup(identity: Identity | null | undefined, group: string): boolean {
-  return identityGroups(identity).some((g) => g === group);
+  return parseIdentity(identity).groups.some((g) => g === group);
 }
 
 /** Stored group names that violate GROUP_RE; every owned write path rejects them, so a hit means the identity was written through the Kratos admin API. */
 export function nonCanonicalGroups(identity: Identity | null | undefined): string[] {
-  return identityGroups(identity).filter((g) => !GROUP_RE.test(g));
+  return parseIdentity(identity).groups.filter((g) => !GROUP_RE.test(g));
 }
 
 /**
@@ -105,12 +101,74 @@ export function enforceAccessGate(
   }
 
   // OR-semantics over the bound groups.
-  const userGroups = identityGroups(identity);
+  const userGroups = parseIdentity(identity).groups;
   if (!accessGroups.some((g) => userGroups.includes(g))) {
     const list = accessGroups.join(', ');
     return { allowed: false, reason: `User is not in any of the access group(s): ${list}` };
   }
   return { allowed: true };
+}
+
+const rankOf = (m: ClientManifest, roleName: string) => m.roles.findIndex((r) => r.name === roleName);
+
+/** An app's entry role rank: the lowest role its access groups map to, else the last declared role (0 is highest). */
+function entryRank(m: ClientManifest): number {
+  const ranks = m.accessGroups.map((g) => rankOf(m, m.groupRoleMap[g] ?? '')).filter((r) => r >= 0);
+  return ranks.length > 0 ? Math.max(...ranks) : m.roles.length - 1;
+}
+
+/** True when the identity resolves, in any served manifest, to a role ranked above that app's entry role. */
+export function holdsElevatedRole(identity: Identity | null | undefined, manifests: ClientManifest[] = servingManifests()): boolean {
+  return manifests.some((m) => {
+    const role = lookupRole(m, identity?.metadata_admin);
+    return role !== null && rankOf(m, role.roleName) < entryRank(m);
+  });
+}
+
+/**
+ * Step-up below aal2 (a missing AAL counts as below): the identity holds a second factor, the admin marker, or a role
+ * above an app's entry role. The identity must come from the admin API (getIdentity).
+ */
+export function needsStepUp(
+  session: Pick<Session, 'authenticator_assurance_level'> | null | undefined,
+  identity: Identity | null | undefined,
+  manifests?: ClientManifest[],
+): boolean {
+  if (session?.authenticator_assurance_level === 'aal2') return false;
+  const facts = parseIdentity(identity);
+  return facts.isAdmin || facts.hasSecondFactor || holdsElevatedRole(identity, manifests);
+}
+
+/**
+ * What a session asks to reach: an OIDC app by its manifest, a forward-auth group, the admin pages, or a session from
+ * an emailed code (code sign-in, recovery, and the setup links the admin pages send).
+ */
+export type AccessTarget = { app: ClientManifest | undefined } | { group: string } | 'admin' | 'emailed-code';
+export type AccessDecision = { allow: true } | { stepUp: true } | { deny: string };
+/** `fresh`: the session is within the admin freshness window; only the admin pages read it. */
+export type SessionFacts = Pick<Session, 'authenticator_assurance_level'> & { fresh?: boolean };
+
+/**
+ * The access policy for app sign-in, forward-auth, the admin pages and emailed codes. Apps and groups: the gate first
+ * (a denial outranks a step-up), then step-up. Admin pages: aal2 within the freshness window, then the admin marker;
+ * that session rule reads no identity, so the caller can settle it (identity null) before reading the admin API.
+ * Emailed codes: never for an admin account, whose sign-in needs a key.
+ */
+export function decideAccess(
+  identity: Identity | null | undefined,
+  target: AccessTarget,
+  session: SessionFacts | null | undefined,
+  manifests?: ClientManifest[],
+): AccessDecision {
+  if (target === 'emailed-code') return parseIdentity(identity).isAdmin ? { deny: 'admin account' } : { allow: true };
+  if (target === 'admin') {
+    if (session?.authenticator_assurance_level !== 'aal2' || session.fresh !== true) return { stepUp: true };
+    return parseIdentity(identity).isAdmin ? { allow: true } : { deny: 'not an admin' };
+  }
+  const gate =
+    'group' in target ? enforceGroupGate(identity, target.group) : enforceAccessGate(identity, target.app?.clientId ?? '', target.app);
+  if (!gate.allowed) return { deny: gate.reason ?? '' };
+  return needsStepUp(session, identity, manifests) ? { stepUp: true } : { allow: true };
 }
 
 /** What one save of the admin edit form is allowed to write. */

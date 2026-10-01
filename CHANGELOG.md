@@ -7,6 +7,21 @@ aims to follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 The git tag is the authoritative version; `portal/package.json` mirrors it.
 This CHANGELOG and git tags carry the deployed-instance release state.
 
+## [0.10.1] - 2026-10-01
+
+A readiness check that reads its dependencies, an audit line per admin action, and one access decision.
+
+### Changed
+
+- `/readyz` on the admin listener checks Kratos and Hydra readiness. It answers 503 and names the dependency that is not ready. `/healthz` stays liveness only.
+- App sign-in, forward-auth, admin pages and emailed-code sessions are decided by one function over one parsed identity. The access rules are unchanged.
+- `DEPLOY.md`: verify the image signature with cosign before pinning, and pin by tag and digest. Take a `pg_dump` before any deploy that changes an Ory pin; rolling back across that change means restoring it.
+
+### Added
+
+- Each admin action writes one JSON line to stdout: `event`, `action`, `actor`, `target` and `result`, with identity ids only.
+- CI fails on a detected secret or an untrackable image pin, and runs the manifest lint.
+
 ## [0.10.0] - 2026-10-01
 
 An apps-first home with setup guides, and fewer env vars.

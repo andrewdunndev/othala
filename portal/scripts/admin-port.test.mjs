@@ -23,9 +23,9 @@ import { asAdmin, identity, session, withCredential, withPasskey, withTotp, with
 import * as secondFactorRuntime from '../src/lib/second-factor-gate.ts';
 import { emailChangeLocked, emailChangeVerdict, EMAIL_CHANGE_REFUSAL } from '../src/lib/profile-gate.ts';
 import { getIdentity, listSessions, revokeSession } from '../src/lib/admin-api.ts';
-import { isAdminMarker } from '../src/lib/admin-auth.ts';
+import { decideAccess } from '../src/lib/gate.ts';
 
-const runtime = { KRATOS_ADMIN_URL: 'http://kratos.test', HYDRA_ADMIN_URL: 'http://hydra.test', ...secondFactorRuntime, emailChangeVerdict, getIdentity, listSessions, revokeSession, isAdminMarker };
+const runtime = { KRATOS_ADMIN_URL: 'http://kratos.test', HYDRA_ADMIN_URL: 'http://hydra.test', ...secondFactorRuntime, emailChangeVerdict, getIdentity, listSessions, revokeSession, decideAccess };
 const handle = (req, res, rt = runtime) => handleAdminRequest(req, res, rt);
 
 const ADMIN_UUID = '11111111-1111-1111-1111-111111111111';

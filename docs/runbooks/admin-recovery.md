@@ -61,7 +61,7 @@ curl -fsS -X PATCH -H 'Content-Type: application/json' \
   http://localhost:4434/admin/identities/<UUID>
 ```
 
-That is the same two-op shape the portal itself uses (`setAdminMarker` in
+That is the same two-op shape the portal itself uses (`patchAdminMarker` in
 `portal/src/lib/admin-api.ts`). Patch the marker and nothing else — sending a
 whole `metadata_admin` object replaces `groups` too, silently stripping an
 admin's app access while they can still sign in.
@@ -70,7 +70,7 @@ admin's app access while they can still sign in.
 app comes from holding that app's `<svc>-access` group, admins included;
 `<svc>-admin` grants the elevated role *inside* an app and admits nobody on
 its own. An admin who also uses a service holds both, explicitly. The full
-model is `portal/src/lib/gate.ts` and `portal/src/lib/admin-auth.ts`.
+model is `portal/src/lib/gate.ts` and `portal/src/lib/identity-facts.ts`.
 
 ---
 

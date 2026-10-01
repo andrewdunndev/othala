@@ -93,7 +93,7 @@ async function loadRuntime() {
 }
 
 /**
- * Read an identity's admin marker from the Kratos admin API (the hook payload carries only the id).
+ * Apply decideAccess's emailed-code rule to the identity read from the Kratos admin API (the payload carries only the id).
  * Fail-closed: any error returns `{ refuse: true, reason }`.
  * @param {string} identityId Kratos identity UUID from the webhook payload.
  * @param {object} [runtime] injectable; defaults to the built bundle.
@@ -102,7 +102,7 @@ async function loadRuntime() {
 export async function fetchAdminMarker(identityId, runtime) {
   const fetched = await fetchStoredIdentity(runtime, identityId, 'recovery-gate');
   if (fetched.refuse) return fetched;
-  if (fetched.rt.isAdminMarker(fetched.identity)) {
+  if ('deny' in fetched.rt.decideAccess(fetched.identity, 'emailed-code', null)) {
     return { refuse: true, admin: true, reason: 'admin recovery is console-only' };
   }
   return { refuse: false, reason: '' };
@@ -379,6 +379,7 @@ async function handleReadyz(res, runtime) {
       try {
         const r = await fetch(url, { signal: AbortSignal.timeout(READY_TIMEOUT_MS) });
         if (!r.ok) failed.push(name);
+        await r.body?.cancel();
       } catch {
         failed.push(name);
       }

@@ -27,8 +27,7 @@ import {
 import { devMockIdentity } from '../lib/dev-mock';
 import { getSession, isReachable } from '../lib/kratos';
 import { getIdentity } from '../lib/admin-api';
-import { identityGroups } from '../lib/gate';
-import { isAdminMarker } from '../lib/admin-auth';
+import { parseIdentity } from '../lib/identity-facts';
 import HeaderActions from '../components/HeaderActions.astro';
 import type { Identity } from '../lib/types';
 import { instanceName } from '../lib/config';
@@ -81,7 +80,7 @@ const hasPasskeyEnrolled = Boolean(identity?.credentials?.passkey);
 // A second, undismissable nudge: an unverified recovery address is a lockout waiting to happen.
 const emailUnverified = state === 'post-auth' && emailVerified(identity) === false;
 
-const groups = identityGroups(identity);
+const groups = parseIdentity(identity).groups;
 // Visibility reads the same access binding (accessGroups, OR) as the OIDC entry gate, so a tile shows iff the gate admits.
 const visibleTiles =
   state === 'post-auth'
@@ -128,8 +127,8 @@ const tileGroups = Array.from(groupedTilesMap.entries())
     meta: groupRegistry.get(groupName),
   }));
 // Admin link: the metadata_admin.admin marker of the admin-API identity; /admin itself is gated by
-// requireAdminSession. isAdminMarker is false on any error or missing marker, which is fine for cosmetic chrome.
-const isAdmin = state === 'post-auth' && isAdminMarker(identity);
+// requireAdminSession. The admin marker reads false on any error or missing marker, which is fine for cosmetic chrome.
+const isAdmin = state === 'post-auth' && parseIdentity(identity).isAdmin;
 
 const displayName = identity?.traits.displayName || identity?.traits.username || '';
 const firstName = displayName.split(' ')[0] || displayName;

@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { INCLUDED_CREDENTIALS } from './admin-api';
 import { identity, session, withTotp, withWebauthnKey, withPasskey, withLookupSecret, asAdmin, whoamiIdentity } from './test-builders';
-import { hasSecondFactor } from './step-up';
+import { parseIdentity } from './identity-facts';
 
 describe('identity builder defaults', () => {
   it('carries the schema webauthn entry with identifiers and no keys', () => {
@@ -19,10 +19,10 @@ describe('identity builder defaults', () => {
   });
 
   it('holds no second factor until one is added', () => {
-    expect(hasSecondFactor(identity())).toBe(false);
-    expect(hasSecondFactor(withTotp(identity()))).toBe(true);
-    expect(hasSecondFactor(withWebauthnKey(identity()))).toBe(true);
-    expect(hasSecondFactor(withWebauthnKey(identity(), { passwordless: true }))).toBe(false);
+    expect(parseIdentity(identity()).hasSecondFactor).toBe(false);
+    expect(parseIdentity(withTotp(identity())).hasSecondFactor).toBe(true);
+    expect(parseIdentity(withWebauthnKey(identity())).hasSecondFactor).toBe(true);
+    expect(parseIdentity(withWebauthnKey(identity(), { passwordless: true })).hasSecondFactor).toBe(false);
   });
 
   it('asAdmin keeps existing metadata_admin fields', () => {
