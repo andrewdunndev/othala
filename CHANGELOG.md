@@ -40,8 +40,8 @@ Delete each from the deploy environment.
 
 ### Changed
 
-- Production start needs `OTHALA_INSTANCE_NAME`.
-- Production start needs `OTHALA_CONTACT_RECIPIENT` and `OTHALA_SMTP_CONNECTION_URI`.
+- Production needs `OTHALA_INSTANCE_NAME`.
+- Production needs `OTHALA_CONTACT_RECIPIENT` and `OTHALA_SMTP_CONNECTION_URI`.
 - Kratos and Hydra trace with `OTHALA_OTLP_ENDPOINT`.
 - Kratos login flow lifespan is 1h, up from 10m.
 - Kratos public CORS is off.
