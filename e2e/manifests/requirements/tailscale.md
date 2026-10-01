@@ -1,17 +1,11 @@
 ---
 title: Tailscale
-why: Some apps are reachable only from devices on the private Tailscale network.
+why: Some apps are reachable only on the private network.
 ---
 ## What it's for
 
-Tailscale puts a device on the private network that hosts these apps, from anywhere.
+Puts a device on the private network.
 
 ## First time
 
-1. Install the Tailscale app on the device.
-2. Sign in with the invited account and switch it on.
-3. Open the app again.
-
-## Getting help
-
-Ask the administrator to send a new invitation.
+1. Install Tailscale and sign in.

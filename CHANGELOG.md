@@ -9,12 +9,12 @@ This CHANGELOG and git tags carry the deployed-instance release state.
 
 ## [Unreleased]
 
-Heading for 0.10.0: an apps-first signed-in home with per-app setup guides, and fewer env vars and Ory keys (restated defaults are gone, and required settings fail at boot).
+Heading for 0.10.0: an apps-first signed-in home with setup guides, and fewer env vars and Ory keys.
 
 ### Added
 
-- The signed-in home is an apps-first grid of compact tiles with logo plates, whole-card launch, copyable chips and a top bar carrying the account actions.
-- Each app can carry a setup guide and `presentation.requires` prerequisites defined under `requirements/` in the manifest directory; a tile shows the person's readiness, and the guide and requirement pages share one layout.
+- The signed-in home is an apps-first grid of tiles with logo plates and a top bar for account actions.
+- Apps can carry a setup guide and `presentation.requires` prerequisites defined under `requirements/`; a tile shows readiness.
 - `manifest-lint` warns when `presentation.requires` names an undefined requirement.
 
 ### Removed
@@ -31,11 +31,11 @@ Delete each from the deploy environment; none is read any more.
 - `OTHALA_HIBP_ENABLED` and `OTHALA_PASSWORD_MIN_LENGTH`: breach check on, minimum length 12.
 - `OTHALA_CORS_ALLOWED_ORIGINS`: Hydra CORS allows only `OTHALA_PUBLIC_URL`.
 - `OTHALA_PUBLIC_HOST`: the Caddyfile site address is `OTHALA_PUBLIC_URL`.
-- `OTHALA_OTLP_PROVIDER`, `OTHALA_OTLP_ENVIRONMENT`, `OTEL_*` and `OTLP_INGEST_TOKEN`: set `OTHALA_OTLP_ENDPOINT` to trace.
+- `OTHALA_OTLP_PROVIDER`, `OTHALA_OTLP_ENVIRONMENT`, `OTEL_*`, `OTLP_INGEST_TOKEN`: set `OTHALA_OTLP_ENDPOINT` to trace.
 - `KRATOS_PUBLIC_URL`, `HYDRA_PUBLIC_URL`, `KRATOS_ADMIN_URL`, `HYDRA_ADMIN_URL`, `KRATOS_ADMIN_TOKEN` and `HYDRA_ADMIN_TOKEN`: fixed at `kratos:4433`, `kratos:4434` and `hydra:4445`, no bearer.
-- `ADMIN_HOST`: renamed to `PORTAL_ADMIN_BIND_HOST`, which is required in production (the portal refuses to start without it).
+- `ADMIN_HOST`: renamed `PORTAL_ADMIN_BIND_HOST`, required in production.
 - `KRATOS_PG_HOST`, `HYDRA_PG_HOST`, `KRATOS_ADMIN_HOST` and `CONSENT_HOST`: the hosts are `postgres`, `kratos`, `othala`.
-- `MANIFEST_DIR` (production reads `/etc/portal/manifests`; `astro dev` still honours it), `PORT`, `HOST`, `ADMIN_PORT`, `PORTAL_LOGIN_URL` and `PORTAL_CONSENT_URL`: fixed.
+- `MANIFEST_DIR` (production reads `/etc/portal/manifests`), `PORT`, `HOST`, `ADMIN_PORT`, `PORTAL_LOGIN_URL` and `PORTAL_CONSENT_URL`: fixed.
 - `SMTP_USER`, `SMTP_PASS`, `ACME_EMAIL` and the Kratos and Hydra `DSN`: credentials ride in `OTHALA_SMTP_CONNECTION_URI` and `dsn`.
 
 ### Changed
@@ -46,8 +46,8 @@ Delete each from the deploy environment; none is read any more.
 - The Kratos login flow lifespan is 1h, up from 10m.
 - Kratos public CORS is off: the portal shares the origin.
 - The reference Caddy `othala_selfservice` limit is 30 events per minute, up from 10.
-- `kratos.yml` and `hydra.yml` drop keys that restated upstream defaults.
-- The e2e suite creates an identity through the admin form, turns the breach check off by overlay, and always runs the Caddy edge.
+- `kratos.yml` and `hydra.yml` drop keys restating upstream defaults.
+- The e2e suite creates an identity through the admin form and always runs the Caddy edge.
 
 ### Fixed
 
