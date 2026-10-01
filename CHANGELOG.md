@@ -31,7 +31,7 @@ Delete each from the deploy environment.
 - `OTHALA_HIBP_ENABLED`, `OTHALA_PASSWORD_MIN_LENGTH`: breach check on, minimum 12.
 - `OTHALA_CORS_ALLOWED_ORIGINS`: Hydra CORS allows `OTHALA_PUBLIC_URL`.
 - `OTHALA_PUBLIC_HOST`: the Caddyfile uses `OTHALA_PUBLIC_URL`.
-- `OTHALA_OTLP_PROVIDER`, `OTHALA_OTLP_ENVIRONMENT`, `OTEL_*`, `OTLP_INGEST_TOKEN`: set `OTHALA_OTLP_ENDPOINT` to trace.
+- `OTHALA_OTLP_PROVIDER`, `OTHALA_OTLP_ENVIRONMENT`, `OTEL_*`, `OTLP_INGEST_TOKEN`: use `OTHALA_OTLP_ENDPOINT`.
 - `KRATOS_PUBLIC_URL`, `HYDRA_PUBLIC_URL`, `KRATOS_ADMIN_URL`, `HYDRA_ADMIN_URL`, `KRATOS_ADMIN_TOKEN` and `HYDRA_ADMIN_TOKEN`: fixed at `kratos:4433`, `kratos:4434`, `hydra:4445`, no bearer.
 - `ADMIN_HOST`: renamed `PORTAL_ADMIN_BIND_HOST`, required in production.
 - `KRATOS_PG_HOST`, `HYDRA_PG_HOST`, `KRATOS_ADMIN_HOST` and `CONSENT_HOST`: hosts are `postgres`, `kratos`, `othala`.
@@ -45,7 +45,7 @@ Delete each from the deploy environment.
 - Kratos and Hydra trace with `OTHALA_OTLP_ENDPOINT`.
 - Kratos login flow lifespan is 1h, up from 10m.
 - Kratos public CORS is off.
-- Caddy `othala_selfservice` limit is 30 events per minute, up from 10.
+- Caddy `othala_selfservice` limit is 30/min, up from 10.
 - `kratos.yml` and `hydra.yml` drop keys restating upstream defaults.
 - The e2e suite creates an identity through the admin form and always runs the Caddy edge.
 
