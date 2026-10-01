@@ -329,28 +329,31 @@ export interface AddressPayload {
  */
 export function emailVerifiedPatch(
   identity: Pick<Identity, 'traits' | 'verifiable_addresses'>,
-  displayed?: string,
-): Array<{ op: 'add' | 'replace' | 'test'; path: string; value: unknown }> {
+): Array<{ op: 'add' | 'replace'; path: string; value: unknown }> {
   const email = String((identity.traits as { email?: unknown } | undefined)?.email ?? '').toLowerCase();
   const existing = identity.verifiable_addresses ?? [];
   const own = existing.findIndex((a) => String(a.via) === 'email' && a.value.toLowerCase() === email);
   const vouched: AddressPayload = { value: email, via: 'email', verified: true, status: 'completed' };
-  // With the displayed address, the patch applies only while the stored trait still holds exactly that value.
-  const guard = displayed === undefined ? [] : [{ op: 'test' as const, path: '/traits/email', value: displayed }];
   if (own === -1) {
     return [
-      ...guard,
       existing.length
         ? { op: 'add', path: '/verifiable_addresses/-', value: vouched }
         : { op: 'add', path: '/verifiable_addresses', value: [vouched] },
     ];
   }
-  return [...guard, { op: 'replace', path: `/verifiable_addresses/${own}`, value: vouched }];
+  return [{ op: 'replace', path: `/verifiable_addresses/${own}`, value: vouched }];
 }
 
-/** Mark the email trait's address verified (admin vouches for it) by a targeted patch; nothing else is written. */
-export async function markEmailVerified(id: string, displayed: string): Promise<void> {
+/**
+ * Mark the email trait's address verified (admin vouches for it) by a targeted patch; nothing else is written. Returns
+ * false, writing nothing, when the stored email is no longer `displayed`. Kratos's patch takes no test op and no
+ * precondition, but the patch names the address it vouches for and Kratos keeps a verifiable address only while it
+ * equals the email trait, so an email changed after this read never ends up verified.
+ */
+export async function markEmailVerified(id: string, displayed: string): Promise<boolean> {
   const api = identityApi();
   const current = await api.getIdentity({ id });
-  await api.patchIdentity({ id, jsonPatch: emailVerifiedPatch(current, displayed) as never });
+  if (!displayed || current.traits?.email !== displayed) return false;
+  await api.patchIdentity({ id, jsonPatch: emailVerifiedPatch(current) as never });
+  return true;
 }

@@ -108,7 +108,7 @@ beforeEach(() => {
   revokeSubjectMock.mockReset().mockResolvedValue(undefined);
   revokeConsentSessionsMock.mockReset().mockResolvedValue(undefined);
   patchPrerequisitesMock.mockReset().mockResolvedValue(undefined);
-  markEmailVerifiedMock.mockReset().mockResolvedValue(undefined);
+  markEmailVerifiedMock.mockReset().mockResolvedValue(true);
 });
 
 describe('deleteAction', () => {
@@ -574,17 +574,18 @@ describe('prerequisites and verified email', () => {
     expect(outcome.actionResult?.kind).toBe('email-verified');
   });
 
-  it('refuses when the stored email differs from the one the admin saw', async () => {
+  it('refuses when the stored email is no longer the one the admin saw', async () => {
+    markEmailVerifiedMock.mockResolvedValue(false);
     const outcome = await markVerifiedAction(fd({ email: 'old@othala.test' }), makeCtx({ identity: makeIdentity('someone') }));
 
-    expect(markEmailVerifiedMock).not.toHaveBeenCalled();
-    expect(outcome.actionResult?.kind).toBe('error');
+    expect(markEmailVerifiedMock).toHaveBeenCalledWith('target-1', 'old@othala.test');
+    expect(outcome.actionResult).toEqual({ kind: 'error', message: expect.stringContaining('changed') });
   });
 
-  it('refuses when no address was posted', async () => {
-    const outcome = await markVerifiedAction(fd(), makeCtx({ identity: makeIdentity('someone') }));
+  it('lets a rejected patch throw to the page, never reporting it verified', async () => {
+    markEmailVerifiedMock.mockRejectedValue(new Error('Response returned an error code'));
+    const id = makeIdentity('someone');
 
-    expect(markEmailVerifiedMock).not.toHaveBeenCalled();
-    expect(outcome.actionResult?.kind).toBe('error');
+    await expect(markVerifiedAction(fd({ email: id.traits.email }), makeCtx({ identity: id }))).rejects.toThrow('error code');
   });
 });
