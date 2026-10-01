@@ -3,16 +3,19 @@
 import { describe, expect, it } from 'vitest';
 import {
   attentionItems,
+  describeTtl,
   emailIsVerified,
   joinApps,
   personName,
   personRows,
   rowMatches,
   showOptions,
+  signInMethods,
+  suggestUsername,
   unrecognisedGroups,
 } from './admin-view';
 import type { ClientManifest } from './manifests';
-import { identity } from './test-builders';
+import { identity, withLookupSecret, withPasskey, withTotp } from './test-builders';
 
 const role = (name: string) => ({ name, description: '', claimEmit: {} });
 const grafana = {
@@ -48,9 +51,9 @@ describe('personRows', () => {
     expect(personName(identity({ username: 'q.r' }))).toBe('q.r');
   });
 
-  it('chips the apps they can use, marking the top level, open apps included', () => {
-    expect(rows[0].chips).toEqual([{ name: 'Grafana', top: true }, { name: 'Status page', top: false }]);
-    expect(rows[1].chips).toEqual([{ name: 'Status page', top: false }]);
+  it('chips the apps they were given, marking the top level, never open apps', () => {
+    expect(rows[0].chips).toEqual([{ name: 'Grafana', top: true }]);
+    expect(rows[1].chips).toEqual([]);
   });
 
   it('badges admin and sign-in off', () => {
@@ -101,5 +104,38 @@ describe('unrecognised groups and attention', () => {
     const rows = personRows([identity({ id: 'n', username: 'nobody', metadataAdmin: { groups: ['garden'] } })], [apps[0]]);
     expect(attentionItems(rows).map((a) => a.text)).toEqual(['Has no apps yet', 'Has a group no app uses']);
     expect(attentionItems(personRows([person('ok', ['grafana-access'])], [apps[0]]))).toEqual([]);
+  });
+});
+
+describe('suggestUsername', () => {
+  it('joins the words of a name with dots, dropping accents and punctuation', () => {
+    expect(suggestUsername('Robin K. Rivera', 'x@example.test')).toBe('robin.k.rivera');
+    expect(suggestUsername('Zoë Núñez', 'x@example.test')).toBe('zoe.nunez');
+  });
+
+  it('falls back to the email local part for one word, and to nothing when that does not fit', () => {
+    expect(suggestUsername('Robin', 'robin.k@example.test')).toBe('robin.k');
+    expect(suggestUsername('Robin', 'robin@example.test')).toBe('');
+    expect(suggestUsername('', '')).toBe('');
+  });
+});
+
+describe('describeTtl', () => {
+  it('says hours and minutes in words and leaves other durations alone', () => {
+    expect([describeTtl('24h'), describeTtl('1h'), describeTtl('30m'), describeTtl('2d')]).toEqual(['24 hours', '1 hour', '30 minutes', '2d']);
+  });
+});
+
+describe('signInMethods', () => {
+  const status = (i: ReturnType<typeof identity>) => Object.fromEntries(signInMethods(i).map((m) => [m.label, m.value]));
+
+  it('reads the account page words from the stored credentials', () => {
+    const i = withLookupSecret(withTotp(identity()));
+    expect(status(i)).toMatchObject({ Password: 'Set', 'Authenticator app': 'Set', 'Backup codes': 'Saved' });
+  });
+
+  it('counts passkeys and security keys and says None when absent', () => {
+    expect(status(withPasskey(identity()))).toMatchObject({ Passkeys: '1' });
+    expect(status(identity())).toMatchObject({ Passkeys: 'None', 'Authenticator app': 'Not set', 'Backup codes': 'Not saved' });
   });
 });

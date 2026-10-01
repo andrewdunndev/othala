@@ -426,10 +426,12 @@ export async function revokeAdminAction(fd: FormData, ctx: ActionContext): Promi
   const { id, identity, adminIdentityId } = ctx;
   const username = identity.traits?.username ?? id;
   const self = id === adminIdentityId;
-  // Giving up your own admin access is allowed, but only by typing your own username, so it cannot happen by a stray click.
-  if (self && String(fd.get('confirm') ?? '').trim() !== username) {
+  // Giving up your own admin access is allowed, but only by typing your own name or username, so it cannot happen by a stray click.
+  const typed = String(fd.get('confirm') ?? '').trim();
+  const displayName = String(identity.traits?.displayName ?? '').trim();
+  if (self && typed !== username && (displayName === '' || typed !== displayName)) {
     return {
-      actionResult: { kind: 'error', message: `Type your username (${username}) to give up your own admin access.` },
+      actionResult: { kind: 'error', message: `Type your name (${displayName || username}) to give up your own admin access.` },
       refetch: false,
     };
   }

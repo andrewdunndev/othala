@@ -150,3 +150,37 @@ describe('choicesFromForm', () => {
     expect(choicesFromForm(fd)).toEqual({ grafana: 'editor', proxywatch: 'none' });
   });
 });
+
+describe('currentLevel follows the consent resolver, never group naming', () => {
+  const wiki = {
+    clientId: 'wiki',
+    accessGroups: ['wiki-access'],
+    roles: [role('admin'), role('editor'), role('reader')],
+    groupRoleMap: { 'wiki-admin': 'admin', 'wiki-edit': 'editor' },
+    skipAccessCheck: false,
+  } as unknown as ClientManifest;
+
+  it('lets an override win over the group map, and ignores an empty or malformed override', () => {
+    const groups = ['wiki-access', 'wiki-admin'];
+    expect(currentLevel(wiki, { groups, roles: { wiki: 'reader' } })).toBe('reader');
+    expect(currentLevel(wiki, { groups, roles: {} })).toBe('admin');
+    expect(currentLevel(wiki, { groups, roles: { wiki: 5 as unknown as string } })).toBe('admin');
+    expect(currentLevel(wiki, { groups, roles: { wiki: 'nonsense' } })).toBe('admin');
+  });
+
+  it('gives the highest-ranked mapped role whatever order the groups are stored in', () => {
+    const set = ['wiki-access', 'wiki-edit', 'wiki-admin'];
+    const orders = [set, [...set].reverse(), [set[1], set[2], set[0]], [set[2], set[0], set[1]]];
+    for (const groups of orders) expect(currentLevel(wiki, { groups })).toBe('admin');
+  });
+
+  it('falls to the lowest level when access holds no mapped role, and to none without the access group', () => {
+    expect(currentLevel(wiki, { groups: ['wiki-access'] })).toBe('reader');
+    expect(currentLevel(wiki, { groups: ['wiki-admin'] })).toBe('none');
+  });
+
+  it('treats a roleless app as Can use only for people in its group', () => {
+    expect(currentLevel(proxywatch, { groups: ['proxywatch-access'] })).toBe('use');
+    expect(currentLevel(proxywatch, { groups: [] })).toBe('none');
+  });
+});

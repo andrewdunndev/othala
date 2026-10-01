@@ -289,6 +289,14 @@ describe('revokeAdminAction', () => {
     expect((outcome as Response).status).toBe(303);
   });
 
+  it('also accepts the display name for the typed confirm', async () => {
+    listIdentitiesMock.mockResolvedValue([makeIdentity('other-admin', true), makeIdentity('admin', true)]);
+    const named = identity({ username: 'admin', displayName: 'Amy Park', metadataAdmin: { admin: true } });
+    await revokeAdminAction(fd({ confirm: 'Amy Park' }), makeCtx({ id: 'admin-1', identity: named, adminIdentityId: 'admin-1' }));
+
+    expect(patchAdminMarkerMock).toHaveBeenCalledWith('admin-1', false);
+  });
+
   it('still refuses the typed self-demote when it would leave no active admin', async () => {
     listIdentitiesMock.mockResolvedValue([makeIdentity('admin', true)]);
     const identity = makeIdentity('admin', true);
@@ -467,7 +475,7 @@ describe('person page sections', () => {
     { clientId: 'proxywatch', accessGroups: ['proxywatch-access'], roles: [], groupRoleMap: {}, skipAccessCheck: false },
   ] as unknown as ActionContext['manifests'];
   const person = (groups: string[], roles?: Record<string, string>) =>
-    identity({ username: 'ashley.k', email: 'ashley@othala.test', metadataAdmin: { groups, ...(roles ? { roles } : {}) } });
+    identity({ username: 'robin.k', email: 'robin@othala.test', metadataAdmin: { groups, ...(roles ? { roles } : {}) } });
   const written = () => updateIdentityMock.mock.calls[0][1];
 
   it('saves access: groups and overrides follow the chosen levels, traits stay as stored', async () => {
@@ -477,7 +485,7 @@ describe('person page sections', () => {
     );
 
     expect(outcome.actionResult?.kind).toBe('updated');
-    expect(written().traits.username).toBe('ashley.k');
+    expect(written().traits.username).toBe('robin.k');
     expect(written().metadataAdmin.groups).toEqual(['everyone', 'grafana-access', 'proxywatch-access']);
     expect(written().metadataAdmin.roles).toEqual({ grafana: 'editor' });
   });
@@ -499,7 +507,7 @@ describe('person page sections', () => {
   });
 
   it('saves household groups without touching app access or the admin marker', async () => {
-    const stored = identity({ username: 'ashley.k', metadataAdmin: { groups: ['everyone', 'proxywatch-access'], admin: true } });
+    const stored = identity({ username: 'robin.k', metadataAdmin: { groups: ['everyone', 'proxywatch-access'], admin: true } });
     await saveHouseholdAction(fd({ identityGroups: 'everyone' }), makeCtx({ identity: stored, manifests: MANIFESTS }));
 
     expect(written().metadataAdmin.groups).toEqual(['everyone', 'proxywatch-access']);
@@ -508,11 +516,11 @@ describe('person page sections', () => {
 
   it('saves the profile and leaves groups as stored', async () => {
     await saveProfileAction(
-      fd({ username: 'Ashley.K', email: 'a@othala.test', displayName: 'Ashley', recoveryEmail: '' }),
+      fd({ username: 'Robin.K', email: 'a@othala.test', displayName: 'Robin', recoveryEmail: '' }),
       makeCtx({ identity: person(['everyone', 'grafana-access']), manifests: MANIFESTS }),
     );
 
-    expect(written().traits).toMatchObject({ username: 'ashley.k', email: 'a@othala.test', displayName: 'Ashley' });
+    expect(written().traits).toMatchObject({ username: 'robin.k', email: 'a@othala.test', displayName: 'Robin' });
     expect(written().metadataAdmin.groups).toEqual(['everyone', 'grafana-access']);
   });
 

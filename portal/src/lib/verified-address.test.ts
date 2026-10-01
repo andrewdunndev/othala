@@ -8,10 +8,10 @@ const addr = (value: string, verified: boolean, via = 'email') => ({ value, via,
 describe('addressesWithEmailVerified', () => {
   it('verifies the trait address, matching case-insensitively', () => {
     const out = addressesWithEmailVerified({
-      traits: { email: 'Ashley@Example.test' },
-      verifiable_addresses: [addr('ashley@example.test', false)] as never,
+      traits: { email: 'Robin@Example.test' },
+      verifiable_addresses: [addr('robin@example.test', false)] as never,
     });
-    expect(out).toEqual([{ value: 'ashley@example.test', via: 'email', verified: true, status: 'completed' }]);
+    expect(out).toEqual([{ value: 'robin@example.test', via: 'email', verified: true, status: 'completed' }]);
   });
 
   it('carries every other address through unchanged', () => {

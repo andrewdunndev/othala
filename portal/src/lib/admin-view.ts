@@ -86,15 +86,12 @@ export interface AppChip {
   top: boolean;
 }
 
-/** Apps this person can use, by name, with their level where it is the highest the app offers. */
+/** Apps this person was given, by name, with their level where it is the highest the app offers. Apps open to everyone are not listed. */
 export function appChips(i: Identity, apps: readonly AdminApp[]): AppChip[] {
   const chips: AppChip[] = [];
   for (const a of apps) {
     const m = a.manifest;
-    if (isOpenToEveryone(m)) {
-      chips.push({ name: a.name, top: false });
-      continue;
-    }
+    if (isOpenToEveryone(m)) continue;
     const level = currentLevel(m, i.metadata_admin);
     if (level !== NO_ACCESS) chips.push({ name: a.name, top: isTopLevel(m, level) });
   }
@@ -193,4 +190,65 @@ export function levelLabel(m: ClientManifest, level: string): string {
 /** The household groups a person page offers, with a plain label. */
 export function householdChoices(): { value: string; label: string }[] {
   return HOUSEHOLD_GROUPS.map((g) => ({ value: g, label: g === 'everyone' ? 'Everyone in the household' : g }));
+}
+
+const USERNAME_SHAPE = /^[a-z0-9]+(?:\.[a-z0-9]+)+$/;
+
+/** A username suggested from the name (first.last) or, for one word, from the email's local part; empty when neither fits the rule. */
+export function suggestUsername(name: string, email: string): string {
+  const words = name
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[̀-ͯ]/g, '')
+    .split(/\s+/)
+    .map((w) => w.replace(/[^a-z0-9]/g, ''))
+    .filter(Boolean);
+  if (words.length > 1) return words.join('.');
+  const local = email.split('@')[0].toLowerCase();
+  return USERNAME_SHAPE.test(local) ? local : '';
+}
+
+/** A Kratos duration like `24h` or `30m` in words, for the expiry line; anything else is shown as written. */
+export function describeTtl(ttl: string): string {
+  const m = /^(\d+)([hm])$/.exec(ttl);
+  if (!m) return ttl;
+  const n = Number(m[1]);
+  const unit = m[2] === 'h' ? 'hour' : 'minute';
+  return `${n} ${unit}${n === 1 ? '' : 's'}`;
+}
+
+export interface SignInMethod {
+  /** The Kratos credential type, which is also what an admin removal posts. */
+  key: string;
+  label: string;
+  /** Plain status in the account page's words: Set, Not set, a count, Saved. */
+  value: string;
+  enrolled: boolean;
+}
+
+function configOf(i: Identity, key: string): Record<string, unknown> | undefined {
+  const c = (i.credentials as Record<string, { config?: Record<string, unknown> } | undefined> | undefined)?.[key];
+  return c ? (c.config ?? {}) : undefined;
+}
+
+function keyCount(cfg: Record<string, unknown> | undefined): number {
+  const keys = cfg?.credentials;
+  return Array.isArray(keys) ? keys.length : cfg ? 1 : 0;
+}
+
+/** How a person signs in, one row per method, in the words of the account settings page. */
+export function signInMethods(i: Identity): SignInMethod[] {
+  const passkeys = keyCount(configOf(i, 'passkey'));
+  const keys = keyCount(configOf(i, 'webauthn'));
+  const password = configOf(i, 'password');
+  const passwordSet = password !== undefined && (Object.keys(password).length === 0 || Boolean(password.hashed_password));
+  const totp = configOf(i, 'totp') !== undefined;
+  const codes = configOf(i, 'lookup_secret') !== undefined;
+  return [
+    { key: 'passkey', label: 'Passkeys', value: passkeys > 0 ? String(passkeys) : 'None', enrolled: passkeys > 0 },
+    { key: 'password', label: 'Password', value: passwordSet ? 'Set' : 'Not set', enrolled: passwordSet },
+    { key: 'totp', label: 'Authenticator app', value: totp ? 'Set' : 'Not set', enrolled: totp },
+    { key: 'webauthn', label: 'Security keys', value: keys > 0 ? String(keys) : 'None', enrolled: keys > 0 },
+    { key: 'lookup_secret', label: 'Backup codes', value: codes ? 'Saved' : 'Not saved', enrolled: codes },
+  ];
 }
