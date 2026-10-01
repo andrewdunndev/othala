@@ -56,6 +56,8 @@ export interface ClientManifest {
   skipAccessCheck: boolean;
   /** Source filename the manifest was parsed from (Go `SourcePath`). */
   sourcePath: string;
+  /** `presentation.requires`: prerequisite names the app needs (defined under requirements/); absent reads as none. */
+  requires?: string[];
 }
 
 /** Mirrors Go `ShouldEmitGroups`: only an explicit `emit_groups_claim: false` suppresses. */
@@ -163,6 +165,11 @@ function loadOne(file: string, dir: string): ClientManifest | null {
   }
 }
 
+/** `presentation.requires` as raw strings, unnormalized, so the lint can flag a malformed or unknown name. */
+function readRequires(v: unknown): string[] {
+  return Array.isArray(v) ? v.filter((x): x is string => typeof x === 'string') : [];
+}
+
 /** Parse one manifest YAML body; exported so tests skip the filesystem. */
 export function parseManifest(yamlText: string, filename: string): ClientManifest {
   const yaml = parseYaml(yamlText) ?? {};
@@ -220,6 +227,7 @@ export function parseManifest(yamlText: string, filename: string): ClientManifes
       emitGroupsClaim: null,
       skipAccessCheck: Boolean(c.skip_access_check ?? false),
       sourcePath: file,
+      requires: readRequires(p.requires),
     };
   }
 
@@ -250,6 +258,7 @@ export function parseManifest(yamlText: string, filename: string): ClientManifes
     emitGroupsClaim: readEmitGroups(c),
     skipAccessCheck: Boolean(c.skip_access_check ?? false),
     sourcePath: file,
+    requires: readRequires(p.requires),
   };
 }
 

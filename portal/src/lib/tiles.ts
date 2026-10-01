@@ -1,6 +1,7 @@
 // Runtime app-tile loader. Reads each `<slug>.yaml` `presentation:` block from MANIFEST_DIR at request time (manifests.ts
 // reads `oidc:`/`consent:` from the same files); an optional `<slug>.md` is the /apps/<slug> detail content.
 // groups.yaml (optional) maps group name to { title, description, order } via loadGroups() and is skipped as a tile.
+// requirements/<name>.md (optional) defines a prerequisite that a manifest names in `presentation.requires`.
 
 import { readdirSync, readFileSync, existsSync, statSync } from 'node:fs';
 import { join } from 'node:path';
@@ -8,6 +9,8 @@ import { parse as parseYaml } from 'yaml';
 import { marked } from 'marked';
 import DOMPurify from 'isomorphic-dompurify';
 import { parseAccessGroups } from './access-groups';
+import { parseManifest, type ClientManifest } from './manifests';
+import { lookupRole } from './claims';
 
 // Vendored icons directory: public/icons/ in dev (a stale dist/ must not shadow it), dist/client/icons/ in prod.
 const _cwd = process.cwd();
@@ -92,6 +95,44 @@ export interface AppTile {
   fqdn: string;
   /** Rendered HTML from the sibling `<slug>.md`, or undefined if absent. */
   educationHtml?: string;
+  /** Prerequisite names from `presentation.requires` (lowercase, deduplicated; malformed names dropped). */
+  requires: string[];
+  /** The parsed oidc/consent manifest, kept so roles resolve through lookupRole; undefined when it does not parse. */
+  manifest?: ClientManifest;
+}
+
+/** A requirement name is a filename stem under requirements/, so it must stay a plain slug. */
+export const REQUIREMENT_NAME_RE = /^[a-z][a-z0-9-]{0,39}$/;
+
+/** One shared prerequisite, from `requirements/<name>.md`: front matter `title` and `why`, then the setup guide. */
+export interface Requirement {
+  name: string;
+  title: string;
+  /** One line on why an app needs it. */
+  why: string;
+  /** Sanitized HTML of the setup guide (steps and explainer); empty when the file has no body. */
+  html: string;
+}
+
+/** The four sections a guide is laid out in, in display order. Any other heading renders after them. */
+export const GUIDE_OUTLINE = [
+  { id: 'purpose', title: "What it's for", match: /what.*for|about|purpose/i },
+  { id: 'first-time', title: 'First time', match: /first|get(ting)? started|set ?up/i },
+  { id: 'good-to-know', title: 'Good to know', match: /good to know|tips|notes?|nuances?/i },
+  { id: 'help', title: 'Getting help', match: /help|support|stuck/i },
+] as const;
+
+export interface GuideSection {
+  /** Outline id, or `extra` for a heading outside the outline. */
+  id: string;
+  title: string;
+  html: string;
+}
+
+export interface Guide {
+  /** Any text before the first heading. */
+  lead: string;
+  sections: GuideSection[];
 }
 
 function manifestDir(): string {
@@ -120,6 +161,11 @@ function freshestMtime(dir: string): number {
         ((f.endsWith('.yaml') || f.endsWith('.yml')) && f !== 'groups.yaml') ||
         f.endsWith('.md'),
     );
+    try {
+      for (const f of readdirSync(join(dir, 'requirements'))) files.push(join('requirements', f));
+    } catch {
+      // no requirements directory
+    }
     let max = 0;
     for (const f of files) {
       const m = statSync(join(dir, f)).mtimeMs;
@@ -144,11 +190,131 @@ export function sanitizeEducationMarkdown(raw: string): string {
   });
 }
 
+/** Plain text of an HTML fragment's tags removed, for matching a heading against the outline. */
+function headingText(html: string): string {
+  return html.replace(/<[^>]*>/g, '').replace(/&#39;|&rsquo;|&apos;/g, "'").replace(/&amp;/g, '&').trim();
+}
+
+/**
+ * Split sanitized guide HTML into the fixed outline. Each `<h2>` opens a section, matched to an outline slot by its
+ * text; a slot's first heading wins and later or unmatched headings follow as `extra` sections in source order. The
+ * section title is the outline's, so the page reads the same for every app. A guide with no `<h2>` is all `lead`.
+ */
+export function splitGuide(html: string | undefined): Guide {
+  if (!html || !html.trim()) return { lead: '', sections: [] };
+  const parts = html.split(/(?=<h2[\s>])/i);
+  let lead = '';
+  const slots = new Map<string, GuideSection>();
+  const extras: GuideSection[] = [];
+  for (const part of parts) {
+    const m = /^<h2[^>]*>([\s\S]*?)<\/h2>([\s\S]*)$/i.exec(part);
+    if (!m) {
+      lead += part;
+      continue;
+    }
+    const text = headingText(m[1] ?? '');
+    const body = (m[2] ?? '').trim();
+    const slot = GUIDE_OUTLINE.find((o) => o.match.test(text));
+    if (slot && !slots.has(slot.id)) {
+      slots.set(slot.id, { id: slot.id, title: slot.title, html: body });
+    } else {
+      extras.push({ id: 'extra', title: text, html: body });
+    }
+  }
+  const sections = [
+    ...GUIDE_OUTLINE.flatMap((o) => (slots.has(o.id) ? [slots.get(o.id) as GuideSection] : [])),
+    ...extras,
+  ];
+  return { lead: lead.trim(), sections };
+}
+
+/** Split `---` YAML front matter off a markdown file; a missing or malformed block yields empty data and the whole text. */
+function splitFrontMatter(raw: string): { data: Record<string, unknown>; body: string } {
+  const m = /^---\r?\n([\s\S]*?)\r?\n---\r?\n?([\s\S]*)$/.exec(raw);
+  if (!m) return { data: {}, body: raw };
+  try {
+    const data = parseYaml(m[1] ?? '');
+    if (data && typeof data === 'object' && !Array.isArray(data)) {
+      return { data: data as Record<string, unknown>, body: m[2] ?? '' };
+    }
+  } catch {
+    // fall through: malformed front matter is treated as plain markdown
+  }
+  return { data: {}, body: m[2] ?? '' };
+}
+
+/** Parse one `requirements/<name>.md` body; exported so tests skip the filesystem. */
+export function parseRequirement(name: string, raw: string): Requirement {
+  const { data, body } = splitFrontMatter(raw);
+  const title = typeof data['title'] === 'string' && data['title'].trim() ? data['title'].trim() : titleCase(name);
+  const why = typeof data['why'] === 'string' ? data['why'].trim() : '';
+  return { name, title, why, html: body.trim() ? sanitizeEducationMarkdown(body) : '' };
+}
+
+function titleCase(name: string): string {
+  return name.charAt(0).toUpperCase() + name.slice(1);
+}
+
+/** Load `requirements/*.md` as name -> Requirement; an absent directory is empty, and a bad filename is skipped. */
+export function loadRequirements(): Map<string, Requirement> {
+  const dir = join(manifestDir(), 'requirements');
+  const out = new Map<string, Requirement>();
+  let files: string[];
+  try {
+    files = readdirSync(dir).filter((f) => f.endsWith('.md')).sort();
+  } catch {
+    return out;
+  }
+  for (const f of files) {
+    const name = f.slice(0, -3);
+    if (!REQUIREMENT_NAME_RE.test(name)) continue;
+    try {
+      out.set(name, parseRequirement(name, readFileSync(join(dir, f), 'utf8')));
+    } catch (err) {
+      console.warn(`tiles: skipping requirements/${f}: ${err}`);
+    }
+  }
+  return out;
+}
+
+/** One requirement by name, or a title-only stand-in when no file defines it (the lint warns separately). */
+export function getRequirement(name: string): Requirement {
+  return loadRequirements().get(name) ?? { name, title: titleCase(name), why: '', html: '' };
+}
+
+/** Normalize `presentation.requires`: a list of slugs, lowercased, deduplicated, anything malformed dropped. */
+export function parseRequires(raw: unknown): string[] {
+  if (!Array.isArray(raw)) return [];
+  const out: string[] = [];
+  for (const v of raw) {
+    if (typeof v !== 'string') continue;
+    const n = v.trim().toLowerCase();
+    if (REQUIREMENT_NAME_RE.test(n) && !out.includes(n)) out.push(n);
+  }
+  return out;
+}
+
+/** Whether the person's resolved role for this app is its top-ranked one; an app with fewer than two roles has none. */
+export function holdsTopRole(tile: AppTile, metadataAdmin: unknown): boolean {
+  const m = tile.manifest;
+  if (!m || m.roles.length < 2) return false;
+  return lookupRole(m, metadataAdmin)?.roleName === m.roles[0]?.name;
+}
+
+export type TileReadiness = 'none' | 'ready' | 'needs';
+
+/** Prerequisite state for a person: `none` when the app requires nothing, `ready` when the admin marked every
+ *  requirement for them, else `needs`. */
+export function tileReadiness(tile: AppTile, marked: readonly string[]): TileReadiness {
+  if (tile.requires.length === 0) return 'none';
+  return tile.requires.every((r) => marked.includes(r)) ? 'ready' : 'needs';
+}
+
 /**
  * Parse one manifest's `presentation:` block into an AppTile; null when it has none. An absent `access_group` gates
  * on the default group (tileDefaultGroup), never on a per-slug group or every authenticated user.
  */
-function parseTile(slug: string, doc: Record<string, unknown>, dir: string): AppTile | null {
+function parseTile(slug: string, doc: Record<string, unknown>, dir: string, manifest?: ClientManifest): AppTile | null {
   const pBlock = doc['presentation'];
   if (!pBlock || typeof pBlock !== 'object' || Array.isArray(pBlock)) return null;
   const p = pBlock as Record<string, unknown>;
@@ -186,6 +352,8 @@ function parseTile(slug: string, doc: Record<string, unknown>, dir: string): App
     disabled: p['disabled'] === true,
     fqdn,
     educationHtml,
+    requires: parseRequires(p['requires']),
+    manifest,
   };
 
   const groupVal = p['group'];
@@ -218,15 +386,23 @@ function loadFromDisk(): AppTile[] {
   for (const f of files) {
     const slug = f.replace(/\.ya?ml$/, '');
     let doc: unknown;
+    let text = '';
     try {
-      doc = parseYaml(readFileSync(join(dir, f), 'utf8'));
+      text = readFileSync(join(dir, f), 'utf8');
+      doc = parseYaml(text);
     } catch (err) {
       console.warn(`tiles: skipping ${f}: ${err}`);
       continue;
     }
     if (!doc || typeof doc !== 'object' || Array.isArray(doc)) continue;
     try {
-      const tile = parseTile(slug, doc as Record<string, unknown>, dir);
+      let manifest: ClientManifest | undefined;
+      try {
+        manifest = parseManifest(text, f);
+      } catch {
+        // a manifest that fails oidc/consent parsing still gets a tile; it just has no roles
+      }
+      const tile = parseTile(slug, doc as Record<string, unknown>, dir, manifest);
       if (tile) tiles.push(tile);
     } catch (err) {
       console.warn(`tiles: skipping ${f}: ${err}`);

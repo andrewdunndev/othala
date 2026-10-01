@@ -33,6 +33,8 @@ export type Identity = Omit<SdkIdentity, 'metadata_admin'> & {
      * excludes metadata_admin from the public /sessions/whoami response.
      */
     admin?: boolean;
+    /** Prerequisite names the admin marked set up for this person (see admin-api patchPrerequisites). */
+    prerequisites?: string[];
   };
 };
 

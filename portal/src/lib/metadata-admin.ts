@@ -1,6 +1,6 @@
 // Validator for `metadata_admin` writes. Kratos does not validate that block
 // (its schema only covers traits), so a typo would be stored silently.
-// Contract: { groups?: string[]; roles?: Record<string,string>; admin?: boolean }
+// Contract: { groups?: string[]; roles?: Record<string,string>; admin?: boolean; prerequisites?: string[] }
 // with canonical group names (GROUP_RE), a strict boolean admin, and no other
 // keys. Hand-rolled, no validator dependency; returns the input or an Error.
 
@@ -18,7 +18,8 @@ export class MetadataAdminError extends Error {
   }
 }
 
-const ALLOWED_KEYS = new Set(['groups', 'roles', 'admin']);
+const ALLOWED_KEYS = new Set(['groups', 'roles', 'admin', 'prerequisites']);
+const PREREQUISITE_RE = /^[a-z][a-z0-9-]{0,39}$/;
 
 export function validateMetadataAdmin(input: unknown): MetadataAdmin {
   if (input === null || input === undefined) return {};
@@ -31,7 +32,7 @@ export function validateMetadataAdmin(input: unknown): MetadataAdmin {
   for (const key of Object.keys(input)) {
     if (!ALLOWED_KEYS.has(key)) {
       throw new MetadataAdminError(
-        `metadata_admin: unknown field "${key}". Allowed: groups, roles, admin.`,
+        `metadata_admin: unknown field "${key}". Allowed: groups, roles, admin, prerequisites.`,
       );
     }
   }
@@ -47,6 +48,10 @@ export function validateMetadataAdmin(input: unknown): MetadataAdmin {
     out.roles = validateRoles(obj.roles);
   }
 
+  if ('prerequisites' in obj && obj.prerequisites !== undefined) {
+    out.prerequisites = validatePrerequisites(obj.prerequisites);
+  }
+
   if ('admin' in obj && obj.admin !== undefined) {
     if (typeof obj.admin !== 'boolean') {
       throw new MetadataAdminError(
@@ -56,6 +61,26 @@ export function validateMetadataAdmin(input: unknown): MetadataAdmin {
     out.admin = obj.admin;
   }
 
+  return out;
+}
+
+function validatePrerequisites(value: unknown): string[] {
+  if (!Array.isArray(value)) {
+    throw new MetadataAdminError('metadata_admin.prerequisites must be an array of strings.');
+  }
+  const out: string[] = [];
+  for (let i = 0; i < value.length; i++) {
+    const item = value[i];
+    if (typeof item !== 'string' || !PREREQUISITE_RE.test(item)) {
+      throw new MetadataAdminError(
+        `metadata_admin.prerequisites[${i}] must be a lowercase slug matching ${PREREQUISITE_RE}.`,
+      );
+    }
+    if (out.includes(item)) {
+      throw new MetadataAdminError(`metadata_admin.prerequisites: duplicate entry "${item}".`);
+    }
+    out.push(item);
+  }
   return out;
 }
 

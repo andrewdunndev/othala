@@ -118,10 +118,11 @@ export async function saveAction(fd: FormData, ctx: ActionContext): Promise<Acti
     return { formErrors, refetch: false };
   }
 
-  // Preserve the existing admin marker: an unrelated groups/roles edit must
-  // not silently drop it. Read from the pre-dispatch identity, not re-fetched
+  // Preserve the existing admin marker and prerequisite marks: an unrelated groups/roles edit must
+  // not silently drop them. Read from the pre-dispatch identity, not re-fetched
   // (avoids a TOCTOU on the write; grant/revoke are the targeted paths).
   const existingAdmin = identity.metadata_admin?.admin;
+  const existingPrerequisites = identity.metadata_admin?.prerequisites;
   const groups = normalizeGroupOrder(groupPlan.groups);
   await updateIdentity(id, {
     traits,
@@ -129,6 +130,7 @@ export async function saveAction(fd: FormData, ctx: ActionContext): Promise<Acti
       groups,
       roles: Object.keys(roles).length ? roles : undefined,
       ...(existingAdmin === true ? { admin: true } : {}),
+      ...(existingPrerequisites?.length ? { prerequisites: existingPrerequisites } : {}),
     },
   });
   // The Kratos write has landed; now end grants issued under the old access.

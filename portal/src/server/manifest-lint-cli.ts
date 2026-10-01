@@ -7,6 +7,7 @@
 import { readdirSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { parseManifest, validateClients } from '../lib/manifests';
+import { lintManifests } from '../lib/manifest-lint';
 
 function manifestDir(): string {
   // CLI argument takes precedence over env var.
@@ -51,6 +52,21 @@ async function main(): Promise<void> {
   }
 
   const errs = validateClients(manifests);
+
+  // Warnings never fail the run. Group warnings need the live registry, so only requirement names are checked here.
+  const requirementNames = (() => {
+    try {
+      return readdirSync(join(dir, 'requirements'))
+        .filter((f) => f.endsWith('.md'))
+        .map((f) => f.slice(0, -3));
+    } catch {
+      return [];
+    }
+  })();
+  const referencedGroups = manifests.flatMap((m) => [...m.accessGroups, ...Object.keys(m.groupRoleMap)]);
+  for (const w of lintManifests(manifests, referencedGroups, requirementNames)) {
+    console.warn(`[manifest-lint] ${w.severity.toUpperCase()}: ${w.source}: ${w.message}`);
+  }
 
   if (errs.length === 0 && parseErrors === 0) {
     console.log(`[manifest-lint] OK — ${manifests.length} manifest(s) passed`);

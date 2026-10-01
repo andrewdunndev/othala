@@ -52,6 +52,11 @@ export interface MetadataAdmin {
    * Kratos admin API. Use patchAdminMarker for targeted grant/revoke so
    * groups/roles are never clobbered.
    */
+  /**
+   * Prerequisites the admin has marked set up for this person (names defined under requirements/ in MANIFEST_DIR).
+   * Written only by patchPrerequisites, a targeted patch, so a groups/roles save never clobbers it.
+   */
+  prerequisites?: string[];
   admin?: boolean;
 }
 
@@ -182,6 +187,31 @@ export async function patchAdminMarker(id: string, grant: boolean): Promise<void
   }
 }
 
+
+/**
+ * Targeted JSON-Patch of `metadata_admin.prerequisites`, leaving groups, roles and the admin marker untouched. The list
+ * is validated by validateMetadataAdmin (a duplicate throws) and written whole (add when absent, else replace); an empty
+ * list removes the key.
+ */
+export async function patchPrerequisites(id: string, names: string[]): Promise<void> {
+  const prerequisites = validateMetadataAdmin({ prerequisites: names }).prerequisites ?? [];
+  const api = identityApi();
+  const current = await api.getIdentity({ id });
+  const meta = current.metadata_admin as Record<string, unknown> | null | undefined;
+  const hasMeta = meta != null && typeof meta === 'object';
+  const hasKey = hasMeta && 'prerequisites' in meta;
+  type Op = { op: 'add' | 'replace' | 'remove'; path: string; value?: unknown };
+  let patch: Op[];
+  if (prerequisites.length === 0) {
+    if (!hasKey) return;
+    patch = [{ op: 'remove', path: '/metadata_admin/prerequisites' }];
+  } else if (!hasMeta) {
+    patch = [{ op: 'add', path: '/metadata_admin', value: { prerequisites } }];
+  } else {
+    patch = [{ op: hasKey ? 'replace' : 'add', path: '/metadata_admin/prerequisites', value: prerequisites }];
+  }
+  await api.patchIdentity({ id, jsonPatch: patch });
+}
 
 /**
  * Credential types admin eviction may delete. `password` is excluded: Kratos rejects DELETE on it and it is not a
