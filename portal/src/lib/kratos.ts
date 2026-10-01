@@ -144,9 +144,13 @@ export const browserFlows = {
     const qs = returnTo ? `?return_to=${encodeURIComponent(returnTo)}` : '';
     return `/self-service/recovery/browser${qs}`;
   },
-  verification(returnTo?: string): string {
-    const qs = returnTo ? `?return_to=${encodeURIComponent(returnTo)}` : '';
-    return `/self-service/verification/browser${qs}`;
+  /** `email` rides in the initiating URL, which Kratos keeps as the flow's request_url, so the verification page can prefill it. */
+  verification(returnTo?: string, email?: string): string {
+    const p = new URLSearchParams();
+    if (returnTo) p.set('return_to', returnTo);
+    if (email) p.set('email', email);
+    const qs = p.toString();
+    return `/self-service/verification/browser${qs ? `?${qs}` : ''}`;
   },
   logout(returnTo?: string): string {
     // The endpoint 303s to a logout-with-token URL; see getLogoutInfo for the token.

@@ -149,3 +149,11 @@ export function emailVerified(
 export function formatAdded(d: Date | null): string | null {
   return d ? d.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric', timeZone: 'UTC' }) : null;
 }
+
+/** The privileged window kratos.yml sets (settings.privileged_session_max_age); a lapsed one makes Kratos ask for a fresh sign-in on save. */
+export const PRIVILEGED_WINDOW_MS = 5 * 60 * 1000;
+
+export function privilegedLapsed(authenticatedAt: Date | string | undefined | null, now = Date.now()): boolean {
+  const t = authenticatedAt ? new Date(authenticatedAt).getTime() : NaN;
+  return Number.isFinite(t) && now - t > PRIVILEGED_WINDOW_MS;
+}

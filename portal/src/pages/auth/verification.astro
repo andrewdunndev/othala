@@ -31,6 +31,20 @@ const flow = result && result.kind === 'ok' ? result.flow : null;
 const ui = flow?.ui;
 const csrf = ui ? csrfToken(ui.nodes) : '';
 const hasCode = ui ? hasMethod(ui.nodes, 'code') : true;
+// Settings starts this flow with the address in the initiating URL, which Kratos keeps as request_url; it only seeds
+// the empty email input, the person still sends the code.
+const prefill = (() => {
+  try {
+    const v = flow ? new URL(flow.request_url).searchParams.get('email') : null;
+    return v && v.length <= 254 && /^[^\s@]+@[^\s@]+$/.test(v) ? v : '';
+  } catch {
+    return '';
+  }
+})();
+const codeNodes = (ui?.nodes ?? []).map((n) => {
+  const a = n.attributes as { name?: string; value?: unknown };
+  return prefill && a.name === 'email' && !a.value ? { ...n, attributes: { ...n.attributes, value: prefill } } : n;
+});
 // Kratos verification flow states: choose_method, sent_email, passed_challenge.
 // Map to the two UI shapes recovery uses.
 const phase: 'request' | 'sent' = flow?.state === 'sent_email' ? 'sent' : 'request';
@@ -65,7 +79,7 @@ const phase: 'request' | 'sent' = flow?.state === 'sent_email' ? 'sent' : 'reque
         <input type="hidden" name="csrf_token" value={csrf} />
         <input type="hidden" name="method" value="code" />
         <FlowNodes
-          nodes={ui.nodes}
+          nodes={codeNodes}
           group="code"
           buttonClass="button button-primary verify-primary"
           submitLabel={phase === 'request' ? 'Send code' : 'Verify code'}
