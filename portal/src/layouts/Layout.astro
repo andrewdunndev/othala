@@ -16,9 +16,11 @@ interface Props {
   nav?: NavItem[];
   /** When true, footer is suppressed (e.g. focused login screens). */
   bare?: boolean;
+  /** Tighter top padding for dashboards that lead with content. */
+  compact?: boolean;
 }
 
-const { title, description, nav, bare = false } = Astro.props;
+const { title, description, nav, bare = false, compact = false } = Astro.props;
 const path = Astro.url.pathname.replace(/\/$/, '') || '/';
 const isHome = title === 'Home';
 const pageTitle = isHome ? siteName : `${title} — ${siteName}`;
@@ -54,10 +56,11 @@ const pageTitle = isHome ? siteName : `${title} — ${siteName}`;
           ))}
         </nav>
       )}
+      <div class="header-actions"><slot name="header-actions" /></div>
     </div>
   </header>
 
-  <main class="page">
+  <main class:list={['page', { 'page-compact': compact }]}>
     <slot />
   </main>
 

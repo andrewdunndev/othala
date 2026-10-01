@@ -418,17 +418,55 @@ a.subtle:hover { color: var(--text); }
   margin-bottom: var(--space-2);
 }
 
-/* Logo plates use the page tokens in both themes. Marks drawn as dark strokes with no ground of their own would vanish
- * on a dark plate, so in dark mode those few (data-icon, the logo file's name) keep the light palette white. */
-:root[data-theme="dark"] :is(.app-icon, .app-modal-logo)[data-icon^="vault"],
-:root[data-theme="dark"] :is(.app-icon, .app-modal-logo)[data-icon="owncloud"] {
-  background: var(--dd-earth-50);
-  border-color: var(--dd-earth-50);
+/* Logo plates sit on the page ground in both themes, so every mark reads alike. The few marks drawn in black or deep
+ * navy with no ground of their own are knocked out to a light tone in dark mode (data-icon, the logo file's name). */
+:root[data-theme="dark"] :is(.app-icon, .app-modal-logo)[data-icon^="vault"] img,
+:root[data-theme="dark"] :is(.app-icon, .app-modal-logo)[data-icon="owncloud"] img {
+  filter: brightness(0) invert(0.92);
 }
 @media (prefers-color-scheme: dark) {
-  :root:not([data-theme="light"]) :is(.app-icon, .app-modal-logo)[data-icon^="vault"],
-  :root:not([data-theme="light"]) :is(.app-icon, .app-modal-logo)[data-icon="owncloud"] {
-    background: var(--dd-earth-50);
-    border-color: var(--dd-earth-50);
+  :root:not([data-theme="light"]) :is(.app-icon, .app-modal-logo)[data-icon^="vault"] img,
+  :root:not([data-theme="light"]) :is(.app-icon, .app-modal-logo)[data-icon="owncloud"] img {
+    filter: brightness(0) invert(0.92);
   }
 }
+
+/* Tiles: white and lifted in the light theme (border plus a faint shadow), the raised surface in dark. */
+:root { --tile-bg: var(--bg); --tile-shadow: 0 1px 2px rgba(20, 20, 20, 0.06); }
+:root[data-theme="dark"] { --tile-bg: var(--surface); --tile-shadow: none; }
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) { --tile-bg: var(--surface); --tile-shadow: none; }
+}
+
+/* Top bar actions (signed-in pages): Account and Sign out on the right, in the same small mono type as the brand. */
+.header-actions { margin-left: auto; display: flex; align-items: center; gap: var(--space-1); }
+.header-actions:empty { display: none; }
+.header-actions form { display: contents; }
+.header-link {
+  all: unset;
+  box-sizing: border-box;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  min-height: 40px;
+  padding: 0 var(--space-3);
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  color: var(--text-2);
+  border-radius: var(--radius-sm);
+}
+.header-link:hover { color: var(--accent); text-decoration: none; }
+.header-link:focus-visible { outline: 2px solid var(--input-focus, var(--accent)); outline-offset: -2px; }
+
+/* Dashboards lead with content: a shorter run above the first row. */
+.page.page-compact { padding-top: var(--space-5); }
+
+/* The footer shares the page's content column and its gutter. */
+.site-footer { padding: 0; }
+.footer-inner { padding: var(--space-5); }
+@media (max-width: 640px) {
+  .header-inner, .page, .footer-inner { padding-left: var(--space-4); padding-right: var(--space-4); }
+  .header-link { padding: 0 var(--space-2); }
+  .page.page-compact { padding-top: var(--space-4); }
+}
+

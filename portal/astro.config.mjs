@@ -58,6 +58,8 @@ const allowedDomains = [{}];
 
 export default defineConfig({
   output: 'server',
+  // The dev toolbar is dev-only (production builds never ship it); off here so it never overlays the page in previews.
+  devToolbar: { enabled: false },
   // trustProxy: Caddy sets X-Forwarded-For; with trustProxy the adapter
   // resolves ctx.clientAddress from XFF rather than the raw TCP socket
   // (which is always the Caddy container IP, collapsing all users to one

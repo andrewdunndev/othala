@@ -8,8 +8,11 @@
     function decorate(root) {
       root.querySelectorAll('.guide code').forEach(function (code) {
         if (code.closest('pre') || code.parentElement.classList.contains('code-chip')) return;
-        // A bare scheme such as https:// is not an address worth copying.
-        if (/^[a-z]+:\/*$/i.test(code.textContent.trim())) return;
+        // Only real values get a Copy button: a full URL or a hostname. Bare schemes, example names and anything with
+        // spaces or placeholders stay plain code.
+        var text = code.textContent.trim();
+        var isValue = /^(https?:\/\/)?([a-z0-9-]+\.)+[a-z]{2,}(:\d+)?(\/\S*)?$/i.test(text);
+        if (!isValue || /(^|[.\/])example(\.|$)|[<>{}]/i.test(text)) return;
         var wrap = document.createElement('span');
         wrap.className = 'code-chip';
         code.replaceWith(wrap);

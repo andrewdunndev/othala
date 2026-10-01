@@ -70,6 +70,7 @@ const empty = !guide.lead && guide.sections.length === 0;
   }
 
   /* Prose inside any section */
+  .guide-prose > :global(:is(p, ul, ol, blockquote)), .guide-lead { max-width: 70ch; }
   .guide-prose > :global(:first-child) { margin-top: 0; }
   .guide-prose > :global(:last-child) { margin-bottom: 0; }
   .guide-prose :global(h3),

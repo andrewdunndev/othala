@@ -155,7 +155,18 @@ const devLinks = [
   { href: '/admin',                label: 'Admin (requires AAL2)' },
 ];
 ---
-<Layout title="Home" description={`Single sign-on for ${siteName}.`}>
+<Layout title="Home" description={`Single sign-on for ${siteName}.`} compact={state === 'post-auth'}>
+
+  {state === 'post-auth' && (
+    <Fragment slot="header-actions">
+      {isAdmin && <a href="/admin" class="header-link">Admin</a>}
+      <a href="/auth/settings" class="header-link">Account</a>
+      <form method="POST" action="/auth/logout">
+        <input type="hidden" name="csrf_token" value={logoutToken} />
+        <button type="submit" class="header-link">Sign out</button>
+      </form>
+    </Fragment>
+  )}
 
   {state === 'down' && (
     <PageHero
@@ -193,28 +204,12 @@ const devLinks = [
 
   {state === 'post-auth' && (
     <>
-      <PageHero
-        title={firstName ? `Hello, ${firstName}.` : 'Welcome back.'}
-        eyebrow={`signed in${displayName ? ' · ' + displayName : ''}`}
-        lede="Pick up where you left off, or hop into one of the apps below."
-      >
-        <div class="cta-row">
-          <button type="button" class="button button-primary" id="open-request-form">
-            Request access or suggest an app
-          </button>
-          {isAdmin && <a href="/admin" class="button button-secondary">Admin</a>}
-          <a href="/auth/settings" class="button button-secondary">Account</a>
-          <form method="POST" action="/auth/logout" class="cta-form">
-            <input type="hidden" name="csrf_token" value={logoutToken} />
-            <button type="submit" class="button button-secondary">Sign out</button>
-          </form>
-        </div>
-      </PageHero>
+      <h1 class="greeting">{firstName ? `Hello, ${firstName}.` : 'Welcome back.'} <span class="greeting-sub">Pick an app to open it, or its Guide for setup.</span></h1>
 
       {!hasPasskeyEnrolled && (
         <div class="passkey-nudge" id="passkey-nudge">
           <p class="passkey-nudge-text">
-            Set up a passkey for one-tap sign-in with Face ID or Touch ID.
+            Set up a passkey for one-tap sign-in.
             <a href="/auth/settings" class="passkey-nudge-link">Set up now →</a>
           </p>
           <button
@@ -226,8 +221,7 @@ const devLinks = [
         </div>
       )}
 
-      <section class="section">
-        <p class="section-subtitle">Your apps</p>
+      <section class="home-apps">
         {visibleTiles.length > 0 ? (
           <>
             {ungroupedTiles.length > 0 && (
@@ -246,7 +240,7 @@ const devLinks = [
                     <p class="tile-group-desc">{meta.description}</p>
                   )}
                 </div>
-                <div class="tile-grid">
+                <div class="tile-grid" style={`--cols:${Math.min(tiles.length, 3)}`}>
                   {tiles.map((t: AppTile) => {
                     const v = views.get(t.slug)!;
                     return <TileCard tile={t} readiness={v.readiness} requirementTitles={v.titles} />;
@@ -261,6 +255,7 @@ const devLinks = [
             enable one.
           </p>
         )}
+        <p class="missing-app"><button type="button" class="text-link" id="open-request-form">Missing an app?</button></p>
       </section>
 
       {/* ── Per-app documentation: one hidden <template> per visible tile, three slots. The dialog script clones
@@ -596,8 +591,8 @@ const devLinks = [
     border: 1px solid var(--accent);
     background: var(--accent-subtle);
     border-radius: var(--radius);
-    padding: var(--space-3) var(--space-4);
-    margin-bottom: var(--space-6);
+    padding: var(--space-1) var(--space-3);
+    margin-bottom: var(--space-4);
   }
   .passkey-nudge-text {
     margin: 0;
@@ -624,6 +619,28 @@ const devLinks = [
     outline-offset: 2px;
   }
 
+  /* Signed-in home: a one-line greeting, then the apps. */
+  .greeting {
+    font-size: var(--text-md);
+    font-weight: 600;
+    line-height: 1.4;
+    margin: 0 0 var(--space-4);
+  }
+  .greeting-sub { font-weight: 400; color: var(--text-2); font-size: var(--text-sm); margin-left: var(--space-2); }
+  @media (max-width: 640px) { .greeting-sub { display: none; } .greeting { margin-bottom: var(--space-3); } }
+  .missing-app { margin: var(--space-6) 0 0; }
+  .text-link {
+    all: unset;
+    cursor: pointer;
+    font-size: var(--text-sm);
+    color: var(--text-2);
+    text-decoration: underline;
+    text-decoration-color: var(--border-strong);
+    text-underline-offset: 3px;
+  }
+  .text-link:hover { color: var(--accent); }
+  .text-link:focus-visible { outline: 2px solid var(--input-focus, var(--accent)); outline-offset: 3px; }
+
   /* ── Hero CTA fragments ── */
   /* The sign-out form lays its button out as a sibling of the other CTAs. */
   .cta-form { display: contents; }
@@ -649,12 +666,25 @@ const devLinks = [
     gap: var(--space-3);
     align-items: stretch;
   }
-  @media (min-width: 640px)  { .tile-grid { grid-template-columns: repeat(2, 1fr); } }
-  @media (min-width: 900px)  { .tile-grid { grid-template-columns: repeat(3, 1fr); } }
+  /* --cols is the group's tile count capped at 3, so a short group stays a row of full-width-looking tiles that is
+     content-sized (22rem a tile) rather than three columns with a hole in them. */
+  @media (min-width: 640px) {
+    .tile-grid {
+      grid-template-columns: repeat(min(var(--cols, 3), 2), minmax(0, 1fr));
+      max-width: calc(min(var(--cols, 3), 2) * 22rem + (min(var(--cols, 3), 2) - 1) * var(--space-3));
+    }
+  }
+  @media (min-width: 900px) {
+    .tile-grid {
+      grid-template-columns: repeat(var(--cols, 3), minmax(0, 1fr));
+      max-width: calc(var(--cols, 3) * 22rem + (var(--cols, 3) - 1) * var(--space-3));
+    }
+  }
 
   /* Grouped tile sections: no frame, so the tiles sit on the same columns as the ungrouped grid. The title uses the
      page's eyebrow type, with the group's description under it, full width above its tiles. */
-  .tile-group { margin-top: var(--space-6); }
+  .tile-group { margin-top: var(--space-5); }
+  .tile-group:first-child { margin-top: 0; }
   .tile-group-header { margin-bottom: var(--space-3); }
   .tile-group-title {
     font-family: var(--font-mono);
@@ -877,7 +907,7 @@ const devLinks = [
     height: 3.5rem;
     padding: 0.55rem;
     box-sizing: border-box;
-    background: var(--surface);
+    background: var(--bg);
     border: 1px solid var(--border);
     border-radius: var(--radius);
   }
@@ -982,8 +1012,11 @@ const devLinks = [
       top: 0;
       z-index: 2;
       gap: var(--space-3);
-      padding: var(--space-3) calc(var(--space-3) + 44px + var(--space-2)) var(--space-3) var(--space-3);
+      padding: calc(var(--space-3) + env(safe-area-inset-top, 0px)) calc(var(--space-3) + 44px + var(--space-2)) var(--space-3) var(--space-3);
       min-height: 4rem;
+      height: auto;
+      flex-shrink: 0;
+      align-items: start;
     }
     .app-modal-desc {
       display: -webkit-box;
@@ -1003,7 +1036,7 @@ const devLinks = [
       border-top: 1px solid var(--border);
     }
     .app-modal-actions :global(.app-actions-row) { width: 100%; }
-    .app-modal-close { position: sticky; top: var(--space-2); right: auto; z-index: 3; flex-shrink: 0; align-self: flex-end; margin: var(--space-2) var(--space-2) -52px 0; }
+    .app-modal-close { position: sticky; top: calc(var(--space-2) + env(safe-area-inset-top, 0px)); right: auto; z-index: 3; flex-shrink: 0; align-self: flex-end; margin: var(--space-2) var(--space-2) -52px 0; }
     .app-modal :global(.app-modal-logo) { width: 2.5rem; height: 2.5rem; padding: 0.4rem; }
   }
   @keyframes app-modal-sheet {
@@ -1023,11 +1056,12 @@ const devLinks = [
      * squeezing both onto one row. */
     .passkey-nudge {
       gap: var(--space-2);
-      padding: var(--space-2) var(--space-2) var(--space-2) var(--space-3);
-      margin-bottom: var(--space-4);
+      padding: 0 var(--space-1) 0 var(--space-3);
+      margin-bottom: var(--space-3);
     }
     .passkey-nudge-text { line-height: 1.4; }
-    .passkey-nudge-link { display: block; margin-left: 0; }
+    .passkey-nudge-link { margin-left: var(--space-1); }
+    .passkey-nudge-text { font-size: var(--text-xs); }
     .passkey-nudge-close { min-width: 44px; min-height: 44px; display: flex; align-items: center; justify-content: center; }
 
     /* Stack post-auth CTA actions full-width with adequate tap height. */
