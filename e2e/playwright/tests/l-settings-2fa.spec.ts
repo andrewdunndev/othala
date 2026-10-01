@@ -16,18 +16,17 @@ function extractHiddenInput(html: string, name: string): string {
   return m ? (m[1] ?? m[2] ?? '') : '';
 }
 
-function extractFormAction(html: string): string {
+/** The lookup_secret form's action and its own csrf token (the header sign-out form carries a different one). */
+function extractLookupForm(html: string): { action: string; csrf: string } {
   const formRe = /<form[^>]+action="([^"]+)"[^>]*>/gi;
-  let lastAction = '';
   let m: RegExpExecArray | null;
   while ((m = formRe.exec(html)) !== null) {
-    lastAction = m[1];
-    const fromHere = html.slice(m.index, html.indexOf('</form>', m.index) + 7);
-    if (/name="method"[^>]*value="lookup_secret"|value="lookup_secret"[^>]*name="method"/i.test(fromHere)) {
-      return m[1];
+    const slice = html.slice(m.index, html.indexOf('</form>', m.index) + 7);
+    if (/name="method"[^>]*value="lookup_secret"|value="lookup_secret"[^>]*name="method"/i.test(slice)) {
+      return { action: m[1], csrf: extractHiddenInput(slice, 'csrf_token') };
     }
   }
-  return lastAction;
+  return { action: '', csrf: '' };
 }
 
 test('L1 — settings page renders TOTP QR and secret when TOTP enrollment is active', async ({
@@ -136,11 +135,10 @@ test('L2 — backup codes are visible in the HTML after generating them (regress
   }
   console.log('[L2] lookup_secret section present in initial settings page');
 
-  const formAction = extractFormAction(pageHtml);
+  const { action: formAction, csrf: csrfToken } = extractLookupForm(pageHtml);
   if (!formAction) {
     console.log('[L2] could not extract form action from HTML; falling back to API flow init');
   }
-  const csrfToken = extractHiddenInput(pageHtml, 'csrf_token');
   console.log('[L2] form action:', formAction || '(not found)', '| csrf:', csrfToken ? csrfToken.slice(0, 12) + '…' : '(not found)');
 
   if (!formAction || !csrfToken) {
