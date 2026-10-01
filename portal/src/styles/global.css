@@ -420,13 +420,13 @@ a.subtle:hover { color: var(--text); }
 
 /* Logo plates use the page tokens in both themes. Marks drawn as dark strokes with no ground of their own would vanish
  * on a dark plate, so in dark mode those few (data-icon, the logo file's name) keep the light palette white. */
-:root[data-theme="dark"] :is(.app-icon, .app-modal-logo)[data-icon="vaultwarden"],
+:root[data-theme="dark"] :is(.app-icon, .app-modal-logo)[data-icon^="vault"],
 :root[data-theme="dark"] :is(.app-icon, .app-modal-logo)[data-icon="owncloud"] {
   background: var(--dd-earth-50);
   border-color: var(--dd-earth-50);
 }
 @media (prefers-color-scheme: dark) {
-  :root:not([data-theme="light"]) :is(.app-icon, .app-modal-logo)[data-icon="vaultwarden"],
+  :root:not([data-theme="light"]) :is(.app-icon, .app-modal-logo)[data-icon^="vault"],
   :root:not([data-theme="light"]) :is(.app-icon, .app-modal-logo)[data-icon="owncloud"] {
     background: var(--dd-earth-50);
     border-color: var(--dd-earth-50);
