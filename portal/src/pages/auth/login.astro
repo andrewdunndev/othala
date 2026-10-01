@@ -7,14 +7,15 @@
 
 export const prerender = false;
 
-import Layout from '../../layouts/Layout.astro';
-import PageHero from '../../components/PageHero.astro';
+import FocusPage from '../../components/FocusPage.astro';
 import { browserFlows, getLoginFlow, getSession } from '../../lib/kratos';
 import { getIdentity } from '../../lib/admin-api';
 import { needsStepUp } from '../../lib/step-up';
 import { instanceName } from '../../lib/config';
 import { csrfToken, nodesByGroup, asInput, scriptNodes, safeOnclick } from '../../lib/nodes';
 import { deriveLoginTiers } from '../../lib/login-tiers';
+import { journeyText, noticeClass } from '../../lib/journey';
+import { DEV_LOGIN_STATES, devLogin, isIn } from '../../lib/journey-fixtures';
 import type { FlowMessage } from '../../lib/types';
 
 const url = Astro.url;
@@ -23,6 +24,8 @@ let aal = (url.searchParams.get('aal') as 'aal1' | 'aal2' | null) ?? undefined;
 const refresh = url.searchParams.get('refresh') === 'true';
 const returnTo = url.searchParams.get('return_to') ?? undefined;
 const isDev = import.meta.env.DEV;
+const devState = isDev ? url.searchParams.get('dev-state') : null;
+const devFlow = isIn(DEV_LOGIN_STATES, devState) ? devLogin(devState) : null;
 const cookie = Astro.request.headers.get('cookie') ?? undefined;
 
 // A live aal1 session that must step up (lib/step-up.ts) gets an aal2 flow;
@@ -43,14 +46,14 @@ if (!flowId && !isDev) {
   return Astro.redirect(browserFlows.login({ aal, refresh, returnTo }));
 }
 
-const result = flowId ? await getLoginFlow(flowId, cookie).catch(() => null) : null;
+const result = !devFlow && flowId ? await getLoginFlow(flowId, cookie).catch(() => null) : null;
 
-if (flowId && (!result || result.kind !== 'ok') && !isDev) {
+if (!devFlow && flowId && (!result || result.kind !== 'ok') && !isDev) {
   return Astro.redirect(browserFlows.login({ aal, refresh, returnTo }));
 }
 
 // Dev without a real flow renders a static preview.
-const flow = result && result.kind === 'ok' ? result.flow : null;
+const flow = devFlow ?? (result && result.kind === 'ok' ? result.flow : null);
 const ui = flow?.ui;
 const csrf = ui ? csrfToken(ui.nodes) : '';
 const scripts = ui ? scriptNodes(ui.nodes) : [];
@@ -77,41 +80,33 @@ const isCodeEntry = codeNodes.some((n) => {
 const { hasPasskey, hasCode, hasPassword, totpNodes, aal2WebauthnNodes, lookupNodes, isAal2, hasAal2Methods } =
   deriveLoginTiers(flow, aal);
 ---
-<Layout title="Sign in" description={`Sign in to ${instanceName}.`} bare>
+<FocusPage
+  title={isAal2 ? 'One more step' : isCodeEntry ? 'Check your email' : 'Sign in'}
+  lede={isAal2
+    ? totpNodes.length > 0
+      ? 'Enter the code from your authenticator app to finish signing in.'
+      : 'Confirm it is you with your security key to finish signing in.'
+    : isCodeEntry
+      ? 'We emailed you a sign-in code. Enter it below.'
+      : 'Use the passkey on this device, or get a code by email.'}
+  description={`Sign in to ${instanceName}.`}
+>
 
-  <PageHero
-    title="Welcome back."
-    eyebrow="sign in"
-    lede={isAal2
-      ? 'Additional verification is required to continue.'
-      : isCodeEntry
-        ? 'Check your email for the sign-in code.'
-        : 'One tap with Face ID or Touch ID. No password to remember.'}
-  />
-
-  {ui?.messages?.map((m: FlowMessage) => (
-    <div class={`notice notice-${m.type === 'error' ? 'danger' : m.type === 'success' ? 'success' : 'warning'}`}>
-      {m.text}
-    </div>
-  ))}
+  {ui?.messages?.map((m: FlowMessage) => <div class={noticeClass(m.type)}>{journeyText(m)}</div>)}
 
   {!flow && isDev && (
-    <div class="notice notice-warning">
-      Dev preview: no Kratos flow available. The form below is the static
-      layout; submissions will not work without a live flow.
-    </div>
+    <div class="notice notice-warning">Dev preview: no flow. Add <code>?dev-state=code|aal2|wrong-password</code>.</div>
   )}
 
-  <section class="panel login-card">
+  <section class="panel focus-card">
 
     {/* ── AAL2 STEP-UP ─────────────────────────────────────────────────── */}
     {/* One form per second-factor method, posting to ui.action; the primary tiers are hidden. */}
     {isAal2 && hasAal2Methods && (
-      <div class="aal2-block">
+      <div class="aal2-block focus-form">
 
-        {/* ── TOTP ─────────────────────────────────────────────── */}
         {totpNodes.length > 0 && (
-          <form method="POST" action={ui?.action ?? '#'} class="login-block aal2-form">
+          <form method="POST" action={ui?.action ?? '#'} class="focus-form aal2-form">
             <input type="hidden" name="csrf_token" value={csrf} />
             {totpNodes.map((n) => {
               const a = asInput(n);
@@ -122,29 +117,27 @@ const { hasPasskey, hasCode, hasPassword, totpNodes, aal2WebauthnNodes, lookupNo
               if (a.type === 'text' && a.name === 'totp_code') {
                 return (
                   <div class="field">
-                    <label for="totp-code">{n.meta?.label?.text ?? 'Authenticator code'}</label>
+                    <label for="totp-code">Authenticator code</label>
                     <input
                       id="totp-code"
                       name="totp_code"
                       type="text"
+                      class="code-input"
                       inputmode="numeric"
                       autocomplete="one-time-code"
                       required
                       autofocus
                       placeholder="123456"
                     />
-                    {n.messages?.map((m: FlowMessage) => (
-                      <div class={`notice notice-${m.type === 'error' ? 'danger' : m.type === 'success' ? 'success' : 'warning'}`}>
-                        {m.text}
-                      </div>
-                    ))}
+                    <div class="field-hint">The 6 digits your app shows. They change every 30 seconds.</div>
+                    {n.messages?.map((m: FlowMessage) => <div class={noticeClass(m.type)}>{journeyText(m)}</div>)}
                   </div>
                 );
               }
               if (a.type === 'submit') {
                 return (
-                  <button class="button button-primary aal2-submit" type="submit" name={a.name} value={String(a.value ?? '')}>
-                    {n.meta?.label?.text ?? 'Verify code'}
+                  <button class="button button-primary focus-btn" type="submit" name={a.name} value={String(a.value ?? '')}>
+                    Verify code
                   </button>
                 );
               }
@@ -153,9 +146,8 @@ const { hasPasskey, hasCode, hasPassword, totpNodes, aal2WebauthnNodes, lookupNo
           </form>
         )}
 
-        {/* ── WebAuthn second-factor ────────────────────────────── */}
         {aal2WebauthnNodes.length > 0 && (
-          <form method="POST" action={ui?.action ?? '#'} class="login-block aal2-form">
+          <form method="POST" action={ui?.action ?? '#'} class="focus-form aal2-form">
             <input type="hidden" name="csrf_token" value={csrf} />
             {aal2WebauthnNodes.map((n) => {
               const a = asInput(n);
@@ -166,13 +158,13 @@ const { hasPasskey, hasCode, hasPassword, totpNodes, aal2WebauthnNodes, lookupNo
               if (a.type === 'submit' || a.type === 'button') {
                 return (
                   <button
-                    class="button button-secondary aal2-submit"
+                    class={`button ${totpNodes.length > 0 ? 'button-secondary' : 'button-primary'} focus-btn`}
                     type={a.type}
                     name={a.name}
                     value={String(a.value ?? '')}
                     onclick={safeOnclick(a)}
                   >
-                    {n.meta?.label?.text ?? 'Use security key'}
+                    Use a security key
                   </button>
                 );
               }
@@ -181,14 +173,10 @@ const { hasPasskey, hasCode, hasPassword, totpNodes, aal2WebauthnNodes, lookupNo
           </form>
         )}
 
-        {/* ── Backup / lookup_secret ────────────────────────────── */}
         {lookupNodes.length > 0 && (
-          <details class="password-disclosure">
-            <summary class="password-summary">
-              <span class="password-summary-label">Use a backup code</span>
-              <span class="password-summary-icon" aria-hidden="true">+</span>
-            </summary>
-            <form method="POST" action={ui?.action ?? '#'} class="login-block aal2-form" style="margin-top: var(--space-5)">
+          <details class="disclosure">
+            <summary>Use a backup code instead</summary>
+            <form method="POST" action={ui?.action ?? '#'} class="focus-form aal2-form">
               <input type="hidden" name="csrf_token" value={csrf} />
               {lookupNodes.map((n) => {
                 const a = asInput(n);
@@ -199,22 +187,16 @@ const { hasPasskey, hasCode, hasPassword, totpNodes, aal2WebauthnNodes, lookupNo
                 if (a.type === 'text' && a.name === 'lookup_secret') {
                   return (
                     <div class="field">
-                      <label for="lookup-secret">{n.meta?.label?.text ?? 'Backup code'}</label>
-                      <input
-                        id="lookup-secret"
-                        name="lookup_secret"
-                        type="text"
-                        autocomplete="off"
-                        required
-                        placeholder="xxxxxxxxxx"
-                      />
+                      <label for="lookup-secret">Backup code</label>
+                      <input id="lookup-secret" name="lookup_secret" type="text" autocomplete="off" required placeholder="xxxxxxxxxx" />
+                      <div class="field-hint">Each backup code works once.</div>
                     </div>
                   );
                 }
                 if (a.type === 'submit') {
                   return (
-                    <button class="button button-secondary aal2-submit" type="submit" name={a.name} value={String(a.value ?? '')}>
-                      {n.meta?.label?.text ?? 'Use backup code'}
+                    <button class="button button-secondary focus-btn" type="submit" name={a.name} value={String(a.value ?? '')}>
+                      Use backup code
                     </button>
                   );
                 }
@@ -230,14 +212,14 @@ const { hasPasskey, hasCode, hasPassword, totpNodes, aal2WebauthnNodes, lookupNo
     {/* An account that must step up but has no second factor enrols one in Settings. */}
     {isAal2 && !hasAal2Methods && flow && (
       <div class="notice notice-warning">
-        No second-factor methods are enrolled for this account. Enroll TOTP or a
-        security key in <a href="/auth/settings">Settings</a>, then sign in again.
+        This account has no second step set up yet. Add an authenticator app or a
+        security key in <a href="/auth/settings">your account</a>, then sign in again.
       </div>
     )}
 
-    {/* ── TIER 1: Passkey ───────────────────────────────────────────────── */}
-    {!isAal2 && hasPasskey && (
-      <form method="POST" action={ui?.action ?? '#'} class="login-block passkey-block">
+    {/* ── Passkey first ─────────────────────────────────────────────────── */}
+    {!isAal2 && hasPasskey && !isCodeEntry && (
+      <form method="POST" action={ui?.action ?? '#'} class="focus-form passkey-block">
         <input type="hidden" name="csrf_token" value={csrf} />
         <input type="hidden" name="method" value="passkey" />
 
@@ -248,17 +230,16 @@ const { hasPasskey, hasCode, hasPassword, totpNodes, aal2WebauthnNodes, lookupNo
             return <input type="hidden" name={a.name} value={String(a.value ?? '')} />;
           }
           if (a.type === 'submit' || a.type === 'button') {
-            // safeOnclick validates against KNOWN_TRIGGERS before emitting a
-            // window.<fn>() call. Never pass a.onclick raw to the DOM.
+            // safeOnclick validates against KNOWN_TRIGGERS before emitting a window.<trigger>() call.
             return (
               <button
-                class="button button-primary login-primary"
+                class="button button-primary focus-btn"
                 type={a.type}
                 name={a.name}
                 value={String(a.value ?? '')}
                 onclick={safeOnclick(a)}
               >
-                {n.meta?.label?.text ?? 'Sign in with a passkey'}
+                Sign in with a passkey
               </button>
             );
           }
@@ -266,32 +247,22 @@ const { hasPasskey, hasCode, hasPassword, totpNodes, aal2WebauthnNodes, lookupNo
         })}
 
         {!ui && (
-          /* Static preview when running dev without Kratos. */
-          <button class="button button-primary login-primary" type="button" disabled>
-            Sign in with a passkey
-          </button>
+          <button class="button button-primary focus-btn" type="button" disabled>Sign in with a passkey</button>
         )}
 
-        <p class="passkey-hint">
-          Face ID, Touch ID, or your device PIN.
-        </p>
+        <p class="focus-note">Face ID, Touch ID, or your device PIN. Nothing to remember.</p>
       </form>
     )}
 
-    {/* ── TIER 2: Email code ────────────────────────────────────────────── */}
-    {/*
-      Two states share a single card:
-      - Identifier step (isCodeEntry=false): show email/identifier input +
-        "Send sign-in code" submit. The identifier lives in the default group,
-        but we render it here inside the code form so Kratos receives it.
-      - Code entry step (isCodeEntry=true): show the "code" text input +
-        Continue + Resend buttons. The identifier is now a hidden in code group.
-      Not rendered during an AAL2 step-up (a step-up only needs second factors).
-    */}
+    {/* ── Email code ────────────────────────────────────────────────────── */}
+    {/* Step 1 (isCodeEntry=false): the identifier input and the code-group submit, inside one form so Kratos receives
+        both. Step 2: the code input, verify, resend. Not rendered during an AAL2 step-up. */}
     {!isAal2 && hasCode && (
-      <div class="code-block">
+      <div class="email-code focus-form">
+        {!isCodeEntry && hasPasskey && <p class="focus-or" aria-hidden="true">or</p>}
+
         {!isCodeEntry && (
-          <form method="POST" action={ui?.action ?? '#'} class="login-block code-form">
+          <form method="POST" action={ui?.action ?? '#'} class="focus-form code-form">
             <input type="hidden" name="csrf_token" value={csrf} />
 
             <div class="field">
@@ -301,20 +272,20 @@ const { hasPasskey, hasCode, hasPassword, totpNodes, aal2WebauthnNodes, lookupNo
                 name="identifier"
                 type="email"
                 autocomplete="email"
+                inputmode="email"
                 required
                 value={identifierInput?.value ? String(identifierInput.value) : ''}
                 placeholder="you@example.com"
               />
             </div>
 
-            {/* Render the code-group submit (method=code) */}
             {ui && codeNodes.map((n) => {
               const a = asInput(n);
               if (!a) return null;
               if (a.type === 'submit' && a.name === 'method') {
                 return (
-                  <button class="button button-secondary code-submit" type="submit" name={a.name} value={String(a.value ?? 'code')}>
-                    {n.meta?.label?.text ?? 'Send sign-in code'}
+                  <button class="button button-secondary focus-btn code-submit" type="submit" name={a.name} value={String(a.value ?? 'code')}>
+                    Email me a sign-in code
                   </button>
                 );
               }
@@ -325,80 +296,66 @@ const { hasPasskey, hasCode, hasPassword, totpNodes, aal2WebauthnNodes, lookupNo
             })}
 
             {!ui && (
-              <button class="button button-secondary code-submit" type="button" disabled>
-                Send sign-in code
-              </button>
+              <button class="button button-secondary focus-btn code-submit" type="button" disabled>Email me a sign-in code</button>
             )}
           </form>
         )}
 
         {isCodeEntry && (
-          <form method="POST" action={ui?.action ?? '#'} class="login-block code-form">
+          <form method="POST" action={ui?.action ?? '#'} class="focus-form code-form">
             <input type="hidden" name="csrf_token" value={csrf} />
 
-            {/* Hidden fields from the default group (carries identifier and any
-                other state Kratos needs for loginVerifyCode — but skip csrf_token
-                which is already rendered above). */}
+            {/* Hidden fields from the default group (state Kratos needs to verify the code), except the csrf token above. */}
             {ui && nodesByGroup(ui.nodes, 'default').map((n) => {
               const a = asInput(n);
               if (!a || a.type !== 'hidden' || a.name === 'csrf_token') return null;
               return <input type="hidden" name={a.name} value={String(a.value ?? '')} />;
             })}
 
-            {/* Hidden fields from the code group (identifier + method) */}
             {codeNodes.map((n) => {
               const a = asInput(n);
-              if (!a) return null;
-              if (a.type === 'hidden') {
-                return <input type="hidden" name={a.name} value={String(a.value ?? '')} />;
-              }
-              return null;
+              if (!a || a.type !== 'hidden') return null;
+              return <input type="hidden" name={a.name} value={String(a.value ?? '')} />;
             })}
 
-            {/* The 6-digit code input */}
             {codeNodes.map((n) => {
               const a = asInput(n);
               if (!a || a.name !== 'code' || a.type !== 'text') return null;
               return (
                 <div class="field">
-                  <label for="login-code">{n.meta?.label?.text ?? 'Sign-in code'}</label>
+                  <label for="login-code">Your code</label>
                   <input
                     id="login-code"
                     name="code"
                     type="text"
+                    class="code-input"
                     inputmode="numeric"
                     autocomplete="one-time-code"
                     required
                     autofocus
                     placeholder="123456"
                   />
-                  {n.messages?.map((m: FlowMessage) => (
-                    <div class={`notice notice-${m.type === 'error' ? 'danger' : m.type === 'success' ? 'success' : 'warning'}`}>
-                      {m.text}
-                    </div>
-                  ))}
+                  {n.messages?.map((m: FlowMessage) => <div class={noticeClass(m.type)}>{journeyText(m)}</div>)}
                 </div>
               );
             })}
 
-            <div class="code-actions">
-              {/* Continue (primary submit) */}
+            <div class="consent-actions">
               {codeNodes.map((n) => {
                 const a = asInput(n);
                 if (!a || a.type !== 'submit' || a.name !== 'method') return null;
                 return (
-                  <button class="button button-secondary code-submit" type="submit" name={a.name} value={String(a.value ?? 'code')}>
-                    {n.meta?.label?.text ?? 'Continue'}
+                  <button class="button button-primary focus-btn code-submit" type="submit" name={a.name} value={String(a.value ?? 'code')}>
+                    Verify code
                   </button>
                 );
               })}
-              {/* Resend */}
               {codeNodes.map((n) => {
                 const a = asInput(n);
                 if (!a || a.type !== 'submit' || a.name !== 'resend') return null;
                 return (
-                  <button class="button button-ghost code-resend" type="submit" name={a.name} value={String(a.value ?? 'code')}>
-                    {n.meta?.label?.text ?? 'Resend code'}
+                  <button class="button button-secondary focus-btn code-resend" type="submit" name={a.name} value={String(a.value ?? 'code')} formnovalidate>
+                    Send a new code
                   </button>
                 );
               })}
@@ -408,16 +365,13 @@ const { hasPasskey, hasCode, hasPassword, totpNodes, aal2WebauthnNodes, lookupNo
       </div>
     )}
 
-    {/* ── TIER 3: Password (legacy) ─────────────────────────────────────── */}
-    {/* Not rendered during an AAL2 step-up. */}
-    {!isAal2 && hasPassword && (
-      <details class="password-disclosure">
-        <summary class="password-summary">
-          <span class="password-summary-label">Use a password (legacy)</span>
-          <span class="password-summary-icon" aria-hidden="true">+</span>
-        </summary>
+    {/* ── Password, last ────────────────────────────────────────────────── */}
+    {/* Not rendered during an AAL2 step-up or the code step. */}
+    {!isAal2 && !isCodeEntry && hasPassword && (
+      <details class="disclosure password-disclosure">
+        <summary><span class="password-summary-label">Use a password instead</span></summary>
 
-        <form method="POST" action={ui?.action ?? '#'} class="login-block password-form">
+        <form method="POST" action={ui?.action ?? '#'} class="focus-form password-form">
           <input type="hidden" name="csrf_token" value={csrf} />
           <input type="hidden" name="method" value="password" />
 
@@ -444,20 +398,24 @@ const { hasPasskey, hasCode, hasPassword, totpNodes, aal2WebauthnNodes, lookupNo
             />
           </div>
 
-          <button class="button button-secondary" type="submit" disabled={!ui}>
+          <button class="button button-secondary focus-btn" type="submit" disabled={!ui}>
             Sign in with password
           </button>
+          <p class="focus-note"><a href="/auth/recovery">Forgot your password?</a> We will email you a code instead.</p>
         </form>
       </details>
     )}
 
   </section>
 
-  <footer class="login-footer">
-    <a href="/auth/recovery" class="login-foot-link">New device or can't sign in?</a>
-    <span class="login-foot-sep" aria-hidden="true">·</span>
-    <a href="/" class="login-foot-link">Back home</a>
-  </footer>
+  <nav class="focus-links" aria-label="Other options">
+    {isAal2
+      ? <span>Lost your second step? Ask a household admin to reset it.</span>
+      : isCodeEntry
+      ? <a href="/auth/login" data-astro-reload>Use a different way to sign in</a>
+      : <a href="/auth/recovery">New device, lost passkey, or have a setup link?</a>}
+    <a href="/" data-astro-reload>Back home</a>
+  </nav>
 
   {scripts.map((s) => (
     <script
@@ -472,152 +430,4 @@ const { hasPasskey, hasCode, hasPassword, totpNodes, aal2WebauthnNodes, lookupNo
     ></script>
   ))}
 
-</Layout>
-
-<style>
-  /* The login card is the focal element on the page; the hero sets the
-   * tone and the card holds the work. Surface via .panel; generous interior
-   * padding, single accent button. */
-  .login-card {
-    max-width: 32rem;
-    margin: 0 auto;
-    padding: var(--space-6);
-  }
-  .login-block {
-    display: flex;
-    flex-direction: column;
-    gap: var(--space-4);
-  }
-  .login-primary {
-    width: 100%;
-    padding: var(--space-4);
-    font-size: var(--text-base);
-  }
-  /* Quiet reassurance under the one-tap button. */
-  .passkey-hint {
-    margin: var(--space-2) 0 0;
-    font-size: var(--text-sm);
-    line-height: 1.5;
-    color: var(--text-muted);
-    text-align: center;
-  }
-
-  /* AAL2 step-up block: full-width, stacked forms with spacing. */
-  .aal2-block {
-    display: flex;
-    flex-direction: column;
-    gap: var(--space-5);
-  }
-  .aal2-form {
-    display: flex;
-    flex-direction: column;
-    gap: var(--space-4);
-  }
-  .aal2-submit {
-    width: 100%;
-  }
-
-  /* Code block: prominent secondary tier, separated by a divider */
-  .code-block {
-    margin-top: var(--space-5);
-    padding-top: var(--space-5);
-    border-top: 1px solid var(--border);
-  }
-  .code-form {
-    display: flex;
-    flex-direction: column;
-    gap: var(--space-4);
-  }
-  .code-submit {
-    width: 100%;
-  }
-  .code-actions {
-    display: flex;
-    flex-direction: column;
-    gap: var(--space-2);
-  }
-  .code-resend {
-    width: 100%;
-    font-size: var(--text-sm);
-    color: var(--text-2);
-  }
-
-  /* Disclosure: collapsed by default. The summary line reads as a quiet
-   * secondary affordance, expanding into a sibling form. */
-  .password-disclosure {
-    margin-top: var(--space-5);
-  }
-  .password-disclosure[open] .password-summary-icon {
-    transform: rotate(45deg);
-  }
-  /* Thumb-friendly toggle: a full-width tappable row, not a quiet text link. */
-  .password-summary {
-    list-style: none;
-    cursor: pointer;
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: var(--space-3);
-    min-height: 52px;
-    padding: var(--space-3) var(--space-4);
-    border: 1px solid var(--border);
-    border-radius: var(--radius);
-    font-family: var(--font-mono);
-    font-size: var(--text-sm);
-    color: var(--text-2);
-    transition:
-      color var(--duration-fast) var(--ease-out),
-      border-color var(--duration-fast) var(--ease-out),
-      background var(--duration-fast) var(--ease-out);
-  }
-  .password-summary:hover {
-    color: var(--text);
-    border-color: var(--border-strong);
-    background: var(--surface);
-  }
-  .password-summary::-webkit-details-marker { display: none; }
-  .password-summary-label {
-    text-transform: uppercase;
-    letter-spacing: 0.08em;
-    font-size: var(--text-xs);
-  }
-  .password-summary-icon {
-    display: inline-flex;
-    width: 18px;
-    height: 18px;
-    align-items: center;
-    justify-content: center;
-    border: 1px solid var(--border);
-    border-radius: var(--radius-sm);
-    color: var(--text-muted);
-    font-family: var(--font-mono);
-    font-size: var(--text-base);
-    line-height: 1;
-    transition: transform var(--duration-fast) var(--ease-out);
-  }
-  .password-form { margin-top: var(--space-5); }
-
-  /* Footer links sit centered below the card, mono uppercase, light. */
-  .login-footer {
-    max-width: 32rem;
-    margin: var(--space-5) auto 0;
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    gap: var(--space-3);
-    font-family: var(--font-mono);
-    font-size: var(--text-xs);
-    text-transform: uppercase;
-    letter-spacing: 0.08em;
-  }
-  .login-foot-link {
-    color: var(--text-muted);
-    text-decoration: none;
-  }
-  .login-foot-link:hover { color: var(--accent); text-decoration: none; }
-  .login-foot-sep { color: var(--border); }
-
-  @media (max-width: 640px) {
-    .login-card { padding: var(--space-5); }
-  }
-</style>
+</FocusPage>

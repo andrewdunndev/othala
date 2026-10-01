@@ -1,146 +1,84 @@
 ---
-// Recovery flow handler, code strategy: email -> one-time code -> privileged
-// session -> /auth/settings, where the user can set a password or register a
-// passkey. One template serves both phases; flow.ui.nodes drives the inputs.
+// Recovery flow handler, code strategy, and how every new household member starts: a setup link (or an emailed code)
+// opens the code step, the code starts a privileged session, and Kratos lands the person on /auth/settings to add a
+// passkey. One template serves both phases; flow.ui.nodes drives the inputs and lib/journey.ts words them. In `astro dev`,
+// `?dev-state=` renders a recorded flow (lib/journey-fixtures.ts) with no Kratos.
 
 export const prerender = false;
 
-import Layout from '../../layouts/Layout.astro';
-import PageHero from '../../components/PageHero.astro';
+import FocusPage from '../../components/FocusPage.astro';
+import FlowNodes from '../../components/FlowNodes.astro';
 import { browserFlows, getRecoveryFlow } from '../../lib/kratos';
 import { csrfToken, hasMethod } from '../../lib/nodes';
-import FlowNodes from '../../components/FlowNodes.astro';
+import { journeyText, noticeClass, recoverySpecs } from '../../lib/journey';
+import { DEV_RECOVERY_STATES, devRecovery, isIn } from '../../lib/journey-fixtures';
 import type { FlowMessage } from '../../lib/types';
 
 const flowId = Astro.url.searchParams.get('flow');
 const isDev = import.meta.env.DEV;
+const devState = isDev ? Astro.url.searchParams.get('dev-state') : null;
+const devFlow = isIn(DEV_RECOVERY_STATES, devState) ? devRecovery(devState) : null;
 
 if (!flowId && !isDev) {
   return Astro.redirect(browserFlows.recovery());
 }
 
 const cookie = Astro.request.headers.get('cookie') ?? undefined;
-const result = flowId ? await getRecoveryFlow(flowId, cookie).catch(() => null) : null;
+const result = !devFlow && flowId ? await getRecoveryFlow(flowId, cookie).catch(() => null) : null;
 
-if (flowId && (!result || result.kind !== 'ok') && !isDev) {
+if (!devFlow && flowId && (!result || result.kind !== 'ok') && !isDev) {
   return Astro.redirect(browserFlows.recovery());
 }
 
-const flow = result && result.kind === 'ok' ? result.flow : null;
+const flow = devFlow ?? (result && result.kind === 'ok' ? result.flow : null);
 const ui = flow?.ui;
 const csrf = ui ? csrfToken(ui.nodes) : '';
 const hasCode = ui ? hasMethod(ui.nodes, 'code') : true;
 const phase: 'request' | 'sent' = flow?.state === 'sent_email' ? 'sent' : 'request';
+// The "a code was sent" info line is noise on a setup link: the person is already holding the code.
+const messages = (ui?.messages ?? []).filter((m: FlowMessage) => !(phase === 'sent' && m.type === 'info'));
 ---
-<Layout title="Get back in" description="Regain access to your account with a one-time email code." bare>
+<FocusPage
+  title={phase === 'request' ? 'Get back in' : 'Enter your code'}
+  lede={phase === 'request'
+    ? "Enter your email and we'll send you a one-time code. No password needed."
+    : 'Use the code from your setup message or email. It works once and expires soon.'}
+  description="Start or regain access with a one-time code."
+>
 
-  <PageHero
-    title={phase === 'request' ? 'Get back in' : 'Check your email'}
-    eyebrow="recovery"
-    lede={phase === 'request'
-      ? 'Enter your email and we\'ll send you a one-time code. Once you\'re in, you can set up a passkey on this device for one-tap sign-in next time.'
-      : 'We sent a code to your email. Enter it below to continue — it\'s only valid for a few minutes.'}
-  />
-
-  {ui?.messages?.map((m: FlowMessage) => (
-    <div class={`notice notice-${m.type === 'error' ? 'danger' : m.type === 'success' ? 'success' : 'warning'}`}>
-      {m.text}
-    </div>
-  ))}
+  {messages.map((m: FlowMessage) => <div class={noticeClass(m.type)}>{journeyText(m)}</div>)}
 
   {!flow && isDev && (
-    <div class="notice notice-warning">
-      Dev preview: no Kratos flow available. Submitting will not work
-      without a live flow.
-    </div>
+    <div class="notice notice-warning">Dev preview: no flow. Add <code>?dev-state=request|code|code-prefilled|code-wrong</code>.</div>
   )}
 
-  {phase === 'request' && (
-    <p class="recovery-context">
-      This works whether you got a new phone, lost your old one, or just
-      want to get in without a passkey. No password needed.
-    </p>
-  )}
-
-  <section class="panel recover-card">
-
+  <section class="panel focus-card">
     {hasCode && ui && (
-      <form method="POST" action={ui.action} class="recover-form">
+      <form method="POST" action={ui.action} class="focus-form recover-form">
         <input type="hidden" name="csrf_token" value={csrf} />
         <input type="hidden" name="method" value="code" />
         <FlowNodes
           nodes={ui.nodes}
           group="code"
-          buttonClass="button button-primary recover-primary"
-          submitLabel={phase === 'request' ? 'Send me a code' : 'Verify code'}
+          buttonClass="button button-primary focus-btn"
+          submitLabel={phase === 'request' ? 'Email me a code' : 'Verify code'}
+          specs={recoverySpecs(phase)}
+          inputLabelFallback={(n: string) => (n === 'code' ? 'Your code' : n)}
+          messageText={journeyText}
         />
       </form>
     )}
 
-    {!ui && (
-      /* Static dev preview — fields shown so the layout exercises both phases. */
-      <form class="recover-form" onsubmit="return false;">
-        <div class="field">
-          <label for="email">Email address</label>
-          <input id="email" name="email" type="email" placeholder="you@example.com" disabled />
-        </div>
-        <button class="button button-primary recover-primary" type="button" disabled>
-          Send me a code
-        </button>
-      </form>
+    {phase === 'sent' && (
+      <p class="focus-next">Next you'll land on your account, where you can add a passkey so signing in takes one tap.</p>
     )}
-
+    {phase === 'request' && (
+      <p class="focus-note">New phone, lost passkey, or first time here with a setup link: this gets you in.</p>
+    )}
   </section>
 
-  <footer class="recover-footer">
-    <a href="/auth/login" class="recover-foot-link">Back to sign in</a>
-  </footer>
+  <nav class="focus-links" aria-label="Other options">
+    <a href="/auth/login">Back to sign in</a>
+  </nav>
 
-</Layout>
-
-<style>
-  .recovery-context {
-    max-width: 32rem;
-    margin: 0 auto var(--space-5);
-    font-size: var(--text-sm);
-    color: var(--text-muted);
-    text-align: center;
-    line-height: 1.5;
-  }
-
-  /* Surface via .panel. */
-  .recover-card {
-    max-width: 32rem;
-    margin: 0 auto;
-    padding: var(--space-6);
-  }
-  .recover-form {
-    display: flex;
-    flex-direction: column;
-    gap: var(--space-4);
-  }
-  .recover-primary {
-    width: 100%;
-    padding: var(--space-4);
-    font-size: var(--text-base);
-  }
-
-  .recover-footer {
-    max-width: 32rem;
-    margin: var(--space-5) auto 0;
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    gap: var(--space-3);
-    font-family: var(--font-mono);
-    font-size: var(--text-xs);
-    text-transform: uppercase;
-    letter-spacing: 0.08em;
-  }
-  .recover-foot-link { color: var(--text-muted); text-decoration: none; }
-  .recover-foot-link:hover { color: var(--accent); text-decoration: none; }
-
-  @media (max-width: 640px) {
-    .recover-card { padding: var(--space-5); }
-  }
-</style>
+</FocusPage>
