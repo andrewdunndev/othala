@@ -395,17 +395,24 @@ const { hasPasskey, hasCode, hasPassword, totpNodes, aal2WebauthnNodes, lookupNo
           <input type="hidden" name="csrf_token" value={csrf} />
           <input type="hidden" name="method" value="password" />
 
-          <div class="field">
-            <label for="pw-identifier">Email or username</label>
-            <input
-              id="pw-identifier"
-              name="identifier"
-              type="text"
-              autocomplete="username"
-              required
-              value={identifierInput?.value ? String(identifierInput.value) : ''}
-            />
-          </div>
+          {passwordFailed && identifierInput?.value ? (
+            <div class="field">
+              <p class="focus-note">Signing in as <strong>{String(identifierInput.value)}</strong></p>
+              <input type="hidden" name="identifier" value={String(identifierInput.value)} />
+            </div>
+          ) : (
+            <div class="field">
+              <label for="pw-identifier">Email or username</label>
+              <input
+                id="pw-identifier"
+                name="identifier"
+                type="text"
+                autocomplete="username"
+                required
+                value={identifierInput?.value ? String(identifierInput.value) : ''}
+              />
+            </div>
+          )}
 
           <div class="field">
             <label for="password">Password</label>
@@ -415,7 +422,7 @@ const { hasPasskey, hasCode, hasPassword, totpNodes, aal2WebauthnNodes, lookupNo
               type="password"
               autocomplete={passwordInput?.autocomplete ?? 'current-password'}
               required
-              autofocus={passwordFailed}
+              data-focus-on-load={passwordFailed ? '' : undefined}
               aria-invalid={passwordFailed ? 'true' : undefined}
               aria-describedby={passwordFailed ? 'flow-error' : undefined}
             />
@@ -438,6 +445,11 @@ const { hasPasskey, hasCode, hasPassword, totpNodes, aal2WebauthnNodes, lookupNo
       ? <a href="/auth/login" data-astro-reload>Use a different way to sign in</a>
       : null}
   </nav>
+
+  <script>
+    // Focus the retry field without scrolling, so the heading and the error stay in view.
+    document.querySelector<HTMLInputElement>('#password[data-focus-on-load]')?.focus({ preventScroll: true });
+  </script>
 
   {scripts.map((s) => (
     <script

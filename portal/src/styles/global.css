@@ -148,6 +148,11 @@ h1 { font-family: var(--font-display); font-weight: 800; letter-spacing: -0.02em
 h2 { font-size: var(--text-xl); }
 h3 { font-size: var(--text-lg); }
 
+h1, h2 { text-wrap: balance; }
+h1, h2, h3 { overflow-wrap: anywhere; }
+p, li { text-wrap: pretty; }
+.sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); border: 0; padding: 0; white-space: nowrap; }
+
 p { color: var(--text); }
 .muted { color: var(--text-2); }
 .muted-strong { color: var(--text-muted); }
@@ -378,15 +383,9 @@ a.subtle:hover { color: var(--text); }
   }
 }
 
-/* Marks that ship their own filled square (data-bleed, set from the logo file) fill the plate edge to edge, so no square
- * sits inside a plate. */
-:root :is(.app-icon, .app-modal-logo)[data-bleed] {
-  padding: 0;
-  overflow: hidden;
-  border-color: transparent;
-  background: transparent;
-  border-radius: 18%;
-}
+/* Marks that ship their own filled square (data-bleed, set from the logo file) sit in the same plate and inset as every
+ * other glyph, with the square's corners softened, so the plates read alike. */
+:root :is(.app-icon, .app-modal-logo)[data-bleed] img { border-radius: 18%; }
 
 /* Tiles: white and lifted in the light theme (border plus a faint shadow), the raised surface in dark. */
 :root { --tile-bg: var(--bg); --tile-shadow: 0 1px 2px rgba(20, 20, 20, 0.06); }

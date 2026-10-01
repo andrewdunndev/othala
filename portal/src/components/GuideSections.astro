@@ -31,6 +31,17 @@ const empty = !guide.lead && guide.sections.length === 0;
   {empty && <p class="guide-empty">{emptyNote ?? 'No guide has been written for this app yet.'}</p>}
 </div>
 
+<script>
+  // A figure that scrolls sideways on a phone is a keyboard-reachable, labelled region.
+  for (const fig of document.querySelectorAll<HTMLElement>('.guide .cat-explainer')) {
+    if (fig.querySelector('.fig-stack')) continue;
+    const label = fig.querySelector('svg')?.getAttribute('aria-label') ?? fig.querySelector('svg title')?.textContent;
+    fig.tabIndex = 0;
+    fig.setAttribute('role', 'region');
+    fig.setAttribute('aria-label', label || 'Diagram');
+  }
+</script>
+
 <style>
   .guide {
     display: flex;
@@ -70,7 +81,8 @@ const empty = !guide.lead && guide.sections.length === 0;
   }
 
   /* Prose inside any section */
-  .guide-prose > :global(:is(p, ul, ol, blockquote)), .guide-lead { max-width: 56ch; }
+  /* One measure: the guide fills whatever column holds it (the page's reading column, the dialog body). */
+  .guide-prose :global(p), .guide-prose :global(li), .guide-lead { text-wrap: pretty; }
   .guide-prose > :global(:first-child) { margin-top: 0; }
   .guide-prose > :global(:last-child) { margin-bottom: 0; }
   .guide-prose :global(h3),
@@ -228,6 +240,7 @@ const empty = !guide.lead && guide.sections.length === 0;
     .guide :global(.cat-explainer .fig-stack) { display: block; }
     /* A single drawing keeps its size and the figure scrolls sideways, so its labels stay readable. */
     .guide :global(.cat-explainer:not(:has(.fig-stack))) { overflow-x: auto; }
+    .guide :global(.cat-explainer:not(:has(.fig-stack)):focus-visible) { outline: 2px solid var(--input-focus, var(--accent)); outline-offset: 2px; }
     .guide :global(.cat-explainer:not(:has(.fig-stack)) svg) { min-width: 38rem; }
   }
   .guide :global(.cat-explainer p) {
@@ -235,6 +248,5 @@ const empty = !guide.lead && guide.sections.length === 0;
     padding: 0;
     font-size: var(--text-sm);
     color: var(--text-2);
-    max-width: 56ch;
   }
 </style>

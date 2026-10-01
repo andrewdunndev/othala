@@ -14,10 +14,13 @@ interface Props {
 }
 
 const { tile, readiness, requirementTitles } = Astro.props;
+// A tile whose prerequisite is unmet opens its setup page (the app page leads with the setup step) rather than an
+// address that will not load until the person is set up.
+const launchHref = readiness === 'needs' ? `/apps/${encodeURIComponent(tile.slug)}` : safeHref(tile.url);
 ---
 
 <article class="tile" data-slug={tile.slug}>
-  <a class="tile-launch" href={safeHref(tile.url)}>
+  <a class="tile-launch" href={launchHref}>
     <AppIcon tile={tile} />
     <span class="tile-title">
       <span class="tile-name">{tile.name}</span>
@@ -95,6 +98,8 @@ const { tile, readiness, requirementTitles } = Astro.props;
     margin-top: var(--space-2);
   }
   .tile-name {
+    min-width: 0;
+    overflow-wrap: anywhere;
     font-size: var(--text-base);
     font-weight: 600;
     line-height: 1.3;
@@ -103,6 +108,7 @@ const { tile, readiness, requirementTitles } = Astro.props;
     font-size: var(--text-sm);
     color: var(--text-2);
     line-height: 1.4;
+    text-wrap: pretty;
     display: -webkit-box;
     -webkit-box-orient: vertical;
     -webkit-line-clamp: 2;

@@ -51,7 +51,6 @@ const guide = splitGuide(requirement.html);
       <h1 class="req-title">{requirement.title}</h1>
       {requirement.why && <p class="req-lede">{requirement.why}</p>}
       <p class:list={['req-state', ready ? 'req-state-ready' : 'req-state-needs']}>
-        <span class="req-state-dot" aria-hidden="true"></span>
         {ready ? 'The household admin has marked you set up.' : <>Not marked as set up for you yet. Follow the steps, then <a href="/#get-in-touch">tell the household admin</a>.</>}
       </p>
     </header>
@@ -63,7 +62,7 @@ const guide = splitGuide(requirement.html);
 </Layout>
 
 <style>
-  .req-detail { max-width: 46rem; margin: 0 auto; padding-bottom: var(--space-7); }
+  .req-detail { max-width: 41.25rem; margin: 0 auto; padding-bottom: var(--space-7); }
   .req-header { padding: var(--space-5) 0; border-bottom: 1px solid var(--border); }
   .req-eyebrow {
     margin: 0;
@@ -80,22 +79,29 @@ const guide = splitGuide(requirement.html);
     line-height: var(--lh-tight);
     margin: var(--space-2) 0 var(--space-3);
   }
-  .req-lede { font-size: var(--text-base); color: var(--text-2); max-width: 56ch; margin: 0 0 var(--space-3); }
+  .req-lede { font-size: var(--text-base); color: var(--text-2); margin: 0 0 var(--space-3); }
   .req-state {
-    display: inline-flex;
-    align-items: center;
-    gap: var(--space-2);
+    display: block;
     margin: 0;
     padding: var(--space-2) var(--space-3);
     border: 1px solid var(--border);
     border-radius: var(--radius-sm);
     font-size: var(--text-sm);
   }
-  .req-state-dot { width: 0.5rem; height: 0.5rem; border-radius: 50%; flex-shrink: 0; }
+  .req-state::before {
+    content: '';
+    display: inline-block;
+    width: 0.5rem;
+    height: 0.5rem;
+    margin-right: var(--space-2);
+    border-radius: 50%;
+    vertical-align: 0.05em;
+    background: currentColor;
+  }
   .req-state-needs { background: var(--warning-subtle); border-color: var(--warning); }
-  .req-state-needs .req-state-dot { background: var(--warning); }
+  .req-state-needs::before { background: var(--warning); }
   .req-state-ready { background: var(--success-subtle); border-color: var(--success); }
-  .req-state-ready .req-state-dot { background: var(--success); }
+  .req-state-ready::before { background: var(--success); }
   .req-body { padding: var(--space-5) 0; }
   @media (max-width: 640px) { .req-title { font-size: var(--text-2xl); } }
 </style>

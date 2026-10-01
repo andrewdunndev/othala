@@ -186,7 +186,7 @@ const devLinks = [
 
   {state === 'post-auth' && (
     <>
-      <h1 class="greeting">{firstName ? `Hello, ${firstName}.` : 'Welcome back.'} <span class="greeting-sub">Pick an app to open it, or its Guide for setup.</span></h1>
+      <h1 class="greeting" id="greeting" tabindex="-1">{firstName ? `Hello, ${firstName}.` : 'Welcome back.'} <span class="greeting-sub">Pick an app to open it, or its Guide for setup.</span></h1>
 
       {!hasPasskeyEnrolled && (
         <div class="passkey-nudge" id="passkey-nudge">
@@ -198,7 +198,7 @@ const devLinks = [
             type="button"
             class="passkey-nudge-close mono"
             data-dismiss-passkey-nudge
-            aria-label="Dismiss"
+            aria-label="Dismiss the passkey reminder"
           >✕</button>
         </div>
       )}
@@ -246,7 +246,7 @@ const devLinks = [
             enable one.
           </p>
         )}
-        <p class="missing-app"><button type="button" class="text-link" id="open-request-form">Missing an app?</button></p>
+        <p class="missing-app"><button type="button" class="text-link" id="open-request-form">Missing an app? Get in touch</button></p>
       </section>
 
       {/* ── Per-app documentation: one hidden <template> per visible tile, three slots. The dialog script clones
@@ -316,7 +316,7 @@ const devLinks = [
             <form class="request-form" id="request-form" method="post" enctype="application/x-www-form-urlencoded" action="/api/request" novalidate>
               <label class="form-field">
                 <span class="form-label">Your name</span>
-                <input class="form-input" type="text" name="name" autocomplete="name" maxlength="80" required placeholder="e.g. Robin" />
+                <input class="form-input" type="text" name="name" autocomplete="name" maxlength="80" required placeholder="e.g. Robin" value={displayName} />
               </label>
 
               <label class="form-field">
@@ -342,8 +342,8 @@ const devLinks = [
               </div>
             </form>
 
-            <div class="request-thanks" id="request-thanks" hidden>
-              <p class="request-thanks-msg">Thanks — your request is on its way to a household admin.</p>
+            <div class="request-thanks" id="request-thanks" role="status" hidden>
+              <p class="request-thanks-msg" id="request-thanks-msg" tabindex="-1">Thanks. Your message went to the household admins, and one of them will follow up with you directly.</p>
               <p class="mono request-thanks-note">You can close this window.</p>
             </div>
           </div>
@@ -392,12 +392,26 @@ const devLinks = [
       errorEl.hidden = true;
     }
 
+    // A link can open the form ready to send: /?ask=<type>&msg=<text>#get-in-touch picks the type and seeds the message.
+    function seedFromLink() {
+      var q = new URLSearchParams(location.search);
+      var type = form.elements.type;
+      var message = form.elements.message;
+      var ask = q.get('ask');
+      if (type && ask && type.querySelector('option[value="' + ask + '"]')) type.value = ask;
+      var msg = q.get('msg');
+      if (message && msg && !message.value) message.value = msg.slice(0, 300);
+    }
+
     openBtn.addEventListener('click', function () {
       clearError();
       if (typeof modal.showModal === 'function') modal.showModal();
     });
 
-    if (location.hash === '#get-in-touch') openBtn.click();
+    if (location.hash === '#get-in-touch') {
+      seedFromLink();
+      openBtn.click();
+    }
 
     modal.querySelectorAll('[data-close-request]').forEach(function (btn) {
       btn.addEventListener('click', function () { modal.close(); });
@@ -428,6 +442,8 @@ const devLinks = [
           if (r.ok && r.data && r.data.ok) {
             form.hidden = true;
             if (thanks) thanks.hidden = false;
+            var msgEl = document.getElementById('request-thanks-msg');
+            if (msgEl) msgEl.focus();
           } else {
             showError((r.data && r.data.error) || 'Something went wrong. Please try again.');
           }
@@ -561,6 +577,8 @@ const devLinks = [
       closeBtn.addEventListener('click', function () {
         try { localStorage.setItem(KEY, '1'); } catch (e) {}
         nudge.remove();
+        var heading = document.getElementById('greeting');
+        if (heading) heading.focus({ preventScroll: true });
       });
     }
   })();
@@ -586,7 +604,7 @@ const devLinks = [
     border: 1px solid var(--accent);
     background: var(--accent-subtle);
     border-radius: var(--radius);
-    padding: var(--space-1) var(--space-3);
+    padding: var(--space-3);
     margin-bottom: var(--space-4);
   }
   .passkey-nudge-text {
@@ -597,7 +615,7 @@ const devLinks = [
   .passkey-nudge-link {
     display: inline-flex;
     align-items: center;
-    min-height: 2.75rem;
+    min-height: 2rem;
     margin-left: var(--space-2);
     font-weight: 600;
     white-space: nowrap;
@@ -606,7 +624,7 @@ const devLinks = [
     all: unset;
     cursor: pointer;
     flex-shrink: 0;
-    color: var(--text-muted);
+    color: var(--text-2);
     padding: var(--space-1) var(--space-2);
     line-height: 1;
     transition: color var(--duration-fast) var(--ease-out);
@@ -618,7 +636,9 @@ const devLinks = [
   }
 
   /* Signed-in home: a one-line greeting, then the apps. */
+  .greeting:focus { outline: none; }
   .greeting {
+    min-width: 0;
     font-size: var(--text-2xl);
     line-height: 1.2;
     margin: 0 0 var(--space-4);
@@ -1051,13 +1071,13 @@ const devLinks = [
      * squeezing both onto one row. */
     .passkey-nudge {
       gap: var(--space-2);
-      padding: 0 var(--space-1) 0 var(--space-3);
+      padding: var(--space-3) var(--space-1) var(--space-3) var(--space-3);
       margin-bottom: var(--space-3);
     }
     .passkey-nudge-text { line-height: 1.4; }
     .passkey-nudge-link { margin-left: var(--space-1); }
     .passkey-nudge-text { font-size: var(--text-sm); }
-    .passkey-nudge-close { min-width: 44px; min-height: 44px; display: flex; align-items: center; justify-content: center; }
+    .passkey-nudge-close { min-width: 44px; min-height: 44px; display: flex; align-items: center; justify-content: center; align-self: center; }
 
     /* Stack post-auth CTA actions full-width with adequate tap height. */
     .cta-row {

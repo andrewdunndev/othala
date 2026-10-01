@@ -25,6 +25,7 @@
         btn.addEventListener('click', function () {
           var done = function (ok) {
             btn.textContent = ok ? 'Copied' : 'Press Ctrl+C';
+            if (window.announce) window.announce(ok ? 'Copied ' + code.textContent : 'Copy failed. Press Ctrl+C to copy ' + code.textContent);
             setTimeout(function () { btn.textContent = 'Copy'; }, 1600);
           };
           try {
