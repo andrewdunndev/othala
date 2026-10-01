@@ -113,8 +113,9 @@ full per-RP runbook.
 6. Smoke: `/healthz`, `/readyz`, and the OIDC discovery document all
    answer; a real login round-trips.
 
-Rollback is purely a deploy-plane change: revert to the previous pinned
-digest and redeploy.
+Kratos and Hydra migrations are forward-only: `pg_dump` before any deploy that
+changes an Ory pin, and roll back across that change by restoring the dump. An
+app-only rollback is a digest revert.
 
 ## Why two repos
 
