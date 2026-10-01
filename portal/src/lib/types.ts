@@ -35,6 +35,8 @@ export type Identity = Omit<SdkIdentity, 'metadata_admin'> & {
     admin?: boolean;
     /** Prerequisite names the admin marked set up for this person (see admin-api patchPrerequisites). */
     prerequisites?: string[];
+    /** Passkey names keyed by hex credential id (see passkey-names.ts). */
+    passkeyNames?: Record<string, string>;
   };
 };
 
@@ -143,7 +145,7 @@ export interface FlowNode {
     | 'identifier_first';
   attributes: NodeAttributes;
   messages?: FlowMessage[];
-  meta?: { label?: { id?: number; text?: string } };
+  meta?: { label?: { id?: number; text?: string; context?: Record<string, unknown> } };
 }
 
 export interface FlowUI {
