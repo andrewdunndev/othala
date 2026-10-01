@@ -210,7 +210,7 @@ const devLinks = [
         {visibleTiles.length > 0 ? (
           <>
             {ungroupedTiles.length > 0 && (
-              <div class="tile-grid">
+              <div class="tile-grid" data-count={ungroupedTiles.length}>
                 {ungroupedTiles.map((t: AppTile) => {
                   const v = views.get(t.slug)!;
                   return <TileCard tile={t} readiness={v.readiness} requirementTitles={v.titles} />;
@@ -653,20 +653,16 @@ const devLinks = [
     gap: var(--space-3);
     align-items: stretch;
   }
-  /* Every grid shares the same tracks (3 from 900px, 2 from 640px, same width cap), so tile edges line up across
-     groups whatever the tile count. A group of four lays out as two full rows of two. */
+  /* Grids fill the full row: 3 columns from 900px, but a group of 1, 2 or 4 tiles uses 2 columns (4 lays out 2x2)
+     so no row ends in an empty third. Outer edges match across groups. */
   @media (min-width: 640px) {
-    .tile-grid {
-      grid-template-columns: repeat(2, minmax(0, 1fr));
-      max-width: calc(2 * 22rem + var(--space-3));
-    }
+    .tile-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   }
   @media (min-width: 900px) {
-    .tile-grid {
-      grid-template-columns: repeat(3, minmax(0, 1fr));
-      max-width: calc(3 * 22rem + 2 * var(--space-3));
-    }
-    .tile-grid[data-count="4"] > :global(:nth-child(3)) { grid-column: 1; }
+    .tile-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+    .tile-grid[data-count="1"],
+    .tile-grid[data-count="2"],
+    .tile-grid[data-count="4"] { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   }
 
   /* Grouped tile sections: no frame, so the tiles sit on the same columns as the ungrouped grid. The title uses the
