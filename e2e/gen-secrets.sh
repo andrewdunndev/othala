@@ -68,7 +68,7 @@ RECOVERY_ADMIN_USERNAME=admin.recovery
 RECOVERY_ADMIN_PASSWORD=othala-testpass-2026
 
 # Admin authority is the metadata_admin.admin marker; RECOVERY_GATE_SECRET guards the Kratos
-# webhooks on the loopback admin port.
+# webhooks on the internal-network admin listener (PORTAL_ADMIN_BIND_HOST) (smoke; the browser overlay binds the static IP).
 RECOVERY_GATE_SECRET=$(gen)
 
 # App CSRF tokens (HIGH-1)

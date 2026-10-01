@@ -4,7 +4,7 @@
 # nodejs-22-minimal via ci-runtime-node for runtime. Astro Node
 # standalone emits an SSR handler at dist/server/entry.mjs; the
 # D-listener wrapper dist/server/listen.mjs serves it on the public
-# port and stands up a separate loopback admin port (CU1 item 4), so
+# port and stands up a separate internal-network admin listener (PORTAL_ADMIN_BIND_HOST) (CU1 item 4), so
 # no Express/Fastify glue is needed.
 #
 # v0.2.0 change: OIDC client manifests are read at RUNTIME from a

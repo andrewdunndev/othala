@@ -704,13 +704,13 @@ test('startup fails in production when a required var is unset', () => {
 });
 
 test('startup refuses in production without PORTAL_ADMIN_BIND_HOST, and on a wildcard; dev defaults to loopback', () => {
-  process.env.RECOVERY_GATE_SECRET = 'x'.repeat(32);
-  process.env.CSRF_SECRET = 'x'.repeat(32);
-  const names = ['NODE_ENV', 'PORTAL_ADMIN_BIND_HOST', 'OTHALA_PUBLIC_URL', 'OTHALA_APEX', 'OTHALA_INSTANCE_NAME', 'OTHALA_CONTACT_RECIPIENT', 'OTHALA_SMTP_CONNECTION_URI'];
+  const names = ['RECOVERY_GATE_SECRET', 'CSRF_SECRET', 'NODE_ENV', 'PORTAL_ADMIN_BIND_HOST', 'OTHALA_PUBLIC_URL', 'OTHALA_APEX', 'OTHALA_INSTANCE_NAME', 'OTHALA_CONTACT_RECIPIENT', 'OTHALA_SMTP_CONNECTION_URI'];
   const saved = Object.fromEntries(names.map((n) => [n, process.env[n]]));
   const restore = (k, v) => (v === undefined ? delete process.env[k] : (process.env[k] = v));
   const bindErrors = () => startupEnvErrors().filter((e) => e.includes('PORTAL_ADMIN_BIND_HOST'));
   try {
+    process.env.RECOVERY_GATE_SECRET = 'x'.repeat(32);
+    process.env.CSRF_SECRET = 'x'.repeat(32);
     process.env.OTHALA_PUBLIC_URL = 'https://auth.example.com';
     process.env.OTHALA_APEX = 'example.com';
     process.env.OTHALA_INSTANCE_NAME = 'Acme';
@@ -719,6 +719,7 @@ test('startup refuses in production without PORTAL_ADMIN_BIND_HOST, and on a wil
     process.env.NODE_ENV = 'production';
     delete process.env.PORTAL_ADMIN_BIND_HOST;
     assert.equal(bindErrors().length, 1, 'unset in production fails');
+    assert.match(bindErrors()[0], /not set/);
     process.env.PORTAL_ADMIN_BIND_HOST = '0.0.0.0';
     assert.equal(bindErrors().length, 1, 'wildcard fails');
     process.env.PORTAL_ADMIN_BIND_HOST = '10.0.0.5';

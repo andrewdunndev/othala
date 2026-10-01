@@ -29,7 +29,7 @@ import Layout from '../layouts/Layout.astro';
       Othala hands it, so the question worth answering first is what can
       reach the two Ory admin APIs at all. The answer is one process: the
       app runs a public SSR listener the edge reaches and a second,
-      loopback-only admin listener the edge never touches, so every
+      internal-network admin listener (PORTAL_ADMIN_BIND_HOST) the edge never touches, so every
       admin-API caller stays inside one trust domain instead of becoming a
       service-to-service authorization problem in its own right.
       <code>ARCHITECTURE.md</code> § Trust boundary has the enforcement;

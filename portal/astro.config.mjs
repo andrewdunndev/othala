@@ -15,7 +15,7 @@ import tailwindcss from '@tailwindcss/vite';
 // (copied into dist by the build) sets ASTRO_NODE_AUTOSTART=disabled before
 // importing entry.mjs — which makes the adapter's start() a no-op — then
 // serves the exported `handler` on the PUBLIC port and stands up a SEPARATE
-// loopback-only ADMIN port (http.createServer) in the same process. Only
+// internal-network admin listener (PORTAL_ADMIN_BIND_HOST) (http.createServer) in the same process. Only
 // listen.mjs binds sockets. The admin port never delegates to `handler`, so
 // the two muxes stay disjoint. (Middleware mode would also export a bare
 // handler; standalone is kept because the rest of the build/runtime tooling

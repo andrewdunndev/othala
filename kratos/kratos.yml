@@ -190,7 +190,7 @@ selfservice:
         hooks:
           - hook: web_hook
             config:
-              # Webhook to the loopback admin port (othala:4431), not the public port.
+              # Webhook to the internal-network admin listener (PORTAL_ADMIN_BIND_HOST) (othala:4431), not the public port.
               # The app constant-time compares the bearer and fails closed on a missing or wrong secret.
               url: "http://othala:4431/admin/recovery-gate"
               method: POST

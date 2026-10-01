@@ -22,7 +22,7 @@ authorization problem to solve a decomposition nobody needed.
 flowchart LR
   browser([Browser / app client]) --> edge[Edge proxy<br/>TLS, one hostname]
   subgraph pod[One trust domain: the admin APIs never leave it]
-    app[The app<br/>public SSR listener + loopback admin listener]
+    app[The app<br/>public SSR listener + internal-network admin listener (PORTAL_ADMIN_BIND_HOST)]
     kratos[Kratos]
     hydra[Hydra]
     pg[(Postgres)]

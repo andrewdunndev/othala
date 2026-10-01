@@ -27,7 +27,7 @@ Delete each from the deploy environment; none is read any more.
 - `OTHALA_PUBLIC_HOST`: the Caddyfile site address is `OTHALA_PUBLIC_URL`.
 - `OTHALA_OTLP_PROVIDER`, `OTHALA_OTLP_ENVIRONMENT`, `OTEL_*` and `OTLP_INGEST_TOKEN`: set `OTHALA_OTLP_ENDPOINT` to trace.
 - `KRATOS_PUBLIC_URL`, `HYDRA_PUBLIC_URL`, `KRATOS_ADMIN_URL`, `HYDRA_ADMIN_URL`, `KRATOS_ADMIN_TOKEN` and `HYDRA_ADMIN_TOKEN`: fixed at `kratos:4433`, `kratos:4434` and `hydra:4445`, no bearer.
-- `ADMIN_HOST`: renamed to `PORTAL_ADMIN_BIND_HOST`, which is required in production (the portal refuses to start without it). Delete `ADMIN_HOST` from the deploy environment.
+- `ADMIN_HOST`: renamed to `PORTAL_ADMIN_BIND_HOST`, which is required in production (the portal refuses to start without it).
 - `KRATOS_PG_HOST`, `HYDRA_PG_HOST`, `KRATOS_ADMIN_HOST` and `CONSENT_HOST`: the hosts are `postgres`, `kratos`, `othala`.
 - `MANIFEST_DIR`, `PORT`, `HOST`, `ADMIN_PORT`, `PORTAL_LOGIN_URL` and `PORTAL_CONSENT_URL`: fixed.
 - `SMTP_USER`, `SMTP_PASS`, `ACME_EMAIL` and the Kratos and Hydra `DSN`: credentials ride in `OTHALA_SMTP_CONNECTION_URI` and `dsn`.
@@ -35,7 +35,7 @@ Delete each from the deploy environment; none is read any more.
 ### Changed
 
 - The portal refuses to start in production when `OTHALA_INSTANCE_NAME` is unset.
-- The portal refuses to start in production when `PORTAL_ADMIN_BIND_HOST` is unset.
+- The portal refuses to start in production without `OTHALA_CONTACT_RECIPIENT` or `OTHALA_SMTP_CONNECTION_URI`.
 - Kratos and Hydra trace when `OTHALA_OTLP_ENDPOINT` is set.
 - The Kratos login flow lifespan is 1h, up from 10m.
 - Kratos public CORS is off: the portal shares the origin.
