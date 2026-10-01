@@ -129,9 +129,6 @@ Live properties of the deployed shape, stated rather than omitted.
 - **Rate limiting depends on a third-party Caddy module.** A binary built without
   it refuses to load `caddy/Caddyfile` at all, so the failure is a refusal to
   start rather than a silently unlimited edge. Confirm it is compiled in.
-- **forward_auth is satisfied by a first-factor session.** It checks state and
-  group membership, not assurance level. An app needing a second factor must
-  enforce it itself or sit behind an OIDC client that does.
 - **Sessions are long-lived and `whoami` answers at the first assurance level**
   (`kratos/kratos.yml`, `session`). A stolen cookie stays valuable for the
   configured lifespan; revocation, not expiry, is what ends it.

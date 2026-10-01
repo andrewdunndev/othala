@@ -24,8 +24,7 @@ this rule, which nothing but review enforces.
 ## Citations
 
 Reference a **file plus a symbol**: a function, constant, directive or heading.
-Never a line number or an ADR number: `docs/adr/` and `docs/access-model.md` no
-longer exist, so references to them dangle.
+Never a line number.
 
 `scripts/check-purity.sh` enforces the line-pin half for the vendored files
 (`no-line-pins-into-vendored-files`). The rest is a habit.
@@ -66,7 +65,7 @@ cost. Comments count, because a comment inside these files ships to production.
 
 ## The gates
 
-Two local scripts. CI runs the same checks and more.
+One local script. CI runs the same checks and more.
 
 **`scripts/check-purity.sh`** runs its checks over the git **index**, not the
 worktree, so the corpus is identical locally and in CI. Every check is a row in

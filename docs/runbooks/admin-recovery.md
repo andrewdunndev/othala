@@ -61,7 +61,7 @@ curl -fsS -X PATCH -H 'Content-Type: application/json' \
   http://localhost:4434/admin/identities/<UUID>
 ```
 
-That is the same two-op shape the portal itself uses (`setAdminMarker` in
+That is the same two-op shape the portal itself uses (`patchAdminMarker` in
 `portal/src/lib/admin-api.ts`). Patch the marker and nothing else — sending a
 whole `metadata_admin` object replaces `groups` too, silently stripping an
 admin's app access while they can still sign in.

@@ -123,7 +123,7 @@ and keeps the role ranked highest by its index in `manifest.roles`. It is not a 
 stored order. Holding both the entry group and the role group is the normal case, not an edge case,
 and a first-match walk over an alphabetically sorted array would have handed those identities the
 lesser role. There is exactly one resolver: the consent path and the admin UI's effective-access view
-(`computeEffectiveAccess`, `portal/src/lib/access.ts`) both call it, so they agree structurally rather
+both call it, so they agree structurally rather
 than by two walks staying in sync.
 
 ## The forward-auth request path
