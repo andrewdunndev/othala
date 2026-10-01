@@ -72,9 +72,11 @@ const personHref = (id: string) => `/admin/users/${id}${devState ? `?dev-state=$
       <li>
         <div class="app-head">
           <AppIcon tile={app.tile ?? { icon: app.name.slice(0, 2).toUpperCase() }} />
-          <div class="app-name">{app.name}</div>
-          {href && <a class="open-link" href={href} rel="noopener">Open {app.name}</a>}
-          <div class="app-desc">{app.description}</div>
+          <div class="app-text">
+            <div class="app-name">{app.name}</div>
+            <div class="app-desc">{app.description}</div>
+          </div>
+          {href && <a class="open-link" href={href} rel="noopener" aria-label={`Open ${app.name}`}>Open</a>}
         </div>
         {(problems.length > 0 || notSynced) && (
           <div class="badges" style="margin-top: var(--space-2)">

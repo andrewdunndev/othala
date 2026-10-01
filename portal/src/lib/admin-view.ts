@@ -8,6 +8,7 @@ import { HOUSEHOLD_GROUPS, IDENTITY_GROUPS } from './constants';
 import { GROUP_RE } from './access-groups';
 import { currentLevel, isOpenToEveryone, isTopLevel, levelsFor, NO_ACCESS } from './access-rows';
 import { isAdminMarker } from './admin-auth';
+import { authenticatorEnrolled, hasSecondFactor, securityKeyCount } from './step-up';
 
 export const ADMIN_NAV = [
   { href: '/admin/users', label: 'People' },
@@ -231,18 +232,19 @@ function configOf(i: Identity, key: string): Record<string, unknown> | undefined
   return c ? (c.config ?? {}) : undefined;
 }
 
-function keyCount(cfg: Record<string, unknown> | undefined): number {
-  const keys = cfg?.credentials;
-  return Array.isArray(keys) ? keys.length : cfg ? 1 : 0;
+/** Stored passkeys; only a credentials array counts, so an empty entry is no key. */
+function passkeyCount(i: Identity): number {
+  const keys = configOf(i, 'passkey')?.credentials;
+  return Array.isArray(keys) ? keys.length : 0;
 }
 
 /** How a person signs in, one row per method, in the words of the account settings page. */
 export function signInMethods(i: Identity): SignInMethod[] {
-  const passkeys = keyCount(configOf(i, 'passkey'));
-  const keys = keyCount(configOf(i, 'webauthn'));
+  const passkeys = passkeyCount(i);
+  const keys = securityKeyCount(i);
   const password = configOf(i, 'password');
   const passwordSet = password !== undefined && (Object.keys(password).length === 0 || Boolean(password.hashed_password));
-  const totp = configOf(i, 'totp') !== undefined;
+  const totp = authenticatorEnrolled(i);
   const codes = configOf(i, 'lookup_secret') !== undefined;
   return [
     { key: 'passkey', label: 'Passkeys', value: passkeys > 0 ? String(passkeys) : 'None', enrolled: passkeys > 0 },
@@ -251,4 +253,36 @@ export function signInMethods(i: Identity): SignInMethod[] {
     { key: 'webauthn', label: 'Security keys', value: keys > 0 ? String(keys) : 'None', enrolled: keys > 0 },
     { key: 'lookup_secret', label: 'Backup codes', value: codes ? 'Saved' : 'Not saved', enrolled: codes },
   ];
+}
+
+export interface PersonLimits {
+  /** Why "Make household admin" is not offered, or null when it is. */
+  grant: string | null;
+  /** Why "Remove household admin" is not offered, or null when it is. */
+  revoke: string | null;
+  /** Why "Turn off sign-in" is not offered, or null when it is. */
+  deactivate: string | null;
+}
+
+/** The refusals the server would give, as reasons the page shows instead of the action. */
+export function personLimits(i: Identity, o: { first: string; isSelf: boolean; lastAdmin: boolean }): PersonLimits {
+  const only = o.isSelf ? "You're the only household admin." : `${o.first} is the only household admin.`;
+  return {
+    grant: hasSecondFactor(i) ? null : `Needs an authenticator app or security key first. Send a setup link so ${o.first} can add one.`,
+    revoke: o.lastAdmin ? `${only} Make someone else an admin first.` : null,
+    deactivate: o.isSelf
+      ? "You can't turn off your own sign-in. Ask another admin."
+      : o.lastAdmin
+        ? `${only} Make someone else an admin first.`
+        : null,
+  };
+}
+
+/** Why a sign-in method can't be removed (it is an admin's last second factor), or null when it can. */
+export function removalBlock(i: Identity, credType: string, isSelf: boolean): string | null {
+  if (!isSelf && !isAdminMarker(i)) return null;
+  const creds = { ...((i.credentials ?? {}) as Record<string, unknown>) };
+  delete creds[credType];
+  if (hasSecondFactor({ ...i, credentials: creds as Identity['credentials'] })) return null;
+  return 'Admins keep at least one authenticator app or security key.';
 }

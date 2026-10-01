@@ -18,7 +18,8 @@ import { getIdentity, listIdentities, EVICTABLE_CREDENTIAL_TYPES } from '../../.
 import { ADMIN_ACTIONS, ENROLLMENT_TTL, type ActionResult } from '../../../lib/admin-actions';
 import { bannerFor } from '../../../lib/admin-banner';
 import { currentLevel, NO_ACCESS } from '../../../lib/access-rows';
-import { emailIsVerified, householdChoices, PEOPLE_LOAD_ERROR, personName, signInMethods, unrecognisedGroups } from '../../../lib/admin-view';
+import { emailIsVerified, householdChoices, PEOPLE_LOAD_ERROR, personLimits, personName, removalBlock, signInMethods, unrecognisedGroups } from '../../../lib/admin-view';
+import { devActionResult } from '../../../lib/admin-fixtures';
 import { isAdminMarker } from '../../../lib/admin-auth';
 import { shouldRefuseRecovery } from '../../../lib/access';
 import { hasSecondFactor } from '../../../lib/step-up';
@@ -63,20 +64,23 @@ if (Astro.request.method === 'POST' && identity) {
   const fd = await Astro.request.formData();
   action = String(fd.get('action') ?? '');
 
-  // Every state-changing admin POST carries a CSRF token bound to the admin identity and the action.
-  try {
-    const tokenAction = action === 'remove-credential' ? `remove-${String(fd.get('cred_type') ?? '')}` : action;
-    verifyToken(String(fd.get('csrf_token') ?? ''), adminId, tokenAction);
-  } catch (err) {
-    if (err instanceof CSRFError) {
-      return new Response(`CSRF: ${err.message}`, { status: 403 });
+  // Every state-changing admin POST carries a CSRF token bound to the admin identity and the action. A dev fixture
+  // has no secret to sign with, so it skips the check and writes nothing.
+  if (!dev) {
+    try {
+      const tokenAction = action === 'remove-credential' ? `remove-${String(fd.get('cred_type') ?? '')}` : action;
+      verifyToken(String(fd.get('csrf_token') ?? ''), adminId, tokenAction);
+    } catch (err) {
+      if (err instanceof CSRFError) {
+        return new Response(`CSRF: ${err.message}`, { status: 403 });
+      }
+      throw err;
     }
-    throw err;
   }
 
   const handler = ADMIN_ACTIONS[action];
   if (dev) {
-    actionResult = { kind: 'error', message: 'Fixture data: nothing was saved.' };
+    actionResult = devActionResult(action, fd, identity.traits?.username ?? '');
   } else if (handler) {
     try {
       const outcome = await handler(fd, { id, identity, adminIdentityId: adminId, manifests, requirements: requirements.map((r) => r.name) });
@@ -104,8 +108,8 @@ const SECTION_OF: Record<string, string> = {
   'send-invite-email': 'signin',
   'force-relogin': 'signin',
   'remove-credential': 'signin',
-  deactivate: 'danger',
-  reactivate: 'danger',
+  deactivate: 'status',
+  reactivate: 'status',
   delete: 'danger',
 };
 const resultSection = SECTION_OF[action] ?? '';
@@ -159,6 +163,7 @@ function tok(name: string): string {
 }
 
 const devState = dev ? Astro.url.searchParams.get('dev-state') : null;
+const limits = identity ? personLimits(identity, { first, isSelf, lastAdmin }) : null;
 const peopleHref = devState ? `/admin/users?dev-state=${devState}` : '/admin/users';
 const removable = methods.filter((m) => m.enrolled && EVICTABLE_CREDENTIAL_TYPES.has(m.key));
 const roleNote = Object.keys(roleOverrides).length;
@@ -179,6 +184,21 @@ const roleNote = Object.keys(roleOverrides).length;
           <span class={`badge ${verified ? 'badge-muted' : 'badge-warning'}`}>{verified ? 'Verified' : 'Unverified'} email</span>
         </div>
       </TitleRow>
+
+      {(isOff || resultSection === 'status') && (
+        <section class={`panel status-card${isOff ? ' is-off' : ''}`} id="status" aria-label="Sign-in status">
+          {resultSection === 'status' && banner && <div class={`notice notice-${banner.tone}`} role="status">{banner.text}</div>}
+          {isOff && (
+            <div class="item-row">
+              <div class="item-id">
+                <span class="item-name">Sign-in is off</span>
+                <span class="item-meta">{first} can't sign in until you turn it back on.</span>
+              </div>
+              <Ask label="Turn sign-in on" action="reactivate" token={tok('reactivate')} section="status" message={`Turn sign-in back on for ${first}?`} confirmLabel="Turn sign-in on" primary />
+            </div>
+          )}
+        </section>
+      )}
 
       <details class="plain" id="profile" open={resultSection === 'profile'}>
         <summary>Edit profile</summary>
@@ -242,7 +262,8 @@ const roleNote = Object.keys(roleOverrides).length;
                 <span class="item-name">Household admin</span>
                 <span class="item-meta">{isTargetAdmin ? "Can add people, change anyone's access and send setup links." : 'Not an admin.'}</span>
               </div>
-              {isTargetAdmin && isSelf && (
+              {isTargetAdmin && limits?.revoke && <span class="reason">{limits.revoke}</span>}
+              {isTargetAdmin && !limits?.revoke && isSelf && (
                 <Ask
                   label="Remove my admin access"
                   action="revoke-admin"
@@ -255,7 +276,7 @@ const roleNote = Object.keys(roleOverrides).length;
                   matchLabel={`Type your name, ${who}, to confirm`}
                 />
               )}
-              {isTargetAdmin && !isSelf && (
+              {isTargetAdmin && !limits?.revoke && !isSelf && (
                 <Ask
                   label="Remove household admin"
                   action="revoke-admin"
@@ -266,7 +287,8 @@ const roleNote = Object.keys(roleOverrides).length;
                   danger
                 />
               )}
-              {!isTargetAdmin && (
+              {!isTargetAdmin && limits?.grant && <span class="reason">{limits.grant}</span>}
+              {!isTargetAdmin && !limits?.grant && (
                 <Ask
                   label="Make household admin"
                   action="grant-admin"
@@ -279,8 +301,6 @@ const roleNote = Object.keys(roleOverrides).length;
               )}
             </li>
           </ul>
-          {!isTargetAdmin && !twoStep && <p class="field-hint">An admin needs an authenticator app or security key first.</p>}
-          {lastAdmin && <p class="field-hint">The last admin can't be removed.</p>}
         </section>
 
         {requirements.length > 0 && (
@@ -374,6 +394,9 @@ const roleNote = Object.keys(roleOverrides).length;
                   <span class="item-name">{m.label}</span>
                   <span class="item-meta">Lost it? Remove it, then send a setup link.</span>
                 </div>
+                {removalBlock(identity, m.key, isSelf) ? (
+                  <span class="reason">{removalBlock(identity, m.key, isSelf)}</span>
+                ) : (
                 <Ask
                   label="Remove"
                   action="remove-credential"
@@ -385,6 +408,7 @@ const roleNote = Object.keys(roleOverrides).length;
                 >
                   <input type="hidden" name="cred_type" value={m.key} />
                 </Ask>
+                )}
               </li>
             ))}
             <li>
@@ -430,17 +454,19 @@ const roleNote = Object.keys(roleOverrides).length;
           <summary>Danger zone</summary>
           {resultSection === 'danger' && banner && <div class={`notice notice-${banner.tone}`} role="status">{banner.text}</div>}
           <ul class="items">
-            <li>
-              <div class="item-id">
-                <span class="item-name">{isOff ? 'Turn sign-in back on' : 'Turn off sign-in'}</span>
-                <span class="item-meta">{isOff ? `${first} can sign in again once you turn it on.` : `${first} can't sign in until you turn it back on. Nothing is deleted.`}</span>
-              </div>
-              {isOff ? (
-                <Ask label="Turn sign-in on" action="reactivate" token={tok('reactivate')} section="danger" message={`Turn sign-in back on for ${first}?`} confirmLabel="Turn sign-in on" primary />
-              ) : (
-                <Ask label="Turn off sign-in" action="deactivate" token={tok('deactivate')} section="danger" message={`Turn off sign-in for ${first}? You can turn it back on later.`} confirmLabel="Turn off sign-in" danger />
-              )}
-            </li>
+            {!isOff && (
+              <li>
+                <div class="item-id">
+                  <span class="item-name">Turn off sign-in</span>
+                  <span class="item-meta">{`${first} can't sign in until you turn it back on. Nothing is deleted.`}</span>
+                </div>
+                {limits?.deactivate ? (
+                  <span class="reason">{limits.deactivate}</span>
+                ) : (
+                  <Ask label="Turn off sign-in" action="deactivate" token={tok('deactivate')} section="status" message={`Turn off sign-in for ${first}? You can turn it back on later.`} confirmLabel="Turn off sign-in" danger />
+                )}
+              </li>
+            )}
             <li>
               <div class="item-id">
                 <span class="item-name">Delete person</span>

@@ -314,7 +314,7 @@ export async function getRecoveryLink(id: string, expiresIn = '1h'): Promise<Rec
   };
 }
 
-/** One entry of an identity's `verifiable_addresses`, as the admin PUT takes it. */
+/** One entry of an identity's `verifiable_addresses`, as the admin API takes it. */
 export interface AddressPayload {
   value: string;
   via: string;
@@ -323,35 +323,28 @@ export interface AddressPayload {
 }
 
 /**
- * The verifiable_addresses an admin PUT should carry to vouch for the email trait: the entry holding the trait's own
- * address (case-insensitive) is marked verified and completed, one is added when none exists, and every other
- * address (a recovery address, say) is carried through unchanged.
+ * The JSON-Patch that vouches for the email trait's address. Kratos's PUT has no verifiable_addresses field (the client
+ * serializer drops it), so this goes through PATCH: the entry holding the trait's own address (case-insensitive) is
+ * replaced with a verified, completed one, or one is appended when none exists. Every other address is not touched.
  */
-export function addressesWithEmailVerified(identity: Pick<Identity, 'traits' | 'verifiable_addresses'>): AddressPayload[] {
+export function emailVerifiedPatch(
+  identity: Pick<Identity, 'traits' | 'verifiable_addresses'>,
+): Array<{ op: 'add' | 'replace'; path: string; value: AddressPayload | AddressPayload[] }> {
   const email = String((identity.traits as { email?: unknown } | undefined)?.email ?? '').toLowerCase();
-  const existing = (identity.verifiable_addresses ?? []).map((a) => ({
-    value: a.value,
-    via: String(a.via),
-    verified: a.verified === true,
-    status: String(a.status),
-  }));
-  const own = existing.findIndex((a) => a.via === 'email' && a.value.toLowerCase() === email);
+  const existing = identity.verifiable_addresses ?? [];
+  const own = existing.findIndex((a) => String(a.via) === 'email' && a.value.toLowerCase() === email);
   const vouched: AddressPayload = { value: email, via: 'email', verified: true, status: 'completed' };
-  if (own === -1) return [...existing, vouched];
-  return existing.map((a, i) => (i === own ? { ...a, verified: true, status: 'completed' } : a));
+  if (own === -1) {
+    return existing.length
+      ? [{ op: 'add', path: '/verifiable_addresses/-', value: vouched }]
+      : [{ op: 'add', path: '/verifiable_addresses', value: [vouched] }];
+  }
+  return [{ op: 'replace', path: `/verifiable_addresses/${own}`, value: vouched }];
 }
 
-/** Mark the email trait's address verified (admin vouches for it), leaving traits, metadata and every other address as stored. */
+/** Mark the email trait's address verified (admin vouches for it) by a targeted patch; nothing else is written. */
 export async function markEmailVerified(id: string): Promise<void> {
   const api = identityApi();
   const current = await api.getIdentity({ id });
-  const updateIdentityBody = {
-    schema_id: current.schema_id,
-    state: current.state ?? 'active',
-    traits: current.traits,
-    metadata_admin: current.metadata_admin ?? undefined,
-    metadata_public: current.metadata_public ?? undefined,
-    verifiable_addresses: addressesWithEmailVerified(current),
-  } as UpdateIdentityBody;
-  await api.updateIdentity({ id, updateIdentityBody });
+  await api.patchIdentity({ id, jsonPatch: emailVerifiedPatch(current) as never });
 }

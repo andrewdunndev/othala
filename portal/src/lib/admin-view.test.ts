@@ -6,8 +6,10 @@ import {
   describeTtl,
   emailIsVerified,
   joinApps,
+  personLimits,
   personName,
   personRows,
+  removalBlock,
   rowMatches,
   showOptions,
   signInMethods,
@@ -15,7 +17,8 @@ import {
   unrecognisedGroups,
 } from './admin-view';
 import type { ClientManifest } from './manifests';
-import { identity, withLookupSecret, withPasskey, withTotp } from './test-builders';
+import { asAdmin, identity, withCredential, withLookupSecret, withPasskey, withTotp, withWebauthnKey } from './test-builders';
+import { hasSecondFactor } from './step-up';
 
 const role = (name: string) => ({ name, description: '', claimEmit: {} });
 const grafana = {
@@ -137,5 +140,54 @@ describe('signInMethods', () => {
   it('counts passkeys and security keys and says None when absent', () => {
     expect(status(withPasskey(identity()))).toMatchObject({ Passkeys: '1' });
     expect(status(identity())).toMatchObject({ Passkeys: 'None', 'Authenticator app': 'Not set', 'Backup codes': 'Not saved' });
+  });
+});
+
+describe('sign-in status agrees with the second-factor rule', () => {
+  const status = (i: ReturnType<typeof identity>) => Object.fromEntries(signInMethods(i).map((m) => [m.label, m.value]));
+
+  it('does not count an empty webauthn entry as a security key', () => {
+    const i = withCredential(identity(), 'webauthn', {});
+    expect(status(i)).toMatchObject({ 'Security keys': 'None' });
+    expect(hasSecondFactor(i)).toBe(false);
+  });
+
+  it('counts a security key and an authenticator app exactly when hasSecondFactor does', () => {
+    const key = withWebauthnKey(identity());
+    expect(status(key)).toMatchObject({ 'Security keys': '1', 'Authenticator app': 'Not set' });
+    expect(hasSecondFactor(key)).toBe(true);
+    const app = withTotp(identity());
+    expect(status(app)).toMatchObject({ 'Authenticator app': 'Set' });
+    expect(hasSecondFactor(app)).toBe(true);
+    expect(status(withCredential(identity(), 'totp', {}))).toMatchObject({ 'Authenticator app': 'Not set' });
+  });
+});
+
+describe('personLimits', () => {
+  const o = { first: 'Eli', isSelf: false, lastAdmin: false };
+
+  it('gives the reason for a person with no second factor instead of a grant', () => {
+    expect(personLimits(identity(), o).grant).toMatch(/authenticator app or security key first/);
+    expect(personLimits(withTotp(identity()), o).grant).toBeNull();
+  });
+
+  it('refuses revoking and turning off the last admin, and turning off your own sign-in', () => {
+    const last = personLimits(asAdmin(withTotp(identity())), { ...o, isSelf: true, lastAdmin: true });
+    expect(last.revoke).toMatch(/only household admin/);
+    expect(last.deactivate).toMatch(/own sign-in/);
+    const other = personLimits(asAdmin(withTotp(identity())), { ...o, lastAdmin: true });
+    expect(other.revoke).toMatch(/Eli is the only household admin/);
+    expect(other.deactivate).toMatch(/only household admin/);
+    expect(personLimits(asAdmin(withTotp(identity())), o)).toMatchObject({ revoke: null, deactivate: null });
+  });
+});
+
+describe('removalBlock', () => {
+  it('blocks removing an admin\'s last second factor and allows it when another remains or for a non-admin', () => {
+    const admin = asAdmin(withTotp(identity()));
+    expect(removalBlock(admin, 'totp', false)).toMatch(/at least one/);
+    expect(removalBlock(withWebauthnKey(admin), 'totp', false)).toBeNull();
+    expect(removalBlock(withTotp(identity()), 'totp', false)).toBeNull();
+    expect(removalBlock(withTotp(identity()), 'totp', true)).toMatch(/at least one/);
   });
 });

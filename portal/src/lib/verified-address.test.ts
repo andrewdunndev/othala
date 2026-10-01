@@ -1,29 +1,27 @@
-// Invariant: marking an email verified changes the email trait's own address and nothing else.
+// Invariant: marking an email verified patches the email trait's own address and nothing else, never via a PUT body.
 
 import { describe, expect, it } from 'vitest';
-import { addressesWithEmailVerified } from './admin-api';
+import { emailVerifiedPatch } from './admin-api';
 
 const addr = (value: string, verified: boolean, via = 'email') => ({ value, via, verified, status: verified ? 'completed' : 'pending' });
+const vouched = (value: string) => ({ value, via: 'email', verified: true, status: 'completed' });
 
-describe('addressesWithEmailVerified', () => {
-  it('verifies the trait address, matching case-insensitively', () => {
-    const out = addressesWithEmailVerified({
+describe('emailVerifiedPatch', () => {
+  it('replaces the trait address entry by index, matching case-insensitively', () => {
+    const out = emailVerifiedPatch({
       traits: { email: 'Robin@Example.test' },
-      verifiable_addresses: [addr('robin@example.test', false)] as never,
+      verifiable_addresses: [addr('other@example.test', false), addr('robin@example.test', false)] as never,
     });
-    expect(out).toEqual([{ value: 'robin@example.test', via: 'email', verified: true, status: 'completed' }]);
+    expect(out).toEqual([{ op: 'replace', path: '/verifiable_addresses/1', value: vouched('robin@example.test') }]);
   });
 
-  it('carries every other address through unchanged', () => {
-    const out = addressesWithEmailVerified({
-      traits: { email: 'a@example.test' },
-      verifiable_addresses: [addr('a@example.test', false), addr('recovery@example.test', false)] as never,
-    });
-    expect(out[1]).toEqual({ value: 'recovery@example.test', via: 'email', verified: false, status: 'pending' });
+  it('appends the trait address when others exist but not it', () => {
+    const out = emailVerifiedPatch({ traits: { email: 'a@example.test' }, verifiable_addresses: [addr('r@example.test', false)] as never });
+    expect(out).toEqual([{ op: 'add', path: '/verifiable_addresses/-', value: vouched('a@example.test') }]);
   });
 
-  it('adds the trait address when none is declared', () => {
-    const out = addressesWithEmailVerified({ traits: { email: 'a@example.test' }, verifiable_addresses: undefined });
-    expect(out).toEqual([{ value: 'a@example.test', via: 'email', verified: true, status: 'completed' }]);
+  it('creates the list when none is declared', () => {
+    const out = emailVerifiedPatch({ traits: { email: 'a@example.test' }, verifiable_addresses: undefined });
+    expect(out).toEqual([{ op: 'add', path: '/verifiable_addresses', value: [vouched('a@example.test')] }]);
   });
 });

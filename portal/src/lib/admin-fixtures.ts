@@ -6,6 +6,7 @@ import type { ClientManifest } from './manifests';
 import type { Identity } from './types';
 import { joinApps, type AdminApp } from './admin-view';
 import type { AppTile } from './tiles';
+import type { ActionResult } from './admin-actions';
 
 export const DEV_ADMIN_STATES = ['household', 'many', 'empty', 'broken'] as const;
 export type DevAdminState = (typeof DEV_ADMIN_STATES)[number];
@@ -91,7 +92,15 @@ function tile(m: ClientManifest, order: number): AppTile {
 }
 
 const STAMP = new Date('2026-01-01T00:00:00Z');
-const cred = (type: string, identifiers: string[]) => ({ type, identifiers, version: 0, created_at: STAMP, updated_at: STAMP });
+const key = (n: number, passwordless: boolean) => ({ id: `key-${n}`, public_key: 'cHVibGlj', attestation_type: 'none', is_passwordless: passwordless });
+const CONFIG: Record<string, object> = {
+  password: { hashed_password: 'x' },
+  totp: { totp_url: 'otpauth://totp/othala:dev?secret=JBSWY3DPEHPK3PXP' },
+  webauthn: { credentials: [key(1, false)] },
+  passkey: { credentials: [key(2, true)] },
+  lookup_secret: { recovery_codes: [{ code: 'aaaa-bbbb' }] },
+};
+const cred = (type: string, identifiers: string[]) => ({ type, identifiers, config: CONFIG[type] ?? {}, version: 0, created_at: STAMP, updated_at: STAMP });
 
 interface Seed {
   id: string;
@@ -166,4 +175,39 @@ export function devAdmin(state: DevAdminState): DevAdmin {
     ],
     broken: state === 'broken',
   };
+}
+
+/**
+ * What a person-page POST shows in `astro dev`: the success result of each action, so the banners and the setup-link
+ * card can be seen. Nothing is written; the fixture household stays as it was.
+ */
+export function devActionResult(action: string, fd: FormData, username: string): ActionResult {
+  switch (action) {
+    case 'remove-groups':
+      return { kind: 'updated', removed: fd.getAll('group').map(String) };
+    case 'mark-verified':
+      return { kind: 'email-verified' };
+    case 'set-prerequisites':
+      return { kind: 'prerequisites-saved' };
+    case 'issue-recovery':
+      return { kind: 'recovery', url: 'https://auth.example.test/self-service/recovery?flow=fixture&token=fixture', code: '123456', expiresAt: '' };
+    case 'send-invite-email':
+      return { kind: 'invite-email', email: `${username.replace('.', '')}@example.test` };
+    case 'force-relogin':
+      return { kind: 'revoked', result: {} as never };
+    case 'deactivate':
+      return { kind: 'deactivated', username };
+    case 'reactivate':
+      return { kind: 'reactivated', username };
+    case 'grant-admin':
+      return { kind: 'admin-granted', username };
+    case 'revoke-admin':
+      return { kind: 'admin-revoked', username };
+    case 'remove-credential':
+      return { kind: 'credential-removed', credType: String(fd.get('cred_type') ?? '') };
+    case 'delete':
+      return { kind: 'error', message: 'Fixture data: nothing was deleted.' };
+    default:
+      return { kind: 'updated', removed: [] };
+  }
 }

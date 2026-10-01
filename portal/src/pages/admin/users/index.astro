@@ -50,7 +50,7 @@ const deleted = Astro.url.searchParams.get('deleted') === '1';
 ---
 <AdminLayout title="People" description="Everyone in your household who can sign in." identityId={ctx.adminId}>
   <TitleRow title="People" count={rows.length} lede="Everyone in your household who can sign in.">
-    <a slot="action" class="button button-primary" href="/admin/users/new">Add person</a>
+    <a slot="action" class="button button-primary" href={devState ? `/admin/users/new?dev-state=${devState}` : '/admin/users/new'}>Add person</a>
   </TitleRow>
 
   {deleted && <div class="notice notice-success" role="status">Person deleted.</div>}
@@ -133,9 +133,6 @@ const deleted = Astro.url.searchParams.get('deleted') === '1';
   {filtering && <p class="empty-note" data-none hidden={visible.some((v) => !v.hidden)}>No one matches.</p>}
 
   {rows.length <= 1 && !loadError && (
-    <div class="panel empty-state">
-      <p>Only you so far.</p>
-      <a class="button button-primary" href="/admin/users/new">Add person</a>
-    </div>
+    <p class="empty-state">Only you so far. People you add will show up here.</p>
   )}
 </AdminLayout>

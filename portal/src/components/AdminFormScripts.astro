@@ -91,6 +91,14 @@
       sync();
     });
 
+    // Opening an inline confirm hides its summary, so focus moves to the first thing to answer.
+    document.addEventListener('toggle', function (e) {
+      var d = e.target;
+      if (!(d instanceof HTMLDetailsElement) || !d.open || !d.classList.contains('ask')) return;
+      var first = d.querySelector('input[type="text"], button:not([disabled])');
+      if (first) first.focus();
+    }, true);
+
     // Cancel inside an inline confirm closes it.
     document.addEventListener('click', function (e) {
       var cancel = e.target.closest ? e.target.closest('[data-cancel]') : null;
