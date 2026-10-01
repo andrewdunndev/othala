@@ -94,7 +94,7 @@ not in their image and nothing here curl-installs a linter.
 ## Conventions that hold the design together
 
 - **Manifests are the API for apps.** Apps are read at request time from
-  `MANIFEST_DIR`. Adding one is a file, never an app-specific code path in the
+  `/etc/portal/manifests`. Adding one is a file, never an app-specific code path in the
   portal and never an image rebuild. The loaders and the gate are generic.
 - **Entry is never derived.** Membership in a group the app's own manifest binds
   is what admits a person, admins included (`enforceAccessGate`,

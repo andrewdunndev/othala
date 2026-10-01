@@ -9,23 +9,37 @@ This CHANGELOG and git tags carry the deployed-instance release state.
 
 ## [Unreleased]
 
-Fewer env vars and Ory keys: values that only restated upstream defaults are gone, and required settings fail at boot.
+Fewer env vars and Ory keys: restated defaults are gone, and required settings fail at boot.
 
 ### Removed
 
-- `OTHALA_DEFAULT_SCHEMA_ID`: the portal omits `schema_id` when creating an identity and Kratos applies `identity.default_schema_id`. Delete it from the deploy environment.
-- `OTHALA_WEBAUTHN_RP_ID` and `OTHALA_WEBAUTHN_RP_ORIGINS`: `kratos.yml` uses `OTHALA_APEX` and `OTHALA_PUBLIC_URL`, which always held the same values. Delete both from the deploy environment.
-- `OTHALA_SMTP_FROM_ADDRESS`: Kratos and portal mail send from `noreply@<OTHALA_APEX>`. Delete it from the deploy environment.
+Delete each from the deploy environment; none is read any more.
+
+- `OTHALA_DEFAULT_SCHEMA_ID`: Kratos applies `identity.default_schema_id`.
+- `OTHALA_WEBAUTHN_RP_ID` and `OTHALA_WEBAUTHN_RP_ORIGINS`: `kratos.yml` uses `OTHALA_APEX` and `OTHALA_PUBLIC_URL`, which always matched.
+- `OTHALA_SMTP_FROM_ADDRESS`: mail sends from `noreply@<OTHALA_APEX>`.
+- `OTHALA_SITE_NAME`: `OTHALA_INSTANCE_NAME` is the one brand name and is now required.
+- `OTHALA_ADMIN_CONTACT`: the dashboard says "your administrator".
+- `OTHALA_DEFAULT_GROUP` and `OTHALA_IDENTITY_GROUPS`: the default group is `everyone`, identity groups are `admin` and `everyone`, app groups come from the manifests.
+- `OTHALA_ADMIN_FRESHNESS_HOURS`: the admin step-up window is 1h.
+- `OTHALA_HIBP_ENABLED` and `OTHALA_PASSWORD_MIN_LENGTH`: the breach check is on and the minimum length is 12.
+- `OTHALA_CORS_ALLOWED_ORIGINS`: Hydra CORS allows only `OTHALA_PUBLIC_URL`.
+- `OTHALA_PUBLIC_HOST`: the Caddyfile site address is `OTHALA_PUBLIC_URL`.
+- `OTHALA_OTLP_PROVIDER`, `OTHALA_OTLP_ENVIRONMENT`, `OTEL_EXPORTER_OTLP_ENDPOINT`, `OTEL_SERVICE_NAME`, `OTEL_EXPORTER_OTLP_HEADERS`, `OTEL_RESOURCE_ATTRIBUTES` and `OTLP_INGEST_TOKEN`: set `OTHALA_OTLP_ENDPOINT` to trace.
+- `KRATOS_PUBLIC_URL`, `HYDRA_PUBLIC_URL`, `KRATOS_ADMIN_URL`, `HYDRA_ADMIN_URL`, `KRATOS_ADMIN_TOKEN` and `HYDRA_ADMIN_TOKEN`: the portal uses `OTHALA_PUBLIC_URL`, `http://kratos:4434` and `http://hydra:4445`, with no bearer.
+- `KRATOS_PG_HOST`, `HYDRA_PG_HOST`, `KRATOS_ADMIN_HOST` and `CONSENT_HOST`: the hosts are `postgres`, `kratos`, `othala`.
+- `MANIFEST_DIR`, `PORT`, `HOST`, `ADMIN_PORT`, `PORTAL_LOGIN_URL` and `PORTAL_CONSENT_URL`: fixed at `/etc/portal/manifests`, 8080 and 4431.
+- `SMTP_USER`, `SMTP_PASS`, `ACME_EMAIL` and the Kratos and Hydra `DSN`: credentials ride in `OTHALA_SMTP_CONNECTION_URI` and the rendered `dsn`.
 
 ### Changed
 
-- The portal refuses to start in production when `OTHALA_PUBLIC_URL` or `OTHALA_APEX` is unset.
-- `KRATOS_PUBLIC_URL` defaults to `OTHALA_PUBLIC_URL`.
+- The portal refuses to start in production when `OTHALA_PUBLIC_URL`, `OTHALA_APEX`, `OTHALA_INSTANCE_NAME` or `RECOVERY_GATE_SECRET` is unset.
+- Kratos and Hydra trace when `OTHALA_OTLP_ENDPOINT` is set, where `OTHALA_OTLP_PROVIDER` decided.
 - The Kratos login flow lifespan is the 1h default, up from 10m.
-- Kratos public CORS is off: the portal shares the origin, so no cross-origin browser client is served.
-- The reference Caddy `othala_selfservice` rate limit is 30 events per minute, up from 10, because a household shares one IP.
-- `kratos.yml` and `hydra.yml` drop keys that restated upstream defaults, including Hydra's token lifespans and the Kratos ports.
-- The e2e suite creates an identity through the admin form.
+- Kratos public CORS is off: the portal shares the origin.
+- The reference Caddy `othala_selfservice` limit is 30 events per minute, up from 10: a household shares one IP.
+- `kratos.yml` and `hydra.yml` drop keys that restated upstream defaults, and name the Postgres host `postgres`.
+- The e2e suite creates an identity through the admin form, turns the breach check off by overlay, and always runs the Caddy edge.
 
 ## [0.8.0] - 2026-09-30
 

@@ -113,8 +113,7 @@ image, not of this repository.
 deliberately long, because passkey-first daily use should not be miserable, so
 `/admin` additionally gates on *when* `aal2` was established: `isSessionFresh`
 (`portal/src/lib/admin.ts`) redirects a stale session to the same step-up flow
-as a missing `aal2`, before the admin-marker fetch. Window: 1h default,
-`OTHALA_ADMIN_FRESHNESS_HOURS`.
+as a missing `aal2`, before the admin-marker fetch. Window: 1h.
 
 **Eviction must remove credentials, not just sessions.** Revoking sessions does
 not delete enrolled credentials, so someone with a brief session can enrol
