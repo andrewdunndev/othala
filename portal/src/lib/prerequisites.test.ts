@@ -193,3 +193,13 @@ describe('manifest lint: requires', () => {
     expect(f.filter((x) => x.message.includes('presentation.requires'))).toHaveLength(0);
   });
 });
+
+describe('e2e fixtures', () => {
+  it('proxywatch requires a tailscale requirement that the fixtures define, and its guide follows the outline', () => {
+    process.env.MANIFEST_DIR = join(process.cwd(), '..', 'e2e', 'manifests');
+    const t = loadTiles().find((x) => x.slug === 'proxywatch');
+    expect(t?.requires).toEqual(['tailscale']);
+    expect(loadRequirements().get('tailscale')?.why).not.toBe('');
+    expect(splitGuide(t?.educationHtml).sections.map((s) => s.id)).toEqual(['purpose', 'first-time', 'good-to-know', 'help']);
+  });
+});

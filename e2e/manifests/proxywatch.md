@@ -1,11 +1,18 @@
-Proxywatch is a generic stand-in for an internal tool that has no built-in
-authentication of its own. Rather than teach the app to speak OIDC, the reverse
-proxy in front of it (Caddy or Traefik, via their `forward_auth` directive)
-enforces sign-in: before forwarding a request upstream, the proxy makes a
-subrequest to the auth provider; a 2xx lets the request through, anything else
-redirects the browser to log in.
+## What it's for
 
-This is the pragmatic pattern for the long tail of self-hosted dashboards and
-admin panels that ship with weak or no auth. Because the gate lives entirely at
-the proxy, the manifest is presentation-only — it appears as a tile in the
-portal but registers no OAuth client.
+Proxywatch is a stand-in for an internal tool with no sign-in of its own. The reverse proxy in front of it enforces
+single sign-on, so the manifest is presentation-only: it appears as a tile and registers no OAuth client.
+
+## First time
+
+1. Switch Tailscale on, since the tool is reachable only from the private network.
+2. Open the tile. The proxy checks your session and lets you through.
+
+## Good to know
+
+- Signing out of the portal ends access here too.
+- The proxy asks the auth provider about every request; anything other than a 2xx sends the browser to sign in.
+
+## Getting help
+
+If the page does not load, check that Tailscale is on, then ask the administrator.
