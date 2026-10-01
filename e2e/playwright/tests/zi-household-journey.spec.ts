@@ -75,7 +75,9 @@ test('ZI1 — admin adds a person; they redeem, enrol a passkey and TOTP, and si
   await expect(registerBtn, 'ZI1: passkey register button').toBeVisible({ timeout: 10_000 });
   await page.waitForFunction(hasWindowFn, 'oryPasskeySettingsRegistration');
   await registerBtn.click();
-  await page.waitForLoadState('networkidle');
+  await expect(page.getByRole('button', { name: /Remove passkey/ }), 'ZI1: the passkey is registered').toBeVisible({ timeout: 15_000 });
+  // The save replaced the settings flow, so open a fresh one: its setup key is the one the form will verify.
+  await page.goto(`${baseURL}/auth/settings`, { waitUntil: 'networkidle' });
 
   const totpForm = page.locator('form:has(.totp-secret-value)');
   const secret = (await totpForm.locator('.totp-secret-value').textContent())?.trim() ?? '';
@@ -83,7 +85,7 @@ test('ZI1 — admin adds a person; they redeem, enrol a passkey and TOTP, and si
   await totpForm.locator('input[name="totp_code"]').fill(await computeTotp(secret));
   await totpForm.locator('button[type="submit"]').click();
   await page.waitForLoadState('networkidle');
-  await expect(page.locator('.totp-secret-value'), 'ZI1: enrolled, so the setup key is no longer offered').toHaveCount(0);
+  await expect(page.locator('.totp-secret-value'), 'ZI1: enrolled, so the setup key is no longer offered').toHaveCount(0, { timeout: 15_000 });
 
   // (d) A returning visit: usernameless passkey sign-in, then an OIDC app and a forward_auth app.
   await ctx.clearCookies();
