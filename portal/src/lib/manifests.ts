@@ -6,7 +6,7 @@ import { readdirSync, readFileSync, statSync } from 'node:fs';
 import { join } from 'node:path';
 import { parse as parseYaml } from 'yaml';
 import { parseAccessGroups } from './access-groups';
-import { MANIFEST_DIR } from './constants';
+import { IDENTITY_GROUPS, MANIFEST_DIR } from './constants';
 
 export interface ClientRole {
   name: string;
@@ -471,6 +471,16 @@ export function validateClients(set: ClientManifest[]): string[] {
             `${src}: no oidc.audience origin matches any redirect_uris origin (apps verify id_token.aud against their own URL)`,
           );
         }
+      }
+    }
+
+    // BLOCK: identity groups belong to the household settings, never to an app's access or role bindings.
+    for (const g of [...new Set([...cm.accessGroups, ...Object.keys(cm.groupRoleMap)])]) {
+      if (IDENTITY_GROUPS.includes(g)) {
+        errs.push(
+          `${src}: ${JSON.stringify(g)} is an identity group and cannot appear in presentation.access or ` +
+            `consent.group_role_map (use skip_access_check for an app open to everyone)`,
+        );
       }
     }
 
