@@ -22,7 +22,7 @@ services:
       - FOWNER
       - SETUID
       - SETGID
-    # NEEDS-VALIDATION: read_only omitted; the entrypoint may write outside PGDATA.
+    # Writable on purpose: throwaway e2e harness.
     pids_limit: 512
     environment:
       POSTGRES_USER: postgres
@@ -47,7 +47,7 @@ services:
       - "no-new-privileges:true"
     cap_drop:
       - ALL
-    # NEEDS-VALIDATION: read_only + tmpfs [/tmp] once the /data path is confirmed.
+    # Writable on purpose: throwaway e2e harness.
     pids_limit: 256
     environment:
       MP_SMTP_AUTH_ACCEPT_ANY: "1"
@@ -161,7 +161,6 @@ services:
     read_only: true
     tmpfs:
       - /tmp
-    # NEEDS-VALIDATION: confirm the SSR adapter writes nothing outside /tmp at startup.
     pids_limit: 512
     depends_on:
       kratos:
