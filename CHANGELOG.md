@@ -15,7 +15,7 @@ Heading for 0.10.0: an apps-first signed-in home with setup guides, and fewer en
 
 - The signed-in home is an apps-first grid of tiles with logo plates and a top bar for account actions.
 - Apps can carry a setup guide and `presentation.requires` prerequisites defined under `requirements/`; a tile shows readiness.
-- `manifest-lint` warns when `presentation.requires` names an undefined requirement.
+- `manifest-lint` warns on an undefined `presentation.requires` name.
 
 ### Removed
 
@@ -24,15 +24,15 @@ Delete each from the deploy environment; none is read any more.
 - `OTHALA_DEFAULT_SCHEMA_ID`: Kratos applies its own default.
 - `OTHALA_WEBAUTHN_RP_ID` and `OTHALA_WEBAUTHN_RP_ORIGINS`: `kratos.yml` uses `OTHALA_APEX` and `OTHALA_PUBLIC_URL`.
 - `OTHALA_SMTP_FROM_ADDRESS`: mail sends from `noreply@<OTHALA_APEX>`.
-- `OTHALA_SITE_NAME`: `OTHALA_INSTANCE_NAME` is the one brand name, now required.
+- `OTHALA_SITE_NAME`: `OTHALA_INSTANCE_NAME` is the brand name, now required.
 - `OTHALA_ADMIN_CONTACT`: the dashboard says "your administrator".
-- `OTHALA_DEFAULT_GROUP` and `OTHALA_IDENTITY_GROUPS`: fixed at `admin` and `everyone`; app groups come from the manifests.
+- `OTHALA_DEFAULT_GROUP` and `OTHALA_IDENTITY_GROUPS`: fixed at `admin` and `everyone`.
 - `OTHALA_ADMIN_FRESHNESS_HOURS`: the step-up window is 1h.
 - `OTHALA_HIBP_ENABLED` and `OTHALA_PASSWORD_MIN_LENGTH`: breach check on, minimum length 12.
 - `OTHALA_CORS_ALLOWED_ORIGINS`: Hydra CORS allows only `OTHALA_PUBLIC_URL`.
 - `OTHALA_PUBLIC_HOST`: the Caddyfile site address is `OTHALA_PUBLIC_URL`.
 - `OTHALA_OTLP_PROVIDER`, `OTHALA_OTLP_ENVIRONMENT`, `OTEL_*`, `OTLP_INGEST_TOKEN`: set `OTHALA_OTLP_ENDPOINT` to trace.
-- `KRATOS_PUBLIC_URL`, `HYDRA_PUBLIC_URL`, `KRATOS_ADMIN_URL`, `HYDRA_ADMIN_URL`, `KRATOS_ADMIN_TOKEN` and `HYDRA_ADMIN_TOKEN`: fixed at `kratos:4433`, `kratos:4434` and `hydra:4445`, no bearer.
+- `KRATOS_PUBLIC_URL`, `HYDRA_PUBLIC_URL`, `KRATOS_ADMIN_URL`, `HYDRA_ADMIN_URL`, `KRATOS_ADMIN_TOKEN` and `HYDRA_ADMIN_TOKEN`: fixed at `kratos:4433`, `kratos:4434`, `hydra:4445`, no bearer.
 - `ADMIN_HOST`: renamed `PORTAL_ADMIN_BIND_HOST`, required in production.
 - `KRATOS_PG_HOST`, `HYDRA_PG_HOST`, `KRATOS_ADMIN_HOST` and `CONSENT_HOST`: the hosts are `postgres`, `kratos`, `othala`.
 - `MANIFEST_DIR` (production reads `/etc/portal/manifests`), `PORT`, `HOST`, `ADMIN_PORT`, `PORTAL_LOGIN_URL` and `PORTAL_CONSENT_URL`: fixed.
@@ -40,8 +40,8 @@ Delete each from the deploy environment; none is read any more.
 
 ### Changed
 
-- The portal refuses to start in production when `OTHALA_INSTANCE_NAME` is unset.
-- The portal refuses to start in production without `OTHALA_CONTACT_RECIPIENT` or `OTHALA_SMTP_CONNECTION_URI`.
+- Production start needs `OTHALA_INSTANCE_NAME`.
+- Production start needs `OTHALA_CONTACT_RECIPIENT` and `OTHALA_SMTP_CONNECTION_URI`.
 - Kratos and Hydra trace when `OTHALA_OTLP_ENDPOINT` is set.
 - The Kratos login flow lifespan is 1h, up from 10m.
 - Kratos public CORS is off: the portal shares the origin.
@@ -51,7 +51,7 @@ Delete each from the deploy environment; none is read any more.
 
 ### Fixed
 
-- `/admin/users/new` creates the identity email-verified, so the id_token carries `email_verified: true`.
+- `/admin/users/new` creates the identity email-verified (`email_verified: true` in the id_token).
 
 ## [0.8.0] - 2026-09-30
 
