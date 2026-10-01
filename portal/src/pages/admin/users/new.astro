@@ -1,273 +1,186 @@
 ---
-// Admin: create a new identity. GET renders the manifest-driven group/role form;
-// POST validates, calls Kratos createIdentity and getRecoveryLink, and renders
-// the one-time recovery LINK + CODE together for the admin to copy (the link
-// alone leaves the code field empty). Nothing is emailed. Validation is
-// server-side; client hints are cosmetic.
+// Admin: add a person. One panel: name, email, the apps they can use (every app starts at No access) and a closed
+// More options (username, recovery email). POST validates, creates the identity with a verified email
+// and files the chosen levels as groups and role overrides, then issues the one-time setup link and code and shows them
+// in one card. Nothing is emailed. The browser validates first; the server validates again.
 
 export const prerender = false;
 
-import Layout from '../../../layouts/Layout.astro';
-import AdminFormScripts from '../../../components/AdminFormScripts.astro';
-import { requireAdminSession } from '../../../lib/admin';
+import AdminLayout from '../../../layouts/AdminLayout.astro';
+import AccessRows from '../../../components/AccessRows.astro';
+import ManifestNotice from '../../../components/ManifestNotice.astro';
+import SetupLink from '../../../components/SetupLink.astro';
+import TitleRow from '../../../components/TitleRow.astro';
+import { adminContext } from '../../../lib/admin-context';
 import { createIdentity, getRecoveryLink } from '../../../lib/admin-api';
+import { ENROLLMENT_TTL } from '../../../lib/admin-actions';
+import { accessToStorage, choicesFromForm } from '../../../lib/access-rows';
+import { suggestUsername } from '../../../lib/admin-view';
 import { signToken, verifyToken, CSRFError } from '../../../lib/csrf';
-import { defaultGroup } from '../../../lib/config';
+import { DEFAULT_GROUP } from '../../../lib/constants';
 
-const guard = await requireAdminSession(Astro);
-if (guard instanceof Response) return guard;
-const adminIdentityId = guard.identity?.id ?? '';
+const ctx = await adminContext(Astro);
+if (ctx instanceof Response) return ctx;
+const { adminId, apps, health, dev } = ctx;
 
 interface FormState {
-  username: string;
-  email: string;
   displayName: string;
+  email: string;
+  username: string;
   recoveryEmail: string;
 }
-
-const empty: FormState = {
-  username: '',
-  email: '',
-  displayName: '',
-  recoveryEmail: '',
-};
-
-// The TTL passed to getRecoveryLink below. Named once so the UI copy and the
-// Kratos call can never drift apart — the panel quotes this, it does not
-// hardcode a second literal.
-const ENROLLMENT_TTL = '24h';
-
-let form: FormState = empty;
-let errors: Record<string, string> = {};
-let success: {
-  recoveryUrl: string;
-  recoveryCode: string;
-  expiresAt: string;
-  username: string;
-} | null = null;
 
 const USERNAME_RE = /^[a-z0-9]+(?:\.[a-z0-9]+)+$/;
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
+let form: FormState = { displayName: '', email: '', username: '', recoveryEmail: '' };
+let levels: Record<string, string> = {};
+const errors: Record<string, string> = {};
+let success: { id: string; first: string; url: string; code: string } | null = null;
+
 if (Astro.request.method === 'POST') {
   const fd = await Astro.request.formData();
 
-  // HIGH-1: verify per-request CSRF token before any side effect.
-  try {
-    verifyToken(String(fd.get('csrf_token') ?? ''), adminIdentityId, 'create-user');
-  } catch (err) {
-    if (err instanceof CSRFError) {
-      return new Response(`CSRF: ${err.message}`, { status: 403 });
+  // Verify the per-request CSRF token before any side effect. A dev fixture has no secret to sign with, so it skips the
+  // check and writes nothing.
+  if (!dev) {
+    try {
+      verifyToken(String(fd.get('csrf_token') ?? ''), adminId, 'create-user');
+    } catch (err) {
+      if (err instanceof CSRFError) {
+        return new Response(`CSRF: ${err.message}`, { status: 403 });
+      }
+      throw err;
     }
-    throw err;
   }
 
+  levels = choicesFromForm(fd);
+  const displayName = String(fd.get('displayName') ?? '').trim();
+  const email = String(fd.get('email') ?? '').trim();
   form = {
-    username: String(fd.get('username') ?? '').trim().toLowerCase(),
-    email: String(fd.get('email') ?? '').trim(),
-    displayName: String(fd.get('displayName') ?? '').trim(),
+    displayName,
+    email,
+    username: String(fd.get('username') ?? '').trim().toLowerCase() || suggestUsername(displayName, email),
     recoveryEmail: String(fd.get('recoveryEmail') ?? '').trim(),
   };
 
-  if (!USERNAME_RE.test(form.username)) {
-    errors.username = 'Use lowercase letters, digits, and dots: first.last';
-  }
-  if (!EMAIL_RE.test(form.email)) errors.email = 'Enter a valid email address.';
-  if (form.recoveryEmail && !EMAIL_RE.test(form.recoveryEmail)) {
-    errors.recoveryEmail = 'Enter a valid recovery email address.';
-  }
+  if (!displayName) errors.displayName = 'Enter a name.';
+  if (!EMAIL_RE.test(form.email)) errors.email = 'Enter an email address like name@example.com.';
+  if (!USERNAME_RE.test(form.username)) errors.username = 'Use lowercase letters, digits and dots: first.last';
+  if (form.recoveryEmail && !EMAIL_RE.test(form.recoveryEmail)) errors.recoveryEmail = 'Enter a valid recovery email address.';
 
   if (Object.keys(errors).length === 0) {
-    try {
-      const created = await createIdentity({
-        traits: {
-          username: form.username,
-          email: form.email,
-          displayName: form.displayName || undefined,
-          recoveryEmail: form.recoveryEmail || undefined,
-        },
-        metadataAdmin: {
-          groups: [defaultGroup],
-        },
-      });
-      const link = await getRecoveryLink(created.id, ENROLLMENT_TTL);
+    if (dev) {
       success = {
-        recoveryUrl: link.recovery_link,
-        recoveryCode: link.recovery_code,
-        expiresAt: link.expires_at,
-        username: form.username,
+        id: 'dev-fay',
+        first: form.displayName.split(/\s+/)[0],
+        url: 'https://auth.example.test/self-service/recovery?flow=fixture&token=fixture',
+        code: '123456',
       };
-    } catch (err) {
-      errors.submit = err instanceof Error ? err.message : String(err);
+    } else {
+      try {
+        const access = accessToStorage(
+          apps.map((a) => a.manifest),
+          levels,
+          { groups: [DEFAULT_GROUP], roles: {} },
+        );
+        const created = await createIdentity({
+          traits: {
+            username: form.username,
+            email: form.email,
+            displayName: form.displayName,
+            recoveryEmail: form.recoveryEmail || undefined,
+          },
+          metadataAdmin: {
+            groups: access.groups,
+            ...(Object.keys(access.roles).length ? { roles: access.roles } : {}),
+          },
+        });
+        const link = await getRecoveryLink(created.id, ENROLLMENT_TTL);
+        success = {
+          id: created.id,
+          first: form.displayName.split(/\s+/)[0],
+          url: link.recovery_link,
+          code: link.recovery_code,
+        };
+      } catch (err) {
+        errors.submit = err instanceof Error ? err.message : String(err);
+      }
     }
   }
 }
 
-// HIGH-1: per-request CSRF token, single-use.
-const csrfToken = signToken(adminIdentityId, 'create-user');
-
-// The exact bytes the admin pastes into Signal/iMessage. Composed server-side
-// so the visible textarea and the copy button are guaranteed to carry the same
-// text, and so link and code can never be sent apart by accident.
-const shareText = success
-  ? [
-      `Set up your account: ${success.recoveryUrl}`,
-      ``,
-      `Recovery code: ${success.recoveryCode}`,
-      ``,
-      `The code works once and expires ${success.expiresAt}.`,
-    ].join('\n')
-  : '';
+let csrfToken = '';
+try {
+  csrfToken = signToken(adminId, 'create-user');
+} catch (err) {
+  if (!dev) throw err;
+}
+const devState = dev ? Astro.url.searchParams.get('dev-state') : null;
+const peopleHref = devState ? `/admin/users?dev-state=${devState}` : '/admin/users';
 ---
-<Layout title="New user — Admin">
-  <header class="page-header">
-    <p class="page-eyebrow">administration · users</p>
-    <h1 class="page-title">New user</h1>
-    <p class="page-lede">
-      Create a new identity and issue its one-time enrollment link and code.
-      Nothing is emailed — you deliver both to them yourself.
-    </p>
-  </header>
+<AdminLayout title={success ? `${success.first} is ready` : 'Add person'} description="Add someone to your household." identityId={adminId}>
+  <a class="back-link" href={peopleHref}>← People</a>
+  <ManifestNotice health={health} />
 
-  <nav class="nav-bar" aria-label="Admin">
-    <a href="/admin">Overview</a>
-    <a href="/admin/users" aria-current="page">Users</a>
-    <a href="/admin/groups">Groups</a>
-    <a href="/admin/oauth2">Apps</a>
-    <a href="/auth/settings">Settings</a>
-  </nav>
-
-  <section class="stack-lg">
-
-    {success ? (
-      <section class="stack-lg">
-        <div class="notice notice-success">
-          <p><strong>Identity created for {success.username}.</strong></p>
-          <p class="text-sm">
-            No email was sent. Send them <strong>both</strong> the link and the
-            code yourself, out of band (Signal, iMessage). The link opens the
-            enrollment form with an empty code field, so the link on its own is
-            a dead end.
-          </p>
-          <p class="text-sm">
-            The code works <strong>once</strong> and the pair is valid for
-            {ENROLLMENT_TTL} from issue — it expires
-            <span class="mono">{success.expiresAt}</span>. After that, issue a
-            fresh pair from the user's page.
-          </p>
+  {success ? (
+    <>
+      <TitleRow title={`${success.first} is ready`} lede="Send them this setup link." />
+      <div class="panel card-ok" role="status">
+        <SetupLink url={success.url} code={success.code} ttl={ENROLLMENT_TTL} name={success.first} />
+        <p class="hint">To make {success.first} a household admin, wait until they have set up an authenticator app or security key, then do it from their page.</p>
+        <div class="row-actions">
+          <a class="button button-secondary" href={devState ? `/admin/users/new?dev-state=${devState}` : '/admin/users/new'}>Add another</a>
+          <a class="button button-secondary" href={`/admin/users/${success.id}${devState ? `?dev-state=${devState}` : ''}`}>View {success.first}</a>
         </div>
-
-        <div class="field">
-          <label for="shareText">Message to send (link + code)</label>
-          <textarea id="shareText" rows="5" readonly>{shareText}</textarea>
-          <div class="copy-actions">
-            <button type="button" class="button button-primary" data-copy="shareText">
-              Copy link + code
-            </button>
-          </div>
-          <span class="field-hint">
-            Together these two values are the credential. Delete the message once they are in.
-          </span>
-        </div>
-
-        <div class="field">
-          <label for="recoveryUrl">Enrollment link</label>
-          <div class="copy-row">
-            <input id="recoveryUrl" type="text" readonly value={success.recoveryUrl} />
-            <button type="button" class="button button-secondary button-sm" data-copy="recoveryUrl">
-              Copy
-            </button>
-          </div>
-        </div>
-
-        <div class="field">
-          <label for="recoveryCode">Recovery code</label>
-          <div class="copy-row">
-            <input id="recoveryCode" type="text" class="mono" readonly value={success.recoveryCode} />
-            <button type="button" class="button button-secondary button-sm" data-copy="recoveryCode">
-              Copy
-            </button>
-          </div>
-          <span class="field-hint">Sending the link without this is the most common way enrollment dead-ends.</span>
-        </div>
-
-        <div class="cta-row">
-          <a href="/admin/users" class="button button-secondary">Back to users</a>
-          <a href="/admin/users/new" class="button button-primary">Create another</a>
-        </div>
-      </section>
-    ) : (
-      <form method="post" class="stack-lg" novalidate>
+      </div>
+    </>
+  ) : (
+    <>
+      <TitleRow title="Add person" lede="You get a link to send them, so they can choose how they sign in." />
+      {errors.submit && <div class="notice notice-danger" role="alert">{errors.submit}</div>}
+      <form class="panel" method="POST" enctype="application/x-www-form-urlencoded">
         <input type="hidden" name="csrf_token" value={csrfToken} />
-        {errors.submit && (
-          <div class="notice notice-danger">{errors.submit}</div>
-        )}
-
-        <div class="field">
-          <label for="username">Username</label>
-          <input
-            id="username"
-            name="username"
-            type="text"
-            required
-            autocomplete="off"
-            value={form.username}
-            pattern="[a-z0-9]+(\.[a-z0-9]+)+"
-            placeholder="first.last"
-          />
-          <span class="field-hint">lowercase, dot-separated.</span>
-          {errors.username && <span class="field-error">{errors.username}</span>}
+        <div class="form-grid two">
+          <div class={`field${errors.displayName ? ' bad' : ''}`}>
+            <label for="displayName">Name</label>
+            <input id="displayName" name="displayName" type="text" required autocomplete="off" value={form.displayName} aria-describedby={errors.displayName ? 'e-name' : undefined} />
+            {errors.displayName && <span class="field-error" id="e-name">{errors.displayName}</span>}
+          </div>
+          <div class={`field${errors.email ? ' bad' : ''}`}>
+            <label for="email">Email</label>
+            <input id="email" name="email" type="email" required autocomplete="off" value={form.email} aria-describedby={errors.email ? 'e-email' : undefined} />
+            {errors.email && <span class="field-error" id="e-email">{errors.email}</span>}
+          </div>
         </div>
 
-        <div class="field">
-          <label for="email">Email</label>
-          <input id="email" name="email" type="email" required value={form.email} />
-          {errors.email && <span class="field-error">{errors.email}</span>}
-        </div>
+        <h2 class="subhead">Apps they can use</h2>
+        <p class="hint">Everything starts at No access. You can change this any time.</p>
+        <AccessRows apps={apps} current={levels} />
 
-        <div class="field">
-          <label for="displayName">Display name (optional)</label>
-          <input id="displayName" name="displayName" type="text" value={form.displayName} />
-        </div>
+        <details class="plain" open={Boolean(errors.username || errors.recoveryEmail)}>
+          <summary>More options</summary>
+          <div class="form-grid">
+            <div class={`field${errors.username ? ' bad' : ''}`}>
+              <label for="username">Username</label>
+              <input id="username" name="username" type="text" autocomplete="off" pattern="[a-z0-9]+(\.[a-z0-9]+)+" value={form.username} aria-describedby="h-user" />
+              <span class="field-hint" id="h-user">Suggested from the name. Lowercase letters, digits and dots: first.last</span>
+              {errors.username && <span class="field-error">{errors.username}</span>}
+            </div>
+            <div class={`field${errors.recoveryEmail ? ' bad' : ''}`}>
+              <label for="recoveryEmail">Recovery email</label>
+              <input id="recoveryEmail" name="recoveryEmail" type="email" autocomplete="off" value={form.recoveryEmail} aria-describedby="h-rec" />
+              <span class="field-hint" id="h-rec">Optional. Where a setup link goes if the main email is lost.</span>
+              {errors.recoveryEmail && <span class="field-error">{errors.recoveryEmail}</span>}
+            </div>
+          </div>
+        </details>
 
-        <div class="field">
-          <label for="recoveryEmail">Recovery email (optional)</label>
-          <input
-            id="recoveryEmail"
-            name="recoveryEmail"
-            type="email"
-            value={form.recoveryEmail}
-            placeholder="alternate@example.com"
-          />
-          <span class="field-hint">Alternate address for account recovery. Leave blank to use the primary email.</span>
-          {errors.recoveryEmail && <span class="field-error">{errors.recoveryEmail}</span>}
-        </div>
-
-        <p class="text-sm muted">
-          The new identity is placed in the <span class="mono">{defaultGroup}</span> group automatically.
-          Group membership, app access, and per-app role overrides are assigned after creation via the user's Edit page.
-        </p>
-
-        <div class="cta-row">
-          <button type="submit" class="button button-primary">
-            Create identity + issue link and code
-          </button>
-          <a href="/admin/users" class="button button-secondary">Cancel</a>
+        <div class="row-actions">
+          <button class="button button-primary" type="submit">Add person</button>
+          <a class="button button-secondary" href={peopleHref}>Cancel</a>
         </div>
       </form>
-    )}
-  </section>
-</Layout>
-
-<AdminFormScripts />
-
-<style>
-  /* Readonly value + its Copy button on one line; the value flexes, the
-   * button stays its natural width. min-width:0 lets a long URL shrink
-   * instead of overflowing the row. */
-  .copy-row { display: flex; align-items: center; gap: var(--space-2); }
-  .copy-row input { flex: 1 1 auto; min-width: 0; }
-  .copy-row .button { flex: 0 0 auto; }
-  .copy-actions { margin-top: var(--space-1); }
-  #shareText { resize: vertical; font-family: var(--font-mono); font-size: var(--text-sm); }
-</style>
+    </>
+  )}
+</AdminLayout>

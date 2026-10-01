@@ -1,0 +1,41 @@
+---
+// A focused page under the portal's top bar: one narrow column with a title, a one-line lede and the page's single card
+// in the slot. Shared by sign in, recovery, verification, consent, and the error and not-found pages so they read as
+// one system with Home and Settings (same Layout, header, footer, tokens and button hierarchy). A signed-in person gets
+// the same Account and Sign out as everywhere else; a page that already looked the viewer up passes it in.
+
+import Layout from '../layouts/Layout.astro';
+import HeaderActions from './HeaderActions.astro';
+import { currentViewer } from '../lib/viewer';
+import type { Viewer } from '../lib/viewer';
+
+interface Props {
+  /** The page heading (h1) and tab title. */
+  title: string;
+  lede?: string;
+  description?: string;
+  /** Tab title when it should differ from the heading. */
+  tabTitle?: string;
+  /** Already resolved by the page (null = signed out); looked up here when omitted. */
+  viewer?: Viewer | null;
+  /** A top back link, the one place every page puts it. */
+  back?: { href: string; label: string };
+}
+
+const { title, lede, description, tabTitle, back } = Astro.props;
+const viewer = Astro.props.viewer === undefined ? await currentViewer(Astro.request, Astro.url) : Astro.props.viewer;
+---
+<Layout title={tabTitle ?? title} description={description} narrow>
+  {viewer && (
+    <Fragment slot="header-actions">
+      <HeaderActions identityId={viewer.identityId} isAdmin={viewer.isAdmin} />
+    </Fragment>
+  )}
+  {back && <a class="back-link" href={back.href} data-astro-reload>← {back.label}</a>}
+  <header class="page-header">
+    <h1 class="page-title">{title}</h1>
+    {lede && <p class="page-lede">{lede}</p>}
+  </header>
+  <slot />
+</Layout>
+

@@ -1,0 +1,59 @@
+---
+// Status badge for a tile or a guide header. Only an unmet prerequisite is flagged; a met one shows nothing, so plain
+// apps and ready apps look alike and only what needs action speaks.
+
+import type { TileReadiness } from '../lib/tiles';
+
+interface Props {
+  readiness: TileReadiness;
+  /** Titles of the app's requirements, in declared order. */
+  titles: string[];
+}
+
+const { readiness, titles } = Astro.props;
+const needsLabel = titles.length > 1 ? `Needs ${titles[0]} +${titles.length - 1}` : `Needs ${titles[0] ?? 'setup'}`;
+---
+
+{
+  readiness === 'needs' && (
+    <span class="app-badges">
+      <span class="app-badge app-badge-needs">
+        <span class="app-badge-dot" aria-hidden="true" />
+        {needsLabel}
+      </span>
+    </span>
+  )
+}
+
+<style>
+  .app-badges {
+    display: inline-flex;
+    flex-wrap: wrap;
+    gap: var(--space-1);
+  }
+  .app-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--space-1);
+    padding: 2px var(--space-2);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    font-family: var(--font-mono);
+    font-size: var(--text-xs);
+    line-height: 1.4;
+    color: var(--text);
+    background: var(--surface);
+    white-space: nowrap;
+  }
+  .app-badge-dot {
+    width: 0.5rem;
+    height: 0.5rem;
+    border-radius: 50%;
+    background: currentColor;
+  }
+  .app-badge-needs {
+    background: var(--warning-subtle);
+    border-color: var(--warning);
+  }
+  .app-badge-needs .app-badge-dot { background: var(--warning); }
+</style>

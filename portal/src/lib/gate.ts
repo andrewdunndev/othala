@@ -7,6 +7,8 @@ import type { Identity } from './types';
 import type { ClientManifest } from './manifests';
 import { GROUP_RE } from './access-groups';
 
+const LEGACY_ADMIN_GROUP = 'admin';
+
 /** Read metadata_admin.groups defensively (tolerates any/undefined shape). */
 export function identityGroups(identity: Identity | null | undefined): string[] {
   const meta = identity?.metadata_admin as { groups?: unknown } | undefined;
@@ -142,9 +144,10 @@ export function planGroupSave(
   const removed = stored.filter((g) => clearedSet.has(g));
   const kept = stored.filter((g) => !clearedSet.has(g));
 
+  // The legacy `admin` identity group confers nothing (admin status is metadata_admin.admin), so a save never stores it.
   const groups: string[] = [];
   for (const g of submitted) {
-    if (GROUP_RE.test(g) && !groups.includes(g)) groups.push(g);
+    if (GROUP_RE.test(g) && g !== LEGACY_ADMIN_GROUP && !groups.includes(g)) groups.push(g);
   }
 
   const refusal =

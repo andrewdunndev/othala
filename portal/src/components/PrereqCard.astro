@@ -1,0 +1,60 @@
+---
+// One-line prerequisite strip under a guide header: what the app needs, why, and whether this person has been marked
+// ready. The setup action itself is the primary button in AppActions; a ready person gets a quiet link to the guide.
+
+import type { Requirement } from '../lib/tiles';
+
+interface Props {
+  requirement: Requirement;
+  ready: boolean;
+}
+
+const { requirement, ready } = Astro.props;
+const href = `/requirements/${encodeURIComponent(requirement.name)}`;
+---
+
+<div class:list={['prereq', ready ? 'prereq-ready' : 'prereq-needs']}>
+  <span class="prereq-mark" aria-hidden="true">{ready ? '✓' : '!'}</span>
+  <p class="prereq-text">
+    <strong class="prereq-title">{ready ? `${requirement.title} is set up for you` : `Needs ${requirement.title}`}</strong>
+    {requirement.why && <span class="prereq-why">{requirement.why}</span>}
+  </p>
+  {ready && <a class="prereq-link mono" href={href}>Setup guide →</a>}
+</div>
+
+<style>
+  .prereq {
+    display: flex;
+    align-items: center;
+    gap: var(--space-3);
+    padding: var(--space-2) var(--space-5);
+    border-bottom: 1px solid var(--border);
+    font-size: var(--text-sm);
+    line-height: 1.4;
+  }
+  .prereq-needs { background: var(--warning-subtle); border-bottom-color: var(--warning); }
+  .prereq-ready { background: var(--success-subtle); border-bottom-color: var(--success); }
+  .prereq-mark {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    width: 1.25rem;
+    height: 1.25rem;
+    border-radius: 50%;
+    font-family: var(--font-mono);
+    font-size: var(--text-xs);
+    font-weight: 700;
+    color: var(--bg);
+  }
+  .prereq-needs .prereq-mark { background: var(--warning); }
+  .prereq-ready .prereq-mark { background: var(--success); }
+  .prereq-text { margin: 0; min-width: 0; flex: 1; color: var(--text-2); }
+  .prereq-title { color: var(--text); font-weight: 600; margin-right: var(--space-2); }
+  .prereq-link { flex-shrink: 0; font-size: var(--text-xs); white-space: nowrap; }
+  @media (max-width: 640px) {
+    .prereq { padding: var(--space-2) var(--space-4); align-items: flex-start; }
+    .prereq-mark { margin-top: 1px; }
+    .prereq-link { align-self: center; }
+  }
+</style>

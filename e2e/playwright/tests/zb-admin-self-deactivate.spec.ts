@@ -2,10 +2,11 @@
 
 import { test, expect, adminAal2Context } from '../fixtures';
 import { createIdentityWithPassword, readIdentity, TEST_PASSWORD } from '../actions/identity';
+import { csrfTokenFor, postAdminAction } from '../actions/admin-post';
 
-const SELF_DEACTIVATE_REFUSAL = 'You cannot deactivate your own identity via the UI. Have another admin do it.';
+const SELF_DEACTIVATE_REFUSAL = 'You cannot turn off your own sign-in. Ask another admin to do it.';
 
-test('ZB1 — deactivating your own identity is refused', async ({ browser, baseURL, kratosAdminURL }) => {
+test('ZB1 — turning off your own sign-in is not offered, and a hand-made POST is refused', async ({ browser, baseURL, kratosAdminURL }) => {
   const suffix = `zb1.${Date.now()}`;
   const admin = await createIdentityWithPassword({
     email: `self.deactivate.${suffix}@othala.test`,
@@ -20,12 +21,23 @@ test('ZB1 — deactivating your own identity is refused', async ({ browser, base
     const page = await ctx.newPage();
     const targetUrl = `${baseURL}/admin/users/${admin.id}`;
     await page.goto(targetUrl, { waitUntil: 'networkidle' });
-    const [resp] = await Promise.all([
-      page.waitForResponse((r) => r.url().startsWith(targetUrl) && r.request().method() === 'POST'),
-      page.getByRole('button', { name: 'Deactivate', exact: true }).click(),
-    ]);
+    await page.locator('summary', { hasText: 'Danger zone' }).click();
+    await expect(page.getByText(/can't turn off your own sign-in/i), 'the page says why instead of offering it').toBeVisible();
+    await expect(page.locator('summary', { hasText: 'Turn off sign-in' }), 'no turn-off action is offered').toHaveCount(0);
+
+    // The server guard stands on its own: a token from another person's page, posted at the admin's own page.
+    const other = await createIdentityWithPassword({
+      email: `other.${suffix}@othala.test`,
+      username: `other.${suffix}`,
+      displayName: 'Other Person',
+      groups: [],
+      kratosAdminURL,
+    });
+    await page.goto(`${baseURL}/admin/users/${other.id}`, { waitUntil: 'networkidle' });
+    const token = await csrfTokenFor(page, 'deactivate');
+    const resp = await postAdminAction(ctx, baseURL!, admin.id, { csrf_token: token, action: 'deactivate' });
     expect(resp.status(), 'refusal re-renders the page').toBe(200);
-    await expect(page.getByText(SELF_DEACTIVATE_REFUSAL)).toBeVisible();
+    expect(await resp.text()).toContain(SELF_DEACTIVATE_REFUSAL);
 
     expect(((await readIdentity(kratosAdminURL, admin.id)) as { state: string }).state).toBe('active');
   } finally {

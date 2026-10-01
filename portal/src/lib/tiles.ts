@@ -1,6 +1,7 @@
-// Runtime app-tile loader. Reads each `<slug>.yaml` `presentation:` block from MANIFEST_DIR at request time (manifests.ts
+// Runtime app-tile loader. Reads each `<slug>.yaml` `presentation:` block from the manifest dir at request time (manifests.ts
 // reads `oidc:`/`consent:` from the same files); an optional `<slug>.md` is the /apps/<slug> detail content.
 // groups.yaml (optional) maps group name to { title, description, order } via loadGroups() and is skipped as a tile.
+// requirements/<name>.md (optional) defines a prerequisite that a manifest names in `presentation.requires`.
 
 import { readdirSync, readFileSync, existsSync, statSync } from 'node:fs';
 import { join } from 'node:path';
@@ -8,6 +9,8 @@ import { parse as parseYaml } from 'yaml';
 import { marked } from 'marked';
 import DOMPurify from 'isomorphic-dompurify';
 import { parseAccessGroups } from './access-groups';
+import { manifestDir } from './manifests';
+import { DEFAULT_GROUP } from './constants';
 
 // Vendored icons directory: public/icons/ in dev (a stale dist/ must not shadow it), dist/client/icons/ in prod.
 const _cwd = process.cwd();
@@ -25,10 +28,22 @@ const _iconsDir = (() => {
 })();
 
 /** Return the web path for a vendored simple-icons SVG, or undefined if absent. */
-function resolveIconHref(iconSlug: string | undefined): string | undefined {
+export function resolveIconHref(iconSlug: string | undefined): string | undefined {
   if (!iconSlug) return undefined;
   const candidate = join(_iconsDir, `${iconSlug}.svg`);
   return existsSync(candidate) ? `/icons/${iconSlug}.svg` : undefined;
+}
+
+/** True when the logo file opens with its own filled square (a rect at the origin, width equal to height). Such
+ *  marks fill the whole plate instead of sitting inside it. */
+export function iconIsBleed(iconSlug: string | undefined): boolean {
+  if (!iconSlug) return false;
+  try {
+    const head = readFileSync(join(_iconsDir, `${iconSlug}.svg`), 'utf8').slice(0, 600);
+    return /<rect(?![^>]*\s[xy]=)[^>]*\swidth="(\d+(?:\.\d+)?)"[^>]*\sheight="\1"[^>]*\sfill="#/i.test(head);
+  } catch {
+    return false;
+  }
 }
 
 export type AuthKind = 'oidc' | 'forward_auth' | 'external';
@@ -78,6 +93,8 @@ export interface AppTile {
   iconFallback?: string;
   /** Web path to the vendored SVG glyph (e.g. `/icons/grafana.svg`), set only when the file exists; absent = monogram. */
   iconHref?: string;
+  /** The logo ships its own filled square, so the plate drops its padding and border. */
+  iconBleed?: boolean;
   authKind: AuthKind;
   /** Fallback group, used only when `accessGroups` is empty (see tileAccessGroups): `presentation.access_group`, else the default group. */
   accessGroup: string;
@@ -92,15 +109,42 @@ export interface AppTile {
   fqdn: string;
   /** Rendered HTML from the sibling `<slug>.md`, or undefined if absent. */
   educationHtml?: string;
+  /** Prerequisite names from `presentation.requires` (lowercase, deduplicated; malformed names dropped). */
+  requires: string[];
 }
 
-function manifestDir(): string {
-  return process.env.MANIFEST_DIR ?? '/etc/portal/manifests';
+/** A requirement name is a filename stem under requirements/, so it must stay a plain slug. */
+export const REQUIREMENT_NAME_RE = /^[a-z][a-z0-9-]{0,39}$/;
+
+/** One shared prerequisite, from `requirements/<name>.md`: front matter `title` and `why`, then the setup guide. */
+export interface Requirement {
+  name: string;
+  title: string;
+  /** One line on why an app needs it. */
+  why: string;
+  /** Sanitized HTML of the setup guide (steps and explainer); empty when the file has no body. */
+  html: string;
 }
 
-/** Fallback group for tiles omitting `access_group`; read at call time and mirrors config.ts `defaultGroup`. */
-function tileDefaultGroup(): string {
-  return process.env.OTHALA_DEFAULT_GROUP?.trim().toLowerCase() || 'everyone';
+/** The four sections a guide is laid out in, in display order. Any other heading renders after them. */
+export const GUIDE_OUTLINE = [
+  { id: 'purpose', title: "What it's for", match: /what.*for|about|purpose/i },
+  { id: 'first-time', title: 'First time', match: /first|get(ting)? started|set ?up/i },
+  { id: 'good-to-know', title: 'Good to know', match: /good to know|tips|notes?|nuances?/i },
+  { id: 'help', title: 'Getting help', match: /help|support|stuck/i },
+] as const;
+
+export interface GuideSection {
+  /** Outline id, or `extra` for a heading outside the outline. */
+  id: string;
+  title: string;
+  html: string;
+}
+
+export interface Guide {
+  /** Any text before the first heading. */
+  lead: string;
+  sections: GuideSection[];
 }
 
 interface CacheEntry {
@@ -120,6 +164,11 @@ function freshestMtime(dir: string): number {
         ((f.endsWith('.yaml') || f.endsWith('.yml')) && f !== 'groups.yaml') ||
         f.endsWith('.md'),
     );
+    try {
+      for (const f of readdirSync(join(dir, 'requirements'))) files.push(join('requirements', f));
+    } catch {
+      // no requirements directory
+    }
     let max = 0;
     for (const f of files) {
       const m = statSync(join(dir, f)).mtimeMs;
@@ -137,16 +186,129 @@ function freshestMtime(dir: string): number {
  * form controls (form-action reaches every apex subdomain).
  */
 export function sanitizeEducationMarkdown(raw: string): string {
-  const html = marked.parse(raw, { async: false }) as string;
+  return sanitizeGuideHtml(marked.parse(raw, { async: false }) as string);
+}
+
+function sanitizeGuideHtml(html: string): string {
   return DOMPurify.sanitize(html, {
     USE_PROFILES: { html: true, svg: true },
     FORBID_TAGS: ['style', 'form', 'input', 'button', 'select', 'textarea'],
   });
 }
 
+/** Plain text of an HTML fragment for matching a heading against the outline: the sanitizer keeps text only. */
+function headingText(html: string): string {
+  const text = DOMPurify.sanitize(html, { ALLOWED_TAGS: [] });
+  return text.replace(/&#39;|&rsquo;|&apos;/g, "'").replace(/&amp;/g, '&').trim();
+}
+
+/**
+ * Split guide HTML into the fixed outline. Each `<h2>` opens a section, matched to an outline slot by its
+ * text; a slot's first heading wins and later or unmatched headings follow as `extra` sections in source order. The
+ * section title is the outline's, so the page reads the same for every app. A guide with no `<h2>` is all `lead`.
+ * The split is textual, so each piece is sanitised after it, never trusted as the earlier sanitising left it.
+ */
+export function splitGuide(html: string | undefined): Guide {
+  if (!html || !html.trim()) return { lead: '', sections: [] };
+  const parts = html.split(/(?=<h2[\s>])/i);
+  let lead = '';
+  const slots = new Map<string, GuideSection>();
+  const extras: GuideSection[] = [];
+  for (const part of parts) {
+    const m = /^<h2[^>]*>([\s\S]*?)<\/h2>([\s\S]*)$/i.exec(part);
+    if (!m) {
+      lead += part;
+      continue;
+    }
+    const text = headingText(m[1] ?? '');
+    const body = sanitizeGuideHtml((m[2] ?? '').trim());
+    const slot = GUIDE_OUTLINE.find((o) => o.match.test(text));
+    if (slot && !slots.has(slot.id)) {
+      slots.set(slot.id, { id: slot.id, title: slot.title, html: body });
+    } else {
+      extras.push({ id: 'extra', title: text, html: body });
+    }
+  }
+  const sections = [
+    ...GUIDE_OUTLINE.flatMap((o) => (slots.has(o.id) ? [slots.get(o.id) as GuideSection] : [])),
+    ...extras,
+  ];
+  return { lead: sanitizeGuideHtml(lead.trim()), sections };
+}
+
+/** Split `---` YAML front matter off a markdown file; a missing or malformed block yields empty data and the whole text. */
+function splitFrontMatter(raw: string): { data: Record<string, unknown>; body: string } {
+  const m = /^---\r?\n([\s\S]*?)\r?\n---\r?\n?([\s\S]*)$/.exec(raw);
+  if (!m) return { data: {}, body: raw };
+  try {
+    const data = parseYaml(m[1] ?? '');
+    if (data && typeof data === 'object' && !Array.isArray(data)) {
+      return { data: data as Record<string, unknown>, body: m[2] ?? '' };
+    }
+  } catch {
+    // fall through: malformed front matter is treated as plain markdown
+  }
+  return { data: {}, body: m[2] ?? '' };
+}
+
+/** Parse one `requirements/<name>.md` body; exported so tests skip the filesystem. */
+export function parseRequirement(name: string, raw: string): Requirement {
+  const { data, body } = splitFrontMatter(raw);
+  const title = typeof data['title'] === 'string' && data['title'].trim() ? data['title'].trim() : titleCase(name);
+  const why = typeof data['why'] === 'string' ? data['why'].trim() : '';
+  return { name, title, why, html: body.trim() ? sanitizeEducationMarkdown(body) : '' };
+}
+
+function titleCase(name: string): string {
+  return name.charAt(0).toUpperCase() + name.slice(1);
+}
+
+/** Load `requirements/*.md` as name -> Requirement; an absent directory is empty, and a bad filename is skipped. */
+export function loadRequirements(): Map<string, Requirement> {
+  const dir = join(manifestDir(), 'requirements');
+  const out = new Map<string, Requirement>();
+  let files: string[];
+  try {
+    files = readdirSync(dir).filter((f) => f.endsWith('.md')).sort();
+  } catch {
+    return out;
+  }
+  for (const f of files) {
+    const name = f.slice(0, -3);
+    if (!REQUIREMENT_NAME_RE.test(name)) continue;
+    try {
+      out.set(name, parseRequirement(name, readFileSync(join(dir, f), 'utf8')));
+    } catch (err) {
+      console.warn(`tiles: skipping requirements/${f}: ${err}`);
+    }
+  }
+  return out;
+}
+
+/** Normalize `presentation.requires`: a list of slugs, lowercased, deduplicated, anything malformed dropped. */
+export function parseRequires(raw: unknown): string[] {
+  if (!Array.isArray(raw)) return [];
+  const out: string[] = [];
+  for (const v of raw) {
+    if (typeof v !== 'string') continue;
+    const n = v.trim().toLowerCase();
+    if (REQUIREMENT_NAME_RE.test(n) && !out.includes(n)) out.push(n);
+  }
+  return out;
+}
+
+export type TileReadiness = 'none' | 'ready' | 'needs';
+
+/** Prerequisite state for a person: `none` when the app requires nothing, `ready` when the admin marked every
+ *  requirement for them, else `needs`. */
+export function tileReadiness(tile: AppTile, marked: readonly string[]): TileReadiness {
+  if (tile.requires.length === 0) return 'none';
+  return tile.requires.every((r) => marked.includes(r)) ? 'ready' : 'needs';
+}
+
 /**
  * Parse one manifest's `presentation:` block into an AppTile; null when it has none. An absent `access_group` gates
- * on the default group (tileDefaultGroup), never on a per-slug group or every authenticated user.
+ * on the default group (DEFAULT_GROUP), never on a per-slug group or every authenticated user.
  */
 function parseTile(slug: string, doc: Record<string, unknown>, dir: string): AppTile | null {
   const pBlock = doc['presentation'];
@@ -154,7 +316,7 @@ function parseTile(slug: string, doc: Record<string, unknown>, dir: string): App
   const p = pBlock as Record<string, unknown>;
 
   // Absent access_group falls back to the default group, which admins assign explicitly.
-  const accessGroup = p['access_group'] ? String(p['access_group']) : tileDefaultGroup();
+  const accessGroup = p['access_group'] ? String(p['access_group']) : DEFAULT_GROUP;
 
   // Normalized `presentation.access:` binding; `[]` means the accessGroup fallback applies.
   const accessGroups = parseAccessGroups(p);
@@ -186,6 +348,7 @@ function parseTile(slug: string, doc: Record<string, unknown>, dir: string): App
     disabled: p['disabled'] === true,
     fqdn,
     educationHtml,
+    requires: parseRequires(p['requires']),
   };
 
   const groupVal = p['group'];
@@ -198,6 +361,7 @@ function parseTile(slug: string, doc: Record<string, unknown>, dir: string): App
 
   // Resolve the icon href at load time so render never 404s.
   tile.iconHref = resolveIconHref(tile.iconSlug) ?? resolveIconHref(tile.iconFallback);
+  tile.iconBleed = iconIsBleed(tile.iconHref?.split('/').pop()?.replace(/\.svg$/, ''));
 
   return tile;
 }
@@ -218,8 +382,10 @@ function loadFromDisk(): AppTile[] {
   for (const f of files) {
     const slug = f.replace(/\.ya?ml$/, '');
     let doc: unknown;
+    let text = '';
     try {
-      doc = parseYaml(readFileSync(join(dir, f), 'utf8'));
+      text = readFileSync(join(dir, f), 'utf8');
+      doc = parseYaml(text);
     } catch (err) {
       console.warn(`tiles: skipping ${f}: ${err}`);
       continue;
@@ -286,4 +452,9 @@ export function tileAccessGroups(tile: AppTile): string[] {
  * read (parseTile reads only `presentation:`), so such a manifest still gates visibility on its binding. */
 export function userCanSeeTile(tile: AppTile, userGroups: string[]): boolean {
   return tileAccessGroups(tile).some((g) => userGroups.includes(g));
+}
+
+/** The tile's requirements resolved against the loaded set, in declared order; a name nothing defines gets a stand-in. */
+export function requirementsFor(tile: AppTile, all: Map<string, Requirement>): Requirement[] {
+  return tile.requires.map((n) => all.get(n) ?? { name: n, title: titleCase(n), why: '', html: '' });
 }

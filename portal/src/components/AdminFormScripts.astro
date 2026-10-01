@@ -37,6 +37,7 @@
       var prev = btn.getAttribute('data-copy-label') || btn.textContent.trim();
       btn.setAttribute('data-copy-label', prev);
       btn.textContent = 'Copied';
+      if (window.announce) window.announce('Copied');
       setTimeout(function () { btn.textContent = prev; }, 1500);
     }
     function fallback() {
@@ -52,4 +53,142 @@
       fallback();
     }
   });
+</script>
+
+<script is:inline>
+  (function () {
+    // Level control: the hint line under a row follows the selected level.
+    document.addEventListener('change', function (e) {
+      var input = e.target;
+      if (!(input instanceof HTMLInputElement) || input.type !== 'radio' || !input.closest('[data-access]')) return;
+      var line = input.closest('li').querySelector('.hint-line');
+      if (line) line.textContent = input.getAttribute('data-hint') || '';
+    });
+
+    // Forms marked data-dirty-form keep their [data-save] button off until something differs from the loaded state.
+    function snapshot(form) { return new URLSearchParams(new FormData(form)).toString(); }
+    function wireDirty(form) {
+      var save = form.querySelector('[data-save]');
+      if (!save) return;
+      var base = snapshot(form);
+      var note = form.querySelector('[data-dirty-note]');
+      function sync() {
+        var dirty = snapshot(form) !== base;
+        save.disabled = !dirty;
+        if (note) note.textContent = dirty ? 'Unsaved changes' : '';
+      }
+      form.addEventListener('input', sync);
+      form.addEventListener('change', sync);
+      sync();
+    }
+    document.querySelectorAll('form[data-dirty-form]').forEach(wireDirty);
+
+    // Type-to-confirm: the confirm button stays off until the typed text matches. The server checks it again.
+    document.querySelectorAll('input[data-match]').forEach(function (input) {
+      var button = input.closest('form').querySelector('[data-needs]');
+      if (!button) return;
+      function sync() { button.disabled = input.value.trim() !== input.getAttribute('data-match'); }
+      input.addEventListener('input', sync);
+      sync();
+    });
+
+    // Opening an inline confirm hides its summary, so focus moves to the question (or the typed-confirm field), never the
+    // confirm button: a double Enter must not act. Closing, by Cancel or Escape, returns focus to the summary.
+    document.addEventListener('toggle', function (e) {
+      var d = e.target;
+      if (!(d instanceof HTMLDetailsElement) || !d.classList.contains('ask')) return;
+      if (d.open) {
+        var first = d.querySelector('input[type="text"], [data-question]');
+        if (first) first.focus();
+      }
+    }, true);
+
+    function closeAsk(d) {
+      d.open = false;
+      var s = d.querySelector('summary');
+      if (s) s.focus();
+    }
+    document.addEventListener('click', function (e) {
+      var cancel = e.target.closest ? e.target.closest('[data-cancel]') : null;
+      if (cancel && cancel.closest('details')) closeAsk(cancel.closest('details'));
+    });
+    document.addEventListener('keydown', function (e) {
+      if (e.key !== 'Escape' || !e.target.closest) return;
+      var d = e.target.closest('details.ask');
+      if (d && d.open) { e.preventDefault(); closeAsk(d); }
+    });
+
+    // +N chips unfold in place.
+    document.addEventListener('click', function (e) {
+      var more = e.target.closest ? e.target.closest('[data-more]') : null;
+      if (!more) return;
+      var extra = more.closest('.chips').querySelectorAll('[data-extra]');
+      extra.forEach(function (li) { li.hidden = false; });
+      more.closest('li').remove();
+      // The button removed itself: focus lands on the first app it revealed.
+      var target = extra[0] && (extra[0].querySelector(':scope > span:not(.app-icon)') || extra[0]);
+      if (target) { target.tabIndex = -1; target.focus(); }
+    });
+
+    // Live people filter: search and Show narrow the server-rendered rows and keep the query string in step.
+    var filters = document.querySelector('[data-filters]');
+    var rows = document.querySelectorAll('[data-row]');
+    if (filters && rows.length) {
+      var q = filters.querySelector('[name="q"]');
+      var show = filters.querySelector('[name="show"]');
+      var none = document.querySelector('[data-none]');
+      var count = document.querySelector('[data-count]');
+      var apply = function () {
+        var needle = q.value.trim().toLowerCase();
+        var mode = show.value;
+        var shown = 0;
+        rows.forEach(function (row) {
+          var ok = !needle || row.getAttribute('data-text').indexOf(needle) > -1;
+          if (ok && mode === 'admins') ok = row.getAttribute('data-admin') === '1';
+          if (ok && mode === 'noapps') ok = row.getAttribute('data-noapps') === '1';
+          if (ok && mode === 'off') ok = row.getAttribute('data-off') === '1';
+          if (ok && mode.indexOf('app:') === 0) ok = (' ' + row.getAttribute('data-apps') + ' ').indexOf(' ' + mode.slice(4) + ' ') > -1;
+          row.hidden = !ok;
+          if (ok) shown++;
+        });
+        if (none) none.hidden = shown > 0;
+        if (count) count.textContent = shown === 0 ? 'No one matches.' : shown + (shown === 1 ? ' person shown' : ' people shown');
+        var params = new URLSearchParams();
+        if (needle) params.set('q', q.value.trim());
+        if (mode && mode !== 'all') params.set('show', mode);
+        var rest = new URLSearchParams(location.search);
+        if (rest.get('dev-state')) params.set('dev-state', rest.get('dev-state'));
+        history.replaceState(null, '', location.pathname + (params.toString() ? '?' + params : ''));
+      };
+      q.addEventListener('input', apply);
+      show.addEventListener('change', apply);
+      filters.addEventListener('submit', function (e) { e.preventDefault(); });
+      filters.querySelectorAll('[data-nojs]').forEach(function (el) { el.hidden = true; });
+      apply();
+    }
+
+    // Add person: suggest the username from the name until the person edits it.
+    var name = document.getElementById('displayName');
+    var user = document.getElementById('username');
+    if (name && user) {
+      var touched = user.value !== '';
+      user.addEventListener('input', function () { touched = true; });
+      name.addEventListener('input', function () {
+        if (touched) return;
+        var words = name.value.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').split(/\s+/).map(function (w) { return w.replace(/[^a-z0-9]/g, ''); }).filter(Boolean);
+        user.value = words.length > 1 ? words.join('.') : '';
+      });
+    }
+  })();
+</script>
+
+<script is:inline>
+  // Anchor jumps clear the sticky top bar by its real height (it wraps to two rows on a phone).
+  (function () {
+    var bar = document.querySelector('.site-header');
+    if (!bar || !window.ResizeObserver) return;
+    var set = function () { document.documentElement.style.setProperty('--header-h', bar.getBoundingClientRect().height + 'px'); };
+    new ResizeObserver(set).observe(bar);
+    set();
+  })();
 </script>

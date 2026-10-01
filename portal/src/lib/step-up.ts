@@ -26,6 +26,20 @@ function webauthnEnrolled(creds: Record<string, unknown>): boolean {
   return Array.isArray(keys) && keys.some((k) => Boolean(k) && (k as { is_passwordless?: unknown }).is_passwordless !== true);
 }
 
+/** How many security keys (non-passwordless webauthn credentials) count as a second factor. */
+export function securityKeyCount(identity: Identity | null | undefined): number {
+  const creds = identity?.credentials as Record<string, unknown> | undefined;
+  if (!creds || typeof creds !== 'object') return 0;
+  const keys = configOf(creds, 'webauthn')?.['credentials'];
+  return Array.isArray(keys) ? keys.filter((k) => Boolean(k) && (k as { is_passwordless?: unknown }).is_passwordless !== true).length : 0;
+}
+
+/** True when an authenticator app is enrolled (a totp entry with its url). */
+export function authenticatorEnrolled(identity: Identity | null | undefined): boolean {
+  const creds = identity?.credentials as Record<string, unknown> | undefined;
+  return !!creds && typeof creds === 'object' && totpEnrolled(creds);
+}
+
 /** True when the identity has a totp or webauthn second factor enrolled. */
 export function hasSecondFactor(identity: Identity | null | undefined): boolean {
   const creds = identity?.credentials as Record<string, unknown> | undefined;

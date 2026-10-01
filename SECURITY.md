@@ -61,8 +61,8 @@ Each names its enforcer and the test that fails if the enforcer stops working.
   marker read fresh from the admin API (`isAdminMarker`,
   `portal/src/lib/admin-auth.ts`). No group grants it. Tests:
   `portal/src/lib/admin-auth.test.ts`, `e2e/playwright/tests/f-aal2-bypass.spec.ts`.
-- **Loopback admin listener.** `portal/src/server/listen.mjs`: privileged routes
-  on a separate loopback listener whose mux is disjoint from the public one,
+- **Internal-network admin listener (PORTAL_ADMIN_BIND_HOST).** `portal/src/server/listen.mjs`: privileged routes
+  on a separate internal-network listener whose mux is disjoint from the public one,
   guarded by one bearer secret compared with `bearerMatches`
   (constant-time, fail-closed on an unset secret). Test:
   `portal/scripts/public-mux-disjoint.test.mjs`.
@@ -105,7 +105,7 @@ Each names its enforcer and the test that fails if the enforcer stops working.
   `e2e/playwright/tests/n-rate-limits.spec.ts`.
 - **Credential and session hygiene.** Self-registration is disabled in
   `kratos/kratos.yml`, so enrolment is admin-initiated; breach checking and a
-  minimum length gate passwords; every credential change fires
+  minimum length gate passwords; a password change fires
   `revoke_active_sessions`; force-logout is `revokeSubject`
   (`portal/src/lib/revoke.ts`). Full eviction (audit, delete credential, then
   revoke) is documented in `docs/runbooks/lost-device.md`, proven live by

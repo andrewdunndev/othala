@@ -1,0 +1,149 @@
+/* Account settings: the grouped cards, credential rows and enrollment steps. Reference tokens only. */
+
+.settings .page-header { margin-bottom: var(--space-4); padding-bottom: var(--space-4); }
+.settings .page-title { font-size: var(--text-3xl); margin-bottom: var(--space-2); }
+.settings .page-lede { font-size: var(--text-base); }
+
+.settings-status { display: flex; flex-wrap: wrap; gap: var(--space-2); align-items: center; }
+.settings-status + .notice, .settings .notice { margin-bottom: 0; margin-top: var(--space-3); }
+.status-note { font-size: var(--text-sm); color: var(--text-2); flex-basis: 100%; }
+.status-note a { color: var(--accent); }
+.settings-notices { display: grid; gap: 0; }
+
+.cards { display: grid; gap: var(--space-4); margin-top: var(--space-4); align-items: stretch; }
+.card { margin-top: 0; padding: var(--space-4); scroll-margin-top: calc(var(--space-8) + var(--space-4)); }
+@media (min-width: 60rem) {
+  .cards { grid-template-columns: 1fr 1fr; }
+  .card-wide { grid-column: 1 / -1; }
+}
+.card > h2 { font-size: var(--text-lg); box-shadow: none; margin-bottom: var(--space-1); }
+.card > .lede { color: var(--text-2); font-size: var(--text-sm); margin-bottom: var(--space-3); }
+.group { scroll-margin-top: 5rem; padding-top: var(--space-3); margin-top: var(--space-3); border-top: 1px solid var(--border); }
+.group:first-of-type { border-top: none; margin-top: 0; padding-top: 0; }
+.group > h3 { font-size: var(--text-base); box-shadow: none; display: flex; gap: var(--space-2); align-items: center; flex-wrap: wrap; }
+.group > p, .group form > p { font-size: var(--text-sm); color: var(--text-2); margin-top: var(--space-1); }
+.group .notice { margin: var(--space-3) 0 0; }
+.group .badge + .badge, .settings-status .badge + .badge { margin-left: 0; }
+
+.settings-form { display: flex; flex-direction: column; gap: var(--space-4); max-width: 32rem; margin-top: var(--space-2); }
+.settings-form.wide { max-width: none; }
+.form-actions, .actions { display: flex; gap: var(--space-2); flex-wrap: wrap; margin-top: var(--space-2); align-items: center; }
+
+/* Credential rows: name and date on the left, one quiet action on the right, an inline confirm underneath. */
+.items { list-style: none; margin-top: var(--space-2); border-top: 1px solid var(--border); padding: 0; }
+.items li { display: flex; gap: var(--space-1) var(--space-3); align-items: center; justify-content: space-between; flex-wrap: wrap; padding: var(--space-2) 0; border-bottom: 1px solid var(--border); }
+.item-id { display: flex; flex-wrap: wrap; align-items: baseline; gap: 0 var(--space-2); flex: 1 1 9rem; min-width: 0; }
+.item-name { font-weight: 600; font-size: var(--text-sm); overflow-wrap: anywhere; }
+.item-meta { font-size: var(--text-xs); color: var(--text-muted); }
+.item-actions { display: flex; gap: var(--space-2); flex-wrap: nowrap; }
+
+/* Disclosure without script: a visually hidden checkbox per row, toggled by its label button, opens the confirm or rename row. */
+.items li, .tools { position: relative; }
+.disclose { position: absolute; opacity: 0; width: 1px; height: 1px; pointer-events: none; }
+.toggle-label { cursor: pointer; }
+.settings .button { display: inline-flex; align-items: center; justify-content: center; }
+.settings [hidden] { display: none !important; }
+.cb-remove:focus-visible ~ * .lbl-remove, .cb-rename:focus-visible ~ * .lbl-rename, .cb-replace:focus-visible ~ * .lbl-replace, .cb-setup:focus-visible ~ * .lbl-setup, .cb-dismiss:focus-visible ~ .prompt .toggle-label { outline: 2px solid var(--input-focus); outline-offset: 2px; }
+.toggle-label .on-open { display: none; }
+.cb-remove:checked ~ * .lbl-remove .on-closed, .cb-rename:checked ~ * .lbl-rename .on-closed, .cb-replace:checked ~ * .lbl-replace .on-closed, .cb-setup:checked ~ * .lbl-setup .on-closed { display: none; }
+.cb-remove:checked ~ * .lbl-remove .on-open, .cb-rename:checked ~ * .lbl-rename .on-open, .cb-replace:checked ~ * .lbl-replace .on-open, .cb-setup:checked ~ * .lbl-setup .on-open { display: inline; }
+.panel-row { flex-basis: 100%; display: none; gap: var(--space-3); align-items: center; flex-wrap: wrap; font-size: var(--text-sm); }
+.cb-remove:checked ~ .panel-remove, .cb-rename:checked ~ .panel-rename, .cb-replace:checked ~ .panel-replace { display: flex; }
+.panel-row > span { flex: 1 1 14rem; }
+.panel-row .field-error { flex-basis: 100%; margin: 0; }
+.settings .panel-block { display: none; }
+.cb-setup:checked ~ .panel-setup { display: block; }
+.cb-setup:checked ~ .when-closed { display: none; }
+.cb-setup:checked ~ ol.panel-setup { display: grid; }
+.cb-dismiss:checked + .prompt { display: none; }
+.card-flash:empty { display: none; }
+.card-flash:focus { outline: none; }
+.panel-cues { flex-basis: 100%; display: grid; gap: var(--space-1); margin: 0; font-size: var(--text-xs); color: var(--text-2); }
+.cue-reauth { color: var(--text); }
+.secret-row { display: flex; gap: var(--space-2); align-items: center; flex-wrap: wrap; margin-top: var(--space-2); }
+.secret-row .totp-secret-value { margin-top: 0; flex: 1 1 12rem; }
+.narrow-only { display: none; }
+
+/* One compact density across the cards. */
+.settings .field input { padding: var(--space-2) var(--space-3); }
+.settings .field label { font-size: var(--text-xs); }
+.static-empty { font-family: var(--font-sans, inherit); color: var(--text-muted); }
+
+/* Read-only values (username, email) sit flat and dashed, apart from inputs that take a change. */
+.settings input[readonly] { background: transparent; border-style: dashed; color: var(--text-2); cursor: default; box-shadow: none; }
+.settings input[readonly]:focus { outline: 2px solid var(--input-focus); outline-offset: 2px; }
+.static { display: grid; gap: var(--space-1); }
+.static-label { font-size: var(--text-sm); font-weight: 600; }
+.static-value { font-family: var(--font-mono); font-size: var(--text-sm); color: var(--text-2); }
+.panel-row input[type='text'] { flex: 1 1 12rem; min-width: 0; background: var(--input-bg); color: var(--text); border: 1px solid var(--input-border); border-radius: var(--radius); padding: var(--space-2) var(--space-3); font: inherit; }
+
+/* Enrollment steps */
+.steps { list-style: none; counter-reset: s; margin-top: var(--space-3); display: grid; gap: var(--space-2); padding: 0; }
+.steps > li { counter-increment: s; border: 1px solid var(--border); border-radius: var(--radius); padding: var(--space-4); background: var(--bg); }
+.steps > li > h4 { scroll-margin-top: var(--space-8); }
+.steps > li > h4:focus { outline: none; }
+.steps > li > h4 { font-family: var(--font-mono); font-size: var(--text-sm); }
+.steps > li > h4::before { content: counter(s) ". "; color: var(--text-muted); }
+.steps p { font-size: var(--text-sm); color: var(--text-2); margin-top: var(--space-2); }
+.totp-qr { margin-top: var(--space-3); }
+.totp-qr img { border: 1px solid var(--border); border-radius: var(--radius-sm); display: block; max-width: 12.5rem; width: 100%; height: auto; background: #fff; }
+.steps details { margin-top: var(--space-3); font-size: var(--text-sm); }
+.steps summary { cursor: pointer; color: var(--accent); }
+.totp-secret-value { display: block; margin-top: var(--space-2); padding: var(--space-2) var(--space-3); background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-sm); font-size: var(--text-sm); word-break: break-all; color: var(--text); user-select: all; }
+.codeinput { max-width: 12rem; font-family: var(--font-mono); letter-spacing: 0.2em; }
+.field.bad input, .field.bad input:focus, .panel-row input[aria-invalid='true'], .panel-row input[aria-invalid='true']:focus { border-color: var(--danger); }
+.field.bad input:focus, .panel-row input[aria-invalid='true']:focus { outline-color: var(--danger); }
+.steps p.field-error, .group p.field-error { color: var(--danger); }
+.steps .field { margin-top: var(--space-3); }
+
+.lookup-codes { margin-top: var(--space-3); }
+.lookup-grid { list-style: none; padding: var(--space-3); margin: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(8rem, 1fr)); gap: var(--space-2) var(--space-3); background: var(--bg); border: 1px solid var(--border); border-radius: var(--radius-sm); }
+.lookup-grid[hidden] { display: none; }
+.lookup-grid li { font-size: var(--text-sm); letter-spacing: 0.04em; }
+.lookup-grid li.used { color: var(--text-muted); text-decoration: line-through; }
+@media print {
+  body.printing-codes * { visibility: hidden; }
+  body.printing-codes #lookup-codes, body.printing-codes #lookup-codes * { visibility: visible; }
+  body.printing-codes #lookup-codes { position: absolute; inset: 0 auto auto 0; }
+  body.printing-codes [data-codes-tools], body.printing-codes .notice { display: none; }
+}
+
+.email-row { display: flex; gap: var(--space-2); align-items: center; }
+.email-row input { flex: 1 1 auto; min-width: 0; }
+.email-row .badge { flex: none; }
+.field > .actions { margin-top: var(--space-2); }
+.email-row .item-name { font-family: var(--font-mono); font-weight: 500; }
+
+.kv { display: flex; flex-direction: column; margin-top: var(--space-2); border-top: 1px solid var(--border); }
+.kv > div { display: grid; grid-template-columns: 9rem 1fr; gap: var(--space-4); padding: var(--space-2) 0; border-bottom: 1px solid var(--border); align-items: baseline; }
+.kv dt { font-size: var(--text-sm); color: var(--text-muted); }
+.kv dd { font-size: var(--text-sm); color: var(--text); }
+.kv-chips { display: flex; flex-wrap: wrap; gap: var(--space-1); }
+
+.settings-back { margin-top: var(--space-5); display: flex; gap: var(--space-4); font-size: var(--text-sm); }
+.settings-back a { color: var(--text-muted); }
+.settings-back a:hover { color: var(--accent); text-decoration: none; }
+
+@media (max-width: 640px) {
+  /* One wrap rule for every item row: the name takes the line, its actions sit under it. */
+  .items > li > .item-id { flex-basis: 100%; }
+  .kv > div { grid-template-columns: 1fr; gap: var(--space-1); }
+  .settings .page-title { font-size: var(--text-2xl); }
+  .narrow-only { display: block; }
+  /* On the phone the setup key comes before the QR, which that phone cannot scan. */
+  .steps > li { display: flex; flex-direction: column; }
+  .steps > li > details { order: 1; }
+  .steps > li > .totp-qr { order: 2; }
+  .totp-secret-value { display: flex; align-items: center; min-height: 2.75rem; }
+}
+
+/* The first step, above the cards, for a person with no passkey yet. */
+.welcome { margin-top: var(--space-4); padding: var(--space-5); border-color: var(--accent); background: var(--accent-subtle); }
+.welcome-step { margin: 0 0 var(--space-1); font-family: var(--font-mono); font-size: var(--text-xs); color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.08em; }
+.welcome > h2 { font-size: var(--text-2xl); box-shadow: none; margin: 0 0 var(--space-2); }
+.welcome > p:not(.welcome-step) { margin: 0 0 var(--space-3); color: var(--text-2); max-width: 36rem; }
+.welcome .settings-form { margin-top: 0; }
+.welcome-btn { align-self: flex-start; min-height: 48px; padding: var(--space-3) var(--space-5); font-size: var(--text-base); }
+
+/* The confirm box carries its own Keep it; the opener steps aside while it is open. */
+.cb-remove:checked ~ * .lbl-remove, .cb-replace:checked ~ * .lbl-replace { display: none; }

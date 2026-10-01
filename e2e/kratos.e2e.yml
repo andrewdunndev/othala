@@ -1,0 +1,7 @@
+# e2e-only Kratos overlay, merged after the rendered kratos.yml (a second --config). The CI VM
+# has no route to haveibeenpwned.org, so the breach check is off here; production ships it on.
+selfservice:
+  methods:
+    password:
+      config:
+        haveibeenpwned_enabled: false

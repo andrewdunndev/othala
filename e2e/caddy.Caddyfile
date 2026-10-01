@@ -62,3 +62,14 @@ auth.othala.test:80 {
 		header_up X-Forwarded-For {client_ip}
 	}
 }
+
+# A forward_auth app behind the portal's gate: the portal's /api/forward-auth checks the session and the
+# group, 200 proxies on (here a stub), and any other status is returned to the client as is, with no
+# login redirect on this route. ZI1 navigates here with a granted session.
+proxywatch.othala.test:80 {
+	forward_auth othala:8080 {
+		uri /api/forward-auth?group=proxywatch-access
+		copy_headers X-Kratos-Authenticated-Identity-Id
+	}
+	respond "proxywatch-stub" 200
+}

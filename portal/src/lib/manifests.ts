@@ -1,4 +1,4 @@
-// OIDC client manifest loader. Reads <slug>.yaml from MANIFEST_DIR at request time (30 s cache, dropped on SIGHUP).
+// OIDC client manifest loader. Reads <slug>.yaml from the manifest dir (constants.ts) at request time (30 s cache, dropped on SIGHUP).
 // loadClientManifests() returns EVERY app manifest, presentation-only tiles included; the OIDC subset
 // comes from oidcClientManifests() and getClientManifest().
 
@@ -6,6 +6,7 @@ import { readdirSync, readFileSync, statSync } from 'node:fs';
 import { join } from 'node:path';
 import { parse as parseYaml } from 'yaml';
 import { parseAccessGroups } from './access-groups';
+import { IDENTITY_GROUPS, MANIFEST_DIR } from './constants';
 
 export interface ClientRole {
   name: string;
@@ -56,6 +57,8 @@ export interface ClientManifest {
   skipAccessCheck: boolean;
   /** Source filename the manifest was parsed from (Go `SourcePath`). */
   sourcePath: string;
+  /** `presentation.requires`: prerequisite names the app needs (defined under requirements/); absent reads as none. */
+  requires?: string[];
 }
 
 /** Mirrors Go `ShouldEmitGroups`: only an explicit `emit_groups_claim: false` suppresses. */
@@ -63,8 +66,17 @@ export function shouldEmitGroups(m: ClientManifest): boolean {
   return m.emitGroupsClaim ?? true;
 }
 
-function manifestDir(): string {
-  return process.env.MANIFEST_DIR ?? '/etc/portal/manifests';
+let manifestDirOverride: string | undefined;
+
+/** Point the loaders at another directory, or back at MANIFEST_DIR with `undefined`. Tests only: production never calls it. */
+export function setManifestDir(dir: string | undefined): void {
+  manifestDirOverride = dir;
+}
+
+/** The manifest directory every loader reads. Production is fixed at MANIFEST_DIR; under `astro dev` the MANIFEST_DIR env var points the dev server at a scratch catalog. */
+export function manifestDir(): string {
+  const devDir = import.meta.env?.DEV ? process.env.MANIFEST_DIR : undefined;
+  return manifestDirOverride ?? devDir ?? MANIFEST_DIR;
 }
 
 interface CacheEntry {
@@ -163,6 +175,11 @@ function loadOne(file: string, dir: string): ClientManifest | null {
   }
 }
 
+/** `presentation.requires` as raw strings, unnormalized, so the lint can flag a malformed or unknown name. */
+function readRequires(v: unknown): string[] {
+  return Array.isArray(v) ? v.filter((x): x is string => typeof x === 'string') : [];
+}
+
 /** Parse one manifest YAML body; exported so tests skip the filesystem. */
 export function parseManifest(yamlText: string, filename: string): ClientManifest {
   const yaml = parseYaml(yamlText) ?? {};
@@ -220,6 +237,7 @@ export function parseManifest(yamlText: string, filename: string): ClientManifes
       emitGroupsClaim: null,
       skipAccessCheck: Boolean(c.skip_access_check ?? false),
       sourcePath: file,
+      requires: readRequires(p.requires),
     };
   }
 
@@ -250,6 +268,7 @@ export function parseManifest(yamlText: string, filename: string): ClientManifes
     emitGroupsClaim: readEmitGroups(c),
     skipAccessCheck: Boolean(c.skip_access_check ?? false),
     sourcePath: file,
+    requires: readRequires(p.requires),
   };
 }
 
@@ -452,6 +471,16 @@ export function validateClients(set: ClientManifest[]): string[] {
             `${src}: no oidc.audience origin matches any redirect_uris origin (apps verify id_token.aud against their own URL)`,
           );
         }
+      }
+    }
+
+    // BLOCK: identity groups belong to the household settings, never to an app's access or role bindings.
+    for (const g of [...new Set([...cm.accessGroups, ...Object.keys(cm.groupRoleMap)])]) {
+      if (IDENTITY_GROUPS.includes(g)) {
+        errs.push(
+          `${src}: ${JSON.stringify(g)} is an identity group and cannot appear in presentation.access or ` +
+            `consent.group_role_map (omitting access leaves the app unreachable; set consent.skip_access_check to open it to everyone)`,
+        );
       }
     }
 

@@ -5,7 +5,7 @@ import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
-import { invalidateManifestCache } from './manifests.js';
+import { invalidateManifestCache, setManifestDir } from './manifests.js';
 import {
   servingManifests,
   servingManifest,
@@ -59,7 +59,7 @@ function write(name: string, body: string): void {
 
 beforeEach(() => {
   dir = mkdtempSync(join(tmpdir(), 'othala-manifest-store-'));
-  process.env['MANIFEST_DIR'] = dir;
+  setManifestDir(dir);
   invalidateManifestCache();
   _resetForTests();
   logged = [];
@@ -70,7 +70,7 @@ beforeEach(() => {
 
 afterEach(() => {
   vi.restoreAllMocks();
-  delete process.env['MANIFEST_DIR'];
+  setManifestDir(undefined);
   rmSync(dir, { recursive: true, force: true });
 });
 

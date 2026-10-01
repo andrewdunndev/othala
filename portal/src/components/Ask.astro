@@ -1,0 +1,39 @@
+---
+// The one destructive-action pattern: a closed details whose summary is the action button. Opening it shows the plain
+// question and the confirm button inline (Cancel closes it). With `match`, the confirm button stays off until that
+// text is typed, and the server checks it again. The form posts back to the page, to the section named in `section`.
+
+interface Props {
+  label: string;
+  action: string;
+  token: string;
+  section: string;
+  message: string;
+  confirmLabel: string;
+  danger?: boolean;
+  primary?: boolean;
+  /** Text the person must type, and the label of the field that asks for it. */
+  match?: string;
+  matchLabel?: string;
+}
+
+const { label, action, token, section, message, confirmLabel, danger = false, primary = false, match, matchLabel } = Astro.props;
+const fieldId = `m-${section}-${action}`;
+---
+<details class:list={['ask', { primary }]}>
+  <summary>{label}</summary>
+  <form class="confirm" method="POST" enctype="application/x-www-form-urlencoded" action={`#${section}`}>
+    <input type="hidden" name="csrf_token" value={token} />
+    <input type="hidden" name="action" value={action} />
+    <span data-question tabindex="-1">{message}</span>
+    {match && (
+      <div class="field">
+        <label for={fieldId}>{matchLabel}</label>
+        <input id={fieldId} name="confirm" type="text" autocomplete="off" data-match={match} />
+      </div>
+    )}
+    <slot />
+    <button class:list={['button', 'button-sm', danger ? 'button-danger' : 'button-primary']} type="submit" data-needs={match ? '' : undefined}>{confirmLabel}</button>
+    <button class="button button-secondary button-sm" type="button" data-cancel>Cancel</button>
+  </form>
+</details>

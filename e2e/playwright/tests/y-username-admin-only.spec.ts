@@ -6,7 +6,7 @@ import { createIdentityWithPassword, readIdentity, TEST_PASSWORD } from '../acti
 import { findCsrfToken, loginViaJsonApi } from '../actions/login';
 import { forRecipient, waitForMessage } from '../actions/mail';
 
-const USERNAME_CHANGE_REFUSAL = 'Your username can only be changed by an administrator.';
+const USERNAME_CHANGE_REFUSAL = 'Your username can only be changed by a household admin.';
 
 async function storedTraits(kratosAdminURL: string, id: string) {
   return (await readIdentity(kratosAdminURL, id)).traits as { username: string; email: string; displayName?: string };
@@ -54,7 +54,7 @@ test.describe('Y — username is admin-only', () => {
       expect(page.status()).toBe(200);
       const html = await page.text();
       expect(html).toMatch(/id="username-readonly"[^>]*readonly/);
-      expect(html).toContain('Only an administrator can change your username.');
+      expect(html).toContain('Only a household admin can change your username.');
 
       const before = await storedTraits(kratosAdminURL, seeded.id);
       const { status, body } = await submitProfile(ctx, baseURL, { ...before, username: `rename.accepted.${Date.now()}` });

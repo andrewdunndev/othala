@@ -144,9 +144,14 @@ h1, h2, h3 {
   line-height: var(--lh-tight);
   color: var(--text);
 }
-h1 { font-size: var(--text-3xl); }
+h1 { font-family: var(--font-display); font-weight: 800; letter-spacing: -0.02em; font-size: var(--text-3xl); }
 h2 { font-size: var(--text-xl); }
 h3 { font-size: var(--text-lg); }
+
+h1, h2 { text-wrap: balance; }
+h1, h2, h3 { overflow-wrap: anywhere; }
+p, li { text-wrap: pretty; }
+.sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); border: 0; padding: 0; white-space: nowrap; }
 
 p { color: var(--text); }
 .muted { color: var(--text-2); }
@@ -165,10 +170,14 @@ a.subtle:hover { color: var(--text); }
 
 /* ── Buttons ────────────────────────────────────────────────── */
 .button {
-  display: inline-block;
-  padding: var(--space-3) var(--space-5);
+  --hit: calc(var(--space-7) - var(--space-1));
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: var(--hit);
+  padding: 0 var(--space-4);
   font-family: var(--font-mono);
-  font-size: var(--text-base);
+  font-size: var(--text-sm);
   font-weight: 500;
   line-height: 1;
   border-radius: var(--radius);
@@ -221,9 +230,16 @@ a.subtle:hover { color: var(--text); }
  * remove, table-row actions). Padding/font-size only; color stays with the
  * variant class so this never needs its own raw-color rules. */
 .button-sm {
-  padding: var(--space-1) var(--space-2);
-  font-size: var(--text-xs);
+  padding: 0 var(--space-4);
+  font-size: var(--text-sm);
 }
+.button[disabled] { opacity: .5; cursor: not-allowed; }
+:where(a, button, summary, input, select, textarea):focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+/* One back link, at the top of every page that has somewhere to go back to. */
+.back-link { display: inline-flex; align-items: center; min-height: var(--hit, 2.75rem); font-family: var(--font-mono); font-size: var(--text-sm); color: var(--accent); }
+.back-link:hover { text-decoration: underline; }
+.badge-accent { background: var(--accent); border-color: var(--accent); color: var(--accent-contrast); }
 
 /* ── Forms ──────────────────────────────────────────────────── */
 .field { display: flex; flex-direction: column; gap: var(--space-2); }
@@ -244,15 +260,17 @@ a.subtle:hover { color: var(--text); }
   border-radius: var(--radius);
   padding: var(--space-3);
   font: inherit;
+  font-size: var(--text-base);
+  min-height: 2.75rem;
   width: 100%;
   transition: border-color var(--duration-fast) var(--ease-out);
 }
 .field input:focus,
 .field select:focus,
 .field textarea:focus {
-  outline: none;
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
   border-color: var(--input-focus);
-  box-shadow: 0 0 0 3px var(--accent-subtle);
 }
 
 .field-hint { font-size: var(--text-xs); color: var(--text-muted); }
@@ -281,26 +299,6 @@ a.subtle:hover { color: var(--text); }
 .notice-danger  { border-color: var(--danger);  background: var(--danger-subtle);  color: var(--text); }
 .notice-warning { border-color: var(--warning); background: var(--warning-subtle); color: var(--text); }
 
-/* ── Nav bar (admin) ────────────────────────────────────────── */
-.nav-bar {
-  display: flex;
-  flex-wrap: wrap;
-  gap: var(--space-4) var(--space-5);
-  padding: var(--space-3) 0;
-  border-bottom: 1px solid var(--border);
-  font-family: var(--font-mono);
-  font-size: var(--text-sm);
-}
-.nav-bar a {
-  color: var(--text-2);
-  text-decoration: none;
-}
-.nav-bar a:hover,
-.nav-bar a[aria-current="page"] {
-  color: var(--accent);
-  text-decoration: none;
-}
-
 /* ── Theme toggle — icon button in footer ────────────────────── */
 /* Override the text-box style from site.css with a compact icon button. */
 .theme-toggle {
@@ -326,6 +324,10 @@ a.subtle:hover { color: var(--text); }
 [data-theme="dark"] .theme-icon-moon { display: none; }
 [data-theme="light"] .theme-icon-sun  { display: none; }
 [data-theme="light"] .theme-icon-moon { display: block; }
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme]) .theme-icon-sun  { display: block; }
+  :root:not([data-theme]) .theme-icon-moon { display: none; }
+}
 
 /* ── Tables (admin lists) ───────────────────────────────────── */
 .data-table {
@@ -368,52 +370,62 @@ a.subtle:hover { color: var(--text); }
 .badge-warning { background: var(--warning-subtle); border-color: var(--warning); }
 .badge-danger { background: var(--danger-subtle); border-color: var(--danger); }
 
-/* ── Admin form grid ────────────────────────────────────────── */
-.checkbox-grid {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: var(--space-2) var(--space-4);
+/* Logo plates sit on the page ground in both themes, so every mark reads alike. The few marks drawn in black or deep
+ * navy with no ground of their own are knocked out to a light tone in dark mode (data-icon, the logo file's name). */
+:root[data-theme="dark"] :is(.app-icon, .app-modal-logo)[data-icon^="vault"] img,
+:root[data-theme="dark"] :is(.app-icon, .app-modal-logo)[data-icon="owncloud"] img {
+  filter: brightness(0) invert(0.92);
 }
-@media (max-width: 540px) {
-  .checkbox-grid { grid-template-columns: 1fr; }
-}
-.checkbox-grid label {
-  display: flex;
-  gap: var(--space-2);
-  align-items: center;
-  font-family: var(--font-mono);
-  font-size: var(--text-sm);
-  color: var(--text);
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) :is(.app-icon, .app-modal-logo)[data-icon^="vault"] img,
+  :root:not([data-theme="light"]) :is(.app-icon, .app-modal-logo)[data-icon="owncloud"] img {
+    filter: brightness(0) invert(0.92);
+  }
 }
 
-/* Tight inline form-row used inside the per-app role override list. */
-.role-row {
-  display: grid;
-  grid-template-columns: 1fr auto;
-  gap: var(--space-3);
-  align-items: center;
-  padding: var(--space-2) 0;
-  border-bottom: 1px solid var(--border);
-  font-size: var(--text-sm);
+/* Marks that ship their own filled square (data-bleed, set from the logo file) sit in the same plate and inset as every
+ * other glyph, with the square's corners softened, so the plates read alike. */
+:root :is(.app-icon, .app-modal-logo)[data-bleed] img { border-radius: 18%; }
+
+/* Tiles: white and lifted in the light theme (border plus a faint shadow), the raised surface in dark. */
+:root { --tile-bg: var(--bg); --tile-shadow: 0 1px 2px rgba(20, 20, 20, 0.06); }
+:root[data-theme="dark"] { --tile-bg: var(--surface); --tile-shadow: none; }
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) { --tile-bg: var(--surface); --tile-shadow: none; }
 }
-.role-row:last-child { border-bottom: none; }
-.role-row select {
-  padding: var(--space-1) var(--space-2);
-  font: inherit;
-  background: var(--input-bg);
-  color: var(--text);
-  border: 1px solid var(--input-border);
+
+/* One top bar height on every page, signed in or not (the Account and Sign out targets are 40px tall). */
+.header-inner { min-height: 4rem; box-sizing: border-box; }
+
+/* Top bar actions (signed-in pages): Account and Sign out on the right, in the same small mono type as the brand. */
+.header-actions { margin-left: auto; display: flex; align-items: center; gap: var(--space-1); }
+.header-actions:empty { display: none; }
+.header-actions form { display: contents; }
+.header-link {
+  all: unset;
+  box-sizing: border-box;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  min-height: 40px;
+  padding: 0 var(--space-3);
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  color: var(--text-2);
   border-radius: var(--radius-sm);
 }
+.header-link:hover { color: var(--accent); text-decoration: none; }
+.header-link:focus-visible { outline: 2px solid var(--input-focus, var(--accent)); outline-offset: -2px; }
 
-/* Card grid used by /admin landing + /admin/groups. */
-.card-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(15rem, 1fr));
-  gap: var(--space-4);
+/* Dashboards lead with content: a shorter run above the first row. */
+.page.page-compact { padding-top: var(--space-5); }
+
+/* The footer shares the page's content column and its gutter. */
+.site-footer { padding: 0; }
+.footer-inner { padding: var(--space-5); }
+@media (max-width: 640px) {
+  .header-inner, .page, .footer-inner { padding-left: var(--space-4); padding-right: var(--space-4); }
+  .header-link { padding: 0 var(--space-2); }
+  .page.page-compact { padding-top: var(--space-4); }
 }
-.card-grid .panel { padding: var(--space-4) var(--space-5); }
-.card-grid .panel h2 {
-  font-size: var(--text-base);
-  margin-bottom: var(--space-2);
-}
+

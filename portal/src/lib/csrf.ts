@@ -4,6 +4,7 @@
 // fails closed. The consumed-nonce store is in-memory (single Node pod); scaling out moves it to Redis or Postgres.
 
 import { createHmac, randomBytes, timingSafeEqual } from 'node:crypto';
+import { secret as readSecret } from './config';
 
 const TOKEN_TTL_MS = 30 * 60 * 1000; // 30 min
 
@@ -11,7 +12,7 @@ const SECRET_ENV = 'CSRF_SECRET';
 
 /** Lazily resolve the signing secret; fails closed when unset. */
 function secret(): Buffer {
-  const v = process.env[SECRET_ENV];
+  const v = readSecret(SECRET_ENV);
   // 32-byte floor by UTF-8 byte length, not character count (multi-byte characters would undercount entropy).
   if (!v || Buffer.byteLength(v, 'utf8') < 32) {
     throw new CSRFError(

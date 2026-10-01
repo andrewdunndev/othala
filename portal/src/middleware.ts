@@ -7,6 +7,7 @@
 import { defineMiddleware } from 'astro:middleware';
 import { contentSecurityPolicy } from './lib/csp';
 import { kratosBase } from './lib/kratos';
+import { apex, publicUrl } from './lib/config';
 
 // Routes that are themselves error pages — rewriting these would loop.
 const ERROR_ROUTE_PREFIXES = ['/auth/error', '/404', '/500'];
@@ -28,8 +29,8 @@ function applySecurityHeaders(res: Response): void {
   res.headers.set(
     'Content-Security-Policy',
     contentSecurityPolicy({
-      apex: process.env.OTHALA_APEX,
-      kratosUrls: [process.env.OTHALA_PUBLIC_URL, kratosBase()],
+      apex,
+      kratosUrls: [publicUrl, kratosBase()],
     }),
   );
 }

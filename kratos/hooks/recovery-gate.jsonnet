@@ -1,7 +1,7 @@
 // Recovery-gate webhook body.
 //
-// Kratos posts this body to the Othala app's loopback admin endpoint
-// (http://<CONSENT_HOST>:4431/admin/recovery-gate, authenticated with
+// Kratos posts this body to the Othala app's internal-network admin listener (PORTAL_ADMIN_BIND_HOST) endpoint
+// (http://othala:4431/admin/recovery-gate, authenticated with
 // Bearer RECOVERY_GATE_SECRET) after the recovery code is verified,
 // BEFORE issuing the privileged settings session. The gate refuses
 // recovery for admin identities, so a compromised mailbox is not a path to

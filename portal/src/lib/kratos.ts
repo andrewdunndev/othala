@@ -1,8 +1,9 @@
 // Kratos public-API client for Astro SSR pages. Flow GETs forward the user's
 // Cookie header so Kratos can read the anti-CSRF cookie (else 403).
-// KRATOS_PUBLIC_URL defaults to http://localhost:4433.
+// Server-side calls use the internal Kratos public address, not the edge.
 
 import { Configuration, FrontendApi, ResponseError } from '@ory/client-fetch';
+import { KRATOS_PUBLIC_URL } from './constants';
 import type {
   FlowResult,
   LoginFlow,
@@ -13,7 +14,7 @@ import type {
 } from './types';
 
 export function kratosBase(): string {
-  return process.env.KRATOS_PUBLIC_URL ?? 'http://localhost:4433';
+  return KRATOS_PUBLIC_URL;
 }
 
 const HEALTH_TIMEOUT_MS = 2000;
@@ -42,7 +43,7 @@ export async function getSession(cookie?: string): Promise<Session | null> {
   }
 }
 
-/** Health check for the three-state landing: public /health/alive, 2s timeout. */
+/** Health check for the three-state landing: internal /health/alive, 2s timeout. */
 export async function isReachable(): Promise<boolean> {
   const ctl = new AbortController();
   const t = setTimeout(() => ctl.abort(), HEALTH_TIMEOUT_MS);
@@ -54,6 +55,28 @@ export async function isReachable(): Promise<boolean> {
     return res.ok;
   } catch {
     return false;
+  } finally {
+    clearTimeout(t);
+  }
+}
+
+const ERROR_ID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+/** The stored self-service error behind /auth/error?id=, or null when the id is malformed or Kratos cannot say. */
+export async function getFlowError(id: string): Promise<{ id?: unknown; code?: unknown } | null> {
+  if (!ERROR_ID.test(id)) return null;
+  const ctl = new AbortController();
+  const t = setTimeout(() => ctl.abort(), HEALTH_TIMEOUT_MS);
+  try {
+    const res = await fetch(`${kratosBase()}/self-service/errors?id=${encodeURIComponent(id)}`, {
+      signal: ctl.signal,
+      headers: { Accept: 'application/json' },
+    });
+    if (!res.ok) return null;
+    const body = (await res.json()) as { error?: { id?: unknown; code?: unknown } };
+    return body?.error ?? null;
+  } catch {
+    return null;
   } finally {
     clearTimeout(t);
   }
@@ -143,9 +166,13 @@ export const browserFlows = {
     const qs = returnTo ? `?return_to=${encodeURIComponent(returnTo)}` : '';
     return `/self-service/recovery/browser${qs}`;
   },
-  verification(returnTo?: string): string {
-    const qs = returnTo ? `?return_to=${encodeURIComponent(returnTo)}` : '';
-    return `/self-service/verification/browser${qs}`;
+  /** `email` rides in the initiating URL, which Kratos keeps as the flow's request_url, so the verification page can prefill it. */
+  verification(returnTo?: string, email?: string): string {
+    const p = new URLSearchParams();
+    if (returnTo) p.set('return_to', returnTo);
+    if (email) p.set('email', email);
+    const qs = p.toString();
+    return `/self-service/verification/browser${qs ? `?${qs}` : ''}`;
   },
   logout(returnTo?: string): string {
     // The endpoint 303s to a logout-with-token URL; see getLogoutInfo for the token.

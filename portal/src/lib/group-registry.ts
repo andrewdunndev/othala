@@ -1,11 +1,11 @@
 // Group registry: a group's type comes from its bindings, never its name.
-// `identity`: listed in OTHALA_IDENTITY_GROUPS. `access`: a manifest's
+// `identity`: one of IDENTITY_GROUPS (constants.ts). `access`: a manifest's
 // `accessGroups` binds it. `role`: a manifest's `group_role_map` references it.
-// A group can carry several kinds; derived from the cached manifests plus env
-// groups, it feeds the admin UI split and the lint.
+// A group can carry several kinds; derived from the cached manifests plus the
+// fixed identity groups, it feeds the admin UI split and the lint.
 
 import type { ClientManifest } from './manifests';
-import { identityGroups as envIdentityGroups } from './config';
+import { IDENTITY_GROUPS } from './constants';
 import { servingManifests } from './manifest-store';
 import { GROUP_RE } from './access-groups';
 
@@ -33,7 +33,7 @@ function entryFor(reg: GroupRegistry, name: string): GroupEntry {
 }
 
 /**
- * Build the registry: seed `identity` from OTHALA_IDENTITY_GROUPS, then per
+ * Build the registry: seed `identity` from the fixed identity groups, then per
  * manifest mark `accessGroups[]` entries `access` and `group_role_map` keys
  * `role`. A group's type is the union of its bindings. Prefer the memoized
  * getGroupRegistry().
@@ -77,7 +77,7 @@ export function getGroupRegistry(): GroupRegistry {
   if (memoRegistry !== null && memoManifests === manifests) {
     return memoRegistry;
   }
-  memoRegistry = buildGroupRegistry(manifests, envIdentityGroups);
+  memoRegistry = buildGroupRegistry(manifests, IDENTITY_GROUPS);
   memoManifests = manifests;
   return memoRegistry;
 }

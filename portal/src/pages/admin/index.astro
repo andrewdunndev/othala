@@ -1,136 +1,17 @@
 ---
-// Admin landing: Users / Groups / Apps cards with live counts from Kratos
-// identities and the manifest catalog. requireAdminSession enforces AAL2.
+// /admin has no page of its own: People is the landing, and anything that needs attention shows there as a notice.
+// The admin gate runs first so the redirect cannot be used to probe routes unauthenticated; an unauthorized caller
+// gets the same step-up redirect every other /admin/* page returns.
 
 export const prerender = false;
 
-import Layout from '../../layouts/Layout.astro';
-import ManifestNotice from '../../components/ManifestNotice.astro';
 import { requireAdminSession } from '../../lib/admin';
-import { listIdentities } from '../../lib/admin-api';
-import { servingManifests, manifestHealth } from '../../lib/manifest-store';
-import { getGroupRegistry, namesOfKind } from '../../lib/group-registry';
 
-const guard = await requireAdminSession(Astro);
-if (guard instanceof Response) return guard;
-
-let userCount = 0;
-let loadError: string | null = null;
-try {
-  const identities = await listIdentities();
-  userCount = identities.length;
-} catch (err) {
-  console.error('[othala/admin] listIdentities failed:', err);
-  loadError = 'Failed to read identity store — check Kratos connectivity.';
+const devFixture = import.meta.env.DEV && Astro.url.searchParams.has('dev-state');
+if (!devFixture) {
+  const guard = await requireAdminSession(Astro);
+  if (guard instanceof Response) return guard;
 }
 
-// Manifest reads go through the serving store, which falls back to the last
-// known good set instead of throwing — a manifest that fails to validate must
-// not 500 the page an operator would open to find out why.
-const manifests = servingManifests();
-const registry = getGroupRegistry();
-const identityGroups = namesOfKind(registry, 'identity');
-const accessGroups = namesOfKind(registry, 'access');
-const health = manifestHealth();
-
-const adminNav = [
-  { href: '/admin',          label: 'Overview' },
-  { href: '/admin/users',    label: 'Users' },
-  { href: '/admin/groups',   label: 'Groups' },
-  { href: '/admin/oauth2',   label: 'Apps' },
-  { href: '/auth/settings',  label: 'Settings' },
-];
-
-const cards = [
-  { href: '/admin/users',  title: 'Users',  primary: `${userCount}`,           secondary: userCount === 1 ? 'identity' : 'identities' },
-  { href: '/admin/groups', title: 'Groups', primary: `${identityGroups.length} / ${accessGroups.length}`, secondary: 'identity / access' },
-  { href: '/admin/oauth2', title: 'Apps',   primary: `${manifests.length}`,    secondary: 'OIDC clients' },
-];
+return Astro.redirect(`/admin/users${devFixture ? Astro.url.search : ''}`, 302);
 ---
-<Layout title="Admin" description="Identity, group, and OIDC client administration.">
-
-  <header class="page-header">
-    <p class="page-eyebrow">administration</p>
-    <h1 class="page-title">Overview</h1>
-    <p class="page-lede">
-      Identities, groups, and OIDC clients across the home estate.
-      Editing happens here. Source of truth for client config lives in
-      the unified per-app <code>&lt;slug&gt;.yaml</code> manifests.
-    </p>
-  </header>
-
-  <nav class="nav-bar" aria-label="Admin">
-    {adminNav.map(item => (
-      <a href={item.href}>{item.label}</a>
-    ))}
-  </nav>
-
-  {loadError && (
-    <div class="notice notice-danger">
-      {loadError}
-    </div>
-  )}
-
-  <ManifestNotice health={health} />
-
-  <section class="section">
-    <p class="section-subtitle">At a glance</p>
-    <div class="card-grid">
-      {cards.map((c) => (
-        <a class="admin-card panel" href={c.href}>
-          <span class="admin-card-primary mono">{c.primary}</span>
-          <span class="admin-card-title">{c.title}</span>
-          <span class="admin-card-secondary mono">{c.secondary}</span>
-          <span class="admin-card-arrow" aria-hidden="true">→</span>
-        </a>
-      ))}
-    </div>
-  </section>
-
-</Layout>
-
-<style>
-  .admin-card {
-    position: relative;
-    display: flex;
-    flex-direction: column;
-    gap: var(--space-2);
-    padding: var(--space-4) var(--space-5);
-    color: var(--text);
-    text-decoration: none;
-    transition: border-color var(--duration-fast) var(--ease-out),
-                color var(--duration-fast) var(--ease-out);
-  }
-  .admin-card:hover { border-color: var(--accent); text-decoration: none; }
-  .admin-card-primary {
-    font-family: var(--font-mono);
-    font-size: var(--text-3xl);
-    color: var(--text);
-    line-height: 1;
-    letter-spacing: -0.01em;
-  }
-  .admin-card-title {
-    font-family: var(--font-mono);
-    font-size: var(--text-base);
-    font-weight: 600;
-    color: var(--text);
-  }
-  .admin-card-secondary {
-    font-size: var(--text-xs);
-    text-transform: uppercase;
-    letter-spacing: 0.08em;
-    color: var(--text-muted);
-  }
-  .admin-card-arrow {
-    position: absolute;
-    top: var(--space-4);
-    right: var(--space-4);
-    color: var(--text-muted);
-    transition: color var(--duration-fast) var(--ease-out),
-                transform var(--duration-fast) var(--ease-out);
-  }
-  .admin-card:hover .admin-card-arrow {
-    color: var(--accent);
-    transform: translateX(2px);
-  }
-</style>

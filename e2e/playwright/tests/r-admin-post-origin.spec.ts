@@ -42,10 +42,12 @@ test('R1 — admin deactivate/reactivate via a real browser click must not 403 (
     const targetUrl = `${baseURL}/admin/users/${target.id}`;
 
     await page.goto(targetUrl, { waitUntil: 'networkidle' });
-    await expect(page.locator('h1'), 'R1: admin page must render the target identity').toContainText('r1.target');
+    await expect(page.locator('h1'), 'R1: admin page must render the target identity').toContainText('R1 Target');
 
-    const deactivateBtn = page.getByRole('button', { name: 'Deactivate' });
-    await expect(deactivateBtn, 'R1: Deactivate button must be visible').toBeVisible({ timeout: 10_000 });
+    await page.locator('summary', { hasText: 'Danger zone' }).click();
+    await page.locator('summary', { hasText: 'Turn off sign-in' }).click();
+    const deactivateBtn = page.locator('form.confirm').getByRole('button', { name: 'Turn off sign-in' });
+    await expect(deactivateBtn, 'R1: the turn-off confirm button must be visible').toBeVisible({ timeout: 10_000 });
 
     const [deactivateResp] = await Promise.all([
       page.waitForResponse((r) => r.url() === targetUrl && r.request().method() === 'POST'),
@@ -64,8 +66,8 @@ test('R1 — admin deactivate/reactivate via a real browser click must not 403 (
     ).toBe(200);
 
     await expect(
-      page.getByText(/marked inactive/i),
-      'R1: page must show the "marked inactive" success notice after deactivate',
+      page.getByText(/Sign-in is off for/i),
+      'R1: page must show the "Sign-in is off" success notice after deactivate',
     ).toBeVisible();
 
     expect(
@@ -73,8 +75,9 @@ test('R1 — admin deactivate/reactivate via a real browser click must not 403 (
       'R1: target identity state must be "inactive" after deactivate',
     ).toBe('inactive');
 
-    const reactivateBtn = page.getByRole('button', { name: 'Reactivate' });
-    await expect(reactivateBtn, 'R1: Reactivate button must be visible after deactivate').toBeVisible({ timeout: 10_000 });
+    await page.locator('summary', { hasText: 'Turn sign-in on' }).click();
+    const reactivateBtn = page.locator('form.confirm').getByRole('button', { name: 'Turn sign-in on' });
+    await expect(reactivateBtn, 'R1: the turn-on confirm button must be visible after deactivate').toBeVisible({ timeout: 10_000 });
 
     const [reactivateResp] = await Promise.all([
       page.waitForResponse((r) => r.url() === targetUrl && r.request().method() === 'POST'),
@@ -92,8 +95,8 @@ test('R1 — admin deactivate/reactivate via a real browser click must not 403 (
     ).toBe(200);
 
     await expect(
-      page.getByText(/restored to active/i),
-      'R1: page must show the "restored to active" success notice after reactivate',
+      page.getByText(/Sign-in is back on/i),
+      'R1: page must show the "Sign-in is back on" success notice after reactivate',
     ).toBeVisible();
 
     expect(

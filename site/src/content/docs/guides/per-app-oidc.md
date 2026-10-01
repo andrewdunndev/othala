@@ -11,7 +11,7 @@ service-local password for native clients that cannot run a browser redirect.
 
 One issuer, fixed once any relying party is wired, and authorization code for
 every interactive application — see [Golden path](golden-path.md). One manifest
-per application, read at runtime from `MANIFEST_DIR`, so adding one is a
+per application, read at runtime, so adding one is a
 manifest drop rather than an image rebuild. A manifest carries up to three
 namespaces: `presentation:` (tile metadata and the access binding), `oidc:`
 (forwarded to Hydra), and `consent:` (role and claim shape, read by the portal

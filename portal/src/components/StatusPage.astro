@@ -1,102 +1,33 @@
 ---
-// Branded error / status page, the single source for error rendering. Props:
-// status (number, the visual hero), title, message (human-readable), reason
-// (optional badge token; never raw errors or stack traces).
+// Friendly error and not-found page, the single source for error rendering: what happened in a sentence, what to do
+// next, and a way home. Never raw errors or stack traces. `status` appears as a small quiet code for support. Actions
+// follow lib/status-actions.ts: Try again for a hiccup, Sign in only for someone signed out.
 
-import Layout from '../layouts/Layout.astro';
+import FocusPage from './FocusPage.astro';
+import { currentViewer } from '../lib/viewer';
+import { statusActions } from '../lib/status-actions';
 
 interface Props {
-  /** HTTP status code rendered as the large display hero. */
+  /** HTTP status code, shown small as a reference for whoever helps. */
   status: number;
-  /** Short title shown below the code. */
   title: string;
-  /** Human-readable message shown to the user. Never include stack traces. */
+  /** Human-readable message: what happened and what to do next. */
   message: string;
-  /** Optional reason token displayed as a mono badge. */
+  /** Machine token for the response; kept as a data attribute for tests, not shown. */
   reason?: string;
+  /** Where Try again leads; default is this same address (right for 404 and 500, which keep the failed URL). */
+  retryHref?: string;
 }
 
-const { status, title, message, reason } = Astro.props;
+const { status, title, message, reason, retryHref } = Astro.props;
+const viewer = await currentViewer(Astro.request, Astro.url);
+const actions = statusActions(status, viewer !== null, retryHref ?? Astro.url.pathname + Astro.url.search, reason);
 ---
-<Layout title={`${status} — ${title}`} bare>
-
-  <div class="status-page">
-    <p class="status-eyebrow">error</p>
-
-    <p class="status-code">{status}</p>
-
-    {reason && (
-      <p class="status-reason">
-        <span class="badge badge-muted">{reason}</span>
-      </p>
-    )}
-
-    <h1 class="status-title">{title}</h1>
-
-    <p class="status-message">{message}</p>
-
-    <div class="status-actions">
-      <a href="/" class="button button-secondary">Back home</a>
-      <a href="/auth/login" class="button button-secondary">Sign in</a>
-    </div>
+<FocusPage title={title} lede={message} tabTitle={`${status} ${title}`} viewer={viewer}>
+  <div class="status-actions" data-reason={reason}>
+    {actions.map((a) => (
+      <a href={a.href} class:list={['button', a.primary ? 'button-primary' : 'button-secondary']} data-astro-reload>{a.label}</a>
+    ))}
   </div>
-
-</Layout>
-
-<style>
-  .status-page {
-    max-width: 44rem;
-    padding-block: var(--space-7) var(--space-6);
-  }
-
-  /* Small accent label above the code. */
-  .status-eyebrow {
-    font-family: var(--font-mono);
-    font-size: var(--text-xs);
-    text-transform: uppercase;
-    letter-spacing: 0.22em;
-    color: var(--accent);
-    margin: 0 0 var(--space-2);
-  }
-
-  /* The hero: a large accent mono status code. */
-  .status-code {
-    font-family: var(--font-mono);
-    font-weight: 700;
-    font-size: clamp(2.75rem, 12vw, 6rem);
-    line-height: 0.82;
-    letter-spacing: -0.05em;
-    font-feature-settings: 'tnum' 1;
-    color: var(--accent);
-    margin: 0;
-  }
-
-  /* The title sits below the code as the semantic heading. */
-  .status-title {
-    font-family: var(--font-display);
-    font-size: var(--text-3xl);
-    font-weight: 600;
-    color: var(--text);
-    margin: var(--space-4) 0 var(--space-3);
-  }
-
-  .status-message {
-    font-size: var(--text-lg);
-    line-height: 1.6;
-    color: var(--text-muted);
-    max-width: 38rem;
-    margin: 0;
-  }
-
-  /* Reason badge sits tight under the code as its machine-readable context. */
-  .status-reason {
-    margin: var(--space-3) 0 0;
-  }
-
-  .status-actions {
-    display: flex;
-    flex-wrap: wrap;
-    gap: var(--space-3);
-    margin-top: var(--space-6);
-  }
-</style>
+  <p class="status-code">Error {status}</p>
+</FocusPage>

@@ -15,6 +15,7 @@ const FORBIDDEN_ROUTES = new Set([
   '/admin/profile-gate',
   '/admin/second-factor-gate',
   '/admin/profile-sessions',
+  '/admin/passkey-prune',
 ]);
 
 const PAGE_EXT = /\.(astro|ts|js|mjs|md|mdx)$/;

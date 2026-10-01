@@ -1,17 +1,14 @@
 ---
-// /admin/activity is out of scope for the public release: a real
-// activity log (alloy → Loki archival + a Postgres summary table for the
-// in-UI last-100 view) is not shipped. This route redirects to the admin
-// overview.
+// /admin/activity is out of scope for the public release: a real activity log (alloy to Loki archival plus a Postgres
+// summary table for the in-UI last-100 view) is not shipped. This route redirects to People.
 export const prerender = false;
 
 import { requireAdminSession } from '../../lib/admin';
 
-// Keep the admin gate so the redirect can't be used to probe routes
-// unauthenticated; an unauthorized caller gets the same refresh-login
-// redirect every other /admin/* page returns.
+// Keep the admin gate so the redirect can't be used to probe routes unauthenticated; an unauthorized caller gets the
+// same refresh-login redirect every other /admin/* page returns.
 const guard = await requireAdminSession(Astro);
 if (guard instanceof Response) return guard;
 
-return Astro.redirect('/admin', 302);
+return Astro.redirect('/admin/users', 302);
 ---

@@ -1,8 +1,9 @@
 ---
-// Settings flow handler. Needs an active session (else /auth/login); reads
-// ?flow=<id> or redirects to Kratos's settings initiator. Renders profile,
-// passkey, password, totp, lookup_secret and webauthn sections from
-// flow.ui.nodes, plus a sign-out-everywhere button.
+// Settings flow handler. Needs an active session (else /auth/login); reads ?flow=<id> or redirects to Kratos's
+// settings initiator. Renders a status line and four cards (Sign-in, Two-step verification, Recovery, Profile) plus
+// Sessions from flow.ui.nodes. Every method form posts natively to Kratos, so the page works without script; the
+// ClientRouter enhancement at the bottom swaps the response in place. In `astro dev`, `?dev-state=` renders a recorded
+// flow (lib/settings-fixtures.ts) with no Kratos.
 
 export const prerender = false;
 
@@ -10,6 +11,7 @@ export const prerender = false;
 Astro.response.headers.set('Cache-Control', 'no-store, max-age=0');
 Astro.response.headers.set('Pragma', 'no-cache');
 
+import '../../styles/settings.css';
 import Layout from '../../layouts/Layout.astro';
 import {
   browserFlows,
@@ -17,474 +19,722 @@ import {
   getSession,
   getSettingsFlow,
 } from '../../lib/kratos';
-import {
-  csrfToken,
-  hasMethod,
-  nodesByGroup,
-  asInput,
-  scriptNodes,
-  safeOnclick,
-} from '../../lib/nodes';
-import type { NodeImageAttributes, NodeTextAttributes } from '../../lib/types';
-import FlowNodes from '../../components/FlowNodes.astro';
+import { csrfToken, nodesByGroup, asInput, scriptNodes, safeOnclick } from '../../lib/nodes';
+import type { FlowNode, Session, SettingsFlow } from '../../lib/types';
+import CredentialRows from '../../components/settings/CredentialRows.astro';
+import ActionForm from '../../components/settings/ActionForm.astro';
+import ConfirmCues from '../../components/settings/ConfirmCues.astro';
+import { SECOND_FACTOR_KEEP } from '../../lib/second-factor-gate';
+import HeaderActions from '../../components/HeaderActions.astro';
 import { revokeSubject, RevokeError } from '../../lib/revoke';
-import { getGroupRegistry, isIdentityGroup } from '../../lib/group-registry';
 import { getIdentity } from '../../lib/admin-api';
 import { emailChangeLocked } from '../../lib/profile-gate';
+import { isAdminMarker } from '../../lib/admin-auth';
 import { identityGroups as readIdentityGroups } from '../../lib/gate';
+import { loadTiles, userCanSeeTile } from '../../lib/tiles';
 import { publicUrl } from '../../lib/config';
 import { signToken, verifyToken, CSRFError } from '../../lib/csrf';
-import type { Session } from '../../lib/types';
+import { readPasskeyNames } from '../../lib/passkey-names';
+import {
+  credentialItems,
+  emailVerified,
+  lookupView,
+  privilegedLapsed,
+  securityStatus,
+  totpView,
+} from '../../lib/settings-view';
+import { devSettings, isDevSettingsState } from '../../lib/settings-fixtures';
+import { FLASH, LOST_KEYS, RENAME_ERROR_COOKIE, RENAME_ERRORS, groupKey, messageText } from '../../lib/settings-flash';
 
 const cookie = Astro.request.headers.get('cookie') ?? undefined;
+const devParam = import.meta.env.DEV ? Astro.url.searchParams.get('dev-state') : null;
+const dev = isDevSettingsState(devParam) ? devSettings(devParam) : null;
 
-let session: Session | null;
-try {
-  session = await getSession(cookie);
-} catch {
-  return Astro.redirect('/auth/login');
-}
-if (!session?.active || !session.identity) {
-  return Astro.redirect('/auth/login?return_to=' + encodeURIComponent('/auth/settings'));
-}
-
-// "Sign out everywhere": revokes the caller's own identity through the in-process
-// fan-out, which, unlike Kratos's browser logout, also closes Hydra's remembered login.
-let signOutError: string | null = null;
-if (Astro.request.method === 'POST') {
-  const fd = await Astro.request.formData();
-  if (String(fd.get('action') ?? '') === 'sign-out-everywhere') {
-    // Verify the CSRF token bound to the caller's identity before any side effect.
-    try {
-      verifyToken(String(fd.get('csrf_token') ?? ''), session.identity.id, 'sign-out-everywhere');
-    } catch (err) {
-      if (err instanceof CSRFError) {
-        return new Response(`CSRF: ${err.message}`, { status: 403 });
-      }
-      throw err;
-    }
-    try {
-      await revokeSubject(session.identity.id);
-    } catch (err) {
-      // Prescriptive on a hard-cut failure; do not leak raw upstream errors.
-      signOutError =
-        err instanceof RevokeError
-          ? err.message
-          : 'Could not sign out everywhere; please retry.';
-    }
-    // revokeSubject ended every session, this browser's included.
-    if (!signOutError) return Astro.redirect('/auth/login');
+/** A CSRF token for this identity and action; empty if minting fails (dev without CSRF_SECRET), so the form still renders. */
+function mint(identityId: string, action: string): string {
+  try {
+    return signToken(identityId, action);
+  } catch (err) {
+    if (!dev) throw err;
+    return '';
   }
 }
 
-const flowId = Astro.url.searchParams.get('flow');
-if (!flowId) {
-  return Astro.redirect(browserFlows.settings(`${publicUrl}/auth/settings`));
+let session: Session | null;
+let flow: SettingsFlow;
+let stored: Awaited<ReturnType<typeof getIdentity>> | null = null;
+let logoutInfo: Awaited<ReturnType<typeof getLogoutInfo>> = null;
+let signOutError: string | null = null;
+
+if (dev) {
+  const email = 'sam@example.test';
+  session = {
+    active: true,
+    authentication_methods: [{ method: 'passkey' }],
+    authenticated_at: new Date().toISOString(),
+    identity: {
+      id: 'dev-mock',
+      traits: { username: 'sam', email, displayName: 'Sam Rivera' },
+      verifiable_addresses: [{ value: email, verified: dev.emailVerified }],
+      metadata_admin: { passkeyNames: dev.names, ...(dev.admin ? { admin: true } : {}) },
+    },
+  } as unknown as Session;
+  flow = dev.flow;
+  stored = session.identity as unknown as typeof stored;
+  logoutInfo = { logout_url: '', logout_token: '' };
+} else {
+  try {
+    session = await getSession(cookie);
+  } catch {
+    return Astro.redirect('/auth/login');
+  }
+  if (!session?.active || !session.identity) {
+    return Astro.redirect('/auth/login?return_to=' + encodeURIComponent('/auth/settings'));
+  }
+
+  // "Sign out everywhere": revokes the caller's own identity through the in-process
+  // fan-out, which, unlike Kratos's browser logout, also closes Hydra's remembered login.
+  if (Astro.request.method === 'POST') {
+    const fd = await Astro.request.formData();
+    if (String(fd.get('action') ?? '') === 'sign-out-everywhere') {
+      // Verify the CSRF token bound to the caller's identity before any side effect.
+      try {
+        verifyToken(String(fd.get('csrf_token') ?? ''), session.identity.id, 'sign-out-everywhere');
+      } catch (err) {
+        if (err instanceof CSRFError) {
+          return new Response(`CSRF: ${err.message}`, { status: 403 });
+        }
+        throw err;
+      }
+      try {
+        await revokeSubject(session.identity.id);
+      } catch (err) {
+        // Prescriptive on a hard-cut failure; do not leak raw upstream errors.
+        signOutError =
+          err instanceof RevokeError
+            ? err.message
+            : 'Could not sign out everywhere; please retry.';
+      }
+      // revokeSubject ended every session, this browser's included.
+      if (!signOutError) return Astro.redirect('/auth/login');
+    }
+  }
+
+  const flowId = Astro.url.searchParams.get('flow');
+  if (!flowId) {
+    return Astro.redirect(browserFlows.settings(`${publicUrl}/auth/settings`));
+  }
+  const result = await getSettingsFlow(flowId, cookie);
+  if (result.kind !== 'ok') {
+    return Astro.redirect(browserFlows.settings(`${publicUrl}/auth/settings`));
+  }
+  flow = result.flow;
+  logoutInfo = await getLogoutInfo(cookie);
+  // whoami omits metadata_admin and credentials, so re-fetch the full identity via the admin API (display only: the
+  // admin marker, group-derived apps, the person's passkey names). Fail closed: nothing shown on error.
+  try {
+    stored = await getIdentity(session.identity.id);
+  } catch (lookupErr) {
+    console.error('[othala/settings] getIdentity failed; showing no names or apps:', lookupErr);
+  }
 }
 
-const result = await getSettingsFlow(flowId, cookie);
-if (result.kind !== 'ok') {
-  return Astro.redirect(browserFlows.settings(`${publicUrl}/auth/settings`));
+// A refused rename leaves a one-minute cookie naming the passkey and the reason; read once, here, after the flow exists
+// (the flow-less first request only redirects).
+let renameError: { id: string; text: string } | null = null;
+if (dev) {
+  renameError = dev.renameError;
+} else {
+  const raw = Astro.cookies.get(RENAME_ERROR_COOKIE)?.value;
+  if (raw) {
+    const [id, code] = raw.split('.');
+    renameError = { id: id ?? '', text: RENAME_ERRORS[code ?? ''] ?? RENAME_ERRORS.busy };
+    Astro.response.headers.append('Set-Cookie', `${RENAME_ERROR_COOKIE}=; Path=/auth/settings; Max-Age=0; HttpOnly; SameSite=Lax${import.meta.env.PROD ? '; Secure' : ''}`);
+  }
 }
 
-const flow = result.flow;
+const identity = session!.identity!;
 const ui = flow.ui;
-const csrf = csrfToken(ui.nodes);
-const scripts = scriptNodes(ui.nodes);
-
-const hasProfile = hasMethod(ui.nodes, 'profile');
-const hasPasskey = hasMethod(ui.nodes, 'passkey');
-const hasPassword = hasMethod(ui.nodes, 'password');
-const hasTotp = hasMethod(ui.nodes, 'totp');
-const hasLookupSecret = hasMethod(ui.nodes, 'lookup_secret');
-const hasWebAuthn = hasMethod(ui.nodes, 'webauthn');
-
-const logoutInfo = await getLogoutInfo(cookie);
-const csrfSignOut = signToken(session.identity.id, 'sign-out-everywhere');
-const traits = session.identity.traits;
-// whoami omits metadata_admin, so the Membership chips re-fetch the full
-// identity via the admin API (display only). Fail closed: no groups on error.
-let groups: string[] = [];
-// The email inputs go read-only when the profile gate would refuse a change
-// from this session (display only; the gate stays the control). An unreadable
-// identity leaves them editable and the gate decides.
-let emailLocked = false;
-try {
-  const stored = await getIdentity(session.identity.id);
-  groups = readIdentityGroups(stored);
-  emailLocked = emailChangeLocked(stored, session.authentication_methods);
-} catch (lookupErr) {
-  console.error('[othala/settings] getIdentity failed; showing no groups:', lookupErr);
-}
+const nodes = ui.nodes;
+const csrf = csrfToken(nodes);
+const scripts = scriptNodes(nodes);
+const traits = identity.traits;
 const displayName = traits.displayName || traits.username || '';
-// Username is admin-controlled: read-only, carried hidden because the schema
-// requires it; the profile gate (listen.mjs handleProfileGate) refuses changes.
-const isUsernameNode = (n: (typeof ui.nodes)[number]) => asInput(n)?.name === 'traits.username';
-const isEmailNode = (n: (typeof ui.nodes)[number]) => ['traits.email', 'traits.recoveryEmail'].includes(asInput(n)?.name ?? '');
-const profileNodes = ui.nodes.filter((n) => !isUsernameNode(n) && !(emailLocked && isEmailNode(n)));
-const changeEmailHref = browserFlows.login({ refresh: true, returnTo: '/auth/settings' });
-const usernameMessages = ui.nodes.find(isUsernameNode)?.messages ?? [];
-// Split the user's groups by the registry's binding-derived type.
-const groupRegistry = getGroupRegistry();
-const identityGroups = groups.filter((g) => isIdentityGroup(groupRegistry, g));
-const accessGroups = groups.filter((g) => !isIdentityGroup(groupRegistry, g));
+
+// The email inputs go read-only when the profile gate would refuse a change from this session (display only; the gate
+// stays the control). An unreadable identity leaves them editable and the gate decides.
+const emailLocked = stored ? emailChangeLocked(stored, session!.authentication_methods) : false;
+const isAdmin = isAdminMarker(stored);
+const names = readPasskeyNames(stored?.metadata_admin);
+const passkeys = credentialItems(nodes, 'passkey_remove', names);
+const keys = credentialItems(nodes, 'webauthn_remove');
+const totp = totpView(nodes);
+const lookup = lookupView(nodes);
+const verified = emailVerified(stored ?? identity);
+const status = securityStatus(nodes, { emailVerified: verified });
+
+const has = (g: FlowNode['group']) => nodes.some((n) => n.group === g);
+const hasNode = (name: string) => nodes.some((n) => asInput(n)?.name === name);
+const nodeMessages = (name: string) => nodes.find((n) => asInput(n)?.name === name)?.messages ?? [];
+const value = (name: string) => {
+  const v = asInput(nodes.find((n) => asInput(n)?.name === name) as FlowNode)?.value;
+  return v === undefined || v === null ? '' : String(v);
+};
+const kind = (t: string) => (t === 'error' ? 'danger' : t === 'success' ? 'success' : 'warning');
+
+const reauth = dev ? dev.reauth : privilegedLapsed(session!.authenticated_at);
+const reauthHref = browserFlows.login({ refresh: true, returnTo: '/auth/settings' });
+const verifyHref = browserFlows.verification(`${publicUrl}/auth/settings`, traits.email);
+const showBackupPrompt = flow.state === 'success' && status.twoStep && !status.backupCodes;
+// The enrollment steps open on their own when a code was refused (or the fixture asks); otherwise they wait behind a button.
+const setupOpen = totp.codeMessages.length > 0 || (dev?.setupOpen ?? false);
+const pwOpen = nodesByGroup(nodes, 'password').some((n) => (n.messages?.length ?? 0) > 0);
+// The saved line belongs in the card that was edited. Script fills it on a live swap; the dev fixture renders it here.
+const devFlash = dev?.flash ? FLASH[dev.flash] : null;
+const devFlashCard = dev?.flash?.startsWith('lookup') ? 'recovery' : 'two-step';
+// Admins keep one second factor: the gate refuses dropping the app when it is their only one, so say so up front.
+// A person with no passkey yet is at the first step: it leads the page, and the Passkeys card keeps only its list.
+const welcome = status.passkeys === 0 && has('passkey');
+const keepSecondFactor = isAdmin && status.securityKeys === 0;
+const lookupConfirm = nodesByGroup(nodes, 'lookup_secret').some((n) => asInput(n)?.name === 'lookup_secret_confirm');
+const lookupOff = nodesByGroup(nodes, 'lookup_secret').map(asInput).find((a) => a?.name === 'lookup_secret_disable') ?? null;
+
+const csrfSignOut = mint(identity.id, 'sign-out-everywhere');
+const renameTokens = passkeys.map(() => mint(identity.id, 'passkey-name'));
+
+// Your apps: the tiles this person's groups open, read-only.
+const groups = readIdentityGroups(stored ?? undefined);
+const yourApps = dev ? [] : loadTiles().filter((t) => userCanSeeTile(t, groups));
+
+const lookupLabel: Record<string, string> = {
+  lookup_secret_regenerate: lookup.enrolled ? 'Make new codes' : 'Get backup codes',
+  lookup_secret_reveal: 'Show my codes',
+  lookup_secret_confirm: "I've saved these codes",
+};
 ---
-<Layout title="Settings" description="Account settings.">
+<Layout title="Account" description="Account settings." compact router>
+  <Fragment slot="header-actions">
+    <HeaderActions identityId={identity.id} isAdmin={isAdmin} />
+  </Fragment>
 
-  <header class="page-header">
-    <p class="page-eyebrow">account</p>
-    <h1 class="page-title">Settings</h1>
-    <p class="page-lede">
-      Profile details, passkeys, authenticator app, backup codes, and active
-      sessions for <strong>{displayName}</strong>.
-    </p>
-  </header>
-
-  {ui.messages?.map((m) => (
-    <div class={`notice notice-${m.type === 'error' ? 'danger' : m.type === 'success' ? 'success' : 'warning'}`}>
-      {m.text}
-    </div>
-  ))}
-
-  {hasProfile && (
-    <section class="section">
-      <p class="section-subtitle">Profile</p>
-      <p class="section-prose">
-        Your display name and email address. A new email address is saved
-        at once and sent a verification code.
+  <div class="settings">
+    {/* Owner of every disclosure checkbox: Enter on one submits this inert form, never the form it sits inside. */}
+    <form id="disclosures" method="dialog" data-astro-reload hidden></form>
+    <a class="back-link" href="/" data-astro-reload>← Home</a>
+    <header class="page-header">
+      <h1 class="page-title">Account</h1>
+      <p class="page-lede">
+        How you sign in, your second step, and how to get back in for <strong>{displayName}</strong>.
       </p>
-      <form method="POST" action={ui.action} class="settings-form">
-        <input type="hidden" name="csrf_token" value={csrf} />
-        <input type="hidden" name="method" value="profile" />
-        <input type="hidden" name="traits.username" value={traits.username} />
-        <div class="field">
-          <label for="username-readonly">Username</label>
-          <input id="username-readonly" type="text" value={traits.username} readonly aria-describedby="username-hint" />
-          <p id="username-hint" class="field-hint">Only an administrator can change your username.</p>
-          {usernameMessages.map((m) => (
-            <div class={`notice notice-${m.type === 'error' ? 'danger' : 'warning'}`}>{m.text}</div>
-          ))}
+    </header>
+
+    <div class="settings-status" role="status" aria-label="Account security summary">
+      <span class={`badge ${status.twoStep ? '' : 'badge-warning'}`}>Two-step {status.twoStep ? 'on' : 'off'}</span>
+      <span class={`badge ${status.passkeys > 0 ? '' : 'badge-warning'}`}>{status.passkeys} {status.passkeys === 1 ? 'passkey' : 'passkeys'}</span>
+      <a class={`badge ${status.backupCodes || !status.twoStep ? '' : 'badge-warning'}`} href="#recovery">Backup codes {status.backupCodes ? 'saved' : 'not saved'}</a>
+      {status.emailUnverified && <span class="badge badge-warning">Unverified email</span>}
+      {reauth && (
+        <span class="status-note" data-testid="reauth-notice">
+          It has been a while, so changes ask you to confirm it's you first. <a href={reauthHref} data-astro-reload>Confirm it's you</a>
+        </span>
+      )}
+    </div>
+
+    <div class="settings-notices" role="status">
+      {ui.messages?.filter((m) => !(devFlash && m.type === 'success')).map((m) => (
+        <div class={`notice notice-${kind(m.type)}`} data-flow-success={m.type === 'success' ? '' : undefined}>{messageText(m)}</div>
+      ))}
+      {signOutError && <div class="notice notice-danger">{signOutError}</div>}
+      {status.passkeys === 1 && (
+        <div class="notice notice-warning">You have one passkey. Add one on your other devices too, so losing this one doesn't lock you out.</div>
+      )}
+      {status.emailUnverified && (
+        <div class="notice notice-warning">
+          Your email address is not verified yet. Verify it so you can get back in if you lose a device.
+          <div class="actions"><a class="button button-secondary button-sm" href={verifyHref} data-astro-reload>Send verification code</a></div>
         </div>
-        {emailLocked && (
+      )}
+    </div>
+    {welcome && (
+      <section class="panel welcome" aria-labelledby="h-welcome">
+        <p class="welcome-step">Your first step</p>
+        <h2 id="h-welcome">Add a passkey</h2>
+        <p>Next time, sign in with your fingerprint, face or screen lock. No code to find, nothing to remember.</p>
+        <form method="POST" enctype="application/x-www-form-urlencoded" action={ui.action} class="settings-form wide">
+          <input type="hidden" name="csrf_token" value={csrf} />
+          <input type="hidden" name="method" value="passkey" />
+          {nodesByGroup(nodes, 'passkey').map((n) => {
+            const a = asInput(n);
+            if (a?.type === 'hidden') return <input type="hidden" name={a.name} value={String(a.value ?? '')} />;
+            if (a?.type === 'button') {
+              return (
+                <button class="button button-primary welcome-btn" type="button" name={a.name} value={String(a.value ?? '')} onclick={safeOnclick(a)}>
+                  Add a passkey
+                </button>
+              );
+            }
+            return null;
+          })}
+        </form>
+      </section>
+    )}
+    <div class="cards">
+      <section class="panel card" id="sign-in" data-card aria-labelledby="h-signin">
+        <h2 id="h-signin">Sign-in</h2>
+        <div class="card-flash" data-flash tabindex="-1" role="status">{null}</div>
+
+        {has('passkey') && (
+          <div class="group">
+            <h3>Passkeys <span class="badge">Recommended</span></h3>
+            <p>Sign in with your fingerprint, face or screen lock. Add one on each device you use.</p>
+            <form method="POST" enctype="application/x-www-form-urlencoded" action={ui.action} class="settings-form wide">
+              <input type="hidden" name="csrf_token" value={csrf} />
+              <input type="hidden" name="method" value="passkey" />
+              {nodesByGroup(nodes, 'passkey').map((n) => {
+                const a = asInput(n);
+                if (a?.type === 'hidden') return <input type="hidden" name={a.name} value={String(a.value ?? '')} />;
+                return null;
+              })}
+              <CredentialRows items={passkeys} kind="passkey" noun="passkey" fallbackName="Passkey" rename={passkeys.length > 0} renameError={renameError} reauth={reauth} reauthHref={reauthHref} />
+              {nodesByGroup(nodes, 'passkey').map((n) => {
+                const a = asInput(n);
+                // safeOnclick validates against KNOWN_TRIGGERS; never emit a.onclick raw.
+                if (a?.type === 'button' && !welcome) {
+                  return (
+                    <div class="form-actions">
+                      <button class="button button-primary button-sm" type="button" name={a.name} value={String(a.value ?? '')} onclick={safeOnclick(a)}>
+                        {passkeys.length > 0 ? 'Add another passkey' : (n.meta?.label?.text ?? 'Add a passkey')}
+                      </button>
+                    </div>
+                  );
+                }
+                return null;
+              })}
+            </form>
+            {passkeys.filter((p) => p.removable).map((p) => <ActionForm id={`rm-passkey-${p.id}`} action={ui.action} csrf={csrf} method="passkey" />)}
+            {passkeys.map((p, i) => (
+              <form id={`rename-${i}`} method="POST" enctype="application/x-www-form-urlencoded" action="/auth/passkey-name" hidden>
+                <input type="hidden" name="csrf_token" value={renameTokens[i]} />
+                <input type="hidden" name="credential_id" value={p.id} />
+              </form>
+            ))}
+          </div>
+        )}
+
+        {has('password') && (
+          <div class="group">
+            <h3>Password</h3>
+            <p>Only for places a passkey can't be used. Changing it signs out your other devices.</p>
+            <form method="POST" enctype="application/x-www-form-urlencoded" action={ui.action} class="settings-form">
+              <input type="hidden" name="csrf_token" value={csrf} />
+              <input type="hidden" name="method" value="password" />
+              <input type="text" class="sr-only" readonly tabindex="-1" aria-hidden="true" autocomplete="username" value={traits.username} />
+              <input type="checkbox" form="disclosures" class="disclose cb-setup" id="pw-open" checked={pwOpen} />
+              <div class="form-actions">
+                <label for="pw-open" class="button button-secondary button-sm toggle-label lbl-setup"><span class="on-closed">Change password</span><span class="on-open">Cancel</span></label>
+              </div>
+              <div class="panel-block panel-setup">
+                {nodesByGroup(nodes, 'password').map((n) => {
+                  const a = asInput(n);
+                  if (!a) return null;
+                  if (a.type === 'hidden') return <input type="hidden" name={a.name} value={String(a.value ?? '')} />;
+                  if (a.type === 'submit') {
+                    return (
+                      <div class="form-actions">
+                        <button class="button button-primary button-sm" type="submit" name={a.name} value={String(a.value ?? '')}>Save new password</button>
+                      </div>
+                    );
+                  }
+                  return (
+                    <div class="field">
+                      <label for="new-password">{n.meta?.label?.text ?? 'New password'}</label>
+                      <input id="new-password" name={a.name} type="password" autocomplete="new-password" required={a.required} />
+                      {n.messages?.map((m) => <div class={`notice notice-${kind(m.type)}`}>{messageText(m)}</div>)}
+                    </div>
+                  );
+                })}
+              </div>
+            </form>
+          </div>
+        )}
+      </section>
+
+      <section class="panel card" id="two-step" data-card aria-labelledby="h-2sv">
+        <h2 id="h-2sv">Two-step verification</h2>
+        <div class="card-flash" data-flash tabindex="-1" role="status">{devFlash && devFlashCard === 'two-step' && <div class="notice notice-success">{devFlash}{LOST_KEYS.has(dev?.flash ?? '') && <> Lost it? <a href="#signout-all" data-open="signout-all">Also sign out everywhere</a></>}</div>}</div>
+        <p class="lede">A second check keeps others out even if they learn your password. Backup codes are under <a href="#recovery">Recovery</a>.</p>
+        {showBackupPrompt && (
           <>
-            <input type="hidden" name="traits.email" value={traits.email} />
-            {traits.recoveryEmail && <input type="hidden" name="traits.recoveryEmail" value={traits.recoveryEmail} />}
-            <div class="field">
-              <label for="email-readonly">Email</label>
-              <input id="email-readonly" type="text" value={traits.email} readonly aria-describedby="email-hint" />
-              {traits.recoveryEmail && (
-                <>
-                  <label for="recovery-email-readonly">Recovery email</label>
-                  <input id="recovery-email-readonly" type="text" value={traits.recoveryEmail} readonly aria-describedby="email-hint" />
-                </>
-              )}
-              <p id="email-hint" class="field-hint">
-                To change an email address, sign in again with your passkey or password.{' '}
-                <a href={changeEmailHref}>Change email address</a>
-              </p>
+            <input type="checkbox" form="disclosures" class="disclose cb-dismiss" id="backup-dismiss" aria-label="Dismiss the backup codes reminder" />
+            <div class="notice notice-warning prompt" data-testid="backup-prompt">
+              <strong>Save your backup codes now.</strong> If you lose your phone or key, they are the way back in.
+              <form method="POST" enctype="application/x-www-form-urlencoded" action={ui.action} class="actions">
+                <input type="hidden" name="csrf_token" value={csrf} />
+                <input type="hidden" name="method" value="lookup_secret" />
+                <button class="button button-primary button-sm" type="submit" name="lookup_secret_regenerate" value="true">Get backup codes</button>
+                <label for="backup-dismiss" class="button button-secondary button-sm toggle-label">Later</label>
+              </form>
             </div>
           </>
         )}
-        <FlowNodes
-          nodes={profileNodes}
-          group="profile"
-          buttonClass="button button-primary"
-          submitLabel="Save changes"
-          wrapActions
-          passDisabled
-        />
-      </form>
-    </section>
-  )}
 
-  {hasPasskey && (
-    <section class="section">
-      <p class="section-subtitle passkey-subtitle">
-        Passkeys <span class="badge">recommended</span>
-      </p>
-      <p class="section-prose">
-        Register a passkey on each device you use. With a passkey,
-        signing in is one tap, no password to remember.
-      </p>
-      <form method="POST" action={ui.action} class="settings-form">
-        <input type="hidden" name="csrf_token" value={csrf} />
-        <input type="hidden" name="method" value="passkey" />
-        <FlowNodes
-          nodes={ui.nodes}
-          group="passkey"
-          buttonClass="button button-secondary"
-          submitLabel="Register a passkey"
-          wrapActions
-          passOnclick
-          passRequired={false}
-        />
-      </form>
-    </section>
-  )}
+        {has('totp') && (
+          <div class="group">
+            <h3>Authenticator app</h3>
+            <form method="POST" enctype="application/x-www-form-urlencoded" action={ui.action} class="settings-form wide">
+              <input type="hidden" name="csrf_token" value={csrf} />
+              <input type="hidden" name="method" value="totp" />
+              {totp.enrolled && totp.unlink && (
+                <>
+                  <p>An app on your phone shows a new 6-digit code every 30 seconds.</p>
+                  <ul class="items">
+                    <li>
+                      <div class="item-id"><span class="item-name">Your app</span><span class="badge">On</span></div>
+                      <input type="checkbox" form="disclosures" class="disclose cb-replace" id="totp-replace" aria-label="Replace authenticator app" />
+                      <input type="checkbox" form="disclosures" class="disclose cb-remove" id="totp-remove" aria-label="Remove authenticator app" />
+                      <div class="item-actions">
+                        <label for="totp-replace" class="button button-secondary button-sm toggle-label lbl-replace"><span class="on-closed">Replace</span></label>
+                        <label for="totp-remove" class="button button-secondary button-sm toggle-label lbl-remove"><span class="on-closed">Remove</span></label>
+                      </div>
+                      <div class="panel-row panel-replace">
+                        {keepSecondFactor ? (
+                          <span>{SECOND_FACTOR_KEEP} Add a security key first, then replace the app.</span>
+                        ) : (
+                          <>
+                            <span>Replace the app? The current one stops working, then you scan a new code.</span>
+                            <button type="submit" form="totp-unlink" name={totp.unlink.name} value={totp.unlink.value} class="button button-danger button-sm" data-flash-key="totp_replace">Replace app</button>
+                            <ConfirmCues reauth={reauth} reauthHref={reauthHref} lost />
+                          </>
+                        )}
+                        <label for="totp-replace" class="button button-secondary button-sm toggle-label">Keep it</label>
+                      </div>
+                      <div class="panel-row panel-remove">
+                        {keepSecondFactor ? (
+                          <span>{SECOND_FACTOR_KEEP} Add a security key first, then remove the app.</span>
+                        ) : (
+                          <>
+                            <span>Remove the app? You won't be able to use it for the second step anymore.</span>
+                            <button type="submit" form="totp-unlink" name={totp.unlink.name} value={totp.unlink.value} class="button button-danger button-sm" aria-label="Remove authenticator app">Remove app</button>
+                            <ConfirmCues reauth={reauth} reauthHref={reauthHref} lost />
+                          </>
+                        )}
+                        <label for="totp-remove" class="button button-secondary button-sm toggle-label">Keep it</label>
+                      </div>
+                    </li>
+                  </ul>
+                </>
+              )}
+              {!totp.enrolled && (
+                <>
+                  <input type="checkbox" form="disclosures" class="disclose cb-setup" id="totp-setup" checked={setupOpen} />
+                  <p class="when-closed">Not set up. Get an authenticator app (Google Authenticator, Microsoft Authenticator or Aegis); it shows a new 6-digit code every 30 seconds.</p>
+                  <div class="form-actions when-closed">
+                    <label for="totp-setup" class="button button-secondary button-sm toggle-label lbl-setup">Set up authenticator app</label>
+                  </div>
+                  <ol class="steps panel-block panel-setup">
+                    {totp.qr && (
+                      <li>
+                        <h4 tabindex="-1">Scan the code</h4>
+                        <p>Scan this into your authenticator app. Scan it into every app you want to use now; each shows the same codes.</p>
+                        <p class="field-hint narrow-only">On this phone? Copy the setup key below into your app.</p>
+                        <div class="totp-qr">
+                          <img src={totp.qr.src} alt={totp.qr.alt} width={totp.qr.width} height={totp.qr.height} />
+                        </div>
+                        {totp.secret && (
+                          <details data-open-narrow>
+                            <summary>Can't scan? Show setup key</summary>
+                            <div class="secret-row">
+                              <code class="totp-secret-value mono" id="totp-secret">{groupKey(totp.secret)}</code>
+                              <button type="button" class="button button-secondary button-sm" data-copy="totp-secret" hidden>Copy key</button>
+                            </div>
+                            <p class="field-hint">Type this key into your app instead. Spaces don't matter.</p>
+                          </details>
+                        )}
+                      </li>
+                    )}
+                    {totp.codeInput && (
+                      <li>
+                        <h4 tabindex="-1">Enter the 6-digit code</h4>
+                        <p>Type the code your app shows now to finish.</p>
+                        <div class={`field ${totp.codeMessages.length ? 'bad' : ''}`}>
+                          <label for="totp-code">6-digit code</label>
+                          <input
+                            id="totp-code"
+                            class="codeinput"
+                            name={totp.codeInput.name}
+                            type="text"
+                            inputmode="numeric"
+                            autocomplete="one-time-code"
+                            maxlength="12"
+                            pattern="[0-9]{6}"
+                            title="Six digits, like 123456"
+                            placeholder="000000"
+                            required={totp.codeInput.required}
+                            aria-invalid={totp.codeMessages.length ? 'true' : undefined}
+                            aria-describedby={totp.codeMessages.length ? 'totp-code-error' : undefined}
+                          />
+                          {totp.codeMessages.map((m) => (
+                            <p id="totp-code-error" class="field-error" role="alert">{messageText(m)} The QR code is still good.</p>
+                          ))}
+                        </div>
+                        {totp.save && (
+                          <div class="form-actions">
+                            <button class="button button-primary button-sm" type="submit" name={totp.save.name} value={totp.save.value}>Verify and add</button>
+                            <label for="totp-setup" class="button button-secondary button-sm toggle-label lbl-setup">Cancel</label>
+                          </div>
+                        )}
+                      </li>
+                    )}
+                  </ol>
+                </>
+              )}
+            </form>
+            {totp.enrolled && totp.unlink && <ActionForm id="totp-unlink" action={ui.action} csrf={csrf} method="totp" />}
+          </div>
+        )}
 
-  {hasPassword && (
-    <section class="section">
-      <p class="section-subtitle">Password (legacy clients only)</p>
-      <p class="section-prose">
-        Change the password used as a fallback when a passkey isn't
-        available.
-      </p>
-      <form method="POST" action={ui.action} class="settings-form">
-        <input type="hidden" name="csrf_token" value={csrf} />
-        <input type="hidden" name="method" value="password" />
-        <FlowNodes
-          nodes={ui.nodes}
-          group="password"
-          buttonClass="button button-secondary"
-          submitLabel="Change password"
-          wrapActions
-          passValue={false}
-          defaultAutocomplete="new-password"
-        />
-      </form>
-    </section>
-  )}
-
-  {hasTotp && (
-    <section class="section">
-      <p class="section-subtitle">Authenticator app</p>
-      <p class="section-prose">
-        Set up a time-based one-time password (TOTP) app such as Google
-        Authenticator or 1Password as a second factor. Scan the QR code or
-        enter the secret manually, then verify with the six-digit code your
-        app shows.
-      </p>
-      <form method="POST" action={ui.action} class="settings-form">
-        <input type="hidden" name="csrf_token" value={csrf} />
-        <input type="hidden" name="method" value="totp" />
-        {nodesByGroup(ui.nodes, 'totp').map((n) => {
-          // img node: QR code
-          if (n.attributes.node_type === 'img') {
-            const a = n.attributes as NodeImageAttributes;
-            return (
-              <div class="totp-qr">
-                <img
-                  src={a.src}
-                  alt={n.meta?.label?.text ?? 'Authenticator app QR code'}
-                  width={a.width ?? 200}
-                  height={a.height ?? 200}
-                />
-              </div>
-            );
-          }
-          // text node: the raw secret for manual entry
-          if (n.attributes.node_type === 'text') {
-            const a = n.attributes as NodeTextAttributes;
-            return (
-              <div class="totp-secret">
-                <p class="totp-secret-label">{n.meta?.label?.text ?? 'Secret key'}</p>
-                <code class="totp-secret-value mono">{a.text?.text ?? ''}</code>
-              </div>
-            );
-          }
-          // input nodes (totp_code + submit)
-          const inp = asInput(n);
-          if (!inp) return null;
-          if (inp.type === 'hidden') {
-            return <input type="hidden" name={inp.name} value={String(inp.value ?? '')} />;
-          }
-          if (inp.type === 'submit') {
-            return (
+        {has('webauthn') && (
+          <div class="group">
+            <h3>Security keys</h3>
+            <p>A small key you plug in or tap. Name each one so you recognise it.</p>
+            <form method="POST" enctype="application/x-www-form-urlencoded" action={ui.action} class="settings-form wide">
+              <input type="hidden" name="csrf_token" value={csrf} />
+              <input type="hidden" name="method" value="webauthn" />
+              <CredentialRows items={keys} kind="webauthn" noun="security key" fallbackName="Security key" reauth={reauth} reauthHref={reauthHref} />
+              <input type="checkbox" form="disclosures" class="disclose cb-setup" id="key-add" checked={nodesByGroup(nodes, 'webauthn').some((n) => (n.messages?.length ?? 0) > 0)} />
               <div class="form-actions">
-                <button class="button button-secondary" type="submit" name={inp.name} value={String(inp.value ?? '')}>
-                  {n.meta?.label?.text ?? 'Save'}
-                </button>
+                <label for="key-add" class="button button-secondary button-sm toggle-label lbl-setup"><span class="on-closed">{keys.length > 0 ? 'Add another security key' : 'Add a security key'}</span><span class="on-open">Cancel</span></label>
               </div>
-            );
-          }
-          // totp_code text input
-          const id = inp.name.replace(/[^a-zA-Z0-9]+/g, '-');
-          return (
-            <div class="field">
-              <label for={id}>{n.meta?.label?.text ?? 'Verification code'}</label>
-              <input
-                id={id}
-                name={inp.name}
-                type="text"
-                inputmode="numeric"
-                autocomplete="one-time-code"
-                required={inp.required}
-                placeholder="123456"
-              />
-            </div>
-          );
-        })}
-      </form>
-    </section>
-  )}
+              <div class="panel-block panel-setup">
+                {nodesByGroup(nodes, 'webauthn').map((n) => {
+                  // script nodes are collected by scriptNodes() and rendered at page bottom
+                  if (n.attributes.node_type === 'script') return null;
+                  const a = asInput(n);
+                  if (!a || a.name === 'webauthn_remove') return null;
+                  if (a.type === 'hidden') return <input type="hidden" name={a.name} value={String(a.value ?? '')} />;
+                  if (a.type === 'button' || a.type === 'submit') {
+                    return (
+                      <div class="form-actions">
+                        <button class="button button-primary button-sm" type={a.type} name={a.name} value={String(a.value ?? '')} onclick={safeOnclick(a)}>
+                          Add this key
+                        </button>
+                      </div>
+                    );
+                  }
+                  return (
+                    <div class="field">
+                      <label for="webauthn-register-displayname">Name for the new key</label>
+                      <input id="webauthn-register-displayname" name={a.name} type={a.type} placeholder="e.g. Spare key in the drawer" value={a.value !== undefined ? String(a.value) : undefined} required={a.required} />
+                      {n.messages?.map((m) => <div class={`notice notice-${kind(m.type)}`}>{messageText(m)}</div>)}
+                    </div>
+                  );
+                })}
+              </div>
+            </form>
+            {keys.filter((k) => k.removable).map((k) => <ActionForm id={`rm-webauthn-${k.id}`} action={ui.action} csrf={csrf} method="webauthn" />)}
+          </div>
+        )}
+      </section>
 
-  {hasLookupSecret && (
-    <section class="section">
-      <p class="section-subtitle">Backup codes</p>
-      <p class="section-prose">
-        Generate single-use backup recovery codes. Store them somewhere safe —
-        if you lose access to every other sign-in method, a backup code is the
-        last resort.
-      </p>
-      <form method="POST" action={ui.action} class="settings-form">
-        <input type="hidden" name="csrf_token" value={csrf} />
-        <input type="hidden" name="method" value="lookup_secret" />
-        {nodesByGroup(ui.nodes, 'lookup_secret').map((n) => {
-          // Text nodes carry the backup codes in attributes.text.text; asInput() drops them.
-          if (n.attributes.node_type === 'text') {
-            const a = n.attributes as NodeTextAttributes;
-            return (
-              <div class="lookup-codes">
-                <p class="lookup-codes-label">
-                  {n.meta?.label?.text ?? 'Backup codes — save these somewhere safe'}
+      <section class="panel card" id="recovery" data-card aria-labelledby="h-rec">
+        <h2 id="h-rec">Recovery</h2>
+        <div class="card-flash" data-flash tabindex="-1" role="status">{devFlash && devFlashCard === 'recovery' && <div class="notice notice-success">{devFlash}</div>}</div>
+        <p class="lede">For the day a phone is lost or broken.</p>
+
+        {has('lookup_secret') && (
+          <div class="group">
+            <h3>Backup codes <span class={`badge ${status.backupCodes || !status.twoStep ? '' : 'badge-warning'}`}>{status.backupCodes ? 'Saved' : 'Not saved'}</span></h3>
+            <p>{status.twoStep || lookup.enrolled ? 'Single-use codes for when nothing else works. Print or store them safely.' : 'Single-use codes for when a second step is lost. Add a passkey or an authenticator app first, then get your codes.'}</p>
+            <form method="POST" enctype="application/x-www-form-urlencoded" action={ui.action} class="settings-form wide">
+              <input type="hidden" name="csrf_token" value={csrf} />
+              <input type="hidden" name="method" value="lookup_secret" />
+              {lookup.list.length > 0 && (
+                <div class="lookup-codes" id="lookup-codes">
+                  <ol class="lookup-grid" data-testid="backup-codes">
+                    {lookup.list.map((c) => (
+                      <li class={c.used ? 'used' : ''}>{c.used ? <span class="mono">used</span> : <code class="mono">{c.code}</code>}</li>
+                    ))}
+                  </ol>
+                  <div class="form-actions" data-codes-tools hidden>
+                    <button type="button" class="button button-secondary button-sm" data-copy-codes="lookup-codes">Copy codes</button>
+                    <button type="button" class="button button-secondary button-sm" data-print-codes>Print</button>
+                    <button type="button" class="button button-secondary button-sm" data-hide-codes aria-expanded="true">Hide codes</button>
+                  </div>
+                  {lookupConfirm && (
+                    <div class="notice notice-warning">These codes only work after you press <strong>I've saved these codes</strong>. Until then, the old ones stay in use.</div>
+                  )}
+                </div>
+              )}
+              {lookupOff && <input type="checkbox" form="disclosures" class="disclose cb-remove" id="lookup-off" aria-label="Turn off backup codes" />}
+              <div class="form-actions">
+                {nodesByGroup(nodes, 'lookup_secret').map((n) => {
+                  const a = asInput(n);
+                  if (!a || a.name === 'lookup_secret_disable') return null;
+                  if (a.type === 'hidden') return <input type="hidden" name={a.name} value={String(a.value ?? '')} />;
+                  if (a.type === 'submit' || a.type === 'button') {
+                    const primary = a.name === 'lookup_secret_confirm' || (a.name === 'lookup_secret_regenerate' && !lookup.enrolled && status.twoStep);
+                    return (
+                      <button
+                        class={`button ${primary ? 'button-primary' : 'button-secondary'} button-sm`}
+                        disabled={a.name === 'lookup_secret_regenerate' && !lookup.enrolled && !status.twoStep}
+                        type={a.type}
+                        name={a.name}
+                        value={String(a.value ?? '')}
+                      >
+                        {lookupLabel[a.name] ?? n.meta?.label?.text ?? 'Save'}
+                      </button>
+                    );
+                  }
+                  // Any remaining labeled inputs (e.g. a confirm checkbox).
+                  const id = a.name.replace(/[^a-zA-Z0-9]+/g, '-');
+                  return (
+                    <div class="field">
+                      <label for={id}>{n.meta?.label?.text ?? a.name}</label>
+                      <input id={id} name={a.name} type={a.type} value={String(a.value ?? '')} />
+                    </div>
+                  );
+                })}
+                {lookupOff && (
+                  <label for="lookup-off" class="button button-secondary button-sm toggle-label lbl-remove"><span class="on-closed">Turn off</span></label>
+                )}
+              </div>
+              {lookupOff && (
+                <div class="panel-row panel-remove">
+                  <span>Turn off backup codes? Any you saved stop working.</span>
+                  <button type="submit" form="lookup-off-form" name={lookupOff.name} value={String(lookupOff.value ?? '')} class="button button-danger button-sm">Turn off backup codes</button>
+                  <label for="lookup-off" class="button button-secondary button-sm toggle-label">Keep it</label>
+                </div>
+              )}
+            </form>
+            {lookupOff && <ActionForm id="lookup-off-form" action={ui.action} csrf={csrf} method="lookup_secret" />}
+          </div>
+        )}
+
+        {has('profile') && hasNode('traits.recoveryEmail') && (
+          <div class="group">
+            <h3>Recovery email</h3>
+            <p>Optional second address, used if {traits.email} stops working.</p>
+            <form method="POST" enctype="application/x-www-form-urlencoded" action={ui.action} class="settings-form">
+              <input type="hidden" name="csrf_token" value={csrf} />
+              <input type="hidden" name="method" value="profile" />
+              <input type="hidden" name="traits.username" value={traits.username} />
+              {hasNode('traits.displayName') && <input type="hidden" name="traits.displayName" value={value('traits.displayName')} />}
+              <input type="hidden" name="traits.email" value={value('traits.email') || traits.email} />
+              {emailLocked ? (
+                <>
+                  <input type="hidden" name="traits.recoveryEmail" value={value('traits.recoveryEmail')} />
+                  <div class="static">
+                    <span class="static-label" id="recovery-email-label">Recovery email address</span>
+                    <span class="static-value" aria-labelledby="recovery-email-label">{value('traits.recoveryEmail') || <span class="static-empty">None yet</span>}</span>
+                  </div>
+                  <div class="form-actions"><a class="button button-secondary button-sm" href={reauthHref} data-astro-reload>{value('traits.recoveryEmail') ? 'Change recovery email' : 'Add a recovery email'}</a></div>
+                </>
+              ) : (
+                <>
+                  <div class="field">
+                    <label for="recovery-email">Recovery email address</label>
+                    <input id="recovery-email" name="traits.recoveryEmail" type="email" value={value('traits.recoveryEmail')} />
+                    {nodeMessages('traits.recoveryEmail').map((m) => <div class={`notice notice-${kind(m.type)}`}>{messageText(m)}</div>)}
+                  </div>
+                  <div class="form-actions"><button class="button button-secondary button-sm" type="submit" name="method" value="profile">Save email</button></div>
+                </>
+              )}
+            </form>
+          </div>
+        )}
+      </section>
+
+      {has('profile') && (
+        <section class="panel card" id="profile" data-card aria-labelledby="h-prof">
+          <h2 id="h-prof">Profile</h2>
+          <div class="card-flash" data-flash tabindex="-1" role="status">{null}</div>
+          <p class="lede">Your name and email. A new address is sent a verification code.</p>
+          <form method="POST" enctype="application/x-www-form-urlencoded" action={ui.action} class="settings-form">
+            <input type="hidden" name="csrf_token" value={csrf} />
+            <input type="hidden" name="method" value="profile" />
+            <input type="hidden" name="traits.username" value={traits.username} />
+            {hasNode('traits.recoveryEmail') && <input type="hidden" name="traits.recoveryEmail" value={value('traits.recoveryEmail')} />}
+            {hasNode('traits.displayName') && (
+              <div class="field">
+                <label for="display-name">Display name</label>
+                <input id="display-name" name="traits.displayName" type="text" value={value('traits.displayName')} />
+                {nodeMessages('traits.displayName').map((m) => <div class={`notice notice-${kind(m.type)}`}>{m.text}</div>)}
+              </div>
+            )}
+            <div class="field">
+              <label for="username-readonly">Username</label>
+              <input id="username-readonly" type="text" value={traits.username} readonly aria-describedby="username-hint" />
+              <p id="username-hint" class="field-hint">Only a household admin can change your username.</p>
+              {nodeMessages('traits.username').map((m) => <div class={`notice notice-${kind(m.type)}`}>{m.text}</div>)}
+            </div>
+            <div class="field">
+              <label for={emailLocked ? 'email-readonly' : 'email'}>Email</label>
+              <div class="email-row">
+                {emailLocked ? (
+                  <>
+                    <input type="hidden" name="traits.email" value={traits.email} />
+                    <input id="email-readonly" type="text" value={traits.email} readonly aria-describedby="email-hint" />
+                  </>
+                ) : (
+                  <input id="email" name="traits.email" type="email" value={value('traits.email') || traits.email} required />
+                )}
+                {verified !== null && <span class={`badge ${verified ? '' : 'badge-warning'}`}>{verified ? 'Verified' : 'Unverified'}</span>}
+              </div>
+              {verified === false && (
+                <div class="actions"><a class="button button-secondary button-sm" href={verifyHref} data-astro-reload>Send verification code</a></div>
+              )}
+              {emailLocked && (
+                <p id="email-hint" class="field-hint">
+                  To change an email address, sign in again with your passkey or password.{' '}
+                  <a href={reauthHref} data-astro-reload>Change email address</a>
                 </p>
-                <code class="lookup-codes-value mono" data-testid="backup-codes">
-                  {a.text?.text ?? ''}
-                </code>
-              </div>
-            );
-          }
-          const inp = asInput(n);
-          if (!inp) return null;
-          if (inp.type === 'hidden') {
-            return <input type="hidden" name={inp.name} value={String(inp.value ?? '')} />;
-          }
-          if (inp.type === 'submit' || inp.type === 'button') {
-            return (
-              <div class="form-actions">
-                <button
-                  class="button button-secondary"
-                  type={inp.type}
-                  name={inp.name}
-                  value={String(inp.value ?? '')}
-                >
-                  {n.meta?.label?.text ?? 'Generate backup codes'}
-                </button>
-              </div>
-            );
-          }
-          // Any remaining labeled inputs (e.g. confirm checkbox nodes).
-          const id = inp.name.replace(/[^a-zA-Z0-9]+/g, '-');
-          return (
-            <div class="field">
-              <label for={id}>{n.meta?.label?.text ?? inp.name}</label>
-              <input id={id} name={inp.name} type={inp.type} value={String(inp.value ?? '')} />
+              )}
+              {nodeMessages('traits.email').map((m) => <div class={`notice notice-${kind(m.type)}`}>{messageText(m)}</div>)}
             </div>
-          );
-        })}
-      </form>
-    </section>
-  )}
-
-  {hasWebAuthn && (
-    <section class="section">
-      <p class="section-subtitle">Security key (legacy 2FA)</p>
-      <p class="section-prose">
-        Register a hardware security key (YubiKey or similar) as a second
-        factor. This is separate from passkeys — use it if you want a
-        dedicated physical token alongside your passkey.
-      </p>
-      <form method="POST" action={ui.action} class="settings-form">
-        <input type="hidden" name="csrf_token" value={csrf} />
-        <input type="hidden" name="method" value="webauthn" />
-        {nodesByGroup(ui.nodes, 'webauthn').map((n) => {
-          // script nodes are collected by scriptNodes() and rendered at page bottom
-          if (n.attributes.node_type === 'script') return null;
-          const inp = asInput(n);
-          if (!inp) return null;
-          if (inp.type === 'hidden') {
-            return <input type="hidden" name={inp.name} value={String(inp.value ?? '')} />;
-          }
-          // safeOnclick validates against KNOWN_TRIGGERS; never emit inp.onclick raw.
-          if (inp.type === 'button' || inp.type === 'submit') {
-            return (
-              <div class="form-actions">
-                <button
-                  class="button button-secondary"
-                  type={inp.type}
-                  name={inp.name}
-                  value={String(inp.value ?? '')}
-                  onclick={safeOnclick(inp)}
-                >
-                  {n.meta?.label?.text ?? 'Add security key'}
-                </button>
-              </div>
-            );
-          }
-          // Remove buttons (webauthn_remove) are also submit nodes
-          const id = inp.name.replace(/[^a-zA-Z0-9]+/g, '-');
-          return (
-            <div class="field">
-              <label for={id}>{n.meta?.label?.text ?? inp.name}</label>
-              <input
-                id={id}
-                name={inp.name}
-                type={inp.type}
-                value={inp.value !== undefined ? String(inp.value) : undefined}
-                required={inp.required}
-              />
+            <div class="form-actions">
+              <button class="button button-primary button-sm" type="submit" name="method" value="profile">Save profile</button>
             </div>
-          );
-        })}
-      </form>
-    </section>
-  )}
+          </form>
+        </section>
+      )}
 
-  <section class="section">
-    <p class="section-subtitle">Sessions</p>
-    <p class="section-prose">
-      Sign out of this device, or revoke every active session at once.
-      "Sign out everywhere" cuts your Kratos sessions AND Hydra's
-      remembered-login window, so no app can silently re-issue a token.
-    </p>
-    {signOutError && (
-      <div class="notice notice-danger">{signOutError}</div>
-    )}
-    <form method="POST" action="/auth/settings" class="settings-form">
-      <input type="hidden" name="action" value="sign-out-everywhere" />
-      <input type="hidden" name="csrf_token" value={csrfSignOut} />
-      <div class="form-actions">
-        <button class="button button-danger" type="submit">Sign out everywhere</button>
-      </div>
-    </form>
-    {!logoutInfo && (
-      <p class="muted text-sm">Local logout endpoint unavailable; the revoke still runs.</p>
-    )}
-  </section>
+      <section class="panel card card-wide" id="sessions" data-card aria-labelledby="h-ses">
+        <h2 id="h-ses">Sessions and apps</h2>
+        <div class="card-flash" data-flash tabindex="-1" role="status">{null}</div>
+        <div class="group">
+          <h3>Sessions</h3>
+          <p>"Sign out everywhere" signs out every device and app, so none can quietly sign you back in.</p>
+          <form id="signout-form" method="POST" enctype="application/x-www-form-urlencoded" action="/auth/settings" data-astro-reload hidden>
+            <input type="hidden" name="action" value="sign-out-everywhere" />
+            <input type="hidden" name="csrf_token" value={csrfSignOut} />
+          </form>
+          <div class="settings-form">
+            <input type="checkbox" form="disclosures" class="disclose cb-remove" id="signout-all" aria-label="Sign out everywhere" />
+            <div class="form-actions">
+              <label for="signout-all" class="button button-danger button-sm toggle-label lbl-remove"><span class="on-closed">Sign out everywhere</span></label>
+            </div>
+            <div class="panel-row panel-remove">
+              <span>Sign out of every device and app, this one included?</span>
+              <button class="button button-danger button-sm" type="submit" form="signout-form">Sign out everywhere</button>
+              <label for="signout-all" class="button button-secondary button-sm toggle-label">Keep it</label>
+            </div>
+          </div>
+          {!logoutInfo && <p class="field-hint">Local logout endpoint unavailable; the revoke still runs.</p>}
+        </div>
+        <div class="group">
+          <h3>Your apps {isAdmin && <span class="badge badge-accent">Admin</span>}</h3>
+          {yourApps.length > 0 ? (
+            <div class="kv-chips" style="margin-top: var(--space-2)">
+              {yourApps.map((t) => <span class="badge badge-muted">{t.name}</span>)}
+            </div>
+          ) : (
+            <p>No apps yet. A household admin can add you.</p>
+          )}
+        </div>
+      </section>
+    </div>
 
-  <section class="section">
-    <p class="section-subtitle">Membership</p>
-    <dl class="kv">
-      <div>
-        <dt>Username</dt>
-        <dd class="mono">{traits.username}</dd>
-      </div>
-      <div>
-        <dt>Email</dt>
-        <dd class="mono">{traits.email}</dd>
-      </div>
-      <div>
-        <dt>Identity</dt>
-        <dd class="kv-chips">
-          {identityGroups.length
-            ? identityGroups.map((g) => <span class="badge">{g}</span>)
-            : <span class="muted text-sm">none</span>}
-        </dd>
-      </div>
-      <div>
-        <dt>App access</dt>
-        <dd class="kv-chips">
-          {accessGroups.length
-            ? accessGroups.map((g) => <span class="badge badge-muted">{g}</span>)
-            : <span class="muted text-sm">none</span>}
-        </dd>
-      </div>
-    </dl>
-  </section>
-
-  <p style="margin-top: var(--space-7);">
-    <a href="/" class="back-link mono">Back home</a>
-  </p>
+  </div>
 
   {scripts.map((s) => (
     <script
@@ -501,131 +751,6 @@ const accessGroups = groups.filter((g) => !isIdentityGroup(groupRegistry, g));
 
 </Layout>
 
-<style>
-  /* Settings forms: column layout, hairline border between fields, labels
-   * sit on their own line so checkboxes and selects align. */
-  .settings-form {
-    display: flex;
-    flex-direction: column;
-    gap: var(--space-4);
-    max-width: 32rem;
-    margin-top: var(--space-3);
-  }
-  .form-actions {
-    display: flex;
-    gap: var(--space-3);
-    margin-top: var(--space-2);
-  }
-
-  /* Passkey section header: subtitle + "recommended" badge on one line. */
-  .passkey-subtitle {
-    display: flex;
-    align-items: center;
-    gap: var(--space-2);
-  }
-
-  /* TOTP enrollment: QR code centered with a border, secret below it. */
-  .totp-qr {
-    display: flex;
-    justify-content: flex-start;
-  }
-  .totp-qr img {
-    border: 1px solid var(--border);
-    border-radius: var(--radius-sm);
-    display: block;
-    max-width: 200px;
-    height: auto;
-  }
-  .totp-secret {
-    margin-top: var(--space-2);
-  }
-  .totp-secret-label {
-    font-family: var(--font-mono);
-    font-size: var(--text-xs);
-    text-transform: uppercase;
-    letter-spacing: 0.08em;
-    color: var(--text-muted);
-    margin-bottom: var(--space-1);
-  }
-  .totp-secret-value {
-    display: block;
-    padding: var(--space-2) var(--space-3);
-    background: var(--bg);
-    border: 1px solid var(--border);
-    border-radius: var(--radius-sm);
-    font-size: var(--text-sm);
-    word-break: break-all;
-    color: var(--text);
-    user-select: all;
-  }
-
-  /* Backup codes display: monospace block, select-all for easy copy. */
-  .lookup-codes {
-    margin-top: var(--space-2);
-  }
-  .lookup-codes-label {
-    font-family: var(--font-mono);
-    font-size: var(--text-xs);
-    text-transform: uppercase;
-    letter-spacing: 0.08em;
-    color: var(--text-muted);
-    margin-bottom: var(--space-1);
-  }
-  .lookup-codes-value {
-    display: block;
-    padding: var(--space-3);
-    background: var(--bg);
-    border: 1px solid var(--border);
-    border-radius: var(--radius-sm);
-    font-size: var(--text-sm);
-    white-space: pre-wrap;
-    word-break: break-all;
-    color: var(--text);
-    user-select: all;
-  }
-
-  /* Key/value membership table without the heaviness of a real table.
-   * Hairline rows, mono values, label in muted weight. */
-  .kv {
-    display: flex;
-    flex-direction: column;
-    margin-top: var(--space-3);
-    border-top: 1px solid var(--border);
-  }
-  .kv > div {
-    display: grid;
-    grid-template-columns: 9rem 1fr;
-    gap: var(--space-4);
-    padding: var(--space-3) 0;
-    border-bottom: 1px solid var(--border);
-    align-items: baseline;
-  }
-  .kv dt {
-    font-family: var(--font-mono);
-    font-size: var(--text-xs);
-    text-transform: uppercase;
-    letter-spacing: 0.08em;
-    color: var(--text-muted);
-  }
-  .kv dd {
-    font-size: var(--text-sm);
-    color: var(--text);
-  }
-  .kv-chips {
-    display: flex;
-    flex-wrap: wrap;
-    gap: var(--space-1);
-  }
-
-  .back-link {
-    font-size: var(--text-xs);
-    text-transform: uppercase;
-    letter-spacing: 0.08em;
-    color: var(--text-muted);
-  }
-  .back-link:hover { color: var(--accent); text-decoration: none; }
-
-  @media (max-width: 640px) {
-    .kv > div { grid-template-columns: 1fr; gap: var(--space-1); }
-  }
-</style>
+<script>
+  import '../../scripts/settings-enhance';
+</script>

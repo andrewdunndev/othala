@@ -4,7 +4,7 @@
 # nodejs-22-minimal via ci-runtime-node for runtime. Astro Node
 # standalone emits an SSR handler at dist/server/entry.mjs; the
 # D-listener wrapper dist/server/listen.mjs serves it on the public
-# port and stands up a separate loopback admin port (CU1 item 4), so
+# port and stands up a separate internal-network admin listener (PORTAL_ADMIN_BIND_HOST) (CU1 item 4), so
 # no Express/Fastify glue is needed.
 #
 # v0.2.0 change: OIDC client manifests are read at RUNTIME from a
@@ -24,10 +24,6 @@
 # Run:
 #   podman run --rm -p 8080:8080 \
 #     -v ./hydra/clients:/etc/portal/manifests:ro \
-#     -e KRATOS_PUBLIC_URL=http://kratos:4433 \
-#     -e KRATOS_ADMIN_URL=http://kratos:4434 \
-#     -e HYDRA_PUBLIC_URL=http://hydra:4444 \
-#     -e HYDRA_ADMIN_URL=http://hydra:4445 \
 #     dunn.dev/othala-portal:lab
 
 # ----- Stage 1: build -----
@@ -70,17 +66,13 @@ FROM registry.gitlab.com/dunn.dev/pipeline/ci-runtime-node:4.8.0@sha256:29d519f7
 WORKDIR /app
 
 ENV NODE_ENV=production \
-    HOST=0.0.0.0 \
-    PORT=8080 \
-    ADMIN_HOST=127.0.0.1 \
-    ADMIN_PORT=4431 \
     # OpenTelemetry bootstrap (PII-safe; src/server/otel.mjs, copied to
     # dist/otel.mjs by `npm run copy:otel`). --import runs it BEFORE
     # listen.mjs so the http instrumentation patches node:http first. The
     # path is relative to WORKDIR /app, where `dist/` is copied below, and
     # its bare @opentelemetry/* imports resolve up to /app/node_modules.
-    # No-op unless OTEL_EXPORTER_OTLP_ENDPOINT is set, so this is inert in
-    # any deploy without a collector — the SDK never starts.
+    # No-op unless OTHALA_OTLP_ENDPOINT is set, so this is inert in any
+    # deploy without a collector: the SDK never starts.
     NODE_OPTIONS="--import ./dist/otel.mjs"
 
 # ci-runtime-node inherits the `default` user (uid 1001) from
@@ -93,12 +85,12 @@ COPY --from=build --chown=1001:0 /src/portal/package.json ./package.json
 
 USER 1001
 
-# Only the public port is EXPOSEd. The admin port (ADMIN_PORT) binds to
-# loopback (ADMIN_HOST=127.0.0.1) and is pod-only by design (D-listener,
+# Only the public port is EXPOSEd. The admin port (4431) binds to
+# PORTAL_ADMIN_BIND_HOST, required, and is pod-only by design (D-listener,
 # CU1 item 4); revoke + recovery-gate routes land on it in CU3.
 EXPOSE 8080
 
-# listen.mjs binds the public SSR handler on PORT and the loopback admin mux
+# listen.mjs binds the public SSR handler on PORT and the admin mux
 # on ADMIN_PORT in one process (see src/server/listen.mjs). Standalone
 # entry.mjs is imported by listen.mjs for its exported `handler`, not run
 # directly, so it never auto-binds its own server.

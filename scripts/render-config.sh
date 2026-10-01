@@ -1,9 +1,9 @@
 #!/usr/bin/env bash
 # render-config.sh: the Ory-config render shared by e2e/validate.sh and the deploy plane.
 # Usage: render-config.sh <template> <output>, variables from the environment. Every ${NAME}
-# left after #@if resolution and comment stripping must be SET (names-only error); exported-
-# empty is allowed (OTHALA_OTLP_PROVIDER="" disables tracing). #@if NAME ... #@endif keeps the
-# block when NAME is non-empty and drops it otherwise (Ory v26 rejects a half-populated block).
+# left after #@if resolution and comment stripping must be SET (names-only error). #@if NAME ...
+# #@endif keeps the block when NAME is non-empty and drops it otherwise (the tracing blocks are
+# keyed on OTHALA_OTLP_ENDPOINT; Ory v26 rejects a half-populated block).
 set -euo pipefail
 
 if [[ $# -ne 2 ]]; then
@@ -94,6 +94,13 @@ if missing:
     for n in missing:
         print(f"  {n}", file=sys.stderr)
     sys.exit(1)
+
+# The Ory admin binds have no default: an empty value is refused (a wildcard is the isolated e2e network's choice).
+for name in ("KRATOS_ADMIN_BIND_HOST", "HYDRA_ADMIN_BIND_HOST"):
+    if name in needed and not os.environ[name].strip():
+        print(f"render-config: {template_path}: {name} must not be empty "
+              f"— refusing to render", file=sys.stderr)
+        sys.exit(1)
 
 # Control-character guard: fail closed before writing output (a newline or CR breaks scalars).
 for name in needed:

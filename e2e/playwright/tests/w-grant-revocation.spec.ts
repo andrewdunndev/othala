@@ -121,7 +121,8 @@ test('W1 — deleting an identity ends its refresh tokens', async ({ browser, ba
     const page = await ctx.newPage();
     const targetUrl = `${baseURL}/admin/users/${member.id}`;
     await page.goto(targetUrl, { waitUntil: 'networkidle' });
-    await page.locator('summary', { hasText: 'Delete identity' }).click();
+    await page.locator('summary', { hasText: 'Danger zone' }).click();
+    await page.locator('summary', { hasText: 'Delete person' }).click();
     await page.locator('input[name="confirm"]').fill(member.username);
     await submitAndExpectStatus(page, targetUrl, () => page.getByRole('button', { name: 'Delete permanently' }).click(), [303]);
     await page.waitForURL(/\/admin\/users\?deleted=1/);
@@ -140,10 +141,10 @@ test('W2 — removing the app access group ends the refresh tokens', async ({ br
   try {
     const page = await ctx.newPage();
     const targetUrl = `${baseURL}/admin/users/${member.id}`;
-    await page.goto(`${targetUrl}?mode=edit`, { waitUntil: 'networkidle' });
-    await page.locator('input[name="accessGroups"][value="grafana-access"]').uncheck();
-    await submitAndExpectStatus(page, targetUrl, () => page.getByRole('button', { name: 'Save', exact: true }).click(), [200]);
-    await expect(page.getByText('Identity updated.'), 'W2: the save and the grant revocation must both succeed').toBeVisible();
+    await page.goto(targetUrl, { waitUntil: 'networkidle' });
+    await page.locator('input[name="level:grafana"][value="none"]').check();
+    await submitAndExpectStatus(page, targetUrl, () => page.getByRole('button', { name: 'Save access' }).click(), [200]);
+    await expect(page.getByText('Access saved.'), 'W2: the save and the grant revocation must both succeed').toBeVisible();
   } finally {
     await ctx.close();
   }

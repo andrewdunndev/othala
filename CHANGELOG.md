@@ -7,6 +7,53 @@ aims to follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 The git tag is the authoritative version; `portal/package.json` mirrors it.
 This CHANGELOG and git tags carry the deployed-instance release state.
 
+## [0.10.0] - 2026-10-01
+
+An apps-first home with setup guides, and fewer env vars.
+
+### Added
+
+- The signed-in home is an apps-first tile grid with a top bar for account actions.
+- Apps can carry a setup guide and `presentation.requires` prerequisites defined under `requirements/`; a tile shows readiness.
+- `manifest-lint` warns on an undefined `presentation.requires` name.
+- Account settings groups sign-in, two-step, recovery and profile into cards, with named passkeys and in-place enrollment.
+
+### Removed
+
+Delete each from the deploy environment.
+
+- `OTHALA_DEFAULT_SCHEMA_ID`: Kratos defaults.
+- `OTHALA_WEBAUTHN_RP_ID`, `OTHALA_WEBAUTHN_RP_ORIGINS`: `kratos.yml` uses `OTHALA_APEX` and `OTHALA_PUBLIC_URL`.
+- `OTHALA_SMTP_FROM_ADDRESS`: mail comes from `noreply@<OTHALA_APEX>`.
+- `OTHALA_SITE_NAME`: `OTHALA_INSTANCE_NAME` is the brand name, now required.
+- `OTHALA_ADMIN_CONTACT`: the dashboard says "your administrator".
+- `OTHALA_DEFAULT_GROUP`, `OTHALA_IDENTITY_GROUPS`: fixed at `admin` and `everyone`.
+- `OTHALA_ADMIN_FRESHNESS_HOURS`: step-up is 1h.
+- `OTHALA_HIBP_ENABLED`, `OTHALA_PASSWORD_MIN_LENGTH`: breach check on, minimum 12.
+- `OTHALA_CORS_ALLOWED_ORIGINS`: Hydra allows `OTHALA_PUBLIC_URL`.
+- `OTHALA_PUBLIC_HOST`: the Caddyfile uses `OTHALA_PUBLIC_URL`.
+- `OTHALA_OTLP_PROVIDER`, `OTHALA_OTLP_ENVIRONMENT`, `OTEL_*`, `OTLP_INGEST_TOKEN`: use `OTHALA_OTLP_ENDPOINT`.
+- `KRATOS_PUBLIC_URL`, `HYDRA_PUBLIC_URL`, `KRATOS_ADMIN_URL`, `HYDRA_ADMIN_URL`, `KRATOS_ADMIN_TOKEN` and `HYDRA_ADMIN_TOKEN`: fixed at `kratos:4433`, `kratos:4434`, `hydra:4445`, no bearer.
+- `ADMIN_HOST`: renamed `PORTAL_ADMIN_BIND_HOST`, required in production.
+- `KRATOS_PG_HOST`, `HYDRA_PG_HOST`, `KRATOS_ADMIN_HOST` and `CONSENT_HOST`: hosts are `postgres`, `kratos`, `othala`.
+- `MANIFEST_DIR` (production reads `/etc/portal/manifests`), `PORT`, `HOST`, `ADMIN_PORT`, `PORTAL_LOGIN_URL` and `PORTAL_CONSENT_URL`: fixed.
+- `SMTP_USER`, `SMTP_PASS`, `ACME_EMAIL`, Kratos and Hydra `DSN`: credentials ride in `OTHALA_SMTP_CONNECTION_URI` and `dsn`.
+
+### Changed
+
+- Production needs `OTHALA_INSTANCE_NAME`, `OTHALA_CONTACT_RECIPIENT` and `OTHALA_SMTP_CONNECTION_URI`.
+- Only a password change signs out other sessions; passkey, key, app and backup-code changes keep them.
+- Kratos and Hydra trace with `OTHALA_OTLP_ENDPOINT`.
+- Kratos login flow lifespan is 1h, up from 10m.
+- Kratos public CORS is off.
+- Caddy `othala_selfservice` limit is 30/min, up from 10.
+- `kratos.yml` and `hydra.yml` drop keys restating upstream defaults.
+- The e2e suite creates an identity through the admin form and always runs the Caddy edge.
+
+### Fixed
+
+- `/admin/users/new` creates the identity email-verified (`email_verified: true` in the id_token).
+
 ## [0.8.0] - 2026-09-30
 
 Apps receive only the groups they bind, privileged roles sign in at aal2, and revoking a person reaches apps by back-channel logout.

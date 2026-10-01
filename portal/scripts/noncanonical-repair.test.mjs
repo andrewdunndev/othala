@@ -135,32 +135,22 @@ test('a refusal blocks the write by returning formErrors instead of updating', (
   assert.match(libSource, /if \(Object\.keys\(formErrors\)\.length > 0\) \{\s*\n\s*return \{ formErrors, refetch: false \};/);
 });
 
-test('the edit form renders the stored non-canonical names with a removal control', () => {
-  assert.match(pageSource, /const nonCanonical = nonCanonicalGroups\(identity\);/);
-  assert.match(pageSource, /name="clearNonCanonical"/);
+test('the person page lists every unrecognised stored name with its own removal form', () => {
+  assert.match(pageSource, /const unrecognised = identity \? unrecognisedGroups\(identity, manifests\) : \[\];/);
+  assert.match(pageSource, /<input type="hidden" name="group" value=\{g\} \/>/);
   assert.match(libSource, /fd\.getAll\('clearNonCanonical'\)/, 'saveAction must read the clear ticks');
+  assert.match(libSource, /for \(const g of removing\) if \(!GROUP_RE\.test\(g\)\) fd\.append\('clearNonCanonical', g\);/);
 });
 
-test('the removal control is unchecked by default (removal is affirmative)', () => {
-  const row = /<input type="checkbox" name="clearNonCanonical" value=\{g\} \/>/;
-  assert.match(pageSource, row, 'the clear checkbox must carry no checked attribute');
+test('removal is affirmative: nothing is removed unless the admin posts that name', () => {
+  assert.match(libSource, /removeGroupsAction[\s\S]*remove: fd\.getAll\('group'\)/);
+  assert.doesNotMatch(pageSource, /name="clearNonCanonical"|name="clearUnconfigured"/, 'the page names groups to remove, never pre-ticks them');
 });
 
-test('the repair row rides the existing save form, under its CSRF token', () => {
-  const openTag = '<form method="post" class="stack-lg" novalidate>';
-  const open = pageSource.indexOf(openTag);
-  assert.notEqual(open, -1, 'save form not found');
-  const close = pageSource.indexOf('</form>', open);
-  assert.notEqual(close, -1, 'save form never closes');
-  const saveForm = pageSource.slice(open + openTag.length, close);
-
-  assert.match(saveForm, /<input type="hidden" name="action" value="save" \/>/);
-  assert.match(saveForm, /<input type="hidden" name="csrf_token" value=\{csrfTokenSave\} \/>/);
-  assert.match(saveForm, /name="clearNonCanonical"/, 'the repair field must live inside the save form');
-  assert.doesNotMatch(saveForm, /<form /, 'no nested form under the save form');
-
-  assert.doesNotMatch(pageSource, /actionScopedActions/);
-  assert.match(pageSource, /verifyToken\(String\(fd\.get\('csrf_token'\) \?\? ''\), adminIdentityId, tokenAction\)/);
+test('the removal form posts under its own CSRF token and the shared verifier', () => {
+  assert.match(pageSource, /<input type="hidden" name="csrf_token" value=\{tok\('remove-groups'\)\} \/>/);
+  assert.match(pageSource, /<input type="hidden" name="action" value="remove-groups" \/>/);
+  assert.match(pageSource, /verifyToken\(String\(fd\.get\('csrf_token'\) \?\? ''\), adminId, tokenAction\)/);
   assert.match(pageSource, /const tokenAction = action === 'remove-credential' \? `remove-\$\{String\(fd\.get\('cred_type'\) \?\? ''\)\}` : action;/);
 });
 
@@ -168,11 +158,7 @@ test('the non-canonical names are rendered escaped, never via set:html', () => {
   assert.doesNotMatch(pageSource, /set:html/);
 });
 
-test('read mode files them under their own heading, not under access', () => {
-  assert.match(pageSource, /unrecognised/);
-  assert.match(pageSource, /const nonCanonicalSet = new Set\(nonCanonical\);/);
-  assert.match(
-    pageSource,
-    /accessGroupMembership = groups\.filter\(\(g\) => !nonCanonicalSet\.has\(g\)/,
-  );
+test('they sit under their own heading, not in the apps section', () => {
+  assert.match(pageSource, /<h2 id="h-groups">Unrecognised groups<\/h2>/);
+  assert.match(pageSource, /unrecognisedGroups\(identity, manifests\)/);
 });

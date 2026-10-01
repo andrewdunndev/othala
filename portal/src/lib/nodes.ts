@@ -148,3 +148,34 @@ export function inputProps(a: NodeInputAttributes): Record<string, string | bool
   if (a.autocomplete) props.autocomplete = a.autocomplete;
   return props;
 }
+
+/** Portal wording and input hints for one Kratos node, so a page asks for something specific in its own words. */
+export interface NodeSpec {
+  label?: string;
+  class?: string;
+  inputmode?: 'numeric' | 'email' | 'text';
+  autocomplete?: string;
+  placeholder?: string;
+  autofocus?: boolean;
+  /** A secondary submit (resend) must not be blocked by an empty required field. */
+  formnovalidate?: boolean;
+  hint?: string;
+  /** Length and shape of a one-time code, so a stray character or a long paste is caught before the round trip. */
+  maxlength?: number;
+  pattern?: string;
+  /** What the browser says when the pattern is not met. */
+  title?: string;
+  /** Start empty after a refused value, so the next try is typed over nothing. */
+  clearOnError?: boolean;
+}
+export type NodeSpecs = Record<string, NodeSpec>;
+
+/** The key a page's NodeSpecs use for a node: its name, or `button:<name>` for a submit or button. */
+export function specKey(a: Pick<NodeInputAttributes, 'name' | 'type'>): string {
+  return a.type === 'submit' || a.type === 'button' ? `button:${a.name}` : a.name;
+}
+
+/** The label to show: the page's own wording first, then Kratos's, then the generic fallback, so unknown nodes still render. */
+export function nodeLabel(spec: NodeSpec | undefined, kratosText: string | undefined, fallback: string): string {
+  return spec?.label ?? kratosText ?? fallback;
+}

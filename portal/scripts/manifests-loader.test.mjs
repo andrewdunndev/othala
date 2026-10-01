@@ -5,7 +5,7 @@ import assert from 'node:assert/strict';
 import { mkdtempSync, writeFileSync, rmSync, readdirSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
-import { parseManifest, loadClientManifests } from '../src/lib/manifests.ts';
+import { parseManifest, loadClientManifests, setManifestDir } from '../src/lib/manifests.ts';
 
 test('namespace split: minimal yaml with oidc + consent blocks parses', () => {
   const out = parseManifest(
@@ -276,7 +276,7 @@ consent:
 `;
     writeFileSync(join(dir, 'goodclient.yaml'), goodYaml);
 
-    process.env.MANIFEST_DIR = dir;
+    setManifestDir(dir);
     const good = loadClientManifests();
     assert.equal(good.length, 1, 'good set must load');
     assert.equal(good[0].clientId, 'goodclient');
@@ -308,7 +308,7 @@ consent:
       'bad candidate set must throw with validation error',
     );
   } finally {
-    delete process.env.MANIFEST_DIR;
+    setManifestDir(undefined);
     rmSync(dir, { recursive: true, force: true });
   }
 });
@@ -331,14 +331,14 @@ oidc:
 consent: {}
 `);
 
-    process.env.MANIFEST_DIR = dir;
+    setManifestDir(dir);
     assert.throws(
       () => loadClientManifests(),
       /duplicate client_id/,
       'duplicate client_id must be detected',
     );
   } finally {
-    delete process.env.MANIFEST_DIR;
+    setManifestDir(undefined);
     rmSync(dir, { recursive: true, force: true });
   }
 });
@@ -381,13 +381,13 @@ presentation:
 consent: {}
 `);
 
-    process.env.MANIFEST_DIR = dir;
+    setManifestDir(dir);
     let manifests;
     assert.doesNotThrow(() => { manifests = loadClientManifests(); });
     assert.equal(manifests.length, 1, 'good manifest must survive broken sibling');
     assert.equal(manifests[0].clientId, 'goodapp');
   } finally {
-    delete process.env.MANIFEST_DIR;
+    setManifestDir(undefined);
     rmSync(dir, { recursive: true, force: true });
   }
 });
@@ -408,13 +408,13 @@ presentation:
 consent: {}
 `);
 
-    process.env.MANIFEST_DIR = dir;
+    setManifestDir(dir);
     let manifests;
     assert.doesNotThrow(() => { manifests = loadClientManifests(); });
     assert.equal(manifests.length, 1);
     assert.equal(manifests[0].clientId, 'survivor');
   } finally {
-    delete process.env.MANIFEST_DIR;
+    setManifestDir(undefined);
     rmSync(dir, { recursive: true, force: true });
   }
 });
@@ -425,12 +425,12 @@ test('per-file isolation: all-broken dir yields empty list without throw', () =>
     writeFileSync(join(dir, 'broken1.yaml'), ': bad: yaml: [');
     writeFileSync(join(dir, 'broken2.yaml'), ': also: bad: yaml: {');
 
-    process.env.MANIFEST_DIR = dir;
+    setManifestDir(dir);
     let manifests;
     assert.doesNotThrow(() => { manifests = loadClientManifests(); });
     assert.equal(manifests.length, 0, 'all-broken dir must yield empty list');
   } finally {
-    delete process.env.MANIFEST_DIR;
+    setManifestDir(undefined);
     rmSync(dir, { recursive: true, force: true });
   }
 });

@@ -1,6 +1,6 @@
 // Invariant: sendInviteRecoveryEmail targets only the confirmed identity address.
 
-import { test, beforeEach, afterEach } from 'vitest';
+import { test, afterEach } from 'vitest';
 import assert from 'node:assert/strict';
 import { sendInviteRecoveryEmail } from '../src/lib/kratos.ts';
 
@@ -36,10 +36,6 @@ function installFetch({ initStatus = 200, flowId = 'flow-abc', submitStatus = 20
   };
   return calls;
 }
-
-beforeEach(() => {
-  delete process.env.KRATOS_PUBLIC_URL;
-});
 
 afterEach(() => {
   globalThis.fetch = realFetch;
@@ -121,11 +117,4 @@ test('sendInviteRecoveryEmail: error messages never include the email address', 
       `error message must not leak the recipient address: ${err.message}`,
     );
   }
-});
-
-test('sendInviteRecoveryEmail: honours KRATOS_PUBLIC_URL override', async () => {
-  process.env.KRATOS_PUBLIC_URL = 'https://kratos.test.example';
-  const calls = installFetch();
-  await sendInviteRecoveryEmail('a@othala.test');
-  assert.ok(calls.every((c) => c.url.startsWith('https://kratos.test.example')));
 });

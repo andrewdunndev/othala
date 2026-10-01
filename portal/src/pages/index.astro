@@ -7,15 +7,32 @@
 export const prerender = false;
 
 import Layout from '../layouts/Layout.astro';
-import PageHero from '../components/PageHero.astro';
-import { loadTiles, loadGroups, safeHref, userCanSeeTile, type AppTile } from '../lib/tiles';
+import TileCard from '../components/TileCard.astro';
+import AppBadges from '../components/AppBadges.astro';
+import PrereqCard from '../components/PrereqCard.astro';
+import AppActions from '../components/AppActions.astro';
+import GuideSections from '../components/GuideSections.astro';
+import CopyChips from '../components/CopyChips.astro';
+import {
+  loadTiles,
+  loadGroups,
+  loadRequirements,
+  requirementsFor,
+  splitGuide,
+  tileReadiness,
+  safeHref,
+  userCanSeeTile,
+  type AppTile,
+} from '../lib/tiles';
+import { devMockIdentity } from '../lib/dev-mock';
 import { getSession, isReachable } from '../lib/kratos';
 import { getIdentity } from '../lib/admin-api';
 import { identityGroups } from '../lib/gate';
 import { isAdminMarker } from '../lib/admin-auth';
-import { signLogoutToken } from '../lib/logout';
+import HeaderActions from '../components/HeaderActions.astro';
 import type { Identity } from '../lib/types';
-import { siteName, adminContact } from '../lib/config';
+import { instanceName } from '../lib/config';
+import { emailVerified } from '../lib/settings-view';
 
 type State = 'down' | 'pre-auth' | 'post-auth';
 
@@ -29,28 +46,8 @@ let downReason = 'Kratos /health/alive unreachable; retrying.';
 
 if (devOverride === 'down' || devOverride === 'pre-auth' || devOverride === 'post-auth') {
   state = devOverride;
-  if (state === 'post-auth') {
-    // Mock identity for the dev post-auth view. Its groups must intersect the e2e/manifests/ `presentation.access:`
-    // groups or zero tiles render (re-derive them from there if a fixture is renamed). `everyone` covers the
-    // default-group fixture; 'admin' is an identity group only, since the mock omits the `metadata_admin.admin` marker.
-    // OTHALA_DEV_MOCK_GROUPS=admin,grafana-access overrides the list.
-    const devGroupsEnv: string | undefined = import.meta.env.OTHALA_DEV_MOCK_GROUPS;
-    const mockGroups = devGroupsEnv
-      ? devGroupsEnv.split(',').map((g) => g.trim()).filter(Boolean)
-      : [
-          'admin',
-          'everyone',
-          'grafana-access',
-          'audiobookshelf-access',
-          'proxywatch-access',
-          'prompt-access',
-        ];
-    identity = {
-      id: 'dev-mock',
-      traits: { username: 'dev.user', email: 'dev@example.local', displayName: 'Dev User' },
-      metadata_admin: { groups: mockGroups },
-    } as unknown as Identity;
-  }
+  // Mock person for the dev post-auth view; see lib/dev-mock.ts for the group and prerequisite query params.
+  if (state === 'post-auth') identity = devMockIdentity(Astro.url);
 } else {
   try {
     const session = await getSession(cookie);
@@ -81,6 +78,8 @@ const groupRegistry = loadGroups();
 // First-run passkey nudge: getIdentity's includeCredential list already carries `credentials.passkey`; the dismiss
 // is remembered per browser in localStorage (inline script below).
 const hasPasskeyEnrolled = Boolean(identity?.credentials?.passkey);
+// A second, undismissable nudge: an unverified recovery address is a lockout waiting to happen.
+const emailUnverified = state === 'post-auth' && emailVerified(identity) === false;
 
 const groups = identityGroups(identity);
 // Visibility reads the same access binding (accessGroups, OR) as the OIDC entry gate, so a tile shows iff the gate admits.
@@ -88,6 +87,25 @@ const visibleTiles =
   state === 'post-auth'
     ? orderedApps.filter((a: AppTile) => userCanSeeTile(a, groups))
     : [];
+
+// Per-tile presentation for this person: prerequisite state (the admin's marks), requirement definitions, the guide
+// outline.
+const requirementSet = loadRequirements();
+const markedPrerequisites = identity?.metadata_admin?.prerequisites ?? [];
+const views = new Map(
+  visibleTiles.map((t: AppTile) => {
+    const requirements = requirementsFor(t, requirementSet);
+    return [
+      t.slug,
+      {
+        requirements,
+        readiness: tileReadiness(t, markedPrerequisites),
+        titles: requirements.map((r) => r.title),
+        guide: splitGuide(t.educationHtml),
+      },
+    ] as const;
+  }),
+);
 
 // Split visibleTiles into ungrouped and grouped sections, ordered by groups.yaml `order`, else min tile order.
 const ungroupedTiles = visibleTiles.filter((t: AppTile) => !t.group);
@@ -113,16 +131,6 @@ const tileGroups = Array.from(groupedTilesMap.entries())
 // requireAdminSession. isAdminMarker is false on any error or missing marker, which is fine for cosmetic chrome.
 const isAdmin = state === 'post-auth' && isAdminMarker(identity);
 
-// Sign-out is a POST carrying a token for this identity (lib/logout.ts); if minting fails the button still posts
-// and /auth/logout shows its confirm form.
-let logoutToken = '';
-if (state === 'post-auth' && identity?.id) {
-  try {
-    logoutToken = signLogoutToken(identity.id);
-  } catch {
-    logoutToken = '';
-  }
-}
 const displayName = identity?.traits.displayName || identity?.traits.username || '';
 const firstName = displayName.split(' ')[0] || displayName;
 
@@ -131,6 +139,11 @@ const devLinks = [
   { href: '/?dev-state=down',      label: 'State A: down (substrate offline)' },
   { href: '/?dev-state=pre-auth',  label: 'State B: pre-auth (sign in)' },
   { href: '/?dev-state=post-auth', label: 'State C: post-auth (mocked identity)' },
+  { href: '/auth/login?dev-state=wrong-password', label: 'Login (also code, aal2)' },
+  { href: '/auth/recovery?dev-state=code-prefilled', label: 'Recovery (also request, code, code-wrong)' },
+  { href: '/auth/verification?dev-state=code', label: 'Verification (also request)' },
+  { href: '/auth/consent?dev-state=consent', label: 'Consent (also consent-unknown-app, consent-error)' },
+  { href: '/auth/error?reason=not-authorised', label: 'Error page (reasons in lib/error-reasons.ts)' },
   { href: '/auth/login',           label: 'Login flow' },
   { href: '/auth/settings',        label: 'Settings flow' },
   { href: '/auth/recovery',        label: 'Recovery flow' },
@@ -139,97 +152,75 @@ const devLinks = [
   { href: '/admin',                label: 'Admin (requires AAL2)' },
 ];
 ---
-<Layout title="Home" description={`Single sign-on for ${siteName}.`}>
+<Layout title="Home" description={`Single sign-on for ${instanceName}.`} compact={state === 'post-auth'} narrow={state !== 'post-auth'}>
+
+  {state === 'post-auth' && (
+    <Fragment slot="header-actions">
+      <HeaderActions identityId={identity?.id} isAdmin={isAdmin} />
+    </Fragment>
+  )}
 
   {state === 'down' && (
-    <PageHero
-      title="Auth services starting up"
-      lede={`The substrate is offline or unreachable. This page will pick the session back up as soon as it returns. If it persists, contact ${adminContact}.`}
-    >
-      <p class="holding-tech">{downReason}</p>
-    </PageHero>
+    <>
+    <header class="page-header">
+      <h1 class="page-title">Sign-in is starting up</h1>
+      <p class="page-lede">This usually takes a minute. Refresh in a moment, and tell an admin if it keeps happening.</p>
+    </header>
+    {isDev && <p class="holding-tech">{downReason}</p>}
+    </>
   )}
 
   {state === 'pre-auth' && (
     <>
-      <PageHero title="Welcome" lede={`Single sign-on for ${siteName}. One sign-in, every app.`}>
-        <div class="cta-row">
-          <a href="/auth/login" class="button button-primary">Sign in</a>
-          <a href="/auth/recovery" class="button button-secondary">Recover access</a>
-          <span class="cta-note mono">passkey or password</span>
-        </div>
-      </PageHero>
-
-      <section class="section">
-        <p class="section-subtitle">What's behind this door</p>
-        <p class="section-prose">
-          A small set of self-hosted services. Photos,
-          films, music, books, recipes, files. A handful of tools for
-          the people who run the place. Each app respects the same
-          identity, so signing in once is enough.
-        </p>
-        <p class="section-prose">
-          If you don't have an account yet, ask whoever invited you.
-        </p>
+      <header class="page-header">
+        <h1 class="page-title">Welcome home</h1>
+        <p class="page-lede">One sign-in for every app in your household.</p>
+      </header>
+      <section class="panel focus-card">
+        <a href="/auth/login" class="button button-primary focus-btn">Sign in</a>
+        <p class="focus-note">Use the passkey on this device, or get a code by email.</p>
+        <p class="focus-note">New here? Open the setup link from whoever invited you.</p>
       </section>
     </>
   )}
 
   {state === 'post-auth' && (
     <>
-      <PageHero
-        title={firstName ? `Hello, ${firstName}.` : 'Welcome back.'}
-        eyebrow={`signed in${displayName ? ' · ' + displayName : ''}`}
-        lede="Pick up where you left off, or hop into one of the apps below."
-      >
-        <div class="cta-row">
-          <button type="button" class="button button-primary" id="open-request-form">
-            Request access or suggest an app
-          </button>
-          {isAdmin && <a href="/admin" class="button button-secondary">Admin</a>}
-          <a href="/auth/settings" class="button button-secondary">Account</a>
-          <form method="POST" action="/auth/logout" class="cta-form">
-            <input type="hidden" name="csrf_token" value={logoutToken} />
-            <button type="submit" class="button button-secondary">Sign out</button>
-          </form>
-        </div>
-      </PageHero>
+      <h1 class="greeting" id="greeting" tabindex="-1">{firstName ? `Hello, ${firstName}.` : 'Welcome back.'} <span class="greeting-sub">Pick an app to open it, or its Guide for setup.</span></h1>
 
       {!hasPasskeyEnrolled && (
         <div class="passkey-nudge" id="passkey-nudge">
           <p class="passkey-nudge-text">
-            Set up a passkey for one-tap sign-in with Face ID or Touch ID.
-            <a href="/auth/settings" class="passkey-nudge-link">Set up now →</a>
+            Set up a passkey for one-tap <span style="white-space: nowrap">sign-in</span>.
+            <a href="/auth/settings" class="passkey-nudge-link">Set up now</a>
           </p>
           <button
             type="button"
             class="passkey-nudge-close mono"
             data-dismiss-passkey-nudge
-            aria-label="Dismiss"
+            aria-label="Dismiss the passkey reminder"
           >✕</button>
         </div>
       )}
 
-      <section class="section">
-        <p class="section-subtitle">Your apps</p>
+      {emailUnverified && (
+        <div class="passkey-nudge" id="email-nudge">
+          <p class="passkey-nudge-text">
+            Your email is not verified yet, so it cannot rescue your account.
+            <a href="/auth/settings" class="passkey-nudge-link">Verify it</a>
+          </p>
+        </div>
+      )}
+
+      <section class="home-apps">
         {visibleTiles.length > 0 ? (
           <>
             {ungroupedTiles.length > 0 && (
-              <div class="tile-grid">
-                {ungroupedTiles.map((t: AppTile) => (
-                  <article class="tile">
-                    <a class="tile-launch" href={safeHref(t.url)}>
-                      {t.iconHref ? (
-                        <img class="tile-icon-img" src={t.iconHref} alt="" loading="lazy" />
-                      ) : (
-                        <div class="tile-icon mono">{t.icon}</div>
-                      )}
-                      <div class="tile-name">{t.name}</div>
-                      <div class="tile-desc">{t.description}</div>
-                    </a>
-                    <button type="button" class="tile-learn mono" data-app-learn={t.slug}>learn more →</button>
-                  </article>
-                ))}
+              <div class="tile-grid" data-count={ungroupedTiles.length}>
+                {ungroupedTiles.map((t: AppTile) => {
+                  const v = views.get(t.slug)!;
+                  return <TileCard tile={t} readiness={v.readiness} requirementTitles={v.titles} />;
+                })}
               </div>
             )}
             {tileGroups.map(({ groupName, tiles, meta }) => (
@@ -240,68 +231,73 @@ const devLinks = [
                     <p class="tile-group-desc">{meta.description}</p>
                   )}
                 </div>
-                <div class="tile-grid">
-                  {tiles.map((t: AppTile) => (
-                    <article class="tile">
-                      <a class="tile-launch" href={safeHref(t.url)}>
-                        {t.iconHref ? (
-                          <img class="tile-icon-img" src={t.iconHref} alt="" loading="lazy" />
-                        ) : (
-                          <div class="tile-icon mono">{t.icon}</div>
-                        )}
-                        <div class="tile-name">{t.name}</div>
-                        <div class="tile-desc">{t.description}</div>
-                      </a>
-                      <button type="button" class="tile-learn mono" data-app-learn={t.slug}>learn more →</button>
-                    </article>
-                  ))}
+                <div class="tile-grid" data-count={tiles.length}>
+                  {tiles.map((t: AppTile) => {
+                    const v = views.get(t.slug)!;
+                    return <TileCard tile={t} readiness={v.readiness} requirementTitles={v.titles} />;
+                  })}
                 </div>
               </div>
             ))}
           </>
         ) : (
           <p class="section-prose">
-            Your account doesn't have any app access yet. Contact {adminContact} to
+            Your account doesn't have any app access yet. Ask a household admin to
             enable one.
           </p>
         )}
+        <p class="missing-app"><button type="button" class="text-link" id="open-request-form">Missing an app? Get in touch</button></p>
       </section>
 
-      {/* ── Per-app education data: one hidden <template> per visible tile.
-          The JS modal reads these to populate the app-modal at open time.
-          educationHtml may contain inline SVG (cat-explainer diagrams). */}
-      {visibleTiles.map((t: AppTile) => (
-        <template
-          data-app-edu={t.slug}
-          data-app-name={t.name}
-          data-app-url={safeHref(t.url)}
-          data-app-desc={t.description}
-        >
-          <Fragment set:html={t.educationHtml ?? ''} />
-        </template>
-      ))}
+      {/* ── Per-app documentation: one hidden <template> per visible tile, three slots. The dialog script clones
+          them into the header (actions), the prerequisite strip and the scrolling guide body. */}
+      {visibleTiles.map((t: AppTile) => {
+        const v = views.get(t.slug)!;
+        return (
+          <template
+            data-app-edu={t.slug}
+            data-app-name={t.name}
+            data-app-desc={t.description}
+            data-app-icon={t.iconHref ?? ''}
+            data-app-bleed={t.iconBleed ? '' : undefined}
+            data-app-mono={t.icon}
+          >
+            <div data-slot="actions">
+              <AppActions name={t.name} href={safeHref(t.url)} requirements={v.requirements} ready={v.readiness === 'ready'} />
+            </div>
+            <div data-slot="prereq">
+              {v.requirements.map((r) => (
+                <PrereqCard requirement={r} ready={v.readiness === 'ready'} />
+              ))}
+            </div>
+            <div data-slot="body">
+              <GuideSections guide={v.guide} topic={t.name} />
+              <p class="app-modal-more mono"><a href={`/apps/${encodeURIComponent(t.slug)}`}>Open as a page →</a></p>
+            </div>
+          </template>
+        );
+      })}
 
-      {/* ── App education modal ────────────────────────────────────────────
-          Mirrors the request-modal structure: fixed, centered, backdrop,
-          Esc + backdrop + × close. Populated at open time from the hidden
-          <template data-app-edu> elements above. */}
+      {/* ── App guide dialog: native <dialog>, so the page behind is inert, Tab stays inside, and Esc closes. Filled at
+          open time from the hidden <template data-app-edu> elements above. */}
       <dialog class="app-modal" id="app-modal" aria-labelledby="app-modal-title">
         <div class="app-modal-inner">
+          <button class="app-modal-close" type="button" data-close-app-modal aria-label="Close guide">
+            <svg viewBox="0 0 16 16" width="16" height="16" aria-hidden="true" focusable="false"><path d="M3.5 3.5l9 9m0-9l-9 9" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>
+          </button>
           <header class="app-modal-header">
+            <span class="app-modal-icon" data-slot-icon></span>
             <div class="app-modal-header-text">
               <h2 class="app-modal-title" id="app-modal-title"></h2>
               <p class="app-modal-desc"></p>
             </div>
-            <button class="app-modal-close mono" type="button" data-close-app-modal aria-label="Close">✕</button>
           </header>
-          <div class="app-modal-cta">
-            <a class="button button-primary app-modal-open-link" href="#" rel="noopener" target="_blank">Open ↗</a>
-          </div>
-          <div class="app-modal-body">
-            <div class="edu-prose app-modal-content"></div>
-          </div>
+          <div class="app-modal-prereq" data-slot-prereq></div>
+          <div class="app-modal-actions" data-slot-actions></div>
+          <div class="app-modal-body" data-slot-body tabindex="0" role="region" aria-label="Guide"></div>
         </div>
       </dialog>
+      <CopyChips />
 
       {/* ── Request / contact form dialog ─────────────────────────────────
           FUNCTIONAL: the submit POSTs to /api/request, which validates,
@@ -317,10 +313,10 @@ const devLinks = [
           </header>
 
           <div class="request-modal-body">
-            <form class="request-form" id="request-form" method="post" action="/api/request" novalidate>
+            <form class="request-form" id="request-form" method="post" enctype="application/x-www-form-urlencoded" action="/api/request" novalidate>
               <label class="form-field">
                 <span class="form-label">Your name</span>
-                <input class="form-input" type="text" name="name" autocomplete="name" maxlength="80" required placeholder="e.g. Robin" />
+                <input class="form-input" type="text" name="name" autocomplete="name" maxlength="80" required placeholder="e.g. Robin" value={displayName} />
               </label>
 
               <label class="form-field">
@@ -346,8 +342,8 @@ const devLinks = [
               </div>
             </form>
 
-            <div class="request-thanks" id="request-thanks" hidden>
-              <p class="request-thanks-msg">Thanks — your request is on its way to {adminContact}.</p>
+            <div class="request-thanks" id="request-thanks" role="status" hidden>
+              <p class="request-thanks-msg" id="request-thanks-msg" tabindex="-1">Thanks. Your message went to the household admins, and one of them will follow up with you directly.</p>
               <p class="mono request-thanks-note">You can close this window.</p>
             </div>
           </div>
@@ -396,10 +392,26 @@ const devLinks = [
       errorEl.hidden = true;
     }
 
+    // A link can open the form ready to send: /?ask=<type>&msg=<text>#get-in-touch picks the type and seeds the message.
+    function seedFromLink() {
+      var q = new URLSearchParams(location.search);
+      var type = form.elements.type;
+      var message = form.elements.message;
+      var ask = q.get('ask');
+      if (type && ask && type.querySelector('option[value="' + ask + '"]')) type.value = ask;
+      var msg = q.get('msg');
+      if (message && msg && !message.value) message.value = msg.slice(0, 300);
+    }
+
     openBtn.addEventListener('click', function () {
       clearError();
       if (typeof modal.showModal === 'function') modal.showModal();
     });
+
+    if (location.hash === '#get-in-touch') {
+      seedFromLink();
+      openBtn.click();
+    }
 
     modal.querySelectorAll('[data-close-request]').forEach(function (btn) {
       btn.addEventListener('click', function () { modal.close(); });
@@ -430,6 +442,8 @@ const devLinks = [
           if (r.ok && r.data && r.data.ok) {
             form.hidden = true;
             if (thanks) thanks.hidden = false;
+            var msgEl = document.getElementById('request-thanks-msg');
+            if (msgEl) msgEl.focus();
           } else {
             showError((r.data && r.data.error) || 'Something went wrong. Please try again.');
           }
@@ -453,58 +467,91 @@ const devLinks = [
     });
   })();
 
-  // App education modal: [data-app-learn] buttons populate it from the hidden <template data-app-edu>.
+  // App guide dialog: [data-app-learn] buttons fill it from the hidden <template data-app-edu>. The native <dialog> makes
+  // the page behind inert and keeps Tab inside; this script adds the fill, focus return and scroll reset.
   (function () {
     var appModal = document.getElementById('app-modal');
     if (!appModal) return;
 
     var titleEl = appModal.querySelector('.app-modal-title');
-    var descEl  = appModal.querySelector('.app-modal-desc');
-    var openLink = appModal.querySelector('.app-modal-open-link');
-    var contentEl = appModal.querySelector('.app-modal-content');
+    var descEl = appModal.querySelector('.app-modal-desc');
+    var iconEl = appModal.querySelector('[data-slot-icon]');
+    var prereqEl = appModal.querySelector('[data-slot-prereq]');
+    var actionsEl = appModal.querySelector('[data-slot-actions]');
+    var bodyEl = appModal.querySelector('[data-slot-body]');
+    var innerEl = appModal.querySelector('.app-modal-inner');
+    var opener = null;
 
-    function openAppModal(slug) {
-      var tpl = document.querySelector('template[data-app-edu="' + slug + '"]');
-      if (!tpl || !contentEl) return;
-
-      if (titleEl) titleEl.textContent = tpl.dataset.appName || slug;
-      if (descEl)  descEl.textContent  = tpl.dataset.appDesc  || '';
-      if (openLink) {
-        openLink.href = tpl.dataset.appUrl || '#';
-        openLink.textContent = 'Open ' + (tpl.dataset.appName || slug) + ' ↗';
+    function slot(tpl, name) {
+      var el = tpl.content.querySelector('[data-slot="' + name + '"]');
+      return el ? el.cloneNode(true) : null;
+    }
+    function fill(target, node) {
+      target.replaceChildren();
+      if (node) while (node.firstChild) target.appendChild(node.firstChild);
+    }
+    function logo(tpl) {
+      var span = document.createElement('span');
+      span.className = 'app-modal-logo';
+      var href = tpl.dataset.appIcon;
+      if (href) {
+        var img = document.createElement('img');
+        img.src = href;
+        img.alt = '';
+        span.appendChild(img);
+        span.dataset.icon = href.split('/').pop().replace(/\.svg$/, '');
+        if (tpl.hasAttribute('data-app-bleed')) span.dataset.bleed = '';
+      } else {
+        span.textContent = tpl.dataset.appMono || '';
+        span.classList.add('app-modal-logo-mono');
       }
-
-      // Clone the template content so re-opens always get a fresh copy.
-      contentEl.innerHTML = '';
-      contentEl.appendChild(tpl.content.cloneNode(true));
-
-      if (typeof appModal.showModal === 'function') appModal.showModal();
+      return span;
     }
 
-    // Delegate click on all [data-app-learn] buttons (covers ungrouped + grouped tiles).
+    function openAppModal(slug, from) {
+      var tpl = document.querySelector('template[data-app-edu="' + slug + '"]');
+      if (!tpl || typeof appModal.showModal !== 'function') return;
+      opener = from || null;
+      titleEl.textContent = tpl.dataset.appName || slug;
+      descEl.textContent = tpl.dataset.appDesc || '';
+      iconEl.replaceChildren(logo(tpl));
+      fill(actionsEl, slot(tpl, 'actions'));
+      fill(prereqEl, slot(tpl, 'prereq'));
+      fill(bodyEl, slot(tpl, 'body'));
+      prereqEl.hidden = !prereqEl.firstChild;
+      appModal.showModal();
+      // Scroll positions only take once the dialog is displayed: the body (desktop) and the whole sheet (phone).
+      bodyEl.scrollTop = 0;
+      innerEl.scrollTop = 0;
+    }
+
     document.addEventListener('click', function (e) {
-      var btn = e.target && e.target.closest('[data-app-learn]');
+      var btn = e.target && e.target.closest ? e.target.closest('[data-app-learn]') : null;
       if (!btn) return;
-      openAppModal(btn.dataset.appLearn);
+      openAppModal(btn.dataset.appLearn, btn);
     });
 
-    // × close button.
     appModal.querySelectorAll('[data-close-app-modal]').forEach(function (btn) {
       btn.addEventListener('click', function () { appModal.close(); });
     });
 
-    // Backdrop click closes (click lands on the <dialog> element itself).
+    // Backdrop click closes (the click lands on the <dialog> element itself).
     appModal.addEventListener('click', function (e) {
       if (e.target === appModal) appModal.close();
     });
 
-    // Clear content when dialog fully closes (keeps DOM tidy; Esc is native).
+    // Return focus to the Guide button that opened it, then clear the content once the close settles.
     appModal.addEventListener('close', function () {
+      if (opener && typeof opener.focus === 'function') opener.focus();
+      opener = null;
       setTimeout(function () {
-        if (contentEl) contentEl.innerHTML = '';
-        if (titleEl) titleEl.textContent = '';
-        if (descEl)  descEl.textContent  = '';
-        if (openLink) { openLink.href = '#'; openLink.textContent = 'Open ↗'; }
+        if (appModal.open) return;
+        titleEl.textContent = '';
+        descEl.textContent = '';
+        iconEl.replaceChildren();
+        prereqEl.replaceChildren();
+        actionsEl.replaceChildren();
+        bodyEl.replaceChildren();
       }, 200);
     });
   })();
@@ -530,6 +577,8 @@ const devLinks = [
       closeBtn.addEventListener('click', function () {
         try { localStorage.setItem(KEY, '1'); } catch (e) {}
         nudge.remove();
+        var heading = document.getElementById('greeting');
+        if (heading) heading.focus({ preventScroll: true });
       });
     }
   })();
@@ -555,8 +604,8 @@ const devLinks = [
     border: 1px solid var(--accent);
     background: var(--accent-subtle);
     border-radius: var(--radius);
-    padding: var(--space-3) var(--space-4);
-    margin-bottom: var(--space-6);
+    padding: var(--space-3);
+    margin-bottom: var(--space-4);
   }
   .passkey-nudge-text {
     margin: 0;
@@ -564,6 +613,9 @@ const devLinks = [
     color: var(--text);
   }
   .passkey-nudge-link {
+    display: inline-flex;
+    align-items: center;
+    min-height: 2rem;
     margin-left: var(--space-2);
     font-weight: 600;
     white-space: nowrap;
@@ -572,7 +624,7 @@ const devLinks = [
     all: unset;
     cursor: pointer;
     flex-shrink: 0;
-    color: var(--text-muted);
+    color: var(--text-2);
     padding: var(--space-1) var(--space-2);
     line-height: 1;
     transition: color var(--duration-fast) var(--ease-out);
@@ -582,6 +634,29 @@ const devLinks = [
     outline: 2px solid var(--input-focus, var(--accent));
     outline-offset: 2px;
   }
+
+  /* Signed-in home: a one-line greeting, then the apps. */
+  .greeting:focus { outline: none; }
+  .greeting {
+    min-width: 0;
+    font-size: var(--text-2xl);
+    line-height: 1.2;
+    margin: 0 0 var(--space-4);
+  }
+  .greeting-sub { font-weight: 400; color: var(--text-2); font-size: var(--text-sm); margin-left: var(--space-2); }
+  @media (max-width: 640px) { .greeting-sub { display: none; } .greeting { margin-bottom: var(--space-3); } }
+  .missing-app { margin: var(--space-6) 0 0; }
+  .text-link {
+    all: unset;
+    cursor: pointer;
+    font-size: var(--text-sm);
+    color: var(--text-2);
+    text-decoration: underline;
+    text-decoration-color: var(--border-strong);
+    text-underline-offset: 3px;
+  }
+  .text-link:hover { color: var(--accent); }
+  .text-link:focus-visible { outline: 2px solid var(--input-focus, var(--accent)); outline-offset: 3px; }
 
   /* ── Hero CTA fragments ── */
   /* The sign-out form lays its button out as a sibling of the other CTAs. */
@@ -601,118 +676,37 @@ const devLinks = [
   }
   .cta-link:hover { color: var(--accent); text-decoration: none; }
 
-  /* Tile grid: each tile is an <article> with a launch anchor and a sibling "learn more" anchor (no nesting). */
+  /* Tile grid: TileCard renders each tile; the grid only sets the columns (1 on phones, 2 from 640px, 3 from 900px; TileCard lays out logo beside text on phones). */
   .tile-grid {
     display: grid;
-    grid-template-columns: repeat(2, 1fr);
+    grid-template-columns: 1fr;
     gap: var(--space-3);
     align-items: stretch;
   }
-  @media (min-width: 640px)  { .tile-grid { grid-template-columns: repeat(2, 1fr); } }
-  @media (min-width: 900px)  { .tile-grid { grid-template-columns: repeat(3, 1fr); } }
-  .tile {
-    display: flex;
-    flex-direction: column;
-    align-items: flex-start;
-    height: 100%;
-    background: var(--surface);
-    border: 1px solid var(--border);
-    border-radius: var(--radius);
-    overflow: hidden;
-    transition:
-      border-color var(--duration-fast) var(--ease-out),
-      box-shadow var(--duration-fast) var(--ease-out);
+  /* Grids fill the full row: 3 columns from 900px, but a group of 1, 2 or 4 tiles uses 2 columns (4 lays out 2x2)
+     so no row ends in an empty third. Outer edges match across groups. */
+  @media (min-width: 640px) {
+    .tile-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   }
-  .tile:hover {
-    border-color: var(--accent);
-  }
-  /* Inner launch anchor wraps icon + name + desc */
-  .tile-launch {
-    display: flex;
-    flex-direction: column;
-    align-items: flex-start;
-    gap: var(--space-2);
-    padding: var(--space-5) var(--space-4) var(--space-3);
-    color: var(--text);
-    text-decoration: none;
-    flex: 1;
-    width: 100%;
-    height: 100%;
-  }
-  .tile-launch:hover { text-decoration: none; color: var(--text); }
-  .tile-icon {
-    font-family: var(--font-mono);
-    font-size: var(--text-sm);
-    color: var(--accent);
-    letter-spacing: 0.06em;
-  }
-  /* Full-color icon image — keeps the SVG's own colors, no tinting. */
-  .tile-icon-img {
-    display: block;
-    width: 1.75rem;
-    height: 1.75rem;
-    object-fit: contain;
-    flex-shrink: 0;
-  }
-  .tile-name {
-    font-size: var(--text-base);
-    font-weight: 600;
-    color: var(--text);
-  }
-  .tile-desc {
-    font-size: var(--text-sm);
-    color: var(--text-2);
-    line-height: 1.4;
-    display: -webkit-box;
-    -webkit-line-clamp: 2;
-    -webkit-box-orient: vertical;
-    overflow: hidden;
-    /* Reserve height for exactly 2 lines so 1-line and 2-line tiles align */
-    min-height: calc(1.4em * 2);
-  }
-  .tile-learn {
-    /* Reset default <button> styles so it looks like the previous <a>. */
-    all: unset;
-    cursor: pointer;
-    font-family: var(--font-mono);
-    font-size: var(--text-xs);
-    color: var(--text-muted);
-    align-self: flex-end;
-    padding: var(--space-2) var(--space-4);
-    padding-block: var(--space-3);
-    min-height: 44px;
-    display: flex;
-    align-items: center;
-    border-top: 1px solid var(--border);
-    width: 100%;
-    justify-content: flex-end;
-    box-sizing: border-box;
-    margin-top: auto;
-  }
-  .tile-learn:hover { color: var(--accent); text-decoration: none; }
-  .tile-learn:focus-visible {
-    outline: 2px solid var(--input-focus, var(--accent));
-    outline-offset: -2px;
+  @media (min-width: 900px) {
+    .tile-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+    .tile-grid[data-count="1"],
+    .tile-grid[data-count="2"],
+    .tile-grid[data-count="4"] { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   }
 
-  /* Grouped tile sections: a bordered labeled section with heading and description above the grid. */
-  .tile-group {
-    margin-top: var(--space-6);
-    border: 1px solid var(--border);
-    border-radius: var(--radius);
-    background: transparent;
-    padding: var(--space-5);
-  }
-  .tile-group-header {
-    margin-bottom: var(--space-4);
-  }
+  /* Grouped tile sections: no frame, so the tiles sit on the same columns as the ungrouped grid. The title uses the
+     page's eyebrow type, with the group's description under it, full width above its tiles. */
+  .tile-group { margin-top: var(--space-5); }
+  .tile-group:first-child { margin-top: 0; }
+  .tile-group-header { margin-bottom: var(--space-3); }
   .tile-group-title {
     font-family: var(--font-mono);
-    font-size: var(--text-lg);
-    font-weight: 600;
-    color: var(--text);
+    font-size: var(--text-xs);
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--text-muted);
     margin: 0 0 var(--space-1) 0;
-    line-height: var(--lh-tight);
   }
   .tile-group-desc {
     font-size: var(--text-sm);
@@ -862,55 +856,91 @@ const devLinks = [
   }
   .request-thanks-note { font-size: var(--text-xs); color: var(--text-muted); }
 
-  /* App education modal: wider (46rem) scrollable reading pane; prose rules copied from apps/[slug].astro. */
+  /* App guide dialog: a centered 46rem card on desktop, a full-screen sheet on phones. Header, action band and the
+     guide body stack; only the body scrolls. */
   .app-modal {
     position: fixed;
-    top: 50%;
-    left: 50%;
-    transform: translate(-50%, -50%);
-    margin: 0;
-    max-width: min(46rem, 92vw);
-    max-height: 85vh;
-    width: 100%;
-    background: var(--bg, #ffffff);
+    inset: 0;
+    margin: auto;
+    width: min(46rem, 92vw);
+    height: fit-content;
+    max-height: min(85vh, 56rem);
+    background: var(--bg);
     border: 1px solid var(--border);
     border-radius: var(--radius);
     color: var(--text);
     padding: 0;
-    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.22);
+    box-shadow: 0 12px 40px rgba(0, 0, 0, 0.28);
     overflow: hidden;
   }
   /* <dialog> is display:none until [open]; scope the flex layout to [open]. */
   .app-modal[open] {
     display: flex;
     flex-direction: column;
+    animation: app-modal-in var(--duration-base, 200ms) var(--ease-out);
   }
   .app-modal::backdrop {
     background: rgba(0, 0, 0, 0.55);
     backdrop-filter: blur(3px);
   }
+  .app-modal[open]::backdrop { animation: app-modal-fade var(--duration-base, 200ms) var(--ease-out); }
+  @keyframes app-modal-in {
+    from { opacity: 0; transform: translateY(8px) scale(0.99); }
+    to   { opacity: 1; transform: none; }
+  }
+  @keyframes app-modal-fade { from { opacity: 0; } to { opacity: 1; } }
+  :global(body:has(.app-modal[open])) { overflow: hidden; }
+
+  /* Desktop: header and actions share the top row (Open sits at the right, under the close button); the strip and the
+     scrolling body follow. Phones reflow this into a title row, the scroll, and a pinned action bar. */
   .app-modal-inner {
-    display: flex;
-    flex-direction: column;
-    height: 100%;
+    position: relative;
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: auto auto auto minmax(0, 1fr);
+    grid-template-areas: "head" "prereq" "actions" "body";
+    min-height: 0;
+    flex: 1;
     overflow: hidden;
   }
   .app-modal-header {
+    grid-area: head;
     display: grid;
-    grid-template-columns: 1fr auto;
-    gap: var(--space-3) var(--space-4);
-    align-items: start;
-    padding: var(--space-5) var(--space-5) var(--space-4);
+    grid-template-columns: auto minmax(0, 1fr);
+    gap: var(--space-4);
+    align-items: center;
+    padding: var(--space-4) calc(var(--space-5) + 44px + var(--space-2)) var(--space-4) var(--space-5);
+    background: var(--tile-bg, var(--bg));
     border-bottom: 1px solid var(--border);
-    flex-shrink: 0;
   }
-  .app-modal-title {
+  .app-modal :global(.app-modal-logo) {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 3.5rem;
+    height: 3.5rem;
+    padding: 0.55rem;
+    box-sizing: border-box;
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+  }
+  .app-modal :global(.app-modal-logo img) { display: block; width: 100%; height: 100%; object-fit: contain; }
+  .app-modal :global(.app-modal-logo-mono) {
     font-family: var(--font-mono);
+    font-size: var(--text-base);
+    font-weight: 600;
+    color: var(--accent);
+    text-transform: uppercase;
+  }
+  .app-modal-header-text { min-width: 0; }
+  .app-modal-title {
+    font-family: var(--font-display, var(--font-mono));
     font-size: var(--text-xl);
     font-weight: 700;
     color: var(--text);
     line-height: 1.2;
-    margin: 0 0 var(--space-1);
+    margin: 0 0 2px;
   }
   .app-modal-desc {
     font-size: var(--text-sm);
@@ -918,117 +948,146 @@ const devLinks = [
     line-height: 1.4;
     margin: 0;
   }
+  /* Close sits over the header's right edge; on phones the whole sheet scrolls and the button stays pinned. */
   .app-modal-close {
-    all: unset;
+    position: absolute;
+    top: var(--space-3);
+    right: var(--space-3);
+    z-index: 3;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 44px;
+    height: 44px;
+    background: var(--tile-bg, var(--bg));
+    border: 1px solid var(--border);
+    border-radius: 50%;
+    color: var(--text-2);
     cursor: pointer;
-    font-size: var(--text-base);
-    color: var(--text-muted);
-    padding: var(--space-1) var(--space-2);
-    border-radius: var(--radius-sm);
-    line-height: 1;
-    transition: color var(--duration-fast) var(--ease-out);
+    transition:
+      color var(--duration-fast) var(--ease-out),
+      background-color var(--duration-fast) var(--ease-out);
   }
-  .app-modal-close:hover { color: var(--text); }
+  .app-modal-close:hover { color: var(--text); background: var(--accent-subtle); }
   .app-modal-close:focus-visible {
     outline: 2px solid var(--input-focus, var(--accent));
-    outline-offset: 2px;
+    outline-offset: 1px;
   }
-  .app-modal-cta {
-    padding: var(--space-4) var(--space-5) 0;
-    flex-shrink: 0;
+
+  .app-modal-actions[hidden],
+  .app-modal-prereq[hidden] { display: none; }
+  .app-modal-actions {
+    grid-area: actions;
+    display: flex;
+    align-items: center;
+    padding: var(--space-3) var(--space-5);
+    background: var(--tile-bg, var(--bg));
+    border-bottom: 1px solid var(--border);
   }
+  .app-modal-prereq { grid-area: prereq; }
   .app-modal-body {
+    grid-area: body;
     padding: var(--space-5) var(--space-5) var(--space-6);
     overflow-y: auto;
+    overscroll-behavior: contain;
     flex: 1;
-    font-size: var(--text-base);
-    line-height: 1.6;
-    color: var(--text);
+    min-height: 0;
+  }
+  .app-modal-body:focus-visible {
+    outline: 2px solid var(--input-focus, var(--accent));
+    outline-offset: -2px;
+  }
+  .app-modal-body :global(.app-modal-more) {
+    margin: var(--space-5) 0 0;
+    font-size: var(--text-xs);
   }
 
-  /* Prose rules — identical to .app-body :global(...) in apps/[slug].astro */
-  .app-modal :global(.edu-prose h2) {
-    font-family: var(--font-mono);
-    font-size: var(--text-lg);
-    font-weight: 600;
-    margin: var(--space-4) 0 var(--space-1);
+  @media (max-width: 640px) {
+    .app-modal {
+      inset: 0;
+      width: 100vw;
+      max-width: none;
+      height: 100dvh;
+      max-height: none;
+      border: 0;
+      border-radius: 0;
+    }
+    .app-modal[open] { animation-name: app-modal-sheet; }
+    /* One scroller. A single title row stays pinned on top, the strip and guide scroll beneath it, and the action
+       bar is pinned to the bottom edge where a thumb reaches it. */
+    .app-modal-inner {
+      display: flex;
+      flex-direction: column;
+      overflow-y: auto;
+      overscroll-behavior: contain;
+    }
+    .app-modal-header {
+      position: sticky;
+      top: 0;
+      z-index: 2;
+      gap: var(--space-3);
+      padding: calc(var(--space-3) + env(safe-area-inset-top, 0px)) calc(var(--space-3) + 44px + var(--space-2)) var(--space-3) var(--space-3);
+      min-height: 4rem;
+      height: auto;
+      flex-shrink: 0;
+      align-items: start;
+    }
+    .app-modal-desc {
+      display: -webkit-box;
+      -webkit-line-clamp: 2;
+      -webkit-box-orient: vertical;
+      overflow: hidden;
+    }
+    .app-modal-title { font-size: var(--text-lg); }
+    .app-modal-body { overflow: visible; flex: none; padding: var(--space-4) var(--space-4) var(--space-5); }
+    .app-modal-actions {
+      position: sticky;
+      bottom: 0;
+      z-index: 2;
+      margin-top: auto;
+      order: 2;
+      padding: var(--space-2) var(--space-3) calc(var(--space-2) + env(safe-area-inset-bottom, 0px));
+      border-bottom: 0;
+      border-top: 1px solid var(--border);
+    }
+    .app-modal-actions :global(.app-actions-row) { width: 100%; }
+    .app-modal-close { position: sticky; top: calc(var(--space-2) + env(safe-area-inset-top, 0px)); right: auto; z-index: 3; flex-shrink: 0; align-self: flex-end; margin: var(--space-2) var(--space-2) -52px 0; }
+    .app-modal :global(.app-modal-logo) { width: 2.5rem; height: 2.5rem; padding: 0.4rem; }
   }
-  .app-modal :global(.edu-prose h3) {
-    font-family: var(--font-mono);
-    font-size: var(--text-base);
-    font-weight: 600;
-    margin: var(--space-3) 0 var(--space-1);
+  @keyframes app-modal-sheet {
+    from { transform: translateY(24px); opacity: 0; }
+    to   { transform: none; opacity: 1; }
   }
-  .app-modal :global(.edu-prose p) {
-    margin: var(--space-3) 0;
-  }
-  .app-modal :global(.edu-prose ul),
-  .app-modal :global(.edu-prose ol) {
-    margin: var(--space-3) 0;
-    padding-left: var(--space-5);
-  }
-  .app-modal :global(.edu-prose code) {
-    font-family: var(--font-mono);
-    font-size: var(--text-sm);
-    background: var(--surface);
-    padding: 0.1em 0.4em;
-    border-radius: 4px;
-  }
-  .app-modal :global(.edu-prose pre) {
-    font-family: var(--font-mono);
-    font-size: var(--text-sm);
-    background: var(--surface);
-    border: 1px solid var(--border);
-    padding: var(--space-3);
-    border-radius: var(--radius);
-    overflow-x: auto;
-  }
-  .app-modal :global(.edu-prose pre code) {
-    background: transparent;
-    padding: 0;
-  }
-  .app-modal :global(.edu-prose a) {
-    color: var(--accent);
-    text-decoration: underline;
-  }
-
-  /* Cat-explainer diagram CSS (inline SVG diagrams in education content) */
-  .app-modal :global(.cat-explainer) {
-    background: var(--surface);
-    border: 1px solid var(--border);
-    border-radius: var(--radius);
-    padding: var(--space-4);
-    margin: var(--space-4) 0;
-  }
-  .app-modal :global(.cat-explainer svg) {
-    display: block;
-    width: 100%;
-    height: auto;
-    max-width: 720px;
-    margin: 0 auto;
-  }
-  .app-modal :global(.cat-explainer p) {
-    margin: var(--space-3) 0 0 0;
-    font-size: var(--text-sm);
-    color: var(--text-2);
+  @media (prefers-reduced-motion: reduce) {
+    .app-modal[open],
+    .app-modal[open]::backdrop { animation: none; }
   }
 
   /* ── Mobile ── */
   @media (max-width: 640px) {
+    .tile-grid { gap: var(--space-2); }
+    .tile-group { margin-top: var(--space-5); }
     /* Passkey nudge: stack the message above the close button instead of
      * squeezing both onto one row. */
     .passkey-nudge {
-      flex-direction: column;
-      align-items: flex-start;
       gap: var(--space-2);
+      padding: var(--space-3) var(--space-1) var(--space-3) var(--space-3);
+      margin-bottom: var(--space-3);
     }
-    .passkey-nudge-close { align-self: flex-end; }
+    .passkey-nudge-text { line-height: 1.4; }
+    .passkey-nudge-link { margin-left: var(--space-1); }
+    .passkey-nudge-text { font-size: var(--text-sm); }
+    .passkey-nudge-close { min-width: 44px; min-height: 44px; display: flex; align-items: center; justify-content: center; align-self: center; }
 
     /* Stack post-auth CTA actions full-width with adequate tap height. */
     .cta-row {
-      flex-direction: column;
-      align-items: stretch;
+      display: grid;
+      grid-template-columns: 1fr;
+      gap: var(--space-2);
+      margin-top: var(--space-4);
     }
+    .cta-row .cta-note { text-align: left; }
+    .section { margin-top: var(--space-5); }
     .cta-row .button,
     .cta-row .cta-link {
       text-align: center;
@@ -1038,12 +1097,5 @@ const devLinks = [
       justify-content: center;
       margin-left: 0;
     }
-    /* 2-col tile grid on narrow screens (≥375px default, 1-col only if very narrow). */
-    .tile-grid {
-      grid-template-columns: repeat(2, 1fr);
-    }
-  }
-  @media (max-width: 374px) {
-    .tile-grid { grid-template-columns: 1fr; }
   }
 </style>

@@ -10,24 +10,12 @@ function kratosIdentity(fields) {
 
 const DEFAULT_BASE = 'http://kratos:4434';
 
-function defaultSchemaId() {
-  const v = process.env.OTHALA_DEFAULT_SCHEMA_ID;
-  return v !== undefined && v.trim() !== '' ? v.trim() : 'default';
-}
-
 function adminBase() {
-  return process.env.KRATOS_ADMIN_URL ?? DEFAULT_BASE;
-}
-
-function adminToken() {
-  return process.env.KRATOS_ADMIN_TOKEN ?? '';
+  return DEFAULT_BASE;
 }
 
 function authHeaders(extra = {}) {
-  const headers = { Accept: 'application/json', ...extra };
-  const token = adminToken();
-  if (token) headers.Authorization = `Bearer ${token}`;
-  return headers;
+  return { Accept: 'application/json', ...extra };
 }
 
 async function ok(res, label) {
@@ -65,7 +53,6 @@ async function createIdentity(input) {
     method: 'POST',
     headers: authHeaders({ 'Content-Type': 'application/json' }),
     body: JSON.stringify({
-      schema_id: input.schemaId ?? defaultSchemaId(),
       traits: input.traits,
       metadata_admin: validated,
     }),
@@ -186,9 +173,6 @@ function mockFetchSequence(responses) {
 }
 
 beforeEach(() => {
-  delete process.env.KRATOS_ADMIN_URL;
-  delete process.env.KRATOS_ADMIN_TOKEN;
-  delete process.env.OTHALA_DEFAULT_SCHEMA_ID;
   mockFetch();
 });
 
@@ -196,23 +180,10 @@ test('adminBase: defaults to http://kratos:4434', () => {
   assert.equal(adminBase(), DEFAULT_BASE);
 });
 
-test('adminBase: KRATOS_ADMIN_URL overrides default', () => {
-  process.env.KRATOS_ADMIN_URL = 'http://custom-host:4434';
-  assert.equal(adminBase(), 'http://custom-host:4434');
-  delete process.env.KRATOS_ADMIN_URL;
-});
-
-test('authHeaders: no token → no Authorization header', () => {
+test('authHeaders: sends no Authorization header', () => {
   const h = authHeaders();
   assert.equal(h.Authorization, undefined);
   assert.equal(h.Accept, 'application/json');
-});
-
-test('authHeaders: token set → Authorization: Bearer <token>', () => {
-  process.env.KRATOS_ADMIN_TOKEN = 'secret-token';
-  const h = authHeaders();
-  assert.equal(h.Authorization, 'Bearer secret-token');
-  delete process.env.KRATOS_ADMIN_TOKEN;
 });
 
 test('authHeaders: extra headers are merged', () => {
@@ -260,14 +231,6 @@ test('listIdentities: caps per_page at 250', async () => {
   assert.match(capturedCalls[0].url, /per_page=250/);
 });
 
-test('listIdentities: uses correct base URL', async () => {
-  process.env.KRATOS_ADMIN_URL = 'http://admin.internal:9000';
-  mockFetch([]);
-  await listIdentities();
-  assert.match(capturedCalls[0].url, /^http:\/\/admin\.internal:9000\//);
-  delete process.env.KRATOS_ADMIN_URL;
-});
-
 test('getIdentity: GETs /admin/identities/<id>', async () => {
   mockFetch(kratosIdentity({ id: 'abc123', traits: {}, schema_id: 'family', state: 'active' }));
   await getIdentity('abc123');
@@ -299,31 +262,6 @@ test('createIdentity: sets Content-Type application/json', async () => {
   await createIdentity({ traits: { username: 'alice', email: 'alice@example.com' }, metadataAdmin: {} });
   const headers = capturedCalls[0].opts.headers;
   assert.equal(headers['Content-Type'], 'application/json');
-});
-
-test('createIdentity: defaults schema_id to OTHALA_DEFAULT_SCHEMA_ID (neutral default "default")', async () => {
-  delete process.env.OTHALA_DEFAULT_SCHEMA_ID;
-  await createIdentity({ traits: { username: 'alice', email: 'alice@example.com' }, metadataAdmin: {} });
-  const body = JSON.parse(capturedCalls[0].opts.body);
-  assert.equal(body.schema_id, 'default');
-});
-
-test('createIdentity: OTHALA_DEFAULT_SCHEMA_ID env var overrides neutral default', async () => {
-  process.env.OTHALA_DEFAULT_SCHEMA_ID = 'family';
-  await createIdentity({ traits: { username: 'alice', email: 'alice@example.com' }, metadataAdmin: {} });
-  const body = JSON.parse(capturedCalls[0].opts.body);
-  assert.equal(body.schema_id, 'family');
-  delete process.env.OTHALA_DEFAULT_SCHEMA_ID;
-});
-
-test('createIdentity: passes through explicit schemaId', async () => {
-  await createIdentity({
-    traits: { username: 'alice', email: 'alice@example.com' },
-    metadataAdmin: {},
-    schemaId: 'guest',
-  });
-  const body = JSON.parse(capturedCalls[0].opts.body);
-  assert.equal(body.schema_id, 'guest');
 });
 
 test('createIdentity: includes traits in request body', async () => {

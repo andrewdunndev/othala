@@ -1,0 +1,47 @@
+---
+// The guide's action buttons. When a prerequisite is unmet, setting it up is the primary action and Open is secondary;
+// otherwise Open is primary. Shared by the dashboard dialog and /apps/<slug>.
+
+import type { Requirement } from '../lib/tiles';
+
+interface Props {
+  name: string;
+  href: string;
+  requirements: Requirement[];
+  ready: boolean;
+}
+
+const { name, href, requirements, ready } = Astro.props;
+const first = requirements[0];
+const needsSetup = !!first && !ready;
+---
+
+<div class="app-actions-row">
+  {
+    needsSetup && (
+      <a class="button button-primary app-act" href={`/requirements/${encodeURIComponent(first.name)}`}>
+        Set up {first.title}
+      </a>
+    )
+  }
+  <a class:list={['button', 'app-act', 'app-modal-open', needsSetup ? 'button-secondary' : 'button-primary']} href={href} rel="noopener">
+    Open {name} ↗
+  </a>
+</div>
+
+<style>
+  .app-actions-row { display: flex; flex-wrap: wrap; gap: var(--space-2); }
+  .app-act {
+    min-height: 44px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-size: var(--text-sm);
+    padding: 0 var(--space-4);
+    white-space: nowrap;
+  }
+  @media (max-width: 640px) {
+    .app-actions-row { width: 100%; }
+    .app-act { flex: 1 1 auto; }
+  }
+</style>

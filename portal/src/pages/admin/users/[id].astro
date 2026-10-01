@@ -1,87 +1,98 @@
 ---
-// Admin: user detail, edit and actions (`?mode=edit` for the form). Also the REPAIR surface for stored group names
-// that refuseNonCanonical (gate.ts) denies: each gets its own row and the save path decides it via planGroupSave.
-// The action=<name> POST handlers live in src/lib/admin-actions.ts; this page verifies the action-scoped CSRF token
-// and dispatches. Effective Access lists only apps the user can use, with the resolved role and its source.
+// Admin: one person, view and edit on one page. Sections save on their own (Apps, Household, Prerequisites, Profile) so
+// none can clobber another; sign-in actions and the danger zone use the inline confirm. This is also the REPAIR
+// surface for stored groups refuseNonCanonical (gate.ts) denies: the Unrecognised groups card shows each raw string so
+// it can be removed. The POST handlers live in src/lib/admin-actions.ts; this page verifies the action-scoped CSRF token
+// and dispatches. The result of an action shows once, inside the section the form posted to.
 
 export const prerender = false;
 
-import Layout from '../../../layouts/Layout.astro';
-import AdminFormScripts from '../../../components/AdminFormScripts.astro';
-import { requireAdminSession } from '../../../lib/admin';
-import { getIdentity, EVICTABLE_CREDENTIAL_TYPES } from '../../../lib/admin-api';
+import AdminLayout from '../../../layouts/AdminLayout.astro';
+import AccessRows from '../../../components/AccessRows.astro';
+import Ask from '../../../components/Ask.astro';
+import ManifestNotice from '../../../components/ManifestNotice.astro';
+import SetupLink from '../../../components/SetupLink.astro';
+import TitleRow from '../../../components/TitleRow.astro';
+import { adminContext } from '../../../lib/admin-context';
+import { getIdentity, listIdentities, EVICTABLE_CREDENTIAL_TYPES } from '../../../lib/admin-api';
 import { ADMIN_ACTIONS, ENROLLMENT_TTL, type ActionResult } from '../../../lib/admin-actions';
-import { servingManifests } from '../../../lib/manifest-store';
-import { computeEffectiveAccess, describeSource, IDENTITY_GROUP_ORDER } from '../../../lib/access';
-import { getGroupRegistry, isIdentityGroup, unconfiguredGroups } from '../../../lib/group-registry';
-import { nonCanonicalGroups } from '../../../lib/gate';
+import { bannerFor } from '../../../lib/admin-banner';
+import { currentLevel, NO_ACCESS } from '../../../lib/access-rows';
+import { emailIsVerified, householdChoices, PEOPLE_LOAD_ERROR, personLimits, personName, removalBlock, signInMethods, unrecognisedGroups } from '../../../lib/admin-view';
+import { devActionResult } from '../../../lib/admin-fixtures';
+import { isAdminMarker } from '../../../lib/admin-auth';
+import { shouldRefuseRecovery } from '../../../lib/access';
+import { hasSecondFactor } from '../../../lib/step-up';
+import { loadRequirements } from '../../../lib/tiles';
 import { signToken, verifyToken, CSRFError } from '../../../lib/csrf';
 import type { Identity } from '../../../lib/types';
 
-const guard = await requireAdminSession(Astro);
-if (guard instanceof Response) return guard;
-const adminIdentityId = guard.identity?.id ?? '';
+const ctx = await adminContext(Astro);
+if (ctx instanceof Response) return ctx;
+const { adminId, apps, health, dev } = ctx;
 
 const { id } = Astro.params;
 if (!id) return new Response('Missing identity id', { status: 400 });
 
-// Serving store, not the strict loader: operators grant and revoke access here, so it must survive a broken manifest.
-const manifests = servingManifests();
-const registry = getGroupRegistry();
-// Identity-group form labels share the canonical order with access.ts.
-const IDENTITY_GROUPS = [...IDENTITY_GROUP_ORDER];
-// "App access" checkboxes: one per access-BEARING group bound in the registry (type is the binding, not the name),
-// each annotated with the app(s) it grants.
-const clientNameById = new Map(manifests.map((m) => [m.clientId, m.clientName] as const));
-const ACCESS_GROUPS = Array.from(registry.values())
-  .filter((e) => e.kinds.has('access'))
-  .map((e) => ({
-    group: e.name,
-    apps: e.accessFor.map((id) => ({ clientId: id, clientName: clientNameById.get(id) ?? id })),
-  }))
-  .sort((a, b) => a.group.localeCompare(b.group));
+const manifests = apps.map((a) => a.manifest);
+const requirements = dev
+  ? dev.requirements
+  : [...loadRequirements().values()].map((r) => ({ name: r.name, title: r.title, why: r.why }));
+
 let identity: Identity | null = null;
 let loadError: string | null = null;
+let notFound = false;
 
 async function reload(): Promise<Identity | null> {
+  if (dev) return dev.identities.find((i) => i.id === id) ?? null;
   try {
     return await getIdentity(id!);
   } catch (err) {
+    if ((err as { response?: { status?: number } })?.response?.status === 404) {
+      notFound = true;
+      return null;
+    }
     console.error('[othala/admin/users/[id]] getIdentity failed:', err);
-    loadError = 'Failed to read identity store — check Kratos connectivity.';
+    loadError = PEOPLE_LOAD_ERROR;
     return null;
   }
 }
 
 identity = await reload();
+if (dev && !identity) notFound = true;
+if (notFound) Astro.response.status = 404;
 
-let mode: 'read' | 'edit' = Astro.url.searchParams.get('mode') === 'edit' ? 'edit' : 'read';
+let action = '';
 let actionResult: ActionResult | null = null;
 let formErrors: Record<string, string> = {};
 
 if (Astro.request.method === 'POST' && identity) {
   const fd = await Astro.request.formData();
-  const action = String(fd.get('action') ?? 'save');
+  action = String(fd.get('action') ?? '');
 
-  // Every state-changing admin POST carries a CSRF token bound to the admin identity and the action.
-  try {
-    const tokenAction = action === 'remove-credential' ? `remove-${String(fd.get('cred_type') ?? '')}` : action;
-    verifyToken(String(fd.get('csrf_token') ?? ''), adminIdentityId, tokenAction);
-  } catch (err) {
-    if (err instanceof CSRFError) {
-      return new Response(`CSRF: ${err.message}`, { status: 403 });
+  // Every state-changing admin POST carries a CSRF token bound to the admin identity and the action. A dev fixture
+  // has no secret to sign with, so it skips the check and writes nothing.
+  if (!dev) {
+    try {
+      const tokenAction = action === 'remove-credential' ? `remove-${String(fd.get('cred_type') ?? '')}` : action;
+      verifyToken(String(fd.get('csrf_token') ?? ''), adminId, tokenAction);
+    } catch (err) {
+      if (err instanceof CSRFError) {
+        return new Response(`CSRF: ${err.message}`, { status: 403 });
+      }
+      throw err;
     }
-    throw err;
   }
 
   const handler = ADMIN_ACTIONS[action];
-  if (handler) {
+  if (dev) {
+    actionResult = devActionResult(action, fd, identity.traits?.username ?? '');
+  } else if (handler) {
     try {
-      const outcome = await handler(fd, { id, identity, adminIdentityId, manifests });
+      const outcome = await handler(fd, { id, identity, adminIdentityId: adminId, manifests, requirements: requirements.map((r) => r.name) });
       if (outcome instanceof Response) return outcome;
       if (outcome.actionResult) actionResult = outcome.actionResult;
       if (outcome.formErrors) formErrors = outcome.formErrors;
-      if (outcome.mode) mode = outcome.mode;
       if (outcome.refetch) identity = await reload();
     } catch (err) {
       actionResult = { kind: 'error', message: err instanceof Error ? err.message : String(err) };
@@ -89,702 +100,418 @@ if (Astro.request.method === 'POST' && identity) {
   }
 }
 
-const groups = identity?.metadata_admin?.groups ?? [];
-// Split membership by the registry's binding-derived type, not an `access-` name prefix: identity-typed groups go in
-// the identity column, everything else in "access". Stored names that miss the canonical policy get their OWN row in
-// both modes (they grant nothing and are why every app denies this identity, see refuseNonCanonical).
-const nonCanonical = nonCanonicalGroups(identity);
-const nonCanonicalSet = new Set(nonCanonical);
-const identityGroupMembership = groups.filter((g) => !nonCanonicalSet.has(g) && isIdentityGroup(registry, g));
-const accessGroupMembership = groups.filter((g) => !nonCanonicalSet.has(g) && !isIdentityGroup(registry, g));
-// Stored names no checkbox offers; the save keeps them unless ticked for removal (saveAction).
-const unconfigured = unconfiguredGroups(registry, groups);
-const roleOverrides = (identity?.metadata_admin?.roles ?? {}) as Record<string, string>;
-const effective = identity ? computeEffectiveAccess(identity, manifests) : [];
-
-// Credential enrollment from the identity's credentials object (present when getIdentity passes `includeCredential`); tolerates absence.
-const CREDENTIAL_METHODS: Array<{ key: string; label: string }> = [
-  { key: 'passkey',       label: 'passkey' },
-  { key: 'password',      label: 'password' },
-  { key: 'totp',          label: 'totp' },
-  { key: 'webauthn',      label: 'webauthn' },
-  { key: 'lookup_secret', label: 'backup codes' },
-];
-const credentialMap = identity?.credentials ?? {};
-
-const formValues = {
-  username: identity?.traits?.username ?? '',
-  email: identity?.traits?.email ?? '',
-  displayName: identity?.traits?.displayName ?? '',
-  recoveryEmail: identity?.traits?.recoveryEmail ?? '',
-  identityGroups: identityGroupMembership,
-  accessGroups: accessGroupMembership,
-  roleOverrides,
+// Which section an action's result belongs to: the form posts there and the result shows there, once.
+const SECTION_OF: Record<string, string> = {
+  'save-profile': 'profile',
+  'save-access': 'apps',
+  'save-household': 'household',
+  'grant-admin': 'household',
+  'revoke-admin': 'household',
+  'set-prerequisites': 'prerequisites',
+  'remove-groups': 'groups',
+  'mark-verified': 'signin',
+  'issue-recovery': 'signin',
+  'send-invite-email': 'signin',
+  'force-relogin': 'signin',
+  'remove-credential': 'signin',
+  deactivate: 'status',
+  reactivate: 'status',
+  delete: 'danger',
 };
+const resultSection = SECTION_OF[action] ?? '';
 
-// Mint a fresh CSRF token per form (tokens are single-use, 30 min TTL), each scoped to its action.
-const csrfTokenSave = signToken(adminIdentityId, 'save');
-const csrfTokenDelete = signToken(adminIdentityId, 'delete');
-const csrfTokenIssueRecovery = signToken(adminIdentityId, 'issue-recovery');
-const csrfTokenInviteEmail = signToken(adminIdentityId, 'send-invite-email');
-const csrfTokenForceRelogin = signToken(adminIdentityId, 'force-relogin');
-// Deactivate/reactivate are mutually exclusive, so one token.
-const csrfTokenDeactivate = identity?.state === 'inactive'
-  ? signToken(adminIdentityId, 'reactivate')
-  : signToken(adminIdentityId, 'deactivate');
-// Admin grant/revoke: mutually exclusive by current marker state.
-const isTargetAdmin = identity?.metadata_admin?.admin === true;
-const csrfTokenAdminToggle = isTargetAdmin
-  ? signToken(adminIdentityId, 'revoke-admin')
-  : signToken(adminIdentityId, 'grant-admin');
-// One token per credential-remove form; types are enumerated at render time.
-const csrfTokensRemove: Record<string, string> = {};
-for (const { key } of CREDENTIAL_METHODS) {
-  if (EVICTABLE_CREDENTIAL_TYPES.has(key) && credentialMap[key]) {
-    csrfTokensRemove[key] = signToken(adminIdentityId, `remove-${key}`);
+const who = identity ? personName(identity) : '';
+const first = who.split(/\s+/)[0] || who;
+const formMessage = Object.values(formErrors).join(' ');
+const banner = actionResult
+  ? bannerFor(actionResult, action, first)
+  : formMessage
+    ? { tone: 'danger' as const, text: formMessage }
+    : null;
+const recovery = actionResult?.kind === 'recovery' ? actionResult : null;
+
+const meta = identity?.metadata_admin;
+const username = identity?.traits?.username ?? '';
+const email = identity?.traits?.email ?? '';
+const isSelf = id === adminId;
+const isTargetAdmin = identity ? isAdminMarker(identity) : false;
+const isOff = identity?.state === 'inactive';
+const verified = identity ? emailIsVerified(identity) : false;
+const twoStep = identity ? hasSecondFactor(identity) : false;
+const methods = identity ? signInMethods(identity) : [];
+const unrecognised = identity ? unrecognisedGroups(identity, manifests) : [];
+const currentLevels: Record<string, string> = {};
+for (const a of apps) currentLevels[a.clientId] = identity ? currentLevel(a.manifest, meta) : NO_ACCESS;
+const households = householdChoices();
+const storedGroups = meta?.groups ?? [];
+const marked = meta?.prerequisites ?? [];
+const roleOverrides = meta?.roles ?? {};
+
+// The last-admin note needs the admin count; a failed read only drops the note, the server still refuses.
+let lastAdmin = false;
+if (isTargetAdmin && !isOff) {
+  try {
+    const all = dev ? dev.identities : await listIdentities();
+    lastAdmin = all.filter((i) => isAdminMarker(i) && i.state !== 'inactive').length <= 1;
+  } catch {
+    lastAdmin = false;
   }
 }
 
-// The exact text the admin pastes, composed server-side so the textarea and the copy button match and link and code travel together.
-const enrollmentShareText =
-  actionResult?.kind === 'recovery'
-    ? [
-        `Set up your account: ${actionResult.url}`,
-        ``,
-        `Recovery code: ${actionResult.code}`,
-        ``,
-        `The code works once and expires ${actionResult.expiresAt}.`,
-      ].join('\n')
-    : '';
+/** A fresh CSRF token scoped to one action; empty only in a dev fixture without CSRF_SECRET. */
+function tok(name: string): string {
+  try {
+    return signToken(adminId, name);
+  } catch (err) {
+    if (!dev) throw err;
+    return '';
+  }
+}
 
-const adminNav = [
-  { href: '/admin',          label: 'Overview' },
-  { href: '/admin/users',    label: 'Users' },
-  { href: '/admin/groups',   label: 'Groups' },
-  { href: '/admin/oauth2',   label: 'Apps' },
-  { href: '/auth/settings',  label: 'Settings' },
-];
+const devState = dev ? Astro.url.searchParams.get('dev-state') : null;
+const limits = identity ? personLimits(identity, { first, isSelf, lastAdmin }) : null;
+const peopleHref = devState ? `/admin/users?dev-state=${devState}` : '/admin/users';
+const removable = methods.filter((m) => m.enrolled && EVICTABLE_CREDENTIAL_TYPES.has(m.key));
+const roleNote = Object.keys(roleOverrides).length;
 ---
-<Layout title={`${formValues.username || id} — Admin`} description="Identity detail.">
-  <header class="page-header">
-    <p class="page-eyebrow">administration · identity</p>
-    <h1 class="page-title">{formValues.username || id}</h1>
-    {formValues.displayName && (
-      <p class="page-lede">{formValues.displayName} · <span class="mono">{formValues.email}</span></p>
-    )}
-  </header>
+<AdminLayout title={who || 'Person'} description="One person: apps, household, sign-in." identityId={adminId}>
+  <a class="back-link" href={peopleHref}>← People</a>
 
-  <nav class="nav-bar" aria-label="Admin">
-    {adminNav.map(item => (
-      <a href={item.href}>{item.label}</a>
-    ))}
-  </nav>
+  {loadError && <div class="notice notice-danger" role="alert">{loadError}</div>}
+  <ManifestNotice health={health} />
 
-  <section class="stack-lg">
-    {loadError && (
-      <div class="notice notice-danger">Failed to load identity: {loadError}</div>
-    )}
-
-    {actionResult?.kind === 'updated' && (
-      <div class="notice notice-success">
-        Identity updated.
-        {actionResult.removed.length > 0 && (
-          <span>
-            {' '}Removed unrecognised group(s):{' '}
-            <span class="mono">{actionResult.removed.join(', ')}</span>. If this
-            person still needs access, confirm the correct group is ticked.
-          </span>
-        )}
-      </div>
-    )}
-    {actionResult?.kind === 'deactivated' && (
-      <div class="notice notice-warning">
-        {actionResult.username} marked inactive. Existing sessions revoked.
-      </div>
-    )}
-    {actionResult?.kind === 'reactivated' && (
-      <div class="notice notice-success">
-        {actionResult.username} restored to active. They will need to log in again.
-      </div>
-    )}
-    {actionResult?.kind === 'recovery' && (
-      <div class="notice notice-success stack">
-        <p><strong>Enrollment link and code issued.</strong></p>
-        <p class="text-sm">
-          No email was sent. Send them <strong>both</strong> values yourself,
-          out of band (Signal, iMessage). The link opens the enrollment form
-          with an empty code field, so the link on its own is a dead end.
-        </p>
-        <p class="text-sm">
-          The code works <strong>once</strong> and the pair is valid for
-          {ENROLLMENT_TTL} from issue — it expires
-          <span class="mono">{actionResult.expiresAt}</span>. After that, issue
-          a fresh pair from this page.
-        </p>
-
-        <div class="field">
-          <label for="enrollmentShareText">Message to send (link + code)</label>
-          <textarea id="enrollmentShareText" rows="5" readonly>{enrollmentShareText}</textarea>
-          <div class="copy-actions">
-            <button type="button" class="button button-primary button-sm" data-copy="enrollmentShareText">
-              Copy link + code
-            </button>
-          </div>
-          <span class="field-hint">
-            Together these two values are the credential. Delete the message once they are in.
-          </span>
+  {identity && (
+    <>
+      <TitleRow title={who} lede={email}>
+        <div class="badges">
+          {isTargetAdmin && <span class="badge badge-accent">Admin</span>}
+          {isOff && <span class="badge badge-muted">Sign-in off</span>}
+          {!twoStep && <a class="badge badge-warning" href="#signin">Two-step off</a>}
+          {!verified && <a class="badge badge-warning" href="#signin">Unverified email</a>}
         </div>
+      </TitleRow>
 
-        <div class="field">
-          <label for="enrollmentUrl">Enrollment link</label>
-          <div class="copy-row">
-            <input id="enrollmentUrl" type="text" readonly value={actionResult.url} />
-            <button type="button" class="button button-secondary button-sm" data-copy="enrollmentUrl">
-              Copy
-            </button>
-          </div>
-        </div>
-
-        <div class="field">
-          <label for="enrollmentCode">Recovery code</label>
-          <div class="copy-row">
-            <input id="enrollmentCode" type="text" class="mono" readonly value={actionResult.code} />
-            <button type="button" class="button button-secondary button-sm" data-copy="enrollmentCode">
-              Copy
-            </button>
-          </div>
-          <span class="field-hint">Sending the link without this is the most common way enrollment dead-ends.</span>
-        </div>
-      </div>
-    )}
-    {actionResult?.kind === 'invite-email' && (
-      <div class="notice notice-success stack">
-        <p>
-          <strong>Invite email sent</strong> to <span class="mono">{actionResult.email}</span> via
-          the Kratos courier.
-        </p>
-        <p class="text-sm">
-          It carries a recovery <strong>code only</strong> — Kratos's code-recovery template never
-          embeds a link with the code, so this message alone can never complete enrollment. Tell
-          them where to go separately (the portal's recovery page is a fixed public URL, not a
-          secret) — Signal, iMessage, or however you'd already planned to reach them.
-        </p>
-        <p class="text-sm muted">
-          This confirms Kratos accepted the request, not that the mail left the relay — identical
-          to what an ordinary "Forgot access?" recovery already promises.
-        </p>
-      </div>
-    )}
-    {actionResult?.kind === 'revoked' && (
-      <div class="notice notice-success">
-        <p>
-          <strong>Force re-login complete.</strong>
-          Kratos sessions revoked; Hydra login + consent sessions revoked
-          (the remembered login is cut).
-        </p>
-      </div>
-    )}
-    {actionResult?.kind === 'admin-granted' && (
-      <div class="notice notice-success">
-        Admin marker granted to <strong>{actionResult.username}</strong>. They will have admin authority on next page load.
-      </div>
-    )}
-    {actionResult?.kind === 'admin-revoked' && (
-      <div class="notice notice-warning">
-        Admin marker revoked from <strong>{actionResult.username}</strong>.
-      </div>
-    )}
-    {actionResult?.kind === 'credential-removed' && (
-      <div class="notice notice-warning">
-        <strong>Credential type removed:</strong> all <span class="mono">{actionResult.credType}</span> credentials
-        have been deleted for this identity. Issue an enrollment link and code below, and send the
-        legitimate user both, so they can re-enroll.
-      </div>
-    )}
-    {actionResult?.kind === 'error' && (
-      <div class="notice notice-danger">{actionResult.message}</div>
-    )}
-
-    {!identity ? null : mode === 'edit' ? (
-      <form method="post" class="stack-lg" novalidate>
-        <input type="hidden" name="action" value="save" />
-        <input type="hidden" name="csrf_token" value={csrfTokenSave} />
-
-        <div class="field">
-          <label for="username">Username</label>
-          <input
-            id="username"
-            name="username"
-            type="text"
-            required
-            value={formValues.username}
-            pattern="[a-z0-9]+(\.[a-z0-9]+)+"
-          />
-          {formErrors.username && <span class="field-error">{formErrors.username}</span>}
-        </div>
-
-        <div class="field">
-          <label for="email">Email</label>
-          <input id="email" name="email" type="email" required value={formValues.email} />
-          {formErrors.email && <span class="field-error">{formErrors.email}</span>}
-        </div>
-
-        <div class="field">
-          <label for="displayName">Display name</label>
-          <input id="displayName" name="displayName" type="text" value={formValues.displayName} />
-        </div>
-
-        <div class="field">
-          <label for="recoveryEmail">Recovery email (optional)</label>
-          <input
-            id="recoveryEmail"
-            name="recoveryEmail"
-            type="email"
-            value={formValues.recoveryEmail}
-            placeholder="alternate@example.com"
-          />
-          <span class="field-hint">Used for account recovery when the primary email is inaccessible. Leave blank to use the primary email.</span>
-          {formErrors.recoveryEmail && <span class="field-error">{formErrors.recoveryEmail}</span>}
-        </div>
-
-        <div class="field">
-          <label>Identity groups</label>
-          <div class="checkbox-grid">
-            {IDENTITY_GROUPS.map((g) => (
-              <label>
-                <input
-                  type="checkbox"
-                  name="identityGroups"
-                  value={g}
-                  checked={formValues.identityGroups.includes(g)}
-                />
-                <span class="mono">{g}</span>
-              </label>
-            ))}
-          </div>
-          {formErrors.identityGroups && <span class="field-error">{formErrors.identityGroups}</span>}
-        </div>
-
-        <div class="field">
-          <label>App access</label>
-          <div class="checkbox-grid">
-            {ACCESS_GROUPS.map((a) => (
-              <label>
-                <input
-                  type="checkbox"
-                  name="accessGroups"
-                  value={a.group}
-                  checked={formValues.accessGroups.includes(a.group)}
-                />
-                <span class="mono">{a.group}</span>
-                <span class="muted text-xs">
-                  {a.apps.length
-                    ? `→ ${a.apps.map((app) => app.clientId).join(', ')}`
-                    : ''}
-                </span>
-              </label>
-            ))}
-          </div>
-        </div>
-
-        {unconfigured.length > 0 && (
-          <div class="field">
-            <label>Other stored groups</label>
-            <div class="checkbox-grid">
-              {unconfigured.map((g) => (
-                <label>
-                  <input type="checkbox" name="clearUnconfigured" value={g} />
-                  <span class="mono">{g}</span>
-                  <span class="muted text-xs">remove</span>
-                </label>
-              ))}
-            </div>
-            <span class="field-hint">
-              Stored on this identity with no checkbox here (role-mapped or not
-              configured): not a configured identity group
-              (<code>OTHALA_IDENTITY_GROUPS</code>) and not an app's access group. Saving
-              keeps them; tick remove to drop one. They do not count as an identity group.
-            </span>
-          </div>
-        )}
-
-        {/* The repair surface. These names cannot appear in either checkbox
-            set above — both are built from vocabularies this codebase owns —
-            so without this row they are invisible here and vanish on save.
-            Removal is an affirmative tick; leaving one alone keeps it. */}
-        {nonCanonical.length > 0 && (
-          <div class="field">
-            <label>Unrecognised groups</label>
-            <p class="notice notice-danger text-sm">
-              Stored on this identity but not a canonical group name
-              (<code>GROUP_RE</code>, <code>src/lib/access-groups.ts</code>). No write
-              path here can produce one, so these were set straight through the Kratos
-              admin API. While any is present, <strong>every app denies this person</strong>
-              — <code>refuseNonCanonical</code>, <code>src/lib/gate.ts</code>.
-            </p>
-            <div class="checkbox-grid">
-              {nonCanonical.map((g) => (
-                <label>
-                  <input type="checkbox" name="clearNonCanonical" value={g} />
-                  <span class="mono">{g}</span>
-                  <span class="muted text-xs">remove</span>
-                </label>
-              ))}
-            </div>
-            <span class="field-hint">
-              Left unticked, the name is kept and the save is <strong>refused</strong>
-              rather than dropping it — the write path validator
-              (<code>validateGroups</code>, <code>src/lib/metadata-admin.ts</code>)
-              rejects the name too, so it cannot be stored again from here. To restore
-              this person's access, tick Remove and pick the correct group above.
-            </span>
-            {formErrors.nonCanonicalGroups && (
-              <span class="field-error">{formErrors.nonCanonicalGroups}</span>
-            )}
-          </div>
-        )}
-
-        <details class="panel">
-          <summary class="mono text-sm">Per-app role overrides</summary>
-          <div class="stack details-content">
-            {manifests.map((m) => (
-              <div class="role-row">
-                <div>
-                  <div class="mono">{m.clientId}</div>
-                  <div class="muted text-xs">{m.clientName}</div>
-                </div>
-                {m.roles.length === 0 ? (
-                  <span class="muted text-xs mono">no roles declared</span>
-                ) : (
-                  <select name={`role:${m.clientId}`}>
-                    <option value="">(default)</option>
-                    {m.roles.map((r) => (
-                      <option
-                        value={r.name}
-                        selected={formValues.roleOverrides[m.clientId] === r.name}
-                      >
-                        {r.name}{r.description ? `: ${r.description}` : ''}
-                      </option>
-                    ))}
-                  </select>
-                )}
+      {(isOff || resultSection === 'status') && (
+        <section class={`panel status-card${isOff ? ' is-off' : ''}`} id="status" aria-label="Sign-in status">
+          {resultSection === 'status' && banner && <div class={`notice notice-${banner.tone}`} role="status">{banner.text}</div>}
+          {isOff && (
+            <div class="item-row">
+              <div class="item-id">
+                <span class="item-name">Sign-in is off</span>
+                <span class="item-meta">{first} can't sign in until you turn it back on.</span>
               </div>
-            ))}
+              <Ask label="Turn sign-in on" action="reactivate" token={tok('reactivate')} section="status" message={`Turn sign-in back on for ${first}?`} confirmLabel="Turn sign-in on" primary />
+            </div>
+          )}
+        </section>
+      )}
+
+      <details class="plain" id="profile" open={resultSection === 'profile'}>
+        <summary>Edit profile</summary>
+        <form class="inline-form" method="POST" enctype="application/x-www-form-urlencoded" action="#profile">
+          <input type="hidden" name="csrf_token" value={tok('save-profile')} />
+          <input type="hidden" name="action" value="save-profile" />
+          <div class="form-grid two">
+            <div class="field"><label for="displayName">Name</label><input id="displayName" name="displayName" type="text" value={identity.traits?.displayName ?? ''} autocomplete="off" /></div>
+            <div class="field"><label for="email">Email</label><input id="email" name="email" type="email" value={email} required autocomplete="off" /></div>
+            <div class="field">
+              <label for="username">Username</label>
+              <input id="username" name="username" type="text" value={username} required pattern="[a-z0-9]+(\.[a-z0-9]+)+" autocomplete="off" aria-describedby="h-username" />
+              <span class="field-hint" id="h-username">Lowercase letters, digits and dots: first.last</span>
+            </div>
+            <div class="field">
+              <label for="recoveryEmail">Recovery email</label>
+              <input id="recoveryEmail" name="recoveryEmail" type="email" value={identity.traits?.recoveryEmail ?? ''} autocomplete="off" aria-describedby="h-recovery" />
+              <span class="field-hint" id="h-recovery">Optional. Where a setup link goes if the main email is lost.</span>
+            </div>
           </div>
+          <div class="row-actions"><button class="button button-primary" type="submit">Save profile</button></div>
+        </form>
+      </details>
+      {resultSection === 'profile' && banner && <div class={`notice notice-${banner.tone}`} role="status">{banner.text}</div>}
+
+      <div class="stackp">
+        <section class="panel" id="apps" aria-labelledby="h-apps">
+          <h2 id="h-apps">Apps</h2>
+          <p class="hint">Pick what {first} can do in each app.</p>
+          {resultSection === 'apps' && banner && <div class={`notice notice-${banner.tone}`} role="status">{banner.text}</div>}
+          <form method="POST" enctype="application/x-www-form-urlencoded" action="#apps" data-dirty-form>
+            <input type="hidden" name="csrf_token" value={tok('save-access')} />
+            <input type="hidden" name="action" value="save-access" />
+            <AccessRows apps={apps} current={currentLevels} />
+            <div class="row-actions">
+              <button class="button button-primary" type="submit" data-save>Save access</button>
+              <span class="dirty-note" data-dirty-note></span>
+            </div>
+          </form>
+        </section>
+
+        <section class="panel" id="household" aria-labelledby="h-house">
+          <h2 id="h-house">Household</h2>
+          <p class="hint">{households.length > 1 ? "Groups the household uses to share things." : "Who can manage the household."}</p>
+          {resultSection === 'household' && banner && <div class={`notice notice-${banner.tone}`} role="status">{banner.text}</div>}
+          {households.length > 1 && (
+          <form method="POST" enctype="application/x-www-form-urlencoded" action="#household" data-dirty-form>
+            <input type="hidden" name="csrf_token" value={tok('save-household')} />
+            <input type="hidden" name="action" value="save-household" />
+            {households.map((g) => (
+              <label class="check"><input type="checkbox" name="identityGroups" value={g.value} checked={storedGroups.includes(g.value)} /><span>{g.label}</span></label>
+            ))}
+            <div class="row-actions">
+              <button class="button button-primary" type="submit" data-save>Save household</button>
+              <span class="dirty-note" data-dirty-note></span>
+            </div>
+          </form>
+          )}
+          {households.length > 1 && <h3 class="subhead">Household admin</h3>}
+          <ul class="items">
+            <li>
+              <div class="item-id">
+                <span class="item-name">Household admin</span>
+                <span class="item-meta">{isTargetAdmin ? "Can add people, change anyone's access and send setup links." : 'Not an admin.'}</span>
+              </div>
+              {isTargetAdmin && limits?.revoke && <span class="reason">{limits.revoke}</span>}
+              {isTargetAdmin && !limits?.revoke && isSelf && (
+                <Ask
+                  label="Remove my admin access"
+                  action="revoke-admin"
+                  token={tok('revoke-admin')}
+                  section="household"
+                  message="Remove your own admin access? You will lose the Admin link and every admin page straight away."
+                  confirmLabel="Remove my admin access"
+                  danger
+                  match={who}
+                  matchLabel={`Type your name, ${who}, to confirm`}
+                />
+              )}
+              {isTargetAdmin && !limits?.revoke && !isSelf && (
+                <Ask
+                  label="Remove household admin"
+                  action="revoke-admin"
+                  token={tok('revoke-admin')}
+                  section="household"
+                  message={`Remove ${first} as household admin? They will no longer be able to add people, change anyone's access or send setup links.`}
+                  confirmLabel="Remove admin"
+                  danger
+                />
+              )}
+              {!isTargetAdmin && limits?.grant && <span class="reason">{limits.grant}</span>}
+              {!isTargetAdmin && !limits?.grant && (
+                <Ask
+                  label="Make household admin"
+                  action="grant-admin"
+                  token={tok('grant-admin')}
+                  section="household"
+                  message={`Make ${first} a household admin? They will be able to add people, change anyone's access and send setup links.`}
+                  confirmLabel="Make admin"
+                  primary={households.length <= 1}
+                />
+              )}
+            </li>
+          </ul>
+        </section>
+
+        {requirements.length > 0 && (
+          <section class="panel" id="prerequisites" aria-labelledby="h-prereq">
+            <h2 id="h-prereq">Prerequisites</h2>
+            <p class="hint">Mark what {first} has already set up. The Needs tag leaves their tiles once it is marked.</p>
+            {resultSection === 'prerequisites' && banner && <div class={`notice notice-${banner.tone}`} role="status">{banner.text}</div>}
+            <form method="POST" enctype="application/x-www-form-urlencoded" action="#prerequisites" data-dirty-form>
+              <input type="hidden" name="csrf_token" value={tok('set-prerequisites')} />
+              <input type="hidden" name="action" value="set-prerequisites" />
+              {requirements.map((r) => (
+                <label class="check">
+                  <input type="checkbox" name="prerequisite" value={r.name} checked={marked.includes(r.name)} />
+                  <span>{r.title} set up{r.why && <small>{r.why}</small>}</span>
+                </label>
+              ))}
+              <div class="row-actions">
+                <button class="button button-primary" type="submit" data-save>Save prerequisites</button>
+                <span class="dirty-note" data-dirty-note></span>
+              </div>
+            </form>
+          </section>
+        )}
+
+        <section class="panel" id="signin" aria-labelledby="h-signin">
+          <h2 id="h-signin">Sign-in</h2>
+          {resultSection === 'signin' && banner && <div class={`notice notice-${banner.tone}`} role="status">{banner.text}</div>}
+          <dl class="kv">
+            <div><dt>Two-step</dt><dd>{twoStep ? 'On' : 'Off'}</dd></div>
+            {methods.map((m) => <div><dt>{m.label}</dt><dd>{m.value}</dd></div>)}
+          </dl>
+          <ul class="items">
+            <li>
+              <div class="item-id">
+                <span class="item-name">Email address</span>
+                <span class="item-meta">{email}{!verified && " · Unverified"}</span>
+              </div>
+              {!verified && (
+                <Ask
+                  label="Mark verified"
+                  action="mark-verified"
+                  token={tok('mark-verified')}
+                  section="signin"
+                  message={`Mark ${email} as verified? Only do this if you know the address belongs to ${first}.`}
+                  confirmLabel="Mark verified"
+                >
+                  <input type="hidden" name="email" value={email} />
+                </Ask>
+              )}
+            </li>
+            <li>
+              <div class="item-id">
+                <span class="item-name">Setup link</span>
+                <span class="item-meta">
+                  {shouldRefuseRecovery(identity)
+                    ? 'A household admin cannot be sent a setup link here.'
+                    : `Makes a link for you to send ${first}, so they can choose how to sign in again.`}
+                </span>
+              </div>
+              {!shouldRefuseRecovery(identity) && (
+                <form method="POST" enctype="application/x-www-form-urlencoded" action="#signin">
+                  <input type="hidden" name="csrf_token" value={tok('issue-recovery')} />
+                  <input type="hidden" name="action" value="issue-recovery" />
+                  <button class="button button-primary" type="submit">Get setup link</button>
+                </form>
+              )}
+              {recovery && (
+                <div class="result" role="status">
+                  <div class="notice notice-success">Setup link ready for {first}. Send it to them.</div>
+                  <SetupLink url={recovery.url} code={recovery.code} ttl={ENROLLMENT_TTL} name={first} />
+                </div>
+              )}
+              {!shouldRefuseRecovery(identity) && (
+                <details class="plain result mail">
+                  <summary>Email a code instead</summary>
+                  <form class="confirm" method="POST" enctype="application/x-www-form-urlencoded" action="#signin">
+                    <input type="hidden" name="csrf_token" value={tok('send-invite-email')} />
+                    <input type="hidden" name="action" value="send-invite-email" />
+                    <span>Sends a sign-in code to the address on file. Type it to confirm.</span>
+                    <div class="field">
+                      <label for="confirmEmail">Email address</label>
+                      <input id="confirmEmail" name="confirmEmail" type="text" autocomplete="off" />
+                    </div>
+                    <button class="button button-secondary button-sm" type="submit">Send invite email</button>
+                  </form>
+                </details>
+              )}
+            </li>
+            {removable.map((m) => (
+              <li>
+                <div class="item-id">
+                  <span class="item-name">{m.label}</span>
+                  <span class="item-meta">Lost it? Remove it, then send a setup link.</span>
+                </div>
+                {removalBlock(identity, m.key, isSelf) ? (
+                  <span class="reason">{removalBlock(identity, m.key, isSelf)}</span>
+                ) : (
+                <Ask
+                  label="Remove"
+                  action="remove-credential"
+                  token={tok(`remove-${m.key}`)}
+                  section="signin"
+                  message={`Remove ${m.label.toLowerCase()} for ${first}? They can set it up again with a setup link.`}
+                  confirmLabel={`Remove ${m.label.toLowerCase()}`}
+                  danger
+                >
+                  <input type="hidden" name="cred_type" value={m.key} />
+                </Ask>
+                )}
+              </li>
+            ))}
+            <li>
+              <div class="item-id">
+                <span class="item-name">Sign out everywhere</span>
+                <span class="item-meta">Signs {first} out of every device and app.</span>
+              </div>
+              <Ask
+                label="Sign out everywhere"
+                action="force-relogin"
+                token={tok('force-relogin')}
+                section="signin"
+                message={`Sign ${first} out of every device? They can sign back in right away.`}
+                confirmLabel="Sign out everywhere"
+                danger
+              />
+            </li>
+          </ul>
+        </section>
+
+        {unrecognised.length > 0 && (
+          <section class="panel warn-card" id="groups" aria-labelledby="h-groups">
+            <h2 id="h-groups">Unrecognised groups</h2>
+            <p class="hint">{first} belongs to a group none of your apps look at. It opens nothing. Remove it to tidy up.</p>
+            {resultSection === 'groups' && banner && <div class={`notice notice-${banner.tone}`} role="status">{banner.text}</div>}
+            <ul>
+              {unrecognised.map((g) => (
+                <li>
+                  <code>{g}</code>
+                  <form method="POST" enctype="application/x-www-form-urlencoded" action="#groups">
+                    <input type="hidden" name="csrf_token" value={tok('remove-groups')} />
+                    <input type="hidden" name="action" value="remove-groups" />
+                    <input type="hidden" name="group" value={g} />
+                    <button class="button button-secondary button-sm" type="submit">Remove</button>
+                  </form>
+                </li>
+              ))}
+            </ul>
+          </section>
+        )}
+
+        <details class="danger" id="danger" open={resultSection === 'danger'}>
+          <summary>Danger zone</summary>
+          {resultSection === 'danger' && banner && <div class={`notice notice-${banner.tone}`} role="status">{banner.text}</div>}
+          <ul class="items">
+            {!isOff && (
+              <li>
+                <div class="item-id">
+                  <span class="item-name">Turn off sign-in</span>
+                  <span class="item-meta">{`${first} can't sign in until you turn it back on. Nothing is deleted.`}</span>
+                </div>
+                {limits?.deactivate ? (
+                  <span class="reason">{limits.deactivate}</span>
+                ) : (
+                  <Ask label="Turn off sign-in" action="deactivate" token={tok('deactivate')} section="status" message={`Turn off sign-in for ${first}? You can turn it back on later.`} confirmLabel="Turn off sign-in" danger />
+                )}
+              </li>
+            )}
+            <li>
+              <div class="item-id">
+                <span class="item-name">Delete person</span>
+                <span class="item-meta">
+                  {isTargetAdmin ? `Remove ${first} as household admin first.` : `Removes ${first} and their sign-in for good. This can't be undone.`}
+                </span>
+              </div>
+              {!isTargetAdmin && (
+                <Ask
+                  label="Delete person"
+                  action="delete"
+                  token={tok('delete')}
+                  section="danger"
+                  message={`This removes ${first} for good.`}
+                  confirmLabel="Delete permanently"
+                  danger
+                  match={username}
+                  matchLabel={`Type ${username} to confirm`}
+                />
+              )}
+            </li>
+          </ul>
         </details>
 
-        {id === adminIdentityId && (
-          <div class="notice notice-warning">
-            You're editing your own identity. The <code>admin</code> group is display-only — admin access is the <code>metadata_admin.admin</code> marker, and you can't revoke your own marker here (have another admin do it, or use the shell break-glass).
-          </div>
-        )}
-
-        <div class="cta-row">
-          <button type="submit" class="button button-primary">Save</button>
-          <a href={`/admin/users/${id}`} class="button button-secondary">Cancel</a>
-        </div>
-      </form>
-    ) : (
-      <section class="stack-lg">
-        <section class="panel stack">
-          <h2>Profile</h2>
-          <dl class="stack dl-grid">
-            <dt class="muted text-sm mono">id</dt>
-            <dd class="mono text-xs">{identity.id}</dd>
-            <dt class="muted text-sm mono">state</dt>
-            <dd class="mono text-sm">{identity.state ?? 'active'}</dd>
-            <dt class="muted text-sm mono">email</dt>
-            <dd class="mono text-sm">{formValues.email}</dd>
-            <dt class="muted text-sm mono">recoveryEmail</dt>
-            <dd class="mono text-sm">{formValues.recoveryEmail || <span class="muted">(unset)</span>}</dd>
-            <dt class="muted text-sm mono">displayName</dt>
-            <dd>{formValues.displayName || <span class="muted">(unset)</span>}</dd>
-            <dt class="muted text-sm mono">credentials</dt>
-            <dd>
-              <div class="cred-list">
-                {CREDENTIAL_METHODS.map((m) => (
-                  credentialMap[m.key] ? (
-                    <span class="cred-item">
-                      <span class="badge cred-enrolled">{m.label} ✓</span>
-                      {EVICTABLE_CREDENTIAL_TYPES.has(m.key) && csrfTokensRemove[m.key] && (
-                        <form method="post" class="cred-remove-form">
-                          <input type="hidden" name="action" value="remove-credential" />
-                          <input type="hidden" name="cred_type" value={m.key} />
-                          <input type="hidden" name="csrf_token" value={csrfTokensRemove[m.key]} />
-                          <button
-                            type="submit"
-                            class="button button-danger button-sm"
-                            title={`Remove all ${m.label} credentials (lost-device eviction). The user must re-enroll after removal.`}
-                          >
-                            Remove
-                          </button>
-                        </form>
-                      )}
-                      {m.key === 'passkey' && (
-                        <span
-                          class="cred-note muted text-xs"
-                          title="Kratos cannot admin-delete a passkey (upstream limitation). Revoke sessions, then the user self-removes it at /auth/settings — or delete the identity as a last resort."
-                        >
-                          self-remove only
-                        </span>
-                      )}
-                    </span>
-                  ) : (
-                    <span class="badge badge-muted">{m.label} —</span>
-                  )
-                ))}
-              </div>
-              <p class="cred-eviction-note muted text-xs">
-                Remove evicts the credential type (webauthn/totp/backup codes) for lost-device response.
-                The user must re-enroll with an enrollment link and code (both, issued from Actions below).
-                Password cannot be removed here. Passkeys cannot be admin-deleted (Kratos upstream
-                limitation) — the user self-removes the lost device's key at /auth/settings; identity
-                deletion is the last resort.
-              </p>
-            </dd>
+        <details class="tech">
+          <summary>Technical details</summary>
+          <dl class="kv">
+            <div><dt>Id</dt><dd><code>{identity.id}</code></dd></div>
+            <div><dt>Username</dt><dd><code>{username}</code></dd></div>
+            <div><dt>Groups</dt><dd>{storedGroups.length ? storedGroups.map((g) => <><code>{g}</code>{' '}</>) : 'None'}</dd></div>
+            <div><dt>Role overrides</dt><dd>{roleNote ? Object.entries(roleOverrides).map(([app, role]) => <><code>{app}: {role}</code>{' '}</>) : 'None'}</dd></div>
+            <div><dt>State</dt><dd><code>{identity.state ?? 'active'}</code></dd></div>
           </dl>
-          <div class="edit-action">
-            <a href={`/admin/users/${id}?mode=edit`} class="button button-secondary">Edit</a>
-          </div>
-        </section>
-
-        <section class="panel stack">
-          <h2>Groups</h2>
-          <div>
-            <p class="muted text-xs mono">identity</p>
-            <div class="badge-row">
-              {identityGroupMembership.length
-                ? identityGroupMembership.map((g) => <span class="badge">{g}</span>)
-                : <span class="muted text-sm">none</span>}
-            </div>
-          </div>
-          <div>
-            <p class="muted text-xs mono">access</p>
-            <div class="badge-row">
-              {accessGroupMembership.length
-                ? accessGroupMembership.map((g) => <span class="badge badge-muted">{g}</span>)
-                : <span class="muted text-sm">none</span>}
-            </div>
-          </div>
-          {nonCanonical.length > 0 && (
-            <div>
-              <p class="muted text-xs mono">unrecognised</p>
-              <div class="badge-row">
-                {nonCanonical.map((g) => <span class="badge badge-danger">{g}</span>)}
-              </div>
-              <p class="text-xs">
-                Not canonical group names, so <strong>every app denies this identity</strong>
-                (<code>refuseNonCanonical</code>, <code>src/lib/gate.ts</code>). Repair them
-                under <a href={`/admin/users/${id}?mode=edit`}>Edit</a>.
-              </p>
-            </div>
-          )}
-        </section>
-
-        <section class="panel stack">
-          <h2>Effective access</h2>
-          <p class="muted text-xs">
-            Per app, the role this user receives at consent time. Mirrors
-            the consent service algorithm.
-          </p>
-          {effective.length === 0 ? (
-            <p class="muted text-sm">No app access. Assign a group named in some app's <code>access:</code> binding to grant entry.</p>
-          ) : (
-            <table class="data-table">
-              <thead>
-                <tr>
-                  <th>App</th>
-                  <th>Role</th>
-                  <th>Source</th>
-                </tr>
-              </thead>
-              <tbody>
-                {effective.map((row) => (
-                  <tr>
-                    <td>
-                      <span class="mono">{row.clientId}</span>
-                      <span class="muted text-xs"> {row.clientName}</span>
-                    </td>
-                    <td><span class="badge">{row.role}</span></td>
-                    <td class="muted text-sm mono">{describeSource(row.source)}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          )}
-        </section>
-
-        <section class="panel stack">
-          <h2>Actions</h2>
-          {/* Each action gets its own action-scoped CSRF token: a captured
-              token from one button cannot be replayed to trigger another. */}
-          <div class="cta-row">
-            <form method="post" class="actions-form">
-              <input type="hidden" name="action" value="issue-recovery" />
-              <input type="hidden" name="csrf_token" value={csrfTokenIssueRecovery} />
-              <button type="submit" class="button button-secondary">
-                Issue enrollment link + code
-              </button>
-            </form>
-            <form method="post" class="actions-form">
-              <input type="hidden" name="action" value="send-invite-email" />
-              <input type="hidden" name="csrf_token" value={csrfTokenInviteEmail} />
-              <input
-                type="email"
-                name="confirmEmail"
-                class="invite-confirm-input"
-                placeholder="re-type address to confirm"
-                aria-label="Re-type the identity's email address to confirm the invite send"
-                autocomplete="off"
-                required
-              />
-              <button type="submit" class="button button-secondary" title="Sends a recovery CODE ONLY via the Kratos courier — never a link with the code embedded. The address above must byte-match the one on file, checked server-side.">
-                Send invite email
-              </button>
-            </form>
-            <form method="post" class="actions-form">
-              <input type="hidden" name="action" value="force-relogin" />
-              <input type="hidden" name="csrf_token" value={csrfTokenForceRelogin} />
-              <button type="submit" class="button button-secondary">
-                Force re-login
-              </button>
-            </form>
-            {identity.state === 'inactive' ? (
-              <form method="post" class="actions-form">
-                <input type="hidden" name="action" value="reactivate" />
-                <input type="hidden" name="csrf_token" value={csrfTokenDeactivate} />
-                <button type="submit" class="button button-secondary">
-                  Reactivate
-                </button>
-              </form>
-            ) : (
-              <form method="post" class="actions-form">
-                <input type="hidden" name="action" value="deactivate" />
-                <input type="hidden" name="csrf_token" value={csrfTokenDeactivate} />
-                <button type="submit" class="button button-secondary">
-                  Deactivate
-                </button>
-              </form>
-            )}
-          </div>
-          <p class="muted text-xs">
-            Force re-login revokes Kratos sessions and asks every supported app to log the user out (OIDC back-channel logout). Apps without that capability keep their local session until the per-app cookie expires.
-          </p>
-
-          <div class="admin-marker-row">
-            <span class="muted text-sm">
-              Admin authority:
-              {isTargetAdmin
-                ? <strong class="admin-on"> granted</strong>
-                : <span class="admin-off"> none</span>}
-            </span>
-            <form method="post" class="actions-form">
-              <input type="hidden" name="action" value={isTargetAdmin ? 'revoke-admin' : 'grant-admin'} />
-              <input type="hidden" name="csrf_token" value={csrfTokenAdminToggle} />
-              <button
-                type="submit"
-                class={isTargetAdmin ? 'button button-secondary' : 'button button-secondary'}
-                title={isTargetAdmin
-                  ? 'Revoke admin authority (removes metadata_admin.admin marker).'
-                  : 'Grant admin authority (sets metadata_admin.admin=true).'}
-              >
-                {isTargetAdmin ? 'Revoke admin' : 'Grant admin'}
-              </button>
-            </form>
-          </div>
-          <p class="muted text-xs">
-            Admin authority is the <code>metadata_admin.admin</code> marker. Grant/revoke is a targeted JSON Patch — groups and roles are not affected. Self-revoke is blocked; use another admin or the shell break-glass. Revoke and deactivate are blocked if this is the last active admin.
-          </p>
-
-          <details>
-            <summary class="mono text-sm summary-danger">
-              Delete identity
-            </summary>
-            <form method="post" class="stack details-content">
-              <input type="hidden" name="action" value="delete" />
-              <input type="hidden" name="csrf_token" value={csrfTokenDelete} />
-              <p class="text-sm">
-                Permanent. Type <span class="mono">{formValues.username}</span> to confirm.
-              </p>
-              <div class="field">
-                <label for="confirm">Confirm username</label>
-                <input id="confirm" name="confirm" type="text" autocomplete="off" required />
-              </div>
-              <button type="submit" class="button button-danger">Delete permanently</button>
-            </form>
-          </details>
-        </section>
-      </section>
-    )}
-  </section>
-</Layout>
-
-<AdminFormScripts />
-
-<style>
-  /* Inline form wrappers so each action button carries its own CSRF token without breaking the flex layout. */
-  .actions-form { display: contents; }
-  /* Send-time address confirmation: a re-type field beside "Send invite email", sized to an address. */
-  .invite-confirm-input {
-    padding: var(--space-2) var(--space-3);
-    font: inherit;
-    font-size: var(--text-sm);
-    background: var(--input-bg);
-    color: var(--text);
-    border: 1px solid var(--input-border);
-    border-radius: var(--radius);
-    width: 14rem;
-  }
-  .invite-confirm-input:focus {
-    outline: none;
-    border-color: var(--input-focus);
-    box-shadow: 0 0 0 3px var(--accent-subtle);
-  }
-  /* Enrollment handoff: readonly value and Copy button on one line; min-width:0 lets a long URL shrink. */
-  .copy-row { display: flex; align-items: center; gap: var(--space-2); }
-  .copy-row input { flex: 1 1 auto; min-width: 0; }
-  .copy-row .button { flex: 0 0 auto; }
-  .copy-actions { margin-top: var(--space-1); }
-  #enrollmentShareText { resize: vertical; font-family: var(--font-mono); font-size: var(--text-sm); }
-  .dl-grid { display: grid; grid-template-columns: 9rem 1fr; gap: var(--space-2) var(--space-4); }
-  .edit-action { margin-top: var(--space-2); }
-  .badge-row { margin-top: var(--space-1); }
-  .details-content { margin-top: var(--space-3); }
-  .summary-danger { color: var(--danger); cursor: pointer; }
-  .cred-list { display: flex; flex-wrap: wrap; gap: var(--space-2); align-items: flex-start; }
-  /* Credential chip and its Remove action read as one bordered pill with a hairline divider. */
-  .cred-item {
-    display: inline-flex;
-    align-items: stretch;
-    border: 1px solid var(--border);
-    border-radius: var(--radius-sm);
-    overflow: hidden;
-  }
-  .cred-item .cred-enrolled {
-    border: none;
-    border-radius: 0;
-    display: inline-flex;
-    align-items: center;
-  }
-  .cred-remove-form { display: inline-flex; margin: 0; padding: 0; }
-  .cred-item .button-danger.button-sm {
-    border: none;
-    border-left: 1px solid var(--border);
-    border-radius: 0;
-  }
-  .cred-note {
-    display: inline-flex;
-    align-items: center;
-    padding: 0 var(--space-2);
-    border-left: 1px solid var(--border);
-  }
-  .cred-enrolled { background: var(--success-subtle); border-color: var(--success); }
-  .cred-eviction-note { margin-top: var(--space-2); }
-  .admin-marker-row { display: flex; align-items: center; gap: var(--space-3); margin-top: var(--space-2); }
-  .admin-on { color: var(--success, #1a7f37); }
-  .admin-off { color: var(--muted, #6e7781); }
-
-  @media (max-width: 640px) {
-    .dl-grid { grid-template-columns: 1fr; gap: var(--space-1); }
-  }
-</style>
+        </details>
+      </div>
+    </>
+  )}
+  {!identity && !loadError && <div class="notice notice-danger" role="alert">That person was not found. <a href={peopleHref}>Back to People</a></div>}
+</AdminLayout>

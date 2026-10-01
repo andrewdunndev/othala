@@ -35,22 +35,20 @@ are upstream Ory images — this repo does not build or publish them.
 The app runs **two HTTP listeners in one process**
 (`portal/src/server/listen.mjs`):
 
-- **Public SSR port** (`PORT`, default `8080`, `HOST=0.0.0.0`). The Astro
+- **Public SSR port** (`8080` on all interfaces). The Astro
   handler: Kratos self-service UIs, the family tile dashboard, `/auth/*` +
   `/admin/*` pages, and the OAuth2 challenge providers
   (`/oauth2/{login,consent,logout}`). The only port a deploy plane should
   expose to the network.
-- **Admin port** (`ADMIN_PORT`, default `4431`, `ADMIN_HOST=127.0.0.1`,
-  loopback only). A separate `http.createServer` with its own disjoint mux:
+- **Admin port** (`4431`, bound to `PORTAL_ADMIN_BIND_HOST`,
+  internal network only). A separate `http.createServer` with its own disjoint mux:
   `GET /healthz`, `GET /readyz`,
   `POST /admin/{recovery,login-code}-gate`. It never delegates to the SSR
-  handler, which never sees these paths — off the public mux **by
-  construction**, not by routing rule. The bearer-guarded routes are
-  constant-time and fail-closed: an unset secret rejects every request.
+  handler: off the public mux by construction. The bearer-guarded routes
+  are constant-time and fail-closed: an unset secret rejects every request.
 
-A deploy plane that publishes the admin port to the network, or to any
-network segment reachable from outside the pod/host, has broken the trust
-boundary this app is built around (`ARCHITECTURE.md` § Trust boundary).
+A deploy plane that publishes the admin port to any network segment reachable
+from outside the pod or host has broken the trust boundary (`ARCHITECTURE.md`).
 
 ## Vendored configs and the drift-check obligation
 
@@ -64,27 +62,20 @@ flow config all assume these bytes. Run a byte-diff check against the
 pinned Othala ref on every promotion; treat any diff as something to port
 upstream to this repo, never a local patch.
 
-Topology values inside those files (service hostnames, bind addresses) are
-expected to be templated (`${ENV}` substitution or equivalent) and
-supplied by the deploy plane at render time — that is not divergence.
+The `${VAR}` values in those files (identity, secrets, bind addresses, the
+optional tracing endpoint) are supplied at render time; that is not divergence.
 
 ## Environment contract
 
-[`.env.example`](.env.example) is the full, authoritative variable list —
-every var the app reads, annotated. This section covers only what needs
-context beyond that file:
+[`.env.example`](.env.example) is the full, authoritative variable list. This
+section covers only what needs context beyond that file:
 
-- The Ory upstream URLs (`KRATOS_PUBLIC_URL`, `KRATOS_ADMIN_URL`,
-  `HYDRA_PUBLIC_URL`, `HYDRA_ADMIN_URL`, `HYDRA_ISSUER_URL`) and the
-  listener ports are set by the deploy plane, not baked into the image.
-- `MANIFEST_DIR` (default `/etc/portal/manifests`) is the directory the app
-  reads per-app manifests from at runtime. A deploy plane mounts its
-  synced manifest set there, read-only.
-- `KRATOS_ADMIN_BIND_HOST` and `HYDRA_ADMIN_BIND_HOST` have no default: bind each to an address on the internal network the edge is not attached to.
-- With `OTHALA_HIBP_ENABLED=true`, an HIBP outage blocks setting a password (registration, settings, the password step after recovery); admin-API and shell break-glass paths are unaffected.
-- Secrets come from whatever secret store the deploy plane uses (sops,
-  Vault, a platform's native secret objects) — never committed, never baked
-  into the image.
+- Service names (`kratos`, `hydra`, `postgres`, `othala`), ports and the Ory
+  admin URLs are fixed, and the admin APIs take no bearer: the network is the
+  control. A deploy plane mounts its manifests at `/etc/portal/manifests`.
+- `KRATOS_ADMIN_BIND_HOST`, `HYDRA_ADMIN_BIND_HOST` and `PORTAL_ADMIN_BIND_HOST` have no production default; the Ory render refuses empty binds, the portal wildcards too. Bind each to an internal-network address the edge cannot reach.
+- The breach check is always on: an HIBP outage blocks setting a password (registration, settings, after recovery); admin-API and shell break-glass paths still work.
+- Secrets come from the deploy plane's secret store, never the image.
 - Admin authority is deliberately **not** an env target: it is the
   `metadata_admin.admin` marker on the Kratos identity
   (`docs/runbooks/admin-recovery.md` § 2). A deploy plane that adds an env

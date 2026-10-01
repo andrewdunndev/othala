@@ -50,9 +50,20 @@ function fakeReq({ method = 'GET', url = '/', headers = {}, body = '' } = {}) {
   return req;
 }
 
+const realFetch = globalThis.fetch;
+
+/** Send the fixed Kratos admin URL (http://kratos:4434) to a mock server on `port`; returns the restore. */
+function redirectKratosAdmin(port) {
+  globalThis.fetch = (url, init) =>
+    realFetch(String(url).replace('http://kratos:4434', `http://127.0.0.1:${port}`), init);
+  return () => { globalThis.fetch = realFetch; };
+}
+
+let restoreKratos = () => {};
+
 beforeEach(() => {
   delete process.env.RECOVERY_GATE_SECRET;
-  delete process.env.KRATOS_ADMIN_URL;
+  restoreKratos();
 });
 
 test('admin GET mux serves exactly /healthz and /readyz', () => {
@@ -64,6 +75,7 @@ test('admin GET mux serves exactly /healthz and /readyz', () => {
 test('admin POST mux serves exactly the admin endpoints', () => {
   assert.deepEqual([...ADMIN_POST_ROUTES].sort(), [
     '/admin/login-code-gate',
+    '/admin/passkey-prune',
     '/admin/profile-gate',
     '/admin/profile-sessions',
     '/admin/recovery-gate',
@@ -173,7 +185,7 @@ test('POST /admin/recovery-gate REFUSES recovery when the admin-API marker is tr
   });
   await new Promise((r) => mockKratos.listen(0, '127.0.0.1', r));
   const { port } = mockKratos.address();
-  process.env.KRATOS_ADMIN_URL = `http://127.0.0.1:${port}`;
+  restoreKratos = redirectKratosAdmin(port);
   process.env.RECOVERY_GATE_SECRET = 'gate-secret';
   try {
     const res = fakeRes();
@@ -190,24 +202,8 @@ test('POST /admin/recovery-gate REFUSES recovery when the admin-API marker is tr
     assert.match(res.body, /console-only/, 'refusal must be the admin-marker reason, not a fail-closed fallback');
   } finally {
     await new Promise((r) => mockKratos.close(r));
-    delete process.env.KRATOS_ADMIN_URL;
+    restoreKratos();
   }
-});
-
-test('POST /admin/recovery-gate is fail-closed when KRATOS_ADMIN_URL is unset (403, admin-api-unavailable)', async () => {
-  process.env.RECOVERY_GATE_SECRET = 'gate-secret';
-  const res = fakeRes();
-  await handle(
-    fakeReq({
-      method: 'POST',
-      url: '/admin/recovery-gate',
-      headers: { authorization: 'Bearer gate-secret' },
-      body: JSON.stringify({ identity_id: OTHER_UUID, is_admin: false, traits: { email: 'kid@othala.test' } }),
-    }),
-    res,
-  );
-  assert.equal(res.statusCode, 403, 'unset KRATOS_ADMIN_URL must fail closed');
-  assert.match(res.body, /unavailable/, 'must refuse via the admin-api-unavailable fail-closed path');
 });
 
 test('POST /admin/recovery-gate ALLOWS recovery for a non-admin identity (200)', async () => {
@@ -217,7 +213,7 @@ test('POST /admin/recovery-gate ALLOWS recovery for a non-admin identity (200)',
   });
   await new Promise((r) => mockKratos.listen(0, '127.0.0.1', r));
   const { port } = mockKratos.address();
-  process.env.KRATOS_ADMIN_URL = `http://127.0.0.1:${port}`;
+  restoreKratos = redirectKratosAdmin(port);
   process.env.RECOVERY_GATE_SECRET = 'gate-secret';
   try {
     const res = fakeRes();
@@ -233,7 +229,7 @@ test('POST /admin/recovery-gate ALLOWS recovery for a non-admin identity (200)',
     assert.equal(res.statusCode, 200);
   } finally {
     await new Promise((r) => mockKratos.close(r));
-    delete process.env.KRATOS_ADMIN_URL;
+    restoreKratos();
   }
 });
 
@@ -281,13 +277,13 @@ test('bearer rejection on recovery-gate is 403 (not 401) — Kratos can_interrup
 async function withMockKratos(respond, fn) {
   const mockKratos = http.createServer(respond);
   await new Promise((r) => mockKratos.listen(0, '127.0.0.1', r));
-  process.env.KRATOS_ADMIN_URL = `http://127.0.0.1:${mockKratos.address().port}`;
+  restoreKratos = redirectKratosAdmin(mockKratos.address().port);
   process.env.RECOVERY_GATE_SECRET = 'gate-secret';
   try {
     await fn();
   } finally {
     await new Promise((r) => mockKratos.close(r));
-    delete process.env.KRATOS_ADMIN_URL;
+    restoreKratos();
   }
 }
 
@@ -333,9 +329,9 @@ test('login-code-gate REFUSES when the admin API fails (fail-closed, 403)', asyn
   });
 });
 
-test('login-code-gate REFUSES when KRATOS_ADMIN_URL is unset or the id is missing (403)', async () => {
+test('login-code-gate REFUSES when the id is missing (403)', async () => {
   process.env.RECOVERY_GATE_SECRET = 'gate-secret';
-  for (const body of [{ identity_id: OTHER_UUID }, { is_admin: false }]) {
+  for (const body of [{ is_admin: false }]) {
     const res = fakeRes();
     await handle(postLoginCodeGate(body), res);
     assert.equal(res.statusCode, 403);
@@ -488,9 +484,9 @@ test('profile-gate REFUSES when the stored identity cannot be read (fail-closed,
   });
 });
 
-test('profile-gate REFUSES when KRATOS_ADMIN_URL is unset or the id is missing (403)', async () => {
+test('profile-gate REFUSES when the id is missing (403)', async () => {
   process.env.RECOVERY_GATE_SECRET = 'gate-secret';
-  for (const body of [profilePayload(STORED.traits), { traits: STORED.traits }]) {
+  for (const body of [{ traits: STORED.traits }]) {
     const res = fakeRes();
     await handle(postProfileGate(body), res);
     assert.equal(res.statusCode, 403);
@@ -656,9 +652,53 @@ test('profile-sessions rejects a wrong bearer with 403 before reading the body',
   assert.deepEqual(JSON.parse(res.body), { error: 'forbidden' });
 });
 
+function postPasskeyPrune(body, bearer = 'gate-secret') {
+  return fakeReq({
+    method: 'POST',
+    url: '/admin/passkey-prune',
+    headers: { authorization: `Bearer ${bearer}` },
+    body: JSON.stringify(body),
+  });
+}
+
+test('passkey-prune prunes the named identity and reports the count (200)', async () => {
+  process.env.RECOVERY_GATE_SECRET = 'gate-secret';
+  const pruned = [];
+  const rt = { prunePasskeyNames: async (id) => { pruned.push(id); return 2; } };
+  const res = fakeRes();
+  await handle(postPasskeyPrune({ identity_id: 'person-1' }), res, rt);
+  assert.equal(res.statusCode, 200);
+  assert.deepEqual(JSON.parse(res.body), { pruned: 2 });
+  assert.deepEqual(pruned, ['person-1']);
+});
+
+test('passkey-prune answers 200 and prunes nothing without an identity_id or when the prune fails', async () => {
+  process.env.RECOVERY_GATE_SECRET = 'gate-secret';
+  const calls = [];
+  const rt = { prunePasskeyNames: async (id) => { calls.push(id); throw new Error('down'); } };
+  for (const body of [{}, { identity_id: '  ' }]) {
+    const res = fakeRes();
+    await handle(postPasskeyPrune(body), res, rt);
+    assert.equal(res.statusCode, 200);
+    assert.deepEqual(JSON.parse(res.body), { pruned: 0 });
+  }
+  assert.deepEqual(calls, []);
+  const res = fakeRes();
+  await handle(postPasskeyPrune({ identity_id: 'person-1' }), res, rt);
+  assert.equal(res.statusCode, 200);
+  assert.deepEqual(JSON.parse(res.body), { pruned: 0 });
+});
+
+test('passkey-prune rejects a wrong bearer with 403 before touching the runtime', async () => {
+  process.env.RECOVERY_GATE_SECRET = 'gate-secret';
+  const rt = { prunePasskeyNames: async () => { throw new Error('must not run'); } };
+  const res = fakeRes();
+  await handle(postPasskeyPrune({ identity_id: 'person-1' }, 'wrong'), res, rt);
+  assert.equal(res.statusCode, 403);
+});
+
 test('recovery, username and second-factor gates and profile-sessions read the identity via the runtime', async () => {
   process.env.RECOVERY_GATE_SECRET = 'gate-secret';
-  process.env.KRATOS_ADMIN_URL = 'http://kratos.invalid:4434';
   const read = [];
   const recorder = {
     ...runtime,
@@ -683,4 +723,60 @@ test('emailChangeLocked follows the verdict for the stored identity and session'
   assert.equal(emailChangeLocked(KEYED, [entry('password', 0), entry('code', 1)]), true);
   assert.equal(emailChangeLocked(KEYED, [entry('code', 0), entry('password', 1)]), false);
   assert.equal(emailChangeLocked(KEYLESS, [entry('code', 0)]), false);
+});
+
+test('startup fails in production when a required var is unset', () => {
+  process.env.RECOVERY_GATE_SECRET = 'x'.repeat(32);
+  const names = ['OTHALA_PUBLIC_URL', 'OTHALA_APEX', 'OTHALA_INSTANCE_NAME', 'OTHALA_CONTACT_RECIPIENT', 'OTHALA_SMTP_CONNECTION_URI'];
+  const saved = { NODE_ENV: process.env.NODE_ENV, ...Object.fromEntries(names.map((n) => [n, process.env[n]])) };
+  const restore = (k, v) => (v === undefined ? delete process.env[k] : (process.env[k] = v));
+  try {
+    process.env.NODE_ENV = 'production';
+    for (const n of names) delete process.env[n];
+    const errors = startupEnvErrors();
+    for (const n of names) assert.ok(errors.some((e) => e.includes(n)), n);
+    process.env.OTHALA_PUBLIC_URL = 'https://auth.example.com';
+    process.env.OTHALA_APEX = 'example.com';
+    process.env.OTHALA_INSTANCE_NAME = 'Acme';
+    process.env.OTHALA_CONTACT_RECIPIENT = 'admin@example.com';
+    process.env.OTHALA_SMTP_CONNECTION_URI = 'smtps://u:p@smtp.example.com:465';
+    assert.ok(!startupEnvErrors().some((e) => /OTHALA_/.test(e)));
+    process.env.NODE_ENV = 'test';
+    delete process.env.OTHALA_APEX;
+    assert.ok(!startupEnvErrors().some((e) => /OTHALA_APEX/.test(e)), 'dev and test keep their defaults');
+  } finally {
+    for (const [k, v] of Object.entries(saved)) restore(k, v);
+  }
+});
+
+test('startup refuses in production without PORTAL_ADMIN_BIND_HOST, and on a wildcard; dev defaults to loopback', () => {
+  const names = ['RECOVERY_GATE_SECRET', 'CSRF_SECRET', 'NODE_ENV', 'PORTAL_ADMIN_BIND_HOST', 'OTHALA_PUBLIC_URL', 'OTHALA_APEX', 'OTHALA_INSTANCE_NAME', 'OTHALA_CONTACT_RECIPIENT', 'OTHALA_SMTP_CONNECTION_URI'];
+  const saved = Object.fromEntries(names.map((n) => [n, process.env[n]]));
+  const restore = (k, v) => (v === undefined ? delete process.env[k] : (process.env[k] = v));
+  const bindErrors = () => startupEnvErrors().filter((e) => e.includes('PORTAL_ADMIN_BIND_HOST'));
+  try {
+    process.env.RECOVERY_GATE_SECRET = 'x'.repeat(32);
+    process.env.CSRF_SECRET = 'x'.repeat(32);
+    process.env.OTHALA_PUBLIC_URL = 'https://auth.example.com';
+    process.env.OTHALA_APEX = 'example.com';
+    process.env.OTHALA_INSTANCE_NAME = 'Acme';
+    process.env.OTHALA_CONTACT_RECIPIENT = 'admin@example.com';
+    process.env.OTHALA_SMTP_CONNECTION_URI = 'smtps://u:p@smtp.example.com:465';
+    process.env.NODE_ENV = 'production';
+    delete process.env.PORTAL_ADMIN_BIND_HOST;
+    assert.equal(bindErrors().length, 1, 'unset in production fails');
+    assert.match(bindErrors()[0], /not set/);
+    process.env.PORTAL_ADMIN_BIND_HOST = '0.0.0.0';
+    assert.equal(bindErrors().length, 1, 'wildcard fails');
+    process.env.PORTAL_ADMIN_BIND_HOST = '10.0.0.5';
+    assert.equal(bindErrors().length, 0, 'an internal address passes');
+    assert.deepEqual(startupEnvErrors(), []);
+    // Mutation: unsetting the address must turn a clean boot into a refusal.
+    delete process.env.PORTAL_ADMIN_BIND_HOST;
+    assert.ok(startupEnvErrors().length > 0);
+    process.env.NODE_ENV = 'test';
+    assert.equal(bindErrors().length, 0, 'dev keeps the loopback default');
+  } finally {
+    for (const [k, v] of Object.entries(saved)) restore(k, v);
+  }
 });

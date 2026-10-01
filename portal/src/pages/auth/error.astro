@@ -2,15 +2,20 @@
 // /auth/error: branded denial page. The `reason` query param drives status,
 // title and message; unknown reasons fall through to a generic 400. Reasons:
 // not-admin, not-authorised, auth-unreachable, session-expired, forbidden,
-// unavailable (grep `/auth/error?reason=` in src/).
+// unavailable, flow-expired, app-misconfigured, sign-in-cancelled (grep `/auth/error?reason=` in src/); Hydra's ?error=
+// and Kratos's ?id= map onto the same entries (lib/error-reasons.ts).
 
 export const prerender = false;
 
 import StatusPage from '../../components/StatusPage.astro';
 
-import { resolveReason } from '../../lib/error-reasons';
+import { resolveError, kratosReason } from '../../lib/error-reasons';
+import { getFlowError } from '../../lib/kratos';
 
-const { entry, reason } = resolveReason(Astro.url.searchParams.get('reason'));
+// Kratos sends ?id=<error id>, Hydra sends ?error=<code>; both read as a next step, never as raw text.
+const kratosId = Astro.url.searchParams.get('id');
+const kratos = kratosId ? kratosReason(await getFlowError(kratosId)) : undefined;
+const { entry, reason } = resolveError(Astro.url.searchParams, kratos);
 
 Astro.response.status = entry.status;
 ---
@@ -19,4 +24,5 @@ Astro.response.status = entry.status;
   title={entry.title}
   message={entry.message}
   reason={reason}
+  retryHref="/"
 />

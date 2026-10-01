@@ -51,16 +51,16 @@ Needs a Docker- or Podman-compatible compose runtime. See [`e2e/README.md`](e2e/
 ### The app alone
 
 To work on the UI without the Ory substrate, run the dev server. The dashboard is built from the
-manifest directory, so point `MANIFEST_DIR` at one or it renders empty:
+manifests in `/etc/portal/manifests`, so it renders empty unless that directory exists:
 
 ```sh
 cd portal
 npm install
-MANIFEST_DIR=../e2e/manifests npm run dev   # http://localhost:4321
+npm run dev   # http://localhost:4321
 ```
 
-Other `OTHALA_*` values fall back to dev defaults with a warning. The OIDC and consent flows need
-Kratos and Hydra, so they only work in the full-stack mode above.
+Unset `OTHALA_*` values fall back to dev defaults with a warning. OIDC and consent need Kratos and
+Hydra, so use the full-stack mode above.
 
 ```sh
 npm test          # vitest run: src/lib/*.test.ts + scripts/*.test.mjs, incl. fuzz suites
@@ -70,7 +70,7 @@ npm run build     # astro build + the listener, admin, and registrar bundles
 
 ## An app is a manifest
 
-One `<slug>.yaml` per app, read at request time from `MANIFEST_DIR`, carrying up to three blocks:
+One `<slug>.yaml` per app, read at request time from the manifest directory, carrying up to three blocks:
 `presentation:` (tile metadata and the entry binding), `oidc:` (the OAuth2 client forwarded to
 Hydra), and `consent:` (roles, the group-to-role map, claim emission).
 

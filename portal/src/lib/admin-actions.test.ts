@@ -11,8 +11,12 @@ const {
   updateIdentityMock,
   revokeSubjectMock,
   revokeConsentSessionsMock,
+  patchPrerequisitesMock,
+  markEmailVerifiedMock,
 } = vi.hoisted(() => ({
   updateIdentityMock: vi.fn(),
+  patchPrerequisitesMock: vi.fn(),
+  markEmailVerifiedMock: vi.fn(),
   revokeSubjectMock: vi.fn(),
   revokeConsentSessionsMock: vi.fn(),
   deleteIdentityMock: vi.fn(),
@@ -37,6 +41,8 @@ vi.mock('./admin-api', async (importOriginal) => {
     updateIdentity: updateIdentityMock,
     deactivateIdentity: deactivateIdentityMock,
     deleteCredential: deleteCredentialMock,
+    patchPrerequisites: patchPrerequisitesMock,
+    markEmailVerified: markEmailVerifiedMock,
   };
 });
 
@@ -44,6 +50,13 @@ import {
   deleteAction,
   deactivateAction,
   saveAction,
+  saveAccessAction,
+  saveHouseholdAction,
+  saveProfileAction,
+  removeGroupsAction,
+  markVerifiedAction,
+  setPrerequisitesAction,
+  nextPrerequisites,
   revokeAdminAction,
   removeCredentialAction,
   grantAdminAction,
@@ -94,6 +107,8 @@ beforeEach(() => {
   updateIdentityMock.mockReset().mockResolvedValue(undefined);
   revokeSubjectMock.mockReset().mockResolvedValue(undefined);
   revokeConsentSessionsMock.mockReset().mockResolvedValue(undefined);
+  patchPrerequisitesMock.mockReset().mockResolvedValue(undefined);
+  markEmailVerifiedMock.mockReset().mockResolvedValue(true);
 });
 
 describe('deleteAction', () => {
@@ -105,7 +120,7 @@ describe('deleteAction', () => {
     expect(outcome).not.toBeInstanceOf(Response);
     if (outcome instanceof Response) throw new Error('unreachable');
     expect(outcome.actionResult?.kind).toBe('error');
-    expect(outcome.actionResult && 'message' in outcome.actionResult ? outcome.actionResult.message : '').toMatch(/revoke admin authority first/i);
+    expect(outcome.actionResult && 'message' in outcome.actionResult ? outcome.actionResult.message : '').toMatch(/remove their admin access first/i);
   });
 
   it('refuses a wrong confirm value and never calls deleteIdentity', async () => {
@@ -157,7 +172,7 @@ describe('deleteAction', () => {
     if (outcome instanceof Response) throw new Error('unreachable');
     expect(outcome.actionResult?.kind).toBe('error');
     expect(outcome.actionResult && 'message' in outcome.actionResult ? outcome.actionResult.message : '').toBe(
-      'Revoked and deactivated, but not deleted: kratos admin unavailable',
+      'Signed out and turned off, but not deleted: kratos admin unavailable',
     );
   });
 });
@@ -253,12 +268,41 @@ describe('saveAction', () => {
 });
 
 describe('revokeAdminAction', () => {
-  it('refuses self-demote and never calls patchAdminMarker', async () => {
+  it('refuses self-demote without the typed username and never calls patchAdminMarker', async () => {
     const identity = makeIdentity('admin', true);
-    const outcome = await revokeAdminAction(fd(), makeCtx({ id: 'admin-1', identity, adminIdentityId: 'admin-1' }));
+    for (const typed of [undefined, 'someone-else']) {
+      const outcome = await revokeAdminAction(fd(typed ? { confirm: typed } : {}), makeCtx({ id: 'admin-1', identity, adminIdentityId: 'admin-1' }));
+      expect(outcome).not.toBeInstanceOf(Response);
+      if (outcome instanceof Response) throw new Error('unreachable');
+      expect(outcome.actionResult?.kind).toBe('error');
+    }
+    expect(patchAdminMarkerMock).not.toHaveBeenCalled();
+  });
+
+  it('lets an admin give up their own access by typing their username when another admin remains', async () => {
+    listIdentitiesMock.mockResolvedValue([makeIdentity('other-admin', true), makeIdentity('admin', true)]);
+    const identity = makeIdentity('admin', true);
+    const outcome = await revokeAdminAction(fd({ confirm: 'admin' }), makeCtx({ id: 'admin-1', identity, adminIdentityId: 'admin-1' }));
+
+    expect(patchAdminMarkerMock).toHaveBeenCalledWith('admin-1', false);
+    expect(outcome).toBeInstanceOf(Response);
+    expect((outcome as Response).status).toBe(303);
+  });
+
+  it('also accepts the display name for the typed confirm', async () => {
+    listIdentitiesMock.mockResolvedValue([makeIdentity('other-admin', true), makeIdentity('admin', true)]);
+    const named = identity({ username: 'admin', displayName: 'Amy Park', metadataAdmin: { admin: true } });
+    await revokeAdminAction(fd({ confirm: 'Amy Park' }), makeCtx({ id: 'admin-1', identity: named, adminIdentityId: 'admin-1' }));
+
+    expect(patchAdminMarkerMock).toHaveBeenCalledWith('admin-1', false);
+  });
+
+  it('still refuses the typed self-demote when it would leave no active admin', async () => {
+    listIdentitiesMock.mockResolvedValue([makeIdentity('admin', true)]);
+    const identity = makeIdentity('admin', true);
+    const outcome = await revokeAdminAction(fd({ confirm: 'admin' }), makeCtx({ id: 'admin-1', identity, adminIdentityId: 'admin-1' }));
 
     expect(patchAdminMarkerMock).not.toHaveBeenCalled();
-    expect(outcome).not.toBeInstanceOf(Response);
     if (outcome instanceof Response) throw new Error('unreachable');
     expect(outcome.actionResult?.kind).toBe('error');
   });
@@ -311,7 +355,7 @@ describe('removeCredentialAction', () => {
     if (outcome instanceof Response) throw new Error('unreachable');
     expect(outcome.actionResult?.kind).toBe('error');
     if (outcome.actionResult?.kind !== 'error') throw new Error('unreachable');
-    expect(outcome.actionResult.message).toMatch(/self-remove/);
+    expect(outcome.actionResult.message).toMatch(/remove it in their own settings/);
   });
 
   it('happy path: calls deleteCredential with the identity id and type', async () => {
@@ -421,5 +465,127 @@ describe('grantAdminAction', () => {
     if (outcome instanceof Response) throw new Error('unreachable');
     expect(outcome.actionResult?.kind).toBe('admin-granted');
     expect(outcome.refetch).toBe(true);
+  });
+});
+
+describe('person page sections', () => {
+  const role = (name: string) => ({ name, description: '', claimEmit: {} });
+  const MANIFESTS = [
+    { clientId: 'grafana', accessGroups: ['grafana-access'], roles: [role('admin'), role('editor'), role('viewer')], groupRoleMap: { 'grafana-admin': 'admin' }, skipAccessCheck: false },
+    { clientId: 'proxywatch', accessGroups: ['proxywatch-access'], roles: [], groupRoleMap: {}, skipAccessCheck: false },
+  ] as unknown as ActionContext['manifests'];
+  const person = (groups: string[], roles?: Record<string, string>) =>
+    identity({ username: 'robin.k', email: 'robin@othala.test', metadataAdmin: { groups, ...(roles ? { roles } : {}) } });
+  const written = () => updateIdentityMock.mock.calls[0][1];
+
+  it('saves access: groups and overrides follow the chosen levels, traits stay as stored', async () => {
+    const outcome = await saveAccessAction(
+      fd({ 'level:grafana': 'editor', 'level:proxywatch': 'use' }),
+      makeCtx({ identity: person(['everyone']), manifests: MANIFESTS }),
+    );
+
+    expect(outcome.actionResult?.kind).toBe('updated');
+    expect(written().traits.username).toBe('robin.k');
+    expect(written().metadataAdmin.groups).toEqual(['everyone', 'grafana-access', 'proxywatch-access']);
+    expect(written().metadataAdmin.roles).toEqual({ grafana: 'editor' });
+  });
+
+  it('names the shared group and saves nothing when No access cannot be stored', async () => {
+    const shared = [
+      MANIFESTS[0],
+      { clientId: 'other', clientName: 'Other', accessGroups: ['grafana-access'], roles: [], groupRoleMap: {}, skipAccessCheck: false },
+    ] as unknown as ActionContext['manifests'];
+    const outcome = await saveAccessAction(
+      fd({ 'level:grafana': 'none' }),
+      makeCtx({ identity: person(['everyone', 'grafana-access']), manifests: shared }),
+    );
+
+    expect(outcome.actionResult?.kind).toBe('error');
+    expect(JSON.stringify(outcome.actionResult)).toContain('grafana-access');
+    expect(updateIdentityMock).not.toHaveBeenCalled();
+  });
+
+  it('removes a role group with the access, then revokes grants', async () => {
+    await saveAccessAction(
+      fd({ 'level:grafana': 'none' }),
+      makeCtx({ identity: person(['everyone', 'grafana-access', 'grafana-admin']), manifests: MANIFESTS }),
+    );
+
+    expect(written().metadataAdmin.groups).toEqual(['everyone']);
+    expect(revokeConsentSessionsMock).toHaveBeenCalledWith('target-1');
+  });
+
+  it('keeps an unrecognised group through an access save', async () => {
+    await saveAccessAction(fd({ 'level:proxywatch': 'use' }), makeCtx({ identity: person(['everyone', 'garden']), manifests: MANIFESTS }));
+
+    expect(written().metadataAdmin.groups).toEqual(['everyone', 'garden', 'proxywatch-access']);
+  });
+
+  it('saves household groups without touching app access or the admin marker', async () => {
+    const stored = identity({ username: 'robin.k', metadataAdmin: { groups: ['everyone', 'proxywatch-access'], admin: true } });
+    await saveHouseholdAction(fd({ identityGroups: 'everyone' }), makeCtx({ identity: stored, manifests: MANIFESTS }));
+
+    expect(written().metadataAdmin.groups).toEqual(['everyone', 'proxywatch-access']);
+    expect(written().metadataAdmin.admin).toBe(true);
+  });
+
+  it('saves the profile and leaves groups as stored', async () => {
+    await saveProfileAction(
+      fd({ username: 'Robin.K', email: 'a@othala.test', displayName: 'Robin', recoveryEmail: '' }),
+      makeCtx({ identity: person(['everyone', 'grafana-access']), manifests: MANIFESTS }),
+    );
+
+    expect(written().traits).toMatchObject({ username: 'robin.k', email: 'a@othala.test', displayName: 'Robin' });
+    expect(written().metadataAdmin.groups).toEqual(['everyone', 'grafana-access']);
+  });
+
+  it('removes an unrecognised group only when named, canonical or not', async () => {
+    const f = fd();
+    f.append('group', 'garden');
+    f.append('group', 'Bad Name');
+    await removeGroupsAction(f, makeCtx({ identity: person(['everyone', 'garden', 'Bad Name', 'proxywatch-access']), manifests: MANIFESTS }));
+
+    expect(written().metadataAdmin.groups).toEqual(['everyone', 'proxywatch-access']);
+  });
+});
+
+describe('prerequisites and verified email', () => {
+  it('keeps marks for names no longer defined and follows the ticks for defined ones', () => {
+    expect(nextPrerequisites(['tailscale', 'old'], ['tailscale', 'vpn'], ['vpn'])).toEqual(['old', 'vpn']);
+    expect(nextPrerequisites([], ['tailscale'], ['tailscale', 'unknown'])).toEqual(['tailscale']);
+  });
+
+  it('patches only the prerequisites', async () => {
+    const stored = identity({ username: 'a.b', metadataAdmin: { groups: ['everyone'], prerequisites: ['tailscale'] } });
+    const f = fd();
+    f.append('prerequisite', 'vpn');
+    const outcome = await setPrerequisitesAction(f, makeCtx({ identity: stored, requirements: ['tailscale', 'vpn'] }));
+
+    expect(patchPrerequisitesMock).toHaveBeenCalledWith('target-1', ['vpn']);
+    expect(updateIdentityMock).not.toHaveBeenCalled();
+    expect(outcome.actionResult?.kind).toBe('prerequisites-saved');
+  });
+
+  it('marks the email verified through the targeted write', async () => {
+    const id = makeIdentity('someone');
+    const outcome = await markVerifiedAction(fd({ email: id.traits.email }), makeCtx({ identity: id }));
+
+    expect(markEmailVerifiedMock).toHaveBeenCalledWith('target-1', id.traits.email);
+    expect(outcome.actionResult?.kind).toBe('email-verified');
+  });
+
+  it('refuses when the stored email is no longer the one the admin saw', async () => {
+    markEmailVerifiedMock.mockResolvedValue(false);
+    const outcome = await markVerifiedAction(fd({ email: 'old@othala.test' }), makeCtx({ identity: makeIdentity('someone') }));
+
+    expect(markEmailVerifiedMock).toHaveBeenCalledWith('target-1', 'old@othala.test');
+    expect(outcome.actionResult).toEqual({ kind: 'error', message: expect.stringContaining('changed') });
+  });
+
+  it('lets a rejected patch throw to the page, never reporting it verified', async () => {
+    markEmailVerifiedMock.mockRejectedValue(new Error('Response returned an error code'));
+    const id = makeIdentity('someone');
+
+    await expect(markVerifiedAction(fd({ email: id.traits.email }), makeCtx({ identity: id }))).rejects.toThrow('error code');
   });
 });

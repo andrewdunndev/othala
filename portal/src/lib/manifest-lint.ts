@@ -2,7 +2,7 @@
 // known-group set so a typo'd group surfaces as a finding, not a silent lockout.
 // BLOCK (also enforced by validateClients at load): empty accessGroups without
 // skipAccessCheck, a duplicated group, an undeclared group_role_map role.
-// WARN: a group missing from the known set, or missing the canonical form.
+// WARN: a group missing from the known set, or missing the canonical form; a `requires` name with no requirements/<name>.md.
 
 import type { ClientManifest } from './manifests';
 import { GROUP_RE } from './access-groups';
@@ -30,8 +30,10 @@ export interface LintFinding {
 export function lintManifests(
   set: ClientManifest[],
   knownGroups: Iterable<string>,
+  knownRequirements?: Iterable<string>,
 ): LintFinding[] {
   const known = new Set(knownGroups);
+  const knownReqs = knownRequirements ? new Set(knownRequirements) : null;
   const findings: LintFinding[] = [];
 
   for (const m of set) {
@@ -67,6 +69,18 @@ export function lintManifests(
       }
     }
 
+    // WARN: a requires name no requirements/<name>.md defines (the tile would show a title-only badge and no setup guide).
+    if (knownReqs) {
+      for (const r of m.requires ?? []) {
+        if (!knownReqs.has(r)) {
+          warn(
+            `presentation.requires names ${JSON.stringify(r)} but requirements/${r}.md does not exist ` +
+              `(names are lowercase slugs).`,
+          );
+        }
+      }
+    }
+
     // WARN: charset miss on ANY group name this manifest declares — both the
     // access binding and the `group_role_map` keys. A key that misses the
     // canonical form (access-groups.ts GROUP_RE) can never match a stored
@@ -90,7 +104,7 @@ export function lintManifests(
         warn(
           `group ${JSON.stringify(g)} is referenced but not in the known group ` +
             `set — a typo here silently locks everyone out (fail-closed). Add it ` +
-            `to OTHALA_IDENTITY_GROUPS or fix the name.`,
+            `to a manifest's access group or fix the name.`,
         );
       }
     }

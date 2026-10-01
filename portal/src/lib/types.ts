@@ -33,6 +33,10 @@ export type Identity = Omit<SdkIdentity, 'metadata_admin'> & {
      * excludes metadata_admin from the public /sessions/whoami response.
      */
     admin?: boolean;
+    /** Prerequisite names the admin marked set up for this person (see admin-api patchPrerequisites). */
+    prerequisites?: string[];
+    /** Passkey names keyed by hex credential id (see passkey-names.ts). */
+    passkeyNames?: Record<string, string>;
   };
 };
 
@@ -115,7 +119,7 @@ export interface NodeImageAttributes {
 export interface NodeTextAttributes {
   node_type: 'text';
   id?: string;
-  text: { id?: number; text: string; type?: MessageType };
+  text: { id?: number; text: string; type?: MessageType; context?: Record<string, unknown> };
 }
 
 export type NodeAttributes =
@@ -141,7 +145,7 @@ export interface FlowNode {
     | 'identifier_first';
   attributes: NodeAttributes;
   messages?: FlowMessage[];
-  meta?: { label?: { id?: number; text?: string } };
+  meta?: { label?: { id?: number; text?: string; context?: Record<string, unknown> } };
 }
 
 export interface FlowUI {
