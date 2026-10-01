@@ -212,6 +212,20 @@ const TRAIT_FIELDS = ['username', 'email', 'displayName', 'recoveryEmail'] as co
 export function saveAccessAction(fd: FormData, ctx: ActionContext): Promise<ActionOutcome> {
   const roles = { ...(ctx.identity.metadata_admin?.roles ?? {}) };
   const access = accessToStorage(ctx.manifests, choicesFromForm(fd), { groups: storedGroups(ctx.identity), roles });
+  const [blocked] = access.unmet;
+  if (blocked) {
+    const app = ctx.manifests.find((m) => m.clientId === blocked.clientId);
+    const others = blocked.sharedWith.join(', ') || 'another app';
+    return Promise.resolve({
+      actionResult: {
+        kind: 'error',
+        message:
+          `${app?.clientName || blocked.clientId} shares the group "${blocked.group}" with ${others}, which you did not change, ` +
+          `so access cannot be turned off for it alone. Turn off ${others} too, or leave it as it was. Nothing was saved.`,
+      },
+      refetch: false,
+    });
+  }
   return sectionSave(ctx, { access });
 }
 

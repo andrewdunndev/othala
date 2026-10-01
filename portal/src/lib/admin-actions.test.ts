@@ -490,6 +490,21 @@ describe('person page sections', () => {
     expect(written().metadataAdmin.roles).toEqual({ grafana: 'editor' });
   });
 
+  it('names the shared group and saves nothing when No access cannot be stored', async () => {
+    const shared = [
+      MANIFESTS[0],
+      { clientId: 'other', clientName: 'Other', accessGroups: ['grafana-access'], roles: [], groupRoleMap: {}, skipAccessCheck: false },
+    ] as unknown as ActionContext['manifests'];
+    const outcome = await saveAccessAction(
+      fd({ 'level:grafana': 'none' }),
+      makeCtx({ identity: person(['everyone', 'grafana-access']), manifests: shared }),
+    );
+
+    expect(outcome.actionResult?.kind).toBe('error');
+    expect(JSON.stringify(outcome.actionResult)).toContain('grafana-access');
+    expect(updateIdentityMock).not.toHaveBeenCalled();
+  });
+
   it('removes a role group with the access, then revokes grants', async () => {
     await saveAccessAction(
       fd({ 'level:grafana': 'none' }),

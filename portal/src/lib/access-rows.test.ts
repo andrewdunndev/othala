@@ -132,12 +132,28 @@ describe('accessToStorage', () => {
     const shared = { ...proxywatch, clientId: 'other', accessGroups: ['grafana-access'] } as unknown as ClientManifest;
     const next = accessToStorage([grafana, shared], { grafana: 'none' }, stored(['grafana-access']));
     expect(next.groups).toEqual(['grafana-access']);
+    expect(next.unmet).toEqual([{ clientId: 'grafana', group: 'grafana-access', sharedWith: ['other'] }]);
+  });
+
+  it('writes an explicit entry-level override when a shared role group would outrank it', () => {
+    const other = {
+      ...proxywatch,
+      clientId: 'other',
+      accessGroups: ['other-access'],
+      groupRoleMap: { 'grafana-admin': 'use' },
+    } as unknown as ClientManifest;
+    const from = stored(['grafana-access', 'grafana-admin', 'other-access']);
+    const next = accessToStorage([grafana, other], { grafana: 'viewer' }, from);
+    expect(next.groups).toContain('grafana-admin');
+    expect(next.roles).toEqual({ grafana: 'viewer' });
+    expect(next.unmet).toEqual([]);
+    expect(currentLevel(grafana, next)).toBe('viewer');
   });
 
   it('ignores open apps, unknown apps and unknown levels', () => {
     const from = stored(['everyone', 'grafana-access']);
     const next = accessToStorage(MANIFESTS, { statuspage: 'use', nothing: 'use', grafana: 'owner' }, from);
-    expect(next).toEqual({ groups: ['everyone', 'grafana-access'], roles: {} });
+    expect(next).toEqual({ groups: ['everyone', 'grafana-access'], roles: {}, unmet: [] });
   });
 });
 

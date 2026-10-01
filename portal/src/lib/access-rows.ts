@@ -64,14 +64,17 @@ function appGroups(m: ClientManifest): string[] {
 export interface AccessStorage {
   groups: string[];
   roles: Record<string, string>;
+  /** Requested levels that cannot be stored: the app, the group that still grants it, and the other apps using it. */
+  unmet: Array<{ clientId: string; group: string; sharedWith: string[] }>;
 }
 
 /**
  * Turn the submitted app -> level choices into storage. Only apps whose choice differs from their current level are
  * rewritten: their groups and role override are cleared first (a contradicting override never survives), then the level
  * is stored as the lowest level (access group), a mapped level (access group plus its role group) or any other level
- * (access group plus a role override). Groups an unchanged app still relies on are never removed. Unknown apps and
- * levels are ignored, and apps open to everyone are not editable here.
+ * (access group plus a role override). Groups an unchanged app still relies on are never removed; a level a held group
+ * would outrank is stored as an explicit role override, and one that still cannot be stored is reported in `unmet`.
+ * Unknown apps and levels are ignored, and apps open to everyone are not editable here.
  */
 export function accessToStorage(
   manifests: readonly ClientManifest[],
@@ -106,12 +109,20 @@ export function accessToStorage(
     if (level === NO_ACCESS) continue;
     const access = m.accessGroups.find((g) => !IDENTITY.has(g));
     if (access) groups.add(access);
-    if (level === levelsFor(m)[0].value) continue;
-    const mapped = roleGroup(m, level);
+    const mapped = level === levelsFor(m)[0].value ? undefined : roleGroup(m, level);
     if (mapped) groups.add(mapped);
-    else roles[m.clientId] = level;
+    // A level the groups alone do not yield (unmapped, or outranked by a held mapped group) is an explicit override.
+    if (m.roles.length > 0 && currentLevel(m, { groups: [...groups], roles }) !== level) roles[m.clientId] = level;
   }
-  return { groups: [...groups], roles };
+  const unmet: AccessStorage['unmet'] = [];
+  for (const m of changed) {
+    if (choices[m.clientId] !== NO_ACCESS) continue;
+    const group = m.accessGroups.find((g) => groups.has(g));
+    if (group === undefined) continue;
+    const sharedWith = manifests.filter((o) => o !== m && appGroups(o).includes(group)).map((o) => o.clientName || o.clientId);
+    unmet.push({ clientId: m.clientId, group, sharedWith });
+  }
+  return { groups: [...groups], roles, unmet };
 }
 
 /** The app -> level choices a form posted as `level:<clientId>` fields. */
