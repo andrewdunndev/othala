@@ -4,6 +4,7 @@ import { test } from 'vitest';
 import assert from 'node:assert/strict';
 import * as fc from 'fast-check';
 import { lookupRole, deepMergeClaims, composeIDTokenClaims, buildIDTokenClaims } from '../src/lib/claims.ts';
+import { identity as buildIdentity } from '../src/lib/test-builders.ts';
 
 function manifest({ clientId = 'myapp', roles = [], groupRoleMap = {}, emitGroupsClaim = null, skipConsent = false } = {}) {
   return {
@@ -31,19 +32,15 @@ function manifest({ clientId = 'myapp', roles = [], groupRoleMap = {}, emitGroup
 }
 
 function identity({ groups = [], roleOverride = null, clientId = 'myapp' } = {}) {
-  const id = {
+  return buildIdentity({
     id: 'subject-1',
-    state: 'active',
-    schema_id: 'family',
-    schema_url: '',
-    traits: { username: 'alice', email: 'alice@example.com' },
-    metadata_admin: {
+    username: 'alice',
+    email: 'alice@example.com',
+    metadataAdmin: {
       groups,
       ...(roleOverride !== null ? { roles: { [clientId.toLowerCase()]: roleOverride } } : {}),
     },
-    verifiable_addresses: [],
-  };
-  return id;
+  });
 }
 
 const identifier = fc.stringMatching(/^[a-z][a-z0-9-]{0,19}$/).filter(s => s.length > 0);

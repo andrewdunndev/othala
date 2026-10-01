@@ -5,20 +5,12 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { planGroupSave, nonCanonicalGroups } from '../src/lib/gate.ts';
+import { identity as buildIdentity } from '../src/lib/test-builders.ts';
 
 const PAGE = fileURLToPath(new URL('../src/pages/admin/users/[id].astro', import.meta.url));
 const pageSource = readFileSync(PAGE, 'utf8');
 
-function identity(groups) {
-  return {
-    id: 'id-1',
-    state: 'active',
-    schema_id: 'family',
-    schema_url: '',
-    traits: { username: 'tester', email: 'a@othala.test' },
-    metadata_admin: { groups },
-  };
-}
+const identity = (groups) => buildIdentity({ metadataAdmin: { groups } });
 
 test('an unrelated save with the name KEPT is refused, so the identity is unchanged', () => {
   const stored = identity(['family', 'Access-Grafana']);
