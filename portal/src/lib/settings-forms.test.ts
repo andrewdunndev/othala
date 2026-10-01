@@ -36,4 +36,17 @@ describe('settings forms', () => {
     expect(removes.length).toBeGreaterThan(0);
     for (const b of removes) expect(b).toMatch(/\bform=/);
   });
+
+  it('every disclosure checkbox belongs to the inert #disclosures form, never the form around it', () => {
+    let seen = 0;
+    for (const [file, src] of Object.entries(sources)) {
+      for (const tag of src.match(/<input\b[^>]*type="checkbox"[^>]*>/g) ?? []) {
+        if (!/\bdisclose\b/.test(tag)) continue;
+        seen++;
+        expect(tag, `${file}: ${tag}`).toMatch(/\bform="disclosures"/);
+      }
+    }
+    expect(seen).toBeGreaterThan(6);
+    expect(sources['settings.astro']).toMatch(/<form id="disclosures"[^>]*hidden><\/form>/);
+  });
 });

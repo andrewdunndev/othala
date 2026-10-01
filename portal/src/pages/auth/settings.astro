@@ -218,6 +218,8 @@ const lookupLabel: Record<string, string> = {
   </Fragment>
 
   <div class="settings">
+    {/* Owner of every disclosure checkbox: Enter on one submits this inert form, never the form it sits inside. */}
+    <form id="disclosures" method="dialog" data-astro-reload hidden></form>
     <header class="page-header">
       <h1 class="page-title">Settings</h1>
       <p class="page-lede">
@@ -326,7 +328,7 @@ const lookupLabel: Record<string, string> = {
               <input type="hidden" name="csrf_token" value={csrf} />
               <input type="hidden" name="method" value="password" />
               <input type="text" class="sr-only" readonly tabindex="-1" aria-hidden="true" autocomplete="username" value={traits.username} />
-              <input type="checkbox" class="disclose cb-setup" id="pw-open" checked={pwOpen} />
+              <input type="checkbox" form="disclosures" class="disclose cb-setup" id="pw-open" checked={pwOpen} />
               <div class="form-actions">
                 <label for="pw-open" class="button button-secondary button-sm toggle-label lbl-setup"><span class="on-closed">Change password</span><span class="on-open">Cancel</span></label>
               </div>
@@ -362,7 +364,7 @@ const lookupLabel: Record<string, string> = {
         <p class="lede">A second check keeps others out even if they learn your password.</p>
         {showBackupPrompt && (
           <>
-            <input type="checkbox" class="disclose cb-dismiss" id="backup-dismiss" aria-label="Dismiss the backup codes reminder" />
+            <input type="checkbox" form="disclosures" class="disclose cb-dismiss" id="backup-dismiss" aria-label="Dismiss the backup codes reminder" />
             <div class="notice notice-warning prompt" data-testid="backup-prompt">
               <strong>Save your backup codes now.</strong> If you lose your phone or key, they are the way back in.
               <form method="POST" enctype="application/x-www-form-urlencoded" action={ui.action} class="actions">
@@ -387,8 +389,8 @@ const lookupLabel: Record<string, string> = {
                   <ul class="items">
                     <li>
                       <div class="item-id"><span class="item-name">Your app</span><span class="badge">on</span></div>
-                      <input type="checkbox" class="disclose cb-replace" id="totp-replace" aria-label="Replace authenticator app" />
-                      <input type="checkbox" class="disclose cb-remove" id="totp-remove" aria-label="Remove authenticator app" />
+                      <input type="checkbox" form="disclosures" class="disclose cb-replace" id="totp-replace" aria-label="Replace authenticator app" />
+                      <input type="checkbox" form="disclosures" class="disclose cb-remove" id="totp-remove" aria-label="Remove authenticator app" />
                       <div class="item-actions">
                         <label for="totp-replace" class="button button-secondary button-sm toggle-label lbl-replace"><span class="on-closed">Replace</span><span class="on-open">Keep it</span></label>
                         <label for="totp-remove" class="button button-secondary button-sm toggle-label lbl-remove"><span class="on-closed">Remove</span><span class="on-open">Keep it</span></label>
@@ -421,7 +423,7 @@ const lookupLabel: Record<string, string> = {
               )}
               {!totp.enrolled && (
                 <>
-                  <input type="checkbox" class="disclose cb-setup" id="totp-setup" checked={setupOpen} />
+                  <input type="checkbox" form="disclosures" class="disclose cb-setup" id="totp-setup" checked={setupOpen} />
                   <p class="when-closed">Not set up. An authenticator app on your phone shows a new 6-digit code every 30 seconds.</p>
                   <div class="form-actions when-closed">
                     <label for="totp-setup" class="button button-secondary button-sm toggle-label lbl-setup">Set up authenticator app</label>
@@ -494,7 +496,7 @@ const lookupLabel: Record<string, string> = {
               <input type="hidden" name="csrf_token" value={csrf} />
               <input type="hidden" name="method" value="webauthn" />
               <CredentialRows items={keys} kind="webauthn" noun="security key" fallbackName="Security key" reauth={reauth} reauthHref={reauthHref} />
-              <input type="checkbox" class="disclose cb-setup" id="key-add" checked={nodesByGroup(nodes, 'webauthn').some((n) => (n.messages?.length ?? 0) > 0)} />
+              <input type="checkbox" form="disclosures" class="disclose cb-setup" id="key-add" checked={nodesByGroup(nodes, 'webauthn').some((n) => (n.messages?.length ?? 0) > 0)} />
               <div class="form-actions">
                 <label for="key-add" class="button button-secondary button-sm toggle-label lbl-setup"><span class="on-closed">{keys.length > 0 ? 'Add another security key' : 'Add a security key'}</span><span class="on-open">Cancel</span></label>
               </div>
@@ -558,7 +560,7 @@ const lookupLabel: Record<string, string> = {
                   )}
                 </div>
               )}
-              {lookupOff && <input type="checkbox" class="disclose cb-remove" id="lookup-off" aria-label="Turn off backup codes" />}
+              {lookupOff && <input type="checkbox" form="disclosures" class="disclose cb-remove" id="lookup-off" aria-label="Turn off backup codes" />}
               <div class="form-actions">
                 {nodesByGroup(nodes, 'lookup_secret').map((n) => {
                   const a = asInput(n);
@@ -700,7 +702,7 @@ const lookupLabel: Record<string, string> = {
             <input type="hidden" name="csrf_token" value={csrfSignOut} />
           </form>
           <div class="settings-form">
-            <input type="checkbox" class="disclose cb-remove" id="signout-all" aria-label="Sign out everywhere" />
+            <input type="checkbox" form="disclosures" class="disclose cb-remove" id="signout-all" aria-label="Sign out everywhere" />
             <div class="form-actions">
               <label for="signout-all" class="button button-secondary button-sm toggle-label lbl-remove"><span class="on-closed">Sign out everywhere</span><span class="on-open">Cancel</span></label>
             </div>
