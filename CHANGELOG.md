@@ -9,7 +9,7 @@ This CHANGELOG and git tags carry the deployed-instance release state.
 
 ## [Unreleased]
 
-Heading for 0.10.0: an apps-first signed-in home with setup guides, and fewer env vars and Ory keys.
+Heading for 0.10.0: an apps-first home with setup guides, and fewer env vars.
 
 ### Added
 
@@ -19,15 +19,15 @@ Heading for 0.10.0: an apps-first signed-in home with setup guides, and fewer en
 
 ### Removed
 
-Delete each from the deploy environment; none is read any more.
+Delete each from the deploy environment.
 
 - `OTHALA_DEFAULT_SCHEMA_ID`: Kratos applies its own default.
 - `OTHALA_WEBAUTHN_RP_ID` and `OTHALA_WEBAUTHN_RP_ORIGINS`: `kratos.yml` uses `OTHALA_APEX` and `OTHALA_PUBLIC_URL`.
-- `OTHALA_SMTP_FROM_ADDRESS`: mail sends from `noreply@<OTHALA_APEX>`.
+- `OTHALA_SMTP_FROM_ADDRESS`: mail comes from `noreply@<OTHALA_APEX>`.
 - `OTHALA_SITE_NAME`: `OTHALA_INSTANCE_NAME` is the brand name, now required.
 - `OTHALA_ADMIN_CONTACT`: the dashboard says "your administrator".
 - `OTHALA_DEFAULT_GROUP` and `OTHALA_IDENTITY_GROUPS`: fixed at `admin` and `everyone`.
-- `OTHALA_ADMIN_FRESHNESS_HOURS`: the step-up window is 1h.
+- `OTHALA_ADMIN_FRESHNESS_HOURS`: step-up is 1h.
 - `OTHALA_HIBP_ENABLED`, `OTHALA_PASSWORD_MIN_LENGTH`: breach check on, minimum 12.
 - `OTHALA_CORS_ALLOWED_ORIGINS`: Hydra CORS allows `OTHALA_PUBLIC_URL`.
 - `OTHALA_PUBLIC_HOST`: the Caddyfile site address is `OTHALA_PUBLIC_URL`.
@@ -36,14 +36,14 @@ Delete each from the deploy environment; none is read any more.
 - `ADMIN_HOST`: renamed `PORTAL_ADMIN_BIND_HOST`, required in production.
 - `KRATOS_PG_HOST`, `HYDRA_PG_HOST`, `KRATOS_ADMIN_HOST` and `CONSENT_HOST`: hosts are `postgres`, `kratos`, `othala`.
 - `MANIFEST_DIR` (production reads `/etc/portal/manifests`), `PORT`, `HOST`, `ADMIN_PORT`, `PORTAL_LOGIN_URL` and `PORTAL_CONSENT_URL`: fixed.
-- `SMTP_USER`, `SMTP_PASS`, `ACME_EMAIL` and the Kratos and Hydra `DSN`: credentials ride in `OTHALA_SMTP_CONNECTION_URI` and `dsn`.
+- `SMTP_USER`, `SMTP_PASS`, `ACME_EMAIL`, Kratos and Hydra `DSN`: credentials ride in `OTHALA_SMTP_CONNECTION_URI` and `dsn`.
 
 ### Changed
 
 - Production start needs `OTHALA_INSTANCE_NAME`.
 - Production start needs `OTHALA_CONTACT_RECIPIENT` and `OTHALA_SMTP_CONNECTION_URI`.
-- Kratos and Hydra trace when `OTHALA_OTLP_ENDPOINT` is set.
-- The Kratos login flow lifespan is 1h, up from 10m.
+- Kratos and Hydra trace with `OTHALA_OTLP_ENDPOINT`.
+- Kratos login flow lifespan is 1h, up from 10m.
 - Kratos public CORS is off.
 - Caddy `othala_selfservice` limit is 30 events per minute, up from 10.
 - `kratos.yml` and `hydra.yml` drop keys restating upstream defaults.
