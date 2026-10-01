@@ -61,19 +61,19 @@ export function pruneNames(names: PasskeyNames, currentIds: readonly string[]): 
 
 export type RenameVerdict =
   | { ok: true; name: string }
-  | { ok: false; status: 400 | 403; error: string };
+  | { ok: false; status: 400 | 403; error: string; code: 'unknown' | 'name' };
 
 /** Validate a rename: a well-formed id the session's identity owns, and a usable name. */
 export function renameVerdict(identity: Identity, credentialId: unknown, rawName: unknown): RenameVerdict {
   if (typeof credentialId !== 'string' || !CREDENTIAL_ID_RE.test(credentialId)) {
-    return { ok: false, status: 400, error: 'Unknown passkey.' };
+    return { ok: false, status: 400, error: 'Unknown passkey.', code: 'unknown' };
   }
   if (!ownsPasskey(identity, credentialId)) {
-    return { ok: false, status: 403, error: 'Unknown passkey.' };
+    return { ok: false, status: 403, error: 'Unknown passkey.', code: 'unknown' };
   }
   const name = cleanPasskeyName(rawName);
   if (!name) {
-    return { ok: false, status: 400, error: `Give the passkey a name of up to ${PASSKEY_NAME_MAX} characters.` };
+    return { ok: false, status: 400, error: `Give the passkey a name of up to ${PASSKEY_NAME_MAX} characters.`, code: 'name' };
   }
   return { ok: true, name };
 }

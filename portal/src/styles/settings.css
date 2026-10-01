@@ -36,14 +36,30 @@
 /* Disclosure without script: a visually hidden checkbox per row, toggled by its label button, opens the confirm or rename row. */
 .items li, .tools { position: relative; }
 .disclose { position: absolute; opacity: 0; width: 1px; height: 1px; pointer-events: none; }
-.toggle-label { cursor: pointer; }
-.cb-remove:focus-visible ~ * .lbl-remove, .cb-rename:focus-visible ~ * .lbl-rename, .cb-replace:focus-visible ~ * .lbl-replace { outline: 2px solid var(--input-focus); outline-offset: 2px; }
+.toggle-label { cursor: pointer; display: inline-flex; align-items: center; justify-content: center; }
+.cb-remove:focus-visible ~ * .lbl-remove, .cb-rename:focus-visible ~ * .lbl-rename, .cb-replace:focus-visible ~ * .lbl-replace, .cb-setup:focus-visible ~ * .lbl-setup, .cb-dismiss:focus-visible ~ .prompt .toggle-label { outline: 2px solid var(--input-focus); outline-offset: 2px; }
 .toggle-label .on-open { display: none; }
-.cb-remove:checked ~ * .lbl-remove .on-closed, .cb-rename:checked ~ * .lbl-rename .on-closed, .cb-replace:checked ~ * .lbl-replace .on-closed { display: none; }
-.cb-remove:checked ~ * .lbl-remove .on-open, .cb-rename:checked ~ * .lbl-rename .on-open, .cb-replace:checked ~ * .lbl-replace .on-open { display: inline; }
+.cb-remove:checked ~ * .lbl-remove .on-closed, .cb-rename:checked ~ * .lbl-rename .on-closed, .cb-replace:checked ~ * .lbl-replace .on-closed, .cb-setup:checked ~ * .lbl-setup .on-closed { display: none; }
+.cb-remove:checked ~ * .lbl-remove .on-open, .cb-rename:checked ~ * .lbl-rename .on-open, .cb-replace:checked ~ * .lbl-replace .on-open, .cb-setup:checked ~ * .lbl-setup .on-open { display: inline; }
 .panel-row { flex-basis: 100%; display: none; gap: var(--space-3); align-items: center; flex-wrap: wrap; font-size: var(--text-sm); }
 .cb-remove:checked ~ .panel-remove, .cb-rename:checked ~ .panel-rename, .cb-replace:checked ~ .panel-replace { display: flex; }
 .panel-row > span { flex: 1 1 14rem; }
+.panel-row .field-error { flex-basis: 100%; margin: 0; }
+.settings .panel-block { display: none; }
+.cb-setup:checked ~ .panel-setup { display: block; }
+.cb-setup:checked ~ ol.panel-setup { display: grid; }
+.cb-dismiss:checked + .prompt { display: none; }
+.card-flash:empty { display: none; }
+.card-flash:focus { outline: none; }
+.settings-hint { margin-top: var(--space-3); }
+.narrow-only { display: none; }
+
+/* Read-only values (username, email) sit flat and dashed, apart from inputs that take a change. */
+.settings input[readonly] { background: transparent; border-style: dashed; color: var(--text-2); cursor: default; box-shadow: none; }
+.settings input[readonly]:focus { outline: 1px dashed var(--border); outline-offset: 2px; }
+.static { display: grid; gap: var(--space-1); }
+.static-label { font-size: var(--text-sm); font-weight: 600; }
+.static-value { font-family: var(--font-mono); font-size: var(--text-sm); color: var(--text-2); }
 .panel-row input[type='text'] { flex: 1 1 12rem; min-width: 0; background: var(--input-bg); color: var(--text); border: 1px solid var(--input-border); border-radius: var(--radius); padding: var(--space-2) var(--space-3); font: inherit; }
 
 /* Enrollment steps */
@@ -64,7 +80,10 @@
 .lookup-codes-label { font-size: var(--text-sm); color: var(--text-2); margin-bottom: var(--space-1); }
 .lookup-codes-value { display: block; padding: var(--space-3); background: var(--bg); border: 1px solid var(--border); border-radius: var(--radius-sm); font-size: var(--text-sm); white-space: pre-wrap; word-break: break-all; color: var(--text); user-select: all; }
 
-.email-row { display: flex; flex-wrap: wrap; gap: var(--space-1) var(--space-3); align-items: center; }
+.email-row { display: flex; gap: var(--space-2); align-items: center; }
+.email-row input { flex: 1 1 auto; min-width: 0; }
+.email-row .badge { flex: none; }
+.field > .actions { margin-top: var(--space-2); }
 .email-row .item-name { font-family: var(--font-mono); font-weight: 500; }
 
 .kv { display: flex; flex-direction: column; margin-top: var(--space-2); border-top: 1px solid var(--border); }
@@ -80,5 +99,6 @@
 @media (max-width: 640px) {
   .kv > div { grid-template-columns: 1fr; gap: var(--space-1); }
   .settings .page-title { font-size: var(--text-2xl); }
-  .items .button, .actions .button, .form-actions .button { min-height: 2.75rem; }
+  .settings .button { min-height: 2.75rem; }
+  .narrow-only { display: block; }
 }

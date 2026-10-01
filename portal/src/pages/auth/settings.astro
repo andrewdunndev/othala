@@ -41,6 +41,7 @@ import {
   totpView,
 } from '../../lib/settings-view';
 import { devSettings, isDevSettingsState } from '../../lib/settings-fixtures';
+import { FLASH, RENAME_ERROR_COOKIE, RENAME_ERRORS, groupKey, messageText } from '../../lib/settings-flash';
 
 const cookie = Astro.request.headers.get('cookie') ?? undefined;
 const devParam = import.meta.env.DEV ? Astro.url.searchParams.get('dev-state') : null;
@@ -135,6 +136,20 @@ if (dev) {
   }
 }
 
+// A refused rename leaves a one-minute cookie naming the passkey and the reason; read once, here, after the flow exists
+// (the flow-less first request only redirects).
+let renameError: { id: string; text: string } | null = null;
+if (dev) {
+  renameError = dev.renameError;
+} else {
+  const raw = Astro.cookies.get(RENAME_ERROR_COOKIE)?.value;
+  if (raw) {
+    const [id, code] = raw.split('.');
+    renameError = { id: id ?? '', text: RENAME_ERRORS[code ?? ''] ?? RENAME_ERRORS.busy };
+    Astro.response.headers.append('Set-Cookie', `${RENAME_ERROR_COOKIE}=; Path=/auth/settings; Max-Age=0; HttpOnly; SameSite=Lax${import.meta.env.PROD ? '; Secure' : ''}`);
+  }
+}
+
 const identity = session!.identity!;
 const ui = flow.ui;
 const nodes = ui.nodes;
@@ -168,6 +183,12 @@ const reauth = dev ? dev.reauth : privilegedLapsed(session!.authenticated_at);
 const reauthHref = browserFlows.login({ refresh: true, returnTo: '/auth/settings' });
 const verifyHref = browserFlows.verification(`${publicUrl}/auth/settings`, traits.email);
 const showBackupPrompt = flow.state === 'success' && status.twoStep && !status.backupCodes;
+// The enrollment steps open on their own when a code was refused (or the fixture asks); otherwise they wait behind a button.
+const setupOpen = totp.codeMessages.length > 0 || (dev?.setupOpen ?? false);
+const pwOpen = nodesByGroup(nodes, 'password').some((n) => (n.messages?.length ?? 0) > 0);
+// The saved line belongs in the card that was edited. Script fills it on a live swap; the dev fixture renders it here.
+const devFlash = dev?.flash ? FLASH[dev.flash] : null;
+const lookupOff = nodesByGroup(nodes, 'lookup_secret').map(asInput).find((a) => a?.name === 'lookup_secret_disable') ?? null;
 
 const csrfSignOut = mint(identity.id, 'sign-out-everywhere');
 const renameTokens = passkeys.map(() => mint(identity.id, 'passkey-name'));
@@ -179,7 +200,6 @@ const yourApps = dev ? [] : loadTiles().filter((t) => userCanSeeTile(t, groups))
 const lookupLabel: Record<string, string> = {
   lookup_secret_regenerate: lookup.enrolled ? 'Make new codes' : 'Get backup codes',
   lookup_secret_reveal: 'Show my codes',
-  lookup_secret_disable: 'Turn off',
   lookup_secret_confirm: "I've saved these codes",
 };
 ---
@@ -204,36 +224,30 @@ const lookupLabel: Record<string, string> = {
     </div>
 
     <div class="settings-notices" role="status">
-      {ui.messages?.map((m) => <div class={`notice notice-${kind(m.type)}`}>{m.text}</div>)}
+      {ui.messages?.filter((m) => !(devFlash && m.type === 'success')).map((m) => (
+        <div class={`notice notice-${kind(m.type)}`} data-flow-success={m.type === 'success' ? '' : undefined}>{messageText(m)}</div>
+      ))}
       {signOutError && <div class="notice notice-danger">{signOutError}</div>}
       {status.passkeys === 1 && (
         <div class="notice notice-warning">You have one passkey. Add one on your other devices too, so losing this one doesn't lock you out.</div>
       )}
       {status.emailUnverified && (
-        <div class="notice notice-warning">Your email address is not verified yet. Verify it so you can get back in if you lose a device.</div>
-      )}
-      {reauth && (
-        <div class="notice notice-warning" data-testid="reauth-notice">
-          It's been a while since you signed in, so we'll ask you to confirm it's you before you change how you sign in.
-          <div class="actions"><a class="button button-secondary button-sm" href={reauthHref} data-astro-reload>Confirm it's you</a></div>
-        </div>
-      )}
-      {showBackupPrompt && (
-        <div class="notice notice-warning" data-testid="backup-prompt">
-          <strong>Save your backup codes now.</strong> If you lose your phone or key, they are the way back in.
-          <form method="POST" action={ui.action} class="actions">
-            <input type="hidden" name="csrf_token" value={csrf} />
-            <input type="hidden" name="method" value="lookup_secret" />
-            <button class="button button-primary button-sm" type="submit" name="lookup_secret_regenerate" value="true">Get backup codes</button>
-            <a class="button button-secondary button-sm" href="#recovery">Later</a>
-          </form>
+        <div class="notice notice-warning">
+          Your email address is not verified yet. Verify it so you can get back in if you lose a device.
+          <div class="actions"><a class="button button-secondary button-sm" href={verifyHref} data-astro-reload>Send verification code</a></div>
         </div>
       )}
     </div>
+    {reauth && (
+      <p class="field-hint settings-hint" data-testid="reauth-notice">
+        Changing how you sign in asks you to confirm it's you first. <a href={reauthHref} data-astro-reload>Confirm now</a>
+      </p>
+    )}
 
     <div class="cards">
       <section class="panel card" id="sign-in" data-card aria-labelledby="h-signin">
         <h2 id="h-signin">Sign-in</h2>
+        <div class="card-flash" data-flash tabindex="-1" role="status">{null}</div>
 
         {has('passkey') && (
           <div class="group">
@@ -247,7 +261,7 @@ const lookupLabel: Record<string, string> = {
                 if (a?.type === 'hidden') return <input type="hidden" name={a.name} value={String(a.value ?? '')} />;
                 return null;
               })}
-              <CredentialRows items={passkeys} kind="passkey" noun="passkey" fallbackName="Passkey" rename={passkeys.length > 0} />
+              <CredentialRows items={passkeys} kind="passkey" noun="passkey" fallbackName="Passkey" rename={passkeys.length > 0} renameError={renameError} />
               {nodesByGroup(nodes, 'passkey').map((n) => {
                 const a = asInput(n);
                 // safeOnclick validates against KNOWN_TRIGGERS; never emit a.onclick raw.
@@ -279,25 +293,31 @@ const lookupLabel: Record<string, string> = {
             <form method="POST" action={ui.action} class="settings-form">
               <input type="hidden" name="csrf_token" value={csrf} />
               <input type="hidden" name="method" value="password" />
-              {nodesByGroup(nodes, 'password').map((n) => {
-                const a = asInput(n);
-                if (!a) return null;
-                if (a.type === 'hidden') return <input type="hidden" name={a.name} value={String(a.value ?? '')} />;
-                if (a.type === 'submit') {
+              <input type="checkbox" class="disclose cb-setup" id="pw-open" checked={pwOpen} />
+              <div class="form-actions">
+                <label for="pw-open" class="button button-secondary button-sm toggle-label lbl-setup"><span class="on-closed">Change password</span><span class="on-open">Cancel</span></label>
+              </div>
+              <div class="panel-block panel-setup">
+                {nodesByGroup(nodes, 'password').map((n) => {
+                  const a = asInput(n);
+                  if (!a) return null;
+                  if (a.type === 'hidden') return <input type="hidden" name={a.name} value={String(a.value ?? '')} />;
+                  if (a.type === 'submit') {
+                    return (
+                      <div class="form-actions">
+                        <button class="button button-primary button-sm" type="submit" name={a.name} value={String(a.value ?? '')}>Save new password</button>
+                      </div>
+                    );
+                  }
                   return (
-                    <div class="form-actions">
-                      <button class="button button-secondary button-sm" type="submit" name={a.name} value={String(a.value ?? '')}>Change password</button>
+                    <div class="field">
+                      <label for="new-password">{n.meta?.label?.text ?? 'New password'}</label>
+                      <input id="new-password" name={a.name} type="password" autocomplete="new-password" required={a.required} />
+                      {n.messages?.map((m) => <div class={`notice notice-${kind(m.type)}`}>{messageText(m)}</div>)}
                     </div>
                   );
-                }
-                return (
-                  <div class="field">
-                    <label for="new-password">{n.meta?.label?.text ?? 'New password'}</label>
-                    <input id="new-password" name={a.name} type="password" autocomplete="new-password" required={a.required} />
-                    {n.messages?.map((m) => <div class={`notice notice-${kind(m.type)}`}>{m.text}</div>)}
-                  </div>
-                );
-              })}
+                })}
+              </div>
             </form>
           </div>
         )}
@@ -305,7 +325,22 @@ const lookupLabel: Record<string, string> = {
 
       <section class="panel card" id="two-step" data-card aria-labelledby="h-2sv">
         <h2 id="h-2sv">Two-step verification</h2>
+        <div class="card-flash" data-flash tabindex="-1" role="status">{devFlash && <div class="notice notice-success">{devFlash}</div>}</div>
         <p class="lede">A second check keeps others out even if they learn your password.</p>
+        {showBackupPrompt && (
+          <>
+            <input type="checkbox" class="disclose cb-dismiss" id="backup-dismiss" aria-label="Dismiss the backup codes reminder" />
+            <div class="notice notice-warning prompt" data-testid="backup-prompt">
+              <strong>Save your backup codes now.</strong> If you lose your phone or key, they are the way back in.
+              <form method="POST" action={ui.action} class="actions">
+                <input type="hidden" name="csrf_token" value={csrf} />
+                <input type="hidden" name="method" value="lookup_secret" />
+                <button class="button button-primary button-sm" type="submit" name="lookup_secret_regenerate" value="true">Get backup codes</button>
+                <label for="backup-dismiss" class="button button-secondary button-sm toggle-label">Later</label>
+              </form>
+            </div>
+          </>
+        )}
 
         {has('totp') && (
           <div class="group">
@@ -339,20 +374,25 @@ const lookupLabel: Record<string, string> = {
               )}
               {!totp.enrolled && (
                 <>
+                  <input type="checkbox" class="disclose cb-setup" id="totp-setup" checked={setupOpen} />
                   <p>Not set up. An authenticator app on your phone shows a new 6-digit code every 30 seconds.</p>
-                  <ol class="steps">
+                  <div class="form-actions">
+                    <label for="totp-setup" class="button button-secondary button-sm toggle-label lbl-setup"><span class="on-closed">Set up authenticator app</span><span class="on-open">Cancel</span></label>
+                  </div>
+                  <ol class="steps panel-block panel-setup">
                     {totp.qr && (
                       <li>
                         <h4>Scan the code</h4>
                         <p>Scan this into your authenticator app. Scan it into every app you want to use now; each shows the same codes.</p>
+                        <p class="field-hint narrow-only">On this phone? Open "Can't scan?" below and copy the setup key into your app.</p>
                         <div class="totp-qr">
                           <img src={totp.qr.src} alt={totp.qr.alt} width={totp.qr.width} height={totp.qr.height} />
                         </div>
                         {totp.secret && (
-                          <details>
+                          <details data-open-narrow>
                             <summary>Can't scan? Show setup key</summary>
-                            <code class="totp-secret-value mono">{totp.secret}</code>
-                            <p class="field-hint">Type this key into your app instead.</p>
+                            <code class="totp-secret-value mono">{groupKey(totp.secret)}</code>
+                            <p class="field-hint">Type this key into your app instead. Spaces don't matter.</p>
                           </details>
                         )}
                       </li>
@@ -377,7 +417,7 @@ const lookupLabel: Record<string, string> = {
                             aria-describedby={totp.codeMessages.length ? 'totp-code-error' : undefined}
                           />
                           {totp.codeMessages.map((m) => (
-                            <p id="totp-code-error" class="field-error">{m.text} The scan code above is still good.</p>
+                            <p id="totp-code-error" class="field-error" role="alert">{messageText(m)} The scan code above is still good.</p>
                           ))}
                         </div>
                         {totp.save && (
@@ -402,29 +442,35 @@ const lookupLabel: Record<string, string> = {
               <input type="hidden" name="csrf_token" value={csrf} />
               <input type="hidden" name="method" value="webauthn" />
               <CredentialRows items={keys} kind="webauthn" noun="security key" fallbackName="Security key" />
-              {nodesByGroup(nodes, 'webauthn').map((n) => {
-                // script nodes are collected by scriptNodes() and rendered at page bottom
-                if (n.attributes.node_type === 'script') return null;
-                const a = asInput(n);
-                if (!a || a.name === 'webauthn_remove') return null;
-                if (a.type === 'hidden') return <input type="hidden" name={a.name} value={String(a.value ?? '')} />;
-                if (a.type === 'button' || a.type === 'submit') {
+              <input type="checkbox" class="disclose cb-setup" id="key-add" checked={nodesByGroup(nodes, 'webauthn').some((n) => (n.messages?.length ?? 0) > 0)} />
+              <div class="form-actions">
+                <label for="key-add" class="button button-secondary button-sm toggle-label lbl-setup"><span class="on-closed">{keys.length > 0 ? 'Add another security key' : 'Add a security key'}</span><span class="on-open">Cancel</span></label>
+              </div>
+              <div class="panel-block panel-setup">
+                {nodesByGroup(nodes, 'webauthn').map((n) => {
+                  // script nodes are collected by scriptNodes() and rendered at page bottom
+                  if (n.attributes.node_type === 'script') return null;
+                  const a = asInput(n);
+                  if (!a || a.name === 'webauthn_remove') return null;
+                  if (a.type === 'hidden') return <input type="hidden" name={a.name} value={String(a.value ?? '')} />;
+                  if (a.type === 'button' || a.type === 'submit') {
+                    return (
+                      <div class="form-actions">
+                        <button class="button button-primary button-sm" type={a.type} name={a.name} value={String(a.value ?? '')} onclick={safeOnclick(a)}>
+                          Add this key
+                        </button>
+                      </div>
+                    );
+                  }
                   return (
-                    <div class="form-actions">
-                      <button class="button button-secondary button-sm" type={a.type} name={a.name} value={String(a.value ?? '')} onclick={safeOnclick(a)}>
-                        {n.meta?.label?.text ?? 'Add a security key'}
-                      </button>
+                    <div class="field">
+                      <label for="webauthn-register-displayname">Name for the new key</label>
+                      <input id="webauthn-register-displayname" name={a.name} type={a.type} placeholder="e.g. Spare key in the drawer" value={a.value !== undefined ? String(a.value) : undefined} required={a.required} />
+                      {n.messages?.map((m) => <div class={`notice notice-${kind(m.type)}`}>{messageText(m)}</div>)}
                     </div>
                   );
-                }
-                return (
-                  <div class="field">
-                    <label for="webauthn-register-displayname">Name for the new key</label>
-                    <input id="webauthn-register-displayname" name={a.name} type={a.type} placeholder="e.g. Spare key in the drawer" value={a.value !== undefined ? String(a.value) : undefined} required={a.required} />
-                    {n.messages?.map((m) => <div class={`notice notice-${kind(m.type)}`}>{m.text}</div>)}
-                  </div>
-                );
-              })}
+                })}
+              </div>
             </form>
           </div>
         )}
@@ -432,6 +478,7 @@ const lookupLabel: Record<string, string> = {
 
       <section class="panel card" id="recovery" data-card aria-labelledby="h-rec">
         <h2 id="h-rec">Recovery</h2>
+        <div class="card-flash" data-flash tabindex="-1" role="status">{null}</div>
         <p class="lede">For the day a phone is lost or broken.</p>
 
         {has('lookup_secret') && (
@@ -447,17 +494,17 @@ const lookupLabel: Record<string, string> = {
                   <code class="lookup-codes-value mono" data-testid="backup-codes">{lookup.codes}</code>
                 </div>
               )}
+              {lookupOff && <input type="checkbox" class="disclose cb-remove" id="lookup-off" aria-label="Turn off backup codes" />}
               <div class="form-actions">
                 {nodesByGroup(nodes, 'lookup_secret').map((n) => {
                   const a = asInput(n);
-                  if (!a) return null;
+                  if (!a || a.name === 'lookup_secret_disable') return null;
                   if (a.type === 'hidden') return <input type="hidden" name={a.name} value={String(a.value ?? '')} />;
                   if (a.type === 'submit' || a.type === 'button') {
                     const primary = a.name === 'lookup_secret_confirm' || (a.name === 'lookup_secret_regenerate' && !lookup.enrolled);
-                    const danger = a.name === 'lookup_secret_disable';
                     return (
                       <button
-                        class={`button ${primary ? 'button-primary' : danger ? 'button-danger' : 'button-secondary'} button-sm`}
+                        class={`button ${primary ? 'button-primary' : 'button-secondary'} button-sm`}
                         type={a.type}
                         name={a.name}
                         value={String(a.value ?? '')}
@@ -475,7 +522,16 @@ const lookupLabel: Record<string, string> = {
                     </div>
                   );
                 })}
+                {lookupOff && (
+                  <label for="lookup-off" class="button button-secondary button-sm toggle-label lbl-remove"><span class="on-closed">Turn off</span><span class="on-open">Keep them</span></label>
+                )}
               </div>
+              {lookupOff && (
+                <div class="panel-row panel-remove">
+                  <span>Turn off backup codes? Any you saved stop working.</span>
+                  <button type="submit" name={lookupOff.name} value={String(lookupOff.value ?? '')} class="button button-danger button-sm">Turn off backup codes</button>
+                </div>
+              )}
             </form>
           </div>
         )}
@@ -490,20 +546,24 @@ const lookupLabel: Record<string, string> = {
               <input type="hidden" name="traits.username" value={traits.username} />
               {hasNode('traits.displayName') && <input type="hidden" name="traits.displayName" value={value('traits.displayName')} />}
               <input type="hidden" name="traits.email" value={value('traits.email') || traits.email} />
-              <div class="field">
-                <label for="recovery-email">Recovery email address</label>
-                <input
-                  id="recovery-email"
-                  name="traits.recoveryEmail"
-                  type="email"
-                  value={value('traits.recoveryEmail')}
-                  readonly={emailLocked}
-                  aria-describedby={emailLocked ? 'email-hint' : undefined}
-                />
-                {nodeMessages('traits.recoveryEmail').map((m) => <div class={`notice notice-${kind(m.type)}`}>{m.text}</div>)}
-              </div>
-              {!emailLocked && (
-                <div class="form-actions"><button class="button button-secondary button-sm" type="submit" name="method" value="profile">Save email</button></div>
+              {emailLocked ? (
+                <>
+                  <input type="hidden" name="traits.recoveryEmail" value={value('traits.recoveryEmail')} />
+                  <div class="static">
+                    <span class="static-label" id="recovery-email-label">Recovery email address</span>
+                    <span class="static-value" aria-labelledby="recovery-email-label">{value('traits.recoveryEmail') || 'Not set'}</span>
+                  </div>
+                  <div class="form-actions"><a class="button button-secondary button-sm" href={reauthHref} data-astro-reload>Confirm it's you to change it</a></div>
+                </>
+              ) : (
+                <>
+                  <div class="field">
+                    <label for="recovery-email">Recovery email address</label>
+                    <input id="recovery-email" name="traits.recoveryEmail" type="email" value={value('traits.recoveryEmail')} />
+                    {nodeMessages('traits.recoveryEmail').map((m) => <div class={`notice notice-${kind(m.type)}`}>{messageText(m)}</div>)}
+                  </div>
+                  <div class="form-actions"><button class="button button-secondary button-sm" type="submit" name="method" value="profile">Save email</button></div>
+                </>
               )}
             </form>
           </div>
@@ -513,6 +573,7 @@ const lookupLabel: Record<string, string> = {
       {has('profile') && (
         <section class="panel card" id="profile" data-card aria-labelledby="h-prof">
           <h2 id="h-prof">Profile</h2>
+          <div class="card-flash" data-flash tabindex="-1" role="status">{null}</div>
           <p class="lede">Your name and email. A new address is sent a verification code.</p>
           <form method="POST" action={ui.action} class="settings-form">
             <input type="hidden" name="csrf_token" value={csrf} />
@@ -534,25 +595,27 @@ const lookupLabel: Record<string, string> = {
             </div>
             <div class="field">
               <label for={emailLocked ? 'email-readonly' : 'email'}>Email</label>
-              {emailLocked ? (
-                <>
-                  <input type="hidden" name="traits.email" value={traits.email} />
-                  <input id="email-readonly" type="text" value={traits.email} readonly aria-describedby="email-hint" />
-                  <p id="email-hint" class="field-hint">
-                    To change an email address, sign in again with your passkey or password.{' '}
-                    <a href={reauthHref} data-astro-reload>Change email address</a>
-                  </p>
-                </>
-              ) : (
-                <input id="email" name="traits.email" type="email" value={value('traits.email') || traits.email} required />
+              <div class="email-row">
+                {emailLocked ? (
+                  <>
+                    <input type="hidden" name="traits.email" value={traits.email} />
+                    <input id="email-readonly" type="text" value={traits.email} readonly aria-describedby="email-hint" />
+                  </>
+                ) : (
+                  <input id="email" name="traits.email" type="email" value={value('traits.email') || traits.email} required />
+                )}
+                {verified !== null && <span class={`badge ${verified ? '' : 'badge-warning'}`}>{verified ? 'Verified' : 'Unverified'}</span>}
+              </div>
+              {verified === false && (
+                <div class="actions"><a class="button button-secondary button-sm" href={verifyHref} data-astro-reload>Send verification code</a></div>
               )}
-              {nodeMessages('traits.email').map((m) => <div class={`notice notice-${kind(m.type)}`}>{m.text}</div>)}
-              {verified !== null && (
-                <div class="email-row">
-                  <span class={`badge ${verified ? '' : 'badge-warning'}`}>{verified ? 'Verified' : 'Unverified'}</span>
-                  {!verified && <a class="button button-secondary button-sm" href={verifyHref} data-astro-reload>Send verification code</a>}
-                </div>
+              {emailLocked && (
+                <p id="email-hint" class="field-hint">
+                  To change an email address, sign in again with your passkey or password.{' '}
+                  <a href={reauthHref} data-astro-reload>Change email address</a>
+                </p>
               )}
+              {nodeMessages('traits.email').map((m) => <div class={`notice notice-${kind(m.type)}`}>{messageText(m)}</div>)}
             </div>
             <div class="form-actions">
               <button class="button button-secondary button-sm" type="submit" name="method" value="profile">Save profile</button>
@@ -563,13 +626,21 @@ const lookupLabel: Record<string, string> = {
 
       <section class="panel card card-wide" id="sessions" data-card aria-labelledby="h-ses">
         <h2 id="h-ses">Sessions and apps</h2>
+        <div class="card-flash" data-flash tabindex="-1" role="status">{null}</div>
         <div class="group">
           <h3>Sessions</h3>
           <p>"Sign out everywhere" ends every session and the remembered logins, so no app can quietly sign you back in.</p>
-          <form method="POST" action="/auth/settings" class="actions" data-astro-reload>
+          <form method="POST" action="/auth/settings" class="settings-form" data-astro-reload>
             <input type="hidden" name="action" value="sign-out-everywhere" />
             <input type="hidden" name="csrf_token" value={csrfSignOut} />
-            <button class="button button-danger button-sm" type="submit">Sign out everywhere</button>
+            <input type="checkbox" class="disclose cb-remove" id="signout-all" aria-label="Sign out everywhere" />
+            <div class="form-actions">
+              <label for="signout-all" class="button button-secondary button-sm toggle-label lbl-remove"><span class="on-closed">Sign out everywhere</span><span class="on-open">Cancel</span></label>
+            </div>
+            <div class="panel-row panel-remove">
+              <span>Sign out of every device and app, this one included?</span>
+              <button class="button button-danger button-sm" type="submit">Sign out everywhere</button>
+            </div>
           </form>
           {!logoutInfo && <p class="field-hint">Local logout endpoint unavailable; the revoke still runs.</p>}
         </div>
