@@ -326,6 +326,10 @@ a.subtle:hover { color: var(--text); }
 [data-theme="dark"] .theme-icon-moon { display: none; }
 [data-theme="light"] .theme-icon-sun  { display: none; }
 [data-theme="light"] .theme-icon-moon { display: block; }
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme]) .theme-icon-sun  { display: block; }
+  :root:not([data-theme]) .theme-icon-moon { display: none; }
+}
 
 /* ── Tables (admin lists) ───────────────────────────────────── */
 .data-table {

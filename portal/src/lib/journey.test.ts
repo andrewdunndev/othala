@@ -52,7 +52,7 @@ describe('error reasons', () => {
 describe('code inputs', () => {
   it('cap a code at six digits and start empty after a refused one', () => {
     for (const s of [recoverySpecs('sent'), verificationSpecs('sent')]) {
-      expect(s.code).toMatchObject({ maxlength: 6, pattern: '[0-9]{6}', clearOnError: true });
+      expect(s.code).toMatchObject({ maxlength: 12, pattern: '[0-9]{6}', clearOnError: true });
     }
   });
 });

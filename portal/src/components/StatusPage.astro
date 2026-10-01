@@ -21,7 +21,7 @@ interface Props {
 
 const { status, title, message, reason, retryHref } = Astro.props;
 const viewer = await currentViewer(Astro.request, Astro.url);
-const actions = statusActions(status, viewer !== null, retryHref ?? Astro.url.pathname + Astro.url.search);
+const actions = statusActions(status, viewer !== null, retryHref ?? Astro.url.pathname + Astro.url.search, reason);
 ---
 <FocusPage title={title} lede={message} tabTitle={`${status} ${title}`} viewer={viewer}>
   <div class="status-actions" data-reason={reason}>

@@ -7,7 +7,7 @@ import type { NodeSpecs } from './nodes';
 const BAD_CODE = "That code didn't work. Check it and try again, or ask for a new one.";
 
 const MESSAGES: Record<number, string> = {
-  4000006: "That didn't match. Check your username and password, or sign in with a passkey or an emailed code instead.",
+  4000006: "That didn't match. Check your email or username and your password, or sign in with a passkey or an emailed code instead.",
   4010008: BAD_CODE,
   4060006: BAD_CODE,
   4070006: BAD_CODE,
@@ -30,7 +30,7 @@ export const noticeClass = (type: FlowMessage['type']): string =>
 export const noticeRole = (type: FlowMessage['type']): 'alert' | undefined => (type === 'error' ? 'alert' : undefined);
 
 /** The six digits Kratos and authenticator apps issue; the title is what the browser's format message says. */
-export const CODE_SHAPE = { maxlength: 6, pattern: '[0-9]{6}', title: 'Six digits, like 123456' } as const;
+export const CODE_SHAPE = { maxlength: 12, pattern: '[0-9]{6}', title: 'Six digits, like 123456' } as const;
 
 /** A one-time code input: large, numeric, offered to the phone's code autofill. */
 const CODE_INPUT = { inputmode: 'numeric', autocomplete: 'one-time-code', autofocus: true, class: 'code-input', placeholder: '123456', ...CODE_SHAPE, clearOnError: true } as const;

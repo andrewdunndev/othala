@@ -435,7 +435,7 @@ const { hasPasskey, hasCode, hasPassword, totpNodes, aal2WebauthnNodes, lookupNo
       ? <span class="focus-aside">Lost your second step? Ask a household admin to reset it.</span>
       : isCodeEntry
       ? <a href="/auth/login" data-astro-reload>Use a different way to sign in</a>
-      : <a href="/auth/recovery">New device or lost passkey? Get a code by email</a>}
+      : null}
     <a href="/" data-astro-reload>Back home</a>
   </nav>
 

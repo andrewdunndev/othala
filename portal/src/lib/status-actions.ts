@@ -10,7 +10,10 @@ export interface StatusAction {
 /** Errors worth retrying as they are: the service was busy or away, not the person's doing. */
 export const isTransient = (status: number): boolean => status === 429 || status >= 500;
 
-export function statusActions(status: number, signedIn: boolean, retryHref: string): StatusAction[] {
+/** Refusals that signing in again cannot fix: the app is wrong, or the person cancelled. */
+const NO_SIGN_IN = new Set(["app-misconfigured", "sign-in-cancelled"]);
+
+export function statusActions(status: number, signedIn: boolean, retryHref: string, reason?: string): StatusAction[] {
   if (isTransient(status)) {
     const retry = { href: retryHref, label: 'Try again', primary: true };
     // When Try again already goes home, a second Go home would say the same thing twice.
@@ -23,5 +26,6 @@ export function statusActions(status: number, signedIn: boolean, retryHref: stri
     return [{ href: '/auth/login', label: 'Sign in', primary: true }, { href: '/', label: 'Go home', primary: false }];
   }
   const home = { href: '/', label: 'Go home', primary: true };
+  if (reason && NO_SIGN_IN.has(reason)) return [home];
   return signedIn ? [home] : [home, { href: '/auth/login', label: 'Sign in', primary: false }];
 }

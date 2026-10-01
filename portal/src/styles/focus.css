@@ -5,7 +5,7 @@
 .page-narrow .page-header { border-bottom: 0; margin-bottom: var(--space-4); padding-bottom: 0; }
 .page-narrow .page-title { font-size: var(--text-3xl); margin-bottom: var(--space-2); }
 .page-narrow .page-lede { font-size: var(--text-base); }
-.page-narrow .notice { margin-bottom: var(--space-4); }
+.page-narrow .notice:not(.field .notice) { margin-bottom: var(--space-4); }
 
 .focus-card { padding: var(--space-5); display: flex; flex-direction: column; gap: var(--focus-gap); }
 .focus-form { display: flex; flex-direction: column; gap: var(--focus-gap); }
