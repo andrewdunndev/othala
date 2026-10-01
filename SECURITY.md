@@ -105,7 +105,7 @@ Each names its enforcer and the test that fails if the enforcer stops working.
   `e2e/playwright/tests/n-rate-limits.spec.ts`.
 - **Credential and session hygiene.** Self-registration is disabled in
   `kratos/kratos.yml`, so enrolment is admin-initiated; breach checking and a
-  minimum length gate passwords; every credential change fires
+  minimum length gate passwords; a password change fires
   `revoke_active_sessions`; force-logout is `revokeSubject`
   (`portal/src/lib/revoke.ts`). Full eviction (audit, delete credential, then
   revoke) is documented in `docs/runbooks/lost-device.md`, proven live by

@@ -16,6 +16,7 @@ Heading for 0.10.0: an apps-first home with setup guides, and fewer env vars.
 - The signed-in home is an apps-first tile grid with a top bar for account actions.
 - Apps can carry a setup guide and `presentation.requires` prerequisites defined under `requirements/`; a tile shows readiness.
 - `manifest-lint` warns on an undefined `presentation.requires` name.
+- Account settings groups sign-in, two-step, recovery and profile into cards, with named passkeys and in-place enrollment.
 
 ### Removed
 
@@ -40,8 +41,8 @@ Delete each from the deploy environment.
 
 ### Changed
 
-- Production needs `OTHALA_INSTANCE_NAME`.
-- Production needs `OTHALA_CONTACT_RECIPIENT` and `OTHALA_SMTP_CONNECTION_URI`.
+- Production needs `OTHALA_INSTANCE_NAME`, `OTHALA_CONTACT_RECIPIENT` and `OTHALA_SMTP_CONNECTION_URI`.
+- Only a password change signs out other sessions; passkey, key, app and backup-code changes keep them.
 - Kratos and Hydra trace with `OTHALA_OTLP_ENDPOINT`.
 - Kratos login flow lifespan is 1h, up from 10m.
 - Kratos public CORS is off.

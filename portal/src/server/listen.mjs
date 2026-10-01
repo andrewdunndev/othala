@@ -1,6 +1,6 @@
 // Dual listener. PUBLIC (8080 on 0.0.0.0): the lazily imported Astro SSR handler (OAuth2 providers, /auth/*, /admin/*).
-// ADMIN (4431 on PORTAL_ADMIN_BIND_HOST, default 127.0.0.1 outside production): its own mux for /healthz, /readyz and the five Kratos webhooks
-// (recovery-gate, login-code-gate, profile-gate, second-factor-gate, profile-sessions); never delegates to Astro.
+// ADMIN (4431 on PORTAL_ADMIN_BIND_HOST, default 127.0.0.1 outside production): its own mux for /healthz, /readyz and the six Kratos webhooks
+// (recovery-gate, login-code-gate, profile-gate, second-factor-gate, profile-sessions, passkey-prune); never delegates to Astro.
 // RECOVERY_GATE_SECRET guards the webhooks: constant-time compare, fail-closed when unset.
 // Run with `node ./dist/server/listen.mjs` after `npm run build`.
 
@@ -23,6 +23,7 @@ export const ADMIN_POST_ROUTES = new Set([
   '/admin/profile-gate',
   '/admin/second-factor-gate',
   '/admin/profile-sessions',
+  '/admin/passkey-prune',
 ]);
 
 function pathOf(url) {
@@ -324,6 +325,38 @@ export async function handleProfileSessions(req, res, runtime) {
   sendJson(res, 200, { ended });
 }
 
+/**
+ * POST /admin/passkey-prune, wired to settings.after.passkey (post-persist, not interrupting): drops passkey names whose
+ * credential is gone. Bad auth is 403; every other failure is logged and still answered 200, the change already saved.
+ */
+export async function handlePasskeyPrune(req, res, runtime) {
+  const expected = process.env.RECOVERY_GATE_SECRET ?? '';
+  if (!bearerMatches(parseBearer(req.headers?.authorization), expected)) {
+    sendJson(res, 403, { error: 'forbidden' });
+    return;
+  }
+  const tag = '[portal/passkey-prune]';
+  let id;
+  try {
+    id = JSON.parse((await readBody(req)) || '{}')?.identity_id;
+  } catch {
+    id = undefined;
+  }
+  if (typeof id !== 'string' || !id.trim()) {
+    console.error(`${tag} identity_id missing; nothing pruned`);
+    sendJson(res, 200, { pruned: 0 });
+    return;
+  }
+  let pruned = 0;
+  try {
+    const rt = runtime ?? (await loadRuntime());
+    pruned = await rt.prunePasskeyNames(id);
+  } catch (err) {
+    console.error(`${tag} could not prune names for identity_id=${JSON.stringify(id)}:`, err?.message ?? err);
+  }
+  sendJson(res, 200, { pruned });
+}
+
 /** Handle one admin-port request. Writes to res; never touches the SSR handler. */
 export async function handleAdminRequest(req, res, runtime) {
   const method = req.method;
@@ -347,6 +380,10 @@ export async function handleAdminRequest(req, res, runtime) {
   }
   if (method === 'POST' && path === '/admin/second-factor-gate') {
     await handleSecondFactorGate(req, res, runtime);
+    return;
+  }
+  if (method === 'POST' && path === '/admin/passkey-prune') {
+    await handlePasskeyPrune(req, res, runtime);
     return;
   }
   if (method === 'POST' && path === '/admin/profile-sessions') {

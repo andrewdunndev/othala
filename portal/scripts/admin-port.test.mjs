@@ -75,6 +75,7 @@ test('admin GET mux serves exactly /healthz and /readyz', () => {
 test('admin POST mux serves exactly the admin endpoints', () => {
   assert.deepEqual([...ADMIN_POST_ROUTES].sort(), [
     '/admin/login-code-gate',
+    '/admin/passkey-prune',
     '/admin/profile-gate',
     '/admin/profile-sessions',
     '/admin/recovery-gate',
@@ -649,6 +650,51 @@ test('profile-sessions rejects a wrong bearer with 403 before reading the body',
   await handle(postProfileSessions({ identity_id: STORED.id, session_id: SAVING.id }, 'wrong'), res);
   assert.equal(res.statusCode, 403);
   assert.deepEqual(JSON.parse(res.body), { error: 'forbidden' });
+});
+
+function postPasskeyPrune(body, bearer = 'gate-secret') {
+  return fakeReq({
+    method: 'POST',
+    url: '/admin/passkey-prune',
+    headers: { authorization: `Bearer ${bearer}` },
+    body: JSON.stringify(body),
+  });
+}
+
+test('passkey-prune prunes the named identity and reports the count (200)', async () => {
+  process.env.RECOVERY_GATE_SECRET = 'gate-secret';
+  const pruned = [];
+  const rt = { prunePasskeyNames: async (id) => { pruned.push(id); return 2; } };
+  const res = fakeRes();
+  await handle(postPasskeyPrune({ identity_id: 'person-1' }), res, rt);
+  assert.equal(res.statusCode, 200);
+  assert.deepEqual(JSON.parse(res.body), { pruned: 2 });
+  assert.deepEqual(pruned, ['person-1']);
+});
+
+test('passkey-prune answers 200 and prunes nothing without an identity_id or when the prune fails', async () => {
+  process.env.RECOVERY_GATE_SECRET = 'gate-secret';
+  const calls = [];
+  const rt = { prunePasskeyNames: async (id) => { calls.push(id); throw new Error('down'); } };
+  for (const body of [{}, { identity_id: '  ' }]) {
+    const res = fakeRes();
+    await handle(postPasskeyPrune(body), res, rt);
+    assert.equal(res.statusCode, 200);
+    assert.deepEqual(JSON.parse(res.body), { pruned: 0 });
+  }
+  assert.deepEqual(calls, []);
+  const res = fakeRes();
+  await handle(postPasskeyPrune({ identity_id: 'person-1' }), res, rt);
+  assert.equal(res.statusCode, 200);
+  assert.deepEqual(JSON.parse(res.body), { pruned: 0 });
+});
+
+test('passkey-prune rejects a wrong bearer with 403 before touching the runtime', async () => {
+  process.env.RECOVERY_GATE_SECRET = 'gate-secret';
+  const rt = { prunePasskeyNames: async () => { throw new Error('must not run'); } };
+  const res = fakeRes();
+  await handle(postPasskeyPrune({ identity_id: 'person-1' }, 'wrong'), res, rt);
+  assert.equal(res.statusCode, 403);
 });
 
 test('recovery, username and second-factor gates and profile-sessions read the identity via the runtime', async () => {
