@@ -82,7 +82,7 @@ someone compromised an admin's email account, the recovery flow would hand
 them full admin access to every account on the system.
 
 The recovery-gate webhook (`kratos/hooks/recovery-gate.jsonnet` +
-`fetchAdminMarker` in `portal/src/server/listen.mjs`) intercepts every
+`fetchAdminMarker` in `portal/src/server/listen.ts`) intercepts every
 recovery attempt after code verification. Kratos posts the identity id; the
 gate calls the admin API to read the authoritative `metadata_admin.admin`
 flag, and if it is `true`, returns HTTP 403 and Kratos (`can_interrupt: true`)
@@ -240,7 +240,7 @@ services; verify with a non-admin recovery that the gate still allows it.
 - `kratos/kratos.yml` — `selfservice.flows.recovery.after.hooks` (the gate
   wire-up and `can_interrupt: true`).
 - `kratos/hooks/recovery-gate.jsonnet` — webhook body template.
-- `portal/src/server/listen.mjs` (`fetchAdminMarker`, `handleRecoveryGate`) —
+- `portal/src/server/listen.ts` (`fetchAdminMarker`, `handleRecoveryGate`) —
   the gate handler.
 - `portal/src/lib/admin.ts` (`requireAdminSession`) — AAL2 step-up at the SSR
   layer.

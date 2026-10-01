@@ -64,7 +64,7 @@ plainly. **Cost of opening it:** operator time, permanently.
 
 ## 6. One admin-marker gate extends Kratos flows
 
-One handler in `portal/src/server/listen.mjs` refuses admin identities email
+One handler in `portal/src/server/listen.ts` refuses admin identities email
 recovery and sign-in by emailed code, so email alone never yields admin
 authority. `portal/scripts/admin-port.test.mjs` and spec j cover it. **Cost of
 opening it:** every additional webhook is another contract with Kratos's

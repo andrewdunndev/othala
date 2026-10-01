@@ -11,7 +11,7 @@ const { signToken, verifyToken, _resetForTests } = await import(
   '../src/lib/csrf.ts'
 );
 const { bearerMatches, parseBearer } = await import(
-  '../src/server/listen.mjs'
+  '../src/server/listen.ts'
 );
 
 const ACTION = 'fuzz';

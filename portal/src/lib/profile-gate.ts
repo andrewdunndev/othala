@@ -1,4 +1,4 @@
-// Verdict for the email part of the settings.after.profile web_hook. An account
+// Verdicts for the settings.after.profile web_hook: username stays fixed, and an account
 // with a passkey or password changes its emails only from a session whose newest
 // aal1 sign-in used one of them (an emailed code proves the mailbox, not the
 // person); identities with neither are unchanged. Stored identity comes from the
@@ -56,4 +56,18 @@ export function emailChangeVerdict(
 export function emailChangeLocked(stored: Identity | null | undefined, methods: unknown): boolean {
   const email = asString((stored?.traits as Record<string, unknown> | undefined)?.email);
   return emailChangeVerdict(stored, { email: `${email}\n` }, methods).refuse;
+}
+
+/** Username gate text: the username keys some apps' accounts, so only an administrator changes it. */
+export const USERNAME_CHANGE_REFUSAL = 'Your username can only be changed by a household admin.';
+export const PROFILE_UPDATE_UNAVAILABLE = 'Profile changes are unavailable right now. Try again later.';
+
+/** Username-gate verdict (pure): refuse unless `stored` (pre-save) and `proposed` are the same non-empty string. */
+export function usernameChangeVerdict(stored: Identity | null | undefined, proposed: unknown): { refuse: false } | { refuse: true; text: string } {
+  const current = (stored?.traits as Record<string, unknown> | undefined)?.username;
+  if (typeof current !== 'string' || current.length === 0 || typeof proposed !== 'string') {
+    return { refuse: true, text: PROFILE_UPDATE_UNAVAILABLE };
+  }
+  if (proposed !== current) return { refuse: true, text: USERNAME_CHANGE_REFUSAL };
+  return { refuse: false };
 }

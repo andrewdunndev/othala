@@ -2,10 +2,18 @@
 // ADMIN (4431 on PORTAL_ADMIN_BIND_HOST, default 127.0.0.1 outside production): its own mux for /healthz, /readyz and the six Kratos webhooks
 // (recovery-gate, login-code-gate, profile-gate, second-factor-gate, profile-sessions, passkey-prune); never delegates to Astro.
 // RECOVERY_GATE_SECRET guards the webhooks: constant-time compare, fail-closed when unset.
-// Run with `node ./dist/server/listen.mjs` after `npm run build`.
+// Bundled by build:listener; run with `node ./dist/server/listen.mjs` after `npm run build`.
+// Nothing imported statically may load lib/config.ts: it throws on the first missing production var, before
+// startupEnvErrors can report them all. Env reads that config.ts also owns stay here for that reason.
 
-import http from 'node:http';
+import http, { type IncomingMessage, type ServerResponse } from 'node:http';
 import { timingSafeEqual } from 'node:crypto';
+import { getIdentity, listSessions, revokeSession, prunePasskeyNames } from '../lib/admin-api';
+import { decideAccess } from '../lib/gate';
+import { secondFactorChangeVerdict, SECOND_FACTOR_UNAVAILABLE } from '../lib/second-factor-gate';
+import { emailChangeVerdict, usernameChangeVerdict, PROFILE_UPDATE_UNAVAILABLE } from '../lib/profile-gate';
+import { HYDRA_ADMIN_URL, KRATOS_ADMIN_URL, SECRET_MIN_BYTES } from '../lib/constants';
+import type { Identity } from '../lib/types';
 
 const PORT = 8080;
 const HOST = '0.0.0.0';
@@ -14,37 +22,18 @@ const isProd = () => process.env.NODE_ENV === 'production';
 /** The admin bind address: required in production, loopback in dev and test. Read lazily so tests can set it. */
 const adminBindHost = () => process.env.PORTAL_ADMIN_BIND_HOST ?? (isProd() ? '' : '127.0.0.1');
 
-/** GET routes the admin mux serves. Disjoint from the public routes. */
-export const ADMIN_GET_ROUTES = new Set(['/healthz', '/readyz']);
-/** POST routes the admin mux serves. Disjoint from the public routes. */
-export const ADMIN_POST_ROUTES = new Set([
-  '/admin/recovery-gate',
-  '/admin/login-code-gate',
-  '/admin/profile-gate',
-  '/admin/second-factor-gate',
-  '/admin/profile-sessions',
-  '/admin/passkey-prune',
-]);
+/** The Kratos admin client the hooks call; a parameter so tests can stand in a stub. */
+const ADMIN_CLIENT = { getIdentity, listSessions, revokeSession, prunePasskeyNames };
+type AdminClient = typeof ADMIN_CLIENT;
+type Handler = (req: IncomingMessage, res: ServerResponse, client?: AdminClient) => unknown;
+type Verdict = { refuse: boolean; admin?: boolean; reason: string };
 
-function pathOf(url) {
+function pathOf(url: string | undefined): string {
   return (url ?? '/').split('?')[0];
 }
 
-/** Report whether a request is an admin GET route (pure; test helper). */
-export function isAdminRoute(method, url) {
-  return method === 'GET' && ADMIN_GET_ROUTES.has(pathOf(url));
-}
-
-/** Report whether a request is any served admin route (GET or POST). */
-export function isAdminEndpoint(method, url) {
-  const path = pathOf(url);
-  if (method === 'GET') return ADMIN_GET_ROUTES.has(path);
-  if (method === 'POST') return ADMIN_POST_ROUTES.has(path);
-  return false;
-}
-
 /** Constant-time bearer compare; an unset or empty secret rejects everything, even an empty token. */
-export function bearerMatches(presented, expected) {
+export function bearerMatches(presented: unknown, expected: string): boolean {
   if (!expected) return false; // fail-closed: no secret configured
   if (typeof presented !== 'string' || presented.length === 0) return false;
   const a = Buffer.from(presented);
@@ -54,18 +43,18 @@ export function bearerMatches(presented, expected) {
 }
 
 /** Extract a Bearer token from an Authorization header value. */
-export function parseBearer(authHeader) {
+export function parseBearer(authHeader: unknown): string {
   if (typeof authHeader !== 'string') return '';
   const m = /^Bearer\s+(.+)$/.exec(authHeader.trim());
   return m ? m[1] : '';
 }
 
 /** Read a request body to a string (bounded). */
-function readBody(req, limitBytes = 1_000_000) {
+function readBody(req: IncomingMessage, limitBytes = 1_000_000): Promise<string> {
   return new Promise((resolve, reject) => {
     let size = 0;
-    const chunks = [];
-    req.on('data', (c) => {
+    const chunks: Buffer[] = [];
+    req.on('data', (c: Buffer) => {
       size += c.length;
       if (size > limitBytes) {
         reject(new Error('request body too large'));
@@ -79,50 +68,42 @@ function readBody(req, limitBytes = 1_000_000) {
   });
 }
 
-function sendJson(res, code, obj) {
+function sendJson(res: ServerResponse, code: number, obj: unknown): void {
   res.writeHead(code, { 'Content-Type': 'application/json' });
   res.end(JSON.stringify(obj));
 }
 
 /** Every webhook's auth: answer 403 and return true unless the request carries the RECOVERY_GATE_SECRET bearer. */
-function refuseUnlessHookBearer(req, res) {
+function refuseUnlessHookBearer(req: IncomingMessage, res: ServerResponse): boolean {
   if (bearerMatches(parseBearer(req.headers?.authorization), process.env.RECOVERY_GATE_SECRET ?? '')) return false;
   // 403, not 401: with can_interrupt a non-403 may be treated as a non-interrupting error (fail-open).
   sendJson(res, 403, { error: 'forbidden' });
   return true;
 }
 
-/** Lazily load dist/server/admin-runtime.mjs (Kratos admin client, second-factor verdict); cached, injectable in tests. */
-let _runtime = null;
-async function loadRuntime() {
-  if (_runtime) return _runtime;
-  _runtime = await import('./admin-runtime.mjs');
-  return _runtime;
-}
-
 /**
  * Apply decideAccess's emailed-code rule to the identity read from the Kratos admin API (the payload carries only the id).
  * Fail-closed: any error returns `{ refuse: true, reason }`.
- * @param {string} identityId Kratos identity UUID from the webhook payload.
- * @param {object} [runtime] injectable; defaults to the built bundle.
- * @returns {{ refuse: boolean, reason: string }}
  */
-export async function fetchAdminMarker(identityId, runtime) {
-  const fetched = await fetchStoredIdentity(runtime, identityId, 'recovery-gate');
+export async function fetchAdminMarker(identityId: string, client: AdminClient = ADMIN_CLIENT): Promise<Verdict> {
+  const fetched = await fetchStoredIdentity(client, identityId, 'recovery-gate');
   if (fetched.refuse) return fetched;
-  if ('deny' in fetched.rt.decideAccess(fetched.identity, 'emailed-code', null)) {
+  if ('deny' in decideAccess(fetched.identity, 'emailed-code', null)) {
     return { refuse: true, admin: true, reason: 'admin recovery is console-only' };
   }
   return { refuse: false, reason: '' };
 }
 
-/** Fetch the stored identity via the runtime's Kratos admin client; fail-closed with `{ refuse: true, reason }` on an unloadable runtime or client error. */
-async function fetchStoredIdentity(runtime, identityId, tag) {
+/** Fetch the stored identity via the Kratos admin client; fail-closed with `{ refuse: true, reason }` on a client error. */
+async function fetchStoredIdentity(
+  client: AdminClient,
+  identityId: string,
+  tag: string,
+): Promise<{ refuse: false; identity: Identity } | { refuse: true; reason: string }> {
   try {
-    const rt = runtime ?? (await loadRuntime());
-    return { refuse: false, identity: await rt.getIdentity(identityId), rt };
+    return { refuse: false, identity: await client.getIdentity(identityId) };
   } catch (err) {
-    console.error(`[portal/${tag}] admin API read failed for ${identityId}:`, err?.message ?? err);
+    console.error(`[portal/${tag}] admin API read failed for ${identityId}:`, (err as Error)?.message ?? err);
     return { refuse: true, reason: 'admin-api-unreachable (fail-closed)' };
   }
 }
@@ -131,7 +112,7 @@ async function fetchStoredIdentity(runtime, identityId, tag) {
 export const LOGIN_CODE_ADMIN_REFUSAL = 'Admin accounts sign in with a passkey or password.';
 export const LOGIN_CODE_UNAVAILABLE = 'Sign-in by code is unavailable right now. Use a passkey or password.';
 
-export function loginCodeRefusalText(verdict) {
+export function loginCodeRefusalText(verdict: Partial<Verdict>): string {
   return verdict?.admin === true ? LOGIN_CODE_ADMIN_REFUSAL : LOGIN_CODE_UNAVAILABLE;
 }
 
@@ -139,16 +120,21 @@ export function loginCodeRefusalText(verdict) {
  * POST /admin/recovery-gate. Bearer RECOVERY_GATE_SECRET; refuses recovery for admin identities, fail-closed on a
  * malformed payload or admin API error. Refusal is the Kratos-webhook error shape (403 + messages), allow is 200.
  */
-export function handleRecoveryGate(req, res, runtime) {
-  return handleAdminMarkerGate(req, res, runtime, (verdict) => `recovery refused: ${verdict.reason}`);
+export function handleRecoveryGate(req: IncomingMessage, res: ServerResponse, client?: AdminClient) {
+  return handleAdminMarkerGate(req, res, client, (verdict) => `recovery refused: ${verdict.reason}`);
 }
 
 /** POST /admin/login-code-gate: recovery-gate's bearer, payload and lookup, wired to login.after.code; an admin-marked identity gets no session from an emailed code. */
-export function handleLoginCodeGate(req, res, runtime) {
-  return handleAdminMarkerGate(req, res, runtime, loginCodeRefusalText);
+export function handleLoginCodeGate(req: IncomingMessage, res: ServerResponse, client?: AdminClient) {
+  return handleAdminMarkerGate(req, res, client, loginCodeRefusalText);
 }
 
-async function handleAdminMarkerGate(req, res, runtime, refusalText) {
+async function handleAdminMarkerGate(
+  req: IncomingMessage,
+  res: ServerResponse,
+  client: AdminClient | undefined,
+  refusalText: (verdict: Partial<Verdict>) => string,
+): Promise<void> {
   if (refuseUnlessHookBearer(req, res)) return;
   let body;
   try {
@@ -168,7 +154,7 @@ async function handleAdminMarkerGate(req, res, runtime, refusalText) {
     return;
   }
 
-  const adminVerdict = await fetchAdminMarker(id, runtime);
+  const adminVerdict = await fetchAdminMarker(id, client);
   if (adminVerdict.refuse) {
     sendJson(res, 403, {
       messages: [{ messages: [{ type: 'error', text: refusalText(adminVerdict) }] }],
@@ -179,28 +165,14 @@ async function handleAdminMarkerGate(req, res, runtime, refusalText) {
   sendJson(res, 200, { ok: true });
 }
 
-/** Username gate text: the username keys some apps' accounts, so only an administrator changes it. */
-export const USERNAME_CHANGE_REFUSAL = 'Your username can only be changed by a household admin.';
-export const PROFILE_UPDATE_UNAVAILABLE = 'Profile changes are unavailable right now. Try again later.';
-
-/** Username-gate verdict (pure): refuse unless `stored` (pre-save) and `proposed` are the same non-empty string. */
-export function usernameChangeVerdict(stored, proposed) {
-  const current = stored?.traits?.username;
-  if (typeof current !== 'string' || current.length === 0 || typeof proposed !== 'string') {
-    return { refuse: true, text: PROFILE_UPDATE_UNAVAILABLE };
-  }
-  if (proposed !== current) return { refuse: true, text: USERNAME_CHANGE_REFUSAL };
-  return { refuse: false };
-}
-
-function refuseProfile(res, text, pointers = ['#/traits/username']) {
+function refuseProfile(res: ServerResponse, text: string, pointers = ['#/traits/username']): void {
   sendJson(res, 403, {
     messages: pointers.map((instance_ptr) => ({ instance_ptr, messages: [{ id: 4000001, type: 'error', text }] })),
   });
 }
 
 /** POST /admin/profile-gate, wired to settings.after.profile with can_interrupt; a failed identity read refuses the update. Username stays fixed; an email change needs a first-factor sign-in when the account has a key. */
-export async function handleProfileGate(req, res, runtime) {
+export async function handleProfileGate(req: IncomingMessage, res: ServerResponse, client: AdminClient = ADMIN_CLIENT) {
   if (refuseUnlessHookBearer(req, res)) return;
   let body;
   try {
@@ -214,7 +186,7 @@ export async function handleProfileGate(req, res, runtime) {
     refuseProfile(res, PROFILE_UPDATE_UNAVAILABLE);
     return;
   }
-  const fetched = await fetchStoredIdentity(runtime, id, 'profile-gate');
+  const fetched = await fetchStoredIdentity(client, id, 'profile-gate');
   if (fetched.refuse) {
     refuseProfile(res, PROFILE_UPDATE_UNAVAILABLE);
     return;
@@ -224,10 +196,7 @@ export async function handleProfileGate(req, res, runtime) {
     refuseProfile(res, verdict.text);
     return;
   }
-  const emailVerdict =
-    typeof fetched.rt.emailChangeVerdict === 'function'
-      ? fetched.rt.emailChangeVerdict(fetched.identity, body?.traits, body?.authentication_methods)
-      : { refuse: true, text: PROFILE_UPDATE_UNAVAILABLE, pointers: ['#/traits/email'] };
+  const emailVerdict = emailChangeVerdict(fetched.identity, body?.traits, body?.authentication_methods);
   if (emailVerdict.refuse) {
     refuseProfile(res, emailVerdict.text, emailVerdict.pointers);
     return;
@@ -235,41 +204,30 @@ export async function handleProfileGate(req, res, runtime) {
   sendJson(res, 200, { ok: true });
 }
 
-function refuseSecondFactor(res, text) {
+function refuseSecondFactor(res: ServerResponse, text: string): void {
   sendJson(res, 403, { messages: [{ instance_ptr: '#/', messages: [{ id: 4000001, type: 'error', text }] }] });
 }
 
-/** POST /admin/second-factor-gate?method=totp|webauthn, wired to settings.after.{totp,webauthn} with can_interrupt; a failed read, missing id or unloadable runtime refuses the change. */
-export async function handleSecondFactorGate(req, res, runtime) {
+/** POST /admin/second-factor-gate?method=totp|webauthn, wired to settings.after.{totp,webauthn} with can_interrupt; a failed read or missing id refuses the change. */
+export async function handleSecondFactorGate(req: IncomingMessage, res: ServerResponse, client: AdminClient = ADMIN_CLIENT) {
   if (refuseUnlessHookBearer(req, res)) return;
-  let rt;
-  try {
-    rt = runtime ?? (await loadRuntime());
-  } catch (err) {
-    console.error('[portal/second-factor-gate] runtime bundle failed to load:', err?.message ?? err);
-  }
-  const unavailable = rt?.SECOND_FACTOR_UNAVAILABLE ?? 'This change is unavailable right now. Try again later.';
-  if (typeof rt?.secondFactorChangeVerdict !== 'function') {
-    refuseSecondFactor(res, unavailable);
-    return;
-  }
   let body;
   try {
     body = JSON.parse((await readBody(req)) || '{}');
   } catch {
-    refuseSecondFactor(res, unavailable);
+    refuseSecondFactor(res, SECOND_FACTOR_UNAVAILABLE);
     return;
   }
   const id = body?.identity_id;
   if (typeof id !== 'string' || id.trim().length === 0) {
-    refuseSecondFactor(res, unavailable);
+    refuseSecondFactor(res, SECOND_FACTOR_UNAVAILABLE);
     return;
   }
   const method = new URLSearchParams((req.url ?? '').split('?')[1] ?? '').get('method') ?? '';
-  const fetched = await fetchStoredIdentity(rt, id, 'second-factor-gate');
+  const fetched = await fetchStoredIdentity(client, id, 'second-factor-gate');
   const verdict = fetched.refuse
-    ? { refuse: true, text: unavailable }
-    : rt.secondFactorChangeVerdict(fetched.identity, method);
+    ? { refuse: true, text: SECOND_FACTOR_UNAVAILABLE }
+    : secondFactorChangeVerdict(fetched.identity, method);
   if (verdict.refuse) {
     refuseSecondFactor(res, verdict.text);
     return;
@@ -282,7 +240,7 @@ export async function handleSecondFactorGate(req, res, runtime) {
  * the identity. Failures are logged and still answered 200 (the change already saved); without `session_id`
  * nothing is ended.
  */
-export async function handleProfileSessions(req, res, runtime) {
+export async function handleProfileSessions(req: IncomingMessage, res: ServerResponse, client: AdminClient = ADMIN_CLIENT) {
   if (refuseUnlessHookBearer(req, res)) return;
   const tag = '[portal/profile-sessions]';
   let body;
@@ -300,18 +258,17 @@ export async function handleProfileSessions(req, res, runtime) {
   }
   let ended = 0;
   try {
-    const rt = runtime ?? (await loadRuntime());
-    for (const s of await rt.listSessions(id)) {
+    for (const s of await client.listSessions(id)) {
       if (typeof s?.id !== 'string' || s.id === keep) continue;
       try {
-        await rt.revokeSession(s.id);
+        await client.revokeSession(s.id);
         ended += 1;
       } catch (err) {
-        console.error(`${tag} ending session for identity_id=${JSON.stringify(id)} failed:`, err?.message ?? err);
+        console.error(`${tag} ending session for identity_id=${JSON.stringify(id)} failed:`, (err as Error)?.message ?? err);
       }
     }
   } catch (err) {
-    console.error(`${tag} could not end other sessions for identity_id=${JSON.stringify(id)}:`, err?.message ?? err);
+    console.error(`${tag} could not end other sessions for identity_id=${JSON.stringify(id)}:`, (err as Error)?.message ?? err);
   }
   sendJson(res, 200, { ended });
 }
@@ -320,7 +277,7 @@ export async function handleProfileSessions(req, res, runtime) {
  * POST /admin/passkey-prune, wired to settings.after.passkey (post-persist, not interrupting): drops passkey names whose
  * credential is gone. Bad auth is 403; every other failure is logged and still answered 200, the change already saved.
  */
-export async function handlePasskeyPrune(req, res, runtime) {
+export async function handlePasskeyPrune(req: IncomingMessage, res: ServerResponse, client: AdminClient = ADMIN_CLIENT) {
   if (refuseUnlessHookBearer(req, res)) return;
   const tag = '[portal/passkey-prune]';
   let id;
@@ -336,10 +293,9 @@ export async function handlePasskeyPrune(req, res, runtime) {
   }
   let pruned = 0;
   try {
-    const rt = runtime ?? (await loadRuntime());
-    pruned = await rt.prunePasskeyNames(id);
+    pruned = await client.prunePasskeyNames(id);
   } catch (err) {
-    console.error(`${tag} could not prune names for identity_id=${JSON.stringify(id)}:`, err?.message ?? err);
+    console.error(`${tag} could not prune names for identity_id=${JSON.stringify(id)}:`, (err as Error)?.message ?? err);
   }
   sendJson(res, 200, { pruned });
 }
@@ -347,20 +303,12 @@ export async function handlePasskeyPrune(req, res, runtime) {
 const READY_TIMEOUT_MS = 2000;
 
 /** Readiness: Kratos and Hydra both answer ready within the timeout; 503 names the dependencies that do not. */
-async function handleReadyz(res, runtime) {
-  let rt;
-  try {
-    rt = runtime ?? (await loadRuntime());
-  } catch (err) {
-    console.error('[portal/readyz] runtime bundle failed to load:', err?.message ?? err);
-    sendJson(res, 503, { status: 'unavailable', failed: ['runtime'] });
-    return;
-  }
+async function handleReadyz(res: ServerResponse): Promise<void> {
   const probes = {
-    kratos: `${rt.KRATOS_ADMIN_URL}/admin/health/ready`,
-    hydra: `${rt.HYDRA_ADMIN_URL}/health/ready`,
+    kratos: `${KRATOS_ADMIN_URL}/admin/health/ready`,
+    hydra: `${HYDRA_ADMIN_URL}/health/ready`,
   };
-  const failed = [];
+  const failed: string[] = [];
   await Promise.all(
     Object.entries(probes).map(async ([name, url]) => {
       try {
@@ -376,44 +324,48 @@ async function handleReadyz(res, runtime) {
   else sendJson(res, 200, { status: 'ok' });
 }
 
+/** The admin mux, by method then path: the served route sets and the dispatch both read these. */
+const ADMIN_GET = new Map<string, Handler>([
+  ['/healthz', (_req, res) => sendJson(res, 200, { status: 'ok' })],
+  ['/readyz', (_req, res) => handleReadyz(res)],
+]);
+const ADMIN_POST = new Map<string, Handler>([
+  ['/admin/recovery-gate', handleRecoveryGate],
+  ['/admin/login-code-gate', handleLoginCodeGate],
+  ['/admin/profile-gate', handleProfileGate],
+  ['/admin/second-factor-gate', handleSecondFactorGate],
+  ['/admin/profile-sessions', handleProfileSessions],
+  ['/admin/passkey-prune', handlePasskeyPrune],
+]);
+
+/** GET routes the admin mux serves. Disjoint from the public routes. */
+export const ADMIN_GET_ROUTES = new Set(ADMIN_GET.keys());
+/** POST routes the admin mux serves. Disjoint from the public routes. */
+export const ADMIN_POST_ROUTES = new Set(ADMIN_POST.keys());
+
+/** Report whether a request is an admin GET route (pure; test helper). */
+export function isAdminRoute(method: string | undefined, url: string | undefined): boolean {
+  return method === 'GET' && ADMIN_GET.has(pathOf(url));
+}
+
+/** Report whether a request is any served admin route (GET or POST). */
+export function isAdminEndpoint(method: string | undefined, url: string | undefined): boolean {
+  return adminHandler(method, url) !== undefined;
+}
+
+function adminHandler(method: string | undefined, url: string | undefined): Handler | undefined {
+  if (method === 'GET') return ADMIN_GET.get(pathOf(url));
+  if (method === 'POST') return ADMIN_POST.get(pathOf(url));
+  return undefined;
+}
+
 /** Handle one admin-port request. Writes to res; never touches the SSR handler. */
-export async function handleAdminRequest(req, res, runtime) {
-  const method = req.method;
-  const path = pathOf(req.url);
-
-  if (method === 'GET' && path === '/healthz') {
-    sendJson(res, 200, { status: 'ok' });
+export async function handleAdminRequest(req: IncomingMessage, res: ServerResponse, client?: AdminClient): Promise<void> {
+  const handler = adminHandler(req.method, req.url);
+  if (handler) {
+    await handler(req, res, client);
     return;
   }
-  if (method === 'GET' && path === '/readyz') {
-    await handleReadyz(res, runtime);
-    return;
-  }
-  if (method === 'POST' && path === '/admin/recovery-gate') {
-    await handleRecoveryGate(req, res, runtime);
-    return;
-  }
-  if (method === 'POST' && path === '/admin/login-code-gate') {
-    await handleLoginCodeGate(req, res, runtime);
-    return;
-  }
-  if (method === 'POST' && path === '/admin/profile-gate') {
-    await handleProfileGate(req, res, runtime);
-    return;
-  }
-  if (method === 'POST' && path === '/admin/second-factor-gate') {
-    await handleSecondFactorGate(req, res, runtime);
-    return;
-  }
-  if (method === 'POST' && path === '/admin/passkey-prune') {
-    await handlePasskeyPrune(req, res, runtime);
-    return;
-  }
-  if (method === 'POST' && path === '/admin/profile-sessions') {
-    await handleProfileSessions(req, res, runtime);
-    return;
-  }
-
   // Everything else, including public paths and a served path on the wrong method, is 404 here.
   res.writeHead(404, { 'Content-Type': 'text/plain' });
   res.end('not found');
@@ -437,7 +389,7 @@ export async function createPublicServer() {
   process.env.ASTRO_NODE_AUTOSTART = 'disabled';
   const { handler: ssrHandler } = await import('./entry.mjs');
   return http.createServer((req, res) => {
-    ssrHandler(req, res, (err) => {
+    ssrHandler(req, res, (err: unknown) => {
       // Unmatched route or error: emit a plain 404/500 rather than hang.
       if (err) {
         res.writeHead(500, { 'Content-Type': 'text/plain' });
@@ -454,21 +406,15 @@ export async function createPublicServer() {
  * Fail-closed startup checks (pure; test helper): a missing or short secret, or a wildcard PORTAL_ADMIN_BIND_HOST, each push a
  * FATAL message. In production PORTAL_ADMIN_BIND_HOST must be set; elsewhere it defaults to loopback.
  */
-export function startupEnvErrors() {
-  const errors = [];
-  // 32-byte UTF-8 floor on both secrets, duplicated from csrf.ts (CRYPTO-2) because this .mjs cannot import TS.
-  const recoverySecret = process.env.RECOVERY_GATE_SECRET ?? '';
-  if (!recoverySecret.trim()) {
-    errors.push('[portal] FATAL: RECOVERY_GATE_SECRET is not set or empty — refusing to start');
-  } else if (Buffer.byteLength(recoverySecret, 'utf8') < 32) {
-    errors.push('[portal] FATAL: RECOVERY_GATE_SECRET is shorter than 32 bytes (UTF-8) — refusing to start');
-  }
-
-  const csrfSecret = process.env.CSRF_SECRET ?? '';
-  if (!csrfSecret.trim()) {
-    errors.push('[portal] FATAL: CSRF_SECRET is not set or empty — refusing to start');
-  } else if (Buffer.byteLength(csrfSecret, 'utf8') < 32) {
-    errors.push('[portal] FATAL: CSRF_SECRET is shorter than 32 bytes (UTF-8) — refusing to start');
+export function startupEnvErrors(): string[] {
+  const errors: string[] = [];
+  for (const name of ['RECOVERY_GATE_SECRET', 'CSRF_SECRET']) {
+    const value = process.env[name] ?? '';
+    if (!value.trim()) {
+      errors.push(`[portal] FATAL: ${name} is not set or empty — refusing to start`);
+    } else if (Buffer.byteLength(value, 'utf8') < SECRET_MIN_BYTES) {
+      errors.push(`[portal] FATAL: ${name} is shorter than ${SECRET_MIN_BYTES} bytes (UTF-8) — refusing to start`);
+    }
   }
 
   // Production only: config.ts throws on these at first import, this surfaces it at boot instead of on the first request.
@@ -489,7 +435,7 @@ export function startupEnvErrors() {
 }
 
 /** Fatal-exits if startupEnvErrors() finds anything. Called before binding any socket. */
-function assertStartupEnv() {
+function assertStartupEnv(): void {
   const errors = startupEnvErrors();
   if (errors.length > 0) {
     for (const msg of errors) console.error(msg);
@@ -513,10 +459,10 @@ if (import.meta.url === `file://${process.argv[1]}`) {
 
   // In-process OIDC client reconciler, started after both listeners are bound so a slow Hydra never delays boot.
   // Boot retries with backoff, then logs an operator notice and keeps serving; SIGHUP drops the manifest cache and
-  // reconciles again.
+  // reconciles again. It stays its own bundle (build:registrar) because it loads config.ts.
   const registrar = await import('./registrar.mjs');
-  registrar.reconcileOnBoot().catch((e) => console.error('[portal] boot reconcile error', e));
+  registrar.reconcileOnBoot().catch((e: unknown) => console.error('[portal] boot reconcile error', e));
   process.on('SIGHUP', () => {
-    registrar.reloadOnSighup().catch((e) => console.error('[portal] SIGHUP reload error', e));
+    registrar.reloadOnSighup().catch((e: unknown) => console.error('[portal] SIGHUP reload error', e));
   });
 }

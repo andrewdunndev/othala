@@ -12,16 +12,13 @@ import {
   handleAdminRequest,
   LOGIN_CODE_ADMIN_REFUSAL,
   LOGIN_CODE_UNAVAILABLE,
-  USERNAME_CHANGE_REFUSAL,
-  PROFILE_UPDATE_UNAVAILABLE,
-  usernameChangeVerdict,
   startupEnvErrors,
   ADMIN_GET_ROUTES,
   ADMIN_POST_ROUTES,
-} from '../src/server/listen.mjs';
+} from '../src/server/listen.ts';
 import { asAdmin, identity, session, withCredential, withPasskey, withTotp, withWebauthnKey } from '../src/lib/test-builders.ts';
 import * as secondFactorRuntime from '../src/lib/second-factor-gate.ts';
-import { emailChangeLocked, emailChangeVerdict, EMAIL_CHANGE_REFUSAL } from '../src/lib/profile-gate.ts';
+import { emailChangeLocked, emailChangeVerdict, EMAIL_CHANGE_REFUSAL, PROFILE_UPDATE_UNAVAILABLE, USERNAME_CHANGE_REFUSAL, usernameChangeVerdict } from '../src/lib/profile-gate.ts';
 import { getIdentity, listSessions, revokeSession } from '../src/lib/admin-api.ts';
 import { decideAccess } from '../src/lib/gate.ts';
 

@@ -42,7 +42,7 @@ flowchart LR
 the app's public SSR port. Neither admin API is exposed, and no app in front of this stack is ever
 given an admin credential.
 
-**The app runs two listeners in one process** (`portal/src/server/listen.mjs`). The public listener
+**The app runs two listeners in one process** (`portal/src/server/listen.ts`). The public listener
 serves the Astro handler. The admin listener binds `PORTAL_ADMIN_BIND_HOST` with its own
 mux, `ADMIN_GET_ROUTES` and `ADMIN_POST_ROUTES`, that never delegates to the Astro handler. The two
 route sets are disjoint *by construction* rather than by a routing rule that could be edited wrong;

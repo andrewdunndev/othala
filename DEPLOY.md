@@ -43,7 +43,7 @@ cosign verify \
 ## The dual-listener
 
 The app runs **two HTTP listeners in one process**
-(`portal/src/server/listen.mjs`):
+(`portal/src/server/listen.ts`):
 
 - **Public SSR port** (`8080` on all interfaces). The Astro
   handler: Kratos self-service UIs, the family tile dashboard, `/auth/*` +

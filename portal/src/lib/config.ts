@@ -1,4 +1,4 @@
-// Portal env config: the only module that reads production env (plain-Node listen.mjs and otel.mjs cannot import TS).
+// Portal env config: the only module that reads production env (listen.ts checks it before this loads; otel.mjs is plain Node).
 // A required var throws at load in production and takes a dev default elsewhere. Fixed topology lives in constants.ts.
 
 // ── helpers ──────────────────────────────────────────────────────────────────
