@@ -12,7 +12,7 @@ import ManifestNotice from '../../components/ManifestNotice.astro';
 import TitleRow from '../../components/TitleRow.astro';
 import { adminContext } from '../../lib/admin-context';
 import { listIdentities } from '../../lib/admin-api';
-import { adminsOf, holdersOf, hydraClientIds } from '../../lib/admin-apps';
+import { holdersOf, hydraClientIds } from '../../lib/admin-apps';
 import { PEOPLE_LOAD_ERROR, personName } from '../../lib/admin-view';
 import { isOpenToEveryone } from '../../lib/access-rows';
 import { lintManifests } from '../../lib/manifest-lint';
@@ -53,7 +53,6 @@ const rows = apps.map((app) => {
     app,
     open: isOpenToEveryone(m),
     holders: holdersOf(app, people),
-    admins: adminsOf(app, people),
     problems,
     notSynced,
     href: app.url ? safeHref(app.url) : '',
@@ -68,7 +67,7 @@ const personHref = (id: string) => `/admin/users/${id}${devState ? `?dev-state=$
   {loadError && <div class="notice notice-danger" role="alert">{loadError}</div>}
 
   <ul class="app-rows panel">
-    {rows.map(({ app, open, holders, admins, problems, notSynced, href }) => (
+    {rows.map(({ app, open, holders, problems, notSynced, href }) => (
       <li>
         <div class="app-head">
           <AppIcon tile={app.tile ?? { icon: app.name.slice(0, 2).toUpperCase() }} />
@@ -94,27 +93,13 @@ const personHref = (id: string) => `/admin/users/${id}${devState ? `?dev-state=$
             ) : holders.length > 0 ? (
               <ul class="chips">
                 {holders.map((h) => (
-                  <li><a class="chip" href={personHref(h.id)}>{h.name}{h.level && <> <b>· {h.level}</b></>}</a></li>
+                  <li><a class="chip" href={personHref(h.id)}>{h.name}{h.level && <> <b>· {h.level}</b></>}{h.off && <> <span class="stat-note">· sign-in off</span></>}</a></li>
                 ))}
               </ul>
             ) : (
               <span class="empty-note">{loadError ? 'Unknown' : 'No one yet'}</span>
             )}
           </dd>
-          {!open && app.manifest.roles.length > 1 && (
-            <>
-              <dt>Admins</dt>
-              <dd>
-                {admins.length > 0 ? (
-                  <ul class="chips">
-                    {admins.map((h) => <li><a class="chip" href={personHref(h.id)}>{h.name}</a></li>)}
-                  </ul>
-                ) : (
-                  <span class="empty-note">{loadError ? 'Unknown' : 'No one yet'}</span>
-                )}
-              </dd>
-            </>
-          )}
         </dl>
         <details class="tech plain">
           <summary>Technical details</summary>

@@ -167,8 +167,9 @@ html:has(.admin) { scroll-padding-top: calc(var(--header-h, 65px) + var(--space-
 .admin .ask > summary { display: inline-flex; align-items: center; font-family: var(--font-mono); font-weight: 500; border-radius: var(--radius); }
 .admin .ask.primary > summary:hover { background: var(--accent-hover); border-color: var(--accent-hover); }
 .admin .badge { white-space: nowrap; }
-.admin .chip { display: inline-flex; align-items: center; gap: var(--space-2); }
-.admin .chip .app-icon { --plate: 1.5rem; }
+.admin .chip { display: inline-flex; align-items: center; gap: var(--space-2); min-height: 2.125rem; }
+.admin .chip .app-icon.app-icon { --plate: 1.5rem; padding: 0.2rem; border-radius: var(--radius-sm); }
+.admin a.badge { text-decoration: none; }
 .admin .person-name { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-1) var(--space-2); }
 .admin .person-name .badges { position: relative; z-index: 1; pointer-events: none; }
 .admin .items .mail { margin-top: var(--space-4); padding-top: var(--space-2); border-top: 1px solid var(--border); }

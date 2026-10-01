@@ -397,6 +397,8 @@ const devLinks = [
       if (typeof modal.showModal === 'function') modal.showModal();
     });
 
+    if (location.hash === '#get-in-touch') openBtn.click();
+
     modal.querySelectorAll('[data-close-request]').forEach(function (btn) {
       btn.addEventListener('click', function () { modal.close(); });
     });

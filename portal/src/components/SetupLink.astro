@@ -1,6 +1,6 @@
 ---
-// A setup link ready to hand over: one Copy button for the link, how long it works, and "Show code instead" for the
-// one-time code the setup page asks for. The input ids are stable (#recoveryUrl, #recoveryCode) for tests and scripts.
+// A setup link ready to hand over: one Copy button for the link, how long it works, and "Also show the code" for the
+// one-time code the setup page asks for. The link and code travel together: the code alone does not open the page. The input ids are stable (#recoveryUrl, #recoveryCode) for tests and scripts.
 
 import { describeTtl } from '../lib/admin-view';
 
@@ -16,16 +16,16 @@ const message = [`Set up your account: ${url}`, ``, `Setup code: ${code}`, ``, `
 ---
 <input id="recoveryUrl" class="link-box" type="text" readonly value={url} aria-label="Setup link" />
 <div class="row-actions flush">
-  <button type="button" class="button button-primary" data-copy="recoveryUrl">Copy link</button>
+  <button type="button" class="button button-primary" data-copy="recoveryMessage">Copy link and code</button>
   <span class="stat-note">Works for {describeTtl(ttl)}. You can send a new one any time.</span>
 </div>
+<textarea id="recoveryMessage" hidden readonly>{message}</textarea>
 <details class="plain">
-  <summary>Show code instead</summary>
-  <p class="hint">The setup page asks {name} for this code. It works once.</p>
+  <summary>Also show the code</summary>
+  <p class="hint">{name} opens the link, then types this code. It works once.</p>
   <input id="recoveryCode" class="link-box code-big" type="text" readonly value={code} aria-label="Setup code" />
-  <textarea id="recoveryMessage" hidden readonly>{message}</textarea>
   <div class="row-actions flush">
     <button type="button" class="button button-secondary button-sm" data-copy="recoveryCode">Copy code</button>
-    <button type="button" class="button button-secondary button-sm" data-copy="recoveryMessage">Copy link and code</button>
+    <button type="button" class="button button-secondary button-sm" data-copy="recoveryUrl">Copy link only</button>
   </div>
 </details>

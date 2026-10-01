@@ -52,7 +52,7 @@ const guide = splitGuide(requirement.html);
       {requirement.why && <p class="req-lede">{requirement.why}</p>}
       <p class:list={['req-state', ready ? 'req-state-ready' : 'req-state-needs']}>
         <span class="req-state-dot" aria-hidden="true"></span>
-        {ready ? 'The household admin has marked you set up.' : 'Not marked as set up for you yet. Follow the steps, then tell the household admin.'}
+        {ready ? 'The household admin has marked you set up.' : <>Not marked as set up for you yet. Follow the steps, then <a href="/#get-in-touch">tell the household admin</a>.</>}
       </p>
     </header>
     <section class="req-body" aria-label={`${requirement.title} setup guide`}>

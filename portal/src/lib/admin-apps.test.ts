@@ -1,7 +1,7 @@
 // Invariant: an unreadable Hydra is "unknown", never "synced"; holders show a level only above the base level.
 
 import { describe, expect, it } from 'vitest';
-import { adminsOf, holdersOf, hydraClientIds } from './admin-apps';
+import { holdersOf, hydraClientIds } from './admin-apps';
 import { joinApps } from './admin-view';
 import type { ClientManifest } from './manifests';
 import { identity } from './test-builders';
@@ -38,7 +38,8 @@ describe('who can use an app', () => {
     expect(holdersOf(app, people).map((h) => [h.name, h.level])).toEqual([['Amy', 'Admin'], ['Ben', 'Editor'], ['Cleo', '']]);
   });
 
-  it('lists admins as those at the top level', () => {
-    expect(adminsOf(app, people).map((h) => h.name)).toEqual(['Amy']);
+  it('flags a person whose sign-in is off', () => {
+    const off = [{ identity: identity({ id: 'e', state: 'inactive', metadataAdmin: { groups: ['grafana-access'] } }), name: 'Eve' }];
+    expect(holdersOf(app, off).map((h) => [h.name, h.off])).toEqual([['Eve', true]]);
   });
 });

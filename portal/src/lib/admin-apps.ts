@@ -3,7 +3,7 @@
 
 import { HYDRA_ADMIN_URL } from './constants';
 import type { AdminApp } from './admin-view';
-import { currentLevel, isOpenToEveryone, isTopLevel, levelsFor, NO_ACCESS } from './access-rows';
+import { currentLevel, isOpenToEveryone, levelsFor, NO_ACCESS } from './access-rows';
 import type { Identity } from './types';
 
 /** Client ids Hydra holds, or null when Hydra cannot be read (so nothing is claimed about sync). */
@@ -24,6 +24,8 @@ export interface Holder {
   name: string;
   /** Their level's label when it is above the app's base level; empty at the base level. */
   level: string;
+  /** Their sign-in is off, so the app is listed but they cannot use it. */
+  off: boolean;
 }
 
 /** People who hold the app (any level above No access), with their level shown only above the base level. Open apps have no holders list. */
@@ -36,16 +38,7 @@ export function holdersOf(app: AdminApp, people: readonly { identity: Identity; 
     const level = currentLevel(m, p.identity.metadata_admin);
     if (level === NO_ACCESS) continue;
     const label = levels.find((l) => l.value === level)?.label ?? level;
-    out.push({ id: p.identity.id, name: p.name, level: level === levels[0].value ? '' : label });
+    out.push({ id: p.identity.id, name: p.name, level: level === levels[0].value ? '' : label, off: p.identity.state === 'inactive' });
   }
   return out;
-}
-
-/** People at the app's highest level; empty when the app has only one level. */
-export function adminsOf(app: AdminApp, people: readonly { identity: Identity; name: string }[]): Holder[] {
-  const m = app.manifest;
-  if (isOpenToEveryone(m) || m.roles.length < 2) return [];
-  return people
-    .filter((p) => isTopLevel(m, currentLevel(m, p.identity.metadata_admin)))
-    .map((p) => ({ id: p.identity.id, name: p.name, level: '' }));
 }

@@ -186,8 +186,8 @@ const roleNote = Object.keys(roleOverrides).length;
         <div class="badges">
           {isTargetAdmin && <span class="badge badge-accent">Admin</span>}
           {isOff && <span class="badge badge-muted">Sign-in off</span>}
-          {!twoStep && <span class="badge badge-warning">Two-step off</span>}
-          {!verified && <span class="badge badge-warning">Unverified email</span>}
+          {!twoStep && <a class="badge badge-warning" href="#signin">Two-step off</a>}
+          {!verified && <a class="badge badge-warning" href="#signin">Unverified email</a>}
         </div>
       </TitleRow>
 
@@ -314,7 +314,7 @@ const roleNote = Object.keys(roleOverrides).length;
         {requirements.length > 0 && (
           <section class="panel" id="prerequisites" aria-labelledby="h-prereq">
             <h2 id="h-prereq">Prerequisites</h2>
-            <p class="hint">Mark what {first} has already set up. Tiles show Ready once it is marked.</p>
+            <p class="hint">Mark what {first} has already set up. The Needs tag leaves their tiles once it is marked.</p>
             {resultSection === 'prerequisites' && banner && <div class={`notice notice-${banner.tone}`} role="status">{banner.text}</div>}
             <form method="POST" enctype="application/x-www-form-urlencoded" action="#prerequisites" data-dirty-form>
               <input type="hidden" name="csrf_token" value={tok('set-prerequisites')} />
@@ -363,7 +363,7 @@ const roleNote = Object.keys(roleOverrides).length;
                 <span class="item-name">Setup link</span>
                 <span class="item-meta">
                   {shouldRefuseRecovery(identity)
-                    ? 'Admins get back in through the console. See the admin recovery runbook.'
+                    ? 'A household admin can't be sent a setup link here.'
                     : `Lets ${first} choose how to sign in again.`}
                 </span>
               </div>

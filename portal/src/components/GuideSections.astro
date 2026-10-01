@@ -226,6 +226,9 @@ const empty = !guide.lead && guide.sections.length === 0;
   @media (max-width: 640px) {
     .guide :global(.cat-explainer .fig-wide) { display: none; }
     .guide :global(.cat-explainer .fig-stack) { display: block; }
+    /* A single drawing keeps its size and the figure scrolls sideways, so its labels stay readable. */
+    .guide :global(.cat-explainer:not(:has(.fig-stack))) { overflow-x: auto; }
+    .guide :global(.cat-explainer:not(:has(.fig-stack)) svg) { min-width: 38rem; }
   }
   .guide :global(.cat-explainer p) {
     margin: var(--space-3) 0 0;
