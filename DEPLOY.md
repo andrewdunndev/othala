@@ -30,6 +30,16 @@ in `.gitlab-ci.yml`). A deploy plane pins by tag or digest; registry tags
 are immutable, so pinning by tag is already deterministic. Kratos and Hydra
 are upstream Ory images — this repo does not build or publish them.
 
+Each release image is signed by digest with keyless cosign, from the tag
+pipeline's GitLab identity. Verify before pinning:
+
+```sh
+cosign verify \
+  --certificate-oidc-issuer https://gitlab.com \
+  --certificate-identity-regexp '^https://gitlab\.com/dunn\.dev/othala//\.gitlab-ci\.yml@refs/tags/v[0-9]+\.[0-9]+\.[0-9]+$' \
+  registry.gitlab.com/dunn.dev/othala@sha256:<digest>
+```
+
 ## The dual-listener
 
 The app runs **two HTTP listeners in one process**
