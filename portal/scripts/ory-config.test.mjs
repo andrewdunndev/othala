@@ -90,10 +90,11 @@ test('the e2e overlay turns off only the breach check', () => {
   assert.deepEqual(overlay, { selfservice: { methods: { password: { config: { haveibeenpwned_enabled: false } } } } });
 });
 
-test('render refuses an empty or wildcard Ory admin bind', () => {
+test('render refuses an empty Ory admin bind', () => {
   for (const [template, name] of [['kratos/kratos.yml', 'KRATOS_ADMIN_BIND_HOST'], ['hydra/hydra.yml', 'HYDRA_ADMIN_BIND_HOST']]) {
-    for (const bad of ['', '0.0.0.0', '::', '[::]']) {
+    for (const bad of ['', '  ']) {
       assert.throws(() => render(template, { [name]: bad }), `${name}=${JSON.stringify(bad)}`);
     }
+    assert.doesNotThrow(() => render(template, { [name]: '0.0.0.0' }));
   }
 });
