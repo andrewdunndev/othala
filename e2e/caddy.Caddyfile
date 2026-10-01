@@ -63,7 +63,9 @@ auth.othala.test:80 {
 	}
 }
 
-# A forward_auth app behind the portal's gate, as the reference Caddyfile documents: ZI1 navigates here.
+# A forward_auth app behind the portal's gate: the portal's /api/forward-auth checks the session and the
+# group, 200 proxies on (here a stub), and any other status is returned to the client as is, with no
+# login redirect on this route. ZI1 navigates here with a granted session.
 proxywatch.othala.test:80 {
 	forward_auth othala:8080 {
 		uri /api/forward-auth?group=proxywatch-access

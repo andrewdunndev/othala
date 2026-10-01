@@ -214,8 +214,8 @@ services:
     # smoke.sh passes the dance script via stdin.
     entrypoint: ["node"]
 
-  # Edge: fronts app, Kratos and Hydra on one host (auth.othala.test, :8088 published) so the
-  # portal reaches Kratos at OTHALA_PUBLIC_URL as in production and a browser can drive login.
+  # Edge: fronts app, Kratos and Hydra on one host (auth.othala.test, :8088 published) so smoke
+  # and the browser run reach the stack as in production; the portal itself calls Kratos and Hydra directly.
   caddy:
     # dunn.dev/caddy, not stock caddy: n-rate-limits.spec.ts needs rate_limit. Same
     # tag as production (iac dag-caddy.container); re-resolve via skopeo inspect.

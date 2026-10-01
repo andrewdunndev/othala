@@ -90,7 +90,8 @@ while true; do
     sleep 5
 done
 
-# The edge has no healthcheck; the portal's Kratos path and smoke cross it, so wait until it answers.
+# The edge has no healthcheck. Smoke and the browser run enter through it (the portal reaches Kratos and
+# Hydra directly on the internal network), so wait until it answers.
 for _ in $(seq 1 30); do
     [[ $(curl -s -o /dev/null -w '%{http_code}' http://localhost:8088/ || true) != 000 ]] && break
     sleep 2

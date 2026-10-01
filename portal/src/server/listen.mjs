@@ -413,7 +413,7 @@ export function startupEnvErrors() {
 
   // Production only: config.ts throws on these at first import, this surfaces it at boot instead of on the first request.
   if (isProd()) {
-    for (const name of ['OTHALA_PUBLIC_URL', 'OTHALA_APEX', 'OTHALA_INSTANCE_NAME']) {
+    for (const name of ['OTHALA_PUBLIC_URL', 'OTHALA_APEX', 'OTHALA_INSTANCE_NAME', 'OTHALA_CONTACT_RECIPIENT', 'OTHALA_SMTP_CONNECTION_URI']) {
       if (!(process.env[name] ?? '').trim()) errors.push(`[portal] FATAL: ${name} is not set or empty — refusing to start`);
     }
   }
