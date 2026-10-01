@@ -47,6 +47,21 @@ export const REASON_MAP: Record<string, ErrorEntry> = {
     title: 'Too many tries',
     message: 'Please wait a minute, then try again.',
   },
+  'flow-expired': {
+    status: 410,
+    title: 'That page timed out',
+    message: 'Sign-in pages only last a few minutes. Go back to sign in and start again.',
+  },
+  'app-misconfigured': {
+    status: 400,
+    title: "This app isn't set up for sign-in",
+    message: "The app sent a request we don't recognise. Ask your household admin to look at it, and tell them which app it was.",
+  },
+  'sign-in-cancelled': {
+    status: 403,
+    title: 'Sign-in was cancelled',
+    message: 'The app was not allowed to sign you in. Go back to the app and choose sign in to try again.',
+  },
   'server-error': {
     status: 500,
     title: 'Something went wrong on our side',
@@ -64,4 +79,47 @@ export const DEFAULT_ENTRY: ErrorEntry = {
 export function resolveReason(raw: string | null): { entry: ErrorEntry; reason?: string } {
   if (raw !== null && Object.hasOwn(REASON_MAP, raw)) return { entry: REASON_MAP[raw], reason: raw };
   return { entry: DEFAULT_ENTRY };
+}
+
+/** Hydra's OAuth2 `error` codes, by what the person should do next. */
+const HYDRA_ERRORS: Record<string, string> = {
+  invalid_client: 'app-misconfigured',
+  unauthorized_client: 'app-misconfigured',
+  invalid_request: 'app-misconfigured',
+  invalid_scope: 'app-misconfigured',
+  unsupported_response_type: 'app-misconfigured',
+  access_denied: 'sign-in-cancelled',
+  login_required: 'flow-expired',
+  consent_required: 'flow-expired',
+  interaction_required: 'flow-expired',
+  request_unauthorized: 'flow-expired',
+  server_error: 'unavailable',
+  temporarily_unavailable: 'unavailable',
+};
+
+/** Kratos self-service error ids (GET /self-service/errors) and, failing an id, their HTTP codes. */
+const KRATOS_ERRORS: Record<string, string> = {
+  self_service_flow_expired: 'flow-expired',
+  self_service_flow_replaced: 'flow-expired',
+  security_csrf_violation: 'flow-expired',
+  session_inactive: 'session-expired',
+  session_refresh_required: 'session-expired',
+  self_service_flow_return_to_forbidden: 'app-misconfigured',
+};
+const KRATOS_CODES: Record<number, string> = { 410: 'flow-expired', 403: 'flow-expired' };
+
+/** What a Kratos error body (id and HTTP code) means for the page, or undefined to show the generic entry. */
+export function kratosReason(err: { id?: unknown; code?: unknown } | null | undefined): string | undefined {
+  if (!err) return undefined;
+  if (typeof err.id === 'string' && Object.hasOwn(KRATOS_ERRORS, err.id)) return KRATOS_ERRORS[err.id];
+  return typeof err.code === 'number' && Object.hasOwn(KRATOS_CODES, err.code) ? KRATOS_CODES[err.code] : undefined;
+}
+
+/** The page's entry from its query: our own `reason`, a Hydra `error` (its description is never shown), or a Kratos error already looked up by `?id=`. */
+export function resolveError(params: URLSearchParams, kratos?: string): { entry: ErrorEntry; reason?: string } {
+  const own = params.get('reason');
+  if (own !== null && Object.hasOwn(REASON_MAP, own)) return resolveReason(own);
+  const hydra = params.get('error');
+  if (hydra !== null && Object.hasOwn(HYDRA_ERRORS, hydra)) return resolveReason(HYDRA_ERRORS[hydra]);
+  return kratos ? resolveReason(kratos) : resolveReason(null);
 }

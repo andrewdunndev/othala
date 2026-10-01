@@ -60,6 +60,28 @@ export async function isReachable(): Promise<boolean> {
   }
 }
 
+const ERROR_ID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+/** The stored self-service error behind /auth/error?id=, or null when the id is malformed or Kratos cannot say. */
+export async function getFlowError(id: string): Promise<{ id?: unknown; code?: unknown } | null> {
+  if (!ERROR_ID.test(id)) return null;
+  const ctl = new AbortController();
+  const t = setTimeout(() => ctl.abort(), HEALTH_TIMEOUT_MS);
+  try {
+    const res = await fetch(`${kratosBase()}/self-service/errors?id=${encodeURIComponent(id)}`, {
+      signal: ctl.signal,
+      headers: { Accept: 'application/json' },
+    });
+    if (!res.ok) return null;
+    const body = (await res.json()) as { error?: { id?: unknown; code?: unknown } };
+    return body?.error ?? null;
+  } catch {
+    return null;
+  } finally {
+    clearTimeout(t);
+  }
+}
+
 // Wraps the get*Flow SDK calls into the FlowResult union the pages use:
 // 410/404/403 -> gone, 401 -> unauthorized, 2xx -> ok. The SDK's Date fields
 // are never parsed by the renderer, so the casts to our flow types are safe.

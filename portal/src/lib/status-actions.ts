@@ -16,6 +16,9 @@ export function statusActions(status: number, signedIn: boolean, retryHref: stri
     // When Try again already goes home, a second Go home would say the same thing twice.
     return retryHref === '/' ? [retry] : [retry, { href: '/', label: 'Go home', primary: false }];
   }
+  if (status === 410) {
+    return [{ href: '/auth/login', label: 'Start again', primary: true }, { href: '/', label: 'Go home', primary: false }];
+  }
   if (status === 401 && !signedIn) {
     return [{ href: '/auth/login', label: 'Sign in', primary: true }, { href: '/', label: 'Go home', primary: false }];
   }

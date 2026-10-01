@@ -1,14 +1,14 @@
 /* First-run and focused pages (sign in, recovery, verification, consent, errors, signed-out home): one narrow column
  * under the same top bar, one card, one primary action. Reference tokens only. */
 
-.page-narrow { padding-top: var(--space-6); }
+.page-narrow { --focus-gap: var(--space-4); padding-top: var(--space-6); }
 .page-narrow .page-header { border-bottom: 0; margin-bottom: var(--space-4); padding-bottom: 0; }
 .page-narrow .page-title { font-size: var(--text-3xl); margin-bottom: var(--space-2); }
 .page-narrow .page-lede { font-size: var(--text-base); }
 .page-narrow .notice { margin-bottom: var(--space-4); }
 
-.focus-card { padding: var(--space-5); display: flex; flex-direction: column; gap: var(--space-4); }
-.focus-form { display: flex; flex-direction: column; gap: var(--space-4); }
+.focus-card { padding: var(--space-5); display: flex; flex-direction: column; gap: var(--focus-gap); }
+.focus-form { display: flex; flex-direction: column; gap: var(--focus-gap); }
 .focus-btn, .status-actions .button { justify-content: center; text-align: center; }
 .focus-btn { width: 100%; padding: var(--space-3) var(--space-4); font-size: var(--text-base); min-height: 48px; }
 .focus-note { margin: 0; font-size: var(--text-sm); color: var(--text-muted); line-height: 1.5; }
@@ -18,7 +18,7 @@
 
 .focus-links { display: flex; flex-wrap: wrap; gap: var(--space-1) var(--space-4); margin-top: var(--space-4); font-size: var(--text-sm); }
 .focus-links a { color: var(--text-2); display: inline-flex; align-items: center; min-height: 44px; }
-.focus-aside { display: inline-flex; align-items: center; min-height: 44px; color: var(--text-muted); }
+.focus-aside { display: inline-flex; align-items: center; min-height: 44px; color: var(--text-2); }
 .focus-links a:hover { color: var(--accent); }
 
 /* A one-time code: large, numeric, spaced so six digits read at a glance. */
@@ -50,12 +50,12 @@
 .consent-label { margin: 0 0 var(--space-2); font-size: var(--text-sm); font-weight: 600; color: var(--text); }
 .consent-list { list-style: none; margin: 0; padding: 0; border-top: 1px solid var(--border); }
 .consent-list li { padding: var(--space-3) 0; border-bottom: 1px solid var(--border); font-size: var(--text-base); }
-.consent-actions { display: flex; flex-direction: column; gap: var(--space-2); }
+.consent-actions { display: flex; flex-direction: column; gap: var(--focus-gap); }
 .consent-actions form { display: contents; }
 
 /* Error and not-found pages. */
 .status-code { font-family: var(--font-mono); font-size: var(--text-xs); color: var(--text-muted); margin: var(--space-4) 0 0; }
-.status-actions { display: flex; flex-wrap: wrap; gap: var(--space-3); margin-top: var(--space-2); }
+.status-actions { display: flex; flex-wrap: wrap; gap: var(--focus-gap); margin-top: var(--space-2); }
 
 @media (max-width: 640px) {
   .page-narrow { padding-top: var(--space-5); }

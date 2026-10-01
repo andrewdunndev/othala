@@ -26,8 +26,11 @@ export const journeyText = (m: Pick<FlowMessage, 'id' | 'text'>): string => MESS
 export const noticeClass = (type: FlowMessage['type']): string =>
   `notice notice-${type === 'error' ? 'danger' : type === 'success' ? 'success' : 'warning'}`;
 
-/** The six digits Kratos and authenticator apps issue. */
-export const CODE_SHAPE = { maxlength: 6, pattern: '[0-9]{6}' } as const;
+/** An error notice interrupts a screen reader; info and success wait their turn. */
+export const noticeRole = (type: FlowMessage['type']): 'alert' | undefined => (type === 'error' ? 'alert' : undefined);
+
+/** The six digits Kratos and authenticator apps issue; the title is what the browser's format message says. */
+export const CODE_SHAPE = { maxlength: 6, pattern: '[0-9]{6}', title: 'Six digits, like 123456' } as const;
 
 /** A one-time code input: large, numeric, offered to the phone's code autofill. */
 const CODE_INPUT = { inputmode: 'numeric', autocomplete: 'one-time-code', autofocus: true, class: 'code-input', placeholder: '123456', ...CODE_SHAPE, clearOnError: true } as const;
@@ -36,7 +39,7 @@ const EMAIL_INPUT = { inputmode: 'email', autocomplete: 'email', placeholder: 'y
 /** Recovery (setup link or emailed code) wording by flow phase, keyed as FlowNodes expects. */
 export function recoverySpecs(phase: 'request' | 'sent'): NodeSpecs {
   return phase === 'request'
-    ? { email: EMAIL_INPUT, 'button:method': { label: 'Email me a code' } }
+    ? { email: EMAIL_INPUT, 'button:method': { label: 'Get a code by email' } }
     : {
         code: { ...CODE_INPUT, label: 'Your code' },
         'button:method': { label: 'Verify code' },
@@ -46,7 +49,7 @@ export function recoverySpecs(phase: 'request' | 'sent'): NodeSpecs {
 
 export function verificationSpecs(phase: 'request' | 'sent'): NodeSpecs {
   return phase === 'request'
-    ? { email: EMAIL_INPUT, 'button:method': { label: 'Email me a code' } }
+    ? { email: EMAIL_INPUT, 'button:method': { label: 'Get a code by email' } }
     : {
         code: { ...CODE_INPUT, label: 'Your code' },
         'button:method': { label: 'Verify email' },

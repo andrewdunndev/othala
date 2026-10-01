@@ -14,7 +14,7 @@ import { needsStepUp } from '../../lib/step-up';
 import { instanceName } from '../../lib/config';
 import { csrfToken, nodesByGroup, asInput, scriptNodes, safeOnclick } from '../../lib/nodes';
 import { deriveLoginTiers } from '../../lib/login-tiers';
-import { CODE_SHAPE, journeyText, noticeClass, passwordRefused } from '../../lib/journey';
+import { CODE_SHAPE, journeyText, noticeClass, noticeRole, passwordRefused } from '../../lib/journey';
 import { DEV_LOGIN_STATES, devLogin, isIn } from '../../lib/journey-fixtures';
 import type { FlowMessage } from '../../lib/types';
 
@@ -82,6 +82,9 @@ const passwordFailed = ui
     nodesByGroup(ui.nodes, 'password').some((n) => n.messages?.some((m: FlowMessage) => m.type === 'error'))
   : false;
 
+const refused = (n: { messages?: FlowMessage[] }) => (n.messages ?? []).some((m) => m.type === 'error');
+const noticeId = (m: FlowMessage, id: string) => (m.type === 'error' ? id : undefined);
+
 // Tier presence and AAL2 derivation live in login-tiers.ts (see there).
 const { hasPasskey, hasCode, hasPassword, totpNodes, aal2WebauthnNodes, lookupNodes, isAal2, hasAal2Methods } =
   deriveLoginTiers(flow, aal);
@@ -98,7 +101,7 @@ const { hasPasskey, hasCode, hasPassword, totpNodes, aal2WebauthnNodes, lookupNo
   description={`Sign in to ${instanceName}.`}
 >
 
-  {ui?.messages?.map((m: FlowMessage) => <div class={noticeClass(m.type)}>{journeyText(m)}</div>)}
+  {ui?.messages?.map((m: FlowMessage) => <div id={noticeId(m, 'flow-error')} class={noticeClass(m.type)} role={noticeRole(m.type)}>{journeyText(m)}</div>)}
 
   {!flow && isDev && (
     <div class="notice notice-warning">Dev preview: no flow. Add <code>?dev-state=code|aal2|wrong-password</code>.</div>
@@ -135,10 +138,13 @@ const { hasPasskey, hasCode, hasPassword, totpNodes, aal2WebauthnNodes, lookupNo
                       autofocus
                       maxlength={CODE_SHAPE.maxlength}
                       pattern={CODE_SHAPE.pattern}
+                      title={CODE_SHAPE.title}
                       placeholder="123456"
+                      aria-invalid={refused(n) ? 'true' : undefined}
+                      aria-describedby={refused(n) ? 'totp-code-error' : undefined}
                     />
                     <div class="field-hint">The 6 digits your app shows. They change every 30 seconds.</div>
-                    {n.messages?.map((m: FlowMessage) => <div class={noticeClass(m.type)}>{journeyText(m)}</div>)}
+                    {n.messages?.map((m: FlowMessage) => <div id={noticeId(m, 'totp-code-error')} class={noticeClass(m.type)} role={noticeRole(m.type)}>{journeyText(m)}</div>)}
                   </div>
                 );
               }
@@ -343,9 +349,12 @@ const { hasPasskey, hasCode, hasPassword, totpNodes, aal2WebauthnNodes, lookupNo
                     autofocus
                     maxlength={CODE_SHAPE.maxlength}
                     pattern={CODE_SHAPE.pattern}
+                    title={CODE_SHAPE.title}
                     placeholder="123456"
+                    aria-invalid={refused(n) ? 'true' : undefined}
+                    aria-describedby={refused(n) ? 'login-code-error' : undefined}
                   />
-                  {n.messages?.map((m: FlowMessage) => <div class={noticeClass(m.type)}>{journeyText(m)}</div>)}
+                  {n.messages?.map((m: FlowMessage) => <div id={noticeId(m, 'login-code-error')} class={noticeClass(m.type)} role={noticeRole(m.type)}>{journeyText(m)}</div>)}
                 </div>
               );
             })}
@@ -386,7 +395,7 @@ const { hasPasskey, hasCode, hasPassword, totpNodes, aal2WebauthnNodes, lookupNo
           <input type="hidden" name="method" value="password" />
 
           <div class="field">
-            <label for="pw-identifier">Username</label>
+            <label for="pw-identifier">Email or username</label>
             <input
               id="pw-identifier"
               name="identifier"
@@ -406,6 +415,8 @@ const { hasPasskey, hasCode, hasPassword, totpNodes, aal2WebauthnNodes, lookupNo
               autocomplete={passwordInput?.autocomplete ?? 'current-password'}
               required
               autofocus={passwordFailed}
+              aria-invalid={passwordFailed ? 'true' : undefined}
+              aria-describedby={passwordFailed ? 'flow-error' : undefined}
             />
           </div>
 
@@ -424,7 +435,7 @@ const { hasPasskey, hasCode, hasPassword, totpNodes, aal2WebauthnNodes, lookupNo
       ? <span class="focus-aside">Lost your second step? Ask a household admin to reset it.</span>
       : isCodeEntry
       ? <a href="/auth/login" data-astro-reload>Use a different way to sign in</a>
-      : <a href="/auth/recovery">New device, lost passkey, or have a setup link?</a>}
+      : <a href="/auth/recovery">New device or lost passkey? Get a code by email</a>}
     <a href="/" data-astro-reload>Back home</a>
   </nav>
 

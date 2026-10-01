@@ -6,6 +6,7 @@
 // structure. login.astro is deliberately not a consumer.
 
 import { asInput, inputProps, safeOnclick, specKey, nodeLabel } from '../lib/nodes';
+import { noticeRole } from '../lib/journey';
 import type { NodeSpecs } from '../lib/nodes';
 import type { FlowNode, FlowMessage } from '../lib/types';
 
@@ -111,11 +112,18 @@ const labelText = (node: FlowNode, fallback: string): string => {
           autofocus={spec?.autofocus}
           maxlength={spec?.maxlength}
           pattern={spec?.pattern}
+          title={spec?.title}
+          aria-invalid={refused ? 'true' : undefined}
+          aria-describedby={refused ? `${id}-error` : undefined}
           class={spec?.class}
         />
         {spec?.hint && <div class="field-hint">{spec.hint}</div>}
-        {node.messages?.map((m: FlowMessage) => (
-          <div class={`notice notice-${m.type === 'error' ? 'danger' : m.type === 'success' ? 'success' : 'warning'}`}>
+        {node.messages?.map((m: FlowMessage, i: number) => (
+          <div
+            id={m.type === 'error' && node.messages?.findIndex((x: FlowMessage) => x.type === 'error') === i ? `${id}-error` : undefined}
+            role={noticeRole(m.type)}
+            class={`notice notice-${m.type === 'error' ? 'danger' : m.type === 'success' ? 'success' : 'warning'}`}
+          >
             {messageText(m)}
           </div>
         ))}

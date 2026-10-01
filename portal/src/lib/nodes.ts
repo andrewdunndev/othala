@@ -163,6 +163,8 @@ export interface NodeSpec {
   /** Length and shape of a one-time code, so a stray character or a long paste is caught before the round trip. */
   maxlength?: number;
   pattern?: string;
+  /** What the browser says when the pattern is not met. */
+  title?: string;
   /** Start empty after a refused value, so the next try is typed over nothing. */
   clearOnError?: boolean;
 }

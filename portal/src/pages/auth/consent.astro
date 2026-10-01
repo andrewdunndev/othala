@@ -23,7 +23,7 @@ const dev = isIn(DEV_CONSENT_STATES, devState) ? devConsent(devState) : null;
 
 let clientId = '';
 let clientName = '';
-let scopeDescriptions: Array<{ scope: string; description: string }> = [];
+let requestedScopes: string[] = [];
 let fetchError = false;
 let ownershipError = false;
 let csrfToken = '';
@@ -33,7 +33,7 @@ if (dev) {
   const stand = dev.clientId === 'dev-app' ? loadTiles().find((t) => t.authKind === 'oidc') : undefined;
   clientId = stand?.slug ?? dev.clientId;
   clientName = stand?.name ?? dev.clientName;
-  scopeDescriptions = describeScopeList(dev.scopes);
+  requestedScopes = dev.scopes;
   fetchError = !!dev.fetchError;
 } else if (!challenge) {
   fetchError = true;
@@ -55,7 +55,7 @@ if (dev) {
     } else {
       clientId = consent.client?.client_id ?? '';
       clientName = consent.client?.client_name ?? clientId;
-      scopeDescriptions = describeScopeList(consent.requested_scope ?? []);
+      requestedScopes = consent.requested_scope ?? [];
       csrfToken = signToken(session.identity.id, 'consent');
     }
   } catch {
@@ -72,6 +72,7 @@ const failMessage = !challenge && !dev
   : ownershipError
   ? 'This request belongs to someone else, or has timed out. Go back to the app and start sign-in again.'
   : 'This request has timed out or was already answered. Go back to the app and start sign-in again.';
+const scopeDescriptions = describeScopeList(requestedScopes, appName);
 const plate = tile ?? { iconHref: undefined, icon: monogram(appName), iconBleed: false };
 ---
 <FocusPage
@@ -119,7 +120,7 @@ const plate = tile ?? { iconHref: undefined, icon: monogram(appName), iconBleed:
           <button type="submit" class="button button-secondary focus-btn">Deny</button>
         </form>
       </div>
-      <p class="focus-note">Allow signs you in this time only, so you'll be asked again next time. Deny returns you to the app without signing in.</p>
+      <p class="focus-note">Deny returns you to the app without signing in.</p>
     </section>
   )}
 

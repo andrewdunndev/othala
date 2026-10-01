@@ -10,7 +10,7 @@ import FocusPage from '../../components/FocusPage.astro';
 import { browserFlows, getVerificationFlow } from '../../lib/kratos';
 import { csrfToken, hasMethod } from '../../lib/nodes';
 import FlowNodes from '../../components/FlowNodes.astro';
-import { journeyText, noticeClass, verificationSpecs } from '../../lib/journey';
+import { journeyText, noticeClass, noticeRole, verificationSpecs } from '../../lib/journey';
 import { DEV_VERIFICATION_STATES, devVerification, isIn } from '../../lib/journey-fixtures';
 import type { FlowMessage } from '../../lib/types';
 
@@ -63,7 +63,7 @@ const phase: 'request' | 'sent' | 'done' = flow?.state === 'passed_challenge' ? 
 >
 
   {(ui?.messages ?? []).filter((m: FlowMessage) => !(phase !== 'request' && m.type !== 'error')).map((m: FlowMessage) => (
-    <div class={noticeClass(m.type)}>{journeyText(m)}</div>
+    <div class={noticeClass(m.type)} role={noticeRole(m.type)}>{journeyText(m)}</div>
   ))}
 
   {!flow && isDev && (
@@ -72,7 +72,7 @@ const phase: 'request' | 'sent' | 'done' = flow?.state === 'passed_challenge' ? 
 
   {phase === 'done' ? (
     <div class="status-actions">
-      <a href="/auth/settings" class="button button-primary" data-astro-reload>Continue</a>
+      <a href="/auth/settings" class="button button-primary" data-astro-reload>Back to your account</a>
     </div>
   ) : (
   <section class="panel focus-card">
@@ -84,7 +84,7 @@ const phase: 'request' | 'sent' | 'done' = flow?.state === 'passed_challenge' ? 
           nodes={codeNodes}
           group="code"
           buttonClass="button button-primary focus-btn"
-          submitLabel={phase === 'request' ? 'Email me a code' : 'Verify email'}
+          submitLabel={phase === 'request' ? 'Get a code by email' : 'Verify email'}
           specs={verificationSpecs(phase)}
           inputLabelFallback={(n: string) => (n === 'code' ? 'Your code' : n)}
           messageText={journeyText}

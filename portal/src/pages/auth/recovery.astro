@@ -10,7 +10,7 @@ import FocusPage from '../../components/FocusPage.astro';
 import FlowNodes from '../../components/FlowNodes.astro';
 import { browserFlows, getRecoveryFlow } from '../../lib/kratos';
 import { csrfToken, hasMethod } from '../../lib/nodes';
-import { journeyText, noticeClass, recoverySpecs } from '../../lib/journey';
+import { journeyText, noticeClass, noticeRole, recoverySpecs } from '../../lib/journey';
 import { DEV_RECOVERY_STATES, devRecovery, isIn } from '../../lib/journey-fixtures';
 import type { FlowMessage } from '../../lib/types';
 
@@ -42,11 +42,11 @@ const messages = (ui?.messages ?? []).filter((m: FlowMessage) => !(phase === 'se
   title={phase === 'request' ? 'Get back in' : 'Enter your code'}
   lede={phase === 'request'
     ? "Enter your email and we'll send you a one-time code. No password needed."
-    : 'Use the code from your setup message or email. It works once and expires soon.'}
+    : 'Enter the code from your email, or from the setup message that brought you here. It works once and expires soon.'}
   description="Start or regain access with a one-time code."
 >
 
-  {messages.map((m: FlowMessage) => <div class={noticeClass(m.type)}>{journeyText(m)}</div>)}
+  {messages.map((m: FlowMessage) => <div class={noticeClass(m.type)} role={noticeRole(m.type)}>{journeyText(m)}</div>)}
 
   {!flow && isDev && (
     <div class="notice notice-warning">Dev preview: no flow. Add <code>?dev-state=request|code|code-prefilled|code-wrong</code>.</div>
@@ -61,7 +61,7 @@ const messages = (ui?.messages ?? []).filter((m: FlowMessage) => !(phase === 'se
           nodes={ui.nodes}
           group="code"
           buttonClass="button button-primary focus-btn"
-          submitLabel={phase === 'request' ? 'Email me a code' : 'Verify code'}
+          submitLabel={phase === 'request' ? 'Get a code by email' : 'Verify code'}
           specs={recoverySpecs(phase)}
           inputLabelFallback={(n: string) => (n === 'code' ? 'Your code' : n)}
           messageText={journeyText}
@@ -73,7 +73,7 @@ const messages = (ui?.messages ?? []).filter((m: FlowMessage) => !(phase === 'se
       <p class="focus-next">Next you'll land on your account, where you can add a passkey so signing in takes one tap.</p>
     )}
     {phase === 'request' && (
-      <p class="focus-note">New phone, lost passkey, or first time here with a setup link: this gets you in.</p>
+      <p class="focus-note">New phone or lost passkey? A code by email gets you in. Got a setup link? Open that link instead; it brings its own code.</p>
     )}
   </section>
 
