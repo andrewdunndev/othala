@@ -1,0 +1,25 @@
+---
+// A focused page under the portal's top bar: one narrow column with a title, a one-line lede and the page's single card
+// in the slot. Shared by sign in, recovery, verification, consent, and the error and not-found pages so they read as
+// one system with Home and Settings (same Layout, header, tokens and button hierarchy).
+
+import Layout from '../layouts/Layout.astro';
+
+interface Props {
+  /** The page heading (h1) and tab title. */
+  title: string;
+  lede?: string;
+  description?: string;
+  /** Tab title when it should differ from the heading. */
+  tabTitle?: string;
+}
+
+const { title, lede, description, tabTitle } = Astro.props;
+---
+<Layout title={tabTitle ?? title} description={description} bare narrow>
+  <header class="page-header">
+    <h1 class="page-title">{title}</h1>
+    {lede && <p class="page-lede">{lede}</p>}
+  </header>
+  <slot />
+</Layout>

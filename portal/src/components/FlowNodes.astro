@@ -5,7 +5,8 @@
 // policy lives in lib/nodes.ts inputProps; pages keep their own copy and
 // structure. login.astro is deliberately not a consumer.
 
-import { asInput, inputProps, safeOnclick } from '../lib/nodes';
+import { asInput, inputProps, safeOnclick, specKey, nodeLabel } from '../lib/nodes';
+import type { NodeSpecs } from '../lib/nodes';
 import type { FlowNode, FlowMessage } from '../lib/types';
 
 interface Props {
@@ -31,6 +32,10 @@ interface Props {
   passRequired?: boolean;
   /** Default autocomplete when the node omits one (e.g. 'new-password'). */
   defaultAutocomplete?: string;
+  /** Portal wording and hints per node, keyed by specKey; nodes without an entry render as before. */
+  specs?: NodeSpecs;
+  /** Wording for a node-level message; default is Kratos's own text. */
+  messageText?: (m: FlowMessage) => string;
 }
 
 const {
@@ -45,10 +50,14 @@ const {
   passDisabled = false,
   passRequired = true,
   defaultAutocomplete,
+  specs = {},
+  messageText = (m: FlowMessage) => m.text,
 } = Astro.props as Props;
 
-const labelText = (node: FlowNode, fallback: string): string =>
-  node.meta?.label?.text ?? fallback;
+const labelText = (node: FlowNode, fallback: string): string => {
+  const a = asInput(node);
+  return nodeLabel(a ? specs[specKey(a)] : undefined, node.meta?.label?.text, fallback);
+};
 ---
 {nodes
   .filter((n: FlowNode) => n.group === group)
@@ -66,7 +75,8 @@ const labelText = (node: FlowNode, fallback: string): string =>
       // is forwarded at all (passkey group needs it; password group doesn't).
       const button = (
         <button
-          class={buttonClass}
+          class={specs[specKey(a)]?.class ?? buttonClass}
+          formnovalidate={specs[specKey(a)]?.formnovalidate}
           type={a.type}
           name={a.name}
           value={String(a.value ?? '')}
@@ -81,8 +91,9 @@ const labelText = (node: FlowNode, fallback: string): string =>
     // Labeled input. Build the attribute set via the shared inputProps helper,
     // then apply the page's render policy (which optional attrs to surface).
     const props = inputProps(a);
+    const spec = specs[specKey(a)];
     const id = a.name.replace(/[^a-zA-Z0-9]+/g, '-');
-    const autocomplete = (props.autocomplete as string | undefined) ?? defaultAutocomplete;
+    const autocomplete = spec?.autocomplete ?? (props.autocomplete as string | undefined) ?? defaultAutocomplete;
     return (
       <div class="field">
         <label for={id}>{labelText(node, inputLabelFallback(a.name))}</label>
@@ -94,10 +105,15 @@ const labelText = (node: FlowNode, fallback: string): string =>
           required={passRequired ? (props.required as boolean | undefined) : undefined}
           disabled={passDisabled ? (props.disabled as boolean | undefined) : undefined}
           autocomplete={autocomplete}
+          inputmode={spec?.inputmode}
+          placeholder={spec?.placeholder}
+          autofocus={spec?.autofocus}
+          class={spec?.class}
         />
+        {spec?.hint && <div class="field-hint">{spec.hint}</div>}
         {node.messages?.map((m: FlowMessage) => (
           <div class={`notice notice-${m.type === 'error' ? 'danger' : m.type === 'success' ? 'success' : 'warning'}`}>
-            {m.text}
+            {messageText(m)}
           </div>
         ))}
       </div>

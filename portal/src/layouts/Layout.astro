@@ -4,6 +4,7 @@
 // sticky header, optional nav, theme toggle (localStorage), repo-link footer.
 
 import '../styles/global.css';
+import '../styles/focus.css';
 import { ClientRouter } from 'astro:transitions';
 import markSvg from '../marks/mark.svg?raw';
 import { instanceName } from '../lib/config';
@@ -21,9 +22,11 @@ interface Props {
   compact?: boolean;
   /** Swap form posts and same-page navigations in place (Astro's ClientRouter); native navigation stays the fallback. */
   router?: boolean;
+  /** One narrow centred column (first-run and focused pages) under the same top bar. */
+  narrow?: boolean;
 }
 
-const { title, description, nav, bare = false, compact = false, router = false } = Astro.props;
+const { title, description, nav, bare = false, compact = false, router = false, narrow = false } = Astro.props;
 const path = Astro.url.pathname.replace(/\/$/, '') || '/';
 const isHome = title === 'Home';
 const pageTitle = isHome ? instanceName : `${title} — ${instanceName}`;
@@ -71,7 +74,7 @@ const pageTitle = isHome ? instanceName : `${title} — ${instanceName}`;
     </div>
   </header>
 
-  <main class:list={['page', { 'page-compact': compact }]}>
+  <main class:list={['page', { 'page-compact': compact, 'page-narrow': narrow }]}>
     <slot />
   </main>
 

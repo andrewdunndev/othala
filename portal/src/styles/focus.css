@@ -1,0 +1,62 @@
+/* First-run and focused pages (sign in, recovery, verification, consent, errors, signed-out home): one narrow column
+ * under the same top bar, one card, one primary action. Reference tokens only. */
+
+.page-narrow { padding-top: var(--space-6); }
+.page-narrow .page-header { border-bottom: 0; margin-bottom: var(--space-4); padding-bottom: 0; }
+.page-narrow .page-title { font-size: var(--text-3xl); margin-bottom: var(--space-2); }
+.page-narrow .page-lede { font-size: var(--text-base); }
+.page-narrow .notice { margin-bottom: var(--space-4); }
+
+.focus-card { padding: var(--space-5); display: flex; flex-direction: column; gap: var(--space-4); }
+.focus-form { display: flex; flex-direction: column; gap: var(--space-4); }
+.focus-btn, .status-actions .button { justify-content: center; text-align: center; }
+.focus-btn { width: 100%; padding: var(--space-3) var(--space-4); font-size: var(--text-base); min-height: 48px; }
+.focus-note { margin: 0; font-size: var(--text-sm); color: var(--text-muted); line-height: 1.5; }
+.focus-or { display: flex; align-items: center; gap: var(--space-3); margin: 0; font-size: var(--text-sm); color: var(--text-muted); }
+.focus-or::before, .focus-or::after { content: ''; flex: 1; border-top: 1px solid var(--border); }
+.focus-next { margin: 0; padding: var(--space-3) var(--space-4); border-radius: var(--radius); background: var(--accent-subtle); font-size: var(--text-sm); color: var(--text); line-height: 1.5; }
+
+.focus-links { display: flex; flex-wrap: wrap; gap: var(--space-1) var(--space-4); margin-top: var(--space-4); font-size: var(--text-sm); }
+.focus-links a { color: var(--text-2); display: inline-flex; align-items: center; min-height: 44px; }
+.focus-links a:hover { color: var(--accent); }
+
+/* A one-time code: large, numeric, spaced so six digits read at a glance. */
+.field input.code-input {
+  font-family: var(--font-mono);
+  font-size: var(--text-2xl);
+  letter-spacing: 0.35em;
+  text-align: center;
+  padding: var(--space-4) var(--space-3);
+}
+.field input.code-input::placeholder { letter-spacing: 0.35em; opacity: 0.4; }
+
+/* A quiet secondary path that opens in place. */
+.disclosure > summary {
+  list-style: none; cursor: pointer; display: flex; align-items: center; justify-content: space-between; gap: var(--space-3);
+  min-height: 48px; padding: var(--space-2) var(--space-4); border: 1px solid var(--border); border-radius: var(--radius);
+  font-size: var(--text-sm); color: var(--text-2);
+}
+.disclosure > summary:hover { color: var(--text); border-color: var(--border-strong); background: var(--surface); }
+.disclosure > summary::-webkit-details-marker { display: none; }
+.disclosure > summary::after { content: '+'; font-family: var(--font-mono); color: var(--text-muted); transition: transform var(--duration-fast) var(--ease-out); }
+.disclosure[open] > summary::after { transform: rotate(45deg); }
+.disclosure > .focus-form { margin-top: var(--space-4); }
+
+/* What an app will see on the consent screen, and the app's identity above it. */
+.consent-app { display: flex; align-items: center; gap: var(--space-3); }
+.consent-app-name { margin: 0; font-size: var(--text-lg); font-weight: 600; color: var(--text); }
+.consent-app-desc { margin: 0; font-size: var(--text-sm); color: var(--text-muted); }
+.consent-list { list-style: none; margin: 0; padding: 0; border-top: 1px solid var(--border); }
+.consent-list li { padding: var(--space-3) 0; border-bottom: 1px solid var(--border); font-size: var(--text-base); }
+.consent-actions { display: flex; flex-direction: column; gap: var(--space-2); }
+.consent-actions form { display: contents; }
+
+/* Error and not-found pages. */
+.status-code { font-family: var(--font-mono); font-size: var(--text-xs); color: var(--text-muted); margin: var(--space-4) 0 0; }
+.status-actions { display: flex; flex-wrap: wrap; gap: var(--space-3); margin-top: var(--space-2); }
+
+@media (max-width: 640px) {
+  .page-narrow { padding-top: var(--space-5); }
+  .focus-card { padding: var(--space-4); }
+  .status-actions .button { flex: 1 1 100%; }
+}
