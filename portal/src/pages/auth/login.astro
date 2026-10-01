@@ -10,7 +10,7 @@ export const prerender = false;
 import FocusPage from '../../components/FocusPage.astro';
 import { browserFlows, getLoginFlow, getSession } from '../../lib/kratos';
 import { getIdentity } from '../../lib/admin-api';
-import { needsStepUp } from '../../lib/step-up';
+import { needsStepUp } from '../../lib/gate';
 import { instanceName } from '../../lib/config';
 import { csrfToken, nodesByGroup, asInput, scriptNodes, safeOnclick } from '../../lib/nodes';
 import { deriveLoginTiers } from '../../lib/login-tiers';
@@ -28,7 +28,7 @@ const devState = isDev ? url.searchParams.get('dev-state') : null;
 const devFlow = isIn(DEV_LOGIN_STATES, devState) ? devLogin(devState) : null;
 const cookie = Astro.request.headers.get('cookie') ?? undefined;
 
-// A live aal1 session that must step up (lib/step-up.ts) gets an aal2 flow;
+// A live aal1 session that must step up (lib/gate.ts) gets an aal2 flow;
 // otherwise Kratos returns the browser to return_to and forward-auth loops.
 if (!flowId && !aal && !isDev) {
   try {

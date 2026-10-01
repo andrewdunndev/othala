@@ -7,9 +7,8 @@
 import type { APIRoute } from 'astro';
 import { getSession } from '../../lib/kratos';
 import { getIdentity } from '../../lib/admin-api';
-import { enforceGroupGate } from '../../lib/gate';
+import { decideAccess } from '../../lib/gate';
 import { GROUP_RE } from '../../lib/access-groups';
-import { needsStepUp } from '../../lib/step-up';
 import { manifestHealth } from '../../lib/manifest-store';
 import type { Identity, Session } from '../../lib/types';
 
@@ -62,9 +61,9 @@ async function decide(request: Request, url: URL): Promise<Response> {
     return text(503, 'unavailable');
   }
 
-  // 4. The canonical gate (gate.ts); 403 means authenticated and not authorised.
-  const gate = enforceGroupGate(identity, group);
-  if (!gate.allowed) {
+  // 4. The access policy (gate.ts); 403 means authenticated and not authorised.
+  const access = decideAccess(identity, { group }, session);
+  if ('deny' in access) {
     return text(403, 'forbidden');
   }
 
@@ -73,7 +72,7 @@ async function decide(request: Request, url: URL): Promise<Response> {
   if (session.authenticator_assurance_level !== 'aal2' && manifestHealth().status === 'unavailable') {
     return text(503, 'unavailable');
   }
-  if (needsStepUp(session, identity)) {
+  if ('stepUp' in access) {
     return text(401, 'unauthenticated');
   }
 

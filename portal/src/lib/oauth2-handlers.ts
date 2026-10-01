@@ -12,12 +12,11 @@ import type {
 import type { Identity, Session } from './types';
 import { getIdentity as defaultGetIdentity, revokeSession as defaultRevokeSession } from './admin-api';
 import { getSession as defaultGetSession } from './kratos';
-import { enforceAccessGate, type GateResult } from './gate';
+import { decideAccess, enforceAccessGate } from './gate';
 import { composeIDTokenClaims } from './claims';
 import type { ClientManifest } from './manifests';
 import { servingManifest } from './manifest-store';
 import { verifyToken, CSRFError } from './csrf';
-import { needsStepUp } from './step-up';
 import { publicUrl } from './config';
 import { HYDRA_ADMIN_URL } from './constants';
 
@@ -60,7 +59,6 @@ export interface Deps {
   getSession?: (cookie?: string) => Promise<Session | null>;
   /** Revoke one Kratos session by id (logout). */
   revokeSession?: (sessionId: string) => Promise<void>;
-  gate?: (identity: Identity | null, clientId: string, manifest?: ClientManifest) => GateResult;
   /** Resolve a client manifest. Defaults to the SERVING loader (manifest-store.ts), which never throws, so an invalid
    * manifest set denies entry instead of 500ing every challenge; undefined is fail-closed at the gate. */
   manifest?: (clientId: string) => ClientManifest | undefined;
@@ -72,7 +70,6 @@ function resolve(deps: Deps): Required<Deps> {
     getIdentity: deps.getIdentity ?? defaultGetIdentity,
     getSession: deps.getSession ?? defaultGetSession,
     revokeSession: deps.revokeSession ?? defaultRevokeSession,
-    gate: deps.gate ?? ((identity, clientId, manifest) => enforceAccessGate(identity, clientId, manifest)),
     manifest: deps.manifest ?? ((clientId) => servingManifest(clientId)),
   };
 }
@@ -167,13 +164,12 @@ export async function handleLogin(req: Request, deps: Deps = {}): Promise<Respon
     acr = session.authenticator_assurance_level ?? undefined;
   }
 
-  // Access gate (state + group), fail-closed on lookup failure.
+  // The access policy (gate.ts): state + group, fail-closed on lookup failure, then step-up.
   const identity = await safeGetIdentity(d, subject);
-  const loginManifest = d.manifest(clientId);
-  const result = d.gate(identity, clientId, loginManifest);
-  if (!result.allowed) {
+  const access = decideAccess(identity, { app: d.manifest(clientId) }, liveSession);
+  if ('deny' in access) {
     // Log the real reason server-side; send Hydra an opaque error_description so RPs learn no group names or identity state.
-    console.warn('[oauth2/login] access denied', { clientId, subject, reason: result.reason });
+    console.warn('[oauth2/login] access denied', { clientId, subject, reason: access.deny });
     try {
       const { redirect_to } = await d.oauth2.rejectOAuth2LoginRequest({
         loginChallenge: challenge,
@@ -190,7 +186,7 @@ export async function handleLogin(req: Request, deps: Deps = {}): Promise<Respon
   }
 
   // Second-factor step-up: accounts with totp/webauthn, the admin marker, or a role above an app's entry role, complete aal2 first; Kratos returns to this challenge.
-  if (needsStepUp(liveSession, identity)) {
+  if ('stepUp' in access) {
     const returnTo = buildLoginReturnTo(challenge);
     return redirect(`${LOGIN_UI_BASE}?aal=aal2&return_to=${encodeURIComponent(returnTo)}`);
   }
@@ -267,7 +263,7 @@ export async function handleConsent(req: Request, deps: Deps = {}): Promise<Resp
   // Re-gate at consent time (state + group), fail-closed; it must gate even when login was remembered.
   const identity = await safeGetIdentity(d, subject);
   const consentManifest = d.manifest(clientId);
-  const result = d.gate(identity, clientId, consentManifest);
+  const result = enforceAccessGate(identity, clientId, consentManifest);
   if (!result.allowed) {
     // Log the real reason server-side; send an opaque error_description.
     console.warn('[oauth2/consent] access denied', { clientId, subject, reason: result.reason });
@@ -409,7 +405,7 @@ export async function handleConsentPost(req: Request, deps: Deps = {}): Promise<
   const clientId = consent.client?.client_id ?? '';
   const identity = await safeGetIdentity(d, consent.subject ?? '');
   const allowManifest = d.manifest(clientId);
-  const result = d.gate(identity, clientId, allowManifest);
+  const result = enforceAccessGate(identity, clientId, allowManifest);
   if (!result.allowed) {
     // Log the real reason server-side; send an opaque error_description.
     console.warn('[oauth2/consent/post] access denied', { clientId, subject: consent.subject, reason: result.reason });

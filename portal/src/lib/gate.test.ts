@@ -1,11 +1,11 @@
-// Invariant: step-up follows enrolled second factors, the admin marker and elevated roles only.
+// Invariant: a denial outranks a step-up, and step-up follows enrolled second factors, the admin marker and elevated
+// roles only.
 
 import { describe, it, expect } from 'vitest';
-import { needsStepUp, holdsElevatedRole } from './step-up';
-import { parseIdentity } from './identity-facts';
+import { decideAccess, needsStepUp, holdsElevatedRole } from './gate';
 import type { ClientManifest } from './manifests';
 import type { Identity } from './types';
-import { identity as buildIdentity, withCredential, withLookupSecret, withPasskey, withTotp, withWebauthnKey } from './test-builders';
+import { asAdmin, identity as buildIdentity, withCredential, withLookupSecret, withPasskey, withTotp, withWebauthnKey } from './test-builders';
 
 const APPLY: Record<string, (i: Identity) => Identity> = {
   password: (i) => i,
@@ -60,17 +60,12 @@ describe('needsStepUp', () => {
   });
 });
 
-describe('parseIdentity hasSecondFactor', () => {
-  it('reads an identity with no credentials map as none', () => {
-    expect(parseIdentity({ ...identity([]), credentials: undefined }).hasSecondFactor).toBe(false);
-  });
-});
+const role = (name: string) => ({ name, claimEmit: {} });
+const manifest = (clientId: string, roles: string[], groupRoleMap: Record<string, string>, accessGroups: string[]) =>
+  ({ clientId, roles: roles.map(role), groupRoleMap, accessGroups }) as unknown as ClientManifest;
+const x = manifest('x', ['admin', 'user'], { 'x-admin': 'admin', 'x-access': 'user' }, ['x-access']);
 
 describe('holdsElevatedRole', () => {
-  const role = (name: string) => ({ name, claimEmit: {} });
-  const manifest = (clientId: string, roles: string[], groupRoleMap: Record<string, string>, accessGroups: string[]) =>
-    ({ clientId, roles: roles.map(role), groupRoleMap, accessGroups }) as unknown as ClientManifest;
-  const x = manifest('x', ['admin', 'user'], { 'x-admin': 'admin', 'x-access': 'user' }, ['x-access']);
   const listen = manifest('listen', ['admin', 'user', 'guest'], { 'listen-admin': 'admin', 'listen-access': 'user' }, ['listen-access']);
   const grafana = manifest('grafana', ['admin', 'editor', 'viewer'], { 'grafana-admin': 'admin', 'grafana-access': 'viewer' }, ['grafana-access']);
   const held = (manifests: ClientManifest[], groups: string[], roles?: Record<string, string>) =>
@@ -92,5 +87,37 @@ describe('holdsElevatedRole', () => {
   });
   it('a manifest without roles is never elevated', () => {
     expect(held([manifest('y', [], {}, ['y-access'])], ['y-access'])).toBe(false);
+  });
+});
+
+describe('decideAccess', () => {
+  const member = (groups = ['x-access']) => buildIdentity({ metadataAdmin: { groups } });
+  const aal1 = { authenticator_assurance_level: 'aal1' as const };
+  const aal2 = { authenticator_assurance_level: 'aal2' as const };
+  const cases: Array<[string, Identity | null, Parameters<typeof decideAccess>[1], Parameters<typeof decideAccess>[2], string]> = [
+    ['app: member at aal1', member(), { app: x }, aal1, 'allow'],
+    ['app: not in an access group', member([]), { app: x }, aal1, 'deny'],
+    ['app: inactive identity', { ...member(), state: 'inactive' }, { app: x }, aal1, 'deny'],
+    ['app: identity lookup failed', null, { app: x }, aal1, 'deny'],
+    ['app: no manifest', member(), { app: undefined }, aal1, 'deny'],
+    ['app: second factor at aal1', withTotp(member()), { app: x }, aal1, 'stepUp'],
+    ['app: second factor at aal2', withTotp(member()), { app: x }, aal2, 'allow'],
+    ['app: admin marker at aal1', asAdmin(member()), { app: x }, aal1, 'stepUp'],
+    ['app: elevated role at aal1', member(['x-access', 'x-admin']), { app: x }, aal1, 'stepUp'],
+    ['app: denial outranks step-up', withTotp(member([])), { app: x }, aal1, 'deny'],
+    ['group: member at aal1', member(), { group: 'x-access' }, aal1, 'allow'],
+    ['group: not a member', member(), { group: 'y-access' }, aal1, 'deny'],
+    ['group: non-canonical stored group', member(['x-access', 'Bad Name']), { group: 'x-access' }, aal1, 'deny'],
+    ['group: second factor at aal1', withTotp(member()), { group: 'x-access' }, aal1, 'stepUp'],
+    ['admin: marker, aal2, fresh', asAdmin(member()), 'admin', { ...aal2, fresh: true }, 'allow'],
+    ['admin: no marker', member(), 'admin', { ...aal2, fresh: true }, 'deny'],
+    ['admin: stale aal2', asAdmin(member()), 'admin', { ...aal2, fresh: false }, 'stepUp'],
+    ['admin: freshness unknown', asAdmin(member()), 'admin', aal2, 'stepUp'],
+    ['admin: aal1', asAdmin(member()), 'admin', { ...aal1, fresh: true }, 'stepUp'],
+    ['admin: session rules settle without an identity', null, 'admin', aal1, 'stepUp'],
+  ];
+
+  it.each(cases)('%s', (_name, i, target, session, expected) => {
+    expect(Object.keys(decideAccess(i, target, session, [x]))).toEqual([expected]);
   });
 });

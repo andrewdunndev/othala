@@ -9,7 +9,7 @@ alone and names the file that fails when it is violated, or says UNENFORCED.
 **Decided.** `session.whoami.required_aal` stays `aal1`. Step-up lives in the application instead:
 the admin UI guard, `required_aal: highest_available` on the settings flow, and app sign-in and
 forward-auth for accounts holding totp, webauthn, the admin marker or a role above an app's entry
-role (`portal/src/lib/step-up.ts`).
+role (`portal/src/lib/gate.ts`).
 Admins cannot sign in by emailed code, hold the marker without a second factor, or remove the last one.
 
 **Why.** Kratos enforces assurance level per flow, never per route, so step-up belongs in the
@@ -20,7 +20,7 @@ host-mounted, not baked into an image, so a stale setting's consumer may not be 
 repository.
 
 **Enforced by.** `portal/scripts/forward-auth.test.mjs` holds the coupling (a session with no identity
-id is 401). Step-up: `step-up.test.ts`, `oauth2-handlers.test.mjs`, `admin-port.test.mjs`,
+id is 401). Step-up: `gate.test.ts`, `oauth2-handlers.test.mjs`, `admin-port.test.mjs`,
 `admin-actions.test.ts`, `second-factor-gate.test.ts`, `e2e/playwright/tests/v-app-stepup.spec.ts`. The pinned value in
 `kratos/kratos.yml` is UNENFORCED.
 

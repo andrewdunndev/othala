@@ -1,12 +1,15 @@
-// Access gate, FAIL-CLOSED, applied on the login and consent challenges: (1) identity.state is exactly "active";
+// Access policy, FAIL-CLOSED. decideAccess decides app sign-in, forward-auth and the admin pages; the consent
+// challenge re-runs only the gate: (1) identity.state is exactly "active";
 // (2) the identity holds ANY group in manifest.accessGroups (OR), read from metadata_admin.groups; (3) every stored
 // group matches GROUP_RE (refuseNonCanonical). consent.skip_access_check bypasses only (2), never (1) or (3).
 // Pure functions over a fetched identity; a failed lookup passes null and is denied.
 
-import type { Identity } from './types';
+import type { Identity, Session } from './types';
 import type { ClientManifest } from './manifests';
 import { GROUP_RE } from './access-groups';
 import { parseIdentity } from './identity-facts';
+import { lookupRole } from './claims';
+import { servingManifests } from './manifest-store';
 
 const LEGACY_ADMIN_GROUP = 'admin';
 
@@ -104,6 +107,63 @@ export function enforceAccessGate(
     return { allowed: false, reason: `User is not in any of the access group(s): ${list}` };
   }
   return { allowed: true };
+}
+
+const rankOf = (m: ClientManifest, roleName: string) => m.roles.findIndex((r) => r.name === roleName);
+
+/** An app's entry role rank: the lowest role its access groups map to, else the last declared role (0 is highest). */
+function entryRank(m: ClientManifest): number {
+  const ranks = m.accessGroups.map((g) => rankOf(m, m.groupRoleMap[g] ?? '')).filter((r) => r >= 0);
+  return ranks.length > 0 ? Math.max(...ranks) : m.roles.length - 1;
+}
+
+/** True when the identity resolves, in any served manifest, to a role ranked above that app's entry role. */
+export function holdsElevatedRole(identity: Identity | null | undefined, manifests: ClientManifest[] = servingManifests()): boolean {
+  return manifests.some((m) => {
+    const role = lookupRole(m, identity?.metadata_admin);
+    return role !== null && rankOf(m, role.roleName) < entryRank(m);
+  });
+}
+
+/**
+ * Step-up below aal2 (a missing AAL counts as below): the identity holds a second factor, the admin marker, or a role
+ * above an app's entry role. The identity must come from the admin API (getIdentity).
+ */
+export function needsStepUp(
+  session: Pick<Session, 'authenticator_assurance_level'> | null | undefined,
+  identity: Identity | null | undefined,
+  manifests?: ClientManifest[],
+): boolean {
+  if (session?.authenticator_assurance_level === 'aal2') return false;
+  const facts = parseIdentity(identity);
+  return facts.isAdmin || facts.hasSecondFactor || holdsElevatedRole(identity, manifests);
+}
+
+/** What a session asks to reach: an OIDC app by its manifest, a forward-auth group, or the admin pages. */
+export type AccessTarget = { app: ClientManifest | undefined } | { group: string } | 'admin';
+export type AccessDecision = { allow: true } | { stepUp: true } | { deny: string };
+/** `fresh`: the session is within the admin freshness window; only the admin pages read it. */
+export type SessionFacts = Pick<Session, 'authenticator_assurance_level'> & { fresh?: boolean };
+
+/**
+ * The access policy for app sign-in, forward-auth and the admin pages. Apps and groups: the gate first (a denial
+ * outranks a step-up), then step-up. Admin pages: aal2 within the freshness window, then the admin marker; that
+ * session rule reads no identity, so the caller can settle it (identity null) before reading the admin API.
+ */
+export function decideAccess(
+  identity: Identity | null | undefined,
+  target: AccessTarget,
+  session: SessionFacts | null | undefined,
+  manifests?: ClientManifest[],
+): AccessDecision {
+  if (target === 'admin') {
+    if (session?.authenticator_assurance_level !== 'aal2' || session.fresh !== true) return { stepUp: true };
+    return parseIdentity(identity).isAdmin ? { allow: true } : { deny: 'not an admin' };
+  }
+  const gate =
+    'group' in target ? enforceGroupGate(identity, target.group) : enforceAccessGate(identity, target.app?.clientId ?? '', target.app);
+  if (!gate.allowed) return { deny: gate.reason ?? '' };
+  return needsStepUp(session, identity, manifests) ? { stepUp: true } : { allow: true };
 }
 
 /** What one save of the admin edit form is allowed to write. */
