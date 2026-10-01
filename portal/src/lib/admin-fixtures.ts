@@ -192,33 +192,19 @@ export function devAdmin(state: DevAdminState): DevAdmin {
  * What a person-page POST shows in `astro dev`: the success result of each action, so the banners and the setup-link
  * card can be seen. Nothing is written; the fixture household stays as it was.
  */
+const NOTHING_SAVED: ActionResult = { kind: 'error', message: 'Preview data: nothing was saved, so this page keeps showing the old state.' };
+
+/** Previews hand-over actions with a believable result; any action that would change what the page shows says nothing was saved. */
 export function devActionResult(action: string, fd: FormData, username: string): ActionResult {
+  void fd;
   switch (action) {
-    case 'remove-groups':
-      return { kind: 'updated', removed: fd.getAll('group').map(String) };
-    case 'mark-verified':
-      return { kind: 'email-verified' };
-    case 'set-prerequisites':
-      return { kind: 'prerequisites-saved' };
     case 'issue-recovery':
       return { kind: 'recovery', url: 'https://auth.example.test/self-service/recovery?flow=fixture&token=fixture', code: '123456', expiresAt: '' };
     case 'send-invite-email':
       return { kind: 'invite-email', email: `${username.replace('.', '')}@example.test` };
     case 'force-relogin':
       return { kind: 'revoked', result: {} as never };
-    case 'deactivate':
-      return { kind: 'deactivated', username };
-    case 'reactivate':
-      return { kind: 'reactivated', username };
-    case 'grant-admin':
-      return { kind: 'admin-granted', username };
-    case 'revoke-admin':
-      return { kind: 'admin-revoked', username };
-    case 'remove-credential':
-      return { kind: 'credential-removed', credType: String(fd.get('cred_type') ?? '') };
-    case 'delete':
-      return { kind: 'error', message: 'Fixture data: nothing was deleted.' };
     default:
-      return { kind: 'updated', removed: [] };
+      return NOTHING_SAVED;
   }
 }
