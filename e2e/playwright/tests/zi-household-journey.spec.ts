@@ -75,7 +75,7 @@ test('ZI1 — admin adds a person; they redeem, enrol a passkey and TOTP, and si
   await expect(registerBtn, 'ZI1: passkey register button').toBeVisible({ timeout: 10_000 });
   await page.waitForFunction(hasWindowFn, 'oryPasskeySettingsRegistration');
   await registerBtn.click();
-  await expect(page.getByRole('button', { name: /Remove passkey/ }), 'ZI1: the passkey is registered').toBeVisible({ timeout: 15_000 });
+  await expect(page.locator('[data-credential="passkey"]'), 'ZI1: the passkey is registered').toBeVisible({ timeout: 15_000 });
   // The save replaced the settings flow, so open a fresh one: its setup key is the one the form will verify.
   await page.goto(`${baseURL}/auth/settings`, { waitUntil: 'networkidle' });
 

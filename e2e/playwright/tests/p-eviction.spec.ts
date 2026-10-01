@@ -186,6 +186,8 @@ test.describe.serial('P — Passkey credential eviction (lost-device scenario)',
     const passkeyBCredentialId = String(removeNodes[removeNodes.length - 1].attributes.value);
     console.log('[P3] passkey B credential id (hex):', passkeyBCredentialId);
 
+    // The remove button sits behind the row's inline confirm.
+    await loginPageA.locator(`li[data-credential-id="${passkeyBCredentialId}"] label.lbl-remove`).click();
     const removeBtn = loginPageA.locator(`button[name="passkey_remove"][value="${passkeyBCredentialId}"]`);
     await expect(removeBtn, 'P3: passkey B remove button must be visible').toBeVisible({ timeout: 10_000 });
     await removeBtn.click();
