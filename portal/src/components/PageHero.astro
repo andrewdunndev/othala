@@ -41,4 +41,13 @@ const { title, lede, eyebrow } = Astro.props;
   .hero-content {
     width: 100%;
   }
+  /* Phones: a tighter banner so the first app sits in the first screen. */
+  @media (max-width: 640px) {
+    .hero-banner {
+      gap: var(--space-3);
+      padding-bottom: var(--space-4);
+      margin-bottom: var(--space-4);
+    }
+    .hero-content :global(.hero-title) { margin-bottom: var(--space-2); }
+  }
 </style>

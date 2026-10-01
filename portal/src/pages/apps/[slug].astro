@@ -12,6 +12,7 @@ import AppBadges from '../../components/AppBadges.astro';
 import PrereqCard from '../../components/PrereqCard.astro';
 import AppActions from '../../components/AppActions.astro';
 import GuideSections from '../../components/GuideSections.astro';
+import CopyChips from '../../components/CopyChips.astro';
 import {
   getTile,
   loadRequirements,
@@ -95,6 +96,7 @@ const guide = splitGuide(entry.educationHtml);
 
     <section class="app-body" aria-label={`Guide for ${entry.name}`}>
       <GuideSections guide={guide} />
+      <CopyChips />
     </section>
   </article>
 </Layout>

@@ -13,6 +13,7 @@ import AppBadges from '../components/AppBadges.astro';
 import PrereqCard from '../components/PrereqCard.astro';
 import AppActions from '../components/AppActions.astro';
 import GuideSections from '../components/GuideSections.astro';
+import CopyChips from '../components/CopyChips.astro';
 import {
   loadTiles,
   loadGroups,
@@ -238,7 +239,7 @@ const devLinks = [
               </div>
             )}
             {tileGroups.map(({ groupName, tiles, meta }) => (
-              <div class="tile-group">
+              <div class:list={['tile-group', tiles.length === 2 && 'tile-group-pair']}>
                 <div class="tile-group-header">
                   <p class="tile-group-title">{meta?.title ?? groupName}</p>
                   {(meta?.description) && (
@@ -303,12 +304,13 @@ const devLinks = [
               <h2 class="app-modal-title" id="app-modal-title"></h2>
               <p class="app-modal-desc"></p>
             </div>
-            <div class="app-modal-actions" data-slot-actions></div>
           </header>
           <div class="app-modal-prereq" data-slot-prereq></div>
           <div class="app-modal-body" data-slot-body tabindex="0" role="region" aria-label="Guide"></div>
+          <div class="app-modal-actions" data-slot-actions></div>
         </div>
       </dialog>
+      <CopyChips />
 
       {/* ── Request / contact form dialog ─────────────────────────────────
           FUNCTIONAL: the submit POSTs to /api/request, which validates,
@@ -649,24 +651,18 @@ const devLinks = [
   @media (min-width: 640px)  { .tile-grid { grid-template-columns: repeat(2, 1fr); } }
   @media (min-width: 900px)  { .tile-grid { grid-template-columns: repeat(3, 1fr); } }
 
-  /* Grouped tile sections: a bordered labeled section with heading and description above the grid. */
-  .tile-group {
-    margin-top: var(--space-6);
-    border: 1px solid var(--border);
-    border-radius: var(--radius);
-    background: transparent;
-    padding: var(--space-5);
-  }
-  .tile-group-header {
-    margin-bottom: var(--space-4);
-  }
+  /* Grouped tile sections: no frame, so the tiles sit on the same columns as the ungrouped grid. The title uses the
+     page's eyebrow type, with the group's description under it. A group of two puts its header in the empty third
+     cell on wide screens instead of leaving a hole. */
+  .tile-group { margin-top: var(--space-6); }
+  .tile-group-header { margin-bottom: var(--space-3); }
   .tile-group-title {
     font-family: var(--font-mono);
-    font-size: var(--text-lg);
-    font-weight: 600;
-    color: var(--text);
+    font-size: var(--text-xs);
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--text-muted);
     margin: 0 0 var(--space-1) 0;
-    line-height: var(--lh-tight);
   }
   .tile-group-desc {
     font-size: var(--text-sm);
@@ -674,6 +670,16 @@ const devLinks = [
     max-width: 60ch;
     margin: 0;
     line-height: 1.5;
+  }
+  @media (min-width: 900px) {
+    .tile-group-pair {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: var(--space-3);
+      align-items: stretch;
+    }
+    .tile-group-pair .tile-grid { display: contents; }
+    .tile-group-pair .tile-group-header { margin: 0; align-self: center; padding-right: var(--space-3); }
   }
 
   /* ── Dev preview ── */
@@ -851,23 +857,27 @@ const devLinks = [
   @keyframes app-modal-fade { from { opacity: 0; } to { opacity: 1; } }
   :global(body:has(.app-modal[open])) { overflow: hidden; }
 
+  /* Desktop: header and actions share the top row (Open sits at the right, under the close button); the strip and the
+     scrolling body follow. Phones reflow this into a title row, the scroll, and a pinned action bar. */
   .app-modal-inner {
     position: relative;
-    display: flex;
-    flex-direction: column;
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    grid-template-rows: auto auto minmax(0, 1fr);
+    grid-template-areas: "head actions" "prereq prereq" "body body";
     min-height: 0;
     flex: 1;
     overflow: hidden;
   }
   .app-modal-header {
+    grid-area: head;
     display: grid;
-    grid-template-columns: auto minmax(0, 1fr) auto;
+    grid-template-columns: auto minmax(0, 1fr);
     gap: var(--space-4);
     align-items: center;
-    padding: var(--space-4) calc(var(--space-4) + 44px + var(--space-2)) var(--space-4) var(--space-5);
+    padding: var(--space-4) var(--space-3) var(--space-4) var(--space-5);
     background: var(--surface);
     border-bottom: 1px solid var(--border);
-    flex-shrink: 0;
   }
   .app-modal :global(.app-modal-logo) {
     display: inline-flex;
@@ -932,8 +942,17 @@ const devLinks = [
 
   .app-modal-actions[hidden],
   .app-modal-prereq[hidden] { display: none; }
-  .app-modal-prereq { flex-shrink: 0; }
+  .app-modal-actions {
+    grid-area: actions;
+    display: flex;
+    align-items: center;
+    padding: var(--space-4) calc(var(--space-3) + 44px + var(--space-3)) var(--space-4) var(--space-3);
+    background: var(--surface);
+    border-bottom: 1px solid var(--border);
+  }
+  .app-modal-prereq { grid-area: prereq; }
   .app-modal-body {
+    grid-area: body;
     padding: var(--space-5) var(--space-5) var(--space-6);
     overflow-y: auto;
     overscroll-behavior: contain;
@@ -960,19 +979,42 @@ const devLinks = [
       border-radius: 0;
     }
     .app-modal[open] { animation-name: app-modal-sheet; }
-    /* One scroller: header, strip and guide all move together, so the chrome never eats the viewport. */
-    .app-modal-inner { overflow-y: auto; overscroll-behavior: contain; }
-    .app-modal-header {
-      grid-template-columns: auto minmax(0, 1fr);
-      gap: var(--space-3);
-      padding: var(--space-4) calc(var(--space-4) + 44px) var(--space-3) var(--space-4);
-      align-items: start;
+    /* One scroller. A single title row stays pinned on top, the strip and guide scroll beneath it, and the action
+       bar is pinned to the bottom edge where a thumb reaches it. */
+    .app-modal-inner {
+      display: flex;
+      flex-direction: column;
+      overflow-y: auto;
+      overscroll-behavior: contain;
     }
-    .app-modal-header :global(.app-actions-row) { grid-column: 1 / -1; }
-    .app-modal-actions { grid-column: 1 / -1; }
-    .app-modal-body { overflow: visible; flex: none; padding: var(--space-4) var(--space-4) var(--space-6); }
-    .app-modal-close { position: sticky; top: var(--space-2); right: auto; flex-shrink: 0; align-self: flex-end; margin: var(--space-2) var(--space-2) -52px 0; }
-    .app-modal :global(.app-modal-logo) { width: 3rem; height: 3rem; }
+    .app-modal-header {
+      position: sticky;
+      top: 0;
+      z-index: 2;
+      gap: var(--space-3);
+      padding: var(--space-2) calc(var(--space-3) + 44px + var(--space-2)) var(--space-2) var(--space-3);
+      min-height: 4rem;
+    }
+    .app-modal-desc {
+      display: -webkit-box;
+      -webkit-line-clamp: 1;
+      -webkit-box-orient: vertical;
+      overflow: hidden;
+    }
+    .app-modal-title { font-size: var(--text-lg); }
+    .app-modal-body { overflow: visible; flex: none; padding: var(--space-4) var(--space-4) var(--space-5); }
+    .app-modal-actions {
+      position: sticky;
+      bottom: 0;
+      z-index: 2;
+      margin-top: auto;
+      padding: var(--space-2) var(--space-3) calc(var(--space-2) + env(safe-area-inset-bottom, 0px));
+      border-bottom: 0;
+      border-top: 1px solid var(--border);
+    }
+    .app-modal-actions :global(.app-actions-row) { width: 100%; }
+    .app-modal-close { position: sticky; top: var(--space-2); right: auto; z-index: 3; flex-shrink: 0; align-self: flex-end; margin: var(--space-2) var(--space-2) -52px 0; }
+    .app-modal :global(.app-modal-logo) { width: 2.5rem; height: 2.5rem; padding: 0.4rem; }
   }
   @keyframes app-modal-sheet {
     from { transform: translateY(24px); opacity: 0; }
@@ -986,21 +1028,28 @@ const devLinks = [
   /* ── Mobile ── */
   @media (max-width: 640px) {
     .tile-grid { gap: var(--space-2); }
-    .tile-group { padding: var(--space-3); margin-top: var(--space-4); }
+    .tile-group { margin-top: var(--space-5); }
     /* Passkey nudge: stack the message above the close button instead of
      * squeezing both onto one row. */
     .passkey-nudge {
-      flex-direction: column;
-      align-items: flex-start;
       gap: var(--space-2);
+      padding: var(--space-2) var(--space-2) var(--space-2) var(--space-3);
+      margin-bottom: var(--space-4);
     }
-    .passkey-nudge-close { align-self: flex-end; }
+    .passkey-nudge-text { line-height: 1.4; }
+    .passkey-nudge-link { display: block; margin-left: 0; }
+    .passkey-nudge-close { min-width: 44px; min-height: 44px; display: flex; align-items: center; justify-content: center; }
 
     /* Stack post-auth CTA actions full-width with adequate tap height. */
     .cta-row {
-      flex-direction: column;
-      align-items: stretch;
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: var(--space-2);
+      margin-top: var(--space-4);
     }
+    .cta-row > :first-child, .cta-row .cta-note { grid-column: 1 / -1; }
+    .cta-row .cta-note { text-align: center; }
+    .section { margin-top: var(--space-5); }
     .cta-row .button,
     .cta-row .cta-link {
       text-align: center;

@@ -417,3 +417,18 @@ a.subtle:hover { color: var(--text); }
   font-size: var(--text-base);
   margin-bottom: var(--space-2);
 }
+
+/* App logos are drawn for light grounds (Keep and Prompt are black marks). In dark mode their plate stays the
+ * light palette white, so every logo reads the same in both themes. */
+:root[data-theme="dark"] .app-icon,
+:root[data-theme="dark"] .app-modal-logo:not(.app-modal-logo-mono) {
+  background: var(--dd-earth-50);
+  border-color: var(--dd-earth-50);
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) .app-icon,
+  :root:not([data-theme="light"]) .app-modal-logo:not(.app-modal-logo-mono) {
+    background: var(--dd-earth-50);
+    border-color: var(--dd-earth-50);
+  }
+}

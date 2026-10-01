@@ -7,6 +7,7 @@ export const prerender = false;
 
 import Layout from '../../layouts/Layout.astro';
 import GuideSections from '../../components/GuideSections.astro';
+import CopyChips from '../../components/CopyChips.astro';
 import { loadRequirements, splitGuide, REQUIREMENT_NAME_RE } from '../../lib/tiles';
 import { getSession } from '../../lib/kratos';
 import { getIdentity } from '../../lib/admin-api';
@@ -56,6 +57,7 @@ const guide = splitGuide(requirement.html);
     </header>
     <section class="req-body" aria-label={`${requirement.title} setup guide`}>
       <GuideSections guide={guide} emptyNote="No setup steps have been written yet. Ask the household admin." />
+      <CopyChips />
     </section>
   </article>
 </Layout>

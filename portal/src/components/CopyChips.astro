@@ -1,0 +1,36 @@
+---
+// Adds a Copy button to every inline code chip inside a guide (a server address in a step, say). One copy of this script
+// per page: guides in the dashboard dialog arrive after load, so a MutationObserver decorates them as they are filled.
+---
+
+<script is:inline>
+  (function () {
+    function decorate(root) {
+      root.querySelectorAll('.guide code').forEach(function (code) {
+        if (code.closest('pre') || code.parentElement.classList.contains('code-chip')) return;
+        var wrap = document.createElement('span');
+        wrap.className = 'code-chip';
+        code.replaceWith(wrap);
+        wrap.appendChild(code);
+        var btn = document.createElement('button');
+        btn.type = 'button';
+        btn.className = 'code-copy';
+        btn.textContent = 'Copy';
+        btn.setAttribute('aria-label', 'Copy ' + code.textContent);
+        btn.addEventListener('click', function () {
+          var done = function (ok) {
+            btn.textContent = ok ? 'Copied' : 'Press Ctrl+C';
+            setTimeout(function () { btn.textContent = 'Copy'; }, 1600);
+          };
+          try {
+            navigator.clipboard.writeText(code.textContent).then(function () { done(true); }, function () { done(false); });
+          } catch (e) { done(false); }
+        });
+        wrap.appendChild(btn);
+      });
+    }
+    decorate(document);
+    var dialog = document.getElementById('app-modal');
+    if (dialog) new MutationObserver(function () { decorate(dialog); }).observe(dialog, { childList: true, subtree: true });
+  })();
+</script>

@@ -142,7 +142,7 @@ const { tile, readiness, requirementTitles } = Astro.props;
     outline: 2px solid var(--input-focus, var(--accent));
     outline-offset: 1px;
   }
-  /* Phone: a compact row. Logo left, name + status + description beside it, a round icon-only Guide button pinned right.
+  /* Phone: a compact row. Logo left, name + status + description beside it, a labelled Guide pill pinned right.
      The row is still one launch link; the button is its sibling, so nothing nests. */
   @media (max-width: 640px) {
     .tile { height: auto; min-height: 5.5rem; }
@@ -151,7 +151,7 @@ const { tile, readiness, requirementTitles } = Astro.props;
       grid-template-columns: auto 1fr;
       column-gap: var(--space-3);
       align-items: center;
-      padding: var(--space-3) calc(var(--space-3) + 44px + var(--space-1)) var(--space-3) var(--space-3);
+      padding: var(--space-3) calc(var(--space-3) + 5.25rem) var(--space-3) var(--space-3);
       min-height: 5.5rem;
     }
     .tile-launch :global(.app-icon) { grid-row: 1 / span 2; }
@@ -166,14 +166,13 @@ const { tile, readiness, requirementTitles } = Astro.props;
       padding: 0;
       min-height: 0;
     }
-    .tile-host, .tile-guide-label { display: none; }
+    .tile-host { display: none; }
     .tile-guide {
-      width: 44px;
       min-height: 44px;
-      padding: 0;
+      padding: 0 var(--space-3);
       justify-content: center;
       border-color: var(--border);
-      border-radius: 50%;
+      border-radius: 22px;
       background: var(--bg);
     }
   }

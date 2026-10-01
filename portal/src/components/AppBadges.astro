@@ -1,6 +1,6 @@
 ---
-// Status badge for a tile or a guide header: this person's prerequisite state.
-// `needs` names the requirement titles the person has not been marked ready for; `ready` means every requirement is set up.
+// Status badge for a tile or a guide header. Only an unmet prerequisite is flagged; a met one shows nothing, so plain
+// apps and ready apps look alike and only what needs action speaks.
 
 import type { TileReadiness } from '../lib/tiles';
 
@@ -15,20 +15,12 @@ const needsLabel = titles.length > 1 ? `Needs ${titles[0]} +${titles.length - 1}
 ---
 
 {
-  readiness !== 'none' && (
+  readiness === 'needs' && (
     <span class="app-badges">
-      {readiness === 'needs' && (
-        <span class="app-badge app-badge-needs">
-          <span class="app-badge-dot" aria-hidden="true" />
-          {needsLabel}
-        </span>
-      )}
-      {readiness === 'ready' && (
-        <span class="app-badge app-badge-ready">
-          <span class="app-badge-dot" aria-hidden="true" />
-          Ready for you
-        </span>
-      )}
+      <span class="app-badge app-badge-needs">
+        <span class="app-badge-dot" aria-hidden="true" />
+        {needsLabel}
+      </span>
     </span>
   )
 }
@@ -64,9 +56,4 @@ const needsLabel = titles.length > 1 ? `Needs ${titles[0]} +${titles.length - 1}
     border-color: var(--warning);
   }
   .app-badge-needs .app-badge-dot { background: var(--warning); }
-  .app-badge-ready {
-    background: var(--success-subtle);
-    border-color: var(--success);
-  }
-  .app-badge-ready .app-badge-dot { background: var(--success); }
 </style>
