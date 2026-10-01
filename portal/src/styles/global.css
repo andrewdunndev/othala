@@ -431,9 +431,9 @@ a.subtle:hover { color: var(--text); }
   }
 }
 
-/* Marks that ship their own filled square (ClickHouse, Open WebUI, LiteLLM) fill the plate edge to edge, so no square
+/* Marks that ship their own filled square (data-bleed, set from the logo file) fill the plate edge to edge, so no square
  * sits inside a plate. */
-:root :is(.app-icon, .app-modal-logo):is([data-icon="clickhouse"], [data-icon="openwebui"], [data-icon="litellm"]) {
+:root :is(.app-icon, .app-modal-logo)[data-bleed] {
   padding: 0;
   overflow: hidden;
   border-color: transparent;

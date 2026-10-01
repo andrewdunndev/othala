@@ -253,6 +253,7 @@ const devLinks = [
             data-app-name={t.name}
             data-app-desc={t.description}
             data-app-icon={t.iconHref ?? ''}
+            data-app-bleed={t.iconBleed ? '' : undefined}
             data-app-mono={t.icon}
           >
             <div data-slot="actions">
@@ -475,6 +476,7 @@ const devLinks = [
         img.alt = '';
         span.appendChild(img);
         span.dataset.icon = href.split('/').pop().replace(/\.svg$/, '');
+        if (tpl.hasAttribute('data-app-bleed')) span.dataset.bleed = '';
       } else {
         span.textContent = tpl.dataset.appMono || '';
         span.classList.add('app-modal-logo-mono');

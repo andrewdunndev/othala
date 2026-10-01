@@ -32,6 +32,18 @@ function resolveIconHref(iconSlug: string | undefined): string | undefined {
   return existsSync(candidate) ? `/icons/${iconSlug}.svg` : undefined;
 }
 
+/** True when the logo file opens with its own filled square (a rect at the origin, width equal to height). Such
+ *  marks fill the whole plate instead of sitting inside it. */
+function iconIsBleed(iconSlug: string | undefined): boolean {
+  if (!iconSlug) return false;
+  try {
+    const head = readFileSync(join(_iconsDir, `${iconSlug}.svg`), 'utf8').slice(0, 600);
+    return /<rect(?![^>]*\s[xy]=)[^>]*\swidth="(\d+(?:\.\d+)?)"[^>]*\sheight="\1"[^>]*\sfill="#/i.test(head);
+  } catch {
+    return false;
+  }
+}
+
 export type AuthKind = 'oidc' | 'forward_auth' | 'external';
 
 /** Metadata for a named tile group, sourced from groups.yaml. */
@@ -79,6 +91,8 @@ export interface AppTile {
   iconFallback?: string;
   /** Web path to the vendored SVG glyph (e.g. `/icons/grafana.svg`), set only when the file exists; absent = monogram. */
   iconHref?: string;
+  /** The logo ships its own filled square, so the plate drops its padding and border. */
+  iconBleed?: boolean;
   authKind: AuthKind;
   /** Fallback group, used only when `accessGroups` is empty (see tileAccessGroups): `presentation.access_group`, else the default group. */
   accessGroup: string;
@@ -349,6 +363,7 @@ function parseTile(slug: string, doc: Record<string, unknown>, dir: string): App
 
   // Resolve the icon href at load time so render never 404s.
   tile.iconHref = resolveIconHref(tile.iconSlug) ?? resolveIconHref(tile.iconFallback);
+  tile.iconBleed = iconIsBleed(tile.iconHref?.split('/').pop()?.replace(/\.svg$/, ''));
 
   return tile;
 }
