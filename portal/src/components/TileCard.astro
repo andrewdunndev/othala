@@ -166,7 +166,7 @@ const { tile, readiness, requirementTitles } = Astro.props;
       grid-template-columns: auto 1fr;
       column-gap: var(--space-3);
       align-items: center;
-      padding: var(--space-3) calc(var(--space-3) + 5.25rem) var(--space-3) var(--space-3);
+      padding: var(--space-3) calc(var(--space-3) * 2 + 5.25rem) var(--space-3) var(--space-3);
       min-height: 5.5rem;
     }
     .tile-launch :global(.app-icon) { grid-row: 1 / span 2; }
@@ -175,7 +175,7 @@ const { tile, readiness, requirementTitles } = Astro.props;
     .tile-foot {
       position: absolute;
       top: 0;
-      right: var(--space-1);
+      right: var(--space-3);
       bottom: 0;
       border: 0;
       padding: 0;

@@ -70,7 +70,7 @@ const empty = !guide.lead && guide.sections.length === 0;
   }
 
   /* Prose inside any section */
-  .guide-prose > :global(:is(p, ul, ol, blockquote)), .guide-lead { max-width: 70ch; }
+  .guide-prose > :global(:is(p, ul, ol, blockquote)), .guide-lead { max-width: 56ch; }
   .guide-prose > :global(:first-child) { margin-top: 0; }
   .guide-prose > :global(:last-child) { margin-bottom: 0; }
   .guide-prose :global(h3),
@@ -89,8 +89,9 @@ const empty = !guide.lead && guide.sections.length === 0;
     font-family: var(--font-mono);
     font-size: var(--text-sm);
     background: var(--surface);
-    padding: 0.1em 0.4em;
+    padding: 0.05em 0.3em;
     border-radius: var(--radius-sm);
+    white-space: nowrap;
   }
   /* A copyable chip (see CopyChips): the code sits on the page ground with its own hairline, so it reads apart from
      the step card behind it. */
@@ -107,6 +108,7 @@ const empty = !guide.lead && guide.sections.length === 0;
   .guide :global(.code-chip code) {
     background: transparent;
     padding: var(--space-1) var(--space-2);
+    white-space: normal;
     overflow-wrap: anywhere;
   }
   .guide :global(.code-copy) {
@@ -133,7 +135,7 @@ const empty = !guide.lead && guide.sections.length === 0;
     border-radius: var(--radius);
     overflow-x: auto;
   }
-  .guide-prose :global(pre code) { background: transparent; padding: 0; }
+  .guide-prose :global(pre code) { background: transparent; padding: 0; white-space: pre; }
   .guide-prose :global(img) { max-width: 100%; height: auto; }
 
   /* First time: numbered step cards */
@@ -150,8 +152,9 @@ const empty = !guide.lead && guide.sections.length === 0;
     position: relative;
     margin: 0;
     padding: var(--space-3) var(--space-4) var(--space-3) calc(var(--space-4) + 2rem);
-    background: var(--surface);
-    border: 1px solid var(--border);
+    background: var(--tile-bg, var(--bg));
+    border: 1px solid var(--border-strong);
+    box-shadow: var(--tile-shadow, none);
     border-radius: var(--radius);
   }
   .guide-sec-first-time .guide-prose :global(ol > li::before) {
@@ -200,10 +203,11 @@ const empty = !guide.lead && guide.sections.length === 0;
   .guide-prose :global(blockquote) {
     margin: var(--space-4) 0;
     padding: var(--space-3) var(--space-4);
-    border: 1px solid var(--border);
+    border: 1px solid var(--border-strong);
     border-left: 4px solid var(--accent);
     border-radius: var(--radius);
-    background: var(--accent-subtle);
+    background: var(--tile-bg, var(--bg));
+    box-shadow: var(--tile-shadow, none);
   }
   .guide-prose :global(blockquote > :first-child) { margin-top: 0; }
   .guide-prose :global(blockquote > :last-child) { margin-bottom: 0; }
@@ -211,20 +215,23 @@ const empty = !guide.lead && guide.sections.length === 0;
   /* Explainer figures (inline SVG in a guide) */
   .guide :global(.cat-explainer) {
     width: 100%;
+    max-width: 100%;
     box-sizing: border-box;
-    background: var(--surface);
-    border: 1px solid var(--border);
-    border-radius: var(--radius);
-    padding: var(--space-2);
     margin: var(--space-4) 0;
     clear: both;
   }
-  .guide :global(.cat-explainer svg) { display: block; width: 100%; height: auto; margin: 0; }
+  .guide :global(.cat-explainer svg) { display: block; width: 100%; max-width: 41.25rem; height: auto; margin: 0; }
+  /* A figure may ship a wide drawing and a stacked one; phones get the stacked drawing so labels stay readable. */
+  .guide :global(.cat-explainer .fig-stack) { display: none; max-width: 20rem; }
+  @media (max-width: 640px) {
+    .guide :global(.cat-explainer .fig-wide) { display: none; }
+    .guide :global(.cat-explainer .fig-stack) { display: block; }
+  }
   .guide :global(.cat-explainer p) {
     margin: var(--space-3) 0 0;
-    padding: 0 var(--space-2) var(--space-1);
+    padding: 0;
     font-size: var(--text-sm);
     color: var(--text-2);
-    max-width: 70ch;
+    max-width: 56ch;
   }
 </style>

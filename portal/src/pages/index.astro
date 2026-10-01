@@ -30,7 +30,7 @@ import { getSession, isReachable } from '../lib/kratos';
 import { getIdentity } from '../lib/admin-api';
 import { identityGroups } from '../lib/gate';
 import { isAdminMarker } from '../lib/admin-auth';
-import { signLogoutToken } from '../lib/logout';
+import HeaderActions from '../components/HeaderActions.astro';
 import type { Identity } from '../lib/types';
 import { siteName, adminContact } from '../lib/config';
 
@@ -129,16 +129,6 @@ const tileGroups = Array.from(groupedTilesMap.entries())
 // requireAdminSession. isAdminMarker is false on any error or missing marker, which is fine for cosmetic chrome.
 const isAdmin = state === 'post-auth' && isAdminMarker(identity);
 
-// Sign-out is a POST carrying a token for this identity (lib/logout.ts); if minting fails the button still posts
-// and /auth/logout shows its confirm form.
-let logoutToken = '';
-if (state === 'post-auth' && identity?.id) {
-  try {
-    logoutToken = signLogoutToken(identity.id);
-  } catch {
-    logoutToken = '';
-  }
-}
 const displayName = identity?.traits.displayName || identity?.traits.username || '';
 const firstName = displayName.split(' ')[0] || displayName;
 
@@ -159,12 +149,7 @@ const devLinks = [
 
   {state === 'post-auth' && (
     <Fragment slot="header-actions">
-      {isAdmin && <a href="/admin" class="header-link">Admin</a>}
-      <a href="/auth/settings" class="header-link">Account</a>
-      <form method="POST" action="/auth/logout">
-        <input type="hidden" name="csrf_token" value={logoutToken} />
-        <button type="submit" class="header-link">Sign out</button>
-      </form>
+      <HeaderActions identityId={identity?.id} isAdmin={isAdmin} />
     </Fragment>
   )}
 
@@ -240,7 +225,7 @@ const devLinks = [
                     <p class="tile-group-desc">{meta.description}</p>
                   )}
                 </div>
-                <div class="tile-grid" style={`--cols:${Math.min(tiles.length, 3)}`}>
+                <div class="tile-grid" data-count={tiles.length}>
                   {tiles.map((t: AppTile) => {
                     const v = views.get(t.slug)!;
                     return <TileCard tile={t} readiness={v.readiness} requirementTitles={v.titles} />;
@@ -301,8 +286,8 @@ const devLinks = [
             </div>
           </header>
           <div class="app-modal-prereq" data-slot-prereq></div>
-          <div class="app-modal-body" data-slot-body tabindex="0" role="region" aria-label="Guide"></div>
           <div class="app-modal-actions" data-slot-actions></div>
+          <div class="app-modal-body" data-slot-body tabindex="0" role="region" aria-label="Guide"></div>
         </div>
       </dialog>
       <CopyChips />
@@ -666,19 +651,20 @@ const devLinks = [
     gap: var(--space-3);
     align-items: stretch;
   }
-  /* --cols is the group's tile count capped at 3, so a short group stays a row of full-width-looking tiles that is
-     content-sized (22rem a tile) rather than three columns with a hole in them. */
+  /* Every grid shares the same tracks (3 from 900px, 2 from 640px, same width cap), so tile edges line up across
+     groups whatever the tile count. A group of four lays out as two full rows of two. */
   @media (min-width: 640px) {
     .tile-grid {
-      grid-template-columns: repeat(min(var(--cols, 3), 2), minmax(0, 1fr));
-      max-width: calc(min(var(--cols, 3), 2) * 22rem + (min(var(--cols, 3), 2) - 1) * var(--space-3));
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      max-width: calc(2 * 22rem + var(--space-3));
     }
   }
   @media (min-width: 900px) {
     .tile-grid {
-      grid-template-columns: repeat(var(--cols, 3), minmax(0, 1fr));
-      max-width: calc(var(--cols, 3) * 22rem + (var(--cols, 3) - 1) * var(--space-3));
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      max-width: calc(3 * 22rem + 2 * var(--space-3));
     }
+    .tile-grid[data-count="4"] > :global(:nth-child(3)) { grid-column: 1; }
   }
 
   /* Grouped tile sections: no frame, so the tiles sit on the same columns as the ungrouped grid. The title uses the
@@ -896,7 +882,7 @@ const devLinks = [
     gap: var(--space-4);
     align-items: center;
     padding: var(--space-4) calc(var(--space-5) + 44px + var(--space-2)) var(--space-4) var(--space-5);
-    background: var(--surface);
+    background: var(--tile-bg, var(--bg));
     border-bottom: 1px solid var(--border);
   }
   .app-modal :global(.app-modal-logo) {
@@ -945,7 +931,7 @@ const devLinks = [
     justify-content: center;
     width: 44px;
     height: 44px;
-    background: var(--surface);
+    background: var(--tile-bg, var(--bg));
     border: 1px solid var(--border);
     border-radius: 50%;
     color: var(--text-2);
@@ -967,7 +953,7 @@ const devLinks = [
     display: flex;
     align-items: center;
     padding: var(--space-3) var(--space-5);
-    background: var(--surface);
+    background: var(--tile-bg, var(--bg));
     border-bottom: 1px solid var(--border);
   }
   .app-modal-prereq { grid-area: prereq; }
@@ -1031,6 +1017,7 @@ const devLinks = [
       bottom: 0;
       z-index: 2;
       margin-top: auto;
+      order: 2;
       padding: var(--space-2) var(--space-3) calc(var(--space-2) + env(safe-area-inset-bottom, 0px));
       border-bottom: 0;
       border-top: 1px solid var(--border);
@@ -1067,12 +1054,11 @@ const devLinks = [
     /* Stack post-auth CTA actions full-width with adequate tap height. */
     .cta-row {
       display: grid;
-      grid-template-columns: 1fr 1fr;
+      grid-template-columns: 1fr;
       gap: var(--space-2);
       margin-top: var(--space-4);
     }
-    .cta-row > :first-child, .cta-row .cta-note { grid-column: 1 / -1; }
-    .cta-row .cta-note { text-align: center; }
+    .cta-row .cta-note { text-align: left; }
     .section { margin-top: var(--space-5); }
     .cta-row .button,
     .cta-row .cta-link {

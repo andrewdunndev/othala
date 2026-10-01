@@ -431,12 +431,25 @@ a.subtle:hover { color: var(--text); }
   }
 }
 
+/* Marks that ship their own filled square (ClickHouse, Open WebUI, LiteLLM) fill the plate edge to edge, so no square
+ * sits inside a plate. */
+:root :is(.app-icon, .app-modal-logo):is([data-icon="clickhouse"], [data-icon="openwebui"], [data-icon="litellm"]) {
+  padding: 0;
+  overflow: hidden;
+  border-color: transparent;
+  background: transparent;
+  border-radius: 18%;
+}
+
 /* Tiles: white and lifted in the light theme (border plus a faint shadow), the raised surface in dark. */
 :root { --tile-bg: var(--bg); --tile-shadow: 0 1px 2px rgba(20, 20, 20, 0.06); }
 :root[data-theme="dark"] { --tile-bg: var(--surface); --tile-shadow: none; }
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme="light"]) { --tile-bg: var(--surface); --tile-shadow: none; }
 }
+
+/* One top bar height on every page, signed in or not (the Account and Sign out targets are 40px tall). */
+.header-inner { min-height: 4rem; box-sizing: border-box; }
 
 /* Top bar actions (signed-in pages): Account and Sign out on the right, in the same small mono type as the brand. */
 .header-actions { margin-left: auto; display: flex; align-items: center; gap: var(--space-1); }

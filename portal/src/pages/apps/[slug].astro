@@ -12,6 +12,7 @@ import PrereqCard from '../../components/PrereqCard.astro';
 import AppActions from '../../components/AppActions.astro';
 import GuideSections from '../../components/GuideSections.astro';
 import CopyChips from '../../components/CopyChips.astro';
+import HeaderActions from '../../components/HeaderActions.astro';
 import {
   getTile,
   loadRequirements,
@@ -73,6 +74,9 @@ const readiness = tileReadiness(entry, meta?.prerequisites ?? []);
 const guide = splitGuide(entry.educationHtml);
 ---
 <Layout title={entry.name} description={entry.description}>
+  <Fragment slot="header-actions">
+    <HeaderActions identityId={identity?.id} isAdmin={isAdmin} />
+  </Fragment>
   <article class="app-detail">
     <p class="app-back mono"><a href="/">← All apps</a></p>
     <header class="app-header">

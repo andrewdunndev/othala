@@ -1,0 +1,29 @@
+---
+// Signed-in top bar actions: Admin (admins only), Account, and Sign out. Used by every signed-in page so the bar is
+// the same everywhere. Sign-out is a POST carrying a token for this identity (lib/logout.ts); if minting fails the
+// button still posts and /auth/logout shows its confirm form.
+
+import { signLogoutToken } from '../lib/logout';
+
+interface Props {
+  identityId?: string;
+  isAdmin?: boolean;
+}
+
+const { identityId, isAdmin = false } = Astro.props;
+let logoutToken = '';
+if (identityId) {
+  try {
+    logoutToken = signLogoutToken(identityId);
+  } catch {
+    logoutToken = '';
+  }
+}
+---
+
+{isAdmin && <a href="/admin" class="header-link">Admin</a>}
+<a href="/auth/settings" class="header-link">Account</a>
+<form method="POST" action="/auth/logout">
+  <input type="hidden" name="csrf_token" value={logoutToken} />
+  <button type="submit" class="header-link">Sign out</button>
+</form>
