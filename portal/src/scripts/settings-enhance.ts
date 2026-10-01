@@ -11,7 +11,8 @@ import { FLASH, LOST_KEYS, flashKey } from '../lib/settings-flash';
 const KEY = 'othala:settings-edit';
 const cardOf = (el: EventTarget | null) => (el instanceof Element ? el.closest<HTMLElement>('[data-card]') : null);
 const remember = (el: EventTarget | null, action: string) => {
-  const card = cardOf(el)?.id;
+  // Backup-code results belong to Recovery, wherever the button that asked for them sits.
+  const card = action.startsWith('lookup_secret') ? 'recovery' : cardOf(el)?.id;
   if (!card) return;
   try { sessionStorage.setItem(KEY, JSON.stringify({ card, action })); } catch { /* storage unavailable */ }
 };
@@ -31,12 +32,49 @@ const lostLink = () => {
   return a;
 };
 
+// An opened authenticator setup keeps its card and puts the person at step 1.
+const focusStep = () => {
+  const h = document.querySelector<HTMLElement>('#two-step .panel-setup h4');
+  if (!h) return;
+  h.focus({ preventScroll: true });
+  h.scrollIntoView({ block: 'start', behavior: matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth' });
+};
+
+// Disclosures are checkbox-and-label so they work without script. With script each label becomes a real button
+// (Enter and Space toggle it, assistive tech hears expanded or collapsed) and the checkbox leaves the tab order.
+const syncExpanded = () => {
+  document.querySelectorAll<HTMLButtonElement>('button[data-disclose]').forEach((b) => {
+    const box = document.getElementById(b.dataset.disclose ?? '');
+    if (box instanceof HTMLInputElement) b.setAttribute('aria-expanded', String(box.checked));
+  });
+};
+const enhanceDisclosures = () => {
+  document.querySelectorAll<HTMLLabelElement>('label.toggle-label[for]').forEach((label) => {
+    const box = document.getElementById(label.htmlFor);
+    if (!(box instanceof HTMLInputElement)) return;
+    const b = document.createElement('button');
+    b.type = 'button';
+    b.className = label.className;
+    b.dataset.disclose = box.id;
+    b.append(...label.childNodes);
+    label.replaceWith(b);
+    box.tabIndex = -1;
+    box.setAttribute('aria-hidden', 'true');
+  });
+  syncExpanded();
+};
+
 const settle = () => {
+  enhanceDisclosures();
   const edit = take();
   // A replaced app leaves the setup steps for the new one; open them where the person is looking.
   if (edit?.action === 'totp_replace') {
     const open = document.getElementById('totp-setup');
-    if (open instanceof HTMLInputElement) open.checked = true;
+    if (open instanceof HTMLInputElement) {
+      open.checked = true;
+      syncExpanded();
+      queueMicrotask(focusStep);
+    }
   }
   // Copy and print need script; they stay hidden without it.
   document.querySelectorAll<HTMLElement>('[data-copy], [data-codes-tools]').forEach((el) => { el.hidden = false; });
@@ -59,7 +97,8 @@ const settle = () => {
         saved?.remove();
       }
       slot.focus({ preventScroll: true });
-      slot.scrollIntoView({ block: 'center' });
+      const codes = edit.action.startsWith('lookup_secret') ? document.getElementById('lookup-codes') : null;
+      (codes ?? slot).scrollIntoView({ block: 'center' });
     }
   } else if (edit) {
     document.getElementById(edit.card)?.scrollIntoView({ block: 'start' });
@@ -89,12 +128,33 @@ const write = async (text: string, btn: HTMLElement) => {
 
 document.addEventListener('click', (e) => {
   const el = e.target instanceof Element ? e.target : null;
+  const toggle = el?.closest<HTMLButtonElement>('button[data-disclose]');
+  if (toggle) {
+    const box = document.getElementById(toggle.dataset.disclose ?? '');
+    if (box instanceof HTMLInputElement) {
+      box.checked = !box.checked;
+      box.dispatchEvent(new Event('change', { bubbles: true }));
+      syncExpanded();
+    }
+    return;
+  }
+  const hide = el?.closest<HTMLButtonElement>('button[data-hide-codes]');
+  if (hide) {
+    const grid = document.querySelector<HTMLElement>('#lookup-codes .lookup-grid');
+    if (grid) {
+      grid.hidden = !grid.hidden;
+      hide.textContent = grid.hidden ? 'Show codes' : 'Hide codes';
+      hide.setAttribute('aria-expanded', String(!grid.hidden));
+    }
+    return;
+  }
   const open = el?.closest<HTMLAnchorElement>('a[data-open]');
   if (open) {
     const box = document.getElementById(open.dataset.open ?? '');
     if (box instanceof HTMLInputElement) {
       e.preventDefault();
       box.checked = true;
+      syncExpanded();
       box.closest('[data-card]')?.scrollIntoView({ block: 'center' });
       box.closest('form')?.querySelector<HTMLElement>('.panel-remove button')?.focus({ preventScroll: true });
     }
@@ -130,6 +190,7 @@ document.addEventListener('change', (e) => {
   if (t instanceof HTMLInputElement && t.classList.contains('cb-rename') && t.checked) {
     t.closest('li')?.querySelector<HTMLInputElement>('.panel-rename input[type="text"]')?.focus();
   }
+  if (t instanceof HTMLInputElement && t.id === 'totp-setup' && t.checked) focusStep();
 });
 // Enter in the new key's name starts adding that key: the add button is a script trigger, so without this the browser
 // would submit the bare form.

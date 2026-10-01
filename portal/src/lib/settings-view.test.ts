@@ -30,15 +30,15 @@ describe('settings view over the fixtures', () => {
     expect(keys).toHaveLength(1);
     expect(keys[0].name).toBe('Keyring key');
     const plain = credentialItems(n, 'passkey_remove');
-    expect(plain.map((p) => p.name)).toEqual([null, null]);
+    expect(plain.map((p) => p.name)).toEqual([null, null, 'iCloud Keychain']);
     expect(formatAdded(plain[0].addedAt)).toBe('12 Jun 2026');
     const named = credentialItems(n, 'passkey_remove', { [plain[1].id]: 'Pixel phone' });
-    expect(named.map((p) => p.name)).toEqual([null, 'Pixel phone']);
+    expect(named.map((p) => p.name)).toEqual([null, 'Pixel phone', 'iCloud Keychain']);
   });
 
   it('the enrolled account reads two-step on with backup codes saved', () => {
     const n = nodesOf('enrolled');
-    expect(securityStatus(n, { emailVerified: true })).toMatchObject({ passkeys: 2, securityKeys: 1, twoStep: true, backupCodes: true, emailUnverified: false });
+    expect(securityStatus(n, { emailVerified: true })).toMatchObject({ passkeys: 3, securityKeys: 1, twoStep: true, backupCodes: true, emailUnverified: false });
     expect(totpView(n).enrolled).toBe(true);
     expect(lookupView(n).enrolled).toBe(true);
   });

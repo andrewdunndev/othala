@@ -226,8 +226,13 @@ const lookupLabel: Record<string, string> = {
     <div class="settings-status" role="status" aria-label="Account security summary">
       <span class={`badge ${status.twoStep ? '' : 'badge-warning'}`}>Two-step: {status.twoStep ? 'on' : 'off'}</span>
       <span class={`badge ${status.passkeys > 0 ? '' : 'badge-warning'}`}>Passkeys: {status.passkeys}</span>
-      <span class={`badge ${status.backupCodes ? '' : 'badge-warning'}`}>Backup codes: {status.backupCodes ? 'saved' : 'not saved'}</span>
+      <span class={`badge ${status.backupCodes || !status.twoStep ? '' : 'badge-warning'}`}>Backup codes: {status.backupCodes ? 'saved' : 'not saved'}</span>
       {status.emailUnverified && <span class="badge badge-warning">Email: unverified</span>}
+      {reauth && (
+        <span class="status-note" data-testid="reauth-notice">
+          It has been a while, so changes ask you to confirm it's you first. <a href={reauthHref} data-astro-reload>Confirm it's you</a>
+        </span>
+      )}
     </div>
 
     <div class="settings-notices" role="status">
@@ -235,12 +240,6 @@ const lookupLabel: Record<string, string> = {
         <div class={`notice notice-${kind(m.type)}`} data-flow-success={m.type === 'success' ? '' : undefined}>{messageText(m)}</div>
       ))}
       {signOutError && <div class="notice notice-danger">{signOutError}</div>}
-      {reauth && (
-        <div class="notice notice-warning" data-testid="reauth-notice">
-          Changing how you sign in asks you to confirm it's you first, and it has been a while.
-          <div class="actions"><a class="button button-primary button-sm" href={reauthHref} data-astro-reload>Confirm it's you</a></div>
-        </div>
-      )}
       {status.passkeys === 1 && (
         <div class="notice notice-warning">You have one passkey. Add one on your other devices too, so losing this one doesn't lock you out.</div>
       )}
@@ -405,7 +404,7 @@ const lookupLabel: Record<string, string> = {
                   <ol class="steps panel-block panel-setup">
                     {totp.qr && (
                       <li>
-                        <h4>Scan the code</h4>
+                        <h4 tabindex="-1">Scan the code</h4>
                         <p>Scan this into your authenticator app. Scan it into every app you want to use now; each shows the same codes.</p>
                         <p class="field-hint narrow-only">On this phone? Copy the setup key below into your app.</p>
                         <div class="totp-qr">
@@ -425,7 +424,7 @@ const lookupLabel: Record<string, string> = {
                     )}
                     {totp.codeInput && (
                       <li>
-                        <h4>Enter the 6-digit code</h4>
+                        <h4 tabindex="-1">Enter the 6-digit code</h4>
                         <p>Type the code your app shows now to finish.</p>
                         <div class={`field ${totp.codeMessages.length ? 'bad' : ''}`}>
                           <label for="totp-code">6-digit code</label>
@@ -443,7 +442,7 @@ const lookupLabel: Record<string, string> = {
                             aria-describedby={totp.codeMessages.length ? 'totp-code-error' : undefined}
                           />
                           {totp.codeMessages.map((m) => (
-                            <p id="totp-code-error" class="field-error" role="alert">{messageText(m)} The scan code above is still good.</p>
+                            <p id="totp-code-error" class="field-error" role="alert">{messageText(m)} The QR code is still good.</p>
                           ))}
                         </div>
                         {totp.save && (
@@ -512,14 +511,14 @@ const lookupLabel: Record<string, string> = {
 
         {has('lookup_secret') && (
           <div class="group">
-            <h3>Backup codes <span class={`badge ${status.backupCodes ? '' : 'badge-warning'}`}>{status.backupCodes ? 'saved' : 'not saved'}</span></h3>
-            <p>Single-use codes for when nothing else works. Print or store them safely.</p>
+            <h3>Backup codes <span class={`badge ${status.backupCodes || !status.twoStep ? '' : 'badge-warning'}`}>{status.backupCodes ? 'saved' : 'not saved'}</span></h3>
+            <p>{status.twoStep || lookup.enrolled ? 'Single-use codes for when nothing else works. Print or store them safely.' : 'Single-use codes for when a second step is lost. Add a passkey or an authenticator app first, then get your codes.'}</p>
             <form method="POST" action={ui.action} class="settings-form wide">
               <input type="hidden" name="csrf_token" value={csrf} />
               <input type="hidden" name="method" value="lookup_secret" />
               {lookup.list.length > 0 && (
                 <div class="lookup-codes" id="lookup-codes">
-                  <p class="lookup-codes-label">{lookup.codesLabel ?? 'Backup codes. Save these somewhere safe.'} Each works once.</p>
+                  <p class="lookup-codes-label">Your backup codes. Keep them somewhere safe; each works once.</p>
                   <ol class="lookup-grid" data-testid="backup-codes">
                     {lookup.list.map((c) => (
                       <li class={c.used ? 'used' : ''}>{c.used ? <span class="mono">used</span> : <code class="mono">{c.code}</code>}</li>
@@ -528,6 +527,7 @@ const lookupLabel: Record<string, string> = {
                   <div class="form-actions" data-codes-tools hidden>
                     <button type="button" class="button button-secondary button-sm" data-copy-codes="lookup-codes">Copy codes</button>
                     <button type="button" class="button button-secondary button-sm" data-print-codes>Print</button>
+                    <button type="button" class="button button-secondary button-sm" data-hide-codes aria-expanded="true">Hide codes</button>
                   </div>
                   {lookupConfirm && (
                     <div class="notice notice-warning">These codes only work after you press <strong>I've saved these codes</strong>. Until then, the old ones stay in use.</div>
@@ -541,7 +541,7 @@ const lookupLabel: Record<string, string> = {
                   if (!a || a.name === 'lookup_secret_disable') return null;
                   if (a.type === 'hidden') return <input type="hidden" name={a.name} value={String(a.value ?? '')} />;
                   if (a.type === 'submit' || a.type === 'button') {
-                    const primary = a.name === 'lookup_secret_confirm' || (a.name === 'lookup_secret_regenerate' && !lookup.enrolled);
+                    const primary = a.name === 'lookup_secret_confirm' || (a.name === 'lookup_secret_regenerate' && !lookup.enrolled && status.twoStep);
                     return (
                       <button
                         class={`button ${primary ? 'button-primary' : 'button-secondary'} button-sm`}

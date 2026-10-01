@@ -75,6 +75,7 @@ function removeNode(group: 'passkey' | 'webauthn', id: string, displayName: stri
 const PASSKEY_A = hex(0xa1);
 const PASSKEY_B = hex(0xb2);
 const KEY_A = hex(0xc3);
+const PASSKEY_C = hex(0xd4);
 
 function profileNodes(): FlowNode[] {
   return [
@@ -213,6 +214,8 @@ function build(spec: Spec, state: DevSettingsState, extra: { success?: boolean; 
 
 const PK_A: [string, string, string] = [PASSKEY_A, 'unnamed', '2026-06-12T09:30:00Z'];
 const PK_B: [string, string, string] = [PASSKEY_B, 'unnamed', '2026-08-03T18:05:00Z'];
+// A platform authenticator names itself (its AAGUID's name) when the person has not chosen one.
+const PK_C: [string, string, string] = [PASSKEY_C, 'iCloud Keychain', '2026-09-02T14:20:00Z'];
 const KEY: [string, string, string] = [KEY_A, 'Keyring key', '2026-07-21T07:10:00Z'];
 
 export function devSettings(state: DevSettingsState): DevSettings {
@@ -220,7 +223,7 @@ export function devSettings(state: DevSettingsState): DevSettings {
     case 'fresh':
       return build({ passkeys: [], keys: [], totp: 'qr', lookup: false, next: 'fresh' }, state);
     case 'enrolled':
-      return build({ passkeys: [PK_A, PK_B], keys: [KEY], totp: 'enrolled', lookup: true, next: 'enrolled' }, state, {
+      return build({ passkeys: [PK_A, PK_B, PK_C], keys: [KEY], totp: 'enrolled', lookup: true, next: 'enrolled' }, state, {
         names: { [PASSKEY_B]: 'Pixel phone' },
       });
     case 'totp-setup':

@@ -1,12 +1,13 @@
 /* Account settings: the grouped cards, credential rows and enrollment steps. Reference tokens only. */
 
-.settings { max-width: 64rem; margin-inline: auto; }
 .settings .page-header { margin-bottom: var(--space-4); padding-bottom: var(--space-4); }
 .settings .page-title { font-size: var(--text-3xl); margin-bottom: var(--space-2); }
 .settings .page-lede { font-size: var(--text-base); }
 
 .settings-status { display: flex; flex-wrap: wrap; gap: var(--space-2); align-items: center; }
 .settings-status + .notice, .settings .notice { margin-bottom: 0; margin-top: var(--space-3); }
+.status-note { font-size: var(--text-sm); color: var(--text-2); flex-basis: 100%; }
+.status-note a { color: var(--accent); }
 .settings-notices { display: grid; gap: 0; }
 
 .cards { display: grid; gap: var(--space-4); margin-top: var(--space-4); align-items: stretch; }
@@ -14,10 +15,6 @@
 @media (min-width: 60rem) {
   .cards { grid-template-columns: 1fr 1fr; }
   .card-wide { grid-column: 1 / -1; }
-  /* An open authenticator setup takes the full row, so it never stretches its neighbour into a blank card. */
-  #two-step:has(#totp-setup:checked) { grid-column: 1 / -1; }
-  #two-step:has(#totp-setup:checked) .steps { grid-template-columns: 1fr 1fr; align-items: start; }
-  #two-step:has(#totp-setup:checked) .steps > li:only-child { grid-column: 1 / -1; }
 }
 .card > h2 { font-size: var(--text-lg); box-shadow: none; margin-bottom: var(--space-1); }
 .card > .lede { color: var(--text-2); font-size: var(--text-sm); margin-bottom: var(--space-3); }
@@ -74,7 +71,7 @@
 
 /* Read-only values (username, email) sit flat and dashed, apart from inputs that take a change. */
 .settings input[readonly] { background: transparent; border-style: dashed; color: var(--text-2); cursor: default; box-shadow: none; }
-.settings input[readonly]:focus { outline: 1px dashed var(--border); outline-offset: 2px; }
+.settings input[readonly]:focus { outline: 2px solid var(--input-focus); outline-offset: 2px; }
 .static { display: grid; gap: var(--space-1); }
 .static-label { font-size: var(--text-sm); font-weight: 600; }
 .static-value { font-family: var(--font-mono); font-size: var(--text-sm); color: var(--text-2); }
@@ -83,6 +80,8 @@
 /* Enrollment steps */
 .steps { list-style: none; counter-reset: s; margin-top: var(--space-3); display: grid; gap: var(--space-2); padding: 0; }
 .steps > li { counter-increment: s; border: 1px solid var(--border); border-radius: var(--radius); padding: var(--space-4); background: var(--bg); }
+.steps > li > h4 { scroll-margin-top: var(--space-8); }
+.steps > li > h4:focus { outline: none; }
 .steps > li > h4 { font-family: var(--font-mono); font-size: var(--text-sm); }
 .steps > li > h4::before { content: counter(s) ". "; color: var(--text-muted); }
 .steps p { font-size: var(--text-sm); color: var(--text-2); margin-top: var(--space-2); }
@@ -100,6 +99,7 @@
 .lookup-codes { margin-top: var(--space-3); }
 .lookup-codes-label { font-size: var(--text-sm); color: var(--text-2); margin-bottom: var(--space-1); }
 .lookup-grid { list-style: none; padding: var(--space-3); margin: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(8rem, 1fr)); gap: var(--space-2) var(--space-3); background: var(--bg); border: 1px solid var(--border); border-radius: var(--radius-sm); }
+.lookup-grid[hidden] { display: none; }
 .lookup-grid li { font-size: var(--text-sm); letter-spacing: 0.04em; }
 .lookup-grid li.used { color: var(--text-muted); text-decoration: line-through; }
 @media print {

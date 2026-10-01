@@ -54,6 +54,7 @@ test('rename inputs belong to the page-level sibling forms by the form attribute
 test('a stored name replaces the fallback; a removal Kratos disabled stays disabled', async () => {
   const items = view.credentialItems(nodes(), 'passkey_remove', { [view.credentialItems(nodes(), 'passkey_remove')[0].id]: 'Pixel phone' });
   items[1].removable = false;
+  items.length = 2;
   const html = await rows({ items, kind: 'passkey', noun: 'passkey', fallbackName: 'Passkey' });
   assert.ok(html.includes('Pixel phone'));
   assert.match(html, /<button[^>]*type="button"[^>]*disabled/);
