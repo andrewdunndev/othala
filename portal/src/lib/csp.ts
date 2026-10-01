@@ -1,7 +1,7 @@
 // Content-Security-Policy builder. form-action covers a form's whole redirect
 // chain: an OIDC login lands on a subdomain of the apex (https://*.<OTHALA_APEX>),
 // and sign-out 303s to Kratos's logout_url on OTHALA_PUBLIC_URL or
-// KRATOS_PUBLIC_URL, the two origins /auth/logout accepts. Unparseable or
+// the internal Kratos address, the two origins /auth/logout accepts. Unparseable or
 // non-http(s) values contribute nothing.
 
 function httpOrigin(raw: string | undefined): string | null {

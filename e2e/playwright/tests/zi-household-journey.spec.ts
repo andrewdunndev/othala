@@ -9,6 +9,7 @@ import { createIdentityWithPassword, TEST_PASSWORD } from '../actions/identity';
 const PASSKEY_REGISTER_BUTTON = 'button[name="passkey_register_trigger"]';
 const PASSKEY_LOGIN_BUTTON = 'button[name="passkey_login_trigger"]';
 const APP_ORIGIN = 'https://grafana.othala.test';
+const PROXYWATCH_ORIGIN = 'http://proxywatch.othala.test';
 
 const hasWindowFn = (n: string) => typeof (window as unknown as Record<string, unknown>)[n] === 'function';
 
@@ -102,12 +103,28 @@ test('ZI1 — admin adds a person; they redeem, enrol a passkey and TOTP, and si
   await page.goto(authorize);
   await stepUpIfAsked(page, secret);
   await page.waitForURL((u) => u.origin === APP_ORIGIN, { timeout: 15_000 });
-  expect(new URL(page.url()).searchParams.get('code'), `ZI1: the OIDC app receives a code, landed at ${page.url()}`).toBeTruthy();
+  const code2 = new URL(page.url()).searchParams.get('code');
+  expect(code2, `ZI1: the OIDC app receives a code, landed at ${page.url()}`).toBeTruthy();
+
+  // The code redeems at the token endpoint for an id_token carrying the person.
+  const basic = Buffer.from(`${GRAFANA_CLIENT_ID}:${process.env.GRAFANA_CLIENT_SECRET ?? ''}`).toString('base64');
+  const token = await ctx.request.post(`${baseURL}/oauth2/token`, {
+    headers: { Authorization: `Basic ${basic}` },
+    form: { grant_type: 'authorization_code', code: code2!, redirect_uri: GRAFANA_REDIRECT_URI },
+  });
+  expect(token.status(), `ZI1: the token endpoint redeems the code: ${await token.text()}`).toBe(200);
+  const idToken = (await token.json()).id_token as string;
+  const claims = JSON.parse(Buffer.from(idToken.split('.')[1], 'base64url').toString('utf8'));
+  expect(claims.sub, 'ZI1: id_token names the person').toBeTruthy();
+  expect(claims.email, 'ZI1: id_token carries the person\'s email').toBe(person.email);
+  expect(claims.groups, 'ZI1: id_token carries the granted app group').toContain('grafana-access');
 
   await page.goto(`${baseURL}/`, { waitUntil: 'networkidle' });
   await expect(page.getByText('Proxywatch').first(), 'ZI1: the forward_auth app is on the person\'s portal').toBeVisible();
-  const forward = await ctx.request.get(`${baseURL}/api/forward-auth?group=proxywatch-access`, { maxRedirects: 0 });
-  expect(forward.status(), 'ZI1: forward_auth admits the person').toBe(200);
+  // The forward_auth app sits behind the edge route: the person reaches the stub through the portal's gate.
+  const appResponse = await page.goto(PROXYWATCH_ORIGIN, { waitUntil: 'networkidle' });
+  expect(appResponse?.status(), 'ZI1: forward_auth admits the person to the app').toBe(200);
+  await expect(page.getByText('proxywatch-stub'), 'ZI1: the person reaches the app behind the edge').toBeVisible();
 });
 
 /** The second factor the person enrolled is asked for when the session is below aal2; answer it in the page. */

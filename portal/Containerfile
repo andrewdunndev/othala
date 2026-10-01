@@ -24,10 +24,6 @@
 # Run:
 #   podman run --rm -p 8080:8080 \
 #     -v ./hydra/clients:/etc/portal/manifests:ro \
-#     -e KRATOS_PUBLIC_URL=http://kratos:4433 \
-#     -e KRATOS_ADMIN_URL=http://kratos:4434 \
-#     -e HYDRA_PUBLIC_URL=http://hydra:4444 \
-#     -e HYDRA_ADMIN_URL=http://hydra:4445 \
 #     dunn.dev/othala-portal:lab
 
 # ----- Stage 1: build -----

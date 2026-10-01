@@ -9,7 +9,7 @@ help:
 	@echo ""
 	@echo "Targets:"
 	@echo "  install    npm install (lockfile-respecting via npm ci)"
-	@echo "  dev        run astro dev on :4321 (point KRATOS_PUBLIC_URL at lab)"
+	@echo "  dev        run astro dev on :4321"
 	@echo "  build      astro build (dist/server + dist/client)"
 	@echo "  check      astro check (type-check)"
 	@echo "  test       node --test on scripts/*.test.mjs"

@@ -26,14 +26,14 @@ Delete each from the deploy environment; none is read any more.
 - `OTHALA_CORS_ALLOWED_ORIGINS`: Hydra CORS allows only `OTHALA_PUBLIC_URL`.
 - `OTHALA_PUBLIC_HOST`: the Caddyfile site address is `OTHALA_PUBLIC_URL`.
 - `OTHALA_OTLP_PROVIDER`, `OTHALA_OTLP_ENVIRONMENT`, `OTEL_EXPORTER_OTLP_ENDPOINT`, `OTEL_SERVICE_NAME`, `OTEL_EXPORTER_OTLP_HEADERS`, `OTEL_RESOURCE_ATTRIBUTES` and `OTLP_INGEST_TOKEN`: set `OTHALA_OTLP_ENDPOINT` to trace.
-- `KRATOS_PUBLIC_URL`, `HYDRA_PUBLIC_URL`, `KRATOS_ADMIN_URL`, `HYDRA_ADMIN_URL`, `KRATOS_ADMIN_TOKEN` and `HYDRA_ADMIN_TOKEN`: the portal uses `OTHALA_PUBLIC_URL`, `http://kratos:4434` and `http://hydra:4445`, with no bearer.
+- `KRATOS_PUBLIC_URL`, `HYDRA_PUBLIC_URL`, `KRATOS_ADMIN_URL`, `HYDRA_ADMIN_URL`, `KRATOS_ADMIN_TOKEN` and `HYDRA_ADMIN_TOKEN`: the portal uses `http://kratos:4433`, `http://kratos:4434` and `http://hydra:4445`, with no bearer.
 - `KRATOS_PG_HOST`, `HYDRA_PG_HOST`, `KRATOS_ADMIN_HOST` and `CONSENT_HOST`: the hosts are `postgres`, `kratos`, `othala`.
 - `MANIFEST_DIR`, `PORT`, `HOST`, `ADMIN_PORT`, `PORTAL_LOGIN_URL` and `PORTAL_CONSENT_URL`: fixed at `/etc/portal/manifests`, 8080 and 4431.
 - `SMTP_USER`, `SMTP_PASS`, `ACME_EMAIL` and the Kratos and Hydra `DSN`: credentials ride in `OTHALA_SMTP_CONNECTION_URI` and the rendered `dsn`.
 
 ### Changed
 
-- The portal refuses to start in production when `OTHALA_PUBLIC_URL`, `OTHALA_APEX`, `OTHALA_INSTANCE_NAME` or `RECOVERY_GATE_SECRET` is unset.
+- The portal refuses to start in production when `OTHALA_INSTANCE_NAME` is unset.
 - Kratos and Hydra trace when `OTHALA_OTLP_ENDPOINT` is set, where `OTHALA_OTLP_PROVIDER` decided.
 - The Kratos login flow lifespan is the 1h default, up from 10m.
 - Kratos public CORS is off: the portal shares the origin.

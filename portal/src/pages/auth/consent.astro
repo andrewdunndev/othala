@@ -17,8 +17,7 @@ const challenge = Astro.url.searchParams.get('consent_challenge');
 
 // Re-fetch the consent request server-side so we can show the client name
 // and requested scopes. Uses the shared defaultOAuth2Api factory from
-// oauth2-handlers.ts — single env-reading code path (process.env resolves
-// identically to import.meta.env in Astro Node SSR at request time).
+// oauth2-handlers.ts.
 
 let clientName = 'Unknown application';
 let scopeDescriptions: Array<{ scope: string; description: string }> = [];

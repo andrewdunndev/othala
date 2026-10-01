@@ -1,5 +1,7 @@
 // Fixed deployment topology and policy, each defined once. Nothing here reads the environment.
 
+/** Kratos public API on the golden service name; server-side calls stay off the edge and its rate limits. */
+export const KRATOS_PUBLIC_URL = 'http://kratos:4433';
 /** Kratos admin API on the golden service name; unauthenticated, network isolation is the control. */
 export const KRATOS_ADMIN_URL = 'http://kratos:4434';
 /** Hydra admin API on the golden service name; unauthenticated, network isolation is the control. */

@@ -73,7 +73,7 @@ while true; do
         docker compose ps
         # Native `podman logs`: the compose logs shim is unreliable and /tmp is not an artifact.
         echo "=== container logs (healthcheck timeout) ==="
-        for svc in postgres kratos-migrate kratos hydra-migrate hydra othala mailpit; do
+        for svc in postgres kratos-migrate kratos hydra-migrate hydra othala mailpit caddy; do
             echo "--- lab-$svc ---"
             podman logs --tail=60 "lab-$svc" 2>&1 || true
         done
@@ -88,6 +88,12 @@ while true; do
         break
     fi
     sleep 5
+done
+
+# The edge has no healthcheck; the portal's Kratos path and smoke cross it, so wait until it answers.
+for _ in $(seq 1 30); do
+    [[ $(curl -s -o /dev/null -w '%{http_code}' http://localhost:8088/ || true) != 000 ]] && break
+    sleep 2
 done
 
 # Step 4b: seed both admin identities via the Kratos admin API with the

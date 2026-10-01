@@ -253,6 +253,7 @@ services:
         # a subdomain of the Kratos cookie domain (othala.test) or the CSRF cookie is never sent.
         aliases:
           - auth.othala.test
+          - proxywatch.othala.test
 
   # Browser e2e runner (profile: browser only): resolves auth.othala.test to Caddy and runs
   # the /test specs from the prebaked e2e-tester image (no runtime npm install;

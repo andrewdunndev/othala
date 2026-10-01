@@ -251,7 +251,7 @@ interface VirtualAuthenticatorOptions {
 
 export const GRAFANA_CLIENT_ID = 'grafana';
 export const GRAFANA_REDIRECT_URI = 'https://grafana.othala.test/login/generic_oauth';
-export const KRATOS_ADMIN_URL = process.env.KRATOS_ADMIN_URL ?? 'http://kratos:4434';
+export const KRATOS_ADMIN_URL = 'http://kratos:4434';
 
 export interface OthalaFixtures {
   baseURL: string;
@@ -280,11 +280,11 @@ export const test = base.extend<OthalaFixtures>({
   }, { scope: 'worker' }],
 
   hydraPublicURL: [async ({}, use) => {
-    await use(process.env.HYDRA_PUBLIC_URL ?? 'http://hydra:4444');
+    await use('http://hydra:4444');
   }, { scope: 'worker' }],
 
   hydraAdminURL: [async ({}, use) => {
-    await use(process.env.HYDRA_ADMIN_URL ?? 'http://hydra:4445');
+    await use('http://hydra:4445');
   }, { scope: 'worker' }],
 
   ctx: async ({ browser }, use) => {

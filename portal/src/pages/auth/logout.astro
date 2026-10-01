@@ -178,7 +178,7 @@ if (identityId && logoutAuthorized(Astro.request.method, form?.get('csrf_token')
   }
   console.warn(
     `[othala/logout] logout_url origin ${seenOrigin} is neither OTHALA_PUBLIC_URL nor ` +
-      'KRATOS_PUBLIC_URL; refusing the redirect and completing the logout server-side.',
+      'the internal Kratos address; refusing the redirect and completing the logout server-side.',
   );
 
   const status = await revokeServerSide(info.logout_token);

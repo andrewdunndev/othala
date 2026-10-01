@@ -103,7 +103,8 @@ The `check-portal` and `check-purity` jobs run on every push, MR and tag;
 - **Env belongs in one module** (`portal/src/lib/config.ts`): throw in
   production, default with a warning in dev. The surface is identity
   (`OTHALA_PUBLIC_URL`, `OTHALA_APEX`, `OTHALA_INSTANCE_NAME`),
-  `OTHALA_CONTACT_RECIPIENT`, secrets, and optional `OTHALA_OTLP_ENDPOINT`;
+  `OTHALA_CONTACT_RECIPIENT`, secrets, optional `OTHALA_OTLP_ENDPOINT`, and the deployer binds
+  (`KRATOS_ADMIN_BIND_HOST`, `HYDRA_ADMIN_BIND_HOST`, `ADMIN_HOST`);
   everything else is derived or a constant there. A habit, not a gate; only the
   plain-ESM `listen.mjs` and `otel.mjs` read env themselves.
 - **The admin listener is loopback-only** and its mux is disjoint from the public
