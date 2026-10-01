@@ -35,10 +35,9 @@ Worked example: the canonical group-name policy is `GROUP_RE` in
 
 ## The prose budget
 
-Tracked prose is capped, and the cap is enforced. **Adding documentation means
-removing documentation, in the same commit.** Growing the corpus back toward the
-ceiling is the failure mode, not the fix. If you cannot name what a new page
-displaces, do not write it.
+Tracked prose is capped, and the cap is enforced. The ceiling leaves headroom
+for documentation that earns its place; spend it deliberately. Before adding a
+page, check whether an existing one should shrink instead.
 
 The `prose-budget` check in `scripts/check-purity.sh` fails the build when the
 total exceeds `PROSE_CEILING_BYTES`, and prints the total, the ceiling and the

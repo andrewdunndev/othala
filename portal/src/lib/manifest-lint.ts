@@ -117,12 +117,3 @@ export function lintManifests(
 export function lintBlockers(set: ClientManifest[], knownGroups: Iterable<string>): LintFinding[] {
   return lintManifests(set, knownGroups).filter((f) => f.severity === 'block');
 }
-
-// TODO: wire lintManifests into the three surfaces below, none of which exist
-// yet in this repo:
-//   1. A CI `lint-manifests` job (`just lint`) that fails on BLOCK findings.
-//   2. An `othala lint` CLI subcommand over MANIFEST_DIR.
-//   3. A non-blocking yellow callout (.notice-warn) on /admin/oauth2 surfacing
-//      WARN findings for the live manifest set.
-// The function + its unit tests are the Phase-2 must-have; the surfaces are
-// intentionally deferred so this change stays atomic and reviewable.

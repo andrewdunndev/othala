@@ -26,9 +26,19 @@ platform runs containers. The contract is the same regardless of mechanism
 
 One image per release, tagged at the git tag and published at the registry
 root (`registry.gitlab.com/dunn.dev/othala:vX.Y.Z`, `publish_at_root: true`
-in `.gitlab-ci.yml`). A deploy plane pins by tag or digest; registry tags
-are immutable, so pinning by tag is already deterministic. Kratos and Hydra
+in `.gitlab-ci.yml`). A deploy plane pins by tag and digest: `v*` registry
+tags are protected, not immutable. Kratos and Hydra
 are upstream Ory images — this repo does not build or publish them.
+
+Each release image is signed by digest with keyless cosign, from the tag
+pipeline's GitLab identity. Verify before pinning:
+
+```sh
+cosign verify \
+  --certificate-oidc-issuer https://gitlab.com \
+  --certificate-identity-regexp '^https://gitlab\.com/dunn\.dev/othala//\.gitlab-ci\.yml@refs/tags/v[0-9]+\.[0-9]+\.[0-9]+$' \
+  registry.gitlab.com/dunn.dev/othala@sha256:<digest>
+```
 
 ## The dual-listener
 
@@ -42,7 +52,7 @@ The app runs **two HTTP listeners in one process**
   expose to the network.
 - **Admin port** (`4431`, bound to `PORTAL_ADMIN_BIND_HOST`,
   internal network only). A separate `http.createServer` with its own disjoint mux:
-  `GET /healthz`, `GET /readyz`,
+  `GET /healthz` (liveness), `GET /readyz` (503 unless Kratos and Hydra report ready),
   `POST /admin/{recovery,login-code}-gate`. It never delegates to the SSR
   handler: off the public mux by construction. The bearer-guarded routes
   are constant-time and fail-closed: an unset secret rejects every request.
@@ -103,8 +113,9 @@ full per-RP runbook.
 6. Smoke: `/healthz`, `/readyz`, and the OIDC discovery document all
    answer; a real login round-trips.
 
-Rollback is purely a deploy-plane change: revert to the previous pinned
-digest and redeploy.
+Kratos and Hydra migrations are forward-only: `pg_dump` before any deploy that
+changes an Ory pin, and roll back across that change by restoring the dump. An
+app-only rollback is a digest revert.
 
 ## Why two repos
 

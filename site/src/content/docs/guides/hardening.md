@@ -101,9 +101,11 @@ drop is load-bearing, and the file carries the scar proving it: without
 `CAP_DAC_OVERRIDE` a 0600 config owned by one uid is unreadable by the image's
 own user and every Ory service exits.
 
-Not built: **no memory bound anywhere**, so the hash-exhaustion lever above is
-unbounded at the container layer too; **nothing evaluates the SBOM** that ships
-with each release, so a known CVE in a shipped image fails nothing; and
+Not built: **no memory bound in the example compose** (bound memory in the
+deploy plane, sized to the host; Kratos needs about 128 MB per concurrent
+argon2 hash), so the hash-exhaustion lever above is otherwise unbounded;
+**nothing evaluates the SBOM** that ships with each release, so a known CVE in
+a shipped image fails nothing; and
 **nothing verifies a signature before use** — a property of whatever runs the
 image, not of this repository.
 

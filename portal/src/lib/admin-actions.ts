@@ -501,8 +501,25 @@ export async function removeCredentialAction(fd: FormData, ctx: ActionContext): 
   return { actionResult: { kind: 'credential-removed', credType }, refetch: true };
 }
 
+/** One stdout JSON line per mutation: ids only, never emails, names or credential material. */
+function audited(action: string, handler: ActionHandler): ActionHandler {
+  const line = (ctx: ActionContext, result: string) =>
+    console.log(JSON.stringify({ event: 'admin_action', action, actor: ctx.adminIdentityId, target: ctx.id, result }));
+  return async (fd, ctx) => {
+    try {
+      const outcome = await handler(fd, ctx);
+      const kind = outcome instanceof Response ? 'ok' : outcome.actionResult?.kind;
+      line(ctx, kind && kind !== 'error' ? 'ok' : 'refused');
+      return outcome;
+    } catch (err) {
+      line(ctx, 'error');
+      throw err;
+    }
+  };
+}
+
 /** Dispatch table keyed by the form's `action` field — the page's whole switch. */
-export const ADMIN_ACTIONS: Record<string, ActionHandler> = {
+const HANDLERS: Record<string, ActionHandler> = {
   'save-access': saveAccessAction,
   'save-household': saveHouseholdAction,
   'save-profile': saveProfileAction,
@@ -519,3 +536,7 @@ export const ADMIN_ACTIONS: Record<string, ActionHandler> = {
   'revoke-admin': revokeAdminAction,
   'remove-credential': removeCredentialAction,
 };
+
+export const ADMIN_ACTIONS: Record<string, ActionHandler> = Object.fromEntries(
+  Object.entries(HANDLERS).map(([action, handler]) => [action, audited(action, handler)]),
+);

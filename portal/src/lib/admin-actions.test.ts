@@ -60,6 +60,7 @@ import {
   revokeAdminAction,
   removeCredentialAction,
   grantAdminAction,
+  ADMIN_ACTIONS,
   type ActionContext,
 } from './admin-actions.js';
 import type { Identity } from './types.js';
@@ -587,5 +588,35 @@ describe('prerequisites and verified email', () => {
     const id = makeIdentity('someone');
 
     await expect(markVerifiedAction(fd({ email: id.traits.email }), makeCtx({ identity: id }))).rejects.toThrow('error code');
+  });
+});
+
+describe('admin action audit line', () => {
+  const audit = async (action: string, ctx: ActionContext) => {
+    const log = vi.spyOn(console, 'log').mockImplementation(() => {});
+    await ADMIN_ACTIONS[action](fd(), ctx).catch(() => {});
+    const lines = log.mock.calls.map((c) => c[0]);
+    log.mockRestore();
+    return lines;
+  };
+  const member = withCreds(makeIdentity('member'), 'password', 'totp');
+
+  it.each([
+    ['grant-admin', makeCtx({ identity: member }), 'ok'],
+    ['grant-admin', makeCtx({ identity: makeIdentity('member') }), 'refused'],
+    ['deactivate', makeCtx(), 'ok'],
+    ['deactivate', makeCtx({ id: 'admin-1' }), 'refused'],
+  ])('%s emits exactly one line, result %s', async (action, ctx, result) => {
+    const lines = await audit(action, ctx);
+    expect(lines).toHaveLength(1);
+    expect(JSON.parse(lines[0])).toEqual({ event: 'admin_action', action, actor: 'admin-1', target: ctx.id, result });
+  });
+
+  it('records a thrown mutation as error and rethrows', async () => {
+    deactivateIdentityMock.mockRejectedValue(new Error('boom'));
+    const log = vi.spyOn(console, 'log').mockImplementation(() => {});
+    await expect(ADMIN_ACTIONS.deactivate(fd(), makeCtx())).rejects.toThrow('boom');
+    expect(JSON.parse(log.mock.calls[0][0]).result).toBe('error');
+    log.mockRestore();
   });
 });
