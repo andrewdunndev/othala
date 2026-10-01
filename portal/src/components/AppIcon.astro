@@ -6,7 +6,7 @@ import type { AppTile } from '../lib/tiles';
 
 interface Props {
   tile: Pick<AppTile, 'iconHref' | 'icon' | 'iconBleed'>;
-  size?: 'md' | 'lg';
+  size?: 'sm' | 'md' | 'lg';
 }
 
 const { tile, size = 'md' } = Astro.props;
@@ -38,6 +38,12 @@ const iconSlug = tile.iconHref?.split('/').pop()?.replace(/\.svg$/, '');
     padding: 0.4rem;
     box-sizing: border-box;
   }
+  .app-icon-sm {
+    --plate: 1.5rem;
+    padding: 0.2rem;
+    border-radius: var(--radius-sm);
+  }
+  .app-icon-sm .app-icon-mono { font-size: 0.5rem; letter-spacing: 0; }
   .app-icon-lg {
     --plate: 3.5rem;
     padding: 0.55rem;

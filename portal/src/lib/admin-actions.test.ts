@@ -120,7 +120,7 @@ describe('deleteAction', () => {
     expect(outcome).not.toBeInstanceOf(Response);
     if (outcome instanceof Response) throw new Error('unreachable');
     expect(outcome.actionResult?.kind).toBe('error');
-    expect(outcome.actionResult && 'message' in outcome.actionResult ? outcome.actionResult.message : '').toMatch(/revoke admin authority first/i);
+    expect(outcome.actionResult && 'message' in outcome.actionResult ? outcome.actionResult.message : '').toMatch(/remove their admin access first/i);
   });
 
   it('refuses a wrong confirm value and never calls deleteIdentity', async () => {
@@ -172,7 +172,7 @@ describe('deleteAction', () => {
     if (outcome instanceof Response) throw new Error('unreachable');
     expect(outcome.actionResult?.kind).toBe('error');
     expect(outcome.actionResult && 'message' in outcome.actionResult ? outcome.actionResult.message : '').toBe(
-      'Revoked and deactivated, but not deleted: kratos admin unavailable',
+      'Signed out and turned off, but not deleted: kratos admin unavailable',
     );
   });
 });

@@ -85,6 +85,8 @@ export interface AppChip {
   name: string;
   /** Holds the app's highest level. */
   top: boolean;
+  /** For the logo beside the name; absent reads as a monogram. */
+  tile?: AppTile;
 }
 
 /** Apps this person was given, by name, with their level where it is the highest the app offers. Apps open to everyone are not listed. */
@@ -94,7 +96,7 @@ export function appChips(i: Identity, apps: readonly AdminApp[]): AppChip[] {
     const m = a.manifest;
     if (isOpenToEveryone(m)) continue;
     const level = currentLevel(m, i.metadata_admin);
-    if (level !== NO_ACCESS) chips.push({ name: a.name, top: isTopLevel(m, level) });
+    if (level !== NO_ACCESS) chips.push({ name: a.name, top: isTopLevel(m, level), tile: a.tile });
   }
   return chips;
 }

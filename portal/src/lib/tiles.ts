@@ -28,7 +28,7 @@ const _iconsDir = (() => {
 })();
 
 /** Return the web path for a vendored simple-icons SVG, or undefined if absent. */
-function resolveIconHref(iconSlug: string | undefined): string | undefined {
+export function resolveIconHref(iconSlug: string | undefined): string | undefined {
   if (!iconSlug) return undefined;
   const candidate = join(_iconsDir, `${iconSlug}.svg`);
   return existsSync(candidate) ? `/icons/${iconSlug}.svg` : undefined;
@@ -36,7 +36,7 @@ function resolveIconHref(iconSlug: string | undefined): string | undefined {
 
 /** True when the logo file opens with its own filled square (a rect at the origin, width equal to height). Such
  *  marks fill the whole plate instead of sitting inside it. */
-function iconIsBleed(iconSlug: string | undefined): boolean {
+export function iconIsBleed(iconSlug: string | undefined): boolean {
   if (!iconSlug) return false;
   try {
     const head = readFileSync(join(_iconsDir, `${iconSlug}.svg`), 'utf8').slice(0, 600);

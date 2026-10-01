@@ -41,12 +41,17 @@ const requirements = dev
 
 let identity: Identity | null = null;
 let loadError: string | null = null;
+let notFound = false;
 
 async function reload(): Promise<Identity | null> {
   if (dev) return dev.identities.find((i) => i.id === id) ?? null;
   try {
     return await getIdentity(id!);
   } catch (err) {
+    if ((err as { response?: { status?: number } })?.response?.status === 404) {
+      notFound = true;
+      return null;
+    }
     console.error('[othala/admin/users/[id]] getIdentity failed:', err);
     loadError = PEOPLE_LOAD_ERROR;
     return null;
@@ -54,7 +59,8 @@ async function reload(): Promise<Identity | null> {
 }
 
 identity = await reload();
-if (dev && !identity) return new Response('Not found', { status: 404 });
+if (dev && !identity) notFound = true;
+if (notFound) Astro.response.status = 404;
 
 let action = '';
 let actionResult: ActionResult | null = null;
@@ -178,10 +184,10 @@ const roleNote = Object.keys(roleOverrides).length;
     <>
       <TitleRow title={who} lede={email}>
         <div class="badges">
-          {isTargetAdmin && <span class="badge">Admin</span>}
+          {isTargetAdmin && <span class="badge badge-accent">Admin</span>}
           {isOff && <span class="badge badge-muted">Sign-in off</span>}
-          <span class={`badge ${twoStep ? '' : 'badge-warning'}`}>Two-step: {twoStep ? 'on' : 'off'}</span>
-          <span class={`badge ${verified ? 'badge-muted' : 'badge-warning'}`}>{verified ? 'Verified' : 'Unverified'} email</span>
+          {!twoStep && <span class="badge badge-warning">Two-step off</span>}
+          {!verified && <span class="badge badge-warning">Unverified email</span>}
         </div>
       </TitleRow>
 
@@ -298,7 +304,7 @@ const roleNote = Object.keys(roleOverrides).length;
                   section="household"
                   message={`Make ${first} a household admin? They will be able to add people, change anyone's access and send setup links.`}
                   confirmLabel="Make admin"
-                  primary
+                  primary={households.length <= 1}
                 />
               )}
             </li>
@@ -338,7 +344,7 @@ const roleNote = Object.keys(roleOverrides).length;
             <li>
               <div class="item-id">
                 <span class="item-name">Email address</span>
-                <span class="item-meta">{email} · {verified ? 'Verified' : 'Unverified'}</span>
+                <span class="item-meta">{email}{!verified && " · Unverified"}</span>
               </div>
               {!verified && (
                 <Ask
@@ -348,7 +354,7 @@ const roleNote = Object.keys(roleOverrides).length;
                   section="signin"
                   message={`Mark ${email} as verified? Only do this if you know the address belongs to ${first}.`}
                   confirmLabel="Mark verified"
-                  primary
+
                 />
               )}
             </li>
@@ -365,7 +371,7 @@ const roleNote = Object.keys(roleOverrides).length;
                 <form method="POST" enctype="application/x-www-form-urlencoded" action="#signin">
                   <input type="hidden" name="csrf_token" value={tok('issue-recovery')} />
                   <input type="hidden" name="action" value="issue-recovery" />
-                  <button class="button button-primary button-sm" type="submit">Send setup link</button>
+                  <button class="button button-primary" type="submit">Send setup link</button>
                 </form>
               )}
               {recovery && (
@@ -375,7 +381,7 @@ const roleNote = Object.keys(roleOverrides).length;
                 </div>
               )}
               {!shouldRefuseRecovery(identity) && (
-                <details class="plain result">
+                <details class="plain result mail">
                   <summary>Email a code instead</summary>
                   <form class="confirm" method="POST" enctype="application/x-www-form-urlencoded" action="#signin">
                     <input type="hidden" name="csrf_token" value={tok('send-invite-email')} />
@@ -506,5 +512,5 @@ const roleNote = Object.keys(roleOverrides).length;
       </div>
     </>
   )}
-  {!identity && !loadError && <div class="notice notice-danger" role="alert">That person was not found.</div>}
+  {!identity && !loadError && <div class="notice notice-danger" role="alert">That person was not found. <a href={peopleHref}>Back to People</a></div>}
 </AdminLayout>

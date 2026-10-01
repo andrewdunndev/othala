@@ -6,6 +6,7 @@
 export const prerender = false;
 
 import AdminLayout from '../../../layouts/AdminLayout.astro';
+import AppIcon from '../../../components/AppIcon.astro';
 import ManifestNotice from '../../../components/ManifestNotice.astro';
 import TitleRow from '../../../components/TitleRow.astro';
 import { adminContext } from '../../../lib/admin-context';
@@ -103,7 +104,16 @@ const deleted = Astro.url.searchParams.get('deleted') === '1';
         >
           <div class="person-row">
             <div>
-              <div class="person-name"><a href={`/admin/users/${row.id}${devState ? `?dev-state=${devState}` : ''}`}>{row.name}</a></div>
+              <div class="person-name">
+                <a href={`/admin/users/${row.id}${devState ? `?dev-state=${devState}` : ''}`}>{row.name}</a>
+                {(row.admin || row.off || !row.verified) && (
+                  <span class="badges">
+                    {row.admin && <span class="badge badge-accent">Admin</span>}
+                    {row.off && <span class="badge badge-muted">Sign-in off</span>}
+                    {!row.verified && <span class="badge badge-warning">Unverified email</span>}
+                  </span>
+                )}
+              </div>
               <div class="person-meta">{row.sub}</div>
             </div>
             {row.chips.length === 0 ? (
@@ -112,7 +122,8 @@ const deleted = Astro.url.searchParams.get('deleted') === '1';
               <ul class="chips">
                 {row.chips.map((c, n) => (
                   <li class="chip" hidden={n >= CHIP_LIMIT} data-extra={n >= CHIP_LIMIT ? '' : undefined}>
-                    {c.name}{c.top && <> <b>· Admin</b></>}
+                    <AppIcon size="sm" tile={c.tile ?? { icon: c.name.replace(/[^A-Za-z0-9]/g, '').slice(0, 2).toUpperCase() }} />
+                    <span>{c.name}{c.top && <> <b>· Admin</b></>}</span>
                   </li>
                 ))}
                 {row.chips.length > CHIP_LIMIT && (
@@ -120,11 +131,6 @@ const deleted = Astro.url.searchParams.get('deleted') === '1';
                 )}
               </ul>
             )}
-            <div class="badges">
-              {row.admin && <span class="badge">Admin</span>}
-              {row.off && <span class="badge badge-muted">Sign-in off</span>}
-              <span class={`badge ${row.verified ? 'badge-muted' : 'badge-warning'}`}>{row.verified ? 'Verified' : 'Unverified'} email</span>
-            </div>
           </div>
         </li>
       ))}

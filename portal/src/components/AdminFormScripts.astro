@@ -174,3 +174,14 @@
     }
   })();
 </script>
+
+<script is:inline>
+  // Anchor jumps clear the sticky top bar by its real height (it wraps to two rows on a phone).
+  (function () {
+    var bar = document.querySelector('.site-header');
+    if (!bar || !window.ResizeObserver) return;
+    var set = function () { document.documentElement.style.setProperty('--header-h', bar.getBoundingClientRect().height + 'px'); };
+    new ResizeObserver(set).observe(bar);
+    set();
+  })();
+</script>

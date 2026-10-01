@@ -5,7 +5,7 @@
 import type { ClientManifest } from './manifests';
 import type { Identity } from './types';
 import { joinApps, type AdminApp } from './admin-view';
-import type { AppTile } from './tiles';
+import { iconIsBleed, resolveIconHref, type AppTile } from './tiles';
 import type { ActionResult } from './admin-actions';
 
 export const DEV_ADMIN_STATES = ['household', 'many', 'empty', 'broken'] as const;
@@ -73,8 +73,12 @@ const DESCRIPTIONS: Record<string, [string, string, string, string]> = {
   statuspage: ['Public status and incident history.', 'https://statuspage.example.test', 'SP', 'external'],
 };
 
+/** Vendored logos the fixture apps resolve; the rest fall back to their monogram. */
+const ICON_SLUGS: Record<string, string> = { grafana: 'grafana', audiobookshelf: 'audiobookshelf', promptdesk: 'openwebui' };
+
 function tile(m: ClientManifest, order: number): AppTile {
   const [description, url, icon, authKind] = DESCRIPTIONS[m.clientId];
+  const iconHref = resolveIconHref(ICON_SLUGS[m.clientId]);
   return {
     slug: m.clientId,
     name: m.clientName,
@@ -82,6 +86,8 @@ function tile(m: ClientManifest, order: number): AppTile {
     url,
     icon,
     authKind,
+    iconHref,
+    iconBleed: iconIsBleed(iconHref?.split('/').pop()?.replace(/\.svg$/, '')),
     accessGroup: 'everyone',
     accessGroups: m.accessGroups,
     order,
@@ -141,7 +147,7 @@ const HOUSEHOLD: Seed[] = [
   { id: 'dev-ben', username: 'ben.okafor', displayName: 'Ben Okafor', admin: true, creds: ['password', 'totp'], groups: ['everyone', 'grafana-access', 'prompt-access'], roles: { grafana: 'editor' } },
   { id: 'dev-cleo', username: 'cleo.marsh', displayName: 'Cleo Marsh', unverified: true, creds: ['password', 'passkey'], groups: ['everyone', 'audiobookshelf-access', 'proxywatch-access'] },
   { id: 'dev-dev', username: 'dev.rao', displayName: 'Dev Rao', off: true, groups: ['everyone', 'grafana-access'] },
-  { id: 'dev-eli', username: 'eli.stone', displayName: 'Eli Stone', creds: ['password', 'passkey'], groups: ['everyone', 'prompt-access', 'garden', 'Old Name'] },
+  { id: 'dev-eli', username: 'eli.stone', displayName: 'Eli Stone', creds: ['password', 'passkey', 'totp'], groups: ['everyone', 'prompt-access', 'garden', 'Old Name'] },
   { id: 'dev-fay', username: 'fay.lindqvist', displayName: 'Fay Lindqvist', creds: [], groups: ['everyone'] },
 ];
 

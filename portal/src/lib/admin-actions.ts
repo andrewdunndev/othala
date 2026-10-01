@@ -76,7 +76,7 @@ type ActionHandler = (fd: FormData, ctx: ActionContext) => Promise<ActionOutcome
 // and send-invite-email share this — see shouldRefuseRecovery, access.ts).
 const ADMIN_RECOVERY_REFUSAL: ActionResult = {
   kind: 'error',
-  message: 'A setup link for an admin cannot be made here. Use the server console.',
+  message: 'A setup link for an admin cannot be made here. Whoever runs the server can set one up.',
 };
 
 export async function saveAction(fd: FormData, ctx: ActionContext): Promise<ActionOutcome> {
@@ -270,7 +270,7 @@ async function revokeGrants(id: string): Promise<ActionResult | null> {
   } catch (err) {
     return {
       kind: 'error',
-      message: `Saved, but existing app grants could not be revoked: ${err instanceof Error ? err.message : 'unknown error'}`,
+      message: `Saved, but their old app access could not be taken away: ${err instanceof Error ? err.message : 'unknown error'}`,
     };
   }
 }
@@ -304,7 +304,7 @@ export async function sendInviteEmailAction(fd: FormData, ctx: ActionContext): P
   } catch (err) {
     // Never interpolate the address into the surfaced message.
     return {
-      actionResult: { kind: 'error', message: `Invite email failed: ${err instanceof Error ? err.message : 'unknown error'}` },
+      actionResult: { kind: 'error', message: `The email could not be sent: ${err instanceof Error ? err.message : 'unknown error'}` },
       refetch: false,
     };
   }
@@ -339,7 +339,7 @@ export async function deactivateAction(_fd: FormData, ctx: ActionContext): Promi
   }
   if (await leavesNoActiveAdmin(ctx.identity)) {
     return {
-      actionResult: { kind: 'error', message: `Refusing to deactivate: ${username} is the last active admin. Make someone else an admin first.` },
+      actionResult: { kind: 'error', message: `${username} is the only admin who can sign in. Make someone else an admin first.` },
       refetch: false,
     };
   }
@@ -363,7 +363,7 @@ export async function deleteAction(fd: FormData, ctx: ActionContext): Promise<Ac
     return {
       actionResult: {
         kind: 'error',
-        message: 'Cannot delete an admin identity. Revoke admin authority first — that path enforces the last-admin guard.',
+        message: 'An admin cannot be deleted. Remove their admin access first.',
       },
       refetch: false,
     };
@@ -371,7 +371,7 @@ export async function deleteAction(fd: FormData, ctx: ActionContext): Promise<Ac
   const expected = identity.traits?.username ?? '';
   const confirm = String(fd.get('confirm') ?? '').trim();
   if (confirm !== expected) {
-    return { actionResult: { kind: 'error', message: `Type the username (${expected}) to confirm deletion.` }, refetch: false };
+    return { actionResult: { kind: 'error', message: `Type the username (${expected}) to confirm.` }, refetch: false };
   }
   // Deactivate and cut sessions and Hydra grants first: Hydra keeps consent
   // and refresh tokens by subject, and nothing reaches them once the identity
@@ -382,7 +382,7 @@ export async function deleteAction(fd: FormData, ctx: ActionContext): Promise<Ac
     return {
       actionResult: {
         kind: 'error',
-        message: `Not deleted: sessions and app grants could not be revoked first. ${err instanceof Error ? err.message : 'unknown error'}`,
+        message: `Not deleted: their sign-ins and app access could not be cleared first. ${err instanceof Error ? err.message : 'unknown error'}`,
       },
       refetch: false,
     };
@@ -393,7 +393,7 @@ export async function deleteAction(fd: FormData, ctx: ActionContext): Promise<Ac
     return {
       actionResult: {
         kind: 'error',
-        message: `Revoked and deactivated, but not deleted: ${err instanceof Error ? err.message : 'unknown error'}`,
+        message: `Signed out and turned off, but not deleted: ${err instanceof Error ? err.message : 'unknown error'}`,
       },
       refetch: true,
     };
@@ -405,12 +405,12 @@ export async function deleteAction(fd: FormData, ctx: ActionContext): Promise<Ac
 // or webauthn credential to step up with, and keeps requiring one.
 const SECOND_FACTOR_REQUIRED: ActionResult = {
   kind: 'error',
-  message: 'Admin accounts need an authenticator app or security key enrolled.',
+  message: 'Admins need an authenticator app or security key set up first.',
 };
 
 const OWN_SECOND_FACTOR_REQUIRED: ActionResult = {
   kind: 'error',
-  message: 'You cannot remove your own last authenticator app or security key. Enroll another one first.',
+  message: 'You cannot remove your own last authenticator app or security key. Set up another one first.',
 };
 
 export async function grantAdminAction(_fd: FormData, ctx: ActionContext): Promise<ActionOutcome> {
@@ -438,7 +438,7 @@ export async function revokeAdminAction(fd: FormData, ctx: ActionContext): Promi
   // Last-admin guard: refuse if this would leave zero active admins.
   if (await leavesNoActiveAdmin(identity)) {
     return {
-      actionResult: { kind: 'error', message: `Refusing to revoke: ${username} is the last active admin. Make someone else an admin first.` },
+      actionResult: { kind: 'error', message: `${username} is the only admin who can sign in. Make someone else an admin first.` },
       refetch: false,
     };
   }
@@ -456,7 +456,7 @@ export async function revokeAdminAction(fd: FormData, ctx: ActionContext): Promi
 // message matches the note rendered next to the passkey chip.
 const PASSKEY_REFUSAL: ActionResult = {
   kind: 'error',
-  message: 'A passkey cannot be removed by an admin. Sign them out everywhere, then they can remove it in their own settings.',
+  message: 'A passkey can only be removed by its owner. Sign them out everywhere, then they can remove it in their own settings.',
 };
 
 export async function removeCredentialAction(fd: FormData, ctx: ActionContext): Promise<ActionOutcome> {
@@ -466,7 +466,7 @@ export async function removeCredentialAction(fd: FormData, ctx: ActionContext): 
   }
   if (!EVICTABLE_CREDENTIAL_TYPES.has(credType)) {
     return {
-      actionResult: { kind: 'error', message: `That kind of sign-in method cannot be removed here.` },
+      actionResult: { kind: 'error', message: `That sign-in method cannot be removed here.` },
       refetch: false,
     };
   }

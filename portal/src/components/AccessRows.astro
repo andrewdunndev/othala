@@ -22,7 +22,7 @@ function monogram(name: string): string {
 const rows = apps.map((a) => {
   const m = a.manifest;
   const options = [
-    { value: NO_ACCESS, label: 'No access', hint: `No access to ${a.name}.` },
+    { value: NO_ACCESS, label: 'No access', hint: '' },
     ...levelsFor(m).map((l) => ({ ...l, hint: l.hint || `${l.label} in ${a.name}.` })),
   ];
   const level = current[a.clientId] ?? NO_ACCESS;
