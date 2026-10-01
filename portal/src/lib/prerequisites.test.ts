@@ -40,9 +40,9 @@ function manifestDirWith(files: Record<string, string>): string {
 }
 
 const TILE = (extra = '') => `presentation:
-  name: Vault
+  name: Sample
   description: Passwords
-  url: https://vault.example.test
+  url: https://app.example.test
   access: [everyone]
 ${extra}`;
 
