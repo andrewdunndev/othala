@@ -75,8 +75,8 @@
 <line class="e" x1="262" y1="298" x2="458" y2="298" stroke="#e0e0e0" stroke-width="1"/>
 <text class="i" x="262" y="282" font-family="'IBM Plex Mono', Menlo, monospace" font-size="7.5" font-weight="700" letter-spacing="0.6" fill="#0a0a0a">PUBLIC SSR</text>
 <text class="m" x="262" y="292" font-size="7.5" fill="#707070">challenge providers, UI</text>
-<text class="a" x="262" y="312" font-family="'IBM Plex Mono', Menlo, monospace" font-size="7.5" font-weight="700" letter-spacing="0.6" fill="#4a6741">ADMIN · LOOPBACK</text>
-<text class="m" x="262" y="322" font-size="7.5" fill="#707070">ADMIN_HOST mux — not</text>
+<text class="a" x="262" y="312" font-family="'IBM Plex Mono', Menlo, monospace" font-size="7.5" font-weight="700" letter-spacing="0.6" fill="#4a6741">ADMIN · INTERNAL</text>
+<text class="m" x="262" y="322" font-size="7.5" fill="#707070">admin-bind mux — not</text>
 <text class="m" x="262" y="332" font-size="7.5" fill="#707070">the Astro handler</text>
 <rect class="s e" x="500" y="252" width="140" height="90" rx="3" fill="#f4f4f4" stroke="#e0e0e0" stroke-width="1"/>
 <text class="m" x="512" y="270" font-family="'IBM Plex Mono', Menlo, monospace" font-size="8" font-weight="700" letter-spacing="1.1" fill="#707070">HYDRA</text>

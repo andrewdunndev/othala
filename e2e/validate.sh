@@ -29,8 +29,8 @@ if ! AUTH_REGISTRY="$AUTH_REGISTRY" AUTH_VERSION="$AUTH_VERSION" bash ./gen-secr
     echo "  ✗ gen-secrets.sh failed — aborting"; exit 1
 fi
 env_vars=$(grep -cE '^[A-Z][A-Z_]*=' .env || true)
-if [[ "$env_vars" -lt 30 ]]; then
-    echo "  ✗ .env has only $env_vars vars (expected >=30) — partial gen-secrets; aborting"; exit 1
+if [[ "$env_vars" -lt 25 ]]; then
+    echo "  ✗ .env has only $env_vars vars (expected >=25) — partial gen-secrets; aborting"; exit 1
 fi
 echo "  secrets generated (.env, $env_vars vars)"
 
@@ -73,7 +73,7 @@ while true; do
         docker compose ps
         # Native `podman logs`: the compose logs shim is unreliable and /tmp is not an artifact.
         echo "=== container logs (healthcheck timeout) ==="
-        for svc in postgres kratos-migrate kratos hydra-migrate hydra othala mailpit; do
+        for svc in postgres kratos-migrate kratos hydra-migrate hydra othala mailpit caddy; do
             echo "--- lab-$svc ---"
             podman logs --tail=60 "lab-$svc" 2>&1 || true
         done
@@ -88,6 +88,13 @@ while true; do
         break
     fi
     sleep 5
+done
+
+# The edge has no healthcheck. Smoke and the browser run enter through it (the portal reaches Kratos and
+# Hydra directly on the internal network), so wait until it answers.
+for _ in $(seq 1 30); do
+    [[ $(curl -s -o /dev/null -w '%{http_code}' http://localhost:8088/ || true) != 000 ]] && break
+    sleep 2
 done
 
 # Step 4b: seed both admin identities via the Kratos admin API with the
@@ -145,21 +152,20 @@ set -a; source .env; set +a
 bash ./smoke.sh
 SMOKE_EXIT=$?
 
-# Step 5b: browser e2e. smoke already did setup; bring up the Caddy edge and run playwright
+# Step 5b: browser e2e. smoke already did setup (the Caddy edge is part of the stack); run playwright
 # as a one-shot `compose run` (`up --exit-code-from` is unreliable under podman-compose).
 echo ""
 echo "=== browser e2e (Playwright) ==="
-# compose.browser.yml is layered only here (smoke needs the internal kratos URL and loopback
-# admin bind). It recreates othala with ADMIN_HOST=10.89.11.12 (0.0.0.0 is FATAL in listen.mjs;
-# loopback is unreachable from kratos, so the J recovery specs would fail; needs the subnet in
-# compose.yml) and KRATOS_PUBLIC_URL=http://auth.othala.test for the cookie domain.
+# compose.browser.yml is layered only here (smoke keeps the loopback admin bind). It recreates
+# othala with PORTAL_ADMIN_BIND_HOST=10.89.11.12 (0.0.0.0 is FATAL in listen.mjs; loopback is unreachable from
+# kratos, so the J recovery specs would fail; needs the subnet in compose.yml).
 BROWSER_EXIT=0
 BROWSER_COMPOSE=(docker compose -f compose.yml -f compose.browser.yml --profile browser --env-file=.env)
-if "${BROWSER_COMPOSE[@]}" up -d --no-deps othala caddy; then
+if "${BROWSER_COMPOSE[@]}" up -d --no-deps othala; then
     sleep 8  # othala recreate + caddy boot; settle before specs hit auth.othala.test
     timeout 360 "${BROWSER_COMPOSE[@]}" run --rm --no-deps -T playwright || BROWSER_EXIT=$?
 else
-    echo "  ✗ could not start the browser edge (othala + caddy)"; BROWSER_EXIT=1
+    echo "  ✗ could not recreate othala for the browser run"; BROWSER_EXIT=1
 fi
 if [[ $BROWSER_EXIT -eq 0 ]]; then echo "  ✓ browser e2e passed"; else echo "  ✗ browser e2e failed (exit $BROWSER_EXIT)"; fi
 

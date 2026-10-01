@@ -15,15 +15,13 @@ import {
   type AppTile,
 } from './tiles';
 import { validateMetadataAdmin, MetadataAdminError } from './metadata-admin';
-import { parseManifest } from './manifests';
+import { parseManifest, setManifestDir } from './manifests';
 import { lintManifests } from './manifest-lint';
 
 const dirs: string[] = [];
-const savedDir = process.env.MANIFEST_DIR;
 afterEach(() => {
   for (const d of dirs.splice(0)) rmSync(d, { recursive: true, force: true });
-  if (savedDir === undefined) delete process.env.MANIFEST_DIR;
-  else process.env.MANIFEST_DIR = savedDir;
+  setManifestDir(undefined);
 });
 
 function manifestDirWith(files: Record<string, string>): string {
@@ -34,7 +32,7 @@ function manifestDirWith(files: Record<string, string>): string {
     mkdirSync(join(p, '..'), { recursive: true });
     writeFileSync(p, body);
   }
-  process.env.MANIFEST_DIR = d;
+  setManifestDir(d);
   return d;
 }
 
@@ -165,7 +163,7 @@ describe('manifest lint: requires', () => {
 
 describe('e2e fixtures', () => {
   it('proxywatch requires a tailscale requirement that the fixtures define, and its guide follows the outline', () => {
-    process.env.MANIFEST_DIR = join(process.cwd(), '..', 'e2e', 'manifests');
+    setManifestDir(join(process.cwd(), '..', 'e2e', 'manifests'));
     const t = loadTiles().find((x) => x.slug === 'proxywatch');
     expect(t?.requires).toEqual(['tailscale']);
     expect(loadRequirements().get('tailscale')?.why).not.toBe('');

@@ -25,9 +25,7 @@ The browser profile adds Caddy and a Playwright container.
 
 ### Build the othala image from current source
 
-The browser specs exercise `ADMIN_HOST`-gated startup logic. You **must**
-build from current source — a stale cached image predates the
-`ADMIN_HOST=0.0.0.0` FATAL assert and will give false results.
+Build from current source; a stale image gives false results.
 
 ```sh
 # from the auth repo root
@@ -54,14 +52,12 @@ bash ../scripts/render-config.sh ../kratos/kratos.yml kratos.rendered.yml
 bash ../scripts/render-config.sh ../hydra/hydra.yml   hydra.rendered.yml
 chmod 0644 kratos.rendered.yml hydra.rendered.yml
 
-# Base stack (smoke services)
+# Base stack (smoke services, with the Caddy edge)
 docker-compose --env-file=.env up -d
 
-# Browser-profile services (othala + caddy — compose.browser.yml overrides
-# KRATOS_PUBLIC_URL and ADMIN_HOST, assigns othala a static IP on subnet
-# 10.89.11.0/24, and wires the Caddy edge alias)
+# Browser run: compose.browser.yml recreates othala with PORTAL_ADMIN_BIND_HOST on a static IP
 docker-compose -f compose.yml -f compose.browser.yml \
-  --profile browser --env-file=.env up -d --no-deps othala caddy
+  --profile browser --env-file=.env up -d --no-deps othala
 ```
 
 ### Run the browser specs
@@ -84,9 +80,6 @@ podman run --rm --platform linux/arm64 \
   -v "$PWD":/test -w /test \
   -e PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD=1 \
   -e BASE=http://auth.othala.test \
-  -e KRATOS_ADMIN_URL=http://kratos:4434 \
-  -e HYDRA_PUBLIC_URL=http://hydra:4444 \
-  -e HYDRA_ADMIN_URL=http://hydra:4445 \
   -e RECOVERY_ADMIN_EMAIL=admin.recovery@othala.test \
   -e MAILPIT_API=http://mailpit:8025 \
   -e OTHALA_ADMIN_URL=http://othala:4431 \
@@ -98,16 +91,13 @@ podman run --rm --platform linux/arm64 \
 
 ### Key facts about the browser profile
 
-- **ADMIN_HOST=10.89.11.12** — `compose.browser.yml` gives `othala` a
+- **PORTAL_ADMIN_BIND_HOST=10.89.11.12** — `compose.browser.yml` gives `othala` a
   static IP on the `10.89.11.0/24` e2e subnet and binds the admin port to
-  that IP, mirroring production (where portal binds to its pod-internal IP
-  and Kratos reaches it by hostname). `0.0.0.0` is FATAL at startup by
-  design (`listen.mjs` `assertStartupEnv`).
-- **KRATOS_PUBLIC_URL override** — set to `http://auth.othala.test` so the
-  portal's SSR browser-flow helpers build URLs that Chromium can resolve
-  through the Caddy edge alias. The smoke path keeps `http://kratos:4433`.
-- **Caddy alias** — `auth.othala.test` resolves to the Caddy container
-  inside the compose network via `networks.default.aliases`.
+  it, as production does. `0.0.0.0` is FATAL at startup by design
+  (`listen.mjs` `assertStartupEnv`).
+- **Caddy alias** — `auth.othala.test` resolves to the Caddy container via
+  `networks.default.aliases`; the portal and Chromium both use it.
+- **Breach check** — `kratos.e2e.yml`, merged after the rendered config, turns it off.
 - **Subnet** — defined only in `compose.browser.yml`; the base `compose.yml`
   (smoke path) uses the default dynamic subnet and is unaffected.
 

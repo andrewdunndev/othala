@@ -1,5 +1,5 @@
-// Manifest lint CLI: runs validateClients over every *.yaml in MANIFEST_DIR (or
-// the first argument), prints findings, exits 1 on BLOCK-class errors, 2 when
+// Manifest lint CLI: runs validateClients over every *.yaml in the first argument (or
+// the golden manifest dir), prints findings, exits 1 on BLOCK-class errors, 2 when
 // no directory or manifests are found.
 //   node dist/server/manifest-lint.mjs [<manifest-dir>]
 // Built by `npm run build:manifest-lint` (esbuild, same shape as registrar).
@@ -8,10 +8,10 @@ import { readdirSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { parseManifest, validateClients } from '../lib/manifests';
 import { lintManifests } from '../lib/manifest-lint';
+import { MANIFEST_DIR } from '../lib/constants';
 
 function manifestDir(): string {
-  // CLI argument takes precedence over env var.
-  return process.argv[2] ?? process.env.MANIFEST_DIR ?? '/etc/portal/manifests';
+  return process.argv[2] ?? MANIFEST_DIR;
 }
 
 async function main(): Promise<void> {

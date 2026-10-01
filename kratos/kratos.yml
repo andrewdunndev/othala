@@ -1,38 +1,21 @@
 # Kratos configuration: generic Othala instance template, ${VAR}-substituted by
-# scripts/render-config.sh. KRATOS_PG_HOST, KRATOS_ADMIN_HOST and CONSENT_HOST are compose service
-# names in the lab and container names in production.
+# scripts/render-config.sh. Service hosts (postgres, kratos, othala) are the golden topology, literal.
 
-dsn: "postgres://kratos:${KRATOS_PG_PASS}@${KRATOS_PG_HOST}:5432/kratos?sslmode=disable"
+dsn: "postgres://kratos:${KRATOS_PG_PASS}@postgres:5432/kratos?sslmode=disable"
 # KRATOS_PG_PASS must be URL-safe (percent-encoded): YAML quoting cannot fix a URL.
 
 serve:
   public:
     base_url: "${OTHALA_PUBLIC_URL}/"
-    port: 4433
     request_log:
       # Probes would write an access-log line every few seconds, burying real ones. Metrics still count them.
       disable_for_health: true
-    cors:
-      enabled: true
-      allowed_origins:
-        - "${OTHALA_PUBLIC_URL}"
-      allowed_methods: [GET, POST, PUT, PATCH, DELETE]
-      allowed_headers:
-        - Authorization
-        - Content-Type
-        - X-Session-Token
-        - Cookie
-        - X-CSRF-Token
-      exposed_headers: [Content-Type, Set-Cookie]
-      allow_credentials: true
-      max_age: 0
 
   admin:
-    base_url: "http://${KRATOS_ADMIN_HOST}:4434/"
+    base_url: "http://kratos:4434/"
     # Admin-plane bind address. The admin API is unauthenticated by design (the network is the
-    # control): segmented deployments bind an admin-plane address, the e2e harness uses 0.0.0.0.
+    # control): bind an admin-plane address, never one on a network shared with other services.
     host: "${KRATOS_ADMIN_BIND_HOST}"
-    port: 4434
     request_log:
       # This listener logs before adding the prefix, so probe /admin/health/ready here.
       disable_for_health: true
@@ -50,14 +33,10 @@ selfservice:
 
   methods:
     password:
-      enabled: true
       config:
-        # Unquoted: the schema types these as bool/int, and a quoted token renders to a string.
-        haveibeenpwned_enabled: ${OTHALA_HIBP_ENABLED}
-        max_breaches: 0
+        haveibeenpwned_enabled: true
         ignore_network_errors: false
-        identifier_similarity_check_enabled: true
-        min_password_length: ${OTHALA_PASSWORD_MIN_LENGTH}
+        min_password_length: 12
 
     # Passkeys: the PRIMARY login method (discoverable credentials, usernameless), distinct from
     # the legacy webauthn strategy below.
@@ -67,10 +46,10 @@ selfservice:
         rp:
           # CRITICAL one-way decision: the registrable parent, so passkeys work from any subdomain
           # origin. Changing it invalidates every enrolled passkey (shared with the webauthn RP below).
-          id: "${OTHALA_WEBAUTHN_RP_ID}"
+          id: "${OTHALA_APEX}"
           display_name: "${OTHALA_INSTANCE_NAME}"
           origins:
-            - "${OTHALA_WEBAUTHN_RP_ORIGINS}"
+            - "${OTHALA_PUBLIC_URL}"
 
     # WebAuthn (legacy): second factor / security key only; passkey owns passwordless.
     webauthn:
@@ -78,10 +57,10 @@ selfservice:
       config:
         passwordless: false
         rp:
-          id: "${OTHALA_WEBAUTHN_RP_ID}"
+          id: "${OTHALA_APEX}"
           display_name: "${OTHALA_INSTANCE_NAME}"
           origins:
-            - "${OTHALA_WEBAUTHN_RP_ORIGINS}"
+            - "${OTHALA_PUBLIC_URL}"
 
     totp:
       enabled: true
@@ -90,20 +69,13 @@ selfservice:
 
     # Code strategy: recovery AND passwordless email-OTP login (fallback for a device without a
     # passkey). max_submissions: 5 bounds brute force of the 6-digit code; lifespan: 15m is the
-    # per-method validity, distinct from flows.login.lifespan.
+    # per-method validity, distinct from the login flow lifespan.
     code:
       enabled: true
       passwordless_enabled: true
       config:
         max_submissions: 5
         lifespan: 15m
-
-    profile:
-      enabled: true
-
-    link:
-      # Magic link recovery is deprecated; use 'code' method above
-      enabled: false
 
     lookup_secret:
       enabled: true
@@ -133,7 +105,7 @@ selfservice:
             - hook: revoke_active_sessions
             - hook: web_hook
               config:
-                url: "http://${CONSENT_HOST}:4431/admin/second-factor-gate?method=webauthn"
+                url: "http://othala:4431/admin/second-factor-gate?method=webauthn"
                 method: POST
                 auth:
                   type: api_key
@@ -153,7 +125,7 @@ selfservice:
             - hook: revoke_active_sessions
             - hook: web_hook
               config:
-                url: "http://${CONSENT_HOST}:4431/admin/second-factor-gate?method=totp"
+                url: "http://othala:4431/admin/second-factor-gate?method=totp"
                 method: POST
                 auth:
                   type: api_key
@@ -178,7 +150,7 @@ selfservice:
           hooks:
             - hook: web_hook
               config:
-                url: "http://${CONSENT_HOST}:4431/admin/profile-gate"
+                url: "http://othala:4431/admin/profile-gate"
                 method: POST
                 auth:
                   type: api_key
@@ -193,7 +165,7 @@ selfservice:
                 can_interrupt: true
             - hook: web_hook
               config:
-                url: "http://${CONSENT_HOST}:4431/admin/profile-sessions"
+                url: "http://othala:4431/admin/profile-sessions"
                 method: POST
                 auth:
                   type: api_key
@@ -209,9 +181,7 @@ selfservice:
 
     recovery:
       enabled: true
-      use: code
       ui_url: "${OTHALA_PUBLIC_URL}/auth/recovery"
-      lifespan: 1h
       notify_unknown_recipients: false
       # Admin email-recovery is refused by the recovery-gate webhook before the privileged settings
       # session is issued; admins recover via console (docs/runbooks/admin-recovery.md).
@@ -220,9 +190,9 @@ selfservice:
         hooks:
           - hook: web_hook
             config:
-              # Webhook to the loopback admin port (:4431, host CONSENT_HOST), not the public port.
+              # Webhook to the internal-network admin listener (PORTAL_ADMIN_BIND_HOST) (othala:4431), not the public port.
               # The app constant-time compares the bearer and fails closed on a missing or wrong secret.
-              url: "http://${CONSENT_HOST}:4431/admin/recovery-gate"
+              url: "http://othala:4431/admin/recovery-gate"
               method: POST
               auth:
                 # Kratos webhooks support only api_key | basic_auth: api_key with header
@@ -240,9 +210,7 @@ selfservice:
 
     verification:
       enabled: true
-      use: code
       ui_url: "${OTHALA_PUBLIC_URL}/auth/verification"
-      lifespan: 1h
       after:
         default_browser_return_url: "${OTHALA_PUBLIC_URL}/"
 
@@ -252,7 +220,6 @@ selfservice:
 
     login:
       ui_url: "${OTHALA_PUBLIC_URL}/auth/login"
-      lifespan: 10m
       # aal1 base: the login flow takes no required_aal. AAL2 step-up is requested per flow by
       # requireAdminSession (admin.ts); a global AAL2 would lock out identities with no second factor.
       after:
@@ -263,7 +230,7 @@ selfservice:
           hooks:
             - hook: web_hook
               config:
-                url: "http://${CONSENT_HOST}:4431/admin/login-code-gate"
+                url: "http://othala:4431/admin/login-code-gate"
                 method: POST
                 auth:
                   type: api_key
@@ -281,11 +248,6 @@ selfservice:
       # Admin-driven onboarding (one-time enrollment URLs); no self-service signup
       enabled: false
       ui_url: "${OTHALA_PUBLIC_URL}/auth/registration"
-      lifespan: 1h
-      after:
-        password:
-          hooks:
-            - hook: session
 
 session:
   # 720h is the blast-radius knob: the cookie is apex-scoped, so a stolen one is good on every
@@ -295,9 +257,6 @@ session:
     # Apex domain so the IdP and every subdomain app share the session cookie. SameSite=Lax permits
     # same-site POSTs; CSRF mitigation is per-request tokens in the portal (csrf.ts).
     domain: "${OTHALA_APEX}"
-    name: ory_kratos_session
-    persistent: true
-    same_site: Lax
   whoami:
     # CRITICAL: aal1, not highest_available, which makes whoami return session.identity = null for
     # MFA identities and forward-auth.ts would 401 them. AAL is enforced per flow.
@@ -305,7 +264,6 @@ session:
 
 cookies:
   domain: "${OTHALA_APEX}"
-  same_site: Lax
 
 identity:
   default_schema_id: family
@@ -318,7 +276,7 @@ courier:
     # Single courier connection, shared with the portal contact-form mailer
     # (OTHALA_SMTP_CONNECTION_URI): one URI, one outbound path.
     connection_uri: "${OTHALA_SMTP_CONNECTION_URI}"
-    from_address: "${OTHALA_SMTP_FROM_ADDRESS}"
+    from_address: "noreply@${OTHALA_APEX}"
     from_name: "${OTHALA_INSTANCE_NAME}"
     # local_name: leave default; Fastmail accepts standard HELO
 
@@ -335,23 +293,20 @@ secrets:
     - "${KRATOS_CIPHER_SECRET_CURRENT}"
 
 log:
-  level: info
   format: json
-  leak_sensitive_values: false
 
-# Tracing (OpenTelemetry), opt-in: the block below is OMITTED when OTHALA_OTLP_PROVIDER is empty
-# (Ory v26.2.0 rejects a present block with provider "") and emitted when it is "otel".
-# OTLP is HTTP/protobuf only (port 4318), Ory ignores OTEL_* env vars, insecure: true is
-# plaintext to the firewall-scoped host alloy receiver, sampling_ratio 0.1 bounds volume.
-#@if OTHALA_OTLP_PROVIDER
+# Tracing (OpenTelemetry), opt-in: the block is OMITTED unless OTHALA_OTLP_ENDPOINT (host:port) is set.
+# OTLP is HTTP/protobuf only, Ory ignores OTEL_* env vars, insecure: true is plaintext to the
+# firewall-scoped collector, sampling_ratio 0.1 bounds volume.
+#@if OTHALA_OTLP_ENDPOINT
 tracing:
   service_name: kratos
-  deployment_environment: ${OTHALA_OTLP_ENVIRONMENT}
-  provider: ${OTHALA_OTLP_PROVIDER}     # "otel" when enabled (deploy)
+  deployment_environment: production
+  provider: otel
   providers:
     otlp:
-      server_url: ${OTHALA_OTLP_ENDPOINT}   # host:port, HTTP — host alloy OTLP receiver
-      insecure: true                         # plaintext to the host alloy receiver
+      server_url: ${OTHALA_OTLP_ENDPOINT}
+      insecure: true
       sampling:
         sampling_ratio: 0.1
 #@endif
@@ -366,7 +321,3 @@ hashers:
 
 ciphers:
   algorithm: xchacha20-poly1305
-
-feature_flags:
-  # Account verification flow as a separate UI; we want it.
-  cacheable_sessions: false

@@ -61,8 +61,8 @@ Each names its enforcer and the test that fails if the enforcer stops working.
   marker read fresh from the admin API (`isAdminMarker`,
   `portal/src/lib/admin-auth.ts`). No group grants it. Tests:
   `portal/src/lib/admin-auth.test.ts`, `e2e/playwright/tests/f-aal2-bypass.spec.ts`.
-- **Loopback admin listener.** `portal/src/server/listen.mjs`: privileged routes
-  on a separate loopback listener whose mux is disjoint from the public one,
+- **Internal-network admin listener (PORTAL_ADMIN_BIND_HOST).** `portal/src/server/listen.mjs`: privileged routes
+  on a separate internal-network listener whose mux is disjoint from the public one,
   guarded by one bearer secret compared with `bearerMatches`
   (constant-time, fail-closed on an unset secret). Test:
   `portal/scripts/public-mux-disjoint.test.mjs`.

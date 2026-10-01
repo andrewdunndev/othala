@@ -1,8 +1,9 @@
 // Kratos public-API client for Astro SSR pages. Flow GETs forward the user's
 // Cookie header so Kratos can read the anti-CSRF cookie (else 403).
-// KRATOS_PUBLIC_URL defaults to http://localhost:4433.
+// Server-side calls use the internal Kratos public address, not the edge.
 
 import { Configuration, FrontendApi, ResponseError } from '@ory/client-fetch';
+import { KRATOS_PUBLIC_URL } from './constants';
 import type {
   FlowResult,
   LoginFlow,
@@ -13,7 +14,7 @@ import type {
 } from './types';
 
 export function kratosBase(): string {
-  return process.env.KRATOS_PUBLIC_URL ?? 'http://localhost:4433';
+  return KRATOS_PUBLIC_URL;
 }
 
 const HEALTH_TIMEOUT_MS = 2000;
@@ -42,7 +43,7 @@ export async function getSession(cookie?: string): Promise<Session | null> {
   }
 }
 
-/** Health check for the three-state landing: public /health/alive, 2s timeout. */
+/** Health check for the three-state landing: internal /health/alive, 2s timeout. */
 export async function isReachable(): Promise<boolean> {
   const ctl = new AbortController();
   const t = setTimeout(() => ctl.abort(), HEALTH_TIMEOUT_MS);

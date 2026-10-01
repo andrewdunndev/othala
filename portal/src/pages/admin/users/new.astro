@@ -12,7 +12,7 @@ import AdminFormScripts from '../../../components/AdminFormScripts.astro';
 import { requireAdminSession } from '../../../lib/admin';
 import { createIdentity, getRecoveryLink } from '../../../lib/admin-api';
 import { signToken, verifyToken, CSRFError } from '../../../lib/csrf';
-import { defaultGroup } from '../../../lib/config';
+import { DEFAULT_GROUP } from '../../../lib/constants';
 
 const guard = await requireAdminSession(Astro);
 if (guard instanceof Response) return guard;
@@ -87,7 +87,7 @@ if (Astro.request.method === 'POST') {
           recoveryEmail: form.recoveryEmail || undefined,
         },
         metadataAdmin: {
-          groups: [defaultGroup],
+          groups: [DEFAULT_GROUP],
         },
       });
       const link = await getRecoveryLink(created.id, ENROLLMENT_TTL);
@@ -244,7 +244,7 @@ const shareText = success
         </div>
 
         <p class="text-sm muted">
-          The new identity is placed in the <span class="mono">{defaultGroup}</span> group automatically.
+          The new identity is placed in the <span class="mono">{DEFAULT_GROUP}</span> group automatically.
           Group membership, app access, and per-app role overrides are assigned after creation via the user's Edit page.
         </p>
 

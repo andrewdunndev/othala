@@ -1,4 +1,4 @@
-// OIDC client manifest loader. Reads <slug>.yaml from MANIFEST_DIR at request time (30 s cache, dropped on SIGHUP).
+// OIDC client manifest loader. Reads <slug>.yaml from the manifest dir (constants.ts) at request time (30 s cache, dropped on SIGHUP).
 // loadClientManifests() returns EVERY app manifest, presentation-only tiles included; the OIDC subset
 // comes from oidcClientManifests() and getClientManifest().
 
@@ -6,6 +6,7 @@ import { readdirSync, readFileSync, statSync } from 'node:fs';
 import { join } from 'node:path';
 import { parse as parseYaml } from 'yaml';
 import { parseAccessGroups } from './access-groups';
+import { MANIFEST_DIR } from './constants';
 
 export interface ClientRole {
   name: string;
@@ -65,8 +66,17 @@ export function shouldEmitGroups(m: ClientManifest): boolean {
   return m.emitGroupsClaim ?? true;
 }
 
-function manifestDir(): string {
-  return process.env.MANIFEST_DIR ?? '/etc/portal/manifests';
+let manifestDirOverride: string | undefined;
+
+/** Point the loaders at another directory, or back at MANIFEST_DIR with `undefined`. Tests only: production never calls it. */
+export function setManifestDir(dir: string | undefined): void {
+  manifestDirOverride = dir;
+}
+
+/** The manifest directory every loader reads. Production is fixed at MANIFEST_DIR; under `astro dev` the MANIFEST_DIR env var points the dev server at a scratch catalog. */
+export function manifestDir(): string {
+  const devDir = import.meta.env?.DEV ? process.env.MANIFEST_DIR : undefined;
+  return manifestDirOverride ?? devDir ?? MANIFEST_DIR;
 }
 
 interface CacheEntry {

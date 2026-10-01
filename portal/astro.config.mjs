@@ -15,7 +15,7 @@ import tailwindcss from '@tailwindcss/vite';
 // (copied into dist by the build) sets ASTRO_NODE_AUTOSTART=disabled before
 // importing entry.mjs — which makes the adapter's start() a no-op — then
 // serves the exported `handler` on the PUBLIC port and stands up a SEPARATE
-// loopback-only ADMIN port (http.createServer) in the same process. Only
+// internal-network admin listener (PORTAL_ADMIN_BIND_HOST) (http.createServer) in the same process. Only
 // listen.mjs binds sockets. The admin port never delegates to `handler`, so
 // the two muxes stay disjoint. (Middleware mode would also export a bare
 // handler; standalone is kept because the rest of the build/runtime tooling
@@ -23,14 +23,6 @@ import tailwindcss from '@tailwindcss/vite';
 //
 // We do NOT use Astro's Sessions API. Identity sessions live in the
 // Kratos cookie on `.dunn.dev`, not in any Astro-managed store.
-
-// Build-time `site` (canonical URL — affects sitemaps and metadata) reads the
-// same env var the runtime lib/config.ts uses. It is host-specific by nature,
-// but it does NOT gate any security control: a default-localhost `site` baked
-// into an OSS image only mislabels canonical metadata, which the runtime can't
-// fix anyway. The SECURITY-bearing host resolution (allowedDomains) is host-
-// AGNOSTIC — see below — so the published image carries no baked host.
-const PUBLIC_URL = process.env.OTHALA_PUBLIC_URL ?? 'http://localhost:4321';
 
 // security.allowedDomains — HOST-AGNOSTIC by design. We pass a single empty
 // pattern `[{}]`, which matchPattern() treats as a match-anything wildcard
@@ -68,10 +60,6 @@ export default defineConfig({
   // flood of large POST bodies cannot exhaust heap before rate-limiting fires.
   adapter: node({ mode: 'standalone', trustProxy: true, bodySizeLimit: 262144 }),
   integrations: [],
-  // Canonical URL for metadata/sitemaps only (no security weight). Defaults to
-  // localhost for a bare/OSS build; operators who care about canonical links
-  // set OTHALA_PUBLIC_URL at build time, but it is not required.
-  site: PUBLIC_URL,
   security: {
     // Host-agnostic wildcard — see the allowedDomains comment above. Keeps
     // checkOrigin meaningful behind a trustProxy reverse proxy WITHOUT baking

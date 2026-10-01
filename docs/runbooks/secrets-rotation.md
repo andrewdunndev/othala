@@ -72,7 +72,7 @@ key).
    populates a fresh schema under the new secret), then Hydra.
 
 7. Re-issue every client secret by running the Othala in-app registrar as a
-   `--rm` one-shot. It walks the manifests in `MANIFEST_DIR` and re-creates
+   `--rm` one-shot. It walks the manifests and re-creates
    each Hydra client with its sops-sourced `<SLUG>_CLIENT_SECRET`.
 
 8. Update consumer-service podman secrets if any `<slug>_oidc_client_secret`
@@ -86,7 +86,7 @@ key).
 
 After rotation:
 
-- The registrar one-shot exited 0 for every manifest in `MANIFEST_DIR`.
+- The registrar one-shot exited 0 for every manifest.
 - A test login through any OIDC client completes.
 - Hydra logs show no decryption errors:
   `journalctl --user -u <hydra-unit> -n 50`.

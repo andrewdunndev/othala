@@ -6,29 +6,23 @@ import { mkdtempSync, writeFileSync, rmSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 
-async function withTilesModule(env, callback) {
-  const saved = { ...process.env };
-  for (const key of Object.keys(process.env)) {
-    if (key.startsWith('OTHALA_') || key === 'MANIFEST_DIR') delete process.env[key];
-  }
-  Object.assign(process.env, env);
+async function withTilesModule({ MANIFEST_DIR: dir }, callback) {
+  const { setManifestDir } = await import('../src/lib/manifests.ts');
+  setManifestDir(dir);
   try {
     const bust = `?bust=${Date.now()}-${Math.random().toString(36).slice(2)}`;
     const mod = await import(/* @vite-ignore */ `../src/lib/tiles.ts${bust}`);
     return await callback(mod);
   } finally {
-    for (const key of Object.keys(process.env)) {
-      if (key.startsWith('OTHALA_') || key === 'MANIFEST_DIR') delete process.env[key];
-    }
-    Object.assign(process.env, saved);
+    setManifestDir(undefined);
   }
 }
 
-async function parseSingleTile(yamlContent, env = {}) {
+async function parseSingleTile(yamlContent) {
   const dir = mkdtempSync(join(tmpdir(), 'tiles-test-'));
   try {
     writeFileSync(join(dir, 'testapp.yaml'), yamlContent);
-    return await withTilesModule({ MANIFEST_DIR: dir, ...env }, (mod) => {
+    return await withTilesModule({ MANIFEST_DIR: dir }, (mod) => {
       const tiles = mod.loadTiles();
       return tiles[0];
     });
@@ -65,43 +59,6 @@ presentation:
   assert.ok(tile, 'tile must be parsed');
   assert.equal(tile.accessGroup, 'everyone',
     'absent access_group must fall back to the default group (everyone)');
-});
-
-test('parseTile: absent access_group respects OTHALA_DEFAULT_GROUP override', async () => {
-  const tile = await parseSingleTile(
-    `
-presentation:
-  name: Test App
-  description: A test application
-  url: https://testapp.othala.test
-  icon: TA
-  auth_kind: external
-  order: 10
-`,
-    { OTHALA_DEFAULT_GROUP: 'family' },
-  );
-  assert.ok(tile, 'tile must be parsed');
-  assert.equal(tile.accessGroup, 'family',
-    'OTHALA_DEFAULT_GROUP=family must override the default');
-});
-
-test('parseTile: explicit access_group wins over OTHALA_DEFAULT_GROUP', async () => {
-  const tile = await parseSingleTile(
-    `
-presentation:
-  name: Test App
-  description: A test application
-  url: https://testapp.othala.test
-  icon: TA
-  auth_kind: oidc
-  access_group: access-specific
-  order: 10
-`,
-    { OTHALA_DEFAULT_GROUP: 'everyone' },
-  );
-  assert.ok(tile, 'tile must be parsed');
-  assert.equal(tile.accessGroup, 'access-specific',
-    'explicit access_group must override OTHALA_DEFAULT_GROUP');
 });
 
 test('parseTile: empty access_group string falls back to default group', async () => {

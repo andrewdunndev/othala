@@ -1,5 +1,5 @@
 // Kratos admin API wrappers for /admin/* SSR pages, via the Ory SDK IdentityApi. The admin port (http://kratos:4434)
-// has no auth; network isolation is the gate, and KRATOS_ADMIN_TOKEN, if set, is forwarded as a bearer.
+// has no auth; network isolation is the gate.
 // The state flip uses RFC 6902 JSON-Patch. Non-2xx surfaces as a ResponseError for callers to render.
 
 import {
@@ -15,25 +15,10 @@ import {
 import type { Identity } from './types';
 import { validateMetadataAdmin } from './metadata-admin';
 import { revokeSubject } from './revoke';
-import { defaultSchemaId } from './config';
+import { KRATOS_ADMIN_URL } from './constants';
 
-function adminBase(): string {
-  return process.env.KRATOS_ADMIN_URL ?? 'http://kratos:4434';
-}
-
-function adminToken(): string {
-  return process.env.KRATOS_ADMIN_TOKEN ?? '';
-}
-
-// The SDK sends the bearer on every request when `accessToken` is set, so configure it only when a token exists.
 function identityApi(): IdentityApi {
-  const token = adminToken();
-  return new IdentityApi(
-    new Configuration({
-      basePath: adminBase(),
-      ...(token ? { accessToken: token } : {}),
-    }),
-  );
+  return new IdentityApi(new Configuration({ basePath: KRATOS_ADMIN_URL }));
 }
 
 export interface IdentityTraits {
@@ -63,7 +48,6 @@ export interface MetadataAdmin {
 export interface CreateIdentityInput {
   traits: IdentityTraits;
   metadataAdmin: MetadataAdmin;
-  schemaId?: string;
 }
 
 export interface UpdateIdentityInput {
@@ -90,11 +74,22 @@ export async function getIdentity(id: string): Promise<Identity> {
 export async function createIdentity(input: CreateIdentityInput): Promise<Identity> {
   // J1: enforce the metadata_admin shape here; the Kratos schema validates only `traits`, so a typo would be stored.
   const validated = validateMetadataAdmin(input.metadataAdmin);
-  const createIdentityBody: CreateIdentityBody = {
-    schema_id: input.schemaId ?? defaultSchemaId,
+  // schema_id is omitted on purpose: Kratos applies identity.default_schema_id, the single source of truth. The SDK
+  // types the field as required, so the cast is the price of not duplicating that setting here.
+  const createIdentityBody = {
     traits: input.traits,
     metadata_admin: validated,
-  };
+    // The admin vouches for the address: Kratos keeps a pre-declared entry that matches the trait (same via and
+    // lowercased value), so the person is verified without a mail round trip and the id_token says so.
+    verifiable_addresses: [
+      {
+        value: input.traits.email.toLowerCase(),
+        via: 'email',
+        verified: true,
+        status: 'completed',
+      },
+    ],
+  } as CreateIdentityBody;
   return identityApi().createIdentity({ createIdentityBody });
 }
 

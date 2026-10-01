@@ -32,7 +32,7 @@ import { identityGroups } from '../lib/gate';
 import { isAdminMarker } from '../lib/admin-auth';
 import HeaderActions from '../components/HeaderActions.astro';
 import type { Identity } from '../lib/types';
-import { siteName, adminContact } from '../lib/config';
+import { instanceName } from '../lib/config';
 
 type State = 'down' | 'pre-auth' | 'post-auth';
 
@@ -145,7 +145,7 @@ const devLinks = [
   { href: '/admin',                label: 'Admin (requires AAL2)' },
 ];
 ---
-<Layout title="Home" description={`Single sign-on for ${siteName}.`} compact={state === 'post-auth'}>
+<Layout title="Home" description={`Single sign-on for ${instanceName}.`} compact={state === 'post-auth'}>
 
   {state === 'post-auth' && (
     <Fragment slot="header-actions">
@@ -156,7 +156,7 @@ const devLinks = [
   {state === 'down' && (
     <PageHero
       title="Auth services starting up"
-      lede={`The substrate is offline or unreachable. This page will pick the session back up as soon as it returns. If it persists, contact ${adminContact}.`}
+      lede={`The substrate is offline or unreachable. This page will pick the session back up as soon as it returns. If it persists, contact your administrator.`}
     >
       <p class="holding-tech">{downReason}</p>
     </PageHero>
@@ -164,7 +164,7 @@ const devLinks = [
 
   {state === 'pre-auth' && (
     <>
-      <PageHero title="Welcome" lede={`Single sign-on for ${siteName}. One sign-in, every app.`}>
+      <PageHero title="Welcome" lede={`Single sign-on for ${instanceName}. One sign-in, every app.`}>
         <div class="cta-row">
           <a href="/auth/login" class="button button-primary">Sign in</a>
           <a href="/auth/recovery" class="button button-secondary">Recover access</a>
@@ -236,7 +236,7 @@ const devLinks = [
           </>
         ) : (
           <p class="section-prose">
-            Your account doesn't have any app access yet. Contact {adminContact} to
+            Your account doesn't have any app access yet. Contact your administrator to
             enable one.
           </p>
         )}
@@ -337,7 +337,7 @@ const devLinks = [
             </form>
 
             <div class="request-thanks" id="request-thanks" hidden>
-              <p class="request-thanks-msg">Thanks — your request is on its way to {adminContact}.</p>
+              <p class="request-thanks-msg">Thanks — your request is on its way to your administrator.</p>
               <p class="mono request-thanks-note">You can close this window.</p>
             </div>
           </div>

@@ -1,5 +1,5 @@
 # Worked Caddyfile for one Othala instance (an adopter example, not a drop-in deploy file).
-# Site address: $OTHALA_PUBLIC_HOST. TLS: DNS-01 via caddy-dns/cloudflare and CF_API_TOKEN; swap the
+# Site address: $OTHALA_PUBLIC_URL (Caddy takes scheme://host). TLS: DNS-01 via caddy-dns/cloudflare and CF_API_TOKEN; swap the
 # tls block for another solver. Upstreams: kratos:4433, hydra:4444, othala:8080.
 # The default backend is the app so static assets (/_astro/*, favicon, manifest) keep their
 # Content-Type; /oauth2/{login,consent,logout} are app challenge handlers. rate_limit is mholt/caddy-ratelimit.
@@ -12,7 +12,7 @@
 	}
 }
 
-{$OTHALA_PUBLIC_HOST} {
+{$OTHALA_PUBLIC_URL} {
 	tls {
 		dns cloudflare {env.CF_API_TOKEN}
 	}
@@ -39,7 +39,7 @@
 		rate_limit {
 			zone othala_selfservice {
 				key    {client_ip}
-				events 10
+				events 30
 				window 1m
 			}
 		}

@@ -10,6 +10,7 @@ import {
   ResponseError,
   type JsonPatch,
 } from '@ory/client-fetch';
+import { HYDRA_ADMIN_URL, KRATOS_ADMIN_URL } from './constants';
 
 /** Which upstream dependency a revoke step failed against. */
 export type RevokeDependency = 'kratos-admin' | 'hydra-admin';
@@ -53,32 +54,12 @@ export interface RevokeResult {
   hydraConsentRevoked: boolean;
 }
 
-function kratosAdminBase(): string {
-  return process.env.KRATOS_ADMIN_URL ?? 'http://kratos:4434';
-}
-
-function hydraAdminBase(): string {
-  return process.env.HYDRA_ADMIN_URL ?? 'http://hydra:4445';
-}
-
 function buildIdentityApi(): IdentityApi {
-  const token = process.env.KRATOS_ADMIN_TOKEN ?? '';
-  return new IdentityApi(
-    new Configuration({
-      basePath: kratosAdminBase(),
-      ...(token ? { accessToken: token } : {}),
-    }),
-  );
+  return new IdentityApi(new Configuration({ basePath: KRATOS_ADMIN_URL }));
 }
 
 function buildOAuth2Api(): OAuth2Api {
-  const token = process.env.HYDRA_ADMIN_TOKEN ?? '';
-  return new OAuth2Api(
-    new Configuration({
-      basePath: hydraAdminBase(),
-      ...(token ? { accessToken: token } : {}),
-    }),
-  );
+  return new OAuth2Api(new Configuration({ basePath: HYDRA_ADMIN_URL }));
 }
 
 /** Resolve injected deps, defaulting to the live SDK clients. */
@@ -130,7 +111,7 @@ export async function revokeSubject(
       throw new RevokeError(
         'kratos-admin',
         'state->inactive',
-        'Could not mark the identity inactive. Verify KRATOS_ADMIN_URL reachability and that the identity id exists, then retry the deactivate.',
+        'Could not mark the identity inactive. Verify Kratos admin reachability and that the identity id exists, then retry the deactivate.',
         err,
       );
     }
@@ -147,7 +128,7 @@ export async function revokeSubject(
       throw new RevokeError(
         'kratos-admin',
         'delete-sessions',
-        'Could not revoke the subject\'s Kratos sessions; fan-out ABORTED (the subject may still hold a live session). Verify KRATOS_ADMIN_URL, then re-run the revoke.',
+        'Could not revoke the subject\'s Kratos sessions; fan-out ABORTED (the subject may still hold a live session). Verify the Kratos admin API, then re-run the revoke.',
         err,
       );
     }
@@ -169,7 +150,7 @@ export async function revokeSubject(
     throw new RevokeError(
       'hydra-admin',
       phase,
-      'Kratos sessions are cut, but Hydra still remembers the login (remembered login still open — a fresh token could skip-login). Verify HYDRA_ADMIN_URL, then re-run the revoke (it is idempotent).',
+      'Kratos sessions are cut, but Hydra still remembers the login (remembered login still open — a fresh token could skip-login). Verify the Hydra admin API, then re-run the revoke (it is idempotent).',
       err,
     );
   }
@@ -182,7 +163,7 @@ export async function revokeSubject(
     throw new RevokeError(
       'hydra-admin',
       'revoke-consent-sessions',
-      'Login sessions are cut, but Hydra consent + associated access tokens persist. Verify HYDRA_ADMIN_URL, then re-run the revoke (it is idempotent).',
+      'Login sessions are cut, but Hydra consent + associated access tokens persist. Verify the Hydra admin API, then re-run the revoke (it is idempotent).',
       err,
     );
   }
@@ -205,7 +186,7 @@ export async function revokeConsentSessions(
     throw new RevokeError(
       'hydra-admin',
       'revoke-consent-sessions',
-      'Hydra consent + associated tokens persist. Verify HYDRA_ADMIN_URL, then use Force re-login on this identity.',
+      'Hydra consent + associated tokens persist. Verify the Hydra admin API, then use Force re-login on this identity.',
       err,
     );
   }

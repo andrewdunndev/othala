@@ -104,7 +104,7 @@ export function lintManifests(
         warn(
           `group ${JSON.stringify(g)} is referenced but not in the known group ` +
             `set — a typo here silently locks everyone out (fail-closed). Add it ` +
-            `to OTHALA_IDENTITY_GROUPS or fix the name.`,
+            `to a manifest's access group or fix the name.`,
         );
       }
     }

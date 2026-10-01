@@ -12,7 +12,7 @@ import PageHero from '../../components/PageHero.astro';
 import { browserFlows, getLoginFlow, getSession } from '../../lib/kratos';
 import { getIdentity } from '../../lib/admin-api';
 import { needsStepUp } from '../../lib/step-up';
-import { siteName } from '../../lib/config';
+import { instanceName } from '../../lib/config';
 import { csrfToken, nodesByGroup, asInput, scriptNodes, safeOnclick } from '../../lib/nodes';
 import { deriveLoginTiers } from '../../lib/login-tiers';
 import type { FlowMessage } from '../../lib/types';
@@ -77,7 +77,7 @@ const isCodeEntry = codeNodes.some((n) => {
 const { hasPasskey, hasCode, hasPassword, totpNodes, aal2WebauthnNodes, lookupNodes, isAal2, hasAal2Methods } =
   deriveLoginTiers(flow, aal);
 ---
-<Layout title="Sign in" description={`Sign in to ${siteName}.`} bare>
+<Layout title="Sign in" description={`Sign in to ${instanceName}.`} bare>
 
   <PageHero
     title="Welcome back."

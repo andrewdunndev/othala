@@ -4,16 +4,13 @@ Ory Hydra server configuration in `hydra.yml`.
 
 ## CORS allowlist
 
-`serve.public.cors.allowed_origins` is rendered from `OTHALA_CORS_ALLOWED_ORIGINS`
-(comma-separated, unquoted origins). A browser-SPA client fetches
-`/.well-known/openid-configuration` and `/oauth2/token` from its own origin, so
-that origin has to be listed; server-side clients need no entry. With no
-browser-SPA client, this is just `OTHALA_PUBLIC_URL`.
+`serve.public.cors.allowed_origins` is `OTHALA_PUBLIC_URL`. Browser clients on
+another origin are unsupported.
 
 ## Clients
 
 Client definitions are not stored here. Each manifest's `oidc:` block is
-registered from `MANIFEST_DIR` on boot and on SIGHUP, with `<SLUG>_CLIENT_SECRET`
+registered on boot and on SIGHUP, with `<SLUG>_CLIENT_SECRET`
 from env; a manifest with only `presentation:` is skipped. See
 ["An app is a manifest"](../README.md#an-app-is-a-manifest),
 [`e2e/manifests/`](../e2e/manifests/) for annotated examples,

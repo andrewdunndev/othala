@@ -22,7 +22,7 @@ authorization problem to solve a decomposition nobody needed.
 flowchart LR
   browser([Browser / app client]) --> edge[Edge proxy<br/>TLS, one hostname]
   subgraph pod[One trust domain: the admin APIs never leave it]
-    app[The app<br/>public SSR listener + loopback admin listener]
+    app[The app<br/>public SSR listener + internal-network admin listener (PORTAL_ADMIN_BIND_HOST)]
     kratos[Kratos]
     hydra[Hydra]
     pg[(Postgres)]
@@ -43,7 +43,7 @@ the app's public SSR port. Neither admin API is exposed, and no app in front of 
 given an admin credential.
 
 **The app runs two listeners in one process** (`portal/src/server/listen.mjs`). The public listener
-serves the Astro handler. The admin listener binds `ADMIN_HOST` (loopback by default) with its own
+serves the Astro handler. The admin listener binds `PORTAL_ADMIN_BIND_HOST` with its own
 mux, `ADMIN_GET_ROUTES` and `ADMIN_POST_ROUTES`, that never delegates to the Astro handler. The two
 route sets are disjoint *by construction* rather than by a routing rule that could be edited wrong;
 `portal/scripts/public-mux-disjoint.test.mjs` and `portal/scripts/admin-port.test.mjs` are what hold
@@ -239,13 +239,12 @@ variable set from the template itself and fails listing missing *names* only, ne
 that could carry a secret into a log. The e2e harness and the deploy plane call the same render, so
 what is validated and what is deployed differ in values, not in mechanism.
 
-Four settings become commitments the moment anyone enrols a credential against them, and should be
+Three settings become commitments the moment anyone enrols a credential against them, and should be
 chosen deliberately rather than discovered later:
 
-- **`OTHALA_WEBAUTHN_RP_ID`** — changing it invalidates every enrolled passkey.
 - **`OTHALA_PUBLIC_URL`** — Hydra's issuer. Every client's discovery and every issued token carry it.
-- **`OTHALA_APEX`** — the Kratos cookie domain, and the ceiling on which hostnames can share the
-  session.
+- **`OTHALA_APEX`** — the Kratos cookie domain and the WebAuthn RP id, and the ceiling on which
+  hostnames can share the session. Changing it invalidates every enrolled passkey.
 - **Hydra's `subject_identifiers`** — `public` subjects mean the subject id is the identity id
   everywhere; switching to pairwise later changes every downstream app's notion of who a user is.
 

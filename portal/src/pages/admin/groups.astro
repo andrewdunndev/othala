@@ -1,6 +1,6 @@
 ---
 // Admin: groups overview (read-only). Identity groups are the
-// OTHALA_IDENTITY_GROUPS names; access groups are the registry-derived
+// fixed set in constants.ts; access groups are the registry-derived
 // Group -> Apps view (type comes from manifest binding, not name). Each card
 // lists members. Editing happens on the per-user page.
 
@@ -103,7 +103,7 @@ function membersOf(group: string): MemberRef[] {
     <p class="section-subtitle">Identity groups</p>
     <p class="muted text-sm">Who you are. Drives default roles via group_role_map.</p>
     <div class="notice">
-      Identity groups are set via the <code>OTHALA_IDENTITY_GROUPS</code> env var (edit + restart to add one). Access groups are derived automatically from app OIDC manifests.
+      Identity groups are fixed: admin and everyone. Access groups are derived automatically from app OIDC manifests.
     </div>
     <div class="card-grid">
       {identityGroups.map((g) => {

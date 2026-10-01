@@ -8,7 +8,7 @@ import type { ClientManifest } from './manifests';
 import type { Identity } from './types';
 import { isAdminMarker } from './admin-auth';
 import { lookupRole } from './claims';
-import { identityGroups } from './config';
+import { IDENTITY_GROUPS } from './constants';
 
 export type AccessSource =
   | { kind: 'override' }
@@ -26,10 +26,9 @@ export interface EffectiveAccessRow {
 
 /**
  * Canonical identity-group order for `metadata_admin.groups` (identity groups first), so the stored array is a pure
- * function of the group SET. It decides no role (lookupRole is order-independent). Driven by OTHALA_IDENTITY_GROUPS;
- * 'admin' is always first.
+ * function of the group SET. It decides no role (lookupRole is order-independent). 'admin' is always first.
  */
-export const IDENTITY_GROUP_ORDER: readonly string[] = identityGroups;
+export const IDENTITY_GROUP_ORDER: readonly string[] = IDENTITY_GROUPS;
 
 /**
  * Sort groups into the canonical stored shape: identity groups (IDENTITY_GROUP_ORDER) in that order, then the rest

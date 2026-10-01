@@ -5,7 +5,7 @@
 import { getSession, browserFlows } from './kratos';
 import { isAdminMarker } from './admin-auth';
 import { revokeSubject, type RevokeResult } from './revoke';
-import { adminFreshnessHours } from './config';
+import { ADMIN_FRESHNESS_HOURS } from './constants';
 import type { Session } from './types';
 import { getIdentity } from './admin-api';
 
@@ -101,7 +101,7 @@ export async function requireAdminSession(astro: any): Promise<Session | Respons
   }
 
   // (c) Freshness gate: same step-up as (b), before the admin-marker fetch.
-  if (!isSessionFresh(session, adminFreshnessHours)) {
+  if (!isSessionFresh(session, ADMIN_FRESHNESS_HOURS)) {
     const returnTo = encodeURIComponent(astro.url.pathname + astro.url.search);
     return astro.redirect(browserFlows.login({ aal: 'aal2', refresh: true, returnTo }));
   }
