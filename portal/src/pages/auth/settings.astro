@@ -229,10 +229,10 @@ const lookupLabel: Record<string, string> = {
     </header>
 
     <div class="settings-status" role="status" aria-label="Account security summary">
-      <span class={`badge ${status.twoStep ? '' : 'badge-warning'}`}>Two-step: {status.twoStep ? 'on' : 'off'}</span>
-      <span class={`badge ${status.passkeys > 0 ? '' : 'badge-warning'}`}>Passkeys: {status.passkeys}</span>
-      <span class={`badge ${status.backupCodes || !status.twoStep ? '' : 'badge-warning'}`}>Backup codes: {status.backupCodes ? 'saved' : 'not saved'}</span>
-      {status.emailUnverified && <span class="badge badge-warning">Email: unverified</span>}
+      <span class={`badge ${status.twoStep ? '' : 'badge-warning'}`}>Two-step {status.twoStep ? 'on' : 'off'}</span>
+      <span class={`badge ${status.passkeys > 0 ? '' : 'badge-warning'}`}>{status.passkeys} {status.passkeys === 1 ? 'passkey' : 'passkeys'}</span>
+      <a class={`badge ${status.backupCodes || !status.twoStep ? '' : 'badge-warning'}`} href="#recovery">Backup codes {status.backupCodes ? 'saved' : 'not saved'}</a>
+      {status.emailUnverified && <span class="badge badge-warning">Unverified email</span>}
       {reauth && (
         <span class="status-note" data-testid="reauth-notice">
           It has been a while, so changes ask you to confirm it's you first. <a href={reauthHref} data-astro-reload>Confirm it's you</a>
@@ -285,7 +285,7 @@ const lookupLabel: Record<string, string> = {
 
         {has('passkey') && (
           <div class="group">
-            <h3>Passkeys <span class="badge">recommended</span></h3>
+            <h3>Passkeys <span class="badge">Recommended</span></h3>
             <p>Sign in with your fingerprint, face or screen lock. Add one on each device you use.</p>
             <form method="POST" enctype="application/x-www-form-urlencoded" action={ui.action} class="settings-form wide">
               <input type="hidden" name="csrf_token" value={csrf} />
@@ -362,7 +362,7 @@ const lookupLabel: Record<string, string> = {
       <section class="panel card" id="two-step" data-card aria-labelledby="h-2sv">
         <h2 id="h-2sv">Two-step verification</h2>
         <div class="card-flash" data-flash tabindex="-1" role="status">{devFlash && devFlashCard === 'two-step' && <div class="notice notice-success">{devFlash}{LOST_KEYS.has(dev?.flash ?? '') && <> Lost it? <a href="#signout-all" data-open="signout-all">Also sign out everywhere</a></>}</div>}</div>
-        <p class="lede">A second check keeps others out even if they learn your password.</p>
+        <p class="lede">A second check keeps others out even if they learn your password. Backup codes are under <a href="#recovery">Recovery</a>.</p>
         {showBackupPrompt && (
           <>
             <input type="checkbox" form="disclosures" class="disclose cb-dismiss" id="backup-dismiss" aria-label="Dismiss the backup codes reminder" />
@@ -389,7 +389,7 @@ const lookupLabel: Record<string, string> = {
                   <p>An app on your phone shows a new 6-digit code every 30 seconds.</p>
                   <ul class="items">
                     <li>
-                      <div class="item-id"><span class="item-name">Your app</span><span class="badge">on</span></div>
+                      <div class="item-id"><span class="item-name">Your app</span><span class="badge">On</span></div>
                       <input type="checkbox" form="disclosures" class="disclose cb-replace" id="totp-replace" aria-label="Replace authenticator app" />
                       <input type="checkbox" form="disclosures" class="disclose cb-remove" id="totp-remove" aria-label="Remove authenticator app" />
                       <div class="item-actions">
@@ -427,7 +427,7 @@ const lookupLabel: Record<string, string> = {
               {!totp.enrolled && (
                 <>
                   <input type="checkbox" form="disclosures" class="disclose cb-setup" id="totp-setup" checked={setupOpen} />
-                  <p class="when-closed">Not set up. An authenticator app on your phone shows a new 6-digit code every 30 seconds.</p>
+                  <p class="when-closed">Not set up. Get an authenticator app (Google Authenticator, Microsoft Authenticator or Aegis); it shows a new 6-digit code every 30 seconds.</p>
                   <div class="form-actions when-closed">
                     <label for="totp-setup" class="button button-secondary button-sm toggle-label lbl-setup">Set up authenticator app</label>
                   </div>
@@ -543,7 +543,7 @@ const lookupLabel: Record<string, string> = {
 
         {has('lookup_secret') && (
           <div class="group">
-            <h3>Backup codes <span class={`badge ${status.backupCodes || !status.twoStep ? '' : 'badge-warning'}`}>{status.backupCodes ? 'saved' : 'not saved'}</span></h3>
+            <h3>Backup codes <span class={`badge ${status.backupCodes || !status.twoStep ? '' : 'badge-warning'}`}>{status.backupCodes ? 'Saved' : 'Not saved'}</span></h3>
             <p>{status.twoStep || lookup.enrolled ? 'Single-use codes for when nothing else works. Print or store them safely.' : 'Single-use codes for when a second step is lost. Add a passkey or an authenticator app first, then get your codes.'}</p>
             <form method="POST" enctype="application/x-www-form-urlencoded" action={ui.action} class="settings-form wide">
               <input type="hidden" name="csrf_token" value={csrf} />
@@ -576,6 +576,7 @@ const lookupLabel: Record<string, string> = {
                     return (
                       <button
                         class={`button ${primary ? 'button-primary' : 'button-secondary'} button-sm`}
+                        disabled={a.name === 'lookup_secret_regenerate' && !lookup.enrolled && !status.twoStep}
                         type={a.type}
                         name={a.name}
                         value={String(a.value ?? '')}
@@ -626,7 +627,7 @@ const lookupLabel: Record<string, string> = {
                     <span class="static-label" id="recovery-email-label">Recovery email address</span>
                     <span class="static-value" aria-labelledby="recovery-email-label">{value('traits.recoveryEmail') || <span class="static-empty">None yet</span>}</span>
                   </div>
-                  <div class="form-actions"><a class="button button-secondary button-sm" href={reauthHref} data-astro-reload>Confirm it's you to change it</a></div>
+                  <div class="form-actions"><a class="button button-secondary button-sm" href={reauthHref} data-astro-reload>{value('traits.recoveryEmail') ? 'Change recovery email' : 'Add a recovery email'}</a></div>
                 </>
               ) : (
                 <>
@@ -663,7 +664,7 @@ const lookupLabel: Record<string, string> = {
             <div class="field">
               <label for="username-readonly">Username</label>
               <input id="username-readonly" type="text" value={traits.username} readonly aria-describedby="username-hint" />
-              <p id="username-hint" class="field-hint">Only an administrator can change your username.</p>
+              <p id="username-hint" class="field-hint">Only a household admin can change your username.</p>
               {nodeMessages('traits.username').map((m) => <div class={`notice notice-${kind(m.type)}`}>{m.text}</div>)}
             </div>
             <div class="field">
@@ -691,7 +692,7 @@ const lookupLabel: Record<string, string> = {
               {nodeMessages('traits.email').map((m) => <div class={`notice notice-${kind(m.type)}`}>{messageText(m)}</div>)}
             </div>
             <div class="form-actions">
-              <button class="button button-secondary button-sm" type="submit" name="method" value="profile">Save profile</button>
+              <button class="button button-primary button-sm" type="submit" name="method" value="profile">Save profile</button>
             </div>
           </form>
         </section>
@@ -702,7 +703,7 @@ const lookupLabel: Record<string, string> = {
         <div class="card-flash" data-flash tabindex="-1" role="status">{null}</div>
         <div class="group">
           <h3>Sessions</h3>
-          <p>"Sign out everywhere" ends every session and the remembered logins, so no app can quietly sign you back in.</p>
+          <p>"Sign out everywhere" signs out every device and app, so none can quietly sign you back in.</p>
           <form id="signout-form" method="POST" enctype="application/x-www-form-urlencoded" action="/auth/settings" data-astro-reload hidden>
             <input type="hidden" name="action" value="sign-out-everywhere" />
             <input type="hidden" name="csrf_token" value={csrfSignOut} />
@@ -710,7 +711,7 @@ const lookupLabel: Record<string, string> = {
           <div class="settings-form">
             <input type="checkbox" form="disclosures" class="disclose cb-remove" id="signout-all" aria-label="Sign out everywhere" />
             <div class="form-actions">
-              <label for="signout-all" class="button button-secondary button-sm toggle-label lbl-remove"><span class="on-closed">Sign out everywhere</span></label>
+              <label for="signout-all" class="button button-danger button-sm toggle-label lbl-remove"><span class="on-closed">Sign out everywhere</span></label>
             </div>
             <div class="panel-row panel-remove">
               <span>Sign out of every device and app, this one included?</span>
@@ -721,13 +722,13 @@ const lookupLabel: Record<string, string> = {
           {!logoutInfo && <p class="field-hint">Local logout endpoint unavailable; the revoke still runs.</p>}
         </div>
         <div class="group">
-          <h3>Your apps {isAdmin && <span class="badge">Admin</span>}</h3>
+          <h3>Your apps {isAdmin && <span class="badge badge-accent">Admin</span>}</h3>
           {yourApps.length > 0 ? (
             <div class="kv-chips" style="margin-top: var(--space-2)">
               {yourApps.map((t) => <span class="badge badge-muted">{t.name}</span>)}
             </div>
           ) : (
-            <p>No apps yet. Your administrator can add you.</p>
+            <p>No apps yet. A household admin can add you.</p>
           )}
         </div>
       </section>

@@ -177,7 +177,7 @@ async function handleAdminMarkerGate(req, res, runtime, refusalText) {
 }
 
 /** Username gate text: the username keys some apps' accounts, so only an administrator changes it. */
-export const USERNAME_CHANGE_REFUSAL = 'Your username can only be changed by an administrator.';
+export const USERNAME_CHANGE_REFUSAL = 'Your username can only be changed by a household admin.';
 export const PROFILE_UPDATE_UNAVAILABLE = 'Profile changes are unavailable right now. Try again later.';
 
 /** Username-gate verdict (pure): refuse unless `stored` (pre-save) and `proposed` are the same non-empty string. */
