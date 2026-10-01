@@ -27,17 +27,21 @@ const settle = () => {
   const edit = take();
   const wrong = document.querySelector<HTMLElement>('[aria-invalid="true"]');
   const saved = document.querySelector<HTMLElement>('[data-flow-success]');
+  // A card the server already filled (the dev fixtures render the saved line themselves).
+  const filled = document.querySelector<HTMLElement>('[data-flash]:not(:empty)');
   if (edit && wrong) {
     wrong.focus({ preventScroll: true });
     wrong.scrollIntoView({ block: 'center' });
-  } else if (edit && saved && FLASH[edit.action]) {
-    const slot = document.getElementById(edit.card)?.querySelector<HTMLElement>('[data-flash]');
+  } else if (edit && (filled || (saved && FLASH[edit.action]))) {
+    const slot = filled ?? document.getElementById(edit.card)?.querySelector<HTMLElement>('[data-flash]');
     if (slot) {
-      const note = document.createElement('div');
-      note.className = 'notice notice-success';
-      note.textContent = FLASH[edit.action];
-      slot.replaceChildren(note);
-      saved.remove();
+      if (!filled && saved) {
+        const note = document.createElement('div');
+        note.className = 'notice notice-success';
+        note.textContent = FLASH[edit.action];
+        slot.replaceChildren(note);
+        saved.remove();
+      }
       slot.focus({ preventScroll: true });
       slot.scrollIntoView({ block: 'center' });
     }

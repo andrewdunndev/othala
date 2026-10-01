@@ -68,7 +68,7 @@ describe('passkey names', () => {
     const me = identityWith([MINE]);
     expect(renameVerdict(me, undefined, 'x')).toMatchObject({ ok: false, status: 400 });
     expect(renameVerdict(me, 'ZZ', 'x')).toMatchObject({ ok: false, status: 400 });
-    expect(renameVerdict(me, OTHER, 'x')).toMatchObject({ ok: false, status: 403 });
+    expect(renameVerdict(me, OTHER, 'x')).toMatchObject({ ok: false, status: 403, code: 'unknown' });
     expect(renameVerdict(me, MINE, '  ')).toMatchObject({ ok: false, status: 400 });
     expect(renameVerdict(me, MINE, ' Pixel ')).toEqual({ ok: true, name: 'Pixel' });
   });

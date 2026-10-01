@@ -36,7 +36,8 @@
 /* Disclosure without script: a visually hidden checkbox per row, toggled by its label button, opens the confirm or rename row. */
 .items li, .tools { position: relative; }
 .disclose { position: absolute; opacity: 0; width: 1px; height: 1px; pointer-events: none; }
-.toggle-label { cursor: pointer; display: inline-flex; align-items: center; justify-content: center; }
+.toggle-label { cursor: pointer; }
+.settings .button { display: inline-flex; align-items: center; justify-content: center; }
 .cb-remove:focus-visible ~ * .lbl-remove, .cb-rename:focus-visible ~ * .lbl-rename, .cb-replace:focus-visible ~ * .lbl-replace, .cb-setup:focus-visible ~ * .lbl-setup, .cb-dismiss:focus-visible ~ .prompt .toggle-label { outline: 2px solid var(--input-focus); outline-offset: 2px; }
 .toggle-label .on-open { display: none; }
 .cb-remove:checked ~ * .lbl-remove .on-closed, .cb-rename:checked ~ * .lbl-rename .on-closed, .cb-replace:checked ~ * .lbl-replace .on-closed, .cb-setup:checked ~ * .lbl-setup .on-closed { display: none; }
