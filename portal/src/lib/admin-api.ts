@@ -329,22 +329,28 @@ export interface AddressPayload {
  */
 export function emailVerifiedPatch(
   identity: Pick<Identity, 'traits' | 'verifiable_addresses'>,
-): Array<{ op: 'add' | 'replace'; path: string; value: AddressPayload | AddressPayload[] }> {
+  displayed?: string,
+): Array<{ op: 'add' | 'replace' | 'test'; path: string; value: unknown }> {
   const email = String((identity.traits as { email?: unknown } | undefined)?.email ?? '').toLowerCase();
   const existing = identity.verifiable_addresses ?? [];
   const own = existing.findIndex((a) => String(a.via) === 'email' && a.value.toLowerCase() === email);
   const vouched: AddressPayload = { value: email, via: 'email', verified: true, status: 'completed' };
+  // With the displayed address, the patch applies only while the stored trait still holds exactly that value.
+  const guard = displayed === undefined ? [] : [{ op: 'test' as const, path: '/traits/email', value: displayed }];
   if (own === -1) {
-    return existing.length
-      ? [{ op: 'add', path: '/verifiable_addresses/-', value: vouched }]
-      : [{ op: 'add', path: '/verifiable_addresses', value: [vouched] }];
+    return [
+      ...guard,
+      existing.length
+        ? { op: 'add', path: '/verifiable_addresses/-', value: vouched }
+        : { op: 'add', path: '/verifiable_addresses', value: [vouched] },
+    ];
   }
-  return [{ op: 'replace', path: `/verifiable_addresses/${own}`, value: vouched }];
+  return [...guard, { op: 'replace', path: `/verifiable_addresses/${own}`, value: vouched }];
 }
 
 /** Mark the email trait's address verified (admin vouches for it) by a targeted patch; nothing else is written. */
-export async function markEmailVerified(id: string): Promise<void> {
+export async function markEmailVerified(id: string, displayed: string): Promise<void> {
   const api = identityApi();
   const current = await api.getIdentity({ id });
-  await api.patchIdentity({ id, jsonPatch: emailVerifiedPatch(current) as never });
+  await api.patchIdentity({ id, jsonPatch: emailVerifiedPatch(current, displayed) as never });
 }

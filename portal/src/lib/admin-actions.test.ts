@@ -552,9 +552,24 @@ describe('prerequisites and verified email', () => {
   });
 
   it('marks the email verified through the targeted write', async () => {
+    const id = makeIdentity('someone');
+    const outcome = await markVerifiedAction(fd({ email: id.traits.email }), makeCtx({ identity: id }));
+
+    expect(markEmailVerifiedMock).toHaveBeenCalledWith('target-1', id.traits.email);
+    expect(outcome.actionResult?.kind).toBe('email-verified');
+  });
+
+  it('refuses when the stored email differs from the one the admin saw', async () => {
+    const outcome = await markVerifiedAction(fd({ email: 'old@othala.test' }), makeCtx({ identity: makeIdentity('someone') }));
+
+    expect(markEmailVerifiedMock).not.toHaveBeenCalled();
+    expect(outcome.actionResult?.kind).toBe('error');
+  });
+
+  it('refuses when no address was posted', async () => {
     const outcome = await markVerifiedAction(fd(), makeCtx({ identity: makeIdentity('someone') }));
 
-    expect(markEmailVerifiedMock).toHaveBeenCalledWith('target-1');
-    expect(outcome.actionResult?.kind).toBe('email-verified');
+    expect(markEmailVerifiedMock).not.toHaveBeenCalled();
+    expect(outcome.actionResult?.kind).toBe('error');
   });
 });

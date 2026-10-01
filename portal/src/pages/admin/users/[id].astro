@@ -354,8 +354,9 @@ const roleNote = Object.keys(roleOverrides).length;
                   section="signin"
                   message={`Mark ${email} as verified? Only do this if you know the address belongs to ${first}.`}
                   confirmLabel="Mark verified"
-
-                />
+                >
+                  <input type="hidden" name="email" value={email} />
+                </Ask>
               )}
             </li>
             <li>

@@ -24,4 +24,10 @@ describe('emailVerifiedPatch', () => {
     const out = emailVerifiedPatch({ traits: { email: 'a@example.test' }, verifiable_addresses: undefined });
     expect(out).toEqual([{ op: 'add', path: '/verifiable_addresses', value: [vouched('a@example.test')] }]);
   });
+
+  it('guards the write with a test op on the displayed address, ahead of the address op', () => {
+    const out = emailVerifiedPatch({ traits: { email: 'a@example.test' }, verifiable_addresses: undefined }, 'a@example.test');
+    expect(out[0]).toEqual({ op: 'test', path: '/traits/email', value: 'a@example.test' });
+    expect(out).toHaveLength(2);
+  });
 });

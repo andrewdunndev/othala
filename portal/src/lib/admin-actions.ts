@@ -232,11 +232,19 @@ export function removeGroupsAction(fd: FormData, ctx: ActionContext): Promise<Ac
 }
 
 /** Admin vouches for the email trait's address; the only write is that one address. */
-export async function markVerifiedAction(_fd: FormData, ctx: ActionContext): Promise<ActionOutcome> {
-  if (!ctx.identity.traits?.email) {
+export async function markVerifiedAction(fd: FormData, ctx: ActionContext): Promise<ActionOutcome> {
+  const stored = ctx.identity.traits?.email;
+  if (!stored) {
     return { actionResult: { kind: 'error', message: 'This person has no email address on file.' }, refetch: false };
   }
-  await markEmailVerified(ctx.id);
+  const displayed = String(fd.get('email') ?? '');
+  if (displayed !== stored) {
+    return {
+      actionResult: { kind: 'error', message: 'Their email address changed. Check the new address and try again.' },
+      refetch: true,
+    };
+  }
+  await markEmailVerified(ctx.id, displayed);
   return { actionResult: { kind: 'email-verified' }, refetch: true };
 }
 
