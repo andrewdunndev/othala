@@ -4,6 +4,7 @@ import { test, expect } from '../fixtures';
 import { adminAal2Context } from '../fixtures';
 import { createIdentityWithPassword, TEST_PASSWORD } from '../actions/identity';
 import { listMail, waitForMessage, forRecipient } from '../actions/mail';
+import { csrfTokenFor, postAdminAction } from '../actions/admin-post';
 
 async function assertNoInviteEmail(toAddress: string, afterMs: number): Promise<void> {
   const deadline = Date.now() + 4_000;
@@ -88,7 +89,7 @@ test('U1 — admin "Send invite email" delivers a code-only message via the Krat
   }
 });
 
-test('U2 — an admin-marked target is offered no invite email or setup link (console-only), and mailpit receives nothing', async ({
+test('U2 — an admin-marked target is offered no invite email or setup link, a hand-made POST is refused server-side, and mailpit receives nothing', async ({
   browser,
   baseURL,
 }) => {
@@ -107,6 +108,13 @@ test('U2 — an admin-marked target is offered no invite email or setup link (co
     displayName: 'U2 Admin Target',
     groups: [],
     isAdmin: true,
+    kratosAdminURL: process.env.KRATOS_ADMIN_URL ?? 'http://kratos:4434',
+  });
+  const bystander = await createIdentityWithPassword({
+    email: `u2.bystander.${uniqueSuffix}@othala.test`,
+    username: `u2.bystander.${uniqueSuffix}`,
+    displayName: 'U2 Bystander',
+    groups: [],
     kratosAdminURL: process.env.KRATOS_ADMIN_URL ?? 'http://kratos:4434',
   });
   console.log('[U2] acting admin:', actingAdmin.id, '| admin target:', adminTarget.id, adminTarget.email);
@@ -130,6 +138,18 @@ test('U2 — an admin-marked target is offered no invite email or setup link (co
     await expect(page.getByText(/admins get back in through the console/i), 'U2: the console-only note is shown').toBeVisible();
     await expect(page.getByRole('button', { name: 'Send invite email' }), 'U2: no invite email action is offered').toHaveCount(0);
     await expect(page.getByRole('button', { name: 'Send setup link' }), 'U2: no setup link action is offered').toHaveCount(0);
+
+    // The server guard stands on its own: a token from a non-admin's page, posted at the admin target by hand.
+    await page.goto(`${baseURL}/admin/users/${bystander.id}`, { waitUntil: 'networkidle' });
+    const token = await csrfTokenFor(page, 'send-invite-email');
+    expect(token, 'U2: the bystander page carries an invite-email token').not.toBe('');
+    const resp = await postAdminAction(ctx, baseURL!, adminTarget.id, {
+      csrf_token: token,
+      action: 'send-invite-email',
+      confirmEmail: adminTarget.email,
+    });
+    expect(resp.status(), 'U2: the refusal is a normal re-render, not a 403').toBe(200);
+    expect(await resp.text(), 'U2: the server refuses admin recovery by email').toMatch(/Admin recovery is console-only/);
 
     await assertNoInviteEmail(adminTarget.email, startTime);
 
