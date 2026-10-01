@@ -66,29 +66,11 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
-    environment:
-      DSN: postgres://kratos:${KRATOS_PG_PASS}@postgres:5432/kratos?sslmode=disable
-      # Vars consumed by kratos.yml after scripts/render-config.sh.
-      OTHALA_PUBLIC_URL: ${OTHALA_PUBLIC_URL}
-      OTHALA_APEX: ${OTHALA_APEX}
-      OTHALA_INSTANCE_NAME: ${OTHALA_INSTANCE_NAME}
-      OTHALA_HIBP_ENABLED: ${OTHALA_HIBP_ENABLED}
-      OTHALA_PASSWORD_MIN_LENGTH: ${OTHALA_PASSWORD_MIN_LENGTH}
-      # Host routing (compose service names)
-      KRATOS_PG_HOST: postgres
-      KRATOS_ADMIN_HOST: kratos
-      CONSENT_HOST: othala
-      # Secrets (needed by kratos.yml even in migrate mode to pass config validation)
-      KRATOS_PG_PASS: ${KRATOS_PG_PASS}
-      KRATOS_COOKIE_SECRET_CURRENT: ${KRATOS_COOKIE_SECRET_CURRENT}
-      KRATOS_CIPHER_SECRET_CURRENT: ${KRATOS_CIPHER_SECRET_CURRENT}
-      RECOVERY_GATE_SECRET: ${RECOVERY_GATE_SECRET}
-      SMTP_USER: lab
-      SMTP_PASS: lab
     volumes:
       - ./kratos.rendered.yml:/etc/config/kratos/kratos.yml:ro,z
+      - ./kratos.e2e.yml:/etc/config/kratos/e2e.yml:ro,z
       - ../kratos/identity.schema.json:/etc/config/kratos/identity.schema.json:ro,z
-    command: ["migrate", "sql", "-e", "--yes", "--config", "/etc/config/kratos/kratos.yml"]
+    command: ["migrate", "sql", "-e", "--yes", "--config", "/etc/config/kratos/kratos.yml", "--config", "/etc/config/kratos/e2e.yml"]
 
   kratos:
     image: docker.io/oryd/kratos:v26.2.0@sha256:2a13bb8d362c7a7ae33bd7c0f5168aee46921f15c916a06346db91c06dc76643
@@ -108,30 +90,12 @@ services:
         condition: service_healthy
       kratos-migrate:
         condition: service_completed_successfully
-    environment:
-      DSN: postgres://kratos:${KRATOS_PG_PASS}@postgres:5432/kratos?sslmode=disable
-      # Vars consumed by kratos.yml after scripts/render-config.sh.
-      OTHALA_PUBLIC_URL: ${OTHALA_PUBLIC_URL}
-      OTHALA_APEX: ${OTHALA_APEX}
-      OTHALA_INSTANCE_NAME: ${OTHALA_INSTANCE_NAME}
-      OTHALA_HIBP_ENABLED: ${OTHALA_HIBP_ENABLED}
-      OTHALA_PASSWORD_MIN_LENGTH: ${OTHALA_PASSWORD_MIN_LENGTH}
-      # Secrets
-      KRATOS_PG_PASS: ${KRATOS_PG_PASS}
-      KRATOS_COOKIE_SECRET_CURRENT: ${KRATOS_COOKIE_SECRET_CURRENT}
-      KRATOS_CIPHER_SECRET_CURRENT: ${KRATOS_CIPHER_SECRET_CURRENT}
-      RECOVERY_GATE_SECRET: ${RECOVERY_GATE_SECRET}
-      SMTP_USER: lab
-      SMTP_PASS: lab
-      # Host routing (compose service names)
-      KRATOS_PG_HOST: postgres
-      KRATOS_ADMIN_HOST: kratos
-      CONSENT_HOST: othala
     volumes:
       - ./kratos.rendered.yml:/etc/config/kratos/kratos.yml:ro,z
+      - ./kratos.e2e.yml:/etc/config/kratos/e2e.yml:ro,z
       - ../kratos/identity.schema.json:/etc/config/kratos/identity.schema.json:ro,z
       - ../kratos/hooks/recovery-gate.jsonnet:/etc/config/kratos/hooks/recovery-gate.jsonnet:ro,z
-    command: ["serve", "--config", "/etc/config/kratos/kratos.yml", "--dev", "--watch-courier"]
+    command: ["serve", "--config", "/etc/config/kratos/kratos.yml", "--config", "/etc/config/kratos/e2e.yml", "--dev", "--watch-courier"]
     healthcheck:
       test: ["CMD-SHELL", "wget -qO- http://localhost:4434/admin/health/ready || exit 1"]
       interval: 5s
@@ -146,11 +110,9 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
-    environment:
-      DSN: postgres://hydra:${HYDRA_PG_PASS}@postgres:5432/hydra?sslmode=disable
-      HYDRA_PG_HOST: postgres
-      HYDRA_PG_PASS: ${HYDRA_PG_PASS}
-    command: ["migrate", "sql", "-e", "--yes"]
+    volumes:
+      - ./hydra.rendered.yml:/etc/config/hydra/hydra.yml:ro,z
+    command: ["migrate", "sql", "-e", "--yes", "--config", "/etc/config/hydra/hydra.yml"]
 
   hydra:
     image: docker.io/oryd/hydra:v26.2.0@sha256:ff67c7fb5f95074fa53374d41151713554960504b340cd3f95b09e65deaea2a9
@@ -168,15 +130,6 @@ services:
     depends_on:
       hydra-migrate:
         condition: service_completed_successfully
-    environment:
-      DSN: postgres://hydra:${HYDRA_PG_PASS}@postgres:5432/hydra?sslmode=disable
-      HYDRA_PG_PASS: ${HYDRA_PG_PASS}
-      HYDRA_SYSTEM_SECRET: ${HYDRA_SYSTEM_SECRET}
-      HYDRA_COOKIE_SECRET_CURRENT: ${HYDRA_COOKIE_SECRET_CURRENT}
-      # Host routing + instance identity consumed by canonical hydra.yml
-      HYDRA_PG_HOST: postgres
-      OTHALA_PUBLIC_URL: ${OTHALA_PUBLIC_URL}
-      OTHALA_CORS_ALLOWED_ORIGINS: ${OTHALA_CORS_ALLOWED_ORIGINS}
     volumes:
       - ./hydra.rendered.yml:/etc/config/hydra/hydra.yml:ro,z
     command: ["serve", "all", "--config", "/etc/config/hydra/hydra.yml", "--dev"]
@@ -218,16 +171,10 @@ services:
       mailpit:
         condition: service_healthy
     environment:
-      # Internal service URLs (compose names; the deploy plane uses container names on auth.network)
-      KRATOS_PUBLIC_URL: http://kratos:4433
-      KRATOS_ADMIN_URL: http://kratos:4434
-      HYDRA_PUBLIC_URL: http://hydra:4444
-      HYDRA_ADMIN_URL: http://hydra:4445
       # Instance identity (consumed by the app for UI + OIDC issuer context)
       OTHALA_PUBLIC_URL: ${OTHALA_PUBLIC_URL}
       OTHALA_INSTANCE_NAME: ${OTHALA_INSTANCE_NAME}
       OTHALA_APEX: ${OTHALA_APEX}
-      MANIFEST_DIR: /etc/portal/manifests
       CSRF_SECRET: ${CSRF_SECRET}
       # Admin authority is metadata_admin.admin===true, set via the Kratos admin API only.
       RECOVERY_GATE_SECRET: ${RECOVERY_GATE_SECRET}
@@ -238,10 +185,7 @@ services:
       GRAFANA_CLIENT_SECRET: ${GRAFANA_CLIENT_SECRET}
       AUDIOBOOKSHELF_CLIENT_SECRET: ${AUDIOBOOKSHELF_CLIENT_SECRET}
       PROMPTDESK_CLIENT_SECRET: ${PROMPTDESK_CLIENT_SECRET}
-      HOST: 0.0.0.0
-      PORT: "8080"
       ADMIN_HOST: 127.0.0.1
-      ADMIN_PORT: "4431"
     volumes:
       - ./manifests:/etc/portal/manifests:ro,z
     healthcheck:
@@ -270,14 +214,13 @@ services:
     # smoke.sh passes the dance script via stdin.
     entrypoint: ["node"]
 
-  # Browser-test edge (profile: browser only, not the golden run): fronts app, Kratos
-  # and Hydra on one host at :8088 so a browser can drive login, consent and token.
+  # Edge: fronts app, Kratos and Hydra on one host (auth.othala.test, :8088 published) so the
+  # portal reaches Kratos at OTHALA_PUBLIC_URL as in production and a browser can drive login.
   caddy:
     # dunn.dev/caddy, not stock caddy: n-rate-limits.spec.ts needs rate_limit. Same
     # tag as production (iac dag-caddy.container); re-resolve via skopeo inspect.
     image: registry.gitlab.com/dunn.dev/caddy:v2.11.4-3@sha256:78e84240c3c703bb374aa003424c56143376c621a0b7e17cc6bcf009eec86446
     container_name: lab-caddy
-    profiles: ["browser"]
     restart: unless-stopped
     security_opt:
       - "no-new-privileges:true"
@@ -313,7 +256,7 @@ services:
 
   # Browser e2e runner (profile: browser only): resolves auth.othala.test to Caddy and runs
   # the /test specs from the prebaked e2e-tester image (no runtime npm install;
-  # the inner VM has no egress). compose.browser.yml overrides KRATOS_PUBLIC_URL to the public host.
+  # the inner VM has no egress).
   playwright:
     image: ${AUTH_REGISTRY}/e2e-tester:${AUTH_VERSION}
     container_name: lab-playwright
@@ -325,9 +268,6 @@ services:
         condition: service_healthy
     environment:
       BASE: http://auth.othala.test
-      KRATOS_ADMIN_URL: http://kratos:4434
-      HYDRA_PUBLIC_URL: http://hydra:4444
-      HYDRA_ADMIN_URL: http://hydra:4445
       # J2: recovery-gate on the othala admin port (static IP via ADMIN_HOST in compose.browser.yml).
       OTHALA_ADMIN_URL: http://othala:4431
       RECOVERY_GATE_SECRET: ${RECOVERY_GATE_SECRET}

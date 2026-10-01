@@ -37,35 +37,17 @@ HYDRA_PG_PASS=$(gen_alnum)
 # SMTP: mailpit catches Kratos courier and portal contact-form mail via one shared URI
 # (kratos.yml courier.smtp.connection_uri, lib/mailer.ts). ?disable_starttls=true is required:
 # Kratos v26.2.0 defaults to MandatoryStartTLS and abandons every message against plain SMTP.
-SMTP_USER=lab
-SMTP_PASS=lab
 OTHALA_SMTP_CONNECTION_URI=smtp://mailpit:1025/?disable_starttls=true
 OTHALA_CONTACT_RECIPIENT=ops@othala.test
 
-# Instance identity: auth.othala.test is the browser-profile Caddy edge alias (compose net, no DNS).
+# Instance identity: auth.othala.test is the Caddy edge alias (compose net, no DNS). No tracing
+# endpoint is set, so the tracing blocks are dropped from the rendered configs.
 OTHALA_PUBLIC_URL=http://auth.othala.test
-# Hydra CORS allowlist (hydra.yml only): comma-separated, unquoted.
-OTHALA_CORS_ALLOWED_ORIGINS=http://auth.othala.test
-OTHALA_PUBLIC_HOST=auth.othala.test
 OTHALA_APEX=othala.test
 OTHALA_INSTANCE_NAME='Othala Lab'
 
-# Tracing is OFF: an empty OTHALA_OTLP_PROVIDER makes render-config.sh drop the whole tracing
-# block (# fence), because Ory v26.2.0 rejects a present-but-empty provider.
-OTHALA_OTLP_PROVIDER=""
-
-# HIBP off (the CI VM has no network for it); min length 12.
-OTHALA_HIBP_ENABLED=false
-OTHALA_PASSWORD_MIN_LENGTH=12
-
-# ── Host routing (compose service names; production quadlets use container names) ───
-KRATOS_PG_HOST=postgres
-HYDRA_PG_HOST=postgres
-KRATOS_ADMIN_HOST=kratos
-CONSENT_HOST=othala
-
-# The e2e network is flat, so the admin APIs bind all interfaces; segmented deployments bind
-# them to the admin-plane IP.
+# The e2e network is flat, so the admin APIs bind all interfaces; deployments bind them to the
+# admin-plane IP.
 KRATOS_ADMIN_BIND_HOST=0.0.0.0
 HYDRA_ADMIN_BIND_HOST=0.0.0.0
 
