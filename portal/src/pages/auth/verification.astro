@@ -77,7 +77,7 @@ const phase: 'request' | 'sent' | 'done' = flow?.state === 'passed_challenge' ? 
   ) : (
   <section class="panel focus-card">
     {hasCode && ui && (
-      <form method="POST" action={ui.action} class="focus-form verify-form">
+      <form method="POST" enctype="application/x-www-form-urlencoded" action={ui.action} class="focus-form verify-form">
         <input type="hidden" name="csrf_token" value={csrf} />
         <input type="hidden" name="method" value="code" />
         <FlowNodes

@@ -106,13 +106,13 @@ const plate = tile ?? { iconHref: undefined, icon: monogram(appName), iconBleed:
       )}
 
       <div class="consent-actions">
-        <form method="POST" action="/oauth2/consent">
+        <form method="POST" enctype="application/x-www-form-urlencoded" action="/oauth2/consent">
           <input type="hidden" name="consent_challenge" value={challenge ?? ''} />
           <input type="hidden" name="action" value="allow" />
           <input type="hidden" name="csrf_token" value={csrfToken} />
           <button type="submit" class="button button-primary focus-btn">Allow</button>
         </form>
-        <form method="POST" action="/oauth2/consent">
+        <form method="POST" enctype="application/x-www-form-urlencoded" action="/oauth2/consent">
           <input type="hidden" name="consent_challenge" value={challenge ?? ''} />
           <input type="hidden" name="action" value="deny" />
           <input type="hidden" name="csrf_token" value={csrfToken} />

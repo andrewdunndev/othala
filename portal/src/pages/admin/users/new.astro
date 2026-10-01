@@ -197,7 +197,7 @@ const shareText = success
         </div>
       </section>
     ) : (
-      <form method="post" class="stack-lg" novalidate>
+      <form method="post" enctype="application/x-www-form-urlencoded" class="stack-lg" novalidate>
         <input type="hidden" name="csrf_token" value={csrfToken} />
         {errors.submit && (
           <div class="notice notice-danger">{errors.submit}</div>

@@ -23,7 +23,7 @@ if (identityId) {
 
 {isAdmin && <a href="/admin" class="header-link" data-astro-reload>Admin</a>}
 <a href="/auth/settings" class="header-link" data-astro-reload>Account</a>
-<form method="POST" action="/auth/logout" data-astro-reload>
+<form method="POST" enctype="application/x-www-form-urlencoded" action="/auth/logout" data-astro-reload>
   <input type="hidden" name="csrf_token" value={logoutToken} />
   <button type="submit" class="header-link">Sign out</button>
 </form>

@@ -54,7 +54,7 @@ const messages = (ui?.messages ?? []).filter((m: FlowMessage) => !(phase === 'se
 
   <section class="panel focus-card">
     {hasCode && ui && (
-      <form method="POST" action={ui.action} class="focus-form recover-form">
+      <form method="POST" enctype="application/x-www-form-urlencoded" action={ui.action} class="focus-form recover-form">
         <input type="hidden" name="csrf_token" value={csrf} />
         <input type="hidden" name="method" value="code" />
         <FlowNodes

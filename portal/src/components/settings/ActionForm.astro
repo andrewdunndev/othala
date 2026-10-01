@@ -4,7 +4,7 @@
 interface Props { id: string; action: string; csrf: string; method: string }
 const { id, action, csrf, method } = Astro.props as Props;
 ---
-<form id={id} method="POST" action={action} hidden>
+<form id={id} method="POST" enctype="application/x-www-form-urlencoded" action={action} hidden>
   <input type="hidden" name="csrf_token" value={csrf} />
   <input type="hidden" name="method" value={method} />
 </form>

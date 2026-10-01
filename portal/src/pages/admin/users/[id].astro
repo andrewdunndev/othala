@@ -306,7 +306,7 @@ const adminNav = [
     )}
 
     {!identity ? null : mode === 'edit' ? (
-      <form method="post" class="stack-lg" novalidate>
+      <form method="post" enctype="application/x-www-form-urlencoded" class="stack-lg" novalidate>
         <input type="hidden" name="action" value="save" />
         <input type="hidden" name="csrf_token" value={csrfTokenSave} />
 
@@ -507,7 +507,7 @@ const adminNav = [
                     <span class="cred-item">
                       <span class="badge cred-enrolled">{m.label} ✓</span>
                       {EVICTABLE_CREDENTIAL_TYPES.has(m.key) && csrfTokensRemove[m.key] && (
-                        <form method="post" class="cred-remove-form">
+                        <form method="post" enctype="application/x-www-form-urlencoded" class="cred-remove-form">
                           <input type="hidden" name="action" value="remove-credential" />
                           <input type="hidden" name="cred_type" value={m.key} />
                           <input type="hidden" name="csrf_token" value={csrfTokensRemove[m.key]} />
@@ -619,14 +619,14 @@ const adminNav = [
           {/* Each action gets its own action-scoped CSRF token: a captured
               token from one button cannot be replayed to trigger another. */}
           <div class="cta-row">
-            <form method="post" class="actions-form">
+            <form method="post" enctype="application/x-www-form-urlencoded" class="actions-form">
               <input type="hidden" name="action" value="issue-recovery" />
               <input type="hidden" name="csrf_token" value={csrfTokenIssueRecovery} />
               <button type="submit" class="button button-secondary">
                 Issue enrollment link + code
               </button>
             </form>
-            <form method="post" class="actions-form">
+            <form method="post" enctype="application/x-www-form-urlencoded" class="actions-form">
               <input type="hidden" name="action" value="send-invite-email" />
               <input type="hidden" name="csrf_token" value={csrfTokenInviteEmail} />
               <input
@@ -642,7 +642,7 @@ const adminNav = [
                 Send invite email
               </button>
             </form>
-            <form method="post" class="actions-form">
+            <form method="post" enctype="application/x-www-form-urlencoded" class="actions-form">
               <input type="hidden" name="action" value="force-relogin" />
               <input type="hidden" name="csrf_token" value={csrfTokenForceRelogin} />
               <button type="submit" class="button button-secondary">
@@ -650,7 +650,7 @@ const adminNav = [
               </button>
             </form>
             {identity.state === 'inactive' ? (
-              <form method="post" class="actions-form">
+              <form method="post" enctype="application/x-www-form-urlencoded" class="actions-form">
                 <input type="hidden" name="action" value="reactivate" />
                 <input type="hidden" name="csrf_token" value={csrfTokenDeactivate} />
                 <button type="submit" class="button button-secondary">
@@ -658,7 +658,7 @@ const adminNav = [
                 </button>
               </form>
             ) : (
-              <form method="post" class="actions-form">
+              <form method="post" enctype="application/x-www-form-urlencoded" class="actions-form">
                 <input type="hidden" name="action" value="deactivate" />
                 <input type="hidden" name="csrf_token" value={csrfTokenDeactivate} />
                 <button type="submit" class="button button-secondary">
@@ -678,7 +678,7 @@ const adminNav = [
                 ? <strong class="admin-on"> granted</strong>
                 : <span class="admin-off"> none</span>}
             </span>
-            <form method="post" class="actions-form">
+            <form method="post" enctype="application/x-www-form-urlencoded" class="actions-form">
               <input type="hidden" name="action" value={isTargetAdmin ? 'revoke-admin' : 'grant-admin'} />
               <input type="hidden" name="csrf_token" value={csrfTokenAdminToggle} />
               <button
@@ -700,7 +700,7 @@ const adminNav = [
             <summary class="mono text-sm summary-danger">
               Delete identity
             </summary>
-            <form method="post" class="stack details-content">
+            <form method="post" enctype="application/x-www-form-urlencoded" class="stack details-content">
               <input type="hidden" name="action" value="delete" />
               <input type="hidden" name="csrf_token" value={csrfTokenDelete} />
               <p class="text-sm">

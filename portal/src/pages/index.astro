@@ -303,7 +303,7 @@ const devLinks = [
           </header>
 
           <div class="request-modal-body">
-            <form class="request-form" id="request-form" method="post" action="/api/request" novalidate>
+            <form class="request-form" id="request-form" method="post" enctype="application/x-www-form-urlencoded" action="/api/request" novalidate>
               <label class="form-field">
                 <span class="form-label">Your name</span>
                 <input class="form-input" type="text" name="name" autocomplete="name" maxlength="80" required placeholder="e.g. Robin" />

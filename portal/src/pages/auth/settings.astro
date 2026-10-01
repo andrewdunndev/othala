@@ -257,7 +257,7 @@ const lookupLabel: Record<string, string> = {
         <p class="welcome-step">Your first step</p>
         <h2 id="h-welcome">Add a passkey</h2>
         <p>Next time, sign in with your fingerprint, face or screen lock. No code to find, nothing to remember.</p>
-        <form method="POST" action={ui.action} class="settings-form wide">
+        <form method="POST" enctype="application/x-www-form-urlencoded" action={ui.action} class="settings-form wide">
           <input type="hidden" name="csrf_token" value={csrf} />
           <input type="hidden" name="method" value="passkey" />
           {nodesByGroup(nodes, 'passkey').map((n) => {
@@ -284,7 +284,7 @@ const lookupLabel: Record<string, string> = {
           <div class="group">
             <h3>Passkeys <span class="badge">recommended</span></h3>
             <p>Sign in with your fingerprint, face or screen lock. Add one on each device you use.</p>
-            <form method="POST" action={ui.action} class="settings-form wide">
+            <form method="POST" enctype="application/x-www-form-urlencoded" action={ui.action} class="settings-form wide">
               <input type="hidden" name="csrf_token" value={csrf} />
               <input type="hidden" name="method" value="passkey" />
               {nodesByGroup(nodes, 'passkey').map((n) => {
@@ -310,7 +310,7 @@ const lookupLabel: Record<string, string> = {
             </form>
             {passkeys.filter((p) => p.removable).map((p) => <ActionForm id={`rm-passkey-${p.id}`} action={ui.action} csrf={csrf} method="passkey" />)}
             {passkeys.map((p, i) => (
-              <form id={`rename-${i}`} method="POST" action="/auth/passkey-name" hidden>
+              <form id={`rename-${i}`} method="POST" enctype="application/x-www-form-urlencoded" action="/auth/passkey-name" hidden>
                 <input type="hidden" name="csrf_token" value={renameTokens[i]} />
                 <input type="hidden" name="credential_id" value={p.id} />
               </form>
@@ -322,7 +322,7 @@ const lookupLabel: Record<string, string> = {
           <div class="group">
             <h3>Password</h3>
             <p>Only for places a passkey can't be used. Changing it signs out your other devices.</p>
-            <form method="POST" action={ui.action} class="settings-form">
+            <form method="POST" enctype="application/x-www-form-urlencoded" action={ui.action} class="settings-form">
               <input type="hidden" name="csrf_token" value={csrf} />
               <input type="hidden" name="method" value="password" />
               <input type="text" class="sr-only" readonly tabindex="-1" aria-hidden="true" autocomplete="username" value={traits.username} />
@@ -365,7 +365,7 @@ const lookupLabel: Record<string, string> = {
             <input type="checkbox" class="disclose cb-dismiss" id="backup-dismiss" aria-label="Dismiss the backup codes reminder" />
             <div class="notice notice-warning prompt" data-testid="backup-prompt">
               <strong>Save your backup codes now.</strong> If you lose your phone or key, they are the way back in.
-              <form method="POST" action={ui.action} class="actions">
+              <form method="POST" enctype="application/x-www-form-urlencoded" action={ui.action} class="actions">
                 <input type="hidden" name="csrf_token" value={csrf} />
                 <input type="hidden" name="method" value="lookup_secret" />
                 <button class="button button-primary button-sm" type="submit" name="lookup_secret_regenerate" value="true">Get backup codes</button>
@@ -378,7 +378,7 @@ const lookupLabel: Record<string, string> = {
         {has('totp') && (
           <div class="group">
             <h3>Authenticator app</h3>
-            <form method="POST" action={ui.action} class="settings-form wide">
+            <form method="POST" enctype="application/x-www-form-urlencoded" action={ui.action} class="settings-form wide">
               <input type="hidden" name="csrf_token" value={csrf} />
               <input type="hidden" name="method" value="totp" />
               {totp.enrolled && totp.unlink && (
@@ -490,7 +490,7 @@ const lookupLabel: Record<string, string> = {
           <div class="group">
             <h3>Security keys</h3>
             <p>A small key you plug in or tap. Name each one so you recognise it.</p>
-            <form method="POST" action={ui.action} class="settings-form wide">
+            <form method="POST" enctype="application/x-www-form-urlencoded" action={ui.action} class="settings-form wide">
               <input type="hidden" name="csrf_token" value={csrf} />
               <input type="hidden" name="method" value="webauthn" />
               <CredentialRows items={keys} kind="webauthn" noun="security key" fallbackName="Security key" reauth={reauth} reauthHref={reauthHref} />
@@ -538,7 +538,7 @@ const lookupLabel: Record<string, string> = {
           <div class="group">
             <h3>Backup codes <span class={`badge ${status.backupCodes || !status.twoStep ? '' : 'badge-warning'}`}>{status.backupCodes ? 'saved' : 'not saved'}</span></h3>
             <p>{status.twoStep || lookup.enrolled ? 'Single-use codes for when nothing else works. Print or store them safely.' : 'Single-use codes for when a second step is lost. Add a passkey or an authenticator app first, then get your codes.'}</p>
-            <form method="POST" action={ui.action} class="settings-form wide">
+            <form method="POST" enctype="application/x-www-form-urlencoded" action={ui.action} class="settings-form wide">
               <input type="hidden" name="csrf_token" value={csrf} />
               <input type="hidden" name="method" value="lookup_secret" />
               {lookup.list.length > 0 && (
@@ -605,7 +605,7 @@ const lookupLabel: Record<string, string> = {
           <div class="group">
             <h3>Recovery email</h3>
             <p>Where we send a code if you can't sign in.</p>
-            <form method="POST" action={ui.action} class="settings-form">
+            <form method="POST" enctype="application/x-www-form-urlencoded" action={ui.action} class="settings-form">
               <input type="hidden" name="csrf_token" value={csrf} />
               <input type="hidden" name="method" value="profile" />
               <input type="hidden" name="traits.username" value={traits.username} />
@@ -640,7 +640,7 @@ const lookupLabel: Record<string, string> = {
           <h2 id="h-prof">Profile</h2>
           <div class="card-flash" data-flash tabindex="-1" role="status">{null}</div>
           <p class="lede">Your name and email. A new address is sent a verification code.</p>
-          <form method="POST" action={ui.action} class="settings-form">
+          <form method="POST" enctype="application/x-www-form-urlencoded" action={ui.action} class="settings-form">
             <input type="hidden" name="csrf_token" value={csrf} />
             <input type="hidden" name="method" value="profile" />
             <input type="hidden" name="traits.username" value={traits.username} />
@@ -695,7 +695,7 @@ const lookupLabel: Record<string, string> = {
         <div class="group">
           <h3>Sessions</h3>
           <p>"Sign out everywhere" ends every session and the remembered logins, so no app can quietly sign you back in.</p>
-          <form id="signout-form" method="POST" action="/auth/settings" data-astro-reload hidden>
+          <form id="signout-form" method="POST" enctype="application/x-www-form-urlencoded" action="/auth/settings" data-astro-reload hidden>
             <input type="hidden" name="action" value="sign-out-everywhere" />
             <input type="hidden" name="csrf_token" value={csrfSignOut} />
           </form>

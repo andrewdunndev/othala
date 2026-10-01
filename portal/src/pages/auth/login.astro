@@ -112,7 +112,7 @@ const { hasPasskey, hasCode, hasPassword, totpNodes, aal2WebauthnNodes, lookupNo
       <div class="aal2-block focus-form">
 
         {totpNodes.length > 0 && (
-          <form method="POST" action={ui?.action ?? '#'} class="focus-form aal2-form">
+          <form method="POST" enctype="application/x-www-form-urlencoded" action={ui?.action ?? '#'} class="focus-form aal2-form">
             <input type="hidden" name="csrf_token" value={csrf} />
             {totpNodes.map((n) => {
               const a = asInput(n);
@@ -155,7 +155,7 @@ const { hasPasskey, hasCode, hasPassword, totpNodes, aal2WebauthnNodes, lookupNo
         )}
 
         {aal2WebauthnNodes.length > 0 && (
-          <form method="POST" action={ui?.action ?? '#'} class="focus-form aal2-form">
+          <form method="POST" enctype="application/x-www-form-urlencoded" action={ui?.action ?? '#'} class="focus-form aal2-form">
             <input type="hidden" name="csrf_token" value={csrf} />
             {aal2WebauthnNodes.map((n) => {
               const a = asInput(n);
@@ -184,7 +184,7 @@ const { hasPasskey, hasCode, hasPassword, totpNodes, aal2WebauthnNodes, lookupNo
         {lookupNodes.length > 0 && (
           <details class="disclosure">
             <summary>Use a backup code instead</summary>
-            <form method="POST" action={ui?.action ?? '#'} class="focus-form aal2-form">
+            <form method="POST" enctype="application/x-www-form-urlencoded" action={ui?.action ?? '#'} class="focus-form aal2-form">
               <input type="hidden" name="csrf_token" value={csrf} />
               {lookupNodes.map((n) => {
                 const a = asInput(n);
@@ -227,7 +227,7 @@ const { hasPasskey, hasCode, hasPassword, totpNodes, aal2WebauthnNodes, lookupNo
 
     {/* ── Passkey first ─────────────────────────────────────────────────── */}
     {!isAal2 && hasPasskey && !isCodeEntry && (
-      <form method="POST" action={ui?.action ?? '#'} class="focus-form passkey-block">
+      <form method="POST" enctype="application/x-www-form-urlencoded" action={ui?.action ?? '#'} class="focus-form passkey-block">
         <input type="hidden" name="csrf_token" value={csrf} />
         <input type="hidden" name="method" value="passkey" />
 
@@ -270,7 +270,7 @@ const { hasPasskey, hasCode, hasPassword, totpNodes, aal2WebauthnNodes, lookupNo
         {!isCodeEntry && hasPasskey && <p class="focus-or" aria-hidden="true">or</p>}
 
         {!isCodeEntry && (
-          <form method="POST" action={ui?.action ?? '#'} class="focus-form code-form">
+          <form method="POST" enctype="application/x-www-form-urlencoded" action={ui?.action ?? '#'} class="focus-form code-form">
             <input type="hidden" name="csrf_token" value={csrf} />
 
             <div class="field">
@@ -310,7 +310,7 @@ const { hasPasskey, hasCode, hasPassword, totpNodes, aal2WebauthnNodes, lookupNo
         )}
 
         {isCodeEntry && (
-          <form method="POST" action={ui?.action ?? '#'} class="focus-form code-form">
+          <form method="POST" enctype="application/x-www-form-urlencoded" action={ui?.action ?? '#'} class="focus-form code-form">
             <input type="hidden" name="csrf_token" value={csrf} />
 
             {/* Hidden fields from the default group (state Kratos needs to verify the code), except the csrf token above. */}
@@ -381,7 +381,7 @@ const { hasPasskey, hasCode, hasPassword, totpNodes, aal2WebauthnNodes, lookupNo
       <details class="disclosure password-disclosure" open={passwordFailed}>
         <summary><span class="password-summary-label">Use a password instead</span></summary>
 
-        <form method="POST" action={ui?.action ?? '#'} class="focus-form password-form">
+        <form method="POST" enctype="application/x-www-form-urlencoded" action={ui?.action ?? '#'} class="focus-form password-form">
           <input type="hidden" name="csrf_token" value={csrf} />
           <input type="hidden" name="method" value="password" />
 

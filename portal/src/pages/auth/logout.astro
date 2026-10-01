@@ -204,7 +204,7 @@ const retry = isPost;
       ? 'The sign-in service did not answer. Signing out clears this device only.'
       : 'Sign out of this device.'}
 >
-  <form method="POST" action="/auth/logout" class="status-actions">
+  <form method="POST" enctype="application/x-www-form-urlencoded" action="/auth/logout" class="status-actions">
     <input type="hidden" name="csrf_token" value={csrfToken} />
     <button type="submit" class="button button-primary">Sign out</button>
     <a href="/" class="button button-secondary">Cancel</a>

@@ -147,7 +147,7 @@ test('the removal control is unchecked by default (removal is affirmative)', () 
 });
 
 test('the repair row rides the existing save form, under its CSRF token', () => {
-  const openTag = '<form method="post" class="stack-lg" novalidate>';
+  const openTag = '<form method="post" enctype="application/x-www-form-urlencoded" class="stack-lg" novalidate>';
   const open = pageSource.indexOf(openTag);
   assert.notEqual(open, -1, 'save form not found');
   const close = pageSource.indexOf('</form>', open);
