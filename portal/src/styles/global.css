@@ -281,26 +281,6 @@ a.subtle:hover { color: var(--text); }
 .notice-danger  { border-color: var(--danger);  background: var(--danger-subtle);  color: var(--text); }
 .notice-warning { border-color: var(--warning); background: var(--warning-subtle); color: var(--text); }
 
-/* ── Nav bar (admin) ────────────────────────────────────────── */
-.nav-bar {
-  display: flex;
-  flex-wrap: wrap;
-  gap: var(--space-4) var(--space-5);
-  padding: var(--space-3) 0;
-  border-bottom: 1px solid var(--border);
-  font-family: var(--font-mono);
-  font-size: var(--text-sm);
-}
-.nav-bar a {
-  color: var(--text-2);
-  text-decoration: none;
-}
-.nav-bar a:hover,
-.nav-bar a[aria-current="page"] {
-  color: var(--accent);
-  text-decoration: none;
-}
-
 /* ── Theme toggle — icon button in footer ────────────────────── */
 /* Override the text-box style from site.css with a compact icon button. */
 .theme-toggle {
@@ -371,56 +351,6 @@ a.subtle:hover { color: var(--text); }
 .badge-muted { background: var(--surface); color: var(--text-2); }
 .badge-warning { background: var(--warning-subtle); border-color: var(--warning); }
 .badge-danger { background: var(--danger-subtle); border-color: var(--danger); }
-
-/* ── Admin form grid ────────────────────────────────────────── */
-.checkbox-grid {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: var(--space-2) var(--space-4);
-}
-@media (max-width: 540px) {
-  .checkbox-grid { grid-template-columns: 1fr; }
-}
-.checkbox-grid label {
-  display: flex;
-  gap: var(--space-2);
-  align-items: center;
-  font-family: var(--font-mono);
-  font-size: var(--text-sm);
-  color: var(--text);
-}
-
-/* Tight inline form-row used inside the per-app role override list. */
-.role-row {
-  display: grid;
-  grid-template-columns: 1fr auto;
-  gap: var(--space-3);
-  align-items: center;
-  padding: var(--space-2) 0;
-  border-bottom: 1px solid var(--border);
-  font-size: var(--text-sm);
-}
-.role-row:last-child { border-bottom: none; }
-.role-row select {
-  padding: var(--space-1) var(--space-2);
-  font: inherit;
-  background: var(--input-bg);
-  color: var(--text);
-  border: 1px solid var(--input-border);
-  border-radius: var(--radius-sm);
-}
-
-/* Card grid used by /admin landing + /admin/groups. */
-.card-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(15rem, 1fr));
-  gap: var(--space-4);
-}
-.card-grid .panel { padding: var(--space-4) var(--space-5); }
-.card-grid .panel h2 {
-  font-size: var(--text-base);
-  margin-bottom: var(--space-2);
-}
 
 /* Logo plates sit on the page ground in both themes, so every mark reads alike. The few marks drawn in black or deep
  * navy with no ground of their own are knocked out to a light tone in dark mode (data-icon, the logo file's name). */

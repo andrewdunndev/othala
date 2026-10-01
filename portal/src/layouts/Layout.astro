@@ -28,6 +28,7 @@ interface Props {
 
 const { title, description, nav, bare = false, compact = false, router = false, narrow = false } = Astro.props;
 const path = Astro.url.pathname.replace(/\/$/, '') || '/';
+const here = (href: string) => path === href || path.startsWith(href + '/');
 const isHome = title === 'Home';
 const pageTitle = isHome ? instanceName : `${title} — ${instanceName}`;
 ---
@@ -64,7 +65,7 @@ const pageTitle = isHome ? instanceName : `${title} — ${instanceName}`;
       {nav && nav.length > 0 && (
         <nav class="site-nav" aria-label="Primary">
           {nav.map((item: NavItem) => (
-            <a href={item.href} class:list={['nav-link', { active: item.href === path }]} data-astro-reload>
+            <a href={item.href} class:list={['nav-link', { active: here(item.href) }]} aria-current={here(item.href) ? 'page' : undefined} data-astro-reload>
               {item.label}
             </a>
           ))}

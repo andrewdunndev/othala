@@ -1,152 +1,135 @@
 ---
-// Admin: OAuth2 clients (read-only). The per-app manifests (`<slug>.yaml`) in
-// MANIFEST_DIR are the source of truth and the registrar syncs them to Hydra;
-// each card names its source file, since editing happens there. An app with no
-// roles block shows "(none)".
+// Admin: apps, read-only. One row per app: icon, name, description, Open, who can use it and its admins. A badge shows
+// only for a real problem (a manifest that fails lint, or a client Hydra does not have). Access is changed on the
+// person, not here. The raw bindings sit in a closed Technical details disclosure on each row.
+// The per-app manifests (`<slug>.yaml`) in MANIFEST_DIR are the source of truth and the registrar syncs them to Hydra.
 
 export const prerender = false;
 
-import Layout from '../../layouts/Layout.astro';
+import AdminLayout from '../../layouts/AdminLayout.astro';
+import AppIcon from '../../components/AppIcon.astro';
 import ManifestNotice from '../../components/ManifestNotice.astro';
-import { requireAdminSession } from '../../lib/admin';
-import { servingManifests, manifestHealth } from '../../lib/manifest-store';
+import TitleRow from '../../components/TitleRow.astro';
+import { adminContext } from '../../lib/admin-context';
+import { listIdentities } from '../../lib/admin-api';
+import { adminsOf, holdersOf, hydraClientIds } from '../../lib/admin-apps';
+import { PEOPLE_LOAD_ERROR, personName } from '../../lib/admin-view';
+import { isOpenToEveryone } from '../../lib/access-rows';
+import { lintManifests } from '../../lib/manifest-lint';
+import { buildGroupRegistry, knownGroupNames } from '../../lib/group-registry';
+import { IDENTITY_GROUPS } from '../../lib/constants';
+import { loadRequirements, safeHref } from '../../lib/tiles';
+import type { Identity } from '../../lib/types';
 
-const guard = await requireAdminSession(Astro);
-if (guard instanceof Response) return guard;
+const ctx = await adminContext(Astro);
+if (ctx instanceof Response) return ctx;
+const { apps, health, dev } = ctx;
 
-// The serving store falls back to the last known good set rather than throwing,
-// so this page still renders when a manifest fails to validate. ManifestNotice
-// says so out loud — a stale catalog must never read as the live one.
-const manifests = servingManifests();
-const health = manifestHealth();
+let identities: Identity[] = [];
+let loadError: string | null = null;
+if (dev) {
+  identities = dev.identities;
+} else {
+  try {
+    identities = await listIdentities();
+  } catch (err) {
+    console.error('[othala/admin/oauth2] listIdentities failed:', err);
+    loadError = PEOPLE_LOAD_ERROR;
+  }
+}
+const people = identities.map((identity) => ({ identity, name: personName(identity) }));
 
-const adminNav = [
-  { href: '/admin',          label: 'Overview' },
-  { href: '/admin/users',    label: 'Users' },
-  { href: '/admin/groups',   label: 'Groups' },
-  { href: '/admin/oauth2',   label: 'Apps' },
-  { href: '/auth/settings',  label: 'Settings' },
-];
+const manifests = apps.map((a) => a.manifest);
+const requirementNames = dev ? dev.requirements.map((r) => r.name) : [...loadRequirements().keys()];
+const findings = lintManifests(manifests, knownGroupNames(buildGroupRegistry(manifests, IDENTITY_GROUPS)), requirementNames);
+const registered = dev ? null : await hydraClientIds();
+const devState = dev ? Astro.url.searchParams.get('dev-state') : null;
+
+const rows = apps.map((app) => {
+  const m = app.manifest;
+  const problems = findings.filter((f) => f.source === (m.sourcePath || m.clientId));
+  const notSynced = registered !== null && !m.presentationOnly && !registered.has(m.clientId);
+  return {
+    app,
+    open: isOpenToEveryone(m),
+    holders: holdersOf(app, people),
+    admins: adminsOf(app, people),
+    problems,
+    notSynced,
+    href: app.url ? safeHref(app.url) : '',
+  };
+});
+const personHref = (id: string) => `/admin/users/${id}${devState ? `?dev-state=${devState}` : ''}`;
 ---
-<Layout title="Apps — Admin" description="OIDC client manifests.">
-  <header class="page-header">
-    <p class="page-eyebrow">administration · oidc clients</p>
-    <h1 class="page-title">Apps</h1>
-    <p class="page-lede">
-      Read-only. Apps are defined by unified <code>&lt;slug&gt;.yaml</code>
-      manifests in the manifest directory; edit a manifest and it is
-      picked up at runtime — no rebuild.
-    </p>
-  </header>
-
-  <nav class="nav-bar" aria-label="Admin">
-    {adminNav.map(item => (
-      <a href={item.href}>{item.label}</a>
-    ))}
-  </nav>
+<AdminLayout title="Apps" description="What your household can sign in to." identityId={ctx.adminId}>
+  <TitleRow title="Apps" count={rows.length} lede="What your household can sign in to." />
 
   <ManifestNotice health={health} />
+  {loadError && <div class="notice notice-danger" role="alert">{loadError}</div>}
 
-  <section class="section stack-lg">
-    {manifests.map((m) => (
-      <article class="panel stack">
-        <header class="card-header">
-          <div>
-            <h2 class="mono">{m.clientId}</h2>
-            <p class="muted text-sm">{m.clientName}</p>
+  <ul class="app-rows panel">
+    {rows.map(({ app, open, holders, admins, problems, notSynced, href }) => (
+      <li>
+        <div class="app-head">
+          <AppIcon tile={app.tile ?? { icon: app.name.slice(0, 2).toUpperCase() }} />
+          <div class="app-name">{app.name}</div>
+          {href && <a class="open-link" href={href} rel="noopener">Open {app.name}</a>}
+          <div class="app-desc">{app.description}</div>
+        </div>
+        {(problems.length > 0 || notSynced) && (
+          <div class="badges" style="margin-top: var(--space-2)">
+            {problems.some((p) => p.severity === 'block') && <span class="badge badge-danger">Manifest invalid</span>}
+            {problems.some((p) => p.severity === 'warn') && !problems.some((p) => p.severity === 'block') && <span class="badge badge-warning">Manifest warning</span>}
+            {notSynced && <span class="badge badge-danger">Not synced to the sign-in service</span>}
           </div>
-          <p class="muted text-xs mono">
-            source: <span class="mono">{m.clientId}.yaml</span>
-          </p>
-        </header>
-
-        <dl class="dl-grid">
-          <dt class="muted mono">access group{m.accessGroups.length === 1 ? '' : 's'}</dt>
+        )}
+        {problems.map((p) => <p class="item-meta">{p.message}</p>)}
+        <dl class="app-who">
+          <dt>Who can use it</dt>
           <dd>
-            {/* Show the actual access binding (accessGroups), the field the
-                gate keys off — not the singular conventional name. */}
-            {m.accessGroups.map((g) => <span class="badge badge-muted">{g}</span>)}
+            {open ? (
+              <span class="chip">Everyone</span>
+            ) : holders.length > 0 ? (
+              <ul class="chips">
+                {holders.map((h) => (
+                  <li><a class="chip" href={personHref(h.id)}>{h.name}{h.level && <> <b>· {h.level}</b></>}</a></li>
+                ))}
+              </ul>
+            ) : (
+              <span class="empty-note">{loadError ? 'Unknown' : 'No one yet'}</span>
+            )}
           </dd>
-
-          <dt class="muted mono">grant types</dt>
-          <dd class="mono text-xs">{m.grantTypes.join(', ') || '(none)'}</dd>
-
-          <dt class="muted mono">scopes</dt>
-          <dd class="mono text-xs">{m.scopes.join(' ') || '(none)'}</dd>
-
-          <dt class="muted mono">audience</dt>
-          <dd class="mono text-xs">{m.audience.join(', ') || '(none)'}</dd>
-
-          <dt class="muted mono">redirect uris</dt>
-          <dd>
-            <ul class="stack mono text-xs uri-list">
-              {m.redirectUris.map((u) => <li>{u}</li>)}
-              {m.redirectUris.length === 0 && <li class="muted">(none)</li>}
-            </ul>
-          </dd>
-
-          <dt class="muted mono">skip consent</dt>
-          <dd class="mono text-xs">{m.skipConsent ? 'true' : 'false'}</dd>
+          {!open && app.manifest.roles.length > 1 && (
+            <>
+              <dt>Admins</dt>
+              <dd>
+                {admins.length > 0 ? (
+                  <ul class="chips">
+                    {admins.map((h) => <li><a class="chip" href={personHref(h.id)}>{h.name}</a></li>)}
+                  </ul>
+                ) : (
+                  <span class="empty-note">{loadError ? 'Unknown' : 'No one yet'}</span>
+                )}
+              </dd>
+            </>
+          )}
         </dl>
-
-        <div>
-          <p class="section-subtitle">declared roles</p>
-          {m.roles.length === 0 ? (
-            <p class="muted text-sm">(none — populate <span class="mono">roles:</span> in the yaml)</p>
-          ) : (
-            <table class="data-table">
-              <thead>
-                <tr><th>name</th><th>description</th></tr>
-              </thead>
-              <tbody>
-                {m.roles.map((r) => (
-                  <tr>
-                    <td><span class="badge">{r.name}</span></td>
-                    <td class="muted text-sm">{r.description || '(no description)'}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          )}
-        </div>
-
-        <div>
-          <p class="section-subtitle">group_role_map</p>
-          {Object.keys(m.groupRoleMap).length === 0 ? (
-            <p class="muted text-sm">(none)</p>
-          ) : (
-            <table class="data-table">
-              <thead>
-                <tr><th>identity group</th><th>default role</th></tr>
-              </thead>
-              <tbody>
-                {Object.entries(m.groupRoleMap).map(([g, r]) => (
-                  <tr>
-                    <td><span class="badge">{g}</span></td>
-                    <td><span class="badge badge-muted">{r}</span></td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          )}
-        </div>
-      </article>
+        <details class="tech plain">
+          <summary>Technical details</summary>
+          <dl class="kv">
+            <div><dt>Client id</dt><dd><code>{app.manifest.clientId}</code></dd></div>
+            <div><dt>Bound groups</dt><dd>{app.manifest.accessGroups.length ? app.manifest.accessGroups.map((g) => <><code>{g}</code>{' '}</>) : 'None'}</dd></div>
+            <div><dt>Role map</dt><dd>{Object.keys(app.manifest.groupRoleMap).length ? Object.entries(app.manifest.groupRoleMap).map(([g, r]) => <><code>{g}: {r}</code>{' '}</>) : 'None'}</dd></div>
+            <div><dt>Scopes</dt><dd>{app.manifest.scopes.length ? app.manifest.scopes.map((s) => <><code>{s}</code>{' '}</>) : 'None'}</dd></div>
+            <div><dt>Grant types</dt><dd>{app.manifest.grantTypes.length ? app.manifest.grantTypes.map((s) => <><code>{s}</code>{' '}</>) : 'None'}</dd></div>
+            <div><dt>Redirect URIs</dt><dd>{app.manifest.redirectUris.length ? app.manifest.redirectUris.map((u) => <><code>{u}</code>{' '}</>) : 'None'}</dd></div>
+            <div><dt>Audience</dt><dd>{app.manifest.audience.length ? app.manifest.audience.map((u) => <><code>{u}</code>{' '}</>) : 'None'}</dd></div>
+            <div><dt>Skip consent</dt><dd><code>{app.manifest.skipConsent ? 'true' : 'false'}</code></dd></div>
+            <div><dt>Source file</dt><dd><code>{app.manifest.sourcePath || `${app.slug}.yaml`}</code></dd></div>
+          </dl>
+        </details>
+      </li>
     ))}
-  </section>
-</Layout>
-
-<style>
-  .card-header {
-    display: flex;
-    justify-content: space-between;
-    align-items: baseline;
-    gap: var(--space-3);
-  }
-  .dl-grid {
-    display: grid;
-    grid-template-columns: 9rem 1fr;
-    gap: var(--space-2) var(--space-3);
-    font-size: var(--text-sm);
-  }
-  .uri-list { list-style: none; }
-</style>
+  </ul>
+  {rows.length === 0 && <div class="panel empty-state"><p>No apps yet.</p></div>}
+</AdminLayout>

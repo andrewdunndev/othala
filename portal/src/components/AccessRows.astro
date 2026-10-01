@@ -1,0 +1,59 @@
+---
+// AccessRows: one row per app with its icon, name, one-line description and a segmented level control (No access, then
+// the app's levels, least to most privilege). Apps open to everyone show a quiet note instead of a control. Used by the
+// add-person form and the person page; the control posts as `level:<clientId>` and accessToStorage maps it to storage.
+
+import AppIcon from './AppIcon.astro';
+import { isOpenToEveryone, levelsFor, NO_ACCESS } from '../lib/access-rows';
+import type { AdminApp } from '../lib/admin-view';
+
+interface Props {
+  apps: AdminApp[];
+  /** Current level by client id; a missing entry reads as No access. */
+  current: Record<string, string>;
+}
+
+const { apps, current } = Astro.props as Props;
+
+function monogram(name: string): string {
+  return name.replace(/[^A-Za-z0-9]/g, '').slice(0, 2).toUpperCase();
+}
+
+const rows = apps.map((a) => {
+  const m = a.manifest;
+  const options = [
+    { value: NO_ACCESS, label: 'No access', hint: `No access to ${a.name}.` },
+    ...levelsFor(m).map((l) => ({ ...l, hint: l.hint || `${l.label} in ${a.name}.` })),
+  ];
+  const level = current[a.clientId] ?? NO_ACCESS;
+  const selected = options.find((o) => o.value === level) ?? options[0];
+  return { app: a, open: isOpenToEveryone(m), options, selected };
+});
+---
+<ul class="access" data-access>
+  {rows.map(({ app, open, options, selected }) => (
+    <li>
+      <AppIcon tile={app.tile ?? { icon: monogram(app.name) }} />
+      <div>
+        <div class="app-name">{app.name}</div>
+        {app.description && <div class="app-desc">{app.description}</div>}
+      </div>
+      {open ? (
+        <span class="open-note">Open to everyone</span>
+      ) : (
+        <>
+          <fieldset class="seg">
+            <legend class="sr">{app.name} access</legend>
+            {options.map((o) => (
+              <label>
+                <input type="radio" name={`level:${app.clientId}`} value={o.value} data-hint={o.hint} checked={o.value === selected.value} />
+                <span>{o.label}</span>
+              </label>
+            ))}
+          </fieldset>
+          <div class="hint-line" aria-live="polite">{selected.hint}</div>
+        </>
+      )}
+    </li>
+  ))}
+</ul>

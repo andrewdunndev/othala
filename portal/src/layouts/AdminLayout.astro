@@ -1,0 +1,28 @@
+---
+// Every /admin page: the shared top bar (brand, People and Apps nav, Account and Sign out) over the admin page body,
+// with the admin styles and the small form behaviors (copy, dirty save, live filter) loaded once.
+
+import '../styles/admin.css';
+import Layout from './Layout.astro';
+import HeaderActions from '../components/HeaderActions.astro';
+import AdminFormScripts from '../components/AdminFormScripts.astro';
+import { ADMIN_NAV } from '../lib/admin-view';
+
+interface Props {
+  title: string;
+  description?: string;
+  /** The signed-in admin, for the Sign out token. */
+  identityId: string;
+}
+
+const { title, description, identityId } = Astro.props;
+---
+<Layout title={title} description={description} nav={ADMIN_NAV} compact>
+  <Fragment slot="header-actions">
+    <HeaderActions identityId={identityId} />
+  </Fragment>
+  <div class="admin">
+    <slot />
+  </div>
+  <AdminFormScripts />
+</Layout>

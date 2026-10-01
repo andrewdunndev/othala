@@ -53,3 +53,104 @@
     }
   });
 </script>
+
+<script is:inline>
+  (function () {
+    // Level control: the hint line under a row follows the selected level.
+    document.addEventListener('change', function (e) {
+      var input = e.target;
+      if (!(input instanceof HTMLInputElement) || input.type !== 'radio' || !input.closest('[data-access]')) return;
+      var line = input.closest('li').querySelector('.hint-line');
+      if (line) line.textContent = input.getAttribute('data-hint') || '';
+    });
+
+    // Forms marked data-dirty-form keep their [data-save] button off until something differs from the loaded state.
+    function snapshot(form) { return new URLSearchParams(new FormData(form)).toString(); }
+    function wireDirty(form) {
+      var save = form.querySelector('[data-save]');
+      if (!save) return;
+      var base = snapshot(form);
+      var note = form.querySelector('[data-dirty-note]');
+      function sync() {
+        var dirty = snapshot(form) !== base;
+        save.disabled = !dirty;
+        if (note) note.textContent = dirty ? 'Unsaved changes' : '';
+      }
+      form.addEventListener('input', sync);
+      form.addEventListener('change', sync);
+      sync();
+    }
+    document.querySelectorAll('form[data-dirty-form]').forEach(wireDirty);
+
+    // Type-to-confirm: the confirm button stays off until the typed text matches. The server checks it again.
+    document.querySelectorAll('input[data-match]').forEach(function (input) {
+      var button = input.closest('form').querySelector('[data-needs]');
+      if (!button) return;
+      function sync() { button.disabled = input.value.trim() !== input.getAttribute('data-match'); }
+      input.addEventListener('input', sync);
+      sync();
+    });
+
+    // Cancel inside an inline confirm closes it.
+    document.addEventListener('click', function (e) {
+      var cancel = e.target.closest ? e.target.closest('[data-cancel]') : null;
+      if (cancel && cancel.closest('details')) cancel.closest('details').open = false;
+    });
+
+    // +N chips unfold in place.
+    document.addEventListener('click', function (e) {
+      var more = e.target.closest ? e.target.closest('[data-more]') : null;
+      if (!more) return;
+      more.closest('.chips').querySelectorAll('[data-extra]').forEach(function (li) { li.hidden = false; });
+      more.closest('li').remove();
+    });
+
+    // Live people filter: search and Show narrow the server-rendered rows and keep the query string in step.
+    var filters = document.querySelector('[data-filters]');
+    var rows = document.querySelectorAll('[data-row]');
+    if (filters && rows.length) {
+      var q = filters.querySelector('[name="q"]');
+      var show = filters.querySelector('[name="show"]');
+      var none = document.querySelector('[data-none]');
+      var apply = function () {
+        var needle = q.value.trim().toLowerCase();
+        var mode = show.value;
+        var shown = 0;
+        rows.forEach(function (row) {
+          var ok = !needle || row.getAttribute('data-text').indexOf(needle) > -1;
+          if (ok && mode === 'admins') ok = row.getAttribute('data-admin') === '1';
+          if (ok && mode === 'noapps') ok = row.getAttribute('data-noapps') === '1';
+          if (ok && mode === 'off') ok = row.getAttribute('data-off') === '1';
+          if (ok && mode.indexOf('app:') === 0) ok = (' ' + row.getAttribute('data-apps') + ' ').indexOf(' ' + mode.slice(4) + ' ') > -1;
+          row.hidden = !ok;
+          if (ok) shown++;
+        });
+        if (none) none.hidden = shown > 0;
+        var params = new URLSearchParams();
+        if (needle) params.set('q', q.value.trim());
+        if (mode && mode !== 'all') params.set('show', mode);
+        var rest = new URLSearchParams(location.search);
+        if (rest.get('dev-state')) params.set('dev-state', rest.get('dev-state'));
+        history.replaceState(null, '', location.pathname + (params.toString() ? '?' + params : ''));
+      };
+      q.addEventListener('input', apply);
+      show.addEventListener('change', apply);
+      filters.addEventListener('submit', function (e) { e.preventDefault(); });
+      filters.querySelectorAll('[data-nojs]').forEach(function (el) { el.hidden = true; });
+      apply();
+    }
+
+    // Add person: suggest the username from the name until the person edits it.
+    var name = document.getElementById('displayName');
+    var user = document.getElementById('username');
+    if (name && user) {
+      var touched = user.value !== '';
+      user.addEventListener('input', function () { touched = true; });
+      name.addEventListener('input', function () {
+        if (touched) return;
+        var words = name.value.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').split(/\s+/).map(function (w) { return w.replace(/[^a-z0-9]/g, ''); }).filter(Boolean);
+        user.value = words.length > 1 ? words.join('.') : '';
+      });
+    }
+  })();
+</script>
