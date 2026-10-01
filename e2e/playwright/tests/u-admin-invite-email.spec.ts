@@ -149,7 +149,7 @@ test('U2 — an admin-marked target is offered no invite email or setup link, a 
       confirmEmail: adminTarget.email,
     });
     expect(resp.status(), 'U2: the refusal is a normal re-render, not a 403').toBe(200);
-    expect(await resp.text(), 'U2: the server refuses admin recovery by email').toMatch(/Admin recovery is console-only/);
+    expect(await resp.text(), 'U2: the server refuses admin recovery by email').toMatch(/setup link for an admin cannot be made here/);
 
     await assertNoInviteEmail(adminTarget.email, startTime);
 

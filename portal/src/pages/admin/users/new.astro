@@ -1,6 +1,6 @@
 ---
 // Admin: add a person. One panel: name, email, the apps they can use (every app starts at No access) and a closed
-// More options (username, recovery email, household admin). POST validates, creates the identity with a verified email
+// More options (username, recovery email). POST validates, creates the identity with a verified email
 // and files the chosen levels as groups and role overrides, then issues the one-time setup link and code and shows them
 // in one card. Nothing is emailed. The browser validates first; the server validates again.
 
@@ -28,16 +28,15 @@ interface FormState {
   email: string;
   username: string;
   recoveryEmail: string;
-  admin: boolean;
 }
 
 const USERNAME_RE = /^[a-z0-9]+(?:\.[a-z0-9]+)+$/;
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
-let form: FormState = { displayName: '', email: '', username: '', recoveryEmail: '', admin: false };
+let form: FormState = { displayName: '', email: '', username: '', recoveryEmail: '' };
 let levels: Record<string, string> = {};
 const errors: Record<string, string> = {};
-let success: { id: string; first: string; url: string; code: string; admin: boolean } | null = null;
+let success: { id: string; first: string; url: string; code: string } | null = null;
 
 if (Astro.request.method === 'POST') {
   const fd = await Astro.request.formData();
@@ -63,7 +62,6 @@ if (Astro.request.method === 'POST') {
     email,
     username: String(fd.get('username') ?? '').trim().toLowerCase() || suggestUsername(displayName, email),
     recoveryEmail: String(fd.get('recoveryEmail') ?? '').trim(),
-    admin: fd.get('admin') === 'on',
   };
 
   if (!displayName) errors.displayName = 'Enter a name.';
@@ -78,7 +76,6 @@ if (Astro.request.method === 'POST') {
         first: form.displayName.split(/\s+/)[0],
         url: 'https://auth.example.test/self-service/recovery?flow=fixture&token=fixture',
         code: '123456',
-        admin: form.admin,
       };
     } else {
       try {
@@ -105,7 +102,6 @@ if (Astro.request.method === 'POST') {
           first: form.displayName.split(/\s+/)[0],
           url: link.recovery_link,
           code: link.recovery_code,
-          admin: form.admin,
         };
       } catch (err) {
         errors.submit = err instanceof Error ? err.message : String(err);
@@ -132,9 +128,7 @@ const peopleHref = devState ? `/admin/users?dev-state=${devState}` : '/admin/use
       <TitleRow title={`${success.first} is ready`} lede="Send them this setup link." />
       <div class="panel card-ok" role="status">
         <SetupLink url={success.url} code={success.code} ttl={ENROLLMENT_TTL} name={success.first} />
-        {success.admin && (
-          <p class="hint">To make {success.first} a household admin, wait until they have set up an authenticator app or security key, then do it from their page.</p>
-        )}
+        <p class="hint">To make {success.first} a household admin, wait until they have set up an authenticator app or security key, then do it from their page.</p>
         <div class="row-actions">
           <a class="button button-secondary" href={devState ? `/admin/users/new?dev-state=${devState}` : '/admin/users/new'}>Add another</a>
           <a class="button button-secondary" href={`/admin/users/${success.id}${devState ? `?dev-state=${devState}` : ''}`}>View {success.first}</a>
@@ -179,10 +173,6 @@ const peopleHref = devState ? `/admin/users?dev-state=${devState}` : '/admin/use
               <span class="field-hint" id="h-rec">Optional. Where a setup link goes if the main email is lost.</span>
               {errors.recoveryEmail && <span class="field-error">{errors.recoveryEmail}</span>}
             </div>
-            <label class="check">
-              <input type="checkbox" name="admin" checked={form.admin} />
-              <span>Household admin<small>Can add people and change anyone's access. They need an authenticator app first, so you finish this from their page.</small></span>
-            </label>
           </div>
         </details>
 

@@ -242,8 +242,9 @@ const roleNote = Object.keys(roleOverrides).length;
 
         <section class="panel" id="household" aria-labelledby="h-house">
           <h2 id="h-house">Household</h2>
-          <p class="hint">Groups the household uses to share things.</p>
+          <p class="hint">{households.length > 1 ? "Groups the household uses to share things." : "Who can manage the household."}</p>
           {resultSection === 'household' && banner && <div class={`notice notice-${banner.tone}`} role="status">{banner.text}</div>}
+          {households.length > 1 && (
           <form method="POST" enctype="application/x-www-form-urlencoded" action="#household" data-dirty-form>
             <input type="hidden" name="csrf_token" value={tok('save-household')} />
             <input type="hidden" name="action" value="save-household" />
@@ -255,7 +256,8 @@ const roleNote = Object.keys(roleOverrides).length;
               <span class="dirty-note" data-dirty-note></span>
             </div>
           </form>
-          <h3 class="subhead">Household admin</h3>
+          )}
+          {households.length > 1 && <h3 class="subhead">Household admin</h3>}
           <ul class="items">
             <li>
               <div class="item-id">

@@ -355,7 +355,7 @@ describe('removeCredentialAction', () => {
     if (outcome instanceof Response) throw new Error('unreachable');
     expect(outcome.actionResult?.kind).toBe('error');
     if (outcome.actionResult?.kind !== 'error') throw new Error('unreachable');
-    expect(outcome.actionResult.message).toMatch(/self-remove/);
+    expect(outcome.actionResult.message).toMatch(/remove it in their own settings/);
   });
 
   it('happy path: calls deleteCredential with the identity id and type', async () => {

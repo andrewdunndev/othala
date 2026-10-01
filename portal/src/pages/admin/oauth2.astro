@@ -42,7 +42,7 @@ const people = identities.map((identity) => ({ identity, name: personName(identi
 const manifests = apps.map((a) => a.manifest);
 const requirementNames = dev ? dev.requirements.map((r) => r.name) : [...loadRequirements().keys()];
 const findings = lintManifests(manifests, knownGroupNames(buildGroupRegistry(manifests, IDENTITY_GROUPS)), requirementNames);
-const registered = dev ? null : await hydraClientIds();
+const registered = dev ? new Set(apps.map((a) => a.manifest.clientId).filter((id) => !dev.unsynced.includes(id))) : await hydraClientIds();
 const devState = dev ? Astro.url.searchParams.get('dev-state') : null;
 
 const rows = apps.map((app) => {
@@ -80,12 +80,12 @@ const personHref = (id: string) => `/admin/users/${id}${devState ? `?dev-state=$
         </div>
         {(problems.length > 0 || notSynced) && (
           <div class="badges" style="margin-top: var(--space-2)">
-            {problems.some((p) => p.severity === 'block') && <span class="badge badge-danger">Manifest invalid</span>}
-            {problems.some((p) => p.severity === 'warn') && !problems.some((p) => p.severity === 'block') && <span class="badge badge-warning">Manifest warning</span>}
+            {problems.some((p) => p.severity === 'block') && <span class="badge badge-danger">Settings need fixing</span>}
+            {problems.some((p) => p.severity === 'warn') && !problems.some((p) => p.severity === 'block') && <span class="badge badge-warning">Settings need a look</span>}
             {notSynced && <span class="badge badge-danger">Not synced to the sign-in service</span>}
           </div>
         )}
-        {problems.map((p) => <p class="item-meta">{p.message}</p>)}
+        {problems.length > 0 && <p class="item-meta">Something is off in this app's settings. The details are under Technical details.</p>}
         <dl class="app-who">
           <dt>Who can use it</dt>
           <dd>
@@ -119,6 +119,7 @@ const personHref = (id: string) => `/admin/users/${id}${devState ? `?dev-state=$
         <details class="tech plain">
           <summary>Technical details</summary>
           <dl class="kv">
+            {problems.length > 0 && <div><dt>Problems</dt><dd>{problems.map((p) => <div>{p.message}</div>)}</dd></div>}
             <div><dt>Client id</dt><dd><code>{app.manifest.clientId}</code></dd></div>
             <div><dt>Bound groups</dt><dd>{app.manifest.accessGroups.length ? app.manifest.accessGroups.map((g) => <><code>{g}</code>{' '}</>) : 'None'}</dd></div>
             <div><dt>Role map</dt><dd>{Object.keys(app.manifest.groupRoleMap).length ? Object.entries(app.manifest.groupRoleMap).map(([g, r]) => <><code>{g}: {r}</code>{' '}</>) : 'None'}</dd></div>

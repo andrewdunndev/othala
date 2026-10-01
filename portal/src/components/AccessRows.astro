@@ -46,7 +46,7 @@ const rows = apps.map((a) => {
             <legend class="sr">{app.name} access</legend>
             {options.map((o) => (
               <label>
-                <input type="radio" name={`level:${app.clientId}`} value={o.value} data-hint={o.hint} checked={o.value === selected.value} />
+                <input type="radio" class={o.value === NO_ACCESS ? "none" : undefined} name={`level:${app.clientId}`} value={o.value} data-hint={o.hint} checked={o.value === selected.value} />
                 <span>{o.label}</span>
               </label>
             ))}

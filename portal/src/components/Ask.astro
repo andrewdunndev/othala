@@ -25,7 +25,7 @@ const fieldId = `m-${section}-${action}`;
   <form class="confirm" method="POST" enctype="application/x-www-form-urlencoded" action={`#${section}`}>
     <input type="hidden" name="csrf_token" value={token} />
     <input type="hidden" name="action" value={action} />
-    <span>{message}</span>
+    <span data-question tabindex="-1">{message}</span>
     {match && (
       <div class="field">
         <label for={fieldId}>{matchLabel}</label>

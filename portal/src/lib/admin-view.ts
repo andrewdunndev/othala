@@ -169,6 +169,8 @@ export function rowMatches(row: PersonRow, q: string, show: string): boolean {
 
 export interface Attention {
   text: string;
+  /** Page section the link lands on, when the thing to fix sits below the top. */
+  anchor?: string;
   /** People it concerns, each linking to their page. */
   people: { id: string; name: string }[];
 }
@@ -179,7 +181,7 @@ export function attentionItems(rows: readonly PersonRow[]): Attention[] {
   const noApps = rows.filter((r) => r.chips.length === 0 && !r.off);
   if (noApps.length > 0) items.push({ text: 'Has no apps yet', people: noApps.map(({ id, name }) => ({ id, name })) });
   const stray = rows.filter((r) => r.unrecognised.length > 0);
-  if (stray.length > 0) items.push({ text: 'Has a group no app uses', people: stray.map(({ id, name }) => ({ id, name })) });
+  if (stray.length > 0) items.push({ text: 'Has a group no app uses', anchor: 'groups', people: stray.map(({ id, name }) => ({ id, name })) });
   return items;
 }
 

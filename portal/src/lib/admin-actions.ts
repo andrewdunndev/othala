@@ -76,7 +76,7 @@ type ActionHandler = (fd: FormData, ctx: ActionContext) => Promise<ActionOutcome
 // and send-invite-email share this — see shouldRefuseRecovery, access.ts).
 const ADMIN_RECOVERY_REFUSAL: ActionResult = {
   kind: 'error',
-  message: 'Admin recovery is console-only. See docs/runbooks/admin-recovery.md.',
+  message: 'A setup link for an admin cannot be made here. Use the server console.',
 };
 
 export async function saveAction(fd: FormData, ctx: ActionContext): Promise<ActionOutcome> {
@@ -89,12 +89,12 @@ export async function saveAction(fd: FormData, ctx: ActionContext): Promise<Acti
     recoveryEmail: rawRecoveryEmail && EMAIL_RE.test(rawRecoveryEmail) ? rawRecoveryEmail : undefined,
   };
   const formErrors: Record<string, string> = {};
-  if (rawRecoveryEmail && !EMAIL_RE.test(rawRecoveryEmail)) formErrors.recoveryEmail = 'Invalid recovery email address.';
-  if (!USERNAME_RE.test(traits.username)) formErrors.username = 'Invalid username pattern.';
-  if (!EMAIL_RE.test(traits.email)) formErrors.email = 'Invalid email.';
+  if (rawRecoveryEmail && !EMAIL_RE.test(rawRecoveryEmail)) formErrors.recoveryEmail = 'Enter a valid recovery email address.';
+  if (!USERNAME_RE.test(traits.username)) formErrors.username = 'Use a username like first.last (letters and numbers, with a dot).';
+  if (!EMAIL_RE.test(traits.email)) formErrors.email = 'Enter a valid email address.';
   const identityGroups = fd.getAll('identityGroups').map(String).filter(Boolean);
   const accessGroups = fd.getAll('accessGroups').map(String).filter(Boolean);
-  if (identityGroups.length === 0) formErrors.identityGroups = 'Pick at least one identity group.';
+  if (identityGroups.length === 0) formErrors.identityGroups = 'Pick at least one household group.';
 
   // Stored groups the form renders no checkbox for stay unless removed by an
   // explicit tick. They never count toward the identity-group minimum above.
@@ -287,7 +287,7 @@ export async function issueRecoveryAction(_fd: FormData, ctx: ActionContext): Pr
 export async function sendInviteEmailAction(fd: FormData, ctx: ActionContext): Promise<ActionOutcome> {
   if (shouldRefuseRecovery(ctx.identity)) return { actionResult: ADMIN_RECOVERY_REFUSAL, refetch: false };
   const targetEmail = ctx.identity.traits?.email;
-  if (!targetEmail) return { actionResult: { kind: 'error', message: 'Identity has no email trait on file.' }, refetch: false };
+  if (!targetEmail) return { actionResult: { kind: 'error', message: 'This person has no email address on file.' }, refetch: false };
 
   // Send-time address confirmation, SERVER-enforced (D1 addendum,
   // DECISIONS.md): a UI-only check is not an invariant.
@@ -332,14 +332,14 @@ export async function deactivateAction(_fd: FormData, ctx: ActionContext): Promi
     return {
       actionResult: {
         kind: 'error',
-        message: 'You cannot deactivate your own identity via the UI. Have another admin do it.',
+        message: 'You cannot turn off your own sign-in. Ask another admin to do it.',
       },
       refetch: false,
     };
   }
   if (await leavesNoActiveAdmin(ctx.identity)) {
     return {
-      actionResult: { kind: 'error', message: `Refusing to deactivate: ${username} is the last active admin. Grant admin to another identity first.` },
+      actionResult: { kind: 'error', message: `Refusing to deactivate: ${username} is the last active admin. Make someone else an admin first.` },
       refetch: false,
     };
   }
@@ -438,7 +438,7 @@ export async function revokeAdminAction(fd: FormData, ctx: ActionContext): Promi
   // Last-admin guard: refuse if this would leave zero active admins.
   if (await leavesNoActiveAdmin(identity)) {
     return {
-      actionResult: { kind: 'error', message: `Refusing to revoke: ${username} is the last active admin. Grant admin to another identity first.` },
+      actionResult: { kind: 'error', message: `Refusing to revoke: ${username} is the last active admin. Make someone else an admin first.` },
       refetch: false,
     };
   }
@@ -456,7 +456,7 @@ export async function revokeAdminAction(fd: FormData, ctx: ActionContext): Promi
 // message matches the note rendered next to the passkey chip.
 const PASSKEY_REFUSAL: ActionResult = {
   kind: 'error',
-  message: 'Passkeys cannot be admin-deleted (Kratos upstream limitation). Revoke sessions, then have the user self-remove the credential at /auth/settings — or delete the identity as a last resort.',
+  message: 'A passkey cannot be removed by an admin. Sign them out everywhere, then they can remove it in their own settings.',
 };
 
 export async function removeCredentialAction(fd: FormData, ctx: ActionContext): Promise<ActionOutcome> {
@@ -466,7 +466,7 @@ export async function removeCredentialAction(fd: FormData, ctx: ActionContext): 
   }
   if (!EVICTABLE_CREDENTIAL_TYPES.has(credType)) {
     return {
-      actionResult: { kind: 'error', message: `Invalid credential type '${credType}'. Evictable types: webauthn, totp, lookup_secret.` },
+      actionResult: { kind: 'error', message: `That kind of sign-in method cannot be removed here.` },
       refetch: false,
     };
   }

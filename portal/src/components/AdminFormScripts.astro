@@ -91,18 +91,30 @@
       sync();
     });
 
-    // Opening an inline confirm hides its summary, so focus moves to the first thing to answer.
+    // Opening an inline confirm hides its summary, so focus moves to the question (or the typed-confirm field), never the
+    // confirm button: a double Enter must not act. Closing, by Cancel or Escape, returns focus to the summary.
     document.addEventListener('toggle', function (e) {
       var d = e.target;
-      if (!(d instanceof HTMLDetailsElement) || !d.open || !d.classList.contains('ask')) return;
-      var first = d.querySelector('input[type="text"], button:not([disabled])');
-      if (first) first.focus();
+      if (!(d instanceof HTMLDetailsElement) || !d.classList.contains('ask')) return;
+      if (d.open) {
+        var first = d.querySelector('input[type="text"], [data-question]');
+        if (first) first.focus();
+      }
     }, true);
 
-    // Cancel inside an inline confirm closes it.
+    function closeAsk(d) {
+      d.open = false;
+      var s = d.querySelector('summary');
+      if (s) s.focus();
+    }
     document.addEventListener('click', function (e) {
       var cancel = e.target.closest ? e.target.closest('[data-cancel]') : null;
-      if (cancel && cancel.closest('details')) cancel.closest('details').open = false;
+      if (cancel && cancel.closest('details')) closeAsk(cancel.closest('details'));
+    });
+    document.addEventListener('keydown', function (e) {
+      if (e.key !== 'Escape' || !e.target.closest) return;
+      var d = e.target.closest('details.ask');
+      if (d && d.open) { e.preventDefault(); closeAsk(d); }
     });
 
     // +N chips unfold in place.

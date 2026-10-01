@@ -161,19 +161,24 @@ export interface DevAdmin {
   requirements: { name: string; title: string; why: string }[];
   /** True when the app catalog failed to load, so the pages show the stale-catalog notice. */
   broken: boolean;
+  /** Client ids the sign-in service does not have yet (dev has no service to ask). */
+  unsynced: string[];
 }
 
 export function devAdmin(state: DevAdminState): DevAdmin {
+  // The broken state also carries one app whose group name fails lint, so its row shows a problem badge.
+  const manifests = state === 'broken' ? MANIFESTS.map((m) => (m.clientId === 'promptdesk' ? { ...m, accessGroups: ['Prompt Access'] } : m)) : MANIFESTS;
   const seeds = state === 'empty' ? HOUSEHOLD.slice(0, 1) : state === 'many' ? [...HOUSEHOLD, ...MORE] : HOUSEHOLD;
   return {
     adminId: 'dev-amy',
     identities: seeds.map(person),
-    apps: joinApps(MANIFESTS, MANIFESTS.map((m, n) => tile(m, n))),
+    apps: joinApps(manifests, manifests.map((m, n) => tile(m, n))),
     requirements: [
       { name: 'tailscale', title: 'Tailscale', why: 'Some apps are reachable only on the private network.' },
       { name: 'vpn', title: 'VPN profile', why: 'Needed away from home.' },
     ],
     broken: state === 'broken',
+    unsynced: state === 'broken' ? ['audiobookshelf'] : [],
   };
 }
 

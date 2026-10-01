@@ -4,7 +4,7 @@ import { test, expect, adminAal2Context } from '../fixtures';
 import { createIdentityWithPassword, readIdentity, TEST_PASSWORD } from '../actions/identity';
 import { csrfTokenFor, postAdminAction } from '../actions/admin-post';
 
-const SELF_DEACTIVATE_REFUSAL = 'You cannot deactivate your own identity via the UI. Have another admin do it.';
+const SELF_DEACTIVATE_REFUSAL = 'You cannot turn off your own sign-in. Ask another admin to do it.';
 
 test('ZB1 — turning off your own sign-in is not offered, and a hand-made POST is refused', async ({ browser, baseURL, kratosAdminURL }) => {
   const suffix = `zb1.${Date.now()}`;

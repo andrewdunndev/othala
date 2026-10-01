@@ -64,7 +64,7 @@ const deleted = Astro.url.searchParams.get('deleted') === '1';
           <li>
             {item.text}:{' '}
             {item.people.map((p, n) => (
-              <>{n > 0 && ', '}<a href={`/admin/users/${p.id}`}>{p.name}</a></>
+              <>{n > 0 && ', '}<a href={`/admin/users/${p.id}${devState ? `?dev-state=${devState}` : ""}${item.anchor ? `#${item.anchor}` : ""}`}>{p.name}</a></>
             ))}
           </li>
         ))}
@@ -116,7 +116,7 @@ const deleted = Astro.url.searchParams.get('deleted') === '1';
                   </li>
                 ))}
                 {row.chips.length > CHIP_LIMIT && (
-                  <li><button type="button" class="chip" data-more aria-label={`Show ${row.chips.length - CHIP_LIMIT} more apps`}>+{row.chips.length - CHIP_LIMIT}</button></li>
+                  <li><button type="button" class="chip" data-more aria-label={`Show ${row.chips.length - CHIP_LIMIT} more ${row.chips.length - CHIP_LIMIT === 1 ? "app" : "apps"}`}>+{row.chips.length - CHIP_LIMIT}</button></li>
                 )}
               </ul>
             )}

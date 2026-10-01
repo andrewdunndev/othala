@@ -1,8 +1,7 @@
 ---
-// The admin-visible half of the manifest fallback: the serving loader
-// (lib/manifest-store.ts) keeps the last known good set when a manifest fails
-// validation, so every admin page rendering manifest data mounts this to show
-// the full cause. Emits nothing when healthy; never shown to non-admins.
+// The admin-visible half of the manifest fallback: the serving loader (lib/manifest-store.ts) keeps the last working set
+// of app settings when a new set fails to load, so every admin page that shows apps mounts this. Plain words up top, the
+// raw cause in a closed disclosure. Emits nothing when healthy; never shown to non-admins.
 
 import type { ManifestHealth } from '../lib/manifest-store';
 
@@ -18,33 +17,36 @@ const brokenForSeconds =
     : Math.max(0, Math.round((Date.now() - health.failingSinceMs) / 1000));
 
 function describeDuration(seconds: number): string {
-  if (seconds < 60) return `${seconds}s`;
-  if (seconds < 3600) return `${Math.round(seconds / 60)}m`;
-  return `${Math.round(seconds / 3600)}h`;
+  if (seconds < 60) return 'under a minute';
+  if (seconds < 3600) return `${Math.round(seconds / 60)} minutes`;
+  return `${Math.round(seconds / 3600)} hours`;
 }
 ---
 {health.status === 'stale' && (
   <div class="notice notice-danger">
     <p>
-      <strong>Showing a stale app catalog.</strong> The manifest set has failed
-      to load for {describeDuration(brokenForSeconds)}, so the portal is serving
-      the last known good set ({health.serving} app{health.serving === 1 ? '' : 's'}).
-      What is on disk is not what is running. Logins keep working against the
-      stale set; fix the manifest and the portal picks it up on the next
-      request, with no restart.
+      <strong>Some app changes are not live yet.</strong> The newest app settings could not be read
+      for {describeDuration(brokenForSeconds)}, so the {health.serving} app{health.serving === 1 ? '' : 's'} below
+      come{health.serving === 1 ? 's' : ''} from the last settings that worked. Signing in keeps working.
+      Whoever runs the server needs to fix the settings; this page updates by itself afterwards.
     </p>
-    <pre class="manifest-cause">{health.error}</pre>
+    <details class="plain">
+      <summary>Technical details</summary>
+      <pre class="manifest-cause">{health.error}</pre>
+    </details>
   </div>
 )}
 {health.status === 'unavailable' && (
   <div class="notice notice-danger">
     <p>
-      <strong>No app catalog is loaded.</strong> The manifest set failed to load
-      and there was no earlier good set to fall back to, so the portal is
-      serving zero apps — every OIDC login is being denied. Fix the manifest and
-      the portal picks it up on the next request, with no restart.
+      <strong>No apps are loaded.</strong> The app settings could not be read and there is no earlier
+      working set, so nobody can sign in to any app until this is fixed. Whoever runs the server needs
+      to fix the settings; this page updates by itself afterwards.
     </p>
-    <pre class="manifest-cause">{health.error}</pre>
+    <details class="plain">
+      <summary>Technical details</summary>
+      <pre class="manifest-cause">{health.error}</pre>
+    </details>
   </div>
 )}
 
