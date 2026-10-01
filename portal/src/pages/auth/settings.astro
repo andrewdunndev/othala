@@ -22,6 +22,7 @@ import {
 import { csrfToken, nodesByGroup, asInput, scriptNodes, safeOnclick } from '../../lib/nodes';
 import type { FlowNode, Session, SettingsFlow } from '../../lib/types';
 import CredentialRows from '../../components/settings/CredentialRows.astro';
+import ActionForm from '../../components/settings/ActionForm.astro';
 import ConfirmCues from '../../components/settings/ConfirmCues.astro';
 import { SECOND_FACTOR_KEEP } from '../../lib/second-factor-gate';
 import HeaderActions from '../../components/HeaderActions.astro';
@@ -283,6 +284,7 @@ const lookupLabel: Record<string, string> = {
                 return null;
               })}
             </form>
+            {passkeys.filter((p) => p.removable).map((p) => <ActionForm id={`rm-passkey-${p.id}`} action={ui.action} csrf={csrf} method="passkey" />)}
             {passkeys.map((p, i) => (
               <form id={`rename-${i}`} method="POST" action="/auth/passkey-name" hidden>
                 <input type="hidden" name="csrf_token" value={renameTokens[i]} />
@@ -373,7 +375,7 @@ const lookupLabel: Record<string, string> = {
                         ) : (
                           <>
                             <span>Replace the app? The current one stops working, then you scan a new code.</span>
-                            <button type="submit" name={totp.unlink.name} value={totp.unlink.value} class="button button-danger button-sm" data-flash-key="totp_replace">Replace app</button>
+                            <button type="submit" form="totp-unlink" name={totp.unlink.name} value={totp.unlink.value} class="button button-danger button-sm" data-flash-key="totp_replace">Replace app</button>
                             <ConfirmCues reauth={reauth} reauthHref={reauthHref} lost />
                           </>
                         )}
@@ -384,7 +386,7 @@ const lookupLabel: Record<string, string> = {
                         ) : (
                           <>
                             <span>Remove the app? You won't be able to use it for the second step anymore.</span>
-                            <button type="submit" name={totp.unlink.name} value={totp.unlink.value} class="button button-danger button-sm" aria-label="Remove authenticator app">Remove app</button>
+                            <button type="submit" form="totp-unlink" name={totp.unlink.name} value={totp.unlink.value} class="button button-danger button-sm" aria-label="Remove authenticator app">Remove app</button>
                             <ConfirmCues reauth={reauth} reauthHref={reauthHref} lost />
                           </>
                         )}
@@ -456,6 +458,7 @@ const lookupLabel: Record<string, string> = {
                 </>
               )}
             </form>
+            {totp.enrolled && totp.unlink && <ActionForm id="totp-unlink" action={ui.action} csrf={csrf} method="totp" />}
           </div>
         )}
 
@@ -497,6 +500,7 @@ const lookupLabel: Record<string, string> = {
                 })}
               </div>
             </form>
+            {keys.filter((k) => k.removable).map((k) => <ActionForm id={`rm-webauthn-${k.id}`} action={ui.action} csrf={csrf} method="webauthn" />)}
           </div>
         )}
       </section>
@@ -565,10 +569,11 @@ const lookupLabel: Record<string, string> = {
               {lookupOff && (
                 <div class="panel-row panel-remove">
                   <span>Turn off backup codes? Any you saved stop working.</span>
-                  <button type="submit" name={lookupOff.name} value={String(lookupOff.value ?? '')} class="button button-danger button-sm">Turn off backup codes</button>
+                  <button type="submit" form="lookup-off-form" name={lookupOff.name} value={String(lookupOff.value ?? '')} class="button button-danger button-sm">Turn off backup codes</button>
                 </div>
               )}
             </form>
+            {lookupOff && <ActionForm id="lookup-off-form" action={ui.action} csrf={csrf} method="lookup_secret" />}
           </div>
         )}
 

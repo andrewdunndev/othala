@@ -131,6 +131,14 @@ document.addEventListener('change', (e) => {
     t.closest('li')?.querySelector<HTMLInputElement>('.panel-rename input[type="text"]')?.focus();
   }
 });
+// Enter in the new key's name starts adding that key: the add button is a script trigger, so without this the browser
+// would submit the bare form.
+document.addEventListener('keydown', (e) => {
+  const t = e.target;
+  if (e.key !== 'Enter' || !(t instanceof HTMLInputElement) || t.id !== 'webauthn-register-displayname') return;
+  e.preventDefault();
+  t.form?.querySelector<HTMLButtonElement>('button[name="webauthn_register_trigger"]')?.click();
+});
 document.addEventListener('astro:before-swap', (e) => {
   const ev = e as Event & { to: URL; swap: () => void };
   if (ev.to.pathname !== '/auth/settings') ev.swap = () => location.assign(ev.to.href);

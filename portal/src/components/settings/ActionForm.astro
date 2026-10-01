@@ -1,0 +1,10 @@
+---
+// A hidden form that only a destructive button points at (`form="<id>"`). Keeping removals out of the method forms
+// means Enter in a text input there can only ever submit the form's own add or save button.
+interface Props { id: string; action: string; csrf: string; method: string }
+const { id, action, csrf, method } = Astro.props as Props;
+---
+<form id={id} method="POST" action={action} hidden>
+  <input type="hidden" name="csrf_token" value={csrf} />
+  <input type="hidden" name="method" value={method} />
+</form>
