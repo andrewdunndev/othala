@@ -13,6 +13,9 @@ export const isTransient = (status: number): boolean => status === 429 || status
 /** Refusals that signing in again cannot fix: the app is wrong, or the person cancelled. */
 const NO_SIGN_IN = new Set(["app-misconfigured", "sign-in-cancelled"]);
 
+/** Refusals an admin can fix; a signed-in person gets the contact form with the type already chosen. */
+const ASK_ADMIN: Record<string, string> = { "not-authorised": "access", forbidden: "access", "not-admin": "other", "app-misconfigured": "problem" };
+
 export function statusActions(status: number, signedIn: boolean, retryHref: string, reason?: string): StatusAction[] {
   if (isTransient(status)) {
     const retry = { href: retryHref, label: 'Try again', primary: true };
@@ -27,5 +30,7 @@ export function statusActions(status: number, signedIn: boolean, retryHref: stri
   }
   const home = { href: '/', label: 'Go home', primary: true };
   if (reason && NO_SIGN_IN.has(reason)) return [home];
+  const ask = reason && signedIn ? ASK_ADMIN[reason] : undefined;
+  if (ask) return [home, { href: `/?ask=${ask}#get-in-touch`, label: 'Ask an admin', primary: false }];
   return signedIn ? [home] : [home, { href: '/auth/login', label: 'Sign in', primary: false }];
 }

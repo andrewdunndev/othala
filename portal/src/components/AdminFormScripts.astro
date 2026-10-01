@@ -37,6 +37,7 @@
       var prev = btn.getAttribute('data-copy-label') || btn.textContent.trim();
       btn.setAttribute('data-copy-label', prev);
       btn.textContent = 'Copied';
+      if (window.announce) window.announce('Copied');
       setTimeout(function () { btn.textContent = prev; }, 1500);
     }
     function fallback() {
@@ -121,8 +122,12 @@
     document.addEventListener('click', function (e) {
       var more = e.target.closest ? e.target.closest('[data-more]') : null;
       if (!more) return;
-      more.closest('.chips').querySelectorAll('[data-extra]').forEach(function (li) { li.hidden = false; });
+      var extra = more.closest('.chips').querySelectorAll('[data-extra]');
+      extra.forEach(function (li) { li.hidden = false; });
       more.closest('li').remove();
+      // The button removed itself: focus lands on the first app it revealed.
+      var target = extra[0] && (extra[0].firstElementChild || extra[0]);
+      if (target) { target.tabIndex = -1; target.focus(); }
     });
 
     // Live people filter: search and Show narrow the server-rendered rows and keep the query string in step.
@@ -132,6 +137,7 @@
       var q = filters.querySelector('[name="q"]');
       var show = filters.querySelector('[name="show"]');
       var none = document.querySelector('[data-none]');
+      var count = document.querySelector('[data-count]');
       var apply = function () {
         var needle = q.value.trim().toLowerCase();
         var mode = show.value;
@@ -146,6 +152,7 @@
           if (ok) shown++;
         });
         if (none) none.hidden = shown > 0;
+        if (count) count.textContent = shown === 0 ? 'No one matches.' : shown + (shown === 1 ? ' person shown' : ' people shown');
         var params = new URLSearchParams();
         if (needle) params.set('q', q.value.trim());
         if (mode && mode !== 'all') params.set('show', mode);

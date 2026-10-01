@@ -48,6 +48,14 @@ const codeNodes = (ui?.nodes ?? []).map((n) => {
   const a = n.attributes as { name?: string; value?: unknown };
   return prefill && a.name === 'email' && !a.value ? { ...n, attributes: { ...n.attributes, value: prefill } } : n;
 });
+// The address the code went to, when the flow carries it (a hidden email node or the seeded one).
+const sentTo = (() => {
+  for (const n of codeNodes) {
+    const a = n.attributes as { name?: string; value?: unknown };
+    if (a.name === 'email' && typeof a.value === 'string' && a.value) return a.value;
+  }
+  return prefill;
+})();
 // Kratos verification flow states: choose_method, sent_email, passed_challenge.
 // Map to the two UI shapes recovery uses.
 const phase: 'request' | 'sent' | 'done' = flow?.state === 'passed_challenge' ? 'done' : flow?.state === 'sent_email' ? 'sent' : 'request';
@@ -59,6 +67,8 @@ const phase: 'request' | 'sent' | 'done' = flow?.state === 'passed_challenge' ? 
     ? 'Thanks. You can use this address to get back in if you ever lose a device.'
     : phase === 'request'
     ? 'Enter the address you want verified and we will email you a one-time code.'
+    : sentTo
+    ? `We emailed a code to ${sentTo}. Enter it to confirm this address.`
     : 'We emailed you a code. Enter it to confirm this address.'}
   description="Verify your email address."
 >
@@ -92,7 +102,7 @@ const phase: 'request' | 'sent' | 'done' = flow?.state === 'passed_challenge' ? 
         />
       </form>
     )}
-    {phase === 'sent' && <p class="focus-next">Once it checks out you'll go straight back to where you were.</p>}
+    {phase === 'sent' && <p class="focus-next">Once it checks out you'll see a confirmation, with a button back to your account.</p>}
   </section>
   )}
 

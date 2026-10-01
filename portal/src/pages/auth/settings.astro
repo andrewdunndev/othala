@@ -212,7 +212,7 @@ const lookupLabel: Record<string, string> = {
   lookup_secret_confirm: "I've saved these codes",
 };
 ---
-<Layout title="Settings" description="Account settings." compact router>
+<Layout title="Account" description="Account settings." compact router>
   <Fragment slot="header-actions">
     <HeaderActions identityId={identity.id} isAdmin={isAdmin} />
   </Fragment>
@@ -222,7 +222,7 @@ const lookupLabel: Record<string, string> = {
     <form id="disclosures" method="dialog" data-astro-reload hidden></form>
     <a class="back-link" href="/" data-astro-reload>← Home</a>
     <header class="page-header">
-      <h1 class="page-title">Settings</h1>
+      <h1 class="page-title">Account</h1>
       <p class="page-lede">
         How you sign in, your second step, and how to get back in for <strong>{displayName}</strong>.
       </p>
@@ -613,7 +613,7 @@ const lookupLabel: Record<string, string> = {
         {has('profile') && hasNode('traits.recoveryEmail') && (
           <div class="group">
             <h3>Recovery email</h3>
-            <p>Where we send a code if you can't sign in.</p>
+            <p>Optional second address, used if {traits.email} stops working.</p>
             <form method="POST" enctype="application/x-www-form-urlencoded" action={ui.action} class="settings-form">
               <input type="hidden" name="csrf_token" value={csrf} />
               <input type="hidden" name="method" value="profile" />

@@ -44,8 +44,9 @@
 .disclosure > .focus-form { margin-top: var(--space-4); }
 
 /* What an app will see on the consent screen, and the app's identity above it. */
-.consent-app { display: flex; align-items: center; gap: var(--space-3); }
-.consent-app-name { margin: 0; font-size: var(--text-lg); font-weight: 600; color: var(--text); }
+.consent-app { display: flex; align-items: center; gap: var(--space-3); min-width: 0; }
+.consent-app > div { min-width: 0; }
+.consent-app-name { margin: 0; overflow-wrap: anywhere; font-size: var(--text-lg); font-weight: 600; color: var(--text); }
 .consent-app-desc { margin: 0; font-size: var(--text-sm); color: var(--text-muted); }
 .consent-label { margin: 0 0 var(--space-2); font-size: var(--text-sm); font-weight: 600; color: var(--text); }
 .consent-list { list-style: none; margin: 0; padding: 0; border-top: 1px solid var(--border); }

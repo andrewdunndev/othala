@@ -26,9 +26,10 @@ function describeDuration(seconds: number): string {
   <div class="notice notice-danger">
     <p>
       <strong>Some app changes are not live yet.</strong> The newest app settings could not be read
-      for {describeDuration(brokenForSeconds)}, so the {health.serving} app{health.serving === 1 ? '' : 's'} below
-      come{health.serving === 1 ? 's' : ''} from the last settings that worked. Signing in keeps working.
-      Whoever runs the server needs to fix the settings; this page updates by itself afterwards.
+      for {describeDuration(brokenForSeconds)}, so the {health.serving} <a href="/admin/oauth2">app{health.serving === 1 ? '' : 's'}</a>
+      {health.serving === 1 ? 'is' : 'are'} served from the last settings that worked. Signing in keeps working.
+      As an admin you can read what went wrong under Technical details, correct that app settings file on the server, and this
+      page updates by itself afterwards.
     </p>
     <details class="plain">
       <summary>Technical details</summary>
@@ -40,8 +41,8 @@ function describeDuration(seconds: number): string {
   <div class="notice notice-danger">
     <p>
       <strong>No apps are loaded.</strong> The app settings could not be read and there is no earlier
-      working set, so nobody can sign in to any app until this is fixed. Whoever runs the server needs
-      to fix the settings; this page updates by itself afterwards.
+      working set, so nobody can sign in to any <a href="/admin/oauth2">app</a> until this is fixed. As an admin you can read what went
+      wrong under Technical details, correct that app settings file on the server, and this page updates by itself afterwards.
     </p>
     <details class="plain">
       <summary>Technical details</summary>

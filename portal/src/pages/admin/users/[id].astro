@@ -365,14 +365,14 @@ const roleNote = Object.keys(roleOverrides).length;
                 <span class="item-meta">
                   {shouldRefuseRecovery(identity)
                     ? 'A household admin cannot be sent a setup link here.'
-                    : `Lets ${first} choose how to sign in again.`}
+                    : `Makes a link for you to send ${first}, so they can choose how to sign in again.`}
                 </span>
               </div>
               {!shouldRefuseRecovery(identity) && (
                 <form method="POST" enctype="application/x-www-form-urlencoded" action="#signin">
                   <input type="hidden" name="csrf_token" value={tok('issue-recovery')} />
                   <input type="hidden" name="action" value="issue-recovery" />
-                  <button class="button button-primary" type="submit">Send setup link</button>
+                  <button class="button button-primary" type="submit">Get setup link</button>
                 </form>
               )}
               {recovery && (

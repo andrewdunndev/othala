@@ -136,6 +136,7 @@ const deleted = Astro.url.searchParams.get('deleted') === '1';
       ))}
     </ul>
   )}
+  {filtering && <p class="sr-only" role="status" data-count></p>}
   {filtering && <p class="empty-note" data-none hidden={visible.some((v) => !v.hidden)}>No one matches.</p>}
 
   {rows.length <= 1 && !loadError && (

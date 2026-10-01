@@ -45,7 +45,12 @@ const focusStep = () => {
 const syncExpanded = () => {
   document.querySelectorAll<HTMLButtonElement>('button[data-disclose]').forEach((b) => {
     const box = document.getElementById(b.dataset.disclose ?? '');
-    if (box instanceof HTMLInputElement) b.setAttribute('aria-expanded', String(box.checked));
+    if (!(box instanceof HTMLInputElement)) return;
+    b.setAttribute('aria-expanded', String(box.checked));
+    // The opener keeps the item's name ("Rename passkey Work laptop"); while open it names what it does instead.
+    const name = b.dataset.itemName;
+    const closeText = b.querySelector('.on-open')?.textContent;
+    if (name) b.setAttribute('aria-label', box.checked && closeText ? `${closeText} ${name.charAt(0).toLowerCase()}${name.slice(1)}` : name);
   });
 };
 const enhanceDisclosures = () => {
@@ -57,8 +62,12 @@ const enhanceDisclosures = () => {
     b.className = label.className;
     b.dataset.disclose = box.id;
     // The checkbox carried the item's name ("Remove passkey Work laptop"); the button now speaks for it.
+    // Only the opener (lbl-*) speaks for the item; a Keep it button keeps its own text.
     const name = box.getAttribute('aria-label');
-    if (name) b.setAttribute('aria-label', name);
+    if (name && /\blbl-/.test(label.className)) {
+      b.dataset.itemName = name;
+      b.setAttribute('aria-label', name);
+    }
     const panel = box.parentElement?.querySelector<HTMLElement>(box.classList.contains('cb-rename') ? '.panel-rename' : box.classList.contains('cb-remove') ? '.panel-remove' : '.panel-setup');
     if (panel) {
       panel.id ||= `${box.id}-panel`;
@@ -125,8 +134,10 @@ const write = async (text: string, btn: HTMLElement) => {
   try {
     await navigator.clipboard.writeText(text);
     btn.textContent = 'Copied';
+    (window as { announce?: (m: string) => void }).announce?.('Copied');
   } catch {
     btn.textContent = 'Press Cmd/Ctrl+C';
+    (window as { announce?: (m: string) => void }).announce?.('Copy failed. Press Command or Control plus C to copy the selection.');
     const r = document.createRange();
     const src = btn.closest('.secret-row, .lookup-codes')?.querySelector('code');
     if (src) { r.selectNodeContents(src); getSelection()?.removeAllRanges(); getSelection()?.addRange(r); }

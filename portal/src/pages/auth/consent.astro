@@ -97,6 +97,10 @@ const plate = tile ?? { iconHref: undefined, icon: monogram(appName), iconBleed:
         </div>
       </div>
 
+      {!tile && (
+        <div class="notice notice-warning" role="note">Not one of your household's apps. Only allow if an admin told you to.</div>
+      )}
+
       {scopeDescriptions.length > 0 && (
         <div>
           <p class="consent-label">{appName} will see</p>
@@ -111,13 +115,13 @@ const plate = tile ?? { iconHref: undefined, icon: monogram(appName), iconBleed:
           <input type="hidden" name="consent_challenge" value={challenge ?? ''} />
           <input type="hidden" name="action" value="allow" />
           <input type="hidden" name="csrf_token" value={csrfToken} />
-          <button type="submit" class="button button-primary focus-btn">Allow</button>
+          <button type="submit" class:list={['button', 'focus-btn', tile ? 'button-primary' : 'button-secondary']}>Allow</button>
         </form>
         <form method="POST" enctype="application/x-www-form-urlencoded" action="/oauth2/consent">
           <input type="hidden" name="consent_challenge" value={challenge ?? ''} />
           <input type="hidden" name="action" value="deny" />
           <input type="hidden" name="csrf_token" value={csrfToken} />
-          <button type="submit" class="button button-secondary focus-btn">Deny</button>
+          <button type="submit" class:list={['button', 'focus-btn', tile ? 'button-secondary' : 'button-primary']}>Deny</button>
         </form>
       </div>
       <p class="focus-note">Deny returns you to the app without signing in.</p>

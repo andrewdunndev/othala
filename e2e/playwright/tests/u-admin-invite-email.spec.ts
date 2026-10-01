@@ -137,7 +137,7 @@ test('U2 — an admin-marked target is offered no invite email or setup link, a 
     // The page withholds email and setup-link actions from an admin-marked target and says so.
     await expect(page.getByText(/A household admin cannot be sent a setup link here/i), 'U2: the no-setup-link note is shown').toBeVisible();
     await expect(page.getByRole('button', { name: 'Send invite email' }), 'U2: no invite email action is offered').toHaveCount(0);
-    await expect(page.getByRole('button', { name: 'Send setup link' }), 'U2: no setup link action is offered').toHaveCount(0);
+    await expect(page.getByRole('button', { name: 'Get setup link' }), 'U2: no setup link action is offered').toHaveCount(0);
 
     // The server guard stands on its own: a token from a non-admin's page, posted at the admin target by hand.
     await page.goto(`${baseURL}/admin/users/${bystander.id}`, { waitUntil: 'networkidle' });

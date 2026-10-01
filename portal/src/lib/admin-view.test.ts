@@ -105,8 +105,8 @@ describe('unrecognised groups and attention', () => {
 
   it('lists people with no apps and people with a stray group, and nothing when all is well', () => {
     const rows = personRows([identity({ id: 'n', username: 'nobody', metadataAdmin: { groups: ['garden'] } })], [apps[0]]);
-    expect(attentionItems(rows).map((a) => a.text)).toEqual(['Has no apps yet', 'Has a group no app uses']);
-    expect(attentionItems(rows).find((a) => a.text.startsWith('Has a group'))?.anchor).toBe('groups');
+    expect(attentionItems(rows).map((a) => a.text)).toEqual(['Has no apps yet', 'Belongs to a group no app uses']);
+    expect(attentionItems(rows).find((a) => a.text.startsWith('Belongs to a group'))?.anchor).toBe('groups');
     expect(attentionItems(personRows([person('ok', ['grafana-access'])], [apps[0]]))).toEqual([]);
   });
 });

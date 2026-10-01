@@ -137,7 +137,7 @@ const peopleHref = devState ? `/admin/users?dev-state=${devState}` : '/admin/use
     </>
   ) : (
     <>
-      <TitleRow title="Add person" lede="They get a setup link to choose how they sign in." />
+      <TitleRow title="Add person" lede="You get a link to send them, so they can choose how they sign in." />
       {errors.submit && <div class="notice notice-danger" role="alert">{errors.submit}</div>}
       <form class="panel" method="POST" enctype="application/x-www-form-urlencoded">
         <input type="hidden" name="csrf_token" value={csrfToken} />
