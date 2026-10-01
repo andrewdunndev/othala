@@ -28,13 +28,13 @@ Delete each from the deploy environment; none is read any more.
 - `OTHALA_ADMIN_CONTACT`: the dashboard says "your administrator".
 - `OTHALA_DEFAULT_GROUP` and `OTHALA_IDENTITY_GROUPS`: fixed at `admin` and `everyone`.
 - `OTHALA_ADMIN_FRESHNESS_HOURS`: the step-up window is 1h.
-- `OTHALA_HIBP_ENABLED` and `OTHALA_PASSWORD_MIN_LENGTH`: breach check on, minimum length 12.
-- `OTHALA_CORS_ALLOWED_ORIGINS`: Hydra CORS allows only `OTHALA_PUBLIC_URL`.
+- `OTHALA_HIBP_ENABLED`, `OTHALA_PASSWORD_MIN_LENGTH`: breach check on, minimum 12.
+- `OTHALA_CORS_ALLOWED_ORIGINS`: Hydra CORS allows `OTHALA_PUBLIC_URL`.
 - `OTHALA_PUBLIC_HOST`: the Caddyfile site address is `OTHALA_PUBLIC_URL`.
 - `OTHALA_OTLP_PROVIDER`, `OTHALA_OTLP_ENVIRONMENT`, `OTEL_*`, `OTLP_INGEST_TOKEN`: set `OTHALA_OTLP_ENDPOINT` to trace.
 - `KRATOS_PUBLIC_URL`, `HYDRA_PUBLIC_URL`, `KRATOS_ADMIN_URL`, `HYDRA_ADMIN_URL`, `KRATOS_ADMIN_TOKEN` and `HYDRA_ADMIN_TOKEN`: fixed at `kratos:4433`, `kratos:4434`, `hydra:4445`, no bearer.
 - `ADMIN_HOST`: renamed `PORTAL_ADMIN_BIND_HOST`, required in production.
-- `KRATOS_PG_HOST`, `HYDRA_PG_HOST`, `KRATOS_ADMIN_HOST` and `CONSENT_HOST`: the hosts are `postgres`, `kratos`, `othala`.
+- `KRATOS_PG_HOST`, `HYDRA_PG_HOST`, `KRATOS_ADMIN_HOST` and `CONSENT_HOST`: hosts are `postgres`, `kratos`, `othala`.
 - `MANIFEST_DIR` (production reads `/etc/portal/manifests`), `PORT`, `HOST`, `ADMIN_PORT`, `PORTAL_LOGIN_URL` and `PORTAL_CONSENT_URL`: fixed.
 - `SMTP_USER`, `SMTP_PASS`, `ACME_EMAIL` and the Kratos and Hydra `DSN`: credentials ride in `OTHALA_SMTP_CONNECTION_URI` and `dsn`.
 
@@ -44,8 +44,8 @@ Delete each from the deploy environment; none is read any more.
 - Production start needs `OTHALA_CONTACT_RECIPIENT` and `OTHALA_SMTP_CONNECTION_URI`.
 - Kratos and Hydra trace when `OTHALA_OTLP_ENDPOINT` is set.
 - The Kratos login flow lifespan is 1h, up from 10m.
-- Kratos public CORS is off: the portal shares the origin.
-- The reference Caddy `othala_selfservice` limit is 30 events per minute, up from 10.
+- Kratos public CORS is off.
+- Caddy `othala_selfservice` limit is 30 events per minute, up from 10.
 - `kratos.yml` and `hydra.yml` drop keys restating upstream defaults.
 - The e2e suite creates an identity through the admin form and always runs the Caddy edge.
 
