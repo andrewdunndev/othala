@@ -8,7 +8,24 @@ export const prerender = false;
 
 import Layout from '../layouts/Layout.astro';
 import PageHero from '../components/PageHero.astro';
-import { loadTiles, loadGroups, safeHref, userCanSeeTile, type AppTile } from '../lib/tiles';
+import TileCard from '../components/TileCard.astro';
+import AppIcon from '../components/AppIcon.astro';
+import AppBadges from '../components/AppBadges.astro';
+import PrereqCard from '../components/PrereqCard.astro';
+import GuideSections from '../components/GuideSections.astro';
+import {
+  loadTiles,
+  loadGroups,
+  loadRequirements,
+  requirementsFor,
+  splitGuide,
+  holdsTopRole,
+  tileReadiness,
+  safeHref,
+  userCanSeeTile,
+  type AppTile,
+} from '../lib/tiles';
+import { devMockIdentity } from '../lib/dev-mock';
 import { getSession, isReachable } from '../lib/kratos';
 import { getIdentity } from '../lib/admin-api';
 import { identityGroups } from '../lib/gate';
@@ -29,28 +46,8 @@ let downReason = 'Kratos /health/alive unreachable; retrying.';
 
 if (devOverride === 'down' || devOverride === 'pre-auth' || devOverride === 'post-auth') {
   state = devOverride;
-  if (state === 'post-auth') {
-    // Mock identity for the dev post-auth view. Its groups must intersect the e2e/manifests/ `presentation.access:`
-    // groups or zero tiles render (re-derive them from there if a fixture is renamed). `everyone` covers the
-    // default-group fixture; 'admin' is an identity group only, since the mock omits the `metadata_admin.admin` marker.
-    // OTHALA_DEV_MOCK_GROUPS=admin,grafana-access overrides the list.
-    const devGroupsEnv: string | undefined = import.meta.env.OTHALA_DEV_MOCK_GROUPS;
-    const mockGroups = devGroupsEnv
-      ? devGroupsEnv.split(',').map((g) => g.trim()).filter(Boolean)
-      : [
-          'admin',
-          'everyone',
-          'grafana-access',
-          'audiobookshelf-access',
-          'proxywatch-access',
-          'prompt-access',
-        ];
-    identity = {
-      id: 'dev-mock',
-      traits: { username: 'dev.user', email: 'dev@example.local', displayName: 'Dev User' },
-      metadata_admin: { groups: mockGroups },
-    } as unknown as Identity;
-  }
+  // Mock person for the dev post-auth view; see lib/dev-mock.ts for the group and prerequisite query params.
+  if (state === 'post-auth') identity = devMockIdentity(Astro.url);
 } else {
   try {
     const session = await getSession(cookie);
@@ -88,6 +85,26 @@ const visibleTiles =
   state === 'post-auth'
     ? orderedApps.filter((a: AppTile) => userCanSeeTile(a, groups))
     : [];
+
+// Per-tile presentation for this person: prerequisite state (the admin's marks), requirement definitions, the guide
+// outline, and whether they hold the app's top role.
+const requirementSet = loadRequirements();
+const markedPrerequisites = identity?.metadata_admin?.prerequisites ?? [];
+const views = new Map(
+  visibleTiles.map((t: AppTile) => {
+    const requirements = requirementsFor(t, requirementSet);
+    return [
+      t.slug,
+      {
+        requirements,
+        readiness: tileReadiness(t, markedPrerequisites),
+        titles: requirements.map((r) => r.title),
+        admin: holdsTopRole(t, identity?.metadata_admin),
+        guide: splitGuide(t.educationHtml),
+      },
+    ] as const;
+  }),
+);
 
 // Split visibleTiles into ungrouped and grouped sections, ordered by groups.yaml `order`, else min tile order.
 const ungroupedTiles = visibleTiles.filter((t: AppTile) => !t.group);
@@ -216,20 +233,10 @@ const devLinks = [
           <>
             {ungroupedTiles.length > 0 && (
               <div class="tile-grid">
-                {ungroupedTiles.map((t: AppTile) => (
-                  <article class="tile">
-                    <a class="tile-launch" href={safeHref(t.url)}>
-                      {t.iconHref ? (
-                        <img class="tile-icon-img" src={t.iconHref} alt="" loading="lazy" />
-                      ) : (
-                        <div class="tile-icon mono">{t.icon}</div>
-                      )}
-                      <div class="tile-name">{t.name}</div>
-                      <div class="tile-desc">{t.description}</div>
-                    </a>
-                    <button type="button" class="tile-learn mono" data-app-learn={t.slug}>learn more →</button>
-                  </article>
-                ))}
+                {ungroupedTiles.map((t: AppTile) => {
+                  const v = views.get(t.slug)!;
+                  return <TileCard tile={t} readiness={v.readiness} requirementTitles={v.titles} admin={v.admin} />;
+                })}
               </div>
             )}
             {tileGroups.map(({ groupName, tiles, meta }) => (
@@ -241,20 +248,10 @@ const devLinks = [
                   )}
                 </div>
                 <div class="tile-grid">
-                  {tiles.map((t: AppTile) => (
-                    <article class="tile">
-                      <a class="tile-launch" href={safeHref(t.url)}>
-                        {t.iconHref ? (
-                          <img class="tile-icon-img" src={t.iconHref} alt="" loading="lazy" />
-                        ) : (
-                          <div class="tile-icon mono">{t.icon}</div>
-                        )}
-                        <div class="tile-name">{t.name}</div>
-                        <div class="tile-desc">{t.description}</div>
-                      </a>
-                      <button type="button" class="tile-learn mono" data-app-learn={t.slug}>learn more →</button>
-                    </article>
-                  ))}
+                  {tiles.map((t: AppTile) => {
+                    const v = views.get(t.slug)!;
+                    return <TileCard tile={t} readiness={v.readiness} requirementTitles={v.titles} admin={v.admin} />;
+                  })}
                 </div>
               </div>
             ))}
@@ -267,39 +264,53 @@ const devLinks = [
         )}
       </section>
 
-      {/* ── Per-app education data: one hidden <template> per visible tile.
-          The JS modal reads these to populate the app-modal at open time.
-          educationHtml may contain inline SVG (cat-explainer diagrams). */}
-      {visibleTiles.map((t: AppTile) => (
-        <template
-          data-app-edu={t.slug}
-          data-app-name={t.name}
-          data-app-url={safeHref(t.url)}
-          data-app-desc={t.description}
-        >
-          <Fragment set:html={t.educationHtml ?? ''} />
-        </template>
-      ))}
+      {/* ── Per-app documentation: one hidden <template> per visible tile, three slots. The dialog script clones
+          them into the header (badges), the action band (prerequisite card + Open) and the scrolling guide body. */}
+      {visibleTiles.map((t: AppTile) => {
+        const v = views.get(t.slug)!;
+        const href = safeHref(t.url);
+        return (
+          <template
+            data-app-edu={t.slug}
+            data-app-name={t.name}
+            data-app-desc={t.description}
+            data-app-icon={t.iconHref ?? ''}
+            data-app-mono={t.icon}
+          >
+            <div data-slot="badges">
+              <AppBadges readiness={v.readiness} titles={v.titles} admin={v.admin} />
+            </div>
+            <div data-slot="actions">
+              {v.requirements.map((r) => (
+                <PrereqCard requirement={r} ready={v.readiness === 'ready'} />
+              ))}
+              <a class="button button-primary app-modal-open" href={href} rel="noopener">Open {t.name} ↗</a>
+            </div>
+            <div data-slot="body">
+              <GuideSections guide={v.guide} />
+              <p class="app-modal-more mono"><a href={`/apps/${encodeURIComponent(t.slug)}`}>Open as a page →</a></p>
+            </div>
+          </template>
+        );
+      })}
 
-      {/* ── App education modal ────────────────────────────────────────────
-          Mirrors the request-modal structure: fixed, centered, backdrop,
-          Esc + backdrop + × close. Populated at open time from the hidden
-          <template data-app-edu> elements above. */}
+      {/* ── App guide dialog: native <dialog>, so the page behind is inert, Tab stays inside, and Esc closes. Filled at
+          open time from the hidden <template data-app-edu> elements above. */}
       <dialog class="app-modal" id="app-modal" aria-labelledby="app-modal-title">
         <div class="app-modal-inner">
           <header class="app-modal-header">
+            <span class="app-modal-icon" data-slot-icon></span>
             <div class="app-modal-header-text">
               <h2 class="app-modal-title" id="app-modal-title"></h2>
               <p class="app-modal-desc"></p>
+              <div class="app-modal-badges" data-slot-badges></div>
             </div>
-            <button class="app-modal-close mono" type="button" data-close-app-modal aria-label="Close">✕</button>
+            <button class="app-modal-close" type="button" data-close-app-modal aria-label="Close guide">
+              <svg viewBox="0 0 16 16" width="16" height="16" aria-hidden="true" focusable="false"><path d="M3.5 3.5l9 9m0-9l-9 9" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>
+            </button>
           </header>
-          <div class="app-modal-cta">
-            <a class="button button-primary app-modal-open-link" href="#" rel="noopener" target="_blank">Open ↗</a>
-          </div>
-          <div class="app-modal-body">
-            <div class="edu-prose app-modal-content"></div>
-          </div>
+          <div class="app-modal-actions" data-slot-actions></div>
+          <div class="app-modal-body" data-slot-body tabindex="0" role="region" aria-label="Guide"></div>
         </div>
       </dialog>
 
@@ -453,58 +464,86 @@ const devLinks = [
     });
   })();
 
-  // App education modal: [data-app-learn] buttons populate it from the hidden <template data-app-edu>.
+  // App guide dialog: [data-app-learn] buttons fill it from the hidden <template data-app-edu>. The native <dialog> makes
+  // the page behind inert and keeps Tab inside; this script adds the fill, focus return and scroll reset.
   (function () {
     var appModal = document.getElementById('app-modal');
     if (!appModal) return;
 
     var titleEl = appModal.querySelector('.app-modal-title');
-    var descEl  = appModal.querySelector('.app-modal-desc');
-    var openLink = appModal.querySelector('.app-modal-open-link');
-    var contentEl = appModal.querySelector('.app-modal-content');
+    var descEl = appModal.querySelector('.app-modal-desc');
+    var iconEl = appModal.querySelector('[data-slot-icon]');
+    var badgesEl = appModal.querySelector('[data-slot-badges]');
+    var actionsEl = appModal.querySelector('[data-slot-actions]');
+    var bodyEl = appModal.querySelector('[data-slot-body]');
+    var opener = null;
 
-    function openAppModal(slug) {
-      var tpl = document.querySelector('template[data-app-edu="' + slug + '"]');
-      if (!tpl || !contentEl) return;
-
-      if (titleEl) titleEl.textContent = tpl.dataset.appName || slug;
-      if (descEl)  descEl.textContent  = tpl.dataset.appDesc  || '';
-      if (openLink) {
-        openLink.href = tpl.dataset.appUrl || '#';
-        openLink.textContent = 'Open ' + (tpl.dataset.appName || slug) + ' ↗';
+    function slot(tpl, name) {
+      var el = tpl.content.querySelector('[data-slot="' + name + '"]');
+      return el ? el.cloneNode(true) : null;
+    }
+    function fill(target, node) {
+      target.replaceChildren();
+      if (node) while (node.firstChild) target.appendChild(node.firstChild);
+    }
+    function logo(tpl) {
+      var span = document.createElement('span');
+      span.className = 'app-modal-logo';
+      var href = tpl.dataset.appIcon;
+      if (href) {
+        var img = document.createElement('img');
+        img.src = href;
+        img.alt = '';
+        span.appendChild(img);
+      } else {
+        span.textContent = tpl.dataset.appMono || '';
+        span.classList.add('app-modal-logo-mono');
       }
-
-      // Clone the template content so re-opens always get a fresh copy.
-      contentEl.innerHTML = '';
-      contentEl.appendChild(tpl.content.cloneNode(true));
-
-      if (typeof appModal.showModal === 'function') appModal.showModal();
+      return span;
     }
 
-    // Delegate click on all [data-app-learn] buttons (covers ungrouped + grouped tiles).
+    function openAppModal(slug, from) {
+      var tpl = document.querySelector('template[data-app-edu="' + slug + '"]');
+      if (!tpl || typeof appModal.showModal !== 'function') return;
+      opener = from || null;
+      titleEl.textContent = tpl.dataset.appName || slug;
+      descEl.textContent = tpl.dataset.appDesc || '';
+      iconEl.replaceChildren(logo(tpl));
+      fill(badgesEl, slot(tpl, 'badges'));
+      fill(actionsEl, slot(tpl, 'actions'));
+      fill(bodyEl, slot(tpl, 'body'));
+      actionsEl.hidden = !actionsEl.firstChild;
+      bodyEl.scrollTop = 0;
+      appModal.showModal();
+    }
+
     document.addEventListener('click', function (e) {
-      var btn = e.target && e.target.closest('[data-app-learn]');
+      var btn = e.target && e.target.closest ? e.target.closest('[data-app-learn]') : null;
       if (!btn) return;
-      openAppModal(btn.dataset.appLearn);
+      openAppModal(btn.dataset.appLearn, btn);
     });
 
-    // × close button.
     appModal.querySelectorAll('[data-close-app-modal]').forEach(function (btn) {
       btn.addEventListener('click', function () { appModal.close(); });
     });
 
-    // Backdrop click closes (click lands on the <dialog> element itself).
+    // Backdrop click closes (the click lands on the <dialog> element itself).
     appModal.addEventListener('click', function (e) {
       if (e.target === appModal) appModal.close();
     });
 
-    // Clear content when dialog fully closes (keeps DOM tidy; Esc is native).
+    // Return focus to the Guide button that opened it, then clear the content once the close settles.
     appModal.addEventListener('close', function () {
+      if (opener && typeof opener.focus === 'function') opener.focus();
+      opener = null;
       setTimeout(function () {
-        if (contentEl) contentEl.innerHTML = '';
-        if (titleEl) titleEl.textContent = '';
-        if (descEl)  descEl.textContent  = '';
-        if (openLink) { openLink.href = '#'; openLink.textContent = 'Open ↗'; }
+        if (appModal.open) return;
+        titleEl.textContent = '';
+        descEl.textContent = '';
+        iconEl.replaceChildren();
+        badgesEl.replaceChildren();
+        actionsEl.replaceChildren();
+        bodyEl.replaceChildren();
       }, 200);
     });
   })();
@@ -601,99 +640,15 @@ const devLinks = [
   }
   .cta-link:hover { color: var(--accent); text-decoration: none; }
 
-  /* Tile grid: each tile is an <article> with a launch anchor and a sibling "learn more" anchor (no nesting). */
+  /* Tile grid: TileCard renders each tile; the grid only sets the columns (1 on phones, 2 from 640px, 3 from 900px; TileCard lays out logo beside text on phones). */
   .tile-grid {
     display: grid;
-    grid-template-columns: repeat(2, 1fr);
+    grid-template-columns: 1fr;
     gap: var(--space-3);
     align-items: stretch;
   }
   @media (min-width: 640px)  { .tile-grid { grid-template-columns: repeat(2, 1fr); } }
   @media (min-width: 900px)  { .tile-grid { grid-template-columns: repeat(3, 1fr); } }
-  .tile {
-    display: flex;
-    flex-direction: column;
-    align-items: flex-start;
-    height: 100%;
-    background: var(--surface);
-    border: 1px solid var(--border);
-    border-radius: var(--radius);
-    overflow: hidden;
-    transition:
-      border-color var(--duration-fast) var(--ease-out),
-      box-shadow var(--duration-fast) var(--ease-out);
-  }
-  .tile:hover {
-    border-color: var(--accent);
-  }
-  /* Inner launch anchor wraps icon + name + desc */
-  .tile-launch {
-    display: flex;
-    flex-direction: column;
-    align-items: flex-start;
-    gap: var(--space-2);
-    padding: var(--space-5) var(--space-4) var(--space-3);
-    color: var(--text);
-    text-decoration: none;
-    flex: 1;
-    width: 100%;
-    height: 100%;
-  }
-  .tile-launch:hover { text-decoration: none; color: var(--text); }
-  .tile-icon {
-    font-family: var(--font-mono);
-    font-size: var(--text-sm);
-    color: var(--accent);
-    letter-spacing: 0.06em;
-  }
-  /* Full-color icon image — keeps the SVG's own colors, no tinting. */
-  .tile-icon-img {
-    display: block;
-    width: 1.75rem;
-    height: 1.75rem;
-    object-fit: contain;
-    flex-shrink: 0;
-  }
-  .tile-name {
-    font-size: var(--text-base);
-    font-weight: 600;
-    color: var(--text);
-  }
-  .tile-desc {
-    font-size: var(--text-sm);
-    color: var(--text-2);
-    line-height: 1.4;
-    display: -webkit-box;
-    -webkit-line-clamp: 2;
-    -webkit-box-orient: vertical;
-    overflow: hidden;
-    /* Reserve height for exactly 2 lines so 1-line and 2-line tiles align */
-    min-height: calc(1.4em * 2);
-  }
-  .tile-learn {
-    /* Reset default <button> styles so it looks like the previous <a>. */
-    all: unset;
-    cursor: pointer;
-    font-family: var(--font-mono);
-    font-size: var(--text-xs);
-    color: var(--text-muted);
-    align-self: flex-end;
-    padding: var(--space-2) var(--space-4);
-    padding-block: var(--space-3);
-    min-height: 44px;
-    display: flex;
-    align-items: center;
-    border-top: 1px solid var(--border);
-    width: 100%;
-    justify-content: flex-end;
-    box-sizing: border-box;
-    margin-top: auto;
-  }
-  .tile-learn:hover { color: var(--accent); text-decoration: none; }
-  .tile-learn:focus-visible {
-    outline: 2px solid var(--input-focus, var(--accent));
-    outline-offset: -2px;
-  }
 
   /* Grouped tile sections: a bordered labeled section with heading and description above the grid. */
   .tile-group {
@@ -862,50 +817,81 @@ const devLinks = [
   }
   .request-thanks-note { font-size: var(--text-xs); color: var(--text-muted); }
 
-  /* App education modal: wider (46rem) scrollable reading pane; prose rules copied from apps/[slug].astro. */
+  /* App guide dialog: a centered 46rem card on desktop, a full-screen sheet on phones. Header, action band and the
+     guide body stack; only the body scrolls. */
   .app-modal {
     position: fixed;
-    top: 50%;
-    left: 50%;
-    transform: translate(-50%, -50%);
-    margin: 0;
-    max-width: min(46rem, 92vw);
-    max-height: 85vh;
-    width: 100%;
-    background: var(--bg, #ffffff);
+    inset: 0;
+    margin: auto;
+    width: min(46rem, 92vw);
+    height: fit-content;
+    max-height: min(85vh, 56rem);
+    background: var(--bg);
     border: 1px solid var(--border);
     border-radius: var(--radius);
     color: var(--text);
     padding: 0;
-    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.22);
+    box-shadow: 0 12px 40px rgba(0, 0, 0, 0.28);
     overflow: hidden;
   }
   /* <dialog> is display:none until [open]; scope the flex layout to [open]. */
   .app-modal[open] {
     display: flex;
     flex-direction: column;
+    animation: app-modal-in var(--duration-base, 200ms) var(--ease-out);
   }
   .app-modal::backdrop {
     background: rgba(0, 0, 0, 0.55);
     backdrop-filter: blur(3px);
   }
+  .app-modal[open]::backdrop { animation: app-modal-fade var(--duration-base, 200ms) var(--ease-out); }
+  @keyframes app-modal-in {
+    from { opacity: 0; transform: translateY(8px) scale(0.99); }
+    to   { opacity: 1; transform: none; }
+  }
+  @keyframes app-modal-fade { from { opacity: 0; } to { opacity: 1; } }
+  :global(body:has(.app-modal[open])) { overflow: hidden; }
+
   .app-modal-inner {
     display: flex;
     flex-direction: column;
-    height: 100%;
+    min-height: 0;
+    flex: 1;
     overflow: hidden;
   }
   .app-modal-header {
     display: grid;
-    grid-template-columns: 1fr auto;
-    gap: var(--space-3) var(--space-4);
+    grid-template-columns: auto 1fr auto;
+    gap: var(--space-4);
     align-items: start;
-    padding: var(--space-5) var(--space-5) var(--space-4);
+    padding: var(--space-5);
+    background: var(--surface);
     border-bottom: 1px solid var(--border);
     flex-shrink: 0;
   }
-  .app-modal-title {
+  .app-modal :global(.app-modal-logo) {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 3.5rem;
+    height: 3.5rem;
+    padding: 0.55rem;
+    box-sizing: border-box;
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+  }
+  .app-modal :global(.app-modal-logo img) { display: block; width: 100%; height: 100%; object-fit: contain; }
+  .app-modal :global(.app-modal-logo-mono) {
     font-family: var(--font-mono);
+    font-size: var(--text-base);
+    font-weight: 600;
+    color: var(--accent);
+    text-transform: uppercase;
+  }
+  .app-modal-header-text { min-width: 0; }
+  .app-modal-title {
+    font-family: var(--font-display, var(--font-mono));
     font-size: var(--text-xl);
     font-weight: 700;
     color: var(--text);
@@ -918,99 +904,86 @@ const devLinks = [
     line-height: 1.4;
     margin: 0;
   }
+  .app-modal-badges { margin-top: var(--space-2); }
+  .app-modal-badges:empty { display: none; }
   .app-modal-close {
-    all: unset;
-    cursor: pointer;
-    font-size: var(--text-base);
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 44px;
+    height: 44px;
+    margin: calc(var(--space-2) * -1) calc(var(--space-2) * -1) 0 0;
+    background: transparent;
+    border: 1px solid transparent;
+    border-radius: var(--radius);
     color: var(--text-muted);
-    padding: var(--space-1) var(--space-2);
-    border-radius: var(--radius-sm);
-    line-height: 1;
-    transition: color var(--duration-fast) var(--ease-out);
+    cursor: pointer;
+    transition:
+      color var(--duration-fast) var(--ease-out),
+      background-color var(--duration-fast) var(--ease-out);
   }
-  .app-modal-close:hover { color: var(--text); }
+  .app-modal-close:hover { color: var(--text); background: var(--accent-subtle); }
   .app-modal-close:focus-visible {
     outline: 2px solid var(--input-focus, var(--accent));
-    outline-offset: 2px;
+    outline-offset: 1px;
   }
-  .app-modal-cta {
-    padding: var(--space-4) var(--space-5) 0;
+
+  /* Action band: prerequisite card above the Open button; always visible. */
+  .app-modal-actions {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-3);
+    padding: var(--space-4) var(--space-5);
+    border-bottom: 1px solid var(--border);
     flex-shrink: 0;
+  }
+  .app-modal-actions[hidden] { display: none; }
+  .app-modal-actions :global(.app-modal-open) {
+    align-self: flex-start;
+    min-height: 44px;
+    display: inline-flex;
+    align-items: center;
   }
   .app-modal-body {
     padding: var(--space-5) var(--space-5) var(--space-6);
     overflow-y: auto;
+    overscroll-behavior: contain;
     flex: 1;
-    font-size: var(--text-base);
-    line-height: 1.6;
-    color: var(--text);
+    min-height: 0;
+  }
+  .app-modal-body:focus-visible {
+    outline: 2px solid var(--input-focus, var(--accent));
+    outline-offset: -2px;
+  }
+  .app-modal-body :global(.app-modal-more) {
+    margin: var(--space-5) 0 0;
+    font-size: var(--text-xs);
   }
 
-  /* Prose rules — identical to .app-body :global(...) in apps/[slug].astro */
-  .app-modal :global(.edu-prose h2) {
-    font-family: var(--font-mono);
-    font-size: var(--text-lg);
-    font-weight: 600;
-    margin: var(--space-4) 0 var(--space-1);
+  @media (max-width: 640px) {
+    .app-modal {
+      inset: 0;
+      width: 100vw;
+      max-width: none;
+      height: 100dvh;
+      max-height: none;
+      border: 0;
+      border-radius: 0;
+    }
+    .app-modal[open] { animation-name: app-modal-sheet; }
+    .app-modal-header { padding: var(--space-4); gap: var(--space-3); }
+    .app-modal-actions { padding: var(--space-3) var(--space-4); }
+    .app-modal-actions :global(.app-modal-open) { align-self: stretch; justify-content: center; }
+    .app-modal-body { padding: var(--space-4) var(--space-4) var(--space-6); }
+    .app-modal :global(.app-modal-logo) { width: 3rem; height: 3rem; }
   }
-  .app-modal :global(.edu-prose h3) {
-    font-family: var(--font-mono);
-    font-size: var(--text-base);
-    font-weight: 600;
-    margin: var(--space-3) 0 var(--space-1);
+  @keyframes app-modal-sheet {
+    from { transform: translateY(24px); opacity: 0; }
+    to   { transform: none; opacity: 1; }
   }
-  .app-modal :global(.edu-prose p) {
-    margin: var(--space-3) 0;
-  }
-  .app-modal :global(.edu-prose ul),
-  .app-modal :global(.edu-prose ol) {
-    margin: var(--space-3) 0;
-    padding-left: var(--space-5);
-  }
-  .app-modal :global(.edu-prose code) {
-    font-family: var(--font-mono);
-    font-size: var(--text-sm);
-    background: var(--surface);
-    padding: 0.1em 0.4em;
-    border-radius: 4px;
-  }
-  .app-modal :global(.edu-prose pre) {
-    font-family: var(--font-mono);
-    font-size: var(--text-sm);
-    background: var(--surface);
-    border: 1px solid var(--border);
-    padding: var(--space-3);
-    border-radius: var(--radius);
-    overflow-x: auto;
-  }
-  .app-modal :global(.edu-prose pre code) {
-    background: transparent;
-    padding: 0;
-  }
-  .app-modal :global(.edu-prose a) {
-    color: var(--accent);
-    text-decoration: underline;
-  }
-
-  /* Cat-explainer diagram CSS (inline SVG diagrams in education content) */
-  .app-modal :global(.cat-explainer) {
-    background: var(--surface);
-    border: 1px solid var(--border);
-    border-radius: var(--radius);
-    padding: var(--space-4);
-    margin: var(--space-4) 0;
-  }
-  .app-modal :global(.cat-explainer svg) {
-    display: block;
-    width: 100%;
-    height: auto;
-    max-width: 720px;
-    margin: 0 auto;
-  }
-  .app-modal :global(.cat-explainer p) {
-    margin: var(--space-3) 0 0 0;
-    font-size: var(--text-sm);
-    color: var(--text-2);
+  @media (prefers-reduced-motion: reduce) {
+    .app-modal[open],
+    .app-modal[open]::backdrop { animation: none; }
   }
 
   /* ── Mobile ── */
@@ -1038,12 +1011,5 @@ const devLinks = [
       justify-content: center;
       margin-left: 0;
     }
-    /* 2-col tile grid on narrow screens (≥375px default, 1-col only if very narrow). */
-    .tile-grid {
-      grid-template-columns: repeat(2, 1fr);
-    }
-  }
-  @media (max-width: 374px) {
-    .tile-grid { grid-template-columns: 1fr; }
   }
 </style>

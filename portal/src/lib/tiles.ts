@@ -277,11 +277,6 @@ export function loadRequirements(): Map<string, Requirement> {
   return out;
 }
 
-/** One requirement by name, or a title-only stand-in when no file defines it (the lint warns separately). */
-export function getRequirement(name: string): Requirement {
-  return loadRequirements().get(name) ?? { name, title: titleCase(name), why: '', html: '' };
-}
-
 /** Normalize `presentation.requires`: a list of slugs, lowercased, deduplicated, anything malformed dropped. */
 export function parseRequires(raw: unknown): string[] {
   if (!Array.isArray(raw)) return [];
@@ -462,4 +457,9 @@ export function tileAccessGroups(tile: AppTile): string[] {
  * read (parseTile reads only `presentation:`), so such a manifest still gates visibility on its binding. */
 export function userCanSeeTile(tile: AppTile, userGroups: string[]): boolean {
   return tileAccessGroups(tile).some((g) => userGroups.includes(g));
+}
+
+/** The tile's requirements resolved against the loaded set, in declared order; a name nothing defines gets a stand-in. */
+export function requirementsFor(tile: AppTile, all: Map<string, Requirement>): Requirement[] {
+  return tile.requires.map((n) => all.get(n) ?? { name: n, title: titleCase(n), why: '', html: '' });
 }

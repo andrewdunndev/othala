@@ -1,0 +1,79 @@
+---
+// Prerequisite card shown above the Open button: what the app needs, why, and whether this person has been marked ready.
+// It links to the shared setup guide at /requirements/<name>.
+
+import type { Requirement } from '../lib/tiles';
+
+interface Props {
+  requirement: Requirement;
+  ready: boolean;
+}
+
+const { requirement, ready } = Astro.props;
+const href = `/requirements/${encodeURIComponent(requirement.name)}`;
+---
+
+<div class:list={['prereq', ready ? 'prereq-ready' : 'prereq-needs']}>
+  <span class="prereq-mark" aria-hidden="true">{ready ? '✓' : '!'}</span>
+  <div class="prereq-text">
+    <p class="prereq-title">{ready ? `${requirement.title} is set up for you` : `This app needs ${requirement.title}`}</p>
+    {requirement.why && <p class="prereq-why">{requirement.why}</p>}
+  </div>
+  <a class="prereq-link mono" href={href}>{ready ? 'Setup guide' : 'Set it up'} →</a>
+</div>
+
+<style>
+  .prereq {
+    display: grid;
+    grid-template-columns: auto 1fr auto;
+    gap: var(--space-3);
+    align-items: center;
+    padding: var(--space-3) var(--space-4);
+    border: 1px solid var(--border);
+    border-left-width: 4px;
+    border-radius: var(--radius);
+    background: var(--surface);
+  }
+  .prereq-needs { border-color: var(--warning); background: var(--warning-subtle); }
+  .prereq-ready { border-color: var(--success); background: var(--success-subtle); }
+  .prereq-mark {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 1.5rem;
+    height: 1.5rem;
+    border-radius: 50%;
+    font-family: var(--font-mono);
+    font-size: var(--text-sm);
+    font-weight: 700;
+    color: var(--bg);
+  }
+  .prereq-needs .prereq-mark { background: var(--warning); }
+  .prereq-ready .prereq-mark { background: var(--success); }
+  .prereq-text { min-width: 0; }
+  .prereq-title {
+    margin: 0;
+    font-size: var(--text-sm);
+    font-weight: 600;
+    color: var(--text);
+    line-height: 1.3;
+  }
+  .prereq-why {
+    margin: 2px 0 0;
+    font-size: var(--text-sm);
+    color: var(--text-2);
+    line-height: 1.4;
+  }
+  .prereq-link {
+    font-size: var(--text-xs);
+    white-space: nowrap;
+    min-height: 44px;
+    display: inline-flex;
+    align-items: center;
+    padding: 0 var(--space-1);
+  }
+  @media (max-width: 480px) {
+    .prereq { grid-template-columns: auto 1fr; }
+    .prereq-link { grid-column: 1 / -1; justify-content: flex-end; min-height: 36px; }
+  }
+</style>
