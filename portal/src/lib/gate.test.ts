@@ -115,6 +115,9 @@ describe('decideAccess', () => {
     ['admin: freshness unknown', asAdmin(member()), 'admin', aal2, 'stepUp'],
     ['admin: aal1', asAdmin(member()), 'admin', { ...aal1, fresh: true }, 'stepUp'],
     ['admin: session rules settle without an identity', null, 'admin', aal1, 'stepUp'],
+    ['emailed code: admin account', asAdmin(member()), 'emailed-code', null, 'deny'],
+    ['emailed code: member', withTotp(member()), 'emailed-code', null, 'allow'],
+    ['emailed code: no identity to refuse', null, 'emailed-code', null, 'allow'],
   ];
 
   it.each(cases)('%s', (_name, i, target, session, expected) => {

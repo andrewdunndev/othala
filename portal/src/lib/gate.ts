@@ -139,16 +139,20 @@ export function needsStepUp(
   return facts.isAdmin || facts.hasSecondFactor || holdsElevatedRole(identity, manifests);
 }
 
-/** What a session asks to reach: an OIDC app by its manifest, a forward-auth group, or the admin pages. */
-export type AccessTarget = { app: ClientManifest | undefined } | { group: string } | 'admin';
+/**
+ * What a session asks to reach: an OIDC app by its manifest, a forward-auth group, the admin pages, or a session from
+ * an emailed code (code sign-in, recovery, and the setup links the admin pages send).
+ */
+export type AccessTarget = { app: ClientManifest | undefined } | { group: string } | 'admin' | 'emailed-code';
 export type AccessDecision = { allow: true } | { stepUp: true } | { deny: string };
 /** `fresh`: the session is within the admin freshness window; only the admin pages read it. */
 export type SessionFacts = Pick<Session, 'authenticator_assurance_level'> & { fresh?: boolean };
 
 /**
- * The access policy for app sign-in, forward-auth and the admin pages. Apps and groups: the gate first (a denial
- * outranks a step-up), then step-up. Admin pages: aal2 within the freshness window, then the admin marker; that
- * session rule reads no identity, so the caller can settle it (identity null) before reading the admin API.
+ * The access policy for app sign-in, forward-auth, the admin pages and emailed codes. Apps and groups: the gate first
+ * (a denial outranks a step-up), then step-up. Admin pages: aal2 within the freshness window, then the admin marker;
+ * that session rule reads no identity, so the caller can settle it (identity null) before reading the admin API.
+ * Emailed codes: never for an admin account, whose sign-in needs a key.
  */
 export function decideAccess(
   identity: Identity | null | undefined,
@@ -156,6 +160,7 @@ export function decideAccess(
   session: SessionFacts | null | undefined,
   manifests?: ClientManifest[],
 ): AccessDecision {
+  if (target === 'emailed-code') return parseIdentity(identity).isAdmin ? { deny: 'admin account' } : { allow: true };
   if (target === 'admin') {
     if (session?.authenticator_assurance_level !== 'aal2' || session.fresh !== true) return { stepUp: true };
     return parseIdentity(identity).isAdmin ? { allow: true } : { deny: 'not an admin' };

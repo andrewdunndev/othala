@@ -2,7 +2,7 @@
 // check. What access a person holds on an app is read by access-rows.ts through the consent resolver (claims.ts lookupRole).
 
 import type { Identity } from './types';
-import { parseIdentity } from './identity-facts';
+import { decideAccess } from './gate';
 import { IDENTITY_GROUPS } from './constants';
 
 /**
@@ -31,11 +31,11 @@ export function normalizeGroupOrder(groups: string[]): string[] {
 
 /**
  * HIGH-3 gate: refuse admin-to-admin recovery via the UI (admin recovery stays console-only, see
- * docs/runbooks/admin-recovery.md). Refuses iff the TARGET carries the `metadata_admin.admin` marker; the caller must
+ * docs/runbooks/admin-recovery.md): decideAccess's emailed-code rule, applied to the TARGET; the caller must
  * pass an admin-API identity, since public whoami strips metadata_admin.
  */
 export function shouldRefuseRecovery(identity: Identity | undefined | null): boolean {
-  return parseIdentity(identity).isAdmin;
+  return 'deny' in decideAccess(identity, 'emailed-code', null);
 }
 
 /**
