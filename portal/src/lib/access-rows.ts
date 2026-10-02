@@ -39,7 +39,7 @@ export function levelsFor(m: ClientManifest): AccessLevel[] {
 
 /** The level a person effectively holds on an app: `none` without access, else the resolved role (the lowest when the
  *  access group carries no role). */
-export function currentLevel(m: ClientManifest, meta: { groups?: string[]; roles?: Record<string, string> } | undefined): string {
+export function currentLevel(m: ClientManifest, meta: { groups?: string[]; roles?: Record<string, string> } | null | undefined): string {
   const groups = meta?.groups ?? [];
   if (!(m.skipAccessCheck || m.accessGroups.some((g) => groups.includes(g)))) return NO_ACCESS;
   if (m.roles.length === 0) return CAN_USE;

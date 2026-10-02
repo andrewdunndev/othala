@@ -37,7 +37,7 @@ export type Identity = Omit<SdkIdentity, 'metadata_admin'> & {
     prerequisites?: string[];
     /** Passkey names keyed by hex credential id (see passkey-names.ts). */
     passkeyNames?: Record<string, string>;
-  };
+  } | null;
 };
 
 /** SDK Session, carrying the narrowed Identity (metadata_admin reads). */
