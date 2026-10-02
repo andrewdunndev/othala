@@ -7,6 +7,16 @@ aims to follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 The git tag is the authoritative version; `portal/package.json` mirrors it.
 This CHANGELOG and git tags carry the deployed-instance release state.
 
+## [0.10.2] - 2026-10-01
+
+Internal simplification. No behavior change.
+
+### Changed
+
+- The server entry is TypeScript, bundled like the other server entries. `dist/server/listen.mjs` and `npm start` are unchanged.
+- Every Kratos hook checks its bearer through one helper.
+- CI type-checks every TypeScript file: portal, e2e and site.
+
 ## [0.10.1] - 2026-10-01
 
 A readiness check that reads its dependencies, an audit line per admin action, and one access decision.

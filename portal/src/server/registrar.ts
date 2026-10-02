@@ -1,6 +1,6 @@
 // In-process OIDC client reconciler, run on boot (bounded retry+backoff for a
 // cold Hydra) and on SIGHUP (drops the manifest cache, re-registers all
-// clients); both are wired in listen.mjs. It never crashes the listeners: errors
+// clients); both are wired in listen.ts. It never crashes the listeners: errors
 // are logged and the portal keeps serving. `register` is injectable for tests.
 import { registerAllClients, type RegisterOptions } from '../lib/register-clients';
 import { invalidateManifestCache } from '../lib/manifests';

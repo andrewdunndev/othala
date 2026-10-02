@@ -12,20 +12,16 @@ import {
   handleAdminRequest,
   LOGIN_CODE_ADMIN_REFUSAL,
   LOGIN_CODE_UNAVAILABLE,
-  USERNAME_CHANGE_REFUSAL,
-  PROFILE_UPDATE_UNAVAILABLE,
-  usernameChangeVerdict,
   startupEnvErrors,
   ADMIN_GET_ROUTES,
   ADMIN_POST_ROUTES,
-} from '../src/server/listen.mjs';
+} from '../src/server/listen.ts';
 import { asAdmin, identity, session, withCredential, withPasskey, withTotp, withWebauthnKey } from '../src/lib/test-builders.ts';
 import * as secondFactorRuntime from '../src/lib/second-factor-gate.ts';
-import { emailChangeLocked, emailChangeVerdict, EMAIL_CHANGE_REFUSAL } from '../src/lib/profile-gate.ts';
+import { emailChangeLocked, emailChangeVerdict, EMAIL_CHANGE_REFUSAL, PROFILE_UPDATE_UNAVAILABLE, USERNAME_CHANGE_REFUSAL, usernameChangeVerdict } from '../src/lib/profile-gate.ts';
 import { getIdentity, listSessions, revokeSession } from '../src/lib/admin-api.ts';
-import { decideAccess } from '../src/lib/gate.ts';
 
-const runtime = { KRATOS_ADMIN_URL: 'http://kratos.test', HYDRA_ADMIN_URL: 'http://hydra.test', ...secondFactorRuntime, emailChangeVerdict, getIdentity, listSessions, revokeSession, decideAccess };
+const runtime = { getIdentity, listSessions, revokeSession };
 const handle = (req, res, rt = runtime) => handleAdminRequest(req, res, rt);
 
 const ADMIN_UUID = '11111111-1111-1111-1111-111111111111';
@@ -196,6 +192,7 @@ test('POST /admin/recovery-gate is fail-closed when RECOVERY_GATE_SECRET unset (
     res,
   );
   assert.equal(res.statusCode, 403);
+  assert.deepEqual(JSON.parse(res.body), { error: 'forbidden' });
 });
 
 test('POST /admin/recovery-gate REFUSES recovery when the admin-API marker is true (403)', async () => {
@@ -292,6 +289,7 @@ test('bearer rejection on recovery-gate is 403 (not 401) — Kratos can_interrup
   );
   assert.equal(res.statusCode, 403, 'must be 403, not 401');
   assert.notEqual(res.statusCode, 401, 'must NOT be 401 (would be fail-open under can_interrupt)');
+  assert.deepEqual(JSON.parse(res.body), { error: 'forbidden' });
 });
 
 async function withMockKratos(respond, fn) {

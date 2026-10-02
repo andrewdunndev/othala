@@ -61,7 +61,7 @@ Each names its enforcer and the test that fails if the enforcer stops working.
   marker read fresh from the admin API (`parseIdentity`,
   `portal/src/lib/identity-facts.ts`). No group grants it. Tests:
   `portal/src/lib/identity-facts.test.ts`, `e2e/playwright/tests/f-aal2-bypass.spec.ts`.
-- **Internal-network admin listener (PORTAL_ADMIN_BIND_HOST).** `portal/src/server/listen.mjs`: privileged routes
+- **Internal-network admin listener (PORTAL_ADMIN_BIND_HOST).** `portal/src/server/listen.ts`: privileged routes
   on a separate internal-network listener whose mux is disjoint from the public one,
   guarded by one bearer secret compared with `bearerMatches`
   (constant-time, fail-closed on an unset secret). Test:

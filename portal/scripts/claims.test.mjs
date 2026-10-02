@@ -12,13 +12,7 @@ import { identity } from '../src/lib/test-builders.ts';
 
 function base(overrides = {}) {
   return {
-    id: 'id-1',
-    state: 'active',
-    schema_id: 'family',
-    schema_url: '',
-    traits: { username: 'ada', email: 'a@othala.test', displayName: 'Ada Lovelace' },
-    metadata_admin: { groups: ['access-grafana'] },
-    verifiable_addresses: [{ value: 'a@othala.test', verified: true, via: 'email', status: 'completed' }],
+    ...identity({ id: 'id-1', username: 'ada', email: 'a@othala.test', displayName: 'Ada Lovelace', metadataAdmin: { groups: ['access-grafana'] } }),
     ...overrides,
   };
 }

@@ -5,6 +5,7 @@ import assert from 'node:assert/strict';
 import fc from 'fast-check';
 import { enforceAccessGate, enforceGroupGate, hasGroup } from '../src/lib/gate.ts';
 import { GROUP_RE } from '../src/lib/access-groups.ts';
+import { identity as buildIdentity } from '../src/lib/test-builders.ts';
 
 function manifest(clientId, opts = {}) {
   return {
@@ -31,17 +32,7 @@ function manifest(clientId, opts = {}) {
   };
 }
 
-function identity(groups, state = 'active') {
-  if (groups === null) return null;
-  return {
-    id: 'id-1',
-    state,
-    schema_id: 'family',
-    schema_url: '',
-    traits: { username: 'tester', email: 'a@othala.test' },
-    metadata_admin: { groups },
-  };
-}
+const identity = (groups, state = 'active') => (groups === null ? null : buildIdentity({ state, metadataAdmin: { groups } }));
 
 test('matrix: null id → DENY', () => {
   const m = manifest('photos', { accessGroups: ['memories'] });

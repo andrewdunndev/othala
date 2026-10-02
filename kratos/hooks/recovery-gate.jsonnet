@@ -9,7 +9,7 @@
 // selfservice.flows.login.after.code) posts this same body.
 //
 // The gate reads `identity_id` and queries the Kratos admin API for the admin
-// marker (portal/src/server/listen.mjs: fetchAdminMarker); without a valid id
+// marker (portal/src/server/listen.ts: fetchAdminMarker); without a valid id
 // it fails closed (403).
 //
 // Available context per Kratos's web_hook spec:

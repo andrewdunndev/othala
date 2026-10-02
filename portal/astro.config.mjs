@@ -11,8 +11,8 @@ import tailwindcss from '@tailwindcss/vite';
 //
 // D-listener (CU1 item 4): standalone mode's entry.mjs EXPORTS a Node
 // `handler` (the adapter declares exports ['handler','startServer','options'])
-// but also AUTO-BINDS its own server on import. `src/server/listen.mjs`
-// (copied into dist by the build) sets ASTRO_NODE_AUTOSTART=disabled before
+// but also AUTO-BINDS its own server on import. `src/server/listen.ts`
+// (bundled into dist by the build) sets ASTRO_NODE_AUTOSTART=disabled before
 // importing entry.mjs — which makes the adapter's start() a no-op — then
 // serves the exported `handler` on the PUBLIC port and stands up a SEPARATE
 // internal-network admin listener (PORTAL_ADMIN_BIND_HOST) (http.createServer) in the same process. Only

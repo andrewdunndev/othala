@@ -91,7 +91,7 @@ USER 1001
 EXPOSE 8080
 
 # listen.mjs binds the public SSR handler on PORT and the admin mux
-# on ADMIN_PORT in one process (see src/server/listen.mjs). Standalone
+# on ADMIN_PORT in one process (see src/server/listen.ts). Standalone
 # entry.mjs is imported by listen.mjs for its exported `handler`, not run
 # directly, so it never auto-binds its own server.
 CMD ["node", "./dist/server/listen.mjs"]

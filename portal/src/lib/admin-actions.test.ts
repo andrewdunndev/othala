@@ -65,22 +65,10 @@ import {
 } from './admin-actions.js';
 import type { Identity } from './types.js';
 import { RevokeError } from './revoke.js';
-import { identity, withLookupSecret, withPasskey, withTotp, withWebauthnKey } from './test-builders.js';
+import { identity, withCredentials } from './test-builders.js';
 
 function makeIdentity(username: string, admin?: boolean, state?: 'active' | 'inactive'): Identity {
   return identity({ username, state, ...(admin === undefined ? {} : { metadataAdmin: { admin } }) });
-}
-
-const ADD: Record<string, (i: Identity) => Identity> = {
-  password: (i) => i,
-  totp: withTotp,
-  webauthn: (i) => withWebauthnKey(i),
-  passkey: withPasskey,
-  lookup_secret: withLookupSecret,
-};
-
-function withCreds(i: Identity, ...types: string[]): Identity {
-  return types.reduce((acc, t) => ADD[t](acc), i);
 }
 
 function makeCtx(overrides: Partial<ActionContext> = {}): ActionContext {
@@ -257,6 +245,22 @@ describe('saveAction', () => {
     expect(outcome.formErrors?.identityGroups).toBeDefined();
   });
 
+  it('refuses a save that would keep a non-canonical group, leaving the identity unwritten', async () => {
+    const outcome = await saveAction(saveForm(['family']), makeCtx({ identity: stored(['family', 'Bad Name']), manifests: MANIFESTS }));
+
+    expect(updateIdentityMock).not.toHaveBeenCalled();
+    expect(outcome.formErrors?.nonCanonicalGroups).toMatch(/Bad Name/);
+    expect(outcome.refetch).toBe(false);
+  });
+
+  it('drops a non-canonical group only when its clear tick is posted', async () => {
+    const f = saveForm(['family']);
+    f.append('clearNonCanonical', 'Bad Name');
+    await saveAction(f, makeCtx({ identity: stored(['family', 'Bad Name']), manifests: MANIFESTS }));
+
+    expect(updateIdentityMock.mock.calls[0][1].metadataAdmin.groups).toEqual(['family']);
+  });
+
   it('reports a revocation failure as an error after the save stood', async () => {
     revokeConsentSessionsMock.mockRejectedValue(new RevokeError('hydra-admin', 'revoke-consent-sessions', 'Verify HYDRA_ADMIN_URL.'));
     const outcome = await saveAction(saveForm(['family']), makeCtx({ identity: stored(['family', 'media']), manifests: MANIFESTS }));
@@ -369,7 +373,7 @@ describe('removeCredentialAction', () => {
   });
 
   it('refuses removing the last second factor of an admin-marked target', async () => {
-    const identity = withCreds(makeIdentity('root', true), 'password', 'totp', 'lookup_secret');
+    const identity = withCredentials(makeIdentity('root', true), 'password', 'totp', 'lookup_secret');
     const outcome = await removeCredentialAction(fd({ cred_type: 'totp' }), makeCtx({ identity }));
 
     expect(deleteCredentialMock).not.toHaveBeenCalled();
@@ -378,7 +382,7 @@ describe('removeCredentialAction', () => {
   });
 
   it('allows removing one second factor of an admin-marked target while another remains', async () => {
-    const identity = withCreds(makeIdentity('root', true), 'totp', 'webauthn');
+    const identity = withCredentials(makeIdentity('root', true), 'totp', 'webauthn');
     const outcome = await removeCredentialAction(fd({ cred_type: 'totp' }), makeCtx({ id: 'target-1', identity }));
 
     expect(deleteCredentialMock).toHaveBeenCalledWith('target-1', 'totp');
@@ -387,7 +391,7 @@ describe('removeCredentialAction', () => {
   });
 
   it('refuses removing the acting admin\'s own last second factor', async () => {
-    const identity = withCreds(makeIdentity('self'), 'webauthn');
+    const identity = withCredentials(makeIdentity('self'), 'webauthn');
     const outcome = await removeCredentialAction(
       fd({ cred_type: 'webauthn' }),
       makeCtx({ id: 'admin-1', identity, adminIdentityId: 'admin-1' }),
@@ -399,13 +403,13 @@ describe('removeCredentialAction', () => {
   });
 
   it('allows the acting admin to remove one second factor while another remains', async () => {
-    const identity = withCreds(makeIdentity('self', true), 'totp', 'webauthn');
+    const identity = withCredentials(makeIdentity('self', true), 'totp', 'webauthn');
     await removeCredentialAction(fd({ cred_type: 'webauthn' }), makeCtx({ id: 'admin-1', identity, adminIdentityId: 'admin-1' }));
     expect(deleteCredentialMock).toHaveBeenCalledWith('admin-1', 'webauthn');
   });
 
   it('allows removing backup codes of an admin-marked target that keeps totp', async () => {
-    const identity = withCreds(makeIdentity('root', true), 'totp', 'lookup_secret');
+    const identity = withCredentials(makeIdentity('root', true), 'totp', 'lookup_secret');
     await removeCredentialAction(fd({ cred_type: 'lookup_secret' }), makeCtx({ identity }));
     expect(deleteCredentialMock).toHaveBeenCalled();
   });
@@ -449,7 +453,7 @@ describe('grantAdminAction', () => {
   it.each([[[]], [['password', 'passkey']], [['lookup_secret']]])(
     'refuses a target holding only %j and never calls patchAdminMarker',
     async (types: string[]) => {
-      const identity = withCreds(makeIdentity('member'), ...types);
+      const identity = withCredentials(makeIdentity('member'), ...types);
       const outcome = await grantAdminAction(fd(), makeCtx({ identity }));
 
       expect(patchAdminMarkerMock).not.toHaveBeenCalled();
@@ -459,7 +463,7 @@ describe('grantAdminAction', () => {
   );
 
   it.each(['totp', 'webauthn'])('happy path with %s: calls patchAdminMarker(id, true)', async (t) => {
-    const identity = withCreds(makeIdentity('member'), 'password', t);
+    const identity = withCredentials(makeIdentity('member'), 'password', t);
     const outcome = await grantAdminAction(fd(), makeCtx({ id: 'target-1', identity }));
 
     expect(patchAdminMarkerMock).toHaveBeenCalledWith('target-1', true);
@@ -599,7 +603,7 @@ describe('admin action audit line', () => {
     log.mockRestore();
     return lines;
   };
-  const member = withCreds(makeIdentity('member'), 'password', 'totp');
+  const member = withCredentials(makeIdentity('member'), 'password', 'totp');
 
   it.each([
     ['grant-admin', makeCtx({ identity: member }), 'ok'],

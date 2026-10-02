@@ -104,9 +104,9 @@ The `check-portal` and `check-purity` jobs run on every push, MR and tag;
   `OTHALA_CONTACT_RECIPIENT`, secrets, optional `OTHALA_OTLP_ENDPOINT`, and the deployer binds
   (`KRATOS_ADMIN_BIND_HOST`, `HYDRA_ADMIN_BIND_HOST`, `PORTAL_ADMIN_BIND_HOST`);
   everything else is derived or a constant there. A habit, not a gate; only the
-  plain-ESM `listen.mjs` and `otel.mjs` read env themselves.
+  `listen.ts` (startup checks run before config.ts loads) and `otel.mjs` read env themselves.
 - **The admin listener binds the internal-network address** (`PORTAL_ADMIN_BIND_HOST`), never the public mux, and its
-  mux is disjoint from the public one (`portal/src/server/listen.mjs`). Never move a privileged route onto the public mux.
+  mux is disjoint from the public one (`portal/src/server/listen.ts`). Never move a privileged route onto the public mux.
 - **Ory configs are templates.** Ory has no native `${VAR}` expansion;
   `scripts/render-config.sh` is the one render, failing with missing variable
   NAMES, never rendered content.

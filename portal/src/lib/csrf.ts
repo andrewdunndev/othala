@@ -5,6 +5,7 @@
 
 import { createHmac, randomBytes, timingSafeEqual } from 'node:crypto';
 import { secret as readSecret } from './config';
+import { SECRET_MIN_BYTES } from './constants';
 
 const TOKEN_TTL_MS = 30 * 60 * 1000; // 30 min
 
@@ -13,10 +14,9 @@ const SECRET_ENV = 'CSRF_SECRET';
 /** Lazily resolve the signing secret; fails closed when unset. */
 function secret(): Buffer {
   const v = readSecret(SECRET_ENV);
-  // 32-byte floor by UTF-8 byte length, not character count (multi-byte characters would undercount entropy).
-  if (!v || Buffer.byteLength(v, 'utf8') < 32) {
+  if (!v || Buffer.byteLength(v, 'utf8') < SECRET_MIN_BYTES) {
     throw new CSRFError(
-      `${SECRET_ENV} is unset or shorter than 32 bytes (UTF-8). ` +
+      `${SECRET_ENV} is unset or shorter than ${SECRET_MIN_BYTES} bytes (UTF-8). ` +
         'Set it on the portal pod (random 32+ bytes; rotate on a fresh deploy).',
     );
   }

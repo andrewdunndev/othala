@@ -9,7 +9,7 @@ import { signToken, _resetForTests } from '../src/lib/csrf.ts';
 import { deepMergeClaims } from '../src/lib/claims.ts';
 import { publicUrl } from '../src/lib/config.ts';
 import {
-  identity, session, whoamiIdentity, withTotp, withWebauthnKey, withPasskey, withLookupSecret,
+  identity, session, whoamiIdentity, withCredentials,
   oauth2LoginRequest, oauth2ConsentRequest, oauth2LogoutRequest,
 } from '../src/lib/test-builders.ts';
 
@@ -154,12 +154,6 @@ test('login 400 on missing challenge', async () => {
   assert.equal(res.status, 400);
 });
 
-const ADD = { password: (i) => i, totp: withTotp, webauthn: (i) => withWebauthnKey(i), passkey: withPasskey, lookup_secret: withLookupSecret };
-
-function withCreds(...types) {
-  return types.reduce((i, t) => ADD[t](i), activeMember()).credentials;
-}
-
 const FRESH = async () => oauth2LoginRequest();
 
 for (const [branch, getReq] of [['skip', undefined], ['fresh', FRESH]]) {
@@ -167,7 +161,7 @@ for (const [branch, getReq] of [['skip', undefined], ['fresh', FRESH]]) {
     const { api, calls } = stubOAuth2(getReq ? { getOAuth2LoginRequest: getReq } : {});
     const res = await handleLogin(new Request('https://x/oauth2/login?login_challenge=lc'), {
       oauth2: api,
-      getIdentity: async () => activeMember({ credentials: withCreds('password', 'totp') }),
+      getIdentity: async () => activeMember({ credentials: withCredentials(activeMember(), 'password', 'totp').credentials }),
       getSession: defaultSession(),
       manifest: () => loadManifest('grafana'),
     });
@@ -196,7 +190,7 @@ for (const [branch, getReq] of [['skip', undefined], ['fresh', FRESH]]) {
     const { api, calls } = stubOAuth2(getReq ? { getOAuth2LoginRequest: getReq } : {});
     const res = await handleLogin(new Request('https://x/oauth2/login?login_challenge=lc'), {
       oauth2: api,
-      getIdentity: async () => activeMember({ credentials: withCreds('password', 'totp') }),
+      getIdentity: async () => activeMember({ credentials: withCredentials(activeMember(), 'password', 'totp').credentials }),
       getSession: defaultSession({ authenticator_assurance_level: 'aal2' }),
       manifest: () => loadManifest('grafana'),
     });
@@ -209,7 +203,7 @@ for (const [branch, getReq] of [['skip', undefined], ['fresh', FRESH]]) {
     const { api, calls } = stubOAuth2(getReq ? { getOAuth2LoginRequest: getReq } : {});
     const res = await handleLogin(new Request('https://x/oauth2/login?login_challenge=lc'), {
       oauth2: api,
-      getIdentity: async () => activeMember({ credentials: withCreds('passkey', 'lookup_secret') }),
+      getIdentity: async () => activeMember({ credentials: withCredentials(activeMember(), 'passkey', 'lookup_secret').credentials }),
       getSession: defaultSession(),
       manifest: () => loadManifest('grafana'),
     });

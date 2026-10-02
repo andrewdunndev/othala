@@ -16,3 +16,5 @@ export const IDENTITY_GROUPS: readonly string[] = ['admin', DEFAULT_GROUP];
 export const HOUSEHOLD_GROUPS: readonly string[] = IDENTITY_GROUPS.filter((g) => g !== 'admin');
 /** Session-age window for the admin step-up; separate from Kratos's 5m privileged window. */
 export const ADMIN_FRESHNESS_HOURS = 1;
+/** Floor on CSRF_SECRET and RECOVERY_GATE_SECRET, by UTF-8 byte length (multi-byte characters would undercount entropy). */
+export const SECRET_MIN_BYTES = 32;

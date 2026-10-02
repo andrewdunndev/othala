@@ -151,7 +151,7 @@ check-purity:
       [ "$rc" -eq 0 ] && echo "OK: bash -n clean on ${#FILES[@]} scripts"
       exit $rc
 
-# check-portal: one npm ci, then astro check, vitest (src and scripts), the manifest lint, and a
+# check-portal: npm ci (portal, e2e, site), then astro check, tsc over e2e and site, vitest (src and scripts), the manifest lint, and a
 # well-formedness parse of the tracked plain-YAML set. kratos.yml and hydra.yml
 # are  templates, so they are excluded.
 check-portal:
@@ -167,8 +167,12 @@ check-portal:
     - git config --global --add safe.directory "$CI_PROJECT_DIR"
     - cd portal
     - npm ci --include=dev
+    - npm ci --include=dev --prefix ../e2e
+    - npm ci --include=dev --prefix ../site
   script:
     - npm run check
+    - node_modules/.bin/tsc --noEmit -p ../e2e
+    - node_modules/.bin/tsc --noEmit -p ../site
     - npm test
     - npm run lint:manifests
     - |
