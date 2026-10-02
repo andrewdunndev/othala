@@ -241,8 +241,8 @@ export async function adminAal2Context(opts: {
 }
 
 interface VirtualAuthenticatorOptions {
-  protocol: string;
-  transport: string;
+  protocol: 'u2f' | 'ctap2';
+  transport: 'usb' | 'nfc' | 'ble' | 'cable' | 'internal';
   hasResidentKey: boolean;
   hasUserVerification: boolean;
   isUserVerified: boolean;
@@ -253,15 +253,18 @@ export const GRAFANA_CLIENT_ID = 'grafana';
 export const GRAFANA_REDIRECT_URI = 'https://grafana.othala.test/login/generic_oauth';
 export const KRATOS_ADMIN_URL = 'http://kratos:4434';
 
-export interface OthalaFixtures {
-  baseURL: string;
+export interface OthalaWorkerFixtures {
   kratosAdminURL: string;
   hydraPublicURL: string;
   hydraAdminURL: string;
-  /** Fresh isolated browser context, closed after the test. */
-  ctx: BrowserContext;
   member: SeedResult & { password: string };
   admin: SeedResult & { password: string };
+}
+
+export interface OthalaFixtures {
+  baseURL: string;
+  /** Fresh isolated browser context, closed after the test. */
+  ctx: BrowserContext;
   /** Override any subset of the virtual authenticator options (test-scoped). */
   virtualAuthenticatorOptions: Partial<VirtualAuthenticatorOptions>;
   /** CDP session attached to the current page (test-scoped). */
@@ -270,7 +273,7 @@ export interface OthalaFixtures {
   virtualAuthenticator: { authenticatorId: string };
 }
 
-export const test = base.extend<OthalaFixtures>({
+export const test = base.extend<OthalaFixtures, OthalaWorkerFixtures>({
   baseURL: async ({}, use) => {
     await use(process.env.BASE ?? 'http://auth.othala.test');
   },
