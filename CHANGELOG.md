@@ -15,7 +15,7 @@ Internal simplification. No behavior change.
 
 - The server entry is TypeScript, bundled like the other server entries. `dist/server/listen.mjs` and `npm start` are unchanged.
 - Every Kratos hook checks its bearer through one helper.
-- CI type-checks every portal TypeScript file.
+- CI type-checks every TypeScript file: portal, e2e and site.
 
 ## [0.10.1] - 2026-10-01
 
