@@ -20,10 +20,9 @@ export default defineConfig({
   test: {
     environment: 'node',
     include: ['src/**/*.test.ts', 'scripts/*.test.mjs'],
-    // Run serially to avoid cross-test module-level state (rate-limiter Map,
-    // process.env mutation in config.test.mjs/tiles.test.mjs).
-    // (poolOptions was removed in Vitest 4; singleFork is now a top-level option.)
+    // Each test file gets a fresh forked worker (isolate defaults to true), so
+    // module-level state (rate-limiter Map, process.env mutation in
+    // config.test.mjs/tiles.test.mjs) never crosses files.
     pool: 'forks',
-    singleFork: true,
   },
 });
