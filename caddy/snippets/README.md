@@ -26,6 +26,4 @@ Give each site block a concrete host: `forward-auth` builds the post-login
 terminated upstream) produces a value Kratos refuses, and the user lands on the
 portal rather than back at the service.
 
-`forward-auth` takes the required group as its third argument. A signed-in
-member outside the group gets a 403 from the portal, returned as is; only a 401
-redirects to login. Leaving the argument out is refused with 403, not allowed.
+Leaving out the third argument is refused with 403.

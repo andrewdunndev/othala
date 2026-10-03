@@ -97,8 +97,7 @@ Click it for each affected type.
 `DELETE /admin/identities/{id}/credentials/{type}` and removes **all**
 credentials of that type from the identity record. The legitimate user
 re-enrolls with new keys after recovery. It then signs them out everywhere
-(Kratos sessions, Hydra login and consent), so there is no separate sign-out
-step.
+(Kratos sessions, Hydra login and consent).
 
 **Evictable types (Remove button present):**
 - `webauthn` — all legacy WebAuthn keys

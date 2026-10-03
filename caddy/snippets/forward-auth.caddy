@@ -10,17 +10,10 @@
 # identity headers are stripped (see the request_header and header_up lines
 # below), so a client cannot spoof one.
 #
-# Status contract (portal/src/pages/api/forward-auth.ts is authoritative):
-#   200  valid session, identity in the group: proxy to the upstream
-#   401  no valid session, or step-up needed: redirect to the portal login
-#   403  refused on merits (not in the group, inactive, bad or missing group):
-#        returned to the client as is, never redirected
-#   503  Kratos or its admin API did not answer: returned as is
-#
-# Only 401 redirects. Redirecting 403 or 503 would send a signed-in visitor to
-# the login page of a portal that is refusing or down, and loop on every retry.
-# An omitted group arrives empty, which the endpoint refuses with 403, so a
-# copy that forgets the third argument fails closed.
+# Status contract: portal/src/pages/api/forward-auth.ts. Only a 401 redirects
+# to login; a 403 or 503 is returned as is, since redirecting a refusal or an
+# outage loops the visitor through login. An omitted $3 arrives empty and is
+# refused with 403, so a copy without it fails closed.
 #
 # Args:
 #   $1 = upstream container name
