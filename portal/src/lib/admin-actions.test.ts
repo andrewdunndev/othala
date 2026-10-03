@@ -65,7 +65,7 @@ import {
   type ActionContext,
 } from './admin-actions.js';
 import type { Identity } from './types.js';
-import { RevokeError } from './revoke.js';
+import { DEACTIVATE_STEP, RevokeError } from './revoke.js';
 import { identity, manifest, withCredentials, withTotp } from './test-builders.js';
 
 function makeIdentity(username: string, admin?: boolean, state?: 'active' | 'inactive'): Identity {
@@ -153,7 +153,7 @@ describe('deleteAction', () => {
   });
 
   it('is not partial when the identity could not be turned off', async () => {
-    revokeSubjectMock.mockRejectedValue(new RevokeError('kratos-admin', 'state->inactive', 'Verify KRATOS_ADMIN_URL.'));
+    revokeSubjectMock.mockRejectedValue(new RevokeError('kratos-admin', DEACTIVATE_STEP, 'Verify KRATOS_ADMIN_URL.'));
     const outcome = await deleteAction(fd({ confirm: 'alice' }), makeCtx({ identity: makeIdentity('alice') }));
 
     if (outcome instanceof Response) throw new Error('unreachable');

@@ -25,7 +25,7 @@ import { GROUP_RE } from './access-groups';
 import { HOUSEHOLD_GROUPS } from './constants';
 import { holdsElevatedRole, planGroupSave } from './gate';
 import { buildGroupRegistry, isIdentityGroup, unconfiguredGroups } from './group-registry';
-import { RevokeError, revokeHydraSessions, revokeSubject } from './revoke';
+import { DEACTIVATE_STEP, RevokeError, revokeHydraSessions, revokeSubject } from './revoke';
 import { removalBlock } from './admin-view';
 import type { ClientManifest } from './manifests';
 import type { Identity } from './types';
@@ -405,7 +405,7 @@ export async function deleteAction(fd: FormData, ctx: ActionContext): Promise<Ac
     await revokeSubject(id, { deactivate: true });
   } catch (err) {
     // Past its first step the identity is already turned off.
-    const landed = err instanceof RevokeError && err.step !== 'state->inactive';
+    const landed = err instanceof RevokeError && err.step !== DEACTIVATE_STEP;
     return {
       actionResult: {
         kind: 'error',

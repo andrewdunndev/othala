@@ -13,6 +13,8 @@ import { timeoutFetch } from './ory-fetch';
 /** Which upstream dependency a revoke step failed against. */
 export type RevokeDependency = 'kratos-admin' | 'hydra-admin';
 
+export const DEACTIVATE_STEP = 'state->inactive';
+
 /** Prescriptive revoke failure: names the dependency and next action; the raw cause is for server logs only. */
 export class RevokeError extends Error {
   readonly dependency: RevokeDependency;
@@ -107,7 +109,7 @@ export async function revokeSubject(
     } catch (err) {
       throw new RevokeError(
         'kratos-admin',
-        'state->inactive',
+        DEACTIVATE_STEP,
         'Could not mark the identity inactive. Verify Kratos admin reachability and that the identity id exists, then retry the deactivate.',
         err,
       );
