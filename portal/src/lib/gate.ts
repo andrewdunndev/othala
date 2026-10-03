@@ -107,7 +107,7 @@ export function needsStepUp(
 
 /**
  * What a session asks to reach: an OIDC app by its manifest, a forward-auth group, the admin pages, or a session from
- * an emailed code (code sign-in, recovery, and the setup links the admin pages send).
+ * an emailed code (code sign-in, recovery, and the setup links the admin pages make).
  */
 export type AccessTarget = { app: ClientManifest | undefined } | { group: string } | 'admin' | 'emailed-code';
 export type AccessDecision = { allow: true } | { stepUp: true } | { deny: string };

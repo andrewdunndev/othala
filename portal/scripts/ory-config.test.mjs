@@ -103,7 +103,7 @@ test('render refuses an empty Ory admin bind', () => {
 });
 
 const MAIL = {
-  recovery_code: { code: '{{ .RecoveryCode }}', subject: /account code/i },
+  recovery_code: { code: '{{ .RecoveryCode }}', subject: /recovery code/i },
   login_code: { code: '{{ .LoginCode }}', subject: /to log in/i },
   verification_code: { code: '{{ .VerificationCode }}', subject: /verif/i },
 };

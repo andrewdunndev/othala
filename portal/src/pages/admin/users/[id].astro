@@ -79,7 +79,7 @@ if (Astro.request.method === 'POST' && identity) {
 
   const handler = ADMIN_ACTIONS[action];
   if (dev) {
-    actionResult = devActionResult(action, fd, identity.traits?.username ?? '');
+    actionResult = devActionResult(action);
   } else if (handler) {
     try {
       const outcome = await handler(fd, { id, identity, adminIdentityId: adminId, manifests, requirements: requirements.map((r) => r.name) });
@@ -104,7 +104,6 @@ const SECTION_OF: Record<string, string> = {
   'remove-groups': 'groups',
   'mark-verified': 'signin',
   'issue-recovery': 'signin',
-  'send-invite-email': 'signin',
   'force-relogin': 'signin',
   'remove-credential': 'signin',
   deactivate: 'status',
@@ -215,7 +214,7 @@ const roleNote = Object.keys(roleOverrides).length;
             <div class="field">
               <label for="recoveryEmail">Recovery email</label>
               <input id="recoveryEmail" name="recoveryEmail" type="email" value={identity.traits?.recoveryEmail ?? ''} autocomplete="off" aria-describedby="h-recovery" />
-              <span class="field-hint" id="h-recovery">Optional. Where a setup link goes if the main email is lost.</span>
+              <span class="field-hint" id="h-recovery">Optional. Where a recovery code goes if the main email is lost.</span>
             </div>
           </div>
           <div class="row-actions"><button class="button button-primary" type="submit">Save profile</button></div>
@@ -373,21 +372,6 @@ const roleNote = Object.keys(roleOverrides).length;
                   <div class="notice notice-success">Setup link ready for {first}. Send it to them.</div>
                   <SetupLink url={recovery.url} code={recovery.code} ttl={ENROLLMENT_TTL} name={first} />
                 </div>
-              )}
-              {!shouldRefuseRecovery(identity) && (
-                <details class="plain result mail">
-                  <summary>Email a code instead</summary>
-                  <form class="confirm" method="POST" enctype="application/x-www-form-urlencoded" action="#signin">
-                    <input type="hidden" name="csrf_token" value={tok('send-invite-email')} />
-                    <input type="hidden" name="action" value="send-invite-email" />
-                    <span>Sends a sign-in code to the address on file. Type it to confirm.</span>
-                    <div class="field">
-                      <label for="confirmEmail">Email address</label>
-                      <input id="confirmEmail" name="confirmEmail" type="text" autocomplete="off" />
-                    </div>
-                    <button class="button button-secondary button-sm" type="submit">Send invite email</button>
-                  </form>
-                </details>
               )}
             </li>
             {removable.map((m) => (

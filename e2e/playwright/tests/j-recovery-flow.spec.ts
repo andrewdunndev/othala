@@ -154,7 +154,7 @@ test('J1 — non-admin recovery flow issues a privileged settings session', asyn
   const codePage = await req.get(`${baseURL}/auth/recovery?flow=${flow.id}`);
   expect(await codePage.text(), 'J1: the code step tells people to check spam or junk').toMatch(/spam or junk/i);
 
-  const { code, subject, body, id: messageId } = await waitForMessage(forRecipient(identity.email, startTime, /account code/i));
+  const { code, subject, body, id: messageId } = await waitForMessage(forRecipient(identity.email, startTime, /recovery code/i));
   expect(subject, 'J1: the subject names the household').toContain(HOUSEHOLD);
   expect(body, 'J1: the body names the household').toContain(HOUSEHOLD);
   console.log('[J1] recovery code received, message id:', messageId, 'code:', code);
@@ -210,7 +210,7 @@ test('J2 — admin recovery is blocked by the recovery-gate webhook (no privileg
   const codeSubmitCsrf = step2.csrfToken;
   console.log('[J2] admin recovery email submitted; csrf rotated:', codeSubmitCsrf !== flow.csrfToken);
 
-  const { code, subject, body } = await waitForMessage(forRecipient(identity.email, startTime, /account code/i));
+  const { code, subject, body } = await waitForMessage(forRecipient(identity.email, startTime, /recovery code/i));
   expect(subject, 'J2: the subject names the household').toContain(HOUSEHOLD);
   expect(body, 'J2: the body names the household').toContain(HOUSEHOLD);
 

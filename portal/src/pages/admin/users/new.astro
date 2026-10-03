@@ -166,7 +166,7 @@ const peopleHref = devState ? `/admin/users?dev-state=${devState}` : '/admin/use
             <div class={`field${errors.recoveryEmail ? ' bad' : ''}`}>
               <label for="recoveryEmail">Recovery email</label>
               <input id="recoveryEmail" name="recoveryEmail" type="email" autocomplete="off" value={form.recoveryEmail} aria-describedby="h-rec" />
-              <span class="field-hint" id="h-rec">Optional. Where a setup link goes if the main email is lost.</span>
+              <span class="field-hint" id="h-rec">Optional. Where a recovery code goes if the main email is lost.</span>
               {errors.recoveryEmail && <span class="field-error">{errors.recoveryEmail}</span>}
             </div>
           </div>

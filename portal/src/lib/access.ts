@@ -22,8 +22,3 @@ export function normalizeGroupOrder(groups: string[]): string[] {
 export function shouldRefuseRecovery(identity: Identity | undefined | null): boolean {
   return 'deny' in decideAccess(identity, 'emailed-code', null);
 }
-
-/** Byte-equal, not case-folded: Kratos keeps the `email` trait as the literal string on file. */
-export function confirmsInviteAddress(confirm: string, targetEmail: string): boolean {
-  return confirm === targetEmail;
-}

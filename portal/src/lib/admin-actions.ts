@@ -14,8 +14,7 @@ import {
   EVICTABLE_CREDENTIAL_TYPES,
 } from './admin-api';
 import { parseIdentity } from './identity-facts';
-import { sendInviteRecoveryEmail } from './kratos';
-import { confirmsInviteAddress, normalizeGroupOrder, shouldRefuseRecovery } from './access';
+import { normalizeGroupOrder, shouldRefuseRecovery } from './access';
 import { accessToStorage, choicesFromForm } from './access-rows';
 import { GROUP_RE } from './access-groups';
 import { IDENTITY_GROUPS } from './constants';
@@ -33,7 +32,6 @@ export const ENROLLMENT_TTL = '24h';
 
 export type ActionResult =
   | { kind: 'recovery'; url: string; code: string; expiresAt: string }
-  | { kind: 'invite-email'; email: string }
   | { kind: 'deactivated'; username: string }
   | { kind: 'reactivated'; username: string }
   | { kind: 'updated'; removed: string[] }
@@ -271,30 +269,6 @@ export async function issueRecoveryAction(_fd: FormData, ctx: ActionContext): Pr
   };
 }
 
-export async function sendInviteEmailAction(fd: FormData, ctx: ActionContext): Promise<ActionOutcome> {
-  if (shouldRefuseRecovery(ctx.identity)) return { actionResult: ADMIN_RECOVERY_REFUSAL, refetch: false };
-  const targetEmail = ctx.identity.traits?.email;
-  if (!targetEmail) return { actionResult: { kind: 'error', message: 'This person has no email address on file.' }, refetch: false };
-
-  const confirmEmail = String(fd.get('confirmEmail') ?? '');
-  if (!confirmsInviteAddress(confirmEmail, targetEmail)) {
-    return {
-      actionResult: { kind: 'error', message: 'Confirmation address does not match the address on file. Nothing was sent.' },
-      refetch: false,
-    };
-  }
-  try {
-    await sendInviteRecoveryEmail(targetEmail);
-    return { actionResult: { kind: 'invite-email', email: targetEmail }, refetch: false };
-  } catch (err) {
-    // Never interpolate the address into the surfaced message.
-    return {
-      actionResult: { kind: 'error', message: `The email could not be sent: ${err instanceof Error ? err.message : 'unknown error'}` },
-      refetch: false,
-    };
-  }
-}
-
 export async function forceReloginAction(_fd: FormData, ctx: ActionContext): Promise<ActionOutcome> {
   const result = await revokeSubject(ctx.id);
   return { actionResult: { kind: 'revoked', result }, refetch: false };
@@ -499,7 +473,6 @@ const HANDLERS: Record<string, ActionHandler> = {
   'mark-verified': markVerifiedAction,
   'set-prerequisites': setPrerequisitesAction,
   'issue-recovery': issueRecoveryAction,
-  'send-invite-email': sendInviteEmailAction,
   'force-relogin': forceReloginAction,
   deactivate: deactivateAction,
   reactivate: reactivateAction,

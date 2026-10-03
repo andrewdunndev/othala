@@ -184,33 +184,3 @@ export async function getLogoutInfo(cookie?: string): Promise<LogoutInfo | null>
     throw e;
   }
 }
-
-/** Runs Kratos's API recovery flow so its courier sends the invite. Never logs the address. */
-export async function sendInviteRecoveryEmail(email: string): Promise<void> {
-  const base = kratosBase();
-
-  const initResp = await fetch(`${base}/self-service/recovery/api`, {
-    method: 'GET',
-    headers: { Accept: 'application/json' },
-  });
-  if (!initResp.ok) {
-    throw new Error(`recovery flow init failed: HTTP ${initResp.status}`);
-  }
-  const flow = (await initResp.json()) as { id?: string };
-  if (!flow.id) {
-    throw new Error('recovery flow init returned no flow id');
-  }
-
-  const submitResp = await fetch(
-    `${base}/self-service/recovery?flow=${encodeURIComponent(flow.id)}`,
-    {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
-      body: JSON.stringify({ method: 'code', email }),
-    },
-  );
-  // Kratos answers 400 once the flow has left choose_method, which the SDK would throw on.
-  if (submitResp.status !== 200 && submitResp.status !== 400 && submitResp.status !== 422) {
-    throw new Error(`recovery email submit failed: HTTP ${submitResp.status}`);
-  }
-}
