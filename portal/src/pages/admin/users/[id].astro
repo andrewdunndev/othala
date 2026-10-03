@@ -170,7 +170,7 @@ function tok(name: string): string {
 const devState = dev ? Astro.url.searchParams.get('dev-state') : null;
 const limits = identity ? personLimits(identity, { first, isSelf, lastAdmin }) : null;
 const peopleHref = devState ? `/admin/users?dev-state=${devState}` : '/admin/users';
-const removable = methods.filter((m) => m.enrolled && EVICTABLE_CREDENTIAL_TYPES.has(m.key));
+const removable = methods.filter((m) => m.enrolled && EVICTABLE_CREDENTIAL_TYPES.has(m.key)).map((m) => ({ ...m, block: removalBlock(identity!, m.key, isSelf, manifests) }));
 const roleNote = Object.keys(roleOverrides).length;
 ---
 <AdminLayout title={who || 'Person'} description="One person: apps, household, sign-in." identityId={adminId}>
@@ -402,8 +402,8 @@ const roleNote = Object.keys(roleOverrides).length;
                   <span class="item-name">{m.label}</span>
                   <span class="item-meta">Lost it? Remove it; they are signed out everywhere. Then send a setup link.</span>
                 </div>
-                {removalBlock(identity, m.key, isSelf, manifests) ? (
-                  <span class="reason">{removalBlock(identity, m.key, isSelf, manifests)}</span>
+                {m.block ? (
+                  <span class="reason">{m.block}</span>
                 ) : (
                 <Ask
                   label="Remove"

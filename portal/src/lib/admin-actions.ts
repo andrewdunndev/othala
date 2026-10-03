@@ -26,6 +26,7 @@ import { HOUSEHOLD_GROUPS } from './constants';
 import { holdsElevatedRole, planGroupSave } from './gate';
 import { buildGroupRegistry, isIdentityGroup, unconfiguredGroups } from './group-registry';
 import { RevokeError, revokeConsentSessions, revokeSubject } from './revoke';
+import { removalBlock } from './admin-view';
 import type { ClientManifest } from './manifests';
 import type { Identity } from './types';
 
@@ -136,7 +137,7 @@ export async function saveAction(fd: FormData, ctx: ActionContext): Promise<Acti
   // Only a new elevation needs the second factor first, so people already elevated without one can still be edited and lowered.
   const after = { ...identity, metadata_admin: { ...identity.metadata_admin, groups, roles } };
   if (holdsElevatedRole(after, manifests) && !holdsElevatedRole(identity, manifests) && !parseIdentity(identity).hasSecondFactor) {
-    return { actionResult: { kind: 'error', message: ELEVATED_ROLE_NEEDS_SECOND_FACTOR }, refetch: false };
+    return { actionResult: ELEVATED_SECOND_FACTOR_REQUIRED, refetch: false };
   }
   await updateIdentity(id, {
     traits,
@@ -439,6 +440,7 @@ const SECOND_FACTOR_REQUIRED: ActionResult = {
 // Elevated app roles step up at sign-in too (needsStepUp, gate.ts).
 export const ELEVATED_ROLE_NEEDS_SECOND_FACTOR =
   "People with a role above an app's entry level need an authenticator app or security key set up first.";
+const ELEVATED_SECOND_FACTOR_REQUIRED: ActionResult = { kind: 'error', message: ELEVATED_ROLE_NEEDS_SECOND_FACTOR };
 
 const OWN_SECOND_FACTOR_REQUIRED: ActionResult = {
   kind: 'error',
@@ -476,8 +478,8 @@ export async function revokeAdminAction(fd: FormData, ctx: ActionContext): Promi
   }
   await patchAdminMarker(id, false);
   const failure = await revokeGrants(id);
-  if (self && !failure) return new Response(null, { status: 303, headers: { Location: '/' } });
   if (failure) return { actionResult: failure, refetch: true };
+  if (self) return new Response(null, { status: 303, headers: { Location: '/' } });
   return { actionResult: { kind: 'admin-revoked', username }, refetch: true };
 }
 
@@ -503,14 +505,9 @@ export async function removeCredentialAction(fd: FormData, ctx: ActionContext): 
     };
   }
   const self = ctx.id === ctx.adminIdentityId;
-  const { isAdmin } = parseIdentity(ctx.identity);
-  if (self || isAdmin || holdsElevatedRole(ctx.identity, ctx.manifests)) {
-    const creds = { ...(ctx.identity.credentials ?? {}) } as Record<string, unknown>;
-    delete creds[credType];
-    if (!parseIdentity({ ...ctx.identity, credentials: creds as Identity['credentials'] }).hasSecondFactor) {
-      const refusal = self ? OWN_SECOND_FACTOR_REQUIRED : isAdmin ? SECOND_FACTOR_REQUIRED : { kind: 'error' as const, message: ELEVATED_ROLE_NEEDS_SECOND_FACTOR };
-      return { actionResult: refusal, refetch: false };
-    }
+  if (removalBlock(ctx.identity, credType, self, ctx.manifests)) {
+    const refusal = self ? OWN_SECOND_FACTOR_REQUIRED : parseIdentity(ctx.identity).isAdmin ? SECOND_FACTOR_REQUIRED : ELEVATED_SECOND_FACTOR_REQUIRED;
+    return { actionResult: refusal, refetch: false };
   }
   await deleteCredential(ctx.id, credType);
   // Someone else's lost method may have signed a session in, so end their sessions too. Your own stay.
