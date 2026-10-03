@@ -61,6 +61,7 @@ import {
   removeCredentialAction,
   grantAdminAction,
   ADMIN_ACTIONS,
+  auditLine,
   type ActionContext,
 } from './admin-actions.js';
 import type { Identity } from './types.js';
@@ -621,9 +622,9 @@ describe('prerequisites and verified email', () => {
 });
 
 describe('admin action audit line', () => {
-  const audit = async (action: string, ctx: ActionContext) => {
+  const audit = async (action: string, ctx: ActionContext, form = fd()) => {
     const log = vi.spyOn(console, 'log').mockImplementation(() => {});
-    await ADMIN_ACTIONS[action](fd(), ctx).catch(() => {});
+    await ADMIN_ACTIONS[action](form, ctx).catch(() => {});
     const lines = log.mock.calls.map((c) => c[0]);
     log.mockRestore();
     return lines;
@@ -639,6 +640,44 @@ describe('admin action audit line', () => {
     const lines = await audit(action, ctx);
     expect(lines).toHaveLength(1);
     expect(JSON.parse(lines[0])).toEqual({ event: 'admin_action', action, actor: 'admin-1', target: ctx.id, result });
+  });
+
+  describe('a write that landed before its sign-out failed is partial', () => {
+    const proxywatch = [
+      { clientId: 'proxywatch', accessGroups: ['proxywatch-access'], roles: [], groupRoleMap: {}, skipAccessCheck: false },
+    ] as unknown as ActionContext['manifests'];
+    const hydraDown = new RevokeError('hydra-admin', 'revoke-consent-sessions', 'Verify HYDRA_ADMIN_URL.');
+
+    it.each([
+      [
+        'save-access',
+        () => makeCtx({ identity: identity({ username: 'robin.k', metadataAdmin: { groups: ['everyone', 'proxywatch-access'] } }), manifests: proxywatch }),
+        () => fd({ 'level:proxywatch': 'none' }),
+      ],
+      [
+        'revoke-admin',
+        () => {
+          listIdentitiesMock.mockResolvedValue([makeIdentity('root', true), makeIdentity('other', true)]);
+          return makeCtx({ identity: makeIdentity('root', true) });
+        },
+        () => fd(),
+      ],
+      ['remove-credential', () => makeCtx(), () => fd({ cred_type: 'totp' })],
+    ])('%s', async (action, ctx, form) => {
+      revokeConsentSessionsMock.mockRejectedValue(hydraDown);
+      revokeSubjectMock.mockRejectedValue(hydraDown);
+      const c = ctx();
+      const lines = await audit(action, c, form());
+      expect(lines).toHaveLength(1);
+      expect(JSON.parse(lines[0])).toEqual({ event: 'admin_action', action, actor: 'admin-1', target: c.id, result: 'partial' });
+    });
+  });
+
+  it('writes the audit line as one JSON object of ids', () => {
+    const log = vi.spyOn(console, 'log').mockImplementation(() => {});
+    auditLine('admin-1', 'create-user', 'new-1', 'ok');
+    expect(log.mock.calls).toEqual([['{"event":"admin_action","action":"create-user","actor":"admin-1","target":"new-1","result":"ok"}']]);
+    log.mockRestore();
   });
 
   it('records a thrown mutation as error and rethrows', async () => {

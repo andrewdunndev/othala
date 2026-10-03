@@ -13,7 +13,7 @@ import SetupLink from '../../../components/SetupLink.astro';
 import TitleRow from '../../../components/TitleRow.astro';
 import { adminContext } from '../../../lib/admin-context';
 import { createIdentity, getRecoveryLink } from '../../../lib/admin-api';
-import { ENROLLMENT_TTL } from '../../../lib/admin-actions';
+import { auditLine, ENROLLMENT_TTL } from '../../../lib/admin-actions';
 import { accessToStorage, choicesFromForm } from '../../../lib/access-rows';
 import { suggestUsername } from '../../../lib/admin-view';
 import { signToken, verifyToken, CSRFError } from '../../../lib/csrf';
@@ -96,6 +96,7 @@ if (Astro.request.method === 'POST') {
             ...(Object.keys(access.roles).length ? { roles: access.roles } : {}),
           },
         });
+        auditLine(adminId, 'create-user', created.id, 'ok');
         const link = await getRecoveryLink(created.id, ENROLLMENT_TTL);
         success = {
           id: created.id,

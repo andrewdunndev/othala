@@ -288,6 +288,7 @@ async function revokeGrants(id: string): Promise<ActionResult | null> {
   } catch (err) {
     return {
       kind: 'error',
+      partial: true,
       message: `Saved, but their old app access could not be taken away: ${err instanceof Error ? err.message : 'unknown error'}`,
     };
   }
@@ -510,17 +511,21 @@ export async function removeCredentialAction(fd: FormData, ctx: ActionContext): 
 }
 
 /** One stdout JSON line per mutation: ids only, never emails, names or credential material. */
+export function auditLine(actor: string, action: string, target: string, result: 'ok' | 'partial' | 'refused' | 'error'): void {
+  console.log(JSON.stringify({ event: 'admin_action', action, actor, target, result }));
+}
+
+/** A partial error landed its write; any other error, or a save sent back with form errors, wrote nothing. */
 function audited(action: string, handler: ActionHandler): ActionHandler {
-  const line = (ctx: ActionContext, result: string) =>
-    console.log(JSON.stringify({ event: 'admin_action', action, actor: ctx.adminIdentityId, target: ctx.id, result }));
   return async (fd, ctx) => {
     try {
       const outcome = await handler(fd, ctx);
-      const kind = outcome instanceof Response ? 'ok' : outcome.actionResult?.kind;
-      line(ctx, kind && kind !== 'error' ? 'ok' : 'refused');
+      const r = outcome instanceof Response ? null : outcome.actionResult;
+      const result = r === undefined ? 'refused' : r?.kind !== 'error' ? 'ok' : r.partial ? 'partial' : 'refused';
+      auditLine(ctx.adminIdentityId, action, ctx.id, result);
       return outcome;
     } catch (err) {
-      line(ctx, 'error');
+      auditLine(ctx.adminIdentityId, action, ctx.id, 'error');
       throw err;
     }
   };
