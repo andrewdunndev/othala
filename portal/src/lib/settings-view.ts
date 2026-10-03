@@ -144,7 +144,7 @@ export function securityStatus(
   };
 }
 
-/** An admin or elevated member whose only second factor is one security key: Kratos refuses a second key until an app is enrolled. */
+/** An admin or elevated member whose only second factor is one security key: the second-factor gate refuses a second key until an app is enrolled. */
 export function keyOnlyKeeper(nodes: FlowNode[], keeper: boolean): boolean {
   return keeper && credentialItems(nodes, 'webauthn_remove').length === 1 && !totpView(nodes).enrolled;
 }
