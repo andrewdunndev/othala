@@ -146,7 +146,7 @@ export async function revokeHydraSessions(
     throw new RevokeError(
       'hydra-admin',
       phase,
-      'Hydra still remembers the login. Verify the Hydra admin API, then sign them out everywhere.',
+      'Hydra still remembers the login. Verify the Hydra admin API, then try again.',
       err,
     );
   }
@@ -157,7 +157,7 @@ export async function revokeHydraSessions(
     throw new RevokeError(
       'hydra-admin',
       'revoke-consent-sessions',
-      'App sign-ins are ended, but app access and its tokens persist. Verify the Hydra admin API, then sign them out everywhere.',
+      'App sign-ins are ended, but app access and its tokens persist. Verify the Hydra admin API, then try again.',
       err,
     );
   }
