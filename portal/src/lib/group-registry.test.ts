@@ -9,19 +9,19 @@ import {
   parseManifest,
   loadClientManifests,
   invalidateManifestCache,
-  knownAccessGroups,
   setManifestDir,
   type ClientManifest,
 } from './manifests.js';
 import {
   buildGroupRegistry,
-  getGroupRegistry,
   isAccessGroup,
   isIdentityGroup,
   knownGroupNames,
-  namesOfKind,
+  type GroupKind,
   type GroupRegistry,
 } from './group-registry.js';
+import { servingManifests } from './manifest-store.js';
+import { IDENTITY_GROUPS } from './constants.js';
 
 const GRAFANA = `
 presentation:
@@ -88,7 +88,7 @@ presentation:
   name: Proxywatch
   url: https://proxywatch.example.test
   auth_kind: forward_auth
-  access_group: proxywatch-access
+  access: [proxywatch-access]
 `;
 
 const FETCHER = `
@@ -96,7 +96,7 @@ presentation:
   name: Usenet downloader
   url: https://downloads.example.test/fetcher
   auth_kind: forward_auth
-  access_group: downloads-usenet-access
+  access: [downloads-usenet-access]
 `;
 
 const SERIES = `
@@ -104,7 +104,7 @@ presentation:
   name: Series manager
   url: https://downloads.example.test/series
   auth_kind: forward_auth
-  access_group: downloads-usenet-access
+  access: [downloads-usenet-access]
 `;
 
 const FILEDROP = `
@@ -156,7 +156,7 @@ consent:
       claim_emit:
         role: Curator
   group_role_map:
-    access-legacy: curator
+    access-curators: curator
 `;
 
 const CATALOG: Record<string, string> = {
@@ -185,8 +185,8 @@ function parse(file: string, body: string): ClientManifest {
   return parseManifest(body, file);
 }
 
-function accessFor(reg: GroupRegistry, name: string): string[] {
-  return reg.get(name)?.accessFor ?? [];
+function namesOfKind(reg: GroupRegistry, kind: GroupKind): string[] {
+  return [...reg.values()].filter((e) => e.kinds.has(kind)).map((e) => e.name).sort();
 }
 
 let dir: string;
@@ -206,16 +206,13 @@ describe('buildGroupRegistry — type comes from the binding, not the name', () 
 
     expect(isAccessGroup(reg, 'photo-club')).toBe(true);
     expect(reg.get('photo-club')?.kinds).toEqual(new Set(['access']));
-    expect(reg.get('photo-club')?.accessFor).toEqual(['archive']);
   });
 
   it('types a group NAMED like the retired access- convention as role when that is its only binding', () => {
     const reg = buildGroupRegistry([parse('archive.yaml', ARCHIVE)], []);
 
-    expect(reg.get('access-legacy')?.kinds).toEqual(new Set(['role']));
-    expect(isAccessGroup(reg, 'access-legacy')).toBe(false);
-    expect(reg.get('access-legacy')?.accessFor).toEqual([]);
-    expect(reg.get('access-legacy')?.roleFor).toEqual(['archive']);
+    expect(reg.get('access-curators')?.kinds).toEqual(new Set(['role']));
+    expect(isAccessGroup(reg, 'access-curators')).toBe(false);
   });
 
   it('does not let <svc>-admin become an access group (entry stays explicit)', () => {
@@ -226,8 +223,6 @@ describe('buildGroupRegistry — type comes from the binding, not the name', () 
 
     expect(reg.get('grafana-admin')?.kinds).toEqual(new Set(['role']));
     expect(isAccessGroup(reg, 'grafana-admin')).toBe(false);
-    expect(reg.get('grafana-admin')?.accessFor).toEqual([]);
-    expect(reg.get('grafana-admin')?.roleFor).toEqual(['grafana']);
   });
 
   it('unions the kinds when one group carries several bindings', () => {
@@ -249,13 +244,12 @@ presentation:
     expect(isAccessGroup(reg, 'admin')).toBe(false);
   });
 
-  it('records every app that binds a shared group, in load order, without duplicates', () => {
+  it('types a group several apps bind once, as access', () => {
     const reg = buildGroupRegistry(
       [parse('fetcher.yaml', FETCHER), parse('series.yaml', SERIES)],
       [],
     );
 
-    expect(reg.get('downloads-usenet-access')?.accessFor).toEqual(['fetcher', 'series']);
     expect(reg.get('downloads-usenet-access')?.kinds).toEqual(new Set(['access']));
   });
 
@@ -287,7 +281,7 @@ presentation:
   });
 });
 
-describe('getGroupRegistry — completeness over the real loader', () => {
+describe('buildGroupRegistry — completeness over the real loader', () => {
   beforeEach(() => {
     dir = mkdtempSync(join(tmpdir(), 'othala-group-registry-'));
     setManifestDir(dir);
@@ -301,6 +295,8 @@ describe('getGroupRegistry — completeness over the real loader', () => {
     setManifestDir(undefined);
     rmSync(dir, { recursive: true, force: true });
   });
+
+  const servingRegistry = () => buildGroupRegistry(servingManifests(), IDENTITY_GROUPS);
 
   it('sees every manifest of every auth_kind — nothing is filtered upstream', () => {
     writeCatalog();
@@ -316,71 +312,16 @@ describe('getGroupRegistry — completeness over the real loader', () => {
       'statuspage',
     ]);
 
-    const reg = getGroupRegistry();
+    const reg = servingRegistry();
     expect(namesOfKind(reg, 'access')).toEqual(EXPECTED_ACCESS);
     expect(namesOfKind(reg, 'role')).toEqual(EXPECTED_ROLE);
   });
 
-  it('B4: a presentation-only tile’s access group is grantable, not invisible', () => {
-    writeCatalog();
-    const reg = getGroupRegistry();
-
-    for (const group of [
-      'proxywatch-access',
-      'downloads-usenet-access',
-      'filedrop-access',
-      'audiobookshelf-access',
-    ]) {
-      expect(isAccessGroup(reg, group), `${group} must be an access group`).toBe(true);
-      expect(knownAccessGroups(), `${group} must be grantable in the admin UI`).toContain(group);
-    }
-
-    expect(knownAccessGroups()).toEqual(EXPECTED_ACCESS);
-    expect(namesOfKind(reg, 'access')).toEqual(knownAccessGroups());
-  });
-
   it('carries the fixed identity groups through without typing them access', () => {
     writeCatalog();
-    const reg = getGroupRegistry();
+    const reg = servingRegistry();
 
     expect(isIdentityGroup(reg, 'everyone')).toBe(true);
     expect(isAccessGroup(reg, 'everyone')).toBe(false);
-    expect(isIdentityGroup(reg, 'admin')).toBe(true);
-    expect(isAccessGroup(reg, 'admin')).toBe(false);
-  });
-
-  it('memoizes on the manifest set and rebuilds when the catalog turns over', () => {
-    writeCatalog();
-    const first = getGroupRegistry();
-    expect(getGroupRegistry()).toBe(first);
-
-    write('grafana.yaml', GRAFANA.replace('    - grafana-access\n', '    - grafana-access\n    - grafana-guest\n'));
-
-    const second = getGroupRegistry();
-    expect(second).not.toBe(first);
-    expect(isAccessGroup(second, 'grafana-guest')).toBe(true);
-    expect(accessFor(second, 'grafana-guest')).toEqual(['grafana']);
-  });
-
-  it('never throws when the catalog breaks, and keeps serving the last good registry', () => {
-    writeCatalog();
-    const good = getGroupRegistry();
-    expect(isAccessGroup(good, 'grafana-access')).toBe(true);
-
-    write('grafana.yaml', GRAFANA.replace('grafana-access: user', 'grafana-access: editor'));
-
-    expect(() => getGroupRegistry()).not.toThrow();
-    const after = getGroupRegistry();
-
-    expect(after).toBe(good);
-    expect(namesOfKind(after, 'access')).toEqual(EXPECTED_ACCESS);
-  });
-
-  it('grants nothing when there is no catalog to read', () => {
-    const reg = getGroupRegistry();
-
-    expect(namesOfKind(reg, 'access')).toEqual([]);
-    expect(namesOfKind(reg, 'role')).toEqual([]);
-    expect(isIdentityGroup(reg, 'everyone')).toBe(true);
   });
 });

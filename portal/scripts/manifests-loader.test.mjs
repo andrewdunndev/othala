@@ -6,6 +6,7 @@ import { mkdtempSync, writeFileSync, rmSync, readdirSync, readFileSync } from 'n
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { parseManifest, loadClientManifests, setManifestDir } from '../src/lib/manifests.ts';
+import { decideAccess } from '../src/lib/gate.ts';
 
 test('namespace split: minimal yaml with oidc + consent blocks parses', () => {
   const out = parseManifest(
@@ -26,7 +27,7 @@ consent:
   assert.equal(out.roles[0].name, 'user');
 });
 
-test('accessGroups dual-read: presentation.access list populates accessGroups', () => {
+test('accessGroups: presentation.access list populates accessGroups', () => {
   const out = parseManifest(
     `
 oidc:
@@ -42,7 +43,7 @@ presentation:
   assert.deepEqual(out.accessGroups, ['memories', 'admin-memories']);
 });
 
-test('accessGroups dual-read: presentation.access_group compat shim', () => {
+test('accessGroups: the singular access_group key binds nothing and the gate denies', () => {
   const out = parseManifest(
     `
 oidc:
@@ -53,7 +54,9 @@ presentation:
 `,
     'photos.yaml',
   );
-  assert.deepEqual(out.accessGroups, ['access-photos']);
+  assert.deepEqual(out.accessGroups, []);
+  const member = { id: 'm', state: 'active', traits: {}, metadata_admin: { groups: ['access-photos'] } };
+  assert.ok('deny' in decideAccess(member, { app: out }, { authenticator_assurance_level: 'aal2' }));
 });
 
 test('accessGroups: no declared binding → [] (no implicit access)', () => {
@@ -68,7 +71,7 @@ oidc:
   assert.deepEqual(out.accessGroups, []);
 });
 
-test('pre-namespace flat shape is rejected', () => {
+test('a manifest without an oidc: block or presentation: is rejected as missing oidc', () => {
   assert.throws(() => parseManifest(
     `
 client_id: filedrop
@@ -76,7 +79,7 @@ roles:
   - name: admin
 `,
     'filedrop.yaml',
-  ));
+  ), /missing or non-object oidc: block/);
 });
 
 test('non-object oidc block is rejected', () => {
@@ -175,7 +178,7 @@ test('presentation-only manifest (forward_auth, no oidc:) parses with the access
 presentation:
   name: Proxywatch
   auth_kind: forward_auth
-  access_group: access-proxywatch
+  access: [access-proxywatch]
 `,
     'proxywatch.yaml',
   );

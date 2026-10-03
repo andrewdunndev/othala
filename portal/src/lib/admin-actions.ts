@@ -13,34 +13,31 @@ import {
   deleteCredential,
   EVICTABLE_CREDENTIAL_TYPES,
 } from './admin-api';
-import { revokeUserSessions, type RevokeUserResult } from './admin';
 import { parseIdentity } from './identity-facts';
-import { sendInviteRecoveryEmail } from './kratos';
-import { confirmsInviteAddress, IDENTITY_GROUP_ORDER, normalizeGroupOrder, shouldRefuseRecovery } from './access';
+import { normalizeGroupOrder, shouldRefuseRecovery } from './access';
 import { accessToStorage, choicesFromForm } from './access-rows';
 import { GROUP_RE } from './access-groups';
-import { HOUSEHOLD_GROUPS } from './constants';
+import { IDENTITY_GROUPS } from './constants';
 import { holdsElevatedRole, planGroupSave } from './gate';
 import { buildGroupRegistry, isIdentityGroup, unconfiguredGroups } from './group-registry';
-import { DEACTIVATE_STEP, RevokeError, revokeHydraSessions, revokeSubject } from './revoke';
+import { DEACTIVATE_STEP, RevokeError, revokeHydraSessions, revokeSubject, type RevokeResult } from './revoke';
 import { removalBlock } from './admin-view';
 import type { ClientManifest } from './manifests';
 import type { Identity } from './types';
 
-const USERNAME_RE = /^[a-z0-9]+(?:\.[a-z0-9]+)+$/;
-const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+export const USERNAME_RE = /^[a-z0-9]+(?:\.[a-z0-9]+)+$/;
+export const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 export const ENROLLMENT_TTL = '24h';
 
 export type ActionResult =
   | { kind: 'recovery'; url: string; code: string; expiresAt: string }
-  | { kind: 'invite-email'; email: string }
   | { kind: 'deactivated'; username: string }
   | { kind: 'reactivated'; username: string }
   | { kind: 'updated'; removed: string[] }
   | { kind: 'admin-granted'; username: string }
   | { kind: 'admin-revoked'; username: string }
-  | { kind: 'revoked'; result: RevokeUserResult }
+  | { kind: 'revoked'; result: RevokeResult }
   | { kind: 'email-verified' }
   | { kind: 'prerequisites-saved' }
   | { kind: 'credential-removed'; credType: string }
@@ -87,7 +84,7 @@ export async function saveAction(fd: FormData, ctx: ActionContext): Promise<Acti
 
   const clearUnconfigured = new Set(fd.getAll('clearUnconfigured').map(String));
   const keptUnconfigured = unconfiguredGroups(
-    buildGroupRegistry(manifests, IDENTITY_GROUP_ORDER),
+    buildGroupRegistry(manifests, IDENTITY_GROUPS),
     parseIdentity(identity).groups,
   ).filter((g) => !clearUnconfigured.has(g));
 
@@ -151,7 +148,7 @@ interface SectionEdit {
 /** Rebuilds the whole form from what is stored, so every section passes saveAction's guards and none clobbers another. */
 function sectionSave(ctx: ActionContext, edit: SectionEdit): Promise<ActionOutcome> {
   const { identity, manifests } = ctx;
-  const registry = buildGroupRegistry(manifests, IDENTITY_GROUP_ORDER);
+  const registry = buildGroupRegistry(manifests, IDENTITY_GROUPS);
   const stored = parseIdentity(identity).groups;
   const storedUnconfigured = unconfiguredGroups(registry, stored);
   const desired = edit.access ? [...edit.access.groups] : [...stored];
@@ -164,10 +161,8 @@ function sectionSave(ctx: ActionContext, edit: SectionEdit): Promise<ActionOutco
   fd.set('displayName', edit.profile?.displayName ?? String(traits?.displayName ?? ''));
   fd.set('recoveryEmail', edit.profile?.recoveryEmail ?? String(traits?.recoveryEmail ?? ''));
 
-  // Identity groups the page does not offer (the legacy `admin` group) ride along unchanged.
-  const unoffered = stored.filter((g) => isIdentityGroup(registry, g) && !HOUSEHOLD_GROUPS.includes(g));
   const household = edit.household
-    ? [...edit.household.filter((g) => HOUSEHOLD_GROUPS.includes(g)), ...unoffered]
+    ? edit.household.filter((g) => IDENTITY_GROUPS.includes(g))
     : desired.filter((g) => isIdentityGroup(registry, g));
   for (const g of household) fd.append('identityGroups', g);
 
@@ -274,32 +269,8 @@ export async function issueRecoveryAction(_fd: FormData, ctx: ActionContext): Pr
   };
 }
 
-export async function sendInviteEmailAction(fd: FormData, ctx: ActionContext): Promise<ActionOutcome> {
-  if (shouldRefuseRecovery(ctx.identity)) return { actionResult: ADMIN_RECOVERY_REFUSAL, refetch: false };
-  const targetEmail = ctx.identity.traits?.email;
-  if (!targetEmail) return { actionResult: { kind: 'error', message: 'This person has no email address on file.' }, refetch: false };
-
-  const confirmEmail = String(fd.get('confirmEmail') ?? '');
-  if (!confirmsInviteAddress(confirmEmail, targetEmail)) {
-    return {
-      actionResult: { kind: 'error', message: 'Confirmation address does not match the address on file. Nothing was sent.' },
-      refetch: false,
-    };
-  }
-  try {
-    await sendInviteRecoveryEmail(targetEmail);
-    return { actionResult: { kind: 'invite-email', email: targetEmail }, refetch: false };
-  } catch (err) {
-    // Never interpolate the address into the surfaced message.
-    return {
-      actionResult: { kind: 'error', message: `The email could not be sent: ${err instanceof Error ? err.message : 'unknown error'}` },
-      refetch: false,
-    };
-  }
-}
-
 export async function forceReloginAction(_fd: FormData, ctx: ActionContext): Promise<ActionOutcome> {
-  const result = await revokeUserSessions(ctx.id);
+  const result = await revokeSubject(ctx.id);
   return { actionResult: { kind: 'revoked', result }, refetch: false };
 }
 
@@ -464,7 +435,7 @@ export async function removeCredentialAction(fd: FormData, ctx: ActionContext): 
   // Someone else's lost method may have signed a session in, so end their sessions too. Your own stay.
   if (!self) {
     try {
-      await revokeUserSessions(ctx.id);
+      await revokeSubject(ctx.id);
     } catch (err) {
       const reason = err instanceof Error ? err.message : 'unknown error';
       return { actionResult: { kind: 'error', partial: true, message: `Removed, but their sessions could not be ended: ${reason}` }, refetch: true };
@@ -502,7 +473,6 @@ const HANDLERS: Record<string, ActionHandler> = {
   'mark-verified': markVerifiedAction,
   'set-prerequisites': setPrerequisitesAction,
   'issue-recovery': issueRecoveryAction,
-  'send-invite-email': sendInviteEmailAction,
   'force-relogin': forceReloginAction,
   deactivate: deactivateAction,
   reactivate: reactivateAction,

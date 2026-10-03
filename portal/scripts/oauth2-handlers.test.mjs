@@ -34,9 +34,16 @@ function stubOAuth2(over = {}) {
     getOAuth2LogoutRequest: over.getOAuth2LogoutRequest
       ?? (async () => oauth2LogoutRequest({ subject: 'id-1' })),
     acceptOAuth2LoginRequest: async (p) => { calls.acceptLogin++; calls.acceptLoginBody = p.acceptOAuth2LoginRequest; return { redirect_to: 'https://sso.othala.test/after-login' }; },
-    rejectOAuth2LoginRequest: async (p) => { calls.rejectLogin++; calls.rejectLoginError = p.rejectOAuth2Request?.error; calls.rejectLoginReason = p.rejectOAuth2Request?.error_description; return { redirect_to: 'https://sso.othala.test/login-rejected' }; },
+    rejectOAuth2LoginRequest: async (p) => { calls.rejectLogin++; calls.rejectLoginError = p.rejectOAuth2Request?.error; calls.rejectLoginReason = p.rejectOAuth2Request?.error_description; calls.rejectLoginStatus = p.rejectOAuth2Request?.status_code; return { redirect_to: 'https://sso.othala.test/login-rejected' }; },
     acceptOAuth2ConsentRequest: async (p) => { calls.acceptConsent++; calls.acceptConsentBody = p.acceptOAuth2ConsentRequest; return { redirect_to: 'https://sso.othala.test/after-consent' }; },
-    rejectOAuth2ConsentRequest: async (p) => { calls.rejectConsent++; calls.rejectConsentReason = p.rejectOAuth2Request?.error_description; return { redirect_to: 'https://sso.othala.test/consent-rejected' }; },
+    rejectOAuth2ConsentRequest: async (p) => {
+      calls.rejectConsent++;
+      calls.rejectConsentError = p.rejectOAuth2Request?.error;
+      calls.rejectConsentReason = p.rejectOAuth2Request?.error_description;
+      calls.rejectConsentStatus = p.rejectOAuth2Request?.status_code;
+      if (over.rejectConsentThrows) throw new Error('hydra down');
+      return { redirect_to: 'https://sso.othala.test/consent-rejected' };
+    },
     acceptOAuth2LogoutRequest: async () => { calls.acceptLogout++; return { redirect_to: 'https://sso.othala.test/after-logout' }; },
     revokeOAuth2LoginSessions: over.revokeOAuth2LoginSessions
       ?? (async (p) => { calls.revokeLoginSessions = (calls.revokeLoginSessions ?? []).concat([p]); }),
@@ -84,6 +91,7 @@ test('login REJECTS when missing the access group — opaque error_description, 
     assert.equal(res.headers.get('location'), 'https://sso.othala.test/login-rejected');
     assert.equal(calls.acceptLogin, 0);
     assert.equal(calls.rejectLoginReason, 'access_denied', 'error_description must be opaque');
+    assert.equal(calls.rejectLoginStatus, 403);
     const logged = warnArgs.find((a) => a[0].includes('oauth2/login'));
     assert.ok(logged, 'console.warn must be called for denied login');
     assert.match(logged[1].reason, /access group\(s\): grafana-access/, 'real reason must be in the server-side log');
@@ -105,6 +113,7 @@ test('login REJECTS when identity state is inactive — opaque error_description
     });
     assert.equal(res.status, 302);
     assert.equal(calls.rejectLoginReason, 'access_denied', 'error_description must be opaque');
+    assert.equal(calls.rejectLoginStatus, 403);
     const logged = warnArgs.find((a) => a[0].includes('oauth2/login'));
     assert.ok(logged, 'console.warn must be called for denied login');
     assert.equal(logged[1].reason, 'identity not active', 'real reason must be in the server-side log');
@@ -126,6 +135,7 @@ test('login REJECTS when identity lookup fails (fail-closed) — opaque error_de
     });
     assert.equal(res.status, 302);
     assert.equal(calls.rejectLoginReason, 'access_denied', 'error_description must be opaque');
+    assert.equal(calls.rejectLoginStatus, 403);
     const logged = warnArgs.find((a) => a[0].includes('oauth2/login'));
     assert.ok(logged, 'console.warn must be called for denied login');
     assert.equal(logged[1].reason, 'identity lookup failed', 'real reason must be in the server-side log');
@@ -277,6 +287,7 @@ for (const [branch, skip] of [['skip', { skip: true, subject: 'id-1' }], ['fresh
       } else {
         assert.equal(u.href, 'https://sso.othala.test/login-rejected');
         assert.equal(calls.rejectLoginError, 'login_required');
+        assert.equal(calls.rejectLoginStatus, 400);
       }
     });
   }
@@ -291,6 +302,7 @@ for (const [branch, skip] of [['skip', { skip: true, subject: 'id-1' }], ['fresh
     });
     assert.equal(res.headers.get('location'), 'https://sso.othala.test/login-rejected');
     assert.equal(calls.rejectLoginReason, 'access_denied');
+    assert.equal(calls.rejectLoginStatus, 403);
   });
 
   test(`login (${branch}) refreshes a stale aal1 totp holder before any step-up`, async () => {
@@ -367,6 +379,19 @@ test('consent accepts an active member and grants scope + injects id_token', asy
   assert.deepEqual(calls.acceptConsentBody.grant_scope, ['email', 'profile']);
   assert.equal(calls.acceptConsentBody.session.id_token.email, 'a@othala.test');
   assert.equal('groups' in calls.acceptConsentBody.session.id_token, false, 'groups absent when groups scope not requested');
+});
+
+test('consent with no requested_scope emits no scoped claims', async () => {
+  const { api, calls } = stubOAuth2({
+    getOAuth2ConsentRequest: async () => oauth2ConsentRequest({ skip: true, subject: 'id-1', client: { client_id: 'grafana' }, requested_scope: undefined }),
+  });
+  await handleConsent(new Request('https://x/oauth2/consent?consent_challenge=cc'), {
+    oauth2: api,
+    getIdentity: async () => activeMember(),
+    manifest: () => loadManifest('grafana'),
+  });
+  const idToken = calls.acceptConsentBody.session.id_token;
+  for (const k of ['email', 'email_verified', 'name', 'preferred_username', 'groups']) assert.equal(k in idToken, false, k);
 });
 
 test('consent REJECTS when missing the access group — opaque error_description, real reason logged', async () => {
@@ -494,7 +519,6 @@ test('T2: consent skip=false bounces to /auth/consent with challenge', async () 
       manifest: () => ({
         clientId: 'grafana',
         clientName: 'grafana',
-        accessGroup: 'grafana-access',
         accessGroups: ['grafana-access'],
         skipConsent: false,
         skipAccessCheck: false,
@@ -581,6 +605,8 @@ test('T4: POST Deny rejects and redirects', async () => {
       active: true,
       identity: { id: 'id-1', state: 'active', schema_id: 'family', schema_url: '', traits: {} },
     }),
+    getIdentity: async () => activeMember(),
+    manifest: () => loadManifest('grafana'),
   });
   assert.equal(res.status, 302);
   assert.equal(res.headers.get('location'), 'https://sso.othala.test/consent-rejected');
@@ -612,6 +638,66 @@ test('T5: POST Allow rejects with access_denied on session-subject mismatch', as
   assert.equal(calls.acceptConsent, 0, 'acceptConsent must NOT be called on subject mismatch');
   assert.match(calls.rejectConsentReason, /mismatch/, 'rejection reason must mention mismatch');
 });
+
+const liveSession = async () => ({
+  active: true,
+  identity: { id: 'id-1', state: 'active', schema_id: 'family', schema_url: '', traits: {} },
+});
+
+function consentPost(action) {
+  const body = new URLSearchParams({ consent_challenge: 'cc', action, csrf_token: signToken('id-1', 'consent') });
+  return new Request('https://x/oauth2/consent', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/x-www-form-urlencoded', cookie: 'session=s1' },
+    body: body.toString(),
+  });
+}
+
+const CONSENT_REJECTS = [
+  ['GET gate deny', 502, (oauth2) => handleConsent(new Request('https://x/oauth2/consent?consent_challenge=cc'), {
+    oauth2, getIdentity: async () => activeMember({ metadata_admin: { groups: [] } }), manifest: () => loadManifest('grafana'),
+  })],
+  ['POST no session', 502, (oauth2) => handleConsentPost(consentPost('allow'), { oauth2, getSession: async () => null })],
+  ['POST subject mismatch', 'screen', (oauth2) => handleConsentPost(consentPost('allow'), { oauth2, getSession: liveSession }), 'other-id'],
+  ['POST deny', 'screen', (oauth2) => handleConsentPost(consentPost('deny'), {
+    oauth2, getSession: liveSession, getIdentity: async () => activeMember(), manifest: () => loadManifest('grafana'),
+  })],
+  ['POST allow gate deny', 'screen', (oauth2) => handleConsentPost(consentPost('allow'), {
+    oauth2, getSession: liveSession, getIdentity: async () => activeMember({ metadata_admin: { groups: [] } }), manifest: () => loadManifest('grafana'),
+  })],
+];
+
+for (const [name, onThrow, run, subject = 'id-1'] of CONSENT_REJECTS) {
+  for (const throws of [false, true]) {
+    test(`consent reject (${name}${throws ? ', Hydra reject fails' : ''}) sends access_denied 403 and never accepts`, async () => {
+      _resetForTests();
+      const { api, calls } = stubOAuth2({
+        rejectConsentThrows: throws,
+        getOAuth2ConsentRequest: async () => oauth2ConsentRequest({ skip: false, subject, client: { client_id: 'grafana' }, requested_scope: ['email'] }),
+      });
+      const origWarn = console.warn;
+      console.warn = () => {};
+      let res;
+      try {
+        res = await run(api);
+      } finally {
+        console.warn = origWarn;
+      }
+      assert.equal(calls.rejectConsent, 1);
+      assert.equal(calls.rejectConsentError, 'access_denied');
+      assert.equal(calls.rejectConsentStatus, 403);
+      assert.equal(calls.acceptConsent, 0);
+      if (!throws) {
+        assert.equal(res.headers.get('location'), 'https://sso.othala.test/consent-rejected');
+      } else if (onThrow === 502) {
+        assert.equal(res.status, 502);
+      } else {
+        assert.equal(res.status, 302);
+        assert.equal(res.headers.get('location'), '/auth/consent?consent_challenge=cc');
+      }
+    });
+  }
+}
 
 test('T6: describeScopeList maps known scopes and falls back for unknown', () => {
   const result = describeScopeList(['openid', 'email', 'groups', 'profile', 'offline_access', 'unknown_scope']);
@@ -777,7 +863,6 @@ test('A4e: roleless manifest -> base claims only, groups emitted', async () => {
   const rolelessManifest = {
     clientId: 'unknown-client',
     clientName: 'unknown-client',
-    accessGroup: 'access-unknown-client',
     accessGroups: ['access-unknown-client'],
     skipAccessCheck: false,
     roles: [],

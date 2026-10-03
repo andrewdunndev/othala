@@ -13,7 +13,9 @@ const {
   revokeHydraSessionsMock,
   patchPrerequisitesMock,
   markEmailVerifiedMock,
+  getRecoveryLinkMock,
 } = vi.hoisted(() => ({
+  getRecoveryLinkMock: vi.fn(),
   updateIdentityMock: vi.fn(),
   patchPrerequisitesMock: vi.fn(),
   markEmailVerifiedMock: vi.fn(),
@@ -43,6 +45,7 @@ vi.mock('./admin-api', async (importOriginal) => {
     deleteCredential: deleteCredentialMock,
     patchPrerequisites: patchPrerequisitesMock,
     markEmailVerified: markEmailVerifiedMock,
+    getRecoveryLink: getRecoveryLinkMock,
   };
 });
 
@@ -60,7 +63,9 @@ import {
   revokeAdminAction,
   removeCredentialAction,
   grantAdminAction,
+  issueRecoveryAction,
   ADMIN_ACTIONS,
+  ENROLLMENT_TTL,
   auditLine,
   type ActionContext,
 } from './admin-actions.js';
@@ -99,6 +104,7 @@ beforeEach(() => {
   revokeHydraSessionsMock.mockReset().mockResolvedValue(undefined);
   patchPrerequisitesMock.mockReset().mockResolvedValue(undefined);
   markEmailVerifiedMock.mockReset().mockResolvedValue(true);
+  getRecoveryLinkMock.mockReset().mockResolvedValue({ recovery_link: 'https://sso.othala.test/r', recovery_code: '123456', expires_at: '' });
 });
 
 describe('deleteAction', () => {
@@ -156,7 +162,9 @@ describe('deleteAction', () => {
     revokeSubjectMock.mockRejectedValue(new RevokeError('kratos-admin', DEACTIVATE_STEP, 'Verify KRATOS_ADMIN_URL.'));
     const outcome = await deleteAction(fd({ confirm: 'alice' }), makeCtx({ identity: makeIdentity('alice') }));
 
+    expect(deleteIdentityMock).not.toHaveBeenCalled();
     if (outcome instanceof Response) throw new Error('unreachable');
+    expect(outcome.actionResult?.kind).toBe('error');
     expect(outcome.actionResult).not.toHaveProperty('partial');
   });
 
@@ -196,6 +204,16 @@ describe('saveAction', () => {
     expect(revokeHydraSessionsMock).toHaveBeenCalledWith('target-1');
     expect(updateIdentityMock.mock.invocationCallOrder[0]).toBeLessThan(revokeHydraSessionsMock.mock.invocationCallOrder[0]);
     expect(outcome.actionResult?.kind).toBe('updated');
+  });
+
+  it('keeps stored prerequisites and passkey names through a save', async () => {
+    const withMeta = identity({
+      username: 'alice.smith',
+      metadataAdmin: { groups: ['family'], prerequisites: ['x'], passkeyNames: { k: 'Key' } },
+    });
+    await saveAction(saveForm(['family']), makeCtx({ identity: withMeta, manifests: MANIFESTS }));
+
+    expect(updateIdentityMock.mock.calls[0][1].metadataAdmin).toMatchObject({ prerequisites: ['x'], passkeyNames: { k: 'Key' } });
   });
 
   it('ends app sign-ins when a stored role changes', async () => {
@@ -318,12 +336,14 @@ describe('saveAction', () => {
 
 describe('revokeAdminAction', () => {
   it('refuses self-demote without the typed username and never calls patchAdminMarker', async () => {
+    listIdentitiesMock.mockResolvedValue([makeIdentity('other-admin', true), makeIdentity('admin', true)]);
     const identity = makeIdentity('admin', true);
     for (const typed of [undefined, 'someone-else']) {
       const outcome = await revokeAdminAction(fd(typed ? { confirm: typed } : {}), makeCtx({ id: 'admin-1', identity, adminIdentityId: 'admin-1' }));
       expect(outcome).not.toBeInstanceOf(Response);
       if (outcome instanceof Response) throw new Error('unreachable');
       expect(outcome.actionResult?.kind).toBe('error');
+      expect(outcome.actionResult && 'message' in outcome.actionResult ? outcome.actionResult.message : '').toMatch(/Type your name/);
     }
     expect(patchAdminMarkerMock).not.toHaveBeenCalled();
   });
@@ -495,6 +515,27 @@ describe('removeCredentialAction', () => {
   });
 });
 
+describe('issueRecoveryAction', () => {
+  it('refuses an admin-marked target and never mints a link', async () => {
+    const outcome = await issueRecoveryAction(fd({}), makeCtx({ identity: makeIdentity('boss', true) }));
+
+    expect(getRecoveryLinkMock).not.toHaveBeenCalled();
+    expect(outcome).toMatchObject({ actionResult: { kind: 'error', message: expect.stringMatching(/setup link for an admin/) }, refetch: false });
+  });
+
+  it('mints a 24h link for a non-admin target and returns it', async () => {
+    getRecoveryLinkMock.mockResolvedValue({ recovery_link: 'https://sso.othala.test/r', recovery_code: '123456', expires_at: '2026-10-04T00:00:00Z' });
+    const outcome = await issueRecoveryAction(fd({}), makeCtx());
+
+    expect(getRecoveryLinkMock).toHaveBeenCalledTimes(1);
+    expect(getRecoveryLinkMock).toHaveBeenCalledWith('target-1', ENROLLMENT_TTL);
+    expect(outcome).toEqual({
+      actionResult: { kind: 'recovery', url: 'https://sso.othala.test/r', code: '123456', expiresAt: '2026-10-04T00:00:00Z' },
+      refetch: false,
+    });
+  });
+});
+
 describe('deactivateAction', () => {
   it('refuses self-deactivation and never calls deactivateIdentity', async () => {
     listIdentitiesMock.mockResolvedValue([makeIdentity('admin', true), makeIdentity('other', true)]);
@@ -624,6 +665,15 @@ describe('person page sections', () => {
     expect(written().metadataAdmin.admin).toBe(true);
   });
 
+  it('drops an access group posted with the household groups', async () => {
+    const form = new FormData();
+    form.append('identityGroups', 'everyone');
+    form.append('identityGroups', 'grafana-access');
+    await saveHouseholdAction(form, makeCtx({ identity: person(['everyone']), manifests: MANIFESTS }));
+
+    expect(written().metadataAdmin.groups).not.toContain('grafana-access');
+  });
+
   it('saves the profile and leaves groups as stored', async () => {
     await saveProfileAction(
       fd({ username: 'Robin.K', email: 'a@othala.test', displayName: 'Robin', recoveryEmail: '' }),
@@ -698,6 +748,7 @@ describe('admin action audit line', () => {
   it.each([
     ['grant-admin', makeCtx({ identity: member }), 'ok'],
     ['grant-admin', makeCtx({ identity: makeIdentity('member') }), 'refused'],
+    ['issue-recovery', makeCtx(), 'ok'],
     ['deactivate', makeCtx(), 'ok'],
     ['deactivate', makeCtx({ id: 'admin-1' }), 'refused'],
   ])('%s emits exactly one line, result %s', async (action, ctx, result) => {

@@ -28,29 +28,18 @@ export interface WhoAmI {
   [key: string]: unknown;
 }
 
-export async function hasSession(ctx: BrowserContext, base: string): Promise<boolean> {
-  try {
-    const resp = await ctx.request.get(`${base}/sessions/whoami`, {
-      headers: { Accept: 'application/json' },
-    });
-    if (!resp.ok()) return false;
-    const body = await resp.json();
-    return body?.active === true;
-  } catch {
-    return false;
-  }
+/** The session, or null only on 401; any other answer means whoami itself is broken, so it throws. */
+export async function getSession(ctx: BrowserContext, base: string): Promise<WhoAmI | null> {
+  const resp = await ctx.request.get(`${base}/sessions/whoami`, {
+    headers: { Accept: 'application/json' },
+  });
+  if (resp.status() === 401) return null;
+  if (!resp.ok()) throw new Error(`whoami answered ${resp.status()}: ${await resp.text()}`);
+  return (await resp.json()) as WhoAmI;
 }
 
-export async function getSession(ctx: BrowserContext, base: string): Promise<WhoAmI | null> {
-  try {
-    const resp = await ctx.request.get(`${base}/sessions/whoami`, {
-      headers: { Accept: 'application/json' },
-    });
-    if (!resp.ok()) return null;
-    return (await resp.json()) as WhoAmI;
-  } catch {
-    return null;
-  }
+export async function hasSession(ctx: BrowserContext, base: string): Promise<boolean> {
+  return (await getSession(ctx, base))?.active === true;
 }
 
 /** GET /admin without following redirects; the first hop is the gate's answer. */

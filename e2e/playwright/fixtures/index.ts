@@ -8,6 +8,7 @@ import { test as base } from '@playwright/test';
 import type { BrowserContext, CDPSession } from 'playwright-core';
 import { createIdentityWithPassword, TEST_PASSWORD, type SeedResult } from '../actions/identity';
 import { loginViaJsonApi } from '../actions/login';
+import { getSession } from '../actions/session';
 
 /** Base32 decode (RFC-4648, case-insensitive, no padding required). */
 function base32Decode(input: string): Uint8Array {
@@ -232,7 +233,8 @@ export async function adminAal2Context(opts: {
       }
     }
 
-    console.log('[adminAal2] AAL2 session established');
+    const aal = (await getSession(ctx, baseURL))?.authenticator_assurance_level;
+    if (aal !== 'aal2') throw new Error(`adminAal2Context: session is ${aal ?? 'absent'} after step-up, not aal2`);
     return ctx;
   } catch (err) {
     await ctx.close();
@@ -312,23 +314,15 @@ export const test = base.extend<OthalaFixtures, OthalaWorkerFixtures>({
 
   admin: [
     async ({ kratosAdminURL }, use) => {
-      const email = process.env.ADMIN_EMAIL ?? 'admin@othala.test';
-      const password = process.env.ADMIN_PASSWORD ?? TEST_PASSWORD;
-      const listResp = await fetch(
-        `${kratosAdminURL}/admin/identities?credentials_identifier=${encodeURIComponent(email)}`,
-      );
-      if (!listResp.ok) {
-        throw new Error(
-          `admin fixture: lookup failed: HTTP ${listResp.status} for ${email}`,
-        );
-      }
-      const list = (await listResp.json()) as Array<{ id: string }>;
-      if (list.length === 0) {
-        throw new Error(
-          `admin fixture: no identity found for ${email} — did validate.sh seed phase run?`,
-        );
-      }
-      await use({ id: list[0].id, email, password });
+      const result = await createIdentityWithPassword({
+        email: 'admin@othala.test',
+        username: 'admin',
+        displayName: 'Othala Admin',
+        groups: ['grafana-access', 'grafana-admin'],
+        isAdmin: true,
+        kratosAdminURL,
+      });
+      await use({ ...result, password: TEST_PASSWORD });
     },
     { scope: 'worker' },
   ],

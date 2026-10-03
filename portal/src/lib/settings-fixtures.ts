@@ -96,7 +96,7 @@ const passwordNodes = (): FlowNode[] => [
 function passkeyTail(): FlowNode[] {
   return [
     {
-      ...input('passkey', 'passkey_register_trigger', 'button', { onclickTrigger: 'oryPasskeySettingsRegistration', onclick: 'window.oryPasskeySettingsRegistration()' }, 'Add passkey'),
+      ...input('passkey', 'passkey_register_trigger', 'button', { onclickTrigger: 'oryPasskeySettingsRegistration' }, 'Add passkey'),
     },
     input('passkey', 'passkey_settings_register', 'hidden', { value: '' }),
     input('passkey', 'passkey_create_data', 'hidden', { value: '{}' }),
@@ -108,7 +108,7 @@ function webauthnTail(): FlowNode[] {
     // Kratos serves this as an SRI script node; the dev route stands in so the swap can be walked against a loaded script.
     { type: 'script', group: 'webauthn', attributes: { node_type: 'script', id: 'webauthn_script', src: '/dev/webauthn.js', async: true, type: 'text/javascript' } as unknown as FlowNode['attributes'], messages: [], meta: {} },
     input('webauthn', 'webauthn_register_displayname', 'text', {}, 'Name of the security key'),
-    input('webauthn', 'webauthn_register_trigger', 'button', { onclickTrigger: 'oryWebAuthnRegistration', onclick: 'window.oryWebAuthnRegistration({})' }, 'Add security key'),
+    input('webauthn', 'webauthn_register_trigger', 'button', { onclickTrigger: 'oryWebAuthnRegistration' }, 'Add security key'),
     input('webauthn', 'webauthn_register', 'hidden', { value: '' }),
   ];
 }

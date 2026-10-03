@@ -1,5 +1,5 @@
 // Serving-path manifest access, which never throws. STRICT callers (registrar, lint CLI) use manifests.ts directly;
-// SERVING callers (/oauth2/*, admin UI, group registry) use this, because a set-wide error would otherwise 500 every
+// SERVING callers (/oauth2/*, admin UI) use this, because a set-wide error would otherwise 500 every
 // login. It keeps the last known good set across mtime checks and SIGHUP, serves the EMPTY set on a cold start
 // (fail-closed), logs `[portal:manifests]` on the first or changed failure, and retries each call so a fix logs
 // RECOVERED. manifestHealth() drives the admin banner.
@@ -53,23 +53,15 @@ export function servingManifests(): ClientManifest[] {
 }
 
 /**
- * One OIDC client manifest by client_id from the served set, as manifests.ts getClientManifest (case-insensitive;
- * presentation-only tiles never resolve). A broken catalog denies at the gate instead of 500ing; undefined is fail-closed.
+ * One OIDC client manifest by client_id from the served set, case-insensitive. Presentation-only tiles never resolve,
+ * so an OAuth2 request cannot bind a client_id to an unregistered tile. A broken catalog denies at the gate instead of
+ * 500ing; undefined is fail-closed.
  */
 export function servingManifest(clientId: string): ClientManifest | undefined {
   const key = clientId.toLowerCase();
   return servingManifests().find(
     (m) => !m.presentationOnly && m.clientId.toLowerCase() === key,
   );
-}
-
-/** Sorted access groups named by any served manifest's `presentation.access:`; as knownAccessGroups() over the served set. */
-export function servingAccessGroups(): string[] {
-  const set = new Set<string>();
-  for (const m of servingManifests()) {
-    for (const g of m.accessGroups) set.add(g);
-  }
-  return Array.from(set).sort();
 }
 
 /** Health of the served set for the admin banner; refreshes first (cached, cheap) so call order does not matter. */

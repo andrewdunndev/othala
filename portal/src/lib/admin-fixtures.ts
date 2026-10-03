@@ -88,7 +88,6 @@ function tile(m: ClientManifest, order: number): AppTile {
     authKind,
     iconHref,
     iconBleed: iconIsBleed(iconHref?.split('/').pop()?.replace(/\.svg$/, '')),
-    accessGroup: 'everyone',
     accessGroups: m.accessGroups,
     order,
     disabled: false,
@@ -195,13 +194,10 @@ export function devAdmin(state: DevAdminState): DevAdmin {
 const NOTHING_SAVED: ActionResult = { kind: 'error', message: 'Preview data: nothing was saved, so this page keeps showing the old state.' };
 
 /** Previews hand-over actions with a believable result; any action that would change what the page shows says nothing was saved. */
-export function devActionResult(action: string, fd: FormData, username: string): ActionResult {
-  void fd;
+export function devActionResult(action: string): ActionResult {
   switch (action) {
     case 'issue-recovery':
       return { kind: 'recovery', url: 'https://auth.example.test/self-service/recovery?flow=fixture&token=fixture', code: '123456', expiresAt: '' };
-    case 'send-invite-email':
-      return { kind: 'invite-email', email: `${username.replace('.', '')}@example.test` };
     case 'force-relogin':
       return { kind: 'revoked', result: {} as never };
     default:

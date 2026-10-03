@@ -14,7 +14,12 @@ const FIRST_FACTOR_METHODS = new Set(['password', 'passkey', 'webauthn']);
 
 export type EmailChangeVerdict = { refuse: false } | { refuse: true; text: string; pointers: string[] };
 
-type AuthMethod = { method?: unknown; aal?: unknown; completed_at?: unknown };
+export type AuthMethod = { method?: unknown; aal?: unknown; completed_at?: unknown };
+
+/** Epoch ms of a Kratos timestamp (a Date or an ISO string); NaN when unreadable. */
+export function atMs(raw: unknown): number {
+  return raw instanceof Date ? raw.getTime() : typeof raw === 'string' ? Date.parse(raw) : NaN;
+}
 
 function asString(v: unknown): string {
   return typeof v === 'string' ? v : '';
@@ -26,8 +31,7 @@ export function newestFirstFactorMethod(methods: unknown): string | null {
   let best: { at: number; method: string } | null = null;
   for (const m of methods as AuthMethod[]) {
     if (!m || m.aal !== 'aal1' || typeof m.method !== 'string') continue;
-    const raw = m.completed_at;
-    const at = raw instanceof Date ? raw.getTime() : typeof raw === 'string' ? Date.parse(raw) : NaN;
+    const at = atMs(m.completed_at);
     if (Number.isNaN(at)) continue;
     if (best === null || at >= best.at) best = { at, method: m.method };
   }

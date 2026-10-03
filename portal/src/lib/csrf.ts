@@ -139,6 +139,17 @@ export function verifyToken(
   consumedNonces.set(nonce, ts * 1000 + TOKEN_TTL_MS);
 }
 
+/** verifyToken as a value: null when the token verifies, the refusal message when it does not. */
+export function csrfRefusal(presented: string | null | undefined, identityId: string, action: string): string | null {
+  try {
+    verifyToken(presented, identityId, action);
+    return null;
+  } catch (err) {
+    if (err instanceof CSRFError) return err.message;
+    throw err;
+  }
+}
+
 /** Test-only helper: drop the in-memory consumed-nonce store. */
 export function _resetForTests(): void {
   consumedNonces.clear();

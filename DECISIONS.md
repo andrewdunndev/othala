@@ -141,25 +141,6 @@ user started should not.
 **Enforced by.** `portal/src/lib/admin-api.ts` (identity created with no credentials block; link and
 code minted together). The both-values rendering at the admin call sites is UNENFORCED.
 
-**D1 addendum (0.5.x).** An admin can also trigger the code by email instead of hand-delivering it:
-`sendInviteRecoveryEmail` (`portal/src/lib/kratos.ts`) drives Kratos's own self-service recovery flow
-for the identity's on-file address, so the Kratos courier — not the portal — sends a CODE ONLY, never a
-link with the code embedded, keeping the same two-channel shape. The parent decision's misrouting
-rationale still applies here — the address is an admin-typed trait, and a typo sends the code to the
-wrong mailbox — so this path is accepted with that risk bounded, not waived. The code is single-use and
-expires within `selfservice.methods.code.config.lifespan: 15m` (`kratos/kratos.yml`) — the per-method
-code window, not the 1h recovery-flow window — so a misdelivered message goes stale fast. A successful
-misroute's blast radius is one fresh identity holding only its own intended group grants, never more,
-because admin-marked targets are refused outright before Kratos is ever asked (`shouldRefuseRecovery`,
-`portal/src/lib/access.ts`; `portal/scripts/admin-recovery-gate.test.mjs`). The send itself requires
-server-checked address confirmation: the admin re-types the target address, and `confirmsInviteAddress`
-(`portal/src/lib/access.ts`) rejects any submission that does not byte-equal the on-file trait before the
-Kratos call — a UI-only check is not an invariant. Rate limiting on this send path is not one of those
-bounds: the MEDIUM-B gap for login/recovery code floods is live and enforced
-(`e2e/playwright/tests/n-rate-limits.spec.ts`, N1/N2), but it doesn't reach here — this call goes to
-Kratos pod-internally, never through the public listener Caddy fronts. Enforced by
-`e2e/playwright/tests/u-admin-invite-email.spec.ts` and `portal/scripts/admin-recovery-gate.test.mjs`.
-
 ## TLS is a network boundary, not an application concern
 
 **Decided.** Applications speak plain HTTP and never load a certificate; where a real boundary exists, a

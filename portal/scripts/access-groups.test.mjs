@@ -1,4 +1,4 @@
-// Invariant: parseAccessGroups prefers the access list over access_group, keeps declared order and de-dupes.
+// Invariant: parseAccessGroups reads only the access list, keeps declared order and de-dupes.
 
 import { test } from 'vitest';
 import assert from 'node:assert/strict';
@@ -12,14 +12,6 @@ test('parseAccessGroups: multi-element access list preserves declared order', ()
   assert.deepEqual(
     parseAccessGroups({ access: ['memories', 'admin-memories', 'family'] }),
     ['memories', 'admin-memories', 'family'],
-  );
-});
-
-test('parseAccessGroups: access list wins over access_group', () => {
-  assert.deepEqual(
-    parseAccessGroups({ access: ['memories'], access_group: 'access-photos' }),
-    ['memories'],
-    'a non-empty access: list supersedes the compat access_group field',
   );
 });
 
@@ -37,61 +29,17 @@ test('parseAccessGroups: duplicates within access list are de-duped, order kept'
   );
 });
 
-test('parseAccessGroups: only access_group → one-element list (compat shim)', () => {
-  assert.deepEqual(
-    parseAccessGroups({ access_group: 'access-photos' }),
-    ['access-photos'],
-    'the access-<slug> name is a valid group name; no prefix validation applied',
-  );
-});
-
-test('parseAccessGroups: compat shim trims whitespace', () => {
-  assert.deepEqual(parseAccessGroups({ access_group: '  memories  ' }), ['memories']);
-});
-
-test('parseAccessGroups: neither field present → []', () => {
+test('parseAccessGroups: no access list → []', () => {
   assert.deepEqual(parseAccessGroups({}), []);
 });
 
-test('parseAccessGroups: empty access list with no access_group → []', () => {
+test('parseAccessGroups: empty access list → []', () => {
   assert.deepEqual(parseAccessGroups({ access: [] }), []);
-});
-
-test('parseAccessGroups: empty access list falls back to access_group', () => {
-  assert.deepEqual(
-    parseAccessGroups({ access: [], access_group: 'memories' }),
-    ['memories'],
-    'an empty access: list is not "non-empty", so the compat shim applies',
-  );
-});
-
-test('parseAccessGroups: empty access_group string → []', () => {
-  assert.deepEqual(parseAccessGroups({ access_group: '' }), []);
 });
 
 test('parseAccessGroups: bad-charset name in access list is skipped, not thrown', () => {
   assert.deepEqual(
     parseAccessGroups({ access: ['memories', 'Bad Name!', 'family'] }),
     ['memories', 'family'],
-  );
-});
-
-test('parseAccessGroups: all-bad access list falls through to access_group', () => {
-  assert.deepEqual(
-    parseAccessGroups({ access: ['-leading-dash', 'UPPER'], access_group: 'memories' }),
-    ['memories'],
-    'no valid name survives the list, so the compat shim takes over',
-  );
-});
-
-test('parseAccessGroups: bad-charset access_group → []', () => {
-  assert.deepEqual(parseAccessGroups({ access_group: 'Has Spaces' }), []);
-});
-
-test('parseAccessGroups: non-array access value falls back to access_group', () => {
-  assert.deepEqual(
-    parseAccessGroups({ access: 'memories', access_group: 'compat' }),
-    ['compat'],
-    'a scalar `access:` is not a list; the compat shim applies',
   );
 });

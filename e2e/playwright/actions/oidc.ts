@@ -15,3 +15,10 @@ export async function walk(ctx: BrowserContext, baseURL: string, start: string, 
   }
   throw new Error(`redirect chain did not settle in 12 hops (last: ${url})`);
 }
+
+/** The named environment variable; throws when it is unset or empty. */
+export function requireEnv(name: string): string {
+  const value = process.env[name];
+  if (!value) throw new Error(`${name} is not set; inject it from the compose environment`);
+  return value;
+}

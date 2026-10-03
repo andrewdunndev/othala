@@ -1,17 +1,11 @@
-import {
-  Configuration,
-  OAuth2Api,
-  ResponseError,
-  type OAuth2Client,
-} from '@ory/client-fetch';
+import type { OAuth2Client } from '@ory/client-fetch';
 import {
   oidcClientManifests,
   assertManifestsValid,
-  CLIENT_ID_ENV_STEM_RE,
+  CLIENT_ID_RE,
   type ClientManifest,
 } from './manifests';
-import { HYDRA_ADMIN_URL } from './constants';
-import { timeoutFetch } from './ory-fetch';
+import { hydraAdmin, isNotFound } from './ory-fetch';
 import { clientSecretEnv } from './config';
 
 export interface OAuth2ClientApi {
@@ -33,23 +27,12 @@ export interface RegisterResult {
   action: 'created' | 'updated';
 }
 
-/** Throws rather than sanitizing: a hyphenated id would name an unresolvable variable. */
+/** Throws rather than sanitizing, so a malformed id never names a variable that cannot resolve. */
 export function secretEnvVar(clientId: string): string {
-  if (!CLIENT_ID_ENV_STEM_RE.test(clientId)) {
-    const wouldBe = `${clientId.toUpperCase()}_CLIENT_SECRET`;
-    throw new Error(
-      `client_id ${JSON.stringify(clientId)} is not a valid POSIX env-var stem ` +
-        `(^[A-Za-z_][A-Za-z0-9_]*$). The registrar would derive ` +
-        `${JSON.stringify(wouldBe)} which is not a valid shell variable and will ` +
-        `never resolve. Rename the client_id to use only letters, digits, and ` +
-        `underscores (manifest-lint rule 1a catches this at load time).`,
-    );
+  if (!CLIENT_ID_RE.test(clientId)) {
+    throw new Error(`client_id ${JSON.stringify(clientId)} must match ${CLIENT_ID_RE}.`);
   }
   return `${clientId.toUpperCase()}_CLIENT_SECRET`;
-}
-
-function defaultApi(): OAuth2ClientApi {
-  return new OAuth2Api(new Configuration({ basePath: HYDRA_ADMIN_URL, fetchApi: timeoutFetch() })) as unknown as OAuth2ClientApi;
 }
 
 export function buildClientBody(
@@ -94,10 +77,6 @@ function resolveSecret(
   return secret;
 }
 
-function isNotFound(err: unknown): boolean {
-  return err instanceof ResponseError && err.response?.status === 404;
-}
-
 export async function registerClient(
   api: OAuth2ClientApi,
   m: ClientManifest,
@@ -136,7 +115,7 @@ export async function registerManifests(
   opts: RegisterOptions = {},
 ): Promise<RegisterResult[]> {
   const env = opts.env ?? clientSecretEnv();
-  const api = opts.api ?? defaultApi();
+  const api = opts.api ?? (hydraAdmin() as unknown as OAuth2ClientApi);
 
   if (!opts.skipValidation) {
     assertManifestsValid(manifests);

@@ -4,8 +4,9 @@
 import type { ClientManifest } from './manifests';
 import type { AppTile } from './tiles';
 import type { Identity } from './types';
-import { HOUSEHOLD_GROUPS, IDENTITY_GROUPS } from './constants';
+import { IDENTITY_GROUPS } from './constants';
 import { GROUP_RE } from './access-groups';
+import { buildGroupRegistry } from './group-registry';
 import { currentLevel, isOpenToEveryone, isTopLevel, levelsFor, NO_ACCESS } from './access-rows';
 import { parseIdentity } from './identity-facts';
 import { holdsElevatedRole } from './gate';
@@ -64,21 +65,10 @@ export function emailIsVerified(i: Identity): boolean {
   return (i.verifiable_addresses ?? []).some((a) => a.verified === true && String(a.value).toLowerCase() === email);
 }
 
-/** Every group a served app binds: access groups and role-map groups. */
-export function appGroupNames(manifests: readonly ClientManifest[]): Set<string> {
-  const out = new Set<string>();
-  for (const m of manifests) {
-    for (const g of m.accessGroups) out.add(g);
-    for (const g of Object.keys(m.groupRoleMap)) out.add(g);
-  }
-  return out;
-}
-
 /** Stored groups nothing uses: not a household or identity group, not bound by any served app, or not a valid name at all. */
 export function unrecognisedGroups(i: Identity, manifests: readonly ClientManifest[]): string[] {
-  const known = appGroupNames(manifests);
-  const identity = new Set<string>(IDENTITY_GROUPS);
-  return (i.metadata_admin?.groups ?? []).filter((g) => !GROUP_RE.test(g) || (!identity.has(g) && !known.has(g)));
+  const reg = buildGroupRegistry([...manifests], IDENTITY_GROUPS);
+  return (i.metadata_admin?.groups ?? []).filter((g) => !GROUP_RE.test(g) || !reg.has(g));
 }
 
 export interface AppChip {
@@ -189,7 +179,7 @@ export function attentionItems(rows: readonly PersonRow[]): Attention[] {
 
 /** The household groups a person page offers, with a plain label. */
 export function householdChoices(): { value: string; label: string }[] {
-  return HOUSEHOLD_GROUPS.map((g) => ({ value: g, label: g === 'everyone' ? 'Everyone in the household' : g }));
+  return IDENTITY_GROUPS.map((g) => ({ value: g, label: g === 'everyone' ? 'Everyone in the household' : g }));
 }
 
 const USERNAME_SHAPE = /^[a-z0-9]+(?:\.[a-z0-9]+)+$/;

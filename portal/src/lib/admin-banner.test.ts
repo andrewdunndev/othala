@@ -23,8 +23,4 @@ describe('bannerFor', () => {
     expect(say({ kind: 'error', message: 'Nope.' })).toEqual({ tone: 'danger', text: 'Nope.' });
     expect(say({ kind: 'recovery', url: 'u', code: 'c', expiresAt: 'x' })).toBeNull();
   });
-
-  it('says invite email sent and the address', () => {
-    expect(say({ kind: 'invite-email', email: 'a@example.test' })?.text).toMatch(/^Invite email sent to a@example.test/);
-  });
 });

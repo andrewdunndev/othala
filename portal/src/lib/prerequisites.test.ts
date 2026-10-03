@@ -161,16 +161,6 @@ describe('manifest lint: requires', () => {
   });
 });
 
-describe('e2e fixtures', () => {
-  it('proxywatch requires a tailscale requirement that the fixtures define, and its guide follows the outline', () => {
-    setManifestDir(join(process.cwd(), '..', 'e2e', 'manifests'));
-    const t = loadTiles().find((x) => x.slug === 'proxywatch');
-    expect(t?.requires).toEqual(['tailscale']);
-    expect(loadRequirements().get('tailscale')?.why).not.toBe('');
-    expect(splitGuide(t?.educationHtml).sections.map((s) => s.id)).toEqual(['purpose', 'first-time', 'good-to-know', 'help']);
-  });
-});
-
 describe('splitGuide: markup hidden in an attribute value', () => {
   it('sanitises each section after the split, so a split inside an attribute cannot revive markup', () => {
     const html = '<h2>First time</h2><p title="<h2>x</h2><img src=x onerror=alert(1)>">hi</p>';

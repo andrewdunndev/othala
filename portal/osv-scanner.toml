@@ -1,0 +1,3 @@
+[[IgnoredVulns]]
+id = "GHSA-ch52-4w7c-c8xp"
+reason = "No patched release. Astro uses http-cache-semantics only to cache remote images at build time (astro/dist/assets/build/remote.js); neither portal nor site uses remote images, and nothing serves a shared cache from it."

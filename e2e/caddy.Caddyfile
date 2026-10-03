@@ -11,31 +11,6 @@
 }
 
 auth.othala.test:80 {
-	# Rate limiting (n-rate-limits.spec.ts). Requests share one socket peer; the tests vary the client address through
-	# X-Forwarded-For (the peer is trusted above). Each zone also requires the X-E2E-Flood-Probe header the flood tests set; only their bursts count.
-	rate_limit {
-		zone e2e_code_request {
-			match {
-				method GET
-				path   /self-service/login/browser
-				header X-E2E-Flood-Probe n1
-			}
-			key    {client_ip}
-			window 1m
-			events 5
-		}
-		zone e2e_wrong_password {
-			match {
-				method POST
-				path   /self-service/login*
-				header X-E2E-Flood-Probe n2
-			}
-			key    {client_ip}
-			window 1m
-			events 10
-		}
-	}
-
 	# Hydra public OAuth2 surface + OIDC discovery.
 	@hydra path /oauth2/auth /oauth2/token /oauth2/revoke /oauth2/sessions/logout /oauth2/fallbacks/* /.well-known/openid-configuration /.well-known/jwks.json /userinfo
 	handle @hydra {

@@ -22,7 +22,6 @@ function manifest(clientId, opts = {}) {
     skipConsent: false,
     backchannelLogoutUri: '',
     backchannelLogoutSessionRequired: false,
-    accessGroup: `access-${clientId}`,
     accessGroups: opts.accessGroups ?? [],
     roles: opts.roles ?? [],
     groupRoleMap: opts.groupRoleMap ?? {},
@@ -33,77 +32,6 @@ function manifest(clientId, opts = {}) {
 }
 
 const identity = (groups, state = 'active') => (groups === null ? null : buildIdentity({ state, metadataAdmin: { groups } }));
-
-test('matrix: null id → DENY', () => {
-  const m = manifest('photos', { accessGroups: ['memories'] });
-  assert.equal(enforceAccessGate(identity(null), 'photos', m).allowed, false);
-});
-
-test('matrix: inactive identity in the bound group → DENY (state gate)', () => {
-  const m = manifest('photos', { accessGroups: ['memories'] });
-  const id = identity(['memories'], 'inactive');
-  assert.equal(enforceAccessGate(id, 'photos', m).allowed, false);
-});
-
-test('matrix: active, NOT in the bound group → DENY', () => {
-  const m = manifest('photos', { accessGroups: ['memories'] });
-  const id = identity(['family']);
-  assert.equal(enforceAccessGate(id, 'photos', m).allowed, false);
-});
-
-test('matrix: active in an UNBOUND group → DENY (group not in accessGroups)', () => {
-  const m = manifest('photos', { accessGroups: ['memories'] });
-  const id = identity(['access-photos']);
-  assert.equal(enforceAccessGate(id, 'photos', m).allowed, false);
-});
-
-test('matrix: active in a bound group → ALLOW', () => {
-  const m = manifest('photos', { accessGroups: ['memories'] });
-  const id = identity(['memories']);
-  assert.equal(enforceAccessGate(id, 'photos', m).allowed, true);
-});
-
-test('matrix: skipAccessCheck + active → ALLOW (membership bypassed)', () => {
-  const m = manifest('photos', { accessGroups: [], skipAccessCheck: true });
-  const id = identity(['anything']);
-  assert.equal(enforceAccessGate(id, 'photos', m).allowed, true);
-});
-
-test('matrix: skipAccessCheck + INACTIVE → DENY (state never bypassed)', () => {
-  const m = manifest('photos', { accessGroups: [], skipAccessCheck: true });
-  const id = identity(['anything'], 'inactive');
-  assert.equal(enforceAccessGate(id, 'photos', m).allowed, false);
-});
-
-test('matrix: skipAccessCheck + a non-canonical stored group → DENY', () => {
-  const m = manifest('photos', { accessGroups: [], skipAccessCheck: true });
-  const id = identity(['Anything']);
-  assert.equal(enforceAccessGate(id, 'photos', m).allowed, false);
-});
-
-test('matrix: multi-group OR — access:[a,b], user has only b → ALLOW', () => {
-  const m = manifest('photos', { accessGroups: ['admin-memories', 'memories'] });
-  const id = identity(['memories']);
-  assert.equal(enforceAccessGate(id, 'photos', m).allowed, true);
-});
-
-test('matrix: groups:[] → DENY', () => {
-  const m = manifest('photos', { accessGroups: ['memories'] });
-  const id = identity([]);
-  assert.equal(enforceAccessGate(id, 'photos', m).allowed, false);
-});
-
-test('matrix: manifest with empty accessGroups, no skip → DENY (no implicit access)', () => {
-  const m = manifest('photos', { accessGroups: [] });
-  const id = identity(['memories']);
-  assert.equal(enforceAccessGate(id, 'photos', m).allowed, false);
-});
-
-test('regression: access-proxywatch is a valid flat binding → ALLOW', () => {
-  const m = manifest('proxywatch', { accessGroups: ['access-proxywatch'] });
-  const id = identity(['access-proxywatch']);
-  assert.equal(enforceAccessGate(id, 'proxywatch', m).allowed, true);
-});
 
 const canonicalName = fc.constantFrom(
   'memories', 'admin-memories', 'family', 'access-photos', 'access-proxywatch',

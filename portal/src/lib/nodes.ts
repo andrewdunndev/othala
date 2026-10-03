@@ -3,11 +3,7 @@
 
 import type { FlowNode, NodeInputAttributes, NodeScriptAttributes } from './types';
 
-// Onclick guard. Kratos passkey/webauthn nodes carry `onclickTrigger` naming a
-// /.well-known/ory/webauthn.js function; older builds send a raw `onclick`,
-// which is untrusted flow JSON. safeOnclick emits `window.<trigger>()` only for
-// a trigger in KNOWN_TRIGGERS, passes through an `onclick` that is exactly such
-// a call, and otherwise returns undefined (form-submit fallback).
+// onclickTrigger arrives in untrusted flow JSON; only allowlisted names may become inline handlers.
 export const KNOWN_TRIGGERS = new Set([
   'oryWebAuthnRegistration',
   'oryWebAuthnLogin',
@@ -17,28 +13,10 @@ export const KNOWN_TRIGGERS = new Set([
   'oryPasskeySettingsRegistration',
 ]);
 
-/**
- * Derive the safe onclick string for a Kratos trigger button.
- *
- * Returns a `window.<trigger>()` string if the node carries a validated
- * trigger, or `undefined` if neither onclickTrigger nor onclick is
- * recognizable. Pages must never emit a raw `a.onclick` directly.
- */
 export function safeOnclick(a: NodeInputAttributes): string | undefined {
-  // Preferred: explicit onclickTrigger validated against the allowlist.
-  if (a.onclickTrigger && KNOWN_TRIGGERS.has(a.onclickTrigger)) {
-    return `window.${a.onclickTrigger}()`;
-  }
-  // Compat: older Kratos emits the full call in onclick. Accept it only when
-  // it looks exactly like `window.ory<Fn>()` for a known trigger.
-  if (a.onclick) {
-    for (const trigger of KNOWN_TRIGGERS) {
-      if (a.onclick === `window.${trigger}()`) {
-        return a.onclick;
-      }
-    }
-  }
-  return undefined;
+  return a.onclickTrigger && KNOWN_TRIGGERS.has(a.onclickTrigger)
+    ? `window.${a.onclickTrigger}()`
+    : undefined;
 }
 
 export function nodesByGroup(nodes: FlowNode[], group: FlowNode['group']): FlowNode[] {

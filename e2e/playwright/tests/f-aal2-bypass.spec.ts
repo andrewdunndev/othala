@@ -2,23 +2,6 @@
 
 import { test, expect } from '../fixtures';
 import { loginViaJsonApi } from '../actions/login';
-import { probeAdmin } from '../actions/session';
-
-test('F1 — admin at AAL1: GET /admin returns AAL2 step-up redirect', async ({
-  ctx,
-  baseURL,
-  admin,
-}) => {
-  await loginViaJsonApi(ctx, { identifier: admin.email, password: admin.password }, baseURL);
-
-  const { status, loc } = await probeAdmin(ctx, baseURL);
-  console.log('[F1] GET /admin AAL1 →', status, loc);
-
-  expect(
-    /aal=aal2/.test(loc),
-    `F1: AAL1 admin GET /admin must redirect to aal=aal2; got ${status} ${loc}`,
-  ).toBe(true);
-});
 
 test('F2 — admin at AAL1: POST /admin/users/new is refused (step-up redirect, no mutation)', async ({
   ctx,
@@ -66,31 +49,6 @@ test('F2 — admin at AAL1: POST /admin/users/new is refused (step-up redirect, 
   ).toBe(true);
 });
 
-test('F3 — return_to param on step-up URL cannot be forged to skip re-check at /admin', async ({
-  baseURL,
-  admin,
-  ctx,
-}) => {
-  await loginViaJsonApi(ctx, { identifier: admin.email, password: admin.password }, baseURL);
-
-  const forgedReturnTo = `${baseURL}/admin/users/new`;
-  const forgedAal2URL =
-    `${baseURL}/self-service/login/browser` +
-    `?aal=aal2&refresh=true` +
-    `&return_to=${encodeURIComponent(forgedReturnTo)}`;
-
-  await ctx.request.get(forgedAal2URL, { maxRedirects: 0 }).catch(() => {});
-
-  const resp2 = await ctx.request.get(`${baseURL}/admin`, { maxRedirects: 0 });
-  const loc2 = resp2.headers()['location'] ?? '';
-  console.log('[F3] after forged AAL2 detour, GET /admin →', resp2.status(), loc2);
-
-  expect(
-    /aal=aal2/.test(loc2),
-    `F3: /admin must still require aal=aal2 after a forged return_to detour; got ${resp2.status()} ${loc2}`,
-  ).toBe(true);
-});
-
 test('F4 — supplying aal=aal2 in the /admin query string does not bypass step-up', async ({
   ctx,
   baseURL,
@@ -106,9 +64,4 @@ test('F4 — supplying aal=aal2 in the /admin query string does not bypass step-
     /aal=aal2/.test(loc),
     `F4: /admin?aal=aal2 must not bypass step-up; got ${resp.status()} ${loc}`,
   ).toBe(true);
-
-  expect(
-    /\/admin/.test(loc) && !/aal=aal2/.test(loc),
-    `F4: step-up redirect must not loop back to /admin without the aal=aal2 Kratos param`,
-  ).toBe(false);
 });

@@ -102,7 +102,8 @@ describe('parseIdentity credentials', () => {
     ['totp entry without a url', withCredential(bare, 'totp', {}), { authenticator: false, hasSecondFactor: false }],
     ['totp entry with an empty url', withCredential(bare, 'totp', { totp_url: '' }), { authenticator: false, hasSecondFactor: false }],
     ['security key', withWebauthnKey(bare), { securityKeys: 1, hasSecondFactor: true, firstFactorKey: false }],
-    ['passwordless webauthn key', withWebauthnKey(bare, { passwordless: true }), { securityKeys: 0, hasSecondFactor: false, firstFactorKey: true }],
+    ['webauthn key without the passwordless flag', withCredential(bare, 'webauthn', { credentials: [{ id: 'k' }] }), { securityKeys: 1, hasSecondFactor: true }],
+    ['passwordless webauthn key',withWebauthnKey(bare, { passwordless: true }), { securityKeys: 0, hasSecondFactor: false, firstFactorKey: true }],
     ['passkey', withPasskey(bare), { hasSecondFactor: false, firstFactorKey: true }],
     ['whoami identity (credentials not read)', whoamiIdentity(asAdmin(withTotp(bare))), { isAdmin: false, hasSecondFactor: false, firstFactorKey: true }],
   ];

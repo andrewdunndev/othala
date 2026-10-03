@@ -9,7 +9,7 @@ import { parse as parseYaml } from 'yaml';
 import { marked } from 'marked';
 import DOMPurify from 'isomorphic-dompurify';
 import { parseAccessGroups } from './access-groups';
-import { manifestDir } from './manifests';
+import { CACHE_TTL_MS, manifestDir, manifestFiles } from './manifests';
 import { DEFAULT_GROUP } from './constants';
 
 // Vendored icons directory: public/icons/ in dev (a stale dist/ must not shadow it), dist/client/icons/ in prod.
@@ -17,11 +17,7 @@ const _cwd = process.cwd();
 const _iconsDir = (() => {
   // import.meta.env is Vite-specific; guard it so the module loads in plain Node.
   const isDev = typeof import.meta.env !== 'undefined' && import.meta.env.DEV;
-  if (isDev) {
-    // Source tree in dev.
-    return join(_cwd, 'public', 'icons');
-  }
-  // prod: fall back to public/ if dist is missing.
+  if (isDev) return join(_cwd, 'public', 'icons');
   const prod = join(_cwd, 'dist', 'client', 'icons');
   if (existsSync(prod)) return prod;
   return join(_cwd, 'public', 'icons');
@@ -91,21 +87,17 @@ export interface AppTile {
   iconSlug?: string;
   /** simple-icons fallback slug for products not in simple-icons. */
   iconFallback?: string;
-  /** Web path to the vendored SVG glyph (e.g. `/icons/grafana.svg`), set only when the file exists; absent = monogram. */
+  /** Set only when the vendored SVG exists; absent renders the monogram. */
   iconHref?: string;
   /** The logo ships its own filled square, so the plate drops its padding and border. */
   iconBleed?: boolean;
   authKind: AuthKind;
-  /** Fallback group, used only when `accessGroups` is empty (see tileAccessGroups): `presentation.access_group`, else the default group. */
-  accessGroup: string;
-  /** Access binding from parseAccessGroups over `presentation.access:` (`[access_group]` compat); `[]` when neither is set. tileAccessGroups prefers it. */
   accessGroups: string[];
-  /** Optional dashboard grouping label (e.g. "Usenet"); tiles sharing one render together. */
+  /** Dashboard grouping label; tiles sharing one render together. */
   group?: string;
   order: number;
   /** Hidden from the dashboard, but the detail page still resolves. */
   disabled: boolean;
-  /** Hostname from presentation.url (e.g. "grafana.othala.test"). */
   fqdn: string;
   /** Rendered HTML from the sibling `<slug>.md`, or undefined if absent. */
   educationHtml?: string;
@@ -154,16 +146,11 @@ interface CacheEntry {
 }
 
 let cache: CacheEntry | null = null;
-const CACHE_TTL_MS = 30 * 1000;
 
 /** Freshest mtime across yaml + md so a sidecar edit also busts the cache. */
 function freshestMtime(dir: string): number {
   try {
-    const files = readdirSync(dir).filter(
-      (f) =>
-        ((f.endsWith('.yaml') || f.endsWith('.yml')) && f !== 'groups.yaml') ||
-        f.endsWith('.md'),
-    );
+    const files = [...manifestFiles(dir), ...readdirSync(dir).filter((f) => f.endsWith('.md'))];
     try {
       for (const f of readdirSync(join(dir, 'requirements'))) files.push(join('requirements', f));
     } catch {
@@ -181,9 +168,9 @@ function freshestMtime(dir: string): number {
 }
 
 /**
- * Render an operator-supplied `<slug>.md` to sanitized HTML for `set:html`; exported so tiles.test.ts exercises this path.
- * SVG is allowed (USE_PROFILES) so inline diagrams survive. FORBID_TAGS removes `style` (the CSP has no style-src) and
- * form controls (form-action reaches every apex subdomain).
+ * Render an operator-supplied `<slug>.md` to sanitized HTML for `set:html`. SVG is allowed so inline diagrams
+ * survive. `style` is forbidden because the CSP has no style-src, form controls because form-action reaches every
+ * apex subdomain.
  */
 export function sanitizeEducationMarkdown(raw: string): string {
   return sanitizeGuideHtml(marked.parse(raw, { async: false }) as string);
@@ -306,19 +293,12 @@ export function tileReadiness(tile: AppTile, marked: readonly string[]): TileRea
   return tile.requires.every((r) => marked.includes(r)) ? 'ready' : 'needs';
 }
 
-/**
- * Parse one manifest's `presentation:` block into an AppTile; null when it has none. An absent `access_group` gates
- * on the default group (DEFAULT_GROUP), never on a per-slug group or every authenticated user.
- */
+/** Parse one manifest's `presentation:` block into an AppTile; null when it has none. */
 function parseTile(slug: string, doc: Record<string, unknown>, dir: string): AppTile | null {
   const pBlock = doc['presentation'];
   if (!pBlock || typeof pBlock !== 'object' || Array.isArray(pBlock)) return null;
   const p = pBlock as Record<string, unknown>;
 
-  // Absent access_group falls back to the default group, which admins assign explicitly.
-  const accessGroup = p['access_group'] ? String(p['access_group']) : DEFAULT_GROUP;
-
-  // Normalized `presentation.access:` binding; `[]` means the accessGroup fallback applies.
   const accessGroups = parseAccessGroups(p);
 
   const url = String(p['url'] ?? '');
@@ -342,7 +322,6 @@ function parseTile(slug: string, doc: Record<string, unknown>, dir: string): App
     url,
     icon: String(p['icon'] ?? '??'),
     authKind: String(p['auth_kind'] ?? 'external') as AuthKind,
-    accessGroup,
     accessGroups,
     order: typeof p['order'] === 'number' ? p['order'] : 999,
     disabled: p['disabled'] === true,
@@ -368,18 +347,8 @@ function parseTile(slug: string, doc: Record<string, unknown>, dir: string): App
 
 function loadFromDisk(): AppTile[] {
   const dir = manifestDir();
-  let files: string[];
-  try {
-    files = readdirSync(dir)
-      .filter((f) => (f.endsWith('.yaml') || f.endsWith('.yml')) && f !== 'groups.yaml')
-      .sort();
-  } catch (err) {
-    if ((err as NodeJS.ErrnoException).code === 'ENOENT') return [];
-    throw err;
-  }
-
   const tiles: AppTile[] = [];
-  for (const f of files) {
+  for (const f of manifestFiles(dir)) {
     const slug = f.replace(/\.ya?ml$/, '');
     let doc: unknown;
     let text = '';
@@ -407,7 +376,6 @@ function loadFromDisk(): AppTile[] {
  */
 export function safeHref(url: string, base = 'https://localhost'): string {
   if (!url) return '#';
-  // Root-relative paths carry no scheme.
   if (url.startsWith('/')) return url;
   try {
     const resolved = new URL(url, base);
@@ -420,7 +388,6 @@ export function safeHref(url: string, base = 'https://localhost'): string {
   return '#';
 }
 
-/** All cached tiles (disabled included), sorted by order then name; 30 s cache, mtime-invalidated. */
 function allTiles(): AppTile[] {
   const now = Date.now();
   const mtime = freshestMtime(manifestDir());
@@ -432,20 +399,18 @@ function allTiles(): AppTile[] {
   return tiles;
 }
 
-/** Tiles for the dashboard: enabled only, sorted by order then name. */
 export function loadTiles(): AppTile[] {
   return allTiles().filter((t) => !t.disabled);
 }
 
-/** One tile by slug for /apps/<slug>; includes disabled tiles. */
+/** Includes disabled tiles. */
 export function getTile(slug: string): AppTile | undefined {
   return allTiles().find((t) => t.slug === slug);
 }
 
-/** The group(s) gating a tile's visibility: the manifest's `accessGroups` (the field the OIDC gate uses), else the singular
- * `accessGroup` (default-group fallback) for tiles with no binding. */
+/** The groups gating a tile's visibility: its access groups, else the default group, never every signed-in user. */
 export function tileAccessGroups(tile: AppTile): string[] {
-  return tile.accessGroups.length > 0 ? tile.accessGroups : [tile.accessGroup];
+  return tile.accessGroups.length > 0 ? tile.accessGroups : [DEFAULT_GROUP];
 }
 
 /** Whether the user may see the tile: OR over tileAccessGroups. Unlike enforceAccessGate, `skip_access_check` is not

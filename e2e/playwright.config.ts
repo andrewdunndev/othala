@@ -18,6 +18,7 @@ export default defineConfig({
   testDir: './playwright/tests',
   outputDir: '/out/test-results',   // sibling of the html-report dir below (Playwright forbids nesting)
   timeout: 60_000,
+  forbidOnly: true,
   retries: 1,          // upstream uses 2 in CI; 1 absorbs first-attempt flakiness from a freshly-started compose stack
   workers: 1,          // serial: tests share seeded identities, keep order deterministic
   reporter: [['list'], ['html', { outputFolder: '/out/html-report', open: 'never' }]],

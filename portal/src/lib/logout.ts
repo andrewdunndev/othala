@@ -1,4 +1,4 @@
-import { signToken, verifyToken, CSRFError } from './csrf';
+import { signToken, csrfRefusal } from './csrf';
 import { revokeHydraSessions, RevokeError } from './revoke';
 
 export const LOGOUT_ACTION = 'logout';
@@ -15,13 +15,7 @@ export function logoutAuthorized(
 ): boolean {
   if (method.toUpperCase() !== 'POST') return false;
   if (typeof presented !== 'string' || !presented) return false;
-  try {
-    verifyToken(presented, identityId, LOGOUT_ACTION);
-    return true;
-  } catch (err) {
-    if (err instanceof CSRFError) return false;
-    throw err;
-  }
+  return csrfRefusal(presented, identityId, LOGOUT_ACTION) === null;
 }
 
 export async function endAppSignIns(identityId: string): Promise<boolean> {

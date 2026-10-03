@@ -10,10 +10,8 @@ export const HYDRA_ADMIN_URL = 'http://hydra:4445';
 export const MANIFEST_DIR = '/etc/portal/manifests';
 /** Group the admin console files a new identity under and tiles fall back to. */
 export const DEFAULT_GROUP = 'everyone';
-/** Identity groups the admin UI offers: 'admin' first, then the default group. App access groups come from the manifests. */
-export const IDENTITY_GROUPS: readonly string[] = ['admin', DEFAULT_GROUP];
-/** The identity groups people see as household groups. 'admin' is stored for compatibility but confers nothing: household admin is the one marker toggle. */
-export const HOUSEHOLD_GROUPS: readonly string[] = IDENTITY_GROUPS.filter((g) => g !== 'admin');
+/** Identity groups the admin UI offers as household groups. App access groups come from the manifests. */
+export const IDENTITY_GROUPS: readonly string[] = [DEFAULT_GROUP];
 /** Session-age window for the admin step-up; separate from Kratos's 5m privileged window. */
 export const ADMIN_FRESHNESS_HOURS = 1;
 /** Floor on CSRF_SECRET and RECOVERY_GATE_SECRET, by UTF-8 byte length (multi-byte characters would undercount entropy). */

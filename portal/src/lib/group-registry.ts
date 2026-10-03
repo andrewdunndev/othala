@@ -1,12 +1,10 @@
 // Group registry: a group's type comes from its bindings, never its name.
 // `identity`: one of IDENTITY_GROUPS (constants.ts). `access`: a manifest's
 // `accessGroups` binds it. `role`: a manifest's `group_role_map` references it.
-// A group can carry several kinds; derived from the cached manifests plus the
-// fixed identity groups, it feeds the admin UI split and the lint.
+// A group can carry several kinds; derived from the manifests plus the fixed
+// identity groups, it feeds the admin UI split and the lint.
 
 import type { ClientManifest } from './manifests';
-import { IDENTITY_GROUPS } from './constants';
-import { servingManifests } from './manifest-store';
 import { GROUP_RE } from './access-groups';
 
 export type GroupKind = 'identity' | 'access' | 'role';
@@ -14,10 +12,6 @@ export type GroupKind = 'identity' | 'access' | 'role';
 export interface GroupEntry {
   name: string;
   kinds: Set<GroupKind>;
-  /** clientIds whose manifest `accessGroups` lists this group. */
-  accessFor: string[];
-  /** clientIds whose `group_role_map` references this group as a key. */
-  roleFor: string[];
 }
 
 export type GroupRegistry = Map<string, GroupEntry>;
@@ -26,7 +20,7 @@ export type GroupRegistry = Map<string, GroupEntry>;
 function entryFor(reg: GroupRegistry, name: string): GroupEntry {
   let e = reg.get(name);
   if (!e) {
-    e = { name, kinds: new Set(), accessFor: [], roleFor: [] };
+    e = { name, kinds: new Set() };
     reg.set(name, e);
   }
   return e;
@@ -35,8 +29,7 @@ function entryFor(reg: GroupRegistry, name: string): GroupEntry {
 /**
  * Build the registry: seed `identity` from the fixed identity groups, then per
  * manifest mark `accessGroups[]` entries `access` and `group_role_map` keys
- * `role`. A group's type is the union of its bindings. Prefer the memoized
- * getGroupRegistry().
+ * `role`. A group's type is the union of its bindings.
  */
 export function buildGroupRegistry(
   manifests: ClientManifest[],
@@ -49,37 +42,11 @@ export function buildGroupRegistry(
   }
 
   for (const m of manifests) {
-    for (const g of m.accessGroups) {
-      const e = entryFor(reg, g);
-      e.kinds.add('access');
-      if (!e.accessFor.includes(m.clientId)) e.accessFor.push(m.clientId);
-    }
-    for (const g of Object.keys(m.groupRoleMap)) {
-      const e = entryFor(reg, g);
-      e.kinds.add('role');
-      if (!e.roleFor.includes(m.clientId)) e.roleFor.push(m.clientId);
-    }
+    for (const g of m.accessGroups) entryFor(reg, g).kinds.add('access');
+    for (const g of Object.keys(m.groupRoleMap)) entryFor(reg, g).kinds.add('role');
   }
 
   return reg;
-}
-
-// Memoized on the servingManifests() array identity: the same reference while
-// the manifest cache is warm (and through a load failure), a fresh one on
-// reload. It reads the serving set, not the strict loader, so a broken manifest
-// cannot 500 the pages the operator uses to see that it is broken.
-let memoManifests: ClientManifest[] | null = null;
-let memoRegistry: GroupRegistry | null = null;
-
-/** The registry for the served manifest set, memoized on the servingManifests() array identity. Never throws. */
-export function getGroupRegistry(): GroupRegistry {
-  const manifests = servingManifests();
-  if (memoRegistry !== null && memoManifests === manifests) {
-    return memoRegistry;
-  }
-  memoRegistry = buildGroupRegistry(manifests, IDENTITY_GROUPS);
-  memoManifests = manifests;
-  return memoRegistry;
 }
 
 /** True when the registry types `name` as (at least) an identity group. */
@@ -99,14 +66,6 @@ export function isAccessGroup(reg: GroupRegistry, name: string): boolean {
  */
 export function knownGroupNames(reg: GroupRegistry): Set<string> {
   return new Set(reg.keys());
-}
-
-/** Every group name typed `kind`, sorted. */
-export function namesOfKind(reg: GroupRegistry, kind: GroupKind): string[] {
-  return Array.from(reg.values())
-    .filter((e) => e.kinds.has(kind))
-    .map((e) => e.name)
-    .sort();
 }
 
 /**

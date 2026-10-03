@@ -3,7 +3,10 @@
  * every predicate must bound on `created` (forRecipient does, with 5s of skew).
  */
 
+import { requireEnv } from './oidc';
+
 export const MAILPIT_API = process.env.MAILPIT_API ?? 'http://mailpit:8025';
+export const HOUSEHOLD = requireEnv('OTHALA_INSTANCE_NAME');
 
 export interface MailSummary {
   id: string;

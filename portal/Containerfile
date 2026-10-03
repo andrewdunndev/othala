@@ -1,81 +1,42 @@
-# othala-portal -- Astro Node SSR.
+# othala-portal: Astro Node SSR.
 #
-# Two-stage: UBI 10 nodejs-22 (full image with npm) for build, ci-runtime-node's
-# nodejs-22-minimal for runtime. Astro Node standalone emits an SSR handler at
-# dist/server/entry.mjs; the D-listener wrapper dist/server/listen.mjs serves it
-# on the public port and stands up a separate internal-network admin listener
-# (PORTAL_ADMIN_BIND_HOST), so no Express/Fastify glue is needed.
+# Build on UBI 10 nodejs-24 (with npm), run on ci-runtime-node's
+# nodejs-24-minimal. App manifests are mounted at runtime, not built in.
 #
-# v0.2.0 change: OIDC client manifests are read at RUNTIME from a
-# mounted directory (/etc/portal/manifests/), not baked into the
-# build via manifests-build.mjs. The build context can therefore be
-# portal/ alone; hydra/clients/ is no longer needed at build time.
-# See portal/src/lib/manifests.ts for the runtime read pattern and
-# the source-of-truth chain.
-#
-# Tile-dashboard MD content (portal/src/content/apps/*.md) IS
-# build-time bundled via Astro Content Collections. Adding an app's
-# education content is an image rebuild; OIDC manifest edits are not.
-#
-# CI build context: repo root (see .gitlab-ci.yml build-portal job).
-# Local build (from repo root):
+# Build from the repo root:
 #   podman build -t dunn.dev/othala-portal:lab -f portal/Containerfile .
-# Run:
 #   podman run --rm -p 8080:8080 \
-#     -v ./hydra/clients:/etc/portal/manifests:ro \
+#     -v ./e2e/manifests:/etc/portal/manifests:ro \
 #     dunn.dev/othala-portal:lab
 
 # ----- Stage 1: build -----
-# Use upstream UBI 10 nodejs-22 (full image with npm + build tools).
-# ci-runtime-node is -minimal and intentionally omits npm.
-FROM registry.access.redhat.com/ubi10/nodejs-22:10.2@sha256:717ad679e570b99d51c36ec735332222b85cc2dc492fd560d4708dc6a18a051b AS build
+# UBI 10 nodejs-24: the runtime image is -minimal and has no npm.
+FROM registry.access.redhat.com/ubi10/nodejs-24:10.2@sha256:80c87fe2b161979a961911c837efff1198bdd597c6dbe7d2e59bf1c60638188d AS build
 
 WORKDIR /src
 USER root
 
-# Install deps first for cache friendliness. .npmrc routes
-# @dunn.dev/* to the GitLab group npm registry endpoint; anonymous
-# access works because reference is in a public group.
 COPY portal/package.json portal/package-lock.json portal/.npmrc portal/
 RUN cd portal && npm ci
 
 COPY portal/ portal/
-# v0.2.0: hydra/clients/ is NOT copied at build time. OIDC manifests
-# are read at runtime from /etc/portal/manifests/ (mounted via the
-# iac quadlet volume). See portal/src/lib/manifests.ts.
-
-# No build-time host: astro.config.mjs uses a host-agnostic
-# security.allowedDomains wildcard, so checkOrigin works behind the reverse
-# proxy without baking any deployment host into the image.
 RUN cd portal \
     && npm run build \
     && npm prune --omit=dev
 
 # ----- Stage 2: runtime -----
-# Base pin is literal, not an ARG: the estate container-publishing
-# standard asserts the pinned ci-runtime-* reference on the FROM line
-# itself. Keep in lockstep with the dunn.dev/pipeline component pins
-# in .gitlab-ci.yml; old catalog image tags get GC'd from the registry
-# (2.5.1 vanished and broke the v0.3.0 tag build with "manifest
-# unknown"). Renovate tracks this line through the native dockerfile
-# manager, grouped with those component pins under the "pipeline
-# catalog" packageRule in renovate.json so one MR moves both.
-FROM registry.gitlab.com/dunn.dev/pipeline/ci-runtime-node:4.8.0@sha256:29d519f7a2290959a6ecfb0272dfb4930406439494bdf0496af357e036be4041
+# Literal pin, not an ARG: the container-publishing standard reads the
+# ci-runtime-* reference off this line. It moves with the pipeline component
+# pins in .gitlab-ci.yml, since old catalog tags are garbage-collected.
+FROM registry.gitlab.com/dunn.dev/pipeline/ci-runtime-node:4.10.0@sha256:f5c9ba73e32e4b5de75778d1ec0b83e1f7a4f3d5bbc961e448c9915cf868eb33
 
 WORKDIR /app
 
 ENV NODE_ENV=production \
-    # OpenTelemetry bootstrap (PII-safe; src/server/otel.mjs, copied to
-    # dist/otel.mjs by `npm run copy:otel`). --import runs it BEFORE
-    # listen.mjs so the http instrumentation patches node:http first. The
-    # path is relative to WORKDIR /app, where `dist/` is copied below, and
-    # its bare @opentelemetry/* imports resolve up to /app/node_modules.
-    # No-op unless OTHALA_OTLP_ENDPOINT is set, so this is inert in any
-    # deploy without a collector: the SDK never starts.
+    # --import runs the OpenTelemetry bootstrap before listen.mjs so it
+    # patches node:http first; it is a no-op unless OTHALA_OTLP_ENDPOINT is set.
     NODE_OPTIONS="--import ./dist/otel.mjs"
 
-# The runtime image runs as the `default` user (uid 1001). COPY as root, then
-# switch back to 1001.
 USER root
 COPY --from=build --chown=1001:0 /src/portal/dist ./dist
 COPY --from=build --chown=1001:0 /src/portal/node_modules ./node_modules
@@ -83,13 +44,7 @@ COPY --from=build --chown=1001:0 /src/portal/package.json ./package.json
 
 USER 1001
 
-# Only the public port is EXPOSEd. The admin port (4431) binds to
-# PORTAL_ADMIN_BIND_HOST, required, and is pod-only by design (D-listener,
-# CU1 item 4); revoke + recovery-gate routes land on it in CU3.
+# The admin listener binds PORTAL_ADMIN_BIND_HOST and stays pod-only.
 EXPOSE 8080
 
-# listen.mjs binds the public SSR handler on PORT and the admin mux
-# on ADMIN_PORT in one process (see src/server/listen.ts). Standalone
-# entry.mjs is imported by listen.mjs for its exported `handler`, not run
-# directly, so it never auto-binds its own server.
 CMD ["node", "./dist/server/listen.mjs"]

@@ -3,7 +3,7 @@
 import { test, afterEach } from 'vitest';
 import assert from 'node:assert/strict';
 import { getIdentity } from '../src/lib/admin-api.ts';
-import { defaultOAuth2Api } from '../src/lib/oauth2-handlers.ts';
+import { hydraAdmin } from '../src/lib/ory-fetch.ts';
 
 const realFetch = globalThis.fetch;
 const envKeys = ['KRATOS_ADMIN_URL', 'KRATOS_ADMIN_TOKEN', 'HYDRA_ADMIN_URL', 'HYDRA_ADMIN_TOKEN'];
@@ -41,7 +41,7 @@ test('Kratos admin client targets http://kratos:4434 and sends no Authorization'
 test('Hydra admin client targets http://hydra:4445 and sends no Authorization', async () => {
   setOverrides();
   const calls = capture();
-  await defaultOAuth2Api().getOAuth2Client({ id: 'x' });
+  await hydraAdmin().getOAuth2Client({ id: 'x' });
   assert.equal(calls.length, 1);
   assert.ok(calls[0].url.startsWith('http://hydra:4445/admin/clients/x'), calls[0].url);
   assert.equal(calls[0].headers.get('authorization'), null);

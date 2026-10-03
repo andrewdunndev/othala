@@ -1,12 +1,12 @@
-// Admin SSR guard + Hydra read-only wrapper. requireAdminSession enforces
+// Admin SSR guard. requireAdminSession enforces
 // session + AAL2 + freshness + admin marker at the SSR layer, the
 // identity-level checks the upstream proxy cannot make.
 
 import { getSession, browserFlows } from './kratos';
 import { decideAccess } from './gate';
-import { revokeSubject, type RevokeResult } from './revoke';
 import { ADMIN_FRESHNESS_HOURS } from './constants';
 import type { Session } from './types';
+import { atMs, type AuthMethod } from './profile-gate';
 import { getIdentity } from './admin-api';
 
 /**
@@ -15,57 +15,12 @@ import { getIdentity } from './admin-api';
  * false when stale or when both timestamps are unreadable (fail closed).
  */
 export function isSessionFresh(session: Session, windowHours: number): boolean {
-  // Primary source: the most recent completed_at among aal2 authentication_methods.
-  let authAt: Date | null = null;
-
-  try {
-    const raw = session as unknown as Record<string, unknown>;
-    const methods = raw['authentication_methods'];
-    if (Array.isArray(methods)) {
-      for (const m of methods) {
-        if (!m || typeof m !== 'object') continue;
-        const entry = m as Record<string, unknown>;
-        if (entry['aal'] !== 'aal2') continue;
-        const completedAt = entry['completed_at'];
-        let candidate: Date | null = null;
-        if (completedAt instanceof Date && Number.isFinite(completedAt.getTime())) {
-          candidate = completedAt;
-        } else if (typeof completedAt === 'string') {
-          const parsed = new Date(completedAt);
-          if (Number.isFinite(parsed.getTime())) candidate = parsed;
-        }
-        // Keep the most recent parseable completed_at.
-        if (candidate !== null && (authAt === null || candidate > authAt)) {
-          authAt = candidate;
-        }
-      }
-    }
-  } catch {
-    // Malformed authentication_methods: fall back below.
-  }
-
-  // Fallback: the session's own authenticated_at.
-  if (authAt === null) {
-    try {
-      const rawAuthAt = (session as unknown as Record<string, unknown>)['authenticated_at'];
-      if (rawAuthAt instanceof Date && Number.isFinite(rawAuthAt.getTime())) {
-        authAt = rawAuthAt;
-      } else if (typeof rawAuthAt === 'string') {
-        const parsed = new Date(rawAuthAt);
-        if (Number.isFinite(parsed.getTime())) authAt = parsed;
-      }
-    } catch {
-      // Malformed authenticated_at — fall through.
-    }
-  }
-
-  if (authAt === null) {
-    return false;
-  }
-
-  const ageMs = Date.now() - authAt.getTime();
-  const windowMs = windowHours * 60 * 60 * 1000;
-  return ageMs <= windowMs;
+  const raw = session as unknown as { authentication_methods?: unknown; authenticated_at?: unknown } | null;
+  const methods = (Array.isArray(raw?.authentication_methods) ? raw.authentication_methods : []) as (AuthMethod | null)[];
+  const aal2 = methods.filter((m) => m?.aal === 'aal2').map((m) => atMs(m?.completed_at)).filter((t) => !Number.isNaN(t));
+  const at = aal2.length > 0 ? Math.max(...aal2) : atMs(raw?.authenticated_at);
+  if (Number.isNaN(at)) return false;
+  return Date.now() - at <= windowHours * 60 * 60 * 1000;
 }
 
 /**
@@ -116,15 +71,4 @@ export async function requireAdminSession(astro: any): Promise<Session | Respons
   astro.response.headers.set('Cache-Control', 'no-store, max-age=0');
 
   return session;
-}
-
-/**
- * Force re-login for an identity (admin "revoke user"): revokeSubject cuts
- * Kratos sessions and Hydra login + consent, without deactivating the identity.
- * Throws a prescriptive RevokeError on a hard-cut failure.
- */
-export type RevokeUserResult = RevokeResult;
-
-export async function revokeUserSessions(subject: string): Promise<RevokeUserResult> {
-  return revokeSubject(subject);
 }

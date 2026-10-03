@@ -172,32 +172,48 @@ function refuseProfile(res: ServerResponse, text: string, pointers = ['#/traits/
   });
 }
 
-/** POST /admin/profile-gate, wired to settings.after.profile with can_interrupt; a failed identity read refuses the update. Username stays fixed; an email change needs a first-factor sign-in when the account has a key. */
-export async function handleProfileGate(req: IncomingMessage, res: ServerResponse, client: AdminClient = ADMIN_CLIENT) {
-  if (refuseUnlessHookBearer(req, res)) return;
-  let body;
+type HookBody = { identity_id?: unknown; traits?: Record<string, unknown> | null; authentication_methods?: unknown } | null;
+
+/** A settings webhook's bearer, payload and stored-identity read; calls refuse() and returns null on any failure. */
+async function hookIdentity(
+  req: IncomingMessage,
+  res: ServerResponse,
+  client: AdminClient,
+  tag: string,
+  refuse: () => void,
+): Promise<{ body: HookBody; identity: Identity } | null> {
+  if (refuseUnlessHookBearer(req, res)) return null;
+  let body: HookBody;
   try {
     body = JSON.parse((await readBody(req)) || '{}');
   } catch {
-    refuseProfile(res, PROFILE_UPDATE_UNAVAILABLE);
-    return;
+    refuse();
+    return null;
   }
   const id = body?.identity_id;
   if (typeof id !== 'string' || id.trim().length === 0) {
-    refuseProfile(res, PROFILE_UPDATE_UNAVAILABLE);
-    return;
+    refuse();
+    return null;
   }
-  const fetched = await fetchStoredIdentity(client, id, 'profile-gate');
+  const fetched = await fetchStoredIdentity(client, id, tag);
   if (fetched.refuse) {
-    refuseProfile(res, PROFILE_UPDATE_UNAVAILABLE);
-    return;
+    refuse();
+    return null;
   }
-  const verdict = usernameChangeVerdict(fetched.identity, body?.traits?.username);
+  return { body, identity: fetched.identity };
+}
+
+/** POST /admin/profile-gate, wired to settings.after.profile with can_interrupt; a failed identity read refuses the update. Username stays fixed; an email change needs a first-factor sign-in when the account has a key. */
+export async function handleProfileGate(req: IncomingMessage, res: ServerResponse, client: AdminClient = ADMIN_CLIENT) {
+  const hook = await hookIdentity(req, res, client, 'profile-gate', () => refuseProfile(res, PROFILE_UPDATE_UNAVAILABLE));
+  if (!hook) return;
+  const { body, identity } = hook;
+  const verdict = usernameChangeVerdict(identity, body?.traits?.username);
   if (verdict.refuse) {
     refuseProfile(res, verdict.text);
     return;
   }
-  const emailVerdict = emailChangeVerdict(fetched.identity, body?.traits, body?.authentication_methods);
+  const emailVerdict = emailChangeVerdict(identity, body?.traits, body?.authentication_methods);
   if (emailVerdict.refuse) {
     refuseProfile(res, emailVerdict.text, emailVerdict.pointers);
     return;
@@ -205,32 +221,14 @@ export async function handleProfileGate(req: IncomingMessage, res: ServerRespons
   sendJson(res, 200, { ok: true });
 }
 
-function refuseSecondFactor(res: ServerResponse, text: string): void {
-  sendJson(res, 403, { messages: [{ instance_ptr: '#/', messages: [{ id: 4000001, type: 'error', text }] }] });
-}
-
 /** POST /admin/second-factor-gate?method=totp|webauthn, wired to settings.after.{totp,webauthn} with can_interrupt; a failed read or missing id refuses the change. */
 export async function handleSecondFactorGate(req: IncomingMessage, res: ServerResponse, client: AdminClient = ADMIN_CLIENT) {
-  if (refuseUnlessHookBearer(req, res)) return;
-  let body;
-  try {
-    body = JSON.parse((await readBody(req)) || '{}');
-  } catch {
-    refuseSecondFactor(res, SECOND_FACTOR_UNAVAILABLE);
-    return;
-  }
-  const id = body?.identity_id;
-  if (typeof id !== 'string' || id.trim().length === 0) {
-    refuseSecondFactor(res, SECOND_FACTOR_UNAVAILABLE);
-    return;
-  }
+  const hook = await hookIdentity(req, res, client, 'second-factor-gate', () => refuseProfile(res, SECOND_FACTOR_UNAVAILABLE, ['#/']));
+  if (!hook) return;
   const method = new URLSearchParams((req.url ?? '').split('?')[1] ?? '').get('method') ?? '';
-  const fetched = await fetchStoredIdentity(client, id, 'second-factor-gate');
-  const verdict = fetched.refuse
-    ? { refuse: true, text: SECOND_FACTOR_UNAVAILABLE }
-    : secondFactorChangeVerdict(fetched.identity, method);
+  const verdict = secondFactorChangeVerdict(hook.identity, method);
   if (verdict.refuse) {
-    refuseSecondFactor(res, verdict.text);
+    refuseProfile(res, verdict.text, ['#/']);
     return;
   }
   sendJson(res, 200, { ok: true });
@@ -325,12 +323,12 @@ async function handleReadyz(res: ServerResponse): Promise<void> {
   else sendJson(res, 200, { status: 'ok' });
 }
 
-/** The admin mux, by method then path: the served route sets and the dispatch both read these. */
-const ADMIN_GET = new Map<string, Handler>([
+/** The admin mux, by method then path. Disjoint from the public routes. */
+export const ADMIN_GET: ReadonlyMap<string, Handler> = new Map<string, Handler>([
   ['/healthz', (_req, res) => sendJson(res, 200, { status: 'ok' })],
   ['/readyz', (_req, res) => handleReadyz(res)],
 ]);
-const ADMIN_POST = new Map<string, Handler>([
+export const ADMIN_POST: ReadonlyMap<string, Handler> = new Map<string, Handler>([
   ['/admin/recovery-gate', handleRecoveryGate],
   ['/admin/login-code-gate', handleLoginCodeGate],
   ['/admin/profile-gate', handleProfileGate],
@@ -338,21 +336,6 @@ const ADMIN_POST = new Map<string, Handler>([
   ['/admin/profile-sessions', handleProfileSessions],
   ['/admin/passkey-prune', handlePasskeyPrune],
 ]);
-
-/** GET routes the admin mux serves. Disjoint from the public routes. */
-export const ADMIN_GET_ROUTES = new Set(ADMIN_GET.keys());
-/** POST routes the admin mux serves. Disjoint from the public routes. */
-export const ADMIN_POST_ROUTES = new Set(ADMIN_POST.keys());
-
-/** Report whether a request is an admin GET route (pure; test helper). */
-export function isAdminRoute(method: string | undefined, url: string | undefined): boolean {
-  return method === 'GET' && ADMIN_GET.has(pathOf(url));
-}
-
-/** Report whether a request is any served admin route (GET or POST). */
-export function isAdminEndpoint(method: string | undefined, url: string | undefined): boolean {
-  return adminHandler(method, url) !== undefined;
-}
 
 function adminHandler(method: string | undefined, url: string | undefined): Handler | undefined {
   if (method === 'GET') return ADMIN_GET.get(pathOf(url));

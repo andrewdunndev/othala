@@ -9,6 +9,6 @@ presentation:
   icon_fallback: serverfault
   auth_kind: forward_auth
   requires: [tailscale]
-  # The edge passes <svc>-access for everyone, admins included (t-access-model.spec.ts T6-T9).
-  access_group: proxywatch-access
+  # The edge passes <svc>-access for everyone, admins included.
+  access: [proxywatch-access]
   order: 120

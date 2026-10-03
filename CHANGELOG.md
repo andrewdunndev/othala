@@ -7,6 +7,29 @@ aims to follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 The git tag is the authoritative version; `portal/package.json` mirrors it.
 This CHANGELOG and git tags carry the deployed-instance release state.
 
+## [0.12.0] - 2026-10-03
+
+Emails name the household, the portal runs on Node 24, Kratos and Hydra updates arrive the day they ship, and code that served old shapes is gone.
+
+### Added
+
+- Recovery, sign-in code and email-verification emails name the household, say where to enter the code and how long it lasts, and end with a warning not to share it.
+
+### Changed
+
+- The portal builds and runs on Node 24 LTS.
+- Admins invite a person with the setup link only.
+- ID-token claims are always limited to the scopes the app was granted.
+- `oidc.client_id` must match `^[a-z][a-z0-9]*$`.
+- Kratos and Hydra updates are proposed the day they are released, as one reviewed change.
+- Deployers render and mount the email templates in `kratos/courier/` with `scripts/render-config.sh`, next to `kratos.yml`. Kratos reads a template once, so a re-render needs a Kratos restart.
+
+### Removed
+
+- The "Email a code instead" invite. Its code could not be redeemed, because Kratos binds a recovery code to the flow that sent it.
+- `presentation.access_group`. Use `presentation.access`, a list. A manifest without it gets no access. A manifest without an `oidc:` block is rejected as invalid.
+- The `admin` identity group. Household admin is the admin marker only.
+
 ## [0.11.0] - 2026-10-03
 
 Signing out and removing access now also ends app sign-ins, apps that ask for a fresh sign-in get one, and people with elevated app roles keep a second factor.

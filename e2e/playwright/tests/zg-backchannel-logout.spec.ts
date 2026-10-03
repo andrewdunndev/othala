@@ -7,7 +7,7 @@ import { test, expect, adminAal2Context, GRAFANA_CLIENT_ID, GRAFANA_REDIRECT_URI
 import { createIdentityWithPassword, TEST_PASSWORD } from '../actions/identity';
 import { loginViaJsonApi } from '../actions/login';
 import { hasSession } from '../actions/session';
-import { walk } from '../actions/oidc';
+import { requireEnv, walk } from '../actions/oidc';
 
 function seed(tag: string, isAdmin = false) {
   const name = `${tag}.${isAdmin ? 'admin' : 'member'}.${Date.now()}`;
@@ -37,8 +37,7 @@ async function listenForLogoutTokens() {
 }
 
 async function authorizeGrafana(ctx: BrowserContext, baseURL: string, hydraPublicURL: string): Promise<string> {
-  const secret = process.env.GRAFANA_CLIENT_SECRET;
-  if (!secret) throw new Error('GRAFANA_CLIENT_SECRET not set — inject from compose environment');
+  const secret = requireEnv('GRAFANA_CLIENT_SECRET');
   const authorize =
     `${baseURL}/oauth2/auth?client_id=${GRAFANA_CLIENT_ID}&response_type=code` +
     `&scope=${encodeURIComponent('openid email groups')}&redirect_uri=${encodeURIComponent(GRAFANA_REDIRECT_URI)}` +

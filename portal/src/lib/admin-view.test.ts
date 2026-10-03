@@ -99,7 +99,7 @@ describe('rowMatches', () => {
 
 describe('unrecognised groups and attention', () => {
   it('flags groups no app binds and invalid names, never role groups or household groups', () => {
-    const i = person('a', ['everyone', 'admin', 'grafana-access', 'grafana-admin', 'garden', 'Bad Name']);
+    const i = person('a', ['everyone', 'grafana-access', 'grafana-admin', 'garden', 'Bad Name']);
     expect(unrecognisedGroups(i, [grafana])).toEqual(['garden', 'Bad Name']);
   });
 

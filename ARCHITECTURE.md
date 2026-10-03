@@ -44,7 +44,7 @@ given an admin credential.
 
 **The app runs two listeners in one process** (`portal/src/server/listen.ts`). The public listener
 serves the Astro handler. The admin listener binds `PORTAL_ADMIN_BIND_HOST` with its own
-mux, `ADMIN_GET_ROUTES` and `ADMIN_POST_ROUTES`, that never delegates to the Astro handler. The two
+mux, the `ADMIN_GET` and `ADMIN_POST` maps, that never delegates to the Astro handler. The two
 route sets are disjoint *by construction* rather than by a routing rule that could be edited wrong;
 `portal/scripts/public-mux-disjoint.test.mjs` and `portal/scripts/admin-port.test.mjs` are what hold
 that. Admin routes authenticate with `bearerMatches`, which is constant-time and returns false when
@@ -231,11 +231,11 @@ denies a client whose manifest is missing. It retries on every call, so recovery
 ## Configuration and the one-way choices
 
 One image serves any instance; `OTHALA_*` variables define the deployment, and `.env.example` is the
-annotated contract. Ory does not expand `${VAR}` inside its own YAML, so `kratos/kratos.yml` and
-`hydra/hydra.yml` are templates rendered by `scripts/render-config.sh`, which derives the required
-variable set from the template itself and fails listing missing *names* only, never rendered content
-that could carry a secret into a log. The e2e harness and the deploy plane call the same render, so
-what is validated and what is deployed differ in values, not in mechanism.
+annotated contract. Ory does not expand `${VAR}` in its own files, so `kratos/kratos.yml`,
+`hydra/hydra.yml` and `kratos/courier/` are templates rendered by `scripts/render-config.sh`, which
+derives the required variable set from the template itself and fails listing missing *names* only,
+never rendered content that could carry a secret into a log. The e2e harness and the deploy plane
+call the same render, so what is validated and what is deployed differ in values, not in mechanism.
 
 Three settings become commitments the moment anyone enrols a credential against them, and should be
 chosen deliberately rather than discovered later:

@@ -23,16 +23,11 @@ echo "=== othala e2e: AUTH_REGISTRY=$AUTH_REGISTRY AUTH_VERSION=$AUTH_VERSION ==
 
 chmod +x ./gen-secrets.sh ./smoke.sh ./postgres-init.sh
 
-# gen-secrets must emit a full env: a partial .env renders literal ${VAR} placeholders
-# that hang Ory at startup.
+# A partial .env fails below: render-config.sh refuses a missing or empty variable.
 if ! AUTH_REGISTRY="$AUTH_REGISTRY" AUTH_VERSION="$AUTH_VERSION" bash ./gen-secrets.sh > .env; then
     echo "  ✗ gen-secrets.sh failed — aborting"; exit 1
 fi
-env_vars=$(grep -cE '^[A-Z][A-Z_]*=' .env || true)
-if [[ "$env_vars" -lt 25 ]]; then
-    echo "  ✗ .env has only $env_vars vars (expected >=25) — partial gen-secrets; aborting"; exit 1
-fi
-echo "  secrets generated (.env, $env_vars vars)"
+echo "  secrets generated (.env)"
 
 # Step 2: registry login (skip if CI vars absent for local runs)
 if [[ -n "${CI_REGISTRY_USER:-}" && -n "${CI_REGISTRY_PASSWORD:-}" ]]; then
@@ -40,8 +35,7 @@ if [[ -n "${CI_REGISTRY_USER:-}" && -n "${CI_REGISTRY_PASSWORD:-}" ]]; then
     echo "$CI_REGISTRY_PASSWORD" | podman login --username "$CI_REGISTRY_USER" --password-stdin "${AUTH_REGISTRY%%/*}"
 fi
 
-# Render the Ory configs with scripts/render-config.sh (the same renderer as the deploy plane);
-# Kratos/Hydra do not interpolate ${VAR}. It fails on any unset template variable, listing names only.
+# Kratos and Hydra do not interpolate ${VAR}, so render them with the deploy plane's renderer.
 set -a
 source ./.env
 set +a
@@ -50,10 +44,15 @@ bash ../scripts/render-config.sh ../kratos/kratos.yml kratos.rendered.yml \
     || { echo "  ✗ render kratos.yml failed — aborting" >&2; exit 1; }
 bash ../scripts/render-config.sh ../hydra/hydra.yml   hydra.rendered.yml \
     || { echo "  ✗ render hydra.yml failed — aborting" >&2; exit 1; }
+rm -rf courier.rendered && mkdir courier.rendered
+for t in ../kratos/courier/*.gotmpl; do
+    bash ../scripts/render-config.sh "$t" "courier.rendered/${t##*/}" \
+        || { echo "  ✗ render $t failed — aborting" >&2; exit 1; }
+done
 # The renderer writes 0600 but kratos/hydra run as uid 10000 under cap_drop ALL and could not
 # read the bind-mounted configs; they are per-run artifacts, .env keeps the secrets at 0600.
-chmod 0644 kratos.rendered.yml hydra.rendered.yml
-echo "  canonical configs rendered (kratos.rendered.yml, hydra.rendered.yml; 0644 for in-container ory uid)"
+chmod 0644 kratos.rendered.yml hydra.rendered.yml courier.rendered/*
+echo "  canonical configs rendered (kratos.rendered.yml, hydra.rendered.yml, courier.rendered/; 0644 for in-container ory uid)"
 
 # Wrapped in a timeout: a never-healthy dependency makes `up -d` block until the CI limit.
 echo "  docker compose up (timeout 300s)..."
@@ -96,54 +95,6 @@ for _ in $(seq 1 30); do
     [[ $(curl -s -o /dev/null -w '%{http_code}' http://localhost:8088/ || true) != 000 ]] && break
     sleep 2
 done
-
-# Step 4b: seed both admin identities via the Kratos admin API with the
-# metadata_admin.admin marker set at creation. No id is supplied: Kratos rejects one
-# with 400. Credentials come from .env (gen-secrets.sh), shared with the Playwright fixtures.
-echo ""
-echo "=== seed phase (admin identities with metadata_admin.admin=true marker) ==="
-
-# Post from the othala container (has Node) to kratos:4434, program on stdin.
-
-# Usage: seed_admin_identity <email> <username> <display_name> <groups_json> <password>
-seed_admin_identity() {
-    local email="$1" username="$2" display_name="$3" groups_json="$4" password="$5"
-    local result
-    result=$(printf '%s' "fetch('http://kratos:4434/admin/identities',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({schema_id:'family',state:'active',traits:{username:'${username}',email:'${email}',displayName:'${display_name}'},metadata_admin:{admin:true,groups:${groups_json}},credentials:{password:{config:{password:'${password}'}}}})}).then(r=>r.json()).then(j=>{process.stdout.write(j.id||('ERR:'+JSON.stringify(j)));process.exit(0)}).catch(e=>{process.stdout.write('EXC:'+e.message);process.exit(1)})" \
-        | docker compose exec -T othala node 2>/dev/null)
-    # Strip ANSI resets that podman-compose prepends.
-    result=$(printf '%s' "$result" | sed 's/\x1b\[[0-9;]*m//g')
-    printf '%s' "$result"
-}
-
-ADMIN_EMAIL="${ADMIN_EMAIL:-admin@othala.test}"
-ADMIN_USERNAME="${ADMIN_USERNAME:-admin}"
-ADMIN_PASSWORD="${ADMIN_PASSWORD:-othala-testpass-2026}"
-RECOVERY_ADMIN_EMAIL="${RECOVERY_ADMIN_EMAIL:-admin.recovery@othala.test}"
-RECOVERY_ADMIN_USERNAME="${RECOVERY_ADMIN_USERNAME:-admin.recovery}"
-RECOVERY_ADMIN_PASSWORD="${RECOVERY_ADMIN_PASSWORD:-othala-testpass-2026}"
-
-# Access model: an admin holds `<svc>-access` AND `<svc>-admin` explicitly; dropping
-# grafana-access locks the admin out (t-access-model.spec.ts T4). metadata_admin.admin
-# is portal authority only and is orthogonal to groups.
-echo "  seeding primary admin: $ADMIN_EMAIL (admin marker + groups) ..."
-ADMIN_ID=$(seed_admin_identity \
-    "$ADMIN_EMAIL" "$ADMIN_USERNAME" "Othala Admin" \
-    "['grafana-access','grafana-admin']" "$ADMIN_PASSWORD")
-if [[ -z "$ADMIN_ID" || "$ADMIN_ID" == ERR:* || "$ADMIN_ID" == EXC:* ]]; then
-    echo "  ✗ seed admin failed: $ADMIN_ID"; exit 1
-fi
-echo "  ✓ admin seeded: id=$ADMIN_ID (metadata_admin.admin=true)"
-
-# The recovery-admin exercises the recovery-gate (marker only), so it holds just grafana-access.
-echo "  seeding recovery-admin: $RECOVERY_ADMIN_EMAIL (admin marker + groups) ..."
-RECOVERY_ADMIN_ID=$(seed_admin_identity \
-    "$RECOVERY_ADMIN_EMAIL" "$RECOVERY_ADMIN_USERNAME" "Admin Recovery Test" \
-    "['grafana-access']" "$RECOVERY_ADMIN_PASSWORD")
-if [[ -z "$RECOVERY_ADMIN_ID" || "$RECOVERY_ADMIN_ID" == ERR:* || "$RECOVERY_ADMIN_ID" == EXC:* ]]; then
-    echo "  ✗ seed recovery-admin failed: $RECOVERY_ADMIN_ID"; exit 1
-fi
-echo "  ✓ recovery-admin seeded: id=$RECOVERY_ADMIN_ID (metadata_admin.admin=true)"
 
 # Step 5: smoke (the API-level suite + browser-free OIDC dance, sections A-G)
 echo ""

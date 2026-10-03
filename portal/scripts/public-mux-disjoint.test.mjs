@@ -5,18 +5,11 @@ import assert from 'node:assert/strict';
 import { readdirSync, statSync } from 'node:fs';
 import { join, dirname, relative, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { ADMIN_POST } from '../src/server/listen.ts';
 
 const here = dirname(fileURLToPath(import.meta.url));
 const pagesDir = join(here, '..', 'src', 'pages');
 
-const FORBIDDEN_ROUTES = new Set([
-  '/admin/recovery-gate',
-  '/admin/login-code-gate',
-  '/admin/profile-gate',
-  '/admin/second-factor-gate',
-  '/admin/profile-sessions',
-  '/admin/passkey-prune',
-]);
 
 const PAGE_EXT = /\.(astro|ts|js|mjs|md|mdx)$/;
 
@@ -48,7 +41,7 @@ test('no src/pages/ file resolves to an admin-listener-only POST route', () => {
   const offenders = [];
   for (const file of files) {
     const route = routeForFile(file);
-    if (FORBIDDEN_ROUTES.has(route)) {
+    if (ADMIN_POST.has(route)) {
       offenders.push(`${relative(pagesDir, file)} -> ${route}`);
     }
   }
@@ -77,6 +70,6 @@ test('the route-mapping helper actually maps the dangerous filenames', () => {
     '/admin/login-code-gate',
   );
   for (const r of ['/admin/recovery-gate', '/admin/login-code-gate']) {
-    assert.ok(FORBIDDEN_ROUTES.has(r));
+    assert.ok(ADMIN_POST.has(r));
   }
 });

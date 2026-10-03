@@ -36,7 +36,7 @@ test('Q — INV-2: non-admin identity at AAL2 is denied at /admin (reason=not-ad
     ).not.toBe(200);
 
     expect(
-      /reason=not-admin/.test(loc) || /\/auth\/error/.test(loc),
+      /reason=not-admin/.test(loc),
       `Q (INV-2): AAL2 non-admin must be denied with reason=not-admin (not step-up, not 200); got ${status} ${loc}`,
     ).toBe(true);
 

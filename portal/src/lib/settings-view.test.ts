@@ -2,13 +2,12 @@
 
 import { describe, it, expect } from 'vitest';
 import { splitCodes, credentialItems, totpView, lookupView, securityStatus, keyOnlyKeeper, emailVerified, formatAdded } from './settings-view';
-import { devSettings, DEV_SETTINGS_STATES, isDevSettingsState } from './settings-fixtures';
+import { devSettings, isDevSettingsState } from './settings-fixtures';
 
 const nodesOf = (s: Parameters<typeof devSettings>[0]) => devSettings(s).flow.ui.nodes;
 
 describe('settings view over the fixtures', () => {
-  it('knows every fixture state and rejects anything else', () => {
-    for (const s of DEV_SETTINGS_STATES) expect(isDevSettingsState(s)).toBe(true);
+  it('rejects anything that is not a fixture state', () => {
     expect(isDevSettingsState('nope')).toBe(false);
     expect(isDevSettingsState(null)).toBe(false);
   });

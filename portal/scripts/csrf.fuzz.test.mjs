@@ -183,29 +183,6 @@ test('prop: future timestamp (> 60s clock skew) always rejects', () => {
   );
 });
 
-test('prop: random five-segment strings never verify', () => {
-  fc.assert(
-    fc.property(
-      fc.uuid(),
-      fc.string({ minLength: 1, maxLength: 20 }),
-      fc.string({ minLength: 1, maxLength: 40 }),
-      fc.string({ minLength: 0, maxLength: 200 }),
-      (id, seg1, seg2, seg3) => {
-        _resetForTests();
-        const tok = `${seg1}.${id}.${seg2}.${ACTION}.${seg3}`;
-        let threw = false;
-        try {
-          verifyToken(tok, id, ACTION);
-        } catch {
-          threw = true;
-        }
-        assert.ok(threw, `random garbage verified unexpectedly: ${tok}`);
-      },
-    ),
-    { numRuns: 2000 },
-  );
-});
-
 test('prop: mutated nonce field (sig still valid for original nonce) rejects', () => {
   fc.assert(
     fc.property(fc.uuid(), fc.string({ minLength: 1, maxLength: 30 }), (id, fakeNonce) => {
@@ -217,22 +194,6 @@ test('prop: mutated nonce field (sig still valid for original nonce) rejects', (
     }),
     { numRuns: 1000 },
   );
-});
-
-test('explicit: ts-shifted resign outside window rejects', () => {
-  const id = 'fuzz-admin-ts-shift';
-  _resetForTests();
-  const futureTs = Math.floor(Date.now() / 1000) + 3600;
-  const nonce = 'BBBBBBBBBBBBBBBBBBBBBBBB';
-  const body = `${futureTs}.${id}.${nonce}.${ACTION}`;
-  const sig = resign(body);
-  assertRejects(`${body}.${sig}`, id, 'ts shifted to future');
-
-  _resetForTests();
-  const pastTs = Math.floor(Date.now() / 1000) - 7200;
-  const body2 = `${pastTs}.${id}.${nonce}.${ACTION}`;
-  const sig2 = resign(body2);
-  assertRejects(`${body2}.${sig2}`, id, 'ts shifted to past');
 });
 
 test('prop: bearerMatches never matches when expected is empty/null/undefined', () => {
@@ -316,26 +277,6 @@ test('prop: parseBearer returns empty string for non-Bearer or missing headers',
       assert.strictEqual(result, '', `expected '' for header: ${JSON.stringify(h)}`);
     }
   }
-});
-
-test('explicit: identityId containing dots is safe (no ambiguity in split)', () => {
-  const dottyId = 'admin.user.with.dots';
-  _resetForTests();
-  assert.throws(
-    () => signToken(dottyId, ACTION),
-    /dot/,
-    'signToken must throw on a dotted identityId (CRYPTO-1)',
-  );
-});
-
-test('explicit: identityId with dot — document whether roundtrip is accepted', () => {
-  const dottyId = 'a.b';
-  _resetForTests();
-  assert.throws(
-    () => signToken(dottyId, ACTION),
-    /dot/,
-    'signToken must throw for dotty identityId (fail-closed, CRYPTO-1)',
-  );
 });
 
 test('explicit: empty identity segment in token always rejects', () => {

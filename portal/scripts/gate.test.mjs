@@ -18,7 +18,6 @@ function manifest(clientId, opts = {}) {
   return {
     clientId,
     clientName: clientId,
-    accessGroup: `access-${clientId}`,
     accessGroups: opts.accessGroups ?? [`access-${clientId}`],
     skipAccessCheck: opts.skipAccessCheck ?? false,
     roles: [],

@@ -1,72 +1,25 @@
-# dunn.dev/othala e2e -- prebaked Playwright test image.
+# othala e2e: prebaked Playwright test image.
 #
-# WHY THIS EXISTS
-# The browser e2e leg runs inside the e2e job's inner VM (a fresh Fedora
-# QEMU guest spawned per job by the QEMU GitLab Runner). That inner VM
-# can pull CONTAINER images from the GitLab registry (it does a `podman
-# login` and pulls oryd/kratos, oryd/hydra, the othala app, the
-# playwright base, ...), but it CANNOT reliably reach the public npm
-# registry: an in-container `npm install` against registry.npmjs.org
-# stalls on egress and times out the whole gate (exit 124).
-#
-# The old shape ran the test-dep install at e2e RUNTIME inside the stock
-# mcr.microsoft.com/playwright image:
-#     sh -c "npm install ... && playwright test"
-# — which is exactly the npm-egress dependency that stalls. It also
-# bind-mounted the e2e tree read-only and shadowed /test/node_modules with
-# an anonymous volume so the runtime install had somewhere to write.
-#
-# THE FIX
-# Bake BOTH the e2e test sources and their npm dependencies into a thin
-# image at BUILD time. The image build runs on the normal, egress-capable
-# GitLab runner (the same place build-othala runs),
-# where npm registry access is fine. `npm ci` against the committed
-# e2e/package-lock.json installs the deps once, into the image; the
-# specs/config/dance script are COPYed in alongside. At e2e runtime the
-# inner VM only PULLS this image (same path it already uses for the app
-# images) and runs the specs straight from /test — no runtime npm
-# install, no npm egress, no exit 124, and no bind-mount / anonymous
-# node_modules dance.
-#
-# ESM note: NODE_PATH does NOT satisfy ESM `import` resolution, so the
-# deps must physically live next to the specs (at /test/node_modules).
-# Baking them in (rather than via NODE_PATH) is what makes this correct.
-#
-# The Playwright browser binaries are already present in the base image
-# at /ms-playwright; we only layer the npm packages + sources on top, so
-# this stays a tiny single-stage overlay pinned to the same Playwright
-# base version compose.yml uses.
-#
-# BUILD CONTEXT: the e2e/ directory (see .gitlab-ci.yml build-e2e-tester).
-# .containerignore keeps runtime cruft (.env, node_modules, rendered
-# configs, browser-out) out of the image. The image is published as the
-# ${CI_REGISTRY_IMAGE}/e2e-tester sub-image.
+# The e2e VM pulls registry images but cannot reliably reach the npm registry,
+# so the specs and their npm dependencies are baked in at build time. ESM
+# imports ignore NODE_PATH, so node_modules must sit next to the specs.
 
-# MUST match e2e/package.json's "@playwright/test" version exactly: the npm
-# package resolves browser builds by its own version and hard-fails when the
-# base image ships another (renovate bumps the npm package but NOT this pin —
-# a 1.61.1-vs-v1.60.0 split failed all 30 browser specs on the first v0.3.0
-# cut, 2026-07-01). Bump both together.
+# Must match e2e/package.json's "@playwright/test" version exactly: the npm
+# package hard-fails on a base image that ships other browser builds, and
+# Renovate bumps only the npm package. Bump both together.
 FROM mcr.microsoft.com/playwright:v1.63.0-noble@sha256:eff16c30e6f3f4af0a03fa4b706120d5e9b0891c344a27d64559aff5900a4a27
 
-# Browsers are already installed in the base image; never let an install
-# step try (and fail) to fetch them.
+# The base image already has the browsers.
 ENV PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD=1 \
     CI=1
 
 WORKDIR /test
 
-# Dependency manifests first so the npm layer caches across spec edits.
 COPY package.json package-lock.json ./
 RUN npm ci --no-audit --no-fund
 
-# Bake the e2e sources (specs, config, fixtures/actions, oidc-dance.mjs)
-# alongside node_modules. .containerignore excludes .env / node_modules /
-# *.rendered.yml / browser-out so only the canonical tree lands here.
 COPY . .
 
-# Make the prebaked CLIs resolvable on PATH (playwright, etc.).
 ENV PATH="/test/node_modules/.bin:${PATH}"
 
-# Default to a shell; compose overrides command/entrypoint per service.
 CMD ["bash"]

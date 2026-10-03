@@ -1,6 +1,6 @@
 # Othala end-to-end harness: the converged substrate on plain docker compose, and the
 # CI e2e gate (driven by e2e/validate.sh; local runs: README.md).
-# Absent vs production: Caddy, TLS and DNS; smoke probes hit container ports directly.
+# Absent vs production: TLS and DNS; smoke probes hit container ports directly.
 # AUTH_VERSION comes from the environment (CI: the just-built tag; local: latest);
 # the app image is ${AUTH_REGISTRY} at the registry root.
 
@@ -95,6 +95,7 @@ services:
       - ./kratos.e2e.yml:/etc/config/kratos/e2e.yml:ro,z
       - ../kratos/identity.schema.json:/etc/config/kratos/identity.schema.json:ro,z
       - ../kratos/hooks/recovery-gate.jsonnet:/etc/config/kratos/hooks/recovery-gate.jsonnet:ro,z
+      - ./courier.rendered:/etc/config/kratos/courier:ro,z
     command: ["serve", "--config", "/etc/config/kratos/kratos.yml", "--config", "/etc/config/kratos/e2e.yml", "--dev", "--watch-courier"]
     healthcheck:
       test: ["CMD-SHELL", "wget -qO- http://localhost:4434/admin/health/ready || exit 1"]
@@ -216,8 +217,7 @@ services:
   # Edge: fronts app, Kratos and Hydra on one host (auth.othala.test, :8088 published) so smoke
   # and the browser run reach the stack as in production; the portal itself calls Kratos and Hydra directly.
   caddy:
-    # dunn.dev/caddy, not stock caddy: n-rate-limits.spec.ts needs rate_limit. Same
-    # tag as production (iac dag-caddy.container); re-resolve via skopeo inspect.
+    # Same image and tag as production; re-resolve via skopeo inspect.
     image: registry.gitlab.com/dunn.dev/caddy:v2.11.4-3@sha256:78e84240c3c703bb374aa003424c56143376c621a0b7e17cc6bcf009eec86446
     container_name: lab-caddy
     restart: unless-stopped
@@ -268,7 +268,8 @@ services:
         condition: service_healthy
     environment:
       BASE: http://auth.othala.test
-      # J2: recovery-gate on the othala admin port (static IP via PORTAL_ADMIN_BIND_HOST in compose.browser.yml).
+      OTHALA_INSTANCE_NAME: ${OTHALA_INSTANCE_NAME}
+      # The recovery-gate on the othala admin port (static IP via PORTAL_ADMIN_BIND_HOST in compose.browser.yml).
       OTHALA_ADMIN_URL: http://othala:4431
       RECOVERY_GATE_SECRET: ${RECOVERY_GATE_SECRET}
       GRAFANA_CLIENT_SECRET: ${GRAFANA_CLIENT_SECRET}

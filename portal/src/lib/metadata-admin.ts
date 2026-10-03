@@ -1,14 +1,10 @@
-// Validator for `metadata_admin` writes. Kratos does not validate that block
-// (its schema only covers traits), so a typo would be stored silently.
-// Contract: { groups?: string[]; roles?: Record<string,string>; admin?: boolean; prerequisites?: string[]; passkeyNames?: Record<string,string> }
-// with canonical group names (GROUP_RE), a strict boolean admin, and no other
-// keys. Hand-rolled, no validator dependency; returns the input or an Error.
+// Validator for `metadata_admin` writes. Kratos's schema covers traits only, so a typo here would be stored silently.
 
 import type { MetadataAdmin } from './admin-api';
 import { GROUP_RE } from './access-groups';
 import { CREDENTIAL_ID_RE, cleanPasskeyName } from './passkey-names';
+import { CLIENT_ID_RE } from './manifests';
 
-const CLIENT_ID_RE = /^[a-z][a-z0-9]*$/;
 const ROLE_NAME_RE = /^[a-z][a-z0-9_\-]*$/;
 const MAX_LEN = 64;
 

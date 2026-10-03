@@ -3,6 +3,7 @@
 import { test, expect, adminAal2Context, GRAFANA_CLIENT_ID, GRAFANA_REDIRECT_URI } from '../fixtures';
 import { loginViaJsonApi } from '../actions/login';
 import { createIdentityWithPassword, TEST_PASSWORD } from '../actions/identity';
+import { requireEnv } from '../actions/oidc';
 import { decodeJwt } from 'jose';
 import type { BrowserContext } from 'playwright-core';
 
@@ -104,8 +105,7 @@ test('T1 — `grafana-access` alone grants entry and the user-tier role', async 
   hydraPublicURL,
   kratosAdminURL,
 }) => {
-  const secret = process.env.GRAFANA_CLIENT_SECRET;
-  if (!secret) throw new Error('GRAFANA_CLIENT_SECRET not set — inject from compose environment');
+  const secret = requireEnv('GRAFANA_CLIENT_SECRET');
 
   const ctx = await seedAndLogin({
     browser, kratosAdminURL, baseURL,
@@ -141,8 +141,7 @@ test('T2 — both groups, access FIRST: entry, and the role resolves to ADMIN', 
   hydraPublicURL,
   kratosAdminURL,
 }) => {
-  const secret = process.env.GRAFANA_CLIENT_SECRET;
-  if (!secret) throw new Error('GRAFANA_CLIENT_SECRET not set — inject from compose environment');
+  const secret = requireEnv('GRAFANA_CLIENT_SECRET');
 
   const ctx = await seedAndLogin({
     browser, kratosAdminURL, baseURL,
@@ -183,8 +182,7 @@ test('T3 — both groups, admin FIRST: same entry, same ADMIN role (order-indepe
   hydraPublicURL,
   kratosAdminURL,
 }) => {
-  const secret = process.env.GRAFANA_CLIENT_SECRET;
-  if (!secret) throw new Error('GRAFANA_CLIENT_SECRET not set — inject from compose environment');
+  const secret = requireEnv('GRAFANA_CLIENT_SECRET');
 
   const ctx = await seedAndLogin({
     browser, kratosAdminURL, baseURL,

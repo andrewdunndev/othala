@@ -6,6 +6,8 @@ import * as fc from 'fast-check';
 import { lookupRole, deepMergeClaims, composeIDTokenClaims, buildIDTokenClaims } from '../src/lib/claims.ts';
 import { identity as buildIdentity } from '../src/lib/test-builders.ts';
 
+const ALL_SCOPES = ['openid', 'email', 'profile', 'groups'];
+
 function manifest({ clientId = 'myapp', roles = [], groupRoleMap = {}, emitGroupsClaim = null, skipConsent = false } = {}) {
   return {
     clientId,
@@ -21,7 +23,6 @@ function manifest({ clientId = 'myapp', roles = [], groupRoleMap = {}, emitGroup
     skipConsent,
     backchannelLogoutUri: '',
     backchannelLogoutSessionRequired: false,
-    accessGroup: `access-${clientId}`,
     accessGroups: [`access-${clientId}`],
     roles,
     groupRoleMap,
@@ -87,7 +88,7 @@ test('P1+P2: claimEmit only injected when subject holds a mapped group', () => {
         const id = identity({ groups: subjectGroups });
         const m = manifest({ roles, groupRoleMap });
 
-        const claims = composeIDTokenClaims(id, m);
+        const claims = composeIDTokenClaims(id, m, ALL_SCOPES);
 
         assert.equal(Object.hasOwn(claims, claimKeyA), true,
           `Expected claimKeyA (${claimKeyA}) for roleA via groupA`);
@@ -126,14 +127,10 @@ test('P3: override naming an undeclared role falls through to group walk, not ph
 
         const result = lookupRole(m, id.metadata_admin);
 
-        if (result !== null) {
-          assert.notEqual(result.roleName, phantomRole,
-            `lookupRole must not return phantom role "${phantomRole}" — it is not declared`);
-          assert.equal(result.roleName, declaredRole,
-            `lookupRole must fall through to declared role "${declaredRole}" via group walk`);
-          assert.equal(Object.hasOwn(result.claimEmit, phantomKey), false,
-            `Phantom claim key "${phantomKey}" must not appear as own property in resolved claimEmit`);
-        }
+        assert.equal(result?.roleName, declaredRole,
+          `lookupRole must fall through to declared role "${declaredRole}" via group walk`);
+        assert.equal(Object.hasOwn(result.claimEmit, phantomKey), false,
+          `Phantom claim key "${phantomKey}" must not appear as own property in resolved claimEmit`);
       },
     ),
     { numRuns: 500, verbose: false },
@@ -168,7 +165,6 @@ test('P4: subject with no mapped groups gets no role claimEmit keys', () => {
       (mappedGroups, roleName, ce, subjectExtraGroups) => {
         const mappedSet = new Set(mappedGroups);
         const subjectGroups = subjectExtraGroups.filter(g => !mappedSet.has(g));
-        fc.pre(subjectGroups.length > 0 || true); // always proceed; subject just won't match
 
         const roles = [{ name: roleName, description: '', claimEmit: ce }];
         const groupRoleMap = Object.fromEntries(mappedGroups.map(g => [g, roleName]));
@@ -183,29 +179,6 @@ test('P4: subject with no mapped groups gets no role claimEmit keys', () => {
     ),
     { numRuns: 500, verbose: false },
   );
-});
-
-test('P5: deepMergeClaims does NOT pollute Object.prototype via __proto__ key (fixed)', () => {
-  if (Object.prototype.hasOwnProperty.call(Object.prototype, 'injected')) {
-    delete Object.prototype.injected;
-  }
-
-  const dst = {};
-  const poisoned = JSON.parse('{"__proto__":{"injected":true},"constructor":{"name":"pwned"}}');
-
-  deepMergeClaims(dst, poisoned);
-
-  const polluted = ({}).injected === true;
-  if (Object.prototype.hasOwnProperty.call(Object.prototype, 'injected')) {
-    delete Object.prototype.injected;
-  }
-  if (Object.prototype.hasOwnProperty.call(Object.prototype, 'name')) {
-    delete Object.prototype.name;
-  }
-
-  assert.equal(polluted, false,
-    'deepMergeClaims must not pollute Object.prototype via __proto__ key. ' +
-    'Fix: skip __proto__/constructor/prototype keys and use hasOwnProperty for existence check.');
 });
 
 test('P5b: nested __proto__ in deepMergeClaims does NOT pollute Object.prototype (fixed)', () => {
@@ -265,7 +238,7 @@ test('P6: emit_groups_claim:false removes groups claim from output', () => {
           groupRoleMap: Object.fromEntries(subjectGroups.slice(0, 1).map(g => [g, 'user'])),
         });
 
-        const claims = composeIDTokenClaims(id, m);
+        const claims = composeIDTokenClaims(id, m, ALL_SCOPES);
         assert.equal('groups' in claims, false,
           'groups claim must be suppressed when emit_groups_claim:false');
       },
@@ -278,7 +251,7 @@ test('P6b: emit_groups_claim:true (default null) keeps groups claim in output', 
   const id = identity({ groups: ['access-myapp', 'eng'] });
   const m = manifest({ emitGroupsClaim: null }); // null = default = true
 
-  const claims = composeIDTokenClaims(id, m);
+  const claims = composeIDTokenClaims(id, m, ALL_SCOPES);
   assert.ok('groups' in claims, 'groups claim must be present when emitGroupsClaim is null (default true)');
   assert.deepEqual(claims.groups, ['access-myapp']);
 });
@@ -301,12 +274,6 @@ test('P7a: override stored with lowercase clientId key resolves the declared rol
         const result = lookupRole(m, metadataAdmin);
         assert.equal(result?.roleName, roleName,
           `Override key "${mixedClientId.toLowerCase()}" must resolve role "${roleName}"`);
-        if (result) {
-          for (const k of Object.keys(result.claimEmit)) {
-            assert.ok(Object.hasOwn(ce, k) || true, // shape matches declared role
-              `Unexpected key "${k}" in claimEmit — not in declared role`);
-          }
-        }
       },
     ),
     { numRuns: 300, verbose: false },
@@ -316,11 +283,14 @@ test('P7a: override stored with lowercase clientId key resolves the declared rol
 test('P7b: override stored with mixed-case key is silently ignored (fails safe)', () => {
   const m = manifest({
     clientId: 'MyApp',
-    roles: [{ name: 'admin', description: '', claimEmit: { role: 'admin' } }],
+    roles: [
+      { name: 'admin', description: '', claimEmit: { role: 'admin' } },
+      { name: 'viewer', description: '', claimEmit: { role: 'viewer' } },
+    ],
     groupRoleMap: { 'eng': 'admin' },
   });
 
-  const meta = { groups: ['access-MyApp', 'eng'], roles: { 'MyApp': 'admin' } };
+  const meta = { groups: ['access-MyApp', 'eng'], roles: { 'MyApp': 'viewer' } };
   const result = lookupRole(m, meta);
 
   assert.equal(result?.roleName, 'admin', 'group walk should still resolve admin via eng group');
@@ -401,7 +371,7 @@ test('adversarial: empty groups array → no role, no claimEmit', () => {
   const result = lookupRole(m, id.metadata_admin);
   assert.equal(result, null, 'empty groups must yield null role result');
 
-  const claims = composeIDTokenClaims(id, m);
+  const claims = composeIDTokenClaims(id, m, ALL_SCOPES);
   assert.equal('superpower' in claims, false, 'superpower claim must not appear with empty groups');
 });
 
@@ -428,9 +398,7 @@ test('adversarial: groups array with non-string elements is coerced/filtered saf
     result = lookupRole(m, id.metadata_admin);
   }, 'lookupRole must not throw on corrupt groups array');
 
-  if (result !== null) {
-    assert.equal(result.roleName, 'admin', 'only the string "admin" element should match');
-  }
+  assert.equal(result?.roleName, 'admin', 'only the string "admin" element should match');
 });
 
 test('adversarial: metadata_admin.roles override with object value (not string) is ignored', () => {
@@ -472,7 +440,7 @@ test('adversarial: metadata_admin.roles is an array (not object) — no override
 
 test('adversarial: null manifest → no claimEmit injection', () => {
   const id = identity({ groups: ['access-myapp', 'admin'] });
-  const claims = composeIDTokenClaims(id, null);
+  const claims = composeIDTokenClaims(id, null, ALL_SCOPES);
   assert.equal('role' in claims, false, 'No role key should appear with null manifest');
   assert.equal('permissions' in claims, false);
   assert.equal('groups' in claims, false, 'groups claim must be omitted with null manifest');
@@ -490,7 +458,7 @@ test('adversarial: claimEmit that tries to overwrite email claim via deepMergeCl
   const id = identity({ groups: ['access-myapp', 'real-group'] });
   const m = manifest({ roles, groupRoleMap });
 
-  const claims = composeIDTokenClaims(id, m);
+  const claims = composeIDTokenClaims(id, m, ALL_SCOPES);
 
   assert.equal('superpower' in claims, false,
     'attacker-role claimEmit must not inject superpower — subject not in attacker-group');

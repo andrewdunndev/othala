@@ -4,7 +4,8 @@ import type { APIRequestContext } from '@playwright/test';
 import { test, expect } from '../fixtures';
 import { createIdentityWithPassword } from '../actions/identity';
 import { getSession } from '../actions/session';
-import { waitForMessage, forRecipient } from '../actions/mail';
+import { HOUSEHOLD, waitForMessage, forRecipient } from '../actions/mail';
+import { requireEnv } from '../actions/oidc';
 
 async function initRecoveryFlow(
   req: APIRequestContext,
@@ -153,7 +154,9 @@ test('J1 — non-admin recovery flow issues a privileged settings session', asyn
   const codePage = await req.get(`${baseURL}/auth/recovery?flow=${flow.id}`);
   expect(await codePage.text(), 'J1: the code step tells people to check spam or junk').toMatch(/spam or junk/i);
 
-  const { code, id: messageId } = await waitForMessage(forRecipient(identity.email, startTime, /recover/i));
+  const { code, subject, body, id: messageId } = await waitForMessage(forRecipient(identity.email, startTime, /recovery code/i));
+  expect(subject, 'J1: the subject names the household').toContain(HOUSEHOLD);
+  expect(body, 'J1: the body names the household').toContain(HOUSEHOLD);
   console.log('[J1] recovery code received, message id:', messageId, 'code:', code);
 
   const codeResp = await req.post(step2.action, {
@@ -207,22 +210,9 @@ test('J2 — admin recovery is blocked by the recovery-gate webhook (no privileg
   const codeSubmitCsrf = step2.csrfToken;
   console.log('[J2] admin recovery email submitted; csrf rotated:', codeSubmitCsrf !== flow.csrfToken);
 
-  let code: string;
-  try {
-    const result = await waitForMessage(forRecipient(identity.email, startTime, /recover/i));
-    code = result.code;
-    console.log('[J2] admin recovery code received:', result.id);
-  } catch (e) {
-    console.log('[J2] no recovery email (gate may fire at initiation):', String(e));
-
-    const session = await getSession(ctx, baseURL);
-    expect(
-      session?.active ?? false,
-      'J2: if no recovery email, there must be no active session (gate blocked at initiation)',
-    ).toBe(false);
-    console.log('[J2] PASS — admin recovery blocked (no email path)');
-    return;
-  }
+  const { code, subject, body } = await waitForMessage(forRecipient(identity.email, startTime, /recovery code/i));
+  expect(subject, 'J2: the subject names the household').toContain(HOUSEHOLD);
+  expect(body, 'J2: the body names the household').toContain(HOUSEHOLD);
 
   const codeResp = await req.post(step2.action, {
     headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
@@ -233,6 +223,8 @@ test('J2 — admin recovery is blocked by the recovery-gate webhook (no privileg
   const status = codeResp.status();
   const loc = codeResp.headers()['location'] ?? '';
   console.log('[J2] admin code submit result:', status, loc);
+  expect(status >= 200 && status < 300, `J2: the code submit must not succeed; got ${status} ${loc}`).toBe(false);
+  expect(await getSession(ctx, baseURL), 'J2: whoami must answer 401 after the refused recovery').toBeNull();
 
   const gateBase = process.env.OTHALA_ADMIN_URL ?? 'http://othala:4431';
   const probeBody = JSON.stringify({
@@ -245,7 +237,7 @@ test('J2 — admin recovery is blocked by the recovery-gate webhook (no privileg
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
-      Authorization: `Bearer ${process.env.RECOVERY_GATE_SECRET ?? ''}`,
+      Authorization: `Bearer ${requireEnv('RECOVERY_GATE_SECRET')}`,
     },
     body: probeBody,
   });
@@ -254,12 +246,4 @@ test('J2 — admin recovery is blocked by the recovery-gate webhook (no privileg
     'J2: recovery-gate must return 403 for admin identity (gate fetches metadata_admin via admin API, ignoring payload is_admin)',
   ).toBe(403);
   console.log('[J2] gate direct probe:', probeResp.status, '(403 = gate correctly blocks admin via admin API lookup)');
-
-  const session = await getSession(ctx, baseURL);
-  const sessionBlocked = !session || session.active !== true;
-  expect(
-    sessionBlocked,
-    'J2: no privileged session must be issued after admin recovery — gate blocks end-to-end',
-  ).toBe(true);
-  console.log('[J2] PASS — admin recovery blocked end-to-end; no session issued');
 });

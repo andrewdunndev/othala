@@ -42,8 +42,6 @@ export function bannerFor(result: ActionResult, action: string, who: string): Ba
       return { tone: 'success', text: `${who} is signed out everywhere.` };
     case 'credential-removed':
       return { tone: 'warning', text: `Removed ${CREDENTIALS[result.credType] ?? result.credType}. Send a setup link so ${who} can set it up again.` };
-    case 'invite-email':
-      return { tone: 'success', text: `Invite email sent to ${result.email}. It carries a code only, so also tell ${who} where to sign in.` };
     case 'email-verified':
       return { tone: 'success', text: `${who}'s email is marked as verified.` };
     case 'prerequisites-saved':

@@ -4,17 +4,16 @@ import { decodeJwt } from 'jose';
 import { test, expect, GRAFANA_CLIENT_ID, GRAFANA_REDIRECT_URI, KRATOS_ADMIN_URL } from '../fixtures';
 import { createIdentityWithPassword, TEST_PASSWORD } from '../actions/identity';
 import { loginViaJsonApi } from '../actions/login';
-import { walk } from '../actions/oidc';
+import { requireEnv, walk } from '../actions/oidc';
 
 test('ZF — groups claim omits identity groups and groups no grafana binding names', async ({ browser, baseURL, hydraPublicURL }) => {
-  const secret = process.env.GRAFANA_CLIENT_SECRET;
-  if (!secret) throw new Error('GRAFANA_CLIENT_SECRET not set — inject from compose environment');
+  const secret = requireEnv('GRAFANA_CLIENT_SECRET');
   const username = `zf.member.${Date.now()}`;
   const member = await createIdentityWithPassword({
     email: `${username}@othala.test`,
     username,
     displayName: 'ZF Member',
-    groups: ['admin', 'family', 'grafana-access'],
+    groups: ['everyone', 'family', 'grafana-access'],
     kratosAdminURL: KRATOS_ADMIN_URL,
   });
 

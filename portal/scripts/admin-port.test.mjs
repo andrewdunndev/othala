@@ -5,16 +5,14 @@ import assert from 'node:assert/strict';
 import http from 'node:http';
 import { Readable } from 'node:stream';
 import {
-  isAdminRoute,
-  isAdminEndpoint,
   bearerMatches,
   parseBearer,
   handleAdminRequest,
   LOGIN_CODE_ADMIN_REFUSAL,
   LOGIN_CODE_UNAVAILABLE,
   startupEnvErrors,
-  ADMIN_GET_ROUTES,
-  ADMIN_POST_ROUTES,
+  ADMIN_GET,
+  ADMIN_POST,
 } from '../src/server/listen.ts';
 import { asAdmin, identity, session, withCredential, withPasskey, withTotp, withWebauthnKey } from '../src/lib/test-builders.ts';
 import * as secondFactorRuntime from '../src/lib/second-factor-gate.ts';
@@ -63,13 +61,11 @@ beforeEach(() => {
 });
 
 test('admin GET mux serves exactly /healthz and /readyz', () => {
-  assert.deepEqual([...ADMIN_GET_ROUTES].sort(), ['/healthz', '/readyz']);
-  assert.equal(isAdminRoute('GET', '/healthz'), true);
-  assert.equal(isAdminRoute('GET', '/readyz'), true);
+  assert.deepEqual([...ADMIN_GET.keys()].sort(), ['/healthz', '/readyz']);
 });
 
 test('admin POST mux serves exactly the admin endpoints', () => {
-  assert.deepEqual([...ADMIN_POST_ROUTES].sort(), [
+  assert.deepEqual([...ADMIN_POST.keys()].sort(), [
     '/admin/login-code-gate',
     '/admin/passkey-prune',
     '/admin/profile-gate',
@@ -79,19 +75,6 @@ test('admin POST mux serves exactly the admin endpoints', () => {
   ]);
 });
 
-test('admin POST paths are NOT public GET routes (disjoint from public mux)', () => {
-  for (const p of ADMIN_POST_ROUTES) {
-    assert.equal(isAdminRoute('GET', p), false, `${p} must not be a public GET admin route`);
-  }
-});
-
-test('admin mux does NOT serve any public/challenge path', () => {
-  for (const p of ['/', '/auth/login', '/admin', '/oauth2/login', '/oauth2/consent', '/oauth2/logout']) {
-    assert.equal(isAdminEndpoint('GET', p), false, `${p} must not be an admin endpoint`);
-    assert.equal(isAdminEndpoint('POST', p), false, `${p} must not be an admin endpoint`);
-  }
-});
-
 test('challenge + public paths 404 on the admin port', async () => {
   const paths = [
     '/oauth2/login?login_challenge=x',
@@ -99,11 +82,14 @@ test('challenge + public paths 404 on the admin port', async () => {
     '/',
     '/admin',
     '/auth/login',
+    '/oauth2/logout',
   ];
-  for (const p of paths) {
-    const res = fakeRes();
-    await handle(fakeReq({ method: 'GET', url: p }), res);
-    assert.equal(res.statusCode, 404, `${p} should 404 on admin port`);
+  for (const method of ['GET', 'POST']) {
+    for (const p of paths) {
+      const res = fakeRes();
+      await handle(fakeReq({ method, url: p }), res);
+      assert.equal(res.statusCode, 404, `${method} ${p} should 404 on admin port`);
+    }
   }
 });
 
@@ -137,7 +123,7 @@ test('readyz is 200 when Kratos and Hydra are ready, 503 naming the one that is 
 });
 
 test('a served admin POST path on the wrong method (GET) 404s', async () => {
-  for (const p of ADMIN_POST_ROUTES) {
+  for (const p of ADMIN_POST.keys()) {
     const res = fakeRes();
     await handle(fakeReq({ method: 'GET', url: p }), res);
     assert.equal(res.statusCode, 404, `GET ${p} should 404`);
@@ -813,4 +799,23 @@ test('startup refuses in production without PORTAL_ADMIN_BIND_HOST, and on a wil
   } finally {
     for (const [k, v] of Object.entries(saved)) restore(k, v);
   }
+});
+
+test('every refusing hook gate refuses a malformed JSON body (403)', async () => {
+  const refusal = (text, instance_ptr) =>
+    ({ messages: [instance_ptr ? { instance_ptr, messages: [{ id: 4000001, type: 'error', text }] } : { messages: [{ type: 'error', text }] }] });
+  const cases = [
+    ['/admin/recovery-gate', refusal('recovery refused: malformed payload')],
+    ['/admin/login-code-gate', refusal(LOGIN_CODE_UNAVAILABLE)],
+    ['/admin/profile-gate', refusal(PROFILE_UPDATE_UNAVAILABLE, '#/traits/username')],
+    ['/admin/second-factor-gate?method=totp', refusal(secondFactorRuntime.SECOND_FACTOR_UNAVAILABLE, '#/')],
+  ];
+  await withMockKratos(identityServer({ groups: ['family'], admin: false }), async () => {
+    for (const [url, body] of cases) {
+      const res = fakeRes();
+      await handle(fakeReq({ method: 'POST', url, headers: { authorization: 'Bearer gate-secret' }, body: '{not json' }), res);
+      assert.equal(res.statusCode, 403, url);
+      assert.deepEqual(JSON.parse(res.body), body, url);
+    }
+  });
 });
