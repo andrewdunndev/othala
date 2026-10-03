@@ -101,54 +101,6 @@ for _ in $(seq 1 30); do
     sleep 2
 done
 
-# Step 4b: seed both admin identities via the Kratos admin API with the
-# metadata_admin.admin marker set at creation. No id is supplied: Kratos rejects one
-# with 400. Credentials come from .env (gen-secrets.sh), shared with the Playwright fixtures.
-echo ""
-echo "=== seed phase (admin identities with metadata_admin.admin=true marker) ==="
-
-# Post from the othala container (has Node) to kratos:4434, program on stdin.
-
-# Usage: seed_admin_identity <email> <username> <display_name> <groups_json> <password>
-seed_admin_identity() {
-    local email="$1" username="$2" display_name="$3" groups_json="$4" password="$5"
-    local result
-    result=$(printf '%s' "fetch('http://kratos:4434/admin/identities',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({schema_id:'family',state:'active',traits:{username:'${username}',email:'${email}',displayName:'${display_name}'},metadata_admin:{admin:true,groups:${groups_json}},credentials:{password:{config:{password:'${password}'}}}})}).then(r=>r.json()).then(j=>{process.stdout.write(j.id||('ERR:'+JSON.stringify(j)));process.exit(0)}).catch(e=>{process.stdout.write('EXC:'+e.message);process.exit(1)})" \
-        | docker compose exec -T othala node 2>/dev/null)
-    # Strip ANSI resets that podman-compose prepends.
-    result=$(printf '%s' "$result" | sed 's/\x1b\[[0-9;]*m//g')
-    printf '%s' "$result"
-}
-
-ADMIN_EMAIL="${ADMIN_EMAIL:-admin@othala.test}"
-ADMIN_USERNAME="${ADMIN_USERNAME:-admin}"
-ADMIN_PASSWORD="${ADMIN_PASSWORD:-othala-testpass-2026}"
-RECOVERY_ADMIN_EMAIL="${RECOVERY_ADMIN_EMAIL:-admin.recovery@othala.test}"
-RECOVERY_ADMIN_USERNAME="${RECOVERY_ADMIN_USERNAME:-admin.recovery}"
-RECOVERY_ADMIN_PASSWORD="${RECOVERY_ADMIN_PASSWORD:-othala-testpass-2026}"
-
-# Access model: an admin holds `<svc>-access` AND `<svc>-admin` explicitly; dropping
-# grafana-access locks the admin out (t-access-model.spec.ts T4). metadata_admin.admin
-# is portal authority only and is orthogonal to groups.
-echo "  seeding primary admin: $ADMIN_EMAIL (admin marker + groups) ..."
-ADMIN_ID=$(seed_admin_identity \
-    "$ADMIN_EMAIL" "$ADMIN_USERNAME" "Othala Admin" \
-    "['grafana-access','grafana-admin']" "$ADMIN_PASSWORD")
-if [[ -z "$ADMIN_ID" || "$ADMIN_ID" == ERR:* || "$ADMIN_ID" == EXC:* ]]; then
-    echo "  ✗ seed admin failed: $ADMIN_ID"; exit 1
-fi
-echo "  ✓ admin seeded: id=$ADMIN_ID (metadata_admin.admin=true)"
-
-# The recovery-admin exercises the recovery-gate (marker only), so it holds just grafana-access.
-echo "  seeding recovery-admin: $RECOVERY_ADMIN_EMAIL (admin marker + groups) ..."
-RECOVERY_ADMIN_ID=$(seed_admin_identity \
-    "$RECOVERY_ADMIN_EMAIL" "$RECOVERY_ADMIN_USERNAME" "Admin Recovery Test" \
-    "['grafana-access']" "$RECOVERY_ADMIN_PASSWORD")
-if [[ -z "$RECOVERY_ADMIN_ID" || "$RECOVERY_ADMIN_ID" == ERR:* || "$RECOVERY_ADMIN_ID" == EXC:* ]]; then
-    echo "  ✗ seed recovery-admin failed: $RECOVERY_ADMIN_ID"; exit 1
-fi
-echo "  ✓ recovery-admin seeded: id=$RECOVERY_ADMIN_ID (metadata_admin.admin=true)"
-
 # Step 5: smoke (the API-level suite + browser-free OIDC dance, sections A-G)
 echo ""
 echo "=== smoke ==="

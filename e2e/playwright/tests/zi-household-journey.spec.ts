@@ -5,6 +5,7 @@
 import type { Page } from '@playwright/test';
 import { test, expect, adminAal2Context, computeTotp, GRAFANA_CLIENT_ID, GRAFANA_REDIRECT_URI } from '../fixtures';
 import { createIdentityWithPassword, TEST_PASSWORD } from '../actions/identity';
+import { requireEnv } from '../actions/oidc';
 
 const PASSKEY_REGISTER_BUTTON = 'button[name="passkey_register_trigger"]';
 const PASSKEY_LOGIN_BUTTON = 'button[name="passkey_login_trigger"]';
@@ -110,7 +111,7 @@ test('ZI1 — admin adds a person; they redeem, enrol a passkey and TOTP, and si
   expect(code2, `ZI1: the OIDC app receives a code, landed at ${page.url()}`).toBeTruthy();
 
   // The code redeems at the token endpoint for an id_token carrying the person.
-  const basic = Buffer.from(`${GRAFANA_CLIENT_ID}:${process.env.GRAFANA_CLIENT_SECRET ?? ''}`).toString('base64');
+  const basic = Buffer.from(`${GRAFANA_CLIENT_ID}:${requireEnv('GRAFANA_CLIENT_SECRET')}`).toString('base64');
   const token = await ctx.request.post(`${baseURL}/oauth2/token`, {
     headers: { Authorization: `Basic ${basic}` },
     form: { grant_type: 'authorization_code', code: code2!, redirect_uri: GRAFANA_REDIRECT_URI },

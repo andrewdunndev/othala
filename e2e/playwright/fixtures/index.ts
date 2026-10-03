@@ -312,23 +312,15 @@ export const test = base.extend<OthalaFixtures, OthalaWorkerFixtures>({
 
   admin: [
     async ({ kratosAdminURL }, use) => {
-      const email = process.env.ADMIN_EMAIL ?? 'admin@othala.test';
-      const password = process.env.ADMIN_PASSWORD ?? TEST_PASSWORD;
-      const listResp = await fetch(
-        `${kratosAdminURL}/admin/identities?credentials_identifier=${encodeURIComponent(email)}`,
-      );
-      if (!listResp.ok) {
-        throw new Error(
-          `admin fixture: lookup failed: HTTP ${listResp.status} for ${email}`,
-        );
-      }
-      const list = (await listResp.json()) as Array<{ id: string }>;
-      if (list.length === 0) {
-        throw new Error(
-          `admin fixture: no identity found for ${email} — did validate.sh seed phase run?`,
-        );
-      }
-      await use({ id: list[0].id, email, password });
+      const result = await createIdentityWithPassword({
+        email: 'admin@othala.test',
+        username: 'admin',
+        displayName: 'Othala Admin',
+        groups: ['grafana-access', 'grafana-admin'],
+        isAdmin: true,
+        kratosAdminURL,
+      });
+      await use({ ...result, password: TEST_PASSWORD });
     },
     { scope: 'worker' },
   ],

@@ -5,6 +5,7 @@ import { test, expect } from '../fixtures';
 import { createIdentityWithPassword } from '../actions/identity';
 import { getSession } from '../actions/session';
 import { HOUSEHOLD, waitForMessage, forRecipient } from '../actions/mail';
+import { requireEnv } from '../actions/oidc';
 
 async function initRecoveryFlow(
   req: APIRequestContext,
@@ -249,7 +250,7 @@ test('J2 — admin recovery is blocked by the recovery-gate webhook (no privileg
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
-      Authorization: `Bearer ${process.env.RECOVERY_GATE_SECRET ?? ''}`,
+      Authorization: `Bearer ${requireEnv('RECOVERY_GATE_SECRET')}`,
     },
     body: probeBody,
   });

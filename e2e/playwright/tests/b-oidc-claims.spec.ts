@@ -2,6 +2,7 @@
 
 import { test, expect, GRAFANA_CLIENT_ID, GRAFANA_REDIRECT_URI } from '../fixtures';
 import { loginViaJsonApi } from '../actions/login';
+import { requireEnv } from '../actions/oidc';
 import { decodeJwt } from 'jose';
 
 test('B — OIDC authorize flow issues id_token with grafana_role=[Viewer]', async ({
@@ -10,10 +11,7 @@ test('B — OIDC authorize flow issues id_token with grafana_role=[Viewer]', asy
   hydraPublicURL,
   member,
 }) => {
-  const GRAFANA_CLIENT_SECRET = process.env.GRAFANA_CLIENT_SECRET;
-  if (!GRAFANA_CLIENT_SECRET) {
-    throw new Error('GRAFANA_CLIENT_SECRET env var not set — inject from compose environment');
-  }
+  const GRAFANA_CLIENT_SECRET = requireEnv('GRAFANA_CLIENT_SECRET');
 
   await loginViaJsonApi(
     ctx,

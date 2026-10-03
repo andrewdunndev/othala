@@ -4,11 +4,10 @@ import type { BrowserContext, Page } from 'playwright-core';
 import { test, expect, adminAal2Context, GRAFANA_CLIENT_ID, GRAFANA_REDIRECT_URI, KRATOS_ADMIN_URL } from '../fixtures';
 import { createIdentityWithPassword, TEST_PASSWORD } from '../actions/identity';
 import { loginViaJsonApi } from '../actions/login';
+import { requireEnv } from '../actions/oidc';
 
 function clientSecret(): string {
-  const secret = process.env.GRAFANA_CLIENT_SECRET;
-  if (!secret) throw new Error('GRAFANA_CLIENT_SECRET not set — inject from compose environment');
-  return secret;
+  return requireEnv('GRAFANA_CLIENT_SECRET');
 }
 
 async function authorizeOffline(ctx: BrowserContext, baseURL: string): Promise<string> {

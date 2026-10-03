@@ -59,14 +59,6 @@ KRATOS_CIPHER_SECRET_CURRENT=${kratos_cipher}
 HYDRA_SYSTEM_SECRET=$(gen)
 HYDRA_COOKIE_SECRET_CURRENT=${hydra_cookie}
 
-# Admin credentials, shared by the validate.sh seed and the Playwright fixtures (test-only values).
-ADMIN_EMAIL=admin@othala.test
-ADMIN_USERNAME=admin
-ADMIN_PASSWORD=othala-testpass-2026
-RECOVERY_ADMIN_EMAIL=admin.recovery@othala.test
-RECOVERY_ADMIN_USERNAME=admin.recovery
-RECOVERY_ADMIN_PASSWORD=othala-testpass-2026
-
 # Admin authority is the metadata_admin.admin marker; RECOVERY_GATE_SECRET guards the Kratos
 # webhooks on the internal-network admin listener (PORTAL_ADMIN_BIND_HOST) (smoke; the browser overlay binds the static IP).
 RECOVERY_GATE_SECRET=$(gen)
