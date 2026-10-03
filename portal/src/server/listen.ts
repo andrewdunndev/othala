@@ -324,11 +324,11 @@ async function handleReadyz(res: ServerResponse): Promise<void> {
 }
 
 /** The admin mux, by method then path. Disjoint from the public routes. */
-export const ADMIN_GET = new Map<string, Handler>([
+export const ADMIN_GET: ReadonlyMap<string, Handler> = new Map<string, Handler>([
   ['/healthz', (_req, res) => sendJson(res, 200, { status: 'ok' })],
   ['/readyz', (_req, res) => handleReadyz(res)],
 ]);
-export const ADMIN_POST = new Map<string, Handler>([
+export const ADMIN_POST: ReadonlyMap<string, Handler> = new Map<string, Handler>([
   ['/admin/recovery-gate', handleRecoveryGate],
   ['/admin/login-code-gate', handleLoginCodeGate],
   ['/admin/profile-gate', handleProfileGate],
