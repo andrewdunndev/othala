@@ -15,7 +15,6 @@ function manifest(redirectUris) {
     grantTypes: [],
     skipConsent: true,
     backchannelLogoutUri: '',
-    accessGroup: 'access-grafana',
     roles: [],
     groupRoleMap: {},
   };

@@ -1,6 +1,6 @@
-// Access-group parsing: reads `presentation.access` (else the `access_group`
-// compat shim, else []) into `accessGroups`, the load-bearing access binding
-// used by gate, access, tiles and the group registry. Absence means no access.
+// Access-group parsing: reads `presentation.access` into `accessGroups`, the
+// load-bearing access binding used by gate, access, tiles and the group
+// registry. Absence means no access.
 // Non-throwing: names missing the canonical form are skipped; hard validation
 // is manifest-lint.ts.
 
@@ -13,8 +13,7 @@
  * The boundaries that enforce it:
  *   - portal/src/lib/metadata-admin.ts `validateGroups` — the identity write
  *     path (createIdentity / updateIdentity in portal/src/lib/admin-api.ts).
- *   - `parseAccessGroups` below — manifest load (`presentation.access`,
- *     `presentation.access_group`).
+ *   - `parseAccessGroups` below — manifest load (`presentation.access`).
  *   - portal/src/lib/manifest-lint.ts — WARNs on an access-binding name or a
  *     `group_role_map` key that misses it.
  *   - portal/src/pages/api/forward-auth.ts — the operator-set `?group=` param.
@@ -34,34 +33,14 @@ export function isValidAccessGroupName(name: unknown): name is string {
   return typeof name === 'string' && GROUP_RE.test(name);
 }
 
-/**
- * Resolve the normalized access-group list for a `presentation:` block.
- *
- * `p` is the raw parsed `presentation:` mapping. The precedence above is
- * applied; each candidate is charset-validated and silently dropped on a miss
- * (Phase 1 is non-breaking — see the module header). Duplicates are de-duped
- * while preserving declared order.
- */
+/** The `presentation.access` names in declared order, de-duplicated; a name missing GROUP_RE is dropped. */
 export function parseAccessGroups(p: Record<string, unknown>): string[] {
-  // (1) presentation.access — a non-empty list wins outright.
   const access = p['access'];
-  if (Array.isArray(access)) {
-    const out: string[] = [];
-    for (const raw of access) {
-      const name = typeof raw === 'string' ? raw.trim() : '';
-      if (isValidAccessGroupName(name) && !out.includes(name)) out.push(name);
-    }
-    if (out.length > 0) return out;
+  if (!Array.isArray(access)) return [];
+  const out: string[] = [];
+  for (const raw of access) {
+    const name = typeof raw === 'string' ? raw.trim() : '';
+    if (isValidAccessGroupName(name) && !out.includes(name)) out.push(name);
   }
-
-  // (2) compat shim: singular access_group → one-element list, NO prefix
-  //     validation (the access-<slug> rule is intentionally not applied here).
-  const single = p['access_group'];
-  if (typeof single === 'string') {
-    const name = single.trim();
-    if (isValidAccessGroupName(name)) return [name];
-  }
-
-  // (3) absence → empty list.
-  return [];
+  return out;
 }

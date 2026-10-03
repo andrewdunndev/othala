@@ -88,7 +88,6 @@ function tile(m: ClientManifest, order: number): AppTile {
     authKind,
     iconHref,
     iconBleed: iconIsBleed(iconHref?.split('/').pop()?.replace(/\.svg$/, '')),
-    accessGroup: 'everyone',
     accessGroups: m.accessGroups,
     order,
     disabled: false,

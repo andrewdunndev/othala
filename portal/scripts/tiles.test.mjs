@@ -5,6 +5,7 @@ import assert from 'node:assert/strict';
 import { mkdtempSync, writeFileSync, rmSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
+import { tileAccessGroups } from '../src/lib/tiles.ts';
 
 async function withTilesModule({ MANIFEST_DIR: dir }, callback) {
   const { setManifestDir } = await import('../src/lib/manifests.ts');
@@ -31,22 +32,7 @@ async function parseSingleTile(yamlContent) {
   }
 }
 
-test('parseTile: explicit access_group passes through unchanged', async () => {
-  const tile = await parseSingleTile(`
-presentation:
-  name: Test App
-  description: A test application
-  url: https://testapp.othala.test
-  icon: TA
-  auth_kind: oidc
-  access_group: access-testapp
-  order: 10
-`);
-  assert.ok(tile, 'tile must be parsed');
-  assert.equal(tile.accessGroup, 'access-testapp');
-});
-
-test('parseTile: absent access_group falls back to default group (everyone)', async () => {
+test('parseTile: no access binding falls back to the default group (everyone)', async () => {
   const tile = await parseSingleTile(`
 presentation:
   name: Test App
@@ -57,24 +43,8 @@ presentation:
   order: 10
 `);
   assert.ok(tile, 'tile must be parsed');
-  assert.equal(tile.accessGroup, 'everyone',
-    'absent access_group must fall back to the default group (everyone)');
-});
-
-test('parseTile: empty access_group string falls back to default group', async () => {
-  const tile = await parseSingleTile(`
-presentation:
-  name: Test App
-  description: A test application
-  url: https://testapp.othala.test
-  icon: TA
-  auth_kind: external
-  access_group: ""
-  order: 10
-`);
-  assert.ok(tile, 'tile must be parsed');
-  assert.equal(tile.accessGroup, 'everyone',
-    'empty access_group must fall back to the default group');
+  assert.deepEqual(tileAccessGroups(tile), ['everyone'],
+    'no access binding must fall back to the default group (everyone)');
 });
 
 test('parseTile: presentation.access list populates accessGroups', async () => {
@@ -94,23 +64,7 @@ presentation:
   assert.deepEqual(tile.accessGroups, ['memories', 'family']);
 });
 
-test('parseTile: only access_group populates accessGroups via compat shim', async () => {
-  const tile = await parseSingleTile(`
-presentation:
-  name: Test App
-  description: A test application
-  url: https://testapp.othala.test
-  icon: TA
-  auth_kind: oidc
-  access_group: access-testapp
-  order: 10
-`);
-  assert.ok(tile, 'tile must be parsed');
-  assert.deepEqual(tile.accessGroups, ['access-testapp']);
-  assert.equal(tile.accessGroup, 'access-testapp');
-});
-
-test('parseTile: neither access nor access_group → accessGroups is empty', async () => {
+test('parseTile: no access list → accessGroups is empty', async () => {
   const tile = await parseSingleTile(`
 presentation:
   name: Test App
@@ -123,7 +77,7 @@ presentation:
   assert.ok(tile, 'tile must be parsed');
   assert.deepEqual(tile.accessGroups, [],
     'no access binding → empty accessGroups (no everyone fallback at this layer)');
-  assert.equal(tile.accessGroup, 'everyone');
+  assert.deepEqual(tileAccessGroups(tile), ['everyone']);
 });
 
 test('parseTile: manifest without presentation block returns no tile', async () => {
@@ -161,7 +115,7 @@ presentation:
   }
 });
 
-test('parseTile: external tile without access_group uses default group (statuspage pattern)', async () => {
+test('parseTile: external tile without access uses default group (statuspage pattern)', async () => {
   const tile = await parseSingleTile(`
 presentation:
   name: Statuspage
@@ -174,6 +128,6 @@ presentation:
 `);
   assert.ok(tile, 'statuspage-pattern tile must be parsed');
   assert.equal(tile.authKind, 'external');
-  assert.equal(tile.accessGroup, 'everyone',
-    'external tile without access_group must gate on the default group');
+  assert.deepEqual(tileAccessGroups(tile), ['everyone'],
+    'external tile without access must gate on the default group');
 });

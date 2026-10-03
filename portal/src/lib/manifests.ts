@@ -42,9 +42,8 @@ export interface ClientManifest {
   /** `oidc.backchannel_logout_session_required`; includes the sid claim. */
   backchannelLogoutSessionRequired: boolean;
   /**
-   * The access binding: groups whose members may enter this app (OR). From `presentation.access:` with an
-   * `[access_group]` compat shim. Absence yields `[]` with no implicit fallback (primitive #5); a bare manifest
-   * without `skip_access_check` is a load-time BLOCK (validateClients).
+   * The access binding: groups whose members may enter this app (OR), from `presentation.access:`. Absence yields
+   * `[]` with no implicit fallback; a bare manifest without `skip_access_check` is a load-time BLOCK (validateClients).
    */
   accessGroups: string[];
   /** Declared role enum for the app; may be empty if the yaml has no `roles:` block. */

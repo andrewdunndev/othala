@@ -19,7 +19,6 @@ function manifest(clientId, opts = {}) {
     skipConsent: false,
     backchannelLogoutUri: '',
     backchannelLogoutSessionRequired: false,
-    accessGroup: `access-${clientId}`,
     accessGroups: opts.accessGroups ?? [`access-${clientId}`],
     roles: opts.roles ?? [],
     groupRoleMap: opts.groupRoleMap ?? {},

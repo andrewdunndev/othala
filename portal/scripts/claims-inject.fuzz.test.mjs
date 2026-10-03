@@ -21,7 +21,6 @@ function manifest({ clientId = 'myapp', roles = [], groupRoleMap = {}, emitGroup
     skipConsent,
     backchannelLogoutUri: '',
     backchannelLogoutSessionRequired: false,
-    accessGroup: `access-${clientId}`,
     accessGroups: [`access-${clientId}`],
     roles,
     groupRoleMap,

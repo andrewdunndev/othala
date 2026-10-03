@@ -475,7 +475,7 @@ test('presentation-only manifest is valid WITHOUT an oidc: block (audience rule 
 presentation:
   name: Proxywatch
   auth_kind: forward_auth
-  access_group: access-proxywatch
+  access: [access-proxywatch]
 `, 'proxywatch.yaml');
   assert.equal(m.presentationOnly, true);
   assert.deepEqual(validateClients([m]), []);

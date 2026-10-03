@@ -8,8 +8,8 @@ OAuth client and no other credential. The portal's tile filter gates all tiles o
 group membership regardless of `auth_kind`, so this tile (like every other)
 requires the user to be in an appropriate group.
 
-This fixture demonstrates the **default-group fallback**: `access_group` is
-intentionally omitted from `statuspage.yaml`. When `access_group` is absent,
+This fixture demonstrates the **default-group fallback**: `access` is
+intentionally omitted from `statuspage.yaml`. When `access` is absent,
 the tile gates on the default group, `everyone`. An admin
 assigns the default group to users who should see such broadly-visible tiles;
 no user is placed in it automatically.
@@ -18,4 +18,4 @@ no user is placed in it automatically.
 > ungated path, even for `auth_kind: external` tiles. Use the default group
 > (`everyone`) for
 > tiles you want visible to most authenticated users, and set an explicit
-> `access_group` for tiles that need tighter control.
+> `access` list for tiles that need tighter control.

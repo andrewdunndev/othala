@@ -494,7 +494,6 @@ test('T2: consent skip=false bounces to /auth/consent with challenge', async () 
       manifest: () => ({
         clientId: 'grafana',
         clientName: 'grafana',
-        accessGroup: 'grafana-access',
         accessGroups: ['grafana-access'],
         skipConsent: false,
         skipAccessCheck: false,
@@ -777,7 +776,6 @@ test('A4e: roleless manifest -> base claims only, groups emitted', async () => {
   const rolelessManifest = {
     clientId: 'unknown-client',
     clientName: 'unknown-client',
-    accessGroup: 'access-unknown-client',
     accessGroups: ['access-unknown-client'],
     skipAccessCheck: false,
     roles: [],

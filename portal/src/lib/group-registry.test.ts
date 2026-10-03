@@ -88,7 +88,7 @@ presentation:
   name: Proxywatch
   url: https://proxywatch.example.test
   auth_kind: forward_auth
-  access_group: proxywatch-access
+  access: [proxywatch-access]
 `;
 
 const FETCHER = `
@@ -96,7 +96,7 @@ presentation:
   name: Usenet downloader
   url: https://downloads.example.test/fetcher
   auth_kind: forward_auth
-  access_group: downloads-usenet-access
+  access: [downloads-usenet-access]
 `;
 
 const SERIES = `
@@ -104,7 +104,7 @@ presentation:
   name: Series manager
   url: https://downloads.example.test/series
   auth_kind: forward_auth
-  access_group: downloads-usenet-access
+  access: [downloads-usenet-access]
 `;
 
 const FILEDROP = `
@@ -156,7 +156,7 @@ consent:
       claim_emit:
         role: Curator
   group_role_map:
-    access-legacy: curator
+    access-curators: curator
 `;
 
 const CATALOG: Record<string, string> = {
@@ -212,10 +212,10 @@ describe('buildGroupRegistry — type comes from the binding, not the name', () 
   it('types a group NAMED like the retired access- convention as role when that is its only binding', () => {
     const reg = buildGroupRegistry([parse('archive.yaml', ARCHIVE)], []);
 
-    expect(reg.get('access-legacy')?.kinds).toEqual(new Set(['role']));
-    expect(isAccessGroup(reg, 'access-legacy')).toBe(false);
-    expect(reg.get('access-legacy')?.accessFor).toEqual([]);
-    expect(reg.get('access-legacy')?.roleFor).toEqual(['archive']);
+    expect(reg.get('access-curators')?.kinds).toEqual(new Set(['role']));
+    expect(isAccessGroup(reg, 'access-curators')).toBe(false);
+    expect(reg.get('access-curators')?.accessFor).toEqual([]);
+    expect(reg.get('access-curators')?.roleFor).toEqual(['archive']);
   });
 
   it('does not let <svc>-admin become an access group (entry stays explicit)', () => {

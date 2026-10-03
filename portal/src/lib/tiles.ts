@@ -96,9 +96,7 @@ export interface AppTile {
   /** The logo ships its own filled square, so the plate drops its padding and border. */
   iconBleed?: boolean;
   authKind: AuthKind;
-  /** Fallback group, used only when `accessGroups` is empty (see tileAccessGroups): `presentation.access_group`, else the default group. */
-  accessGroup: string;
-  /** Access binding from parseAccessGroups over `presentation.access:` (`[access_group]` compat); `[]` when neither is set. tileAccessGroups prefers it. */
+  /** Access binding from parseAccessGroups over `presentation.access:`; `[]` when unset. */
   accessGroups: string[];
   /** Optional dashboard grouping label (e.g. "Usenet"); tiles sharing one render together. */
   group?: string;
@@ -306,19 +304,12 @@ export function tileReadiness(tile: AppTile, marked: readonly string[]): TileRea
   return tile.requires.every((r) => marked.includes(r)) ? 'ready' : 'needs';
 }
 
-/**
- * Parse one manifest's `presentation:` block into an AppTile; null when it has none. An absent `access_group` gates
- * on the default group (DEFAULT_GROUP), never on a per-slug group or every authenticated user.
- */
+/** Parse one manifest's `presentation:` block into an AppTile; null when it has none. */
 function parseTile(slug: string, doc: Record<string, unknown>, dir: string): AppTile | null {
   const pBlock = doc['presentation'];
   if (!pBlock || typeof pBlock !== 'object' || Array.isArray(pBlock)) return null;
   const p = pBlock as Record<string, unknown>;
 
-  // Absent access_group falls back to the default group, which admins assign explicitly.
-  const accessGroup = p['access_group'] ? String(p['access_group']) : DEFAULT_GROUP;
-
-  // Normalized `presentation.access:` binding; `[]` means the accessGroup fallback applies.
   const accessGroups = parseAccessGroups(p);
 
   const url = String(p['url'] ?? '');
@@ -342,7 +333,6 @@ function parseTile(slug: string, doc: Record<string, unknown>, dir: string): App
     url,
     icon: String(p['icon'] ?? '??'),
     authKind: String(p['auth_kind'] ?? 'external') as AuthKind,
-    accessGroup,
     accessGroups,
     order: typeof p['order'] === 'number' ? p['order'] : 999,
     disabled: p['disabled'] === true,
@@ -442,10 +432,10 @@ export function getTile(slug: string): AppTile | undefined {
   return allTiles().find((t) => t.slug === slug);
 }
 
-/** The group(s) gating a tile's visibility: the manifest's `accessGroups` (the field the OIDC gate uses), else the singular
- * `accessGroup` (default-group fallback) for tiles with no binding. */
+/** The group(s) gating a tile's visibility: the manifest's `accessGroups` (the field the OIDC gate uses), else the
+ * default group, never every authenticated user. */
 export function tileAccessGroups(tile: AppTile): string[] {
-  return tile.accessGroups.length > 0 ? tile.accessGroups : [tile.accessGroup];
+  return tile.accessGroups.length > 0 ? tile.accessGroups : [DEFAULT_GROUP];
 }
 
 /** Whether the user may see the tile: OR over tileAccessGroups. Unlike enforceAccessGate, `skip_access_check` is not
