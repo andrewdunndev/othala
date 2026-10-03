@@ -1,6 +1,4 @@
-// Verdict for the settings.after.totp and settings.after.webauthn web_hooks: admins and members holding an elevated app
-// role keep at least one second factor. The hook context carries neither credentials nor the form, so the verdict reads
-// the stored identity and assumes the worst removal the method allows.
+// The Kratos hook context carries neither credentials nor the form, so the verdict assumes the worst removal the method allows.
 
 import type { Identity } from './types';
 import type { ClientManifest } from './manifests';
@@ -24,7 +22,6 @@ function without(creds: Creds, type: string): Creds {
   return next;
 }
 
-/** Each credential map the submission can produce by removing something. */
 function removalOutcomes(stored: Identity, creds: Creds, method: 'totp' | 'webauthn'): Creds[] {
   if (method === 'totp') {
     const totpOnly = parseIdentity(withCreds(stored, { totp: creds.totp })).hasSecondFactor;
@@ -39,7 +36,6 @@ function removalOutcomes(stored: Identity, creds: Creds, method: 'totp' | 'webau
   }));
 }
 
-/** `stored` is the admin-API identity from before the change; anything unreadable refuses. */
 export function secondFactorChangeVerdict(
   stored: Identity | null | undefined,
   method: string,

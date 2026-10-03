@@ -1,5 +1,3 @@
-// Reasons the /auth/error page knows how to describe. Plain household language: what happened, then what to do next.
-
 export interface ErrorEntry {
   status: number;
   title: string;
@@ -75,13 +73,11 @@ export const DEFAULT_ENTRY: ErrorEntry = {
   message: 'Wait a minute and try again; tell an admin if it repeats.',
 };
 
-/** The entry for a reason. The reason token is not shown to people: it is a code, not a sentence. */
 export function resolveReason(raw: string | null): { entry: ErrorEntry; reason?: string } {
   if (raw !== null && Object.hasOwn(REASON_MAP, raw)) return { entry: REASON_MAP[raw], reason: raw };
   return { entry: DEFAULT_ENTRY };
 }
 
-/** Hydra's OAuth2 `error` codes, by what the person should do next. */
 const HYDRA_ERRORS: Record<string, string> = {
   invalid_client: 'app-misconfigured',
   unauthorized_client: 'app-misconfigured',
@@ -97,7 +93,6 @@ const HYDRA_ERRORS: Record<string, string> = {
   temporarily_unavailable: 'unavailable',
 };
 
-/** Kratos self-service error ids (GET /self-service/errors) and, failing an id, their HTTP codes. */
 const KRATOS_ERRORS: Record<string, string> = {
   self_service_flow_expired: 'flow-expired',
   self_service_flow_replaced: 'flow-expired',
@@ -115,14 +110,12 @@ const KRATOS_CODES: Record<number, string> = {
   504: 'unavailable',
 };
 
-/** What a Kratos error body (id and HTTP code) means for the page, or undefined to show the generic entry. */
 export function kratosReason(err: { id?: unknown; code?: unknown } | null | undefined): string | undefined {
   if (!err) return undefined;
   if (typeof err.id === 'string' && Object.hasOwn(KRATOS_ERRORS, err.id)) return KRATOS_ERRORS[err.id];
   return typeof err.code === 'number' && Object.hasOwn(KRATOS_CODES, err.code) ? KRATOS_CODES[err.code] : undefined;
 }
 
-/** The page's entry from its query: our own `reason`, a Hydra `error` (its description is never shown), or a Kratos error already looked up by `?id=`. */
 export function resolveError(params: URLSearchParams, kratos?: string): { entry: ErrorEntry; reason?: string } {
   const own = params.get('reason');
   if (own !== null && Object.hasOwn(REASON_MAP, own)) return resolveReason(own);

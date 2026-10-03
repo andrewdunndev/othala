@@ -1,6 +1,3 @@
-// Hydra login/consent/logout challenge providers at /oauth2/{login,consent,logout} (not the Kratos UI pages in
-// src/pages/auth/). Each handler takes a Web Request and returns a Web Response, so routes stay thin and tests inject Deps.
-
 import { Configuration, OAuth2Api } from '@ory/client-fetch';
 import type {
   OAuth2ConsentRequest,
@@ -19,11 +16,9 @@ import { publicUrl } from './config';
 import { HYDRA_ADMIN_URL } from './constants';
 import { timeoutFetch } from './ory-fetch';
 
-// Hydra remembers a sign-in as long as the Kratos session lives so a later app sign-out still reaches handleLogout;
-// the fallback is the Kratos session.lifespan (720h).
-const KRATOS_SESSION_LIFESPAN = 2_592_000; // 30 days
+// Hydra remembers a sign-in as long as the Kratos session lives, so a later app sign-out still reaches handleLogout.
+const KRATOS_SESSION_LIFESPAN = 2_592_000; // Kratos session.lifespan, 720h
 
-/** Seconds until the Kratos session expires; the configured lifespan when unknown. */
 export function loginRememberFor(session: Session, now: number = Date.now()): number {
   const expires = session.expires_at ? new Date(session.expires_at).getTime() : NaN;
   if (!Number.isFinite(expires)) return KRATOS_SESSION_LIFESPAN;
@@ -35,11 +30,8 @@ export function defaultOAuth2Api(): OAuth2Api {
 }
 
 const LOGIN_UI_BASE = '/auth/login';
-
-/** Consent grant-screen base. */
 const CONSENT_UI_BASE = '/auth/consent';
 
-/** Injectable dependencies; tests pass stubs for what they need. */
 export interface Deps {
   oauth2?: Pick<
     OAuth2Api,
@@ -55,10 +47,8 @@ export interface Deps {
   >;
   getIdentity?: (id: string) => Promise<Identity>;
   getSession?: (cookie?: string) => Promise<Session | null>;
-  /** Revoke one Kratos session by id (logout). */
   revokeSession?: (sessionId: string) => Promise<void>;
-  /** Resolve a client manifest. Defaults to the SERVING loader (manifest-store.ts), which never throws, so an invalid
-   * manifest set denies entry instead of 500ing every challenge; undefined is fail-closed at the gate. */
+  /** The serving default never throws, so an invalid manifest set denies entry instead of failing every challenge. */
   manifest?: (clientId: string) => ClientManifest | undefined;
 }
 
@@ -72,23 +62,21 @@ function resolve(deps: Deps): Required<Deps> {
   };
 }
 
-/** Log an upstream (Kratos or Hydra) failure with the step that failed; the error text only, never cookies, challenges or tokens. */
+/** Logs the error text only, never cookies, challenges or tokens. */
 export function upstream(step: string, err: unknown): void {
   console.error('[portal] upstream failure', { step, error: String(err) });
 }
 
-/** 302 redirect. */
 function redirect(location: string): Response {
   return new Response(null, { status: 302, headers: { Location: location } });
 }
 
-/** Relative return_to path for the Kratos login bounce: never a scheme or host, so it cannot redirect cross-origin. */
+/** Relative path only, so the login bounce cannot redirect cross-origin. */
 export function buildLoginReturnTo(challenge: string): string {
   const qs = new URLSearchParams({ login_challenge: challenge });
   return `/oauth2/login?${qs.toString()}`;
 }
 
-/** Fetch an identity, returning null on any lookup failure (fail-closed). */
 async function safeGetIdentity(
   d: Required<Deps>,
   subject: string,
@@ -104,7 +92,6 @@ async function safeGetIdentity(
 // Hydra exposes no requested_at, so a sign-in this recent satisfies prompt=login and stops the refresh looping back.
 const FRESH_LOGIN_WINDOW_S = 30;
 
-/** Whether the Kratos session is recent enough for the prompt and max_age in Hydra's request_url. */
 export function freshnessVerdict(
   requestUrl: string,
   session: Pick<Session, 'authenticated_at'>,
@@ -143,7 +130,6 @@ async function rejectLogin(d: Required<Deps>, challenge: string, error: string, 
   }
 }
 
-/** Handle GET /oauth2/login?login_challenge=... */
 export async function handleLogin(req: Request, deps: Deps = {}): Promise<Response> {
   const d = resolve(deps);
   const challenge = new URL(req.url).searchParams.get('login_challenge');
@@ -217,11 +203,6 @@ export async function handleLogin(req: Request, deps: Deps = {}): Promise<Respon
   }
 }
 
-/**
- * Accept a consent request with full claims; shared by the skip auto-accept in handleConsent and the POST in
- * /oauth2/consent.ts. Consent is not remembered, so every authorize passes the gate again. Callers have passed the
- * gate, so identity is non-null; `clientId` resolves the manifest for claims.
- */
 export async function acceptConsentRequest(
   challenge: string,
   consent: OAuth2ConsentRequest,
@@ -237,6 +218,7 @@ export async function acceptConsentRequest(
       acceptOAuth2ConsentRequest: {
         grant_scope: consent.requested_scope,
         grant_access_token_audience: consent.requested_access_token_audience,
+        // Not remembered, so every authorize passes the gate again.
         remember: false,
         session: {
           id_token: idTokenClaims,
@@ -251,7 +233,6 @@ export async function acceptConsentRequest(
   }
 }
 
-/** Handle GET /oauth2/consent?consent_challenge=... */
 export async function handleConsent(req: Request, deps: Deps = {}): Promise<Response> {
   const d = resolve(deps);
   const challenge = new URL(req.url).searchParams.get('consent_challenge');
@@ -275,7 +256,6 @@ export async function handleConsent(req: Request, deps: Deps = {}): Promise<Resp
   const consentManifest = d.manifest(clientId);
   const result = enforceAccessGate(identity, clientId, consentManifest);
   if (!result.allowed) {
-    // Log the real reason server-side; send an opaque error_description.
     console.warn('[oauth2/consent] access denied', { clientId, subject, reason: result.reason });
     try {
       const { redirect_to } = await d.oauth2.rejectOAuth2ConsentRequest({
@@ -293,22 +273,15 @@ export async function handleConsent(req: Request, deps: Deps = {}): Promise<Resp
     }
   }
 
-  // SKIP PATH: the manifest's skip_consent (the operator's pre-consent record, which survives client re-registration)
-  // or Hydra's consent.skip auto-accepts with no grant UI. Identity is non-null: the gate denies null above.
+  // The manifest's skip_consent survives client re-registration; the gate above denied a null identity.
   if (consent.skip || consentManifest?.skipConsent) {
     return acceptConsentRequest(challenge, consent, identity!, d, clientId);
   }
 
-  // PROMPT PATH: redirect to /auth/consent; its POST to /oauth2/consent completes the challenge.
   const qs = new URLSearchParams({ consent_challenge: challenge });
   return redirect(`${CONSENT_UI_BASE}?${qs.toString()}`);
 }
 
-/**
- * Handle POST /oauth2/consent (Allow/Deny from /auth/consent.astro). Verifies the signed, consent-scoped CSRF token
- * (CSRFError returns 400, fail-closed), re-fetches the challenge from Hydra (single-use, so stale posts are inert),
- * and requires the Kratos session's identity.id to equal consent.subject, else access_denied.
- */
 export async function handleConsentPost(req: Request, deps: Deps = {}): Promise<Response> {
   const d = resolve(deps);
 
@@ -330,7 +303,7 @@ export async function handleConsentPost(req: Request, deps: Deps = {}): Promise<
     return new Response('invalid action', { status: 400 });
   }
 
-  // Re-fetch from Hydra: single-use integrity, binds to the subject.
+  // Re-fetch: the challenge is single-use, so a stale post is inert.
   let consent: OAuth2ConsentRequest;
   try {
     consent = await d.oauth2.getOAuth2ConsentRequest({ consentChallenge: challenge });
@@ -339,7 +312,6 @@ export async function handleConsentPost(req: Request, deps: Deps = {}): Promise<
     return new Response('upstream error', { status: 502 });
   }
 
-  // Resolve the Kratos session and assert subject match.
   let session: Session | null;
   try {
     session = await d.getSession(req.headers.get('cookie') ?? undefined);
@@ -349,7 +321,6 @@ export async function handleConsentPost(req: Request, deps: Deps = {}): Promise<
   }
 
   if (!session?.active || !session.identity) {
-    // No active session: cannot consent for anyone.
     try {
       const { redirect_to } = await d.oauth2.rejectOAuth2ConsentRequest({
         consentChallenge: challenge,
@@ -366,7 +337,7 @@ export async function handleConsentPost(req: Request, deps: Deps = {}): Promise<
     }
   }
 
-  // CSRF: the token is scoped to 'consent', so one minted for another action cannot be replayed here.
+  // The CSRF token is scoped to 'consent', so one minted for another action cannot be replayed here.
   const csrfToken = body.get('csrf_token');
   try {
     verifyToken(csrfToken, session.identity.id, 'consent');
@@ -377,7 +348,6 @@ export async function handleConsentPost(req: Request, deps: Deps = {}): Promise<
     return new Response('server error', { status: 500 });
   }
 
-  // Subject-mismatch guard: the posting session must be the challenge's subject.
   if (session.identity.id !== consent.subject) {
     try {
       const { redirect_to } = await d.oauth2.rejectOAuth2ConsentRequest({
@@ -397,7 +367,6 @@ export async function handleConsentPost(req: Request, deps: Deps = {}): Promise<
     }
   }
 
-  // Deny path.
   if (action === 'deny') {
     try {
       const { redirect_to } = await d.oauth2.rejectOAuth2ConsentRequest({
@@ -411,19 +380,16 @@ export async function handleConsentPost(req: Request, deps: Deps = {}): Promise<
       return redirect(redirect_to);
     } catch (err) {
       upstream('rejectOAuth2ConsentRequest', err);
-      // Reject failed after the nonce was consumed: back to the grant screen for a fresh token.
       const qs = new URLSearchParams({ consent_challenge: challenge });
       return redirect(`${CONSENT_UI_BASE}?${qs.toString()}`);
     }
   }
 
-  // Allow path: re-gate before accepting.
   const clientId = consent.client?.client_id ?? '';
   const identity = await safeGetIdentity(d, consent.subject ?? '');
   const allowManifest = d.manifest(clientId);
   const result = enforceAccessGate(identity, clientId, allowManifest);
   if (!result.allowed) {
-    // Log the real reason server-side; send an opaque error_description.
     console.warn('[oauth2/consent/post] access denied', { clientId, subject: consent.subject, reason: result.reason });
     try {
       const { redirect_to } = await d.oauth2.rejectOAuth2ConsentRequest({
@@ -437,7 +403,6 @@ export async function handleConsentPost(req: Request, deps: Deps = {}): Promise<
       return redirect(redirect_to);
     } catch (err) {
       upstream('rejectOAuth2ConsentRequest', err);
-      // Reject failed after the nonce was consumed: back to the grant screen for a fresh token.
       const qs = new URLSearchParams({ consent_challenge: challenge });
       return redirect(`${CONSENT_UI_BASE}?${qs.toString()}`);
     }
@@ -452,7 +417,6 @@ export async function handleConsentPost(req: Request, deps: Deps = {}): Promise<
   return allowResponse;
 }
 
-/** Handle GET /oauth2/logout?logout_challenge=... */
 export async function handleLogout(req: Request, deps: Deps = {}): Promise<Response> {
   const d = resolve(deps);
   const challenge = new URL(req.url).searchParams.get('logout_challenge');
@@ -484,11 +448,9 @@ export async function handleLogout(req: Request, deps: Deps = {}): Promise<Respo
       return redirect(`${publicUrl}/auth/error?reason=auth-unreachable`);
     }
     if (logoutSubject && session?.active && session.identity && session.identity.id !== logoutSubject) {
-      // Live session is a different user's: refuse to auto-accept and redirect home.
       return redirect(`${publicUrl}/`);
     }
-    // The live session is the subject's: revoke it before Hydra forgets the login; a failed revoke must not accept,
-    // or the next authorize would sign straight back in.
+    // Revoke before Hydra forgets the login: accepting after a failed revoke lets the next authorize sign straight back in.
     if (session?.active && session.identity) {
       try {
         if (!session.id) throw new Error('session without id');

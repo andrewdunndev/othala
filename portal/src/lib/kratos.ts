@@ -1,6 +1,4 @@
-// Kratos public-API client for Astro SSR pages. Flow GETs forward the user's
-// Cookie header so Kratos can read the anti-CSRF cookie (else 403).
-// Server-side calls use the internal Kratos public address, not the edge.
+// Flow GETs forward the user's Cookie header: without its anti-CSRF cookie Kratos answers 403.
 
 import { Configuration, FrontendApi, ResponseError } from '@ory/client-fetch';
 import { KRATOS_PUBLIC_URL } from './constants';
@@ -29,10 +27,6 @@ function frontendApi(): FrontendApi {
   );
 }
 
-/**
- * GET /sessions/whoami. Null when the cookie is absent, invalid or expired;
- * throws on network failure or an unexpected status.
- */
 export async function getSession(cookie?: string): Promise<Session | null> {
   try {
     const session = await frontendApi().toSession({ cookie });
@@ -45,7 +39,6 @@ export async function getSession(cookie?: string): Promise<Session | null> {
   }
 }
 
-/** Health check for the three-state landing: internal /health/alive, 2s timeout. */
 export async function isReachable(): Promise<boolean> {
   const ctl = new AbortController();
   const t = setTimeout(() => ctl.abort(), HEALTH_TIMEOUT_MS);
@@ -64,7 +57,6 @@ export async function isReachable(): Promise<boolean> {
 
 const ERROR_ID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
-/** The stored self-service error behind /auth/error?id=, or null when the id is malformed or Kratos cannot say. */
 export async function getFlowError(id: string): Promise<{ id?: unknown; code?: unknown } | null> {
   if (!ERROR_ID.test(id)) return null;
   const ctl = new AbortController();
@@ -84,9 +76,7 @@ export async function getFlowError(id: string): Promise<{ id?: unknown; code?: u
   }
 }
 
-// Wraps the get*Flow SDK calls into the FlowResult union the pages use:
-// 410/404/403 -> gone, 401 -> unauthorized, 2xx -> ok. The SDK's Date fields
-// are never parsed by the renderer, so the casts to our flow types are safe.
+// The renderer never reads the SDK's Date fields, so casting to our flow types is safe.
 async function wrapFlowResult<T>(call: () => Promise<T>): Promise<FlowResult<T>> {
   try {
     const flow = await call();
@@ -142,11 +132,7 @@ export function getVerificationFlow(
   );
 }
 
-/**
- * URL builders for Kratos browser-flow initiators, redirected to when no flow
- * ID is present or the flow is gone. Browser-relative, NOT kratosBase(): that
- * is the server-side address, which the browser cannot resolve.
- */
+// Browser-relative: kratosBase() is a server-side address the browser cannot resolve.
 export const browserFlows = {
   login(opts: { aal?: 'aal1' | 'aal2'; refresh?: boolean; returnTo?: string } = {}): string {
     const p = new URLSearchParams();
@@ -177,13 +163,11 @@ export const browserFlows = {
     return `/self-service/verification/browser${qs ? `?${qs}` : ''}`;
   },
   logout(returnTo?: string): string {
-    // The endpoint 303s to a logout-with-token URL; see getLogoutInfo for the token.
     const qs = returnTo ? `?return_to=${encodeURIComponent(returnTo)}` : '';
     return `/self-service/logout/browser${qs}`;
   },
 };
 
-/** GET /self-service/logout/browser: the logout_url and logout_token for a sign-out POST. */
 export interface LogoutInfo {
   logout_url: string;
   logout_token: string;
@@ -201,19 +185,7 @@ export async function getLogoutInfo(cookie?: string): Promise<LogoutInfo | null>
   }
 }
 
-/**
- * Drive Kratos's own recovery flow server-side for one address, so Kratos's
- * courier sends the invite email. Uses the API flow (no anti-CSRF cookie
- * needed); the flow id never reaches a browser.
- *
- * Bare fetch, not the SDK: the SDK throws on any non-2xx, but Kratos v26 answers
- * 400 for this submission once the flow has left `choose_method`, with a valid
- * body. {200, 400, 422} is the accepted set, as in the e2e recovery specs.
- *
- * Success does not prove the email left the SMTP relay; Kratos dispatches
- * courier messages on its own worker. Throws on a genuine failure. Never logs
- * `email`; the caller keeps the address out of server logs.
- */
+/** Runs Kratos's API recovery flow so its courier sends the invite. Never logs the address. */
 export async function sendInviteRecoveryEmail(email: string): Promise<void> {
   const base = kratosBase();
 
@@ -237,8 +209,7 @@ export async function sendInviteRecoveryEmail(email: string): Promise<void> {
       body: JSON.stringify({ method: 'code', email }),
     },
   );
-  // 400 is Kratos v26's "flow state mismatch" after choose_method: still success.
-  // Anything else is a real failure.
+  // Kratos answers 400 once the flow has left choose_method, which the SDK would throw on.
   if (submitResp.status !== 200 && submitResp.status !== 400 && submitResp.status !== 422) {
     throw new Error(`recovery email submit failed: HTTP ${submitResp.status}`);
   }

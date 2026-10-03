@@ -1,24 +1,13 @@
-// Sign-out gate for /auth/logout.
-//
-// Ending a session is a state change, so it rides the same per-request token
-// as every other portal form: a GET only renders the confirm form, and only a
-// POST carrying a token minted for this identity's sign-out proceeds.
-
 import { signToken, verifyToken, CSRFError } from './csrf';
 import { revokeHydraSessions, RevokeError } from './revoke';
 
 export const LOGOUT_ACTION = 'logout';
 
-/** Mint the token the sign-out form carries. */
 export function signLogoutToken(identityId: string): string {
   return signToken(identityId, LOGOUT_ACTION);
 }
 
-/**
- * True only for a POST whose token was minted for this identity's sign-out.
- * Any token failure answers false (fails closed); the caller re-renders the
- * confirm form rather than ending the session.
- */
+/** Sign-out is a state change, so only a POST carrying this identity's sign-out token proceeds. */
 export function logoutAuthorized(
   method: string,
   presented: FormDataEntryValue | null | undefined,
@@ -35,7 +24,6 @@ export function logoutAuthorized(
   }
 }
 
-/** End the identity's app sign-ins on every device; a failure is logged, never thrown, so the sign-out still completes. */
 export async function endAppSignIns(identityId: string): Promise<boolean> {
   try {
     await revokeHydraSessions(identityId);

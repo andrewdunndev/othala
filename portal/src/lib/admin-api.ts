@@ -1,6 +1,4 @@
-// Kratos admin API wrappers for /admin/* SSR pages, via the Ory SDK IdentityApi. The admin port (http://kratos:4434)
-// has no auth; network isolation is the gate.
-// The state flip uses RFC 6902 JSON-Patch. Non-2xx surfaces as a ResponseError for callers to render.
+// The Kratos admin port has no auth; network isolation is the gate.
 
 import {
   Configuration,
@@ -34,17 +32,7 @@ export interface MetadataAdmin {
   groups?: string[];
   /** Per-app role overrides, keyed by client_id. */
   roles?: Record<string, string>;
-  /**
-   * Admin authority marker. Strict boolean; only set via the
-   * Kratos admin API. Use patchAdminMarker for targeted grant/revoke so
-   * groups/roles are never clobbered.
-   */
-  /**
-   * Prerequisites the admin has marked set up for this person (names defined under requirements/ in MANIFEST_DIR).
-   * Written only by patchPrerequisites, a targeted patch, so a groups/roles save never clobbers it.
-   */
   prerequisites?: string[];
-  /** Passkey names keyed by hex credential id. Written only by patchPasskeyName and prunePasskeyNames, targeted patches. */
   passkeyNames?: Record<string, string>;
   admin?: boolean;
 }
@@ -59,13 +47,12 @@ export interface UpdateIdentityInput {
   metadataAdmin: MetadataAdmin;
 }
 
-// per_page=250 is the family-scale ceiling; the Link-header pagination is deliberately not followed.
+// One page of 250 is the family-scale ceiling; later pages are not fetched.
 export async function listIdentities(): Promise<Identity[]> {
   return identityApi().listIdentities({ perPage: 250 });
 }
 
-// Credential types the admin API returns. 'lookup_secret' must be included or backup codes are never fetched (the
-// admin page keys its badge on it and updateIdentity would drop it on a PUT round-trip).
+// Without lookup_secret, backup codes are never fetched and a PUT round-trip would drop them.
 export const INCLUDED_CREDENTIALS: GetIdentityIncludeCredentialEnum[] = ['password', 'webauthn', 'passkey', 'totp', 'lookup_secret'];
 
 export async function getIdentity(id: string): Promise<Identity> {
@@ -76,15 +63,13 @@ export async function getIdentity(id: string): Promise<Identity> {
 }
 
 export async function createIdentity(input: CreateIdentityInput): Promise<Identity> {
-  // J1: enforce the metadata_admin shape here; the Kratos schema validates only `traits`, so a typo would be stored.
+  // The Kratos schema validates only traits, so a typo in metadata_admin would be stored.
   const validated = validateMetadataAdmin(input.metadataAdmin);
-  // schema_id is omitted on purpose: Kratos applies identity.default_schema_id, the single source of truth. The SDK
-  // types the field as required, so the cast is the price of not duplicating that setting here.
+  // No schema_id: Kratos applies default_schema_id. The SDK types the field as required, hence the cast.
   const createIdentityBody = {
     traits: input.traits,
     metadata_admin: validated,
-    // The admin vouches for the address: Kratos keeps a pre-declared entry that matches the trait (same via and
-    // lowercased value), so the person is verified without a mail round trip and the id_token says so.
+    // Kratos keeps a pre-declared address that matches the trait, so the person is verified without a mail round trip.
     verifiable_addresses: [
       {
         value: input.traits.email.toLowerCase(),
@@ -97,9 +82,7 @@ export async function createIdentity(input: CreateIdentityInput): Promise<Identi
   return identityApi().createIdentity({ createIdentityBody });
 }
 
-/** Replace traits + metadata_admin via PUT (simpler than JSON-Patch when both are written together). */
 export async function updateIdentity(id: string, input: UpdateIdentityInput): Promise<Identity> {
-  // J1: same metadata_admin enforcement as createIdentity.
   const validated = validateMetadataAdmin(input.metadataAdmin);
   const api = identityApi();
   const current = await api.getIdentity({
@@ -119,7 +102,6 @@ export async function deleteIdentity(id: string): Promise<void> {
   await identityApi().deleteIdentity({ id });
 }
 
-/** Revoke one Kratos session by id; a 404 (already gone) is success, anything else throws. */
 export async function revokeSession(id: string): Promise<void> {
   try {
     await identityApi().disableSession({ id });
@@ -129,7 +111,6 @@ export async function revokeSession(id: string): Promise<void> {
   }
 }
 
-/** Active Kratos sessions of an identity. A 404 means it has none left. */
 export async function listSessions(id: string): Promise<Session[]> {
   try {
     return await identityApi().listIdentitySessions({ id, active: true, perPage: 1000 });
@@ -139,22 +120,15 @@ export async function listSessions(id: string): Promise<Session[]> {
   }
 }
 
-/** Mark the identity inactive AND run the full revocation fan-out (revokeSubject with deactivate:true); a Kratos-sessions failure aborts with a RevokeError. */
 export async function deactivateIdentity(id: string): Promise<void> {
   await revokeSubject(id, { deactivate: true });
 }
 
-/** Restore an inactive identity to active. No revokeSubject: the fan-out ran at deactivate and the user signs in fresh. */
 export async function reactivateIdentity(id: string): Promise<void> {
   const patch = [{ op: 'replace' as const, path: '/state', value: 'active' }];
   await identityApi().patchIdentity({ id, jsonPatch: patch });
 }
 
-/**
- * Targeted JSON-Patch of the `metadata_admin.admin` marker, leaving groups and roles untouched. Grant sets admin=true
- * (an add of /metadata_admin when absent, else add/replace of the key); revoke removes the key and treats an absent
- * one as success. No validateMetadataAdmin: only one boolean key is touched.
- */
 export async function patchAdminMarker(id: string, grant: boolean): Promise<void> {
   const api = identityApi();
   if (grant) {
@@ -165,7 +139,6 @@ export async function patchAdminMarker(id: string, grant: boolean): Promise<void
     if (!hasMeta) {
       patch.push({ op: 'add', path: '/metadata_admin', value: { admin: true } });
     } else {
-      // metadata_admin exists: add or replace the key.
       const meta = current.metadata_admin as Record<string, unknown>;
       if ('admin' in meta) {
         patch.push({ op: 'replace', path: '/metadata_admin/admin', value: true });
@@ -179,19 +152,12 @@ export async function patchAdminMarker(id: string, grant: boolean): Promise<void
     const current = await api.getIdentity({ id });
     const meta = current.metadata_admin as Record<string, unknown> | undefined;
     if (!meta || !('admin' in meta)) {
-      // Already absent.
       return;
     }
     await api.patchIdentity({ id, jsonPatch: [{ op: 'remove', path: '/metadata_admin/admin' }] });
   }
 }
 
-
-/**
- * Targeted JSON-Patch of `metadata_admin.prerequisites`, leaving groups, roles and the admin marker untouched. The list
- * is validated by validateMetadataAdmin (a duplicate throws) and written whole (add when absent, else replace); an empty
- * list removes the key.
- */
 export async function patchPrerequisites(id: string, names: string[]): Promise<void> {
   const prerequisites = validateMetadataAdmin({ prerequisites: names }).prerequisites ?? [];
   const api = identityApi();
@@ -214,11 +180,6 @@ export async function patchPrerequisites(id: string, names: string[]): Promise<v
 
 type PatchOp = { op: 'add' | 'replace' | 'remove'; path: string; value?: unknown };
 
-/**
- * Targeted JSON-Patch that sets one entry of `metadata_admin.passkeyNames`, leaving every other key untouched (never a
- * full-record PUT). Creates /metadata_admin and /metadata_admin/passkeyNames when absent; `add` on an existing member
- * replaces it.
- */
 export async function patchPasskeyName(id: string, credentialId: string, name: string): Promise<void> {
   const names = validateMetadataAdmin({ passkeyNames: { [credentialId]: name } }).passkeyNames ?? {};
   const api = identityApi();
@@ -235,10 +196,6 @@ export async function patchPasskeyName(id: string, credentialId: string, name: s
   await api.patchIdentity({ id, jsonPatch: patch });
 }
 
-/**
- * Drop passkey names whose credential is no longer on the identity (run by the settings.after.passkey hook). Reads the
- * stored identity and patches only metadata_admin.passkeyNames; returns how many names were dropped.
- */
 export async function prunePasskeyNames(id: string): Promise<number> {
   const api = identityApi();
   const current = await api.getIdentity({ id, includeCredential: INCLUDED_CREDENTIALS });
@@ -253,27 +210,18 @@ export async function prunePasskeyNames(id: string): Promise<number> {
   return Object.keys(names).length - Object.keys(kept).length;
 }
 
-/**
- * Credential types admin eviction may delete. `password` is excluded: Kratos rejects DELETE on it and it is not a
- * lost-device factor. `passkey` is excluded because Kratos v26.2.0 deleteIdentityCredentials 400s on it; passkeys are
- * removed per credential at /auth/settings (p-eviction.spec.ts P3). Included: webauthn, totp and lookup_secret.
- */
+// Kratos refuses to admin-delete password and passkey credentials.
 export const EVICTABLE_CREDENTIAL_TYPES = new Set<string>([
   'webauthn',
   'totp',
   'lookup_secret',
 ]);
 
-/**
- * Delete ALL credentials of `type` (DELETE /admin/identities/{id}/credentials/{type}): Kratos has no per-instance
- * removal, so the user re-enrolls via the recovery URL from the same admin action. Not valid for passkey. A 404 (type
- * not enrolled) is success; other non-2xx statuses throw.
- */
+/** Kratos has no per-instance removal: this deletes every credential of the type. */
 export async function deleteCredential(
   identityId: string,
   type: string,
 ): Promise<void> {
-  // Only eviction-relevant types (Kratos rejects password).
   if (!EVICTABLE_CREDENTIAL_TYPES.has(type)) {
     throw new Error(`deleteCredential: '${type}' is not an evictable credential type`);
   }
@@ -283,7 +231,6 @@ export async function deleteCredential(
       type: type as DeleteIdentityCredentialsTypeEnum,
     });
   } catch (err: unknown) {
-    // 404: type not present, nothing to evict.
     if (
       err != null &&
       typeof err === 'object' &&
@@ -298,12 +245,10 @@ export async function deleteCredential(
 
 export interface RecoveryLink {
   recovery_link: string;
-  /** The short numeric code Kratos generates (used alongside recovery_link). */
   recovery_code: string;
   expires_at: string;
 }
 
-/** One-shot recovery code + link the admin shares out-of-band (createRecoveryCodeForIdentity). The SDK returns `expires_at` as a Date; coerce to a string. */
 export async function getRecoveryLink(id: string, expiresIn = '1h'): Promise<RecoveryLink> {
   const link = await identityApi().createRecoveryCodeForIdentity({
     createRecoveryCodeForIdentityBody: { identity_id: id, expires_in: expiresIn },
@@ -315,7 +260,6 @@ export async function getRecoveryLink(id: string, expiresIn = '1h'): Promise<Rec
   };
 }
 
-/** One entry of an identity's `verifiable_addresses`, as the admin API takes it. */
 export interface AddressPayload {
   value: string;
   via: string;
@@ -323,11 +267,7 @@ export interface AddressPayload {
   status: string;
 }
 
-/**
- * The JSON-Patch that vouches for the email trait's address. Kratos's PUT has no verifiable_addresses field (the client
- * serializer drops it), so this goes through PATCH: the entry holding the trait's own address (case-insensitive) is
- * replaced with a verified, completed one, or one is appended when none exists. Every other address is not touched.
- */
+/** Kratos's PUT drops verifiable_addresses, so vouching goes through PATCH. */
 export function emailVerifiedPatch(
   identity: Pick<Identity, 'traits' | 'verifiable_addresses'>,
 ): Array<{ op: 'add' | 'replace'; path: string; value: unknown }> {
@@ -345,12 +285,7 @@ export function emailVerifiedPatch(
   return [{ op: 'replace', path: `/verifiable_addresses/${own}`, value: vouched }];
 }
 
-/**
- * Mark the email trait's address verified (admin vouches for it) by a targeted patch; nothing else is written. Returns
- * false, writing nothing, when the stored email is no longer `displayed`. Kratos's patch takes no test op and no
- * precondition, but the patch names the address it vouches for and Kratos keeps a verifiable address only while it
- * equals the email trait, so an email changed after this read never ends up verified.
- */
+/** Kratos keeps a verifiable address only while it equals the email trait, so an email changed after this read never ends up verified. */
 export async function markEmailVerified(id: string, displayed: string): Promise<boolean> {
   const api = identityApi();
   const current = await api.getIdentity({ id });

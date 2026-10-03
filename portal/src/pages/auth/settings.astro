@@ -1,10 +1,4 @@
 ---
-// Settings flow handler. Needs an active session (else /auth/login); reads ?flow=<id> or redirects to Kratos's
-// settings initiator. Renders a status line and four cards (Sign-in, Two-step verification, Recovery, Profile) plus
-// Sessions from flow.ui.nodes. Every method form posts natively to Kratos, so the page works without script; the
-// ClientRouter enhancement at the bottom swaps the response in place. In `astro dev`, `?dev-state=` renders a recorded
-// flow (lib/settings-fixtures.ts) with no Kratos.
-
 export const prerender = false;
 
 // Keep TOTP QR/secret and backup codes out of the back/forward cache.
@@ -93,12 +87,10 @@ if (dev) {
     return Astro.redirect('/auth/login?return_to=' + encodeURIComponent('/auth/settings'));
   }
 
-  // "Sign out everywhere": revokes the caller's own identity through the in-process
-  // fan-out, which, unlike Kratos's browser logout, also closes Hydra's remembered login.
+  // Unlike Kratos's browser logout, revokeSubject also ends Hydra's remembered login.
   if (Astro.request.method === 'POST') {
     const fd = await Astro.request.formData();
     if (String(fd.get('action') ?? '') === 'sign-out-everywhere') {
-      // Verify the CSRF token bound to the caller's identity before any side effect.
       try {
         verifyToken(String(fd.get('csrf_token') ?? ''), session.identity.id, 'sign-out-everywhere');
       } catch (err) {
@@ -110,7 +102,7 @@ if (dev) {
       try {
         await revokeSubject(session.identity.id);
       } catch (err) {
-        // Prescriptive on a hard-cut failure; do not leak raw upstream errors.
+        // Never show raw upstream errors.
         signOutError =
           err instanceof RevokeError
             ? err.message
@@ -131,8 +123,7 @@ if (dev) {
   }
   flow = result.flow;
   logoutInfo = await getLogoutInfo(cookie);
-  // whoami omits metadata_admin and credentials, so re-fetch the full identity via the admin API (display only: the
-  // admin marker, group-derived apps, the person's passkey names). Fail closed: nothing shown on error.
+  // whoami omits metadata_admin and credentials. Display only: nothing is shown on error.
   try {
     stored = await getIdentity(session.identity.id);
   } catch (lookupErr) {
@@ -204,7 +195,6 @@ const lookupOff = nodesByGroup(nodes, 'lookup_secret').map(asInput).find((a) => 
 const csrfSignOut = mint(identity.id, 'sign-out-everywhere');
 const renameTokens = passkeys.map(() => mint(identity.id, 'passkey-name'));
 
-// Your apps: the tiles this person's groups open, read-only.
 const groups = parseIdentity(stored).groups;
 const yourApps = dev ? [] : loadTiles().filter((t) => userCanSeeTile(t, groups));
 
@@ -510,7 +500,6 @@ const lookupLabel: Record<string, string> = {
               </div>
               <div class="panel-block panel-setup">
                 {nodesByGroup(nodes, 'webauthn').map((n) => {
-                  // script nodes are collected by scriptNodes() and rendered at page bottom
                   if (n.attributes.node_type === 'script') return null;
                   const a = asInput(n);
                   if (!a || a.name === 'webauthn_remove') return null;
@@ -588,7 +577,6 @@ const lookupLabel: Record<string, string> = {
                       </button>
                     );
                   }
-                  // Any remaining labeled inputs (e.g. a confirm checkbox).
                   const id = a.name.replace(/[^a-zA-Z0-9]+/g, '-');
                   return (
                     <div class="field">

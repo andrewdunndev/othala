@@ -932,7 +932,7 @@ test('deepMergeClaims: recursive nested-object merge (array union, scalar src-wi
   };
   const src = {
     resource_access: {
-      myapp: { roles: ['admin'] },       // array conflict: unioned (H1: union, not src-wins)
+      myapp: { roles: ['admin'] },       // array conflict: unioned, not source-wins
     },
     flat_key: 'override',               // scalar conflict: src wins
   };

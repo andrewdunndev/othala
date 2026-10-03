@@ -1,5 +1,3 @@
-// Session revocation over the typed Ory SDK. A failed step throws a RevokeError naming the dependency and next action.
-
 import {
   Configuration,
   IdentityApi,
@@ -10,12 +8,11 @@ import {
 import { HYDRA_ADMIN_URL, KRATOS_ADMIN_URL } from './constants';
 import { timeoutFetch } from './ory-fetch';
 
-/** Which upstream dependency a revoke step failed against. */
 export type RevokeDependency = 'kratos-admin' | 'hydra-admin';
 
 export const DEACTIVATE_STEP = 'state->inactive';
 
-/** Prescriptive revoke failure: names the dependency and next action; the raw cause is for server logs only. */
+/** The message is safe to show; the raw cause is for server logs only. */
 export class RevokeError extends Error {
   readonly dependency: RevokeDependency;
   readonly step: string;
@@ -29,7 +26,7 @@ export class RevokeError extends Error {
   }
 }
 
-/** True for an HTTP 404; Kratos returns it from DELETE .../sessions when the subject has no active sessions. */
+/** Kratos answers DELETE .../sessions with 404 when the subject has no active sessions. */
 function isNotFound(err: unknown): boolean {
   return err instanceof ResponseError && err.response?.status === 404;
 }
@@ -40,11 +37,9 @@ export interface RevokeDeps {
 }
 
 export interface RevokeOptions {
-  /** deactivate trigger: run step 1 (state -> inactive) before step 2. */
   deactivate?: boolean;
 }
 
-/** Per-step outcome for the UI. */
 export interface RevokeResult {
   subject: string;
   deactivated: boolean;
@@ -61,7 +56,6 @@ function buildOAuth2Api(): OAuth2Api {
   return new OAuth2Api(new Configuration({ basePath: HYDRA_ADMIN_URL, fetchApi: timeoutFetch() }));
 }
 
-/** Resolve injected deps, defaulting to the live SDK clients. */
 function resolveDeps(deps: Partial<RevokeDeps> = {}): RevokeDeps {
   return {
     identityApi: deps.identityApi ?? buildIdentityApi(),
@@ -69,7 +63,6 @@ function resolveDeps(deps: Partial<RevokeDeps> = {}): RevokeDeps {
   };
 }
 
-/** Distinct login-session ids named by the subject's consent rows, following the Link rel=next pages. */
 async function listLoginSessionIds(oauth2Api: OAuth2Api, subject: string): Promise<string[]> {
   const sids = new Set<string>();
   let pageToken: string | undefined;
@@ -85,7 +78,6 @@ async function listLoginSessionIds(oauth2Api: OAuth2Api, subject: string): Promi
   return [...sids];
 }
 
-/** Run the fan-out for one subject (Kratos identity id), aborting on the first failure. */
 export async function revokeSubject(
   subject: string,
   options: RevokeOptions = {},
@@ -136,7 +128,6 @@ export async function revokeSubject(
   return result;
 }
 
-/** End the subject's Hydra login sessions on every device, then its consent sessions and their tokens. */
 export async function revokeHydraSessions(
   subject: string,
   deps: Partial<Pick<RevokeDeps, 'oauth2Api'>> = {},

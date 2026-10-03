@@ -1,12 +1,8 @@
-// SMTP mailer for portal-originated mail (the contact form). Reuses Kratos's
-// courier relay: OTHALA_SMTP_CONNECTION_URI is the single source for both. The
-// transport is built lazily, so build and tests need no relay. A send failure
-// throws a MailerError, safe to log, which the API route never echoes.
-
 import nodemailer from 'nodemailer';
 import type { Transporter } from 'nodemailer';
 import { smtpConnectionUri, smtpFromAddress, instanceName } from './config';
 
+/** Safe to log; never echoed to the HTTP client. */
 export class MailerError extends Error {
   constructor(message: string) {
     super(message);
@@ -14,15 +10,6 @@ export class MailerError extends Error {
   }
 }
 
-/**
- * Parse a courier SMTP connection URI into nodemailer transport options.
- *
- * Accepts `smtps://user:pass@host:port` (implicit TLS) and
- * `smtp://user:pass@host:port` (plain / STARTTLS). User and password are
- * URL-decoded (Kratos requires them URL-encoded in the URI).
- *
- * Exported for unit testing the parse without opening a socket.
- */
 export interface SmtpOptions {
   host: string;
   port: number;
@@ -50,6 +37,7 @@ export function parseSmtpUri(uri: string): SmtpOptions {
   }
   const opts: SmtpOptions = { host, port, secure };
   if (u.username) {
+    // Kratos requires the credentials URL-encoded in the URI.
     opts.auth = {
       user: decodeURIComponent(u.username),
       pass: decodeURIComponent(u.password),
@@ -76,28 +64,14 @@ function transport(): Transporter {
 }
 
 export interface ContactMail {
-  /** Resolved recipient (config.contactRecipient). */
   to: string;
-  /** Verified Kratos identity id of the signed-in sender. */
   identityId: string;
-  /** Verified username of the signed-in sender. */
   username: string;
-  /** Submitter-provided display name (already validated + length-capped). */
   fromName: string;
-  /** Request category (already validated against the allowlist). */
   requestType: string;
-  /** Free-text body (already validated + length-capped). */
   message: string;
 }
 
-/**
- * Send a contact/request-form submission to the operator. Throws MailerError
- * on any transport failure; the message is safe to log but MUST NOT be relayed
- * verbatim to the HTTP client.
- *
- * Submitted content is placed in the BODY only (never interpolated into headers
- * or the envelope), so a hostile name/message cannot inject headers.
- */
 export async function sendContactRequest(mail: ContactMail): Promise<void> {
   const subject = `[${instanceName}] ${mail.requestType} request from ${mail.fromName}`;
   const text =
@@ -110,7 +84,7 @@ export async function sendContactRequest(mail: ContactMail): Promise<void> {
     await transport().sendMail({
       from: smtpFromAddress,
       to: mail.to,
-      subject: subject.replace(/[\r\n]+/g, ' '), // belt-and-suspenders header hygiene
+      subject: subject.replace(/[\r\n]+/g, ' '), // fromName is user input in a header
       text,
     });
   } catch (err) {
@@ -120,7 +94,6 @@ export async function sendContactRequest(mail: ContactMail): Promise<void> {
   }
 }
 
-/** Test-only: drop the cached transport so a fresh URI is re-parsed. */
 export function _resetForTests(): void {
   _transport = null;
 }

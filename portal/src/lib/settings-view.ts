@@ -1,7 +1,3 @@
-// View model for the account settings page: digests a Kratos settings flow's flat node list into the lists and
-// states the cards render (passkeys, security keys, authenticator app, backup codes) and the status line. Pure, so
-// the page stays markup and the fixtures and tests share one reading of the flow.
-
 import { asInput } from './nodes';
 import type { FlowNode, FlowMessage, NodeImageAttributes, NodeInputAttributes, NodeTextAttributes } from './types';
 import type { PasskeyNames } from './passkey-names';
@@ -89,16 +85,13 @@ export function totpView(nodes: FlowNode[]): TotpView {
 }
 
 export interface LookupView {
-  /** Backup codes exist (the flow offers to reveal or disable them). */
   enrolled: boolean;
-  /** The codes, when this flow shows them. */
   codes: string | null;
   /** The codes one by one: Kratos joins them into one string, so the list comes from context.secrets when it has it. */
   list: Array<{ code: string; used: boolean }>;
   codesLabel: string | null;
 }
 
-/** Split the codes Kratos sends: per-code messages in context.secrets, else the comma-joined text. */
 export function splitCodes(text: string, context?: Record<string, unknown>): Array<{ code: string; used: boolean }> {
   const secrets = context?.secrets;
   if (Array.isArray(secrets) && secrets.length > 0) {
@@ -156,7 +149,6 @@ export function keyOnlyKeeper(nodes: FlowNode[], keeper: boolean): boolean {
   return keeper && credentialItems(nodes, 'webauthn_remove').length === 1 && !totpView(nodes).enrolled;
 }
 
-/** Whether the email address is verified, from the identity's verifiable addresses; null when unknown. */
 export function emailVerified(
   identity: { traits?: { email?: string }; verifiable_addresses?: Array<{ value?: string; verified?: boolean }> } | null | undefined,
 ): boolean | null {
