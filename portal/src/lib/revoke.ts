@@ -169,24 +169,3 @@ export async function revokeHydraSessions(
     );
   }
 }
-
-/**
- * Step 4 alone: revoke the subject's Hydra consent sessions for every client, used when an admin narrows groups,
- * roles or the admin marker so old grants and refresh tokens stop working. Login sessions are left alone.
- */
-export async function revokeConsentSessions(
-  subject: string,
-  deps: Partial<Pick<RevokeDeps, 'oauth2Api'>> = {},
-): Promise<void> {
-  const oauth2Api = deps.oauth2Api ?? buildOAuth2Api();
-  try {
-    await oauth2Api.revokeOAuth2ConsentSessions({ subject, all: true });
-  } catch (err) {
-    throw new RevokeError(
-      'hydra-admin',
-      'revoke-consent-sessions',
-      'Hydra consent + associated tokens persist. Verify the Hydra admin API, then use Force re-login on this identity.',
-      err,
-    );
-  }
-}

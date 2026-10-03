@@ -10,7 +10,7 @@ const {
   deactivateIdentityMock,
   updateIdentityMock,
   revokeSubjectMock,
-  revokeConsentSessionsMock,
+  revokeHydraSessionsMock,
   patchPrerequisitesMock,
   markEmailVerifiedMock,
 } = vi.hoisted(() => ({
@@ -18,7 +18,7 @@ const {
   patchPrerequisitesMock: vi.fn(),
   markEmailVerifiedMock: vi.fn(),
   revokeSubjectMock: vi.fn(),
-  revokeConsentSessionsMock: vi.fn(),
+  revokeHydraSessionsMock: vi.fn(),
   deleteIdentityMock: vi.fn(),
   listIdentitiesMock: vi.fn(),
   patchAdminMarkerMock: vi.fn(),
@@ -28,7 +28,7 @@ const {
 
 vi.mock('./revoke', async (importOriginal) => {
   const actual = await importOriginal<typeof import('./revoke.js')>();
-  return { ...actual, revokeSubject: revokeSubjectMock, revokeConsentSessions: revokeConsentSessionsMock };
+  return { ...actual, revokeSubject: revokeSubjectMock, revokeHydraSessions: revokeHydraSessionsMock };
 });
 
 vi.mock('./admin-api', async (importOriginal) => {
@@ -96,7 +96,7 @@ beforeEach(() => {
   deactivateIdentityMock.mockReset().mockResolvedValue(undefined);
   updateIdentityMock.mockReset().mockResolvedValue(undefined);
   revokeSubjectMock.mockReset().mockResolvedValue(undefined);
-  revokeConsentSessionsMock.mockReset().mockResolvedValue(undefined);
+  revokeHydraSessionsMock.mockReset().mockResolvedValue(undefined);
   patchPrerequisitesMock.mockReset().mockResolvedValue(undefined);
   markEmailVerifiedMock.mockReset().mockResolvedValue(true);
 });
@@ -189,19 +189,19 @@ describe('saveAction', () => {
     return identity({ username: 'alice.smith', metadataAdmin: { groups, ...(roles ? { roles } : {}) } });
   }
 
-  it('revokes consent sessions after the write when a group is removed', async () => {
+  it('ends app sign-ins after the write when a group is removed', async () => {
     const outcome = await saveAction(saveForm(['family']), makeCtx({ identity: stored(['family', 'media']), manifests: MANIFESTS }));
 
     expect(updateIdentityMock).toHaveBeenCalledTimes(1);
-    expect(revokeConsentSessionsMock).toHaveBeenCalledWith('target-1');
-    expect(updateIdentityMock.mock.invocationCallOrder[0]).toBeLessThan(revokeConsentSessionsMock.mock.invocationCallOrder[0]);
+    expect(revokeHydraSessionsMock).toHaveBeenCalledWith('target-1');
+    expect(updateIdentityMock.mock.invocationCallOrder[0]).toBeLessThan(revokeHydraSessionsMock.mock.invocationCallOrder[0]);
     expect(outcome.actionResult?.kind).toBe('updated');
   });
 
-  it('revokes consent sessions when a stored role changes', async () => {
+  it('ends app sign-ins when a stored role changes', async () => {
     await saveAction(saveForm(['family'], 'viewer'), makeCtx({ identity: stored(['family'], { wiki: 'editor' }), manifests: MANIFESTS }));
 
-    expect(revokeConsentSessionsMock).toHaveBeenCalledWith('target-1');
+    expect(revokeHydraSessionsMock).toHaveBeenCalledWith('target-1');
   });
 
   it('does not revoke when groups and roles are unchanged', async () => {
@@ -211,21 +211,21 @@ describe('saveAction', () => {
     );
 
     expect(updateIdentityMock).toHaveBeenCalledTimes(1);
-    expect(revokeConsentSessionsMock).not.toHaveBeenCalled();
+    expect(revokeHydraSessionsMock).not.toHaveBeenCalled();
     expect(outcome.actionResult?.kind).toBe('updated');
   });
 
   it('does not revoke when a group is only added', async () => {
     await saveAction(saveForm(['family', 'media']), makeCtx({ identity: stored(['family']), manifests: MANIFESTS }));
 
-    expect(revokeConsentSessionsMock).not.toHaveBeenCalled();
+    expect(revokeHydraSessionsMock).not.toHaveBeenCalled();
   });
 
   it('keeps a stored group the form offers no checkbox for', async () => {
     const outcome = await saveAction(saveForm(['family']), makeCtx({ identity: stored(['family', 'garden']), manifests: MANIFESTS }));
 
     expect(updateIdentityMock.mock.calls[0][1].metadataAdmin.groups).toEqual(['family', 'garden']);
-    expect(revokeConsentSessionsMock).not.toHaveBeenCalled();
+    expect(revokeHydraSessionsMock).not.toHaveBeenCalled();
     expect(outcome.actionResult?.kind).toBe('updated');
   });
 
@@ -244,7 +244,7 @@ describe('saveAction', () => {
     await saveAction(f, makeCtx({ identity: stored(['family', 'garden']), manifests: MANIFESTS }));
 
     expect(updateIdentityMock.mock.calls[0][1].metadataAdmin.groups).toEqual(['family']);
-    expect(revokeConsentSessionsMock).toHaveBeenCalledWith('target-1');
+    expect(revokeHydraSessionsMock).toHaveBeenCalledWith('target-1');
   });
 
   it('does not count a kept unconfigured group toward the identity-group minimum', async () => {
@@ -271,12 +271,12 @@ describe('saveAction', () => {
   });
 
   it('reports a revocation failure as an error after the save stood', async () => {
-    revokeConsentSessionsMock.mockRejectedValue(new RevokeError('hydra-admin', 'revoke-consent-sessions', 'Verify HYDRA_ADMIN_URL.'));
+    revokeHydraSessionsMock.mockRejectedValue(new RevokeError('hydra-admin', 'revoke-consent-sessions', 'Verify HYDRA_ADMIN_URL.'));
     const outcome = await saveAction(saveForm(['family']), makeCtx({ identity: stored(['family', 'media']), manifests: MANIFESTS }));
 
     expect(updateIdentityMock).toHaveBeenCalledTimes(1);
     expect(outcome.actionResult?.kind).toBe('error');
-    expect(outcome.actionResult && 'message' in outcome.actionResult ? outcome.actionResult.message : '').toMatch(/^Saved, but/);
+    expect(outcome.actionResult && 'message' in outcome.actionResult ? outcome.actionResult.message : '').toMatch(/^Saved, but their app sign-ins and access could not be ended: /);
     expect(outcome.refetch).toBe(true);
   });
 
@@ -334,6 +334,7 @@ describe('revokeAdminAction', () => {
     const outcome = await revokeAdminAction(fd({ confirm: 'admin' }), makeCtx({ id: 'admin-1', identity, adminIdentityId: 'admin-1' }));
 
     expect(patchAdminMarkerMock).toHaveBeenCalledWith('admin-1', false);
+    expect(revokeHydraSessionsMock).toHaveBeenCalledWith('admin-1');
     expect(outcome).toBeInstanceOf(Response);
     expect((outcome as Response).status).toBe(303);
   });
@@ -381,7 +382,7 @@ describe('revokeAdminAction', () => {
     const outcome = await revokeAdminAction(fd(), makeCtx({ id: 'target-1', identity, adminIdentityId: 'admin-1' }));
 
     expect(patchAdminMarkerMock).toHaveBeenCalledWith('target-1', false);
-    expect(revokeConsentSessionsMock).toHaveBeenCalledWith('target-1');
+    expect(revokeHydraSessionsMock).toHaveBeenCalledWith('target-1');
     if (outcome instanceof Response) throw new Error('unreachable');
     expect(outcome.actionResult?.kind).toBe('admin-revoked');
     expect(outcome.refetch).toBe(true);
@@ -606,7 +607,7 @@ describe('person page sections', () => {
     );
 
     expect(written().metadataAdmin.groups).toEqual(['everyone']);
-    expect(revokeConsentSessionsMock).toHaveBeenCalledWith('target-1');
+    expect(revokeHydraSessionsMock).toHaveBeenCalledWith('target-1');
   });
 
   it('keeps an unrecognised group through an access save', async () => {
@@ -745,7 +746,7 @@ describe('admin action audit line', () => {
         () => fd({ confirm: 'alice' }),
       ],
     ])('%s', async (_label, action, ctx, form) => {
-      revokeConsentSessionsMock.mockRejectedValue(hydraDown);
+      revokeHydraSessionsMock.mockRejectedValue(hydraDown);
       revokeSubjectMock.mockRejectedValue(hydraDown);
       const c = ctx();
       const lines = await audit(action, c, form());

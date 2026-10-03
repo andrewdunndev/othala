@@ -25,7 +25,7 @@ import { GROUP_RE } from './access-groups';
 import { HOUSEHOLD_GROUPS } from './constants';
 import { holdsElevatedRole, planGroupSave } from './gate';
 import { buildGroupRegistry, isIdentityGroup, unconfiguredGroups } from './group-registry';
-import { RevokeError, revokeConsentSessions, revokeSubject } from './revoke';
+import { RevokeError, revokeHydraSessions, revokeSubject } from './revoke';
 import { removalBlock } from './admin-view';
 import type { ClientManifest } from './manifests';
 import type { Identity } from './types';
@@ -289,13 +289,13 @@ export function narrowsAccess(identity: Identity, groups: readonly string[], rol
 
 async function revokeGrants(id: string): Promise<ActionResult | null> {
   try {
-    await revokeConsentSessions(id);
+    await revokeHydraSessions(id);
     return null;
   } catch (err) {
     return {
       kind: 'error',
       partial: true,
-      message: `Saved, but their old app access could not be taken away: ${err instanceof Error ? err.message : 'unknown error'}`,
+      message: `Saved, but their app sign-ins and access could not be ended: ${err instanceof Error ? err.message : 'unknown error'}`,
     };
   }
 }
