@@ -152,6 +152,14 @@ describe('deleteAction', () => {
     expect(outcome.actionResult && 'message' in outcome.actionResult ? outcome.actionResult.message : '').toMatch(/not deleted/i);
   });
 
+  it('is not partial when the identity could not be turned off', async () => {
+    revokeSubjectMock.mockRejectedValue(new RevokeError('kratos-admin', 'state->inactive', 'Verify KRATOS_ADMIN_URL.'));
+    const outcome = await deleteAction(fd({ confirm: 'alice' }), makeCtx({ identity: makeIdentity('alice') }));
+
+    if (outcome instanceof Response) throw new Error('unreachable');
+    expect(outcome.actionResult).not.toHaveProperty('partial');
+  });
+
   it('reports a delete failure after revocation as an error, not a 500', async () => {
     deleteIdentityMock.mockRejectedValue(new Error('kratos admin unavailable'));
     const identity = makeIdentity('alice');
@@ -730,6 +738,16 @@ describe('admin action audit line', () => {
         () => fd({ confirm: 'admin' }),
       ],
       ['remove-credential', () => makeCtx(), () => fd({ cred_type: 'totp' })],
+      ['delete', () => makeCtx({ identity: makeIdentity('alice') }), () => fd({ confirm: 'alice' })],
+      [
+        'delete',
+        () => {
+          revokeSubjectMock.mockResolvedValue(undefined);
+          deleteIdentityMock.mockRejectedValue(new Error('kratos admin unavailable'));
+          return makeCtx({ identity: makeIdentity('alice') });
+        },
+        () => fd({ confirm: 'alice' }),
+      ],
     ])('%s', async (action, ctx, form) => {
       revokeConsentSessionsMock.mockRejectedValue(hydraDown);
       revokeSubjectMock.mockRejectedValue(hydraDown);

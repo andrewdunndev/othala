@@ -25,7 +25,7 @@ import { GROUP_RE } from './access-groups';
 import { HOUSEHOLD_GROUPS } from './constants';
 import { holdsElevatedRole, planGroupSave } from './gate';
 import { buildGroupRegistry, isIdentityGroup, unconfiguredGroups } from './group-registry';
-import { revokeConsentSessions, revokeSubject } from './revoke';
+import { RevokeError, revokeConsentSessions, revokeSubject } from './revoke';
 import type { ClientManifest } from './manifests';
 import type { Identity } from './types';
 
@@ -403,12 +403,15 @@ export async function deleteAction(fd: FormData, ctx: ActionContext): Promise<Ac
   try {
     await revokeSubject(id, { deactivate: true });
   } catch (err) {
+    // Past its first step the identity is already turned off.
+    const landed = err instanceof RevokeError && err.step !== 'state->inactive';
     return {
       actionResult: {
         kind: 'error',
+        ...(landed && { partial: true as const }),
         message: `Not deleted: their sign-ins and app access could not be cleared first. ${err instanceof Error ? err.message : 'unknown error'}`,
       },
-      refetch: false,
+      refetch: landed,
     };
   }
   try {
@@ -417,6 +420,7 @@ export async function deleteAction(fd: FormData, ctx: ActionContext): Promise<Ac
     return {
       actionResult: {
         kind: 'error',
+        partial: true,
         message: `Signed out and turned off, but not deleted: ${err instanceof Error ? err.message : 'unknown error'}`,
       },
       refetch: true,
