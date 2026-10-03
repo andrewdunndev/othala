@@ -3,7 +3,8 @@
 import { test, beforeEach, afterEach } from 'vitest';
 import assert from 'node:assert/strict';
 import { identity } from '../src/lib/test-builders.ts';
-import { deleteCredential, getIdentity, getRecoveryLink, listSessions, patchAdminMarker, patchPrerequisites, revokeSession, updateIdentity } from '../src/lib/admin-api.ts';
+import { createIdentity, deleteCredential, getIdentity, getRecoveryLink, listSessions, patchAdminMarker, patchPrerequisites, revokeSession, updateIdentity } from '../src/lib/admin-api.ts';
+import { MetadataAdminError } from '../src/lib/metadata-admin.ts';
 
 function kratosIdentity(fields) {
   return { ...identity({ id: fields.id }), ...fields };
@@ -158,4 +159,13 @@ test('a 404 means already gone for revokeSession, listSessions and deleteCredent
   assert.deepEqual(await listSessions('u9'), []);
   await deleteCredential('u9', 'webauthn');
   assert.equal(capturedCalls.length, 3);
+});
+
+test('createIdentity and updateIdentity refuse an invalid metadata_admin before any Kratos call', async () => {
+  const input = { traits: { email: 'a@othala.test', username: 'ada' }, metadataAdmin: { groups: ['Bad Group'] } };
+  for (const call of [() => createIdentity(input), () => updateIdentity('id-1', input)]) {
+    mockFetch(kratosIdentity({ id: 'id-1', traits: {} }));
+    await assert.rejects(call, MetadataAdminError);
+    assert.equal(capturedCalls.length, 0);
+  }
 });
