@@ -52,6 +52,7 @@ selfservice:
             - "${OTHALA_PUBLIC_URL}"
 
     # WebAuthn (legacy): second factor / security key only; passkey owns passwordless.
+    # Kept because enrolled security keys and the second-factor gate depend on it; retiring it needs a key migration.
     webauthn:
       enabled: true
       config:
