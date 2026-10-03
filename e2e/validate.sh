@@ -23,16 +23,11 @@ echo "=== othala e2e: AUTH_REGISTRY=$AUTH_REGISTRY AUTH_VERSION=$AUTH_VERSION ==
 
 chmod +x ./gen-secrets.sh ./smoke.sh ./postgres-init.sh
 
-# gen-secrets must emit a full env: a partial .env renders literal ${VAR} placeholders
-# that hang Ory at startup.
+# A partial .env fails below: render-config.sh refuses a missing or empty variable.
 if ! AUTH_REGISTRY="$AUTH_REGISTRY" AUTH_VERSION="$AUTH_VERSION" bash ./gen-secrets.sh > .env; then
     echo "  ✗ gen-secrets.sh failed — aborting"; exit 1
 fi
-env_vars=$(grep -cE '^[A-Z][A-Z_]*=' .env || true)
-if [[ "$env_vars" -lt 25 ]]; then
-    echo "  ✗ .env has only $env_vars vars (expected >=25) — partial gen-secrets; aborting"; exit 1
-fi
-echo "  secrets generated (.env, $env_vars vars)"
+echo "  secrets generated (.env)"
 
 # Step 2: registry login (skip if CI vars absent for local runs)
 if [[ -n "${CI_REGISTRY_USER:-}" && -n "${CI_REGISTRY_PASSWORD:-}" ]]; then
