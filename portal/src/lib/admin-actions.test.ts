@@ -413,6 +413,31 @@ describe('removeCredentialAction', () => {
     await removeCredentialAction(fd({ cred_type: 'lookup_secret' }), makeCtx({ identity }));
     expect(deleteCredentialMock).toHaveBeenCalled();
   });
+
+  it("ends another person's sessions after the removal", async () => {
+    await removeCredentialAction(fd({ cred_type: 'totp' }), makeCtx({ id: 'target-1' }));
+
+    expect(revokeSubjectMock).toHaveBeenCalledWith('target-1');
+    expect(deleteCredentialMock.mock.invocationCallOrder[0]).toBeLessThan(revokeSubjectMock.mock.invocationCallOrder[0]);
+  });
+
+  it('keeps the acting admin signed in after removing their own method', async () => {
+    const identity = withCredentials(makeIdentity('self', true), 'totp', 'webauthn');
+    await removeCredentialAction(fd({ cred_type: 'webauthn' }), makeCtx({ id: 'admin-1', identity, adminIdentityId: 'admin-1' }));
+
+    expect(deleteCredentialMock).toHaveBeenCalledWith('admin-1', 'webauthn');
+    expect(revokeSubjectMock).not.toHaveBeenCalled();
+  });
+
+  it('reports a failed sign-out after the removal as a partial error, not a 500', async () => {
+    revokeSubjectMock.mockRejectedValue(new RevokeError('kratos-admin', 'delete-sessions', 'Verify KRATOS_ADMIN_URL.'));
+    const outcome = await removeCredentialAction(fd({ cred_type: 'totp' }), makeCtx({ id: 'target-1' }));
+
+    expect(deleteCredentialMock).toHaveBeenCalledWith('target-1', 'totp');
+    if (outcome instanceof Response) throw new Error('unreachable');
+    expect(outcome.actionResult).toMatchObject({ kind: 'error', partial: true, message: expect.stringMatching(/^Removed, but their sessions could not be ended: /) });
+    expect(outcome.refetch).toBe(true);
+  });
 });
 
 describe('deactivateAction', () => {

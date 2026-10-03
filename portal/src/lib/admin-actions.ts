@@ -47,7 +47,7 @@ export type ActionResult =
   | { kind: 'email-verified' }
   | { kind: 'prerequisites-saved' }
   | { kind: 'credential-removed'; credType: string }
-  | { kind: 'error'; message: string };
+  | { kind: 'error'; message: string; partial?: true };
 
 export interface ActionOutcome {
   /** Absent only on save's validation-failure path (re-render with formErrors, no notice). */
@@ -497,6 +497,15 @@ export async function removeCredentialAction(fd: FormData, ctx: ActionContext): 
     }
   }
   await deleteCredential(ctx.id, credType);
+  // Someone else's lost method may have signed a session in, so end their sessions too. Your own stay.
+  if (!self) {
+    try {
+      await revokeUserSessions(ctx.id);
+    } catch (err) {
+      const reason = err instanceof Error ? err.message : 'unknown error';
+      return { actionResult: { kind: 'error', partial: true, message: `Removed, but their sessions could not be ended: ${reason}` }, refetch: true };
+    }
+  }
   return { actionResult: { kind: 'credential-removed', credType }, refetch: true };
 }
 

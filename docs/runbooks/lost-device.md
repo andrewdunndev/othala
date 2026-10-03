@@ -64,7 +64,7 @@ treated as compromised.
 
 If you cannot reach the user (emergency eviction), remove all evictable types
 as a conservative response. The user re-enrolls from scratch via the recovery
-URL in Step 5.
+URL in Step 4.
 
 ### Step 2b — Check the identity's recovery email address
 
@@ -86,7 +86,7 @@ an address they do not own, clear it:
 3. Click **Save**.
 
 The legitimate user can set a recovery email of their choice after they
-re-enroll in Step 5.
+re-enroll in Step 4.
 
 ### Step 3 — Remove the affected credential type(s)
 
@@ -96,7 +96,9 @@ Click it for each affected type.
 **What Remove does:** it calls the Kratos admin API
 `DELETE /admin/identities/{id}/credentials/{type}` and removes **all**
 credentials of that type from the identity record. The legitimate user
-re-enrolls with new keys after recovery.
+re-enrolls with new keys after recovery. It then signs them out everywhere
+(Kratos sessions, Hydra login and consent), so there is no separate sign-out
+step.
 
 **Evictable types (Remove button present):**
 - `webauthn` — all legacy WebAuthn keys
@@ -117,29 +119,19 @@ Kratos exposes per-credential passkey removal only through the user's own
 `/auth/settings` — each enrolled key is listed separately with its own
 label; the victim removes the one matching the lost or stolen device. If
 they still hold a session, have them do it directly. If they're locked out,
-issue the enrollment URL (Step 5) first — it lands them in a privileged
-settings session to remove the compromised key and enroll a new one.
+issue the enrollment URL (Step 4) first — it lands them in a privileged
+settings session to remove the compromised key and enroll a new one. Removing
+a passkey signs no one out: once it is gone, click **Sign out everywhere** in
+the Actions panel.
 
 If the victim can't be reached and urgency requires full lockout now, the
 last resort is **Delete** on this identity (Actions panel): it revokes
-sessions and app grants first, covering Step 4, and the user re-registers.
+sessions and app grants first, and the user re-registers.
 
 Each Remove action is CSRF-protected and requires an active AAL2 admin session.
 The confirmation banner after each removal tells you which type was removed.
 
-### Step 4 — Sign out everywhere (revoke sessions)
-
-After removing the attacker's credentials, click **Sign out everywhere** in the
-Actions panel. This:
-
-- Deletes all active Kratos sessions for the identity.
-- Invalidates the Hydra login window and consent grants.
-- Emits OIDC back-channel logout to every app that supports it.
-
-At this point the attacker has no sessions and no enrolled credentials. They
-cannot log in.
-
-### Step 5 — Issue a recovery/enrollment URL
+### Step 4 — Issue a recovery/enrollment URL
 
 Click **Send setup link** to generate a one-shot Kratos recovery URL.
 Share it with the legitimate user out-of-band (Signal, iMessage, or another
@@ -155,7 +147,7 @@ re-enroll:
 The enrollment URL expires (default 24 h). If the user misses it, issue a
 new one.
 
-### Step 6 — Optionally rotate the password (if password auth is in use)
+### Step 5 — Optionally rotate the password (if password auth is in use)
 
 If the identity has a `password ✓` chip and reaches a directory-backed app by
 password, that password may also be compromised (the device may have had it
@@ -175,10 +167,9 @@ current password or a privileged recovery session).
 [ ] 2b. Check the recoveryEmail trait — clear any address the user doesn't recognise
 [ ] 3. Remove each affected evictable type (webauthn / totp / backup codes)
 [ ] 3b. Passkey: victim self-removes at /auth/settings, or Delete identity as last resort
-[ ] 4. Sign out everywhere  (revoke sessions)
-[ ] 5. Send setup link  — share via Signal/iMessage
-[ ] 6. If password in use: rotate in the directory-backed app's admin
-[ ] 7. Follow up with the user once they confirm re-enrollment
+[ ] 4. Send setup link  — share via Signal/iMessage
+[ ] 5. If password in use: rotate in the directory-backed app's admin
+[ ] 6. Follow up with the user once they confirm re-enrollment
 ```
 
 ---
