@@ -4,6 +4,8 @@
 
 [![license](https://img.shields.io/badge/license-MIT-green)](LICENSE)
 
+A reference deployment, not a product: no roadmap, no support, no compatibility promise.
+
 Othala is a running Ory deployment: **Kratos** for identity, **Hydra** for OAuth2/OIDC, and one
 TypeScript application that supplies the parts Ory deliberately leaves to the integrator.
 
@@ -29,7 +31,6 @@ Passkeys are the primary credential; email code and password are the fallbacks. 
 configured through `OTHALA_*` environment variables, so one image serves any instance
 (see [`.env.example`](.env.example) for the full contract).
 
-This is published as a reference, not as a product: no roadmap, no support, no compatibility promise.
 Read it, copy it, lift whole files out of it. That is what it is for.
 
 ## Run it
