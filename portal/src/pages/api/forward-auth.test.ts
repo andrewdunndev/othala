@@ -34,3 +34,13 @@ describe('GET /api/forward-auth with no manifest set', () => {
     expect((await call('grafana-admin')).status).toBe(200);
   });
 });
+
+describe('GET /api/forward-auth when Kratos is unreachable', () => {
+  it('answers 503 and logs the failing step and error', async () => {
+    const spy = vi.spyOn(console, 'error').mockImplementation(() => {});
+    getSessionMock.mockRejectedValue(new Error('boom'));
+    expect((await call('grafana-admin')).status).toBe(503);
+    expect(spy).toHaveBeenCalledWith('[portal] upstream failure', { step: 'getSession', error: 'Error: boom' });
+    spy.mockRestore();
+  });
+});

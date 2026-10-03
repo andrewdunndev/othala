@@ -11,6 +11,7 @@ import { decideAccess } from '../../lib/gate';
 import { GROUP_RE } from '../../lib/access-groups';
 import { manifestHealth } from '../../lib/manifest-store';
 import type { Identity, Session } from '../../lib/types';
+import { upstream } from '../../lib/oauth2-handlers';
 
 export const prerender = false;
 
@@ -48,7 +49,8 @@ async function decide(request: Request, url: URL): Promise<Response> {
       return text(401, 'unauthenticated');
     }
     identityId = session.identity.id;
-  } catch {
+  } catch (err) {
+    upstream('getSession', err);
     return text(503, 'unavailable');
   }
 
@@ -57,7 +59,8 @@ async function decide(request: Request, url: URL): Promise<Response> {
   let identity: Identity;
   try {
     identity = await getIdentity(identityId);
-  } catch {
+  } catch (err) {
+    upstream('getIdentity', err);
     return text(503, 'unavailable');
   }
 

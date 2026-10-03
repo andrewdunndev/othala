@@ -150,6 +150,9 @@ test('J1 — non-admin recovery flow issues a privileged settings session', asyn
     'and prevents code verification',
   ).toBeUndefined();
 
+  const codePage = await req.get(`${baseURL}/auth/recovery?flow=${flow.id}`);
+  expect(await codePage.text(), 'J1: the code step tells people to check spam or junk').toMatch(/spam or junk/i);
+
   const { code, id: messageId } = await waitForMessage(forRecipient(identity.email, startTime, /recover/i));
   console.log('[J1] recovery code received, message id:', messageId, 'code:', code);
 

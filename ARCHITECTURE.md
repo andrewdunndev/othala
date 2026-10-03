@@ -172,10 +172,8 @@ Every failure path is exercised in `portal/scripts/forward-auth.test.mjs`, inclu
 properties that are easy to lose: no path returns 2xx, and no denial body echoes the required group
 or the identity id.
 
-There are two archetypes. `caddy/snippets/forward-auth.caddy` is the *session-only* one: it points
-`forward_auth` straight at Kratos and establishes only that a session exists. This endpoint is the
-*session-and-group* one, and the edge config calling it is written per site, because the group is a
-per-site value.
+`caddy/snippets/forward-auth.caddy` calls this endpoint with the group as its third argument, and redirects only a 401
+to login; a 403 or 503 is returned as is.
 
 ## The OIDC path
 

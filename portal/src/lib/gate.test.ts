@@ -5,7 +5,7 @@ import { describe, it, expect } from 'vitest';
 import { decideAccess, needsStepUp, holdsElevatedRole } from './gate';
 import type { ClientManifest } from './manifests';
 import type { Identity } from './types';
-import { asAdmin, identity as buildIdentity, withCredential, withLookupSecret, withPasskey, withTotp, withWebauthnKey } from './test-builders';
+import { asAdmin, identity as buildIdentity, withCredential, withLookupSecret, withPasskey, withTotp, withWebauthnKey, manifest } from './test-builders';
 
 const APPLY: Record<string, (i: Identity) => Identity> = {
   password: (i) => i,
@@ -60,9 +60,6 @@ describe('needsStepUp', () => {
   });
 });
 
-const role = (name: string) => ({ name, claimEmit: {} });
-const manifest = (clientId: string, roles: string[], groupRoleMap: Record<string, string>, accessGroups: string[]) =>
-  ({ clientId, roles: roles.map(role), groupRoleMap, accessGroups }) as unknown as ClientManifest;
 const x = manifest('x', ['admin', 'user'], { 'x-admin': 'admin', 'x-access': 'user' }, ['x-access']);
 
 describe('holdsElevatedRole', () => {
@@ -84,6 +81,16 @@ describe('holdsElevatedRole', () => {
   it('an override resolves through the same ranking', () => {
     expect(held([grafana], ['grafana-access'], { grafana: 'editor' })).toBe(true);
     expect(held([grafana], ['grafana-admin'], { grafana: 'viewer' })).toBe(false);
+  });
+  it('the entry role is the lowest-ranked mapped access group', () => {
+    const m = manifest('m', ['admin', 'editor', 'viewer'], { 'm-edit': 'editor', 'm-view': 'viewer' }, ['m-edit', 'm-view']);
+    expect(held([m], ['m-edit'])).toBe(true);
+    expect(held([m], ['m-view'])).toBe(false);
+  });
+  it('without a mapped access group the entry role is the last declared', () => {
+    const m = manifest('m', ['admin', 'editor', 'viewer'], {}, ['m-access']);
+    expect(held([m], ['m-access'], { m: 'editor' })).toBe(true);
+    expect(held([m], ['m-access'], { m: 'viewer' })).toBe(false);
   });
   it('a manifest without roles is never elevated', () => {
     expect(held([manifest('y', [], {}, ['y-access'])], ['y-access'])).toBe(false);

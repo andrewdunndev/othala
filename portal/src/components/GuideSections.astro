@@ -131,7 +131,7 @@ const empty = !guide.lead && guide.sections.length === 0;
   .guide :global(.code-copy) {
     flex-shrink: 0;
     min-width: 3.5rem;
-    min-height: 2rem;
+    min-height: var(--hit, 2.75rem);
     padding: 0 var(--space-2);
     background: var(--surface);
     border: 0;

@@ -100,6 +100,7 @@ describe('parseIdentity credentials', () => {
     ['schema entries only', bare, { securityKeys: 0, hasSecondFactor: false, firstFactorKey: false }],
     ['authenticator app', withTotp(bare), { authenticator: true, hasSecondFactor: true, firstFactorKey: false }],
     ['totp entry without a url', withCredential(bare, 'totp', {}), { authenticator: false, hasSecondFactor: false }],
+    ['totp entry with an empty url', withCredential(bare, 'totp', { totp_url: '' }), { authenticator: false, hasSecondFactor: false }],
     ['security key', withWebauthnKey(bare), { securityKeys: 1, hasSecondFactor: true, firstFactorKey: false }],
     ['passwordless webauthn key', withWebauthnKey(bare, { passwordless: true }), { securityKeys: 0, hasSecondFactor: false, firstFactorKey: true }],
     ['passkey', withPasskey(bare), { hasSecondFactor: false, firstFactorKey: true }],

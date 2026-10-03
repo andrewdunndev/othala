@@ -272,6 +272,12 @@ test('loginRememberFor rounds up and reads a string expires_at', () => {
   assert.equal(loginRememberFor({ ...session(), expires_at: new Date(now + 3_600_000).toISOString() }, now), 3600);
 });
 
+test('loginRememberFor never returns less than one second', () => {
+  const now = Date.UTC(2026, 0, 1);
+  assert.equal(loginRememberFor(session('aal1', ['password'], { expires_at: new Date(now) }), now), 1);
+  assert.equal(loginRememberFor(session('aal1', ['password'], { expires_at: new Date(now - 5000) }), now), 1);
+});
+
 test('consent accepts an active member and grants scope + injects id_token', async () => {
   const { api, calls } = stubOAuth2();
   const res = await handleConsent(new Request('https://x/oauth2/consent?consent_challenge=cc'), {

@@ -74,6 +74,11 @@ function resolve(deps: Deps): Required<Deps> {
   };
 }
 
+/** Log an upstream (Kratos or Hydra) failure with the step that failed; the error text only, never cookies, challenges or tokens. */
+export function upstream(step: string, err: unknown): void {
+  console.error('[portal] upstream failure', { step, error: String(err) });
+}
+
 /** 302 redirect. */
 function redirect(location: string): Response {
   return new Response(null, { status: 302, headers: { Location: location } });
@@ -92,7 +97,8 @@ async function safeGetIdentity(
 ): Promise<Identity | null> {
   try {
     return await d.getIdentity(subject);
-  } catch {
+  } catch (err) {
+    upstream('getIdentity', err);
     return null;
   }
 }
@@ -108,7 +114,8 @@ export async function handleLogin(req: Request, deps: Deps = {}): Promise<Respon
   let login: OAuth2LoginRequest;
   try {
     login = await d.oauth2.getOAuth2LoginRequest({ loginChallenge: challenge });
-  } catch {
+  } catch (err) {
+    upstream('getOAuth2LoginRequest', err);
     return new Response('upstream error', { status: 502 });
   }
 
@@ -125,7 +132,8 @@ export async function handleLogin(req: Request, deps: Deps = {}): Promise<Respon
     let session: Session | null;
     try {
       session = await d.getSession(req.headers.get('cookie') ?? undefined);
-    } catch {
+    } catch (err) {
+      upstream('getSession', err);
       return new Response('upstream error', { status: 502 });
     }
     if (session?.active && session.identity && session.identity.id !== login.subject) {
@@ -133,7 +141,8 @@ export async function handleLogin(req: Request, deps: Deps = {}): Promise<Respon
       if (!login.session_id) return new Response('upstream error', { status: 502 });
       try {
         await d.oauth2.revokeOAuth2LoginSessions({ sid: login.session_id });
-      } catch {
+      } catch (err) {
+        upstream('revokeOAuth2LoginSessions', err);
         return new Response('upstream error', { status: 502 });
       }
       return redirect(login.request_url);
@@ -150,7 +159,8 @@ export async function handleLogin(req: Request, deps: Deps = {}): Promise<Respon
     let session: Session | null;
     try {
       session = await d.getSession(req.headers.get('cookie') ?? undefined);
-    } catch {
+    } catch (err) {
+      upstream('getSession', err);
       return new Response('upstream error', { status: 502 });
     }
     if (!session?.active || !session.identity) {
@@ -180,7 +190,8 @@ export async function handleLogin(req: Request, deps: Deps = {}): Promise<Respon
         },
       });
       return redirect(redirect_to);
-    } catch {
+    } catch (err) {
+      upstream('rejectOAuth2LoginRequest', err);
       return new Response('upstream error', { status: 502 });
     }
   }
@@ -204,7 +215,8 @@ export async function handleLogin(req: Request, deps: Deps = {}): Promise<Respon
       },
     });
     return redirect(redirect_to);
-  } catch {
+  } catch (err) {
+    upstream('acceptOAuth2LoginRequest', err);
     return new Response('upstream error', { status: 502 });
   }
 }
@@ -237,7 +249,8 @@ export async function acceptConsentRequest(
       },
     });
     return redirect(redirect_to);
-  } catch {
+  } catch (err) {
+    upstream('acceptOAuth2ConsentRequest', err);
     return new Response('upstream error', { status: 502 });
   }
 }
@@ -253,7 +266,8 @@ export async function handleConsent(req: Request, deps: Deps = {}): Promise<Resp
   let consent: OAuth2ConsentRequest;
   try {
     consent = await d.oauth2.getOAuth2ConsentRequest({ consentChallenge: challenge });
-  } catch {
+  } catch (err) {
+    upstream('getOAuth2ConsentRequest', err);
     return new Response('upstream error', { status: 502 });
   }
 
@@ -277,7 +291,8 @@ export async function handleConsent(req: Request, deps: Deps = {}): Promise<Resp
         },
       });
       return redirect(redirect_to);
-    } catch {
+    } catch (err) {
+      upstream('rejectOAuth2ConsentRequest', err);
       return new Response('upstream error', { status: 502 });
     }
   }
@@ -323,7 +338,8 @@ export async function handleConsentPost(req: Request, deps: Deps = {}): Promise<
   let consent: OAuth2ConsentRequest;
   try {
     consent = await d.oauth2.getOAuth2ConsentRequest({ consentChallenge: challenge });
-  } catch {
+  } catch (err) {
+    upstream('getOAuth2ConsentRequest', err);
     return new Response('upstream error', { status: 502 });
   }
 
@@ -331,7 +347,8 @@ export async function handleConsentPost(req: Request, deps: Deps = {}): Promise<
   let session: Session | null;
   try {
     session = await d.getSession(req.headers.get('cookie') ?? undefined);
-  } catch {
+  } catch (err) {
+    upstream('getSession', err);
     return new Response('upstream error', { status: 502 });
   }
 
@@ -347,7 +364,8 @@ export async function handleConsentPost(req: Request, deps: Deps = {}): Promise<
         },
       });
       return redirect(redirect_to);
-    } catch {
+    } catch (err) {
+      upstream('rejectOAuth2ConsentRequest', err);
       return new Response('upstream error', { status: 502 });
     }
   }
@@ -375,7 +393,8 @@ export async function handleConsentPost(req: Request, deps: Deps = {}): Promise<
         },
       });
       return redirect(redirect_to);
-    } catch {
+    } catch (err) {
+      upstream('rejectOAuth2ConsentRequest', err);
       // Reject failed after the nonce was consumed: back to the grant screen for a fresh token.
       const qs = new URLSearchParams({ consent_challenge: challenge });
       return redirect(`${CONSENT_UI_BASE}?${qs.toString()}`);
@@ -394,7 +413,8 @@ export async function handleConsentPost(req: Request, deps: Deps = {}): Promise<
         },
       });
       return redirect(redirect_to);
-    } catch {
+    } catch (err) {
+      upstream('rejectOAuth2ConsentRequest', err);
       // Reject failed after the nonce was consumed: back to the grant screen for a fresh token.
       const qs = new URLSearchParams({ consent_challenge: challenge });
       return redirect(`${CONSENT_UI_BASE}?${qs.toString()}`);
@@ -419,7 +439,8 @@ export async function handleConsentPost(req: Request, deps: Deps = {}): Promise<
         },
       });
       return redirect(redirect_to);
-    } catch {
+    } catch (err) {
+      upstream('rejectOAuth2ConsentRequest', err);
       // Reject failed after the nonce was consumed: back to the grant screen for a fresh token.
       const qs = new URLSearchParams({ consent_challenge: challenge });
       return redirect(`${CONSENT_UI_BASE}?${qs.toString()}`);
@@ -446,7 +467,8 @@ export async function handleLogout(req: Request, deps: Deps = {}): Promise<Respo
   let _logout: OAuth2LogoutRequest;
   try {
     _logout = await d.oauth2.getOAuth2LogoutRequest({ logoutChallenge: challenge });
-  } catch {
+  } catch (err) {
+    upstream('getOAuth2LogoutRequest', err);
     return new Response('upstream error', { status: 502 });
   }
 
@@ -461,7 +483,8 @@ export async function handleLogout(req: Request, deps: Deps = {}): Promise<Respo
     let session: Session | null;
     try {
       session = await d.getSession(req.headers.get('cookie') ?? undefined);
-    } catch {
+    } catch (err) {
+      upstream('getSession', err);
       return redirect(`${publicUrl}/auth/error?reason=auth-unreachable`);
     }
     if (logoutSubject && session?.active && session.identity && session.identity.id !== logoutSubject) {
@@ -486,7 +509,8 @@ export async function handleLogout(req: Request, deps: Deps = {}): Promise<Respo
       logoutChallenge: challenge,
     });
     return redirect(redirect_to);
-  } catch {
+  } catch (err) {
+    upstream('acceptOAuth2LogoutRequest', err);
     return new Response('upstream error', { status: 502 });
   }
 }

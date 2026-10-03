@@ -9,6 +9,7 @@ import type {
   SessionAuthenticationMethod,
 } from '@ory/client-fetch';
 import type { AAL, Identity, Session } from './types';
+import type { ClientManifest } from './manifests';
 
 const STAMP = new Date('2026-01-01T00:00:00Z');
 
@@ -217,3 +218,7 @@ export function oauth2LogoutRequest(overrides: Partial<OAuth2LogoutRequest> = {}
     ...overrides,
   };
 }
+
+export const role = (name: string) => ({ name, claimEmit: {} });
+export const manifest = (clientId: string, roles: string[], groupRoleMap: Record<string, string>, accessGroups: string[]) =>
+  ({ clientId, roles: roles.map(role), groupRoleMap, accessGroups }) as unknown as ClientManifest;

@@ -61,11 +61,12 @@ import {
   removeCredentialAction,
   grantAdminAction,
   ADMIN_ACTIONS,
+  auditLine,
   type ActionContext,
 } from './admin-actions.js';
 import type { Identity } from './types.js';
 import { RevokeError } from './revoke.js';
-import { identity, withCredentials } from './test-builders.js';
+import { identity, manifest, withCredentials, withTotp } from './test-builders.js';
 
 function makeIdentity(username: string, admin?: boolean, state?: 'active' | 'inactive'): Identity {
   return identity({ username, state, ...(admin === undefined ? {} : { metadataAdmin: { admin } }) });
@@ -151,6 +152,14 @@ describe('deleteAction', () => {
     expect(outcome.actionResult && 'message' in outcome.actionResult ? outcome.actionResult.message : '').toMatch(/not deleted/i);
   });
 
+  it('is not partial when the identity could not be turned off', async () => {
+    revokeSubjectMock.mockRejectedValue(new RevokeError('kratos-admin', 'state->inactive', 'Verify KRATOS_ADMIN_URL.'));
+    const outcome = await deleteAction(fd({ confirm: 'alice' }), makeCtx({ identity: makeIdentity('alice') }));
+
+    if (outcome instanceof Response) throw new Error('unreachable');
+    expect(outcome.actionResult).not.toHaveProperty('partial');
+  });
+
   it('reports a delete failure after revocation as an error, not a 500', async () => {
     deleteIdentityMock.mockRejectedValue(new Error('kratos admin unavailable'));
     const identity = makeIdentity('alice');
@@ -167,7 +176,7 @@ describe('deleteAction', () => {
 });
 
 describe('saveAction', () => {
-  const MANIFESTS = [{ clientId: 'wiki', accessGroups: ['family', 'media'], groupRoleMap: {} }] as unknown as ActionContext['manifests'];
+  const MANIFESTS = [{ clientId: 'wiki', accessGroups: ['family', 'media'], roles: [], groupRoleMap: {} }] as unknown as ActionContext['manifests'];
 
   function saveForm(groups: string[], role?: string): FormData {
     const f = fd({ username: 'alice.smith', email: 'alice.smith@othala.test' });
@@ -222,7 +231,7 @@ describe('saveAction', () => {
 
   it('keeps a stored group bound only as a role key', async () => {
     const manifests = [
-      { clientId: 'wiki', accessGroups: ['family'], groupRoleMap: { 'wiki-admin': 'admin' } },
+      { clientId: 'wiki', accessGroups: ['family'], roles: [], groupRoleMap: { 'wiki-admin': 'admin' } },
     ] as unknown as ActionContext['manifests'];
     await saveAction(saveForm(['family']), makeCtx({ identity: stored(['family', 'wiki-admin']), manifests }));
 
@@ -269,6 +278,41 @@ describe('saveAction', () => {
     expect(outcome.actionResult?.kind).toBe('error');
     expect(outcome.actionResult && 'message' in outcome.actionResult ? outcome.actionResult.message : '').toMatch(/^Saved, but/);
     expect(outcome.refetch).toBe(true);
+  });
+
+  describe('an elevated role needs a second factor', () => {
+    const ranked = [manifest('wiki', ['admin', 'user'], { 'wiki-admin': 'admin', family: 'user' }, ['family'])];
+    const save = (groups: string[], from: Identity) => saveAction(saveForm(groups), makeCtx({ identity: from, manifests: ranked }));
+
+    it('refuses granting it to someone without one and writes nothing', async () => {
+      const outcome = await save(['family', 'wiki-admin'], stored(['family']));
+
+      expect(updateIdentityMock).not.toHaveBeenCalled();
+      expect(outcome).toMatchObject({ actionResult: { kind: 'error', message: expect.stringMatching(/authenticator app or security key/) }, refetch: false });
+    });
+
+    it('grants it to someone with one', async () => {
+      const outcome = await save(['family', 'wiki-admin'], withTotp(stored(['family'])));
+
+      expect(updateIdentityMock).toHaveBeenCalledTimes(1);
+      expect(outcome.actionResult?.kind).toBe('updated');
+    });
+
+    it('still saves other edits for someone who already holds it without one', async () => {
+      const f = saveForm(['family'], 'admin');
+      f.set('username', 'alice.jones');
+      const outcome = await saveAction(f, makeCtx({ identity: stored(['family'], { wiki: 'admin' }), manifests: ranked }));
+
+      expect(outcome.actionResult?.kind).toBe('updated');
+      expect(updateIdentityMock.mock.calls[0][1].traits.username).toBe('alice.jones');
+    });
+
+    it('still lowers it for someone without one', async () => {
+      const outcome = await save(['family'], stored(['family', 'wiki-admin']));
+
+      expect(updateIdentityMock).toHaveBeenCalledTimes(1);
+      expect(outcome.actionResult?.kind).toBe('updated');
+    });
   });
 });
 
@@ -413,6 +457,41 @@ describe('removeCredentialAction', () => {
     await removeCredentialAction(fd({ cred_type: 'lookup_secret' }), makeCtx({ identity }));
     expect(deleteCredentialMock).toHaveBeenCalled();
   });
+
+  it('refuses removing the last second factor of someone with an elevated app role', async () => {
+    const manifests = [manifest('wiki', ['admin', 'user'], { 'wiki-admin': 'admin' }, ['family'])];
+    const elevated = withCredentials(identity({ username: 'robin.k', metadataAdmin: { groups: ['family', 'wiki-admin'] } }), 'totp');
+    const outcome = await removeCredentialAction(fd({ cred_type: 'totp' }), makeCtx({ identity: elevated, manifests }));
+
+    expect(deleteCredentialMock).not.toHaveBeenCalled();
+    if (outcome instanceof Response) throw new Error('unreachable');
+    expect(outcome).toMatchObject({ actionResult: { kind: 'error', message: expect.stringMatching(/role above an app's entry level/) }, refetch: false });
+  });
+
+  it("ends another person's sessions after the removal", async () => {
+    await removeCredentialAction(fd({ cred_type: 'totp' }), makeCtx({ id: 'target-1' }));
+
+    expect(revokeSubjectMock).toHaveBeenCalledWith('target-1');
+    expect(deleteCredentialMock.mock.invocationCallOrder[0]).toBeLessThan(revokeSubjectMock.mock.invocationCallOrder[0]);
+  });
+
+  it('keeps the acting admin signed in after removing their own method', async () => {
+    const identity = withCredentials(makeIdentity('self', true), 'totp', 'webauthn');
+    await removeCredentialAction(fd({ cred_type: 'webauthn' }), makeCtx({ id: 'admin-1', identity, adminIdentityId: 'admin-1' }));
+
+    expect(deleteCredentialMock).toHaveBeenCalledWith('admin-1', 'webauthn');
+    expect(revokeSubjectMock).not.toHaveBeenCalled();
+  });
+
+  it('reports a failed sign-out after the removal as a partial error, not a 500', async () => {
+    revokeSubjectMock.mockRejectedValue(new RevokeError('kratos-admin', 'delete-sessions', 'Verify KRATOS_ADMIN_URL.'));
+    const outcome = await removeCredentialAction(fd({ cred_type: 'totp' }), makeCtx({ id: 'target-1' }));
+
+    expect(deleteCredentialMock).toHaveBeenCalledWith('target-1', 'totp');
+    if (outcome instanceof Response) throw new Error('unreachable');
+    expect(outcome.actionResult).toMatchObject({ kind: 'error', partial: true, message: expect.stringMatching(/^Removed, but their sessions could not be ended: /) });
+    expect(outcome.refetch).toBe(true);
+  });
 });
 
 describe('deactivateAction', () => {
@@ -486,13 +565,23 @@ describe('person page sections', () => {
   it('saves access: groups and overrides follow the chosen levels, traits stay as stored', async () => {
     const outcome = await saveAccessAction(
       fd({ 'level:grafana': 'editor', 'level:proxywatch': 'use' }),
-      makeCtx({ identity: person(['everyone']), manifests: MANIFESTS }),
+      makeCtx({ identity: withTotp(person(['everyone'])), manifests: MANIFESTS }),
     );
 
     expect(outcome.actionResult?.kind).toBe('updated');
     expect(written().traits.username).toBe('robin.k');
     expect(written().metadataAdmin.groups).toEqual(['everyone', 'grafana-access', 'proxywatch-access']);
     expect(written().metadataAdmin.roles).toEqual({ grafana: 'editor' });
+  });
+
+  it('refuses an access level above the entry role for someone without a second factor and writes nothing', async () => {
+    const outcome = await saveAccessAction(
+      fd({ 'level:grafana': 'editor', 'level:proxywatch': 'use' }),
+      makeCtx({ identity: person(['everyone']), manifests: MANIFESTS }),
+    );
+
+    expect(updateIdentityMock).not.toHaveBeenCalled();
+    expect(outcome).toMatchObject({ actionResult: { kind: 'error', message: expect.stringMatching(/authenticator app or security key/) }, refetch: false });
   });
 
   it('names the shared group and saves nothing when No access cannot be stored', async () => {
@@ -596,9 +685,9 @@ describe('prerequisites and verified email', () => {
 });
 
 describe('admin action audit line', () => {
-  const audit = async (action: string, ctx: ActionContext) => {
+  const audit = async (action: string, ctx: ActionContext, form = fd()) => {
     const log = vi.spyOn(console, 'log').mockImplementation(() => {});
-    await ADMIN_ACTIONS[action](fd(), ctx).catch(() => {});
+    await ADMIN_ACTIONS[action](form, ctx).catch(() => {});
     const lines = log.mock.calls.map((c) => c[0]);
     log.mockRestore();
     return lines;
@@ -614,6 +703,62 @@ describe('admin action audit line', () => {
     const lines = await audit(action, ctx);
     expect(lines).toHaveLength(1);
     expect(JSON.parse(lines[0])).toEqual({ event: 'admin_action', action, actor: 'admin-1', target: ctx.id, result });
+  });
+
+  describe('a write that landed before its sign-out failed is partial', () => {
+    const proxywatch = [
+      { clientId: 'proxywatch', accessGroups: ['proxywatch-access'], roles: [], groupRoleMap: {}, skipAccessCheck: false },
+    ] as unknown as ActionContext['manifests'];
+    const hydraDown = new RevokeError('hydra-admin', 'revoke-consent-sessions', 'Verify HYDRA_ADMIN_URL.');
+
+    it.each([
+      [
+        'save-access', 'save-access',
+        () => makeCtx({ identity: identity({ username: 'robin.k', metadataAdmin: { groups: ['everyone', 'proxywatch-access'] } }), manifests: proxywatch }),
+        () => fd({ 'level:proxywatch': 'none' }),
+      ],
+      [
+        'revoke-admin of another admin', 'revoke-admin',
+        () => {
+          listIdentitiesMock.mockResolvedValue([makeIdentity('root', true), makeIdentity('other', true)]);
+          return makeCtx({ identity: makeIdentity('root', true) });
+        },
+        () => fd(),
+      ],
+      [
+        'revoke-admin of yourself', 'revoke-admin',
+        () => {
+          listIdentitiesMock.mockResolvedValue([makeIdentity('admin', true), makeIdentity('other', true)]);
+          return makeCtx({ id: 'admin-1', identity: makeIdentity('admin', true) });
+        },
+        () => fd({ confirm: 'admin' }),
+      ],
+      ['remove-credential', 'remove-credential', () => makeCtx(), () => fd({ cred_type: 'totp' })],
+      ['delete when sign-out fails after deactivating', 'delete', () => makeCtx({ identity: makeIdentity('alice') }), () => fd({ confirm: 'alice' })],
+      [
+        'delete when removal fails after sign-out', 'delete',
+        () => {
+          revokeSubjectMock.mockResolvedValue(undefined);
+          deleteIdentityMock.mockRejectedValue(new Error('kratos admin unavailable'));
+          return makeCtx({ identity: makeIdentity('alice') });
+        },
+        () => fd({ confirm: 'alice' }),
+      ],
+    ])('%s', async (_label, action, ctx, form) => {
+      revokeConsentSessionsMock.mockRejectedValue(hydraDown);
+      revokeSubjectMock.mockRejectedValue(hydraDown);
+      const c = ctx();
+      const lines = await audit(action, c, form());
+      expect(lines).toHaveLength(1);
+      expect(JSON.parse(lines[0])).toEqual({ event: 'admin_action', action, actor: 'admin-1', target: c.id, result: 'partial' });
+    });
+  });
+
+  it('writes the audit line as one JSON object of ids', () => {
+    const log = vi.spyOn(console, 'log').mockImplementation(() => {});
+    auditLine('admin-1', 'create-user', 'new-1', 'ok');
+    expect(log.mock.calls).toEqual([['{"event":"admin_action","action":"create-user","actor":"admin-1","target":"new-1","result":"ok"}']]);
+    log.mockRestore();
   });
 
   it('records a thrown mutation as error and rethrows', async () => {

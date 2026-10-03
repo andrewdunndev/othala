@@ -23,9 +23,10 @@ import { confirmsInviteAddress, IDENTITY_GROUP_ORDER, normalizeGroupOrder, shoul
 import { accessToStorage, choicesFromForm } from './access-rows';
 import { GROUP_RE } from './access-groups';
 import { HOUSEHOLD_GROUPS } from './constants';
-import { planGroupSave } from './gate';
+import { holdsElevatedRole, planGroupSave } from './gate';
 import { buildGroupRegistry, isIdentityGroup, unconfiguredGroups } from './group-registry';
-import { revokeConsentSessions, revokeSubject } from './revoke';
+import { RevokeError, revokeConsentSessions, revokeSubject } from './revoke';
+import { removalBlock } from './admin-view';
 import type { ClientManifest } from './manifests';
 import type { Identity } from './types';
 
@@ -47,7 +48,7 @@ export type ActionResult =
   | { kind: 'email-verified' }
   | { kind: 'prerequisites-saved' }
   | { kind: 'credential-removed'; credType: string }
-  | { kind: 'error'; message: string };
+  | { kind: 'error'; message: string; partial?: true };
 
 export interface ActionOutcome {
   /** Absent only on save's validation-failure path (re-render with formErrors, no notice). */
@@ -133,6 +134,11 @@ export async function saveAction(fd: FormData, ctx: ActionContext): Promise<Acti
   const existingPrerequisites = identity.metadata_admin?.prerequisites;
   const existingPasskeyNames = identity.metadata_admin?.passkeyNames;
   const groups = normalizeGroupOrder(groupPlan.groups);
+  // Only a new elevation needs the second factor first, so people already elevated without one can still be edited and lowered.
+  const after = { ...identity, metadata_admin: { ...identity.metadata_admin, groups, roles } };
+  if (holdsElevatedRole(after, manifests) && !holdsElevatedRole(identity, manifests) && !parseIdentity(identity).hasSecondFactor) {
+    return { actionResult: ELEVATED_SECOND_FACTOR_REQUIRED, refetch: false };
+  }
   await updateIdentity(id, {
     traits,
     metadataAdmin: {
@@ -288,6 +294,7 @@ async function revokeGrants(id: string): Promise<ActionResult | null> {
   } catch (err) {
     return {
       kind: 'error',
+      partial: true,
       message: `Saved, but their old app access could not be taken away: ${err instanceof Error ? err.message : 'unknown error'}`,
     };
   }
@@ -397,12 +404,15 @@ export async function deleteAction(fd: FormData, ctx: ActionContext): Promise<Ac
   try {
     await revokeSubject(id, { deactivate: true });
   } catch (err) {
+    // Past its first step the identity is already turned off.
+    const landed = err instanceof RevokeError && err.step !== 'state->inactive';
     return {
       actionResult: {
         kind: 'error',
+        ...(landed && { partial: true as const }),
         message: `Not deleted: their sign-ins and app access could not be cleared first. ${err instanceof Error ? err.message : 'unknown error'}`,
       },
-      refetch: false,
+      refetch: landed,
     };
   }
   try {
@@ -411,6 +421,7 @@ export async function deleteAction(fd: FormData, ctx: ActionContext): Promise<Ac
     return {
       actionResult: {
         kind: 'error',
+        partial: true,
         message: `Signed out and turned off, but not deleted: ${err instanceof Error ? err.message : 'unknown error'}`,
       },
       refetch: true,
@@ -425,6 +436,11 @@ const SECOND_FACTOR_REQUIRED: ActionResult = {
   kind: 'error',
   message: 'Admins need an authenticator app or security key set up first.',
 };
+
+// Elevated app roles step up at sign-in too (needsStepUp, gate.ts).
+export const ELEVATED_ROLE_NEEDS_SECOND_FACTOR =
+  "People with a role above an app's entry level need an authenticator app or security key set up first.";
+const ELEVATED_SECOND_FACTOR_REQUIRED: ActionResult = { kind: 'error', message: ELEVATED_ROLE_NEEDS_SECOND_FACTOR };
 
 const OWN_SECOND_FACTOR_REQUIRED: ActionResult = {
   kind: 'error',
@@ -462,8 +478,8 @@ export async function revokeAdminAction(fd: FormData, ctx: ActionContext): Promi
   }
   await patchAdminMarker(id, false);
   const failure = await revokeGrants(id);
-  if (self) return new Response(null, { status: 303, headers: { Location: '/' } });
   if (failure) return { actionResult: failure, refetch: true };
+  if (self) return new Response(null, { status: 303, headers: { Location: '/' } });
   return { actionResult: { kind: 'admin-revoked', username }, refetch: true };
 }
 
@@ -489,29 +505,39 @@ export async function removeCredentialAction(fd: FormData, ctx: ActionContext): 
     };
   }
   const self = ctx.id === ctx.adminIdentityId;
-  if (self || parseIdentity(ctx.identity).isAdmin) {
-    const creds = { ...(ctx.identity.credentials ?? {}) } as Record<string, unknown>;
-    delete creds[credType];
-    if (!parseIdentity({ ...ctx.identity, credentials: creds as Identity['credentials'] }).hasSecondFactor) {
-      return { actionResult: self ? OWN_SECOND_FACTOR_REQUIRED : SECOND_FACTOR_REQUIRED, refetch: false };
-    }
+  if (removalBlock(ctx.identity, credType, self, ctx.manifests)) {
+    const refusal = self ? OWN_SECOND_FACTOR_REQUIRED : parseIdentity(ctx.identity).isAdmin ? SECOND_FACTOR_REQUIRED : ELEVATED_SECOND_FACTOR_REQUIRED;
+    return { actionResult: refusal, refetch: false };
   }
   await deleteCredential(ctx.id, credType);
+  // Someone else's lost method may have signed a session in, so end their sessions too. Your own stay.
+  if (!self) {
+    try {
+      await revokeUserSessions(ctx.id);
+    } catch (err) {
+      const reason = err instanceof Error ? err.message : 'unknown error';
+      return { actionResult: { kind: 'error', partial: true, message: `Removed, but their sessions could not be ended: ${reason}` }, refetch: true };
+    }
+  }
   return { actionResult: { kind: 'credential-removed', credType }, refetch: true };
 }
 
 /** One stdout JSON line per mutation: ids only, never emails, names or credential material. */
+export function auditLine(actor: string, action: string, target: string, result: 'ok' | 'partial' | 'refused' | 'error'): void {
+  console.log(JSON.stringify({ event: 'admin_action', action, actor, target, result }));
+}
+
+/** A partial error landed its write; any other error, or a save sent back with form errors, wrote nothing. */
 function audited(action: string, handler: ActionHandler): ActionHandler {
-  const line = (ctx: ActionContext, result: string) =>
-    console.log(JSON.stringify({ event: 'admin_action', action, actor: ctx.adminIdentityId, target: ctx.id, result }));
   return async (fd, ctx) => {
     try {
       const outcome = await handler(fd, ctx);
-      const kind = outcome instanceof Response ? 'ok' : outcome.actionResult?.kind;
-      line(ctx, kind && kind !== 'error' ? 'ok' : 'refused');
+      const r = outcome instanceof Response ? null : outcome.actionResult;
+      const result = r === undefined ? 'refused' : r?.kind !== 'error' ? 'ok' : r.partial ? 'partial' : 'refused';
+      auditLine(ctx.adminIdentityId, action, ctx.id, result);
       return outcome;
     } catch (err) {
-      line(ctx, 'error');
+      auditLine(ctx.adminIdentityId, action, ctx.id, 'error');
       throw err;
     }
   };

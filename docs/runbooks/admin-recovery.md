@@ -95,6 +95,8 @@ operator at the admin API can clear the marker, recover, and put it back.
 
 Non-admin family members are unaffected; they recover via email as normal.
 
+If a member reports an authenticator app they did not add, remove it from their account page; they are signed out everywhere.
+
 ---
 
 ## 4. Admin recovery ladder
