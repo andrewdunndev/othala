@@ -33,6 +33,10 @@ describe('resolveError', () => {
     expect(kratosReason({ id: 'constructor' })).toBeUndefined();
     expect(resolveError(q('error=constructor')).entry).toBe(DEFAULT_ENTRY);
   });
+  it.each([500, 502, 503, 504])('maps a Kratos %i to unavailable', (code) => {
+    expect(kratosReason({ code })).toBe('unavailable');
+    expect(resolveError(q('id=x'), kratosReason({ code })).reason).toBe('unavailable');
+  });
   it('lets our own reason win', () => {
     expect(resolveError(q('reason=not-admin&error=invalid_client')).reason).toBe('not-admin');
   });

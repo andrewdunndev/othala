@@ -72,7 +72,7 @@ export const REASON_MAP: Record<string, ErrorEntry> = {
 export const DEFAULT_ENTRY: ErrorEntry = {
   status: 400,
   title: "That didn't work",
-  message: 'Your request could not be completed. Sign in again and try once more.',
+  message: 'Wait a minute and try again; tell an admin if it repeats.',
 };
 
 /** The entry for a reason. The reason token is not shown to people: it is a code, not a sentence. */
@@ -106,7 +106,14 @@ const KRATOS_ERRORS: Record<string, string> = {
   session_refresh_required: 'session-expired',
   self_service_flow_return_to_forbidden: 'app-misconfigured',
 };
-const KRATOS_CODES: Record<number, string> = { 410: 'flow-expired', 403: 'flow-expired' };
+const KRATOS_CODES: Record<number, string> = {
+  410: 'flow-expired',
+  403: 'flow-expired',
+  500: 'unavailable',
+  502: 'unavailable',
+  503: 'unavailable',
+  504: 'unavailable',
+};
 
 /** What a Kratos error body (id and HTTP code) means for the page, or undefined to show the generic entry. */
 export function kratosReason(err: { id?: unknown; code?: unknown } | null | undefined): string | undefined {
