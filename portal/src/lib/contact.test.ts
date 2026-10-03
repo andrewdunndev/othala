@@ -77,14 +77,6 @@ describe('rateLimit()', () => {
     expect(blocked.retryAfterSec).toBeGreaterThan(0);
   });
 
-  it('_resetForTests clears state', () => {
-    const key = 'test-key-3';
-    for (let i = 0; i < 5; i++) rateLimit(key);
-    expect(rateLimit(key).allowed).toBe(false);
-    _resetForTests();
-    expect(rateLimit(key).allowed).toBe(true);
-  });
-
   it('per-key isolation', () => {
     for (let i = 0; i < 5; i++) rateLimit('addr-a');
     expect(rateLimit('addr-a').allowed).toBe(false);

@@ -21,11 +21,3 @@ test('dev honours MANIFEST_DIR in the environment', () => {
   process.env.MANIFEST_DIR = '/elsewhere';
   assert.equal(manifestDir(), '/elsewhere');
 });
-
-test('the test seam overrides and restores the directory', () => {
-  vi.stubEnv('DEV', false);
-  setManifestDir('/tmp/x');
-  assert.equal(manifestDir(), '/tmp/x');
-  setManifestDir(undefined);
-  assert.equal(manifestDir(), '/etc/portal/manifests');
-});

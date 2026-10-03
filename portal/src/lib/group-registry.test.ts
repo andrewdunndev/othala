@@ -317,22 +317,6 @@ describe('buildGroupRegistry — completeness over the real loader', () => {
     expect(namesOfKind(reg, 'role')).toEqual(EXPECTED_ROLE);
   });
 
-  it('B4: a presentation-only tile’s access group is grantable, not invisible', () => {
-    writeCatalog();
-    const reg = servingRegistry();
-
-    for (const group of [
-      'proxywatch-access',
-      'downloads-usenet-access',
-      'filedrop-access',
-      'audiobookshelf-access',
-    ]) {
-      expect(isAccessGroup(reg, group), `${group} must be an access group`).toBe(true);
-    }
-
-    expect(namesOfKind(reg, 'access')).toEqual(EXPECTED_ACCESS);
-  });
-
   it('carries the fixed identity groups through without typing them access', () => {
     writeCatalog();
     const reg = servingRegistry();

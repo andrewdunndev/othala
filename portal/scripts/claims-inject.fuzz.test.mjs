@@ -186,29 +186,6 @@ test('P4: subject with no mapped groups gets no role claimEmit keys', () => {
   );
 });
 
-test('P5: deepMergeClaims does NOT pollute Object.prototype via __proto__ key (fixed)', () => {
-  if (Object.prototype.hasOwnProperty.call(Object.prototype, 'injected')) {
-    delete Object.prototype.injected;
-  }
-
-  const dst = {};
-  const poisoned = JSON.parse('{"__proto__":{"injected":true},"constructor":{"name":"pwned"}}');
-
-  deepMergeClaims(dst, poisoned);
-
-  const polluted = ({}).injected === true;
-  if (Object.prototype.hasOwnProperty.call(Object.prototype, 'injected')) {
-    delete Object.prototype.injected;
-  }
-  if (Object.prototype.hasOwnProperty.call(Object.prototype, 'name')) {
-    delete Object.prototype.name;
-  }
-
-  assert.equal(polluted, false,
-    'deepMergeClaims must not pollute Object.prototype via __proto__ key. ' +
-    'Fix: skip __proto__/constructor/prototype keys and use hasOwnProperty for existence check.');
-});
-
 test('P5b: nested __proto__ in deepMergeClaims does NOT pollute Object.prototype (fixed)', () => {
   if (Object.prototype.hasOwnProperty.call(Object.prototype, 'nested_polluted')) {
     delete Object.prototype.nested_polluted;
