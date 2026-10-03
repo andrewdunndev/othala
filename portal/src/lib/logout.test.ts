@@ -1,5 +1,13 @@
-import { describe, it, expect, beforeEach } from 'vitest';
-import { logoutAuthorized, signLogoutToken } from './logout.js';
+import { describe, it, expect, beforeEach, vi } from 'vitest';
+
+const { revokeHydraSessionsMock } = vi.hoisted(() => ({ revokeHydraSessionsMock: vi.fn() }));
+vi.mock('./revoke', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('./revoke.js')>()),
+  revokeHydraSessions: revokeHydraSessionsMock,
+}));
+
+import { endAppSignIns, logoutAuthorized, signLogoutToken } from './logout.js';
+import { RevokeError } from './revoke.js';
 import { signToken, _resetForTests } from './csrf.js';
 import { session } from './test-builders.js';
 
@@ -54,5 +62,26 @@ describe('logoutAuthorized', () => {
     const t = signLogoutToken(self);
     delete process.env['CSRF_SECRET'];
     expect(logoutAuthorized('POST', t, self)).toBe(false);
+  });
+});
+
+describe('endAppSignIns', () => {
+  it('ends the identity\'s Hydra sessions and reports success', async () => {
+    revokeHydraSessionsMock.mockReset().mockResolvedValue(undefined);
+    expect(await endAppSignIns(self)).toBe(true);
+    expect(revokeHydraSessionsMock).toHaveBeenCalledWith(self);
+  });
+
+  it('logs the failed step and returns false instead of throwing', async () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    revokeHydraSessionsMock.mockReset().mockRejectedValue(new RevokeError('hydra-admin', 'revoke-login-sessions', 'Verify HYDRA_ADMIN_URL.'));
+    expect(await endAppSignIns(self)).toBe(false);
+    revokeHydraSessionsMock.mockRejectedValue(new Error('boom'));
+    expect(await endAppSignIns(self)).toBe(false);
+    expect(warn.mock.calls.map((c) => String(c[0]))).toEqual([
+      expect.stringMatching(/^\[othala\/logout\] .*revoke-login-sessions/),
+      expect.stringMatching(/^\[othala\/logout\] .*unknown/),
+    ]);
+    warn.mockRestore();
   });
 });

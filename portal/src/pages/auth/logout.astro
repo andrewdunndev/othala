@@ -1,9 +1,8 @@
 ---
 // Sign-out page. A GET renders a confirm form; only a POST whose token is bound
-// to the caller's identity (lib/logout.ts) ends the session. On a verified POST
-// we fetch Kratos's logout_url and 303 the browser to it; if that URL is not
-// ours we revoke server-side and expire the session cookie. Nobody leaves still
-// holding a live session.
+// to the caller's identity (lib/logout.ts) ends the session. A verified POST ends
+// the person's app sign-ins, then 303s to Kratos's logout_url, or revokes
+// server-side and expires the cookie when that URL is not ours.
 
 export const prerender = false;
 
@@ -11,7 +10,7 @@ import FocusPage from '../../components/FocusPage.astro';
 import { getLogoutInfo, getSession, kratosBase } from '../../lib/kratos';
 import type { LogoutInfo } from '../../lib/kratos';
 import { publicUrl } from '../../lib/config';
-import { logoutAuthorized, signLogoutToken } from '../../lib/logout';
+import { endAppSignIns, logoutAuthorized, signLogoutToken } from '../../lib/logout';
 
 const cookie = Astro.request.headers.get('cookie') ?? undefined;
 
@@ -149,6 +148,7 @@ if (!lookupFailed && !identityId) {
 }
 
 if (identityId && logoutAuthorized(Astro.request.method, form?.get('csrf_token'), identityId)) {
+  await endAppSignIns(identityId);
   let info: LogoutInfo | null = null;
   try {
     info = await getLogoutInfo(cookie);
@@ -202,7 +202,7 @@ const retry = isPost;
       ? 'That sign-out request could not be confirmed. Press the button to sign out of this device.'
       : lookupFailed
       ? 'The sign-in service did not answer. Signing out clears this device only.'
-      : 'Sign out of this device.'}
+      : 'Sign out of this device. Your app sign-ins end on every device.'}
 >
   <form method="POST" enctype="application/x-www-form-urlencoded" action="/auth/logout" class="status-actions">
     <input type="hidden" name="csrf_token" value={csrfToken} />

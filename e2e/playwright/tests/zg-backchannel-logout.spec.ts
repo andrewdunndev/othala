@@ -6,6 +6,7 @@ import { decodeJwt } from 'jose';
 import { test, expect, adminAal2Context, GRAFANA_CLIENT_ID, GRAFANA_REDIRECT_URI, KRATOS_ADMIN_URL } from '../fixtures';
 import { createIdentityWithPassword, TEST_PASSWORD } from '../actions/identity';
 import { loginViaJsonApi } from '../actions/login';
+import { hasSession } from '../actions/session';
 import { walk } from '../actions/oidc';
 
 function seed(tag: string, isAdmin = false) {
@@ -95,6 +96,27 @@ test('ZG — force re-login delivers a logout token carrying the session sid', a
   } finally {
     await memberCtx.close();
     await adminCtx.close();
+    await sink.close();
+  }
+});
+
+test('ZG2 — portal sign-out delivers a logout token for the app session', async ({ browser, baseURL, hydraPublicURL }) => {
+  const member = await seed('zg2');
+  const sink = await listenForLogoutTokens();
+  const ctx = await browser.newContext();
+  try {
+    await loginViaJsonApi(ctx, { identifier: member.email, password: TEST_PASSWORD }, baseURL!);
+    const sid = await authorizeGrafana(ctx, baseURL!, hydraPublicURL);
+
+    const page = await ctx.newPage();
+    await page.goto(`${baseURL}/`, { waitUntil: 'networkidle' });
+    await submitStatus(page, `${baseURL}/auth/logout`, () => page.getByRole('button', { name: 'Sign out', exact: true }).click());
+
+    await expectLogoutToken(sink.tokens, sid);
+    await expect(page.getByRole('link', { name: 'Sign in', exact: true })).toBeVisible({ timeout: 15_000 });
+    expect(await hasSession(ctx, baseURL!), 'session after Sign out').toBe(false);
+  } finally {
+    await ctx.close();
     await sink.close();
   }
 });
