@@ -1,7 +1,5 @@
-# Statuspage: an external hosted service (auth_kind: external), presentation only.
-# skip_access_check suppresses the load-time BLOCK for a manifest with no access binding;
-# it does not affect tile visibility (parseTile reads presentation only, so the tile falls
-# back to the default group). Add access to bind it.
+# Statuspage: an external hosted service, presentation only. skip_access_check
+# suppresses the empty-binding error; the tile still gates on the default group.
 
 presentation:
   name: Statuspage

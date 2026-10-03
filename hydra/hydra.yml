@@ -55,7 +55,7 @@ oauth2:
     bcrypt:
       # 14 (default 10): raises the offline brute-force cost of a leaked client-secret hash.
       cost: 14
-  # An explicit oauth2.strategies pin is schema-rejected by Hydra v26.2.0; defaults are correct.
+  # An explicit oauth2.strategies pin is schema-rejected; defaults are correct.
   client_credentials:
     default_grant_allowed_scope: false
 
@@ -65,7 +65,7 @@ secrets:
   system:
     - "${HYDRA_SYSTEM_SECRET}"
 
-  # Single active cookie secret (v26.2.0 enforces uniqueItems); rotation: docs/runbooks/cookie-rotation.md.
+  # Single active cookie secret: Ory enforces uniqueItems.
   cookie:
     - "${HYDRA_COOKIE_SECRET_CURRENT}"
 

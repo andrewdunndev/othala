@@ -1,21 +1,9 @@
-Statuspage is a generic stand-in for an external, hosted service that the
-portal surfaces as a tile but does not authenticate. `auth_kind: external`
-means the link points off-instance — a public status page, a vendor console, a
-SaaS dashboard — where sign-in (if any) is handled entirely by the third party.
+Statuspage stands in for an external hosted service the portal links to but
+does not authenticate (`auth_kind: external`). It has no OAuth client and no
+credential.
 
-It exists in the catalog purely as a convenience launch point. There is no
-OAuth client and no other credential. The portal's tile filter gates all tiles on
-group membership regardless of `auth_kind`, so this tile (like every other)
-requires the user to be in an appropriate group.
-
-This fixture demonstrates the **default-group fallback**: `access` is
-intentionally omitted from `statuspage.yaml`. When `access` is absent,
-the tile gates on the default group, `everyone`. An admin
-assigns the default group to users who should see such broadly-visible tiles;
-no user is placed in it automatically.
-
-> **Design note:** every tile in Othala gates on group membership — there is no
-> ungated path, even for `auth_kind: external` tiles. Use the default group
-> (`everyone`) for
-> tiles you want visible to most authenticated users, and set an explicit
-> `access` list for tiles that need tighter control.
+It shows the default-group fallback: `statuspage.yaml` has no `access` list,
+so the tile gates on the default group, `everyone`. Every tile gates on group
+membership, whatever its `auth_kind`. An admin assigns `everyone` to the people
+who should see broadly visible tiles and sets an `access` list on tiles that
+need tighter control.

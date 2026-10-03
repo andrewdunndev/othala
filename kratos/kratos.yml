@@ -192,9 +192,9 @@ selfservice:
       ui_url: "${OTHALA_PUBLIC_URL}/auth/recovery"
       notify_unknown_recipients: false
       # Admin email-recovery is refused by the recovery-gate webhook before the privileged settings
-      # session is issued; admins recover via console (docs/runbooks/admin-recovery.md).
+      # session is issued; admins recover via the console.
       after:
-        # v26.2.0: recovery after-hooks sit directly under `after.hooks`; a `code:` wrapper fails validation.
+        # Recovery after-hooks sit directly under `after.hooks`; a `code:` wrapper fails validation.
         hooks:
           - hook: web_hook
             config:
@@ -286,7 +286,6 @@ courier:
     connection_uri: "${OTHALA_SMTP_CONNECTION_URI}"
     from_address: "noreply@${OTHALA_APEX}"
     from_name: "${OTHALA_INSTANCE_NAME}"
-    # local_name: leave default; Fastmail accepts standard HELO
   # Rendered from kratos/courier/ by render-config.sh; Kratos reads each file only when it sends.
   templates:
     recovery_code:
@@ -314,8 +313,8 @@ courier:
 
 secrets:
   # Cookie signing + at-rest cipher secrets. The first entry signs/encrypts; older ones still
-  # verify. v26.2.0 enforces uniqueItems, so one active secret is a SINGLE-element array.
-  # Rotation (docs/runbooks/cookie-rotation.md): prepend the new secret as a distinct first entry,
+  # verify. Ory enforces uniqueItems, so one active secret is a single-element array.
+  # Rotation: prepend the new secret as a distinct first entry,
   # restart, then after the session lifespan drop the old entry and restart again.
   cookie:
     - "${KRATOS_COOKIE_SECRET_CURRENT}"
