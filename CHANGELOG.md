@@ -7,6 +7,31 @@ aims to follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 The git tag is the authoritative version; `portal/package.json` mirrors it.
 This CHANGELOG and git tags carry the deployed-instance release state.
 
+## [0.10.3] - 2026-10-02
+
+Second-factor and sign-out rules for elevated app roles, a group-aware forward-auth snippet, and clearer errors and logs.
+
+### Changed
+
+- Giving someone an app role above the app's entry level now requires them to have an authenticator app or security key first, as making them an admin already does. This holds when adding a person and when editing one. People who already hold such a role can still be edited or lowered.
+- An admin cannot remove the last authenticator app or security key of someone who holds such a role.
+- Removing another person's authenticator app, security key or backup codes also signs them out everywhere. The lost-device runbook no longer has a separate sign-out step.
+- The admin audit log records person creation (`create-user`). A write that landed but whose follow-up step failed is recorded as `partial` instead of `refused` or `ok`, and an admin who gives up their own access is told if their app grants could not be revoked.
+- The reference `forward-auth` snippet calls the portal's `/api/forward-auth` and takes a third argument, the required group. A signed-in member outside the group gets 403. Copies of the snippet need the new argument.
+- Upstream failures (Kratos, Hydra) in sign-in, consent and forward-auth are logged to stderr with the failing step. Responses are unchanged.
+- Code-entry screens remind people to check spam or junk. An admin's page points to the admin-recovery runbook.
+- The copy button in app guides is a full-size tap target.
+- `SECURITY.md` lists the accepted risk for members with no second factor.
+
+### Fixed
+
+- A Kratos outage shows "Back in a moment" instead of asking people to sign in again.
+- `@opentelemetry/sdk-trace-base` is declared as a direct dependency. It was already installed.
+
+### Removed
+
+- The `/admin/activity` redirect stub. It now returns 404.
+
 ## [0.10.2] - 2026-10-01
 
 Internal simplification. No behavior change.
