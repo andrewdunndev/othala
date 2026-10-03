@@ -136,6 +136,7 @@ Live properties of the deployed shape, stated rather than omitted.
   (`portal/src/lib/claims.ts`) reads declaration order in `consent.roles` as
   descending privilege, so a manifest listing roles ascending silently downgrades
   its users. The direction is fail-safe; the silence is not.
+- **A member with no second factor: the mailbox holder keeps the account.** An emailed code proves the mailbox, not the person. A passkey or TOTP the mailbox holder adds is accepted, and the email-change gate only guards members who already hold a passkey or password.
 - **One maintainer.** The times above are best effort; there is no on-call.
 
 ## Out of scope

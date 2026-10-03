@@ -154,7 +154,7 @@ selfservice:
         # stored one. The schema allows no revoke_active_sessions here, so a second non-interrupting
         # hook ends the account's other sessions, keeping the one that saved. An account with a passkey
         # or password changes its email addresses only from a session whose newest sign-in used one; an
-        # emailed code proves the mailbox, not the person.
+        # emailed code proves the mailbox, not the person. A member with neither has no gate beyond the mailbox (SECURITY.md, accepted risks).
         profile:
           hooks:
             - hook: web_hook
