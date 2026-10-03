@@ -10,6 +10,14 @@
       "automerge": false
     },
     {
+      "description": "Kratos and Hydra release together and update the day they ship, as one MR a session reviews; automerge stays off.",
+      "matchDatasources": ["docker"],
+      "matchPackageNames": ["docker.io/oryd/kratos", "docker.io/oryd/hydra"],
+      "groupName": "ory",
+      "minimumReleaseAge": null,
+      "automerge": false
+    },
+    {
       "description": "The .gitlab-ci.yml component pins track a single dunn.dev/pipeline release and must bump together in one MR with the portal/Containerfile runtime base; automerge stays off because a stale base pin breaks the next tag build once the old image tag is registry-GC'd.",
       "matchPackageNames": ["dunn.dev/pipeline"],
       "groupName": "pipeline catalog",
