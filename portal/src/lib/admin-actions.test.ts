@@ -13,7 +13,9 @@ const {
   revokeHydraSessionsMock,
   patchPrerequisitesMock,
   markEmailVerifiedMock,
+  getRecoveryLinkMock,
 } = vi.hoisted(() => ({
+  getRecoveryLinkMock: vi.fn(),
   updateIdentityMock: vi.fn(),
   patchPrerequisitesMock: vi.fn(),
   markEmailVerifiedMock: vi.fn(),
@@ -43,6 +45,7 @@ vi.mock('./admin-api', async (importOriginal) => {
     deleteCredential: deleteCredentialMock,
     patchPrerequisites: patchPrerequisitesMock,
     markEmailVerified: markEmailVerifiedMock,
+    getRecoveryLink: getRecoveryLinkMock,
   };
 });
 
@@ -60,6 +63,7 @@ import {
   revokeAdminAction,
   removeCredentialAction,
   grantAdminAction,
+  issueRecoveryAction,
   ADMIN_ACTIONS,
   auditLine,
   type ActionContext,
@@ -99,6 +103,7 @@ beforeEach(() => {
   revokeHydraSessionsMock.mockReset().mockResolvedValue(undefined);
   patchPrerequisitesMock.mockReset().mockResolvedValue(undefined);
   markEmailVerifiedMock.mockReset().mockResolvedValue(true);
+  getRecoveryLinkMock.mockReset().mockResolvedValue({ recovery_link: 'https://sso.othala.test/r', recovery_code: '123456', expires_at: '' });
 });
 
 describe('deleteAction', () => {
@@ -198,6 +203,16 @@ describe('saveAction', () => {
     expect(revokeHydraSessionsMock).toHaveBeenCalledWith('target-1');
     expect(updateIdentityMock.mock.invocationCallOrder[0]).toBeLessThan(revokeHydraSessionsMock.mock.invocationCallOrder[0]);
     expect(outcome.actionResult?.kind).toBe('updated');
+  });
+
+  it('keeps stored prerequisites and passkey names through a save', async () => {
+    const withMeta = identity({
+      username: 'alice.smith',
+      metadataAdmin: { groups: ['family'], prerequisites: ['x'], passkeyNames: { k: 'Key' } },
+    });
+    await saveAction(saveForm(['family']), makeCtx({ identity: withMeta, manifests: MANIFESTS }));
+
+    expect(updateIdentityMock.mock.calls[0][1].metadataAdmin).toMatchObject({ prerequisites: ['x'], passkeyNames: { k: 'Key' } });
   });
 
   it('ends app sign-ins when a stored role changes', async () => {
@@ -499,6 +514,15 @@ describe('removeCredentialAction', () => {
   });
 });
 
+describe('issueRecoveryAction', () => {
+  it('refuses an admin-marked target and never mints a link', async () => {
+    const outcome = await issueRecoveryAction(fd({}), makeCtx({ identity: makeIdentity('boss', true) }));
+
+    expect(getRecoveryLinkMock).not.toHaveBeenCalled();
+    expect(outcome).toMatchObject({ actionResult: { kind: 'error', message: expect.stringMatching(/setup link for an admin/) }, refetch: false });
+  });
+});
+
 describe('deactivateAction', () => {
   it('refuses self-deactivation and never calls deactivateIdentity', async () => {
     listIdentitiesMock.mockResolvedValue([makeIdentity('admin', true), makeIdentity('other', true)]);
@@ -626,6 +650,15 @@ describe('person page sections', () => {
 
     expect(written().metadataAdmin.groups).toEqual(['everyone', 'proxywatch-access']);
     expect(written().metadataAdmin.admin).toBe(true);
+  });
+
+  it('drops an access group posted with the household groups', async () => {
+    const form = new FormData();
+    form.append('identityGroups', 'everyone');
+    form.append('identityGroups', 'grafana-access');
+    await saveHouseholdAction(form, makeCtx({ identity: person(['everyone']), manifests: MANIFESTS }));
+
+    expect(written().metadataAdmin.groups).not.toContain('grafana-access');
   });
 
   it('saves the profile and leaves groups as stored', async () => {

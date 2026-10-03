@@ -4,8 +4,8 @@
 
 import { test } from 'vitest';
 import assert from 'node:assert/strict';
-import { execFileSync } from 'node:child_process';
-import { existsSync, mkdtempSync, readFileSync, rmSync } from 'node:fs';
+import { execFileSync, spawnSync } from 'node:child_process';
+import { existsSync, mkdtempSync, readFileSync, rmSync, statSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -163,4 +163,34 @@ test('mail: only the recovery email branches on the invite flag and prints nothi
     assert.deepEqual(reads, file.includes('/recovery_code.') ? ['.TransientPayload.invite'] : [], file);
     assert.equal(reads.length, (src.match(/\{\{ if \.TransientPayload\.invite -?\}\}/g) ?? []).length, file);
   }
+});
+
+function renderOutcome(template, extra) {
+  const dir = mkdtempSync(join(tmpdir(), 'ory-config-'));
+  const out = join(dir, 'out');
+  try {
+    const r = spawnSync('bash', [join(root, 'scripts/render-config.sh'), join(root, template), out], {
+      env: { ...BASE_ENV, ...extra },
+      stdio: 'pipe',
+    });
+    return { status: r.status, written: existsSync(out), mode: existsSync(out) ? statSync(out).mode : 0 };
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+}
+
+test('render refuses a line break in a value and writes nothing', () => {
+  for (const bad of ['kp\nmalicious: true', 'kp\rx']) {
+    assert.deepEqual(renderOutcome('kratos/kratos.yml', { KRATOS_PG_PASS: bad }), { status: 1, written: false, mode: 0 });
+  }
+});
+
+test('a backslash and a quote round-trip through a double-quoted scalar', () => {
+  assert.equal(render('kratos/kratos.yml', { KRATOS_PG_PASS: 'a\\"b' }).dsn, 'postgres://kratos:a\\"b@postgres:5432/kratos?sslmode=disable');
+});
+
+test('the rendered file is readable by its owner only', () => {
+  const r = renderOutcome('kratos/kratos.yml');
+  assert.equal(r.status, 0);
+  assert.equal(r.mode & 0o077, 0);
 });

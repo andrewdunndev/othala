@@ -57,6 +57,11 @@ describe('levels', () => {
     expect(levelsFor(proxywatch)).toEqual([{ value: 'use', label: 'Can use', hint: '' }]);
   });
 
+  it('offers the single role of an app that declares one', () => {
+    const single = { ...grafana, roles: [role('viewer')], groupRoleMap: {} } as unknown as ClientManifest;
+    expect(levelsFor(single)).toEqual([{ value: 'viewer', label: 'Viewer', hint: 'viewer role' }]);
+  });
+
   it('knows open apps and the top level', () => {
     expect(isOpenToEveryone(statuspage)).toBe(true);
     expect(isOpenToEveryone(grafana)).toBe(false);
@@ -78,6 +83,11 @@ describe('currentLevel', () => {
   it('reads a mapped group and an override', () => {
     expect(currentLevel(grafana, { groups: ['grafana-access', 'grafana-admin'] })).toBe('admin');
     expect(currentLevel(grafana, { groups: ['grafana-access'], roles: { grafana: 'editor' } })).toBe('editor');
+  });
+
+  it('counts any one of several access groups', () => {
+    const either = { ...proxywatch, accessGroups: ['a', 'b'] } as unknown as ClientManifest;
+    expect(currentLevel(either, { groups: ['b'] })).toBe('use');
   });
 });
 
@@ -155,6 +165,18 @@ describe('accessToStorage', () => {
     expect(next.roles).toEqual({ grafana: 'viewer' });
     expect(next.unmet).toEqual([]);
     expect(currentLevel(grafana, next)).toBe('viewer');
+  });
+
+  it('stores no mapped group for the lowest level', () => {
+    const media = {
+      ...grafana,
+      clientId: 'media',
+      accessGroups: ['media'],
+      roles: [role('admin'), role('viewer')],
+      groupRoleMap: { media: 'admin', 'media-viewers': 'viewer' },
+    } as unknown as ClientManifest;
+    const next = accessToStorage([media], { media: 'viewer' }, stored([]));
+    expect(next.groups).toEqual(['media']);
   });
 
   it('ignores open apps, unknown apps and unknown levels', () => {

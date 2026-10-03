@@ -3,7 +3,7 @@
 import { test, beforeEach, afterEach } from 'vitest';
 import assert from 'node:assert/strict';
 import { identity } from '../src/lib/test-builders.ts';
-import { getIdentity, getRecoveryLink, patchAdminMarker } from '../src/lib/admin-api.ts';
+import { deleteCredential, getIdentity, getRecoveryLink, listSessions, patchAdminMarker, patchPrerequisites, revokeSession, updateIdentity } from '../src/lib/admin-api.ts';
 
 function kratosIdentity(fields) {
   return { ...identity({ id: fields.id }), ...fields };
@@ -125,4 +125,37 @@ test('patchAdminMarker/revoke: no PATCH when the admin key or metadata_admin is 
     await patchAdminMarker('u5', false);
     assert.equal(capturedCalls.length, 1);
   }
+});
+
+test('updateIdentity keeps a deactivated person deactivated', async () => {
+  mockFetchSequence([
+    { body: kratosIdentity({ id: 'u6', traits: {}, schema_id: 'family', state: 'inactive', metadata_admin: {} }) },
+    { body: kratosIdentity({ id: 'u6', traits: {}, state: 'inactive' }) },
+  ]);
+  await updateIdentity('u6', { traits: { username: 'robin' }, metadataAdmin: { groups: ['family'] } });
+  assert.equal(capturedCalls[1].opts.method, 'PUT');
+  assert.equal(JSON.parse(capturedCalls[1].opts.body).state, 'inactive');
+});
+
+test('patchPrerequisites: no PATCH when clearing a list that was never stored', async () => {
+  mockFetchSequence([{ body: kratosIdentity({ id: 'u7', traits: {}, metadata_admin: {} }) }]);
+  await patchPrerequisites('u7', []);
+  assert.equal(capturedCalls.length, 1);
+});
+
+test('patchPrerequisites: adds the key beside existing metadata', async () => {
+  mockFetchSequence([
+    { body: kratosIdentity({ id: 'u8', traits: {}, metadata_admin: { groups: ['family'] } }) },
+    { body: kratosIdentity({ id: 'u8', traits: {} }) },
+  ]);
+  await patchPrerequisites('u8', ['tailscale']);
+  assert.deepEqual(JSON.parse(capturedCalls[1].opts.body), [{ op: 'add', path: '/metadata_admin/prerequisites', value: ['tailscale'] }]);
+});
+
+test('a 404 means already gone for revokeSession, listSessions and deleteCredential', async () => {
+  mockFetch({ error: { code: 404 } }, 404);
+  await revokeSession('s1');
+  assert.deepEqual(await listSessions('u9'), []);
+  await deleteCredential('u9', 'webauthn');
+  assert.equal(capturedCalls.length, 3);
 });

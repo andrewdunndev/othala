@@ -1,8 +1,12 @@
 // Invariant: contact input is validated (name is header-bound, message is body-only), submissions are rate-limited per key, and SMTP URIs parse strictly.
 
-import { describe, it, expect, beforeEach } from 'vitest';
+import { describe, it, expect, beforeEach, vi } from 'vitest';
+
+const { sendMailMock } = vi.hoisted(() => ({ sendMailMock: vi.fn() }));
+vi.mock('nodemailer', () => ({ default: { createTransport: () => ({ sendMail: sendMailMock }) } }));
+
 import { rateLimit, _resetForTests, validateContact, LIMITS } from './contact.js';
-import { parseSmtpUri, smtpTransportOptions, MailerError } from './mailer.js';
+import { parseSmtpUri, smtpTransportOptions, sendContactRequest, MailerError } from './mailer.js';
 
 beforeEach(() => {
   _resetForTests();
@@ -144,5 +148,23 @@ describe('smtpTransportOptions()', () => {
       greetingTimeout: 10_000,
       socketTimeout: 30_000,
     });
+  });
+});
+
+describe('sendContactRequest()', () => {
+  const mail = { to: 'admin@othala.test', identityId: 'id-1', username: 'robin', fromName: 'Robin', requestType: 'access', message: 'please' };
+
+  beforeEach(() => {
+    sendMailMock.mockReset().mockResolvedValue({});
+  });
+
+  it('reports a failed send instead of claiming the request went out', async () => {
+    sendMailMock.mockRejectedValueOnce(new Error('relay down'));
+    await expect(sendContactRequest(mail)).rejects.toBeInstanceOf(MailerError);
+  });
+
+  it('keeps a line break in the sender name out of the subject header', async () => {
+    await sendContactRequest({ ...mail, fromName: 'A\r\nBcc: x' });
+    expect(sendMailMock.mock.calls[0][0].subject).not.toMatch(/[\r\n]/);
   });
 });

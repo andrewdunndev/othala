@@ -800,3 +800,13 @@ test('startup refuses in production without PORTAL_ADMIN_BIND_HOST, and on a wil
     for (const [k, v] of Object.entries(saved)) restore(k, v);
   }
 });
+
+test('both hook gates refuse a malformed JSON body (403)', async () => {
+  await withMockKratos(identityServer({ groups: ['family'], admin: false }), async () => {
+    for (const url of ['/admin/recovery-gate', '/admin/login-code-gate']) {
+      const res = fakeRes();
+      await handle(fakeReq({ method: 'POST', url, headers: { authorization: 'Bearer gate-secret' }, body: '{not json' }), res);
+      assert.equal(res.statusCode, 403, url);
+    }
+  });
+});
