@@ -7,7 +7,7 @@
   <text x="60" y="138" font-size="72" font-weight="700" fill="#4a6741" letter-spacing="-2">othala</text>
   <text x="60" y="172" font-size="16" font-style="italic" fill="#404040">Ory for your home.</text>
   <text x="60" y="202" font-size="14" fill="#404040">Kratos + Hydra that hold the home's identity.</text>
-  <text x="60" y="222" font-size="14" fill="#404040">config-as-code is the only path to an identity change.</text>
+  <text x="60" y="222" font-size="14" fill="#404040">config-as-code is the main path to an identity change.</text>
   <g transform="translate(110 246)" font-family="IBM Plex Mono, Menlo, monospace">
     <!-- door (dagaz ᛞ) → home (othala ᛟ), geometric runic line-art coherent with mark/ -->
     <!-- dagaz ᛞ : 64-unit glyph scaled 0.66 (≈42u), top-left placed so glyph sits in y≈4..46 -->
