@@ -115,8 +115,8 @@ selfservice:
                   parse: false
                 body: file:///etc/config/kratos/hooks/recovery-gate.jsonnet
                 can_interrupt: false
-        # An admin keeps a second factor: this interrupting hook refuses a change that could leave
-        # no authenticator app and no security key.
+        # Admins and members above an app's entry role keep a second factor: this interrupting hook
+        # refuses a change that could leave no authenticator app and no security key.
         webauthn:
           hooks:
             - hook: web_hook
