@@ -65,6 +65,7 @@ import {
   grantAdminAction,
   issueRecoveryAction,
   ADMIN_ACTIONS,
+  ENROLLMENT_TTL,
   auditLine,
   type ActionContext,
 } from './admin-actions.js';
@@ -521,6 +522,18 @@ describe('issueRecoveryAction', () => {
     expect(getRecoveryLinkMock).not.toHaveBeenCalled();
     expect(outcome).toMatchObject({ actionResult: { kind: 'error', message: expect.stringMatching(/setup link for an admin/) }, refetch: false });
   });
+
+  it('mints a 24h link for a non-admin target and returns it', async () => {
+    getRecoveryLinkMock.mockResolvedValue({ recovery_link: 'https://sso.othala.test/r', recovery_code: '123456', expires_at: '2026-10-04T00:00:00Z' });
+    const outcome = await issueRecoveryAction(fd({}), makeCtx());
+
+    expect(getRecoveryLinkMock).toHaveBeenCalledTimes(1);
+    expect(getRecoveryLinkMock).toHaveBeenCalledWith('target-1', ENROLLMENT_TTL);
+    expect(outcome).toEqual({
+      actionResult: { kind: 'recovery', url: 'https://sso.othala.test/r', code: '123456', expiresAt: '2026-10-04T00:00:00Z' },
+      refetch: false,
+    });
+  });
 });
 
 describe('deactivateAction', () => {
@@ -735,6 +748,7 @@ describe('admin action audit line', () => {
   it.each([
     ['grant-admin', makeCtx({ identity: member }), 'ok'],
     ['grant-admin', makeCtx({ identity: makeIdentity('member') }), 'refused'],
+    ['issue-recovery', makeCtx(), 'ok'],
     ['deactivate', makeCtx(), 'ok'],
     ['deactivate', makeCtx({ id: 'admin-1' }), 'refused'],
   ])('%s emits exactly one line, result %s', async (action, ctx, result) => {
