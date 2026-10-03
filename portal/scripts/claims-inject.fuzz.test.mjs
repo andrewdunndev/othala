@@ -127,14 +127,10 @@ test('P3: override naming an undeclared role falls through to group walk, not ph
 
         const result = lookupRole(m, id.metadata_admin);
 
-        if (result !== null) {
-          assert.notEqual(result.roleName, phantomRole,
-            `lookupRole must not return phantom role "${phantomRole}" — it is not declared`);
-          assert.equal(result.roleName, declaredRole,
-            `lookupRole must fall through to declared role "${declaredRole}" via group walk`);
-          assert.equal(Object.hasOwn(result.claimEmit, phantomKey), false,
-            `Phantom claim key "${phantomKey}" must not appear as own property in resolved claimEmit`);
-        }
+        assert.equal(result?.roleName, declaredRole,
+          `lookupRole must fall through to declared role "${declaredRole}" via group walk`);
+        assert.equal(Object.hasOwn(result.claimEmit, phantomKey), false,
+          `Phantom claim key "${phantomKey}" must not appear as own property in resolved claimEmit`);
       },
     ),
     { numRuns: 500, verbose: false },
@@ -169,7 +165,6 @@ test('P4: subject with no mapped groups gets no role claimEmit keys', () => {
       (mappedGroups, roleName, ce, subjectExtraGroups) => {
         const mappedSet = new Set(mappedGroups);
         const subjectGroups = subjectExtraGroups.filter(g => !mappedSet.has(g));
-        fc.pre(subjectGroups.length > 0 || true); // always proceed; subject just won't match
 
         const roles = [{ name: roleName, description: '', claimEmit: ce }];
         const groupRoleMap = Object.fromEntries(mappedGroups.map(g => [g, roleName]));
@@ -279,12 +274,6 @@ test('P7a: override stored with lowercase clientId key resolves the declared rol
         const result = lookupRole(m, metadataAdmin);
         assert.equal(result?.roleName, roleName,
           `Override key "${mixedClientId.toLowerCase()}" must resolve role "${roleName}"`);
-        if (result) {
-          for (const k of Object.keys(result.claimEmit)) {
-            assert.ok(Object.hasOwn(ce, k) || true, // shape matches declared role
-              `Unexpected key "${k}" in claimEmit — not in declared role`);
-          }
-        }
       },
     ),
     { numRuns: 300, verbose: false },
@@ -294,11 +283,14 @@ test('P7a: override stored with lowercase clientId key resolves the declared rol
 test('P7b: override stored with mixed-case key is silently ignored (fails safe)', () => {
   const m = manifest({
     clientId: 'MyApp',
-    roles: [{ name: 'admin', description: '', claimEmit: { role: 'admin' } }],
+    roles: [
+      { name: 'admin', description: '', claimEmit: { role: 'admin' } },
+      { name: 'viewer', description: '', claimEmit: { role: 'viewer' } },
+    ],
     groupRoleMap: { 'eng': 'admin' },
   });
 
-  const meta = { groups: ['access-MyApp', 'eng'], roles: { 'MyApp': 'admin' } };
+  const meta = { groups: ['access-MyApp', 'eng'], roles: { 'MyApp': 'viewer' } };
   const result = lookupRole(m, meta);
 
   assert.equal(result?.roleName, 'admin', 'group walk should still resolve admin via eng group');
@@ -406,9 +398,7 @@ test('adversarial: groups array with non-string elements is coerced/filtered saf
     result = lookupRole(m, id.metadata_admin);
   }, 'lookupRole must not throw on corrupt groups array');
 
-  if (result !== null) {
-    assert.equal(result.roleName, 'admin', 'only the string "admin" element should match');
-  }
+  assert.equal(result?.roleName, 'admin', 'only the string "admin" element should match');
 });
 
 test('adversarial: metadata_admin.roles override with object value (not string) is ignored', () => {

@@ -108,13 +108,8 @@ test('sendInviteRecoveryEmail: rejects when init succeeds but returns no flow id
 
 test('sendInviteRecoveryEmail: error messages never include the email address', async () => {
   installFetch({ submitStatus: 500 });
-  try {
-    await sendInviteRecoveryEmail('should-not-leak@othala.test');
-    assert.fail('expected sendInviteRecoveryEmail to throw');
-  } catch (err) {
-    assert.ok(
-      !String(err.message).includes('should-not-leak@othala.test'),
-      `error message must not leak the recipient address: ${err.message}`,
-    );
-  }
+  await assert.rejects(
+    () => sendInviteRecoveryEmail('should-not-leak@othala.test'),
+    (err) => !String(err.message).includes('should-not-leak@othala.test'),
+  );
 });

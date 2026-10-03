@@ -1,9 +1,16 @@
 import { describe, it, expect } from 'vitest';
-import { resolveReason, resolveError, kratosReason, REASON_MAP, DEFAULT_ENTRY } from './error-reasons.js';
+import { resolveReason, resolveError, kratosReason, DEFAULT_ENTRY } from './error-reasons.js';
 
 describe('resolveReason', () => {
-  it('shows a known reason with its entry', () => {
-    expect(resolveReason('not-admin')).toEqual({ entry: REASON_MAP['not-admin'], reason: 'not-admin' });
+  it.each([
+    ['not-admin', 403],
+    ['session-expired', 401],
+    ['rate-limited', 429],
+    ['flow-expired', 410],
+  ])('shows %s with status %i', (r, s) => {
+    const resolved = resolveReason(r);
+    expect(resolved.entry.status).toBe(s);
+    expect(resolved.reason).toBe(r);
   });
 
   it.each(['<b>hello</b>', 'anything at all', '', 'constructor', '__proto__', 'toString'])(

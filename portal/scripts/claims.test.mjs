@@ -100,6 +100,8 @@ test('deepMergeClaims: __proto__ key is silently dropped (no pollution)', () => 
   const dst = { existing: 1 };
   deepMergeClaims(dst, src);
   assert.equal(Object.prototype.polluted, undefined, '__proto__ must not pollute Object.prototype');
+  assert.equal(Object.getPrototypeOf(dst), Object.prototype);
+  assert.equal(dst.polluted, undefined);
   assert.equal(dst.safe, 'value');
   assert.equal(dst.existing, 1);
 });

@@ -593,6 +593,8 @@ test('T4: POST Deny rejects and redirects', async () => {
       active: true,
       identity: { id: 'id-1', state: 'active', schema_id: 'family', schema_url: '', traits: {} },
     }),
+    getIdentity: async () => activeMember(),
+    manifest: () => loadManifest('grafana'),
   });
   assert.equal(res.status, 302);
   assert.equal(res.headers.get('location'), 'https://sso.othala.test/consent-rejected');

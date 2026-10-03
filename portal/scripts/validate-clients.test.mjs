@@ -493,23 +493,12 @@ presentation:
 const e2eClientsDir = join(here, '..', '..', 'e2e', 'manifests');
 
 test('every e2e/manifests/*.yaml round-trips AND the set passes validateClients', () => {
-  let files;
-  try {
-    files = readdirSync(e2eClientsDir)
-      .filter((f) => (f.endsWith('.yaml') || f.endsWith('.yml')) && f !== 'groups.yaml');
-  } catch {
-    return;
-  }
+  const files = readdirSync(e2eClientsDir)
+    .filter((f) => (f.endsWith('.yaml') || f.endsWith('.yml')) && f !== 'groups.yaml');
   assert.ok(files.length > 0, 'expected at least one e2e fixture manifest');
   const manifests = files
-    .map((f) => {
-      try {
-        return parseManifest(readFileSync(join(e2eClientsDir, f), 'utf8'), f);
-      } catch {
-        return null;
-      }
-    })
-    .filter((m) => m !== null && !m.presentationOnly);
+    .map((f) => parseManifest(readFileSync(join(e2eClientsDir, f), 'utf8'), f))
+    .filter((m) => !m.presentationOnly);
   const errs = validateClients(manifests);
   assert.deepEqual(errs, [], `e2e fixtures should be clean:\n${errs.join('\n')}`);
 });

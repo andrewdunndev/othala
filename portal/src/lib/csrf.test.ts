@@ -28,6 +28,7 @@ describe('signToken / verifyToken — errors', () => {
     expect(() => verifyToken('ts.id.nonce', IDENTITY, 'save')).toThrow(CSRFError);
     expect(() => verifyToken('not-a-token', IDENTITY, 'save')).toThrow(CSRFError);
     expect(() => verifyToken('a.b.c', IDENTITY, 'save')).toThrow(CSRFError);
+    expect(() => verifyToken(signToken(IDENTITY, 'save') + '.x', IDENTITY, 'save')).toThrow(/malformed/);
   });
 
   it('rejects a 4-part token without an action', () => {

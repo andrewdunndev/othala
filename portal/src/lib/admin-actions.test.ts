@@ -156,7 +156,9 @@ describe('deleteAction', () => {
     revokeSubjectMock.mockRejectedValue(new RevokeError('kratos-admin', DEACTIVATE_STEP, 'Verify KRATOS_ADMIN_URL.'));
     const outcome = await deleteAction(fd({ confirm: 'alice' }), makeCtx({ identity: makeIdentity('alice') }));
 
+    expect(deleteIdentityMock).not.toHaveBeenCalled();
     if (outcome instanceof Response) throw new Error('unreachable');
+    expect(outcome.actionResult?.kind).toBe('error');
     expect(outcome.actionResult).not.toHaveProperty('partial');
   });
 
@@ -318,12 +320,14 @@ describe('saveAction', () => {
 
 describe('revokeAdminAction', () => {
   it('refuses self-demote without the typed username and never calls patchAdminMarker', async () => {
+    listIdentitiesMock.mockResolvedValue([makeIdentity('other-admin', true), makeIdentity('admin', true)]);
     const identity = makeIdentity('admin', true);
     for (const typed of [undefined, 'someone-else']) {
       const outcome = await revokeAdminAction(fd(typed ? { confirm: typed } : {}), makeCtx({ id: 'admin-1', identity, adminIdentityId: 'admin-1' }));
       expect(outcome).not.toBeInstanceOf(Response);
       if (outcome instanceof Response) throw new Error('unreachable');
       expect(outcome.actionResult?.kind).toBe('error');
+      expect(outcome.actionResult && 'message' in outcome.actionResult ? outcome.actionResult.message : '').toMatch(/Type your name/);
     }
     expect(patchAdminMarkerMock).not.toHaveBeenCalled();
   });

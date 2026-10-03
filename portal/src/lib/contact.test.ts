@@ -35,8 +35,14 @@ describe('validateContact()', () => {
     expect(validateContact({ name: 'X', type: 'other', message: 'm'.repeat(LIMITS.messageMax + 1) }).ok).toBe(false);
   });
 
-  it('rejects header-injection control characters', () => {
-    expect(validateContact({ name: 'X\r\nBcc: evil@x', type: 'other', message: 'a real message body' }).ok).toBe(false);
+  it('rejects control characters in the name or the message', () => {
+    for (const raw of [
+      { name: 'X\x1b', type: 'other', message: 'a real message body' },
+      { name: 'X', type: 'other', message: 'ok \x00 body' },
+      { name: 'X', type: 'other', message: 'ok \x7f body' },
+    ]) {
+      expect(validateContact(raw)).toEqual({ ok: false, reason: 'Message contains invalid characters.' });
+    }
   });
 
   it('name rejects CR/LF (header injection guard)', () => {
@@ -50,7 +56,7 @@ describe('validateContact()', () => {
   });
 
   it('rejects a body that is mostly links (spam)', () => {
-    const message = 'http://a.com http://b.com http://c.com http://d.com';
+    const message = 'http://a.com http://b.com http://c.com HTTPS://d.com';
     expect(validateContact({ name: 'X', type: 'other', message }).ok).toBe(false);
   });
 
@@ -87,6 +93,7 @@ describe('rateLimit()', () => {
     const t0 = 1_000_000_000_000;
     for (let i = 0; i < 5; i++) rateLimit('test-key-slide', t0);
     expect(rateLimit('test-key-slide', t0).allowed).toBe(false);
+    expect(rateLimit('test-key-slide', t0 + 5 * 60 * 1000).allowed).toBe(false);
     expect(rateLimit('test-key-slide', t0 + 11 * 60 * 1000).allowed).toBe(true);
   });
 
