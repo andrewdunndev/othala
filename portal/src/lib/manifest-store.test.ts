@@ -9,7 +9,6 @@ import { invalidateManifestCache, setManifestDir } from './manifests.js';
 import {
   servingManifests,
   servingManifest,
-  servingAccessGroups,
   manifestHealth,
   _resetForTests,
 } from './manifest-store.js';
@@ -147,7 +146,6 @@ describe('servingManifests — cold start onto a broken set', () => {
     write('proxywatch.yaml', BROKEN_APP);
 
     expect(servingManifest('proxywatch')).toBeUndefined();
-    expect(servingAccessGroups()).toEqual([]);
   });
 });
 

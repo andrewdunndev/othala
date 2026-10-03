@@ -1,5 +1,5 @@
 // App manifest loader. loadClientManifests() returns every manifest, presentation-only tiles included;
-// oidcClientManifests() and getClientManifest() narrow to the OIDC clients.
+// oidcClientManifests() narrows to the OIDC clients.
 
 import { readdirSync, readFileSync, statSync } from 'node:fs';
 import { join } from 'node:path';
@@ -71,7 +71,7 @@ interface CacheEntry {
 }
 
 let cache: CacheEntry | null = null;
-const CACHE_TTL_MS = 30 * 1000;
+export const CACHE_TTL_MS = 30 * 1000;
 
 /** Drop the manifest cache so the next load re-reads disk (SIGHUP path in registrar.ts). */
 export function invalidateManifestCache(): void {
@@ -232,20 +232,21 @@ export function parseManifest(yamlText: string, filename: string): ClientManifes
   };
 }
 
-function loadFromDisk(): ClientManifest[] {
-  const dir = manifestDir();
-  let files: string[];
+/** The sorted app manifest filenames in `dir`, groups.yaml excluded; an absent directory has none. */
+export function manifestFiles(dir: string): string[] {
   try {
-    files = readdirSync(dir)
+    return readdirSync(dir)
       .filter((f) => (f.endsWith('.yaml') || f.endsWith('.yml')) && f !== 'groups.yaml')
       .sort();
   } catch (err) {
-    if ((err as NodeJS.ErrnoException).code === 'ENOENT') {
-      return [];
-    }
+    if ((err as NodeJS.ErrnoException).code === 'ENOENT') return [];
     throw err;
   }
-  return files
+}
+
+function loadFromDisk(): ClientManifest[] {
+  const dir = manifestDir();
+  return manifestFiles(dir)
     .map((f) => loadOne(f, dir))
     .filter((m): m is ClientManifest => m !== null);
 }
@@ -253,11 +254,8 @@ function loadFromDisk(): ClientManifest[] {
 function freshestMtime(): number {
   const dir = manifestDir();
   try {
-    const files = readdirSync(dir).filter(
-      (f) => (f.endsWith('.yaml') || f.endsWith('.yml')) && f !== 'groups.yaml',
-    );
     let max = 0;
-    for (const f of files) {
+    for (const f of manifestFiles(dir)) {
       const m = statSync(join(dir, f)).mtimeMs;
       if (m > max) max = m;
     }
@@ -315,15 +313,6 @@ export function oidcClientManifests(
   set: ClientManifest[] = loadClientManifests(),
 ): ClientManifest[] {
   return set.filter((m) => !m.presentationOnly);
-}
-
-/** OIDC client manifest for a client_id, case-insensitive. Presentation-only tiles never resolve, so an
- * OAuth2 request cannot bind a client_id to a tile that was never registered. */
-export function getClientManifest(clientId: string): ClientManifest | undefined {
-  const key = clientId.toLowerCase();
-  return loadClientManifests().find(
-    (m) => !m.presentationOnly && m.clientId.toLowerCase() === key,
-  );
 }
 
 /**
@@ -461,12 +450,3 @@ export function assertManifestsValid(set: ClientManifest[]): void {
   }
 }
 
-/** Distinct access groups across the whole catalog, forward_auth and external tiles included, so the admin form
- * renders a checkbox for each. An auth_kind filter upstream would make a save drop the groups it hides. */
-export function knownAccessGroups(): string[] {
-  const set = new Set<string>();
-  for (const m of loadClientManifests()) {
-    for (const g of m.accessGroups) set.add(g);
-  }
-  return Array.from(set).sort();
-}

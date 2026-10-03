@@ -9,7 +9,7 @@ import { parse as parseYaml } from 'yaml';
 import { marked } from 'marked';
 import DOMPurify from 'isomorphic-dompurify';
 import { parseAccessGroups } from './access-groups';
-import { manifestDir } from './manifests';
+import { CACHE_TTL_MS, manifestDir, manifestFiles } from './manifests';
 import { DEFAULT_GROUP } from './constants';
 
 // Vendored icons directory: public/icons/ in dev (a stale dist/ must not shadow it), dist/client/icons/ in prod.
@@ -146,16 +146,11 @@ interface CacheEntry {
 }
 
 let cache: CacheEntry | null = null;
-const CACHE_TTL_MS = 30 * 1000;
 
 /** Freshest mtime across yaml + md so a sidecar edit also busts the cache. */
 function freshestMtime(dir: string): number {
   try {
-    const files = readdirSync(dir).filter(
-      (f) =>
-        ((f.endsWith('.yaml') || f.endsWith('.yml')) && f !== 'groups.yaml') ||
-        f.endsWith('.md'),
-    );
+    const files = [...manifestFiles(dir), ...readdirSync(dir).filter((f) => f.endsWith('.md'))];
     try {
       for (const f of readdirSync(join(dir, 'requirements'))) files.push(join('requirements', f));
     } catch {
@@ -352,18 +347,8 @@ function parseTile(slug: string, doc: Record<string, unknown>, dir: string): App
 
 function loadFromDisk(): AppTile[] {
   const dir = manifestDir();
-  let files: string[];
-  try {
-    files = readdirSync(dir)
-      .filter((f) => (f.endsWith('.yaml') || f.endsWith('.yml')) && f !== 'groups.yaml')
-      .sort();
-  } catch (err) {
-    if ((err as NodeJS.ErrnoException).code === 'ENOENT') return [];
-    throw err;
-  }
-
   const tiles: AppTile[] = [];
-  for (const f of files) {
+  for (const f of manifestFiles(dir)) {
     const slug = f.replace(/\.ya?ml$/, '');
     let doc: unknown;
     let text = '';
