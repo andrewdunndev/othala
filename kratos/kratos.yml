@@ -38,8 +38,7 @@ selfservice:
         ignore_network_errors: false
         min_password_length: 12
 
-    # Passkeys: the PRIMARY login method (discoverable credentials, usernameless), distinct from
-    # the legacy webauthn strategy below.
+    # Passkeys: the primary login method (discoverable credentials, usernameless).
     passkey:
       enabled: true
       config:
@@ -51,8 +50,7 @@ selfservice:
           origins:
             - "${OTHALA_PUBLIC_URL}"
 
-    # WebAuthn (legacy): second factor / security key only; passkey owns passwordless.
-    # Kept because enrolled security keys and the second-factor gate depend on it; retiring it needs a key migration.
+    # Security keys as a second factor: passkey only grants aal1, so aal2 keys need this strategy.
     webauthn:
       enabled: true
       config:
