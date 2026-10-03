@@ -1,6 +1,5 @@
-// OIDC client manifest loader. Reads <slug>.yaml from the manifest dir (constants.ts) at request time (30 s cache, dropped on SIGHUP).
-// loadClientManifests() returns EVERY app manifest, presentation-only tiles included; the OIDC subset
-// comes from oidcClientManifests() and getClientManifest().
+// App manifest loader. loadClientManifests() returns every manifest, presentation-only tiles included;
+// oidcClientManifests() and getClientManifest() narrow to the OIDC clients.
 
 import { readdirSync, readFileSync, statSync } from 'node:fs';
 import { join } from 'node:path';
@@ -11,56 +10,43 @@ import { IDENTITY_GROUPS, MANIFEST_DIR } from './constants';
 export interface ClientRole {
   name: string;
   description: string;
-  /** `claim_emit` map; null when the key is absent, which the validator flags (Go `Role.ClaimEmit == nil`). */
+  /** null when the key is absent, which the validator flags. */
   claimEmit: Record<string, unknown> | null;
 }
 
 export interface ClientManifest {
   clientId: string;
-  /**
-   * True for a `presentation:` block with no `oidc:` client (a forward_auth / external tile). It still names an
-   * access group but registers no OIDC client, so the audience, redirect and client_id rules skip it and
-   * getClientManifest() refuses to resolve it. The loader does not filter it out.
-   */
+  /** A `presentation:` tile with no `oidc:` client: it has access groups but registers no OIDC client. */
   presentationOnly: boolean;
   clientName: string;
   redirectUris: string[];
   postLogoutRedirectUris: string[];
-  /** Scope tokens, split for presentation/lookup. */
   scopes: string[];
-  /** Raw `oidc.scope` string as Hydra's OAuth2Client.scope expects it; `scopes` is the parsed form. */
+  /** Raw `oidc.scope` string as Hydra expects it. */
   scope: string;
   audience: string[];
   grantTypes: string[];
-  /** `oidc.response_types`; empty for client_credentials clients. */
   responseTypes: string[];
-  /** `oidc.token_endpoint_auth_method`; empty string when the yaml omits it. */
   tokenEndpointAuthMethod: string;
   skipConsent: boolean;
-  /** OIDC Back-Channel Logout 1.0 endpoint; empty when the yaml omits it. */
   backchannelLogoutUri: string;
-  /** `oidc.backchannel_logout_session_required`; includes the sid claim. */
+  /** Includes the sid claim in the logout token. */
   backchannelLogoutSessionRequired: boolean;
-  /**
-   * The access binding: groups whose members may enter this app (OR), from `presentation.access:`. Absence yields
-   * `[]` with no implicit fallback; a bare manifest without `skip_access_check` is a load-time BLOCK (validateClients).
-   */
+  /** Groups whose members may enter this app (any one suffices), from `presentation.access`; no implicit fallback. */
   accessGroups: string[];
-  /** Declared role enum for the app; may be empty if the yaml has no `roles:` block. */
   roles: ClientRole[];
-  /** identity-group → role-name map; what role a member of <group> gets by default. */
+  /** Identity group to the role its members get by default. */
   groupRoleMap: Record<string, string>;
-  /** `consent.emit_groups_claim`; `null` = absent (default true), so the M10 lint can see an explicit false. */
+  /** `null` when absent, which means true. */
   emitGroupsClaim: boolean | null;
-  /** `consent.skip_access_check`; disables the access-<client_id> gate. */
+  /** Disables the access gate for this app. */
   skipAccessCheck: boolean;
-  /** Source filename the manifest was parsed from (Go `SourcePath`). */
   sourcePath: string;
-  /** `presentation.requires`: prerequisite names the app needs (defined under requirements/); absent reads as none. */
+  /** Prerequisite names defined under requirements/. */
   requires?: string[];
 }
 
-/** Mirrors Go `ShouldEmitGroups`: only an explicit `emit_groups_claim: false` suppresses. */
+/** Only an explicit `emit_groups_claim: false` suppresses. */
 export function shouldEmitGroups(m: ClientManifest): boolean {
   return m.emitGroupsClaim ?? true;
 }
@@ -98,21 +84,18 @@ function splitScope(scope: unknown): string[] {
   return String(scope).split(/\s+/).filter(Boolean);
 }
 
-/** Raw scope string: an array is space-joined, a string is trimmed. */
 function rawScope(scope: unknown): string {
   if (!scope) return '';
   if (Array.isArray(scope)) return scope.map(String).join(' ');
   return String(scope).trim();
 }
 
-/** Read a role's `claim_emit`: the map when present (even `{}`), `null` when the key is absent. */
 function readClaimEmit(v: unknown): Record<string, unknown> | null {
   if (v && typeof v === 'object' && !Array.isArray(v) && 'claim_emit' in v) {
     const ce = (v as { claim_emit?: unknown }).claim_emit;
     if (ce && typeof ce === 'object' && !Array.isArray(ce)) {
       return ce as Record<string, unknown>;
     }
-    // Present but not a mapping (e.g. claim_emit: null) → treat as nil.
     return null;
   }
   return null;
@@ -139,7 +122,6 @@ function normaliseRoles(raw: unknown): ClientRole[] {
   return [];
 }
 
-/** Read `consent.emit_groups_claim`: `null` = absent, else the explicit boolean. */
 function readEmitGroups(c: Record<string, unknown>): boolean | null {
   if (!('emit_groups_claim' in c)) return null;
   const v = c.emit_groups_claim;
@@ -156,14 +138,7 @@ function normaliseGroupRoleMap(raw: unknown): Record<string, string> {
   return out;
 }
 
-/**
- * Load one manifest file. Every well-formed manifest is returned, presentation-only ones included
- * (empty OIDC fields, presentationOnly:true); one with neither block throws.
- * The loader must not drop presentation-only tiles: the registry and admin UI need their access groups,
- * and a save would otherwise drop groups it cannot see. The registrar's constraint (no client, no secret)
- * lives in oidcClientManifests() and getClientManifest().
- * Any read/parse error is warned and returned as null so one bad file does not fail the whole load.
- */
+/** A read or parse error is warned and skipped so one bad file does not fail the whole load. */
 function loadOne(file: string, dir: string): ClientManifest | null {
   try {
     const text = readFileSync(join(dir, file), 'utf8');
@@ -193,16 +168,13 @@ export function parseManifest(yamlText: string, filename: string): ClientManifes
     : {}) as Record<string, unknown>;
   const hasPresentation = presentation != null && typeof presentation === 'object' && !Array.isArray(presentation);
 
-  // No implicit `access-<clientId>` fallback (primitive #5): an empty binding is a load-time BLOCK in validateClients.
   const accessGroups = parseAccessGroups(p);
 
-  // Presentation-only manifest: a `presentation:` block with no `oidc:`; OIDC-specific rules skip it.
   if (!oidc || typeof oidc !== 'object') {
     if (!hasPresentation) {
       throw new Error(`${file}: missing or non-object oidc: block`);
     }
     const clientId = String(p.client_id ?? file.replace(/\.ya?ml$/, ''));
-    // A tile may set skip_access_check to suppress the empty-binding BLOCK (e.g. external tiles open to all logged-in users).
     const c = (consent && typeof consent === 'object' ? consent : {}) as Record<string, unknown>;
     return {
       clientId,
@@ -269,8 +241,6 @@ function loadFromDisk(): ClientManifest[] {
       .sort();
   } catch (err) {
     if ((err as NodeJS.ErrnoException).code === 'ENOENT') {
-      // Manifest dir not provisioned yet: return empty list so the
-      // admin UI renders "no clients yet" rather than 500-ing.
       return [];
     }
     throw err;
@@ -297,9 +267,8 @@ function freshestMtime(): number {
   }
 }
 
-/** Every app manifest in MANIFEST_DIR, sorted by filename; cached 30 s, invalidated on mtime change.
- * Validates the candidate set before swapping the cache and throws on failure, keeping the prior cache
- * (Go Reload M2). Duplicate client_ids (case-insensitive) throw before the swap. */
+/** Every app manifest, sorted by filename; cached 30 s or until an mtime changes. An invalid set throws and
+ * keeps the prior cache. */
 export function loadClientManifests(): ClientManifest[] {
   const now = Date.now();
   const mtime = freshestMtime();
@@ -328,7 +297,6 @@ export function loadClientManifests(): ClientManifest[] {
     seen.set(key, m.sourcePath);
   }
 
-  // Pre-swap validation guard (Go M2): validate before swapping the cache.
   const errs = validateClients(manifests);
   if (errs.length > 0) {
     cache = priorCache;
@@ -377,7 +345,6 @@ export function audienceMatchesRedirect(
     const origin = originOf(redirect);
     if (origin) allowedOrigins.add(origin);
   }
-  // No usable redirect origins -> fail closed (Go silently allowed here).
   if (allowedOrigins.size === 0) return false;
 
   for (const aud of auds) {
@@ -389,7 +356,6 @@ export function audienceMatchesRedirect(
   return true;
 }
 
-/** Parse a URL string to its exact origin (scheme://host[:port]), or null. */
 function originOf(raw: string): string | null {
   try {
     return new URL(raw).origin;
@@ -401,12 +367,7 @@ function originOf(raw: string): string | null {
 /** The one client_id form: manifests, metadata_admin.roles keys and the registrar's `<CLIENT_ID>_CLIENT_SECRET` all key on it. */
 export const CLIENT_ID_RE = /^[a-z][a-z0-9]*$/;
 
-/**
- * Lint pass shared by the Reload pre-swap guard and `--validate-manifests`; one string per finding, empty = clean.
- * Rules: client_id non-empty and matching CLIENT_ID_RE; audience non-empty; an audience matches a redirect
- * origin; group_role_map values name declared roles; every role has a claim_emit; and M10 (emit_groups_claim:false
- * with a role claim_emit setting `groups`).
- */
+/** Lint pass shared by the reload guard and `--validate-manifests`; one string per finding, empty when clean. */
 export function validateClients(set: ClientManifest[]): string[] {
   const errs: string[] = [];
   for (const cm of set) {
@@ -421,7 +382,6 @@ export function validateClients(set: ClientManifest[]): string[] {
       errs.push(`${src}: oidc.client_id ${JSON.stringify(cm.clientId)} must match ${CLIENT_ID_RE}.`);
     }
 
-    // BLOCK: an empty binding without skip_access_check is unreachable (primitive #5: no binding means no access).
     if (cm.accessGroups.length === 0 && !cm.skipAccessCheck) {
       errs.push(
         `${src}: presentation.access is empty and consent.skip_access_check is not set: ` +
@@ -430,7 +390,6 @@ export function validateClients(set: ClientManifest[]): string[] {
       );
     }
 
-    // BLOCK (manifest-lint §11): a group listed twice in one manifest's binding.
     const seenGroups = new Set<string>();
     for (const g of cm.accessGroups) {
       if (seenGroups.has(g)) {
@@ -439,7 +398,6 @@ export function validateClients(set: ClientManifest[]): string[] {
       seenGroups.add(g);
     }
 
-    // OIDC-only rules: a presentation-only tile registers no client; the access-binding BLOCK above still applies.
     if (!cm.presentationOnly) {
       if (cm.audience.length === 0) {
         errs.push(
@@ -454,7 +412,6 @@ export function validateClients(set: ClientManifest[]): string[] {
       }
     }
 
-    // BLOCK: identity groups belong to the household settings, never to an app's access or role bindings.
     for (const g of [...new Set([...cm.accessGroups, ...Object.keys(cm.groupRoleMap)])]) {
       if (IDENTITY_GROUPS.includes(g)) {
         errs.push(
@@ -480,7 +437,6 @@ export function validateClients(set: ClientManifest[]): string[] {
       }
     }
 
-    // M10: the role's groups ship in the token despite the suppressed auto claim; an error so the pre-swap guard rejects it.
     if (cm.emitGroupsClaim === false) {
       for (const role of cm.roles) {
         if (role.claimEmit === null) continue;

@@ -1,7 +1,4 @@
-// ID-token claim construction, ported from consent/claims.go and consent/manifest.go. Divergences from Go: array
-// UNION in deepMergeClaims, highest-role-wins in lookupRole, and emailVerified reading only the email trait's own address.
-// Missing claims are omitted, never null. composeIDTokenClaims order: build identity claims, drop groups when the
-// manifest suppresses them, keep only the groups it binds, merge the role's claim_emit, then drop claims whose scope was not granted.
+// ID-token claim construction. A missing claim is omitted, never null.
 
 import type { Identity } from './types';
 import type { ClientManifest } from './manifests';
@@ -9,14 +6,12 @@ import { shouldEmitGroups } from './manifests';
 
 type Claims = Record<string, unknown>;
 
-/** A trait value coerced to a non-empty string, or undefined. */
 function stringTrait(traits: unknown, key: string): string | undefined {
   if (!traits || typeof traits !== 'object') return undefined;
   const v = (traits as Record<string, unknown>)[key];
   return typeof v === 'string' && v !== '' ? v : undefined;
 }
 
-/** Read metadata_admin.groups tolerating any-shaped metadata. */
 function extractGroups(meta: unknown): string[] | undefined {
   if (!meta || typeof meta !== 'object') return undefined;
   const raw = (meta as Record<string, unknown>).groups;
@@ -33,7 +28,6 @@ function emailVerified(identity: Identity, email: string): boolean | undefined {
   return own?.verified === true;
 }
 
-/** Build ID-token claims from a Kratos identity (BuildIDTokenClaims in claims.go). */
 export function buildIDTokenClaims(identity: Identity | null | undefined): Claims {
   const claims: Claims = {};
   if (!identity) return claims;
@@ -70,13 +64,9 @@ export function buildIDTokenClaims(identity: Identity | null | undefined): Claim
 }
 
 /**
- * Resolve the app role: (1) an override in metadataAdmin.roles[clientId] naming a declared role wins (an undeclared
- * name falls through); (2) otherwise the HIGHEST-RANKED declared role over every stored group mapped through
- * groupRoleMap, rank being index in manifest.roles (0 highest), so the result depends on the group SET, not its order
- * (admins hold both `<svc>-access` and `<svc>-admin`); (3) null. Role never grants entry (manifest.accessGroups does).
- * Rank is a convention (roles declared in descending privilege); ascending order silently downgrades, the safe
- * direction. Undeclared mapped roles are blocked at load (validateClients); the `index === -1` skip is defence in depth.
- * Returns a shallow copy of claimEmit.
+ * The app role: a metadataAdmin.roles[clientId] override naming a declared role, else the highest-ranked role any
+ * stored group maps to (index 0 is highest), so the result depends on the group set, not its order. A role never
+ * grants entry. Roles declared in ascending order silently downgrade, the safe direction.
  */
 export function lookupRole(
   manifest: ClientManifest | undefined | null,
@@ -95,11 +85,9 @@ export function lookupRole(
       if (role) {
         return { roleName: role.name, claimEmit: shallowCopyClaimEmit(role.claimEmit) };
       }
-      // Override names an undeclared role: fall through to the groups walk.
     }
   }
 
-  // Highest-ranked declared role over the whole group set, not the first match.
   const rawGroups = meta?.groups;
   const groups: string[] = Array.isArray(rawGroups)
     ? rawGroups.filter((g): g is string => typeof g === 'string')
@@ -111,7 +99,6 @@ export function lookupRole(
     if (!roleName) continue;
     // findIndex for the rank; a duplicated role name resolves to its first declaration.
     const index = manifest.roles.findIndex((r) => r.name === roleName);
-    // Undeclared mapped role: skip (defence in depth, see above).
     if (index === -1) continue;
     if (bestIndex === -1 || index < bestIndex) bestIndex = index;
   }
@@ -124,7 +111,6 @@ export function lookupRole(
   return null;
 }
 
-/** Shallow-copy a claimEmit map. */
 function shallowCopyClaimEmit(ce: Record<string, unknown> | null): Record<string, unknown> {
   if (!ce) return {};
   return { ...ce };
@@ -186,11 +172,7 @@ const SCOPE_CLAIMS: Record<string, string[]> = {
   groups: ['groups'],
 };
 
-/**
- * The emission sequence acceptConsentRequest calls: identity claims, drop groups if the manifest suppresses them,
- * keep only the groups the manifest binds, merge the role's claim_emit (arrays unioned), then drop claims whose scope
- * (OIDC Core §5.4) was not granted. `sub` is Hydra's.
- */
+/** The ID-token claims for a consent; `sub` is Hydra's. Scope filtering runs last, so claim_emit cannot bypass it. */
 export function composeIDTokenClaims(
   identity: Identity | null | undefined,
   manifest: ClientManifest | undefined | null,

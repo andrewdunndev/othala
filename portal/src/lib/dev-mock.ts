@@ -1,5 +1,4 @@
-// Dev-only mock identity for `astro dev` pages that cannot reach Kratos (index.astro, apps/[slug].astro,
-// requirements/[name].astro). Every entry point returns null outside dev, so production never reads a query param.
+// Mock identity for `astro dev` without Kratos. It returns null outside dev, so production never reads a query param.
 
 import type { Identity } from './types';
 

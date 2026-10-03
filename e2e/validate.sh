@@ -40,8 +40,7 @@ if [[ -n "${CI_REGISTRY_USER:-}" && -n "${CI_REGISTRY_PASSWORD:-}" ]]; then
     echo "$CI_REGISTRY_PASSWORD" | podman login --username "$CI_REGISTRY_USER" --password-stdin "${AUTH_REGISTRY%%/*}"
 fi
 
-# Render the Ory configs with scripts/render-config.sh (the same renderer as the deploy plane);
-# Kratos/Hydra do not interpolate ${VAR}. It fails on any unset template variable, listing names only.
+# Kratos and Hydra do not interpolate ${VAR}, so render them with the deploy plane's renderer.
 set -a
 source ./.env
 set +a

@@ -2,6 +2,3 @@ browser-out/
 *.rendered*
 .env
 node_modules/
-# package-lock.json IS tracked: the prebaked e2e-tester image
-# (Containerfile) runs `npm ci` against it at build time so the browser
-# leg never does a runtime npm install in the no-egress inner VM.

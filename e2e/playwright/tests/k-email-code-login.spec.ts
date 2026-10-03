@@ -1,4 +1,4 @@
-// K — the email-code login completes end to end (regression: step-2 identifier).
+// K — the email-code login completes end to end.
 
 import { test, expect } from '../fixtures';
 import type { APIRequestContext } from '@playwright/test';

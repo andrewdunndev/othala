@@ -17,11 +17,7 @@ const _cwd = process.cwd();
 const _iconsDir = (() => {
   // import.meta.env is Vite-specific; guard it so the module loads in plain Node.
   const isDev = typeof import.meta.env !== 'undefined' && import.meta.env.DEV;
-  if (isDev) {
-    // Source tree in dev.
-    return join(_cwd, 'public', 'icons');
-  }
-  // prod: fall back to public/ if dist is missing.
+  if (isDev) return join(_cwd, 'public', 'icons');
   const prod = join(_cwd, 'dist', 'client', 'icons');
   if (existsSync(prod)) return prod;
   return join(_cwd, 'public', 'icons');
@@ -91,19 +87,17 @@ export interface AppTile {
   iconSlug?: string;
   /** simple-icons fallback slug for products not in simple-icons. */
   iconFallback?: string;
-  /** Web path to the vendored SVG glyph (e.g. `/icons/grafana.svg`), set only when the file exists; absent = monogram. */
+  /** Set only when the vendored SVG exists; absent renders the monogram. */
   iconHref?: string;
   /** The logo ships its own filled square, so the plate drops its padding and border. */
   iconBleed?: boolean;
   authKind: AuthKind;
-  /** Access binding from parseAccessGroups over `presentation.access:`; `[]` when unset. */
   accessGroups: string[];
-  /** Optional dashboard grouping label (e.g. "Usenet"); tiles sharing one render together. */
+  /** Dashboard grouping label; tiles sharing one render together. */
   group?: string;
   order: number;
   /** Hidden from the dashboard, but the detail page still resolves. */
   disabled: boolean;
-  /** Hostname from presentation.url (e.g. "grafana.othala.test"). */
   fqdn: string;
   /** Rendered HTML from the sibling `<slug>.md`, or undefined if absent. */
   educationHtml?: string;
@@ -179,9 +173,9 @@ function freshestMtime(dir: string): number {
 }
 
 /**
- * Render an operator-supplied `<slug>.md` to sanitized HTML for `set:html`; exported so tiles.test.ts exercises this path.
- * SVG is allowed (USE_PROFILES) so inline diagrams survive. FORBID_TAGS removes `style` (the CSP has no style-src) and
- * form controls (form-action reaches every apex subdomain).
+ * Render an operator-supplied `<slug>.md` to sanitized HTML for `set:html`. SVG is allowed so inline diagrams
+ * survive. `style` is forbidden because the CSP has no style-src, form controls because form-action reaches every
+ * apex subdomain.
  */
 export function sanitizeEducationMarkdown(raw: string): string {
   return sanitizeGuideHtml(marked.parse(raw, { async: false }) as string);
@@ -397,7 +391,6 @@ function loadFromDisk(): AppTile[] {
  */
 export function safeHref(url: string, base = 'https://localhost'): string {
   if (!url) return '#';
-  // Root-relative paths carry no scheme.
   if (url.startsWith('/')) return url;
   try {
     const resolved = new URL(url, base);
@@ -410,7 +403,6 @@ export function safeHref(url: string, base = 'https://localhost'): string {
   return '#';
 }
 
-/** All cached tiles (disabled included), sorted by order then name; 30 s cache, mtime-invalidated. */
 function allTiles(): AppTile[] {
   const now = Date.now();
   const mtime = freshestMtime(manifestDir());
@@ -422,18 +414,16 @@ function allTiles(): AppTile[] {
   return tiles;
 }
 
-/** Tiles for the dashboard: enabled only, sorted by order then name. */
 export function loadTiles(): AppTile[] {
   return allTiles().filter((t) => !t.disabled);
 }
 
-/** One tile by slug for /apps/<slug>; includes disabled tiles. */
+/** Includes disabled tiles. */
 export function getTile(slug: string): AppTile | undefined {
   return allTiles().find((t) => t.slug === slug);
 }
 
-/** The group(s) gating a tile's visibility: the manifest's `accessGroups` (the field the OIDC gate uses), else the
- * default group, never every authenticated user. */
+/** The groups gating a tile's visibility: its access groups, else the default group, never every signed-in user. */
 export function tileAccessGroups(tile: AppTile): string[] {
   return tile.accessGroups.length > 0 ? tile.accessGroups : [DEFAULT_GROUP];
 }

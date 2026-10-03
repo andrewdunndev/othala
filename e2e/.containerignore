@@ -1,6 +1,4 @@
-# Keep runtime cruft out of the prebaked e2e-tester image (Containerfile).
-# node_modules is reinstalled reproducibly via `npm ci` in the image; the
-# rest are per-run artifacts that must never bake into a published image.
+# Per-run artifacts never bake into the published image; npm ci reinstalls node_modules.
 node_modules/
 .env
 *.rendered*

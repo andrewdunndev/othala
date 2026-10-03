@@ -20,7 +20,7 @@ gen_alnum() {
 AUTH_REGISTRY="${AUTH_REGISTRY:-registry.gitlab.com/dunn.dev/othala}"
 AUTH_VERSION="${AUTH_VERSION:-latest}"
 
-# One value per rotation slot, as in production: Ory v26.2.0 enforces uniqueItems on these
+# One value per rotation slot, as in production: Ory enforces uniqueItems on these
 # arrays, so never two identical slots and no _PREVIOUS at rest.
 kratos_cookie=$(gen)
 kratos_cipher=$(gen_short)
@@ -36,7 +36,7 @@ HYDRA_PG_PASS=$(gen_alnum)
 
 # SMTP: mailpit catches Kratos courier and portal contact-form mail via one shared URI
 # (kratos.yml courier.smtp.connection_uri, lib/mailer.ts). ?disable_starttls=true is required:
-# Kratos v26.2.0 defaults to MandatoryStartTLS and abandons every message against plain SMTP.
+# Kratos defaults to MandatoryStartTLS and abandons every message against plain SMTP.
 OTHALA_SMTP_CONNECTION_URI=smtp://mailpit:1025/?disable_starttls=true
 OTHALA_CONTACT_RECIPIENT=ops@othala.test
 
