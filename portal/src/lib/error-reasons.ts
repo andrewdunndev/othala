@@ -50,7 +50,7 @@ export const REASON_MAP: Record<string, ErrorEntry> = {
   'flow-expired': {
     status: 410,
     title: 'That page timed out',
-    message: 'Sign-in pages only last a few minutes. Go back to the app and choose sign in again, or start again here.',
+    message: 'This page was replaced or has expired. Go back to the app and choose sign in again, or start again here.',
   },
   'app-misconfigured': {
     status: 400,
