@@ -196,9 +196,9 @@ then any claim whose required scope was not requested removed.
 Revocation is one in-process fan-out, `revokeSubject` (`portal/src/lib/revoke.ts`), shared by admin
 force-logout, user sign-out-everywhere, and deactivation. Kratos sessions and Hydra's remembered
 login and consent sessions are all cut, because cutting only the Kratos session leaves a remembered
-Hydra login able to mint fresh tokens. There is no identity cache to invalidate: the login and
-consent paths always fetch a fresh identity, so a deactivated subject fails the state check on the
-next request by construction.
+Hydra login able to mint fresh tokens. Portal sign-out and narrowing someone's access run the Hydra
+half alone. There is no identity cache: the login and consent paths always fetch a fresh identity,
+so a deactivated subject fails the state check on the next request.
 
 ## OIDC client registration
 

@@ -1,8 +1,3 @@
-// revokeSubject: the in-process revocation fan-out for admin force-logout, self-service sign-out-everywhere and
-// deactivate, via the typed Ory SDK. Order is fixed: (1) deactivate only: Kratos state -> inactive, before 2;
-// (2) Kratos sessions revoke, where 404 (no sessions) is success and continues; (3) Hydra login sessions, by sid then by subject;
-// (4) Hydra consent sessions. A real failure throws a RevokeError naming the dependency and next action.
-
 import {
   Configuration,
   IdentityApi,
@@ -11,11 +6,13 @@ import {
   type JsonPatch,
 } from '@ory/client-fetch';
 import { HYDRA_ADMIN_URL, KRATOS_ADMIN_URL } from './constants';
+import { timeoutFetch } from './ory-fetch';
 
-/** Which upstream dependency a revoke step failed against. */
 export type RevokeDependency = 'kratos-admin' | 'hydra-admin';
 
-/** Prescriptive revoke failure: names the dependency and next action; the raw cause is for server logs only. */
+export const DEACTIVATE_STEP = 'state->inactive';
+
+/** The message is safe to show; the raw cause is for server logs only. */
 export class RevokeError extends Error {
   readonly dependency: RevokeDependency;
   readonly step: string;
@@ -29,23 +26,20 @@ export class RevokeError extends Error {
   }
 }
 
-/** True for an HTTP 404; Kratos returns it from DELETE .../sessions when the subject has no active sessions. */
+/** Kratos answers DELETE .../sessions with 404 when the subject has no active sessions. */
 function isNotFound(err: unknown): boolean {
   return err instanceof ResponseError && err.response?.status === 404;
 }
 
-/** The portal-side revoke fan-out clients + the trigger flavour. */
 export interface RevokeDeps {
   identityApi: IdentityApi;
   oauth2Api: OAuth2Api;
 }
 
 export interface RevokeOptions {
-  /** deactivate trigger: run step 1 (state -> inactive) before step 2. */
   deactivate?: boolean;
 }
 
-/** Per-step outcome for the UI. */
 export interface RevokeResult {
   subject: string;
   deactivated: boolean;
@@ -55,14 +49,13 @@ export interface RevokeResult {
 }
 
 function buildIdentityApi(): IdentityApi {
-  return new IdentityApi(new Configuration({ basePath: KRATOS_ADMIN_URL }));
+  return new IdentityApi(new Configuration({ basePath: KRATOS_ADMIN_URL, fetchApi: timeoutFetch() }));
 }
 
 function buildOAuth2Api(): OAuth2Api {
-  return new OAuth2Api(new Configuration({ basePath: HYDRA_ADMIN_URL }));
+  return new OAuth2Api(new Configuration({ basePath: HYDRA_ADMIN_URL, fetchApi: timeoutFetch() }));
 }
 
-/** Resolve injected deps, defaulting to the live SDK clients. */
 function resolveDeps(deps: Partial<RevokeDeps> = {}): RevokeDeps {
   return {
     identityApi: deps.identityApi ?? buildIdentityApi(),
@@ -70,7 +63,6 @@ function resolveDeps(deps: Partial<RevokeDeps> = {}): RevokeDeps {
   };
 }
 
-/** Distinct login-session ids named by the subject's consent rows, following the Link rel=next pages. */
 async function listLoginSessionIds(oauth2Api: OAuth2Api, subject: string): Promise<string[]> {
   const sids = new Set<string>();
   let pageToken: string | undefined;
@@ -86,7 +78,6 @@ async function listLoginSessionIds(oauth2Api: OAuth2Api, subject: string): Promi
   return [...sids];
 }
 
-/** Run the fan-out for one subject (Kratos identity id); steps 1-4 abort on the first failure. */
 export async function revokeSubject(
   subject: string,
   options: RevokeOptions = {},
@@ -101,7 +92,7 @@ export async function revokeSubject(
     hydraConsentRevoked: false,
   };
 
-  // Step 1 (deactivate only): flip state first so a session re-minted in the race window is for an inactive identity.
+  // Inactive first, so a session re-minted in the race window belongs to an inactive identity.
   if (options.deactivate) {
     const patch: Array<JsonPatch> = [{ op: 'replace', path: '/state', value: 'inactive' }];
     try {
@@ -110,21 +101,17 @@ export async function revokeSubject(
     } catch (err) {
       throw new RevokeError(
         'kratos-admin',
-        'state->inactive',
+        DEACTIVATE_STEP,
         'Could not mark the identity inactive. Verify Kratos admin reachability and that the identity id exists, then retry the deactivate.',
         err,
       );
     }
   }
 
-  // Step 2: a 404 means no active sessions, which counts as revoked; only a real failure aborts.
   try {
     await d.identityApi.deleteIdentitySessions({ id: subject });
-    result.kratosSessionsRevoked = true;
   } catch (err) {
-    if (isNotFound(err)) {
-      result.kratosSessionsRevoked = true; // no active sessions == nothing to revoke
-    } else {
+    if (!isNotFound(err)) {
       throw new RevokeError(
         'kratos-admin',
         'delete-sessions',
@@ -133,60 +120,44 @@ export async function revokeSubject(
       );
     }
   }
+  result.kratosSessionsRevoked = true;
 
-  // Step 3: Hydra login-session revoke. Each session the subject's consent rows name is revoked by its own sid so Hydra
-  // posts the back-channel logout token to that session's clients; the {subject} delete then sweeps sessions with no
-  // row. Per-sid must precede step 4, which deletes the rows Hydra selects those clients from.
-  let phase = 'list-consent-sessions';
-  try {
-    for (const sid of await listLoginSessionIds(d.oauth2Api, subject)) {
-      phase = 'revoke-login-sessions';
-      await d.oauth2Api.revokeOAuth2LoginSessions({ sid });
-    }
-    phase = 'revoke-login-sessions';
-    await d.oauth2Api.revokeOAuth2LoginSessions({ subject });
-    result.hydraLoginRevoked = true;
-  } catch (err) {
-    throw new RevokeError(
-      'hydra-admin',
-      phase,
-      'Kratos sessions are cut, but Hydra still remembers the login (remembered login still open — a fresh token could skip-login). Verify the Hydra admin API, then re-run the revoke (it is idempotent).',
-      err,
-    );
-  }
-
-  // Step 4: Hydra consent-session revoke.
-  try {
-    await d.oauth2Api.revokeOAuth2ConsentSessions({ subject, all: true });
-    result.hydraConsentRevoked = true;
-  } catch (err) {
-    throw new RevokeError(
-      'hydra-admin',
-      'revoke-consent-sessions',
-      'Login sessions are cut, but Hydra consent + associated access tokens persist. Verify the Hydra admin API, then re-run the revoke (it is idempotent).',
-      err,
-    );
-  }
-
+  await revokeHydraSessions(subject, d);
+  result.hydraLoginRevoked = true;
+  result.hydraConsentRevoked = true;
   return result;
 }
 
-/**
- * Step 4 alone: revoke the subject's Hydra consent sessions for every client, used when an admin narrows groups,
- * roles or the admin marker so old grants and refresh tokens stop working. Login sessions are left alone.
- */
-export async function revokeConsentSessions(
+export async function revokeHydraSessions(
   subject: string,
   deps: Partial<Pick<RevokeDeps, 'oauth2Api'>> = {},
 ): Promise<void> {
   const oauth2Api = deps.oauth2Api ?? buildOAuth2Api();
+  // Only a per-sid revoke posts back-channel logout, and Hydra picks its clients from the consent rows the last step deletes.
+  let phase = 'list-consent-sessions';
+  try {
+    for (const sid of await listLoginSessionIds(oauth2Api, subject)) {
+      phase = 'revoke-login-sessions';
+      await oauth2Api.revokeOAuth2LoginSessions({ sid });
+    }
+    phase = 'revoke-login-sessions';
+    await oauth2Api.revokeOAuth2LoginSessions({ subject });
+  } catch (err) {
+    throw new RevokeError(
+      'hydra-admin',
+      phase,
+      'Hydra still remembers the login. Verify the Hydra admin API, then try again.',
+      err,
+    );
+  }
+
   try {
     await oauth2Api.revokeOAuth2ConsentSessions({ subject, all: true });
   } catch (err) {
     throw new RevokeError(
       'hydra-admin',
       'revoke-consent-sessions',
-      'Hydra consent + associated tokens persist. Verify the Hydra admin API, then use Force re-login on this identity.',
+      'App sign-ins are ended, but app access and its tokens persist. Verify the Hydra admin API, then try again.',
       err,
     );
   }

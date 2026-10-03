@@ -1,9 +1,4 @@
 ---
-// Recovery flow handler, code strategy, and how every new household member starts: a setup link (or an emailed code)
-// opens the code step, the code starts a privileged session, and Kratos lands the person on /auth/settings to add a
-// passkey. One template serves both phases; flow.ui.nodes drives the inputs and lib/journey.ts words them. In `astro dev`,
-// `?dev-state=` renders a recorded flow (lib/journey-fixtures.ts) with no Kratos.
-
 export const prerender = false;
 
 import FocusPage from '../../components/FocusPage.astro';
@@ -13,6 +8,8 @@ import { csrfToken, hasMethod } from '../../lib/nodes';
 import { journeyText, noticeClass, noticeRole, recoverySpecs } from '../../lib/journey';
 import { DEV_RECOVERY_STATES, devRecovery, isIn } from '../../lib/journey-fixtures';
 import type { FlowMessage } from '../../lib/types';
+import { ENROLLMENT_TTL } from '../../lib/admin-actions';
+import { describeTtl } from '../../lib/admin-view';
 
 const flowId = Astro.url.searchParams.get('flow');
 const isDev = import.meta.env.DEV;
@@ -35,8 +32,6 @@ const ui = flow?.ui;
 const csrf = ui ? csrfToken(ui.nodes) : '';
 const hasCode = ui ? hasMethod(ui.nodes, 'code') : true;
 const phase: 'request' | 'sent' = flow?.state === 'sent_email' ? 'sent' : 'request';
-// The "a code was sent" info line is noise on a setup link: the person is already holding the code.
-// The address the code went to, when the flow carries it (the resend node's value).
 const sentTo = (() => {
   for (const n of ui?.nodes ?? []) {
     const a = n.attributes as { name?: string; value?: unknown };
@@ -44,6 +39,7 @@ const sentTo = (() => {
   }
   return '';
 })();
+// The "a code was sent" info line is noise on a setup link: the person is already holding the code.
 const messages = (ui?.messages ?? []).filter((m: FlowMessage) => !(phase === 'sent' && m.type === 'info'));
 ---
 <FocusPage
@@ -51,7 +47,7 @@ const messages = (ui?.messages ?? []).filter((m: FlowMessage) => !(phase === 'se
   title={phase === 'request' ? 'Get back in' : 'Enter your code'}
   lede={phase === 'request'
     ? "Enter your email and we'll send you a one-time code. No password needed."
-    : `${sentTo ? `We emailed a code to ${sentTo}. ` : ''}Enter the code from your email, or from the setup message that brought you here. It works once and expires soon. Nothing yet? Check spam or junk, then send a new code.`}
+    : `${sentTo ? `We emailed a code to ${sentTo}. ` : ''}Enter the code from your email, or from the setup message that brought you here. It works once. An emailed code lasts 15 minutes; a code from a setup message lasts ${describeTtl(ENROLLMENT_TTL)}. Nothing yet? Check spam or junk, then send a new code.`}
   description="Start or regain access with a one-time code."
 >
 

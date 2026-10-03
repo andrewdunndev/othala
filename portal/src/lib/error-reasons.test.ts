@@ -30,6 +30,7 @@ describe('resolveError', () => {
   it('maps a looked-up Kratos error, and falls back to the generic entry', () => {
     expect(resolveError(q('id=x'), kratosReason({ id: 'self_service_flow_expired', code: 410 })).reason).toBe('flow-expired');
     expect(kratosReason({ code: 403 })).toBe('flow-expired');
+    expect(resolveError(q('id=x'), 'flow-expired').entry.message).toContain('replaced or has expired');
     expect(kratosReason({ id: 'constructor' })).toBeUndefined();
     expect(resolveError(q('error=constructor')).entry).toBe(DEFAULT_ENTRY);
   });

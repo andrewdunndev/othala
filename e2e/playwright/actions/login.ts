@@ -28,10 +28,11 @@ export async function loginViaJsonApi(
   ctx: BrowserContext,
   creds: Credentials,
   base: string,
+  flowQuery = '',
 ): Promise<string> {
   const req: APIRequestContext = ctx.request;
 
-  const flowResp = await req.get(`${base}/self-service/login/browser`, {
+  const flowResp = await req.get(`${base}/self-service/login/browser${flowQuery}`, {
     headers: { Accept: 'application/json' },
     maxRedirects: 5,
   });

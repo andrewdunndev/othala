@@ -34,7 +34,7 @@ function stubOAuth2(over = {}) {
     getOAuth2LogoutRequest: over.getOAuth2LogoutRequest
       ?? (async () => oauth2LogoutRequest({ subject: 'id-1' })),
     acceptOAuth2LoginRequest: async (p) => { calls.acceptLogin++; calls.acceptLoginBody = p.acceptOAuth2LoginRequest; return { redirect_to: 'https://sso.othala.test/after-login' }; },
-    rejectOAuth2LoginRequest: async (p) => { calls.rejectLogin++; calls.rejectLoginReason = p.rejectOAuth2Request?.error_description; return { redirect_to: 'https://sso.othala.test/login-rejected' }; },
+    rejectOAuth2LoginRequest: async (p) => { calls.rejectLogin++; calls.rejectLoginError = p.rejectOAuth2Request?.error; calls.rejectLoginReason = p.rejectOAuth2Request?.error_description; return { redirect_to: 'https://sso.othala.test/login-rejected' }; },
     acceptOAuth2ConsentRequest: async (p) => { calls.acceptConsent++; calls.acceptConsentBody = p.acceptOAuth2ConsentRequest; return { redirect_to: 'https://sso.othala.test/after-consent' }; },
     rejectOAuth2ConsentRequest: async (p) => { calls.rejectConsent++; calls.rejectConsentReason = p.rejectOAuth2Request?.error_description; return { redirect_to: 'https://sso.othala.test/consent-rejected' }; },
     acceptOAuth2LogoutRequest: async () => { calls.acceptLogout++; return { redirect_to: 'https://sso.othala.test/after-logout' }; },
@@ -228,6 +228,83 @@ for (const [branch, getReq] of [['skip', undefined], ['fresh', FRESH]]) {
     assert.equal(res.headers.get('location'), 'https://sso.othala.test/after-login');
     assert.equal(calls.acceptLogin, 1);
     assert.equal(calls.acceptLoginBody.acr, 'aal1');
+  });
+}
+
+const ago = (s) => new Date(Date.now() - s * 1000);
+
+const FRESHNESS = [
+  ['prompt=login with a 1h-old session', 'prompt=login', 3600, 'refresh'],
+  ['prompt=login inside the 30s window', 'prompt=login', 5, 'accept'],
+  ['prompt=consent login with a 1h-old session', 'prompt=consent+login', 3600, 'refresh'],
+  ['prompt=login without authenticated_at', 'prompt=login', null, 'refresh'],
+  ['prompt=login outranks a generous max_age', 'prompt=login&max_age=3600', 60, 'refresh'],
+  ['max_age=60 with a 2h-old session', 'max_age=60', 7200, 'refresh'],
+  ['max_age=3600 with a 10s-old session', 'max_age=3600', 10, 'accept'],
+  ['max_age=5 with a 20s-old session (30s floor)', 'max_age=5', 20, 'accept'],
+  ['a malformed max_age', 'max_age=1e2', 7200, 'accept'],
+  ['a negative max_age', 'max_age=-1', 7200, 'accept'],
+  ['no prompt or max_age', '', 7200, 'accept'],
+  ['prompt=none with a stale max_age', 'prompt=none&max_age=60', 7200, 'login_required'],
+];
+
+for (const [branch, skip] of [['skip', { skip: true, subject: 'id-1' }], ['fresh', {}]]) {
+  const asking = (query) => async () =>
+    oauth2LoginRequest({ ...skip, request_url: `https://hydra.othala.test/oauth2/auth?client_id=grafana&${query}` });
+
+  for (const [name, query, age, expected] of FRESHNESS) {
+    test(`login (${branch}) ${name}: ${expected}`, async () => {
+      const { api, calls } = stubOAuth2({ getOAuth2LoginRequest: asking(query) });
+      const res = await handleLogin(new Request('https://x/oauth2/login?login_challenge=lc'), {
+        oauth2: api,
+        getIdentity: async () => activeMember(),
+        getSession: defaultSession({ authenticated_at: age === null ? undefined : ago(age) }),
+        manifest: () => loadManifest('grafana'),
+      });
+      assert.equal(res.status, 302);
+      const u = new URL(res.headers.get('location'), 'https://sso.othala.test');
+      if (expected === 'accept') {
+        assert.equal(u.href, 'https://sso.othala.test/after-login');
+        assert.equal(calls.acceptLogin, 1);
+        return;
+      }
+      assert.equal(calls.acceptLogin, 0);
+      if (expected === 'refresh') {
+        assert.equal(u.pathname, '/auth/login');
+        assert.equal(u.searchParams.get('refresh'), 'true');
+        assert.equal(u.searchParams.get('return_to'), '/oauth2/login?login_challenge=lc');
+        assert.equal(calls.rejectLogin, 0);
+      } else {
+        assert.equal(u.href, 'https://sso.othala.test/login-rejected');
+        assert.equal(calls.rejectLoginError, 'login_required');
+      }
+    });
+  }
+
+  test(`login (${branch}) rejects a denied member with a stale session instead of refreshing`, async () => {
+    const { api, calls } = stubOAuth2({ getOAuth2LoginRequest: asking('prompt=login') });
+    const res = await handleLogin(new Request('https://x/oauth2/login?login_challenge=lc'), {
+      oauth2: api,
+      getIdentity: async () => activeMember({ metadata_admin: { groups: [] } }),
+      getSession: defaultSession({ authenticated_at: ago(3600) }),
+      manifest: () => loadManifest('grafana'),
+    });
+    assert.equal(res.headers.get('location'), 'https://sso.othala.test/login-rejected');
+    assert.equal(calls.rejectLoginReason, 'access_denied');
+  });
+
+  test(`login (${branch}) refreshes a stale aal1 totp holder before any step-up`, async () => {
+    const { api, calls } = stubOAuth2({ getOAuth2LoginRequest: asking('prompt=login') });
+    const res = await handleLogin(new Request('https://x/oauth2/login?login_challenge=lc'), {
+      oauth2: api,
+      getIdentity: async () => activeMember({ credentials: withCredentials(activeMember(), 'password', 'totp').credentials }),
+      getSession: defaultSession({ authenticated_at: ago(3600) }),
+      manifest: () => loadManifest('grafana'),
+    });
+    const u = new URL(res.headers.get('location'), 'https://sso.othala.test');
+    assert.equal(u.searchParams.get('refresh'), 'true');
+    assert.equal(u.searchParams.get('aal'), null);
+    assert.equal(calls.acceptLogin, 0);
   });
 }
 
@@ -855,7 +932,7 @@ test('deepMergeClaims: recursive nested-object merge (array union, scalar src-wi
   };
   const src = {
     resource_access: {
-      myapp: { roles: ['admin'] },       // array conflict: unioned (H1: union, not src-wins)
+      myapp: { roles: ['admin'] },       // array conflict: unioned, not source-wins
     },
     flat_key: 'override',               // scalar conflict: src wins
   };

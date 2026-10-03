@@ -9,7 +9,7 @@ Topology, ports and the check sequence are in the headers of `compose.yml`,
 ## Run the smoke matrix
 
 ```sh
-# Requires: podman, docker-compose-compat or podman-compose, registry login
+# Requires: podman, docker-compose-compat or podman-compose
 cd e2e
 AUTH_VERSION=latest bash validate.sh
 ```

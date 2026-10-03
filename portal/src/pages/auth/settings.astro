@@ -1,10 +1,4 @@
 ---
-// Settings flow handler. Needs an active session (else /auth/login); reads ?flow=<id> or redirects to Kratos's
-// settings initiator. Renders a status line and four cards (Sign-in, Two-step verification, Recovery, Profile) plus
-// Sessions from flow.ui.nodes. Every method form posts natively to Kratos, so the page works without script; the
-// ClientRouter enhancement at the bottom swaps the response in place. In `astro dev`, `?dev-state=` renders a recorded
-// flow (lib/settings-fixtures.ts) with no Kratos.
-
 export const prerender = false;
 
 // Keep TOTP QR/secret and backup codes out of the back/forward cache.
@@ -30,6 +24,7 @@ import { revokeSubject, RevokeError } from '../../lib/revoke';
 import { getIdentity } from '../../lib/admin-api';
 import { emailChangeLocked } from '../../lib/profile-gate';
 import { parseIdentity } from '../../lib/identity-facts';
+import { holdsElevatedRole } from '../../lib/gate';
 import { loadTiles, userCanSeeTile } from '../../lib/tiles';
 import { publicUrl } from '../../lib/config';
 import { signToken, verifyToken, CSRFError } from '../../lib/csrf';
@@ -40,6 +35,7 @@ import {
   lookupView,
   privilegedLapsed,
   securityStatus,
+  keyOnlyKeeper,
   totpView,
 } from '../../lib/settings-view';
 import { devSettings, isDevSettingsState } from '../../lib/settings-fixtures';
@@ -91,12 +87,10 @@ if (dev) {
     return Astro.redirect('/auth/login?return_to=' + encodeURIComponent('/auth/settings'));
   }
 
-  // "Sign out everywhere": revokes the caller's own identity through the in-process
-  // fan-out, which, unlike Kratos's browser logout, also closes Hydra's remembered login.
+  // Unlike Kratos's browser logout, revokeSubject also ends Hydra's remembered login.
   if (Astro.request.method === 'POST') {
     const fd = await Astro.request.formData();
     if (String(fd.get('action') ?? '') === 'sign-out-everywhere') {
-      // Verify the CSRF token bound to the caller's identity before any side effect.
       try {
         verifyToken(String(fd.get('csrf_token') ?? ''), session.identity.id, 'sign-out-everywhere');
       } catch (err) {
@@ -108,7 +102,7 @@ if (dev) {
       try {
         await revokeSubject(session.identity.id);
       } catch (err) {
-        // Prescriptive on a hard-cut failure; do not leak raw upstream errors.
+        // Never show raw upstream errors.
         signOutError =
           err instanceof RevokeError
             ? err.message
@@ -129,8 +123,7 @@ if (dev) {
   }
   flow = result.flow;
   logoutInfo = await getLogoutInfo(cookie);
-  // whoami omits metadata_admin and credentials, so re-fetch the full identity via the admin API (display only: the
-  // admin marker, group-derived apps, the person's passkey names). Fail closed: nothing shown on error.
+  // whoami omits metadata_admin and credentials. Display only: nothing is shown on error.
   try {
     stored = await getIdentity(session.identity.id);
   } catch (lookupErr) {
@@ -191,17 +184,17 @@ const pwOpen = nodesByGroup(nodes, 'password').some((n) => (n.messages?.length ?
 // The saved line belongs in the card that was edited. Script fills it on a live swap; the dev fixture renders it here.
 const devFlash = dev?.flash ? FLASH[dev.flash] : null;
 const devFlashCard = dev?.flash?.startsWith('lookup') ? 'recovery' : 'two-step';
-// Admins keep one second factor: the gate refuses dropping the app when it is their only one, so say so up front.
 // A person with no passkey yet is at the first step: it leads the page, and the Passkeys card keeps only its list.
 const welcome = status.passkeys === 0 && has('passkey');
-const keepSecondFactor = isAdmin && status.securityKeys === 0;
+const keeper = isAdmin || holdsElevatedRole(stored);
+const keepSecondFactor = keeper && status.securityKeys === 0;
+const keyOnly = keyOnlyKeeper(nodes, keeper);
 const lookupConfirm = nodesByGroup(nodes, 'lookup_secret').some((n) => asInput(n)?.name === 'lookup_secret_confirm');
 const lookupOff = nodesByGroup(nodes, 'lookup_secret').map(asInput).find((a) => a?.name === 'lookup_secret_disable') ?? null;
 
 const csrfSignOut = mint(identity.id, 'sign-out-everywhere');
 const renameTokens = passkeys.map(() => mint(identity.id, 'passkey-name'));
 
-// Your apps: the tiles this person's groups open, read-only.
 const groups = parseIdentity(stored).groups;
 const yourApps = dev ? [] : loadTiles().filter((t) => userCanSeeTile(t, groups));
 
@@ -496,6 +489,7 @@ const lookupLabel: Record<string, string> = {
           <div class="group">
             <h3>Security keys</h3>
             <p>A small key you plug in or tap. Name each one so you recognise it.</p>
+            {keyOnly && <p>To add another key, set up an authenticator app first, add the key, then remove the app if you like.</p>}
             <form method="POST" enctype="application/x-www-form-urlencoded" action={ui.action} class="settings-form wide">
               <input type="hidden" name="csrf_token" value={csrf} />
               <input type="hidden" name="method" value="webauthn" />
@@ -506,7 +500,6 @@ const lookupLabel: Record<string, string> = {
               </div>
               <div class="panel-block panel-setup">
                 {nodesByGroup(nodes, 'webauthn').map((n) => {
-                  // script nodes are collected by scriptNodes() and rendered at page bottom
                   if (n.attributes.node_type === 'script') return null;
                   const a = asInput(n);
                   if (!a || a.name === 'webauthn_remove') return null;
@@ -584,7 +577,6 @@ const lookupLabel: Record<string, string> = {
                       </button>
                     );
                   }
-                  // Any remaining labeled inputs (e.g. a confirm checkbox).
                   const id = a.name.replace(/[^a-zA-Z0-9]+/g, '-');
                   return (
                     <div class="field">

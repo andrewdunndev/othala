@@ -52,7 +52,7 @@ with a chip:
 | Chip | Meaning |
 |------|---------|
 | `passkey ✓` | One or more FIDO2 passkeys registered |
-| `webauthn ✓` | Legacy WebAuthn keys registered |
+| `webauthn ✓` | Security keys registered |
 | `totp ✓` | TOTP authenticator app enrolled |
 | `backup codes ✓` | Single-use recovery codes generated |
 | `password ✓` | Password set (directory-backed / password-auth path) |
@@ -100,7 +100,7 @@ re-enrolls with new keys after recovery. It then signs them out everywhere
 (Kratos sessions, Hydra login and consent).
 
 **Evictable types (Remove button present):**
-- `webauthn` — all legacy WebAuthn keys
+- `webauthn` — all security keys
 - `totp` — the TOTP shared secret (the authenticator app binding)
 - `lookup_secret` (backup codes) — the set of backup codes
 

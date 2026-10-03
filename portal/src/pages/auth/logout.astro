@@ -1,29 +1,17 @@
 ---
-// Sign-out page. A GET renders a confirm form; only a POST whose token is bound
-// to the caller's identity (lib/logout.ts) ends the session. On a verified POST
-// we fetch Kratos's logout_url and 303 the browser to it; if that URL is not
-// ours we revoke server-side and expire the session cookie. Nobody leaves still
-// holding a live session.
-
 export const prerender = false;
 
 import FocusPage from '../../components/FocusPage.astro';
 import { getLogoutInfo, getSession, kratosBase } from '../../lib/kratos';
 import type { LogoutInfo } from '../../lib/kratos';
 import { publicUrl } from '../../lib/config';
-import { logoutAuthorized, signLogoutToken } from '../../lib/logout';
+import { endAppSignIns, logoutAuthorized, signLogoutToken } from '../../lib/logout';
 
 const cookie = Astro.request.headers.get('cookie') ?? undefined;
 
 const REVOKE_TIMEOUT_MS = 2000;
 
-/**
- * Is this logout_url one of ours? A compromised Kratos response must not bounce
- * the user off-instance. Kratos builds the URL from its own public base_url,
- * while the portal may dial Kratos at an internal address, so accept either
- * configured origin (publicUrl or kratosBase()) and hardcode neither. Anything
- * else takes the fail-closed path below.
- */
+// Kratos builds logout_url from its public base_url while the portal may dial an internal address; any other origin fails closed.
 function isOurLogoutUrl(raw: string): boolean {
   let url: URL;
   try {
@@ -45,12 +33,7 @@ function isOurLogoutUrl(raw: string): boolean {
   return allowed.has(url.origin);
 }
 
-/**
- * Complete the logout server-side over the internal Kratos address, for when
- * logout_url could not be validated. Raw fetch: the SDK sends no Accept header,
- * so Kratos would answer 303 toward the public origin. Returns the HTTP status,
- * or null when the call could not be completed.
- */
+// Raw fetch: the SDK sends no Accept header, so Kratos would answer 303 toward the public origin.
 async function revokeServerSide(token: string): Promise<number | null> {
   const base = kratosBase().replace(/\/+$/, '');
   const ctl = new AbortController();
@@ -76,10 +59,7 @@ async function revokeServerSide(token: string): Promise<number | null> {
   }
 }
 
-/**
- * OTHALA_APEX, the parent domain of Kratos's session cookie. Read through a
- * typed globalThis because the portal wires no @types/node.
- */
+// Read through globalThis: the portal wires no @types/node.
 function apexDomain(): string | undefined {
   const env = (
     globalThis as { process?: { env?: Record<string, string | undefined> } }
@@ -87,12 +67,7 @@ function apexDomain(): string | undefined {
   return env?.OTHALA_APEX?.trim() || undefined;
 }
 
-/**
- * Redirect home with the Kratos session cookie expired on this device.
- * Name, Domain and Path must mirror the cookie Kratos set. `Secure` follows
- * OTHALA_PUBLIC_URL, not the request (behind the proxy the request is plain
- * http). Domain is omitted when OTHALA_APEX is unset.
- */
+// Attributes mirror the Kratos cookie; Secure follows OTHALA_PUBLIC_URL because the proxied request is plain http.
 function signedOutLocally(): Response {
   const apex = apexDomain();
   const attrs = [
@@ -134,7 +109,6 @@ try {
 }
 
 if (lookupFailed && isPost) {
-  // Kratos is unreachable, so nothing can be checked or revoked; drop the cookie here.
   console.warn(
     '[othala/logout] session lookup failed; clearing the session cookie on this device. ' +
       'The Kratos-side session, if any, is untouched.',
@@ -149,6 +123,7 @@ if (!lookupFailed && !identityId) {
 }
 
 if (identityId && logoutAuthorized(Astro.request.method, form?.get('csrf_token'), identityId)) {
+  await endAppSignIns(identityId);
   let info: LogoutInfo | null = null;
   try {
     info = await getLogoutInfo(cookie);
@@ -163,11 +138,9 @@ if (identityId && logoutAuthorized(Astro.request.method, form?.get('csrf_token')
   }
 
   if (isOurLogoutUrl(info.logout_url)) {
-    // 303 so the browser follows with a GET after the POST.
     return Astro.redirect(info.logout_url, 303);
   }
 
-// Fail closed: complete the logout here instead of following a foreign URL.
   let seenOrigin = 'unparseable';
   try {
     // URL.origin is normalised and cannot carry CR/LF, so it is safe to log.
@@ -202,7 +175,7 @@ const retry = isPost;
       ? 'That sign-out request could not be confirmed. Press the button to sign out of this device.'
       : lookupFailed
       ? 'The sign-in service did not answer. Signing out clears this device only.'
-      : 'Sign out of this device.'}
+      : 'Sign out of this device. Your app sign-ins end on every device.'}
 >
   <form method="POST" enctype="application/x-www-form-urlencoded" action="/auth/logout" class="status-actions">
     <input type="hidden" name="csrf_token" value={csrfToken} />

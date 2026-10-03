@@ -1,11 +1,9 @@
-// Verdict for the settings.after.totp and settings.after.webauthn web_hooks:
-// an admin-marked identity keeps at least one second factor. The hook context
-// lacks credentials and the form, so the verdict uses the stored identity and
-// the method: totp is known (Kratos unlinks when enrolled); a webauthn change
-// is refused if any key removal would leave no second factor (parseIdentity).
+// The Kratos hook context carries neither credentials nor the form, so the verdict assumes the worst removal the method allows.
 
 import type { Identity } from './types';
+import type { ClientManifest } from './manifests';
 import { parseIdentity } from './identity-facts';
+import { holdsElevatedRole } from './gate';
 
 export const SECOND_FACTOR_KEEP = 'Admin accounts keep at least one authenticator app or security key.';
 export const SECOND_FACTOR_UNAVAILABLE = 'This change is unavailable right now. Try again later.';
@@ -24,7 +22,6 @@ function without(creds: Creds, type: string): Creds {
   return next;
 }
 
-/** Each credential map the submission can produce by removing something. */
 function removalOutcomes(stored: Identity, creds: Creds, method: 'totp' | 'webauthn'): Creds[] {
   if (method === 'totp') {
     const totpOnly = parseIdentity(withCreds(stored, { totp: creds.totp })).hasSecondFactor;
@@ -39,18 +36,17 @@ function removalOutcomes(stored: Identity, creds: Creds, method: 'totp' | 'webau
   }));
 }
 
-/**
- * Decide whether a totp or webauthn settings change may proceed. `stored` is
- * the identity from the admin API before the change; `method` is the settings
- * method the hook was wired to. Anything unreadable refuses.
- */
-export function secondFactorChangeVerdict(stored: Identity | null | undefined, method: string): SecondFactorVerdict {
+export function secondFactorChangeVerdict(
+  stored: Identity | null | undefined,
+  method: string,
+  manifests?: ClientManifest[],
+): SecondFactorVerdict {
   if (!stored || typeof stored !== 'object' || (method !== 'totp' && method !== 'webauthn')) {
     return { refuse: true, text: SECOND_FACTOR_UNAVAILABLE };
   }
-  if (!parseIdentity(stored).isAdmin) return { refuse: false };
-  // A totp or webauthn entry without its config means the read did not
-  // include credential configs, and proves nothing about enrolment.
+  const facts = parseIdentity(stored);
+  if (!facts.isAdmin && !holdsElevatedRole(stored, manifests)) return { refuse: false };
+  // An entry without its config means the read omitted credential configs, which proves nothing about enrolment.
   const creds = stored.credentials as Creds | undefined;
   if (!creds || typeof creds !== 'object') return { refuse: true, text: SECOND_FACTOR_UNAVAILABLE };
   for (const type of ['totp', 'webauthn']) {
@@ -59,7 +55,7 @@ export function secondFactorChangeVerdict(stored: Identity | null | undefined, m
       return { refuse: true, text: SECOND_FACTOR_UNAVAILABLE };
     }
   }
-  if (!parseIdentity(stored).hasSecondFactor) return { refuse: false };
+  if (!facts.hasSecondFactor) return { refuse: false };
   const losesLast = removalOutcomes(stored, creds, method).some((after) => !parseIdentity(withCreds(stored, after)).hasSecondFactor);
   return losesLast ? { refuse: true, text: SECOND_FACTOR_KEEP } : { refuse: false };
 }

@@ -1,7 +1,4 @@
-// The admin POST actions from pages/admin/users/[id].astro, so the page is a
-// thin dispatch. CSRF verification stays page-level, before any handler runs.
-// Each handler takes the FormData plus an ActionContext (the identity already
-// loaded) and returns an ActionOutcome; `refetch` asks the page to reload().
+// The page verifies CSRF before any handler runs.
 
 import {
   listIdentities,
@@ -25,7 +22,7 @@ import { GROUP_RE } from './access-groups';
 import { HOUSEHOLD_GROUPS } from './constants';
 import { holdsElevatedRole, planGroupSave } from './gate';
 import { buildGroupRegistry, isIdentityGroup, unconfiguredGroups } from './group-registry';
-import { RevokeError, revokeConsentSessions, revokeSubject } from './revoke';
+import { DEACTIVATE_STEP, RevokeError, revokeHydraSessions, revokeSubject } from './revoke';
 import { removalBlock } from './admin-view';
 import type { ClientManifest } from './manifests';
 import type { Identity } from './types';
@@ -33,7 +30,6 @@ import type { Identity } from './types';
 const USERNAME_RE = /^[a-z0-9]+(?:\.[a-z0-9]+)+$/;
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
-/** TTL passed to getRecoveryLink — quoted by the page's enrollment-pair copy too. */
 export const ENROLLMENT_TTL = '24h';
 
 export type ActionResult =
@@ -51,13 +47,9 @@ export type ActionResult =
   | { kind: 'error'; message: string; partial?: true };
 
 export interface ActionOutcome {
-  /** Absent only on save's validation-failure path (re-render with formErrors, no notice). */
   actionResult?: ActionResult;
-  /** True when the page must re-run its own reload() after this mutation. */
   refetch: boolean;
-  /** save only. */
   formErrors?: Record<string, string>;
-  /** save only, on success. */
   mode?: 'read';
 }
 
@@ -66,14 +58,11 @@ export interface ActionContext {
   identity: Identity;
   adminIdentityId: string;
   manifests: ClientManifest[];
-  /** Names defined under requirements/, the only prerequisites an admin can mark. */
   requirements?: readonly string[];
 }
 
 type ActionHandler = (fd: FormData, ctx: ActionContext) => Promise<ActionOutcome | Response>;
 
-// HIGH-3 / D1 gate: refuse admin-to-admin recovery via the UI (issue-recovery
-// and send-invite-email share this — see shouldRefuseRecovery, access.ts).
 const ADMIN_RECOVERY_REFUSAL: ActionResult = {
   kind: 'error',
   message: 'A setup link for an admin cannot be made here. Whoever runs the server can set one up.',
@@ -96,16 +85,13 @@ export async function saveAction(fd: FormData, ctx: ActionContext): Promise<Acti
   const accessGroups = fd.getAll('accessGroups').map(String).filter(Boolean);
   if (identityGroups.length === 0) formErrors.identityGroups = 'Pick at least one household group.';
 
-  // Stored groups the form renders no checkbox for stay unless removed by an
-  // explicit tick. They never count toward the identity-group minimum above.
   const clearUnconfigured = new Set(fd.getAll('clearUnconfigured').map(String));
   const keptUnconfigured = unconfiguredGroups(
     buildGroupRegistry(manifests, IDENTITY_GROUP_ORDER),
     parseIdentity(identity).groups,
   ).filter((g) => !clearUnconfigured.has(g));
 
-  // Repair surface for refuseNonCanonical (gate.ts): planGroupSave decides
-  // the write from the STORED identity, never from submitted checkboxes.
+  // planGroupSave decides from the stored identity, never from submitted checkboxes.
   const groupPlan = planGroupSave(
     identity,
     [...identityGroups, ...accessGroups, ...keptUnconfigured],
@@ -127,9 +113,7 @@ export async function saveAction(fd: FormData, ctx: ActionContext): Promise<Acti
     return { formErrors, refetch: false };
   }
 
-  // Preserve the existing admin marker and prerequisite marks: an unrelated groups/roles edit must
-  // not silently drop them. Read from the pre-dispatch identity, not re-fetched
-  // (avoids a TOCTOU on the write; grant/revoke are the targeted paths).
+  // Only the targeted actions change these marks, so a save carries them over from the loaded identity.
   const existingAdmin = identity.metadata_admin?.admin;
   const existingPrerequisites = identity.metadata_admin?.prerequisites;
   const existingPasskeyNames = identity.metadata_admin?.passkeyNames;
@@ -149,9 +133,6 @@ export async function saveAction(fd: FormData, ctx: ActionContext): Promise<Acti
       ...(existingPasskeyNames && Object.keys(existingPasskeyNames).length ? { passkeyNames: existingPasskeyNames } : {}),
     },
   });
-  // The Kratos write has landed; now end grants issued under the old access.
-  // A failure here cannot roll the save back, so it is reported as an error
-  // that says the save stood.
   if (narrowsAccess(identity, groups, roles)) {
     const failure = await revokeGrants(id);
     if (failure) return { actionResult: failure, mode: 'read', refetch: true };
@@ -159,22 +140,15 @@ export async function saveAction(fd: FormData, ctx: ActionContext): Promise<Acti
   return { actionResult: { kind: 'updated', removed: groupPlan.removed }, mode: 'read', refetch: true };
 }
 
+/** An absent field keeps what is stored. */
 interface SectionEdit {
-  /** Replaces the identity's traits; absent keeps the stored ones. */
   profile?: { username: string; email: string; displayName: string; recoveryEmail: string };
-  /** Replaces the household groups the page offers; absent keeps the stored ones. */
   household?: readonly string[];
-  /** Replaces the app groups and role overrides; absent keeps the stored ones. */
   access?: { groups: readonly string[]; roles: Readonly<Record<string, string>> };
-  /** Stored groups to remove outright. */
   remove?: readonly string[];
 }
 
-/**
- * The person page saves one section at a time. Each section builds the full form saveAction already guards (traits,
- * groups, roles) from what is stored plus its own edit, so every section keeps the same narrowing revocation and
- * repair rules and no section can clobber another's data.
- */
+/** Rebuilds the whole form from what is stored, so every section passes saveAction's guards and none clobbers another. */
 function sectionSave(ctx: ActionContext, edit: SectionEdit): Promise<ActionOutcome> {
   const { identity, manifests } = ctx;
   const registry = buildGroupRegistry(manifests, IDENTITY_GROUP_ORDER);
@@ -202,7 +176,6 @@ function sectionSave(ctx: ActionContext, edit: SectionEdit): Promise<ActionOutco
     if (isIdentityGroup(registry, g) || storedUnconfigured.includes(g) || removing.has(g)) continue;
     fd.append('accessGroups', g);
   }
-  // A stored group the access edit dropped goes through the explicit clear path saveAction guards.
   for (const g of storedUnconfigured) {
     if (removing.has(g) || (edit.access && !desired.includes(g))) fd.append('clearUnconfigured', g);
   }
@@ -213,7 +186,6 @@ function sectionSave(ctx: ActionContext, edit: SectionEdit): Promise<ActionOutco
 
 const TRAIT_FIELDS = ['username', 'email', 'displayName', 'recoveryEmail'] as const;
 
-/** Save the apps section: the submitted app -> level choices become groups and role overrides. */
 export function saveAccessAction(fd: FormData, ctx: ActionContext): Promise<ActionOutcome> {
   const roles = { ...(ctx.identity.metadata_admin?.roles ?? {}) };
   const access = accessToStorage(ctx.manifests, choicesFromForm(fd), { groups: parseIdentity(ctx.identity).groups, roles });
@@ -234,23 +206,19 @@ export function saveAccessAction(fd: FormData, ctx: ActionContext): Promise<Acti
   return sectionSave(ctx, { access });
 }
 
-/** Save the household section: the ticked household groups. */
 export function saveHouseholdAction(fd: FormData, ctx: ActionContext): Promise<ActionOutcome> {
   return sectionSave(ctx, { household: fd.getAll('identityGroups').map(String) });
 }
 
-/** Save the profile: name, username, email and recovery email. */
 export function saveProfileAction(fd: FormData, ctx: ActionContext): Promise<ActionOutcome> {
   const [username, email, displayName, recoveryEmail] = TRAIT_FIELDS.map((k) => String(fd.get(k) ?? '').trim());
   return sectionSave(ctx, { profile: { username: username.toLowerCase(), email, displayName, recoveryEmail } });
 }
 
-/** Remove unrecognised stored groups, each named by the admin who sees the raw string in the warning card. */
 export function removeGroupsAction(fd: FormData, ctx: ActionContext): Promise<ActionOutcome> {
   return sectionSave(ctx, { remove: fd.getAll('group').map(String).filter(Boolean) });
 }
 
-/** Admin vouches for the email trait's address; the only write is that one address. */
 export async function markVerifiedAction(fd: FormData, ctx: ActionContext): Promise<ActionOutcome> {
   if (!ctx.identity.traits?.email) {
     return { actionResult: { kind: 'error', message: 'This person has no email address on file.' }, refetch: false };
@@ -264,12 +232,10 @@ export async function markVerifiedAction(fd: FormData, ctx: ActionContext): Prom
   return { actionResult: { kind: 'email-verified' }, refetch: true };
 }
 
-/** The prerequisites to store: marks for names that are no longer defined stay, defined names follow the submitted ticks. */
 export function nextPrerequisites(stored: readonly string[], known: readonly string[], submitted: readonly string[]): string[] {
   return [...stored.filter((n) => !known.includes(n)), ...known.filter((n) => submitted.includes(n))];
 }
 
-/** Save which prerequisites the admin has marked set up for this person, a targeted patch that touches nothing else. */
 export async function setPrerequisitesAction(fd: FormData, ctx: ActionContext): Promise<ActionOutcome> {
   const next = nextPrerequisites(
     ctx.identity.metadata_admin?.prerequisites ?? [],
@@ -280,7 +246,6 @@ export async function setPrerequisitesAction(fd: FormData, ctx: ActionContext): 
   return { actionResult: { kind: 'prerequisites-saved' }, refetch: true };
 }
 
-/** True when the save drops a stored group or changes or drops a stored role. */
 export function narrowsAccess(identity: Identity, groups: readonly string[], roles: Record<string, string>): boolean {
   const stored = identity.metadata_admin;
   if ((stored?.groups ?? []).some((g) => !groups.includes(g))) return true;
@@ -289,13 +254,13 @@ export function narrowsAccess(identity: Identity, groups: readonly string[], rol
 
 async function revokeGrants(id: string): Promise<ActionResult | null> {
   try {
-    await revokeConsentSessions(id);
+    await revokeHydraSessions(id);
     return null;
   } catch (err) {
     return {
       kind: 'error',
       partial: true,
-      message: `Saved, but their old app access could not be taken away: ${err instanceof Error ? err.message : 'unknown error'}`,
+      message: `Saved, but their app sign-ins and access could not be ended: ${err instanceof Error ? err.message : 'unknown error'}`,
     };
   }
 }
@@ -314,8 +279,6 @@ export async function sendInviteEmailAction(fd: FormData, ctx: ActionContext): P
   const targetEmail = ctx.identity.traits?.email;
   if (!targetEmail) return { actionResult: { kind: 'error', message: 'This person has no email address on file.' }, refetch: false };
 
-  // Send-time address confirmation, SERVER-enforced (D1 addendum,
-  // DECISIONS.md): a UI-only check is not an invariant.
   const confirmEmail = String(fd.get('confirmEmail') ?? '');
   if (!confirmsInviteAddress(confirmEmail, targetEmail)) {
     return {
@@ -344,7 +307,6 @@ function isActiveAdmin(identity: Identity): boolean {
   return parseIdentity(identity).isAdmin && identity.state !== 'inactive';
 }
 
-/** True when taking `target` out of service would leave no active admin. */
 async function leavesNoActiveAdmin(target: Identity): Promise<boolean> {
   if (!isActiveAdmin(target)) return false;
   const active = (await listIdentities()).filter(isActiveAdmin).length;
@@ -380,10 +342,7 @@ export async function reactivateAction(_fd: FormData, ctx: ActionContext): Promi
 
 export async function deleteAction(fd: FormData, ctx: ActionContext): Promise<ActionOutcome | Response> {
   const { id, identity } = ctx;
-  // Closes the delete-the-last-admin lockout (and covers self-delete, since
-  // self is admin): an admin-marked target must be revoke-admin'd first,
-  // which enforces the last-admin guard. Checked before the confirm text so
-  // an admin target is refused regardless of what was typed.
+  // An admin must lose the marker first, where the last-admin guard runs; checked before the confirm text.
   if (parseIdentity(identity).isAdmin) {
     return {
       actionResult: {
@@ -398,14 +357,12 @@ export async function deleteAction(fd: FormData, ctx: ActionContext): Promise<Ac
   if (confirm !== expected) {
     return { actionResult: { kind: 'error', message: `Type the username (${expected}) to confirm.` }, refetch: false };
   }
-  // Deactivate and cut sessions and Hydra grants first: Hydra keeps consent
-  // and refresh tokens by subject, and nothing reaches them once the identity
-  // is gone. A failed delete then leaves an inactive identity the gate denies.
+  // Clear Hydra first: nothing reaches its tokens once the identity is gone, and a failed delete leaves it inactive.
   try {
     await revokeSubject(id, { deactivate: true });
   } catch (err) {
     // Past its first step the identity is already turned off.
-    const landed = err instanceof RevokeError && err.step !== 'state->inactive';
+    const landed = err instanceof RevokeError && err.step !== DEACTIVATE_STEP;
     return {
       actionResult: {
         kind: 'error',
@@ -430,14 +387,13 @@ export async function deleteAction(fd: FormData, ctx: ActionContext): Promise<Ac
   return new Response(null, { status: 303, headers: { Location: '/admin/users?deleted=1' } });
 }
 
-// Admin accounts always step up at app sign-in, so the marker requires a totp
-// or webauthn credential to step up with, and keeps requiring one.
+// Admins always step up at app sign-in, so the marker needs a second factor to step up with.
 const SECOND_FACTOR_REQUIRED: ActionResult = {
   kind: 'error',
   message: 'Admins need an authenticator app or security key set up first.',
 };
 
-// Elevated app roles step up at sign-in too (needsStepUp, gate.ts).
+// Elevated app roles step up at sign-in too.
 export const ELEVATED_ROLE_NEEDS_SECOND_FACTOR =
   "People with a role above an app's entry level need an authenticator app or security key set up first.";
 const ELEVATED_SECOND_FACTOR_REQUIRED: ActionResult = { kind: 'error', message: ELEVATED_ROLE_NEEDS_SECOND_FACTOR };
@@ -469,7 +425,6 @@ export async function revokeAdminAction(fd: FormData, ctx: ActionContext): Promi
       refetch: false,
     };
   }
-  // Last-admin guard: refuse if this would leave zero active admins.
   if (await leavesNoActiveAdmin(identity)) {
     return {
       actionResult: { kind: 'error', message: `${username} is the only admin who can sign in. Make someone else an admin first.` },
@@ -483,11 +438,7 @@ export async function revokeAdminAction(fd: FormData, ctx: ActionContext): Promi
   return { actionResult: { kind: 'admin-revoked', username }, refetch: true };
 }
 
-// Kratos upstream cannot admin-delete a passkey credential (identity/handler.go
-// deleteIdentityCredentials, v26.2.0 — no passkey case, unconditional 400; see
-// issue #10 and admin-api.ts EVICTABLE_CREDENTIAL_TYPES). Refuse it here too,
-// server-side, in case a stale form ever submits cred_type=passkey — the
-// message matches the note rendered next to the passkey chip.
+// Kratos cannot admin-delete a passkey credential, so a stale form submitting one is refused here.
 const PASSKEY_REFUSAL: ActionResult = {
   kind: 'error',
   message: 'A passkey can only be removed by its owner. Sign them out everywhere, then they can remove it in their own settings.',
@@ -543,7 +494,6 @@ function audited(action: string, handler: ActionHandler): ActionHandler {
   };
 }
 
-/** Dispatch table keyed by the form's `action` field — the page's whole switch. */
 const HANDLERS: Record<string, ActionHandler> = {
   'save-access': saveAccessAction,
   'save-household': saveHouseholdAction,

@@ -7,6 +7,24 @@ aims to follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 The git tag is the authoritative version; `portal/package.json` mirrors it.
 This CHANGELOG and git tags carry the deployed-instance release state.
 
+## [0.11.0] - 2026-10-03
+
+Signing out and removing access now also ends app sign-ins, apps that ask for a fresh sign-in get one, and people with elevated app roles keep a second factor.
+
+### Changed
+
+- Signing out of the portal also ends your app sign-ins and app access on every device. Apps with a back-channel logout address are told at once; other apps keep their own session until it expires.
+- Removing someone's groups, roles or admin marker now also ends their app sign-ins on every device, not only their app access. They stay signed in to the portal.
+- People who hold a role above an app's entry level keep at least one authenticator app or security key through their settings page, as admins do.
+- Settings tells an admin with one security key and no authenticator app how to add a second key.
+- Expired-page and code messages say how long codes last and cover replaced pages.
+- A skip-to-content link, and 44px header links.
+
+### Fixed
+
+- Apps that ask for a fresh sign-in (`prompt=login`) or a maximum sign-in age (`max_age`) get one: an older portal session goes through a fresh sign-in first. A `max_age` under 30 seconds is treated as 30 seconds.
+- Kratos and Hydra calls from the portal, and outgoing mail, time out instead of hanging a request.
+
 ## [0.10.3] - 2026-10-02
 
 Second-factor and sign-out rules for elevated app roles, a group-aware forward-auth snippet, and clearer errors and logs.

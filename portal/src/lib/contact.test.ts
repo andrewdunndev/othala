@@ -2,7 +2,7 @@
 
 import { describe, it, expect, beforeEach } from 'vitest';
 import { rateLimit, _resetForTests, validateContact, LIMITS } from './contact.js';
-import { parseSmtpUri, MailerError } from './mailer.js';
+import { parseSmtpUri, smtpTransportOptions, MailerError } from './mailer.js';
 
 beforeEach(() => {
   _resetForTests();
@@ -135,5 +135,15 @@ describe('parseSmtpUri()', () => {
 
   it('rejects a non-URL', () => {
     expect(() => parseSmtpUri('not a uri')).toThrow(MailerError);
+  });
+});
+
+describe('smtpTransportOptions()', () => {
+  it('bounds connection, greeting and socket time', () => {
+    expect(smtpTransportOptions()).toMatchObject({
+      connectionTimeout: 10_000,
+      greetingTimeout: 10_000,
+      socketTimeout: 30_000,
+    });
   });
 });

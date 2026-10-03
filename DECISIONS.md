@@ -10,7 +10,8 @@ alone and names the file that fails when it is violated, or says UNENFORCED.
 the admin UI guard, `required_aal: highest_available` on the settings flow, and app sign-in and
 forward-auth for accounts holding totp, webauthn, the admin marker or a role above an app's entry
 role (`portal/src/lib/gate.ts`).
-Admins cannot sign in by emailed code, hold the marker without a second factor, or remove the last one.
+Admins cannot sign in by emailed code or hold the marker without a second factor. Admins and people with
+a role above an app's entry level cannot remove their last one.
 
 **Why.** Kratos enforces assurance level per flow, never per route, so step-up belongs in the
 application, which reads the session's AAL itself. Raising the pin tightens nothing: the session endpoint
@@ -109,8 +110,8 @@ configuration, unenforced here.
 ranked above password. Username plus password is the tertiary recovery on-ramp and the credential the
 break-glass floor identities carry.
 
-**Why.** Kratos's dedicated passkey strategy and its legacy webauthn strategy differ: the former gives
-discoverable credentials and conditional UI (the usernameless one-tap flow); the latter is kept only as
+**Why.** Kratos's passkey and webauthn strategies differ: the former gives
+discoverable credentials and conditional UI (the usernameless one-tap flow); the latter serves only as
 a hardware second factor with passwordless disabled, so it never duplicates the primary. The fallback
 ordering is deliberate: email one-time-code sits above password so a user on a new or borrowed device
 gets in without typing a secret they would rarely use, landing straight in passkey enrollment.
@@ -119,7 +120,7 @@ enrollment and email delivery are both degraded.
 
 **Enforced by.** `e2e/playwright/tests/k-email-code-login.spec.ts` end to end. The passkey leg
 (`i-passkey-register-login.spec.ts` I1) covers registration and usernameless login. UNENFORCED, like the tier
-ORDER and the legacy strategy's disabled passwordless — `kratos/kratos.yml` holds those values and
+ORDER and the webauthn strategy's disabled passwordless — `kratos/kratos.yml` holds those values and
 nothing fails when they change.
 
 ## No password ever transits a channel
