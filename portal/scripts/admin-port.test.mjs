@@ -427,6 +427,20 @@ const at = (n) => new Date(Date.UTC(2026, 0, 1, 0, n)).toISOString();
 const entry = (method, n, aal = 'aal1') => ({ method, aal, completed_at: at(n) });
 const NEW_EMAIL = { ...STORED.traits, email: 'new@example.test' };
 
+test('recovery-gate and login-code-gate refuse a whitespace-only identity_id (403)', async () => {
+  process.env.RECOVERY_GATE_SECRET = 'gate-secret';
+  await withMockKratos(identityServer({ groups: [] }), async () => {
+    for (const url of ['/admin/recovery-gate', '/admin/login-code-gate']) {
+      const res = fakeRes();
+      await handle(
+        fakeReq({ method: 'POST', url, headers: { authorization: 'Bearer gate-secret' }, body: JSON.stringify({ identity_id: '  ' }) }),
+        res,
+      );
+      assert.equal(res.statusCode, 403, url);
+    }
+  });
+});
+
 test('emailChangeVerdict table', () => {
   const refuse = (stored, traits, methods) => emailChangeVerdict(stored, traits, methods).refuse;
   assert.equal(refuse(KEYLESS, NEW_EMAIL, [entry('code', 0)]), false, 'keyless with code');
@@ -436,6 +450,8 @@ test('emailChangeVerdict table', () => {
   assert.equal(refuse(KEYED, NEW_EMAIL, [entry('code', 0), entry('totp', 1, 'aal2')]), true, 'aal2 never counts');
   assert.equal(refuse(KEYED, NEW_EMAIL, [entry('password', 0), entry('code', 1), entry('totp', 2, 'aal2')]), true, 'aal2 newer than code');
   assert.equal(refuse(KEYED, NEW_EMAIL, [entry('code', 0), entry('webauthn', 1)]), false, 'webauthn newest');
+  assert.equal(refuse(KEYED, NEW_EMAIL, [entry('code', 0), entry('webauthn', 1, 'aal2')]), true, 'aal2 webauthn never counts');
+  assert.equal(refuse(KEYED, NEW_EMAIL, [entry('password', 0), entry('code', 0)]), true, 'a tie goes to the later entry');
   assert.equal(refuse(withPasskey(KEYLESS), NEW_EMAIL, [entry('code', 0), entry('passkey', 1)]), false, 'passkey newest');
   assert.equal(refuse(withPasskey(KEYLESS), NEW_EMAIL, [entry('passkey', 0), entry('code', 1)]), true, 'passkey account, code newest');
   assert.equal(refuse(KEYED, NEW_EMAIL, [{ method: 'password', aal: 'aal1', completed_at: 'not a date' }]), true, 'unparseable');

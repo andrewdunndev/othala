@@ -85,6 +85,16 @@ describe('holdsElevatedRole', () => {
     expect(held([grafana], ['grafana-access'], { grafana: 'editor' })).toBe(true);
     expect(held([grafana], ['grafana-admin'], { grafana: 'viewer' })).toBe(false);
   });
+  it('the entry role is the lowest-ranked mapped access group', () => {
+    const m = manifest('m', ['admin', 'editor', 'viewer'], { 'm-edit': 'editor', 'm-view': 'viewer' }, ['m-edit', 'm-view']);
+    expect(held([m], ['m-edit'])).toBe(true);
+    expect(held([m], ['m-view'])).toBe(false);
+  });
+  it('without a mapped access group the entry role is the last declared', () => {
+    const m = manifest('m', ['admin', 'editor', 'viewer'], {}, ['m-access']);
+    expect(held([m], ['m-access'], { m: 'editor' })).toBe(true);
+    expect(held([m], ['m-access'], { m: 'viewer' })).toBe(false);
+  });
   it('a manifest without roles is never elevated', () => {
     expect(held([manifest('y', [], {}, ['y-access'])], ['y-access'])).toBe(false);
   });
