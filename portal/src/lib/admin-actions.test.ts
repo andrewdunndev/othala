@@ -721,6 +721,14 @@ describe('admin action audit line', () => {
         },
         () => fd(),
       ],
+      [
+        'revoke-admin',
+        () => {
+          listIdentitiesMock.mockResolvedValue([makeIdentity('admin', true), makeIdentity('other', true)]);
+          return makeCtx({ id: 'admin-1', identity: makeIdentity('admin', true) });
+        },
+        () => fd({ confirm: 'admin' }),
+      ],
       ['remove-credential', () => makeCtx(), () => fd({ cred_type: 'totp' })],
     ])('%s', async (action, ctx, form) => {
       revokeConsentSessionsMock.mockRejectedValue(hydraDown);

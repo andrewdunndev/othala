@@ -472,7 +472,7 @@ export async function revokeAdminAction(fd: FormData, ctx: ActionContext): Promi
   }
   await patchAdminMarker(id, false);
   const failure = await revokeGrants(id);
-  if (self) return new Response(null, { status: 303, headers: { Location: '/' } });
+  if (self && !failure) return new Response(null, { status: 303, headers: { Location: '/' } });
   if (failure) return { actionResult: failure, refetch: true };
   return { actionResult: { kind: 'admin-revoked', username }, refetch: true };
 }
