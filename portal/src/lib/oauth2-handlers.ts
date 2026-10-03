@@ -1,7 +1,5 @@
 // Hydra login/consent/logout challenge providers at /oauth2/{login,consent,logout} (not the Kratos UI pages in
 // src/pages/auth/). Each handler takes a Web Request and returns a Web Response, so routes stay thin and tests inject Deps.
-// login: resolve subject (remembered or whoami), gate, accept/reject; consent: re-gate, build claims, accept;
-// logout: revoke the subject's live Kratos session, then accept.
 
 import { Configuration, OAuth2Api } from '@ory/client-fetch';
 import type {
@@ -36,7 +34,6 @@ export function defaultOAuth2Api(): OAuth2Api {
   return new OAuth2Api(new Configuration({ basePath: HYDRA_ADMIN_URL, fetchApi: timeoutFetch() }));
 }
 
-/** Login-UI base for the no-session bounce (the portal's Kratos login page). */
 const LOGIN_UI_BASE = '/auth/login';
 
 /** Consent grant-screen base. */
@@ -104,6 +101,48 @@ async function safeGetIdentity(
   }
 }
 
+// Hydra exposes no requested_at, so a sign-in this recent satisfies prompt=login and stops the refresh looping back.
+const FRESH_LOGIN_WINDOW_S = 30;
+
+/** Whether the Kratos session is recent enough for the prompt and max_age in Hydra's request_url. */
+export function freshnessVerdict(
+  requestUrl: string,
+  session: Pick<Session, 'authenticated_at'>,
+  now: number = Date.now(),
+): 'ok' | 'refresh' | 'login_required' {
+  let params: URLSearchParams;
+  try {
+    params = new URL(requestUrl).searchParams;
+  } catch {
+    return 'ok';
+  }
+  const prompt = (params.get('prompt') ?? '').split(' ');
+  const rawMaxAge = params.get('max_age') ?? '';
+  const maxAge = /^\d+$/.test(rawMaxAge) ? Number(rawMaxAge) : undefined;
+  if (!prompt.includes('login') && maxAge === undefined) return 'ok';
+  const limit = prompt.includes('login') ? FRESH_LOGIN_WINDOW_S : Math.max(maxAge ?? 0, FRESH_LOGIN_WINDOW_S);
+  const age = (now - new Date(session.authenticated_at ?? NaN).getTime()) / 1000;
+  if (age <= limit) return 'ok';
+  return prompt.includes('none') ? 'login_required' : 'refresh';
+}
+
+function loginBounce(challenge: string, query = ''): Response {
+  return redirect(`${LOGIN_UI_BASE}?${query}return_to=${encodeURIComponent(buildLoginReturnTo(challenge))}`);
+}
+
+async function rejectLogin(d: Required<Deps>, challenge: string, error: string, status_code: number): Promise<Response> {
+  try {
+    const { redirect_to } = await d.oauth2.rejectOAuth2LoginRequest({
+      loginChallenge: challenge,
+      rejectOAuth2Request: { error, error_description: error, status_code },
+    });
+    return redirect(redirect_to);
+  } catch (err) {
+    upstream('rejectOAuth2LoginRequest', err);
+    return new Response('upstream error', { status: 502 });
+  }
+}
+
 /** Handle GET /oauth2/login?login_challenge=... */
 export async function handleLogin(req: Request, deps: Deps = {}): Promise<Response> {
   const d = resolve(deps);
@@ -122,86 +161,42 @@ export async function handleLogin(req: Request, deps: Deps = {}): Promise<Respon
 
   const clientId = login.client?.client_id ?? '';
 
-  // Resolve the authenticated subject.
-  let subject: string;
-  let acr: string | undefined;
-  let liveSession: Session;
-
-  if (login.skip) {
-    // Hydra remembers this subject but Kratos is the authority: honor the skip only with a live Kratos session for
-    // the same subject; otherwise force interactive login.
-    let session: Session | null;
-    try {
-      session = await d.getSession(req.headers.get('cookie') ?? undefined);
-    } catch (err) {
-      upstream('getSession', err);
-      return new Response('upstream error', { status: 502 });
-    }
-    if (session?.active && session.identity && session.identity.id !== login.subject) {
-      // A different user's live session: end that one Hydra login session so Hydra re-issues without skip; never a subject-wide revoke.
-      if (!login.session_id) return new Response('upstream error', { status: 502 });
-      try {
-        await d.oauth2.revokeOAuth2LoginSessions({ sid: login.session_id });
-      } catch (err) {
-        upstream('revokeOAuth2LoginSessions', err);
-        return new Response('upstream error', { status: 502 });
-      }
-      return redirect(login.request_url);
-    }
-    if (!session?.active || !session.identity) {
-      const returnTo = buildLoginReturnTo(challenge);
-      const loginURL = `${LOGIN_UI_BASE}?return_to=${encodeURIComponent(returnTo)}`;
-      return redirect(loginURL);
-    }
-    subject = login.subject;
-    liveSession = session;
-    acr = session.authenticator_assurance_level ?? undefined;
-  } else {
-    let session: Session | null;
-    try {
-      session = await d.getSession(req.headers.get('cookie') ?? undefined);
-    } catch (err) {
-      upstream('getSession', err);
-      return new Response('upstream error', { status: 502 });
-    }
-    if (!session?.active || !session.identity) {
-      // Not authenticated: bounce to the login UI with a relative return_to.
-      const returnTo = buildLoginReturnTo(challenge);
-      const loginURL = `${LOGIN_UI_BASE}?return_to=${encodeURIComponent(returnTo)}`;
-      return redirect(loginURL);
-    }
-    subject = session.identity.id;
-    liveSession = session;
-    acr = session.authenticator_assurance_level ?? undefined;
+  let session: Session | null;
+  try {
+    session = await d.getSession(req.headers.get('cookie') ?? undefined);
+  } catch (err) {
+    upstream('getSession', err);
+    return new Response('upstream error', { status: 502 });
   }
+  // Hydra remembers this subject but Kratos is the authority: a skip needs a live Kratos session for the same subject.
+  if (login.skip && session?.active && session.identity && session.identity.id !== login.subject) {
+    // A different user's live session: end that one Hydra login session so Hydra re-issues without skip; never a subject-wide revoke.
+    if (!login.session_id) return new Response('upstream error', { status: 502 });
+    try {
+      await d.oauth2.revokeOAuth2LoginSessions({ sid: login.session_id });
+    } catch (err) {
+      upstream('revokeOAuth2LoginSessions', err);
+      return new Response('upstream error', { status: 502 });
+    }
+    return redirect(login.request_url);
+  }
+  if (!session?.active || !session.identity) return loginBounce(challenge);
+  const subject = session.identity.id;
+  const acr = session.authenticator_assurance_level ?? undefined;
 
-  // The access policy (gate.ts): state + group, fail-closed on lookup failure, then step-up.
   const identity = await safeGetIdentity(d, subject);
-  const access = decideAccess(identity, { app: d.manifest(clientId) }, liveSession);
+  const access = decideAccess(identity, { app: d.manifest(clientId) }, session);
   if ('deny' in access) {
     // Log the real reason server-side; send Hydra an opaque error_description so RPs learn no group names or identity state.
     console.warn('[oauth2/login] access denied', { clientId, subject, reason: access.deny });
-    try {
-      const { redirect_to } = await d.oauth2.rejectOAuth2LoginRequest({
-        loginChallenge: challenge,
-        rejectOAuth2Request: {
-          error: 'access_denied',
-          error_description: 'access_denied',
-          status_code: 403,
-        },
-      });
-      return redirect(redirect_to);
-    } catch (err) {
-      upstream('rejectOAuth2LoginRequest', err);
-      return new Response('upstream error', { status: 502 });
-    }
+    return rejectLogin(d, challenge, 'access_denied', 403);
   }
 
-  // Second-factor step-up: accounts with totp/webauthn, the admin marker, or a role above an app's entry role, complete aal2 first; Kratos returns to this challenge.
-  if ('stepUp' in access) {
-    const returnTo = buildLoginReturnTo(challenge);
-    return redirect(`${LOGIN_UI_BASE}?aal=aal2&return_to=${encodeURIComponent(returnTo)}`);
-  }
+  const freshness = freshnessVerdict(login.request_url, session);
+  if (freshness === 'login_required') return rejectLogin(d, challenge, freshness, 400);
+  if (freshness === 'refresh') return loginBounce(challenge, 'refresh=true&');
+
+  if ('stepUp' in access) return loginBounce(challenge, 'aal=aal2&');
 
   try {
     const { redirect_to } = await d.oauth2.acceptOAuth2LoginRequest({
@@ -209,7 +204,7 @@ export async function handleLogin(req: Request, deps: Deps = {}): Promise<Respon
       acceptOAuth2LoginRequest: {
         subject,
         remember: true,
-        remember_for: loginRememberFor(liveSession),
+        remember_for: loginRememberFor(session),
         // Hydra keeps its cookie on a remembered login unless asked to renew it.
         ...(login.skip ? { extend_session_lifespan: true } : {}),
         ...(acr ? { acr } : {}),
