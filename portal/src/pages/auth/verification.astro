@@ -68,8 +68,8 @@ const phase: 'request' | 'sent' | 'done' = flow?.state === 'passed_challenge' ? 
     : phase === 'request'
     ? 'Enter the address you want verified and we will email you a one-time code.'
     : sentTo
-    ? `We emailed a code to ${sentTo}. Enter it to confirm this address.`
-    : 'We emailed you a code. Enter it to confirm this address.'}
+    ? `We emailed a code to ${sentTo}. Enter it to confirm this address. Nothing yet? Check spam or junk, then send a new code.`
+    : 'We emailed you a code. Enter it to confirm this address. Nothing yet? Check spam or junk, then send a new code.'}
   description="Verify your email address."
 >
 

@@ -98,8 +98,8 @@ const { hasPasskey, hasCode, hasPassword, totpNodes, aal2WebauthnNodes, lookupNo
       : 'Confirm it is you with your security key to finish signing in.'
     : isCodeEntry
       ? identifierInput?.value
-        ? `We emailed a sign-in code to ${String(identifierInput.value)}. Enter it below.`
-        : 'We emailed you a sign-in code. Enter it below.'
+        ? `We emailed a sign-in code to ${String(identifierInput.value)}. Enter it below. Nothing yet? Check spam or junk, then send a new code.`
+        : 'We emailed you a sign-in code. Enter it below. Nothing yet? Check spam or junk, then send a new code.'
       : 'Use the passkey on this device, or get a code by email.'}
   description={`Sign in to ${instanceName}.`}
 >
