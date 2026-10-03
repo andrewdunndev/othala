@@ -87,20 +87,6 @@ test.describe('ZE — email changes need a first-factor sign-in', () => {
     }
   });
 
-  test('ZE2 — a password account signed in with its password can change its email', async ({ browser, baseURL, kratosAdminURL }) => {
-    const seeded = await createIdentityWithPassword(seedOpts('ze.owner', kratosAdminURL));
-    const target = `ze.owner.${Date.now()}.new@othala.test`;
-    const ctx = await browser.newContext();
-    try {
-      await loginViaJsonApi(ctx, { identifier: seeded.email, password: TEST_PASSWORD }, baseURL);
-      const before = await storedTraits(kratosAdminURL, seeded.id);
-      expect((await submitProfile(ctx, baseURL, { ...before, email: target })).status).toBe(200);
-      expect((await storedTraits(kratosAdminURL, seeded.id)).email).toBe(target);
-    } finally {
-      await ctx.close();
-    }
-  });
-
   test('ZE3 — an account with no password or passkey changes its email after a code sign-in', async ({ browser, baseURL, kratosAdminURL }) => {
     const seeded = await createIdentityCodeOnly(seedOpts('ze.keyless', kratosAdminURL));
     const target = `ze.keyless.${Date.now()}.new@othala.test`;

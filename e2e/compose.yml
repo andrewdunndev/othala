@@ -217,8 +217,7 @@ services:
   # Edge: fronts app, Kratos and Hydra on one host (auth.othala.test, :8088 published) so smoke
   # and the browser run reach the stack as in production; the portal itself calls Kratos and Hydra directly.
   caddy:
-    # dunn.dev/caddy, not stock caddy: n-rate-limits.spec.ts needs rate_limit. Same
-    # tag as production; re-resolve via skopeo inspect.
+    # Same image and tag as production; re-resolve via skopeo inspect.
     image: registry.gitlab.com/dunn.dev/caddy:v2.11.4-3@sha256:78e84240c3c703bb374aa003424c56143376c621a0b7e17cc6bcf009eec86446
     container_name: lab-caddy
     restart: unless-stopped

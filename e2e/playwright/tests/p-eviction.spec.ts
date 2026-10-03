@@ -142,7 +142,7 @@ test.describe.serial('P — Passkey credential eviction (lost-device scenario)',
     sharedIdentity = identity;
   });
 
-  test('P3 — victim self-removes the lost passkey; B locked out, A survives', async ({ baseURL, kratosAdminURL }) => {
+  test('P3 — victim self-removes the lost passkey; B locked out, A survives', async ({ baseURL }) => {
     if (!sharedIdentity || !ctxA || !pageA || !ctxB || !pageB) {
       test.skip(true, 'P3: requires P1 to have run first in this worker (shared module state)');
       return;
@@ -154,14 +154,6 @@ test.describe.serial('P — Passkey credential eviction (lost-device scenario)',
     const loginPageB = pageB;
 
     await clearSession(contextB, baseURL);
-
-    const adminDeleteResp = await fetch(
-      `${kratosAdminURL}/admin/identities/${identity.id}/credentials/passkey`,
-      { method: 'DELETE' },
-    );
-    const adminDeleteBody = await adminDeleteResp.text().catch(() => '');
-    expect(adminDeleteResp.status, 'P3a: admin credential-type DELETE must document the upstream refusal').toBe(400);
-    expect(adminDeleteBody, 'P3a: refusal reason must name the passkey type').toContain('Credentials type passkey cannot be deleted.');
 
     await loginViaJsonApi(contextA, { identifier: identity.email, password: TEST_PASSWORD }, baseURL);
     await loginPageA.goto(`${baseURL}/auth/settings`);

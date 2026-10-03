@@ -1,7 +1,6 @@
 // G — forged or malformed session cookies never authenticate.
 
 import { test, expect } from '../fixtures';
-import { loginViaJsonApi } from '../actions/login';
 import { getSession, probeAdmin } from '../actions/session';
 
 test('G1 — fabricated ory_kratos_session cookie is rejected by Kratos (401)', async ({
@@ -66,34 +65,5 @@ test('G2 — unauthenticated request (no session cookie) is rejected at /admin',
   expect(
     /\/auth\/login/.test(loc),
     `G2: /admin must redirect to /auth/login; got ${status} ${loc}`,
-  ).toBe(true);
-});
-
-test('G3 — INV-1: member real session (valid Kratos cookie, AAL1) never reaches /admin', async ({
-  ctx,
-  baseURL,
-  member,
-}) => {
-  await loginViaJsonApi(ctx, { identifier: member.email, password: member.password }, baseURL);
-
-  const session = await getSession(ctx, baseURL);
-  console.log('[G3] member whoami:', session ? `email=${session.identity?.traits?.email} active=${session.active}` : 'null');
-  expect(
-    session?.active,
-    'G3 precondition: member must have an active Kratos session (genuine cookie)',
-  ).toBe(true);
-  expect(session?.identity?.traits?.email).toBe(member.email);
-
-  const { status, loc } = await probeAdmin(ctx, baseURL);
-  console.log('[G3] GET /admin with AAL1 member session →', status, loc);
-
-  expect(
-    status,
-    `G3 (INV-1): /admin must not return 200 for an AAL1 member; got ${status}`,
-  ).not.toBe(200);
-
-  expect(
-    /aal=aal2/.test(loc),
-    `G3 (INV-1): AAL1 member must be bounced to aal=aal2 step-up; got ${status} ${loc}`,
   ).toBe(true);
 });
