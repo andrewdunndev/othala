@@ -1,32 +1,31 @@
-# Reusable Caddy snippet — forward-auth via Kratos /sessions/whoami
+# Reusable Caddy snippet — forward-auth through the portal's /api/forward-auth
 #
 # Usage in a per-app Caddyfile:
-#   import forward-auth audiobookshelf 13378
+#   import forward-auth audiobookshelf 13378 audiobookshelf-access
 #
-# Caddy's built-in forward_auth directive calls Kratos to verify the user's
-# session. If valid (200 from whoami), proxies to the upstream with identity
-# headers. If invalid (401), redirects to the home portal login.
+# Caddy's built-in forward_auth directive calls the portal, which checks the
+# Kratos session and the identity's membership of the required group
+# server-side, and injects the verified identity id
+# (X-Kratos-Authenticated-Identity-Id) into the proxied request. Inbound
+# identity headers are stripped (see the request_header and header_up lines
+# below), so a client cannot spoof one.
 #
-# This snippet establishes ONLY that a valid Kratos session exists and
-# injects the trusted identity id from whoami (X-Kratos-Authenticated-Identity-Id).
-# It does NOT pass group claims: whoami does not emit them, and inbound
-# identity headers are stripped (see header_up lines below) so a client
-# cannot spoof group membership.
+# Status contract (portal/src/pages/api/forward-auth.ts is authoritative):
+#   200  valid session, identity in the group: proxy to the upstream
+#   401  no valid session, or step-up needed: redirect to the portal login
+#   403  refused on merits (not in the group, inactive, bad or missing group):
+#        returned to the client as is, never redirected
+#   503  Kratos or its admin API did not answer: returned as is
 #
-# Per-app GROUP enforcement must be done one of two ways:
-#   (a) OIDC apps: use the portal's OIDC access-gate (audience/scope claims
-#       from Hydra carry authoritative group membership).
-#   (b) Non-OIDC apps needing group checks: add a dedicated forward_auth
-#       endpoint that resolves group membership server-side via the Kratos
-#       admin API and returns 200/401/403/503 — never trust a passed header.
-#       That endpoint is portal/src/pages/api/forward-auth.ts; its header
-#       comment is the status contract. 503 is not decoration: it is what
-#       separates "the identity provider did not answer" from "you are
-#       refused", so an edge can keep an outage out of its redirect arm.
+# Only 401 redirects. Redirecting 403 or 503 would send a signed-in visitor to
+# the login page of a portal that is refusing or down, and loop on every retry.
+# An omitted group arrives empty, which the endpoint refuses with 403, so a
+# copy that forgets the third argument fails closed.
 #
 # Args:
 #   $1 = upstream container name
 #   $2 = upstream port
+#   $3 = required group, e.g. audiobookshelf-access
 
 (forward-auth) {
 	tls {
@@ -37,33 +36,17 @@
 	# directives by its default order, which puts forward_auth before
 	# request_header: the strip would then run after copy_headers and delete
 	# the verified id. Written order here: strip the inbound id, verify the
-	# session and copy the id from whoami, then proxy.
+	# session and group and copy the id from the response, then proxy.
 	route {
 		# Drop any client-supplied identity id before the auth call, so the
 		# only value that can reach the upstream is the one copy_headers takes
-		# from the whoami response.
+		# from the portal response.
 		request_header -X-Kratos-Authenticated-Identity-Id
 
-		forward_auth kratos:4433 {
-			uri /sessions/whoami
+		forward_auth othala:8080 {
+			uri /api/forward-auth?group={args[2]}
 			copy_headers X-Kratos-Authenticated-Identity-Id
 
-			# Kratos /sessions/whoami returns 200 with full session JSON if
-			# valid, 401 if not. Caddy treats non-2xx as "not authorized"
-			# and falls through to the handle_response below. 403 is listed
-			# too because getSession (portal/src/lib/kratos.ts) treats both
-			# the same way: "e.response.status === 401 || e.response.status
-			# === 403" → a null session.
-			#
-			# 503 is deliberately absent, and must stay absent in any edge
-			# copied from this snippet. handle_response below redirects to
-			# the portal's login flow; matching 503 into that arm would send
-			# a visitor to the login page of the very portal that just failed
-			# to answer, and bounce them there on every retry — the infinite
-			# login loop the four-status contract in
-			# portal/src/pages/api/forward-auth.ts exists to prevent. An
-			# outage must stay a flat error, not a redirect.
-			#
 			# return_to must be ABSOLUTE. A path-only value resolves against
 			# the portal's own host, so the user lands back on the portal
 			# instead of the service they were trying to reach — which defeats
@@ -74,7 +57,7 @@
 			# request carrying a Host outside the apex yields a return_to Kratos
 			# refuses, and the user is sent to `default_browser_return_url`
 			# instead — degraded, never an off-apex redirect.
-			@unauthorized status 401 403
+			@unauthorized status 401
 			handle_response @unauthorized {
 				redir {env.OTHALA_PUBLIC_URL}/auth/login?return_to={http.request.scheme}://{http.request.host}{http.request.uri.path} 302
 			}
@@ -92,7 +75,7 @@
 			# equivalent) and pass per-app group checks at the app layer.
 			#
 			# X-Kratos-Authenticated-Identity-Id is stripped by request_header
-			# ahead of forward_auth in this route and set from the whoami
+			# ahead of forward_auth in this route and set from the portal
 			# response by copy_headers, so it is deliberately not removed here.
 			header_up -X-Kratos-Groups
 			header_up -X-Remote-User
