@@ -11,7 +11,7 @@ import AppIcon from '../../components/AppIcon.astro';
 import { describeScopeList } from '../../lib/scope-descriptions';
 import { getSession } from '../../lib/kratos';
 import { signToken } from '../../lib/csrf';
-import { defaultOAuth2Api } from '../../lib/oauth2-handlers';
+import { hydraAdmin } from '../../lib/ory-fetch';
 import { loadTiles } from '../../lib/tiles';
 import { devViewer } from '../../lib/viewer';
 import { monogram } from '../../lib/monogram';
@@ -39,7 +39,7 @@ if (dev) {
   fetchError = true;
 } else {
   try {
-    const oauth2 = defaultOAuth2Api();
+    const oauth2 = hydraAdmin();
     const consent = await oauth2.getOAuth2ConsentRequest({ consentChallenge: challenge });
 
     // Both the session AND the consent request must resolve before anything renders: the ownership check compares

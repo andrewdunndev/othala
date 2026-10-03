@@ -1,25 +1,17 @@
 // The Kratos admin port has no auth; network isolation is the gate.
 
-import {
-  Configuration,
-  IdentityApi,
-  ResponseError,
-  type CreateIdentityBody,
-  type UpdateIdentityBody,
-  type DeleteIdentityCredentialsTypeEnum,
-  type GetIdentityIncludeCredentialEnum,
-  type Session,
+import type {
+  CreateIdentityBody,
+  UpdateIdentityBody,
+  DeleteIdentityCredentialsTypeEnum,
+  GetIdentityIncludeCredentialEnum,
+  Session,
 } from '@ory/client-fetch';
 import type { Identity } from './types';
 import { validateMetadataAdmin } from './metadata-admin';
 import { passkeyCredentialIds, pruneNames, readPasskeyNames } from './passkey-names';
 import { revokeSubject } from './revoke';
-import { KRATOS_ADMIN_URL } from './constants';
-import { timeoutFetch } from './ory-fetch';
-
-function identityApi(): IdentityApi {
-  return new IdentityApi(new Configuration({ basePath: KRATOS_ADMIN_URL, fetchApi: timeoutFetch() }));
-}
+import { isNotFound, kratosAdmin } from './ory-fetch';
 
 export interface IdentityTraits {
   username: string;
@@ -49,14 +41,14 @@ export interface UpdateIdentityInput {
 
 // One page of 250 is the family-scale ceiling; later pages are not fetched.
 export async function listIdentities(): Promise<Identity[]> {
-  return identityApi().listIdentities({ perPage: 250 });
+  return kratosAdmin().listIdentities({ perPage: 250 });
 }
 
 // Without lookup_secret, backup codes are never fetched and a PUT round-trip would drop them.
 export const INCLUDED_CREDENTIALS: GetIdentityIncludeCredentialEnum[] = ['password', 'webauthn', 'passkey', 'totp', 'lookup_secret'];
 
 export async function getIdentity(id: string): Promise<Identity> {
-  return identityApi().getIdentity({
+  return kratosAdmin().getIdentity({
     id,
     includeCredential: INCLUDED_CREDENTIALS,
   });
@@ -79,12 +71,12 @@ export async function createIdentity(input: CreateIdentityInput): Promise<Identi
       },
     ],
   } as CreateIdentityBody;
-  return identityApi().createIdentity({ createIdentityBody });
+  return kratosAdmin().createIdentity({ createIdentityBody });
 }
 
 export async function updateIdentity(id: string, input: UpdateIdentityInput): Promise<Identity> {
   const validated = validateMetadataAdmin(input.metadataAdmin);
-  const api = identityApi();
+  const api = kratosAdmin();
   const current = await api.getIdentity({
     id,
     includeCredential: INCLUDED_CREDENTIALS,
@@ -99,23 +91,23 @@ export async function updateIdentity(id: string, input: UpdateIdentityInput): Pr
 }
 
 export async function deleteIdentity(id: string): Promise<void> {
-  await identityApi().deleteIdentity({ id });
+  await kratosAdmin().deleteIdentity({ id });
 }
 
 export async function revokeSession(id: string): Promise<void> {
   try {
-    await identityApi().disableSession({ id });
+    await kratosAdmin().disableSession({ id });
   } catch (e) {
-    if (e instanceof ResponseError && e.response.status === 404) return;
+    if (isNotFound(e)) return;
     throw e;
   }
 }
 
 export async function listSessions(id: string): Promise<Session[]> {
   try {
-    return await identityApi().listIdentitySessions({ id, active: true, perPage: 1000 });
+    return await kratosAdmin().listIdentitySessions({ id, active: true, perPage: 1000 });
   } catch (e) {
-    if (e instanceof ResponseError && e.response.status === 404) return [];
+    if (isNotFound(e)) return [];
     throw e;
   }
 }
@@ -126,11 +118,11 @@ export async function deactivateIdentity(id: string): Promise<void> {
 
 export async function reactivateIdentity(id: string): Promise<void> {
   const patch = [{ op: 'replace' as const, path: '/state', value: 'active' }];
-  await identityApi().patchIdentity({ id, jsonPatch: patch });
+  await kratosAdmin().patchIdentity({ id, jsonPatch: patch });
 }
 
 export async function patchAdminMarker(id: string, grant: boolean): Promise<void> {
-  const api = identityApi();
+  const api = kratosAdmin();
   if (grant) {
     // Kratos does not auto-vivify /metadata_admin, so pre-fetch to choose the ops.
     const current = await api.getIdentity({ id });
@@ -160,7 +152,7 @@ export async function patchAdminMarker(id: string, grant: boolean): Promise<void
 
 export async function patchPrerequisites(id: string, names: string[]): Promise<void> {
   const prerequisites = validateMetadataAdmin({ prerequisites: names }).prerequisites ?? [];
-  const api = identityApi();
+  const api = kratosAdmin();
   const current = await api.getIdentity({ id });
   const meta = current.metadata_admin as Record<string, unknown> | null | undefined;
   const hasMeta = meta != null && typeof meta === 'object';
@@ -182,7 +174,7 @@ type PatchOp = { op: 'add' | 'replace' | 'remove'; path: string; value?: unknown
 
 export async function patchPasskeyName(id: string, credentialId: string, name: string): Promise<void> {
   const names = validateMetadataAdmin({ passkeyNames: { [credentialId]: name } }).passkeyNames ?? {};
-  const api = identityApi();
+  const api = kratosAdmin();
   const current = await api.getIdentity({ id });
   const meta = current.metadata_admin as Record<string, unknown> | null | undefined;
   let patch: PatchOp[];
@@ -197,7 +189,7 @@ export async function patchPasskeyName(id: string, credentialId: string, name: s
 }
 
 export async function prunePasskeyNames(id: string): Promise<number> {
-  const api = identityApi();
+  const api = kratosAdmin();
   const current = await api.getIdentity({ id, includeCredential: INCLUDED_CREDENTIALS });
   const names = readPasskeyNames(current.metadata_admin);
   const kept = pruneNames(names, passkeyCredentialIds(current as unknown as Identity));
@@ -226,7 +218,7 @@ export async function deleteCredential(
     throw new Error(`deleteCredential: '${type}' is not an evictable credential type`);
   }
   try {
-    await identityApi().deleteIdentityCredentials({
+    await kratosAdmin().deleteIdentityCredentials({
       id: identityId,
       type: type as DeleteIdentityCredentialsTypeEnum,
     });
@@ -250,7 +242,7 @@ export interface RecoveryLink {
 }
 
 export async function getRecoveryLink(id: string, expiresIn = '1h'): Promise<RecoveryLink> {
-  const link = await identityApi().createRecoveryCodeForIdentity({
+  const link = await kratosAdmin().createRecoveryCodeForIdentity({
     createRecoveryCodeForIdentityBody: { identity_id: id, expires_in: expiresIn },
   });
   return {
@@ -287,7 +279,7 @@ export function emailVerifiedPatch(
 
 /** Kratos keeps a verifiable address only while it equals the email trait, so an email changed after this read never ends up verified. */
 export async function markEmailVerified(id: string, displayed: string): Promise<boolean> {
-  const api = identityApi();
+  const api = kratosAdmin();
   const current = await api.getIdentity({ id });
   if (!displayed || current.traits?.email !== displayed) return false;
   await api.patchIdentity({ id, jsonPatch: emailVerifiedPatch(current) as never });

@@ -1,5 +1,5 @@
-import { Configuration, OAuth2Api } from '@ory/client-fetch';
 import type {
+  OAuth2Api,
   OAuth2ConsentRequest,
   OAuth2LoginRequest,
   OAuth2LogoutRequest,
@@ -13,8 +13,7 @@ import type { ClientManifest } from './manifests';
 import { servingManifest } from './manifest-store';
 import { verifyToken, CSRFError } from './csrf';
 import { publicUrl } from './config';
-import { HYDRA_ADMIN_URL } from './constants';
-import { timeoutFetch } from './ory-fetch';
+import { hydraAdmin } from './ory-fetch';
 
 // Hydra remembers a sign-in as long as the Kratos session lives, so a later app sign-out still reaches handleLogout.
 const KRATOS_SESSION_LIFESPAN = 2_592_000; // Kratos session.lifespan, 720h
@@ -23,10 +22,6 @@ export function loginRememberFor(session: Session, now: number = Date.now()): nu
   const expires = session.expires_at ? new Date(session.expires_at).getTime() : NaN;
   if (!Number.isFinite(expires)) return KRATOS_SESSION_LIFESPAN;
   return Math.max(1, Math.ceil((expires - now) / 1000));
-}
-
-export function defaultOAuth2Api(): OAuth2Api {
-  return new OAuth2Api(new Configuration({ basePath: HYDRA_ADMIN_URL, fetchApi: timeoutFetch() }));
 }
 
 const LOGIN_UI_BASE = '/auth/login';
@@ -54,7 +49,7 @@ export interface Deps {
 
 function resolve(deps: Deps): Required<Deps> {
   return {
-    oauth2: deps.oauth2 ?? defaultOAuth2Api(),
+    oauth2: deps.oauth2 ?? hydraAdmin(),
     getIdentity: deps.getIdentity ?? defaultGetIdentity,
     getSession: deps.getSession ?? defaultGetSession,
     revokeSession: deps.revokeSession ?? defaultRevokeSession,
@@ -70,6 +65,8 @@ export function upstream(step: string, err: unknown): void {
 function redirect(location: string): Response {
   return new Response(null, { status: 302, headers: { Location: location } });
 }
+
+const upstreamError = (): Response => new Response('upstream error', { status: 502 });
 
 /** Relative path only, so the login bounce cannot redirect cross-origin. */
 export function buildLoginReturnTo(challenge: string): string {
@@ -126,7 +123,29 @@ async function rejectLogin(d: Required<Deps>, challenge: string, error: string, 
     return redirect(redirect_to);
   } catch (err) {
     upstream('rejectOAuth2LoginRequest', err);
-    return new Response('upstream error', { status: 502 });
+    return upstreamError();
+  }
+}
+
+function consentScreen(challenge: string): Response {
+  return redirect(`${CONSENT_UI_BASE}?${new URLSearchParams({ consent_challenge: challenge }).toString()}`);
+}
+
+async function rejectConsent(
+  d: Required<Deps>,
+  challenge: string,
+  description: string,
+  onFail: () => Response,
+): Promise<Response> {
+  try {
+    const { redirect_to } = await d.oauth2.rejectOAuth2ConsentRequest({
+      consentChallenge: challenge,
+      rejectOAuth2Request: { error: 'access_denied', error_description: description, status_code: 403 },
+    });
+    return redirect(redirect_to);
+  } catch (err) {
+    upstream('rejectOAuth2ConsentRequest', err);
+    return onFail();
   }
 }
 
@@ -142,7 +161,7 @@ export async function handleLogin(req: Request, deps: Deps = {}): Promise<Respon
     login = await d.oauth2.getOAuth2LoginRequest({ loginChallenge: challenge });
   } catch (err) {
     upstream('getOAuth2LoginRequest', err);
-    return new Response('upstream error', { status: 502 });
+    return upstreamError();
   }
 
   const clientId = login.client?.client_id ?? '';
@@ -152,17 +171,17 @@ export async function handleLogin(req: Request, deps: Deps = {}): Promise<Respon
     session = await d.getSession(req.headers.get('cookie') ?? undefined);
   } catch (err) {
     upstream('getSession', err);
-    return new Response('upstream error', { status: 502 });
+    return upstreamError();
   }
   // Hydra remembers this subject but Kratos is the authority: a skip needs a live Kratos session for the same subject.
   if (login.skip && session?.active && session.identity && session.identity.id !== login.subject) {
     // A different user's live session: end that one Hydra login session so Hydra re-issues without skip; never a subject-wide revoke.
-    if (!login.session_id) return new Response('upstream error', { status: 502 });
+    if (!login.session_id) return upstreamError();
     try {
       await d.oauth2.revokeOAuth2LoginSessions({ sid: login.session_id });
     } catch (err) {
       upstream('revokeOAuth2LoginSessions', err);
-      return new Response('upstream error', { status: 502 });
+      return upstreamError();
     }
     return redirect(login.request_url);
   }
@@ -199,7 +218,7 @@ export async function handleLogin(req: Request, deps: Deps = {}): Promise<Respon
     return redirect(redirect_to);
   } catch (err) {
     upstream('acceptOAuth2LoginRequest', err);
-    return new Response('upstream error', { status: 502 });
+    return upstreamError();
   }
 }
 
@@ -229,7 +248,7 @@ export async function acceptConsentRequest(
     return redirect(redirect_to);
   } catch (err) {
     upstream('acceptOAuth2ConsentRequest', err);
-    return new Response('upstream error', { status: 502 });
+    return upstreamError();
   }
 }
 
@@ -245,7 +264,7 @@ export async function handleConsent(req: Request, deps: Deps = {}): Promise<Resp
     consent = await d.oauth2.getOAuth2ConsentRequest({ consentChallenge: challenge });
   } catch (err) {
     upstream('getOAuth2ConsentRequest', err);
-    return new Response('upstream error', { status: 502 });
+    return upstreamError();
   }
 
   const subject = consent.subject ?? '';
@@ -257,20 +276,7 @@ export async function handleConsent(req: Request, deps: Deps = {}): Promise<Resp
   const result = enforceAccessGate(identity, clientId, consentManifest);
   if (!result.allowed) {
     console.warn('[oauth2/consent] access denied', { clientId, subject, reason: result.reason });
-    try {
-      const { redirect_to } = await d.oauth2.rejectOAuth2ConsentRequest({
-        consentChallenge: challenge,
-        rejectOAuth2Request: {
-          error: 'access_denied',
-          error_description: 'access_denied',
-          status_code: 403,
-        },
-      });
-      return redirect(redirect_to);
-    } catch (err) {
-      upstream('rejectOAuth2ConsentRequest', err);
-      return new Response('upstream error', { status: 502 });
-    }
+    return rejectConsent(d, challenge, 'access_denied', upstreamError);
   }
 
   // The manifest's skip_consent survives client re-registration; the gate above denied a null identity.
@@ -278,8 +284,7 @@ export async function handleConsent(req: Request, deps: Deps = {}): Promise<Resp
     return acceptConsentRequest(challenge, consent, identity!, d, clientId);
   }
 
-  const qs = new URLSearchParams({ consent_challenge: challenge });
-  return redirect(`${CONSENT_UI_BASE}?${qs.toString()}`);
+  return consentScreen(challenge);
 }
 
 export async function handleConsentPost(req: Request, deps: Deps = {}): Promise<Response> {
@@ -309,7 +314,7 @@ export async function handleConsentPost(req: Request, deps: Deps = {}): Promise<
     consent = await d.oauth2.getOAuth2ConsentRequest({ consentChallenge: challenge });
   } catch (err) {
     upstream('getOAuth2ConsentRequest', err);
-    return new Response('upstream error', { status: 502 });
+    return upstreamError();
   }
 
   let session: Session | null;
@@ -317,24 +322,11 @@ export async function handleConsentPost(req: Request, deps: Deps = {}): Promise<
     session = await d.getSession(req.headers.get('cookie') ?? undefined);
   } catch (err) {
     upstream('getSession', err);
-    return new Response('upstream error', { status: 502 });
+    return upstreamError();
   }
 
   if (!session?.active || !session.identity) {
-    try {
-      const { redirect_to } = await d.oauth2.rejectOAuth2ConsentRequest({
-        consentChallenge: challenge,
-        rejectOAuth2Request: {
-          error: 'access_denied',
-          error_description: 'no active session',
-          status_code: 403,
-        },
-      });
-      return redirect(redirect_to);
-    } catch (err) {
-      upstream('rejectOAuth2ConsentRequest', err);
-      return new Response('upstream error', { status: 502 });
-    }
+    return rejectConsent(d, challenge, 'no active session', upstreamError);
   }
 
   // The CSRF token is scoped to 'consent', so one minted for another action cannot be replayed here.
@@ -348,41 +340,15 @@ export async function handleConsentPost(req: Request, deps: Deps = {}): Promise<
     return new Response('server error', { status: 500 });
   }
 
+  // From here the nonce is consumed, so a failed reject goes back to the grant screen for a fresh token.
+  const toScreen = () => consentScreen(challenge);
+
   if (session.identity.id !== consent.subject) {
-    try {
-      const { redirect_to } = await d.oauth2.rejectOAuth2ConsentRequest({
-        consentChallenge: challenge,
-        rejectOAuth2Request: {
-          error: 'access_denied',
-          error_description: 'session subject mismatch',
-          status_code: 403,
-        },
-      });
-      return redirect(redirect_to);
-    } catch (err) {
-      upstream('rejectOAuth2ConsentRequest', err);
-      // Reject failed after the nonce was consumed: back to the grant screen for a fresh token.
-      const qs = new URLSearchParams({ consent_challenge: challenge });
-      return redirect(`${CONSENT_UI_BASE}?${qs.toString()}`);
-    }
+    return rejectConsent(d, challenge, 'session subject mismatch', toScreen);
   }
 
   if (action === 'deny') {
-    try {
-      const { redirect_to } = await d.oauth2.rejectOAuth2ConsentRequest({
-        consentChallenge: challenge,
-        rejectOAuth2Request: {
-          error: 'access_denied',
-          error_description: 'user denied access',
-          status_code: 403,
-        },
-      });
-      return redirect(redirect_to);
-    } catch (err) {
-      upstream('rejectOAuth2ConsentRequest', err);
-      const qs = new URLSearchParams({ consent_challenge: challenge });
-      return redirect(`${CONSENT_UI_BASE}?${qs.toString()}`);
-    }
+    return rejectConsent(d, challenge, 'user denied access', toScreen);
   }
 
   const clientId = consent.client?.client_id ?? '';
@@ -391,30 +357,11 @@ export async function handleConsentPost(req: Request, deps: Deps = {}): Promise<
   const result = enforceAccessGate(identity, clientId, allowManifest);
   if (!result.allowed) {
     console.warn('[oauth2/consent/post] access denied', { clientId, subject: consent.subject, reason: result.reason });
-    try {
-      const { redirect_to } = await d.oauth2.rejectOAuth2ConsentRequest({
-        consentChallenge: challenge,
-        rejectOAuth2Request: {
-          error: 'access_denied',
-          error_description: 'access_denied',
-          status_code: 403,
-        },
-      });
-      return redirect(redirect_to);
-    } catch (err) {
-      upstream('rejectOAuth2ConsentRequest', err);
-      const qs = new URLSearchParams({ consent_challenge: challenge });
-      return redirect(`${CONSENT_UI_BASE}?${qs.toString()}`);
-    }
+    return rejectConsent(d, challenge, 'access_denied', toScreen);
   }
 
-  // The nonce is spent, so a 502 from Hydra redirects to the grant screen for a fresh token.
   const allowResponse = await acceptConsentRequest(challenge, consent, identity!, d, clientId);
-  if (allowResponse.status === 502) {
-    const qs = new URLSearchParams({ consent_challenge: challenge });
-    return redirect(`${CONSENT_UI_BASE}?${qs.toString()}`);
-  }
-  return allowResponse;
+  return allowResponse.status === 502 ? toScreen() : allowResponse;
 }
 
 export async function handleLogout(req: Request, deps: Deps = {}): Promise<Response> {
@@ -429,7 +376,7 @@ export async function handleLogout(req: Request, deps: Deps = {}): Promise<Respo
     _logout = await d.oauth2.getOAuth2LogoutRequest({ logoutChallenge: challenge });
   } catch (err) {
     upstream('getOAuth2LogoutRequest', err);
-    return new Response('upstream error', { status: 502 });
+    return upstreamError();
   }
 
   // A logout that Hydra did not initiate for the RP is the portal's own.
@@ -469,6 +416,6 @@ export async function handleLogout(req: Request, deps: Deps = {}): Promise<Respo
     return redirect(redirect_to);
   } catch (err) {
     upstream('acceptOAuth2LogoutRequest', err);
-    return new Response('upstream error', { status: 502 });
+    return upstreamError();
   }
 }

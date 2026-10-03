@@ -1,12 +1,5 @@
-import {
-  Configuration,
-  IdentityApi,
-  OAuth2Api,
-  ResponseError,
-  type JsonPatch,
-} from '@ory/client-fetch';
-import { HYDRA_ADMIN_URL, KRATOS_ADMIN_URL } from './constants';
-import { timeoutFetch } from './ory-fetch';
+import type { IdentityApi, JsonPatch, OAuth2Api } from '@ory/client-fetch';
+import { hydraAdmin, isNotFound, kratosAdmin } from './ory-fetch';
 
 export type RevokeDependency = 'kratos-admin' | 'hydra-admin';
 
@@ -26,11 +19,6 @@ export class RevokeError extends Error {
   }
 }
 
-/** Kratos answers DELETE .../sessions with 404 when the subject has no active sessions. */
-function isNotFound(err: unknown): boolean {
-  return err instanceof ResponseError && err.response?.status === 404;
-}
-
 export interface RevokeDeps {
   identityApi: IdentityApi;
   oauth2Api: OAuth2Api;
@@ -48,18 +36,10 @@ export interface RevokeResult {
   hydraConsentRevoked: boolean;
 }
 
-function buildIdentityApi(): IdentityApi {
-  return new IdentityApi(new Configuration({ basePath: KRATOS_ADMIN_URL, fetchApi: timeoutFetch() }));
-}
-
-function buildOAuth2Api(): OAuth2Api {
-  return new OAuth2Api(new Configuration({ basePath: HYDRA_ADMIN_URL, fetchApi: timeoutFetch() }));
-}
-
 function resolveDeps(deps: Partial<RevokeDeps> = {}): RevokeDeps {
   return {
-    identityApi: deps.identityApi ?? buildIdentityApi(),
-    oauth2Api: deps.oauth2Api ?? buildOAuth2Api(),
+    identityApi: deps.identityApi ?? kratosAdmin(),
+    oauth2Api: deps.oauth2Api ?? hydraAdmin(),
   };
 }
 
@@ -111,6 +91,7 @@ export async function revokeSubject(
   try {
     await d.identityApi.deleteIdentitySessions({ id: subject });
   } catch (err) {
+    // Kratos answers 404 when the subject has no active sessions.
     if (!isNotFound(err)) {
       throw new RevokeError(
         'kratos-admin',
@@ -132,7 +113,7 @@ export async function revokeHydraSessions(
   subject: string,
   deps: Partial<Pick<RevokeDeps, 'oauth2Api'>> = {},
 ): Promise<void> {
-  const oauth2Api = deps.oauth2Api ?? buildOAuth2Api();
+  const oauth2Api = deps.oauth2Api ?? hydraAdmin();
   // Only a per-sid revoke posts back-channel logout, and Hydra picks its clients from the consent rows the last step deletes.
   let phase = 'list-consent-sessions';
   try {
