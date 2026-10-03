@@ -155,3 +155,12 @@ test('mail: render refuses a value carrying template delimiters', () => {
     }
   }
 });
+
+test('mail: only the recovery email branches on the invite flag and prints nothing from the payload', () => {
+  for (const file of mailFiles()) {
+    const src = readFileSync(join(root, file), 'utf8');
+    const reads = src.match(/\.TransientPayload\S*/g) ?? [];
+    assert.deepEqual(reads, file.includes('/recovery_code.') ? ['.TransientPayload.invite'] : [], file);
+    assert.equal(reads.length, (src.match(/\{\{ if \.TransientPayload\.invite -?\}\}/g) ?? []).length, file);
+  }
+});

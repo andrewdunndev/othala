@@ -206,7 +206,7 @@ export async function sendInviteRecoveryEmail(email: string): Promise<void> {
     {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
-      body: JSON.stringify({ method: 'code', email }),
+      body: JSON.stringify({ method: 'code', email, transient_payload: { invite: true } }),
     },
   );
   // Kratos answers 400 once the flow has left choose_method, which the SDK would throw on.

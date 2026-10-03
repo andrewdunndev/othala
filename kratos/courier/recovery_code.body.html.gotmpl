@@ -1,3 +1,7 @@
-<p>Someone asked to recover your ${OTHALA_INSTANCE_NAME} account. To continue, enter this code on the recovery page:</p>
+<p>{{ if .TransientPayload.invite -}}
+You're invited to ${OTHALA_INSTANCE_NAME}. To set up your account, enter this code on the recovery page:
+{{- else -}}
+Someone asked to recover your ${OTHALA_INSTANCE_NAME} account. To continue, enter this code on the recovery page:
+{{- end }}</p>
 <p><strong>{{ .RecoveryCode }}</strong></p>
 <p>The code expires in {{ .ExpiresInMinutes }} minutes. If you did not expect this email, ignore it.</p>
