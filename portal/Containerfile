@@ -1,7 +1,7 @@
 # othala-portal -- Astro Node SSR.
 #
-# Two-stage: UBI 9 nodejs-22 (full image with npm) for build, UBI 9
-# nodejs-22-minimal via ci-runtime-node for runtime. Astro Node
+# Two-stage: UBI 10 nodejs-22 (full image with npm) for build, ci-runtime-node's
+# nodejs-22-minimal for runtime. Astro Node
 # standalone emits an SSR handler at dist/server/entry.mjs; the
 # D-listener wrapper dist/server/listen.mjs serves it on the public
 # port and stands up a separate internal-network admin listener (PORTAL_ADMIN_BIND_HOST) (CU1 item 4), so
@@ -27,7 +27,7 @@
 #     dunn.dev/othala-portal:lab
 
 # ----- Stage 1: build -----
-# Use upstream UBI 9 nodejs-22 (full image with npm + build tools).
+# Use upstream UBI 10 nodejs-22 (full image with npm + build tools).
 # ci-runtime-node is -minimal and intentionally omits npm.
 FROM registry.access.redhat.com/ubi10/nodejs-22:10.2@sha256:717ad679e570b99d51c36ec735332222b85cc2dc492fd560d4708dc6a18a051b AS build
 
@@ -76,7 +76,7 @@ ENV NODE_ENV=production \
     NODE_OPTIONS="--import ./dist/otel.mjs"
 
 # ci-runtime-node inherits the `default` user (uid 1001) from
-# ubi9/nodejs-22-minimal. COPY as root, then switch to 1001 for
+# ci-runtime-node's nodejs-22-minimal. COPY as root, then switch to 1001 for
 # runtime.
 USER root
 COPY --from=build --chown=1001:0 /src/portal/dist ./dist

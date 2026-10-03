@@ -1,8 +1,7 @@
 ---
 // Email verification flow handler, the two-phase code form mirroring recovery:
 // enter an email, then the code, then Kratos 303s to default_browser_return_url.
-// Disabled in production (flows.verification.enabled is per deployment), kept
-// so the lab and any re-enablement don't hit a dead route.
+// Live wherever flows.verification.enabled is set in the Kratos config.
 
 export const prerender = false;
 

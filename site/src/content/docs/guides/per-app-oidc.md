@@ -68,7 +68,9 @@ naming both. Then register the client with Hydra:
 the app's boot reconcile (and SIGHUP) registers it through the Hydra admin
 port, and it creates and updates but **never deletes**, so
 retiring a service leaves a ghost registration until an operator removes it by
-hand. Everything to that point is verifiable without the application running.
+hand: delete the Hydra client through the admin API as well as removing the
+manifest, and drop `offline_access` from the manifest scopes where the app
+needs no refresh tokens. Everything to that point is verifiable without the application running.
 
 The secret must land as the same plaintext on both sides — nothing links them,
 and a mismatch surfaces as `invalid_client` at the token exchange, which reads

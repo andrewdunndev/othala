@@ -78,7 +78,7 @@ removed. The `.env.example` and `gen-secrets.sh` reflect this: only
    remains in the YAML list as a secondary verifier.
 
 6. Wait for the session lifespan to elapse:
-   - Kratos: 90 days for normal sessions, 1 day for admin enforcement
+   - Kratos: 30 days (720h) for normal sessions, 1 day for admin enforcement
      (admin SSR forces re-auth at AAL2 daily).
    - Hydra: 30 days for refresh tokens (the ttl.refresh_token cap).
 
