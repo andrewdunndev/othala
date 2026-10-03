@@ -8,6 +8,7 @@ import { HOUSEHOLD_GROUPS, IDENTITY_GROUPS } from './constants';
 import { GROUP_RE } from './access-groups';
 import { currentLevel, isOpenToEveryone, isTopLevel, levelsFor, NO_ACCESS } from './access-rows';
 import { parseIdentity } from './identity-facts';
+import { holdsElevatedRole } from './gate';
 
 export const ADMIN_NAV = [
   { href: '/admin/users', label: 'People' },
@@ -276,11 +277,11 @@ export function personLimits(i: Identity, o: { first: string; isSelf: boolean; l
   };
 }
 
-/** Why a sign-in method can't be removed (it is an admin's last second factor), or null when it can. */
-export function removalBlock(i: Identity, credType: string, isSelf: boolean): string | null {
-  if (!isSelf && !parseIdentity(i).isAdmin) return null;
+/** Why a sign-in method can't be removed (it is the last second factor of an admin or an elevated role), or null when it can. */
+export function removalBlock(i: Identity, credType: string, isSelf: boolean, manifests: ClientManifest[]): string | null {
+  if (!isSelf && !parseIdentity(i).isAdmin && !holdsElevatedRole(i, manifests)) return null;
   const creds = { ...((i.credentials ?? {}) as Record<string, unknown>) };
   delete creds[credType];
   if (parseIdentity({ ...i, credentials: creds as Identity['credentials'] }).hasSecondFactor) return null;
-  return 'Admins keep at least one authenticator app or security key.';
+  return "Admins and people with a role above an app's entry level keep at least one authenticator app or security key.";
 }

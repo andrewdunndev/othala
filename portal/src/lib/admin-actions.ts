@@ -23,7 +23,7 @@ import { confirmsInviteAddress, IDENTITY_GROUP_ORDER, normalizeGroupOrder, shoul
 import { accessToStorage, choicesFromForm } from './access-rows';
 import { GROUP_RE } from './access-groups';
 import { HOUSEHOLD_GROUPS } from './constants';
-import { planGroupSave } from './gate';
+import { holdsElevatedRole, planGroupSave } from './gate';
 import { buildGroupRegistry, isIdentityGroup, unconfiguredGroups } from './group-registry';
 import { revokeConsentSessions, revokeSubject } from './revoke';
 import type { ClientManifest } from './manifests';
@@ -133,6 +133,11 @@ export async function saveAction(fd: FormData, ctx: ActionContext): Promise<Acti
   const existingPrerequisites = identity.metadata_admin?.prerequisites;
   const existingPasskeyNames = identity.metadata_admin?.passkeyNames;
   const groups = normalizeGroupOrder(groupPlan.groups);
+  // Only a new elevation needs the second factor first, so people already elevated without one can still be edited and lowered.
+  const after = { ...identity, metadata_admin: { ...identity.metadata_admin, groups, roles } };
+  if (holdsElevatedRole(after, manifests) && !holdsElevatedRole(identity, manifests) && !parseIdentity(identity).hasSecondFactor) {
+    return { actionResult: { kind: 'error', message: ELEVATED_ROLE_NEEDS_SECOND_FACTOR }, refetch: false };
+  }
   await updateIdentity(id, {
     traits,
     metadataAdmin: {
@@ -427,6 +432,10 @@ const SECOND_FACTOR_REQUIRED: ActionResult = {
   message: 'Admins need an authenticator app or security key set up first.',
 };
 
+// Elevated app roles step up at sign-in too (needsStepUp, gate.ts).
+export const ELEVATED_ROLE_NEEDS_SECOND_FACTOR =
+  "People with a role above an app's entry level need an authenticator app or security key set up first.";
+
 const OWN_SECOND_FACTOR_REQUIRED: ActionResult = {
   kind: 'error',
   message: 'You cannot remove your own last authenticator app or security key. Set up another one first.',
@@ -490,11 +499,13 @@ export async function removeCredentialAction(fd: FormData, ctx: ActionContext): 
     };
   }
   const self = ctx.id === ctx.adminIdentityId;
-  if (self || parseIdentity(ctx.identity).isAdmin) {
+  const { isAdmin } = parseIdentity(ctx.identity);
+  if (self || isAdmin || holdsElevatedRole(ctx.identity, ctx.manifests)) {
     const creds = { ...(ctx.identity.credentials ?? {}) } as Record<string, unknown>;
     delete creds[credType];
     if (!parseIdentity({ ...ctx.identity, credentials: creds as Identity['credentials'] }).hasSecondFactor) {
-      return { actionResult: self ? OWN_SECOND_FACTOR_REQUIRED : SECOND_FACTOR_REQUIRED, refetch: false };
+      const refusal = self ? OWN_SECOND_FACTOR_REQUIRED : isAdmin ? SECOND_FACTOR_REQUIRED : { kind: 'error' as const, message: ELEVATED_ROLE_NEEDS_SECOND_FACTOR };
+      return { actionResult: refusal, refetch: false };
     }
   }
   await deleteCredential(ctx.id, credType);

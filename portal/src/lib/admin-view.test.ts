@@ -186,9 +186,17 @@ describe('personLimits', () => {
 describe('removalBlock', () => {
   it('blocks removing an admin\'s last second factor and allows it when another remains or for a non-admin', () => {
     const admin = asAdmin(withTotp(identity()));
-    expect(removalBlock(admin, 'totp', false)).toMatch(/at least one/);
-    expect(removalBlock(withWebauthnKey(admin), 'totp', false)).toBeNull();
-    expect(removalBlock(withTotp(identity()), 'totp', false)).toBeNull();
-    expect(removalBlock(withTotp(identity()), 'totp', true)).toMatch(/at least one/);
+    expect(removalBlock(admin, 'totp', false, [])).toMatch(/at least one/);
+    expect(removalBlock(withWebauthnKey(admin), 'totp', false, [])).toBeNull();
+    expect(removalBlock(withTotp(identity()), 'totp', false, [])).toBeNull();
+    expect(removalBlock(withTotp(identity()), 'totp', true, [])).toMatch(/at least one/);
+  });
+
+  it('blocks removing the last second factor of someone with an elevated app role', () => {
+    const wiki = { clientId: 'wiki', roles: [{ name: 'admin', claimEmit: {} }, { name: 'user', claimEmit: {} }], groupRoleMap: { 'wiki-admin': 'admin' }, accessGroups: ['family'] } as unknown as ClientManifest;
+    const elevated = withTotp(identity({ metadataAdmin: { groups: ['family', 'wiki-admin'] } }));
+    expect(removalBlock(elevated, 'totp', false, [wiki])).toMatch(/at least one/);
+    expect(removalBlock(withWebauthnKey(elevated), 'totp', false, [wiki])).toBeNull();
+    expect(removalBlock(withTotp(identity({ metadataAdmin: { groups: ['family'] } })), 'totp', false, [wiki])).toBeNull();
   });
 });

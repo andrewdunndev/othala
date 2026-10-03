@@ -66,7 +66,7 @@ import {
 } from './admin-actions.js';
 import type { Identity } from './types.js';
 import { RevokeError } from './revoke.js';
-import { identity, withCredentials } from './test-builders.js';
+import { identity, withCredentials, withTotp } from './test-builders.js';
 
 function makeIdentity(username: string, admin?: boolean, state?: 'active' | 'inactive'): Identity {
   return identity({ username, state, ...(admin === undefined ? {} : { metadataAdmin: { admin } }) });
@@ -168,7 +168,7 @@ describe('deleteAction', () => {
 });
 
 describe('saveAction', () => {
-  const MANIFESTS = [{ clientId: 'wiki', accessGroups: ['family', 'media'], groupRoleMap: {} }] as unknown as ActionContext['manifests'];
+  const MANIFESTS = [{ clientId: 'wiki', accessGroups: ['family', 'media'], roles: [], groupRoleMap: {} }] as unknown as ActionContext['manifests'];
 
   function saveForm(groups: string[], role?: string): FormData {
     const f = fd({ username: 'alice.smith', email: 'alice.smith@othala.test' });
@@ -223,7 +223,7 @@ describe('saveAction', () => {
 
   it('keeps a stored group bound only as a role key', async () => {
     const manifests = [
-      { clientId: 'wiki', accessGroups: ['family'], groupRoleMap: { 'wiki-admin': 'admin' } },
+      { clientId: 'wiki', accessGroups: ['family'], roles: [], groupRoleMap: { 'wiki-admin': 'admin' } },
     ] as unknown as ActionContext['manifests'];
     await saveAction(saveForm(['family']), makeCtx({ identity: stored(['family', 'wiki-admin']), manifests }));
 
@@ -270,6 +270,43 @@ describe('saveAction', () => {
     expect(outcome.actionResult?.kind).toBe('error');
     expect(outcome.actionResult && 'message' in outcome.actionResult ? outcome.actionResult.message : '').toMatch(/^Saved, but/);
     expect(outcome.refetch).toBe(true);
+  });
+
+  describe('an elevated role needs a second factor', () => {
+    const ranked = [
+      { clientId: 'wiki', roles: [{ name: 'admin', claimEmit: {} }, { name: 'user', claimEmit: {} }], groupRoleMap: { 'wiki-admin': 'admin', family: 'user' }, accessGroups: ['family'] },
+    ] as unknown as ActionContext['manifests'];
+    const save = (groups: string[], from: Identity) => saveAction(saveForm(groups), makeCtx({ identity: from, manifests: ranked }));
+
+    it('refuses granting it to someone without one and writes nothing', async () => {
+      const outcome = await save(['family', 'wiki-admin'], stored(['family']));
+
+      expect(updateIdentityMock).not.toHaveBeenCalled();
+      expect(outcome).toMatchObject({ actionResult: { kind: 'error', message: expect.stringMatching(/authenticator app or security key/) }, refetch: false });
+    });
+
+    it('grants it to someone with one', async () => {
+      const outcome = await save(['family', 'wiki-admin'], withTotp(stored(['family'])));
+
+      expect(updateIdentityMock).toHaveBeenCalledTimes(1);
+      expect(outcome.actionResult?.kind).toBe('updated');
+    });
+
+    it('still saves other edits for someone who already holds it without one', async () => {
+      const f = saveForm(['family'], 'admin');
+      f.set('username', 'alice.jones');
+      const outcome = await saveAction(f, makeCtx({ identity: stored(['family'], { wiki: 'admin' }), manifests: ranked }));
+
+      expect(outcome.actionResult?.kind).toBe('updated');
+      expect(updateIdentityMock.mock.calls[0][1].traits.username).toBe('alice.jones');
+    });
+
+    it('still lowers it for someone without one', async () => {
+      const outcome = await save(['family'], stored(['family', 'wiki-admin']));
+
+      expect(updateIdentityMock).toHaveBeenCalledTimes(1);
+      expect(outcome.actionResult?.kind).toBe('updated');
+    });
   });
 });
 
@@ -415,6 +452,18 @@ describe('removeCredentialAction', () => {
     expect(deleteCredentialMock).toHaveBeenCalled();
   });
 
+  it('refuses removing the last second factor of someone with an elevated app role', async () => {
+    const manifests = [
+      { clientId: 'wiki', roles: [{ name: 'admin', claimEmit: {} }, { name: 'user', claimEmit: {} }], groupRoleMap: { 'wiki-admin': 'admin' }, accessGroups: ['family'] },
+    ] as unknown as ActionContext['manifests'];
+    const elevated = withCredentials(identity({ username: 'robin.k', metadataAdmin: { groups: ['family', 'wiki-admin'] } }), 'totp');
+    const outcome = await removeCredentialAction(fd({ cred_type: 'totp' }), makeCtx({ identity: elevated, manifests }));
+
+    expect(deleteCredentialMock).not.toHaveBeenCalled();
+    if (outcome instanceof Response) throw new Error('unreachable');
+    expect(outcome).toMatchObject({ actionResult: { kind: 'error', message: expect.stringMatching(/role above an app's entry level/) }, refetch: false });
+  });
+
   it("ends another person's sessions after the removal", async () => {
     await removeCredentialAction(fd({ cred_type: 'totp' }), makeCtx({ id: 'target-1' }));
 
@@ -512,13 +561,23 @@ describe('person page sections', () => {
   it('saves access: groups and overrides follow the chosen levels, traits stay as stored', async () => {
     const outcome = await saveAccessAction(
       fd({ 'level:grafana': 'editor', 'level:proxywatch': 'use' }),
-      makeCtx({ identity: person(['everyone']), manifests: MANIFESTS }),
+      makeCtx({ identity: withTotp(person(['everyone'])), manifests: MANIFESTS }),
     );
 
     expect(outcome.actionResult?.kind).toBe('updated');
     expect(written().traits.username).toBe('robin.k');
     expect(written().metadataAdmin.groups).toEqual(['everyone', 'grafana-access', 'proxywatch-access']);
     expect(written().metadataAdmin.roles).toEqual({ grafana: 'editor' });
+  });
+
+  it('refuses an access level above the entry role for someone without a second factor and writes nothing', async () => {
+    const outcome = await saveAccessAction(
+      fd({ 'level:grafana': 'editor', 'level:proxywatch': 'use' }),
+      makeCtx({ identity: person(['everyone']), manifests: MANIFESTS }),
+    );
+
+    expect(updateIdentityMock).not.toHaveBeenCalled();
+    expect(outcome).toMatchObject({ actionResult: { kind: 'error', message: expect.stringMatching(/authenticator app or security key/) }, refetch: false });
   });
 
   it('names the shared group and saves nothing when No access cannot be stored', async () => {

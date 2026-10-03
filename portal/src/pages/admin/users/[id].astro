@@ -402,8 +402,8 @@ const roleNote = Object.keys(roleOverrides).length;
                   <span class="item-name">{m.label}</span>
                   <span class="item-meta">Lost it? Remove it; they are signed out everywhere. Then send a setup link.</span>
                 </div>
-                {removalBlock(identity, m.key, isSelf) ? (
-                  <span class="reason">{removalBlock(identity, m.key, isSelf)}</span>
+                {removalBlock(identity, m.key, isSelf, manifests) ? (
+                  <span class="reason">{removalBlock(identity, m.key, isSelf, manifests)}</span>
                 ) : (
                 <Ask
                   label="Remove"

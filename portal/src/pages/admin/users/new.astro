@@ -13,7 +13,9 @@ import SetupLink from '../../../components/SetupLink.astro';
 import TitleRow from '../../../components/TitleRow.astro';
 import { adminContext } from '../../../lib/admin-context';
 import { createIdentity, getRecoveryLink } from '../../../lib/admin-api';
-import { auditLine, ENROLLMENT_TTL } from '../../../lib/admin-actions';
+import { auditLine, ELEVATED_ROLE_NEEDS_SECOND_FACTOR, ENROLLMENT_TTL } from '../../../lib/admin-actions';
+import { holdsElevatedRole } from '../../../lib/gate';
+import type { Identity } from '../../../lib/types';
 import { accessToStorage, choicesFromForm } from '../../../lib/access-rows';
 import { suggestUsername } from '../../../lib/admin-view';
 import { signToken, verifyToken, CSRFError } from '../../../lib/csrf';
@@ -69,6 +71,13 @@ if (Astro.request.method === 'POST') {
   if (!USERNAME_RE.test(form.username)) errors.username = 'Use lowercase letters, digits and dots: first.last';
   if (form.recoveryEmail && !EMAIL_RE.test(form.recoveryEmail)) errors.recoveryEmail = 'Enter a valid recovery email address.';
 
+  // A new person has no second factor yet, so no level above an app's entry level.
+  const manifests = apps.map((a) => a.manifest);
+  const access = accessToStorage(manifests, levels, { groups: [DEFAULT_GROUP], roles: {} });
+  if (holdsElevatedRole({ metadata_admin: { groups: access.groups, roles: access.roles } } as Identity, manifests)) {
+    errors.submit = `${ELEVATED_ROLE_NEEDS_SECOND_FACTOR} Add them at a lower level and raise it after they set one up.`;
+  }
+
   if (Object.keys(errors).length === 0) {
     if (dev) {
       success = {
@@ -79,11 +88,6 @@ if (Astro.request.method === 'POST') {
       };
     } else {
       try {
-        const access = accessToStorage(
-          apps.map((a) => a.manifest),
-          levels,
-          { groups: [DEFAULT_GROUP], roles: {} },
-        );
         const created = await createIdentity({
           traits: {
             username: form.username,
