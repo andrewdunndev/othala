@@ -6,7 +6,7 @@ import { createIdentityWithPassword, TEST_PASSWORD } from '../actions/identity';
 import { HOUSEHOLD, listMail, waitForMessage, forRecipient } from '../actions/mail';
 import { csrfTokenFor, postAdminAction } from '../actions/admin-post';
 
-const INVITE_SUBJECT = /invited|recover/i;
+const INVITE_SUBJECT = /account code/i;
 
 async function assertNoInviteEmail(toAddress: string, afterMs: number): Promise<void> {
   const deadline = Date.now() + 4_000;
@@ -78,8 +78,8 @@ test('U1 — admin "Send invite email" delivers a code-only message via the Krat
     console.log('[U1] invite email received, message id:', messageId, 'code:', code);
 
     expect(code, 'U1: the delivered message must carry a 6-digit recovery code').toMatch(/^\d{6}$/);
-    expect(subject, 'U1: the subject says it is an invite to the household').toContain(`invited to ${HOUSEHOLD}`);
-    expect(body, 'U1: the body says how to set up the account').toContain(`invited to ${HOUSEHOLD}. To set up your account`);
+    expect(subject, 'U1: the subject names the household account code').toContain(`Your ${HOUSEHOLD} account code`);
+    expect(body, 'U1: the body says the code sets up the household account').toContain(`set up or recover your ${HOUSEHOLD} account`);
 
     expect(
       body.includes(`code=${code}`),

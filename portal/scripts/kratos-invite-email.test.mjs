@@ -50,14 +50,14 @@ test('sendInviteRecoveryEmail: GETs the API-flow init endpoint with Accept: appl
   assert.equal(init.headers.Accept, 'application/json');
 });
 
-test('sendInviteRecoveryEmail: POSTs method=code, email and the invite flag to the flow returned by init', async () => {
+test('sendInviteRecoveryEmail: POSTs only method=code and email to the flow returned by init', async () => {
   const calls = installFetch({ flowId: 'flow-xyz' });
   await sendInviteRecoveryEmail('invitee@othala.test');
   const submit = calls.find((c) => c.url.includes('/self-service/recovery?flow='));
   assert.ok(submit, 'submit call must be made');
   assert.equal(submit.method, 'POST');
   assert.ok(submit.url.includes('flow=flow-xyz'), `submit URL must carry the flow id: ${submit.url}`);
-  assert.deepEqual(submit.body, { method: 'code', email: 'invitee@othala.test', transient_payload: { invite: true } });
+  assert.deepEqual(submit.body, { method: 'code', email: 'invitee@othala.test' });
 });
 
 test('sendInviteRecoveryEmail: submit call never carries a csrf_token (API flow, not browser)', async () => {

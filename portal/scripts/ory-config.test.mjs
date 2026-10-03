@@ -103,7 +103,7 @@ test('render refuses an empty Ory admin bind', () => {
 });
 
 const MAIL = {
-  recovery_code: { code: '{{ .RecoveryCode }}', subject: /recover/i },
+  recovery_code: { code: '{{ .RecoveryCode }}', subject: /account code/i },
   login_code: { code: '{{ .LoginCode }}', subject: /to log in/i },
   verification_code: { code: '{{ .VerificationCode }}', subject: /verif/i },
 };
@@ -156,12 +156,9 @@ test('mail: render refuses a value carrying template delimiters', () => {
   }
 });
 
-test('mail: only the recovery email branches on the invite flag and prints nothing from the payload', () => {
+test('mail: no template reads the caller-set transient payload', () => {
   for (const file of mailFiles()) {
-    const src = readFileSync(join(root, file), 'utf8');
-    const reads = src.match(/\.TransientPayload\S*/g) ?? [];
-    assert.deepEqual(reads, file.includes('/recovery_code.') ? ['.TransientPayload.invite'] : [], file);
-    assert.equal(reads.length, (src.match(/\{\{ if \.TransientPayload\.invite -?\}\}/g) ?? []).length, file);
+    assert.doesNotMatch(readFileSync(join(root, file), 'utf8'), /TransientPayload/, file);
   }
 });
 
