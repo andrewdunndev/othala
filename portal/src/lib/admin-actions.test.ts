@@ -66,7 +66,7 @@ import {
 } from './admin-actions.js';
 import type { Identity } from './types.js';
 import { RevokeError } from './revoke.js';
-import { identity, withCredentials, withTotp } from './test-builders.js';
+import { identity, manifest, withCredentials, withTotp } from './test-builders.js';
 
 function makeIdentity(username: string, admin?: boolean, state?: 'active' | 'inactive'): Identity {
   return identity({ username, state, ...(admin === undefined ? {} : { metadataAdmin: { admin } }) });
@@ -281,9 +281,7 @@ describe('saveAction', () => {
   });
 
   describe('an elevated role needs a second factor', () => {
-    const ranked = [
-      { clientId: 'wiki', roles: [{ name: 'admin', claimEmit: {} }, { name: 'user', claimEmit: {} }], groupRoleMap: { 'wiki-admin': 'admin', family: 'user' }, accessGroups: ['family'] },
-    ] as unknown as ActionContext['manifests'];
+    const ranked = [manifest('wiki', ['admin', 'user'], { 'wiki-admin': 'admin', family: 'user' }, ['family'])];
     const save = (groups: string[], from: Identity) => saveAction(saveForm(groups), makeCtx({ identity: from, manifests: ranked }));
 
     it('refuses granting it to someone without one and writes nothing', async () => {
@@ -461,9 +459,7 @@ describe('removeCredentialAction', () => {
   });
 
   it('refuses removing the last second factor of someone with an elevated app role', async () => {
-    const manifests = [
-      { clientId: 'wiki', roles: [{ name: 'admin', claimEmit: {} }, { name: 'user', claimEmit: {} }], groupRoleMap: { 'wiki-admin': 'admin' }, accessGroups: ['family'] },
-    ] as unknown as ActionContext['manifests'];
+    const manifests = [manifest('wiki', ['admin', 'user'], { 'wiki-admin': 'admin' }, ['family'])];
     const elevated = withCredentials(identity({ username: 'robin.k', metadataAdmin: { groups: ['family', 'wiki-admin'] } }), 'totp');
     const outcome = await removeCredentialAction(fd({ cred_type: 'totp' }), makeCtx({ identity: elevated, manifests }));
 
@@ -717,12 +713,12 @@ describe('admin action audit line', () => {
 
     it.each([
       [
-        'save-access',
+        'save-access', 'save-access',
         () => makeCtx({ identity: identity({ username: 'robin.k', metadataAdmin: { groups: ['everyone', 'proxywatch-access'] } }), manifests: proxywatch }),
         () => fd({ 'level:proxywatch': 'none' }),
       ],
       [
-        'revoke-admin',
+        'revoke-admin of another admin', 'revoke-admin',
         () => {
           listIdentitiesMock.mockResolvedValue([makeIdentity('root', true), makeIdentity('other', true)]);
           return makeCtx({ identity: makeIdentity('root', true) });
@@ -730,17 +726,17 @@ describe('admin action audit line', () => {
         () => fd(),
       ],
       [
-        'revoke-admin',
+        'revoke-admin of yourself', 'revoke-admin',
         () => {
           listIdentitiesMock.mockResolvedValue([makeIdentity('admin', true), makeIdentity('other', true)]);
           return makeCtx({ id: 'admin-1', identity: makeIdentity('admin', true) });
         },
         () => fd({ confirm: 'admin' }),
       ],
-      ['remove-credential', () => makeCtx(), () => fd({ cred_type: 'totp' })],
-      ['delete', () => makeCtx({ identity: makeIdentity('alice') }), () => fd({ confirm: 'alice' })],
+      ['remove-credential', 'remove-credential', () => makeCtx(), () => fd({ cred_type: 'totp' })],
+      ['delete when sign-out fails after deactivating', 'delete', () => makeCtx({ identity: makeIdentity('alice') }), () => fd({ confirm: 'alice' })],
       [
-        'delete',
+        'delete when removal fails after sign-out', 'delete',
         () => {
           revokeSubjectMock.mockResolvedValue(undefined);
           deleteIdentityMock.mockRejectedValue(new Error('kratos admin unavailable'));
@@ -748,7 +744,7 @@ describe('admin action audit line', () => {
         },
         () => fd({ confirm: 'alice' }),
       ],
-    ])('%s', async (action, ctx, form) => {
+    ])('%s', async (_label, action, ctx, form) => {
       revokeConsentSessionsMock.mockRejectedValue(hydraDown);
       revokeSubjectMock.mockRejectedValue(hydraDown);
       const c = ctx();

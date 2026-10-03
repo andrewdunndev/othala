@@ -17,7 +17,7 @@ import {
   unrecognisedGroups,
 } from './admin-view';
 import type { ClientManifest } from './manifests';
-import { asAdmin, identity, withCredential, withLookupSecret, withPasskey, withTotp, withWebauthnKey } from './test-builders';
+import { asAdmin, identity, withCredential, withLookupSecret, withPasskey, withTotp, withWebauthnKey, manifest } from './test-builders';
 import { parseIdentity } from './identity-facts';
 
 const role = (name: string) => ({ name, description: '', claimEmit: {} });
@@ -193,7 +193,7 @@ describe('removalBlock', () => {
   });
 
   it('blocks removing the last second factor of someone with an elevated app role', () => {
-    const wiki = { clientId: 'wiki', roles: [{ name: 'admin', claimEmit: {} }, { name: 'user', claimEmit: {} }], groupRoleMap: { 'wiki-admin': 'admin' }, accessGroups: ['family'] } as unknown as ClientManifest;
+    const wiki = manifest('wiki', ['admin', 'user'], { 'wiki-admin': 'admin' }, ['family']);
     const elevated = withTotp(identity({ metadataAdmin: { groups: ['family', 'wiki-admin'] } }));
     expect(removalBlock(elevated, 'totp', false, [wiki])).toMatch(/at least one/);
     expect(removalBlock(withWebauthnKey(elevated), 'totp', false, [wiki])).toBeNull();

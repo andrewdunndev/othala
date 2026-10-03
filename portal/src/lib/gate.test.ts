@@ -5,7 +5,7 @@ import { describe, it, expect } from 'vitest';
 import { decideAccess, needsStepUp, holdsElevatedRole } from './gate';
 import type { ClientManifest } from './manifests';
 import type { Identity } from './types';
-import { asAdmin, identity as buildIdentity, withCredential, withLookupSecret, withPasskey, withTotp, withWebauthnKey } from './test-builders';
+import { asAdmin, identity as buildIdentity, withCredential, withLookupSecret, withPasskey, withTotp, withWebauthnKey, manifest } from './test-builders';
 
 const APPLY: Record<string, (i: Identity) => Identity> = {
   password: (i) => i,
@@ -60,9 +60,6 @@ describe('needsStepUp', () => {
   });
 });
 
-const role = (name: string) => ({ name, claimEmit: {} });
-const manifest = (clientId: string, roles: string[], groupRoleMap: Record<string, string>, accessGroups: string[]) =>
-  ({ clientId, roles: roles.map(role), groupRoleMap, accessGroups }) as unknown as ClientManifest;
 const x = manifest('x', ['admin', 'user'], { 'x-admin': 'admin', 'x-access': 'user' }, ['x-access']);
 
 describe('holdsElevatedRole', () => {
