@@ -345,8 +345,6 @@ describe('getGroupRegistry — completeness over the real loader', () => {
 
     expect(isIdentityGroup(reg, 'everyone')).toBe(true);
     expect(isAccessGroup(reg, 'everyone')).toBe(false);
-    expect(isIdentityGroup(reg, 'admin')).toBe(true);
-    expect(isAccessGroup(reg, 'admin')).toBe(false);
   });
 
   it('memoizes on the manifest set and rebuilds when the catalog turns over', () => {

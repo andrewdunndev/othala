@@ -14,7 +14,7 @@ test('ZF — groups claim omits identity groups and groups no grafana binding na
     email: `${username}@othala.test`,
     username,
     displayName: 'ZF Member',
-    groups: ['admin', 'family', 'grafana-access'],
+    groups: ['everyone', 'family', 'grafana-access'],
     kratosAdminURL: KRATOS_ADMIN_URL,
   });
 

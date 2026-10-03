@@ -6,22 +6,22 @@ import { normalizeGroupOrder } from '../src/lib/access.ts';
 
 test('normalizeGroupOrder: identity groups in canonical order', () => {
   assert.deepEqual(
-    normalizeGroupOrder(['friends', 'admin', 'family', 'kids']),
-    ['admin', 'family', 'friends', 'kids'],
+    normalizeGroupOrder(['friends', 'everyone', 'family', 'kids']),
+    ['everyone', 'family', 'friends', 'kids'],
   );
 });
 
 test('normalizeGroupOrder: non-identity groups sort alphabetically after identity groups', () => {
   assert.deepEqual(
-    normalizeGroupOrder(['access-statuspage', 'admin', 'access-filedrop', 'family']),
-    ['admin', 'access-filedrop', 'access-statuspage', 'family'],
+    normalizeGroupOrder(['access-statuspage', 'everyone', 'access-filedrop', 'family']),
+    ['everyone', 'access-filedrop', 'access-statuspage', 'family'],
   );
 });
 
 test('normalizeGroupOrder: all non-identity groups (access-* and bare) interleave alphabetically', () => {
   assert.deepEqual(
-    normalizeGroupOrder(['service', 'admin', 'access-foo', 'elder']),
-    ['admin', 'access-foo', 'elder', 'service'],
+    normalizeGroupOrder(['service', 'everyone', 'access-foo', 'elder']),
+    ['everyone', 'access-foo', 'elder', 'service'],
   );
 });
 

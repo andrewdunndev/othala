@@ -16,10 +16,10 @@ import {
 import { revokeUserSessions, type RevokeUserResult } from './admin';
 import { parseIdentity } from './identity-facts';
 import { sendInviteRecoveryEmail } from './kratos';
-import { confirmsInviteAddress, IDENTITY_GROUP_ORDER, normalizeGroupOrder, shouldRefuseRecovery } from './access';
+import { confirmsInviteAddress, normalizeGroupOrder, shouldRefuseRecovery } from './access';
 import { accessToStorage, choicesFromForm } from './access-rows';
 import { GROUP_RE } from './access-groups';
-import { HOUSEHOLD_GROUPS } from './constants';
+import { IDENTITY_GROUPS } from './constants';
 import { holdsElevatedRole, planGroupSave } from './gate';
 import { buildGroupRegistry, isIdentityGroup, unconfiguredGroups } from './group-registry';
 import { DEACTIVATE_STEP, RevokeError, revokeHydraSessions, revokeSubject } from './revoke';
@@ -87,7 +87,7 @@ export async function saveAction(fd: FormData, ctx: ActionContext): Promise<Acti
 
   const clearUnconfigured = new Set(fd.getAll('clearUnconfigured').map(String));
   const keptUnconfigured = unconfiguredGroups(
-    buildGroupRegistry(manifests, IDENTITY_GROUP_ORDER),
+    buildGroupRegistry(manifests, IDENTITY_GROUPS),
     parseIdentity(identity).groups,
   ).filter((g) => !clearUnconfigured.has(g));
 
@@ -151,7 +151,7 @@ interface SectionEdit {
 /** Rebuilds the whole form from what is stored, so every section passes saveAction's guards and none clobbers another. */
 function sectionSave(ctx: ActionContext, edit: SectionEdit): Promise<ActionOutcome> {
   const { identity, manifests } = ctx;
-  const registry = buildGroupRegistry(manifests, IDENTITY_GROUP_ORDER);
+  const registry = buildGroupRegistry(manifests, IDENTITY_GROUPS);
   const stored = parseIdentity(identity).groups;
   const storedUnconfigured = unconfiguredGroups(registry, stored);
   const desired = edit.access ? [...edit.access.groups] : [...stored];
@@ -164,10 +164,8 @@ function sectionSave(ctx: ActionContext, edit: SectionEdit): Promise<ActionOutco
   fd.set('displayName', edit.profile?.displayName ?? String(traits?.displayName ?? ''));
   fd.set('recoveryEmail', edit.profile?.recoveryEmail ?? String(traits?.recoveryEmail ?? ''));
 
-  // Identity groups the page does not offer (the legacy `admin` group) ride along unchanged.
-  const unoffered = stored.filter((g) => isIdentityGroup(registry, g) && !HOUSEHOLD_GROUPS.includes(g));
   const household = edit.household
-    ? [...edit.household.filter((g) => HOUSEHOLD_GROUPS.includes(g)), ...unoffered]
+    ? edit.household.filter((g) => IDENTITY_GROUPS.includes(g))
     : desired.filter((g) => isIdentityGroup(registry, g));
   for (const g of household) fd.append('identityGroups', g);
 

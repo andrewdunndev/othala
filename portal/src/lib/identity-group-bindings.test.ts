@@ -1,4 +1,4 @@
-// Invariant: identity groups never ride in an app's access or role bindings, and a group save never stores `admin`.
+// Invariant: identity groups never ride in an app's access or role bindings, and 'admin' is an ordinary group name.
 
 import { describe, expect, it } from 'vitest';
 import { parseManifest, validateClients } from './manifests';
@@ -29,20 +29,24 @@ describe('identity groups in manifests', () => {
     expect(validateClients([parseManifest(manifest('app-access'), 'app.yaml')])).toEqual([]);
   });
 
-  it.each(['admin', 'everyone'])('rejects %s in presentation.access', (g) => {
-    const errs = validateClients([parseManifest(manifest(`app-access, ${g}`), 'app.yaml')]);
-    expect(errs.some((e) => e.includes(`"${g}"`) && e.includes('identity group'))).toBe(true);
+  it('rejects everyone in presentation.access', () => {
+    const errs = validateClients([parseManifest(manifest('app-access, everyone'), 'app.yaml')]);
+    expect(errs.some((e) => e.includes('"everyone"') && e.includes('identity group'))).toBe(true);
   });
 
-  it.each(['admin', 'everyone'])('rejects %s in group_role_map', (g) => {
-    const errs = validateClients([parseManifest(manifest('app-access', g), 'app.yaml')]);
-    expect(errs.some((e) => e.includes(`"${g}"`) && e.includes('identity group'))).toBe(true);
+  it('rejects everyone in group_role_map', () => {
+    const errs = validateClients([parseManifest(manifest('app-access', 'everyone'), 'app.yaml')]);
+    expect(errs.some((e) => e.includes('"everyone"') && e.includes('identity group'))).toBe(true);
   });
 });
 
-describe('planGroupSave and the legacy admin group', () => {
-  it('drops admin from the submitted groups', () => {
-    const stored = { metadata_admin: { groups: ['admin', 'everyone'] } } as unknown as Identity;
-    expect(planGroupSave(stored, ['admin', 'everyone', 'app-access'], []).groups).toEqual(['everyone', 'app-access']);
+describe('the admin group name', () => {
+  it('binds like any app group', () => {
+    expect(validateClients([parseManifest(manifest('admin', 'admin'), 'app.yaml')])).toEqual([]);
+  });
+
+  it('is stored by a group save', () => {
+    const stored = { metadata_admin: { groups: ['everyone'] } } as unknown as Identity;
+    expect(planGroupSave(stored, ['admin', 'everyone'], []).groups).toEqual(['admin', 'everyone']);
   });
 });

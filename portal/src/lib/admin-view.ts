@@ -4,7 +4,7 @@
 import type { ClientManifest } from './manifests';
 import type { AppTile } from './tiles';
 import type { Identity } from './types';
-import { HOUSEHOLD_GROUPS, IDENTITY_GROUPS } from './constants';
+import { IDENTITY_GROUPS } from './constants';
 import { GROUP_RE } from './access-groups';
 import { currentLevel, isOpenToEveryone, isTopLevel, levelsFor, NO_ACCESS } from './access-rows';
 import { parseIdentity } from './identity-facts';
@@ -189,7 +189,7 @@ export function attentionItems(rows: readonly PersonRow[]): Attention[] {
 
 /** The household groups a person page offers, with a plain label. */
 export function householdChoices(): { value: string; label: string }[] {
-  return HOUSEHOLD_GROUPS.map((g) => ({ value: g, label: g === 'everyone' ? 'Everyone in the household' : g }));
+  return IDENTITY_GROUPS.map((g) => ({ value: g, label: g === 'everyone' ? 'Everyone in the household' : g }));
 }
 
 const USERNAME_SHAPE = /^[a-z0-9]+(?:\.[a-z0-9]+)+$/;

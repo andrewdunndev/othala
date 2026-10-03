@@ -6,20 +6,14 @@ import { decideAccess } from './gate';
 import { IDENTITY_GROUPS } from './constants';
 
 /**
- * Canonical identity-group order for `metadata_admin.groups` (identity groups first), so the stored array is a pure
- * function of the group SET. It decides no role (lookupRole is order-independent). 'admin' is always first.
- */
-export const IDENTITY_GROUP_ORDER: readonly string[] = IDENTITY_GROUPS;
-
-/**
- * Sort groups into the canonical stored shape: identity groups (IDENTITY_GROUP_ORDER) in that order, then the rest
- * alphabetically. Example: [family-editors, family, admin] with order [admin, family] -> [admin, family, family-editors].
+ * Sort groups into the canonical stored shape: identity groups (IDENTITY_GROUPS) in that order, then the rest
+ * alphabetically, so the stored array is a pure function of the group set. Example: [family, everyone, admin] -> [everyone, admin, family].
  * Position carries no meaning: lookupRole ranks by `manifest.roles`, so reordering this array changes only the display.
  */
 export function normalizeGroupOrder(groups: string[]): string[] {
   const set = new Set(groups);
   const ordered: string[] = [];
-  for (const g of IDENTITY_GROUP_ORDER) {
+  for (const g of IDENTITY_GROUPS) {
     if (set.has(g)) {
       ordered.push(g);
       set.delete(g);

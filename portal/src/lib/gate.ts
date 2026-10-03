@@ -11,8 +11,6 @@ import { parseIdentity } from './identity-facts';
 import { lookupRole } from './claims';
 import { servingManifests } from './manifest-store';
 
-const LEGACY_ADMIN_GROUP = 'admin';
-
 /** Whether the identity holds the group. Compared VERBATIM: GROUP_RE is the one canonical form, so a case fold would only match names no owned boundary could write. */
 export function hasGroup(identity: Identity | null | undefined, group: string): boolean {
   return parseIdentity(identity).groups.some((g) => g === group);
@@ -202,10 +200,9 @@ export function planGroupSave(
   const removed = stored.filter((g) => clearedSet.has(g));
   const kept = stored.filter((g) => !clearedSet.has(g));
 
-  // The legacy `admin` identity group confers nothing (admin status is metadata_admin.admin), so a save never stores it.
   const groups: string[] = [];
   for (const g of submitted) {
-    if (GROUP_RE.test(g) && g !== LEGACY_ADMIN_GROUP && !groups.includes(g)) groups.push(g);
+    if (GROUP_RE.test(g) && !groups.includes(g)) groups.push(g);
   }
 
   const refusal =
