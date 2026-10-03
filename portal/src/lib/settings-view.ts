@@ -151,6 +151,11 @@ export function securityStatus(
   };
 }
 
+/** An admin or elevated member whose only second factor is one security key: Kratos refuses a second key until an app is enrolled. */
+export function keyOnlyKeeper(nodes: FlowNode[], keeper: boolean): boolean {
+  return keeper && credentialItems(nodes, 'webauthn_remove').length === 1 && !totpView(nodes).enrolled;
+}
+
 /** Whether the email address is verified, from the identity's verifiable addresses; null when unknown. */
 export function emailVerified(
   identity: { traits?: { email?: string }; verifiable_addresses?: Array<{ value?: string; verified?: boolean }> } | null | undefined,

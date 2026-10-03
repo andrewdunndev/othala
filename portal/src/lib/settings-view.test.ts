@@ -1,7 +1,7 @@
 // Invariant: the settings view model reads each recorded fixture state the way the page presents it.
 
 import { describe, it, expect } from 'vitest';
-import { splitCodes, credentialItems, totpView, lookupView, securityStatus, emailVerified, formatAdded } from './settings-view';
+import { splitCodes, credentialItems, totpView, lookupView, securityStatus, keyOnlyKeeper, emailVerified, formatAdded } from './settings-view';
 import { devSettings, DEV_SETTINGS_STATES, isDevSettingsState } from './settings-fixtures';
 
 const nodesOf = (s: Parameters<typeof devSettings>[0]) => devSettings(s).flow.ui.nodes;
@@ -55,6 +55,16 @@ describe('settings view over the fixtures', () => {
     const s = securityStatus(d.flow.ui.nodes, { emailVerified: true });
     expect(s.twoStep).toBe(true);
     expect(s.backupCodes).toBe(false);
+  });
+
+  it('keyOnlyKeeper holds only for a keeper with exactly one key and no app', () => {
+    const enrolled = nodesOf('enrolled');
+    const keyOnly = enrolled.filter((n) => n.group !== 'totp');
+    expect(keyOnlyKeeper(keyOnly, true)).toBe(true);
+    expect(keyOnlyKeeper(keyOnly, false)).toBe(false);
+    expect(keyOnlyKeeper(enrolled, true)).toBe(false);
+    expect(keyOnlyKeeper(nodesOf('fresh'), true)).toBe(false);
+    expect(keyOnlyKeeper(keyOnly.filter((n) => n.group !== 'webauthn'), true)).toBe(false);
   });
 
   it('flags an unverified email only when the address is known unverified', () => {
