@@ -158,7 +158,7 @@ function normaliseGroupRoleMap(raw: unknown): Record<string, string> {
 
 /**
  * Load one manifest file. Every well-formed manifest is returned, presentation-only ones included
- * (empty OIDC fields, presentationOnly:true); a flat-shape manifest or one with neither block throws.
+ * (empty OIDC fields, presentationOnly:true); one with neither block throws.
  * The loader must not drop presentation-only tiles: the registry and admin UI need their access groups,
  * and a save would otherwise drop groups it cannot see. The registrar's constraint (no client, no secret)
  * lives in oidcClientManifests() and getClientManifest().
@@ -192,17 +192,6 @@ export function parseManifest(yamlText: string, filename: string): ClientManifes
     ? presentation
     : {}) as Record<string, unknown>;
   const hasPresentation = presentation != null && typeof presentation === 'object' && !Array.isArray(presentation);
-
-  // Reject the pre-namespace flat shape so a stale manifest does not load silently.
-  const flatLikely =
-    'client_id' in yaml ||
-    'client_name' in yaml ||
-    'grant_types' in yaml ||
-    'roles' in yaml ||
-    'group_role_map' in yaml;
-  if (!oidc && flatLikely) {
-    throw new Error(`${file}: pre-namespace flat shape detected. Migrate to oidc:/consent: blocks.`);
-  }
 
   // No implicit `access-<clientId>` fallback (primitive #5): an empty binding is a load-time BLOCK in validateClients.
   const accessGroups = parseAccessGroups(p);

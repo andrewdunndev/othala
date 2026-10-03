@@ -71,7 +71,7 @@ oidc:
   assert.deepEqual(out.accessGroups, []);
 });
 
-test('pre-namespace flat shape is rejected', () => {
+test('a manifest without an oidc: block or presentation: is rejected as missing oidc', () => {
   assert.throws(() => parseManifest(
     `
 client_id: filedrop
@@ -79,7 +79,7 @@ roles:
   - name: admin
 `,
     'filedrop.yaml',
-  ));
+  ), /missing or non-object oidc: block/);
 });
 
 test('non-object oidc block is rejected', () => {
