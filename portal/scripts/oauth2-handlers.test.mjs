@@ -369,6 +369,19 @@ test('consent accepts an active member and grants scope + injects id_token', asy
   assert.equal('groups' in calls.acceptConsentBody.session.id_token, false, 'groups absent when groups scope not requested');
 });
 
+test('consent with no requested_scope emits no scoped claims', async () => {
+  const { api, calls } = stubOAuth2({
+    getOAuth2ConsentRequest: async () => oauth2ConsentRequest({ skip: true, subject: 'id-1', client: { client_id: 'grafana' }, requested_scope: undefined }),
+  });
+  await handleConsent(new Request('https://x/oauth2/consent?consent_challenge=cc'), {
+    oauth2: api,
+    getIdentity: async () => activeMember(),
+    manifest: () => loadManifest('grafana'),
+  });
+  const idToken = calls.acceptConsentBody.session.id_token;
+  for (const k of ['email', 'email_verified', 'name', 'preferred_username', 'groups']) assert.equal(k in idToken, false, k);
+});
+
 test('consent REJECTS when missing the access group — opaque error_description, real reason logged', async () => {
   const { api, calls } = stubOAuth2();
   const warnArgs = [];

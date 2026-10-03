@@ -152,6 +152,8 @@ function manifest({ group, roleClaimEmit, emitGroupsClaim = null } = {}) {
   };
 }
 
+const ALL_SCOPES = ['openid', 'email', 'profile', 'groups'];
+
 function identityWithGroups(groups) {
   return base({ metadata_admin: { groups } });
 }
@@ -159,7 +161,7 @@ function identityWithGroups(groups) {
 test('composeIDTokenClaims H1: filedrop member only — groups is union of real + role', () => {
   const id = identityWithGroups(['filedrop']);
   const m = manifest({ group: 'filedrop', roleClaimEmit: { groups: ['filedrop-user'] } });
-  const c = composeIDTokenClaims(id, m);
+  const c = composeIDTokenClaims(id, m, ALL_SCOPES);
   assert.ok(Array.isArray(c.groups), 'groups is an array');
   assert.ok(c.groups.includes('filedrop'), 'filedrop preserved');
   assert.ok(c.groups.includes('filedrop-user'), 'filedrop-user added');
@@ -168,7 +170,7 @@ test('composeIDTokenClaims H1: filedrop member only — groups is union of real 
 test('composeIDTokenClaims H1: filedrop-admin only — admin membership preserved', () => {
   const id = identityWithGroups(['filedrop-admin']);
   const m = manifest({ group: 'filedrop-admin', roleClaimEmit: { groups: ['filedrop-user'] } });
-  const c = composeIDTokenClaims(id, m);
+  const c = composeIDTokenClaims(id, m, ALL_SCOPES);
   assert.ok(c.groups.includes('filedrop-admin'), 'filedrop-admin preserved');
   assert.ok(c.groups.includes('filedrop-user'), 'filedrop-user added');
 });
@@ -180,7 +182,7 @@ test('composeIDTokenClaims H1: filedrop+filedrop-admin — both preserved, no du
     groupRoleMap: { filedrop: 'member', 'filedrop-admin': 'member' },
     accessGroups: ['filedrop', 'filedrop-admin'],
   };
-  const c = composeIDTokenClaims(id, m);
+  const c = composeIDTokenClaims(id, m, ALL_SCOPES);
   assert.ok(c.groups.includes('filedrop'), 'filedrop preserved');
   assert.ok(c.groups.includes('filedrop-admin'), 'filedrop-admin preserved');
   assert.ok(c.groups.includes('filedrop-user'), 'filedrop-user additive');
@@ -194,13 +196,13 @@ test('composeIDTokenClaims binds groups: identity and other apps groups dropped,
     ...manifest({ group: 'filedrop', roleClaimEmit: { groups: ['filedrop-user'] } }),
     groupRoleMap: { filedrop: 'member', 'filedrop-admin': 'member' },
   };
-  assert.deepEqual(composeIDTokenClaims(id, m).groups, ['filedrop-admin', 'filedrop', 'filedrop-user']);
+  assert.deepEqual(composeIDTokenClaims(id, m, ALL_SCOPES).groups, ['filedrop-admin', 'filedrop', 'filedrop-user']);
 });
 
 test('composeIDTokenClaims binds groups: nothing bound omits the claim, null manifest omits it', () => {
   const id = identityWithGroups(['admin', 'everyone']);
-  assert.equal('groups' in composeIDTokenClaims(id, manifest({ group: 'filedrop' })), false);
-  assert.equal('groups' in composeIDTokenClaims(id, null), false);
+  assert.equal('groups' in composeIDTokenClaims(id, manifest({ group: 'filedrop' }), ALL_SCOPES), false);
+  assert.equal('groups' in composeIDTokenClaims(id, null, ALL_SCOPES), false);
 });
 
 test('composeIDTokenClaims H2: requestedScope [openid] — no email/name/groups', () => {
@@ -231,16 +233,6 @@ test('composeIDTokenClaims H2: requestedScope [openid, email, profile, groups] �
   const c = composeIDTokenClaims(id, m, ['openid', 'email', 'profile', 'groups']);
   assert.equal(c.email, 'a@othala.test');
   assert.equal(c.email_verified, true);
-  assert.equal(c.name, 'Ada Lovelace');
-  assert.equal(c.preferred_username, 'ada');
-  assert.ok(Array.isArray(c.groups), 'groups is an array');
-});
-
-test('composeIDTokenClaims back-compat: no requestedScope → all claims emitted', () => {
-  const id = identityWithGroups(['filedrop']);
-  const m = manifest();
-  const c = composeIDTokenClaims(id, m);
-  assert.equal(c.email, 'a@othala.test');
   assert.equal(c.name, 'Ada Lovelace');
   assert.equal(c.preferred_username, 'ada');
   assert.ok(Array.isArray(c.groups), 'groups is an array');

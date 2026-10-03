@@ -6,6 +6,8 @@ import * as fc from 'fast-check';
 import { lookupRole, deepMergeClaims, composeIDTokenClaims, buildIDTokenClaims } from '../src/lib/claims.ts';
 import { identity as buildIdentity } from '../src/lib/test-builders.ts';
 
+const ALL_SCOPES = ['openid', 'email', 'profile', 'groups'];
+
 function manifest({ clientId = 'myapp', roles = [], groupRoleMap = {}, emitGroupsClaim = null, skipConsent = false } = {}) {
   return {
     clientId,
@@ -86,7 +88,7 @@ test('P1+P2: claimEmit only injected when subject holds a mapped group', () => {
         const id = identity({ groups: subjectGroups });
         const m = manifest({ roles, groupRoleMap });
 
-        const claims = composeIDTokenClaims(id, m);
+        const claims = composeIDTokenClaims(id, m, ALL_SCOPES);
 
         assert.equal(Object.hasOwn(claims, claimKeyA), true,
           `Expected claimKeyA (${claimKeyA}) for roleA via groupA`);
@@ -264,7 +266,7 @@ test('P6: emit_groups_claim:false removes groups claim from output', () => {
           groupRoleMap: Object.fromEntries(subjectGroups.slice(0, 1).map(g => [g, 'user'])),
         });
 
-        const claims = composeIDTokenClaims(id, m);
+        const claims = composeIDTokenClaims(id, m, ALL_SCOPES);
         assert.equal('groups' in claims, false,
           'groups claim must be suppressed when emit_groups_claim:false');
       },
@@ -277,7 +279,7 @@ test('P6b: emit_groups_claim:true (default null) keeps groups claim in output', 
   const id = identity({ groups: ['access-myapp', 'eng'] });
   const m = manifest({ emitGroupsClaim: null }); // null = default = true
 
-  const claims = composeIDTokenClaims(id, m);
+  const claims = composeIDTokenClaims(id, m, ALL_SCOPES);
   assert.ok('groups' in claims, 'groups claim must be present when emitGroupsClaim is null (default true)');
   assert.deepEqual(claims.groups, ['access-myapp']);
 });
@@ -400,7 +402,7 @@ test('adversarial: empty groups array → no role, no claimEmit', () => {
   const result = lookupRole(m, id.metadata_admin);
   assert.equal(result, null, 'empty groups must yield null role result');
 
-  const claims = composeIDTokenClaims(id, m);
+  const claims = composeIDTokenClaims(id, m, ALL_SCOPES);
   assert.equal('superpower' in claims, false, 'superpower claim must not appear with empty groups');
 });
 
@@ -471,7 +473,7 @@ test('adversarial: metadata_admin.roles is an array (not object) — no override
 
 test('adversarial: null manifest → no claimEmit injection', () => {
   const id = identity({ groups: ['access-myapp', 'admin'] });
-  const claims = composeIDTokenClaims(id, null);
+  const claims = composeIDTokenClaims(id, null, ALL_SCOPES);
   assert.equal('role' in claims, false, 'No role key should appear with null manifest');
   assert.equal('permissions' in claims, false);
   assert.equal('groups' in claims, false, 'groups claim must be omitted with null manifest');
@@ -489,7 +491,7 @@ test('adversarial: claimEmit that tries to overwrite email claim via deepMergeCl
   const id = identity({ groups: ['access-myapp', 'real-group'] });
   const m = manifest({ roles, groupRoleMap });
 
-  const claims = composeIDTokenClaims(id, m);
+  const claims = composeIDTokenClaims(id, m, ALL_SCOPES);
 
   assert.equal('superpower' in claims, false,
     'attacker-role claimEmit must not inject superpower — subject not in attacker-group');

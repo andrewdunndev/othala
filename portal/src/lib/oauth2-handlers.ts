@@ -211,7 +211,7 @@ export async function acceptConsentRequest(
   clientId: string,
 ): Promise<Response> {
   const manifest = d.manifest(clientId);
-  const idTokenClaims = composeIDTokenClaims(identity, manifest, consent.requested_scope);
+  const idTokenClaims = composeIDTokenClaims(identity, manifest, consent.requested_scope ?? []);
   try {
     const { redirect_to } = await d.oauth2.acceptOAuth2ConsentRequest({
       consentChallenge: challenge,

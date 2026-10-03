@@ -188,13 +188,13 @@ const SCOPE_CLAIMS: Record<string, string[]> = {
 
 /**
  * The emission sequence acceptConsentRequest calls: identity claims, drop groups if the manifest suppresses them,
- * keep only the groups the manifest binds, merge the role's claim_emit (arrays unioned), then, when requestedScope is given, drop claims whose scope
- * (OIDC Core §5.4) was not granted. Omitting requestedScope emits everything. `sub` is Hydra's.
+ * keep only the groups the manifest binds, merge the role's claim_emit (arrays unioned), then drop claims whose scope
+ * (OIDC Core §5.4) was not granted. `sub` is Hydra's.
  */
 export function composeIDTokenClaims(
   identity: Identity | null | undefined,
   manifest: ClientManifest | undefined | null,
-  requestedScope?: string[],
+  requestedScope: readonly string[],
 ): Record<string, unknown> {
   const claims = buildIDTokenClaims(identity) as Record<string, unknown>;
 
@@ -217,12 +217,9 @@ export function composeIDTokenClaims(
     }
   }
 
-  // Scope-gate (OIDC Core §5.4); skipped when requestedScope is omitted.
-  if (requestedScope) {
-    for (const [scope, keys] of Object.entries(SCOPE_CLAIMS)) {
-      if (!requestedScope.includes(scope)) {
-        for (const k of keys) delete claims[k];
-      }
+  for (const [scope, keys] of Object.entries(SCOPE_CLAIMS)) {
+    if (!requestedScope.includes(scope)) {
+      for (const k of keys) delete claims[k];
     }
   }
 
