@@ -132,7 +132,7 @@ The confirmation banner after each removal tells you which type was removed.
 
 ### Step 4 — Issue a recovery/enrollment URL
 
-Click **Send setup link** to generate a one-shot Kratos recovery URL.
+Click **Get setup link** to generate a one-shot Kratos recovery URL.
 Share it with the legitimate user out-of-band (Signal, iMessage, or another
 trusted channel — not the compromised email account if that was the attack
 vector).

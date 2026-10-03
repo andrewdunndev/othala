@@ -127,8 +127,8 @@ import Layout from '../layouts/Layout.astro';
       There is no self-service registration, so every identity starts with
       an admin creating it through the admin API with no credentials block
       at all. What reaches the new person is a recovery link and a
-      one-time code, delivered over two channels that both keep the
-      password, or passkey, itself off the wire. That is the mechanism
+      one-time code, handed over on a conversation that already exists; the password and passkey
+      never leave their browser. That is the mechanism
       behind a rule stated once and held everywhere it matters: no
       password ever transits a channel. The <a href="/guides/golden-path/">Golden path</a> guide's Registration
       is admin-driven section has the operator side; <code>DECISIONS.md</code> § No password ever transits a channel has
@@ -136,7 +136,7 @@ import Layout from '../layouts/Layout.astro';
     </p>
 
     <figure class="diagram">
-      <img src="/diagrams/first-credential.svg" alt="An admin creates the identity through the admin API with no credentials block at all. Two channels can then carry the enrolment secret, and both keep link and code apart from any password. Hand-delivery: the admin mints a one-time recovery link and code together and hands both over on a conversation that already exists with that person. Email, the D1 addendum: the admin re-types the target address and the server checks it byte-equal against the identity's own trait before anything is sent; Kratos's own courier then sends a code alone, never a link with the code embedded. Either way the recipient's own browser is where a password and a passkey first get set. One branch refuses outright: when the target carries the admin marker, shouldRefuseRecovery refuses before Kratos is ever asked, console-only.">
+      <img src="/diagrams/first-credential.svg" alt="An admin creates the identity through the admin API with no credentials block at all, then mints a one-time recovery link and code together and hands both over on a conversation that already exists with that person; link and code stay apart from any password. The recipient's own browser is where a password and a passkey first get set. One branch refuses outright: when the target carries the admin marker, shouldRefuseRecovery refuses before Kratos is ever asked, console-only.">
       <figcaption class="diagram-caption">Not "no password exists" — no password ever transits a channel</figcaption>
     </figure>
 
