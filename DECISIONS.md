@@ -10,7 +10,8 @@ alone and names the file that fails when it is violated, or says UNENFORCED.
 the admin UI guard, `required_aal: highest_available` on the settings flow, and app sign-in and
 forward-auth for accounts holding totp, webauthn, the admin marker or a role above an app's entry
 role (`portal/src/lib/gate.ts`).
-Admins cannot sign in by emailed code, hold the marker without a second factor, or remove the last one.
+Admins cannot sign in by emailed code or hold the marker without a second factor. Admins and people with
+a role above an app's entry level cannot remove their last one.
 
 **Why.** Kratos enforces assurance level per flow, never per route, so step-up belongs in the
 application, which reads the session's AAL itself. Raising the pin tightens nothing: the session endpoint

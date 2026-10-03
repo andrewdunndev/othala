@@ -30,6 +30,7 @@ import { revokeSubject, RevokeError } from '../../lib/revoke';
 import { getIdentity } from '../../lib/admin-api';
 import { emailChangeLocked } from '../../lib/profile-gate';
 import { parseIdentity } from '../../lib/identity-facts';
+import { holdsElevatedRole } from '../../lib/gate';
 import { loadTiles, userCanSeeTile } from '../../lib/tiles';
 import { publicUrl } from '../../lib/config';
 import { signToken, verifyToken, CSRFError } from '../../lib/csrf';
@@ -191,10 +192,9 @@ const pwOpen = nodesByGroup(nodes, 'password').some((n) => (n.messages?.length ?
 // The saved line belongs in the card that was edited. Script fills it on a live swap; the dev fixture renders it here.
 const devFlash = dev?.flash ? FLASH[dev.flash] : null;
 const devFlashCard = dev?.flash?.startsWith('lookup') ? 'recovery' : 'two-step';
-// Admins keep one second factor: the gate refuses dropping the app when it is their only one, so say so up front.
 // A person with no passkey yet is at the first step: it leads the page, and the Passkeys card keeps only its list.
 const welcome = status.passkeys === 0 && has('passkey');
-const keepSecondFactor = isAdmin && status.securityKeys === 0;
+const keepSecondFactor = (isAdmin || holdsElevatedRole(stored)) && status.securityKeys === 0;
 const lookupConfirm = nodesByGroup(nodes, 'lookup_secret').some((n) => asInput(n)?.name === 'lookup_secret_confirm');
 const lookupOff = nodesByGroup(nodes, 'lookup_secret').map(asInput).find((a) => a?.name === 'lookup_secret_disable') ?? null;
 

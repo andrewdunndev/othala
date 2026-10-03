@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { secondFactorChangeVerdict, SECOND_FACTOR_KEEP, SECOND_FACTOR_UNAVAILABLE } from './second-factor-gate';
 import type { Identity } from './types';
-import { asAdmin, identity, withCredential, withLookupSecret, withPasskey, withTotp, withWebauthnKey } from './test-builders';
+import { asAdmin, identity, manifest, withCredential, withLookupSecret, withPasskey, withTotp, withWebauthnKey } from './test-builders';
 
 const KEEP = { refuse: true, text: SECOND_FACTOR_KEEP };
 const UNAVAILABLE = { refuse: true, text: SECOND_FACTOR_UNAVAILABLE };
@@ -42,6 +42,29 @@ describe('secondFactorChangeVerdict — member', () => {
 
   it('allows a member whose read carried no credential configs', () => {
     expect(secondFactorChangeVerdict({ ...build(withTotp), credentials: undefined }, 'totp')).toEqual(ALLOW);
+  });
+});
+
+describe('secondFactorChangeVerdict — elevated member', () => {
+  const manifests = [manifest('x', ['admin', 'user'], { 'x-admin': 'admin', 'x-access': 'user' }, ['x-access'])];
+  const elevated = (i: Identity): Identity => ({ ...i, metadata_admin: { groups: ['x-admin'] } });
+  const verdict = (stored: Identity, method: string) => secondFactorChangeVerdict(stored, method, manifests);
+
+  it('keeps the only totp', () => {
+    expect(verdict(build(elevated, withTotp), 'totp')).toEqual(KEEP);
+  });
+
+  it('allows dropping totp when a key remains', () => {
+    expect(verdict(build(elevated, withTotp, key), 'totp')).toEqual(ALLOW);
+  });
+
+  it('refuses when the read carried no credential configs', () => {
+    expect(verdict({ ...build(elevated, withTotp), credentials: undefined }, 'totp')).toEqual(UNAVAILABLE);
+  });
+
+  it('leaves an entry-level member alone', () => {
+    const member = (i: Identity): Identity => ({ ...i, metadata_admin: { groups: ['x-access'] } });
+    expect(verdict(build(member, withTotp), 'totp')).toEqual(ALLOW);
   });
 });
 
