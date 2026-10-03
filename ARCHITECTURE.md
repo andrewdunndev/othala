@@ -44,7 +44,7 @@ given an admin credential.
 
 **The app runs two listeners in one process** (`portal/src/server/listen.ts`). The public listener
 serves the Astro handler. The admin listener binds `PORTAL_ADMIN_BIND_HOST` with its own
-mux, `ADMIN_GET_ROUTES` and `ADMIN_POST_ROUTES`, that never delegates to the Astro handler. The two
+mux, the `ADMIN_GET` and `ADMIN_POST` maps, that never delegates to the Astro handler. The two
 route sets are disjoint *by construction* rather than by a routing rule that could be edited wrong;
 `portal/scripts/public-mux-disjoint.test.mjs` and `portal/scripts/admin-port.test.mjs` are what hold
 that. Admin routes authenticate with `bearerMatches`, which is constant-time and returns false when
