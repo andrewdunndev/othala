@@ -30,5 +30,8 @@ test.describe('O — Rendered anonymous login journey', () => {
     await expect(page.locator('#password'), 'O1: password-tier password input must be in the DOM').toBeAttached();
 
     await expect(page.locator('.aal2-block'), 'O1: no AAL2 step-up shell on an anonymous AAL1 visit').toHaveCount(0);
+
+    const firstStop = await page.evaluate(() => document.querySelector('a[href], button, input, select, textarea')?.textContent?.trim());
+    expect(firstStop, 'O1: the skip link is the first focusable element').toBe('Skip to content');
   });
 });

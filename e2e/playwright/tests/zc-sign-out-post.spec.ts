@@ -42,11 +42,13 @@ test('ZC2 — the home page Sign out button ends the session', async ({ ctx, bas
   await loginViaJsonApi(ctx, { identifier: member.email, password: TEST_PASSWORD }, baseURL!);
   const page = await ctx.newPage();
   await page.goto(`${baseURL}/`, { waitUntil: 'networkidle' });
+  const signOut = page.getByRole('button', { name: 'Sign out', exact: true });
+  expect((await signOut.boundingBox())!.height, 'header link target height').toBeGreaterThanOrEqual(44);
   await Promise.all([
     page.waitForResponse(
       (r) => r.url().startsWith(`${baseURL}/auth/logout`) && r.request().method() === 'POST',
     ),
-    page.getByRole('button', { name: 'Sign out', exact: true }).click(),
+    signOut.click(),
   ]);
   await expect(page.getByRole('link', { name: 'Sign in', exact: true })).toBeVisible({ timeout: 15_000 });
   expect(await hasSession(ctx, baseURL!), 'session after Sign out').toBe(false);
