@@ -801,12 +801,21 @@ test('startup refuses in production without PORTAL_ADMIN_BIND_HOST, and on a wil
   }
 });
 
-test('both hook gates refuse a malformed JSON body (403)', async () => {
+test('every refusing hook gate refuses a malformed JSON body (403)', async () => {
+  const refusal = (text, instance_ptr) =>
+    ({ messages: [instance_ptr ? { instance_ptr, messages: [{ id: 4000001, type: 'error', text }] } : { messages: [{ type: 'error', text }] }] });
+  const cases = [
+    ['/admin/recovery-gate', refusal('recovery refused: malformed payload')],
+    ['/admin/login-code-gate', refusal(LOGIN_CODE_UNAVAILABLE)],
+    ['/admin/profile-gate', refusal(PROFILE_UPDATE_UNAVAILABLE, '#/traits/username')],
+    ['/admin/second-factor-gate?method=totp', refusal(secondFactorRuntime.SECOND_FACTOR_UNAVAILABLE, '#/')],
+  ];
   await withMockKratos(identityServer({ groups: ['family'], admin: false }), async () => {
-    for (const url of ['/admin/recovery-gate', '/admin/login-code-gate']) {
+    for (const [url, body] of cases) {
       const res = fakeRes();
       await handle(fakeReq({ method: 'POST', url, headers: { authorization: 'Bearer gate-secret' }, body: '{not json' }), res);
       assert.equal(res.statusCode, 403, url);
+      assert.deepEqual(JSON.parse(res.body), body, url);
     }
   });
 });
