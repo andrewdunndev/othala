@@ -37,7 +37,7 @@ test('G1 — fabricated ory_kratos_session cookie is rejected by Kratos (401)', 
   ).not.toBe(200);
 
   expect(
-    /\/auth\/login/.test(loc) || /\/auth\/error/.test(loc) || status === 302,
+    /\/auth\/login/.test(loc),
     `G1: /admin must redirect to /auth/login; got ${status} ${loc}`,
   ).toBe(true);
 });

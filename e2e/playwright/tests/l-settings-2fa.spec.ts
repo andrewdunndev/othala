@@ -63,34 +63,9 @@ test('L1 — settings page renders TOTP QR and secret when TOTP enrollment is ac
   expect(resp.status(), 'L1: /auth/settings must return 200 for authenticated user').toBe(200);
 
   const html = await resp.text();
-  console.log('[L1] settings page length:', html.length);
-
-  if (!html.includes('Authenticator app')) {
-    console.log('[L1] TOTP section absent for this identity (no TOTP nodes in flow — expected for fresh identity without TOTP enrolled)');
-    expect(html, 'L1: settings page must render even without TOTP nodes').toContain('Settings');
-    console.log('[L1] PASS (conditional) — settings page renders; TOTP section absent for fresh identity');
-    return;
-  }
-
-  console.log('[L1] TOTP section present in settings page');
-
-  if (html.includes('totp-qr') || /<img[^>]+alt[^>]*[Aa]uthenticator/.test(html)) {
-    expect(
-      /<img[^>]+src[^>]*>/i.test(html),
-      'L1: TOTP QR img element must be in the page HTML',
-    ).toBe(true);
-    console.log('[L1] TOTP QR img rendered');
-  }
-
-  if (html.includes('totp-secret-value')) {
-    expect(
-      html,
-      'L1: .totp-secret-value element must contain the TOTP secret',
-    ).toMatch(/totp-secret-value/);
-    console.log('[L1] TOTP secret element rendered');
-  }
-
-  console.log('[L1] PASS — TOTP section renders on the settings page');
+  expect(html, 'L1: the authenticator app section').toMatch(/<h3[^>]*>Authenticator app<\/h3>/);
+  expect(html, 'L1: a QR image inside .totp-qr').toMatch(/class="totp-qr"[^>]*>\s*<img\b[^>]*\bsrc="[^"]+"/);
+  expect(html, 'L1: a non-empty setup key').toMatch(/class="totp-secret-value[^"]*"[^>]*>\s*[^<\s][^<]*<\/code>/);
 });
 
 test('L2 — backup codes are visible in the HTML after generating them (regression for bug #1)', async ({
@@ -127,82 +102,10 @@ test('L2 — backup codes are visible in the HTML after generating them (regress
   expect(pageResp.status(), 'L2: initial GET /auth/settings must return 200').toBe(200);
 
   const pageHtml = await pageResp.text();
-
-  if (!pageHtml.includes('Backup codes') && !pageHtml.includes('lookup_secret')) {
-    console.log('[L2] lookup_secret section absent — strategy may be disabled; skipping');
-    test.skip(true, 'lookup_secret strategy not enabled in this stack');
-    return;
-  }
-  console.log('[L2] lookup_secret section present in initial settings page');
-
+  expect(pageHtml, 'L2: the backup codes section').toMatch(/<h3[^>]*>Backup codes/);
   const { action: formAction, csrf: csrfToken } = extractLookupForm(pageHtml);
-  if (!formAction) {
-    console.log('[L2] could not extract form action from HTML; falling back to API flow init');
-  }
-  console.log('[L2] form action:', formAction || '(not found)', '| csrf:', csrfToken ? csrfToken.slice(0, 12) + '…' : '(not found)');
-
-  if (!formAction || !csrfToken) {
-    const flowResp = await ctx.request.get(
-      `${baseURL}/self-service/settings/browser`,
-      { headers: { Accept: 'application/json' }, maxRedirects: 5 },
-    );
-    expect(flowResp.ok(), 'L2 fallback: settings flow init must succeed').toBe(true);
-    const flow = await flowResp.json() as {
-      ui?: {
-        action?: string;
-        nodes?: Array<{
-          type?: string;
-          group?: string;
-          attributes?: { name?: string; type?: string; value?: unknown; node_type?: string };
-        }>;
-      };
-    };
-    const apiAction = flow?.ui?.action ?? '';
-    let apiCsrf = '';
-    for (const node of flow?.ui?.nodes ?? []) {
-      if (
-        node?.attributes?.node_type === 'input' &&
-        node?.attributes?.name === 'csrf_token' &&
-        node?.attributes?.type === 'hidden'
-      ) {
-        apiCsrf = String(node.attributes.value ?? '');
-        break;
-      }
-    }
-    expect(apiAction, 'L2 fallback: settings flow must have ui.action').toBeTruthy();
-    expect(apiCsrf, 'L2 fallback: settings flow must have csrf_token').toBeTruthy();
-
-    const genResp = await ctx.request.post(apiAction, {
-      headers: {
-        'Content-Type': 'application/x-www-form-urlencoded',
-        Accept: 'text/html',
-      },
-      form: {
-        csrf_token: apiCsrf,
-        method: 'lookup_secret',
-        lookup_secret_regenerate: 'true',
-      },
-      maxRedirects: 5,
-    });
-    const genStatus = genResp.status();
-    console.log('[L2] API-path generate status:', genStatus);
-    expect([200, 302, 303].includes(genStatus), `L2: generate must return 200/30x; got ${genStatus}`).toBe(true);
-
-    let finalHtml: string;
-    if (genStatus === 200) {
-      finalHtml = await genResp.text();
-    } else {
-      const loc = genResp.headers()['location'] ?? `${baseURL}/auth/settings`;
-      const followResp = await ctx.request.get(loc.startsWith('http') ? loc : `${baseURL}${loc}`, {
-        headers: { Accept: 'text/html' },
-        maxRedirects: 5,
-      });
-      finalHtml = await followResp.text();
-    }
-
-    assertBackupCodesVisible(finalHtml, 'L2 (API fallback)');
-    return;
-  }
+  expect(formAction, 'L2: the lookup_secret form action').not.toBe('');
+  expect(csrfToken, 'L2: the lookup_secret form csrf token').not.toBe('');
 
   const generateResp = await ctx.request.post(formAction, {
     headers: {

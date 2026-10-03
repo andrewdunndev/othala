@@ -141,32 +141,16 @@ test('K1 — email-code login delivers a code and establishes an active session'
   const step2 = await submitIdentifierForCode(ctx.request, flow.action, flow.csrfToken, identity.email);
   console.log('[K1] identifier submitted; step-2 action:', step2.action);
 
-  const identifierHidden = step2.nodes.find(
-    (n) =>
-      n.group === 'default' &&
-      n.type === 'input' &&
-      n.attributes?.name === 'identifier' &&
-      n.attributes?.type === 'hidden',
-  );
-  console.log(
-    '[K1] default-group identifier hidden node present in step-2 flow:',
-    identifierHidden !== undefined,
-  );
-
   const { code, subject, body, id: messageId } = await waitForMessage(forRecipient(identity.email, startTime));
   expect(subject, 'K1: the subject names the household').toContain(HOUSEHOLD);
   expect(body, 'K1: the body names the household').toContain(HOUSEHOLD);
   console.log('[K1] received sign-in code:', code, 'message id:', messageId);
 
-  const identifierValue = identifierHidden?.attributes?.value != null
-    ? String(identifierHidden.attributes.value)
-    : identity.email;
-
   const codeSubmitResp = await ctx.request.post(step2.action, {
     headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
     data: {
       csrf_token: step2.csrfToken,
-      identifier: identifierValue,
+      identifier: identity.email,
       code,
       method: 'code',
     },
@@ -178,7 +162,7 @@ test('K1 — email-code login delivers a code and establishes an active session'
 
   expect(
     session,
-    'K1: email-code login must result in an active session (null → step-2 identifier bug still present)',
+    'K1: email-code login must result in an active session',
   ).not.toBeNull();
 
   expect(

@@ -54,15 +54,8 @@ test('D2 — INV-3: admin at AAL2 reaches /admin (marker GRANTS, gate is not alw
       `D2 (INV-3): admin at AAL2 must receive 200 at /admin; got ${status} (url: ${finalUrl})`,
     ).toBe(200);
 
-    const body = await resp.text();
-    const hasAdminContent =
-      /admin/i.test(body) &&
-      (/Users?/i.test(body) || /Dashboard/i.test(body) || /admin-panel/i.test(body));
-
-    expect(
-      hasAdminContent,
-      `D2 (INV-3): /admin must render admin-specific page content; got ${body.slice(0, 300)}`,
-    ).toBe(true);
+    expect(new URL(finalUrl).pathname, 'D2 (INV-3): /admin lands on the People page, not a step-up').toBe('/admin/users');
+    expect(await resp.text(), 'D2 (INV-3): the admin People heading').toMatch(/<h1[^>]*>People\b/);
   } finally {
     await ctx.close();
   }

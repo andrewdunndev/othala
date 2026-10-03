@@ -8,6 +8,7 @@ import { test as base } from '@playwright/test';
 import type { BrowserContext, CDPSession } from 'playwright-core';
 import { createIdentityWithPassword, TEST_PASSWORD, type SeedResult } from '../actions/identity';
 import { loginViaJsonApi } from '../actions/login';
+import { getSession } from '../actions/session';
 
 /** Base32 decode (RFC-4648, case-insensitive, no padding required). */
 function base32Decode(input: string): Uint8Array {
@@ -232,7 +233,8 @@ export async function adminAal2Context(opts: {
       }
     }
 
-    console.log('[adminAal2] AAL2 session established');
+    const aal = (await getSession(ctx, baseURL))?.authenticator_assurance_level;
+    if (aal !== 'aal2') throw new Error(`adminAal2Context: session is ${aal ?? 'absent'} after step-up, not aal2`);
     return ctx;
   } catch (err) {
     await ctx.close();
