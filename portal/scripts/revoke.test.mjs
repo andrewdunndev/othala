@@ -2,7 +2,7 @@
 
 import { test } from 'vitest';
 import assert from 'node:assert/strict';
-import { revokeSubject, RevokeError } from '../src/lib/revoke.ts';
+import { revokeHydraSessions, revokeSubject, RevokeError } from '../src/lib/revoke.ts';
 import { ResponseError } from '@ory/client-fetch';
 
 function makeDeps(sids = []) {
@@ -221,4 +221,30 @@ test('a per-sid revoke failure aborts before the subject sweep and the consent r
   );
   assert.ok(!calls.some((c) => c[0] === 'revokeOAuth2LoginSessions' && c[1].subject));
   assert.ok(!calls.some((c) => c[0] === 'revokeOAuth2ConsentSessions'));
+});
+
+test('revokeHydraSessions revokes each sid, then the subject, then consent, and leaves Kratos alone', async () => {
+  const { calls, deps } = makeDeps(['s1']);
+  await revokeHydraSessions('sub-1', deps);
+  assert.deepEqual(calls, [
+    ['listOAuth2ConsentSessionsRaw', { subject: 'sub-1', pageSize: 250, pageToken: undefined }],
+    ['revokeOAuth2LoginSessions', { sid: 's1' }],
+    ['revokeOAuth2LoginSessions', { subject: 'sub-1' }],
+    ['revokeOAuth2ConsentSessions', { subject: 'sub-1', all: true }],
+  ]);
+});
+
+test.each([
+  ['listOAuth2ConsentSessionsRaw', 'list-consent-sessions'],
+  ['revokeOAuth2LoginSessions', 'revoke-login-sessions'],
+  ['revokeOAuth2ConsentSessions', 'revoke-consent-sessions'],
+])('revokeHydraSessions names the failed step when %s rejects', async (method, step) => {
+  const { deps } = makeDeps(['s1']);
+  deps.oauth2Api[method] = async () => {
+    throw new Error('hydra 500');
+  };
+  await assert.rejects(
+    () => revokeHydraSessions('sub-1', deps),
+    (err) => err instanceof RevokeError && err.dependency === 'hydra-admin' && err.step === step,
+  );
 });
