@@ -109,6 +109,6 @@ test('the non-canonical names are rendered escaped, never via set:html', () => {
 });
 
 test('every POST verifies its CSRF token against the action it names', () => {
-  assert.match(pageSource, /verifyToken\(String\(fd\.get\('csrf_token'\) \?\? ''\), adminId, tokenAction\)/);
+  assert.match(pageSource, /const bad = csrfRefusal\(String\(fd\.get\('csrf_token'\) \?\? ''\), adminId, tokenAction\);\n\s*if \(bad !== null\) return new Response\(`CSRF: \$\{bad\}`, \{ status: 403 \}\);/);
   assert.match(pageSource, /const tokenAction = action === 'remove-credential' \? `remove-\$\{String\(fd\.get\('cred_type'\) \?\? ''\)\}` : action;/);
 });

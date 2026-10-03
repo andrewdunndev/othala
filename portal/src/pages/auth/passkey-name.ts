@@ -7,7 +7,7 @@
 import type { APIRoute } from 'astro';
 import { browserFlows, getSession } from '../../lib/kratos';
 import { getIdentity, patchPasskeyName } from '../../lib/admin-api';
-import { verifyToken, CSRFError } from '../../lib/csrf';
+import { csrfRefusal } from '../../lib/csrf';
 import { applyRename, CREDENTIAL_ID_RE } from '../../lib/passkey-names';
 import { publicUrl } from '../../lib/config';
 import { RENAME_ERROR_COOKIE } from '../../lib/settings-flash';
@@ -39,12 +39,7 @@ export const POST: APIRoute = async ({ request, redirect, cookies }) => {
   const fd = await request.formData();
   const rawId = fd.get('credential_id');
   if (typeof rawId === 'string' && CREDENTIAL_ID_RE.test(rawId)) credentialId = rawId;
-  try {
-    verifyToken(String(fd.get('csrf_token') ?? ''), session.identity.id, 'passkey-name');
-  } catch (err) {
-    if (err instanceof CSRFError) return refuse('csrf');
-    throw err;
-  }
+  if (csrfRefusal(String(fd.get('csrf_token') ?? ''), session.identity.id, 'passkey-name') !== null) return refuse('csrf');
 
   let stored;
   try {

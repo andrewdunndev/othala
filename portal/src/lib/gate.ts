@@ -19,10 +19,13 @@ export function nonCanonicalGroups(identity: Identity | null | undefined): strin
 }
 
 /**
- * A stored name we could not have written denies and names the group: coercing would admit it, skipping would hide it.
- * It returns rather than throws so the admin pages and repair form still load.
+ * The refusal both gates start with: no identity, an inactive one, or a stored group name we could not have written.
+ * A non-canonical name denies and is named: coercing would admit it, skipping would hide it. It returns rather than
+ * throws so the admin pages and repair form still load.
  */
-function refuseNonCanonical(identity: Identity): GateResult | null {
+function refuseIdentity(identity: Identity | null | undefined): GateResult | null {
+  if (!identity) return { allowed: false, reason: 'identity lookup failed' };
+  if (identity.state !== 'active') return { allowed: false, reason: 'identity not active' };
   const bad = nonCanonicalGroups(identity);
   if (bad.length === 0) return null;
   return {
@@ -41,13 +44,7 @@ export function enforceGroupGate(
   identity: Identity | null | undefined,
   group: string,
 ): GateResult {
-  if (!identity) {
-    return { allowed: false, reason: 'identity lookup failed' };
-  }
-  if (identity.state !== 'active') {
-    return { allowed: false, reason: 'identity not active' };
-  }
-  const refusal = refuseNonCanonical(identity);
+  const refusal = refuseIdentity(identity);
   if (refusal) return refusal;
   if (!hasGroup(identity, group)) {
     return { allowed: false, reason: `User is not in ${group} group` };
@@ -61,13 +58,7 @@ export function enforceAccessGate(
   _clientId: string,
   manifest?: ClientManifest | undefined,
 ): GateResult {
-  if (!identity) {
-    return { allowed: false, reason: 'identity lookup failed' };
-  }
-  if (identity.state !== 'active') {
-    return { allowed: false, reason: 'identity not active' };
-  }
-  const refusal = refuseNonCanonical(identity);
+  const refusal = refuseIdentity(identity);
   if (refusal) return refusal;
   if (manifest?.skipAccessCheck) {
     return { allowed: true };

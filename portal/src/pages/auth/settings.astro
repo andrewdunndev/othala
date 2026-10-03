@@ -27,7 +27,7 @@ import { parseIdentity } from '../../lib/identity-facts';
 import { holdsElevatedRole } from '../../lib/gate';
 import { loadTiles, userCanSeeTile } from '../../lib/tiles';
 import { publicUrl } from '../../lib/config';
-import { signToken, verifyToken, CSRFError } from '../../lib/csrf';
+import { signToken, csrfRefusal } from '../../lib/csrf';
 import { readPasskeyNames } from '../../lib/passkey-names';
 import {
   credentialItems,
@@ -91,14 +91,8 @@ if (dev) {
   if (Astro.request.method === 'POST') {
     const fd = await Astro.request.formData();
     if (String(fd.get('action') ?? '') === 'sign-out-everywhere') {
-      try {
-        verifyToken(String(fd.get('csrf_token') ?? ''), session.identity.id, 'sign-out-everywhere');
-      } catch (err) {
-        if (err instanceof CSRFError) {
-          return new Response(`CSRF: ${err.message}`, { status: 403 });
-        }
-        throw err;
-      }
+      const bad = csrfRefusal(String(fd.get('csrf_token') ?? ''), session.identity.id, 'sign-out-everywhere');
+      if (bad !== null) return new Response(`CSRF: ${bad}`, { status: 403 });
       try {
         await revokeSubject(session.identity.id);
       } catch (err) {

@@ -13,7 +13,6 @@ import {
   deleteCredential,
   EVICTABLE_CREDENTIAL_TYPES,
 } from './admin-api';
-import { revokeUserSessions, type RevokeUserResult } from './admin';
 import { parseIdentity } from './identity-facts';
 import { sendInviteRecoveryEmail } from './kratos';
 import { confirmsInviteAddress, normalizeGroupOrder, shouldRefuseRecovery } from './access';
@@ -22,13 +21,13 @@ import { GROUP_RE } from './access-groups';
 import { IDENTITY_GROUPS } from './constants';
 import { holdsElevatedRole, planGroupSave } from './gate';
 import { buildGroupRegistry, isIdentityGroup, unconfiguredGroups } from './group-registry';
-import { DEACTIVATE_STEP, RevokeError, revokeHydraSessions, revokeSubject } from './revoke';
+import { DEACTIVATE_STEP, RevokeError, revokeHydraSessions, revokeSubject, type RevokeResult } from './revoke';
 import { removalBlock } from './admin-view';
 import type { ClientManifest } from './manifests';
 import type { Identity } from './types';
 
-const USERNAME_RE = /^[a-z0-9]+(?:\.[a-z0-9]+)+$/;
-const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+export const USERNAME_RE = /^[a-z0-9]+(?:\.[a-z0-9]+)+$/;
+export const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 export const ENROLLMENT_TTL = '24h';
 
@@ -40,7 +39,7 @@ export type ActionResult =
   | { kind: 'updated'; removed: string[] }
   | { kind: 'admin-granted'; username: string }
   | { kind: 'admin-revoked'; username: string }
-  | { kind: 'revoked'; result: RevokeUserResult }
+  | { kind: 'revoked'; result: RevokeResult }
   | { kind: 'email-verified' }
   | { kind: 'prerequisites-saved' }
   | { kind: 'credential-removed'; credType: string }
@@ -297,7 +296,7 @@ export async function sendInviteEmailAction(fd: FormData, ctx: ActionContext): P
 }
 
 export async function forceReloginAction(_fd: FormData, ctx: ActionContext): Promise<ActionOutcome> {
-  const result = await revokeUserSessions(ctx.id);
+  const result = await revokeSubject(ctx.id);
   return { actionResult: { kind: 'revoked', result }, refetch: false };
 }
 
@@ -462,7 +461,7 @@ export async function removeCredentialAction(fd: FormData, ctx: ActionContext): 
   // Someone else's lost method may have signed a session in, so end their sessions too. Your own stay.
   if (!self) {
     try {
-      await revokeUserSessions(ctx.id);
+      await revokeSubject(ctx.id);
     } catch (err) {
       const reason = err instanceof Error ? err.message : 'unknown error';
       return { actionResult: { kind: 'error', partial: true, message: `Removed, but their sessions could not be ended: ${reason}` }, refetch: true };

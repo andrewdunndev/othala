@@ -23,7 +23,7 @@ import { devActionResult } from '../../../lib/admin-fixtures';
 import { parseIdentity } from '../../../lib/identity-facts';
 import { shouldRefuseRecovery } from '../../../lib/access';
 import { loadRequirements } from '../../../lib/tiles';
-import { signToken, verifyToken, CSRFError } from '../../../lib/csrf';
+import { signToken, csrfRefusal } from '../../../lib/csrf';
 import type { Identity } from '../../../lib/types';
 
 const ctx = await adminContext(Astro);
@@ -72,15 +72,9 @@ if (Astro.request.method === 'POST' && identity) {
   // Every state-changing admin POST carries a CSRF token bound to the admin identity and the action. A dev fixture
   // has no secret to sign with, so it skips the check and writes nothing.
   if (!dev) {
-    try {
-      const tokenAction = action === 'remove-credential' ? `remove-${String(fd.get('cred_type') ?? '')}` : action;
-      verifyToken(String(fd.get('csrf_token') ?? ''), adminId, tokenAction);
-    } catch (err) {
-      if (err instanceof CSRFError) {
-        return new Response(`CSRF: ${err.message}`, { status: 403 });
-      }
-      throw err;
-    }
+    const tokenAction = action === 'remove-credential' ? `remove-${String(fd.get('cred_type') ?? '')}` : action;
+    const bad = csrfRefusal(String(fd.get('csrf_token') ?? ''), adminId, tokenAction);
+    if (bad !== null) return new Response(`CSRF: ${bad}`, { status: 403 });
   }
 
   const handler = ADMIN_ACTIONS[action];
