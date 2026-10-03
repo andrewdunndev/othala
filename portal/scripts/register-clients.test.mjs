@@ -163,16 +163,13 @@ test('secretEnvVar uppercases the client_id (apply-clients.sh convention)', () =
   assert.equal(secretEnvVar('filedrop'), 'FILEDROP_CLIENT_SECRET');
   assert.equal(secretEnvVar('llm'), 'LLM_CLIENT_SECRET');
   assert.equal(secretEnvVar('promptdesk'), 'PROMPTDESK_CLIENT_SECRET');
-  assert.equal(secretEnvVar('my_app'), 'MY_APP_CLIENT_SECRET');
 });
 
 test('secretEnvVar throws loudly on a hyphenated client_id (fail-loud contract)', () => {
   assert.throws(
     () => secretEnvVar('prompt-desk'),
     (err) =>
-      /POSIX env-var stem/.test(err.message) &&
-      /prompt-desk/.test(err.message) &&
-      /PROMPT-DESK_CLIENT_SECRET/.test(err.message),
+      /must match/.test(err.message) && /prompt-desk/.test(err.message),
     'expected a loud throw, not a silent invalid env var name',
   );
 });
@@ -180,14 +177,14 @@ test('secretEnvVar throws loudly on a hyphenated client_id (fail-loud contract)'
 test('secretEnvVar throws on a client_id with a dot', () => {
   assert.throws(
     () => secretEnvVar('my.app'),
-    (err) => /POSIX env-var stem/.test(err.message) && /MY\.APP_CLIENT_SECRET/.test(err.message),
+    (err) => /must match/.test(err.message) && /my\.app/.test(err.message),
   );
 });
 
 test('secretEnvVar throws on a client_id starting with a digit', () => {
   assert.throws(
     () => secretEnvVar('2app'),
-    (err) => /POSIX env-var stem/.test(err.message),
+    (err) => /must match/.test(err.message),
   );
 });
 

@@ -7,7 +7,7 @@ import {
 import {
   oidcClientManifests,
   assertManifestsValid,
-  CLIENT_ID_ENV_STEM_RE,
+  CLIENT_ID_RE,
   type ClientManifest,
 } from './manifests';
 import { HYDRA_ADMIN_URL } from './constants';
@@ -33,17 +33,10 @@ export interface RegisterResult {
   action: 'created' | 'updated';
 }
 
-/** Throws rather than sanitizing: a hyphenated id would name an unresolvable variable. */
+/** Throws rather than sanitizing, so a malformed id never names a variable that cannot resolve. */
 export function secretEnvVar(clientId: string): string {
-  if (!CLIENT_ID_ENV_STEM_RE.test(clientId)) {
-    const wouldBe = `${clientId.toUpperCase()}_CLIENT_SECRET`;
-    throw new Error(
-      `client_id ${JSON.stringify(clientId)} is not a valid POSIX env-var stem ` +
-        `(^[A-Za-z_][A-Za-z0-9_]*$). The registrar would derive ` +
-        `${JSON.stringify(wouldBe)} which is not a valid shell variable and will ` +
-        `never resolve. Rename the client_id to use only letters, digits, and ` +
-        `underscores (manifest-lint rule 1a catches this at load time).`,
-    );
+  if (!CLIENT_ID_RE.test(clientId)) {
+    throw new Error(`client_id ${JSON.stringify(clientId)} must match ${CLIENT_ID_RE}.`);
   }
   return `${clientId.toUpperCase()}_CLIENT_SECRET`;
 }

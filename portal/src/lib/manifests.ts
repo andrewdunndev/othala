@@ -19,7 +19,7 @@ export interface ClientManifest {
   clientId: string;
   /**
    * True for a `presentation:` block with no `oidc:` client (a forward_auth / external tile). It still names an
-   * access group but registers no OIDC client, so the audience, redirect and env-var-stem rules skip it and
+   * access group but registers no OIDC client, so the audience, redirect and client_id rules skip it and
    * getClientManifest() refuses to resolve it. The loader does not filter it out.
    */
   presentationOnly: boolean;
@@ -398,12 +398,12 @@ function originOf(raw: string): string | null {
   }
 }
 
-/** A client_id must be a valid env-var stem: the registrar derives `<CLIENT_ID_UPPER>_CLIENT_SECRET` from it. */
-export const CLIENT_ID_ENV_STEM_RE = /^[A-Za-z_][A-Za-z0-9_]*$/;
+/** The one client_id form: manifests, metadata_admin.roles keys and the registrar's `<CLIENT_ID>_CLIENT_SECRET` all key on it. */
+export const CLIENT_ID_RE = /^[a-z][a-z0-9]*$/;
 
 /**
  * Lint pass shared by the Reload pre-swap guard and `--validate-manifests`; one string per finding, empty = clean.
- * Rules: client_id non-empty and a valid env-var stem; audience non-empty; an audience matches a redirect
+ * Rules: client_id non-empty and matching CLIENT_ID_RE; audience non-empty; an audience matches a redirect
  * origin; group_role_map values name declared roles; every role has a claim_emit; and M10 (emit_groups_claim:false
  * with a role claim_emit setting `groups`).
  */
@@ -416,17 +416,9 @@ export function validateClients(set: ClientManifest[]): string[] {
       errs.push(`${src}: oidc.client_id is empty`);
     }
 
-    // OIDC-only: a presentation-only tile derives no secret, and firing this would hard-fail the whole load for
-    // a valid hyphenated slug. The error names the expected env var.
-    if (!cm.presentationOnly && cm.clientId !== '' && !CLIENT_ID_ENV_STEM_RE.test(cm.clientId)) {
-      const wouldBe = `${cm.clientId.toUpperCase()}_CLIENT_SECRET`;
-      errs.push(
-        `${src}: oidc.client_id ${JSON.stringify(cm.clientId)} contains characters that are ` +
-          `invalid in a POSIX env var name (rule: ^[A-Za-z_][A-Za-z0-9_]*$). ` +
-          `The registrar derives the secret env var as ${JSON.stringify(wouldBe)}, ` +
-          `which is not a valid shell variable and will never resolve. ` +
-          `Rename the client_id to use only letters, digits, and underscores.`,
-      );
+    // A presentation-only tile has no client, and its slug may be hyphenated.
+    if (!cm.presentationOnly && cm.clientId !== '' && !CLIENT_ID_RE.test(cm.clientId)) {
+      errs.push(`${src}: oidc.client_id ${JSON.stringify(cm.clientId)} must match ${CLIENT_ID_RE}.`);
     }
 
     // BLOCK: an empty binding without skip_access_check is unreachable (primitive #5: no binding means no access).

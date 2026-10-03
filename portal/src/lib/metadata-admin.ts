@@ -7,8 +7,8 @@
 import type { MetadataAdmin } from './admin-api';
 import { GROUP_RE } from './access-groups';
 import { CREDENTIAL_ID_RE, cleanPasskeyName } from './passkey-names';
+import { CLIENT_ID_RE } from './manifests';
 
-const CLIENT_ID_RE = /^[a-z][a-z0-9]*$/;
 const ROLE_NAME_RE = /^[a-z][a-z0-9_\-]*$/;
 const MAX_LEN = 64;
 

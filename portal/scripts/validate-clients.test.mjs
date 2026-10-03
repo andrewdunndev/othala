@@ -10,7 +10,7 @@ import {
   validateClients,
   assertManifestsValid,
   shouldEmitGroups,
-  CLIENT_ID_ENV_STEM_RE,
+  CLIENT_ID_RE,
 } from '../src/lib/manifests.ts';
 
 const here = dirname(fileURLToPath(import.meta.url));
@@ -20,19 +20,19 @@ function fromYaml(yamlText, filename = 'crafted.yaml') {
   return parseManifest(yamlText, filename);
 }
 
-test('CLIENT_ID_ENV_STEM_RE: valid stems pass', () => {
-  for (const id of ['filedrop', 'promptdesk', 'llm', 'my_app', '_app', 'App123']) {
-    assert.ok(CLIENT_ID_ENV_STEM_RE.test(id), `expected ${JSON.stringify(id)} to be a valid stem`);
+test('CLIENT_ID_RE: lowercase ids pass', () => {
+  for (const id of ['filedrop', 'promptdesk', 'llm', 'app123']) {
+    assert.ok(CLIENT_ID_RE.test(id), `expected ${JSON.stringify(id)} to be valid`);
   }
 });
 
-test('CLIENT_ID_ENV_STEM_RE: invalid stems are rejected (hyphens, dots, leading digits)', () => {
-  for (const id of ['prompt-desk', 'my.app', '1app', 'app-', 'a b']) {
-    assert.ok(!CLIENT_ID_ENV_STEM_RE.test(id), `expected ${JSON.stringify(id)} to be rejected`);
+test('CLIENT_ID_RE: rejects hyphens, dots, underscores, capitals and leading digits', () => {
+  for (const id of ['prompt-desk', 'my.app', '1app', 'app-', 'a b', 'my_app', '_app', 'App123']) {
+    assert.ok(!CLIENT_ID_RE.test(id), `expected ${JSON.stringify(id)} to be rejected`);
   }
 });
 
-test('rule 1a: hyphenated client_id fires the env-var-stem error', () => {
+test('rule 1a: hyphenated client_id fires the client_id error', () => {
   const m = fromYaml(`
 oidc:
   client_id: prompt-desk
@@ -48,14 +48,13 @@ consent:
     errs.some(
       (e) =>
         e.includes('prompt-desk') &&
-        e.includes('POSIX env var') &&
-        e.includes('PROMPT-DESK_CLIENT_SECRET'),
+        e.includes('must match'),
     ),
-    `expected env-var-stem error, got:\n${errs.join('\n')}`,
+    `expected client_id error, got:\n${errs.join('\n')}`,
   );
 });
 
-test('rule 1a: client_id with a dot fires the env-var-stem error', () => {
+test('rule 1a: client_id with a dot fires the client_id error', () => {
   const m = fromYaml(`
 oidc:
   client_id: my.app
@@ -66,12 +65,12 @@ consent:
 `);
   const errs = validateClients([m]);
   assert.ok(
-    errs.some((e) => e.includes('POSIX env var') && e.includes('MY.APP_CLIENT_SECRET')),
-    `expected env-var-stem error, got:\n${errs.join('\n')}`,
+    errs.some((e) => e.includes('"my.app"') && e.includes('must match')),
+    `expected client_id error, got:\n${errs.join('\n')}`,
   );
 });
 
-test('rule 1a: client_id starting with a digit fires the env-var-stem error', () => {
+test('rule 1a: client_id starting with a digit fires the client_id error', () => {
   const m = fromYaml(`
 oidc:
   client_id: 2app
@@ -82,12 +81,12 @@ consent:
 `);
   const errs = validateClients([m]);
   assert.ok(
-    errs.some((e) => e.includes('POSIX env var')),
-    `expected env-var-stem error, got:\n${errs.join('\n')}`,
+    errs.some((e) => e.includes('must match')),
+    `expected client_id error, got:\n${errs.join('\n')}`,
   );
 });
 
-test('rule 1a: valid client_id without hyphens does NOT fire the env-var-stem error', () => {
+test('rule 1a: valid client_id without hyphens does NOT fire the client_id error', () => {
   const m = fromYaml(`
 oidc:
   client_id: promptdesk
@@ -102,13 +101,13 @@ consent: {}
 `);
   const errs = validateClients([m]);
   assert.equal(
-    errs.filter((e) => e.includes('POSIX env var')).length,
+    errs.filter((e) => e.includes('must match')).length,
     0,
-    `promptdesk should not trigger the env-var-stem rule:\n${errs.join('\n')}`,
+    `promptdesk should not trigger the client_id rule:\n${errs.join('\n')}`,
   );
 });
 
-test('rule 1a: assertManifestsValid surfaces the env-var-stem error in the thrown message', () => {
+test('rule 1a: assertManifestsValid surfaces the client_id error in the thrown message', () => {
   const m = fromYaml(`
 oidc:
   client_id: prompt-desk
@@ -123,8 +122,8 @@ consent:
     () => assertManifestsValid([m]),
     (err) =>
       /manifest validation failed/.test(err.message) &&
-      /POSIX env var/.test(err.message) &&
-      /PROMPT-DESK_CLIENT_SECRET/.test(err.message),
+      /must match/.test(err.message) &&
+      /prompt-desk/.test(err.message),
   );
 });
 
