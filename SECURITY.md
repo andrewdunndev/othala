@@ -67,7 +67,7 @@ Each names its enforcer and the test that fails if the enforcer stops working.
   (constant-time, fail-closed on an unset secret). Test:
   `portal/scripts/public-mux-disjoint.test.mjs`.
 - **Recovery is not a path to admin.** The recovery `after` hook in
-  `kratos/kratos.yml` posts `kratos/hooks/recovery-gate.jsonnet` to that loopback
+  `kratos/kratos.yml` posts `kratos/hooks/recovery-gate.jsonnet` to that internal
   gate before the privileged settings session issues; `shouldRefuseRecovery`
   (`portal/src/lib/access.ts`) refuses an admin-marked target, so a compromised
   mailbox does not become admin authority. Tests:

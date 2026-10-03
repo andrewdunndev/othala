@@ -13,7 +13,7 @@ either.
 
 **Option A — E2E smoke harness (`e2e/`):** The fastest way to validate
 Othala locally against a running substrate, without any deploy plane. See
-`e2e/README.md` for env reference and smoke verification. The harness runs
+`e2e/README.md` for smoke verification. The harness runs
 the same app image production would; a deploy plane's job is the topology
 and secrets around it, not a different app.
 
@@ -42,23 +42,10 @@ cosign verify \
 
 ## The dual-listener
 
-The app runs **two HTTP listeners in one process**
-(`portal/src/server/listen.ts`):
-
-- **Public SSR port** (`8080` on all interfaces). The Astro
-  handler: Kratos self-service UIs, the family tile dashboard, `/auth/*` +
-  `/admin/*` pages, and the OAuth2 challenge providers
-  (`/oauth2/{login,consent,logout}`). The only port a deploy plane should
-  expose to the network.
-- **Admin port** (`4431`, bound to `PORTAL_ADMIN_BIND_HOST`,
-  internal network only). A separate `http.createServer` with its own disjoint mux:
-  `GET /healthz` (liveness), `GET /readyz` (503 unless Kratos and Hydra report ready),
-  `POST /admin/{recovery,login-code}-gate`. It never delegates to the SSR
-  handler: off the public mux by construction. The bearer-guarded routes
-  are constant-time and fail-closed: an unset secret rejects every request.
-
-A deploy plane that publishes the admin port to any network segment reachable
-from outside the pod or host has broken the trust boundary (`ARCHITECTURE.md`).
+Expose only the public port, `8080`. The admin port, `4431`, stays on the
+internal network; publishing it anywhere reachable from outside the pod or
+host breaks the trust boundary
+([`ARCHITECTURE.md` § Trust boundary](ARCHITECTURE.md#trust-boundary)).
 
 ## Vendored configs and the drift-check obligation
 
@@ -103,7 +90,7 @@ full per-RP runbook.
 
 1. Tag this repo after CI publishes images (`git tag vX.Y.Z && git push
    --tags`).
-2. The deploy plane re-vendors the four config files (previous section) at
+2. The deploy plane re-vendors the configs under *Vendored configs* at
    the new ref and reviews what changed.
 3. Bump the pinned image tag/digest for the app, plus Kratos/Hydra if their
    pins changed.
@@ -115,24 +102,3 @@ full per-RP runbook.
 Kratos and Hydra migrations are forward-only: `pg_dump` before any deploy that
 changes an Ory pin, and roll back across that change by restoring the dump. An
 app-only rollback is a digest revert.
-
-## Why two repos
-
-`dunn.dev/othala` is the **application** and its authoritative configs. The
-deploy plane is the operator concern: secrets, runtime topology, storage,
-every other host service. It vendors Othala's configs by tag-pin so the
-open-sourceable application stays decoupled from private infrastructure
-decisions. Othala versions independently of any instance running it.
-
-## Related docs
-
-- [`ARCHITECTURE.md`](ARCHITECTURE.md) — what the app is + load-bearing
-  decisions (this file does not restate it)
-- [`CHANGELOG.md`](CHANGELOG.md) and git tags — the only place
-  release/version state is asserted
-- [`per-app-oidc.md`](site/src/content/docs/guides/per-app-oidc.md) —
-  per-RP OIDC integration runbook
-- [`docs/runbooks/admin-recovery.md`](docs/runbooks/admin-recovery.md) —
-  the admin-authority model and the recovery ladder
-- `portal/src/lib/gate.ts` — how entry and role are decided (the model the
-  manifests express)
