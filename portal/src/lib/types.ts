@@ -81,9 +81,6 @@ export interface NodeInputAttributes {
   autocomplete?: string;
   // Kratos uses "node_type": "input" to discriminate.
   node_type: 'input';
-  // Buttons/triggers carry an onclick handler string the script wires up.
-  onclick?: string;
-  // Used by passkey discoverable-credential trigger.
   onclickTrigger?: string;
 }
 

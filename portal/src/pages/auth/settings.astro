@@ -290,7 +290,6 @@ const lookupLabel: Record<string, string> = {
               <CredentialRows items={passkeys} kind="passkey" noun="passkey" fallbackName="Passkey" rename={passkeys.length > 0} renameError={renameError} reauth={reauth} reauthHref={reauthHref} />
               {nodesByGroup(nodes, 'passkey').map((n) => {
                 const a = asInput(n);
-                // safeOnclick validates against KNOWN_TRIGGERS; never emit a.onclick raw.
                 if (a?.type === 'button' && !welcome) {
                   return (
                     <div class="form-actions">
