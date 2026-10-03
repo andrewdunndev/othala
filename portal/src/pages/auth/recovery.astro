@@ -8,6 +8,8 @@ import { csrfToken, hasMethod } from '../../lib/nodes';
 import { journeyText, noticeClass, noticeRole, recoverySpecs } from '../../lib/journey';
 import { DEV_RECOVERY_STATES, devRecovery, isIn } from '../../lib/journey-fixtures';
 import type { FlowMessage } from '../../lib/types';
+import { ENROLLMENT_TTL } from '../../lib/admin-actions';
+import { describeTtl } from '../../lib/admin-view';
 
 const flowId = Astro.url.searchParams.get('flow');
 const isDev = import.meta.env.DEV;
@@ -45,7 +47,7 @@ const messages = (ui?.messages ?? []).filter((m: FlowMessage) => !(phase === 'se
   title={phase === 'request' ? 'Get back in' : 'Enter your code'}
   lede={phase === 'request'
     ? "Enter your email and we'll send you a one-time code. No password needed."
-    : `${sentTo ? `We emailed a code to ${sentTo}. ` : ''}Enter the code from your email, or from the setup message that brought you here. It works once. An emailed code lasts 15 minutes; a code from a setup message lasts an hour. Nothing yet? Check spam or junk, then send a new code.`}
+    : `${sentTo ? `We emailed a code to ${sentTo}. ` : ''}Enter the code from your email, or from the setup message that brought you here. It works once. An emailed code lasts 15 minutes; a code from a setup message lasts ${describeTtl(ENROLLMENT_TTL)}. Nothing yet? Check spam or junk, then send a new code.`}
   description="Start or regain access with a one-time code."
 >
 
