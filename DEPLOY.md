@@ -62,18 +62,17 @@ from outside the pod or host has broken the trust boundary (`ARCHITECTURE.md`).
 
 ## Vendored configs and the drift-check obligation
 
-Four files are byte-canonical here and must be vendored **verbatim**, not
+These files are byte-canonical here and must be vendored **verbatim**, not
 hand-edited, by any deploy plane: `kratos/kratos.yml`, `hydra/hydra.yml`,
-`kratos/identity.schema.json`, and `kratos/hooks/recovery-gate.jsonnet`. A
-deploy plane that diverges from these has diverged from behavior this repo
-tests and documents — the gate handler's own guarantees (Section 3 of
-`docs/runbooks/admin-recovery.md`), the identity schema, and the recovery
-flow config all assume these bytes. Run a byte-diff check against the
-pinned Othala ref on every promotion; treat any diff as something to port
-upstream to this repo, never a local patch.
+`kratos/identity.schema.json`, `kratos/hooks/recovery-gate.jsonnet`, and the
+mail templates in `kratos/courier/`. The gate handler (Section 3 of
+`docs/runbooks/admin-recovery.md`) and the recovery flow assume these bytes:
+byte-diff them against the pinned Othala ref on every promotion, and port any
+diff upstream, never patch locally.
 
-The `${VAR}` values in those files (identity, secrets, bind addresses, the
-optional tracing endpoint) are supplied at render time; that is not divergence.
+`scripts/render-config.sh` supplies the `${VAR}` values at render time; that is
+not divergence. Render each `kratos/courier/*.gotmpl` to the same file name and
+mount the directory at `/etc/config/kratos/courier/`, or code emails fail at send.
 
 ## Environment contract
 

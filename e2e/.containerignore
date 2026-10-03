@@ -3,7 +3,7 @@
 # rest are per-run artifacts that must never bake into a published image.
 node_modules/
 .env
-*.rendered.yml
+*.rendered*
 browser-out/
 Containerfile
 .containerignore

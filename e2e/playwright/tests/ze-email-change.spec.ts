@@ -5,7 +5,7 @@ import type { BrowserContext } from 'playwright-core';
 import { test, expect } from '../fixtures';
 import { createIdentityCodeOnly, createIdentityWithPassword, readIdentity, TEST_PASSWORD } from '../actions/identity';
 import { findCsrfToken, loginViaJsonApi } from '../actions/login';
-import { forRecipient, waitForMessage } from '../actions/mail';
+import { forRecipient, HOUSEHOLD, waitForMessage } from '../actions/mail';
 
 const EMAIL_CHANGE_REFUSAL = 'To change an email address, sign in again with your passkey or password.';
 
@@ -43,7 +43,9 @@ async function codeLogin(ctx: BrowserContext, baseURL: string, identifier: strin
     maxRedirects: 0,
   });
   const step2 = await sent.json();
-  const { code } = await waitForMessage(forRecipient(identifier, since, /to log in/i));
+  const { code, subject, body } = await waitForMessage(forRecipient(identifier, since, /to log in/i));
+  expect(subject, 'subject names the household').toContain(HOUSEHOLD);
+  expect(body, 'body names the household').toContain(HOUSEHOLD);
   expect(code, 'code in the mail body').not.toBe('');
   const done = await ctx.request.post(step2.ui.action, {
     headers: { 'Content-Type': 'application/json', Accept: 'application/json' },

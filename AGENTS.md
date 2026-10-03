@@ -50,18 +50,18 @@ When a document is wrong, delete the wrong sentence before considering a
 replacement: a fresher value goes stale on the same schedule, a pointer to the
 enforcing file does not. Nothing enforces this.
 
-## The four byte-vendored files
+## The byte-vendored files
 
 - `kratos/kratos.yml`
 - `hydra/hydra.yml`
 - `kratos/identity.schema.json`
 - `kratos/hooks/recovery-gate.jsonnet`
+- `kratos/courier/*.gotmpl`
 
 These are vendored verbatim into a separate deployment repository, which fails
 its own drift check on any divergence. Editing one here starts a re-vendor
 costing a release tag and an operator review: a deliberate act with a downstream
 cost. Comments count, because a comment inside these files ships to production.
-`e2e/compose.yml` mounts them from `kratos/`.
 
 ## The gates
 

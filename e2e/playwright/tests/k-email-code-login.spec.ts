@@ -4,7 +4,7 @@ import { test, expect } from '../fixtures';
 import type { APIRequestContext } from '@playwright/test';
 import { createIdentityWithPassword } from '../actions/identity';
 import { getSession } from '../actions/session';
-import { waitForMessage, forRecipient } from '../actions/mail';
+import { HOUSEHOLD, waitForMessage, forRecipient } from '../actions/mail';
 
 async function initLoginFlow(
   request: APIRequestContext,
@@ -153,7 +153,9 @@ test('K1 — email-code login delivers a code and establishes an active session'
     identifierHidden !== undefined,
   );
 
-  const { code, id: messageId } = await waitForMessage(forRecipient(identity.email, startTime));
+  const { code, subject, body, id: messageId } = await waitForMessage(forRecipient(identity.email, startTime));
+  expect(subject, 'K1: the subject names the household').toContain(HOUSEHOLD);
+  expect(body, 'K1: the body names the household').toContain(HOUSEHOLD);
   console.log('[K1] received sign-in code:', code, 'message id:', messageId);
 
   const identifierValue = identifierHidden?.attributes?.value != null

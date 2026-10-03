@@ -1,10 +1,11 @@
 // Invariant: the shipped Ory templates carry the policy as literals, trace only when OTHALA_OTLP_ENDPOINT is set,
 // and derive CORS and WebAuthn from the identity vars; e2e alone turns the breach check off, by overlay.
+// Code emails name the household without letting its value inject template actions or HTML.
 
 import { test } from 'vitest';
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
-import { mkdtempSync, readFileSync, rmSync } from 'node:fs';
+import { existsSync, mkdtempSync, readFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -29,19 +30,21 @@ const BASE_ENV = {
   HYDRA_ADMIN_BIND_HOST: '10.0.0.2',
 };
 
-function render(template, extra = {}) {
+function renderText(template, extra = {}) {
   const dir = mkdtempSync(join(tmpdir(), 'ory-config-'));
   try {
-    const out = join(dir, 'out.yml');
+    const out = join(dir, 'out');
     execFileSync('bash', [join(root, 'scripts/render-config.sh'), join(root, template), out], {
       env: { ...BASE_ENV, ...extra },
       stdio: 'pipe',
     });
-    return parse(readFileSync(out, 'utf8'));
+    return readFileSync(out, 'utf8');
   } finally {
     rmSync(dir, { recursive: true, force: true });
   }
 }
+
+const render = (template, extra) => parse(renderText(template, extra));
 
 test('kratos: breach check on and minimum length 12 are literals', () => {
   const cfg = render('kratos/kratos.yml');
@@ -96,5 +99,59 @@ test('render refuses an empty Ory admin bind', () => {
       assert.throws(() => render(template, { [name]: bad }), `${name}=${JSON.stringify(bad)}`);
     }
     assert.doesNotThrow(() => render(template, { [name]: '0.0.0.0' }));
+  }
+});
+
+const MAIL = {
+  recovery_code: { code: '{{ .RecoveryCode }}', subject: /recover/i },
+  login_code: { code: '{{ .LoginCode }}', subject: /to log in/i },
+  verification_code: { code: '{{ .VerificationCode }}', subject: /verif/i },
+};
+const PARTS = ['subject', 'body.html', 'body.plaintext'];
+const mailFiles = () => Object.keys(MAIL).flatMap((id) => PARTS.map((part) => `kratos/courier/${id}.${part}.gotmpl`));
+
+test('kratos: every code email part is a vendored template', () => {
+  const templates = render('kratos/kratos.yml').courier.templates;
+  assert.deepEqual(Object.keys(templates).sort(), Object.keys(MAIL).sort());
+  for (const id of Object.keys(MAIL)) {
+    const { subject, body } = templates[id].valid.email;
+    for (const [part, uri] of [['subject', subject], ['body.html', body.html], ['body.plaintext', body.plaintext]]) {
+      assert.equal(uri, `file:///etc/config/kratos/courier/${id}.${part}.gotmpl`);
+      assert.ok(existsSync(join(root, `kratos/courier/${id}.${part}.gotmpl`)), uri);
+    }
+  }
+});
+
+test('mail: subjects match the flow, bodies lead with the code and take the lifetime from Kratos', () => {
+  for (const [id, { code, subject }] of Object.entries(MAIL)) {
+    assert.match(renderText(`kratos/courier/${id}.subject.gotmpl`), subject);
+    for (const part of ['body.html', 'body.plaintext']) {
+      const body = renderText(`kratos/courier/${id}.${part}.gotmpl`);
+      assert.ok(body.includes(code), `${id}.${part}`);
+      assert.ok(body.includes('{{ .ExpiresInMinutes }}'), `${id}.${part}`);
+      assert.doesNotMatch(body.slice(0, body.indexOf(code)), /\d/, `${id}.${part}`);
+      assert.doesNotMatch(body, /15|code=|href|:\/\//, `${id}.${part}`);
+    }
+  }
+});
+
+test('mail: the household name renders into every part, escaped in HTML only', () => {
+  const name = 'Tom & <Jerry>';
+  for (const file of mailFiles()) {
+    const out = renderText(file, { OTHALA_INSTANCE_NAME: name });
+    if (file.endsWith('.html.gotmpl')) {
+      assert.ok(out.includes('Tom &amp; &lt;Jerry&gt;'), file);
+      assert.ok(!out.includes(name), file);
+    } else {
+      assert.ok(out.includes(name), file);
+    }
+  }
+});
+
+test('mail: render refuses a value carrying template delimiters', () => {
+  for (const file of mailFiles()) {
+    for (const bad of ['{{ .Identity }}', 'Acme {{', 'Acme }}']) {
+      assert.throws(() => renderText(file, { OTHALA_INSTANCE_NAME: bad }), `${file} ${bad}`);
+    }
   }
 });

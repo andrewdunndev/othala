@@ -62,7 +62,7 @@ RUN npm ci --no-audit --no-fund
 
 # Bake the e2e sources (specs, config, fixtures/actions, oidc-dance.mjs)
 # alongside node_modules. .containerignore excludes .env / node_modules /
-# *.rendered.yml / browser-out so only the canonical tree lands here.
+# *.rendered* / browser-out so only the canonical tree lands here.
 COPY . .
 
 # Make the prebaked CLIs resolvable on PATH (playwright, etc.).

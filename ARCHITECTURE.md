@@ -231,11 +231,11 @@ denies a client whose manifest is missing. It retries on every call, so recovery
 ## Configuration and the one-way choices
 
 One image serves any instance; `OTHALA_*` variables define the deployment, and `.env.example` is the
-annotated contract. Ory does not expand `${VAR}` inside its own YAML, so `kratos/kratos.yml` and
-`hydra/hydra.yml` are templates rendered by `scripts/render-config.sh`, which derives the required
-variable set from the template itself and fails listing missing *names* only, never rendered content
-that could carry a secret into a log. The e2e harness and the deploy plane call the same render, so
-what is validated and what is deployed differ in values, not in mechanism.
+annotated contract. Ory does not expand `${VAR}` in its own files, so `kratos/kratos.yml`,
+`hydra/hydra.yml` and `kratos/courier/` are templates rendered by `scripts/render-config.sh`, which
+derives the required variable set from the template itself and fails listing missing *names* only,
+never rendered content that could carry a secret into a log. The e2e harness and the deploy plane
+call the same render, so what is validated and what is deployed differ in values, not in mechanism.
 
 Three settings become commitments the moment anyone enrols a credential against them, and should be
 chosen deliberately rather than discovered later:

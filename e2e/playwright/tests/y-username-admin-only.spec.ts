@@ -4,7 +4,7 @@ import type { BrowserContext } from 'playwright-core';
 import { test, expect } from '../fixtures';
 import { createIdentityWithPassword, readIdentity, TEST_PASSWORD } from '../actions/identity';
 import { findCsrfToken, loginViaJsonApi } from '../actions/login';
-import { forRecipient, waitForMessage } from '../actions/mail';
+import { forRecipient, HOUSEHOLD, waitForMessage } from '../actions/mail';
 
 const USERNAME_CHANGE_REFUSAL = 'Your username can only be changed by a household admin.';
 
@@ -94,7 +94,9 @@ test.describe('Y — username is admin-only', () => {
       expect(after.username).toBe(username);
       const addresses = (await readIdentity(kratosAdminURL, seeded.id)).verifiable_addresses as Array<{ value: string; verified: boolean }>;
       expect(addresses.find((a) => a.value === changed)?.verified, 'new address unverified').toBe(false);
-      await waitForMessage(forRecipient(changed, since, /verif/i));
+      const { subject, body } = await waitForMessage(forRecipient(changed, since, /verif/i));
+      expect(subject, 'Y3: the subject names the household').toContain(HOUSEHOLD);
+      expect(body, 'Y3: the body names the household').toContain(HOUSEHOLD);
 
       const whoOther = await other.request.get(`${baseURL}/sessions/whoami`, { headers: { Accept: 'application/json' } });
       expect(whoOther.status(), 'the other session ended').toBe(401);

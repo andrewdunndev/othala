@@ -287,6 +287,29 @@ courier:
     from_address: "noreply@${OTHALA_APEX}"
     from_name: "${OTHALA_INSTANCE_NAME}"
     # local_name: leave default; Fastmail accepts standard HELO
+  # Rendered from kratos/courier/ by render-config.sh; Kratos reads each file only when it sends.
+  templates:
+    recovery_code:
+      valid:
+        email:
+          subject: file:///etc/config/kratos/courier/recovery_code.subject.gotmpl
+          body:
+            html: file:///etc/config/kratos/courier/recovery_code.body.html.gotmpl
+            plaintext: file:///etc/config/kratos/courier/recovery_code.body.plaintext.gotmpl
+    login_code:
+      valid:
+        email:
+          subject: file:///etc/config/kratos/courier/login_code.subject.gotmpl
+          body:
+            html: file:///etc/config/kratos/courier/login_code.body.html.gotmpl
+            plaintext: file:///etc/config/kratos/courier/login_code.body.plaintext.gotmpl
+    verification_code:
+      valid:
+        email:
+          subject: file:///etc/config/kratos/courier/verification_code.subject.gotmpl
+          body:
+            html: file:///etc/config/kratos/courier/verification_code.body.html.gotmpl
+            plaintext: file:///etc/config/kratos/courier/verification_code.body.plaintext.gotmpl
 
 
 secrets:

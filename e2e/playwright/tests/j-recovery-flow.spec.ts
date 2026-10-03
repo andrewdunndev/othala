@@ -4,7 +4,7 @@ import type { APIRequestContext } from '@playwright/test';
 import { test, expect } from '../fixtures';
 import { createIdentityWithPassword } from '../actions/identity';
 import { getSession } from '../actions/session';
-import { waitForMessage, forRecipient } from '../actions/mail';
+import { HOUSEHOLD, waitForMessage, forRecipient } from '../actions/mail';
 
 async function initRecoveryFlow(
   req: APIRequestContext,
@@ -153,7 +153,9 @@ test('J1 — non-admin recovery flow issues a privileged settings session', asyn
   const codePage = await req.get(`${baseURL}/auth/recovery?flow=${flow.id}`);
   expect(await codePage.text(), 'J1: the code step tells people to check spam or junk').toMatch(/spam or junk/i);
 
-  const { code, id: messageId } = await waitForMessage(forRecipient(identity.email, startTime, /recover/i));
+  const { code, subject, body, id: messageId } = await waitForMessage(forRecipient(identity.email, startTime, /recover/i));
+  expect(subject, 'J1: the subject names the household').toContain(HOUSEHOLD);
+  expect(body, 'J1: the body names the household').toContain(HOUSEHOLD);
   console.log('[J1] recovery code received, message id:', messageId, 'code:', code);
 
   const codeResp = await req.post(step2.action, {
@@ -211,6 +213,8 @@ test('J2 — admin recovery is blocked by the recovery-gate webhook (no privileg
   try {
     const result = await waitForMessage(forRecipient(identity.email, startTime, /recover/i));
     code = result.code;
+    expect(result.subject, 'J2: the subject names the household').toContain(HOUSEHOLD);
+    expect(result.body, 'J2: the body names the household').toContain(HOUSEHOLD);
     console.log('[J2] admin recovery code received:', result.id);
   } catch (e) {
     console.log('[J2] no recovery email (gate may fire at initiation):', String(e));

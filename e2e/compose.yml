@@ -95,6 +95,7 @@ services:
       - ./kratos.e2e.yml:/etc/config/kratos/e2e.yml:ro,z
       - ../kratos/identity.schema.json:/etc/config/kratos/identity.schema.json:ro,z
       - ../kratos/hooks/recovery-gate.jsonnet:/etc/config/kratos/hooks/recovery-gate.jsonnet:ro,z
+      - ./courier.rendered:/etc/config/kratos/courier:ro,z
     command: ["serve", "--config", "/etc/config/kratos/kratos.yml", "--config", "/etc/config/kratos/e2e.yml", "--dev", "--watch-courier"]
     healthcheck:
       test: ["CMD-SHELL", "wget -qO- http://localhost:4434/admin/health/ready || exit 1"]
@@ -268,6 +269,7 @@ services:
         condition: service_healthy
     environment:
       BASE: http://auth.othala.test
+      OTHALA_INSTANCE_NAME: ${OTHALA_INSTANCE_NAME}
       # J2: recovery-gate on the othala admin port (static IP via PORTAL_ADMIN_BIND_HOST in compose.browser.yml).
       OTHALA_ADMIN_URL: http://othala:4431
       RECOVERY_GATE_SECRET: ${RECOVERY_GATE_SECRET}

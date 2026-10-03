@@ -1,5 +1,5 @@
 browser-out/
-*.rendered.yml
+*.rendered*
 .env
 node_modules/
 # package-lock.json IS tracked: the prebaked e2e-tester image

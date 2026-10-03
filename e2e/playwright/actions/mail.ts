@@ -4,6 +4,7 @@
  */
 
 export const MAILPIT_API = process.env.MAILPIT_API ?? 'http://mailpit:8025';
+export const HOUSEHOLD = process.env.OTHALA_INSTANCE_NAME ?? 'Othala Lab';
 
 export interface MailSummary {
   id: string;

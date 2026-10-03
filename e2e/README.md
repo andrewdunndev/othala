@@ -50,7 +50,8 @@ set -a; source ./.env; set +a
 
 bash ../scripts/render-config.sh ../kratos/kratos.yml kratos.rendered.yml
 bash ../scripts/render-config.sh ../hydra/hydra.yml   hydra.rendered.yml
-chmod 0644 kratos.rendered.yml hydra.rendered.yml
+mkdir -p courier.rendered; for t in ../kratos/courier/*.gotmpl; do bash ../scripts/render-config.sh "$t" "courier.rendered/${t##*/}"; done
+chmod 0644 kratos.rendered.yml hydra.rendered.yml courier.rendered/*
 
 # Base stack (smoke services, with the Caddy edge)
 docker-compose --env-file=.env up -d

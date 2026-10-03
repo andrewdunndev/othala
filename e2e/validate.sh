@@ -50,10 +50,15 @@ bash ../scripts/render-config.sh ../kratos/kratos.yml kratos.rendered.yml \
     || { echo "  ✗ render kratos.yml failed — aborting" >&2; exit 1; }
 bash ../scripts/render-config.sh ../hydra/hydra.yml   hydra.rendered.yml \
     || { echo "  ✗ render hydra.yml failed — aborting" >&2; exit 1; }
+rm -rf courier.rendered && mkdir courier.rendered
+for t in ../kratos/courier/*.gotmpl; do
+    bash ../scripts/render-config.sh "$t" "courier.rendered/${t##*/}" \
+        || { echo "  ✗ render $t failed — aborting" >&2; exit 1; }
+done
 # The renderer writes 0600 but kratos/hydra run as uid 10000 under cap_drop ALL and could not
 # read the bind-mounted configs; they are per-run artifacts, .env keeps the secrets at 0600.
-chmod 0644 kratos.rendered.yml hydra.rendered.yml
-echo "  canonical configs rendered (kratos.rendered.yml, hydra.rendered.yml; 0644 for in-container ory uid)"
+chmod 0644 kratos.rendered.yml hydra.rendered.yml courier.rendered/*
+echo "  canonical configs rendered (kratos.rendered.yml, hydra.rendered.yml, courier.rendered/; 0644 for in-container ory uid)"
 
 # Wrapped in a timeout: a never-healthy dependency makes `up -d` block until the CI limit.
 echo "  docker compose up (timeout 300s)..."

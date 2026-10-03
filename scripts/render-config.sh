@@ -1,9 +1,10 @@
 #!/usr/bin/env bash
 # render-config.sh: the Ory-config render shared by e2e/validate.sh and the deploy plane.
 # Usage: render-config.sh <template> <output>, variables from the environment. Every ${NAME}
-# left after #@if resolution and comment stripping must be SET (names-only error). #@if NAME ...
-# #@endif keeps the block when NAME is non-empty and drops it otherwise (the tracing blocks are
-# keyed on OTHALA_OTLP_ENDPOINT; Ory v26 rejects a half-populated block).
+# left after #@if resolution (and, in YAML, comment stripping) must be SET (names-only error).
+# #@if NAME ... #@endif keeps the block when NAME is non-empty and drops it otherwise (Ory
+# rejects a half-populated tracing block). Values are escaped for YAML double-quoted scalars,
+# for HTML in *.html.gotmpl, and land verbatim in other *.gotmpl (Kratos mail templates).
 set -euo pipefail
 
 if [[ $# -ne 2 ]]; then
@@ -22,10 +23,11 @@ fi
 umask 077
 
 python3 - "$TEMPLATE" "$OUTPUT" <<'PY'
-import os, re, sys
+import html, os, re, sys
 
 template_path, output_path = sys.argv[1], sys.argv[2]
 src = open(template_path).read()
+mode = "html" if template_path.endswith(".html.gotmpl") else "text" if template_path.endswith(".gotmpl") else "yaml"
 
 TOKEN = re.compile(r"\$\{([A-Za-z_][A-Za-z0-9_]*)\}")
 IF_RE = re.compile(r"^\s*#@if\s+([A-Za-z_][A-Za-z0-9_]*)\s*$")
@@ -71,8 +73,7 @@ def resolve_conditionals(text):
 
 src = resolve_conditionals(src)
 
-# Derive required tokens from a comment-stripped view so ${VAR} inside comments is not a phantom
-# requirement. Simple heuristic (misses '#' inside quoted strings); substitution uses the full source.
+# YAML comments may name ${VAR} without requiring it; the heuristic misses '#' inside quoted strings.
 def strip_comments(text):
     out = []
     for line in text.splitlines():
@@ -85,7 +86,7 @@ def strip_comments(text):
         out.append(line[:pos] if pos != -1 else line)
     return '\n'.join(out)
 
-needed = sorted(set(TOKEN.findall(strip_comments(src))))
+needed = sorted(set(TOKEN.findall(strip_comments(src) if mode == "yaml" else src)))
 
 missing = [n for n in needed if n not in os.environ]
 if missing:
@@ -113,40 +114,40 @@ for name in needed:
               f"(YAML structure injection guard)",
               file=sys.stderr)
         sys.exit(1)
+    # Kratos parses mail templates as Go templates: a delimiter in a value would inject an action.
+    if mode != "yaml" and ("{{" in val or "}}" in val):
+        print(f"render-config: {template_path}: variable {name} contains a "
+              f"template delimiter — refusing to render", file=sys.stderr)
+        sys.exit(1)
 
-# All tokens sit in YAML double-quoted scalars: escape backslash first, then double-quote.
+# YAML tokens sit in double-quoted scalars: escape backslash first, then double-quote.
 def escape_for_double_quoted_yaml(val):
-    val = val.replace('\\', '\\\\')   # \ → \\ (must be first)
-    val = val.replace('"', '\\"')     # " → \"
-    return val
+    return val.replace('\\', '\\\\').replace('"', '\\"')
 
-# Substitute only the needed (non-comment) tokens; comment-only tokens stay literal.
+escape = {"yaml": escape_for_double_quoted_yaml, "html": html.escape, "text": str}[mode]
 needed_set = set(needed)
 rendered = TOKEN.sub(
-    lambda m: escape_for_double_quoted_yaml(os.environ[m.group(1)])
-              if m.group(1) in needed_set else m.group(0),
+    lambda m: escape(os.environ[m.group(1)]) if m.group(1) in needed_set else m.group(0),
     src
 )
 with open(output_path, "w") as f:
     f.write(rendered)
 
-# Post-render YAML parse catches values that still break YAML; skipped with a warning if
-# pyyaml is missing.
-try:
-    import yaml
+if mode == "yaml":
     try:
-        yaml.safe_load(open(output_path).read())
-    except yaml.YAMLError as e:
-        print(f"render-config: rendered output {output_path} failed YAML "
-              f"validation — deleting partial output. Error: {e}",
+        import yaml
+        try:
+            yaml.safe_load(rendered)
+        except yaml.YAMLError as e:
+            print(f"render-config: rendered output {output_path} failed YAML "
+                  f"validation — deleting partial output. Error: {e}",
+                  file=sys.stderr)
+            os.unlink(output_path)
+            sys.exit(1)
+    except ImportError:
+        print(f"render-config: pyyaml not available — skipping post-render YAML "
+              f"validation of {output_path}. Install pyyaml for full validation.",
               file=sys.stderr)
-        import os as _os
-        _os.unlink(output_path)
-        sys.exit(1)
-except ImportError:
-    print(f"render-config: pyyaml not available — skipping post-render YAML "
-          f"validation of {output_path}. Install pyyaml for full validation.",
-          file=sys.stderr)
 
 print(f"render-config: {template_path} -> {output_path} ({len(needed)} vars)")
 PY
