@@ -4,6 +4,7 @@
 
 import { Configuration, FrontendApi, ResponseError } from '@ory/client-fetch';
 import { KRATOS_PUBLIC_URL } from './constants';
+import { timeoutFetch } from './ory-fetch';
 import type {
   FlowResult,
   LoginFlow,
@@ -23,6 +24,7 @@ function frontendApi(): FrontendApi {
   return new FrontendApi(
     new Configuration({
       basePath: kratosBase(),
+      fetchApi: timeoutFetch(),
     }),
   );
 }

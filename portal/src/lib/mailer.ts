@@ -60,9 +60,18 @@ export function parseSmtpUri(uri: string): SmtpOptions {
 
 let _transport: Transporter | null = null;
 
+export function smtpTransportOptions() {
+  return {
+    ...parseSmtpUri(smtpConnectionUri),
+    connectionTimeout: 10_000,
+    greetingTimeout: 10_000,
+    socketTimeout: 30_000,
+  };
+}
+
 function transport(): Transporter {
   if (_transport) return _transport;
-  _transport = nodemailer.createTransport(parseSmtpUri(smtpConnectionUri));
+  _transport = nodemailer.createTransport(smtpTransportOptions());
   return _transport;
 }
 

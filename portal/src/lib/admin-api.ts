@@ -17,9 +17,10 @@ import { validateMetadataAdmin } from './metadata-admin';
 import { passkeyCredentialIds, pruneNames, readPasskeyNames } from './passkey-names';
 import { revokeSubject } from './revoke';
 import { KRATOS_ADMIN_URL } from './constants';
+import { timeoutFetch } from './ory-fetch';
 
 function identityApi(): IdentityApi {
-  return new IdentityApi(new Configuration({ basePath: KRATOS_ADMIN_URL }));
+  return new IdentityApi(new Configuration({ basePath: KRATOS_ADMIN_URL, fetchApi: timeoutFetch() }));
 }
 
 export interface IdentityTraits {

@@ -16,6 +16,7 @@ import {
   type ClientManifest,
 } from './manifests';
 import { HYDRA_ADMIN_URL } from './constants';
+import { timeoutFetch } from './ory-fetch';
 import { clientSecretEnv } from './config';
 
 /** The slice of OAuth2Api the registrar needs, so tests can inject a stub. */
@@ -61,7 +62,7 @@ export function secretEnvVar(clientId: string): string {
 }
 
 function defaultApi(): OAuth2ClientApi {
-  return new OAuth2Api(new Configuration({ basePath: HYDRA_ADMIN_URL })) as unknown as OAuth2ClientApi;
+  return new OAuth2Api(new Configuration({ basePath: HYDRA_ADMIN_URL, fetchApi: timeoutFetch() })) as unknown as OAuth2ClientApi;
 }
 
 /** Build the Hydra OAuth2Client body from a manifest + secret: only `oidc:` fields, optional ones omitted when empty, the secret as a typed field. */

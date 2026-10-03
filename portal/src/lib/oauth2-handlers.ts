@@ -19,6 +19,7 @@ import { servingManifest } from './manifest-store';
 import { verifyToken, CSRFError } from './csrf';
 import { publicUrl } from './config';
 import { HYDRA_ADMIN_URL } from './constants';
+import { timeoutFetch } from './ory-fetch';
 
 // Hydra remembers a sign-in as long as the Kratos session lives so a later app sign-out still reaches handleLogout;
 // the fallback is the Kratos session.lifespan (720h).
@@ -32,7 +33,7 @@ export function loginRememberFor(session: Session, now: number = Date.now()): nu
 }
 
 export function defaultOAuth2Api(): OAuth2Api {
-  return new OAuth2Api(new Configuration({ basePath: HYDRA_ADMIN_URL }));
+  return new OAuth2Api(new Configuration({ basePath: HYDRA_ADMIN_URL, fetchApi: timeoutFetch() }));
 }
 
 /** Login-UI base for the no-session bounce (the portal's Kratos login page). */

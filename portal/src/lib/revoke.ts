@@ -11,6 +11,7 @@ import {
   type JsonPatch,
 } from '@ory/client-fetch';
 import { HYDRA_ADMIN_URL, KRATOS_ADMIN_URL } from './constants';
+import { timeoutFetch } from './ory-fetch';
 
 /** Which upstream dependency a revoke step failed against. */
 export type RevokeDependency = 'kratos-admin' | 'hydra-admin';
@@ -55,11 +56,11 @@ export interface RevokeResult {
 }
 
 function buildIdentityApi(): IdentityApi {
-  return new IdentityApi(new Configuration({ basePath: KRATOS_ADMIN_URL }));
+  return new IdentityApi(new Configuration({ basePath: KRATOS_ADMIN_URL, fetchApi: timeoutFetch() }));
 }
 
 function buildOAuth2Api(): OAuth2Api {
-  return new OAuth2Api(new Configuration({ basePath: HYDRA_ADMIN_URL }));
+  return new OAuth2Api(new Configuration({ basePath: HYDRA_ADMIN_URL, fetchApi: timeoutFetch() }));
 }
 
 /** Resolve injected deps, defaulting to the live SDK clients. */
