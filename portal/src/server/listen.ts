@@ -14,6 +14,7 @@ import { secondFactorChangeVerdict, SECOND_FACTOR_UNAVAILABLE } from '../lib/sec
 import { emailChangeVerdict, usernameChangeVerdict, PROFILE_UPDATE_UNAVAILABLE } from '../lib/profile-gate';
 import { HYDRA_ADMIN_URL, KRATOS_ADMIN_URL, SECRET_MIN_BYTES } from '../lib/constants';
 import type { Identity } from '../lib/types';
+import { upstream } from '../lib/oauth2-handlers';
 
 const PORT = 8080;
 const HOST = '0.0.0.0';
@@ -374,7 +375,8 @@ export async function handleAdminRequest(req: IncomingMessage, res: ServerRespon
 /** Build the admin server (no socket bound until .listen). */
 export function createAdminServer() {
   return http.createServer((req, res) => {
-    handleAdminRequest(req, res).catch(() => {
+    handleAdminRequest(req, res).catch((err: unknown) => {
+      upstream('admin-request', err);
       if (!res.headersSent) {
         res.writeHead(500, { 'Content-Type': 'text/plain' });
         res.end('internal server error');
@@ -392,6 +394,7 @@ export async function createPublicServer() {
     ssrHandler(req, res, (err: unknown) => {
       // Unmatched route or error: emit a plain 404/500 rather than hang.
       if (err) {
+        upstream('public-request', err);
         res.writeHead(500, { 'Content-Type': 'text/plain' });
         res.end('internal server error');
         return;
