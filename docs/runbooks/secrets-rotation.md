@@ -23,8 +23,8 @@ exposure, on-disk leak, accidental commit).
   re-receive new client_secret values when the in-app registrar re-runs.
 - Outstanding consent challenges (in-flight OAuth2 flows) become
   invalid. Users mid-flow see an error and re-attempt.
-- Hydra's signing keys (id_token JWKS) are unaffected; they live in a
-  different table and use a different key.
+- Hydra's signing keys (id_token JWKS) are encrypted with this key too,
+  so they do not survive: the rebuilt database gets new ones.
 
 So rotation is a brief disruption, not a multi-day migration. Family
 schedule it for a low-traffic window.
