@@ -1,7 +1,7 @@
 # othala-portal: Astro Node SSR.
 #
-# Build on UBI 10 nodejs-22 (with npm), run on ci-runtime-node's
-# nodejs-22-minimal. App manifests are mounted at runtime, not built in.
+# Build on UBI 10 nodejs-24 (with npm), run on ci-runtime-node's
+# nodejs-24-minimal. App manifests are mounted at runtime, not built in.
 #
 # Build from the repo root:
 #   podman build -t dunn.dev/othala-portal:lab -f portal/Containerfile .
@@ -10,8 +10,8 @@
 #     dunn.dev/othala-portal:lab
 
 # ----- Stage 1: build -----
-# UBI 10 nodejs-22: the runtime image is -minimal and has no npm.
-FROM registry.access.redhat.com/ubi10/nodejs-22:10.2@sha256:717ad679e570b99d51c36ec735332222b85cc2dc492fd560d4708dc6a18a051b AS build
+# UBI 10 nodejs-24: the runtime image is -minimal and has no npm.
+FROM registry.access.redhat.com/ubi10/nodejs-24:10.2@sha256:80c87fe2b161979a961911c837efff1198bdd597c6dbe7d2e59bf1c60638188d AS build
 
 WORKDIR /src
 USER root
@@ -28,7 +28,7 @@ RUN cd portal \
 # Literal pin, not an ARG: the container-publishing standard reads the
 # ci-runtime-* reference off this line. It moves with the pipeline component
 # pins in .gitlab-ci.yml, since old catalog tags are garbage-collected.
-FROM registry.gitlab.com/dunn.dev/pipeline/ci-runtime-node:4.8.0@sha256:29d519f7a2290959a6ecfb0272dfb4930406439494bdf0496af357e036be4041
+FROM registry.gitlab.com/dunn.dev/pipeline/ci-runtime-node:4.10.0@sha256:f5c9ba73e32e4b5de75778d1ec0b83e1f7a4f3d5bbc961e448c9915cf868eb33
 
 WORKDIR /app
 

@@ -3,6 +3,9 @@
   "private": true,
   "version": "0.11.0",
   "type": "module",
+  "engines": {
+    "node": ">=24"
+  },
   "scripts": {
     "dev": "astro dev --port 4321",
     "build": "astro build && npm run build:listener && npm run copy:otel && npm run build:registrar && npm run build:manifest-lint",
