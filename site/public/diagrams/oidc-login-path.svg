@@ -80,6 +80,6 @@
 <line class="e" x1="40" y1="500" x2="680" y2="500" stroke="#e0e0e0" stroke-width="1"/>
 <text class="m" x="40" y="518" font-size="8" fill="#707070">A remembered subject (Hydra skip=true) takes a different step 3 — it re-verifies a live Kratos session before</text>
 <text class="m" x="40" y="530" font-size="8" fill="#707070">honouring the skip. See "Hydra remembers; Kratos authenticates."</text>
-<text class="m" x="40" y="548" font-size="8" fill="#707070">Pinned by e2e/playwright/tests/a-login-session.spec.ts, b-oidc-claims.spec.ts and i-passkey-register-login.spec.ts.</text>
+<text class="m" x="40" y="548" font-size="8" fill="#707070">Pinned by e2e/playwright/tests/t-access-model.spec.ts and i-passkey-register-login.spec.ts.</text>
 </g>
 </svg>

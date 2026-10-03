@@ -75,7 +75,7 @@ Each names its enforcer and the test that fails if the enforcer stops working.
 - **Claims decide role, never entry.** `composeIDTokenClaims` / `lookupRole`,
   `portal/src/lib/claims.ts`: a per-app role, every claim gated on the granted
   scope, and `deepMergeClaims` skipping `__proto__`, `constructor`, `prototype`.
-  Tests: `portal/scripts/claims-inject.fuzz.test.mjs`, `e2e/playwright/tests/b-oidc-claims.spec.ts`.
+  Tests: `portal/scripts/claims-inject.fuzz.test.mjs`, `e2e/playwright/tests/t-access-model.spec.ts`.
 - **Manifest validation, fail-closed.** `validateClients` and
   `audienceMatchesRedirect`, `portal/src/lib/manifests.ts`, reject a duplicate
   `client_id`, an empty audience, an audience with no exact-origin redirect
@@ -95,14 +95,14 @@ Each names its enforcer and the test that fails if the enforcer stops working.
   `Cross-Origin-Opener-Policy`, HSTS, and a `form-action` bounded to the
   configured apex. CSRF on state-changing POSTs is Astro's `security.checkOrigin`
   (`portal/astro.config.mjs`) plus `portal/src/lib/csrf.ts`. Tests:
-  `e2e/playwright/tests/m-security-headers.spec.ts`,
-  `e2e/playwright/tests/e-consent-csrf-tamper.spec.ts`.
+  `e2e/playwright/tests/m-security-headers.spec.ts`, `e2e/playwright/tests/r-admin-post-origin.spec.ts`,
+  `portal/scripts/oauth2-handlers.test.mjs`.
 - **Abuse resistance ships with the install.** `caddy/Caddyfile` rate-limits the
   Kratos self-service paths keyed on the socket peer and overwrites
   `X-Forwarded-For` at every `reverse_proxy`, so a client cannot mint a fresh
   bucket per request; `kratos/kratos.yml` bounds password-hash work
-  (`hashers.argon2`) and code guessing (`max_submissions`, `lifespan`). Test:
-  `e2e/playwright/tests/n-rate-limits.spec.ts`.
+  (`hashers.argon2`) and code guessing (`max_submissions`, `lifespan`). The rate limits are
+  reference config with no automated test; the deploy plane owns the live edge.
 - **Credential and session hygiene.** Self-registration is disabled in
   `kratos/kratos.yml`, so enrolment is admin-initiated; breach checking and a
   minimum length gate passwords; a password change fires

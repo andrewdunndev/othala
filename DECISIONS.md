@@ -155,8 +155,7 @@ because admin-marked targets are refused outright before Kratos is ever asked (`
 server-checked address confirmation: the admin re-types the target address, and `confirmsInviteAddress`
 (`portal/src/lib/access.ts`) rejects any submission that does not byte-equal the on-file trait before the
 Kratos call — a UI-only check is not an invariant. Rate limiting on this send path is not one of those
-bounds: the MEDIUM-B gap for login/recovery code floods is live and enforced
-(`e2e/playwright/tests/n-rate-limits.spec.ts`, N1/N2), but it doesn't reach here — this call goes to
+bounds: the reference Caddyfile rate-limits login and recovery code requests, but that doesn't reach here — this call goes to
 Kratos pod-internally, never through the public listener Caddy fronts. Enforced by
 `e2e/playwright/tests/u-admin-invite-email.spec.ts` and `portal/scripts/admin-recovery-gate.test.mjs`.
 
