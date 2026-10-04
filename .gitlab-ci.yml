@@ -45,6 +45,9 @@ include:
   # image pin Renovate cannot track.
   - component: gitlab.com/dunn.dev/pipeline/osv-verdict@4.10.0
   - component: gitlab.com/dunn.dev/pipeline/secret-verdict@4.10.0
+    inputs:
+      # Fake SMTP credentials on example.com, parser fixtures.
+      excluded_paths: "portal/src/lib/contact.test.ts,portal/scripts/config.test.mjs,portal/scripts/admin-port.test.mjs"
   - component: gitlab.com/dunn.dev/pipeline/pin-audit@4.10.0
   - component: gitlab.com/dunn.dev/pipeline/automerge-gate@4.10.0
     inputs:
