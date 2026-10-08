@@ -243,11 +243,28 @@ test('registerManifests throws when a required secret is missing', async () => {
   );
 });
 
-test('registerManifests tolerates a missing secret with allowMissingSecret (dry run)', async () => {
+test('a token_endpoint_auth_method none client registers with no secret env and sends no secret', async () => {
   const api = stubApi(new Set());
-  const m = parseManifest(FILEDROP_YAML, 'filedrop.yaml');
-  await registerManifests([m], { api, env: {}, allowMissingSecret: true });
+  const m = parseManifest(FILEDROP_YAML.replace('client_secret_basic', 'none'), 'filedrop.yaml');
+  const env = new Proxy({}, { get: (_, k) => assert.fail(`read env ${String(k)}`) });
+  await registerManifests([m], { api, env });
   assert.ok(!('client_secret' in api.calls.create[0]));
+});
+
+test('one failing client does not stop the others; the aggregate error names it', async () => {
+  const api = stubApi(new Set());
+  const create = api.createOAuth2Client;
+  api.createOAuth2Client = async (req) => {
+    if (req.oAuth2Client.client_id === 'filedrop') throw new Error('hydra 500');
+    return create(req);
+  };
+  const a = parseManifest(FILEDROP_YAML, 'filedrop.yaml');
+  const b = parseManifest(FILEDROP_YAML.replaceAll('filedrop', 'other'), 'other.yaml');
+  await assert.rejects(
+    () => registerManifests([a, b], { api, env: { FILEDROP_CLIENT_SECRET: 'x', OTHER_CLIENT_SECRET: 'y' } }),
+    /filedrop \(hydra 500\)/,
+  );
+  assert.deepEqual(api.calls.create.map((c) => c.client_id), ['other']);
 });
 
 test('registerManifests runs the validateClients lint pre-flight and ABORTS on a bad set', async () => {

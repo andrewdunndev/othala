@@ -1,4 +1,4 @@
-// App manifest loader. loadClientManifests() returns every manifest, presentation-only tiles included;
+// App manifest loader. loadClientManifests() returns every manifest that survives quarantine, presentation-only tiles included;
 // oidcClientManifests() narrows to the OIDC clients.
 
 import { readdirSync, readFileSync, statSync } from 'node:fs';
@@ -265,8 +265,26 @@ function freshestMtime(): number {
   }
 }
 
-/** Every app manifest, sorted by filename; cached 30 s or until an mtime changes. An invalid set throws and
- * keeps the prior cache. */
+/** Drops, with a logged reason, every manifest that fails validation or shares a client_id (case-insensitive) with another, so one bad file never takes the rest down. */
+function quarantine(manifests: ClientManifest[]): ClientManifest[] {
+  const files = new Map<string, string[]>();
+  for (const m of manifests) {
+    const key = m.clientId.toLowerCase();
+    files.set(key, [...(files.get(key) ?? []), m.sourcePath]);
+  }
+  return manifests.filter((m) => {
+    const key = m.clientId.toLowerCase();
+    const sharing = files.get(key) ?? [];
+    const reason =
+      sharing.length > 1
+        ? `duplicate client_id ${JSON.stringify(key)} in ${sharing.join(', ')}`
+        : validateClients([m]).join('; ');
+    if (reason) console.warn(`manifests: dropping ${m.sourcePath}: ${reason}`);
+    return !reason;
+  });
+}
+
+/** Every valid app manifest, sorted by filename; cached 30 s or until an mtime changes. Invalid files are quarantined, not fatal. */
 export function loadClientManifests(): ClientManifest[] {
   const now = Date.now();
   const mtime = freshestMtime();
@@ -278,31 +296,7 @@ export function loadClientManifests(): ClientManifest[] {
     return cache.manifests;
   }
 
-  const priorCache = cache;
-
-  const manifests = loadFromDisk();
-
-  const seen = new Map<string, string>(); // lowercase clientId -> sourcePath
-  for (const m of manifests) {
-    const key = m.clientId.toLowerCase();
-    const existing = seen.get(key);
-    if (existing !== undefined) {
-      cache = priorCache;
-      throw new Error(
-        `duplicate client_id ${JSON.stringify(key)} in ${existing} and ${m.sourcePath}`,
-      );
-    }
-    seen.set(key, m.sourcePath);
-  }
-
-  const errs = validateClients(manifests);
-  if (errs.length > 0) {
-    cache = priorCache;
-    throw new Error(
-      `manifest validation failed (${errs.length} finding(s)):\n  - ${errs.join('\n  - ')}`,
-    );
-  }
-
+  const manifests = quarantine(loadFromDisk());
   cache = { manifests, mtimeMs: mtime, loadedAtMs: now };
   return manifests;
 }

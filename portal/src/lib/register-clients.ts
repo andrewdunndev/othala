@@ -19,7 +19,6 @@ export interface RegisterOptions {
   env?: Record<string, string | undefined>;
   /** Skip the validateClients lint; default false so a bad manifest set cannot half-register. */
   skipValidation?: boolean;
-  allowMissingSecret?: boolean;
 }
 
 export interface RegisterResult {
@@ -66,14 +65,11 @@ export function buildClientBody(
 function resolveSecret(
   m: ClientManifest,
   env: Record<string, string | undefined>,
-  allowMissing: boolean,
 ): string | undefined {
+  if (m.tokenEndpointAuthMethod === 'none') return undefined;
   const name = secretEnvVar(m.clientId);
   const secret = env[name];
-  if (!secret) {
-    if (allowMissing) return undefined;
-    throw new Error(`${name} not set in environment for client ${m.clientId}`);
-  }
+  if (!secret) throw new Error(`${name} not set in environment for client ${m.clientId}`);
   return secret;
 }
 
@@ -122,9 +118,16 @@ export async function registerManifests(
   }
 
   const results: RegisterResult[] = [];
+  const failed: string[] = [];
   for (const m of manifests) {
-    const secret = resolveSecret(m, env, Boolean(opts.allowMissingSecret));
-    results.push(await registerClient(api, m, secret));
+    try {
+      results.push(await registerClient(api, m, resolveSecret(m, env)));
+    } catch (err) {
+      failed.push(`${m.clientId} (${err instanceof Error ? err.message : String(err)})`);
+    }
+  }
+  if (failed.length > 0) {
+    throw new Error(`registration failed for ${failed.length} client(s): ${failed.join('; ')}`);
   }
   return results;
 }

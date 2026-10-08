@@ -80,9 +80,12 @@ Each names its enforcer and the test that fails if the enforcer stops working.
   `audienceMatchesRedirect`, `portal/src/lib/manifests.ts`, reject a duplicate
   `client_id`, an empty audience, an audience with no exact-origin redirect
   match, an undeclared role in `group_role_map`, an empty access binding;
-  `portal/src/lib/manifest-store.ts` then serves the last known good set, or the
-  empty set on a cold start, which denies everywhere. Tests:
-  `portal/scripts/manifest-validate.fuzz.test.mjs`, `portal/src/lib/manifest-store.test.ts`.
+  `loadClientManifests` then drops each such file, so its app is an unknown client
+  and is refused at login and consent, while the rest keep serving (its Hydra client keeps
+  its last registered config, so existing refresh tokens still work); if the directory itself cannot load,
+  `portal/src/lib/manifest-store.ts` serves the last known good set, or the empty
+  set on a cold start, which denies everywhere. Tests:
+  `portal/scripts/manifests-loader.test.mjs`, `portal/scripts/manifest-validate.fuzz.test.mjs`, `portal/src/lib/manifest-store.test.ts`.
 - **forward_auth never trusts a header.** `portal/src/pages/api/forward-auth.ts`
   takes the required group from an operator-set query parameter and the user's
   groups from the admin API; no inbound identity header is read, and `HEAD`

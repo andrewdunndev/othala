@@ -1,6 +1,5 @@
-// Serving-path manifest access, which never throws. STRICT callers (registrar, lint CLI) use manifests.ts directly;
-// SERVING callers (/oauth2/*, admin UI) use this, because a set-wide error would otherwise 500 every
-// login. It keeps the last known good set across mtime checks and SIGHUP, serves the EMPTY set on a cold start
+// Serving-path manifest access, which never throws. Per-file problems are quarantined in manifests.ts; this covers
+// a directory that cannot be read, which would otherwise 500 every login. It keeps the last known good set across mtime checks and SIGHUP, serves the EMPTY set on a cold start
 // (fail-closed), logs `[portal:manifests]` on the first or changed failure, and retries each call so a fix logs
 // RECOVERED. manifestHealth() drives the admin banner.
 
