@@ -12,23 +12,24 @@ import { publicUrl } from './config';
 export const DEVICE_VERIFY_PATH = '/oauth2/device/verify';
 export const DEVICE_CODE_COOKIE = 'othala_device_code';
 const USER_CODE_RE = /^[A-Za-z0-9-]{6,32}$/;
-const CODE_COOKIE_MAX_AGE_S = 600; // ttl.device_user_code
+export const CODE_COOKIE_MAX_AGE_S = 600; // ttl.device_user_code
 
 export function isDeviceRequest(requestUrl: string | undefined): boolean {
   try {
-    return new URL(requestUrl ?? '').pathname === DEVICE_VERIFY_PATH;
+    return new URL(requestUrl ?? '').pathname.endsWith(DEVICE_VERIFY_PATH);
   } catch {
     return false;
   }
 }
 
-/** The code this browser entered, for display on the confirm screen only. */
+/** The code this browser entered, for display on the confirm screen only; two cookies of that name could be either. */
 export function readDeviceCode(cookieHeader: string | null | undefined): string | null {
-  for (const part of (cookieHeader ?? '').split(';')) {
-    const [name, value] = part.trim().split('=');
-    if (name === DEVICE_CODE_COOKIE && USER_CODE_RE.test(value ?? '')) return value;
-  }
-  return null;
+  const values = (cookieHeader ?? '')
+    .split(';')
+    .map((part) => part.trim().split('='))
+    .filter(([name]) => name === DEVICE_CODE_COOKIE);
+  const value = values.length === 1 ? values[0][1] : undefined;
+  return value && USER_CODE_RE.test(value) ? value : null;
 }
 
 function codeCookie(value: string, maxAge: number): string {

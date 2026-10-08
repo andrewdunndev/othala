@@ -3,7 +3,8 @@
 
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { ResponseError } from '@ory/client-fetch';
-import { handleDeviceVerify, isDeviceRequest, readDeviceCode, DEVICE_CODE_COOKIE, type VerifyView } from './device.js';
+import { readFileSync } from 'node:fs';
+import { handleDeviceVerify, isDeviceRequest, readDeviceCode, DEVICE_CODE_COOKIE, CODE_COOKIE_MAX_AGE_S, type VerifyView } from './device.js';
 import { _resetForTests } from './csrf.js';
 
 beforeEach(() => {
@@ -35,6 +36,7 @@ describe('isDeviceRequest', () => {
   it.each([
     ['https://sso.othala.test/oauth2/device/verify?client_id=stepca', true],
     ['https://sso.othala.test/oauth2/auth?client_id=grafana', false],
+    ['https://sso.othala.test/sso/oauth2/device/verify?client_id=stepca', true],
     ['https://sso.othala.test/oauth2/device/verify/x', false],
     ['not a url', false],
     [undefined, false],
@@ -45,10 +47,14 @@ describe('readDeviceCode', () => {
   it('reads the code among other cookies', () => {
     expect(readDeviceCode(`a=1; ${DEVICE_CODE_COOKIE}=ABCD-EFGH; b=2`)).toBe('ABCD-EFGH');
   });
-  it.each([null, '', `${DEVICE_CODE_COOKIE}=`, `${DEVICE_CODE_COOKIE}=<script>`, `x${DEVICE_CODE_COOKIE}=ABCDEFGH`])(
+  it.each([null, '', `${DEVICE_CODE_COOKIE}=`, `${DEVICE_CODE_COOKIE}=<script>`, `x${DEVICE_CODE_COOKIE}=ABCDEFGH`, `${DEVICE_CODE_COOKIE}=ABCDEFGH; ${DEVICE_CODE_COOKIE}=IJKLMNOP`])(
     'refuses %s',
     (header) => expect(readDeviceCode(header)).toBeNull(),
   );
+  it('lives as long as the user code Hydra issues', () => {
+    const ttl = /^\s*device_user_code:\s*(\d+)m\s*$/m.exec(readFileSync(new URL('../../../hydra/hydra.yml', import.meta.url), 'utf8'));
+    expect(Number(ttl?.[1]) * 60).toBe(CODE_COOKIE_MAX_AGE_S);
+  });
 });
 
 describe('handleDeviceVerify GET', () => {
@@ -71,7 +77,7 @@ describe('handleDeviceVerify POST', () => {
     expect(res.headers.get('location')).toBe('https://sso.othala.test/oauth2/device/verify?device_verifier=v');
     expect(oauth2.acceptUserCodeRequest).toHaveBeenCalledWith({ deviceChallenge: 'dc', acceptDeviceUserCodeRequest: { user_code: 'ABCDEFGH' } });
     const cookie = res.headers.get('set-cookie') ?? '';
-    expect(cookie).toMatch(new RegExp(`^${DEVICE_CODE_COOKIE}=ABCDEFGH; Path=/; Max-Age=600; HttpOnly; SameSite=Lax`));
+    expect(cookie).toMatch(new RegExp(`^${DEVICE_CODE_COOKIE}=ABCDEFGH; Path=/; Max-Age=${CODE_COOKIE_MAX_AGE_S}; HttpOnly; SameSite=Lax`));
   });
 
   it('re-renders "not found" with a fresh token when Hydra refuses the code', async () => {
