@@ -60,6 +60,11 @@ export const REASON_MAP: Record<string, ErrorEntry> = {
     title: 'Sign-in was cancelled',
     message: 'The app was not allowed to sign you in. Go back to the app and choose sign in to try again.',
   },
+  'second-factor-required': {
+    status: 403,
+    title: 'This needs a second factor',
+    message: 'Signing in a device needs an authenticator app or a security key. Add one in your account settings, then try again on the device.',
+  },
   'server-error': {
     status: 500,
     title: 'Something went wrong on our side',
