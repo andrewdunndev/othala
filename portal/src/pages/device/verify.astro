@@ -1,0 +1,35 @@
+---
+// Device grant code entry: Hydra sends the browser here with a device_challenge, and a user_code when the device's
+// link carried one. The logic is handleDeviceVerify (lib/device.ts).
+
+export const prerender = false;
+
+import FocusPage from '../../components/FocusPage.astro';
+import { handleDeviceVerify } from '../../lib/device';
+
+const result = await handleDeviceVerify(Astro.request);
+if (result instanceof Response) return result;
+const { challenge, userCode, csrfToken, error } = result;
+Astro.response.headers.set('Cache-Control', 'no-store');
+---
+<FocusPage
+  title={error === 'missing' ? 'Start on your device' : 'Sign in a device'}
+  lede={error === 'missing'
+    ? 'This page opens from the link or address your device shows. Start sign-in on the device again.'
+    : 'Enter the code your device shows. Only use a code from a device in front of you.'}
+  tabTitle="Device sign-in"
+  description="Enter the code a device shows to sign it in."
+>
+  {error !== 'missing' && (
+    <form method="POST" enctype="application/x-www-form-urlencoded" class="panel focus-card focus-form">
+      <input type="hidden" name="device_challenge" value={challenge} />
+      <input type="hidden" name="csrf_token" value={csrfToken} />
+      <div class="field">
+        <label for="user-code">Code</label>
+        <input id="user-code" name="user_code" type="text" class="code-input" autocomplete="off" autocapitalize="characters" spellcheck="false" required value={userCode} />
+        {error === 'not-found' && <p class="field-error" role="alert">That code was not found or has expired. Check your device and try again.</p>}
+      </div>
+      <button type="submit" class="button button-primary focus-btn">Continue</button>
+    </form>
+  )}
+</FocusPage>

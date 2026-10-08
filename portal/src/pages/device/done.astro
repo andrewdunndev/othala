@@ -1,0 +1,18 @@
+---
+// Device grant success: Hydra lands here with ?client_id once the code is approved, and the device's poll succeeds.
+
+export const prerender = false;
+
+import FocusPage from '../../components/FocusPage.astro';
+import { clearDeviceCode } from '../../lib/device';
+import { servingManifest } from '../../lib/manifest-store';
+
+const clientName = servingManifest(Astro.url.searchParams.get('client_id') ?? '')?.clientName;
+Astro.response.headers.append('Set-Cookie', clearDeviceCode());
+---
+<FocusPage
+  title="Device signed in"
+  lede={`${clientName ?? 'Your device'} is signed in. Go back to the device; you can close this page.`}
+  tabTitle="Device signed in"
+  description="The device is signed in."
+/>

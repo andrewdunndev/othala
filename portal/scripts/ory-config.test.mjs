@@ -70,6 +70,15 @@ test('hydra: Postgres host is literal and CORS allows only the public URL', () =
   assert.deepEqual(cfg.serve.public.cors.allowed_origins, ['https://auth.example.com']);
 });
 
+test('hydra: the device grant pages are portal pages under the public URL', () => {
+  const { device } = render('hydra/hydra.yml').urls;
+  for (const url of [device.verification, device.success]) {
+    const { origin, pathname } = new URL(url);
+    assert.equal(origin, 'https://auth.example.com');
+    assert.ok(existsSync(join(root, 'portal/src/pages', `${pathname}.astro`)), `${pathname} has no portal page`);
+  }
+});
+
 test('tracing blocks are absent unless OTHALA_OTLP_ENDPOINT is set', () => {
   assert.equal('tracing' in render('kratos/kratos.yml'), false);
   assert.equal('tracing' in render('hydra/hydra.yml'), false);
