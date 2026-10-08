@@ -115,7 +115,7 @@ The `check-portal` and `check-purity` jobs run on every push, MR and tag;
   config fields, the generated `@ory/client-fetch` SDK. Deviate only where
   upstream is broken here, and say why at the deviation site. A habit.
 - **Robust where it protects a family account, simple everywhere else.** Robust:
-  the gates, aal2 and freshness on admin, admin recovery console-only, HIBP
+  the gates, aal2 and freshness on admin and the device grant, admin recovery console-only, HIBP
   fail-closed, consent revocation. Simple: no knob whose default can contradict
   the shipped config, no key restating an upstream default, no second layer
   duplicating a control, limits sized for a household. Acceptance is the

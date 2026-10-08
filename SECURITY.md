@@ -86,6 +86,16 @@ Each names its enforcer and the test that fails if the enforcer stops working.
   `portal/src/lib/manifest-store.ts` serves the last known good set, or the empty
   set on a cold start, which denies everywhere. Tests:
   `portal/scripts/manifests-loader.test.mjs`, `portal/scripts/manifest-validate.fuzz.test.mjs`, `portal/src/lib/manifest-store.test.ts`.
+- **A device grant needs a fresh second factor and a shown code.** A
+  verification link can carry someone else's code, so `handleLogin` and
+  `handleConsent` (`portal/src/lib/oauth2-handlers.ts`) hold any request whose
+  `request_url` is Hydra's device verification path (`isDeviceRequest`,
+  `portal/src/lib/device.ts`) to a sign-in inside the fresh window at `aal2`,
+  refuse an identity with no second factor, and always confirm against the code
+  this browser entered, whatever `skip_consent` says. The portal enforces this
+  because Hydra ignores `prompt` and `max_age` on that path. Tests:
+  `portal/scripts/oauth2-handlers.test.mjs`, `e2e/playwright/tests/zo-device-phishing.spec.ts`,
+  `e2e/playwright/tests/zp-device-aal1-refused.spec.ts`.
 - **forward_auth never trusts a header.** `portal/src/pages/api/forward-auth.ts`
   takes the required group from an operator-set query parameter and the user's
   groups from the admin API; no inbound identity header is read, and `HEAD`
@@ -140,6 +150,8 @@ Live properties of the deployed shape, stated rather than omitted.
   descending privilege, so a manifest listing roles ascending silently downgrades
   its users. The direction is fail-safe; the silence is not.
 - **A member with no second factor: the mailbox holder keeps the account.** An emailed code proves the mailbox, not the person. A passkey or TOTP the mailbox holder adds is accepted, and the email-change gate only guards members who already hold a passkey or password.
+- **A refused device keeps polling.** Hydra has no device-grant reject, so a
+  denied or refused code answers `authorization_pending` until it expires.
 - **One maintainer.** The times above are best effort; there is no on-call.
 
 ## Out of scope
