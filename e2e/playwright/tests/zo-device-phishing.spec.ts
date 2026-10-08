@@ -30,6 +30,7 @@ test('ZO1 — a prefilled link on a 31s-old session refreshes the sign-in and st
   const chain = hops.map(String).join(' -> ');
   const bounce = hops.find((u) => u.pathname === '/auth/login' && u.searchParams.has('return_to'));
   expect(bounce?.searchParams.get('refresh'), `ZO1: a fresh sign-in is asked for: ${chain}`).toBe('true');
+  expect(bounce?.searchParams.get('aal'), `ZO1: and it proves the second factor again: ${chain}`).toBe('aal2');
   expect(hops.some((u) => u.pathname === '/auth/consent' || u.pathname === '/device/done'), `ZO1: nothing approved: ${chain}`).toBe(false);
   const pending = await pollDeviceToken(request, baseURL, attacker.device_code);
   expect(pending.body.error, 'ZO1: the attacker\'s device is still waiting').toBe('authorization_pending');

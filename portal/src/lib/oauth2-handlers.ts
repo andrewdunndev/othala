@@ -212,8 +212,8 @@ export async function handleLogin(req: Request, deps: Deps = {}): Promise<Respon
     return rejectLogin(d, challenge, 'access_denied', 403, device ? 'not-authorised' : undefined);
   }
 
-  // A device grant hands a token to a machine the browser cannot see, so it takes aal2: a second factor makes the
-  // step-up below ask for it, and an identity without one is refused.
+  // A device grant hands a token to a machine the browser cannot see, so it takes aal2: the refresh and step-up below
+  // ask for the second factor, and an identity without one is refused.
   if (device && acr !== 'aal2' && !parseIdentity(identity).hasSecondFactor) {
     console.warn('[oauth2/login] access denied', { clientId, subject, reason: 'device grant without a second factor' });
     return rejectLogin(d, challenge, 'access_denied', 403, 'second-factor-required');
@@ -221,7 +221,7 @@ export async function handleLogin(req: Request, deps: Deps = {}): Promise<Respon
 
   const freshness = freshnessVerdict(login.request_url, session);
   if (freshness === 'login_required') return rejectLogin(d, challenge, freshness, 400);
-  if (freshness === 'refresh') return loginBounce(challenge, 'refresh=true&');
+  if (freshness === 'refresh') return loginBounce(challenge, device ? 'refresh=true&aal=aal2&' : 'refresh=true&');
 
   if ('stepUp' in access) return loginBounce(challenge, 'aal=aal2&');
 

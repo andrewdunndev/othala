@@ -1404,8 +1404,9 @@ test('logout redirects to auth-unreachable, accepting nothing, when the session 
   assert.equal(calls.acceptLogout, 0);
 });
 
-// Device grant: Hydra drops prompt and skip on its verification URL, so the handlers hold every device login to a
-// fresh aal2 sign-in and every device consent to a confirm screen, and send refusals to the portal's error page.
+// Device grant: Hydra ignores prompt and max_age on its verification URL and skip can arrive true, so the handlers hold
+// every device login to a fresh aal2 sign-in and every device consent to a confirm screen, and send refusals to the
+// portal's error page.
 const DEVICE_URL = 'https://sso.othala.test/oauth2/device/verify?client_id=stepca';
 const deviceMember = (...methods) => activeMember({
   metadata_admin: { groups: ['stepca-access'] },
@@ -1438,10 +1439,11 @@ async function deviceLogin({ skip = false, aal = 'aal1', age = 0, methods = ['pa
 for (const skip of [false, true]) {
   const branch = skip ? 'skip' : 'fresh';
 
-  test(`device login (${branch}) refreshes a 31s-old aal2 session though the request names no prompt`, async () => {
+  test(`device login (${branch}) refreshes a 31s-old aal2 session's second factor though the request names no prompt`, async () => {
     const { loc, calls } = await deviceLogin({ skip, aal: 'aal2', age: 31 });
     assert.equal(loc.pathname, '/auth/login');
     assert.equal(loc.searchParams.get('refresh'), 'true');
+    assert.equal(loc.searchParams.get('aal'), 'aal2');
     assert.equal(calls.acceptLogin, 0);
   });
 

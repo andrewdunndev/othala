@@ -48,8 +48,8 @@ export function recordNavigations(page: Page): URL[] {
   return seen;
 }
 
-export async function totpStepUp(ctx: BrowserContext, baseURL: string, secret: string, returnTo = ''): Promise<void> {
-  const query = returnTo ? `&return_to=${encodeURIComponent(returnTo)}` : '';
+export async function totpStepUp(ctx: BrowserContext, baseURL: string, secret: string, returnTo = '', refresh = false): Promise<void> {
+  const query = `${refresh ? '&refresh=true' : ''}${returnTo ? `&return_to=${encodeURIComponent(returnTo)}` : ''}`;
   const flowResp = await ctx.request.get(`${baseURL}/self-service/login/browser?aal=aal2${query}`, {
     headers: { Accept: 'application/json' },
   });
@@ -77,7 +77,8 @@ export async function answerSignIns(
     const bounce = [...hops].reverse().find((u) => u.pathname === '/auth/login' && u.searchParams.has('return_to'));
     if (new URL(page.url()).pathname !== '/auth/login' || !bounce) return new URL(page.url());
     const returnTo = bounce.searchParams.get('return_to')!;
-    if (bounce.searchParams.get('aal') === 'aal2' && totpSecret) await totpStepUp(page.context(), baseURL, totpSecret, returnTo);
+    const refresh = bounce.searchParams.get('refresh') === 'true';
+    if (bounce.searchParams.get('aal') === 'aal2' && totpSecret) await totpStepUp(page.context(), baseURL, totpSecret, returnTo, refresh);
     else await loginViaJsonApi(page.context(), creds, baseURL, `?refresh=true&return_to=${encodeURIComponent(returnTo)}`);
     hops.length = 0;
     await page.goto(`${baseURL}${returnTo}`);
