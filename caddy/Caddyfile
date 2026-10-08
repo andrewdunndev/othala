@@ -17,6 +17,16 @@
 		dns cloudflare {env.CF_API_TOKEN}
 	}
 
+	# Public write paths of the device grant: a secretless client mints a device_code row per call, and the code form accepts guesses.
+	@device_entry path /oauth2/device/auth /device/verify
+	rate_limit @device_entry {
+		zone othala_device {
+			key    {client_ip}
+			events 30
+			window 1m
+		}
+	}
+
 	# Hydra public OAuth2 surface + OIDC discovery.
 	@hydra path /oauth2/auth /oauth2/token /oauth2/device/auth /oauth2/device/verify /oauth2/revoke /oauth2/sessions/logout /oauth2/fallbacks/* /.well-known/openid-configuration /.well-known/jwks.json /userinfo
 	handle @hydra {

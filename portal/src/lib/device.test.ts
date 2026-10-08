@@ -1,4 +1,4 @@
-// Invariant: a code reaches Hydra only with a CSRF token minted for its own challenge; only an accepted code is stored,
+// Invariant: a code reaches Hydra only with a challenge token minted for its own challenge; only an accepted code is stored,
 // in an httpOnly Lax cookie; Hydra's 4xx re-renders the form, anything else is an upstream error.
 
 import { describe, it, expect, beforeEach, vi } from 'vitest';
@@ -61,18 +61,18 @@ describe('handleDeviceVerify GET', () => {
   it('prefills the code from the link and mints a token', async () => {
     const v = (await handleDeviceVerify(new Request(`${URL_BASE}?device_challenge=dc&user_code=ABCDEFGH`))) as VerifyView;
     expect(v).toMatchObject({ challenge: 'dc', userCode: 'ABCDEFGH', error: undefined });
-    expect(v.csrfToken).not.toBe('');
+    expect(v.challengeToken).not.toBe('');
   });
   it('without a challenge renders the start-on-your-device notice', async () => {
-    expect(await handleDeviceVerify(new Request(URL_BASE))).toMatchObject({ error: 'missing', csrfToken: '' });
+    expect(await handleDeviceVerify(new Request(URL_BASE))).toMatchObject({ error: 'missing', challengeToken: '' });
   });
 });
 
 describe('handleDeviceVerify POST', () => {
   it('accepts the code, stores it for display and follows Hydra', async () => {
-    const { csrfToken } = await formFor('dc');
+    const { challengeToken } = await formFor('dc');
     const oauth2 = accepted();
-    const res = (await handleDeviceVerify(post({ device_challenge: 'dc', user_code: ' ABCDEFGH ', csrf_token: csrfToken }), { oauth2 })) as Response;
+    const res = (await handleDeviceVerify(post({ device_challenge: 'dc', user_code: ' ABCDEFGH ', challenge_token: challengeToken }), { oauth2 })) as Response;
     expect(res.status).toBe(302);
     expect(res.headers.get('location')).toBe('https://sso.othala.test/oauth2/device/verify?device_verifier=v');
     expect(oauth2.acceptUserCodeRequest).toHaveBeenCalledWith({ deviceChallenge: 'dc', acceptDeviceUserCodeRequest: { user_code: 'ABCDEFGH' } });
@@ -81,40 +81,40 @@ describe('handleDeviceVerify POST', () => {
   });
 
   it('re-renders "not found" with a fresh token when Hydra refuses the code', async () => {
-    const { csrfToken } = await formFor('dc');
+    const { challengeToken } = await formFor('dc');
     const oauth2 = hydra(async () => {
       throw new ResponseError(new Response(null, { status: 400 }), 'invalid_request');
     });
-    const v = (await handleDeviceVerify(post({ device_challenge: 'dc', user_code: 'ABCDEFGH', csrf_token: csrfToken }), { oauth2 })) as VerifyView;
+    const v = (await handleDeviceVerify(post({ device_challenge: 'dc', user_code: 'ABCDEFGH', challenge_token: challengeToken }), { oauth2 })) as VerifyView;
     expect(v).toMatchObject({ challenge: 'dc', userCode: 'ABCDEFGH', error: 'not-found' });
-    expect(v.csrfToken).not.toBe(csrfToken);
+    expect(v.challengeToken).not.toBe(challengeToken);
   });
 
   it('answers 502 when Hydra fails', async () => {
-    const { csrfToken } = await formFor('dc');
+    const { challengeToken } = await formFor('dc');
     const spy = vi.spyOn(console, 'error').mockImplementation(() => {});
     const oauth2 = hydra(async () => {
       throw new Error('boom');
     });
-    const res = (await handleDeviceVerify(post({ device_challenge: 'dc', user_code: 'ABCDEFGH', csrf_token: csrfToken }), { oauth2 })) as Response;
+    const res = (await handleDeviceVerify(post({ device_challenge: 'dc', user_code: 'ABCDEFGH', challenge_token: challengeToken }), { oauth2 })) as Response;
     expect(res.status).toBe(502);
     spy.mockRestore();
   });
 
   it.each([
     ['no token', async () => ''],
-    ['a token minted for another challenge', async () => (await formFor('other')).csrfToken],
+    ['a token minted for another challenge', async () => (await formFor('other')).challengeToken],
   ])('refuses %s without calling Hydra', async (_name, token) => {
     const oauth2 = accepted();
-    const res = (await handleDeviceVerify(post({ device_challenge: 'dc', user_code: 'ABCDEFGH', csrf_token: await token() }), { oauth2 })) as Response;
+    const res = (await handleDeviceVerify(post({ device_challenge: 'dc', user_code: 'ABCDEFGH', challenge_token: await token() }), { oauth2 })) as Response;
     expect(res.status).toBe(400);
     expect(oauth2.acceptUserCodeRequest).not.toHaveBeenCalled();
   });
 
   it('refuses a malformed code without calling Hydra', async () => {
-    const { csrfToken } = await formFor('dc');
+    const { challengeToken } = await formFor('dc');
     const oauth2 = accepted();
-    const v = await handleDeviceVerify(post({ device_challenge: 'dc', user_code: 'AB;CD=EF', csrf_token: csrfToken }), { oauth2 });
+    const v = await handleDeviceVerify(post({ device_challenge: 'dc', user_code: 'AB;CD=EF', challenge_token: challengeToken }), { oauth2 });
     expect(v).toMatchObject({ error: 'not-found' });
     expect(oauth2.acceptUserCodeRequest).not.toHaveBeenCalled();
   });

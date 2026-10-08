@@ -8,7 +8,6 @@ import { fileURLToPath } from 'node:url';
 import {
   parseManifest,
   validateClients,
-  assertManifestsValid,
   shouldEmitGroups,
   CLIENT_ID_RE,
 } from '../src/lib/manifests.ts';
@@ -107,7 +106,7 @@ consent: {}
   );
 });
 
-test('rule 1a: assertManifestsValid surfaces the client_id error in the thrown message', () => {
+test('rule 1a: the client_id finding names the offending id', () => {
   const m = fromYaml(`
 oidc:
   client_id: prompt-desk
@@ -118,13 +117,9 @@ oidc:
 consent:
   skip_access_check: true
 `);
-  assert.throws(
-    () => assertManifestsValid([m]),
-    (err) =>
-      /manifest validation failed/.test(err.message) &&
-      /must match/.test(err.message) &&
-      /prompt-desk/.test(err.message),
-  );
+  const errs = validateClients([m]).join('\n');
+  assert.match(errs, /must match/);
+  assert.match(errs, /prompt-desk/);
 });
 
 test('rule: empty audience fires (every client needs an audience)', () => {
@@ -371,48 +366,6 @@ consent:
   assert.equal(shouldEmitGroups(m), false);
 });
 
-test('assertManifestsValid throws on a bad set, with all findings in the message', () => {
-  const bad = fromYaml(`
-oidc:
-  client_id: novel
-  redirect_uris:
-    - https://novel.othala.test/cb
-consent:
-  roles:
-    user:
-      description: no claim_emit
-`);
-  assert.throws(
-    () => assertManifestsValid([bad]),
-    (err) =>
-      /manifest validation failed/.test(err.message) &&
-      /oidc.audience is empty/.test(err.message) &&
-      /has no claim_emit/.test(err.message),
-  );
-});
-
-test('assertManifestsValid does not throw on a clean set', () => {
-  const good = fromYaml(`
-oidc:
-  client_id: novel
-  redirect_uris:
-    - https://novel.othala.test/cb
-  audience:
-    - https://novel.othala.test
-presentation:
-  access:
-    - novel
-consent:
-  roles:
-    user:
-      description: viewer
-      claim_emit: {}
-  group_role_map:
-    family: user
-`);
-  assert.doesNotThrow(() => assertManifestsValid([good]));
-});
-
 test('BLOCK: bare manifest (no access binding, no skip) is a load-time hard-fail', () => {
   const m = fromYaml(`
 oidc:
@@ -429,7 +382,6 @@ consent: {}
     errs.some((e) => e.includes('presentation.access is empty') && e.includes('unreachable')),
     errs.join('\n'),
   );
-  assert.throws(() => assertManifestsValid([m]), /manifest validation failed/);
 });
 
 test('BLOCK: skip_access_check bypasses the empty-binding block', () => {

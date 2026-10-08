@@ -15,7 +15,7 @@ import { verifyToken, CSRFError } from './csrf';
 import { publicUrl } from './config';
 import { hydraAdmin } from './ory-fetch';
 import { parseIdentity } from './identity-facts';
-import { isDeviceRequest, readDeviceCode } from './device';
+import { isDeviceRequest, readDeviceCode, clearDeviceCode } from './device';
 
 // Hydra remembers a sign-in as long as the Kratos session lives, so a later app sign-out still reaches handleLogout.
 const KRATOS_SESSION_LIFESPAN = 2_592_000; // Kratos session.lifespan, 720h
@@ -346,7 +346,8 @@ export async function handleConsentPost(req: Request, deps: Deps = {}): Promise<
     return upstreamError();
   }
 
-  const refused = (reason: string) => (isDeviceRequest(consent.request_url) ? reason : undefined);
+  const device = isDeviceRequest(consent.request_url);
+  const refused = (reason: string) => (device ? reason : undefined);
 
   let session: Session | null;
   try {
@@ -373,13 +374,20 @@ export async function handleConsentPost(req: Request, deps: Deps = {}): Promise<
 
   // From here the nonce is consumed, so a failed reject goes back to the grant screen for a fresh token.
   const toScreen = () => consentScreen(challenge);
+  // A decided device consent drops the entered code, so a later flow in this browser never shows a leftover one.
+  const decided = (res: Response): Response => {
+    if (!device || res.headers.get('location') === toScreen().headers.get('location')) return res;
+    const headers = new Headers(res.headers);
+    headers.append('Set-Cookie', clearDeviceCode());
+    return new Response(res.body, { status: res.status, headers });
+  };
 
   if (session.identity.id !== consent.subject) {
     return rejectConsent(d, challenge, 'session subject mismatch', toScreen, refused('flow-expired'));
   }
 
   if (action === 'deny') {
-    return rejectConsent(d, challenge, 'user denied access', toScreen, refused('sign-in-cancelled'));
+    return decided(await rejectConsent(d, challenge, 'user denied access', toScreen, refused('sign-in-cancelled')));
   }
 
   const clientId = consent.client?.client_id ?? '';
@@ -392,7 +400,7 @@ export async function handleConsentPost(req: Request, deps: Deps = {}): Promise<
   }
 
   const allowResponse = await acceptConsentRequest(challenge, consent, identity!, d, clientId);
-  return allowResponse.status === 502 ? toScreen() : allowResponse;
+  return allowResponse.status === 502 ? toScreen() : decided(allowResponse);
 }
 
 export async function handleLogout(req: Request, deps: Deps = {}): Promise<Response> {

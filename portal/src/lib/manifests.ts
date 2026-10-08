@@ -274,7 +274,7 @@ function quarantine(manifests: ClientManifest[]): ClientManifest[] {
   }
   return manifests.filter((m) => {
     const key = m.clientId.toLowerCase();
-    const sharing = files.get(key) ?? [];
+    const sharing = files.get(key)!;
     const reason =
       sharing.length > 1
         ? `duplicate client_id ${JSON.stringify(key)} in ${sharing.join(', ')}`
@@ -433,14 +433,3 @@ export function validateClients(set: ClientManifest[]): string[] {
   }
   return errs;
 }
-
-/** Throws one error joining all findings; called before any client is pushed to Hydra. */
-export function assertManifestsValid(set: ClientManifest[]): void {
-  const errs = validateClients(set);
-  if (errs.length > 0) {
-    throw new Error(
-      `manifest validation failed (${errs.length} finding(s)):\n  - ${errs.join('\n  - ')}`,
-    );
-  }
-}
-

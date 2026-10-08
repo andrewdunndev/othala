@@ -9,7 +9,7 @@ import { handleDeviceVerify } from '../../lib/device';
 
 const result = await handleDeviceVerify(Astro.request);
 if (result instanceof Response) return result;
-const { challenge, userCode, csrfToken, error } = result;
+const { challenge, userCode, challengeToken, error } = result;
 Astro.response.headers.set('Cache-Control', 'no-store');
 ---
 <FocusPage
@@ -23,7 +23,7 @@ Astro.response.headers.set('Cache-Control', 'no-store');
   {error !== 'missing' && (
     <form method="POST" enctype="application/x-www-form-urlencoded" class="panel focus-card focus-form">
       <input type="hidden" name="device_challenge" value={challenge} />
-      <input type="hidden" name="csrf_token" value={csrfToken} />
+      <input type="hidden" name="challenge_token" value={challengeToken} />
       <div class="field">
         <label for="user-code">Code</label>
         <input id="user-code" name="user_code" type="text" class="code-input" autocomplete="off" autocapitalize="characters" spellcheck="false" required value={userCode} />

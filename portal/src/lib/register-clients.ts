@@ -1,7 +1,6 @@
 import type { OAuth2Client } from '@ory/client-fetch';
 import {
   oidcClientManifests,
-  assertManifestsValid,
   CLIENT_ID_RE,
   type ClientManifest,
 } from './manifests';
@@ -17,8 +16,6 @@ export interface OAuth2ClientApi {
 export interface RegisterOptions {
   api?: OAuth2ClientApi;
   env?: Record<string, string | undefined>;
-  /** Skip the validateClients lint; default false so a bad manifest set cannot half-register. */
-  skipValidation?: boolean;
 }
 
 export interface RegisterResult {
@@ -112,10 +109,6 @@ export async function registerManifests(
 ): Promise<RegisterResult[]> {
   const env = opts.env ?? clientSecretEnv();
   const api = opts.api ?? (hydraAdmin() as unknown as OAuth2ClientApi);
-
-  if (!opts.skipValidation) {
-    assertManifestsValid(manifests);
-  }
 
   const results: RegisterResult[] = [];
   const failed: string[] = [];

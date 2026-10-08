@@ -5,7 +5,8 @@ import { test, expect, enrollTotpSecret, KRATOS_ADMIN_URL } from '../fixtures';
 import { createIdentityWithPassword, TEST_PASSWORD } from '../actions/identity';
 import { loginViaJsonApi } from '../actions/login';
 import { getSession } from '../actions/session';
-import { startDeviceFlow, pollDeviceToken, recordNavigations, totpStepUp, answerSignIns } from '../actions/device';
+import { startDeviceFlow, pollDeviceToken, recordNavigations, answerSignIns } from '../actions/device';
+import { totpStepUp } from '../actions/login';
 
 test('ZO1 — a prefilled link on a 31s-old session refreshes the sign-in and still asks to confirm the code', async ({ ctx, request, baseURL }) => {
   test.setTimeout(120_000);
