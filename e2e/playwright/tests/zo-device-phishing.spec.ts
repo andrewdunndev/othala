@@ -16,7 +16,7 @@ test('ZO1 — a prefilled link on a 31s-old session refreshes the sign-in and st
   const creds = { identifier: member.email, password: TEST_PASSWORD };
   await loginViaJsonApi(ctx, creds, baseURL);
   const secret = await enrollTotpSecret(ctx, baseURL);
-  await totpStepUp(ctx, baseURL, secret);
+  await totpStepUp(ctx, baseURL, secret, '', true);
   expect((await getSession(ctx, baseURL))?.authenticator_assurance_level, 'ZO1: the victim holds an aal2 session').toBe('aal2');
   await new Promise((r) => setTimeout(r, 31_000));
 
