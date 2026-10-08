@@ -84,68 +84,55 @@ describe('servingManifests — healthy set', () => {
   });
 });
 
-describe('servingManifests — a manifest breaks under it', () => {
-  it('keeps serving the last known good set instead of throwing', () => {
-    write('proxywatch.yaml', VALID_APP);
-    const good = servingManifests();
-    expect(good).toHaveLength(1);
-
+describe('servingManifests — an invalid manifest', () => {
+  it('is dropped while its valid sibling keeps serving, and health stays ok', () => {
     write('proxywatch.yaml', BROKEN_APP);
+    write('other.yaml', VALID_APP.replaceAll('proxywatch', 'other'));
 
-    expect(() => servingManifests()).not.toThrow();
-    const served = servingManifests();
-    expect(served.map((m) => m.clientId)).toEqual(['proxywatch']);
-    expect(served[0]?.groupRoleMap).toEqual({ 'proxywatch-access': 'viewer' });
-  });
-
-  it('reports stale, names the cause, and logs it', () => {
-    write('proxywatch.yaml', VALID_APP);
-    servingManifests();
-
-    write('proxywatch.yaml', BROKEN_APP);
-    servingManifests();
-
-    const health = manifestHealth();
-    expect(health.status).toBe('stale');
-    expect(health.serving).toBe(1);
-    expect(health.error).toContain('editor');
-    expect(health.failingSinceMs).not.toBeNull();
-
-    expect(logged.some((line) => line.includes('[portal:manifests] STALE'))).toBe(true);
-  });
-
-  it('recovers on the next call once the manifest is fixed — no restart', () => {
-    write('proxywatch.yaml', VALID_APP);
-    servingManifests();
-    write('proxywatch.yaml', BROKEN_APP);
-    servingManifests();
-    expect(manifestHealth().status).toBe('stale');
-
-    write('proxywatch.yaml', VALID_APP.replaceAll('viewer', 'reader'));
-
-    const set = servingManifests();
-    expect(set[0]?.groupRoleMap).toEqual({ 'proxywatch-access': 'reader' });
+    expect(servingManifests().map((m) => m.clientId)).toEqual(['other']);
     expect(manifestHealth().status).toBe('ok');
-    expect(logged.some((line) => line.includes('[portal:manifests] RECOVERED'))).toBe(true);
-  });
-});
-
-describe('servingManifests — cold start onto a broken set', () => {
-  it('serves the empty set and reports unavailable', () => {
-    write('proxywatch.yaml', BROKEN_APP);
-
-    expect(servingManifests()).toEqual([]);
-
-    const health = manifestHealth();
-    expect(health.status).toBe('unavailable');
-    expect(health.serving).toBe(0);
-    expect(logged.some((line) => line.includes('[portal:manifests] UNAVAILABLE'))).toBe(true);
   });
 
   it('resolves no client, so the gate denies rather than the page 500-ing', () => {
     write('proxywatch.yaml', BROKEN_APP);
 
     expect(servingManifest('proxywatch')).toBeUndefined();
+  });
+});
+
+describe('servingManifests — the directory itself fails to load', () => {
+  function breakDir(): void {
+    const file = join(dir, 'not-a-dir');
+    writeFileSync(file, '');
+    setManifestDir(file);
+    invalidateManifestCache();
+  }
+
+  it('keeps serving the last known good set, reports stale, names the cause, and recovers', () => {
+    write('proxywatch.yaml', VALID_APP);
+    expect(servingManifests()).toHaveLength(1);
+
+    breakDir();
+    expect(servingManifests().map((m) => m.clientId)).toEqual(['proxywatch']);
+    const health = manifestHealth();
+    expect(health.status).toBe('stale');
+    expect(health.serving).toBe(1);
+    expect(health.error).toContain('ENOTDIR');
+    expect(logged.some((line) => line.includes('[portal:manifests] STALE'))).toBe(true);
+
+    setManifestDir(dir);
+    invalidateManifestCache();
+    expect(servingManifests()).toHaveLength(1);
+    expect(manifestHealth().status).toBe('ok');
+    expect(logged.some((line) => line.includes('[portal:manifests] RECOVERED'))).toBe(true);
+  });
+
+  it('serves the empty set and reports unavailable on a cold start', () => {
+    breakDir();
+
+    expect(servingManifests()).toEqual([]);
+    expect(manifestHealth().status).toBe('unavailable');
+    expect(logged.some((line) => line.includes('[portal:manifests] UNAVAILABLE'))).toBe(true);
   });
 });
 

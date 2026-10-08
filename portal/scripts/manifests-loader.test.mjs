@@ -5,7 +5,7 @@ import assert from 'node:assert/strict';
 import { mkdtempSync, writeFileSync, rmSync, readdirSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
-import { parseManifest, loadClientManifests, setManifestDir } from '../src/lib/manifests.ts';
+import { parseManifest, loadClientManifests, invalidateManifestCache, setManifestDir } from '../src/lib/manifests.ts';
 import { decideAccess } from '../src/lib/gate.ts';
 
 test('namespace split: minimal yaml with oidc + consent blocks parses', () => {
@@ -256,94 +256,47 @@ consent: {}
   assert.equal(out.skipConsent, true);
 });
 
-test('B: pre-swap validation rejects a set with undeclared group_role_map role', () => {
-  const dir = mkdtempSync(join(tmpdir(), 'manifest-preswap-'));
+const VALID = (id) => `
+oidc:
+  client_id: ${id}
+  audience:
+    - https://${id}.example.com
+  redirect_uris:
+    - https://${id}.example.com/callback
+presentation:
+  access:
+    - ${id}
+consent: {}
+`;
+
+function loadFrom(files) {
+  const dir = mkdtempSync(join(tmpdir(), 'manifest-quarantine-'));
   try {
-    const goodYaml = `
-oidc:
-  client_id: goodclient
-  audience:
-    - https://good.example.com
-  redirect_uris:
-    - https://good.example.com/callback
-presentation:
-  access:
-    - goodclient
-consent:
-  roles:
-    user:
-      description: normal user
-      claim_emit: {}
-  group_role_map:
-    family: user
-`;
-    writeFileSync(join(dir, 'goodclient.yaml'), goodYaml);
-
+    for (const [name, text] of Object.entries(files)) writeFileSync(join(dir, name), text);
     setManifestDir(dir);
-    const good = loadClientManifests();
-    assert.equal(good.length, 1, 'good set must load');
-    assert.equal(good[0].clientId, 'goodclient');
-
-    const badYaml = `
-oidc:
-  client_id: badclient
-  audience:
-    - https://bad.example.com
-  redirect_uris:
-    - https://bad.example.com/callback
-presentation:
-  access:
-    - badclient
-consent:
-  roles:
-    user:
-      description: normal user
-      claim_emit: {}
-  group_role_map:
-    family: UNDECLARED_ROLE
-`;
-    rmSync(join(dir, 'goodclient.yaml'));
-    writeFileSync(join(dir, 'badclient.yaml'), badYaml);
-
-    assert.throws(
-      () => loadClientManifests(),
-      /manifest validation failed/,
-      'bad candidate set must throw with validation error',
-    );
+    invalidateManifestCache();
+    return loadClientManifests().map((m) => m.clientId);
   } finally {
     setManifestDir(undefined);
+    invalidateManifestCache();
     rmSync(dir, { recursive: true, force: true });
   }
+}
+
+test('B: an invalid manifest sorted first is dropped and the valid one loads', () => {
+  const invalid = VALID('aa').replace('consent: {}', 'consent:\n  group_role_map:\n    family: UNDECLARED');
+  assert.deepEqual(loadFrom({ 'aa-invalid.yaml': invalid, 'grafana.yaml': VALID('grafana') }), ['grafana']);
 });
 
-test('B: duplicate client_id (case-insensitive) is detected and rejected', () => {
-  const dir = mkdtempSync(join(tmpdir(), 'manifest-dup-'));
-  try {
-    writeFileSync(join(dir, 'a-client.yaml'), `
-oidc:
-  client_id: my-client
-  audience:
-    - https://a.example.com
-consent: {}
-`);
-    writeFileSync(join(dir, 'b-client.yaml'), `
-oidc:
-  client_id: my-client
-  audience:
-    - https://b.example.com
-consent: {}
-`);
-
-    setManifestDir(dir);
-    assert.throws(
-      () => loadClientManifests(),
-      /duplicate client_id/,
-      'duplicate client_id must be detected',
-    );
-  } finally {
-    setManifestDir(undefined);
-    rmSync(dir, { recursive: true, force: true });
-  }
+test('B: duplicate client_id (case-insensitive) drops every file carrying it', () => {
+  assert.deepEqual(
+    loadFrom({
+      'a-client.yaml': VALID('myclient'),
+      'b-client.yaml': VALID('myclient').replace('client_id: myclient', 'client_id: MyClient'),
+      'c.yaml': VALID('keeper'),
+    }),
+    ['keeper'],
+  );
 });
 
 test('directory walk: sorted by filename, yaml + yml both picked up', () => {

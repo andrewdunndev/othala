@@ -96,8 +96,9 @@ The `check-portal` and `check-purity` jobs run on every push, MR and tag;
   naming rule; there is none. `portal/src/lib/manifest-lint.ts` WARNs on a name
   no binding knows (the typo-to-silent-lockout case) and never blocks on style.
 - **Fail closed.** The access gate, the audience and redirect check and the
-  manifest validator deny on anything ambiguous; `portal/src/lib/manifest-store.ts`
-  serves the last known good set or the empty set, never a partial one.
+  manifest validator deny on anything ambiguous; the loader quarantines an invalid
+  manifest (its app is refused, the rest serve) and `portal/src/lib/manifest-store.ts`
+  serves the last known good set or the empty set when the directory cannot load.
 - **Env belongs in one module** (`portal/src/lib/config.ts`): throw in
   production, default with a warning in dev. The surface is identity
   (`OTHALA_PUBLIC_URL`, `OTHALA_APEX`, `OTHALA_INSTANCE_NAME`),
