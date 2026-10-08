@@ -9,7 +9,7 @@ import { signToken, csrfRefusal } from './csrf';
 import { publicUrl } from './config';
 
 /** The path of every device-grant login and consent request_url; Hydra's login request has no device field. */
-export const DEVICE_VERIFY_PATH = '/oauth2/device/verify';
+const DEVICE_VERIFY_PATH = '/oauth2/device/verify';
 export const DEVICE_CODE_COOKIE = 'othala_device_code';
 const USER_CODE_RE = /^[A-Za-z0-9-]{6,32}$/;
 export const CODE_COOKIE_MAX_AGE_S = 600; // ttl.device_user_code
@@ -39,26 +39,22 @@ function codeCookie(value: string, maxAge: number): string {
 
 export const clearDeviceCode = (): string => codeCookie('', 0);
 
-/** No session exists yet, so the token binds to the challenge. */
-const csrfSubject = (challenge: string) => createHash('sha256').update(challenge).digest('hex');
+/** An integrity check that the posted challenge is the one the form was minted for, not cross-site protection: no session exists yet, and Hydra's device CSRF cookie is what binds the flow to the browser. */
+const challengeSubject = (challenge: string) => createHash('sha256').update(challenge).digest('hex');
 
 export interface VerifyView {
   challenge: string;
   userCode: string;
-  csrfToken: string;
+  challengeToken: string;
   error?: 'missing' | 'not-found';
 }
 
-export interface DeviceDeps {
-  oauth2?: Pick<OAuth2Api, 'acceptUserCodeRequest'>;
-}
-
 function view(challenge: string, userCode: string, error?: VerifyView['error']): VerifyView {
-  return { challenge, userCode, csrfToken: challenge ? signToken(csrfSubject(challenge), 'device') : '', error };
+  return { challenge, userCode, challengeToken: challenge ? signToken(challengeSubject(challenge), 'device') : '', error };
 }
 
 /** GET renders the form (a user_code on the link prefills it); POST accepts the code and sends the browser on. */
-export async function handleDeviceVerify(req: Request, deps: DeviceDeps = {}): Promise<Response | VerifyView> {
+export async function handleDeviceVerify(req: Request, deps: { oauth2?: Pick<OAuth2Api, 'acceptUserCodeRequest'> } = {}): Promise<Response | VerifyView> {
   if (req.method !== 'POST') {
     const q = new URL(req.url).searchParams;
     const challenge = q.get('device_challenge') ?? '';
@@ -69,8 +65,8 @@ export async function handleDeviceVerify(req: Request, deps: DeviceDeps = {}): P
   const challenge = body.get('device_challenge') ?? '';
   const userCode = (body.get('user_code') ?? '').trim();
   if (!challenge) return view('', userCode, 'missing');
-  if (csrfRefusal(body.get('csrf_token'), csrfSubject(challenge), 'device') !== null) {
-    return new Response('CSRF token invalid', { status: 400 });
+  if (csrfRefusal(body.get('challenge_token'), challengeSubject(challenge), 'device') !== null) {
+    return new Response('challenge token invalid', { status: 400 });
   }
   if (!USER_CODE_RE.test(userCode)) return view(challenge, userCode, 'not-found');
 

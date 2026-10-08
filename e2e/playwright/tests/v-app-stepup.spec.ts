@@ -1,10 +1,10 @@
 // V — second-factor step-up at app sign-in and forward-auth, and the code-login gate for admins.
 
-import { test, expect, enrollTotpSecret, computeTotp, GRAFANA_REDIRECT_URI } from '../fixtures';
+import { test, expect, enrollTotpSecret, GRAFANA_REDIRECT_URI } from '../fixtures';
 import type { APIRequestContext } from '@playwright/test';
 import type { BrowserContext } from 'playwright-core';
 import { createIdentityWithPassword, TEST_PASSWORD } from '../actions/identity';
-import { loginViaJsonApi } from '../actions/login';
+import { loginViaJsonApi, totpStepUp } from '../actions/login';
 import { getSession } from '../actions/session';
 import { waitForMessage, forRecipient } from '../actions/mail';
 
@@ -109,13 +109,7 @@ test('V2 — a TOTP member signed in by code steps up before app sign-in and for
   expect(promoted.searchParams.get('aal'), 'V2: aal1 session without aal param is promoted').toBe('aal2');
   expect(promoted.searchParams.get('return_to')).toBe(`${baseURL}/`);
 
-  const flow = await initFlow(ctx.request, `${baseURL}/self-service/login/browser?aal=aal2`);
-  const totp = await ctx.request.post(flow.ui.action, {
-    headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
-    data: { csrf_token: csrfOf(flow), method: 'totp', totp_code: await computeTotp(secret) },
-    maxRedirects: 5,
-  });
-  expect(totp.ok(), `V2: TOTP step: ${totp.status()}`).toBe(true);
+  await totpStepUp(ctx, baseURL, secret);
   expect((await getSession(ctx, baseURL))?.authenticator_assurance_level).toBe('aal2');
 
   const done = await walkAuthorize(ctx, baseURL);

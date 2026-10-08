@@ -19,7 +19,7 @@ export type ManifestStatus = 'ok' | 'stale' | 'unavailable';
 
 export interface ManifestHealth {
   status: ManifestStatus;
-  /** The load/validation failure verbatim, for the operator; null when `ok`. */
+  /** The load failure verbatim, for the operator; null when `ok`. */
   error: string | null;
   /** Epoch ms of the first failure in the current run; null when `ok`. */
   failingSinceMs: number | null;

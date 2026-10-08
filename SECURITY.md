@@ -82,7 +82,7 @@ Each names its enforcer and the test that fails if the enforcer stops working.
   match, an undeclared role in `group_role_map`, an empty access binding;
   `loadClientManifests` then drops each such file, so its app is an unknown client
   and is refused at login and consent, while the rest keep serving (its Hydra client keeps
-  its last registered config, so existing refresh tokens still work); if the directory itself cannot load,
+  its last registered config, so both its refresh tokens and its client_credentials grant keep working until the manifest is fixed or the client is deleted from Hydra); if the directory itself cannot load,
   `portal/src/lib/manifest-store.ts` serves the last known good set, or the empty
   set on a cold start, which denies everywhere. Tests:
   `portal/scripts/manifests-loader.test.mjs`, `portal/scripts/manifest-validate.fuzz.test.mjs`, `portal/src/lib/manifest-store.test.ts`.

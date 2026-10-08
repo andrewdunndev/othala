@@ -1515,5 +1515,6 @@ for (const [action, expected] of [['deny', `${publicUrl}/auth/error?reason=sign-
       oauth2: api, getSession: liveSession, getIdentity: async () => deviceMember('password', 'totp'), manifest: () => loadManifest('stepca'),
     });
     assert.equal(res.headers.get('location'), expected);
+    assert.match(res.headers.get('set-cookie') ?? '', /^othala_device_code=; .*Max-Age=0/);
   });
 }

@@ -4,8 +4,7 @@
  */
 
 import type { APIRequestContext, BrowserContext, Page } from '@playwright/test';
-import { computeTotp } from '../fixtures';
-import { loginViaJsonApi, findCsrfToken, type Credentials } from './login';
+import { loginViaJsonApi, totpStepUp, type Credentials } from './login';
 
 export const DEVICE_CLIENT_ID = 'stepca';
 const DEVICE_GRANT = 'urn:ietf:params:oauth:grant-type:device_code';
@@ -46,20 +45,6 @@ export function recordNavigations(page: Page): URL[] {
     if (r.isNavigationRequest()) seen.push(new URL(r.url()));
   });
   return seen;
-}
-
-export async function totpStepUp(ctx: BrowserContext, baseURL: string, secret: string, returnTo = '', refresh = false): Promise<void> {
-  const query = `${refresh ? '&refresh=true' : ''}${returnTo ? `&return_to=${encodeURIComponent(returnTo)}` : ''}`;
-  const flowResp = await ctx.request.get(`${baseURL}/self-service/login/browser?aal=aal2${query}`, {
-    headers: { Accept: 'application/json' },
-  });
-  if (!flowResp.ok()) throw new Error(`aal2 flow init answered ${flowResp.status()}`);
-  const flow = await flowResp.json();
-  const resp = await ctx.request.post(flow.ui.action, {
-    headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
-    data: { csrf_token: findCsrfToken(flow.ui.nodes), method: 'totp', totp_code: await computeTotp(secret) },
-  });
-  if (!resp.ok()) throw new Error(`totp step-up answered ${resp.status()}: ${(await resp.text()).slice(0, 300)}`);
 }
 
 const SETTLED = ['/auth/login', '/auth/consent', '/auth/error', '/device/done'];

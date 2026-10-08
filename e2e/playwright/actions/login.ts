@@ -4,6 +4,7 @@
  */
 
 import type { BrowserContext, APIRequestContext } from '@playwright/test';
+import { computeTotp } from '../fixtures';
 
 export interface Credentials {
   identifier: string;
@@ -75,4 +76,19 @@ export async function loginViaJsonApi(
   const cookies = await ctx.cookies();
   const session = cookies.find((c) => c.name === 'ory_kratos_session');
   return session?.value ?? '(no session cookie found)';
+}
+
+/** Completes an aal2 TOTP step-up over the Kratos JSON API; `refresh` re-asks even a fresh aal2 session. */
+export async function totpStepUp(ctx: BrowserContext, baseURL: string, secret: string, returnTo = '', refresh = false): Promise<void> {
+  const query = `${refresh ? '&refresh=true' : ''}${returnTo ? `&return_to=${encodeURIComponent(returnTo)}` : ''}`;
+  const flowResp = await ctx.request.get(`${baseURL}/self-service/login/browser?aal=aal2${query}`, {
+    headers: { Accept: 'application/json' },
+  });
+  if (!flowResp.ok()) throw new Error(`aal2 flow init answered ${flowResp.status()}`);
+  const flow = await flowResp.json();
+  const resp = await ctx.request.post(flow.ui.action, {
+    headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+    data: { csrf_token: findCsrfToken(flow.ui.nodes), method: 'totp', totp_code: await computeTotp(secret) },
+  });
+  if (!resp.ok()) throw new Error(`totp step-up answered ${resp.status()}: ${(await resp.text()).slice(0, 300)}`);
 }
