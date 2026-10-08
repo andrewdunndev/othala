@@ -1403,3 +1403,117 @@ test('logout redirects to auth-unreachable, accepting nothing, when the session 
   assert.equal(res.headers.get('location'), `${publicUrl}/auth/error?reason=auth-unreachable`);
   assert.equal(calls.acceptLogout, 0);
 });
+
+// Device grant: Hydra ignores prompt and max_age on its verification URL and skip can arrive true, so the handlers hold
+// every device login to a fresh aal2 sign-in and every device consent to a confirm screen, and send refusals to the
+// portal's error page.
+const DEVICE_URL = 'https://sso.othala.test/oauth2/device/verify?client_id=stepca';
+const deviceMember = (...methods) => activeMember({
+  metadata_admin: { groups: ['stepca-access'] },
+  credentials: withCredentials(activeMember(), ...methods).credentials,
+});
+
+async function deviceLogin({ skip = false, aal = 'aal1', age = 0, methods = ['password', 'totp'], groups } = {}) {
+  const { api, calls } = stubOAuth2({
+    getOAuth2LoginRequest: async () => oauth2LoginRequest({
+      ...(skip ? { skip: true, subject: 'id-1' } : {}), client: { client_id: 'stepca' }, request_url: DEVICE_URL,
+    }),
+  });
+  const identity = deviceMember(...methods);
+  if (groups) identity.metadata_admin.groups = groups;
+  const origWarn = console.warn;
+  console.warn = () => {};
+  try {
+    const res = await handleLogin(new Request('https://x/oauth2/login?login_challenge=lc'), {
+      oauth2: api,
+      getIdentity: async () => identity,
+      getSession: defaultSession({ authenticator_assurance_level: aal, authenticated_at: ago(age) }),
+      manifest: () => loadManifest('stepca'),
+    });
+    return { loc: new URL(res.headers.get('location'), 'https://sso.othala.test'), calls };
+  } finally {
+    console.warn = origWarn;
+  }
+}
+
+for (const skip of [false, true]) {
+  const branch = skip ? 'skip' : 'fresh';
+
+  test(`device login (${branch}) refreshes a 31s-old aal2 session's second factor though the request names no prompt`, async () => {
+    const { loc, calls } = await deviceLogin({ skip, aal: 'aal2', age: 31 });
+    assert.equal(loc.pathname, '/auth/login');
+    assert.equal(loc.searchParams.get('refresh'), 'true');
+    assert.equal(loc.searchParams.get('aal'), 'aal2');
+    assert.equal(calls.acceptLogin, 0);
+  });
+
+  test(`device login (${branch}) steps a fresh aal1 password+totp session up to aal2`, async () => {
+    const { loc, calls } = await deviceLogin({ skip });
+    assert.equal(loc.pathname, '/auth/login');
+    assert.equal(loc.searchParams.get('aal'), 'aal2');
+    assert.equal(calls.acceptLogin, 0);
+  });
+
+  test(`device login (${branch}) accepts a fresh aal2 session`, async () => {
+    const { loc, calls } = await deviceLogin({ skip, aal: 'aal2' });
+    assert.equal(loc.href, 'https://sso.othala.test/after-login');
+    assert.equal(calls.acceptLoginBody.acr, 'aal2');
+  });
+
+  for (const methods of [['password'], ['passkey']]) {
+    test(`device login (${branch}) refuses a ${methods[0]}-only identity on the portal error page`, async () => {
+      const { loc, calls } = await deviceLogin({ skip, methods, age: 3600 });
+      assert.equal(loc.href, `${publicUrl}/auth/error?reason=second-factor-required`);
+      assert.equal(calls.rejectLogin, 1);
+      assert.equal(calls.rejectLoginError, 'access_denied');
+      assert.equal(calls.acceptLogin, 0);
+    });
+  }
+
+  test(`device login (${branch}) sends a gate denial to the portal error page`, async () => {
+    const { loc, calls } = await deviceLogin({ skip, aal: 'aal2', groups: [] });
+    assert.equal(loc.href, `${publicUrl}/auth/error?reason=not-authorised`);
+    assert.equal(calls.rejectLogin, 1);
+  });
+}
+
+const deviceConsent = (cookie, skip = true) => {
+  const stub = stubOAuth2({
+    getOAuth2ConsentRequest: async () => oauth2ConsentRequest({
+      skip, subject: 'id-1', client: { client_id: 'stepca' }, request_url: DEVICE_URL, requested_scope: ['openid', 'email'],
+    }),
+  });
+  const res = handleConsent(new Request('https://x/oauth2/consent?consent_challenge=cc', { headers: cookie ? { cookie } : {} }), {
+    oauth2: stub.api,
+    getIdentity: async () => deviceMember('password', 'totp'),
+    manifest: () => loadManifest('stepca'),
+  });
+  return { res, calls: stub.calls };
+};
+
+test('device consent shows the confirm screen despite consent.skip and the manifest skip_consent', async () => {
+  const { res, calls } = deviceConsent('othala_device_code=ABCDEFGH');
+  assert.equal((await res).headers.get('location'), '/auth/consent?consent_challenge=cc');
+  assert.equal(calls.acceptConsent, 0);
+  assert.equal(calls.rejectConsent, 0);
+});
+
+test('device consent without the code cookie is refused on the portal error page', async () => {
+  const { res, calls } = deviceConsent('');
+  assert.equal((await res).headers.get('location'), `${publicUrl}/auth/error?reason=flow-expired`);
+  assert.equal(calls.rejectConsent, 1);
+  assert.equal(calls.acceptConsent, 0);
+});
+
+for (const [action, expected] of [['deny', `${publicUrl}/auth/error?reason=sign-in-cancelled`], ['allow', 'https://sso.othala.test/after-consent']]) {
+  test(`device consent POST ${action} lands on ${expected}`, async () => {
+    _resetForTests();
+    const { api } = stubOAuth2({
+      getOAuth2ConsentRequest: async () => oauth2ConsentRequest({ subject: 'id-1', client: { client_id: 'stepca' }, request_url: DEVICE_URL }),
+    });
+    const res = await handleConsentPost(consentPost(action), {
+      oauth2: api, getSession: liveSession, getIdentity: async () => deviceMember('password', 'totp'), manifest: () => loadManifest('stepca'),
+    });
+    assert.equal(res.headers.get('location'), expected);
+  });
+}

@@ -1,0 +1,24 @@
+# step-ca: a CLI on a machine without a browser signs in through the device grant (RFC 8628).
+# A public client, so it has no secret and no gen-secrets.sh entry. skip_consent is set to prove
+# that a device grant is confirmed regardless (zo-device-phishing.spec.ts).
+
+presentation:
+  name: Certificates
+  description: SSH and TLS certificates for the household's machines, signed in from the command line.
+  url: https://ca.othala.test
+  icon: CA
+  auth_kind: oidc
+  access:
+    - stepca-access
+  order: 130
+
+oidc:
+  client_id: stepca
+  client_name: Certificates
+  grant_types:
+    - urn:ietf:params:oauth:grant-type:device_code
+  scope: openid email profile
+  token_endpoint_auth_method: none
+  audience:
+    - https://ca.othala.test
+  skip_consent: true

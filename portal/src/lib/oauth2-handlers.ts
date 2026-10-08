@@ -14,6 +14,8 @@ import { servingManifest } from './manifest-store';
 import { verifyToken, CSRFError } from './csrf';
 import { publicUrl } from './config';
 import { hydraAdmin } from './ory-fetch';
+import { parseIdentity } from './identity-facts';
+import { isDeviceRequest, readDeviceCode } from './device';
 
 // Hydra remembers a sign-in as long as the Kratos session lives, so a later app sign-out still reaches handleLogout.
 const KRATOS_SESSION_LIFESPAN = 2_592_000; // Kratos session.lifespan, 720h
@@ -100,7 +102,8 @@ export function freshnessVerdict(
   } catch {
     return 'ok';
   }
-  const prompt = (params.get('prompt') ?? '').split(' ');
+  // Hydra drops prompt from the device verification URL, so a device login always asks for a fresh sign-in.
+  const prompt = isDeviceRequest(requestUrl) ? ['login'] : (params.get('prompt') ?? '').split(' ');
   const rawMaxAge = params.get('max_age') ?? '';
   const maxAge = /^\d+$/.test(rawMaxAge) ? Number(rawMaxAge) : undefined;
   if (!prompt.includes('login') && maxAge === undefined) return 'ok';
@@ -114,13 +117,23 @@ function loginBounce(challenge: string, query = ''): Response {
   return redirect(`${LOGIN_UI_BASE}?${query}return_to=${encodeURIComponent(buildLoginReturnTo(challenge))}`);
 }
 
-async function rejectLogin(d: Required<Deps>, challenge: string, error: string, status_code: number): Promise<Response> {
+/** A refused device grant lands on the portal's error page: Hydra's own redirect ends on a raw JSON error. */
+const landing = (redirect_to: string, deviceReason?: string) =>
+  redirect(deviceReason ? `${publicUrl}/auth/error?reason=${deviceReason}` : redirect_to);
+
+async function rejectLogin(
+  d: Required<Deps>,
+  challenge: string,
+  error: string,
+  status_code: number,
+  deviceReason?: string,
+): Promise<Response> {
   try {
     const { redirect_to } = await d.oauth2.rejectOAuth2LoginRequest({
       loginChallenge: challenge,
       rejectOAuth2Request: { error, error_description: error, status_code },
     });
-    return redirect(redirect_to);
+    return landing(redirect_to, deviceReason);
   } catch (err) {
     upstream('rejectOAuth2LoginRequest', err);
     return upstreamError();
@@ -136,13 +149,14 @@ async function rejectConsent(
   challenge: string,
   description: string,
   onFail: () => Response,
+  deviceReason?: string,
 ): Promise<Response> {
   try {
     const { redirect_to } = await d.oauth2.rejectOAuth2ConsentRequest({
       consentChallenge: challenge,
       rejectOAuth2Request: { error: 'access_denied', error_description: description, status_code: 403 },
     });
-    return redirect(redirect_to);
+    return landing(redirect_to, deviceReason);
   } catch (err) {
     upstream('rejectOAuth2ConsentRequest', err);
     return onFail();
@@ -189,17 +203,25 @@ export async function handleLogin(req: Request, deps: Deps = {}): Promise<Respon
   const subject = session.identity.id;
   const acr = session.authenticator_assurance_level ?? undefined;
 
+  const device = isDeviceRequest(login.request_url);
   const identity = await safeGetIdentity(d, subject);
   const access = decideAccess(identity, { app: d.manifest(clientId) }, session);
   if ('deny' in access) {
     // Log the real reason server-side; send Hydra an opaque error_description so RPs learn no group names or identity state.
     console.warn('[oauth2/login] access denied', { clientId, subject, reason: access.deny });
-    return rejectLogin(d, challenge, 'access_denied', 403);
+    return rejectLogin(d, challenge, 'access_denied', 403, device ? 'not-authorised' : undefined);
+  }
+
+  // A device grant hands a token to a machine the browser cannot see, so it takes aal2: the refresh and step-up below
+  // ask for the second factor, and an identity without one is refused.
+  if (device && acr !== 'aal2' && !parseIdentity(identity).hasSecondFactor) {
+    console.warn('[oauth2/login] access denied', { clientId, subject, reason: 'device grant without a second factor' });
+    return rejectLogin(d, challenge, 'access_denied', 403, 'second-factor-required');
   }
 
   const freshness = freshnessVerdict(login.request_url, session);
   if (freshness === 'login_required') return rejectLogin(d, challenge, freshness, 400);
-  if (freshness === 'refresh') return loginBounce(challenge, 'refresh=true&');
+  if (freshness === 'refresh') return loginBounce(challenge, device ? 'refresh=true&aal=aal2&' : 'refresh=true&');
 
   if ('stepUp' in access) return loginBounce(challenge, 'aal=aal2&');
 
@@ -269,6 +291,7 @@ export async function handleConsent(req: Request, deps: Deps = {}): Promise<Resp
 
   const subject = consent.subject ?? '';
   const clientId = consent.client?.client_id ?? '';
+  const device = isDeviceRequest(consent.request_url);
 
   // Re-gate at consent time (state + group), fail-closed; it must gate even when login was remembered.
   const identity = await safeGetIdentity(d, subject);
@@ -276,7 +299,13 @@ export async function handleConsent(req: Request, deps: Deps = {}): Promise<Resp
   const result = enforceAccessGate(identity, clientId, consentManifest);
   if (!result.allowed) {
     console.warn('[oauth2/consent] access denied', { clientId, subject, reason: result.reason });
-    return rejectConsent(d, challenge, 'access_denied', upstreamError);
+    return rejectConsent(d, challenge, 'access_denied', upstreamError, device ? 'not-authorised' : undefined);
+  }
+
+  // A device grant is always confirmed against the code this browser entered, whatever skip_consent says.
+  if (device) {
+    if (readDeviceCode(req.headers.get('cookie'))) return consentScreen(challenge);
+    return rejectConsent(d, challenge, 'device code not entered in this browser', upstreamError, 'flow-expired');
   }
 
   // The manifest's skip_consent survives client re-registration; the gate above denied a null identity.
@@ -317,6 +346,8 @@ export async function handleConsentPost(req: Request, deps: Deps = {}): Promise<
     return upstreamError();
   }
 
+  const refused = (reason: string) => (isDeviceRequest(consent.request_url) ? reason : undefined);
+
   let session: Session | null;
   try {
     session = await d.getSession(req.headers.get('cookie') ?? undefined);
@@ -326,7 +357,7 @@ export async function handleConsentPost(req: Request, deps: Deps = {}): Promise<
   }
 
   if (!session?.active || !session.identity) {
-    return rejectConsent(d, challenge, 'no active session', upstreamError);
+    return rejectConsent(d, challenge, 'no active session', upstreamError, refused('session-expired'));
   }
 
   // The CSRF token is scoped to 'consent', so one minted for another action cannot be replayed here.
@@ -344,11 +375,11 @@ export async function handleConsentPost(req: Request, deps: Deps = {}): Promise<
   const toScreen = () => consentScreen(challenge);
 
   if (session.identity.id !== consent.subject) {
-    return rejectConsent(d, challenge, 'session subject mismatch', toScreen);
+    return rejectConsent(d, challenge, 'session subject mismatch', toScreen, refused('flow-expired'));
   }
 
   if (action === 'deny') {
-    return rejectConsent(d, challenge, 'user denied access', toScreen);
+    return rejectConsent(d, challenge, 'user denied access', toScreen, refused('sign-in-cancelled'));
   }
 
   const clientId = consent.client?.client_id ?? '';
@@ -357,7 +388,7 @@ export async function handleConsentPost(req: Request, deps: Deps = {}): Promise<
   const result = enforceAccessGate(identity, clientId, allowManifest);
   if (!result.allowed) {
     console.warn('[oauth2/consent/post] access denied', { clientId, subject: consent.subject, reason: result.reason });
-    return rejectConsent(d, challenge, 'access_denied', toScreen);
+    return rejectConsent(d, challenge, 'access_denied', toScreen, refused('not-authorised'));
   }
 
   const allowResponse = await acceptConsentRequest(challenge, consent, identity!, d, clientId);

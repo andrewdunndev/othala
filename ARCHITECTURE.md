@@ -193,6 +193,10 @@ claims are composed by `composeIDTokenClaims` (`portal/src/lib/claims.ts`): iden
 groups claim dropped unless the manifest opts in and narrowed to the groups that manifest binds, then the resolved role's `claim_emit` merged in,
 then any claim whose required scope was not requested removed.
 
+A device grant (RFC 8628) arrives on the same two challenges after the code is entered at
+`/device/verify`; Hydra marks it only by its device verification path in `request_url`, and the
+handlers add the controls in [`SECURITY.md`](SECURITY.md) § Controls.
+
 Revocation is one in-process fan-out, `revokeSubject` (`portal/src/lib/revoke.ts`), shared by admin
 force-logout, user sign-out-everywhere, and deactivation. Kratos sessions and Hydra's remembered
 login and consent sessions are all cut, because cutting only the Kratos session leaves a remembered

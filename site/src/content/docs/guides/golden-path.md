@@ -46,12 +46,12 @@ forever — the largest upgrade-burden decision available in a Kratos integratio
 
 ## 4. Conservative grant types and public subject identifiers
 
-Every manifest's `oidc:` block uses authorization code plus refresh token, or
-client credentials — no implicit, no device code. New grant types are additive
-in Hydra, so an integration requesting none of them never touches the new
-surface. Likewise `hydra/hydra.yml` supports only `public` subject types.
-**Cost of opening it:** device flow needs its own UI, Hydra config and
-threat-model pass; pairwise is fine operationally but one-way per client.
+Every manifest's `oidc:` block uses authorization code plus refresh token,
+client credentials, or the device code grant for a public client — no implicit.
+New grant types are additive in Hydra, so an integration requesting none of them
+never touches the new surface. Likewise `hydra/hydra.yml` supports only `public`
+subject types. **Cost of opening it:** pairwise is fine operationally but
+one-way per client.
 
 ## 5. The pod network is the trust domain; no in-pod mTLS
 

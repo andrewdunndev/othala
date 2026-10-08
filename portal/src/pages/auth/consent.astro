@@ -1,8 +1,8 @@
 ---
-// OAuth2 consent grant screen, shown when Hydra redirects here for a client without skip_consent. Names the app (logo and
-// name from its manifest), says in plain words what it will see, and offers Allow or Deny, posting to /oauth2/consent
-// (signed CSRF token + subject match). Consent is not a Kratos flow. In `astro dev`, `?dev-state=` renders a recorded
-// request (lib/journey-fixtures.ts) with no Hydra.
+// OAuth2 consent grant screen, shown for a client without skip_consent and for every device grant (with the code this
+// browser entered). Names the app (logo and name from its manifest), says in plain words what it will see, and offers
+// Allow or Deny, posting to /oauth2/consent (signed CSRF token + subject match). Consent is not a Kratos flow. In
+// `astro dev`, `?dev-state=` renders a recorded request (lib/journey-fixtures.ts) with no Hydra.
 
 export const prerender = false;
 
@@ -16,6 +16,7 @@ import { loadTiles } from '../../lib/tiles';
 import { devViewer } from '../../lib/viewer';
 import { monogram } from '../../lib/monogram';
 import { DEV_CONSENT_STATES, devConsent, isIn } from '../../lib/journey-fixtures';
+import { isDeviceRequest, readDeviceCode } from '../../lib/device';
 
 const challenge = Astro.url.searchParams.get('consent_challenge');
 const devState = import.meta.env.DEV ? Astro.url.searchParams.get('dev-state') : null;
@@ -27,6 +28,7 @@ let requestedScopes: string[] = [];
 let fetchError = false;
 let ownershipError = false;
 let csrfToken = '';
+let deviceCode: string | null = null;
 
 if (dev) {
   // The first app in the dev catalog stands in, so its real logo and description render.
@@ -52,6 +54,8 @@ if (dev) {
     } else if (session.identity.id !== consent.subject) {
       // Mirrors the POST-time subject match in handleConsentPost. Do NOT disclose the client name or scope list.
       ownershipError = true;
+    } else if (isDeviceRequest(consent.request_url) && !(deviceCode = readDeviceCode(cookie))) {
+      fetchError = true;
     } else {
       clientId = consent.client?.client_id ?? '';
       clientName = consent.client?.client_name ?? clientId;
@@ -77,8 +81,8 @@ const plate = tile ?? { iconHref: undefined, icon: monogram(appName), iconBleed:
 ---
 <FocusPage
   viewer={dev ? devViewer(true, 'member') : undefined}
-  title={failed ? "That request can't be used" : `Let ${appName} use your account?`}
-  lede={failed ? failMessage : 'You are signed in. This app is asking before it can sign you in.'}
+  title={failed ? "That request can't be used" : deviceCode ? `Sign in ${appName} on a device?` : `Let ${appName} use your account?`}
+  lede={failed ? failMessage : deviceCode ? 'Allow only if the device in front of you shows this code.' : 'You are signed in. This app is asking before it can sign you in.'}
   tabTitle="Allow access"
   description="Allow or deny an app's request to use your account."
 >
@@ -96,6 +100,8 @@ const plate = tile ?? { iconHref: undefined, icon: monogram(appName), iconBleed:
           {tile?.description && <p class="consent-app-desc">{tile.description}</p>}
         </div>
       </div>
+
+      {deviceCode && <p class="device-code">{deviceCode}</p>}
 
       {!tile && (
         <div class="notice notice-warning" role="note">Not one of your household's apps. Only allow if an admin told you to.</div>
@@ -124,7 +130,7 @@ const plate = tile ?? { iconHref: undefined, icon: monogram(appName), iconBleed:
           <button type="submit" class:list={['button', 'focus-btn', tile ? 'button-secondary' : 'button-primary']}>Deny</button>
         </form>
       </div>
-      <p class="focus-note">Deny returns you to the app without signing in.</p>
+      <p class="focus-note">{deviceCode ? "Deny stops the device from signing in." : "Deny returns you to the app without signing in."}</p>
     </section>
   )}
 

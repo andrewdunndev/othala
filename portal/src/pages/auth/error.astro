@@ -2,7 +2,7 @@
 // /auth/error: branded denial page. The `reason` query param drives status,
 // title and message; unknown reasons fall through to a generic 400. Reasons:
 // not-admin, not-authorised, auth-unreachable, session-expired, forbidden,
-// unavailable, flow-expired, app-misconfigured, sign-in-cancelled (grep `/auth/error?reason=` in src/); Hydra's ?error=
+// unavailable, flow-expired, app-misconfigured, sign-in-cancelled, second-factor-required (grep `/auth/error?reason=` in src/); Hydra's ?error=
 // and Kratos's ?id= map onto the same entries (lib/error-reasons.ts).
 
 export const prerender = false;

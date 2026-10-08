@@ -41,15 +41,21 @@ urls:
   logout: "${OTHALA_PUBLIC_URL}/oauth2/logout"
   error: "${OTHALA_PUBLIC_URL}/auth/error"
   post_logout_redirect: "${OTHALA_PUBLIC_URL}/"
+  # Device grant code entry and its success page (portal routes); unset, Hydra serves error fallbacks.
+  device:
+    verification: "${OTHALA_PUBLIC_URL}/device/verify"
+    success: "${OTHALA_PUBLIC_URL}/device/done"
 
 ttl:
   refresh_token: 720h    # 30 days
+  # The schema documents 10m but the code default is 15m.
+  device_user_code: 10m
 
 oauth2:
   pkce:
     # Global switch (no per-client PKCE knob): breaks any confidential client that cannot do PKCE.
     enforced: false
-    # Free hardening while there are no public clients.
+    # Binds public clients on the code flow; the device grant has no authorize code to bind.
     enforced_for_public_clients: true
   hashers:
     bcrypt:
