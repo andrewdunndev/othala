@@ -7,6 +7,26 @@ aims to follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 The git tag is the authoritative version; `portal/package.json` mirrors it.
 This CHANGELOG and git tags carry the deployed-instance release state.
 
+## [0.13.0] - 2026-10-08
+
+Apps without a secret can sign in, one bad app file no longer takes the rest down, and devices without a browser can sign in with a code.
+
+### Added
+
+- Public clients: an app manifest can register a client without a secret.
+- Device authorization grant (RFC 8628) for devices without a browser. The person enters the code on the portal, signs in, and confirms a screen that shows the same code, so a link carrying someone else's code is caught.
+- Device logins need a second factor. A passkey-only identity is refused, because Kratos counts a passkey as aal1.
+
+### Changed
+
+- An invalid app manifest is quarantined: it is dropped with a logged reason and its app is refused at login and consent, while the other apps keep serving. Before, one bad file failed the whole set. A quarantined app's Hydra client keeps its refresh tokens and its client_credentials grant working until the manifest is fixed or the client is deleted from Hydra.
+- Consumers re-vendor `hydra/hydra.yml`, which now enables the device grant and pins the user-code lifetime.
+- Consumers add the device routes to their Caddyfile and the `othala_device` rate-limit zone for `/oauth2/device/auth` and `/device/verify`; see `caddy/Caddyfile`.
+
+### Security
+
+- Accepted risk: a denied or refused device code answers `authorization_pending` to the device's poll until the code expires.
+
 ## [0.12.0] - 2026-10-03
 
 Emails name the household, the portal runs on Node 24, Kratos and Hydra updates arrive the day they ship, and code that served old shapes is gone.
