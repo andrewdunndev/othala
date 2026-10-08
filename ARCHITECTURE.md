@@ -218,15 +218,13 @@ cannot reach Hydra must still serve the admin surface an operator would use to f
 ## Manifests and failure posture
 
 Manifests are read at request time behind a short cache, so adding or removing an app is a change to
-the manifest directory with no image rebuild. That creates one hazard: a *syntax* error in one file
-is isolated and skipped, but a *semantic* error is set-wide, and the strict loader throws on any
-finding. Left alone, one bad edit would 500 every OIDC login and the entire admin UI at once,
-including the surface needed to diagnose it. `portal/src/lib/manifest-store.ts` is the split that
-prevents it: the registrar and the lint call the strict loader and must throw, while every request
-path calls the serving loader, which never throws. On a failed load it keeps serving the last known
-good set and reports `stale` through `manifestHealth`, so nothing reads stale as live; with no last
-known good set it serves the empty set, which is fail-closed everywhere it lands, because the gate
-denies a client whose manifest is missing. It retries on every call, so recovery needs no restart.
+the manifest directory with no image rebuild. A file that fails to parse or validate, or shares a
+`client_id` with another, is dropped and logged while the rest keep serving, so one bad edit cannot
+500 every OIDC login and the admin UI; the dropped app is an unknown client and is refused. The lint
+CLI still fails on an invalid file. `portal/src/lib/manifest-store.ts` covers the one remaining
+failure, an unreadable directory: it keeps serving the last known good set and reports `stale`
+through `manifestHealth`, or the empty set with none, which is fail-closed because the gate denies a
+client whose manifest is missing. It retries on every call, so recovery needs no restart.
 
 ## Configuration and the one-way choices
 

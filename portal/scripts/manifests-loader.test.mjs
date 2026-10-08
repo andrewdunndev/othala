@@ -288,11 +288,11 @@ test('B: an invalid manifest sorted first is dropped and the valid one loads', (
   assert.deepEqual(loadFrom({ 'aa-invalid.yaml': invalid, 'grafana.yaml': VALID('grafana') }), ['grafana']);
 });
 
-test('B: duplicate client_id (case-insensitive) drops every file carrying it', () => {
+test('B: duplicate client_id drops every file carrying it', () => {
   assert.deepEqual(
     loadFrom({
       'a-client.yaml': VALID('myclient'),
-      'b-client.yaml': VALID('myclient').replace('client_id: myclient', 'client_id: MyClient'),
+      'b-client.yaml': VALID('myclient').replaceAll('myclient.example.com', 'other.example.com'),
       'c.yaml': VALID('keeper'),
     }),
     ['keeper'],

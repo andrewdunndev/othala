@@ -1,4 +1,4 @@
-// App manifest loader. loadClientManifests() returns every manifest, presentation-only tiles included;
+// App manifest loader. loadClientManifests() returns every manifest that survives quarantine, presentation-only tiles included;
 // oidcClientManifests() narrows to the OIDC clients.
 
 import { readdirSync, readFileSync, statSync } from 'node:fs';
