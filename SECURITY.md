@@ -1,23 +1,21 @@
 # Security
 
-Othala issues the tokens and gates the access that everything downstream of it
-trusts. A flaw here is a flaw in the front door. This document states where the
-trust boundary sits, what is defended and by which file, and what is knowingly
-not defended.
+Othala issues the tokens and gates the access that everything downstream trusts.
+This document states where the trust boundary sits, what is defended and by
+which file, and what is knowingly not defended.
 
 ## Reporting a vulnerability
 
 Do not open a public issue or merge request. Open a **confidential issue** at
 <https://gitlab.com/dunn.dev/othala/-/issues>, ticking "This issue is
 confidential" before you submit; those are visible only to project members.
-Include the affected component and the commit or tag, what an attacker gains,
-reproduction steps, and any deployment specifics that matter (edge proxy, OIDC
-client config, manifest set). A flaw in upstream Ory Kratos or Hydra rather than
+Include the affected component and commit or tag, what an attacker gains,
+reproduction steps, and relevant deployment specifics. A flaw in upstream Ory Kratos or Hydra rather than
 in this glue goes to Ory (<https://www.ory.sh/docs/ecosystem/security>); a note
-here is still welcome so the affected version can be pinned.
+here is still welcome.
 
 Expect acknowledgement within 3 business days and an assessment within 10. One
-maintainer, no bounty, coordinated disclosure: fixed privately, released, then
+maintainer, best effort, no on-call, no bounty, coordinated disclosure: fixed privately, released, then
 published, with credit unless you decline it. Fixes land on the newest tag; older
 tags are not backported.
 
@@ -30,12 +28,10 @@ everything is lost; no control here is written to survive it.
 **Untrusted:** every HTTP request, inbound header, cookie, manifest field, and
 value a downstream app hands back.
 
-Two facts about the boundary explain the shape of every control below.
-
 - **The Ory admin APIs authenticate nobody.** They are protected by bind address
   (`KRATOS_ADMIN_BIND_HOST` in `kratos/kratos.yml`, `HYDRA_ADMIN_BIND_HOST` in
-  `hydra/hydra.yml`) and by network reachability, and by nothing else. Exposing
-  either port is total compromise, not a degraded posture.
+  `hydra/hydra.yml`) and network reachability, and nothing else. Exposing
+  either port is total compromise.
 - **`metadata_admin` is writable only through the Kratos admin API.** Every
   authority decision reads from it, which is why it is always fetched fresh from
   the admin API and never taken from a session payload (`/sessions/whoami` omits
@@ -43,7 +39,7 @@ Two facts about the boundary explain the shape of every control below.
 
 ## Controls
 
-Each names its enforcer and the test that fails if the enforcer stops working.
+Each names its enforcer and the test that fails if it stops working.
 
 - **Entry gate, fail-closed.** `enforceAccessGate` / `enforceGroupGate`,
   `portal/src/lib/gate.ts`: state exactly `active`, plus membership in at least
@@ -52,9 +48,8 @@ Each names its enforcer and the test that fails if the enforcer stops working.
   admin marker admit nobody. Tests: `portal/scripts/gate-property.test.mjs`,
   `e2e/playwright/tests/t-access-model.spec.ts`.
 - **Read-boundary refusal.** `refuseNonCanonical`, `portal/src/lib/gate.ts`:
-  denies every app, loudly, when a stored group name could not have been written
-  by any path this codebase owns (`GROUP_RE`, `portal/src/lib/access-groups.ts`);
-  coercing or ignoring it would admit an identity no owned boundary created.
+  denies every app when a stored group name could not have been written
+  by any path this codebase owns (`GROUP_RE`, `portal/src/lib/access-groups.ts`).
   Test: `portal/scripts/noncanonical-repair.test.mjs`.
 - **Portal admin authority.** `requireAdminSession`, `portal/src/lib/admin.ts`:
   active session, assurance level exactly `aal2`, and the `metadata_admin.admin`
@@ -82,7 +77,7 @@ Each names its enforcer and the test that fails if the enforcer stops working.
   match, an undeclared role in `group_role_map`, an empty access binding;
   `loadClientManifests` then drops each such file, so its app is an unknown client
   and is refused at login and consent, while the rest keep serving (its Hydra client keeps
-  its last registered config, so both its refresh tokens and its client_credentials grant keep working until the manifest is fixed or the client is deleted from Hydra); if the directory itself cannot load,
+  its last registered config, so its refresh tokens and client_credentials grant keep working until the manifest is fixed or the client is deleted from Hydra); if the directory itself cannot load,
   `portal/src/lib/manifest-store.ts` serves the last known good set, or the empty
   set on a cold start, which denies everywhere. Tests:
   `portal/scripts/manifests-loader.test.mjs`, `portal/scripts/manifest-validate.fuzz.test.mjs`, `portal/src/lib/manifest-store.test.ts`.
@@ -93,15 +88,14 @@ Each names its enforcer and the test that fails if the enforcer stops working.
   `portal/src/lib/device.ts`) to a sign-in inside the fresh window at `aal2`,
   refuse an identity with no second factor, and always confirm against the code
   this browser entered, whatever `skip_consent` says. The portal enforces this
-  because Hydra ignores `prompt` and `max_age` on that path. Tests:
+  because Hydra ignores `prompt` and `max_age` there. Tests:
   `portal/scripts/oauth2-handlers.test.mjs`, `e2e/playwright/tests/zo-device-phishing.spec.ts`,
   `e2e/playwright/tests/zp-device-aal1-refused.spec.ts`.
 - **forward_auth never trusts a header.** `portal/src/pages/api/forward-auth.ts`
   takes the required group from an operator-set query parameter and the user's
   groups from the admin API; no inbound identity header is read, and `HEAD`
-  reuses the `GET` decision verbatim. The status contract (200/401/403/503) and
-  why 503 stays separate from 403 are [`ARCHITECTURE.md`](ARCHITECTURE.md) §
-  The forward-auth request path → The status contract. Test:
+  reuses the `GET` decision verbatim. The status contract (200/401/403/503) is in
+  [`ARCHITECTURE.md`](ARCHITECTURE.md) § The status contract. Test:
   `portal/scripts/forward-auth.test.mjs`.
 - **Browser hardening.** `applySecurityHeaders`, `portal/src/middleware.ts`:
   frame-ancestors and `X-Frame-Options`, `nosniff`, `Referrer-Policy`,
@@ -129,8 +123,6 @@ Each names its enforcer and the test that fails if the enforcer stops working.
 
 ## Accepted risks
 
-Live properties of the deployed shape, stated rather than omitted.
-
 - **Plaintext inside the trusted host.** Both Postgres DSNs set
   `sslmode=disable` and both tracing exporters set `insecure: true`
   (`kratos/kratos.yml`, `hydra/hydra.yml`). Each assumes the hop stays inside one
@@ -140,11 +132,11 @@ Live properties of the deployed shape, stated rather than omitted.
   theme script, so an XSS in the portal is not contained by CSP. See
   `site/src/content/docs/guides/hardening.md`.
 - **Rate limiting depends on a third-party Caddy module.** A binary built without
-  it refuses to load `caddy/Caddyfile` at all, so the failure is a refusal to
-  start rather than a silently unlimited edge. Confirm it is compiled in.
+  it refuses to load `caddy/Caddyfile`, so the failure is a refusal to start,
+  not a silently unlimited edge.
 - **Sessions are long-lived and `whoami` answers at the first assurance level**
   (`kratos/kratos.yml`, `session`). A stolen cookie stays valuable for the
-  configured lifespan; revocation, not expiry, is what ends it.
+  session lifespan; revocation ends it sooner.
 - **Role rank is a convention no code enforces.** `lookupRole`
   (`portal/src/lib/claims.ts`) reads declaration order in `consent.roles` as
   descending privilege, so a manifest listing roles ascending silently downgrades
@@ -152,7 +144,6 @@ Live properties of the deployed shape, stated rather than omitted.
 - **A member with no second factor: the mailbox holder keeps the account.** An emailed code proves the mailbox, not the person. A passkey or TOTP the mailbox holder adds is accepted, and the email-change gate only guards members who already hold a passkey or password.
 - **A refused device keeps polling.** Hydra has no device-grant reject, so a
   denied or refused code answers `authorization_pending` until it expires.
-- **One maintainer.** The times above are best effort; there is no on-call.
 
 ## Out of scope
 
