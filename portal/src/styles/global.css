@@ -374,13 +374,11 @@ a.subtle:hover { color: var(--text); }
 
 /* Logo plates sit on the page ground in both themes, so every mark reads alike. The few marks drawn in black or deep
  * navy with no ground of their own are knocked out to a light tone in dark mode (data-icon, the logo file's name). */
-:root[data-theme="dark"] :is(.app-icon, .app-modal-logo)[data-icon^="vault"] img,
-:root[data-theme="dark"] :is(.app-icon, .app-modal-logo)[data-icon="owncloud"] img {
+:root[data-theme="dark"] :is(.app-icon, .app-modal-logo)[data-icon^="vault"] img {
   filter: brightness(0) invert(0.92);
 }
 @media (prefers-color-scheme: dark) {
-  :root:not([data-theme="light"]) :is(.app-icon, .app-modal-logo)[data-icon^="vault"] img,
-  :root:not([data-theme="light"]) :is(.app-icon, .app-modal-logo)[data-icon="owncloud"] img {
+  :root:not([data-theme="light"]) :is(.app-icon, .app-modal-logo)[data-icon^="vault"] img {
     filter: brightness(0) invert(0.92);
   }
 }
