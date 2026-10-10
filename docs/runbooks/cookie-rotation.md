@@ -1,120 +1,49 @@
 # Cookie / cipher secret rotation
 
-Rotates the Kratos and Hydra cookie signing secrets and the Kratos
-cipher (at-rest credential encryption) secret without invalidating
-active sessions.
+Rotates the Kratos and Hydra cookie signing secrets and the Kratos cipher
+(at-rest credential encryption) secret without invalidating active sessions.
 
 ## When
 
-- Quarterly, or sooner on any of:
-  - Suspected leak (env-file disclosure, host compromise)
-  - Operator handover
-  - Incident closeout where the secret was potentially exposed
+Quarterly, or on a suspected leak, operator handover, or an incident where the
+secret may have been exposed.
 
-## What stays the same forever
+`HYDRA_SYSTEM_SECRET` is non-rotatable for the life of the Hydra database; do
+not touch it here (see `hydra/hydra.yml`).
 
-`HYDRA_SYSTEM_SECRET` is non-rotatable for the life of the Hydra
-database. Do not touch it during cookie rotation. See `hydra/hydra.yml`
-header comment.
+## Single-slot model
 
-## Single-slot model (collapsed key)
-
-Both Kratos `secrets.cookie` and `secrets.cipher`, plus Hydra
-`secrets.cookie`, accept a list of values. The first entry signs new
-material; every entry in the list verifies.
-
-Ory v26.2.0 enforces `uniqueItems` on these arrays, which rules out a
-two-identical-slot approach. Production collapses the rotation model to
-a **single active `_CURRENT` key per secret** (`gen-secrets.sh` mints
-one value per slot — no `_PREVIOUS` at rest). Rotation works by
-prepending a new `_CURRENT` directly into the YAML list in the Kratos
-and Hydra config; the old value remains in the list as a secondary
-verifier until all cookies minted under it have expired, then it is
-removed. The `.env.example` and `gen-secrets.sh` reflect this: only
-`KRATOS_COOKIE_SECRET_CURRENT`, `KRATOS_CIPHER_SECRET_CURRENT`, and
-`HYDRA_COOKIE_SECRET_CURRENT` exist. There is no `_PREVIOUS` env var.
+Kratos `secrets.cookie` and `secrets.cipher` and Hydra `secrets.cookie` accept
+a list: the first entry signs, every entry verifies. Ory enforces
+`uniqueItems` on these arrays, so there is one active `_CURRENT` value per
+secret at rest (`KRATOS_COOKIE_SECRET_CURRENT`, `KRATOS_CIPHER_SECRET_CURRENT`,
+`HYDRA_COOKIE_SECRET_CURRENT`; no `_PREVIOUS`). Rotation prepends the new value
+to the YAML list; the old one stays as a secondary verifier until every cookie
+minted under it has expired, then is removed.
 
 ## Procedure
 
-1. Generate a fresh secret:
-
-   ```sh
-   openssl rand -hex 32
-   ```
-
-2. Update sops (production) or `.env` (lab):
-
-   Production (sops-backed deploy repo):
-
-   ```sh
-   sops <your-deploy-repo>/pyinfra/secrets.enc.yaml
-   # Update auth_session_secret to the new value (single _CURRENT per
-   # secret; no _PREVIOUS slot in the operator store).
-   ```
-
-   E2E harness (`e2e/.env`): only `_CURRENT` exists (no `_PREVIOUS`
-   slot). Update the single value:
-
-   ```diff
-   -KRATOS_COOKIE_SECRET_CURRENT=<old value>
-   +KRATOS_COOKIE_SECRET_CURRENT=<new value>
-   ```
-
-3. Restart Kratos and Hydra:
-   - Lab: `podman compose restart kratos hydra`
-   - Production: re-provision secrets and redeploy via your operator tooling
-     (the secrets re-provision picks up the new value; redeploy restarts
-     the substrate)
-
-4. Verify both services healthy:
-
-   ```sh
-   curl -fsS https://<your-othala-host>/health/ready
-   # then run your deployment's smoke suite against <sso-host>
-   ```
-
-5. Active sessions: still valid. Existing cookies were signed with the
-   old secret; verification still succeeds because the old value
-   remains in the YAML list as a secondary verifier.
-
-6. Wait for the session lifespan to elapse:
-   - Kratos: 30 days (720h) for normal sessions, 1 day for admin enforcement
-     (admin SSR forces re-auth at AAL2 daily).
-   - Hydra: 30 days for refresh tokens (the ttl.refresh_token cap).
-
-7. After the wait, no live cookie was minted under the old secret.
-   Remove the old value from the Kratos and Hydra `secrets.*` YAML
-   lists so only the new `_CURRENT` remains, then update sops (or
-   `.env` for the lab) to match:
-
-   ```sh
-   # The kratos.yml / hydra.yml secrets.cookie list now has only one entry.
-   sops <your-deploy-repo>/pyinfra/secrets.enc.yaml
-   # Remove the stale old value from auth_session_secret (or whichever
-   # key feeds the list); only the value from step 1 should remain.
-   ```
-
-8. Restart again. The single-slot posture is restored; the old signing
-   key is no longer in memory or config anywhere except the operator's
-   archive.
-
-## Validation
-
-Sign in via home portal after step 3, observe the new cookie's
-`Set-Cookie` header carrying a fresh MAC. The old session cookie is
-honored until its own expiry.
+1. Generate a secret: `openssl rand -hex 32`.
+2. Set it in your sops file (production) or `e2e/.env` (lab) as the single
+   `_CURRENT` value.
+3. Restart Kratos and Hydra (lab: `podman compose restart kratos hydra`;
+   production: re-provision secrets and redeploy).
+4. Verify health: `curl -fsS https://<your-othala-host>/health/ready`, then
+   your smoke suite. Active sessions stay valid, since the old value still
+   verifies; a fresh sign-in carries a `Set-Cookie` with a new MAC.
+5. Wait out the session lifespan: Kratos 30 days (720h), with admin
+   re-authentication at AAL2 daily; Hydra 30 days (`ttl.refresh_token`).
+6. Remove the old value from the Kratos and Hydra `secrets.*` lists and from
+   sops (or `.env`), leaving only the new `_CURRENT`, and restart again.
 
 ## Failure modes
 
-- **Restart with new CURRENT but old entry accidentally dropped from
-  the list before sessions expire:** every active session gets bounced
-  to login. UX hit, not a security regression.
-- **Restart with the secrets list empty:** Kratos refuses to start
-  (`secrets.cookie: at least one entry required`). Same for Hydra.
-  Restore from operator store.
+- **Old entry dropped before sessions expire:** every active session is
+  bounced to login. A UX hit, not a security regression.
+- **Empty secrets list:** Kratos and Hydra refuse to start. Restore from the
+  operator store.
 
 ## Related
 
 - `kratos/kratos.yml`, `hydra/hydra.yml`: the env-var indirection.
-- `e2e/gen-secrets.sh`: produces a fresh `_CURRENT` for each secret
-  (no `_PREVIOUS` — single-slot / collapsed-key model).
+- `e2e/gen-secrets.sh`: mints a fresh `_CURRENT` per secret.

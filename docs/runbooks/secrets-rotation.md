@@ -1,112 +1,62 @@
 # secrets.system rotation (break-glass)
 
-`secrets.system` is the symmetric key Hydra uses to encrypt OAuth2
-client secrets and consent challenges at rest in Postgres. Rotation is
-a database-rebuild operation, not a periodic maintenance task. Run
-this only on a known compromise of the key (sops file or age key
-exposure, on-disk leak, accidental commit).
-
-## When to rotate
-
-- The sops entry for `hydra_system_secret` was accessed by an
-  unexpected party, OR the age private key (`~/.config/sops/age/keys.txt`
-  on the operator workstation) was exposed.
-- The value appeared in a chat / log / commit and you cannot guarantee
-  it never reached a third party.
-- A planned-rotation cadence is NOT required at family scale. Hydra's
-  threat model treats this key like a database master key, not a
-  session cookie.
+`secrets.system` is the symmetric key Hydra uses to encrypt OAuth2 client
+secrets and consent challenges at rest in Postgres. Rotation rebuilds the Hydra
+database; do it only on known compromise of the key (sops file or age key
+exposure, a leak to a chat, log or commit). No cadence is required: Hydra
+treats this key like a database master key, not a session cookie.
 
 ## What rotation costs
 
-- Every Hydra-stored OAuth2 client secret becomes unreadable. Apps
-  re-receive new client_secret values when the in-app registrar re-runs.
-- Outstanding consent challenges (in-flight OAuth2 flows) become
-  invalid. Users mid-flow see an error and re-attempt.
-- Hydra's signing keys (id_token JWKS) are encrypted with this key too,
-  so they do not survive: the rebuilt database gets new ones.
+- Every stored client secret becomes unreadable; the in-app registrar
+  re-creates each client.
+- In-flight consent challenges become invalid; users mid-flow retry.
+- Hydra's id_token signing keys are encrypted with this key and do not
+  survive; the rebuilt database mints new ones.
 
-So rotation is a brief disruption, not a multi-day migration. Family
-schedule it for a low-traffic window.
+A brief disruption, best in a low-traffic window.
 
 ## Procedure
 
-Prereqs: SSH access to the SSO host + sudo + sops+age access on the
-operator workstation (`SOPS_AGE_KEY_FILE` pointing at the age private
-key).
+Prerequisites: shell on the host, and sops with the age key
+(`SOPS_AGE_KEY_FILE`).
 
-1. Generate the new secret (32+ bytes, random):
-
-   ```sh
-   openssl rand -base64 48
-   ```
-
-2. Update sops:
+1. Generate the new secret: `openssl rand -base64 48`.
+2. Set the `hydra_system_secret` entry in your sops file to it.
+3. Stop Hydra and its migrate unit.
+4. Drop and recreate the Hydra database:
 
    ```sh
-   sops <your-deploy-repo>/pyinfra/secrets.enc.yaml
-   # Set the hydra_system_secret entry to the new value.
+   podman exec -it <postgres-container> psql -U postgres -c \
+     "DROP DATABASE hydra; CREATE DATABASE hydra OWNER hydra;"
    ```
 
-3. Stop Hydra on the SSO host:
-
-   ```sh
-   ssh <operator>@<sso-host> 'systemctl --user stop <hydra-unit>'
-   ```
-
-4. Drop and recreate the Hydra schema (Postgres-side):
-
-   ```sh
-   ssh <operator>@<sso-host> '
-     systemctl --user stop <hydra-migrate-unit>;
-     podman exec -it <postgres-container> psql -U postgres -c \
-       "DROP DATABASE hydra; CREATE DATABASE hydra OWNER hydra;"
-   '
-   ```
-
-5. Re-provision podman secrets on the SSO host so the new sops value lands,
-   using your deploy tooling.
-
-6. Re-run the Hydra migration and restart the substrate, again with your
-   deploy tooling. Order matters: Postgres up, then the migration (which
-   populates a fresh schema under the new secret), then Hydra.
-
-7. Re-issue every client secret by running the Othala in-app registrar as a
-   `--rm` one-shot. It walks the manifests and re-creates
-   each Hydra client with its sops-sourced `<SLUG>_CLIENT_SECRET`.
-
-8. Update consumer-service podman secrets if any `<slug>_oidc_client_secret`
-   changed, then redeploy each affected consumer (operator-side, e.g.
-   `make <consumer>-secrets HOST=<sso-host> && make <consumer>-deploy HOST=<sso-host>`).
-
-9. Verify a known OIDC flow end-to-end, via your deployment's smoke suite,
-   before clearing the runbook.
+5. Re-provision the host secrets so the new value lands, using your deploy tooling.
+6. Run the Hydra migration, then start Hydra, in that order: Postgres, migration
+   (which populates a fresh schema under the new secret), Hydra.
+7. Run the Othala registrar as a `--rm` one-shot; it re-creates each Hydra
+   client from the manifests with its `<SLUG>_CLIENT_SECRET`.
+8. If any `<slug>_oidc_client_secret` changed, update and redeploy each affected app.
+9. Verify an OIDC flow end to end.
 
 ## Verification
 
-After rotation:
+- The registrar exited 0 for every manifest.
+- A test login through an OIDC client completes.
+- Hydra logs show no decryption errors.
+- The sops file holds only the new `hydra_system_secret`.
 
-- The registrar one-shot exited 0 for every manifest.
-- A test login through any OIDC client completes.
-- Hydra logs show no decryption errors:
-  `journalctl --user -u <hydra-unit> -n 50`.
-- The sops file has only the new `hydra_system_secret` value.
+## Not covered
 
-## What this does NOT cover
-
-- Kratos cookie/cipher rotation. See `cookie-rotation.md`.
-- id_token + back-channel-logout signing key rotation. Hydra's
-  `/admin/keys/.../rotate` handles that without touching
-  `secrets.system`; Hydra signs natively, so the Othala app holds no
-  signing key at rest and there is no app-side cache to refresh.
-- Postgres credential rotation (the database-password sops entry).
-  Separate procedure: stop the substrate, rotate the password,
-  re-deploy. No db rebuild needed since the password is independent
-  of at-rest encryption.
+- Kratos cookie and cipher rotation: `cookie-rotation.md`.
+- id_token and back-channel-logout signing keys: Hydra's `/admin/keys/.../rotate`
+  rotates them without touching `secrets.system`; Hydra signs natively, so the
+  app holds no signing key.
+- Postgres credential rotation: stop the substrate, rotate the password,
+  redeploy. No rebuild, since the password is independent of at-rest encryption.
 
 ## Related
 
-- `ARCHITECTURE.md` "LB-3: `secrets.system` is non-rotatable"
+- `hydra/hydra.yml` `secrets.system`
 - `docs/runbooks/cookie-rotation.md`
 - `docs/runbooks/admin-recovery.md`
-- `hydra/hydra.yml` `secrets.system` field
