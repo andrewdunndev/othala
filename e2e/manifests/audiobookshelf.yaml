@@ -11,6 +11,7 @@ presentation:
   access:
     - audiobookshelf-access
   order: 40
+  group: media
 
 oidc:
   client_id: audiobookshelf
