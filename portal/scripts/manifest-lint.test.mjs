@@ -25,6 +25,7 @@ function manifest(clientId, opts = {}) {
     emitGroupsClaim: null,
     skipAccessCheck: opts.skipAccessCheck ?? false,
     sourcePath: opts.sourcePath ?? `${clientId}.yaml`,
+    retiredIcon: opts.retiredIcon ?? false,
   };
 }
 
@@ -136,4 +137,10 @@ test('lintBlockers returns only BLOCK findings', () => {
 test('access-proxywatch is a known flat name — no typo warning', () => {
   const f = lintManifests([manifest('proxywatch', { accessGroups: ['access-proxywatch'] })], known);
   assert.deepEqual(f.filter((x) => /locks everyone out/.test(x.message)), []);
+});
+
+test('BLOCK: a retired icon_slug or icon_fallback points at <stem>.svg', () => {
+  const b = lintBlockers([manifest('photos', { retiredIcon: true })], known);
+  assert.equal(b.length, 1);
+  assert.match(b[0].message, /<stem>\.svg/);
 });

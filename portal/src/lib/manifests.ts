@@ -44,6 +44,8 @@ export interface ClientManifest {
   sourcePath: string;
   /** Prerequisite names defined under requirements/. */
   requires?: string[];
+  /** The manifest still carries the retired `icon_slug` or `icon_fallback`; the logo is now `<stem>.svg`. */
+  retiredIcon?: boolean;
 }
 
 /** Only an explicit `emit_groups_claim: false` suppresses. */
@@ -169,6 +171,7 @@ export function parseManifest(yamlText: string, filename: string): ClientManifes
   const hasPresentation = presentation != null && typeof presentation === 'object' && !Array.isArray(presentation);
 
   const accessGroups = parseAccessGroups(p);
+  const retiredIcon = 'icon_slug' in p || 'icon_fallback' in p;
 
   if (!oidc || typeof oidc !== 'object') {
     if (!hasPresentation) {
@@ -198,6 +201,7 @@ export function parseManifest(yamlText: string, filename: string): ClientManifes
       skipAccessCheck: Boolean(c.skip_access_check ?? false),
       sourcePath: file,
       requires: readRequires(p.requires),
+      retiredIcon,
     };
   }
 
@@ -229,6 +233,7 @@ export function parseManifest(yamlText: string, filename: string): ClientManifes
     skipAccessCheck: Boolean(c.skip_access_check ?? false),
     sourcePath: file,
     requires: readRequires(p.requires),
+    retiredIcon,
   };
 }
 

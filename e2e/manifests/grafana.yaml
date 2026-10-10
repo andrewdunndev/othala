@@ -7,7 +7,6 @@ presentation:
   description: Dashboards and metrics — CPU, disk, network, and service health at a glance.
   url: https://grafana.othala.test
   icon: GR
-  icon_slug: grafana
   auth_kind: oidc
   # Entry only; grafana-admin is a role and is deliberately absent (T4 fails if added back).
   access:
