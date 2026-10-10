@@ -5,8 +5,6 @@ presentation:
   description: Internal monitoring tool gated at the edge — no native login, the proxy enforces SSO.
   url: https://proxywatch.othala.test
   icon: PW
-  icon_slug: ""
-  icon_fallback: serverfault
   auth_kind: forward_auth
   requires: [tailscale]
   # The edge passes <svc>-access for everyone, admins included.

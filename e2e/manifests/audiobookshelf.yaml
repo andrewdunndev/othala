@@ -6,7 +6,6 @@ presentation:
   description: Self-hosted audiobook and podcast server with multi-user progress sync.
   url: https://audiobookshelf.othala.test
   icon: AB
-  icon_slug: audiobookshelf
   auth_kind: oidc
   # Entry only; audiobookshelf-admin is a role and is deliberately absent here.
   access:

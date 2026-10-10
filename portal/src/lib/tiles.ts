@@ -1,5 +1,5 @@
 // Runtime app-tile loader. Reads each `<slug>.yaml` `presentation:` block from the manifest dir at request time (manifests.ts
-// reads `oidc:`/`consent:` from the same files); an optional `<slug>.md` is the /apps/<slug> detail content.
+// reads `oidc:`/`consent:` from the same files); an optional `<slug>.md` is the /apps/<slug> detail content and an optional `<slug>.svg` its logo (served by pages/icons).
 // groups.yaml (optional) maps group name to { title, description, order } via loadGroups() and is skipped as a tile.
 // requirements/<name>.md (optional) defines a prerequisite that a manifest names in `presentation.requires`.
 
@@ -12,34 +12,27 @@ import { parseAccessGroups } from './access-groups';
 import { CACHE_TTL_MS, manifestDir, manifestFiles } from './manifests';
 import { DEFAULT_GROUP } from './constants';
 
-// Vendored icons directory: public/icons/ in dev (a stale dist/ must not shadow it), dist/client/icons/ in prod.
-const _cwd = process.cwd();
-const _iconsDir = (() => {
-  // import.meta.env is Vite-specific; guard it so the module loads in plain Node.
-  const isDev = typeof import.meta.env !== 'undefined' && import.meta.env.DEV;
-  if (isDev) return join(_cwd, 'public', 'icons');
-  const prod = join(_cwd, 'dist', 'client', 'icons');
-  if (existsSync(prod)) return prod;
-  return join(_cwd, 'public', 'icons');
-})();
+const ICON_MAX_BYTES = 32 * 1024;
+const SVG_ROOT_RE = /^\uFEFF?\s*(?:<\?xml[^>]*\?>\s*)?(?:<!--[\s\S]*?-->\s*)*(?:<!DOCTYPE[^>]*>\s*)?<svg[\s>]/i;
 
-/** Return the web path for a vendored logo SVG, or undefined if absent. */
-export function resolveIconHref(iconSlug: string | undefined): string | undefined {
-  if (!iconSlug) return undefined;
-  const candidate = join(_iconsDir, `${iconSlug}.svg`);
-  return existsSync(candidate) ? `/icons/${iconSlug}.svg` : undefined;
+/** The `<stem>.svg` sidecar: its markup when it is a plausible logo, a reason when it is rejected, empty when absent. */
+function loadIcon(dir: string, stem: string): { svg?: string; reason?: string } {
+  const path = join(dir, `${stem}.svg`);
+  try {
+    if (!existsSync(path)) return {};
+    if (!statSync(path).isFile()) return { reason: `${stem}.svg is not a regular file` };
+    const svg = readFileSync(path, 'utf8');
+    if (Buffer.byteLength(svg) > ICON_MAX_BYTES) return { reason: `${stem}.svg is over the ${ICON_MAX_BYTES} byte limit` };
+    return SVG_ROOT_RE.test(svg) ? { svg } : { reason: `${stem}.svg does not open with an <svg> root` };
+  } catch (err) {
+    return { reason: `${stem}.svg is unreadable: ${err}` };
+  }
 }
 
-/** True when the logo file opens with its own filled square (a rect at the origin, width equal to height). Such
- *  marks fill the whole plate instead of sitting inside it. */
-export function iconIsBleed(iconSlug: string | undefined): boolean {
-  if (!iconSlug) return false;
-  try {
-    const head = readFileSync(join(_iconsDir, `${iconSlug}.svg`), 'utf8').slice(0, 600);
-    return /<rect(?![^>]*\s[xy]=)[^>]*\swidth="(\d+(?:\.\d+)?)"[^>]*\sheight="\1"[^>]*\sfill="#/i.test(head);
-  } catch {
-    return false;
-  }
+/** True when the logo opens with its own filled square (a rect at the origin, width equal to height). Such marks fill
+ *  the whole plate instead of sitting inside it. */
+function isBleed(svg: string): boolean {
+  return /<rect(?![^>]*\s[xy]=)[^>]*\swidth="(\d+(?:\.\d+)?)"[^>]*\sheight="\1"[^>]*\sfill="#/i.test(svg.slice(0, 600));
 }
 
 export type AuthKind = 'oidc' | 'forward_auth' | 'external';
@@ -83,12 +76,12 @@ export interface AppTile {
   url: string;
   /** 1-3 char monogram fallback when no icon resolves. */
   icon: string;
-  /** Slug of the vendored logo SVG in public/icons (preferred). */
-  iconSlug?: string;
-  /** Fallback logo slug. */
-  iconFallback?: string;
-  /** Set only when the vendored SVG exists; absent renders the monogram. */
+  /** Route of the `<slug>.svg` sidecar; set only when it passed validation, else the monogram renders. */
   iconHref?: string;
+  /** The validated sidecar markup, served by the icon route. */
+  iconSvg?: string;
+  /** Why a present sidecar was rejected. */
+  iconReason?: string;
   /** The logo ships its own filled square, so the plate drops its padding and border. */
   iconBleed?: boolean;
   authKind: AuthKind;
@@ -147,10 +140,10 @@ interface CacheEntry {
 
 let cache: CacheEntry | null = null;
 
-/** Freshest mtime across yaml + md so a sidecar edit also busts the cache. */
+/** Freshest mtime across yaml + md + svg so a sidecar edit also busts the cache. */
 function freshestMtime(dir: string): number {
   try {
-    const files = [...manifestFiles(dir), ...readdirSync(dir).filter((f) => f.endsWith('.md'))];
+    const files = [...manifestFiles(dir), ...readdirSync(dir).filter((f) => f.endsWith('.md') || f.endsWith('.svg'))];
     try {
       for (const f of readdirSync(join(dir, 'requirements'))) files.push(join('requirements', f));
     } catch {
@@ -333,14 +326,13 @@ function parseTile(slug: string, doc: Record<string, unknown>, dir: string): App
   const groupVal = p['group'];
   if (typeof groupVal === 'string' && groupVal.trim()) tile.group = groupVal.trim();
 
-  const iconSlug = p['icon_slug'];
-  if (typeof iconSlug === 'string' && iconSlug.trim()) tile.iconSlug = iconSlug.trim();
-  const iconFallback = p['icon_fallback'];
-  if (typeof iconFallback === 'string' && iconFallback.trim()) tile.iconFallback = iconFallback.trim();
-
-  // Resolve the icon href at load time so render never 404s.
-  tile.iconHref = resolveIconHref(tile.iconSlug) ?? resolveIconHref(tile.iconFallback);
-  tile.iconBleed = iconIsBleed(tile.iconHref?.split('/').pop()?.replace(/\.svg$/, ''));
+  const icon = loadIcon(dir, slug);
+  if (icon.svg) {
+    tile.iconHref = `/icons/${encodeURIComponent(slug)}.svg`;
+    tile.iconSvg = icon.svg;
+    tile.iconBleed = isBleed(icon.svg);
+  }
+  tile.iconReason = icon.reason;
 
   return tile;
 }

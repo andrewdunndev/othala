@@ -77,7 +77,7 @@ const failMessage = !challenge && !dev
   ? 'This request belongs to someone else, or has timed out. Go back to the app and start sign-in again.'
   : 'This request has timed out or was already answered. Go back to the app and start sign-in again.';
 const scopeDescriptions = describeScopeList(requestedScopes, appName);
-const plate = tile ?? { iconHref: undefined, icon: monogram(appName), iconBleed: false };
+const plate = tile ?? { icon: monogram(appName) };
 ---
 <FocusPage
   viewer={dev ? devViewer(true, 'member') : undefined}

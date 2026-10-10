@@ -11,8 +11,7 @@ service-local password for native clients that cannot run a browser redirect.
 
 One issuer, fixed once any relying party is wired, and authorization code for
 every interactive application — see [Golden path](golden-path.md). One manifest
-per application, read at runtime, so adding one is a
-manifest drop rather than an image rebuild. A manifest carries up to three
+per application, read at runtime. A manifest carries up to three
 namespaces: `presentation:` (tile metadata and the access binding), `oidc:`
 (forwarded to Hydra), and `consent:` (role and claim shape, read by the portal
 and never sent to Hydra). That shape produces one login, shown next end to end
@@ -60,6 +59,11 @@ plus its role's `claim_emit`.
   <figcaption class="diagram-caption">The identity holds · the manifest binds · the code decides</figcaption>
 </figure>
 
+## Adding an app
+
+Drop `<stem>.yaml`, and optionally `<stem>.md` (guide) and `<stem>.svg` (logo, at most 32 KiB, shown only to
+people who can see the tile), into the manifest directory and SIGHUP the portal.
+
 ## Wiring a new relying party
 
 Generate a client secret, store it, and write the manifest with
@@ -96,9 +100,7 @@ its rank and keeps the highest rank matched across the whole group set, which
 makes resolution independent of storage order. Grafana also shows the class of
 quirk that costs time: its role expression is evaluated
 application-side, and a separate flag must be enabled or the server-admin role
-silently resolves to org-admin only. The general lesson is to read an
-application's OIDC documentation for **when** it reads the role, not just where
-— several read it at account creation and never re-sync.
+silently resolves to org-admin only.
 
 ## When it is not OIDC
 
