@@ -1,7 +1,7 @@
 // Invariant: the settings view model reads each recorded fixture state the way the page presents it.
 
 import { describe, it, expect } from 'vitest';
-import { splitCodes, credentialItems, totpView, lookupView, securityStatus, keyOnlyKeeper, emailVerified, formatAdded } from './settings-view';
+import { splitCodes, credentialItems, totpView, lookupView, securityStatus, passwordPanelOpen, keyOnlyKeeper, emailVerified, formatAdded } from './settings-view';
 import { devSettings, isDevSettingsState } from './settings-fixtures';
 
 const nodesOf = (s: Parameters<typeof devSettings>[0]) => devSettings(s).flow.ui.nodes;
@@ -88,5 +88,15 @@ describe('settings view over the fixtures', () => {
       { code: 'aaaa-bbbb', used: false }, { code: 'cccc-dddd', used: false }, { code: 'used', used: true },
     ]);
     expect(splitCodes('x', { secrets: [{ context: { secret: 'one' } }, { context: {} }] })).toEqual([{ code: 'one', used: false }, { code: '', used: true }]);
+  });
+});
+
+describe('passwordPanelOpen', () => {
+  it('opens with no password yet, and for a refusal; otherwise stays collapsed', () => {
+    const nodes = nodesOf('fresh');
+    expect(passwordPanelOpen(nodes, false)).toBe(true);
+    expect(passwordPanelOpen(nodes, true)).toBe(false);
+    const refused = nodes.map((n) => (n.group === 'password' ? { ...n, messages: [{ id: 1, text: 'no', type: 'error' as const }] } : n));
+    expect(passwordPanelOpen(refused, true)).toBe(true);
   });
 });

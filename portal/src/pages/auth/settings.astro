@@ -16,6 +16,8 @@ import {
 import { csrfToken, nodesByGroup, asInput, scriptNodes, safeOnclick } from '../../lib/nodes';
 import type { FlowNode, Session, SettingsFlow } from '../../lib/types';
 import CredentialRows from '../../components/settings/CredentialRows.astro';
+import PasswordField from '../../components/settings/PasswordField.astro';
+import TotpKey from '../../components/settings/TotpKey.astro';
 import ActionForm from '../../components/settings/ActionForm.astro';
 import ConfirmCues from '../../components/settings/ConfirmCues.astro';
 import { SECOND_FACTOR_KEEP } from '../../lib/second-factor-gate';
@@ -37,9 +39,10 @@ import {
   securityStatus,
   keyOnlyKeeper,
   totpView,
+  passwordPanelOpen,
 } from '../../lib/settings-view';
 import { devSettings, isDevSettingsState } from '../../lib/settings-fixtures';
-import { FLASH, LOST_KEYS, RENAME_ERROR_COOKIE, RENAME_ERRORS, groupKey, messageText } from '../../lib/settings-flash';
+import { FLASH, LOST_KEYS, RENAME_ERROR_COOKIE, RENAME_ERRORS, messageText } from '../../lib/settings-flash';
 
 const cookie = Astro.request.headers.get('cookie') ?? undefined;
 const devParam = import.meta.env.DEV ? Astro.url.searchParams.get('dev-state') : null;
@@ -174,7 +177,7 @@ const verifyHref = browserFlows.verification(`${publicUrl}/auth/settings`, trait
 const showBackupPrompt = flow.state === 'success' && status.twoStep && !status.backupCodes;
 // The enrollment steps open on their own when a code was refused (or the fixture asks); otherwise they wait behind a button.
 const setupOpen = totp.codeMessages.length > 0 || (dev?.setupOpen ?? false);
-const pwOpen = nodesByGroup(nodes, 'password').some((n) => (n.messages?.length ?? 0) > 0);
+const pwOpen = passwordPanelOpen(nodes, parseIdentity(stored).hasPassword);
 // The saved line belongs in the card that was edited. Script fills it on a live swap; the dev fixture renders it here.
 const devFlash = dev?.flash ? FLASH[dev.flash] : null;
 const devFlashCard = dev?.flash?.startsWith('lookup') ? 'recovery' : 'two-step';
@@ -313,7 +316,6 @@ const lookupLabel: Record<string, string> = {
             <form method="POST" enctype="application/x-www-form-urlencoded" action={ui.action} class="settings-form">
               <input type="hidden" name="csrf_token" value={csrf} />
               <input type="hidden" name="method" value="password" />
-              <input type="text" class="sr-only" readonly tabindex="-1" aria-hidden="true" autocomplete="username" value={traits.username} />
               <input type="checkbox" form="disclosures" class="disclose cb-setup" id="pw-open" checked={pwOpen} />
               <div class="form-actions">
                 <label for="pw-open" class="button button-secondary button-sm toggle-label lbl-setup"><span class="on-closed">Change password</span><span class="on-open">Cancel</span></label>
@@ -331,11 +333,9 @@ const lookupLabel: Record<string, string> = {
                     );
                   }
                   return (
-                    <div class="field">
-                      <label for="new-password">{n.meta?.label?.text ?? 'New password'}</label>
-                      <input id="new-password" name={a.name} type="password" autocomplete="new-password" required={a.required} />
+                    <PasswordField username={traits.username} name={a.name} label={n.meta?.label?.text ?? 'New password'} required={a.required}>
                       {n.messages?.map((m) => <div class={`notice notice-${kind(m.type)}`}>{messageText(m)}</div>)}
-                    </div>
+                    </PasswordField>
                   );
                 })}
               </div>
@@ -421,20 +421,8 @@ const lookupLabel: Record<string, string> = {
                       <li>
                         <h4 tabindex="-1">Scan the code</h4>
                         <p>Scan this into your authenticator app. Scan it into every app you want to use now; each shows the same codes.</p>
-                        <p class="field-hint narrow-only">On this phone? Copy the setup key below into your app.</p>
-                        <div class="totp-qr">
-                          <img src={totp.qr.src} alt={totp.qr.alt} width={totp.qr.width} height={totp.qr.height} />
-                        </div>
-                        {totp.secret && (
-                          <details data-open-narrow>
-                            <summary>Can't scan? Show setup key</summary>
-                            <div class="secret-row">
-                              <code class="totp-secret-value mono" id="totp-secret">{groupKey(totp.secret)}</code>
-                              <button type="button" class="button button-secondary button-sm" data-copy="totp-secret" hidden>Copy key</button>
-                            </div>
-                            <p class="field-hint">Type this key into your app instead. Spaces don't matter.</p>
-                          </details>
-                        )}
+                        <p class="field-hint narrow-only">On this phone? Copy the setup key into your app.</p>
+                        <TotpKey qr={totp.qr} secret={totp.secret} />
                       </li>
                     )}
                     {totp.codeInput && (

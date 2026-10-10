@@ -3,6 +3,7 @@
 
 import { test, beforeAll, afterAll } from 'vitest';
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
 import { getViteConfig } from 'astro/config';
 import { createServer } from 'vite';
 
@@ -67,4 +68,46 @@ test('security keys post webauthn_remove and show Kratos\'s name', async () => {
   assert.ok(html.includes('Keyring key'));
   assert.match(html, /name="webauthn_remove"/);
   assert.ok(!html.includes('cb-rename'));
+});
+
+async function render(path, props, slots) {
+  const mod = (await server.ssrLoadModule(path)).default;
+  const container = await AstroContainer.create();
+  return container.renderToString(mod, { props, slots });
+}
+
+test('the password field is new-password beside a visible username anchor managers can file it under', async () => {
+  const html = await render('/src/components/settings/PasswordField.astro', { username: 'sam', name: 'password', label: 'New password', required: true });
+  assert.match(html, /<input[^>]*type="password"[^>]*autocomplete="new-password"|<input[^>]*autocomplete="new-password"[^>]*type="password"/);
+  const user = html.match(/<input[^>]*autocomplete="username"[^>]*>/)?.[0] ?? '';
+  assert.ok(user.includes('value="sam"'));
+  assert.ok(!/readonly|disabled|type="hidden"|name=/.test(user), 'not hidden from managers, not posted');
+  assert.ok(html.indexOf('autocomplete="username"') < html.indexOf('autocomplete="new-password"'));
+});
+
+test('the TOTP setup key sits beside the QR as grouped text with its copy button, behind no disclosure', async () => {
+  const html = await render('/src/components/settings/TotpKey.astro', { qr: { src: 'data:image/png;base64,AA', alt: 'QR' }, secret: 'ABCDEFGHIJKLMNOP' });
+  assert.match(html, /<code[^>]*id="totp-secret"[^>]*>\s*ABCD EFGH IJKL MNOP\s*<\/code>/);
+  assert.match(html, /data-copy="totp-secret"/);
+  assert.ok(!html.includes('<details'));
+  assert.ok(html.indexOf('<img') < html.indexOf('totp-secret'));
+});
+
+test('each setup-link copy control names the one field it copies', async () => {
+  const html = await render('/src/components/SetupLink.astro', { url: 'https://x.test/s?f=1', code: '123456', ttl: '1h', name: 'Sam' });
+  const label = (target) => html.match(new RegExp(`data-copy="${target}"[^>]*>([^<]*)<`))?.[1];
+  assert.equal(label('recoveryUrl'), 'Copy link');
+  assert.equal(label('recoveryCode'), 'Copy code');
+  assert.equal(label('recoveryMessage'), 'Copy message');
+  assert.match(html, /<input id="recoveryUrl"[^>]*value="https:\/\/x\.test\/s\?f=1"/);
+  assert.match(html, /<input id="recoveryCode"[^>]*value="123456"/);
+});
+
+test('the settings page hands the account name to the password field and renders the key beside the QR', () => {
+  const page = readFileSync(new URL('../src/pages/auth/settings.astro', import.meta.url), 'utf8');
+  assert.match(page, /<PasswordField username=\{traits\.username\}/);
+  assert.match(page, /^\s*<TotpKey qr=\{totp\.qr\} secret=\{totp\.secret\}/m);
+  assert.match(page, /checked=\{pwOpen\}/);
+  assert.match(page, /pwOpen = passwordPanelOpen\(nodes, parseIdentity\(stored\)\.hasPassword\)/);
+  assert.ok(!page.includes('Show setup key'));
 });
