@@ -6,7 +6,7 @@ import { requireAdminSession } from './admin';
 import { joinApps, type AdminApp } from './admin-view';
 import { devAdmin, isDevAdminState, type DevAdmin } from './admin-fixtures';
 import { manifestHealth, servingManifests, type ManifestHealth } from './manifest-store';
-import { loadTiles } from './tiles';
+import { loadTiles, rejectedIcons } from './tiles';
 
 export interface AdminContext {
   /** The signed-in admin's identity id. */
@@ -23,8 +23,8 @@ export async function adminContext(astro: any): Promise<AdminContext | Response>
   if (isDevAdminState(devParam)) {
     const dev = devAdmin(devParam);
     const health: ManifestHealth = dev.broken
-      ? { status: 'stale', error: 'grafana.yaml: presentation.access names an unknown group', failingSinceMs: Date.now() - 600_000, serving: dev.apps.length }
-      : { status: 'ok', error: null, failingSinceMs: null, serving: dev.apps.length };
+      ? { status: 'stale', error: 'grafana.yaml: presentation.access names an unknown group', failingSinceMs: Date.now() - 600_000, serving: dev.apps.length, dropped: [] }
+      : { status: 'ok', error: null, failingSinceMs: null, serving: dev.apps.length, dropped: [] };
     return { adminId: dev.adminId, apps: dev.apps, health, dev };
   }
 
@@ -38,5 +38,7 @@ export async function adminContext(astro: any): Promise<AdminContext | Response>
   } catch (err) {
     console.error('[othala/admin] loadTiles failed:', err);
   }
-  return { adminId: guard.identity?.id ?? '', apps: joinApps(servingManifests(), tiles), health: manifestHealth(), dev: null };
+  const health = manifestHealth();
+  health.dropped = [...health.dropped, ...rejectedIcons(tiles)];
+  return { adminId: guard.identity?.id ?? '', apps: joinApps(servingManifests(), tiles), health, dev: null };
 }

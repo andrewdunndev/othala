@@ -391,6 +391,11 @@ function allTiles(): AppTile[] {
   return tiles;
 }
 
+/** The sidecars loadIcon refused, named by file with the reason. */
+export function rejectedIcons(tiles: AppTile[]): { file: string; reason: string }[] {
+  return tiles.flatMap((t) => (t.iconReason ? [{ file: `${t.slug}.svg`, reason: t.iconReason }] : []));
+}
+
 export function loadTiles(): AppTile[] {
   return allTiles().filter((t) => !t.disabled);
 }

@@ -37,6 +37,14 @@ function describeDuration(seconds: number): string {
     </details>
   </div>
 )}
+{health.dropped.length > 0 && (
+  <div class="notice notice-warning">
+    <p><strong>Some app files were skipped.</strong> The other apps keep working; correct these files on the server.</p>
+    <ul>
+      {health.dropped.map((d) => <li><code>{d.file}</code>: {d.reason}</li>)}
+    </ul>
+  </div>
+)}
 {health.status === 'unavailable' && (
   <div class="notice notice-danger">
     <p>
