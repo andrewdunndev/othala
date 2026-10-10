@@ -22,6 +22,8 @@ export interface IdentityFacts {
    * keyed: the read did not carry them.
    */
   firstFactorKey: boolean;
+  /** A password hash is stored. Missing credentials count as set: the read did not carry them. */
+  hasPassword: boolean;
 }
 
 function plainObject(v: unknown): Record<string, unknown> | null {
@@ -47,6 +49,7 @@ export function parseIdentity(identity: Identity | null | undefined): IdentityFa
   const webauthn = creds ? keysOf(creds, 'webauthn') : [];
   const securityKeys = webauthn.filter((k) => k.is_passwordless !== true).length;
   const hash = creds ? configOf(creds, 'password')?.['hashed_password'] : undefined;
+  const hasHash = typeof hash === 'string' && hash.length > 0;
   return {
     state: identity?.state,
     isAdmin: meta?.['admin'] === true,
@@ -54,10 +57,11 @@ export function parseIdentity(identity: Identity | null | undefined): IdentityFa
     authenticator,
     securityKeys,
     hasSecondFactor: authenticator || securityKeys > 0,
+    hasPassword: !rawCreds || typeof rawCreds !== 'object' || hasHash,
     firstFactorKey:
       !rawCreds ||
       typeof rawCreds !== 'object' ||
-      (typeof hash === 'string' && hash.length > 0) ||
+      hasHash ||
       (creds !== null && keysOf(creds, 'passkey').length > 0) ||
       webauthn.some((k) => k.is_passwordless === true),
   };

@@ -1,4 +1,4 @@
-import { asInput } from './nodes';
+import { asInput, nodesByGroup } from './nodes';
 import type { FlowNode, FlowMessage, NodeImageAttributes, NodeInputAttributes, NodeTextAttributes } from './types';
 import type { PasskeyNames } from './passkey-names';
 
@@ -127,6 +127,11 @@ export interface SecurityStatus {
   twoStep: boolean;
   backupCodes: boolean;
   emailUnverified: boolean;
+}
+
+/** Open when a refusal needs reading, and on first use, when there is no password yet to change. */
+export function passwordPanelOpen(nodes: FlowNode[], hasPassword: boolean): boolean {
+  return !hasPassword || nodesByGroup(nodes, 'password').some((n) => (n.messages?.length ?? 0) > 0);
 }
 
 export function securityStatus(

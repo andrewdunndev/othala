@@ -39,6 +39,7 @@ import {
   securityStatus,
   keyOnlyKeeper,
   totpView,
+  passwordPanelOpen,
 } from '../../lib/settings-view';
 import { devSettings, isDevSettingsState } from '../../lib/settings-fixtures';
 import { FLASH, LOST_KEYS, RENAME_ERROR_COOKIE, RENAME_ERRORS, messageText } from '../../lib/settings-flash';
@@ -176,7 +177,7 @@ const verifyHref = browserFlows.verification(`${publicUrl}/auth/settings`, trait
 const showBackupPrompt = flow.state === 'success' && status.twoStep && !status.backupCodes;
 // The enrollment steps open on their own when a code was refused (or the fixture asks); otherwise they wait behind a button.
 const setupOpen = totp.codeMessages.length > 0 || (dev?.setupOpen ?? false);
-const pwOpen = nodesByGroup(nodes, 'password').some((n) => (n.messages?.length ?? 0) > 0);
+const pwOpen = passwordPanelOpen(nodes, parseIdentity(stored).hasPassword);
 // The saved line belongs in the card that was edited. Script fills it on a live swap; the dev fixture renders it here.
 const devFlash = dev?.flash ? FLASH[dev.flash] : null;
 const devFlashCard = dev?.flash?.startsWith('lookup') ? 'recovery' : 'two-step';

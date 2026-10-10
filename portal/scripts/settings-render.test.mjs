@@ -3,6 +3,7 @@
 
 import { test, beforeAll, afterAll } from 'vitest';
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
 import { getViteConfig } from 'astro/config';
 import { createServer } from 'vite';
 
@@ -80,7 +81,7 @@ test('the password field is new-password beside a visible username anchor manage
   assert.match(html, /<input[^>]*type="password"[^>]*autocomplete="new-password"|<input[^>]*autocomplete="new-password"[^>]*type="password"/);
   const user = html.match(/<input[^>]*autocomplete="username"[^>]*>/)?.[0] ?? '';
   assert.ok(user.includes('value="sam"'));
-  assert.ok(!/readonly|aria-hidden|disabled|type="hidden"/.test(user), 'managers skip such fields');
+  assert.ok(!/readonly|disabled|type="hidden"|name=/.test(user), 'not hidden from managers, not posted');
   assert.ok(html.indexOf('autocomplete="username"') < html.indexOf('autocomplete="new-password"'));
 });
 
@@ -100,4 +101,13 @@ test('each setup-link copy control names the one field it copies', async () => {
   assert.equal(label('recoveryMessage'), 'Copy message');
   assert.match(html, /<input id="recoveryUrl"[^>]*value="https:\/\/x\.test\/s\?f=1"/);
   assert.match(html, /<input id="recoveryCode"[^>]*value="123456"/);
+});
+
+test('the settings page hands the account name to the password field and renders the key beside the QR', () => {
+  const page = readFileSync(new URL('../src/pages/auth/settings.astro', import.meta.url), 'utf8');
+  assert.match(page, /<PasswordField username=\{traits\.username\}/);
+  assert.match(page, /^\s*<TotpKey qr=\{totp\.qr\} secret=\{totp\.secret\}/m);
+  assert.match(page, /checked=\{pwOpen\}/);
+  assert.match(page, /pwOpen = passwordPanelOpen\(nodes, parseIdentity\(stored\)\.hasPassword\)/);
+  assert.ok(!page.includes('Show setup key'));
 });

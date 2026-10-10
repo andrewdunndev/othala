@@ -112,6 +112,14 @@ describe('parseIdentity credentials', () => {
     expect(parseIdentity(i)).toMatchObject(want);
   });
 
+  it('hasPassword needs a stored hash; missing credentials count as set', () => {
+    const bare = identity({ password: false });
+    expect(parseIdentity(bare).hasPassword).toBe(false);
+    expect(parseIdentity(withCredential(bare, 'password', { hashed_password: '$argon2id$x' })).hasPassword).toBe(true);
+    expect(parseIdentity(withCredential(bare, 'password', {})).hasPassword).toBe(false);
+    expect(parseIdentity(whoamiIdentity(identity())).hasPassword).toBe(true);
+  });
+
   it('reads groups as stored, keeping only strings', () => {
     expect(parseIdentity(makeIdentity({ groups: ['family', 'Bad Name', 3, null] })).groups).toEqual(['family', 'Bad Name']);
     expect(parseIdentity(makeIdentity({ groups: 'family' })).groups).toEqual([]);
