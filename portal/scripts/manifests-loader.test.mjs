@@ -390,3 +390,12 @@ test('per-file isolation: all-broken dir yields empty list without throw', () =>
     rmSync(dir, { recursive: true, force: true });
   }
 });
+
+test('retired icon_slug and icon_fallback are flagged for manifest-lint', async () => {
+  const { lintBlockers } = await import('../src/lib/manifest-lint.ts');
+  for (const key of ['icon_slug', 'icon_fallback']) {
+    const m = parseManifest(`oidc:\n  client_id: photos\npresentation:\n  ${key}: photos\n`, 'photos.yaml');
+    assert.ok(lintBlockers([m], []).some((x) => /<stem>\.svg/.test(x.message)), key);
+  }
+  assert.equal(parseManifest('oidc:\n  client_id: photos\n', 'photos.yaml').retiredIcon, false);
+});

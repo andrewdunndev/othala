@@ -18,11 +18,11 @@ const SVG_ROOT_RE = /^\uFEFF?\s*(?:<\?xml[^>]*\?>\s*)?(?:<!--[\s\S]*?-->\s*)*(?:
 /** The `<stem>.svg` sidecar: its markup when it is a plausible logo, a reason when it is rejected, empty when absent. */
 function loadIcon(dir: string, stem: string): { svg?: string; reason?: string } {
   const path = join(dir, `${stem}.svg`);
-  if (!existsSync(path)) return {};
   try {
-    const size = statSync(path).size;
-    if (size > ICON_MAX_BYTES) return { reason: `${stem}.svg is ${size} bytes, over the ${ICON_MAX_BYTES} byte limit` };
+    if (!existsSync(path)) return {};
+    if (!statSync(path).isFile()) return { reason: `${stem}.svg is not a regular file` };
     const svg = readFileSync(path, 'utf8');
+    if (Buffer.byteLength(svg) > ICON_MAX_BYTES) return { reason: `${stem}.svg is over the ${ICON_MAX_BYTES} byte limit` };
     return SVG_ROOT_RE.test(svg) ? { svg } : { reason: `${stem}.svg does not open with an <svg> root` };
   } catch (err) {
     return { reason: `${stem}.svg is unreadable: ${err}` };
@@ -249,7 +249,7 @@ export function loadRequirements(): Map<string, Requirement> {
   const out = new Map<string, Requirement>();
   let files: string[];
   try {
-    files = readdirSync(dir).filter((f) => f.endsWith('.md') || f.endsWith('.svg')).sort();
+    files = readdirSync(dir).filter((f) => f.endsWith('.md')).sort();
   } catch {
     return out;
   }

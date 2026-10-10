@@ -1,4 +1,4 @@
 Fixture logos are vendored unmodified and remain trademarks of their owners.
 
-homarr-labs/dashboard-icons (https://github.com/homarr-labs/dashboard-icons), Apache-2.0 (https://www.apache.org/licenses/LICENSE-2.0): byte-identical to its svg/ copy there
-selfhst/icons (https://github.com/selfhst/icons), CC BY 4.0 (https://creativecommons.org/licenses/by/4.0/): any file not in dashboard-icons, byte-identical to its svg/ copy there
+grafana.svg and audiobookshelf.svg: homarr-labs/dashboard-icons (https://github.com/homarr-labs/dashboard-icons), Apache-2.0 (https://www.apache.org/licenses/LICENSE-2.0), byte-identical to the svg/ copies there
+promptdesk.svg: selfhst/icons (https://github.com/selfhst/icons), CC BY 4.0 (https://creativecommons.org/licenses/by/4.0/), byte-identical to its svg/ copy there

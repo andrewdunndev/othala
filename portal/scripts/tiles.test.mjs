@@ -2,7 +2,7 @@
 
 import { test } from 'vitest';
 import assert from 'node:assert/strict';
-import { mkdtempSync, writeFileSync, rmSync } from 'node:fs';
+import { mkdtempSync, writeFileSync, rmSync, mkdirSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { tileAccessGroups } from '../src/lib/tiles.ts';
@@ -170,6 +170,19 @@ test('sidecar: an oversize file or a non-svg root gives no href and a reason, an
   const html = await loadWithSidecar('<html><svg></svg></html>');
   assert.equal(html.iconHref, undefined);
   assert.match(html.iconReason, /<svg> root/);
+});
+
+test('sidecar: a non-regular <stem>.svg gives no href and a reason', async () => {
+  const dir = mkdtempSync(join(tmpdir(), 'tiles-test-svg-'));
+  try {
+    writeFileSync(join(dir, 'side.yaml'), SIDECAR_YAML);
+    mkdirSync(join(dir, 'side.svg'));
+    const tile = await withTilesModule({ MANIFEST_DIR: dir }, (mod) => mod.loadTiles()[0]);
+    assert.equal(tile.iconHref, undefined);
+    assert.match(tile.iconReason, /regular file/);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
 });
 
 test('sidecar: bleed is read from the sidecar', async () => {
