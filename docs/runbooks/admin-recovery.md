@@ -127,9 +127,9 @@ the API is never published to the network).
    `metadata_admin` value before clearing it; you restore it at step 4.
    Removing the `admin` key only (never a whole-object replace) leaves
    `groups` untouched.
-2. **Issue a recovery code**, not a link: `POST /admin/recovery/code`. The
-   link strategy is disabled (`selfservice.methods.link.enabled: false` in
-   `kratos.yml`); `selfservice.flows.recovery.use` runs the code method. The response carries both
+2. **Issue a recovery code**, not a link: `POST /admin/recovery/code`. `kratos.yml`
+   enables only the `code` method (`selfservice.methods.code.enabled: true`) for
+   recovery; the `link` method is not enabled. The response carries both
    a `recovery_link` and a `recovery_code`; nothing is emailed. The code's
    lifetime is bounded by `selfservice.methods.code.config.lifespan`
    regardless of the `expires_in` requested; issue a fresh one if it expires.

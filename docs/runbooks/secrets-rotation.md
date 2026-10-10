@@ -1,18 +1,20 @@
 # secrets.system rotation (break-glass)
 
-`secrets.system` is the symmetric key Hydra uses to encrypt OAuth2 client
-secrets and consent challenges at rest in Postgres. Rotation rebuilds the Hydra
+`secrets.system` is the symmetric key Hydra uses to encrypt its JWK private
+keys and stored OAuth2 session data at rest in Postgres. (Client secrets are
+hashed, not encrypted.) Rotation rebuilds the Hydra
 database; do it only on known compromise of the key (sops file or age key
 exposure, a leak to a chat, log or commit). No cadence is required: Hydra
 treats this key like a database master key, not a session cookie.
 
 ## What rotation costs
 
-- Every stored client secret becomes unreadable; the in-app registrar
-  re-creates each client.
-- In-flight consent challenges become invalid; users mid-flow retry.
-- Hydra's id_token signing keys are encrypted with this key and do not
-  survive; the rebuilt database mints new ones.
+- The encrypted JWK private keys and session data become unreadable, so the
+  database is rebuilt; the in-app registrar re-creates each client from the
+  manifests.
+- Outstanding tokens, grants and in-flight consent flows are lost; users
+  mid-flow retry and sign in again.
+- Hydra's id_token signing keys do not survive; the rebuilt database mints new ones.
 
 A brief disruption, best in a low-traffic window.
 

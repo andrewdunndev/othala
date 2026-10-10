@@ -7,11 +7,10 @@ deploy-plane work; this runbook is the contract it must satisfy.
 ## Stakes
 
 The databases hold every passkey enrollment, active session, recovery-code
-state, and every Hydra OAuth2 client secret (encrypted at rest under
-`secrets.system`, which is non-rotatable). Losing them without a backup means
-every member re-enrolls, every OIDC client is re-created with its secret
-pushed to the app, and `secrets.system` must be restored from your secret
-store or even a partial restore cannot decrypt.
+state, and the Hydra OAuth2 clients (secrets hashed) and signing keys (private keys and
+session data encrypted at rest under `secrets.system`, which is non-rotatable). Losing them without a backup means
+every member re-enrolls, every OIDC client is re-created, and `secrets.system` must be restored from
+your secret store or even a partial restore cannot decrypt.
 
 ## Required posture
 
@@ -24,7 +23,7 @@ store or even a partial restore cannot decrypt.
    failure; two independent destinations are stronger.
 4. **`secrets.system` stays out of the dump.** It is an env var held in sops
    (`hydra_system_secret`). Restore it into the env before starting Hydra;
-   otherwise the client_secret column is permanently ciphertext. Back up the
+   otherwise the JWK private keys and session data are permanently ciphertext. Back up the
    sops age key separately.
 5. **Quarterly restore drill.** Restore the latest dump into a throwaway VM
    with fresh Kratos and Hydra pods and confirm one identity signs in, one

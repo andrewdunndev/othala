@@ -133,7 +133,7 @@ Each names its enforcer and the test that fails if it stops working.
   `site/src/content/docs/guides/hardening.md`.
 - **Rate limiting depends on a third-party Caddy module.** A binary built without
   it refuses to load `caddy/Caddyfile`, so the failure is a refusal to start,
-  not a silently unlimited edge.
+  not a silently unlimited edge. Confirm it is compiled in.
 - **Sessions are long-lived and `whoami` answers at the first assurance level**
   (`kratos/kratos.yml`, `session`). A stolen cookie stays valuable for the
   session lifespan; revocation ends it sooner.

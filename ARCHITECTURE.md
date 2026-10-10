@@ -183,7 +183,7 @@ Hydra's client list is reconciled from the manifests.
 `registerAllClients` (`portal/src/lib/register-clients.ts`) narrows the catalog to manifests that
 actually declare an `oidc:` block, runs the full manifest lint, and then, per client, reads the
 current state from Hydra to decide create versus update. Only `oidc:`-derived fields cross the wire;
-the `consent:` block is a namespace this app owns and Hydra never sees it. Registration is
+the `consent:` block is a namespace this app owns and Hydra never sees it. The secret is set as a typed field on the request body (`body.client_secret`), never interpolated into a JSON string. Registration is
 create-or-update only and never deletes, so a decommissioned client survives until removed deliberately.
 
 `portal/src/server/registrar.ts` drives it on boot with bounded retry (Hydra may still be starting)

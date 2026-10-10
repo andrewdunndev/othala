@@ -4,8 +4,6 @@ The response when a member's device is lost, stolen, or accessed without their
 knowledge. Follow it in full: skipped steps leave a window for the attacker to
 regain access.
 
-See also `site/src/content/docs/guides/hardening.md` §7 for the threat context.
-
 ---
 
 ## Why `revokeSubject` (force re-login) alone is insufficient

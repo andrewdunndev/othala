@@ -33,7 +33,7 @@ a code can arrive still valid against a flow that has expired.
 **There is no `script-src` and no `default-src` in the CSP.** A strict
 `script-src` breaks the Kratos WebAuthn ceremony, which injects inline script
 nodes, and breaks the portal's own inline theme setup. Adding one needs live
-validation of every auth flow, so the CSP here is a framing, base-URI and
+validation of every auth flow and is still deferred, so the CSP here is a framing, base-URI and
 form-target control, **not XSS insurance**. Relatedly,
 `form-action` cannot be `'self'` alone: it governs a submission's whole redirect
 chain, and an OIDC login's redirect lands on the requesting app's own domain.

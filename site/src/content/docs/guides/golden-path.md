@@ -62,7 +62,7 @@ One handler in `portal/src/server/listen.ts` refuses admin identities email
 recovery and sign-in by emailed code, so email alone never yields admin
 authority. `portal/scripts/admin-port.test.mjs` and spec j cover it. **Cost of
 opening it:** every additional webhook is another contract with Kratos's
-webhook schema to re-verify on each bump. 
+webhook schema to re-verify on each bump.
 
 ## 7. One secret per rotation slot, no standing second slot
 
@@ -76,7 +76,7 @@ it is generate-once for the life of the database, and changing it is a rebuild e
 
 Every write to an identity's `metadata_admin` goes through
 `validateMetadataAdmin` in `portal/src/lib/metadata-admin.ts`, because Kratos
-treats that object as opaque and validates nothing inside it. In-pod, the portal is the only writer. **Cost of opening it:** a second writer — a CLI, a migration
+treats that object as opaque and validates nothing inside it. Network isolation keeps the admin port unreachable from outside the pod; in-pod, the portal is the only writer. **Cost of opening it:** a second writer — a CLI, a migration
 script — must share the validator, or typo'd groups land in storage and
 silently remove access.
 

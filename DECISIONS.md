@@ -15,7 +15,8 @@ a role above an app's entry level cannot remove their last one.
 **Why.** Kratos enforces assurance level per flow, never per route, so step-up belongs in the
 application, which reads the session's AAL itself. Raising the pin tightens nothing: the session endpoint
 stops returning a usable identity for exactly the people who enrolled a second factor, and that identity
-id is the gate's only input, so every gated app locks out at once.
+id is the gate's only input, so every gated app locks out at once. Ory config is mounted by the consumer, so a stale
+setting's consumer may be outside this repository.
 
 **Enforced by.** `portal/scripts/forward-auth.test.mjs` holds the coupling (a session with no identity
 id is 401). Step-up: `gate.test.ts`, `oauth2-handlers.test.mjs`, `admin-port.test.mjs`,
