@@ -7,6 +7,17 @@ aims to follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 The git tag is the authoritative version; `portal/package.json` mirrors it.
 This CHANGELOG and git tags carry the deployed-instance release state.
 
+## [0.13.1] - 2026-10-09
+
+Enrollment is easier to follow, and app tiles show the real software logos.
+
+### Changed
+
+- TOTP enrollment shows the setup key as text beside the QR code, with no click to reveal.
+- The setup-link result leads with **Copy message** (link and code together). **Copy link** and **Copy code** sit beside it and copy only what they say.
+- When an identity has no password yet, the settings password panel is open on load, so a password manager finds the field without a click.
+- App tiles use the projects' real logos instead of hand-drawn plates, and unused icons are removed. A tile whose icon slug no longer resolves shows its monogram. `portal/public/icons/NOTICE` credits each source and license.
+
 ## [0.13.0] - 2026-10-08
 
 Apps without a secret can sign in, one bad app file no longer takes the rest down, and devices without a browser can sign in with a code.
