@@ -13,6 +13,8 @@ import { getSession } from '../../lib/kratos';
 import { signToken } from '../../lib/csrf';
 import { hydraAdmin } from '../../lib/ory-fetch';
 import { loadTiles } from '../../lib/tiles';
+import { getIdentity } from '../../lib/admin-api';
+import { parseIdentity } from '../../lib/identity-facts';
 import { devViewer } from '../../lib/viewer';
 import { monogram } from '../../lib/monogram';
 import { DEV_CONSENT_STATES, devConsent, isIn } from '../../lib/journey-fixtures';
@@ -29,6 +31,7 @@ let fetchError = false;
 let ownershipError = false;
 let csrfToken = '';
 let deviceCode: string | null = null;
+let viewerGroups: string[] = [];
 
 if (dev) {
   // The first app in the dev catalog stands in, so its real logo and description render.
@@ -36,6 +39,7 @@ if (dev) {
   clientId = stand?.slug ?? dev.clientId;
   clientName = stand?.name ?? dev.clientName;
   requestedScopes = dev.scopes;
+  viewerGroups = stand?.accessGroups ?? [];
   fetchError = !!dev.fetchError;
 } else if (!challenge) {
   fetchError = true;
@@ -61,6 +65,7 @@ if (dev) {
       clientName = consent.client?.client_name ?? clientId;
       requestedScopes = consent.requested_scope ?? [];
       csrfToken = signToken(session.identity.id, 'consent');
+      viewerGroups = parseIdentity(await getIdentity(session.identity.id).catch(() => null)).groups;
     }
   } catch {
     fetchError = true;
@@ -77,7 +82,7 @@ const failMessage = !challenge && !dev
   ? 'This request belongs to someone else, or has timed out. Go back to the app and start sign-in again.'
   : 'This request has timed out or was already answered. Go back to the app and start sign-in again.';
 const scopeDescriptions = describeScopeList(requestedScopes, appName);
-const plate = tile ?? { iconHref: undefined, icon: monogram(appName), iconBleed: false };
+const plate = tile ?? { icon: monogram(appName) };
 ---
 <FocusPage
   viewer={dev ? devViewer(true, 'member') : undefined}
@@ -94,7 +99,7 @@ const plate = tile ?? { iconHref: undefined, icon: monogram(appName), iconBleed:
   ) : (
     <section class="panel focus-card">
       <div class="consent-app">
-        <AppIcon tile={plate} size="lg" />
+        <AppIcon tile={plate} groups={viewerGroups} size="lg" />
         <div>
           <p class="consent-app-name">{appName}</p>
           {tile?.description && <p class="consent-app-desc">{tile.description}</p>}

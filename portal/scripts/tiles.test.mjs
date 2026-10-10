@@ -122,7 +122,6 @@ presentation:
   description: Public status and incident history.
   url: https://status.othala.test
   icon: ST
-  icon_fallback: statuspage
   auth_kind: external
   order: 200
 `);
@@ -130,4 +129,55 @@ presentation:
   assert.equal(tile.authKind, 'external');
   assert.deepEqual(tileAccessGroups(tile), ['everyone'],
     'external tile without access must gate on the default group');
+});
+
+const SIDECAR_YAML = `
+presentation:
+  name: Side
+  description: d
+  url: https://side.othala.test
+  icon: SI
+  auth_kind: external
+`;
+
+async function loadWithSidecar(svg) {
+  const dir = mkdtempSync(join(tmpdir(), 'tiles-test-svg-'));
+  try {
+    writeFileSync(join(dir, 'side.yaml'), SIDECAR_YAML);
+    if (svg !== undefined) writeFileSync(join(dir, 'side.svg'), svg);
+    return await withTilesModule({ MANIFEST_DIR: dir }, (mod) => mod.loadTiles()[0]);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+}
+
+test('sidecar: <stem>.svg beside the manifest gives the tile an href', async () => {
+  const tile = await loadWithSidecar('<svg viewBox="0 0 1 1"></svg>');
+  assert.equal(tile.iconHref, '/icons/side.svg');
+  assert.equal(tile.iconBleed, false);
+});
+
+test('sidecar: no file leaves the monogram', async () => {
+  const tile = await loadWithSidecar(undefined);
+  assert.equal(tile.iconHref, undefined);
+  assert.equal(tile.iconReason, undefined);
+});
+
+test('sidecar: an oversize file or a non-svg root gives no href and a reason, and the tile still loads', async () => {
+  const big = await loadWithSidecar('<svg>' + ' '.repeat(33 * 1024) + '</svg>');
+  assert.equal(big.iconHref, undefined);
+  assert.match(big.iconReason, /over the/);
+  const html = await loadWithSidecar('<html><svg></svg></html>');
+  assert.equal(html.iconHref, undefined);
+  assert.match(html.iconReason, /<svg> root/);
+});
+
+test('sidecar: bleed is read from the sidecar', async () => {
+  const tile = await loadWithSidecar('<svg viewBox="0 0 8 8"><rect width="8" height="8" fill="#123456"/></svg>');
+  assert.equal(tile.iconBleed, true);
+});
+
+test('sidecar: retired icon_slug and icon_fallback are ignored at serve', async () => {
+  const tile = await parseSingleTile(SIDECAR_YAML + '  icon_slug: grafana\n  icon_fallback: grafana\n');
+  assert.equal(tile.iconHref, undefined);
 });
