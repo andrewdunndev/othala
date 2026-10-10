@@ -23,7 +23,7 @@ The app in `portal/` (Astro Node SSR) provides:
 - **a forward-auth endpoint** so apps with no OIDC support sit behind the same session and the same
   groups;
 - **an OIDC client registrar** that reconciles Hydra's client list from per-app manifest files, so
-  adding an app is a file drop rather than an image rebuild;
+  adding an app, logo included, is a file drop rather than an image rebuild;
 - **an admin surface** for identities, groups, and OAuth2 clients, on a listener that is not on the
   network.
 
