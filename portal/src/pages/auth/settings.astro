@@ -16,6 +16,7 @@ import {
 import { csrfToken, nodesByGroup, asInput, scriptNodes, safeOnclick } from '../../lib/nodes';
 import type { FlowNode, Session, SettingsFlow } from '../../lib/types';
 import CredentialRows from '../../components/settings/CredentialRows.astro';
+import PasswordField from '../../components/settings/PasswordField.astro';
 import ActionForm from '../../components/settings/ActionForm.astro';
 import ConfirmCues from '../../components/settings/ConfirmCues.astro';
 import { SECOND_FACTOR_KEEP } from '../../lib/second-factor-gate';
@@ -313,7 +314,6 @@ const lookupLabel: Record<string, string> = {
             <form method="POST" enctype="application/x-www-form-urlencoded" action={ui.action} class="settings-form">
               <input type="hidden" name="csrf_token" value={csrf} />
               <input type="hidden" name="method" value="password" />
-              <input type="text" class="sr-only" readonly tabindex="-1" aria-hidden="true" autocomplete="username" value={traits.username} />
               <input type="checkbox" form="disclosures" class="disclose cb-setup" id="pw-open" checked={pwOpen} />
               <div class="form-actions">
                 <label for="pw-open" class="button button-secondary button-sm toggle-label lbl-setup"><span class="on-closed">Change password</span><span class="on-open">Cancel</span></label>
@@ -331,11 +331,9 @@ const lookupLabel: Record<string, string> = {
                     );
                   }
                   return (
-                    <div class="field">
-                      <label for="new-password">{n.meta?.label?.text ?? 'New password'}</label>
-                      <input id="new-password" name={a.name} type="password" autocomplete="new-password" required={a.required} />
+                    <PasswordField username={traits.username} name={a.name} label={n.meta?.label?.text ?? 'New password'} required={a.required}>
                       {n.messages?.map((m) => <div class={`notice notice-${kind(m.type)}`}>{messageText(m)}</div>)}
-                    </div>
+                    </PasswordField>
                   );
                 })}
               </div>

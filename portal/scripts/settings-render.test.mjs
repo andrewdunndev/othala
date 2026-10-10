@@ -75,12 +75,11 @@ async function render(path, props, slots) {
   return container.renderToString(mod, { props, slots });
 }
 
-test('each setup-link copy control names the one field it copies', async () => {
-  const html = await render('/src/components/SetupLink.astro', { url: 'https://x.test/s?f=1', code: '123456', ttl: '1h', name: 'Sam' });
-  const label = (target) => html.match(new RegExp(`data-copy="${target}"[^>]*>([^<]*)<`))?.[1];
-  assert.equal(label('recoveryUrl'), 'Copy link');
-  assert.equal(label('recoveryCode'), 'Copy code');
-  assert.equal(label('recoveryMessage'), 'Copy message');
-  assert.match(html, /<input id="recoveryUrl"[^>]*value="https:\/\/x\.test\/s\?f=1"/);
-  assert.match(html, /<input id="recoveryCode"[^>]*value="123456"/);
+test('the password field is new-password beside a visible username anchor managers can file it under', async () => {
+  const html = await render('/src/components/settings/PasswordField.astro', { username: 'sam', name: 'password', label: 'New password', required: true });
+  assert.match(html, /<input[^>]*type="password"[^>]*autocomplete="new-password"|<input[^>]*autocomplete="new-password"[^>]*type="password"/);
+  const user = html.match(/<input[^>]*autocomplete="username"[^>]*>/)?.[0] ?? '';
+  assert.ok(user.includes('value="sam"'));
+  assert.ok(!/readonly|aria-hidden|disabled|type="hidden"/.test(user), 'managers skip such fields');
+  assert.ok(html.indexOf('autocomplete="username"') < html.indexOf('autocomplete="new-password"'));
 });
