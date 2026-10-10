@@ -153,7 +153,7 @@ function loadOne(file: string, dir: string, dropped: Dropped[]): ClientManifest 
     return parseManifest(text, file);
   } catch (err) {
     console.warn(`manifests: skipping ${file}: ${err}`);
-    dropped.push({ file, reason: String(err) });
+    dropped.push({ file, reason: String(err).split('\n')[0] });
     return null;
   }
 }

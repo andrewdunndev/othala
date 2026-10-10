@@ -17,6 +17,13 @@ export interface AdminContext {
   dev: DevAdmin | null;
 }
 
+/** The banner's health: dropped manifests plus rejected icon sidecars, listed only while the manifests load normally. */
+export function adminHealth(tiles: ReturnType<typeof loadTiles>): ManifestHealth {
+  const health = manifestHealth();
+  if (health.status === 'ok') health.dropped = [...health.dropped, ...rejectedIcons(tiles)];
+  return health;
+}
+
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 export async function adminContext(astro: any): Promise<AdminContext | Response> {
   const devParam: string | null = import.meta.env.DEV ? astro.url.searchParams.get('dev-state') : null;
@@ -38,7 +45,5 @@ export async function adminContext(astro: any): Promise<AdminContext | Response>
   } catch (err) {
     console.error('[othala/admin] loadTiles failed:', err);
   }
-  const health = manifestHealth();
-  health.dropped = [...health.dropped, ...rejectedIcons(tiles)];
-  return { adminId: guard.identity?.id ?? '', apps: joinApps(servingManifests(), tiles), health, dev: null };
+  return { adminId: guard.identity?.id ?? '', apps: joinApps(servingManifests(), tiles), health: adminHealth(tiles), dev: null };
 }

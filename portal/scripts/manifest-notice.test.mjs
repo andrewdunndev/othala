@@ -8,7 +8,7 @@ import { tmpdir } from 'node:os';
 import { getViteConfig } from 'astro/config';
 import { createServer } from 'vite';
 
-let server, AstroContainer, Notice, manifests, store, tiles;
+let server, AstroContainer, Notice, manifests, ctx, tiles;
 
 beforeAll(async () => {
   const inline = await getViteConfig({ server: { middlewareMode: true } })({ command: 'serve', mode: 'test' });
@@ -16,7 +16,7 @@ beforeAll(async () => {
   ({ experimental_AstroContainer: AstroContainer } = await server.ssrLoadModule('astro/container'));
   Notice = (await server.ssrLoadModule('/src/components/ManifestNotice.astro')).default;
   manifests = await server.ssrLoadModule('/src/lib/manifests.ts');
-  store = await server.ssrLoadModule('/src/lib/manifest-store.ts');
+  ctx = await server.ssrLoadModule('/src/lib/admin-context.ts');
   tiles = await server.ssrLoadModule('/src/lib/tiles.ts');
 });
 
@@ -33,8 +33,7 @@ async function render(files) {
     for (const [name, text] of Object.entries(files)) writeFileSync(join(dir, name), text);
     manifests.setManifestDir(dir);
     manifests.invalidateManifestCache();
-    const health = store.manifestHealth();
-    health.dropped = [...health.dropped, ...tiles.rejectedIcons(tiles.loadTiles())];
+    const health = ctx.adminHealth(tiles.loadTiles());
     const container = await AstroContainer.create();
     return await container.renderToString(Notice, { props: { health } });
   } finally {
@@ -56,4 +55,9 @@ test('a dropped manifest and a rejected sidecar are listed with their reasons', 
 
 test('a clean catalog renders nothing', async () => {
   assert.equal((await render({ 'good.yaml': GOOD, 'good.svg': '<svg viewBox="0 0 1 1"></svg>' })).trim(), '');
+});
+
+test('a parse failure lists one line of the error, not the source excerpt', async () => {
+  const html = await render({ 'good.yaml': GOOD, 'broken.yaml': 'oidc: [unclosed\n' });
+  assert.doesNotMatch(html, /unclosed/);
 });
