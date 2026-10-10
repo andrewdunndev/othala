@@ -46,7 +46,7 @@ selfservice:
           # CRITICAL one-way decision: the registrable parent, so passkeys work from any subdomain
           # origin. Changing it invalidates every enrolled passkey (shared with the webauthn RP below).
           id: "${OTHALA_APEX}"
-          display_name: "${OTHALA_INSTANCE_NAME}"
+          display_name: "${OTHALA_INSTANCE_NAME} Single Sign-On"
           origins:
             - "${OTHALA_PUBLIC_URL}"
 
@@ -57,7 +57,7 @@ selfservice:
         passwordless: false
         rp:
           id: "${OTHALA_APEX}"
-          display_name: "${OTHALA_INSTANCE_NAME}"
+          display_name: "${OTHALA_INSTANCE_NAME} Single Sign-On"
           origins:
             - "${OTHALA_PUBLIC_URL}"
 
