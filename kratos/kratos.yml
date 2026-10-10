@@ -312,10 +312,8 @@ courier:
 
 
 secrets:
-  # Cookie signing + at-rest cipher secrets. The first entry signs/encrypts; older ones still
-  # verify. Ory enforces uniqueItems, so one active secret is a single-element array.
-  # Rotation: prepend the new secret as a distinct first entry,
-  # restart, then after the session lifespan drop the old entry and restart again.
+  # Cookie signing + at-rest cipher secrets: one slot each, so rotation signs every member out
+  # (docs/runbooks/cookie-rotation.md).
   cookie:
     - "${KRATOS_COOKIE_SECRET_CURRENT}"
 
