@@ -257,7 +257,7 @@ const devLinks = [
             data-app-edu={t.slug}
             data-app-name={t.name}
             data-app-desc={t.description}
-            data-app-icon={t.iconHref ?? ''}
+            data-app-icon={t.iconHref ? t.iconHref + (import.meta.env.DEV ? '?dev-state=post-auth' : '') : ''}
             data-app-bleed={t.iconBleed ? '' : undefined}
             data-app-mono={t.icon}
           >

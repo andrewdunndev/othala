@@ -17,7 +17,7 @@ const src = tile.iconHref && groups && userCanSeeTile(tile as AppTile, groups)
   : undefined;
 ---
 
-<span class:list={['app-icon', `app-icon-${size}`]} data-icon={src ? tile.slug : undefined} data-bleed={tile.iconBleed ? '' : undefined} aria-hidden="true">
+<span class:list={['app-icon', `app-icon-${size}`]} data-icon={src ? tile.slug : undefined} data-bleed={src && tile.iconBleed ? '' : undefined} aria-hidden="true">
   {
     src ? (
       <img class="app-icon-img" src={src} alt="" decoding="async" />

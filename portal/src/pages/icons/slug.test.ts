@@ -51,6 +51,7 @@ describe('GET /icons/<stem>.svg', () => {
     expect(res.headers.get('content-type')).toBe('image/svg+xml');
     expect(res.headers.get('content-security-policy')).toContain('sandbox');
     expect(res.headers.get('cache-control')).toContain('private');
+    expect(res.headers.get('x-content-type-options')).toBe('nosniff');
     expect(await res.text()).toBe(SVG);
   });
 
