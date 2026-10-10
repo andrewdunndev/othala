@@ -68,3 +68,19 @@ test('security keys post webauthn_remove and show Kratos\'s name', async () => {
   assert.match(html, /name="webauthn_remove"/);
   assert.ok(!html.includes('cb-rename'));
 });
+
+async function render(path, props, slots) {
+  const mod = (await server.ssrLoadModule(path)).default;
+  const container = await AstroContainer.create();
+  return container.renderToString(mod, { props, slots });
+}
+
+test('each setup-link copy control names the one field it copies', async () => {
+  const html = await render('/src/components/SetupLink.astro', { url: 'https://x.test/s?f=1', code: '123456', ttl: '1h', name: 'Sam' });
+  const label = (target) => html.match(new RegExp(`data-copy="${target}"[^>]*>([^<]*)<`))?.[1];
+  assert.equal(label('recoveryUrl'), 'Copy link');
+  assert.equal(label('recoveryCode'), 'Copy code');
+  assert.equal(label('recoveryMessage'), 'Copy message');
+  assert.match(html, /<input id="recoveryUrl"[^>]*value="https:\/\/x\.test\/s\?f=1"/);
+  assert.match(html, /<input id="recoveryCode"[^>]*value="123456"/);
+});
