@@ -6,7 +6,7 @@ import { requireAdminSession } from './admin';
 import { joinApps, type AdminApp } from './admin-view';
 import { devAdmin, isDevAdminState, type DevAdmin } from './admin-fixtures';
 import { manifestHealth, servingManifests, type ManifestHealth } from './manifest-store';
-import { loadTiles } from './tiles';
+import { loadTiles, rejectedIcons } from './tiles';
 
 export interface AdminContext {
   /** The signed-in admin's identity id. */
@@ -17,14 +17,21 @@ export interface AdminContext {
   dev: DevAdmin | null;
 }
 
+/** The banner's health: dropped manifests plus rejected icon sidecars, listed only while the manifests load normally. */
+export function adminHealth(tiles: ReturnType<typeof loadTiles>): ManifestHealth {
+  const health = manifestHealth();
+  if (health.status === 'ok') health.dropped = [...health.dropped, ...rejectedIcons(tiles)];
+  return health;
+}
+
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 export async function adminContext(astro: any): Promise<AdminContext | Response> {
   const devParam: string | null = import.meta.env.DEV ? astro.url.searchParams.get('dev-state') : null;
   if (isDevAdminState(devParam)) {
     const dev = devAdmin(devParam);
     const health: ManifestHealth = dev.broken
-      ? { status: 'stale', error: 'grafana.yaml: presentation.access names an unknown group', failingSinceMs: Date.now() - 600_000, serving: dev.apps.length }
-      : { status: 'ok', error: null, failingSinceMs: null, serving: dev.apps.length };
+      ? { status: 'stale', error: 'grafana.yaml: presentation.access names an unknown group', failingSinceMs: Date.now() - 600_000, serving: dev.apps.length, dropped: [] }
+      : { status: 'ok', error: null, failingSinceMs: null, serving: dev.apps.length, dropped: [] };
     return { adminId: dev.adminId, apps: dev.apps, health, dev };
   }
 
@@ -38,5 +45,5 @@ export async function adminContext(astro: any): Promise<AdminContext | Response>
   } catch (err) {
     console.error('[othala/admin] loadTiles failed:', err);
   }
-  return { adminId: guard.identity?.id ?? '', apps: joinApps(servingManifests(), tiles), health: manifestHealth(), dev: null };
+  return { adminId: guard.identity?.id ?? '', apps: joinApps(servingManifests(), tiles), health: adminHealth(tiles), dev: null };
 }

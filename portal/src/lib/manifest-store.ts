@@ -3,7 +3,7 @@
 // (fail-closed), logs `[portal:manifests]` on the first or changed failure, and retries each call so a fix logs
 // RECOVERED. manifestHealth() drives the admin banner.
 
-import { loadClientManifests, type ClientManifest } from './manifests';
+import { droppedManifests, loadClientManifests, type ClientManifest, type Dropped } from './manifests';
 
 /** Log tag, as `[portal:registrar]` in server/registrar.ts. */
 const TAG = '[portal:manifests]';
@@ -25,6 +25,8 @@ export interface ManifestHealth {
   failingSinceMs: number | null;
   /** How many manifests are actually being served right now. */
   serving: number;
+  /** Files the loader dropped (unparseable or invalid manifests), each with its reason; the rest keep serving. */
+  dropped: Dropped[];
 }
 
 let lastGood: ClientManifest[] | null = null;
@@ -66,12 +68,14 @@ export function servingManifest(clientId: string): ClientManifest | undefined {
 /** Health of the served set for the admin banner; refreshes first (cached, cheap) so call order does not matter. */
 export function manifestHealth(): ManifestHealth {
   servingManifests();
+  const dropped = failure === null ? droppedManifests() : [];
   if (failure === null) {
     return {
       status: 'ok',
       error: null,
       failingSinceMs: null,
       serving: lastGood?.length ?? 0,
+      dropped,
     };
   }
   return {
@@ -79,6 +83,7 @@ export function manifestHealth(): ManifestHealth {
     error: failure.message,
     failingSinceMs: failure.sinceMs,
     serving: lastGood?.length ?? 0,
+    dropped,
   };
 }
 

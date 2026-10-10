@@ -391,6 +391,11 @@ function allTiles(): AppTile[] {
   return tiles;
 }
 
+/** The sidecars loadIcon refused, named by file with the reason. */
+export function rejectedIcons(tiles: AppTile[]): { file: string; reason: string }[] {
+  return tiles.flatMap((t) => (t.iconReason ? [{ file: `${t.slug}.svg`, reason: t.iconReason }] : []));
+}
+
 export function loadTiles(): AppTile[] {
   return allTiles().filter((t) => !t.disabled);
 }
@@ -398,6 +403,25 @@ export function loadTiles(): AppTile[] {
 /** Includes disabled tiles. */
 export function getTile(slug: string): AppTile | undefined {
   return allTiles().find((t) => t.slug === slug);
+}
+
+export interface TileSection {
+  title: string;
+  description: string;
+  tiles: AppTile[];
+}
+
+/** The tiles the user may see, split into ungrouped and per-group sections. Sections follow groups.yaml `order`, else
+ * their lowest tile order; a group the registry lacks is titled with its raw key. */
+export function sectionTiles(tiles: AppTile[], userGroups: string[], registry: Map<string, GroupMeta>) {
+  const visible = tiles.filter((t) => userCanSeeTile(t, userGroups));
+  const byGroup = new Map<string, AppTile[]>();
+  for (const t of visible) if (t.group) byGroup.set(t.group, [...(byGroup.get(t.group) ?? []), t]);
+  const rank = ([key, ts]: [string, AppTile[]]) => registry.get(key)?.order ?? Math.min(...ts.map((t) => t.order));
+  const groups: TileSection[] = [...byGroup.entries()]
+    .sort((a, b) => rank(a) - rank(b))
+    .map(([key, ts]) => ({ title: registry.get(key)?.title ?? key, description: registry.get(key)?.description ?? '', tiles: ts }));
+  return { visible, ungrouped: visible.filter((t) => !t.group), groups };
 }
 
 /** The groups gating a tile's visibility: its access groups, else the default group, never every signed-in user. */
