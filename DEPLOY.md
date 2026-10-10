@@ -1,34 +1,25 @@
 # Deploy
 
-Othala ships one container image; a deploy plane is the operator-owned
-config, secrets, and runtime topology that turns that image into a running
-instance. This document is the consumption contract: what a deploy plane
-must provide, not how any particular one provides it. For what the
-application *is* and the load-bearing decisions behind it, read
-[`ARCHITECTURE.md`](ARCHITECTURE.md). For release/version state, read
-[`CHANGELOG.md`](CHANGELOG.md) and git tags. This file does not restate
-either.
+Othala ships one container image; a deploy plane is the operator-owned config,
+secrets and runtime topology around it. This is the consumption contract: what a
+deploy plane must provide. Design decisions are in [`ARCHITECTURE.md`](ARCHITECTURE.md),
+version state in [`CHANGELOG.md`](CHANGELOG.md) and git tags.
 
 ## Getting started: two entry paths
 
-**Option A — E2E smoke harness (`e2e/`):** The fastest way to validate
-Othala locally against a running substrate, without any deploy plane. See
-`e2e/README.md` for smoke verification. The harness runs
-the same app image production would; a deploy plane's job is the topology
-and secrets around it, not a different app.
+**Option A, the E2E smoke harness (`e2e/`):** validates Othala locally with no
+deploy plane, running the same app image as production. See `e2e/README.md`.
 
-**Option B — a real deploy plane:** vendor Othala's configs by tag-pin,
-supply the env contract below, and run the containers however your
-platform runs containers. The contract is the same regardless of mechanism
-— quadlets, compose, Kubernetes.
+**Option B, a real deploy plane:** vendor Othala's configs by tag-pin, supply the
+env contract below, and run the containers however your platform does (quadlets,
+compose, Kubernetes).
 
 ## Images
 
 One image per release, tagged at the git tag and published at the registry
 root (`registry.gitlab.com/dunn.dev/othala:vX.Y.Z`, `publish_at_root: true`
-in `.gitlab-ci.yml`). A deploy plane pins by tag and digest: `v*` registry
-tags are protected, not immutable. Kratos and Hydra
-are upstream Ory images — this repo does not build or publish them.
+in `.gitlab-ci.yml`). Pin by tag and digest: `v*` registry tags are protected, not immutable. Kratos
+and Hydra are upstream Ory images this repo does not build.
 
 Each release image is signed by digest with keyless cosign, from the tag
 pipeline's GitLab identity. Verify before pinning:
@@ -52,10 +43,9 @@ host breaks the trust boundary
 These files are byte-canonical here and must be vendored **verbatim**, not
 hand-edited, by any deploy plane: `kratos/kratos.yml`, `hydra/hydra.yml`,
 `kratos/identity.schema.json`, `kratos/hooks/recovery-gate.jsonnet`, and the
-mail templates in `kratos/courier/`. The gate handler (Section 3 of
-`docs/runbooks/admin-recovery.md`) and the recovery flow assume these bytes:
-byte-diff them against the pinned Othala ref on every promotion, and port any
-diff upstream, never patch locally.
+mail templates in `kratos/courier/`. The recovery gate (`docs/runbooks/admin-recovery.md` § 3) assumes these bytes:
+byte-diff them against the pinned ref on every promotion, and port any diff
+upstream, never patch locally.
 
 `scripts/render-config.sh` supplies the `${VAR}` values at render time; that is
 not divergence. Render each `kratos/courier/*.gotmpl` to the same file name and
@@ -74,17 +64,15 @@ section covers only what needs context beyond that file:
 - Secrets come from the deploy plane's secret store, never the image.
 - Admin authority is deliberately **not** an env target: it is the
   `metadata_admin.admin` marker on the Kratos identity
-  (`docs/runbooks/admin-recovery.md` § 2). A deploy plane that adds an env
-  var admin allowlist has reintroduced the exact bypass this design avoids.
+  (`docs/runbooks/admin-recovery.md` § 2). An env var admin allowlist reintroduces the
+  bypass this design avoids.
 
 ## Client registration
 
 The app registers OIDC clients itself: `portal/src/server/registrar.ts` runs
-`registerAllClients` (`portal/src/lib/register-clients.ts`, fed by the
-`manifests.ts` parser and the full `validateClients` lint) on boot and on
-SIGHUP against Hydra's admin port. See
-[`per-app-oidc.md`](site/src/content/docs/guides/per-app-oidc.md) for the
-full per-RP runbook.
+`registerAllClients` (`portal/src/lib/register-clients.ts`) on boot and on SIGHUP
+against Hydra's admin port. See
+[`per-app-oidc.md`](site/src/content/docs/guides/per-app-oidc.md).
 
 ## Promotion path
 
