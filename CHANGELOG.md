@@ -7,6 +7,14 @@ aims to follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 The git tag is the authoritative version; `portal/package.json` mirrors it.
 This CHANGELOG and git tags carry the deployed-instance release state.
 
+## [0.13.2] - 2026-10-09
+
+Two more app tiles get their real logos.
+
+### Changed
+
+- Two more app tiles show the projects' real logos, and two unused icons are removed.
+
 ## [0.13.1] - 2026-10-09
 
 Enrollment is easier to follow, and app tiles show the real software logos.
