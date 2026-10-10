@@ -1,9 +1,8 @@
 # Lost or stolen device — eviction procedure
 
-This runbook covers the correct response when a family member's device is lost,
-stolen, or accessed without their knowledge. Follow it in full: skipping steps
-leaves a window where an attacker can regain access even after you believe the
-account is secure.
+The response when a member's device is lost, stolen, or accessed without their
+knowledge. Follow it in full: skipped steps leave a window for the attacker to
+regain access.
 
 See also `site/src/content/docs/guides/hardening.md` §7 for the threat context.
 
@@ -13,20 +12,14 @@ See also `site/src/content/docs/guides/hardening.md` §7 for the threat context.
 
 The **Sign out everywhere** action in the admin UI calls `revokeSubject`, which
 deletes the identity's active Kratos sessions and invalidates Hydra login/consent
-grants. This cuts the attacker's current session — they are logged out
-immediately.
+grants, logging the attacker out immediately. **It does not delete enrolled
+credentials.**
 
-**It does not delete enrolled credentials.**
-
-A passkey (or TOTP seed, or WebAuthn key) is stored in Kratos as a credential
-on the identity record, separate from any session. If a thief got a brief
-authenticated session — or if the legitimate user was already signed in on the
-device — the attacker can enrol *their own* passkey while that session is
-live. That credential persists after `revokeSubject` runs. With it, the attacker
-can authenticate afresh: the session is gone, but they hold a valid login key.
-
-The same applies to TOTP: if the attacker saw or copied the TOTP QR code, they
-have an indefinitely valid second factor even after a force re-login.
+Passkeys, TOTP seeds and WebAuthn keys are credentials on the identity record,
+separate from any session. An attacker with a brief authenticated session can
+enrol their own passkey, which persists after `revokeSubject` and lets them
+authenticate afresh. An attacker who copied the TOTP QR code holds a valid
+second factor indefinitely.
 
 **Eviction requires removing the enrolled credentials, not just the sessions.**
 
@@ -34,15 +27,13 @@ have an indefinitely valid second factor even after a force re-login.
 
 ## The correct eviction sequence
 
-Perform these steps in order. Do not skip to "force re-login" first — that
-burns the session before you can audit what credentials need removing.
+Perform these steps in order. Do not force re-login first; audit the credentials first.
 
 ### Step 1 — Open the user in the admin UI
 
 Navigate to **/admin/users/\<id\>** for the affected identity.
 
-You must have an active admin session at AAL2. If you are prompted for your
-second factor (TOTP), complete it before continuing.
+This requires an active admin session at AAL2.
 
 ### Step 2 — Audit enrolled credentials
 
@@ -58,46 +49,33 @@ with a chip:
 | `password ✓` | Password set (directory-backed / password-auth path) |
 | `— ` (muted) | Not enrolled |
 
-Ask the user which devices or credential types they had on the lost/stolen
-device. Any type that was enrolled and accessible on that device should be
-treated as compromised.
-
-If you cannot reach the user (emergency eviction), remove all evictable types
-as a conservative response. The user re-enrolls from scratch via the recovery
-URL in Step 4.
+Ask the user which credential types were on the device; treat each as
+compromised. If you cannot reach them, remove all evictable types; they
+re-enroll via the Step 4 URL.
 
 ### Step 2b — Check the identity's recovery email address
 
-While you have the Profile section open, look at the **recoveryEmail** row.
-
-A `recoveryEmail` trait accepts an unverified email address. If the attacker had
-a brief authenticated session — even just AAL1 — they could have opened the
-settings flow and planted their own address. That address is not removed by
-`revokeSubject` or credential eviction, so it survives the rest of this
-procedure and stays usable for future account recovery.
-
-**What to check:** the `recoveryEmail` value shown in the Profile section. Ask
-the family member whether they recognise it. If they don't, or if it looks like
-an address they do not own, clear it:
+The `recoveryEmail` trait accepts an unverified address. An attacker with even
+an AAL1 session could have planted their own in the settings flow, and neither
+`revokeSubject` nor credential eviction removes it. Ask the member whether they
+recognise the value in the Profile section; if not, clear it:
 
 1. Click **Edit profile**.
 2. Clear the **Recovery email** field (leave it blank, or replace it with an
    address the family member controls).
 3. Click **Save**.
 
-The legitimate user can set a recovery email of their choice after they
-re-enroll in Step 4.
+The user can set their own after re-enrolling in Step 4.
 
 ### Step 3 — Remove the affected credential type(s)
 
 Next to each enrolled evictable credential chip, there is a **Remove** button.
 Click it for each affected type.
 
-**What Remove does:** it calls the Kratos admin API
-`DELETE /admin/identities/{id}/credentials/{type}` and removes **all**
-credentials of that type from the identity record. The legitimate user
-re-enrolls with new keys after recovery. It then signs them out everywhere
-(Kratos sessions, Hydra login and consent).
+Remove calls the Kratos admin API
+`DELETE /admin/identities/{id}/credentials/{type}`, deleting **all**
+credentials of that type, then signs the user out everywhere (Kratos sessions,
+Hydra login and consent).
 
 **Evictable types (Remove button present):**
 - `webauthn` — all security keys
@@ -115,87 +93,48 @@ re-enrolls with new keys after recovery. It then signs them out everywhere
 ### Step 3b — Passkey: self-service removal
 
 Kratos exposes per-credential passkey removal only through the user's own
-`/auth/settings` — each enrolled key is listed separately with its own
-label; the victim removes the one matching the lost or stolen device. If
-they still hold a session, have them do it directly. If they're locked out,
-issue the enrollment URL (Step 4) first — it lands them in a privileged
-settings session to remove the compromised key and enroll a new one. Removing
-a passkey signs no one out: once it is gone, click **Sign out everywhere** in
-the Actions panel.
+`/auth/settings`, where each key is listed with its label; the user removes the
+one matching the lost device. If they are locked out, issue the Step 4 URL
+first: it lands them in a privileged settings session. Removing a passkey signs
+no one out, so then click **Sign out everywhere** in the Actions panel.
 
-If the victim can't be reached and urgency requires full lockout now, the
-last resort is **Delete** on this identity (Actions panel): it revokes
-sessions and app grants first, and the user re-registers.
-
-Each Remove action is CSRF-protected and requires an active AAL2 admin session.
-The confirmation banner after each removal tells you which type was removed.
+If the user cannot be reached and full lockout is urgent, the last resort is
+**Delete** on this identity (Actions panel): it revokes sessions and app grants
+first, and the user re-registers.
 
 ### Step 4 — Issue a recovery/enrollment URL
 
 Click **Get setup link** to generate a one-shot Kratos recovery URL.
-Share it with the legitimate user out-of-band (Signal, iMessage, or another
-trusted channel — not the compromised email account if that was the attack
-vector).
-
-The URL lands the user in the settings flow with a privileged session. They
+Share it out-of-band over a trusted channel, not a possibly compromised
+mailbox. It lands the user in the settings flow with a privileged session to
 re-enroll:
 1. A new passkey on a trusted device.
 2. TOTP on a fresh authenticator app.
 3. A new set of backup codes.
 
-The enrollment URL expires (default 24 h). If the user misses it, issue a
-new one.
+The URL expires (default 24 h); issue a new one if missed.
 
 ### Step 5 — Optionally rotate the password (if password auth is in use)
 
 If the identity has a `password ✓` chip and reaches a directory-backed app by
-password, that password may also be compromised (the device may have had it
-saved). Rotate it in that app's own admin console.
-
-The portal does not expose a password-reset path for the admin-on-behalf-of-user
-case by design (Kratos does not allow admin-set passwords without the user's
-current password or a privileged recovery session).
-
----
-
-## Summary checklist
-
-```
-[ ] 1. Open /admin/users/<id>  (confirm AAL2 gate passed)
-[ ] 2. Audit the credential chips — note which types were on the lost device
-[ ] 2b. Check the recoveryEmail trait — clear any address the user doesn't recognise
-[ ] 3. Remove each affected evictable type (webauthn / totp / backup codes)
-[ ] 3b. Passkey: victim self-removes at /auth/settings, or Delete identity as last resort
-[ ] 4. Send setup link  — share via Signal/iMessage
-[ ] 5. If password in use: rotate in the directory-backed app's admin
-[ ] 6. Follow up with the user once they confirm re-enrollment
-```
+password, the device may have had it saved. Rotate it in that app's own admin
+console; the portal has no admin-set password path by design.
 
 ---
 
 ## Security gates protecting this surface
 
-- **AAL2 requirement** — the admin user-detail page requires a Kratos session
-  at authenticator assurance level 2 (passkey + TOTP). An attacker with only
-  the admin's password cannot reach it.
-
-- **CSRF protection** — every Remove action carries a per-render, per-type,
-  per-admin-identity CSRF token (30-min TTL, single-use). A cross-site form
-  submission cannot trigger eviction.
-
-- **Console break-glass** — the admin's own account cannot be evicted via
-  this UI (the `shouldRefuseRecovery` guard blocks portal-UI admin-to-admin
-  recovery). Operator self-recovery uses the console path in
-  `docs/runbooks/admin-recovery.md`.
+- **AAL2 requirement.** The user-detail page needs a session at assurance level 2.
+- **CSRF protection.** Every Remove action carries a per-render, per-type,
+  per-admin-identity, single-use token (30-min TTL).
+- **Console break-glass.** An admin's own account cannot be evicted here
+  (`shouldRefuseRecovery`); see `docs/runbooks/admin-recovery.md`.
 
 ---
 
 ## Related runbooks and source files
 
-- `docs/runbooks/admin-recovery.md` — admin self-recovery (locked out, lost
-  device, break-glass ladder).
-- `site/src/content/docs/guides/hardening.md` §7 — sessions & lost-device
-  hardening rationale (published as `/guides/hardening/`).
+- `docs/runbooks/admin-recovery.md` — admin self-recovery.
 - `portal/src/lib/admin-api.ts` (`deleteCredential`, `EVICTABLE_CREDENTIAL_TYPES`) —
   the Kratos admin API call.
 - `portal/src/lib/admin.ts` (`requireAdminSession`) — AAL2 gate.

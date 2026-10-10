@@ -1,121 +1,57 @@
 # Postgres backup and restore
 
-This runbook records the **backup posture** for the auth substrate's
-Postgres state and the **restore procedure** an operator follows. The
-backup *implementation* (the cron/quadlet runner, off-host copy, ZFS
-snapshot policy) is deploy-plane work, not auth-project code — see
-"Where it lives" below. The stakes, the required posture, and the
-partial-state restore drill documented here are the contract the
-deploy-layer runner must satisfy.
+The backup posture for the `kratos` and `hydra` databases and the restore
+procedure. The runner (cron or quadlet, off-host copy, snapshot policy) is
+deploy-plane work; this runbook is the contract it must satisfy.
 
 ## Stakes
 
-The Postgres `kratos` and `hydra` databases hold:
+The databases hold every passkey enrollment, active session, recovery-code
+state, and every Hydra OAuth2 client secret (encrypted at rest under
+`secrets.system`, which is non-rotatable). Losing them without a backup means
+every member re-enrolls, every OIDC client is re-created with its secret
+pushed to the app, and `secrets.system` must be restored from your secret
+store or even a partial restore cannot decrypt.
 
-- Every passkey enrollment.
-- Every active session.
-- Every Hydra OAuth2 client secret (encrypted at rest under
-  `secrets.system`, which is itself non-rotatable).
-- Every recovery-code state.
+## Required posture
 
-Disk failure on the SSO host without backups means: every family member
-re-enrolls passkeys, the admin manually re-creates 11 OIDC clients
-with secrets pushed to every app, and `secrets.system` rehydrates
-from Bitwarden (otherwise even partial restore can't decrypt). At
-family scale the human cost is hours of re-enrollment plus operator
-panic; it's the worst single-failure outcome in the auth substrate.
-
-## Required posture (the deploy-layer runner must satisfy this)
-
-1. **pg_dump cron job**
-   - Run nightly via systemd timer or cron in the postgres pod.
-   - Output written to `/var/lib/postgres/backups/<UTC-timestamp>.dump`
-     (custom format, suitable for `pg_restore`).
-   - Both databases (kratos + hydra) in one dump per timestamp, or
-     one each. Decide based on restore drill ergonomics.
-   - Retention: 30 daily + 12 monthly. Configurable.
-
-2. **Filesystem snapshot integration (if the data volume supports it)**
-   - The Postgres data volume gets snapshotted by whatever snapshot
-     policy the host already runs.
-   - Snapshots live alongside dumps for two-tier recovery: quick
-     rollback via snapshot, long-term archive via pg_dump.
-
-3. **Off-host copy**
-   - Dumps copied off the host to at least one destination outside the
-     blast radius of a single-host failure — two independent
-     destinations (e.g. onsite-to-another-host plus offsite/cloud) is
-     stronger than one.
-   - `secrets.system` lives in sops (the `hydra_system_secret` entry), not
-     in the dump (it's an env var). On restore from a fresh DB, the
-     operator pulls `secrets.system` from sops into the env and only
-     then starts Hydra; otherwise the encrypted client secrets in the
-     dump can't decrypt. Sops + age key are themselves backed up
-     separately — losing both means the dump is decryptable as raw
-     postgres data but the Hydra client_secret column is permanently
-     ciphertext.
-
-4. **Restore drill**
-   - Quarterly: spin up a throwaway VM, restore the latest dump,
-     point a fresh Hydra+Kratos pod at it, confirm (a) one identity
-     can sign in, (b) one OIDC client emits a token, (c) WebAuthn
-     credentials still verify (this last one tests
-     `secrets.cipher` rehydration).
-   - Document drill results inline here on each run.
-
-5. **Restore runbook (this file, expanded)**
-   - Step-by-step for an operator who isn't the author. Include the
-     `secrets.system` rehydration path, the env-var setup, the
-     pg_restore invocation, and the post-restore smoke test.
-
-## Where it lives
-
-The backup runner is deploy-plane work, not auth-project code — the
-cron/quadlet that runs pg_dump, the off-host copy mechanism and
-destinations, and the on-host snapshot policy are all deploy-plane
-choices. This runbook is the contract those choices must satisfy: the
-required posture above, and the restore drill and partial-state
-response below.
+1. **Nightly `pg_dump`** in custom format (`pg_restore`-compatible) to
+   `/var/lib/postgres/backups/<UTC-timestamp>.dump`, both databases per
+   timestamp. Retention: 30 daily and 12 monthly.
+2. **Filesystem snapshots**, if the data volume supports them, alongside the
+   dumps: snapshot for quick rollback, dump for long-term archive.
+3. **Off-host copy** to at least one destination outside a single-host
+   failure; two independent destinations are stronger.
+4. **`secrets.system` stays out of the dump.** It is an env var held in sops
+   (`hydra_system_secret`). Restore it into the env before starting Hydra;
+   otherwise the client_secret column is permanently ciphertext. Back up the
+   sops age key separately.
+5. **Quarterly restore drill.** Restore the latest dump into a throwaway VM
+   with fresh Kratos and Hydra pods and confirm one identity signs in, one
+   OIDC client emits a token, and WebAuthn credentials still verify (this
+   tests `secrets.cipher` rehydration). Record results here.
 
 ## Partial-state restore
 
-Postgres point-in-time consistency is per-database. The auth substrate
-touches both `kratos` and `hydra` databases in different transactions,
-so a backup taken between a Kratos write (e.g., new identity created)
-and the corresponding Hydra write (e.g., remembered consent rows)
-yields drift on restore: a Kratos identity exists with no Hydra
-remembered-consent row, or vice versa.
+Consistency is per-database, and the two are written in different
+transactions. A backup between a Kratos write and the matching Hydra write
+restores with drift: an identity with no remembered-consent row, or the
+reverse. Do not reconcile rows:
 
-At family scale the recovery is NOT "fix the row." Instead:
-
-1. Restore both databases from the most recent compatible pair of
-   dumps.
-2. Truncate Hydra's remembered-consent rows for any Kratos identity
-   whose state in Hydra looks inconsistent. SQL:
+1. Restore both databases from the most recent compatible pair of dumps.
+2. Clear Hydra's remembered sessions to force re-consent:
 
    ```sql
-   -- Kratos has identity, Hydra has consent rows. Force a re-consent
-   -- for every family member by clearing their Hydra session cache.
    TRUNCATE hydra_oauth2_consent_request_handled;
    TRUNCATE hydra_oauth2_authentication_session;
    ```
 
-3. Sign out everywhere from the admin UI for every active family member
-   (`/admin/users/<id>` → "Sign out everywhere" button). This drops
-   their Kratos session and any RP-side state.
-
-4. Each member re-authenticates at their next app visit. The cost is
-   a one-time login prompt across 14 apps, much lower than per-row
-   reconciliation.
-
-This is the canonical drift response. Documenting it here so a
-post-restore operator doesn't waste hours hunting for orphan rows.
+3. **Sign out everywhere** for every active member (`/admin/users/<id>`),
+   dropping their Kratos session and relying-party state.
+4. Each member re-authenticates at their next app visit.
 
 ## Related
 
-- `docs/runbooks/secrets-rotation.md`: break-glass rotation of
-  `secrets.system` itself.
-- `docs/runbooks/cookie-rotation.md`: separate runbook for the
-  rotatable secrets.
-- `docs/runbooks/admin-recovery.md`: the recovery path that depends on
-  Postgres being alive.
+- `docs/runbooks/secrets-rotation.md`: break-glass rotation of `secrets.system`.
+- `docs/runbooks/cookie-rotation.md`: the rotatable secrets.
+- `docs/runbooks/admin-recovery.md`: recovery, which needs Postgres alive.
