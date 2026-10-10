@@ -97,8 +97,8 @@ const isPageActive = (href: string) => path === href.replace(/\/$/, '');
     </div>
   </header>
 
-  {currentSection ? (
-    <div class="page-with-sidebar">
+  <main class="page page-rail">
+    {currentSection && (
       <aside class="section-sidebar" aria-label={`${currentSection.label} navigation`}>
         <p class="section-sidebar-heading">{currentSection.label}</p>
         {sidebarGroups.map(group => (
@@ -116,15 +116,12 @@ const isPageActive = (href: string) => path === href.replace(/\/$/, '');
           </>
         ))}
       </aside>
-      <main class="page page-in-section">
-        <slot />
-      </main>
-    </div>
-  ) : (
-    <main class="page">
+    )}
+    {!currentSection && <slot name="rail" />}
+    <div class="page-content">
       <slot />
-    </main>
-  )}
+    </div>
+  </main>
 
   <footer class="site-footer">
     <div class="footer-inner">

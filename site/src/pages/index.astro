@@ -34,25 +34,23 @@ const entryPoints = [
 ];
 ---
 <Layout title="Home" description="Othala is one family's home single sign-on, built on Ory Kratos and Hydra with a TypeScript portal and a Caddy forward-auth endpoint. Public so it can be read and copied. Architecture, guides, and decisions from a single-maintainer homelab.">
-  <div class="overview-hero">
-    <div class="overview-mark" set:html={markSvg} />
-    <div class="overview-title-block">
-      <p class="page-eyebrow">dunn.dev</p>
-      <h1 class="overview-title">Othala</h1>
-      <p class="overview-lede">
-        Othala is the single sign-on for one family's house: Ory Kratos and
-        Hydra behind a TypeScript portal that supplies the login provider,
-        consent provider, and access gate they ship without, plus a Caddy
-        forward-auth endpoint for the apps that speak no OIDC at all.
-        Passkey-first, running for a handful of people. This site is the
-        reading copy: an architecture walkthrough of why it is wired the way
-        it is, the guides for how, and the decisions behind both.
-      </p>
-    </div>
+  <div class="hero-mark" slot="rail" set:html={markSvg} />
+  <div class="hero">
+    <p class="hero-eyebrow">dunn.dev</p>
+    <h1 class="hero-title">Othala</h1>
+    <p class="hero-lede">
+      Othala is the single sign-on for one family's house: Ory Kratos and
+      Hydra behind a TypeScript portal that supplies the login provider,
+      consent provider, and access gate they ship without, plus a Caddy
+      forward-auth endpoint for the apps that speak no OIDC at all.
+      Passkey-first, running for a handful of people. This site is the
+      reading copy: an architecture walkthrough of why it is wired the way
+      it is, the guides for how, and the decisions behind both.
+    </p>
   </div>
 
   <section class="section">
-    <p class="overview-prose">
+    <p class="section-prose">
       It is public because a deployment with no support contract has nothing
       to lose by being readable, and because most of what makes an Ory
       integration hard has no complete worked example in the open. This one
@@ -60,7 +58,7 @@ const entryPoints = [
       a file out whole. It is not a pitch: no roadmap, no adoption path, one
       maintainer.
     </p>
-    <p class="overview-prose">
+    <p class="section-prose">
       Every application it fronts is one manifest file: what the tile says,
       what OAuth2 client Hydra sees, and which group grants entry versus
       which one grants a role. Adding an app is a file drop, not an image
@@ -70,62 +68,14 @@ const entryPoints = [
 
   <section class="section">
     <p class="section-subtitle">Start here</p>
-    <div class="overview-grid">
+    <div class="tile-grid">
       {entryPoints.map(e => (
-        <a href={e.href} class="overview-card" rel={e.external ? 'external' : undefined}>
-          <h2 class="overview-card-title">{e.label}{e.external ? ' ↗' : ''}</h2>
-          <p class="overview-card-desc">{e.desc}</p>
+        <a href={e.href} class="tile" rel={e.external ? 'external' : undefined}>
+          <h2 class="tile-headline">{e.label}{e.external ? ' ↗' : ''}</h2>
+          <p class="tile-prose">{e.desc}</p>
         </a>
       ))}
     </div>
   </section>
 </Layout>
 
-<style>
-  .overview-hero {
-    display: flex;
-    align-items: center;
-    gap: var(--space-6);
-    margin-bottom: var(--space-7);
-  }
-  .overview-mark {
-    flex: none;
-    width: 84px;
-    height: 84px;
-    color: var(--accent);
-  }
-  .overview-mark :global(svg) { width: 100%; height: 100%; }
-  .overview-title-block { flex: 1; }
-  .overview-title {
-    font-family: var(--font-display);
-    font-size: var(--text-4xl);
-    line-height: var(--lh-hero);
-    margin: var(--space-1) 0 var(--space-3);
-    color: var(--text);
-  }
-  .overview-lede {
-    font-size: var(--text-lg);
-    color: var(--text-2);
-    max-width: 62ch;
-    margin: 0;
-  }
-  .section-subtitle {
-    font-family: var(--font-mono);
-    font-size: var(--text-xs);
-    text-transform: uppercase;
-    letter-spacing: 0.08em;
-    color: var(--text-muted);
-    margin: 0 0 var(--space-2);
-  }
-  .overview-prose {
-    font-size: var(--text-md);
-    line-height: var(--lh-base);
-    color: var(--text-2);
-    max-width: 62ch;
-    margin: 0 0 var(--space-4);
-  }
-  .overview-prose:last-child { margin-bottom: 0; }
-  @media (max-width: 640px) {
-    .overview-hero { flex-direction: column; align-items: flex-start; gap: var(--space-4); }
-  }
-</style>

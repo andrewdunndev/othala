@@ -116,63 +116,13 @@
   text-decoration: none;
 }
 
-/* Overview card grids (home + section index pages). */
-.overview-grid {
-  display: grid;
-  grid-template-columns: repeat(2, 1fr);
-  gap: 0.75rem;
-  margin-top: var(--space-4);
-}
-.overview-card {
+a.tile {
   display: block;
-  position: relative;
-  padding: var(--space-4) var(--space-5);
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
-  background: var(--surface);
-  text-decoration: none;
   color: inherit;
-  transition: border-color 0.12s, transform 0.12s;
+  text-decoration: none;
 }
-.overview-card:hover {
-  border-color: var(--accent);
-  transform: translateY(-1px);
-}
-.overview-card-title {
-  font-family: var(--font-display);
-  font-size: var(--text-lg);
-  color: var(--text);
-  margin: 0 0 var(--space-2) 0;
-}
-.overview-card-desc {
-  font-size: var(--text-sm);
-  color: var(--text-2);
-  margin: 0;
-  line-height: var(--lh-base);
-}
-@media (max-width: 640px) {
-  .overview-grid { grid-template-columns: 1fr; }
-}
+a.tile:hover { border-color: var(--accent); }
 
-/* Two-column layout for section pages — persistent sidebar left,
-   content right. Lists every page in the current section. */
-.page-with-sidebar {
-  flex: 1;
-  max-width: 1280px;
-  width: 100%;
-  margin: 0 auto;
-  padding: var(--space-7) var(--space-5) var(--space-8);
-  display: grid;
-  grid-template-columns: 220px 1fr;
-  gap: var(--space-7);
-  align-items: start;
-}
-.page-with-sidebar .page-in-section {
-  flex: unset;
-  max-width: unset;
-  margin: 0;
-  padding: 0;
-}
 .section-sidebar {
   position: sticky;
   top: calc(var(--space-5) + 56px);
@@ -228,10 +178,6 @@
   font-weight: 600;
 }
 @media (max-width: 900px) {
-  .page-with-sidebar {
-    grid-template-columns: 1fr;
-    gap: var(--space-5);
-  }
   .section-sidebar {
     position: static;
     border-right: none;
