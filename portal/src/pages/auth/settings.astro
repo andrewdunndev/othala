@@ -17,6 +17,7 @@ import { csrfToken, nodesByGroup, asInput, scriptNodes, safeOnclick } from '../.
 import type { FlowNode, Session, SettingsFlow } from '../../lib/types';
 import CredentialRows from '../../components/settings/CredentialRows.astro';
 import PasswordField from '../../components/settings/PasswordField.astro';
+import TotpKey from '../../components/settings/TotpKey.astro';
 import ActionForm from '../../components/settings/ActionForm.astro';
 import ConfirmCues from '../../components/settings/ConfirmCues.astro';
 import { SECOND_FACTOR_KEEP } from '../../lib/second-factor-gate';
@@ -40,7 +41,7 @@ import {
   totpView,
 } from '../../lib/settings-view';
 import { devSettings, isDevSettingsState } from '../../lib/settings-fixtures';
-import { FLASH, LOST_KEYS, RENAME_ERROR_COOKIE, RENAME_ERRORS, groupKey, messageText } from '../../lib/settings-flash';
+import { FLASH, LOST_KEYS, RENAME_ERROR_COOKIE, RENAME_ERRORS, messageText } from '../../lib/settings-flash';
 
 const cookie = Astro.request.headers.get('cookie') ?? undefined;
 const devParam = import.meta.env.DEV ? Astro.url.searchParams.get('dev-state') : null;
@@ -419,20 +420,8 @@ const lookupLabel: Record<string, string> = {
                       <li>
                         <h4 tabindex="-1">Scan the code</h4>
                         <p>Scan this into your authenticator app. Scan it into every app you want to use now; each shows the same codes.</p>
-                        <p class="field-hint narrow-only">On this phone? Copy the setup key below into your app.</p>
-                        <div class="totp-qr">
-                          <img src={totp.qr.src} alt={totp.qr.alt} width={totp.qr.width} height={totp.qr.height} />
-                        </div>
-                        {totp.secret && (
-                          <details data-open-narrow>
-                            <summary>Can't scan? Show setup key</summary>
-                            <div class="secret-row">
-                              <code class="totp-secret-value mono" id="totp-secret">{groupKey(totp.secret)}</code>
-                              <button type="button" class="button button-secondary button-sm" data-copy="totp-secret" hidden>Copy key</button>
-                            </div>
-                            <p class="field-hint">Type this key into your app instead. Spaces don't matter.</p>
-                          </details>
-                        )}
+                        <p class="field-hint narrow-only">On this phone? Copy the setup key into your app.</p>
+                        <TotpKey qr={totp.qr} secret={totp.secret} />
                       </li>
                     )}
                     {totp.codeInput && (

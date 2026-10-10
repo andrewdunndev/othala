@@ -83,3 +83,21 @@ test('the password field is new-password beside a visible username anchor manage
   assert.ok(!/readonly|aria-hidden|disabled|type="hidden"/.test(user), 'managers skip such fields');
   assert.ok(html.indexOf('autocomplete="username"') < html.indexOf('autocomplete="new-password"'));
 });
+
+test('the TOTP setup key sits beside the QR as grouped text with its copy button, behind no disclosure', async () => {
+  const html = await render('/src/components/settings/TotpKey.astro', { qr: { src: 'data:image/png;base64,AA', alt: 'QR' }, secret: 'ABCDEFGHIJKLMNOP' });
+  assert.match(html, /<code[^>]*id="totp-secret"[^>]*>\s*ABCD EFGH IJKL MNOP\s*<\/code>/);
+  assert.match(html, /data-copy="totp-secret"/);
+  assert.ok(!html.includes('<details'));
+  assert.ok(html.indexOf('<img') < html.indexOf('totp-secret'));
+});
+
+test('each setup-link copy control names the one field it copies', async () => {
+  const html = await render('/src/components/SetupLink.astro', { url: 'https://x.test/s?f=1', code: '123456', ttl: '1h', name: 'Sam' });
+  const label = (target) => html.match(new RegExp(`data-copy="${target}"[^>]*>([^<]*)<`))?.[1];
+  assert.equal(label('recoveryUrl'), 'Copy link');
+  assert.equal(label('recoveryCode'), 'Copy code');
+  assert.equal(label('recoveryMessage'), 'Copy message');
+  assert.match(html, /<input id="recoveryUrl"[^>]*value="https:\/\/x\.test\/s\?f=1"/);
+  assert.match(html, /<input id="recoveryCode"[^>]*value="123456"/);
+});

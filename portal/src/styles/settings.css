@@ -61,7 +61,6 @@
 .panel-cues { flex-basis: 100%; display: grid; gap: var(--space-1); margin: 0; font-size: var(--text-xs); color: var(--text-2); }
 .cue-reauth { color: var(--text); }
 .secret-row { display: flex; gap: var(--space-2); align-items: center; flex-wrap: wrap; margin-top: var(--space-2); }
-.secret-row .totp-secret-value { margin-top: 0; flex: 1 1 12rem; }
 .narrow-only { display: none; }
 
 /* One compact density across the cards. */
@@ -85,7 +84,8 @@
 .steps > li > h4 { font-family: var(--font-mono); font-size: var(--text-sm); }
 .steps > li > h4::before { content: counter(s) ". "; color: var(--text-muted); }
 .steps p { font-size: var(--text-sm); color: var(--text-2); margin-top: var(--space-2); }
-.totp-qr { margin-top: var(--space-3); }
+.totp-qr { margin-top: var(--space-3); display: flex; flex-wrap: wrap; gap: var(--space-4); align-items: center; }
+.totp-qr .secret-row { flex: 1 1 14rem; flex-direction: column; align-items: flex-start; margin-top: 0; }
 .totp-qr img { border: 1px solid var(--border); border-radius: var(--radius-sm); display: block; max-width: 12.5rem; width: 100%; height: auto; background: #fff; }
 .steps details { margin-top: var(--space-3); font-size: var(--text-sm); }
 .steps summary { cursor: pointer; color: var(--accent); }
@@ -131,9 +131,7 @@
   .settings .page-title { font-size: var(--text-2xl); }
   .narrow-only { display: block; }
   /* On the phone the setup key comes before the QR, which that phone cannot scan. */
-  .steps > li { display: flex; flex-direction: column; }
-  .steps > li > details { order: 1; }
-  .steps > li > .totp-qr { order: 2; }
+  .totp-qr .secret-row { order: -1; flex-basis: 100%; }
   .totp-secret-value { display: flex; align-items: center; min-height: 2.75rem; }
 }
 

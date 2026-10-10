@@ -1,0 +1,17 @@
+---
+// The QR and its setup key side by side: the key is always visible, so a person who cannot scan has nothing to open.
+import { groupKey } from '../../lib/settings-flash';
+
+interface Props { qr: { src: string; alt: string; width?: number; height?: number }; secret: string | null }
+const { qr, secret } = Astro.props as Props;
+---
+<div class="totp-qr">
+  <img src={qr.src} alt={qr.alt} width={qr.width} height={qr.height} />
+  {secret && (
+    <div class="secret-row">
+      <code class="totp-secret-value mono" id="totp-secret">{groupKey(secret)}</code>
+      <button type="button" class="button button-secondary button-sm" data-copy="totp-secret" hidden>Copy key</button>
+      <p class="field-hint">Type this key into your app instead. Spaces don't matter.</p>
+    </div>
+  )}
+</div>

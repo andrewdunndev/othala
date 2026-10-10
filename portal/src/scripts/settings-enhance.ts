@@ -120,9 +120,6 @@ const settle = () => {
   } else if (edit) {
     document.getElementById(edit.card)?.scrollIntoView({ block: 'start' });
   }
-  if (matchMedia('(max-width: 640px)').matches) {
-    document.querySelectorAll<HTMLDetailsElement>('details[data-open-narrow]').forEach((d) => { d.open = true; });
-  }
 };
 
 document.addEventListener('submit', (e) => {
