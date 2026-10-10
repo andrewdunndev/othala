@@ -23,7 +23,7 @@ const _iconsDir = (() => {
   return join(_cwd, 'public', 'icons');
 })();
 
-/** Return the web path for a vendored simple-icons SVG, or undefined if absent. */
+/** Return the web path for a vendored logo SVG, or undefined if absent. */
 export function resolveIconHref(iconSlug: string | undefined): string | undefined {
   if (!iconSlug) return undefined;
   const candidate = join(_iconsDir, `${iconSlug}.svg`);
@@ -83,9 +83,9 @@ export interface AppTile {
   url: string;
   /** 1-3 char monogram fallback when no icon resolves. */
   icon: string;
-  /** simple-icons slug for the product SVG (preferred). */
+  /** Slug of the vendored logo SVG in public/icons (preferred). */
   iconSlug?: string;
-  /** simple-icons fallback slug for products not in simple-icons. */
+  /** Fallback logo slug. */
   iconFallback?: string;
   /** Set only when the vendored SVG exists; absent renders the monogram. */
   iconHref?: string;
