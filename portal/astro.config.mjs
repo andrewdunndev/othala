@@ -31,16 +31,11 @@ import tailwindcss from '@tailwindcss/vite';
 // node adapter (trustProxy:true) TRUST whatever host Caddy forwards in
 // X-Forwarded-Host and resolve `Astro.url.origin` to it.
 //
-// Crucially, the `{}` wildcard does NOT disable the origin check. Astro's
-// checkOrigin middleware (astro/dist/core/app/middlewares.js) compares
-// `request.headers.get('origin') === url.origin` on every unsafe POST. With
-// the wildcard, `url.origin` is the real forwarded host, so:
-//   - a same-origin browser POST (Origin == forwarded host) PASSES, and
-//   - a forged cross-origin POST (Origin == http://evil.example) is 403'd,
-// because Origin != url.origin. No build-time host, no runtime host config:
-// the wildcard accepts whatever Caddy forwards while checkOrigin still
-// enforces Origin == Host. Empirically verified against the live e2e stack
-// (E/F/H same-origin specs pass; forged-Origin POST → 403).
+// The `{}` wildcard does NOT disable the origin check. Astro's checkOrigin
+// (core/app/origin-check.ts) refuses an unsafe form POST whose Sec-Fetch-Site
+// is cross-site or same-site, or, without Sec-Fetch-Site, whose Origin differs
+// from `url.origin`, the real forwarded host here. Same-origin POSTs pass; e2e
+// F2/F3/H1-H3 pin the 403.
 //
 // NOTE: an EMPTY list `[]` is NOT equivalent — validateHost/
 // validateForwardedHeaders bail when allowedDomains.length === 0, the host
