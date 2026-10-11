@@ -4,18 +4,6 @@ import { readdirSync, readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { sections } from '../lib/sections';
 
-const markSvg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="othala rune">
-  <g fill="none" stroke="currentColor" stroke-width="4.5" stroke-linecap="round">
-    <line x1="32" y1="8" x2="48" y2="24"/>
-    <line x1="48" y1="24" x2="32" y2="40"/>
-    <line x1="32" y1="40" x2="16" y2="24"/>
-    <line x1="16" y1="24" x2="32" y2="8"/>
-    <line x1="32" y1="40" x2="18" y2="56"/>
-    <line x1="32" y1="40" x2="46" y2="56"/>
-  </g>
-  <circle cx="32" cy="24" r="2.5" fill="currentColor"/>
-</svg>`;
-
 // Entry points below the story: Architecture is a standalone page (not
 // a content-collection section, see lib/sections.ts), Guides comes from
 // `sections` so it stays in sync with the one place that lists them,
@@ -46,7 +34,6 @@ const entryPoints = [
 ---
 <Layout title="Home" description="Othala is one family's home single sign-on, built on Ory Kratos and Hydra with a TypeScript portal and a Caddy forward-auth endpoint. Public so it can be read and copied. Architecture, guides, and decisions from a single-maintainer homelab.">
   <div class="hero">
-    <div class="hero-mark" aria-hidden="true" set:html={markSvg} />
     <p class="hero-eyebrow">dunn.dev</p>
     <h1 class="hero-title">Othala</h1>
     <p class="hero-lede">
