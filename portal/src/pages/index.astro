@@ -662,8 +662,7 @@ const devLinks = [
   }
   .cta-link:hover { color: var(--accent); text-decoration: none; }
 
-  /* Tile grid: one column on phones, two from 46rem; each tile is a row that grows to fit its description.
-     An odd last tile spans both columns so no section ends in an empty half-row. */
+  /* Tile grid: one column on phones, two from 46rem; each tile is a row that grows to fit its description. */
   .tile-grid {
     display: grid;
     grid-template-columns: 1fr;
@@ -671,7 +670,6 @@ const devLinks = [
   }
   @media (min-width: 46rem) {
     .tile-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-    .tile-grid > :global(.tile:last-child:nth-child(odd)) { grid-column: 1 / -1; }
   }
 
   /* Grouped tile sections: a hairline, a sans title and the group's description above its tiles. */
