@@ -7,6 +7,22 @@ aims to follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 The git tag is the authoritative version; `portal/package.json` mirrors it.
 This CHANGELOG and git tags carry the deployed-instance release state.
 
+## [0.14.0] - 2026-10-11
+
+The home page lists every app with its full description, in calm sections.
+
+### Changed
+
+- App tiles are rows with the logo, the name and the full description, with no truncation. They sit in two columns on wider screens and one on phones.
+- Sections have real headings, and each tile has a labelled Guide button.
+- Apps without a logo show initials on a monogram plate. Single-colour logos invert in dark mode.
+- The guide dialog shows the app's address, which the tile no longer carries.
+- Astro 7.3.6 refuses cross-site form posts from the `Sec-Fetch-Site` header first, and the CSRF tests now send real cross-site headers. Playwright moves to 1.64 and OpenTelemetry to 0.223.
+
+### Deployment changes
+
+- None: image bump only.
+
 ## [0.13.3] - 2026-10-10
 
 App logos now live beside each manifest, and passkeys carry a clearer name.
