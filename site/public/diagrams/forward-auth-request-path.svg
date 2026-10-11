@@ -73,12 +73,14 @@
 <line x1="264" y1="116" x2="280" y2="116" marker-end="url(#fa-arrow-mut)"/>
 <line x1="442" y1="116" x2="552" y2="116" marker-end="url(#fa-arrow-mut)"/>
 </g>
+<g data-step="3">
 <text class="m" x="499" y="106" text-anchor="middle" font-size="8.5" fill="#707070">proxied only after 200</text>
 <!-- deny return to the browser -->
 <g class="ns" stroke="#a8443a" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round" fill="none" stroke-dasharray="4 3">
 <polyline points="300,142 300,164 90,164 90,144" marker-end="url(#fa-arrow-no)"/>
 </g>
 <text class="n" x="106" y="154" font-size="8.5" fill="#a8443a">denied — the edge's matcher decides</text>
+</g>
 <!-- gate lane -->
 <text class="m" x="40" y="190" font-family="'IBM Plex Mono', Menlo, monospace" font-size="8.5" font-weight="700" letter-spacing="1.1" fill="#707070">THE GATE · A SUB-REQUEST, NOT A REDIRECT</text>
 <g class="ms" stroke="#707070" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" fill="none">
@@ -97,6 +99,7 @@
 <text class="i2" x="300" y="308" font-size="8.5" fill="#404040">4 · enforceGroupGate: active, every stored</text>
 <text class="m" x="310" y="319" font-size="8.5" fill="#707070">group canonical, and in the named group</text>
 <text class="m" x="300" y="337" font-family="'IBM Plex Mono', Menlo, monospace" font-size="8" font-weight="700" letter-spacing="0.8" fill="#707070">FAIL CLOSED AT EVERY STEP</text>
+<g data-step="2">
 <g class="ms" stroke="#707070" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" fill="none">
 <line x1="522" y1="240" x2="552" y2="240" marker-end="url(#fa-arrow-mut)"/>
 <line x1="522" y1="288" x2="552" y2="288" marker-end="url(#fa-arrow-mut)"/>
@@ -112,6 +115,8 @@
 <text class="m" x="572" y="311" font-size="8.5" fill="#707070">metadata_admin</text>
 <text class="m" x="572" y="322" font-size="8.5" fill="#707070">.groups — not in whoami</text>
 <text class="n" x="572" y="335" font-size="8.5" fill="#a8443a">no answer → a 503</text>
+</g>
+<g data-step="3">
 <!-- status contract -->
 <line class="e" x1="40" y1="360" x2="680" y2="360" stroke="#e0e0e0" stroke-width="1"/>
 <text class="m" x="40" y="380" font-family="'IBM Plex Mono', Menlo, monospace" font-size="9" font-weight="700" letter-spacing="1.2" fill="#707070">STATUS CONTRACT · CADDY KEYS ON THE STATUS, NEVER THE BODY</text>
@@ -123,5 +128,6 @@
 <text class="i2" x="84" y="442" font-size="8.5" fill="#404040">refused on the merits: inactive identity, non-canonical stored group, group miss — plus a bad ?group= param.</text>
 <text class="n" x="40" y="462" font-family="'IBM Plex Mono', Menlo, monospace" font-size="11" font-weight="700" fill="#a8443a">503</text>
 <text class="i2" x="84" y="462" font-size="8.5" fill="#404040">Kratos or its admin API did not answer. Denies like a 403 — but must never be matched into a redirect.</text>
+</g>
 </g>
 </svg>
