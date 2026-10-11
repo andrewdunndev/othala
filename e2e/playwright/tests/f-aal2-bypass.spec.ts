@@ -11,19 +11,40 @@ test('F2 — admin at AAL1: POST /admin/users/new is refused (step-up redirect, 
   const origin = new URL(baseURL!).origin;
   await loginViaJsonApi(ctx, { identifier: admin.email, password: admin.password }, baseURL);
 
+  const body = 'username=attack.user&email=attack@othala.test&identityGroups=grafana-access&csrf_token=fake';
+
   const resp1 = await ctx.request.post(`${baseURL}/admin/users/new`, {
     maxRedirects: 0,
-    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-    data: 'username=attack.user&email=attack@othala.test&identityGroups=grafana-access&csrf_token=fake',
+    headers: {
+      'Content-Type': 'application/x-www-form-urlencoded',
+      'Origin': 'https://attacker.example',
+      'Sec-Fetch-Site': 'cross-site',
+    },
+    data: body,
   });
 
   const status1 = resp1.status();
-  console.log('[F2] origin-less POST /admin/users/new AAL1 →', status1);
+  console.log('[F2] cross-site POST /admin/users/new AAL1 →', status1);
 
   expect(
     status1,
-    `F2 (layer 1): origin-less POST must be rejected by Astro checkOrigin with 403; got ${status1}`,
+    `F2 (layer 1): cross-site POST must be rejected by Astro checkOrigin with 403; got ${status1}`,
   ).toBe(403);
+
+  const respNoOrigin = await ctx.request.post(`${baseURL}/admin/users/new`, {
+    maxRedirects: 0,
+    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    data: body,
+  });
+
+  const statusNoOrigin = respNoOrigin.status();
+  const locNoOrigin = respNoOrigin.headers()['location'] ?? '';
+  console.log('[F2] origin-less POST /admin/users/new AAL1 →', statusNoOrigin, locNoOrigin);
+
+  expect(
+    /aal=aal2/.test(locNoOrigin),
+    `F2 (layer 2): origin-less AAL1 admin POST must be redirected to aal=aal2; got ${statusNoOrigin} ${locNoOrigin}`,
+  ).toBe(true);
 
   const resp2 = await ctx.request.post(`${baseURL}/admin/users/new`, {
     maxRedirects: 0,
@@ -31,7 +52,7 @@ test('F2 — admin at AAL1: POST /admin/users/new is refused (step-up redirect, 
       'Content-Type': 'application/x-www-form-urlencoded',
       'Origin': origin,
     },
-    data: 'username=attack.user&email=attack@othala.test&identityGroups=grafana-access&csrf_token=fake',
+    data: body,
   });
 
   const status2 = resp2.status();
