@@ -35,6 +35,24 @@ function isBleed(svg: string): boolean {
   return /<rect(?![^>]*\s[xy]=)[^>]*\swidth="(\d+(?:\.\d+)?)"[^>]*\sheight="\1"[^>]*\sfill="#/i.test(svg.slice(0, 600));
 }
 
+/** True when the logo is drawn only in dark ink with no ground of its own (no gradient, no light or saturated colour),
+ *  so dark mode can knock it out to a light tone. */
+function isInk(svg: string): boolean {
+  if (!/<(path|rect|circle|ellipse|polygon|polyline|line)\b/i.test(svg) || /gradient|<image|<pattern|url\(/i.test(svg)) return false;
+  for (const m of svg.matchAll(/#([0-9a-f]{3}|[0-9a-f]{6})\b/gi)) {
+    const h = m[1].length === 3 ? [...m[1]].map((c) => c + c).join('') : m[1];
+    const [r, g, b] = [0, 2, 4].map((i) => parseInt(h.slice(i, i + 2), 16));
+    if (Math.max(r, g, b) - Math.min(r, g, b) > 80 || 0.2126 * r + 0.7152 * g + 0.0722 * b > 90) return false;
+  }
+  return !/(?:fill|stroke|color)\s*[:=]\s*["']?(?:white|rgb|hsl)/i.test(svg);
+}
+
+function initials(name: string): string {
+  const words = name.split(/[^\p{L}\p{N}]+/u).filter(Boolean);
+  const out = words.length > 1 ? words[0][0] + words[1][0] : (words[0] ?? '').slice(0, 2);
+  return out.toUpperCase() || '?';
+}
+
 export type AuthKind = 'oidc' | 'forward_auth' | 'external';
 
 /** Metadata for a named tile group, sourced from groups.yaml. */
@@ -84,6 +102,8 @@ export interface AppTile {
   iconReason?: string;
   /** The logo ships its own filled square, so the plate drops its padding and border. */
   iconBleed?: boolean;
+  /** The logo is dark ink only, so dark mode inverts it. */
+  iconInk?: boolean;
   authKind: AuthKind;
   accessGroups: string[];
   /** Dashboard grouping label; tiles sharing one render together. */
@@ -313,7 +333,7 @@ function parseTile(slug: string, doc: Record<string, unknown>, dir: string): App
     name: String(p['name'] ?? slug),
     description: String(p['description'] ?? ''),
     url,
-    icon: String(p['icon'] ?? '??'),
+    icon: String(p['icon'] ?? initials(String(p['name'] ?? slug))),
     authKind: String(p['auth_kind'] ?? 'external') as AuthKind,
     accessGroups,
     order: typeof p['order'] === 'number' ? p['order'] : 999,
@@ -331,6 +351,7 @@ function parseTile(slug: string, doc: Record<string, unknown>, dir: string): App
     tile.iconHref = `/icons/${encodeURIComponent(slug)}.svg`;
     tile.iconSvg = icon.svg;
     tile.iconBleed = isBleed(icon.svg);
+    tile.iconInk = !tile.iconBleed && isInk(icon.svg);
   }
   tile.iconReason = icon.reason;
 

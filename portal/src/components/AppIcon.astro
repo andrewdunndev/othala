@@ -17,12 +17,12 @@ const src = tile.iconHref && groups && userCanSeeTile(tile as AppTile, groups)
   : undefined;
 ---
 
-<span class:list={['app-icon', `app-icon-${size}`]} data-icon={src ? tile.slug : undefined} data-bleed={src && tile.iconBleed ? '' : undefined} aria-hidden="true">
+<span class:list={['app-icon', `app-icon-${size}`]} data-icon={src ? tile.slug : undefined} data-bleed={src && tile.iconBleed ? '' : undefined} data-ink={src && tile.iconInk ? '' : undefined} aria-hidden="true">
   {
     src ? (
       <img class="app-icon-img" src={src} alt="" decoding="async" />
     ) : (
-      <span class="app-icon-mono mono">{tile.icon}</span>
+      <span class="app-icon-mono">{tile.icon}</span>
     )
   }
 </span>
@@ -35,11 +35,11 @@ const src = tile.iconHref && groups && userCanSeeTile(tile as AppTile, groups)
     flex-shrink: 0;
     background: var(--bg);
     border: 1px solid var(--border);
-    border-radius: var(--radius);
-    --plate: 2.75rem;
+    border-radius: var(--radius-md);
+    --plate: 3rem;
     width: var(--plate);
     height: var(--plate);
-    padding: 0.4rem;
+    padding: 0.45rem;
     box-sizing: border-box;
   }
   .app-icon-sm {
@@ -58,11 +58,13 @@ const src = tile.iconHref && groups && userCanSeeTile(tile as AppTile, groups)
     height: 100%;
     object-fit: contain;
   }
+  .app-icon:has(.app-icon-mono) {
+    background: var(--accent-subtle);
+  }
   .app-icon-mono {
-    font-size: var(--text-sm);
+    font-family: var(--font-sans);
+    font-size: 1.05rem;
     font-weight: 600;
     color: var(--accent);
-    letter-spacing: 0.04em;
-    text-transform: uppercase;
   }
 </style>
