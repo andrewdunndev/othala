@@ -67,6 +67,18 @@ const entryPoints = [
   </div>
 
   <section class="section">
+    <p class="section-subtitle">Start here</p>
+    <div class="tile-grid" data-reveal>
+      {entryPoints.map(e => (
+        <a href={e.href} class="tile" rel={e.external ? 'external' : undefined}>
+          <h2 class="tile-headline">{e.label}{e.external ? ' ↗' : ''}</h2>
+          <p class="tile-prose">{e.desc}</p>
+        </a>
+      ))}
+    </div>
+  </section>
+
+  <section class="section">
     <p class="section-prose">
       It is public because a deployment with no support contract has nothing
       to lose by being readable, and because most of what makes an Ory
@@ -81,18 +93,6 @@ const entryPoints = [
       which one grants a role. Adding an app is a file drop, not an image
       rebuild.
     </p>
-  </section>
-
-  <section class="section">
-    <p class="section-subtitle">Start here</p>
-    <div class="tile-grid" data-reveal>
-      {entryPoints.map(e => (
-        <a href={e.href} class="tile" rel={e.external ? 'external' : undefined}>
-          <h2 class="tile-headline">{e.label}{e.external ? ' ↗' : ''}</h2>
-          <p class="tile-prose">{e.desc}</p>
-        </a>
-      ))}
-    </div>
   </section>
 </Layout>
 
