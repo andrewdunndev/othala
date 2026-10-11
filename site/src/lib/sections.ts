@@ -27,8 +27,6 @@ export interface SectionPage {
   blurb?: string;
   /** Optional sub-heading the sidebar groups this page under. */
   group?: string;
-  /** 'single' keeps the article in one measure column instead of balanced columns. */
-  flow?: 'single';
 }
 
 export interface Section {
@@ -45,9 +43,9 @@ export const sections: Section[] = [
     lede: 'The integration commitments that keep an Ory deployment durable across upgrades, how applications are connected over OIDC, how requests are denied, and how the substrate is hardened.',
     pages: [
       { href: '/guides/',                       label: 'Overview' },
-      { href: '/guides/golden-path/',           label: 'Golden path',            file: 'guides/golden-path.md', flow: 'single' },
-      { href: '/guides/per-app-oidc/',          label: 'Per-app OIDC',           file: 'guides/per-app-oidc.md', flow: 'single' },
-      { href: '/guides/error-handling/',        label: 'Error handling',         file: 'guides/error-handling.md', flow: 'single' },
+      { href: '/guides/golden-path/',           label: 'Golden path',            file: 'guides/golden-path.md' },
+      { href: '/guides/per-app-oidc/',          label: 'Per-app OIDC',           file: 'guides/per-app-oidc.md' },
+      { href: '/guides/error-handling/',        label: 'Error handling',         file: 'guides/error-handling.md' },
       { href: '/guides/hardening/',             label: 'Hardening',              file: 'guides/hardening.md' },
     ],
   },

@@ -2,11 +2,8 @@
 import Layout from '../layouts/Layout.astro';
 import { readFileSync } from 'node:fs';
 import { resolve, join } from 'node:path';
-import { sections, docLinkMap, type Section, type SectionPage } from '../lib/sections';
+import { sections, docLinkMap, type SectionPage } from '../lib/sections';
 import { renderMarkdown, cardBlurb, anchorHeadings } from '../lib/render';
-
-const CONTENT_ROOT = resolve(process.cwd(), 'src/content/docs');
-const linkMap = docLinkMap();
 
 type IndexProps = {
   kind: 'index';
@@ -20,11 +17,8 @@ type DocProps = {
   sectionHref: string;
   sectionLabel: string;
   html: string;
-  flow?: 'single';
   headings: { slug: string; text: string }[];
 };
-
-const slugOf = (href: string) => href.replace(/^\/|\/$/g, '');
 
 export function getStaticPaths() {
   const contentRoot = resolve(process.cwd(), 'src/content/docs');
@@ -33,11 +27,8 @@ export function getStaticPaths() {
 
   for (const section of sections) {
     const leaves = section.pages.filter((p: SectionPage) => p.file);
-    // Cards: every page but the section Overview — file-backed leaves and
-    // external index links alike.
     const cardPages = section.pages.filter((p: SectionPage) => p.file || p.external);
 
-    // Section overview — card grid.
     paths.push({
       params: { slug: section.href.replace(/^\/|\/$/g, '') },
       props: {
@@ -53,7 +44,6 @@ export function getStaticPaths() {
       } satisfies IndexProps,
     });
 
-    // Leaf doc pages.
     for (const p of leaves) {
       const raw = readFileSync(join(contentRoot, p.file!), 'utf-8');
       const { html, headings } = anchorHeadings(renderMarkdown(raw, map));
@@ -66,7 +56,6 @@ export function getStaticPaths() {
           sectionLabel: section.label,
           html,
           headings,
-          flow: p.flow,
         } satisfies DocProps,
       });
     }
@@ -97,6 +86,6 @@ const props = Astro.props as IndexProps | DocProps;
 ) : (
   <Layout title={props.label} headings={props.headings} progress>
     <a href={props.sectionHref} class="page-eyebrow page-eyebrow-link">← {props.sectionLabel}</a>
-    <article class="flow" data-flow={props.flow} set:html={props.html} />
+    <article set:html={props.html} />
   </Layout>
 )}
