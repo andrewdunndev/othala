@@ -372,13 +372,13 @@ a.subtle:hover { color: var(--text); }
 .badge-warning { background: var(--warning-subtle); border-color: var(--warning); }
 .badge-danger { background: var(--danger-subtle); border-color: var(--danger); }
 
-/* Logo plates sit on the page ground in both themes, so every mark reads alike. The few marks drawn in black or deep
- * navy with no ground of their own are knocked out to a light tone in dark mode (data-icon, the logo file's name). */
-:root[data-theme="dark"] :is(.app-icon, .app-modal-logo)[data-icon^="vault"] img {
+/* Logo plates sit on the page ground in both themes, so every mark reads alike. Marks drawn in dark ink with no ground
+ * of their own (data-ink, read from the logo file) are knocked out to a light tone in dark mode. */
+:root[data-theme="dark"] :is(.app-icon, .app-modal-logo)[data-ink] img {
   filter: brightness(0) invert(0.92);
 }
 @media (prefers-color-scheme: dark) {
-  :root:not([data-theme="light"]) :is(.app-icon, .app-modal-logo)[data-icon^="vault"] img {
+  :root:not([data-theme="light"]) :is(.app-icon, .app-modal-logo)[data-ink] img {
     filter: brightness(0) invert(0.92);
   }
 }

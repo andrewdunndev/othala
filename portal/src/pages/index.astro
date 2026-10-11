@@ -203,10 +203,10 @@ const devLinks = [
                 })}
               </div>
             )}
-            {tileGroups.map(({ title, description, tiles }) => (
-              <div class="tile-group">
+            {tileGroups.map(({ title, description, tiles }, i) => (
+              <section class="tile-group" aria-labelledby={`tile-group-${i}`}>
                 <div class="tile-group-header">
-                  <p class="tile-group-title">{title}</p>
+                  <h2 class="tile-group-title" id={`tile-group-${i}`}>{title}</h2>
                   {description && (
                     <p class="tile-group-desc">{description}</p>
                   )}
@@ -217,7 +217,7 @@ const devLinks = [
                     return <TileCard tile={t} readiness={v.readiness} requirementTitles={v.titles} groups={groups} />;
                   })}
                 </div>
-              </div>
+              </section>
             ))}
           </>
         ) : (
@@ -240,6 +240,8 @@ const devLinks = [
             data-app-desc={t.description}
             data-app-icon={t.iconHref ? t.iconHref + (import.meta.env.DEV ? '?dev-state=post-auth' : '') : ''}
             data-app-bleed={t.iconBleed ? '' : undefined}
+            data-app-ink={t.iconInk ? '' : undefined}
+            data-app-host={t.fqdn}
             data-app-mono={t.icon}
           >
             <div data-slot="actions">
@@ -270,6 +272,7 @@ const devLinks = [
             <div class="app-modal-header-text">
               <h2 class="app-modal-title" id="app-modal-title"></h2>
               <p class="app-modal-desc"></p>
+              <p class="app-modal-host mono"></p>
             </div>
           </header>
           <div class="app-modal-prereq" data-slot-prereq></div>
@@ -455,6 +458,7 @@ const devLinks = [
 
     var titleEl = appModal.querySelector('.app-modal-title');
     var descEl = appModal.querySelector('.app-modal-desc');
+    var hostEl = appModal.querySelector('.app-modal-host');
     var iconEl = appModal.querySelector('[data-slot-icon]');
     var prereqEl = appModal.querySelector('[data-slot-prereq]');
     var actionsEl = appModal.querySelector('[data-slot-actions]');
@@ -481,6 +485,7 @@ const devLinks = [
         span.appendChild(img);
         span.dataset.icon = href.split('/').pop().replace(/\.svg$/, '');
         if (tpl.hasAttribute('data-app-bleed')) span.dataset.bleed = '';
+        if (tpl.hasAttribute('data-app-ink')) span.dataset.ink = '';
       } else {
         span.textContent = tpl.dataset.appMono || '';
         span.classList.add('app-modal-logo-mono');
@@ -494,6 +499,7 @@ const devLinks = [
       opener = from || null;
       titleEl.textContent = tpl.dataset.appName || slug;
       descEl.textContent = tpl.dataset.appDesc || '';
+      hostEl.textContent = tpl.dataset.appHost || '';
       iconEl.replaceChildren(logo(tpl));
       fill(actionsEl, slot(tpl, 'actions'));
       fill(prereqEl, slot(tpl, 'prereq'));
@@ -927,6 +933,12 @@ const devLinks = [
     color: var(--text-2);
     line-height: 1.4;
     margin: 0;
+  }
+  .app-modal-host {
+    font-size: var(--text-xs);
+    color: var(--text-muted);
+    margin: var(--space-1) 0 0;
+    overflow-wrap: anywhere;
   }
   /* Close sits over the header's right edge; on phones the whole sheet scrolls and the button stays pinned. */
   .app-modal-close {

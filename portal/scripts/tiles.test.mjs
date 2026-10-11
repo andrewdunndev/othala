@@ -190,6 +190,22 @@ test('sidecar: bleed is read from the sidecar', async () => {
   assert.equal(tile.iconBleed, true);
 });
 
+test('sidecar: ink is dark-only marks with no ground', async () => {
+  const wrap = (body) => `<svg viewBox="0 0 8 8">${body}</svg>`;
+  assert.equal((await loadWithSidecar(wrap('<path d="M0 0h8v8z"/>'))).iconInk, true);
+  assert.equal((await loadWithSidecar(wrap('<path d="M0 0h8v8z" fill="#0b1f3a"/>'))).iconInk, true);
+  assert.equal((await loadWithSidecar(wrap('<circle r="4" style="fill:#fff"/><path d="M0 0h8v8z"/>'))).iconInk, false);
+  assert.equal((await loadWithSidecar(wrap('<path d="M0 0h8v8z" fill="#f05a28"/>'))).iconInk, false);
+  assert.equal((await loadWithSidecar(wrap('<linearGradient id="a"/><path d="M0 0h8v8z" fill="url(#a)"/>'))).iconInk, false);
+  assert.equal((await loadWithSidecar('<svg viewBox="0 0 8 8"><rect width="8" height="8" fill="#123456"/></svg>')).iconInk, false);
+});
+
+test('parseTile: a tile without an icon gets initials from its name', async () => {
+  const yaml = (name) => `\npresentation:\n  name: ${name}\n  url: https://x.example\n  auth_kind: external\n`;
+  assert.equal((await parseSingleTile(yaml('Audio Books'))).icon, 'AB');
+  assert.equal((await parseSingleTile(yaml('Statuspage'))).icon, 'ST');
+});
+
 test('sidecar: retired icon_slug and icon_fallback are ignored at serve', async () => {
   const tile = await parseSingleTile(SIDECAR_YAML + '  icon_slug: grafana\n  icon_fallback: grafana\n');
   assert.equal(tile.iconHref, undefined);

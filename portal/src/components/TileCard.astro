@@ -60,13 +60,11 @@ const launchHref = readiness === 'needs' ? `/apps/${encodeURIComponent(tile.slug
     overflow: hidden;
     transition:
       border-color var(--duration-fast) var(--ease-out),
-      box-shadow var(--duration-fast) var(--ease-out),
-      transform var(--duration-fast) var(--ease-out);
+      box-shadow var(--duration-fast) var(--ease-out);
   }
   .tile:hover,
   .tile:focus-within {
     border-color: var(--accent);
-    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
   }
   .tile-launch {
     display: flex;
@@ -197,8 +195,5 @@ const launchHref = readiness === 'needs' ? `/apps/${encodeURIComponent(tile.slug
       border-radius: 22px;
       background: var(--bg);
     }
-  }
-  @media (prefers-reduced-motion: reduce) {
-    .tile { transition: none; }
   }
 </style>
