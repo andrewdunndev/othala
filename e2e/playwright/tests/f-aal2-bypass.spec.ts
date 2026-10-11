@@ -86,3 +86,25 @@ test('F4 — supplying aal=aal2 in the /admin query string does not bypass step-
     `F4: /admin?aal=aal2 must not bypass step-up; got ${resp.status()} ${loc}`,
   ).toBe(true);
 });
+
+test('F3 — layer 1: mismatched Origin without Sec-Fetch-Site is rejected by checkOrigin', async ({
+  ctx,
+  baseURL,
+  admin,
+}) => {
+  await loginViaJsonApi(ctx, { identifier: admin.email, password: admin.password }, baseURL);
+
+  const resp = await ctx.request.post(`${baseURL}/admin/users/new`, {
+    maxRedirects: 0,
+    headers: {
+      'Content-Type': 'application/x-www-form-urlencoded',
+      'Origin': 'https://attacker.example',
+    },
+    data: 'username=attack.user&email=attack@othala.test&identityGroups=grafana-access&csrf_token=fake',
+  });
+
+  expect(
+    resp.status(),
+    `F3 (layer 1): Origin mismatch without Sec-Fetch-Site must be rejected with 403; got ${resp.status()}`,
+  ).toBe(403);
+});

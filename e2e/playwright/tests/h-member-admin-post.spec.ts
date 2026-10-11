@@ -145,3 +145,25 @@ test('H2 — INV-1: member POST /admin/users/<own-id> at AAL1 is denied (step-up
     `H2 (INV-1): AAL1 member POST own-id must redirect to aal=aal2 step-up (not 200, not 403); got ${status2} ${loc2}`,
   ).toBe(true);
 });
+
+test('H3 — layer 1: member POST with mismatched Origin and no Sec-Fetch-Site is rejected by checkOrigin', async ({
+  ctx,
+  baseURL,
+  member,
+}) => {
+  await loginViaJsonApi(ctx, { identifier: member.email, password: member.password }, baseURL);
+
+  const resp = await ctx.request.post(`${baseURL}/admin/users/new`, {
+    maxRedirects: 0,
+    headers: {
+      'Content-Type': 'application/x-www-form-urlencoded',
+      'Origin': 'https://attacker.example',
+    },
+    data: DUMMY_FORM_BODY,
+  });
+
+  expect(
+    resp.status(),
+    `H3 (layer 1): Origin mismatch without Sec-Fetch-Site must be rejected with 403; got ${resp.status()}`,
+  ).toBe(403);
+});
