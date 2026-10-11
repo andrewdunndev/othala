@@ -77,11 +77,11 @@ const ov1Label = 'A family member opens an app through the edge proxy (1); an OI
     </Fragment>
     <figure class="shots" slot="aside">
       <div>
-        <svg viewBox="318 132 484 496" preserveAspectRatio="xMidYMid meet" role="img" aria-label="The Othala sign-in page from the end-to-end test lab, with a single passkey button as the primary way in."><image href="/captures/sign-in.png" width="1120" height="760" /></svg>
+        <svg viewBox="318 132 484 496" role="img" aria-label="The Othala sign-in page from the end-to-end test lab, with a single passkey button as the primary way in."><svg x="318" y="132" width="484" height="496" viewBox="318 132 484 496"><image href="/captures/sign-in.png" width="1120" height="760" /></svg></svg>
         <figcaption>1 · passkey sign-in</figcaption>
       </div>
       <div>
-        <svg viewBox="22 208 540 404" preserveAspectRatio="xMinYMin meet" role="img" aria-label="The dashboard a signed-in person lands on in the test lab: one tile per app their groups admit them to."><image href="/captures/dashboard.png" width="1120" height="760" /></svg>
+        <svg viewBox="22 208 540 404" role="img" aria-label="The dashboard a signed-in person lands on in the test lab: one tile per app their groups admit them to."><svg x="22" y="208" width="540" height="404" viewBox="22 208 540 404"><image href="/captures/dashboard.png" width="1120" height="760" /></svg></svg>
         <figcaption>2 · every app they can open</figcaption>
       </div>
     </figure>
@@ -112,10 +112,11 @@ const ov1Label = 'A family member opens an app through the edge proxy (1); an OI
       <path d="M420,152 V244" fill="none" stroke="var(--danger)" stroke-width="1.5" stroke-dasharray="5 4" marker-end="url(#oth-ov1-deny)"/>
       <g font-family="'IBM Plex Mono', monospace" font-size="10" fill="var(--text-2)" stroke="var(--bg)" stroke-width="4" paint-order="stroke">
         <text x="275" y="112" text-anchor="middle">1 opens an app</text>
-        <text x="905" y="258" text-anchor="middle">2 authorize</text>
+        <text x="895" y="258" text-anchor="middle">2 authorize</text>
         <text x="575" y="258" text-anchor="middle">3 challenges</text>
         <text x="428" y="338">4 passkey</text>
-        <text x="905" y="314" text-anchor="middle">5 id_token, groups</text>
+        <text x="895" y="314" text-anchor="middle">5 id_token</text>
+        <text x="895" y="327" text-anchor="middle">with groups</text>
         <text x="275" y="272" text-anchor="middle">7 manages people</text>
         <text x="275" y="298" text-anchor="middle">internal listener</text>
         <text x="430" y="202" fill="var(--danger)">6 forward-auth:</text>
@@ -208,6 +209,7 @@ const ov1Label = 'A family member opens an app through the edge proxy (1); an OI
         <text x="24" y="596">4 passkey session</text>
         <text x="180" y="548">5 id_token, groups</text>
         <text x="180" y="564" fill="var(--danger)">6 allow or deny</text>
+        <text x="180" y="580">7 manages people</text>
       </g>
     </svg>
     <p>Ory holds identity and issues tokens; Othala's portal makes every decision in between, from login and consent to the access gate.</p>
@@ -263,7 +265,7 @@ const ov1Label = 'A family member opens an app through the edge proxy (1); an OI
   :global(.hero-aside:has(> .shots)) { align-self: stretch; display: flex; }
   .shots { flex: 1; display: grid; grid-template-columns: 0.95fr 1.35fr; gap: var(--space-4); margin: 0; }
   .shots > div { display: flex; flex-direction: column; min-width: 0; }
-  .shots svg { flex: 1 1 0; min-height: 15rem; width: 100%; display: block; background: #fff; border: 1px solid var(--border); border-radius: var(--radius-sm); }
-  @media (max-width: 900px) { .shots svg { flex: none; height: auto; min-height: 0; } }
+  .shots > div > svg { flex: 1 1 0; min-height: 15rem; width: 100%; display: block; background: #fff; border: 1px solid var(--border); border-radius: var(--radius-sm); }
+  @media (max-width: 900px) { .shots > div > svg { flex: none; height: auto; min-height: 0; } }
   .shots figcaption { font-family: var(--font-mono); font-size: var(--text-xs); color: var(--text-muted); letter-spacing: 0.06em; text-transform: uppercase; margin-top: var(--space-2); }
 </style>
