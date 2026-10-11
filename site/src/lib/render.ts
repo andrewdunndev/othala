@@ -26,8 +26,8 @@ export function renderMarkdown(raw: string, linkMap: Record<string, string>): st
 }
 
 /** First real prose paragraph of a doc, for section-index card blurbs.
- *  Skips the H1, blockquote callouts, and status lines. Trimmed to a
- *  reasonable card length. */
+ *  Skips the H1, blockquote callouts, and status lines. Kept to whole
+ *  sentences, up to a card length. */
 export function cardBlurb(raw: string): string {
   const body = stripLeading(raw);
   const lines = body.split(/\r?\n/);
@@ -41,9 +41,14 @@ export function cardBlurb(raw: string): string {
     if (t === '' && buf.length > 0) break;
     buf.push(t);
   }
-  let text = buf.join(' ').replace(/[*`_]/g, '').replace(/\[([^\]]+)\]\([^)]+\)/g, '$1');
-  if (text.length > 180) text = text.slice(0, 177).replace(/\s+\S*$/, '') + '…';
-  return text;
+  const text = buf.join(' ').replace(/[*`_]/g, '').replace(/\[([^\]]+)\]\([^)]+\)/g, '$1');
+  const sentences = text.split(/(?<=[.!?])\s+(?=[A-Z0-9"'(])/);
+  let out = sentences[0];
+  for (const s of sentences.slice(1)) {
+    if (out.length + 1 + s.length > 200) break;
+    out += ' ' + s;
+  }
+  return out;
 }
 
 /** Give each h2 an id and list them for the on-page TOC. */
