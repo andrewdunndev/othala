@@ -57,7 +57,7 @@ const entryPoints = [
   },
 ];
 
-const ov1Label = 'A family member opens an app through the edge proxy (1); an OIDC app sends them to Hydra to authorize (2); Hydra hands the login and consent challenges to the portal (3), which checks the passkey session with Kratos (4) and returns an id_token carrying their groups through Hydra to the app (5); for an app with no OIDC the edge asks the portal to allow or deny each request (6); every app is registered from its manifest file (7); the admin reaches the portal only on its internal listener.';
+const ov1Label = 'A family member opens an app through the edge proxy (1); an OIDC app sends them to Hydra to authorize (2); Hydra hands the login and consent challenges to the portal (3), which checks the passkey session with Kratos (4) and returns an id_token carrying their groups through Hydra to the app (5); for an app with no OIDC the edge asks the portal to allow or deny each request (6); and the admin manages people on the portal\'s internal listener only (7).';
 ---
 <Layout description="Othala is one family's single sign-on: one passkey for every app in the house, groups that decide what each person can do, and the login, consent and access-gate code Ory leaves to the integrator.">
   <Hero title="Othala">
@@ -71,44 +71,42 @@ const ov1Label = 'A family member opens an app through the edge proxy (1); an OI
       login, consent and access-gate code Ory leaves to the integrator,
       published as a worked example.
     </p>
+    <Fragment slot="actions">
+      <a class="cta-primary" href="/guides/golden-path/">Golden path</a>
+      <a class="cta-secondary" href="/architecture/">Architecture</a>
+    </Fragment>
     <figure class="shots" slot="aside">
       <div>
-        <img src="/captures/sign-in.png" width="1120" height="760" alt="The Othala sign-in page from the end-to-end test lab, with a single passkey button as the primary way in." />
+        <svg viewBox="318 132 484 496" preserveAspectRatio="xMidYMid meet" role="img" aria-label="The Othala sign-in page from the end-to-end test lab, with a single passkey button as the primary way in."><image href="/captures/sign-in.png" width="1120" height="760" /></svg>
         <figcaption>1 · passkey sign-in</figcaption>
       </div>
       <div>
-        <img src="/captures/dashboard.png" width="1120" height="760" alt="The dashboard a signed-in person lands on in the test lab: one tile per app their groups admit them to." />
+        <svg viewBox="22 208 540 404" preserveAspectRatio="xMinYMin meet" role="img" aria-label="The dashboard a signed-in person lands on in the test lab: one tile per app their groups admit them to."><image href="/captures/dashboard.png" width="1120" height="760" /></svg>
         <figcaption>2 · every app they can open</figcaption>
       </div>
     </figure>
   </Hero>
 
   <figure class="cat-explainer figure-pair figure-full">
-    <svg class="figure-wide" viewBox="0 0 1320 460" role="img" aria-label={ov1Label} font-family="'IBM Plex Sans', system-ui, sans-serif">
+    <svg class="figure-wide" viewBox="24 28 1288 404" role="img" aria-label={ov1Label} font-family="'IBM Plex Sans', system-ui, sans-serif">
       <defs>
         <marker id="oth-ov1-arrow" markerUnits="userSpaceOnUse" markerWidth="10" markerHeight="8" refX="10" refY="4" orient="auto"><path d="M0,0 L10,4 L0,8 Z" fill="var(--text-2)"/></marker>
         <marker id="oth-ov1-deny" markerUnits="userSpaceOnUse" markerWidth="10" markerHeight="8" refX="10" refY="4" orient="auto"><path d="M0,0 L10,4 L0,8 Z" fill="var(--danger)"/></marker>
       </defs>
-      <rect x="20" y="20" width="1280" height="420" rx="6" fill="var(--bg)" stroke="var(--border)"/>
       <text x="40" y="52" font-family="'IBM Plex Mono', monospace" font-size="11" letter-spacing="0.12em" fill="var(--text-muted)"><tspan fill="var(--accent)">WHY</tspan>  ONE PASSKEY AND ONE SET OF GROUPS FOR EVERY APP; ORY SUPPLIES IDENTITY AND TOKENS, OTHALA THE DECISIONS</text>
       <g font-family="'IBM Plex Mono', monospace" font-size="10" letter-spacing="0.14em" fill="var(--text-muted)">
         <text x="40" y="78">ACTORS</text>
         <text x="316" y="194">OTHALA</text>
-        <text x="980" y="194">OUTSIDE</text>
+        <text x="330" y="78">OUTSIDE</text>
       </g>
       <rect x="300" y="172" width="560" height="252" rx="10" fill="none" stroke="var(--accent)" stroke-width="1.5"/>
-      <g fill="none" stroke="var(--border)" stroke-width="1.5">
-        <path d="M1050,152 V244"/>
-        <path d="M1210,152 V244"/>
-      </g>
+      <path d="M336,88 H1294 a6,6 0 0 1 6,6 V334 a6,6 0 0 1 -6,6 H966 a6,6 0 0 1 -6,-6 V152 H336 a6,6 0 0 1 -6,-6 V94 a6,6 0 0 1 6,-6 Z" fill="var(--surface)" stroke="var(--border)"/>
       <g fill="none" stroke="var(--text-2)" stroke-width="1.5" marker-end="url(#oth-ov1-arrow)">
         <path d="M220,120 H330"/>
         <path d="M980,266 H830"/>
         <path d="M640,266 H510"/>
         <path d="M420,316 V352"/>
-        <path d="M510,298 H640"/>
         <path d="M830,298 H980"/>
-        <path d="M980,380 H490 V316"/>
         <path d="M220,280 H330"/>
       </g>
       <path d="M420,152 V244" fill="none" stroke="var(--danger)" stroke-width="1.5" stroke-dasharray="5 4" marker-end="url(#oth-ov1-deny)"/>
@@ -117,10 +115,9 @@ const ov1Label = 'A family member opens an app through the edge proxy (1); an OI
         <text x="905" y="258" text-anchor="middle">2 authorize</text>
         <text x="575" y="258" text-anchor="middle">3 challenges</text>
         <text x="428" y="338">4 passkey</text>
-        <text x="575" y="314" text-anchor="middle">5 groups as claims</text>
-        <text x="905" y="314" text-anchor="middle">5 id_token</text>
-        <text x="735" y="372" text-anchor="middle">7 registers a client</text>
-        <text x="275" y="272" text-anchor="middle">internal listener</text>
+        <text x="905" y="314" text-anchor="middle">5 id_token, groups</text>
+        <text x="275" y="272" text-anchor="middle">7 manages people</text>
+        <text x="275" y="298" text-anchor="middle">internal listener</text>
         <text x="430" y="202" fill="var(--danger)">6 forward-auth:</text>
         <text x="430" y="216" fill="var(--danger)">allow or deny</text>
       </g>
@@ -131,9 +128,8 @@ const ov1Label = 'A family member opens an app through the edge proxy (1); an OI
         <rect x="40" y="248" width="180" height="64" rx="6" fill="var(--surface)" stroke="var(--border)"/>
         <text x="130" y="276" font-size="16" font-weight="600" fill="var(--text)">Admin</text>
         <text x="130" y="297" font-family="'IBM Plex Mono', monospace" font-size="12" fill="var(--text-2)">household admin</text>
-        <rect x="330" y="88" width="950" height="64" rx="6" fill="var(--surface)" stroke="var(--border)"/>
-        <text x="805" y="116" font-size="16" font-weight="600" fill="var(--text)">Edge proxy</text>
-        <text x="805" y="137" font-family="'IBM Plex Mono', monospace" font-size="12" fill="var(--text-2)">Caddy, in front of every app</text>
+        <text x="815" y="116" font-size="16" font-weight="600" fill="var(--text)">Edge proxy</text>
+        <text x="815" y="137" font-family="'IBM Plex Mono', monospace" font-size="12" fill="var(--text-2)">Caddy, in front of every app</text>
         <rect x="330" y="244" width="180" height="72" rx="6" fill="var(--accent)"/>
         <text x="420" y="274" font-size="16" font-weight="600" fill="var(--accent-contrast)">Portal</text>
         <text x="420" y="295" font-family="'IBM Plex Mono', monospace" font-size="12" fill="var(--accent-contrast)" opacity="0.85">login, consent, gate</text>
@@ -143,23 +139,19 @@ const ov1Label = 'A family member opens an app through the edge proxy (1); an OI
         <rect x="330" y="352" width="130" height="56" rx="6" fill="var(--bg)" stroke="var(--text-2)"/>
         <text x="395" y="376" font-size="16" font-weight="600" fill="var(--text)">Kratos</text>
         <text x="395" y="396" font-family="'IBM Plex Mono', monospace" font-size="11" fill="var(--text-2)">sessions</text>
-        <rect x="980" y="244" width="140" height="72" rx="6" fill="var(--surface)" stroke="var(--border)"/>
+        <rect x="980" y="244" width="140" height="72" rx="6" fill="var(--bg)" stroke="var(--border)"/>
         <text x="1050" y="274" font-size="16" font-weight="600" fill="var(--text)">OIDC apps</text>
         <text x="1050" y="295" font-family="'IBM Plex Mono', monospace" font-size="11" fill="var(--text-2)">sign in by redirect</text>
-        <rect x="1140" y="244" width="140" height="72" rx="6" fill="var(--surface)" stroke="var(--border)"/>
+        <rect x="1140" y="244" width="140" height="72" rx="6" fill="var(--bg)" stroke="var(--border)"/>
         <text x="1210" y="274" font-size="16" font-weight="600" fill="var(--text)">No-OIDC apps</text>
         <text x="1210" y="295" font-family="'IBM Plex Mono', monospace" font-size="11" fill="var(--text-2)">gated at the edge</text>
-        <rect x="980" y="352" width="300" height="56" rx="6" fill="var(--surface)" stroke="var(--border)"/>
-        <text x="1130" y="376" font-size="16" font-weight="600" fill="var(--text)">App manifests</text>
-        <text x="1130" y="396" font-family="'IBM Plex Mono', monospace" font-size="12" fill="var(--text-2)">one file per app</text>
       </g>
     </svg>
-    <svg class="figure-narrow" viewBox="0 0 340 700" role="img" aria-label={ov1Label} font-family="'IBM Plex Sans', system-ui, sans-serif">
+    <svg class="figure-narrow" viewBox="8 16 324 588" role="img" aria-label={ov1Label} font-family="'IBM Plex Sans', system-ui, sans-serif">
       <defs>
         <marker id="oth-ov1n-arrow" markerUnits="userSpaceOnUse" markerWidth="9" markerHeight="7" refX="9" refY="3.5" orient="auto"><path d="M0,0 L9,3.5 L0,7 Z" fill="var(--text-2)"/></marker>
         <marker id="oth-ov1n-deny" markerUnits="userSpaceOnUse" markerWidth="9" markerHeight="7" refX="9" refY="3.5" orient="auto"><path d="M0,0 L9,3.5 L0,7 Z" fill="var(--danger)"/></marker>
       </defs>
-      <rect x="10" y="10" width="320" height="680" rx="6" fill="var(--bg)" stroke="var(--border)"/>
       <g font-family="'IBM Plex Mono', monospace" font-size="9" letter-spacing="0.08em" fill="var(--text-muted)">
         <text x="24" y="34"><tspan fill="var(--accent)">WHY</tspan>  ONE PASSKEY AND ONE SET OF GROUPS</text>
         <text x="24" y="48">FOR EVERY APP; ORY SUPPLIES IDENTITY</text>
@@ -175,23 +167,19 @@ const ov1Label = 'A family member opens an app through the edge proxy (1); an OI
         <path d="M92,140 V172"/>
         <path d="M248,140 V262"/>
         <path d="M72,350 V310"/>
-        <path d="M120,310 V350"/>
         <path d="M244,310 V350"/>
         <path d="M72,462 V394"/>
         <path d="M120,394 V462"/>
-        <path d="M170,530 V310"/>
       </g>
       <path d="M92,216 V262" fill="none" stroke="var(--danger)" stroke-width="1.5" stroke-dasharray="5 4" marker-end="url(#oth-ov1n-deny)"/>
       <g font-family="'IBM Plex Mono', monospace" font-size="9" fill="var(--text-2)" stroke="var(--bg)" stroke-width="3" paint-order="stroke">
         <text x="100" y="160">1</text>
         <text x="64" y="334" text-anchor="end">3</text>
-        <text x="128" y="334">5</text>
         <text x="252" y="334">4</text>
         <text x="64" y="432" text-anchor="end">2</text>
         <text x="128" y="432">5</text>
-        <text x="178" y="512">7</text>
-        <text x="256" y="190">internal</text>
-        <text x="256" y="202">listener</text>
+        <text x="256" y="178">7 internal</text>
+        <text x="256" y="190">listener</text>
         <text x="100" y="244" fill="var(--danger)">6</text>
       </g>
       <g text-anchor="middle">
@@ -212,17 +200,14 @@ const ov1Label = 'A family member opens an app through the edge proxy (1); an OI
         <text x="96" y="489" font-size="13" font-weight="600" fill="var(--text)">OIDC apps</text>
         <rect x="180" y="462" width="128" height="44" rx="6" fill="var(--surface)" stroke="var(--border)"/>
         <text x="244" y="489" font-size="13" font-weight="600" fill="var(--text)">No-OIDC apps</text>
-        <rect x="32" y="530" width="276" height="44" rx="6" fill="var(--surface)" stroke="var(--border)"/>
-        <text x="170" y="557" font-size="13" font-weight="600" fill="var(--text)">App manifests</text>
       </g>
       <g font-family="'IBM Plex Mono', monospace" font-size="9" fill="var(--text-2)">
-        <text x="24" y="604">1 opens an app</text>
-        <text x="24" y="620">2 authorize</text>
-        <text x="24" y="636">3 challenges</text>
-        <text x="24" y="652">4 passkey session</text>
-        <text x="180" y="604">5 id_token, groups</text>
-        <text x="180" y="620" fill="var(--danger)">6 allow or deny</text>
-        <text x="180" y="636">7 registers a client</text>
+        <text x="24" y="548">1 opens an app</text>
+        <text x="24" y="564">2 authorize</text>
+        <text x="24" y="580">3 challenges</text>
+        <text x="24" y="596">4 passkey session</text>
+        <text x="180" y="548">5 id_token, groups</text>
+        <text x="180" y="564" fill="var(--danger)">6 allow or deny</text>
       </g>
     </svg>
     <p>Ory holds identity and issues tokens; Othala's portal makes every decision in between, from login and consent to the access gate.</p>
@@ -275,7 +260,10 @@ const ov1Label = 'A family member opens an app through the edge proxy (1); an OI
 </Layout>
 
 <style>
-  .shots { display: grid; grid-template-columns: 1fr 1fr; gap: var(--space-4); margin: 0; }
-  .shots img { width: 100%; height: auto; display: block; border: 1px solid var(--border); border-radius: var(--radius-sm); }
+  :global(.hero-aside:has(> .shots)) { align-self: stretch; display: flex; }
+  .shots { flex: 1; display: grid; grid-template-columns: 0.95fr 1.35fr; gap: var(--space-4); margin: 0; }
+  .shots > div { display: flex; flex-direction: column; min-width: 0; }
+  .shots svg { flex: 1 1 0; min-height: 15rem; width: 100%; display: block; background: #fff; border: 1px solid var(--border); border-radius: var(--radius-sm); }
+  @media (max-width: 900px) { .shots svg { flex: none; height: auto; min-height: 0; } }
   .shots figcaption { font-family: var(--font-mono); font-size: var(--text-xs); color: var(--text-muted); letter-spacing: 0.06em; text-transform: uppercase; margin-top: var(--space-2); }
 </style>

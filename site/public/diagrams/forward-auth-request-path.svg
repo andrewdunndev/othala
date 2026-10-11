@@ -22,15 +22,7 @@
 <rect class="p" x="0" y="0" width="720" height="494" fill="#ffffff"/>
 <rect class="p e" x="20" y="20" width="680" height="454" rx="3" fill="#ffffff" stroke="#e0e0e0" stroke-width="1"/>
 <!-- header -->
-<g class="as" stroke="#4a6741" stroke-width="5" stroke-linecap="round" fill="none" transform="translate(37 29) scale(0.3)">
-<line x1="32" y1="8" x2="48" y2="24"/>
-<line x1="48" y1="24" x2="32" y2="40"/>
-<line x1="32" y1="40" x2="16" y2="24"/>
-<line x1="16" y1="24" x2="32" y2="8"/>
-<line x1="32" y1="40" x2="18" y2="56"/>
-<line x1="32" y1="40" x2="46" y2="56"/>
-</g>
-<text class="m" x="60" y="45" font-family="'IBM Plex Mono', Menlo, monospace" font-size="9" font-weight="700" letter-spacing="1.2" fill="#707070">REQUEST PATH · AN APP THAT CANNOT SPEAK OIDC</text>
+<text class="m" x="40" y="45" font-family="'IBM Plex Mono', Menlo, monospace" font-size="9" font-weight="700" letter-spacing="1.2" fill="#707070">REQUEST PATH · AN APP THAT CANNOT SPEAK OIDC</text>
 <text class="m" x="680" y="45" text-anchor="end" font-family="'IBM Plex Mono', Menlo, monospace" font-size="9" font-weight="700" letter-spacing="1.2" fill="#707070">OTHALA</text>
 <line class="e" x1="40" y1="56" x2="680" y2="56" stroke="#e0e0e0" stroke-width="1"/>
 <text class="m" x="40" y="78" font-family="'IBM Plex Mono', Menlo, monospace" font-size="8.5" font-weight="700" letter-spacing="1.1" fill="#707070">THE REQUEST</text>
