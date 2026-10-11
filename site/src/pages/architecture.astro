@@ -17,14 +17,14 @@ const label = (svg: string, text: string) =>
     <p class="page-eyebrow">Othala</p>
     <h1 class="page-title">Architecture</h1>
     <p class="page-lede">
-      Six diagrams, in the order a request crosses them: who is inside the
-      trust boundary, how a login becomes a token, how an app with no OIDC
-      gets an answer anyway, and how one group becomes two different grants.
+      Six diagrams: who is inside the trust boundary, how a login becomes a
+      token, how an app with no OIDC gets an answer anyway, and what
+      happens on sign-out.
     </p>
     <p class="page-lede">
-      Then what happens on sign-out, and how the first credential gets in
-      the door at all. Each diagram carries the what in its caption; the
-      prose beside it is the why.
+      Then how the first credential gets in the door, and how one group
+      becomes two different grants. Each diagram carries the what in its
+      caption; the prose beside it is the why.
     </p>
   </header>
 
@@ -105,6 +105,50 @@ const label = (svg: string, text: string) =>
   </section>
 
   <section class="section">
+    <DiagramTrack caption="Hydra remembers; Kratos authenticates, and revoking cuts both">
+      <h2>What actually happens on sign-out</h2>
+      <p data-step="1">
+        Hydra and Kratos each remember something about a session. When Hydra
+        says it remembers a subject, the login handler still checks for a
+        live Kratos session belonging to that same identity before honouring
+        the skip. No match means signing in again.
+      </p>
+      <p data-step="2">
+        Revoking a subject is one in-process fan-out that cuts the Kratos
+        sessions and both of Hydra's remembered sessions in a fixed order,
+        whatever the trigger. It stops sessions, not credentials, so a
+        lost-device eviction deletes the credential first; the
+        <a href="/guides/hardening/">Hardening</a> guide has that procedure.
+      </p>
+      <Fragment slot="figure" set:html={label(sessionRevocation, 'Two panels. Left: when Hydra remembers a subject, the login handler re-verifies a live Kratos session for that identity before honouring the skip; no live match forces a fresh sign-in. Right: one revocation fan-out, triggered by admin force-logout, sign-out-everywhere or deactivation, revokes the Kratos sessions, Hydra\'s login session and Hydra\'s consent session in a fixed order. It cuts sessions and remembered logins, not enrolled credentials.')} />
+    </DiagramTrack>
+  </section>
+
+  <section class="section">
+    <DiagramTrack caption='Not "no password exists": no password ever transits a channel'>
+      <h2>How the first credential gets in the door</h2>
+      <p data-step="1">
+        There is no self-service registration. An admin creates each
+        identity through the admin API with no credentials block at all,
+        then mints a recovery link and a one-time code together and hands
+        them over on a conversation that already exists with that person.
+      </p>
+      <p data-step="2">
+        The person redeems the code in their own browser, which is where a
+        password and a passkey are first set. Neither ever leaves it. The
+        <a href="/guides/golden-path/">Golden path</a> guide has the operator
+        side; <code>DECISIONS.md</code> has the reasoning.
+      </p>
+      <p data-step="3">
+        One branch refuses outright. When the target carries the admin
+        marker, recovery is refused before Kratos is ever asked, so an
+        admin's own recovery stays at the console.
+      </p>
+      <Fragment slot="figure" set:html={label(firstCredential, 'An admin creates the identity through the admin API with no credentials block, then mints a one-time recovery link and code together and hands both over on a conversation that already exists with that person. The person\'s own browser is where a password and a passkey are first set. One branch refuses outright: when the target carries the admin marker, recovery is refused before Kratos is asked, console-only.')} />
+    </DiagramTrack>
+  </section>
+
+  <section class="section">
     <h2>One group gets you in; the other decides what you can do</h2>
     <Split>
       <p>
@@ -126,50 +170,6 @@ const label = (svg: string, text: string) =>
         <figcaption class="diagram-caption">The identity holds · the manifest binds · the code decides</figcaption>
       </figure>
     </Split>
-  </section>
-
-  <section class="section">
-    <DiagramTrack caption="Hydra remembers; Kratos authenticates, and revoking cuts both">
-      <h2>What actually happens on sign-out</h2>
-      <p data-step="1">
-        Hydra and Kratos each remember something about a session. When Hydra
-        says it remembers a subject, the login handler still checks for a
-        live Kratos session belonging to that same identity before honouring
-        the skip. No match means signing in again.
-      </p>
-      <p data-step="2">
-        Revoking a subject is one in-process fan-out that cuts the Kratos
-        sessions and both of Hydra's remembered sessions in a fixed order,
-        whatever the trigger. It stops sessions, not credentials, so a
-        lost-device eviction deletes the credential first; the
-        <a href="/guides/hardening/">Hardening</a> guide has that procedure.
-      </p>
-      <Fragment slot="figure" set:html={label(sessionRevocation, 'Two panels. Left: when Hydra remembers a subject, the login handler re-verifies a live Kratos session for that identity before honouring the skip; no live match forces a fresh sign-in. Right: one revocation fan-out, triggered by admin force-logout, sign-out-everywhere or deactivation, revokes the Kratos sessions, Hydra\'s login session and Hydra\'s consent session in a fixed order. It cuts sessions and remembered logins, not enrolled credentials.')} />
-    </DiagramTrack>
-  </section>
-
-  <section class="section">
-    <DiagramTrack caption="Not &quot;no password exists&quot;: no password ever transits a channel">
-      <h2>How the first credential gets in the door</h2>
-      <p data-step="1">
-        There is no self-service registration. An admin creates each
-        identity through the admin API with no credentials block at all,
-        then mints a recovery link and a one-time code together and hands
-        them over on a conversation that already exists with that person.
-      </p>
-      <p data-step="2">
-        The person redeems the code in their own browser, which is where a
-        password and a passkey are first set. Neither ever leaves it. The
-        <a href="/guides/golden-path/">Golden path</a> guide has the operator
-        side; <code>DECISIONS.md</code> has the reasoning.
-      </p>
-      <p data-step="3">
-        One branch refuses outright. When the target carries the admin
-        marker, recovery is refused before Kratos is ever asked, so an
-        admin's own recovery stays at the console.
-      </p>
-      <Fragment slot="figure" set:html={label(firstCredential, 'An admin creates the identity through the admin API with no credentials block, then mints a one-time recovery link and code together and hands both over on a conversation that already exists with that person. The person\'s own browser is where a password and a passkey are first set. One branch refuses outright: when the target carries the admin marker, recovery is refused before Kratos is asked, console-only.')} />
-    </DiagramTrack>
   </section>
 
   <section class="section">
