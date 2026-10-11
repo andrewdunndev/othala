@@ -12,7 +12,7 @@ import firstCredential from '../../public/diagrams/first-credential.svg?raw';
 const label = (svg: string, text: string) =>
   svg.replace('<svg ', `<svg aria-label="${text.replace(/"/g, '&quot;')}" `);
 ---
-<Layout title="Architecture" progress description="How Kratos, Hydra, the portal, and the edge fit together in Othala, told through six diagrams: trust boundary, OIDC login, forward-auth, group binding, session revocation, and the first credential.">
+<Layout title="Architecture" description="How Kratos, Hydra, the portal, and the edge fit together in Othala, told through six diagrams: trust boundary, OIDC login, forward-auth, group binding, session revocation, and the first credential.">
   <header class="page-header">
     <p class="page-eyebrow">Othala</p>
     <h1 class="page-title">Architecture</h1>

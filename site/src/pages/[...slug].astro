@@ -84,7 +84,7 @@ const props = Astro.props as IndexProps | DocProps;
     </section>
   </Layout>
 ) : (
-  <Layout title={props.label} headings={props.headings} progress>
+  <Layout title={props.label} headings={props.headings}>
     <a href={props.sectionHref} class="page-eyebrow page-eyebrow-link">← {props.sectionLabel}</a>
     <article set:html={props.html} />
   </Layout>

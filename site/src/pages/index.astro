@@ -75,7 +75,7 @@ const entryPoints = [
       <a class="cta-primary" href="/guides/golden-path/">Golden path</a>
       <a class="cta-secondary" href="/architecture/">Architecture</a>
     </Fragment>
-    <figure class="shots" slot="aside">
+    <figure class="captures" slot="aside" style="--captures-cols:0.95fr 1.35fr">
       <div>
         <svg viewBox="318 132 484 496" role="img" aria-label="The Othala sign-in page from the end-to-end test lab, with a single passkey button as the primary way in."><svg x="318" y="132" width="484" height="496" viewBox="318 132 484 496"><image href="/captures/sign-in.png" width="1120" height="760" /></svg></svg>
         <figcaption>1 · passkey sign-in</figcaption>
@@ -137,12 +137,3 @@ const entryPoints = [
     </div>
   </section>
 </Layout>
-
-<style>
-  :global(.hero-aside:has(> .shots)) { align-self: stretch; display: flex; }
-  .shots { flex: 1; display: grid; grid-template-columns: 0.95fr 1.35fr; gap: var(--space-4); margin: 0; }
-  .shots > div { display: flex; flex-direction: column; min-width: 0; }
-  .shots > div > svg { flex: 1 1 0; min-height: 15rem; width: 100%; display: block; background: #fff; border: 1px solid var(--border); border-radius: var(--radius-sm); }
-  @media (max-width: 900px) { .shots > div > svg { flex: none; height: auto; min-height: 0; } }
-  .shots figcaption { font-family: var(--font-mono); font-size: var(--text-xs); color: var(--text-muted); letter-spacing: 0.06em; text-transform: uppercase; margin-top: var(--space-2); }
-</style>
