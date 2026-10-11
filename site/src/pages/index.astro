@@ -1,5 +1,7 @@
 ---
 import Layout from '../layouts/Layout.astro';
+import Hero from '@dunn.dev/reference/chrome/Hero.astro';
+import StatStrip from '@dunn.dev/reference/chrome/StatStrip.astro';
 import { readdirSync, readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { sections } from '../lib/sections';
@@ -32,26 +34,18 @@ const entryPoints = [
   },
 ];
 ---
-<Layout title="Home" description="Othala is one family's home single sign-on, built on Ory Kratos and Hydra with a TypeScript portal and a Caddy forward-auth endpoint. Public so it can be read and copied. Architecture, guides, and decisions from a single-maintainer homelab.">
-  <div class="hero">
-    <p class="hero-eyebrow">dunn.dev</p>
-    <h1 class="hero-title">Othala</h1>
-    <p class="hero-lede">
-      Othala is the single sign-on for one family's house: Ory Kratos and
-      Hydra behind a TypeScript portal that supplies the login provider,
-      consent provider, and access gate they ship without, plus a Caddy
-      forward-auth endpoint for the apps that speak no OIDC at all.
-      Passkey-first, running for a handful of people. This site is the
-      reading copy: an architecture walkthrough of why it is wired the way
-      it is, the guides for how, and the decisions behind both.
-    </p>
-  </div>
+<Layout description="Othala is one family's home single sign-on, built on Ory Kratos and Hydra with a TypeScript portal and a Caddy forward-auth endpoint. Public so it can be read and copied. Architecture, guides, and decisions from a single-maintainer homelab.">
+  <Hero title="Othala">
+    Othala is the single sign-on for one family's house: Ory Kratos and
+    Hydra behind a TypeScript portal that supplies the login provider,
+    consent provider, and access gate they ship without, plus a Caddy
+    forward-auth endpoint for the apps that speak no OIDC at all.
+    Passkey-first, running for a handful of people. This site is the
+    reading copy: an architecture walkthrough of why it is wired the way
+    it is, the guides for how, and the decisions behind both.
+  </Hero>
 
-  <div class="stat-strip" data-reveal>
-    {stats.map(s => (
-      <div><span class="stat-num">{s.num}</span><span class="stat-label">{s.label}</span></div>
-    ))}
-  </div>
+  <StatStrip items={stats} />
 
   <section class="section">
     <p class="section-subtitle">Start here</p>
