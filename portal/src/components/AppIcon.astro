@@ -22,7 +22,7 @@ const src = tile.iconHref && groups && userCanSeeTile(tile as AppTile, groups)
     src ? (
       <img class="app-icon-img" src={src} alt="" decoding="async" />
     ) : (
-      <span class="app-icon-mono mono">{tile.icon}</span>
+      <span class="app-icon-mono">{tile.icon}</span>
     )
   }
 </span>
@@ -58,7 +58,12 @@ const src = tile.iconHref && groups && userCanSeeTile(tile as AppTile, groups)
     height: 100%;
     object-fit: contain;
   }
+  .app-icon:has(.app-icon-mono) {
+    background: var(--accent-subtle);
+    border-color: transparent;
+  }
   .app-icon-mono {
+    font-family: var(--font-body);
     font-size: var(--text-sm);
     font-weight: 600;
     color: var(--accent);

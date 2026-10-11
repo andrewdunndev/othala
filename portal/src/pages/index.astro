@@ -196,7 +196,7 @@ const devLinks = [
         {visibleTiles.length > 0 ? (
           <>
             {ungroupedTiles.length > 0 && (
-              <div class="tile-grid" data-count={ungroupedTiles.length}>
+              <div class="tile-grid">
                 {ungroupedTiles.map((t: AppTile) => {
                   const v = views.get(t.slug)!;
                   return <TileCard tile={t} readiness={v.readiness} requirementTitles={v.titles} groups={groups} />;
@@ -211,7 +211,7 @@ const devLinks = [
                     <p class="tile-group-desc">{description}</p>
                   )}
                 </div>
-                <div class="tile-grid" data-count={tiles.length}>
+                <div class="tile-grid">
                   {tiles.map((t: AppTile) => {
                     const v = views.get(t.slug)!;
                     return <TileCard tile={t} readiness={v.readiness} requirementTitles={v.titles} groups={groups} />;
@@ -662,41 +662,28 @@ const devLinks = [
   }
   .cta-link:hover { color: var(--accent); text-decoration: none; }
 
-  /* Tile grid: TileCard renders each tile; the grid only sets the columns (1 on phones, 2 from 640px, 3 from 900px; TileCard lays out logo beside text on phones). */
+  /* Tile grid: one column on phones, two from about 46rem; each tile is a row. */
   .tile-grid {
     display: grid;
-    grid-template-columns: 1fr;
-    gap: var(--space-3);
-    align-items: stretch;
-  }
-  /* Grids fill the full row: 3 columns from 900px, but a group of 1, 2 or 4 tiles uses 2 columns (4 lays out 2x2)
-     so no row ends in an empty third. Outer edges match across groups. */
-  @media (min-width: 640px) {
-    .tile-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-  }
-  @media (min-width: 900px) {
-    .tile-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
-    .tile-grid[data-count="1"],
-    .tile-grid[data-count="2"],
-    .tile-grid[data-count="4"] { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    grid-template-columns: repeat(auto-fill, minmax(min(100%, 22rem), 1fr));
+    gap: var(--space-2);
   }
 
-  /* Grouped tile sections: no frame, so the tiles sit on the same columns as the ungrouped grid. The title uses the
-     page's eyebrow type, with the group's description under it, full width above its tiles. */
+  /* Grouped tile sections: no frame, so the tiles sit on the same columns as the ungrouped grid. */
   .tile-group { margin-top: var(--space-5); }
   .tile-group:first-child { margin-top: 0; }
-  .tile-group-header { margin-bottom: var(--space-3); }
+  .tile-group-header { margin-bottom: var(--space-2); }
   .tile-group-title {
-    font-family: var(--font-mono);
-    font-size: var(--text-xs);
-    text-transform: uppercase;
-    letter-spacing: 0.08em;
-    color: var(--text-muted);
-    margin: 0 0 var(--space-1) 0;
+    font-family: var(--font-body);
+    letter-spacing: 0;
+    font-size: var(--text-sm);
+    font-weight: 600;
+    color: var(--text);
+    margin: 0;
   }
   .tile-group-desc {
     font-size: var(--text-sm);
-    color: var(--text-2);
+    color: var(--text-muted);
     max-width: 60ch;
     margin: 0;
     line-height: 1.5;
@@ -1057,8 +1044,6 @@ const devLinks = [
 
   /* ── Mobile ── */
   @media (max-width: 640px) {
-    .tile-grid { gap: var(--space-2); }
-    .tile-group { margin-top: var(--space-5); }
     /* Passkey nudge: stack the message above the close button instead of
      * squeezing both onto one row. */
     .passkey-nudge {
