@@ -662,24 +662,32 @@ const devLinks = [
   }
   .cta-link:hover { color: var(--accent); text-decoration: none; }
 
-  /* Tile grid: one column on phones, two from about 46rem; each tile is a row. */
+  /* Tile grid: one column on phones, two from 46rem; each tile is a row that grows to fit its description.
+     An odd last tile spans both columns so no section ends in an empty half-row. */
   .tile-grid {
     display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(min(100%, 22rem), 1fr));
-    gap: var(--space-2);
+    grid-template-columns: 1fr;
+    gap: var(--space-3);
+  }
+  @media (min-width: 46rem) {
+    .tile-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .tile-grid > :global(.tile:last-child:nth-child(odd)) { grid-column: 1 / -1; }
   }
 
-  /* Grouped tile sections: no frame, so the tiles sit on the same columns as the ungrouped grid. */
-  .tile-group { margin-top: var(--space-5); }
+  /* Grouped tile sections: a hairline, a sans title and the group's description above its tiles. */
+  .tile-group {
+    margin-top: var(--space-6);
+    padding-top: var(--space-4);
+    border-top: 1px solid var(--border);
+  }
   .tile-group:first-child { margin-top: 0; }
-  .tile-group-header { margin-bottom: var(--space-2); }
+  .tile-group-header { margin-bottom: var(--space-3); }
   .tile-group-title {
-    font-family: var(--font-body);
-    letter-spacing: 0;
-    font-size: var(--text-sm);
+    font-family: var(--font-sans);
+    font-size: var(--text-base);
     font-weight: 600;
     color: var(--text);
-    margin: 0;
+    margin: 0 0 var(--space-1) 0;
   }
   .tile-group-desc {
     font-size: var(--text-sm);
