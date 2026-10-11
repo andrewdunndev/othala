@@ -123,14 +123,7 @@ a.tile {
 }
 a.tile:hover { border-color: var(--accent); }
 
-.section-sidebar {
-  position: sticky;
-  top: calc(var(--space-5) + 56px);
-  align-self: start;
-  font-size: var(--text-sm);
-  border-right: 1px solid var(--border);
-  padding-right: var(--space-5);
-}
+.section-sidebar { font-size: var(--text-sm); }
 .section-sidebar-heading {
   font-family: var(--font-mono);
   font-size: var(--text-xs);
@@ -177,12 +170,8 @@ a.tile:hover { border-color: var(--accent); }
   background: var(--surface);
   font-weight: 600;
 }
-@media (max-width: 900px) {
-  .section-sidebar {
-    position: static;
-    border-right: none;
-    border-bottom: 1px solid var(--border);
-    padding-right: 0;
-    padding-bottom: var(--space-5);
-  }
+
+/* Three honest counts, not four. */
+@media (min-width: 721px) {
+  .stat-strip { grid-template-columns: repeat(3, minmax(0, 1fr)); }
 }

@@ -45,3 +45,18 @@ export function cardBlurb(raw: string): string {
   if (text.length > 180) text = text.slice(0, 177).replace(/\s+\S*$/, '') + '…';
   return text;
 }
+
+/** Give each h2 an id and list them for the on-page TOC. */
+export function anchorHeadings(html: string): { html: string; headings: { slug: string; text: string }[] } {
+  const headings: { slug: string; text: string }[] = [];
+  const seen = new Set<string>();
+  const out = html.replace(/<h2>([\s\S]*?)<\/h2>/g, (_m, inner: string) => {
+    const text = inner.replace(/<[^>]+>/g, '').replace(/&amp;/g, '&').replace(/&#39;/g, "'").replace(/&quot;/g, '"').trim();
+    let slug = text.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') || 'section';
+    for (let n = 2; seen.has(slug); n++) slug = `${slug.replace(/-\d+$/, '')}-${n}`;
+    seen.add(slug);
+    headings.push({ slug, text });
+    return `<h2 id="${slug}">${inner}</h2>`;
+  });
+  return { html: out, headings };
+}

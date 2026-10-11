@@ -6,9 +6,12 @@ import { sections, sectionForPath, extraNav } from '../lib/sections';
 interface Props {
   title: string;
   description?: string;
+  /** Page headings for the on-page TOC; shown from three up. */
+  headings?: { slug: string; text: string }[];
+  progress?: boolean;
 }
 
-const { title, description } = Astro.props;
+const { title, description, headings = [], progress = false } = Astro.props;
 const pageTitle = title === 'Home' || title === 'othala'
   ? 'othala.dunn.dev'
   : `${title} — othala.dunn.dev`;
@@ -95,31 +98,49 @@ const isPageActive = (href: string) => path === href.replace(/\/$/, '');
         <span class="theme-toggle-dark" aria-hidden="true">dark</span>
       </button>
     </div>
+    {progress && <div class="scroll-progress" aria-hidden="true"></div>}
   </header>
 
-  <main class="page page-rail">
-    {currentSection && (
-      <aside class="section-sidebar" aria-label={`${currentSection.label} navigation`}>
-        <p class="section-sidebar-heading">{currentSection.label}</p>
-        {sidebarGroups.map(group => (
-          <>
-            {group.heading && <p class="section-sidebar-group">{group.heading}</p>}
-            <ul class="section-sidebar-list">
-              {group.pages.map(p => (
-                <li>
-                  <a href={p.href} rel={p.external ? 'external' : undefined} class:list={['section-sidebar-link', { active: isPageActive(p.href) }]}>
-                    {p.label}{p.external ? ' ↗' : ''}
-                  </a>
-                </li>
-              ))}
-            </ul>
-          </>
-        ))}
-      </aside>
-    )}
-    {!currentSection && <slot name="rail" />}
+  <main class="page">
     <div class="page-content">
-      <slot />
+      {currentSection ? (
+        <div class="split split-wide">
+          <div class="split-main">
+            <slot />
+          </div>
+          <div class="split-aside">
+            <aside class="section-sidebar" aria-label={`${currentSection.label} navigation`}>
+              <p class="section-sidebar-heading">{currentSection.label}</p>
+              {sidebarGroups.map(group => (
+                <>
+                  {group.heading && <p class="section-sidebar-group">{group.heading}</p>}
+                  <ul class="section-sidebar-list">
+                    {group.pages.map(p => (
+                      <li>
+                        <a href={p.href} rel={p.external ? 'external' : undefined} class:list={['section-sidebar-link', { active: isPageActive(p.href) }]}>
+                          {p.label}{p.external ? ' ↗' : ''}
+                        </a>
+                      </li>
+                    ))}
+                  </ul>
+                </>
+              ))}
+            </aside>
+            {headings.length >= 3 && (
+              <aside class="section-sidebar section-toc" aria-label="On this page">
+                <p class="section-sidebar-heading">On this page</p>
+                <ul class="section-sidebar-list">
+                  {headings.map(h => (
+                    <li><a href={`#${h.slug}`} class="section-sidebar-link">{h.text}</a></li>
+                  ))}
+                </ul>
+              </aside>
+            )}
+          </div>
+        </div>
+      ) : (
+        <slot />
+      )}
     </div>
   </main>
 

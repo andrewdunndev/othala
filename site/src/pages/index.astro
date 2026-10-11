@@ -1,5 +1,7 @@
 ---
 import Layout from '../layouts/Layout.astro';
+import { readdirSync, readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
 import { sections } from '../lib/sections';
 
 const markSvg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="othala rune">
@@ -18,6 +20,15 @@ const markSvg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" rol
 // a content-collection section, see lib/sections.ts), Guides comes from
 // `sections` so it stays in sync with the one place that lists them,
 // and Source is the repo this site is a reading copy of.
+const guides = sections.flatMap(s => s.pages).filter(p => p.file).length;
+const diagrams = readdirSync(resolve(process.cwd(), 'public/diagrams')).filter(f => f.endsWith('.svg')).length;
+const decisions = (readFileSync(resolve(process.cwd(), '../DECISIONS.md'), 'utf-8').match(/^## /gm) ?? []).length;
+const stats = [
+  { num: guides, label: 'guides' },
+  { num: diagrams, label: 'diagrams' },
+  { num: decisions, label: 'decisions' },
+];
+
 const entryPoints = [
   {
     href: '/architecture/',
@@ -34,8 +45,8 @@ const entryPoints = [
 ];
 ---
 <Layout title="Home" description="Othala is one family's home single sign-on, built on Ory Kratos and Hydra with a TypeScript portal and a Caddy forward-auth endpoint. Public so it can be read and copied. Architecture, guides, and decisions from a single-maintainer homelab.">
-  <div class="hero-mark" slot="rail" set:html={markSvg} />
   <div class="hero">
+    <div class="hero-mark" aria-hidden="true" set:html={markSvg} />
     <p class="hero-eyebrow">dunn.dev</p>
     <h1 class="hero-title">Othala</h1>
     <p class="hero-lede">
@@ -47,6 +58,12 @@ const entryPoints = [
       reading copy: an architecture walkthrough of why it is wired the way
       it is, the guides for how, and the decisions behind both.
     </p>
+  </div>
+
+  <div class="stat-strip" data-reveal>
+    {stats.map(s => (
+      <div><span class="stat-num">{s.num}</span><span class="stat-label">{s.label}</span></div>
+    ))}
   </div>
 
   <section class="section">
@@ -68,7 +85,7 @@ const entryPoints = [
 
   <section class="section">
     <p class="section-subtitle">Start here</p>
-    <div class="tile-grid">
+    <div class="tile-grid" data-reveal>
       {entryPoints.map(e => (
         <a href={e.href} class="tile" rel={e.external ? 'external' : undefined}>
           <h2 class="tile-headline">{e.label}{e.external ? ' ↗' : ''}</h2>
