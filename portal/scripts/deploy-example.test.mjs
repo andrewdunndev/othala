@@ -43,3 +43,19 @@ test('the e2e overlay re-pins no image the example pins', () => {
     if (image && !image.startsWith('${AUTH_REGISTRY}')) assert.ok(!pinned.has(image.split(/[:@]/)[0]), svc);
   }
 });
+
+test('render and portal run one othala image, at the release tag on a tag pipeline', () => {
+  const { render, othala } = compose.services;
+  assert.equal(render.image, othala.image);
+  const tag = othala.image.split('@')[0].split(':').pop();
+  if (process.env.CI_COMMIT_TAG) assert.equal(tag, process.env.CI_COMMIT_TAG);
+});
+
+test('the e2e overlay runs the example Ory commands, adding only its config layer and --dev', () => {
+  const overlay = readYaml(join(root, 'e2e/compose.e2e.yml'));
+  for (const svc of ['kratos', 'hydra']) {
+    const added = overlay.services[svc].command;
+    const stripped = added.filter((arg, i) => arg !== '--dev' && arg !== '/etc/config/kratos.e2e.yml' && added[i + 1] !== '/etc/config/kratos.e2e.yml');
+    assert.deepEqual(stripped, compose.services[svc].command, svc);
+  }
+});
