@@ -1,7 +1,5 @@
-# Browser-test edge for the e2e harness only (compose `browser` profile): one host in front of
-# the app, Kratos and Hydra so a real browser can drive the human flow. Plain HTTP (the e2e
-# issuer is http and Hydra runs --dev). Routing shape to copy: the app is the default and the
-# Kratos browser paths are named, else static assets fall through to Kratos and 404.
+# Test-only site Caddyfile for the e2e harness, outside the deployment contract: plain HTTP (the e2e issuer is http
+# and Hydra runs --dev) and a stub app behind the gate. Everything else is the rendered othala.caddy, as shipped.
 {
 	auto_https off
 	admin off
@@ -10,41 +8,18 @@
 	}
 }
 
+import /etc/caddy/othala/othala.caddy
+
 auth.othala.test:80 {
-	# Hydra public OAuth2 surface + OIDC discovery.
-	@hydra path /oauth2/auth /oauth2/token /oauth2/device/auth /oauth2/device/verify /oauth2/revoke /oauth2/sessions/logout /oauth2/fallbacks/* /.well-known/openid-configuration /.well-known/jwks.json /userinfo
-	handle @hydra {
-		reverse_proxy hydra:4444
-	}
-
-	# App-owned Hydra challenge handlers.
-	@portal_challenges path /oauth2/login /oauth2/consent /oauth2/logout
-	handle @portal_challenges {
-		# XFF overwrite: see caddy/Caddyfile.
-		reverse_proxy othala:8080 {
-			header_up X-Forwarded-For {client_ip}
-		}
-	}
-
-	# Kratos browser endpoints.
-	@kratos path /.well-known/ory/* /self-service/* /sessions/* /schemas/*
-	handle @kratos {
-		reverse_proxy kratos:4433
-	}
-
-	# Default -> the app (UI, pages, static assets). XFF overwrite: rationale in caddy/Caddyfile.
-	reverse_proxy othala:8080 {
-		header_up X-Forwarded-For {client_ip}
-	}
+	import othala-routes
 }
 
-# A forward_auth app behind the portal's gate: the portal's /api/forward-auth checks the session and the
-# group, 200 proxies on (here a stub), and any other status is returned to the client as is, with no
-# login redirect on this route. ZI1 navigates here with a granted session.
+# ZI1 and T8/T10 reach the stub through the gate; it echoes the identity, spoof and cookie headers it was sent.
 proxywatch.othala.test:80 {
-	forward_auth othala:8080 {
-		uri /api/forward-auth?group=proxywatch-access
-		copy_headers X-Kratos-Authenticated-Identity-Id
-	}
-	respond "proxywatch-stub" 200
+	import othala-forward-auth 127.0.0.1 8081 proxywatch-access
+}
+
+:8081 {
+	bind 127.0.0.1
+	respond "proxywatch-stub id={http.request.header.X-Kratos-Authenticated-Identity-Id} spoof={http.request.header.X-Remote-User}{http.request.header.Remote-User} cookie={http.request.header.Cookie}" 200
 }

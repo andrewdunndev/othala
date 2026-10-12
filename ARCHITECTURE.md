@@ -10,7 +10,7 @@ Why the pieces are arranged the way they are. What each one does is in the code 
 | **Hydra** | OAuth2 / OIDC. Issues tokens; ships no UI and no authorization model by design. Public API through the edge; admin API pod-internal only. |
 | **Postgres** | Separate databases for Kratos and Hydra. |
 | **The app** (`portal/`) | Everything Ory leaves to the integrator: Hydra's login and consent providers, the access gate, the claims builder, the forward-auth endpoint, the client registrar, the admin UI, and the rendered Kratos self-service pages. |
-| **The edge** | A reverse proxy terminating TLS and routing one hostname across the three upstreams. `caddy/Caddyfile` is a worked example, not shipped deploy config. |
+| **The edge** | A reverse proxy terminating TLS and routing one hostname across the three upstreams. The image ships the routes and the app gates as snippets (`caddy/othala.caddy`); the site address and TLS are the deployment's. |
 
 It is one application because every one of those concerns needs an Ory **admin** API, which must never
 be reachable from the network. One process keeps every admin-API caller inside one trust domain and
@@ -47,12 +47,12 @@ are disjoint by construction; `portal/scripts/public-mux-disjoint.test.mjs` and
 no secret is configured, so a misconfigured deployment refuses rather than opens.
 
 **Inbound headers are never an identity claim.** Group membership and identity id come from Kratos,
-never from a request header. `caddy/snippets/forward-auth.caddy` strips the whole `X-Remote-*` /
-`X-Forwarded-User` / `X-Auth-Request-*` family before proxying, and clears the inbound identity id
-before the auth call so the upstream receives only the value taken from the auth response. Those
-steps sit in a `route` block because Caddy's default directive order would otherwise run
-`forward_auth` ahead of `request_header` and strip the verified id. The
-`oidc-app` snippet removes only the Kratos session cookie.
+never from a request header. Every snippet in `caddy/othala.caddy` first deletes the inbound identity
+id and every header in the `Remote-*`, `X-Remote-*`, `X-Forwarded-User*`, `X-Auth-Request-*`,
+`X-Webauth-*` and `X-Authentik-*` families, so the upstream receives only the id taken from the auth
+response. Each snippet is a `route` block because Caddy's
+default directive order would otherwise run `forward_auth` ahead of `request_header` and strip the
+verified id. Of the cookies, `othala-oidc-app` removes only the Kratos session cookie.
 
 **Admin authority is a marker, not a group.** Kratos strips `metadata_admin` from
 `/sessions/whoami`, so it can only be written and read through the admin API. `parseIdentity`
@@ -144,11 +144,11 @@ The malformed parameter is a broken deployment, static per site, not an outage, 
 unchanged either way. The separation lets an edge keep an outage out of its redirect arm: an edge
 matching `status 401 403` into a login redirect would, if outages arrived as 403, bounce the visitor
 to the login page of the app that just failed to answer, on every retry.
-`caddy/snippets/forward-auth.caddy` leaves 503 out of that matcher for this reason.
+`othala-forward-auth` leaves 503 out of that matcher for this reason.
 
 `portal/scripts/forward-auth.test.mjs` exercises every failure path, including that no failure path
 returns 2xx and no denial body echoes the required group or the identity id. The snippet redirects
-only a 401 to login; a 403 or 503 is returned as is.
+only a 401 to login and answers a 403 or 503 in place (`portal/scripts/othala-caddy.test.mjs`).
 
 ## The OIDC path
 

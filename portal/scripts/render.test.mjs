@@ -32,6 +32,7 @@ mkdirSync(join(CONTENT, 'apps'));
 afterAll(() => rmSync(CONTENT, { recursive: true, force: true }));
 
 const OUTPUTS = [
+  'caddy/othala.caddy',
   'hydra/hydra.yml',
   'kratos/courier/login_code.body.html.gotmpl',
   'kratos/courier/login_code.body.plaintext.gotmpl',
@@ -59,6 +60,7 @@ function withDir(fn) {
 function policyCopy(dir) {
   cpSync(join(root, 'kratos'), join(dir, 'kratos'), { recursive: true });
   cpSync(join(root, 'hydra'), join(dir, 'hydra'), { recursive: true });
+  cpSync(join(root, 'caddy'), join(dir, 'caddy'), { recursive: true });
   return dir;
 }
 
@@ -165,13 +167,20 @@ test('check runs without secrets and names a missing value or policy file', () =
   });
 });
 
-test('rendered files and directories are owner-only', () => {
+test('rendered files and directories are owner-only, but the secret-free edge snippets are readable', () => {
   withDir((dir) => {
-    writeRendered(dir, render(root, CONTENT, ENV));
-    for (const path of OUTPUTS) assert.equal(statSync(join(dir, path)).mode & 0o777, 0o600, path);
+    const files = render(root, CONTENT, ENV);
+    writeRendered(dir, files);
+    for (const path of OUTPUTS.filter((p) => !p.startsWith('caddy/'))) {
+      assert.equal(statSync(join(dir, path)).mode & 0o777, 0o600, path);
+    }
     for (const path of ['kratos', 'kratos/courier', 'kratos/hooks', 'hydra']) {
       assert.equal(statSync(join(dir, path)).mode & 0o077, 0, path);
     }
+    assert.equal(statSync(join(dir, 'caddy/othala.caddy')).mode & 0o777, 0o644);
+    assert.equal(statSync(join(dir, 'caddy')).mode & 0o777, 0o755);
+    const caddy = files.find((f) => f.path === 'caddy/othala.caddy').content;
+    for (const name of SECRETS) assert.ok(!caddy.includes(FAKE_SECRETS[name]), `${name} reached the edge snippets`);
   });
 });
 

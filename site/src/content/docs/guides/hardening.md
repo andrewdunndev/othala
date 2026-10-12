@@ -13,8 +13,8 @@ Three unauthenticated risks: **email-bomb** against the code, recovery and
 verification flows; **credential brute-force**, since Kratos ships no account
 lockout by design; and **password-hash exhaustion**, where the argon2 memory
 parameter that makes hashing strong becomes the denial-of-service lever.
-`caddy/Caddyfile` carries reverse-proxy rate limiting for the Kratos browser
-paths under a standing do-not-deploy marker — the directive is a third-party
+`othala-routes` in `caddy/othala.caddy` rate-limits the Kratos browser paths and
+the device grant — the directive is a third-party
 module that must be compiled in, and a Caddy without it refuses to start rather
 than degrading. `portal/src/lib/contact.ts` rate-limits the one unauthenticated
 form the portal serves, and `kratos/kratos.yml` caps wrong-code submissions and

@@ -6,6 +6,7 @@ import type { Page } from '@playwright/test';
 import { test, expect, adminAal2Context, computeTotp, GRAFANA_CLIENT_ID, GRAFANA_REDIRECT_URI } from '../fixtures';
 import { createIdentityWithPassword, TEST_PASSWORD } from '../actions/identity';
 import { requireEnv } from '../actions/oidc';
+import { getSession } from '../actions/session';
 
 const PASSKEY_REGISTER_BUTTON = 'button[name="passkey_register_trigger"]';
 const PASSKEY_LOGIN_BUTTON = 'button[name="passkey_login_trigger"]';
@@ -130,6 +131,21 @@ test('ZI1 — admin adds a person; they redeem, enrol a passkey and TOTP, and si
   const appResponse = await page.goto(PROXYWATCH_ORIGIN, { waitUntil: 'networkidle' });
   expect(appResponse?.status(), 'ZI1: forward_auth admits the person to the app').toBe(200);
   await expect(page.getByText('proxywatch-stub'), 'ZI1: the person reaches the app behind the edge').toBeVisible();
+
+  // Forged identity headers are stripped before the gate copies its own id in, and no cookie reaches the app.
+  const session = await getSession(ctx, baseURL!);
+  const forged = await ctx.request.get(PROXYWATCH_ORIGIN, {
+    headers: {
+      'X-Kratos-Authenticated-Identity-Id': '00000000-0000-0000-0000-000000000000',
+      'X-Remote-User': 'admin',
+      'Remote-User': 'admin',
+    },
+    maxRedirects: 0,
+  });
+  expect(forged.status(), 'ZI1: the gate admits the person despite the forged headers').toBe(200);
+  expect(await forged.text(), 'ZI1: the app sees only the gate\'s identity id, no spoofed user and no cookie').toBe(
+    `proxywatch-stub id=${session!.identity.id} spoof= cookie=`,
+  );
 });
 
 /** The second factor the person enrolled is asked for when the session is below aal2; answer it in the page. */

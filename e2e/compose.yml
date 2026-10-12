@@ -244,6 +244,7 @@ services:
         condition: service_healthy
     volumes:
       - ./caddy.Caddyfile:/etc/caddy/Caddyfile:ro,z
+      - ./config.rendered/caddy:/etc/caddy/othala:ro,z
     ports:
       - "8088:80"
     networks:

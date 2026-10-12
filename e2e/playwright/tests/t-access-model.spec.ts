@@ -276,6 +276,7 @@ test('T5 — NEITHER group is DENIED', async ({ browser, baseURL, kratosAdminURL
   }
 });
 
+const PROXYWATCH_ORIGIN = 'http://proxywatch.othala.test';
 const FA = (baseURL: string, group: string) =>
   `${baseURL}/api/forward-auth?group=${encodeURIComponent(group)}`;
 
@@ -346,6 +347,10 @@ test('T8 — forward_auth: `proxywatch-admin` ALONE → 403 (abolition, at the e
         'satisfy a gate for the access group. If it returned 401, the denial is being ' +
         'reported as "please log in", which loops an authenticated user through login.',
     ).toBe(403);
+
+    const edge = await ctx.request.get(`${PROXYWATCH_ORIGIN}/`, { maxRedirects: 0 });
+    expect(edge.status(), 'T8: the edge answers the gate\'s 403 in place').toBe(403);
+    expect(await edge.text(), 'T8: the edge serves its fixed denial page, not the app').toContain('Access denied');
   } finally {
     await ctx.close();
   }
@@ -377,4 +382,11 @@ test('T10 — forward_auth: no session at all → 401', async ({ ctx, baseURL })
     'T10: with no Kratos session the gate must 401 so the edge sends the user to ' +
       `login; got ${resp.status()}`,
   ).toBe(401);
+
+  const requested = `${PROXYWATCH_ORIGIN}/a%26b%23c?x=1&y=2`;
+  const edge = await ctx.request.get(requested, { maxRedirects: 0 });
+  expect(edge.status(), 'T10: the edge turns the 401 into a login redirect').toBe(302);
+  const login = new URL(edge.headers()['location'] ?? '');
+  expect(`${login.origin}${login.pathname}`, 'T10: the redirect goes to the portal login').toBe(`${baseURL}/auth/login`);
+  expect(login.searchParams.get('return_to'), 'T10: return_to carries the whole request, path escapes and query intact').toBe(requested);
 });
