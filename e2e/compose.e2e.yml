@@ -78,6 +78,14 @@ services:
     working_dir: /test
     entrypoint: ["node"]
 
+  # smoke.sh A10 probes from here: a container on `edge` alone, like the edge.
+  edge-probe:
+    image: ${AUTH_REGISTRY}/e2e-tester:${AUTH_VERSION}
+    profiles: ["oneshot"]
+    networks:
+      edge: {}
+    entrypoint: ["node"]
+
   # The specs reach the edge on `edge` and the admin listeners on `internal`, like the portal.
   playwright:
     image: ${AUTH_REGISTRY}/e2e-tester:${AUTH_VERSION}

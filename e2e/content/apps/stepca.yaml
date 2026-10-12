@@ -1,5 +1,5 @@
 # step-ca: a CLI on a machine without a browser signs in through the device grant (RFC 8628).
-# A public client, so it has no secret and no gen-secrets.sh entry. skip_consent is set to prove
+# A public client, so it has no secret and no gen-secrets entry. skip_consent is set to prove
 # that a device grant is confirmed regardless (zo-device-phishing.spec.ts).
 
 presentation:

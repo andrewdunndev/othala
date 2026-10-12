@@ -171,6 +171,16 @@ else
     fail "A9b admin route leaked onto public port" "code=$code (expected 404; admin /healthz must be admin-port-only)"
 fi
 
+# A10: from `edge` alone, no admin listener answers, by alias or bind address; Hydra public is the control.
+admin_urls="http://kratos:4434/ http://hydra:4445/ http://othala:4431/ http://${KRATOS_ADMIN_BIND_HOST}:4434/ http://${HYDRA_ADMIN_BIND_HOST}:4445/ http://${PORTAL_ADMIN_BIND_HOST}:4431/"
+reach=$(printf '%s' "const hit=(u)=>fetch(u,{signal:AbortSignal.timeout(3000)}).then(()=>u,()=>null);Promise.all(['http://hydra:4444/health/ready',...'${admin_urls}'.split(' ')].map(hit)).then(([c,...a])=>{process.stdout.write('control='+(c?'up':'down')+' reached='+(a.filter(Boolean).join(',')||'none'));process.exit(0)})" \
+    | docker compose --profile oneshot run --rm --no-deps -T edge-probe 2>&1 | _strip_ansi | tail -1)
+if [[ "$reach" == "control=up reached=none" ]]; then
+    pass "A10 edge network reaches no admin listener"
+else
+    fail "A10 edge network reaches an admin listener" "$reach"
+fi
+
 # Section B: client registration (boot reconcile in the othala service)
 echo ""
 echo "B. client registration (boot reconcile)"
