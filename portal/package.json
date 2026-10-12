@@ -8,11 +8,12 @@
   },
   "scripts": {
     "dev": "astro dev --port 4321",
-    "build": "astro build && npm run build:listener && npm run copy:otel && npm run build:registrar && npm run build:manifest-lint",
+    "build": "astro build && npm run build:listener && npm run copy:otel && npm run build:registrar && npm run build:manifest-lint && npm run build:config",
     "build:listener": "esbuild src/server/listen.ts --bundle --format=esm --platform=node --packages=external --external:./entry.mjs --external:./registrar.mjs --outfile=dist/server/listen.mjs",
     "copy:otel": "cp src/server/otel.mjs dist/otel.mjs",
     "build:registrar": "esbuild src/server/registrar.ts --bundle --format=esm --platform=node --packages=external --outfile=dist/server/registrar.mjs",
     "build:manifest-lint": "esbuild src/server/manifest-lint-cli.ts --bundle --format=esm --platform=node --packages=external --outfile=dist/server/manifest-lint.mjs",
+    "build:config": "esbuild src/server/config-cli.ts --bundle --format=esm --platform=node --packages=external --outfile=dist/server/config.mjs",
     "lint:manifests": "tsx src/server/manifest-lint-cli.ts ../e2e/manifests",
     "check": "astro check",
     "preview": "astro preview",
