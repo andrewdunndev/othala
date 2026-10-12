@@ -1,0 +1,195 @@
+---
+const story = 'Othala at a glance, in seven steps: 1, members open an app in a browser, through the edge, Caddy, which stands in front of every app and is not part of Othala; 2, the edge proxies to an app that speaks OIDC; 3, the app redirects them to Hydra to authorize; 4, Hydra hands the login and consent challenges to the portal; 5, the portal checks their passkey session with Kratos; 6, Hydra issues the app an id_token carrying their groups; 7, for an app without OIDC, the edge first asks the portal to allow or deny the request, and proxies it only if allowed. Admins manage people on the portal\'s admin listener over the internal network, never through the edge.';
+---
+<svg class="figure-wide" viewBox="0 0 1320 420" role="img" aria-label={story} xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <marker id="oth-ov1-arrow" markerUnits="userSpaceOnUse" markerWidth="10" markerHeight="8" refX="10" refY="4" orient="auto"><path d="M0,0 L10,4 L0,8 Z" fill="var(--text-2)"/></marker>
+    <marker id="oth-ov1-deny" markerUnits="userSpaceOnUse" markerWidth="10" markerHeight="8" refX="10" refY="4" orient="auto"><path d="M0,0 L10,4 L0,8 Z" fill="var(--danger)"/></marker>
+  </defs>
+  <g font-family="'IBM Plex Sans', Helvetica, Arial, sans-serif">
+    <rect x="8" y="8" width="1304" height="404" rx="6" fill="var(--bg)" stroke="var(--border)"/>
+    <text x="32" y="38" font-family="'IBM Plex Mono', Menlo, monospace" font-size="14" font-weight="600" letter-spacing="0.08em" fill="var(--text-2)">WHY · ONE PASSKEY GETS EACH PERSON INTO EVERY APP; THEIR GROUPS DECIDE WHAT THEY CAN DO</text>
+
+    <g font-family="'IBM Plex Mono', Menlo, monospace" font-size="12" letter-spacing="0.08em" fill="var(--text-muted)">
+      <text x="32" y="80">ACTORS</text>
+      <text x="984" y="80">OUTSIDE</text>
+    </g>
+    <rect x="352" y="56" width="488" height="264" rx="10" fill="var(--accent-subtle)" stroke="var(--accent)" stroke-width="1.5"/>
+    <text x="372" y="80" font-family="'IBM Plex Mono', Menlo, monospace" font-size="12" font-weight="600" letter-spacing="0.08em" fill="var(--accent)">OTHALA · ONE TRUST DOMAIN</text>
+
+    <path d="M232,116 H376" fill="none" stroke="var(--border-strong)" stroke-width="1.5"/>
+    <g fill="none" stroke="var(--text-2)" stroke-width="1.5" marker-end="url(#oth-ov1-arrow)">
+      <path d="M232,368 H376"/>
+      <path d="M1056,344 V196"/>
+      <path d="M984,120 H816"/>
+      <path d="M672,144 H528"/>
+      <path d="M528,240 H672"/>
+      <path d="M816,172 H984"/>
+      <path d="M452,344 V268"/>
+    </g>
+    <path d="M1216,344 V196" fill="none" stroke="var(--danger)" stroke-width="1.5" stroke-dasharray="5 4" marker-end="url(#oth-ov1-deny)"/>
+
+    <g font-family="'IBM Plex Mono', Menlo, monospace" font-size="11" font-weight="700" text-anchor="middle" fill="var(--accent-contrast)">
+      <circle cx="248" cy="354" r="9" fill="var(--accent)"/><text x="248" y="358">1</text>
+      <circle cx="1072" cy="270" r="9" fill="var(--accent)"/><text x="1072" y="274">2</text>
+      <circle cx="856" cy="106" r="9" fill="var(--accent)"/><text x="856" y="110">3</text>
+      <circle cx="544" cy="130" r="9" fill="var(--accent)"/><text x="544" y="134">4</text>
+      <circle cx="544" cy="226" r="9" fill="var(--accent)"/><text x="544" y="230">5</text>
+      <circle cx="856" cy="158" r="9" fill="var(--accent)"/><text x="856" y="162">6</text>
+      <circle cx="468" cy="290" r="9" fill="var(--accent)"/><text x="468" y="294">7</text>
+    </g>
+    <g font-size="15" font-weight="600" fill="var(--text)">
+      <text x="262" y="359">open an app</text>
+      <text x="1086" y="275">proxies</text>
+      <text x="870" y="111">redirects</text>
+      <text x="558" y="135">hands over</text>
+      <text x="558" y="231">checks</text>
+      <text x="870" y="163">issues</text>
+      <text x="482" y="295">asks</text>
+      <text x="1228" y="275">proxies</text>
+    </g>
+    <g font-size="13" fill="var(--text-2)">
+      <text x="240" y="387">in a browser</text>
+      <text x="848" y="139">to authorize</text>
+      <text x="536" y="163">login, consent</text>
+      <text x="848" y="191">id_token, groups</text>
+      <text x="474" y="313">allow or deny?</text>
+      <text x="1220" y="293" font-weight="600" fill="var(--danger)">if allowed</text>
+    </g>
+
+    <g fill="var(--bg)" stroke="var(--border-strong)">
+      <rect x="32" y="96" width="200" height="96" rx="6"/>
+      <rect x="32" y="336" width="200" height="64" rx="6"/>
+      <rect x="376" y="96" width="152" height="172" rx="6"/>
+      <rect x="672" y="96" width="144" height="100" rx="6"/>
+      <rect x="672" y="212" width="144" height="56" rx="6"/>
+      <rect x="984" y="96" width="144" height="100" rx="6"/>
+      <rect x="1144" y="96" width="144" height="100" rx="6"/>
+      <rect x="376" y="344" width="912" height="56" rx="6"/>
+    </g>
+    <path d="M376,136 H528" fill="none" stroke="var(--border-strong)"/>
+    <g font-size="18" font-weight="600" text-anchor="middle" fill="var(--text)">
+      <text x="132" y="124">admins</text>
+      <text x="132" y="364">members</text>
+      <text x="452" y="168">portal</text>
+      <text x="744" y="128">Hydra</text>
+      <text x="744" y="238">Kratos</text>
+      <text x="1056" y="128">OIDC apps</text>
+      <text x="1216" y="124">forward-auth</text>
+      <text x="1216" y="146">apps</text>
+      <text x="832" y="368">edge</text>
+    </g>
+    <g font-size="13" text-anchor="middle" fill="var(--text-2)">
+      <text x="132" y="146">passkey, admin marker</text>
+      <text x="132" y="166">manage people over</text>
+      <text x="132" y="184">the internal network</text>
+      <text x="132" y="386">one passkey each</text>
+      <text x="452" y="190">login, consent, gate</text>
+      <text x="452" y="216">the only caller</text>
+      <text x="452" y="234">of the admin APIs</text>
+      <text x="744" y="150">OAuth2, OIDC</text>
+      <text x="744" y="258">passkey sessions</text>
+      <text x="1056" y="150">sign in by redirect</text>
+      <text x="1216" y="170">no OIDC needed</text>
+      <text x="832" y="388">Caddy, in front of every app, ends TLS</text>
+    </g>
+    <text x="452" y="121" text-anchor="middle" font-family="'IBM Plex Mono', Menlo, monospace" font-size="12" fill="var(--text-2)">admin listener</text>
+  </g>
+</svg>
+<svg class="figure-narrow" viewBox="0 0 340 736" role="img" aria-label={story} xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <marker id="oth-ov1n-arrow" markerUnits="userSpaceOnUse" markerWidth="9" markerHeight="7" refX="9" refY="3.5" orient="auto"><path d="M0,0 L9,3.5 L0,7 Z" fill="var(--text-2)"/></marker>
+    <marker id="oth-ov1n-deny" markerUnits="userSpaceOnUse" markerWidth="9" markerHeight="7" refX="9" refY="3.5" orient="auto"><path d="M0,0 L9,3.5 L0,7 Z" fill="var(--danger)"/></marker>
+  </defs>
+  <g font-family="'IBM Plex Sans', Helvetica, Arial, sans-serif">
+    <rect x="0.5" y="0.5" width="339" height="735" rx="6" fill="var(--bg)" stroke="var(--border)"/>
+    <g font-family="'IBM Plex Mono', Menlo, monospace" font-size="9.5" font-weight="600" letter-spacing="0.06em" fill="var(--text-2)">
+      <text x="16" y="26">WHY · ONE PASSKEY GETS EACH PERSON INTO</text>
+      <text x="16" y="40">EVERY APP; THEIR GROUPS DECIDE WHAT THEY CAN DO</text>
+    </g>
+
+    <g font-family="'IBM Plex Mono', Menlo, monospace" font-size="9" letter-spacing="0.08em" fill="var(--text-muted)">
+      <text x="16" y="64">ACTORS</text>
+      <text x="196" y="540">OUTSIDE</text>
+    </g>
+    <rect x="36" y="168" width="294" height="320" rx="8" fill="var(--accent-subtle)" stroke="var(--accent)" stroke-width="1.5"/>
+    <text x="48" y="186" font-family="'IBM Plex Mono', Menlo, monospace" font-size="9" font-weight="600" letter-spacing="0.08em" fill="var(--accent)">OTHALA · ONE TRUST DOMAIN</text>
+
+    <path d="M290,152 V300" fill="none" stroke="var(--border-strong)" stroke-width="1.5"/>
+    <g fill="none" stroke="var(--text-2)" stroke-width="1.5" marker-end="url(#oth-ov1n-arrow)">
+      <path d="M24,152 V668"/>
+      <path d="M150,668 V612"/>
+      <path d="M60,548 V476"/>
+      <path d="M100,420 V372"/>
+      <path d="M100,300 V252"/>
+      <path d="M172,476 V548"/>
+      <path d="M318,668 V372"/>
+    </g>
+    <path d="M232,668 V612" fill="none" stroke="var(--danger)" stroke-width="1.5" stroke-dasharray="4 3" marker-end="url(#oth-ov1n-deny)"/>
+
+    <g font-family="'IBM Plex Mono', Menlo, monospace" font-size="10" font-weight="700" text-anchor="middle" fill="var(--accent-contrast)">
+      <circle cx="40" cy="632" r="8" fill="var(--accent)"/><text x="40" y="635.5">1</text>
+      <circle cx="166" cy="632" r="8" fill="var(--accent)"/><text x="166" y="635.5">2</text>
+      <circle cx="76" cy="500" r="8" fill="var(--accent)"/><text x="76" y="503.5">3</text>
+      <circle cx="116" cy="392" r="8" fill="var(--accent)"/><text x="116" y="395.5">4</text>
+      <circle cx="116" cy="276" r="8" fill="var(--accent)"/><text x="116" y="279.5">5</text>
+      <circle cx="188" cy="500" r="8" fill="var(--accent)"/><text x="188" y="503.5">6</text>
+      <circle cx="302" cy="436" r="8" fill="var(--accent)"/><text x="302" y="439.5">7</text>
+    </g>
+    <g font-size="11" font-weight="600" fill="var(--text)">
+      <text x="52" y="636">open an app</text>
+      <text x="178" y="636">proxies</text>
+      <text x="88" y="504">redirects</text>
+      <text x="128" y="396">hands over</text>
+      <text x="128" y="280">checks</text>
+      <text x="200" y="504">issues</text>
+      <text x="290" y="440" text-anchor="end">asks</text>
+      <text x="244" y="636">proxies</text>
+    </g>
+    <g font-size="10" fill="var(--text-2)">
+      <text x="44" y="652">in a browser</text>
+      <text x="72" y="520">to authorize</text>
+      <text x="120" y="412">login, consent</text>
+      <text x="184" y="520">id_token, groups</text>
+      <text x="310" y="456" text-anchor="end">allow or deny?</text>
+      <text x="244" y="652" font-weight="600" fill="var(--danger)">if allowed</text>
+    </g>
+
+    <g fill="var(--bg)" stroke="var(--border-strong)">
+      <rect x="16" y="72" width="148" height="80" rx="6"/>
+      <rect x="176" y="72" width="148" height="80" rx="6"/>
+      <rect x="48" y="200" width="136" height="52" rx="6"/>
+      <rect x="48" y="300" width="276" height="72" rx="6"/>
+      <rect x="212" y="300" width="112" height="24" rx="6"/>
+      <rect x="48" y="420" width="136" height="56" rx="6"/>
+      <rect x="40" y="548" width="144" height="64" rx="6"/>
+      <rect x="196" y="548" width="110" height="64" rx="6"/>
+      <rect x="16" y="668" width="308" height="52" rx="6"/>
+    </g>
+    <g font-size="13" font-weight="600" text-anchor="middle" fill="var(--text)">
+      <text x="90" y="104">members</text>
+      <text x="250" y="94">admins</text>
+      <text x="116" y="222">Kratos</text>
+      <text x="60" y="322" text-anchor="start">portal</text>
+      <text x="116" y="442">Hydra</text>
+      <text x="112" y="572">OIDC apps</text>
+      <text x="251" y="570">forward-auth</text>
+      <text x="251" y="585">apps</text>
+      <text x="170" y="690">edge</text>
+    </g>
+    <g font-size="10" text-anchor="middle" fill="var(--text-2)">
+      <text x="90" y="122">one passkey each</text>
+      <text x="250" y="110">passkey, admin marker</text>
+      <text x="250" y="126">manage people over</text>
+      <text x="250" y="140">the internal network</text>
+      <text x="116" y="240">passkey sessions</text>
+      <text x="60" y="340" text-anchor="start">login, consent, gate</text>
+      <text x="60" y="356" text-anchor="start">the only caller of the admin APIs</text>
+      <text x="116" y="460">OAuth2, OIDC</text>
+      <text x="112" y="590">sign in by redirect</text>
+      <text x="251" y="602">no OIDC needed</text>
+      <text x="170" y="708">Caddy, in front of every app, ends TLS</text>
+    </g>
+    <text x="268" y="316" text-anchor="middle" font-family="'IBM Plex Mono', Menlo, monospace" font-size="9" fill="var(--text-2)">admin listener</text>
+  </g>
+</svg>

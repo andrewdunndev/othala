@@ -1,149 +1,183 @@
 ---
 import Layout from '../layouts/Layout.astro';
+import DiagramTrack from '@dunn.dev/reference/chrome/DiagramTrack.astro';
+import Split from '@dunn.dev/reference/chrome/Split.astro';
+import trustBoundary from '../../public/diagrams/trust-boundary.svg?raw';
+import oidcLogin from '../../public/diagrams/oidc-login-path.svg?raw';
+import forwardAuth from '../../public/diagrams/forward-auth-request-path.svg?raw';
+import groupBinding from '../../public/diagrams/group-binding-decision.svg?raw';
+import sessionRevocation from '../../public/diagrams/session-revocation.svg?raw';
+import firstCredential from '../../public/diagrams/first-credential.svg?raw';
 
-// Hand-authored rather than markdown: this page reuses the six diagrams
-// already embedded in the guides (site/public/diagrams/*.svg), told in
-// one narrative pass instead of split across four documents. Keeping it
-// as a standalone .astro page (like index.astro) rather than a content-
-// collection doc means it costs nothing against the prose budget in
-// scripts/check-purity.sh — see lib/sections.ts for how it reaches nav.
+const label = (svg: string, text: string) =>
+  svg.replace('<svg ', `<svg aria-label="${text.replace(/"/g, '&quot;')}" `);
 ---
 <Layout title="Architecture" description="How Kratos, Hydra, the portal, and the edge fit together in Othala, told through six diagrams: trust boundary, OIDC login, forward-auth, group binding, session revocation, and the first credential.">
   <header class="page-header">
     <p class="page-eyebrow">Othala</p>
     <h1 class="page-title">Architecture</h1>
     <p class="page-lede">
-      Six diagrams, in the order a request actually crosses them: who is
-      inside the trust boundary, how a login becomes a token, how an app
-      with no OIDC gets an answer anyway, how one group becomes two
-      different grants, what actually happens on sign-out, and how the
-      first credential gets in the door at all. Each one carries the WHAT
-      as its caption and its enforcer; what follows here is the WHY.
+      Six diagrams: who is inside the trust boundary, how a login becomes a
+      token, how an app with no OIDC gets an answer anyway, and what
+      happens on sign-out.
+    </p>
+    <p class="page-lede">
+      Then how the first credential gets in the door, and how one group
+      becomes two different grants. Each diagram carries the what in its
+      caption; the prose beside it is the why.
     </p>
   </header>
 
-  <article>
+  <section class="section">
     <h2>One trust domain</h2>
-    <p>
-      Everything downstream of a login trusts whatever token or session
-      Othala hands it, so the question worth answering first is what can
-      reach the two Ory admin APIs at all. The answer is one process: the
-      app runs a public SSR listener the edge reaches and a second,
-      internal-network admin listener (PORTAL_ADMIN_BIND_HOST) the edge never touches, so every
-      admin-API caller stays inside one trust domain instead of becoming a
-      service-to-service authorization problem in its own right.
-      <code>ARCHITECTURE.md</code> § Trust boundary has the enforcement;
-      the <a href="/guides/hardening/">Hardening</a> guide's Admin-API
-      isolation section walks the control end to end.
-    </p>
+    <Split>
+      <p>
+        Everything downstream of a login trusts whatever token or session
+        Othala hands it, so the first question is what can reach the two Ory
+        admin APIs at all. The answer is one process. The portal runs a
+        public listener the edge reaches and a second, internal-network
+        admin listener the edge never touches, so every admin-API caller
+        stays inside one trust domain instead of becoming a
+        service-to-service authorization problem of its own.
+      </p>
+      <p>
+        <code>ARCHITECTURE.md</code> § Trust boundary has the enforcement;
+        the <a href="/guides/hardening/">Hardening</a> guide's Admin-API
+        isolation section walks the control end to end.
+      </p>
+      <figure class="diagram" slot="aside">
+        <Fragment set:html={label(trustBoundary, 'A browser reaches one hostname at the edge proxy, which terminates TLS. Inside one trust domain the admin APIs never leave: the app runs a public listener the edge reaches and an admin listener the edge never touches; Kratos and Hydra each expose a public API to the edge, while the app alone calls their admin APIs. Kratos and Hydra each keep a separate Postgres database.')} />
+        <figcaption class="diagram-caption">Three ports on the network; the admin APIs are not among them</figcaption>
+      </figure>
+    </Split>
+  </section>
 
-    <figure class="diagram">
-      <img src="/diagrams/trust-boundary.svg" alt="A browser reaches one hostname at the edge proxy, which terminates TLS. Inside one trust domain the admin APIs never leave: the app runs two listeners, a public SSR listener the edge reaches and an admin listener bound to PORTAL_ADMIN_BIND_HOST that the edge never touches; Kratos and Hydra each expose the edge a public API — self-service and sessions for Kratos, authorize, token and discovery for Hydra — while the app alone calls their admin APIs. Kratos and Hydra each keep a separate Postgres database. Admin APIs are reachable only from the app, never from the edge, enforced by scripts/render-config.sh, requireAdminSession, and pinned by d-admin-aal2-stepup.spec.ts and f-aal2-bypass.spec.ts.">
-      <figcaption class="diagram-caption">Three ports on the network; the admin APIs are not among them</figcaption>
-    </figure>
+  <section class="section">
+    <DiagramTrack caption="One code exchange, four parties, one live Kratos session underneath it">
+      <h2>How a login becomes a token</h2>
+      <p data-step="1">
+        A relying party, here Grafana, redirects the browser to Hydra. Hydra
+        ships no login UI of its own, so it opens a login challenge on the
+        portal, and with no session yet the portal sends the browser to
+        Kratos.
+      </p>
+      <p data-step="2">
+        Kratos runs the passkey ceremony, sets the session cookie and resumes
+        the authorize request. A remembered subject skips the passkey but
+        never the gate: Hydra's memory of a past login is never trusted
+        without a live Kratos session behind it.
+      </p>
+      <p data-step="3">
+        At consent the portal gates again, then maps groups to the claims the
+        token carries. Hydra hands Grafana a code to exchange server-side.
+        The <a href="/guides/per-app-oidc/">Per-app OIDC</a> guide walks one
+        relying party through it; <code>ARCHITECTURE.md</code> § The OIDC
+        path has the sequencing.
+      </p>
+      <Fragment slot="figure" set:html={label(oidcLogin, 'A sequence across four lifelines: browser, Hydra, the Othala portal and Kratos, for an example relying party, Grafana. The browser is redirected to Hydra, which opens a login challenge on the portal; with no session the portal sends the browser to Kratos, which runs the passkey challenge, sets the session cookie and resumes at Hydra. Hydra opens a consent challenge; the portal gates again, maps groups to claims and accepts. Hydra redirects the browser back to Grafana with a code, exchanged server-side for tokens.')} />
+    </DiagramTrack>
+  </section>
 
-    <h2>How a login becomes a token</h2>
-    <p>
-      A relying party redirects the browser to Hydra, and Hydra ships no
-      login UI of its own, so it opens a challenge back on the app for
-      every piece the standard leaves to the integrator. The app gates the
-      identity, Kratos runs the passkey ceremony, and the app gates again
-      at consent before composing the claims a token actually carries. A
-      remembered subject skips the passkey step but never the gate:
-      Hydra's memory of who logged in before is never trusted without a
-      live Kratos session behind it. The <a href="/guides/per-app-oidc/">Per-app OIDC</a> guide's The shape
-      section walks one relying party through the whole exchange; <code>ARCHITECTURE.md</code> § The OIDC path has the sequencing.
-    </p>
+  <section class="section">
+    <DiagramTrack caption="One sub-request decides the request, before the app ever sees it">
+      <h2>The apps that speak no OIDC</h2>
+      <p data-step="1">
+        Not every app in the house can run an OAuth2 redirect, so the edge
+        asks a question instead. Before any proxying, it sends a sub-request
+        to the portal carrying the session cookie and a group name that the
+        edge's own config sets, never an inbound header.
+      </p>
+      <p data-step="2">
+        The portal verifies the session, then re-resolves the identity
+        through the Kratos admin API, because group metadata is not in
+        whoami. The gate fails closed at every step: an inactive identity, a
+        non-canonical stored group or a missing group each refuse.
+      </p>
+      <p data-step="3">
+        The answer is a status, and each status means one thing. 401 is the
+        only denial an edge may turn into a login redirect. 503 means Kratos
+        never answered; folding it into 403 would turn an outage into an
+        endless bounce. <code>ARCHITECTURE.md</code> § The forward-auth
+        request path has the contract.
+      </p>
+      <Fragment slot="figure" set:html={label(forwardAuth, 'A browser carrying the session cookie reaches the edge, then the service\'s own proxy, where forward_auth runs before any reverse_proxy. The proxy sends a sub-request to the portal with the required group set by the edge config. The portal verifies the session, re-resolves the identity through the Kratos admin API and applies the group gate, failing closed. It answers 200 to proxy through with the identity header set, 401 for no usable session, the one status an edge may turn into a login redirect, 403 for a refusal on the merits, and 503 when Kratos did not answer.')} />
+    </DiagramTrack>
+  </section>
 
-    <figure class="diagram">
-      <img src="/diagrams/oidc-login-path.svg" alt="A sequence across four lifelines — browser, Hydra, the Othala app and Kratos — for an example relying party, Grafana. The browser is redirected to Hydra's authorize endpoint, which opens a login challenge on the app; with no session yet the app bounces the browser to Kratos, which runs the passkey challenge, the primary credential. Kratos sets the session cookie and resumes at Hydra, which opens a consent challenge; the app gates again, composes id_token claims with groups mapped to claims, and accepts. Hydra redirects the browser back to Grafana with a code, exchanged server-side for tokens: signed in. A remembered subject takes a different first step, re-verifying a live Kratos session before honouring Hydra's skip.">
-      <figcaption class="diagram-caption">One code exchange, four parties, one live Kratos session underneath it</figcaption>
-    </figure>
+  <section class="section">
+    <DiagramTrack caption="Hydra remembers; Kratos authenticates, and revoking cuts both">
+      <h2>What actually happens on sign-out</h2>
+      <p data-step="1">
+        Hydra and Kratos each remember something about a session. When Hydra
+        says it remembers a subject, the login handler still checks for a
+        live Kratos session belonging to that same identity before honouring
+        the skip. No match means signing in again.
+      </p>
+      <p data-step="2">
+        Revoking a subject is one in-process fan-out that cuts the Kratos
+        sessions and both of Hydra's remembered sessions in a fixed order,
+        whatever the trigger. It stops sessions, not credentials, so a
+        lost-device eviction deletes the credential first; the
+        <a href="/guides/hardening/">Hardening</a> guide has that procedure.
+      </p>
+      <Fragment slot="figure" set:html={label(sessionRevocation, 'Two panels. Left: when Hydra remembers a subject, the login handler re-verifies a live Kratos session for that identity before honouring the skip; no live match forces a fresh sign-in. Right: one revocation fan-out, triggered by admin force-logout, sign-out-everywhere or deactivation, revokes the Kratos sessions, Hydra\'s login session and Hydra\'s consent session in a fixed order. It cuts sessions and remembered logins, not enrolled credentials.')} />
+    </DiagramTrack>
+  </section>
 
-    <h2>The apps that speak no OIDC</h2>
-    <p>
-      Not every application in the house can run an OAuth2 redirect, so the
-      edge asks a question instead: a sub-request to the portal's
-      forward-auth endpoint, carrying the session cookie and a group name
-      the edge itself configured. The endpoint answers with a status, not a
-      redirect, and the status has to mean one thing consistently or the
-      edge cannot safely act on it. 401 is the only denial an edge can turn
-      into a login redirect; 503 means the identity service never
-      answered, and folding that into 403 would turn an outage into an
-      infinite bounce back to a login page that cannot help.
-      <code>ARCHITECTURE.md</code> § The forward-auth request path has the
-      full status contract; the <a href="/guides/per-app-oidc/">Per-app OIDC</a> guide's When it is
-      not OIDC section shows it wired to a real proxy.
-    </p>
+  <section class="section">
+    <DiagramTrack caption='Not "no password exists": no password ever transits a channel'>
+      <h2>How the first credential gets in the door</h2>
+      <p data-step="1">
+        There is no self-service registration. An admin creates each
+        identity through the admin API with no credentials block at all,
+        then mints a recovery link and a one-time code together and hands
+        them over on a conversation that already exists with that person.
+      </p>
+      <p data-step="2">
+        The person redeems the code in their own browser, which is where a
+        password and a passkey are first set. Neither ever leaves it. The
+        <a href="/guides/golden-path/">Golden path</a> guide has the operator
+        side; <code>DECISIONS.md</code> has the reasoning.
+      </p>
+      <p data-step="3">
+        One branch refuses outright. When the target carries the admin
+        marker, recovery is refused before Kratos is ever asked, so an
+        admin's own recovery stays at the console.
+      </p>
+      <Fragment slot="figure" set:html={label(firstCredential, 'An admin creates the identity through the admin API with no credentials block, then mints a one-time recovery link and code together and hands both over on a conversation that already exists with that person. The person\'s own browser is where a password and a passkey are first set. One branch refuses outright: when the target carries the admin marker, recovery is refused before Kratos is asked, console-only.')} />
+    </DiagramTrack>
+  </section>
 
-    <figure class="diagram">
-      <img src="/diagrams/forward-auth-request-path.svg" alt="A browser carrying the apex-scoped session cookie reaches the edge, which routes at L4 by SNI without decrypting, then the service's own proxy — the door, where forward_auth runs before any reverse_proxy. The proxy issues a sub-request to the portal's forward-auth endpoint with the required group as a query parameter set by the edge config, never an inbound header. The portal verifies the session cookie, re-resolves the identity through the Kratos admin API because group metadata is absent from whoami, and applies enforceGroupGate — identity active, every stored group canonical, and in the named group — failing closed at every step. It answers one of four statuses: 200 proxy through with the identity header set from the server-verified session; 401 no usable session, the one status an edge can safely turn into a login redirect; 403 refused on the merits; and 503 when Kratos did not answer, which denies like a 403 but must never be matched into a redirect. The application sees only the identity header.">
-      <figcaption class="diagram-caption">One sub-request decides the request, before the app ever sees it</figcaption>
-    </figure>
-
+  <section class="section">
     <h2>One group gets you in; the other decides what you can do</h2>
+    <Split>
+      <p>
+        Every manifest binds a group twice, and the two bindings do
+        different jobs on purpose. <code>presentation.access</code> is
+        entry: hold it and the gate admits you.
+        <code>consent.group_role_map</code> is role: it elevates someone
+        already admitted and grants nothing on its own, so holding only an
+        app's admin group gets a person nowhere.
+      </p>
+      <p>
+        Keeping the two questions on two bindings is what makes an admin
+        group safe to have at all. The <a href="/guides/per-app-oidc/">Per-app OIDC</a>
+        guide has the manifest shape; <code>ARCHITECTURE.md</code> § The
+        access model has the resolution order.
+      </p>
+      <figure class="diagram" slot="aside">
+        <Fragment set:html={label(groupBinding, 'Three columns. The identity holds groups in admin-API-only metadata. The manifest binds them twice: presentation.access is the entry binding, consent.group_role_map is the role binding. The code then decides: the access gate admits on the entry binding, and the role resolves from the highest-ranked match. Holding only the admin group admits nobody, and a group no manifest binds grants nothing.')} />
+        <figcaption class="diagram-caption">The identity holds · the manifest binds · the code decides</figcaption>
+      </figure>
+    </Split>
+  </section>
+
+  <section class="section">
     <p>
-      Every manifest binds a group twice, and the two bindings do
-      different jobs on purpose. <code>presentation.access</code> is
-      entry: hold it and the gate admits you, full stop.
-      <code>consent.group_role_map</code> is role: it elevates someone
-      already admitted and grants nothing on its own, so holding only an
-      app's admin group gets a person nowhere. Keeping those two questions
-      on two separate bindings is what makes an admin group safe to have
-      at all; collapsing them is the shortcut this model exists to close
-      off. The <a href="/guides/per-app-oidc/">Per-app OIDC</a> guide's
-      Entry and role are different bindings section has the manifest
-      shape; <code>ARCHITECTURE.md</code> § The access model has the
-      resolution order.
+      That is the shape of it end to end. <code>ARCHITECTURE.md</code> has
+      the rest of the reasoning, <code>DECISIONS.md</code> has the roads not
+      taken, and the <a href="https://gitlab.com/dunn.dev/othala">repository</a>
+      has the code and the tests these diagrams are drawn from.
     </p>
-
-    <figure class="diagram">
-      <img src="/diagrams/group-binding-decision.svg" alt="Three columns. The identity holds groups in admin-API-only metadata. The manifest binds them twice: presentation.access is the entry binding, consent.group_role_map is the role binding. The code then decides — the access gate admits on the entry binding, and lookupRole resolves a role from the highest-ranked match. Holding only the admin group admits nobody, and a group no manifest binds grants nothing.">
-      <figcaption class="diagram-caption">The identity holds · the manifest binds · the code decides</figcaption>
-    </figure>
-
-    <h2>What actually happens on sign-out</h2>
-    <p>
-      Hydra and Kratos each remember something about a session, and
-      cutting only one of them leaves the other able to mint a login on
-      its own. Revoking a subject is one in-process fan-out that cuts the
-      Kratos session and both of Hydra's remembered login and consent
-      sessions together, in a fixed order, whether it was triggered by the
-      person signing out everywhere, an admin forcing a logout, or a
-      deactivation. It stops sessions and remembered logins; it does not
-      remove enrolled credentials, which is why a lost-device eviction is
-      a separate procedure that deletes the credential first. The <a href="/guides/hardening/">Hardening</a> guide's Sessions and
-      eviction section has that procedure; <code>ARCHITECTURE.md</code> § The OIDC path has the revocation
-      fan-out.
-    </p>
-
-    <figure class="diagram">
-      <img src="/diagrams/session-revocation.svg" alt="Two panels. Left: when Hydra reports skip=true because it remembers a subject, the login handler re-verifies that a live Kratos session exists whose identity.id equals the remembered subject before honouring the skip; no live match forces interactive re-authentication, pinned by the FIX-A cases in portal/scripts/oauth2-handlers.test.mjs. Right: revokeSubject is the one in-process revocation fan-out, triggered by admin force-logout, sign-out-everywhere, or deactivate. Kratos sessions, Hydra's login-session and Hydra's consent-session are all revoked in a fixed order; this cuts sessions and remembered logins but not enrolled credentials, which is why the full eviction procedure above audits credentials and deletes the affected type before it revokes.">
-      <figcaption class="diagram-caption">Hydra remembers; Kratos authenticates — and revoking cuts both</figcaption>
-    </figure>
-
-    <h2>How the first credential gets in the door</h2>
-    <p>
-      There is no self-service registration, so every identity starts with
-      an admin creating it through the admin API with no credentials block
-      at all. What reaches the new person is a recovery link and a
-      one-time code, handed over on a conversation that already exists; the password and passkey
-      never leave their browser. That is the mechanism
-      behind a rule stated once and held everywhere it matters: no
-      password ever transits a channel. The <a href="/guides/golden-path/">Golden path</a> guide's Registration
-      is admin-driven section has the operator side; <code>DECISIONS.md</code> § No password ever transits a channel has
-      the reasoning.
-    </p>
-
-    <figure class="diagram">
-      <img src="/diagrams/first-credential.svg" alt="An admin creates the identity through the admin API with no credentials block at all, then mints a one-time recovery link and code together and hands both over on a conversation that already exists with that person; link and code stay apart from any password. The recipient's own browser is where a password and a passkey first get set. One branch refuses outright: when the target carries the admin marker, shouldRefuseRecovery refuses before Kratos is ever asked, console-only.">
-      <figcaption class="diagram-caption">Not "no password exists" — no password ever transits a channel</figcaption>
-    </figure>
-
-    <p>
-      That is the shape of it end to end. <code>ARCHITECTURE.md</code> has the rest of the reasoning, <code>DECISIONS.md</code> has the
-      roads not taken, and the <a href="https://gitlab.com/dunn.dev/othala">repository</a> has the
-      code and the tests these diagrams are drawn from.
-    </p>
-  </article>
+  </section>
 </Layout>
