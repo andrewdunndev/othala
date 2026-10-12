@@ -442,11 +442,11 @@ presentation:
   assert.ok(errs.some((e) => e.includes('unreachable')), errs.join('\n'));
 });
 
-const e2eClientsDir = join(here, '..', '..', 'e2e', 'manifests');
+const e2eClientsDir = join(here, '..', '..', 'e2e', 'content', 'apps');
 
-test('every e2e/manifests/*.yaml round-trips AND the set passes validateClients', () => {
+test('every e2e/content/apps/*.yaml round-trips AND the set passes validateClients', () => {
   const files = readdirSync(e2eClientsDir)
-    .filter((f) => (f.endsWith('.yaml') || f.endsWith('.yml')) && f !== 'groups.yaml');
+    .filter((f) => f.endsWith('.yaml') || f.endsWith('.yml'));
   assert.ok(files.length > 0, 'expected at least one e2e fixture manifest');
   const manifests = files
     .map((f) => parseManifest(readFileSync(join(e2eClientsDir, f), 'utf8'), f))

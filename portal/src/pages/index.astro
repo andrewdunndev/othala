@@ -2,7 +2,7 @@
 // Session-gated tile dashboard. State A (down): Kratos unreachable, holding panel. State B (pre-auth): hero and Sign In
 // CTA. State C (post-auth): greeting and the tiles userCanSeeTile admits against `metadata_admin.groups` (the Admin
 // shortcut reads the `metadata_admin.admin` marker instead; see `isAdmin`). Tiles come from the manifests in
-// MANIFEST_DIR (lib/tiles.ts). In `astro dev`, `?dev-state=` forces a state without Kratos.
+// apps/ (lib/tiles.ts). In `astro dev`, `?dev-state=` forces a state without Kratos.
 
 export const prerender = false;
 
@@ -68,7 +68,7 @@ if (devOverride === 'down' || devOverride === 'pre-auth' || devOverride === 'pos
   }
 }
 
-// Enabled tiles from MANIFEST_DIR, sorted by order then name.
+// Enabled tiles from apps/, sorted by order then name.
 const orderedApps = loadTiles();
 
 // Optional groups.yaml registry; an empty Map when absent.

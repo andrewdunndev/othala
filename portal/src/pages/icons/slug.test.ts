@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { mkdtempSync, writeFileSync, rmSync } from 'node:fs';
+import { mkdtempSync, mkdirSync, writeFileSync, rmSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 
@@ -10,7 +10,7 @@ vi.mock('astro:middleware', () => ({ defineMiddleware: (fn: unknown) => fn }));
 vi.mock('../../lib/admin-api', () => ({ getIdentity: getIdentityMock }));
 
 import { GET } from './[slug].svg.js';
-import { setManifestDir } from '../../lib/manifests.js';
+import { setContentDir } from '../../lib/manifests.js';
 import { identity, session } from '../../lib/test-builders.js';
 import { onRequest } from '../../middleware.js';
 
@@ -18,24 +18,27 @@ const SVG = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1 1"><rect wid
 const manifest = (group: string) =>
   `presentation:\n  name: App\n  description: d\n  url: https://app.example.test\n  icon: AP\n  auth_kind: external\n  access:\n    - ${group}\n`;
 
+let root: string;
 let dir: string;
 
 beforeEach(() => {
-  dir = mkdtempSync(join(tmpdir(), 'icon-route-'));
+  root = mkdtempSync(join(tmpdir(), 'icon-route-'));
+  dir = join(root, 'apps');
+  mkdirSync(dir);
   writeFileSync(join(dir, 'app.yaml'), manifest('app-access'));
   writeFileSync(join(dir, 'app.svg'), SVG);
   writeFileSync(join(dir, 'big.yaml'), manifest('app-access'));
   writeFileSync(join(dir, 'big.svg'), SVG + ' '.repeat(33 * 1024));
   writeFileSync(join(dir, 'text.yaml'), manifest('app-access'));
   writeFileSync(join(dir, 'text.svg'), '<html><script>alert(1)</script></html>');
-  setManifestDir(dir);
+  setContentDir(root);
   getSessionMock.mockResolvedValue(session('aal1'));
   getIdentityMock.mockResolvedValue(identity({ metadataAdmin: { groups: ['app-access'] } }));
 });
 
 afterEach(() => {
-  setManifestDir(undefined);
-  rmSync(dir, { recursive: true, force: true });
+  setContentDir(undefined);
+  rmSync(root, { recursive: true, force: true });
 });
 
 function call(slug: string, cookie: string | null = 'c=1') {

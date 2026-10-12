@@ -79,7 +79,7 @@ The `check-portal` and `check-purity` jobs run on every push, MR and tag;
 ## Conventions that hold the design together
 
 - **Manifests are the API for apps.** Apps are read at request time from
-  `/etc/portal/manifests`. Adding one is a file, never an app-specific code path
+  `/etc/othala/apps`. Adding one is a file, never an app-specific code path
   or an image rebuild. The loaders and the gate are generic.
 - **Entry is never derived.** Membership in a group the app's own manifest binds
   is what admits a person, admins included (`enforceAccessGate`,
@@ -122,7 +122,7 @@ The `check-portal` and `check-purity` jobs run on every push, MR and tag;
 ```sh
 cd portal && npm test           # vitest: src/**/*.test.ts + scripts/*.test.mjs, incl. the fuzz suites
 cd portal && npm run check      # type + content check
-cd portal && npm run dev        # UI iteration without the full stack; dev-only MANIFEST_DIR and OTHALA_DEV_MOCK_GROUPS (.env.example)
+cd portal && npm run dev        # UI iteration without the full stack; dev-only CONTENT_DIR and OTHALA_DEV_MOCK_GROUPS (.env.example)
 cd e2e && ./gen-secrets.sh && bash validate.sh   # full compose stand-up
 bash scripts/check-purity.sh    # the purity gate
 ```

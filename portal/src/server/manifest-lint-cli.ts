@@ -1,17 +1,16 @@
-// Manifest lint CLI: runs validateClients over every *.yaml in the first argument (or
-// the golden manifest dir), prints findings, exits 1 on BLOCK-class errors, 2 when
-// no directory or manifests are found.
-//   node dist/server/manifest-lint.mjs [<manifest-dir>]
+// Manifest lint CLI: runs validateClients over every apps/*.yaml under the content root in the first argument
+// (or CONTENT_DIR), prints findings, exits 1 on BLOCK-class errors, 2 when no directory or manifests are found.
+//   node dist/server/manifest-lint.mjs [<content-dir>]
 // Built by `npm run build:manifest-lint` (esbuild, same shape as registrar).
 
 import { readdirSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { parseManifest, validateClients } from '../lib/manifests';
 import { lintManifests } from '../lib/manifest-lint';
-import { MANIFEST_DIR } from '../lib/constants';
+import { CONTENT_DIR } from '../lib/constants';
 
 function manifestDir(): string {
-  return process.argv[2] ?? MANIFEST_DIR;
+  return join(process.argv[2] ?? CONTENT_DIR, 'apps');
 }
 
 async function main(): Promise<void> {
@@ -20,7 +19,7 @@ async function main(): Promise<void> {
   let files: string[];
   try {
     files = readdirSync(dir)
-      .filter((f) => (f.endsWith('.yaml') || f.endsWith('.yml')) && f !== 'groups.yaml')
+      .filter((f) => (f.endsWith('.yaml') || f.endsWith('.yml')))
       .sort();
   } catch (err) {
     const code = (err as NodeJS.ErrnoException).code;

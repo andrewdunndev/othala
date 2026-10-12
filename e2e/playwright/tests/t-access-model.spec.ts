@@ -235,7 +235,7 @@ test('T4 — `grafana-admin` ALONE is DENIED (admin-implies-access is abolished)
         'Admin-implies-access has been reintroduced. Entry must come from ' +
         '`grafana-access` and NOTHING else — an identity with only `<svc>-admin` is a ' +
         'MISCONFIGURED identity, not a supported shortcut. Look for `grafana-admin` ' +
-        'added back to `presentation.access:` in e2e/manifests/grafana.yaml (that list ' +
+        'added back to `presentation.access:` in e2e/content/apps/grafana.yaml (that list ' +
         'is the mechanism), or for a derivation added to enforceAccessGate in ' +
         `portal/src/lib/gate.ts. Flow terminated at: ${outcome.terminus}`,
     ).toBeFalsy();

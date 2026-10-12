@@ -75,7 +75,7 @@ will also administer the application gets `<svc>-admin` **as well**, not instead
 
 ## Two worked examples
 
-Both live in `e2e/manifests/`, exercised by CI, so neither can drift silently.
+Both live in `e2e/content/apps/`, exercised by CI, so neither can drift silently.
 
 **`audiobookshelf.yaml` — the minimal well-behaved relying party.** A `groups`
 claim and a two-entry `group_role_map`; no JMESPath, no nested claim shapes.

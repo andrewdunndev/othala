@@ -2,7 +2,7 @@
 // Admin: apps, read-only. One row per app: icon, name, description, Open, who can use it and its admins. A badge shows
 // only for a real problem (a manifest that fails lint, or a client Hydra does not have). Access is changed on the
 // person, not here. The raw bindings sit in a closed Technical details disclosure on each row.
-// The per-app manifests (`<slug>.yaml`) in MANIFEST_DIR are the source of truth and the registrar syncs them to Hydra.
+// The per-app manifests (`apps/<slug>.yaml`) are the source of truth and the registrar syncs them to Hydra.
 
 export const prerender = false;
 

@@ -3,7 +3,7 @@
 import type { Identity } from './types';
 
 /**
- * Groups for the mock person. They must intersect the `presentation.access:` groups of the manifests in MANIFEST_DIR or
+ * Groups for the mock person. They must intersect the `presentation.access:` groups of the manifests in apps/ or
  * zero tiles render. OTHALA_DEV_MOCK_GROUPS sets the list, and `?dev-groups=a,b` overrides it for one request.
  */
 function mockGroups(url: URL): string[] {

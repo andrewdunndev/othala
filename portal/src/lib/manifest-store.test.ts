@@ -1,11 +1,11 @@
 // Invariant: one bad manifest must not take the portal down.
 
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
-import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdtempSync, mkdirSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
-import { invalidateManifestCache, setManifestDir } from './manifests.js';
+import { invalidateManifestCache, setContentDir } from './manifests.js';
 import {
   servingManifests,
   servingManifest,
@@ -48,6 +48,7 @@ presentation:
     - audiobookshelf-access
 `;
 
+let root: string;
 let dir: string;
 let logged: string[];
 
@@ -57,8 +58,10 @@ function write(name: string, body: string): void {
 }
 
 beforeEach(() => {
-  dir = mkdtempSync(join(tmpdir(), 'othala-manifest-store-'));
-  setManifestDir(dir);
+  root = mkdtempSync(join(tmpdir(), 'othala-manifest-store-'));
+  dir = join(root, 'apps');
+  mkdirSync(dir);
+  setContentDir(root);
   invalidateManifestCache();
   _resetForTests();
   logged = [];
@@ -69,8 +72,8 @@ beforeEach(() => {
 
 afterEach(() => {
   vi.restoreAllMocks();
-  setManifestDir(undefined);
-  rmSync(dir, { recursive: true, force: true });
+  setContentDir(undefined);
+  rmSync(root, { recursive: true, force: true });
 });
 
 describe('servingManifests — healthy set', () => {
@@ -104,7 +107,7 @@ describe('servingManifests — the directory itself fails to load', () => {
   function breakDir(): void {
     const file = join(dir, 'not-a-dir');
     writeFileSync(file, '');
-    setManifestDir(file);
+    setContentDir(file);
     invalidateManifestCache();
   }
 
@@ -120,7 +123,7 @@ describe('servingManifests — the directory itself fails to load', () => {
     expect(health.error).toContain('ENOTDIR');
     expect(logged.some((line) => line.includes('[portal:manifests] STALE'))).toBe(true);
 
-    setManifestDir(dir);
+    setContentDir(root);
     invalidateManifestCache();
     expect(servingManifests()).toHaveLength(1);
     expect(manifestHealth().status).toBe('ok');
