@@ -57,7 +57,7 @@ additional internal-only network does not hide its admin port from the first
 one. Segmentation needs that second network **and** an admin listener bound to
 its address. A deployment doing only the first has the appearance of isolation
 and none of it. The admin bind address is therefore a required variable, and
-`scripts/render-config.sh` fails the render when any token is unset, though
+the Ory config render fails when any token is unset, though
 nothing can check *which* address you supplied.
 
 The portal reaches the admin API with no mTLS and no client certificate, so
@@ -76,7 +76,7 @@ marker on every request — `e2e/playwright/tests/d-admin-aal2-stepup.spec.ts` a
 The shape of that boundary, laid out end to end:
 
 <figure class="diagram">
-  <img src="/diagrams/trust-boundary.svg" alt="A browser reaches one hostname at the edge proxy, which terminates TLS. Inside one trust domain the admin APIs never leave: the app runs two listeners, a public SSR listener the edge reaches and an admin listener bound to PORTAL_ADMIN_BIND_HOST that the edge never touches; Kratos and Hydra each expose the edge a public API — self-service and sessions for Kratos, authorize, token and discovery for Hydra — while the app alone calls their admin APIs. Kratos and Hydra each keep a separate Postgres database. Admin APIs are reachable only from the app, never from the edge, enforced by scripts/render-config.sh, requireAdminSession, and pinned by d-admin-aal2-stepup.spec.ts and f-aal2-bypass.spec.ts.">
+  <img src="/diagrams/trust-boundary.svg" alt="A browser reaches one hostname at the edge proxy, which terminates TLS. Inside one trust domain the admin APIs never leave: the app runs two listeners, a public SSR listener the edge reaches and an admin listener bound to PORTAL_ADMIN_BIND_HOST that the edge never touches; Kratos and Hydra each expose the edge a public API — self-service and sessions for Kratos, authorize, token and discovery for Hydra — while the app alone calls their admin APIs. Kratos and Hydra each keep a separate Postgres database. Admin APIs are reachable only from the app, never from the edge, enforced by the Ory config render, requireAdminSession, and pinned by d-admin-aal2-stepup.spec.ts and f-aal2-bypass.spec.ts.">
   <figcaption class="diagram-caption">Three ports on the network; the admin APIs are not among them</figcaption>
 </figure>
 

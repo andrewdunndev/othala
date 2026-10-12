@@ -47,8 +47,8 @@ mail templates in `kratos/courier/`. The recovery gate (`docs/runbooks/admin-rec
 byte-diff them against the pinned ref on every promotion, and port any diff
 upstream, never patch locally.
 
-`scripts/render-config.sh` supplies the `${VAR}` values at render time; that is
-not divergence. Render each `kratos/courier/*.gotmpl` to the same file name and
+`node dist/server/config.mjs render`, run from the othala image, supplies the
+`${VAR}` values; that is not divergence. Render each `kratos/courier/*.gotmpl` to the same file name and
 mount the directory at `/etc/config/kratos/courier/`, or code emails fail at send.
 
 ## Environment contract

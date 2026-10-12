@@ -85,7 +85,7 @@
 <line class="e" x1="40" y1="498" x2="680" y2="498" stroke="#e0e0e0" stroke-width="1"/>
 <text class="m" x="40" y="518" font-family="'IBM Plex Mono', Menlo, monospace" font-size="11.5" font-weight="700" letter-spacing="1.2" fill="#707070">ADMIN-API ISOLATION</text>
 <text class="a" x="40" y="540" font-size="13" font-weight="700" fill="#4a6741">Admin APIs are reachable only from the app — never from the edge.</text>
-<text class="m" x="40" y="558" font-size="10.5" fill="#707070">Enforced by scripts/render-config.sh (fails the render when the admin bind-address token is unset),</text>
+<text class="m" x="40" y="558" font-size="10.5" fill="#707070">Enforced by the Ory config render (fails when the admin bind-address token is unset),</text>
 <text class="m" x="40" y="572" font-size="10.5" fill="#707070">requireAdminSession (portal/src/lib/admin.ts), and pinned by d-admin-aal2-stepup.spec.ts + f-aal2-bypass.spec.ts.</text>
 </g>
 </svg>
