@@ -1,4 +1,4 @@
-// Ory config render: the image's policy templates plus env values and secrets, out to files Ory reads.
+// Config render: the image's policy templates plus env values and secrets, out to files Ory and Caddy read.
 // Errors name variables, never values. Env is a parameter here; only the CLI reads process.env.
 
 import { randomBytes } from 'node:crypto';
@@ -12,12 +12,18 @@ export type Env = Record<string, string | undefined>;
 export type RenderedFile = { path: string; content: string };
 
 /** Policy files rendered with `${NAME}` substitution, by path under the policy dir. */
-const TEMPLATES = ['kratos/kratos.yml', 'hydra/hydra.yml'];
+const TEMPLATES = ['kratos/kratos.yml', 'hydra/hydra.yml', 'caddy/othala.caddy'];
 /** Policy files copied as they are. */
 const LITERALS = ['kratos/identity.schema.json', 'kratos/hooks/recovery-gate.jsonnet'];
 const COURIER_DIR = 'kratos/courier';
 /** The only values a courier override may name: identity, never a secret. */
 const COURIER_TOKENS = ['OTHALA_APEX', 'OTHALA_INSTANCE_NAME', 'OTHALA_PUBLIC_URL'];
+/** The only value the edge snippets may name. Caddy's own syntax opens with `{`, never `$`. */
+const CADDY_TOKENS = ['OTHALA_PUBLIC_URL'];
+/** Rendered trees that hold no secret, readable by an edge running under another uid. */
+const PUBLIC_TREES = new Set(['caddy']);
+/** scheme://host[:port], lowercase, with no path: the value lands as one bare Caddyfile token and in Ory URLs. */
+const ORIGIN_RE = /^https?:\/\/[a-z0-9]([a-z0-9-]*[a-z0-9])?(\.[a-z0-9]([a-z0-9-]*[a-z0-9])?)*(:[0-9]{1,5})?$/;
 
 /** Secrets a render requires, set and non-blank, whether or not a template names them. */
 export const SECRETS = [
@@ -53,9 +59,10 @@ const NONEMPTY_BINDS = ['KRATOS_ADMIN_BIND_HOST', 'HYDRA_ADMIN_BIND_HOST'];
 
 export class RenderError extends Error {}
 
-type Mode = 'yaml' | 'html' | 'text';
+type Mode = 'yaml' | 'html' | 'text' | 'caddy';
 
 function modeOf(path: string): Mode {
+  if (path.endsWith('.caddy')) return 'caddy';
   if (path.endsWith('.html.gotmpl')) return 'html';
   if (path.endsWith('.gotmpl')) return 'text';
   return 'yaml';
@@ -115,7 +122,8 @@ function tokens(text: string): string[] {
 const escapeYaml = (v: string) => v.replaceAll('\\', '\\\\').replaceAll('"', '\\"');
 const escapeHtml = (v: string) =>
   v.replaceAll('&', '&amp;').replaceAll('<', '&lt;').replaceAll('>', '&gt;').replaceAll('"', '&quot;').replaceAll("'", '&#x27;');
-const ESCAPE: Record<Mode, (v: string) => string> = { yaml: escapeYaml, html: escapeHtml, text: (v) => v };
+// A Caddyfile has no escape for a bare token; the caddy value is validated instead (ORIGIN_RE).
+const ESCAPE: Record<Mode, (v: string) => string> = { yaml: escapeYaml, html: escapeHtml, text: (v) => v, caddy: (v) => v };
 
 type Parsed = { resolved: string; needed: string[]; mode: Mode };
 
@@ -132,6 +140,9 @@ function valueErrors(path: string, names: string[], mode: Mode, env: Env): strin
   const errors: string[] = [];
   for (const name of NONEMPTY_BINDS) {
     if (names.includes(name) && env[name]!.trim() === '') errors.push(`${path}: ${name} must not be empty`);
+  }
+  if (names.includes('OTHALA_PUBLIC_URL') && !ORIGIN_RE.test(env.OTHALA_PUBLIC_URL!)) {
+    errors.push(`${path}: OTHALA_PUBLIC_URL must be a lowercase origin, scheme://host[:port], with no path or trailing slash`);
   }
   for (const name of names) {
     const val = env[name]!;
@@ -185,9 +196,10 @@ export function check(policyDir: string, contentDir: string, env: Env, scope: 'a
   for (const { path, label, file } of sources(policyDir, contentDir)) {
     try {
       const { needed, mode } = parseTemplate(label, readFileSync(file, 'utf8'), env);
-      const foreign = label === path ? [] : needed.filter((n) => !COURIER_TOKENS.includes(n));
+      const [allowed, what] = label !== path ? [COURIER_TOKENS, 'an override'] : mode === 'caddy' ? [CADDY_TOKENS, 'the edge snippets'] : [null, ''];
+      const foreign = allowed === null ? [] : needed.filter((n) => !allowed.includes(n));
       if (foreign.length > 0) {
-        errors.push(`${label}: an override may name only ${COURIER_TOKENS.join(', ')}; remove ${foreign.join(', ')}`);
+        errors.push(`${label}: ${what} may name only ${allowed!.join(', ')}; remove ${foreign.join(', ')}`);
         continue;
       }
       errors.push(...valueErrors(label, needed.filter((n) => !secrets.has(n)), mode, env));
@@ -220,7 +232,7 @@ export function render(policyDir: string, contentDir: string, env: Env): Rendere
   for (const path of LITERALS) files.push({ path, content: readFileSync(join(policyDir, path), 'utf8') });
   for (const { path, content } of files) {
     if (content.includes('${')) errors.push(`${path}: \${ left in the rendered output`);
-    if (TEMPLATES.includes(path)) {
+    if (TEMPLATES.includes(path) && modeOf(path) === 'yaml') {
       try {
         parse(content, { logLevel: 'error' });
       } catch {
@@ -232,19 +244,21 @@ export function render(policyDir: string, contentDir: string, env: Env): Rendere
   return files;
 }
 
-/** Writes the rendered set under `outDir`, owner-only, replacing any earlier render of the same trees. */
+/** Writes the rendered set under `outDir`, owner-only except the secret-free PUBLIC_TREES, replacing any earlier
+ *  render of the same trees. */
 export function writeRendered(outDir: string, files: RenderedFile[]): void {
   const previous = process.umask(0o077);
   try {
-    for (const top of new Set(files.map(({ path }) => path.split('/')[0]))) {
-      rmSync(join(outDir, top), { recursive: true, force: true });
-    }
+    const tops = new Set(files.map(({ path }) => path.split('/')[0]));
+    for (const top of tops) rmSync(join(outDir, top), { recursive: true, force: true });
     for (const { path, content } of files) {
       const target = join(outDir, path);
+      const open = PUBLIC_TREES.has(path.split('/')[0]);
       mkdirSync(dirname(target), { recursive: true, mode: 0o700 });
       writeFileSync(target, content, { mode: 0o600 });
-      chmodSync(target, 0o600);
+      chmodSync(target, open ? 0o644 : 0o600);
     }
+    for (const top of tops) if (PUBLIC_TREES.has(top)) chmodSync(join(outDir, top), 0o755);
   } finally {
     process.umask(previous);
   }

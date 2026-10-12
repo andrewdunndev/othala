@@ -1,4 +1,4 @@
-// Ory config CLI, run from the portal image as a one-shot before Kratos and Hydra start:
+// Config CLI, run from the portal image as a one-shot before Kratos, Hydra and Caddy start:
 //   node dist/server/config.mjs render [--policy <dir>] [--content <dir>] [--out <dir>]
 //   node dist/server/config.mjs check [--policy <dir>] [--content <dir>]
 //   node dist/server/config.mjs gen-secrets [--content <dir>]

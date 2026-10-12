@@ -1,0 +1,164 @@
+# Othala's edge as three Caddy snippets, written out by `node dist/server/config.mjs render`; do not edit the
+# rendered copy. Needs the caddy-ratelimit module. The importing site Caddyfile owns the site address, TLS and
+# its DNS provider, trusted_proxies, proxy_protocol and listeners:
+#
+#   import /etc/caddy/othala/othala.caddy
+#   sso.example.org {
+#   	import othala-routes
+#   }
+#   wiki.example.org {
+#   	import othala-oidc-app wiki 3000
+#   }
+#   media.example.org {
+#   	import othala-forward-auth media 8096 media-access
+#   }
+#
+# Each snippet is one route block: Caddy runs a route's directives in the order written, so rate_limit needs no
+# global `order` line and the identity strip runs before forward_auth. A client-supplied identity header is
+# dropped at every site; only forward_auth's copy_headers sets one, from the portal's answer.
+
+# The site at OTHALA_PUBLIC_URL: Kratos browser paths, Hydra's public OAuth2 surface, the app as the default.
+(othala-routes) {
+	route {
+		request_header -X-Kratos-Authenticated-Identity-Id
+		request_header -X-Kratos-Groups
+		request_header -X-Remote-User
+		request_header -X-Remote-Groups
+		request_header -X-Remote-Email
+		request_header -X-Remote-Name
+		request_header -X-Forwarded-User
+		request_header -X-Forwarded-Groups
+		request_header -X-Forwarded-Email
+		request_header -X-Auth-Request-User
+		request_header -X-Auth-Request-Groups
+		request_header -X-Auth-Request-Email
+
+		# Public write paths of the device grant: a secretless client mints a device_code row per call, and the
+		# code form accepts guesses.
+		@device_entry path /oauth2/device/auth /device/verify
+		rate_limit @device_entry {
+			zone othala_device {
+				key    {client_ip}
+				events 30
+				window 1m
+			}
+		}
+
+		# Kratos browser endpoints, limited per client against email-bombing through repeated code requests.
+		@kratos path /.well-known/ory/* /self-service/* /sessions/* /schemas/*
+		rate_limit @kratos {
+			zone othala_selfservice {
+				key    {client_ip}
+				events 30
+				window 1m
+			}
+		}
+
+		# Every upstream sees the verified client address: @astrojs/node reads the leftmost X-Forwarded-For entry,
+		# so a client-supplied prefix would land in a fresh rate-limit bucket on every request.
+		@hydra path /oauth2/auth /oauth2/token /oauth2/device/auth /oauth2/device/verify /oauth2/revoke /oauth2/sessions/logout /oauth2/fallbacks/* /.well-known/openid-configuration /.well-known/jwks.json /userinfo
+		handle @hydra {
+			reverse_proxy hydra:4444 {
+				header_up X-Forwarded-For {client_ip}
+				header_up X-Real-IP {client_ip}
+			}
+		}
+
+		@portal_challenges path /oauth2/login /oauth2/consent /oauth2/logout
+		handle @portal_challenges {
+			reverse_proxy othala:8080 {
+				header_up X-Forwarded-For {client_ip}
+				header_up X-Real-IP {client_ip}
+			}
+		}
+
+		handle @kratos {
+			reverse_proxy kratos:4433 {
+				header_up X-Forwarded-For {client_ip}
+				header_up X-Real-IP {client_ip}
+			}
+		}
+
+		# The app is the default, so its static assets (/_astro/*, favicon, manifest) keep their Content-Type.
+		handle {
+			reverse_proxy othala:8080 {
+				header_up X-Forwarded-For {client_ip}
+				header_up X-Real-IP {client_ip}
+			}
+		}
+	}
+}
+
+# An app with no usable SSO: the portal's /api/forward-auth checks the session and the group.
+# Args: upstream host, upstream port, required group. A missing group is refused with 403.
+(othala-forward-auth) {
+	route {
+		request_header -X-Kratos-Authenticated-Identity-Id
+		request_header -X-Kratos-Groups
+		request_header -X-Remote-User
+		request_header -X-Remote-Groups
+		request_header -X-Remote-Email
+		request_header -X-Remote-Name
+		request_header -X-Forwarded-User
+		request_header -X-Forwarded-Groups
+		request_header -X-Forwarded-Email
+		request_header -X-Auth-Request-User
+		request_header -X-Auth-Request-Groups
+		request_header -X-Auth-Request-Email
+
+		# Status contract: portal/src/pages/api/forward-auth.ts. Any non-2xx is a denial; these arms only choose
+		# what it looks like. Only 401 goes to login: a 403 would come straight back after sign-in, and a 503
+		# bounced to the login page of a portal that is down loops.
+		forward_auth othala:8080 {
+			uri /api/forward-auth?group={args[2]}
+			copy_headers X-Kratos-Authenticated-Identity-Id
+
+			# return_to must be absolute, built from the request being gated, or the user lands on the portal.
+			# kratos.yml `allowed_return_urls` bounds it: an off-apex Host yields a value Kratos refuses.
+			@unauthorized status 401
+			handle_response @unauthorized {
+				redir ${OTHALA_PUBLIC_URL}/auth/login?return_to={http.request.scheme}://{http.request.host}{http.request.uri.path} 302
+			}
+
+			@denied status 403
+			handle_response @denied {
+				header Content-Type "text/html; charset=utf-8"
+				respond "<!doctype html><title>Access denied</title><h1>Access denied</h1><p>You are signed in, but this app admits only members of a group you are not in. Ask whoever runs your sign-in to add you, then reload this page.</p>" 403
+			}
+
+			@idp_down status 503
+			handle_response @idp_down {
+				header Content-Type "text/html; charset=utf-8"
+				respond "<!doctype html><title>Sign-in unavailable</title><h1>Sign-in unavailable</h1><p>Your access could not be checked, so nothing was granted. This is not a decision about your account. Try again shortly.</p>" 503
+			}
+		}
+
+		# Forward-auth upstreams get no cookies, the Kratos session cookie included.
+		reverse_proxy {args[0]}:{args[1]} {
+			header_up -Cookie
+		}
+	}
+}
+
+# An app that speaks OIDC itself. Args: upstream host, upstream port.
+(othala-oidc-app) {
+	route {
+		request_header -X-Kratos-Authenticated-Identity-Id
+		request_header -X-Kratos-Groups
+		request_header -X-Remote-User
+		request_header -X-Remote-Groups
+		request_header -X-Remote-Email
+		request_header -X-Remote-Name
+		request_header -X-Forwarded-User
+		request_header -X-Forwarded-Groups
+		request_header -X-Forwarded-Email
+		request_header -X-Auth-Request-User
+		request_header -X-Auth-Request-Groups
+		request_header -X-Auth-Request-Email
+
+		# The app keeps its own cookies; only the Kratos session cookie (session.cookie.name in kratos.yml) is
+		# removed. Caddy has no single-cookie delete, hence the regexp replace.
+		request_header Cookie "(^|;\s*)ory_kratos_session=[^;]*" ""
+		reverse_proxy {args[0]}:{args[1]}
+	}
+}
