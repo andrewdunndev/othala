@@ -48,8 +48,9 @@ no secret is configured, so a misconfigured deployment refuses rather than opens
 
 **Inbound headers are never an identity claim.** Group membership and identity id come from Kratos,
 never from a request header. Every snippet in `caddy/othala.caddy` first deletes the inbound identity
-id and the whole `X-Remote-*` / `X-Forwarded-User` / `X-Auth-Request-*` family, so the upstream
-receives only the id taken from the auth response. Each snippet is a `route` block because Caddy's
+id and every header in the `Remote-*`, `X-Remote-*`, `X-Forwarded-User*`, `X-Auth-Request-*`,
+`X-Webauth-*` and `X-Authentik-*` families, so the upstream receives only the id taken from the auth
+response. Each snippet is a `route` block because Caddy's
 default directive order would otherwise run `forward_auth` ahead of `request_header` and strip the
 verified id. Of the cookies, `othala-oidc-app` removes only the Kratos session cookie.
 

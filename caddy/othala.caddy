@@ -22,16 +22,15 @@
 	route {
 		request_header -X-Kratos-Authenticated-Identity-Id
 		request_header -X-Kratos-Groups
-		request_header -X-Remote-User
-		request_header -X-Remote-Groups
-		request_header -X-Remote-Email
-		request_header -X-Remote-Name
-		request_header -X-Forwarded-User
+		request_header -Remote-*
+		request_header -X-Remote-*
+		request_header -X-Forwarded-User*
 		request_header -X-Forwarded-Groups
 		request_header -X-Forwarded-Email
-		request_header -X-Auth-Request-User
-		request_header -X-Auth-Request-Groups
-		request_header -X-Auth-Request-Email
+		request_header -X-Forwarded-Preferred-Username
+		request_header -X-Auth-Request-*
+		request_header -X-Webauth-*
+		request_header -X-Authentik-*
 
 		# Public write paths of the device grant: a secretless client mints a device_code row per call, and the
 		# code form accepts guesses.
@@ -54,8 +53,8 @@
 			}
 		}
 
-		# Every upstream sees the verified client address: @astrojs/node reads the leftmost X-Forwarded-For entry,
-		# so a client-supplied prefix would land in a fresh rate-limit bucket on every request.
+		# Every upstream sees {client_ip} as trusted_proxies resolves it: @astrojs/node reads the leftmost
+		# X-Forwarded-For entry, so a client-supplied prefix would land in a fresh rate-limit bucket on every request.
 		@hydra path /oauth2/auth /oauth2/token /oauth2/device/auth /oauth2/device/verify /oauth2/revoke /oauth2/sessions/logout /oauth2/fallbacks/* /.well-known/openid-configuration /.well-known/jwks.json /userinfo
 		handle @hydra {
 			reverse_proxy hydra:4444 {
@@ -95,16 +94,15 @@
 	route {
 		request_header -X-Kratos-Authenticated-Identity-Id
 		request_header -X-Kratos-Groups
-		request_header -X-Remote-User
-		request_header -X-Remote-Groups
-		request_header -X-Remote-Email
-		request_header -X-Remote-Name
-		request_header -X-Forwarded-User
+		request_header -Remote-*
+		request_header -X-Remote-*
+		request_header -X-Forwarded-User*
 		request_header -X-Forwarded-Groups
 		request_header -X-Forwarded-Email
-		request_header -X-Auth-Request-User
-		request_header -X-Auth-Request-Groups
-		request_header -X-Auth-Request-Email
+		request_header -X-Forwarded-Preferred-Username
+		request_header -X-Auth-Request-*
+		request_header -X-Webauth-*
+		request_header -X-Authentik-*
 
 		# Status contract: portal/src/pages/api/forward-auth.ts. Any non-2xx is a denial; these arms only choose
 		# what it looks like. Only 401 goes to login: a 403 would come straight back after sign-in, and a 503
@@ -113,11 +111,11 @@
 			uri /api/forward-auth?group={args[2]}
 			copy_headers X-Kratos-Authenticated-Identity-Id
 
-			# return_to must be absolute, built from the request being gated, or the user lands on the portal.
-			# kratos.yml `allowed_return_urls` bounds it: an off-apex Host yields a value Kratos refuses.
+			# return_to must be absolute, built from the request being gated, or the user lands on the portal. The path and
+			# query ride query-escaped; kratos.yml `allowed_return_urls` bounds the result, so an off-apex Host is refused.
 			@unauthorized status 401
 			handle_response @unauthorized {
-				redir ${OTHALA_PUBLIC_URL}/auth/login?return_to={http.request.scheme}://{http.request.host}{http.request.uri.path} 302
+				redir ${OTHALA_PUBLIC_URL}/auth/login?return_to={http.request.scheme}://{http.request.host}{http.request.uri_escaped} 302
 			}
 
 			@denied status 403
@@ -145,16 +143,15 @@
 	route {
 		request_header -X-Kratos-Authenticated-Identity-Id
 		request_header -X-Kratos-Groups
-		request_header -X-Remote-User
-		request_header -X-Remote-Groups
-		request_header -X-Remote-Email
-		request_header -X-Remote-Name
-		request_header -X-Forwarded-User
+		request_header -Remote-*
+		request_header -X-Remote-*
+		request_header -X-Forwarded-User*
 		request_header -X-Forwarded-Groups
 		request_header -X-Forwarded-Email
-		request_header -X-Auth-Request-User
-		request_header -X-Auth-Request-Groups
-		request_header -X-Auth-Request-Email
+		request_header -X-Forwarded-Preferred-Username
+		request_header -X-Auth-Request-*
+		request_header -X-Webauth-*
+		request_header -X-Authentik-*
 
 		# The app keeps its own cookies; only the Kratos session cookie (session.cookie.name in kratos.yml) is
 		# removed. Caddy has no single-cookie delete, hence the regexp replace.

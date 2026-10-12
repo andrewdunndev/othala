@@ -30,9 +30,14 @@ const TEMPLATE = readFileSync(join(root, 'caddy/othala.caddy'), 'utf8');
 const renderedCaddy = (env = ENV, policy = root) => render(policy, CONTENT, env).find((f) => f.path === 'caddy/othala.caddy').content;
 
 const STRIPPED = [
-  'X-Kratos-Authenticated-Identity-Id', 'X-Kratos-Groups', 'X-Remote-User', 'X-Remote-Groups', 'X-Remote-Email', 'X-Remote-Name',
-  'X-Forwarded-User', 'X-Forwarded-Groups', 'X-Forwarded-Email', 'X-Auth-Request-User', 'X-Auth-Request-Groups', 'X-Auth-Request-Email',
+  'X-Kratos-Authenticated-Identity-Id', 'X-Kratos-Groups', 'Remote-*', 'X-Remote-*', 'X-Forwarded-User*', 'X-Forwarded-Groups',
+  'X-Forwarded-Email', 'X-Forwarded-Preferred-Username', 'X-Auth-Request-*', 'X-Webauth-*', 'X-Authentik-*',
 ];
+
+// Caddy's header delete: case-insensitive, a trailing `*` matches by prefix.
+const strips = (name) => STRIPPED.some((p) => (p.endsWith('*')
+  ? name.toLowerCase().startsWith(p.slice(0, -1).toLowerCase())
+  : name.toLowerCase() === p.toLowerCase()));
 
 // The file's block tree: a line ending in `{` opens a block, a lone `}` closes it; placeholders never span lines.
 function tree(text) {
@@ -64,7 +69,7 @@ const routeOf = (name) => blocksOf(snippet(name))[0];
 
 test('render writes the snippets with the public URL substituted and every Caddy placeholder intact', () => {
   const text = renderedCaddy();
-  assert.ok(text.includes(`redir ${URL_VALUE}/auth/login?return_to={http.request.scheme}://{http.request.host}{http.request.uri.path} 302`));
+  assert.ok(text.includes(`redir ${URL_VALUE}/auth/login?return_to={http.request.scheme}://{http.request.host}{http.request.uri_escaped} 302`));
   assert.equal(text.includes('${'), false);
   const expected = placeholders(TEMPLATE.replace(/\$\{[A-Za-z_][A-Za-z0-9_]*\}/g, ''));
   assert.ok(expected.length >= 15 && expected.includes('{client_ip}') && expected.includes('{args[2]}'), 'placeholder corpus is vacuous');
@@ -118,6 +123,15 @@ test('every snippet strips the client identity headers first', () => {
   for (const name of ['othala-routes', 'othala-forward-auth', 'othala-oidc-app']) {
     const body = routeOf(name).body;
     assert.deepEqual(body.slice(0, STRIPPED.length), STRIPPED.map((h) => `request_header -${h}`), name);
+  }
+});
+
+test('the strip covers the identity headers other proxies and apps use, and leaves forwarding headers', () => {
+  for (const h of ['Remote-User', 'remote-groups', 'Remote-Email', 'Remote-Name', 'X-Remote-User', 'X-Remote-Uid', 'X-Forwarded-User',
+    'X-Forwarded-Username', 'X-Forwarded-Preferred-Username', 'X-Auth-Request-Preferred-Username', 'X-Auth-Request-Access-Token',
+    'X-Webauth-User', 'X-Authentik-Username', 'x-authentik-groups', 'X-Kratos-Groups']) assert.ok(strips(h), h);
+  for (const h of ['X-Forwarded-For', 'X-Forwarded-Proto', 'X-Forwarded-Host', 'X-Real-IP', 'Cookie', 'Authorization']) {
+    assert.ok(!strips(h), h);
   }
 });
 
