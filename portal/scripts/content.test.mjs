@@ -3,7 +3,7 @@
 
 import { test } from 'vitest';
 import assert from 'node:assert/strict';
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -123,4 +123,29 @@ test('an invalid, unparseable, duplicated or retired-field manifest is refused',
   assert.deepEqual(errorsFor({ 'apps/wiki.yaml': `${APP('wiki')}`.replace('  access: [family]\n', '  access: [family]\n  icon_slug: wiki\n') }), [
     'apps/wiki.yaml: presentation.icon_slug and icon_fallback are retired: drop the logo beside the manifest as <stem>.svg',
   ]);
+});
+
+test('a broken symlink is a finding, not a crash', () => {
+  const root = mkdtempSync(join(tmpdir(), 'othala-content-link-'));
+  try {
+    mkdirSync(join(root, 'apps'));
+    symlinkSync('/nonexistent/wiki.yaml', join(root, 'apps', 'wiki.yaml'));
+    assert.ok(contentErrors(root, COURIER).includes('apps/wiki.yaml: broken symlink; fix or delete it'));
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test('a courier override linking outside the content directory is refused', () => {
+  const root = mkdtempSync(join(tmpdir(), 'othala-content-link-'));
+  try {
+    mkdirSync(join(root, 'apps'));
+    mkdirSync(join(root, 'courier'));
+    writeFileSync(join(root, 'courier', '.real'), 'x');
+    symlinkSync('/etc/hosts', join(root, 'courier', 'login_code.subject.gotmpl'));
+    symlinkSync(join(root, 'courier', '.real'), join(root, 'courier', 'recovery_code.subject.gotmpl'));
+    assert.deepEqual(contentErrors(root, COURIER), ['courier/login_code.subject.gotmpl: a link must stay inside the content directory; copy the file in']);
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
 });

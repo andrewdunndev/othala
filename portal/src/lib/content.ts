@@ -1,8 +1,8 @@
 // The deployment content tree under the content root: its layout, the app manifests, their sidecars and groups.yaml.
 // Every finding names the file and the fix. Dot-entries are skipped, so a Kubernetes ConfigMap mount checks clean.
 
-import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs';
-import { join } from 'node:path';
+import { existsSync, lstatSync, readdirSync, readFileSync, realpathSync, statSync } from 'node:fs';
+import { dirname, join, sep } from 'node:path';
 import { parse as parseYaml } from 'yaml';
 import { lintManifests } from './manifest-lint';
 import { needsClientSecret, parseManifest, secretEnvVar, validateClients, type ClientManifest } from './manifests';
@@ -20,7 +20,18 @@ function entries(dir: string): string[] {
     .sort();
 }
 
-const isDir = (path: string) => statSync(path).isDirectory();
+const isDir = (path: string) => statSync(path, { throwIfNoEntry: false })?.isDirectory() ?? false;
+
+function brokenLinkErrors(dir: string, label: string): string[] {
+  return entries(dir).flatMap((f) => {
+    const path = join(dir, f);
+    const rel = label ? `${label}/${f}` : f;
+    if (statSync(path, { throwIfNoEntry: false }) === undefined) return [`${rel}: broken symlink; fix or delete it`];
+    return lstatSync(path).isDirectory() ? brokenLinkErrors(path, rel) : [];
+  });
+}
+
+const within = (root: string, path: string) => path === root || path.startsWith(root + sep);
 
 export interface AppsLint {
   manifests: ClientManifest[];
@@ -106,15 +117,20 @@ function groupsErrors(path: string): string[] {
 
 function courierErrors(dir: string, defaults: readonly string[]): string[] {
   if (!isDir(dir)) return ['courier: must be a directory of <name>.gotmpl overrides'];
-  return entries(dir)
-    .filter((f) => !defaults.includes(f) || isDir(join(dir, f)))
-    .map((f) => `courier/${f}: no shipped template has this name; an override is one of ${defaults.join(', ')}`);
+  const root = realpathSync(dirname(dir));
+  return entries(dir).flatMap((f) => {
+    const path = join(dir, f);
+    if (!defaults.includes(f) || isDir(path)) {
+      return [`courier/${f}: no shipped template has this name; an override is one of ${defaults.join(', ')}`];
+    }
+    return existsSync(path) && !within(root, realpathSync(path)) ? [`courier/${f}: a link must stay inside the content directory; copy the file in`] : [];
+  });
 }
 
 /** Every layout, manifest, sidecar, groups.yaml and courier-name error under `contentDir`; reads no secrets. */
 export function contentErrors(contentDir: string, courierDefaults: readonly string[]): string[] {
   if (!existsSync(contentDir) || !isDir(contentDir)) return [`${contentDir}: content directory not found`];
-  const errors: string[] = [];
+  const errors: string[] = brokenLinkErrors(contentDir, '');
   for (const f of entries(contentDir)) {
     const path = join(contentDir, f);
     if (f === 'apps') {
