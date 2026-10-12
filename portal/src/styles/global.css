@@ -1,9 +1,6 @@
-/* Auth portal global styles.
- *
- * Consumes design tokens from the @dunn.dev/reference package
- * (file:../../design dependency). Do NOT define color, spacing, motion,
- * or typography values here. If a needed token doesn't exist, add it
- * upstream to dunn.dev/design/tokens/ and bump the design package. */
+/* Auth portal global styles. Tokens and the auth chrome come from
+ * @dunn.dev/reference: define no color, spacing, motion or typography values
+ * here; a missing token is added upstream in reference. */
 
 @import '@dunn.dev/reference/tokens/index.css';
 @import '@dunn.dev/reference/site.css';
