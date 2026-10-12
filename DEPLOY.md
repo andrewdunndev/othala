@@ -50,6 +50,10 @@ emails fail at send without the courier directory. The recovery gate
 (`docs/runbooks/admin-recovery.md` § 3) assumes these bytes. `check --content <dir>`
 runs the same validation offline, with no secrets.
 
+The render also writes `/run/othala/caddy/othala.caddy`; mount it at
+`/etc/caddy/othala` and import it from a site Caddyfile that owns the address,
+TLS, `trusted_proxies` and listeners. Caddy needs the `caddy-ratelimit` module.
+
 A deploy plane that still vendors `kratos/kratos.yml`, `hydra/hydra.yml`, the
 schema, the hook or `kratos/courier/` must copy them **verbatim**, byte-diff them
 against the pinned ref on every promotion, and port any diff upstream, never patch

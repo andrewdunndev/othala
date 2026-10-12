@@ -1,6 +1,5 @@
 # dunn.dev/othala -- container build + release pipeline.
-# build-othala publishes at the registry root; the production Caddyfile
-# snippets live in dunn.dev/caddy-estate (caddy/snippets/ is a reference copy).
+# build-othala publishes at the registry root.
 # Tags run build, e2e, sbom, release (sbom and release wait on e2e); main + Containerfile changes rebuild :short-sha.
 
 default:

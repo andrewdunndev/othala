@@ -104,12 +104,12 @@ Each names its enforcer and the test that fails if it stops working.
   (`portal/astro.config.mjs`) plus `portal/src/lib/csrf.ts`. Tests:
   `e2e/playwright/tests/m-security-headers.spec.ts`, `e2e/playwright/tests/r-admin-post-origin.spec.ts`,
   `portal/scripts/oauth2-handlers.test.mjs`.
-- **Abuse resistance ships with the install.** `caddy/Caddyfile` rate-limits the
+- **Abuse resistance ships with the install.** `othala-routes` in `caddy/othala.caddy` rate-limits the
   Kratos self-service paths keyed on the socket peer and overwrites
   `X-Forwarded-For` at every `reverse_proxy`, so a client cannot mint a fresh
   bucket per request; `kratos/kratos.yml` bounds password-hash work
-  (`hashers.argon2`) and code guessing (`max_submissions`, `lifespan`). The rate limits are
-  reference config with no automated test; the deploy plane owns the live edge.
+  (`hashers.argon2`) and code guessing (`max_submissions`, `lifespan`). No test
+  trips the rate limits.
 - **Credential and session hygiene.** Self-registration is disabled in
   `kratos/kratos.yml`, so enrolment is admin-initiated; breach checking and a
   minimum length gate passwords; a password change fires
@@ -132,7 +132,7 @@ Each names its enforcer and the test that fails if it stops working.
   theme script, so an XSS in the portal is not contained by CSP. See
   `site/src/content/docs/guides/hardening.md`.
 - **Rate limiting depends on a third-party Caddy module.** A binary built without
-  it refuses to load `caddy/Caddyfile`, so the failure is a refusal to start,
+  it refuses to load `caddy/othala.caddy`, so the failure is a refusal to start,
   not a silently unlimited edge. Confirm it is compiled in.
 - **Sessions are long-lived and `whoami` answers at the first assurance level**
   (`kratos/kratos.yml`, `session`). A stolen cookie stays valuable for the
