@@ -267,9 +267,6 @@ a.subtle:hover { color: var(--text); }
   :root:not([data-theme="light"]) { --tile-bg: var(--surface); --tile-shadow: none; }
 }
 
-/* One top bar height on every page, signed in or not (the Account and Sign out targets are 44px tall). */
-.header-inner { min-height: 4rem; box-sizing: border-box; }
-
 /* Top bar actions (signed-in pages): Account and Sign out on the right, in the same small mono type as the brand. */
 .header-actions { margin-left: auto; display: flex; align-items: center; gap: var(--space-1); }
 .header-actions:empty { display: none; }
@@ -297,7 +294,7 @@ a.subtle:hover { color: var(--text); }
 .site-footer { padding: 0; }
 .footer-inner { padding: var(--space-5); }
 @media (max-width: 640px) {
-  .header-inner, .page, .footer-inner { padding-left: var(--space-4); padding-right: var(--space-4); }
+  .page, .footer-inner { padding-left: var(--space-4); padding-right: var(--space-4); }
   .header-link { padding: 0 var(--space-2); }
   .page.page-compact { padding-top: var(--space-4); }
 }
