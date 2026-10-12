@@ -14,12 +14,12 @@ auth.othala.test:80 {
 	import othala-routes
 }
 
-# ZI1 navigates here with a granted session.
+# ZI1 and T8/T10 reach the stub through the gate; it echoes the identity, spoof and cookie headers it was sent.
 proxywatch.othala.test:80 {
 	import othala-forward-auth 127.0.0.1 8081 proxywatch-access
 }
 
 :8081 {
 	bind 127.0.0.1
-	respond "proxywatch-stub" 200
+	respond "proxywatch-stub id={http.request.header.X-Kratos-Authenticated-Identity-Id} spoof={http.request.header.X-Remote-User}{http.request.header.Remote-User} cookie={http.request.header.Cookie}" 200
 }

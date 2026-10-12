@@ -4,6 +4,7 @@
  * enrolled through the settings flow at runtime).
  */
 
+import { createHash } from 'node:crypto';
 import { test as base } from '@playwright/test';
 import type { BrowserContext, CDPSession } from 'playwright-core';
 import { createIdentityWithPassword, TEST_PASSWORD, type SeedResult } from '../actions/identity';
@@ -275,7 +276,20 @@ export interface OthalaFixtures {
   virtualAuthenticator: { authenticatorId: string };
 }
 
+/**
+ * A client address for the edge to key its rate limits on: the e2e Caddy trusts the runner as a proxy, so
+ * `{client_ip}` is this X-Forwarded-For value. One per test attempt keeps the suite under the per-client zones.
+ */
+export function clientAddress(seed: string): string {
+  const [a, b] = createHash('sha256').update(seed).digest();
+  return `10.99.${a}.${b}`;
+}
+
 export const test = base.extend<OthalaFixtures, OthalaWorkerFixtures>({
+  extraHTTPHeaders: async ({}, use, testInfo) => {
+    await use({ 'X-Forwarded-For': clientAddress(`${testInfo.testId}:${testInfo.retry}`) });
+  },
+
   baseURL: async ({}, use) => {
     await use(process.env.BASE ?? 'http://auth.othala.test');
   },
