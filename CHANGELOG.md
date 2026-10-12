@@ -29,7 +29,7 @@ The image carries the Ory and edge policy and renders it from the deployment's e
 - Content moves to `/etc/othala`: manifests and their `.md` and `.svg` sidecars, `requirements/` and `NOTICE` in `apps/`, and `groups.yaml` at the root. `/etc/portal/manifests` is no longer read.
 - A retired env name, or an `OTHALA_*` name othala does not read, stops the portal at boot and fails `check` and `render`, naming the fix. The table is `RETIRED_NAMES` in `portal/src/lib/env-names.ts`.
 - `npm run lint:manifests` and `manifest-lint.mjs` take the content root and fail on a BLOCK finding.
-- The render empties each output directory in place, and the image carries `/run/othala/{kratos,hydra,caddy}` owned by uid 10000, so each can be a fresh named volume.
+- The render empties each output directory in place, also when it refuses, and the image carries `/run/othala/{kratos,hydra,caddy}` owned by uid 10000, so each can be a fresh named volume.
 
 ### Removed
 
@@ -47,7 +47,7 @@ In this order, for an existing deployment; [`deploy/example/`](deploy/example/) 
 4. Mount its `/run/othala/kratos`, `/run/othala/hydra` and `/run/othala/caddy` read-only at `/etc/config/kratos`, `/etc/config/hydra` and `/etc/caddy/othala`, and order Kratos, Hydra, both migrate units and Caddy after it. Mount the content root read-only at `/etc/othala` on the portal and the render, in place of `/etc/portal/manifests`.
 5. Cut your Caddyfile to the imports and what is yours, as in `deploy/example/Caddyfile`: site addresses, TLS and the DNS provider in the site blocks; `trusted_proxies`, `proxy_protocol` and listeners in the global options. Delete your copied routes, snippets and their `tls`, and your global `order rate_limit` unless your own blocks use `rate_limit` outside a `route`. Your Caddy build needs `caddy-ratelimit` and a DNS module.
 6. Behind a load balancer, keep `trusted_proxies_strict` (or a `client_ip_headers` header the balancer overwrites): both rate-limit zones, `othala_device` and `othala_selfservice`, key on `{client_ip}`. Zones you named differently start from zero, which is harmless.
-7. Delete your vendored Ory files, courier templates, renderer and Caddy snippets, and any drift check over them.
+7. Delete your vendored Ory files, courier templates, renderer and Caddy snippets, any drift check over them, and every env var on Kratos and Hydra.
 
 ## [0.14.0] - 2026-10-11
 
