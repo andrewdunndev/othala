@@ -34,7 +34,7 @@ For an OIDC app added later, copy only its `<CLIENT_ID>_CLIENT_SECRET` line from
 
 ## Startup order
 
-The render runs first, as uid 10000 (the Kratos and Hydra uid), then both migrate jobs, Kratos and Hydra, and
+The render runs first as uid 10000, the Kratos image's uid (Hydra runs as 10000 too; its image defaults to nonroot). Then come both migrate jobs, Kratos and Hydra, and
 the portal; Caddy waits only for the render. With quadlets the render is a `Type=oneshot`,
 `RemainAfterExit=yes` unit writing a host tmpfs `/run/othala`; Kratos, Hydra, both migrate units and Caddy take
 `Requires=` and `After=` on it and mount `/run/othala/{kratos,hydra,caddy}` read-only at `/etc/config/kratos`,

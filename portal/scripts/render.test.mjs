@@ -194,6 +194,19 @@ test('a render replaces the earlier trees and leaves no stale files', () => {
   });
 });
 
+test('a re-render clears nested stale entries and leaves nothing staged', () => {
+  withDir((dir) => {
+    writeRendered(dir, render(root, CONTENT, ENV));
+    mkdirSync(join(dir, 'kratos/old/deeper'), { recursive: true });
+    writeFileSync(join(dir, 'kratos/old/deeper/stale.txt'), 'old');
+    writeRendered(dir, render(root, CONTENT, ENV));
+    assert.equal(existsSync(join(dir, 'kratos/old')), false);
+    for (const path of OUTPUTS) assert.equal(existsSync(join(dir, path)), true, path);
+    const staged = readdirSync(dir, { recursive: true }).filter((f) => String(f).includes('.render-'));
+    assert.deepEqual(staged, []);
+  });
+});
+
 test('a render empties each tree in place, so a tree can be a mount point', () => {
   withDir((dir) => {
     for (const top of ['kratos', 'hydra', 'caddy']) mkdirSync(join(dir, top), { mode: 0o755 });

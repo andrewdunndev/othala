@@ -59,3 +59,12 @@ test('the e2e overlay runs the example Ory commands, adding only its config laye
     assert.deepEqual(stripped, compose.services[svc].command, svc);
   }
 });
+
+test('every service reading an owner-only rendered tree runs as the render uid', () => {
+  const ownerOnly = new Set(['othala-kratos', 'othala-hydra']);
+  const readers = Object.entries(compose.services).filter(([name, s]) =>
+    name !== 'render' && (s.volumes ?? []).some((v) => ownerOnly.has(typeof v === 'string' ? v.split(':')[0] : v.source)),
+  );
+  assert.ok(readers.length >= 4);
+  for (const [name, s] of readers) assert.equal(s.user, compose.services.render.user, `${name} cannot read 0600 files`);
+});

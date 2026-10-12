@@ -45,6 +45,7 @@ services:
 
   kratos-migrate:
     image: docker.io/oryd/kratos:v26.2.0@sha256:2a13bb8d362c7a7ae33bd7c0f5168aee46921f15c916a06346db91c06dc76643
+    user: "10000:10000"
     restart: "no"
     command: ["migrate", "sql", "-e", "--yes", "--config", "/etc/config/kratos/kratos.yml"]
     read_only: true
@@ -62,6 +63,7 @@ services:
 
   kratos:
     image: docker.io/oryd/kratos:v26.2.0@sha256:2a13bb8d362c7a7ae33bd7c0f5168aee46921f15c916a06346db91c06dc76643
+    user: "10000:10000"
     restart: unless-stopped
     command: ["serve", "--config", "/etc/config/kratos/kratos.yml", "--watch-courier"]
     read_only: true
@@ -88,6 +90,7 @@ services:
 
   hydra-migrate:
     image: docker.io/oryd/hydra:v26.2.0@sha256:ff67c7fb5f95074fa53374d41151713554960504b340cd3f95b09e65deaea2a9
+    user: "10000:10000"
     restart: "no"
     command: ["migrate", "sql", "-e", "--yes", "--config", "/etc/config/hydra/hydra.yml"]
     read_only: true
@@ -105,6 +108,7 @@ services:
 
   hydra:
     image: docker.io/oryd/hydra:v26.2.0@sha256:ff67c7fb5f95074fa53374d41151713554960504b340cd3f95b09e65deaea2a9
+    user: "10000:10000"
     restart: unless-stopped
     command: ["serve", "all", "--config", "/etc/config/hydra/hydra.yml"]
     read_only: true

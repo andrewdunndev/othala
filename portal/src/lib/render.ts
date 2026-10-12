@@ -2,7 +2,7 @@
 // Errors name variables, never values. Env is a parameter here; only the CLI reads process.env.
 
 import { randomBytes } from 'node:crypto';
-import { chmodSync, existsSync, mkdirSync, readdirSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs';
+import { chmodSync, existsSync, mkdirSync, readdirSync, readFileSync, renameSync, rmSync, statSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { parse } from 'yaml';
 import { clientSecretNames, contentErrors, COURIER_OVERRIDE_DIR, courierContentErrors } from './content';
@@ -258,22 +258,43 @@ export function clearRendered(outDir: string): void {
 }
 
 /** Writes the rendered set under `outDir`, owner-only except the secret-free PUBLIC_TREES, replacing any earlier
- *  render of the same trees. */
+ *  render of the same trees. Each file lands by rename and stale entries go last, so a reader of a running stack
+ *  never finds a file missing. */
 export function writeRendered(outDir: string, files: RenderedFile[]): void {
   const previous = process.umask(0o077);
   try {
-    clearRendered(outDir);
     for (const { path, content } of files) {
       const target = join(outDir, path);
       const open = PUBLIC_TREES.has(path.split('/')[0]);
       mkdirSync(dirname(target), { recursive: true, mode: 0o700 });
-      writeFileSync(target, content, { mode: 0o600 });
-      chmodSync(target, open ? 0o644 : 0o600);
+      const staged = `${target}.render-${process.pid}`;
+      writeFileSync(staged, content, { mode: 0o600 });
+      chmodSync(staged, open ? 0o644 : 0o600);
+      renameSync(staged, target);
     }
-    for (const top of TREES) if (PUBLIC_TREES.has(top)) chmodSync(join(outDir, top), 0o755);
+    const kept = new Set(files.map(({ path }) => path));
+    for (const top of TREES) removeStale(join(outDir, top), top, kept);
+    for (const top of TREES) chmodSync(join(outDir, top), PUBLIC_TREES.has(top) ? 0o755 : 0o700);
   } finally {
     process.umask(previous);
   }
+}
+
+function removeStale(dir: string, rel: string, kept: Set<string>): boolean {
+  let empty = true;
+  for (const entry of readdirSync(dir, { withFileTypes: true })) {
+    const path = join(dir, entry.name);
+    const relPath = `${rel}/${entry.name}`;
+    if (entry.isDirectory() && !entry.isSymbolicLink()) {
+      if (removeStale(path, relPath, kept)) rmSync(path, { recursive: true, force: true });
+      else empty = false;
+    } else if (kept.has(relPath)) {
+      empty = false;
+    } else {
+      rmSync(path, { force: true });
+    }
+  }
+  return empty;
 }
 
 /** Fresh values for every secret othala can mint, a client secret per confidential manifest under `contentDir`
