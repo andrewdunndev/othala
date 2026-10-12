@@ -130,7 +130,7 @@ describe('requireAdminSession — aal2-but-stale redirects before the admin-mark
       ),
     );
 
-    const astro = fakeAstro('/admin', '');
+    const astro = fakeAstro('/admin/users', '?q=a%26b');
     const result = await requireAdminSession(astro);
 
     expect(getIdentityMock).not.toHaveBeenCalled();
@@ -140,7 +140,7 @@ describe('requireAdminSession — aal2-but-stale redirects before the admin-mark
     expect(parsed.pathname).toBe('/self-service/login/browser');
     expect(parsed.searchParams.get('aal')).toBe('aal2');
     expect(parsed.searchParams.get('refresh')).toBe('true');
-    expect(parsed.searchParams.has('return_to')).toBe(true);
+    expect(parsed.searchParams.get('return_to')).toBe('/admin/users?q=a%26b');
     expect(result).toEqual({ location: target });
   });
 });
