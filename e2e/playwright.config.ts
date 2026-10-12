@@ -12,7 +12,7 @@ import { defineConfig, devices } from '@playwright/test';
  * The playwright container is ON that net, so http:// (no TLS) works fine.
  *
  * Output dir: /out (mounted from ./browser-out on the host, matches the
- * volume in compose.yml so screenshots are available as CI artifacts).
+ * volume in compose.e2e.yml so screenshots are available as CI artifacts).
  */
 export default defineConfig({
   testDir: './playwright/tests',
@@ -47,7 +47,7 @@ export default defineConfig({
         launchOptions: {
           // Blink's [SecureContext] gate blocks navigator.credentials on
           // plaintext http:// origins (the e2e edge is deliberately not
-          // TLS'd — see e2e/caddy.Caddyfile); this allowlists it for WebAuthn.
+          // TLS'd — see e2e/Caddyfile); this allowlists it for WebAuthn.
           args: ['--unsafely-treat-insecure-origin-as-secure=http://auth.othala.test'],
         },
       },

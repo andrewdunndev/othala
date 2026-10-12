@@ -186,7 +186,7 @@ check-portal:
     - |
       echo "=== YAML parse: tracked plain-YAML ==="
       FILES=()
-      while IFS= read -r -d '' f; do FILES+=("../$f"); done < <(git -C .. ls-files -z -- .gitlab-ci.yml 'e2e/compose*.yml' 'e2e/content/*.yaml' 'e2e/content/apps/*.yaml')
+      while IFS= read -r -d '' f; do FILES+=("../$f"); done < <(git -C .. ls-files -z -- .gitlab-ci.yml 'e2e/compose*.yml' 'e2e/content/*.yaml' 'e2e/content/apps/*.yaml' 'deploy/example/*.yml' 'deploy/example/content/*.yaml' 'deploy/example/content/apps/*.yaml')
       if [ "${#FILES[@]}" -eq 0 ]; then
         echo "ERROR: 0 tracked plain-YAML files — nothing was parsed"
         exit 1
@@ -224,7 +224,7 @@ e2e:
   tags: ["$E2E_RUNNER_TAG", qemu]
   needs:
     - build-othala
-    # Pulled by compose.yml's playwright + dance-runner services.
+    # Pulled by compose.e2e.yml's playwright + dance-runner services.
     - build-e2e-tester
   variables:
     AUTH_REGISTRY: "${CI_REGISTRY_IMAGE}"

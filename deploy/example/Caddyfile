@@ -1,0 +1,17 @@
+# The site file: addresses, TLS and listeners are yours; othala.caddy carries the routes and gates.
+# Replace the dns lines with your provider's module; behind a load balancer, add trusted_proxies (DEPLOY.md).
+import /etc/caddy/othala/othala.caddy
+
+sso.example.org {
+	tls {
+		dns <provider> ...
+	}
+	import othala-routes
+}
+
+media.example.org {
+	tls {
+		dns <provider> ...
+	}
+	import othala-forward-auth media 8096 media-access
+}

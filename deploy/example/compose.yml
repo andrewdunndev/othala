@@ -1,0 +1,195 @@
+# An Othala deployment on compose (DEPLOY.md). Copy this directory, then fill othala.env, secrets.env,
+# Caddyfile and content/. e2e/validate.sh runs this file unchanged.
+#
+# Two networks: the edge reaches the public listeners on `edge`; the admin listeners bind their address on
+# `internal`, which the edge never joins. extra_hosts pins each admin caller to those addresses, which
+# othala.env repeats as the bind hosts.
+
+services:
+  render:
+    image: registry.gitlab.com/dunn.dev/othala:v0.15.0
+    restart: "no"
+    user: "10000:10000"
+    command: ["node", "dist/server/config.mjs", "render"]
+    env_file: [othala.env, secrets.env]
+    network_mode: none
+    read_only: true
+    security_opt: ["no-new-privileges:true"]
+    cap_drop: [ALL]
+    volumes:
+      - ./content:/etc/othala:ro,z
+      - othala-kratos:/run/othala/kratos
+      - othala-hydra:/run/othala/hydra
+      - othala-caddy:/run/othala/caddy
+
+  postgres:
+    image: docker.io/library/postgres:18-alpine@sha256:77f585114c32fbca283dc835b0596f4e52b51b4c6662d7810b2f4084f60a1873
+    restart: unless-stopped
+    env_file: [secrets.env]
+    security_opt: ["no-new-privileges:true"]
+    cap_drop: [ALL]
+    # The entrypoint chowns PGDATA, then drops to postgres.
+    cap_add: [CHOWN, DAC_OVERRIDE, FOWNER, SETUID, SETGID]
+    pids_limit: 512
+    volumes:
+      - ./postgres-init.sh:/docker-entrypoint-initdb.d/init.sh:ro,z
+      - postgres-data:/var/lib/postgresql
+    networks:
+      internal: {}
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 5s
+      timeout: 3s
+      retries: 12
+
+  kratos-migrate:
+    image: docker.io/oryd/kratos:v26.2.0@sha256:2a13bb8d362c7a7ae33bd7c0f5168aee46921f15c916a06346db91c06dc76643
+    restart: "no"
+    command: ["migrate", "sql", "-e", "--yes", "--config", "/etc/config/kratos/kratos.yml"]
+    read_only: true
+    security_opt: ["no-new-privileges:true"]
+    cap_drop: [ALL]
+    volumes:
+      - othala-kratos:/etc/config/kratos:ro
+    networks:
+      internal: {}
+    depends_on:
+      render:
+        condition: service_completed_successfully
+      postgres:
+        condition: service_healthy
+
+  kratos:
+    image: docker.io/oryd/kratos:v26.2.0@sha256:2a13bb8d362c7a7ae33bd7c0f5168aee46921f15c916a06346db91c06dc76643
+    restart: unless-stopped
+    command: ["serve", "--config", "/etc/config/kratos/kratos.yml", "--watch-courier"]
+    read_only: true
+    tmpfs: [/tmp]
+    security_opt: ["no-new-privileges:true"]
+    cap_drop: [ALL]
+    pids_limit: 512
+    volumes:
+      - othala-kratos:/etc/config/kratos:ro
+    networks:
+      edge: {}
+      internal:
+        ipv4_address: 10.89.11.10
+    extra_hosts: ["othala:10.89.11.12"]
+    depends_on:
+      kratos-migrate:
+        condition: service_completed_successfully
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:4433/health/ready || exit 1"]
+      interval: 5s
+      timeout: 3s
+      retries: 18
+      start_period: 20s
+
+  hydra-migrate:
+    image: docker.io/oryd/hydra:v26.2.0@sha256:ff67c7fb5f95074fa53374d41151713554960504b340cd3f95b09e65deaea2a9
+    restart: "no"
+    command: ["migrate", "sql", "-e", "--yes", "--config", "/etc/config/hydra/hydra.yml"]
+    read_only: true
+    security_opt: ["no-new-privileges:true"]
+    cap_drop: [ALL]
+    volumes:
+      - othala-hydra:/etc/config/hydra:ro
+    networks:
+      internal: {}
+    depends_on:
+      render:
+        condition: service_completed_successfully
+      postgres:
+        condition: service_healthy
+
+  hydra:
+    image: docker.io/oryd/hydra:v26.2.0@sha256:ff67c7fb5f95074fa53374d41151713554960504b340cd3f95b09e65deaea2a9
+    restart: unless-stopped
+    command: ["serve", "all", "--config", "/etc/config/hydra/hydra.yml"]
+    read_only: true
+    tmpfs: [/tmp]
+    security_opt: ["no-new-privileges:true"]
+    cap_drop: [ALL]
+    pids_limit: 512
+    volumes:
+      - othala-hydra:/etc/config/hydra:ro
+    networks:
+      edge: {}
+      internal:
+        ipv4_address: 10.89.11.11
+    depends_on:
+      hydra-migrate:
+        condition: service_completed_successfully
+    healthcheck:
+      # The public listener: hydra.yml silences health probes there only.
+      test: ["CMD-SHELL", "wget -qO- http://localhost:4444/health/ready || exit 1"]
+      interval: 5s
+      timeout: 3s
+      retries: 18
+      start_period: 20s
+
+  othala:
+    image: registry.gitlab.com/dunn.dev/othala:v0.15.0
+    restart: unless-stopped
+    env_file: [othala.env, secrets.env]
+    read_only: true
+    tmpfs: [/tmp]
+    security_opt: ["no-new-privileges:true"]
+    cap_drop: [ALL]
+    pids_limit: 512
+    volumes:
+      - ./content:/etc/othala:ro,z
+    networks:
+      edge: {}
+      internal:
+        ipv4_address: 10.89.11.12
+    extra_hosts: ["kratos:10.89.11.10", "hydra:10.89.11.11"]
+    depends_on:
+      kratos:
+        condition: service_healthy
+      hydra:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://'+process.env.PORTAL_ADMIN_BIND_HOST+':4431/healthz').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      interval: 5s
+      timeout: 3s
+      retries: 12
+      start_period: 10s
+
+  caddy:
+    # Needs caddy-ratelimit and a DNS module; any build with both will do.
+    image: registry.gitlab.com/dunn.dev/caddy:v2.11.4-3@sha256:78e84240c3c703bb374aa003424c56143376c621a0b7e17cc6bcf009eec86446
+    restart: unless-stopped
+    read_only: true
+    tmpfs: [/tmp]
+    security_opt: ["no-new-privileges:true"]
+    cap_drop: [ALL]
+    cap_add: [NET_BIND_SERVICE]
+    pids_limit: 256
+    ports: ["80:80", "443:443"]
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro,z
+      - othala-caddy:/etc/caddy/othala:ro
+      - caddy-data:/data
+      - caddy-config:/config
+    networks:
+      edge: {}
+    depends_on:
+      render:
+        condition: service_completed_successfully
+
+networks:
+  edge: {}
+  internal:
+    internal: true
+    ipam:
+      config:
+        - subnet: 10.89.11.0/24
+
+volumes:
+  othala-kratos: {}
+  othala-hydra: {}
+  othala-caddy: {}
+  postgres-data: {}
+  caddy-data: {}
+  caddy-config: {}

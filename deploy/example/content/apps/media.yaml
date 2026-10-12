@@ -1,0 +1,10 @@
+# An app with no SSO of its own: Caddy asks the portal before each request (othala-forward-auth in the Caddyfile).
+presentation:
+  name: Media
+  description: Films and music for the household.
+  url: https://media.example.org
+  icon: ME
+  auth_kind: forward_auth
+  group: media
+  access: [media-access]
+  order: 10

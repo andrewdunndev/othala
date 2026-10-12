@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
-# validate.sh: the Othala e2e orchestrator. Runs in the per-job VM (podman + docker
-# shim) or on a workstation: cd e2e && AUTH_VERSION=latest bash validate.sh
+# validate.sh: the Othala e2e orchestrator. Runs deploy/example/compose.yml under compose.e2e.yml in the per-job
+# VM (podman + docker shim) or on a workstation: cd e2e && AUTH_VERSION=latest bash validate.sh
 # Env: CI_REGISTRY_USER/PASSWORD (login), AUTH_REGISTRY, AUTH_VERSION (default latest).
 
 set -uo pipefail
@@ -21,42 +21,32 @@ AUTH_VERSION="${AUTH_VERSION:-latest}"
 
 echo "=== othala e2e: AUTH_REGISTRY=$AUTH_REGISTRY AUTH_VERSION=$AUTH_VERSION ==="
 
-chmod +x ./gen-secrets.sh ./smoke.sh ./postgres-init.sh
+# This directory is the deployment: the shipped compose file and init script, the test's own othala.env,
+# Caddyfile and content/, and compose.e2e.yml (outside the contract) on top.
+cp ../deploy/example/compose.yml ../deploy/example/postgres-init.sh .
+chmod +x ./smoke.sh ./postgres-init.sh
+export AUTH_REGISTRY AUTH_VERSION
+export COMPOSE_FILE=compose.yml:compose.e2e.yml
 
-# A partial .env fails below: the render refuses a missing variable or secret.
-if ! AUTH_REGISTRY="$AUTH_REGISTRY" AUTH_VERSION="$AUTH_VERSION" bash ./gen-secrets.sh > .env; then
-    echo "  ✗ gen-secrets.sh failed — aborting"; exit 1
-fi
-echo "  secrets generated (.env)"
-
-# Step 2: registry login (skip if CI vars absent for local runs)
+# Registry login (skipped when the CI vars are absent, for local runs).
 if [[ -n "${CI_REGISTRY_USER:-}" && -n "${CI_REGISTRY_PASSWORD:-}" ]]; then
     echo "  podman login to $AUTH_REGISTRY..."
     echo "$CI_REGISTRY_PASSWORD" | podman login --username "$CI_REGISTRY_USER" --password-stdin "${AUTH_REGISTRY%%/*}"
 fi
 
-# Kratos and Hydra do not interpolate ${VAR}: the image under test renders its own policy from the .env names.
-set -a
-source ./.env
-set +a
-ENV_ARGS=()
-while IFS= read -r name; do ENV_ARGS+=(-e "$name"); done < <(grep -oE '^[A-Za-z_][A-Za-z0-9_]*=' .env | tr -d '=')
-rm -rf config.rendered && mkdir config.rendered
-# Rootless podman maps the host user to container root; keep-id makes the render's uid own the mount.
-USERNS_ARGS=()
-[[ -S /run/podman/podman.sock ]] || USERNS_ARGS=(--userns=keep-id)
-podman run --rm --user "$(id -u):$(id -g)" "${USERNS_ARGS[@]}" "${ENV_ARGS[@]}" -v "$SCRIPT_DIR/config.rendered:/run/othala:z" \
-    -v "$SCRIPT_DIR/content:/etc/othala:ro,z" \
-    "$AUTH_REGISTRY:$AUTH_VERSION" node dist/server/config.mjs render \
-    || { echo "  ✗ render failed — aborting" >&2; exit 1; }
-# The render writes owner-only, but kratos/hydra run as uid 10000 under cap_drop ALL and could not read the
-# bind-mounted configs; they are per-run artifacts, .env keeps the secrets at 0600.
-chmod -R go+rX config.rendered
-echo "  configs rendered by the image (config.rendered/; world-readable for the in-container ory uid)"
+# A deployer's secrets.env: the image's gen-secrets over the content, which mints each client secret.
+if ! (umask 077 && podman run --rm -v "$SCRIPT_DIR/content:/etc/othala:ro,z" "$AUTH_REGISTRY:$AUTH_VERSION" \
+        node dist/server/config.mjs gen-secrets > secrets.env); then
+    echo "  ✗ gen-secrets failed — aborting"; exit 1
+fi
+echo "  secrets generated (secrets.env)"
+
+# smoke.sh reads the same values the containers get; read literally, as compose does.
+while IFS= read -r line; do export "$line"; done < <(grep -hE '^[A-Za-z_][A-Za-z0-9_]*=' othala.env secrets.env)
 
 # Wrapped in a timeout: a never-healthy dependency makes `up -d` block until the CI limit.
 echo "  docker compose up (timeout 300s)..."
-if ! timeout 300 docker compose --env-file=.env up -d; then
+if ! timeout 300 docker compose up -d; then
     echo "  ✗ compose up failed or timed out — diagnostics:"
     docker compose ps || true
     docker compose logs --tail=120 || true
@@ -72,7 +62,7 @@ while true; do
         docker compose ps
         # Native `podman logs`: the compose logs shim is unreliable and /tmp is not an artifact.
         echo "=== container logs (healthcheck timeout) ==="
-        for svc in postgres kratos-migrate kratos hydra-migrate hydra othala mailpit caddy; do
+        for svc in render postgres kratos-migrate kratos hydra-migrate hydra othala mailpit caddy; do
             echo "--- lab-$svc ---"
             podman logs --tail=60 "lab-$svc" 2>&1 || true
         done
@@ -99,25 +89,15 @@ done
 # Step 5: smoke (the API-level suite + browser-free OIDC dance, sections A-G)
 echo ""
 echo "=== smoke ==="
-set -a; source .env; set +a
 bash ./smoke.sh
 SMOKE_EXIT=$?
 
-# Step 5b: browser e2e. smoke already did setup (the Caddy edge is part of the stack); run playwright
-# as a one-shot `compose run` (`up --exit-code-from` is unreliable under podman-compose).
+# Step 5b: browser e2e against the same stack, as a one-shot `compose run` (`up --exit-code-from` is
+# unreliable under podman-compose).
 echo ""
 echo "=== browser e2e (Playwright) ==="
-# compose.browser.yml is layered only here (smoke keeps the loopback admin bind). It recreates
-# othala with PORTAL_ADMIN_BIND_HOST=10.89.11.12 (0.0.0.0 is FATAL in listen.mjs; loopback is unreachable from
-# kratos, so the J recovery specs would fail; needs the subnet in compose.yml).
 BROWSER_EXIT=0
-BROWSER_COMPOSE=(docker compose -f compose.yml -f compose.browser.yml --profile browser --env-file=.env)
-if "${BROWSER_COMPOSE[@]}" up -d --no-deps othala; then
-    sleep 8  # othala recreate + caddy boot; settle before specs hit auth.othala.test
-    timeout 360 "${BROWSER_COMPOSE[@]}" run --rm --no-deps -T playwright || BROWSER_EXIT=$?
-else
-    echo "  ✗ could not recreate othala for the browser run"; BROWSER_EXIT=1
-fi
+timeout 360 docker compose --profile browser run --rm --no-deps -T playwright || BROWSER_EXIT=$?
 if [[ $BROWSER_EXIT -eq 0 ]]; then echo "  ✓ browser e2e passed"; else echo "  ✗ browser e2e failed (exit $BROWSER_EXIT)"; fi
 
 # Step 6: log dump on failure via native `podman logs`.
