@@ -245,12 +245,17 @@ export function render(policyDir: string, contentDir: string, env: Env): Rendere
 }
 
 /** Writes the rendered set under `outDir`, owner-only except the secret-free PUBLIC_TREES, replacing any earlier
- *  render of the same trees. */
+ *  render of the same trees. Each tree is emptied in place, so it can be a mount point. */
 export function writeRendered(outDir: string, files: RenderedFile[]): void {
   const previous = process.umask(0o077);
   try {
     const tops = new Set(files.map(({ path }) => path.split('/')[0]));
-    for (const top of tops) rmSync(join(outDir, top), { recursive: true, force: true });
+    for (const top of tops) {
+      const dir = join(outDir, top);
+      if (!existsSync(dir)) continue;
+      for (const entry of readdirSync(dir)) rmSync(join(dir, entry), { recursive: true, force: true });
+      chmodSync(dir, 0o700);
+    }
     for (const { path, content } of files) {
       const target = join(outDir, path);
       const open = PUBLIC_TREES.has(path.split('/')[0]);

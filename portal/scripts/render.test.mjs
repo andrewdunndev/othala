@@ -194,6 +194,19 @@ test('a render replaces the earlier trees and leaves no stale files', () => {
   });
 });
 
+test('a render empties each tree in place, so a tree can be a mount point', () => {
+  withDir((dir) => {
+    for (const top of ['kratos', 'hydra', 'caddy']) mkdirSync(join(dir, top), { mode: 0o755 });
+    writeFileSync(join(dir, 'kratos/stale.txt'), 'old');
+    const before = statSync(join(dir, 'kratos')).ino;
+    writeRendered(dir, render(root, CONTENT, ENV));
+    assert.equal(statSync(join(dir, 'kratos')).ino, before);
+    assert.equal(existsSync(join(dir, 'kratos/stale.txt')), false);
+    assert.equal(statSync(join(dir, 'kratos')).mode & 0o077, 0);
+    assert.equal(statSync(join(dir, 'caddy')).mode & 0o777, 0o755);
+  });
+});
+
 const cli = (args, env) =>
   spawnSync(join(portal, 'node_modules/.bin/tsx'), [join(portal, 'src/server/config-cli.ts'), ...args], {
     env: { PATH: process.env.PATH, HOME: process.env.HOME, TMPDIR: process.env.TMPDIR, ...env },
