@@ -51,8 +51,7 @@ export async function requireAdminSession(astro: any): Promise<Session | Respons
   // (b, c) AAL2 within the freshness window (gate.ts decideAccess), settled before the admin-marker fetch.
   const facts = { ...session, fresh: isSessionFresh(session, ADMIN_FRESHNESS_HOURS) };
   if ('stepUp' in decideAccess(null, 'admin', facts)) {
-    const returnTo = encodeURIComponent(astro.url.pathname + astro.url.search);
-    return astro.redirect(browserFlows.login({ aal: 'aal2', refresh: true, returnTo }));
+    return astro.redirect(browserFlows.login({ aal: 'aal2', refresh: true, returnTo: astro.url.pathname + astro.url.search }));
   }
 
   // (d) Admin marker, read fresh from the admin API (whoami omits metadata_admin); fail closed.
