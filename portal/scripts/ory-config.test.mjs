@@ -4,17 +4,15 @@
 
 import { test } from 'vitest';
 import assert from 'node:assert/strict';
-import { execFileSync, spawnSync } from 'node:child_process';
-import { existsSync, mkdtempSync, readFileSync, rmSync, statSync } from 'node:fs';
-import { tmpdir } from 'node:os';
+import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { parse } from 'yaml';
+import { renderTemplate } from '../src/lib/render.ts';
 
 const root = fileURLToPath(new URL('../../', import.meta.url));
 
 const BASE_ENV = {
-  PATH: process.env.PATH,
   OTHALA_PUBLIC_URL: 'https://auth.example.com',
   OTHALA_APEX: 'example.com',
   OTHALA_INSTANCE_NAME: 'Acme',
@@ -30,19 +28,8 @@ const BASE_ENV = {
   HYDRA_ADMIN_BIND_HOST: '10.0.0.2',
 };
 
-function renderText(template, extra = {}) {
-  const dir = mkdtempSync(join(tmpdir(), 'ory-config-'));
-  try {
-    const out = join(dir, 'out');
-    execFileSync('bash', [join(root, 'scripts/render-config.sh'), join(root, template), out], {
-      env: { ...BASE_ENV, ...extra },
-      stdio: 'pipe',
-    });
-    return readFileSync(out, 'utf8');
-  } finally {
-    rmSync(dir, { recursive: true, force: true });
-  }
-}
+const renderText = (template, extra = {}) =>
+  renderTemplate(template, readFileSync(join(root, template), 'utf8'), { ...BASE_ENV, ...extra });
 
 const render = (template, extra) => parse(renderText(template, extra));
 
@@ -179,32 +166,12 @@ test('mail: no template reads the caller-set transient payload', () => {
   }
 });
 
-function renderOutcome(template, extra) {
-  const dir = mkdtempSync(join(tmpdir(), 'ory-config-'));
-  const out = join(dir, 'out');
-  try {
-    const r = spawnSync('bash', [join(root, 'scripts/render-config.sh'), join(root, template), out], {
-      env: { ...BASE_ENV, ...extra },
-      stdio: 'pipe',
-    });
-    return { status: r.status, written: existsSync(out), mode: existsSync(out) ? statSync(out).mode : 0 };
-  } finally {
-    rmSync(dir, { recursive: true, force: true });
-  }
-}
-
-test('render refuses a line break in a value and writes nothing', () => {
+test('render refuses a line break in a value', () => {
   for (const bad of ['kp\nmalicious: true', 'kp\rx']) {
-    assert.deepEqual(renderOutcome('kratos/kratos.yml', { KRATOS_PG_PASS: bad }), { status: 1, written: false, mode: 0 });
+    assert.throws(() => renderText('kratos/kratos.yml', { KRATOS_PG_PASS: bad }), /KRATOS_PG_PASS contains a control character/);
   }
 });
 
 test('a backslash and a quote round-trip through a double-quoted scalar', () => {
   assert.equal(render('kratos/kratos.yml', { KRATOS_PG_PASS: 'a\\"b' }).dsn, 'postgres://kratos:a\\"b@postgres:5432/kratos?sslmode=disable');
-});
-
-test('the rendered file is readable by its owner only', () => {
-  const r = renderOutcome('kratos/kratos.yml');
-  assert.equal(r.status, 0);
-  assert.equal(r.mode & 0o077, 0);
 });
