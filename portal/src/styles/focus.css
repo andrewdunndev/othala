@@ -1,25 +1,12 @@
-/* First-run and focused pages (sign in, recovery, verification, consent, errors, signed-out home): one narrow column
- * under the same top bar, one card, one primary action. Reference tokens only. */
+/* The flow-specific parts of the focused pages (sign in, recovery, verification, consent, errors, signed-out home).
+ * The column, card, buttons, fields and notices are @dunn.dev/reference/auth/auth.css. Reference tokens only. */
 
-.page-narrow { --focus-gap: var(--space-4); padding-top: var(--space-6); }
-.page-narrow .page-header { border-bottom: 0; margin-bottom: var(--space-4); padding-bottom: 0; }
-.page-narrow .page-title { font-size: var(--text-3xl); margin-bottom: var(--space-2); }
-.page-narrow .page-lede { font-size: var(--text-base); }
-.page-narrow .notice:not(.field .notice) { margin-bottom: var(--space-4); }
-
-.focus-card { padding: var(--space-5); display: flex; flex-direction: column; gap: var(--focus-gap); }
-.focus-form { display: flex; flex-direction: column; gap: var(--focus-gap); }
-.focus-btn, .status-actions .button { justify-content: center; text-align: center; }
-.focus-btn { width: 100%; padding: var(--space-3) var(--space-4); font-size: var(--text-base); min-height: 48px; }
-.focus-note { margin: 0; font-size: var(--text-sm); color: var(--text-muted); line-height: 1.5; }
+.status-actions .button { justify-content: center; text-align: center; }
 .focus-or { display: flex; align-items: center; gap: var(--space-3); margin: 0; font-size: var(--text-sm); color: var(--text-muted); }
 .focus-or::before, .focus-or::after { content: ''; flex: 1; border-top: 1px solid var(--border); }
 .focus-next { margin: 0; padding: var(--space-3) var(--space-4); border-radius: var(--radius); background: var(--accent-subtle); font-size: var(--text-sm); color: var(--text); line-height: 1.5; }
 
-.focus-links { display: flex; flex-wrap: wrap; gap: var(--space-1) var(--space-4); margin-top: var(--space-4); font-size: var(--text-sm); }
-.focus-links a { color: var(--text-2); display: inline-flex; align-items: center; min-height: 44px; }
 .focus-aside { display: inline-flex; align-items: center; min-height: 44px; color: var(--text-2); }
-.focus-links a:hover { color: var(--accent); }
 
 /* A one-time code: large, numeric, spaced so six digits read at a glance. */
 .field input.code-input {
@@ -60,7 +47,5 @@
 .status-actions { display: flex; flex-wrap: wrap; gap: var(--focus-gap); margin-top: var(--space-2); }
 
 @media (max-width: 640px) {
-  .page-narrow { padding-top: var(--space-5); }
-  .focus-card { padding: var(--space-4); }
   .status-actions .button { flex: 1 1 100%; }
 }
