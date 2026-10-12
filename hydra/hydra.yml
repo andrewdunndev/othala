@@ -21,7 +21,7 @@ serve:
         - Content-Type
   admin:
     # Admin-plane bind address. The admin API is unauthenticated by design (the network is the
-    # control): bind an admin-plane address, never one on a network shared with other services.
+    # control): bind an address on a network the edge never joins.
     # NEVER expose publicly.
     host: "${HYDRA_ADMIN_BIND_HOST}"
     request_log:

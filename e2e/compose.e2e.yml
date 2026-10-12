@@ -87,7 +87,7 @@ services:
     networks:
       edge: {}
       internal: {}
-    extra_hosts: ["kratos:10.89.11.10", "hydra:10.89.11.11", "othala:10.89.11.12"]
+    extra_hosts: ["kratos:10.200.11.10", "hydra:10.200.11.11", "othala:10.200.11.12"]
     depends_on:
       caddy:
         condition: service_started

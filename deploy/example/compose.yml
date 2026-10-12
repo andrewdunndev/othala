@@ -25,6 +25,7 @@ services:
   postgres:
     image: docker.io/library/postgres:18-alpine@sha256:77f585114c32fbca283dc835b0596f4e52b51b4c6662d7810b2f4084f60a1873
     restart: unless-stopped
+    # Gets all of secrets.env; it reads only the three database passwords.
     env_file: [secrets.env]
     security_opt: ["no-new-privileges:true"]
     cap_drop: [ALL]
@@ -50,7 +51,7 @@ services:
     security_opt: ["no-new-privileges:true"]
     cap_drop: [ALL]
     volumes:
-      - othala-kratos:/etc/config/kratos:ro
+      - {type: volume, source: othala-kratos, target: /etc/config/kratos, read_only: true, volume: {nocopy: true}}
     networks:
       internal: {}
     depends_on:
@@ -69,12 +70,12 @@ services:
     cap_drop: [ALL]
     pids_limit: 512
     volumes:
-      - othala-kratos:/etc/config/kratos:ro
+      - {type: volume, source: othala-kratos, target: /etc/config/kratos, read_only: true, volume: {nocopy: true}}
     networks:
       edge: {}
       internal:
-        ipv4_address: 10.89.11.10
-    extra_hosts: ["othala:10.89.11.12"]
+        ipv4_address: 10.200.11.10
+    extra_hosts: ["othala:10.200.11.12"]
     depends_on:
       kratos-migrate:
         condition: service_completed_successfully
@@ -93,7 +94,7 @@ services:
     security_opt: ["no-new-privileges:true"]
     cap_drop: [ALL]
     volumes:
-      - othala-hydra:/etc/config/hydra:ro
+      - {type: volume, source: othala-hydra, target: /etc/config/hydra, read_only: true, volume: {nocopy: true}}
     networks:
       internal: {}
     depends_on:
@@ -112,11 +113,11 @@ services:
     cap_drop: [ALL]
     pids_limit: 512
     volumes:
-      - othala-hydra:/etc/config/hydra:ro
+      - {type: volume, source: othala-hydra, target: /etc/config/hydra, read_only: true, volume: {nocopy: true}}
     networks:
       edge: {}
       internal:
-        ipv4_address: 10.89.11.11
+        ipv4_address: 10.200.11.11
     depends_on:
       hydra-migrate:
         condition: service_completed_successfully
@@ -142,8 +143,8 @@ services:
     networks:
       edge: {}
       internal:
-        ipv4_address: 10.89.11.12
-    extra_hosts: ["kratos:10.89.11.10", "hydra:10.89.11.11"]
+        ipv4_address: 10.200.11.12
+    extra_hosts: ["kratos:10.200.11.10", "hydra:10.200.11.11"]
     depends_on:
       kratos:
         condition: service_healthy
@@ -169,7 +170,7 @@ services:
     ports: ["80:80", "443:443"]
     volumes:
       - ./Caddyfile:/etc/caddy/Caddyfile:ro,z
-      - othala-caddy:/etc/caddy/othala:ro
+      - {type: volume, source: othala-caddy, target: /etc/caddy/othala, read_only: true, volume: {nocopy: true}}
       - caddy-data:/data
       - caddy-config:/config
     networks:
@@ -184,7 +185,7 @@ networks:
     internal: true
     ipam:
       config:
-        - subnet: 10.89.11.0/24
+        - subnet: 10.200.11.0/24
 
 volumes:
   othala-kratos: {}
