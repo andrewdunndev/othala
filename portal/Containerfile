@@ -1,7 +1,8 @@
 # othala-portal: Astro Node SSR.
 #
 # Build on UBI 10 nodejs-24 (with npm), run on ci-runtime-node's
-# nodejs-24-minimal. App manifests are mounted at runtime, not built in.
+# nodejs-24-minimal. App manifests are mounted at runtime, not built in; the
+# Ory policy is built in and rendered by dist/server/config.mjs.
 #
 # Build from the repo root:
 #   podman build -t dunn.dev/othala-portal:lab -f portal/Containerfile .
@@ -41,6 +42,12 @@ USER root
 COPY --from=build --chown=1001:0 /src/portal/dist ./dist
 COPY --from=build --chown=1001:0 /src/portal/node_modules ./node_modules
 COPY --from=build --chown=1001:0 /src/portal/package.json ./package.json
+
+# Ory policy, root-owned and read-only to the app user; `node dist/server/config.mjs render` reads it (POLICY_DIR).
+COPY kratos/kratos.yml kratos/identity.schema.json /usr/share/othala/kratos/
+COPY kratos/hooks/ /usr/share/othala/kratos/hooks/
+COPY kratos/courier/ /usr/share/othala/kratos/courier/
+COPY hydra/hydra.yml /usr/share/othala/hydra/
 
 USER 1001
 

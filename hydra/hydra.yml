@@ -1,5 +1,5 @@
-# Hydra configuration: generic Othala instance template, ${VAR}-substituted by
-# scripts/render-config.sh. The Postgres host is the golden service name, literal.
+# Hydra configuration: generic Othala instance template, rendered by portal/src/lib/render.ts.
+# The Postgres host is the golden service name, literal.
 
 dsn: "postgres://hydra:${HYDRA_PG_PASS}@postgres:5432/hydra?sslmode=disable"
 # HYDRA_PG_PASS must be URL-safe (percent-encoded): YAML quoting cannot fix a URL.

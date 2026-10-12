@@ -23,7 +23,7 @@ echo "=== othala e2e: AUTH_REGISTRY=$AUTH_REGISTRY AUTH_VERSION=$AUTH_VERSION ==
 
 chmod +x ./gen-secrets.sh ./smoke.sh ./postgres-init.sh
 
-# A partial .env fails below: render-config.sh refuses a missing or empty variable.
+# A partial .env fails below: the render refuses a missing variable or secret.
 if ! AUTH_REGISTRY="$AUTH_REGISTRY" AUTH_VERSION="$AUTH_VERSION" bash ./gen-secrets.sh > .env; then
     echo "  ✗ gen-secrets.sh failed — aborting"; exit 1
 fi
@@ -35,24 +35,23 @@ if [[ -n "${CI_REGISTRY_USER:-}" && -n "${CI_REGISTRY_PASSWORD:-}" ]]; then
     echo "$CI_REGISTRY_PASSWORD" | podman login --username "$CI_REGISTRY_USER" --password-stdin "${AUTH_REGISTRY%%/*}"
 fi
 
-# Kratos and Hydra do not interpolate ${VAR}, so render them with the deploy plane's renderer.
+# Kratos and Hydra do not interpolate ${VAR}: the image under test renders its own policy from the .env names.
 set -a
 source ./.env
 set +a
-# validate.sh omits -e, so each render needs an explicit fail-fast guard.
-bash ../scripts/render-config.sh ../kratos/kratos.yml kratos.rendered.yml \
-    || { echo "  ✗ render kratos.yml failed — aborting" >&2; exit 1; }
-bash ../scripts/render-config.sh ../hydra/hydra.yml   hydra.rendered.yml \
-    || { echo "  ✗ render hydra.yml failed — aborting" >&2; exit 1; }
-rm -rf courier.rendered && mkdir courier.rendered
-for t in ../kratos/courier/*.gotmpl; do
-    bash ../scripts/render-config.sh "$t" "courier.rendered/${t##*/}" \
-        || { echo "  ✗ render $t failed — aborting" >&2; exit 1; }
-done
-# The renderer writes 0600 but kratos/hydra run as uid 10000 under cap_drop ALL and could not
-# read the bind-mounted configs; they are per-run artifacts, .env keeps the secrets at 0600.
-chmod 0644 kratos.rendered.yml hydra.rendered.yml courier.rendered/*
-echo "  canonical configs rendered (kratos.rendered.yml, hydra.rendered.yml, courier.rendered/; 0644 for in-container ory uid)"
+ENV_ARGS=()
+while IFS= read -r name; do ENV_ARGS+=(-e "$name"); done < <(grep -oE '^[A-Za-z_][A-Za-z0-9_]*=' .env | tr -d '=')
+rm -rf config.rendered && mkdir config.rendered
+# Rootless podman maps the host user to container root; keep-id makes the render's uid own the mount.
+USERNS_ARGS=()
+[[ -S /run/podman/podman.sock ]] || USERNS_ARGS=(--userns=keep-id)
+podman run --rm --user "$(id -u):$(id -g)" "${USERNS_ARGS[@]}" "${ENV_ARGS[@]}" -v "$SCRIPT_DIR/config.rendered:/run/othala:z" \
+    "$AUTH_REGISTRY:$AUTH_VERSION" node dist/server/config.mjs render \
+    || { echo "  ✗ render failed — aborting" >&2; exit 1; }
+# The render writes owner-only, but kratos/hydra run as uid 10000 under cap_drop ALL and could not read the
+# bind-mounted configs; they are per-run artifacts, .env keeps the secrets at 0600.
+chmod -R go+rX config.rendered
+echo "  configs rendered by the image (config.rendered/; world-readable for the in-container ory uid)"
 
 # Wrapped in a timeout: a never-healthy dependency makes `up -d` block until the CI limit.
 echo "  docker compose up (timeout 300s)..."

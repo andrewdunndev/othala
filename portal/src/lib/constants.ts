@@ -8,6 +8,10 @@ export const KRATOS_ADMIN_URL = 'http://kratos:4434';
 export const HYDRA_ADMIN_URL = 'http://hydra:4445';
 /** Where the golden compose mounts the app manifests. */
 export const MANIFEST_DIR = '/etc/portal/manifests';
+/** Where the image carries the Ory policy files the render reads. */
+export const POLICY_DIR = '/usr/share/othala';
+/** Where the render writes the Ory configs; kratos/ mounts at /etc/config/kratos, hydra/ at /etc/config/hydra. */
+export const RENDER_DIR = '/run/othala';
 /** Group the admin console files a new identity under and tiles fall back to. */
 export const DEFAULT_GROUP = 'everyone';
 /** Identity groups the admin UI offers as household groups. App access groups come from the manifests. */

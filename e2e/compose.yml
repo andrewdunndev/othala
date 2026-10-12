@@ -67,9 +67,9 @@ services:
       postgres:
         condition: service_healthy
     volumes:
-      - ./kratos.rendered.yml:/etc/config/kratos/kratos.yml:ro,z
+      - ./config.rendered/kratos/kratos.yml:/etc/config/kratos/kratos.yml:ro,z
       - ./kratos.e2e.yml:/etc/config/kratos/e2e.yml:ro,z
-      - ../kratos/identity.schema.json:/etc/config/kratos/identity.schema.json:ro,z
+      - ./config.rendered/kratos/identity.schema.json:/etc/config/kratos/identity.schema.json:ro,z
     command: ["migrate", "sql", "-e", "--yes", "--config", "/etc/config/kratos/kratos.yml", "--config", "/etc/config/kratos/e2e.yml"]
 
   kratos:
@@ -91,11 +91,11 @@ services:
       kratos-migrate:
         condition: service_completed_successfully
     volumes:
-      - ./kratos.rendered.yml:/etc/config/kratos/kratos.yml:ro,z
+      - ./config.rendered/kratos/kratos.yml:/etc/config/kratos/kratos.yml:ro,z
       - ./kratos.e2e.yml:/etc/config/kratos/e2e.yml:ro,z
-      - ../kratos/identity.schema.json:/etc/config/kratos/identity.schema.json:ro,z
-      - ../kratos/hooks/recovery-gate.jsonnet:/etc/config/kratos/hooks/recovery-gate.jsonnet:ro,z
-      - ./courier.rendered:/etc/config/kratos/courier:ro,z
+      - ./config.rendered/kratos/identity.schema.json:/etc/config/kratos/identity.schema.json:ro,z
+      - ./config.rendered/kratos/hooks/recovery-gate.jsonnet:/etc/config/kratos/hooks/recovery-gate.jsonnet:ro,z
+      - ./config.rendered/kratos/courier:/etc/config/kratos/courier:ro,z
     command: ["serve", "--config", "/etc/config/kratos/kratos.yml", "--config", "/etc/config/kratos/e2e.yml", "--dev", "--watch-courier"]
     healthcheck:
       test: ["CMD-SHELL", "wget -qO- http://localhost:4434/admin/health/ready || exit 1"]
@@ -112,7 +112,7 @@ services:
       postgres:
         condition: service_healthy
     volumes:
-      - ./hydra.rendered.yml:/etc/config/hydra/hydra.yml:ro,z
+      - ./config.rendered/hydra/hydra.yml:/etc/config/hydra/hydra.yml:ro,z
     command: ["migrate", "sql", "-e", "--yes", "--config", "/etc/config/hydra/hydra.yml"]
 
   hydra:
@@ -132,7 +132,7 @@ services:
       hydra-migrate:
         condition: service_completed_successfully
     volumes:
-      - ./hydra.rendered.yml:/etc/config/hydra/hydra.yml:ro,z
+      - ./config.rendered/hydra/hydra.yml:/etc/config/hydra/hydra.yml:ro,z
     command: ["serve", "all", "--config", "/etc/config/hydra/hydra.yml", "--dev"]
     healthcheck:
       # Public listener: the only one whose request_log.disable_for_health

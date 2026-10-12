@@ -1,5 +1,5 @@
-# Kratos configuration: generic Othala instance template, ${VAR}-substituted by
-# scripts/render-config.sh. Service hosts (postgres, kratos, othala) are the golden topology, literal.
+# Kratos configuration: generic Othala instance template, rendered by portal/src/lib/render.ts.
+# Service hosts (postgres, kratos, othala) are the golden topology, literal.
 
 dsn: "postgres://kratos:${KRATOS_PG_PASS}@postgres:5432/kratos?sslmode=disable"
 # KRATOS_PG_PASS must be URL-safe (percent-encoded): YAML quoting cannot fix a URL.
@@ -286,7 +286,7 @@ courier:
     connection_uri: "${OTHALA_SMTP_CONNECTION_URI}"
     from_address: "noreply@${OTHALA_APEX}"
     from_name: "${OTHALA_INSTANCE_NAME}"
-  # Rendered from kratos/courier/ by render-config.sh; Kratos reads each file only when it sends.
+  # Rendered from kratos/courier/ by the same render; Kratos reads each file only when it sends.
   templates:
     recovery_code:
       valid:
