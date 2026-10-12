@@ -42,7 +42,10 @@ set +a
 ENV_ARGS=()
 while IFS= read -r name; do ENV_ARGS+=(-e "$name"); done < <(grep -oE '^[A-Za-z_][A-Za-z0-9_]*=' .env | tr -d '=')
 rm -rf config.rendered && mkdir config.rendered
-podman run --rm --user "$(id -u):$(id -g)" "${ENV_ARGS[@]}" -v "$SCRIPT_DIR/config.rendered:/run/othala:z" \
+# Rootless podman maps the host user to container root; keep-id makes the render's uid own the mount.
+USERNS_ARGS=()
+[[ -S /run/podman/podman.sock ]] || USERNS_ARGS=(--userns=keep-id)
+podman run --rm --user "$(id -u):$(id -g)" "${USERNS_ARGS[@]}" "${ENV_ARGS[@]}" -v "$SCRIPT_DIR/config.rendered:/run/othala:z" \
     "$AUTH_REGISTRY:$AUTH_VERSION" node dist/server/config.mjs render \
     || { echo "  ✗ render failed — aborting" >&2; exit 1; }
 # The render writes owner-only, but kratos/hydra run as uid 10000 under cap_drop ALL and could not read the
