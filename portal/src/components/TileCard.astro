@@ -11,9 +11,10 @@ interface Props {
   tile: AppTile;
   readiness: TileReadiness;
   requirementTitles: string[];
+  groups: string[];
 }
 
-const { tile, readiness, requirementTitles } = Astro.props;
+const { tile, readiness, requirementTitles, groups } = Astro.props;
 // A tile whose prerequisite is unmet opens its setup page (the app page leads with the setup step) rather than an
 // address that will not load until the person is set up.
 const launchHref = readiness === 'needs' ? `/apps/${encodeURIComponent(tile.slug)}` : safeHref(tile.url);
@@ -21,64 +22,65 @@ const launchHref = readiness === 'needs' ? `/apps/${encodeURIComponent(tile.slug
 
 <article class="tile" data-slug={tile.slug}>
   <a class="tile-launch" href={launchHref}>
-    <AppIcon tile={tile} />
-    <span class="tile-title">
+    <AppIcon tile={tile} groups={groups} />
+    <span class="tile-text">
       <span class="tile-name">{tile.name}</span>
-      <AppBadges readiness={readiness} titles={requirementTitles} />
+      {
+        readiness === 'needs' ? (
+          <AppBadges readiness={readiness} titles={requirementTitles} />
+        ) : (
+          <span class="tile-desc">{tile.description}</span>
+        )
+      }
     </span>
-    <span class="tile-desc">{tile.description}</span>
   </a>
-  <div class="tile-foot">
-    <span class="tile-host mono" title={tile.fqdn}>{tile.fqdn}</span>
-    <button
-      type="button"
-      class="tile-guide"
-      data-app-learn={tile.slug}
-      aria-haspopup="dialog"
-      aria-label={`Guide for ${tile.name}`}
-    >
-      <svg class="tile-guide-icon" viewBox="0 0 16 16" width="16" height="16" aria-hidden="true" focusable="false">
-        <path d="M2.5 3h4.2c.8 0 1.3.4 1.3 1v8.5c0-.6-.5-1-1.3-1H2.5z M13.5 3H9.3c-.8 0-1.3.4-1.3 1v8.5c0-.6.5-1 1.3-1h4.2z" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"/>
-      </svg>
-      <span class="tile-guide-label">Guide</span>
-    </button>
-  </div>
+  <button
+    type="button"
+    class="tile-guide"
+    data-app-learn={tile.slug}
+    aria-haspopup="dialog"
+    aria-label={`Guide for ${tile.name}`}
+  >
+    <svg class="tile-guide-icon" viewBox="0 0 16 16" width="16" height="16" aria-hidden="true" focusable="false">
+      <path d="M2.5 3h4.2c.8 0 1.3.4 1.3 1v8.5c0-.6-.5-1-1.3-1H2.5z M13.5 3H9.3c-.8 0-1.3.4-1.3 1v8.5c0-.6.5-1 1.3-1h4.2z" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"/>
+    </svg>
+    <span class="tile-guide-label">Guide</span>
+  </button>
 </article>
 
 <style>
   .tile {
     position: relative;
     display: flex;
-    flex-direction: column;
-    height: 100%;
-    padding: 0;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--space-2) var(--space-3);
+    padding: var(--space-3) var(--space-4);
     background: var(--tile-bg, var(--bg));
     border: 1px solid var(--border-strong);
     box-shadow: var(--tile-shadow, none);
     border-radius: var(--radius);
-    overflow: hidden;
     transition:
       border-color var(--duration-fast) var(--ease-out),
-      box-shadow var(--duration-fast) var(--ease-out),
-      transform var(--duration-fast) var(--ease-out);
+      background-color var(--duration-fast) var(--ease-out);
   }
   .tile:hover,
   .tile:focus-within {
     border-color: var(--accent);
-    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+    background: var(--accent-subtle);
   }
+  /* Logo, then name over the full description; the row grows to fit the text. */
   .tile-launch {
     display: flex;
-    flex-direction: column;
-    align-items: flex-start;
-    gap: var(--space-1);
-    flex: 1;
-    padding: var(--space-3) var(--space-4) var(--space-2);
+    flex: 1 1 12rem;
+    align-items: center;
+    gap: var(--space-3);
+    min-width: 0;
     color: var(--text);
     text-decoration: none;
   }
   .tile-launch:hover { color: var(--text); text-decoration: none; }
-  /* The link's ::after stretches over the whole card so every pixel but the Guide button launches the app. */
+  /* The link's ::after stretches over the whole row so every pixel but the Guide pill launches the app. */
   .tile-launch::after {
     content: '';
     position: absolute;
@@ -90,114 +92,63 @@ const launchHref = readiness === 'needs' ? `/apps/${encodeURIComponent(tile.slug
     outline: 2px solid var(--input-focus, var(--accent));
     outline-offset: -3px;
   }
-  .tile-title {
+  .tile-text {
     display: flex;
-    flex-wrap: wrap;
-    align-items: center;
-    gap: var(--space-1) var(--space-2);
-    margin-top: var(--space-2);
+    flex-direction: column;
+    gap: 2px;
+    min-width: 0;
   }
   .tile-name {
-    min-width: 0;
-    overflow-wrap: anywhere;
     font-size: var(--text-base);
     font-weight: 600;
     line-height: 1.3;
+    overflow-wrap: anywhere;
   }
   .tile-desc {
     font-size: var(--text-sm);
     color: var(--text-2);
-    line-height: 1.4;
+    line-height: 1.45;
     text-wrap: pretty;
-    display: -webkit-box;
-    -webkit-box-orient: vertical;
-    -webkit-line-clamp: 2;
-    line-clamp: 2;
-    overflow: hidden;
-  }
-  .tile-foot {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: var(--space-2);
-    border-top: 1px solid var(--border);
-    padding: 0 var(--space-2) 0 var(--space-4);
-    min-height: 44px;
-  }
-  .tile-host {
-    min-width: 0;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-    font-size: var(--text-xs);
-    color: var(--text-muted);
+    overflow-wrap: anywhere;
   }
   .tile-guide {
-    display: inline-flex;
-    align-items: center;
-    gap: var(--space-1);
     position: relative;
     z-index: 1;
     flex-shrink: 0;
-    min-height: 36px;
+    display: inline-flex;
+    align-items: center;
+    gap: var(--space-1);
+    min-height: 2.25rem;
     padding: 0 var(--space-3);
-    background: transparent;
-    border: 1px solid transparent;
-    border-radius: var(--radius-sm);
-    font-family: var(--font-mono);
-    font-size: var(--text-xs);
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 999px;
+    font-family: var(--font-sans);
+    font-size: var(--text-sm);
     font-weight: 500;
     color: var(--text-2);
     cursor: pointer;
     transition:
       color var(--duration-fast) var(--ease-out),
-      background-color var(--duration-fast) var(--ease-out),
       border-color var(--duration-fast) var(--ease-out);
   }
   .tile-guide:hover {
     color: var(--accent);
-    background: var(--accent-subtle);
-    border-color: var(--border);
+    border-color: var(--accent);
   }
   .tile-guide:focus-visible {
     outline: 2px solid var(--input-focus, var(--accent));
     outline-offset: 1px;
   }
-  /* Phone: a compact row. Logo left, name + status + description beside it, a labelled Guide pill pinned right.
-     The row is still one launch link; the button is its sibling, so nothing nests. */
-  @media (max-width: 640px) {
-    .tile { height: auto; min-height: 5.5rem; }
-    .tile-launch {
-      display: grid;
-      grid-template-columns: auto 1fr;
-      column-gap: var(--space-3);
-      align-items: center;
-      padding: var(--space-3) calc(var(--space-3) * 2 + 5.25rem) var(--space-3) var(--space-3);
-      min-height: 5.5rem;
-    }
-    .tile-launch :global(.app-icon) { grid-row: 1 / span 2; }
-    .tile-title { margin-top: 0; align-self: end; }
-    .tile-desc { align-self: start; }
-    .tile-foot {
-      position: absolute;
-      top: 0;
-      right: var(--space-3);
-      bottom: 0;
-      border: 0;
-      padding: 0;
-      min-height: 0;
-    }
-    .tile-host { display: none; }
-    .tile-guide {
-      min-height: 44px;
-      padding: 0 var(--space-3);
-      justify-content: center;
-      border-color: var(--border);
-      border-radius: 22px;
-      background: var(--bg);
-    }
+  /* On phones the pill drops under the text, aligned with it, so the description keeps the full row width. */
+  @media (max-width: 30rem) {
+    .tile-launch { flex-basis: 100%; }
+    .tile-guide { margin-left: calc(3rem + var(--space-3)); }
+  }
+  @media (pointer: coarse) {
+    .tile-guide { min-height: 2.75rem; }
   }
   @media (prefers-reduced-motion: reduce) {
-    .tile { transition: none; }
+    .tile, .tile-guide { transition: none; }
   }
 </style>

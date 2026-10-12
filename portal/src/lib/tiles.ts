@@ -1,5 +1,5 @@
 // Runtime app-tile loader. Reads each `<slug>.yaml` `presentation:` block from the manifest dir at request time (manifests.ts
-// reads `oidc:`/`consent:` from the same files); an optional `<slug>.md` is the /apps/<slug> detail content.
+// reads `oidc:`/`consent:` from the same files); an optional `<slug>.md` is the /apps/<slug> detail content and an optional `<slug>.svg` its logo (served by pages/icons).
 // groups.yaml (optional) maps group name to { title, description, order } via loadGroups() and is skipped as a tile.
 // requirements/<name>.md (optional) defines a prerequisite that a manifest names in `presentation.requires`.
 
@@ -12,34 +12,45 @@ import { parseAccessGroups } from './access-groups';
 import { CACHE_TTL_MS, manifestDir, manifestFiles } from './manifests';
 import { DEFAULT_GROUP } from './constants';
 
-// Vendored icons directory: public/icons/ in dev (a stale dist/ must not shadow it), dist/client/icons/ in prod.
-const _cwd = process.cwd();
-const _iconsDir = (() => {
-  // import.meta.env is Vite-specific; guard it so the module loads in plain Node.
-  const isDev = typeof import.meta.env !== 'undefined' && import.meta.env.DEV;
-  if (isDev) return join(_cwd, 'public', 'icons');
-  const prod = join(_cwd, 'dist', 'client', 'icons');
-  if (existsSync(prod)) return prod;
-  return join(_cwd, 'public', 'icons');
-})();
+const ICON_MAX_BYTES = 32 * 1024;
+const SVG_ROOT_RE = /^\uFEFF?\s*(?:<\?xml[^>]*\?>\s*)?(?:<!--[\s\S]*?-->\s*)*(?:<!DOCTYPE[^>]*>\s*)?<svg[\s>]/i;
 
-/** Return the web path for a vendored logo SVG, or undefined if absent. */
-export function resolveIconHref(iconSlug: string | undefined): string | undefined {
-  if (!iconSlug) return undefined;
-  const candidate = join(_iconsDir, `${iconSlug}.svg`);
-  return existsSync(candidate) ? `/icons/${iconSlug}.svg` : undefined;
+/** The `<stem>.svg` sidecar: its markup when it is a plausible logo, a reason when it is rejected, empty when absent. */
+function loadIcon(dir: string, stem: string): { svg?: string; reason?: string } {
+  const path = join(dir, `${stem}.svg`);
+  try {
+    if (!existsSync(path)) return {};
+    if (!statSync(path).isFile()) return { reason: `${stem}.svg is not a regular file` };
+    const svg = readFileSync(path, 'utf8');
+    if (Buffer.byteLength(svg) > ICON_MAX_BYTES) return { reason: `${stem}.svg is over the ${ICON_MAX_BYTES} byte limit` };
+    return SVG_ROOT_RE.test(svg) ? { svg } : { reason: `${stem}.svg does not open with an <svg> root` };
+  } catch (err) {
+    return { reason: `${stem}.svg is unreadable: ${err}` };
+  }
 }
 
-/** True when the logo file opens with its own filled square (a rect at the origin, width equal to height). Such
- *  marks fill the whole plate instead of sitting inside it. */
-export function iconIsBleed(iconSlug: string | undefined): boolean {
-  if (!iconSlug) return false;
-  try {
-    const head = readFileSync(join(_iconsDir, `${iconSlug}.svg`), 'utf8').slice(0, 600);
-    return /<rect(?![^>]*\s[xy]=)[^>]*\swidth="(\d+(?:\.\d+)?)"[^>]*\sheight="\1"[^>]*\sfill="#/i.test(head);
-  } catch {
-    return false;
+/** True when the logo opens with its own filled square (a rect at the origin, width equal to height). Such marks fill
+ *  the whole plate instead of sitting inside it. */
+function isBleed(svg: string): boolean {
+  return /<rect(?![^>]*\s[xy]=)[^>]*\swidth="(\d+(?:\.\d+)?)"[^>]*\sheight="\1"[^>]*\sfill="#/i.test(svg.slice(0, 600));
+}
+
+/** True when the logo is drawn only in dark ink with no ground of its own (no gradient, no light or saturated colour),
+ *  so dark mode can knock it out to a light tone. */
+function isInk(svg: string): boolean {
+  if (!/<(path|rect|circle|ellipse|polygon|polyline|line)\b/i.test(svg) || /gradient|<image|<pattern|url\(/i.test(svg)) return false;
+  for (const m of svg.matchAll(/#([0-9a-f]{3}|[0-9a-f]{6})\b/gi)) {
+    const h = m[1].length === 3 ? [...m[1]].map((c) => c + c).join('') : m[1];
+    const [r, g, b] = [0, 2, 4].map((i) => parseInt(h.slice(i, i + 2), 16));
+    if (Math.max(r, g, b) - Math.min(r, g, b) > 80 || 0.2126 * r + 0.7152 * g + 0.0722 * b > 90) return false;
   }
+  return !/(?:fill|stroke|color)\s*[:=]\s*["']?(?:white|rgb|hsl)/i.test(svg);
+}
+
+function initials(name: string): string {
+  const words = name.split(/[^\p{L}\p{N}]+/u).filter(Boolean);
+  const out = words.length > 1 ? words[0][0] + words[1][0] : (words[0] ?? '').slice(0, 2);
+  return out.toUpperCase() || '?';
 }
 
 export type AuthKind = 'oidc' | 'forward_auth' | 'external';
@@ -83,14 +94,16 @@ export interface AppTile {
   url: string;
   /** 1-3 char monogram fallback when no icon resolves. */
   icon: string;
-  /** Slug of the vendored logo SVG in public/icons (preferred). */
-  iconSlug?: string;
-  /** Fallback logo slug. */
-  iconFallback?: string;
-  /** Set only when the vendored SVG exists; absent renders the monogram. */
+  /** Route of the `<slug>.svg` sidecar; set only when it passed validation, else the monogram renders. */
   iconHref?: string;
+  /** The validated sidecar markup, served by the icon route. */
+  iconSvg?: string;
+  /** Why a present sidecar was rejected. */
+  iconReason?: string;
   /** The logo ships its own filled square, so the plate drops its padding and border. */
   iconBleed?: boolean;
+  /** The logo is dark ink only, so dark mode inverts it. */
+  iconInk?: boolean;
   authKind: AuthKind;
   accessGroups: string[];
   /** Dashboard grouping label; tiles sharing one render together. */
@@ -147,10 +160,10 @@ interface CacheEntry {
 
 let cache: CacheEntry | null = null;
 
-/** Freshest mtime across yaml + md so a sidecar edit also busts the cache. */
+/** Freshest mtime across yaml + md + svg so a sidecar edit also busts the cache. */
 function freshestMtime(dir: string): number {
   try {
-    const files = [...manifestFiles(dir), ...readdirSync(dir).filter((f) => f.endsWith('.md'))];
+    const files = [...manifestFiles(dir), ...readdirSync(dir).filter((f) => f.endsWith('.md') || f.endsWith('.svg'))];
     try {
       for (const f of readdirSync(join(dir, 'requirements'))) files.push(join('requirements', f));
     } catch {
@@ -320,7 +333,7 @@ function parseTile(slug: string, doc: Record<string, unknown>, dir: string): App
     name: String(p['name'] ?? slug),
     description: String(p['description'] ?? ''),
     url,
-    icon: String(p['icon'] ?? '??'),
+    icon: String(p['icon'] ?? initials(String(p['name'] ?? slug))),
     authKind: String(p['auth_kind'] ?? 'external') as AuthKind,
     accessGroups,
     order: typeof p['order'] === 'number' ? p['order'] : 999,
@@ -333,14 +346,14 @@ function parseTile(slug: string, doc: Record<string, unknown>, dir: string): App
   const groupVal = p['group'];
   if (typeof groupVal === 'string' && groupVal.trim()) tile.group = groupVal.trim();
 
-  const iconSlug = p['icon_slug'];
-  if (typeof iconSlug === 'string' && iconSlug.trim()) tile.iconSlug = iconSlug.trim();
-  const iconFallback = p['icon_fallback'];
-  if (typeof iconFallback === 'string' && iconFallback.trim()) tile.iconFallback = iconFallback.trim();
-
-  // Resolve the icon href at load time so render never 404s.
-  tile.iconHref = resolveIconHref(tile.iconSlug) ?? resolveIconHref(tile.iconFallback);
-  tile.iconBleed = iconIsBleed(tile.iconHref?.split('/').pop()?.replace(/\.svg$/, ''));
+  const icon = loadIcon(dir, slug);
+  if (icon.svg) {
+    tile.iconHref = `/icons/${encodeURIComponent(slug)}.svg`;
+    tile.iconSvg = icon.svg;
+    tile.iconBleed = isBleed(icon.svg);
+    tile.iconInk = !tile.iconBleed && isInk(icon.svg);
+  }
+  tile.iconReason = icon.reason;
 
   return tile;
 }
@@ -399,6 +412,11 @@ function allTiles(): AppTile[] {
   return tiles;
 }
 
+/** The sidecars loadIcon refused, named by file with the reason. */
+export function rejectedIcons(tiles: AppTile[]): { file: string; reason: string }[] {
+  return tiles.flatMap((t) => (t.iconReason ? [{ file: `${t.slug}.svg`, reason: t.iconReason }] : []));
+}
+
 export function loadTiles(): AppTile[] {
   return allTiles().filter((t) => !t.disabled);
 }
@@ -406,6 +424,25 @@ export function loadTiles(): AppTile[] {
 /** Includes disabled tiles. */
 export function getTile(slug: string): AppTile | undefined {
   return allTiles().find((t) => t.slug === slug);
+}
+
+export interface TileSection {
+  title: string;
+  description: string;
+  tiles: AppTile[];
+}
+
+/** The tiles the user may see, split into ungrouped and per-group sections. Sections follow groups.yaml `order`, else
+ * their lowest tile order; a group the registry lacks is titled with its raw key. */
+export function sectionTiles(tiles: AppTile[], userGroups: string[], registry: Map<string, GroupMeta>) {
+  const visible = tiles.filter((t) => userCanSeeTile(t, userGroups));
+  const byGroup = new Map<string, AppTile[]>();
+  for (const t of visible) if (t.group) byGroup.set(t.group, [...(byGroup.get(t.group) ?? []), t]);
+  const rank = ([key, ts]: [string, AppTile[]]) => registry.get(key)?.order ?? Math.min(...ts.map((t) => t.order));
+  const groups: TileSection[] = [...byGroup.entries()]
+    .sort((a, b) => rank(a) - rank(b))
+    .map(([key, ts]) => ({ title: registry.get(key)?.title ?? key, description: registry.get(key)?.description ?? '', tiles: ts }));
+  return { visible, ungrouped: visible.filter((t) => !t.group), groups };
 }
 
 /** The groups gating a tile's visibility: its access groups, else the default group, never every signed-in user. */

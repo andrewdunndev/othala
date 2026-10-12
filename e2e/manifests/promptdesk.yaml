@@ -7,8 +7,6 @@ presentation:
   description: Internal chat interface. SSO via othala — no local password required.
   url: https://prompt.othala.test
   icon: PD
-  icon_slug: ""
-  icon_fallback: chat
   auth_kind: oidc
   access:
     - prompt-access

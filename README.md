@@ -10,10 +10,9 @@ Othala is a running Ory deployment: **Kratos** for identity, **Hydra** for OAuth
 TypeScript application that supplies the parts Ory deliberately leaves to the integrator.
 
 Ory ships no login UI, no consent UI, and no authorization model. Hydra will not issue a token until
-something tells it who the subject is and what they may have; Kratos will hold groups on an identity
-but will never decide what they mean. Those decisions are the integration, and they are the part with
-the fewest complete worked examples in the open. This repository is one, with the reasoning kept next
-to the code.
+something tells it who the subject is and what they may have; Kratos holds groups on an identity but
+never decides what they mean. Those decisions are the integration, and this repository is a worked
+example with the reasoning kept next to the code.
 
 The app in `portal/` (Astro Node SSR) provides:
 
@@ -23,15 +22,13 @@ The app in `portal/` (Astro Node SSR) provides:
 - **a forward-auth endpoint** so apps with no OIDC support sit behind the same session and the same
   groups;
 - **an OIDC client registrar** that reconciles Hydra's client list from per-app manifest files, so
-  adding an app is a file drop rather than an image rebuild;
+  adding an app, logo included, is a file drop rather than an image rebuild;
 - **an admin surface** for identities, groups, and OAuth2 clients, on a listener that is not on the
   network.
 
 Passkeys are the primary credential; email code and password are the fallbacks. Everything is
 configured through `OTHALA_*` environment variables, so one image serves any instance
 (see [`.env.example`](.env.example) for the full contract).
-
-Read it, copy it, lift whole files out of it. That is what it is for.
 
 ## Run it
 
@@ -60,8 +57,7 @@ npm install
 npm run dev   # http://localhost:4321
 ```
 
-Unset `OTHALA_*` values fall back to dev defaults with a warning. OIDC and consent need Kratos and
-Hydra, so use the full-stack mode above.
+Unset `OTHALA_*` values fall back to dev defaults with a warning. OIDC and consent need the full stack.
 
 ```sh
 npm test          # vitest run: src/lib/*.test.ts + scripts/*.test.mjs, incl. fuzz suites
@@ -77,8 +73,7 @@ Hydra), and `consent:` (roles, the group-to-role map, claim emission).
 
 [`e2e/manifests/grafana.yaml`](e2e/manifests/grafana.yaml) and
 [`e2e/manifests/audiobookshelf.yaml`](e2e/manifests/audiobookshelf.yaml) are the annotated spec.
-Every field's constraint and enforcer is a comment on the line, so the documented behaviour and the
-tested behaviour are the same file. `validateClients` and `lintManifests`
+Every field's constraint and enforcer is a comment on the line. `validateClients` and `lintManifests`
 (`portal/src/lib/manifests.ts`, `portal/src/lib/manifest-lint.ts`) are the enforcement; `npm run
 lint:manifests` (in `portal/`) checks a manifest directory.
 
@@ -106,14 +101,11 @@ lint:manifests` (in `portal/`) checks a manifest directory.
 - [`SECURITY.md`](SECURITY.md): report vulnerabilities privately, never in a public issue.
 - [`CHANGELOG.md`](CHANGELOG.md) and the git tags: the only place release state is asserted.
 
-## Copying this
+## Contributing
 
-Copy freely; it is MIT.
-
-Corrections are wanted: a statement here that is false, a dead link, a config that does not do what
-it claims. Those are bugs, and an issue or merge request for one is welcome. Feature requests and
-changes that add configuration surface to fit a different deployment are not taken, even when the
-patch is good. Fork it; that is what the licence is for.
+Copy freely; it is MIT. Corrections are welcome: a false statement, a dead link, a config that does
+not do what it claims. Feature requests and changes that add configuration surface for a different
+deployment are not taken; fork it.
 
 ## License
 

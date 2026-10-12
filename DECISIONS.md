@@ -1,8 +1,7 @@
 # Decisions
 
-Reasoning you could not recover by reading the code: roads not taken, invisible constraints, and
-reversals, so they are not re-litigated. Behaviour lives in the code and the tests. Each entry stands
-alone and names the file that fails when it is violated, or says UNENFORCED.
+Reasoning you cannot recover from the code: roads not taken and invisible constraints. Each entry
+names the file that fails when it is violated, or says UNENFORCED.
 
 ## Assurance level is per-flow, so the session check stays aal1
 
@@ -16,9 +15,8 @@ a role above an app's entry level cannot remove their last one.
 **Why.** Kratos enforces assurance level per flow, never per route, so step-up belongs in the
 application, which reads the session's AAL itself. Raising the pin tightens nothing: the session endpoint
 stops returning a usable identity for exactly the people who enrolled a second factor, and that identity
-id is the gate's only input, so every gated app locks out at once. Ory config here is
-host-mounted, not baked into an image, so a stale setting's consumer may not be in this
-repository.
+id is the gate's only input, so every gated app locks out at once. Ory config is mounted by the consumer, so a stale
+setting's consumer may be outside this repository.
 
 **Enforced by.** `portal/scripts/forward-auth.test.mjs` holds the coupling (a session with no identity
 id is 401). Step-up: `gate.test.ts`, `oauth2-handlers.test.mjs`, `admin-port.test.mjs`,
@@ -30,12 +28,11 @@ id is 401). Step-up: `gate.test.ts`, `oauth2-handlers.test.mjs`, `admin-port.tes
 **Decided.** The forward-auth endpoint answers 200 / 401 / 403 / 503, with 503 reserved for "could not
 establish the facts". Every non-200 denies; the statuses tell the edge which kind of failure occurred.
 
-**Why.** Were 503 folded into 403, an edge matching `401 403` and redirecting would turn an
-identity-provider outage into an infinite login loop: the gate denies because it cannot reach the IdP,
-and the edge bounces the browser to a login page served by the same process that is down.
-`ARCHITECTURE.md`'s status contract ("Why 503 is separate at all") carries the full argument. The required group arrives as an operator-set query
-parameter, not a header, because anything reaching the endpoint internally can forge a header; and HEAD
-reuses the GET decision verbatim: a HEAD answered 200 where GET would answer 403 would admit a request GET refuses.
+**Why.** Folded into 403, an outage would send an edge matching `401 403` into an infinite login loop: the
+gate denies because it cannot reach the IdP, and the edge redirects to a login page served by the process that is down.
+`ARCHITECTURE.md`'s status contract carries the full argument. The required group arrives as an
+operator-set query parameter, not a header, because anything reaching the endpoint internally can forge
+a header. HEAD reuses the GET decision, since a divergent HEAD would admit what GET refuses.
 
 **Enforced by.** `portal/scripts/forward-auth.test.mjs`
 
@@ -52,11 +49,12 @@ Kratos validates the identity schema against `traits` only, so the schema's `met
 executes: it is documentation, the application's validator is the sole runtime enforcement, and a
 deployed schema can fail to enumerate the very key the application reads as authority. Kratos also omits
 `metadata_admin` from the identity passed to after-hook body templates, so a hook needing to know
-whether an identity is an admin must call the admin API, not read its own context. Admin authority is not a group: groups are user-visible display data carried in OIDC claims, and an
-admin bit there would let an unprivileged session probe its own admin status. The floor exists so the live
-mechanism can carry hard guards — refusing to demote the last admin, blocking self-revoke — without
-becoming a lockout, and because an identity provider's break-glass cannot route through itself.
-Self-service recovery refuses admin identities for the same reason.
+whether an identity is an admin must call the admin API, not read its own context.
+Admin authority is not a group: groups are user-visible data carried in OIDC claims, and an admin bit
+there would let an unprivileged session probe its own admin status. The floor lets the live mechanism
+carry hard guards (no demoting the last admin, no self-revoke) without becoming a lockout, since an
+identity provider's break-glass cannot route through itself. Self-service recovery refuses admin
+identities for the same reason.
 
 **Enforced by.** `portal/src/lib/metadata-admin.ts` (strict-boolean, allowed-key validation),
 `portal/src/lib/identity-facts.ts`, `portal/src/lib/admin.ts` (AAL2 guard),
@@ -70,16 +68,14 @@ carries only the identity id and the admin marker is read from the admin API.
 for everyone, admins included. An elevated role comes from additionally holding a role-mapped group. A
 group's type comes from its bindings, never from its name.
 
-**Why.** Both halves resist a tempting shortcut. Deriving entry from a role — a capability group
-conferring access as a side effect, or the admin group implicitly granting it — means someone reading a
-service's access list does not have the whole answer: entry lives partly in a different table. A rule
-that must be remembered will be misremembered, so reconstructibility from one artifact is a requirement
-of the model; the price, knowingly paid, is two group assignments per admin per service. That price
-carries its own hazard: an admin holds two role-mapped groups, normalization sorts alphabetically, and a
-first-match walk would silently hand every admin the low role, so the resolver takes the highest-ranked
-declared role over the whole set instead. A naming prefix cannot double as both convention and runtime type discriminator. Binding and role mapping stay separate
-fields for a case the collapse loses: everyone in a group may enter while only a second earns the editor
-role.
+**Why.** Deriving entry from a role (a capability group conferring access as a side effect, or the admin group
+implicitly granting it) leaves a service's access list without the whole answer. A rule that must be
+remembered will be misremembered, so the model requires reconstructibility from one artifact; the price
+is two group assignments per admin per service. Because an admin then holds two role-mapped groups and
+normalization sorts alphabetically, a first-match walk would hand every admin the low role, so the
+resolver takes the highest-ranked declared role over the whole set. A naming prefix cannot be both
+convention and runtime type discriminator. Binding and role mapping stay separate fields for the case
+where everyone in a group may enter while only a second earns the editor role.
 
 **Enforced by.** `portal/src/lib/gate.ts`, `portal/src/lib/claims.ts` (highest-rank resolution),
 `portal/src/lib/group-registry.ts` (binding-derived typing), `portal/scripts/gate-property.test.mjs`,
@@ -91,13 +87,12 @@ role.
 The username is only the first-link key, set per app before OIDC is enabled, and only an administrator
 can change it. Email is never a link key.
 
-**Why.** The UUID is minted at identity creation, so it exists nowhere in pre-existing application data;
-the only key present in both the old data and the identity service is the human one. Most relying parties
-converge anyway: match once by username, persist the UUID, match on it after. Email is rejected because
-it is mutable. The UUID lives only in the identity database, so a rebuild that recreates identities breaks
-every link: import identities with their ids, or budget a re-link pass. Kratos has no primitive to freeze
-a trait, and an app that still re-matches on username at every sign-in would silently orphan the account
-on a self-service rename, so the profile flow refuses one before it is saved.
+**Why.** The UUID is minted at identity creation, so it exists nowhere in pre-existing application data; the
+only key in both is the human one. Relying parties match once by username, persist the UUID, and match
+on it after. Email is rejected because it is mutable. A rebuild that recreates identities breaks every
+link: import identities with their ids, or budget a re-link pass. Kratos cannot freeze a trait, and an
+app that re-matches on username at every sign-in would orphan the account on a self-service rename, so
+the profile flow refuses one before it is saved.
 
 **Enforced by.** `handleProfileGate` in `portal/src/server/listen.ts` on
 `selfservice.flows.settings.after.profile` in `kratos/kratos.yml`; `portal/scripts/admin-port.test.mjs`,
@@ -110,13 +105,11 @@ configuration, unenforced here.
 ranked above password. Username plus password is the tertiary recovery on-ramp and the credential the
 break-glass floor identities carry.
 
-**Why.** Kratos's passkey and webauthn strategies differ: the former gives
-discoverable credentials and conditional UI (the usernameless one-tap flow); the latter serves only as
-a hardware second factor with passwordless disabled, so it never duplicates the primary. The fallback
-ordering is deliberate: email one-time-code sits above password so a user on a new or borrowed device
-gets in without typing a secret they would rarely use, landing straight in passkey enrollment.
-A password credential type stays enabled because the break-glass floor must work when passkey
-enrollment and email delivery are both degraded.
+**Why.** Kratos's passkey strategy gives discoverable credentials and conditional UI (usernameless one-tap);
+its webauthn strategy serves only as a hardware second factor with passwordless disabled, so it never
+duplicates the primary. Email one-time-code sits above password so a user on a new or borrowed device
+gets in without typing a rarely used secret, landing straight in passkey enrollment. Password stays
+enabled because the break-glass floor must work when passkey enrollment and email delivery are both degraded.
 
 **Enforced by.** `e2e/playwright/tests/k-email-code-login.spec.ts` end to end. The passkey leg
 (`i-passkey-register-login.spec.ts` I1) covers registration and usernameless login. UNENFORCED, like the tier
@@ -130,13 +123,11 @@ block, mints a one-time recovery link and code in the same request, and hands bo
 conversation that already exists with that person. The recipient establishes their own password and
 passkey in their own browser.
 
-**Why.** The invariant is not "no password exists" — it is that no password ever transits a channel.
-A code emailed at creation is a delivery guess: the address is an unverified trait the admin just typed, and a
-mistyped address misroutes the secret in motion. An admin-chosen initial password is refused outright —
-it is exactly a password in transit. Both link and code are required: the link alone lands on a form with an
-empty code field, so a link with no code is an enrollment that looks fine from the admin's side and
-dead-ends for every invitee. The admin-minted code expires slowly while self-service recovery expires fast. An enrollment message may sit unread overnight; a recovery the
-user started should not.
+**Why.** The invariant is that no password ever transits a channel. A code emailed at creation is a delivery
+guess: the address is an unverified trait the admin just typed. An admin-chosen initial password is
+refused outright. Both link and code are required: the link alone lands on a form with an empty code
+field and dead-ends every invitee. The admin-minted code expires slowly because an enrollment message
+may sit unread overnight; self-service recovery expires fast.
 
 **Enforced by.** `portal/src/lib/admin-api.ts` (identity created with no credentials block; link and
 code minted together). The both-values rendering at the admin call sites is UNENFORCED.
@@ -148,15 +139,13 @@ sidecar holds the cert. A hop between mutually trusted services on one private n
 isolation instead of mTLS or transport encryption. Issuer choice follows one question — must a browser
 or device trust this out of the box — and the two roots are never cross-signed.
 
-**Why.** One rule applied three times. In-app TLS would make every app own cert loading, renewal and error handling. An mTLS proxy in front of the identity service's admin API
-is rejected the same way: mTLS earns its keep across a trust boundary, and there is none between two
-containers on one isolated bridge, so it would cost a network, a proxy container and two cert-lifecycle
-units to protect a hop nobody can reach. Database connections run without transport encryption for the same reason. The cost
-is recorded, not hidden — "is on this network" is weaker than "presents a rostered client certificate".
-Chaining an internal root under a public one fails on feasibility and blast radius alike: a public CA
-will not sign intermediates for non-public use, and if it did, compromising the internal CA would
-compromise the public chain. All of it is scoped to the database sharing a private network with the
-services that dial it; if that stops being true, none of it transfers.
+**Why.** In-app TLS would make every app own cert loading, renewal and error handling. An mTLS proxy in front
+of the admin API is rejected the same way: mTLS earns its keep across a trust boundary, and there is
+none between two containers on one isolated bridge. Database connections run unencrypted for the same
+reason. The cost is real: "is on this network" is weaker than "presents a rostered client certificate".
+Chaining an internal root under a public one fails on feasibility (a public CA will not sign
+intermediates for non-public use) and blast radius. None of this transfers once the database stops
+sharing a private network with its clients.
 
 **Enforced by.** UNENFORCED here — no file in this repository declares the deployment's networks or port
 publications, so nothing fails when the isolation the argument rests on regresses.
@@ -166,14 +155,11 @@ publications, so nothing fails when the isolation the argument rests on regresse
 **Decided.** Trusted first-party clients are registered with consent skipped, declared per client in
 that client's manifest rather than as a server-wide default.
 
-**Why.** Two reasons unrecoverable from the config: it keeps "which apps skip consent?" answerable by grepping
-manifests rather than by reading server config and inferring "all of them, always"; and it is a
-tripwire, because a default grants the skip silently to whatever gets registered next, while per-client
-means a future non-first-party client must be given it explicitly. The accepted threat: the consent
-screen is the one place a victim might notice "wait, I didn't open that app", so skipping it means a
-stolen session mints tokens across every first-party surface silently and the session cookie becomes the
-entire perimeter. The expiry condition is named: the first money-moving, irreversible or destructive
-client warrants per-action re-consent or step-up regardless.
+**Why.** "Which apps skip consent?" stays answerable by grepping manifests, and a server default would grant
+the skip silently to whatever is registered next. Accepted threat: consent is the one place a victim
+might notice an app they did not open, so a stolen session mints tokens across every first-party
+surface silently and the session cookie becomes the entire perimeter. The first money-moving,
+irreversible or destructive client warrants per-action re-consent or step-up regardless.
 
 **Enforced by.** `portal/src/lib/oauth2-handlers.ts` (the consent handler honours the per-manifest flag;
 a client without it bounces to the interactive screen)
@@ -185,12 +171,10 @@ the fronting proxy must match that exact path set before any wider wildcard rout
 server. The CORS allowlist is keyed by client type: a browser SPA that fetches discovery and token
 endpoints needs an entry; a redirect-flow server-side client never does.
 
-**Why.** Both are traps that stay invisible until they fire. Inverting the proxy route order silently
-breaks every login — the challenge paths get proxied to the authorization server, which does not
-implement them — and the failure is total, with no degraded state to notice first. A redirect-flow
-client's browser never issues a cross-origin request to the authorization server, so its origin in the
-allowlist adds nothing, and credentials are allowed on the CORS config, so each extra origin widens who
-can reach the token endpoint.
+**Why.** Inverting the proxy route order breaks every login outright: the challenge paths get proxied to the
+authorization server, which does not implement them. A redirect-flow client's browser never makes a
+cross-origin request to it, so its origin adds nothing, and since credentials are allowed each extra
+origin widens who can reach the token endpoint.
 
 **Enforced by.** UNENFORCED — the constraint holds only in the deployed proxy config, which no gate here
 can read.
@@ -200,13 +184,11 @@ can read.
 **Decided.** Global PKCE enforcement stays off, with enforcement for public clients on as a forward
 guard — held deliberately rather than flipped.
 
-**Why.** The authorization server has no per-client PKCE knob, and that absence is the constraint that
-makes this a decision at all — the choice is global. "No client needs the relaxation" is not
-the same statement as "every client actually sends a challenge". A confidential client that omits the challenge breaks the moment
-enforcement goes on — an outage discovered at login time by every user of every affected app, not at
-deploy time by a gate. Three triggers retire this debt: the non-PKCE relying party ships (keep it off,
-the original constraint has returned); its rollout is abandoned (verify every deployed confidential
-client, then enforce); or the authorization server ships a per-client knob.
+**Why.** The authorization server has no per-client PKCE knob, so the choice is global. "No client needs the
+relaxation" is not "every client sends a challenge": a confidential client that omits it breaks the
+moment enforcement goes on, discovered at login time by its users rather than at deploy time by a gate.
+Retired when a non-PKCE relying party ships (keep it off), its rollout is abandoned (verify every
+confidential client, then enforce), or the server ships a per-client knob.
 
 **Enforced by.** `hydra/hydra.yml` holds the value, but UNENFORCED — nothing verifies that deployed
 clients send a challenge, which is exactly the gap that makes flipping it dangerous.
@@ -216,11 +198,9 @@ clients send a challenge, which is exactly the gap that makes flipping it danger
 **Decided.** The login, consent and challenge UI runs inside the same private network as the identity
 and authorization services, not on an edge or serverless runtime.
 
-**Why.** The Ory admin APIs have
-no authentication of their own; network position *is* the authorization, so they must be bound to a
-private network, and no edge function can reach one: "reaches the admin API" and "runs at the edge" are
-jointly inconsistent. Reading identity metadata, registering clients and resolving group membership all require the admin API; group membership lives in metadata the public session endpoint does not return, so even
-"is this person allowed in" needs the privileged hop.
+**Why.** The Ory admin APIs have no authentication of their own; network position is the authorization, and no
+edge function can reach a private network. Reading identity metadata, registering clients and resolving
+group membership all need the admin API, so even "is this person allowed in" needs the privileged hop.
 
 **Enforced by.** UNENFORCED — nothing prevents re-adopting an edge adapter; the failure would surface as
 unreachable admin endpoints at runtime.
@@ -231,30 +211,13 @@ unreachable admin endpoints at runtime.
 where the app supports it natively; do not break native clients; gate sensitive browser-only surfaces
 behind forward-auth — rather than decided on each service's own merits.
 
-**Why.** The ladder is reproducible by someone who was not in the room; absent a stated rule, each service
-got its own defensible answer. The non-obvious rung
-is the second: a uniform edge gate is only uniform until the first native client, because such a client
-carries a bearer credential rather than the browser's session cookie and the gate simply rejects it — so
-the carve-out is scoped to that client's paths, not the whole service, and thereafter a "uniform" gate
-is a uniform gate plus an undocumented exception. That rung also rules out a dedicated bridge for any
-native-auth protocol a browser app doesn't need: a browser app without OIDC sits behind forward-auth, a
-native client uses an app-local credential, and neither justifies standing up a privileged listener
-whose only job is bridging one to the other. The endpoint reads a single group per call, so "entry AND
-role" is two gates on one site. Finally, an ungated surface is an assignment a rung made, not an omission,
-and the comment beside it is usually the only place that reason is written.
+**Why.** Without a stated rule each service got its own defensible answer; the ladder is reproducible by
+someone who was not in the room. The non-obvious rung is the second: a native client carries a bearer
+credential rather than the browser's session cookie, so a uniform edge gate rejects it, and the
+carve-out is scoped to that client's paths. That rung also rules out a privileged bridge listener
+between browser and native auth. The endpoint reads a single group per call, so "entry AND role" is two
+gates on one site. An ungated surface is an assignment a rung made, not an omission.
 
 **Enforced by.** UNENFORCED. The single-value group read is visible in
 `portal/src/pages/api/forward-auth.ts`, but nothing fails if a second parameter is added, and the
 agreement between a declared binding and what a service's edge config gates is unobservable here.
-
-## Cite the artifact that holds the value; never restate the value
-
-**Decided.** A record points at the gate, test or config file that holds a value instead of copying it,
-and every normative "must" either names the file that fails when it is violated or carries an explicit
-unenforced marker.
-
-**Why.** Counts, addresses, hostnames, rosters, tallies and line numbers rot silently, while a gate
-cannot — it fails. Claiming an enforcer that does not exist is worse than admitting there is none.
-
-**Enforced by.** `scripts/check-purity.sh`, over the whole index. Each check states its own scope at
-its call site, and restating that list here would be the rot this entry is about.

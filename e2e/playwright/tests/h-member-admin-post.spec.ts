@@ -10,6 +10,12 @@ const DUMMY_FORM_BODY =
 
 const FAKE_UUID = '00000000-0000-4000-a000-000000000001';
 
+const CROSS_SITE_FORM_HEADERS = {
+  'Content-Type': 'application/x-www-form-urlencoded',
+  'Origin': 'https://attacker.example',
+  'Sec-Fetch-Site': 'cross-site',
+};
+
 test('H1 — INV-1: member POST /admin/users/new at AAL1 is denied (step-up redirect, not 200)', async ({
   ctx,
   baseURL,
@@ -23,17 +29,32 @@ test('H1 — INV-1: member POST /admin/users/new at AAL1 is denied (step-up redi
 
   const resp1 = await ctx.request.post(`${baseURL}/admin/users/new`, {
     maxRedirects: 0,
-    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    headers: CROSS_SITE_FORM_HEADERS,
     data: DUMMY_FORM_BODY,
   });
 
   const status1 = resp1.status();
-  console.log('[H1] origin-less POST /admin/users/new →', status1);
+  console.log('[H1] cross-site POST /admin/users/new →', status1);
 
   expect(
     status1,
-    `H1 (layer 1): origin-less POST must be rejected by Astro checkOrigin with 403; got ${status1}`,
+    `H1 (layer 1): cross-site POST must be rejected by Astro checkOrigin with 403; got ${status1}`,
   ).toBe(403);
+
+  const respNoOrigin = await ctx.request.post(`${baseURL}/admin/users/new`, {
+    maxRedirects: 0,
+    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    data: DUMMY_FORM_BODY,
+  });
+
+  const statusNoOrigin = respNoOrigin.status();
+  const locNoOrigin = respNoOrigin.headers()['location'] ?? '';
+  console.log('[H1] origin-less POST /admin/users/new →', statusNoOrigin, locNoOrigin);
+
+  expect(
+    /aal=aal2/.test(locNoOrigin),
+    `H1 (INV-1): origin-less AAL1 member POST must redirect to aal=aal2 step-up; got ${statusNoOrigin} ${locNoOrigin}`,
+  ).toBe(true);
 
   const resp2 = await ctx.request.post(`${baseURL}/admin/users/new`, {
     maxRedirects: 0,
@@ -74,17 +95,32 @@ test('H2 — INV-1: member POST /admin/users/<own-id> at AAL1 is denied (step-up
 
   const resp1 = await ctx.request.post(`${baseURL}/admin/users/${ownId}`, {
     maxRedirects: 0,
-    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    headers: CROSS_SITE_FORM_HEADERS,
     data: DUMMY_FORM_BODY,
   });
 
   const status1 = resp1.status();
-  console.log('[H2] origin-less POST /admin/users/<own-id> →', status1);
+  console.log('[H2] cross-site POST /admin/users/<own-id> →', status1);
 
   expect(
     status1,
-    `H2 (layer 1): origin-less POST must be rejected by Astro checkOrigin with 403; got ${status1}`,
+    `H2 (layer 1): cross-site POST must be rejected by Astro checkOrigin with 403; got ${status1}`,
   ).toBe(403);
+
+  const respNoOrigin = await ctx.request.post(`${baseURL}/admin/users/${ownId}`, {
+    maxRedirects: 0,
+    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    data: DUMMY_FORM_BODY,
+  });
+
+  const statusNoOrigin = respNoOrigin.status();
+  const locNoOrigin = respNoOrigin.headers()['location'] ?? '';
+  console.log('[H2] origin-less POST /admin/users/<own-id> →', statusNoOrigin, locNoOrigin);
+
+  expect(
+    /aal=aal2/.test(locNoOrigin),
+    `H2 (INV-1): origin-less AAL1 member POST own-id must redirect to aal=aal2 step-up; got ${statusNoOrigin} ${locNoOrigin}`,
+  ).toBe(true);
 
   const resp2 = await ctx.request.post(`${baseURL}/admin/users/${ownId}`, {
     maxRedirects: 0,
@@ -108,4 +144,26 @@ test('H2 — INV-1: member POST /admin/users/<own-id> at AAL1 is denied (step-up
     /aal=aal2/.test(loc2),
     `H2 (INV-1): AAL1 member POST own-id must redirect to aal=aal2 step-up (not 200, not 403); got ${status2} ${loc2}`,
   ).toBe(true);
+});
+
+test('H3 — layer 1: member POST with mismatched Origin and no Sec-Fetch-Site is rejected by checkOrigin', async ({
+  ctx,
+  baseURL,
+  member,
+}) => {
+  await loginViaJsonApi(ctx, { identifier: member.email, password: member.password }, baseURL);
+
+  const resp = await ctx.request.post(`${baseURL}/admin/users/new`, {
+    maxRedirects: 0,
+    headers: {
+      'Content-Type': 'application/x-www-form-urlencoded',
+      'Origin': 'https://attacker.example',
+    },
+    data: DUMMY_FORM_BODY,
+  });
+
+  expect(
+    resp.status(),
+    `H3 (layer 1): Origin mismatch without Sec-Fetch-Site must be rejected with 403; got ${resp.status()}`,
+  ).toBe(403);
 });

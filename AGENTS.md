@@ -4,8 +4,7 @@ The working contract for whoever maintains this repo, human or model. Read it
 first. `ARCHITECTURE.md` describes what is built; this, how to work on it.
 
 **When this file and the code disagree, the code is right, and fixing this file
-is part of the change that made it wrong.** A confidently wrong sentence here is
-this project's most expensive bug: it is read first, with no other context.
+is part of the change that made it wrong.**
 
 ## The two rules
 
@@ -14,7 +13,7 @@ adopting Ory patterns. Anything that serves only this deployment does not
 appear: no instance hostnames, no personal names, no private-stack applications
 (three whole-index checks in `scripts/check-purity.sh`). `grafana` and
 `audiobookshelf` are the only example apps, being the `e2e/` fixtures, so docs
-and tests agree by construction. Judging what else serves a stranger is a habit.
+and tests agree by construction. Judging the rest is a habit.
 
 **2. Docs state WHY; code states WHAT.** Never restate code behaviour in prose:
 it rots. Where behaviour must be referenced, point at the TEST that enforces it.
@@ -34,21 +33,17 @@ Worked example: the canonical group-name policy is `GROUP_RE` in
 
 ## The prose budget
 
-Tracked prose is capped, and the cap is enforced. The ceiling leaves headroom
-for documentation that earns its place; spend it deliberately. Before adding a
-page, check whether an existing one should shrink instead.
-
-The `prose-budget` check in `scripts/check-purity.sh` fails the build when the
+Tracked prose is capped. Before adding a page, check whether an existing one
+should shrink instead. The `prose-budget` check in `scripts/check-purity.sh` fails the build when the
 total exceeds `PROSE_CEILING_BYTES`, and prints the total, the ceiling and the
-headroom on every run. Raising the ceiling is deliberately awkward: an edit to
-that constant, in a commit whose message says what grew and why it earned the
-room.
+headroom on every run. Raising the ceiling is an edit to that constant, in a commit whose message says
+what grew and why.
 
 ## Correcting documentation: delete, do not rewrite (a habit)
 
-When a document is wrong, delete the wrong sentence before considering a
-replacement: a fresher value goes stale on the same schedule, a pointer to the
-enforcing file does not. Nothing enforces this.
+Delete the wrong sentence before considering a replacement: a fresher value
+goes stale on the same schedule, a pointer to the enforcing file does not.
+Nothing enforces this.
 
 ## The byte-vendored files
 
@@ -59,9 +54,8 @@ enforcing file does not. Nothing enforces this.
 - `kratos/courier/*.gotmpl`
 
 These are vendored verbatim into a separate deployment repository, which fails
-its own drift check on any divergence. Editing one here starts a re-vendor
-costing a release tag and an operator review: a deliberate act with a downstream
-cost. Comments count, because a comment inside these files ships to production.
+its own drift check on any divergence. Editing one here starts a re-vendor costing a release tag and an operator
+review. Comments count, because they ship to production.
 
 ## The gates
 
@@ -134,10 +128,8 @@ bash scripts/check-purity.sh    # the purity gate
 
 ## Writing (habits — nothing enforces these)
 
-Direct phrasing, no filler. State uncertainty plainly, no hedging. No trailing
-summary paragraphs. Anything intended, shelved or parked says so in its own
-sentence; nothing that is not running is written as though it were.
+Direct phrasing, no filler, no hedging, no trailing summaries. Anything intended
+or shelved says so in its own sentence; nothing not running is written as though it were.
 
-Corrections are wanted. Generalization requests are not: no abstraction,
-extension points or configuration surface for adopters we have never met. That a
-stranger cannot drop this in unchanged is the design working, never a defect.
+Corrections are wanted. Generalization is not: no abstraction, extension points
+or configuration surface for unknown adopters.

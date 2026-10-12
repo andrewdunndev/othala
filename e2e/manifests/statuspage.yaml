@@ -6,8 +6,6 @@ presentation:
   description: Public status and incident history — an external hosted service the portal links out to.
   url: https://status.othala.test
   icon: ST
-  icon_slug: ""
-  icon_fallback: statuspage
   auth_kind: external
   order: 200
 

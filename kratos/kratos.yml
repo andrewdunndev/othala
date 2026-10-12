@@ -46,7 +46,7 @@ selfservice:
           # CRITICAL one-way decision: the registrable parent, so passkeys work from any subdomain
           # origin. Changing it invalidates every enrolled passkey (shared with the webauthn RP below).
           id: "${OTHALA_APEX}"
-          display_name: "${OTHALA_INSTANCE_NAME}"
+          display_name: "${OTHALA_INSTANCE_NAME} Single Sign-On"
           origins:
             - "${OTHALA_PUBLIC_URL}"
 
@@ -57,7 +57,7 @@ selfservice:
         passwordless: false
         rp:
           id: "${OTHALA_APEX}"
-          display_name: "${OTHALA_INSTANCE_NAME}"
+          display_name: "${OTHALA_INSTANCE_NAME} Single Sign-On"
           origins:
             - "${OTHALA_PUBLIC_URL}"
 
@@ -312,10 +312,8 @@ courier:
 
 
 secrets:
-  # Cookie signing + at-rest cipher secrets. The first entry signs/encrypts; older ones still
-  # verify. Ory enforces uniqueItems, so one active secret is a single-element array.
-  # Rotation: prepend the new secret as a distinct first entry,
-  # restart, then after the session lifespan drop the old entry and restart again.
+  # Cookie signing + at-rest cipher secrets: one slot each, so rotation signs every member out
+  # (docs/runbooks/cookie-rotation.md).
   cookie:
     - "${KRATOS_COOKIE_SECRET_CURRENT}"
 

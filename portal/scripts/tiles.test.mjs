@@ -2,10 +2,10 @@
 
 import { test } from 'vitest';
 import assert from 'node:assert/strict';
-import { mkdtempSync, writeFileSync, rmSync } from 'node:fs';
+import { mkdtempSync, writeFileSync, rmSync, mkdirSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
-import { tileAccessGroups } from '../src/lib/tiles.ts';
+import { tileAccessGroups, sectionTiles } from '../src/lib/tiles.ts';
 
 async function withTilesModule({ MANIFEST_DIR: dir }, callback) {
   const { setManifestDir } = await import('../src/lib/manifests.ts');
@@ -122,7 +122,6 @@ presentation:
   description: Public status and incident history.
   url: https://status.othala.test
   icon: ST
-  icon_fallback: statuspage
   auth_kind: external
   order: 200
 `);
@@ -130,4 +129,143 @@ presentation:
   assert.equal(tile.authKind, 'external');
   assert.deepEqual(tileAccessGroups(tile), ['everyone'],
     'external tile without access must gate on the default group');
+});
+
+const SIDECAR_YAML = `
+presentation:
+  name: Side
+  description: d
+  url: https://side.othala.test
+  icon: SI
+  auth_kind: external
+`;
+
+async function loadWithSidecar(svg) {
+  const dir = mkdtempSync(join(tmpdir(), 'tiles-test-svg-'));
+  try {
+    writeFileSync(join(dir, 'side.yaml'), SIDECAR_YAML);
+    if (svg !== undefined) writeFileSync(join(dir, 'side.svg'), svg);
+    return await withTilesModule({ MANIFEST_DIR: dir }, (mod) => mod.loadTiles()[0]);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+}
+
+test('sidecar: <stem>.svg beside the manifest gives the tile an href', async () => {
+  const tile = await loadWithSidecar('<svg viewBox="0 0 1 1"></svg>');
+  assert.equal(tile.iconHref, '/icons/side.svg');
+  assert.equal(tile.iconBleed, false);
+});
+
+test('sidecar: no file leaves the monogram', async () => {
+  const tile = await loadWithSidecar(undefined);
+  assert.equal(tile.iconHref, undefined);
+  assert.equal(tile.iconReason, undefined);
+});
+
+test('sidecar: an oversize file or a non-svg root gives no href and a reason, and the tile still loads', async () => {
+  const big = await loadWithSidecar('<svg>' + ' '.repeat(33 * 1024) + '</svg>');
+  assert.equal(big.iconHref, undefined);
+  assert.match(big.iconReason, /over the/);
+  const html = await loadWithSidecar('<html><svg></svg></html>');
+  assert.equal(html.iconHref, undefined);
+  assert.match(html.iconReason, /<svg> root/);
+});
+
+test('sidecar: a non-regular <stem>.svg gives no href and a reason', async () => {
+  const dir = mkdtempSync(join(tmpdir(), 'tiles-test-svg-'));
+  try {
+    writeFileSync(join(dir, 'side.yaml'), SIDECAR_YAML);
+    mkdirSync(join(dir, 'side.svg'));
+    const tile = await withTilesModule({ MANIFEST_DIR: dir }, (mod) => mod.loadTiles()[0]);
+    assert.equal(tile.iconHref, undefined);
+    assert.match(tile.iconReason, /regular file/);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test('sidecar: bleed is read from the sidecar', async () => {
+  const tile = await loadWithSidecar('<svg viewBox="0 0 8 8"><rect width="8" height="8" fill="#123456"/></svg>');
+  assert.equal(tile.iconBleed, true);
+});
+
+test('sidecar: ink is dark-only marks with no ground', async () => {
+  const wrap = (body) => `<svg viewBox="0 0 8 8">${body}</svg>`;
+  assert.equal((await loadWithSidecar(wrap('<path d="M0 0h8v8z"/>'))).iconInk, true);
+  assert.equal((await loadWithSidecar(wrap('<path d="M0 0h8v8z" fill="#0b1f3a"/>'))).iconInk, true);
+  assert.equal((await loadWithSidecar(wrap('<circle r="4" style="fill:#fff"/><path d="M0 0h8v8z"/>'))).iconInk, false);
+  assert.equal((await loadWithSidecar(wrap('<path d="M0 0h8v8z" fill="#f05a28"/>'))).iconInk, false);
+  assert.equal((await loadWithSidecar(wrap('<linearGradient id="a"/><path d="M0 0h8v8z" fill="url(#a)"/>'))).iconInk, false);
+  assert.equal((await loadWithSidecar('<svg viewBox="0 0 8 8"><rect width="8" height="8" fill="#123456"/></svg>')).iconInk, false);
+});
+
+test('parseTile: a tile without an icon gets initials from its name', async () => {
+  const yaml = (name) => `\npresentation:\n  name: ${name}\n  url: https://x.example\n  auth_kind: external\n`;
+  assert.equal((await parseSingleTile(yaml('Audio Books'))).icon, 'AB');
+  assert.equal((await parseSingleTile(yaml('Statuspage'))).icon, 'ST');
+});
+
+test('sidecar: retired icon_slug and icon_fallback are ignored at serve', async () => {
+  const tile = await parseSingleTile(SIDECAR_YAML + '  icon_slug: grafana\n  icon_fallback: grafana\n');
+  assert.equal(tile.iconHref, undefined);
+});
+
+// ── sectionTiles and loadGroups ──────────────────────────────────────────────
+
+const tile = (slug, order, group, access = ['staff']) => ({ slug, order, group, accessGroups: access });
+const meta = (title, order, description = '') => ({ title, description, order });
+const titles = (s) => s.groups.map((g) => g.title);
+
+test('sectionTiles: registry order beats tile order', () => {
+  const s = sectionTiles(
+    [tile('a', 1, 'late'), tile('b', 90, 'early')],
+    ['staff'],
+    new Map([['late', meta('Late', 50)], ['early', meta('Early', 5)]]),
+  );
+  assert.deepEqual(titles(s), ['Early', 'Late']);
+});
+
+test('sectionTiles: an unknown key sorts by its lowest tile order and is titled with the raw key', () => {
+  const s = sectionTiles(
+    [tile('a', 30, 'known'), tile('b', 9, 'raw'), tile('c', 70, 'raw')],
+    ['staff'],
+    new Map([['known', meta('Known', 20)]]),
+  );
+  assert.deepEqual(titles(s), ['raw', 'Known']);
+  assert.equal(s.groups[0].description, '');
+});
+
+test('sectionTiles: ungrouped tiles are split out, and a section with no visible tile is omitted', () => {
+  const s = sectionTiles(
+    [tile('plain', 1), tile('in', 2, 'g'), tile('hidden', 3, 'gone', ['other'])],
+    ['staff'],
+    new Map(),
+  );
+  assert.deepEqual(s.ungrouped.map((t) => t.slug), ['plain']);
+  assert.deepEqual(titles(s), ['g']);
+  assert.deepEqual(s.visible.map((t) => t.slug), ['plain', 'in']);
+});
+
+async function groupsFrom(text) {
+  const dir = mkdtempSync(join(tmpdir(), 'groups-test-'));
+  try {
+    if (text !== undefined) writeFileSync(join(dir, 'groups.yaml'), text);
+    return await withTilesModule({ MANIFEST_DIR: dir }, (mod) => mod.loadGroups());
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+}
+
+test('loadGroups: absent or malformed is empty', async () => {
+  assert.equal((await groupsFrom(undefined)).size, 0);
+  assert.equal((await groupsFrom('a: [unclosed\n')).size, 0);
+  assert.equal((await groupsFrom('- just\n- a list\n')).size, 0);
+});
+
+test('loadGroups: missing fields default and non-mapping entries are skipped', async () => {
+  const g = await groupsFrom('bare: {}\nfull:\n  title: Full\n  description: D\n  order: 3\nskipped: nope\n');
+  assert.deepEqual([...g.keys()], ['bare', 'full']);
+  assert.deepEqual(g.get('bare'), { title: 'bare', description: '', order: 999 });
+  assert.deepEqual(g.get('full'), { title: 'Full', description: 'D', order: 3 });
 });

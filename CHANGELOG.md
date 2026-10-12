@@ -7,6 +7,54 @@ aims to follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 The git tag is the authoritative version; `portal/package.json` mirrors it.
 This CHANGELOG and git tags carry the deployed-instance release state.
 
+## [0.14.0] - 2026-10-11
+
+The home page lists every app with its full description, in calm sections.
+
+### Changed
+
+- App tiles are rows with the logo, the name and the full description, with no truncation. They sit in two columns on wider screens and one on phones.
+- Sections have real headings, and each tile has a labelled Guide button.
+- Apps without a logo show initials on a monogram plate. Single-colour logos invert in dark mode.
+- The guide dialog shows the app's address, which the tile no longer carries.
+- Astro 7.3.6 refuses cross-site form posts from the `Sec-Fetch-Site` header first, and the CSRF tests now send real cross-site headers. Playwright moves to 1.64 and OpenTelemetry to 0.223.
+
+### Deployment changes
+
+- None: image bump only.
+
+## [0.13.3] - 2026-10-10
+
+App logos now live beside each manifest, and passkeys carry a clearer name.
+
+### Added
+
+- App logos are served from `<stem>.svg` files beside each `<stem>.yaml` manifest. The image ships no app logos.
+
+### Changed
+
+- Passkey and security-key names read "<instance name> Single Sign-On". The relying-party id is unchanged, so existing passkeys keep working; saved items keep their old label until renamed.
+- The web app manifest's name follows `OTHALA_INSTANCE_NAME`.
+- The consent screen shows the monogram only.
+- Documentation is shorter across the README, architecture, decisions, security and guides.
+
+### Removed
+
+- The `icon_slug` and `icon_fallback` manifest fields are retired: ignored at serve time and rejected by manifest-lint. The bundled icon set is removed.
+
+### Security
+- A logo is served only to a signed-in member who can see that tile, sandboxed (`Content-Security-Policy: sandbox`, `nosniff`, private cache). Every other request gets the same 404.
+
+- The cookie-rotation runbook now states the shipped single-slot behavior: rotation signs every member out. The secret-rotation and backup runbooks now say `secrets.system` encrypts Hydra's signing keys and session data, while client secrets are hashed.
+
+### Deployment changes
+
+- Put `<stem>.svg` beside each `<stem>.yaml` in the manifest directory (stem = the manifest filename, the same key as `<stem>.md`). At most 32 KiB, with an `<svg>` root.
+- Remove `icon_slug` and `icon_fallback` from your manifests.
+- Copy `*.svg` alongside `*.yaml` and `*.md` into the mounted manifest directory, and do not prune them.
+- Re-vendor `kratos/kratos.yml`.
+- No environment changes.
+
 ## [0.13.2] - 2026-10-09
 
 Two more app tiles get their real logos.

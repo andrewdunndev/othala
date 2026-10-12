@@ -25,7 +25,8 @@ function applySecurityHeaders(res: Response): void {
   // HSTS: 2-year max-age + includeSubDomains + preload.
   // The IdP is HTTPS-only behind Caddy and serves both the apex and subdomains.
   res.headers.set('Strict-Transport-Security', 'max-age=63072000; includeSubDomains; preload');
-  // form-action allowlist: see lib/csp.ts.
+  // form-action allowlist: see lib/csp.ts. A route that set its own CSP keeps it.
+  if (res.headers.has('Content-Security-Policy')) return;
   res.headers.set(
     'Content-Security-Policy',
     contentSecurityPolicy({

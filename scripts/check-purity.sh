@@ -8,8 +8,7 @@
 # Reads the git INDEX, not the worktree, so CI sees what this sees, and a
 # staged-not-written violation is caught (build_scan_set). Deps: git, bash,
 # grep, sed, coreutils only.
-# Anti-vacuity, why: DECISIONS.md "Cite the artifact that holds the value;
-# never restate the value". Each branch proves itself on its own canary before
+# Anti-vacuity, why: a gate that cannot fail proves nothing. Each branch proves itself on its own canary before
 # it scans anything — selftest(), the inline successor to the retired
 # probe-check-purity.sh mutation harness. Scanned files/bytes are asserted >
 # 0; a verdict is read off grep's captured HITS, never its bare exit status;

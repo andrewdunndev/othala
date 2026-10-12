@@ -44,6 +44,8 @@ export interface ClientManifest {
   sourcePath: string;
   /** Prerequisite names defined under requirements/. */
   requires?: string[];
+  /** The manifest still carries the retired `icon_slug` or `icon_fallback`; the logo is now `<stem>.svg`. */
+  retiredIcon?: boolean;
 }
 
 /** Only an explicit `emit_groups_claim: false` suppresses. */
@@ -64,8 +66,14 @@ export function manifestDir(): string {
   return manifestDirOverride ?? devDir ?? MANIFEST_DIR;
 }
 
+export interface Dropped {
+  file: string;
+  reason: string;
+}
+
 interface CacheEntry {
   manifests: ClientManifest[];
+  dropped: Dropped[];
   mtimeMs: number;
   loadedAtMs: number;
 }
@@ -139,12 +147,13 @@ function normaliseGroupRoleMap(raw: unknown): Record<string, string> {
 }
 
 /** A read or parse error is warned and skipped so one bad file does not fail the whole load. */
-function loadOne(file: string, dir: string): ClientManifest | null {
+function loadOne(file: string, dir: string, dropped: Dropped[]): ClientManifest | null {
   try {
     const text = readFileSync(join(dir, file), 'utf8');
     return parseManifest(text, file);
   } catch (err) {
     console.warn(`manifests: skipping ${file}: ${err}`);
+    dropped.push({ file, reason: String(err).split('\n')[0] });
     return null;
   }
 }
@@ -169,6 +178,7 @@ export function parseManifest(yamlText: string, filename: string): ClientManifes
   const hasPresentation = presentation != null && typeof presentation === 'object' && !Array.isArray(presentation);
 
   const accessGroups = parseAccessGroups(p);
+  const retiredIcon = 'icon_slug' in p || 'icon_fallback' in p;
 
   if (!oidc || typeof oidc !== 'object') {
     if (!hasPresentation) {
@@ -198,6 +208,7 @@ export function parseManifest(yamlText: string, filename: string): ClientManifes
       skipAccessCheck: Boolean(c.skip_access_check ?? false),
       sourcePath: file,
       requires: readRequires(p.requires),
+      retiredIcon,
     };
   }
 
@@ -229,6 +240,7 @@ export function parseManifest(yamlText: string, filename: string): ClientManifes
     skipAccessCheck: Boolean(c.skip_access_check ?? false),
     sourcePath: file,
     requires: readRequires(p.requires),
+    retiredIcon,
   };
 }
 
@@ -244,10 +256,10 @@ export function manifestFiles(dir: string): string[] {
   }
 }
 
-function loadFromDisk(): ClientManifest[] {
+function loadFromDisk(dropped: Dropped[]): ClientManifest[] {
   const dir = manifestDir();
   return manifestFiles(dir)
-    .map((f) => loadOne(f, dir))
+    .map((f) => loadOne(f, dir, dropped))
     .filter((m): m is ClientManifest => m !== null);
 }
 
@@ -266,7 +278,7 @@ function freshestMtime(): number {
 }
 
 /** Drops, with a logged reason, every manifest that fails validation or shares a client_id (case-insensitive) with another, so one bad file never takes the rest down. */
-function quarantine(manifests: ClientManifest[]): ClientManifest[] {
+function quarantine(manifests: ClientManifest[], dropped: Dropped[]): ClientManifest[] {
   const files = new Map<string, string[]>();
   for (const m of manifests) {
     const key = m.clientId.toLowerCase();
@@ -279,7 +291,10 @@ function quarantine(manifests: ClientManifest[]): ClientManifest[] {
       sharing.length > 1
         ? `duplicate client_id ${JSON.stringify(key)} in ${sharing.join(', ')}`
         : validateClients([m]).join('; ');
-    if (reason) console.warn(`manifests: dropping ${m.sourcePath}: ${reason}`);
+    if (reason) {
+      console.warn(`manifests: dropping ${m.sourcePath}: ${reason}`);
+      dropped.push({ file: m.sourcePath, reason });
+    }
     return !reason;
   });
 }
@@ -296,9 +311,16 @@ export function loadClientManifests(): ClientManifest[] {
     return cache.manifests;
   }
 
-  const manifests = quarantine(loadFromDisk());
-  cache = { manifests, mtimeMs: mtime, loadedAtMs: now };
+  const dropped: Dropped[] = [];
+  const manifests = quarantine(loadFromDisk(dropped), dropped);
+  cache = { manifests, dropped, mtimeMs: mtime, loadedAtMs: now };
   return manifests;
+}
+
+/** The files the last load dropped, with why; empty when every file loaded. */
+export function droppedManifests(): Dropped[] {
+  loadClientManifests();
+  return cache?.dropped ?? [];
 }
 
 /** The registrable OIDC subset: manifests declaring `oidc:`. registerAllClients() needs a secret per manifest,

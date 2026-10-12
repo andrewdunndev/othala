@@ -21,7 +21,7 @@ import {
   splitGuide,
   tileReadiness,
   safeHref,
-  userCanSeeTile,
+  sectionTiles,
   type AppTile,
 } from '../lib/tiles';
 import { devMockIdentity } from '../lib/dev-mock';
@@ -82,10 +82,11 @@ const emailUnverified = state === 'post-auth' && emailVerified(identity) === fal
 
 const groups = parseIdentity(identity).groups;
 // Visibility reads the same access binding (accessGroups, OR) as the OIDC entry gate, so a tile shows iff the gate admits.
-const visibleTiles =
-  state === 'post-auth'
-    ? orderedApps.filter((a: AppTile) => userCanSeeTile(a, groups))
-    : [];
+const { visible: visibleTiles, ungrouped: ungroupedTiles, groups: tileGroups } = sectionTiles(
+  state === 'post-auth' ? orderedApps : [],
+  groups,
+  groupRegistry,
+);
 
 // Per-tile presentation for this person: prerequisite state (the admin's marks), requirement definitions, the guide
 // outline.
@@ -106,26 +107,6 @@ const views = new Map(
   }),
 );
 
-// Split visibleTiles into ungrouped and grouped sections, ordered by groups.yaml `order`, else min tile order.
-const ungroupedTiles = visibleTiles.filter((t: AppTile) => !t.group);
-const groupedTilesMap = new Map<string, AppTile[]>();
-for (const tile of visibleTiles.filter((t: AppTile) => !!t.group)) {
-  const g = tile.group as string;
-  if (!groupedTilesMap.has(g)) groupedTilesMap.set(g, []);
-  groupedTilesMap.get(g)!.push(tile);
-}
-// Group boxes: registry order, else min tile order.
-const tileGroups = Array.from(groupedTilesMap.entries())
-  .sort(([nameA, tilesA], [nameB, tilesB]) => {
-    const orderA = groupRegistry.get(nameA)?.order ?? Math.min(...tilesA.map((t) => t.order));
-    const orderB = groupRegistry.get(nameB)?.order ?? Math.min(...tilesB.map((t) => t.order));
-    return orderA - orderB;
-  })
-  .map(([groupName, tiles]) => ({
-    groupName,
-    tiles,
-    meta: groupRegistry.get(groupName),
-  }));
 // Admin link: the metadata_admin.admin marker of the admin-API identity; /admin itself is gated by
 // requireAdminSession. The admin marker reads false on any error or missing marker, which is fine for cosmetic chrome.
 const isAdmin = state === 'post-auth' && parseIdentity(identity).isAdmin;
@@ -215,28 +196,28 @@ const devLinks = [
         {visibleTiles.length > 0 ? (
           <>
             {ungroupedTiles.length > 0 && (
-              <div class="tile-grid" data-count={ungroupedTiles.length}>
+              <div class="tile-grid">
                 {ungroupedTiles.map((t: AppTile) => {
                   const v = views.get(t.slug)!;
-                  return <TileCard tile={t} readiness={v.readiness} requirementTitles={v.titles} />;
+                  return <TileCard tile={t} readiness={v.readiness} requirementTitles={v.titles} groups={groups} />;
                 })}
               </div>
             )}
-            {tileGroups.map(({ groupName, tiles, meta }) => (
-              <div class="tile-group">
+            {tileGroups.map(({ title, description, tiles }, i) => (
+              <section class="tile-group" aria-labelledby={`tile-group-${i}`}>
                 <div class="tile-group-header">
-                  <p class="tile-group-title">{meta?.title ?? groupName}</p>
-                  {(meta?.description) && (
-                    <p class="tile-group-desc">{meta.description}</p>
+                  <h2 class="tile-group-title" id={`tile-group-${i}`}>{title}</h2>
+                  {description && (
+                    <p class="tile-group-desc">{description}</p>
                   )}
                 </div>
-                <div class="tile-grid" data-count={tiles.length}>
+                <div class="tile-grid">
                   {tiles.map((t: AppTile) => {
                     const v = views.get(t.slug)!;
-                    return <TileCard tile={t} readiness={v.readiness} requirementTitles={v.titles} />;
+                    return <TileCard tile={t} readiness={v.readiness} requirementTitles={v.titles} groups={groups} />;
                   })}
                 </div>
-              </div>
+              </section>
             ))}
           </>
         ) : (
@@ -257,8 +238,10 @@ const devLinks = [
             data-app-edu={t.slug}
             data-app-name={t.name}
             data-app-desc={t.description}
-            data-app-icon={t.iconHref ?? ''}
+            data-app-icon={t.iconHref ? t.iconHref + (import.meta.env.DEV ? '?dev-state=post-auth' : '') : ''}
             data-app-bleed={t.iconBleed ? '' : undefined}
+            data-app-ink={t.iconInk ? '' : undefined}
+            data-app-host={t.fqdn}
             data-app-mono={t.icon}
           >
             <div data-slot="actions">
@@ -289,6 +272,7 @@ const devLinks = [
             <div class="app-modal-header-text">
               <h2 class="app-modal-title" id="app-modal-title"></h2>
               <p class="app-modal-desc"></p>
+              <p class="app-modal-host mono"></p>
             </div>
           </header>
           <div class="app-modal-prereq" data-slot-prereq></div>
@@ -474,6 +458,7 @@ const devLinks = [
 
     var titleEl = appModal.querySelector('.app-modal-title');
     var descEl = appModal.querySelector('.app-modal-desc');
+    var hostEl = appModal.querySelector('.app-modal-host');
     var iconEl = appModal.querySelector('[data-slot-icon]');
     var prereqEl = appModal.querySelector('[data-slot-prereq]');
     var actionsEl = appModal.querySelector('[data-slot-actions]');
@@ -500,6 +485,7 @@ const devLinks = [
         span.appendChild(img);
         span.dataset.icon = href.split('/').pop().replace(/\.svg$/, '');
         if (tpl.hasAttribute('data-app-bleed')) span.dataset.bleed = '';
+        if (tpl.hasAttribute('data-app-ink')) span.dataset.ink = '';
       } else {
         span.textContent = tpl.dataset.appMono || '';
         span.classList.add('app-modal-logo-mono');
@@ -513,6 +499,7 @@ const devLinks = [
       opener = from || null;
       titleEl.textContent = tpl.dataset.appName || slug;
       descEl.textContent = tpl.dataset.appDesc || '';
+      hostEl.textContent = tpl.dataset.appHost || '';
       iconEl.replaceChildren(logo(tpl));
       fill(actionsEl, slot(tpl, 'actions'));
       fill(prereqEl, slot(tpl, 'prereq'));
@@ -675,41 +662,34 @@ const devLinks = [
   }
   .cta-link:hover { color: var(--accent); text-decoration: none; }
 
-  /* Tile grid: TileCard renders each tile; the grid only sets the columns (1 on phones, 2 from 640px, 3 from 900px; TileCard lays out logo beside text on phones). */
+  /* Tile grid: one column on phones, two from 46rem; each tile is a row that grows to fit its description. */
   .tile-grid {
     display: grid;
     grid-template-columns: 1fr;
     gap: var(--space-3);
-    align-items: stretch;
   }
-  /* Grids fill the full row: 3 columns from 900px, but a group of 1, 2 or 4 tiles uses 2 columns (4 lays out 2x2)
-     so no row ends in an empty third. Outer edges match across groups. */
-  @media (min-width: 640px) {
+  @media (min-width: 46rem) {
     .tile-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   }
-  @media (min-width: 900px) {
-    .tile-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
-    .tile-grid[data-count="1"],
-    .tile-grid[data-count="2"],
-    .tile-grid[data-count="4"] { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-  }
 
-  /* Grouped tile sections: no frame, so the tiles sit on the same columns as the ungrouped grid. The title uses the
-     page's eyebrow type, with the group's description under it, full width above its tiles. */
-  .tile-group { margin-top: var(--space-5); }
+  /* Grouped tile sections: a hairline, a sans title and the group's description above its tiles. */
+  .tile-group {
+    margin-top: var(--space-6);
+    padding-top: var(--space-4);
+    border-top: 1px solid var(--border);
+  }
   .tile-group:first-child { margin-top: 0; }
   .tile-group-header { margin-bottom: var(--space-3); }
   .tile-group-title {
-    font-family: var(--font-mono);
-    font-size: var(--text-xs);
-    text-transform: uppercase;
-    letter-spacing: 0.08em;
-    color: var(--text-muted);
+    font-family: var(--font-sans);
+    font-size: var(--text-base);
+    font-weight: 600;
+    color: var(--text);
     margin: 0 0 var(--space-1) 0;
   }
   .tile-group-desc {
     font-size: var(--text-sm);
-    color: var(--text-2);
+    color: var(--text-muted);
     max-width: 60ch;
     margin: 0;
     line-height: 1.5;
@@ -947,6 +927,12 @@ const devLinks = [
     line-height: 1.4;
     margin: 0;
   }
+  .app-modal-host {
+    font-size: var(--text-xs);
+    color: var(--text-muted);
+    margin: var(--space-1) 0 0;
+    overflow-wrap: anywhere;
+  }
   /* Close sits over the header's right edge; on phones the whole sheet scrolls and the button stays pinned. */
   .app-modal-close {
     position: absolute;
@@ -1064,8 +1050,6 @@ const devLinks = [
 
   /* ── Mobile ── */
   @media (max-width: 640px) {
-    .tile-grid { gap: var(--space-2); }
-    .tile-group { margin-top: var(--space-5); }
     /* Passkey nudge: stack the message above the close button instead of
      * squeezing both onto one row. */
     .passkey-nudge {

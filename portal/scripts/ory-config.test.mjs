@@ -46,6 +46,14 @@ function renderText(template, extra = {}) {
 
 const render = (template, extra) => parse(renderText(template, extra));
 
+test('kratos: passkey and webauthn relying-party names carry the instance name, ids stay the apex', () => {
+  const rp = render('kratos/kratos.yml').selfservice.methods;
+  for (const m of [rp.passkey, rp.webauthn]) {
+    assert.equal(m.config.rp.display_name, 'Acme Single Sign-On');
+    assert.equal(m.config.rp.id, 'example.com');
+  }
+});
+
 test('kratos: breach check on and minimum length 12 are literals', () => {
   const cfg = render('kratos/kratos.yml');
   const pw = cfg.selfservice.methods.password.config;

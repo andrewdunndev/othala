@@ -1,6 +1,6 @@
 // Manifest lint: cross-checks every group a manifest references against the
 // known-group set so a typo'd group surfaces as a finding, not a silent lockout.
-// BLOCK (also enforced by validateClients at load): empty accessGroups without
+// BLOCK: a retired icon_slug or icon_fallback. BLOCK (also enforced by validateClients at load): empty accessGroups without
 // skipAccessCheck, a duplicated group, an undeclared group_role_map role.
 // WARN: a group missing from the known set, or missing the canonical form; a `requires` name with no requirements/<name>.md.
 
@@ -48,6 +48,10 @@ export function lintManifests(
           'satisfy the gate, so this app is unreachable. Declare presentation.access: ' +
           'or set consent.skip_access_check.',
       );
+    }
+
+    if (m.retiredIcon) {
+      block('presentation.icon_slug and icon_fallback are retired: drop the logo beside the manifest as <stem>.svg');
     }
 
     // BLOCK: duplicate group within this manifest's access binding.

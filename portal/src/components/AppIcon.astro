@@ -1,24 +1,28 @@
 ---
-// An app's logo on a plate: the vendored SVG in its own colors, or the manifest monogram when no file resolves.
+// An app's logo on a plate: its sidecar SVG in its own colors, or the manifest monogram. The logo shows only when the
+// caller passes the viewer's groups and they admit the tile, matching the icon route's own check.
 // The plate keeps white or transparent logos legible on both themes. Decorative: the app name sits beside it.
 
-import type { AppTile } from '../lib/tiles';
+import { userCanSeeTile, type AppTile } from '../lib/tiles';
 
 interface Props {
-  tile: Pick<AppTile, 'iconHref' | 'icon' | 'iconBleed'>;
+  tile: Pick<AppTile, 'icon'> & Partial<AppTile>;
+  groups?: string[];
   size?: 'sm' | 'md' | 'lg';
 }
 
-const { tile, size = 'md' } = Astro.props;
-const iconSlug = tile.iconHref?.split('/').pop()?.replace(/\.svg$/, '');
+const { tile, size = 'md', groups } = Astro.props;
+const src = tile.iconHref && groups && userCanSeeTile(tile as AppTile, groups)
+  ? tile.iconHref + (import.meta.env.DEV ? '?dev-state=post-auth' : '')
+  : undefined;
 ---
 
-<span class:list={['app-icon', `app-icon-${size}`]} data-icon={iconSlug} data-bleed={tile.iconBleed ? '' : undefined} aria-hidden="true">
+<span class:list={['app-icon', `app-icon-${size}`]} data-icon={src ? tile.slug : undefined} data-bleed={src && tile.iconBleed ? '' : undefined} data-ink={src && tile.iconInk ? '' : undefined} aria-hidden="true">
   {
-    tile.iconHref ? (
-      <img class="app-icon-img" src={tile.iconHref} alt="" decoding="async" />
+    src ? (
+      <img class="app-icon-img" src={src} alt="" decoding="async" />
     ) : (
-      <span class="app-icon-mono mono">{tile.icon}</span>
+      <span class="app-icon-mono">{tile.icon}</span>
     )
   }
 </span>
@@ -31,11 +35,11 @@ const iconSlug = tile.iconHref?.split('/').pop()?.replace(/\.svg$/, '');
     flex-shrink: 0;
     background: var(--bg);
     border: 1px solid var(--border);
-    border-radius: var(--radius);
-    --plate: 2.75rem;
+    border-radius: var(--radius-md);
+    --plate: 3rem;
     width: var(--plate);
     height: var(--plate);
-    padding: 0.4rem;
+    padding: 0.45rem;
     box-sizing: border-box;
   }
   .app-icon-sm {
@@ -54,11 +58,13 @@ const iconSlug = tile.iconHref?.split('/').pop()?.replace(/\.svg$/, '');
     height: 100%;
     object-fit: contain;
   }
+  .app-icon:has(.app-icon-mono) {
+    background: var(--accent-subtle);
+  }
   .app-icon-mono {
-    font-size: var(--text-sm);
+    font-family: var(--font-sans);
+    font-size: 1.05rem;
     font-weight: 600;
     color: var(--accent);
-    letter-spacing: 0.04em;
-    text-transform: uppercase;
   }
 </style>
