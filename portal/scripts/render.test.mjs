@@ -278,19 +278,27 @@ test('courier: an override may not name a secret or any value outside the identi
 const CONFIDENTIAL = 'presentation:\n  name: Wiki\n  url: https://wiki.example.org\n  access: [family]\noidc:\n  client_id: wiki\n  redirect_uris: [https://wiki.example.org/cb]\n  audience: [https://wiki.example.org]\n  token_endpoint_auth_method: client_secret_basic\n';
 const PUBLIC = 'presentation:\n  name: Cli\n  url: https://cli.example.org\n  access: [family]\noidc:\n  client_id: cli\n  redirect_uris: [http://127.0.0.1/cb]\n  audience: [http://127.0.0.1]\n  token_endpoint_auth_method: none\n';
 
-test('render requires a client secret per confidential OIDC manifest, by name, and none for a public client', () => {
+test('render needs no client secret and ignores app problems, which check still reports', () => {
   withDir((dir) => {
-    const content = contentTree(dir, { 'apps/wiki.yaml': CONFIDENTIAL, 'apps/cli.yaml': PUBLIC });
-    assert.deepEqual(check(root, content, VALUES), []);
-    let message = '';
-    try {
-      render(root, content, ENV);
-    } catch (err) {
-      message = err.message;
-    }
-    assert.equal(message, 'missing secret(s): WIKI_CLIENT_SECRET');
-    assert.throws(() => render(root, content, { ...ENV, WIKI_CLIENT_SECRET: '  ' }), /missing secret\(s\): WIKI_CLIENT_SECRET/);
-    assert.doesNotThrow(() => render(root, content, { ...ENV, WIKI_CLIENT_SECRET: 'fake-wiki-secret' }));
+    const content = contentTree(dir, {
+      'apps/wiki.yaml': CONFIDENTIAL,
+      'apps/cli.yaml': PUBLIC,
+      'apps/wiki.svg': '<html></html>',
+      'groups.yaml': '- not a mapping\n',
+    });
+    assert.deepEqual(check(root, content, VALUES), [
+      'groups.yaml: must be a mapping of group name to { title, description, order }',
+      'apps/wiki.svg does not open with an <svg> root',
+    ]);
+    assert.deepEqual(check(root, content, VALUES, 'render'), []);
+    assert.doesNotThrow(() => render(root, content, ENV));
+  });
+});
+
+test('render still refuses a bad courier override', () => {
+  withDir((dir) => {
+    const content = contentTree(dir, { 'apps/wiki.yaml': CONFIDENTIAL, 'courier/nope.gotmpl': 'x' });
+    assert.throws(() => render(root, content, ENV), /courier\/nope\.gotmpl: no shipped template has this name/);
   });
 });
 

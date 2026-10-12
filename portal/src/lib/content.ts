@@ -127,6 +127,13 @@ function courierErrors(dir: string, defaults: readonly string[]): string[] {
   });
 }
 
+/** The courier-override errors alone: the only content the Ory render reads. */
+export function courierContentErrors(contentDir: string, courierDefaults: readonly string[]): string[] {
+  const dir = join(contentDir, COURIER_OVERRIDE_DIR);
+  if (statSync(dir, { throwIfNoEntry: false }) === undefined) return existsSync(dir) ? ['courier: broken symlink; fix or delete it'] : [];
+  return [...(isDir(dir) ? brokenLinkErrors(dir, COURIER_OVERRIDE_DIR) : []), ...courierErrors(dir, courierDefaults)];
+}
+
 /** Every layout, manifest, sidecar, groups.yaml and courier-name error under `contentDir`; reads no secrets. */
 export function contentErrors(contentDir: string, courierDefaults: readonly string[]): string[] {
   if (!existsSync(contentDir) || !isDir(contentDir)) return [`${contentDir}: content directory not found`];

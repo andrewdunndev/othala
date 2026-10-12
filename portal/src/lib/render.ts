@@ -5,7 +5,7 @@ import { randomBytes } from 'node:crypto';
 import { chmodSync, existsSync, mkdirSync, readdirSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { parse } from 'yaml';
-import { clientSecretNames, contentErrors, COURIER_OVERRIDE_DIR } from './content';
+import { clientSecretNames, contentErrors, COURIER_OVERRIDE_DIR, courierContentErrors } from './content';
 import { envNameErrors } from './env-names';
 
 export type Env = Record<string, string | undefined>;
@@ -173,13 +173,15 @@ function sources(policyDir: string, contentDir: string): Source[] {
   return [...TEMPLATES.map((p) => ({ path: p, label: p, file: join(policyDir, p) })), ...courier];
 }
 
-/** The offline check: policy files present, no retired or unknown env name, the content tree valid, and every
+/** The offline check: policy files present, no retired or unknown env name, the content tree valid (only the courier
+ *  overrides when `scope` is `render`, since an app problem sidelines that app and must not stop sign-in), and every
  *  non-secret value the templates need, valid. No secrets read. */
-export function check(policyDir: string, contentDir: string, env: Env): string[] {
+export function check(policyDir: string, contentDir: string, env: Env, scope: 'all' | 'render' = 'all'): string[] {
   const missingFiles = [...TEMPLATES, ...LITERALS, COURIER_DIR].filter((p) => !existsSync(join(policyDir, p)));
   if (missingFiles.length > 0) return missingFiles.map((p) => `${policyDir}: missing policy file ${p}`);
   const secrets = new Set<string>(SECRETS);
-  const errors: string[] = [...envNameErrors(env), ...contentErrors(contentDir, courierDefaults(policyDir))];
+  const content = scope === 'all' ? contentErrors : courierContentErrors;
+  const errors: string[] = [...envNameErrors(env), ...content(contentDir, courierDefaults(policyDir))];
   for (const { path, label, file } of sources(policyDir, contentDir)) {
     try {
       const { needed, mode } = parseTemplate(label, readFileSync(file, 'utf8'), env);
@@ -197,12 +199,12 @@ export function check(policyDir: string, contentDir: string, env: Env): string[]
   return errors;
 }
 
-/** check, then every secret present (a client secret per confidential manifest too), every template rendered with
+/** check scoped to what it renders, then every secret present, every template rendered with
  *  the courier overrides merged over the defaults, no `${` left and the YAML well-formed. Writes nothing. */
 export function render(policyDir: string, contentDir: string, env: Env): RenderedFile[] {
-  const checkErrors = check(policyDir, contentDir, env);
+  const checkErrors = check(policyDir, contentDir, env, 'render');
   if (checkErrors.length > 0) throw new RenderError(checkErrors.join('\n'));
-  const unset = [...SECRETS, ...clientSecretNames(contentDir)].filter((n) => (env[n] ?? '').trim() === '');
+  const unset = SECRETS.filter((n) => (env[n] ?? '').trim() === '');
   if (unset.length > 0) throw new RenderError(`missing secret(s): ${unset.join(', ')}`);
 
   const files: RenderedFile[] = [];

@@ -36,7 +36,7 @@ The image carries the Ory policy and renders it from the deployment's env and co
 - Rendered files are mode 0600, owned by the render's uid: run the one-shot with `--user 10000`, the uid of the Kratos and Hydra images, so those processes can read them.
 - If you still vendor the Ory files, re-vendor `kratos/kratos.yml` and `hydra/hydra.yml` (comments only).
 - Move your manifests into `apps/` (`git mv <manifests>/* <content>/apps/`), then move `groups.yaml` back up to the content root. Mount the content root read-only at `/etc/othala` on the portal and on the render one-shot, in place of the `/etc/portal/manifests` mount. Run `node dist/server/config.mjs check --content <dir>` with the non-secret env in CI.
-- Give the render one-shot every `<CLIENT_ID>_CLIENT_SECRET` the portal has; it refuses a missing one.
+- The render one-shot checks only env names and `courier/`, so a bad app sidelines that app and never stops sign-in; `check` in CI is the gate for `apps/`. `gen-secrets` mints each `<CLIENT_ID>_CLIENT_SECRET` the portal needs.
 - Keep a reworded mail as `courier/<name>.gotmpl` under the content root, named after the shipped template it replaces (e.g. `courier/login_code.subject.gotmpl`), never as an edit to a vendored copy.
 - Delete every name `check` reports as retired. `MANIFEST_DIR` is one: under `astro dev` use `CONTENT_DIR`.
 
