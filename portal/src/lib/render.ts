@@ -2,9 +2,11 @@
 // Errors name variables, never values. Env is a parameter here; only the CLI reads process.env.
 
 import { randomBytes } from 'node:crypto';
-import { chmodSync, existsSync, mkdirSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { chmodSync, existsSync, mkdirSync, readdirSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { parse } from 'yaml';
+import { clientSecretNames, contentErrors, COURIER_OVERRIDE_DIR, courierContentErrors } from './content';
+import { envNameErrors } from './env-names';
 
 export type Env = Record<string, string | undefined>;
 export type RenderedFile = { path: string; content: string };
@@ -14,6 +16,8 @@ const TEMPLATES = ['kratos/kratos.yml', 'hydra/hydra.yml'];
 /** Policy files copied as they are. */
 const LITERALS = ['kratos/identity.schema.json', 'kratos/hooks/recovery-gate.jsonnet'];
 const COURIER_DIR = 'kratos/courier';
+/** The only values a courier override may name: identity, never a secret. */
+const COURIER_TOKENS = ['OTHALA_APEX', 'OTHALA_INSTANCE_NAME', 'OTHALA_PUBLIC_URL'];
 
 /** Secrets a render requires, set and non-blank, whether or not a template names them. */
 export const SECRETS = [
@@ -42,6 +46,8 @@ const GENERATED: Record<string, number> = {
   RECOVERY_GATE_SECRET: 32,
   CSRF_SECRET: 32,
 };
+
+const CLIENT_SECRET_BYTES = 32;
 
 const NONEMPTY_BINDS = ['KRATOS_ADMIN_BIND_HOST', 'HYDRA_ADMIN_BIND_HOST'];
 
@@ -146,24 +152,45 @@ export function renderTemplate(path: string, src: string, env: Env): string {
   return resolved.replace(TOKEN, (whole, name: string) => (neededSet.has(name) ? ESCAPE[mode](env[name]!) : whole));
 }
 
-function templatePaths(policyDir: string): string[] {
-  const courier = readdirSync(join(policyDir, COURIER_DIR))
+/** The shipped courier template names; a deployment override must reuse one. */
+export function courierDefaults(policyDir: string): string[] {
+  return readdirSync(join(policyDir, COURIER_DIR))
     .filter((f) => f.endsWith('.gotmpl'))
-    .sort()
-    .map((f) => `${COURIER_DIR}/${f}`);
-  return [...TEMPLATES, ...courier];
+    .sort();
 }
 
-/** The offline check: policy files present and every non-secret value the templates need, valid. No secrets read. */
-export function check(policyDir: string, env: Env): string[] {
+/** A template to render: `path` is where it lands, `label` names it in errors, `file` is what is read. */
+type Source = { path: string; label: string; file: string };
+
+// The shipped courier defaults, each replaced by the deployment's `courier/<name>` when one exists.
+function sources(policyDir: string, contentDir: string): Source[] {
+  const courier = courierDefaults(policyDir).map((name) => {
+    const override = join(contentDir, COURIER_OVERRIDE_DIR, name);
+    return existsSync(override) && statSync(override).isFile()
+      ? { path: `${COURIER_DIR}/${name}`, label: `${COURIER_OVERRIDE_DIR}/${name}`, file: override }
+      : { path: `${COURIER_DIR}/${name}`, label: `${COURIER_DIR}/${name}`, file: join(policyDir, COURIER_DIR, name) };
+  });
+  return [...TEMPLATES.map((p) => ({ path: p, label: p, file: join(policyDir, p) })), ...courier];
+}
+
+/** The offline check: policy files present, no retired or unknown env name, the content tree valid (only the courier
+ *  overrides when `scope` is `render`, since an app problem sidelines that app and must not stop sign-in), and every
+ *  non-secret value the templates need, valid. No secrets read. */
+export function check(policyDir: string, contentDir: string, env: Env, scope: 'all' | 'render' = 'all'): string[] {
   const missingFiles = [...TEMPLATES, ...LITERALS, COURIER_DIR].filter((p) => !existsSync(join(policyDir, p)));
   if (missingFiles.length > 0) return missingFiles.map((p) => `${policyDir}: missing policy file ${p}`);
   const secrets = new Set<string>(SECRETS);
-  const errors: string[] = [];
-  for (const path of templatePaths(policyDir)) {
+  const content = scope === 'all' ? contentErrors : courierContentErrors;
+  const errors: string[] = [...envNameErrors(env), ...content(contentDir, courierDefaults(policyDir))];
+  for (const { path, label, file } of sources(policyDir, contentDir)) {
     try {
-      const { needed, mode } = parseTemplate(path, readFileSync(join(policyDir, path), 'utf8'), env);
-      errors.push(...valueErrors(path, needed.filter((n) => !secrets.has(n)), mode, env));
+      const { needed, mode } = parseTemplate(label, readFileSync(file, 'utf8'), env);
+      const foreign = label === path ? [] : needed.filter((n) => !COURIER_TOKENS.includes(n));
+      if (foreign.length > 0) {
+        errors.push(`${label}: an override may name only ${COURIER_TOKENS.join(', ')}; remove ${foreign.join(', ')}`);
+        continue;
+      }
+      errors.push(...valueErrors(label, needed.filter((n) => !secrets.has(n)), mode, env));
     } catch (err) {
       if (!(err instanceof RenderError)) throw err;
       errors.push(err.message);
@@ -172,18 +199,19 @@ export function check(policyDir: string, env: Env): string[] {
   return errors;
 }
 
-/** check, then every secret present, every template rendered, no `${` left and the YAML well-formed. Writes nothing. */
-export function render(policyDir: string, env: Env): RenderedFile[] {
-  const checkErrors = check(policyDir, env);
+/** check scoped to what it renders, then every secret present, every template rendered with
+ *  the courier overrides merged over the defaults, no `${` left and the YAML well-formed. Writes nothing. */
+export function render(policyDir: string, contentDir: string, env: Env): RenderedFile[] {
+  const checkErrors = check(policyDir, contentDir, env, 'render');
   if (checkErrors.length > 0) throw new RenderError(checkErrors.join('\n'));
   const unset = SECRETS.filter((n) => (env[n] ?? '').trim() === '');
   if (unset.length > 0) throw new RenderError(`missing secret(s): ${unset.join(', ')}`);
 
   const files: RenderedFile[] = [];
   const errors: string[] = [];
-  for (const path of templatePaths(policyDir)) {
+  for (const { path, label, file } of sources(policyDir, contentDir)) {
     try {
-      files.push({ path, content: renderTemplate(path, readFileSync(join(policyDir, path), 'utf8'), env) });
+      files.push({ path, content: renderTemplate(label, readFileSync(file, 'utf8'), env) });
     } catch (err) {
       if (!(err instanceof RenderError)) throw err;
       errors.push(err.message);
@@ -222,9 +250,14 @@ export function writeRendered(outDir: string, files: RenderedFile[]): void {
   }
 }
 
-/** Fresh values for every secret othala can mint, as `NAME=value` lines. */
-export function generateSecrets(): string {
-  return Object.entries(GENERATED)
+/** Fresh values for every secret othala can mint, a client secret per confidential manifest under `contentDir`
+ *  included, as `NAME=value` lines. */
+export function generateSecrets(contentDir: string): string {
+  if (!existsSync(join(contentDir, 'apps'))) {
+    console.error(`no apps/ under ${contentDir}; no client secrets minted. Pass --content <dir> if the content is elsewhere.`);
+  }
+  const clients = Object.fromEntries(clientSecretNames(contentDir).map((name) => [name, CLIENT_SECRET_BYTES]));
+  return Object.entries({ ...GENERATED, ...clients })
     .map(([name, bytes]) => `${name}=${randomBytes(bytes).toString('hex')}\n`)
     .join('');
 }

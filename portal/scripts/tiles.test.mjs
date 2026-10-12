@@ -7,28 +7,30 @@ import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { tileAccessGroups, sectionTiles } from '../src/lib/tiles.ts';
 
-async function withTilesModule({ MANIFEST_DIR: dir }, callback) {
-  const { setManifestDir } = await import('../src/lib/manifests.ts');
-  setManifestDir(dir);
+async function withTilesModule({ CONTENT_DIR: root }, callback) {
+  const { setContentDir } = await import('../src/lib/manifests.ts');
+  setContentDir(root);
   try {
     const bust = `?bust=${Date.now()}-${Math.random().toString(36).slice(2)}`;
     const mod = await import(/* @vite-ignore */ `../src/lib/tiles.ts${bust}`);
     return await callback(mod);
   } finally {
-    setManifestDir(undefined);
+    setContentDir(undefined);
   }
 }
 
 async function parseSingleTile(yamlContent) {
-  const dir = mkdtempSync(join(tmpdir(), 'tiles-test-'));
+  const root = mkdtempSync(join(tmpdir(), 'tiles-test-'));
+  const dir = join(root, 'apps');
+  mkdirSync(dir);
   try {
     writeFileSync(join(dir, 'testapp.yaml'), yamlContent);
-    return await withTilesModule({ MANIFEST_DIR: dir }, (mod) => {
+    return await withTilesModule({ CONTENT_DIR: root }, (mod) => {
       const tiles = mod.loadTiles();
       return tiles[0];
     });
   } finally {
-    rmSync(dir, { recursive: true, force: true });
+    rmSync(root, { recursive: true, force: true });
   }
 }
 
@@ -81,22 +83,26 @@ presentation:
 });
 
 test('parseTile: manifest without presentation block returns no tile', async () => {
-  const dir = mkdtempSync(join(tmpdir(), 'tiles-test-nopres-'));
+  const root = mkdtempSync(join(tmpdir(), 'tiles-test-nopres-'));
+  const dir = join(root, 'apps');
+  mkdirSync(dir);
   try {
     writeFileSync(join(dir, 'oidconly.yaml'), `
 oidc:
   client_id: oidconly
 consent: {}
 `);
-    const count = await withTilesModule({ MANIFEST_DIR: dir }, (mod) => mod.loadTiles().length);
+    const count = await withTilesModule({ CONTENT_DIR: root }, (mod) => mod.loadTiles().length);
     assert.equal(count, 0, 'OIDC-only manifest must yield no tile');
   } finally {
-    rmSync(dir, { recursive: true, force: true });
+    rmSync(root, { recursive: true, force: true });
   }
 });
 
 test('parseTile: disabled tile is excluded from loadTiles', async () => {
-  const dir = mkdtempSync(join(tmpdir(), 'tiles-test-disabled-'));
+  const root = mkdtempSync(join(tmpdir(), 'tiles-test-disabled-'));
+  const dir = join(root, 'apps');
+  mkdirSync(dir);
   try {
     writeFileSync(join(dir, 'hidden.yaml'), `
 presentation:
@@ -108,10 +114,10 @@ presentation:
   disabled: true
   order: 10
 `);
-    const count = await withTilesModule({ MANIFEST_DIR: dir }, (mod) => mod.loadTiles().length);
+    const count = await withTilesModule({ CONTENT_DIR: root }, (mod) => mod.loadTiles().length);
     assert.equal(count, 0, 'disabled tile must be excluded from loadTiles');
   } finally {
-    rmSync(dir, { recursive: true, force: true });
+    rmSync(root, { recursive: true, force: true });
   }
 });
 
@@ -141,13 +147,15 @@ presentation:
 `;
 
 async function loadWithSidecar(svg) {
-  const dir = mkdtempSync(join(tmpdir(), 'tiles-test-svg-'));
+  const root = mkdtempSync(join(tmpdir(), 'tiles-test-svg-'));
+  const dir = join(root, 'apps');
+  mkdirSync(dir);
   try {
     writeFileSync(join(dir, 'side.yaml'), SIDECAR_YAML);
     if (svg !== undefined) writeFileSync(join(dir, 'side.svg'), svg);
-    return await withTilesModule({ MANIFEST_DIR: dir }, (mod) => mod.loadTiles()[0]);
+    return await withTilesModule({ CONTENT_DIR: root }, (mod) => mod.loadTiles()[0]);
   } finally {
-    rmSync(dir, { recursive: true, force: true });
+    rmSync(root, { recursive: true, force: true });
   }
 }
 
@@ -173,15 +181,17 @@ test('sidecar: an oversize file or a non-svg root gives no href and a reason, an
 });
 
 test('sidecar: a non-regular <stem>.svg gives no href and a reason', async () => {
-  const dir = mkdtempSync(join(tmpdir(), 'tiles-test-svg-'));
+  const root = mkdtempSync(join(tmpdir(), 'tiles-test-svg-'));
+  const dir = join(root, 'apps');
+  mkdirSync(dir);
   try {
     writeFileSync(join(dir, 'side.yaml'), SIDECAR_YAML);
     mkdirSync(join(dir, 'side.svg'));
-    const tile = await withTilesModule({ MANIFEST_DIR: dir }, (mod) => mod.loadTiles()[0]);
+    const tile = await withTilesModule({ CONTENT_DIR: root }, (mod) => mod.loadTiles()[0]);
     assert.equal(tile.iconHref, undefined);
     assert.match(tile.iconReason, /regular file/);
   } finally {
-    rmSync(dir, { recursive: true, force: true });
+    rmSync(root, { recursive: true, force: true });
   }
 });
 
@@ -248,12 +258,14 @@ test('sectionTiles: ungrouped tiles are split out, and a section with no visible
 });
 
 async function groupsFrom(text) {
-  const dir = mkdtempSync(join(tmpdir(), 'groups-test-'));
+  const root = mkdtempSync(join(tmpdir(), 'groups-test-'));
+  const dir = join(root, 'apps');
+  mkdirSync(dir);
   try {
-    if (text !== undefined) writeFileSync(join(dir, 'groups.yaml'), text);
-    return await withTilesModule({ MANIFEST_DIR: dir }, (mod) => mod.loadGroups());
+    if (text !== undefined) writeFileSync(join(root, 'groups.yaml'), text);
+    return await withTilesModule({ CONTENT_DIR: root }, (mod) => mod.loadGroups());
   } finally {
-    rmSync(dir, { recursive: true, force: true });
+    rmSync(root, { recursive: true, force: true });
   }
 }
 

@@ -12,7 +12,7 @@ const manifestKeep = /^(presentation|presentation\.(name|url|access.*)|oidc|oidc
 const manifest = (() => {
   const out: string[] = [];
   const path: string[] = [];
-  for (const line of readFileSync(resolve(process.cwd(), '../e2e/manifests/grafana.yaml'), 'utf-8').split('\n')) {
+  for (const line of readFileSync(resolve(process.cwd(), '../e2e/content/apps/grafana.yaml'), 'utf-8').split('\n')) {
     if (!line.trim() || line.trim().startsWith('#')) continue;
     const depth = (line.length - line.trimStart().length) / 2;
     const key = line.trim().match(/^([\w-]+):/)?.[1];
@@ -106,7 +106,7 @@ const entryPoints = [
   </section>
 
   <section class="section">
-    <SectionLabel label="One file per app" meta="e2e/manifests/grafana.yaml, abridged" />
+    <SectionLabel label="One file per app" meta="e2e/content/apps/grafana.yaml, abridged" />
     <Split>
       <p class="section-prose">
         Every app Othala fronts is one manifest file: what its tile says,

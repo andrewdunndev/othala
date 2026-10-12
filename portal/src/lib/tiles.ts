@@ -1,6 +1,6 @@
-// Runtime app-tile loader. Reads each `<slug>.yaml` `presentation:` block from the manifest dir at request time (manifests.ts
+// Runtime app-tile loader. Reads each `<slug>.yaml` `presentation:` block from apps/ at request time (manifests.ts
 // reads `oidc:`/`consent:` from the same files); an optional `<slug>.md` is the /apps/<slug> detail content and an optional `<slug>.svg` its logo (served by pages/icons).
-// groups.yaml (optional) maps group name to { title, description, order } via loadGroups() and is skipped as a tile.
+// groups.yaml (optional, at the content root) maps group name to { title, description, order } via loadGroups().
 // requirements/<name>.md (optional) defines a prerequisite that a manifest names in `presentation.requires`.
 
 import { readdirSync, readFileSync, existsSync, statSync } from 'node:fs';
@@ -9,14 +9,14 @@ import { parse as parseYaml } from 'yaml';
 import { marked } from 'marked';
 import DOMPurify from 'isomorphic-dompurify';
 import { parseAccessGroups } from './access-groups';
-import { CACHE_TTL_MS, manifestDir, manifestFiles } from './manifests';
+import { appsDir, CACHE_TTL_MS, contentDir, manifestFiles } from './manifests';
 import { DEFAULT_GROUP } from './constants';
 
 const ICON_MAX_BYTES = 32 * 1024;
 const SVG_ROOT_RE = /^\uFEFF?\s*(?:<\?xml[^>]*\?>\s*)?(?:<!--[\s\S]*?-->\s*)*(?:<!DOCTYPE[^>]*>\s*)?<svg[\s>]/i;
 
 /** The `<stem>.svg` sidecar: its markup when it is a plausible logo, a reason when it is rejected, empty when absent. */
-function loadIcon(dir: string, stem: string): { svg?: string; reason?: string } {
+export function loadIcon(dir: string, stem: string): { svg?: string; reason?: string } {
   const path = join(dir, `${stem}.svg`);
   try {
     if (!existsSync(path)) return {};
@@ -64,7 +64,7 @@ export interface GroupMeta {
 
 /** Load the optional groups.yaml as name -> GroupMeta; absent is empty, a parse error warns once and returns empty. */
 export function loadGroups(): Map<string, GroupMeta> {
-  const path = join(manifestDir(), 'groups.yaml');
+  const path = join(contentDir(), 'groups.yaml');
   if (!existsSync(path)) return new Map();
   let raw: unknown;
   try {
@@ -265,7 +265,7 @@ function titleCase(name: string): string {
 
 /** Load `requirements/*.md` as name -> Requirement; an absent directory is empty, and a bad filename is skipped. */
 export function loadRequirements(): Map<string, Requirement> {
-  const dir = join(manifestDir(), 'requirements');
+  const dir = join(appsDir(), 'requirements');
   const out = new Map<string, Requirement>();
   let files: string[];
   try {
@@ -359,7 +359,7 @@ function parseTile(slug: string, doc: Record<string, unknown>, dir: string): App
 }
 
 function loadFromDisk(): AppTile[] {
-  const dir = manifestDir();
+  const dir = appsDir();
   const tiles: AppTile[] = [];
   for (const f of manifestFiles(dir)) {
     const slug = f.replace(/\.ya?ml$/, '');
@@ -403,7 +403,7 @@ export function safeHref(url: string, base = 'https://localhost'): string {
 
 function allTiles(): AppTile[] {
   const now = Date.now();
-  const mtime = freshestMtime(manifestDir());
+  const mtime = freshestMtime(appsDir());
   if (cache && cache.mtimeMs === mtime && now - cache.loadedAtMs < CACHE_TTL_MS) {
     return cache.tiles;
   }

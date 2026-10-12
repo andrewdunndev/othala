@@ -2,7 +2,7 @@
 
 import { test, beforeAll, afterAll } from 'vitest';
 import assert from 'node:assert/strict';
-import { mkdtempSync, writeFileSync, rmSync } from 'node:fs';
+import { mkdtempSync, mkdirSync, writeFileSync, rmSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { getViteConfig } from 'astro/config';
@@ -21,23 +21,25 @@ beforeAll(async () => {
 });
 
 afterAll(async () => {
-  manifests?.setManifestDir(undefined);
+  manifests?.setContentDir(undefined);
   if (server) await server.close();
 });
 
 const GOOD = 'presentation:\n  name: Good\n  url: https://good.example.test\n  access: [staff]\n';
 
 async function render(files) {
-  const dir = mkdtempSync(join(tmpdir(), 'notice-'));
+  const root = mkdtempSync(join(tmpdir(), 'notice-'));
+  const dir = join(root, 'apps');
+  mkdirSync(dir);
   try {
     for (const [name, text] of Object.entries(files)) writeFileSync(join(dir, name), text);
-    manifests.setManifestDir(dir);
+    manifests.setContentDir(root);
     manifests.invalidateManifestCache();
     const health = ctx.adminHealth(tiles.loadTiles());
     const container = await AstroContainer.create();
     return await container.renderToString(Notice, { props: { health } });
   } finally {
-    rmSync(dir, { recursive: true, force: true });
+    rmSync(root, { recursive: true, force: true });
   }
 }
 

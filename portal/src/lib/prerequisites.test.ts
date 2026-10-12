@@ -1,5 +1,5 @@
 // Prerequisites and guides: the requires schema, the requirements/ loader, the guide outline, per-person readiness,
-// and the lint warning. Properties over a temp MANIFEST_DIR, not snapshots.
+// and the lint warning. Properties over a temp content dir, not snapshots.
 
 import { describe, it, expect, afterEach } from 'vitest';
 import { mkdtempSync, mkdirSync, writeFileSync, rmSync } from 'node:fs';
@@ -15,24 +15,26 @@ import {
   type AppTile,
 } from './tiles';
 import { validateMetadataAdmin, MetadataAdminError } from './metadata-admin';
-import { parseManifest, setManifestDir } from './manifests';
+import { parseManifest, setContentDir } from './manifests';
 import { lintManifests } from './manifest-lint';
 
 const dirs: string[] = [];
 afterEach(() => {
   for (const d of dirs.splice(0)) rmSync(d, { recursive: true, force: true });
-  setManifestDir(undefined);
+  setContentDir(undefined);
 });
 
 function manifestDirWith(files: Record<string, string>): string {
-  const d = mkdtempSync(join(tmpdir(), 'othala-prereq-'));
-  dirs.push(d);
+  const root = mkdtempSync(join(tmpdir(), 'othala-prereq-'));
+  const d = join(root, 'apps');
+  mkdirSync(d);
+  dirs.push(root);
   for (const [name, body] of Object.entries(files)) {
     const p = join(d, name);
     mkdirSync(join(p, '..'), { recursive: true });
     writeFileSync(p, body);
   }
-  setManifestDir(d);
+  setContentDir(root);
   return d;
 }
 

@@ -2,13 +2,8 @@
 
 import { test } from 'vitest';
 import assert from 'node:assert/strict';
-import { parseManifest } from '../src/lib/manifests.ts';
-import {
-  buildClientBody,
-  registerClient,
-  registerManifests,
-  secretEnvVar,
-} from '../src/lib/register-clients.ts';
+import { parseManifest, secretEnvVar } from '../src/lib/manifests.ts';
+import { buildClientBody, registerClient, registerManifests } from '../src/lib/register-clients.ts';
 
 import { ResponseError } from '@ory/client-fetch';
 

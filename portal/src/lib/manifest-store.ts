@@ -130,7 +130,7 @@ function logFull(message: string): void {
     console.error(
       `${TAG} UNAVAILABLE — the manifest set failed to load and there is no last known ` +
         `good set to fall back to. Serving ZERO apps: every OIDC login is denied and the ` +
-        `admin app list is empty. Fix the manifest directory; the portal recovers on the ` +
+        `admin app list is empty. Fix apps/ under /etc/othala; the portal recovers on the ` +
         `next request, no restart needed. Cause: ${message}`,
     );
     return;
@@ -138,7 +138,7 @@ function logFull(message: string): void {
   console.error(
     `${TAG} STALE — the manifest set failed to load. Serving the last known good set ` +
       `(${lastGood.length} app(s)), which no longer matches what is on disk. ` +
-      `Fix the manifest directory; the portal recovers on the next request, no restart ` +
+      `Fix apps/ under /etc/othala; the portal recovers on the next request, no restart ` +
       `needed. Cause: ${message}`,
   );
 }

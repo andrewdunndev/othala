@@ -1,13 +1,13 @@
 # othala-portal: Astro Node SSR.
 #
 # Build on UBI 10 nodejs-24 (with npm), run on ci-runtime-node's
-# nodejs-24-minimal. App manifests are mounted at runtime, not built in; the
+# nodejs-24-minimal. Deployment content is mounted at runtime, not built in; the
 # Ory policy is built in and rendered by dist/server/config.mjs.
 #
 # Build from the repo root:
 #   podman build -t dunn.dev/othala-portal:lab -f portal/Containerfile .
 #   podman run --rm -p 8080:8080 \
-#     -v ./e2e/manifests:/etc/portal/manifests:ro \
+#     -v ./e2e/content:/etc/othala:ro \
 #     dunn.dev/othala-portal:lab
 
 # ----- Stage 1: build -----

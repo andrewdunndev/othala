@@ -49,7 +49,7 @@ Needs a Docker- or Podman-compatible compose runtime. See [`e2e/README.md`](e2e/
 ### The app alone
 
 To work on the UI without the Ory substrate, run the dev server. The dashboard is built from the
-manifests in `/etc/portal/manifests`, so it renders empty unless that directory exists:
+manifests in `/etc/othala/apps`, so it renders empty unless that directory exists:
 
 ```sh
 cd portal
@@ -67,15 +67,15 @@ npm run build     # astro build + the listener, admin, and registrar bundles
 
 ## An app is a manifest
 
-One `<slug>.yaml` per app, read at request time from the manifest directory, carrying up to three blocks:
+One `<slug>.yaml` per app, read at request time from `apps/` under the content root, carrying up to three blocks:
 `presentation:` (tile metadata and the entry binding), `oidc:` (the OAuth2 client forwarded to
 Hydra), and `consent:` (roles, the group-to-role map, claim emission).
 
-[`e2e/manifests/grafana.yaml`](e2e/manifests/grafana.yaml) and
-[`e2e/manifests/audiobookshelf.yaml`](e2e/manifests/audiobookshelf.yaml) are the annotated spec.
+[`e2e/content/apps/grafana.yaml`](e2e/content/apps/grafana.yaml) and
+[`e2e/content/apps/audiobookshelf.yaml`](e2e/content/apps/audiobookshelf.yaml) are the annotated spec.
 Every field's constraint and enforcer is a comment on the line. `validateClients` and `lintManifests`
 (`portal/src/lib/manifests.ts`, `portal/src/lib/manifest-lint.ts`) are the enforcement; `npm run
-lint:manifests` (in `portal/`) checks a manifest directory.
+lint:manifests` (in `portal/`) checks a content directory.
 
 ## Repository map
 

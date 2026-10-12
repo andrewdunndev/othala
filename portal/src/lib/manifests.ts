@@ -5,7 +5,7 @@ import { readdirSync, readFileSync, statSync } from 'node:fs';
 import { join } from 'node:path';
 import { parse as parseYaml } from 'yaml';
 import { parseAccessGroups } from './access-groups';
-import { IDENTITY_GROUPS, MANIFEST_DIR } from './constants';
+import { CONTENT_DIR, IDENTITY_GROUPS } from './constants';
 
 export interface ClientRole {
   name: string;
@@ -53,17 +53,22 @@ export function shouldEmitGroups(m: ClientManifest): boolean {
   return m.emitGroupsClaim ?? true;
 }
 
-let manifestDirOverride: string | undefined;
+let contentDirOverride: string | undefined;
 
-/** Point the loaders at another directory, or back at MANIFEST_DIR with `undefined`. Tests only: production never calls it. */
-export function setManifestDir(dir: string | undefined): void {
-  manifestDirOverride = dir;
+/** Point the loaders at another content root, or back at CONTENT_DIR with `undefined`. Tests only: production never calls it. */
+export function setContentDir(dir: string | undefined): void {
+  contentDirOverride = dir;
 }
 
-/** The manifest directory every loader reads. Production is fixed at MANIFEST_DIR; under `astro dev` the MANIFEST_DIR env var points the dev server at a scratch catalog. */
-export function manifestDir(): string {
-  const devDir = import.meta.env?.DEV ? process.env.MANIFEST_DIR : undefined;
-  return manifestDirOverride ?? devDir ?? MANIFEST_DIR;
+/** The content root every loader reads. Production is fixed at CONTENT_DIR; under `astro dev` the CONTENT_DIR env var points the dev server at a scratch tree. */
+export function contentDir(): string {
+  const devDir = import.meta.env?.DEV ? process.env.CONTENT_DIR : undefined;
+  return contentDirOverride ?? devDir ?? CONTENT_DIR;
+}
+
+/** The app manifests and their sidecars: `apps/` under the content root. */
+export function appsDir(): string {
+  return join(contentDir(), 'apps');
 }
 
 export interface Dropped {
@@ -244,11 +249,11 @@ export function parseManifest(yamlText: string, filename: string): ClientManifes
   };
 }
 
-/** The sorted app manifest filenames in `dir`, groups.yaml excluded; an absent directory has none. */
+/** The sorted app manifest filenames in `dir`; an absent directory has none. */
 export function manifestFiles(dir: string): string[] {
   try {
     return readdirSync(dir)
-      .filter((f) => (f.endsWith('.yaml') || f.endsWith('.yml')) && f !== 'groups.yaml')
+      .filter((f) => f.endsWith('.yaml') || f.endsWith('.yml'))
       .sort();
   } catch (err) {
     if ((err as NodeJS.ErrnoException).code === 'ENOENT') return [];
@@ -257,14 +262,14 @@ export function manifestFiles(dir: string): string[] {
 }
 
 function loadFromDisk(dropped: Dropped[]): ClientManifest[] {
-  const dir = manifestDir();
+  const dir = appsDir();
   return manifestFiles(dir)
     .map((f) => loadOne(f, dir, dropped))
     .filter((m): m is ClientManifest => m !== null);
 }
 
 function freshestMtime(): number {
-  const dir = manifestDir();
+  const dir = appsDir();
   try {
     let max = 0;
     for (const f of manifestFiles(dir)) {
@@ -371,6 +376,19 @@ function originOf(raw: string): string | null {
 
 /** The one client_id form: manifests, metadata_admin.roles keys and the registrar's `<CLIENT_ID>_CLIENT_SECRET` all key on it. */
 export const CLIENT_ID_RE = /^[a-z][a-z0-9]*$/;
+
+/** Throws rather than sanitizing, so a malformed id never names a variable that cannot resolve. */
+export function secretEnvVar(clientId: string): string {
+  if (!CLIENT_ID_RE.test(clientId)) {
+    throw new Error(`client_id ${JSON.stringify(clientId)} must match ${CLIENT_ID_RE}.`);
+  }
+  return `${clientId.toUpperCase()}_CLIENT_SECRET`;
+}
+
+/** True when Hydra holds a secret for the client: an `oidc:` block whose `token_endpoint_auth_method` is not `none`. */
+export function needsClientSecret(m: ClientManifest): boolean {
+  return !m.presentationOnly && m.tokenEndpointAuthMethod !== 'none';
+}
 
 /** Lint pass shared by the reload guard and `--validate-manifests`; one string per finding, empty when clean. */
 export function validateClients(set: ClientManifest[]): string[] {

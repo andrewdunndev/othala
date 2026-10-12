@@ -6,8 +6,8 @@ export const KRATOS_PUBLIC_URL = 'http://kratos:4433';
 export const KRATOS_ADMIN_URL = 'http://kratos:4434';
 /** Hydra admin API on the golden service name; unauthenticated, network isolation is the control. */
 export const HYDRA_ADMIN_URL = 'http://hydra:4445';
-/** Where the golden compose mounts the app manifests. */
-export const MANIFEST_DIR = '/etc/portal/manifests';
+/** Where the deployment mounts its content: apps/ (manifests and their sidecars), groups.yaml and courier/. */
+export const CONTENT_DIR = '/etc/othala';
 /** Where the image carries the Ory policy files the render reads. */
 export const POLICY_DIR = '/usr/share/othala';
 /** Where the render writes the Ory configs; kratos/ mounts at /etc/config/kratos, hydra/ at /etc/config/hydra. */

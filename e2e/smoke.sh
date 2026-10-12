@@ -177,7 +177,7 @@ echo "B. client registration (boot reconcile)"
 
 # B2: Hydra admin lists exactly the clients with an oidc: block, counted from the manifest
 # fixtures (presentation-only tiles register none).
-oidc_fixture_count=$(grep -lE '^oidc:' ./manifests/*.yaml 2>/dev/null | wc -l | tr -d ' ')
+oidc_fixture_count=$(grep -lE '^oidc:' ./content/apps/*.yaml 2>/dev/null | wc -l | tr -d ' ')
 # The boot reconcile runs behind hydra's healthcheck (5 x 2 s), so poll.
 client_count=0
 for _ in $(seq 1 30); do

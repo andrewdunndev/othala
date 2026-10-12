@@ -1,9 +1,10 @@
-// Invariant: portal env config validates required values at load and takes no knob for fixed topology.
+// Invariant: portal env config validates required values at load, takes no knob for fixed topology, and refuses a
+// retired or unknown name by name.
 
 import { test } from 'vitest';
 import assert from 'node:assert/strict';
 
-const MANAGED = (key) => key.startsWith('OTHALA_') || key === 'NODE_ENV' || key === 'CSRF_SECRET' || key === 'RECOVERY_GATE_SECRET';
+const MANAGED = (key) => key.startsWith('OTHALA_') || key === 'NODE_ENV' || key === 'CSRF_SECRET' || key === 'RECOVERY_GATE_SECRET' || key === 'UNRELATED_SETTING' || key.endsWith('_CLIENT_SECRET');
 
 async function loadConfig(env = {}) {
   const saved = { ...process.env };
@@ -71,14 +72,39 @@ test('publicUrl: strips trailing slashes', async () => {
   assert.equal(publicUrl, 'https://auth.example.com');
 });
 
-test('instanceName: the one brand name, with no OTHALA_SITE_NAME fallback', async () => {
-  const mod = await loadConfig({ NODE_ENV: 'test', OTHALA_SITE_NAME: 'Acme Portal' });
-  assert.equal(mod.instanceName, 'Othala');
-  assert.equal('siteName' in mod, false);
+test('a retired name throws in every mode, naming the fix and never the value', async () => {
+  for (const NODE_ENV of ['test', 'production']) {
+    const base = NODE_ENV === 'production' ? PROD : { NODE_ENV };
+    await assert.rejects(
+      () => loadConfig({ ...base, OTHALA_SITE_NAME: 'Acme Portal' }),
+      (err) => /OTHALA_SITE_NAME is retired: rename it OTHALA_INSTANCE_NAME/.test(err.message) && !err.message.includes('Acme Portal'),
+    );
+  }
 });
 
-test('smtpFromAddress: always noreply@<OTHALA_APEX>, the old override is ignored', async () => {
-  const { smtpFromAddress } = await loadConfig({ NODE_ENV: 'test', OTHALA_APEX: 'example.org', OTHALA_SMTP_FROM_ADDRESS: 'other@x.test' });
+test('every retired knob throws by name', async () => {
+  for (const name of [
+    'OTHALA_DEFAULT_SCHEMA_ID',
+    'OTHALA_DEFAULT_GROUP',
+    'OTHALA_IDENTITY_GROUPS',
+    'OTHALA_ADMIN_CONTACT',
+    'OTHALA_ADMIN_FRESHNESS_HOURS',
+    'OTHALA_SMTP_FROM_ADDRESS',
+  ]) {
+    await assert.rejects(() => loadConfig({ NODE_ENV: 'test', [name]: 'x' }), new RegExp(`${name} is retired: `));
+  }
+});
+
+test('an unknown OTHALA_ name throws and lists the names othala reads', async () => {
+  await assert.rejects(() => loadConfig({ NODE_ENV: 'test', OTHALA_PUBLIC_URLS: 'https://a.example' }), /OTHALA_PUBLIC_URLS is not an othala setting: delete it \(othala reads OTHALA_PUBLIC_URL, /);
+});
+
+test('names outside the OTHALA_ prefix and the retired table are left alone', async () => {
+  await assert.doesNotReject(() => loadConfig({ ...PROD, UNRELATED_SETTING: '1', GRAFANA_CLIENT_SECRET: 'x' }));
+});
+
+test('smtpFromAddress: always noreply@<OTHALA_APEX>', async () => {
+  const { smtpFromAddress } = await loadConfig({ NODE_ENV: 'test', OTHALA_APEX: 'example.org' });
   assert.equal(smtpFromAddress, 'noreply@example.org');
 });
 
@@ -92,19 +118,5 @@ test('secret: reads CSRF_SECRET and RECOVERY_GATE_SECRET lazily, undefined when 
   } finally {
     delete process.env.CSRF_SECRET;
     delete process.env.RECOVERY_GATE_SECRET;
-  }
-});
-
-test('retired knobs are gone: config exports no default schema id, group, contact or freshness setting', async () => {
-  const mod = await loadConfig({
-    NODE_ENV: 'test',
-    OTHALA_DEFAULT_SCHEMA_ID: 'family',
-    OTHALA_DEFAULT_GROUP: 'family',
-    OTHALA_IDENTITY_GROUPS: 'family,friends',
-    OTHALA_ADMIN_CONTACT: 'help@example.com',
-    OTHALA_ADMIN_FRESHNESS_HOURS: '5',
-  });
-  for (const gone of ['defaultSchemaId', 'defaultGroup', 'identityGroups', 'adminContact', 'adminFreshnessHours']) {
-    assert.equal(gone in mod, false, gone);
   }
 });

@@ -2,10 +2,10 @@
 
 import { test } from 'vitest';
 import assert from 'node:assert/strict';
-import { mkdtempSync, writeFileSync, rmSync, readdirSync, readFileSync } from 'node:fs';
+import { mkdtempSync, mkdirSync, writeFileSync, rmSync, readdirSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
-import { parseManifest, loadClientManifests, invalidateManifestCache, setManifestDir } from '../src/lib/manifests.ts';
+import { parseManifest, loadClientManifests, invalidateManifestCache, setContentDir } from '../src/lib/manifests.ts';
 import { decideAccess } from '../src/lib/gate.ts';
 
 test('namespace split: minimal yaml with oidc + consent blocks parses', () => {
@@ -270,16 +270,18 @@ consent: {}
 `;
 
 function loadFrom(files) {
-  const dir = mkdtempSync(join(tmpdir(), 'manifest-quarantine-'));
+  const root = mkdtempSync(join(tmpdir(), 'manifest-quarantine-'));
+  const dir = join(root, 'apps');
+  mkdirSync(dir);
   try {
     for (const [name, text] of Object.entries(files)) writeFileSync(join(dir, name), text);
-    setManifestDir(dir);
+    setContentDir(root);
     invalidateManifestCache();
     return loadClientManifests().map((m) => m.clientId);
   } finally {
-    setManifestDir(undefined);
+    setContentDir(undefined);
     invalidateManifestCache();
-    rmSync(dir, { recursive: true, force: true });
+    rmSync(root, { recursive: true, force: true });
   }
 }
 
@@ -300,7 +302,9 @@ test('B: duplicate client_id drops every file carrying it', () => {
 });
 
 test('directory walk: sorted by filename, yaml + yml both picked up', () => {
-  const dir = mkdtempSync(join(tmpdir(), 'manifest-test-'));
+  const root = mkdtempSync(join(tmpdir(), 'manifest-test-'));
+  const dir = join(root, 'apps');
+  mkdirSync(dir);
   try {
     writeFileSync(join(dir, 'zeta.yaml'), 'oidc:\n  client_id: zeta\nconsent: {}\n');
     writeFileSync(join(dir, 'alpha.yml'), 'oidc:\n  client_id: alpha\nconsent: {}\n');
@@ -312,12 +316,14 @@ test('directory walk: sorted by filename, yaml + yml both picked up', () => {
     const manifests = files.map((f) => parseManifest(readFileSync(join(dir, f), 'utf8'), f));
     assert.deepEqual(manifests.map((m) => m.clientId), ['alpha', 'beta', 'zeta']);
   } finally {
-    rmSync(dir, { recursive: true, force: true });
+    rmSync(root, { recursive: true, force: true });
   }
 });
 
 test('per-file isolation: broken YAML is skipped, good manifest still loads', () => {
-  const dir = mkdtempSync(join(tmpdir(), 'manifest-isolation-'));
+  const root = mkdtempSync(join(tmpdir(), 'manifest-isolation-'));
+  const dir = join(root, 'apps');
+  mkdirSync(dir);
   try {
     writeFileSync(join(dir, 'broken.yaml'), `
 oidc:
@@ -337,19 +343,21 @@ presentation:
 consent: {}
 `);
 
-    setManifestDir(dir);
+    setContentDir(root);
     let manifests;
     assert.doesNotThrow(() => { manifests = loadClientManifests(); });
     assert.equal(manifests.length, 1, 'good manifest must survive broken sibling');
     assert.equal(manifests[0].clientId, 'goodapp');
   } finally {
-    setManifestDir(undefined);
-    rmSync(dir, { recursive: true, force: true });
+    setContentDir(undefined);
+    rmSync(root, { recursive: true, force: true });
   }
 });
 
 test('per-file isolation: unreadable file is skipped, no throw', () => {
-  const dir = mkdtempSync(join(tmpdir(), 'manifest-toctou-'));
+  const root = mkdtempSync(join(tmpdir(), 'manifest-toctou-'));
+  const dir = join(root, 'apps');
+  mkdirSync(dir);
   try {
     writeFileSync(join(dir, 'good.yaml'), `
 oidc:
@@ -364,30 +372,32 @@ presentation:
 consent: {}
 `);
 
-    setManifestDir(dir);
+    setContentDir(root);
     let manifests;
     assert.doesNotThrow(() => { manifests = loadClientManifests(); });
     assert.equal(manifests.length, 1);
     assert.equal(manifests[0].clientId, 'survivor');
   } finally {
-    setManifestDir(undefined);
-    rmSync(dir, { recursive: true, force: true });
+    setContentDir(undefined);
+    rmSync(root, { recursive: true, force: true });
   }
 });
 
 test('per-file isolation: all-broken dir yields empty list without throw', () => {
-  const dir = mkdtempSync(join(tmpdir(), 'manifest-allbad-'));
+  const root = mkdtempSync(join(tmpdir(), 'manifest-allbad-'));
+  const dir = join(root, 'apps');
+  mkdirSync(dir);
   try {
     writeFileSync(join(dir, 'broken1.yaml'), ': bad: yaml: [');
     writeFileSync(join(dir, 'broken2.yaml'), ': also: bad: yaml: {');
 
-    setManifestDir(dir);
+    setContentDir(root);
     let manifests;
     assert.doesNotThrow(() => { manifests = loadClientManifests(); });
     assert.equal(manifests.length, 0, 'all-broken dir must yield empty list');
   } finally {
-    setManifestDir(undefined);
-    rmSync(dir, { recursive: true, force: true });
+    setContentDir(undefined);
+    rmSync(root, { recursive: true, force: true });
   }
 });
 

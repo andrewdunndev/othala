@@ -1,7 +1,7 @@
 // Invariant: a group's type comes from its binding, never its name.
 
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
-import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdtempSync, mkdirSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
@@ -9,7 +9,7 @@ import {
   parseManifest,
   loadClientManifests,
   invalidateManifestCache,
-  setManifestDir,
+  setContentDir,
   type ClientManifest,
 } from './manifests.js';
 import {
@@ -189,6 +189,7 @@ function namesOfKind(reg: GroupRegistry, kind: GroupKind): string[] {
   return [...reg.values()].filter((e) => e.kinds.has(kind)).map((e) => e.name).sort();
 }
 
+let root: string;
 let dir: string;
 
 function write(name: string, body: string): void {
@@ -283,8 +284,10 @@ presentation:
 
 describe('buildGroupRegistry — completeness over the real loader', () => {
   beforeEach(() => {
-    dir = mkdtempSync(join(tmpdir(), 'othala-group-registry-'));
-    setManifestDir(dir);
+    root = mkdtempSync(join(tmpdir(), 'othala-group-registry-'));
+    dir = join(root, 'apps');
+    mkdirSync(dir);
+    setContentDir(root);
     invalidateManifestCache();
     vi.spyOn(console, 'error').mockImplementation(() => {});
     vi.spyOn(console, 'warn').mockImplementation(() => {});
@@ -292,8 +295,8 @@ describe('buildGroupRegistry — completeness over the real loader', () => {
 
   afterEach(() => {
     vi.restoreAllMocks();
-    setManifestDir(undefined);
-    rmSync(dir, { recursive: true, force: true });
+    setContentDir(undefined);
+    rmSync(root, { recursive: true, force: true });
   });
 
   const servingRegistry = () => buildGroupRegistry(servingManifests(), IDENTITY_GROUPS);

@@ -1,6 +1,8 @@
 // Portal env config: the only module that reads production env (listen.ts checks it before this loads; otel.mjs is plain Node).
 // A required var throws at load in production and takes a dev default elsewhere. Fixed topology lives in constants.ts.
 
+import { envNameErrors } from './env-names';
+
 // ── helpers ──────────────────────────────────────────────────────────────────
 
 function isProduction(): boolean {
@@ -23,6 +25,10 @@ function requiredVar(name: string, devDefault: string): string {
   );
   return devDefault;
 }
+
+// A retired or unknown name throws in every mode, naming the fix.
+const nameErrors = envNameErrors(process.env);
+if (nameErrors.length > 0) throw new Error(`[othala/config] ${nameErrors.join('; ')}`);
 
 // ── OTHALA_PUBLIC_URL ── public issuer URL, no trailing slash; required in production.
 export const publicUrl: string = requiredVar(

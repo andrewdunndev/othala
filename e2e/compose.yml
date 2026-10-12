@@ -187,7 +187,7 @@ services:
       PROMPTDESK_CLIENT_SECRET: ${PROMPTDESK_CLIENT_SECRET}
       PORTAL_ADMIN_BIND_HOST: 127.0.0.1
     volumes:
-      - ./manifests:/etc/portal/manifests:ro,z
+      - ./content:/etc/othala:ro,z
     healthcheck:
       # /healthz is on the loopback admin port; probe inside the container.
       test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:4431/healthz').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]

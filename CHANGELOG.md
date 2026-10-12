@@ -9,12 +9,21 @@ This CHANGELOG and git tags carry the deployed-instance release state.
 
 ## [Unreleased]
 
-The image carries the Ory policy and renders it: one command replaces the shell renderer.
+The image carries the Ory policy and renders it from the deployment's env and content tree at `/etc/othala`; one command replaces the shell renderer.
 
 ### Added
 
 - `node dist/server/config.mjs render` renders `kratos.yml`, `hydra.yml` and the courier templates from env, and copies the identity schema and recovery-gate hook beside them. It refuses an unset or blank secret, any `${` left in the output and malformed YAML, and writes owner-only files.
 - `check` validates the non-secret values offline; `gen-secrets` prints fresh values for every secret except the SMTP URI.
+- `check` also validates the content tree offline: env names, the layout, manifests, sidecars, `groups.yaml` and courier override names. Every failure names the file or variable and the fix.
+- A deployment overrides a courier template with `courier/<name>.gotmpl` under the content root; the render merges it over the shipped default of the same name. An override may name only `${OTHALA_APEX}`, `${OTHALA_INSTANCE_NAME}` and `${OTHALA_PUBLIC_URL}`.
+- `gen-secrets --content <dir>` also mints a `<CLIENT_ID>_CLIENT_SECRET` for each confidential OIDC manifest.
+
+### Changed
+
+- Content moves to `/etc/othala`: manifests and their `.md` and `.svg` sidecars, `requirements/` and `NOTICE` in `apps/`, and `groups.yaml` at the root. `/etc/portal/manifests` is no longer read.
+- A retired env name, or an `OTHALA_*` name othala does not read, stops the portal at boot and fails `check` and `render`, naming the fix. The table is `RETIRED_NAMES` in `portal/src/lib/env-names.ts`.
+- `npm run lint:manifests` and `manifest-lint.mjs` take the content root and fail on a BLOCK finding.
 
 ### Removed
 
@@ -26,6 +35,10 @@ The image carries the Ory policy and renders it: one command replaces the shell 
 - The render now also requires `POSTGRES_PASSWORD` and `CSRF_SECRET`, and refuses a blank secret.
 - Rendered files are mode 0600, owned by the render's uid: run the one-shot with `--user 10000`, the uid of the Kratos and Hydra images, so those processes can read them.
 - If you still vendor the Ory files, re-vendor `kratos/kratos.yml` and `hydra/hydra.yml` (comments only).
+- Move your manifests into `apps/` (`git mv <manifests>/* <content>/apps/`), then move `groups.yaml` back up to the content root. Mount the content root read-only at `/etc/othala` on the portal and on the render one-shot, in place of the `/etc/portal/manifests` mount. Run `node dist/server/config.mjs check --content <dir>` with the non-secret env in CI.
+- The render one-shot checks only env names and `courier/`, so a bad app sidelines that app and never stops sign-in; `check` in CI is the gate for `apps/`. `gen-secrets` mints each `<CLIENT_ID>_CLIENT_SECRET` the portal needs.
+- Keep a reworded mail as `courier/<name>.gotmpl` under the content root, named after the shipped template it replaces (e.g. `courier/login_code.subject.gotmpl`), never as an edit to a vendored copy.
+- Delete every name `check` reports as retired. `MANIFEST_DIR` is one: under `astro dev` use `CONTENT_DIR`.
 
 ## [0.14.0] - 2026-10-11
 

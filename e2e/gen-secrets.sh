@@ -66,7 +66,7 @@ RECOVERY_GATE_SECRET=$(gen)
 # App CSRF tokens (HIGH-1)
 CSRF_SECRET=$(gen)
 
-# Per-client OIDC secrets: <SLUG>_CLIENT_SECRET for each e2e/manifests fixture with an oidc:
+# Per-client OIDC secrets: <SLUG>_CLIENT_SECRET for each e2e/content/apps fixture with an oidc:
 # block (client_id upper-cased; promptdesk.yaml's client_id is "promptdesk").
 GRAFANA_CLIENT_SECRET=$(gen)
 AUDIOBOOKSHELF_CLIENT_SECRET=$(gen)

@@ -13,7 +13,7 @@ Client definitions are not stored here. Each manifest's `oidc:` block is
 registered on boot and on SIGHUP, with `<SLUG>_CLIENT_SECRET`
 from env; a manifest with only `presentation:` is skipped. See
 ["An app is a manifest"](../README.md#an-app-is-a-manifest),
-[`e2e/manifests/`](../e2e/manifests/) for annotated examples,
+[`e2e/content/apps/`](../e2e/content/apps/) for annotated examples,
 [`DEPLOY.md`](../DEPLOY.md) "Client registration" and
 [`per-app-oidc.md`](../site/src/content/docs/guides/per-app-oidc.md).
 

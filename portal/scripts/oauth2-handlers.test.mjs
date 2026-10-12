@@ -768,7 +768,7 @@ import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
-const clientsDir = join(__dirname, '..', '..', 'e2e', 'manifests');
+const clientsDir = join(__dirname, '..', '..', 'e2e', 'content', 'apps');
 
 function loadManifest(name) {
   const yaml = readFileSync(join(clientsDir, `${name}.yaml`), 'utf8');
