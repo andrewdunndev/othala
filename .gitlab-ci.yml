@@ -35,25 +35,25 @@ stages:
 
 include:
   # Advisory until verified clean (fail_on_violation: false).
-  - component: gitlab.com/dunn.dev/pipeline/reference-check@4.10.0
+  - component: gitlab.com/dunn.dev/pipeline/reference-check@4.12.0
     inputs:
       reference_ref: main
       fail_on_violation: false
 
   # secret-verdict fails the pipeline on a detected secret; pin-audit on an
   # image pin Renovate cannot track.
-  - component: gitlab.com/dunn.dev/pipeline/osv-verdict@4.10.0
-  - component: gitlab.com/dunn.dev/pipeline/secret-verdict@4.10.0
+  - component: gitlab.com/dunn.dev/pipeline/osv-verdict@4.12.0
+  - component: gitlab.com/dunn.dev/pipeline/secret-verdict@4.12.0
     inputs:
       # Fake SMTP credentials on example.com, parser fixtures.
       excluded_paths: "portal/src/lib/contact.test.ts,portal/scripts/config.test.mjs,portal/scripts/admin-port.test.mjs"
-  - component: gitlab.com/dunn.dev/pipeline/pin-audit@4.10.0
-  - component: gitlab.com/dunn.dev/pipeline/automerge-gate@4.10.0
+  - component: gitlab.com/dunn.dev/pipeline/pin-audit@4.12.0
+  - component: gitlab.com/dunn.dev/pipeline/automerge-gate@4.12.0
     inputs:
       stage: automerge-gate
       required-checks: "osv,secret"
 
-  - component: gitlab.com/dunn.dev/pipeline/node-build@4.10.0
+  - component: gitlab.com/dunn.dev/pipeline/node-build@4.12.0
     inputs:
       stage: verify
       job_name: verify-othala
@@ -62,7 +62,7 @@ include:
 
   # e2e-tester: prebaked Playwright image. The e2e inner VM cannot reach npm, so
   # deps are baked at build time. Test-only: no SBOM or release.
-  - component: gitlab.com/dunn.dev/pipeline/container-image@4.10.0
+  - component: gitlab.com/dunn.dev/pipeline/container-image@4.12.0
     inputs:
       job_name: build-e2e-tester
       image_tag: e2e-tester
@@ -72,7 +72,7 @@ include:
       sign_image: false
 
   # othala: context stays at the repo root because changing it needs a CI dance.
-  - component: gitlab.com/dunn.dev/pipeline/container-image@4.10.0
+  - component: gitlab.com/dunn.dev/pipeline/container-image@4.12.0
     inputs:
       job_name: build-othala
       publish_at_root: true
@@ -80,7 +80,7 @@ include:
       context: .
       tag_pipeline: true
 
-  - component: gitlab.com/dunn.dev/pipeline/container-sbom@4.10.0
+  - component: gitlab.com/dunn.dev/pipeline/container-sbom@4.12.0
     inputs:
       job_name: sbom-othala
       container_image: "${CI_REGISTRY_IMAGE}:${CI_COMMIT_TAG}"
@@ -90,7 +90,7 @@ include:
 
   # release-create expects binary_job; it points at the image build and the
   # dist/ slot stays empty.
-  - component: gitlab.com/dunn.dev/pipeline/release-create@4.10.0
+  - component: gitlab.com/dunn.dev/pipeline/release-create@4.12.0
     inputs:
       package_name: auth
       release_title: "auth $CI_COMMIT_TAG"
@@ -98,7 +98,7 @@ include:
       sbom_job: sbom-othala
 
   # Docs site as a Cloudflare Worker (not GitLab Pages: dotted domains break LE).
-  - component: gitlab.com/dunn.dev/pipeline/cloudflare-worker@4.10.0
+  - component: gitlab.com/dunn.dev/pipeline/cloudflare-worker@4.12.0
     inputs:
       wrangler_config: site/wrangler.toml
       build_command: npx astro build
