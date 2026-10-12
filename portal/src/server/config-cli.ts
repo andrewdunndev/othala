@@ -9,7 +9,7 @@ import { join } from 'node:path';
 import { parseArgs } from 'node:util';
 import { CONTENT_DIR, POLICY_DIR, RENDER_DIR } from '../lib/constants';
 import { lintApps } from '../lib/content';
-import { check, generateSecrets, render, RenderError, writeRendered } from '../lib/render';
+import { check, clearRendered, generateSecrets, render, RenderError, writeRendered } from '../lib/render';
 
 const USAGE =
   'usage: config.mjs render [--policy <dir>] [--content <dir>] [--out <dir>] | check [--policy <dir>] [--content <dir>] | gen-secrets [--content <dir>]';
@@ -57,7 +57,8 @@ function main(): number {
       } catch (err) {
         if (!(err instanceof RenderError)) throw err;
         for (const line of err.message.split('\n')) console.error(`[othala-config] ${line}`);
-        console.error('[othala-config] render refused; nothing written');
+        clearRendered(out);
+        console.error('[othala-config] render refused; earlier output cleared');
         return 1;
       }
     }

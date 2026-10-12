@@ -13,6 +13,8 @@ export type RenderedFile = { path: string; content: string };
 
 /** Policy files rendered with `${NAME}` substitution, by path under the policy dir. */
 const TEMPLATES = ['kratos/kratos.yml', 'hydra/hydra.yml', 'caddy/othala.caddy'];
+/** The trees a render writes, one per consumer. */
+const TREES = [...new Set(TEMPLATES.map((p) => p.split('/')[0]))];
 /** Policy files copied as they are. */
 const LITERALS = ['kratos/identity.schema.json', 'kratos/hooks/recovery-gate.jsonnet'];
 const COURIER_DIR = 'kratos/courier';
@@ -244,18 +246,23 @@ export function render(policyDir: string, contentDir: string, env: Env): Rendere
   return files;
 }
 
+/** Empties each rendered tree under `outDir` in place, so a tree can be a mount point. A refused render calls it
+ *  too, so Kratos, Hydra and Caddy refuse to boot rather than run an earlier render. */
+export function clearRendered(outDir: string): void {
+  for (const top of TREES) {
+    const dir = join(outDir, top);
+    if (!existsSync(dir)) continue;
+    for (const entry of readdirSync(dir)) rmSync(join(dir, entry), { recursive: true, force: true });
+    chmodSync(dir, 0o700);
+  }
+}
+
 /** Writes the rendered set under `outDir`, owner-only except the secret-free PUBLIC_TREES, replacing any earlier
- *  render of the same trees. Each tree is emptied in place, so it can be a mount point. */
+ *  render of the same trees. */
 export function writeRendered(outDir: string, files: RenderedFile[]): void {
   const previous = process.umask(0o077);
   try {
-    const tops = new Set(files.map(({ path }) => path.split('/')[0]));
-    for (const top of tops) {
-      const dir = join(outDir, top);
-      if (!existsSync(dir)) continue;
-      for (const entry of readdirSync(dir)) rmSync(join(dir, entry), { recursive: true, force: true });
-      chmodSync(dir, 0o700);
-    }
+    clearRendered(outDir);
     for (const { path, content } of files) {
       const target = join(outDir, path);
       const open = PUBLIC_TREES.has(path.split('/')[0]);
@@ -263,7 +270,7 @@ export function writeRendered(outDir: string, files: RenderedFile[]): void {
       writeFileSync(target, content, { mode: 0o600 });
       chmodSync(target, open ? 0o644 : 0o600);
     }
-    for (const top of tops) if (PUBLIC_TREES.has(top)) chmodSync(join(outDir, top), 0o755);
+    for (const top of TREES) if (PUBLIC_TREES.has(top)) chmodSync(join(outDir, top), 0o755);
   } finally {
     process.umask(previous);
   }
