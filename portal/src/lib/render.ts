@@ -2,7 +2,7 @@
 // Errors name variables, never values. Env is a parameter here; only the CLI reads process.env.
 
 import { randomBytes } from 'node:crypto';
-import { chmodSync, existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { chmodSync, existsSync, mkdirSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { parse } from 'yaml';
 
@@ -194,7 +194,7 @@ export function render(policyDir: string, env: Env): RenderedFile[] {
     if (content.includes('${')) errors.push(`${path}: \${ left in the rendered output`);
     if (TEMPLATES.includes(path)) {
       try {
-        parse(content);
+        parse(content, { logLevel: 'error' });
       } catch {
         errors.push(`${path}: rendered output is not well-formed YAML`);
       }
@@ -204,10 +204,13 @@ export function render(policyDir: string, env: Env): RenderedFile[] {
   return files;
 }
 
-/** Writes the rendered set under `outDir`, owner-only. */
+/** Writes the rendered set under `outDir`, owner-only, replacing any earlier render of the same trees. */
 export function writeRendered(outDir: string, files: RenderedFile[]): void {
   const previous = process.umask(0o077);
   try {
+    for (const top of new Set(files.map(({ path }) => path.split('/')[0]))) {
+      rmSync(join(outDir, top), { recursive: true, force: true });
+    }
     for (const { path, content } of files) {
       const target = join(outDir, path);
       mkdirSync(dirname(target), { recursive: true, mode: 0o700 });
