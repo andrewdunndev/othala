@@ -274,11 +274,14 @@ export interface OthalaFixtures {
   pageCDPSession: CDPSession;
   /** CDP virtual authenticator id (test-scoped). Cleaned up after each test. */
   virtualAuthenticator: { authenticatorId: string };
+  /** Moves contexts a test inherits from an earlier one onto this test's client address. */
+  clientAddressRotation: void;
 }
 
 /**
  * A client address for the edge to key its rate limits on: the e2e Caddy trusts the runner as a proxy, so
- * `{client_ip}` is this X-Forwarded-For value. One per test attempt keeps the suite under the per-client zones.
+ * `{client_ip}` is this X-Forwarded-For value. One per test attempt, applied to every open context, keeps the suite
+ * under the per-client zones.
  */
 export function clientAddress(seed: string): string {
   const [a, b] = createHash('sha256').update(seed).digest();
@@ -289,6 +292,11 @@ export const test = base.extend<OthalaFixtures, OthalaWorkerFixtures>({
   extraHTTPHeaders: async ({}, use, testInfo) => {
     await use({ 'X-Forwarded-For': clientAddress(`${testInfo.testId}:${testInfo.retry}`) });
   },
+
+  clientAddressRotation: [async ({ browser, extraHTTPHeaders }, use) => {
+    await Promise.all(browser.contexts().map((c) => c.setExtraHTTPHeaders(extraHTTPHeaders ?? {})));
+    await use();
+  }, { auto: true }],
 
   baseURL: async ({}, use) => {
     await use(process.env.BASE ?? 'http://auth.othala.test');
