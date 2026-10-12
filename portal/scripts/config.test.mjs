@@ -4,7 +4,7 @@
 import { test } from 'vitest';
 import assert from 'node:assert/strict';
 
-const MANAGED = (key) => key.startsWith('OTHALA_') || key === 'NODE_ENV' || key === 'CSRF_SECRET' || key === 'RECOVERY_GATE_SECRET' || key === 'ADMIN_HOST' || key === 'UNRELATED_SETTING' || key.endsWith('_CLIENT_SECRET');
+const MANAGED = (key) => key.startsWith('OTHALA_') || key === 'NODE_ENV' || key === 'CSRF_SECRET' || key === 'RECOVERY_GATE_SECRET' || key === 'UNRELATED_SETTING' || key.endsWith('_CLIENT_SECRET');
 
 async function loadConfig(env = {}) {
   const saved = { ...process.env };
@@ -90,7 +90,6 @@ test('every retired knob throws by name', async () => {
     'OTHALA_ADMIN_CONTACT',
     'OTHALA_ADMIN_FRESHNESS_HOURS',
     'OTHALA_SMTP_FROM_ADDRESS',
-    'ADMIN_HOST',
   ]) {
     await assert.rejects(() => loadConfig({ NODE_ENV: 'test', [name]: 'x' }), new RegExp(`${name} is retired: `));
   }
