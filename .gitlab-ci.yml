@@ -38,7 +38,7 @@ include:
   # Advisory until verified clean (fail_on_violation: false).
   - component: gitlab.com/dunn.dev/pipeline/reference-check@4.10.0
     inputs:
-      reference_ref: v0.7.0
+      reference_ref: v0.7.1
       fail_on_violation: false
 
   # secret-verdict fails the pipeline on a detected secret; pin-audit on an
