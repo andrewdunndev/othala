@@ -5,6 +5,7 @@ import { randomBytes } from 'node:crypto';
 import { chmodSync, existsSync, mkdirSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { parse } from 'yaml';
+import { envNameErrors } from './env-names';
 
 export type Env = Record<string, string | undefined>;
 export type RenderedFile = { path: string; content: string };
@@ -154,12 +155,13 @@ function templatePaths(policyDir: string): string[] {
   return [...TEMPLATES, ...courier];
 }
 
-/** The offline check: policy files present and every non-secret value the templates need, valid. No secrets read. */
+/** The offline check: policy files present, no retired or unknown env name, and every non-secret value the templates
+ *  need, valid. No secrets read. */
 export function check(policyDir: string, env: Env): string[] {
   const missingFiles = [...TEMPLATES, ...LITERALS, COURIER_DIR].filter((p) => !existsSync(join(policyDir, p)));
   if (missingFiles.length > 0) return missingFiles.map((p) => `${policyDir}: missing policy file ${p}`);
   const secrets = new Set<string>(SECRETS);
-  const errors: string[] = [];
+  const errors: string[] = envNameErrors(env);
   for (const path of templatePaths(policyDir)) {
     try {
       const { needed, mode } = parseTemplate(path, readFileSync(join(policyDir, path), 'utf8'), env);

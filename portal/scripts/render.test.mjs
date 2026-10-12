@@ -1,5 +1,5 @@
 // Invariant: the render keeps the substitution rules byte for byte, refuses a missing secret or a leftover ${,
-// writes owner-only files and nothing on refusal, ignores names it does not know, and gen-secrets mints every
+// writes owner-only files and nothing on refusal, refuses retired or unknown names, and gen-secrets mints every
 // secret it can. Assertions name variables only, so no secret value reaches the test log.
 
 import { test } from 'vitest';
@@ -132,10 +132,19 @@ test('render refuses output that is not well-formed YAML', () => {
   });
 });
 
-test('names outside the contract are ignored, as the portal config ignores them', () => {
-  const extra = { OTHALA_SITE_NAME: 'Retired', OTHALA_SMTP_FROM_ADDRESS: 'x@example.org', UNRELATED: '1' };
-  assert.deepEqual(render(root, { ...ENV, ...extra }), render(root, ENV));
-  assert.deepEqual(check(root, { ...VALUES, ...extra }), []);
+test('a retired or unknown name fails check and render with its fix; other names are ignored', () => {
+  const retired = { OTHALA_SITE_NAME: 'Retired Value', OTHALA_SMTP_FROM_ADDRESS: 'x@example.org', OTHALA_TYPO: 'typo-value' };
+  const expected = [
+    'OTHALA_SITE_NAME is retired: rename it OTHALA_INSTANCE_NAME',
+    'OTHALA_SMTP_FROM_ADDRESS is retired: delete it; mail comes from noreply@<OTHALA_APEX>',
+  ];
+  const errors = check(root, { ...VALUES, ...retired });
+  assert.deepEqual(errors.slice(0, 2), expected);
+  assert.match(errors[2], /^OTHALA_TYPO is not an othala setting: delete it \(othala reads OTHALA_PUBLIC_URL, /);
+  assert.equal(errors.length, 3);
+  for (const value of Object.values(retired)) assert.ok(!errors.join('\n').includes(value), 'error carries a value');
+  assert.throws(() => render(root, { ...ENV, ...retired }), /OTHALA_SITE_NAME is retired/);
+  assert.deepEqual(render(root, { ...ENV, UNRELATED: '1' }), render(root, ENV));
 });
 
 test('check runs without secrets and names a missing value or policy file', () => {
