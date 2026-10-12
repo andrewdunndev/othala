@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 # smoke.sh: converged-substrate validation matrix, run in the e2e VM after compose up.
-# Admin probes run via `compose exec` against localhost:4431 (loopback-bound); the public
-# port is probed across the network. Exit 0 on all-green; diagnostics print to STDOUT.
-# Needs docker compose up, healthy services and .env in cwd.
+# Admin probes run via `compose exec` against the internal-network bind hosts from othala.env; the
+# public port is probed across the network. Exit 0 on all-green; diagnostics print to STDOUT.
+# Needs validate.sh: the stack up and healthy, othala.env and secrets.env exported.
 
 set -uo pipefail   # NOT -e: every probe runs even if some fail.
 
@@ -103,7 +103,7 @@ else
 fi
 
 # A3: Kratos admin /health/ready
-code=$(curl_code_in kratos http://localhost:4434/admin/health/ready)
+code=$(curl_code_in kratos http://${KRATOS_ADMIN_BIND_HOST}:4434/admin/health/ready)
 if [[ "$code" == "200" ]]; then
     pass "A3 kratos admin /health/ready"
 else
@@ -119,7 +119,7 @@ else
 fi
 
 # A5: Hydra admin /health/ready
-code=$(curl_code_in hydra http://localhost:4445/health/ready)
+code=$(curl_code_in hydra http://${HYDRA_ADMIN_BIND_HOST}:4445/health/ready)
 if [[ "$code" == "200" ]]; then
     pass "A5 hydra admin /health/ready"
 else
@@ -129,7 +129,7 @@ fi
 # A6: Hydra public /.well-known/openid-configuration + issuer byte-match
 oidc=$(curl_in hydra http://localhost:4444/.well-known/openid-configuration)
 issuer=$(echo "$oidc" | python3 -c "import sys,json; print(json.load(sys.stdin).get('issuer',''))" 2>/dev/null || echo "")
-# Issuer is OTHALA_PUBLIC_URL (http://auth.othala.test from gen-secrets.sh).
+# Issuer is OTHALA_PUBLIC_URL (http://auth.othala.test from othala.env).
 expected_issuer="${OTHALA_PUBLIC_URL}/"
 if [[ "$issuer" == "$expected_issuer" ]]; then
     pass "A6 hydra openid-config issuer byte-match: $issuer"
@@ -145,10 +145,10 @@ else
     fail "A7 hydra jwks.json missing RS256 key"
 fi
 
-# A8: othala admin /healthz on loopback :4431 (admin mux, not the public port).
-code=$(othala_code http://127.0.0.1:4431/healthz)
+# A8: othala admin /healthz on the bind host :4431 (admin mux, not the public port).
+code=$(othala_code http://${PORTAL_ADMIN_BIND_HOST}:4431/healthz)
 if [[ "$code" == "200" ]]; then
-    pass "A8 othala admin /healthz (loopback :4431)"
+    pass "A8 othala admin /healthz (bind host :4431)"
 else
     fail "A8 othala admin /healthz" "code=$code"
 fi
@@ -163,12 +163,22 @@ else
 fi
 
 # A9b: the admin mux is disjoint from the public mux; a GET of /admin/recovery-gate on 8080
-# is a gated page route, never the loopback admin endpoint.
+# is a gated page route, never the admin endpoint.
 code=$(othala_code http://localhost:8080/healthz)
 if [[ "$code" == "404" ]]; then
     pass "A9b othala public port does NOT serve admin /healthz (mux split holds)"
 else
-    fail "A9b admin route leaked onto public port" "code=$code (expected 404; admin /healthz must be loopback-only)"
+    fail "A9b admin route leaked onto public port" "code=$code (expected 404; admin /healthz must be admin-port-only)"
+fi
+
+# A10: from `edge` alone, no admin listener answers, by alias or bind address; Hydra public is the control.
+admin_urls="http://kratos:4434/ http://hydra:4445/ http://othala:4431/ http://${KRATOS_ADMIN_BIND_HOST}:4434/ http://${HYDRA_ADMIN_BIND_HOST}:4445/ http://${PORTAL_ADMIN_BIND_HOST}:4431/"
+reach=$(printf '%s' "const hit=(u)=>fetch(u,{signal:AbortSignal.timeout(3000)}).then(()=>u,()=>null);Promise.all(['http://hydra:4444/health/ready',...'${admin_urls}'.split(' ')].map(hit)).then(([c,...a])=>{process.stdout.write('control='+(c?'up':'down')+' reached='+(a.filter(Boolean).join(',')||'none'));process.exit(0)})" \
+    | docker compose --profile oneshot run --rm --no-deps -T edge-probe 2>&1 | _strip_ansi | tail -1)
+if [[ "$reach" == "control=up reached=none" ]]; then
+    pass "A10 edge network reaches no admin listener"
+else
+    fail "A10 edge network reaches an admin listener" "$reach"
 fi
 
 # Section B: client registration (boot reconcile in the othala service)
@@ -181,7 +191,7 @@ oidc_fixture_count=$(grep -lE '^oidc:' ./content/apps/*.yaml 2>/dev/null | wc -l
 # The boot reconcile runs behind hydra's healthcheck (5 x 2 s), so poll.
 client_count=0
 for _ in $(seq 1 30); do
-    clients_json=$(curl_in hydra http://localhost:4445/admin/clients)
+    clients_json=$(curl_in hydra http://${HYDRA_ADMIN_BIND_HOST}:4445/admin/clients)
     client_count=$(echo "$clients_json" | python3 -c "import sys,json; print(len(json.load(sys.stdin)))" 2>/dev/null || echo "0")
     [[ "$client_count" == "$oidc_fixture_count" ]] && break
     sleep 2
@@ -193,7 +203,7 @@ else
 fi
 
 # B3: grafana is registered (the role-mapping client the G-series drives).
-grafana_check=$(curl_code_in hydra http://localhost:4445/admin/clients/grafana)
+grafana_check=$(curl_code_in hydra http://${HYDRA_ADMIN_BIND_HOST}:4445/admin/clients/grafana)
 if [[ "$grafana_check" == "200" ]]; then
     pass "B3 grafana client registered"
 else
@@ -201,7 +211,7 @@ else
 fi
 
 # B4: audiobookshelf registered (the plain generic_oauth client).
-abs_check=$(curl_code_in hydra http://localhost:4445/admin/clients/audiobookshelf)
+abs_check=$(curl_code_in hydra http://${HYDRA_ADMIN_BIND_HOST}:4445/admin/clients/audiobookshelf)
 if [[ "$abs_check" == "200" ]]; then
     pass "B4 audiobookshelf client registered"
 else
@@ -224,7 +234,7 @@ fi
 
 # C2: Read identity back, metadata_admin.groups round-tripped
 if [[ -n "$identity_id" ]]; then
-    rt=$(curl_in kratos "http://localhost:4434/admin/identities/$identity_id")
+    rt=$(curl_in kratos "http://${KRATOS_ADMIN_BIND_HOST}:4434/admin/identities/$identity_id")
     groups=$(echo "$rt" | python3 -c "import sys,json; d=json.load(sys.stdin); print(','.join(d.get('metadata_admin',{}).get('groups',[])))" 2>/dev/null || echo "")
     if [[ "$groups" == "grafana-access,audiobookshelf-access" ]]; then
         pass "C2 identity round-trip preserves metadata_admin.groups"
@@ -233,7 +243,7 @@ if [[ -n "$identity_id" ]]; then
     fi
 fi
 
-# Section D: recovery-gate (converged app loopback admin endpoint)
+# Section D: recovery-gate (the app's admin endpoint)
 echo ""
 echo "D. Recovery-gate (othala :4431 /admin/recovery-gate)"
 # The gate re-fetches the identity from the Kratos admin API and refuses iff
@@ -244,13 +254,13 @@ echo "D. Recovery-gate (othala :4431 /admin/recovery-gate)"
 # Helper: POST a recovery-gate body with a bearer from inside the othala container.
 gate_code() {
     local bearer="$1"; local body="$2"
-    printf '%s' "fetch('http://127.0.0.1:4431/admin/recovery-gate',{method:'POST',headers:{'Content-Type':'application/json','Authorization':'Bearer ${bearer}'},body:'${body}'}).then(r=>{process.stdout.write(String(r.status));process.exit(0)}).catch(()=>{process.stdout.write('0');process.exit(1)})" | node_in othala
+    printf '%s' "fetch('http://${PORTAL_ADMIN_BIND_HOST}:4431/admin/recovery-gate',{method:'POST',headers:{'Content-Type':'application/json','Authorization':'Bearer ${bearer}'},body:'${body}'}).then(r=>{process.stdout.write(String(r.status));process.exit(0)}).catch(()=>{process.stdout.write('0');process.exit(1)})" | node_in othala
 }
 
 # Variant returning "code|body" so a refusal REASON can be asserted.
 gate_resp() {
     local bearer="$1"; local body="$2"
-    printf '%s' "fetch('http://127.0.0.1:4431/admin/recovery-gate',{method:'POST',headers:{'Content-Type':'application/json','Authorization':'Bearer ${bearer}'},body:'${body}'}).then(async r=>{const t=await r.text();process.stdout.write(r.status+'|'+t);process.exit(0)}).catch(()=>{process.stdout.write('0|');process.exit(1)})" | node_in othala
+    printf '%s' "fetch('http://${PORTAL_ADMIN_BIND_HOST}:4431/admin/recovery-gate',{method:'POST',headers:{'Content-Type':'application/json','Authorization':'Bearer ${bearer}'},body:'${body}'}).then(async r=>{const t=await r.text();process.stdout.write(r.status+'|'+t);process.exit(0)}).catch(()=>{process.stdout.write('0|');process.exit(1)})" | node_in othala
 }
 
 # D1: seed a REAL admin-marker identity; expect 403 WITH the console-only reason (a fail-closed
@@ -310,8 +320,8 @@ fi
 # Section F: dual-listener boundary (the reverse of A9b)
 echo ""
 echo "F. Listener boundary"
-# The reverse of A9b: the loopback admin mux does not serve public SSR routes.
-f1=$(othala_code http://127.0.0.1:4431/oauth2/login)
+# The reverse of A9b: the admin mux does not serve public SSR routes.
+f1=$(othala_code http://${PORTAL_ADMIN_BIND_HOST}:4431/oauth2/login)
 if [[ "$f1" == "404" ]]; then
     pass "F1 admin port does NOT serve public /oauth2/login (mux split holds both ways)"
 else

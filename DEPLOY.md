@@ -1,28 +1,86 @@
 # Deploy
 
-Othala ships one container image; a deploy plane is the operator-owned config,
-secrets and runtime topology around it. This is the consumption contract: what a
-deploy plane must provide. Design decisions are in [`ARCHITECTURE.md`](ARCHITECTURE.md),
-version state in [`CHANGELOG.md`](CHANGELOG.md) and git tags.
+[`deploy/example/`](deploy/example/) is a whole compose deployment; e2e runs it on every MR and tag.
 
-## Getting started: two entry paths
+## The seam
 
-**Option A, the E2E smoke harness (`e2e/`):** validates Othala locally with no
-deploy plane, running the same app image as production. See `e2e/README.md`.
+The image owns the Kratos and Hydra configs, identity schema, recovery-gate hook and courier defaults; the
+`othala.caddy` snippets (`othala-routes`, `othala-forward-auth`, `othala-oidc-app`); the env names
+(`portal/src/lib/env-names.ts`); the content layout; and the topology below.
 
-**Option B, a real deploy plane:** vendor Othala's configs by tag-pin, supply the
-env contract below, and run the containers however your platform does (quadlets,
-compose, Kubernetes).
+The deployment owns `othala.env` (values), `secrets.env` (never committed), `content/`, a site Caddyfile
+(addresses, TLS and DNS provider, `trusted_proxies`, `proxy_protocol`, listeners), its compose file or
+units, and a Caddy build with `caddy-ratelimit` and its DNS provider's module.
+
+Never: an extra Ory `--config` layer, any env on Kratos or Hydra (it overrides the rendered files, unseen by
+`check`), edits to rendered output, copies of what the image carries, or renamed topology. A policy need
+becomes a typed value in a release.
+
+## The deployment directory
+
+Copy the example, then edit `othala.env`, the Caddyfile and `content/` (`apps/`, `groups.yaml`, optional
+`courier/<name>.gotmpl` replacing the shipped template of that name) before the rest runs:
+
+```sh
+cp -r deploy/example /srv/othala && cd /srv/othala && cp othala.env.example othala.env
+IMAGE=registry.gitlab.com/dunn.dev/othala@sha256:<digest>   # the tag in compose.yml, plus its digest
+(umask 077; docker run --rm -v "$PWD/content:/etc/othala:ro" "$IMAGE" node dist/server/config.mjs gen-secrets > secrets.env)
+echo 'OTHALA_SMTP_CONNECTION_URI=smtps://user:pass@smtp.example.org:465' >> secrets.env
+docker run --rm --env-file othala.env -v "$PWD/content:/etc/othala:ro" "$IMAGE" node dist/server/config.mjs check
+docker compose up -d
+```
+
+For an OIDC app added later, copy only its `<CLIENT_ID>_CLIENT_SECRET` line from a new `gen-secrets` run.
+
+## Startup order
+
+The render runs first as uid 10000, the Kratos image's uid (Hydra runs as 10000 too; its image defaults to nonroot). Then come both migrate jobs, Kratos and Hydra, and
+the portal; Caddy waits only for the render. With quadlets the render is a `Type=oneshot`,
+`RemainAfterExit=yes` unit writing a host tmpfs `/run/othala`; Kratos, Hydra, both migrate units and Caddy take
+`Requires=` and `After=` on it and mount `/run/othala/{kratos,hydra,caddy}` read-only at `/etc/config/kratos`,
+`/etc/config/hydra` and `/etc/caddy/othala`.
+
+## Restart rules
+
+- Image pin, `othala.env`, `secrets.env` or `courier/`: rerun the render and recreate what reads them:
+  `docker compose up -d --force-recreate render kratos hydra othala caddy`.
+- `apps/` or `groups.yaml`: `docker compose kill -s SIGHUP othala`. The portal reloads and reconciles its Hydra
+  clients (`registerAllClients`, `portal/src/lib/register-clients.ts`).
+
+## Validation
+
+1. `check` runs offline, without secrets, over env names and the whole content tree. Run `check --content <dir>`
+   with the non-secret env in CI after every edit to `apps/`.
+2. `render` checks only env names and `courier/`, so a bad app sidelines that app and never stops sign-in. It
+   refuses a missing or blank secret, a leftover `${` and malformed YAML, and empties its earlier output.
+3. Kratos and Hydra validate their merged config at boot and refuse to start.
+4. Caddy refuses an unknown directive or a missing module at boot.
+
+## Topology
+
+Fixed by the image (`portal/src/lib/constants.ts`, `PORT` and `ADMIN_PORT` in `portal/src/server/listen.ts`):
+
+| Alias | Port | Listener | Called by |
+|---|---|---|---|
+| `kratos` | 4433 | Kratos public | edge, portal |
+| `kratos` | 4434 | Kratos admin, on `KRATOS_ADMIN_BIND_HOST` | portal |
+| `hydra` | 4444 | Hydra public | edge |
+| `hydra` | 4445 | Hydra admin, on `HYDRA_ADMIN_BIND_HOST` | portal |
+| `othala` | 8080 | portal public | edge |
+| `othala` | 4431 | portal admin: health and the Kratos webhooks, on `PORTAL_ADMIN_BIND_HOST` | Kratos |
+| `postgres` | 5432 | the `kratos` and `hydra` databases | Kratos, Hydra |
+
+The Kratos and Hydra admin APIs take no bearer: bind each to its address on a network the edge never joins,
+resolve its alias to that address for its callers (`extra_hosts` in the example), and publish only the edge
+([`ARCHITECTURE.md` § Trust boundary](ARCHITECTURE.md#trust-boundary)).
+
+Both edge rate-limit zones key on `{client_ip}`: behind a load balancer, set `trusted_proxies_strict` beside
+`trusted_proxies`, or a client picks its own address.
 
 ## Images
 
-One image per release, tagged at the git tag and published at the registry
-root (`registry.gitlab.com/dunn.dev/othala:vX.Y.Z`, `publish_at_root: true`
-in `.gitlab-ci.yml`). Pin by tag and digest: `v*` registry tags are protected, not immutable. Kratos
-and Hydra are upstream Ory images this repo does not build.
-
-Each release image is signed by digest with keyless cosign, from the tag
-pipeline's GitLab identity. Verify before pinning:
+One othala image per release, signed by digest with keyless cosign. Pin tag and digest (`v*` tags are
+protected, not immutable), and verify first:
 
 ```sh
 cosign verify \
@@ -31,76 +89,12 @@ cosign verify \
   registry.gitlab.com/dunn.dev/othala@sha256:<digest>
 ```
 
-## The dual-listener
+Each release's `deploy/example/compose.yml` pins the upstream Ory digests its e2e ran; run those.
 
-Expose only the public port, `8080`. The admin port, `4431`, stays on the
-internal network; publishing it anywhere reachable from outside the pod or
-host breaks the trust boundary
-([`ARCHITECTURE.md` § Trust boundary](ARCHITECTURE.md#trust-boundary)).
+## Upgrading
 
-## Rendered configs
-
-Kratos and Hydra read their config from the othala image: run
-`node dist/server/config.mjs render` as a one-shot from the same image digest as
-the portal, with the portal's env, every secret and the content tree at
-`/etc/othala`, and mount its `/run/othala/kratos` and `/run/othala/hydra` at
-`/etc/config/kratos` and `/etc/config/hydra`. That supplies the `${VAR}` values,
-the identity schema, the recovery-gate hook and the courier templates; code
-emails fail at send without the courier directory. The recovery gate
-(`docs/runbooks/admin-recovery.md` § 3) assumes these bytes. `check --content <dir>`
-runs the same validation offline, with no secrets.
-
-The render also writes `/run/othala/caddy/othala.caddy`; mount that directory at
-`/etc/caddy/othala` and import it from a site Caddyfile that owns the address,
-TLS, `trusted_proxies` and listeners. Caddy needs the `caddy-ratelimit` module.
-The render creates a missing `/run/othala` under its own umask, so a Caddy that
-reads the file in place on the host needs the deployment to own that mode. Both
-rate-limit zones key on `{client_ip}`: behind a load balancer, set
-`trusted_proxies_strict` beside `trusted_proxies`, or name a header the balancer
-overwrites in `client_ip_headers`, or a client picks its own address.
-
-A deploy plane that still vendors `kratos/kratos.yml`, `hydra/hydra.yml`, the
-schema, the hook or `kratos/courier/` must copy them **verbatim**, byte-diff them
-against the pinned ref on every promotion, and port any diff upstream, never patch
-locally.
-
-## Environment contract
-
-[`.env.example`](.env.example) is the full, authoritative variable list. This
-section covers only what needs context beyond that file:
-
-- Service names (`kratos`, `hydra`, `postgres`, `othala`), ports and the Ory
-  admin URLs are fixed, and the admin APIs take no bearer: the network is the
-  control. A deploy plane mounts its content (`apps/`, `groups.yaml`, optional
-  `courier/`) at `/etc/othala`.
-- `KRATOS_ADMIN_BIND_HOST`, `HYDRA_ADMIN_BIND_HOST` and `PORTAL_ADMIN_BIND_HOST` have no production default; the Ory render refuses empty binds, the portal wildcards too. Bind each to an internal-network address the edge cannot reach.
-- The breach check is always on: an HIBP outage blocks setting a password (registration, settings, after recovery); admin-API and shell break-glass paths still work.
-- Secrets come from the deploy plane's secret store, never the image.
-- Admin authority is deliberately **not** an env target: it is the
-  `metadata_admin.admin` marker on the Kratos identity
-  (`docs/runbooks/admin-recovery.md` § 2). An env var admin allowlist reintroduces the
-  bypass this design avoids.
-
-## Client registration
-
-The app registers OIDC clients itself: `portal/src/server/registrar.ts` runs
-`registerAllClients` (`portal/src/lib/register-clients.ts`) on boot and on SIGHUP
-against Hydra's admin port. See
-[`per-app-oidc.md`](site/src/content/docs/guides/per-app-oidc.md).
-
-## Promotion path
-
-1. Tag this repo after CI publishes images (`git tag vX.Y.Z && git push
-   --tags`).
-2. The deploy plane re-vendors the configs under *Vendored configs* at
-   the new ref and reviews what changed.
-3. Bump the pinned image tag/digest for the app, plus Kratos/Hydra if their
-   pins changed.
-4. Provision any new secrets, then deploy.
-5. SIGHUP the app if manifests changed (previous section).
-6. Smoke: `/healthz`, `/readyz`, and the OIDC discovery document all
-   answer; a real login round-trips.
-
-Kratos and Hydra migrations are forward-only: `pg_dump` before any deploy that
-changes an Ory pin, and roll back across that change by restoring the dump. An
-app-only rollback is a digest revert.
+1. Apply the release's "Deployment changes" from [`CHANGELOG.md`](CHANGELOG.md).
+2. Move the othala, Kratos and Hydra pins to the release's example.
+3. Before an Ory pin change, `pg_dump`: Ory migrations are forward-only, so rolling back restores the dump. An
+   othala-only rollback is a digest revert.
+4. `docker compose up -d`; check the OIDC discovery document and a real login.

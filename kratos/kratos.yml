@@ -14,7 +14,7 @@ serve:
   admin:
     base_url: "http://kratos:4434/"
     # Admin-plane bind address. The admin API is unauthenticated by design (the network is the
-    # control): bind an admin-plane address, never one on a network shared with other services.
+    # control): bind an address on a network the edge never joins.
     host: "${KRATOS_ADMIN_BIND_HOST}"
     request_log:
       # This listener logs before adding the prefix, so probe /admin/health/ready here.

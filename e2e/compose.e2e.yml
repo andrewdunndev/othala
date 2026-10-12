@@ -1,0 +1,111 @@
+# Test-only overlay, outside the deployment contract. validate.sh copies deploy/example/compose.yml here and runs
+#   docker compose -f compose.yml -f compose.e2e.yml
+# with this directory as the deployment: othala.env, secrets.env, Caddyfile and content/ are the test's own.
+# Only what testing needs is added: the image under test, Ory's --dev for the http issuer, the HIBP-off Kratos
+# layer, plain-HTTP test hostnames, fixed container names for podman logs, a mail catcher and the runners.
+
+services:
+  render:
+    image: ${AUTH_REGISTRY}:${AUTH_VERSION}
+    container_name: lab-render
+
+  postgres:
+    container_name: lab-postgres
+
+  kratos-migrate:
+    container_name: lab-kratos-migrate
+
+  kratos:
+    container_name: lab-kratos
+    volumes:
+      - ./kratos.e2e.yml:/etc/config/kratos.e2e.yml:ro,z
+    command: ["serve", "--config", "/etc/config/kratos/kratos.yml", "--config", "/etc/config/kratos.e2e.yml", "--dev", "--watch-courier"]
+
+  hydra-migrate:
+    container_name: lab-hydra-migrate
+
+  hydra:
+    container_name: lab-hydra
+    command: ["serve", "all", "--config", "/etc/config/hydra/hydra.yml", "--dev"]
+
+  othala:
+    image: ${AUTH_REGISTRY}:${AUTH_VERSION}
+    container_name: lab-othala
+    depends_on:
+      mailpit:
+        condition: service_healthy
+
+  # Plain HTTP on :8088: the test hostnames have no DNS, so the example's ACME ports are replaced.
+  caddy:
+    container_name: lab-caddy
+    ports: !override ["8088:80"]
+    networks:
+      edge:
+        # MUST be subdomains of the Kratos cookie domain (othala.test) or the CSRF cookie is never sent.
+        aliases: [auth.othala.test, proxywatch.othala.test]
+
+  # SMTP :1025 for Kratos and the portal, HTTP API :8025 for smoke.sh Section H and the specs.
+  mailpit:
+    image: docker.io/axllent/mailpit:v1.31.4@sha256:b68349e3a014b90c5610bfb26b2ae36f3892d7b8cf25ee140c6c71c98d2fcf48
+    container_name: lab-mailpit
+    restart: unless-stopped
+    security_opt: ["no-new-privileges:true"]
+    cap_drop: [ALL]
+    pids_limit: 256
+    environment:
+      MP_SMTP_AUTH_ACCEPT_ANY: "1"
+      MP_SMTP_AUTH_ALLOW_INSECURE: "1"
+    networks:
+      internal: {}
+    healthcheck:
+      test: ["CMD", "/mailpit", "readyz"]
+      interval: 5s
+      timeout: 3s
+      retries: 12
+      start_period: 3s
+
+  # smoke.sh Section G pipes oidc-dance.mjs in; the prebaked image carries its deps (the VM has no npm egress).
+  dance-runner:
+    image: ${AUTH_REGISTRY}/e2e-tester:${AUTH_VERSION}
+    profiles: ["oneshot"]
+    networks:
+      internal: {}
+    depends_on:
+      othala:
+        condition: service_healthy
+    environment:
+      OTHALA_URL: http://othala:8080
+    working_dir: /test
+    entrypoint: ["node"]
+
+  # smoke.sh A10 probes from here: a container on `edge` alone, like the edge.
+  edge-probe:
+    image: ${AUTH_REGISTRY}/e2e-tester:${AUTH_VERSION}
+    profiles: ["oneshot"]
+    networks:
+      edge: {}
+    entrypoint: ["node"]
+
+  # The specs reach the edge on `edge` and the admin listeners on `internal`, like the portal.
+  playwright:
+    image: ${AUTH_REGISTRY}/e2e-tester:${AUTH_VERSION}
+    container_name: lab-playwright
+    profiles: ["browser"]
+    env_file: [othala.env, secrets.env]
+    networks:
+      edge: {}
+      internal: {}
+    extra_hosts: ["kratos:10.200.11.10", "hydra:10.200.11.11", "othala:10.200.11.12"]
+    depends_on:
+      caddy:
+        condition: service_started
+      othala:
+        condition: service_healthy
+    environment:
+      BASE: http://auth.othala.test
+      OTHALA_ADMIN_URL: http://othala:4431
+      PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD: "1"
+    volumes:
+      - ./browser-out:/out:z
+    working_dir: /test
+    command: ["npx", "playwright", "test", "--config=playwright.config.ts"]

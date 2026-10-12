@@ -1,10 +1,8 @@
 # Othala end-to-end harness
 
-`docker compose` stack (Postgres, Kratos, Hydra, the othala app, Mailpit) plus a
-smoke matrix and Playwright specs. It is the release gate and a worked adopter
-example: the same `compose.yml` and `validate.sh` run in CI and on a workstation.
-Topology, ports and the check sequence are in the headers of `compose.yml`,
-`validate.sh` and `smoke.sh`. There is no TLS in the smoke path.
+A deployment of [`deploy/example/`](../deploy/example/) and the release gate. `validate.sh` copies in
+its `compose.yml`, mints `secrets.env` with the image's `gen-secrets` and layers `compose.e2e.yml`, a
+test-only overlay outside the deployment contract, then runs `smoke.sh` and the Playwright specs.
 
 ## Run the smoke matrix
 

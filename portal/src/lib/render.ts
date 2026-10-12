@@ -2,7 +2,7 @@
 // Errors name variables, never values. Env is a parameter here; only the CLI reads process.env.
 
 import { randomBytes } from 'node:crypto';
-import { chmodSync, existsSync, mkdirSync, readdirSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs';
+import { chmodSync, existsSync, mkdirSync, readdirSync, readFileSync, renameSync, rmSync, statSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { parse } from 'yaml';
 import { clientSecretNames, contentErrors, COURIER_OVERRIDE_DIR, courierContentErrors } from './content';
@@ -13,6 +13,8 @@ export type RenderedFile = { path: string; content: string };
 
 /** Policy files rendered with `${NAME}` substitution, by path under the policy dir. */
 const TEMPLATES = ['kratos/kratos.yml', 'hydra/hydra.yml', 'caddy/othala.caddy'];
+/** The trees a render writes, one per consumer. */
+const TREES = [...new Set(TEMPLATES.map((p) => p.split('/')[0]))];
 /** Policy files copied as they are. */
 const LITERALS = ['kratos/identity.schema.json', 'kratos/hooks/recovery-gate.jsonnet'];
 const COURIER_DIR = 'kratos/courier';
@@ -244,24 +246,55 @@ export function render(policyDir: string, contentDir: string, env: Env): Rendere
   return files;
 }
 
+/** Empties each rendered tree under `outDir` in place, so a tree can be a mount point. A refused render calls it
+ *  too, so Kratos, Hydra and Caddy refuse to boot rather than run an earlier render. */
+export function clearRendered(outDir: string): void {
+  for (const top of TREES) {
+    const dir = join(outDir, top);
+    if (!existsSync(dir)) continue;
+    for (const entry of readdirSync(dir)) rmSync(join(dir, entry), { recursive: true, force: true });
+    chmodSync(dir, 0o700);
+  }
+}
+
 /** Writes the rendered set under `outDir`, owner-only except the secret-free PUBLIC_TREES, replacing any earlier
- *  render of the same trees. */
+ *  render of the same trees. Each file lands by rename and stale entries go last, so a reader of a running stack
+ *  never finds a file missing. */
 export function writeRendered(outDir: string, files: RenderedFile[]): void {
   const previous = process.umask(0o077);
   try {
-    const tops = new Set(files.map(({ path }) => path.split('/')[0]));
-    for (const top of tops) rmSync(join(outDir, top), { recursive: true, force: true });
     for (const { path, content } of files) {
       const target = join(outDir, path);
       const open = PUBLIC_TREES.has(path.split('/')[0]);
       mkdirSync(dirname(target), { recursive: true, mode: 0o700 });
-      writeFileSync(target, content, { mode: 0o600 });
-      chmodSync(target, open ? 0o644 : 0o600);
+      const staged = `${target}.render-${process.pid}`;
+      writeFileSync(staged, content, { mode: 0o600 });
+      chmodSync(staged, open ? 0o644 : 0o600);
+      renameSync(staged, target);
     }
-    for (const top of tops) if (PUBLIC_TREES.has(top)) chmodSync(join(outDir, top), 0o755);
+    const kept = new Set(files.map(({ path }) => path));
+    for (const top of TREES) removeStale(join(outDir, top), top, kept);
+    for (const top of TREES) chmodSync(join(outDir, top), PUBLIC_TREES.has(top) ? 0o755 : 0o700);
   } finally {
     process.umask(previous);
   }
+}
+
+function removeStale(dir: string, rel: string, kept: Set<string>): boolean {
+  let empty = true;
+  for (const entry of readdirSync(dir, { withFileTypes: true })) {
+    const path = join(dir, entry.name);
+    const relPath = `${rel}/${entry.name}`;
+    if (entry.isDirectory() && !entry.isSymbolicLink()) {
+      if (removeStale(path, relPath, kept)) rmSync(path, { recursive: true, force: true });
+      else empty = false;
+    } else if (kept.has(relPath)) {
+      empty = false;
+    } else {
+      rmSync(path, { force: true });
+    }
+  }
+  return empty;
 }
 
 /** Fresh values for every secret othala can mint, a client secret per confidential manifest under `contentDir`

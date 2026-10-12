@@ -1,11 +1,11 @@
 // Invariant: the render keeps the substitution rules byte for byte, refuses a missing secret or a leftover ${,
-// writes owner-only files and nothing on refusal, refuses retired or unknown names, and gen-secrets mints every
-// secret it can. Assertions name variables only, so no secret value reaches the test log.
+// writes owner-only files, empties earlier output on refusal, refuses retired or unknown names, and gen-secrets
+// mints every secret it can. Assertions name variables only, so no secret value reaches the test log.
 
 import { afterAll, test } from 'vitest';
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
-import { cpSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs';
+import { cpSync, existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -194,19 +194,49 @@ test('a render replaces the earlier trees and leaves no stale files', () => {
   });
 });
 
+test('a re-render clears nested stale entries and leaves nothing staged', () => {
+  withDir((dir) => {
+    writeRendered(dir, render(root, CONTENT, ENV));
+    mkdirSync(join(dir, 'kratos/old/deeper'), { recursive: true });
+    writeFileSync(join(dir, 'kratos/old/deeper/stale.txt'), 'old');
+    writeRendered(dir, render(root, CONTENT, ENV));
+    assert.equal(existsSync(join(dir, 'kratos/old')), false);
+    for (const path of OUTPUTS) assert.equal(existsSync(join(dir, path)), true, path);
+    const staged = readdirSync(dir, { recursive: true }).filter((f) => String(f).includes('.render-'));
+    assert.deepEqual(staged, []);
+  });
+});
+
+test('a render empties each tree in place, so a tree can be a mount point', () => {
+  withDir((dir) => {
+    for (const top of ['kratos', 'hydra', 'caddy']) mkdirSync(join(dir, top), { mode: 0o755 });
+    writeFileSync(join(dir, 'kratos/stale.txt'), 'old');
+    const before = statSync(join(dir, 'kratos')).ino;
+    writeRendered(dir, render(root, CONTENT, ENV));
+    assert.equal(statSync(join(dir, 'kratos')).ino, before);
+    assert.equal(existsSync(join(dir, 'kratos/stale.txt')), false);
+    assert.equal(statSync(join(dir, 'kratos')).mode & 0o077, 0);
+    assert.equal(statSync(join(dir, 'caddy')).mode & 0o777, 0o755);
+  });
+});
+
 const cli = (args, env) =>
   spawnSync(join(portal, 'node_modules/.bin/tsx'), [join(portal, 'src/server/config-cli.ts'), ...args], {
     env: { PATH: process.env.PATH, HOME: process.env.HOME, TMPDIR: process.env.TMPDIR, ...env },
     encoding: 'utf8',
   });
 
-test('the CLI writes nothing when the render is refused', () => {
+test('a refused render through the CLI writes nothing and empties an earlier render', () => {
   withDir((dir) => {
     const out = join(dir, 'out');
-    const r = cli(['render', '--policy', root, '--content', CONTENT, '--out', out], { ...ENV, CSRF_SECRET: '' });
+    const refused = { ...ENV, CSRF_SECRET: '' };
+    const r = cli(['render', '--policy', root, '--content', CONTENT, '--out', out], refused);
     assert.equal(r.status, 1);
     assert.match(r.stderr, /missing secret\(s\): CSRF_SECRET/);
     assert.equal(existsSync(out), false);
+    writeRendered(out, render(root, CONTENT, ENV));
+    assert.equal(cli(['render', '--policy', root, '--content', CONTENT, '--out', out], refused).status, 1);
+    for (const top of ['kratos', 'hydra', 'caddy']) assert.deepEqual(readdirSync(join(out, top)), [], top);
   });
 });
 

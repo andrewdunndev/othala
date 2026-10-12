@@ -1,4 +1,7 @@
 browser-out/
-*.rendered*
 .env
 node_modules/
+# Copied from deploy/example by validate.sh, and the generated secrets.
+/compose.yml
+/postgres-init.sh
+secrets.env

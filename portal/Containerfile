@@ -24,6 +24,11 @@ COPY portal/ portal/
 RUN cd portal \
     && npm run build \
     && npm prune --omit=dev
+# The render's output trees, owned by the Ory uid it runs as: a fresh named volume mounted on one takes this
+# owner and mode, so the one-shot can write it.
+RUN mkdir -p /out/othala/kratos /out/othala/hydra /out/othala/caddy \
+    && chmod 0700 /out/othala/kratos /out/othala/hydra \
+    && chmod 0755 /out/othala/caddy
 
 # ----- Stage 2: runtime -----
 # Literal pin, not an ARG: the container-publishing standard reads the
@@ -49,6 +54,7 @@ COPY kratos/hooks/ /usr/share/othala/kratos/hooks/
 COPY kratos/courier/ /usr/share/othala/kratos/courier/
 COPY hydra/hydra.yml /usr/share/othala/hydra/
 COPY caddy/othala.caddy /usr/share/othala/caddy/
+COPY --from=build --chown=10000:10000 /out/othala /run/othala
 
 USER 1001
 

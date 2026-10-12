@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Lab postgres-init. Mirrors production but with the lab role names.
+# Creates the kratos and hydra roles and databases the rendered DSNs name, on first start only.
 
 set -euo pipefail
 
