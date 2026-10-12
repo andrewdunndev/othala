@@ -5,7 +5,7 @@
 import { test } from 'vitest';
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
-import { cpSync, existsSync, mkdtempSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs';
+import { cpSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -58,7 +58,7 @@ function policyCopy(dir) {
 }
 
 // Expected bytes are the output of the shell renderer this module replaced, for the same inputs.
-const RULE_ENV = { A: 'a\\"b', B: 'v', ON: 'on', GATE_ON: '1', GATE_OFF: '', N: 'Tom & <J> "q" \'a\'' };
+const RULE_ENV = { A: 'a\\"b', B: 'v', ON: 'on', GATE_ON: '1', GATE_OFF: '', E: '', N: 'Tom & <J> "q" \'a\'' };
 const RULE_CASES = [
   {
     path: 'fixture.yml',
@@ -70,6 +70,7 @@ const RULE_CASES = [
       '# header ${COMMENT_ONLY} is not required\na: "a\\\\\\"b"\nb: "x v y" # trailing ${COMMENT_INLINE}\n' +
       'c: "file:///s.json#frag-v"\n  # indented a\\\\\\"b is substituted where needed\non: "on"\nd: a\\\\\\"b\n',
   },
+  { path: 'empty.yml', src: 'x: "${E}"\n', out: 'x: ""\n' },
   { path: 'crlf.yml', src: 'crlf: "${B}"\r\nend: 1', out: 'crlf: "v"\nend: 1' },
   {
     path: 'x.body.html.gotmpl',
@@ -157,6 +158,16 @@ test('rendered files and directories are owner-only', () => {
     for (const path of ['kratos', 'kratos/courier', 'kratos/hooks', 'hydra']) {
       assert.equal(statSync(join(dir, path)).mode & 0o077, 0, path);
     }
+  });
+});
+
+test('a render replaces the earlier trees and leaves no stale files', () => {
+  withDir((dir) => {
+    mkdirSync(join(dir, 'kratos'), { recursive: true });
+    writeFileSync(join(dir, 'kratos/stale.txt'), 'old');
+    writeRendered(dir, render(root, ENV));
+    assert.equal(existsSync(join(dir, 'kratos/stale.txt')), false);
+    for (const path of OUTPUTS) assert.equal(existsSync(join(dir, path)), true, path);
   });
 });
 
