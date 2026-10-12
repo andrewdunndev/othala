@@ -42,12 +42,13 @@ host breaks the trust boundary
 
 Kratos and Hydra read their config from the othala image: run
 `node dist/server/config.mjs render` as a one-shot from the same image digest as
-the portal, with the portal's env and every secret, and mount its
-`/run/othala/kratos` and `/run/othala/hydra` at `/etc/config/kratos` and
-`/etc/config/hydra`. That supplies the `${VAR}` values, the identity schema, the
-recovery-gate hook and the courier templates; code emails fail at send without
-the courier directory. The recovery gate (`docs/runbooks/admin-recovery.md` § 3)
-assumes these bytes.
+the portal, with the portal's env, every secret and the content tree at
+`/etc/othala`, and mount its `/run/othala/kratos` and `/run/othala/hydra` at
+`/etc/config/kratos` and `/etc/config/hydra`. That supplies the `${VAR}` values,
+the identity schema, the recovery-gate hook and the courier templates; code
+emails fail at send without the courier directory. The recovery gate
+(`docs/runbooks/admin-recovery.md` § 3) assumes these bytes. `check --content <dir>`
+runs the same validation offline, with no secrets.
 
 A deploy plane that still vendors `kratos/kratos.yml`, `hydra/hydra.yml`, the
 schema, the hook or `kratos/courier/` must copy them **verbatim**, byte-diff them
