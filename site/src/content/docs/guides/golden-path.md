@@ -50,10 +50,9 @@ one-way per client.
 
 ## 5. The pod network is the trust domain; no in-pod mTLS
 
-Plain HTTP between the portal, Kratos and Hydra, admin APIs included. No peer
-address is hard-coded: every host in `kratos/kratos.yml` and `hydra/hydra.yml`
-is a `${VAR}` token, so the same file renders for a single-network test harness
-and for a segmented deployment. Re-examine this first as a deployment grows;
+Plain HTTP between the portal, Kratos and Hydra, admin APIs included. Peer
+names and ports are fixed (`DEPLOY.md` § Topology); only the admin bind
+addresses are values, so the same files render for any network layout. Re-examine this first as a deployment grows;
 [Hardening](hardening.md) states its residual risk. **Cost of opening it:** operator time, permanently.
 
 ## 6. One admin-marker gate extends Kratos flows

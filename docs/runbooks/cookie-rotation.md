@@ -44,4 +44,4 @@ unreadable; rotate it only on suspected exposure.
 ## Related
 
 - `kratos/kratos.yml`, `hydra/hydra.yml`: the env-var indirection.
-- `e2e/gen-secrets.sh`: mints a fresh `_CURRENT` per secret.
+- `node dist/server/config.mjs gen-secrets`: mints a fresh `_CURRENT` per secret.

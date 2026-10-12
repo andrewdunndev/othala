@@ -118,4 +118,4 @@ Hydra's log explains generic OAuth failures. Two are specific to this model:
   shape, not the gate. Check what the application reads, and how often.
 
 `ARCHITECTURE.md` holds the issuer URL, cookie domain and subject types as
-load-bearing, non-changeable decisions; `DEPLOY.md` holds the promotion path.
+load-bearing, non-changeable decisions; `DEPLOY.md` holds the upgrade steps.

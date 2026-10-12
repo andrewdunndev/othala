@@ -19,6 +19,7 @@ The image carries the Ory and edge policy and renders it from the deployment's e
 - A deployment overrides a courier template with `courier/<name>.gotmpl` under the content root; the render merges it over the shipped default of the same name. An override may name only `${OTHALA_APEX}`, `${OTHALA_INSTANCE_NAME}` and `${OTHALA_PUBLIC_URL}`.
 - `gen-secrets --content <dir>` also mints a `<CLIENT_ID>_CLIENT_SECRET` for each confidential OIDC manifest.
 - `render` also writes `/run/othala/caddy/othala.caddy` with the public URL written in. It holds three snippets, each one `route` block: `othala-routes` (every route on the public host, with the `othala_device` and `othala_selfservice` rate-limit zones), `othala-forward-auth <host> <port> <group>` and `othala-oidc-app <host> <port>`.
+- `deploy/example/`: a compose deployment (the render one-shot, both migrate jobs, Kratos, Hydra, the portal, Caddy and Postgres, with the admin listeners on an internal network), `othala.env.example`, a site Caddyfile and sample content. e2e runs it, with a test-only overlay outside the contract.
 - `othala-forward-auth` answers a 403 or 503 in place with a short HTML page; only a 401 redirects to login, with the requested path and query escaped into `return_to`. Every snippet strips client-supplied identity headers first, by family (`Remote-*`, `X-Remote-*`, `X-Auth-Request-*` and others), and `othala-routes` hands every upstream `{client_ip}` as `X-Forwarded-For`.
 
 ### Changed
@@ -28,51 +29,25 @@ The image carries the Ory and edge policy and renders it from the deployment's e
 - Content moves to `/etc/othala`: manifests and their `.md` and `.svg` sidecars, `requirements/` and `NOTICE` in `apps/`, and `groups.yaml` at the root. `/etc/portal/manifests` is no longer read.
 - A retired env name, or an `OTHALA_*` name othala does not read, stops the portal at boot and fails `check` and `render`, naming the fix. The table is `RETIRED_NAMES` in `portal/src/lib/env-names.ts`.
 - `npm run lint:manifests` and `manifest-lint.mjs` take the content root and fail on a BLOCK finding.
+- The render empties each output directory in place, and the image carries `/run/othala/{kratos,hydra,caddy}` owned by uid 10000, so each can be a fresh named volume.
 
 ### Removed
 
 - `scripts/render-config.sh`. The TS render produces the same bytes for the same inputs.
 - `caddy/Caddyfile` and `caddy/snippets/`, replaced by `caddy/othala.caddy`. The snippets no longer carry `tls { dns cloudflare }`.
+- `e2e/gen-secrets.sh`: use `gen-secrets`.
 
 ### Deployment changes
 
-- Run `node dist/server/config.mjs render` from the othala image, the same digest as the portal, as a one-shot that Kratos, Hydra and both migrate units wait for. Give it the portal's env plus every secret. It writes `/run/othala/kratos` and `/run/othala/hydra` (`--out` moves them); mount those at `/etc/config/kratos` and `/etc/config/hydra` in place of your rendered and copied Ory files.
-- The render now also requires `POSTGRES_PASSWORD` and `CSRF_SECRET`, and refuses a blank secret.
-- Rendered files are mode 0600, owned by the render's uid: run the one-shot with `--user 10000`, the uid of the Kratos and Hydra images, so those processes can read them.
-- If you still vendor the Ory files, re-vendor `kratos/kratos.yml` and `hydra/hydra.yml` (comments only).
-- Move your manifests into `apps/` (`git mv <manifests>/* <content>/apps/`), then move `groups.yaml` back up to the content root. Mount the content root read-only at `/etc/othala` on the portal and on the render one-shot, in place of the `/etc/portal/manifests` mount. Run `node dist/server/config.mjs check --content <dir>` with the non-secret env in CI.
-- The render one-shot checks only env names and `courier/`, so a bad app sidelines that app and never stops sign-in; `check` in CI is the gate for `apps/`. `gen-secrets` mints each `<CLIENT_ID>_CLIENT_SECRET` the portal needs.
-- Keep a reworded mail as `courier/<name>.gotmpl` under the content root, named after the shipped template it replaces (e.g. `courier/login_code.subject.gotmpl`), never as an edit to a vendored copy.
-- Delete every name `check` reports as retired. `MANIFEST_DIR` is one: under `astro dev` use `CONTENT_DIR`.
-- Mount `/run/othala/caddy` read-only at `/etc/caddy/othala` on Caddy, ordered after the render one-shot. The file is mode 0644, so any uid can read it. Cut your Caddyfile to what is yours, plus the imports:
+In this order, for an existing deployment; [`deploy/example/`](deploy/example/) is the end state.
 
-  ```caddyfile
-  {
-  	servers {
-  		trusted_proxies static <your load balancer>
-  		trusted_proxies_strict
-  	}
-  }
-
-  import /etc/caddy/othala/othala.caddy
-
-  sso.example.org {
-  	tls {
-  		dns <provider> ...
-  	}
-  	import othala-routes
-  }
-
-  media.example.org {
-  	import othala-forward-auth media 8096 media-access
-  }
-  ```
-
-  The site blocks keep the address, TLS and the DNS provider, and the global options block, which stays first, keeps `trusted_proxies`, `proxy_protocol` and the listeners. Delete your copied routes and snippets and any `tls` inside them, and your global `order rate_limit` line unless your own blocks use `rate_limit` outside a `route`.
-- Your Caddy build needs `caddy-ratelimit` and a DNS module for your provider. Without the rate-limit module Caddy refuses to start.
-- Both rate-limit zones key on `{client_ip}`. Behind a load balancer, keep `trusted_proxies_strict` (or a `client_ip_headers` header the balancer overwrites); without it a client sets its own address and dodges the limits.
-- The rate-limit zones are `othala_device` and `othala_selfservice`. If you used other zone names, the counters start again from zero, which is harmless.
-- An `OTHALA_PUBLIC_URL` with a trailing slash, a path or uppercase letters now fails `check` and `render`: write the bare origin.
+1. Move your manifests into `apps/` under a content root (`git mv <manifests>/* <content>/apps/`), with `groups.yaml` at the root. Keep a reworded mail there as `courier/<name>.gotmpl`, named after the shipped template it replaces (e.g. `courier/login_code.subject.gotmpl`).
+2. Run `node dist/server/config.mjs check --content <dir>` with the non-secret env. Delete every name it reports as retired (`MANIFEST_DIR` is one: under `astro dev` use `CONTENT_DIR`), and write `OTHALA_PUBLIC_URL` as a bare lowercase origin. Keep this check in CI after every edit to `apps/`: the render checks only env names and `courier/`, so a bad app sidelines that app and never stops sign-in.
+3. Add the render one-shot: `node dist/server/config.mjs render` from the othala image at the portal's digest, as uid 10000 (the Kratos and Hydra uid; its files are 0600), with the portal's env, every secret and the content root. It now also requires `POSTGRES_PASSWORD` and `CSRF_SECRET` and refuses a blank secret; `gen-secrets` mints each `<CLIENT_ID>_CLIENT_SECRET`.
+4. Mount its `/run/othala/kratos`, `/run/othala/hydra` and `/run/othala/caddy` read-only at `/etc/config/kratos`, `/etc/config/hydra` and `/etc/caddy/othala`, and order Kratos, Hydra, both migrate units and Caddy after it. Mount the content root read-only at `/etc/othala` on the portal and the render, in place of `/etc/portal/manifests`.
+5. Cut your Caddyfile to the imports and what is yours, as in `deploy/example/Caddyfile`: site addresses, TLS and the DNS provider in the site blocks; `trusted_proxies`, `proxy_protocol` and listeners in the global options. Delete your copied routes, snippets and their `tls`, and your global `order rate_limit` unless your own blocks use `rate_limit` outside a `route`. Your Caddy build needs `caddy-ratelimit` and a DNS module.
+6. Behind a load balancer, keep `trusted_proxies_strict` (or a `client_ip_headers` header the balancer overwrites): both rate-limit zones, `othala_device` and `othala_selfservice`, key on `{client_ip}`. Zones you named differently start from zero, which is harmless.
+7. Delete your vendored Ory files, courier templates, renderer and Caddy snippets, and any drift check over them.
 
 ## [0.14.0] - 2026-10-11
 

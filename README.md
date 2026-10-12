@@ -34,10 +34,9 @@ configured through `OTHALA_*` environment variables, so one image serves any ins
 
 ### The whole stack
 
-The compose harness in `e2e/` stands up Postgres, Kratos, Hydra, the app, and a mail catcher, renders
-the Ory configs, registers the example OIDC clients, and runs a smoke matrix plus a Playwright suite
-against the result. It runs entirely on the reserved test domain `othala.test`, so it touches no real
-DNS.
+`e2e/` runs the shipped compose deployment, [`deploy/example/`](deploy/example/), with a mail catcher and
+test hostnames on the reserved domain `othala.test`, then a smoke matrix and a Playwright suite. It
+touches no real DNS.
 
 ```sh
 cd e2e
@@ -85,7 +84,8 @@ lint:manifests` (in `portal/`) checks a content directory.
 | `kratos/` | Kratos config template, identity schema, the recovery-gate hook |
 | `hydra/` | Hydra config template |
 | `caddy/` | `othala.caddy`: the edge routes and the app gates as Caddy snippets, written out by the render |
-| `e2e/` | Compose harness, smoke script, Playwright specs, example manifests |
+| `deploy/example/` | A whole compose deployment: compose file, env, site Caddyfile, sample content |
+| `e2e/` | The test overlay on that deployment, smoke script, Playwright specs, example manifests |
 | `site/` | Source for the published guides |
 | `docs/runbooks/` | Operator runbooks: recovery, cookie rotation, lost device, backup, secrets rotation |
 | `scripts/` | The repo gates |
@@ -95,7 +95,7 @@ lint:manifests` (in `portal/`) checks a content directory.
 - [`ARCHITECTURE.md`](ARCHITECTURE.md): how the pieces fit and why. Topology, trust boundary,
   access model, the forward-auth request path, client registration.
 - [`.env.example`](.env.example): the runtime contract, every variable annotated.
-- [`DEPLOY.md`](DEPLOY.md): the deploy shape and the promotion path.
+- [`DEPLOY.md`](DEPLOY.md): what a deployment owns, its topology, and upgrades.
 - [`site/src/content/docs/guides/`](site/src/content/docs/guides/): the longer operator guides,
   illustrated at [othala.dunn.dev](https://othala.dunn.dev) (architecture, login flow, trust boundary).
 - [`SECURITY.md`](SECURITY.md): report vulnerabilities privately, never in a public issue.

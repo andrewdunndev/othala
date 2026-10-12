@@ -123,7 +123,7 @@ The `check-portal` and `check-purity` jobs run on every push, MR and tag;
 cd portal && npm test           # vitest: src/**/*.test.ts + scripts/*.test.mjs, incl. the fuzz suites
 cd portal && npm run check      # type + content check
 cd portal && npm run dev        # UI iteration without the full stack; dev-only CONTENT_DIR and OTHALA_DEV_MOCK_GROUPS (.env.example)
-cd e2e && ./gen-secrets.sh && bash validate.sh   # full compose stand-up
+cd e2e && bash validate.sh      # deploy/example under the e2e overlay
 bash scripts/check-purity.sh    # the purity gate
 ```
 

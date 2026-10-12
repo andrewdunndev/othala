@@ -87,13 +87,11 @@ environment**, and environment secrets are readable through `/proc` to anything
 in the user namespace. Closing that means a tmpfs-backed mount and a reader that
 takes a path — a known gap, not an oversight. No committed config holds
 plaintext, and rotation shape (including why Hydra's system secret cannot rotate
-at all) is a [Golden path](golden-path.md) commitment. This project ships no
-deployment artifact: `e2e/compose.yml` is the canonical example and doubles as
-the CI gate, so its container baseline is exercised on every tag rather than
-described here. One property is worth knowing before copying it — the capability
-drop is load-bearing, and without
-`CAP_DAC_OVERRIDE` a 0600 config owned by one uid is unreadable by the image's
-own user and every Ory service exits.
+at all) is a [Golden path](golden-path.md) commitment. `deploy/example/compose.yml`
+is the example deployment and e2e runs it, so its container baseline is exercised
+on every tag rather than described here. Its render runs as the Kratos and Hydra
+uid because the capability drop is load-bearing: without `CAP_DAC_OVERRIDE`, a
+0600 config owned by another uid is unreadable and every Ory service exits.
 
 Not built: **no memory bound in the example compose** (bound memory in the
 deploy plane, sized to the host; Kratos needs about 128 MB per concurrent
