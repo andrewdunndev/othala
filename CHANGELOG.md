@@ -24,7 +24,7 @@ The image carries the Ory policy and renders it: one command replaces the shell 
 
 - Run `node dist/server/config.mjs render` from the othala image, the same digest as the portal, as a one-shot that Kratos, Hydra and both migrate units wait for. Give it the portal's env plus every secret. It writes `/run/othala/kratos` and `/run/othala/hydra` (`--out` moves them); mount those at `/etc/config/kratos` and `/etc/config/hydra` in place of your rendered and copied Ory files.
 - The render now also requires `POSTGRES_PASSWORD` and `CSRF_SECRET`, and refuses a blank secret.
-- Rendered files are mode 0600: let the Kratos and Hydra users read them.
+- Rendered files are mode 0600, owned by the render's uid: run the one-shot with `--user 10000`, the uid of the Kratos and Hydra images, so those processes can read them.
 - If you still vendor the Ory files, re-vendor `kratos/kratos.yml` and `hydra/hydra.yml` (comments only).
 
 ## [0.14.0] - 2026-10-11

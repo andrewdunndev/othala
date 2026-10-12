@@ -38,18 +38,21 @@ internal network; publishing it anywhere reachable from outside the pod or
 host breaks the trust boundary
 ([`ARCHITECTURE.md` § Trust boundary](ARCHITECTURE.md#trust-boundary)).
 
-## Vendored configs and the drift-check obligation
+## Rendered configs
 
-These files are byte-canonical here and must be vendored **verbatim**, not
-hand-edited, by any deploy plane: `kratos/kratos.yml`, `hydra/hydra.yml`,
-`kratos/identity.schema.json`, `kratos/hooks/recovery-gate.jsonnet`, and the
-mail templates in `kratos/courier/`. The recovery gate (`docs/runbooks/admin-recovery.md` § 3) assumes these bytes:
-byte-diff them against the pinned ref on every promotion, and port any diff
-upstream, never patch locally.
+Kratos and Hydra read their config from the othala image: run
+`node dist/server/config.mjs render` as a one-shot from the same image digest as
+the portal, with the portal's env and every secret, and mount its
+`/run/othala/kratos` and `/run/othala/hydra` at `/etc/config/kratos` and
+`/etc/config/hydra`. That supplies the `${VAR}` values, the identity schema, the
+recovery-gate hook and the courier templates; code emails fail at send without
+the courier directory. The recovery gate (`docs/runbooks/admin-recovery.md` § 3)
+assumes these bytes.
 
-`node dist/server/config.mjs render`, run from the othala image, supplies the
-`${VAR}` values; that is not divergence. Render each `kratos/courier/*.gotmpl` to the same file name and
-mount the directory at `/etc/config/kratos/courier/`, or code emails fail at send.
+A deploy plane that still vendors `kratos/kratos.yml`, `hydra/hydra.yml`, the
+schema, the hook or `kratos/courier/` must copy them **verbatim**, byte-diff them
+against the pinned ref on every promotion, and port any diff upstream, never patch
+locally.
 
 ## Environment contract
 
