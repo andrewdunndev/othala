@@ -251,6 +251,9 @@ export function writeRendered(outDir: string, files: RenderedFile[]): void {
 /** Fresh values for every secret othala can mint, a client secret per confidential manifest under `contentDir`
  *  included, as `NAME=value` lines. */
 export function generateSecrets(contentDir: string): string {
+  if (!existsSync(join(contentDir, 'apps'))) {
+    console.error(`no apps/ under ${contentDir}; no client secrets minted. Pass --content <dir> if the content is elsewhere.`);
+  }
   const clients = Object.fromEntries(clientSecretNames(contentDir).map((name) => [name, CLIENT_SECRET_BYTES]));
   return Object.entries({ ...GENERATED, ...clients })
     .map(([name, bytes]) => `${name}=${randomBytes(bytes).toString('hex')}\n`)
