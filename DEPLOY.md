@@ -50,9 +50,14 @@ emails fail at send without the courier directory. The recovery gate
 (`docs/runbooks/admin-recovery.md` § 3) assumes these bytes. `check --content <dir>`
 runs the same validation offline, with no secrets.
 
-The render also writes `/run/othala/caddy/othala.caddy`; mount it at
+The render also writes `/run/othala/caddy/othala.caddy`; mount that directory at
 `/etc/caddy/othala` and import it from a site Caddyfile that owns the address,
 TLS, `trusted_proxies` and listeners. Caddy needs the `caddy-ratelimit` module.
+The render creates a missing `/run/othala` under its own umask, so a Caddy that
+reads the file in place on the host needs the deployment to own that mode. Both
+rate-limit zones key on `{client_ip}`: behind a load balancer, set
+`trusted_proxies_strict` beside `trusted_proxies`, or name a header the balancer
+overwrites in `client_ip_headers`, or a client picks its own address.
 
 A deploy plane that still vendors `kratos/kratos.yml`, `hydra/hydra.yml`, the
 schema, the hook or `kratos/courier/` must copy them **verbatim**, byte-diff them

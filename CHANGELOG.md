@@ -19,7 +19,7 @@ The image carries the Ory and edge policy and renders it from the deployment's e
 - A deployment overrides a courier template with `courier/<name>.gotmpl` under the content root; the render merges it over the shipped default of the same name. An override may name only `${OTHALA_APEX}`, `${OTHALA_INSTANCE_NAME}` and `${OTHALA_PUBLIC_URL}`.
 - `gen-secrets --content <dir>` also mints a `<CLIENT_ID>_CLIENT_SECRET` for each confidential OIDC manifest.
 - `render` also writes `/run/othala/caddy/othala.caddy` with the public URL written in. It holds three snippets, each one `route` block: `othala-routes` (every route on the public host, with the `othala_device` and `othala_selfservice` rate-limit zones), `othala-forward-auth <host> <port> <group>` and `othala-oidc-app <host> <port>`.
-- `othala-forward-auth` answers a 403 or 503 in place with a short HTML page; only a 401 redirects to login. Every snippet strips client-supplied identity headers first, and `othala-routes` hands every upstream the verified client address.
+- `othala-forward-auth` answers a 403 or 503 in place with a short HTML page; only a 401 redirects to login, with the requested path and query escaped into `return_to`. Every snippet strips client-supplied identity headers first, by family (`Remote-*`, `X-Remote-*`, `X-Auth-Request-*` and others), and `othala-routes` hands every upstream `{client_ip}` as `X-Forwarded-For`.
 
 ### Changed
 
@@ -47,6 +47,13 @@ The image carries the Ory and edge policy and renders it from the deployment's e
 - Mount `/run/othala/caddy` read-only at `/etc/caddy/othala` on Caddy, ordered after the render one-shot. The file is mode 0644, so any uid can read it. Cut your Caddyfile to what is yours, plus the imports:
 
   ```caddyfile
+  {
+  	servers {
+  		trusted_proxies static <your load balancer>
+  		trusted_proxies_strict
+  	}
+  }
+
   import /etc/caddy/othala/othala.caddy
 
   sso.example.org {
@@ -61,8 +68,9 @@ The image carries the Ory and edge policy and renders it from the deployment's e
   }
   ```
 
-  The site blocks keep the address, TLS and the DNS provider, and the global options block, which stays first, keeps `trusted_proxies`, `proxy_protocol` and the listeners. Delete your global `order rate_limit` line, your copied routes and snippets, and any `tls` inside them.
+  The site blocks keep the address, TLS and the DNS provider, and the global options block, which stays first, keeps `trusted_proxies`, `proxy_protocol` and the listeners. Delete your copied routes and snippets and any `tls` inside them, and your global `order rate_limit` line unless your own blocks use `rate_limit` outside a `route`.
 - Your Caddy build needs `caddy-ratelimit` and a DNS module for your provider. Without the rate-limit module Caddy refuses to start.
+- Both rate-limit zones key on `{client_ip}`. Behind a load balancer, keep `trusted_proxies_strict` (or a `client_ip_headers` header the balancer overwrites); without it a client sets its own address and dodges the limits.
 - The rate-limit zones are `othala_device` and `othala_selfservice`. If you used other zone names, the counters start again from zero, which is harmless.
 - An `OTHALA_PUBLIC_URL` with a trailing slash, a path or uppercase letters now fails `check` and `render`: write the bare origin.
 

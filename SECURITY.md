@@ -105,11 +105,11 @@ Each names its enforcer and the test that fails if it stops working.
   `e2e/playwright/tests/m-security-headers.spec.ts`, `e2e/playwright/tests/r-admin-post-origin.spec.ts`,
   `portal/scripts/oauth2-handlers.test.mjs`.
 - **Abuse resistance ships with the install.** `othala-routes` in `caddy/othala.caddy` rate-limits the
-  Kratos self-service paths keyed on the socket peer and overwrites
+  Kratos self-service paths keyed on `{client_ip}` and overwrites
   `X-Forwarded-For` at every `reverse_proxy`, so a client cannot mint a fresh
   bucket per request; `kratos/kratos.yml` bounds password-hash work
-  (`hashers.argon2`) and code guessing (`max_submissions`, `lifespan`). No test
-  trips the rate limits.
+  (`hashers.argon2`) and code guessing (`max_submissions`, `lifespan`). Test:
+  `e2e/playwright/tests/zq-edge-rate-limit.spec.ts`.
 - **Credential and session hygiene.** Self-registration is disabled in
   `kratos/kratos.yml`, so enrolment is admin-initiated; breach checking and a
   minimum length gate passwords; a password change fires
@@ -134,6 +134,13 @@ Each names its enforcer and the test that fails if it stops working.
 - **Rate limiting depends on a third-party Caddy module.** A binary built without
   it refuses to load `caddy/othala.caddy`, so the failure is a refusal to start,
   not a silently unlimited edge. Confirm it is compiled in.
+- **The identity-header strip matches names, not spellings.** Caddy cannot
+  match `X_Remote_User`, which WSGI and CGI upstreams fold into the same
+  variable as `X-Remote-User`. An app behind `othala-forward-auth` that trusts
+  a proxy identity header must read the hyphenated name only.
+- **`{client_ip}` is only as good as `trusted_proxies`.** Behind a trusted load
+  balancer without `trusted_proxies_strict`, Caddy takes the leftmost
+  `X-Forwarded-For` entry, which the client chose. See `DEPLOY.md`.
 - **Sessions are long-lived and `whoami` answers at the first assurance level**
   (`kratos/kratos.yml`, `session`). A stolen cookie stays valuable for the
   session lifespan; revocation ends it sooner.
