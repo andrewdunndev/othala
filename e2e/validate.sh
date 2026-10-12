@@ -46,6 +46,7 @@ rm -rf config.rendered && mkdir config.rendered
 USERNS_ARGS=()
 [[ -S /run/podman/podman.sock ]] || USERNS_ARGS=(--userns=keep-id)
 podman run --rm --user "$(id -u):$(id -g)" "${USERNS_ARGS[@]}" "${ENV_ARGS[@]}" -v "$SCRIPT_DIR/config.rendered:/run/othala:z" \
+    -v "$SCRIPT_DIR/content:/etc/othala:ro,z" \
     "$AUTH_REGISTRY:$AUTH_VERSION" node dist/server/config.mjs render \
     || { echo "  ✗ render failed — aborting" >&2; exit 1; }
 # The render writes owner-only, but kratos/hydra run as uid 10000 under cap_drop ALL and could not read the

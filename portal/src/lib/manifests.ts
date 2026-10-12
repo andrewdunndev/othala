@@ -377,6 +377,19 @@ function originOf(raw: string): string | null {
 /** The one client_id form: manifests, metadata_admin.roles keys and the registrar's `<CLIENT_ID>_CLIENT_SECRET` all key on it. */
 export const CLIENT_ID_RE = /^[a-z][a-z0-9]*$/;
 
+/** Throws rather than sanitizing, so a malformed id never names a variable that cannot resolve. */
+export function secretEnvVar(clientId: string): string {
+  if (!CLIENT_ID_RE.test(clientId)) {
+    throw new Error(`client_id ${JSON.stringify(clientId)} must match ${CLIENT_ID_RE}.`);
+  }
+  return `${clientId.toUpperCase()}_CLIENT_SECRET`;
+}
+
+/** True when Hydra holds a secret for the client: an `oidc:` block whose `token_endpoint_auth_method` is not `none`. */
+export function needsClientSecret(m: ClientManifest): boolean {
+  return !m.presentationOnly && m.tokenEndpointAuthMethod !== 'none';
+}
+
 /** Lint pass shared by the reload guard and `--validate-manifests`; one string per finding, empty when clean. */
 export function validateClients(set: ClientManifest[]): string[] {
   const errs: string[] = [];

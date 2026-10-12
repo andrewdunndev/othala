@@ -16,7 +16,7 @@ const ICON_MAX_BYTES = 32 * 1024;
 const SVG_ROOT_RE = /^\uFEFF?\s*(?:<\?xml[^>]*\?>\s*)?(?:<!--[\s\S]*?-->\s*)*(?:<!DOCTYPE[^>]*>\s*)?<svg[\s>]/i;
 
 /** The `<stem>.svg` sidecar: its markup when it is a plausible logo, a reason when it is rejected, empty when absent. */
-function loadIcon(dir: string, stem: string): { svg?: string; reason?: string } {
+export function loadIcon(dir: string, stem: string): { svg?: string; reason?: string } {
   const path = join(dir, `${stem}.svg`);
   try {
     if (!existsSync(path)) return {};

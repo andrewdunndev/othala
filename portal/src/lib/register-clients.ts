@@ -1,9 +1,5 @@
 import type { OAuth2Client } from '@ory/client-fetch';
-import {
-  oidcClientManifests,
-  CLIENT_ID_RE,
-  type ClientManifest,
-} from './manifests';
+import { needsClientSecret, oidcClientManifests, secretEnvVar, type ClientManifest } from './manifests';
 import { hydraAdmin, isNotFound } from './ory-fetch';
 import { clientSecretEnv } from './config';
 
@@ -21,14 +17,6 @@ export interface RegisterOptions {
 export interface RegisterResult {
   clientId: string;
   action: 'created' | 'updated';
-}
-
-/** Throws rather than sanitizing, so a malformed id never names a variable that cannot resolve. */
-export function secretEnvVar(clientId: string): string {
-  if (!CLIENT_ID_RE.test(clientId)) {
-    throw new Error(`client_id ${JSON.stringify(clientId)} must match ${CLIENT_ID_RE}.`);
-  }
-  return `${clientId.toUpperCase()}_CLIENT_SECRET`;
 }
 
 export function buildClientBody(
@@ -63,7 +51,7 @@ function resolveSecret(
   m: ClientManifest,
   env: Record<string, string | undefined>,
 ): string | undefined {
-  if (m.tokenEndpointAuthMethod === 'none') return undefined;
+  if (!needsClientSecret(m)) return undefined;
   const name = secretEnvVar(m.clientId);
   const secret = env[name];
   if (!secret) throw new Error(`${name} not set in environment for client ${m.clientId}`);
