@@ -26,6 +26,11 @@ test('D1 — INV-1: admin at AAL1 is redirected to AAL2 step-up (marker alone in
 
   const expectedOrigin = new URL(String(baseURL)).origin;
   expect(
+    new URL(loc, baseURL).searchParams.get('return_to'),
+    'D1: step-up return_to is the requested path, encoded once',
+  ).toBe('/admin');
+
+  expect(
     /^https?:\/\//.test(loc) ? new URL(loc).origin : expectedOrigin,
     `D1 (portability): step-up must stay on the configured origin; got ${loc}`,
   ).toBe(expectedOrigin);
