@@ -81,14 +81,14 @@ lint:manifests` (in `portal/`) checks a manifest directory.
 
 | Path | Contents |
 |---|---|
-| `portal/` | The application: Kratos self-service flows, Hydra login/consent/logout providers, access gate, claims builder, manifest loaders, client registrar, admin pages, dual listener |
+| `portal/` | The application: Kratos self-service flows, Hydra login/consent/logout providers, access gate, claims builder, manifest loaders, client registrar, admin pages, dual listener, the Ory-config render |
 | `kratos/` | Kratos config template, identity schema, the recovery-gate hook |
 | `hydra/` | Hydra config template |
 | `caddy/` | Reverse-proxy integration examples: a worked `Caddyfile` and reusable `caddy/snippets/` |
 | `e2e/` | Compose harness, smoke script, Playwright specs, example manifests |
 | `site/` | Source for the published guides |
 | `docs/runbooks/` | Operator runbooks: recovery, cookie rotation, lost device, backup, secrets rotation |
-| `scripts/` | The canonical Ory-config render and the repo gates |
+| `scripts/` | The repo gates |
 
 ## Where to look next
 
