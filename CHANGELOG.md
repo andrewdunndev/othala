@@ -7,7 +7,7 @@ aims to follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 The git tag is the authoritative version; `portal/package.json` mirrors it.
 This CHANGELOG and git tags carry the deployed-instance release state.
 
-## [Unreleased]
+## [0.15.0] - 2026-10-12
 
 The image carries the Ory and edge policy and renders it from the deployment's env and content tree at `/etc/othala`; one command replaces the shell renderer.
 
@@ -25,17 +25,21 @@ The image carries the Ory and edge policy and renders it from the deployment's e
 ### Changed
 
 - `check` and `render` refuse an `OTHALA_PUBLIC_URL` that is not a lowercase origin (`scheme://host[:port]`, with no path or trailing slash).
-
 - Content moves to `/etc/othala`: manifests and their `.md` and `.svg` sidecars, `requirements/` and `NOTICE` in `apps/`, and `groups.yaml` at the root. `/etc/portal/manifests` is no longer read.
 - A retired env name, or an `OTHALA_*` name othala does not read, stops the portal at boot and fails `check` and `render`, naming the fix. The table is `RETIRED_NAMES` in `portal/src/lib/env-names.ts`.
 - `npm run lint:manifests` and `manifest-lint.mjs` take the content root and fail on a BLOCK finding.
 - The render empties each output directory in place, also when it refuses, and the image carries `/run/othala/{kratos,hydra,caddy}` owned by uid 10000, so each can be a fresh named volume.
+- The `:latest` image tag and its signature move only on a release tag, no longer on every push to main.
 
 ### Removed
 
 - `scripts/render-config.sh`. The TS render produces the same bytes for the same inputs.
 - `caddy/Caddyfile` and `caddy/snippets/`, replaced by `caddy/othala.caddy`. The snippets no longer carry `tls { dns cloudflare }`.
 - `e2e/gen-secrets.sh`: use `gen-secrets`.
+
+### Fixed
+
+- Opening Admin from a session that needed a second factor asked for it, then landed on a not-found page. It now returns to the admin page.
 
 ### Deployment changes
 
