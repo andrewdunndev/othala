@@ -133,6 +133,23 @@ test.each(HYDRA_PINS)('hydra %s fails when mutated (consumer: %s)', (pointer, mu
   assert.ok(v.some((x) => x.startsWith(`hydra: ${pointer}`)), v.join('\n'));
 });
 
+const URL_SLOTS = [
+  ...['error', 'settings', 'recovery', 'verification', 'login'].map((f) => ['kratos', `/selfservice/flows/${f}/ui_url`, (k) => k.selfservice.flows[f], 'ui_url']),
+  ...['login', 'consent', 'logout', 'error'].map((p) => ['hydra', `/urls/${p}`, (h) => h.urls, p]),
+  ...['verification', 'success'].map((p) => ['hydra', `/urls/device/${p}`, (h) => h.urls.device, p]),
+];
+test.each(URL_SLOTS.flatMap((s) => [[...s, 'a path prefix', (u) => `https://h/x${u.pathname}`], [...s, 'a non-http scheme', (u) => `ftp://h${u.pathname}`]]))(
+  '%s %s fails with %#: a return url must be one http(s) origin plus the page path',
+  (name, pointer, at, key, _label, bad) => {
+    const mutate = (c) => {
+      const o = at(c);
+      o[key] = bad(new URL(o[key]));
+    };
+    const v = name === 'kratos' ? run(edit(kratos, mutate), hydra) : run(kratos, edit(hydra, mutate));
+    assert.ok(v.some((x) => x.startsWith(`${name}: ${pointer}`)), v.join('\n'));
+  },
+);
+
 test('a YAML merge key is resolved before the contract applies', () => {
   const doc = stringify(kratos).replace(/( {2}whoami:\n) {4}required_aal: aal1/, '$1    <<: {required_aal: highest_available}');
   const dir = join(scratch, 'merge');
@@ -200,10 +217,10 @@ test('the contract names exactly the admin webhook routes', () => {
 test('every ui_url, oauth2 and device page the contract names exists', () => {
   const pin = (name, re) => [...readFileSync(join(root, `contract/${name}.schema.json`), 'utf8').matchAll(re)].map((m) => m[1]);
   const pages = (dir) => readdirSync(join(portal, 'src/pages', dir)).map((f) => f.replace(/\.\w+$/, ''));
-  const auth = [...pin('kratos', /"pattern": "\/auth\/(\w+)\$"/g), ...pin('hydra', /"pattern": "\/auth\/(\w+)\$"/g)];
+  const auth = [...pin('kratos', /"pattern": "\^https\?:\/\/\[\^\/\]\+\/auth\/(\w+)\$"/g), ...pin('hydra', /"pattern": "\^https\?:\/\/\[\^\/\]\+\/auth\/(\w+)\$"/g)];
   assert.equal(auth.length, 6);
-  const oauth2 = pin('hydra', /"pattern": "\/oauth2\/(\w+)\$"/g);
-  const device = pin('hydra', /"pattern": "\/device\/(\w+)\$"/g);
+  const oauth2 = pin('hydra', /"pattern": "\^https\?:\/\/\[\^\/\]\+\/oauth2\/(\w+)\$"/g);
+  const device = pin('hydra', /"pattern": "\^https\?:\/\/\[\^\/\]\+\/device\/(\w+)\$"/g);
   assert.equal(oauth2.length, 3);
   assert.equal(device.length, 2);
   for (const [dir, names] of [['auth', auth], ['oauth2', oauth2], ['device', device]]) {

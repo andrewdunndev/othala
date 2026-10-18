@@ -9,15 +9,15 @@
       "type": "object",
       "required": ["login", "consent", "logout", "error", "device"],
       "properties": {
-        "login": {"type": "string", "pattern": "/oauth2/login$"},
-        "consent": {"type": "string", "pattern": "/oauth2/consent$"},
-        "logout": {"type": "string", "pattern": "/oauth2/logout$"},
-        "error": {"type": "string", "pattern": "/auth/error$"},
+        "login": {"type": "string", "pattern": "^https?://[^/]+/oauth2/login$"},
+        "consent": {"type": "string", "pattern": "^https?://[^/]+/oauth2/consent$"},
+        "logout": {"type": "string", "pattern": "^https?://[^/]+/oauth2/logout$"},
+        "error": {"type": "string", "pattern": "^https?://[^/]+/auth/error$"},
         "device": {
           "type": "object",
           "properties": {
-            "verification": {"type": "string", "pattern": "/device/verify$"},
-            "success": {"type": "string", "pattern": "/device/done$"}
+            "verification": {"type": "string", "pattern": "^https?://[^/]+/device/verify$"},
+            "success": {"type": "string", "pattern": "^https?://[^/]+/device/done$"}
           },
           "required": ["verification", "success"]
         }
