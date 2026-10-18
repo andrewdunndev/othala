@@ -1,0 +1,27 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://dunn.dev/othala/contract/hydra.schema.json",
+  "type": "object",
+  "required": ["urls"],
+  "properties": {
+    "serve": {"type": "object", "properties": {"admin": {"type": "object", "properties": {"port": {"const": 4445}}}}},
+    "urls": {
+      "type": "object",
+      "required": ["login", "consent", "logout", "error", "device"],
+      "properties": {
+        "login": {"type": "string", "pattern": "/oauth2/login$"},
+        "consent": {"type": "string", "pattern": "/oauth2/consent$"},
+        "logout": {"type": "string", "pattern": "/oauth2/logout$"},
+        "error": {"type": "string", "pattern": "/auth/error$"},
+        "device": {
+          "type": "object",
+          "properties": {
+            "verification": {"type": "string", "pattern": "/device/verify$"},
+            "success": {"type": "string", "pattern": "/device/done$"}
+          },
+          "required": ["verification", "success"]
+        }
+      }
+    }
+  }
+}

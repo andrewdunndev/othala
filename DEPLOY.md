@@ -32,6 +32,21 @@ docker compose up -d
 
 For an OIDC app added later, copy only its `<CLIENT_ID>_CLIENT_SECRET` line from a new `gen-secrets` run.
 
+## Your own Ory config
+
+A deployment may own finished `kratos.yml` and `hydra.yml` instead of rendering them, with secrets as any
+placeholder. The image's `contract/` pins only what the portal depends on; the identity schema and recovery-gate
+hook must equal the image's copies. In CI, after every edit:
+
+```sh
+docker run --rm -v "$PWD/ory:/ory:ro" "$IMAGE" node dist/server/config.mjs check-ory \
+  --kratos /ory/kratos.yml --hydra /ory/hydra.yml --identity-schema /ory/identity.schema.json --jsonnet /ory/recovery-gate.jsonnet
+```
+
+An env var or extra `-c` file overriding a contract key is the deployment's to keep right: `check-ory` cannot see it.
+A placeholder may replace only the secret or instance part of a value; the `Bearer ` prefix and the URL paths stay literal.
+It exits 1 naming each violated key and rule, never a value, and 2 when a flag is missing. `kratos validate` stays the deployment's job.
+
 ## Startup order
 
 The render runs first as uid 10000, the Kratos image's uid (Hydra runs as 10000 too; its image defaults to nonroot). Then come both migrate jobs, Kratos and Hydra, and
