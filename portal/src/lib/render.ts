@@ -4,7 +4,7 @@
 import { randomBytes } from 'node:crypto';
 import { chmodSync, existsSync, mkdirSync, readdirSync, readFileSync, renameSync, rmSync, statSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
-import { parse } from 'yaml';
+import { IDENTITY, JSONNET, parseOryYaml } from './contract';
 import { clientSecretNames, contentErrors, COURIER_OVERRIDE_DIR, courierContentErrors } from './content';
 import { envNameErrors } from './env-names';
 
@@ -16,7 +16,7 @@ const TEMPLATES = ['kratos/kratos.yml', 'hydra/hydra.yml', 'caddy/othala.caddy']
 /** The trees a render writes, one per consumer. */
 const TREES = [...new Set(TEMPLATES.map((p) => p.split('/')[0]))];
 /** Policy files copied as they are. */
-const LITERALS = ['kratos/identity.schema.json', 'kratos/hooks/recovery-gate.jsonnet'];
+const LITERALS = [IDENTITY, JSONNET];
 const COURIER_DIR = 'kratos/courier';
 /** The only values a courier override may name: identity, never a secret. */
 const COURIER_TOKENS = ['OTHALA_APEX', 'OTHALA_INSTANCE_NAME', 'OTHALA_PUBLIC_URL'];
@@ -236,7 +236,7 @@ export function render(policyDir: string, contentDir: string, env: Env): Rendere
     if (content.includes('${')) errors.push(`${path}: \${ left in the rendered output`);
     if (TEMPLATES.includes(path) && modeOf(path) === 'yaml') {
       try {
-        parse(content, { logLevel: 'error' });
+        parseOryYaml(content);
       } catch {
         errors.push(`${path}: rendered output is not well-formed YAML`);
       }

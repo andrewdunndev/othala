@@ -3,10 +3,13 @@ import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { parse } from 'yaml';
 
-export type OryFiles = { kratos: string; hydra: string; identitySchema: string; jsonnet: string };
+export const IDENTITY = 'kratos/identity.schema.json';
+export const JSONNET = 'kratos/hooks/recovery-gate.jsonnet';
 
-const JSONNET = 'kratos/hooks/recovery-gate.jsonnet';
-const IDENTITY = 'kratos/identity.schema.json';
+/** One parse for rendered and given Ory YAML, so both read merge keys alike. */
+export const parseOryYaml = (text: string): unknown => parse(text, { merge: true, logLevel: 'error' });
+
+export type OryFiles = { kratos: string; hydra: string; identitySchema: string; jsonnet: string };
 
 const read = (path: string): string | null => {
   try {
@@ -40,7 +43,7 @@ export function checkOry(policyDir: string, files: OryFiles): string[] {
     }
     let doc: unknown;
     try {
-      doc = parse(text, { logLevel: 'error', merge: true });
+      doc = parseOryYaml(text);
     } catch {
       violations.push(`${name}: not well-formed YAML`);
       continue;

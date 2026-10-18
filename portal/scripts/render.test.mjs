@@ -139,6 +139,15 @@ test('render refuses output that is not well-formed YAML', () => {
   });
 });
 
+test('render resolves merge keys as check-ory does, so a broken merge is refused', () => {
+  withDir((dir) => {
+    policyCopy(dir);
+    const hydra = join(dir, 'hydra/hydra.yml');
+    writeFileSync(hydra, `${readFileSync(hydra, 'utf8')}\nbroken:\n  <<: 5\n`);
+    assert.throws(() => render(dir, CONTENT, ENV), /hydra\/hydra\.yml: rendered output is not well-formed YAML/);
+  });
+});
+
 test('a retired or unknown name fails check and render with its fix; other names are ignored', () => {
   const retired = { OTHALA_SITE_NAME: 'Retired Value', OTHALA_SMTP_FROM_ADDRESS: 'x@example.org', OTHALA_TYPO: 'typo-value' };
   const expected = [
