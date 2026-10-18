@@ -35,7 +35,7 @@
 
 		# Public write paths of the device grant: a secretless client mints a device_code row per call, and the
 		# code form accepts guesses.
-		@device_entry path /oauth2/device/auth /device/verify
+		@device_entry path /oauth2/device/auth /device/verify /device/verify/*
 		rate_limit @device_entry {
 			zone othala_device {
 				key    {client_ip}

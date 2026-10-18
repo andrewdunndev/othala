@@ -191,3 +191,9 @@ test('a missing or malformed OTHALA_PUBLIC_URL fails check and render, naming it
     assert.deepEqual(check(root, CONTENT, { ...VALUES, OTHALA_PUBLIC_URL: value }), [], value);
   }
 });
+
+test('the device rate-limit matcher covers /device/verify with and without a trailing slash', () => {
+  const entry = walk(out).flatMap(linesOf).find((l) => l.startsWith('@device_entry path '));
+  const paths = entry.split(/\s+/).slice(2);
+  assert.ok(paths.includes('/device/verify') && paths.includes('/device/verify/*'), entry);
+});
