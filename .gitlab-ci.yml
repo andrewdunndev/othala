@@ -113,6 +113,7 @@ include:
   - kratos/**/*
   - hydra/**/*
   - caddy/**/*
+  - contract/**/*
   - deploy/**/*
   - site/**/*
   - .gitlab-ci.yml

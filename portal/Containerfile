@@ -54,6 +54,7 @@ COPY kratos/hooks/ /usr/share/othala/kratos/hooks/
 COPY kratos/courier/ /usr/share/othala/kratos/courier/
 COPY hydra/hydra.yml /usr/share/othala/hydra/
 COPY caddy/othala.caddy /usr/share/othala/caddy/
+COPY contract/ /usr/share/othala/contract/
 COPY --from=build --chown=10000:10000 /out/othala /run/othala
 
 USER 1001
