@@ -4,10 +4,7 @@
   "type": "object",
   "required": ["urls"],
   "properties": {
-    "serve": {
-      "type": "object",
-      "properties": {"admin": {"type": "object", "properties": {"port": {"const": 4445}, "host": {"type": "string"}}}}
-    },
+    "serve": {"type": "object", "properties": {"admin": {"type": "object", "properties": {"port": {"const": 4445}}}}},
     "urls": {
       "type": "object",
       "required": ["login", "consent", "logout", "error", "device"],

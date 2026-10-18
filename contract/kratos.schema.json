@@ -35,14 +35,141 @@
         }
       },
       "required": ["hook", "config"]
+    },
+    "hook_passkey_prune": {
+      "allOf": [
+        {"$ref": "#/$defs/webhook"},
+        {
+          "type": "object",
+          "properties": {
+            "config": {
+              "type": "object",
+              "properties": {
+                "url": {"const": "http://othala:4431/admin/passkey-prune"},
+                "can_interrupt": {"const": false},
+                "response": {"type": "object", "properties": {"ignore": {"const": true}}}
+              }
+            }
+          }
+        }
+      ]
+    },
+    "hook_second_factor_gate_webauthn": {
+      "allOf": [
+        {"$ref": "#/$defs/webhook"},
+        {
+          "type": "object",
+          "properties": {
+            "config": {
+              "type": "object",
+              "properties": {
+                "url": {"const": "http://othala:4431/admin/second-factor-gate?method=webauthn"},
+                "can_interrupt": {"const": true},
+                "response": {"type": "object", "properties": {"ignore": {"const": false}}}
+              }
+            }
+          }
+        }
+      ]
+    },
+    "hook_second_factor_gate_totp": {
+      "allOf": [
+        {"$ref": "#/$defs/webhook"},
+        {
+          "type": "object",
+          "properties": {
+            "config": {
+              "type": "object",
+              "properties": {
+                "url": {"const": "http://othala:4431/admin/second-factor-gate?method=totp"},
+                "can_interrupt": {"const": true},
+                "response": {"type": "object", "properties": {"ignore": {"const": false}}}
+              }
+            }
+          }
+        }
+      ]
+    },
+    "hook_profile_gate": {
+      "allOf": [
+        {"$ref": "#/$defs/webhook"},
+        {
+          "type": "object",
+          "properties": {
+            "config": {
+              "type": "object",
+              "properties": {
+                "url": {"const": "http://othala:4431/admin/profile-gate"},
+                "can_interrupt": {"const": true},
+                "response": {"type": "object", "properties": {"ignore": {"const": false}}}
+              }
+            }
+          }
+        }
+      ]
+    },
+    "hook_profile_sessions": {
+      "allOf": [
+        {"$ref": "#/$defs/webhook"},
+        {
+          "type": "object",
+          "properties": {
+            "config": {
+              "type": "object",
+              "properties": {
+                "url": {"const": "http://othala:4431/admin/profile-sessions"},
+                "can_interrupt": {"const": false},
+                "response": {"type": "object", "properties": {"ignore": {"const": false}}}
+              }
+            }
+          }
+        }
+      ]
+    },
+    "hook_recovery_gate": {
+      "allOf": [
+        {"$ref": "#/$defs/webhook"},
+        {
+          "type": "object",
+          "properties": {
+            "config": {
+              "type": "object",
+              "properties": {
+                "url": {"const": "http://othala:4431/admin/recovery-gate"},
+                "can_interrupt": {"const": true},
+                "response": {"type": "object", "properties": {"ignore": {"const": false}}}
+              }
+            }
+          }
+        }
+      ]
+    },
+    "hook_login_code_gate": {
+      "allOf": [
+        {"$ref": "#/$defs/webhook"},
+        {
+          "type": "object",
+          "properties": {
+            "config": {
+              "type": "object",
+              "properties": {
+                "url": {"const": "http://othala:4431/admin/login-code-gate"},
+                "can_interrupt": {"const": true},
+                "response": {"type": "object", "properties": {"ignore": {"const": false}}}
+              }
+            }
+          }
+        }
+      ]
     }
   },
+  "not": {"required": ["oauth2_provider"]},
   "properties": {
     "serve": {
       "type": "object",
       "properties": {
         "public": {"type": "object", "properties": {"port": {"const": 4433}}},
-        "admin": {"type": "object", "properties": {"port": {"const": 4434}, "host": {"type": "string"}}}
+        "admin": {"type": "object", "properties": {"port": {"const": 4434}}}
       }
     },
     "selfservice": {
@@ -62,101 +189,24 @@
               "properties": {
                 "ui_url": {"type": "string", "pattern": "/auth/settings$"},
                 "privileged_session_max_age": {"const": "5m"},
+                "required_aal": {"const": "highest_available"},
                 "after": {
                   "type": "object",
                   "properties": {
                     "passkey": {
                       "type": "object",
                       "required": ["hooks"],
-                      "properties": {
-                        "hooks": {
-                          "type": "array",
-                          "allOf": [
-                            {
-                              "contains": {
-                                "allOf": [
-                                  {"$ref": "#/$defs/webhook"},
-                                  {
-                                    "type": "object",
-                                    "properties": {
-                                      "config": {
-                                        "type": "object",
-                                        "properties": {
-                                          "url": {"const": "http://othala:4431/admin/passkey-prune"},
-                                          "can_interrupt": {"const": false},
-                                          "response": {"type": "object", "properties": {"ignore": {"const": true}}}
-                                        }
-                                      }
-                                    }
-                                  }
-                                ]
-                              }
-                            }
-                          ]
-                        }
-                      }
+                      "properties": {"hooks": {"type": "array", "contains": {"$ref": "#/$defs/hook_passkey_prune"}}}
                     },
                     "webauthn": {
                       "type": "object",
                       "required": ["hooks"],
-                      "properties": {
-                        "hooks": {
-                          "type": "array",
-                          "allOf": [
-                            {
-                              "contains": {
-                                "allOf": [
-                                  {"$ref": "#/$defs/webhook"},
-                                  {
-                                    "type": "object",
-                                    "properties": {
-                                      "config": {
-                                        "type": "object",
-                                        "properties": {
-                                          "url": {"const": "http://othala:4431/admin/second-factor-gate?method=webauthn"},
-                                          "can_interrupt": {"const": true},
-                                          "response": {"type": "object", "properties": {"ignore": {"const": false}}}
-                                        }
-                                      }
-                                    }
-                                  }
-                                ]
-                              }
-                            }
-                          ]
-                        }
-                      }
+                      "properties": {"hooks": {"type": "array", "contains": {"$ref": "#/$defs/hook_second_factor_gate_webauthn"}}}
                     },
                     "totp": {
                       "type": "object",
                       "required": ["hooks"],
-                      "properties": {
-                        "hooks": {
-                          "type": "array",
-                          "allOf": [
-                            {
-                              "contains": {
-                                "allOf": [
-                                  {"$ref": "#/$defs/webhook"},
-                                  {
-                                    "type": "object",
-                                    "properties": {
-                                      "config": {
-                                        "type": "object",
-                                        "properties": {
-                                          "url": {"const": "http://othala:4431/admin/second-factor-gate?method=totp"},
-                                          "can_interrupt": {"const": true},
-                                          "response": {"type": "object", "properties": {"ignore": {"const": false}}}
-                                        }
-                                      }
-                                    }
-                                  }
-                                ]
-                              }
-                            }
-                          ]
-                        }
-                      }
+                      "properties": {"hooks": {"type": "array", "contains": {"$ref": "#/$defs/hook_second_factor_gate_totp"}}}
                     },
                     "profile": {
                       "type": "object",
@@ -165,46 +215,8 @@
                         "hooks": {
                           "type": "array",
                           "allOf": [
-                            {
-                              "contains": {
-                                "allOf": [
-                                  {"$ref": "#/$defs/webhook"},
-                                  {
-                                    "type": "object",
-                                    "properties": {
-                                      "config": {
-                                        "type": "object",
-                                        "properties": {
-                                          "url": {"const": "http://othala:4431/admin/profile-gate"},
-                                          "can_interrupt": {"const": true},
-                                          "response": {"type": "object", "properties": {"ignore": {"const": false}}}
-                                        }
-                                      }
-                                    }
-                                  }
-                                ]
-                              }
-                            },
-                            {
-                              "contains": {
-                                "allOf": [
-                                  {"$ref": "#/$defs/webhook"},
-                                  {
-                                    "type": "object",
-                                    "properties": {
-                                      "config": {
-                                        "type": "object",
-                                        "properties": {
-                                          "url": {"const": "http://othala:4431/admin/profile-sessions"},
-                                          "can_interrupt": {"const": false},
-                                          "response": {"type": "object", "properties": {"ignore": {"const": false}}}
-                                        }
-                                      }
-                                    }
-                                  }
-                                ]
-                              }
-                            }
+                            {"contains": {"$ref": "#/$defs/hook_profile_gate"}},
+                            {"contains": {"$ref": "#/$defs/hook_profile_sessions"}}
                           ]
                         }
                       }
@@ -222,33 +234,7 @@
                 "after": {
                   "type": "object",
                   "required": ["hooks"],
-                  "properties": {
-                    "hooks": {
-                      "type": "array",
-                      "allOf": [
-                        {
-                          "contains": {
-                            "allOf": [
-                              {"$ref": "#/$defs/webhook"},
-                              {
-                                "type": "object",
-                                "properties": {
-                                  "config": {
-                                    "type": "object",
-                                    "properties": {
-                                      "url": {"const": "http://othala:4431/admin/recovery-gate"},
-                                      "can_interrupt": {"const": true},
-                                      "response": {"type": "object", "properties": {"ignore": {"const": false}}}
-                                    }
-                                  }
-                                }
-                              }
-                            ]
-                          }
-                        }
-                      ]
-                    }
-                  }
+                  "properties": {"hooks": {"type": "array", "contains": {"$ref": "#/$defs/hook_recovery_gate"}}}
                 }
               }
             },
@@ -268,51 +254,28 @@
                     "code": {
                       "type": "object",
                       "required": ["hooks"],
-                      "properties": {
-                        "hooks": {
-                          "type": "array",
-                          "allOf": [
-                            {
-                              "contains": {
-                                "allOf": [
-                                  {"$ref": "#/$defs/webhook"},
-                                  {
-                                    "type": "object",
-                                    "properties": {
-                                      "config": {
-                                        "type": "object",
-                                        "properties": {
-                                          "url": {"const": "http://othala:4431/admin/login-code-gate"},
-                                          "can_interrupt": {"const": true},
-                                          "response": {"type": "object", "properties": {"ignore": {"const": false}}}
-                                        }
-                                      }
-                                    }
-                                  }
-                                ]
-                              }
-                            }
-                          ]
-                        }
-                      }
+                      "properties": {"hooks": {"type": "array", "contains": {"$ref": "#/$defs/hook_login_code_gate"}}}
                     }
                   },
                   "required": ["code"]
                 }
               }
-            }
+            },
+            "registration": {"type": "object", "properties": {"enabled": {"const": false}}, "required": ["enabled"]}
           },
-          "required": ["error", "settings", "recovery", "verification", "login"]
-        }
+          "required": ["error", "settings", "recovery", "verification", "login", "registration"]
+        },
+        "methods": {"type": "object", "properties": {"code": {"type": "object", "properties": {"mfa_enabled": {"const": false}}}}}
       },
       "required": ["flows"]
     },
     "session": {
       "type": "object",
       "properties": {
-        "whoami": {"type": "object", "properties": {"required_aal": {"const": "aal1"}}},
-        "cookie": {"type": "object", "properties": {"name": {"const": "ory_kratos_session"}, "domain": {"type": "string"}}}
-      }
+        "whoami": {"type": "object", "properties": {"required_aal": {"const": "aal1"}}, "required": ["required_aal"]},
+        "cookie": {"type": "object", "properties": {"name": {"const": "ory_kratos_session"}}}
+      },
+      "required": ["whoami"]
     },
     "identity": {
       "type": "object",
@@ -320,10 +283,14 @@
         "default_schema_id": {"const": "family"},
         "schemas": {
           "type": "array",
-          "contains": {
-            "type": "object",
-            "properties": {"id": {"const": "family"}, "url": {"type": "string", "pattern": "(^|/)identity\\.schema\\.json$"}},
-            "required": ["id", "url"]
+          "contains": {"type": "object", "properties": {"id": {"const": "family"}}, "required": ["id"]},
+          "items": {
+            "if": {"type": "object", "properties": {"id": {"const": "family"}}, "required": ["id"]},
+            "then": {
+              "type": "object",
+              "properties": {"url": {"const": "file:///etc/config/kratos/identity.schema.json"}},
+              "required": ["url"]
+            }
           }
         }
       },

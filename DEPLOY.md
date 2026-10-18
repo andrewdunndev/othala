@@ -43,6 +43,7 @@ docker run --rm -v "$PWD/ory:/ory:ro" "$IMAGE" node dist/server/config.mjs check
   --kratos /ory/kratos.yml --hydra /ory/hydra.yml --identity-schema /ory/identity.schema.json --jsonnet /ory/recovery-gate.jsonnet
 ```
 
+An env var or extra `-c` file overriding a contract key is the deployment's to keep right: `check-ory` cannot see it.
 A placeholder may replace only the secret or instance part of a value; the `Bearer ` prefix and the URL paths stay literal.
 It exits 1 naming each violated key and rule, never a value, and 2 when a flag is missing. `kratos validate` stays the deployment's job.
 

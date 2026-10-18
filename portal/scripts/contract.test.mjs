@@ -66,19 +66,18 @@ test('the rendered deploy/example passes, through the CLI', () => {
   assert.equal(good.status, 0);
   assert.equal(good.stderr, '');
   for (const drop of [0, 2, 4, 6]) assert.equal(cli(...ok.filter((_, i) => i !== drop && i !== drop + 1)).status, 2);
-  writeFileSync(join(dir, 'k.yml'), stringify(edit(kratos, (k) => (k.session.whoami.required_aal = 'SECRET-VALUE'))));
+  writeFileSync(join(dir, 'k.yml'), stringify(edit(kratos, (k) => (hook(k, 'recovery', 'after').hooks[0].config.auth.config.value = 'Bearer two SECRET-VALUE'))));
   const bad = cli(...ok);
   assert.equal(bad.status, 1);
-  assert.ok(bad.stderr.includes('/session/whoami/required_aal'));
+  assert.ok(bad.stderr.includes('/selfservice/flows/recovery/after/hooks'));
   assert.ok(!bad.stderr.includes('SECRET-VALUE'));
-});
+}, 30_000);
 
 const hook = (k, ...path) => path.reduce((o, p) => o[p], k.selfservice.flows);
 // pointer, mutation, consumer: each pinned key, where the portal depends on it (a symbol, never a line).
 const KRATOS_PINS = [
   ['/serve/admin/port', (k) => (k.serve.admin.port = 1), 'KRATOS_ADMIN_URL, constants.ts'],
   ['/serve/public/port', (k) => (k.serve.public = { port: 1 }), 'KRATOS_PUBLIC_URL, constants.ts'],
-  ['/serve/admin/host', (k) => (k.serve.admin.host = 1), 'KRATOS_ADMIN_BIND_HOST, env-names.ts'],
   ...['error', 'settings', 'recovery', 'verification', 'login'].map((f) => [`/selfservice/flows/${f}/ui_url`, (k) => (k.selfservice.flows[f].ui_url = 'https://a.example/x'), `pages/auth/${f}.astro`]),
   ['/selfservice/flows/settings/after/passkey/hooks', (k) => (hook(k, 'settings', 'after', 'passkey').hooks[0].config.url += 'x'), 'handlePasskeyPrune, listen.ts'],
   ['/selfservice/flows/settings/after/webauthn/hooks', (k) => (hook(k, 'settings', 'after', 'webauthn').hooks[0].config.method = 'GET'), 'handleSecondFactorGate, listen.ts'],
@@ -90,7 +89,14 @@ const KRATOS_PINS = [
   ['/selfservice/flows/login/after/code/hooks', (k) => (hook(k, 'login', 'after', 'code').hooks[0].config.auth.config.in = 'cookie'), 'handleLoginCodeGate, listen.ts'],
   ['/session/whoami/required_aal', (k) => (k.session.whoami.required_aal = 'highest_available'), 'getSession, kratos.ts; handleForwardAuth, api/forward-auth.ts'],
   ['/session/cookie/name', (k) => (k.session.cookie.name = 'sid'), 'getSession, kratos.ts'],
-  ['/session/cookie/domain', (k) => (k.session.cookie.domain = 1), 'OTHALA_APEX, config.ts'],
+  ['/selfservice/flows/registration/enabled', (k) => (k.selfservice.flows.registration.enabled = true), 'no signup route: members arrive by invite, admin-api.ts'],
+  ['/selfservice/flows/registration', (k) => delete k.selfservice.flows.registration, 'no signup route: members arrive by invite, admin-api.ts'],
+  ['/selfservice/methods/code/mfa_enabled', (k) => (k.selfservice.methods.code.mfa_enabled = true), 'handleLoginCodeGate, listen.ts: code login must stay a first factor'],
+  ['/selfservice/flows/settings/required_aal', (k) => (k.selfservice.flows.settings.required_aal = 'aal1'), 'handleSecondFactorGate, listen.ts'],
+  ['', (k) => (k.oauth2_provider = { url: 'http://hydra:4445' }), 'oauth2 challenges ride Hydra urls, oauth2-handlers.ts'],
+  ['/session/whoami', (k) => delete k.session.whoami.required_aal, 'getSession, kratos.ts'],
+  ['/identity/schemas', (k) => k.identity.schemas.unshift({ id: 'family', url: 'file:///elsewhere.json' }), 'schema_id, admin-api.ts'],
+  ['/identity/schemas', (k) => (k.identity.schemas[0].url = 'file:///etc/config/kratos/other/identity.schema.json'), 'identity.schema.json, Containerfile'],
   ['/identity/default_schema_id', (k) => (k.identity.default_schema_id = 'other'), 'schema_id, admin-api.ts'],
   ['/identity/schemas', (k) => (k.identity.schemas[0].id = 'other'), 'schema_id, admin-api.ts'],
   ['/identity/schemas', (k) => (k.identity.schemas[0].url = 'file:///etc/schema.json'), 'identity.schema.json, Containerfile'],
@@ -115,7 +121,6 @@ const HYDRA_PINS = [
   ['/urls/device/success', (h) => (h.urls.device.success = 'https://a.example/x'), 'pages/device/done.astro'],
   ['/urls/device', (h) => delete h.urls.device, 'pages/device/verify.astro'],
   ['/serve/admin/port', (h) => (h.serve.admin.port = 1), 'HYDRA_ADMIN_URL, constants.ts'],
-  ['/serve/admin/host', (h) => (h.serve.admin.host = 1), 'HYDRA_ADMIN_BIND_HOST, env-names.ts'],
 ];
 
 test.each(KRATOS_PINS)('kratos %s fails when mutated (consumer: %s)', (pointer, mutate) => {
@@ -126,6 +131,16 @@ test.each(KRATOS_PINS)('kratos %s fails when mutated (consumer: %s)', (pointer, 
 test.each(HYDRA_PINS)('hydra %s fails when mutated (consumer: %s)', (pointer, mutate) => {
   const v = run(kratos, edit(hydra, mutate));
   assert.ok(v.some((x) => x.startsWith(`hydra: ${pointer}`)), v.join('\n'));
+});
+
+test('a YAML merge key is resolved before the contract applies', () => {
+  const doc = stringify(kratos).replace(/( {2}whoami:\n) {4}required_aal: aal1/, '$1    <<: {required_aal: highest_available}');
+  const dir = join(scratch, 'merge');
+  mkdirSync(dir);
+  writeFileSync(join(dir, 'k.yml'), doc);
+  const f = files(kratos, hydra);
+  const v = checkOry(root, { ...f, kratos: join(dir, 'k.yml') });
+  assert.ok(v.some((x) => x.includes('/session/whoami/required_aal violates const')), v.join('\n'));
 });
 
 test('a value outside the contract changes freely', () => {

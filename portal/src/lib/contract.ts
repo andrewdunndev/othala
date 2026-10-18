@@ -40,7 +40,7 @@ export function checkOry(policyDir: string, files: OryFiles): string[] {
     }
     let doc: unknown;
     try {
-      doc = parse(text, { logLevel: 'error' });
+      doc = parse(text, { logLevel: 'error', merge: true });
     } catch {
       violations.push(`${name}: not well-formed YAML`);
       continue;
