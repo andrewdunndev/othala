@@ -333,7 +333,7 @@ tracing:
   provider: otel
   providers:
     otlp:
-      server_url: ${OTHALA_OTLP_ENDPOINT}
+      server_url: "${OTHALA_OTLP_ENDPOINT}"
       insecure: true
       sampling:
         sampling_ratio: 0.1

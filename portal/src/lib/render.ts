@@ -148,8 +148,8 @@ function valueErrors(path: string, names: string[], mode: Mode, env: Env): strin
   }
   for (const name of names) {
     const val = env[name]!;
-    // A line break would restructure a YAML scalar.
-    if ([...val].some((c) => c.charCodeAt(0) < 0x20)) errors.push(`${path}: ${name} contains a control character`);
+    // Go yaml reads DEL, NEL, LS and PS as line breaks; a line break would restructure a YAML scalar.
+    if (/[\u0000-\u001f\u007f\u0085\u2028\u2029]/.test(val)) errors.push(`${path}: ${name} contains a control character`);
     // Kratos parses mail templates as Go templates: a delimiter would inject an action.
     if (mode !== 'yaml' && (val.includes('{{') || val.includes('}}'))) errors.push(`${path}: ${name} contains a template delimiter`);
   }

@@ -175,3 +175,15 @@ test('render refuses a line break in a value', () => {
 test('a backslash and a quote round-trip through a double-quoted scalar', () => {
   assert.equal(render('kratos/kratos.yml', { KRATOS_PG_PASS: 'a\\"b' }).dsn, 'postgres://kratos:a\\"b@postgres:5432/kratos?sslmode=disable');
 });
+
+test('render refuses DEL and the Unicode line breaks Go yaml honours', () => {
+  for (const bad of ['\x7f', '\u0085', ' ', ' ']) {
+    assert.throws(() => renderText('kratos/kratos.yml', { KRATOS_PG_PASS: `kp${bad}x: y` }), /KRATOS_PG_PASS contains a control character/);
+  }
+});
+
+test('the OTLP endpoint is a quoted scalar in both Ory templates', () => {
+  for (const file of ['kratos/kratos.yml', 'hydra/hydra.yml']) {
+    assert.match(readFileSync(join(root, file), 'utf8'), /server_url: "\$\{OTHALA_OTLP_ENDPOINT\}"/, file);
+  }
+});
