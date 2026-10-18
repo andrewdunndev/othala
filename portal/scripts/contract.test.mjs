@@ -11,6 +11,7 @@ import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { parse, stringify } from 'yaml';
 import { checkOry } from '../src/lib/contract.ts';
+import { PRIVILEGED_WINDOW_MS } from '../src/lib/settings-view.ts';
 import { render, SECRETS } from '../src/lib/render.ts';
 import { ADMIN_POST } from '../src/server/listen.ts';
 
@@ -41,7 +42,9 @@ function files(k, h) {
   mkdirSync(dir);
   writeFileSync(kratosFile, stringify(k));
   writeFileSync(hydraFile, stringify(h));
-  return { kratos: kratosFile, hydra: hydraFile };
+  writeFileSync(join(dir, 'i.json'), rendered['kratos/identity.schema.json']);
+  writeFileSync(join(dir, 'g.jsonnet'), rendered['kratos/hooks/recovery-gate.jsonnet']);
+  return { kratos: kratosFile, hydra: hydraFile, identitySchema: join(dir, 'i.json'), jsonnet: join(dir, 'g.jsonnet') };
 }
 const run = (k = kratos, h = hydra) => checkOry(root, files(structuredClone(k), structuredClone(h)));
 const edit = (doc, fn) => {
@@ -62,7 +65,7 @@ test('the rendered deploy/example passes, through the CLI', () => {
   const good = cli(...ok);
   assert.equal(good.status, 0);
   assert.equal(good.stderr, '');
-  assert.equal(cli('--kratos', join(dir, 'k.yml')).status, 2);
+  for (const drop of [0, 2, 4, 6]) assert.equal(cli(...ok.filter((_, i) => i !== drop && i !== drop + 1)).status, 2);
   writeFileSync(join(dir, 'k.yml'), stringify(edit(kratos, (k) => (k.session.whoami.required_aal = 'SECRET-VALUE'))));
   const bad = cli(...ok);
   assert.equal(bad.status, 1);
@@ -73,11 +76,10 @@ test('the rendered deploy/example passes, through the CLI', () => {
 const hook = (k, ...path) => path.reduce((o, p) => o[p], k.selfservice.flows);
 // pointer, mutation, consumer: each pinned key, where the portal depends on it (a symbol, never a line).
 const KRATOS_PINS = [
-  ['/serve/admin/base_url', (k) => (k.serve.admin.base_url = 'http://kratos:9/'), 'KRATOS_ADMIN_URL, constants.ts'],
   ['/serve/admin/port', (k) => (k.serve.admin.port = 1), 'KRATOS_ADMIN_URL, constants.ts'],
   ['/serve/public/port', (k) => (k.serve.public = { port: 1 }), 'KRATOS_PUBLIC_URL, constants.ts'],
   ['/serve/admin/host', (k) => (k.serve.admin.host = 1), 'KRATOS_ADMIN_BIND_HOST, env-names.ts'],
-  ...['error', 'settings', 'recovery', 'verification', 'login', 'registration'].map((f) => [`/selfservice/flows/${f}/ui_url`, (k) => (k.selfservice.flows[f].ui_url = 'https://a.example/x'), `pages/auth/${f}.astro`]),
+  ...['error', 'settings', 'recovery', 'verification', 'login'].map((f) => [`/selfservice/flows/${f}/ui_url`, (k) => (k.selfservice.flows[f].ui_url = 'https://a.example/x'), `pages/auth/${f}.astro`]),
   ['/selfservice/flows/settings/after/passkey/hooks', (k) => (hook(k, 'settings', 'after', 'passkey').hooks[0].config.url += 'x'), 'handlePasskeyPrune, listen.ts'],
   ['/selfservice/flows/settings/after/webauthn/hooks', (k) => (hook(k, 'settings', 'after', 'webauthn').hooks[0].config.method = 'GET'), 'handleSecondFactorGate, listen.ts'],
   ['/selfservice/flows/settings/after/totp/hooks', (k) => (hook(k, 'settings', 'after', 'totp').hooks[0].config.auth.config.name = 'X-Key'), 'handleSecondFactorGate, listen.ts'],
@@ -92,11 +94,26 @@ const KRATOS_PINS = [
   ['/identity/default_schema_id', (k) => (k.identity.default_schema_id = 'other'), 'schema_id, admin-api.ts'],
   ['/identity/schemas', (k) => (k.identity.schemas[0].id = 'other'), 'schema_id, admin-api.ts'],
   ['/identity/schemas', (k) => (k.identity.schemas[0].url = 'file:///etc/schema.json'), 'identity.schema.json, Containerfile'],
+  ['/selfservice/flows/settings/privileged_session_max_age', (k) => (k.selfservice.flows.settings.privileged_session_max_age = '1h'), 'PRIVILEGED_WINDOW_MS, settings-view.ts'],
+  ['/selfservice/flows/settings/after/passkey/hooks', (k) => (hook(k, 'settings', 'after', 'passkey').hooks[0].config.can_interrupt = true), 'handlePasskeyPrune, listen.ts: a failed prune must not block the save'],
+  ['/selfservice/flows/settings/after/profile/hooks', (k) => (hook(k, 'settings', 'after', 'profile').hooks[1].config.can_interrupt = true), 'handleProfileSessions, listen.ts: best-effort'],
+  ['/selfservice/flows/settings/after/webauthn/hooks', (k) => (hook(k, 'settings', 'after', 'webauthn').hooks[0].config.can_interrupt = false), 'handleSecondFactorGate, listen.ts: a gate refuses by interrupting'],
+  ['/selfservice/flows/recovery/after/hooks', (k) => (hook(k, 'recovery', 'after').hooks[0].config.can_interrupt = false), 'handleRecoveryGate, listen.ts'],
+  ['/selfservice/flows/login/after/code/hooks', (k) => (hook(k, 'login', 'after', 'code').hooks[0].config.can_interrupt = false), 'handleLoginCodeGate, listen.ts'],
+  ['/selfservice/flows/recovery/after/hooks', (k) => (hook(k, 'recovery', 'after').hooks[0].config.response.ignore = true), 'handleRecoveryGate, listen.ts: a 403 must reach the flow'],
+  ['/selfservice/flows/settings/after/passkey/hooks', (k) => (hook(k, 'settings', 'after', 'passkey').hooks[0].config.response.ignore = false), 'handlePasskeyPrune, listen.ts'],
+  ['/selfservice/flows/login/after/code/hooks', (k) => (hook(k, 'login', 'after', 'code').hooks[0].config.response.parse = true), 'handleLoginCodeGate, listen.ts'],
+  ['/selfservice/flows/recovery/after/hooks', (k) => (hook(k, 'recovery', 'after').hooks[0].config.body = 'file:///x.jsonnet'), 'recovery-gate.jsonnet, Containerfile'],
+  ['/selfservice/flows/settings/after/totp/hooks', (k) => delete hook(k, 'settings', 'after', 'totp').hooks[0].config.body, 'recovery-gate.jsonnet, Containerfile'],
   ['/selfservice/flows/login/after', (k) => delete k.selfservice.flows.login.after, 'handleLoginCodeGate, listen.ts'],
 ];
 const HYDRA_PINS = [
   ...['login', 'consent', 'logout'].map((p) => [`/urls/${p}`, (h) => (h.urls[p] = 'https://a.example/x'), `pages/oauth2/${p}.ts`]),
   ['/urls', (h) => delete h.urls.consent, 'pages/oauth2/consent.ts'],
+  ['/urls/error', (h) => (h.urls.error = 'https://a.example/x'), 'pages/auth/error.astro'],
+  ['/urls/device/verification', (h) => (h.urls.device.verification = 'https://a.example/x'), 'pages/device/verify.astro'],
+  ['/urls/device/success', (h) => (h.urls.device.success = 'https://a.example/x'), 'pages/device/done.astro'],
+  ['/urls/device', (h) => delete h.urls.device, 'pages/device/verify.astro'],
   ['/serve/admin/port', (h) => (h.serve.admin.port = 1), 'HYDRA_ADMIN_URL, constants.ts'],
   ['/serve/admin/host', (h) => (h.serve.admin.host = 1), 'HYDRA_ADMIN_BIND_HOST, env-names.ts'],
 ];
@@ -115,8 +132,7 @@ test('a value outside the contract changes freely', () => {
   const k = edit(kratos, (d) => {
     d.session.lifespan = '1h';
     d.log = { level: 'debug', format: 'text' };
-    d.selfservice.flows.settings.privileged_session_max_age = '1m';
-    d.selfservice.flows.settings.after.passkey.hooks[0].config.can_interrupt = true;
+    d.selfservice.flows.settings.after.passkey.hooks[0].config.extra = true;
     d.extra = { anything: [1, 2] };
   });
   const h = edit(hydra, (d) => {
@@ -135,9 +151,10 @@ test('consumer placeholders pass wherever the template has a secret or an instan
     d.serve.admin.host = ph('bind');
     d.serve.public.base_url = ph('url');
     d.session.cookie.domain = ph('apex');
-    d.selfservice.flows.login.ui_url = `${ph('url')}/auth/login`;
   });
   assert.deepEqual(run(k, edit(hydra, (d) => (d.secrets = { system: [ph('system')] }))), []);
+  const bare = edit(k, (d) => (hook(d, 'recovery', 'after').hooks[0].config.auth.config.value = ph('gate')));
+  assert.ok(run(bare, hydra).length > 0);
 });
 
 test('the policy files must equal the image copies, compared as JSON and as trimmed text', () => {
@@ -151,7 +168,7 @@ test('the policy files must equal the image copies, compared as JSON and as trim
     return checkOry(root, { ...files(kratos, hydra), identitySchema: join(dir, 'i.json'), jsonnet: join(dir, 'g.jsonnet') });
   };
   const reordered = JSON.stringify(Object.fromEntries(Object.entries(JSON.parse(identity)).reverse()));
-  assert.deepEqual(check(reordered, `${jsonnet}\n\n  \n`), []);
+  assert.deepEqual(check(reordered, `${jsonnet}\n\n  \n`.replace(/\n/g, '\r\n')), []);
   assert.equal(check(identity.replace('"traits"', '"traitz"'), jsonnet).length, 1);
   assert.equal(check(identity, `${jsonnet}// edit`).length, 1);
   assert.equal(check('not json', jsonnet).length, 1);
@@ -165,15 +182,22 @@ test('the contract names exactly the admin webhook routes', () => {
   assert.deepEqual([...paths].sort(), [...ADMIN_POST.keys()].sort());
 });
 
-test('every ui_url and oauth2 page the contract names exists', () => {
+test('every ui_url, oauth2 and device page the contract names exists', () => {
   const pin = (name, re) => [...readFileSync(join(root, `contract/${name}.schema.json`), 'utf8').matchAll(re)].map((m) => m[1]);
-  const auth = readdirSync(join(portal, 'src/pages/auth')).map((f) => f.replace(/\.\w+$/, ''));
-  const oauth2 = readdirSync(join(portal, 'src/pages/oauth2')).map((f) => f.replace(/\.\w+$/, ''));
-  const flows = pin('kratos', /"pattern": "\/auth\/(\w+)\$"/g);
-  assert.equal(flows.length, 6);
-  // Registration is disabled in the template, so no page serves its ui_url.
-  for (const f of flows.filter((x) => x !== 'registration')) assert.ok(auth.includes(f), f);
-  const grants = pin('hydra', /"pattern": "\/oauth2\/(\w+)\$"/g);
-  assert.equal(grants.length, 3);
-  for (const f of grants) assert.ok(oauth2.includes(f), f);
+  const pages = (dir) => readdirSync(join(portal, 'src/pages', dir)).map((f) => f.replace(/\.\w+$/, ''));
+  const auth = [...pin('kratos', /"pattern": "\/auth\/(\w+)\$"/g), ...pin('hydra', /"pattern": "\/auth\/(\w+)\$"/g)];
+  assert.equal(auth.length, 6);
+  const oauth2 = pin('hydra', /"pattern": "\/oauth2\/(\w+)\$"/g);
+  const device = pin('hydra', /"pattern": "\/device\/(\w+)\$"/g);
+  assert.equal(oauth2.length, 3);
+  assert.equal(device.length, 2);
+  for (const [dir, names] of [['auth', auth], ['oauth2', oauth2], ['device', device]]) {
+    for (const f of names) assert.ok(pages(dir).includes(f), `${dir}/${f}`);
+  }
+});
+
+test('the pinned privileged window equals the portal constant', () => {
+  const schema = JSON.parse(readFileSync(join(root, 'contract/kratos.schema.json'), 'utf8'));
+  const age = schema.properties.selfservice.properties.flows.properties.settings.properties.privileged_session_max_age.const;
+  assert.equal(PRIVILEGED_WINDOW_MS, { s: 1e3, m: 6e4, h: 36e5 }[age.slice(-1)] * parseInt(age, 10));
 });

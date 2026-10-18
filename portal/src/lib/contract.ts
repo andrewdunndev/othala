@@ -3,7 +3,7 @@ import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { parse } from 'yaml';
 
-export type OryFiles = { kratos: string; hydra: string; identitySchema?: string; jsonnet?: string };
+export type OryFiles = { kratos: string; hydra: string; identitySchema: string; jsonnet: string };
 
 const JSONNET = 'kratos/hooks/recovery-gate.jsonnet';
 const IDENTITY = 'kratos/identity.schema.json';
@@ -24,7 +24,8 @@ function canonical(v: unknown): unknown {
 }
 
 const sameJson = (a: string, b: string): boolean => JSON.stringify(canonical(JSON.parse(a))) === JSON.stringify(canonical(JSON.parse(b)));
-const sameText = (a: string, b: string): boolean => a.trimEnd() === b.trimEnd();
+const lf = (t: string): string => t.replace(/\r\n/g, '\n').trimEnd();
+const sameText = (a: string, b: string): boolean => lf(a) === lf(b);
 
 /** Each violation names a file, a JSON pointer and a rule, never a value: the files hold secrets. */
 export function checkOry(policyDir: string, files: OryFiles): string[] {
@@ -52,12 +53,11 @@ export function checkOry(policyDir: string, files: OryFiles): string[] {
       }
     }
   }
-  const policy: [string, string | undefined, string, (a: string, b: string) => boolean][] = [
+  const policy: [string, string, string, (a: string, b: string) => boolean][] = [
     ['identity schema', files.identitySchema, IDENTITY, sameJson],
     ['recovery-gate jsonnet', files.jsonnet, JSONNET, sameText],
   ];
   for (const [label, given, rel, same] of policy) {
-    if (given === undefined) continue;
     const mine = read(given);
     const image = read(join(policyDir, rel));
     try {

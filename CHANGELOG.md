@@ -13,7 +13,7 @@ This CHANGELOG and git tags carry the deployed-instance release state.
 
 Contract:
 
-- `contract/kratos.schema.json` and `contract/hydra.schema.json` pin what the portal depends on in an Ory config: the seven webhooks (URL, method, `Bearer` header), the flow `ui_url` pages, `whoami` at aal1, the `family` identity schema, the Hydra login, consent and logout URLs and the fixed ports. `node dist/server/config.mjs check-ory` validates a deployment's own finished files against them and requires its identity schema and recovery-gate hook to equal the image's copies. A deployment that renders its configs needs no change.
+- `contract/kratos.schema.json` and `contract/hydra.schema.json` pin what the portal depends on in an Ory config: the seven webhooks (URL, method, `Bearer` header, interrupt and response settings, body), the flow `ui_url` pages, `whoami` at aal1, the `family` identity schema, the Hydra login, consent, logout, error and device URLs, the settings privileged-session age and the fixed ports. `node dist/server/config.mjs check-ory` validates a deployment's own finished files against them and requires its identity schema and recovery-gate hook to equal the image's copies. A deployment that renders its configs needs no change.
 
 Reference:
 

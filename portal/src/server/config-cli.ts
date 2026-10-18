@@ -2,7 +2,7 @@
 //   node dist/server/config.mjs render [--policy <dir>] [--content <dir>] [--out <dir>]
 //   node dist/server/config.mjs check [--policy <dir>] [--content <dir>]
 //   node dist/server/config.mjs gen-secrets [--content <dir>]
-//   node dist/server/config.mjs check-ory --kratos <file> --hydra <file> [--identity-schema <file>] [--jsonnet <file>] [--policy <dir>]
+//   node dist/server/config.mjs check-ory --kratos <file> --hydra <file> --identity-schema <file> --jsonnet <file> [--policy <dir>]
 // Values and secrets come from the environment. Exits 1 on a failed check or render, 2 on bad usage.
 
 import { existsSync } from 'node:fs';
@@ -14,7 +14,7 @@ import { lintApps } from '../lib/content';
 import { check, clearRendered, generateSecrets, render, RenderError, writeRendered } from '../lib/render';
 
 const USAGE =
-  'usage: config.mjs render [--policy <dir>] [--content <dir>] [--out <dir>] | check [--policy <dir>] [--content <dir>] | gen-secrets [--content <dir>] | check-ory --kratos <file> --hydra <file> [--identity-schema <file>] [--jsonnet <file>] [--policy <dir>]';
+  'usage: config.mjs render [--policy <dir>] [--content <dir>] [--out <dir>] | check [--policy <dir>] [--content <dir>] | gen-secrets [--content <dir>] | check-ory --kratos <file> --hydra <file> --identity-schema <file> --jsonnet <file> [--policy <dir>]';
 
 function main(): number {
   let parsed;
@@ -70,7 +70,7 @@ function main(): number {
       }
     }
     case 'check-ory': {
-      if (!values.kratos || !values.hydra) {
+      if (!values.kratos || !values.hydra || !values['identity-schema'] || !values.jsonnet) {
         console.error(USAGE);
         return 2;
       }
