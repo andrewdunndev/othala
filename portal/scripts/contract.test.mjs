@@ -59,7 +59,9 @@ test('the rendered deploy/example passes, through the CLI', () => {
   }
   const cli = (...args) => spawnSync(join(portal, 'node_modules/.bin/tsx'), [join(portal, 'src/server/config-cli.ts'), 'check-ory', '--policy', root, ...args], { encoding: 'utf8' });
   const ok = ['--kratos', join(dir, 'k.yml'), '--hydra', join(dir, 'h.yml'), '--identity-schema', join(dir, 'i.json'), '--jsonnet', join(dir, 'g.jsonnet')];
-  assert.equal(cli(...ok).status, 0);
+  const good = cli(...ok);
+  assert.equal(good.status, 0);
+  assert.equal(good.stderr, '');
   assert.equal(cli('--kratos', join(dir, 'k.yml')).status, 2);
   writeFileSync(join(dir, 'k.yml'), stringify(edit(kratos, (k) => (k.session.whoami.required_aal = 'SECRET-VALUE'))));
   const bad = cli(...ok);
