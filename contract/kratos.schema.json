@@ -181,13 +181,13 @@
             "error": {
               "type": "object",
               "required": ["ui_url"],
-              "properties": {"ui_url": {"type": "string", "pattern": "/auth/error$"}}
+              "properties": {"ui_url": {"type": "string", "pattern": "^https?://[^/]+/auth/error$"}}
             },
             "settings": {
               "type": "object",
               "required": ["ui_url", "privileged_session_max_age", "after"],
               "properties": {
-                "ui_url": {"type": "string", "pattern": "/auth/settings$"},
+                "ui_url": {"type": "string", "pattern": "^https?://[^/]+/auth/settings$"},
                 "privileged_session_max_age": {"const": "5m"},
                 "required_aal": {"const": "highest_available"},
                 "after": {
@@ -230,7 +230,7 @@
               "type": "object",
               "required": ["ui_url", "after"],
               "properties": {
-                "ui_url": {"type": "string", "pattern": "/auth/recovery$"},
+                "ui_url": {"type": "string", "pattern": "^https?://[^/]+/auth/recovery$"},
                 "after": {
                   "type": "object",
                   "required": ["hooks"],
@@ -241,13 +241,13 @@
             "verification": {
               "type": "object",
               "required": ["ui_url"],
-              "properties": {"ui_url": {"type": "string", "pattern": "/auth/verification$"}}
+              "properties": {"ui_url": {"type": "string", "pattern": "^https?://[^/]+/auth/verification$"}}
             },
             "login": {
               "type": "object",
               "required": ["ui_url", "after"],
               "properties": {
-                "ui_url": {"type": "string", "pattern": "/auth/login$"},
+                "ui_url": {"type": "string", "pattern": "^https?://[^/]+/auth/login$"},
                 "after": {
                   "type": "object",
                   "properties": {

@@ -13,11 +13,18 @@ This CHANGELOG and git tags carry the deployed-instance release state.
 
 Contract:
 
-- `contract/kratos.schema.json` and `contract/hydra.schema.json` pin what the portal depends on in an Ory config: the seven webhooks (URL, method, `Bearer` header, interrupt and response settings, body), the flow `ui_url` pages, `whoami` at aal1, the `family` identity schema, the Hydra login, consent, logout, error and device URLs, the settings privileged-session age, registration disabled, `oauth2_provider` absent and the fixed ports. `node dist/server/config.mjs check-ory` validates a deployment's own finished files against them and requires its identity schema and recovery-gate hook to equal the image's copies. A deployment that renders its configs needs no change.
+- `contract/` pins what the portal depends on in an Ory config. `node dist/server/config.mjs check-ory` validates a deployment's own finished files against it. A deployment that renders its configs needs no change.
 
 Reference:
 
 - The OTLP endpoint is quoted in the `tracing` blocks of `kratos.yml` and `hydra.yml`. Optional: `git diff v0.15.0..<tag> -- kratos hydra`.
+
+### Fixed
+
+- Identity headers with underscores in their names are dropped at the edge.
+- The device verify rate limit also matches a trailing path.
+- Render refuses more line-break characters in values and quotes the OTLP endpoint.
+- A failed render clears the earlier output.
 
 ## [0.15.0] - 2026-10-12
 
