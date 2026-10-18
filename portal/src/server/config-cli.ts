@@ -55,8 +55,9 @@ function main(): number {
         console.log(`[othala-config] rendered ${files.length} files from ${policy} and ${content} to ${out}`);
         return 0;
       } catch (err) {
-        if (!(err instanceof RenderError)) throw err;
-        for (const line of err.message.split('\n')) console.error(`[othala-config] ${line}`);
+        // Any failure clears the earlier render, so old and new files never mix. Only a RenderError message is safe to print.
+        const lines = err instanceof RenderError ? err.message.split('\n') : [`render failed: ${(err as NodeJS.ErrnoException).code ?? 'unexpected error'}`];
+        for (const line of lines) console.error(`[othala-config] ${line}`);
         clearRendered(out);
         console.error('[othala-config] render refused; earlier output cleared');
         return 1;

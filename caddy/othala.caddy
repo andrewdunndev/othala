@@ -31,10 +31,11 @@
 		request_header -X-Auth-Request-*
 		request_header -X-Webauth-*
 		request_header -X-Authentik-*
+		request_header -*_*
 
 		# Public write paths of the device grant: a secretless client mints a device_code row per call, and the
 		# code form accepts guesses.
-		@device_entry path /oauth2/device/auth /device/verify
+		@device_entry path /oauth2/device/auth /device/verify /device/verify/*
 		rate_limit @device_entry {
 			zone othala_device {
 				key    {client_ip}
@@ -103,6 +104,7 @@
 		request_header -X-Auth-Request-*
 		request_header -X-Webauth-*
 		request_header -X-Authentik-*
+		request_header -*_*
 
 		# Status contract: portal/src/pages/api/forward-auth.ts. Any non-2xx is a denial; these arms only choose
 		# what it looks like. Only 401 goes to login: a 403 would come straight back after sign-in, and a 503
@@ -152,6 +154,7 @@
 		request_header -X-Auth-Request-*
 		request_header -X-Webauth-*
 		request_header -X-Authentik-*
+		request_header -*_*
 
 		# The app keeps its own cookies; only the Kratos session cookie (session.cookie.name in kratos.yml) is
 		# removed. Caddy has no single-cookie delete, hence the regexp replace.

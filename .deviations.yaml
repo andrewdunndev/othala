@@ -1,0 +1,8 @@
+- standard: package-publishing
+  assertion: file-contains:.gitlab-ci.yml
+  reason: |
+    slsa-attest attests binaries, and othala ships none. The image
+    carries a cosign keyless signature by digest and a CycloneDX SBOM
+    through container-sbom. Closes if the catalog gains an image-shaped
+    attest.
+  owner: maintainers@dunn.dev
