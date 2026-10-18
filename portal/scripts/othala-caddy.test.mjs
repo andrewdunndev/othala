@@ -32,12 +32,16 @@ const renderedCaddy = (env = ENV, policy = root) => render(policy, CONTENT, env)
 const STRIPPED = [
   'X-Kratos-Authenticated-Identity-Id', 'X-Kratos-Groups', 'Remote-*', 'X-Remote-*', 'X-Forwarded-User*', 'X-Forwarded-Groups',
   'X-Forwarded-Email', 'X-Forwarded-Preferred-Username', 'X-Auth-Request-*', 'X-Webauth-*', 'X-Authentik-*',
+  '*_*',
 ];
 
 // Caddy's header delete: case-insensitive, a trailing `*` matches by prefix.
-const strips = (name) => STRIPPED.some((p) => (p.endsWith('*')
-  ? name.toLowerCase().startsWith(p.slice(0, -1).toLowerCase())
-  : name.toLowerCase() === p.toLowerCase()));
+const strips = (name) => STRIPPED.some((p) => {
+  const n = name.toLowerCase();
+  const q = p.toLowerCase();
+  if (q.startsWith('*') && q.endsWith('*')) return n.includes(q.slice(1, -1));
+  return q.endsWith('*') ? n.startsWith(q.slice(0, -1)) : n === q;
+});
 
 // The file's block tree: a line ending in `{` opens a block, a lone `}` closes it; placeholders never span lines.
 function tree(text) {
@@ -129,7 +133,8 @@ test('every snippet strips the client identity headers first', () => {
 test('the strip covers the identity headers other proxies and apps use, and leaves forwarding headers', () => {
   for (const h of ['Remote-User', 'remote-groups', 'Remote-Email', 'Remote-Name', 'X-Remote-User', 'X-Remote-Uid', 'X-Forwarded-User',
     'X-Forwarded-Username', 'X-Forwarded-Preferred-Username', 'X-Auth-Request-Preferred-Username', 'X-Auth-Request-Access-Token',
-    'X-Webauth-User', 'X-Authentik-Username', 'x-authentik-groups', 'X-Kratos-Groups']) assert.ok(strips(h), h);
+    'X-Webauth-User', 'X-Authentik-Username', 'x-authentik-groups', 'X-Kratos-Groups',
+    'X-Kratos-Authenticated-Identity_Id', 'Remote_User']) assert.ok(strips(h), h);
   for (const h of ['X-Forwarded-For', 'X-Forwarded-Proto', 'X-Forwarded-Host', 'X-Real-IP', 'Cookie', 'Authorization']) {
     assert.ok(!strips(h), h);
   }
