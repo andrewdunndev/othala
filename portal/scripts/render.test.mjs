@@ -240,6 +240,19 @@ test('a refused render through the CLI writes nothing and empties an earlier ren
   });
 });
 
+test('a filesystem error during the write also empties an earlier render', () => {
+  withDir((dir) => {
+    const out = join(dir, 'out');
+    writeRendered(out, render(root, CONTENT, ENV));
+    rmSync(join(out, 'hydra/hydra.yml'));
+    mkdirSync(join(out, 'hydra/hydra.yml/blocker'), { recursive: true });
+    const r = cli(['render', '--policy', root, '--content', CONTENT, '--out', out], ENV);
+    assert.equal(r.status, 1);
+    assert.match(r.stderr, /render refused; earlier output cleared/);
+    for (const top of ['kratos', 'hydra', 'caddy']) assert.deepEqual(readdirSync(join(out, top)), [], top);
+  });
+});
+
 test('gen-secrets mints every secret but the SMTP URI, fresh each run, and the render accepts them', () => {
   const r = cli(['gen-secrets', '--content', CONTENT], {});
   assert.equal(r.status, 0);
