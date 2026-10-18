@@ -13,8 +13,7 @@ The deployment owns `othala.env` (values), `secrets.env` (never committed), `con
 units, and a Caddy build with `caddy-ratelimit` and its DNS provider's module.
 
 Never: an extra Ory `--config` layer, any env on Kratos or Hydra (it overrides the rendered files, unseen by
-`check`), edits to rendered output, copies of what the image carries, or renamed topology. A policy need
-becomes a typed value in a release.
+`check`), edits to rendered output, copies of what the image carries, or renamed topology. A policy need becomes a typed value.
 
 ## The deployment directory
 
@@ -32,9 +31,22 @@ docker compose up -d
 
 For an OIDC app added later, copy only its `<CLIENT_ID>_CLIENT_SECRET` line from a new `gen-secrets` run.
 
+## Your own Ory config
+
+A deployment may own finished `kratos.yml` and `hydra.yml` instead of rendering them, with secrets as any
+placeholder. The image's `contract/` pins only what the portal depends on; the identity schema and recovery-gate
+hook must equal the image's copies. In CI, after every edit:
+
+```sh
+docker run --rm -v "$PWD/ory:/ory:ro" "$IMAGE" node dist/server/config.mjs check-ory \
+  --kratos /ory/kratos.yml --hydra /ory/hydra.yml --identity-schema /ory/identity.schema.json --jsonnet /ory/recovery-gate.jsonnet
+```
+
+It exits 1 naming each violated key and rule, never a value. `kratos validate` stays the deployment's job.
+
 ## Startup order
 
-The render runs first as uid 10000, the Kratos image's uid (Hydra runs as 10000 too; its image defaults to nonroot). Then come both migrate jobs, Kratos and Hydra, and
+The render runs first as uid 10000, the Kratos image's uid. Then come both migrate jobs, Kratos and Hydra, and
 the portal; Caddy waits only for the render. With quadlets the render is a `Type=oneshot`,
 `RemainAfterExit=yes` unit writing a host tmpfs `/run/othala`; Kratos, Hydra, both migrate units and Caddy take
 `Requires=` and `After=` on it and mount `/run/othala/{kratos,hydra,caddy}` read-only at `/etc/config/kratos`,
@@ -49,8 +61,7 @@ the portal; Caddy waits only for the render. With quadlets the render is a `Type
 
 ## Validation
 
-1. `check` runs offline, without secrets, over env names and the whole content tree. Run `check --content <dir>`
-   with the non-secret env in CI after every edit to `apps/`.
+1. `check` runs offline, without secrets, over env names and the whole content tree. Run it in CI after every edit to `apps/`.
 2. `render` checks only env names and `courier/`, so a bad app sidelines that app and never stops sign-in. It
    refuses a missing or blank secret, a leftover `${` and malformed YAML, and empties its earlier output.
 3. Kratos and Hydra validate their merged config at boot and refuse to start.
@@ -89,7 +100,7 @@ cosign verify \
   registry.gitlab.com/dunn.dev/othala@sha256:<digest>
 ```
 
-Each release's `deploy/example/compose.yml` pins the upstream Ory digests its e2e ran; run those.
+Run the upstream Ory digests each release's `deploy/example/compose.yml` pins.
 
 ## Upgrading
 

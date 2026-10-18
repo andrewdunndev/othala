@@ -125,7 +125,7 @@ test('a value outside the contract changes freely', () => {
 });
 
 test('consumer placeholders pass wherever the template has a secret or an instance value', () => {
-  const ph = (name) => `\${sops:lodestone.dag.${name}}`;
+  const ph = (name) => `\${sops:example.${name}}`;
   const k = edit(kratos, (d) => {
     for (const h of [...hook(d, 'settings', 'after', 'profile').hooks, hook(d, 'recovery', 'after').hooks[0]]) h.config.auth.config.value = `Bearer ${ph('gate')}`;
     d.dsn = ph('dsn');

@@ -7,6 +7,18 @@ aims to follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 The git tag is the authoritative version; `portal/package.json` mirrors it.
 This CHANGELOG and git tags carry the deployed-instance release state.
 
+## [Unreleased]
+
+### Config changes
+
+Contract:
+
+- `contract/kratos.schema.json` and `contract/hydra.schema.json` pin what the portal depends on in an Ory config: the seven webhooks (URL, method, `Bearer` header), the flow `ui_url` pages, `whoami` at aal1, the `family` identity schema, the Hydra login, consent and logout URLs and the fixed ports. `node dist/server/config.mjs check-ory` validates a deployment's own finished files against them and requires its identity schema and recovery-gate hook to equal the image's copies. A deployment that renders its configs needs no change.
+
+Reference:
+
+- The OTLP endpoint is quoted in the `tracing` blocks of `kratos.yml` and `hydra.yml`. Optional: `git diff v0.15.0..<tag> -- kratos hydra`.
+
 ## [0.15.0] - 2026-10-12
 
 The image carries the Ory and edge policy and renders it from the deployment's env and content tree at `/etc/othala`; one command replaces the shell renderer.
