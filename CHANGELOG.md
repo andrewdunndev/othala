@@ -7,6 +7,12 @@ aims to follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 The git tag is the authoritative version; `portal/package.json` mirrors it.
 This CHANGELOG and git tags carry the deployed-instance release state.
 
+## [0.16.1] - 2026-10-18
+
+### Fixed
+
+- deploy/example runs the release image. The 0.16.0 tag was never published because its pipeline stopped on this pin.
+
 ## [0.16.0] - 2026-10-18
 
 ### Config changes
