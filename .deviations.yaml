@@ -5,4 +5,4 @@
     carries a cosign keyless signature by digest and a CycloneDX SBOM
     through container-sbom. Closes if the catalog gains an image-shaped
     attest.
-  owner: maintainers@dunn.dev
+  owner: root@dunn.dev
