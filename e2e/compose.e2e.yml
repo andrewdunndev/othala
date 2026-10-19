@@ -46,7 +46,7 @@ services:
 
   # SMTP :1025 for Kratos and the portal, HTTP API :8025 for smoke.sh Section H and the specs.
   mailpit:
-    image: docker.io/axllent/mailpit:v1.31.4@sha256:b68349e3a014b90c5610bfb26b2ae36f3892d7b8cf25ee140c6c71c98d2fcf48
+    image: docker.io/axllent/mailpit:v1.31.5@sha256:94f6b70c1436defae6799d9ac7ff0eeff9540465b842026d5cdb018f1c0234ea
     container_name: lab-mailpit
     restart: unless-stopped
     security_opt: ["no-new-privileges:true"]
