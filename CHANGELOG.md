@@ -7,7 +7,7 @@ aims to follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 The git tag is the authoritative version; `portal/package.json` mirrors it.
 This CHANGELOG and git tags carry the deployed-instance release state.
 
-## [Unreleased]
+## [0.16.0] - 2026-10-18
 
 ### Config changes
 
