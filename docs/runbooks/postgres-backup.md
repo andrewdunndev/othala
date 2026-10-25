@@ -28,7 +28,7 @@ your secret store or even a partial restore cannot decrypt.
 5. **Quarterly restore drill.** Restore the latest dump into a throwaway VM
    with fresh Kratos and Hydra pods and confirm one identity signs in, one
    OIDC client emits a token, and WebAuthn credentials still verify (this
-   tests `secrets.cipher` rehydration). Record results here.
+   tests `secrets.cipher` rehydration).
 
 ## Partial-state restore
 

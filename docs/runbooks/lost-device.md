@@ -4,22 +4,9 @@ The response when a member's device is lost, stolen, or accessed without their
 knowledge. Follow it in full: skipped steps leave a window for the attacker to
 regain access.
 
----
-
-## Why `revokeSubject` (force re-login) alone is insufficient
-
-The **Sign out everywhere** action in the admin UI calls `revokeSubject`, which
-deletes the identity's active Kratos sessions and invalidates Hydra login/consent
-grants, logging the attacker out immediately. **It does not delete enrolled
-credentials.**
-
-Passkeys, TOTP seeds and WebAuthn keys are credentials on the identity record,
-separate from any session. An attacker with a brief authenticated session can
-enrol their own passkey, which persists after `revokeSubject` and lets them
-authenticate afresh. An attacker who copied the TOTP QR code holds a valid
-second factor indefinitely.
-
-**Eviction requires removing the enrolled credentials, not just the sessions.**
+Signing out everywhere (`revokeSubject`) ends sessions and Hydra grants but does not delete enrolled
+credentials. An attacker with a brief session can enrol their own passkey, or hold a copied TOTP seed, and
+authenticate afresh. Eviction removes the credentials, not just the sessions.
 
 ---
 
@@ -51,6 +38,9 @@ Ask the user which credential types were on the device; treat each as
 compromised. If you cannot reach them, remove all evictable types; they
 re-enroll via the Step 4 URL.
 
+If a member reports an authenticator app they did not add, remove it from their account page; they are
+signed out everywhere.
+
 ### Step 2b — Check the identity's recovery email address
 
 The `recoveryEmail` trait accepts an unverified address. An attacker with even
@@ -60,7 +50,7 @@ recognise the value in the Profile section; if not, clear it:
 
 1. Click **Edit profile**.
 2. Clear the **Recovery email** field (leave it blank, or replace it with an
-   address the family member controls).
+   address the member controls).
 3. Click **Save**.
 
 The user can set their own after re-enrolling in Step 4.
@@ -118,22 +108,6 @@ If the identity has a `password ✓` chip and reaches a directory-backed app by
 password, the device may have had it saved. Rotate it in that app's own admin
 console; the portal has no admin-set password path by design.
 
----
+## Related
 
-## Security gates protecting this surface
-
-- **AAL2 requirement.** The user-detail page needs a session at assurance level 2.
-- **CSRF protection.** Every Remove action carries a per-render, per-type,
-  per-admin-identity, single-use token (30-min TTL).
-- **Console break-glass.** An admin's own account cannot be evicted here
-  (`shouldRefuseRecovery`); see `docs/runbooks/admin-recovery.md`.
-
----
-
-## Related runbooks and source files
-
-- `docs/runbooks/admin-recovery.md` — admin self-recovery.
-- `portal/src/lib/admin-api.ts` (`deleteCredential`, `EVICTABLE_CREDENTIAL_TYPES`) —
-  the Kratos admin API call.
-- `portal/src/lib/admin.ts` (`requireAdminSession`) — AAL2 gate.
-- `portal/src/pages/admin/users/[id].astro` — Remove action handler and UI.
+`docs/runbooks/admin-recovery.md` covers an admin's own account.

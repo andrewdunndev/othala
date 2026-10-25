@@ -33,11 +33,7 @@ authenticator app, and backup codes saved.
 
 ## 2. How admin authority works
 
-Admin status is the `metadata_admin.admin` flag on a Kratos identity, a
-boolean set only via the Kratos admin API, never through self-service flows
-or OIDC claims. The portal reads it fresh on every request via
-`GET /admin/identities/:id`, so nobody can elevate themselves by editing their
-own identity; the only write path is the network-gated admin API.
+Admin status is the `metadata_admin.admin` flag on a Kratos identity (SECURITY.md has the boundary).
 
 The admin API's identity-update endpoint takes a JSON Patch **array**, not a
 merge object — a bare `{"metadata_admin": …}` body is rejected:
@@ -55,31 +51,16 @@ Patch the marker and nothing else — sending a
 whole `metadata_admin` object replaces `groups` too, silently stripping an
 admin's app access while they can still sign in.
 
-**Groups are separate, and nothing is derived from the marker.** Entry to an
-app comes from holding that app's `<svc>-access` group, admins included;
-`<svc>-admin` grants the elevated role *inside* an app and admits nobody on
-its own. An admin who also uses a service holds both, explicitly. The full
-model is `portal/src/lib/gate.ts` and `portal/src/lib/identity-facts.ts`.
 
 ---
 
 ## 3. Why admin email-recovery is intentionally blocked
 
-For regular members, "Forgot account?" emails a code. For admins that path is
-blocked: a compromised admin mailbox would otherwise yield full admin access.
-
-The recovery-gate webhook (`kratos/hooks/recovery-gate.jsonnet` +
-`fetchAdminMarker` in `portal/src/server/listen.ts`) intercepts every
-recovery attempt after code verification. Kratos posts the identity id; the
-gate reads the authoritative `metadata_admin.admin` flag from the admin API and,
-if `true`, returns 403 and Kratos (`can_interrupt: true`) aborts the flow, even
-with a correct code.
-
-The gate re-reads the flag live on every attempt, with no cache and no
-allow-list, which is what lets the Section 4 console procedure clear the
-marker, recover, and restore it.
-
-If a member reports an authenticator app they did not add, remove it from their account page; they are signed out everywhere.
+For regular members, "Forgot account?" emails a code. For admins that path is blocked, because a
+compromised admin mailbox would otherwise yield full admin access: the recovery-gate webhook
+(`kratos/hooks/recovery-gate.jsonnet`, `fetchAdminMarker` in `portal/src/server/listen.ts`) reads the
+marker live and returns 403 for an admin, aborting the flow even with a correct code. Live means no cache, which is what lets
+the Section 4 procedure clear the marker, recover, and restore it.
 
 ---
 
@@ -88,7 +69,7 @@ If a member reports an authenticator app they did not add, remove it from their 
 Work from top to bottom. Each step is less convenient and more drastic than
 the one above it.
 
-> Steps A and B are ordinary product paths, exercised by the e2e suite. Steps
+> Steps A and B are ordinary product paths. Steps
 > C, D and E are console procedures on the Kratos admin API; rehearse them
 > against a throwaway stack. An admin-issued recovery code does not bypass the
 > gate, which is why Step D clears the marker first.
@@ -131,26 +112,22 @@ the API is never published to the network).
 2. **Issue a recovery code**, not a link: `POST /admin/recovery/code`. `kratos.yml`
    enables only the `code` method (`selfservice.methods.code.enabled: true`) for
    recovery; the `link` method is not enabled. The response carries both
-   a `recovery_link` and a `recovery_code`; nothing is emailed. The code's
-   lifetime is bounded by `selfservice.methods.code.config.lifespan`
-   regardless of the `expires_in` requested; issue a fresh one if it expires.
+   a `recovery_link` and a `recovery_code`; nothing is emailed.
+   Issue a fresh one if it expires.
 3. **Open the link, enter the code**, and re-enroll in that session before
    the tab closes: two passkeys across two devices, fresh TOTP, new backup
    codes.
 4. **Restore the admin marker**, re-add-only, and compare the result against
    what step 1 recorded. It takes effect on the next request — no restart.
-5. **Verify:** two-plus passkeys visible, TOTP + backup codes present, the
-   marker back with `groups` unchanged, `/admin` reachable again (proof the
-   marker works, not just that the patch returned 200), and old
-   session cookies invalidated (`revoke_active_sessions` fires automatically
-   on credential change). Record the event — date, reason, and the window the
-   marker was off — in your ops log.
+5. **Sign out everywhere** for the recovered identity in the admin UI. Only a password save revokes
+   sessions on its own.
+6. **Verify:** two-plus passkeys visible, TOTP + backup codes present, the
+   marker back with `groups` unchanged, and `/admin` reachable again (proof the
+   marker works, not just that the patch returned 200).
 
-**Why the marker comes off and goes back on.** The recovery-gate webhook is
-wired at the flow level (`selfservice.flows.recovery.after.hooks`,
-`can_interrupt: true`) with no exemption for admin-API-issued flows. Clearing the
-marker makes the procedure work whether or not the hook fires for them, and costs
-nothing: anyone who can call the admin API can already do far more.
+**Why the marker comes off and goes back on.** The recovery-gate hook has no exemption for admin-API-issued
+flows, so clearing the marker makes the procedure work whether or not the hook fires for them.
+Anyone who can call the admin API can already do far more.
 
 ### Step E: No devices, no admin-API access — physical access only
 
@@ -164,13 +141,9 @@ would be a trivially abusable break-glass. Get Kratos running and use Step D.
 
 ## 5. The dual-admin model (recommended)
 
-Two admins — carrying the `metadata_admin.admin` marker on separate
-identities — removes the single point of human failure: either can recover
-the other via Step C without an Asteroid-grade event, and either can manage
-family accounts without waiting on the other. The co-admin runs Step D
-against themself the same way an operator would; the portal UI blocks
-browser-based admin-to-admin recovery for both of them equally, so console
-access is the only path either has.
+Two admins, carrying the marker on separate identities, remove the single point of human failure: either can
+recover the other via Step C. The portal UI blocks browser-based admin-to-admin recovery for both equally, so
+console access is the only path either has.
 
 To add a co-admin: create their identity, toggle the admin marker on (admin
 UI, or the marker-only JSON Patch from Section 2 — never a whole
@@ -192,19 +165,8 @@ services; verify with a non-admin recovery that the gate still allows it.
 
 ---
 
-## Related runbooks and source files
+## Related
 
-- `docs/runbooks/lost-device.md` — lost/stolen device eviction procedure.
-  Read this first when responding to a lost device — force re-login alone is
-  insufficient if a credential was enrolled on the device.
-- `docs/runbooks/cookie-rotation.md` — rotate session cookies after a console
-  recovery.
-- `docs/runbooks/secrets-rotation.md` — break-glass rotation of
-  `secrets.system`.
-- `kratos/kratos.yml` — `selfservice.flows.recovery.after.hooks` (the gate
-  wire-up and `can_interrupt: true`).
-- `kratos/hooks/recovery-gate.jsonnet` — webhook body template.
-- `portal/src/server/listen.ts` (`fetchAdminMarker`, `handleRecoveryGate`) —
-  the gate handler.
-- `portal/src/lib/admin.ts` (`requireAdminSession`) — AAL2 step-up at the SSR
-  layer.
+- `docs/runbooks/lost-device.md`: eviction when a credential may have been enrolled on a lost device.
+- `docs/runbooks/cookie-rotation.md`: rotate session cookies after a console recovery.
+- `docs/runbooks/secrets-rotation.md`: break-glass rotation of `secrets.system`.

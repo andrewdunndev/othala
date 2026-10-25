@@ -7,10 +7,8 @@ exposure, a leak to a chat, log or commit); no cadence is required.
 
 ## Why this rebuilds the database
 
-Ory itself rotates this secret in place: a `[new, old]` list encrypts with the
-first entry and decrypts with all of them. Othala renders a single entry from
-`HYDRA_SYSTEM_SECRET` (no `_PREVIOUS`), so a new value cannot read what the old
-one wrote. The procedure therefore rebuilds the Hydra database.
+Ory rotates this in place with a `[new, old]` list, but Othala renders a single entry from
+`HYDRA_SYSTEM_SECRET`, so a new value cannot read what the old one wrote and the Hydra database is rebuilt.
 
 ## What rotation costs
 
@@ -20,8 +18,6 @@ one wrote. The procedure therefore rebuilds the Hydra database.
 - Outstanding tokens, grants and in-flight consent flows are lost; users
   mid-flow retry and sign in again.
 - Hydra's id_token signing keys do not survive; the rebuilt database mints new ones.
-
-A brief disruption, best in a low-traffic window.
 
 ## Procedure
 
@@ -43,7 +39,7 @@ Prerequisites: shell on the host and write access to your secret store.
 7. Re-register the clients: the registrar runs inside othala, so restart it or
    send `docker compose kill -s SIGHUP othala`; it re-creates each Hydra client
    from the manifests with its `<SLUG>_CLIENT_SECRET`.
-8. If any `<slug>_oidc_client_secret` changed, update and redeploy each affected app.
+8. If any `<SLUG>_CLIENT_SECRET` changed, update and redeploy each affected app.
 9. Verify an OIDC flow end to end.
 
 ## Verification
@@ -61,9 +57,3 @@ Prerequisites: shell on the host and write access to your secret store.
   and the app holds no signing key.
 - Postgres credential rotation: stop the substrate, rotate the password,
   redeploy. No rebuild, since the password is independent of at-rest encryption.
-
-## Related
-
-- `hydra/hydra.yml` `secrets.system`
-- `docs/runbooks/cookie-rotation.md`
-- `docs/runbooks/admin-recovery.md`

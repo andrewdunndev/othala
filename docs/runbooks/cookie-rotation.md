@@ -11,9 +11,7 @@ secret may have been exposed. For the Hydra system secret see
 
 ## Single-slot rendering
 
-Ory accepts a list for each of these secrets: the first entry signs or
-encrypts, every entry verifies or decrypts, so `[new, old]` rotates without
-logging anyone out (`uniqueItems` only rejects duplicates). A two-entry Kratos cookie list is untested with othala's 64-character cookie secrets; the continuity cookie needs 16, 24 or 32 characters. Othala renders one
+Ory accepts a list per secret, but Othala renders one
 entry from one `_CURRENT` value per secret (`KRATOS_COOKIE_SECRET_CURRENT`,
 `KRATOS_CIPHER_SECRET_CURRENT`, `HYDRA_COOKIE_SECRET_CURRENT`; no `_PREVIOUS`),
 so the old value stops verifying: every session and flow cookie signed under
