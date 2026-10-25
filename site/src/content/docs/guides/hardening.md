@@ -1,11 +1,8 @@
 # Hardening
 
-Why each control sits where it does and, where one is absent, why. The "not
-built" paragraphs are the ones worth reading; scope and reporting live in
-`SECURITY.md`. Controls ship with the install rather than being delegated to a
-WAF. Host root is out of scope and a compromised container is the tier most
-controls target, but the threat that dominates at small scale is a lost,
-stolen or shared device, and the worst case is a privacy breach, not fraud.
+Why each control sits where it does and, where one is absent, why. Scope and reporting live in
+`SECURITY.md`. The threat that dominates at small scale is a lost, stolen or shared device, and the worst
+case is a privacy breach, not fraud.
 
 ## Abuse resistance
 
@@ -13,12 +10,6 @@ Three unauthenticated risks: **email-bomb** against the code, recovery and
 verification flows; **credential brute-force**, since Kratos ships no account
 lockout by design; and **password-hash exhaustion**, where the argon2 memory
 parameter that makes hashing strong becomes the denial-of-service lever.
-`othala-routes` in `caddy/othala.caddy` rate-limits the Kratos browser paths and
-the device grant — the directive is a third-party
-module that must be compiled in, and a Caddy without it refuses to start rather
-than degrading. `portal/src/lib/contact.ts` rate-limits the one unauthenticated
-form the portal serves, and `kratos/kratos.yml` caps wrong-code submissions and
-declines to confirm to a stranger whether an address is enrolled.
 
 Not built, because the risk is real: **nothing caps concurrent argon2
 operations**, so the memory-exhaustion lever is unbounded regardless of
@@ -60,10 +51,9 @@ and none of it. The admin bind address is therefore a required variable, and
 the Ory config render fails when any token is unset, though
 nothing can check *which* address you supplied.
 
-The portal reaches the admin API with no mTLS and no client certificate, so
-**network isolation is the load-bearing control on that hop**. The residual: an edge proxy attached to both networks segments the admin APIs
-against every container outside the auth stack, and not against a compromise of
-the edge proxy itself. Both database DSNs likewise disable TLS (one private network, never crossing a host); an accepted risk.
+The portal reaches the admin API with no mTLS and no client certificate, so **network isolation is the
+load-bearing control on that hop**. An edge proxy attached to both networks segments the admin APIs
+against every container outside the auth stack, and not against a compromise of the edge proxy itself.
 
 **And no, you cannot put a password in front of the whole thing.** An identity
 provider serves unauthenticated callers: browsers at login and relying-party
@@ -86,18 +76,13 @@ The shape of that boundary, laid out end to end:
 environment**, and environment secrets are readable through `/proc` to anything
 in the user namespace. Closing that means a tmpfs-backed mount and a reader that
 takes a path — a known gap, not an oversight. No committed config holds
-plaintext, and rotation shape is a [Golden path](golden-path.md) commitment. `deploy/example/compose.yml`
-is the example deployment and e2e runs it, so its container baseline is exercised
-on every tag rather than described here. Its render runs as the Kratos and Hydra
-uid because the capability drop is load-bearing: without `CAP_DAC_OVERRIDE`, a
-0600 config owned by another uid is unreadable and every Ory service exits.
+plaintext. Its render runs as the Kratos and Hydra uid because the capability drop is load-bearing:
+without `CAP_DAC_OVERRIDE`, a 0600 config owned by another uid is unreadable and every Ory service exits.
 
 Not built: **no memory bound in the example compose** (bound memory in the
 deploy plane, sized to the host; Kratos needs about 128 MB per concurrent
-argon2 hash), so the hash-exhaustion lever above is otherwise unbounded;
-**nothing evaluates the SBOM** that ships with each release, so a known CVE in
-a shipped image fails nothing; and
-**nothing verifies a signature before use** — a property of whatever runs the
+argon2 hash), so the hash-exhaustion lever above is otherwise unbounded; and
+**nothing verifies a signature before use**, a property of whatever runs the
 image, not of this repository.
 
 ## Sessions and eviction
@@ -107,17 +92,10 @@ long for passkey-first daily use, so `/admin` additionally gates on *when* `aal2
 (`portal/src/lib/admin.ts`) redirects a stale session to the same step-up flow
 as a missing `aal2`, before the admin-marker fetch. Window: 1h.
 
-**Eviction must remove credentials, not just sessions.** Revoking sessions does
-not delete enrolled credentials, so someone with a brief session can enrol
-*their own* passkey and it survives both the revoke and a password reset. The
-ladder, per `docs/runbooks/lost-device.md`: contain (admin revoke, cuts the
-session now) → recover (self-service `/auth/recovery` if the victim is
-locked out) → self-remove (the victim deletes the lost device's own
-credential at `/auth/settings`) → last resort (delete the identity). For
-webauthn/totp/lookup_secret the admin API can delete the whole credential
-**type** in one call, but not for passkey: Kratos's admin API has no per-passkey
-removal and refuses the type-delete too (upstream limitation). Self-remove is
-therefore the only passkey eviction path, proven end to end by `e2e/playwright/tests/p-eviction.spec.ts` P3.
+**Eviction must remove credentials, not just sessions.** Revoking sessions does not delete enrolled
+credentials, so someone with a brief session can enrol *their own* passkey and it survives both the revoke
+and a password reset. Kratos's admin API has no per-passkey removal, so self-remove at `/auth/settings` is the
+only passkey eviction path; the ladder is in `docs/runbooks/lost-device.md`.
 
 Revoking itself is one fan-out, and it shares an invariant with the login
 path's own skip=true handling — Hydra's memory is never trusted on its own:

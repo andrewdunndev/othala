@@ -36,8 +36,4 @@ preserves the original status, and leaves API responses alone. Adding a denial r
 ## The one surface that stays unbranded
 
 Because `checkOrigin` short-circuits before user middleware, the framework `403`
-is the one deny the portal cannot brand. It ships bare. Branding it would mean intercepting upstream 4xx at the reverse
-proxy and re-rendering the application's error page, a finicky sub-request
-pattern for a population that is only attackers. The acceptance bar for doing
-it: the branded page carries the original status, and a portal-down 502 or 503
-falls back to something static rather than sub-requesting a dead application.
+is the one deny the portal cannot brand. It ships bare.

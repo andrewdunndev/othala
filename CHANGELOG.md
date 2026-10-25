@@ -5,7 +5,6 @@ All notable changes to Othala are documented here. The format follows
 aims to follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 The git tag is the authoritative version; `portal/package.json` mirrors it.
-This CHANGELOG and git tags carry the deployed-instance release state.
 
 ## [Unreleased]
 
@@ -15,6 +14,7 @@ This CHANGELOG and git tags carry the deployed-instance release state.
 - `/readyz` also fails while the registrar's last reconcile failed, and a SIGHUP during a reconcile queues one rerun instead of being dropped.
 - A remembered login lasts as long as the Kratos session's own expiry; the hardcoded 720h fallback is gone.
 - The identity schema no longer carries a `metadata_admin` block; Kratos validates `traits` only and the portal enforces the marker.
+- Documentation cut to what a stranger or operator needs: DECISIONS is a ruling list, the Golden path guide and `hydra/README.md` are folded into DEPLOY, DECISIONS and the per-app guide, and the recovery-session and SBOM statements that tests contradict are corrected.
 
 ### Removed
 
