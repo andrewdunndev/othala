@@ -9,6 +9,7 @@ const REQUIRED_HEADERS: Array<[string, string | RegExp]> = [
   ['content-security-policy', /frame-ancestors\s+'none'/],
   ['content-security-policy', /form-action\s+'self'/],
   ['strict-transport-security', /max-age=63072000/],
+  ['cross-origin-opener-policy', 'same-origin'],
 ];
 
 const PROBE_ROUTES = [
