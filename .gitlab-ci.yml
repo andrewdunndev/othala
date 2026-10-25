@@ -145,6 +145,16 @@ verify-othala:
     - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
       changes: *heavy-paths
     - if: '$CI_PIPELINE_SOURCE =~ /^(web|api)$/'
+# Installs the previous release, upgrades it per DEPLOY.md and checks identity, session and grant survive.
+# GIT_DEPTH 0: it reads the release tags.
+e2e-upgrade:
+  extends: e2e
+  variables:
+    GIT_DEPTH: 0
+  script:
+    - cd e2e
+    - bash upgrade.sh
+
 # sbom and release wait on e2e. The components' own needs stop at the image
 # build, so the jobs are extended here (needs arrays replace, not merge).
 sbom-othala:
@@ -155,6 +165,7 @@ create-release:
     - job: build-othala
       artifacts: false
     - e2e
+    - e2e-upgrade
 
 upload-release-assets:
   needs:
@@ -164,6 +175,7 @@ upload-release-assets:
     - job: sbom-othala
       artifacts: true
     - e2e
+    - e2e-upgrade
 
 # check-purity: OSS purity and deprecated-name gate, plus a bash -n over tracked
 # shell scripts.

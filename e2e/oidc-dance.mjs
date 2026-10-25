@@ -49,7 +49,7 @@ const loc = (r) => r.headers.get('location');
     const authUrl =
       HP + '/oauth2/auth?client_id=' + CLIENT +
       '&response_type=code' +
-      '&scope=' + encodeURIComponent('openid email groups') +
+      '&scope=' + encodeURIComponent('openid email groups offline_access') +
       '&redirect_uri=' + encodeURIComponent(REDIRECT) +
       '&state=dancestate01&nonce=dancenonce01';
 
@@ -159,6 +159,7 @@ const loc = (r) => r.headers.get('location');
       groups: claims.groups,
       grafana_role: grafanaRole,
       introspect_active: intro.active,
+      refresh_token: tok.refresh_token,
     }));
   } catch (e) {
     console.log('EXC ' + e.message);
