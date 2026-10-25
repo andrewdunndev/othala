@@ -19,12 +19,12 @@ from env; a manifest with only `presentation:` is skipped. See
 
 ## secrets.system non-rotatable
 
-`hydra.yml` references `${HYDRA_SYSTEM_SECRET}`. **Generate once. Store in
-sops as `<host>.hydra_system_secret`. Never rotate without rebuilding the
+`hydra.yml` references `${HYDRA_SYSTEM_SECRET}`. **Generate once. Store it in
+your secret store. Never rotate without rebuilding the
 Hydra database.** Break-glass rotation: `docs/runbooks/secrets-rotation.md`.
 
 ## Schema migrations
 
-Hydra does not migrate on startup. The production quadlet stack and the e2e
+Hydra does not migrate on startup. Deployments and the e2e
 compose stack run a `hydra-migrate` init step (`hydra migrate sql up -e --yes`)
 before `hydra serve`.

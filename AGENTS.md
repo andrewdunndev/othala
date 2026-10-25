@@ -11,9 +11,9 @@ is part of the change that made it wrong.**
 **1. The audience test.** Every file, section and sentence must serve a stranger
 adopting Ory patterns. Anything that serves only this deployment does not
 appear: no instance hostnames, no personal names, no private-stack applications
-(three whole-index checks in `scripts/check-purity.sh`). `grafana` and
-`audiobookshelf` are the only example apps, being the `e2e/` fixtures, so docs
-and tests agree by construction. Judging the rest is a habit.
+(whole-index checks in `scripts/check-purity.sh`; the private-name patterns
+live in the file named by `PURITY_PRIVATE_NAMES`, outside the tree). The `e2e/`
+fixtures are the only example apps, so docs and tests agree by construction. Judging the rest is a habit.
 
 **2. Docs state WHY; code states WHAT.** Never restate code behaviour in prose:
 it rots. Where behaviour must be referenced, point at the TEST that enforces it.
@@ -30,14 +30,6 @@ Never a line number.
 
 Worked example: the canonical group-name policy is `GROUP_RE` in
 `portal/src/lib/access-groups.ts`. Name it and stop.
-
-## The prose budget
-
-Tracked prose is capped. Before adding a page, check whether an existing one
-should shrink instead. The `prose-budget` check in `scripts/check-purity.sh` fails the build when the
-total exceeds `PROSE_CEILING_BYTES`, and prints the total, the ceiling and the
-headroom on every run. Raising the ceiling is an edit to that constant, in a commit whose message says
-what grew and why.
 
 ## Correcting documentation: delete, do not rewrite (a habit)
 
@@ -64,7 +56,7 @@ One local script. CI runs the same checks and more.
 **`scripts/check-purity.sh`** runs its checks over the git **index**, not the
 worktree, so the corpus is identical locally and in CI. Every check is a row in
 a data table (pattern branches, canaries, pathspec); `scan()` plus the loop over
-it is the whole runner. Four rows take the whole index as their corpus
+it is the whole runner. Some rows take the whole index as their corpus
 (instance names, personal names, private-stack application names, vendored
 line-pins) because a pathspec-scoped check cannot catch what is outside its glob.
 

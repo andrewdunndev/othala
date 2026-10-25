@@ -7,8 +7,7 @@
 //
 // The site carries the Guides (content-collection-backed, below) plus
 // a standalone Architecture overview at src/pages/architecture.astro —
-// hand-authored rather than markdown, so it costs nothing against the
-// prose budget. `extraNav` is how it reaches the header nav without a
+// hand-authored rather than markdown. `extraNav` is how it reaches the header nav without a
 // `Section` entry of its own. Operational runbooks live in the
 // repository (docs/), not on the public site.
 

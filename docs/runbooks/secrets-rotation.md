@@ -3,7 +3,7 @@
 `secrets.system` is the symmetric key Hydra uses to encrypt its JWK private
 keys and stored OAuth2 session data at rest in Postgres. (Client secrets are
 hashed, not encrypted.) Rotation rebuilds the Hydra
-database; do it only on known compromise of the key (sops file or age key
+database; do it only on known compromise of the key (secret-store
 exposure, a leak to a chat, log or commit). No cadence is required: Hydra
 treats this key like a database master key, not a session cookie.
 
@@ -20,16 +20,15 @@ A brief disruption, best in a low-traffic window.
 
 ## Procedure
 
-Prerequisites: shell on the host, and sops with the age key
-(`SOPS_AGE_KEY_FILE`).
+Prerequisites: shell on the host and write access to your secret store.
 
 1. Generate the new secret: `openssl rand -base64 48`.
-2. Set the `hydra_system_secret` entry in your sops file to it.
+2. Store it as the Hydra system secret in your secret store.
 3. Stop Hydra and its migrate unit.
 4. Drop and recreate the Hydra database:
 
    ```sh
-   podman exec -it <postgres-container> psql -U postgres -c \
+   <exec into the postgres container> psql -U postgres -c \
      "DROP DATABASE hydra; CREATE DATABASE hydra OWNER hydra;"
    ```
 
@@ -46,7 +45,7 @@ Prerequisites: shell on the host, and sops with the age key
 - The registrar exited 0 for every manifest.
 - A test login through an OIDC client completes.
 - Hydra logs show no decryption errors.
-- The sops file holds only the new `hydra_system_secret`.
+- The secret store holds only the new system secret.
 
 ## Not covered
 

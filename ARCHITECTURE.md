@@ -99,10 +99,6 @@ unnoticed; coercing or skipping the name would do one of those. The admin form's
 (`planGroupSave`, `portal/src/lib/gate.ts`) is the way out, and it refuses to write while a
 non-canonical name is still held.
 
-The pattern is repeated in `kratos/identity.schema.json`, which Kratos does not enforce (it validates
-`traits` only) but which must match: divergence advertises names the read gate refuses, a lockout with
-no error message. Nothing checks the schema against `GROUP_RE`; that agreement is UNENFORCED.
-
 **Role resolution is order-independent.** `lookupRole` (`portal/src/lib/claims.ts`) takes a per-client
 override if it names a declared role, and otherwise maps every held group through `group_role_map`
 and keeps the role ranked highest by its index in `manifest.roles`, not a first-match walk over

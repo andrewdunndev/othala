@@ -45,9 +45,8 @@ the system only through the network-isolated admin API.
 **Why.** Kratos treats `metadata_admin` as opaque; three empirical facts follow. Kratos mints identity
 ids and rejects caller-supplied ones on create, so an env allowlist of admin UUIDs could only be filled
 by create, read back the minted id, write config, restart: changing the admin set becomes a redeploy.
-Kratos validates the identity schema against `traits` only, so the schema's `metadata_admin` block never
-executes: it is documentation, the application's validator is the sole runtime enforcement, and a
-deployed schema can fail to enumerate the very key the application reads as authority. Kratos also omits
+Kratos validates the identity schema against `traits` only, so the application's validator is the sole
+enforcement of `metadata_admin`. Kratos also omits
 `metadata_admin` from the identity passed to after-hook body templates, so a hook needing to know
 whether an identity is an admin must call the admin API, not read its own context.
 Admin authority is not a group: groups are user-visible data carried in OIDC claims, and an admin bit

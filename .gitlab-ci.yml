@@ -163,9 +163,9 @@ upload-release-assets:
       artifacts: true
     - e2e
 
-# check-purity: OSS purity, deprecated, dated-debt and prose-budget gate, plus a
-# bash -n over tracked shell scripts. The script names every check; the gate
-# scans this file too, so a runner tag or comment naming a private host fails.
+# check-purity: OSS purity and deprecated-name gate, plus a bash -n over tracked
+# shell scripts. The two private-name rules read the file named by the
+# PURITY_PRIVATE_NAMES file variable and fail in CI when it is unset.
 check-purity:
   stage: verify
   image: registry.access.redhat.com/ubi10/nodejs-24:10.2@sha256:881f7b8acbf0e131a9d0cb134e3e001be8d64eae4926f0a5d4147339c2ab5c6c

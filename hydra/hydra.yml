@@ -67,7 +67,7 @@ oauth2:
 
 secrets:
   # CRITICAL: secrets.system is non-rotatable for the life of the Hydra DB. Generate once and
-  # store in sops as <host>.hydra_system_secret (docs/runbooks/secrets-rotation.md).
+  # keep it in your secret store (docs/runbooks/secrets-rotation.md).
   system:
     - "${HYDRA_SYSTEM_SECRET}"
 

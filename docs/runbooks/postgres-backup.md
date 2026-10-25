@@ -1,7 +1,7 @@
 # Postgres backup and restore
 
 The backup posture for the `kratos` and `hydra` databases and the restore
-procedure. The runner (cron or quadlet, off-host copy, snapshot policy) is
+procedure. The runner (scheduler, off-host copy, snapshot policy) is
 deploy-plane work; this runbook is the contract it must satisfy.
 
 ## Stakes
@@ -21,10 +21,10 @@ your secret store or even a partial restore cannot decrypt.
    dumps: snapshot for quick rollback, dump for long-term archive.
 3. **Off-host copy** to at least one destination outside a single-host
    failure; two independent destinations are stronger.
-4. **`secrets.system` stays out of the dump.** It is an env var held in sops
-   (`hydra_system_secret`). Restore it into the env before starting Hydra;
+4. **`secrets.system` stays out of the dump.** It is an env var held in your secret
+   store. Restore it into the env before starting Hydra;
    otherwise the JWK private keys and session data are permanently ciphertext. Back up the
-   sops age key separately.
+   secret-store key separately.
 5. **Quarterly restore drill.** Restore the latest dump into a throwaway VM
    with fresh Kratos and Hydra pods and confirm one identity signs in, one
    OIDC client emits a token, and WebAuthn credentials still verify (this
