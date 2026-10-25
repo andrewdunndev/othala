@@ -1,6 +1,6 @@
 # Grafana: the role-mapping example (JMESPath grafana_role plus a groups claim) and the
 # access-model fixture (t-access-model.spec.ts T1-T4; site guides/per-app-oidc.md;
-# DECISIONS.md § Nothing is derived).
+# DECISIONS.md).
 
 presentation:
   name: Grafana

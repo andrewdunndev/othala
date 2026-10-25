@@ -60,7 +60,8 @@ A placeholder may replace only the secret or instance part of a value; the `Bear
 ## Startup order
 
 The render runs first as uid 10000, the Kratos image's uid. Then come both migrate jobs, Kratos and Hydra
-(Hydra does not migrate on startup), and the portal; Caddy waits only for the render.
+(neither Ory service migrates on startup), and the portal; Caddy waits only for the render.
+With quadlets the render is a `Type=oneshot`, `RemainAfterExit=yes` unit writing a host tmpfs `/run/othala`; Kratos, Hydra, both migrate units and Caddy take `Requires=` and `After=` on it and mount `/run/othala/{kratos,hydra,caddy}` read-only at `/etc/config/kratos`, `/etc/config/hydra` and `/etc/caddy/othala`.
 
 ## Restart rules
 

@@ -38,8 +38,7 @@ Ask the user which credential types were on the device; treat each as
 compromised. If you cannot reach them, remove all evictable types; they
 re-enroll via the Step 4 URL.
 
-If a member reports an authenticator app they did not add, remove it from their account page; they are
-signed out everywhere.
+If a member reports an authenticator app they did not add, remove it from their account page, then use Also sign out everywhere on the same page.
 
 ### Step 2b — Check the identity's recovery email address
 
