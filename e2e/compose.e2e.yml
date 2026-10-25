@@ -1,8 +1,8 @@
 # Test-only overlay, outside the deployment contract. validate.sh copies deploy/example/compose.yml here and runs
 #   docker compose -f compose.yml -f compose.e2e.yml
 # with this directory as the deployment: othala.env, secrets.env, Caddyfile and content/ are the test's own.
-# Only what testing needs is added: the image under test, Ory's --dev for the http issuer, the HIBP-off Kratos
-# layer, plain-HTTP test hostnames, fixed container names for podman logs, a mail catcher and the runners.
+# Only what testing needs is added: the image under test, the HIBP-off Kratos
+# layer, an internal-CA edge for the test hostnames, fixed container names for podman logs, a mail catcher and the runners.
 
 services:
   render:
@@ -19,14 +19,13 @@ services:
     container_name: lab-kratos
     volumes:
       - ./kratos.e2e.yml:/etc/config/kratos.e2e.yml:ro,z
-    command: ["serve", "--config", "/etc/config/kratos/kratos.yml", "--config", "/etc/config/kratos.e2e.yml", "--dev", "--watch-courier"]
+    command: ["serve", "--config", "/etc/config/kratos/kratos.yml", "--config", "/etc/config/kratos.e2e.yml", "--watch-courier"]
 
   hydra-migrate:
     container_name: lab-hydra-migrate
 
   hydra:
     container_name: lab-hydra
-    command: ["serve", "all", "--config", "/etc/config/hydra/hydra.yml", "--dev"]
 
   othala:
     image: ${AUTH_REGISTRY}:${AUTH_VERSION}
@@ -35,10 +34,10 @@ services:
       mailpit:
         condition: service_healthy
 
-  # Plain HTTP on :8088: the test hostnames have no DNS, so the example's ACME ports are replaced.
+  # Internal CA on :8443: the test hostnames have no DNS, so the example's ACME ports are replaced.
   caddy:
     container_name: lab-caddy
-    ports: !override ["8088:80"]
+    ports: !override ["8443:443"]
     networks:
       edge:
         # MUST be subdomains of the Kratos cookie domain (othala.test) or the CSRF cookie is never sent.
@@ -69,12 +68,17 @@ services:
     image: ${AUTH_REGISTRY}/e2e-tester:${AUTH_VERSION}
     profiles: ["oneshot"]
     networks:
+      edge: {}
       internal: {}
+    extra_hosts: ["kratos:10.200.11.10", "hydra:10.200.11.11", "othala:10.200.11.12"]
     depends_on:
       othala:
         condition: service_healthy
     environment:
-      OTHALA_URL: http://othala:8080
+      EDGE_URL: https://auth.othala.test
+      NODE_EXTRA_CA_CERTS: /caddy/caddy/pki/authorities/local/root.crt
+    volumes:
+      - caddy-data:/caddy:ro
     working_dir: /test
     entrypoint: ["node"]
 
@@ -102,10 +106,12 @@ services:
       othala:
         condition: service_healthy
     environment:
-      BASE: http://auth.othala.test
+      BASE: https://auth.othala.test
+      NODE_EXTRA_CA_CERTS: /caddy/caddy/pki/authorities/local/root.crt
       OTHALA_ADMIN_URL: http://othala:4431
       PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD: "1"
     volumes:
       - ./browser-out:/out:z
+      - caddy-data:/caddy:ro
     working_dir: /test
     command: ["npx", "playwright", "test", "--config=playwright.config.ts"]

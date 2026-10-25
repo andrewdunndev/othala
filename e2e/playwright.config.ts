@@ -1,4 +1,15 @@
+import { createHash, X509Certificate } from 'node:crypto';
+import { readFileSync } from 'node:fs';
 import { defineConfig, devices } from '@playwright/test';
+
+// SPKI pins of the edge's internal CA (read-only volume): Chromium treats a pinned chain as valid, so
+// WebAuthn sees a clean secure context.
+const ca = '/caddy/caddy/pki/authorities/local/';
+const spki = ['root', 'intermediate']
+  .map((n) => createHash('sha256')
+    .update(new X509Certificate(readFileSync(ca + n + '.crt')).publicKey.export({ type: 'spki', format: 'der' }))
+    .digest('base64'))
+  .join(',');
 
 /**
  * Othala browser e2e — Playwright config.
@@ -9,7 +20,7 @@ import { defineConfig, devices } from '@playwright/test';
  * this process starts.
  *
  * baseURL is the Caddy edge alias inside the compose net: auth.othala.test.
- * The playwright container is ON that net, so http:// (no TLS) works fine.
+ * The edge serves a Caddy internal CA, trusted via the SPKI pins above.
  *
  * Output dir: /out (mounted from ./browser-out on the host, matches the
  * volume in compose.e2e.yml so screenshots are available as CI artifacts).
@@ -24,7 +35,7 @@ export default defineConfig({
   reporter: [['list'], ['html', { outputFolder: '/out/html-report', open: 'never' }]],
 
   use: {
-    baseURL: process.env.BASE ?? 'http://auth.othala.test',
+    baseURL: process.env.BASE ?? 'https://auth.othala.test',
     // Browser context carries cookies across navigations automatically.
     // The JSON-API login action (actions/login.ts) returns the session via
     // Set-Cookie; we use a storageState pattern per identity in the fixtures.
@@ -39,16 +50,10 @@ export default defineConfig({
       name: 'chromium',
       use: {
         ...devices['Desktop Chrome'],
-        // channel: 'chromium' forces the full Chromium binary instead of the
-        // default headless-shell — the shell ignores
-        // --unsafely-treat-insecure-origin-as-secure entirely (playwright#22944),
-        // which silently defeated the flag below.
+        // The full Chromium binary: the default headless-shell ignores the SPKI flag below.
         channel: 'chromium',
         launchOptions: {
-          // Blink's [SecureContext] gate blocks navigator.credentials on
-          // plaintext http:// origins (the e2e edge is deliberately not
-          // TLS'd — see e2e/Caddyfile); this allowlists it for WebAuthn.
-          args: ['--unsafely-treat-insecure-origin-as-secure=http://auth.othala.test'],
+          args: ['--ignore-certificate-errors-spki-list=' + spki],
         },
       },
     },

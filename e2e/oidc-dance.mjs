@@ -22,13 +22,8 @@ import { CookieJar } from 'tough-cookie';
 import makeFetchCookie from 'fetch-cookie';
 import { decodeJwt } from 'jose';
 
-const HP = 'http://hydra:4444';
+const HP = process.env.EDGE_URL ?? 'https://auth.othala.test';
 const HA = 'http://hydra:4445';
-// APP is the othala public SSR port. When running inside the othala container
-// this is localhost:8080; when running from the playwright container (which
-// has the npm deps) this must be the service name: othala:8080.
-// smoke.sh run_dance now execs into the playwright container after npm ci.
-const APP = process.env.OTHALA_URL ?? 'http://othala:8080';
 // grafana is the role-mapping client; its registered redirect_uri must
 // byte-match the grafana fixture's redirect_uris[0].
 const CLIENT = 'grafana';
@@ -36,10 +31,8 @@ const REDIRECT = 'https://grafana.othala.test/login/generic_oauth';
 const SUBJECT = '__SUBJECT__';
 const SECRET = '__GRAFANA_SECRET__';
 
-// Cookie jar — RFC-compliant, handles Domain/Path/Secure/SameSite attributes.
-// tough-cookie rejects 'secure' cookies on http:// by default; the e2e is HTTP
-// only, so we use a relaxed options object.
-const jar = new CookieJar(undefined, { rejectPublicSuffixes: false, looseMode: true });
+// Hydra's CSRF cookies are Secure, so every hop goes through the https edge.
+const jar = new CookieJar();
 // fetch-cookie wraps globalThis.fetch (Node 18+) with automatic jar management.
 // Hydra sets CSRF cookies on the OAuth2 flow that must survive the login/consent
 // redirect chain; tough-cookie handles the persistence the old manual accumulator did.
@@ -47,31 +40,6 @@ const fetchWithCookies = makeFetchCookie(fetch, jar);
 
 // Hydra admin API client for the login accept call.
 const hydraAdmin = new OAuth2Api(new Configuration({ basePath: HA }));
-
-// Rewrite Hydra's external-facing redirect_to URLs (which embed the configured
-// issuer host, e.g. auth.othala.test) to the internal hydra:4444 endpoint so we
-// can follow them from inside the compose net without DNS for auth.othala.test.
-// Hydra's redirect_to URLs carry the external issuer host (auth.othala.test).
-// Rewrite to internal addresses. Ordering matters: app-challenge paths (/oauth2/login,
-// /oauth2/consent) must be matched BEFORE the generic /oauth2 prefix or they'd be
-// routed to hydra:4444 instead of the app.
-const toInternal = (u) => {
-  try {
-    const x = new URL(u);
-    // Challenge handlers are served by the app, not Hydra.
-    if (x.pathname.startsWith('/oauth2/login') || x.pathname.startsWith('/oauth2/consent') || x.pathname.startsWith('/oauth2/logout')) {
-      return APP + x.pathname + x.search;
-    }
-    // Remaining /oauth2/* and /.well-known/* are Hydra's public surface.
-    if (x.pathname.startsWith('/oauth2') || x.pathname.startsWith('/.well-known')) {
-      return HP + x.pathname + x.search;
-    }
-    // Fallback: rewrite to hydra for any unrecognised hydra-issued URL.
-    return HP + x.pathname + x.search;
-  } catch {
-    return u;
-  }
-};
 
 const loc = (r) => r.headers.get('location');
 
@@ -111,7 +79,7 @@ const loc = (r) => r.headers.get('location');
     }
 
     // ── Step 3: follow redirect_to → Hydra issues consent_challenge ───────────
-    let r3 = await fetchWithCookies(toInternal(redirectTo), { redirect: 'manual' });
+    let r3 = await fetchWithCookies(redirectTo, { redirect: 'manual' });
     const l3 = loc(r3);
     const consentChallenge = l3 ? new URL(l3, HP).searchParams.get('consent_challenge') : null;
     if (!consentChallenge) {
@@ -120,28 +88,27 @@ const loc = (r) => r.headers.get('location');
     }
 
     // ── Step 4: drive the APP consent handler (re-gates + composes claims) ────
-    // The URL is the app's /oauth2/consent handler, routed via APP (othala:8080).
-    const consentHandlerUrl = APP + '/oauth2/consent?consent_challenge=' + consentChallenge;
+    const consentHandlerUrl = HP + '/oauth2/consent?consent_challenge=' + consentChallenge;
     let r4 = await fetchWithCookies(consentHandlerUrl, { redirect: 'manual' });
     const l4 = loc(r4);
     if (!l4) {
       console.log('STEP4 consent no location status=' + r4.status + ' body=' + (await r4.text()).slice(0, 200));
       return;
     }
-    const u4 = new URL(l4, APP);
+    const u4 = new URL(l4, HP);
     if (u4.searchParams.get('error')) {
       console.log('DENIED-at-consent error=' + u4.searchParams.get('error') + ' desc=' + u4.searchParams.get('error_description'));
       return;
     }
 
     // ── Step 5: follow consent verifier → Hydra issues the auth code ──────────
-    let r5 = await fetchWithCookies(toInternal(l4), { redirect: 'manual' });
+    let r5 = await fetchWithCookies(l4, { redirect: 'manual' });
     const l5 = loc(r5);
     if (!l5) {
       console.log('STEP5 no location status=' + r5.status + ' body=' + (await r5.text()).slice(0, 200));
       return;
     }
-    const u5 = new URL(l5, APP);
+    const u5 = new URL(l5, HP);
     if (u5.searchParams.get('error')) {
       console.log('DENIED-at-code error=' + u5.searchParams.get('error') + ' desc=' + u5.searchParams.get('error_description'));
       return;

@@ -137,7 +137,7 @@ fi
 # A6: Hydra public /.well-known/openid-configuration + issuer byte-match
 oidc=$(curl_in hydra http://localhost:4444/.well-known/openid-configuration)
 issuer=$(echo "$oidc" | python3 -c "import sys,json; print(json.load(sys.stdin).get('issuer',''))" 2>/dev/null || echo "")
-# Issuer is OTHALA_PUBLIC_URL (http://auth.othala.test from othala.env).
+# Issuer is OTHALA_PUBLIC_URL (https://auth.othala.test from othala.env).
 expected_issuer="${OTHALA_PUBLIC_URL}/"
 if [[ "$issuer" == "$expected_issuer" ]]; then
     pass "A6 hydra openid-config issuer byte-match: $issuer"

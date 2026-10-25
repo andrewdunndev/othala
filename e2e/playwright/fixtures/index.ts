@@ -299,7 +299,7 @@ export const test = base.extend<OthalaFixtures, OthalaWorkerFixtures>({
   }, { auto: true }],
 
   baseURL: async ({}, use) => {
-    await use(process.env.BASE ?? 'http://auth.othala.test');
+    await use(process.env.BASE ?? 'https://auth.othala.test');
   },
 
   kratosAdminURL: [async ({}, use) => {

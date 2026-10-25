@@ -276,7 +276,7 @@ test('T5 — NEITHER group is DENIED', async ({ browser, baseURL, kratosAdminURL
   }
 });
 
-const PROXYWATCH_ORIGIN = 'http://proxywatch.othala.test';
+const PROXYWATCH_ORIGIN = 'https://proxywatch.othala.test';
 const FA = (baseURL: string, group: string) =>
   `${baseURL}/api/forward-auth?group=${encodeURIComponent(group)}`;
 

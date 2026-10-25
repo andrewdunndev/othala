@@ -54,7 +54,7 @@ test('X — RP-initiated logout ends the Kratos session and the next authorize r
     expect(idToken, 'openid scope must yield an id_token').toBeTruthy();
 
     const before = await ctx.cookies();
-    expect(before.some((c) => c.name === 'ory_kratos_session'), 'Kratos session cookie present').toBe(true);
+    expect(before.find((c) => c.name === 'ory_kratos_session')?.secure, 'Kratos session cookie present and Secure').toBe(true);
 
     const logout = await walk(
       ctx,

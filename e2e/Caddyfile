@@ -1,7 +1,7 @@
-# Test-only site Caddyfile for the e2e harness, outside the deployment contract: plain HTTP (the e2e issuer is http
-# and Hydra runs --dev) and a stub app behind the gate. Everything else is the rendered othala.caddy, as shipped.
+# Test-only site Caddyfile for the e2e harness, outside the deployment contract: an internal CA for the test
+# hostnames and a stub app behind the gate. Everything else is the rendered othala.caddy, as shipped.
 {
-	auto_https off
+	skip_install_trust
 	admin off
 	servers {
 		trusted_proxies static private_ranges
@@ -10,12 +10,14 @@
 
 import /etc/caddy/othala/othala.caddy
 
-auth.othala.test:80 {
+auth.othala.test {
+	tls internal
 	import othala-routes
 }
 
 # ZI1 and T8/T10 reach the stub through the gate; it echoes the identity, spoof and cookie headers it was sent.
-proxywatch.othala.test:80 {
+proxywatch.othala.test {
+	tls internal
 	import othala-forward-auth 127.0.0.1 8081 proxywatch-access
 }
 

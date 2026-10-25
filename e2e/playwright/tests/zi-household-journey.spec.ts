@@ -11,7 +11,7 @@ import { getSession } from '../actions/session';
 const PASSKEY_REGISTER_BUTTON = 'button[name="passkey_register_trigger"]';
 const PASSKEY_LOGIN_BUTTON = 'button[name="passkey_login_trigger"]';
 const APP_ORIGIN = 'https://grafana.othala.test';
-const PROXYWATCH_ORIGIN = 'http://proxywatch.othala.test';
+const PROXYWATCH_ORIGIN = 'https://proxywatch.othala.test';
 
 const hasWindowFn = (n: string) => typeof (window as unknown as Record<string, unknown>)[n] === 'function';
 
