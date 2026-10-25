@@ -17,12 +17,11 @@ import { hydraAdmin } from './ory-fetch';
 import { parseIdentity } from './identity-facts';
 import { isDeviceRequest, readDeviceCode, clearDeviceCode } from './device';
 
-// Hydra remembers a sign-in as long as the Kratos session lives, so a later app sign-out still reaches handleLogout.
-const KRATOS_SESSION_LIFESPAN = 2_592_000; // Kratos session.lifespan, 720h
-
+// Hydra remembers a sign-in exactly as long as the Kratos session lives, so a later app sign-out still reaches
+// handleLogout. The session's own expires_at is the only source; without one, remember for the 1s minimum (0 would mean forever).
 export function loginRememberFor(session: Session, now: number = Date.now()): number {
   const expires = session.expires_at ? new Date(session.expires_at).getTime() : NaN;
-  if (!Number.isFinite(expires)) return KRATOS_SESSION_LIFESPAN;
+  if (!Number.isFinite(expires)) return 1;
   return Math.max(1, Math.ceil((expires - now) / 1000));
 }
 

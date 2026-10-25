@@ -8,22 +8,28 @@ import { invalidateManifestCache } from '../lib/manifests';
 /** Signature of the injectable register function (matches registerAllClients). */
 type RegisterFn = (opts?: RegisterOptions) => Promise<{ clientId: string; action: string }[]>;
 
-// Module-level single-flight guard. A second call while one is in-flight
-// warns and returns immediately — prevents queued SIGHUPs from piling up.
+// Single-flight guard. A call during a pass queues exactly one rerun, so a SIGHUP
+// that lands mid-pass is not lost and many of them still cost one extra pass.
 let reconciling = false;
+let rerunPending = false;
+let lastOk = true;
+
+/** False once a pass has failed and until a later pass succeeds; read by /readyz. */
+export const lastReconcileOk = (): boolean => lastOk;
 
 /**
  * Run one reconcile pass: load manifests, register every client, log results.
  *
- * Single-flight: if already running, warns and returns without calling
- * `register` again. On error: logs loudly and RE-THROWS so reconcileOnBoot
- * can apply its retry logic. `finally` always resets the guard.
+ * Single-flight: if already running, queues one rerun and returns. On error:
+ * logs loudly and RE-THROWS so reconcileOnBoot can apply its retry logic.
+ * `finally` resets the guard, then runs the queued rerun.
  *
  * @param register Injectable register function (defaults to registerAllClients).
  */
 export async function reconcileClients(register: RegisterFn = registerAllClients): Promise<void> {
   if (reconciling) {
-    console.warn('[portal:registrar] reconcile already in-flight — skipping concurrent call');
+    console.warn('[portal:registrar] reconcile already in-flight — queued one rerun');
+    rerunPending = true;
     return;
   }
   reconciling = true;
@@ -33,11 +39,17 @@ export async function reconcileClients(register: RegisterFn = registerAllClients
       console.log(`[portal:registrar] ${r.action} ${r.clientId}`);
     }
     console.log(`[portal:registrar] reconcile complete — ${results.length} client(s) processed`);
+    lastOk = true;
   } catch (err) {
+    lastOk = false;
     console.error('[portal:registrar] reconcile FAILED — continuing to serve:', err);
     throw err;
   } finally {
     reconciling = false;
+    if (rerunPending) {
+      rerunPending = false;
+      await reconcileClients(register).catch(() => {});
+    }
   }
 }
 

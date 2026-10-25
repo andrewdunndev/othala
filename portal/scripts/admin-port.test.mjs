@@ -13,6 +13,7 @@ import {
   startupEnvErrors,
   ADMIN_GET,
   ADMIN_POST,
+  setRegistrarProbe,
 } from '../src/server/listen.ts';
 import { asAdmin, identity, session, withCredential, withPasskey, withTotp, withWebauthnKey } from '../src/lib/test-builders.ts';
 import * as secondFactorRuntime from '../src/lib/second-factor-gate.ts';
@@ -118,6 +119,21 @@ test('readyz is 200 when Kratos and Hydra are ready, 503 naming the one that is 
     await handle(fakeReq({ method: 'GET', url: '/readyz' }), res);
     assert.deepEqual(JSON.parse(res.body).failed, ['hydra', 'kratos']);
   } finally {
+    globalThis.fetch = realFetch;
+  }
+});
+
+test('readyz is 503 naming the registrar while its last reconcile failed', async () => {
+  const realFetch = globalThis.fetch;
+  globalThis.fetch = async () => ({ ok: true });
+  try {
+    setRegistrarProbe(() => false);
+    const res = fakeRes();
+    await handle(fakeReq({ method: 'GET', url: '/readyz' }), res);
+    assert.equal(res.statusCode, 503);
+    assert.deepEqual(JSON.parse(res.body).failed, ['registrar']);
+  } finally {
+    setRegistrarProbe(() => true);
     globalThis.fetch = realFetch;
   }
 });
