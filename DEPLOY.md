@@ -96,6 +96,8 @@ Fixed by the image:
 The Kratos and Hydra admin APIs take no bearer: bind each to its address on a network the edge never joins,
 resolve its alias to that address for its callers (`extra_hosts` in the example), and publish only the edge
 ([`ARCHITECTURE.md` § Trust boundary](ARCHITECTURE.md#trust-boundary)).
+Under rootless podman, also create that network with `isolate=true` (compose `driver_opts: {isolate: "true"}`):
+without it the edge can route to the bind addresses.
 
 Browser clients on another origin are unsupported: Hydra's CORS allowlist is `OTHALA_PUBLIC_URL` only.
 
