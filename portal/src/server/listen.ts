@@ -301,7 +301,13 @@ export async function handlePasskeyPrune(req: IncomingMessage, res: ServerRespon
 
 const READY_TIMEOUT_MS = 2000;
 
-/** Readiness: Kratos and Hydra both answer ready within the timeout; 503 names the dependencies that do not. */
+let registrarOk = (): boolean => true;
+/** Wires the registrar's last-pass result into /readyz (the registrar is a separate bundle). */
+export function setRegistrarProbe(probe: () => boolean): void {
+  registrarOk = probe;
+}
+
+/** Readiness: Kratos and Hydra both answer ready within the timeout and the registrar's last pass succeeded; 503 names what is not. */
 async function handleReadyz(res: ServerResponse): Promise<void> {
   const probes = {
     kratos: `${KRATOS_ADMIN_URL}/admin/health/ready`,
@@ -319,6 +325,7 @@ async function handleReadyz(res: ServerResponse): Promise<void> {
       }
     }),
   );
+  if (!registrarOk()) failed.push('registrar');
   if (failed.length) sendJson(res, 503, { status: 'unavailable', failed: failed.sort() });
   else sendJson(res, 200, { status: 'ok' });
 }
@@ -447,6 +454,7 @@ if (import.meta.url === `file://${process.argv[1]}`) {
   // Boot retries with backoff, then logs an operator notice and keeps serving; SIGHUP drops the manifest cache and
   // reconciles again. It stays its own bundle (build:registrar) because it loads config.ts.
   const registrar = await import('./registrar.mjs');
+  setRegistrarProbe(registrar.lastReconcileOk);
   registrar.reconcileOnBoot().catch((e: unknown) => console.error('[portal] boot reconcile error', e));
   process.on('SIGHUP', () => {
     registrar.reloadOnSighup().catch((e: unknown) => console.error('[portal] SIGHUP reload error', e));

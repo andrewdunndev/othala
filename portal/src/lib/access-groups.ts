@@ -1,6 +1,6 @@
 /**
  * The one form a group name takes anywhere in the portal, so group comparisons are raw string equality.
- * identity.schema.json repeats it byte for byte, but Kratos does not validate metadata_admin, so gate.ts re-checks on read.
+ * Kratos does not validate metadata_admin, so gate.ts re-checks on read.
  */
 export const GROUP_RE = /^[a-z][a-z0-9-]*$/;
 

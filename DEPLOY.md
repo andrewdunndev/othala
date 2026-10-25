@@ -1,6 +1,6 @@
 # Deploy
 
-[`deploy/example/`](deploy/example/) is a whole compose deployment; e2e runs it on every MR and tag.
+[`deploy/example/`](deploy/example/) is a whole compose deployment; e2e runs it on tags and on MRs that change portal, e2e, kratos, hydra, caddy, contract, deploy or site.
 
 ## The seam
 
@@ -109,7 +109,7 @@ Each release's `deploy/example/compose.yml` pins the upstream Ory digests its e2
 
 ## Upgrading
 
-1. Apply the release's "Deployment changes" from [`CHANGELOG.md`](CHANGELOG.md).
+1. Apply the release's "Config changes" from [`CHANGELOG.md`](CHANGELOG.md).
 2. Move the othala, Kratos and Hydra pins to the release's example.
 3. Before an Ory pin change, `pg_dump`: Ory migrations are forward-only, so rolling back restores the dump. An
    othala-only rollback is a digest revert.

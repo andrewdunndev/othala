@@ -4,6 +4,7 @@ import { test, beforeEach } from 'vitest';
 import assert from 'node:assert/strict';
 
 import {
+  lastReconcileOk,
   reconcileClients,
   reconcileOnBoot,
   reloadOnSighup,
@@ -65,7 +66,7 @@ test('reconcileClients calls the injected register and logs each result', async 
   );
 });
 
-test('reconcileClients single-flight: second concurrent call returns without calling register twice', async () => {
+test('reconcileClients single-flight: concurrent calls return at once and queue exactly one rerun', async () => {
   let releaseFirst;
   const blocked = new Promise((resolve) => { releaseFirst = resolve; });
 
@@ -89,11 +90,13 @@ test('reconcileClients single-flight: second concurrent call returns without cal
     await new Promise((resolve) => setImmediate(resolve));
 
     await reconcileClients(blockingRegister);
+    await reconcileClients(blockingRegister);
 
-    assert.equal(callCount, 1, 'register should only be called once — second call is a no-op');
+    assert.equal(callCount, 1, 'concurrent calls do not run register in parallel');
 
     releaseFirst();
     await first;
+    assert.equal(callCount, 2, 'the calls made mid-pass collapse into one rerun');
   } finally {
     console.warn = origWarn;
     console.log = origLog;
@@ -178,4 +181,20 @@ test('reconcileOnBoot gives up after `attempts` exhausted without throwing', asy
     errors.some((e) => e.includes('gave up') || e.includes('SIGHUP to retry')),
     'should log the give-up message with SIGHUP hint',
   );
+});
+
+test('lastReconcileOk is false after a failed pass and true again after a good one', async () => {
+  const origLog = console.log;
+  const origError = console.error;
+  console.log = () => {};
+  console.error = () => {};
+  try {
+    await assert.rejects(reconcileClients(stubRegisterAlwaysFails()));
+    assert.equal(lastReconcileOk(), false);
+    await reconcileClients(stubRegister());
+    assert.equal(lastReconcileOk(), true);
+  } finally {
+    console.log = origLog;
+    console.error = origError;
+  }
 });

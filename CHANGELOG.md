@@ -7,6 +7,19 @@ aims to follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 The git tag is the authoritative version; `portal/package.json` mirrors it.
 This CHANGELOG and git tags carry the deployed-instance release state.
 
+## [Unreleased]
+
+### Fixed
+
+- Runbooks and config comments match Ory v26.2.0: cookie, cipher and Hydra system secrets accept `[new, old]` lists, the cipher secret is 32 characters, and the admin-marker, readiness, registrar and consent-reset steps use commands that work in the compose deployment.
+- `/readyz` also fails while the registrar's last reconcile failed, and a SIGHUP during a reconcile queues one rerun instead of being dropped.
+- A remembered login lasts as long as the Kratos session's own expiry; the hardcoded 720h fallback is gone.
+- The identity schema no longer carries a `metadata_admin` block; Kratos validates `traits` only and the portal enforces the marker.
+
+### Removed
+
+- The root and portal Makefiles, and the prose-budget and check-count gates in `scripts/check-purity.sh`.
+
 ## [0.16.1] - 2026-10-18
 
 ### Fixed

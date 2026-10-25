@@ -43,10 +43,11 @@ The admin API's identity-update endpoint takes a JSON Patch **array**, not a
 merge object — a bare `{"metadata_admin": …}` body is rejected:
 
 ```sh
-curl -fsS -X PATCH -H 'Content-Type: application/json' \
-  -d '[{"op":"add","path":"/metadata_admin/admin","value":true}]' \
-  http://localhost:4434/admin/identities/<UUID>
+docker compose exec -T othala node -e "fetch('http://kratos:4434/admin/identities/<UUID>',{method:'PATCH',headers:{'Content-Type':'application/json'},body:JSON.stringify([{op:'add',path:'/metadata_admin/admin',value:true}])}).then(async r=>{console.log(r.status,await r.text());process.exit(r.ok?0:1)})"
 ```
+
+The admin API is reachable only from inside the compose network, hence the
+run from the othala container.
 
 If `metadata_admin` is null, send `add /metadata_admin {"admin":true}` instead;
 Kratos does not create the parent (`patchAdminMarker` pre-fetches for this).

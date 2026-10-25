@@ -65,11 +65,9 @@ webhook schema to re-verify on each bump.
 
 ## 7. One secret per rotation slot, no standing second slot
 
-Ory models rotation as distinct entries in a secrets array (the first signs,
-older ones still verify), and Kratos and Hydra enforce `uniqueItems` on them, so
-a duplicated slot is a config error. Rotation prepends a distinct entry rather
-than keeping a standing second slot. Hydra's at-rest system secret cannot rotate:
-it is generate-once for the life of the database, and changing it is a rebuild event.
+Ory accepts `[new, old]` lists, where the first entry signs and every entry
+verifies. Othala renders one slot, so changing a secret invalidates what the old
+one protected, and a Hydra system-secret change rebuilds the database.
 
 ## 8. One writer for identity metadata
 

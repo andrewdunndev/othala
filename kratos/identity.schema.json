@@ -83,38 +83,6 @@
         "email"
       ],
       "additionalProperties": false
-    },
-    "metadata_admin": {
-      "type": "object",
-      "title": "Admin-managed metadata",
-      "description": "Admin-only fields. groups[] drives default role derivation via per-app group_role_map; roles{client_id: role_name} is a per-app override that takes precedence. Only `groups` and `roles` are accepted; new fields require a schema update so a typo (e.g. grupos instead of groups) is rejected at write time rather than silently dropped at read time.",
-      "properties": {
-        "groups": {
-          "type": "array",
-          "title": "Groups",
-          "description": "Membership groups: each string must match this array's own pattern. Kratos validates traits only, so this pattern enforces nothing at write time: it must stay byte-identical to GROUP_RE in portal/src/lib/access-groups.ts, which IS enforced, and on read denies any identity holding a group that misses it. Role resolution (portal/src/lib/claims.ts, lookupRole) is order-independent; stored order here is a cosmetic diff-stability concern (portal/src/lib/access.ts), not part of how a role is decided.",
-          "items": {
-            "type": "string",
-            "pattern": "^[a-z][a-z0-9-]*$",
-            "maxLength": 64
-          },
-          "uniqueItems": true
-        },
-        "roles": {
-          "type": "object",
-          "title": "Per-app role overrides",
-          "description": "Map of client_id to role name. When present for a client, this wins over group-derived role lookup.",
-          "patternProperties": {
-            "^[a-z][a-z0-9]*$": {
-              "type": "string",
-              "pattern": "^[a-z][a-z0-9_\\-]*$",
-              "maxLength": 64
-            }
-          },
-          "additionalProperties": false
-        }
-      },
-      "additionalProperties": false
     }
   }
 }

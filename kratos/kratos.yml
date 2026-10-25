@@ -312,8 +312,8 @@ courier:
 
 
 secrets:
-  # Cookie signing + at-rest cipher secrets: one slot each, so rotation signs every member out
-  # (docs/runbooks/cookie-rotation.md).
+  # Ory accepts [new, old] lists; othala renders one slot each, so a rotation signs every member out and a
+  # cipher rotation drops stored OIDC upstream tokens (docs/runbooks/cookie-rotation.md).
   cookie:
     - "${KRATOS_COOKIE_SECRET_CURRENT}"
 

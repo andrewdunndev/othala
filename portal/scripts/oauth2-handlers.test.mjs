@@ -350,9 +350,9 @@ test('login (skip) re-accepts with remember and renews the remembered login', as
   assert.equal(calls.acceptLoginBody.extend_session_lifespan, true);
 });
 
-test('loginRememberFor falls back to the Kratos lifespan without expires_at', () => {
+test('loginRememberFor never outlives a session with no expires_at', () => {
   const s = session('aal1', ['password'], { expires_at: undefined });
-  assert.equal(loginRememberFor(s), 2_592_000);
+  assert.equal(loginRememberFor(s), 1);
 });
 
 test('loginRememberFor rounds up and reads a string expires_at', () => {
