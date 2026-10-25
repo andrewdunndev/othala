@@ -51,13 +51,12 @@ test('render and portal run one othala image, at the release tag on a tag pipeli
   if (process.env.CI_COMMIT_TAG) assert.equal(tag, process.env.CI_COMMIT_TAG);
 });
 
-test('the e2e overlay runs the example Ory commands, adding only its config layer and --dev', () => {
+test('the e2e overlay runs the example Ory flags, adding only the Kratos config layer', () => {
   const overlay = readYaml(join(root, 'e2e/compose.e2e.yml'));
-  for (const svc of ['kratos', 'hydra']) {
-    const added = overlay.services[svc].command;
-    const stripped = added.filter((arg, i) => arg !== '--dev' && arg !== '/etc/config/kratos.e2e.yml' && added[i + 1] !== '/etc/config/kratos.e2e.yml');
-    assert.deepEqual(stripped, compose.services[svc].command, svc);
-  }
+  assert.equal(overlay.services.hydra.command, undefined);
+  const added = overlay.services.kratos.command;
+  const stripped = added.filter((arg, i) => arg !== '/etc/config/kratos.e2e.yml' && added[i + 1] !== '/etc/config/kratos.e2e.yml');
+  assert.deepEqual(stripped, compose.services.kratos.command);
 });
 
 test('every service reading an owner-only rendered tree runs as the render uid', () => {

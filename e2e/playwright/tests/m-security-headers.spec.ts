@@ -53,7 +53,7 @@ test.describe('M — Security response headers', () => {
     page,
     baseURL,
   }) => {
-    const origin = new URL(baseURL).origin; // e.g. http://auth.othala.test
+    const origin = new URL(baseURL).origin; // e.g. https://auth.othala.test
     const externalRequests: string[] = [];
 
     page.on('request', (req) => {

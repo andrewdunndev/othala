@@ -15,7 +15,7 @@ test('G1 — fabricated ory_kratos_session cookie is rejected by Kratos (401)', 
       domain: 'auth.othala.test',
       path: '/',
       httpOnly: true,
-      secure: false,
+      secure: true,
       sameSite: 'Lax',
     },
   ]);

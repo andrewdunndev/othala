@@ -6,6 +6,8 @@
 
 set -uo pipefail   # NOT -e: every probe runs even if some fail.
 
+source "$(dirname "${BASH_SOURCE[0]}")/lib.sh"
+
 PASS=0
 FAIL=0
 FAILED_PROBES=()
@@ -21,10 +23,6 @@ fail() {
 }
 
 # Every probe goes through `docker compose exec` (the compose network is a private bridge).
-# podman-compose prepends an ANSI reset to the first line of exec output, which breaks
-# JSON parses and string compares; _strip_ansi is a no-op under docker.
-_strip_ansi() { sed 's/\x1b\[[0-9;]*m//g'; }
-
 curl_in() {
     local container="$1"; shift
     docker compose exec -T "$container" wget -qO- "$@" 2>/dev/null | _strip_ansi
@@ -34,13 +32,6 @@ curl_code_in() {
     local container="$1"; shift
     docker compose exec -T "$container" wget -qO /dev/null -S "$@" 2>&1 \
         | _strip_ansi | grep -oE 'HTTP/[0-9.]+ +[0-9]{3}' | tail -1 | grep -oE '[0-9]{3}$'
-}
-
-# node_in <container>: run a JS program from STDIN inside <container>'s node (podman-compose
-# mangles argv with spaces/quotes). othala has no wget/curl, so its probes route here.
-node_in() {
-    local container="$1"
-    docker compose exec -T "$container" node 2>/dev/null | _strip_ansi
 }
 
 # othala_code <url> — HTTP status code via Node fetch.
@@ -137,7 +128,7 @@ fi
 # A6: Hydra public /.well-known/openid-configuration + issuer byte-match
 oidc=$(curl_in hydra http://localhost:4444/.well-known/openid-configuration)
 issuer=$(echo "$oidc" | python3 -c "import sys,json; print(json.load(sys.stdin).get('issuer',''))" 2>/dev/null || echo "")
-# Issuer is OTHALA_PUBLIC_URL (http://auth.othala.test from othala.env).
+# Issuer is OTHALA_PUBLIC_URL (https://auth.othala.test from othala.env).
 expected_issuer="${OTHALA_PUBLIC_URL}/"
 if [[ "$issuer" == "$expected_issuer" ]]; then
     pass "A6 hydra openid-config issuer byte-match: $issuer"
@@ -354,22 +345,6 @@ echo "G. OIDC dance (login -> consent -> ID token; claims + access-gate deny)"
 # mk_identity <state> <groups-json> <localpart> -> echoes the new identity id.
 mk_identity() {
     printf '%s' "fetch('http://kratos:4434/admin/identities',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({schema_id:'family',state:'$1',traits:{username:'$3',email:'$3@${OTHALA_APEX}',displayName:'$3'},metadata_admin:{groups:$2}})}).then(r=>r.json()).then(j=>{process.stdout.write(j.id||'');process.exit(0)}).catch(()=>process.exit(1))" | node_in othala
-}
-# run_dance <subject> -> the result line (OK claims=... / DENIED... / STEP/EXC). Pipes
-# oidc-dance.mjs with the subject and grafana client secret into the dance-runner oneshot;
-# grafana is the role-mapping client whose consent block emits grafana_role.
-run_dance() {
-    local out res
-    out=$(sed "s|__SUBJECT__|$1|g; s|__GRAFANA_SECRET__|${GRAFANA_CLIENT_SECRET}|g" ./oidc-dance.mjs \
-        | docker compose --profile oneshot run --rm --no-deps -T dance-runner 2>&1 | _strip_ansi)
-    res=$(echo "$out" | grep -E '^OK |^DENIED|^STEP|^EXC' | tail -1)
-    if [[ -z "$res" ]]; then
-        # No result line means the dance crashed; surface the full output.
-        echo "  ----- dance produced no OK/DENIED/STEP/EXC line; full output: -----" >&2
-        echo "$out" | sed 's/^/    | /' | tail -45 >&2
-        echo "  ----- end dance output -----" >&2
-    fi
-    echo "$res"
 }
 
 # G1: active member with grafana-access -> dance completes, ID token carries grafana_role=[Viewer]
