@@ -29,6 +29,7 @@ const env = {
       .map((l) => [l.slice(0, l.indexOf('=')), l.slice(l.indexOf('=') + 1)]),
   ),
   ...Object.fromEntries(SECRETS.map((n) => [n, `fake-${n.toLowerCase()}`])),
+  KRATOS_CIPHER_SECRET_CURRENT: 'c'.repeat(32),
 };
 const rendered = Object.fromEntries(render(root, join(example, 'content'), env).map((f) => [f.path, f.content]));
 const kratos = parse(rendered['kratos/kratos.yml']);
