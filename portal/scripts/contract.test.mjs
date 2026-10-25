@@ -234,3 +234,17 @@ test('the pinned privileged window equals the portal constant', () => {
   const age = schema.properties.selfservice.properties.flows.properties.settings.properties.privileged_session_max_age.const;
   assert.equal(PRIVILEGED_WINDOW_MS, { s: 1e3, m: 6e4, h: 36e5 }[age.slice(-1)] * parseInt(age, 10));
 });
+
+test('each Ory secret list holds one or two entries', () => {
+  const lists = { kratos: ['cookie', 'cipher'], hydra: ['system', 'cookie'] };
+  const docs = { kratos, hydra };
+  for (const [which, names] of Object.entries(lists)) {
+    for (const name of names) {
+      const sized = (n) => edit(docs[which], (d) => (d.secrets[name] = Array.from({ length: n }, (_, i) => `v${i}`)));
+      const at = (n) => (which === 'kratos' ? run(sized(n), hydra) : run(kratos, sized(n)));
+      assert.deepEqual(at(2), [], `${which} ${name} two`);
+      assert.ok(at(3).length > 0, `${which} ${name} three`);
+      assert.ok(at(0).length > 0, `${which} ${name} none`);
+    }
+  }
+});

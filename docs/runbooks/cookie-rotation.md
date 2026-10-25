@@ -1,7 +1,7 @@
 # Cookie / cipher secret rotation
 
-Rotates the Kratos and Hydra cookie signing secrets and the Kratos cipher
-(at-rest encryption) secret. As shipped, rotation logs every member out.
+Rotates the Kratos and Hydra cookie secrets and the Kratos cipher (at-rest
+encryption) secret without signing members out.
 
 ## When
 
@@ -9,27 +9,23 @@ Quarterly, or on a suspected leak, operator handover, or an incident where the
 secret may have been exposed. For the Hydra system secret see
 `secrets-rotation.md`.
 
-## Single-slot rendering
+## How it works
 
-Ory accepts a list per secret, but Othala renders one
-entry from one `_CURRENT` value per secret (`KRATOS_COOKIE_SECRET_CURRENT`,
-`KRATOS_CIPHER_SECRET_CURRENT`, `HYDRA_COOKIE_SECRET_CURRENT`; no `_PREVIOUS`),
-so the old value stops verifying: every session and flow cookie signed under
-it is rejected, and rotating the cipher drops the OIDC upstream tokens Kratos
-stored under the old value.
+Each secret takes an optional `<NAME>_PREVIOUS` (`KRATOS_COOKIE_SECRET_PREVIOUS`,
+`KRATOS_CIPHER_SECRET_PREVIOUS`, `HYDRA_COOKIE_SECRET_PREVIOUS`). Unset, one entry
+renders; set, `[current, previous]` renders: the first signs and encrypts, both
+verify and decrypt. A Kratos cookie pair must be 16, 24 or 32 characters per
+entry (a 64-character pair fails continuity flows with `crypto/aes: invalid key
+size 64`); the cipher is exactly 32. A deployment still on a 64-character Kratos
+cookie secret first rotates once, single-slot, to a 32-character one; that
+rotation signs members out.
 
 ## Procedure
 
-A Kratos `secrets.cookie` list of two 64-character entries fails every
-continuity-cookie flow with `crypto/aes: invalid key size 64`; use a single
-slot or two 32-character entries.
-
-1. Generate the cookie secrets with `openssl rand -hex 32` and the cipher
-   secret with `openssl rand -hex 16`; Kratos requires exactly 32 characters
-   for the cipher.
-2. Set each as the single `_CURRENT` value in your secret store (lab:
-   `e2e/secrets.env`).
-3. Rerun the render and recreate what reads it (`restart` does not re-render):
+1. Generate each new secret with `openssl rand -hex 16` (32 characters).
+2. In your secret store (lab: `e2e/secrets.env`) set the new value as
+   `_CURRENT` and the old one as `_PREVIOUS`.
+3. Recreate what reads it (`restart` does not re-render):
    `docker compose up -d --force-recreate render kratos hydra othala caddy`.
 4. Verify readiness from the compose directory:
 
@@ -37,13 +33,14 @@ slot or two 32-character entries.
    docker compose exec -T othala node -e "fetch('http://'+process.env.PORTAL_ADMIN_BIND_HOST+':4431/readyz').then(r=>process.exit(r.ok?0:1))"
    ```
 
-   then your smoke suite. Every member signs in again.
+   then your smoke suite. Members stay signed in.
+5. After the longest session lifetime, remove `_PREVIOUS` and recreate again.
 
 ## Failure modes
 
-- **Sessions bounced to login after rotation:** expected, see above.
-- **Kratos or Hydra refuses to start:** a secret rendered empty or too short
-  (cipher: not exactly 32 characters). Restore from your secret store.
+- **Kratos or Hydra refuses to start:** a secret rendered empty or the wrong
+  length. Restore from your secret store.
+- **Sessions bounced to login:** a `_PREVIOUS` was dropped early or never set.
 
 ## Related
 

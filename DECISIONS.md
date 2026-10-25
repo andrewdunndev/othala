@@ -17,5 +17,4 @@ Rulings a change must not reverse. The reasoning is in git history; the enforcer
 - Edge authorization: OIDC where native, keep native clients working, forward-auth for browser-only surfaces; one group per forward-auth call. UNENFORCED.
 - The portal renders its own auth UI and never branches on Kratos UI flags or node groups. UNENFORCED.
 - Admin listings fetch one capped page and never read a total count (`listIdentities`, `portal/src/lib/admin-api.ts`). UNENFORCED.
-- One rendered slot per secret; rotation logs everyone out, and a Hydra system-secret change rebuilds its database. UNENFORCED.
 - Every `metadata_admin` write goes through `validateMetadataAdmin` (`portal/src/lib/metadata-admin.ts`). UNENFORCED.
