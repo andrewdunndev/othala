@@ -251,6 +251,16 @@ if [[ -n "$identity_id" ]]; then
     fi
 fi
 
+# C3: an admin-minted recovery code lives as long as asked (24h), not the 15m self-service code lifespan
+if [[ -n "$identity_id" ]]; then
+    ttl=$(printf '%s' "fetch('http://kratos:4434/admin/recovery/code',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({identity_id:'${identity_id}',expires_in:'24h'})}).then(r=>r.json()).then(j=>{process.stdout.write(String(Math.round((Date.parse(j.expires_at)-Date.now())/1000)));process.exit(0)}).catch(()=>process.exit(1))" | node_in othala)
+    if [[ "$ttl" =~ ^[0-9]+$ && "$ttl" -ge 86000 && "$ttl" -le 86400 ]]; then
+        pass "C3 admin-minted recovery code expires in 24h (${ttl}s)"
+    else
+        fail "C3 admin recovery code lifetime" "got ${ttl:-none}s, want 86000-86400"
+    fi
+fi
+
 # Section D: recovery-gate (the app's admin endpoint)
 echo ""
 echo "D. Recovery-gate (othala :4431 /admin/recovery-gate)"
