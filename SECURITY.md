@@ -1,8 +1,7 @@
 # Security
 
-Othala issues the tokens and gates the access that everything downstream trusts.
-This document states where the trust boundary sits, what is defended and by
-which file, and what is knowingly not defended.
+Othala issues the tokens and gates the access that everything downstream trusts. The trust boundary,
+the controls with their tests, and the accepted risks follow.
 
 ## Reporting a vulnerability
 
@@ -36,6 +35,8 @@ value a downstream app hands back.
   authority decision reads from it, which is why it is always fetched fresh from
   the admin API and never taken from a session payload (`/sessions/whoami` omits
   it).
+  Kratos validates the identity schema against `traits` only, so the portal's
+  validator is the sole enforcement of `metadata_admin`.
 
 ## Controls
 
@@ -56,7 +57,7 @@ Each names its enforcer and the test that fails if it stops working.
   marker read fresh from the admin API (`parseIdentity`,
   `portal/src/lib/identity-facts.ts`). No group grants it. Tests:
   `portal/src/lib/identity-facts.test.ts`, `e2e/playwright/tests/f-aal2-bypass.spec.ts`.
-- **Internal-network admin listener (PORTAL_ADMIN_BIND_HOST).** `portal/src/server/listen.ts`: privileged routes
+- **Internal-network admin listener.** `portal/src/server/listen.ts`: privileged routes
   on a separate internal-network listener whose mux is disjoint from the public one,
   guarded by one bearer secret compared with `bearerMatches`
   (constant-time, fail-closed on an unset secret). Test:
@@ -77,9 +78,8 @@ Each names its enforcer and the test that fails if it stops working.
   match, an undeclared role in `group_role_map`, an empty access binding;
   `loadClientManifests` then drops each such file, so its app is an unknown client
   and is refused at login and consent, while the rest keep serving (its Hydra client keeps
-  its last registered config, so its refresh tokens and client_credentials grant keep working until the manifest is fixed or the client is deleted from Hydra); if the directory itself cannot load,
-  `portal/src/lib/manifest-store.ts` serves the last known good set, or the empty
-  set on a cold start, which denies everywhere. Tests:
+  its last registered config, so its refresh tokens and client_credentials grant keep working until the manifest is fixed or the client is deleted from Hydra).
+  Tests:
   `portal/scripts/manifests-loader.test.mjs`, `portal/scripts/manifest-validate.fuzz.test.mjs`, `portal/src/lib/manifest-store.test.ts`.
 - **A device grant needs a fresh second factor and a shown code.** A
   verification link can carry someone else's code, so `handleLogin` and
@@ -95,8 +95,10 @@ Each names its enforcer and the test that fails if it stops working.
   takes the required group from an operator-set query parameter and the user's
   groups from the admin API; no inbound identity header is read, and `HEAD`
   reuses the `GET` decision verbatim. The status contract (200/401/403/503) is in
-  [`ARCHITECTURE.md`](ARCHITECTURE.md) § The status contract. Test:
-  `portal/scripts/forward-auth.test.mjs`.
+  [`ARCHITECTURE.md`](ARCHITECTURE.md) § The status contract. `othala.caddy` also
+  strips every `*_*` request header, so WSGI and CGI upstreams cannot fold
+  `X_Remote_User` into `X-Remote-User`. Tests: `portal/scripts/forward-auth.test.mjs`,
+  `portal/scripts/othala-caddy.test.mjs`.
 - **Browser hardening.** `applySecurityHeaders`, `portal/src/middleware.ts`:
   frame-ancestors and `X-Frame-Options`, `nosniff`, `Referrer-Policy`,
   `Cross-Origin-Opener-Policy`, HSTS, and a `form-action` bounded to the
@@ -127,16 +129,11 @@ Each names its enforcer and the test that fails if it stops working.
   `sslmode=disable` and both tracing exporters set `insecure: true`
   (`kratos/kratos.yml`, `hydra/hydra.yml`). Each assumes the hop stays inside one
   pod on one host; on a segmented network, fix them before deploying.
-- **The CSP carries no `script-src`** (`portal/src/middleware.ts`). A strict one
-  breaks the WebAuthn ceremony's injected inline scripts and the portal's inline
-  theme script, so an XSS in the portal is not contained by CSP. See
-  `site/src/content/docs/guides/hardening.md`.
+- **The CSP carries no `script-src`** (`portal/src/middleware.ts`), so an XSS in the
+  portal is not contained by CSP. Why: `site/src/content/docs/guides/hardening.md`.
 - **Rate limiting depends on a third-party Caddy module.** A binary built without
   it refuses to load `caddy/othala.caddy`, so the failure is a refusal to start,
   not a silently unlimited edge. Confirm it is compiled in.
-- **The identity-header strip covers underscore spellings.** `othala.caddy` strips every
-  `*_*` request header, so WSGI and CGI upstreams cannot fold `X_Remote_User` into
-  `X-Remote-User`; `othala-caddy.test.mjs` holds that.
 - **`{client_ip}` is only as good as `trusted_proxies`.** Behind a trusted load
   balancer without `trusted_proxies_strict`, Caddy takes the leftmost
   `X-Forwarded-For` entry, which the client chose. See `DEPLOY.md`.
@@ -150,6 +147,9 @@ Each names its enforcer and the test that fails if it stops working.
 - **A member with no second factor: the mailbox holder keeps the account.** An emailed code proves the mailbox, not the person. A passkey or TOTP the mailbox holder adds is accepted, and the email-change gate only guards members who already hold a passkey or password.
 - **A refused device keeps polling.** Hydra has no device-grant reject, so a
   denied or refused code answers `authorization_pending` until it expires.
+- **Consent skip trusts the session.** A client with `skip_consent` mints tokens
+  silently for whoever holds a stolen session cookie, which is why a stolen
+  cookie is treated as a perimeter loss.
 
 ## Out of scope
 
