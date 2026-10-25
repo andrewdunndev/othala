@@ -392,3 +392,10 @@ test('inbound identity headers without a session → 401', async () => {
   const res = await GET(ctxWithHeaders('family', SPOOFED_HEADERS));
   assert.equal(res.status, 401);
 });
+
+test('a deactivated identity is refused on the very next call, with no cached decision', async () => {
+  installFetch({ whoami: SESSION_OK, identity: ACTIVE_IN_GROUP });
+  assert.equal((await GET(ctx('family'))).status, 200);
+  installFetch({ whoami: SESSION_OK, identity: { status: 200, body: { ...ACTIVE_IN_GROUP.body, state: 'inactive' } } });
+  assert.equal((await GET(ctx('family'))).status, 403);
+});
