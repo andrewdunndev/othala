@@ -102,6 +102,14 @@ else
     fail "A2 uuid-ossp" "missing on hydra; init.sh failed"
 fi
 
+# A2b: the Hydra tables the postgres-backup runbook truncates exist under those names
+out=$(docker compose exec -T postgres psql -U postgres -d hydra -t -A -c "SELECT tablename FROM pg_tables WHERE tablename IN ('hydra_oauth2_flow','hydra_oauth2_authentication_session') ORDER BY 1;" 2>/dev/null | _strip_ansi | tr '\n' ',')
+if [[ "$out" == "hydra_oauth2_authentication_session,hydra_oauth2_flow," ]]; then
+    pass "A2b postgres: hydra_oauth2_flow and hydra_oauth2_authentication_session present"
+else
+    fail "A2b hydra session tables" "got: $out"
+fi
+
 # A3: Kratos admin /health/ready
 code=$(curl_code_in kratos http://${KRATOS_ADMIN_BIND_HOST}:4434/admin/health/ready)
 if [[ "$code" == "200" ]]; then
