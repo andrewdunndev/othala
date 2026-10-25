@@ -1,9 +1,12 @@
 // Invariant: manifest oidc: entries map to Hydra client bodies without contacting a live Hydra.
 
-import { test } from 'vitest';
+import { test, afterEach } from 'vitest';
 import assert from 'node:assert/strict';
-import { parseManifest, secretEnvVar } from '../src/lib/manifests.ts';
-import { buildClientBody, registerClient, registerManifests } from '../src/lib/register-clients.ts';
+import { mkdtempSync, mkdirSync, writeFileSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import { parseManifest, secretEnvVar, setContentDir } from '../src/lib/manifests.ts';
+import { buildClientBody, registerAllClients, registerClient, registerManifests } from '../src/lib/register-clients.ts';
 
 import { ResponseError } from '@ory/client-fetch';
 
@@ -262,3 +265,43 @@ test('one failing client does not stop the others; the aggregate error names it'
   assert.deepEqual(api.calls.create.map((c) => c.client_id), ['other']);
 });
 
+
+test('a client_secret with a quote and a backslash reaches Hydra byte-identical', async () => {
+  const api = stubApi(new Set());
+  const secret = 'pa"ss\\wo\\"rd';
+  const m = parseManifest(FILEDROP_YAML, 'filedrop.yaml');
+  await registerManifests([m], { api, env: { FILEDROP_CLIENT_SECRET: secret } });
+  assert.equal(api.calls.create[0].client_secret, secret);
+});
+
+test('reconcile never deletes: an orphan Hydra client is neither listed nor removed', async () => {
+  const api = stubApi(new Set(['orphan', 'filedrop']));
+  for (const op of ['deleteOAuth2Client', 'listOAuth2Clients']) {
+    api[op] = async () => assert.fail(`${op} must not be called`);
+  }
+  const m = parseManifest(FILEDROP_YAML, 'filedrop.yaml');
+  await registerManifests([m], { api, env: { FILEDROP_CLIENT_SECRET: 'x' } });
+  assert.deepEqual(api.calls.set.map((c) => c.id), ['filedrop']);
+});
+
+const tmpRoots = [];
+afterEach(() => {
+  setContentDir(undefined);
+  while (tmpRoots.length) rmSync(tmpRoots.pop(), { recursive: true, force: true });
+});
+
+test('registerAllClients registers only valid oidc manifests: presentation-only and invalid ones make no Hydra call', async () => {
+  const root = mkdtempSync(join(tmpdir(), 'register-all-'));
+  tmpRoots.push(root);
+  mkdirSync(join(root, 'apps'));
+  const put = (name, text) => writeFileSync(join(root, 'apps', name), text);
+  put('filedrop.yaml', FILEDROP_YAML);
+  put('tile.yaml', 'presentation:\n  name: Tile\n  description: d\n  url: https://tile.othala.test\n  icon: TI\n  auth_kind: external\n  access:\n    - tile\n');
+  put('broken.yaml', FILEDROP_YAML.replaceAll('filedrop', 'broken').replace('    - broken\n', ''));
+  setContentDir(root);
+  const api = stubApi(new Set());
+  const results = await registerAllClients({ api, env: { FILEDROP_CLIENT_SECRET: 'x' } });
+  assert.deepEqual(results, [{ clientId: 'filedrop', action: 'created' }]);
+  assert.deepEqual(api.calls.get, ['filedrop']);
+  assert.deepEqual(api.calls.create.map((c) => c.client_id), ['filedrop']);
+});
