@@ -352,3 +352,43 @@ test('aal1 session, identity NOT in group but holds totp → 403 (the gate answe
   const res = await GET(ctx('photos'));
   assert.equal(res.status, 403);
 });
+
+const SPOOFED_HEADERS = {
+  'X-Kratos-Authenticated-Identity-Id': 'id-member',
+  'Remote-User': 'id-member',
+  'X-Forwarded-User': 'id-member',
+};
+
+function ctxWithHeaders(group, extra) {
+  const c = ctx(group);
+  const headers = new Headers(c.request.headers);
+  for (const [k, v] of Object.entries(extra)) headers.set(k, v);
+  return { url: c.url, request: new Request(c.url, { method: 'GET', headers }) };
+}
+
+function installByIdentity(session) {
+  const members = { 'id-member': ['family'], 'id-other': ['photos'] };
+  globalThis.fetch = async (input) => {
+    const url = String(typeof input === 'string' ? input : input?.url ?? input);
+    if (url.includes('/sessions/whoami')) {
+      return session
+        ? jsonResponse({ active: true, identity: { id: 'id-other', traits: {} } })
+        : jsonResponse({ error: { code: 401 } }, 401);
+    }
+    const id = url.split('/admin/identities/')[1]?.split(/[?/]/)[0];
+    return jsonResponse({ id, state: 'active', metadata_admin: { groups: members[id] ?? [] } });
+  };
+}
+
+test('inbound identity headers naming a member never lift a non-member session → 403', async () => {
+  installByIdentity(true);
+  const res = await GET(ctxWithHeaders('family', SPOOFED_HEADERS));
+  assert.equal(res.status, 403);
+  assert.equal(res.headers.get('X-Kratos-Authenticated-Identity-Id'), null);
+});
+
+test('inbound identity headers without a session → 401', async () => {
+  installByIdentity(false);
+  const res = await GET(ctxWithHeaders('family', SPOOFED_HEADERS));
+  assert.equal(res.status, 401);
+});
