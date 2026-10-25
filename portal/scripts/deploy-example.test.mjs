@@ -68,3 +68,25 @@ test('every service reading an owner-only rendered tree runs as the render uid',
   assert.ok(readers.length >= 4);
   for (const [name, s] of readers) assert.equal(s.user, compose.services.render.user, `${name} cannot read 0600 files`);
 });
+
+test('startup order: render gates everything, Caddy waits only for render, the portal waits for healthy Ory', () => {
+  const after = (svc) => Object.fromEntries(Object.entries(compose.services[svc].depends_on ?? {}).map(([k, v]) => [k, v.condition]));
+  const done = 'service_completed_successfully';
+  assert.deepEqual(after('caddy'), { render: done });
+  assert.deepEqual(after('kratos-migrate'), { render: done, postgres: 'service_healthy' });
+  assert.deepEqual(after('hydra-migrate'), { render: done, postgres: 'service_healthy' });
+  assert.deepEqual(after('kratos'), { 'kratos-migrate': done });
+  assert.deepEqual(after('hydra'), { 'hydra-migrate': done });
+  assert.deepEqual(after('othala'), { kratos: 'service_healthy', hydra: 'service_healthy' });
+});
+
+test('Kratos and Hydra take no environment, so nothing overrides the rendered files unseen by check', () => {
+  for (const svc of ['kratos', 'hydra', 'kratos-migrate', 'hydra-migrate']) {
+    assert.ok(!('environment' in compose.services[svc]), `${svc} environment`);
+    assert.ok(!('env_file' in compose.services[svc]), `${svc} env_file`);
+  }
+});
+
+test('every service drops all capabilities', () => {
+  for (const [name, s] of Object.entries(compose.services)) assert.deepEqual(s.cap_drop, ['ALL'], name);
+});

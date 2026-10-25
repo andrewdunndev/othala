@@ -220,6 +220,9 @@ export function render(policyDir: string, contentDir: string, env: Env): Rendere
   if (checkErrors.length > 0) throw new RenderError(checkErrors.join('\n'));
   const unset = SECRETS.filter((n) => (env[n] ?? '').trim() === '');
   if (unset.length > 0) throw new RenderError(`missing secret(s): ${unset.join(', ')}`);
+  if (env.KRATOS_CIPHER_SECRET_CURRENT?.length !== 32) {
+    throw new RenderError('KRATOS_CIPHER_SECRET_CURRENT must be exactly 32 characters');
+  }
 
   const files: RenderedFile[] = [];
   const errors: string[] = [];

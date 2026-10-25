@@ -486,3 +486,24 @@ test('promptdesk.yaml: parses correctly — client_id, access binding, redirect,
   const errs = validateClients([m]);
   assert.deepEqual(errs, [], `promptdesk.yaml must validate clean:\n${errs.join('\n')}`);
 });
+
+const implicitManifest = (oidcExtra) => `
+oidc:
+  client_id: spa
+  redirect_uris:
+    - https://spa.othala.test/cb
+  audience:
+    - https://spa.othala.test
+${oidcExtra}
+consent:
+  skip_access_check: true
+`;
+
+test('implicit grant: grant_types implicit or response_types token fail the load, code flow passes', () => {
+  for (const extra of ['  grant_types: [implicit]', '  response_types: [token]', '  response_types: [id_token token]']) {
+    const errs = validateClients([fromYaml(implicitManifest(extra))]);
+    assert.ok(errs.some((e) => e.includes('implicit grant')), `${extra}: ${errs.join('; ')}`);
+  }
+  const ok = validateClients([fromYaml(implicitManifest('  grant_types: [authorization_code, refresh_token]\n  response_types: [code]'))]);
+  assert.deepEqual(ok, []);
+});

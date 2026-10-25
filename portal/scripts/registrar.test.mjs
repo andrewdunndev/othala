@@ -61,8 +61,8 @@ test('reconcileClients calls the injected register and logs each result', async 
     'should log "created x"',
   );
   assert.ok(
-    logs.some((l) => l.includes('1 client(s) processed')),
-    'should log total count',
+    logs.some((l) => /reconcile complete.*1 client\(s\) processed/.test(l)),
+    'should log the reconcile complete line',
   );
 });
 

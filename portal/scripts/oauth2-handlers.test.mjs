@@ -1518,3 +1518,33 @@ for (const [action, expected] of [['deny', `${publicUrl}/auth/error?reason=sign-
     assert.match(res.headers.get('set-cookie') ?? '', /^othala_device_code=; .*Max-Age=0/);
   });
 }
+
+test('login and consent REJECT access_denied for a client_id with no served manifest, whatever the member holds', async () => {
+  const quiet = console.warn;
+  console.warn = () => {};
+  try {
+    const login = stubOAuth2();
+    const lres = await handleLogin(new Request('https://x/oauth2/login?login_challenge=lc'), {
+      oauth2: login.api,
+      getIdentity: async () => activeMember(),
+      getSession: defaultSession(),
+      manifest: () => undefined,
+    });
+    assert.equal(lres.headers.get('location'), 'https://sso.othala.test/login-rejected');
+    assert.equal(login.calls.acceptLogin, 0);
+    assert.equal(login.calls.rejectLoginError, 'access_denied');
+    assert.equal(login.calls.rejectLoginStatus, 403);
+
+    const consent = stubOAuth2();
+    const cres = await handleConsent(new Request('https://x/oauth2/consent?consent_challenge=cc'), {
+      oauth2: consent.api,
+      getIdentity: async () => activeMember(),
+      manifest: () => undefined,
+    });
+    assert.equal(cres.headers.get('location'), 'https://sso.othala.test/consent-rejected');
+    assert.equal(consent.calls.acceptConsent, 0);
+    assert.equal(consent.calls.rejectConsentError, 'access_denied');
+  } finally {
+    console.warn = quiet;
+  }
+});

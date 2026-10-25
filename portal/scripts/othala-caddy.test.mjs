@@ -123,6 +123,12 @@ test('othala-routes carries the two zones ahead of the upstreams, which all see 
   for (const p of proxies) assert.ok(p.body.includes('header_up X-Forwarded-For {client_ip}'), p.head);
 });
 
+test('both rate-limit zones key on the verified client address, never a client-supplied header', () => {
+  const zones = walk(routeOf('othala-routes')).filter((b) => b.head.startsWith('zone '));
+  assert.equal(zones.length, 2);
+  for (const z of zones) assert.deepEqual(z.body.filter((l) => /^key\s/.test(l)).map((l) => l.replace(/\s+/g, ' ')), ['key {client_ip}'], z.head);
+});
+
 test('every snippet strips the client identity headers first', () => {
   for (const name of ['othala-routes', 'othala-forward-auth', 'othala-oidc-app']) {
     const body = routeOf(name).body;

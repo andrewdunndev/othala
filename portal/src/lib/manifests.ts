@@ -452,6 +452,10 @@ export function validateClients(set: ClientManifest[]): string[] {
       }
     }
 
+    if (cm.grantTypes.includes('implicit') || cm.responseTypes.some((t) => t.split(/\s+/).includes('token'))) {
+      errs.push(`${src}: the implicit grant (grant_types implicit, response_types token) is not allowed; use the code flow with PKCE`);
+    }
+
     for (const role of cm.roles) {
       if (role.claimEmit === null) {
         errs.push(

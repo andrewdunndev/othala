@@ -45,3 +45,22 @@ test('createIdentity: the email trait is declared verified (admin vouches), valu
     { value: 'alice@example.com', via: 'email', verified: true, status: 'completed' },
   ]);
 });
+
+test('createIdentity: no credentials block is sent, and a password in the input is ignored', async () => {
+  let sent;
+  globalThis.fetch = async (_url, init) => {
+    sent = JSON.parse(init.body);
+    return new Response(JSON.stringify({ id: 'new-id', traits: sent.traits }), {
+      status: 201,
+      headers: { 'Content-Type': 'application/json' },
+    });
+  };
+  await createIdentity({
+    traits: { username: 'alice', email: 'alice@example.com' },
+    metadataAdmin: { groups: ['family'] },
+    credentials: { password: { config: { password: 'hunter2hunter2' } } },
+    password: 'hunter2hunter2',
+  });
+  assert.ok(!('credentials' in sent));
+  assert.ok(!JSON.stringify(sent).includes('hunter2'));
+});

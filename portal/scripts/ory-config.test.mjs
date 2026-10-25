@@ -187,3 +187,35 @@ test('the OTLP endpoint is a quoted scalar in both Ory templates', () => {
     assert.match(readFileSync(join(root, file), 'utf8'), /server_url: "\$\{OTHALA_OTLP_ENDPOINT\}"/, file);
   }
 });
+
+test('kratos: argon2 password hashing is bounded to a memory-hard cost', () => {
+  const a = render('kratos/kratos.yml').hashers.argon2;
+  assert.ok(parseInt(a.memory, 10) >= 64);
+  assert.ok(a.iterations >= 2);
+});
+
+test('kratos: the email code is bounded at five tries and fifteen minutes', () => {
+  const code = render('kratos/kratos.yml').selfservice.methods.code;
+  assert.equal(code.enabled, true);
+  assert.ok(code.config.max_submissions <= 5);
+  assert.equal(code.config.lifespan, '15m');
+});
+
+test('kratos: the recovery link method is not enabled', () => {
+  const methods = render('kratos/kratos.yml').selfservice.methods;
+  assert.ok(!methods.link || methods.link.enabled === false);
+});
+
+test('hydra: subject identifiers are public only', () => {
+  const types = render('hydra/hydra.yml').oidc?.subject_identifiers?.supported_types;
+  assert.ok(types === undefined || (types.length === 1 && types[0] === 'public'));
+});
+
+test('both Postgres DSNs disable TLS and both OTLP exporters are plaintext, as documented', () => {
+  const env = { OTHALA_OTLP_ENDPOINT: 'alloy:4318' };
+  for (const template of ['kratos/kratos.yml', 'hydra/hydra.yml']) {
+    const cfg = render(template, env);
+    assert.match(cfg.dsn, /\?sslmode=disable$/, template);
+    assert.equal(cfg.tracing.providers.otlp.insecure, true, template);
+  }
+});

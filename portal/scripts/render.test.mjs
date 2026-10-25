@@ -385,3 +385,10 @@ test('the CLI check runs offline against a content dir argument and fails on a b
     assert.match(bad.stderr, /stray\.txt: not part of the content layout \(apps\/, groups\.yaml, courier\/\); delete it/);
   });
 });
+
+test('render refuses a Kratos cipher secret that is not exactly 32 characters', () => {
+  for (const length of [31, 33]) {
+    const env = { ...ENV, KRATOS_CIPHER_SECRET_CURRENT: 'c'.repeat(length) };
+    assert.throws(() => render(root, CONTENT, env), /KRATOS_CIPHER_SECRET_CURRENT must be exactly 32 characters/);
+  }
+});

@@ -102,6 +102,14 @@ else
     fail "A2 uuid-ossp" "missing on hydra; init.sh failed"
 fi
 
+# A2b: the Hydra tables the postgres-backup runbook truncates exist under those names
+out=$(docker compose exec -T postgres psql -U postgres -d hydra -t -A -c "SELECT tablename FROM pg_tables WHERE tablename IN ('hydra_oauth2_flow','hydra_oauth2_authentication_session') ORDER BY 1;" 2>/dev/null | _strip_ansi | tr '\n' ',')
+if [[ "$out" == "hydra_oauth2_authentication_session,hydra_oauth2_flow," ]]; then
+    pass "A2b postgres: hydra_oauth2_flow and hydra_oauth2_authentication_session present"
+else
+    fail "A2b hydra session tables" "got: $out"
+fi
+
 # A3: Kratos admin /health/ready
 code=$(curl_code_in kratos http://${KRATOS_ADMIN_BIND_HOST}:4434/admin/health/ready)
 if [[ "$code" == "200" ]]; then
@@ -240,6 +248,16 @@ if [[ -n "$identity_id" ]]; then
         pass "C2 identity round-trip preserves metadata_admin.groups"
     else
         fail "C2 metadata_admin.groups round-trip" "got=$groups"
+    fi
+fi
+
+# C3: an admin-minted recovery code lives as long as asked (24h), not the 15m self-service code lifespan
+if [[ -n "$identity_id" ]]; then
+    ttl=$(printf '%s' "fetch('http://kratos:4434/admin/recovery/code',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({identity_id:'${identity_id}',expires_in:'24h'})}).then(r=>r.json()).then(j=>{process.stdout.write(String(Math.round((Date.parse(j.expires_at)-Date.now())/1000)));process.exit(0)}).catch(()=>process.exit(1))" | node_in othala)
+    if [[ "$ttl" =~ ^[0-9]+$ && "$ttl" -ge 86000 && "$ttl" -le 86400 ]]; then
+        pass "C3 admin-minted recovery code expires in 24h (${ttl}s)"
+    else
+        fail "C3 admin recovery code lifetime" "got ${ttl:-none}s, want 86000-86400"
     fi
 fi
 

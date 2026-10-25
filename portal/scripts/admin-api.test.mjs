@@ -3,7 +3,7 @@
 import { test, beforeEach, afterEach } from 'vitest';
 import assert from 'node:assert/strict';
 import { identity } from '../src/lib/test-builders.ts';
-import { createIdentity, deleteCredential, getIdentity, getRecoveryLink, listSessions, patchAdminMarker, patchPrerequisites, revokeSession, updateIdentity } from '../src/lib/admin-api.ts';
+import { createIdentity, deleteCredential, getIdentity, getRecoveryLink, listIdentities, listSessions, patchAdminMarker, patchPrerequisites, revokeSession, updateIdentity } from '../src/lib/admin-api.ts';
 import { MetadataAdminError } from '../src/lib/metadata-admin.ts';
 
 function kratosIdentity(fields) {
@@ -168,4 +168,11 @@ test('createIdentity and updateIdentity refuse an invalid metadata_admin before 
     await assert.rejects(call, MetadataAdminError);
     assert.equal(capturedCalls.length, 0);
   }
+});
+
+test('listIdentities: asks for one page of 250 and fetches no further page', async () => {
+  mockFetch([kratosIdentity({ id: 'a', traits: {} })]);
+  await listIdentities();
+  assert.equal(capturedCalls.length, 1);
+  assert.equal(new URL(capturedCalls[0].url).searchParams.get('per_page'), '250');
 });
