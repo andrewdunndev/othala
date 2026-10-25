@@ -47,7 +47,7 @@ test.describe('ZR — admin-managed access is not self-service', () => {
       });
       expect(flowResp.ok(), 'settings flow init').toBe(true);
       const flow = await flowResp.json();
-      await ctx.request.post(flow.ui.action, {
+      const resp = await ctx.request.post(flow.ui.action, {
         headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
         data: {
           method: 'profile',
@@ -58,6 +58,7 @@ test.describe('ZR — admin-managed access is not self-service', () => {
         },
         maxRedirects: 0,
       });
+      expect(resp.status(), 'ZR2: the self-service submission is accepted').toBe(200);
       const after = await readIdentity(kratosAdminURL, seeded.id);
       expect(after.metadata_admin, 'ZR2: admin-managed metadata is untouched by a self-service submission').toEqual(before.metadata_admin);
     } finally {
