@@ -2,7 +2,7 @@
 
 # Prefer the rootful podman socket: postgres chowns PGDATA as real root, which fails rootless.
 # Set both DOCKER_HOST and CONTAINER_HOST so compose, login and logs share one store.
-if [[ -S /run/podman/podman.sock ]]; then
+if [[ -z "${DOCKER_HOST:-}" && -S /run/podman/podman.sock ]]; then
   export DOCKER_HOST="unix:///run/podman/podman.sock"
   export CONTAINER_HOST="unix:///run/podman/podman.sock"
   echo "  rootful podman socket detected → DOCKER_HOST/CONTAINER_HOST=/run/podman/podman.sock"
@@ -94,7 +94,7 @@ up_and_wait() {
     # The edge has no healthcheck. Smoke and the browser run enter through it (the portal reaches Kratos and
     # Hydra directly on the internal network), so wait until it answers.
     for _ in $(seq 1 30); do
-        [[ $(curl -sk --resolve auth.othala.test:8443:127.0.0.1 -o /dev/null -w '%{http_code}' https://auth.othala.test:8443/ || true) != 000 ]] && break
+        (exec 3<>/dev/tcp/127.0.0.1/8443) 2>/dev/null && break
         sleep 2
     done
 }

@@ -2,7 +2,7 @@
 #   docker compose -f compose.yml -f compose.e2e.yml
 # with this directory as the deployment: othala.env, secrets.env, Caddyfile and content/ are the test's own.
 # Only what testing needs is added: the image under test, the HIBP-off Kratos
-# layer, an internal-CA edge for the test hostnames, fixed container names for podman logs, a mail catcher and the runners.
+# layer, internal-CA test hostnames, fixed container names for podman logs, a mail catcher and the runners.
 
 services:
   render:

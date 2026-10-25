@@ -39,7 +39,6 @@ export default defineConfig({
     // Browser context carries cookies across navigations automatically.
     // The JSON-API login action (actions/login.ts) returns the session via
     // Set-Cookie; we use a storageState pattern per identity in the fixtures.
-    ignoreHTTPSErrors: true,
     screenshot: 'only-on-failure',
     video: 'off',
     trace: 'off',
