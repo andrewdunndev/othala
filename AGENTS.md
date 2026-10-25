@@ -11,8 +11,7 @@ is part of the change that made it wrong.**
 **1. The audience test.** Every file, section and sentence must serve a stranger
 adopting Ory patterns. Anything that serves only this deployment does not
 appear: no instance hostnames, no personal names, no private-stack applications
-(whole-index checks in `scripts/check-purity.sh`; the private-name patterns
-live in the file named by `PURITY_PRIVATE_NAMES`, outside the tree). The `e2e/`
+(whole-index checks in `scripts/check-purity.sh`). The `e2e/`
 fixtures are the only example apps, so docs and tests agree by construction. Judging the rest is a habit.
 
 **2. Docs state WHY; code states WHAT.** Never restate code behaviour in prose:

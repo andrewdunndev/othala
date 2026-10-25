@@ -18,7 +18,7 @@ This CHANGELOG and git tags carry the deployed-instance release state.
 
 ### Removed
 
-- The root and portal Makefiles, and the prose-budget and check-count gates in `scripts/check-purity.sh`. The host and private-app name rules read their patterns from the file named by `PURITY_PRIVATE_NAMES`.
+- The root and portal Makefiles, and the prose-budget and check-count gates in `scripts/check-purity.sh`.
 
 ## [0.16.1] - 2026-10-18
 
