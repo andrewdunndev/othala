@@ -1,5 +1,5 @@
 # Audiobookshelf: the minimal generic_oauth client and the access-model fixture
-# (t-access-model.spec.ts; site guides/per-app-oidc.md; DECISIONS.md § Nothing is derived).
+# (t-access-model.spec.ts; site guides/per-app-oidc.md; DECISIONS.md).
 
 presentation:
   name: Audiobookshelf

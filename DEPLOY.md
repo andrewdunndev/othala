@@ -1,6 +1,6 @@
 # Deploy
 
-[`deploy/example/`](deploy/example/) is a whole compose deployment; e2e runs it on tags and on MRs that change portal, e2e, kratos, hydra, caddy, contract, deploy or site.
+[`deploy/example/`](deploy/example/) is a whole compose deployment.
 
 ## The seam
 
@@ -16,6 +16,16 @@ Never: an extra Ory `--config` layer, any env on Kratos or Hydra (it overrides t
 `check`), edits to rendered output, copies of what the image carries, or renamed topology. A policy need
 becomes a typed value in a release.
 
+## Before the first enrolment
+
+Three settings become commitments once anyone enrols a credential:
+
+- **`OTHALA_PUBLIC_URL`**: Hydra's issuer. Every client's discovery and every issued token carry it.
+- **`OTHALA_APEX`**: the Kratos cookie domain and the WebAuthn RP id, and the ceiling on which
+  hostnames can share the session. Changing it invalidates every enrolled passkey.
+- **Hydra's `subject_identifiers`**: `public` subjects mean the subject id is the identity id
+  everywhere; switching to pairwise later changes every downstream app's notion of who a user is.
+
 ## The deployment directory
 
 Copy the example, then edit `othala.env`, the Caddyfile and `content/` (`apps/`, `groups.yaml`, optional
@@ -24,9 +34,9 @@ Copy the example, then edit `othala.env`, the Caddyfile and `content/` (`apps/`,
 ```sh
 cp -r deploy/example /srv/othala && cd /srv/othala && cp othala.env.example othala.env
 IMAGE=registry.gitlab.com/dunn.dev/othala@sha256:<digest>   # the tag in compose.yml, plus its digest
-(umask 077; docker run --rm -v "$PWD/content:/etc/othala:ro" "$IMAGE" node dist/server/config.mjs gen-secrets > secrets.env)
+(umask 077; docker run --rm -v "$PWD/content:/etc/othala:ro,z" "$IMAGE" node dist/server/config.mjs gen-secrets > secrets.env)
 echo 'OTHALA_SMTP_CONNECTION_URI=smtps://user:pass@smtp.example.org:465' >> secrets.env
-docker run --rm --env-file othala.env -v "$PWD/content:/etc/othala:ro" "$IMAGE" node dist/server/config.mjs check
+docker run --rm --env-file othala.env -v "$PWD/content:/etc/othala:ro,z" "$IMAGE" node dist/server/config.mjs check
 docker compose up -d
 ```
 
@@ -39,29 +49,26 @@ placeholder. The image's `contract/` pins only what the portal depends on; the i
 hook must equal the image's copies. In CI, after every edit:
 
 ```sh
-docker run --rm -v "$PWD/ory:/ory:ro" "$IMAGE" node dist/server/config.mjs check-ory \
+docker run --rm -v "$PWD/ory:/ory:ro,z" "$IMAGE" node dist/server/config.mjs check-ory \
   --kratos /ory/kratos.yml --hydra /ory/hydra.yml --identity-schema /ory/identity.schema.json --jsonnet /ory/recovery-gate.jsonnet
 ```
 
 An env var or extra `-c` file overriding a contract key is the deployment's to keep right: `check-ory` cannot see it.
-`check-ory` proves the config meets what othala depends on; it is not a security review of instance policy (return URLs, cookie scope, lifespans).
-A placeholder may replace only the secret or instance part of a value; the `Bearer ` prefix and the URL paths stay literal.
-It exits 1 naming each violated key and rule, never a value, and 2 when a flag is missing. `kratos validate` stays the deployment's job.
+`check-ory` verifies the config meets what othala depends on; it does not review instance policy (return URLs, cookie scope, lifespans).
+A placeholder may replace only the secret or instance part of a value; the `Bearer ` prefix and the URL paths stay literal. `kratos validate` stays the deployment's job.
 
 ## Startup order
 
-The render runs first as uid 10000, the Kratos image's uid (Hydra runs as 10000 too; its image defaults to nonroot). Then come both migrate jobs, Kratos and Hydra, and
-the portal; Caddy waits only for the render. With quadlets the render is a `Type=oneshot`,
-`RemainAfterExit=yes` unit writing a host tmpfs `/run/othala`; Kratos, Hydra, both migrate units and Caddy take
-`Requires=` and `After=` on it and mount `/run/othala/{kratos,hydra,caddy}` read-only at `/etc/config/kratos`,
-`/etc/config/hydra` and `/etc/caddy/othala`.
+The render runs first as uid 10000, the Kratos image's uid. Then come both migrate jobs, Kratos and Hydra
+(neither Ory service migrates on startup), and the portal; Caddy waits only for the render.
+With quadlets the render is a `Type=oneshot`, `RemainAfterExit=yes` unit writing a host tmpfs `/run/othala`; Kratos, Hydra, both migrate units and Caddy take `Requires=` and `After=` on it and mount `/run/othala/{kratos,hydra,caddy}` read-only at `/etc/config/kratos`, `/etc/config/hydra` and `/etc/caddy/othala`.
 
 ## Restart rules
 
 - Image pin, `othala.env`, `secrets.env` or `courier/`: rerun the render and recreate what reads them:
   `docker compose up -d --force-recreate render kratos hydra othala caddy`.
 - `apps/` or `groups.yaml`: `docker compose kill -s SIGHUP othala`. The portal reloads and reconciles its Hydra
-  clients (`registerAllClients`, `portal/src/lib/register-clients.ts`).
+  clients.
 
 ## Validation
 
@@ -74,7 +81,7 @@ the portal; Caddy waits only for the render. With quadlets the render is a `Type
 
 ## Topology
 
-Fixed by the image (`portal/src/lib/constants.ts`, `PORT` and `ADMIN_PORT` in `portal/src/server/listen.ts`):
+Fixed by the image:
 
 | Alias | Port | Listener | Called by |
 |---|---|---|---|
@@ -89,6 +96,8 @@ Fixed by the image (`portal/src/lib/constants.ts`, `PORT` and `ADMIN_PORT` in `p
 The Kratos and Hydra admin APIs take no bearer: bind each to its address on a network the edge never joins,
 resolve its alias to that address for its callers (`extra_hosts` in the example), and publish only the edge
 ([`ARCHITECTURE.md` § Trust boundary](ARCHITECTURE.md#trust-boundary)).
+
+Browser clients on another origin are unsupported: Hydra's CORS allowlist is `OTHALA_PUBLIC_URL` only.
 
 Both edge rate-limit zones key on `{client_ip}`: behind a load balancer, set `trusted_proxies_strict` beside
 `trusted_proxies`, or a client picks its own address.
@@ -113,4 +122,4 @@ Each release's `deploy/example/compose.yml` pins the upstream Ory digests its e2
 2. Move the othala, Kratos and Hydra pins to the release's example.
 3. Before an Ory pin change, `pg_dump`: Ory migrations are forward-only, so rolling back restores the dump. An
    othala-only rollback is a digest revert.
-4. `docker compose up -d`; check the OIDC discovery document and a real login.
+4. `docker compose up -d --force-recreate render kratos hydra othala caddy` (a plain `up -d` leaves them on pre-upgrade config); the migrate services run automatically via `depends_on`. Check the OIDC discovery document and a real login.

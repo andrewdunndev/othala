@@ -42,7 +42,6 @@ export const sections: Section[] = [
     lede: 'The integration commitments that keep an Ory deployment durable across upgrades, how applications are connected over OIDC, how requests are denied, and how the substrate is hardened.',
     pages: [
       { href: '/guides/',                       label: 'Overview' },
-      { href: '/guides/golden-path/',           label: 'Golden path',            file: 'guides/golden-path.md' },
       { href: '/guides/per-app-oidc/',          label: 'Per-app OIDC',           file: 'guides/per-app-oidc.md' },
       { href: '/guides/error-handling/',        label: 'Error handling',         file: 'guides/error-handling.md' },
       { href: '/guides/hardening/',             label: 'Hardening',              file: 'guides/hardening.md' },
@@ -69,7 +68,7 @@ export function sectionForPath(path: string): Section | null {
 }
 
 /** Map every published doc's source basename → its site URL, so
- *  intra-repo Markdown links (`[golden path](golden-path.md)`,
+ *  intra-repo Markdown links (`[hardening](hardening.md)`,
  *  `docs/per-app-oidc.md`) rewrite to working site links at render
  *  time. Basenames not in the map (repo-only docs, off-site paths)
  *  are left untouched — those links resolve

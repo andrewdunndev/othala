@@ -11,9 +11,7 @@ secret may have been exposed. For the Hydra system secret see
 
 ## Single-slot rendering
 
-Ory accepts a list for each of these secrets: the first entry signs or
-encrypts, every entry verifies or decrypts, so `[new, old]` rotates without
-logging anyone out (`uniqueItems` only rejects duplicates). A two-entry Kratos cookie list is untested with othala's 64-character cookie secrets; the continuity cookie needs 16, 24 or 32 characters. Othala renders one
+Ory accepts a list per secret, but Othala renders one
 entry from one `_CURRENT` value per secret (`KRATOS_COOKIE_SECRET_CURRENT`,
 `KRATOS_CIPHER_SECRET_CURRENT`, `HYDRA_COOKIE_SECRET_CURRENT`; no `_PREVIOUS`),
 so the old value stops verifying: every session and flow cookie signed under
@@ -22,13 +20,17 @@ stored under the old value.
 
 ## Procedure
 
+A Kratos `secrets.cookie` list of two 64-character entries fails every
+continuity-cookie flow with `crypto/aes: invalid key size 64`; use a single
+slot or two 32-character entries.
+
 1. Generate the cookie secrets with `openssl rand -hex 32` and the cipher
    secret with `openssl rand -hex 16`; Kratos requires exactly 32 characters
    for the cipher.
 2. Set each as the single `_CURRENT` value in your secret store (lab:
    `e2e/secrets.env`).
-3. Restart Kratos and Hydra (lab: `docker compose restart kratos hydra`;
-   deployed: re-provision secrets and redeploy).
+3. Rerun the render and recreate what reads it (`restart` does not re-render):
+   `docker compose up -d --force-recreate render kratos hydra othala caddy`.
 4. Verify readiness from the compose directory:
 
    ```sh
