@@ -2,7 +2,7 @@
 
 # Prefer the rootful podman socket: postgres chowns PGDATA as real root, which fails rootless.
 # Set both DOCKER_HOST and CONTAINER_HOST so compose, login and logs share one store.
-if [[ -z "${DOCKER_HOST:-}" && -S /run/podman/podman.sock ]]; then
+if [[ "${DOCKER_HOST:-}" != unix:///run/podman/podman.sock && -S /run/podman/podman.sock ]]; then
   export DOCKER_HOST="unix:///run/podman/podman.sock"
   export CONTAINER_HOST="unix:///run/podman/podman.sock"
   echo "  rootful podman socket detected → DOCKER_HOST/CONTAINER_HOST=/run/podman/podman.sock"
