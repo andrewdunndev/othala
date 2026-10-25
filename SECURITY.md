@@ -143,6 +143,10 @@ Each names its enforcer and the test that fails if it stops working.
   descending privilege, so a manifest listing roles ascending silently downgrades
   its users. The mistake only ever downgrades, and nothing reports it.
 - **A member with no second factor: the mailbox holder keeps the account.** An emailed code proves the mailbox, not the person. A passkey or TOTP the mailbox holder adds is accepted, and the email-change gate only guards members who already hold a passkey or password.
+- **Login by emailed code can reveal whether an address has an account.** Kratos
+  answers an unknown address differently on this path; recovery is not affected.
+  The per-IP limit on `/self-service/*` bounds probing. Tracked upstream in
+  [ory/kratos#4521](https://github.com/ory/kratos/issues/4521).
 - **A refused device keeps polling.** Hydra has no device-grant reject, so a
   denied or refused code answers `authorization_pending` until it expires.
 - **Consent skip trusts the session.** A client with `skip_consent` mints tokens
