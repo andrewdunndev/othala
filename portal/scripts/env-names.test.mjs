@@ -3,6 +3,9 @@
 
 import { test } from 'vitest';
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
+import { SECRETS } from '../src/lib/render.ts';
 import { envNameErrors, KNOWN_OTHALA_NAMES, RETIRED_NAMES } from '../src/lib/env-names.ts';
 
 test('no name is both known and retired, and every retired name names a fix', () => {
@@ -29,4 +32,20 @@ test('an unknown OTHALA_ name names itself and the known set, never the value', 
   const [error, ...rest] = envNameErrors({ OTHALA_INSTANCE: 'Value That Must Not Leak' });
   assert.deepEqual(rest, []);
   assert.equal(error, `OTHALA_INSTANCE is not an othala setting: delete it (othala reads ${KNOWN_OTHALA_NAMES.join(', ')})`);
+});
+
+const documented = new Set(
+  readFileSync(fileURLToPath(new URL('../../.env.example', import.meta.url)), 'utf8')
+    .split('\n')
+    .map((l) => /^(?:# )?([A-Z<][A-Z0-9_<>]*)=/.exec(l)?.[1])
+    .filter(Boolean),
+);
+
+test('.env.example documents every known setting, every required secret and every bind, and no retired or unknown OTHALA_ name', () => {
+  const binds = ['KRATOS_ADMIN_BIND_HOST', 'HYDRA_ADMIN_BIND_HOST', 'PORTAL_ADMIN_BIND_HOST'];
+  for (const name of [...KNOWN_OTHALA_NAMES, ...SECRETS, ...binds]) assert.ok(documented.has(name), `${name} undocumented`);
+  for (const name of documented) {
+    assert.ok(!Object.hasOwn(RETIRED_NAMES, name), `${name} is retired`);
+    if (name.startsWith('OTHALA_')) assert.ok(KNOWN_OTHALA_NAMES.includes(name), `${name} unknown`);
+  }
 });
