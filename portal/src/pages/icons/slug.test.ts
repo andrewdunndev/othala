@@ -29,6 +29,10 @@ beforeEach(() => {
   writeFileSync(join(dir, 'app.svg'), SVG);
   writeFileSync(join(dir, 'big.yaml'), manifest('app-access'));
   writeFileSync(join(dir, 'big.svg'), SVG + ' '.repeat(33 * 1024));
+  for (const [stem, bytes] of [['edge', 32 * 1024], ['over', 32 * 1024 + 1]] as const) {
+    writeFileSync(join(dir, `${stem}.yaml`), manifest('app-access'));
+    writeFileSync(join(dir, `${stem}.svg`), SVG + ' '.repeat(bytes - SVG.length));
+  }
   writeFileSync(join(dir, 'text.yaml'), manifest('app-access'));
   writeFileSync(join(dir, 'text.svg'), '<html><script>alert(1)</script></html>');
   setContentDir(root);
@@ -61,6 +65,11 @@ describe('GET /icons/<stem>.svg', () => {
   it('keeps the route CSP through the middleware', async () => {
     const res = (await onRequest({ request: new Request('http://portal.test/icons/app.svg'), url: new URL('http://portal.test/icons/app.svg') } as never, async () => call('app'))) as Response;
     expect(res.headers.get('content-security-policy')).toMatch(/^sandbox/);
+  });
+
+  it('serves a logo of exactly 32 KiB and refuses one byte more', async () => {
+    expect((await call('edge')).status).toBe(200);
+    expect((await call('over')).status).toBe(404);
   });
 
   it('is 404 without a session cookie', async () => {
