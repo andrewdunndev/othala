@@ -8,13 +8,15 @@ exposure, a leak to a chat, log or commit); no cadence is required.
 ## Procedure
 
 1. Generate the new secret: `openssl rand -base64 48`.
-2. Set it as `HYDRA_SYSTEM_SECRET` and the old value as `HYDRA_SYSTEM_SECRET_PREVIOUS`.
-3. Recreate: `docker compose up -d --force-recreate render kratos hydra othala caddy`.
-4. Verify an OIDC flow end to end; Hydra logs show no decryption errors.
+2. Set it as `HYDRA_SYSTEM_SECRET` and the old value as `HYDRA_SYSTEM_SECRET_PREVIOUS`, then recreate: `docker compose up -d --force-recreate render kratos hydra othala caddy`.
+3. Delete the ID-token key set so Hydra re-creates it under the new secret:
+   `docker compose exec -T othala node -e "fetch('http://hydra:4445/admin/keys/hydra.openid.id-token',{method:'DELETE'}).then(r=>{console.log(r.status);process.exit(r.ok?0:1)})"`
+4. Confirm `/.well-known/jwks.json` lists a key and an OIDC flow works end to end.
+5. Drop `HYDRA_SYSTEM_SECRET_PREVIOUS` and recreate as in step 2.
 
-Keep `_PREVIOUS`: Hydra's JWKs stay encrypted under the key that created them,
-so drop it only after the stored keys and tokens that predate the rotation are
-gone or re-created.
+Hydra keeps its stored keys encrypted under the secret that created them, and
+stays healthy while unable to read them. ID tokens signed by the old keys no
+longer verify, so relying parties re-fetch the JWKS.
 
 ## Not covered
 
