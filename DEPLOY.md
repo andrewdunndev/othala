@@ -34,9 +34,9 @@ Copy the example, then edit `othala.env`, the Caddyfile and `content/` (`apps/`,
 ```sh
 cp -r deploy/example /srv/othala && cd /srv/othala && cp othala.env.example othala.env
 IMAGE=registry.gitlab.com/dunn.dev/othala@sha256:<digest>   # the tag in compose.yml, plus its digest
-(umask 077; docker run --rm -v "$PWD/content:/etc/othala:ro" "$IMAGE" node dist/server/config.mjs gen-secrets > secrets.env)
+(umask 077; docker run --rm -v "$PWD/content:/etc/othala:ro,z" "$IMAGE" node dist/server/config.mjs gen-secrets > secrets.env)
 echo 'OTHALA_SMTP_CONNECTION_URI=smtps://user:pass@smtp.example.org:465' >> secrets.env
-docker run --rm --env-file othala.env -v "$PWD/content:/etc/othala:ro" "$IMAGE" node dist/server/config.mjs check
+docker run --rm --env-file othala.env -v "$PWD/content:/etc/othala:ro,z" "$IMAGE" node dist/server/config.mjs check
 docker compose up -d
 ```
 
@@ -49,7 +49,7 @@ placeholder. The image's `contract/` pins only what the portal depends on; the i
 hook must equal the image's copies. In CI, after every edit:
 
 ```sh
-docker run --rm -v "$PWD/ory:/ory:ro" "$IMAGE" node dist/server/config.mjs check-ory \
+docker run --rm -v "$PWD/ory:/ory:ro,z" "$IMAGE" node dist/server/config.mjs check-ory \
   --kratos /ory/kratos.yml --hydra /ory/hydra.yml --identity-schema /ory/identity.schema.json --jsonnet /ory/recovery-gate.jsonnet
 ```
 
@@ -122,4 +122,4 @@ Each release's `deploy/example/compose.yml` pins the upstream Ory digests its e2
 2. Move the othala, Kratos and Hydra pins to the release's example.
 3. Before an Ory pin change, `pg_dump`: Ory migrations are forward-only, so rolling back restores the dump. An
    othala-only rollback is a digest revert.
-4. `docker compose up -d`; check the OIDC discovery document and a real login.
+4. `docker compose up -d --force-recreate render kratos hydra othala caddy` (a plain `up -d` leaves them on pre-upgrade config); the migrate services run automatically via `depends_on`. Check the OIDC discovery document and a real login.

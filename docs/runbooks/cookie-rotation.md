@@ -20,13 +20,17 @@ stored under the old value.
 
 ## Procedure
 
+A Kratos `secrets.cookie` list of two 64-character entries fails every
+continuity-cookie flow with `crypto/aes: invalid key size 64`; use a single
+slot or two 32-character entries.
+
 1. Generate the cookie secrets with `openssl rand -hex 32` and the cipher
    secret with `openssl rand -hex 16`; Kratos requires exactly 32 characters
    for the cipher.
 2. Set each as the single `_CURRENT` value in your secret store (lab:
    `e2e/secrets.env`).
-3. Restart Kratos and Hydra (lab: `docker compose restart kratos hydra`;
-   deployed: re-provision secrets and redeploy).
+3. Rerun the render and recreate what reads it (`restart` does not re-render):
+   `docker compose up -d --force-recreate render kratos hydra othala caddy`.
 4. Verify readiness from the compose directory:
 
    ```sh

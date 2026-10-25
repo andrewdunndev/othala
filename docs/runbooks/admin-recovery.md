@@ -45,8 +45,6 @@ docker compose exec -T othala node -e "fetch('http://kratos:4434/admin/identitie
 The admin API is reachable only from inside the compose network, hence the
 run from the othala container.
 
-If `metadata_admin` is null, send `add /metadata_admin {"admin":true}` instead;
-Kratos does not create the parent (`patchAdminMarker` pre-fetches for this).
 Patch the marker and nothing else — sending a
 whole `metadata_admin` object replaces `groups` too, silently stripping an
 admin's app access while they can still sign in.

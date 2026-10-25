@@ -26,7 +26,8 @@ same-origin POST gets the application's structured deny.
 
 ## One branded surface
 
-Every branded status page renders through
+Login, consent and logout render through `FocusPage`; the error routes (404, 500,
+`auth/error`) render through
 `portal/src/components/StatusPage.astro`: status, title, message, an optional
 reason badge, never any internals. Denials redirect to
 `portal/src/pages/auth/error.astro` carrying a `reason` that page maps to copy;

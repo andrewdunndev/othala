@@ -10,11 +10,12 @@ The git tag is the authoritative version; `portal/package.json` mirrors it.
 
 ### Fixed
 
+- Cookie rotation and upgrade steps recreate render, kratos, hydra, othala and caddy (`restart` and plain `up -d` left old config running), and the `docker run` mounts carry `:ro,z` for SELinux hosts.
 - Runbooks and config comments match Ory v26.2.0: cookie, cipher and Hydra system secrets accept `[new, old]` lists, the cipher secret is 32 characters, and the admin-marker, readiness, registrar and consent-reset steps use commands that work in the compose deployment.
 - `/readyz` also fails while the registrar's last reconcile failed, and a SIGHUP during a reconcile queues one rerun instead of being dropped.
 - A remembered login lasts as long as the Kratos session's own expiry; the hardcoded 720h fallback is gone.
 - The identity schema no longer carries a `metadata_admin` block; Kratos validates `traits` only and the portal enforces the marker.
-- Documentation cut to what a stranger or operator needs: DECISIONS is a ruling list, the Golden path guide and `hydra/README.md` are folded into DEPLOY, DECISIONS and the per-app guide, and the recovery-session and SBOM statements that tests contradict are corrected.
+- Documentation cut to what a stranger or operator needs: DECISIONS is a ruling list, the Golden path guide and `hydra/README.md` are folded into DEPLOY, DECISIONS and the per-app guide, the recovery-session statements are corrected, and the hardening guide no longer says nothing evaluates the SBOM (CI runs an OSV verdict over it).
 
 ### Removed
 
