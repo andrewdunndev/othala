@@ -134,10 +134,9 @@ Each names its enforcer and the test that fails if it stops working.
 - **Rate limiting depends on a third-party Caddy module.** A binary built without
   it refuses to load `caddy/othala.caddy`, so the failure is a refusal to start,
   not a silently unlimited edge. Confirm it is compiled in.
-- **The identity-header strip matches names, not spellings.** Caddy cannot
-  match `X_Remote_User`, which WSGI and CGI upstreams fold into the same
-  variable as `X-Remote-User`. An app behind `othala-forward-auth` that trusts
-  a proxy identity header must read the hyphenated name only.
+- **The identity-header strip covers underscore spellings.** `othala.caddy` strips every
+  `*_*` request header, so WSGI and CGI upstreams cannot fold `X_Remote_User` into
+  `X-Remote-User`; `othala-caddy.test.mjs` holds that.
 - **`{client_ip}` is only as good as `trusted_proxies`.** Behind a trusted load
   balancer without `trusted_proxies_strict`, Caddy takes the leftmost
   `X-Forwarded-For` entry, which the client chose. See `DEPLOY.md`.

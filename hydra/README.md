@@ -14,14 +14,13 @@ registered on boot and on SIGHUP, with `<SLUG>_CLIENT_SECRET`
 from env; a manifest with only `presentation:` is skipped. See
 ["An app is a manifest"](../README.md#an-app-is-a-manifest),
 [`e2e/content/apps/`](../e2e/content/apps/) for annotated examples,
-[`DEPLOY.md`](../DEPLOY.md) "Client registration" and
 [`per-app-oidc.md`](../site/src/content/docs/guides/per-app-oidc.md).
 
-## secrets.system non-rotatable
+## secrets.system
 
-`hydra.yml` references `${HYDRA_SYSTEM_SECRET}`. **Generate once. Store it in
-your secret store. Never rotate without rebuilding the
-Hydra database.** Break-glass rotation: `docs/runbooks/secrets-rotation.md`.
+`hydra.yml` references `${HYDRA_SYSTEM_SECRET}`. Generate once and keep it in your
+secret store. Othala renders a single slot, so changing it rebuilds the Hydra database:
+`docs/runbooks/secrets-rotation.md`.
 
 ## Schema migrations
 

@@ -20,8 +20,8 @@ setting's consumer may be outside this repository.
 
 **Enforced by.** `portal/scripts/forward-auth.test.mjs` holds the coupling (a session with no identity
 id is 401). Step-up: `gate.test.ts`, `oauth2-handlers.test.mjs`, `admin-port.test.mjs`,
-`admin-actions.test.ts`, `second-factor-gate.test.ts`, `e2e/playwright/tests/v-app-stepup.spec.ts`. The pinned value in
-`kratos/kratos.yml` is UNENFORCED.
+`admin-actions.test.ts`, `second-factor-gate.test.ts`, `e2e/playwright/tests/v-app-stepup.spec.ts`. The pinned `whoami` AAL in
+`kratos/kratos.yml` is enforced by `portal/scripts/contract.test.mjs`.
 
 ## An outage is not a denial
 

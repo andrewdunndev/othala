@@ -23,8 +23,8 @@ The app in `portal/` (Astro Node SSR) provides:
   groups;
 - **an OIDC client registrar** that reconciles Hydra's client list from per-app manifest files, so
   adding an app, logo included, is a file drop rather than an image rebuild;
-- **an admin surface** for identities, groups, and OAuth2 clients, on a listener that is not on the
-  network.
+- **an admin surface** for identities, groups, and OAuth2 clients, served on the public listener and
+  gated by an admin session.
 
 Passkeys are the primary credential; email code and password are the fallbacks. Everything is
 configured through `OTHALA_*` environment variables, so one image serves any instance

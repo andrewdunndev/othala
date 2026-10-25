@@ -8,7 +8,7 @@ deploy-plane work; this runbook is the contract it must satisfy.
 
 The databases hold every passkey enrollment, active session, recovery-code
 state, and the Hydra OAuth2 clients (secrets hashed) and signing keys (private keys and
-session data encrypted at rest under `secrets.system`, which is non-rotatable). Losing them without a backup means
+session data encrypted at rest under `secrets.system`; rotating it rebuilds the Hydra database). Losing them without a backup means
 every member re-enrolls, every OIDC client is re-created, and `secrets.system` must be restored from
 your secret store or even a partial restore cannot decrypt.
 
@@ -38,12 +38,16 @@ restores with drift: an identity with no remembered-consent row, or the
 reverse. Do not reconcile rows:
 
 1. Restore both databases from the most recent compatible pair of dumps.
-2. Clear Hydra's remembered sessions to force re-consent:
+2. Clear Hydra's remembered consent and login sessions to force re-consent, per subject,
+   through the Hydra admin API (from the othala container):
+   `DELETE /admin/oauth2/auth/sessions/consent?subject=<id>&all=true` and
+   `DELETE /admin/oauth2/auth/sessions/login?subject=<id>`. For a whole-instance wipe:
 
    ```sql
-   TRUNCATE hydra_oauth2_consent_request_handled;
-   TRUNCATE hydra_oauth2_authentication_session;
+   TRUNCATE hydra_oauth2_flow, hydra_oauth2_authentication_session CASCADE;
    ```
+
+   This also drops in-flight flows and every issued token.
 
 3. **Sign out everywhere** for every active member (`/admin/users/<id>`),
    dropping their Kratos session and relying-party state.

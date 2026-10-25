@@ -65,8 +65,8 @@ run, so there is no separate probe script to keep in sync. A check that scanned
 zero files, weighed zero bytes, whose pattern no longer fires on its canary, or
 whose `grep` hit an I/O error is an ERROR, never a pass.
 
-The `check-portal` and `check-purity` jobs run on every push, MR and tag;
-`shellcheck` is not in their image and nothing here curl-installs a linter.
+`check-purity` runs on every push, MR and tag; `check-portal` runs on tags and on MRs
+that change the heavy paths. `shellcheck` is not in their image and nothing here curl-installs a linter.
 
 ## Conventions that hold the design together
 

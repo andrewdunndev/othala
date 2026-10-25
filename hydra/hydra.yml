@@ -66,12 +66,12 @@ oauth2:
     default_grant_allowed_scope: false
 
 secrets:
-  # CRITICAL: secrets.system is non-rotatable for the life of the Hydra DB. Generate once and
-  # keep it in your secret store (docs/runbooks/secrets-rotation.md).
+  # Ory rotates this by list ([new, old]); othala renders one slot, so changing it means a database
+  # rebuild (docs/runbooks/secrets-rotation.md).
   system:
     - "${HYDRA_SYSTEM_SECRET}"
 
-  # Single active cookie secret: Ory enforces uniqueItems.
+  # One slot: a rotation signs every member out (docs/runbooks/cookie-rotation.md).
   cookie:
     - "${HYDRA_COOKIE_SECRET_CURRENT}"
 

@@ -1,45 +1,47 @@
 # Cookie / cipher secret rotation
 
 Rotates the Kratos and Hydra cookie signing secrets and the Kratos cipher
-(at-rest encryption) secret. Rotation logs every member out.
+(at-rest encryption) secret. As shipped, rotation logs every member out.
 
 ## When
 
 Quarterly, or on a suspected leak, operator handover, or an incident where the
-secret may have been exposed.
+secret may have been exposed. For the Hydra system secret see
+`secrets-rotation.md`.
 
-`HYDRA_SYSTEM_SECRET` is non-rotatable for the life of the Hydra database; do
-not touch it here (see `hydra/hydra.yml`).
+## Single-slot rendering
 
-## Single-slot model
-
-Ory accepts a list for Kratos `secrets.cookie` and `secrets.cipher` and Hydra
-`secrets.cookie` (the first entry signs, every entry verifies), but enforces
-`uniqueItems`, and the shipped config renders exactly one entry from one
-`_CURRENT` value per secret (`KRATOS_COOKIE_SECRET_CURRENT`,
-`KRATOS_CIPHER_SECRET_CURRENT`, `HYDRA_COOKIE_SECRET_CURRENT`; no
-`_PREVIOUS`). The old value therefore cannot stay as a verifier: rotation
-replaces it, and every session and flow cookie signed under it stops
-verifying.
+Ory accepts a list for each of these secrets: the first entry signs or
+encrypts, every entry verifies or decrypts, so `[new, old]` rotates without
+logging anyone out (`uniqueItems` only rejects duplicates). Othala renders one
+entry from one `_CURRENT` value per secret (`KRATOS_COOKIE_SECRET_CURRENT`,
+`KRATOS_CIPHER_SECRET_CURRENT`, `HYDRA_COOKIE_SECRET_CURRENT`; no `_PREVIOUS`),
+so the old value stops verifying: every session and flow cookie signed under
+it is rejected, and rotating the cipher drops the OIDC upstream tokens Kratos
+stored under the old value.
 
 ## Procedure
 
-1. Generate a secret: `openssl rand -hex 32`.
-2. Set it in your sops file (production) or `e2e/.env` (lab) as the single
-   `_CURRENT` value.
-3. Restart Kratos and Hydra (lab: `podman compose restart kratos hydra`;
-   production: re-provision secrets and redeploy).
-4. Verify health: `curl -fsS https://<your-othala-host>/health/ready`, then
-   your smoke suite. Every member signs in again.
+1. Generate the cookie secrets with `openssl rand -hex 32` and the cipher
+   secret with `openssl rand -hex 16`; Kratos requires exactly 32 characters
+   for the cipher.
+2. Set each as the single `_CURRENT` value in your secret store (lab:
+   `e2e/secrets.env`).
+3. Restart Kratos and Hydra (lab: `docker compose restart kratos hydra`;
+   deployed: re-provision secrets and redeploy).
+4. Verify readiness from the compose directory:
 
-Rotating `secrets.cipher` also makes data Kratos encrypted under the old value
-unreadable; rotate it only on suspected exposure.
+   ```sh
+   docker compose exec -T othala node -e "fetch('http://'+process.env.PORTAL_ADMIN_BIND_HOST+':4431/readyz').then(r=>process.exit(r.ok?0:1))"
+   ```
+
+   then your smoke suite. Every member signs in again.
 
 ## Failure modes
 
 - **Sessions bounced to login after rotation:** expected, see above.
-- **Empty secrets list:** Kratos and Hydra refuse to start. Restore from the
-  operator store.
+- **Kratos or Hydra refuses to start:** a secret rendered empty or too short
+  (cipher: not exactly 32 characters). Restore from your secret store.
 
 ## Related
 
