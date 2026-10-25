@@ -66,14 +66,18 @@ oauth2:
     default_grant_allowed_scope: false
 
 secrets:
-  # Ory rotates this by list ([new, old]); othala renders one slot, so changing it means a database
-  # rebuild (docs/runbooks/secrets-rotation.md).
+  # [new, old] (docs/runbooks/secrets-rotation.md, docs/runbooks/cookie-rotation.md).
   system:
     - "${HYDRA_SYSTEM_SECRET}"
+#@if HYDRA_SYSTEM_SECRET_PREVIOUS
+    - "${HYDRA_SYSTEM_SECRET_PREVIOUS}"
+#@endif
 
-  # One slot: a rotation signs every member out (docs/runbooks/cookie-rotation.md).
   cookie:
     - "${HYDRA_COOKIE_SECRET_CURRENT}"
+#@if HYDRA_COOKIE_SECRET_PREVIOUS
+    - "${HYDRA_COOKIE_SECRET_PREVIOUS}"
+#@endif
 
 log:
   format: json

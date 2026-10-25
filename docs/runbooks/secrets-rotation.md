@@ -1,53 +1,22 @@
-# secrets.system rotation (break-glass)
+# secrets.system rotation
 
 `secrets.system` is the symmetric key Hydra uses to encrypt its JWK private
 keys and stored OAuth2 session data at rest in Postgres. (Client secrets are
-hashed, not encrypted.) Do this only on known compromise of the key (secret-store
+hashed, not encrypted.) Rotate on known compromise of the key (secret-store
 exposure, a leak to a chat, log or commit); no cadence is required.
-
-## Why this rebuilds the database
-
-Ory rotates this in place with a `[new, old]` list, but Othala renders a single entry from
-`HYDRA_SYSTEM_SECRET`, so a new value cannot read what the old one wrote and the Hydra database is rebuilt.
-
-## What rotation costs
-
-- The encrypted JWK private keys and session data become unreadable, so the
-  database is rebuilt; the in-app registrar re-creates each client from the
-  manifests.
-- Outstanding tokens, grants and in-flight consent flows are lost; users
-  mid-flow retry and sign in again.
-- Hydra's id_token signing keys do not survive; the rebuilt database mints new ones.
 
 ## Procedure
 
-Prerequisites: shell on the host and write access to your secret store.
-
 1. Generate the new secret: `openssl rand -base64 48`.
-2. Store it as the Hydra system secret in your secret store.
-3. Stop Hydra and its migrate unit.
-4. Drop and recreate the Hydra database:
+2. Set it as `HYDRA_SYSTEM_SECRET` and the old value as `HYDRA_SYSTEM_SECRET_PREVIOUS`, then recreate: `docker compose up -d --force-recreate render kratos hydra othala caddy`.
+3. Delete the ID-token key set so Hydra re-creates it under the new secret:
+   `docker compose exec -T othala node -e "fetch('http://hydra:4445/admin/keys/hydra.openid.id-token',{method:'DELETE'}).then(r=>{console.log(r.status);process.exit(r.ok?0:1)})"`
+4. Confirm `/.well-known/jwks.json` lists a key and an OIDC flow works end to end.
+5. Drop `HYDRA_SYSTEM_SECRET_PREVIOUS` and recreate as in step 2.
 
-   ```sh
-   docker compose exec postgres psql -U postgres \
-     -c "DROP DATABASE hydra;" -c "CREATE DATABASE hydra OWNER hydra;"
-   ```
-
-5. Re-provision the host secrets so the new value lands, using your deploy tooling.
-6. Run the Hydra migration, then start Hydra, in that order: Postgres, migration
-   (which populates a fresh schema under the new secret), Hydra.
-7. Re-register the clients: the registrar runs inside othala, so restart it or
-   send `docker compose kill -s SIGHUP othala`; it re-creates each Hydra client
-   from the manifests with its `<SLUG>_CLIENT_SECRET`.
-8. If any `<SLUG>_CLIENT_SECRET` changed, update and redeploy each affected app.
-9. Verify an OIDC flow end to end.
-
-## Verification
-
-- The othala log shows `reconcile complete` with every manifest processed.
-- A test login through an OIDC client completes.
-- Hydra logs show no decryption errors.
-- The secret store holds only the new system secret.
+Hydra keeps its stored keys encrypted under the secret that created them, and
+stays healthy while unable to read them. ID tokens signed by the old keys no
+longer verify, so relying parties re-fetch the JWKS.
 
 ## Not covered
 

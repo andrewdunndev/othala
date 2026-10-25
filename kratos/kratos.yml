@@ -312,13 +312,18 @@ courier:
 
 
 secrets:
-  # Ory accepts [new, old] lists; othala renders one slot each, so a rotation signs every member out and a
-  # cipher rotation drops stored OIDC upstream tokens (docs/runbooks/cookie-rotation.md).
+  # [new, old]: the first signs and encrypts, every entry verifies and decrypts (docs/runbooks/cookie-rotation.md).
   cookie:
     - "${KRATOS_COOKIE_SECRET_CURRENT}"
+#@if KRATOS_COOKIE_SECRET_PREVIOUS
+    - "${KRATOS_COOKIE_SECRET_PREVIOUS}"
+#@endif
 
   cipher:
     - "${KRATOS_CIPHER_SECRET_CURRENT}"
+#@if KRATOS_CIPHER_SECRET_PREVIOUS
+    - "${KRATOS_CIPHER_SECRET_PREVIOUS}"
+#@endif
 
 log:
   format: json

@@ -2,8 +2,10 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://dunn.dev/othala/contract/hydra.schema.json",
   "type": "object",
+  "$defs": {"oneOrTwo": {"type": "array", "minItems": 1, "maxItems": 2}},
   "required": ["urls"],
   "properties": {
+    "secrets": {"type": "object", "properties": {"system": {"$ref": "#/$defs/oneOrTwo"}, "cookie": {"$ref": "#/$defs/oneOrTwo"}}},
     "serve": {"type": "object", "properties": {"admin": {"type": "object", "properties": {"port": {"const": 4445}}}}},
     "urls": {
       "type": "object",

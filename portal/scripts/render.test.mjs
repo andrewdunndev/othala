@@ -9,6 +9,7 @@ import { cpSync, existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, 
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { parseOryYaml } from '../src/lib/contract.ts';
 import { check, courierDefaults, generateSecrets, render, renderTemplate, SECRETS, writeRendered } from '../src/lib/render.ts';
 
 const root = fileURLToPath(new URL('../../', import.meta.url));
@@ -268,7 +269,7 @@ test('gen-secrets mints every secret but the SMTP URI, fresh each run, and the r
   const minted = Object.fromEntries(r.stdout.trim().split('\n').map((l) => [l.slice(0, l.indexOf('=')), l.slice(l.indexOf('=') + 1)]));
   assert.deepEqual(Object.keys(minted).sort(), SECRETS.filter((n) => n !== 'OTHALA_SMTP_CONNECTION_URI').sort());
   for (const [name, value] of Object.entries(minted)) {
-    const length = name === 'KRATOS_CIPHER_SECRET_CURRENT' ? 32 : 64;
+    const length = name === 'KRATOS_CIPHER_SECRET_CURRENT' || name === 'KRATOS_COOKIE_SECRET_CURRENT' ? 32 : 64;
     assert.ok(new RegExp(`^[0-9a-f]{${length}}$`).test(value), `${name} is not ${length} hex characters`);
   }
   const again = generateSecrets(CONTENT);
@@ -391,4 +392,36 @@ test('render refuses a Kratos cipher secret that is not exactly 32 characters', 
     const env = { ...ENV, KRATOS_CIPHER_SECRET_CURRENT: 'c'.repeat(length) };
     assert.throws(() => render(root, CONTENT, env), /KRATOS_CIPHER_SECRET_CURRENT must be exactly 32 characters/);
   }
+});
+
+const secretsOf = (env, file) => parseOryYaml(render(root, CONTENT, env).find((f) => f.path === file).content).secrets;
+const PREVIOUS = {
+  KRATOS_COOKIE_SECRET_PREVIOUS: 'p'.repeat(32),
+  KRATOS_CIPHER_SECRET_PREVIOUS: 'q'.repeat(32),
+  HYDRA_SYSTEM_SECRET_PREVIOUS: 'old-system',
+  HYDRA_COOKIE_SECRET_PREVIOUS: 'old-hcookie',
+};
+
+test('with no _PREVIOUS set, or one set empty, each secret list is the single current entry', () => {
+  const single = { cookie: ['fake-kratos_cookie_secret_current'], cipher: ['c'.repeat(32)] };
+  assert.deepEqual(secretsOf(ENV, 'kratos/kratos.yml'), single);
+  assert.deepEqual(secretsOf({ ...ENV, KRATOS_COOKIE_SECRET_PREVIOUS: '' }, 'kratos/kratos.yml'), single);
+  assert.deepEqual(secretsOf(ENV, 'hydra/hydra.yml'), { system: ['fake-hydra_system_secret'], cookie: ['fake-hydra_cookie_secret_current'] });
+});
+
+test('a _PREVIOUS renders as the second entry, after the current one', () => {
+  const env = { ...ENV, KRATOS_COOKIE_SECRET_CURRENT: 'n'.repeat(32), ...PREVIOUS };
+  assert.deepEqual(secretsOf(env, 'kratos/kratos.yml'), { cookie: ['n'.repeat(32), 'p'.repeat(32)], cipher: ['c'.repeat(32), 'q'.repeat(32)] });
+  assert.deepEqual(secretsOf(env, 'hydra/hydra.yml'), {
+    system: ['fake-hydra_system_secret', 'old-system'],
+    cookie: ['fake-hydra_cookie_secret_current', 'old-hcookie'],
+  });
+});
+
+test('render refuses a Kratos cookie pair with an entry that is not 16, 24 or 32 characters, and a cipher _PREVIOUS that is not 32', () => {
+  const pair = { ...ENV, KRATOS_COOKIE_SECRET_CURRENT: 'n'.repeat(32), KRATOS_COOKIE_SECRET_PREVIOUS: 'p'.repeat(24) };
+  assert.doesNotThrow(() => render(root, CONTENT, pair));
+  assert.throws(() => render(root, CONTENT, { ...pair, KRATOS_COOKIE_SECRET_PREVIOUS: 'p'.repeat(64) }), /KRATOS_COOKIE_SECRET_PREVIOUS must be 16, 24 or 32/);
+  assert.throws(() => render(root, CONTENT, { ...pair, KRATOS_COOKIE_SECRET_CURRENT: 'n'.repeat(64) }), /KRATOS_COOKIE_SECRET_CURRENT must be 16, 24 or 32/);
+  assert.throws(() => render(root, CONTENT, { ...ENV, KRATOS_CIPHER_SECRET_PREVIOUS: 'q'.repeat(31) }), /KRATOS_CIPHER_SECRET_PREVIOUS must be exactly 32/);
 });

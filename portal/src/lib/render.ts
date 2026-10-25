@@ -46,7 +46,8 @@ const GENERATED: Record<string, number> = {
   POSTGRES_PASSWORD: 32,
   KRATOS_PG_PASS: 32,
   HYDRA_PG_PASS: 32,
-  KRATOS_COOKIE_SECRET_CURRENT: 32,
+  // Kratos reads a two-entry cookie list as hash and AES keys, so entries are 16, 24 or 32 characters.
+  KRATOS_COOKIE_SECRET_CURRENT: 16,
   // Kratos requires a cipher secret of exactly 32 characters.
   KRATOS_CIPHER_SECRET_CURRENT: 16,
   HYDRA_SYSTEM_SECRET: 32,
@@ -220,8 +221,15 @@ export function render(policyDir: string, contentDir: string, env: Env): Rendere
   if (checkErrors.length > 0) throw new RenderError(checkErrors.join('\n'));
   const unset = SECRETS.filter((n) => (env[n] ?? '').trim() === '');
   if (unset.length > 0) throw new RenderError(`missing secret(s): ${unset.join(', ')}`);
-  if (env.KRATOS_CIPHER_SECRET_CURRENT?.length !== 32) {
-    throw new RenderError('KRATOS_CIPHER_SECRET_CURRENT must be exactly 32 characters');
+  for (const name of ['KRATOS_CIPHER_SECRET_CURRENT', 'KRATOS_CIPHER_SECRET_PREVIOUS']) {
+    if (env[name] && Buffer.byteLength(env[name]) !== 32) throw new RenderError(`${name} must be exactly 32 characters`);
+  }
+  if (env.KRATOS_COOKIE_SECRET_PREVIOUS) {
+    for (const name of ['KRATOS_COOKIE_SECRET_CURRENT', 'KRATOS_COOKIE_SECRET_PREVIOUS']) {
+      if (![16, 24, 32].includes(Buffer.byteLength(env[name]!))) {
+        throw new RenderError(`${name} must be 16, 24 or 32 characters while KRATOS_COOKIE_SECRET_PREVIOUS is set`);
+      }
+    }
   }
 
   const files: RenderedFile[] = [];

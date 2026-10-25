@@ -8,7 +8,7 @@ deploy-plane work; this runbook is the contract it must satisfy.
 
 The databases hold every passkey enrollment, active session, recovery-code
 state, and the Hydra OAuth2 clients (secrets hashed) and signing keys (private keys and
-session data encrypted at rest under `secrets.system`; rotating it rebuilds the Hydra database). Losing them without a backup means
+session data encrypted at rest under `secrets.system`). Losing them without a backup means
 every member re-enrolls, every OIDC client is re-created, and `secrets.system` must be restored from
 your secret store or even a partial restore cannot decrypt.
 
@@ -55,6 +55,6 @@ reverse. Do not reconcile rows:
 
 ## Related
 
-- `docs/runbooks/secrets-rotation.md`: break-glass rotation of `secrets.system`.
+- `docs/runbooks/secrets-rotation.md`: rotation of `secrets.system`.
 - `docs/runbooks/cookie-rotation.md`: the rotatable secrets.
 - `docs/runbooks/admin-recovery.md`: recovery, which needs Postgres alive.

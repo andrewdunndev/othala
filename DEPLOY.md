@@ -67,6 +67,7 @@ With quadlets the render is a `Type=oneshot`, `RemainAfterExit=yes` unit writing
 
 - Image pin, `othala.env`, `secrets.env` or `courier/`: rerun the render and recreate what reads them:
   `docker compose up -d --force-recreate render kratos hydra othala caddy`.
+  Under podman a repeated recreate can fail with "address already allocated"; `docker compose down` (volumes kept) then `up -d` clears it.
 - `apps/` or `groups.yaml`: `docker compose kill -s SIGHUP othala`. The portal reloads and reconciles its Hydra
   clients.
 

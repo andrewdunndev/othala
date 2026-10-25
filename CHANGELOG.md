@@ -8,6 +8,10 @@ The git tag is the authoritative version; `portal/package.json` mirrors it.
 
 ## [Unreleased]
 
+### Added
+
+- Optional `KRATOS_COOKIE_SECRET_PREVIOUS`, `KRATOS_CIPHER_SECRET_PREVIOUS`, `HYDRA_SYSTEM_SECRET_PREVIOUS` and `HYDRA_COOKIE_SECRET_PREVIOUS` render as the second entry of each Ory secret list, so a rotation keeps members signed in and Hydra's database intact. `gen-secrets` mints Kratos cookie secrets at 32 characters.
+
 ### Fixed
 
 - Cookie rotation and upgrade steps recreate render, kratos, hydra, othala and caddy (`restart` and plain `up -d` left old config running), and the `docker run` mounts carry `:ro,z` for SELinux hosts.
