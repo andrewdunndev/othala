@@ -6,7 +6,7 @@
 [![license](https://img.shields.io/badge/license-MIT-green)](LICENSE)
 [![built with GitLab](https://img.shields.io/badge/built%20with-GitLab-fc6d26?logo=gitlab)](https://gitlab.com/dunn.dev/othala)
 
-A reference deployment, not a product: no roadmap, no support, no compatibility promise.
+A reference deployment with no roadmap, no support and no compatibility promise.
 
 Othala is a running Ory deployment: **Kratos** for identity, **Hydra** for OAuth2/OIDC, and one
 TypeScript application that supplies the parts Ory deliberately leaves to the integrator.
@@ -20,11 +20,11 @@ The app in `portal/` (Astro Node SSR) provides:
 
 - **the login and consent providers** Hydra calls on every authorization request;
 - **the access gate** that decides whether a person may enter a given app, fail-closed;
-- **the id_token claims builder** that turns group membership into the claims apps actually read;
+- **the id_token claims builder** that turns group membership into the claims apps read;
 - **a forward-auth endpoint** so apps with no OIDC support sit behind the same session and the same
   groups;
 - **an OIDC client registrar** that reconciles Hydra's client list from per-app manifest files, so
-  adding an app, logo included, is a file drop rather than an image rebuild;
+  adding an app, logo included, needs no image rebuild;
 - **an admin surface** for identities, groups, and OAuth2 clients, served on the public listener and
   gated by an admin session.
 

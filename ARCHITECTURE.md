@@ -58,7 +58,7 @@ admin API; the three-part admin check is in [SECURITY.md](SECURITY.md).
 
 ## The access model
 
-Two questions, two bindings, nothing derived.
+Entry and role are separate bindings, and nothing is derived from a name.
 
 **Entry** comes from an access group, always. A manifest's `presentation.access` list is the entry
 binding; `parseAccessGroups` (`portal/src/lib/access-groups.ts`) normalizes it into `accessGroups`,
@@ -75,8 +75,8 @@ admin does not imply access. A group's *type* is a property of its bindings, nev
 
 `enforceAccessGate` (`portal/src/lib/gate.ts`) evaluates in a fixed order:
 
-1. **identity present** — a failed lookup denies rather than proceeding on nothing;
-2. **`state === 'active'`** — exactly that string, anything else denies;
+1. **identity present**: a failed lookup denies;
+2. **`state === 'active'`**: exactly that string, anything else denies;
 3. **every stored group is canonical** (`refuseNonCanonical`);
 4. **`skip_access_check`**, if the manifest sets it, bypasses only what follows;
 5. **membership in a bound access group.**
@@ -94,8 +94,8 @@ name no owned boundary could produce denies every app and names the group; repai
 
 **Role resolution is order-independent.** `lookupRole` (`portal/src/lib/claims.ts`) takes a per-client
 override if it names a declared role, and otherwise maps every held group through `group_role_map`
-and keeps the role ranked highest by its index in `manifest.roles`, not a first-match walk over
-stored order, which would hand an identity holding both entry and role groups the lesser role. The
+and keeps the role ranked highest by its index in `manifest.roles`. A first-match walk over stored
+order would hand an identity holding both entry and role groups the lesser role. The
 consent path and the admin UI's effective-access view share this one resolver.
 
 ## The forward-auth request path
@@ -124,7 +124,7 @@ The body is advisory; the edge keys on the status.
 |---|---|
 | **200** | Allow. |
 | **401** | No usable session, or aal2 step-up due. |
-| **403** | Refused. Either **on the merits** (inactive identity, a non-canonical stored group, or a group miss) **or** a missing or malformed `group` parameter. **403 therefore does not mean exactly one thing.** |
+| **403** | Refused, either on the merits (inactive identity, a non-canonical stored group, or a group miss) or for a missing or malformed `group` parameter. 403 does not mean one thing. |
 | **503** | Kratos or its admin API did not answer. |
 
 The malformed parameter is a broken deployment, static per site, not an outage, so it is not a 503.
@@ -143,13 +143,13 @@ Failure paths are pinned by `portal/scripts/forward-auth.test.mjs`, the redirect
 
 On a login challenge, the subject is resolved and then gated. When Hydra reports `skip` (it remembers
 this subject), the handler still re-verifies a live Kratos session matching the
-remembered subject. Hydra remembers; Kratos authenticates; honouring a remembered login after Kratos
-sign-out would be a silent re-SSO.
+remembered subject. Hydra only remembers; Kratos authenticates. Honouring a remembered login after a
+Kratos sign-out would sign the subject in again silently.
 
 A denial is logged server-side with its real reason and rejected upstream with an opaque
 `access_denied`, so group names and identity-state distinctions never reach the relying party.
 
-On consent, the gate runs **again**, and the id_token
+On consent, the gate runs again, and the id_token
 claims are composed by `composeIDTokenClaims` (`portal/src/lib/claims.ts`): identity claims, then the
 groups claim dropped unless the manifest opts in and narrowed to the groups that manifest binds, then the resolved role's `claim_emit` merged in,
 then any claim whose required scope was not requested removed.
@@ -168,7 +168,7 @@ half alone. There is no identity cache, so a deactivated subject fails the state
 
 Hydra's client list is reconciled from the manifests.
 `registerAllClients` (`portal/src/lib/register-clients.ts`) narrows the catalog to manifests that
-actually declare an `oidc:` block, runs the full manifest lint, and then, per client, reads the
+declare an `oidc:` block, runs the full manifest lint, and then, per client, reads the
 current state from Hydra to decide create versus update. Only `oidc:`-derived fields cross the wire;
 the `consent:` block is a namespace this app owns and Hydra never sees it. Registration is
 create-or-update only and never deletes, so a decommissioned client survives until removed deliberately.

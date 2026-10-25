@@ -54,7 +54,7 @@ docker run --rm -v "$PWD/ory:/ory:ro" "$IMAGE" node dist/server/config.mjs check
 ```
 
 An env var or extra `-c` file overriding a contract key is the deployment's to keep right: `check-ory` cannot see it.
-`check-ory` proves the config meets what othala depends on; it is not a security review of instance policy (return URLs, cookie scope, lifespans).
+`check-ory` verifies the config meets what othala depends on; it does not review instance policy (return URLs, cookie scope, lifespans).
 A placeholder may replace only the secret or instance part of a value; the `Bearer ` prefix and the URL paths stay literal. `kratos validate` stays the deployment's job.
 
 ## Startup order

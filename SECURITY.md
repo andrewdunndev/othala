@@ -1,7 +1,6 @@
 # Security
 
-Othala issues the tokens and gates the access that everything downstream trusts. The trust boundary,
-the controls with their tests, and the accepted risks follow.
+Othala issues the tokens and gates the access that everything downstream trusts.
 
 ## Reporting a vulnerability
 
@@ -9,14 +8,13 @@ Do not open a public issue or merge request. Open a **confidential issue** at
 <https://gitlab.com/dunn.dev/othala/-/issues>, ticking "This issue is
 confidential" before you submit; those are visible only to project members.
 Include the affected component and commit or tag, what an attacker gains,
-reproduction steps, and relevant deployment specifics. A flaw in upstream Ory Kratos or Hydra rather than
-in this glue goes to Ory (<https://www.ory.sh/docs/ecosystem/security>); a note
-here is still welcome.
+reproduction steps, and relevant deployment specifics. A flaw in Ory Kratos or Hydra itself
+goes to Ory (<https://www.ory.sh/docs/ecosystem/security>); a note here is still welcome.
 
-Expect acknowledgement within 3 business days and an assessment within 10. One
-maintainer, best effort, no on-call, no bounty, coordinated disclosure: fixed privately, released, then
-published, with credit unless you decline it. Fixes land on the newest tag; older
-tags are not backported.
+Expect acknowledgement within 3 business days and an assessment within 10, from one
+maintainer on best effort, with no on-call and no bounty. Disclosure is coordinated: the fix lands
+privately, ships in a release, then is published, with credit unless you decline it. Fixes land on the
+newest tag only; older tags are not backported.
 
 ## The trust boundary
 
@@ -106,7 +104,7 @@ Each names its enforcer and the test that fails if it stops working.
   (`portal/astro.config.mjs`) plus `portal/src/lib/csrf.ts`. Tests:
   `e2e/playwright/tests/m-security-headers.spec.ts`, `e2e/playwright/tests/r-admin-post-origin.spec.ts`,
   `portal/scripts/oauth2-handlers.test.mjs`.
-- **Abuse resistance ships with the install.** `othala-routes` in `caddy/othala.caddy` rate-limits the
+- **Edge rate limits and hash bounds.** `othala-routes` in `caddy/othala.caddy` rate-limits the
   Kratos self-service paths keyed on `{client_ip}` and overwrites
   `X-Forwarded-For` at every `reverse_proxy`, so a client cannot mint a fresh
   bucket per request; `kratos/kratos.yml` bounds password-hash work
@@ -117,7 +115,7 @@ Each names its enforcer and the test that fails if it stops working.
   minimum length gate passwords; a password change fires
   `revoke_active_sessions`; force-logout is `revokeSubject`
   (`portal/src/lib/revoke.ts`). Full eviction (audit, delete credential, then
-  revoke) is documented in `docs/runbooks/lost-device.md`, proven live by
+  revoke) is in `docs/runbooks/lost-device.md`, pinned by
   `e2e/playwright/tests/p-eviction.spec.ts`.
 - **Telemetry carries no secrets.** `portal/src/server/otel.mjs` scrubs session
   cookies, CSRF tokens, bearer headers, challenge ids and one-time codes out of
@@ -132,8 +130,8 @@ Each names its enforcer and the test that fails if it stops working.
 - **The CSP carries no `script-src`** (`portal/src/middleware.ts`), so an XSS in the
   portal is not contained by CSP. Why: `site/src/content/docs/guides/hardening.md`.
 - **Rate limiting depends on a third-party Caddy module.** A binary built without
-  it refuses to load `caddy/othala.caddy`, so the failure is a refusal to start,
-  not a silently unlimited edge. Confirm it is compiled in.
+  it refuses to load `caddy/othala.caddy` at start, so the edge is never silently
+  unlimited. Confirm it is compiled in.
 - **`{client_ip}` is only as good as `trusted_proxies`.** Behind a trusted load
   balancer without `trusted_proxies_strict`, Caddy takes the leftmost
   `X-Forwarded-For` entry, which the client chose. See `DEPLOY.md`.
@@ -143,7 +141,7 @@ Each names its enforcer and the test that fails if it stops working.
 - **Role rank is a convention no code enforces.** `lookupRole`
   (`portal/src/lib/claims.ts`) reads declaration order in `consent.roles` as
   descending privilege, so a manifest listing roles ascending silently downgrades
-  its users. The direction is fail-safe; the silence is not.
+  its users. The mistake only ever downgrades, and nothing reports it.
 - **A member with no second factor: the mailbox holder keeps the account.** An emailed code proves the mailbox, not the person. A passkey or TOTP the mailbox holder adds is accepted, and the email-change gate only guards members who already hold a passkey or password.
 - **A refused device keeps polling.** Hydra has no device-grant reject, so a
   denied or refused code answers `authorization_pending` until it expires.
