@@ -41,10 +41,8 @@ admin API is exposed, and no app in front of this stack is given an admin creden
 
 **The app runs two listeners in one process** (`portal/src/server/listen.ts`). The public listener
 serves the Astro handler. The admin listener binds `PORTAL_ADMIN_BIND_HOST` with its own
-mux (the `ADMIN_GET` and `ADMIN_POST` maps) that never delegates to the Astro handler. The route sets
-are disjoint by construction; `portal/scripts/public-mux-disjoint.test.mjs` and
-`portal/scripts/admin-port.test.mjs` hold that. Admin routes authenticate with `bearerMatches`, which is constant-time and returns false when
-no secret is configured, so a misconfigured deployment refuses rather than opens.
+mux (the `ADMIN_GET` and `ADMIN_POST` maps) that never delegates to the Astro handler. SECURITY.md
+owns the listener controls and their tests.
 
 **Inbound headers are never an identity claim.** Group membership and identity id come from Kratos,
 never from a request header. Every snippet in `caddy/othala.caddy` first deletes the inbound identity
@@ -54,11 +52,9 @@ response. Each snippet is a `route` block because Caddy's
 default directive order would otherwise run `forward_auth` ahead of `request_header` and strip the
 verified id. Of the cookies, `othala-oidc-app` removes only the Kratos session cookie.
 
-**Admin authority is a marker, not a group.** Kratos strips `metadata_admin` from
-`/sessions/whoami`, so it can only be written and read through the admin API. `parseIdentity`
-(`portal/src/lib/identity-facts.ts`) is the sole authority check, fed only an identity fresh from the admin API. A string named `admin` inside `metadata_admin.groups` confers
-nothing. `requireAdminSession` (`portal/src/lib/admin.ts`) demands three things together: an active
-session, `authenticator_assurance_level === 'aal2'`, and the marker.
+**Admin authority is a marker, not a group.** Kratos strips `metadata_admin` from `/sessions/whoami`, so
+`parseIdentity` (`portal/src/lib/identity-facts.ts`) reads it only from an identity fetched fresh from the
+admin API; the three-part admin check is in [SECURITY.md](SECURITY.md).
 
 ## The access model
 
@@ -92,12 +88,9 @@ binding; no manifest may waive them.
 a group name may take anywhere in the app. No prefix is required; one definition lets every
 group comparison use raw strings. Every write path enforces it (`validateGroups` in
 `portal/src/lib/metadata-admin.ts`, the manifest loader, the lint, the forward-auth query parameter).
-Step 3 above is the *read* boundary: Kratos's admin API is a write path this
-codebase does not own, so a name no owned boundary could produce means the record was written
-out of band. Denying every app and naming the offending group neither grants access nor passes
-unnoticed; coercing or skipping the name would do one of those. The admin form's repair path
-(`planGroupSave`, `portal/src/lib/gate.ts`) is the way out, and it refuses to write while a
-non-canonical name is still held.
+Step 3 above is the *read* boundary. Kratos's admin API is a write path this codebase does not own, so a
+name no owned boundary could produce denies every app and names the group; repair is `planGroupSave`
+(`portal/src/lib/gate.ts`), which refuses to write while a non-canonical name is held.
 
 **Role resolution is order-independent.** `lookupRole` (`portal/src/lib/claims.ts`) takes a per-client
 override if it names a declared role, and otherwise maps every held group through `group_role_map`
@@ -142,9 +135,7 @@ matching `status 401 403` into a login redirect would, if outages arrived as 403
 to the login page of the app that just failed to answer, on every retry.
 `othala-forward-auth` leaves 503 out of that matcher for this reason.
 
-`portal/scripts/forward-auth.test.mjs` exercises every failure path, including that no failure path
-returns 2xx and no denial body echoes the required group or the identity id. The snippet redirects
-only a 401 to login and answers a 403 or 503 in place (`portal/scripts/othala-caddy.test.mjs`).
+Failure paths are pinned by `portal/scripts/forward-auth.test.mjs`, the redirect-only-on-401 snippet by `portal/scripts/othala-caddy.test.mjs`.
 
 ## The OIDC path
 
@@ -179,7 +170,7 @@ Hydra's client list is reconciled from the manifests.
 `registerAllClients` (`portal/src/lib/register-clients.ts`) narrows the catalog to manifests that
 actually declare an `oidc:` block, runs the full manifest lint, and then, per client, reads the
 current state from Hydra to decide create versus update. Only `oidc:`-derived fields cross the wire;
-the `consent:` block is a namespace this app owns and Hydra never sees it. The secret is set as a typed field on the request body (`body.client_secret`), never interpolated into a JSON string. Registration is
+the `consent:` block is a namespace this app owns and Hydra never sees it. Registration is
 create-or-update only and never deletes, so a decommissioned client survives until removed deliberately.
 
 `portal/src/server/registrar.ts` drives it on boot with bounded retry (Hydra may still be starting)
@@ -207,17 +198,4 @@ derives the required variable set from the template itself and fails listing mis
 never rendered content that could carry a secret into a log. The e2e harness and the deploy plane
 call the same render.
 
-Three settings become commitments once anyone enrols a credential:
-
-- **`OTHALA_PUBLIC_URL`** — Hydra's issuer. Every client's discovery and every issued token carry it.
-- **`OTHALA_APEX`** — the Kratos cookie domain and the WebAuthn RP id, and the ceiling on which
-  hostnames can share the session. Changing it invalidates every enrolled passkey.
-- **Hydra's `subject_identifiers`** — `public` subjects mean the subject id is the identity id
-  everywhere; switching to pairwise later changes every downstream app's notion of who a user is.
-
-## Where behaviour is pinned
-
-Unit tests under `portal/scripts/` and `portal/src/lib/` cover the gate, group-name policy, status
-contract, mux disjointness and manifest lint, with fuzz suites over the recovery gate, CSRF, claims
-injection and manifest validation. `e2e/playwright/tests/` asserts the access model end to end. When
-this file and a test disagree, the test is right.
+The one-way choices (issuer, apex, subject type) are in [DEPLOY.md](DEPLOY.md#before-the-first-enrolment).

@@ -1,6 +1,6 @@
 # Deploy
 
-[`deploy/example/`](deploy/example/) is a whole compose deployment; e2e runs it on tags and on MRs that change portal, e2e, kratos, hydra, caddy, contract, deploy or site.
+[`deploy/example/`](deploy/example/) is a whole compose deployment.
 
 ## The seam
 
@@ -15,6 +15,16 @@ units, and a Caddy build with `caddy-ratelimit` and its DNS provider's module.
 Never: an extra Ory `--config` layer, any env on Kratos or Hydra (it overrides the rendered files, unseen by
 `check`), edits to rendered output, copies of what the image carries, or renamed topology. A policy need
 becomes a typed value in a release.
+
+## Before the first enrolment
+
+Three settings become commitments once anyone enrols a credential:
+
+- **`OTHALA_PUBLIC_URL`**: Hydra's issuer. Every client's discovery and every issued token carry it.
+- **`OTHALA_APEX`**: the Kratos cookie domain and the WebAuthn RP id, and the ceiling on which
+  hostnames can share the session. Changing it invalidates every enrolled passkey.
+- **Hydra's `subject_identifiers`**: `public` subjects mean the subject id is the identity id
+  everywhere; switching to pairwise later changes every downstream app's notion of who a user is.
 
 ## The deployment directory
 
@@ -45,23 +55,19 @@ docker run --rm -v "$PWD/ory:/ory:ro" "$IMAGE" node dist/server/config.mjs check
 
 An env var or extra `-c` file overriding a contract key is the deployment's to keep right: `check-ory` cannot see it.
 `check-ory` proves the config meets what othala depends on; it is not a security review of instance policy (return URLs, cookie scope, lifespans).
-A placeholder may replace only the secret or instance part of a value; the `Bearer ` prefix and the URL paths stay literal.
-It exits 1 naming each violated key and rule, never a value, and 2 when a flag is missing. `kratos validate` stays the deployment's job.
+A placeholder may replace only the secret or instance part of a value; the `Bearer ` prefix and the URL paths stay literal. `kratos validate` stays the deployment's job.
 
 ## Startup order
 
-The render runs first as uid 10000, the Kratos image's uid (Hydra runs as 10000 too; its image defaults to nonroot). Then come both migrate jobs, Kratos and Hydra, and
-the portal; Caddy waits only for the render. With quadlets the render is a `Type=oneshot`,
-`RemainAfterExit=yes` unit writing a host tmpfs `/run/othala`; Kratos, Hydra, both migrate units and Caddy take
-`Requires=` and `After=` on it and mount `/run/othala/{kratos,hydra,caddy}` read-only at `/etc/config/kratos`,
-`/etc/config/hydra` and `/etc/caddy/othala`.
+The render runs first as uid 10000, the Kratos image's uid. Then come both migrate jobs, Kratos and Hydra
+(Hydra does not migrate on startup), and the portal; Caddy waits only for the render.
 
 ## Restart rules
 
 - Image pin, `othala.env`, `secrets.env` or `courier/`: rerun the render and recreate what reads them:
   `docker compose up -d --force-recreate render kratos hydra othala caddy`.
 - `apps/` or `groups.yaml`: `docker compose kill -s SIGHUP othala`. The portal reloads and reconciles its Hydra
-  clients (`registerAllClients`, `portal/src/lib/register-clients.ts`).
+  clients.
 
 ## Validation
 
@@ -74,7 +80,7 @@ the portal; Caddy waits only for the render. With quadlets the render is a `Type
 
 ## Topology
 
-Fixed by the image (`portal/src/lib/constants.ts`, `PORT` and `ADMIN_PORT` in `portal/src/server/listen.ts`):
+Fixed by the image:
 
 | Alias | Port | Listener | Called by |
 |---|---|---|---|
@@ -89,6 +95,8 @@ Fixed by the image (`portal/src/lib/constants.ts`, `PORT` and `ADMIN_PORT` in `p
 The Kratos and Hydra admin APIs take no bearer: bind each to its address on a network the edge never joins,
 resolve its alias to that address for its callers (`extra_hosts` in the example), and publish only the edge
 ([`ARCHITECTURE.md` § Trust boundary](ARCHITECTURE.md#trust-boundary)).
+
+Browser clients on another origin are unsupported: Hydra's CORS allowlist is `OTHALA_PUBLIC_URL` only.
 
 Both edge rate-limit zones key on `{client_ip}`: behind a load balancer, set `trusted_proxies_strict` beside
 `trusted_proxies`, or a client picks its own address.
