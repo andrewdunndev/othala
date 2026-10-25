@@ -202,7 +202,7 @@ private_names() {
             continue
         fi
         pats=()
-        while IFS= read -r line; do pats+=("$line"); done < <(awk -v s="[$rule]" '/^\[/{on=($0==s);next} on&&NF' "$file")
+        while IFS= read -r line; do pats+=("$line"); done < <(awk -v s="[$rule]" '/^\[[a-z-]+\]$/{on=($0==s);next} on&&NF' "$file")
         (( ${#pats[@]} > 0 )) || { step_error "$rule" "no patterns under [$rule] in $file"; continue; }
         for line in "${pats[@]}"; do
             printf '' | grep -qE -e "$line"; (( $? > 1 )) && { step_error "$rule" "invalid pattern in $file"; continue 2; }

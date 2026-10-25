@@ -33,8 +33,8 @@ Prerequisites: shell on the host and write access to your secret store.
 4. Drop and recreate the Hydra database:
 
    ```sh
-   docker compose exec postgres psql -U postgres -c \
-     "DROP DATABASE hydra; CREATE DATABASE hydra OWNER hydra;"
+   docker compose exec postgres psql -U postgres \
+     -c "DROP DATABASE hydra;" -c "CREATE DATABASE hydra OWNER hydra;"
    ```
 
 5. Re-provision the host secrets so the new value lands, using your deploy tooling.

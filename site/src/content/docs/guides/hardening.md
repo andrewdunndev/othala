@@ -86,8 +86,7 @@ The shape of that boundary, laid out end to end:
 environment**, and environment secrets are readable through `/proc` to anything
 in the user namespace. Closing that means a tmpfs-backed mount and a reader that
 takes a path — a known gap, not an oversight. No committed config holds
-plaintext, and rotation shape (including why Hydra's system secret cannot rotate
-at all) is a [Golden path](golden-path.md) commitment. `deploy/example/compose.yml`
+plaintext, and rotation shape is a [Golden path](golden-path.md) commitment. `deploy/example/compose.yml`
 is the example deployment and e2e runs it, so its container baseline is exercised
 on every tag rather than described here. Its render runs as the Kratos and Hydra
 uid because the capability drop is load-bearing: without `CAP_DAC_OVERRIDE`, a
