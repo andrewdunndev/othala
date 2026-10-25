@@ -222,11 +222,11 @@ export function render(policyDir: string, contentDir: string, env: Env): Rendere
   const unset = SECRETS.filter((n) => (env[n] ?? '').trim() === '');
   if (unset.length > 0) throw new RenderError(`missing secret(s): ${unset.join(', ')}`);
   for (const name of ['KRATOS_CIPHER_SECRET_CURRENT', 'KRATOS_CIPHER_SECRET_PREVIOUS']) {
-    if (env[name] && env[name].length !== 32) throw new RenderError(`${name} must be exactly 32 characters`);
+    if (env[name] && Buffer.byteLength(env[name]) !== 32) throw new RenderError(`${name} must be exactly 32 characters`);
   }
   if (env.KRATOS_COOKIE_SECRET_PREVIOUS) {
     for (const name of ['KRATOS_COOKIE_SECRET_CURRENT', 'KRATOS_COOKIE_SECRET_PREVIOUS']) {
-      if (![16, 24, 32].includes(env[name]!.length)) {
+      if (![16, 24, 32].includes(Buffer.byteLength(env[name]!))) {
         throw new RenderError(`${name} must be 16, 24 or 32 characters while KRATOS_COOKIE_SECRET_PREVIOUS is set`);
       }
     }

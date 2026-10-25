@@ -34,7 +34,7 @@ rotation signs members out.
    ```
 
    then your smoke suite. Members stay signed in.
-5. After the longest session lifetime, remove `_PREVIOUS` and recreate again.
+5. After the longest session lifetime, remove the cookie `_PREVIOUS` values and recreate again. Keep `KRATOS_CIPHER_SECRET_PREVIOUS` until members have signed in again through their upstream provider.
 
 ## Failure modes
 
