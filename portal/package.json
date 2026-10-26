@@ -42,7 +42,7 @@
     "yaml": "^2.6.1"
   },
   "devDependencies": {
-    "@astrojs/check": "0.9.11",
+    "@astrojs/check": "0.9.12",
     "@types/nodemailer": "8.0.2",
     "esbuild": "0.28.2",
     "fast-check": "4.10.2",
