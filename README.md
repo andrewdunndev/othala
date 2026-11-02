@@ -81,7 +81,7 @@ Hydra), and `consent:` (roles, the group-to-role map, claim emission).
 
 ## Contributing
 
-Issues and changes are welcome on either forge:
+Corrections are welcome on either forge:
 
 - GitLab (canonical): https://gitlab.com/dunn.dev/othala
 - GitHub (mirror): https://github.com/andrewdunndev/othala
