@@ -34,7 +34,7 @@ RUN mkdir -p /out/othala/kratos /out/othala/hydra /out/othala/caddy \
 # Literal pin, not an ARG: the container-publishing standard reads the
 # ci-runtime-* reference off this line. It moves with the pipeline component
 # pins in .gitlab-ci.yml, since old catalog tags are garbage-collected.
-FROM registry.gitlab.com/dunn.dev/pipeline/ci-runtime-node:4.12.0@sha256:156c216d09e1a7953013dd27ba5f3d6377c4381f11454475512f6d53aa463ba5
+FROM registry.gitlab.com/dunn.dev/pipeline/ci-runtime-node:4.14.0@sha256:a8649590889b71ee255ad7c07a0dfda51ea7876258e01262a5a181e7ea2ecc4b
 
 WORKDIR /app
 
