@@ -36,7 +36,8 @@ describe('logoutAuthorized', () => {
   it('refuses a malformed or tampered token', () => {
     expect(logoutAuthorized('POST', 'not-a-token', self)).toBe(false);
     const t = signLogoutToken(self);
-    expect(logoutAuthorized('POST', `${t.slice(0, -2)}xx`, self)).toBe(false);
+    const flipped = t.at(-2) === 'A' ? 'B' : 'A';
+    expect(logoutAuthorized('POST', `${t.slice(0, -2)}${flipped}${t.slice(-1)}`, self)).toBe(false);
   });
 
   it('refuses a token minted for another identity', () => {
