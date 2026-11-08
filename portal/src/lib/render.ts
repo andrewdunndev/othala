@@ -46,7 +46,7 @@ const GENERATED: Record<string, number> = {
   POSTGRES_PASSWORD: 32,
   KRATOS_PG_PASS: 32,
   HYDRA_PG_PASS: 32,
-  // Kratos reads a two-entry cookie list as hash and AES keys, so entries are 16, 24 or 32 characters.
+  // Kratos reads a two-entry cookie list as one continuity-cookie key (sign, then AES), so entries are 16, 24 or 32 characters.
   KRATOS_COOKIE_SECRET_CURRENT: 16,
   // Kratos requires a cipher secret of exactly 32 characters.
   KRATOS_CIPHER_SECRET_CURRENT: 16,

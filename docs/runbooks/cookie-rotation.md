@@ -13,8 +13,10 @@ secret may have been exposed. For the Hydra system secret see
 
 Each secret takes an optional `<NAME>_PREVIOUS` (`KRATOS_COOKIE_SECRET_PREVIOUS`,
 `KRATOS_CIPHER_SECRET_PREVIOUS`, `HYDRA_COOKIE_SECRET_PREVIOUS`). Unset, one entry
-renders; set, `[current, previous]` renders: the first signs and encrypts, both
-verify and decrypt. A Kratos cookie pair must be 16, 24 or 32 characters per
+renders; set, `[current, previous]` renders. Kratos session cookies verify and
+decrypt under both entries, but its continuity cookies (sign-in and recovery
+flows in progress) use the pair as one key: signed with the first, encrypted
+with the second. So a Kratos cookie pair must be 16, 24 or 32 characters per
 entry (a 64-character pair fails continuity flows with `crypto/aes: invalid key
 size 64`); the cipher is exactly 32. A deployment still on a 64-character Kratos
 cookie secret first rotates once, single-slot, to a 32-character one; that
@@ -34,7 +36,7 @@ rotation signs members out.
    ```
 
    then your smoke suite. Members stay signed in.
-5. After the longest session lifetime, remove the cookie `_PREVIOUS` values and recreate again. Keep `KRATOS_CIPHER_SECRET_PREVIOUS` until members have signed in again through their upstream provider.
+5. After the longest session lifetime, remove the cookie `_PREVIOUS` values and recreate again. After a suspected leak, remove the Kratos one as soon as in-flight flows finish: while set, the previous secret encrypts continuity cookies. Keep `KRATOS_CIPHER_SECRET_PREVIOUS` until members have signed in again through their upstream provider.
 
 ## Failure modes
 
