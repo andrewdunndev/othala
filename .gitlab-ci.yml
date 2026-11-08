@@ -104,7 +104,8 @@ include:
       npm_dir: site
       production_url: https://othala.dunn.dev
 
-# The environment scopes the GitHub App variables to this job.
+# The release job runs in its own environment so the GitHub App variables
+# can be scoped to it.
 github-release:
   environment:
     name: github-release
@@ -215,8 +216,9 @@ check-purity:
       [ "$rc" -eq 0 ] && echo "OK: bash -n clean on ${#FILES[@]} scripts"
       exit $rc
 
-# check-portal: npm ci without install scripts (portal, e2e, site), then astro check, tsc over e2e and site, vitest (src and scripts), the manifest lint, and a
-# well-formedness parse of the tracked plain-YAML set. kratos.yml and hydra.yml
+# check-portal: npm ci without install scripts (portal, e2e, site), then astro
+# check, tsc over e2e and site, vitest (src and scripts), the manifest lint, and
+# a well-formedness parse of the tracked plain-YAML set. kratos.yml and hydra.yml
 # are  templates, so they are excluded.
 check-portal:
   stage: verify
