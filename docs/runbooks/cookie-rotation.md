@@ -36,7 +36,12 @@ rotation signs members out.
    ```
 
    then your smoke suite. Members stay signed in.
-5. After the longest session lifetime, remove the cookie `_PREVIOUS` values and recreate again. After a suspected leak, remove the Kratos one as soon as in-flight flows finish: while set, the previous secret encrypts continuity cookies. Keep `KRATOS_CIPHER_SECRET_PREVIOUS` until members have signed in again through their upstream provider.
+5. After the longest session lifetime, remove the cookie `_PREVIOUS` values and
+   recreate again. After a suspected leak, remove `KRATOS_COOKIE_SECRET_PREVIOUS`
+   as soon as in-flight flows finish: while set, the previous secret encrypts
+   continuity cookies. Removing it earlier interrupts settings flows in progress
+   and signs out sessions not yet re-issued. Keep `KRATOS_CIPHER_SECRET_PREVIOUS`
+   until members have signed in again through their upstream provider.
 
 ## Failure modes
 

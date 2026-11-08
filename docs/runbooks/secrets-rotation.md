@@ -15,8 +15,8 @@ exposure, a leak to a chat, log or commit); no cadence is required.
 5. Drop `HYDRA_SYSTEM_SECRET_PREVIOUS` and recreate as in step 2.
 
 Session data is encrypted at rest, so dropping `HYDRA_SYSTEM_SECRET_PREVIOUS` makes
-anything still encrypted under the old secret unreadable: refresh tokens stop working and those members sign in again. After a compromise, drop it
-at once. To rotate without signing anyone out, keep it until the longest token
+anything still encrypted under the old secret unreadable: refresh tokens stop working
+and those members sign in again. After a compromise, drop it at once. To rotate without signing anyone out, keep it until the longest token
 lifetime (`ttl.refresh_token` in `hydra.yml`) has passed.
 
 Hydra keeps its stored keys encrypted under the secret that created them, and
