@@ -6,7 +6,7 @@
 
 import { NodeSDK } from '@opentelemetry/sdk-node';
 import { OTLPTraceExporter } from '@opentelemetry/exporter-trace-otlp-http';
-import { BatchSpanProcessor, ParentBasedSampler, TraceIdRatioBasedSampler } from '@opentelemetry/sdk-trace-base';
+import { BatchSpanProcessor, ParentBasedSampler, TraceIdRatioBasedSampler } from '@opentelemetry/sdk-trace';
 import { HttpInstrumentation } from '@opentelemetry/instrumentation-http';
 import { resourceFromAttributes } from '@opentelemetry/resources';
 import { ATTR_SERVICE_NAME } from '@opentelemetry/semantic-conventions';
@@ -175,7 +175,7 @@ export function startTelemetry(env = process.env) {
     const traceExporter = new OTLPTraceExporter({ url });
 
     // Batch, then redact: every exported span is scrubbed and admin spans never leave the process.
-    const spanProcessor = new RedactingSpanProcessor(new BatchSpanProcessor(traceExporter));
+    const spanProcessor = new RedactingSpanProcessor(new BatchSpanProcessor({ exporter: traceExporter }));
 
     const sdk = new NodeSDK({
       resource,
