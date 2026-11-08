@@ -97,8 +97,8 @@ Fixed by the image:
 The Kratos and Hydra admin APIs take no bearer: bind each to its address on a network the edge never joins,
 resolve its alias to that address for its callers (`extra_hosts` in the example), and publish only the edge
 ([`ARCHITECTURE.md` § Trust boundary](ARCHITECTURE.md#trust-boundary)).
-The example's `internal` network sets `driver_opts: {isolate: "true"}` (a podman option other engines ignore);
-a hand-made network, as in quadlets, needs `isolate=true` too, or the edge can route to the bind addresses.
+Under rootless podman, also create that network with `isolate=true` (compose `driver_opts: {isolate: "true"}`):
+without it the edge can route to the bind addresses.
 
 Browser clients on another origin are unsupported: Hydra's CORS allowlist is `OTHALA_PUBLIC_URL` only.
 
@@ -126,5 +126,3 @@ Each release's `deploy/example/compose.yml` pins the upstream Ory digests its e2
 3. Before an Ory pin change, `pg_dump`: Ory migrations are forward-only, so rolling back restores the dump. An
    othala-only rollback is a digest revert.
 4. `docker compose up -d --force-recreate render kratos hydra othala caddy` (a plain `up -d` leaves them on pre-upgrade config); the migrate services run automatically via `depends_on`. Check the OIDC discovery document and a real login.
-   Once, before this, for a deployment that predates `isolate`: podman-compose keeps an existing network as is, so
-   `docker compose down` (never `-v`), `podman network rm <project>_internal` (`network ls` shows the name), then `up`.

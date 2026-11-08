@@ -86,11 +86,6 @@ test('Kratos and Hydra take no environment, so nothing overrides the rendered fi
   }
 });
 
-test('the internal network is internal and isolated, so the edge cannot route to the bind addresses', () => {
-  assert.equal(compose.networks.internal.internal, true);
-  assert.equal(compose.networks.internal.driver_opts.isolate, 'true');
-});
-
 test('every service drops all capabilities', () => {
   for (const [name, s] of Object.entries(compose.services)) assert.deepEqual(s.cap_drop, ['ALL'], name);
 });

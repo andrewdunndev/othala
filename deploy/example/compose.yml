@@ -187,8 +187,6 @@ networks:
   edge: {}
   internal:
     internal: true
-    driver_opts:
-      isolate: "true"
     ipam:
       config:
         - subnet: 10.200.11.0/24
