@@ -14,8 +14,8 @@ secret may have been exposed. For the Hydra system secret see
 Each secret takes an optional `<NAME>_PREVIOUS` (`KRATOS_COOKIE_SECRET_PREVIOUS`,
 `KRATOS_CIPHER_SECRET_PREVIOUS`, `HYDRA_COOKIE_SECRET_PREVIOUS`). Unset, one entry
 renders; set, `[current, previous]` renders. Kratos session cookies verify and
-decrypt under both entries, but its continuity cookies (sign-in and recovery
-flows in progress) use the pair as one key: signed with the first, encrypted
+decrypt under both entries, but its continuity cookies (settings flows in progress)
+use the pair as one key: signed with the first, encrypted
 with the second. So a Kratos cookie pair must be 16, 24 or 32 characters per
 entry (a 64-character pair fails continuity flows with `crypto/aes: invalid key
 size 64`); the cipher is exactly 32. A deployment still on a 64-character Kratos
