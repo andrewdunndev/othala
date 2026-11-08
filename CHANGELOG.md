@@ -14,7 +14,7 @@ The git tag is the authoritative version; `portal/package.json` mirrors it.
 
 ### Fixed
 
-- DEPLOY no longer asks for `isolate=true` under rootless podman: `internal: true` alone keeps the edge off the admin bind addresses (measured on podman 6, rootful and rootless), and podman 6 or later is required.
+- DEPLOY no longer asks for `isolate=true` under rootless podman: `internal: true` alone keeps the edge off the admin bind addresses (measured on podman 5.8 and 6, rootful and rootless), and podman 5.8 or later is required.
 - Cookie rotation and upgrade steps recreate render, kratos, hydra, othala and caddy (`restart` and plain `up -d` left old config running), and the `docker run` mounts carry `:ro,z` for SELinux hosts.
 - Runbooks and config comments match Ory v26.2.0: cookie, cipher and Hydra system secrets accept `[new, old]` lists, the cipher secret is 32 characters, and the admin-marker, readiness, registrar and consent-reset steps use commands that work in the compose deployment.
 - `/readyz` also fails while the registrar's last reconcile failed, and a SIGHUP during a reconcile queues one rerun instead of being dropped.

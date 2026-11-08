@@ -97,7 +97,7 @@ Fixed by the image:
 The Kratos and Hydra admin APIs take no bearer: bind each to its address on a network the edge never joins,
 resolve its alias to that address for its callers (`extra_hosts` in the example), and publish only the edge
 ([`ARCHITECTURE.md` § Trust boundary](ARCHITECTURE.md#trust-boundary)).
-`internal: true` on that network is the boundary, rootful or rootless; podman needs 6 or later (netavark 2).
+`internal: true` on that network is the boundary, rootful or rootless; podman needs 5.8 or later.
 
 Browser clients on another origin are unsupported: Hydra's CORS allowlist is `OTHALA_PUBLIC_URL` only.
 
