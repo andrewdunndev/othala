@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { AVATAR_MAX_BYTES, avatarPath, avatarProblem, parseAvatarBytes, readAvatar, readCapped, readCappedForm, sniffImageType } from './avatar';
+import { AVATAR_MAX_BYTES, avatarPath, avatarProblem, parseAvatarBytes, readAvatar, isBodyLimitError, sniffImageType } from './avatar';
 import { validateMetadataAdmin } from './metadata-admin';
 import { avatarOf, imageBytes } from './test-builders';
 
@@ -71,37 +71,11 @@ describe('stored avatar', () => {
   });
 });
 
-describe('readCapped', () => {
-  const post = (body: BodyInit, headers: Record<string, string> = {}) => new Request('http://portal.test/x', { method: 'POST', body, headers });
-  it('returns the body under the limit and null over it, by header or by stream', async () => {
-    expect(Buffer.from((await readCapped(post('abc'), 10))!).toString()).toBe('abc');
-    expect(await readCapped(post('x'.repeat(11)), 10)).toBeNull();
-    const stream = new ReadableStream({ start(c) { c.enqueue(text('x'.repeat(6))); c.enqueue(text('x'.repeat(6))); c.close(); } });
-    const chunked = new Request('http://portal.test/x', { method: 'POST', body: stream, duplex: 'half' } as RequestInit);
-    expect(await readCapped(chunked, 10)).toBeNull();
-  });
-});
-
-describe('readCappedForm', () => {
-  const multipart = (fields: Record<string, string | File>) => {
-    const f = new FormData();
-    for (const [k, v] of Object.entries(fields)) f.set(k, v);
-    return new Request('http://portal.test/x', { method: 'POST', body: f });
-  };
-  it('parses a form under the cap', async () => {
-    const fd = await readCappedForm(multipart({ action: 'save-avatar', avatar: new File([imageBytes('png') as BlobPart], 'p.png') }), 4096);
-    expect(fd?.get('action')).toBe('save-avatar');
-    expect((fd?.get('avatar') as File).size).toBe(imageBytes('png').length);
-  });
-  it('returns null for a body over the cap, declared or streamed without a length', async () => {
-    const big = new Request('http://portal.test/x', { method: 'POST', body: new Uint8Array(5000), headers: { 'content-type': 'multipart/form-data; boundary=x' } });
-    expect(await readCappedForm(big, 4096)).toBeNull();
-    const stream = new ReadableStream({ start(c) { c.enqueue(new Uint8Array(3000)); c.enqueue(new Uint8Array(3000)); c.close(); } });
-    const chunked = new Request('http://portal.test/x', { method: 'POST', body: stream, headers: { 'content-type': 'multipart/form-data; boundary=x' }, duplex: 'half' } as RequestInit);
-    expect(await readCappedForm(chunked, 4096)).toBeNull();
-  });
-  it('gives an empty form for an unparseable body', async () => {
-    const req = new Request('http://portal.test/x', { method: 'POST', body: 'junk', headers: { 'content-type': 'multipart/form-data; boundary=x' } });
-    expect([...(await readCappedForm(req, 4096))!.keys()]).toEqual([]);
+describe('isBodyLimitError', () => {
+  it('recognises the adapter limit error, also as a cause, and nothing else', () => {
+    expect(isBodyLimitError(new Error('Body size limit exceeded: received more than 262144 bytes'))).toBe(true);
+    expect(isBodyLimitError(new TypeError('failed', { cause: new Error('Body size limit exceeded: x') }))).toBe(true);
+    expect(isBodyLimitError(new Error('bad multipart'))).toBe(false);
+    expect(isBodyLimitError('Body size limit exceeded')).toBe(false);
   });
 });

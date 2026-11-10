@@ -79,48 +79,54 @@ describe('POST /auth/avatar', () => {
     expect(patchAvatarMock).not.toHaveBeenCalled();
   });
 
-  it('refuses a body over the ceiling before parsing it', async () => {
-    // A source that stops when cancelled, so nothing is pushed into a closed stream.
-    let sent = 0;
-    const stream = new ReadableStream({
-      pull(c) {
-        c.enqueue(new Uint8Array(16 * 1024));
-        sent += 16 * 1024;
-        if (sent >= 1024 * 1024) c.close();
-      },
-    });
-    const raw = new Request('http://portal.test/auth/avatar', { method: 'POST', body: stream, headers: { 'content-type': 'multipart/form-data; boundary=x' }, duplex: 'half' } as RequestInit);
-    const { flash } = await run({}, { raw });
-    expect(sent).toBeLessThan(1024 * 1024);
-    expect(flash).toBe('too-large');
-    expect(patchAvatarMock).not.toHaveBeenCalled();
-  });
+  // The adapter's bodySizeLimit (astro.config.mjs) wraps the Node request in astro core's limitAsyncIterable and builds
+  // `new Request({ body, duplex: 'half' })`. The limit lives in the server, not the handler, so this replays that exact
+  // shape with a copy of limitAsyncIterable and drives the real handler through it.
+  async function* limited(source: AsyncIterable<Uint8Array>, limit: number) {
+    let received = 0;
+    for await (const chunk of source) {
+      received += chunk.byteLength;
+      if (received > limit) throw new Error(`Body size limit exceeded: received more than ${limit} bytes`);
+      yield chunk;
+    }
+  }
+  const adapterRequest = (chunk: number, count: number, contentType = 'multipart/form-data; boundary=x', onPull?: () => void) => {
+    async function* source() {
+      for (let i = 0; i < count; i++) {
+        await new Promise((r) => setTimeout(r, 1));
+        onPull?.();
+        yield new Uint8Array(chunk);
+      }
+    }
+    return new Request('http://portal.test/auth/avatar', {
+      method: 'POST',
+      body: limited(source(), 262144) as unknown as BodyInit,
+      duplex: 'half',
+      headers: { 'content-type': contentType },
+    } as RequestInit);
+  };
 
-  it('settles cleanly on an async-iterable body that keeps producing past the cap, as the Node adapter builds it', async () => {
+  it('answers too-large for a body past the adapter limit, with no unhandled rejection or exception', async () => {
     const events: unknown[] = [];
     const onEvent = (e: unknown) => events.push(e);
     process.on('unhandledRejection', onEvent);
     process.on('uncaughtException', onEvent);
     try {
-      async function* chunks() {
-        for (let i = 0; i < 64; i++) {
-          await new Promise((r) => setTimeout(r, 1));
-          yield new Uint8Array(16 * 1024);
-        }
-      }
-      const raw = new Request('http://portal.test/auth/avatar', {
-        method: 'POST',
-        body: chunks() as unknown as BodyInit,
-        duplex: 'half',
-        headers: { 'content-type': 'multipart/form-data; boundary=x' },
-      } as RequestInit);
-      const { flash } = await run({}, { raw });
+      let pulled = 0;
+      const { flash } = await run({}, { raw: adapterRequest(16 * 1024, 80, undefined, () => pulled++) });
       expect(flash).toBe('too-large');
+      expect(pulled).toBeLessThan(80);
+      expect(patchAvatarMock).not.toHaveBeenCalled();
       await new Promise((r) => setTimeout(r, 150));
       expect(events).toEqual([]);
     } finally {
       process.off('unhandledRejection', onEvent);
       process.off('uncaughtException', onEvent);
     }
+  });
+
+  it('answers a body that is not a form as a refused type, not too-large', async () => {
+    const { flash } = await run({}, { raw: adapterRequest(100, 2, 'multipart/form-data; boundary=x') });
+    expect(flash).toBe('type');
   });
 });

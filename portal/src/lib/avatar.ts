@@ -13,8 +13,6 @@ export interface Avatar {
 }
 
 export const AVATAR_MAX_BYTES = 64 * 1024;
-/** Request body ceiling: the image plus multipart framing. */
-export const AVATAR_BODY_MAX = AVATAR_MAX_BYTES + 16 * 1024;
 
 export const AVATAR_ID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
 export const AVATAR_HASH_RE = /^[0-9a-f]{16}$/;
@@ -89,32 +87,8 @@ export function readAvatar(meta: unknown): Avatar | undefined {
   return avatarProblem(a) === null ? (a as Avatar) : undefined;
 }
 
-/** Reads an uploaded body, stopping once it passes `limit` so an oversized body is never buffered whole. */
-export async function readCapped(request: Request, limit: number): Promise<Uint8Array | null> {
-  const declared = Number(request.headers.get('content-length'));
-  if (Number.isFinite(declared) && declared > limit) return null;
-  if (!request.body) return new Uint8Array();
-  const reader = request.body.getReader();
-  const chunks: Uint8Array[] = [];
-  let total = 0;
-  for (;;) {
-    const { done, value } = await reader.read();
-    if (done) break;
-    total += value.length;
-    if (total > limit) {
-      await reader.cancel().catch(() => undefined);
-      reader.releaseLock();
-      return null;
-    }
-    chunks.push(value);
-  }
-  return Buffer.concat(chunks);
-}
-
-/** A multipart or urlencoded form read under `limit`: null when the body is over it, an empty form when unparseable. */
-export async function readCappedForm(request: Request, limit: number): Promise<FormData | null> {
-  const bytes = await readCapped(request, limit);
-  if (bytes === null) return null;
-  const headers = { 'content-type': request.headers.get('content-type') ?? '' };
-  return new Response(new Blob([bytes as BlobPart]), { headers }).formData().catch(() => new FormData());
-}
+/** The adapter's bodySizeLimit rejects a stream with this message once it passes the cap (astro core limitAsyncIterable). */
+export const isBodyLimitError = (err: unknown): boolean => {
+  for (let e = err; e instanceof Error; e = e.cause as unknown) if (/body size limit exceeded/i.test(e.message)) return true;
+  return false;
+};

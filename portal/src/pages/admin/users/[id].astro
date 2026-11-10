@@ -24,7 +24,7 @@ import { parseIdentity } from '../../../lib/identity-facts';
 import { shouldRefuseRecovery } from '../../../lib/access';
 import { loadRequirements } from '../../../lib/tiles';
 import { signToken, csrfRefusal } from '../../../lib/csrf';
-import { AVATAR_BODY_MAX, AVATAR_REFUSALS, readAvatar, avatarPath, readCappedForm } from '../../../lib/avatar';
+import { AVATAR_REFUSALS, readAvatar, avatarPath, isBodyLimitError } from '../../../lib/avatar';
 import AvatarEditor from '../../../components/AvatarEditor.astro';
 import type { Identity } from '../../../lib/types';
 
@@ -68,16 +68,16 @@ let actionResult: ActionResult | null = null;
 let formErrors: Record<string, string> = {};
 
 if (Astro.request.method === 'POST' && identity) {
-  // Only the picture form is multipart: it is read under a cap, so a chunked or understated body is never buffered whole.
+  // The adapter's bodySizeLimit rejects an oversized body here; only the multipart picture form turns that into a banner.
   const contentType = Astro.request.headers.get('content-type') ?? '';
   let fd: FormData;
   let tooLarge = false;
-  if (contentType.startsWith('multipart/form-data')) {
-    const capped = await readCappedForm(Astro.request, AVATAR_BODY_MAX);
-    tooLarge = capped === null;
-    fd = capped ?? new FormData();
-  } else {
+  try {
     fd = await Astro.request.formData();
+  } catch (err) {
+    if (!contentType.startsWith('multipart/form-data') || !isBodyLimitError(err)) throw err;
+    tooLarge = true;
+    fd = new FormData();
   }
   action = tooLarge ? 'save-avatar' : String(fd.get('action') ?? '');
 
