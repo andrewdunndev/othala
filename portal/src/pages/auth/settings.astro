@@ -31,6 +31,8 @@ import { loadTiles, userCanSeeTile } from '../../lib/tiles';
 import { publicUrl } from '../../lib/config';
 import { signToken, csrfRefusal } from '../../lib/csrf';
 import { readPasskeyNames } from '../../lib/passkey-names';
+import { readAvatar, avatarPath } from '../../lib/avatar';
+import AvatarEditor from '../../components/AvatarEditor.astro';
 import {
   credentialItems,
   emailVerified,
@@ -42,7 +44,7 @@ import {
   passwordPanelOpen,
 } from '../../lib/settings-view';
 import { devSettings, isDevSettingsState } from '../../lib/settings-fixtures';
-import { FLASH, LOST_KEYS, RENAME_ERROR_COOKIE, RENAME_ERRORS, messageText } from '../../lib/settings-flash';
+import { FLASH, LOST_KEYS, RENAME_ERROR_COOKIE, RENAME_ERRORS, AVATAR_FLASH, AVATAR_FLASH_COOKIE, messageText } from '../../lib/settings-flash';
 
 const cookie = Astro.request.headers.get('cookie') ?? undefined;
 const devParam = import.meta.env.DEV ? Astro.url.searchParams.get('dev-state') : null;
@@ -142,6 +144,15 @@ if (dev) {
   }
 }
 
+let avatarFlash: (typeof AVATAR_FLASH)[string] | null = null;
+if (!dev) {
+  const code = Astro.cookies.get(AVATAR_FLASH_COOKIE)?.value;
+  if (code) {
+    avatarFlash = Object.hasOwn(AVATAR_FLASH, code) ? AVATAR_FLASH[code] : AVATAR_FLASH.busy;
+    Astro.response.headers.append('Set-Cookie', `${AVATAR_FLASH_COOKIE}=; Path=/auth/settings; Max-Age=0; HttpOnly; SameSite=Lax${import.meta.env.PROD ? '; Secure' : ''}`);
+  }
+}
+
 const identity = session!.identity!;
 const ui = flow.ui;
 const nodes = ui.nodes;
@@ -191,6 +202,9 @@ const lookupOff = nodesByGroup(nodes, 'lookup_secret').map(asInput).find((a) => 
 
 const csrfSignOut = mint(identity.id, 'sign-out-everywhere');
 const renameTokens = passkeys.map(() => mint(identity.id, 'passkey-name'));
+const storedAvatar = readAvatar(stored?.metadata_admin);
+const avatarSrc = storedAvatar ? avatarPath(identity.id, storedAvatar) : null;
+const avatarToken = mint(identity.id, 'avatar');
 
 const groups = parseIdentity(stored).groups;
 const yourApps = dev ? [] : loadTiles().filter((t) => userCanSeeTile(t, groups));
@@ -614,6 +628,13 @@ const lookupLabel: Record<string, string> = {
             </form>
           </div>
         )}
+      </section>
+
+      <section class="panel card" id="picture" data-card aria-labelledby="h-pic">
+        <h2 id="h-pic">Picture</h2>
+        {avatarFlash && <div class={`notice notice-${avatarFlash.tone}`} role="status">{avatarFlash.text}</div>}
+        <p class="lede">Shown in the apps you sign in to that use a picture.</p>
+        <AvatarEditor action="/auth/avatar" csrf={avatarToken} src={avatarSrc} name={displayName} />
       </section>
 
       {has('profile') && (

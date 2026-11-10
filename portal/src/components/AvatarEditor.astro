@@ -1,0 +1,49 @@
+---
+// Picture controls shared by the member's settings card and the admin's user page: the current picture, a file chooser,
+// Save and Remove. The page script squares and shrinks the chosen file to 256x256 before it is sent; without scripts the
+// server's size and type checks answer instead.
+interface Props {
+  action: string;
+  csrf: string;
+  src: string | null;
+  name: string;
+  fields?: Record<string, string>;
+  idPrefix?: string;
+}
+const { action, csrf, src, name, fields = {}, idPrefix = 'avatar' } = Astro.props as Props;
+const initial = (name.trim()[0] ?? '?').toUpperCase();
+---
+<div class="avatar-editor">
+  {src ? <img class="avatar-img" src={src} width="96" height="96" alt={`Picture of ${name}`} /> : <span class="avatar-img avatar-none" aria-hidden="true">{initial}</span>}
+  <div class="avatar-controls">
+    <form method="POST" enctype="multipart/form-data" action={action} data-avatar-form data-astro-reload>
+      <input type="hidden" name="csrf_token" value={csrf} />
+      {Object.entries(fields).map(([k, v]) => <input type="hidden" name={k} value={v} />)}
+      <div class="field">
+        <label for={`${idPrefix}-file`}>Choose a picture</label>
+        <input id={`${idPrefix}-file`} name="avatar" type="file" accept="image/png,image/jpeg,image/webp" required aria-describedby={`${idPrefix}-hint`} />
+        <span class="field-hint" id={`${idPrefix}-hint`}>PNG, JPEG or WebP, under 64 KB. It is cropped to a square.</span>
+      </div>
+      <div class="form-actions"><button class="button button-primary button-sm" type="submit">Save picture</button></div>
+    </form>
+    {src && (
+      <form method="POST" enctype="multipart/form-data" action={action} data-astro-reload>
+        <input type="hidden" name="csrf_token" value={csrf} />
+        {Object.entries(fields).map(([k, v]) => <input type="hidden" name={k} value={v} />)}
+        <input type="hidden" name="remove" value="1" />
+        <div class="form-actions"><button class="button button-secondary button-sm" type="submit">Remove picture</button></div>
+      </form>
+    )}
+  </div>
+</div>
+
+<style>
+  .avatar-editor { display: flex; gap: var(--space-4); align-items: flex-start; flex-wrap: wrap; }
+  .avatar-img { width: 96px; height: 96px; border-radius: 50%; object-fit: cover; border: 1px solid var(--border); flex: none; }
+  .avatar-none { display: inline-flex; align-items: center; justify-content: center; font-size: var(--text-lg); color: var(--text-2); background: var(--bg); }
+  .avatar-controls { flex: 1 1 16rem; display: grid; gap: var(--space-2); }
+</style>
+
+<script>
+  import '../scripts/avatar-resize';
+</script>

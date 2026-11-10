@@ -3,6 +3,8 @@
 import type { Identity } from './types';
 import type { ClientManifest } from './manifests';
 import { shouldEmitGroups } from './manifests';
+import { avatarPath, readAvatar } from './avatar';
+import { publicUrl } from './config';
 
 type Claims = Record<string, unknown>;
 
@@ -58,6 +60,11 @@ export function buildIDTokenClaims(identity: Identity | null | undefined): Claim
   const groups = extractGroups(identity.metadata_admin);
   if (groups !== undefined) {
     claims.groups = groups;
+  }
+
+  const avatar = readAvatar(identity.metadata_admin);
+  if (avatar !== undefined && identity.id) {
+    claims.picture = `${publicUrl}${avatarPath(identity.id, avatar)}`;
   }
 
   return claims;
@@ -168,7 +175,7 @@ export function deepMergeClaims(
 /** Map from OIDC scope token to the claim keys it covers (OIDC Core §5.4). */
 const SCOPE_CLAIMS: Record<string, string[]> = {
   email: ['email', 'email_verified'],
-  profile: ['name', 'preferred_username'],
+  profile: ['name', 'preferred_username', 'picture'],
   groups: ['groups'],
 };
 

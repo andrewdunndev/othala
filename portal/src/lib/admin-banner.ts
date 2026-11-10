@@ -46,6 +46,8 @@ export function bannerFor(result: ActionResult, action: string, who: string): Ba
       return { tone: 'success', text: `${who}'s email is marked as verified.` };
     case 'prerequisites-saved':
       return { tone: 'success', text: 'Prerequisites saved.' };
+    case 'avatar-saved':
+      return { tone: 'success', text: result.removed ? 'Picture removed.' : 'Picture saved.' };
     case 'error':
       return { tone: 'danger', text: result.message };
     case 'recovery':

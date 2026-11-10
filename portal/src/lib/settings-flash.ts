@@ -1,5 +1,6 @@
 // House-voice confirmations for the settings page. Kratos reports one generic "saved" for every method, so the page
 // script keys the action the person took (the submitter's name, or `method:<value>`) to the sentence shown in the card.
+import { AVATAR_REFUSALS } from './avatar';
 
 export const FLASH: Record<string, string> = {
   'method:totp': 'Authenticator app added.',
@@ -42,3 +43,16 @@ export const RENAME_ERRORS: Record<string, string> = {
 };
 
 export const RENAME_ERROR_COOKIE = 'othala_rename_error';
+
+/** The sentence a picture change leaves in the Picture card, by the code the POST left in the cookie. */
+export const AVATAR_FLASH: Record<string, { tone: 'success' | 'danger'; text: string }> = {
+  set: { tone: 'success', text: 'Picture saved. Apps pick it up the next time you sign in to them.' },
+  removed: { tone: 'success', text: 'Picture removed.' },
+  empty: { tone: 'danger', text: AVATAR_REFUSALS.empty },
+  'too-large': { tone: 'danger', text: AVATAR_REFUSALS['too-large'] },
+  type: { tone: 'danger', text: AVATAR_REFUSALS.type },
+  csrf: { tone: 'danger', text: 'That page was out of date. Try again.' },
+  busy: { tone: 'danger', text: 'Could not save the picture. Try again in a moment.' },
+};
+
+export const AVATAR_FLASH_COOKIE = 'othala_avatar_flash';

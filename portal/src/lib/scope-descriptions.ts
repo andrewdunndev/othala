@@ -3,7 +3,7 @@
 
 export const SCOPE_DESCRIPTIONS: Record<string, string> = {
   openid: 'That it is you, so it can sign you in',
-  profile: 'Your name and username',
+  profile: 'Your name, username and picture',
   email: 'Your email address',
   groups: 'Your access level in this app',
   offline_access: 'Staying signed in on this device between visits',

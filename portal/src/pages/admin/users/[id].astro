@@ -24,6 +24,8 @@ import { parseIdentity } from '../../../lib/identity-facts';
 import { shouldRefuseRecovery } from '../../../lib/access';
 import { loadRequirements } from '../../../lib/tiles';
 import { signToken, csrfRefusal } from '../../../lib/csrf';
+import { AVATAR_BODY_MAX, readAvatar, avatarPath } from '../../../lib/avatar';
+import AvatarEditor from '../../../components/AvatarEditor.astro';
 import type { Identity } from '../../../lib/types';
 
 const ctx = await adminContext(Astro);
@@ -66,6 +68,7 @@ let actionResult: ActionResult | null = null;
 let formErrors: Record<string, string> = {};
 
 if (Astro.request.method === 'POST' && identity) {
+  if (Number(Astro.request.headers.get('content-length')) > AVATAR_BODY_MAX) return new Response('Too large', { status: 413 });
   const fd = await Astro.request.formData();
   action = String(fd.get('action') ?? '');
 
@@ -96,6 +99,7 @@ if (Astro.request.method === 'POST' && identity) {
 // Which section an action's result belongs to: the form posts there and the result shows there, once.
 const SECTION_OF: Record<string, string> = {
   'save-profile': 'profile',
+  'save-avatar': 'profile',
   'save-access': 'apps',
   'save-household': 'household',
   'grant-admin': 'household',
@@ -123,6 +127,8 @@ const banner = actionResult
 const recovery = actionResult?.kind === 'recovery' ? actionResult : null;
 
 const meta = identity?.metadata_admin;
+const storedAvatar = readAvatar(meta);
+const avatarSrc = storedAvatar && identity ? avatarPath(identity.id, storedAvatar) : null;
 const username = identity?.traits?.username ?? '';
 const email = identity?.traits?.email ?? '';
 const isSelf = id === adminId;
@@ -200,6 +206,7 @@ const roleNote = Object.keys(roleOverrides).length;
 
       <details class="plain" id="profile" open={resultSection === 'profile'}>
         <summary>Edit profile</summary>
+        <AvatarEditor action="#profile" csrf={tok('save-avatar')} src={avatarSrc} name={who} fields={{ action: 'save-avatar' }} idPrefix="avatar" />
         <form class="inline-form" method="POST" enctype="application/x-www-form-urlencoded" action="#profile">
           <input type="hidden" name="csrf_token" value={tok('save-profile')} />
           <input type="hidden" name="action" value="save-profile" />
