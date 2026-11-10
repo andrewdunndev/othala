@@ -30,6 +30,10 @@ const CLIENT = 'grafana';
 const REDIRECT = 'https://grafana.othala.test/login/generic_oauth';
 const SUBJECT = '__SUBJECT__';
 const SECRET = '__GRAFANA_SECRET__';
+// Picture mode: a non-empty base64 PNG and the hash of the avatar stored on SUBJECT add the profile-scope checks.
+const SCOPE = '__SCOPE__';
+const PNG_B64 = '__PNG_B64__';
+const PICTURE_SHA = '__PICTURE_SHA__';
 
 // Hydra's CSRF cookies are Secure, so every hop goes through the https edge.
 const jar = new CookieJar();
@@ -43,13 +47,34 @@ const hydraAdmin = new OAuth2Api(new Configuration({ basePath: HA }));
 
 const loc = (r) => r.headers.get('location');
 
+async function pictureChecks(claims, accessToken) {
+  const url = HP + '/avatar/' + SUBJECT + '/' + PICTURE_SHA.slice(0, 16);
+  const want = Buffer.from(PNG_B64, 'base64');
+  const ok = await fetch(url);
+  const body = Buffer.from(await ok.arrayBuffer());
+  const bad = await fetch(HP + '/avatar/' + SUBJECT + '/' + '0'.repeat(16));
+  const info = await fetch(HP + '/userinfo', { headers: { Authorization: 'Bearer ' + accessToken } });
+  const infoClaims = await info.json().catch(() => ({}));
+  return {
+    claim_ok: claims.picture === url,
+    claim: claims.picture,
+    get_status: ok.status,
+    get_type: ok.headers.get('content-type'),
+    get_nosniff: ok.headers.get('x-content-type-options'),
+    get_bytes_equal: body.equals(want),
+    wrong_hash_status: bad.status,
+    userinfo_status: info.status,
+    userinfo_picture: infoClaims.picture,
+  };
+}
+
 (async () => {
   try {
     // ── Step 1: authorization request → redirect with login_challenge ─────────
     const authUrl =
       HP + '/oauth2/auth?client_id=' + CLIENT +
       '&response_type=code' +
-      '&scope=' + encodeURIComponent('openid email groups offline_access') +
+      '&scope=' + encodeURIComponent(SCOPE) +
       '&redirect_uri=' + encodeURIComponent(REDIRECT) +
       '&state=dancestate01&nonce=dancenonce01';
 
@@ -152,6 +177,7 @@ const loc = (r) => r.headers.get('location');
 
     // grafana's consent block emits a `grafana_role` JMESPath array claim
     // per identity group (family -> Viewer). The smoke asserts on it.
+    const picture = PNG_B64 ? await pictureChecks(claims, tok.access_token) : undefined;
     const grafanaRole = claims?.grafana_role;
     console.log('OK claims=' + JSON.stringify({
       sub: claims.sub,
@@ -160,6 +186,7 @@ const loc = (r) => r.headers.get('location');
       grafana_role: grafanaRole,
       introspect_active: intro.active,
       refresh_token: tok.refresh_token,
+      picture,
     }));
   } catch (e) {
     console.log('EXC ' + e.message);

@@ -379,6 +379,34 @@ else
     fail "G3 admin-only deny" "got: $g3 (want DENIED ... access_denied) — admin-implies-access may have been reintroduced"
 fi
 
+# G4: a member with a stored picture, signing in with the profile scope. The avatar is patched on through the Kratos
+# admin API (a 1x1 PNG built inline), the id_token must carry its absolute URL, the URL must serve with no cookie, and a
+# wrong hash must 404. Userinfo is asserted separately.
+g4_id=$(mk_identity active "['grafana-access']" g4.picture)
+g4_sha=$(printf '%s' "const c=require('node:crypto');const b64='iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==';const sha=c.createHash('sha256').update(Buffer.from(b64,'base64')).digest('hex');fetch('http://kratos:4434/admin/identities/${g4_id}',{method:'PATCH',headers:{'Content-Type':'application/json'},body:JSON.stringify([{op:'add',path:'/metadata_admin/avatar',value:{type:'image/png',sha256:sha,data:b64}}])}).then(r=>{process.stdout.write(r.ok?sha:'PATCH-'+r.status);process.exit(0)}).catch(()=>process.exit(1))" | node_in othala)
+g4_png='iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg=='
+g4=$(run_dance "$g4_id" "openid email profile groups offline_access" "$g4_png" "$g4_sha")
+if [[ "$g4" == OK* && "$g4" == *'"claim_ok":true'* ]]; then
+    pass "G4a profile-scoped id_token carries picture = the avatar's absolute URL"
+else
+    fail "G4a picture claim" "sha=$g4_sha got: $g4"
+fi
+if [[ "$g4" == *'"get_status":200'* && "$g4" == *'"get_type":"image/png"'* && "$g4" == *'"get_nosniff":"nosniff"'* && "$g4" == *'"get_bytes_equal":true'* ]]; then
+    pass "G4b the picture URL serves the image with no cookie (image/png, nosniff, same bytes)"
+else
+    fail "G4b picture GET" "got: $g4"
+fi
+if [[ "$g4" == *'"wrong_hash_status":404'* ]]; then
+    pass "G4c the same URL with a wrong hash is 404"
+else
+    fail "G4c wrong-hash 404" "got: $g4"
+fi
+if [[ "$g4" == *'"userinfo_status":200'* && "$g4" == *'"userinfo_picture":"https://'* ]]; then
+    pass "G4d /userinfo carries picture too"
+else
+    fail "G4d userinfo picture" "got: $g4"
+fi
+
 # Section H: contact / request form (SSR /api/request, signed-in only).
 echo ""
 echo "H. Contact form (othala :8080 /api/request -> mailpit)"

@@ -19,12 +19,12 @@ node_in() {
     docker compose exec -T "$container" node 2>/dev/null | _strip_ansi
 }
 
-# run_dance <subject> -> the result line (OK claims=... / DENIED... / STEP/EXC). Pipes
+# run_dance <subject> [scope] [png-base64 avatar-sha256] -> the result line (OK claims=... / DENIED... / STEP/EXC). Pipes
 # oidc-dance.mjs with the subject and grafana client secret into the dance-runner oneshot;
 # grafana is the role-mapping client whose consent block emits grafana_role.
 run_dance() {
     local out res
-    out=$(sed "s|__SUBJECT__|$1|g; s|__GRAFANA_SECRET__|${GRAFANA_CLIENT_SECRET}|g" ./oidc-dance.mjs \
+    out=$(sed "s|__SUBJECT__|$1|g; s|__GRAFANA_SECRET__|${GRAFANA_CLIENT_SECRET}|g; s|__SCOPE__|${2:-openid email groups offline_access}|g; s|__PNG_B64__|${3:-}|g; s|__PICTURE_SHA__|${4:-}|g" ./oidc-dance.mjs \
         | docker compose --profile oneshot run --rm --no-deps -T dance-runner 2>&1 | _strip_ansi)
     res=$(echo "$out" | grep -E '^OK |^DENIED|^STEP|^EXC' | tail -1)
     if [[ -z "$res" ]]; then
