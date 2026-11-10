@@ -95,4 +95,32 @@ describe('POST /auth/avatar', () => {
     expect(flash).toBe('too-large');
     expect(patchAvatarMock).not.toHaveBeenCalled();
   });
+
+  it('settles cleanly on an async-iterable body that keeps producing past the cap, as the Node adapter builds it', async () => {
+    const events: unknown[] = [];
+    const onEvent = (e: unknown) => events.push(e);
+    process.on('unhandledRejection', onEvent);
+    process.on('uncaughtException', onEvent);
+    try {
+      async function* chunks() {
+        for (let i = 0; i < 64; i++) {
+          await new Promise((r) => setTimeout(r, 1));
+          yield new Uint8Array(16 * 1024);
+        }
+      }
+      const raw = new Request('http://portal.test/auth/avatar', {
+        method: 'POST',
+        body: chunks() as unknown as BodyInit,
+        duplex: 'half',
+        headers: { 'content-type': 'multipart/form-data; boundary=x' },
+      } as RequestInit);
+      const { flash } = await run({}, { raw });
+      expect(flash).toBe('too-large');
+      await new Promise((r) => setTimeout(r, 150));
+      expect(events).toEqual([]);
+    } finally {
+      process.off('unhandledRejection', onEvent);
+      process.off('uncaughtException', onEvent);
+    }
+  });
 });
