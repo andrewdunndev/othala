@@ -49,13 +49,13 @@ describe('applyAvatarForm', () => {
 });
 
 describe('POST /auth/avatar', () => {
-  const run = async (fields: Record<string, string | File>, opts: { token?: string | null; active?: boolean } = {}) => {
+  const run = async (fields: Record<string, string | File>, opts: { token?: string | null; active?: boolean; raw?: Request } = {}) => {
     getSessionMock.mockResolvedValue(opts.active === false ? { active: false } : session('aal1'));
     const sess = session('aal1');
     const token = opts.token === undefined ? signToken(sess.identity!.id, 'avatar') : opts.token;
     const body = form({ ...(token === null ? {} : { csrf_token: token }), ...fields });
     const cookies = { set: vi.fn() };
-    const res = (await POST({ request: new Request('http://portal.test/auth/avatar', { method: 'POST', body }), redirect: (u: string, s: number) => new Response(null, { status: s, headers: { Location: u } }), cookies } as never)) as Response;
+    const res = (await POST({ request: opts.raw ?? new Request('http://portal.test/auth/avatar', { method: 'POST', body }), redirect: (u: string, s: number) => new Response(null, { status: s, headers: { Location: u } }), cookies } as never)) as Response;
     return { res, flash: cookies.set.mock.calls[0]?.[1] };
   };
 
@@ -80,7 +80,18 @@ describe('POST /auth/avatar', () => {
   });
 
   it('refuses a body over the ceiling before parsing it', async () => {
-    const { flash } = await run({ avatar: file(new Uint8Array(100 * 1024)) });
+    // A source that stops when cancelled, so nothing is pushed into a closed stream.
+    let sent = 0;
+    const stream = new ReadableStream({
+      pull(c) {
+        c.enqueue(new Uint8Array(16 * 1024));
+        sent += 16 * 1024;
+        if (sent >= 1024 * 1024) c.close();
+      },
+    });
+    const raw = new Request('http://portal.test/auth/avatar', { method: 'POST', body: stream, headers: { 'content-type': 'multipart/form-data; boundary=x' }, duplex: 'half' } as RequestInit);
+    const { flash } = await run({}, { raw });
+    expect(sent).toBeLessThan(1024 * 1024);
     expect(flash).toBe('too-large');
     expect(patchAvatarMock).not.toHaveBeenCalled();
   });

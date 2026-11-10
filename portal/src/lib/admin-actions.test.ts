@@ -850,6 +850,13 @@ describe('avatar through admin saves', () => {
     survives();
   });
 
+  it('drops a malformed stored one instead of rewriting or throwing on it', async () => {
+    const bad = identity({ username: 'robin.k', email: 'robin@othala.test', metadataAdmin: { groups: ['everyone'], avatar: { ...pic, type: 'image/svg+xml' } as never } });
+    await saveProfileAction(fd({ username: 'robin.k', email: 'robin@othala.test', displayName: 'Robin', recoveryEmail: '' }), makeCtx({ identity: bad, manifests: MANIFESTS }));
+    expect(written().metadataAdmin).not.toHaveProperty('avatar');
+    expect(written().metadataAdmin.groups).toEqual(['everyone']);
+  });
+
   it('an identity without one gains none', async () => {
     await saveProfileAction(fd({ username: 'robin.k', email: 'robin@othala.test', displayName: '', recoveryEmail: '' }), makeCtx({ identity: identity({ username: 'robin.k', metadataAdmin: { groups: ['everyone'] } }), manifests: MANIFESTS }));
     expect(written().metadataAdmin).not.toHaveProperty('avatar');

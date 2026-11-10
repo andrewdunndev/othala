@@ -24,7 +24,7 @@ import { parseIdentity } from '../../../lib/identity-facts';
 import { shouldRefuseRecovery } from '../../../lib/access';
 import { loadRequirements } from '../../../lib/tiles';
 import { signToken, csrfRefusal } from '../../../lib/csrf';
-import { AVATAR_BODY_MAX, readAvatar, avatarPath } from '../../../lib/avatar';
+import { AVATAR_BODY_MAX, AVATAR_REFUSALS, readAvatar, avatarPath, readCappedForm } from '../../../lib/avatar';
 import AvatarEditor from '../../../components/AvatarEditor.astro';
 import type { Identity } from '../../../lib/types';
 
@@ -68,22 +68,33 @@ let actionResult: ActionResult | null = null;
 let formErrors: Record<string, string> = {};
 
 if (Astro.request.method === 'POST' && identity) {
-  if (Number(Astro.request.headers.get('content-length')) > AVATAR_BODY_MAX) return new Response('Too large', { status: 413 });
-  const fd = await Astro.request.formData();
-  action = String(fd.get('action') ?? '');
+  // Only the picture form is multipart: it is read under a cap, so a chunked or understated body is never buffered whole.
+  const contentType = Astro.request.headers.get('content-type') ?? '';
+  let fd: FormData;
+  let tooLarge = false;
+  if (contentType.startsWith('multipart/form-data')) {
+    const capped = await readCappedForm(Astro.request, AVATAR_BODY_MAX);
+    tooLarge = capped === null;
+    fd = capped ?? new FormData();
+  } else {
+    fd = await Astro.request.formData();
+  }
+  action = tooLarge ? 'save-avatar' : String(fd.get('action') ?? '');
 
   // Every state-changing admin POST carries a CSRF token bound to the admin identity and the action. A dev fixture
   // has no secret to sign with, so it skips the check and writes nothing.
-  if (!dev) {
+  if (tooLarge) {
+    actionResult = { kind: 'error', message: AVATAR_REFUSALS['too-large'] };
+  } else if (!dev) {
     const tokenAction = action === 'remove-credential' ? `remove-${String(fd.get('cred_type') ?? '')}` : action;
     const bad = csrfRefusal(String(fd.get('csrf_token') ?? ''), adminId, tokenAction);
     if (bad !== null) return new Response(`CSRF: ${bad}`, { status: 403 });
   }
 
   const handler = ADMIN_ACTIONS[action];
-  if (dev) {
+  if (dev && !tooLarge) {
     actionResult = devActionResult(action);
-  } else if (handler) {
+  } else if (handler && !tooLarge) {
     try {
       const outcome = await handler(fd, { id, identity, adminIdentityId: adminId, manifests, requirements: requirements.map((r) => r.name) });
       if (outcome instanceof Response) return outcome;

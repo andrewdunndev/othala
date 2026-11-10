@@ -6,7 +6,7 @@ import type { APIRoute } from 'astro';
 import { browserFlows, getSession } from '../../lib/kratos';
 import { csrfRefusal } from '../../lib/csrf';
 import { publicUrl } from '../../lib/config';
-import { AVATAR_BODY_MAX, readCapped } from '../../lib/avatar';
+import { AVATAR_BODY_MAX, readCappedForm } from '../../lib/avatar';
 import { applyAvatarForm } from '../../lib/avatar-edit';
 import { AVATAR_FLASH_COOKIE } from '../../lib/settings-flash';
 
@@ -32,14 +32,8 @@ export const POST: APIRoute = async ({ request, redirect, cookies }) => {
   }
   if (!session?.active || !session.identity) return redirect('/auth/login', 303);
 
-  const body = await readCapped(request, AVATAR_BODY_MAX);
-  if (body === null) return back('too-large');
-  let fd: FormData;
-  try {
-    fd = await new Response(new Blob([body as BlobPart]), { headers: { 'content-type': request.headers.get('content-type') ?? '' } }).formData();
-  } catch {
-    return back('type');
-  }
+  const fd = await readCappedForm(request, AVATAR_BODY_MAX);
+  if (fd === null) return back('too-large');
   if (csrfRefusal(String(fd.get('csrf_token') ?? ''), session.identity.id, 'avatar') !== null) return back('csrf');
 
   try {

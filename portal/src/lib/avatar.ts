@@ -102,10 +102,19 @@ export async function readCapped(request: Request, limit: number): Promise<Uint8
     if (done) break;
     total += value.length;
     if (total > limit) {
-      await reader.cancel();
+      await reader.cancel().catch(() => undefined);
+      reader.releaseLock();
       return null;
     }
     chunks.push(value);
   }
   return Buffer.concat(chunks);
+}
+
+/** A multipart or urlencoded form read under `limit`: null when the body is over it, an empty form when unparseable. */
+export async function readCappedForm(request: Request, limit: number): Promise<FormData | null> {
+  const bytes = await readCapped(request, limit);
+  if (bytes === null) return null;
+  const headers = { 'content-type': request.headers.get('content-type') ?? '' };
+  return new Response(new Blob([bytes as BlobPart]), { headers }).formData().catch(() => new FormData());
 }

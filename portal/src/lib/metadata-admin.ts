@@ -56,7 +56,7 @@ export function validateMetadataAdmin(input: unknown): MetadataAdmin {
 
   if ('avatar' in obj && obj.avatar !== undefined) {
     const problem = avatarProblem(obj.avatar);
-    if (problem) throw new MetadataAdminError(`metadata_admin.avatar: `);
+    if (problem) throw new MetadataAdminError(`metadata_admin.avatar: ${problem}`);
     out.avatar = obj.avatar as Avatar;
   }
 

@@ -25,7 +25,7 @@ import { removalBlock } from './admin-view';
 import type { ClientManifest } from './manifests';
 import type { Identity } from './types';
 import { applyAvatarForm } from './avatar-edit';
-import { AVATAR_REFUSALS } from './avatar';
+import { AVATAR_REFUSALS, readAvatar } from './avatar';
 
 export const USERNAME_RE = /^[a-z0-9]+(?:\.[a-z0-9]+)+$/;
 export const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -117,7 +117,7 @@ export async function saveAction(fd: FormData, ctx: ActionContext): Promise<Acti
   const existingAdmin = identity.metadata_admin?.admin;
   const existingPrerequisites = identity.metadata_admin?.prerequisites;
   const existingPasskeyNames = identity.metadata_admin?.passkeyNames;
-  const existingAvatar = identity.metadata_admin?.avatar;
+  const existingAvatar = readAvatar(identity.metadata_admin);
   const groups = normalizeGroupOrder(groupPlan.groups);
   // Only a new elevation needs the second factor first, so people already elevated without one can still be edited and lowered.
   const after = { ...identity, metadata_admin: { ...identity.metadata_admin, groups, roles } };
