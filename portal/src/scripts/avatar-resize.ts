@@ -4,7 +4,7 @@
 
 const SIZE = 256;
 const CAP = 64 * 1024;
-const TOO_LARGE = 'That picture is too large. Use one under 64 KB, or a smaller image.';
+const TOO_LARGE = 'That picture is too large. Choose a smaller one, under 64 KB.';
 
 const ENCODERS: ReadonlyArray<readonly [string, string, number | undefined]> = [
   ['image/webp', 'webp', 0.9],
@@ -39,21 +39,51 @@ async function squared(file: File): Promise<Squared> {
   return { tooLarge: true };
 }
 
+function preview(input: HTMLInputElement, file: File) {
+  const editor = input.closest('.avatar-editor');
+  let img = editor?.querySelector('.avatar-img');
+  if (!(img instanceof HTMLImageElement)) {
+    const fresh = document.createElement('img');
+    fresh.className = 'avatar-img';
+    fresh.width = 96;
+    fresh.height = 96;
+    fresh.alt = 'Your new picture, not saved yet';
+    img?.replaceWith(fresh);
+    img = fresh;
+  }
+  if (img instanceof HTMLImageElement) img.src = URL.createObjectURL(file);
+}
+
+document.addEventListener('submit', (e) => {
+  const form = e.target;
+  if (form instanceof HTMLFormElement && form.dataset.resizing) e.preventDefault();
+});
+
 document.addEventListener('change', async (e) => {
   const input = e.target;
   if (!(input instanceof HTMLInputElement) || input.type !== 'file' || !input.form?.hasAttribute('data-avatar-form')) return;
   const file = input.files?.[0];
   if (!file) return;
-  input.setCustomValidity('');
-  const out = await squared(file);
-  if (!out) return;
-  if ('tooLarge' in out) {
-    input.value = '';
-    input.setCustomValidity(TOO_LARGE);
-    input.reportValidity();
-    return;
+  const form = input.form;
+  const save = form.querySelector('button[type="submit"]');
+  form.dataset.resizing = '1';
+  if (save instanceof HTMLButtonElement) save.disabled = true;
+  try {
+    input.setCustomValidity('');
+    const out = await squared(file);
+    if (!out) return;
+    if ('tooLarge' in out) {
+      input.value = '';
+      input.setCustomValidity(TOO_LARGE);
+      input.reportValidity();
+      return;
+    }
+    const dt = new DataTransfer();
+    dt.items.add(out.file);
+    input.files = dt.files;
+    preview(input, out.file);
+  } finally {
+    delete form.dataset.resizing;
+    if (save instanceof HTMLButtonElement) save.disabled = false;
   }
-  const dt = new DataTransfer();
-  dt.items.add(out.file);
-  input.files = dt.files;
 });

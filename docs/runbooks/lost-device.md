@@ -47,7 +47,7 @@ an AAL1 session could have planted their own in the settings flow, and neither
 `revokeSubject` nor credential eviction removes it. Ask the member whether they
 recognise the value in the Profile section; if not, clear it:
 
-1. Click **Edit profile**.
+1. Click **Edit profile and picture**.
 2. Clear the **Recovery email** field (leave it blank, or replace it with an
    address the member controls).
 3. Click **Save**.

@@ -1,7 +1,8 @@
 ---
 // Picture controls shared by the member's settings card and the admin's user page: the current picture, a file chooser,
-// Save and Remove. The page script squares and shrinks the chosen file to 256x256 before it is sent; without scripts the
-// server's size and type checks answer instead.
+// Save and Remove. The page script squares and shrinks the chosen file to 256x256 and previews it before the form is
+// sent; without scripts the server's size and type checks answer instead. Remove asks first: the settings page uses its
+// own disclosure row, and a page that fills the `remove` slot (the admin's Ask) supplies the question itself.
 interface Props {
   action: string;
   csrf: string;
@@ -12,28 +13,43 @@ interface Props {
 }
 const { action, csrf, src, name, fields = {}, idPrefix = 'avatar' } = Astro.props as Props;
 const initial = (name.trim()[0] ?? '?').toUpperCase();
+const ownRemove = src !== null && !Astro.slots.has('remove');
+const removeForm = `${idPrefix}-remove-form`;
+const removeBox = `${idPrefix}-remove`;
 ---
 <div class="avatar-editor">
-  {src ? <img class="avatar-img" src={src} width="96" height="96" alt={`Picture of ${name}`} /> : <span class="avatar-img avatar-none" aria-hidden="true">{initial}</span>}
+  {src ? <img class="avatar-img" src={src} width="96" height="96" alt={`Picture of ${name}`} /> : <span class="avatar-img avatar-none" role="img" aria-label={`No picture yet for ${name}`}>{initial}</span>}
   <div class="avatar-controls">
+    {!src && <p class="field-hint">No picture yet. Apps show your initial.</p>}
+    {ownRemove && <input type="checkbox" form="disclosures" class="disclose cb-remove" id={removeBox} aria-label="Remove picture" />}
     <form method="POST" enctype="multipart/form-data" action={action} data-avatar-form data-astro-reload>
       <input type="hidden" name="csrf_token" value={csrf} />
       {Object.entries(fields).map(([k, v]) => <input type="hidden" name={k} value={v} />)}
       <div class="field">
         <label for={`${idPrefix}-file`}>Choose a picture</label>
         <input id={`${idPrefix}-file`} name="avatar" type="file" accept="image/png,image/jpeg,image/webp" required aria-describedby={`${idPrefix}-hint`} />
-        <span class="field-hint" id={`${idPrefix}-hint`}>PNG, JPEG or WebP, under 64 KB. It is cropped to a square.</span>
+        <span class="field-hint" id={`${idPrefix}-hint`}>A photo in JPEG, PNG or WebP. It is cropped to a square and shrunk to fit.</span>
       </div>
-      <div class="form-actions"><button class="button button-primary button-sm" type="submit">Save picture</button></div>
+      <div class="form-actions">
+        <button class="button button-primary button-sm" type="submit">Save picture</button>
+        {ownRemove && <label for={removeBox} class="button button-secondary button-sm toggle-label lbl-remove"><span class="on-closed">Remove picture</span></label>}
+      </div>
     </form>
-    {src && (
-      <form method="POST" enctype="multipart/form-data" action={action} data-astro-reload>
+    {ownRemove && (
+      <form id={removeForm} method="POST" enctype="multipart/form-data" action={action} data-astro-reload hidden>
         <input type="hidden" name="csrf_token" value={csrf} />
         {Object.entries(fields).map(([k, v]) => <input type="hidden" name={k} value={v} />)}
         <input type="hidden" name="remove" value="1" />
-        <div class="form-actions"><button class="button button-secondary button-sm" type="submit">Remove picture</button></div>
       </form>
     )}
+    {ownRemove && (
+      <div class="panel-row panel-remove">
+        <span>Remove the picture? Apps show your initial instead.</span>
+        <button type="submit" form={removeForm} class="button button-danger button-sm">Remove picture</button>
+        <label for={removeBox} class="button button-secondary button-sm toggle-label">Keep it</label>
+      </div>
+    )}
+    {src && <slot name="remove" />}
   </div>
 </div>
 

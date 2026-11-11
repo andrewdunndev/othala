@@ -217,8 +217,10 @@ const roleNote = Object.keys(roleOverrides).length;
       )}
 
       <details class="plain" id="profile" open={resultSection === 'profile'}>
-        <summary>Edit profile</summary>
-        <AvatarEditor action="#profile" csrf={tok('save-avatar')} src={avatarSrc} name={who} fields={{ action: 'save-avatar' }} idPrefix="avatar" />
+        <summary>Edit profile and picture</summary>
+        <AvatarEditor action="#profile" csrf={tok('save-avatar')} src={avatarSrc} name={who} fields={{ action: 'save-avatar' }} idPrefix="avatar">
+          <Ask slot="remove" label="Remove picture" action="save-avatar" token={tok('save-avatar')} section="profile" message={`Remove ${first}'s picture?`} confirmLabel="Remove picture" danger><input type="hidden" name="remove" value="1" /></Ask>
+        </AvatarEditor>
         <form class="inline-form" method="POST" enctype="application/x-www-form-urlencoded" action="#profile">
           <input type="hidden" name="csrf_token" value={tok('save-profile')} />
           <input type="hidden" name="action" value="save-profile" />
