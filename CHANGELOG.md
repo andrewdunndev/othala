@@ -6,11 +6,13 @@ aims to follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 The git tag is the authoritative version; `portal/package.json` mirrors it.
 
-## [Unreleased]
+## [0.18.0] - 2026-11-11
 
 ### Added
 
-- A member picture, set from the settings page or by a household admin on the user page, emitted as the OIDC `picture` claim under the `profile` scope. It is stored in `metadata_admin.avatar` (PNG, JPEG or WebP, up to 64 KiB) and served without a session at `/avatar/<identity>/<hash>`.
+- A member picture, set from the settings page or by a household admin on the user page, emitted as the OIDC `picture` claim (ID token and userinfo) under the `profile` scope. It is stored in `metadata_admin.avatar` (PNG, JPEG or WebP, up to 64 KiB) and served without a session at `/avatar/<identity>/<hash>`, so relying parties can fetch it server-side. No schema or Ory config change.
+- Before saving, the browser lets the member position and zoom the picture (drag, slider, pinch or keyboard) and crops it to 256x256; without scripts it is a plain upload, checked by the server.
+- The picture, or the member's initial, shows on the home greeting, the admin people list and the admin user page.
 
 ## [0.17.0] - 2026-11-07
 
