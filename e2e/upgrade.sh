@@ -8,8 +8,9 @@ source ./lib.sh
 
 AUTH_REGISTRY="${AUTH_REGISTRY:-registry.gitlab.com/dunn.dev/othala}"
 CUR="${AUTH_VERSION:-latest}"
-PREV=$(git tag --merged HEAD -l 'v*' --sort=-v:refname | grep -E '^v[0-9]+\.[0-9]+\.[0-9]+$' | grep -vxF "${CI_COMMIT_TAG:-}" | head -1)
-[[ -n "$PREV" ]] || { echo "  ✗ no earlier release tag in history (shallow clone?)"; exit 1; }
+mapfile -t TAGS < <(git tag --merged HEAD -l 'v*' --sort=-v:refname | grep -E '^v[0-9]+\.[0-9]+\.[0-9]+$' | grep -vxF "${CI_COMMIT_TAG:-}")
+PREV=$(pick_prev image_published "${TAGS[@]}")
+[[ -n "$PREV" ]] || { echo "  ✗ no published release among the newest 5 earlier tags (shallow clone?)"; exit 1; }
 echo "=== othala upgrade: $PREV -> $CUR ==="
 
 RC=0
