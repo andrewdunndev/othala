@@ -14,6 +14,8 @@ html:has(.admin) { scroll-padding-top: calc(var(--space-7) + var(--space-3)); }
 /* Title row: heading with a muted count, a lede, and the page's one primary action */
 .admin .title-row { display: flex; flex-wrap: wrap; align-items: flex-end; gap: var(--space-3) var(--space-4); margin-bottom: var(--space-5); }
 .admin .title-row > div { flex: 1 1 20rem; min-width: 0; }
+.admin .title-row .title-who { display: flex; align-items: center; gap: var(--space-3); }
+.admin .title-row .title-who > div { min-width: 0; }
 .admin .title-row h1 { line-height: var(--lh-tight); margin: 0; overflow-wrap: anywhere; }
 .admin .title-row .count { color: var(--text-muted); font-weight: 400; }
 .admin .title-row .lede { color: var(--text-2); font-size: var(--text-sm); margin: var(--space-1) 0 0; overflow-wrap: anywhere; }
@@ -35,6 +37,7 @@ html:has(.admin) { scroll-padding-top: calc(var(--space-7) + var(--space-3)); }
 .admin .person-row { display: grid; gap: var(--space-2) var(--space-4); align-items: center; min-height: var(--hit); padding: var(--space-3) var(--space-2); }
 .admin .person-row:hover { background: var(--accent-subtle); }
 .admin .person-name { font-weight: 600; color: var(--text); }
+.admin .person-who { display: flex; align-items: center; gap: var(--space-3); }
 .admin .person-name a { color: inherit; }
 .admin .person-name a::after { content: ""; position: absolute; inset: 0; }
 .admin .person-name a:focus-visible { outline-offset: calc(var(--space-1) * -1); }

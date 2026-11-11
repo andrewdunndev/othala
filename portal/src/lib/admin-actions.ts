@@ -24,6 +24,8 @@ import { DEACTIVATE_STEP, RevokeError, revokeHydraSessions, revokeSubject, type 
 import { removalBlock } from './admin-view';
 import type { ClientManifest } from './manifests';
 import type { Identity } from './types';
+import { applyAvatarForm } from './avatar-edit';
+import { AVATAR_REFUSALS, readAvatar } from './avatar';
 
 export const USERNAME_RE = /^[a-z0-9]+(?:\.[a-z0-9]+)+$/;
 export const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -40,6 +42,7 @@ export type ActionResult =
   | { kind: 'revoked'; result: RevokeResult }
   | { kind: 'email-verified' }
   | { kind: 'prerequisites-saved' }
+  | { kind: 'avatar-saved'; removed: boolean }
   | { kind: 'credential-removed'; credType: string }
   | { kind: 'error'; message: string; partial?: true };
 
@@ -114,6 +117,7 @@ export async function saveAction(fd: FormData, ctx: ActionContext): Promise<Acti
   const existingAdmin = identity.metadata_admin?.admin;
   const existingPrerequisites = identity.metadata_admin?.prerequisites;
   const existingPasskeyNames = identity.metadata_admin?.passkeyNames;
+  const existingAvatar = readAvatar(identity.metadata_admin);
   const groups = normalizeGroupOrder(groupPlan.groups);
   // Only a new elevation needs the second factor first, so people already elevated without one can still be edited and lowered.
   const after = { ...identity, metadata_admin: { ...identity.metadata_admin, groups, roles } };
@@ -128,6 +132,7 @@ export async function saveAction(fd: FormData, ctx: ActionContext): Promise<Acti
       ...(existingAdmin === true ? { admin: true } : {}),
       ...(existingPrerequisites?.length ? { prerequisites: existingPrerequisites } : {}),
       ...(existingPasskeyNames && Object.keys(existingPasskeyNames).length ? { passkeyNames: existingPasskeyNames } : {}),
+      ...(existingAvatar ? { avatar: existingAvatar } : {}),
     },
   });
   if (narrowsAccess(identity, groups, roles)) {
@@ -444,6 +449,12 @@ export async function removeCredentialAction(fd: FormData, ctx: ActionContext): 
   return { actionResult: { kind: 'credential-removed', credType }, refetch: true };
 }
 
+export async function saveAvatarAction(fd: FormData, ctx: ActionContext): Promise<ActionOutcome> {
+  const result = await applyAvatarForm(fd, ctx.id);
+  if (!result.ok) return { actionResult: { kind: 'error', message: AVATAR_REFUSALS[result.code] }, refetch: false };
+  return { actionResult: { kind: 'avatar-saved', removed: result.change === 'removed' }, refetch: true };
+}
+
 /** One stdout JSON line per mutation: ids only, never emails, names or credential material. */
 export function auditLine(actor: string, action: string, target: string, result: 'ok' | 'partial' | 'refused' | 'error'): void {
   console.log(JSON.stringify({ event: 'admin_action', action, actor, target, result }));
@@ -469,6 +480,7 @@ const HANDLERS: Record<string, ActionHandler> = {
   'save-access': saveAccessAction,
   'save-household': saveHouseholdAction,
   'save-profile': saveProfileAction,
+  'save-avatar': saveAvatarAction,
   'remove-groups': removeGroupsAction,
   'mark-verified': markVerifiedAction,
   'set-prerequisites': setPrerequisitesAction,

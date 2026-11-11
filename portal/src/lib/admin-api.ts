@@ -8,6 +8,7 @@ import type {
   Session,
 } from '@ory/client-fetch';
 import type { Identity } from './types';
+import type { Avatar } from './avatar';
 import { validateMetadataAdmin } from './metadata-admin';
 import { passkeyCredentialIds, pruneNames, readPasskeyNames } from './passkey-names';
 import { revokeSubject } from './revoke';
@@ -27,6 +28,7 @@ export interface MetadataAdmin {
   prerequisites?: string[];
   passkeyNames?: Record<string, string>;
   admin?: boolean;
+  avatar?: Avatar;
 }
 
 export interface CreateIdentityInput {
@@ -52,6 +54,10 @@ export async function getIdentity(id: string): Promise<Identity> {
     id,
     includeCredential: INCLUDED_CREDENTIALS,
   });
+}
+
+export async function getIdentityWithoutCredentials(id: string): Promise<Identity> {
+  return kratosAdmin().getIdentity({ id });
 }
 
 export async function createIdentity(input: CreateIdentityInput): Promise<Identity> {
@@ -284,4 +290,24 @@ export async function markEmailVerified(id: string, displayed: string): Promise<
   if (!displayed || current.traits?.email !== displayed) return false;
   await api.patchIdentity({ id, jsonPatch: emailVerifiedPatch(current) as never });
   return true;
+}
+
+/** Sets the picture, or removes it with null. Targeted like the other metadata_admin marks, so no other key is rewritten. */
+export async function patchAvatar(id: string, avatar: Avatar | null): Promise<void> {
+  const value = avatar === null ? null : validateMetadataAdmin({ avatar }).avatar!;
+  const api = kratosAdmin();
+  const current = await api.getIdentity({ id });
+  const meta = current.metadata_admin as Record<string, unknown> | null | undefined;
+  const hasMeta = meta != null && typeof meta === 'object';
+  const hasKey = hasMeta && 'avatar' in meta;
+  let patch: PatchOp[];
+  if (value === null) {
+    if (!hasKey) return;
+    patch = [{ op: 'remove', path: '/metadata_admin/avatar' }];
+  } else if (!hasMeta) {
+    patch = [{ op: 'add', path: '/metadata_admin', value: { avatar: value } }];
+  } else {
+    patch = [{ op: hasKey ? 'replace' : 'add', path: '/metadata_admin/avatar', value }];
+  }
+  await api.patchIdentity({ id, jsonPatch: patch });
 }

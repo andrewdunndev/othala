@@ -7,6 +7,8 @@ export const prerender = false;
 
 import AdminLayout from '../../../layouts/AdminLayout.astro';
 import AppIcon from '../../../components/AppIcon.astro';
+import Avatar from '../../../components/Avatar.astro';
+import { DEV_AVATAR_SRC } from '../../../lib/dev-avatar';
 import ManifestNotice from '../../../components/ManifestNotice.astro';
 import TitleRow from '../../../components/TitleRow.astro';
 import { adminContext } from '../../../lib/admin-context';
@@ -39,7 +41,7 @@ if (dev) {
   }
 }
 
-const rows = personRows(identities, apps);
+const rows = personRows(identities, apps).map((r) => (dev && r.avatar ? { ...r, avatar: DEV_AVATAR_SRC } : r));
 const attention = attentionItems(rows);
 const filtering = rows.length > FILTER_THRESHOLD;
 const q = filtering ? (Astro.url.searchParams.get('q') ?? '').trim() : '';
@@ -103,7 +105,9 @@ const deleted = Astro.url.searchParams.get('deleted') === '1';
           data-text={row.haystack}
         >
           <div class="person-row">
-            <div>
+            <div class="person-who">
+              <Avatar src={row.avatar} name={row.name} size={32} />
+              <div>
               <div class="person-name">
                 <a href={`/admin/users/${row.id}${devState ? `?dev-state=${devState}` : ''}`}>{row.name}</a>
                 {(row.admin || row.off || !row.verified) && (
@@ -115,6 +119,7 @@ const deleted = Astro.url.searchParams.get('deleted') === '1';
                 )}
               </div>
               <div class="person-meta">{row.sub}</div>
+              </div>
             </div>
             {row.chips.length === 0 ? (
               <div><span class="empty-note">No apps yet</span></div>

@@ -8,6 +8,7 @@ import type {
   Identity as SdkIdentity,
   Session as SdkSession,
 } from '@ory/client-fetch';
+import type { Avatar } from './avatar';
 
 // ── Admin / programmatic surface: SDK types ─────────────────────────────────
 
@@ -37,6 +38,8 @@ export type Identity = Omit<SdkIdentity, 'metadata_admin'> & {
     prerequisites?: string[];
     /** Passkey names keyed by hex credential id (see passkey-names.ts). */
     passkeyNames?: Record<string, string>;
+    /** The member's picture (see avatar.ts). */
+    avatar?: Avatar;
   } | null;
 };
 

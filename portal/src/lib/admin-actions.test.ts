@@ -71,7 +71,8 @@ import {
 } from './admin-actions.js';
 import type { Identity } from './types.js';
 import { DEACTIVATE_STEP, RevokeError } from './revoke.js';
-import { identity, manifest, withCredentials, withTotp } from './test-builders.js';
+import { identity, manifest, withCredentials, withTotp, avatarOf } from './test-builders.js';
+import { validateMetadataAdmin } from './metadata-admin.js';
 
 function makeIdentity(username: string, admin?: boolean, state?: 'active' | 'inactive'): Identity {
   return identity({ username, state, ...(admin === undefined ? {} : { metadataAdmin: { admin } }) });
@@ -819,5 +820,45 @@ describe('admin action audit line', () => {
     await expect(ADMIN_ACTIONS.deactivate(fd(), makeCtx())).rejects.toThrow('boom');
     expect(JSON.parse(log.mock.calls[0][0]).result).toBe('error');
     log.mockRestore();
+  });
+});
+
+describe('avatar through admin saves', () => {
+  const MANIFESTS = [{ clientId: 'grafana', accessGroups: ['grafana-access'], roles: [], groupRoleMap: {}, skipAccessCheck: false }] as unknown as ActionContext['manifests'];
+  const pic = avatarOf('jpeg');
+  const person = () => identity({ username: 'robin.k', email: 'robin@othala.test', metadataAdmin: { groups: ['everyone'], avatar: pic } });
+  const written = () => updateIdentityMock.mock.calls[0][1];
+
+  // The real write validates what it is handed, so the stored picture must come through the validator, not only the call.
+  const survives = () => expect(validateMetadataAdmin(written().metadataAdmin).avatar).toEqual(pic);
+
+  it('profile save keeps it', async () => {
+    await saveProfileAction(fd({ username: 'robin.k', email: 'robin@othala.test', displayName: 'Robin', recoveryEmail: '' }), makeCtx({ identity: person(), manifests: MANIFESTS }));
+    survives();
+  });
+
+  it('access save, household save and group removal keep it', async () => {
+    await saveAccessAction(fd({ 'level:grafana': 'use' }), makeCtx({ identity: withTotp(person()), manifests: MANIFESTS }));
+    survives();
+    updateIdentityMock.mockClear();
+    await saveHouseholdAction(fd({ identityGroups: 'everyone' }), makeCtx({ identity: person(), manifests: MANIFESTS }));
+    survives();
+    updateIdentityMock.mockClear();
+    const f = fd();
+    f.append('group', 'garden');
+    await removeGroupsAction(f, makeCtx({ identity: identity({ username: 'robin.k', metadataAdmin: { groups: ['everyone', 'garden'], avatar: pic } }), manifests: MANIFESTS }));
+    survives();
+  });
+
+  it('drops a malformed stored one instead of rewriting or throwing on it', async () => {
+    const bad = identity({ username: 'robin.k', email: 'robin@othala.test', metadataAdmin: { groups: ['everyone'], avatar: { ...pic, type: 'image/svg+xml' } as never } });
+    await saveProfileAction(fd({ username: 'robin.k', email: 'robin@othala.test', displayName: 'Robin', recoveryEmail: '' }), makeCtx({ identity: bad, manifests: MANIFESTS }));
+    expect(written().metadataAdmin).not.toHaveProperty('avatar');
+    expect(written().metadataAdmin.groups).toEqual(['everyone']);
+  });
+
+  it('an identity without one gains none', async () => {
+    await saveProfileAction(fd({ username: 'robin.k', email: 'robin@othala.test', displayName: '', recoveryEmail: '' }), makeCtx({ identity: identity({ username: 'robin.k', metadataAdmin: { groups: ['everyone'] } }), manifests: MANIFESTS }));
+    expect(written().metadataAdmin).not.toHaveProperty('avatar');
   });
 });

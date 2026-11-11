@@ -200,3 +200,13 @@ describe('removalBlock', () => {
     expect(removalBlock(withTotp(identity({ metadataAdmin: { groups: ['family'] } })), 'totp', false, [wiki])).toBeNull();
   });
 });
+
+describe('personRow avatar', () => {
+  it('is the picture path when one is stored, else null', async () => {
+    const { DEV_AVATAR } = await import('./dev-avatar');
+    const withPic = personRows([person('pic', ['everyone'], { avatar: DEV_AVATAR }), person('none', ['everyone'], { avatar: { junk: 1 } })], apps);
+    const [none, pic] = withPic;
+    expect(none.avatar).toBeNull();
+    expect(pic.avatar).toBe(`/avatar/pic/${DEV_AVATAR.sha256.slice(0, 16)}`);
+  });
+});

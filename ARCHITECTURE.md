@@ -154,6 +154,10 @@ claims are composed by `composeIDTokenClaims` (`portal/src/lib/claims.ts`): iden
 groups claim dropped unless the manifest opts in and narrowed to the groups that manifest binds, then the resolved role's `claim_emit` merged in,
 then any claim whose required scope was not requested removed.
 
+The `picture` claim (profile scope) exists only when a member has a picture. The image lives in
+`metadata_admin.avatar`, so the identity schema is untouched, and is served unauthenticated at a content-addressed
+`/avatar/<identity>/<hash>` because relying-party servers fetch it themselves; a new picture is a new URL.
+
 A device grant (RFC 8628) arrives on the same two challenges after the code is entered at
 `/device/verify`; Hydra marks it only by its device verification path in `request_url`, and the
 handlers add the controls in [`SECURITY.md`](SECURITY.md) § Controls.

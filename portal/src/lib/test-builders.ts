@@ -1,5 +1,6 @@
 // Invariant: builders reproduce Kratos v26.2.0 and Hydra shapes; tests state only what they vary.
 
+import { createHash } from 'node:crypto';
 import type {
   IdentityCredentials,
   OAuth2Client,
@@ -222,3 +223,23 @@ export function oauth2LogoutRequest(overrides: Partial<OAuth2LogoutRequest> = {}
 export const role = (name: string) => ({ name, claimEmit: {} });
 export const manifest = (clientId: string, roles: string[], groupRoleMap: Record<string, string>, accessGroups: string[]) =>
   ({ clientId, roles: roles.map(role), groupRoleMap, accessGroups }) as unknown as ClientManifest;
+
+const IEND = [0, 0, 0, 0, 0x49, 0x45, 0x4e, 0x44, 0xae, 0x42, 0x60, 0x82];
+
+/** Smallest byte strings the avatar sniffer accepts; the pixels are not decodable. `tag` varies the hash. */
+export function imageBytes(kind: 'png' | 'jpeg' | 'webp', tag = 0): Uint8Array {
+  const body = [tag & 0xff, 1, 2, 3, 4, 5, 6, 7];
+  if (kind === 'png') return Uint8Array.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, ...body, ...IEND]);
+  if (kind === 'jpeg') return Uint8Array.from([0xff, 0xd8, 0xff, 0xe0, ...body, 0xff, 0xd9]);
+  const rest = [0x57, 0x45, 0x42, 0x50, ...body];
+  return Uint8Array.from([0x52, 0x49, 0x46, 0x46, rest.length, 0, 0, 0, ...rest]);
+}
+
+export function avatarOf(kind: 'png' | 'jpeg' | 'webp' = 'png', tag = 0): NonNullable<NonNullable<Identity['metadata_admin']>['avatar']> {
+  const bytes = imageBytes(kind, tag);
+  return {
+    type: `image/${kind}` as 'image/png',
+    sha256: createHash('sha256').update(bytes).digest('hex'),
+    data: Buffer.from(bytes).toString('base64'),
+  };
+}

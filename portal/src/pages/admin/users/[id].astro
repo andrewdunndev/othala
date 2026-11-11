@@ -13,6 +13,7 @@ import Ask from '../../../components/Ask.astro';
 import ManifestNotice from '../../../components/ManifestNotice.astro';
 import SetupLink from '../../../components/SetupLink.astro';
 import TitleRow from '../../../components/TitleRow.astro';
+import Avatar from '../../../components/Avatar.astro';
 import { adminContext } from '../../../lib/admin-context';
 import { getIdentity, listIdentities, EVICTABLE_CREDENTIAL_TYPES } from '../../../lib/admin-api';
 import { ADMIN_ACTIONS, ENROLLMENT_TTL, type ActionResult } from '../../../lib/admin-actions';
@@ -24,6 +25,9 @@ import { parseIdentity } from '../../../lib/identity-facts';
 import { shouldRefuseRecovery } from '../../../lib/access';
 import { loadRequirements } from '../../../lib/tiles';
 import { signToken, csrfRefusal } from '../../../lib/csrf';
+import { AVATAR_REFUSALS, readAvatar, avatarPath, isBodyLimitError } from '../../../lib/avatar';
+import { DEV_AVATAR_SRC } from '../../../lib/dev-avatar';
+import AvatarEditor from '../../../components/AvatarEditor.astro';
 import type { Identity } from '../../../lib/types';
 
 const ctx = await adminContext(Astro);
@@ -66,21 +70,33 @@ let actionResult: ActionResult | null = null;
 let formErrors: Record<string, string> = {};
 
 if (Astro.request.method === 'POST' && identity) {
-  const fd = await Astro.request.formData();
-  action = String(fd.get('action') ?? '');
+  // The adapter's bodySizeLimit rejects an oversized body here; only the multipart picture form turns that into a banner.
+  const contentType = Astro.request.headers.get('content-type') ?? '';
+  let fd: FormData;
+  let tooLarge = false;
+  try {
+    fd = await Astro.request.formData();
+  } catch (err) {
+    if (!contentType.startsWith('multipart/form-data') || !isBodyLimitError(err)) throw err;
+    tooLarge = true;
+    fd = new FormData();
+  }
+  action = tooLarge ? 'save-avatar' : String(fd.get('action') ?? '');
 
   // Every state-changing admin POST carries a CSRF token bound to the admin identity and the action. A dev fixture
   // has no secret to sign with, so it skips the check and writes nothing.
-  if (!dev) {
+  if (tooLarge) {
+    actionResult = { kind: 'error', message: AVATAR_REFUSALS['too-large'] };
+  } else if (!dev) {
     const tokenAction = action === 'remove-credential' ? `remove-${String(fd.get('cred_type') ?? '')}` : action;
     const bad = csrfRefusal(String(fd.get('csrf_token') ?? ''), adminId, tokenAction);
     if (bad !== null) return new Response(`CSRF: ${bad}`, { status: 403 });
   }
 
   const handler = ADMIN_ACTIONS[action];
-  if (dev) {
+  if (dev && !tooLarge) {
     actionResult = devActionResult(action);
-  } else if (handler) {
+  } else if (handler && !tooLarge) {
     try {
       const outcome = await handler(fd, { id, identity, adminIdentityId: adminId, manifests, requirements: requirements.map((r) => r.name) });
       if (outcome instanceof Response) return outcome;
@@ -96,6 +112,7 @@ if (Astro.request.method === 'POST' && identity) {
 // Which section an action's result belongs to: the form posts there and the result shows there, once.
 const SECTION_OF: Record<string, string> = {
   'save-profile': 'profile',
+  'save-avatar': 'profile',
   'save-access': 'apps',
   'save-household': 'household',
   'grant-admin': 'household',
@@ -123,6 +140,8 @@ const banner = actionResult
 const recovery = actionResult?.kind === 'recovery' ? actionResult : null;
 
 const meta = identity?.metadata_admin;
+const storedAvatar = readAvatar(meta);
+const avatarSrc = storedAvatar && identity ? (dev ? DEV_AVATAR_SRC : avatarPath(identity.id, storedAvatar)) : null;
 const username = identity?.traits?.username ?? '';
 const email = identity?.traits?.email ?? '';
 const isSelf = id === adminId;
@@ -175,6 +194,7 @@ const roleNote = Object.keys(roleOverrides).length;
   {identity && (
     <>
       <TitleRow title={who} lede={email}>
+        <Avatar slot="avatar" src={avatarSrc} name={who} size={48} />
         <div class="badges">
           {isTargetAdmin && <span class="badge badge-accent">Admin</span>}
           {isOff && <span class="badge badge-muted">Sign-in off</span>}
@@ -199,7 +219,10 @@ const roleNote = Object.keys(roleOverrides).length;
       )}
 
       <details class="plain" id="profile" open={resultSection === 'profile'}>
-        <summary>Edit profile</summary>
+        <summary>Edit profile and picture</summary>
+        <AvatarEditor action="#profile" csrf={tok('save-avatar')} src={avatarSrc} name={who} fields={{ action: 'save-avatar' }} idPrefix="avatar">
+          <Ask slot="remove" label="Remove picture" action="save-avatar" token={tok('save-avatar')} section="profile" message={`Remove ${first}'s picture?`} confirmLabel="Remove picture" danger><input type="hidden" name="remove" value="1" /></Ask>
+        </AvatarEditor>
         <form class="inline-form" method="POST" enctype="application/x-www-form-urlencoded" action="#profile">
           <input type="hidden" name="csrf_token" value={tok('save-profile')} />
           <input type="hidden" name="action" value="save-profile" />

@@ -8,7 +8,7 @@ import {
   composeIDTokenClaims,
   lookupRole,
 } from '../src/lib/claims.ts';
-import { identity } from '../src/lib/test-builders.ts';
+import { identity, avatarOf } from '../src/lib/test-builders.ts';
 
 function base(overrides = {}) {
   return {
@@ -257,4 +257,30 @@ test('lookupRole: access-then-admin storage order resolves the higher-ranked adm
 test('lookupRole: admin-then-access storage order resolves the SAME higher-ranked admin role', () => {
   const result = lookupRole(rankedManifest, { groups: ['filedrop-admin', 'filedrop-access'] });
   assert.equal(result?.roleName, 'admin');
+});
+
+test('picture: absolute URL under the public origin, only when an avatar is set', () => {
+  const a = avatarOf('png');
+  const withPic = base({ id: 'id-1', metadata_admin: { groups: ['access-grafana'], avatar: a } });
+  const c = buildIDTokenClaims(withPic);
+  assert.match(c.picture, /^https?:\/\/[^/]+\/avatar\/id-1\/[0-9a-f]{16}$/);
+  assert.ok(c.picture.endsWith(a.sha256.slice(0, 16)));
+  assert.equal('picture' in buildIDTokenClaims(base()), false);
+});
+
+test('picture: emitted only under the profile scope, and never for a malformed avatar', () => {
+  const a = avatarOf('webp');
+  const id = base({ metadata_admin: { groups: ['access-grafana'], avatar: a } });
+  assert.ok(composeIDTokenClaims(id, null, ['openid', 'profile']).picture);
+  for (const scope of [['openid'], ['openid', 'email', 'groups']]) {
+    assert.equal('picture' in composeIDTokenClaims(id, null, scope), false, scope.join(' '));
+  }
+  const bad = base({ metadata_admin: { avatar: { ...a, type: 'image/svg+xml' } } });
+  assert.equal('picture' in composeIDTokenClaims(bad, null, ['openid', 'profile']), false);
+});
+
+test('picture: a role claim_emit cannot add it past the scope filter', () => {
+  const id = base({ metadata_admin: { groups: ['filedrop-access'] } });
+  const m = { ...rankedManifest, roles: [{ name: 'user', description: '', claimEmit: { picture: 'https://elsewhere.test/x.png' } }] };
+  assert.equal('picture' in composeIDTokenClaims(id, m, ['openid']), false);
 });

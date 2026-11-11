@@ -29,6 +29,9 @@ import { getSession, isReachable } from '../lib/kratos';
 import { getIdentity } from '../lib/admin-api';
 import { parseIdentity } from '../lib/identity-facts';
 import HeaderActions from '../components/HeaderActions.astro';
+import Avatar from '../components/Avatar.astro';
+import { avatarPath, readAvatar } from '../lib/avatar';
+import { DEV_AVATAR_SRC } from '../lib/dev-avatar';
 import type { Identity } from '../lib/types';
 import { instanceName } from '../lib/config';
 import { emailVerified } from '../lib/settings-view';
@@ -67,6 +70,9 @@ if (devOverride === 'down' || devOverride === 'pre-auth' || devOverride === 'pos
     if (!ok) console.error('[othala/index] Kratos unreachable:', err);
   }
 }
+
+const storedAvatar = identity ? readAvatar(identity.metadata_admin) : undefined;
+const avatarSrc = devOverride === 'post-auth' ? (Astro.url.searchParams.has('avatar') ? DEV_AVATAR_SRC : null) : identity && storedAvatar ? avatarPath(identity.id, storedAvatar) : null;
 
 // Enabled tiles from apps/, sorted by order then name.
 const orderedApps = loadTiles();
@@ -166,7 +172,7 @@ const devLinks = [
 
   {state === 'post-auth' && (
     <>
-      <h1 class="greeting" id="greeting" tabindex="-1">{firstName ? `Hello, ${firstName}.` : 'Welcome back.'} <span class="greeting-sub">Pick an app to open it, or its Guide for setup.</span></h1>
+      <h1 class="greeting" id="greeting" tabindex="-1">{state === "post-auth" && <Avatar src={avatarSrc} name={firstName || identity?.traits?.username || "?"} size={40} />}{firstName ? `Hello, ${firstName}.` : 'Welcome back.'} <span class="greeting-sub">Pick an app to open it, or its Guide for setup.</span></h1>
 
       {!hasPasskeyEnrolled && (
         <div class="passkey-nudge" id="passkey-nudge">
@@ -629,6 +635,7 @@ const devLinks = [
     line-height: 1.2;
     margin: 0 0 var(--space-4);
   }
+  .greeting :global(.avatar) { margin-right: var(--space-2); }
   .greeting-sub { font-weight: 400; color: var(--text-2); font-size: var(--text-sm); margin-left: var(--space-2); }
   @media (max-width: 640px) { .greeting-sub { display: none; } .greeting { margin-bottom: var(--space-3); } }
   .missing-app { margin: var(--space-6) 0 0; }

@@ -4,6 +4,7 @@ import type { MetadataAdmin } from './admin-api';
 import { GROUP_RE } from './access-groups';
 import { CREDENTIAL_ID_RE, cleanPasskeyName } from './passkey-names';
 import { CLIENT_ID_RE } from './manifests';
+import { avatarProblem, type Avatar } from './avatar';
 
 const ROLE_NAME_RE = /^[a-z][a-z0-9_\-]*$/;
 const MAX_LEN = 64;
@@ -15,7 +16,7 @@ export class MetadataAdminError extends Error {
   }
 }
 
-const ALLOWED_KEYS = new Set(['groups', 'roles', 'admin', 'prerequisites', 'passkeyNames']);
+const ALLOWED_KEYS = new Set(['groups', 'roles', 'admin', 'prerequisites', 'passkeyNames', 'avatar']);
 const PREREQUISITE_RE = /^[a-z][a-z0-9-]{0,39}$/;
 
 export function validateMetadataAdmin(input: unknown): MetadataAdmin {
@@ -29,7 +30,7 @@ export function validateMetadataAdmin(input: unknown): MetadataAdmin {
   for (const key of Object.keys(input)) {
     if (!ALLOWED_KEYS.has(key)) {
       throw new MetadataAdminError(
-        `metadata_admin: unknown field "${key}". Allowed: groups, roles, admin, prerequisites, passkeyNames.`,
+        `metadata_admin: unknown field "${key}". Allowed: groups, roles, admin, prerequisites, passkeyNames, avatar.`,
       );
     }
   }
@@ -51,6 +52,12 @@ export function validateMetadataAdmin(input: unknown): MetadataAdmin {
 
   if ('passkeyNames' in obj && obj.passkeyNames !== undefined) {
     out.passkeyNames = validatePasskeyNames(obj.passkeyNames);
+  }
+
+  if ('avatar' in obj && obj.avatar !== undefined) {
+    const problem = avatarProblem(obj.avatar);
+    if (problem) throw new MetadataAdminError(`metadata_admin.avatar: ${problem}`);
+    out.avatar = obj.avatar as Avatar;
   }
 
   if ('admin' in obj && obj.admin !== undefined) {

@@ -6,6 +6,12 @@ aims to follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 The git tag is the authoritative version; `portal/package.json` mirrors it.
 
+## [Unreleased]
+
+### Added
+
+- A member picture, set from the settings page or by a household admin on the user page, emitted as the OIDC `picture` claim under the `profile` scope. It is stored in `metadata_admin.avatar` (PNG, JPEG or WebP, up to 64 KiB) and served without a session at `/avatar/<identity>/<hash>`.
+
 ## [0.17.0] - 2026-11-07
 
 ### Added

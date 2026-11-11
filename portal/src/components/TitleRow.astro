@@ -1,6 +1,7 @@
 ---
 // The title row every admin page opens with: heading with a muted count, a one-line lede, and the page's one primary
-// action at the right (full width under 640px). The default slot sits under the lede (badges); the `action` slot is the button.
+// action at the right (full width under 640px). The default slot sits under the lede (badges); the `action` slot is the
+// button; the optional `avatar` slot puts a picture disc before the heading.
 
 interface Props {
   title: string;
@@ -9,12 +10,16 @@ interface Props {
 }
 
 const { title, count, lede } = Astro.props;
+const hasAvatar = Astro.slots.has('avatar');
 ---
 <div class="title-row">
-  <div>
-    <h1>{title}{count !== undefined && <> <span class="count">({count})</span></>}</h1>
-    {lede && <p class="lede">{lede}</p>}
-    <slot />
+  <div class:list={[hasAvatar && 'title-who']}>
+    {hasAvatar && <slot name="avatar" />}
+    <div>
+      <h1>{title}{count !== undefined && <> <span class="count">({count})</span></>}</h1>
+      {lede && <p class="lede">{lede}</p>}
+      <slot />
+    </div>
   </div>
   <slot name="action" />
 </div>

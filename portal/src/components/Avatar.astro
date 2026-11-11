@@ -1,0 +1,19 @@
+---
+// A member's picture as a small disc, or their initial when they have none. Decorative: the name stays next to it as
+// text, so the picture carries no alt.
+interface Props {
+  src: string | null;
+  name: string;
+  size: 24 | 32 | 40 | 48;
+}
+const { src, name, size } = Astro.props as Props;
+const initial = (name.trim()[0] ?? '?').toUpperCase();
+---
+{src
+  ? <img class="avatar" src={src} width={size} height={size} alt="" />
+  : <span class="avatar avatar-none" aria-hidden="true" style={`width:${size}px;height:${size}px;font-size:${Math.round(size * 0.42)}px`}>{initial}</span>}
+
+<style>
+  .avatar { border-radius: 50%; object-fit: cover; border: 1px solid var(--border); flex: none; vertical-align: middle; }
+  .avatar-none { display: inline-flex; align-items: center; justify-content: center; color: var(--text-2); background: var(--bg); }
+</style>

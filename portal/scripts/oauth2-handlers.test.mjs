@@ -9,7 +9,7 @@ import { signToken, _resetForTests } from '../src/lib/csrf.ts';
 import { deepMergeClaims } from '../src/lib/claims.ts';
 import { publicUrl } from '../src/lib/config.ts';
 import {
-  identity, session, whoamiIdentity, withCredentials,
+  identity, session, whoamiIdentity, withCredentials, avatarOf,
   oauth2LoginRequest, oauth2ConsentRequest, oauth2LogoutRequest,
 } from '../src/lib/test-builders.ts';
 
@@ -391,7 +391,7 @@ test('consent with no requested_scope emits no scoped claims', async () => {
     manifest: () => loadManifest('grafana'),
   });
   const idToken = calls.acceptConsentBody.session.id_token;
-  for (const k of ['email', 'email_verified', 'name', 'preferred_username', 'groups']) assert.equal(k in idToken, false, k);
+  for (const k of ['email', 'email_verified', 'name', 'preferred_username', 'picture', 'groups']) assert.equal(k in idToken, false, k);
 });
 
 test('consent REJECTS when missing the access group — opaque error_description, real reason logged', async () => {
@@ -1547,4 +1547,20 @@ test('login and consent REJECT access_denied for a client_id with no served mani
   } finally {
     console.warn = quiet;
   }
+});
+
+test('consent puts the picture URL in the id_token for a profile grant, and omits it without an avatar', async () => {
+  const run = async (member) => {
+    const { api, calls } = stubOAuth2();
+    await handleConsent(new Request('https://x/oauth2/consent?consent_challenge=cc'), {
+      oauth2: api,
+      getIdentity: async () => member,
+      manifest: () => loadManifest('grafana'),
+    });
+    return calls.acceptConsentBody.session.id_token;
+  };
+  const a = avatarOf('png');
+  const withPic = await run(activeMember({ metadata_admin: { groups: ['grafana-access'], avatar: a } }));
+  assert.equal(withPic.picture, `${publicUrl}/avatar/id-1/${a.sha256.slice(0, 16)}`);
+  assert.equal('picture' in (await run(activeMember())), false);
 });
