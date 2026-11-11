@@ -1,8 +1,9 @@
 ---
 // Picture controls shared by the member's settings card and the admin's user page: the current picture, a file chooser,
-// Save and Remove. The page script squares and shrinks the chosen file to 256x256 and previews it before the form is
-// sent; without scripts the server's size and type checks answer instead. Remove asks first: the settings page uses its
-// own disclosure row, and a page that fills the `remove` slot (the admin's Ask) supplies the question itself.
+// a crop stage (drag and zoom), Save and Remove. The page script crops the chosen file to 256x256 and previews it before
+// the form is sent; without scripts the server's size and type checks answer instead. The script only toggles and fills
+// what this template renders. Remove asks first: the settings page uses its own disclosure row, and a page that fills the
+// `remove` slot (the admin's Ask) supplies the question itself.
 interface Props {
   action: string;
   csrf: string;
@@ -16,9 +17,14 @@ const initial = (name.trim()[0] ?? '?').toUpperCase();
 const ownRemove = src !== null && !Astro.slots.has('remove');
 const removeForm = `${idPrefix}-remove-form`;
 const removeBox = `${idPrefix}-remove`;
+const p = idPrefix;
 ---
-<div class="avatar-editor">
-  {src ? <img class="avatar-img" src={src} width="96" height="96" alt={`Picture of ${name}`} /> : <span class="avatar-img avatar-none" role="img" aria-label={`No picture yet for ${name}`}>{initial}</span>}
+<div class="avatar-editor" data-state="empty">
+  <div class="avatar-preview">
+    <img class="avatar-img" src={src ?? undefined} width="96" height="96" alt={src ? `Picture of ${name}` : ''} hidden={!src} />
+    <span class="avatar-img avatar-none" role="img" aria-label={`No picture yet for ${name}`} hidden={!!src}>{initial}</span>
+    <p class="field-hint" data-ready-hint hidden>This is how it will look. Save it, or adjust.</p>
+  </div>
   <div class="avatar-controls">
     {!src && <p class="field-hint">No picture yet. Apps show your initial.</p>}
     {ownRemove && <input type="checkbox" form="disclosures" class="disclose cb-remove" id={removeBox} aria-label="Remove picture" />}
@@ -26,11 +32,25 @@ const removeBox = `${idPrefix}-remove`;
       <input type="hidden" name="csrf_token" value={csrf} />
       {Object.entries(fields).map(([k, v]) => <input type="hidden" name={k} value={v} />)}
       <div class="field">
-        <label for={`${idPrefix}-file`}>Choose a picture</label>
-        <input id={`${idPrefix}-file`} name="avatar" type="file" accept="image/png,image/jpeg,image/webp" required aria-describedby={`${idPrefix}-hint`} />
-        <span class="field-hint" id={`${idPrefix}-hint`}>A photo in JPEG, PNG or WebP. It is cropped to a square and shrunk to fit.</span>
+        <label for={`${p}-file`}>Choose a picture</label>
+        <input id={`${p}-file`} name="avatar" type="file" accept="image/png,image/jpeg,image/webp" required aria-describedby={`${p}-hint`} />
+        <span class="field-hint" id={`${p}-hint`}>A photo in JPEG, PNG or WebP. Move and zoom it, then save.</span>
+      </div>
+      <div class="crop" id={`${p}-crop`} hidden>
+        <div class="crop-stage" id={`${p}-stage`} tabindex="0" role="img" aria-roledescription="crop area" aria-label="Crop area. Drag to move the picture. Arrow keys move it, plus and minus zoom." aria-describedby={`${p}-crop-hint`} data-crop-stage>
+          <img class="crop-img" alt="" draggable="false" data-crop-img />
+          <div class="crop-guide" aria-hidden="true"></div>
+        </div>
+        <p class="field-hint" id={`${p}-crop-hint`}>Drag to move. Zoom with the slider, or the plus and minus keys.</p>
+        <div class="crop-zoom">
+          <label for={`${p}-zoom`}>Zoom</label>
+          <input type="range" id={`${p}-zoom`} min="1" max="4" step="0.01" value="1" data-crop-zoom />
+        </div>
+        <div class="form-actions"><button type="button" class="button button-primary button-sm" data-crop-use>Use this picture</button></div>
+        <p class="crop-error field-error" role="alert" data-crop-error hidden></p>
       </div>
       <div class="form-actions">
+        <button type="button" class="button button-secondary button-sm" data-crop-adjust hidden>Adjust</button>
         <button class="button button-primary button-sm" type="submit">Save picture</button>
         {ownRemove && <label for={removeBox} class="button button-secondary button-sm toggle-label lbl-remove"><span class="on-closed">Remove picture</span></label>}
       </div>
@@ -55,9 +75,20 @@ const removeBox = `${idPrefix}-remove`;
 
 <style>
   .avatar-editor { display: flex; gap: var(--space-4); align-items: flex-start; flex-wrap: wrap; }
+  .avatar-preview { display: grid; gap: var(--space-2); max-width: 12rem; justify-items: start; }
   .avatar-img { width: 96px; height: 96px; border-radius: 50%; object-fit: cover; border: 1px solid var(--border); flex: none; }
   .avatar-none { display: inline-flex; align-items: center; justify-content: center; font-size: var(--text-lg); color: var(--text-2); background: var(--bg); }
+  .avatar-img[hidden], .avatar-none[hidden], .crop[hidden], [data-ready-hint][hidden], [data-crop-adjust][hidden], .crop-error[hidden] { display: none; }
   .avatar-controls { flex: 1 1 16rem; display: grid; gap: var(--space-2); }
+  .avatar-editor[data-state="error"] .crop > :not(.crop-error) { display: none; }
+  .crop { display: grid; gap: var(--space-2); margin-block: var(--space-2); }
+  .crop-stage { width: min(280px, 100%); aspect-ratio: 1; overflow: hidden; position: relative; touch-action: none; border: 1px solid var(--border); border-radius: var(--radius-sm); background: var(--bg); cursor: grab; }
+  .crop-stage:active { cursor: grabbing; }
+  .crop-stage:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+  .crop-img { position: absolute; left: 0; top: 0; transform-origin: 0 0; user-select: none; -webkit-user-drag: none; max-width: none; }
+  .crop-guide { position: absolute; inset: 0; border-radius: 50%; box-shadow: 0 0 0 999px color-mix(in srgb, var(--text) 45%, transparent); pointer-events: none; }
+  .crop-zoom { display: flex; align-items: center; gap: var(--space-2); width: min(280px, 100%); }
+  .crop-zoom input { flex: 1; min-width: 0; }
 </style>
 
 <script>
