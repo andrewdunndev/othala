@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 const { getIdentityMock } = vi.hoisted(() => ({ getIdentityMock: vi.fn() }));
-vi.mock('../../lib/admin-api', () => ({ getIdentity: getIdentityMock }));
+vi.mock('../../lib/admin-api', () => ({ getIdentityWithoutCredentials: getIdentityMock }));
 
 import { GET } from './[id]/[hash].js';
 import { identity, avatarOf } from '../../lib/test-builders.js';

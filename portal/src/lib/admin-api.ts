@@ -56,6 +56,10 @@ export async function getIdentity(id: string): Promise<Identity> {
   });
 }
 
+export async function getIdentityWithoutCredentials(id: string): Promise<Identity> {
+  return kratosAdmin().getIdentity({ id });
+}
+
 export async function createIdentity(input: CreateIdentityInput): Promise<Identity> {
   // The Kratos schema validates only traits, so a typo in metadata_admin would be stored.
   const validated = validateMetadataAdmin(input.metadataAdmin);

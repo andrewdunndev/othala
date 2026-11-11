@@ -3,7 +3,7 @@
 // is a new URL. A malformed id, unknown identity, absent picture and stale hash are the same 404.
 
 import type { APIRoute } from 'astro';
-import { getIdentity } from '../../../lib/admin-api';
+import { getIdentityWithoutCredentials } from '../../../lib/admin-api';
 import { AVATAR_HASH_RE, AVATAR_ID_RE, readAvatar } from '../../../lib/avatar';
 
 export const prerender = false;
@@ -17,7 +17,7 @@ const notFound = () =>
 export const GET: APIRoute = async ({ params }) => {
   const { id, hash } = params;
   if (!id || !hash || !AVATAR_ID_RE.test(id) || !AVATAR_HASH_RE.test(hash)) return notFound();
-  const identity = await getIdentity(id).catch(() => null);
+  const identity = await getIdentityWithoutCredentials(id).catch(() => null);
   const avatar = readAvatar(identity?.metadata_admin);
   if (!avatar || avatar.sha256.slice(0, 16) !== hash) return notFound();
   return new Response(Buffer.from(avatar.data, 'base64'), {
