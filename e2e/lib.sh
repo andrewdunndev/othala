@@ -98,3 +98,17 @@ up_and_wait() {
         sleep 2
     done
 }
+
+# image_published <tag>: the tag's image exists in the registry (a tag whose pipeline died before publishing does not).
+image_published() { podman manifest inspect "$AUTH_REGISTRY:$1" >/dev/null 2>&1; }
+
+# pick_prev <checker> [tag...]: the first tag, newest-first, the checker accepts; only the first 5 are tried.
+pick_prev() {
+    local check="$1" t n=0; shift
+    for t in "$@"; do
+        (( n++ < 5 )) || break
+        if "$check" "$t"; then echo "$t"; return 0; fi
+        echo "  skipping $t: image not published" >&2
+    done
+    return 1
+}
