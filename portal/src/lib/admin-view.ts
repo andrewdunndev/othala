@@ -10,6 +10,7 @@ import { buildGroupRegistry } from './group-registry';
 import { currentLevel, isOpenToEveryone, isTopLevel, levelsFor, NO_ACCESS } from './access-rows';
 import { parseIdentity } from './identity-facts';
 import { holdsElevatedRole } from './gate';
+import { avatarPath, readAvatar } from './avatar';
 
 export const ADMIN_NAV = [
   { href: '/admin/users', label: 'People' },
@@ -101,6 +102,8 @@ export interface PersonRow {
   off: boolean;
   verified: boolean;
   unrecognised: string[];
+  /** Path of their picture, or null when they have none. */
+  avatar: string | null;
   /** Client ids of the apps they can use, for the Show filter. */
   appIds: string[];
   /** Lowercase text the search box matches. */
@@ -110,6 +113,7 @@ export interface PersonRow {
 export function personRow(i: Identity, apps: readonly AdminApp[]): PersonRow {
   const t = i.traits as { username?: string; email?: string; displayName?: string } | undefined;
   const chips = appChips(i, apps);
+  const avatar = readAvatar(i.metadata_admin);
   const appIds = apps
     .filter((a) => isOpenToEveryone(a.manifest) || currentLevel(a.manifest, i.metadata_admin) !== NO_ACCESS)
     .map((a) => a.clientId);
@@ -122,6 +126,7 @@ export function personRow(i: Identity, apps: readonly AdminApp[]): PersonRow {
     off: i.state === 'inactive',
     verified: emailIsVerified(i),
     unrecognised: unrecognisedGroups(i, apps.map((a) => a.manifest)),
+    avatar: avatar ? avatarPath(i.id, avatar) : null,
     appIds,
     haystack: [t?.displayName, t?.username, t?.email].filter(Boolean).join(' ').toLowerCase(),
   };

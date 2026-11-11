@@ -13,6 +13,7 @@ import Ask from '../../../components/Ask.astro';
 import ManifestNotice from '../../../components/ManifestNotice.astro';
 import SetupLink from '../../../components/SetupLink.astro';
 import TitleRow from '../../../components/TitleRow.astro';
+import Avatar from '../../../components/Avatar.astro';
 import { adminContext } from '../../../lib/admin-context';
 import { getIdentity, listIdentities, EVICTABLE_CREDENTIAL_TYPES } from '../../../lib/admin-api';
 import { ADMIN_ACTIONS, ENROLLMENT_TTL, type ActionResult } from '../../../lib/admin-actions';
@@ -193,6 +194,7 @@ const roleNote = Object.keys(roleOverrides).length;
   {identity && (
     <>
       <TitleRow title={who} lede={email}>
+        <Avatar slot="avatar" src={avatarSrc} name={who} size={48} />
         <div class="badges">
           {isTargetAdmin && <span class="badge badge-accent">Admin</span>}
           {isOff && <span class="badge badge-muted">Sign-in off</span>}
