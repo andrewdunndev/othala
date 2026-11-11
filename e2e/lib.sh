@@ -99,8 +99,8 @@ up_and_wait() {
     done
 }
 
-# image_published <tag>: the tag's image exists in the registry (a tag whose pipeline died before publishing does not).
-image_published() { podman manifest inspect "$AUTH_REGISTRY:$1" >/dev/null 2>&1; }
+# image_published <tag>: the tag's image pulls (a tag whose pipeline died before publishing has none). The chosen one is then cached.
+image_published() { podman pull --quiet "$AUTH_REGISTRY:$1" >/dev/null 2>&1; }
 
 # pick_prev <checker> [tag...]: the first tag, newest-first, the checker accepts; only the first 5 are tried.
 pick_prev() {
