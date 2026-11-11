@@ -5,9 +5,15 @@
 
 import type { FlowMessage, FlowNode, NodeInputAttributes, SettingsFlow } from './types';
 import type { PasskeyNames } from './passkey-names';
-import { RENAME_ERRORS } from './settings-flash';
+import { AVATAR_FLASH, RENAME_ERRORS } from './settings-flash';
+
+// One state per picture flash the route emits, each showing the picture the person would then see.
+const AVATAR_FLASH_STATES = Object.keys(AVATAR_FLASH).map((code) => `picture-${code}` as `picture-${string}`);
 
 export const DEV_SETTINGS_STATES = [
+  'picture-none',
+  'picture-has',
+  ...AVATAR_FLASH_STATES,
   'fresh',
   'enrolled',
   'totp-setup',
@@ -42,6 +48,10 @@ export interface DevSettings {
   renameError: { id: string; text: string } | null;
   /** The identity carries the admin marker, so the second-factor gate refuses to drop its only second factor. */
   admin: boolean;
+  /** The identity carries a stored picture. */
+  avatar: boolean;
+  /** Code of the picture flash the page reads from the one-shot cookie, as AVATAR_FLASH keys it. */
+  avatarFlash: string | null;
 }
 
 type Group = FlowNode['group'];
@@ -177,7 +187,7 @@ interface Spec {
   next: DevSettingsState;
 }
 
-function build(spec: Spec, state: DevSettingsState, extra: { recovered?: boolean; success?: boolean; verified?: boolean; reauth?: boolean; names?: PasskeyNames; setupOpen?: boolean; admin?: boolean; flash?: string; renameError?: DevSettings['renameError'] } = {}): DevSettings {
+function build(spec: Spec, state: DevSettingsState, extra: { recovered?: boolean; success?: boolean; verified?: boolean; reauth?: boolean; names?: PasskeyNames; setupOpen?: boolean; admin?: boolean; flash?: string; renameError?: DevSettings['renameError']; avatar?: boolean; avatarFlash?: string } = {}): DevSettings {
   const nodes: FlowNode[] = [
     csrf,
     ...profileNodes(),
@@ -212,6 +222,8 @@ function build(spec: Spec, state: DevSettingsState, extra: { recovered?: boolean
     flash: extra.flash ?? null,
     renameError: extra.renameError ?? null,
     admin: extra.admin === true,
+    avatar: extra.avatar === true,
+    avatarFlash: extra.avatarFlash ?? null,
   };
 }
 
@@ -221,7 +233,18 @@ const PK_B: [string, string, string] = [PASSKEY_B, 'unnamed', '2026-08-03T18:05:
 const PK_C: [string, string, string] = [PASSKEY_C, 'iCloud Keychain', '2026-09-02T14:20:00Z'];
 const KEY: [string, string, string] = [KEY_A, 'Keyring key', '2026-07-21T07:10:00Z'];
 
+/** A removed or empty submit leaves no picture; every other outcome leaves the placeholder in place. */
+const PICTURE_ABSENT = new Set(['picture-none', 'picture-removed', 'picture-empty']);
+
 export function devSettings(state: DevSettingsState): DevSettings {
+  if (state.startsWith('picture-')) {
+    const code = state.slice('picture-'.length);
+    const flashed = Object.hasOwn(AVATAR_FLASH, code);
+    return build({ passkeys: [PK_A, PK_B], keys: [], totp: 'enrolled', lookup: true, next: state }, state, {
+      avatar: !PICTURE_ABSENT.has(state),
+      ...(flashed ? { avatarFlash: code } : {}),
+    });
+  }
   switch (state) {
     case 'fresh':
       return build({ passkeys: [], keys: [], totp: 'qr', lookup: false, next: 'fresh' }, state);
@@ -253,5 +276,7 @@ export function devSettings(state: DevSettingsState): DevSettings {
       return build({ passkeys: [PK_A, PK_B], keys: [], totp: 'enrolled', lookup: true, next: 'enrolled-admin' }, state, { admin: true });
     case 'unverified':
       return build({ passkeys: [PK_A, PK_B], keys: [], totp: 'enrolled', lookup: true, next: 'unverified' }, state, { verified: false });
+    default:
+      throw new Error(`[othala/settings-fixtures] unknown state ${state}`);
   }
 }

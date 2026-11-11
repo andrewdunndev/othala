@@ -32,6 +32,7 @@ import { publicUrl } from '../../lib/config';
 import { signToken, csrfRefusal } from '../../lib/csrf';
 import { readPasskeyNames } from '../../lib/passkey-names';
 import { readAvatar, avatarPath } from '../../lib/avatar';
+import { DEV_AVATAR, DEV_AVATAR_SRC } from '../../lib/dev-avatar';
 import AvatarEditor from '../../components/AvatarEditor.astro';
 import {
   credentialItems,
@@ -76,7 +77,7 @@ if (dev) {
       id: 'dev-mock',
       traits: { username: 'sam', email, displayName: 'Sam Rivera' },
       verifiable_addresses: [{ value: email, verified: dev.emailVerified }],
-      metadata_admin: { passkeyNames: dev.names, ...(dev.admin ? { admin: true } : {}) },
+      metadata_admin: { passkeyNames: dev.names, ...(dev.admin ? { admin: true } : {}), ...(dev.avatar ? { avatar: DEV_AVATAR } : {}) },
     },
   } as unknown as Session;
   flow = dev.flow;
@@ -144,7 +145,7 @@ if (dev) {
   }
 }
 
-let avatarFlash: (typeof AVATAR_FLASH)[string] | null = null;
+let avatarFlash: (typeof AVATAR_FLASH)[string] | null = dev?.avatarFlash ? AVATAR_FLASH[dev.avatarFlash] : null;
 if (!dev) {
   const code = Astro.cookies.get(AVATAR_FLASH_COOKIE)?.value;
   if (code) {
@@ -203,7 +204,7 @@ const lookupOff = nodesByGroup(nodes, 'lookup_secret').map(asInput).find((a) => 
 const csrfSignOut = mint(identity.id, 'sign-out-everywhere');
 const renameTokens = passkeys.map(() => mint(identity.id, 'passkey-name'));
 const storedAvatar = readAvatar(stored?.metadata_admin);
-const avatarSrc = storedAvatar ? avatarPath(identity.id, storedAvatar) : null;
+const avatarSrc = storedAvatar ? (dev ? DEV_AVATAR_SRC : avatarPath(identity.id, storedAvatar)) : null;
 const avatarToken = mint(identity.id, 'avatar');
 
 const groups = parseIdentity(stored).groups;

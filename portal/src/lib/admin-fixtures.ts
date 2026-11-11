@@ -4,6 +4,7 @@
 
 import type { ClientManifest } from './manifests';
 import type { Identity } from './types';
+import { DEV_AVATAR } from './dev-avatar';
 import { joinApps, type AdminApp } from './admin-view';
 import type { AppTile } from './tiles';
 import type { ActionResult } from './admin-actions';
@@ -112,6 +113,7 @@ interface Seed {
   off?: boolean;
   creds?: string[];
   prerequisites?: string[];
+  avatar?: boolean;
 }
 
 function person(s: Seed): Identity {
@@ -131,13 +133,14 @@ function person(s: Seed): Identity {
       ...(s.roles ? { roles: s.roles } : {}),
       ...(s.admin ? { admin: true } : {}),
       ...(s.prerequisites ? { prerequisites: s.prerequisites } : {}),
+      ...(s.avatar ? { avatar: DEV_AVATAR } : {}),
     },
   } as unknown as Identity;
 }
 
 const HOUSEHOLD: Seed[] = [
   { id: 'dev-amy', username: 'amy.park', displayName: 'Amy Park', admin: true, creds: ['password', 'totp', 'webauthn', 'lookup_secret'], groups: ['everyone', 'grafana-access', 'grafana-admin', 'audiobookshelf-access', 'prompt-access', 'proxywatch-access'], roles: { audiobookshelf: 'admin' }, prerequisites: ['tailscale'] },
-  { id: 'dev-ben', username: 'ben.okafor', displayName: 'Ben Okafor', admin: true, creds: ['password', 'totp'], groups: ['everyone', 'grafana-access', 'prompt-access'], roles: { grafana: 'editor' } },
+  { id: 'dev-ben', username: 'ben.okafor', displayName: 'Ben Okafor', admin: true, avatar: true, creds: ['password', 'totp'], groups: ['everyone', 'grafana-access', 'prompt-access'], roles: { grafana: 'editor' } },
   { id: 'dev-cleo', username: 'cleo.marsh', displayName: 'Cleo Marsh', unverified: true, creds: ['password', 'passkey'], groups: ['everyone', 'audiobookshelf-access', 'proxywatch-access'] },
   { id: 'dev-dev', username: 'dev.rao', displayName: 'Dev Rao', off: true, groups: ['everyone', 'grafana-access'] },
   { id: 'dev-eli', username: 'eli.stone', displayName: 'Eli Stone', creds: ['password', 'passkey', 'totp'], groups: ['everyone', 'prompt-access', 'garden', 'Old Name'] },
