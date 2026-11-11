@@ -23,10 +23,10 @@ const p = idPrefix;
   <div class="avatar-preview">
     <img class="avatar-img" src={src ?? undefined} width="96" height="96" alt={src ? `Picture of ${name}` : ''} hidden={!src} />
     <span class="avatar-img avatar-none" role="img" aria-label={`No picture yet for ${name}`} hidden={!!src}>{initial}</span>
-    <p class="field-hint" data-ready-hint hidden>This is how it will look. Save it, or adjust.</p>
+    <p class="field-hint" role="status" data-ready-hint hidden>This is how it will look. Save it, or adjust.</p>
   </div>
   <div class="avatar-controls">
-    {!src && <p class="field-hint">No picture yet. Apps show your initial.</p>}
+    {!src && <p class="field-hint" data-none-hint>No picture yet. Apps show your initial.</p>}
     {ownRemove && <input type="checkbox" form="disclosures" class="disclose cb-remove" id={removeBox} aria-label="Remove picture" />}
     <form method="POST" enctype="multipart/form-data" action={action} data-avatar-form data-astro-reload>
       <input type="hidden" name="csrf_token" value={csrf} />
@@ -79,6 +79,7 @@ const p = idPrefix;
   .avatar-img { width: 96px; height: 96px; border-radius: 50%; object-fit: cover; border: 1px solid var(--border); flex: none; }
   .avatar-none { display: inline-flex; align-items: center; justify-content: center; font-size: var(--text-lg); color: var(--text-2); background: var(--bg); }
   .avatar-img[hidden], .avatar-none[hidden], .crop[hidden], [data-ready-hint][hidden], [data-crop-adjust][hidden], .crop-error[hidden] { display: none; }
+  .avatar-editor:not([data-state="empty"]) [data-none-hint] { display: none; }
   .avatar-controls { flex: 1 1 16rem; display: grid; gap: var(--space-2); }
   .avatar-editor[data-state="error"] .crop > :not(.crop-error) { display: none; }
   .crop { display: grid; gap: var(--space-2); margin-block: var(--space-2); }

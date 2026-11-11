@@ -23,6 +23,7 @@ interface Crop {
   file: File | null;
   url: string | null;
   previewUrl: string | null;
+  origSrc: string | null;
   w: number;
   h: number;
   L: number;
@@ -36,7 +37,7 @@ interface Crop {
 const crops = new WeakMap<Element, Crop>();
 const state = (editor: Element): Crop => {
   let c = crops.get(editor);
-  if (!c) crops.set(editor, (c = { file: null, url: null, previewUrl: null, w: 0, h: 0, L: 0, zoom: 1, max: 1, ox: 0, oy: 0, pointers: new Map() }));
+  if (!c) crops.set(editor, (c = { file: null, url: null, previewUrl: null, origSrc: null, w: 0, h: 0, L: 0, zoom: 1, max: 1, ox: 0, oy: 0, pointers: new Map() }));
   return c;
 };
 
@@ -67,6 +68,7 @@ function fail(editor: HTMLElement, input: HTMLInputElement, message: string, cle
   if (clear) input.value = '';
   input.setCustomValidity(message);
   setState(editor, 'error');
+  input.focus();
 }
 
 function render(editor: HTMLElement) {
@@ -99,6 +101,19 @@ function open(editor: HTMLElement, input: HTMLInputElement, file: File) {
   const img = q<HTMLImageElement>(editor, '[data-crop-img]');
   if (!img) return;
   if (c.url) URL.revokeObjectURL(c.url);
+  if (c.previewUrl) {
+    URL.revokeObjectURL(c.previewUrl);
+    c.previewUrl = null;
+    const pv = q<HTMLImageElement>(editor, '.avatar-preview img.avatar-img');
+    const none = q<HTMLElement>(editor, '.avatar-none');
+    c.origSrc ??= pv?.getAttribute('src') ?? '';
+    if (pv) {
+      pv.src = c.origSrc;
+      pv.hidden = !c.origSrc;
+      pv.alt = c.origSrc ? pv.alt : '';
+    }
+    if (none) none.hidden = !!c.origSrc;
+  }
   c.file = file;
   c.url = URL.createObjectURL(file);
   const err = q<HTMLElement>(editor, '[data-crop-error]');
@@ -158,6 +173,7 @@ function showResult(editor: HTMLElement, file: File) {
   const c = state(editor);
   const img = q<HTMLImageElement>(editor, '.avatar-preview img.avatar-img');
   const none = q<HTMLElement>(editor, '.avatar-none');
+  c.origSrc ??= img?.getAttribute('src') ?? '';
   if (c.previewUrl) URL.revokeObjectURL(c.previewUrl);
   c.previewUrl = URL.createObjectURL(file);
   if (img) {
@@ -167,6 +183,7 @@ function showResult(editor: HTMLElement, file: File) {
   }
   if (none) none.hidden = true;
   setState(editor, 'ready');
+  q<HTMLButtonElement>(editor, 'button[type="submit"]')?.focus();
 }
 
 document.addEventListener('submit', (e) => {
@@ -181,6 +198,8 @@ document.addEventListener('change', (e) => {
   const file = input.files?.[0];
   if (!editor || !file) return;
   input.setCustomValidity('');
+  const save = q<HTMLButtonElement>(editor, 'button[type="submit"]');
+  if (save) save.disabled = true;
   open(editor, input, file);
 });
 
