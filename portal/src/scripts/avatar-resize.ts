@@ -124,7 +124,10 @@ function open(editor: HTMLElement, input: HTMLInputElement, file: File) {
     c.max = zoomMax(c.w, c.h);
     c.zoom = 1;
     const slider = q<HTMLInputElement>(editor, '[data-crop-zoom]');
-    if (slider) slider.max = String(c.max);
+    if (slider) {
+      slider.max = String(c.max);
+      slider.disabled = c.max === 1;
+    }
     setState(editor, 'cropping');
     c.L = q<HTMLElement>(editor, '[data-crop-stage]')?.clientWidth ?? 0;
     Object.assign(c, centered(c.w, c.h, cover(c.L, c.w, c.h), c.L));
@@ -137,7 +140,8 @@ function open(editor: HTMLElement, input: HTMLInputElement, file: File) {
 async function crop(editor: HTMLElement, input: HTMLInputElement) {
   const c = state(editor);
   if (!c.file) return;
-  const use = q<HTMLButtonElement>(editor, '[data-crop-use]');
+  render(editor);
+  const use =q<HTMLButtonElement>(editor, '[data-crop-use]');
   if (use) use.disabled = true;
   const form = input.form;
   if (form) form.dataset.resizing = '1';
@@ -211,6 +215,7 @@ const local = (stage: HTMLElement, e: PointerEvent): Pt => {
 const dist = (a: Pt, b: Pt) => Math.hypot(a.x - b.x, a.y - b.y);
 
 document.addEventListener('pointerdown', (e) => {
+  if (e.button !== 0) return;
   const stage = stageOf(e);
   const editor = editorOf(stage);
   if (!stage || !editor) return;
@@ -289,4 +294,8 @@ document.addEventListener('click', (e) => {
     render(editor);
     q<HTMLElement>(editor, '[data-crop-stage]')?.focus();
   }
+});
+
+window.addEventListener('resize', () => {
+  document.querySelectorAll<HTMLElement>('.avatar-editor[data-state="cropping"]').forEach(render);
 });
