@@ -42,6 +42,41 @@ docker compose up -d
 
 For an OIDC app added later, copy only its `<CLIENT_ID>_CLIENT_SECRET` line from a new `gen-secrets` run.
 
+## The first admin
+
+Registration is disabled, so a new stack has no identities and nobody can sign in. Make the first admin from the
+console with the `admin` helper in [`docs/runbooks/admin-recovery.md`](docs/runbooks/admin-recovery.md#console-commands),
+run from the compose directory. The marker goes on last, because the recovery gate refuses an identity that already
+carries it.
+
+1. Create the identity with no credentials and no marker. The traits are `username` and `email`; `groups` starts empty
+   and the admin pages grant them later.
+
+   ```sh
+   admin identities POST '{"schema_id":"family","traits":{"username":"first.last","email":"you@example.org"},"metadata_admin":{"groups":[]},"verifiable_addresses":[{"value":"you@example.org","via":"email","verified":true,"status":"completed"}]}'
+   ```
+
+2. Issue a recovery code for the returned `id`, open `recovery_link` and enter `recovery_code`. In that session enrol
+   what the runbook's first section lists: two passkeys, an authenticator app, backup codes and a security key.
+
+   ```sh
+   admin recovery/code POST '{"identity_id":"<id>","expires_in":"1h"}'
+   ```
+
+3. Set the marker, then sign in and open the admin pages.
+
+   ```sh
+   admin identities/<id> PATCH '[{"op":"add","path":"/metadata_admin/admin","value":true}]'
+   ```
+
+## Backups and break-glass
+
+All identity state, every passkey and the Hydra clients included, is in the `postgres-data` volume; `secrets.env`
+holds the keys that decrypt part of it. Back up both, together: [`docs/runbooks/postgres-backup.md`](docs/runbooks/postgres-backup.md)
+says what and how to restore. The example runs no backup job. If an admin loses access,
+[`docs/runbooks/admin-recovery.md`](docs/runbooks/admin-recovery.md) is the ladder, and
+[`docs/runbooks/lost-device.md`](docs/runbooks/lost-device.md) is for a member's lost device.
+
 ## Your own Ory config
 
 A deployment may own finished `kratos.yml` and `hydra.yml` instead of rendering them, with secrets as any
