@@ -2,7 +2,7 @@
  * passkey.ts — a CDP virtual authenticator, passkey enrolment from settings, and usernameless passkey sign-in.
  */
 
-import type { BrowserContext, Page } from '@playwright/test';
+import type { BrowserContext, Locator, Page } from '@playwright/test';
 import { expect } from '@playwright/test';
 
 const REGISTER_BUTTON = 'button[name="passkey_register_trigger"]';
@@ -26,7 +26,14 @@ export async function registerPasskey(page: Page, baseURL: string): Promise<void
   const button = page.locator(REGISTER_BUTTON).first();
   await expect(button, 'the passkey register button is offered').toBeVisible({ timeout: 10_000 });
   await page.waitForFunction(() => typeof (window as unknown as Win).oryPasskeySettingsRegistration === 'function');
+  await clickAndSettle(page, button);
+}
+
+// The save answers with a redirect back to settings; a caller that navigates before that page lands loses the passkey or the goto.
+export async function clickAndSettle(page: Page, button: Locator): Promise<void> {
+  const settled = page.waitForResponse((r) => r.request().isNavigationRequest() && r.request().method() === 'GET' && new URL(r.url()).pathname === '/auth/settings' && r.status() === 200);
   await button.click();
+  await settled;
   await page.waitForLoadState('networkidle');
 }
 

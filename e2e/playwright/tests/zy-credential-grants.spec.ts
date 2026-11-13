@@ -64,8 +64,11 @@ test.describe('ZY — a credential change ends earlier refresh tokens', () => {
       const trigger = page.locator('button[name="webauthn_register_trigger"]').first();
       await expect(trigger, 'ZY2: the security key register button is offered').toBeVisible({ timeout: 10_000 });
       await page.waitForFunction(() => typeof (window as unknown as Record<string, unknown>).oryWebAuthnRegistration === 'function');
+      // The key is stored before the revoke hook runs; the settings answer comes after it.
+      const answered = page.waitForResponse((r) => r.url().includes('/self-service/settings') && r.request().method() === 'POST');
       await trigger.click();
-      await expect.poll(async () => Boolean(await stored(id, 'webauthn')), { timeout: 15_000, message: 'ZY2: the security key is stored' }).toBe(true);
+      await answered;
+      expect(Boolean(await stored(id, 'webauthn')), 'ZY2: the security key is stored').toBe(true);
     } finally {
       await ctx.close();
     }

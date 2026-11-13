@@ -5,7 +5,7 @@
 import type { Page } from '@playwright/test';
 import { test, expect, adminAal2Context, computeTotp, GRAFANA_CLIENT_ID, GRAFANA_REDIRECT_URI } from '../fixtures';
 import { createIdentityWithPassword, TEST_PASSWORD } from '../actions/identity';
-import { requireEnv } from '../actions/oidc';
+import { requireEnv, walk } from '../actions/oidc';
 import { getSession } from '../actions/session';
 
 const PASSKEY_REGISTER_BUTTON = 'button[name="passkey_register_trigger"]';
@@ -97,19 +97,18 @@ test('ZI1 — admin adds a person; they redeem, enrol a passkey and TOTP, and si
   await expect(loginBtn, 'ZI1: passkey sign-in button').toBeVisible({ timeout: 10_000 });
   await page.waitForFunction(hasWindowFn, 'oryPasskeyLogin');
   await loginBtn.click();
-  await page.waitForURL((u) => !u.pathname.startsWith('/auth/login'), { timeout: 15_000 });
+  await answerSecondStepAtDag(page, secret);
 
-  await ctx.route(`${APP_ORIGIN}/**`, (route) => route.fulfill({ status: 200, contentType: 'text/plain', body: 'app' }));
   const authorize =
     `${baseURL}/oauth2/auth?client_id=${GRAFANA_CLIENT_ID}&response_type=code` +
     `&scope=${encodeURIComponent('openid email groups')}` +
     `&redirect_uri=${encodeURIComponent(GRAFANA_REDIRECT_URI)}` +
     `&state=zi-household-state&nonce=zi-household-nonce`;
-  await page.goto(authorize);
-  await stepUpIfAsked(page, secret);
-  await page.waitForURL((u) => u.origin === APP_ORIGIN, { timeout: 15_000 });
-  const code2 = new URL(page.url()).searchParams.get('code');
-  expect(code2, `ZI1: the OIDC app receives a code, landed at ${page.url()}`).toBeTruthy();
+  // Hand-walked: the app host does not resolve in the browser, and the second step was answered at the dag.
+  const chain = await walk(ctx, baseURL!, authorize, (loc) => loc.origin === APP_ORIGIN);
+  const code2 = chain.at(-1)?.searchParams.get('code');
+  expect(code2, `ZI1: the OIDC app receives a code, hops ${chain.join(' > ')}`).toBeTruthy();
+  expect(chain.map(String).filter((u) => /aal=aal2|\/auth\/login/.test(u)), 'ZI1: the app sign-in never asks').toEqual([]);
 
   // The code redeems at the token endpoint for an id_token carrying the person.
   const basic = Buffer.from(`${GRAFANA_CLIENT_ID}:${requireEnv('GRAFANA_CLIENT_SECRET')}`).toString('base64');
@@ -148,12 +147,11 @@ test('ZI1 — admin adds a person; they redeem, enrol a passkey and TOTP, and si
   );
 });
 
-/** The second factor the person enrolled is asked for when the session is below aal2; answer it in the page. */
-async function stepUpIfAsked(page: Page, secret: string): Promise<void> {
-  await page.waitForURL((u) => u.origin === APP_ORIGIN || u.pathname.startsWith('/auth/login'), { timeout: 15_000 });
-  if (!new URL(page.url()).pathname.startsWith('/auth/login')) return;
+/** The dag sign-in asks the enrolled second factor; answer it in the page and land on the dashboard. */
+async function answerSecondStepAtDag(page: Page, secret: string): Promise<void> {
   const form = page.locator('form:has(#totp-code)');
-  await expect(form, 'ZI1: step-up offers the authenticator code').toBeVisible({ timeout: 10_000 });
+  await expect(form, 'ZI1: the dag sign-in offers the authenticator code').toBeVisible({ timeout: 15_000 });
   await form.locator('#totp-code').fill(await computeTotp(secret));
   await form.locator('button[type="submit"]').click();
+  await page.waitForURL((u) => u.pathname === '/', { timeout: 15_000 });
 }
