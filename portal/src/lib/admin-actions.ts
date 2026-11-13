@@ -4,6 +4,7 @@ import {
   listIdentities,
   updateIdentity,
   deleteIdentity,
+  getIdentity,
   deactivateIdentity,
   reactivateIdentity,
   getRecoveryLink,
@@ -337,8 +338,9 @@ export function deleteAction(fd: FormData, ctx: ActionContext): Promise<ActionOu
 
 async function remove(fd: FormData, ctx: ActionContext): Promise<ActionOutcome | Response> {
   const { id, identity } = ctx;
-  // An admin must lose the marker first, where the last-admin guard runs; checked before the confirm text.
-  if (parseIdentity(identity).isAdmin) {
+  // An admin must lose the marker first, where the last-admin guard runs; checked before the confirm text. The marker is
+  // read again here, inside the lock, because a grant that landed since the page loaded is not in `identity`.
+  if (parseIdentity(identity).isAdmin || parseIdentity(await getIdentity(id)).isAdmin) {
     return {
       actionResult: {
         kind: 'error',

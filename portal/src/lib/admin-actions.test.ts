@@ -14,7 +14,9 @@ const {
   patchPrerequisitesMock,
   markEmailVerifiedMock,
   getRecoveryLinkMock,
+  getIdentityMock,
 } = vi.hoisted(() => ({
+  getIdentityMock: vi.fn(),
   getRecoveryLinkMock: vi.fn(),
   updateIdentityMock: vi.fn(),
   patchPrerequisitesMock: vi.fn(),
@@ -46,6 +48,7 @@ vi.mock('./admin-api', async (importOriginal) => {
     patchPrerequisites: patchPrerequisitesMock,
     markEmailVerified: markEmailVerifiedMock,
     getRecoveryLink: getRecoveryLinkMock,
+    getIdentity: getIdentityMock,
   };
 });
 
@@ -94,6 +97,7 @@ function fd(entries: Record<string, string> = {}): FormData {
 }
 
 beforeEach(() => {
+  getIdentityMock.mockReset().mockImplementation(async (id: string) => makeIdentity(`read-${id}`));
   deleteIdentityMock.mockReset().mockResolvedValue(undefined);
   listIdentitiesMock.mockReset().mockResolvedValue([]);
   patchAdminMarkerMock.mockReset().mockResolvedValue(undefined);
@@ -114,6 +118,18 @@ describe('deleteAction', () => {
 
     expect(deleteIdentityMock).not.toHaveBeenCalled();
     expect(outcome).not.toBeInstanceOf(Response);
+    if (outcome instanceof Response) throw new Error('unreachable');
+    expect(outcome.actionResult?.kind).toBe('error');
+    expect(outcome.actionResult && 'message' in outcome.actionResult ? outcome.actionResult.message : '').toMatch(/remove their admin access first/i);
+  });
+
+  it('refuses a target who became an admin since the page loaded, and never calls deleteIdentity', async () => {
+    getIdentityMock.mockResolvedValue(makeIdentity('promoted', true));
+    const outcome = await deleteAction(fd({ confirm: 'promoted' }), makeCtx({ identity: makeIdentity('promoted') }));
+
+    expect(getIdentityMock).toHaveBeenCalledWith('target-1');
+    expect(revokeSubjectMock).not.toHaveBeenCalled();
+    expect(deleteIdentityMock).not.toHaveBeenCalled();
     if (outcome instanceof Response) throw new Error('unreachable');
     expect(outcome.actionResult?.kind).toBe('error');
     expect(outcome.actionResult && 'message' in outcome.actionResult ? outcome.actionResult.message : '').toMatch(/remove their admin access first/i);

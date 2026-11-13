@@ -21,6 +21,7 @@ The git tag is the authoritative version; `portal/package.json` mirrors it.
 - Revoking an admin, turning off sign-in and deleting a person now run one at a time, and the last-admin count is taken inside that queue, so two admins acting on each other at the same moment can no longer leave none.
 - A consent challenge that skips the grant screen is accepted only for the browser whose session belongs to the challenge's subject, the same binding the grant screen's submit already had.
 - The identity list the admin pages, the last-admin count and the registrar use now follows Kratos pagination to the end; before, it stopped at the first 250.
+- Deleting a person re-reads their admin marker inside the same queue and refuses when it is set, so a grant that landed after the page loaded cannot be deleted through.
 
 ## [0.18.0] - 2026-11-11
 
