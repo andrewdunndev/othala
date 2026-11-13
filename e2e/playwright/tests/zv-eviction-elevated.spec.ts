@@ -38,10 +38,11 @@ test('ZV1 — an elevated member is evicted by lowering the role, removing the a
       kratosAdminURL,
     });
   const admin = await seed('admin', [], true);
-  const member = await seed('member', ['grafana-access', 'grafana-admin']);
+  // Every real member carries the household group; a save without one is refused whole.
+  const member = await seed('member', ['everyone', 'grafana-access', 'grafana-admin']);
   // A member with no elevated role, on whose page the removal form is offered: the token binds to the admin and the
   // action, not to the person it is posted at.
-  const bystander = await seed('bystander', ['grafana-access']);
+  const bystander = await seed('bystander', ['everyone', 'grafana-access']);
 
   const memberCtx = await memberWithTotp(browser, baseURL!, member);
   const bystanderCtx = await memberWithTotp(browser, baseURL!, bystander);
@@ -64,6 +65,7 @@ test('ZV1 — an elevated member is evicted by lowering the role, removing the a
 
     // 2. Lower the role to the app's entry level.
     await post(member.id, member.id, 'save-access', { 'level:grafana': 'viewer' });
+    expect(await groupsOf(kratosAdminURL, member.id), 'ZV1: the household group is kept').toContain('everyone');
     expect(await groupsOf(kratosAdminURL, member.id), 'ZV1: the elevated group is gone').not.toContain('grafana-admin');
 
     // 3. Remove the app; the member's sessions end.
