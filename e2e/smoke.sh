@@ -344,7 +344,10 @@ echo "G. OIDC dance (login -> consent -> ID token; claims + access-gate deny)"
 
 # mk_identity <state> <groups-json> <localpart> [password] -> echoes the new identity id; with a password the dance can sign in at Kratos.
 mk_identity() {
-    printf '%s' "fetch('http://kratos:4434/admin/identities',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({schema_id:'family',state:'$1',traits:{username:'$3',email:'$3@${OTHALA_APEX}',displayName:'$3'},metadata_admin:{groups:$2}${4:+,credentials:{password:{config:{password:'$4'}}}}})}).then(r=>r.json()).then(j=>{process.stdout.write(j.id||'');process.exit(0)}).catch(()=>process.exit(1))" | node_in othala
+    # The credentials fragment is built apart: its braces would end a ${4:+...} expansion early.
+    local cred=""
+    [[ -n "${4:-}" ]] && cred=",credentials:{password:{config:{password:'$4'}}}"
+    printf '%s' "fetch('http://kratos:4434/admin/identities',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({schema_id:'family',state:'$1',traits:{username:'$3',email:'$3@${OTHALA_APEX}',displayName:'$3'},metadata_admin:{groups:$2}${cred}})}).then(r=>r.json()).then(j=>{process.stdout.write(j.id||'');process.exit(0)}).catch(()=>process.exit(1))" | node_in othala
 }
 
 # G1: active member with grafana-access -> dance completes, ID token carries grafana_role=[Viewer]
