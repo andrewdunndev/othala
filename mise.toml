@@ -1,5 +1,5 @@
 # Node is stated here and nowhere else a human edits: portal/Containerfile and
 # the CI image follow it (portal/scripts/ci-pins.test.mjs grades the match).
 [tools]
-node = "24"
+node = "26"
 just = "1.59.0"
