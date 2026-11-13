@@ -411,7 +411,7 @@ else
 fi
 
 # G5: an access-relevant manifest edit plus a registrar reconcile ends refresh tokens issued before it, and the
-# Hydra client carries the fingerprint the registrar compared. The edit flips grafana's emit_groups_claim and is undone.
+# Hydra client carries the fingerprint the registrar compared. The edit adds an access group to grafana's manifest and is undone.
 g5_id=$(mk_identity active "['grafana-access']" g5.refresh "$SMOKE_PASSWORD")
 g5=$(run_dance "$g5_id" "" "" "" "g5.refresh@${OTHALA_APEX}")
 g5_refresh=$(echo "$g5" | sed -n 's/.*"refresh_token":"\([^"]*\)".*/\1/p')
@@ -425,7 +425,13 @@ else
     fail "G5a fingerprint metadata + refresh token" "fingerprint='$g5_before' refresh_token present=$([[ -n "$g5_refresh" ]] && echo yes || echo no) dance: $g5"
 fi
 cp content/apps/grafana.yaml content/apps/grafana.yaml.bak
-sed -i.tmp 's/^\(  emit_groups_claim:\) true/\1 false/' content/apps/grafana.yaml && rm -f content/apps/grafana.yaml.tmp
+awk '{print} /^    - grafana-access$/ {print "    - grafana-smoke-extra"}' content/apps/grafana.yaml.bak > content/apps/grafana.yaml
+# A quarantined manifest would drop grafana from the served set and the reconcile would prove nothing.
+if docker compose exec -T othala node dist/server/manifest-lint.mjs /etc/othala >/dev/null 2>&1; then
+    pass "G5 the edited grafana manifest still lints clean (served, not quarantined)"
+else
+    fail "G5 the edited grafana manifest does not lint" "$(docker compose exec -T othala node dist/server/manifest-lint.mjs /etc/othala 2>&1 | _strip_ansi | tail -5)"
+fi
 docker compose kill -s SIGHUP othala >/dev/null 2>&1
 g5_after=$g5_before
 for _ in $(seq 1 30); do
