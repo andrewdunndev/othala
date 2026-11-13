@@ -6,6 +6,12 @@ aims to follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 The git tag is the authoritative version; `portal/package.json` mirrors it.
 
+## [Unreleased]
+
+### Fixed
+
+- A manifest gate flag (`skip_access_check`, `skip_consent`, `backchannel_logout_session_required`, `emit_groups_claim`) must be `true` or `false`; any other value, such as the string `no`, quarantines the file and `manifest-lint` reports it. Before, a non-empty string opened the app to every member.
+
 ## [0.18.0] - 2026-11-11
 
 ### Added
