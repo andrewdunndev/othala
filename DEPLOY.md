@@ -114,7 +114,7 @@ With quadlets the render is a `Type=oneshot`, `RemainAfterExit=yes` unit writing
    Run `check --content <dir>` after every edit to `apps/`.
 2. `render` checks only env names and `courier/`, so a bad app sidelines that app and never stops sign-in. It
    refuses a missing or blank secret, a leftover `${`, malformed YAML, a secret of the wrong length and a
-   `_PREVIOUS` equal to its `_CURRENT`. A refusal exits 1 and leaves the last good render in place, so a restart
+   `KRATOS_COOKIE_SECRET_PREVIOUS` equal to its `_CURRENT`. A refusal exits 1 and leaves the last good render in place, so a restart
    still boots the earlier config; the migrate jobs and Caddy wait on the render and stay down until it succeeds.
    That protection holds for the example compose, whose render output lives in named volumes. A deployment that
    renders to tmpfs, or that ties services to the render with a hard dependency, loses it on reboot and should render

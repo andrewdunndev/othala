@@ -16,7 +16,7 @@ Kratos session cookies verify under both entries, but its continuity cookies (se
 as one key, signed with the first and encrypted with the second. A Kratos cookie pair must therefore be 16, 24 or 32
 characters per entry: a 64-character pair fails those flows with `crypto/aes: invalid key size 64`. A deployment still
 on a 64-character Kratos cookie secret first rotates once, single-slot, to a 32-character one, which signs members out.
-A `_PREVIOUS` equal to its `_CURRENT` is refused too. `check` with the new values in the environment reports every refusal before anything is rendered.
+A `KRATOS_COOKIE_SECRET_PREVIOUS` equal to its `_CURRENT` is refused too. `check` with the new values in the environment reports every refusal before anything is rendered.
 
 An adopter who enables an upstream provider keeps `KRATOS_CIPHER_SECRET_PREVIOUS` until those members have signed in again through it.
 

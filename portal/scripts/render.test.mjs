@@ -276,25 +276,23 @@ test('render refuses a cookie or system secret under 16 characters, set or not _
   }
 });
 
-test('render refuses a _PREVIOUS equal to its _CURRENT', () => {
-  const pairs = [
-    ['KRATOS_COOKIE_SECRET', 'k'.repeat(32)],
-    ['KRATOS_CIPHER_SECRET', 'c'.repeat(32)],
-    ['HYDRA_COOKIE_SECRET', 'h'.repeat(32)],
-  ];
-  for (const [base, value] of pairs) {
-    const env = { ...ENV, [`${base}_CURRENT`]: value, [`${base}_PREVIOUS`]: value };
-    assert.throws(() => render(root, CONTENT, env), new RegExp(`${base}_PREVIOUS must differ from ${base}_CURRENT`), base);
+test('render refuses a Kratos cookie _PREVIOUS equal to its _CURRENT and leaves the other pairs alone', () => {
+  const same = { KRATOS_COOKIE_SECRET: 'k'.repeat(32) };
+  const env = { ...ENV, KRATOS_COOKIE_SECRET_CURRENT: same.KRATOS_COOKIE_SECRET, KRATOS_COOKIE_SECRET_PREVIOUS: same.KRATOS_COOKIE_SECRET };
+  assert.throws(() => render(root, CONTENT, env), /KRATOS_COOKIE_SECRET_PREVIOUS must differ from KRATOS_COOKIE_SECRET_CURRENT/);
+  // Kratos's schema requires unique items only for its cookie list; Hydra's and the cipher list accept a repeat.
+  for (const base of ['KRATOS_CIPHER_SECRET', 'HYDRA_COOKIE_SECRET']) {
+    const value = 'c'.repeat(32);
+    assert.doesNotThrow(() => render(root, CONTENT, { ...ENV, [`${base}_CURRENT`]: value, [`${base}_PREVIOUS`]: value }), base);
   }
-  const system = { ...ENV, HYDRA_SYSTEM_SECRET: 's'.repeat(32), HYDRA_SYSTEM_SECRET_PREVIOUS: 's'.repeat(32) };
-  assert.throws(() => render(root, CONTENT, system), /HYDRA_SYSTEM_SECRET_PREVIOUS must differ from HYDRA_SYSTEM_SECRET/);
+  assert.doesNotThrow(() => render(root, CONTENT, { ...ENV, HYDRA_SYSTEM_SECRET: 's'.repeat(32), HYDRA_SYSTEM_SECRET_PREVIOUS: 's'.repeat(32) }));
 });
 
-test('check reports a short secret and a repeated _PREVIOUS', () => {
+test('check reports a short secret and a repeated Kratos cookie _PREVIOUS', () => {
   const args = ['check', '--policy', root, '--content', CONTENT];
   assert.match(cli(args, { ...ENV, HYDRA_COOKIE_SECRET_CURRENT: 'short' }).stderr, /HYDRA_COOKIE_SECRET_CURRENT must be at least 16/);
-  const same = { ...ENV, HYDRA_COOKIE_SECRET_CURRENT: 'h'.repeat(32), HYDRA_COOKIE_SECRET_PREVIOUS: 'h'.repeat(32) };
-  assert.match(cli(args, same).stderr, /HYDRA_COOKIE_SECRET_PREVIOUS must differ/);
+  const same = { ...ENV, KRATOS_COOKIE_SECRET_CURRENT: 'k'.repeat(32), KRATOS_COOKIE_SECRET_PREVIOUS: 'k'.repeat(32) };
+  assert.match(cli(args, same).stderr, /KRATOS_COOKIE_SECRET_PREVIOUS must differ/);
 });
 
 test('check refuses what render would refuse, with or without secrets in the environment', () => {

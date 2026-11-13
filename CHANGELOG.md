@@ -10,7 +10,7 @@ The git tag is the authoritative version; `portal/package.json` mirrors it.
 
 ### Changed
 
-- `render` also refuses a Kratos or Hydra cookie secret or the Hydra system secret under 16 characters, and a `_PREVIOUS` equal to its `_CURRENT`, since Kratos and Hydra refuse to start on either.
+- `render` also refuses a Kratos or Hydra cookie secret or the Hydra system secret under 16 characters, and a `KRATOS_COOKIE_SECRET_PREVIOUS` equal to its `_CURRENT`, since Kratos and Hydra refuse to start on either.
 - `DEPLOY.md` says how the first admin is made, names the `postgres-data` volume and `secrets.env` as what to back up, and links the backup, admin-recovery and lost-device runbooks.
 - The cookie-rotation and secrets-rotation runbooks are merged into `docs/runbooks/secrets-rotation.md`; the comments in `kratos.yml`, `hydra.yml` and `.env.example` that pointed at the old name now point at it.
 - The admin-recovery, lost-device and postgres-backup runbooks give working sequences: the key-first authenticator swap, the console credential deletes for an admin with no second factor left, eviction of a member or admin who holds an elevated role, and a client re-registration step after a restore.
