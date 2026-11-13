@@ -30,13 +30,13 @@ load_env
 
 up_and_wait
 
-# Step 5: smoke (the API-level suite + browser-free OIDC dance, sections A-G)
+# Smoke (the API-level suite + browser-free OIDC dance, sections A-G)
 echo ""
 echo "=== smoke ==="
 bash ./smoke.sh
 SMOKE_EXIT=$?
 
-# Step 5b: browser e2e against the same stack, as a one-shot `compose run` (`up --exit-code-from` is
+# Browser e2e against the same stack, as a one-shot `compose run` (`up --exit-code-from` is
 # unreliable under podman-compose).
 echo ""
 echo "=== browser e2e (Playwright) ==="
@@ -44,7 +44,7 @@ BROWSER_EXIT=0
 timeout 360 docker compose --profile browser run --rm --no-deps -T playwright || BROWSER_EXIT=$?
 if [[ $BROWSER_EXIT -eq 0 ]]; then echo "  ✓ browser e2e passed"; else echo "  ✗ browser e2e failed (exit $BROWSER_EXIT)"; fi
 
-# Step 6: log dump on failure via native `podman logs`.
+# Log dump on failure via native `podman logs`.
 if [[ $SMOKE_EXIT -ne 0 || $BROWSER_EXIT -ne 0 ]]; then
     echo ""
     echo "=== container ps ==="
@@ -56,7 +56,7 @@ if [[ $SMOKE_EXIT -ne 0 || $BROWSER_EXIT -ne 0 ]]; then
     done
 fi
 
-# Step 7: teardown
+# Teardown
 echo ""
 echo "  docker compose down..."
 docker compose --profile browser down -v --remove-orphans || true

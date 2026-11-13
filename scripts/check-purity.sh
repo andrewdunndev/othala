@@ -8,8 +8,7 @@
 # staged-not-written violation is caught (build_scan_set). Deps: git, bash,
 # grep, sed, coreutils only.
 # Anti-vacuity, why: a gate that cannot fail proves nothing. Each branch proves itself on its own canary before
-# it scans anything — selftest(), the inline successor to the retired
-# probe-check-purity.sh mutation harness. Scanned files/bytes are asserted >
+# it scans anything (selftest()). Scanned files/bytes are asserted >
 # 0; a verdict is read off grep's captured HITS, never its bare exit status.
 # Usage: bash scripts/check-purity.sh — exit 0 clean, 1 on any FAIL/ERROR.
 set -uo pipefail  # NOT -e: every check classifies grep's exit itself (0/1/>1).
@@ -155,26 +154,15 @@ echo ""
 # Purity: instance-specific strings must not leak into a public repo.
 row "no-dunn-dev-in-configs" 1 'dunn\.dev' 'issuer: https://auth.dunn.dev/' 'hydra/hydra.yml kratos/kratos.yml'
 row "no-dunn-dev-in-tests" 1 'dunn\.dev' 'fetch("https://portal.dunn.dev/api/health")' 'portal/scripts/'
-# Whole-index (pathspec "."): the rule has no path qualifier — a private host
-# leaked from .gitlab-ci.yml and two diagrams before these three checks were
-# widened past docs/. Bracketed first letter, not `grep -i`: a flag would
-# apply to the positive control too and collapse selftest()'s discrimination.
+# Whole index, no path qualifier. Bracketed first letter, not `grep -i`: a flag would apply to the positive control too
+# and collapse selftest()'s discrimination.
 row "no-instance-names" 10 \
     "$(printf '%s\n' '\b[Ll]odestone\b' '\b[Cc]armine\b' '\b[Cc]orbel\b' '\b[Cc]rimson\b' '\b[Ss]torr\b' '\b[Oo]aktimbers\b' '\b[Tt]yr\b' '\b[Aa]nvil\b' '\b[Cc]rucible\b' '\b[Nn]orn\b')" \
     "$(printf '%s\n' "reboot $(jn lode stone) after the upgrade" "the retired $(jn car mine) host" "deployed to $(jn cor bel) last week" "$(jn crim son) holds the replica" "rsync from $(jn sto rr) nightly" "the $(jn oak timbers) box is the spare" "$(jn ty r) runs the QEMU executor" "the $(jn an vil) runner is tagged" "$(jn cru cible) builds the images" "$(jn no rn) serves the metrics")" \
     .
 # LICENSE is exempted (copyright holder) below, bounded — see personal_names().
-# Branches 11-18 are the historical private-catalog CODENAMES a pre-tag pass
-# found leaked as fixture data (larder, and the app-shaped hits among
-# candidates keep/observe/tune/vault/forge/gather/memory — branch 3 above
-# already covered a tenth; listen/library never fired as codenames, only as
-# real filenames/products/verbs, so they stay out). Unlike branches 1-10 these
-# are
-# ordinary English words, so a bare `\bword\b` would fail on every legitimate
-# use (e.g. "keep in sync"); scoped instead to the violation SHAPE itself —
-# `<word>-access`/`access-<word>`/`<word>-admin` group names or a
-# `<word>.dunn.dev`/`<word>.othala.test`/`<word>.example.test` hostname —
-# which prose never produces by accident.
+# Common-word codenames match only the group or hostname shape (`<word>-access`, `access-<word>`, `<word>-admin`,
+# `<word>.dunn.dev`, `<word>.othala.test`, `<word>.example.test`), never the bare word.
 row "no-private-stack-apps" 18 \
     "$(printf '%s\n' '\b[Ii]mmich\b' '\b[Jj]ellyfin\b' '\b[Cc]inema\b' '\b[Vv]aultwarden\b' '\b[Nn]avidrome\b' '\b[Ss]onarr\b' '\b[Rr]adarr\b' '\b[Mm]ealie\b' '[Oo]pen ?[Ww]eb ?UI' '[Ll]ite[Ll][Ll][Mm]' '\b[Ll]arder-access\b|\baccess-[Ll]arder\b|\b[Ll]arder-admin\b|\b[Ll]arder\.(dunn\.dev|othala\.test|example\.test)\b' '\b[Kk]eep-access\b|\baccess-[Kk]eep\b|\b[Kk]eep-admin\b|\b[Kk]eep\.(dunn\.dev|othala\.test|example\.test)\b' '\b[Oo]bserve-access\b|\baccess-[Oo]bserve\b|\b[Oo]bserve-admin\b|\b[Oo]bserve\.(dunn\.dev|othala\.test|example\.test)\b' '\b[Tt]une-access\b|\baccess-[Tt]une\b|\b[Tt]une-admin\b|\b[Tt]une\.(dunn\.dev|othala\.test|example\.test)\b' '\b[Vv]ault-access\b|\baccess-[Vv]ault\b|\b[Vv]ault-admin\b|\b[Vv]ault\.(dunn\.dev|othala\.test|example\.test)\b' '\b[Ff]orge-access\b|\baccess-[Ff]orge\b|\b[Ff]orge-admin\b|\b[Ff]orge\.(dunn\.dev|othala\.test|example\.test)\b' '\b[Gg]ather-access\b|\baccess-[Gg]ather\b|\b[Gg]ather-admin\b|\b[Gg]ather\.(dunn\.dev|othala\.test|example\.test)\b' '\b[Mm]emory-access\b|\baccess-[Mm]emory\b|\b[Mm]emory-admin\b|\b[Mm]emory\.(dunn\.dev|othala\.test|example\.test)\b')" \
     "$(printf '%s\n' "photos live in $(jn Imm ich)" "$(jn Jelly fin) uses the code path" "the $(jn cin ema) tile is gated" "$(jn Vault warden) issues the client" "$(jn Navi drome) streams over forward-auth" "$(jn Son arr) polls the indexer" "$(jn Rad arr) polls the same one" "$(jn Mea lie) holds the recipes" "$(jn Open ' ' WebUI) proxies the model" "$(jn Lite LLM) fronts the inference" "granted entry via access-$(jn lar der)" "the tile binds $(jn ke ep)-access for entry" "reachable once the identity holds access-$(jn ob serve)" "the manifest grants access-$(jn tu ne) to members" "the client resolves $(jn va ult)-access from the group map" "the manifest binds access-$(jn for ge) for entry" "the tile carries $(jn gat her)-access as its binding" "the identity already holds access-$(jn mem ory)")" \

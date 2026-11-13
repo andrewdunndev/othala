@@ -295,7 +295,7 @@ export async function handleConsent(req: Request, deps: Deps = {}): Promise<Resp
   // Re-gate at consent time (state + group), fail-closed; it must gate even when login was remembered.
   const identity = await safeGetIdentity(d, subject);
   const consentManifest = d.manifest(clientId);
-  const result = enforceAccessGate(identity, clientId, consentManifest);
+  const result = enforceAccessGate(identity, consentManifest);
   if (!result.allowed) {
     console.warn('[oauth2/consent] access denied', { clientId, subject, reason: result.reason });
     return rejectConsent(d, challenge, 'access_denied', upstreamError, device ? 'not-authorised' : undefined);
@@ -402,7 +402,7 @@ export async function handleConsentPost(req: Request, deps: Deps = {}): Promise<
   const clientId = consent.client?.client_id ?? '';
   const identity = await safeGetIdentity(d, consent.subject ?? '');
   const allowManifest = d.manifest(clientId);
-  const result = enforceAccessGate(identity, clientId, allowManifest);
+  const result = enforceAccessGate(identity, allowManifest);
   if (!result.allowed) {
     console.warn('[oauth2/consent/post] access denied', { clientId, subject: consent.subject, reason: result.reason });
     return rejectConsent(d, challenge, 'access_denied', toScreen, refused('not-authorised'));

@@ -1,10 +1,9 @@
 // The picture cropper: the chosen file is shown in a stage the member drags and zooms, then cropped to 256x256 and
-// shrunk to fit the server's 64 KB cap before the form is sent. A file the browser cannot decode is reported here; one
+// shrunk to fit the server's size cap before the form is sent. A file the browser cannot decode is reported here; one
 // that cannot be made small enough is not sent. All elements come from AvatarEditor.astro; this only fills and toggles.
 import { OUTPUT, centered, clamp, clampOffset, cover, sourceRect, zoomAbout, zoomMax } from './crop-geometry';
+import { AVATAR_MAX_BYTES, AVATAR_TOO_LARGE } from '../lib/avatar-limits';
 
-const CAP = 64 * 1024;
-const TOO_LARGE = 'That picture is too large. Choose a smaller one, under 64 KB.';
 const UNREADABLE = 'That file is not a picture this browser can read. Choose a JPEG, PNG or WebP photo.';
 
 const ENCODERS: ReadonlyArray<readonly [string, string, number | undefined]> = [
@@ -156,7 +155,7 @@ async function crop(editor: HTMLElement, input: HTMLInputElement) {
     bitmap.close();
     for (const [type, ext, quality] of ENCODERS) {
       const blob = await encode(canvas, type, quality);
-      if (blob && blob.type === type && blob.size <= CAP) {
+      if (blob && blob.type === type && blob.size <= AVATAR_MAX_BYTES) {
         const out = new File([blob], `picture.${ext}`, { type });
         const dt = new DataTransfer();
         dt.items.add(out);
@@ -165,7 +164,7 @@ async function crop(editor: HTMLElement, input: HTMLInputElement) {
         return;
       }
     }
-    fail(editor, input, TOO_LARGE, true);
+    fail(editor, input, AVATAR_TOO_LARGE, true);
   } catch {
     fail(editor, input, UNREADABLE, false);
   } finally {

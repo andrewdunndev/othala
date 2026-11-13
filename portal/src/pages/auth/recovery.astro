@@ -47,7 +47,9 @@ const messages = (ui?.messages ?? []).filter((m: FlowMessage) => !(phase === 'se
   title={phase === 'request' ? 'Get back in' : 'Enter your code'}
   lede={phase === 'request'
     ? "Enter your email and we'll send you a one-time code. No password needed."
-    : `${sentTo ? `We emailed a code to ${sentTo}. ` : ''}Enter the code from your email, or from the setup message that brought you here. It works once. An emailed code lasts 15 minutes; a code from a setup message lasts ${describeTtl(ENROLLMENT_TTL)}. Nothing yet? Check spam or junk, then send a new code.`}
+    : sentTo
+    ? `We emailed a code to ${sentTo}. Enter it below.`
+    : 'Enter your code below.'}
   description="Start or regain access with a one-time code."
 >
 
@@ -76,6 +78,9 @@ const messages = (ui?.messages ?? []).filter((m: FlowMessage) => !(phase === 'se
 
     {phase === 'sent' && (
       <p class="focus-next">Next you'll land on your account, where you can add a passkey so signing in takes one tap.</p>
+    )}
+    {phase === 'sent' && (
+      <p class="focus-note">Came from a setup link? Use the code in that message; it lasts {describeTtl(ENROLLMENT_TTL)}. Emailed codes last 15 minutes. Every code works once. Nothing yet? Check spam or junk, then send a new code.</p>
     )}
     {phase === 'request' && (
       <p class="focus-note">New phone or lost passkey? A code by email gets you in. Got a setup link? Open that link instead; it brings its own code.</p>

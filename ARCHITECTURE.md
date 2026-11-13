@@ -36,8 +36,9 @@ flowchart LR
 
 ## Trust boundary
 
-**The network sees three ports:** Kratos public, Hydra public, and the app's public SSR port. Neither
-admin API is exposed, and no app in front of this stack is given an admin credential.
+**The edge sees three upstreams; the network sees only the edge.** The edge routes to Kratos public, Hydra
+public and the app's public SSR port. Neither admin API is exposed, and no app in front of this stack is
+given an admin credential.
 
 **The app runs two listeners in one process** (`portal/src/server/listen.ts`). The public listener
 serves the Astro handler. The admin listener binds `PORTAL_ADMIN_BIND_HOST` with its own
@@ -166,7 +167,7 @@ Revocation is one in-process fan-out, `revokeSubject` (`portal/src/lib/revoke.ts
 force-logout, user sign-out-everywhere, and deactivation. Kratos sessions and Hydra's remembered
 login and consent sessions are all cut, because a remembered
 Hydra login would otherwise still mint fresh tokens. Portal sign-out and narrowing someone's access run the Hydra
-half alone. There is no identity cache, so a deactivated subject fails the state check on the next request.
+half alone, as does the revoke-grants hook after any credential change. There is no identity cache, so a deactivated subject fails the state check on the next request.
 
 ## OIDC client registration
 
@@ -205,7 +206,7 @@ annotated contract. Ory does not expand `${VAR}` in its own files, so `kratos/kr
 `hydra/hydra.yml` and `kratos/courier/` are templates, carried in the image and rendered by
 `portal/src/lib/render.ts` (`node dist/server/config.mjs render`), which
 derives the required variable set from the template itself and fails listing missing *names* only,
-never rendered content that could carry a secret into a log. The e2e harness and the deploy plane
+never rendered content that could carry a secret into a log. The e2e harness and your deployment
 call the same render.
 
 The one-way choices (issuer, apex, subject type) are in [DEPLOY.md](DEPLOY.md#before-the-first-enrolment).

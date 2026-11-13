@@ -40,7 +40,7 @@ test('identityGroups / hasGroup read metadata_admin.groups defensively', () => {
 });
 
 test('gate ALLOWS an active member of a bound access group', () => {
-  const r = enforceAccessGate(identity(), 'photos', manifest('photos', { accessGroups: ['memories'] }));
+  const r = enforceAccessGate(identity(), manifest('photos', { accessGroups: ['memories'] }));
   assert.equal(r.allowed, true);
   assert.equal(r.reason, undefined);
 });
@@ -48,7 +48,6 @@ test('gate ALLOWS an active member of a bound access group', () => {
 test('gate ALLOWS via OR-semantics when the user is in any one bound group', () => {
   const r = enforceAccessGate(
     identity({ metadata_admin: { groups: ['memories'] } }),
-    'photos',
     manifest('photos', { accessGroups: ['admin-memories', 'memories'] }),
   );
   assert.equal(r.allowed, true);
@@ -57,7 +56,6 @@ test('gate ALLOWS via OR-semantics when the user is in any one bound group', () 
 test('gate DENIES when the user is in NONE of the bound groups', () => {
   const r = enforceAccessGate(
     identity({ metadata_admin: { groups: ['other'] } }),
-    'photos',
     manifest('photos', { accessGroups: ['memories'] }),
   );
   assert.equal(r.allowed, false);
@@ -65,33 +63,32 @@ test('gate DENIES when the user is in NONE of the bound groups', () => {
 });
 
 test('gate DENIES when the manifest binds no access groups (no implicit access)', () => {
-  const r = enforceAccessGate(identity(), 'photos', manifest('photos', { accessGroups: [] }));
+  const r = enforceAccessGate(identity(), manifest('photos', { accessGroups: [] }));
   assert.equal(r.allowed, false);
   assert.match(r.reason, /no access group bound/);
 });
 
 test('gate DENIES when no manifest is supplied (fail-closed)', () => {
-  const r = enforceAccessGate(identity(), 'photos', undefined);
+  const r = enforceAccessGate(identity(), undefined);
   assert.equal(r.allowed, false);
 });
 
 test('skip_access_check bypasses the group check for an active identity', () => {
   const r = enforceAccessGate(
     identity({ metadata_admin: { groups: [] } }),
-    'photos',
     manifest('photos', { accessGroups: [], skipAccessCheck: true }),
   );
   assert.equal(r.allowed, true);
 });
 
 test('gate DENIES when state is inactive (deactivated identity)', () => {
-  const r = enforceAccessGate(identity({ state: 'inactive' }), 'photos', manifest('photos', { accessGroups: ['memories'] }));
+  const r = enforceAccessGate(identity({ state: 'inactive' }), manifest('photos', { accessGroups: ['memories'] }));
   assert.equal(r.allowed, false);
   assert.equal(r.reason, 'identity not active');
 });
 
 test('gate DENIES when state is missing (fail-closed)', () => {
-  const r = enforceAccessGate(identity({ state: undefined }), 'photos', manifest('photos', { accessGroups: ['memories'] }));
+  const r = enforceAccessGate(identity({ state: undefined }), manifest('photos', { accessGroups: ['memories'] }));
   assert.equal(r.allowed, false);
   assert.equal(r.reason, 'identity not active');
 });
@@ -99,7 +96,6 @@ test('gate DENIES when state is missing (fail-closed)', () => {
 test('skip_access_check NEVER bypasses the state check', () => {
   const r = enforceAccessGate(
     identity({ state: 'inactive' }),
-    'photos',
     manifest('photos', { accessGroups: [], skipAccessCheck: true }),
   );
   assert.equal(r.allowed, false);
@@ -107,7 +103,7 @@ test('skip_access_check NEVER bypasses the state check', () => {
 });
 
 test('gate DENIES on null identity (lookup failure, fail-closed)', () => {
-  const r = enforceAccessGate(null, 'photos', manifest('photos', { accessGroups: ['memories'] }));
+  const r = enforceAccessGate(null, manifest('photos', { accessGroups: ['memories'] }));
   assert.equal(r.allowed, false);
   assert.equal(r.reason, 'identity lookup failed');
 });
@@ -115,7 +111,6 @@ test('gate DENIES on null identity (lookup failure, fail-closed)', () => {
 test('state check precedes group check', () => {
   const r = enforceAccessGate(
     identity({ state: 'inactive', metadata_admin: { groups: [] } }),
-    'photos',
     manifest('photos', { accessGroups: ['memories'] }),
   );
   assert.equal(r.reason, 'identity not active');
@@ -124,7 +119,6 @@ test('state check precedes group check', () => {
 test('regression: access-proxywatch flat binding still admits a member', () => {
   const r = enforceAccessGate(
     identity({ metadata_admin: { groups: ['access-proxywatch'] } }),
-    'proxywatch',
     manifest('proxywatch', { accessGroups: ['access-proxywatch'] }),
   );
   assert.equal(r.allowed, true);
@@ -189,7 +183,6 @@ test('enforceGroupGate DENIES a group the identity legitimately holds when ANOTH
 test('enforceAccessGate DENIES on a non-canonical stored group, even with skip_access_check', () => {
   const r = enforceAccessGate(
     identity({ metadata_admin: { groups: ['Access-Proxywatch'] } }),
-    'photos',
     manifest('photos', { accessGroups: [], skipAccessCheck: true }),
   );
   assert.equal(r.allowed, false);

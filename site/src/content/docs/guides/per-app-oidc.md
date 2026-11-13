@@ -19,10 +19,10 @@ and never sent to Hydra). That shape produces one login, shown end to end:
 
 ## Entry and role are different bindings
 
-Two groups exist per service with different jobs. `<svc>-access` is **entry**: hold it and you get in, and that is
-true of everyone, admins included. `<svc>-admin` is **role only**: it elevates
-someone already admitted and admits nobody on its own. So "can this person get
-in?" is answered by looking at exactly one group.
+Two bindings with different jobs. The group the manifest's `presentation.access` lists is **entry**: hold it and you
+get in, and that is true of everyone, admins included. A group that `group_role_map` maps to a role is **role only**: it
+elevates someone already admitted and admits nobody on its own. So "can this person get in?" is answered by looking at
+exactly one binding.
 
 ```yaml
 presentation:
@@ -61,7 +61,7 @@ from the scopes where the app needs no refresh tokens.
 The secret must be the same plaintext on both sides; nothing links them, and a
 mismatch surfaces as `invalid_client` at the token exchange. Last, grant the
 access group, which is admin-API-only with no self-service path. An admin who
-will also administer the application gets `<svc>-admin` in addition, never instead.
+will also administer the application gets the role group in addition, never instead.
 
 ## Two worked examples
 
@@ -97,8 +97,8 @@ supported pattern for those clients.
 
 Hydra's log explains generic OAuth failures. Two are specific to this model:
 
-- **Denied when they should be admitted**: check the entry group, not
-  the admin group. Entry comes from `<svc>-access` and nothing else.
+- **Denied when they should be admitted**: check the group `presentation.access`
+  binds, not the role group.
 - **The role is wrong but login works**: that is `group_role_map` and claim
   shape, not the gate. Check what the application reads, and how often.
 

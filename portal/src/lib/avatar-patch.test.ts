@@ -37,13 +37,15 @@ describe('patchAvatar', () => {
     expect(patchIdentity).toHaveBeenCalledWith({ id: 'i', jsonPatch: [{ op: 'add', path: '/metadata_admin', value: { avatar: a } }] });
   });
 
-  it('adds the key beside existing ones, then replaces it', async () => {
+  it('writes the key beside existing ones with one targeted op, new or already set', async () => {
     getIdentity.mockResolvedValue({ metadata_admin: { groups: ['everyone'] } });
     await patchAvatar('i', a);
     expect(patchIdentity).toHaveBeenLastCalledWith({ id: 'i', jsonPatch: [{ op: 'add', path: '/metadata_admin/avatar', value: a }] });
     getIdentity.mockResolvedValue({ metadata_admin: { groups: ['everyone'], avatar: a } });
     await patchAvatar('i', b);
-    expect(patchIdentity).toHaveBeenLastCalledWith({ id: 'i', jsonPatch: [{ op: 'replace', path: '/metadata_admin/avatar', value: b }] });
+    const sent = (patchIdentity.mock.lastCall as unknown as [{ jsonPatch: unknown[] }])[0].jsonPatch;
+    expect(sent).toEqual([{ op: 'add', path: '/metadata_admin/avatar', value: b }]);
+    expect(updateIdentity).not.toHaveBeenCalled();
   });
 
   it('removes only a present key, and never does a full update', async () => {

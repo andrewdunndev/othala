@@ -38,7 +38,7 @@ export const REASON_MAP: Record<string, ErrorEntry> = {
   'not-found': {
     status: 404,
     title: "We can't find that page",
-    message: 'It may have moved, or the link may be mistyped. Go home to find what you were after.',
+    message: 'It may have moved, the link may be mistyped, or it may be an app you do not have yet. Go home to find what you were after.',
   },
   'rate-limited': {
     status: 429,
@@ -62,8 +62,8 @@ export const REASON_MAP: Record<string, ErrorEntry> = {
   },
   'second-factor-required': {
     status: 403,
-    title: 'This needs a second factor',
-    message: 'Signing in a device needs an authenticator app or a security key. Add one in your account settings, then try again on the device.',
+    title: 'This needs a second step',
+    message: 'Signing in a device needs your second step: an authenticator app or security key. Add one in Account, then try the device again.',
   },
   'server-error': {
     status: 500,

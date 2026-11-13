@@ -17,7 +17,7 @@ interface Props {
 
 const { title, description, identityId } = Astro.props;
 ---
-<Layout title={title} description={description} nav={ADMIN_NAV} compact>
+<Layout title={title} description={description} nav={ADMIN_NAV} compact admin>
   <Fragment slot="header-actions">
     <HeaderActions identityId={identityId} />
   </Fragment>

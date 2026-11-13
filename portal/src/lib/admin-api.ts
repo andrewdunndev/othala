@@ -145,71 +145,52 @@ export async function reactivateIdentity(id: string): Promise<void> {
   await kratosAdmin().patchIdentity({ id, jsonPatch: patch });
 }
 
-export async function patchAdminMarker(id: string, grant: boolean): Promise<void> {
+type PatchOp = { op: 'add' | 'replace' | 'remove'; path: string; value?: unknown };
+
+const pointerSegment = (segment: string) => segment.replace(/~/g, '~0').replace(/\//g, '~1');
+const nest = (path: string[], value: unknown): unknown => path.reduceRight<unknown>((inner, key) => ({ [key]: inner }), value);
+
+/**
+ * One targeted write under metadata_admin: set `path` to `value`, or remove it with null. Targeted so no other key is
+ * rewritten and a concurrent change to one is not lost. Kratos does not create a missing parent, so the add lands at the
+ * first segment that is absent, carrying the rest nested; an add onto an existing member replaces it (RFC 6902).
+ */
+async function patchMetadataKey(id: string, path: string[], value: unknown | null): Promise<void> {
   const api = kratosAdmin();
-  if (grant) {
-    // Kratos does not auto-vivify /metadata_admin, so pre-fetch to choose the ops.
-    const current = await api.getIdentity({ id });
-    const hasMeta = current.metadata_admin != null && typeof current.metadata_admin === 'object';
-    const patch: Array<{ op: 'add' | 'replace' | 'remove'; path: string; value?: unknown }> = [];
-    if (!hasMeta) {
-      patch.push({ op: 'add', path: '/metadata_admin', value: { admin: true } });
-    } else {
-      const meta = current.metadata_admin as Record<string, unknown>;
-      if ('admin' in meta) {
-        patch.push({ op: 'replace', path: '/metadata_admin/admin', value: true });
-      } else {
-        patch.push({ op: 'add', path: '/metadata_admin/admin', value: true });
-      }
-    }
-    await api.patchIdentity({ id, jsonPatch: patch });
-  } else {
-    // Kratos may error on removing a missing path, so check first.
-    const current = await api.getIdentity({ id });
-    const meta = current.metadata_admin as Record<string, unknown> | undefined;
-    if (!meta || !('admin' in meta)) {
-      return;
-    }
-    await api.patchIdentity({ id, jsonPatch: [{ op: 'remove', path: '/metadata_admin/admin' }] });
+  const current = await api.getIdentity({ id });
+  const hasMeta = current.metadata_admin != null && typeof current.metadata_admin === 'object';
+  let node: unknown = current.metadata_admin;
+  let present = 0;
+  while (hasMeta && present < path.length && node != null && typeof node === 'object' && Object.hasOwn(node, path[present])) {
+    node = (node as Record<string, unknown>)[path[present]];
+    present++;
   }
+  const pointer = (segments: string[]) => ['/metadata_admin', ...segments.map(pointerSegment)].join('/');
+  let patch: PatchOp[];
+  if (value === null) {
+    if (!hasMeta || present < path.length) return;
+    patch = [{ op: 'remove', path: pointer(path) }];
+  } else if (!hasMeta) {
+    patch = [{ op: 'add', path: '/metadata_admin', value: nest(path, value) }];
+  } else {
+    const depth = Math.min(present + 1, path.length);
+    patch = [{ op: 'add', path: pointer(path.slice(0, depth)), value: nest(path.slice(depth), value) }];
+  }
+  await api.patchIdentity({ id, jsonPatch: patch });
+}
+
+export async function patchAdminMarker(id: string, grant: boolean): Promise<void> {
+  await patchMetadataKey(id, ['admin'], grant ? true : null);
 }
 
 export async function patchPrerequisites(id: string, names: string[]): Promise<void> {
   const prerequisites = validateMetadataAdmin({ prerequisites: names }).prerequisites ?? [];
-  const api = kratosAdmin();
-  const current = await api.getIdentity({ id });
-  const meta = current.metadata_admin as Record<string, unknown> | null | undefined;
-  const hasMeta = meta != null && typeof meta === 'object';
-  const hasKey = hasMeta && 'prerequisites' in meta;
-  type Op = { op: 'add' | 'replace' | 'remove'; path: string; value?: unknown };
-  let patch: Op[];
-  if (prerequisites.length === 0) {
-    if (!hasKey) return;
-    patch = [{ op: 'remove', path: '/metadata_admin/prerequisites' }];
-  } else if (!hasMeta) {
-    patch = [{ op: 'add', path: '/metadata_admin', value: { prerequisites } }];
-  } else {
-    patch = [{ op: hasKey ? 'replace' : 'add', path: '/metadata_admin/prerequisites', value: prerequisites }];
-  }
-  await api.patchIdentity({ id, jsonPatch: patch });
+  await patchMetadataKey(id, ['prerequisites'], prerequisites.length === 0 ? null : prerequisites);
 }
-
-type PatchOp = { op: 'add' | 'replace' | 'remove'; path: string; value?: unknown };
 
 export async function patchPasskeyName(id: string, credentialId: string, name: string): Promise<void> {
   const names = validateMetadataAdmin({ passkeyNames: { [credentialId]: name } }).passkeyNames ?? {};
-  const api = kratosAdmin();
-  const current = await api.getIdentity({ id });
-  const meta = current.metadata_admin as Record<string, unknown> | null | undefined;
-  let patch: PatchOp[];
-  if (meta == null || typeof meta !== 'object') {
-    patch = [{ op: 'add', path: '/metadata_admin', value: { passkeyNames: names } }];
-  } else if (!('passkeyNames' in meta)) {
-    patch = [{ op: 'add', path: '/metadata_admin/passkeyNames', value: names }];
-  } else {
-    patch = [{ op: 'add', path: `/metadata_admin/passkeyNames/${credentialId}`, value: names[credentialId] }];
-  }
-  await api.patchIdentity({ id, jsonPatch: patch });
+  await patchMetadataKey(id, ['passkeyNames', credentialId], names[credentialId]);
 }
 
 export async function prunePasskeyNames(id: string): Promise<number> {
@@ -247,14 +228,7 @@ export async function deleteCredential(
       type: type as DeleteIdentityCredentialsTypeEnum,
     });
   } catch (err: unknown) {
-    if (
-      err != null &&
-      typeof err === 'object' &&
-      'response' in err &&
-      (err as { response: { status: number } }).response?.status === 404
-    ) {
-      return;
-    }
+    if (isNotFound(err)) return;
     throw err;
   }
 }
@@ -310,22 +284,7 @@ export async function markEmailVerified(id: string, displayed: string): Promise<
   return true;
 }
 
-/** Sets the picture, or removes it with null. Targeted like the other metadata_admin marks, so no other key is rewritten. */
+/** Sets the picture, or removes it with null. */
 export async function patchAvatar(id: string, avatar: Avatar | null): Promise<void> {
-  const value = avatar === null ? null : validateMetadataAdmin({ avatar }).avatar!;
-  const api = kratosAdmin();
-  const current = await api.getIdentity({ id });
-  const meta = current.metadata_admin as Record<string, unknown> | null | undefined;
-  const hasMeta = meta != null && typeof meta === 'object';
-  const hasKey = hasMeta && 'avatar' in meta;
-  let patch: PatchOp[];
-  if (value === null) {
-    if (!hasKey) return;
-    patch = [{ op: 'remove', path: '/metadata_admin/avatar' }];
-  } else if (!hasMeta) {
-    patch = [{ op: 'add', path: '/metadata_admin', value: { avatar: value } }];
-  } else {
-    patch = [{ op: hasKey ? 'replace' : 'add', path: '/metadata_admin/avatar', value }];
-  }
-  await api.patchIdentity({ id, jsonPatch: patch });
+  await patchMetadataKey(id, ['avatar'], avatar === null ? null : validateMetadataAdmin({ avatar }).avatar!);
 }

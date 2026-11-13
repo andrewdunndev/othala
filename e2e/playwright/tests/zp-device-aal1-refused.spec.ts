@@ -19,7 +19,7 @@ test('ZP1 — a password-only member is refused on the portal error page and no 
   await page.getByRole('button', { name: 'Continue' }).click();
   await page.waitForURL((u) => u.pathname === '/auth/error');
   expect(new URL(page.url()).searchParams.get('reason')).toBe('second-factor-required');
-  await expect(page.getByRole('heading', { name: 'This needs a second factor' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'This needs a second step' })).toBeVisible();
 
   const token = await pollDeviceToken(request, baseURL, device.device_code);
   expect(token.status, `ZP1: no token: ${JSON.stringify(token.body)}`).not.toBe(200);
