@@ -163,7 +163,8 @@ test('reconcileOnBoot keeps retrying past the old give-up point and logs each ba
   const origWarn = console.warn;
   const origError = console.error;
   const lines = [];
-  console.log = () => {};
+  const attempts = [];
+  console.log = (...args) => attempts.push(args.join(' '));
   console.warn = (...args) => lines.push(args.join(' '));
   console.error = (...args) => lines.push(args.join(' '));
 
@@ -182,6 +183,8 @@ test('reconcileOnBoot keeps retrying past the old give-up point and logs each ba
   }
   assert.ok(lines.length <= 5, `failures are not logged per attempt (${lines.length} lines)`);
   assert.ok(!lines.some((l) => l.includes('gave up')));
+  const attemptLines = attempts.filter((l) => l.includes('boot reconcile attempt'));
+  assert.ok(attemptLines.length <= 3, `the attempt line is logged only when the delay changes (${attemptLines.length} lines)`);
 });
 
 test('lastReconcileOk is false after a failed pass and true again after a good one', async () => {
@@ -196,6 +199,33 @@ test('lastReconcileOk is false after a failed pass and true again after a good o
     assert.equal(lastReconcileOk(), true);
   } finally {
     console.log = origLog;
+    console.error = origError;
+  }
+});
+
+test('a pass skipped behind a failing SIGHUP pass does not end the boot loop', async () => {
+  const origLog = console.log;
+  const origWarn = console.warn;
+  const origError = console.error;
+  console.log = () => {};
+  console.warn = () => {};
+  console.error = () => {};
+  try {
+    let passes = 0;
+    const slowFailure = async () => {
+      await new Promise((resolve) => setTimeout(resolve, 30));
+      if (++passes === 1) throw new Error('hydra still down');
+      return [];
+    };
+    const inFlight = reconcileClients(slowFailure).catch(() => {});
+    const reg = stubRegister();
+    await reconcileOnBoot(reg, 1, 4);
+    assert.ok(reg.callCount() >= 1, 'the boot loop ran a pass of its own before returning');
+    assert.equal(lastReconcileOk(), true);
+    await inFlight;
+  } finally {
+    console.log = origLog;
+    console.warn = origWarn;
     console.error = origError;
   }
 });

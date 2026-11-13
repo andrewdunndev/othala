@@ -56,7 +56,7 @@ export async function reconcileClients(register: RegisterFn = registerAllClients
  * Boot reconcile. Hydra may still be starting, or recovering its database, when the portal binds its
  * listeners, so a failed pass retries with doubling backoff capped at `maxDelayMs` until one succeeds; the
  * listeners serve throughout and /readyz reports 503 until it does. A failure is logged once per backoff step,
- * so a long outage costs a handful of lines, not one per retry. A SIGHUP pass that succeeds ends the loop.
+ * so a long outage costs a handful of lines, not one per retry. Only a pass of its own ends the loop.
  *
  * @param register  Injectable register function (defaults to registerAllClients).
  * @param baseDelayMs  First retry delay in ms (default 2000).
@@ -68,22 +68,30 @@ export async function reconcileOnBoot(
   maxDelayMs = 60_000,
 ): Promise<void> {
   let delay = baseDelayMs;
-  let logged = 0;
+  let attemptLogged = 0;
+  let failureLogged = 0;
   for (let attempt = 1; ; attempt++) {
-    try {
+    if (delay !== attemptLogged) {
+      attemptLogged = delay;
       console.log(`[portal:registrar] boot reconcile attempt ${attempt}`);
+    }
+    // Wait out a pass already running (a SIGHUP) without queueing a rerun behind it: only a pass of our own ends the loop.
+    if (reconciling) {
+      await new Promise((resolve) => setTimeout(resolve, baseDelayMs));
+      continue;
+    }
+    try {
       await reconcileClients(register, false);
       return;
     } catch (err) {
-      if (delay !== logged) {
-        logged = delay;
+      if (delay !== failureLogged) {
+        failureLogged = delay;
         const at = delay >= maxDelayMs ? ' (the longest wait; logged no more until it succeeds)' : '';
         console.warn(
           `[portal:registrar] reconcile failed: ${(err as Error).message} — retrying in ${delay}ms${at}`,
         );
       }
       await new Promise((resolve) => setTimeout(resolve, delay));
-      if (lastOk) return;
       delay = Math.min(delay * 2, maxDelayMs);
     }
   }
