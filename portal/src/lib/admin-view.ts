@@ -80,6 +80,18 @@ export function unservedOverrides(i: Identity, manifests: readonly ClientManifes
     .map(([clientId, role]) => ({ clientId, role }));
 }
 
+/** Stored overrides naming a role their app's manifest does not declare: the person holds the app's lowest role until an admin picks a level. */
+export function undeclaredOverrides(i: Identity, manifests: readonly ClientManifest[]): Array<{ clientId: string; appName: string; role: string }> {
+  const out: Array<{ clientId: string; appName: string; role: string }> = [];
+  for (const m of manifests) {
+    const role = i.metadata_admin?.roles?.[m.clientId];
+    if (typeof role === 'string' && role !== '' && !m.roles.some((r) => r.name === role)) {
+      out.push({ clientId: m.clientId, appName: m.clientName || m.clientId, role });
+    }
+  }
+  return out;
+}
+
 export interface AppChip {
   name: string;
   /** Holds the app's highest level. */

@@ -14,6 +14,7 @@ The git tag is the authoritative version; `portal/package.json` mirrors it.
 - An admin save ends the member's app sign-ins whenever their role overrides change in any way (added, changed or removed) or a group is removed; before, a newly added override, such as a demotion kept alongside a shared group, left their old tokens valid. A group addition ends nothing.
 - An admin save no longer drops a stored role override for an app with no served manifest (a retired app, a manifest with a mistake, or an unreadable apps directory); the person page lists them under "Overrides for apps not shown" and removes one only on an explicit click.
 - An admin save carries `admin`, the picture and passkey names from the identity as it stands when the write happens, so a save racing a revoke-admin no longer restores the marker.
+- A stored role override naming a role the app's manifest no longer declares now resolves to the app's lowest declared role instead of falling back to the group-mapped role, and the person page flags it. Rename a role and anyone held back by an override stays held back.
 
 ## [0.18.0] - 2026-11-11
 

@@ -19,7 +19,7 @@ import { getIdentity, listIdentities, EVICTABLE_CREDENTIAL_TYPES } from '../../.
 import { ADMIN_ACTIONS, ENROLLMENT_TTL, type ActionResult } from '../../../lib/admin-actions';
 import { bannerFor } from '../../../lib/admin-banner';
 import { currentLevel, NO_ACCESS } from '../../../lib/access-rows';
-import { emailIsVerified, householdChoices, PEOPLE_LOAD_ERROR, personLimits, personName, removalBlock, signInMethods, unrecognisedGroups, unservedOverrides } from '../../../lib/admin-view';
+import { emailIsVerified, householdChoices, PEOPLE_LOAD_ERROR, personLimits, personName, removalBlock, signInMethods, unrecognisedGroups, undeclaredOverrides, unservedOverrides } from '../../../lib/admin-view';
 import { devActionResult } from '../../../lib/admin-fixtures';
 import { parseIdentity } from '../../../lib/identity-facts';
 import { shouldRefuseRecovery } from '../../../lib/access';
@@ -153,6 +153,7 @@ const twoStep = parseIdentity(identity).hasSecondFactor;
 const methods = identity ? signInMethods(identity) : [];
 const unrecognised = identity ? unrecognisedGroups(identity, manifests) : [];
 const unserved = identity ? unservedOverrides(identity, manifests) : [];
+const undeclared = identity ? undeclaredOverrides(identity, manifests) : [];
 const currentLevels: Record<string, string> = {};
 for (const a of apps) currentLevels[a.clientId] = identity ? currentLevel(a.manifest, meta) : NO_ACCESS;
 const households = householdChoices();
@@ -457,6 +458,16 @@ const roleNote = Object.keys(roleOverrides).length;
                   </form>
                 </li>
               ))}
+            </ul>
+          </section>
+        )}
+
+        {undeclared.length > 0 && (
+          <section class="panel warn-card" id="undeclared" aria-labelledby="h-undeclared">
+            <h2 id="h-undeclared">Roles an app no longer has</h2>
+            <p class="hint">{first} has a stored role the app no longer offers, so they hold its lowest level until you pick one under Apps.</p>
+            <ul>
+              {undeclared.map((o) => <li><code>{o.appName}: {o.role}</code></li>)}
             </ul>
           </section>
         )}
