@@ -43,6 +43,12 @@ function resolveDeps(deps: Partial<RevokeDeps> = {}): RevokeDeps {
   };
 }
 
+/** The page token of a Hydra list response's `rel="next"` Link header, if any. */
+export function nextPageToken(headers: Headers): string | undefined {
+  const next = /<([^>]*)>\s*;\s*rel="?next"?/.exec(headers.get('link') ?? '');
+  return next ? (new URL(next[1], 'http://hydra').searchParams.get('page_token') ?? undefined) : undefined;
+}
+
 async function listLoginSessionIds(oauth2Api: OAuth2Api, subject: string): Promise<string[]> {
   const sids = new Set<string>();
   let pageToken: string | undefined;
@@ -52,8 +58,7 @@ async function listLoginSessionIds(oauth2Api: OAuth2Api, subject: string): Promi
       const sid = row.consent_request?.login_session_id;
       if (sid) sids.add(sid);
     }
-    const next = /<([^>]*)>\s*;\s*rel="?next"?/.exec(res.raw.headers.get('link') ?? '');
-    pageToken = next ? (new URL(next[1], 'http://hydra').searchParams.get('page_token') ?? undefined) : undefined;
+    pageToken = nextPageToken(res.raw.headers);
   } while (pageToken);
   return [...sids];
 }

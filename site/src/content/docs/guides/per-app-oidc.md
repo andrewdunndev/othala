@@ -53,8 +53,9 @@ Generate a client secret, store it, and write the manifest with
 `presentation.access` naming only the access group and `consent.group_role_map`
 naming both. The app's boot reconcile (and SIGHUP) registers the client through
 the Hydra admin port. It creates and updates but never deletes: retiring a
-service means deleting the Hydra client through the admin API as well as the
-manifest. Drop `offline_access` from the scopes where the app needs no refresh
+service ends its tokens on the next reconcile, and removing the Hydra client
+through the admin API is still yours to do. Editing who may enter or what the
+roles emit ends that app's existing sign-ins the same way. Drop `offline_access` from the scopes where the app needs no refresh
 tokens.
 
 The secret must be the same plaintext on both sides; nothing links them, and a

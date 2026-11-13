@@ -16,6 +16,8 @@ The git tag is the authoritative version; `portal/package.json` mirrors it.
 - An admin save carries `admin`, the picture and passkey names from the identity as it stands when the write happens, so a save racing a revoke-admin no longer restores the marker.
 - A stored role override naming a role the app's manifest no longer declares now resolves to the app's lowest declared role instead of falling back to the group-mapped role, and the person page flags it. Rename a role and anyone held back by an override stays held back.
 - A password change now also ends the member's app sign-ins and refresh tokens: `kratos/kratos.yml` gains a non-interrupting `settings.after.password` web hook to `/admin/revoke-grants`, authenticated like the other hooks. Deployers who vendor `kratos.yml` and `contract/kratos.schema.json` take both.
+- Editing a manifest's access-relevant fields (access groups, `group_role_map`, roles and their `claim_emit`, `emit_groups_claim`, scopes, `skip_access_check`) ends that app's existing sign-ins and refresh tokens for everyone on the next reconcile; before, they kept their old claims for up to 30 days. The fingerprint lives in the Hydra client's metadata. A client without one is baselined, not revoked.
+- A Hydra client othala registered whose manifest file is gone has its grants ended once and is marked retired in its metadata. This is skipped while any manifest is quarantined, when none is served, or when the apps directory is unreadable. No client is ever deleted.
 
 ## [0.18.0] - 2026-11-11
 
