@@ -6,6 +6,7 @@ import { test, expect } from '../fixtures';
 import { createIdentityWithPassword, readIdentity, TEST_PASSWORD } from '../actions/identity';
 import { loginViaJsonApi } from '../actions/login';
 import { getSession } from '../actions/session';
+import { registerPasskey } from '../actions/passkey';
 
 const OUT = '/out/captures';
 const hasWindowFn = (n: string) => typeof (window as unknown as Record<string, unknown>)[n] === 'function';
@@ -26,11 +27,7 @@ test('ZZ1 — capture passkey sign-in and the dashboard it opens', async ({ base
 
   const ctx = page.context();
   await loginViaJsonApi(ctx, { identifier: identity.email, password: TEST_PASSWORD }, baseURL);
-  await page.goto(`${baseURL}/auth/settings`);
-  await page.waitForLoadState('networkidle');
-  await page.waitForFunction(hasWindowFn, 'oryPasskeySettingsRegistration');
-  await page.locator('button[name="passkey_register_trigger"]').first().click();
-  await page.waitForLoadState('networkidle');
+  await registerPasskey(page, baseURL!);
 
   await expect.poll(async () => (await readIdentity(kratosAdminURL, identity.id))?.credentials?.passkey, { timeout: 10_000 }).toBeTruthy();
   await ctx.clearCookies();

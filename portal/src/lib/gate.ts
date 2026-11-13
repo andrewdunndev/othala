@@ -104,6 +104,15 @@ export function needsStepUp(
   return facts.isAdmin || facts.hasSecondFactor || holdsElevatedRole(identity, manifests);
 }
 
+/** The front-door ask: step-up, only for an identity that can answer it. */
+export function stepUpAtLanding(
+  session: Pick<Session, 'authenticator_assurance_level'> | null | undefined,
+  identity: Identity | null | undefined,
+  manifests?: ClientManifest[],
+): boolean {
+  return needsStepUp(session, identity, manifests) && parseIdentity(identity).hasSecondFactor;
+}
+
 /**
  * What a session asks to reach: an OIDC app by its manifest, a forward-auth group, the admin pages, or a session from
  * an emailed code (code sign-in, recovery, and the setup links the admin pages make).

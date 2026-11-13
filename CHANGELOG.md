@@ -10,6 +10,7 @@ The git tag is the authoritative version; `portal/package.json` mirrors it.
 
 ### Added
 
+- The second step is asked at the dag sign-in, not at the first app.
 - `mise.toml` and a `justfile` (`setup`, `test`, `check`, `build`, `dev`, `purity`, `e2e`, `backup`). `just e2e` builds both images from the working tree before it runs the harness; `just backup <dir>` writes custom-format dumps of the kratos and hydra databases.
 - e2e walks for the admin recovery refresh with the new passkey, eviction of an admin target, and refresh-token revocation after each credential change.
 
