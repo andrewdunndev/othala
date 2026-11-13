@@ -276,6 +276,15 @@ test('render refuses a cookie or system secret under 16 characters, set or not _
   }
 });
 
+test('render refuses a Hydra _PREVIOUS secret under 16 characters when set and allows it unset', () => {
+  for (const name of ['HYDRA_SYSTEM_SECRET_PREVIOUS', 'HYDRA_COOKIE_SECRET_PREVIOUS']) {
+    assert.throws(() => render(root, CONTENT, { ...ENV, [name]: 's'.repeat(15) }), new RegExp(`${name} must be at least 16 characters`));
+    assert.doesNotThrow(() => render(root, CONTENT, { ...ENV, [name]: 's'.repeat(16) }), name);
+    assert.doesNotThrow(() => render(root, CONTENT, { ...ENV, [name]: '' }), name);
+    assert.doesNotThrow(() => render(root, CONTENT, ENV), name);
+  }
+});
+
 test('render refuses a Kratos cookie _PREVIOUS equal to its _CURRENT and leaves the other pairs alone', () => {
   const same = { KRATOS_COOKIE_SECRET: 'k'.repeat(32) };
   const env = { ...ENV, KRATOS_COOKIE_SECRET_CURRENT: same.KRATOS_COOKIE_SECRET, KRATOS_COOKIE_SECRET_PREVIOUS: same.KRATOS_COOKIE_SECRET };
@@ -453,8 +462,8 @@ const secretsOf = (env, file) => parseOryYaml(render(root, CONTENT, env).find((f
 const PREVIOUS = {
   KRATOS_COOKIE_SECRET_PREVIOUS: 'p'.repeat(32),
   KRATOS_CIPHER_SECRET_PREVIOUS: 'q'.repeat(32),
-  HYDRA_SYSTEM_SECRET_PREVIOUS: 'old-system',
-  HYDRA_COOKIE_SECRET_PREVIOUS: 'old-hcookie',
+  HYDRA_SYSTEM_SECRET_PREVIOUS: 'old-system-secret',
+  HYDRA_COOKIE_SECRET_PREVIOUS: 'old-hydra-cookie',
 };
 
 test('with no _PREVIOUS set, or one set empty, each secret list is the single current entry', () => {
@@ -468,8 +477,8 @@ test('a _PREVIOUS renders as the second entry, after the current one', () => {
   const env = { ...ENV, KRATOS_COOKIE_SECRET_CURRENT: 'n'.repeat(32), ...PREVIOUS };
   assert.deepEqual(secretsOf(env, 'kratos/kratos.yml'), { cookie: ['n'.repeat(32), 'p'.repeat(32)], cipher: ['c'.repeat(32), 'q'.repeat(32)] });
   assert.deepEqual(secretsOf(env, 'hydra/hydra.yml'), {
-    system: ['fake-hydra_system_secret', 'old-system'],
-    cookie: ['fake-hydra_cookie_secret_current', 'old-hcookie'],
+    system: ['fake-hydra_system_secret', 'old-system-secret'],
+    cookie: ['fake-hydra_cookie_secret_current', 'old-hydra-cookie'],
   });
 });
 

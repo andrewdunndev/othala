@@ -29,11 +29,15 @@ export async function registerPasskey(page: Page, baseURL: string): Promise<void
   await clickAndSettle(page, button);
 }
 
-// The save answers with a redirect back to settings; a caller that navigates before that page lands loses the passkey or the goto.
+// The save posts, then redirects through a fresh settings flow to /auth/settings?flow=. The previous document stays current, and
+// networkidle, until the new one commits, so neither a response event nor a load state marks the end. The saved passkey listed
+// on the settled flow URL does; a caller that navigates earlier has its goto interrupted.
 export async function clickAndSettle(page: Page, button: Locator): Promise<void> {
-  const settled = page.waitForResponse((r) => r.request().isNavigationRequest() && r.request().method() === 'GET' && new URL(r.url()).pathname === '/auth/settings' && r.status() === 200);
+  const listed = page.locator('[data-credential="passkey"]');
+  const before = await listed.count();
   await button.click();
-  await settled;
+  await expect(listed, 'the saved passkey is listed').toHaveCount(before + 1, { timeout: 15_000 });
+  await expect(page, 'the save lands on a settings flow').toHaveURL(/\/auth\/settings\?flow=/);
   await page.waitForLoadState('networkidle');
 }
 

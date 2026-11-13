@@ -6,6 +6,7 @@ import { createIdentityWithPassword, readIdentity, TEST_PASSWORD } from '../acti
 import { loginViaJsonApi } from '../actions/login';
 import { getSession } from '../actions/session';
 import { capturePasskeyLoginDiagnostics, probePasskeyLoginCapabilities } from '../actions/diagnostics';
+import { clickAndSettle } from '../actions/passkey';
 
 const PASSKEY_REGISTER_BUTTON = 'button[name="passkey_register_trigger"]';
 const PASSKEY_LOGIN_BUTTON = 'button[name="passkey_login_trigger"]';
@@ -20,8 +21,7 @@ async function registerPasskeyForContext(
   const btn = page.locator(PASSKEY_REGISTER_BUTTON).first();
   await expect(btn, 'passkey register button must be visible').toBeVisible({ timeout: 10_000 });
   await page.waitForFunction(() => typeof (window as unknown as Record<string, unknown>).oryPasskeySettingsRegistration === 'function');
-  await btn.click();
-  await page.waitForLoadState('networkidle');
+  await clickAndSettle(page, btn);
   console.log(`[P] passkey registered for ${identity.email} at URL:`, page.url());
 }
 

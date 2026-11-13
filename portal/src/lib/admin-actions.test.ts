@@ -1025,6 +1025,21 @@ describe('admin changes are serialized and the last-admin count is taken inside 
     expect(rows.filter((r) => r.admin && r.state === 'active')).toHaveLength(1);
   });
 
+  it('a save racing a revoke-admin does not restore the marker', async () => {
+    // updateIdentity writes the marker back from the value it read, so an unqueued save lands after the revoke and undoes it.
+    updateIdentityMock.mockReset().mockImplementation(async (id: string) => {
+      const read = rowOf(id).admin;
+      for (let i = 0; i < 4; i++) await tick();
+      rowOf(id).admin = read;
+    });
+    const form = fd({ username: 'aaa.person', email: 'aaa.person@othala.test' });
+    form.append('identityGroups', 'family');
+
+    await Promise.all([saveAction(form, ctxFor('aaa', 'bbb')), revokeAdminAction(fd(), ctxFor('aaa', 'bbb'))]);
+
+    expect(rowOf('aaa').admin).toBe(false);
+  });
+
   it('a failed action does not hold the lock for the next one', async () => {
     patchAdminMarkerMock.mockRejectedValueOnce(new Error('kratos down'));
     await expect(revokeAdminAction(fd(), ctxFor('bbb', 'aaa'))).rejects.toThrow('kratos down');

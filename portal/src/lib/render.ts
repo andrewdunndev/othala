@@ -223,8 +223,9 @@ export function render(policyDir: string, contentDir: string, env: Env): Rendere
   if (unset.length > 0) throw new RenderError(`missing secret(s): ${unset.join(', ')}`);
   // Both schemas reject a secret under 16 characters; Kratos also requires unique entries in its cookie list only, so
   // no other repeated pair is refused here.
-  for (const name of ['KRATOS_COOKIE_SECRET_CURRENT', 'HYDRA_COOKIE_SECRET_CURRENT', 'HYDRA_SYSTEM_SECRET']) {
-    if (Buffer.byteLength(env[name]!) < 16) throw new RenderError(`${name} must be at least 16 characters`);
+  // A _PREVIOUS is optional, but once set Hydra refuses to boot on a short one mid-rotation.
+  for (const name of ['KRATOS_COOKIE_SECRET_CURRENT', 'HYDRA_COOKIE_SECRET_CURRENT', 'HYDRA_SYSTEM_SECRET', 'HYDRA_SYSTEM_SECRET_PREVIOUS', 'HYDRA_COOKIE_SECRET_PREVIOUS']) {
+    if (env[name] && Buffer.byteLength(env[name]) < 16) throw new RenderError(`${name} must be at least 16 characters`);
   }
   if (env.KRATOS_COOKIE_SECRET_PREVIOUS && env.KRATOS_COOKIE_SECRET_PREVIOUS === env.KRATOS_COOKIE_SECRET_CURRENT) {
     throw new RenderError('KRATOS_COOKIE_SECRET_PREVIOUS must differ from KRATOS_COOKIE_SECRET_CURRENT');
