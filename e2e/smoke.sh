@@ -342,15 +342,15 @@ fi
 echo ""
 echo "G. OIDC dance (login -> consent -> ID token; claims + access-gate deny)"
 
-# mk_identity <state> <groups-json> <localpart> -> echoes the new identity id.
+# mk_identity <state> <groups-json> <localpart> [password] -> echoes the new identity id; with a password the dance can sign in at Kratos.
 mk_identity() {
-    printf '%s' "fetch('http://kratos:4434/admin/identities',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({schema_id:'family',state:'$1',traits:{username:'$3',email:'$3@${OTHALA_APEX}',displayName:'$3'},metadata_admin:{groups:$2}})}).then(r=>r.json()).then(j=>{process.stdout.write(j.id||'');process.exit(0)}).catch(()=>process.exit(1))" | node_in othala
+    printf '%s' "fetch('http://kratos:4434/admin/identities',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({schema_id:'family',state:'$1',traits:{username:'$3',email:'$3@${OTHALA_APEX}',displayName:'$3'},metadata_admin:{groups:$2}${4:+,credentials:{password:{config:{password:'$4'}}}}})}).then(r=>r.json()).then(j=>{process.stdout.write(j.id||'');process.exit(0)}).catch(()=>process.exit(1))" | node_in othala
 }
 
 # G1: active member with grafana-access -> dance completes, ID token carries grafana_role=[Viewer]
 # (claims-injection regression guard; the admin pairing is asserted in t-access-model.spec.ts).
-g1_id=$(mk_identity active "['grafana-access']" g1.activegrafana)
-g1=$(run_dance "$g1_id")
+g1_id=$(mk_identity active "['grafana-access']" g1.activegrafana "$SMOKE_PASSWORD")
+g1=$(run_dance "$g1_id" "" "" "" "g1.activegrafana@${OTHALA_APEX}")
 if [[ "$g1" == OK* && "$g1" == *'"grafana_role":["Viewer"]'* ]]; then
     pass "G1 OIDC dance issues an ID token with the injected role claim (grafana_role=[Viewer])"
 else
@@ -382,10 +382,10 @@ fi
 # G4: a member with a stored picture, signing in with the profile scope. The avatar is patched on through the Kratos
 # admin API (a 1x1 PNG built inline), the id_token must carry its absolute URL, the URL must serve with no cookie, and a
 # wrong hash must 404. Userinfo is asserted separately.
-g4_id=$(mk_identity active "['grafana-access']" g4.picture)
+g4_id=$(mk_identity active "['grafana-access']" g4.picture "$SMOKE_PASSWORD")
 g4_sha=$(printf '%s' "const c=require('node:crypto');const b64='iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==';const sha=c.createHash('sha256').update(Buffer.from(b64,'base64')).digest('hex');fetch('http://kratos:4434/admin/identities/${g4_id}',{method:'PATCH',headers:{'Content-Type':'application/json'},body:JSON.stringify([{op:'add',path:'/metadata_admin/avatar',value:{type:'image/png',sha256:sha,data:b64}}])}).then(r=>{process.stdout.write(r.ok?sha:'PATCH-'+r.status);process.exit(0)}).catch(()=>process.exit(1))" | node_in othala)
 g4_png='iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg=='
-g4=$(run_dance "$g4_id" "openid email profile groups offline_access" "$g4_png" "$g4_sha")
+g4=$(run_dance "$g4_id" "openid email profile groups offline_access" "$g4_png" "$g4_sha" "g4.picture@${OTHALA_APEX}")
 if [[ "$g4" == OK* && "$g4" == *'"claim_ok":true'* ]]; then
     pass "G4a profile-scoped id_token carries picture = the avatar's absolute URL"
 else
@@ -406,6 +406,43 @@ if [[ "$g4" == *'"userinfo_status":200'* && "$g4" == *'"userinfo_picture":"https
 else
     fail "G4d userinfo picture" "got: $g4"
 fi
+
+# G5: an access-relevant manifest edit plus a registrar reconcile ends refresh tokens issued before it, and the
+# Hydra client carries the fingerprint the registrar compared. The edit flips grafana's emit_groups_claim and is undone.
+g5_id=$(mk_identity active "['grafana-access']" g5.refresh "$SMOKE_PASSWORD")
+g5=$(run_dance "$g5_id" "" "" "" "g5.refresh@${OTHALA_APEX}")
+g5_refresh=$(echo "$g5" | sed -n 's/.*"refresh_token":"\([^"]*\)".*/\1/p')
+grafana_fingerprint() {
+    curl_in hydra "http://${HYDRA_ADMIN_BIND_HOST}:4445/admin/clients/grafana" | sed -n 's/.*"fingerprint":"\([0-9a-f]*\)".*/\1/p'
+}
+g5_before=$(grafana_fingerprint)
+if [[ -n "$g5_refresh" && -n "$g5_before" ]]; then
+    pass "G5a the grafana client carries an access fingerprint in its metadata, and the dance issued a refresh token"
+else
+    fail "G5a fingerprint metadata + refresh token" "fingerprint='$g5_before' refresh_token present=$([[ -n "$g5_refresh" ]] && echo yes || echo no) dance: $g5"
+fi
+cp content/apps/grafana.yaml content/apps/grafana.yaml.bak
+sed -i.tmp 's/^\(  emit_groups_claim:\) true/\1 false/' content/apps/grafana.yaml && rm -f content/apps/grafana.yaml.tmp
+docker compose kill -s SIGHUP othala >/dev/null 2>&1
+g5_after=$g5_before
+for _ in $(seq 1 30); do
+    g5_after=$(grafana_fingerprint)
+    [[ "$g5_after" != "$g5_before" ]] && break
+    sleep 1
+done
+if [[ -n "$g5_after" && "$g5_after" != "$g5_before" ]]; then
+    pass "G5b a reconcile after the manifest edit stored a new fingerprint"
+else
+    fail "G5b fingerprint did not change after SIGHUP" "before=$g5_before after=$g5_after"
+fi
+g5_refused=$(run_refresh "$g5_refresh")
+if [[ "$g5_refused" == "REFRESH status=400" || "$g5_refused" == "REFRESH status=401" ]]; then
+    pass "G5c a refresh token issued before the manifest change is refused after the reconcile"
+else
+    fail "G5c pre-change refresh token still works" "got: $g5_refused (want 400 or 401)"
+fi
+mv content/apps/grafana.yaml.bak content/apps/grafana.yaml
+docker compose kill -s SIGHUP othala >/dev/null 2>&1
 
 # Section H: contact / request form (SSR /api/request, signed-in only).
 echo ""
