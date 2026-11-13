@@ -66,7 +66,7 @@ oauth2:
     default_grant_allowed_scope: false
 
 secrets:
-  # [new, old] (docs/runbooks/secrets-rotation.md, docs/runbooks/cookie-rotation.md).
+  # [new, old] (docs/runbooks/secrets-rotation.md).
   system:
     - "${HYDRA_SYSTEM_SECRET}"
 #@if HYDRA_SYSTEM_SECRET_PREVIOUS

@@ -8,6 +8,16 @@ The git tag is the authoritative version; `portal/package.json` mirrors it.
 
 ## [Unreleased]
 
+### Changed
+
+- `render` also refuses a Kratos or Hydra cookie secret or the Hydra system secret under 16 characters, and a `KRATOS_COOKIE_SECRET_PREVIOUS` equal to its `_CURRENT`, since Kratos and Hydra refuse to start on either.
+- `DEPLOY.md` says how the first admin is made, names the `postgres-data` volume and `secrets.env` as what to back up, and links the backup, admin-recovery and lost-device runbooks.
+- The cookie-rotation and secrets-rotation runbooks are merged into `docs/runbooks/secrets-rotation.md`; the comments in `kratos.yml`, `hydra.yml` and `.env.example` that pointed at the old name now point at it.
+- The admin-recovery, lost-device and postgres-backup runbooks give working sequences: the key-first authenticator swap, the console credential deletes for an admin with no second factor left, eviction of a member or admin who holds an elevated role, and a client re-registration step after a restore.
+- A signed-in member sees the sign-in-is-starting-up page, not the signed-out home, when Kratos answers but cannot read its database.
+- The portal keeps retrying its Hydra client registration with a capped backoff (up to 60 s) until it succeeds, instead of giving up after about 20 s and waiting for a SIGHUP. It serves throughout, and `/readyz` reports 503 until the registration lands.
+- A refused render keeps the last good output instead of emptying it, so a restart after a bad edit still boots the earlier config; only a write that fails partway clears it. `check` now runs the render in memory and reports every refusal `render` would make.
+
 ### Fixed
 
 - A manifest gate flag (`skip_access_check`, `skip_consent`, `backchannel_logout_session_required`, `emit_groups_claim`) must be `true` or `false`; any other value, such as the string `no`, quarantines the file (a blank value reads as unset) and `manifest-lint` reports it. Before, a non-empty string opened the app to every member.

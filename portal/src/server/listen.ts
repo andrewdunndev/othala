@@ -481,7 +481,7 @@ if (import.meta.url === `file://${process.argv[1]}`) {
   });
 
   // In-process OIDC client reconciler, started after both listeners are bound so a slow Hydra never delays boot.
-  // Boot retries with backoff, then logs an operator notice and keeps serving; SIGHUP drops the manifest cache and
+  // Boot retries with capped backoff until Hydra answers while the portal serves; SIGHUP drops the manifest cache and
   // reconciles again. It stays its own bundle (build:registrar) because it loads config.ts.
   const registrar = await import('./registrar.mjs');
   setRegistrarProbe(registrar.lastReconcileOk);

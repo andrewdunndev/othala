@@ -3,7 +3,7 @@
 //   node dist/server/config.mjs check [--policy <dir>] [--content <dir>]
 //   node dist/server/config.mjs gen-secrets [--content <dir>]
 //   node dist/server/config.mjs check-ory --kratos <file> --hydra <file> --identity-schema <file> --jsonnet <file> [--policy <dir>]
-// Values and secrets come from the environment. Exits 1 on a failed check or render, 2 on bad usage.
+// Values and secrets come from the environment. Exits 1 on a failed check or render, 2 on bad usage. A refused render keeps the last good output; a write that fails partway clears it.
 
 import { existsSync } from 'node:fs';
 import { join } from 'node:path';
@@ -11,7 +11,7 @@ import { parseArgs } from 'node:util';
 import { CONTENT_DIR, POLICY_DIR, RENDER_DIR } from '../lib/constants';
 import { checkOry } from '../lib/contract';
 import { lintApps } from '../lib/content';
-import { check, clearRendered, generateSecrets, render, RenderError, writeRendered } from '../lib/render';
+import { clearRendered, generateSecrets, preflight, RenderError, render, writeRendered, type RenderedFile } from '../lib/render';
 
 const USAGE =
   'usage: config.mjs render [--policy <dir>] [--content <dir>] [--out <dir>] | check [--policy <dir>] [--content <dir>] | gen-secrets [--content <dir>] | check-ory --kratos <file> --hydra <file> --identity-schema <file> --jsonnet <file> [--policy <dir>]';
@@ -46,7 +46,7 @@ function main(): number {
 
   switch (positionals[0]) {
     case 'check': {
-      const errors = check(policy, content, process.env);
+      const errors = preflight(policy, content, process.env);
       for (const e of errors) console.error(`[othala-config] ${e}`);
       if (errors.length > 0) return 1;
       const apps = join(content, 'apps');
@@ -55,17 +55,25 @@ function main(): number {
       return 0;
     }
     case 'render': {
+      let files: RenderedFile[];
       try {
-        const files = render(policy, content, process.env);
+        files = render(policy, content, process.env);
+      } catch (err) {
+        // A refusal is the operator's to fix, and the running stack keeps serving the last good render. Only a RenderError message is safe to print.
+        const lines = err instanceof RenderError ? err.message.split('\n') : [`render failed: ${(err as NodeJS.ErrnoException).code ?? 'unexpected error'}`];
+        for (const line of lines) console.error(`[othala-config] ${line}`);
+        console.error('[othala-config] render refused; earlier output kept');
+        return 1;
+      }
+      try {
         writeRendered(out, files);
         console.log(`[othala-config] rendered ${files.length} files from ${policy} and ${content} to ${out}`);
         return 0;
       } catch (err) {
-        // Any failure clears the earlier render, so old and new files never mix. Only a RenderError message is safe to print.
-        const lines = err instanceof RenderError ? err.message.split('\n') : [`render failed: ${(err as NodeJS.ErrnoException).code ?? 'unexpected error'}`];
-        for (const line of lines) console.error(`[othala-config] ${line}`);
+        // A write that fails partway leaves old and new files mixed, so Kratos, Hydra and Caddy must refuse to boot on it.
+        console.error(`[othala-config] render failed writing: ${(err as NodeJS.ErrnoException).code ?? 'unexpected error'}`);
         clearRendered(out);
-        console.error('[othala-config] render refused; earlier output cleared');
+        console.error('[othala-config] earlier output cleared');
         return 1;
       }
     }

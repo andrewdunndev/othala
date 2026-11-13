@@ -39,22 +39,6 @@ export async function getSession(cookie?: string): Promise<Session | null> {
   }
 }
 
-export async function isReachable(): Promise<boolean> {
-  const ctl = new AbortController();
-  const t = setTimeout(() => ctl.abort(), HEALTH_TIMEOUT_MS);
-  try {
-    const res = await fetch(`${kratosBase()}/health/alive`, {
-      signal: ctl.signal,
-      redirect: 'manual',
-    });
-    return res.ok;
-  } catch {
-    return false;
-  } finally {
-    clearTimeout(t);
-  }
-}
-
 const ERROR_ID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 export async function getFlowError(id: string): Promise<{ id?: unknown; code?: unknown } | null> {

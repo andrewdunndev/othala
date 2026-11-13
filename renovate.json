@@ -1,6 +1,7 @@
 {
   "$schema": "https://docs.renovatebot.com/renovate-schema.json",
   "extends": ["gitlab>dunn.dev/pipeline:renovate-config"],
+  "rebaseWhen": "conflicted",
   "packageRules": [
     {
       "description": "Playwright's npm package and Docker image move in lockstep; the image tag can lag the npm release, so automerge stays off to stop a solo npm-only bump from landing unmatched.",

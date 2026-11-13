@@ -183,7 +183,7 @@ reconcile revokes that client's consent sessions for every identity before stori
 A client othala registered whose manifest is gone is revoked once and marked retired, but only from a complete load: a
 quarantined file, an empty set or an unreadable directory proves nothing absent (`portal/scripts/register-revoke.test.mjs`).
 
-`portal/src/server/registrar.ts` drives it on boot with bounded retry (Hydra may still be starting)
+`portal/src/server/registrar.ts` drives it on boot with capped-backoff retry until Hydra answers
 and again on `SIGHUP`. A registration failure never takes down the listeners, so the admin surface stays
 up to diagnose it.
 

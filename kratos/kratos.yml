@@ -391,7 +391,7 @@ courier:
 
 secrets:
   # [new, old]: session cookies verify under both entries; continuity cookies use the pair as one key,
-  # signed with the first and encrypted with the second (docs/runbooks/cookie-rotation.md).
+  # signed with the first and encrypted with the second (docs/runbooks/secrets-rotation.md).
   cookie:
     - "${KRATOS_COOKIE_SECRET_CURRENT}"
 #@if KRATOS_COOKIE_SECRET_PREVIOUS
