@@ -8,8 +8,16 @@ The git tag is the authoritative version; `portal/package.json` mirrors it.
 
 ## [Unreleased]
 
+### Added
+
+- `mise.toml` and a `justfile` (`setup`, `test`, `check`, `build`, `dev`, `purity`, `e2e`, `backup`). `just e2e` builds both images from the working tree before it runs the harness; `just backup <dir>` writes custom-format dumps of the kratos and hydra databases.
+- e2e walks for the admin recovery refresh with the new passkey, eviction of an admin target, and refresh-token revocation after each credential change.
+
 ### Changed
 
+- CI runs `just check` and `just purity`. The release image-tag check runs wherever `check-portal` does (every MR, tags and web/api runs), `e2e-upgrade` runs on tags and on MRs touching `deploy/`, `kratos/`, `hydra/` or `DEPLOY.md`, the heavy jobs run on every MR, `reference-check` blocks, and Playwright fails a flaky test in CI.
+- `portal/.npmrc` sets `engine-strict`, and `@types/node` is on the 24 line. The `purity` npm script is gone; use `just purity`.
+- `rateLimit` sweeps idle keys at most once a second; the cap is checked on every call.
 - `render` also refuses a Kratos or Hydra cookie secret or the Hydra system secret under 16 characters, and a `KRATOS_COOKIE_SECRET_PREVIOUS` equal to its `_CURRENT`, since Kratos and Hydra refuse to start on either.
 - `DEPLOY.md` says how the first admin is made, names the `postgres-data` volume and `secrets.env` as what to back up, and links the backup, admin-recovery and lost-device runbooks.
 - The cookie-rotation and secrets-rotation runbooks are merged into `docs/runbooks/secrets-rotation.md`; the comments in `kratos.yml`, `hydra.yml` and `.env.example` that pointed at the old name now point at it.
@@ -20,6 +28,7 @@ The git tag is the authoritative version; `portal/package.json` mirrors it.
 
 ### Fixed
 
+- Passing tests no longer print their stderr, and the avatar upload tests wait for their request body to finish, so a CI run no longer ends with an unhandled-rejection error.
 - A manifest gate flag (`skip_access_check`, `skip_consent`, `backchannel_logout_session_required`, `emit_groups_claim`) must be `true` or `false`; any other value, such as the string `no`, quarantines the file (a blank value reads as unset) and `manifest-lint` reports it. Before, a non-empty string opened the app to every member.
 - An admin save ends the member's app sign-ins whenever their role overrides change in any way (added, changed or removed) or a group is removed; before, a newly added override, such as a demotion kept alongside a shared group, left their old tokens valid. A group addition ends nothing.
 - An admin save no longer drops a stored role override for an app with no served manifest (a retired app, a manifest with a mistake, or an unreadable apps directory); the person page lists them under "Overrides for apps not shown" and removes one only on an explicit click.

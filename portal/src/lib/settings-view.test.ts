@@ -1,6 +1,6 @@
 // Invariant: the settings view model reads each recorded fixture state the way the page presents it.
 
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi, afterEach } from 'vitest';
 import { splitCodes, credentialItems, totpView, lookupView, securityStatus, passwordPanelOpen, keyOnlyKeeper, emailVerified, formatAdded } from './settings-view';
 import { devSettings, isDevSettingsState } from './settings-fixtures';
 
@@ -98,5 +98,19 @@ describe('passwordPanelOpen', () => {
     expect(passwordPanelOpen(nodes, true)).toBe(false);
     const refused = nodes.map((n) => (n.group === 'password' ? { ...n, messages: [{ id: 1, text: 'no', type: 'error' as const }] } : n));
     expect(passwordPanelOpen(refused, true)).toBe(true);
+  });
+});
+
+describe('formatAdded without locale data', () => {
+  afterEach(() => vi.restoreAllMocks());
+
+  it('reads "12 Jun 2026" on a Node whose ICU falls back to en-US for every locale', () => {
+    const real = Date.prototype.toLocaleDateString;
+    vi.spyOn(Date.prototype, 'toLocaleDateString').mockImplementation(function (this: Date, _locale, options) {
+      return real.call(this, 'en-US', options);
+    });
+    expect(formatAdded(new Date(Date.UTC(2026, 5, 12, 23, 59)))).toBe('12 Jun 2026');
+    expect(formatAdded(new Date(Date.UTC(2026, 0, 1)))).toBe('1 Jan 2026');
+    expect(formatAdded(null)).toBeNull();
   });
 });

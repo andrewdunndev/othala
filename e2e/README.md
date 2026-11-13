@@ -8,18 +8,14 @@ test-only overlay outside the deployment contract, then runs `smoke.sh` and the 
 
 ```sh
 # Requires: podman, docker-compose-compat or podman-compose
-cd e2e
-AUTH_VERSION=latest bash validate.sh
+just e2e   # from the repo root
 ```
 
-## Build the image from current source
+`just e2e` builds the portal and e2e-tester images from this working tree before it runs `validate.sh`, so
+the specs and the product under test are the checked-out ones. To validate a published image instead:
+`cd e2e && AUTH_VERSION=<tag> bash validate.sh`.
 
-`validate.sh` also runs the Playwright specs. A stale image gives false results.
-
-```sh
-# from the repo root
-podman build -t registry.gitlab.com/dunn.dev/othala:lab -f portal/Containerfile .
-```
+`smoke.sh` section I assumes the compose container store (it runs `podman run --volumes-from lab-render`) and fails loudly if the store differs.
 
 ## CI
 

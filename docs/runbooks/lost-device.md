@@ -46,4 +46,4 @@ A sole admin has no one to run this; follow Step D of `docs/runbooks/admin-recov
 ## Related
 
 - `docs/runbooks/admin-recovery.md`: an admin's own account.
-- Pinned by `e2e/playwright/tests/p-eviction.spec.ts` (passkeys) and `e2e/playwright/tests/zv-eviction-elevated.spec.ts` (an elevated role).
+- Pinned by `e2e/playwright/tests/p-eviction.spec.ts` (passkeys) and `e2e/playwright/tests/zv-eviction-elevated.spec.ts` (an elevated role) and `e2e/playwright/tests/zx-eviction-admin.spec.ts` (an admin).

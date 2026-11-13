@@ -14,6 +14,7 @@ restore cannot decrypt. Keep `KRATOS_CIPHER_SECRET_CURRENT` in `secrets.env` too
 
 1. **Both databases** with `pg_dump` in custom format, taken together. The example deployment keeps them in one volume
    (`postgres-data`), which holds every credential; a copy of that volume or a dump of both databases is the backup.
+   In the example stack, `just backup <dir>` writes `kratos.dump` and `hydra.dump` there.
 2. **`secrets.env`**, stored with the dump but not inside it. It carries the system and cipher secrets and the cookie
    secrets, and it is the only copy.
 3. **At least one copy off the host.**

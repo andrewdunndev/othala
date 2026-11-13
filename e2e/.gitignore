@@ -5,3 +5,4 @@ node_modules/
 /compose.yml
 /postgres-init.sh
 secrets.env
+*.rendered.yml

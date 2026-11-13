@@ -93,6 +93,10 @@ const HITS_MAP_MAX = 10_000;
 
 const hits = new Map<string, number[]>();
 
+// The idle-key sweep walks the whole Map, so it runs at most once a second; the cap below is checked on every call.
+const SWEEP_INTERVAL_MS = 1000;
+let lastSweep = -Infinity;
+
 /**
  * Record an attempt for `key` and report whether it is allowed. Returns
  * `{ allowed, retryAfterSec }`. A blocked caller gets a retry hint.
@@ -115,7 +119,8 @@ export function rateLimit(
   hits.set(key, recent);
 
   // Opportunistic global sweep so idle keys don't accumulate forever.
-  if (hits.size > 1000) {
+  if (hits.size > HITS_MAP_MAX || (hits.size > 1000 && now - lastSweep >= SWEEP_INTERVAL_MS)) {
+    lastSweep = now;
     for (const [k, ts] of hits) {
       const live = ts.filter((t) => t > cutoff);
       if (live.length === 0) hits.delete(k);
@@ -134,4 +139,5 @@ export function rateLimit(
 /** Test-only: clear the rate-limit state. */
 export function _resetForTests(): void {
   hits.clear();
+  lastSweep = -Infinity;
 }

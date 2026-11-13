@@ -144,3 +144,32 @@ describe('requireAdminSession — aal2-but-stale redirects before the admin-mark
     expect(result).toEqual({ location: target });
   });
 });
+
+describe('requireAdminSession — the admin step-up window is one hour', () => {
+  const aal2At = (completed: Date) =>
+    buildSession(
+      'aal2',
+      [
+        { method: 'password', aal: 'aal1', completed_at: completed },
+        { method: 'totp', aal: 'aal2', completed_at: completed },
+      ],
+      { identity: whoamiIdentity(identity({ id: 'user-1' })), authenticated_at: completed },
+    );
+
+  it('refuses a second factor completed 61 minutes ago and accepts one completed 59 minutes ago', async () => {
+    getIdentityMock.mockResolvedValue(identity({ id: 'user-1', metadataAdmin: { admin: true } }));
+
+    getSessionMock.mockResolvedValue(aal2At(new Date(Date.now() - 61 * 60 * 1000)));
+    const stale = fakeAstro();
+    await requireAdminSession(stale);
+    expect(stale.redirect).toHaveBeenCalledTimes(1);
+    expect(getIdentityMock).not.toHaveBeenCalled();
+
+    getSessionMock.mockResolvedValue(aal2At(new Date(Date.now() - 59 * 60 * 1000)));
+    const fresh = fakeAstro();
+    const result = await requireAdminSession(fresh);
+    expect(fresh.redirect).not.toHaveBeenCalled();
+    expect(getIdentityMock).toHaveBeenCalledTimes(1);
+    expect((result as Session).identity?.id).toBe('user-1');
+  });
+});
