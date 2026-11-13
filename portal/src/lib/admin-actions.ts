@@ -135,7 +135,7 @@ export async function saveAction(fd: FormData, ctx: ActionContext): Promise<Acti
       ...(existingAvatar ? { avatar: existingAvatar } : {}),
     },
   });
-  if (narrowsAccess(identity, groups, roles)) {
+  if (changesGrants(identity, groups, roles)) {
     const failure = await revokeGrants(id);
     if (failure) return { actionResult: failure, mode: 'read', refetch: true };
   }
@@ -246,10 +246,13 @@ export async function setPrerequisitesAction(fd: FormData, ctx: ActionContext): 
   return { actionResult: { kind: 'prerequisites-saved' }, refetch: true };
 }
 
-export function narrowsAccess(identity: Identity, groups: readonly string[], roles: Record<string, string>): boolean {
+/** Any removed group or any change to the stored roles map (a key added, changed or removed) ends app grants; a group only added does not. Decided from storage alone, so an app whose manifest is not served cannot hide a change. */
+export function changesGrants(identity: Identity, groups: readonly string[], roles: Record<string, string>): boolean {
   const stored = identity.metadata_admin;
   if ((stored?.groups ?? []).some((g) => !groups.includes(g))) return true;
-  return Object.entries(stored?.roles ?? {}).some(([clientId, role]) => roles[clientId] !== role);
+  const before = stored?.roles ?? {};
+  const keys = new Set([...Object.keys(before), ...Object.keys(roles)]);
+  return [...keys].some((k) => before[k] !== roles[k]);
 }
 
 async function revokeGrants(id: string): Promise<ActionResult | null> {

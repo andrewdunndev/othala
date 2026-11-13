@@ -862,3 +862,64 @@ describe('avatar through admin saves', () => {
     expect(written().metadataAdmin).not.toHaveProperty('avatar');
   });
 });
+
+describe('app grants end on any roles-map or group-removal change', () => {
+  const role = (name: string) => ({ name, description: '', claimEmit: {} });
+  const MANIFESTS = [
+    { clientId: 'grafana', accessGroups: ['grafana-access'], roles: [role('admin'), role('editor'), role('viewer')], groupRoleMap: { 'grafana-admin': 'admin' }, skipAccessCheck: false },
+    { clientId: 'vault', accessGroups: ['grafana-admin'], roles: [], groupRoleMap: {}, skipAccessCheck: false },
+  ] as unknown as ActionContext['manifests'];
+  const person = (groups: string[], roles?: Record<string, string>) =>
+    identity({ username: 'robin.k', email: 'robin@othala.test', metadataAdmin: { groups, ...(roles ? { roles } : {}) } });
+  const form = (groups: string[], roles: Record<string, string> = {}) => {
+    const f = fd({ username: 'robin.k', email: 'robin@othala.test' });
+    for (const g of groups) f.append('identityGroups', g);
+    for (const [k, v] of Object.entries(roles)) f.set(`role:${k}`, v);
+    return f;
+  };
+
+  it('revokes when a demotion is stored as a new override while a shared group stays', async () => {
+    const outcome = await saveAccessAction(
+      fd({ 'level:grafana': 'editor', 'level:vault': 'use' }),
+      makeCtx({ identity: withTotp(person(['everyone', 'grafana-access', 'grafana-admin'])), manifests: MANIFESTS }),
+    );
+
+    expect(updateIdentityMock.mock.calls[0][1].metadataAdmin.roles).toEqual({ grafana: 'editor' });
+    expect(updateIdentityMock.mock.calls[0][1].metadataAdmin.groups).toContain('grafana-admin');
+    expect(revokeHydraSessionsMock).toHaveBeenCalledWith('target-1');
+    expect(outcome.actionResult?.kind).toBe('updated');
+  });
+
+  it('revokes when an override is added', async () => {
+    await saveAction(form(['everyone', 'grafana-access'], { grafana: 'viewer' }), makeCtx({ identity: person(['everyone', 'grafana-access']), manifests: MANIFESTS }));
+
+    expect(revokeHydraSessionsMock).toHaveBeenCalledWith('target-1');
+  });
+
+  it('revokes when an override is removed', async () => {
+    await saveAction(form(['everyone', 'grafana-access']), makeCtx({ identity: person(['everyone', 'grafana-access'], { grafana: 'viewer' }), manifests: MANIFESTS }));
+
+    expect(revokeHydraSessionsMock).toHaveBeenCalledWith('target-1');
+  });
+
+  it('revokes when a group is removed', async () => {
+    await saveAction(form(['everyone']), makeCtx({ identity: person(['everyone', 'grafana-access']), manifests: MANIFESTS }));
+
+    expect(revokeHydraSessionsMock).toHaveBeenCalledWith('target-1');
+  });
+
+  it('does not revoke when a group is only added', async () => {
+    const outcome = await saveAction(
+      (() => {
+        const f = form(['everyone']);
+        f.append('accessGroups', 'grafana-access');
+        return f;
+      })(),
+      makeCtx({ identity: person(['everyone']), manifests: MANIFESTS }),
+    );
+
+    expect(updateIdentityMock.mock.calls[0][1].metadataAdmin.groups).toContain('grafana-access');
+    expect(revokeHydraSessionsMock).not.toHaveBeenCalled();
+    expect(outcome.actionResult?.kind).toBe('updated');
+  });
+});
