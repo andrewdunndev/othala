@@ -73,11 +73,15 @@ MRs that change the heavy paths. A push to main runs neither.
 
 ## Commands
 
+Tools come from `mise.toml` (`mise install`); every recipe is in the `justfile`.
+
 ```sh
-cd portal && npm test           # vitest: src/**/*.test.ts + scripts/*.test.mjs
-cd portal && npm run check      # type + content check
-cd portal && npm run build      # production bundle
-cd portal && npm run dev        # UI iteration without the full stack; dev-only CONTENT_DIR and OTHALA_DEV_MOCK_GROUPS (.env.example)
-cd e2e && bash validate.sh      # deploy/example under the e2e overlay
-bash scripts/check-purity.sh    # the purity gate
+just setup    # once: npm ci in portal, e2e and site
+just test     # vitest: portal/src/**/*.test.ts + portal/scripts/*.test.mjs
+just check    # the CI check-portal sequence: astro check, tsc over e2e and site, vitest, manifest lint, YAML parse
+just build    # production bundle
+just dev      # UI iteration without the full stack; dev-only CONTENT_DIR and OTHALA_DEV_MOCK_GROUPS (.env.example)
+just purity   # the purity gate, then bash -n over tracked shell scripts
+just e2e      # build both images from the working tree, then run deploy/example under the e2e overlay
+just backup   # pg_dump of the identity database from a running stack
 ```
