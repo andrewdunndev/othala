@@ -5,7 +5,7 @@
 import type { Page } from '@playwright/test';
 import { test, expect, adminAal2Context, computeTotp, GRAFANA_CLIENT_ID, GRAFANA_REDIRECT_URI } from '../fixtures';
 import { createIdentityWithPassword, TEST_PASSWORD } from '../actions/identity';
-import { requireEnv } from '../actions/oidc';
+import { requireEnv, walk } from '../actions/oidc';
 import { getSession } from '../actions/session';
 
 const PASSKEY_REGISTER_BUTTON = 'button[name="passkey_register_trigger"]';
@@ -99,16 +99,16 @@ test('ZI1 — admin adds a person; they redeem, enrol a passkey and TOTP, and si
   await loginBtn.click();
   await answerSecondStepAtDag(page, secret);
 
-  await ctx.route(`${APP_ORIGIN}/**`, (route) => route.fulfill({ status: 200, contentType: 'text/plain', body: 'app' }));
   const authorize =
     `${baseURL}/oauth2/auth?client_id=${GRAFANA_CLIENT_ID}&response_type=code` +
     `&scope=${encodeURIComponent('openid email groups')}` +
     `&redirect_uri=${encodeURIComponent(GRAFANA_REDIRECT_URI)}` +
     `&state=zi-household-state&nonce=zi-household-nonce`;
-  await page.goto(authorize);
-  await page.waitForURL((u) => u.origin === APP_ORIGIN, { timeout: 15_000 });
-  const code2 = new URL(page.url()).searchParams.get('code');
-  expect(code2, `ZI1: the OIDC app receives a code, landed at ${page.url()}`).toBeTruthy();
+  // Hand-walked: the app host does not resolve in the browser, and the second step was answered at the dag.
+  const chain = await walk(ctx, baseURL!, authorize, (loc) => loc.origin === APP_ORIGIN);
+  const code2 = chain.at(-1)?.searchParams.get('code');
+  expect(code2, `ZI1: the OIDC app receives a code, hops ${chain.join(' > ')}`).toBeTruthy();
+  expect(chain.map(String).filter((u) => /aal=aal2|\/auth\/login/.test(u)), 'ZI1: the app sign-in never asks').toEqual([]);
 
   // The code redeems at the token endpoint for an id_token carrying the person.
   const basic = Buffer.from(`${GRAFANA_CLIENT_ID}:${requireEnv('GRAFANA_CLIENT_SECRET')}`).toString('base64');

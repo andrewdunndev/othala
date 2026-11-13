@@ -1,12 +1,13 @@
 // VB — the second step is asked at the dag sign-in: a TOTP holder answers once there and no app asks again; a
 // member with no second factor is never asked; the "lost your second step" contact link stays reachable.
 
-import type { Page } from '@playwright/test';
+import type { BrowserContext, Page } from '@playwright/test';
 import { test, expect, enrollTotpSecret, computeTotp, GRAFANA_CLIENT_ID, GRAFANA_REDIRECT_URI } from '../fixtures';
 import { createIdentityWithPassword, TEST_PASSWORD } from '../actions/identity';
 import { loginViaJsonApi } from '../actions/login';
 import { registerPasskey, passkeySignIn } from '../actions/passkey';
 import { getSession } from '../actions/session';
+import { walk } from '../actions/oidc';
 
 const APP_ORIGIN = 'https://grafana.othala.test';
 
@@ -21,13 +22,25 @@ function authorizeUrl(baseURL: string): string {
   );
 }
 
+const isAsk = (url: string) => /aal=aal2|\/auth\/login/.test(url);
+
 /** Requests that ask for a login flow or a second factor, recorded while the callback runs. */
 function recordAsks(page: Page): string[] {
   const asks: string[] = [];
   page.on('request', (r) => {
-    if (/aal=aal2|\/auth\/login/.test(r.url())) asks.push(r.url());
+    if (isAsk(r.url())) asks.push(r.url());
   });
   return asks;
+}
+
+/** Signs in to the app by hand-walked redirects (the app host does not resolve in the browser); returns the hops. */
+async function signInToApp(ctx: BrowserContext, baseURL: string, who: string): Promise<URL[]> {
+  const chain = await walk(ctx, baseURL, authorizeUrl(baseURL), (loc) => loc.origin === APP_ORIGIN);
+  const end = chain.at(-1);
+  expect(end?.origin, `${who}: the app sign-in reaches the callback, hops ${chain.join(' > ')}`).toBe(APP_ORIGIN);
+  expect(end?.searchParams.get('code'), `${who}: the app receives a code`).toBeTruthy();
+  expect(chain.map(String).filter(isAsk), `${who}: the app sign-in never asks`).toEqual([]);
+  return chain;
 }
 
 async function seed(slug: string, kratosAdminURL: string, isAdmin: boolean): Promise<{ email: string }> {
@@ -68,12 +81,7 @@ test('VB1 — an admin with a passkey and TOTP is asked once at the dag sign-in,
   await expect(page.locator('#greeting'), 'VB1: lands on the dashboard').toBeVisible();
   expect((await getSession(ctx, baseURL!))?.authenticator_assurance_level, 'VB1: aal2 after the step').toBe('aal2');
 
-  await ctx.route(`${APP_ORIGIN}/**`, (route) => route.fulfill({ status: 200, contentType: 'text/plain', body: 'app' }));
-  const asks = recordAsks(page);
-  await page.goto(authorizeUrl(baseURL!));
-  await page.waitForURL((u) => u.origin === APP_ORIGIN, { timeout: 15_000 });
-  expect(new URL(page.url()).searchParams.get('code'), 'VB1: the app receives a code').toBeTruthy();
-  expect(asks, 'VB1: the app sign-in never asks again').toEqual([]);
+  await signInToApp(ctx, baseURL!, 'VB1');
   const fa = await ctx.request.get(`${baseURL}/api/forward-auth?group=grafana-access`, { maxRedirects: 0 });
   expect(fa.status(), 'VB1: forward-auth admits the aal2 session').toBe(200);
 });
@@ -94,11 +102,7 @@ test('VB2 — a passkey-only member is never asked for a second step', async ({ 
   expect(asks.filter((u) => u.includes('aal=aal2')), 'VB2: no second-step request').toEqual([]);
   expect((await getSession(ctx, baseURL!))?.authenticator_assurance_level, 'VB2: aal1').toBe('aal1');
 
-  await ctx.route(`${APP_ORIGIN}/**`, (route) => route.fulfill({ status: 200, contentType: 'text/plain', body: 'app' }));
-  await page.goto(authorizeUrl(baseURL!));
-  await page.waitForURL((u) => u.origin === APP_ORIGIN, { timeout: 15_000 });
-  expect(new URL(page.url()).searchParams.get('code'), 'VB2: the app receives a code').toBeTruthy();
-  expect(asks.filter((u) => u.includes('aal=aal2')), 'VB2: the app sign-in did not ask either').toEqual([]);
+  await signInToApp(ctx, baseURL!, 'VB2');
 });
 
 test('VB3 — a TOTP holder at aal1 reaches the contact form through ?ask=', async ({ baseURL, kratosAdminURL, page }) => {
@@ -106,7 +110,10 @@ test('VB3 — a TOTP holder at aal1 reaches the contact form through ?ask=', asy
   const { email } = await seed('vb3.member', kratosAdminURL, false);
   await loginViaJsonApi(ctx, { identifier: email, password: TEST_PASSWORD }, baseURL!);
   await enrollTotpSecret(ctx, baseURL!);
-  expect((await getSession(ctx, baseURL!))?.authenticator_assurance_level, 'VB3: aal1 after enrolment').toBe('aal1');
+  // Enrolling lifts the session to aal2; a first-factor sign-in afterwards is the aal1 session of a TOTP holder.
+  await ctx.clearCookies();
+  await loginViaJsonApi(ctx, { identifier: email, password: TEST_PASSWORD }, baseURL!);
+  expect((await getSession(ctx, baseURL!))?.authenticator_assurance_level, 'VB3: aal1 for a TOTP holder').toBe('aal1');
 
   const res = await page.goto(`${baseURL}/?ask=problem#get-in-touch`, { waitUntil: 'networkidle' });
   expect(res?.status(), 'VB3: the landing renders').toBe(200);

@@ -26,7 +26,10 @@ export async function registerPasskey(page: Page, baseURL: string): Promise<void
   const button = page.locator(REGISTER_BUTTON).first();
   await expect(button, 'the passkey register button is offered').toBeVisible({ timeout: 10_000 });
   await page.waitForFunction(() => typeof (window as unknown as Win).oryPasskeySettingsRegistration === 'function');
+  // The settings answer comes after the credential is stored; a caller that clears cookies sooner loses the passkey.
+  const answered = page.waitForResponse((r) => r.url().includes('/self-service/settings') && r.request().method() === 'POST');
   await button.click();
+  await answered;
   await page.waitForLoadState('networkidle');
 }
 
