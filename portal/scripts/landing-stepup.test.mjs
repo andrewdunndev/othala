@@ -68,3 +68,15 @@ test('a failed identity lookup renders instead of redirecting', async () => {
   const res = await visit('aal1', adminTotp(), '/', 500);
   assert.equal(res.status, 200);
 });
+
+test('return_to keeps a non-empty search', async () => {
+  const res = await visit('aal1', adminTotp(), '/?tab=x');
+  assert.equal(res.status, 302);
+  assert.equal(res.headers.get('location'), '/self-service/login/browser?aal=aal2&return_to=%2F%3Ftab%3Dx');
+});
+
+test('return_to is a single-slash path for a //host path', async () => {
+  const res = await visit('aal1', adminTotp(), '//evil.example');
+  assert.equal(res.status, 302);
+  assert.equal(res.headers.get('location'), '/self-service/login/browser?aal=aal2&return_to=%2Fevil.example');
+});

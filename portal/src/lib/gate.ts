@@ -1,8 +1,3 @@
-
-/** The front-door ask: step-up, only for an identity that can answer it. */
-export function stepUpAtLanding(session: Parameters<typeof needsStepUp>[0], identity: Identity | null | undefined, manifests?: ClientManifest[]): boolean {
-  return needsStepUp(session, identity, manifests) && parseIdentity(identity).hasSecondFactor;
-}
 // Access policy, fail-closed, as pure functions over a fetched identity; a failed lookup passes null and is denied.
 // consent.skip_access_check bypasses only group membership, never the active-state or canonical-group checks.
 
@@ -108,6 +103,15 @@ export function needsStepUp(
   if (session?.authenticator_assurance_level === 'aal2') return false;
   const facts = parseIdentity(identity);
   return facts.isAdmin || facts.hasSecondFactor || holdsElevatedRole(identity, manifests);
+}
+
+/** The front-door ask: step-up, only for an identity that can answer it. */
+export function stepUpAtLanding(
+  session: Pick<Session, 'authenticator_assurance_level'> | null | undefined,
+  identity: Identity | null | undefined,
+  manifests?: ClientManifest[],
+): boolean {
+  return needsStepUp(session, identity, manifests) && parseIdentity(identity).hasSecondFactor;
 }
 
 /**

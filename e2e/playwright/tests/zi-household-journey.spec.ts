@@ -97,7 +97,7 @@ test('ZI1 — admin adds a person; they redeem, enrol a passkey and TOTP, and si
   await expect(loginBtn, 'ZI1: passkey sign-in button').toBeVisible({ timeout: 10_000 });
   await page.waitForFunction(hasWindowFn, 'oryPasskeyLogin');
   await loginBtn.click();
-  await stepUpIfAsked(page, secret);
+  await answerSecondStepAtDag(page, secret);
 
   await ctx.route(`${APP_ORIGIN}/**`, (route) => route.fulfill({ status: 200, contentType: 'text/plain', body: 'app' }));
   const authorize =
@@ -148,7 +148,7 @@ test('ZI1 — admin adds a person; they redeem, enrol a passkey and TOTP, and si
 });
 
 /** The dag sign-in asks the enrolled second factor; answer it in the page and land on the dashboard. */
-async function stepUpIfAsked(page: Page, secret: string): Promise<void> {
+async function answerSecondStepAtDag(page: Page, secret: string): Promise<void> {
   const form = page.locator('form:has(#totp-code)');
   await expect(form, 'ZI1: the dag sign-in offers the authenticator code').toBeVisible({ timeout: 15_000 });
   await form.locator('#totp-code').fill(await computeTotp(secret));

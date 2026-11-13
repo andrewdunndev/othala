@@ -106,6 +106,7 @@ test('VB3 — a TOTP holder at aal1 reaches the contact form through ?ask=', asy
   const { email } = await seed('vb3.member', kratosAdminURL, false);
   await loginViaJsonApi(ctx, { identifier: email, password: TEST_PASSWORD }, baseURL!);
   await enrollTotpSecret(ctx, baseURL!);
+  expect((await getSession(ctx, baseURL!))?.authenticator_assurance_level, 'VB3: aal1 after enrolment').toBe('aal1');
 
   const res = await page.goto(`${baseURL}/?ask=problem#get-in-touch`, { waitUntil: 'networkidle' });
   expect(res?.status(), 'VB3: the landing renders').toBe(200);
