@@ -9,7 +9,6 @@ import '../../styles/settings.css';
 import Layout from '../../layouts/Layout.astro';
 import {
   browserFlows,
-  getLogoutInfo,
   getSession,
   getSettingsFlow,
 } from '../../lib/kratos';
@@ -64,7 +63,6 @@ function mint(identityId: string, action: string): string {
 let session: Session | null;
 let flow: SettingsFlow;
 let stored: Awaited<ReturnType<typeof getIdentity>> | null = null;
-let logoutInfo: Awaited<ReturnType<typeof getLogoutInfo>> = null;
 let signOutError: string | null = null;
 
 if (dev) {
@@ -82,7 +80,6 @@ if (dev) {
   } as unknown as Session;
   flow = dev.flow;
   stored = session.identity as unknown as typeof stored;
-  logoutInfo = { logout_url: '', logout_token: '' };
 } else {
   try {
     session = await getSession(cookie);
@@ -122,7 +119,6 @@ if (dev) {
     return Astro.redirect(browserFlows.settings(`${publicUrl}/auth/settings`));
   }
   flow = result.flow;
-  logoutInfo = await getLogoutInfo(cookie);
   // whoami omits metadata_admin and credentials. Display only: nothing is shown on error.
   try {
     stored = await getIdentity(session.identity.id);
@@ -228,7 +224,7 @@ const lookupLabel: Record<string, string> = {
     <header class="page-header">
       <h1 class="page-title">Account</h1>
       <p class="page-lede">
-        How you sign in, your second step, and how to get back in for <strong>{displayName}</strong>.
+        How you sign in, how to get back in, and how you appear in apps, for <strong>{displayName}</strong>.
       </p>
     </header>
 
@@ -634,7 +630,7 @@ const lookupLabel: Record<string, string> = {
       <section class="panel card" id="picture" data-card aria-labelledby="h-pic">
         <h2 id="h-pic">Picture</h2>
         {avatarFlash && <div class={`notice notice-${avatarFlash.tone}`} role="status">{avatarFlash.text}</div>}
-        <p class="lede">Shown in the apps you sign in to that use a picture.</p>
+        <p class="lede">Apps that show a picture use this one.</p>
         <AvatarEditor action="/auth/avatar" csrf={avatarToken} src={avatarSrc} name={displayName} />
       </section>
 
@@ -713,7 +709,6 @@ const lookupLabel: Record<string, string> = {
               <label for="signout-all" class="button button-secondary button-sm toggle-label">Keep it</label>
             </div>
           </div>
-          {!logoutInfo && <p class="field-hint">Local logout endpoint unavailable; the revoke still runs.</p>}
         </div>
         <div class="group">
           <h3>Your apps {isAdmin && <span class="badge badge-accent">Admin</span>}</h3>
