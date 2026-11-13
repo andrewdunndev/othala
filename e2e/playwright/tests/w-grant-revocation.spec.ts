@@ -1,9 +1,9 @@
 // W — admin changes end a subject's refresh tokens.
 
 import type { BrowserContext, Page } from 'playwright-core';
-import { test, expect, adminAal2Context, GRAFANA_CLIENT_ID, GRAFANA_REDIRECT_URI, KRATOS_ADMIN_URL } from '../fixtures';
+import { test, expect, adminAal2Context, enrollTotpSecret, GRAFANA_CLIENT_ID, GRAFANA_REDIRECT_URI, KRATOS_ADMIN_URL } from '../fixtures';
 import { createIdentityWithPassword, TEST_PASSWORD } from '../actions/identity';
-import { loginViaJsonApi } from '../actions/login';
+import { loginViaJsonApi, totpStepUp } from '../actions/login';
 import { requireEnv } from '../actions/oidc';
 
 function clientSecret(): string {
@@ -48,10 +48,13 @@ async function liveRefreshToken(opts: {
   baseURL: string;
   hydraPublicURL: string;
   email: string;
+  /** A member holding an elevated role steps up to aal2 at the app, so they enrol an authenticator first. */
+  withTotp?: boolean;
 }): Promise<string> {
   const ctx = await opts.browser.newContext();
   try {
     await loginViaJsonApi(ctx, { identifier: opts.email, password: TEST_PASSWORD }, opts.baseURL);
+    if (opts.withTotp) await totpStepUp(ctx, opts.baseURL, await enrollTotpSecret(ctx, opts.baseURL));
     const code = await authorizeOffline(ctx, opts.baseURL);
     const exchange = await tokenGrant(ctx, opts.hydraPublicURL, {
       grant_type: 'authorization_code',
@@ -169,7 +172,7 @@ test('W3 — an admin role change ends refresh tokens issued before it', async (
     groups: ['everyone', 'grafana-access', 'grafana-admin'],
     kratosAdminURL: KRATOS_ADMIN_URL,
   });
-  const refreshToken = await liveRefreshToken({ browser, baseURL: baseURL!, hydraPublicURL, email: member.email });
+  const refreshToken = await liveRefreshToken({ browser, baseURL: baseURL!, hydraPublicURL, email: member.email, withTotp: true });
 
   const ctx = await adminAal2Context({ browser, email: admin.email, password: TEST_PASSWORD, baseURL: baseURL! });
   try {
