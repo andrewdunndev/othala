@@ -282,13 +282,29 @@ function isActiveAdmin(identity: Identity): boolean {
   return parseIdentity(identity).isAdmin && identity.state !== 'inactive';
 }
 
-async function leavesNoActiveAdmin(target: Identity): Promise<boolean> {
-  if (!isActiveAdmin(target)) return false;
-  const active = (await listIdentities()).filter(isActiveAdmin).length;
-  return active <= 1;
+// The portal is one Node process, so a promise chain is the lock: actions that can remove an admin's ability to sign in
+// run one at a time, and each counts the admins left only once the one before it has landed.
+let adminChanges: Promise<unknown> = Promise.resolve();
+function serialized<T>(run: () => Promise<T>): Promise<T> {
+  const result = adminChanges.then(run, run);
+  adminChanges = result.catch(() => {});
+  return result;
 }
 
-export async function deactivateAction(_fd: FormData, ctx: ActionContext): Promise<ActionOutcome> {
+/** Counted from a fresh list, target included, so a change that landed while this one waited is seen. */
+async function leavesNoActiveAdmin(target: Identity): Promise<boolean> {
+  if (!isActiveAdmin(target)) return false;
+  const all = await listIdentities();
+  const current = all.find((i) => i.id === target.id) ?? target;
+  if (!isActiveAdmin(current)) return false;
+  return all.filter(isActiveAdmin).length <= 1;
+}
+
+export function deactivateAction(_fd: FormData, ctx: ActionContext): Promise<ActionOutcome> {
+  return serialized(() => deactivate(ctx));
+}
+
+async function deactivate(ctx: ActionContext): Promise<ActionOutcome> {
   const username = ctx.identity.traits?.username ?? ctx.id;
   if (ctx.id === ctx.adminIdentityId) {
     return {
@@ -315,7 +331,11 @@ export async function reactivateAction(_fd: FormData, ctx: ActionContext): Promi
   return { actionResult: { kind: 'reactivated', username }, refetch: true };
 }
 
-export async function deleteAction(fd: FormData, ctx: ActionContext): Promise<ActionOutcome | Response> {
+export function deleteAction(fd: FormData, ctx: ActionContext): Promise<ActionOutcome | Response> {
+  return serialized(() => remove(fd, ctx));
+}
+
+async function remove(fd: FormData, ctx: ActionContext): Promise<ActionOutcome | Response> {
   const { id, identity } = ctx;
   // An admin must lose the marker first, where the last-admin guard runs; checked before the confirm text.
   if (parseIdentity(identity).isAdmin) {
@@ -387,7 +407,11 @@ export async function grantAdminAction(_fd: FormData, ctx: ActionContext): Promi
   return { actionResult: { kind: 'admin-granted', username }, refetch: true };
 }
 
-export async function revokeAdminAction(fd: FormData, ctx: ActionContext): Promise<ActionOutcome | Response> {
+export function revokeAdminAction(fd: FormData, ctx: ActionContext): Promise<ActionOutcome | Response> {
+  return serialized(() => revokeAdmin(fd, ctx));
+}
+
+async function revokeAdmin(fd: FormData, ctx: ActionContext): Promise<ActionOutcome | Response> {
   const { id, identity, adminIdentityId } = ctx;
   const username = identity.traits?.username ?? id;
   const self = id === adminIdentityId;

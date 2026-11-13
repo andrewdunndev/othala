@@ -74,7 +74,7 @@ import { DEACTIVATE_STEP, RevokeError } from './revoke.js';
 import { identity, manifest, withCredentials, withTotp, avatarOf } from './test-builders.js';
 
 function makeIdentity(username: string, admin?: boolean, state?: 'active' | 'inactive'): Identity {
-  return identity({ username, state, ...(admin === undefined ? {} : { metadataAdmin: { admin } }) });
+  return identity({ id: `id-${username}`, username, state, ...(admin === undefined ? {} : { metadataAdmin: { admin } }) });
 }
 
 function makeCtx(overrides: Partial<ActionContext> = {}): ActionContext {
@@ -950,5 +950,79 @@ describe('clearRolesAction', () => {
     await ADMIN_ACTIONS['clear-roles'](f, makeCtx({ identity: person, manifests: MANIFESTS }));
 
     expect(updateIdentityMock.mock.calls[0][1].metadataAdmin.roles).toEqual({ wiki: 'editor', ghost: 'viewer' });
+  });
+});
+
+describe('admin changes are serialized and the last-admin count is taken inside the lock', () => {
+  const tick = () => new Promise((r) => setTimeout(r, 5));
+  type Row = { id: string; admin: boolean; state: 'active' | 'inactive' };
+  let rows: Row[];
+  const asIdentity = (r: Row) => identity({ id: r.id, username: `${r.id}.person`, state: r.state, metadataAdmin: { admin: r.admin } });
+  const rowOf = (id: string) => rows.find((r) => r.id === id)!;
+  const ctxFor = (target: string, actor: string): ActionContext => makeCtx({ id: target, adminIdentityId: actor, identity: asIdentity(rowOf(target)) });
+  const outcomeKind = (o: unknown) => (o instanceof Response ? 'response' : (o as { actionResult?: { kind: string } }).actionResult?.kind);
+
+  beforeEach(() => {
+    rows = [
+      { id: 'aaa', admin: true, state: 'active' },
+      { id: 'bbb', admin: true, state: 'active' },
+    ];
+    listIdentitiesMock.mockReset().mockImplementation(async () => {
+      await tick();
+      return rows.map(asIdentity);
+    });
+    patchAdminMarkerMock.mockReset().mockImplementation(async (id: string, grant: boolean) => {
+      await tick();
+      rowOf(id).admin = grant;
+    });
+    deactivateIdentityMock.mockReset().mockImplementation(async (id: string) => {
+      await tick();
+      rowOf(id).state = 'inactive';
+    });
+  });
+
+  it('two admins revoking each other at once leave one admin', async () => {
+    const kinds = (await Promise.all([revokeAdminAction(fd(), ctxFor('bbb', 'aaa')), revokeAdminAction(fd(), ctxFor('aaa', 'bbb'))])).map(outcomeKind);
+
+    expect(kinds.sort()).toEqual(['admin-revoked', 'error']);
+    expect(rows.filter((r) => r.admin)).toHaveLength(1);
+  });
+
+  it('two admins deactivating each other at once leave one who can sign in', async () => {
+    const kinds = (await Promise.all([deactivateAction(fd(), ctxFor('bbb', 'aaa')), deactivateAction(fd(), ctxFor('aaa', 'bbb'))])).map(outcomeKind);
+
+    expect(kinds.sort()).toEqual(['deactivated', 'error']);
+    expect(rows.filter((r) => r.admin && r.state === 'active')).toHaveLength(1);
+  });
+
+  it('a revoke and a deactivate aimed at the two admins at once leave one', async () => {
+    await Promise.all([revokeAdminAction(fd(), ctxFor('bbb', 'aaa')), deactivateAction(fd(), ctxFor('aaa', 'bbb'))]);
+
+    expect(rows.filter((r) => r.admin && r.state === 'active')).toHaveLength(1);
+  });
+
+  it('a failed action does not hold the lock for the next one', async () => {
+    patchAdminMarkerMock.mockRejectedValueOnce(new Error('kratos down'));
+    await expect(revokeAdminAction(fd(), ctxFor('bbb', 'aaa'))).rejects.toThrow('kratos down');
+    const next = await revokeAdminAction(fd(), ctxFor('bbb', 'aaa'));
+
+    expect(outcomeKind(next)).toBe('admin-revoked');
+  });
+
+  it('deletes run one at a time', async () => {
+    rows.push({ id: 'ccc', admin: false, state: 'active' }, { id: 'ddd', admin: false, state: 'active' });
+    const trace: string[] = [];
+    revokeSubjectMock.mockReset().mockImplementation(async (id: string) => {
+      trace.push(`start ${id}`);
+      await tick();
+    });
+    deleteIdentityMock.mockReset().mockImplementation(async (id: string) => {
+      await tick();
+      trace.push(`end ${id}`);
+    });
+    const del = (id: string) => deleteAction(fd({ confirm: `${id}.person` }), ctxFor(id, 'aaa'));
+    await Promise.all([del('ccc'), del('ddd')]);
+
+    expect(trace).toEqual(['start ccc', 'end ccc', 'start ddd', 'end ddd']);
   });
 });

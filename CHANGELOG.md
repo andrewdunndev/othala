@@ -18,6 +18,8 @@ The git tag is the authoritative version; `portal/package.json` mirrors it.
 - A password change now also ends the member's app sign-ins and refresh tokens: `kratos/kratos.yml` gains a non-interrupting `settings.after.password` web hook to `/admin/revoke-grants`, authenticated like the other hooks. Deployers who vendor `kratos.yml` and `contract/kratos.schema.json` take both.
 - Editing a manifest's access-relevant fields (access groups, `group_role_map`, roles and their `claim_emit`, `emit_groups_claim`, scopes, `skip_access_check`) ends that app's existing sign-ins and refresh tokens for everyone on the next reconcile; before, they kept their old claims for up to 30 days. The fingerprint lives in the Hydra client's metadata. A client without one is baselined, not revoked.
 - A Hydra client othala registered whose manifest file is gone has its grants ended once and is marked retired in its metadata. This is skipped while any manifest is quarantined, when none is served, or when the apps directory is unreadable. No client is ever deleted.
+- Revoking an admin, turning off sign-in and deleting a person now run one at a time, and the last-admin count is taken inside that queue, so two admins acting on each other at the same moment can no longer leave none.
+- A consent challenge that skips the grant screen is accepted only for the browser whose session belongs to the challenge's subject, the same binding the grant screen's submit already had.
 
 ## [0.18.0] - 2026-11-11
 
