@@ -103,7 +103,7 @@ test('an access change revokes that client for every identity, then stores the n
   // A new process has no memory: the stored fingerprint is all it has.
   await reconcile(api, [wiki({ access: ['wiki', 'kids'] })]);
   assert.deepEqual(revokes(api), [['revoke', 'wiki', 'ada'], ['revoke', 'wiki', 'grace']]);
-  assert.ok(api.log.findIndex((e) => e[0] === 'revoke') < api.log.findIndex((e) => e[0] === 'set'), 'revoke runs before the new fingerprint is stored');
+  assert.deepEqual(api.log.map((e) => e[0]), ['set', 'revoke', 'revoke', 'patch'], 'the client is written first, the new fingerprint stored last');
   assert.equal(api.clients.get('wiki').metadata.othala.fingerprint, accessFingerprint(wiki({ access: ['wiki', 'kids'] })));
   api.log.length = 0;
   await reconcile(api, [wiki({ access: ['wiki', 'kids'] })]);
@@ -122,6 +122,21 @@ test('a failed revoke leaves the old fingerprint so the next reconcile retries',
   api.log.length = 0;
   await reconcile(api, [wiki({ access: ['wiki', 'kids'] })]);
   assert.equal(revokes(api).length, 2);
+});
+
+test('a Kratos outage still applies the client update and keeps the old fingerprint for the retry', async () => {
+  const api = hydra();
+  await reconcile(api, [wiki()]);
+  const stored = api.clients.get('wiki').metadata.othala.fingerprint;
+  const moved = wiki({ access: ['wiki', 'kids'] });
+  moved.redirectUris = ['https://wiki.example.com/moved'];
+  await assert.rejects(() => registerManifests([moved], { api, env, subjects: async () => { throw new Error('kratos down'); } }), /kratos down/);
+  assert.deepEqual(api.clients.get('wiki').redirect_uris, ['https://wiki.example.com/moved']);
+  assert.equal(api.clients.get('wiki').metadata.othala.fingerprint, stored);
+  api.log.length = 0;
+  await registerManifests([moved], { api, env, subjects });
+  assert.equal(revokes(api).length, 2, 'the next reconcile retries');
+  assert.equal(api.clients.get('wiki').metadata.othala.fingerprint, accessFingerprint(moved));
 });
 
 test('a subject with nothing to revoke is not an error', async () => {

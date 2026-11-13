@@ -141,12 +141,18 @@ export async function registerClient(
   }
 
   if (existing) {
-    // A client with no stored fingerprint predates this check: it is baselined, not revoked. Revoking first and storing
-    // the new fingerprint after means a failed revoke is retried on the next reconcile.
+    // A client with no stored fingerprint predates this check: it is baselined, not revoked. Otherwise the client is written
+    // first with the old fingerprint, so a secret or redirect change never waits on Kratos, then revoked, then the new
+    // fingerprint is stored: a failed revoke leaves the old one and the next reconcile retries.
     const stored = markOf(existing)?.fingerprint;
-    if (stored !== undefined && stored !== fingerprint) await revoke(m.clientId);
-    body.metadata = { ...(existing.metadata as object | null), othala: { fingerprint } };
+    const changed = stored !== undefined && stored !== fingerprint;
+    const metadata = (fp: string) => ({ ...(existing.metadata as object | null), othala: { fingerprint: fp } });
+    body.metadata = metadata(changed ? stored : fingerprint);
     await api.setOAuth2Client({ id: m.clientId, oAuth2Client: body });
+    if (changed) {
+      await revoke(m.clientId);
+      await api.patchOAuth2Client({ id: m.clientId, jsonPatch: [{ op: 'add', path: '/metadata', value: metadata(fingerprint) }] });
+    }
     return { clientId: m.clientId, action: 'updated' };
   }
   body.metadata = { othala: { fingerprint } };
