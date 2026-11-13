@@ -221,6 +221,18 @@ export function render(policyDir: string, contentDir: string, env: Env): Rendere
   if (checkErrors.length > 0) throw new RenderError(checkErrors.join('\n'));
   const unset = SECRETS.filter((n) => (env[n] ?? '').trim() === '');
   if (unset.length > 0) throw new RenderError(`missing secret(s): ${unset.join(', ')}`);
+  // Kratos and Hydra schema-reject a secret list with an entry under 16 characters or a repeated entry, and then refuse to start.
+  for (const name of ['KRATOS_COOKIE_SECRET_CURRENT', 'HYDRA_COOKIE_SECRET_CURRENT', 'HYDRA_SYSTEM_SECRET']) {
+    if (Buffer.byteLength(env[name]!) < 16) throw new RenderError(`${name} must be at least 16 characters`);
+  }
+  for (const base of ['KRATOS_COOKIE_SECRET', 'KRATOS_CIPHER_SECRET', 'HYDRA_COOKIE_SECRET']) {
+    if (env[`${base}_PREVIOUS`] && env[`${base}_PREVIOUS`] === env[`${base}_CURRENT`]) {
+      throw new RenderError(`${base}_PREVIOUS must differ from ${base}_CURRENT`);
+    }
+  }
+  if (env.HYDRA_SYSTEM_SECRET_PREVIOUS && env.HYDRA_SYSTEM_SECRET_PREVIOUS === env.HYDRA_SYSTEM_SECRET) {
+    throw new RenderError('HYDRA_SYSTEM_SECRET_PREVIOUS must differ from HYDRA_SYSTEM_SECRET');
+  }
   for (const name of ['KRATOS_CIPHER_SECRET_CURRENT', 'KRATOS_CIPHER_SECRET_PREVIOUS']) {
     if (env[name] && Buffer.byteLength(env[name]) !== 32) throw new RenderError(`${name} must be exactly 32 characters`);
   }

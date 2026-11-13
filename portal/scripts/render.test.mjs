@@ -269,6 +269,34 @@ test('a refused cookie-secret pair keeps the last good render and fails closed',
   });
 });
 
+test('render refuses a cookie or system secret under 16 characters, set or not _PREVIOUS', () => {
+  for (const name of ['KRATOS_COOKIE_SECRET_CURRENT', 'HYDRA_COOKIE_SECRET_CURRENT', 'HYDRA_SYSTEM_SECRET']) {
+    assert.throws(() => render(root, CONTENT, { ...ENV, [name]: 's'.repeat(15) }), new RegExp(`${name} must be at least 16 characters`));
+    assert.doesNotThrow(() => render(root, CONTENT, { ...ENV, [name]: 's'.repeat(16) }), name);
+  }
+});
+
+test('render refuses a _PREVIOUS equal to its _CURRENT', () => {
+  const pairs = [
+    ['KRATOS_COOKIE_SECRET', 'k'.repeat(32)],
+    ['KRATOS_CIPHER_SECRET', 'c'.repeat(32)],
+    ['HYDRA_COOKIE_SECRET', 'h'.repeat(32)],
+  ];
+  for (const [base, value] of pairs) {
+    const env = { ...ENV, [`${base}_CURRENT`]: value, [`${base}_PREVIOUS`]: value };
+    assert.throws(() => render(root, CONTENT, env), new RegExp(`${base}_PREVIOUS must differ from ${base}_CURRENT`), base);
+  }
+  const system = { ...ENV, HYDRA_SYSTEM_SECRET: 's'.repeat(32), HYDRA_SYSTEM_SECRET_PREVIOUS: 's'.repeat(32) };
+  assert.throws(() => render(root, CONTENT, system), /HYDRA_SYSTEM_SECRET_PREVIOUS must differ from HYDRA_SYSTEM_SECRET/);
+});
+
+test('check reports a short secret and a repeated _PREVIOUS', () => {
+  const args = ['check', '--policy', root, '--content', CONTENT];
+  assert.match(cli(args, { ...ENV, HYDRA_COOKIE_SECRET_CURRENT: 'short' }).stderr, /HYDRA_COOKIE_SECRET_CURRENT must be at least 16/);
+  const same = { ...ENV, HYDRA_COOKIE_SECRET_CURRENT: 'h'.repeat(32), HYDRA_COOKIE_SECRET_PREVIOUS: 'h'.repeat(32) };
+  assert.match(cli(args, same).stderr, /HYDRA_COOKIE_SECRET_PREVIOUS must differ/);
+});
+
 test('check refuses what render would refuse, with or without secrets in the environment', () => {
   const args = ['check', '--policy', root, '--content', CONTENT];
   const pair = { KRATOS_COOKIE_SECRET_CURRENT: 'k'.repeat(64), KRATOS_COOKIE_SECRET_PREVIOUS: 'p'.repeat(32) };
