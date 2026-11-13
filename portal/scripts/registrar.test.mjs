@@ -1,4 +1,4 @@
-// Invariant: reconciliation is single-flight, retries on boot, and a failing register never stops the server.
+// Invariant: reconciliation is single-flight, boot retries with capped backoff until Hydra answers, and a failing register never stops the server.
 
 import { test, beforeEach } from 'vitest';
 import assert from 'node:assert/strict';
@@ -146,7 +146,7 @@ test('reconcileOnBoot retries on failure then succeeds without throwing', async 
   console.error = () => {};
 
   try {
-    await assert.doesNotReject(() => reconcileOnBoot(reg, 5, 1));
+    await assert.doesNotReject(() => reconcileOnBoot(reg, 1, 4));
   } finally {
     console.log = origLog;
     console.warn = origWarn;
@@ -156,31 +156,35 @@ test('reconcileOnBoot retries on failure then succeeds without throwing', async 
   assert.equal(reg.callCount(), 3, 'register should be called until success');
 });
 
-test('reconcileOnBoot gives up after `attempts` exhausted without throwing', async () => {
-  const failing = stubRegisterAlwaysFails();
+test('reconcileOnBoot keeps retrying past the old give-up point and logs each backoff step once', async () => {
+  const reg = stubRegisterFailN(12);
 
   const origLog = console.log;
   const origWarn = console.warn;
   const origError = console.error;
-  const errors = [];
-  console.log = () => {};
-  console.warn = () => {};
-  console.error = (...args) => errors.push(args.join(' '));
+  const lines = [];
+  const attempts = [];
+  console.log = (...args) => attempts.push(args.join(' '));
+  console.warn = (...args) => lines.push(args.join(' '));
+  console.error = (...args) => lines.push(args.join(' '));
 
   try {
-    await assert.doesNotReject(() => reconcileOnBoot(failing, 3, 1));
+    await assert.doesNotReject(() => reconcileOnBoot(reg, 1, 4));
   } finally {
     console.log = origLog;
     console.warn = origWarn;
     console.error = origError;
   }
 
-  assert.equal(failing.callCount(), 3, 'register should be called exactly `attempts` times');
-
-  assert.ok(
-    errors.some((e) => e.includes('gave up') || e.includes('SIGHUP to retry')),
-    'should log the give-up message with SIGHUP hint',
-  );
+  assert.equal(reg.callCount(), 13, 'register is retried until it succeeds');
+  assert.equal(lastReconcileOk(), true);
+  for (const step of [1, 2, 4]) {
+    assert.equal(lines.filter((l) => l.includes(`retrying in ${step}ms`)).length, 1, `delay ${step}ms is logged once`);
+  }
+  assert.ok(lines.length <= 5, `failures are not logged per attempt (${lines.length} lines)`);
+  assert.ok(!lines.some((l) => l.includes('gave up')));
+  const attemptLines = attempts.filter((l) => l.includes('boot reconcile attempt'));
+  assert.ok(attemptLines.length <= 3, `the attempt line is logged only when the delay changes (${attemptLines.length} lines)`);
 });
 
 test('lastReconcileOk is false after a failed pass and true again after a good one', async () => {
@@ -195,6 +199,33 @@ test('lastReconcileOk is false after a failed pass and true again after a good o
     assert.equal(lastReconcileOk(), true);
   } finally {
     console.log = origLog;
+    console.error = origError;
+  }
+});
+
+test('a pass skipped behind a failing SIGHUP pass does not end the boot loop', async () => {
+  const origLog = console.log;
+  const origWarn = console.warn;
+  const origError = console.error;
+  console.log = () => {};
+  console.warn = () => {};
+  console.error = () => {};
+  try {
+    let passes = 0;
+    const slowFailure = async () => {
+      await new Promise((resolve) => setTimeout(resolve, 30));
+      if (++passes === 1) throw new Error('hydra still down');
+      return [];
+    };
+    const inFlight = reconcileClients(slowFailure).catch(() => {});
+    const reg = stubRegister();
+    await reconcileOnBoot(reg, 1, 4);
+    assert.ok(reg.callCount() >= 1, 'the boot loop ran a pass of its own before returning');
+    assert.equal(lastReconcileOk(), true);
+    await inFlight;
+  } finally {
+    console.log = origLog;
+    console.warn = origWarn;
     console.error = origError;
   }
 });

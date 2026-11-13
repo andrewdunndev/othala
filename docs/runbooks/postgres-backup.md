@@ -1,60 +1,60 @@
 # Postgres backup and restore
 
-The backup posture for the `kratos` and `hydra` databases and the restore
-procedure. The runner (scheduler, off-host copy, snapshot policy) is
-deploy-plane work; this runbook is the contract it must satisfy.
+What must be backed up, and how to restore it. Scheduling, retention and where copies live are yours to choose; this is
+the contract they must satisfy.
 
 ## Stakes
 
-The databases hold every passkey enrollment, active session, recovery-code
-state, and the Hydra OAuth2 clients (secrets hashed) and signing keys (private keys and
-session data encrypted at rest under `secrets.system`). Losing them without a backup means
-every member re-enrolls, every OIDC client is re-created, and `secrets.system` must be restored from
-your secret store or even a partial restore cannot decrypt.
+The `kratos` and `hydra` databases hold every passkey enrolment, session and recovery-code state, the Hydra OAuth2
+clients (secrets hashed) and its signing keys (private keys and session data encrypted at rest under
+`HYDRA_SYSTEM_SECRET`). Without a backup every member re-enrols and every client is re-created. Without the secrets, a
+restore cannot decrypt. Keep `KRATOS_CIPHER_SECRET_CURRENT` in `secrets.env` too; it covers only upstream-provider tokens and OIDC flow state, so nothing in this stack depends on it, but an adopter who enables a provider does.
 
-## Required posture
+## What to back up
 
-1. **Nightly `pg_dump`** in custom format (`pg_restore`-compatible) to
-   `/var/lib/postgres/backups/<UTC-timestamp>.dump`, both databases per
-   timestamp. Retention: 30 daily and 12 monthly.
-2. **Filesystem snapshots**, if the data volume supports them, alongside the
-   dumps: snapshot for quick rollback, dump for long-term archive.
-3. **Off-host copy** to at least one destination outside a single-host
-   failure; two independent destinations are stronger.
-4. **`secrets.system` stays out of the dump.** It is an env var held in your secret
-   store. Restore it into the env before starting Hydra;
-   otherwise the JWK private keys and session data are permanently ciphertext. Back up the
-   secret-store key separately.
-5. **Quarterly restore drill.** Restore the latest dump into a throwaway VM
-   with fresh Kratos and Hydra pods and confirm one identity signs in, one
-   OIDC client emits a token, and WebAuthn credentials still verify (this
-   tests `secrets.cipher` rehydration).
+1. **Both databases** with `pg_dump` in custom format, taken together. The example deployment keeps them in one volume
+   (`postgres-data`), which holds every credential; a copy of that volume or a dump of both databases is the backup.
+2. **`secrets.env`**, stored with the dump but not inside it. It carries the system and cipher secrets and the cookie
+   secrets, and it is the only copy.
+3. **At least one copy off the host.**
+4. **A restore you have tried**, into a throwaway stack: one identity signs in, one OIDC client issues a token, and a
+   passkey still signs in.
 
-## Partial-state restore
+## Restore
 
-Consistency is per-database, and the two are written in different
-transactions. A backup between a Kratos write and the matching Hydra write
-restores with drift: an identity with no remembered-consent row, or the
-reverse. Do not reconcile rows:
+1. Put `secrets.env` back first, then restore both databases from the most recent compatible pair of dumps.
+2. Restart Kratos and Hydra, then re-run client registration: Hydra's clients and their secrets come back as of the
+   dump, so an app added or re-keyed since is missing or stale until the portal registers again.
 
-1. Restore both databases from the most recent compatible pair of dumps.
-2. Clear Hydra's remembered consent and login sessions to force re-consent, per subject,
-   through the Hydra admin API (from the othala container):
-   `DELETE /admin/oauth2/auth/sessions/consent?subject=<id>&all=true` and
-   `DELETE /admin/oauth2/auth/sessions/login?subject=<id>`. For a whole-instance wipe:
+   ```sh
+   docker compose kill -s SIGHUP othala
+   ```
+
+   Confirm readiness (the portal reports 503 until its last registration pass succeeds):
+
+   ```sh
+   docker compose exec -T othala node -e "fetch('http://'+process.env.PORTAL_ADMIN_BIND_HOST+':4431/readyz').then(r=>process.exit(r.ok?0:1))"
+   ```
+
+3. Clear Hydra's remembered consent and login sessions so apps ask again, per subject through the Hydra admin API from
+   the othala container: `DELETE /admin/oauth2/auth/sessions/consent?subject=<id>&all=true` and
+   `DELETE /admin/oauth2/auth/sessions/login?subject=<id>`. For the whole instance:
 
    ```sql
    TRUNCATE hydra_oauth2_flow, hydra_oauth2_authentication_session CASCADE;
    ```
 
    This also drops in-flight flows and every issued token.
+4. Sign out everywhere for every active member from their admin page. Each member signs in again at their next app
+   visit.
 
-3. **Sign out everywhere** for every active member (`/admin/users/<id>`),
-   dropping their Kratos session and relying-party state.
-4. Each member re-authenticates at their next app visit.
+## Drift between the two databases
+
+The databases are written in separate transactions, so a backup between a Kratos write and its Hydra write restores
+with an identity that has no remembered consent, or the reverse. Do not reconcile rows; restore a compatible pair and
+run steps 2 to 4.
 
 ## Related
 
-- `docs/runbooks/secrets-rotation.md`: rotation of `secrets.system`.
-- `docs/runbooks/cookie-rotation.md`: the rotatable secrets.
+- `docs/runbooks/secrets-rotation.md`: the rotatable secrets.
 - `docs/runbooks/admin-recovery.md`: recovery, which needs Postgres alive.

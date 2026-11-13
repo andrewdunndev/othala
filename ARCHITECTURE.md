@@ -177,7 +177,7 @@ current state from Hydra to decide create versus update. Only `oidc:`-derived fi
 the `consent:` block is a namespace this app owns and Hydra never sees it. Registration is
 create-or-update only and never deletes, so a decommissioned client survives until removed deliberately.
 
-`portal/src/server/registrar.ts` drives it on boot with bounded retry (Hydra may still be starting)
+`portal/src/server/registrar.ts` drives it on boot with capped-backoff retry until Hydra answers
 and again on `SIGHUP`. A registration failure never takes down the listeners, so the admin surface stays
 up to diagnose it.
 

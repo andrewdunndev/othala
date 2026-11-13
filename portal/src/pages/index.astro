@@ -25,7 +25,7 @@ import {
   type AppTile,
 } from '../lib/tiles';
 import { devMockIdentity } from '../lib/dev-mock';
-import { getSession, isReachable } from '../lib/kratos';
+import { getSession } from '../lib/kratos';
 import { getIdentity } from '../lib/admin-api';
 import { parseIdentity } from '../lib/identity-facts';
 import HeaderActions from '../components/HeaderActions.astro';
@@ -44,7 +44,7 @@ const devOverride = isDev ? Astro.url.searchParams.get('dev-state') : null;
 
 let state: State = 'pre-auth';
 let identity: Identity | null = null;
-let downReason = 'Kratos /health/alive unreachable; retrying.';
+const downReason = 'Kratos session check failed; retrying.';
 
 if (devOverride === 'down' || devOverride === 'pre-auth' || devOverride === 'post-auth') {
   state = devOverride;
@@ -65,9 +65,10 @@ if (devOverride === 'down' || devOverride === 'pre-auth' || devOverride === 'pos
       }
     }
   } catch (err) {
-    const ok = await isReachable();
-    state = ok ? 'pre-auth' : 'down';
-    if (!ok) console.error('[othala/index] Kratos unreachable:', err);
+    // A rejected session is a null above, so a throw is Kratos unreachable or answering 5xx; its liveness probe stays green
+    // when its database is down, so a signed-in member would otherwise see the signed-out page.
+    state = 'down';
+    console.error('[othala/index] session check failed:', err);
   }
 }
 

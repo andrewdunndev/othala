@@ -36,11 +36,46 @@ cp -r deploy/example /srv/othala && cd /srv/othala && cp othala.env.example otha
 IMAGE=registry.gitlab.com/dunn.dev/othala@sha256:<digest>   # the tag in compose.yml, plus its digest
 (umask 077; docker run --rm -v "$PWD/content:/etc/othala:ro,z" "$IMAGE" node dist/server/config.mjs gen-secrets > secrets.env)
 echo 'OTHALA_SMTP_CONNECTION_URI=smtps://user:pass@smtp.example.org:465' >> secrets.env
-docker run --rm --env-file othala.env -v "$PWD/content:/etc/othala:ro,z" "$IMAGE" node dist/server/config.mjs check
+docker run --rm --env-file othala.env --env-file secrets.env -v "$PWD/content:/etc/othala:ro,z" "$IMAGE" node dist/server/config.mjs check
 docker compose up -d
 ```
 
 For an OIDC app added later, copy only its `<CLIENT_ID>_CLIENT_SECRET` line from a new `gen-secrets` run.
+
+## The first admin
+
+Registration is disabled, so a new stack has no identities and nobody can sign in. Make the first admin from the
+console with the `admin` helper in [`docs/runbooks/admin-recovery.md`](docs/runbooks/admin-recovery.md#console-commands),
+run from the compose directory. The marker goes on last, because the recovery gate refuses an identity that already
+carries it.
+
+1. Create the identity with no credentials and no marker. The traits are `username` and `email`; `groups` starts empty
+   and the admin pages grant them later.
+
+   ```sh
+   admin identities POST '{"schema_id":"family","traits":{"username":"first.last","email":"you@example.org"},"metadata_admin":{"groups":[]},"verifiable_addresses":[{"value":"you@example.org","via":"email","verified":true,"status":"completed"}]}'
+   ```
+
+2. Issue a recovery code for the returned `id`, open `recovery_link` and enter `recovery_code`. In that session enrol
+   what the runbook's first section lists: two passkeys, an authenticator app, backup codes and a security key.
+
+   ```sh
+   admin recovery/code POST '{"identity_id":"<id>","expires_in":"1h"}'
+   ```
+
+3. Set the marker, then sign in and open the admin pages.
+
+   ```sh
+   admin identities/<id> PATCH '[{"op":"add","path":"/metadata_admin/admin","value":true}]'
+   ```
+
+## Backups and break-glass
+
+All identity state, every passkey and the Hydra clients included, is in the `postgres-data` volume; `secrets.env`
+holds the keys that decrypt part of it. Back up both, together: [`docs/runbooks/postgres-backup.md`](docs/runbooks/postgres-backup.md)
+says what and how to restore. The example runs no backup job. If an admin loses access,
+[`docs/runbooks/admin-recovery.md`](docs/runbooks/admin-recovery.md) is the ladder, and
+[`docs/runbooks/lost-device.md`](docs/runbooks/lost-device.md) is for a member's lost device.
 
 ## Your own Ory config
 
@@ -73,10 +108,18 @@ With quadlets the render is a `Type=oneshot`, `RemainAfterExit=yes` unit writing
 
 ## Validation
 
-1. `check` runs offline, without secrets, over env names and the whole content tree. Run `check --content <dir>`
-   with the non-secret env in CI after every edit to `apps/`.
+1. `check` runs offline over env names, the whole content tree and a render held in memory, so it reports every
+   refusal `render` would make for the values it is given. It stands a placeholder in for any secret left unset and
+   reports none missing, so run it with `--env-file secrets.env` as well to hold the real secrets to render's rules.
+   Run `check --content <dir>` after every edit to `apps/`.
 2. `render` checks only env names and `courier/`, so a bad app sidelines that app and never stops sign-in. It
-   refuses a missing or blank secret, a leftover `${` and malformed YAML, and empties its earlier output.
+   refuses a missing or blank secret, a leftover `${`, malformed YAML, a secret of the wrong length and a
+   `KRATOS_COOKIE_SECRET_PREVIOUS` equal to its `_CURRENT`. A refusal exits 1 and leaves the last good render in place, so a restart
+   still boots the earlier config; the migrate jobs and Caddy wait on the render and stay down until it succeeds.
+   That protection holds for the example compose, whose render output lives in named volumes. A deployment that
+   renders to tmpfs, or that ties services to the render with a hard dependency, loses it on reboot and should render
+   to persistent storage. Only a write that fails partway empties the output. `portal/scripts/render.test.mjs` and
+   `e2e/smoke.sh` (section I) pin it.
 3. Kratos and Hydra validate their merged config at boot and refuse to start.
 4. Caddy refuses an unknown directive or a missing module at boot.
 
