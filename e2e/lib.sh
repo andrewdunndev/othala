@@ -74,7 +74,7 @@ up_and_wait() {
         exit 1
     fi
 
-    # Step 4: wait for healthy
+    # Wait for healthy
     echo "  waiting for healthchecks (max 240s)..."
     DEADLINE=$(($(date +%s) + 240))
     while true; do
