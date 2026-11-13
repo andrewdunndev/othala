@@ -167,7 +167,7 @@ Revocation is one in-process fan-out, `revokeSubject` (`portal/src/lib/revoke.ts
 force-logout, user sign-out-everywhere, and deactivation. Kratos sessions and Hydra's remembered
 login and consent sessions are all cut, because a remembered
 Hydra login would otherwise still mint fresh tokens. Portal sign-out and narrowing someone's access run the Hydra
-half alone. There is no identity cache, so a deactivated subject fails the state check on the next request.
+half alone, as does the revoke-grants hook after any credential change. There is no identity cache, so a deactivated subject fails the state check on the next request.
 
 ## OIDC client registration
 
