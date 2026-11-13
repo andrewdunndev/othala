@@ -85,3 +85,4 @@ deployment is made the same way, from `DEPLOY.md`.
 
 - `docs/runbooks/lost-device.md`: removing a credential from a member.
 - `docs/runbooks/secrets-rotation.md`: rotate cookies after a console recovery.
+- Pinned by `e2e/playwright/tests/zt-recovery-step-b.spec.ts` (Step B) and `e2e/playwright/tests/zu-recovery-step-d.spec.ts` (Step D).

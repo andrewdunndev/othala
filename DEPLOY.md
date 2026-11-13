@@ -116,6 +116,7 @@ With quadlets the render is a `Type=oneshot`, `RemainAfterExit=yes` unit writing
    refuses a missing or blank secret, a leftover `${` and malformed YAML, and a secret of the wrong length. A
    refusal exits 1 and leaves the last good render in place, so a restart still boots the earlier config; the migrate jobs and Caddy
    wait on the render and stay down until it succeeds. Only a write that fails partway empties the output.
+   `portal/scripts/render.test.mjs` and `e2e/smoke.sh` (section I) pin it.
 3. Kratos and Hydra validate their merged config at boot and refuse to start.
 4. Caddy refuses an unknown directive or a missing module at boot.
 
