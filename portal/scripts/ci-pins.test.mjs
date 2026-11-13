@@ -24,12 +24,15 @@ test('the deviation register parses and every entry carries a reason and an owne
 
 const major = (v) => Number(String(v).match(/\d+/)[0]);
 
-test('the node major in mise.toml is the one the images and engines state', () => {
+test('the node major in mise.toml is the one the image, engines and @types/node state', () => {
   const mise = Number(read('mise.toml').match(/^node = "(\d+)/m)[1]);
   const images = [...read('portal/Containerfile').matchAll(/nodejs-(\d+)/g)].map((m) => Number(m[1]));
   assert.ok(images.length > 0, 'portal/Containerfile names a nodejs image');
-  for (const n of [...images, ...[...ci.matchAll(/nodejs-(\d+)/g)].map((m) => Number(m[1]))]) assert.equal(n, mise);
+  for (const n of images) assert.equal(n, mise);
   assert.equal(major(JSON.parse(read('portal/package.json')).engines.node), mise);
+  for (const tree of ['portal', 'e2e', 'site']) {
+    assert.equal(major(JSON.parse(read(`${tree}/package.json`)).devDependencies['@types/node']), mise, `${tree} @types/node`);
+  }
 });
 
 test('the Playwright npm package and the e2e-tester base image are one version', () => {

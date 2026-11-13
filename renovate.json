@@ -30,6 +30,17 @@
       "matchPackageNames": ["registry.gitlab.com/dunn.dev/pipeline/ci-runtime-node"],
       "groupName": "pipeline catalog",
       "automerge": false
+    },
+    {
+      "description": "The check jobs in .gitlab-ci.yml run on the pipeline catalog's ci image; it moves with the component pins in one MR, with automerge off.",
+      "matchPackageNames": ["registry.gitlab.com/dunn.dev/pipeline/ci"],
+      "groupName": "pipeline catalog",
+      "automerge": false
+    },
+    {
+      "description": "@types/node tracks the Node major in mise.toml, which ci-pins grades; a newer major would type APIs the runtime lacks.",
+      "matchPackageNames": ["@types/node"],
+      "allowedVersions": "<25"
     }
   ]
 }
