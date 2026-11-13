@@ -41,8 +41,9 @@ corpus is the same locally and in CI. Each check is a row in a data table with
 an embedded canary; a check that scans nothing or whose pattern misses its
 canary is an error, never a pass.
 
-`check-purity` runs on every pipeline; `check-portal` and e2e run on tags and on
-MRs that change the heavy paths. A push to main runs neither.
+`check-purity` runs on every pipeline; `check-portal` and e2e run on every MR, on tags
+and on web/api runs. `e2e-upgrade` runs on tags, web/api runs and MRs that touch
+`deploy/`, `kratos/`, `hydra/` or `DEPLOY.md`. A push to main runs none of them.
 
 ## Conventions that hold the design together
 

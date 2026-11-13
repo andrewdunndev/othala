@@ -1,7 +1,8 @@
 # dunn.dev/othala -- container build + release pipeline.
 # build-othala publishes at the registry root.
 # Tags run build, e2e, sbom, release (sbom and release wait on e2e). Pipelines
-# exist for MRs, main, tags and web/api runs; feature-branch pushes get none.
+# exist for MRs, main, tags and web/api runs; a push to a feature branch with no
+# open MR gets no pipeline.
 
 default:
   interruptible: true
@@ -28,11 +29,9 @@ stages:
   - automerge-gate
 
 include:
-  # Advisory until verified clean (fail_on_violation: false).
   - component: gitlab.com/dunn.dev/pipeline/reference-check@4.14.0
     inputs:
       reference_ref: v0.11.0
-      fail_on_violation: false
 
   # secret-verdict fails the pipeline on a detected secret; pin-audit on an
   # image pin Renovate cannot track.
@@ -113,29 +112,13 @@ github-release:
 
 
 # Heavy chain: build-othala, build-e2e-tester, verify-othala, check-portal, e2e.
-# Runs on MRs that touch the product, on tags and on web/api runs; a main push
-# skips it because the tag pipeline is the release gate. `changes:` is true on
-# tag and web/api pipelines; the MR rule is the only one it narrows.
-.heavy-paths: &heavy-paths
-  - portal/**/*
-  - e2e/**/*
-  - kratos/**/*
-  - hydra/**/*
-  - caddy/**/*
-  - contract/**/*
-  - deploy/**/*
-  - site/**/*
-  - .gitlab-ci.yml
-  - .containerignore
-  - .env.example
-  - .deviations.yaml
-
+# Runs on every MR, on tags and on web/api runs; a main push skips it because the
+# tag pipeline is the release gate.
 .heavy-image-rules:
   - if: '$CI_COMMIT_TAG'
     variables:
       VERSION: $CI_COMMIT_TAG
   - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
-    changes: *heavy-paths
     variables:
       VERSION: $CI_COMMIT_SHORT_SHA
   - if: '$CI_PIPELINE_SOURCE =~ /^(web|api)$/'
@@ -152,14 +135,25 @@ build-e2e-tester:
 verify-othala:
   rules:
     - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
-      changes: *heavy-paths
     - if: '$CI_PIPELINE_SOURCE =~ /^(web|api)$/'
 # Installs the previous release, upgrades it per DEPLOY.md and checks identity, session and grant survive.
-# GIT_DEPTH 0: it reads the release tags.
+# GIT_DEPTH 0: it reads the release tags. Rules replace the e2e job's: it gates the release on tags, and
+# on an MR it runs only where an upgrade could break (the deployment, the Ory configs, the upgrade steps).
 e2e-upgrade:
   extends: e2e
   variables:
     GIT_DEPTH: 0
+  rules:
+    - if: '$CI_COMMIT_TAG'
+      variables:
+        AUTH_VERSION: "$CI_COMMIT_TAG"
+    - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
+      changes:
+        - deploy/**/*
+        - kratos/**/*
+        - hydra/**/*
+        - DEPLOY.md
+    - if: '$CI_PIPELINE_SOURCE =~ /^(web|api)$/'
   script:
     - cd e2e
     - bash upgrade.sh
@@ -213,7 +207,6 @@ check-portal:
   image: registry.gitlab.com/dunn.dev/pipeline/ci:4.16.0@sha256:7f2f7c1c9fe4ec3a8f4a4c51b6c2eba0ff452de662e2ab4ef8a18d685ecc58d1
   rules:
     - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
-      changes: *heavy-paths
     - if: '$CI_PIPELINE_SOURCE =~ /^(web|api)$/'
     - if: '$CI_COMMIT_TAG'
   before_script:
@@ -263,5 +256,4 @@ e2e:
       variables:
         AUTH_VERSION: "$CI_COMMIT_TAG"
     - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
-      changes: *heavy-paths
     - if: '$CI_PIPELINE_SOURCE =~ /^(web|api)$/'
