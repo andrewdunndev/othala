@@ -9,15 +9,8 @@
 import { test, expect, adminAal2Context } from '../fixtures';
 import { createIdentityWithPassword, readIdentity, TEST_PASSWORD } from '../actions/identity';
 import { getSession } from '../actions/session';
+import { adminApi } from '../actions/kratos-admin';
 import { addPlatformAuthenticator, passkeySignIn, registerPasskey } from '../actions/passkey';
-
-async function adminApi(kratosAdminURL: string, method: string, path: string, body?: unknown): Promise<Response> {
-  return fetch(`${kratosAdminURL}/admin/${path}`, {
-    method,
-    headers: { 'Content-Type': 'application/json' },
-    body: body === undefined ? undefined : JSON.stringify(body),
-  });
-}
 
 test('ZW1 — after recovery the new passkey refreshes the session and settings opens without the deleted second factor', async ({
   browser,

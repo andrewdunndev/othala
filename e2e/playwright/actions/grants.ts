@@ -11,7 +11,7 @@ import { loginViaJsonApi } from './login';
 import { requireEnv } from './oidc';
 import { TEST_PASSWORD } from './identity';
 
-async function authorizeOffline(ctx: BrowserContext, baseURL: string): Promise<string> {
+export async function authorizeOffline(ctx: BrowserContext, baseURL: string): Promise<string> {
   let url =
     `${baseURL}/oauth2/auth` +
     `?client_id=${GRAFANA_CLIENT_ID}` +
@@ -36,7 +36,7 @@ async function authorizeOffline(ctx: BrowserContext, baseURL: string): Promise<s
   throw new Error(`authorize chain did not terminate in 10 hops (last: ${url})`);
 }
 
-async function tokenGrant(ctx: BrowserContext, hydraPublicURL: string, form: Record<string, string>) {
+export async function tokenGrant(ctx: BrowserContext, hydraPublicURL: string, form: Record<string, string>) {
   const basic = Buffer.from(`${GRAFANA_CLIENT_ID}:${requireEnv('GRAFANA_CLIENT_SECRET')}`).toString('base64');
   return ctx.request.post(`${hydraPublicURL}/oauth2/token`, {
     headers: { Authorization: `Basic ${basic}`, 'Content-Type': 'application/x-www-form-urlencoded' },
