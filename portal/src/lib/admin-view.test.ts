@@ -106,6 +106,7 @@ describe('unrecognised groups and attention', () => {
     const declared = identity({ username: 'a', metadataAdmin: { groups: ['everyone'], roles: { grafana: grafana.roles[0].name } } });
     expect(undeclaredOverrides(declared, [grafana])).toEqual([]);
     expect(undeclaredOverrides(i, [])).toEqual([]);
+    expect(undeclaredOverrides(i, [{ ...grafana, roles: [] } as unknown as ClientManifest])).toEqual([]);
   });
 
   it('lists stored overrides for apps no served manifest names', () => {

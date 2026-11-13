@@ -85,7 +85,8 @@ export function undeclaredOverrides(i: Identity, manifests: readonly ClientManif
   const out: Array<{ clientId: string; appName: string; role: string }> = [];
   for (const m of manifests) {
     const role = i.metadata_admin?.roles?.[m.clientId];
-    if (typeof role === 'string' && role !== '' && !m.roles.some((r) => r.name === role)) {
+    // An app that declares no roles has nothing to resolve an override against, so nothing is held back.
+    if (m.roles.length > 0 && typeof role === 'string' && role !== '' && !m.roles.some((r) => r.name === role)) {
       out.push({ clientId: m.clientId, appName: m.clientName || m.clientId, role });
     }
   }

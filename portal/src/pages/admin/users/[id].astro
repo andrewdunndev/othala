@@ -462,6 +462,8 @@ const roleNote = Object.keys(roleOverrides).length;
           </section>
         )}
 
+        {resultSection === 'overrides' && banner && <div class={`notice notice-${banner.tone}`} role="status">{banner.text}</div>}
+
         {undeclared.length > 0 && (
           <section class="panel warn-card" id="undeclared" aria-labelledby="h-undeclared">
             <h2 id="h-undeclared">Roles an app no longer has</h2>
@@ -476,7 +478,6 @@ const roleNote = Object.keys(roleOverrides).length;
           <section class="panel warn-card" id="overrides" aria-labelledby="h-overrides">
             <h2 id="h-overrides">Overrides for apps not shown</h2>
             <p class="hint">{first} has a stored role for an app that is not loaded right now: it was retired, or its manifest has a mistake. It is kept so a save never drops it silently. Remove it only if the app is gone for good.</p>
-            {resultSection === 'overrides' && banner && <div class={`notice notice-${banner.tone}`} role="status">{banner.text}</div>}
             <ul>
               {unserved.map((o) => (
                 <li>
