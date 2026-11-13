@@ -138,7 +138,8 @@ verify-othala:
     - if: '$CI_PIPELINE_SOURCE =~ /^(web|api)$/'
 # Installs the previous release, upgrades it per DEPLOY.md and checks identity, session and grant survive.
 # GIT_DEPTH 0: it reads the release tags. Rules replace the e2e job's: it gates the release on tags, and
-# on an MR it runs only where an upgrade could break (the deployment, the Ory configs, the upgrade steps).
+# on an MR it runs only where an upgrade could break (the deployment, the Ory configs, the upgrade steps and the
+# harness and image they run on).
 e2e-upgrade:
   extends: e2e
   variables:
@@ -153,6 +154,12 @@ e2e-upgrade:
         - kratos/**/*
         - hydra/**/*
         - DEPLOY.md
+        - e2e/upgrade.sh
+        - e2e/smoke.sh
+        - e2e/lib.sh
+        - e2e/compose*.yml
+        - .gitlab-ci.yml
+        - portal/Containerfile
     - if: '$CI_PIPELINE_SOURCE =~ /^(web|api)$/'
   script:
     - cd e2e
