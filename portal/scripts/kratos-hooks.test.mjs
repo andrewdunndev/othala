@@ -52,6 +52,16 @@ function afterHooks(method) {
   return parse(readFileSync(file, 'utf8')).selfservice.flows.settings.after[method]?.hooks ?? [];
 }
 
+test('a password save ends app grants through a non-interrupting web_hook that still ends the other sessions', () => {
+  const hooks = afterHooks('password');
+  assert.ok(hooks.some((h) => h.hook === 'revoke_active_sessions'));
+  const grants = hooks.find((h) => h.hook === 'web_hook' && h.config.url === 'http://othala:4431/admin/revoke-grants');
+  assert.ok(grants, 'settings.after.password has no revoke-grants hook');
+  assert.equal(grants.config.can_interrupt, false);
+  assert.equal(grants.config.response.ignore, false);
+  assert.match(grants.config.auth.config.value, /^Bearer \$\{RECOVERY_GATE_SECRET\}$/);
+});
+
 test('only a password save revokes the other sessions; adding or removing a credential keeps them', () => {
   assert.ok(afterHooks('password').some((h) => h.hook === 'revoke_active_sessions'));
   for (const m of ['passkey', 'webauthn', 'totp', 'lookup_secret']) {

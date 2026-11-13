@@ -15,6 +15,7 @@ The git tag is the authoritative version; `portal/package.json` mirrors it.
 - An admin save no longer drops a stored role override for an app with no served manifest (a retired app, a manifest with a mistake, or an unreadable apps directory); the person page lists them under "Overrides for apps not shown" and removes one only on an explicit click.
 - An admin save carries `admin`, the picture and passkey names from the identity as it stands when the write happens, so a save racing a revoke-admin no longer restores the marker.
 - A stored role override naming a role the app's manifest no longer declares now resolves to the app's lowest declared role instead of falling back to the group-mapped role, and the person page flags it. Rename a role and anyone held back by an override stays held back.
+- A password change now also ends the member's app sign-ins and refresh tokens: `kratos/kratos.yml` gains a non-interrupting `settings.after.password` web hook to `/admin/revoke-grants`, authenticated like the other hooks. Deployers who vendor `kratos.yml` and `contract/kratos.schema.json` take both.
 
 ## [0.18.0] - 2026-11-11
 

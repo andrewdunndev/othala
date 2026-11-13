@@ -91,10 +91,26 @@ selfservice:
       # unaffected. This does NOT touch session.whoami, which must stay aal1 (forward-auth.ts).
       required_aal: highest_available
       after:
+        # A password save ends the other sessions and, through the web_hook, the app grants Kratos never sees.
         password:
           hooks:
             - hook: revoke_active_sessions
-        # Only a password save ends the other sessions; adding or removing a credential keeps them.
+            - hook: web_hook
+              config:
+                url: "http://othala:4431/admin/revoke-grants"
+                method: POST
+                auth:
+                  type: api_key
+                  config:
+                    in: header
+                    name: Authorization
+                    value: "Bearer ${RECOVERY_GATE_SECRET}"
+                response:
+                  ignore: false
+                  parse: false
+                body: file:///etc/config/kratos/hooks/recovery-gate.jsonnet
+                can_interrupt: false
+        # Adding or removing a credential keeps the other sessions.
         # Post-persist: drop the names of passkeys that no longer exist.
         passkey:
           hooks:

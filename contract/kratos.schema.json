@@ -127,6 +127,24 @@
         }
       ]
     },
+    "hook_revoke_grants": {
+      "allOf": [
+        {"$ref": "#/$defs/webhook"},
+        {
+          "type": "object",
+          "properties": {
+            "config": {
+              "type": "object",
+              "properties": {
+                "url": {"const": "http://othala:4431/admin/revoke-grants"},
+                "can_interrupt": {"const": false},
+                "response": {"type": "object", "properties": {"ignore": {"const": false}}}
+              }
+            }
+          }
+        }
+      ]
+    },
     "hook_recovery_gate": {
       "allOf": [
         {"$ref": "#/$defs/webhook"},
@@ -195,6 +213,11 @@
                 "after": {
                   "type": "object",
                   "properties": {
+                    "password": {
+                      "type": "object",
+                      "required": ["hooks"],
+                      "properties": {"hooks": {"type": "array", "contains": {"$ref": "#/$defs/hook_revoke_grants"}}}
+                    },
                     "passkey": {
                       "type": "object",
                       "required": ["hooks"],
@@ -224,7 +247,7 @@
                       }
                     }
                   },
-                  "required": ["passkey", "webauthn", "totp", "profile"]
+                  "required": ["password", "passkey", "webauthn", "totp", "profile"]
                 }
               }
             },
