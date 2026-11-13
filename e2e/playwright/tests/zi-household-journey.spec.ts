@@ -7,6 +7,7 @@ import { test, expect, adminAal2Context, computeTotp, GRAFANA_CLIENT_ID, GRAFANA
 import { createIdentityWithPassword, TEST_PASSWORD } from '../actions/identity';
 import { requireEnv, walk } from '../actions/oidc';
 import { getSession } from '../actions/session';
+import { clickAndSettle } from '../actions/passkey';
 
 const PASSKEY_REGISTER_BUTTON = 'button[name="passkey_register_trigger"]';
 const PASSKEY_LOGIN_BUTTON = 'button[name="passkey_login_trigger"]';
@@ -76,8 +77,7 @@ test('ZI1 — admin adds a person; they redeem, enrol a passkey and TOTP, and si
   const registerBtn = page.locator(PASSKEY_REGISTER_BUTTON).first();
   await expect(registerBtn, 'ZI1: passkey register button').toBeVisible({ timeout: 10_000 });
   await page.waitForFunction(hasWindowFn, 'oryPasskeySettingsRegistration');
-  await registerBtn.click();
-  await expect(page.locator('[data-credential="passkey"]'), 'ZI1: the passkey is registered').toBeVisible({ timeout: 15_000 });
+  await clickAndSettle(page, registerBtn);
   // The save replaced the settings flow, so open a fresh one: its setup key is the one the form will verify.
   await page.goto(`${baseURL}/auth/settings`, { waitUntil: 'networkidle' });
 
