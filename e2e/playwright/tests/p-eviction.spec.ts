@@ -59,16 +59,6 @@ async function clearSession(ctx: BrowserContext, baseURL: string): Promise<void>
   await ctx.clearCookies();
 }
 
-let sharedIdentity: { id: string; email: string } | null = null;
-let ctxA: BrowserContext | null = null;
-let pageA: Page | null = null;
-let cdpA: CDPSession | null = null;
-let authenticatorIdA = '';
-let ctxB: BrowserContext | null = null;
-let pageB: Page | null = null;
-let cdpB: CDPSession | null = null;
-let authenticatorIdB = '';
-
 async function newDeviceContext(browser: import('playwright-core').Browser) {
   const ctx = await browser.newContext();
   const page = await ctx.newPage();
@@ -86,72 +76,66 @@ async function newDeviceContext(browser: import('playwright-core').Browser) {
   return { ctx, page, cdp, authenticatorId };
 }
 
-test.describe.serial('P — Passkey credential eviction (lost-device scenario)', () => {
-  test.afterAll(async () => {
-    if (ctxA) await ctxA.close().catch(() => {});
-    if (ctxB) await ctxB.close().catch(() => {});
-  });
+type Device = Awaited<ReturnType<typeof newDeviceContext>>;
 
-  test('P1 — victim enrolls passkey A; a second context enrolls passkey B', async ({
-    browser,
-    baseURL,
+// A victim with passkey A on one device and passkey B on another, both signed out. Each test seeds its own, so neither
+// depends on the other having run.
+async function enrollTwoPasskeys(browser: import('playwright-core').Browser, baseURL: string, kratosAdminURL: string) {
+  const uniqueSuffix = Date.now();
+  const identity = await createIdentityWithPassword({
+    email: `evict.victim.${uniqueSuffix}@othala.test`,
+    username: `evict.victim.${uniqueSuffix}`,
+    displayName: 'Eviction Victim',
+    groups: [],
     kratosAdminURL,
-  }) => {
-    const uniqueSuffix = Date.now();
-    const identity = await createIdentityWithPassword({
-      email: `evict.victim.${uniqueSuffix}@othala.test`,
-      username: `evict.victim.${uniqueSuffix}`,
-      displayName: 'Eviction Victim',
-      groups: [],
-      kratosAdminURL,
-    });
-    console.log('[P1] seeded identity:', identity.id);
+  });
+  console.log('[P] seeded identity:', identity.id);
 
-    const devA = await newDeviceContext(browser);
-    ctxA = devA.ctx;
-    pageA = devA.page;
-    cdpA = devA.cdp;
-    authenticatorIdA = devA.authenticatorId;
-    await loginViaJsonApi(ctxA, { identifier: identity.email, password: TEST_PASSWORD }, baseURL);
-    await registerPasskeyForContext(pageA, baseURL, identity);
+  const devA = await newDeviceContext(browser);
+  await loginViaJsonApi(devA.ctx, { identifier: identity.email, password: TEST_PASSWORD }, baseURL);
+  await registerPasskeyForContext(devA.page, baseURL, identity);
 
-    const devB = await newDeviceContext(browser);
-    ctxB = devB.ctx;
-    pageB = devB.page;
-    cdpB = devB.cdp;
-    authenticatorIdB = devB.authenticatorId;
-    console.log('[P1] second virtual authenticator id:', authenticatorIdB);
+  const devB = await newDeviceContext(browser);
+  console.log('[P] second virtual authenticator id:', devB.authenticatorId);
+  await loginViaJsonApi(devB.ctx, { identifier: identity.email, password: TEST_PASSWORD }, baseURL);
+  await registerPasskeyForContext(devB.page, baseURL, identity);
 
-    await loginViaJsonApi(ctxB, { identifier: identity.email, password: TEST_PASSWORD }, baseURL);
-    await registerPasskeyForContext(pageB, baseURL, identity);
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  let registered: any;
+  await expect.poll(
+    async () => {
+      registered = await readIdentity(kratosAdminURL, identity.id);
+      return registered?.credentials?.passkey;
+    },
+    { timeout: 10_000, message: 'identity must have passkey credentials after both enrollments' },
+  ).toBeTruthy();
+  console.log('[P] passkey credential record:', JSON.stringify(registered?.credentials?.passkey));
 
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    let registered: any;
-    await expect.poll(
-      async () => {
-        registered = await readIdentity(kratosAdminURL, identity.id);
-        return registered?.credentials?.passkey;
-      },
-      { timeout: 10_000, message: 'P1: identity must have passkey credentials after both enrollments' },
-    ).toBeTruthy();
-    console.log('[P1] passkey credential record:', JSON.stringify(registered?.credentials?.passkey));
+  await clearSession(devA.ctx, baseURL);
+  await clearSession(devB.ctx, baseURL);
+  return { identity, devA, devB };
+}
 
-    await clearSession(ctxA, baseURL);
-    await clearSession(ctxB, baseURL);
+async function closeDevices(...devices: Device[]) {
+  for (const dev of devices) {
+    await dev.cdp.send('WebAuthn.removeVirtualAuthenticator', { authenticatorId: dev.authenticatorId }).catch(() => {});
+    await dev.cdp.detach().catch(() => {});
+    await dev.ctx.close().catch(() => {});
+  }
+}
 
-    sharedIdentity = identity;
+test.describe('P — Passkey credential eviction (lost-device scenario)', () => {
+  test('P1 — victim enrolls passkey A; a second context enrolls passkey B', async ({ browser, baseURL, kratosAdminURL }) => {
+    const { devA, devB } = await enrollTwoPasskeys(browser, baseURL, kratosAdminURL);
+    await closeDevices(devA, devB);
   });
 
-  test('P3 — victim self-removes the lost passkey; B locked out, A survives', async ({ baseURL }) => {
-    if (!sharedIdentity || !ctxA || !pageA || !ctxB || !pageB) {
-      test.skip(true, 'P3: requires P1 to have run first in this worker (shared module state)');
-      return;
-    }
-    const identity = sharedIdentity;
-    const contextA = ctxA;
-    const loginPageA = pageA;
-    const contextB = ctxB;
-    const loginPageB = pageB;
+  test('P3 — victim self-removes the lost passkey; B locked out, A survives', async ({ browser, baseURL, kratosAdminURL }) => {
+    const { identity, devA, devB } = await enrollTwoPasskeys(browser, baseURL, kratosAdminURL);
+    const contextA = devA.ctx;
+    const loginPageA = devA.page;
+    const contextB = devB.ctx;
+    const loginPageB = devB.page;
 
     await clearSession(contextB, baseURL);
 
@@ -208,13 +192,6 @@ test.describe.serial('P — Passkey credential eviction (lost-device scenario)',
     const sessionA = await passkeyLogin(loginPageA, contextA, baseURL, 'P3-A');
     expect(sessionA?.active, 'P3: passkey A must still work — eviction must not be scorched-earth').toBe(true);
 
-    if (cdpA) {
-      await cdpA.send('WebAuthn.removeVirtualAuthenticator', { authenticatorId: authenticatorIdA }).catch(() => {});
-      await cdpA.detach().catch(() => {});
-    }
-    if (cdpB) {
-      await cdpB.send('WebAuthn.removeVirtualAuthenticator', { authenticatorId: authenticatorIdB }).catch(() => {});
-      await cdpB.detach().catch(() => {});
-    }
+    await closeDevices(devA, devB);
   });
 });
