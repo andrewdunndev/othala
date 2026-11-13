@@ -20,7 +20,7 @@ function mockFetchSequence(responses) {
     const r = responses[i] ?? responses[responses.length - 1];
     i++;
     capturedCalls.push({ url: String(url), opts });
-    return new Response(JSON.stringify(r.body), { status: r.status ?? 200, headers: { 'Content-Type': 'application/json' } });
+    return new Response(JSON.stringify(r.body), { status: r.status ?? 200, headers: { 'Content-Type': 'application/json', ...r.headers } });
   };
 }
 
@@ -170,11 +170,27 @@ test('createIdentity and updateIdentity refuse an invalid metadata_admin before 
   }
 });
 
-test('listIdentities: asks for one page of 250 and fetches no further page', async () => {
+test('listIdentities: a single page is one call', async () => {
   mockFetch([kratosIdentity({ id: 'a', traits: {} })]);
-  await listIdentities();
+  const all = await listIdentities();
   assert.equal(capturedCalls.length, 1);
-  assert.equal(new URL(capturedCalls[0].url).searchParams.get('per_page'), '250');
+  assert.deepEqual(all.map((i) => i.id), ['a']);
+  assert.equal(new URL(capturedCalls[0].url).searchParams.get('page_size'), '250');
+});
+
+test('listIdentities: follows the next-page link to the end, so every identity is returned', async () => {
+  const next = (token) => ({ link: `<http://kratos:4434/admin/identities?page_size=250&page_token=${token}>; rel="next"` });
+  mockFetchSequence([
+    { body: [kratosIdentity({ id: 'a', traits: {} }), kratosIdentity({ id: 'b', traits: {} })], headers: next('t2') },
+    { body: [kratosIdentity({ id: 'c', traits: {} })], headers: next('t3') },
+    { body: [kratosIdentity({ id: 'd', traits: {} })] },
+  ]);
+  const all = await listIdentities();
+  assert.deepEqual(all.map((i) => i.id), ['a', 'b', 'c', 'd']);
+  assert.equal(capturedCalls.length, 3);
+  assert.equal(new URL(capturedCalls[0].url).searchParams.get('page_token'), null);
+  assert.equal(new URL(capturedCalls[1].url).searchParams.get('page_token'), 't2');
+  assert.equal(new URL(capturedCalls[2].url).searchParams.get('page_token'), 't3');
 });
 
 const PIC = avatarOf('png');

@@ -20,6 +20,7 @@ The git tag is the authoritative version; `portal/package.json` mirrors it.
 - A Hydra client othala registered whose manifest file is gone has its grants ended once and is marked retired in its metadata. This is skipped while any manifest is quarantined, when none is served, or when the apps directory is unreadable. No client is ever deleted.
 - Revoking an admin, turning off sign-in and deleting a person now run one at a time, and the last-admin count is taken inside that queue, so two admins acting on each other at the same moment can no longer leave none.
 - A consent challenge that skips the grant screen is accepted only for the browser whose session belongs to the challenge's subject, the same binding the grant screen's submit already had.
+- The identity list the admin pages, the last-admin count and the registrar use now follows Kratos pagination to the end; before, it stopped at the first 250.
 
 ## [0.18.0] - 2026-11-11
 

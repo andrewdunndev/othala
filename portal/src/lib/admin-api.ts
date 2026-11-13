@@ -11,7 +11,7 @@ import type { Identity } from './types';
 import { validateMetadataAdmin } from './metadata-admin';
 import { readAvatar, type Avatar } from './avatar';
 import { passkeyCredentialIds, pruneNames, readPasskeyNames } from './passkey-names';
-import { revokeSubject } from './revoke';
+import { nextPageToken, revokeSubject } from './revoke';
 import { isNotFound, kratosAdmin } from './ory-fetch';
 
 export interface IdentityTraits {
@@ -42,9 +42,17 @@ export interface UpdateIdentityInput {
   metadataAdmin: Pick<MetadataAdmin, 'groups' | 'roles'>;
 }
 
-// One page of 250 is the family-scale ceiling; later pages are not fetched.
+/** Every identity: callers count and revoke across the whole set, so a page is never the end of it. */
 export async function listIdentities(): Promise<Identity[]> {
-  return kratosAdmin().listIdentities({ perPage: 250 });
+  const api = kratosAdmin();
+  const all: Identity[] = [];
+  let pageToken: string | undefined;
+  do {
+    const page = await api.listIdentitiesRaw({ pageSize: 250, pageToken });
+    all.push(...(await page.value()));
+    pageToken = nextPageToken(page.raw.headers);
+  } while (pageToken);
+  return all;
 }
 
 // Without lookup_secret, backup codes are never fetched and a PUT round-trip would drop them.
