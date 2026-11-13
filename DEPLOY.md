@@ -109,14 +109,17 @@ With quadlets the render is a `Type=oneshot`, `RemainAfterExit=yes` unit writing
 ## Validation
 
 1. `check` runs offline over env names, the whole content tree and a render held in memory, so it reports every
-   refusal `render` would make. Run with `--env-file secrets.env` as well it also holds the secrets to render's
-   rules; without them it skips only the missing-secret refusal. Run `check --content <dir>` after every edit to
-   `apps/`.
+   refusal `render` would make for the values it is given. It stands a placeholder in for any secret left unset and
+   reports none missing, so run it with `--env-file secrets.env` as well to hold the real secrets to render's rules.
+   Run `check --content <dir>` after every edit to `apps/`.
 2. `render` checks only env names and `courier/`, so a bad app sidelines that app and never stops sign-in. It
-   refuses a missing or blank secret, a leftover `${` and malformed YAML, and a secret of the wrong length. A
-   refusal exits 1 and leaves the last good render in place, so a restart still boots the earlier config; the migrate jobs and Caddy
-   wait on the render and stay down until it succeeds. Only a write that fails partway empties the output.
-   `portal/scripts/render.test.mjs` and `e2e/smoke.sh` (section I) pin it.
+   refuses a missing or blank secret, a leftover `${`, malformed YAML, a secret of the wrong length and a
+   `_PREVIOUS` equal to its `_CURRENT`. A refusal exits 1 and leaves the last good render in place, so a restart
+   still boots the earlier config; the migrate jobs and Caddy wait on the render and stay down until it succeeds.
+   That protection holds for the example compose, whose render output lives in named volumes. A deployment that
+   renders to tmpfs, or that ties services to the render with a hard dependency, loses it on reboot and should render
+   to persistent storage. Only a write that fails partway empties the output. `portal/scripts/render.test.mjs` and
+   `e2e/smoke.sh` (section I) pin it.
 3. Kratos and Hydra validate their merged config at boot and refuse to start.
 4. Caddy refuses an unknown directive or a missing module at boot.
 

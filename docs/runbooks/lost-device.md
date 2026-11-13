@@ -20,7 +20,7 @@ You need an admin session at AAL2, on the member's page in the admin area.
 4. **Passkeys** the admin API cannot delete, even as a type. The member removes the lost one from their own settings
    after step 5, then you use sign out everywhere, since removing a passkey ends no sessions. If they cannot be
    reached and the lockout is urgent, delete the identity; it revokes sessions and app grants first and the member
-   registers again.
+   enrols again through the setup link.
 5. **Issue a setup link** and send it over a channel that is not the member's possibly compromised mailbox. It opens
    a privileged settings session in which they enrol a new passkey, an authenticator app and new backup codes. It
    expires after 24 hours; issue another if it lapses.

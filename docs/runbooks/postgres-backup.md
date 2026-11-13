@@ -8,7 +8,7 @@ the contract they must satisfy.
 The `kratos` and `hydra` databases hold every passkey enrolment, session and recovery-code state, the Hydra OAuth2
 clients (secrets hashed) and its signing keys (private keys and session data encrypted at rest under
 `HYDRA_SYSTEM_SECRET`). Without a backup every member re-enrols and every client is re-created. Without the secrets, a
-restore cannot decrypt: Kratos needs `KRATOS_CIPHER_SECRET_CURRENT` for the same reason.
+restore cannot decrypt. Keep `KRATOS_CIPHER_SECRET_CURRENT` in `secrets.env` too; it covers only upstream-provider tokens and OIDC flow state, so nothing in this stack depends on it, but an adopter who enables a provider does.
 
 ## What to back up
 
@@ -18,7 +18,7 @@ restore cannot decrypt: Kratos needs `KRATOS_CIPHER_SECRET_CURRENT` for the same
    secrets, and it is the only copy.
 3. **At least one copy off the host.**
 4. **A restore you have tried**, into a throwaway stack: one identity signs in, one OIDC client issues a token, and a
-   WebAuthn credential still verifies (this exercises the cipher secret).
+   passkey still signs in.
 
 ## Restore
 

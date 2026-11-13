@@ -24,10 +24,11 @@ admin identities/<id> PATCH '[{"op":"add","path":"/metadata_admin/admin","value"
 admin recovery/code POST '{"identity_id":"<id>","expires_in":"1h"}'         # recovery_link and recovery_code; nothing is emailed
 admin identities/<id>/credentials/totp DELETE
 admin identities/<id>/credentials/lookup_secret DELETE                      # backup codes
-admin 'identities/<id>/credentials/webauthn?identifier=<credential id>' DELETE
+admin identities/<id>/credentials/webauthn DELETE                           # every security key; passkeys stay
 ```
 
-The admin API cannot delete a passkey; only its owner removes one, from their own settings.
+The admin API cannot delete a passkey; only its owner removes one, from their own settings. Deleting a credential type
+the identity does not hold returns 404, and the helper exits 1.
 
 ## Step A: another passkey still works
 
