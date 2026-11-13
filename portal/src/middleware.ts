@@ -3,6 +3,13 @@
 // and the error routes themselves, and applies security headers to every
 // response. The CSP omits script-src deliberately: a strict one breaks the
 // Kratos WebAuthn ceremony and the portal's inline scripts.
+//
+// Denials happen at two layers and this middleware sees only one. Astro's `security.checkOrigin` runs ahead of user
+// middleware and answers a bare 403 without calling next(), so nothing here can brand it; leave it on, since the bypass
+// of this exact check (CVE-2024-56140) turned on content-type handling. A normal browser sends a matching Origin, so
+// that 403 is effectively attacker-only. Past it, the guards (requireAdminSession, consent CSRF) return structured
+// denials that redirect to auth/error with a `reason` that error-reasons.ts maps to copy. Both layers are asserted
+// together in e2e r-admin-post-origin and h-member-admin-post. A new denial is a reason entry, never a new page.
 
 import { defineMiddleware } from 'astro:middleware';
 import { contentSecurityPolicy } from './lib/csp';

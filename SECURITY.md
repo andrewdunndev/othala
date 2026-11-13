@@ -11,10 +11,9 @@ Include the affected component and commit or tag, what an attacker gains,
 reproduction steps, and relevant deployment specifics. A flaw in Ory Kratos or Hydra itself
 goes to Ory (<https://www.ory.sh/docs/ecosystem/security>); a note here is still welcome.
 
-Expect acknowledgement within 3 business days and an assessment within 10, from one
-maintainer on best effort, with no on-call and no bounty. Disclosure is coordinated: the fix lands
-privately, ships in a release, then is published, with credit unless you decline it. Fixes land on the
-newest tag only; older tags are not backported.
+One maintainer reads reports on a best-effort basis: no timetable, no on-call and no bounty. The
+intent is a coordinated disclosure: the fix lands privately, ships in a release, then is published,
+with credit unless you decline it. Fixes land on the newest tag only; older tags are not backported.
 
 ## The trust boundary
 

@@ -64,7 +64,7 @@ marker on every request; `e2e/playwright/tests/d-admin-aal2-stepup.spec.ts` and
 
 <figure class="diagram">
   <img src="/diagrams/trust-boundary.svg" alt="A browser reaches one hostname at the edge proxy, which terminates TLS. Inside one trust domain the admin APIs never leave: the app runs two listeners, a public SSR listener the edge reaches and an admin listener bound to PORTAL_ADMIN_BIND_HOST that the edge never touches; Kratos and Hydra each expose the edge a public API (self-service and sessions for Kratos, authorize, token and discovery for Hydra), while the app alone calls their admin APIs. Kratos and Hydra each keep a separate Postgres database. Admin APIs are reachable only from the app, never from the edge, enforced by the Ory config render, requireAdminSession, and pinned by d-admin-aal2-stepup.spec.ts and f-aal2-bypass.spec.ts.">
-  <figcaption class="diagram-caption">Three ports on the network; the admin APIs are not among them</figcaption>
+  <figcaption class="diagram-caption">The network sees only the edge; the admin APIs are not behind it</figcaption>
 </figure>
 
 ## Secrets and the shipped baseline
@@ -76,8 +76,8 @@ takes a path, a known gap. No committed config holds
 plaintext. The config render runs as the Kratos and Hydra uid because the capability drop is load-bearing:
 without `CAP_DAC_OVERRIDE`, a 0600 config owned by another uid is unreadable and every Ory service exits.
 
-Also open: **the example compose sets no memory bound** (set one in the
-deploy plane, sized to the host; Kratos needs about 128 MB per concurrent
+Also open: **the example compose sets no memory bound** (set one in your
+deployment, sized to the host; Kratos needs about 128 MB per concurrent
 argon2 hash), so the hash-exhaustion lever above is unbounded; and
 **nothing verifies a signature before use**, which belongs to whatever runs the
 image, not to this repository.
