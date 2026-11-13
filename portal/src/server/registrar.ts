@@ -1,7 +1,6 @@
-// In-process OIDC client reconciler, run on boot (bounded retry+backoff for a
-// cold Hydra) and on SIGHUP (drops the manifest cache, re-registers all
-// clients); both are wired in listen.ts. It never crashes the listeners: errors
-// are logged and the portal keeps serving. `register` is injectable for tests.
+// In-process OIDC client reconciler, run on boot (retrying with capped backoff until a cold Hydra answers) and on
+// SIGHUP (drops the manifest cache, re-registers all clients); both are wired in listen.ts. It never crashes the
+// listeners: errors are logged and the portal keeps serving. `register` is injectable for tests.
 import { registerAllClients, type RegisterOptions } from '../lib/register-clients';
 import { invalidateManifestCache } from '../lib/manifests';
 
@@ -21,12 +20,12 @@ export const lastReconcileOk = (): boolean => lastOk;
  * Run one reconcile pass: load manifests, register every client, log results.
  *
  * Single-flight: if already running, queues one rerun and returns. On error:
- * logs loudly and RE-THROWS so reconcileOnBoot can apply its retry logic.
+ * logs loudly (unless `logFailure` is false, for a caller that logs its own) and RE-THROWS so reconcileOnBoot can retry.
  * `finally` resets the guard, then runs the queued rerun.
  *
  * @param register Injectable register function (defaults to registerAllClients).
  */
-export async function reconcileClients(register: RegisterFn = registerAllClients): Promise<void> {
+export async function reconcileClients(register: RegisterFn = registerAllClients, logFailure = true): Promise<void> {
   if (reconciling) {
     console.warn('[portal:registrar] reconcile already in-flight — queued one rerun');
     rerunPending = true;
@@ -42,7 +41,7 @@ export async function reconcileClients(register: RegisterFn = registerAllClients
     lastOk = true;
   } catch (err) {
     lastOk = false;
-    console.error('[portal:registrar] reconcile FAILED — continuing to serve:', err);
+    if (logFailure) console.error('[portal:registrar] reconcile FAILED — continuing to serve:', err);
     throw err;
   } finally {
     reconciling = false;
@@ -54,42 +53,40 @@ export async function reconcileClients(register: RegisterFn = registerAllClients
 }
 
 /**
- * Bounded-retry boot reconcile. Hydra may still be starting when the portal
- * binds its listeners, so we retry with linear backoff up to `attempts` times.
- *
- * After the last attempt, logs a clear operator message and RETURNS without
- * throwing — the portal must not crash its listeners due to Hydra
- * unavailability at boot. An operator can SIGHUP to retry once Hydra is up.
+ * Boot reconcile. Hydra may still be starting, or recovering its database, when the portal binds its
+ * listeners, so a failed pass retries with doubling backoff capped at `maxDelayMs` until one succeeds; the
+ * listeners serve throughout and /readyz reports 503 until it does. A failure is logged once per backoff step,
+ * so a long outage costs a handful of lines, not one per retry. A SIGHUP pass that succeeds ends the loop.
  *
  * @param register  Injectable register function (defaults to registerAllClients).
- * @param attempts  Maximum attempts before giving up (default 5).
- * @param baseDelayMs  Delay multiplier in ms (attempt × baseDelayMs, default 2000).
+ * @param baseDelayMs  First retry delay in ms (default 2000).
+ * @param maxDelayMs  Ceiling for the retry delay in ms (default 60000).
  */
 export async function reconcileOnBoot(
   register: RegisterFn = registerAllClients,
-  attempts = 5,
   baseDelayMs = 2000,
+  maxDelayMs = 60_000,
 ): Promise<void> {
-  for (let attempt = 1; attempt <= attempts; attempt++) {
+  let delay = baseDelayMs;
+  let logged = 0;
+  for (let attempt = 1; ; attempt++) {
     try {
-      console.log(`[portal:registrar] boot reconcile attempt ${attempt}/${attempts}`);
-      await reconcileClients(register);
-      return; // success — done
-    } catch {
-      if (attempt < attempts) {
-        const delay = baseDelayMs * attempt;
+      console.log(`[portal:registrar] boot reconcile attempt ${attempt}`);
+      await reconcileClients(register, false);
+      return;
+    } catch (err) {
+      if (delay !== logged) {
+        logged = delay;
+        const at = delay >= maxDelayMs ? ' (the longest wait; logged no more until it succeeds)' : '';
         console.warn(
-          `[portal:registrar] attempt ${attempt} failed — retrying in ${delay}ms`,
+          `[portal:registrar] reconcile failed: ${(err as Error).message} — retrying in ${delay}ms${at}`,
         );
-        await new Promise((resolve) => setTimeout(resolve, delay));
       }
+      await new Promise((resolve) => setTimeout(resolve, delay));
+      if (lastOk) return;
+      delay = Math.min(delay * 2, maxDelayMs);
     }
   }
-  // All attempts exhausted — log prominently and return (never throw).
-  console.error(
-    `[portal:registrar] boot reconcile gave up after ${attempts} attempt(s) — ` +
-      'serving anyway — fix Hydra and SIGHUP to retry',
-  );
 }
 
 /**
