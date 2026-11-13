@@ -1,5 +1,6 @@
-// ZY — every credential change ends the refresh tokens issued before it: the revoke-grants hook runs after a passkey,
-// a security key, an authenticator app and a backup-code set are saved, not only after a password change.
+// ZY — every credential change ends the refresh tokens issued before it: Kratos's settings.after hooks call the portal's
+// revoke-grants endpoint after a passkey, a security key, an authenticator app and a backup-code set are saved. The
+// password change is W4 in w-grant-revocation.spec.ts.
 
 import type { Browser, BrowserContext } from 'playwright-core';
 import { test, expect, enrollTotpSecret, KRATOS_ADMIN_URL } from '../fixtures';

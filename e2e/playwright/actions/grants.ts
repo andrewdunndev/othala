@@ -6,8 +6,8 @@
 
 import type { Browser, BrowserContext } from '@playwright/test';
 import { expect } from '@playwright/test';
-import { GRAFANA_CLIENT_ID, GRAFANA_REDIRECT_URI } from '../fixtures';
-import { loginViaJsonApi } from './login';
+import { GRAFANA_CLIENT_ID, GRAFANA_REDIRECT_URI, enrollTotpSecret } from '../fixtures';
+import { loginViaJsonApi, totpStepUp } from './login';
 import { requireEnv } from './oidc';
 import { TEST_PASSWORD } from './identity';
 
@@ -50,10 +50,25 @@ export async function liveRefreshToken(opts: {
   baseURL: string;
   hydraPublicURL: string;
   email: string;
+  /** A member holding an elevated role steps up to aal2 at the app, so they enrol an authenticator first. */
+  withTotp?: boolean;
 }): Promise<string> {
+  // The authenticator is enrolled in a session of its own: enrolling lifts that session, so the session that steps up
+  // has to start at aal1 with the authenticator already on the identity.
+  let totpSecret: string | undefined;
+  if (opts.withTotp) {
+    const enrolling = await opts.browser.newContext();
+    try {
+      await loginViaJsonApi(enrolling, { identifier: opts.email, password: TEST_PASSWORD }, opts.baseURL);
+      totpSecret = await enrollTotpSecret(enrolling, opts.baseURL);
+    } finally {
+      await enrolling.close();
+    }
+  }
   const ctx = await opts.browser.newContext();
   try {
     await loginViaJsonApi(ctx, { identifier: opts.email, password: TEST_PASSWORD }, opts.baseURL);
+    if (totpSecret) await totpStepUp(ctx, opts.baseURL, totpSecret);
     const code = await authorizeOffline(ctx, opts.baseURL);
     const exchange = await tokenGrant(ctx, opts.hydraPublicURL, {
       grant_type: 'authorization_code',
@@ -74,7 +89,7 @@ export async function liveRefreshToken(opts: {
   }
 }
 
-export async function expectRefreshRefused(browser: Browser, hydraPublicURL: string, refreshToken: string, why: string) {
+export async function expectRefreshRefused(browser: Browser, hydraPublicURL: string, refreshToken: string, why = 'refresh after the change') {
   const ctx = await browser.newContext();
   try {
     const resp = await tokenGrant(ctx, hydraPublicURL, { grant_type: 'refresh_token', refresh_token: refreshToken });
