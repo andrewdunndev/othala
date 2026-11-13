@@ -15,6 +15,8 @@ just e2e   # from the repo root
 the specs and the product under test are the checked-out ones. To validate a published image instead:
 `cd e2e && AUTH_VERSION=<tag> bash validate.sh`.
 
+`smoke.sh` section I assumes the compose container store (it runs `podman run --volumes-from lab-render`) and fails loudly if the store differs.
+
 ## CI
 
 The `e2e` job runs on a QEMU runner selected by the project CI/CD variable

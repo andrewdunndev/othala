@@ -165,6 +165,6 @@ Each release's `deploy/example/compose.yml` pins the upstream Ory digests its e2
 
 1. Apply the release's "Config changes" from [`CHANGELOG.md`](CHANGELOG.md).
 2. Move the othala, Kratos and Hydra pins to the release's example.
-3. Before an Ory pin change, `just backup <file>` (a `pg_dump` of the identity database): Ory migrations are forward-only, so rolling back restores the dump. An
+3. Before an Ory pin change, `just backup <dir>` (a `pg_dump` of the kratos and hydra databases, as the backup runbook describes; `secrets.env` is yours to copy): Ory migrations are forward-only, so rolling back restores the dump. An
    othala-only rollback is a digest revert.
 4. `docker compose up -d --force-recreate render kratos hydra othala caddy` (a plain `up -d` leaves them on pre-upgrade config); the migrate services run automatically via `depends_on`. Check the OIDC discovery document and a real login.

@@ -84,5 +84,5 @@ just build    # production bundle
 just dev      # UI iteration without the full stack; dev-only CONTENT_DIR and OTHALA_DEV_MOCK_GROUPS (.env.example)
 just purity   # the purity gate, then bash -n over tracked shell scripts
 just e2e      # build both images from the working tree, then run deploy/example under the e2e overlay
-just backup   # pg_dump of the identity database from a running stack
+just backup   # custom-format pg_dump of the kratos and hydra databases from a running stack
 ```

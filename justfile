@@ -58,9 +58,12 @@ e2e:
     cd e2e
     AUTH_REGISTRY="$registry" AUTH_VERSION="$version" bash validate.sh
 
-# one-shot dump of the identity database from a running deploy/example stack into <out>
-backup out compose="deploy/example/compose.yml":
+# one-shot custom-format pg_dump of the kratos and hydra databases into <dir>, from a running deploy/example stack
+backup dir compose="deploy/example/compose.yml":
     #!/usr/bin/env bash
     set -euo pipefail
-    docker compose -f "{{ compose }}" exec -T postgres pg_dump --username postgres --dbname kratos > "{{ out }}.partial"
-    mv "{{ out }}.partial" "{{ out }}"
+    mkdir -p "{{ dir }}"
+    for db in kratos hydra; do
+      docker compose -f "{{ compose }}" exec -T postgres pg_dump --username postgres --format custom --dbname "$db" > "{{ dir }}/$db.dump.partial"
+    done
+    for db in kratos hydra; do mv "{{ dir }}/$db.dump.partial" "{{ dir }}/$db.dump"; done
