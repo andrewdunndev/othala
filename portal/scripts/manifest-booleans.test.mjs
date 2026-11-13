@@ -25,7 +25,7 @@ const FLAGS = [
 ];
 
 for (const [where, key] of FLAGS) {
-  for (const bad of ['no', 'false', 'yes', 0, 1, null, [], {}]) {
+  for (const bad of ['no', 'false', 'yes', 0, 1, [], {}]) {
     test(`${key}: ${JSON.stringify(bad)} is a manifest error`, () => {
       assert.throws(() => parseManifest(manifestWith(where, key, bad), 'wiki.yaml'), new RegExp(key));
     });
@@ -45,6 +45,15 @@ test('an unquoted YAML 1.1 no is rejected, not read as skip', () => {
 test('presentation-only manifest: a non-boolean skip_access_check is rejected too', () => {
   const text = 'presentation:\n  name: Wiki\nconsent:\n  skip_access_check: "no"\n';
   assert.throws(() => parseManifest(text, 'wiki.yaml'), /skip_access_check/);
+});
+
+test('a blank flag (YAML null) is absent and takes the default, so an upgrade never drops a deployed app', () => {
+  const text = 'oidc:\n  client_id: wiki\n  scope: openid\n  audience: [https://wiki.example.com]\n  redirect_uris: [https://wiki.example.com/cb]\n  skip_consent:\n  backchannel_logout_session_required:\npresentation:\n  access: [wiki]\nconsent:\n  skip_access_check:\n  emit_groups_claim:\n';
+  const m = parseManifest(text, 'wiki.yaml');
+  assert.equal(m.skipAccessCheck, false);
+  assert.equal(m.skipConsent, false);
+  assert.equal(m.backchannelLogoutSessionRequired, false);
+  assert.equal(m.emitGroupsClaim, null);
 });
 
 test('absent flags keep their defaults', () => {

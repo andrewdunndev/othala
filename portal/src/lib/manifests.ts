@@ -135,10 +135,11 @@ function normaliseRoles(raw: unknown): ClientRole[] {
   return [];
 }
 
-/** A gate flag is a real boolean or absent; a loose value such as the string `no` is an error, never coerced. */
+/** A gate flag is a real boolean or absent (a blank value counts as absent); a loose value such as the string `no` is an error, never coerced. */
 function readFlag(src: Record<string, unknown>, key: string, file: string): boolean | null {
   if (!(key in src)) return null;
   const v = src[key];
+  if (v === null || v === undefined) return null;
   if (typeof v === 'boolean') return v;
   throw new Error(`${file}: ${key} must be true or false, got ${JSON.stringify(v) ?? String(v)}`);
 }
