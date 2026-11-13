@@ -11,7 +11,7 @@ import type { Identity } from './types';
 import { validateMetadataAdmin } from './metadata-admin';
 import { readAvatar, type Avatar } from './avatar';
 import { passkeyCredentialIds, pruneNames, readPasskeyNames } from './passkey-names';
-import { nextPageToken, revokeSubject } from './revoke';
+import { pageTokens, revokeSubject } from './revoke';
 import { isNotFound, kratosAdmin } from './ory-fetch';
 
 export interface IdentityTraits {
@@ -46,11 +46,12 @@ export interface UpdateIdentityInput {
 export async function listIdentities(): Promise<Identity[]> {
   const api = kratosAdmin();
   const all: Identity[] = [];
+  const next = pageTokens();
   let pageToken: string | undefined;
   do {
     const page = await api.listIdentitiesRaw({ pageSize: 250, pageToken });
     all.push(...(await page.value()));
-    pageToken = nextPageToken(page.raw.headers);
+    pageToken = next(page.raw.headers);
   } while (pageToken);
   return all;
 }

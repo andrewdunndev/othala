@@ -11,7 +11,7 @@ import {
 import { hydraAdmin, isNotFound } from './ory-fetch';
 import { clientSecretEnv } from './config';
 import { listIdentities } from './admin-api';
-import { nextPageToken } from './revoke';
+import { pageTokens } from './revoke';
 
 export interface OAuth2ClientApi {
   getOAuth2Client(req: { id: string }): Promise<OAuth2Client>;
@@ -186,6 +186,7 @@ async function retireAbsentClients(opts: RegisterOptions): Promise<void> {
   const revoke = clientRevoker(api, opts.subjects ?? (async () => (await listIdentities()).map((i) => i.id)));
   const served = new Set(present.map((m) => m.clientId.toLowerCase()));
   const failed: string[] = [];
+  const next = pageTokens();
   let pageToken: string | undefined;
   do {
     const page = await api.listOAuth2ClientsRaw({ pageSize: 250, pageToken });
@@ -200,7 +201,7 @@ async function retireAbsentClients(opts: RegisterOptions): Promise<void> {
         failed.push(`${c.client_id} (${err instanceof Error ? err.message : String(err)})`);
       }
     }
-    pageToken = nextPageToken(page.raw.headers);
+    pageToken = next(page.raw.headers);
   } while (pageToken);
   if (failed.length > 0) throw new Error(`retiring failed for ${failed.length} client(s): ${failed.join('; ')}`);
 }

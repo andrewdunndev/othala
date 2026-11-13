@@ -193,6 +193,13 @@ test('listIdentities: follows the next-page link to the end, so every identity i
   assert.equal(new URL(capturedCalls[2].url).searchParams.get('page_token'), 't3');
 });
 
+test('listIdentities: a repeated page token is an error, not an endless loop', async () => {
+  const same = { link: '<http://kratos:4434/admin/identities?page_size=250&page_token=t2>; rel="next"' };
+  mockFetchSequence([{ body: [kratosIdentity({ id: 'a', traits: {} })], headers: same }]);
+  await assert.rejects(() => listIdentities(), /repeated page token/);
+  assert.ok(capturedCalls.length <= 3);
+});
+
 const PIC = avatarOf('png');
 const savedMetadata = () => JSON.parse(capturedCalls[1].opts.body).metadata_admin;
 const updateAgainst = async (stored, input = { groups: ['family'], roles: { wiki: 'viewer' } }) => {

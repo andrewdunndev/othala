@@ -182,6 +182,16 @@ test('a registered client whose manifest is absent is revoked once and marked re
   assert.deepEqual(revokes(api), [], 'once only');
 });
 
+test('a repeated client page token stops the retire pass with an error and retires nothing further', async () => {
+  apps({ 'wiki.yaml': manifestYaml('wiki') });
+  const api = hydra({ gone: { client_id: 'gone', ...ours() } });
+  api.listOAuth2ClientsRaw = async () => ({
+    value: async () => [],
+    raw: { headers: new Headers({ link: '<http://hydra/admin/clients?page_token=t2>; rel="next"' }) },
+  });
+  await assert.rejects(() => retire(api), /repeated page token/);
+});
+
 test('a retired client whose manifest returns is served again without a revoke', async () => {
   apps({ 'wiki.yaml': manifestYaml('wiki') });
   const api = hydra();
