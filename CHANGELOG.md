@@ -10,6 +10,8 @@ The git tag is the authoritative version; `portal/package.json` mirrors it.
 
 ### Changed
 
+- The cookie-rotation and secrets-rotation runbooks are merged into `docs/runbooks/secrets-rotation.md`; the comments in `kratos.yml`, `hydra.yml` and `.env.example` that pointed at the old name now point at it.
+- The admin-recovery, lost-device and postgres-backup runbooks give working sequences: the key-first authenticator swap, the console credential deletes for an admin with no second factor left, eviction of a member or admin who holds an elevated role, and a client re-registration step after a restore.
 - A signed-in member sees the sign-in-is-starting-up page, not the signed-out home, when Kratos answers but cannot read its database.
 - The portal keeps retrying its Hydra client registration with a capped backoff (up to 60 s) until it succeeds, instead of giving up after about 20 s and waiting for a SIGHUP. It serves throughout, and `/readyz` reports 503 until the registration lands.
 - A refused render keeps the last good output instead of emptying it, so a restart after a bad edit still boots the earlier config; only a write that fails partway clears it. `check` now runs the render in memory and reports every refusal `render` would make.

@@ -1,112 +1,48 @@
-# Lost or stolen device — eviction procedure
+# Lost or stolen device
 
-The response when a member's device is lost, stolen, or accessed without their
-knowledge. Follow it in full: skipped steps leave a window for the attacker to
-regain access.
+Use this when a member's device is lost, stolen or used without their knowledge. Signing out everywhere ends sessions
+and Hydra grants but leaves enrolled credentials, so someone holding a brief session can enrol their own passkey, or
+keep a copied TOTP seed, and sign in afresh. Eviction removes the credentials first and the sessions with them. Do not
+force a re-login before the credentials are audited.
 
-Signing out everywhere (`revokeSubject`) ends sessions and Hydra grants but does not delete enrolled
-credentials. An attacker with a brief session can enrol their own passkey, or hold a copied TOTP seed, and
-authenticate afresh. Eviction removes the credentials, not just the sessions.
+You need an admin session at AAL2, on the member's page in the admin area.
 
----
+## Eviction
 
-## The correct eviction sequence
+1. **Audit.** The member's credentials row lists each enrolled method. Ask which were on the device and treat each as
+   compromised; if you cannot reach them, take every removable type.
+2. **Check the recovery email.** The trait accepts an unverified address, and neither sign-out nor credential removal
+   clears one a thief planted. If the member does not recognise it, blank it or replace it with an address they
+   control.
+3. **Remove** each affected type: `webauthn` (security keys), `totp`, `lookup_secret` (backup codes). Each removal
+   deletes every credential of that type and signs the member out everywhere. A `password` credential cannot be
+   removed here; rotate it in the app with its own password store.
+4. **Passkeys** the admin API cannot delete, even as a type. The member removes the lost one from their own settings
+   after step 5, then you use sign out everywhere, since removing a passkey ends no sessions. If they cannot be
+   reached and the lockout is urgent, delete the identity; it revokes sessions and app grants first and the member
+   registers again.
+5. **Issue a setup link** and send it over a channel that is not the member's possibly compromised mailbox. It opens
+   a privileged settings session in which they enrol a new passkey, an authenticator app and new backup codes. It
+   expires after 24 hours; issue another if it lapses.
 
-Perform these steps in order. Do not force re-login first; audit the credentials first.
+## A member who holds an elevated role
 
-### Step 1 — Open the user in the admin UI
+The portal refuses to remove the last authenticator app or security key from someone who holds an elevated role, so
+step 3 is refused. Lower first, remove, then raise again:
 
-Navigate to **/admin/users/\<id\>** for the affected identity.
+1. Lower every elevated role to the app's entry level.
+2. Do steps 1 to 3 above, including `totp`, and `lookup_secret` unless the member still holds the codes, and
+   `webauthn` if a key was on the device.
+3. Issue the setup link. The member enrols a second factor and removes the lost passkey from settings within the five
+   minutes the setup session stays privileged.
+4. Raise the roles again; the portal allows it once a second factor exists.
 
-This requires an active admin session at AAL2.
+## An admin
 
-### Step 2 — Audit enrolled credentials
-
-In the **Profile** section, the **credentials** row shows every enrolled method
-with a chip:
-
-| Chip | Meaning |
-|------|---------|
-| `passkey ✓` | One or more FIDO2 passkeys registered |
-| `webauthn ✓` | Security keys registered |
-| `totp ✓` | TOTP authenticator app enrolled |
-| `backup codes ✓` | Single-use recovery codes generated |
-| `password ✓` | Password set (directory-backed / password-auth path) |
-| `— ` (muted) | Not enrolled |
-
-Ask the user which credential types were on the device; treat each as
-compromised. If you cannot reach them, remove all evictable types; they
-re-enroll via the Step 4 URL.
-
-If a member reports an authenticator app they did not add, remove it from their account page, then use Also sign out everywhere on the same page.
-
-### Step 2b — Check the identity's recovery email address
-
-The `recoveryEmail` trait accepts an unverified address. An attacker with even
-an AAL1 session could have planted their own in the settings flow, and neither
-`revokeSubject` nor credential eviction removes it. Ask the member whether they
-recognise the value in the Profile section; if not, clear it:
-
-1. Click **Edit profile and picture**.
-2. Clear the **Recovery email** field (leave it blank, or replace it with an
-   address the member controls).
-3. Click **Save**.
-
-The user can set their own after re-enrolling in Step 4.
-
-### Step 3 — Remove the affected credential type(s)
-
-Next to each enrolled evictable credential chip, there is a **Remove** button.
-Click it for each affected type.
-
-Remove calls the Kratos admin API
-`DELETE /admin/identities/{id}/credentials/{type}`, deleting **all**
-credentials of that type, then signs the user out everywhere (Kratos sessions,
-Hydra login and consent).
-
-**Evictable types (Remove button present):**
-- `webauthn` — all security keys
-- `totp` — the TOTP shared secret (the authenticator app binding)
-- `lookup_secret` (backup codes) — the set of backup codes
-
-**Not evictable from this UI:**
-- `password` — Kratos rejects admin deletion of the password credential.
-  Where a directory-backed app authenticates by password, rotate it in that
-  app's own admin console instead.
-- `passkey` — Kratos's admin API cannot delete a passkey credential at all,
-  even the whole type (upstream limitation, not a missing UI feature); no
-  Remove button is shown. See Step 3b.
-
-### Step 3b — Passkey: self-service removal
-
-Kratos exposes per-credential passkey removal only through the user's own
-`/auth/settings`, where each key is listed with its label; the user removes the
-one matching the lost device. If they are locked out, issue the Step 4 URL
-first: it lands them in a privileged settings session. Removing a passkey signs
-no one out, so then click **Sign out everywhere** in the Actions panel.
-
-If the user cannot be reached and full lockout is urgent, the last resort is
-**Delete** on this identity (Actions panel): it revokes sessions and app grants
-first, and the user re-registers.
-
-### Step 4 — Issue a recovery/enrollment URL
-
-Click **Get setup link** to generate a one-shot Kratos recovery URL.
-Share it out-of-band over a trusted channel, not a possibly compromised
-mailbox. It lands the user in the settings flow with a privileged session to
-re-enroll:
-1. A new passkey on a trusted device.
-2. TOTP on a fresh authenticator app.
-3. A new set of backup codes.
-
-The URL expires (default 24 h); issue a new one if missed.
-
-### Step 5 — Optionally rotate the password (if password auth is in use)
-
-If the identity has a `password ✓` chip and reaches a directory-backed app by
-password, the device may have had it saved. Rotate it in that app's own admin
-console; the portal has no admin-set password path by design.
+With a second admin present, revoke the target's admin access first (the portal blocks only revoking the last admin),
+then follow the sequence above for an elevated member, then grant admin access back once they hold a second factor.
+A sole admin has no one to run this; follow Step D of `docs/runbooks/admin-recovery.md`.
 
 ## Related
 
-`docs/runbooks/admin-recovery.md` covers an admin's own account.
+- `docs/runbooks/admin-recovery.md`: an admin's own account.

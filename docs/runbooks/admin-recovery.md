@@ -1,170 +1,87 @@
-# Admin account recovery and AAL operations
+# Admin account recovery
 
-Admin accounts cannot use ordinary email recovery (Section 3), so losing access
-needs its own ladder: what to enroll so you rarely need it, how admin authority
-works, and break-glass steps in order of decreasing convenience. Deploy-specific
-transcripts (SSH, container exec, host storage) belong in your deploy plane's runbook.
+An admin cannot use email recovery: the recovery-gate webhook refuses any identity carrying the admin marker, so a
+stolen admin mailbox yields nothing (SECURITY.md has the boundary). Losing access therefore needs its own ladder.
+Start at the position that matches what you still hold.
 
----
+## Enrol so you rarely need it
 
-## 1. Prevention: what every admin should have enrolled
+Two passkeys on different devices, an authenticator app (TOTP), backup codes, and one security key. The security key
+is what makes a lost phone survivable: the portal refuses to remove an admin's last authenticator app or security
+key, so replacing a TOTP means adding a key first.
 
-### Passkeys (AAL1 — primary login)
+## Console commands
 
-Enroll a passkey on at least two physical devices. Losing one is then a
-non-event: log in from the other and remove the lost credential from Settings.
-A hardware key as a third is a good bonus.
-
-### TOTP (AAL2 — required for admin actions)
-
-Admin pages require AAL2. Enroll TOTP from Settings → Two-factor
-authentication → Add authenticator app; any TOTP client works. Admin pages then
-prompt for the step-up automatically.
-
-### Backup codes (recovery insurance)
-
-After enrolling TOTP, download the backup codes (`lookup_secret` in Kratos
-terms) into a password manager. They are the AAL2 fallback.
-
-**Fully enrolled** means: 2+ passkeys on different devices, TOTP in an
-authenticator app, and backup codes saved.
-
----
-
-## 2. How admin authority works
-
-Admin status is the `metadata_admin.admin` flag on a Kratos identity (SECURITY.md has the boundary).
-
-The admin API's identity-update endpoint takes a JSON Patch **array**, not a
-merge object — a bare `{"metadata_admin": …}` body is rejected:
+Steps C to E use the Kratos admin API, which is never published; call it from the othala container. The marker is
+`metadata_admin.admin`; patch that key and nothing else, because a whole-object replace also strips the admin's
+`groups`. The update endpoint takes a JSON Patch array.
 
 ```sh
-docker compose exec -T othala node -e "fetch('http://kratos:4434/admin/identities/<UUID>',{method:'PATCH',headers:{'Content-Type':'application/json'},body:JSON.stringify([{op:'add',path:'/metadata_admin/admin',value:true}])}).then(async r=>{console.log(r.status,await r.text());process.exit(r.ok?0:1)})"
+admin() { docker compose exec -T othala node -e "fetch('http://kratos:4434/admin/'+process.argv[1],{method:process.argv[2],headers:{'Content-Type':'application/json'},body:process.argv[3]}).then(async r=>{console.log(r.status,await r.text());process.exit(r.ok?0:1)})" "$@"; }
+admin identities/<id> GET                                                   # read the marker and groups first
+admin identities/<id> PATCH '[{"op":"remove","path":"/metadata_admin/admin"}]'   # clear
+admin identities/<id> PATCH '[{"op":"add","path":"/metadata_admin/admin","value":true}]'   # restore
+admin recovery/code POST '{"identity_id":"<id>","expires_in":"1h"}'         # recovery_link and recovery_code; nothing is emailed
+admin identities/<id>/credentials/totp DELETE
+admin identities/<id>/credentials/lookup_secret DELETE                      # backup codes
+admin 'identities/<id>/credentials/webauthn?identifier=<credential id>' DELETE
 ```
 
-The admin API is reachable only from inside the compose network, hence the
-run from the othala container.
+The admin API cannot delete a passkey; only its owner removes one, from their own settings.
 
-Patch the marker and nothing else — sending a
-whole `metadata_admin` object replaces `groups` too, silently stripping an
-admin's app access while they can still sign in.
+## Step A: another passkey still works
 
+Sign in with it, open settings and remove the lost passkey.
 
----
+## Step B: lost authenticator app, but a passkey and backup codes remain
 
-## 3. Why admin email-recovery is intentionally blocked
+Order matters. Removing the authenticator app is refused while it is the last app or key, and replacing it is a
+removal.
 
-For regular members, "Forgot account?" emails a code. For admins that path is blocked, because a
-compromised admin mailbox would otherwise yield full admin access: the recovery-gate webhook
-(`kratos/hooks/recovery-gate.jsonnet`, `fetchAdminMarker` in `portal/src/server/listen.ts`) reads the
-marker live and returns 403 for an admin, aborting the flow even with a correct code. Live means no cache, which is what lets
-the Section 4 procedure clear the marker, recover, and restore it.
+1. Sign in with the passkey and step up with a backup code when asked.
+2. Within five minutes of that step-up, add a security key.
+3. Remove the old authenticator app, set up the new one, and generate new backup codes (each set is single-use).
+4. Remove the stand-in security key if you do not want to keep it.
 
----
+A device with no WebAuthn cannot add a key; delete the `totp` credential from the console instead (Step D) and enrol
+the new app.
 
-## 4. Admin recovery ladder
+## Step C: another admin recovers you
 
-Work from top to bottom. Each step is less convenient and more drastic than
-the one above it.
+The portal refuses to issue a setup link for an admin target, so a stolen mailbox or a stray click cannot mint one.
+That guard stops the mailbox path, not another admin: an admin session can clear the target's marker, issue a link
+and restore the marker. Treat the second admin as someone who can take over the first, and the reverse.
 
-> Steps A and B are ordinary product paths. Steps
-> C, D and E are console procedures on the Kratos admin API; rehearse them
-> against a throwaway stack. An admin-issued recovery code does not bypass the
-> gate, which is why Step D clears the marker first.
+The working admin runs Step D against the locked-out identity and hands over `recovery_link` and `recovery_code`
+over a channel you both already trust; both are needed.
 
-### Step A: You have another enrolled device
+## Step D: no admin has a working session
 
-With a working passkey anywhere, this is not a lockout. Sign in from that
-device and remove the lost credential in Settings → Security → Passkeys, or
-(lost TOTP app) use a backup code (Step B) to step up and enroll a fresh TOTP app.
+1. Read the identity, then clear the marker. The gate reads it live, so the next step lands at once.
+2. Delete what the locked-out admin can no longer answer. Recovery signs in at the first factor only, and settings
+   then demands a second factor the admin does not have, so: with no authenticator app, no backup codes and no key,
+   delete `totp` and `lookup_secret`, plus `webauthn` for a lost key. An admin who still holds an app or a backup
+   code skips this and steps up when asked.
+3. Issue a recovery code and hand over the link and code.
+4. In that session enrol passkeys first, so the sign-in that follows the five-minute privileged window has a first
+   factor; then the authenticator app, step up with it, and generate new backup codes. A lost phone's passkey stays
+   until its owner removes it from settings.
+5. Restore the marker and compare the identity with what you read in step 1.
+6. Sign the identity out everywhere from its admin page, and confirm the admin pages open (the proof the marker
+   works, not the patch's 200).
 
-### Step B: You lost your TOTP app but have a backup code
+## Step E: no devices and no admin API
 
-Sign in with your passkey. When prompted for TOTP, choose "Use backup
-code". You are in at AAL2; enroll a new TOTP app before the session expires.
-Backup codes are single-use; generate a fresh set after re-enrolling.
+Get physical access to the host, bring up Kratos and its database, and follow Step D. There is no procedure that
+edits a password hash in Postgres; it would be too easy to abuse.
 
-### Step C: The other admin recovers you (dual-admin)
+## Adding a second admin
 
-The recommended path when a second admin exists. The portal UI refuses to
-issue a recovery URL for an admin target (`shouldRefuseRecovery` in
-`portal/src/lib/access.ts`), so a compromised admin browser session cannot mint
-one for the other admin. Admin-to-admin recovery is console-only: the
-working admin runs Step D against the locked-out identity, then hands
-the `recovery_link` **and** `recovery_code` over a channel you both already
-trust. Both are needed and the code is short-lived. Restoring the marker (last
-step of D) is not optional: until then the locked-out admin is a normal member.
-
-### Step D: Console break-glass (no working admin session)
-
-Use this when no admin has a working browser session but you can reach the
-Kratos admin API (SSH, `kubectl exec`, or however your deploy plane exposes it;
-the API is never published to the network).
-
-1. **Save, then clear the admin marker.** The recovery-gate refuses recovery
-   for any identity carrying it (Section 3), and it re-reads the marker live
-   — clearing it first is what makes the next step land. Record the
-   `metadata_admin` value before clearing it; you restore it at step 4.
-   Removing the `admin` key only (never a whole-object replace) leaves
-   `groups` untouched.
-2. **Issue a recovery code**, not a link: `POST /admin/recovery/code`. `kratos.yml`
-   enables only the `code` method (`selfservice.methods.code.enabled: true`) for
-   recovery; the `link` method is not enabled. The response carries both
-   a `recovery_link` and a `recovery_code`; nothing is emailed.
-   Issue a fresh one if it expires.
-3. **Open the link, enter the code**, and re-enroll in that session before
-   the tab closes: two passkeys across two devices, fresh TOTP, new backup
-   codes.
-4. **Restore the admin marker**, re-add-only, and compare the result against
-   what step 1 recorded. It takes effect on the next request — no restart.
-5. **Sign out everywhere** for the recovered identity in the admin UI. Only a password save revokes
-   sessions on its own.
-6. **Verify:** two-plus passkeys visible, TOTP + backup codes present, the
-   marker back with `groups` unchanged, and `/admin` reachable again (proof the
-   marker works, not just that the patch returned 200).
-
-**Why the marker comes off and goes back on.** The recovery-gate hook has no exemption for admin-API-issued
-flows, so clearing the marker makes the procedure work whether or not the hook fires for them.
-Anyone who can call the admin API can already do far more.
-
-### Step E: No devices, no admin-API access — physical access only
-
-The last resort. Get physical (or BMC/serial) access to the host, unlock
-its data volume, start Kratos, and follow Step D from the local console.
-
-There is deliberately no "edit the password hash in Postgres" procedure: it
-would be a trivially abusable break-glass. Get Kratos running and use Step D.
-
----
-
-## 5. The dual-admin model (recommended)
-
-Two admins, carrying the marker on separate identities, remove the single point of human failure: either can
-recover the other via Step C. The portal UI blocks browser-based admin-to-admin recovery for both equally, so
-console access is the only path either has.
-
-To add a co-admin: create their identity, toggle the admin marker on (admin
-UI, or the marker-only JSON Patch from Section 2 — never a whole
-`metadata_admin` object), grant the groups they need (each app's
-`<svc>-access`, plus `<svc>-admin` wherever they hold the elevated role), and
-have them enroll a second passkey and TOTP per Section 1. Takes effect
-immediately, no restart. Both admins should be able to reach the console
-independently (SSH key, `kubectl` access — whatever your deploy plane uses).
-
----
-
-## 6. Webhook authentication note
-
-The recovery-gate webhook requires `RECOVERY_GATE_SECRET` to match on both
-Kratos (`Authorization: Bearer <secret>`) and the portal (constant-time
-comparison on receive). Empty or mismatched secret fails closed — recovery is
-denied, not allowed. Rotate by updating the secret and restarting both
-services; verify with a non-admin recovery that the gate still allows it.
-
----
+Create the identity, grant the groups it needs, and have them enrol as above. Then set the marker from the console
+(or the admin page) only once enrolment is done: with the marker present, recovery is refused. The first admin of a
+deployment is made the same way, from `DEPLOY.md`.
 
 ## Related
 
-- `docs/runbooks/lost-device.md`: eviction when a credential may have been enrolled on a lost device.
-- `docs/runbooks/cookie-rotation.md`: rotate session cookies after a console recovery.
-- `docs/runbooks/secrets-rotation.md`: break-glass rotation of `secrets.system`.
+- `docs/runbooks/lost-device.md`: removing a credential from a member.
+- `docs/runbooks/secrets-rotation.md`: rotate cookies after a console recovery.
