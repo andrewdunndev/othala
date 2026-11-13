@@ -50,17 +50,23 @@ test('ZV1 — an elevated member is evicted by lowering the role, removing the a
   let raisedCtx: BrowserContext | null = null;
   try {
     const page = await adminCtx.newPage();
-    const post = async (target: string, tokenFrom: string, action: string, fields: Record<string, string>) => {
+    // The page answers 200 whether or not the action was accepted; a refusal is a danger notice carrying its reason.
+    // Every step must say which it expects, so a refused save cannot pass unnoticed.
+    const post = async (target: string, tokenFrom: string, action: string, fields: Record<string, string>, expectRefusal = false) => {
       await page.goto(`${baseURL}/admin/users/${tokenFrom}`, { waitUntil: 'networkidle' });
       const token = await csrfTokenFor(page, action);
       expect(token, `ZV1: ${action} is offered on the token page`).not.toBe('');
       const resp = await postAdminAction(adminCtx, baseURL!, target, { csrf_token: token, action, ...fields });
       expect(resp.status(), `ZV1: ${action} answers with the page`).toBe(200);
-      return resp.text();
+      const html = await resp.text();
+      const refusal = html.match(/class="notice notice-danger[^"]*"[^>]*>([\s\S]*?)<\/div>/)?.[1]?.replace(/<[^>]*>/g, '').trim();
+      if (expectRefusal) expect(refusal, `ZV1: ${action} is refused`).toBeTruthy();
+      else expect(refusal, `ZV1: ${action} was refused: ${refusal}`).toBeUndefined();
+      return html;
     };
 
     // 1. The removal is refused while the member holds the elevated role.
-    await post(member.id, bystander.id, 'remove-credential', { cred_type: 'totp' });
+    await post(member.id, bystander.id, 'remove-credential', { cred_type: 'totp' }, true);
     expect(await hasTotp(kratosAdminURL, member.id), 'ZV1: the app stays while the role is elevated').toBe(true);
 
     // 2. Lower the role to the app's entry level.
