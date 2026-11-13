@@ -372,6 +372,7 @@ test('consent accepts an active member and grants scope + injects id_token', asy
   const res = await handleConsent(new Request('https://x/oauth2/consent?consent_challenge=cc'), {
     oauth2: api,
     getIdentity: async () => activeMember(),
+    getSession: defaultSession(),
     manifest: () => loadManifest('grafana'),
   });
   assert.equal(res.status, 302);
@@ -388,6 +389,7 @@ test('consent with no requested_scope emits no scoped claims', async () => {
   await handleConsent(new Request('https://x/oauth2/consent?consent_challenge=cc'), {
     oauth2: api,
     getIdentity: async () => activeMember(),
+    getSession: defaultSession(),
     manifest: () => loadManifest('grafana'),
   });
   const idToken = calls.acceptConsentBody.session.id_token;
@@ -483,6 +485,7 @@ test('T1: consent skip=true auto-accepts (REGRESSION GUARD)', async () => {
     {
       oauth2: api,
       getIdentity: async () => activeMember(),
+      getSession: defaultSession(),
       manifest: () => loadManifest('grafana'),
     },
   );
@@ -544,6 +547,7 @@ test('T2b: consent skip=false but manifest skip_consent:true AUTO-ACCEPTS', asyn
     {
       oauth2: api,
       getIdentity: async () => activeMember(),
+      getSession: defaultSession(),
       manifest: () => loadManifest('grafana'),
     },
   );
@@ -790,6 +794,7 @@ test('A4a: audiobookshelf access-group holder gets user role, groups unioned', a
     {
       oauth2: api,
       getIdentity: async () => identity,
+      getSession: defaultSession(),
       manifest: (id) => id === 'audiobookshelf' ? audiobookshelfManifest : undefined,
     },
   );
@@ -815,6 +820,7 @@ test('A4b: grafana admin holds both groups, highest-ranked role (admin) wins, gr
     {
       oauth2: api,
       getIdentity: async () => identity,
+      getSession: defaultSession(),
       manifest: (id) => id === 'grafana' ? grafanaManifest : undefined,
     },
   );
@@ -844,6 +850,7 @@ test('A4c: grafana override (roles.grafana=admin) beats group_role_map viewer', 
     {
       oauth2: api,
       getIdentity: async () => identity,
+      getSession: defaultSession(),
       manifest: (id) => id === 'grafana' ? grafanaManifest : undefined,
     },
   );
@@ -874,6 +881,7 @@ test('A4e: roleless manifest -> base claims only, groups emitted', async () => {
     {
       oauth2: api,
       getIdentity: async () => identity,
+      getSession: defaultSession(),
       manifest: () => rolelessManifest,
     },
   );
@@ -898,6 +906,7 @@ test('D3: grafana skip path injects grafana_role from manifest (regression guard
     {
       oauth2: api,
       getIdentity: async () => identity,
+      getSession: defaultSession(),
       manifest: (id) => id === 'grafana' ? grafanaManifest : undefined,
     },
   );
@@ -921,6 +930,7 @@ test('C: skip_access_check bypasses access-group check', async () => {
     {
       oauth2: api,
       getIdentity: async () => identity,
+      getSession: defaultSession(),
       manifest: () => skipManifest,
     },
   );
@@ -1555,6 +1565,7 @@ test('consent puts the picture URL in the id_token for a profile grant, and omit
     await handleConsent(new Request('https://x/oauth2/consent?consent_challenge=cc'), {
       oauth2: api,
       getIdentity: async () => member,
+      getSession: defaultSession(),
       manifest: () => loadManifest('grafana'),
     });
     return calls.acceptConsentBody.session.id_token;
@@ -1563,4 +1574,46 @@ test('consent puts the picture URL in the id_token for a profile grant, and omit
   const withPic = await run(activeMember({ metadata_admin: { groups: ['grafana-access'], avatar: a } }));
   assert.equal(withPic.picture, `${publicUrl}/avatar/id-1/${a.sha256.slice(0, 16)}`);
   assert.equal('picture' in (await run(activeMember())), false);
+});
+
+const skipConsent = (over = {}) => ({
+  getIdentity: async () => activeMember(),
+  manifest: () => loadManifest('grafana'),
+  ...over,
+});
+const skipChallenge = () =>
+  stubOAuth2({ getOAuth2ConsentRequest: async () => oauth2ConsentRequest({ skip: true, subject: 'id-1', client: { client_id: 'grafana' }, requested_scope: ['email'] }) });
+
+test('consent GET skip path accepts only for the browser whose session is the consent subject', async () => {
+  const { api, calls } = skipChallenge();
+  const res = await handleConsent(new Request('https://x/oauth2/consent?consent_challenge=cc'), { oauth2: api, ...skipConsent({ getSession: defaultSession() }) });
+  assert.equal(res.status, 302);
+  assert.equal(calls.acceptConsent, 1);
+});
+
+test('consent GET skip path refuses a session for a different identity, and no session at all', async () => {
+  const other = async () => session('aal1', ['password'], { identity: whoamiIdentity(identity({ id: 'id-2', username: 'grace', email: 'g@othala.test' })) });
+  for (const getSession of [other, async () => null, async () => session('aal1', ['password'], { active: false, identity: whoamiIdentity(activeMember()) })]) {
+    const { api, calls } = skipChallenge();
+    const res = await handleConsent(new Request('https://x/oauth2/consent?consent_challenge=cc'), { oauth2: api, ...skipConsent({ getSession }) });
+    assert.equal(calls.acceptConsent, 0, 'a leaked challenge must not be accepted for the victim');
+    assert.equal(calls.rejectConsent, 1);
+    assert.notEqual(res.headers.get('location'), 'https://sso.othala.test/after-consent');
+  }
+});
+
+test('consent GET skip path fails closed when the session lookup fails', async () => {
+  const { api, calls } = skipChallenge();
+  const warn = console.error;
+  console.error = () => {};
+  try {
+    const res = await handleConsent(new Request('https://x/oauth2/consent?consent_challenge=cc'), {
+      oauth2: api,
+      ...skipConsent({ getSession: async () => { throw new Error('kratos down'); } }),
+    });
+    assert.equal(res.status, 502);
+  } finally {
+    console.error = warn;
+  }
+  assert.equal(calls.acceptConsent, 0);
 });

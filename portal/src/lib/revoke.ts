@@ -43,8 +43,27 @@ function resolveDeps(deps: Partial<RevokeDeps> = {}): RevokeDeps {
   };
 }
 
+/** The page token of a Hydra list response's `rel="next"` Link header, if any. */
+export function nextPageToken(headers: Headers): string | undefined {
+  const next = /<([^>]*)>\s*;\s*rel="?next"?/.exec(headers.get('link') ?? '');
+  return next ? (new URL(next[1], 'http://hydra').searchParams.get('page_token') ?? undefined) : undefined;
+}
+
+/** A `nextPageToken` that throws on a token it has already returned, so a misbehaving list cannot loop forever. */
+export function pageTokens(): (headers: Headers) => string | undefined {
+  const seen = new Set<string>();
+  return (headers) => {
+    const token = nextPageToken(headers);
+    if (token === undefined) return undefined;
+    if (seen.has(token)) throw new Error(`pagination returned a repeated page token (${token})`);
+    seen.add(token);
+    return token;
+  };
+}
+
 async function listLoginSessionIds(oauth2Api: OAuth2Api, subject: string): Promise<string[]> {
   const sids = new Set<string>();
+  const next = pageTokens();
   let pageToken: string | undefined;
   do {
     const res = await oauth2Api.listOAuth2ConsentSessionsRaw({ subject, pageSize: 250, pageToken });
@@ -52,8 +71,7 @@ async function listLoginSessionIds(oauth2Api: OAuth2Api, subject: string): Promi
       const sid = row.consent_request?.login_session_id;
       if (sid) sids.add(sid);
     }
-    const next = /<([^>]*)>\s*;\s*rel="?next"?/.exec(res.raw.headers.get('link') ?? '');
-    pageToken = next ? (new URL(next[1], 'http://hydra').searchParams.get('page_token') ?? undefined) : undefined;
+    pageToken = next(res.raw.headers);
   } while (pageToken);
   return [...sids];
 }

@@ -4,6 +4,7 @@ import {
   listIdentities,
   updateIdentity,
   deleteIdentity,
+  getIdentity,
   deactivateIdentity,
   reactivateIdentity,
   getRecoveryLink,
@@ -25,7 +26,7 @@ import { removalBlock } from './admin-view';
 import type { ClientManifest } from './manifests';
 import type { Identity } from './types';
 import { applyAvatarForm } from './avatar-edit';
-import { AVATAR_REFUSALS, readAvatar } from './avatar';
+import { AVATAR_REFUSALS } from './avatar';
 
 export const USERNAME_RE = /^[a-z0-9]+(?:\.[a-z0-9]+)+$/;
 export const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -99,43 +100,32 @@ export async function saveAction(fd: FormData, ctx: ActionContext): Promise<Acti
   );
   if (groupPlan.refusal) formErrors.nonCanonicalGroups = groupPlan.refusal;
 
-  const knownClientIds = new Set(manifests.map((m) => m.clientId));
+  // An override for an app with no served manifest is carried over: a quarantined file or an unreadable apps directory is
+  // transient, so only an explicit clear removes it.
+  const servedClientIds = new Set(manifests.map((m) => m.clientId));
+  const clearRoles = new Set(fd.getAll('clearRoles').map(String));
   const roles: Record<string, string> = {};
+  for (const [clientId, role] of Object.entries(identity.metadata_admin?.roles ?? {})) {
+    if (!servedClientIds.has(clientId) && !clearRoles.has(clientId)) roles[clientId] = role;
+  }
   for (const m of manifests) {
     const v = String(fd.get(`role:${m.clientId}`) ?? '').trim();
     if (v) roles[m.clientId] = v;
-  }
-  for (const clientId of Object.keys(roles)) {
-    if (!knownClientIds.has(clientId)) delete roles[clientId];
   }
 
   if (Object.keys(formErrors).length > 0) {
     return { formErrors, refetch: false };
   }
 
-  // Only the targeted actions change these marks, so a save carries them over from the loaded identity.
-  const existingAdmin = identity.metadata_admin?.admin;
-  const existingPrerequisites = identity.metadata_admin?.prerequisites;
-  const existingPasskeyNames = identity.metadata_admin?.passkeyNames;
-  const existingAvatar = readAvatar(identity.metadata_admin);
   const groups = normalizeGroupOrder(groupPlan.groups);
   // Only a new elevation needs the second factor first, so people already elevated without one can still be edited and lowered.
   const after = { ...identity, metadata_admin: { ...identity.metadata_admin, groups, roles } };
   if (holdsElevatedRole(after, manifests) && !holdsElevatedRole(identity, manifests) && !parseIdentity(identity).hasSecondFactor) {
     return { actionResult: ELEVATED_SECOND_FACTOR_REQUIRED, refetch: false };
   }
-  await updateIdentity(id, {
-    traits,
-    metadataAdmin: {
-      groups,
-      roles: Object.keys(roles).length ? roles : undefined,
-      ...(existingAdmin === true ? { admin: true } : {}),
-      ...(existingPrerequisites?.length ? { prerequisites: existingPrerequisites } : {}),
-      ...(existingPasskeyNames && Object.keys(existingPasskeyNames).length ? { passkeyNames: existingPasskeyNames } : {}),
-      ...(existingAvatar ? { avatar: existingAvatar } : {}),
-    },
-  });
-  if (narrowsAccess(identity, groups, roles)) {
+  // updateIdentity carries every other mark over from the identity it reads, so a concurrent targeted write is not undone.
+  await updateIdentity(id, { traits, metadataAdmin: { groups, roles: Object.keys(roles).length ? roles : undefined } });
+  if (changesGrants(identity, groups, roles)) {
     const failure = await revokeGrants(id);
     if (failure) return { actionResult: failure, mode: 'read', refetch: true };
   }
@@ -148,6 +138,8 @@ interface SectionEdit {
   household?: readonly string[];
   access?: { groups: readonly string[]; roles: Readonly<Record<string, string>> };
   remove?: readonly string[];
+  /** Role overrides for apps with no served manifest to drop; saveAction carries every other one over. */
+  clearRoles?: readonly string[];
 }
 
 /** Rebuilds the whole form from what is stored, so every section passes saveAction's guards and none clobbers another. */
@@ -181,6 +173,7 @@ function sectionSave(ctx: ActionContext, edit: SectionEdit): Promise<ActionOutco
   }
   for (const g of removing) if (!GROUP_RE.test(g)) fd.append('clearNonCanonical', g);
   for (const [clientId, role] of Object.entries(roles)) fd.set(`role:${clientId}`, role);
+  for (const clientId of edit.clearRoles ?? []) fd.append('clearRoles', clientId);
   return saveAction(fd, ctx);
 }
 
@@ -219,6 +212,10 @@ export function removeGroupsAction(fd: FormData, ctx: ActionContext): Promise<Ac
   return sectionSave(ctx, { remove: fd.getAll('group').map(String).filter(Boolean) });
 }
 
+export function clearRolesAction(fd: FormData, ctx: ActionContext): Promise<ActionOutcome> {
+  return sectionSave(ctx, { clearRoles: fd.getAll('clearRole').map(String).filter(Boolean) });
+}
+
 export async function markVerifiedAction(fd: FormData, ctx: ActionContext): Promise<ActionOutcome> {
   if (!ctx.identity.traits?.email) {
     return { actionResult: { kind: 'error', message: 'This person has no email address on file.' }, refetch: false };
@@ -246,10 +243,13 @@ export async function setPrerequisitesAction(fd: FormData, ctx: ActionContext): 
   return { actionResult: { kind: 'prerequisites-saved' }, refetch: true };
 }
 
-export function narrowsAccess(identity: Identity, groups: readonly string[], roles: Record<string, string>): boolean {
+/** Any removed group or any change to the stored roles map (a key added, changed or removed) ends app grants; a group only added does not. Decided from storage alone, so an app whose manifest is not served cannot hide a change. */
+export function changesGrants(identity: Identity, groups: readonly string[], roles: Record<string, string>): boolean {
   const stored = identity.metadata_admin;
   if ((stored?.groups ?? []).some((g) => !groups.includes(g))) return true;
-  return Object.entries(stored?.roles ?? {}).some(([clientId, role]) => roles[clientId] !== role);
+  const before = stored?.roles ?? {};
+  const keys = new Set([...Object.keys(before), ...Object.keys(roles)]);
+  return [...keys].some((k) => before[k] !== roles[k]);
 }
 
 async function revokeGrants(id: string): Promise<ActionResult | null> {
@@ -283,13 +283,28 @@ function isActiveAdmin(identity: Identity): boolean {
   return parseIdentity(identity).isAdmin && identity.state !== 'inactive';
 }
 
-async function leavesNoActiveAdmin(target: Identity): Promise<boolean> {
-  if (!isActiveAdmin(target)) return false;
-  const active = (await listIdentities()).filter(isActiveAdmin).length;
-  return active <= 1;
+// The portal is one Node process, so a promise chain is the lock: actions that can remove an admin's ability to sign in
+// run one at a time, and each counts the admins left only once the one before it has landed.
+let adminChanges: Promise<unknown> = Promise.resolve();
+function serialized<T>(run: () => Promise<T>): Promise<T> {
+  const result = adminChanges.then(run, run);
+  adminChanges = result.catch(() => {});
+  return result;
 }
 
-export async function deactivateAction(_fd: FormData, ctx: ActionContext): Promise<ActionOutcome> {
+/** Counted from a fresh list, target included, so a change that landed while this one waited is seen. */
+async function leavesNoActiveAdmin(target: Identity): Promise<boolean> {
+  const all = await listIdentities();
+  const current = all.find((i) => i.id === target.id);
+  if (!current || !isActiveAdmin(current)) return false;
+  return all.filter(isActiveAdmin).length <= 1;
+}
+
+export function deactivateAction(_fd: FormData, ctx: ActionContext): Promise<ActionOutcome> {
+  return serialized(() => deactivate(ctx));
+}
+
+async function deactivate(ctx: ActionContext): Promise<ActionOutcome> {
   const username = ctx.identity.traits?.username ?? ctx.id;
   if (ctx.id === ctx.adminIdentityId) {
     return {
@@ -316,10 +331,15 @@ export async function reactivateAction(_fd: FormData, ctx: ActionContext): Promi
   return { actionResult: { kind: 'reactivated', username }, refetch: true };
 }
 
-export async function deleteAction(fd: FormData, ctx: ActionContext): Promise<ActionOutcome | Response> {
+export function deleteAction(fd: FormData, ctx: ActionContext): Promise<ActionOutcome | Response> {
+  return serialized(() => remove(fd, ctx));
+}
+
+async function remove(fd: FormData, ctx: ActionContext): Promise<ActionOutcome | Response> {
   const { id, identity } = ctx;
-  // An admin must lose the marker first, where the last-admin guard runs; checked before the confirm text.
-  if (parseIdentity(identity).isAdmin) {
+  // An admin must lose the marker first, where the last-admin guard runs; checked before the confirm text. The marker is
+  // read again here, inside the lock, because a grant that landed since the page loaded is not in `identity`.
+  if (parseIdentity(identity).isAdmin || parseIdentity(await getIdentity(id)).isAdmin) {
     return {
       actionResult: {
         kind: 'error',
@@ -388,7 +408,11 @@ export async function grantAdminAction(_fd: FormData, ctx: ActionContext): Promi
   return { actionResult: { kind: 'admin-granted', username }, refetch: true };
 }
 
-export async function revokeAdminAction(fd: FormData, ctx: ActionContext): Promise<ActionOutcome | Response> {
+export function revokeAdminAction(fd: FormData, ctx: ActionContext): Promise<ActionOutcome | Response> {
+  return serialized(() => revokeAdmin(fd, ctx));
+}
+
+async function revokeAdmin(fd: FormData, ctx: ActionContext): Promise<ActionOutcome | Response> {
   const { id, identity, adminIdentityId } = ctx;
   const username = identity.traits?.username ?? id;
   const self = id === adminIdentityId;
@@ -482,6 +506,7 @@ const HANDLERS: Record<string, ActionHandler> = {
   'save-profile': saveProfileAction,
   'save-avatar': saveAvatarAction,
   'remove-groups': removeGroupsAction,
+  'clear-roles': clearRolesAction,
   'mark-verified': markVerifiedAction,
   'set-prerequisites': setPrerequisitesAction,
   'issue-recovery': issueRecoveryAction,

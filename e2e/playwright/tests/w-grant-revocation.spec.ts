@@ -1,9 +1,9 @@
 // W — admin changes end a subject's refresh tokens.
 
 import type { BrowserContext, Page } from 'playwright-core';
-import { test, expect, adminAal2Context, GRAFANA_CLIENT_ID, GRAFANA_REDIRECT_URI, KRATOS_ADMIN_URL } from '../fixtures';
+import { test, expect, adminAal2Context, enrollTotpSecret, GRAFANA_CLIENT_ID, GRAFANA_REDIRECT_URI, KRATOS_ADMIN_URL } from '../fixtures';
 import { createIdentityWithPassword, TEST_PASSWORD } from '../actions/identity';
-import { loginViaJsonApi } from '../actions/login';
+import { loginViaJsonApi, totpStepUp } from '../actions/login';
 import { requireEnv } from '../actions/oidc';
 
 function clientSecret(): string {
@@ -48,10 +48,25 @@ async function liveRefreshToken(opts: {
   baseURL: string;
   hydraPublicURL: string;
   email: string;
+  /** A member holding an elevated role steps up to aal2 at the app, so they enrol an authenticator first. */
+  withTotp?: boolean;
 }): Promise<string> {
+  // The authenticator is enrolled in a session of its own, as in v-app-stepup: enrolling lifts that session, so the
+  // session that steps up has to start at aal1 with the authenticator already on the identity.
+  let totpSecret: string | undefined;
+  if (opts.withTotp) {
+    const enrolling = await opts.browser.newContext();
+    try {
+      await loginViaJsonApi(enrolling, { identifier: opts.email, password: TEST_PASSWORD }, opts.baseURL);
+      totpSecret = await enrollTotpSecret(enrolling, opts.baseURL);
+    } finally {
+      await enrolling.close();
+    }
+  }
   const ctx = await opts.browser.newContext();
   try {
     await loginViaJsonApi(ctx, { identifier: opts.email, password: TEST_PASSWORD }, opts.baseURL);
+    if (totpSecret) await totpStepUp(ctx, opts.baseURL, totpSecret);
     const code = await authorizeOffline(ctx, opts.baseURL);
     const exchange = await tokenGrant(ctx, opts.hydraPublicURL, {
       grant_type: 'authorization_code',
@@ -144,6 +159,65 @@ test('W2 — removing the app access group ends the refresh tokens', async ({ br
     await page.locator('input[name="level:grafana"][value="none"]').check();
     await submitAndExpectStatus(page, targetUrl, () => page.getByRole('button', { name: 'Save access' }).click(), [200]);
     await expect(page.getByText('Access saved.'), 'W2: the save and the grant revocation must both succeed').toBeVisible();
+  } finally {
+    await ctx.close();
+  }
+
+  await expectRefreshRefused(browser, hydraPublicURL, refreshToken);
+});
+
+test('W3 — an admin role change ends refresh tokens issued before it', async ({ browser, baseURL, hydraPublicURL }) => {
+  const suffix = Date.now();
+  const admin = await createIdentityWithPassword({
+    email: `w3.admin.${suffix}@othala.test`,
+    username: `w3.admin.${suffix}`,
+    displayName: 'W3 Admin',
+    groups: [],
+    isAdmin: true,
+    kratosAdminURL: KRATOS_ADMIN_URL,
+  });
+  const username = `w3.member.${suffix}`;
+  const member = await createIdentityWithPassword({
+    email: `${username}@othala.test`,
+    username,
+    displayName: 'W3 Member',
+    groups: ['everyone', 'grafana-access', 'grafana-admin'],
+    kratosAdminURL: KRATOS_ADMIN_URL,
+  });
+  const refreshToken = await liveRefreshToken({ browser, baseURL: baseURL!, hydraPublicURL, email: member.email, withTotp: true });
+
+  const ctx = await adminAal2Context({ browser, email: admin.email, password: TEST_PASSWORD, baseURL: baseURL! });
+  try {
+    const page = await ctx.newPage();
+    const targetUrl = `${baseURL}/admin/users/${member.id}`;
+    await page.goto(targetUrl, { waitUntil: 'networkidle' });
+    await page.locator('input[name="level:grafana"][value="viewer"]').check();
+    await submitAndExpectStatus(page, targetUrl, () => page.getByRole('button', { name: 'Save access' }).click(), [200]);
+    await expect(page.getByText('Access saved.'), 'W3: the save and the grant revocation must both succeed').toBeVisible();
+  } finally {
+    await ctx.close();
+  }
+
+  await expectRefreshRefused(browser, hydraPublicURL, refreshToken);
+});
+
+test('W4 — a password change ends refresh tokens issued before it', async ({ browser, baseURL, hydraPublicURL }) => {
+  const { member } = await seedPair('w4');
+  const refreshToken = await liveRefreshToken({ browser, baseURL: baseURL!, hydraPublicURL, email: member.email });
+
+  const ctx = await browser.newContext();
+  try {
+    await loginViaJsonApi(ctx, { identifier: member.email, password: TEST_PASSWORD }, baseURL!);
+    const flowResp = await ctx.request.get(`${baseURL}/self-service/settings/browser`, { headers: { Accept: 'application/json' } });
+    expect(flowResp.ok(), `settings flow init: ${flowResp.status()}`).toBe(true);
+    const flow = await flowResp.json();
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const csrf = (flow.ui.nodes as any[]).find((n) => n?.attributes?.name === 'csrf_token')?.attributes?.value ?? '';
+    const saved = await ctx.request.post(flow.ui.action, {
+      headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+      data: { csrf_token: csrf, method: 'password', password: 'w4-new-Passw0rd-2026-xyz' },
+    });
+    expect(saved.ok(), `password change answered ${saved.status()}: ${(await saved.text()).slice(0, 300)}`).toBe(true);
   } finally {
     await ctx.close();
   }

@@ -52,7 +52,19 @@ function afterHooks(method) {
   return parse(readFileSync(file, 'utf8')).selfservice.flows.settings.after[method]?.hooks ?? [];
 }
 
-test('only a password save revokes the other sessions; adding or removing a credential keeps them', () => {
+test.each(['password', 'passkey', 'webauthn', 'totp', 'lookup_secret'])('a %s change ends app grants through a non-interrupting web_hook', (method) => {
+  const grants = afterHooks(method).find((h) => h.hook === 'web_hook' && h.config.url === 'http://othala:4431/admin/revoke-grants');
+  assert.ok(grants, `settings.after.${method} has no revoke-grants hook`);
+  assert.equal(grants.config.can_interrupt, false);
+  assert.equal(grants.config.response.ignore, false);
+  assert.match(grants.config.auth.config.value, /^Bearer \$\{RECOVERY_GATE_SECRET\}$/);
+});
+
+test('a password save still ends the other sessions', () => {
+  assert.ok(afterHooks('password').some((h) => h.hook === 'revoke_active_sessions'));
+});
+
+test('only a password save revokes the other sessions; adding or removing a credential keeps them (it ends app grants instead)', () => {
   assert.ok(afterHooks('password').some((h) => h.hook === 'revoke_active_sessions'));
   for (const m of ['passkey', 'webauthn', 'totp', 'lookup_secret']) {
     assert.ok(!afterHooks(m).some((h) => h.hook === 'revoke_active_sessions'), `${m} must not revoke sessions`);
@@ -61,7 +73,6 @@ test('only a password save revokes the other sessions; adding or removing a cred
 
 test('settings.after.passkey prunes names through a non-interrupting post-persist web_hook', () => {
   const hooks = afterHooks('passkey');
-  assert.equal(hooks.length, 1);
   const { url, auth, can_interrupt: interrupt } = hooks[0].config;
   assert.equal(hooks[0].hook, 'web_hook');
   assert.equal(url, 'http://othala:4431/admin/passkey-prune');

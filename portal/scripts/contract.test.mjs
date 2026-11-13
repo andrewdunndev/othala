@@ -113,6 +113,12 @@ const KRATOS_PINS = [
   ['/selfservice/flows/recovery/after/hooks', (k) => (hook(k, 'recovery', 'after').hooks[0].config.body = 'file:///x.jsonnet'), 'recovery-gate.jsonnet, Containerfile'],
   ['/selfservice/flows/settings/after/totp/hooks', (k) => delete hook(k, 'settings', 'after', 'totp').hooks[0].config.body, 'recovery-gate.jsonnet, Containerfile'],
   ['/selfservice/flows/login/after', (k) => delete k.selfservice.flows.login.after, 'handleLoginCodeGate, listen.ts'],
+  ['/selfservice/flows/settings/after/password/hooks', (k) => hook(k, 'settings', 'after', 'password').hooks.pop(), 'handleRevokeGrants, listen.ts: a password change ends app grants'],
+  ['/selfservice/flows/settings/after/password/hooks', (k) => (hook(k, 'settings', 'after', 'password').hooks[1].config.can_interrupt = true), 'handleRevokeGrants, listen.ts: best-effort'],
+  ['/selfservice/flows/settings/after', (k) => delete k.selfservice.flows.settings.after.password, 'handleRevokeGrants, listen.ts'],
+  ...['passkey', 'webauthn', 'totp'].map((m) => [`/selfservice/flows/settings/after/${m}/hooks`, (k) => hook(k, 'settings', 'after', m).hooks.pop(), 'handleRevokeGrants, listen.ts: a credential change ends app grants']),
+  ['/selfservice/flows/settings/after', (k) => delete k.selfservice.flows.settings.after.lookup_secret, 'handleRevokeGrants, listen.ts'],
+  ['/selfservice/flows/settings/after/lookup_secret/hooks', (k) => (hook(k, 'settings', 'after', 'lookup_secret').hooks[0].config.can_interrupt = true), 'handleRevokeGrants, listen.ts: best-effort'],
 ];
 const HYDRA_PINS = [
   ...['login', 'consent', 'logout'].map((p) => [`/urls/${p}`, (h) => (h.urls[p] = 'https://a.example/x'), `pages/oauth2/${p}.ts`]),

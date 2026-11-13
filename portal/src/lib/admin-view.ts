@@ -72,6 +72,27 @@ export function unrecognisedGroups(i: Identity, manifests: readonly ClientManife
   return (i.metadata_admin?.groups ?? []).filter((g) => !GROUP_RE.test(g) || !reg.has(g));
 }
 
+/** Stored role overrides for an app no served manifest names: a retired app, or a manifest quarantined right now. A save keeps them until cleared. */
+export function unservedOverrides(i: Identity, manifests: readonly ClientManifest[]): Array<{ clientId: string; role: string }> {
+  const served = new Set(manifests.map((m) => m.clientId));
+  return Object.entries(i.metadata_admin?.roles ?? {})
+    .filter(([clientId]) => !served.has(clientId))
+    .map(([clientId, role]) => ({ clientId, role }));
+}
+
+/** Stored overrides naming a role their app's manifest does not declare: the person holds the app's lowest role until an admin picks a level. */
+export function undeclaredOverrides(i: Identity, manifests: readonly ClientManifest[]): Array<{ clientId: string; appName: string; role: string }> {
+  const out: Array<{ clientId: string; appName: string; role: string }> = [];
+  for (const m of manifests) {
+    const role = i.metadata_admin?.roles?.[m.clientId];
+    // An app that declares no roles has nothing to resolve an override against, so nothing is held back.
+    if (m.roles.length > 0 && typeof role === 'string' && role !== '' && !m.roles.some((r) => r.name === role)) {
+      out.push({ clientId: m.clientId, appName: m.clientName || m.clientId, role });
+    }
+  }
+  return out;
+}
+
 export interface AppChip {
   name: string;
   /** Holds the app's highest level. */

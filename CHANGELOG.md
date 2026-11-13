@@ -18,6 +18,22 @@ The git tag is the authoritative version; `portal/package.json` mirrors it.
 - The portal keeps retrying its Hydra client registration with a capped backoff (up to 60 s) until it succeeds, instead of giving up after about 20 s and waiting for a SIGHUP. It serves throughout, and `/readyz` reports 503 until the registration lands.
 - A refused render keeps the last good output instead of emptying it, so a restart after a bad edit still boots the earlier config; only a write that fails partway clears it. `check` now runs the render in memory and reports every refusal `render` would make.
 
+### Fixed
+
+- A manifest gate flag (`skip_access_check`, `skip_consent`, `backchannel_logout_session_required`, `emit_groups_claim`) must be `true` or `false`; any other value, such as the string `no`, quarantines the file (a blank value reads as unset) and `manifest-lint` reports it. Before, a non-empty string opened the app to every member.
+- An admin save ends the member's app sign-ins whenever their role overrides change in any way (added, changed or removed) or a group is removed; before, a newly added override, such as a demotion kept alongside a shared group, left their old tokens valid. A group addition ends nothing.
+- An admin save no longer drops a stored role override for an app with no served manifest (a retired app, a manifest with a mistake, or an unreadable apps directory); the person page lists them under "Overrides for apps not shown" and removes one only on an explicit click.
+- An admin save carries `admin`, the picture and passkey names from the identity as it stands when the write happens, so a save racing a revoke-admin no longer restores the marker.
+- A stored role override naming a role the app's manifest no longer declares now resolves to the app's lowest declared role instead of falling back to the group-mapped role, and the person page flags it. Rename a role and anyone held back by an override stays held back.
+- A password change now also ends the member's app sign-ins and refresh tokens: `kratos/kratos.yml` gains a non-interrupting `settings.after.password` web hook to `/admin/revoke-grants`, authenticated like the other hooks. Deployers who vendor `kratos.yml` and `contract/kratos.schema.json` take both.
+- Editing a manifest's access-relevant fields (access groups, `group_role_map`, roles and their `claim_emit`, `emit_groups_claim`, scopes, `skip_access_check`) ends that app's existing sign-ins and refresh tokens for everyone on the next reconcile; before, they kept their old claims for up to 30 days. The fingerprint lives in the Hydra client's metadata. A client without one is baselined, not revoked.
+- A Hydra client othala registered whose manifest file is gone has its grants ended once and is marked retired in its metadata. This is skipped while any manifest is quarantined, when none is served, or when the apps directory is unreadable. No client is ever deleted.
+- Revoking an admin, turning off sign-in and deleting a person now run one at a time, and the last-admin count is taken inside that queue, so two admins acting on each other at the same moment can no longer leave none.
+- A consent challenge that skips the grant screen is accepted only for the browser whose session belongs to the challenge's subject, the same binding the grant screen's submit already had.
+- The identity list the admin pages, the last-admin count and the registrar use now follows Kratos pagination to the end; before, it stopped at the first 250.
+- Deleting a person re-reads their admin marker inside the same queue and refuses when it is set, so a grant that landed after the page loaded cannot be deleted through.
+- Adding or removing a passkey, security key, authenticator app or set of backup codes now also signs the member out of their apps: the same `revoke-grants` web hook is wired to those settings changes in `kratos/kratos.yml`, and `contract/kratos.schema.json` requires it. Kratos cannot tell an addition from a removal at that point, so both end app grants.
+
 ## [0.18.0] - 2026-11-11
 
 ### Added
