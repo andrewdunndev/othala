@@ -31,6 +31,7 @@ export default defineConfig({
   timeout: 60_000,
   forbidOnly: true,
   retries: 1,          // upstream uses 2 in CI; 1 absorbs first-attempt flakiness from a freshly-started compose stack
+  failOnFlakyTests: !!process.env.CI,   // the retry absorbs a flake locally; in CI it is a failure, so a flaky spec is seen
   workers: 1,          // serial: tests share seeded identities, keep order deterministic
   reporter: [['list'], ['html', { outputFolder: '/out/html-report', open: 'never' }]],
 

@@ -18,8 +18,7 @@
     "check": "astro check",
     "preview": "astro preview",
     "start": "node ./dist/server/listen.mjs",
-    "test": "vitest run",
-    "purity": "cd .. && bash scripts/check-purity.sh"
+    "test": "vitest run"
   },
   "dependencies": {
     "@astrojs/node": "^11.0.0",
@@ -43,6 +42,7 @@
   },
   "devDependencies": {
     "@astrojs/check": "0.9.12",
+    "@types/node": "24.19.2",
     "@types/nodemailer": "8.0.2",
     "esbuild": "0.28.2",
     "fast-check": "4.10.2",

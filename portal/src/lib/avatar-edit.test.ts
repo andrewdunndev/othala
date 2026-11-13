@@ -90,20 +90,29 @@ describe('POST /auth/avatar', () => {
       yield chunk;
     }
   }
+  // `finished` resolves when the source generator has stopped, so a test never leaves a pull pending on a body the handler
+  // has already abandoned: undici enqueues into a stream that is closed by then and the rejection lands in a later test.
   const adapterRequest = (chunk: number, count: number, contentType = 'multipart/form-data; boundary=x', onPull?: () => void) => {
+    let stop!: () => void;
+    const finished = new Promise<void>((r) => (stop = r));
     async function* source() {
-      for (let i = 0; i < count; i++) {
-        await new Promise((r) => setTimeout(r, 1));
-        onPull?.();
-        yield new Uint8Array(chunk);
+      try {
+        for (let i = 0; i < count; i++) {
+          await new Promise((r) => setTimeout(r, 1));
+          onPull?.();
+          yield new Uint8Array(chunk);
+        }
+      } finally {
+        stop();
       }
     }
-    return new Request('http://portal.test/auth/avatar', {
+    const request = new Request('http://portal.test/auth/avatar', {
       method: 'POST',
       body: limited(source(), 262144) as unknown as BodyInit,
       duplex: 'half',
       headers: { 'content-type': contentType },
     } as RequestInit);
+    return { request, finished };
   };
 
   it('answers too-large for a body past the adapter limit, with no unhandled rejection or exception', async () => {
@@ -113,7 +122,9 @@ describe('POST /auth/avatar', () => {
     process.on('uncaughtException', onEvent);
     try {
       let pulled = 0;
-      const { flash } = await run({}, { raw: adapterRequest(16 * 1024, 80, undefined, () => pulled++) });
+      const { request, finished } = adapterRequest(16 * 1024, 80, undefined, () => pulled++);
+      const { flash } = await run({}, { raw: request });
+      await finished;
       expect(flash).toBe('too-large');
       expect(pulled).toBeLessThan(80);
       expect(patchAvatarMock).not.toHaveBeenCalled();
@@ -126,7 +137,9 @@ describe('POST /auth/avatar', () => {
   });
 
   it('answers a body that is not a form as a refused type, not too-large', async () => {
-    const { flash } = await run({}, { raw: adapterRequest(100, 2, 'multipart/form-data; boundary=x') });
+    const { request, finished } = adapterRequest(100, 2, 'multipart/form-data; boundary=x');
+    const { flash } = await run({}, { raw: request });
+    await finished;
     expect(flash).toBe('type');
   });
 });

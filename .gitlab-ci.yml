@@ -1,7 +1,8 @@
 # dunn.dev/othala -- container build + release pipeline.
 # build-othala publishes at the registry root.
 # Tags run build, e2e, sbom, release (sbom and release wait on e2e). Pipelines
-# exist for MRs, main, tags and web/api runs; feature-branch pushes get none.
+# exist for MRs, main, tags and web/api runs; a push to a feature branch with no
+# open MR gets no pipeline.
 
 default:
   interruptible: true
@@ -28,11 +29,9 @@ stages:
   - automerge-gate
 
 include:
-  # Advisory until verified clean (fail_on_violation: false).
   - component: gitlab.com/dunn.dev/pipeline/reference-check@4.14.0
     inputs:
       reference_ref: v0.11.0
-      fail_on_violation: false
 
   # secret-verdict fails the pipeline on a detected secret; pin-audit on an
   # image pin Renovate cannot track.
@@ -113,29 +112,13 @@ github-release:
 
 
 # Heavy chain: build-othala, build-e2e-tester, verify-othala, check-portal, e2e.
-# Runs on MRs that touch the product, on tags and on web/api runs; a main push
-# skips it because the tag pipeline is the release gate. `changes:` is true on
-# tag and web/api pipelines; the MR rule is the only one it narrows.
-.heavy-paths: &heavy-paths
-  - portal/**/*
-  - e2e/**/*
-  - kratos/**/*
-  - hydra/**/*
-  - caddy/**/*
-  - contract/**/*
-  - deploy/**/*
-  - site/**/*
-  - .gitlab-ci.yml
-  - .containerignore
-  - .env.example
-  - .deviations.yaml
-
+# Runs on every MR, on tags and on web/api runs; a main push skips it because the
+# tag pipeline is the release gate.
 .heavy-image-rules:
   - if: '$CI_COMMIT_TAG'
     variables:
       VERSION: $CI_COMMIT_TAG
   - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
-    changes: *heavy-paths
     variables:
       VERSION: $CI_COMMIT_SHORT_SHA
   - if: '$CI_PIPELINE_SOURCE =~ /^(web|api)$/'
@@ -152,14 +135,32 @@ build-e2e-tester:
 verify-othala:
   rules:
     - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
-      changes: *heavy-paths
     - if: '$CI_PIPELINE_SOURCE =~ /^(web|api)$/'
 # Installs the previous release, upgrades it per DEPLOY.md and checks identity, session and grant survive.
-# GIT_DEPTH 0: it reads the release tags.
+# GIT_DEPTH 0: it reads the release tags. Rules replace the e2e job's: it gates the release on tags, and
+# on an MR it runs only where an upgrade could break (the deployment, the Ory configs, the upgrade steps and the
+# harness and image they run on).
 e2e-upgrade:
   extends: e2e
   variables:
     GIT_DEPTH: 0
+  rules:
+    - if: '$CI_COMMIT_TAG'
+      variables:
+        AUTH_VERSION: "$CI_COMMIT_TAG"
+    - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
+      changes:
+        - deploy/**/*
+        - kratos/**/*
+        - hydra/**/*
+        - DEPLOY.md
+        - e2e/upgrade.sh
+        - e2e/smoke.sh
+        - e2e/lib.sh
+        - e2e/compose*.yml
+        - .gitlab-ci.yml
+        - portal/Containerfile
+    - if: '$CI_PIPELINE_SOURCE =~ /^(web|api)$/'
   script:
     - cd e2e
     - bash upgrade.sh
@@ -187,10 +188,12 @@ upload-release-assets:
     - e2e-upgrade
 
 # check-purity: OSS purity and deprecated-name gate, plus a bash -n over tracked
-# shell scripts.
+# shell scripts (`just purity`). The jobs run the justfile's recipes, so the
+# local and CI paths cannot drift; the ci image bakes node and just, and the
+# justfile fails if its node major differs from mise.toml's.
 check-purity:
   stage: verify
-  image: registry.access.redhat.com/ubi10/nodejs-24:10.3@sha256:6cd9a91dbfbdba836beb153f2ed6ce46b418487d47b3cd5343511d4fa23a1ac4
+  image: registry.gitlab.com/dunn.dev/pipeline/ci:4.16.0@sha256:7f2f7c1c9fe4ec3a8f4a4c51b6c2eba0ff452de662e2ab4ef8a18d685ecc58d1
   rules:
     - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
     - if: '$CI_PIPELINE_SOURCE == "push"'
@@ -200,75 +203,25 @@ check-purity:
     # Checkout uid differs from the job user; without this git ls-files exits 128.
     - git config --global --add safe.directory "$CI_PROJECT_DIR"
   script:
-    - bash scripts/check-purity.sh
-    - |
-      echo "=== bash -n: tracked shell scripts ==="
-      FILES=()
-      while IFS= read -r -d '' f; do FILES+=("$f"); done < <(git ls-files -z -- '*.sh')
-      if [ "${#FILES[@]}" -eq 0 ]; then
-        echo "ERROR: 0 tracked .sh files — bash -n would check nothing"
-        exit 1
-      fi
-      rc=0
-      for f in "${FILES[@]}"; do
-        bash -n "$f" || { echo "FAIL: bash -n $f"; rc=1; }
-      done
-      [ "$rc" -eq 0 ] && echo "OK: bash -n clean on ${#FILES[@]} scripts"
-      exit $rc
+    - just purity
 
-# check-portal: npm ci without install scripts (portal, e2e, site), then astro
-# check, tsc over e2e and site, vitest (src and scripts), the manifest lint, and
-# a well-formedness parse of the tracked plain-YAML set. kratos.yml and hydra.yml
-# are  templates, so they are excluded.
+# check-portal: `just setup` (npm ci without install scripts in portal, e2e and
+# site), then `just check`: astro check, tsc over e2e and site, vitest (src and
+# scripts), the manifest lint, and a well-formedness parse of the tracked
+# plain-YAML set.
 check-portal:
   stage: verify
-  image: registry.access.redhat.com/ubi10/nodejs-24:10.3@sha256:6cd9a91dbfbdba836beb153f2ed6ce46b418487d47b3cd5343511d4fa23a1ac4
+  image: registry.gitlab.com/dunn.dev/pipeline/ci:4.16.0@sha256:7f2f7c1c9fe4ec3a8f4a4c51b6c2eba0ff452de662e2ab4ef8a18d685ecc58d1
   rules:
     - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
-      changes: *heavy-paths
     - if: '$CI_PIPELINE_SOURCE =~ /^(web|api)$/'
     - if: '$CI_COMMIT_TAG'
   before_script:
     # Same safe.directory fix as check-purity.
     - git config --global --add safe.directory "$CI_PROJECT_DIR"
-    - cd portal
-    - npm ci --include=dev --ignore-scripts
-    - npm ci --include=dev --ignore-scripts --prefix ../e2e
-    - npm ci --include=dev --ignore-scripts --prefix ../site
+    - just setup
   script:
-    - npm run check
-    - node_modules/.bin/tsc --noEmit -p ../e2e
-    - node_modules/.bin/tsc --noEmit -p ../site
-    - npm test
-    - npm run lint:manifests
-    - |
-      echo "=== YAML parse: tracked plain-YAML ==="
-      FILES=()
-      while IFS= read -r -d '' f; do FILES+=("../$f"); done < <(git -C .. ls-files -z -- .gitlab-ci.yml 'e2e/compose*.yml' 'e2e/content/*.yaml' 'e2e/content/apps/*.yaml' 'deploy/example/*.yml' 'deploy/example/content/*.yaml' 'deploy/example/content/apps/*.yaml')
-      if [ "${#FILES[@]}" -eq 0 ]; then
-        echo "ERROR: 0 tracked plain-YAML files — nothing was parsed"
-        exit 1
-      fi
-      node -e '
-        const fs = require("fs");
-        const YAML = require("yaml");
-        const files = process.argv.slice(1);
-        let bad = 0;
-        for (const f of files) {
-          try {
-            const doc = YAML.parse(fs.readFileSync(f, "utf8"));
-            const empty = doc === null || doc === undefined ||
-              (typeof doc === "object" && !Array.isArray(doc) && Object.keys(doc).length === 0) ||
-              (Array.isArray(doc) && doc.length === 0);
-            if (empty) { console.error(`FAIL: ${f} parsed to an empty document`); bad = 1; }
-          } catch (e) {
-            console.error(`FAIL: ${f}: ${e.message}`);
-            bad = 1;
-          }
-        }
-        if (!bad) console.log(`OK: ${files.length} tracked YAML files parse to non-empty documents`);
-        process.exit(bad);
-      ' "${FILES[@]}"
+    - just check
 
 # e2e: QEMU-runner harness, the release gate (e2e/README.md). validate.sh
 # generates secrets, brings up the compose stack, waits for health, runs smoke.sh.
@@ -310,5 +263,4 @@ e2e:
       variables:
         AUTH_VERSION: "$CI_COMMIT_TAG"
     - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
-      changes: *heavy-paths
     - if: '$CI_PIPELINE_SOURCE =~ /^(web|api)$/'

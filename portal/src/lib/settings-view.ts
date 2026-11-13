@@ -162,9 +162,11 @@ export function emailVerified(
   return addr ? addr.verified === true : null;
 }
 
-/** "12 Jun 2026", fixed locale so the page reads the same on every server. */
+const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+
+/** "12 Jun 2026" in UTC. Built by hand, not by Intl: a Node whose ICU lacks en-GB falls back to en-US ("Jun 12, 2026"), so the output would depend on the server's build. */
 export function formatAdded(d: Date | null): string | null {
-  return d ? d.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric', timeZone: 'UTC' }) : null;
+  return d ? `${d.getUTCDate()} ${MONTHS[d.getUTCMonth()]} ${d.getUTCFullYear()}` : null;
 }
 
 /** The privileged window kratos.yml sets (settings.privileged_session_max_age); a lapsed one makes Kratos ask for a fresh sign-in on save. */

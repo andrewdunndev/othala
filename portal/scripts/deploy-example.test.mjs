@@ -44,11 +44,50 @@ test('the e2e overlay re-pins no image the example pins', () => {
   }
 });
 
-test('render and portal run one othala image, at the release tag on a tag pipeline', () => {
+// A release commit bumps portal/package.json, renames the changelog's [Unreleased] heading to the version and
+// moves the example's image tag, all together. Between releases all three still name the last release, with
+// an [Unreleased] heading above it. So the rule holds on every commit: the example tag is the declared version.
+const releaseHeading = /^## \[(\d+\.\d+\.\d+)\]/m;
+const declaredVersion = (pkgText, changelogText) => {
+  const pkg = JSON.parse(pkgText).version;
+  const heading = changelogText.match(releaseHeading)?.[1];
+  assert.equal(pkg, heading, 'package.json version is the newest changelog release heading');
+  return pkg;
+};
+// A release tag names the tree it was cut from.
+const tagNamesTree = (tag, version) => tag === undefined || tag === '' || tag === `v${version}`;
+const exampleTag = (image) => image.split('@')[0].split(':').pop();
+
+test('render and portal run one othala image', () => {
   const { render, othala } = compose.services;
   assert.equal(render.image, othala.image);
-  const tag = othala.image.split('@')[0].split(':').pop();
-  if (process.env.CI_COMMIT_TAG) assert.equal(tag, process.env.CI_COMMIT_TAG);
+});
+
+test('the example image tag is the version the tree declares', () => {
+  const version = declaredVersion(
+    readFileSync(join(root, 'portal/package.json'), 'utf8'),
+    readFileSync(join(root, 'CHANGELOG.md'), 'utf8'),
+  );
+  assert.equal(exampleTag(compose.services.othala.image), `v${version}`);
+  assert.ok(tagNamesTree(process.env.CI_COMMIT_TAG, version), `tag ${process.env.CI_COMMIT_TAG} is not v${version}`);
+});
+
+test('the version rule reads a released tree and an unreleased tree the same way', () => {
+  const pkg = (version) => JSON.stringify({ version });
+  const released = '# Changelog\n\n## [0.19.0] - 2026-12-01\n\n## [0.18.0] - 2026-11-11\n';
+  const unreleased = '# Changelog\n\n## [Unreleased]\n\n### Added\n\n## [0.18.0] - 2026-11-11\n';
+  assert.equal(declaredVersion(pkg('0.19.0'), released), '0.19.0');
+  assert.equal(declaredVersion(pkg('0.18.0'), unreleased), '0.18.0');
+  // a release commit that moved package.json and the heading but not the compose pin
+  assert.notEqual(exampleTag('registry.example/othala:v0.18.0@sha256:abc'), `v${declaredVersion(pkg('0.19.0'), released)}`);
+  // a tag pipeline: the tag must be the declared version; no tag means no claim
+  assert.ok(tagNamesTree('v0.19.0', '0.19.0'));
+  assert.ok(tagNamesTree(undefined, '0.19.0'));
+  assert.ok(!tagNamesTree('v0.18.0', '0.19.0'));
+  assert.ok(!tagNamesTree('0.19.0', '0.19.0'));
+  // package.json bumped ahead of the changelog, or the changelog ahead of package.json
+  assert.throws(() => declaredVersion(pkg('0.19.0'), unreleased));
+  assert.throws(() => declaredVersion(pkg('0.18.0'), released));
 });
 
 test('the e2e overlay runs the example Ory flags, adding only the Kratos config layer', () => {

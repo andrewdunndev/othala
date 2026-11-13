@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 # validate.sh: the Othala e2e orchestrator. Runs deploy/example/compose.yml under compose.e2e.yml in the per-job
-# VM (podman + docker shim) or on a workstation: cd e2e && AUTH_VERSION=latest bash validate.sh
+# VM (podman + docker shim) or on a workstation: `just e2e` (builds both images first), or
+# cd e2e && AUTH_VERSION=<tag> bash validate.sh against a published image
 # Env: CI_REGISTRY_USER/PASSWORD (login), AUTH_REGISTRY, AUTH_VERSION (default latest).
 
 set -uo pipefail

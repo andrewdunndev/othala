@@ -41,8 +41,9 @@ corpus is the same locally and in CI. Each check is a row in a data table with
 an embedded canary; a check that scans nothing or whose pattern misses its
 canary is an error, never a pass.
 
-`check-purity` runs on every pipeline; `check-portal` and e2e run on tags and on
-MRs that change the heavy paths. A push to main runs neither.
+`check-purity` runs on every pipeline; `check-portal` and e2e run on every MR, on tags
+and on web/api runs. `e2e-upgrade` runs on tags, web/api runs and MRs that touch
+`deploy/`, `kratos/`, `hydra/`, `DEPLOY.md` or the upgrade harness. A push to main runs `check-purity` and the catalog's component jobs, and none of the heavy chain.
 
 ## Conventions that hold the design together
 
@@ -73,11 +74,15 @@ MRs that change the heavy paths. A push to main runs neither.
 
 ## Commands
 
+Tools come from `mise.toml` (`mise install`); every recipe is in the `justfile`.
+
 ```sh
-cd portal && npm test           # vitest: src/**/*.test.ts + scripts/*.test.mjs
-cd portal && npm run check      # type + content check
-cd portal && npm run build      # production bundle
-cd portal && npm run dev        # UI iteration without the full stack; dev-only CONTENT_DIR and OTHALA_DEV_MOCK_GROUPS (.env.example)
-cd e2e && bash validate.sh      # deploy/example under the e2e overlay
-bash scripts/check-purity.sh    # the purity gate
+just setup    # once: npm ci in portal, e2e and site
+just test     # vitest: portal/src/**/*.test.ts + portal/scripts/*.test.mjs
+just check    # the CI check-portal sequence: astro check, tsc over e2e and site, vitest, manifest lint, YAML parse
+just build    # production bundle
+just dev      # UI iteration without the full stack; dev-only CONTENT_DIR and OTHALA_DEV_MOCK_GROUPS (.env.example)
+just purity   # the purity gate, then bash -n over tracked shell scripts
+just e2e      # build both images from the working tree, then run deploy/example under the e2e overlay
+just backup   # custom-format pg_dump of the kratos and hydra databases from a running stack
 ```

@@ -41,11 +41,10 @@ test hostnames on the reserved domain `othala.test`, then a smoke matrix and a P
 touches no real DNS.
 
 ```sh
-cd e2e
-AUTH_VERSION=latest bash validate.sh
+just e2e
 ```
 
-Needs a Docker- or Podman-compatible compose runtime. See [`e2e/README.md`](e2e/README.md).
+Builds the portal and e2e-tester images from this working tree, then runs the harness. Needs Podman and a compose runtime. See [`e2e/README.md`](e2e/README.md).
 
 ### The app alone
 
@@ -53,9 +52,8 @@ To work on the UI without the Ory substrate, run the dev server. The dashboard i
 manifests in `/etc/othala/apps`, so it renders empty unless that directory exists:
 
 ```sh
-cd portal
-npm install
-npm run dev   # http://localhost:4321
+just setup   # once: npm ci in portal, e2e and site
+just dev     # http://localhost:4321
 ```
 
 Unset `OTHALA_*` values fall back to dev defaults with a warning. OIDC and consent need the full stack.
@@ -87,6 +85,8 @@ Corrections are welcome on either forge:
 - GitHub (mirror): https://github.com/andrewdunndev/othala
 
 GitHub pull requests land through GitLab; the mirror then marks them merged.
+
+To work on it: `just setup` once, then `just test` (see [`CONTRIBUTING.md`](CONTRIBUTING.md)).
 
 Corrections are welcome: a false statement, a dead link, a config that does
 not do what it claims. Feature requests and changes that add configuration surface for a different
