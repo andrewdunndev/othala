@@ -69,7 +69,12 @@ const ADMIN_RECOVERY_REFUSAL: ActionResult = {
   message: 'A setup link for an admin cannot be made here. Whoever runs the server can set one up.',
 };
 
-export async function saveAction(fd: FormData, ctx: ActionContext): Promise<ActionOutcome> {
+/** Serialized with the admin-marker actions: updateIdentity writes the marker back from its own read, so an unqueued save could undo a revoke-admin. */
+export function saveAction(fd: FormData, ctx: ActionContext): Promise<ActionOutcome> {
+  return serialized(() => save(fd, ctx));
+}
+
+async function save(fd: FormData, ctx: ActionContext): Promise<ActionOutcome> {
   const { id, identity, manifests } = ctx;
   const rawRecoveryEmail = String(fd.get('recoveryEmail') ?? '').trim();
   const traits = {
