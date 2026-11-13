@@ -51,10 +51,22 @@ async function liveRefreshToken(opts: {
   /** A member holding an elevated role steps up to aal2 at the app, so they enrol an authenticator first. */
   withTotp?: boolean;
 }): Promise<string> {
+  // The authenticator is enrolled in a session of its own, as in v-app-stepup: enrolling lifts that session, so the
+  // session that steps up has to start at aal1 with the authenticator already on the identity.
+  let totpSecret: string | undefined;
+  if (opts.withTotp) {
+    const enrolling = await opts.browser.newContext();
+    try {
+      await loginViaJsonApi(enrolling, { identifier: opts.email, password: TEST_PASSWORD }, opts.baseURL);
+      totpSecret = await enrollTotpSecret(enrolling, opts.baseURL);
+    } finally {
+      await enrolling.close();
+    }
+  }
   const ctx = await opts.browser.newContext();
   try {
     await loginViaJsonApi(ctx, { identifier: opts.email, password: TEST_PASSWORD }, opts.baseURL);
-    if (opts.withTotp) await totpStepUp(ctx, opts.baseURL, await enrollTotpSecret(ctx, opts.baseURL));
+    if (totpSecret) await totpStepUp(ctx, opts.baseURL, totpSecret);
     const code = await authorizeOffline(ctx, opts.baseURL);
     const exchange = await tokenGrant(ctx, opts.hydraPublicURL, {
       grant_type: 'authorization_code',
