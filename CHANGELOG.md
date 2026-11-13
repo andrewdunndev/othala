@@ -8,7 +8,16 @@ The git tag is the authoritative version; `portal/package.json` mirrors it.
 
 ## [Unreleased]
 
+### Added
+
+- `mise.toml` and a `justfile` (`setup`, `test`, `check`, `build`, `dev`, `purity`, `e2e`, `backup`). `just e2e` builds both images from the working tree before it runs the harness; `just backup <dir>` writes custom-format dumps of the kratos and hydra databases.
+- e2e walks for the admin recovery refresh with the new passkey, eviction of an admin target, and refresh-token revocation after each credential change.
+
 ### Changed
+
+- CI runs `just check` and `just purity`. The release image-tag check runs on every pipeline, `e2e-upgrade` runs on tags and on MRs touching `deploy/`, `kratos/`, `hydra/` or `DEPLOY.md`, the heavy jobs run on every MR, `reference-check` blocks, and Playwright fails a flaky test in CI.
+- `portal/.npmrc` sets `engine-strict`, and `@types/node` is on the 24 line. The `purity` npm script is gone; use `just purity`.
+- `rateLimit` sweeps idle keys at most once a second; the cap is checked on every call.
 
 - `render` also refuses a Kratos or Hydra cookie secret or the Hydra system secret under 16 characters, and a `KRATOS_COOKIE_SECRET_PREVIOUS` equal to its `_CURRENT`, since Kratos and Hydra refuse to start on either.
 - `DEPLOY.md` says how the first admin is made, names the `postgres-data` volume and `secrets.env` as what to back up, and links the backup, admin-recovery and lost-device runbooks.
@@ -17,6 +26,10 @@ The git tag is the authoritative version; `portal/package.json` mirrors it.
 - A signed-in member sees the sign-in-is-starting-up page, not the signed-out home, when Kratos answers but cannot read its database.
 - The portal keeps retrying its Hydra client registration with a capped backoff (up to 60 s) until it succeeds, instead of giving up after about 20 s and waiting for a SIGHUP. It serves throughout, and `/readyz` reports 503 until the registration lands.
 - A refused render keeps the last good output instead of emptying it, so a restart after a bad edit still boots the earlier config; only a write that fails partway clears it. `check` now runs the render in memory and reports every refusal `render` would make.
+
+### Fixed
+
+- Passing tests no longer print their stderr, and the avatar upload tests wait for their request body to finish, so a CI run no longer ends with an unhandled-rejection error.
 
 ## [0.18.0] - 2026-11-11
 
