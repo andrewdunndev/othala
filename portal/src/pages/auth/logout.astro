@@ -2,7 +2,9 @@
 export const prerender = false;
 
 import FocusPage from '../../components/FocusPage.astro';
-import { getLogoutInfo, getSession, kratosBase } from '../../lib/kratos';
+import { getLogoutInfo, getSession } from '../../lib/kratos';
+import { KRATOS_PUBLIC_URL } from '../../lib/constants';
+import { timeoutFetch } from '../../lib/ory-fetch';
 import type { LogoutInfo } from '../../lib/kratos';
 import { publicUrl } from '../../lib/config';
 import { endAppSignIns, logoutAuthorized, signLogoutToken } from '../../lib/logout';
@@ -23,7 +25,7 @@ function isOurLogoutUrl(raw: string): boolean {
   if (url.protocol !== 'https:' && url.protocol !== 'http:') return false;
 
   const allowed = new Set<string>();
-  for (const base of [publicUrl, kratosBase()]) {
+  for (const base of [publicUrl, KRATOS_PUBLIC_URL]) {
     try {
       allowed.add(new URL(base).origin);
     } catch {
@@ -35,12 +37,9 @@ function isOurLogoutUrl(raw: string): boolean {
 
 // Raw fetch: the SDK sends no Accept header, so Kratos would answer 303 toward the public origin.
 async function revokeServerSide(token: string): Promise<number | null> {
-  const base = kratosBase().replace(/\/+$/, '');
-  const ctl = new AbortController();
-  const t = setTimeout(() => ctl.abort(), REVOKE_TIMEOUT_MS);
   try {
-    const res = await fetch(
-      `${base}/self-service/logout?token=${encodeURIComponent(token)}`,
+    const res = await timeoutFetch(REVOKE_TIMEOUT_MS)(
+      `${KRATOS_PUBLIC_URL}/self-service/logout?token=${encodeURIComponent(token)}`,
       {
         method: 'GET',
         headers: {
@@ -48,14 +47,11 @@ async function revokeServerSide(token: string): Promise<number | null> {
           ...(cookie ? { cookie } : {}),
         },
         redirect: 'manual',
-        signal: ctl.signal,
       },
     );
     return res.status;
   } catch {
     return null;
-  } finally {
-    clearTimeout(t);
   }
 }
 

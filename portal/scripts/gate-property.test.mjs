@@ -159,7 +159,7 @@ test('law: enforceAccessGate — ALLOWED without skip implies a verbatim binding
       (groups, state, accessGroups) => {
         const id = identity(groups, state);
         const m = manifest('photos', { accessGroups });
-        if (!enforceAccessGate(id, 'photos', m).allowed) return;
+        if (!enforceAccessGate(id, m).allowed) return;
         assert.ok(accessGroups.some((g) => (groups ?? []).includes(g)));
       },
     ),
@@ -172,7 +172,7 @@ test('law: enforceAccessGate — NO CASE FOLDING against the manifest binding', 
     fc.property(canonicalName, (lower) => {
       const upper = lower.toUpperCase();
       const m = manifest('photos', { accessGroups: [upper] });
-      assert.equal(enforceAccessGate(identity([lower]), 'photos', m).allowed, false);
+      assert.equal(enforceAccessGate(identity([lower]), m).allowed, false);
     }),
     { numRuns: 200 },
   );
@@ -188,7 +188,7 @@ test('law: enforceAccessGate — ALLOWED implies an all-canonical stored list', 
       (groups, state, accessGroups, skipAccessCheck) => {
         const id = identity(groups, state);
         const m = manifest('photos', { accessGroups, skipAccessCheck });
-        if (!enforceAccessGate(id, 'photos', m).allowed) return;
+        if (!enforceAccessGate(id, m).allowed) return;
         assert.deepEqual((groups ?? []).filter((g) => !GROUP_RE.test(g)), []);
       },
     ),

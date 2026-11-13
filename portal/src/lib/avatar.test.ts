@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
-import { AVATAR_MAX_BYTES, avatarPath, avatarProblem, parseAvatarBytes, readAvatar, isBodyLimitError, sniffImageType } from './avatar';
+import { avatarPath, avatarProblem, parseAvatarBytes, readAvatar, isBodyLimitError, sniffImageType } from './avatar';
+import { AVATAR_MAX_BYTES } from './avatar-limits';
 import { validateMetadataAdmin } from './metadata-admin';
 import { avatarOf, imageBytes } from './test-builders';
 

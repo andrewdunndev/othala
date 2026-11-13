@@ -13,7 +13,7 @@
 
 import { defineMiddleware } from 'astro:middleware';
 import { contentSecurityPolicy } from './lib/csp';
-import { kratosBase } from './lib/kratos';
+import { KRATOS_PUBLIC_URL } from './lib/constants';
 import { apex, publicUrl } from './lib/config';
 
 // Routes that are themselves error pages — rewriting these would loop.
@@ -38,7 +38,7 @@ function applySecurityHeaders(res: Response): void {
     'Content-Security-Policy',
     contentSecurityPolicy({
       apex,
-      kratosUrls: [publicUrl, kratosBase()],
+      kratosUrls: [publicUrl, KRATOS_PUBLIC_URL],
     }),
   );
 }
@@ -59,30 +59,14 @@ const STATUS_REASON: Record<number, string> = {
 export const onRequest = defineMiddleware(async (context, next) => {
   const res = await next();
 
-  // Guard 1: only intercept error-range responses for rebrand.
-  if (res.status < 400) {
-    applySecurityHeaders(res);
-    return res;
-  }
-
-  // Guard 2: only rewrite HTML navigations. Check the request Accept header.
-  const accept = context.request.headers.get('accept') ?? '';
-  if (!accept.includes('text/html')) {
-    applySecurityHeaders(res);
-    return res;
-  }
-
-  // Guard 3: don't rewrite error page routes themselves (loop prevention).
+  // Rebrand only error-range HTML navigations that are not already an error page or branded HTML (loop prevention).
   const path = context.url.pathname;
-  if (ERROR_ROUTE_PREFIXES.some((prefix) => path === prefix || path.startsWith(prefix + '?'))) {
-    applySecurityHeaders(res);
-    return res;
-  }
-
-  // Guard 4: don't rewrite an already-branded HTML response.
-  const contentType = res.headers.get('content-type') ?? '';
-  if (contentType.includes('text/html')) {
-    // Already branded HTML (e.g. 404.astro, 500.astro); let it through.
+  const rebrand =
+    res.status >= 400 &&
+    (context.request.headers.get('accept') ?? '').includes('text/html') &&
+    !ERROR_ROUTE_PREFIXES.includes(path) &&
+    !(res.headers.get('content-type') ?? '').includes('text/html');
+  if (!rebrand) {
     applySecurityHeaders(res);
     return res;
   }

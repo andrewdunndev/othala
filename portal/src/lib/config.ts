@@ -1,7 +1,7 @@
 // Portal env config: the only module that reads production env (listen.ts checks it before this loads; otel.mjs is plain Node).
 // A required var throws at load in production and takes a dev default elsewhere. Fixed topology lives in constants.ts.
 
-import { envNameErrors } from './env-names';
+import { REQUIRED_IN_PRODUCTION, envNameErrors } from './env-names';
 
 // ── helpers ──────────────────────────────────────────────────────────────────
 
@@ -10,7 +10,7 @@ function isProduction(): boolean {
 }
 
 /** Reads an env var; in production throws if absent, in dev/test warns and returns `devDefault`. */
-function requiredVar(name: string, devDefault: string): string {
+function requiredVar(name: (typeof REQUIRED_IN_PRODUCTION)[number], devDefault: string): string {
   const val = process.env[name];
   if (val !== undefined && val.trim() !== '') return val.trim();
   if (isProduction()) {

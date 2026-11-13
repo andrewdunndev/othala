@@ -2,6 +2,7 @@
 
 import { Configuration, FrontendApi, ResponseError } from '@ory/client-fetch';
 import { KRATOS_PUBLIC_URL } from './constants';
+import { UUID_RE } from './uuid';
 import { timeoutFetch } from './ory-fetch';
 import type {
   FlowResult,
@@ -12,17 +13,11 @@ import type {
   VerificationFlow,
 } from './types';
 
-export function kratosBase(): string {
-  return KRATOS_PUBLIC_URL;
-}
-
-const HEALTH_TIMEOUT_MS = 2000;
-
-function frontendApi(): FrontendApi {
+function frontendApi(timeoutMs?: number): FrontendApi {
   return new FrontendApi(
     new Configuration({
-      basePath: kratosBase(),
-      fetchApi: timeoutFetch(),
+      basePath: KRATOS_PUBLIC_URL,
+      fetchApi: timeoutFetch(timeoutMs),
     }),
   );
 }
@@ -39,24 +34,17 @@ export async function getSession(cookie?: string): Promise<Session | null> {
   }
 }
 
-const ERROR_ID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+// The error page must stay quick when Kratos is down, so this read gives up sooner than the flow getters.
+const ERROR_PAGE_TIMEOUT_MS = 2000;
 
 export async function getFlowError(id: string): Promise<{ id?: unknown; code?: unknown } | null> {
-  if (!ERROR_ID.test(id)) return null;
-  const ctl = new AbortController();
-  const t = setTimeout(() => ctl.abort(), HEALTH_TIMEOUT_MS);
+  const flowErrorId = id.toLowerCase();
+  if (!UUID_RE.test(flowErrorId)) return null;
   try {
-    const res = await fetch(`${kratosBase()}/self-service/errors?id=${encodeURIComponent(id)}`, {
-      signal: ctl.signal,
-      headers: { Accept: 'application/json' },
-    });
-    if (!res.ok) return null;
-    const body = (await res.json()) as { error?: { id?: unknown; code?: unknown } };
-    return body?.error ?? null;
+    const flowError = await frontendApi(ERROR_PAGE_TIMEOUT_MS).getFlowError({ id: flowErrorId });
+    return (flowError.error as { id?: unknown; code?: unknown } | undefined) ?? null;
   } catch {
     return null;
-  } finally {
-    clearTimeout(t);
   }
 }
 
@@ -116,7 +104,7 @@ export function getVerificationFlow(
   );
 }
 
-// Browser-relative: kratosBase() is a server-side address the browser cannot resolve.
+// Browser-relative: KRATOS_PUBLIC_URL is a server-side address the browser cannot resolve.
 export const browserFlows = {
   login(opts: { aal?: 'aal1' | 'aal2'; refresh?: boolean; returnTo?: string } = {}): string {
     const p = new URLSearchParams();

@@ -22,12 +22,12 @@ node_in() {
 # The password the smoke's credentialed identities are created with, for the dance's Kratos sign-in.
 SMOKE_PASSWORD='smoke-pass-2026-correct-horse'
 
-# run_dance <subject> [scope] [png-base64 avatar-sha256] [email] -> the result line (OK claims=... / DENIED... / STEP/EXC). Pipes
+# run_dance <subject> [scope] [png-base64] [email] -> the result line (OK claims=... / DENIED... / STEP/EXC). Pipes
 # oidc-dance.mjs with the subject and grafana client secret into the dance-runner oneshot;
 # grafana is the role-mapping client whose consent block emits grafana_role.
 run_dance() {
     local out res
-    out=$(sed "s|__SUBJECT__|$1|g; s|__GRAFANA_SECRET__|${GRAFANA_CLIENT_SECRET}|g; s|__SCOPE__|${2:-openid email groups offline_access}|g; s|__PNG_B64__|${3:-}|g; s|__PICTURE_SHA__|${4:-}|g; s|__EMAIL__|${5:-}|g; s|__PASSWORD__|${SMOKE_PASSWORD}|g; s|__REFRESH_TOKEN__||g" ./oidc-dance.mjs \
+    out=$(sed "s|__SUBJECT__|$1|g; s|__GRAFANA_SECRET__|${GRAFANA_CLIENT_SECRET}|g; s|__SCOPE__|${2:-openid email groups offline_access}|g; s|__PNG_B64__|${3:-}|g; s|__EMAIL__|${4:-}|g; s|__PASSWORD__|${SMOKE_PASSWORD}|g; s|__REFRESH_TOKEN__||g" ./oidc-dance.mjs \
         | docker compose --profile oneshot run --rm --no-deps -T dance-runner 2>&1 | _strip_ansi)
     res=$(echo "$out" | grep -E '^OK |^DENIED|^STEP|^EXC' | tail -1)
     if [[ -z "$res" ]]; then
@@ -41,7 +41,7 @@ run_dance() {
 
 # run_refresh <refresh-token> -> "REFRESH status=<http status>" from the grafana token endpoint, through the dance-runner.
 run_refresh() {
-    sed "s|__SUBJECT__||g; s|__GRAFANA_SECRET__|${GRAFANA_CLIENT_SECRET}|g; s|__SCOPE__||g; s|__PNG_B64__||g; s|__PICTURE_SHA__||g; s|__EMAIL__||g; s|__PASSWORD__||g; s|__REFRESH_TOKEN__|$1|g" ./oidc-dance.mjs \
+    sed "s|__SUBJECT__||g; s|__GRAFANA_SECRET__|${GRAFANA_CLIENT_SECRET}|g; s|__SCOPE__||g; s|__PNG_B64__||g; s|__EMAIL__||g; s|__PASSWORD__||g; s|__REFRESH_TOKEN__|$1|g" ./oidc-dance.mjs \
         | docker compose --profile oneshot run --rm --no-deps -T dance-runner 2>&1 | _strip_ansi | grep -E '^REFRESH |^EXC' | tail -1
 }
 

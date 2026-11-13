@@ -55,7 +55,6 @@ export function enforceGroupGate(
 /** Entry needs any one of the app's access groups; a missing manifest or an empty binding denies. */
 export function enforceAccessGate(
   identity: Identity | null | undefined,
-  _clientId: string,
   manifest?: ClientManifest | undefined,
 ): GateResult {
   const refusal = refuseIdentity(identity);
@@ -132,7 +131,7 @@ export function decideAccess(
     return parseIdentity(identity).isAdmin ? { allow: true } : { deny: 'not an admin' };
   }
   const gate =
-    'group' in target ? enforceGroupGate(identity, target.group) : enforceAccessGate(identity, target.app?.clientId ?? '', target.app);
+    'group' in target ? enforceGroupGate(identity, target.group) : enforceAccessGate(identity, target.app);
   if (!gate.allowed) return { deny: gate.reason ?? '' };
   return needsStepUp(session, identity, manifests) ? { stepUp: true } : { allow: true };
 }

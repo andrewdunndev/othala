@@ -4,7 +4,8 @@
 
 import type { APIRoute } from 'astro';
 import { getIdentityWithoutCredentials } from '../../../lib/admin-api';
-import { AVATAR_HASH_RE, AVATAR_ID_RE, readAvatar } from '../../../lib/avatar';
+import { AVATAR_HASH_RE, readAvatar } from '../../../lib/avatar';
+import { UUID_RE } from '../../../lib/uuid';
 
 export const prerender = false;
 
@@ -16,7 +17,7 @@ const notFound = () =>
 
 export const GET: APIRoute = async ({ params }) => {
   const { id, hash } = params;
-  if (!id || !hash || !AVATAR_ID_RE.test(id) || !AVATAR_HASH_RE.test(hash)) return notFound();
+  if (!id || !hash || !UUID_RE.test(id) || !AVATAR_HASH_RE.test(hash)) return notFound();
   const identity = await getIdentityWithoutCredentials(id).catch(() => null);
   const avatar = readAvatar(identity?.metadata_admin);
   if (!avatar || avatar.sha256.slice(0, 16) !== hash) return notFound();

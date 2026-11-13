@@ -100,13 +100,13 @@ test('patchAdminMarker/grant: add /metadata_admin/admin when metadata_admin exis
   assert.deepEqual(JSON.parse(capturedCalls[1].opts.body), [{ op: 'add', path: '/metadata_admin/admin', value: true }]);
 });
 
-test('patchAdminMarker/grant: replace /metadata_admin/admin when admin key already exists', async () => {
+test('patchAdminMarker/grant: add onto /metadata_admin/admin when the admin key already exists (add replaces)', async () => {
   mockFetchSequence([
     { body: kratosIdentity({ id: 'u3', traits: {}, metadata_admin: { groups: ['family'], admin: false } }) },
     { body: kratosIdentity({ id: 'u3', traits: {}, metadata_admin: { groups: ['family'], admin: true } }) },
   ]);
   await patchAdminMarker('u3', true);
-  assert.deepEqual(JSON.parse(capturedCalls[1].opts.body), [{ op: 'replace', path: '/metadata_admin/admin', value: true }]);
+  assert.deepEqual(JSON.parse(capturedCalls[1].opts.body), [{ op: 'add', path: '/metadata_admin/admin', value: true }]);
 });
 
 test('patchAdminMarker/revoke: GET then PATCH remove when admin key present', async () => {

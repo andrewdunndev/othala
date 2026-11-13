@@ -8,7 +8,7 @@ vi.mock('./admin-api', () => ({ patchAvatar: patchAvatarMock }));
 vi.mock('./kratos', () => ({ getSession: getSessionMock, browserFlows: { settings: (u: string) => u } }));
 
 import { applyAvatarForm } from './avatar-edit';
-import { AVATAR_MAX_BYTES } from './avatar';
+import { AVATAR_MAX_BYTES } from './avatar-limits';
 import { POST } from '../pages/auth/avatar.js';
 import { signToken, _resetForTests } from './csrf';
 import { avatarOf, imageBytes, session } from './test-builders';
