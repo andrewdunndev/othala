@@ -97,7 +97,7 @@ test('ZI1 — admin adds a person; they redeem, enrol a passkey and TOTP, and si
   await expect(loginBtn, 'ZI1: passkey sign-in button').toBeVisible({ timeout: 10_000 });
   await page.waitForFunction(hasWindowFn, 'oryPasskeyLogin');
   await loginBtn.click();
-  await page.waitForURL((u) => !u.pathname.startsWith('/auth/login'), { timeout: 15_000 });
+  await stepUpIfAsked(page, secret);
 
   await ctx.route(`${APP_ORIGIN}/**`, (route) => route.fulfill({ status: 200, contentType: 'text/plain', body: 'app' }));
   const authorize =
@@ -106,7 +106,6 @@ test('ZI1 — admin adds a person; they redeem, enrol a passkey and TOTP, and si
     `&redirect_uri=${encodeURIComponent(GRAFANA_REDIRECT_URI)}` +
     `&state=zi-household-state&nonce=zi-household-nonce`;
   await page.goto(authorize);
-  await stepUpIfAsked(page, secret);
   await page.waitForURL((u) => u.origin === APP_ORIGIN, { timeout: 15_000 });
   const code2 = new URL(page.url()).searchParams.get('code');
   expect(code2, `ZI1: the OIDC app receives a code, landed at ${page.url()}`).toBeTruthy();
@@ -148,12 +147,11 @@ test('ZI1 — admin adds a person; they redeem, enrol a passkey and TOTP, and si
   );
 });
 
-/** The second factor the person enrolled is asked for when the session is below aal2; answer it in the page. */
+/** The dag sign-in asks the enrolled second factor; answer it in the page and land on the dashboard. */
 async function stepUpIfAsked(page: Page, secret: string): Promise<void> {
-  await page.waitForURL((u) => u.origin === APP_ORIGIN || u.pathname.startsWith('/auth/login'), { timeout: 15_000 });
-  if (!new URL(page.url()).pathname.startsWith('/auth/login')) return;
   const form = page.locator('form:has(#totp-code)');
-  await expect(form, 'ZI1: step-up offers the authenticator code').toBeVisible({ timeout: 10_000 });
+  await expect(form, 'ZI1: the dag sign-in offers the authenticator code').toBeVisible({ timeout: 15_000 });
   await form.locator('#totp-code').fill(await computeTotp(secret));
   await form.locator('button[type="submit"]').click();
+  await page.waitForURL((u) => u.pathname === '/', { timeout: 15_000 });
 }

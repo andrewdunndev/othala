@@ -1,3 +1,8 @@
+
+/** The front-door ask: step-up, only for an identity that can answer it. */
+export function stepUpAtLanding(session: Parameters<typeof needsStepUp>[0], identity: Identity | null | undefined, manifests?: ClientManifest[]): boolean {
+  return needsStepUp(session, identity, manifests) && parseIdentity(identity).hasSecondFactor;
+}
 // Access policy, fail-closed, as pure functions over a fetched identity; a failed lookup passes null and is denied.
 // consent.skip_access_check bypasses only group membership, never the active-state or canonical-group checks.
 

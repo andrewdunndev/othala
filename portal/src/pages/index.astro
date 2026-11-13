@@ -25,7 +25,8 @@ import {
   type AppTile,
 } from '../lib/tiles';
 import { devMockIdentity } from '../lib/dev-mock';
-import { getSession } from '../lib/kratos';
+import { getSession, browserFlows } from '../lib/kratos';
+import { stepUpAtLanding } from '../lib/gate';
 import { getIdentity } from '../lib/admin-api';
 import { parseIdentity } from '../lib/identity-facts';
 import HeaderActions from '../components/HeaderActions.astro';
@@ -44,6 +45,7 @@ const devOverride = isDev ? Astro.url.searchParams.get('dev-state') : null;
 
 let state: State = 'pre-auth';
 let identity: Identity | null = null;
+let stepUp = false;
 const downReason = 'Kratos session check failed; retrying.';
 
 if (devOverride === 'down' || devOverride === 'pre-auth' || devOverride === 'post-auth') {
@@ -59,6 +61,7 @@ if (devOverride === 'down' || devOverride === 'pre-auth' || devOverride === 'pos
       // failure fall back to the whoami identity (no groups, no tiles), never fail-open.
       try {
         identity = await getIdentity(session.identity.id);
+        stepUp = stepUpAtLanding(session, identity);
       } catch (lookupErr) {
         console.error('[othala/index] getIdentity failed; falling back to whoami (no groups):', lookupErr);
         identity = session.identity;
@@ -71,6 +74,9 @@ if (devOverride === 'down' || devOverride === 'pre-auth' || devOverride === 'pos
     console.error('[othala/index] session check failed:', err);
   }
 }
+
+// The ask moves to the front door so app sign-ins never ask; ?ask= keeps the contact form reachable from the step-up page.
+if (stepUp && !Astro.url.searchParams.has('ask')) return Astro.redirect(browserFlows.login({ aal: 'aal2', returnTo: Astro.url.pathname + Astro.url.search }));
 
 const storedAvatar = identity ? readAvatar(identity.metadata_admin) : undefined;
 const avatarSrc = devOverride === 'post-auth' ? (Astro.url.searchParams.has('avatar') ? DEV_AVATAR_SRC : null) : identity && storedAvatar ? avatarPath(identity.id, storedAvatar) : null;
