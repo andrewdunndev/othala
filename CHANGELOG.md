@@ -28,7 +28,7 @@ The git tag is the authoritative version; `portal/package.json` mirrors it.
 - Copy across the portal says what a person experiences, and the second sign-in step has one name throughout. The admin picture hint speaks about the person, not the field.
 - The 404 and 500 pages come from one source.
 - The footer repo and design links show to admins only.
-- `SECURITY.md` lists four more accepted risks and no longer promises a response timetable. The error-handling guide is off the public site.
+- `SECURITY.md` lists three more accepted risks, widens the proxy one, and no longer promises a response timetable. The error-handling guide is off the public site.
 - Settings drops an unused logout fetch.
 
 ### Fixed
