@@ -135,7 +135,7 @@ Each names its enforcer and the test that fails if it stops working.
 - **`{client_ip}` is only as good as `trusted_proxies`.** Behind a trusted load
   balancer without `trusted_proxies_strict`, Caddy takes the leftmost
   `X-Forwarded-For` entry, which the client chose. A proxy missing from
-  `trusted_proxies` puts every client in one bucket, so a flood can lock sign-in
+  `trusted_proxies` puts every client in one bucket, so one flood throttles sign-in
   for everyone until it passes; existing sessions and forward-auth are unaffected.
   See `DEPLOY.md`.
 - **Any host under the apex can set the session cookie.** The cookie is scoped to
@@ -143,11 +143,10 @@ Each names its enforcer and the test that fails if it stops working.
   there can overwrite it with its own valid session. Serve only apps you run
   under the apex.
 - **RP-initiated logout ends the portal session.** An app holding a valid
-  `id_token_hint` can sign a person out of the portal in that browser, and only that
-  session ends. Logout leaving single sign-on alive is the worse outcome.
+  `id_token_hint` can sign a person out of the portal in that browser; only that browser's session ends. The alternative, a sign-out that leaves single sign-on alive, is worse.
 - **A picture is public to anyone holding its URL.** `/avatar/<id>/<hash>` is served
   without a session because apps fetch it themselves; the URL needs the identity id
-  and the content hash, and a new picture is a new URL.
+  and a prefix of the content hash; a new picture is a new URL and the old one stops serving.
 - **Sessions are long-lived and `whoami` answers at the first assurance level**
   (`kratos/kratos.yml`, `session`). A stolen cookie stays valuable for the
   session lifespan; revocation ends it sooner.

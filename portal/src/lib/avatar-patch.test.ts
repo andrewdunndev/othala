@@ -44,7 +44,7 @@ describe('patchAvatar', () => {
     getIdentity.mockResolvedValue({ metadata_admin: { groups: ['everyone'], avatar: a } });
     await patchAvatar('i', b);
     const sent = (patchIdentity.mock.lastCall as unknown as [{ jsonPatch: unknown[] }])[0].jsonPatch;
-    expect(sent).toEqual([expect.objectContaining({ path: '/metadata_admin/avatar', value: b })]);
+    expect(sent).toEqual([{ op: 'add', path: '/metadata_admin/avatar', value: b }]);
     expect(updateIdentity).not.toHaveBeenCalled();
   });
 

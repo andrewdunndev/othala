@@ -17,7 +17,7 @@ import { KRATOS_PUBLIC_URL } from './lib/constants';
 import { apex, publicUrl } from './lib/config';
 
 // Routes that are themselves error pages — rewriting these would loop.
-const ERROR_ROUTE_PREFIXES = ['/auth/error', '/404', '/500'];
+const ERROR_ROUTES = ['/auth/error', '/404', '/500'];
 
 // Security response headers applied to every response (see the CSP note above).
 function applySecurityHeaders(res: Response): void {
@@ -64,7 +64,7 @@ export const onRequest = defineMiddleware(async (context, next) => {
   const rebrand =
     res.status >= 400 &&
     (context.request.headers.get('accept') ?? '').includes('text/html') &&
-    !ERROR_ROUTE_PREFIXES.includes(path) &&
+    !ERROR_ROUTES.includes(path) &&
     !(res.headers.get('content-type') ?? '').includes('text/html');
   if (!rebrand) {
     applySecurityHeaders(res);

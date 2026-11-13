@@ -42,7 +42,7 @@ export type AvatarRefusal = 'empty' | 'too-large' | 'type';
 
 export const AVATAR_REFUSALS: Record<AvatarRefusal, string> = {
   empty: 'Choose a picture first.',
-  'too-large': AVATAR_TOO_LARGE,
+  'too-large': `${AVATAR_TOO_LARGE} Or try again from a phone or computer with JavaScript on.`,
   type: 'Use a PNG, JPEG or WebP picture.',
 };
 

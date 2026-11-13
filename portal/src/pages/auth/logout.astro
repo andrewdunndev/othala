@@ -171,7 +171,7 @@ const retry = isPost;
       ? 'That sign-out request could not be confirmed. Press the button to sign out of this device.'
       : lookupFailed
       ? 'The sign-in service did not answer. Signing out clears this device only.'
-      : 'You stay signed in on your other devices, but every app signs you out and will ask again. To sign out everywhere, use Account.'}
+      : 'This signs out this device and every app, so apps will ask you to sign in again. Your other devices stay signed in; to end those too, use Account.'}
 >
   <form method="POST" enctype="application/x-www-form-urlencoded" action="/auth/logout" class="status-actions">
     <input type="hidden" name="csrf_token" value={csrfToken} />
