@@ -294,10 +294,9 @@ function serialized<T>(run: () => Promise<T>): Promise<T> {
 
 /** Counted from a fresh list, target included, so a change that landed while this one waited is seen. */
 async function leavesNoActiveAdmin(target: Identity): Promise<boolean> {
-  if (!isActiveAdmin(target)) return false;
   const all = await listIdentities();
-  const current = all.find((i) => i.id === target.id) ?? target;
-  if (!isActiveAdmin(current)) return false;
+  const current = all.find((i) => i.id === target.id);
+  if (!current || !isActiveAdmin(current)) return false;
   return all.filter(isActiveAdmin).length <= 1;
 }
 

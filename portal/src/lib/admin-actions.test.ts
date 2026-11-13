@@ -567,10 +567,18 @@ describe('deactivateAction', () => {
     expect(outcome.actionResult?.kind).toBe('deactivated');
   });
 
-  it('deactivates a member without an admin count', async () => {
+  it('refuses a target who became the only admin since the page loaded', async () => {
+    listIdentitiesMock.mockResolvedValue([makeIdentity('promoted', true)]);
+    const outcome = await deactivateAction(fd(), makeCtx({ identity: makeIdentity('promoted') }));
+
+    expect(deactivateIdentityMock).not.toHaveBeenCalled();
+    expect(outcome.actionResult?.kind).toBe('error');
+  });
+
+  it('deactivates a member who is not an admin', async () => {
+    listIdentitiesMock.mockResolvedValue([makeIdentity('someone'), makeIdentity('other-admin', true)]);
     const outcome = await deactivateAction(fd(), makeCtx());
 
-    expect(listIdentitiesMock).not.toHaveBeenCalled();
     expect(deactivateIdentityMock).toHaveBeenCalledWith('target-1');
     expect(outcome.actionResult?.kind).toBe('deactivated');
   });
