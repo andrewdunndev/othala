@@ -6,6 +6,12 @@ aims to follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 The git tag is the authoritative version; `portal/package.json` mirrors it.
 
+## [Unreleased]
+
+### Changed
+
+- A refused render keeps the last good output instead of emptying it, so a restart after a bad edit still boots the earlier config; only a write that fails partway clears it. `check` now runs the render in memory and reports every refusal `render` would make.
+
 ## [0.18.0] - 2026-11-11
 
 ### Added

@@ -1,5 +1,5 @@
 // Invariant: the render keeps the substitution rules byte for byte, refuses a missing secret or a leftover ${,
-// writes owner-only files, empties earlier output on refusal, refuses retired or unknown names, and gen-secrets
+// writes owner-only files, keeps the last good render on refusal, refuses retired or unknown names, and gen-secrets
 // mints every secret it can. Assertions name variables only, so no secret value reaches the test log.
 
 import { afterAll, test } from 'vitest';
@@ -236,7 +236,10 @@ const cli = (args, env) =>
     encoding: 'utf8',
   });
 
-test('a refused render through the CLI writes nothing and empties an earlier render', () => {
+const snapshot = (out) =>
+  Object.fromEntries(OUTPUTS.map((path) => [path, readFileSync(join(out, path), 'utf8')]));
+
+test('a refused render through the CLI writes nothing and keeps the last good render', () => {
   withDir((dir) => {
     const out = join(dir, 'out');
     const refused = { ...ENV, CSRF_SECRET: '' };
@@ -245,12 +248,38 @@ test('a refused render through the CLI writes nothing and empties an earlier ren
     assert.match(r.stderr, /missing secret\(s\): CSRF_SECRET/);
     assert.equal(existsSync(out), false);
     writeRendered(out, render(root, CONTENT, ENV));
-    assert.equal(cli(['render', '--policy', root, '--content', CONTENT, '--out', out], refused).status, 1);
-    for (const top of ['kratos', 'hydra', 'caddy']) assert.deepEqual(readdirSync(join(out, top)), [], top);
+    const before = snapshot(out);
+    const again = cli(['render', '--policy', root, '--content', CONTENT, '--out', out], refused);
+    assert.equal(again.status, 1);
+    assert.match(again.stderr, /kept/);
+    assert.deepEqual(snapshot(out), before);
   });
 });
 
-test('a filesystem error during the write also empties an earlier render', () => {
+test('a refused cookie-secret pair keeps the last good render and fails closed', () => {
+  withDir((dir) => {
+    const out = join(dir, 'out');
+    writeRendered(out, render(root, CONTENT, ENV));
+    const before = snapshot(out);
+    const refused = { ...ENV, KRATOS_COOKIE_SECRET_CURRENT: 'k'.repeat(64), KRATOS_COOKIE_SECRET_PREVIOUS: 'p'.repeat(32) };
+    const r = cli(['render', '--policy', root, '--content', CONTENT, '--out', out], refused);
+    assert.equal(r.status, 1);
+    assert.match(r.stderr, /KRATOS_COOKIE_SECRET_CURRENT must be 16, 24 or 32/);
+    assert.deepEqual(snapshot(out), before);
+  });
+});
+
+test('check refuses what render would refuse, with or without secrets in the environment', () => {
+  const args = ['check', '--policy', root, '--content', CONTENT];
+  const pair = { KRATOS_COOKIE_SECRET_CURRENT: 'k'.repeat(64), KRATOS_COOKIE_SECRET_PREVIOUS: 'p'.repeat(32) };
+  const bad = cli(args, { ...ENV, ...pair });
+  assert.equal(bad.status, 1);
+  assert.match(bad.stderr, /KRATOS_COOKIE_SECRET_CURRENT must be 16, 24 or 32/);
+  assert.equal(cli(args, ENV).status, 0);
+  assert.equal(cli(args, VALUES).status, 0);
+});
+
+test('a filesystem error during the write empties an earlier render', () => {
   withDir((dir) => {
     const out = join(dir, 'out');
     writeRendered(out, render(root, CONTENT, ENV));
@@ -258,7 +287,7 @@ test('a filesystem error during the write also empties an earlier render', () =>
     mkdirSync(join(out, 'hydra/hydra.yml/blocker'), { recursive: true });
     const r = cli(['render', '--policy', root, '--content', CONTENT, '--out', out], ENV);
     assert.equal(r.status, 1);
-    assert.match(r.stderr, /render refused; earlier output cleared/);
+    assert.match(r.stderr, /earlier output cleared/);
     for (const top of ['kratos', 'hydra', 'caddy']) assert.deepEqual(readdirSync(join(out, top)), [], top);
   });
 });

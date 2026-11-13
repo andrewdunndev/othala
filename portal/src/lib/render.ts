@@ -257,8 +257,23 @@ export function render(policyDir: string, contentDir: string, env: Env): Rendere
   return files;
 }
 
-/** Empties each rendered tree under `outDir` in place, so a tree can be a mount point. A refused render calls it
- *  too, so Kratos, Hydra and Caddy refuse to boot rather than run an earlier render. */
+/** `check` plus a render held in memory, so a preflight reports every refusal `render` would make. A secret the
+ *  caller left unset is stood in for, keeping the offline check free of secrets; one that is set is held to render's rules. */
+export function preflight(policyDir: string, contentDir: string, env: Env): string[] {
+  const errors = check(policyDir, contentDir, env);
+  if (errors.length > 0) return errors;
+  const stand = Object.fromEntries(SECRETS.filter((n) => (env[n] ?? '').trim() === '').map((n) => [n, 'x'.repeat(32)]));
+  try {
+    render(policyDir, contentDir, { ...env, ...stand });
+  } catch (err) {
+    if (!(err instanceof RenderError)) throw err;
+    return err.message.split('\n');
+  }
+  return [];
+}
+
+/** Empties each rendered tree under `outDir` in place, so a tree can be a mount point. A write that fails partway calls it
+ *  so Kratos, Hydra and Caddy refuse to boot rather than run a mix of old and new files. */
 export function clearRendered(outDir: string): void {
   for (const top of TREES) {
     const dir = join(outDir, top);

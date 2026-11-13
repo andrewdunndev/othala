@@ -36,7 +36,7 @@ cp -r deploy/example /srv/othala && cd /srv/othala && cp othala.env.example otha
 IMAGE=registry.gitlab.com/dunn.dev/othala@sha256:<digest>   # the tag in compose.yml, plus its digest
 (umask 077; docker run --rm -v "$PWD/content:/etc/othala:ro,z" "$IMAGE" node dist/server/config.mjs gen-secrets > secrets.env)
 echo 'OTHALA_SMTP_CONNECTION_URI=smtps://user:pass@smtp.example.org:465' >> secrets.env
-docker run --rm --env-file othala.env -v "$PWD/content:/etc/othala:ro,z" "$IMAGE" node dist/server/config.mjs check
+docker run --rm --env-file othala.env --env-file secrets.env -v "$PWD/content:/etc/othala:ro,z" "$IMAGE" node dist/server/config.mjs check
 docker compose up -d
 ```
 
@@ -73,10 +73,14 @@ With quadlets the render is a `Type=oneshot`, `RemainAfterExit=yes` unit writing
 
 ## Validation
 
-1. `check` runs offline, without secrets, over env names and the whole content tree. Run `check --content <dir>`
-   with the non-secret env in CI after every edit to `apps/`.
+1. `check` runs offline over env names, the whole content tree and a render held in memory, so it reports every
+   refusal `render` would make. Run with `--env-file secrets.env` as well it also holds the secrets to render's
+   rules; without them it skips only the missing-secret refusal. Run `check --content <dir>` after every edit to
+   `apps/`.
 2. `render` checks only env names and `courier/`, so a bad app sidelines that app and never stops sign-in. It
-   refuses a missing or blank secret, a leftover `${` and malformed YAML, and empties its earlier output.
+   refuses a missing or blank secret, a leftover `${` and malformed YAML, and a secret of the wrong length. A
+   refusal exits 1 and leaves the last good render in place, so a restart still boots the earlier config; the migrate jobs and Caddy
+   wait on the render and stay down until it succeeds. Only a write that fails partway empties the output.
 3. Kratos and Hydra validate their merged config at boot and refuse to start.
 4. Caddy refuses an unknown directive or a missing module at boot.
 
