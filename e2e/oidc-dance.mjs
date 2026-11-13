@@ -1,26 +1,21 @@
-// e2e fixture: browser-free OIDC authorization-code dance — Section G of smoke.sh.
+// e2e fixture: browser-free OIDC authorization-code dance, Section G of smoke.sh.
 //
-// Runs inside the `dance-runner` compose oneshot service (playwright image, profile
-// oneshot) via `docker compose --profile oneshot run --rm --no-deps -T dance-runner`.
-// smoke.sh's run_dance() helper subs __SUBJECT__ / __KEEP_SECRET__ with sed and
-// pipes the result to the container's stdin. The dance-runner entrypoint runs
-// `npm ci && node` — node reads this script from stdin. npm deps (@ory/client-fetch,
-// tough-cookie, fetch-cookie, jose) are installed from e2e/package.json.
+// Runs in the `dance-runner` compose oneshot service (playwright image, profile oneshot): smoke.sh's run_dance
+// substitutes the placeholders below with sed and pipes the result to node on stdin. npm deps (@ory/client-fetch,
+// tough-cookie, fetch-cookie, jose) come from e2e/package.json.
 //
-// Rewritten from the bespoke jar+fetch accumulator onto:
-//   @ory/client-fetch  — OAuth2Api.acceptOAuth2LoginRequest (admin-forged login)
-//   tough-cookie + fetch-cookie — proper RFC-compliant cookie jar (replaces the
-//                                 manual Set-Cookie accumulator)
-//   jose               — decodeJwt for id_token claims (replaces manual base64url)
-//   introspectOAuth2Token assertion — confirms active=true + sub matches
+// Placeholders: __SUBJECT__ (identity id), __GRAFANA_SECRET__, __SCOPE__, __EMAIL__ and __PASSWORD__ (Kratos sign-in for
+// a credentialed subject), __PNG_B64__ (picture mode: the avatar is stored on SUBJECT and the profile checks run),
+// __REFRESH_TOKEN__ (only trade this refresh token).
 //
-// __SUBJECT__ / __GRAFANA_SECRET__ are sed-substituted by smoke.sh before piping.
-// Output: single line `OK claims={...}` on success, or `DENIED-at-...` / `EXC`.
+// Output, one line: `OK claims={...}` on success, `REFRESH status=<n>` in refresh mode, or `DENIED-at-...` / `STEP...` /
+// `EXC ...`.
 
 import { OAuth2Api, Configuration } from '@ory/client-fetch';
 import { CookieJar } from 'tough-cookie';
 import makeFetchCookie from 'fetch-cookie';
 import { decodeJwt } from 'jose';
+import { createHash } from 'node:crypto';
 
 const HP = process.env.EDGE_URL ?? 'https://auth.othala.test';
 const HA = 'http://hydra:4445';
@@ -30,10 +25,11 @@ const CLIENT = 'grafana';
 const REDIRECT = 'https://grafana.othala.test/login/generic_oauth';
 const SUBJECT = '__SUBJECT__';
 const SECRET = '__GRAFANA_SECRET__';
-// Picture mode: a non-empty base64 PNG and the hash of the avatar stored on SUBJECT add the profile-scope checks.
+// Picture mode: a non-empty base64 PNG is stored on SUBJECT and adds the profile-scope checks.
 const SCOPE = '__SCOPE__';
 const PNG_B64 = '__PNG_B64__';
-const PICTURE_SHA = '__PICTURE_SHA__';
+const HK = 'http://kratos:4434';
+const PICTURE_SHA = PNG_B64 ? createHash('sha256').update(Buffer.from(PNG_B64, 'base64')).digest('hex') : '';
 // A skip_consent client is accepted only for the browser whose Kratos session is the subject, so a subject with
 // credentials signs in at Kratos first; one without (inactive, no access) is denied before a session matters.
 const EMAIL = '__EMAIL__';
@@ -43,9 +39,7 @@ const REFRESH_TOKEN = '__REFRESH_TOKEN__';
 
 // Hydra's CSRF cookies are Secure, so every hop goes through the https edge.
 const jar = new CookieJar();
-// fetch-cookie wraps globalThis.fetch (Node 18+) with automatic jar management.
-// Hydra sets CSRF cookies on the OAuth2 flow that must survive the login/consent
-// redirect chain; tough-cookie handles the persistence the old manual accumulator did.
+// Hydra sets CSRF cookies on the OAuth2 flow that must survive the login/consent redirect chain.
 const fetchWithCookies = makeFetchCookie(fetch, jar);
 
 // Hydra admin API client for the login accept call.
@@ -72,6 +66,16 @@ async function pictureChecks(claims, accessToken) {
     userinfo_status: info.status,
     userinfo_picture: infoClaims.picture,
   };
+}
+
+// Store the avatar on SUBJECT through the Kratos admin API, as the portal's own write would.
+async function storeAvatar() {
+  const res = await fetch(HK + '/admin/identities/' + SUBJECT, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify([{ op: 'add', path: '/metadata_admin/avatar', value: { type: 'image/png', sha256: PICTURE_SHA, data: PNG_B64 } }]),
+  });
+  if (!res.ok) throw new Error('avatar PATCH ' + res.status);
 }
 
 async function kratosLogin() {
@@ -101,6 +105,7 @@ async function refreshOnly() {
       await refreshOnly();
       return;
     }
+    if (PNG_B64) await storeAvatar();
     if (EMAIL) await kratosLogin();
 
     // ── Step 1: authorization request → redirect with login_challenge ─────────

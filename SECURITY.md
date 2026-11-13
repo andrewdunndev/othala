@@ -11,10 +11,9 @@ Include the affected component and commit or tag, what an attacker gains,
 reproduction steps, and relevant deployment specifics. A flaw in Ory Kratos or Hydra itself
 goes to Ory (<https://www.ory.sh/docs/ecosystem/security>); a note here is still welcome.
 
-Expect acknowledgement within 3 business days and an assessment within 10, from one
-maintainer on best effort, with no on-call and no bounty. Disclosure is coordinated: the fix lands
-privately, ships in a release, then is published, with credit unless you decline it. Fixes land on the
-newest tag only; older tags are not backported.
+One maintainer reads reports on a best-effort basis: no timetable, no on-call and no bounty. The
+intent is a coordinated disclosure: the fix lands privately, ships in a release, then is published,
+with credit unless you decline it. Fixes land on the newest tag only; older tags are not backported.
 
 ## The trust boundary
 
@@ -135,7 +134,19 @@ Each names its enforcer and the test that fails if it stops working.
   unlimited. Confirm it is compiled in.
 - **`{client_ip}` is only as good as `trusted_proxies`.** Behind a trusted load
   balancer without `trusted_proxies_strict`, Caddy takes the leftmost
-  `X-Forwarded-For` entry, which the client chose. See `DEPLOY.md`.
+  `X-Forwarded-For` entry, which the client chose. A proxy missing from
+  `trusted_proxies` puts every client in one bucket, so one flood throttles sign-in
+  for everyone until it passes; existing sessions and forward-auth are unaffected.
+  See `DEPLOY.md`.
+- **Any host under the apex can set the session cookie.** The cookie is scoped to
+  `OTHALA_APEX` so forward-auth apps share it, which means a compromised host
+  there can overwrite it with its own valid session. Serve only apps you run
+  under the apex.
+- **RP-initiated logout ends the portal session.** An app holding a valid
+  `id_token_hint` can sign a person out of the portal in that browser; only that browser's session ends. The alternative, a sign-out that leaves single sign-on alive, is worse.
+- **A picture is public to anyone holding its URL.** `/avatar/<id>/<hash>` is served
+  without a session because apps fetch it themselves; the URL needs the identity id
+  and a prefix of the content hash; a new picture is a new URL and the old one stops serving.
 - **Sessions are long-lived and `whoami` answers at the first assurance level**
   (`kratos/kratos.yml`, `session`). A stolen cookie stays valuable for the
   session lifespan; revocation ends it sooner.

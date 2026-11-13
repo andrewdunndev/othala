@@ -2,6 +2,7 @@
 // are accepted, identified by their bytes: a declared type is never trusted and SVG is never an option.
 
 import { createHash } from 'node:crypto';
+import { AVATAR_MAX_BYTES, AVATAR_TOO_LARGE } from './avatar-limits';
 
 export const AVATAR_TYPES = ['image/png', 'image/jpeg', 'image/webp'] as const;
 export type AvatarType = (typeof AVATAR_TYPES)[number];
@@ -12,9 +13,7 @@ export interface Avatar {
   data: string;
 }
 
-export const AVATAR_MAX_BYTES = 64 * 1024;
 
-export const AVATAR_ID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
 export const AVATAR_HASH_RE = /^[0-9a-f]{16}$/;
 const SHA_RE = /^[0-9a-f]{64}$/;
 const BASE64_RE = /^[A-Za-z0-9+/]+={0,2}$/;
@@ -43,7 +42,7 @@ export type AvatarRefusal = 'empty' | 'too-large' | 'type';
 
 export const AVATAR_REFUSALS: Record<AvatarRefusal, string> = {
   empty: 'Choose a picture first.',
-  'too-large': 'That picture is too large. Choose a smaller one (under 64 KB), or try again from a phone or computer with JavaScript on.',
+  'too-large': `${AVATAR_TOO_LARGE} Or try again from a phone or computer with JavaScript on.`,
   type: 'Use a PNG, JPEG or WebP picture.',
 };
 

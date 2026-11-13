@@ -5,6 +5,7 @@
 export const prerender = false;
 
 import StatusPage from '../components/StatusPage.astro';
+import { REASON_MAP } from '../lib/error-reasons';
 
 interface Props {
   error: unknown;
@@ -15,8 +16,4 @@ const { error } = Astro.props;
 // Server-side log only — never forwarded to the rendered HTML.
 console.error('[othala/portal] Unhandled server error:', error);
 ---
-<StatusPage
-  status={500}
-  title="Something went wrong on our side"
-  message="It is not you. Try again in a moment, and tell an admin if it keeps happening."
-/>
+<StatusPage status={500} title={REASON_MAP['server-error'].title} message={REASON_MAP['server-error'].message} />

@@ -173,7 +173,8 @@ const devLinks = [
 
   {state === 'post-auth' && (
     <>
-      <h1 class="greeting" id="greeting" tabindex="-1">{state === "post-auth" && <Avatar src={avatarSrc} name={firstName || identity?.traits?.username || "?"} size={40} />}{firstName ? `Hello, ${firstName}.` : 'Welcome back.'} <span class="greeting-sub">Pick an app to open it, or its Guide for setup.</span></h1>
+      <h1 class="greeting" id="greeting" tabindex="-1">{state === "post-auth" && <Avatar src={avatarSrc} name={firstName || identity?.traits?.username || "?"} size={40} />}{firstName ? `Hello, ${firstName}.` : 'Welcome back.'}</h1>
+      <p class="page-lede greeting-sub">Pick an app to open it, or its Guide for setup.</p>
 
       {!hasPasskeyEnrolled && (
         <div class="passkey-nudge" id="passkey-nudge">
@@ -229,8 +230,7 @@ const devLinks = [
           </>
         ) : (
           <p class="section-prose">
-            Your account doesn't have any app access yet. Ask a household admin to
-            enable one.
+            No apps yet. A household admin can add you to one.
           </p>
         )}
         <p class="missing-app"><button type="button" class="text-link" id="open-request-form">Missing an app? Get in touch</button></p>
@@ -312,11 +312,11 @@ const devLinks = [
               <label class="form-field">
                 <span class="form-label">Request type</span>
                 <select class="form-select" name="type" required>
-                  <option value="">— choose one —</option>
+                  <option value="">Choose one</option>
                   <option value="access">Access to an app</option>
-                  <option value="new">New app idea</option>
-                  <option value="problem">Problem / something broken</option>
-                  <option value="other">Other</option>
+                  <option value="new">A new app idea</option>
+                  <option value="problem">Something is broken</option>
+                  <option value="other">Something else</option>
                 </select>
               </label>
 
@@ -634,10 +634,10 @@ const devLinks = [
     min-width: 0;
     font-size: var(--text-2xl);
     line-height: 1.2;
-    margin: 0 0 var(--space-4);
+    margin: 0 0 var(--space-1);
   }
   .greeting :global(.avatar) { margin-right: var(--space-2); }
-  .greeting-sub { font-weight: 400; color: var(--text-2); font-size: var(--text-sm); margin-left: var(--space-2); }
+  .greeting-sub { color: var(--text-2); font-size: var(--text-sm); margin: 0 0 var(--space-4); }
   @media (max-width: 640px) { .greeting-sub { display: none; } .greeting { margin-bottom: var(--space-3); } }
   .missing-app { margin: var(--space-6) 0 0; }
   .text-link {

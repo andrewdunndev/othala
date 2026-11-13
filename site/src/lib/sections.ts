@@ -39,11 +39,10 @@ export const sections: Section[] = [
   {
     href: '/guides/',
     label: 'Guides',
-    lede: 'The integration commitments that keep an Ory deployment durable across upgrades, how applications are connected over OIDC, how requests are denied, and how the substrate is hardened.',
+    lede: 'The integration commitments that keep an Ory deployment durable across upgrades, how applications are connected over OIDC, and how the substrate is hardened.',
     pages: [
       { href: '/guides/',                       label: 'Overview' },
       { href: '/guides/per-app-oidc/',          label: 'Per-app OIDC',           file: 'guides/per-app-oidc.md' },
-      { href: '/guides/error-handling/',        label: 'Error handling',         file: 'guides/error-handling.md' },
       { href: '/guides/hardening/',             label: 'Hardening',              file: 'guides/hardening.md' },
     ],
   },

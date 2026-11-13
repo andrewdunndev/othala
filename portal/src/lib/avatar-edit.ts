@@ -2,7 +2,7 @@
 // clears the picture, an `avatar` file sets it. The same refusals apply to both.
 
 import { patchAvatar } from './admin-api';
-import { AVATAR_MAX_BYTES, parseAvatarBytes, type AvatarRefusal } from './avatar';
+import { parseAvatarBytes, type AvatarRefusal } from './avatar';
 
 export type AvatarEdit = { ok: true; change: 'set' | 'removed' } | { ok: false; code: AvatarRefusal };
 
@@ -13,7 +13,6 @@ export async function applyAvatarForm(fd: FormData, identityId: string): Promise
   }
   const file = fd.get('avatar');
   if (typeof file === 'string' || file === null) return { ok: false, code: 'empty' };
-  if (file.size > AVATAR_MAX_BYTES) return { ok: false, code: 'too-large' };
   const parsed = parseAvatarBytes(new Uint8Array(await file.arrayBuffer()));
   if (!parsed.ok) return { ok: false, code: parsed.code };
   await patchAvatar(identityId, parsed.avatar);

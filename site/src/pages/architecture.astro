@@ -47,7 +47,7 @@ const label = (svg: string, text: string) =>
       </p>
       <figure class="diagram" slot="aside">
         <Fragment set:html={label(trustBoundary, 'A browser reaches one hostname at the edge proxy, which terminates TLS. Inside one trust domain the admin APIs never leave: the app runs a public listener the edge reaches and an admin listener the edge never touches; Kratos and Hydra each expose a public API to the edge, while the app alone calls their admin APIs. Kratos and Hydra each keep a separate Postgres database.')} />
-        <figcaption class="diagram-caption">Three ports on the network; the admin APIs are not among them</figcaption>
+        <figcaption class="diagram-caption">The network sees only the edge, and the edge has no route to the admin APIs</figcaption>
       </figure>
     </Split>
   </section>

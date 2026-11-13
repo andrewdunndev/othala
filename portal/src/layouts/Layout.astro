@@ -20,9 +20,11 @@ interface Props {
   router?: boolean;
   /** One narrow centred column (first-run and focused pages) under the same top bar. */
   narrow?: boolean;
+  /** Admin pages add the repo and design links to the footer; members see only the instance name and theme toggle. */
+  admin?: boolean;
 }
 
-const { title, description, nav, bare = false, compact = false, router = false, narrow = false } = Astro.props;
+const { title, description, nav, bare = false, compact = false, router = false, narrow = false, admin = false } = Astro.props;
 const path = Astro.url.pathname.replace(/\/$/, '') || '/';
 const here = (href: string) => path === href || path.startsWith(href + '/');
 const isHome = title === 'Home';
@@ -80,10 +82,14 @@ const pageTitle = isHome ? instanceName : `${title} — ${instanceName}`;
     <footer class="site-footer">
       <div class="footer-inner">
         <span>{instanceName}</span>
-        <span class="footer-sep">·</span>
-        <a href="https://gitlab.com/dunn.dev/othala" data-astro-reload>repo</a>
-        <span class="footer-sep">·</span>
-        <a href="https://design.dunn.dev" data-astro-reload>design</a>
+        {admin && (
+          <>
+            <span class="footer-sep">·</span>
+            <a href="https://gitlab.com/dunn.dev/othala" data-astro-reload>repo</a>
+            <span class="footer-sep">·</span>
+            <a href="https://design.dunn.dev" data-astro-reload>design</a>
+          </>
+        )}
         <button class="theme-toggle" id="theme-toggle" aria-label="Switch theme">
           <svg class="theme-icon theme-icon-sun" xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
             <circle cx="12" cy="12" r="4"/>

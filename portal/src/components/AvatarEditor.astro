@@ -11,8 +11,10 @@ interface Props {
   name: string;
   fields?: Record<string, string>;
   idPrefix?: string;
+  /** Who the hint speaks about: "your" for the member, "Name's" for an admin editing someone else. */
+  whose?: string;
 }
-const { action, csrf, src, name, fields = {}, idPrefix = 'avatar' } = Astro.props as Props;
+const { action, csrf, src, name, fields = {}, idPrefix = 'avatar', whose = 'your' } = Astro.props as Props;
 const initial = (name.trim()[0] ?? '?').toUpperCase();
 const ownRemove = src !== null && !Astro.slots.has('remove');
 const removeForm = `${idPrefix}-remove-form`;
@@ -26,7 +28,7 @@ const p = idPrefix;
     <p class="field-hint" role="status" data-ready-hint hidden>This is how it will look. Save it, or adjust.</p>
   </div>
   <div class="avatar-controls">
-    {!src && <p class="field-hint" data-none-hint>No picture yet. Apps show your initial.</p>}
+    {!src && <p class="field-hint" data-none-hint>No picture yet. Apps show {whose} initial.</p>}
     {ownRemove && <input type="checkbox" form="disclosures" class="disclose cb-remove" id={removeBox} aria-label="Remove picture" />}
     <form method="POST" enctype="multipart/form-data" action={action} data-avatar-form data-astro-reload>
       <input type="hidden" name="csrf_token" value={csrf} />
@@ -34,7 +36,7 @@ const p = idPrefix;
       <div class="field">
         <label for={`${p}-file`}>Choose a picture</label>
         <input id={`${p}-file`} name="avatar" type="file" accept="image/png,image/jpeg,image/webp" required aria-describedby={`${p}-hint`} />
-        <span class="field-hint" id={`${p}-hint`}>A photo in JPEG, PNG or WebP. Move and zoom it, then save.</span>
+        <span class="field-hint" id={`${p}-hint`}>A photo in JPEG, PNG or WebP.</span>
       </div>
       <div class="crop" id={`${p}-crop`} hidden>
         <div class="crop-stage" id={`${p}-stage`} tabindex="0" role="application" aria-roledescription="crop area" aria-label="Crop area. Drag to move the picture. Arrow keys move it, plus and minus zoom." aria-describedby={`${p}-crop-hint`} data-crop-stage>

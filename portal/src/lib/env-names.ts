@@ -1,13 +1,18 @@
 // The env names othala answers to. An unknown OTHALA_* name or a retired name is an error that names the fix, so a
 // deployment env cannot carry a setting that silently does nothing. Reads no environment; callers pass it in.
 
-/** Every OTHALA_* name othala reads. Secrets, binds and `<SLUG>_CLIENT_SECRET` sit outside the prefix. */
-export const KNOWN_OTHALA_NAMES: readonly string[] = Object.freeze([
+/** Required in production: config.ts throws on a missing one at load, and listen.ts reports them all at boot. */
+export const REQUIRED_IN_PRODUCTION = [
   'OTHALA_PUBLIC_URL',
   'OTHALA_APEX',
   'OTHALA_INSTANCE_NAME',
   'OTHALA_CONTACT_RECIPIENT',
   'OTHALA_SMTP_CONNECTION_URI',
+] as const;
+
+/** Every OTHALA_* name othala reads. Secrets, binds and `<SLUG>_CLIENT_SECRET` sit outside the prefix. */
+export const KNOWN_OTHALA_NAMES: readonly string[] = Object.freeze([
+  ...REQUIRED_IN_PRODUCTION,
   'OTHALA_OTLP_ENDPOINT',
   'OTHALA_DEV_MOCK_GROUPS',
 ]);
