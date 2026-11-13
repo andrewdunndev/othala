@@ -43,7 +43,7 @@ canary is an error, never a pass.
 
 `check-purity` runs on every pipeline; `check-portal` and e2e run on every MR, on tags
 and on web/api runs. `e2e-upgrade` runs on tags, web/api runs and MRs that touch
-`deploy/`, `kratos/`, `hydra/` or `DEPLOY.md`. A push to main runs none of them.
+`deploy/`, `kratos/`, `hydra/`, `DEPLOY.md` or the upgrade harness. A push to main runs `check-purity` and the catalog's component jobs, and none of the heavy chain.
 
 ## Conventions that hold the design together
 

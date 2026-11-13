@@ -15,7 +15,7 @@ The git tag is the authoritative version; `portal/package.json` mirrors it.
 
 ### Changed
 
-- CI runs `just check` and `just purity`. The release image-tag check runs on every pipeline, `e2e-upgrade` runs on tags and on MRs touching `deploy/`, `kratos/`, `hydra/` or `DEPLOY.md`, the heavy jobs run on every MR, `reference-check` blocks, and Playwright fails a flaky test in CI.
+- CI runs `just check` and `just purity`. The release image-tag check runs wherever `check-portal` does (every MR, tags and web/api runs), `e2e-upgrade` runs on tags and on MRs touching `deploy/`, `kratos/`, `hydra/` or `DEPLOY.md`, the heavy jobs run on every MR, `reference-check` blocks, and Playwright fails a flaky test in CI.
 - `portal/.npmrc` sets `engine-strict`, and `@types/node` is on the 24 line. The `purity` npm script is gone; use `just purity`.
 - `rateLimit` sweeps idle keys at most once a second; the cap is checked on every call.
 

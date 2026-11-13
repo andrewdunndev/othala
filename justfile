@@ -62,6 +62,7 @@ e2e:
 backup dir compose="deploy/example/compose.yml":
     #!/usr/bin/env bash
     set -euo pipefail
+    umask 077
     mkdir -p "{{ dir }}"
     for db in kratos hydra; do
       docker compose -f "{{ compose }}" exec -T postgres pg_dump --username postgres --format custom --dbname "$db" > "{{ dir }}/$db.dump.partial"
