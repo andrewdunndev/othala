@@ -218,20 +218,25 @@
                       "required": ["hooks"],
                       "properties": {"hooks": {"type": "array", "contains": {"$ref": "#/$defs/hook_revoke_grants"}}}
                     },
+                    "lookup_secret": {
+                      "type": "object",
+                      "required": ["hooks"],
+                      "properties": {"hooks": {"type": "array", "contains": {"$ref": "#/$defs/hook_revoke_grants"}}}
+                    },
                     "passkey": {
                       "type": "object",
                       "required": ["hooks"],
-                      "properties": {"hooks": {"type": "array", "contains": {"$ref": "#/$defs/hook_passkey_prune"}}}
+                      "properties": {"hooks": {"type": "array", "allOf": [{"contains": {"$ref": "#/$defs/hook_passkey_prune"}}, {"contains": {"$ref": "#/$defs/hook_revoke_grants"}}]}}
                     },
                     "webauthn": {
                       "type": "object",
                       "required": ["hooks"],
-                      "properties": {"hooks": {"type": "array", "contains": {"$ref": "#/$defs/hook_second_factor_gate_webauthn"}}}
+                      "properties": {"hooks": {"type": "array", "allOf": [{"contains": {"$ref": "#/$defs/hook_second_factor_gate_webauthn"}}, {"contains": {"$ref": "#/$defs/hook_revoke_grants"}}]}}
                     },
                     "totp": {
                       "type": "object",
                       "required": ["hooks"],
-                      "properties": {"hooks": {"type": "array", "contains": {"$ref": "#/$defs/hook_second_factor_gate_totp"}}}
+                      "properties": {"hooks": {"type": "array", "allOf": [{"contains": {"$ref": "#/$defs/hook_second_factor_gate_totp"}}, {"contains": {"$ref": "#/$defs/hook_revoke_grants"}}]}}
                     },
                     "profile": {
                       "type": "object",
@@ -247,7 +252,7 @@
                       }
                     }
                   },
-                  "required": ["password", "passkey", "webauthn", "totp", "profile"]
+                  "required": ["password", "passkey", "webauthn", "totp", "lookup_secret", "profile"]
                 }
               }
             },

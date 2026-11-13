@@ -116,6 +116,9 @@ const KRATOS_PINS = [
   ['/selfservice/flows/settings/after/password/hooks', (k) => hook(k, 'settings', 'after', 'password').hooks.pop(), 'handleRevokeGrants, listen.ts: a password change ends app grants'],
   ['/selfservice/flows/settings/after/password/hooks', (k) => (hook(k, 'settings', 'after', 'password').hooks[1].config.can_interrupt = true), 'handleRevokeGrants, listen.ts: best-effort'],
   ['/selfservice/flows/settings/after', (k) => delete k.selfservice.flows.settings.after.password, 'handleRevokeGrants, listen.ts'],
+  ...['passkey', 'webauthn', 'totp'].map((m) => [`/selfservice/flows/settings/after/${m}/hooks`, (k) => hook(k, 'settings', 'after', m).hooks.pop(), 'handleRevokeGrants, listen.ts: a credential change ends app grants']),
+  ['/selfservice/flows/settings/after', (k) => delete k.selfservice.flows.settings.after.lookup_secret, 'handleRevokeGrants, listen.ts'],
+  ['/selfservice/flows/settings/after/lookup_secret/hooks', (k) => (hook(k, 'settings', 'after', 'lookup_secret').hooks[0].config.can_interrupt = true), 'handleRevokeGrants, listen.ts: best-effort'],
 ];
 const HYDRA_PINS = [
   ...['login', 'consent', 'logout'].map((p) => [`/urls/${p}`, (h) => (h.urls[p] = 'https://a.example/x'), `pages/oauth2/${p}.ts`]),

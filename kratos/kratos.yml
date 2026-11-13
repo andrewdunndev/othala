@@ -110,7 +110,7 @@ selfservice:
                   parse: false
                 body: file:///etc/config/kratos/hooks/recovery-gate.jsonnet
                 can_interrupt: false
-        # Adding or removing a credential keeps the other sessions.
+        # Adding or removing a credential keeps the other sessions but ends the app grants, because the hook cannot tell the two apart.
         # Post-persist: drop the names of passkeys that no longer exist.
         passkey:
           hooks:
@@ -126,6 +126,21 @@ selfservice:
                     value: "Bearer ${RECOVERY_GATE_SECRET}"
                 response:
                   ignore: true
+                  parse: false
+                body: file:///etc/config/kratos/hooks/recovery-gate.jsonnet
+                can_interrupt: false
+            - hook: web_hook
+              config:
+                url: "http://othala:4431/admin/revoke-grants"
+                method: POST
+                auth:
+                  type: api_key
+                  config:
+                    in: header
+                    name: Authorization
+                    value: "Bearer ${RECOVERY_GATE_SECRET}"
+                response:
+                  ignore: false
                   parse: false
                 body: file:///etc/config/kratos/hooks/recovery-gate.jsonnet
                 can_interrupt: false
@@ -148,6 +163,21 @@ selfservice:
                   parse: false
                 body: file:///etc/config/kratos/hooks/recovery-gate.jsonnet
                 can_interrupt: true
+            - hook: web_hook
+              config:
+                url: "http://othala:4431/admin/revoke-grants"
+                method: POST
+                auth:
+                  type: api_key
+                  config:
+                    in: header
+                    name: Authorization
+                    value: "Bearer ${RECOVERY_GATE_SECRET}"
+                response:
+                  ignore: false
+                  parse: false
+                body: file:///etc/config/kratos/hooks/recovery-gate.jsonnet
+                can_interrupt: false
         totp:
           hooks:
             - hook: web_hook
@@ -165,6 +195,38 @@ selfservice:
                   parse: false
                 body: file:///etc/config/kratos/hooks/recovery-gate.jsonnet
                 can_interrupt: true
+            - hook: web_hook
+              config:
+                url: "http://othala:4431/admin/revoke-grants"
+                method: POST
+                auth:
+                  type: api_key
+                  config:
+                    in: header
+                    name: Authorization
+                    value: "Bearer ${RECOVERY_GATE_SECRET}"
+                response:
+                  ignore: false
+                  parse: false
+                body: file:///etc/config/kratos/hooks/recovery-gate.jsonnet
+                can_interrupt: false
+        lookup_secret:
+          hooks:
+            - hook: web_hook
+              config:
+                url: "http://othala:4431/admin/revoke-grants"
+                method: POST
+                auth:
+                  type: api_key
+                  config:
+                    in: header
+                    name: Authorization
+                    value: "Bearer ${RECOVERY_GATE_SECRET}"
+                response:
+                  ignore: false
+                  parse: false
+                body: file:///etc/config/kratos/hooks/recovery-gate.jsonnet
+                can_interrupt: false
         # Username is admin-controlled: an interrupting hook refuses any username other than the
         # stored one. The schema allows no revoke_active_sessions here, so a second non-interrupting
         # hook ends the account's other sessions, keeping the one that saved. An account with a passkey

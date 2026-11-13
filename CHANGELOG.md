@@ -22,6 +22,7 @@ The git tag is the authoritative version; `portal/package.json` mirrors it.
 - A consent challenge that skips the grant screen is accepted only for the browser whose session belongs to the challenge's subject, the same binding the grant screen's submit already had.
 - The identity list the admin pages, the last-admin count and the registrar use now follows Kratos pagination to the end; before, it stopped at the first 250.
 - Deleting a person re-reads their admin marker inside the same queue and refuses when it is set, so a grant that landed after the page loaded cannot be deleted through.
+- Adding or removing a passkey, security key, authenticator app or set of backup codes now also signs the member out of their apps: the same `revoke-grants` web hook is wired to those settings changes in `kratos/kratos.yml`, and `contract/kratos.schema.json` requires it. Kratos cannot tell an addition from a removal at that point, so both end app grants.
 
 ## [0.18.0] - 2026-11-11
 

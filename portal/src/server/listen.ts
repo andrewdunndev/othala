@@ -301,8 +301,8 @@ export async function handlePasskeyPrune(req: IncomingMessage, res: ServerRespon
 }
 
 /**
- * POST /admin/revoke-grants, wired to settings.after.password without can_interrupt: ends the identity's app grants, which
- * Kratos session revocation never reaches. Failures are logged and still answered 200 (the change already saved).
+ * POST /admin/revoke-grants, wired to settings.after.{password,passkey,webauthn,totp,lookup_secret} without can_interrupt: ends the identity's app
+ * grants, which Kratos session revocation never reaches. A post-persist hook cannot tell a removed credential from an added one, so both end grants. Failures are logged and still answered 200 (the change already saved).
  */
 export async function handleRevokeGrants(req: IncomingMessage, res: ServerResponse, client: AdminClient = ADMIN_CLIENT) {
   if (refuseUnlessHookBearer(req, res)) return;
