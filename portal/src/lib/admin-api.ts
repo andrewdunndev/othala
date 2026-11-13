@@ -8,8 +8,8 @@ import type {
   Session,
 } from '@ory/client-fetch';
 import type { Identity } from './types';
-import type { Avatar } from './avatar';
 import { validateMetadataAdmin } from './metadata-admin';
+import { readAvatar, type Avatar } from './avatar';
 import { passkeyCredentialIds, pruneNames, readPasskeyNames } from './passkey-names';
 import { revokeSubject } from './revoke';
 import { isNotFound, kratosAdmin } from './ory-fetch';
@@ -38,7 +38,8 @@ export interface CreateIdentityInput {
 
 export interface UpdateIdentityInput {
   traits: IdentityTraits;
-  metadataAdmin: MetadataAdmin;
+  /** What the caller edits. Every other mark is carried from the identity read inside the update. */
+  metadataAdmin: Pick<MetadataAdmin, 'groups' | 'roles'>;
 }
 
 // One page of 250 is the family-scale ceiling; later pages are not fetched.
@@ -87,11 +88,19 @@ export async function updateIdentity(id: string, input: UpdateIdentityInput): Pr
     id,
     includeCredential: INCLUDED_CREDENTIALS,
   });
+  const held = current.metadata_admin as MetadataAdmin | null | undefined;
+  // The marks no whole-form save edits come from this read, never the caller's earlier one, so a revoke that landed in between is not undone.
+  const carried = validateMetadataAdmin({
+    ...(held?.admin === true ? { admin: true } : {}),
+    ...(held?.prerequisites?.length ? { prerequisites: held.prerequisites } : {}),
+    ...(held?.passkeyNames && Object.keys(held.passkeyNames).length ? { passkeyNames: held.passkeyNames } : {}),
+    avatar: readAvatar(held),
+  });
   const updateIdentityBody: UpdateIdentityBody = {
     schema_id: current.schema_id,
     state: current.state ?? 'active',
     traits: input.traits,
-    metadata_admin: validated,
+    metadata_admin: { ...carried, ...validated },
   };
   return api.updateIdentity({ id, updateIdentityBody });
 }

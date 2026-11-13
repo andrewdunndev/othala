@@ -72,7 +72,6 @@ import {
 import type { Identity } from './types.js';
 import { DEACTIVATE_STEP, RevokeError } from './revoke.js';
 import { identity, manifest, withCredentials, withTotp, avatarOf } from './test-builders.js';
-import { validateMetadataAdmin } from './metadata-admin.js';
 
 function makeIdentity(username: string, admin?: boolean, state?: 'active' | 'inactive'): Identity {
   return identity({ username, state, ...(admin === undefined ? {} : { metadataAdmin: { admin } }) });
@@ -205,16 +204,6 @@ describe('saveAction', () => {
     expect(revokeHydraSessionsMock).toHaveBeenCalledWith('target-1');
     expect(updateIdentityMock.mock.invocationCallOrder[0]).toBeLessThan(revokeHydraSessionsMock.mock.invocationCallOrder[0]);
     expect(outcome.actionResult?.kind).toBe('updated');
-  });
-
-  it('keeps stored prerequisites and passkey names through a save', async () => {
-    const withMeta = identity({
-      username: 'alice.smith',
-      metadataAdmin: { groups: ['family'], prerequisites: ['x'], passkeyNames: { k: 'Key' } },
-    });
-    await saveAction(saveForm(['family']), makeCtx({ identity: withMeta, manifests: MANIFESTS }));
-
-    expect(updateIdentityMock.mock.calls[0][1].metadataAdmin).toMatchObject({ prerequisites: ['x'], passkeyNames: { k: 'Key' } });
   });
 
   it('ends app sign-ins when a stored role changes', async () => {
@@ -658,12 +647,11 @@ describe('person page sections', () => {
     expect(written().metadataAdmin.groups).toEqual(['everyone', 'garden', 'proxywatch-access']);
   });
 
-  it('saves household groups without touching app access or the admin marker', async () => {
-    const stored = identity({ username: 'robin.k', metadataAdmin: { groups: ['everyone', 'proxywatch-access'], admin: true } });
+  it('saves household groups without touching app access', async () => {
+    const stored = identity({ username: 'robin.k', metadataAdmin: { groups: ['everyone', 'proxywatch-access'] } });
     await saveHouseholdAction(fd({ identityGroups: 'everyone' }), makeCtx({ identity: stored, manifests: MANIFESTS }));
 
     expect(written().metadataAdmin.groups).toEqual(['everyone', 'proxywatch-access']);
-    expect(written().metadataAdmin.admin).toBe(true);
   });
 
   it('drops an access group posted with the household groups', async () => {
@@ -823,46 +811,6 @@ describe('admin action audit line', () => {
   });
 });
 
-describe('avatar through admin saves', () => {
-  const MANIFESTS = [{ clientId: 'grafana', accessGroups: ['grafana-access'], roles: [], groupRoleMap: {}, skipAccessCheck: false }] as unknown as ActionContext['manifests'];
-  const pic = avatarOf('jpeg');
-  const person = () => identity({ username: 'robin.k', email: 'robin@othala.test', metadataAdmin: { groups: ['everyone'], avatar: pic } });
-  const written = () => updateIdentityMock.mock.calls[0][1];
-
-  // The real write validates what it is handed, so the stored picture must come through the validator, not only the call.
-  const survives = () => expect(validateMetadataAdmin(written().metadataAdmin).avatar).toEqual(pic);
-
-  it('profile save keeps it', async () => {
-    await saveProfileAction(fd({ username: 'robin.k', email: 'robin@othala.test', displayName: 'Robin', recoveryEmail: '' }), makeCtx({ identity: person(), manifests: MANIFESTS }));
-    survives();
-  });
-
-  it('access save, household save and group removal keep it', async () => {
-    await saveAccessAction(fd({ 'level:grafana': 'use' }), makeCtx({ identity: withTotp(person()), manifests: MANIFESTS }));
-    survives();
-    updateIdentityMock.mockClear();
-    await saveHouseholdAction(fd({ identityGroups: 'everyone' }), makeCtx({ identity: person(), manifests: MANIFESTS }));
-    survives();
-    updateIdentityMock.mockClear();
-    const f = fd();
-    f.append('group', 'garden');
-    await removeGroupsAction(f, makeCtx({ identity: identity({ username: 'robin.k', metadataAdmin: { groups: ['everyone', 'garden'], avatar: pic } }), manifests: MANIFESTS }));
-    survives();
-  });
-
-  it('drops a malformed stored one instead of rewriting or throwing on it', async () => {
-    const bad = identity({ username: 'robin.k', email: 'robin@othala.test', metadataAdmin: { groups: ['everyone'], avatar: { ...pic, type: 'image/svg+xml' } as never } });
-    await saveProfileAction(fd({ username: 'robin.k', email: 'robin@othala.test', displayName: 'Robin', recoveryEmail: '' }), makeCtx({ identity: bad, manifests: MANIFESTS }));
-    expect(written().metadataAdmin).not.toHaveProperty('avatar');
-    expect(written().metadataAdmin.groups).toEqual(['everyone']);
-  });
-
-  it('an identity without one gains none', async () => {
-    await saveProfileAction(fd({ username: 'robin.k', email: 'robin@othala.test', displayName: '', recoveryEmail: '' }), makeCtx({ identity: identity({ username: 'robin.k', metadataAdmin: { groups: ['everyone'] } }), manifests: MANIFESTS }));
-    expect(written().metadataAdmin).not.toHaveProperty('avatar');
-  });
-});
-
 describe('app grants end on any roles-map or group-removal change', () => {
   const role = (name: string) => ({ name, description: '', claimEmit: {} });
   const MANIFESTS = [
@@ -921,5 +869,86 @@ describe('app grants end on any roles-map or group-removal change', () => {
     expect(updateIdentityMock.mock.calls[0][1].metadataAdmin.groups).toContain('grafana-access');
     expect(revokeHydraSessionsMock).not.toHaveBeenCalled();
     expect(outcome.actionResult?.kind).toBe('updated');
+  });
+});
+
+describe('what a save does not render', () => {
+  const MANIFESTS = [{ clientId: 'wiki', accessGroups: ['family'], roles: [], groupRoleMap: {}, skipAccessCheck: false }] as unknown as ActionContext['manifests'];
+  const person = (roles?: Record<string, string>) =>
+    identity({ username: 'robin.k', email: 'robin@othala.test', metadataAdmin: { groups: ['everyone'], ...(roles ? { roles } : {}) } });
+  const form = (extra: Record<string, string> = {}) => fd({ username: 'robin.k', email: 'robin@othala.test', ...extra });
+  const withGroup = (f: FormData) => (f.append('identityGroups', 'everyone'), f);
+  const written = () => updateIdentityMock.mock.calls[0][1].metadataAdmin;
+
+  it('keeps an override for an app with no served manifest, and does not end grants for it', async () => {
+    const outcome = await saveAction(withGroup(form()), makeCtx({ identity: person({ ghost: 'editor' }), manifests: MANIFESTS }));
+
+    expect(written().roles).toEqual({ ghost: 'editor' });
+    expect(revokeHydraSessionsMock).not.toHaveBeenCalled();
+    expect(outcome.actionResult?.kind).toBe('updated');
+  });
+
+  it('keeps every override on a cold start with no manifests served', async () => {
+    await saveAction(withGroup(form()), makeCtx({ identity: person({ wiki: 'editor', ghost: 'viewer' }), manifests: [] }));
+
+    expect(written().roles).toEqual({ wiki: 'editor', ghost: 'viewer' });
+    expect(revokeHydraSessionsMock).not.toHaveBeenCalled();
+  });
+
+  it('keeps an unserved override through a section save that posts it back', async () => {
+    await saveProfileAction(
+      fd({ username: 'robin.k', email: 'robin@othala.test', displayName: 'Robin', recoveryEmail: '' }),
+      makeCtx({ identity: person({ ghost: 'editor' }), manifests: MANIFESTS }),
+    );
+
+    expect(written().roles).toEqual({ ghost: 'editor' });
+  });
+
+  it('removes an unserved override only on an explicit clear, and ends grants then', async () => {
+    const f = withGroup(form());
+    f.append('clearRoles', 'ghost');
+    await saveAction(f, makeCtx({ identity: person({ ghost: 'editor', other: 'x' }), manifests: MANIFESTS }));
+
+    expect(written().roles).toEqual({ other: 'x' });
+    expect(revokeHydraSessionsMock).toHaveBeenCalledWith('target-1');
+  });
+
+  it('still takes the submitted value for a served app', async () => {
+    await saveAction(withGroup(form({ 'role:wiki': 'viewer' })), makeCtx({ identity: person({ wiki: 'editor', ghost: 'x' }), manifests: MANIFESTS }));
+
+    expect(written().roles).toEqual({ wiki: 'viewer', ghost: 'x' });
+  });
+
+  it('hands updateIdentity only what it edits; admin, avatar and passkey names are the update\'s to carry', async () => {
+    const stale = identity({ username: 'robin.k', metadataAdmin: { groups: ['family'], admin: true, avatar: avatarOf('png'), passkeyNames: { k: 'Key' } } });
+    await saveAction(withGroup(form()), makeCtx({ identity: stale, manifests: MANIFESTS }));
+
+    expect(written()).not.toHaveProperty('admin');
+    expect(written()).not.toHaveProperty('avatar');
+    expect(written()).not.toHaveProperty('passkeyNames');
+  });
+});
+
+describe('clearRolesAction', () => {
+  const MANIFESTS = [{ clientId: 'wiki', accessGroups: ['family'], roles: [], groupRoleMap: {}, skipAccessCheck: false }] as unknown as ActionContext['manifests'];
+  const person = identity({ username: 'robin.k', email: 'robin@othala.test', metadataAdmin: { groups: ['everyone'], roles: { wiki: 'editor', ghost: 'viewer' } } });
+
+  it('removes the named override for an app with no served manifest and ends grants', async () => {
+    const f = new FormData();
+    f.append('clearRole', 'ghost');
+    const outcome = await ADMIN_ACTIONS['clear-roles'](f, makeCtx({ identity: person, manifests: MANIFESTS }));
+
+    expect(updateIdentityMock.mock.calls[0][1].metadataAdmin.roles).toEqual({ wiki: 'editor' });
+    expect(revokeHydraSessionsMock).toHaveBeenCalledWith('target-1');
+    if (outcome instanceof Response) throw new Error('unreachable');
+    expect(outcome.actionResult?.kind).toBe('updated');
+  });
+
+  it('leaves the override of a served app alone', async () => {
+    const f = new FormData();
+    f.append('clearRole', 'wiki');
+    await ADMIN_ACTIONS['clear-roles'](f, makeCtx({ identity: person, manifests: MANIFESTS }));
+
+    expect(updateIdentityMock.mock.calls[0][1].metadataAdmin.roles).toEqual({ wiki: 'editor', ghost: 'viewer' });
   });
 });

@@ -72,6 +72,14 @@ export function unrecognisedGroups(i: Identity, manifests: readonly ClientManife
   return (i.metadata_admin?.groups ?? []).filter((g) => !GROUP_RE.test(g) || !reg.has(g));
 }
 
+/** Stored role overrides for an app no served manifest names: a retired app, or a manifest quarantined right now. A save keeps them until cleared. */
+export function unservedOverrides(i: Identity, manifests: readonly ClientManifest[]): Array<{ clientId: string; role: string }> {
+  const served = new Set(manifests.map((m) => m.clientId));
+  return Object.entries(i.metadata_admin?.roles ?? {})
+    .filter(([clientId]) => !served.has(clientId))
+    .map(([clientId, role]) => ({ clientId, role }));
+}
+
 export interface AppChip {
   name: string;
   /** Holds the app's highest level. */

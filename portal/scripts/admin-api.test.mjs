@@ -2,7 +2,7 @@
 
 import { test, beforeEach, afterEach } from 'vitest';
 import assert from 'node:assert/strict';
-import { identity } from '../src/lib/test-builders.ts';
+import { identity, avatarOf } from '../src/lib/test-builders.ts';
 import { createIdentity, deleteCredential, getIdentity, getRecoveryLink, listIdentities, listSessions, patchAdminMarker, patchPrerequisites, revokeSession, updateIdentity } from '../src/lib/admin-api.ts';
 import { MetadataAdminError } from '../src/lib/metadata-admin.ts';
 
@@ -175,4 +175,48 @@ test('listIdentities: asks for one page of 250 and fetches no further page', asy
   await listIdentities();
   assert.equal(capturedCalls.length, 1);
   assert.equal(new URL(capturedCalls[0].url).searchParams.get('per_page'), '250');
+});
+
+const PIC = avatarOf('png');
+const savedMetadata = () => JSON.parse(capturedCalls[1].opts.body).metadata_admin;
+const updateAgainst = async (stored, input = { groups: ['family'], roles: { wiki: 'viewer' } }) => {
+  mockFetchSequence([
+    { body: kratosIdentity({ id: 'u10', traits: {}, schema_id: 'family', metadata_admin: stored }) },
+    { body: kratosIdentity({ id: 'u10', traits: {} }) },
+  ]);
+  await updateIdentity('u10', { traits: { username: 'robin' }, metadataAdmin: input });
+  return savedMetadata();
+};
+
+test('updateIdentity carries admin, avatar, passkey names and prerequisites from the identity it reads, not the caller', async () => {
+  const saved = await updateAgainst({
+    groups: ['old'],
+    roles: { old: 'x' },
+    admin: true,
+    avatar: PIC,
+    passkeyNames: { 'abcd01': 'Laptop' },
+    prerequisites: ['tailscale'],
+  });
+  assert.deepEqual(saved.groups, ['family']);
+  assert.deepEqual(saved.roles, { wiki: 'viewer' });
+  assert.equal(saved.admin, true);
+  assert.deepEqual(saved.avatar, PIC);
+  assert.deepEqual(saved.passkeyNames, { 'abcd01': 'Laptop' });
+  assert.deepEqual(saved.prerequisites, ['tailscale']);
+});
+
+test('updateIdentity does not restore an admin marker that was revoked since the caller read the person', async () => {
+  const saved = await updateAgainst({ groups: ['family'] });
+  assert.ok(!('admin' in saved));
+});
+
+test('updateIdentity drops a malformed stored avatar and keeps the rest', async () => {
+  const saved = await updateAgainst({ groups: ['family'], avatar: { ...PIC, type: 'image/svg+xml' }, passkeyNames: { 'abcd01': 'Laptop' } });
+  assert.ok(!('avatar' in saved));
+  assert.deepEqual(saved.passkeyNames, { 'abcd01': 'Laptop' });
+});
+
+test('updateIdentity leaves out empty carried keys', async () => {
+  const saved = await updateAgainst({ groups: ['family'], admin: false, prerequisites: [], passkeyNames: {} }, { groups: ['family'] });
+  assert.deepEqual(Object.keys(saved).sort(), ['groups']);
 });

@@ -25,7 +25,7 @@ import { removalBlock } from './admin-view';
 import type { ClientManifest } from './manifests';
 import type { Identity } from './types';
 import { applyAvatarForm } from './avatar-edit';
-import { AVATAR_REFUSALS, readAvatar } from './avatar';
+import { AVATAR_REFUSALS } from './avatar';
 
 export const USERNAME_RE = /^[a-z0-9]+(?:\.[a-z0-9]+)+$/;
 export const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -99,42 +99,31 @@ export async function saveAction(fd: FormData, ctx: ActionContext): Promise<Acti
   );
   if (groupPlan.refusal) formErrors.nonCanonicalGroups = groupPlan.refusal;
 
-  const knownClientIds = new Set(manifests.map((m) => m.clientId));
+  // An override for an app with no served manifest is carried over: a quarantined file or an unreadable apps directory is
+  // transient, so only an explicit clear removes it.
+  const servedClientIds = new Set(manifests.map((m) => m.clientId));
+  const clearRoles = new Set(fd.getAll('clearRoles').map(String));
   const roles: Record<string, string> = {};
+  for (const [clientId, role] of Object.entries(identity.metadata_admin?.roles ?? {})) {
+    if (!servedClientIds.has(clientId) && !clearRoles.has(clientId)) roles[clientId] = role;
+  }
   for (const m of manifests) {
     const v = String(fd.get(`role:${m.clientId}`) ?? '').trim();
     if (v) roles[m.clientId] = v;
-  }
-  for (const clientId of Object.keys(roles)) {
-    if (!knownClientIds.has(clientId)) delete roles[clientId];
   }
 
   if (Object.keys(formErrors).length > 0) {
     return { formErrors, refetch: false };
   }
 
-  // Only the targeted actions change these marks, so a save carries them over from the loaded identity.
-  const existingAdmin = identity.metadata_admin?.admin;
-  const existingPrerequisites = identity.metadata_admin?.prerequisites;
-  const existingPasskeyNames = identity.metadata_admin?.passkeyNames;
-  const existingAvatar = readAvatar(identity.metadata_admin);
   const groups = normalizeGroupOrder(groupPlan.groups);
   // Only a new elevation needs the second factor first, so people already elevated without one can still be edited and lowered.
   const after = { ...identity, metadata_admin: { ...identity.metadata_admin, groups, roles } };
   if (holdsElevatedRole(after, manifests) && !holdsElevatedRole(identity, manifests) && !parseIdentity(identity).hasSecondFactor) {
     return { actionResult: ELEVATED_SECOND_FACTOR_REQUIRED, refetch: false };
   }
-  await updateIdentity(id, {
-    traits,
-    metadataAdmin: {
-      groups,
-      roles: Object.keys(roles).length ? roles : undefined,
-      ...(existingAdmin === true ? { admin: true } : {}),
-      ...(existingPrerequisites?.length ? { prerequisites: existingPrerequisites } : {}),
-      ...(existingPasskeyNames && Object.keys(existingPasskeyNames).length ? { passkeyNames: existingPasskeyNames } : {}),
-      ...(existingAvatar ? { avatar: existingAvatar } : {}),
-    },
-  });
+  // updateIdentity carries every other mark over from the identity it reads, so a concurrent targeted write is not undone.
+  await updateIdentity(id, { traits, metadataAdmin: { groups, roles: Object.keys(roles).length ? roles : undefined } });
   if (changesGrants(identity, groups, roles)) {
     const failure = await revokeGrants(id);
     if (failure) return { actionResult: failure, mode: 'read', refetch: true };
@@ -148,6 +137,8 @@ interface SectionEdit {
   household?: readonly string[];
   access?: { groups: readonly string[]; roles: Readonly<Record<string, string>> };
   remove?: readonly string[];
+  /** Role overrides for apps with no served manifest to drop; saveAction carries every other one over. */
+  clearRoles?: readonly string[];
 }
 
 /** Rebuilds the whole form from what is stored, so every section passes saveAction's guards and none clobbers another. */
@@ -181,6 +172,7 @@ function sectionSave(ctx: ActionContext, edit: SectionEdit): Promise<ActionOutco
   }
   for (const g of removing) if (!GROUP_RE.test(g)) fd.append('clearNonCanonical', g);
   for (const [clientId, role] of Object.entries(roles)) fd.set(`role:${clientId}`, role);
+  for (const clientId of edit.clearRoles ?? []) fd.append('clearRoles', clientId);
   return saveAction(fd, ctx);
 }
 
@@ -217,6 +209,10 @@ export function saveProfileAction(fd: FormData, ctx: ActionContext): Promise<Act
 
 export function removeGroupsAction(fd: FormData, ctx: ActionContext): Promise<ActionOutcome> {
   return sectionSave(ctx, { remove: fd.getAll('group').map(String).filter(Boolean) });
+}
+
+export function clearRolesAction(fd: FormData, ctx: ActionContext): Promise<ActionOutcome> {
+  return sectionSave(ctx, { clearRoles: fd.getAll('clearRole').map(String).filter(Boolean) });
 }
 
 export async function markVerifiedAction(fd: FormData, ctx: ActionContext): Promise<ActionOutcome> {
@@ -485,6 +481,7 @@ const HANDLERS: Record<string, ActionHandler> = {
   'save-profile': saveProfileAction,
   'save-avatar': saveAvatarAction,
   'remove-groups': removeGroupsAction,
+  'clear-roles': clearRolesAction,
   'mark-verified': markVerifiedAction,
   'set-prerequisites': setPrerequisitesAction,
   'issue-recovery': issueRecoveryAction,

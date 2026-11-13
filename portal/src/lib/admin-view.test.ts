@@ -15,6 +15,7 @@ import {
   signInMethods,
   suggestUsername,
   unrecognisedGroups,
+  unservedOverrides,
 } from './admin-view';
 import type { ClientManifest } from './manifests';
 import { asAdmin, identity, withCredential, withLookupSecret, withPasskey, withTotp, withWebauthnKey, manifest } from './test-builders';
@@ -98,6 +99,12 @@ describe('rowMatches', () => {
 });
 
 describe('unrecognised groups and attention', () => {
+  it('lists stored overrides for apps no served manifest names', () => {
+    const i = identity({ username: 'a', metadataAdmin: { groups: ['everyone'], roles: { grafana: 'viewer', retired: 'admin' } } });
+    expect(unservedOverrides(i, [grafana])).toEqual([{ clientId: 'retired', role: 'admin' }]);
+    expect(unservedOverrides(i, [])).toHaveLength(2);
+  });
+
   it('flags groups no app binds and invalid names, never role groups or household groups', () => {
     const i = person('a', ['everyone', 'grafana-access', 'grafana-admin', 'garden', 'Bad Name']);
     expect(unrecognisedGroups(i, [grafana])).toEqual(['garden', 'Bad Name']);

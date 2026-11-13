@@ -19,7 +19,7 @@ import { getIdentity, listIdentities, EVICTABLE_CREDENTIAL_TYPES } from '../../.
 import { ADMIN_ACTIONS, ENROLLMENT_TTL, type ActionResult } from '../../../lib/admin-actions';
 import { bannerFor } from '../../../lib/admin-banner';
 import { currentLevel, NO_ACCESS } from '../../../lib/access-rows';
-import { emailIsVerified, householdChoices, PEOPLE_LOAD_ERROR, personLimits, personName, removalBlock, signInMethods, unrecognisedGroups } from '../../../lib/admin-view';
+import { emailIsVerified, householdChoices, PEOPLE_LOAD_ERROR, personLimits, personName, removalBlock, signInMethods, unrecognisedGroups, unservedOverrides } from '../../../lib/admin-view';
 import { devActionResult } from '../../../lib/admin-fixtures';
 import { parseIdentity } from '../../../lib/identity-facts';
 import { shouldRefuseRecovery } from '../../../lib/access';
@@ -119,6 +119,7 @@ const SECTION_OF: Record<string, string> = {
   'revoke-admin': 'household',
   'set-prerequisites': 'prerequisites',
   'remove-groups': 'groups',
+  'clear-roles': 'overrides',
   'mark-verified': 'signin',
   'issue-recovery': 'signin',
   'force-relogin': 'signin',
@@ -151,6 +152,7 @@ const verified = identity ? emailIsVerified(identity) : false;
 const twoStep = parseIdentity(identity).hasSecondFactor;
 const methods = identity ? signInMethods(identity) : [];
 const unrecognised = identity ? unrecognisedGroups(identity, manifests) : [];
+const unserved = identity ? unservedOverrides(identity, manifests) : [];
 const currentLevels: Record<string, string> = {};
 for (const a of apps) currentLevels[a.clientId] = identity ? currentLevel(a.manifest, meta) : NO_ACCESS;
 const households = householdChoices();
@@ -451,6 +453,27 @@ const roleNote = Object.keys(roleOverrides).length;
                     <input type="hidden" name="csrf_token" value={tok('remove-groups')} />
                     <input type="hidden" name="action" value="remove-groups" />
                     <input type="hidden" name="group" value={g} />
+                    <button class="button button-secondary button-sm" type="submit">Remove</button>
+                  </form>
+                </li>
+              ))}
+            </ul>
+          </section>
+        )}
+
+        {unserved.length > 0 && (
+          <section class="panel warn-card" id="overrides" aria-labelledby="h-overrides">
+            <h2 id="h-overrides">Overrides for apps not shown</h2>
+            <p class="hint">{first} has a stored role for an app that is not loaded right now: it was retired, or its manifest has a mistake. It is kept so a save never drops it silently. Remove it only if the app is gone for good.</p>
+            {resultSection === 'overrides' && banner && <div class={`notice notice-${banner.tone}`} role="status">{banner.text}</div>}
+            <ul>
+              {unserved.map((o) => (
+                <li>
+                  <code>{o.clientId}: {o.role}</code>
+                  <form method="POST" enctype="application/x-www-form-urlencoded" action="#overrides">
+                    <input type="hidden" name="csrf_token" value={tok('clear-roles')} />
+                    <input type="hidden" name="action" value="clear-roles" />
+                    <input type="hidden" name="clearRole" value={o.clientId} />
                     <button class="button button-secondary button-sm" type="submit">Remove</button>
                   </form>
                 </li>
