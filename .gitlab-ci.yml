@@ -187,10 +187,12 @@ upload-release-assets:
     - e2e-upgrade
 
 # check-purity: OSS purity and deprecated-name gate, plus a bash -n over tracked
-# shell scripts.
+# shell scripts (`just purity`). The jobs run the justfile's recipes, so the
+# local and CI paths cannot drift; the ci image bakes node and just, and the
+# justfile fails if its node major differs from mise.toml's.
 check-purity:
   stage: verify
-  image: registry.access.redhat.com/ubi10/nodejs-24:10.3@sha256:6cd9a91dbfbdba836beb153f2ed6ce46b418487d47b3cd5343511d4fa23a1ac4
+  image: registry.gitlab.com/dunn.dev/pipeline/ci:4.16.0@sha256:7f2f7c1c9fe4ec3a8f4a4c51b6c2eba0ff452de662e2ab4ef8a18d685ecc58d1
   rules:
     - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
     - if: '$CI_PIPELINE_SOURCE == "push"'
@@ -200,29 +202,15 @@ check-purity:
     # Checkout uid differs from the job user; without this git ls-files exits 128.
     - git config --global --add safe.directory "$CI_PROJECT_DIR"
   script:
-    - bash scripts/check-purity.sh
-    - |
-      echo "=== bash -n: tracked shell scripts ==="
-      FILES=()
-      while IFS= read -r -d '' f; do FILES+=("$f"); done < <(git ls-files -z -- '*.sh')
-      if [ "${#FILES[@]}" -eq 0 ]; then
-        echo "ERROR: 0 tracked .sh files — bash -n would check nothing"
-        exit 1
-      fi
-      rc=0
-      for f in "${FILES[@]}"; do
-        bash -n "$f" || { echo "FAIL: bash -n $f"; rc=1; }
-      done
-      [ "$rc" -eq 0 ] && echo "OK: bash -n clean on ${#FILES[@]} scripts"
-      exit $rc
+    - just purity
 
-# check-portal: npm ci without install scripts (portal, e2e, site), then astro
-# check, tsc over e2e and site, vitest (src and scripts), the manifest lint, and
-# a well-formedness parse of the tracked plain-YAML set. kratos.yml and hydra.yml
-# are  templates, so they are excluded.
+# check-portal: `just setup` (npm ci without install scripts in portal, e2e and
+# site), then `just check`: astro check, tsc over e2e and site, vitest (src and
+# scripts), the manifest lint, and a well-formedness parse of the tracked
+# plain-YAML set.
 check-portal:
   stage: verify
-  image: registry.access.redhat.com/ubi10/nodejs-24:10.3@sha256:6cd9a91dbfbdba836beb153f2ed6ce46b418487d47b3cd5343511d4fa23a1ac4
+  image: registry.gitlab.com/dunn.dev/pipeline/ci:4.16.0@sha256:7f2f7c1c9fe4ec3a8f4a4c51b6c2eba0ff452de662e2ab4ef8a18d685ecc58d1
   rules:
     - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
       changes: *heavy-paths
@@ -231,44 +219,9 @@ check-portal:
   before_script:
     # Same safe.directory fix as check-purity.
     - git config --global --add safe.directory "$CI_PROJECT_DIR"
-    - cd portal
-    - npm ci --include=dev --ignore-scripts
-    - npm ci --include=dev --ignore-scripts --prefix ../e2e
-    - npm ci --include=dev --ignore-scripts --prefix ../site
+    - just setup
   script:
-    - npm run check
-    - node_modules/.bin/tsc --noEmit -p ../e2e
-    - node_modules/.bin/tsc --noEmit -p ../site
-    - npm test
-    - npm run lint:manifests
-    - |
-      echo "=== YAML parse: tracked plain-YAML ==="
-      FILES=()
-      while IFS= read -r -d '' f; do FILES+=("../$f"); done < <(git -C .. ls-files -z -- .gitlab-ci.yml 'e2e/compose*.yml' 'e2e/content/*.yaml' 'e2e/content/apps/*.yaml' 'deploy/example/*.yml' 'deploy/example/content/*.yaml' 'deploy/example/content/apps/*.yaml')
-      if [ "${#FILES[@]}" -eq 0 ]; then
-        echo "ERROR: 0 tracked plain-YAML files — nothing was parsed"
-        exit 1
-      fi
-      node -e '
-        const fs = require("fs");
-        const YAML = require("yaml");
-        const files = process.argv.slice(1);
-        let bad = 0;
-        for (const f of files) {
-          try {
-            const doc = YAML.parse(fs.readFileSync(f, "utf8"));
-            const empty = doc === null || doc === undefined ||
-              (typeof doc === "object" && !Array.isArray(doc) && Object.keys(doc).length === 0) ||
-              (Array.isArray(doc) && doc.length === 0);
-            if (empty) { console.error(`FAIL: ${f} parsed to an empty document`); bad = 1; }
-          } catch (e) {
-            console.error(`FAIL: ${f}: ${e.message}`);
-            bad = 1;
-          }
-        }
-        if (!bad) console.log(`OK: ${files.length} tracked YAML files parse to non-empty documents`);
-        process.exit(bad);
-      ' "${FILES[@]}"
+    - just check
 
 # e2e: QEMU-runner harness, the release gate (e2e/README.md). validate.sh
 # generates secrets, brings up the compose stack, waits for health, runs smoke.sh.
