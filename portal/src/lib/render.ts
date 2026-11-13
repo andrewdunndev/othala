@@ -221,6 +221,14 @@ export function render(policyDir: string, contentDir: string, env: Env): Rendere
   if (checkErrors.length > 0) throw new RenderError(checkErrors.join('\n'));
   const unset = SECRETS.filter((n) => (env[n] ?? '').trim() === '');
   if (unset.length > 0) throw new RenderError(`missing secret(s): ${unset.join(', ')}`);
+  // Both schemas reject a secret under 16 characters; Kratos also requires unique entries in its cookie list only, so
+  // no other repeated pair is refused here.
+  for (const name of ['KRATOS_COOKIE_SECRET_CURRENT', 'HYDRA_COOKIE_SECRET_CURRENT', 'HYDRA_SYSTEM_SECRET']) {
+    if (Buffer.byteLength(env[name]!) < 16) throw new RenderError(`${name} must be at least 16 characters`);
+  }
+  if (env.KRATOS_COOKIE_SECRET_PREVIOUS && env.KRATOS_COOKIE_SECRET_PREVIOUS === env.KRATOS_COOKIE_SECRET_CURRENT) {
+    throw new RenderError('KRATOS_COOKIE_SECRET_PREVIOUS must differ from KRATOS_COOKIE_SECRET_CURRENT');
+  }
   for (const name of ['KRATOS_CIPHER_SECRET_CURRENT', 'KRATOS_CIPHER_SECRET_PREVIOUS']) {
     if (env[name] && Buffer.byteLength(env[name]) !== 32) throw new RenderError(`${name} must be exactly 32 characters`);
   }
@@ -257,8 +265,23 @@ export function render(policyDir: string, contentDir: string, env: Env): Rendere
   return files;
 }
 
-/** Empties each rendered tree under `outDir` in place, so a tree can be a mount point. A refused render calls it
- *  too, so Kratos, Hydra and Caddy refuse to boot rather than run an earlier render. */
+/** `check` plus a render held in memory, so a preflight reports every refusal `render` would make. A secret the
+ *  caller left unset is stood in for, keeping the offline check free of secrets; one that is set is held to render's rules. */
+export function preflight(policyDir: string, contentDir: string, env: Env): string[] {
+  const errors = check(policyDir, contentDir, env);
+  if (errors.length > 0) return errors;
+  const stand = Object.fromEntries(SECRETS.filter((n) => (env[n] ?? '').trim() === '').map((n) => [n, 'x'.repeat(32)]));
+  try {
+    render(policyDir, contentDir, { ...env, ...stand });
+  } catch (err) {
+    if (!(err instanceof RenderError)) throw err;
+    return err.message.split('\n');
+  }
+  return [];
+}
+
+/** Empties each rendered tree under `outDir` in place, so a tree can be a mount point. A write that fails partway calls it
+ *  so Kratos, Hydra and Caddy refuse to boot rather than run a mix of old and new files. */
 export function clearRendered(outDir: string): void {
   for (const top of TREES) {
     const dir = join(outDir, top);

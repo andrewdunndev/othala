@@ -187,7 +187,7 @@ echo "B. client registration (boot reconcile)"
 # B2: Hydra admin lists exactly the clients with an oidc: block, counted from the manifest
 # fixtures (presentation-only tiles register none).
 oidc_fixture_count=$(grep -lE '^oidc:' ./content/apps/*.yaml 2>/dev/null | wc -l | tr -d ' ')
-# The boot reconcile runs behind hydra's healthcheck (5 x 2 s), so poll.
+# The boot reconcile retries until Hydra answers, so poll.
 client_count=0
 for _ in $(seq 1 30); do
     clients_json=$(curl_in hydra http://${HYDRA_ADMIN_BIND_HOST}:4445/admin/clients)
@@ -429,6 +429,70 @@ if [[ "$h2" == "0" ]]; then
     pass "H2 the refused submission sent no mail"
 else
     fail "H2 refused submission left mail in the catcher" "got=$h2"
+fi
+
+# Section I: a refused render leaves the last good render in place (the render service's own volumes).
+echo ""
+echo "I. Render refusal keeps the last good render"
+
+# Hash of every rendered file, read through the render container's volumes; a failed read prints nothing.
+render_sum() {
+    podman run --rm --network none --user 10000:10000 --volumes-from lab-render "$AUTH_REGISTRY:$AUTH_VERSION" node -e '
+const c = require("crypto"), fs = require("fs"), p = require("path");
+const rows = [];
+const walk = (d) => { for (const e of fs.readdirSync(d, { withFileTypes: true }).sort((a, b) => (a.name < b.name ? -1 : 1))) {
+  const f = p.join(d, e.name);
+  if (e.isDirectory()) walk(f); else rows.push(f + " " + c.createHash("sha256").update(fs.readFileSync(f)).digest("hex"));
+} };
+for (const t of ["kratos", "hydra", "caddy"]) walk("/run/othala/" + t);
+process.stdout.write(c.createHash("sha256").update(rows.join("\n")).digest("hex") + " " + rows.length);
+' 2>/dev/null | _strip_ansi | tail -1
+}
+
+# render_with <command> [NAME=value...]: the image's config CLI over the deployment's own env, overridden by the arguments.
+render_with() {
+    local cmd="$1"; shift
+    local args=() kv
+    for kv in "$@"; do args+=(-e "$kv"); done
+    podman run --rm --network none --user 10000:10000 --volumes-from lab-render \
+        --env-file othala.env --env-file secrets.env ${args[@]+"${args[@]}"} \
+        -v "$PWD/content:/etc/othala:ro,z" "$AUTH_REGISTRY:$AUTH_VERSION" node dist/server/config.mjs "$cmd" 2>&1 | _strip_ansi
+}
+
+# A 64-character Kratos cookie secret beside a PREVIOUS is the refusal an operator meets mid-rotation.
+BAD_PAIR=("KRATOS_COOKIE_SECRET_CURRENT=$(printf 'k%.0s' $(seq 1 64))" "KRATOS_COOKIE_SECRET_PREVIOUS=$(printf 'p%.0s' $(seq 1 32))")
+
+render_before=$(render_sum)
+if [[ "$render_before" =~ ^[0-9a-f]{64}\ [1-9][0-9]*$ ]]; then
+    pass "I1 the rendered trees are readable and non-empty (${render_before#* } files)"
+else
+    fail "I1 rendered trees" "got: ${render_before:-nothing}"
+fi
+
+i2=$(render_with render "${BAD_PAIR[@]}"); i2_rc=$?
+if [[ "$i2_rc" == 1 ]] && echo "$i2" | grep -q "must be 16, 24 or 32" && echo "$i2" | grep -q "earlier output kept"; then
+    pass "I2 render exits 1 on the cookie-secret pair and says it kept the earlier output"
+else
+    fail "I2 render refusal" "got: $(echo "$i2" | tail -3 | tr '\n' ' ')"
+fi
+
+if [[ -n "$render_before" && "$(render_sum)" == "$render_before" ]]; then
+    pass "I3 the refused render left every rendered file unchanged"
+else
+    fail "I3 rendered files after a refused render" "before: $render_before after: $(render_sum)"
+fi
+
+i4=$(render_with check "${BAD_PAIR[@]}")
+if echo "$i4" | grep -q "must be 16, 24 or 32"; then
+    pass "I4 check reports the refusal render would make"
+else
+    fail "I4 check preflight" "got: $(echo "$i4" | tail -3 | tr '\n' ' ')"
+fi
+
+if render_with render >/dev/null && [[ "$(render_sum)" == "$render_before" ]]; then
+    pass "I5 a render on the deployment's own env succeeds and reproduces the same files"
+else
+    fail "I5 control render" "exit or hash differs"
 fi
 
 # ----- Summary -----

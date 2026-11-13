@@ -195,6 +195,7 @@ volumes:
   othala-kratos: {}
   othala-hydra: {}
   othala-caddy: {}
+  # Every identity, passkey and Hydra client lives here: back it up with secrets.env (DEPLOY.md, Backups and break-glass).
   postgres-data: {}
   caddy-data: {}
   caddy-config: {}
