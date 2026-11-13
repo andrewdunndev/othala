@@ -6,7 +6,7 @@ aims to follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 The git tag is the authoritative version; `portal/package.json` mirrors it.
 
-## [Unreleased]
+## [0.19.0] - 2026-11-13
 
 ### Added
 
