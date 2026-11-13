@@ -1,6 +1,6 @@
 // P — credential eviction ends the lost device's sessions (HIGH-C).
 
-import { test, expect } from '../fixtures';
+import { test, expect, clientAddress } from '../fixtures';
 import type { BrowserContext, CDPSession, Page } from 'playwright-core';
 import { createIdentityWithPassword, readIdentity, TEST_PASSWORD } from '../actions/identity';
 import { loginViaJsonApi } from '../actions/login';
@@ -59,8 +59,10 @@ async function clearSession(ctx: BrowserContext, baseURL: string): Promise<void>
   await ctx.clearCookies();
 }
 
-async function newDeviceContext(browser: import('playwright-core').Browser) {
-  const ctx = await browser.newContext();
+// A context opened inside a test misses the fixture's per-test client address; each device is its own client to the edge.
+async function newDeviceContext(browser: import('playwright-core').Browser, device: string) {
+  const { testId, retry } = test.info();
+  const ctx = await browser.newContext({ extraHTTPHeaders: { 'X-Forwarded-For': clientAddress(`${testId}:${retry}:${device}`) } });
   const page = await ctx.newPage();
   const cdp = await ctx.newCDPSession(page);
   await cdp.send('WebAuthn.enable', { enableUI: false });
@@ -91,11 +93,11 @@ async function enrollTwoPasskeys(browser: import('playwright-core').Browser, bas
   });
   console.log('[P] seeded identity:', identity.id);
 
-  const devA = await newDeviceContext(browser);
+  const devA = await newDeviceContext(browser, 'A');
   await loginViaJsonApi(devA.ctx, { identifier: identity.email, password: TEST_PASSWORD }, baseURL);
   await registerPasskeyForContext(devA.page, baseURL, identity);
 
-  const devB = await newDeviceContext(browser);
+  const devB = await newDeviceContext(browser, 'B');
   console.log('[P] second virtual authenticator id:', devB.authenticatorId);
   await loginViaJsonApi(devB.ctx, { identifier: identity.email, password: TEST_PASSWORD }, baseURL);
   await registerPasskeyForContext(devB.page, baseURL, identity);
