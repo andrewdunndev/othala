@@ -54,6 +54,8 @@ const declaredVersion = (pkgText, changelogText) => {
   assert.equal(pkg, heading, 'package.json version is the newest changelog release heading');
   return pkg;
 };
+// A release tag names the tree it was cut from.
+const tagNamesTree = (tag, version) => tag === undefined || tag === '' || tag === `v${version}`;
 const exampleTag = (image) => image.split('@')[0].split(':').pop();
 
 test('render and portal run one othala image', () => {
@@ -67,6 +69,7 @@ test('the example image tag is the version the tree declares', () => {
     readFileSync(join(root, 'CHANGELOG.md'), 'utf8'),
   );
   assert.equal(exampleTag(compose.services.othala.image), `v${version}`);
+  assert.ok(tagNamesTree(process.env.CI_COMMIT_TAG, version), `tag ${process.env.CI_COMMIT_TAG} is not v${version}`);
 });
 
 test('the version rule reads a released tree and an unreleased tree the same way', () => {
@@ -77,6 +80,11 @@ test('the version rule reads a released tree and an unreleased tree the same way
   assert.equal(declaredVersion(pkg('0.18.0'), unreleased), '0.18.0');
   // a release commit that moved package.json and the heading but not the compose pin
   assert.notEqual(exampleTag('registry.example/othala:v0.18.0@sha256:abc'), `v${declaredVersion(pkg('0.19.0'), released)}`);
+  // a tag pipeline: the tag must be the declared version; no tag means no claim
+  assert.ok(tagNamesTree('v0.19.0', '0.19.0'));
+  assert.ok(tagNamesTree(undefined, '0.19.0'));
+  assert.ok(!tagNamesTree('v0.18.0', '0.19.0'));
+  assert.ok(!tagNamesTree('0.19.0', '0.19.0'));
   // package.json bumped ahead of the changelog, or the changelog ahead of package.json
   assert.throws(() => declaredVersion(pkg('0.19.0'), unreleased));
   assert.throws(() => declaredVersion(pkg('0.18.0'), released));
