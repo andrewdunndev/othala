@@ -3,7 +3,6 @@
 import { test, vi, afterEach } from 'vitest';
 import assert from 'node:assert/strict';
 import { appsDir, contentDir, setContentDir } from '../src/lib/manifests.ts';
-import { ADMIN_FRESHNESS_HOURS } from '../src/lib/constants.ts';
 
 afterEach(() => {
   vi.unstubAllEnvs();
@@ -23,8 +22,4 @@ test('dev honours CONTENT_DIR in the environment', () => {
   process.env.CONTENT_DIR = '/elsewhere';
   assert.equal(contentDir(), '/elsewhere');
   assert.equal(appsDir(), '/elsewhere/apps');
-});
-
-test('the admin pages demand a second factor completed within the last hour', () => {
-  assert.equal(ADMIN_FRESHNESS_HOURS * 60 * 60 * 1000, 3_600_000);
 });

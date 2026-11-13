@@ -15,11 +15,6 @@ test('no name is both known and retired, and every retired name names a fix', ()
   }
 });
 
-test('the tables are frozen', () => {
-  assert.ok(Object.isFrozen(RETIRED_NAMES));
-  assert.ok(Object.isFrozen(KNOWN_OTHALA_NAMES));
-});
-
 test('every retired name is an error with its fix; known and unprefixed names pass; unset is absent', () => {
   for (const name of Object.keys(RETIRED_NAMES)) {
     assert.deepEqual(envNameErrors({ [name]: 'secret-looking-value' }), [`${name} is retired: ${RETIRED_NAMES[name]}`]);

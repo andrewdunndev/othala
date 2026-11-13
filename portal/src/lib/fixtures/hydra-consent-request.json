@@ -1,0 +1,28 @@
+{
+  "challenge": "c0ffee0123456789abcdef0123456789",
+  "skip": true,
+  "subject": "2f6e1b9a-4c7d-4e58-b1a3-9d0c5e7a8f21",
+  "request_url": "https://sso.othala.test/oauth2/auth?client_id=grafana&redirect_uri=https%3A%2F%2Fgrafana.othala.test%2Flogin%2Fgeneric_oauth&response_type=code&scope=openid+email+profile+offline_access&state=abc123",
+  "login_challenge": "0123456789abcdef0123456789abcdef",
+  "login_session_id": "9c4e2a60-7d1b-4f35-a8e9-5b3d1f7c0e24",
+  "requested_scope": ["openid", "email", "profile", "offline_access"],
+  "requested_access_token_audience": [],
+  "acr": "0",
+  "amr": [],
+  "context": {},
+  "oidc_context": { "ui_locales": ["en"] },
+  "client": {
+    "client_id": "grafana",
+    "client_name": "Grafana",
+    "grant_types": ["authorization_code", "refresh_token"],
+    "response_types": ["code"],
+    "scope": "openid email profile groups offline_access",
+    "redirect_uris": ["https://grafana.othala.test/login/generic_oauth"],
+    "token_endpoint_auth_method": "client_secret_basic",
+    "subject_type": "public",
+    "skip_consent": false,
+    "skip_logout_consent": false,
+    "created_at": "2026-11-01T12:00:00.000Z",
+    "updated_at": "2026-11-01T12:00:00.000Z"
+  }
+}

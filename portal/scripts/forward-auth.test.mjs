@@ -1,8 +1,10 @@
 // Invariant: forward_auth admits only requests whose groups match an explicit binding.
 
-import { test, afterEach } from 'vitest';
+import { test, afterEach, vi } from 'vitest';
 import assert from 'node:assert/strict';
 import { GET, HEAD } from '../src/pages/api/forward-auth.ts';
+import { setContentDir, invalidateManifestCache } from '../src/lib/manifests.ts';
+import { _resetForTests as resetManifestStore } from '../src/lib/manifest-store.ts';
 
 const realFetch = globalThis.fetch;
 
@@ -146,6 +148,19 @@ test('kratos unreachable → 503 (NOT 401 — avoids login-redirect loop)', asyn
   const res = await GET(ctx('access-proxywatch'));
   assert.equal(res.status, 503);
   assert.equal(await res.text(), 'unavailable');
+});
+
+test('kratos unreachable → the log names the failing step and the error', async () => {
+  const spy = vi.spyOn(console, 'error').mockImplementation(() => {});
+  try {
+    installFetch({ whoamiThrow: true });
+    assert.equal((await GET(ctx('access-proxywatch'))).status, 503);
+    assert.ok(
+      spy.mock.calls.some((c) => c[0] === '[portal] upstream failure' && c[1]?.step === 'getSession' && typeof c[1]?.error === 'string'),
+    );
+  } finally {
+    spy.mockRestore();
+  }
 });
 
 test('kratos unreachable → NOT 403 (an outage must not read as a denial)', async () => {
@@ -331,6 +346,22 @@ test('aal2 session, identity holds totp → 200', async () => {
   installFetch({ whoami: sessionAt('aal2'), identity: inGroupWith('password', 'totp') });
   const res = await GET(ctx('access-proxywatch'));
   assert.equal(res.status, 200);
+});
+
+test('aal1 session in the group with no manifest set → 503 (the step-up rule cannot be evaluated)', async () => {
+  setContentDir(import.meta.filename); // a file, not a directory: reading apps/ under it fails with ENOTDIR, not ENOENT
+  invalidateManifestCache();
+  resetManifestStore();
+  try {
+    installFetch({ whoami: sessionAt('aal1'), identity: inGroupWith('passkey') });
+    assert.equal((await GET(ctx('access-proxywatch'))).status, 503);
+    installFetch({ whoami: sessionAt('aal2'), identity: inGroupWith('password', 'totp') });
+    assert.equal((await GET(ctx('access-proxywatch'))).status, 200);
+  } finally {
+    setContentDir(undefined);
+    invalidateManifestCache();
+    resetManifestStore();
+  }
 });
 
 test('aal1 session, passkey-only identity → 200 (no second factor to ask for)', async () => {
