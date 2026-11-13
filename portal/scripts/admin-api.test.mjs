@@ -2,7 +2,7 @@
 
 import { test, beforeEach, afterEach } from 'vitest';
 import assert from 'node:assert/strict';
-import { identity } from '../src/lib/test-builders.ts';
+import { identity, avatarOf } from '../src/lib/test-builders.ts';
 import { createIdentity, deleteCredential, getIdentity, getRecoveryLink, listIdentities, listSessions, patchAdminMarker, patchPrerequisites, revokeSession, updateIdentity } from '../src/lib/admin-api.ts';
 import { MetadataAdminError } from '../src/lib/metadata-admin.ts';
 
@@ -20,7 +20,7 @@ function mockFetchSequence(responses) {
     const r = responses[i] ?? responses[responses.length - 1];
     i++;
     capturedCalls.push({ url: String(url), opts });
-    return new Response(JSON.stringify(r.body), { status: r.status ?? 200, headers: { 'Content-Type': 'application/json' } });
+    return new Response(JSON.stringify(r.body), { status: r.status ?? 200, headers: { 'Content-Type': 'application/json', ...r.headers } });
   };
 }
 
@@ -170,9 +170,76 @@ test('createIdentity and updateIdentity refuse an invalid metadata_admin before 
   }
 });
 
-test('listIdentities: asks for one page of 250 and fetches no further page', async () => {
+test('listIdentities: a single page is one call', async () => {
   mockFetch([kratosIdentity({ id: 'a', traits: {} })]);
-  await listIdentities();
+  const all = await listIdentities();
   assert.equal(capturedCalls.length, 1);
-  assert.equal(new URL(capturedCalls[0].url).searchParams.get('per_page'), '250');
+  assert.deepEqual(all.map((i) => i.id), ['a']);
+  assert.equal(new URL(capturedCalls[0].url).searchParams.get('page_size'), '250');
+});
+
+test('listIdentities: follows the next-page link to the end, so every identity is returned', async () => {
+  const next = (token) => ({ link: `<http://kratos:4434/admin/identities?page_size=250&page_token=${token}>; rel="next"` });
+  mockFetchSequence([
+    { body: [kratosIdentity({ id: 'a', traits: {} }), kratosIdentity({ id: 'b', traits: {} })], headers: next('t2') },
+    { body: [kratosIdentity({ id: 'c', traits: {} })], headers: next('t3') },
+    { body: [kratosIdentity({ id: 'd', traits: {} })] },
+  ]);
+  const all = await listIdentities();
+  assert.deepEqual(all.map((i) => i.id), ['a', 'b', 'c', 'd']);
+  assert.equal(capturedCalls.length, 3);
+  assert.equal(new URL(capturedCalls[0].url).searchParams.get('page_token'), null);
+  assert.equal(new URL(capturedCalls[1].url).searchParams.get('page_token'), 't2');
+  assert.equal(new URL(capturedCalls[2].url).searchParams.get('page_token'), 't3');
+});
+
+test('listIdentities: a repeated page token is an error, not an endless loop', async () => {
+  const same = { link: '<http://kratos:4434/admin/identities?page_size=250&page_token=t2>; rel="next"' };
+  mockFetchSequence([{ body: [kratosIdentity({ id: 'a', traits: {} })], headers: same }]);
+  await assert.rejects(() => listIdentities(), /repeated page token/);
+  assert.ok(capturedCalls.length <= 3);
+});
+
+const PIC = avatarOf('png');
+const savedMetadata = () => JSON.parse(capturedCalls[1].opts.body).metadata_admin;
+const updateAgainst = async (stored, input = { groups: ['family'], roles: { wiki: 'viewer' } }) => {
+  mockFetchSequence([
+    { body: kratosIdentity({ id: 'u10', traits: {}, schema_id: 'family', metadata_admin: stored }) },
+    { body: kratosIdentity({ id: 'u10', traits: {} }) },
+  ]);
+  await updateIdentity('u10', { traits: { username: 'robin' }, metadataAdmin: input });
+  return savedMetadata();
+};
+
+test('updateIdentity carries admin, avatar, passkey names and prerequisites from the identity it reads, not the caller', async () => {
+  const saved = await updateAgainst({
+    groups: ['old'],
+    roles: { old: 'x' },
+    admin: true,
+    avatar: PIC,
+    passkeyNames: { 'abcd01': 'Laptop' },
+    prerequisites: ['tailscale'],
+  });
+  assert.deepEqual(saved.groups, ['family']);
+  assert.deepEqual(saved.roles, { wiki: 'viewer' });
+  assert.equal(saved.admin, true);
+  assert.deepEqual(saved.avatar, PIC);
+  assert.deepEqual(saved.passkeyNames, { 'abcd01': 'Laptop' });
+  assert.deepEqual(saved.prerequisites, ['tailscale']);
+});
+
+test('updateIdentity does not restore an admin marker that was revoked since the caller read the person', async () => {
+  const saved = await updateAgainst({ groups: ['family'] });
+  assert.ok(!('admin' in saved));
+});
+
+test('updateIdentity drops a malformed stored avatar and keeps the rest', async () => {
+  const saved = await updateAgainst({ groups: ['family'], avatar: { ...PIC, type: 'image/svg+xml' }, passkeyNames: { 'abcd01': 'Laptop' } });
+  assert.ok(!('avatar' in saved));
+  assert.deepEqual(saved.passkeyNames, { 'abcd01': 'Laptop' });
+});
+
+test('updateIdentity leaves out empty carried keys', async () => {
+  const saved = await updateAgainst({ groups: ['family'], admin: false, prerequisites: [], passkeyNames: {} }, { groups: ['family'] });
+  assert.deepEqual(Object.keys(saved).sort(), ['groups']);
 });

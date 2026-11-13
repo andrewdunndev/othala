@@ -309,6 +309,16 @@ export async function handleConsent(req: Request, deps: Deps = {}): Promise<Resp
 
   // The manifest's skip_consent survives client re-registration; the gate above denied a null identity.
   if (consent.skip || consentManifest?.skipConsent) {
+    // A challenge id is not a credential: only the browser holding the subject's session may complete it, as in the POST.
+    let session: Session | null;
+    try {
+      session = await d.getSession(req.headers.get('cookie') ?? undefined);
+    } catch (err) {
+      upstream('getSession', err);
+      return upstreamError();
+    }
+    if (!session?.active || !session.identity) return rejectConsent(d, challenge, 'no active session', upstreamError);
+    if (session.identity.id !== consent.subject) return rejectConsent(d, challenge, 'session subject mismatch', upstreamError);
     return acceptConsentRequest(challenge, consent, identity!, d, clientId);
   }
 

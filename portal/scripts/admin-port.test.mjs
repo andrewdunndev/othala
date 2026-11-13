@@ -72,6 +72,7 @@ test('admin POST mux serves exactly the admin endpoints', () => {
     '/admin/profile-gate',
     '/admin/profile-sessions',
     '/admin/recovery-gate',
+    '/admin/revoke-grants',
     '/admin/second-factor-gate',
   ]);
 });
@@ -731,6 +732,53 @@ test('passkey-prune rejects a wrong bearer with 403 before touching the runtime'
   const res = fakeRes();
   await handle(postPasskeyPrune({ identity_id: 'person-1' }, 'wrong'), res, rt);
   assert.equal(res.statusCode, 403);
+});
+
+function postRevokeGrants(body, bearer = 'gate-secret') {
+  return fakeReq({
+    method: 'POST',
+    url: '/admin/revoke-grants',
+    headers: { authorization: `Bearer ${bearer}` },
+    body: JSON.stringify(body),
+  });
+}
+
+test('revoke-grants ends the named identity\'s app grants (200)', async () => {
+  process.env.RECOVERY_GATE_SECRET = 'gate-secret';
+  const revoked = [];
+  const rt = { revokeGrants: async (id) => { revoked.push(id); } };
+  const res = fakeRes();
+  await handle(postRevokeGrants({ identity_id: 'person-1', session_id: 'saving' }), res, rt);
+  assert.equal(res.statusCode, 200);
+  assert.deepEqual(JSON.parse(res.body), { revoked: true });
+  assert.deepEqual(revoked, ['person-1']);
+});
+
+test('revoke-grants answers 200 and revokes nothing without an identity_id, and 200 when the revoke fails', async () => {
+  process.env.RECOVERY_GATE_SECRET = 'gate-secret';
+  const calls = [];
+  const rt = { revokeGrants: async (id) => { calls.push(id); throw new Error('hydra down'); } };
+  for (const body of [{}, { identity_id: '  ' }, { identity_id: 7 }]) {
+    const res = fakeRes();
+    await handle(postRevokeGrants(body), res, rt);
+    assert.equal(res.statusCode, 200);
+    assert.deepEqual(JSON.parse(res.body), { revoked: false });
+  }
+  assert.deepEqual(calls, []);
+  const res = fakeRes();
+  await handle(postRevokeGrants({ identity_id: 'person-1' }), res, rt);
+  assert.equal(res.statusCode, 200);
+  assert.deepEqual(JSON.parse(res.body), { revoked: false });
+  assert.deepEqual(calls, ['person-1']);
+});
+
+test('revoke-grants rejects a wrong bearer with 403 before touching the runtime', async () => {
+  process.env.RECOVERY_GATE_SECRET = 'gate-secret';
+  const rt = { revokeGrants: async () => { throw new Error('must not run'); } };
+  const res = fakeRes();
+  await handle(postRevokeGrants({ identity_id: 'person-1' }, 'wrong'), res, rt);
+  assert.equal(res.statusCode, 403);
+  assert.deepEqual(JSON.parse(res.body), { error: 'forbidden' });
 });
 
 test('recovery, username and second-factor gates and profile-sessions read the identity via the runtime', async () => {

@@ -284,3 +284,25 @@ test('picture: a role claim_emit cannot add it past the scope filter', () => {
   const m = { ...rankedManifest, roles: [{ name: 'user', description: '', claimEmit: { picture: 'https://elsewhere.test/x.png' } }] };
   assert.equal('picture' in composeIDTokenClaims(id, m, ['openid']), false);
 });
+
+const staleOverride = { groups: ['filedrop-access', 'filedrop-admin'], roles: { filedrop: 'reader' } };
+
+test('lookupRole: an override naming an undeclared role resolves to the lowest declared role, not the group map', () => {
+  assert.equal(lookupRole(rankedManifest, staleOverride)?.roleName, 'user');
+});
+
+test('lookupRole: an override naming a declared role still wins over the group map', () => {
+  assert.equal(lookupRole(rankedManifest, { ...staleOverride, roles: { filedrop: 'user' } })?.roleName, 'user');
+  assert.equal(lookupRole(rankedManifest, { groups: ['filedrop-access'], roles: { filedrop: 'admin' } })?.roleName, 'admin');
+});
+
+test('lookupRole: an empty override falls through to the group map', () => {
+  assert.equal(lookupRole(rankedManifest, { ...staleOverride, roles: { filedrop: '' } })?.roleName, 'admin');
+});
+
+test('composeIDTokenClaims: an undeclared override never emits the group-mapped higher role claims', () => {
+  const id = { ...identityWithGroups(['filedrop-access', 'filedrop-admin']), metadata_admin: staleOverride };
+  const claims = composeIDTokenClaims(id, rankedManifest, ALL_SCOPES);
+  assert.ok(claims.groups.includes('filedrop-user-claim'));
+  assert.ok(!claims.groups.includes('filedrop-admin-claim'));
+});

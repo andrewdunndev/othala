@@ -15,6 +15,8 @@ import {
   signInMethods,
   suggestUsername,
   unrecognisedGroups,
+  unservedOverrides,
+  undeclaredOverrides,
 } from './admin-view';
 import type { ClientManifest } from './manifests';
 import { asAdmin, identity, withCredential, withLookupSecret, withPasskey, withTotp, withWebauthnKey, manifest } from './test-builders';
@@ -98,6 +100,21 @@ describe('rowMatches', () => {
 });
 
 describe('unrecognised groups and attention', () => {
+  it('flags an override naming a role the app no longer declares', () => {
+    const i = identity({ username: 'a', metadataAdmin: { groups: ['everyone'], roles: { grafana: 'reader' } } });
+    expect(undeclaredOverrides(i, [grafana]).map((o) => [o.clientId, o.role])).toEqual([['grafana', 'reader']]);
+    const declared = identity({ username: 'a', metadataAdmin: { groups: ['everyone'], roles: { grafana: grafana.roles[0].name } } });
+    expect(undeclaredOverrides(declared, [grafana])).toEqual([]);
+    expect(undeclaredOverrides(i, [])).toEqual([]);
+    expect(undeclaredOverrides(i, [{ ...grafana, roles: [] } as unknown as ClientManifest])).toEqual([]);
+  });
+
+  it('lists stored overrides for apps no served manifest names', () => {
+    const i = identity({ username: 'a', metadataAdmin: { groups: ['everyone'], roles: { grafana: 'viewer', retired: 'admin' } } });
+    expect(unservedOverrides(i, [grafana])).toEqual([{ clientId: 'retired', role: 'admin' }]);
+    expect(unservedOverrides(i, [])).toHaveLength(2);
+  });
+
   it('flags groups no app binds and invalid names, never role groups or household groups', () => {
     const i = person('a', ['everyone', 'grafana-access', 'grafana-admin', 'garden', 'Bad Name']);
     expect(unrecognisedGroups(i, [grafana])).toEqual(['garden', 'Bad Name']);

@@ -113,7 +113,8 @@ Each names its enforcer and the test that fails if it stops working.
 - **Credential and session hygiene.** Self-registration is disabled in
   `kratos/kratos.yml`, so enrolment is admin-initiated; breach checking and a
   minimum length gate passwords; a password change fires
-  `revoke_active_sessions`; force-logout is `revokeSubject`
+  `revoke_active_sessions`, and any password or credential change ends the member's app grants
+  (`portal/scripts/kratos-hooks.test.mjs`); force-logout is `revokeSubject`
   (`portal/src/lib/revoke.ts`). Full eviction (audit, delete credential, then
   revoke) is in `docs/runbooks/lost-device.md`, pinned by
   `e2e/playwright/tests/p-eviction.spec.ts`.

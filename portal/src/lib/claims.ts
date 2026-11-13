@@ -72,8 +72,10 @@ export function buildIDTokenClaims(identity: Identity | null | undefined): Claim
 
 /**
  * The app role: a metadataAdmin.roles[clientId] override naming a declared role, else the highest-ranked role any
- * stored group maps to (index 0 is highest), so the result depends on the group set, not its order. A role never
- * grants entry. Roles declared in ascending order silently downgrade, the safe direction.
+ * stored group maps to (index 0 is highest), so the result depends on the group set, not its order. An override naming
+ * a role the manifest no longer declares resolves to the lowest declared role: a person someone chose to hold back never
+ * regains what a group maps to. A role never grants entry. Roles declared in ascending order silently downgrade, the safe
+ * direction.
  */
 export function lookupRole(
   manifest: ClientManifest | undefined | null,
@@ -89,9 +91,8 @@ export function lookupRole(
     const overrideName = overrideMap[manifest.clientId.toLowerCase()];
     if (typeof overrideName === 'string' && overrideName !== '') {
       const role = manifest.roles.find((r) => r.name === overrideName);
-      if (role) {
-        return { roleName: role.name, claimEmit: shallowCopyClaimEmit(role.claimEmit) };
-      }
+      const resolved = role ?? manifest.roles[manifest.roles.length - 1];
+      return { roleName: resolved.name, claimEmit: shallowCopyClaimEmit(resolved.claimEmit) };
     }
   }
 

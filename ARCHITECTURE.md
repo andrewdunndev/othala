@@ -177,6 +177,12 @@ current state from Hydra to decide create versus update. Only `oidc:`-derived fi
 the `consent:` block is a namespace this app owns and Hydra never sees it. Registration is
 create-or-update only and never deletes, so a decommissioned client survives until removed deliberately.
 
+Tokens already issued keep the claims they were minted with, so a manifest edit that changes who may enter or what the tokens say
+must end them. Each client keeps a fingerprint of its access-relevant fields in its Hydra metadata; when it differs, the
+reconcile revokes that client's consent sessions for every identity before storing the new one, so a restart loses nothing.
+A client othala registered whose manifest is gone is revoked once and marked retired, but only from a complete load: a
+quarantined file, an empty set or an unreadable directory proves nothing absent (`portal/scripts/register-revoke.test.mjs`).
+
 `portal/src/server/registrar.ts` drives it on boot with capped-backoff retry until Hydra answers
 and again on `SIGHUP`. A registration failure never takes down the listeners, so the admin surface stays
 up to diagnose it.

@@ -57,6 +57,7 @@ test('a Hydra consent request is read and accepted with the scopes it asked for'
   globalThis.fetch = async (input, init) => {
     const req = new Request(input, init);
     const { pathname } = new URL(req.url);
+    if (req.method === 'GET' && pathname === '/sessions/whoami') return json(whoami);
     if (req.method === 'GET' && pathname === '/admin/oauth2/auth/requests/consent') return json(consentRequest);
     if (req.method === 'PUT' && pathname === '/admin/oauth2/auth/requests/consent/accept') {
       accepted = await req.json();
@@ -64,7 +65,9 @@ test('a Hydra consent request is read and accepted with the scopes it asked for'
     }
     throw new Error(`unexpected ${req.method} ${pathname}`);
   };
-  const res = await handleConsent(new Request('https://sso.othala.test/auth/consent?consent_challenge=c0ffee'), {
+  // The consent is completed only by the browser holding the subject's session: the whoami fixture is that session.
+  const req = new Request('https://sso.othala.test/auth/consent?consent_challenge=c0ffee', { headers: { cookie: 'ory_kratos_session=abc' } });
+  const res = await handleConsent(req, {
     getIdentity: async () => member,
     manifest: (clientId) => (clientId === 'grafana' ? manifest : undefined),
   });

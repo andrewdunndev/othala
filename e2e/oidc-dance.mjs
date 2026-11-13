@@ -34,6 +34,12 @@ const SECRET = '__GRAFANA_SECRET__';
 const SCOPE = '__SCOPE__';
 const PNG_B64 = '__PNG_B64__';
 const PICTURE_SHA = '__PICTURE_SHA__';
+// A skip_consent client is accepted only for the browser whose Kratos session is the subject, so a subject with
+// credentials signs in at Kratos first; one without (inactive, no access) is denied before a session matters.
+const EMAIL = '__EMAIL__';
+const PASSWORD = '__PASSWORD__';
+// Set, the script only trades this refresh token at the token endpoint and prints the status.
+const REFRESH_TOKEN = '__REFRESH_TOKEN__';
 
 // Hydra's CSRF cookies are Secure, so every hop goes through the https edge.
 const jar = new CookieJar();
@@ -68,8 +74,35 @@ async function pictureChecks(claims, accessToken) {
   };
 }
 
+async function kratosLogin() {
+  const flow = await (await fetchWithCookies(HP + '/self-service/login/browser', { headers: { Accept: 'application/json' } })).json();
+  const csrf = (flow.ui?.nodes ?? []).find((n) => n.attributes?.name === 'csrf_token')?.attributes?.value ?? '';
+  const res = await fetchWithCookies(flow.ui.action, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+    body: JSON.stringify({ method: 'password', identifier: EMAIL, password: PASSWORD, csrf_token: csrf }),
+  });
+  return res.ok;
+}
+
+async function refreshOnly() {
+  const basic = Buffer.from(CLIENT + ':' + SECRET).toString('base64');
+  const res = await fetch(HP + '/oauth2/token', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/x-www-form-urlencoded', Authorization: 'Basic ' + basic },
+    body: new URLSearchParams({ grant_type: 'refresh_token', refresh_token: REFRESH_TOKEN }),
+  });
+  console.log('REFRESH status=' + res.status);
+}
+
 (async () => {
   try {
+    if (REFRESH_TOKEN) {
+      await refreshOnly();
+      return;
+    }
+    if (EMAIL) await kratosLogin();
+
     // ── Step 1: authorization request → redirect with login_challenge ─────────
     const authUrl =
       HP + '/oauth2/auth?client_id=' + CLIENT +

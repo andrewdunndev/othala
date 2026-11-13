@@ -21,6 +21,7 @@ const SAVED: Record<string, string> = {
   'save-household': 'Household saved.',
   'save-profile': 'Profile saved.',
   'remove-groups': 'Group removed.',
+  'clear-roles': 'Override removed.',
 };
 
 export function bannerFor(result: ActionResult, action: string, who: string): Banner | null {

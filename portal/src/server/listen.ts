@@ -1,6 +1,6 @@
 // Dual listener. PUBLIC (8080 on 0.0.0.0): the lazily imported Astro SSR handler (OAuth2 providers, /auth/*, /admin/*).
-// ADMIN (4431 on PORTAL_ADMIN_BIND_HOST, default 127.0.0.1 outside production): its own mux for /healthz, /readyz and the six Kratos webhooks
-// (recovery-gate, login-code-gate, profile-gate, second-factor-gate, profile-sessions, passkey-prune); never delegates to Astro.
+// ADMIN (4431 on PORTAL_ADMIN_BIND_HOST, default 127.0.0.1 outside production): its own mux for /healthz, /readyz and the seven Kratos webhooks
+// (recovery-gate, login-code-gate, profile-gate, second-factor-gate, profile-sessions, passkey-prune, revoke-grants); never delegates to Astro.
 // RECOVERY_GATE_SECRET guards the webhooks: constant-time compare, fail-closed when unset.
 // Bundled by build:listener; run with `node ./dist/server/listen.mjs` after `npm run build`.
 // Nothing imported statically may load lib/config.ts: it throws on the first missing production var, before
@@ -9,6 +9,7 @@
 import http, { type IncomingMessage, type ServerResponse } from 'node:http';
 import { timingSafeEqual } from 'node:crypto';
 import { getIdentity, listSessions, revokeSession, prunePasskeyNames } from '../lib/admin-api';
+import { revokeHydraSessions } from '../lib/revoke';
 import { decideAccess } from '../lib/gate';
 import { secondFactorChangeVerdict, SECOND_FACTOR_UNAVAILABLE } from '../lib/second-factor-gate';
 import { emailChangeVerdict, usernameChangeVerdict, PROFILE_UPDATE_UNAVAILABLE } from '../lib/profile-gate';
@@ -24,7 +25,7 @@ const isProd = () => process.env.NODE_ENV === 'production';
 const adminBindHost = () => process.env.PORTAL_ADMIN_BIND_HOST ?? (isProd() ? '' : '127.0.0.1');
 
 /** The Kratos admin client the hooks call; a parameter so tests can stand in a stub. */
-const ADMIN_CLIENT = { getIdentity, listSessions, revokeSession, prunePasskeyNames };
+const ADMIN_CLIENT = { getIdentity, listSessions, revokeSession, prunePasskeyNames, revokeGrants: revokeHydraSessions };
 type AdminClient = typeof ADMIN_CLIENT;
 type Handler = (req: IncomingMessage, res: ServerResponse, client?: AdminClient) => unknown;
 type Verdict = { refuse: boolean; admin?: boolean; reason: string };
@@ -299,6 +300,34 @@ export async function handlePasskeyPrune(req: IncomingMessage, res: ServerRespon
   sendJson(res, 200, { pruned });
 }
 
+/**
+ * POST /admin/revoke-grants, wired to settings.after.{password,passkey,webauthn,totp,lookup_secret} without can_interrupt: ends the identity's app
+ * grants, which Kratos session revocation never reaches. A post-persist hook cannot tell a removed credential from an added one, so both end grants. Failures are logged and still answered 200 (the change already saved).
+ */
+export async function handleRevokeGrants(req: IncomingMessage, res: ServerResponse, client: AdminClient = ADMIN_CLIENT) {
+  if (refuseUnlessHookBearer(req, res)) return;
+  const tag = '[portal/revoke-grants]';
+  let id;
+  try {
+    id = JSON.parse((await readBody(req)) || '{}')?.identity_id;
+  } catch {
+    id = undefined;
+  }
+  if (typeof id !== 'string' || !id.trim()) {
+    console.error(`${tag} identity_id missing; app grants left active`);
+    sendJson(res, 200, { revoked: false });
+    return;
+  }
+  try {
+    await client.revokeGrants(id);
+  } catch (err) {
+    console.error(`${tag} could not end app grants for identity_id=${JSON.stringify(id)}:`, (err as Error)?.message ?? err);
+    sendJson(res, 200, { revoked: false });
+    return;
+  }
+  sendJson(res, 200, { revoked: true });
+}
+
 const READY_TIMEOUT_MS = 2000;
 
 let registrarOk = (): boolean => true;
@@ -342,6 +371,7 @@ export const ADMIN_POST: ReadonlyMap<string, Handler> = new Map<string, Handler>
   ['/admin/second-factor-gate', handleSecondFactorGate],
   ['/admin/profile-sessions', handleProfileSessions],
   ['/admin/passkey-prune', handlePasskeyPrune],
+  ['/admin/revoke-grants', handleRevokeGrants],
 ]);
 
 function adminHandler(method: string | undefined, url: string | undefined): Handler | undefined {

@@ -18,7 +18,6 @@ The git tag is the authoritative version; `portal/package.json` mirrors it.
 - CI runs `just check` and `just purity`. The release image-tag check runs wherever `check-portal` does (every MR, tags and web/api runs), `e2e-upgrade` runs on tags and on MRs touching `deploy/`, `kratos/`, `hydra/` or `DEPLOY.md`, the heavy jobs run on every MR, `reference-check` blocks, and Playwright fails a flaky test in CI.
 - `portal/.npmrc` sets `engine-strict`, and `@types/node` is on the 24 line. The `purity` npm script is gone; use `just purity`.
 - `rateLimit` sweeps idle keys at most once a second; the cap is checked on every call.
-
 - `render` also refuses a Kratos or Hydra cookie secret or the Hydra system secret under 16 characters, and a `KRATOS_COOKIE_SECRET_PREVIOUS` equal to its `_CURRENT`, since Kratos and Hydra refuse to start on either.
 - `DEPLOY.md` says how the first admin is made, names the `postgres-data` volume and `secrets.env` as what to back up, and links the backup, admin-recovery and lost-device runbooks.
 - The cookie-rotation and secrets-rotation runbooks are merged into `docs/runbooks/secrets-rotation.md`; the comments in `kratos.yml`, `hydra.yml` and `.env.example` that pointed at the old name now point at it.
@@ -30,6 +29,19 @@ The git tag is the authoritative version; `portal/package.json` mirrors it.
 ### Fixed
 
 - Passing tests no longer print their stderr, and the avatar upload tests wait for their request body to finish, so a CI run no longer ends with an unhandled-rejection error.
+- A manifest gate flag (`skip_access_check`, `skip_consent`, `backchannel_logout_session_required`, `emit_groups_claim`) must be `true` or `false`; any other value, such as the string `no`, quarantines the file (a blank value reads as unset) and `manifest-lint` reports it. Before, a non-empty string opened the app to every member.
+- An admin save ends the member's app sign-ins whenever their role overrides change in any way (added, changed or removed) or a group is removed; before, a newly added override, such as a demotion kept alongside a shared group, left their old tokens valid. A group addition ends nothing.
+- An admin save no longer drops a stored role override for an app with no served manifest (a retired app, a manifest with a mistake, or an unreadable apps directory); the person page lists them under "Overrides for apps not shown" and removes one only on an explicit click.
+- An admin save carries `admin`, the picture and passkey names from the identity as it stands when the write happens, so a save racing a revoke-admin no longer restores the marker.
+- A stored role override naming a role the app's manifest no longer declares now resolves to the app's lowest declared role instead of falling back to the group-mapped role, and the person page flags it. Rename a role and anyone held back by an override stays held back.
+- A password change now also ends the member's app sign-ins and refresh tokens: `kratos/kratos.yml` gains a non-interrupting `settings.after.password` web hook to `/admin/revoke-grants`, authenticated like the other hooks. Deployers who vendor `kratos.yml` and `contract/kratos.schema.json` take both.
+- Editing a manifest's access-relevant fields (access groups, `group_role_map`, roles and their `claim_emit`, `emit_groups_claim`, scopes, `skip_access_check`) ends that app's existing sign-ins and refresh tokens for everyone on the next reconcile; before, they kept their old claims for up to 30 days. The fingerprint lives in the Hydra client's metadata. A client without one is baselined, not revoked.
+- A Hydra client othala registered whose manifest file is gone has its grants ended once and is marked retired in its metadata. This is skipped while any manifest is quarantined, when none is served, or when the apps directory is unreadable. No client is ever deleted.
+- Revoking an admin, turning off sign-in and deleting a person now run one at a time, and the last-admin count is taken inside that queue, so two admins acting on each other at the same moment can no longer leave none.
+- A consent challenge that skips the grant screen is accepted only for the browser whose session belongs to the challenge's subject, the same binding the grant screen's submit already had.
+- The identity list the admin pages, the last-admin count and the registrar use now follows Kratos pagination to the end; before, it stopped at the first 250.
+- Deleting a person re-reads their admin marker inside the same queue and refuses when it is set, so a grant that landed after the page loaded cannot be deleted through.
+- Adding or removing a passkey, security key, authenticator app or set of backup codes now also signs the member out of their apps: the same `revoke-grants` web hook is wired to those settings changes in `kratos/kratos.yml`, and `contract/kratos.schema.json` requires it. Kratos cannot tell an addition from a removal at that point, so both end app grants.
 
 ## [0.18.0] - 2026-11-11
 

@@ -205,12 +205,12 @@ describe('currentLevel follows the consent resolver, never group naming', () => 
     skipAccessCheck: false,
   } as unknown as ClientManifest;
 
-  it('lets an override win over the group map, and ignores an empty or malformed override', () => {
+  it('lets an override win over the group map; an undeclared one reads as the lowest level, an empty or malformed one is ignored', () => {
     const groups = ['wiki-access', 'wiki-admin'];
     expect(currentLevel(wiki, { groups, roles: { wiki: 'reader' } })).toBe('reader');
     expect(currentLevel(wiki, { groups, roles: {} })).toBe('admin');
     expect(currentLevel(wiki, { groups, roles: { wiki: 5 as unknown as string } })).toBe('admin');
-    expect(currentLevel(wiki, { groups, roles: { wiki: 'nonsense' } })).toBe('admin');
+    expect(currentLevel(wiki, { groups, roles: { wiki: 'nonsense' } })).toBe('reader');
   });
 
   it('gives the highest-ranked mapped role whatever order the groups are stored in', () => {

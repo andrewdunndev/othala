@@ -82,6 +82,9 @@ describe('holdsElevatedRole', () => {
     expect(held([grafana], ['grafana-access'], { grafana: 'editor' })).toBe(true);
     expect(held([grafana], ['grafana-admin'], { grafana: 'viewer' })).toBe(false);
   });
+  it('an override naming an undeclared role is not elevated, whatever the groups map', () => {
+    expect(held([grafana], ['grafana-access', 'grafana-admin'], { grafana: 'reader' })).toBe(false);
+  });
   it('the entry role is the lowest-ranked mapped access group', () => {
     const m = manifest('m', ['admin', 'editor', 'viewer'], { 'm-edit': 'editor', 'm-view': 'viewer' }, ['m-edit', 'm-view']);
     expect(held([m], ['m-edit'])).toBe(true);

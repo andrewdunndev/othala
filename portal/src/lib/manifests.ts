@@ -135,11 +135,13 @@ function normaliseRoles(raw: unknown): ClientRole[] {
   return [];
 }
 
-function readEmitGroups(c: Record<string, unknown>): boolean | null {
-  if (!('emit_groups_claim' in c)) return null;
-  const v = c.emit_groups_claim;
+/** A gate flag is a real boolean or absent (a blank value counts as absent); a loose value such as the string `no` is an error, never coerced. */
+function readFlag(src: Record<string, unknown>, key: string, file: string): boolean | null {
+  if (!(key in src)) return null;
+  const v = src[key];
+  if (v === null || v === undefined) return null;
   if (typeof v === 'boolean') return v;
-  return null;
+  throw new Error(`${file}: ${key} must be true or false, got ${JSON.stringify(v) ?? String(v)}`);
 }
 
 function normaliseGroupRoleMap(raw: unknown): Record<string, string> {
@@ -210,7 +212,7 @@ export function parseManifest(yamlText: string, filename: string): ClientManifes
       roles: [],
       groupRoleMap: {},
       emitGroupsClaim: null,
-      skipAccessCheck: Boolean(c.skip_access_check ?? false),
+      skipAccessCheck: readFlag(c, 'skip_access_check', file) ?? false,
       sourcePath: file,
       requires: readRequires(p.requires),
       retiredIcon,
@@ -235,14 +237,14 @@ export function parseManifest(yamlText: string, filename: string): ClientManifes
     grantTypes: Array.isArray(o.grant_types) ? o.grant_types.map(String) : [],
     responseTypes: Array.isArray(o.response_types) ? o.response_types.map(String) : [],
     tokenEndpointAuthMethod: o.token_endpoint_auth_method ? String(o.token_endpoint_auth_method) : '',
-    skipConsent: Boolean(o.skip_consent ?? false),
+    skipConsent: readFlag(o, 'skip_consent', file) ?? false,
     backchannelLogoutUri: o.backchannel_logout_uri ? String(o.backchannel_logout_uri) : '',
-    backchannelLogoutSessionRequired: Boolean(o.backchannel_logout_session_required ?? false),
+    backchannelLogoutSessionRequired: readFlag(o, 'backchannel_logout_session_required', file) ?? false,
     accessGroups,
     roles: normaliseRoles(c.roles),
     groupRoleMap: normaliseGroupRoleMap(c.group_role_map),
-    emitGroupsClaim: readEmitGroups(c),
-    skipAccessCheck: Boolean(c.skip_access_check ?? false),
+    emitGroupsClaim: readFlag(c, 'emit_groups_claim', file),
+    skipAccessCheck: readFlag(c, 'skip_access_check', file) ?? false,
     sourcePath: file,
     requires: readRequires(p.requires),
     retiredIcon,
