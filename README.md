@@ -49,11 +49,11 @@ Builds the portal and e2e-tester images from this working tree, then runs the ha
 ### The app alone
 
 To work on the UI without the Ory substrate, run the dev server. The dashboard is built from the
-manifests in `/etc/othala/apps`, so it renders empty unless that directory exists:
+manifests under `CONTENT_DIR` in dev (`/etc/othala` otherwise), so point it at a content tree:
 
 ```sh
 just setup   # once: npm ci in portal, e2e and site
-just dev     # http://localhost:4321
+CONTENT_DIR=$PWD/deploy/example/content just dev   # http://localhost:4321
 ```
 
 Unset `OTHALA_*` values fall back to dev defaults with a warning. OIDC and consent need the full stack.
@@ -79,18 +79,7 @@ Hydra), and `consent:` (roles, the group-to-role map, claim emission).
 
 ## Contributing
 
-Corrections are welcome on either forge:
-
-- GitLab (canonical): https://gitlab.com/dunn.dev/othala
-- GitHub (mirror): https://github.com/andrewdunndev/othala
-
-GitHub pull requests land through GitLab; the mirror then marks them merged.
-
-To work on it: `just setup` once, then `just test` (see [`CONTRIBUTING.md`](CONTRIBUTING.md)).
-
-Corrections are welcome: a false statement, a dead link, a config that does
-not do what it claims. Feature requests and changes that add configuration surface for a different
-deployment are not taken; fork it.
+Corrections are welcome on [GitLab](https://gitlab.com/dunn.dev/othala) (canonical) and the GitHub mirror. See [`CONTRIBUTING.md`](CONTRIBUTING.md).
 
 ## License
 
