@@ -31,6 +31,8 @@ The git tag is the authoritative version; `portal/package.json` mirrors it.
 - The footer repo and design links show to admins only.
 - `SECURITY.md` lists three more accepted risks, widens the proxy one, and no longer promises a response timetable. The error-handling guide is off the public site.
 - Settings drops an unused logout fetch.
+- Routine dependency bumps (astro, jose, marked, OpenTelemetry, Playwright and its e2e image, the postgres 18 image digest, the pipeline components and the `ci-runtime-node` image, lock file maintenance).
+- The release image is signed and tagged `latest` only after the end-to-end tests pass.
 
 ### Fixed
 
