@@ -1,12 +1,13 @@
 // ZY — every credential change ends the refresh tokens issued before it: Kratos's settings.after hooks call the portal's
-// revoke-grants endpoint after a passkey, a security key, an authenticator app and a backup-code set are saved. The
-// password change is W4 in w-grant-revocation.spec.ts.
+// revoke-grants endpoint after a passkey, a security key, an authenticator app and a backup-code set are saved. The hook
+// runs detached from the settings response, so each test waits for the refusal. The password change is W4 in
+// w-grant-revocation.spec.ts.
 
 import type { Browser, BrowserContext } from 'playwright-core';
 import { test, expect, enrollTotpSecret, KRATOS_ADMIN_URL } from '../fixtures';
 import { createIdentityWithPassword, readIdentity, TEST_PASSWORD } from '../actions/identity';
 import { findCsrfToken, loginViaJsonApi } from '../actions/login';
-import { expectRefreshRefused, liveRefreshToken } from '../actions/grants';
+import { expectRefreshRefusedSoon, liveRefreshToken } from '../actions/grants';
 import { addPlatformAuthenticator, registerPasskey } from '../actions/passkey';
 
 // A member with the household group and a password, holding a live refresh token, and a signed-in browser context.
@@ -45,7 +46,7 @@ test.describe('ZY — a credential change ends earlier refresh tokens', () => {
     } finally {
       await ctx.close();
     }
-    await expectRefreshRefused(browser, hydraPublicURL, refreshToken, 'ZY1: after a passkey is added');
+    await expectRefreshRefusedSoon(browser, hydraPublicURL, refreshToken, 'ZY1: after a passkey is added');
   });
 
   test('ZY2 — a new security key', async ({ browser, baseURL, hydraPublicURL }) => {
@@ -64,7 +65,6 @@ test.describe('ZY — a credential change ends earlier refresh tokens', () => {
       const trigger = page.locator('button[name="webauthn_register_trigger"]').first();
       await expect(trigger, 'ZY2: the security key register button is offered').toBeVisible({ timeout: 10_000 });
       await page.waitForFunction(() => typeof (window as unknown as Record<string, unknown>).oryWebAuthnRegistration === 'function');
-      // The key is stored before the revoke hook runs; the settings answer comes after it.
       const answered = page.waitForResponse((r) => r.url().includes('/self-service/settings') && r.request().method() === 'POST');
       await trigger.click();
       await answered;
@@ -72,7 +72,7 @@ test.describe('ZY — a credential change ends earlier refresh tokens', () => {
     } finally {
       await ctx.close();
     }
-    await expectRefreshRefused(browser, hydraPublicURL, refreshToken, 'ZY2: after a security key is added');
+    await expectRefreshRefusedSoon(browser, hydraPublicURL, refreshToken, 'ZY2: after a security key is added');
   });
 
   test('ZY3 — a new authenticator app', async ({ browser, baseURL, hydraPublicURL }) => {
@@ -83,7 +83,7 @@ test.describe('ZY — a credential change ends earlier refresh tokens', () => {
     } finally {
       await ctx.close();
     }
-    await expectRefreshRefused(browser, hydraPublicURL, refreshToken, 'ZY3: after an authenticator app is added');
+    await expectRefreshRefusedSoon(browser, hydraPublicURL, refreshToken, 'ZY3: after an authenticator app is added');
   });
 
   test('ZY4 — a new set of backup codes', async ({ browser, baseURL, hydraPublicURL }) => {
@@ -108,6 +108,6 @@ test.describe('ZY — a credential change ends earlier refresh tokens', () => {
     } finally {
       await ctx.close();
     }
-    await expectRefreshRefused(browser, hydraPublicURL, refreshToken, 'ZY4: after backup codes are saved');
+    await expectRefreshRefusedSoon(browser, hydraPublicURL, refreshToken, 'ZY4: after backup codes are saved');
   });
 });

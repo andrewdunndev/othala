@@ -15,6 +15,7 @@ export const KNOWN_OTHALA_NAMES: readonly string[] = Object.freeze([
   ...REQUIRED_IN_PRODUCTION,
   'OTHALA_OTLP_ENDPOINT',
   'OTHALA_DEV_MOCK_GROUPS',
+  'OTHALA_REVOKE_SWEEP_SECONDS',
 ]);
 
 const FIXED_TOPOLOGY = 'delete it; service hosts and ports are fixed (kratos:4433, kratos:4434, hydra:4445, othala:4431)';

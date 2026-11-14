@@ -4,7 +4,7 @@ import type { Page } from 'playwright-core';
 import { test, expect, adminAal2Context, KRATOS_ADMIN_URL } from '../fixtures';
 import { createIdentityWithPassword, TEST_PASSWORD } from '../actions/identity';
 import { loginViaJsonApi } from '../actions/login';
-import { expectRefreshRefused, liveRefreshToken } from '../actions/grants';
+import { expectRefreshRefused, expectRefreshRefusedSoon, liveRefreshToken } from '../actions/grants';
 
 async function seedPair(tag: string) {
   const suffix = Date.now();
@@ -131,5 +131,5 @@ test('W4 — a password change ends refresh tokens issued before it', async ({ b
     await ctx.close();
   }
 
-  await expectRefreshRefused(browser, hydraPublicURL, refreshToken);
+  await expectRefreshRefusedSoon(browser, hydraPublicURL, refreshToken);
 });

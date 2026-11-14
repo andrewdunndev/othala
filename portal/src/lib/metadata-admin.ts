@@ -16,7 +16,7 @@ export class MetadataAdminError extends Error {
   }
 }
 
-const ALLOWED_KEYS = new Set(['groups', 'roles', 'admin', 'prerequisites', 'passkeyNames', 'avatar']);
+const ALLOWED_KEYS = new Set(['groups', 'roles', 'admin', 'prerequisites', 'passkeyNames', 'avatar', 'grants_revoked']);
 const PREREQUISITE_RE = /^[a-z][a-z0-9-]{0,39}$/;
 
 export function validateMetadataAdmin(input: unknown): MetadataAdmin {
@@ -30,7 +30,7 @@ export function validateMetadataAdmin(input: unknown): MetadataAdmin {
   for (const key of Object.keys(input)) {
     if (!ALLOWED_KEYS.has(key)) {
       throw new MetadataAdminError(
-        `metadata_admin: unknown field "${key}". Allowed: groups, roles, admin, prerequisites, passkeyNames, avatar.`,
+        `metadata_admin: unknown field "${key}". Allowed: groups, roles, admin, prerequisites, passkeyNames, avatar, grants_revoked.`,
       );
     }
   }
@@ -58,6 +58,14 @@ export function validateMetadataAdmin(input: unknown): MetadataAdmin {
     const problem = avatarProblem(obj.avatar);
     if (problem) throw new MetadataAdminError(`metadata_admin.avatar: ${problem}`);
     out.avatar = obj.avatar as Avatar;
+  }
+
+  if ('grants_revoked' in obj && obj.grants_revoked !== undefined) {
+    const m = obj.grants_revoked as Record<string, unknown> | null;
+    if (!m || typeof m !== 'object' || typeof m.fp !== 'string' || !/^[0-9a-f]{64}$/.test(m.fp) || typeof m.at !== 'string') {
+      throw new MetadataAdminError('metadata_admin.grants_revoked must be { fp: 64 hex characters, at: ISO time }.');
+    }
+    out.grants_revoked = { fp: m.fp, at: m.at };
   }
 
   if ('admin' in obj && obj.admin !== undefined) {

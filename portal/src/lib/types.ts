@@ -40,6 +40,8 @@ export type Identity = Omit<SdkIdentity, 'metadata_admin'> & {
     passkeyNames?: Record<string, string>;
     /** The member's picture (see avatar.ts). */
     avatar?: Avatar;
+    /** The credential fingerprint the last grant revoke covered (see grant-reconcile.ts). */
+    grants_revoked?: { fp: string; at: string };
   } | null;
 };
 

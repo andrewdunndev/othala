@@ -53,10 +53,10 @@ and on web/api runs. `e2e-upgrade` runs on tags, web/api runs and MRs that touch
 - **Env belongs in one module** (`portal/src/lib/config.ts`): throw in
   production, default with a warning in dev. The surface is identity
   (`OTHALA_PUBLIC_URL`, `OTHALA_APEX`, `OTHALA_INSTANCE_NAME`),
-  `OTHALA_CONTACT_RECIPIENT`, secrets, optional `OTHALA_OTLP_ENDPOINT`, and the
-  deployer binds (`KRATOS_ADMIN_BIND_HOST`, `HYDRA_ADMIN_BIND_HOST`,
+  `OTHALA_CONTACT_RECIPIENT`, secrets, optional `OTHALA_OTLP_ENDPOINT`, the
+  e2e-only `OTHALA_REVOKE_SWEEP_SECONDS`, and the deployer binds (`KRATOS_ADMIN_BIND_HOST`, `HYDRA_ADMIN_BIND_HOST`,
   `PORTAL_ADMIN_BIND_HOST`); everything else is derived or a constant there.
-  Only `listen.ts`, `config-cli.ts`, `manifests.ts` and `otel.mjs` read env themselves.
+  Only `listen.ts` (the binds, the secrets, the sweep period), `config-cli.ts`, `manifests.ts` and `otel.mjs` read env themselves.
 - **Ory configs are templates.** Ory has no native `${VAR}` expansion;
   `portal/src/lib/render.ts` is the one render, shipped in the image as
   `dist/server/config.mjs`, failing with variable NAMES, never rendered content
