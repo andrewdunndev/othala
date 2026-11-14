@@ -1,8 +1,8 @@
 # dunn.dev/othala -- container build + release pipeline.
 # build-othala publishes at the registry root.
-# Tags run build, e2e, sbom, release (sbom and release wait on e2e). Pipelines
-# exist for MRs, main, tags and web/api runs; a push to a feature branch with no
-# open MR gets no pipeline.
+# Tags run build, e2e, promote (sign and move :latest), sbom, release; promote,
+# sbom and release wait on e2e. Pipelines exist for MRs, main, tags and web/api
+# runs; a push to a feature branch with no open MR gets no pipeline.
 
 default:
   interruptible: true
@@ -72,6 +72,14 @@ include:
       containerfile: portal/Containerfile
       context: .
       tag_pipeline: true
+      promote_later: true
+
+  # Signs the release image and moves :latest once e2e passes; the package
+  # stage sits after e2e and before the release jobs.
+  - component: gitlab.com/dunn.dev/pipeline/container-promote@4.16.0
+    inputs:
+      container_image_job: build-othala
+      stage: package
 
   - component: gitlab.com/dunn.dev/pipeline/container-sbom@4.16.0
     inputs:
@@ -103,14 +111,6 @@ include:
       npm_dir: site
       production_url: https://othala.dunn.dev
 
-# The release job runs in its own environment so the GitHub App variables
-# can be scoped to it.
-github-release:
-  environment:
-    name: github-release
-
-
-
 # Heavy chain: build-othala, build-e2e-tester, verify-othala, check-portal, e2e.
 # Runs on every MR, on tags and on web/api runs; a main push skips it because the
 # tag pipeline is the release gate.
@@ -130,6 +130,11 @@ build-othala:
 
 build-e2e-tester:
   rules: !reference [.heavy-image-rules]
+
+# Only a protected tag signs the image and moves :latest.
+promote-image:
+  rules:
+    - if: '$CI_COMMIT_TAG && $CI_COMMIT_REF_PROTECTED == "true"'
 
 # node-build never runs on tags (component rule); that stays.
 verify-othala:
@@ -165,7 +170,7 @@ e2e-upgrade:
     - cd e2e
     - bash upgrade.sh
 
-# sbom and release wait on e2e. The components' own needs stop at the image
+# promote, sbom and release wait on e2e. The components' own needs stop at the image
 # build, so the jobs are extended here (needs arrays replace, not merge).
 sbom-othala:
   needs: [build-othala, e2e]
@@ -176,6 +181,7 @@ create-release:
       artifacts: false
     - e2e
     - e2e-upgrade
+    - promote-image
 
 upload-release-assets:
   needs:
@@ -186,6 +192,7 @@ upload-release-assets:
       artifacts: true
     - e2e
     - e2e-upgrade
+    - promote-image
 
 # check-purity: OSS purity and deprecated-name gate, plus a bash -n over tracked
 # shell scripts (`just purity`). The jobs run the justfile's recipes, so the
