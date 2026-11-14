@@ -17,6 +17,8 @@ RC=0
 check() { if [[ "$2" == "$3" ]]; then echo "  ✓ $1"; else echo "  ✗ $1 (want '$3', got '$2')"; RC=1; fi; }
 export AUTH_REGISTRY COMPOSE_FILE=compose.yml:compose.e2e.yml
 
+cp othala.env othala.env.cur
+git show "$PREV:e2e/othala.env" > othala.env
 git show "$PREV:deploy/example/compose.yml" > compose.yml
 git show "$PREV:deploy/example/postgres-init.sh" > postgres-init.sh
 chmod +x postgres-init.sh
@@ -43,7 +45,8 @@ REFRESH=$(AUTH_VERSION="$CUR" run_dance "$SUB" | sed -n 's/.*"refresh_token":"\(
 [[ -n "$REFRESH" ]] || { echo "  ✗ no refresh token from the seed dance"; exit 1; }
 echo "  seeded identity, session and refresh token on $PREV"
 
-# DEPLOY.md: new example, new secret keys, then the restart-rules command.
+# DEPLOY.md: new example, new settings and secret keys, then the restart-rules command.
+mv othala.env.cur othala.env
 cp ../deploy/example/compose.yml ../deploy/example/postgres-init.sh .
 gen_secrets "$CUR" | while IFS= read -r l; do grep -q "^${l%%=*}=" secrets.env || echo "$l" >> secrets.env; done
 load_env
