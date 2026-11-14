@@ -33,7 +33,7 @@ async function codeLogin(ctx: BrowserContext, baseURL: string, email: string) {
     maxRedirects: 5,
   });
   const step2 = (await step1.json()) as Flow;
-  const { code } = await waitForMessage(forRecipient(email, since));
+  const { code } = await waitForMessage(forRecipient(email, since, /to log in/i));
   const resp = await ctx.request.post(step2.ui?.action ?? flow.ui.action, {
     headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
     data: { identifier: email, code, method: 'code', csrf_token: csrfOf(step2) || csrfOf(flow) },
