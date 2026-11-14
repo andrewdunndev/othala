@@ -98,3 +98,27 @@ export async function expectRefreshRefused(browser: Browser, hydraPublicURL: str
     await ctx.close();
   }
 }
+
+/** One refresh attempt: the rotated token while the grant lives, null once the server refuses it. */
+export async function refreshOnce(browser: Browser, hydraPublicURL: string, refreshToken: string): Promise<string | null> {
+  const ctx = await browser.newContext();
+  try {
+    const resp = await tokenGrant(ctx, hydraPublicURL, { grant_type: 'refresh_token', refresh_token: refreshToken });
+    if (resp.ok()) return ((await resp.json()).refresh_token as string | undefined) ?? null;
+    expect([400, 401], `refresh answered ${resp.status()}`).toContain(resp.status());
+    return null;
+  } finally {
+    await ctx.close();
+  }
+}
+
+/**
+ * The refusal of a refresh token, waited for: the revoke after a credential change runs detached from the settings
+ * response. A refresh that still succeeds rotates the token, so the poll carries the new one forward.
+ */
+export async function expectRefreshRefusedSoon(browser: Browser, hydraPublicURL: string, refreshToken: string, why = 'refresh after the change', timeout = 30_000) {
+  let token: string | null = refreshToken;
+  await expect
+    .poll(async () => (token === null ? null : (token = await refreshOnce(browser, hydraPublicURL, token))), { timeout, message: `${why}: refresh must end up refused` })
+    .toBeNull();
+}

@@ -20,12 +20,22 @@ function afterHooks(method) {
   return parse(readFileSync(file, 'utf8')).selfservice.flows.settings.after[method]?.hooks ?? [];
 }
 
-test.each(['password', 'passkey', 'webauthn', 'totp', 'lookup_secret'])('a %s change ends app grants through a non-interrupting web_hook', (method) => {
+test.each(['password', 'passkey', 'webauthn', 'totp', 'lookup_secret'])('a %s change ends app grants through a non-interrupting, detached web_hook', (method) => {
   const grants = afterHooks(method).find((h) => h.hook === 'web_hook' && h.config.url === 'http://othala:4431/admin/revoke-grants');
   assert.ok(grants, `settings.after.${method} has no revoke-grants hook`);
   assert.equal(grants.config.can_interrupt, false);
-  assert.equal(grants.config.response.ignore, false);
+  assert.equal(grants.config.response.ignore, true);
   assert.match(grants.config.auth.config.value, /^Bearer \$\{RECOVERY_GATE_SECRET\}$/);
+});
+
+test('every post-persist web_hook after a settings change is detached; only the pre-persist gates answer the flow', () => {
+  const file = fileURLToPath(new URL('../../kratos/kratos.yml', import.meta.url));
+  const after = parse(readFileSync(file, 'utf8')).selfservice.flows.settings.after;
+  for (const [method, { hooks = [] }] of Object.entries(after)) {
+    for (const h of hooks.filter((x) => x.hook === 'web_hook')) {
+      assert.equal(h.config.response.ignore, !h.config.can_interrupt, `settings.after.${method} ${h.config.url}`);
+    }
+  }
 });
 
 test('a password save still ends the other sessions', () => {

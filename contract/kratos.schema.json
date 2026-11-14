@@ -120,7 +120,7 @@
               "properties": {
                 "url": {"const": "http://othala:4431/admin/profile-sessions"},
                 "can_interrupt": {"const": false},
-                "response": {"type": "object", "properties": {"ignore": {"const": false}}}
+                "response": {"type": "object", "properties": {"ignore": {"const": true}}}
               }
             }
           }
@@ -138,7 +138,7 @@
               "properties": {
                 "url": {"const": "http://othala:4431/admin/revoke-grants"},
                 "can_interrupt": {"const": false},
-                "response": {"type": "object", "properties": {"ignore": {"const": false}}}
+                "response": {"type": "object", "properties": {"ignore": {"const": true}}}
               }
             }
           }

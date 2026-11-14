@@ -12,10 +12,12 @@ The git tag is the authoritative version; `portal/package.json` mirrors it.
 
 - The second step is asked at the dag sign-in, not at the first app.
 - `mise.toml` and a `justfile` (`setup`, `test`, `check`, `build`, `dev`, `purity`, `e2e`, `backup`). `just e2e` builds both images from the working tree before it runs the harness; `just backup <dir>` writes custom-format dumps of the kratos and hydra databases.
+- App access granted before a credential change is withdrawn even if the save is interrupted, and after a change made through the Kratos admin API: the portal records a credential fingerprint per identity and a timer sweep (every 5 minutes) ends the grants of any identity whose credentials differ from it. An identity without a record is recorded, not signed out, so an upgrade keeps existing app access. `OTHALA_REVOKE_SWEEP_SECONDS` sets the period for the e2e suite only.
 - e2e walks for the admin recovery refresh with the new passkey, eviction of an admin target, and refresh-token revocation after each credential change.
 
 ### Changed
 
+- The settings revoke hooks (`revoke-grants` after a password, passkey, security key, authenticator or backup-code change, `profile-sessions` after a profile change) answer `response.ignore: true`, so Kratos runs them detached from the request.
 - CI runs `just check` and `just purity`. The release image-tag check runs wherever `check-portal` does (every MR, tags and web/api runs), `e2e-upgrade` runs on tags and on MRs touching `deploy/`, `kratos/`, `hydra/` or `DEPLOY.md`, the heavy jobs run on every MR, `reference-check` blocks, and Playwright fails a flaky test in CI.
 - `portal/.npmrc` sets `engine-strict`, and `@types/node` is on the 24 line. The `purity` npm script is gone; use `just purity`.
 - `rateLimit` sweeps idle keys at most once a second; the cap is checked on every call.

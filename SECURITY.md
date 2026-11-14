@@ -113,7 +113,10 @@ Each names its enforcer and the test that fails if it stops working.
   `kratos/kratos.yml`, so enrolment is admin-initiated; breach checking and a
   minimum length gate passwords; a password change fires
   `revoke_active_sessions`, and any password or credential change ends the member's app grants
-  (`portal/scripts/kratos-hooks.test.mjs`); force-logout is `revokeSubject`
+  (`portal/scripts/kratos-hooks.test.mjs`). The hook is detached from the request, and a portal
+  timer re-checks every identity against the credential fingerprint recorded after its last revoke, so an
+  interrupted save or an admin-API change is still covered within the sweep period
+  (`portal/scripts/grant-reconcile.test.mjs`, `e2e/playwright/tests/zza-grant-sweep.spec.ts`); force-logout is `revokeSubject`
   (`portal/src/lib/revoke.ts`). Full eviction (audit, delete credential, then
   revoke) is in `docs/runbooks/lost-device.md`, pinned by
   `e2e/playwright/tests/p-eviction.spec.ts`.

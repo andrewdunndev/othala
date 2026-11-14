@@ -1,6 +1,6 @@
 // Dual listener. PUBLIC (8080 on 0.0.0.0): the lazily imported Astro SSR handler (OAuth2 providers, /auth/*, /admin/*).
 // ADMIN (4431 on PORTAL_ADMIN_BIND_HOST, default 127.0.0.1 outside production): its own mux for /healthz, /readyz and the seven Kratos webhooks
-// (recovery-gate, login-code-gate, profile-gate, second-factor-gate, profile-sessions, passkey-prune, revoke-grants); never delegates to Astro.
+// (recovery-gate, login-code-gate, profile-gate, second-factor-gate, profile-sessions, passkey-prune, revoke-grants); never delegates to Astro. Also runs the grant sweep timer.
 // RECOVERY_GATE_SECRET guards the webhooks: constant-time compare, fail-closed when unset.
 // Bundled by build:listener; run with `node ./dist/server/listen.mjs` after `npm run build`.
 // Nothing imported statically may load lib/config.ts: it throws on the first missing production var, before
@@ -8,7 +8,8 @@
 
 import http, { type IncomingMessage, type ServerResponse } from 'node:http';
 import { timingSafeEqual } from 'node:crypto';
-import { getIdentity, listSessions, revokeSession, prunePasskeyNames } from '../lib/admin-api';
+import { getIdentity, listSessions, revokeSession, prunePasskeyNames, listIdentitiesWithCredentials, patchGrantsRevoked } from '../lib/admin-api';
+import { revokeThenStamp, startGrantSweep, SWEEP_INTERVAL_MS } from '../lib/grant-reconcile';
 import { revokeHydraSessions } from '../lib/revoke';
 import { decideAccess } from '../lib/gate';
 import { secondFactorChangeVerdict, SECOND_FACTOR_UNAVAILABLE } from '../lib/second-factor-gate';
@@ -26,7 +27,7 @@ const isProd = () => process.env.NODE_ENV === 'production';
 const adminBindHost = () => process.env.PORTAL_ADMIN_BIND_HOST ?? (isProd() ? '' : '127.0.0.1');
 
 /** The Kratos admin client the hooks call; a parameter so tests can stand in a stub. */
-const ADMIN_CLIENT = { getIdentity, listSessions, revokeSession, prunePasskeyNames, revokeGrants: revokeHydraSessions };
+const ADMIN_CLIENT = { getIdentity, listSessions, revokeSession, prunePasskeyNames, revokeGrants: revokeHydraSessions, stampMarker: patchGrantsRevoked };
 type AdminClient = typeof ADMIN_CLIENT;
 type Handler = (req: IncomingMessage, res: ServerResponse, client?: AdminClient) => unknown;
 type Verdict = { refuse: boolean; admin?: boolean; reason: string };
@@ -303,7 +304,7 @@ export async function handlePasskeyPrune(req: IncomingMessage, res: ServerRespon
 
 /**
  * POST /admin/revoke-grants, wired to settings.after.{password,passkey,webauthn,totp,lookup_secret} without can_interrupt: ends the identity's app
- * grants, which Kratos session revocation never reaches. A post-persist hook cannot tell a removed credential from an added one, so both end grants. Failures are logged and still answered 200 (the change already saved).
+ * grants, which Kratos session revocation never reaches, then records the credential fingerprint the revoke covered. A post-persist hook cannot tell a removed credential from an added one, so both end grants. Failures are logged and still answered 200 (the change already saved); the sweep re-covers a failed revoke.
  */
 export async function handleRevokeGrants(req: IncomingMessage, res: ServerResponse, client: AdminClient = ADMIN_CLIENT) {
   if (refuseUnlessHookBearer(req, res)) return;
@@ -320,13 +321,19 @@ export async function handleRevokeGrants(req: IncomingMessage, res: ServerRespon
     return;
   }
   try {
-    await client.revokeGrants(id);
+    await revokeThenStamp(id, { getIdentity: client.getIdentity, revokeGrants: client.revokeGrants, stampMarker: client.stampMarker });
   } catch (err) {
     console.error(`${tag} could not end app grants for identity_id=${JSON.stringify(id)}:`, (err as Error)?.message ?? err);
     sendJson(res, 200, { revoked: false });
     return;
   }
   sendJson(res, 200, { revoked: true });
+}
+
+/** The sweep period: a constant, overridable by OTHALA_REVOKE_SWEEP_SECONDS for the e2e suite only. Read here, not in config.ts. */
+export function sweepIntervalMs(env: NodeJS.ProcessEnv = process.env): number {
+  const seconds = Number(env.OTHALA_REVOKE_SWEEP_SECONDS);
+  return Number.isFinite(seconds) && seconds >= 1 ? Math.round(seconds * 1000) : SWEEP_INTERVAL_MS;
 }
 
 const READY_TIMEOUT_MS = 2000;
@@ -480,6 +487,12 @@ if (import.meta.url === `file://${process.argv[1]}`) {
   adminServer.listen(ADMIN_PORT, adminBindHost(), () => {
     console.log(`[portal] admin listener on http://${adminBindHost()}:${ADMIN_PORT}`);
   });
+
+  // Durable grant revoke: every identity is checked against its recorded credential fingerprint now and on a timer.
+  startGrantSweep(
+    { listIdentities: listIdentitiesWithCredentials, revokeGrants: revokeHydraSessions, stampMarker: patchGrantsRevoked },
+    sweepIntervalMs(),
+  );
 
   // In-process OIDC client reconciler, started after both listeners are bound so a slow Hydra never delays boot.
   // Boot retries with capped backoff until Hydra answers while the portal serves; SIGHUP drops the manifest cache and

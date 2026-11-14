@@ -91,8 +91,10 @@ selfservice:
       # unaffected. This does NOT touch session.whoami, which must stay aal1 (forward-auth.ts).
       required_aal: highest_available
       after:
-        # A password save ends the other sessions. Every credential change also ends app grants through the revoke-grants hook;
-        # it stays synchronous because a silent background failure would lose the revoke, and the portal answers 200 on its own errors.
+        # A password save ends the other sessions. Every credential change also ends app grants through the revoke-grants hook. The
+        # post-persist hooks below answer ignore: true, so Kratos runs them detached from the request and a client disconnect cannot
+        # cancel them. The hook is not the guarantee: the portal sweeps every identity on a timer and ends app grants for any whose
+        # credentials differ from the fingerprint it last recorded, so a lost hook and an admin-API change are both caught.
         password:
           hooks:
             - hook: revoke_active_sessions
@@ -107,7 +109,7 @@ selfservice:
                     name: Authorization
                     value: "Bearer ${RECOVERY_GATE_SECRET}"
                 response:
-                  ignore: false
+                  ignore: true
                   parse: false
                 body: file:///etc/config/kratos/hooks/recovery-gate.jsonnet
                 can_interrupt: false
@@ -140,7 +142,7 @@ selfservice:
                     name: Authorization
                     value: "Bearer ${RECOVERY_GATE_SECRET}"
                 response:
-                  ignore: false
+                  ignore: true
                   parse: false
                 body: file:///etc/config/kratos/hooks/recovery-gate.jsonnet
                 can_interrupt: false
@@ -174,7 +176,7 @@ selfservice:
                     name: Authorization
                     value: "Bearer ${RECOVERY_GATE_SECRET}"
                 response:
-                  ignore: false
+                  ignore: true
                   parse: false
                 body: file:///etc/config/kratos/hooks/recovery-gate.jsonnet
                 can_interrupt: false
@@ -206,7 +208,7 @@ selfservice:
                     name: Authorization
                     value: "Bearer ${RECOVERY_GATE_SECRET}"
                 response:
-                  ignore: false
+                  ignore: true
                   parse: false
                 body: file:///etc/config/kratos/hooks/recovery-gate.jsonnet
                 can_interrupt: false
@@ -223,7 +225,7 @@ selfservice:
                     name: Authorization
                     value: "Bearer ${RECOVERY_GATE_SECRET}"
                 response:
-                  ignore: false
+                  ignore: true
                   parse: false
                 body: file:///etc/config/kratos/hooks/recovery-gate.jsonnet
                 can_interrupt: false
@@ -260,7 +262,7 @@ selfservice:
                     name: Authorization
                     value: "Bearer ${RECOVERY_GATE_SECRET}"
                 response:
-                  ignore: false
+                  ignore: true
                   parse: false
                 body: file:///etc/config/kratos/hooks/recovery-gate.jsonnet
                 can_interrupt: false

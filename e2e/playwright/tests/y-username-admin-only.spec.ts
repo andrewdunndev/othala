@@ -98,8 +98,13 @@ test.describe('Y — username is admin-only', () => {
       expect(subject, 'Y3: the subject names the household').toContain(HOUSEHOLD);
       expect(body, 'Y3: the body names the household').toContain(HOUSEHOLD);
 
-      const whoOther = await other.request.get(`${baseURL}/sessions/whoami`, { headers: { Accept: 'application/json' } });
-      expect(whoOther.status(), 'the other session ended').toBe(401);
+      // The hook that ends the other sessions runs detached from the profile response.
+      await expect
+        .poll(async () => (await other.request.get(`${baseURL}/sessions/whoami`, { headers: { Accept: 'application/json' } })).status(), {
+          timeout: 15_000,
+          message: 'the other session ended',
+        })
+        .toBe(401);
       const whoSelf = await ctx.request.get(`${baseURL}/sessions/whoami`, { headers: { Accept: 'application/json' } });
       expect(whoSelf.status(), 'the submitting session survives').toBe(200);
     } finally {

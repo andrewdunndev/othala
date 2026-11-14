@@ -167,7 +167,14 @@ Revocation is one in-process fan-out, `revokeSubject` (`portal/src/lib/revoke.ts
 force-logout, user sign-out-everywhere, and deactivation. Kratos sessions and Hydra's remembered
 login and consent sessions are all cut, because a remembered
 Hydra login would otherwise still mint fresh tokens. Portal sign-out and narrowing someone's access run the Hydra
-half alone, as does the revoke-grants hook after any credential change. There is no identity cache, so a deactivated subject fails the state check on the next request.
+half alone, as does the revoke-grants hook after any credential change.
+
+Ending grants after a credential change does not rest on that hook. The portal records the credential fingerprint
+a revoke covered in the identity's `metadata_admin.grants_revoked`, and `portal/src/lib/grant-reconcile.ts` compares it on a timer
+over every identity (`OTHALA_REVOKE_SWEEP_SECONDS` overrides the period for the e2e suite). A mismatch revokes, then
+records the new fingerprint; an identity with no record is recorded without a revoke. The fingerprint covers only what a
+change alters and a sign-in does not, which is why it is a fingerprint and not a timestamp: a removed credential
+shows too. There is no identity cache, so a deactivated subject fails the state check on the next request.
 
 ## OIDC client registration
 

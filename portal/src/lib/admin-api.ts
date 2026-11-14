@@ -12,6 +12,7 @@ import { validateMetadataAdmin } from './metadata-admin';
 import { readAvatar, type Avatar } from './avatar';
 import { passkeyCredentialIds, pruneNames, readPasskeyNames } from './passkey-names';
 import { pageTokens, revokeSubject } from './revoke';
+import { readGrantsMarker, type GrantsMarker } from './grant-reconcile';
 import { isNotFound, kratosAdmin } from './ory-fetch';
 
 export interface IdentityTraits {
@@ -29,6 +30,8 @@ export interface MetadataAdmin {
   passkeyNames?: Record<string, string>;
   admin?: boolean;
   avatar?: Avatar;
+  /** The credential fingerprint the last grant revoke covered (see grant-reconcile.ts). */
+  grants_revoked?: { fp: string; at: string };
 }
 
 export interface CreateIdentityInput {
@@ -64,6 +67,20 @@ export async function getIdentity(id: string): Promise<Identity> {
     id,
     includeCredential: INCLUDED_CREDENTIALS,
   });
+}
+
+/** Every identity with the five settings credential types included, fully paginated: the sweep's one read. */
+export async function listIdentitiesWithCredentials(): Promise<Identity[]> {
+  const api = kratosAdmin();
+  const all: Identity[] = [];
+  const next = pageTokens();
+  let pageToken: string | undefined;
+  do {
+    const page = await api.listIdentitiesRaw({ pageSize: 250, pageToken, includeCredential: INCLUDED_CREDENTIALS });
+    all.push(...(await page.value()));
+    pageToken = next(page.raw.headers);
+  } while (pageToken);
+  return all;
 }
 
 export async function getIdentityWithoutCredentials(id: string): Promise<Identity> {
@@ -104,6 +121,7 @@ export async function updateIdentity(id: string, input: UpdateIdentityInput): Pr
     ...(held?.prerequisites?.length ? { prerequisites: held.prerequisites } : {}),
     ...(held?.passkeyNames && Object.keys(held.passkeyNames).length ? { passkeyNames: held.passkeyNames } : {}),
     avatar: readAvatar(held),
+    grants_revoked: readGrantsMarker(held),
   });
   const updateIdentityBody: UpdateIdentityBody = {
     schema_id: current.schema_id,
@@ -181,6 +199,11 @@ async function patchMetadataKey(id: string, path: string[], value: unknown | nul
 
 export async function patchAdminMarker(id: string, grant: boolean): Promise<void> {
   await patchMetadataKey(id, ['admin'], grant ? true : null);
+}
+
+/** Records the fingerprint a revoke covered: one JSON Patch add on /metadata_admin/grants_revoked. */
+export async function patchGrantsRevoked(id: string, marker: GrantsMarker): Promise<void> {
+  await patchMetadataKey(id, ['grants_revoked'], validateMetadataAdmin({ grants_revoked: marker }).grants_revoked!);
 }
 
 export async function patchPrerequisites(id: string, names: string[]): Promise<void> {
