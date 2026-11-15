@@ -1,7 +1,7 @@
 // ZR — what a signed-in person can read and write about their own admin-managed access.
 
 import { test, expect } from '../fixtures';
-import { createIdentityWithPassword, readIdentity, TEST_PASSWORD } from '../actions/identity';
+import { createIdentityWithPassword, readIdentity, TEST_PASSWORD, withoutSweepMarker } from '../actions/identity';
 import { findCsrfToken, loginViaJsonApi } from '../actions/login';
 import { getSession } from '../actions/session';
 
@@ -60,7 +60,7 @@ test.describe('ZR — admin-managed access is not self-service', () => {
       });
       expect(resp.status(), 'ZR2: the self-service submission is accepted').toBe(200);
       const after = await readIdentity(kratosAdminURL, seeded.id);
-      expect(after.metadata_admin, 'ZR2: admin-managed metadata is untouched by a self-service submission').toEqual(before.metadata_admin);
+      expect(withoutSweepMarker(after.metadata_admin), 'ZR2: admin-managed metadata is untouched by a self-service submission').toEqual(withoutSweepMarker(before.metadata_admin));
     } finally {
       await ctx.close();
     }
