@@ -4,6 +4,11 @@
   "rebaseWhen": "conflicted",
   "packageRules": [
     {
+      "description": "The portal builds on Red Hat's ubi10/nodejs image, and ci-pins.test.mjs holds mise, engines and @types/node to that image's major. Red Hat publishes no ubi10/nodejs-26 yet, so Node and its types stay below 25; drop this rule when that image ships.",
+      "matchDepNames": ["node", "@types/node"],
+      "allowedVersions": "<25"
+    },
+    {
       "description": "Playwright's npm package and Docker image move in lockstep; the image tag can lag the npm release, so automerge stays off to stop a solo npm-only bump from landing unmatched.",
       "matchPackageNames": ["@playwright/test", "mcr.microsoft.com/playwright"],
       "groupName": "playwright",
