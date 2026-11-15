@@ -141,7 +141,7 @@ test('K1 — email-code login delivers a code and establishes an active session'
   const step2 = await submitIdentifierForCode(ctx.request, flow.action, flow.csrfToken, identity.email);
   console.log('[K1] identifier submitted; step-2 action:', step2.action);
 
-  const { code, subject, body, id: messageId } = await waitForMessage(forRecipient(identity.email, startTime));
+  const { code, subject, body, id: messageId } = await waitForMessage(forRecipient(identity.email, startTime, /to log in/i));
   expect(subject, 'K1: the subject names the household').toContain(HOUSEHOLD);
   expect(body, 'K1: the body names the household').toContain(HOUSEHOLD);
   console.log('[K1] received sign-in code:', code, 'message id:', messageId);

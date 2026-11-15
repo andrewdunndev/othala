@@ -2,7 +2,7 @@
 // admin still holds until the console deletes it (docs/runbooks/admin-recovery.md).
 
 import { test, expect, adminAal2Context } from '../fixtures';
-import { createIdentityWithPassword, readIdentity, TEST_PASSWORD } from '../actions/identity';
+import { createIdentityWithPassword, readIdentity, TEST_PASSWORD, withoutSweepMarker } from '../actions/identity';
 import { getSession } from '../actions/session';
 
 async function adminApi(kratosAdminURL: string, method: string, path: string, body?: unknown): Promise<Response> {
@@ -72,5 +72,5 @@ test('ZU1 — recovery lands at the first factor; settings opens only after the 
   const restored = await adminApi(kratosAdminURL, 'PATCH', `identities/${seeded.id}`, [{ op: 'add', path: '/metadata_admin/admin', value: true }]);
   expect(restored.ok, 'ZU1: the marker is restored').toBe(true);
   const after = await readIdentity(kratosAdminURL, seeded.id);
-  expect(after.metadata_admin, 'ZU1: the metadata matches what was read before').toEqual(stored.metadata_admin);
+  expect(withoutSweepMarker(after.metadata_admin), 'ZU1: the metadata matches what was read before').toEqual(withoutSweepMarker(stored.metadata_admin));
 });

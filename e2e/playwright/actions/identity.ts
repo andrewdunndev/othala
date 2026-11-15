@@ -89,3 +89,12 @@ export async function readIdentity(
   if (!resp.ok) throw new Error(`admin API identity read: HTTP ${resp.status} for ${id}`);
   return resp.json();
 }
+
+/**
+ * metadata_admin without the grant sweep's `grants_revoked` stamp, which the portal may add at any
+ * moment. Compare this, not the raw object, when a test checks that nothing else changed.
+ */
+export function withoutSweepMarker(metadata: Record<string, unknown> | null | undefined): Record<string, unknown> {
+  const { grants_revoked: _stamp, ...rest } = metadata ?? {};
+  return rest;
+}
