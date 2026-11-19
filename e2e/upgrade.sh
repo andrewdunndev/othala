@@ -28,7 +28,7 @@ load_env
 AUTH_VERSION="$PREV" up_and_wait
 
 # State an upgrade must keep: an identity, an API session, an OIDC grant with a refresh token.
-PW='upgrade-seed-Passw0rd-7431'
+PW="$SMOKE_PASSWORD"
 read -r SUB TOKEN <<<"$(cat <<JS | node_in othala
 const J={'Content-Type':'application/json'};
 const post=async(u,b)=>(await fetch(u,{method:'POST',headers:J,body:JSON.stringify(b)})).json();
@@ -41,8 +41,9 @@ const post=async(u,b)=>(await fetch(u,{method:'POST',headers:J,body:JSON.stringi
 JS
 )"
 [[ -n "${TOKEN:-}" ]] || { echo "  ✗ seeding failed"; exit 1; }
-REFRESH=$(AUTH_VERSION="$CUR" run_dance "$SUB" | sed -n 's/.*"refresh_token":"\([^"]*\)".*/\1/p')
-[[ -n "$REFRESH" ]] || { echo "  ✗ no refresh token from the seed dance"; exit 1; }
+DANCE=$(AUTH_VERSION="$CUR" run_dance "$SUB" "" "" "up.member@${OTHALA_APEX}")
+REFRESH=$(sed -n 's/.*"refresh_token":"\([^"]*\)".*/\1/p' <<<"$DANCE")
+[[ -n "$REFRESH" ]] || { echo "  ✗ no refresh token from the seed dance: ${DANCE:0:300}"; exit 1; }
 echo "  seeded identity, session and refresh token on $PREV"
 
 # DEPLOY.md: new example, new settings and secret keys, then the restart-rules command.

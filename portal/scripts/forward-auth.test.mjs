@@ -185,6 +185,7 @@ test('active identity NOT in group → 403', async () => {
   const res = await GET(ctx('access-proxywatch'));
   assert.equal(res.status, 403);
   assert.equal(res.headers.get('X-Kratos-Authenticated-Identity-Id'), null);
+  assert.equal(res.headers.get('X-Kratos-Authenticated-Username'), null);
 });
 
 test('inactive identity IN group → 403 (fail-closed state check)', async () => {
@@ -229,6 +230,7 @@ test('non-canonical stored group → 403, even when the required group matches i
   const res = await GET(ctx('access-proxywatch'));
   assert.equal(res.status, 403);
   assert.equal(res.headers.get('X-Kratos-Authenticated-Identity-Id'), null);
+  assert.equal(res.headers.get('X-Kratos-Authenticated-Username'), null);
 });
 
 test('one non-canonical group denies a group the identity legitimately holds', async () => {
@@ -328,6 +330,7 @@ test('aal1 session, identity holds totp → 401 (step up)', async () => {
   const res = await GET(ctx('access-proxywatch'));
   assert.equal(res.status, 401);
   assert.equal(res.headers.get('X-Kratos-Authenticated-Identity-Id'), null);
+  assert.equal(res.headers.get('X-Kratos-Authenticated-Username'), null);
   assert.equal((await HEAD(ctx('access-proxywatch'))).status, 401);
 });
 
@@ -340,6 +343,7 @@ test('aal1 session, admin-marked identity with no second factor → 401 (step up
   const res = await GET(ctx('access-proxywatch'));
   assert.equal(res.status, 401);
   assert.equal(res.headers.get('X-Kratos-Authenticated-Identity-Id'), null);
+  assert.equal(res.headers.get('X-Kratos-Authenticated-Username'), null);
 });
 
 test('aal2 session, identity holds totp → 200', async () => {
@@ -416,6 +420,7 @@ test('inbound identity headers naming a member never lift a non-member session �
   const res = await GET(ctxWithHeaders('family', SPOOFED_HEADERS));
   assert.equal(res.status, 403);
   assert.equal(res.headers.get('X-Kratos-Authenticated-Identity-Id'), null);
+  assert.equal(res.headers.get('X-Kratos-Authenticated-Username'), null);
 });
 
 test('inbound identity headers without a session → 401', async () => {
@@ -429,4 +434,37 @@ test('a deactivated identity is refused on the very next call, with no cached de
   assert.equal((await GET(ctx('family'))).status, 200);
   installFetch({ whoami: SESSION_OK, identity: { status: 200, body: { ...ACTIVE_IN_GROUP.body, state: 'inactive' } } });
   assert.equal((await GET(ctx('family'))).status, 403);
+});
+
+test('200 carries the username trait next to the identity id', async () => {
+  installFetch({
+    whoami: SESSION_OK,
+    identity: { status: 200, body: { ...ACTIVE_IN_GROUP.body, traits: { username: 'robin.k' } } },
+  });
+  const res = await GET(ctx('access-proxywatch'));
+  assert.equal(res.status, 200);
+  assert.equal(res.headers.get('X-Kratos-Authenticated-Username'), 'robin.k');
+  assert.equal(res.headers.get('X-Kratos-Authenticated-Identity-Id'), 'id-1');
+});
+
+for (const [label, traits] of [['absent', {}], ['empty', { username: '' }], ['not a string', { username: 7 }], ['no traits', undefined]]) {
+  test(`200 with a ${label} username omits the username header and keeps the id`, async () => {
+    installFetch({ whoami: SESSION_OK, identity: { status: 200, body: { ...ACTIVE_IN_GROUP.body, traits } } });
+    const res = await GET(ctx('access-proxywatch'));
+    assert.equal(res.status, 200);
+    assert.equal(res.headers.get('X-Kratos-Authenticated-Username'), null);
+    assert.equal(res.headers.get('X-Kratos-Authenticated-Identity-Id'), 'id-1');
+  });
+}
+
+test('401 and 403 carry no username header', async () => {
+  const withName = { status: 200, body: { ...ACTIVE_IN_GROUP.body, traits: { username: 'robin.k' } } };
+  installFetch({ whoami: { status: 401, body: {} }, identity: withName });
+  const unauth = await GET(ctx('access-proxywatch'));
+  assert.equal(unauth.status, 401);
+  assert.equal(unauth.headers.get('X-Kratos-Authenticated-Username'), null);
+  installFetch({ whoami: SESSION_OK, identity: withName });
+  const denied = await GET(ctx('access-other'));
+  assert.equal(denied.status, 403);
+  assert.equal(denied.headers.get('X-Kratos-Authenticated-Username'), null);
 });

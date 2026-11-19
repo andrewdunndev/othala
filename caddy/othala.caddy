@@ -21,6 +21,7 @@
 (othala-routes) {
 	route {
 		request_header -X-Kratos-Authenticated-Identity-Id
+		request_header -X-Kratos-Authenticated-Username
 		request_header -X-Kratos-Groups
 		request_header -Remote-*
 		request_header -X-Remote-*
@@ -94,6 +95,7 @@
 (othala-forward-auth) {
 	route {
 		request_header -X-Kratos-Authenticated-Identity-Id
+		request_header -X-Kratos-Authenticated-Username
 		request_header -X-Kratos-Groups
 		request_header -Remote-*
 		request_header -X-Remote-*
@@ -111,7 +113,7 @@
 		# bounced to the login page of a portal that is down loops.
 		forward_auth othala:8080 {
 			uri /api/forward-auth?group={args[2]}
-			copy_headers X-Kratos-Authenticated-Identity-Id
+			copy_headers X-Kratos-Authenticated-Identity-Id X-Kratos-Authenticated-Username
 
 			# return_to must be absolute, built from the request being gated, or the user lands on the portal. The path and
 			# query ride query-escaped; kratos.yml `allowed_return_urls` bounds the result, so an off-apex Host is refused.
@@ -144,6 +146,7 @@
 (othala-oidc-app) {
 	route {
 		request_header -X-Kratos-Authenticated-Identity-Id
+		request_header -X-Kratos-Authenticated-Username
 		request_header -X-Kratos-Groups
 		request_header -Remote-*
 		request_header -X-Remote-*

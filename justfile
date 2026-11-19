@@ -68,3 +68,16 @@ backup dir compose="deploy/example/compose.yml":
       docker compose -f "{{ compose }}" exec -T postgres pg_dump --username postgres --format custom --dbname "$db" > "{{ dir }}/$db.dump.partial"
     done
     for db in kratos hydra; do mv "{{ dir }}/$db.dump.partial" "{{ dir }}/$db.dump"; done
+
+# favicon rasters from portal/public/favicon.svg (the repo-root favicon.svg): ico 16/32/48, touch icon 180 on white, manifest 192/512
+icons:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    cd portal/public
+    cp ../../favicon.svg favicon.svg
+    t=$(mktemp -d); trap 'rm -rf "$t"' EXIT
+    for s in 16 32 48; do /opt/homebrew/bin/rsvg-convert -w $s -h $s favicon.svg -o "$t/$s.png"; done
+    /opt/homebrew/bin/magick "$t/16.png" "$t/32.png" "$t/48.png" favicon.ico
+    /opt/homebrew/bin/rsvg-convert -w 180 -h 180 -b white favicon.svg -o apple-touch-icon.png
+    /opt/homebrew/bin/rsvg-convert -w 192 -h 192 favicon.svg -o icon-192.png
+    /opt/homebrew/bin/rsvg-convert -w 512 -h 512 favicon.svg -o icon-512.png

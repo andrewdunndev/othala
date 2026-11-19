@@ -45,11 +45,12 @@ serves the Astro handler. The admin listener binds `PORTAL_ADMIN_BIND_HOST` with
 mux (the `ADMIN_GET` and `ADMIN_POST` maps) that never delegates to the Astro handler. SECURITY.md
 owns the listener controls and their tests.
 
-**Inbound headers are never an identity claim.** Group membership and identity id come from Kratos,
+**Inbound headers are never an identity claim.** Group membership, identity id and username come from Kratos,
 never from a request header. Every snippet in `caddy/othala.caddy` first deletes the inbound identity
-id and every header in the `Remote-*`, `X-Remote-*`, `X-Forwarded-User*`, `X-Auth-Request-*`,
-`X-Webauth-*` and `X-Authentik-*` families, so the upstream receives only the id taken from the auth
-response. Each snippet is a `route` block because Caddy's
+id and username headers and every header in the `Remote-*`, `X-Remote-*`, `X-Forwarded-User*`,
+`X-Auth-Request-*`, `X-Webauth-*` and `X-Authentik-*` families, so the upstream receives only
+`X-Kratos-Authenticated-Identity-Id` and `X-Kratos-Authenticated-Username` from the auth response,
+the username read from the verified identity. Each snippet is a `route` block because Caddy's
 default directive order would otherwise run `forward_auth` ahead of `request_header` and strip the
 verified id. Of the cookies, `othala-oidc-app` removes only the Kratos session cookie.
 

@@ -6,6 +6,13 @@ aims to follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 The git tag is the authoritative version; `portal/package.json` mirrors it.
 
+## [0.19.1] - 2026-11-19
+
+### Added
+
+- The portal serves the Othala mark as a favicon (`/favicon.svg`, `/favicon.ico`, `/apple-touch-icon.png`) and lists 192 and 512 px icons in the web manifest. `just icons` regenerates the rasters from the SVG.
+- forward-auth sets `X-Kratos-Authenticated-Username` (the username trait) beside the identity id for ExtAuth apps; the edge strips an inbound copy.
+
 ## [0.19.0] - 2026-11-13
 
 ### Added
