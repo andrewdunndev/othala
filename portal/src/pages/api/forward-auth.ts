@@ -18,6 +18,7 @@ export const prerender = false;
 // The group name policy is GROUP_RE (access-groups.ts); a group's type comes from its bindings, so `access-metrics` and `metrics` both pass.
 
 const ID_HEADER = 'X-Kratos-Authenticated-Identity-Id';
+const USER_HEADER = 'X-Kratos-Authenticated-Username';
 
 function text(status: number, body: string, headers: Record<string, string> = {}): Response {
   return new Response(body, {
@@ -79,8 +80,13 @@ async function decide(request: Request, url: URL): Promise<Response> {
     return text(401, 'unauthenticated');
   }
 
-  // 6. Allow; the identity id header is only ever SET from a server-verified id.
-  return text(200, 'ok', { [ID_HEADER]: identityId });
+  // 6. Allow; both headers are SET only from the server-verified identity, and a non-string or empty username is omitted.
+  const username = (identity.traits as { username?: unknown } | undefined)?.username;
+  const headers: Record<string, string> = { [ID_HEADER]: identityId };
+  if (typeof username === 'string' && username !== '') {
+    headers[USER_HEADER] = username;
+  }
+  return text(200, 'ok', headers);
 }
 
 export const GET: APIRoute = ({ request, url }) => decide(request, url);

@@ -23,5 +23,5 @@ proxywatch.othala.test {
 
 :8081 {
 	bind 127.0.0.1
-	respond "proxywatch-stub id={http.request.header.X-Kratos-Authenticated-Identity-Id} spoof={http.request.header.X-Remote-User}{http.request.header.Remote-User} cookie={http.request.header.Cookie}" 200
+	respond "proxywatch-stub id={http.request.header.X-Kratos-Authenticated-Identity-Id} user={http.request.header.X-Kratos-Authenticated-Username} spoof={http.request.header.X-Remote-User}{http.request.header.Remote-User} cookie={http.request.header.Cookie}" 200
 }

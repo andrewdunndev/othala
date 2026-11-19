@@ -30,7 +30,7 @@ const TEMPLATE = readFileSync(join(root, 'caddy/othala.caddy'), 'utf8');
 const renderedCaddy = (env = ENV, policy = root) => render(policy, CONTENT, env).find((f) => f.path === 'caddy/othala.caddy').content;
 
 const STRIPPED = [
-  'X-Kratos-Authenticated-Identity-Id', 'X-Kratos-Groups', 'Remote-*', 'X-Remote-*', 'X-Forwarded-User*', 'X-Forwarded-Groups',
+  'X-Kratos-Authenticated-Identity-Id', 'X-Kratos-Authenticated-Username', 'X-Kratos-Groups', 'Remote-*', 'X-Remote-*', 'X-Forwarded-User*', 'X-Forwarded-Groups',
   'X-Forwarded-Email', 'X-Forwarded-Preferred-Username', 'X-Auth-Request-*', 'X-Webauth-*', 'X-Authentik-*',
   '*_*',
 ];
@@ -152,7 +152,7 @@ test('forward-auth asks the portal with the group, copies the verified id, and p
   assert.deepEqual(blocks.map((b) => b.head), ['forward_auth othala:8080', 'reverse_proxy {args[0]}:{args[1]}']);
   assert.ok(body.indexOf(blocks[0]) > body.lastIndexOf('request_header -X-Kratos-Authenticated-Identity-Id'));
   assert.ok(blocks[0].body.includes('uri /api/forward-auth?group={args[2]}'));
-  assert.ok(blocks[0].body.includes('copy_headers X-Kratos-Authenticated-Identity-Id'));
+  assert.ok(blocks[0].body.includes('copy_headers X-Kratos-Authenticated-Identity-Id X-Kratos-Authenticated-Username'));
   assert.deepEqual(blocks[1].body, ['header_up -Cookie']);
   assert.ok(!allLines(snippet('othala-forward-auth')).some((l) => l.includes('/sessions/whoami')));
 });

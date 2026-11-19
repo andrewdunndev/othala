@@ -10,6 +10,7 @@ The git tag is the authoritative version; `portal/package.json` mirrors it.
 
 ### Added
 
+- forward-auth sets `X-Kratos-Authenticated-Username` (the username trait) beside the identity id for ExtAuth apps; the edge strips an inbound copy.
 - The portal serves the Othala mark as a favicon (`/favicon.svg`, `/favicon.ico`, `/apple-touch-icon.png`) and lists 192 and 512 px icons in the web manifest. `just icons` regenerates the rasters from the SVG.
 
 ## [0.19.0] - 2026-11-13

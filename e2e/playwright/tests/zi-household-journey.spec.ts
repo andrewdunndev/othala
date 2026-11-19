@@ -136,14 +136,15 @@ test('ZI1 — admin adds a person; they redeem, enrol a passkey and TOTP, and si
   const forged = await ctx.request.get(PROXYWATCH_ORIGIN, {
     headers: {
       'X-Kratos-Authenticated-Identity-Id': '00000000-0000-0000-0000-000000000000',
+      'X-Kratos-Authenticated-Username': 'forged.admin',
       'X-Remote-User': 'admin',
       'Remote-User': 'admin',
     },
     maxRedirects: 0,
   });
   expect(forged.status(), 'ZI1: the gate admits the person despite the forged headers').toBe(200);
-  expect(await forged.text(), 'ZI1: the app sees only the gate\'s identity id, no spoofed user and no cookie').toBe(
-    `proxywatch-stub id=${session!.identity.id} spoof= cookie=`,
+  expect(await forged.text(), 'ZI1: the app sees only the gate\'s identity id and username, no spoofed user and no cookie').toBe(
+    `proxywatch-stub id=${session!.identity.id} user=${person.username} spoof= cookie=`,
   );
 });
 
