@@ -167,6 +167,11 @@ Each names its enforcer and the test that fails if it stops working.
 - **Consent skip trusts the session.** A client with `skip_consent` mints tokens
   silently for whoever holds a stolen session cookie, which is why a stolen
   cookie is treated as a perimeter loss.
+- **An app keyed on the forwarded username follows the name, not `sub`.** An
+  ExtAuth-style app such as Navidrome keys its accounts on
+  `X-Kratos-Authenticated-Username`. Members cannot rename themselves (profile
+  gate), but an admin rename, or deleting a user and re-creating the same
+  username, hands that app account to whoever holds the name.
 
 ## Out of scope
 
