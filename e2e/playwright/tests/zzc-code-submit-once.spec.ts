@@ -36,8 +36,10 @@ test('ZZC1 — a doubled TOTP submit during app sign-in posts once and lands on 
       await r.continue();
     });
     const posts: string[] = [];
+    const appHits: string[] = [];
     page.on('request', (r) => {
       if (r.method() === 'POST' && r.url().includes('/self-service/login')) posts.push(r.url());
+      if (r.url().startsWith(APP_ORIGIN)) appHits.push(r.url());
     });
 
     await code.fill(await computeTotp(secret));
@@ -47,11 +49,14 @@ test('ZZC1 — a doubled TOTP submit during app sign-in posts once and lands on 
       await new Promise((res) => setTimeout(res, 1000));
       form.requestSubmit();
     });
-    await page.waitForURL((u) => u.origin === APP_ORIGIN, { timeout: 30_000 });
+    // The app host does not resolve, so the callback is read from the requests the page made, not from page.url().
+    const callback = () => appHits.map((u) => new URL(u)).find((u) => u.searchParams.has('code'));
+    await expect
+      .poll(() => callback()?.searchParams.get('code') ?? '', { message: `ZZC1: the authorize ends at the app callback with a code; posts=${posts.length}, app requests=${appHits.length}`, timeout: 30_000 })
+      .not.toBe('');
     await page.waitForTimeout(3000);
-    const end = new URL(page.url());
-    expect(end.origin, `ZZC1: ends at the app, got ${end}`).toBe(APP_ORIGIN);
-    expect(end.searchParams.get('code'), 'ZZC1: the app receives a code').toBeTruthy();
+    expect(`${callback()?.origin}${callback()?.pathname}`, 'ZZC1: the callback is the registered redirect_uri').toBe(GRAFANA_REDIRECT_URI);
+    expect(callback()?.searchParams.get('state'), 'ZZC1: the callback carries the authorize state').toBe('zzc-state');
     expect(posts, 'ZZC1: one POST left the page').toHaveLength(1);
   } finally {
     await ctx.close();
