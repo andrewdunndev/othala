@@ -1,5 +1,6 @@
-// VC — a client with consent.skip_step_up takes a passkey-only aal1 session, an admin-marked member included; the admin
-// pages, forward-auth and every unflagged client keep asking for aal2; the tile opens presentation.launch_url.
+// VC — a client with consent.skip_step_up takes a passkey-only aal1 session, an admin-marked member included, and asks a
+// password-only one for TOTP; the admin pages, forward-auth and every unflagged client keep asking for aal2; the tile opens
+// presentation.launch_url.
 
 import type { Page } from '@playwright/test';
 import { test, expect, enrollTotpSecret, GRAFANA_CLIENT_ID, GRAFANA_REDIRECT_URI } from '../fixtures';
@@ -101,4 +102,23 @@ test('VC5 — the tile opens presentation.launch_url', async ({ baseURL, kratosA
   await expect(tile, 'VC5: the tile links to launch_url, not url').toHaveAttribute('href', LAUNCH_URL);
   const grafanaTile = page.locator('.tile[data-slug="grafana"] a.tile-launch');
   await expect(grafanaTile, 'VC5: a tile with no launch_url keeps url').toHaveAttribute('href', 'https://grafana.othala.test');
+});
+
+test('VC6 — a password-only sign-in into the opted-out client is asked for TOTP', async ({ baseURL, kratosAdminURL, page, virtualAuthenticator }) => {
+  test.setTimeout(120_000);
+  expect(virtualAuthenticator.authenticatorId, 'VC6: virtual authenticator is attached').toBeTruthy();
+  const ctx = page.context();
+  const email = await seed('vc6.member', kratosAdminURL, false);
+  await loginViaJsonApi(ctx, { identifier: email, password: TEST_PASSWORD }, baseURL!);
+  await registerPasskey(page, baseURL!);
+  await enrollTotpSecret(ctx, baseURL!);
+  await ctx.clearCookies();
+
+  // A password session is aal1 like a passkey one, but the opt-out reads the sign-in method, so the client steps up.
+  await loginViaJsonApi(ctx, { identifier: email, password: TEST_PASSWORD }, baseURL!);
+  expect((await getSession(ctx, baseURL!))?.authenticator_assurance_level, 'VC6: the password session is aal1').toBe('aal1');
+  const hops = await walk(ctx, baseURL!, authorizeUrl(baseURL!, OPT_OUT_CLIENT, OPT_OUT_REDIRECT), (loc) => isAsk(loc.toString()));
+  const ask = hops.at(-1);
+  expect(ask?.pathname, `VC6: the opted-out client steps up, hops ${hops.join(' > ')}`).toBe('/auth/login');
+  expect(ask?.searchParams.get('aal'), 'VC6: the step-up asks for aal2').toBe('aal2');
 });

@@ -1646,7 +1646,7 @@ for (const skip of [false, true]) {
     const res = await handleLogin(new Request('https://x/oauth2/login?login_challenge=lc'), {
       oauth2: api,
       getIdentity: async () => activeMember({ credentials: withCredentials(activeMember(), 'passkey', 'totp').credentials }),
-      getSession: defaultSession(),
+      getSession: async () => session('aal1', ['passkey'], { identity: whoamiIdentity(activeMember()) }),
       manifest: () => optedOut('grafana'),
     });
     assert.equal(res.headers.get('location'), 'https://sso.othala.test/after-login');
@@ -1666,6 +1666,18 @@ for (const skip of [false, true]) {
     assert.equal(calls.acceptLogin, 0);
   });
 }
+
+test('login on an opted-out client bounces a password-only aal1 session to aal2', async () => {
+  const { api, calls } = stubOAuth2({ getOAuth2LoginRequest: async () => oauth2LoginRequest() });
+  const res = await handleLogin(new Request('https://x/oauth2/login?login_challenge=lc'), {
+    oauth2: api,
+    getIdentity: async () => activeMember({ credentials: withCredentials(activeMember(), 'password', 'totp').credentials }),
+    getSession: defaultSession(),
+    manifest: () => optedOut('grafana'),
+  });
+  assert.equal(new URL(res.headers.get('location'), 'https://sso.othala.test').searchParams.get('aal'), 'aal2');
+  assert.equal(calls.acceptLogin, 0);
+});
 
 test('device login on an opted-out client still bounces an aal1 password+totp session to aal2', async () => {
   const { api, calls } = stubOAuth2({

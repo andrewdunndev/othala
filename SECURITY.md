@@ -150,7 +150,7 @@ Each names its enforcer and the test that fails if it stops working.
 - **A picture is public to anyone holding its URL.** `/avatar/<id>/<hash>` is served
   without a session because apps fetch it themselves; the URL needs the identity id
   and a prefix of the content hash; a new picture is a new URL and the old one stops serving.
-- **A client with `skip_step_up` accepts a passkey alone, admins included.** A stolen aal1 session reaches those apps, and any in-app admin role they map, for the session lifespan; portal admin, settings, device grants, forward-auth and other clients still require aal2.
+- **A client with `skip_step_up` accepts a passkey alone, admins included.** Only a session whose aal1 sign-in methods are all `passkey` qualifies; password and emailed-code sessions step up. A stolen passkey-signed aal1 session reaches those apps, and any in-app admin role they map, for the session lifespan; portal admin, settings, device grants, forward-auth and other clients still require aal2.
 - **Sessions are long-lived and `whoami` answers at the first assurance level**
   (`kratos/kratos.yml`, `session`). A stolen cookie stays valuable for the
   session lifespan; revocation ends it sooner.

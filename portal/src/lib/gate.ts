@@ -120,7 +120,18 @@ export function stepUpAtLanding(
 export type AccessTarget = { app: ClientManifest | undefined } | { group: string } | 'admin' | 'emailed-code';
 export type AccessDecision = { allow: true } | { stepUp: true } | { deny: string };
 /** `fresh`: the session is within the admin freshness window; only the admin pages read it. */
-export type SessionFacts = Pick<Session, 'authenticator_assurance_level'> & { fresh?: boolean };
+export type SessionFacts = Pick<Session, 'authenticator_assurance_level' | 'authentication_methods'> & { fresh?: boolean };
+
+/**
+ * A passkey sign-in at aal1: at least one aal1 method, and every aal1 method is the Kratos `passkey` strategy (a
+ * discoverable credential with user verification). `webauthn` is not counted: it is configured `passwordless: false`, a
+ * second factor recorded at aal2. Password, code, link, oidc and anything unknown never qualify, and a passkey beside
+ * any other aal1 method does not either.
+ */
+export function isPasskeySignIn(session: SessionFacts | null | undefined): boolean {
+  const aal1 = (session?.authentication_methods ?? []).filter((m) => m.aal === 'aal1');
+  return aal1.length > 0 && aal1.every((m) => m.method === 'passkey');
+}
 
 /**
  * The access policy for app sign-in, forward-auth, the admin pages and emailed codes. Apps and groups: the gate first
@@ -142,7 +153,9 @@ export function decideAccess(
   const gate =
     'group' in target ? enforceGroupGate(identity, target.group) : enforceAccessGate(identity, target.app);
   if (!gate.allowed) return { deny: gate.reason ?? '' };
-  if ('app' in target && target.app?.skipStepUp) return { allow: true };
+  if ('app' in target && target.app?.skipStepUp && session?.authenticator_assurance_level === 'aal1' && isPasskeySignIn(session)) {
+    return { allow: true };
+  }
   return needsStepUp(session, identity, manifests) ? { stepUp: true } : { allow: true };
 }
 

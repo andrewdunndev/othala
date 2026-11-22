@@ -49,7 +49,7 @@ people who can see the tile), into `apps/` under `/etc/othala` and SIGHUP the po
 
 `presentation.launch_url` (optional) is where the tile's Open link goes, for an app whose entry point is not its `url` (a path or fragment such as `#/sso?identifier=dag`). It must be https on exactly the host of `url`; the manifest lint blocks anything else, and the tile falls back to `url`.
 
-`consent.skip_step_up: true` (optional, default false) lets that OIDC client accept an aal1 passkey session where it would otherwise ask for a second step, for any identity and any in-app admin role it maps. The portal admin pages, settings, device grants, forward-auth and every unflagged client still require aal2, and the id_token `acr` is `aal1`. The lint blocks the flag on a presentation-only manifest or a `device_code` client.
+`consent.skip_step_up: true` (optional, default false) lets that OIDC client accept an aal1 session whose only sign-in was a passkey where it would otherwise ask for a second step, for any identity and any in-app admin role it maps. A password or emailed-code sign-in still steps up. The portal admin pages, settings, device grants, forward-auth and every unflagged client still require aal2, and the id_token `acr` is `aal1`. The lint blocks the flag on a presentation-only manifest or a `device_code` client.
 
 ## Wiring a new relying party
 

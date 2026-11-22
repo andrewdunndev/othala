@@ -11,7 +11,7 @@ The git tag is the authoritative version; `portal/package.json` mirrors it.
 ### Added
 
 - `presentation.launch_url` sets where an app tile's Open link goes; it must be https on the host of `presentation.url`, and the manifest lint blocks anything else.
-- `consent.skip_step_up: true` lets an OIDC client accept an aal1 passkey session in place of step-up, admins included; the admin pages, settings, device grants, forward-auth and every other client still require aal2, and the manifest lint blocks the flag on a presentation-only manifest or a `device_code` client.
+- `consent.skip_step_up: true` lets an OIDC client accept an aal1 session signed in by a passkey alone in place of step-up, admins included (a password or emailed-code sign-in still steps up); the admin pages, settings, device grants, forward-auth and every other client still require aal2, and the manifest lint blocks the flag on a presentation-only manifest or a `device_code` client.
 
 ### Fixed
 
