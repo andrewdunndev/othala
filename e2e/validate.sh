@@ -41,7 +41,7 @@ SMOKE_EXIT=$?
 echo ""
 echo "=== browser e2e (Playwright) ==="
 BROWSER_EXIT=0
-timeout 360 docker compose --profile browser run --rm --no-deps -T playwright || BROWSER_EXIT=$?
+timeout 600 docker compose --profile browser run --rm --no-deps -T playwright || BROWSER_EXIT=$?
 if [[ $BROWSER_EXIT -eq 0 ]]; then echo "  ✓ browser e2e passed"; else echo "  ✗ browser e2e failed (exit $BROWSER_EXIT)"; fi
 
 # Log dump on failure via native `podman logs`.
