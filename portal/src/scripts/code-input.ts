@@ -1,6 +1,8 @@
 // One-time code inputs take digits only: " 482 913" typed, pasted or autofilled becomes 482913, so a copied code never
 // meets the browser's "match the requested format" message. Without script the pattern and title still guard the field.
 
+import { createSubmitOnce } from './submit-once';
+
 const digits = (v: string, max: number) => v.replace(/\D+/g, '').slice(0, max);
 // maxlength is set above six so the browser never truncates a spaced code before the script strips it.
 const LEN = 6;
@@ -21,4 +23,17 @@ document.addEventListener('paste', (e) => {
   e.preventDefault();
   el.value = digits(text, LEN);
   el.dispatchEvent(new Event('input', { bubbles: true }));
+});
+
+const once = createSubmitOnce();
+const codeForms = () => [...document.forms].filter((f) => f.querySelector('input.code-input, input.codeinput'));
+
+document.addEventListener('submit', (e) => {
+  const form = e.target;
+  if (!(form instanceof HTMLFormElement) || !form.querySelector('input.code-input, input.codeinput')) return;
+  if (!once.allow(form)) e.preventDefault();
+});
+
+window.addEventListener('pageshow', (e) => {
+  if (e.persisted) for (const f of codeForms()) once.rearm(f);
 });
