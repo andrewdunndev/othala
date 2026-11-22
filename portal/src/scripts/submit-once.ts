@@ -17,3 +17,17 @@ export function createSubmitOnce() {
     },
   };
 }
+
+interface SubmitTarget {
+  addEventListener(type: 'submit', h: (e: Event) => void, capture: boolean): void;
+}
+
+// Registered in the capture phase: the Astro router listens for submit on the document too and, finding the event
+// not yet cancelled, posts the form itself. Running first lets this guard cancel the repeat before the router sees it.
+export function guardSubmits(doc: SubmitTarget, once: ReturnType<typeof createSubmitOnce>, isGuarded: (form: unknown) => boolean): void {
+  doc.addEventListener('submit', (e) => {
+    const form = e.target;
+    if (!form || !isGuarded(form)) return;
+    if (!once.allow(form)) e.preventDefault();
+  }, true);
+}

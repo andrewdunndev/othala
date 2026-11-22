@@ -32,7 +32,7 @@ test('ZZC1 — a doubled TOTP submit during app sign-in posts once and lands on 
 
     // Hold the first POST so the second submit lands while it is in flight, as it does on a phone.
     await page.route(/\/self-service\/login\?flow=/, async (r) => {
-      if (r.request().method() === 'POST') await new Promise((res) => setTimeout(res, 1500));
+      if (r.request().method() === 'POST') await new Promise((res) => setTimeout(res, 3000));
       await r.continue();
     });
     const posts: string[] = [];
@@ -47,12 +47,53 @@ test('ZZC1 — a doubled TOTP submit during app sign-in posts once and lands on 
       await new Promise((res) => setTimeout(res, 1000));
       form.requestSubmit();
     });
-    await page.waitForURL((u) => u.origin === APP_ORIGIN, { timeout: 20_000 });
-    await page.waitForTimeout(1500);
+    await page.waitForURL((u) => u.origin === APP_ORIGIN, { timeout: 30_000 });
+    await page.waitForTimeout(3000);
     const end = new URL(page.url());
     expect(end.origin, `ZZC1: ends at the app, got ${end}`).toBe(APP_ORIGIN);
     expect(end.searchParams.get('code'), 'ZZC1: the app receives a code').toBeTruthy();
     expect(posts, 'ZZC1: one POST left the page').toHaveLength(1);
+  } finally {
+    await ctx.close();
+  }
+});
+
+test('ZZC2 — a doubled TOTP enrol submit on settings posts once, through the router too', async ({ browser, baseURL, kratosAdminURL }) => {
+  test.setTimeout(90_000);
+  const username = `zzc2.member.${Date.now()}`;
+  const email = `${username}@othala.test`;
+  await createIdentityWithPassword({ email, username, displayName: 'ZZC zzc2', groups: [], kratosAdminURL });
+  const ctx = await browser.newContext();
+  try {
+    await loginViaJsonApi(ctx, { identifier: email, password: TEST_PASSWORD }, baseURL);
+    const page = await ctx.newPage();
+    await page.goto(`${baseURL}/auth/settings`, { waitUntil: 'networkidle' });
+    await page.locator('.lbl-setup', { hasText: 'Set up authenticator app' }).click();
+    const form = page.locator('form:has(.totp-secret-value)');
+    const secret = ((await form.locator('.totp-secret-value').textContent()) ?? '').replace(/\s+/g, '');
+    expect(secret, 'ZZC2: the setup key is a base32 secret').toMatch(/^[A-Z2-7]{16,}$/i);
+
+    // Hold the first POST so the second submit lands while it is in flight. Requests are counted at the page, so a
+    // fetch made by the router counts as well as a native form post.
+    await page.route(/\/self-service\/settings\?flow=/, async (r) => {
+      if (r.request().method() === 'POST') await new Promise((res) => setTimeout(res, 3000));
+      await r.continue();
+    });
+    const posts: string[] = [];
+    page.on('request', (r) => {
+      if (r.method() === 'POST' && r.url().includes('/self-service/settings')) posts.push(r.url());
+    });
+
+    await form.locator('input[name="totp_code"]').fill(await computeTotp(secret));
+    await page.evaluate(async () => {
+      const f = document.querySelector<HTMLFormElement>('form:has(#totp-code)')!;
+      f.requestSubmit();
+      await new Promise((res) => setTimeout(res, 1000));
+      f.requestSubmit();
+    });
+    await expect(page.locator('.totp-secret-value'), 'ZZC2: enrolled, so the setup key is no longer offered').toHaveCount(0, { timeout: 20_000 });
+    await page.waitForTimeout(3000);
+    expect(posts, 'ZZC2: one settings POST left the page').toHaveLength(1);
   } finally {
     await ctx.close();
   }
