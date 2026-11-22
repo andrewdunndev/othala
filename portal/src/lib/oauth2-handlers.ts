@@ -222,7 +222,8 @@ export async function handleLogin(req: Request, deps: Deps = {}): Promise<Respon
   if (freshness === 'login_required') return rejectLogin(d, challenge, freshness, 400);
   if (freshness === 'refresh') return loginBounce(challenge, device ? 'refresh=true&aal=aal2&' : 'refresh=true&');
 
-  if ('stepUp' in access) return loginBounce(challenge, 'aal=aal2&');
+  // The opt-out skips the step-up verdict, never the device grant's aal2.
+  if ('stepUp' in access || (device && acr !== 'aal2')) return loginBounce(challenge, 'aal=aal2&');
 
   try {
     const { redirect_to } = await d.oauth2.acceptOAuth2LoginRequest({

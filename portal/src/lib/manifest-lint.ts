@@ -1,6 +1,7 @@
 // Manifest lint: cross-checks every group a manifest references against the
 // known-group set so a typo'd group surfaces as a finding, not a silent lockout.
-// BLOCK: a retired icon_slug or icon_fallback. BLOCK: a launch_url that is not https on the host of url. BLOCK (also enforced by validateClients at load): empty accessGroups without
+// BLOCK: a retired icon_slug or icon_fallback; a launch_url that is not https on the host of url; consent.skip_step_up on a
+// presentation-only manifest or a device_code client. BLOCK (also enforced by validateClients at load): empty accessGroups without
 // skipAccessCheck, a duplicated group, an undeclared group_role_map role.
 // WARN: a group missing from the known set, or missing the canonical form; a `requires` name with no requirements/<name>.md.
 
@@ -48,6 +49,11 @@ export function lintManifests(
           'satisfy the gate, so this app is unreachable. Declare presentation.access: ' +
           'or set consent.skip_access_check.',
       );
+    }
+
+    if (m.skipStepUp) {
+      if (m.presentationOnly) block('consent.skip_step_up is set on a presentation-only manifest: it has no OIDC client to opt out, and forward-auth never reads it');
+      if (m.grantTypes.includes('urn:ietf:params:oauth:grant-type:device_code')) block('consent.skip_step_up is set on a device_code client: a device grant always takes aal2');
     }
 
     if (m.retiredIcon) {

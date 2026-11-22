@@ -324,6 +324,7 @@ describe('step-up and elevation', () => {
     const member = (groups = ['x-access']) => buildIdentity({ metadataAdmin: { groups } });
     const aal1 = { authenticator_assurance_level: 'aal1' };
     const aal2 = { authenticator_assurance_level: 'aal2' };
+    const optOut = { ...x, skipStepUp: true };
     const cases = [
       ['app: member at aal1', member(), { app: x }, aal1, 'allow'],
       ['app: not in an access group', member([]), { app: x }, aal1, 'deny'],
@@ -335,6 +336,13 @@ describe('step-up and elevation', () => {
       ['app: admin marker at aal1', asAdmin(member()), { app: x }, aal1, 'stepUp'],
       ['app: elevated role at aal1', member(['x-access', 'x-admin']), { app: x }, aal1, 'stepUp'],
       ['app: denial outranks step-up', withTotp(member([])), { app: x }, aal1, 'deny'],
+      ['app opt-out: admin with a second factor at aal1', withTotp(asAdmin(member())), { app: optOut }, aal1, 'allow'],
+      ['app opt-out: elevated role at aal1', member(['x-access', 'x-admin']), { app: optOut }, aal1, 'allow'],
+      ['app opt-out: not in an access group', withTotp(member([])), { app: optOut }, aal1, 'deny'],
+      ['app opt-out: inactive identity', { ...withTotp(member()), state: 'inactive' }, { app: optOut }, aal1, 'deny'],
+      ['app opt-out: non-canonical stored group', withTotp(member(['x-access', 'Bad Name'])), { app: optOut }, aal1, 'deny'],
+      ['app opt-out: the flag is not read for admin', withTotp(asAdmin(member())), 'admin', { ...aal1, fresh: true }, 'stepUp'],
+      ['group: second factor at aal1 (no opt-out form)', withTotp(member()), { group: 'x-access' }, aal1, 'stepUp'],
       ['group: member at aal1', member(), { group: 'x-access' }, aal1, 'allow'],
       ['group: not a member', member(), { group: 'y-access' }, aal1, 'deny'],
       ['group: non-canonical stored group', member(['x-access', 'Bad Name']), { group: 'x-access' }, aal1, 'deny'],

@@ -142,6 +142,7 @@ export function decideAccess(
   const gate =
     'group' in target ? enforceGroupGate(identity, target.group) : enforceAccessGate(identity, target.app);
   if (!gate.allowed) return { deny: gate.reason ?? '' };
+  if ('app' in target && target.app?.skipStepUp) return { allow: true };
   return needsStepUp(session, identity, manifests) ? { stepUp: true } : { allow: true };
 }
 

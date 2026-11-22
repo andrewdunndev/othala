@@ -1634,3 +1634,69 @@ describe('handleLogin when Hydra is unreachable', () => {
     spy.mockRestore();
   });
 });
+
+// consent.skip_step_up: an opted-out client takes an aal1 session for an identity that would otherwise step up; a device
+// grant keeps aal2 regardless.
+const optedOut = (name) => ({ ...loadManifest(name), skipStepUp: true });
+
+for (const skip of [false, true]) {
+  const branch = skip ? 'skip' : 'fresh';
+  test(`login (${branch}) accepts an aal1 session with a second factor for an opted-out client, acr aal1`, async () => {
+    const { api, calls } = stubOAuth2(skip ? {} : { getOAuth2LoginRequest: async () => oauth2LoginRequest() });
+    const res = await handleLogin(new Request('https://x/oauth2/login?login_challenge=lc'), {
+      oauth2: api,
+      getIdentity: async () => activeMember({ credentials: withCredentials(activeMember(), 'passkey', 'totp').credentials }),
+      getSession: defaultSession(),
+      manifest: () => optedOut('grafana'),
+    });
+    assert.equal(res.headers.get('location'), 'https://sso.othala.test/after-login');
+    assert.equal(calls.acceptLogin, 1);
+    assert.equal(calls.acceptLoginBody.acr, 'aal1');
+  });
+
+  test(`login (${branch}) still steps the same session up for a client without the flag`, async () => {
+    const { api, calls } = stubOAuth2(skip ? {} : { getOAuth2LoginRequest: async () => oauth2LoginRequest() });
+    const res = await handleLogin(new Request('https://x/oauth2/login?login_challenge=lc'), {
+      oauth2: api,
+      getIdentity: async () => activeMember({ credentials: withCredentials(activeMember(), 'passkey', 'totp').credentials }),
+      getSession: defaultSession(),
+      manifest: () => loadManifest('grafana'),
+    });
+    assert.equal(new URL(res.headers.get('location'), 'https://sso.othala.test').searchParams.get('aal'), 'aal2');
+    assert.equal(calls.acceptLogin, 0);
+  });
+}
+
+test('device login on an opted-out client still bounces an aal1 password+totp session to aal2', async () => {
+  const { api, calls } = stubOAuth2({
+    getOAuth2LoginRequest: async () => oauth2LoginRequest({ client: { client_id: 'stepca' }, request_url: DEVICE_URL }),
+  });
+  const res = await handleLogin(new Request('https://x/oauth2/login?login_challenge=lc'), {
+    oauth2: api,
+    getIdentity: async () => deviceMember('password', 'totp'),
+    getSession: defaultSession(),
+    manifest: () => optedOut('stepca'),
+  });
+  assert.equal(new URL(res.headers.get('location'), 'https://sso.othala.test').searchParams.get('aal'), 'aal2');
+  assert.equal(calls.acceptLogin, 0);
+});
+
+test('device login on an opted-out client with no second factor is refused', async () => {
+  const origWarn = console.warn;
+  console.warn = () => {};
+  try {
+    const { api, calls } = stubOAuth2({
+      getOAuth2LoginRequest: async () => oauth2LoginRequest({ client: { client_id: 'stepca' }, request_url: DEVICE_URL }),
+    });
+    await handleLogin(new Request('https://x/oauth2/login?login_challenge=lc'), {
+      oauth2: api,
+      getIdentity: async () => deviceMember('passkey'),
+      getSession: defaultSession(),
+      manifest: () => optedOut('stepca'),
+    });
+    assert.equal(calls.acceptLogin, 0);
+    assert.equal(calls.rejectLogin, 1);
+  } finally {
+    console.warn = origWarn;
+  }
+});

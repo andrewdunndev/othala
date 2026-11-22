@@ -41,6 +41,8 @@ export interface ClientManifest {
   emitGroupsClaim: boolean | null;
   /** Disables the access gate for this app. */
   skipAccessCheck: boolean;
+  /** An OIDC client that takes an aal1 passkey session where it would ask for step-up. Portal policy: only the app gate reads it. */
+  skipStepUp: boolean;
   sourcePath: string;
   /** Prerequisite names defined under requirements/. */
   requires?: string[];
@@ -228,6 +230,7 @@ export function parseManifest(yamlText: string, filename: string): ClientManifes
       groupRoleMap: {},
       emitGroupsClaim: null,
       skipAccessCheck: readFlag(c, 'skip_access_check', file) ?? false,
+      skipStepUp: readFlag(c, 'skip_step_up', file) ?? false,
       sourcePath: file,
       requires: readRequires(p.requires),
       retiredIcon,
@@ -261,6 +264,7 @@ export function parseManifest(yamlText: string, filename: string): ClientManifes
     groupRoleMap: normaliseGroupRoleMap(c.group_role_map),
     emitGroupsClaim: readFlag(c, 'emit_groups_claim', file),
     skipAccessCheck: readFlag(c, 'skip_access_check', file) ?? false,
+    skipStepUp: readFlag(c, 'skip_step_up', file) ?? false,
     sourcePath: file,
     requires: readRequires(p.requires),
     retiredIcon,

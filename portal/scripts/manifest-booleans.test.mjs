@@ -19,6 +19,7 @@ const manifestWith = (where, key, value) => {
 
 const FLAGS = [
   ['consent', 'skip_access_check'],
+  ['consent', 'skip_step_up'],
   ['oidc', 'skip_consent'],
   ['oidc', 'backchannel_logout_session_required'],
   ['consent', 'emit_groups_claim'],

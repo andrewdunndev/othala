@@ -3,6 +3,7 @@
 Rulings a change must not reverse. The reasoning is in git history; the enforcer is named or UNENFORCED.
 
 - `whoami.required_aal` stays `aal1`; step-up is per flow in the app. Enforced by `portal/scripts/forward-auth.test.mjs`, `portal/scripts/contract.test.mjs`, `e2e/playwright/tests/v-app-stepup.spec.ts`.
+- Step-up is per client: `consent.skip_step_up: true` lets that OIDC client accept an aal1 passkey session for any identity, admin-marked included; portal admin pages, settings, device grants, forward-auth, the landing and every unflagged client keep aal2 (operator, 2026-11-22). Enforced by `portal/scripts/gate.test.mjs`, `e2e/playwright/tests/vc-client-stepup-optout.spec.ts`.
 - Forward-auth answers 200/401/403/503; an outage is never a 403; the group is a query parameter, never a header; HEAD = GET. Enforced by `portal/scripts/forward-auth.test.mjs`.
 - Admin authority is the boolean `metadata_admin.admin`, never a group or an env allowlist; the portal is its only validator. Enforced by `portal/src/lib/metadata-admin.ts`, `portal/src/lib/identity-facts.test.ts`.
 - Entry comes only from a manifest's access binding, admins included; a group's type comes from its binding, never its name; role is the highest-ranked declared role over all held groups. Enforced by `portal/scripts/gate-property.test.mjs`, `e2e/playwright/tests/t-access-model.spec.ts`.

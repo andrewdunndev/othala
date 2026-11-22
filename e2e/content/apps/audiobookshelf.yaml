@@ -5,6 +5,7 @@ presentation:
   name: Audiobookshelf
   description: Self-hosted audiobook and podcast server with multi-user progress sync.
   url: https://audiobookshelf.othala.test
+  launch_url: https://audiobookshelf.othala.test/login#/sso?identifier=dag
   icon: AB
   auth_kind: oidc
   # Entry only; audiobookshelf-admin is a role and is deliberately absent here.
@@ -37,6 +38,8 @@ oidc:
 # https://www.audiobookshelf.org/guides/oidc_authentication/
 consent:
   emit_groups_claim: true
+  # The fixture for the per-client step-up opt-out (vc-client-stepup-optout.spec.ts); grafana stays without it.
+  skip_step_up: true
   roles:
     # Declaration order is rank, descending privilege (see grafana.yaml).
     admin:
