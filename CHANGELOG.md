@@ -6,6 +6,12 @@ aims to follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 The git tag is the authoritative version; `portal/package.json` mirrors it.
 
+## [0.19.2] - 2026-11-22
+
+### Fixed
+
+- A code form (authenticator, email, recovery or verification code) submits once per page load, so iOS code AutoFill followed by a tap no longer sends a second request that sends the sign-in to the portal instead of back to the app.
+
 ## [0.19.1] - 2026-11-19
 
 ### Added
