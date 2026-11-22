@@ -47,6 +47,8 @@ Group names are convention; `ARCHITECTURE.md` § The access model is the rule.
 Drop `<stem>.yaml`, and optionally `<stem>.md` (guide) and `<stem>.svg` (logo, at most 32 KiB, shown only to
 people who can see the tile), into `apps/` under `/etc/othala` and SIGHUP the portal.
 
+`presentation.launch_url` (optional) is where the tile's Open link goes, for an app whose entry point is not its `url` (a path or fragment such as `#/sso?identifier=dag`). It must be https on exactly the host of `url`; the manifest lint blocks anything else, and the tile falls back to `url`.
+
 ## Wiring a new relying party
 
 Generate a client secret, store it, and write the manifest with

@@ -8,6 +8,10 @@ The git tag is the authoritative version; `portal/package.json` mirrors it.
 
 ## [0.19.2] - 2026-11-22
 
+### Added
+
+- `presentation.launch_url` sets where an app tile's Open link goes; it must be https on the host of `presentation.url`, and the manifest lint blocks anything else.
+
 ### Fixed
 
 - A code form (authenticator, email, recovery or verification code) submits once per page load, so iOS code AutoFill followed by a tap no longer sends a second request that sends the sign-in to the portal instead of back to the app.

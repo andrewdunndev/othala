@@ -258,7 +258,7 @@ const devLinks = [
             data-app-mono={t.icon}
           >
             <div data-slot="actions">
-              <AppActions name={t.name} href={safeHref(t.url)} requirements={v.requirements} ready={v.readiness === 'ready'} />
+              <AppActions name={t.name} href={safeHref(t.launchUrl)} requirements={v.requirements} ready={v.readiness === 'ready'} />
             </div>
             <div data-slot="prereq">
               {v.requirements.map((r) => (

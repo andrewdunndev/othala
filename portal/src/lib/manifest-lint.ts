@@ -1,6 +1,6 @@
 // Manifest lint: cross-checks every group a manifest references against the
 // known-group set so a typo'd group surfaces as a finding, not a silent lockout.
-// BLOCK: a retired icon_slug or icon_fallback. BLOCK (also enforced by validateClients at load): empty accessGroups without
+// BLOCK: a retired icon_slug or icon_fallback. BLOCK: a launch_url that is not https on the host of url. BLOCK (also enforced by validateClients at load): empty accessGroups without
 // skipAccessCheck, a duplicated group, an undeclared group_role_map role.
 // WARN: a group missing from the known set, or missing the canonical form; a `requires` name with no requirements/<name>.md.
 
@@ -53,6 +53,8 @@ export function lintManifests(
     if (m.retiredIcon) {
       block('presentation.icon_slug and icon_fallback are retired: drop the logo beside the manifest as <stem>.svg');
     }
+
+    if (m.launchUrlProblem) block(m.launchUrlProblem);
 
     // BLOCK: duplicate group within this manifest's access binding.
     const seen = new Set<string>();
