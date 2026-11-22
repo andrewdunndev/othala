@@ -124,7 +124,7 @@ export type SessionFacts = Pick<Session, 'authenticator_assurance_level' | 'auth
 
 /**
  * A passkey sign-in at aal1: at least one aal1 method, and every aal1 method is the Kratos `passkey` strategy (a
- * discoverable credential with user verification). `webauthn` is not counted: it is configured `passwordless: false`, a
+ * discoverable credential; Kratos asks for user verification as preferred, not required). `webauthn` is not counted: it is configured `passwordless: false`, a
  * second factor recorded at aal2. Password, code, link, oidc and anything unknown never qualify, and a passkey beside
  * any other aal1 method does not either.
  */
