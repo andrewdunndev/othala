@@ -21,5 +21,5 @@ test('ZZ1 — a refresh succeeds while the session lives and is refused once its
 
   const revoked = await adminApi(KRATOS_ADMIN_URL, 'DELETE', `identities/${member.id}/sessions`);
   expect(revoked.ok, `session revoke: ${revoked.status}`).toBe(true);
-  await expectRefreshRefused(browser, hydraPublicURL, rotated!, 'guard: a refresh with no active session is refused by the token hook');
+  await expectRefreshRefused(browser, hydraPublicURL, rotated!, 'guard: a refresh with no active session is refused by the token hook', [403]);
 });

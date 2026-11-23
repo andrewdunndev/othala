@@ -89,12 +89,12 @@ export async function liveRefreshToken(opts: {
   }
 }
 
-/** 400/401: the grant is gone; 403: the token hook refused a refresh for a subject with no live session. */
-export async function expectRefreshRefused(browser: Browser, hydraPublicURL: string, refreshToken: string, why = 'refresh after the change') {
+/** Default 400/401: the grant is gone. Pass [403] to pin the token hook's refusal, which a revoked grant must not be able to satisfy. */
+export async function expectRefreshRefused(browser: Browser, hydraPublicURL: string, refreshToken: string, why = 'refresh after the change', expected = [400, 401]) {
   const ctx = await browser.newContext();
   try {
     const resp = await tokenGrant(ctx, hydraPublicURL, { grant_type: 'refresh_token', refresh_token: refreshToken });
-    expect([400, 401, 403], `${why}: refresh must be refused; got ${resp.status()}`).toContain(resp.status());
+    expect(expected, `${why}: refresh must be refused; got ${resp.status()}`).toContain(resp.status());
   } finally {
     await ctx.close();
   }
