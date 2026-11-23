@@ -43,11 +43,13 @@ test('ZZC1 — a doubled TOTP submit during app sign-in posts once and lands on 
     });
 
     await code.fill(await computeTotp(secret));
+    // Both submits go through the button, as a tap and implicit submission do: method=totp rides on the button alone.
     await page.evaluate(async () => {
       const form = document.querySelector<HTMLFormElement>('form:has(#totp-code)')!;
-      form.requestSubmit();
+      const button = form.querySelector<HTMLButtonElement>('button[type="submit"]')!;
+      form.requestSubmit(button);
       await new Promise((res) => setTimeout(res, 1000));
-      form.requestSubmit();
+      form.requestSubmit(button);
     });
     // The app host does not resolve, so the callback is read from the requests the page made, not from page.url().
     const callback = () => appHits.map((u) => new URL(u)).find((u) => u.searchParams.has('code'));
