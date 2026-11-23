@@ -47,7 +47,7 @@ urls:
     success: "${OTHALA_PUBLIC_URL}/device/done"
 
 ttl:
-  refresh_token: 720h    # 30 days
+  refresh_token: 2160h    # 90 days, the Kratos session lifespan
   # The schema documents 10m but the code default is 15m.
   device_user_code: 10m
 

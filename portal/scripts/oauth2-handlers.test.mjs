@@ -3,6 +3,8 @@
 import { test, describe, it, expect, vi } from 'vitest';
 import assert from 'node:assert/strict';
 import { handleLogin, loginRememberFor, handleConsent, handleConsentPost, handleLogout, buildLoginReturnTo } from '../src/lib/oauth2-handlers.ts';
+// The default slide would call Kratos; each test below that exercises it injects its own.
+vi.mock('../src/lib/session-slide.ts', () => ({ slide: async (s) => ({ session: s, setCookie: [] }) }));
 import { describeScopeList, SCOPE_DESCRIPTIONS } from '../src/lib/scope-descriptions.ts';
 import { parseManifest } from '../src/lib/manifests.ts';
 import { signToken, _resetForTests } from '../src/lib/csrf.ts';
@@ -1711,4 +1713,41 @@ test('device login on an opted-out client with no second factor is refused', asy
   } finally {
     console.warn = origWarn;
   }
+});
+
+// Sliding sessions: an allowed login extends the Kratos session, then remember_for and the cookie follow the extension.
+test('login remembers until the extended expiry and relays the reissued cookie (pins the slide call and the cookie relay)', async () => {
+  const { api, calls } = stubOAuth2({ getOAuth2LoginRequest: FRESH });
+  const extended = session('aal1', ['password'], { identity: whoamiIdentity(activeMember()), expires_at: new Date(Date.now() + 90 * 86_400_000) });
+  const slideSession = vi.fn(async () => ({ session: extended, setCookie: ['ory_kratos_session=new; Max-Age=7776000'] }));
+  const res = await handleLogin(new Request('https://x/oauth2/login?login_challenge=lc', { headers: { cookie: 'ory_kratos_session=old' } }), {
+    oauth2: api,
+    getIdentity: async () => activeMember(),
+    getSession: defaultSession({ expires_at: IN_20_DAYS() }),
+    slideSession,
+    manifest: () => loadManifest('grafana'),
+  });
+  assert.equal(slideSession.mock.calls[0][1], 'ory_kratos_session=old');
+  assert.ok(Math.abs(calls.acceptLoginBody.remember_for - 90 * 86_400) <= 2, `remember_for ${calls.acceptLoginBody.remember_for}`);
+  assert.deepEqual(res.headers.getSetCookie(), ['ory_kratos_session=new; Max-Age=7776000']);
+});
+
+test('a denied login and a step-up bounce never slide the session (pins the slide placement after the gate)', async () => {
+  const slideSession = vi.fn(async (s) => ({ session: s, setCookie: [] }));
+  const { api } = stubOAuth2({ getOAuth2LoginRequest: FRESH });
+  await handleLogin(new Request('https://x/oauth2/login?login_challenge=lc'), {
+    oauth2: api,
+    getIdentity: async () => activeMember({ metadata_admin: { groups: [] } }),
+    getSession: defaultSession(),
+    slideSession,
+    manifest: () => loadManifest('grafana'),
+  });
+  await handleLogin(new Request('https://x/oauth2/login?login_challenge=lc'), {
+    oauth2: api,
+    getIdentity: async () => activeMember({ credentials: withCredentials(activeMember(), 'password', 'totp').credentials }),
+    getSession: defaultSession(),
+    slideSession,
+    manifest: () => loadManifest('grafana'),
+  });
+  assert.equal(slideSession.mock.calls.length, 0);
 });

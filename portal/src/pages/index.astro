@@ -26,6 +26,7 @@ import {
 } from '../lib/tiles';
 import { devMockIdentity } from '../lib/dev-mock';
 import { getSession, browserFlows } from '../lib/kratos';
+import { slide } from '../lib/session-slide';
 import { stepUpAtLanding } from '../lib/gate';
 import { getIdentity } from '../lib/admin-api';
 import { parseIdentity } from '../lib/identity-facts';
@@ -54,7 +55,9 @@ if (devOverride === 'down' || devOverride === 'pre-auth' || devOverride === 'pos
   if (state === 'post-auth') identity = devMockIdentity(Astro.url);
 } else {
   try {
-    const session = await getSession(cookie);
+    const slid = await slide(await getSession(cookie), cookie);
+    const session = slid.session;
+    for (const c of slid.setCookie) Astro.response.headers.append('set-cookie', c);
     if (session?.active && session.identity) {
       state = 'post-auth';
       // The public whoami omits metadata_admin, so re-fetch the full identity via the admin API for groups; on

@@ -148,6 +148,9 @@ this subject), the handler still re-verifies a live Kratos session matching the
 remembered subject. Hydra only remembers; Kratos authenticates. Honouring a remembered login after a
 Kratos sign-out would sign the subject in again silently.
 
+Before it accepts, and on the landing page, `slide` (`portal/src/lib/session-slide.ts`) extends a live session through
+the Kratos admin API and relays the reissued cookie; forward-auth never does.
+
 A denial is logged server-side with its real reason and rejected upstream with an opaque
 `access_denied`, so group names and identity-state distinctions never reach the relying party.
 

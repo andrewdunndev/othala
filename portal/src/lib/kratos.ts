@@ -34,6 +34,11 @@ export async function getSession(cookie?: string): Promise<Session | null> {
   }
 }
 
+export async function getSessionRelay(cookie: string): Promise<{ session: Session | null; setCookie: string[] }> {
+  const r = await frontendApi().toSessionRaw({ cookie });
+  return { session: (await r.value()) as unknown as Session, setCookie: r.raw.headers.getSetCookie() };
+}
+
 // The error page must stay quick when Kratos is down, so this read gives up sooner than the flow getters.
 const ERROR_PAGE_TIMEOUT_MS = 2000;
 

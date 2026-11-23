@@ -7,6 +7,7 @@ import type {
 import type { Identity, Session } from './types';
 import { getIdentity as defaultGetIdentity, revokeSession as defaultRevokeSession } from './admin-api';
 import { getSession as defaultGetSession } from './kratos';
+import { slide as defaultSlide, type Slid } from './session-slide';
 import { decideAccess, enforceAccessGate } from './gate';
 import { composeIDTokenClaims } from './claims';
 import type { ClientManifest } from './manifests';
@@ -43,6 +44,7 @@ export interface Deps {
   >;
   getIdentity?: (id: string) => Promise<Identity>;
   getSession?: (cookie?: string) => Promise<Session | null>;
+  slideSession?: (session: Session, cookie?: string) => Promise<Slid>;
   revokeSession?: (sessionId: string) => Promise<void>;
   /** The serving default never throws, so an invalid manifest set denies entry instead of failing every challenge. */
   manifest?: (clientId: string) => ClientManifest | undefined;
@@ -53,6 +55,7 @@ function resolve(deps: Deps): Required<Deps> {
     oauth2: deps.oauth2 ?? hydraAdmin(),
     getIdentity: deps.getIdentity ?? defaultGetIdentity,
     getSession: deps.getSession ?? defaultGetSession,
+    slideSession: deps.slideSession ?? defaultSlide,
     revokeSession: deps.revokeSession ?? defaultRevokeSession,
     manifest: deps.manifest ?? ((clientId) => servingManifest(clientId)),
   };
@@ -63,8 +66,10 @@ export function upstream(step: string, err: unknown): void {
   console.error('[portal] upstream failure', { step, error: String(err) });
 }
 
-function redirect(location: string): Response {
-  return new Response(null, { status: 302, headers: { Location: location } });
+function redirect(location: string, setCookie: string[] = []): Response {
+  const headers = new Headers({ Location: location });
+  for (const c of setCookie) headers.append('Set-Cookie', c);
+  return new Response(null, { status: 302, headers });
 }
 
 const upstreamError = (): Response => new Response('upstream error', { status: 502 });
@@ -225,19 +230,21 @@ export async function handleLogin(req: Request, deps: Deps = {}): Promise<Respon
   // The opt-out skips the step-up verdict, never the device grant's aal2.
   if ('stepUp' in access || (device && acr !== 'aal2')) return loginBounce(challenge, 'aal=aal2&');
 
+  // A sign-in to an app counts as use, and remember_for follows the extended expiry.
+  const slid = await d.slideSession(session, req.headers.get('cookie') ?? undefined);
   try {
     const { redirect_to } = await d.oauth2.acceptOAuth2LoginRequest({
       loginChallenge: challenge,
       acceptOAuth2LoginRequest: {
         subject,
         remember: true,
-        remember_for: loginRememberFor(session),
+        remember_for: loginRememberFor(slid.session ?? session),
         // Hydra keeps its cookie on a remembered login unless asked to renew it.
         ...(login.skip ? { extend_session_lifespan: true } : {}),
         ...(acr ? { acr } : {}),
       },
     });
-    return redirect(redirect_to);
+    return redirect(redirect_to, slid.setCookie);
   } catch (err) {
     upstream('acceptOAuth2LoginRequest', err);
     return upstreamError();

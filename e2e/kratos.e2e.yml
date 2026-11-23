@@ -5,3 +5,6 @@ selfservice:
     password:
       config:
         haveibeenpwned_enabled: false
+session:
+  # Equal to the lifespan, so every extend call takes effect and a spec need not wait a day.
+  earliest_possible_extend: 2160h
