@@ -12,7 +12,7 @@ The git tag is the authoritative version; `portal/package.json` mirrors it.
 
 - `presentation.launch_url` sets where an app tile's Open link goes; it must be https on the host of `presentation.url`, and the manifest lint blocks anything else.
 - `consent.skip_step_up: true` lets an OIDC client accept an aal1 session signed in by a passkey alone in place of step-up, admins included (a password or emailed-code sign-in still steps up); the admin pages, settings, device grants, forward-auth and every other client still require aal2, and the manifest lint blocks the flag on a presentation-only manifest or a `device_code` client.
-- Sessions slide while used: a landing visit or an app sign-in extends the session to 90 days (`session.lifespan` and `ttl.refresh_token` are 2160h) and reissues the cookie, up to 365 days after the last real sign-in; forward-auth use does not extend. A suspected theft takes the subject-wide revoke, since refresh tokens outlive a single-session revoke.
+- Sessions slide while used: a landing visit or an app sign-in extends the session to 90 days (`session.lifespan` and `ttl.refresh_token` are 2160h) and reissues the cookie, up to 365 days after the last real sign-in; forward-auth use does not extend. The cap covers app refresh chains: Hydra's `oauth2.token_hook` calls the new portal `/admin/token-hook` (hook bearer), which refuses a `refresh_token` grant when the subject has no active Kratos session, failing closed; refreshes now depend on the portal being up. Deployers who vendor `hydra.yml` add the hook, and the Hydra service needs `othala` to resolve (`extra_hosts` in the example compose). A suspected theft still takes the subject-wide revoke, which ends grants at once.
 
 ## [0.19.2] - 2026-11-22
 

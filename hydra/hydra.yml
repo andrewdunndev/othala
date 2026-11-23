@@ -52,6 +52,15 @@ ttl:
   device_user_code: 10m
 
 oauth2:
+  # A refresh_token grant is refused without an active Kratos session (portal handleTokenHook); fail closed. Same bearer as the Kratos hooks.
+  token_hook:
+    url: "http://othala:4431/admin/token-hook"
+    auth:
+      type: api_key
+      config:
+        in: header
+        name: Authorization
+        value: "Bearer ${RECOVERY_GATE_SECRET}"
   pkce:
     # Global switch (no per-client PKCE knob): breaks any confidential client that cannot do PKCE.
     enforced: false

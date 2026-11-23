@@ -218,7 +218,7 @@ const pathsOf = (doc) => JSON.stringify(doc).match(/"const":"([^"]+)"/g) ?? [];
 test('the contract names exactly the admin webhook routes', () => {
   const schema = JSON.parse(readFileSync(join(root, 'contract/kratos.schema.json'), 'utf8'));
   const paths = new Set(pathsOf(schema).map((c) => c.slice(9, -1)).filter((u) => u.startsWith('http://othala:4431')).map((u) => new URL(u).pathname));
-  assert.deepEqual([...paths].sort(), [...ADMIN_POST.keys()].sort());
+  assert.deepEqual([...paths].sort(), [...ADMIN_POST.keys()].filter((k) => k !== '/admin/token-hook').sort()); // Hydra's hook, not Kratos's
 });
 
 test('every ui_url, oauth2 and device page the contract names exists', () => {

@@ -74,6 +74,7 @@ test('admin POST mux serves exactly the admin endpoints', () => {
     '/admin/recovery-gate',
     '/admin/revoke-grants',
     '/admin/second-factor-gate',
+    '/admin/token-hook',
   ]);
 });
 
@@ -882,4 +883,48 @@ test('every refusing hook gate refuses a malformed JSON body (403)', async () =>
       assert.deepEqual(JSON.parse(res.body), body, url);
     }
   });
+});
+
+const hookBody = (grant, sub = 'sub-1') => JSON.stringify({ session: { id_token: { subject: sub } }, request: { grant_types: [grant] } });
+
+async function tokenHook({ grant = 'refresh_token', auth = 'Bearer gate-secret', sessions = [session()], body = hookBody(grant) } = {}) {
+  process.env.RECOVERY_GATE_SECRET = 'gate-secret';
+  const asked = [];
+  const rt = { ...runtime, async listSessions(id) { asked.push(id); if (sessions instanceof Error) throw sessions; return sessions; } };
+  const res = fakeRes();
+  await handle(fakeReq({ method: 'POST', url: '/admin/token-hook', headers: auth ? { authorization: auth } : {}, body }), res, rt);
+  return { res, asked };
+}
+
+test('token hook: a refresh with no active session is refused (the 365-day cap reaches app chains)', async () => {
+  const { res, asked } = await tokenHook({ sessions: [] });
+  assert.equal(res.statusCode, 403);
+  assert.deepEqual(asked, ['sub-1']);
+  assert.equal((await tokenHook({ sessions: [session('aal1', ['password'], { expires_at: new Date(Date.now() - 1000) })] })).res.statusCode, 403, 'an expired row does not count');
+});
+
+test('token hook: a refresh with an active session passes', async () => {
+  assert.equal((await tokenHook()).res.statusCode, 204);
+});
+
+test('token hook: other grants pass without a Kratos call', async () => {
+  for (const grant of ['authorization_code', 'client_credentials', 'urn:ietf:params:oauth:grant-type:device_code']) {
+    const { res, asked } = await tokenHook({ grant, sessions: [] });
+    assert.equal(res.statusCode, 204, grant);
+    assert.deepEqual(asked, [], grant);
+  }
+});
+
+test('token hook: a Kratos error, a missing subject or a malformed body refuses (fail closed)', async () => {
+  assert.equal((await tokenHook({ sessions: new Error('kratos down') })).res.statusCode, 403);
+  assert.equal((await tokenHook({ body: JSON.stringify({ session: {}, request: { grant_types: ['refresh_token'] } }) })).res.statusCode, 403);
+  assert.equal((await tokenHook({ body: '{not json' })).res.statusCode, 403);
+});
+
+test('token hook: a call without the bearer is refused before any lookup', async () => {
+  for (const auth of [undefined, 'Bearer wrong']) {
+    const { res, asked } = await tokenHook({ auth });
+    assert.equal(res.statusCode, 403);
+    assert.deepEqual(asked, []);
+  }
 });

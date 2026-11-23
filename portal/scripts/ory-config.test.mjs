@@ -212,6 +212,13 @@ test('kratos: the recovery link method is not enabled', () => {
   assert.ok(!methods.link || methods.link.enabled === false);
 });
 
+test('hydra: the token hook calls the portal with the hook bearer (unset, refresh chains are uncapped)', () => {
+  assert.deepEqual(render('hydra/hydra.yml').oauth2.token_hook, {
+    url: 'http://othala:4431/admin/token-hook',
+    auth: { type: 'api_key', config: { in: 'header', name: 'Authorization', value: 'Bearer gate' } },
+  });
+});
+
 test('hydra: subject identifiers are public only', () => {
   const types = render('hydra/hydra.yml').oidc?.subject_identifiers?.supported_types;
   assert.ok(types === undefined || (types.length === 1 && types[0] === 'public'));
