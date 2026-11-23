@@ -2,9 +2,10 @@ import type { Session } from './types';
 import { getSessionRelay } from './kratos';
 import { kratosAdmin } from './ory-fetch';
 
-// Counted from authenticated_at, which an extend never moves; an extend that would push expiry past it is skipped, so no cookie outlives a year since the last real sign-in.
+// Counted from authenticated_at, which an extend never moves; an extend past it is skipped, so no Kratos cookie outlives a year since sign-in.
 export const ABSOLUTE_CAP_MS = 365 * 86_400_000;
-const IDLE_MS = 90 * 86_400_000;
+/** Mirrors kratos.yml session.lifespan; ory-config.test.mjs ties them. */
+export const IDLE_MS = 90 * 86_400_000;
 
 export interface Slid {
   session: Session | null;

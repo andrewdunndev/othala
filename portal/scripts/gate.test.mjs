@@ -349,6 +349,7 @@ describe('step-up and elevation', () => {
       ['app opt-out: no methods recorded', withTotp(member()), { app: optOut }, aal1, 'stepUp'],
       ['app opt-out: passkey beside password at aal1', withTotp(member()), { app: optOut }, amr(['passkey', 'aal1'], ['password', 'aal1']), 'stepUp'],
       ['app opt-out: password then passkey at aal1', withTotp(member()), { app: optOut }, amr(['password', 'aal1'], ['passkey', 'aal1']), 'stepUp'],
+      ['app opt-out: an aal-less method beside a passkey', withTotp(member()), { app: optOut }, amr(['passkey', 'aal1'], ['password', undefined]), 'stepUp'],
       ['app opt-out: webauthn is not a passkey sign-in', withTotp(member()), { app: optOut }, amr(['webauthn', 'aal1']), 'stepUp'],
       ['app opt-out: passkey then totp at aal2', withTotp(member()), { app: optOut }, { ...aal2, authentication_methods: [{ method: 'passkey', aal: 'aal1' }, { method: 'totp', aal: 'aal2' }] }, 'allow'],
       ['app opt-out: the flag is not read for admin', withTotp(asAdmin(member())), 'admin', { ...aal1, fresh: true }, 'stepUp'],

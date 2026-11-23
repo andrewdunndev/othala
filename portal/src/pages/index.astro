@@ -58,6 +58,8 @@ if (devOverride === 'down' || devOverride === 'pre-auth' || devOverride === 'pos
     const session = await getSession(cookie);
     if (session?.active && session.identity) {
       state = 'post-auth';
+      // The slide branch and the whoami fallback both render a post-auth page, so neither may be cached.
+      Astro.response.headers.set('cache-control', 'no-store');
       // The public whoami omits metadata_admin, so re-fetch the full identity via the admin API for groups; on
       // failure fall back to the whoami identity (no groups, no tiles), never fail-open.
       try {
@@ -67,7 +69,6 @@ if (devOverride === 'down' || devOverride === 'pre-auth' || devOverride === 'pos
         if (!stepUp) {
           const slid = await slide(session, cookie);
           for (const c of slid.setCookie) Astro.response.headers.append('set-cookie', c);
-          Astro.response.headers.set('cache-control', 'no-store');
         }
       } catch (lookupErr) {
         console.error('[othala/index] getIdentity failed; falling back to whoami (no groups):', lookupErr);

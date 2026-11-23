@@ -1,8 +1,8 @@
 // VS — loading the landing extends the session and hands the browser the reissued cookie, never moving authenticated_at;
-// a disabled session is not revived by a landing visit. The overlay sets earliest_possible_extend to the lifespan, so
+// a disabled session is not revived by a landing visit; a TOTP holder's aal1 session is sent to step-up and not extended. The overlay sets earliest_possible_extend to the lifespan, so
 // every visit extends.
 
-import { test, expect } from '../fixtures';
+import { test, expect, enrollTotpSecret } from '../fixtures';
 import { createIdentityWithPassword, TEST_PASSWORD } from '../actions/identity';
 import { loginViaJsonApi } from '../actions/login';
 import { getSession } from '../actions/session';
@@ -49,4 +49,29 @@ test('VS2 — a disabled session is not revived by a landing visit', async ({ ct
   await page.goto(`${baseURL}/`, { waitUntil: 'networkidle' });
   await expect(page.getByRole('link', { name: 'Sign in', exact: true })).toBeVisible({ timeout: 15_000 });
   expect(await getSession(ctx, baseURL!), 'session after the visit').toBeNull();
+});
+
+test('VS3 — a TOTP holder at aal1 is sent to step-up and the visit does not extend the session', async ({ ctx, baseURL, kratosAdminURL }) => {
+  const { email } = await createIdentityWithPassword({
+    email: `slide.vs3.${Date.now()}@othala.test`,
+    username: `slide.vs3.${Date.now()}`,
+    displayName: 'Slide',
+    groups: [],
+    kratosAdminURL,
+  });
+  await loginViaJsonApi(ctx, { identifier: email, password: TEST_PASSWORD }, baseURL!);
+  await enrollTotpSecret(ctx, baseURL!);
+  // Enrolling lifts the session to aal2; a first-factor sign-in afterwards is the aal1 session of a TOTP holder.
+  await ctx.clearCookies();
+  await loginViaJsonApi(ctx, { identifier: email, password: TEST_PASSWORD }, baseURL!);
+  const before = await getSession(ctx, baseURL!);
+  expect(before!.authenticator_assurance_level, 'VS3: aal1 for a TOTP holder').toBe('aal1');
+
+  await new Promise((r) => setTimeout(r, 3000));
+  const res = await ctx.request.get(`${baseURL}/`, { maxRedirects: 0 });
+  expect(res.status(), 'VS3: the landing redirects').toBe(302);
+  expect(res.headers()['location'], 'VS3: to aal2').toContain('aal=aal2');
+
+  const after = await getSession(ctx, baseURL!);
+  expect(after!.expires_at, 'VS3: expires_at unchanged').toBe(before!.expires_at);
 });

@@ -1681,7 +1681,7 @@ test('login on an opted-out client bounces a password-only aal1 session to aal2'
   assert.equal(calls.acceptLogin, 0);
 });
 
-test('device login on an opted-out client still bounces an aal1 password+totp session to aal2', async () => {
+test('device login on an opted-out client still bounces an aal1 session of a TOTP holder to aal2', async () => {
   const { api, calls } = stubOAuth2({
     getOAuth2LoginRequest: async () => oauth2LoginRequest({ client: { client_id: 'stepca' }, request_url: DEVICE_URL }),
   });
