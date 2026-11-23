@@ -92,9 +92,9 @@ test('tracing blocks use the fixed provider, service name and environment', () =
   }
 });
 
-test('the e2e overlay turns off only the breach check', () => {
+test('the e2e overlay turns off the breach check and lets every call extend', () => {
   const overlay = parse(readFileSync(join(root, 'e2e/kratos.e2e.yml'), 'utf8'));
-  assert.deepEqual(overlay, { selfservice: { methods: { password: { config: { haveibeenpwned_enabled: false } } } } });
+  assert.deepEqual(overlay, { selfservice: { methods: { password: { config: { haveibeenpwned_enabled: false } } } }, session: { earliest_possible_extend: '2160h' } });
 });
 
 test('render refuses an empty Ory admin bind', () => {

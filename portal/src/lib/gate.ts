@@ -122,14 +122,9 @@ export type AccessDecision = { allow: true } | { stepUp: true } | { deny: string
 /** `fresh`: the session is within the admin freshness window; only the admin pages read it. */
 export type SessionFacts = Pick<Session, 'authenticator_assurance_level' | 'authentication_methods'> & { fresh?: boolean };
 
-/**
- * A passkey sign-in at aal1: at least one aal1 method, and every aal1 method is the Kratos `passkey` strategy (a
- * discoverable credential; Kratos asks for user verification as preferred, not required). `webauthn` is not counted: it is configured `passwordless: false`, a
- * second factor recorded at aal2. Password, code, link, oidc and anything unknown never qualify, and a passkey beside
- * any other aal1 method does not either.
- */
+/** A passkey sign-in at aal1: at least one aal1 method and all of them `passkey`; anything else, unknown included, never qualifies. */
 export function isPasskeySignIn(session: SessionFacts | null | undefined): boolean {
-  const aal1 = (session?.authentication_methods ?? []).filter((m) => m.aal === 'aal1');
+  const aal1 = (session?.authentication_methods ?? []).filter((m) => m.aal !== 'aal2');
   return aal1.length > 0 && aal1.every((m) => m.method === 'passkey');
 }
 

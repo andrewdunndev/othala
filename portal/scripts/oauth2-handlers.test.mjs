@@ -1687,8 +1687,8 @@ test('device login on an opted-out client still bounces an aal1 password+totp se
   });
   const res = await handleLogin(new Request('https://x/oauth2/login?login_challenge=lc'), {
     oauth2: api,
-    getIdentity: async () => deviceMember('password', 'totp'),
-    getSession: defaultSession(),
+    getIdentity: async () => deviceMember('passkey', 'totp'),
+    getSession: async () => session('aal1', ['passkey'], { identity: whoamiIdentity(activeMember()) }),
     manifest: () => optedOut('stepca'),
   });
   assert.equal(new URL(res.headers.get('location'), 'https://sso.othala.test').searchParams.get('aal'), 'aal2');

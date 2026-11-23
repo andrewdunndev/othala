@@ -31,10 +31,12 @@ test('VS1 — the landing extends the session and moves the browser cookie, not 
   const page = await ctx.newPage();
   await page.goto(`${baseURL}/`, { waitUntil: 'networkidle' });
 
+  // Read before any whoami from the context, which would reissue the cookie itself and mask a landing that drops it.
+  const cookieAfter = await cookieOf();
   const after = await getSession(ctx, baseURL!);
   expect(Date.parse(String(after!.expires_at)), 'expires_at moved').toBeGreaterThan(Date.parse(String(before!.expires_at)));
   expect(after!.authenticated_at, 'authenticated_at unchanged').toBe(before!.authenticated_at);
-  expect((await cookieOf()).expires, 'browser cookie expiry moved').toBeGreaterThan(cookieBefore.expires);
+  expect(cookieAfter.expires, 'browser cookie expiry moved').toBeGreaterThan(cookieBefore.expires);
 });
 
 test('VS2 — a disabled session is not revived by a landing visit', async ({ ctx, baseURL, kratosAdminURL }) => {

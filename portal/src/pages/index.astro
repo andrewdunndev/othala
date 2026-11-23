@@ -55,9 +55,7 @@ if (devOverride === 'down' || devOverride === 'pre-auth' || devOverride === 'pos
   if (state === 'post-auth') identity = devMockIdentity(Astro.url);
 } else {
   try {
-    const slid = await slide(await getSession(cookie), cookie);
-    const session = slid.session;
-    for (const c of slid.setCookie) Astro.response.headers.append('set-cookie', c);
+    const session = await getSession(cookie);
     if (session?.active && session.identity) {
       state = 'post-auth';
       // The public whoami omits metadata_admin, so re-fetch the full identity via the admin API for groups; on
@@ -65,6 +63,12 @@ if (devOverride === 'down' || devOverride === 'pre-auth' || devOverride === 'pos
       try {
         identity = await getIdentity(session.identity.id);
         stepUp = stepUpAtLanding(session, identity);
+        // A session sent to step-up is not in use, so it must not be extended.
+        if (!stepUp) {
+          const slid = await slide(session, cookie);
+          for (const c of slid.setCookie) Astro.response.headers.append('set-cookie', c);
+          Astro.response.headers.set('cache-control', 'no-store');
+        }
       } catch (lookupErr) {
         console.error('[othala/index] getIdentity failed; falling back to whoami (no groups):', lookupErr);
         identity = session.identity;

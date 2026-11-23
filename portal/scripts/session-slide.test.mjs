@@ -43,12 +43,13 @@ test.each([
 });
 
 // Pins: the absolute cap, in both directions, so neither a dropped guard nor an off-by-a-year bound passes.
-test('a sign-in older than the cap is not extended; one just inside it is', async () => {
+test('an extend whose new expiry would pass the cap is skipped; one landing exactly on it is made', async () => {
+  const IDLE = 90 * 86_400_000;
   const over = deps();
-  await slide(live({ authenticated_at: new Date(NOW - ABSOLUTE_CAP_MS - 1) }), COOKIE, NOW, over);
+  await slide(live({ authenticated_at: new Date(NOW + IDLE - ABSOLUTE_CAP_MS - 1) }), COOKIE, NOW, over);
   expect(over.extend).not.toHaveBeenCalled();
   const inside = deps();
-  await slide(live({ authenticated_at: new Date(NOW - ABSOLUTE_CAP_MS) }), COOKIE, NOW, inside);
+  await slide(live({ authenticated_at: new Date(NOW + IDLE - ABSOLUTE_CAP_MS) }), COOKIE, NOW, inside);
   expect(inside.extend).toHaveBeenCalledTimes(1);
 });
 
