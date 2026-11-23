@@ -77,10 +77,6 @@ test('the rendered deploy/example passes, through the CLI', () => {
 const hook = (k, ...path) => path.reduce((o, p) => o[p], k.selfservice.flows);
 // pointer, mutation, consumer: each pinned key, where the portal depends on it (a symbol, never a line).
 const KRATOS_PINS = [
-  ['/oauth2', (h) => delete h.oauth2.token_hook, 'handleTokenHook, listen.ts: without the hook refresh chains outlive the cap'],
-  ['/oauth2/token_hook/url', (h) => (h.oauth2.token_hook.url = 'http://othala:4431/admin/other'), 'handleTokenHook, listen.ts'],
-  ['/oauth2/token_hook/auth', (h) => delete h.oauth2.token_hook.auth, 'handleTokenHook, listen.ts: the hook is bearer-gated'],
-  ['/oauth2/token_hook/auth/config/value', (h) => (h.oauth2.token_hook.auth.config.value = 'Bearer'), 'handleTokenHook, listen.ts'],
   ['/serve/admin/port', (k) => (k.serve.admin.port = 1), 'KRATOS_ADMIN_URL, constants.ts'],
   ['/serve/public/port', (k) => (k.serve.public = { port: 1 }), 'KRATOS_PUBLIC_URL, constants.ts'],
   ...['error', 'settings', 'recovery', 'verification', 'login'].map((f) => [`/selfservice/flows/${f}/ui_url`, (k) => (k.selfservice.flows[f].ui_url = 'https://a.example/x'), `pages/auth/${f}.astro`]),
@@ -125,6 +121,10 @@ const KRATOS_PINS = [
   ['/selfservice/flows/settings/after/lookup_secret/hooks', (k) => (hook(k, 'settings', 'after', 'lookup_secret').hooks[0].config.can_interrupt = true), 'handleRevokeGrants, listen.ts: best-effort'],
 ];
 const HYDRA_PINS = [
+  ['/oauth2', (h) => delete h.oauth2.token_hook, 'handleTokenHook, listen.ts: without the hook refresh chains outlive the cap'],
+  ['/oauth2/token_hook/url', (h) => (h.oauth2.token_hook.url = 'http://othala:4431/admin/other'), 'handleTokenHook, listen.ts'],
+  ['/oauth2/token_hook/auth', (h) => delete h.oauth2.token_hook.auth, 'handleTokenHook, listen.ts: the hook is bearer-gated'],
+  ['/oauth2/token_hook/auth/config/value', (h) => (h.oauth2.token_hook.auth.config.value = 'Bearer'), 'handleTokenHook, listen.ts'],
   ...['login', 'consent', 'logout'].map((p) => [`/urls/${p}`, (h) => (h.urls[p] = 'https://a.example/x'), `pages/oauth2/${p}.ts`]),
   ['/urls', (h) => delete h.urls.consent, 'pages/oauth2/consent.ts'],
   ['/urls/error', (h) => (h.urls.error = 'https://a.example/x'), 'pages/auth/error.astro'],

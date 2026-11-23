@@ -925,7 +925,7 @@ test('token hook: a Kratos error, a missing subject or a malformed body refuses 
 });
 
 test('token hook: a call without the bearer is refused before any lookup', async () => {
-  for (const auth of [undefined, 'Bearer wrong']) {
+  for (const auth of [null, 'Bearer wrong']) {
     const { res, asked } = await tokenHook({ auth });
     assert.equal(res.statusCode, 403);
     assert.deepEqual(asked, []);

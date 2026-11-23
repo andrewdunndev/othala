@@ -84,7 +84,7 @@ test('only the landing and the OAuth login import the slide', () => {
     for (const e of readdirSync(dir, { withFileTypes: true })) {
       const p = join(dir, e.name);
       if (e.isDirectory()) walk(p);
-      else if (/\.(ts|astro)$/.test(e.name) && !/\.test\./.test(e.name) && readFileSync(p, 'utf8')./session-slide|extendSession/.test(readFileSync(p, 'utf8'))) users.push(p.slice(root.length + 1));
+      else if (/\.(ts|astro)$/.test(e.name) && !/\.test\./.test(e.name) && /session-slide|extendSession/.test(readFileSync(p, 'utf8'))) users.push(p.slice(root.length + 1));
     }
   };
   walk(root);
