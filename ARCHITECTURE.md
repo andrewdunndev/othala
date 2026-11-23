@@ -173,7 +173,7 @@ login and consent sessions are all cut, because a remembered
 Hydra login would otherwise still mint fresh tokens. Portal sign-out and narrowing someone's access run the Hydra
 half alone, as does the revoke-grants hook after any credential change.
 
-Hydra's `oauth2.token_hook` calls the portal's `/admin/token-hook` (`handleTokenHook`), which refuses a refresh with no active Kratos session, so refresh chains end with the session cap.
+Hydra's `oauth2.token_hook` calls the portal's `/admin/token-hook` (`handleTokenHook`), which refuses a refresh with no active Kratos session, so chains end with the cap.
 
 Ending grants after a credential change does not rest on that hook. The portal records the credential fingerprint
 a revoke covered in the identity's `metadata_admin.grants_revoked`, and `portal/src/lib/grant-reconcile.ts` compares it on a timer

@@ -155,8 +155,8 @@ Each names its enforcer and the test that fails if it stops working.
   (`kratos/kratos.yml`, `session`). Each landing visit or app sign-in pushes expiry to 90 days, up to 365 days
   after the last real sign-in, so a stolen cookie lives as long as anyone uses it and, with `skip_step_up`,
   reaches in-app admin. Refresh chains obey the same cap: a Hydra token hook refuses a refresh once the subject has no
-  active Kratos session, and fails closed, so an app cannot refresh while the portal is down. A single-session revoke ends
-  the chain only when it was the subject's last session; a suspected theft takes the subject-wide revoke.
+  active Kratos session, and fails closed, so no token exchange succeeds while the portal is down. A refusal revokes nothing: it suspends
+  the chain until the subject signs in again. A single-session revoke suspends it only when it was the subject's last session; a suspected theft takes the subject-wide revoke.
 - **Role rank is a convention no code enforces.** `lookupRole`
   (`portal/src/lib/claims.ts`) reads declaration order in `consent.roles` as
   descending privilege, so a manifest listing roles ascending silently downgrades

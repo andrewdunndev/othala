@@ -52,7 +52,7 @@ ttl:
   device_user_code: 10m
 
 oauth2:
-  # A refresh_token grant is refused without an active Kratos session (portal handleTokenHook); fail closed. Same bearer as the Kratos hooks.
+  # Refuses a refresh without an active Kratos session (portal handleTokenHook), failing closed; same bearer as the Kratos hooks.
   token_hook:
     url: "http://othala:4431/admin/token-hook"
     auth:
