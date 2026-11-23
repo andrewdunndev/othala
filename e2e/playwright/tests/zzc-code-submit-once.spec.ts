@@ -65,6 +65,50 @@ test('ZZC1 — a doubled TOTP submit during app sign-in posts once and lands on 
   }
 });
 
+test('ZZC3 — a TOTP submit with no submitter still signs in to the app with one POST', async ({ browser, baseURL, kratosAdminURL }) => {
+  test.setTimeout(90_000);
+  const username = `zzc3.member.${Date.now()}`;
+  const email = `${username}@othala.test`;
+  await createIdentityWithPassword({ email, username, displayName: 'ZZC zzc3', groups: ['grafana-access'], kratosAdminURL });
+  const ctx = await browser.newContext();
+  try {
+    await loginViaJsonApi(ctx, { identifier: email, password: TEST_PASSWORD }, baseURL);
+    const secret = await enrollTotpSecret(ctx, baseURL);
+    await ctx.clearCookies();
+    await loginViaJsonApi(ctx, { identifier: email, password: TEST_PASSWORD }, baseURL);
+
+    const page = await ctx.newPage();
+    await page.route(`${APP_ORIGIN}/**`, (r) => r.fulfill({ status: 200, contentType: 'text/html', body: 'app' }));
+    const authorize =
+      `${baseURL}/oauth2/auth?client_id=${GRAFANA_CLIENT_ID}&response_type=code` +
+      `&scope=${encodeURIComponent('openid email')}` +
+      `&redirect_uri=${encodeURIComponent(GRAFANA_REDIRECT_URI)}&state=zzc-state&nonce=zzc-nonce`;
+    await page.goto(authorize, { waitUntil: 'networkidle' });
+    const code = page.locator('#totp-code');
+    await expect(code, 'ZZC3: authorize asks for the second step').toBeVisible({ timeout: 15_000 });
+
+    const posts: string[] = [];
+    const appHits: string[] = [];
+    page.on('request', (r) => {
+      if (r.method() === 'POST' && r.url().includes('/self-service/login')) posts.push(r.url());
+      if (r.url().startsWith(APP_ORIGIN)) appHits.push(r.url());
+    });
+
+    await code.fill(await computeTotp(secret));
+    // iOS one-time-code AutoFill may submit with no submitter: the strategy must ride on the form, not on the button.
+    await page.evaluate(() => document.querySelector<HTMLFormElement>('form:has(#totp-code)')!.requestSubmit());
+    const callback = () => appHits.map((u) => new URL(u)).find((u) => u.searchParams.has('code'));
+    await expect
+      .poll(() => callback()?.searchParams.get('code') ?? '', { message: `ZZC3: a submit with no submitter reaches the app callback with a code; posts=${posts.length}, app requests=${appHits.length}`, timeout: 30_000 })
+      .not.toBe('');
+    await page.waitForTimeout(3000);
+    expect(`${callback()?.origin}${callback()?.pathname}`, 'ZZC3: the callback is the registered redirect_uri').toBe(GRAFANA_REDIRECT_URI);
+    expect(posts, 'ZZC3: one POST left the page').toHaveLength(1);
+  } finally {
+    await ctx.close();
+  }
+});
+
 test('ZZC2 — a doubled TOTP enrol submit on settings posts once, through the router too', async ({ browser, baseURL, kratosAdminURL }) => {
   test.setTimeout(90_000);
   const username = `zzc2.member.${Date.now()}`;

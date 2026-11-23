@@ -11,6 +11,7 @@ The git tag is the authoritative version; `portal/package.json` mirrors it.
 ### Fixed
 
 - A code form (authenticator, email, recovery or verification code) submits once per page load, so iOS code AutoFill followed by a tap no longer sends a second request that sends the sign-in to the portal instead of back to the app.
+- The sign-in code forms (authenticator, backup code, emailed code) carry their method in a hidden field, so a code submitted without pressing the button, as iOS AutoFill can, still signs in.
 
 ## [0.19.1] - 2026-11-19
 

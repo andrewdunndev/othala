@@ -120,6 +120,8 @@ const { hasPasskey, hasCode, hasPassword, totpNodes, aal2WebauthnNodes, lookupNo
         {totpNodes.length > 0 && (
           <form method="POST" enctype="application/x-www-form-urlencoded" action={ui?.action ?? '#'} class="focus-form aal2-form">
             <input type="hidden" name="csrf_token" value={csrf} />
+            {/* Hidden method, not a named button: a submit without a submitter (AutoFill) must still pick the strategy. */}
+            <input type="hidden" name="method" value="totp" />
             {totpNodes.map((n) => {
               const a = asInput(n);
               if (!a) return null;
@@ -153,7 +155,7 @@ const { hasPasskey, hasCode, hasPassword, totpNodes, aal2WebauthnNodes, lookupNo
               }
               if (a.type === 'submit') {
                 return (
-                  <button class="button button-primary focus-btn" type="submit" name={a.name} value={String(a.value ?? '')}>
+                  <button class="button button-primary focus-btn" type="submit">
                     Verify code
                   </button>
                 );
@@ -195,6 +197,7 @@ const { hasPasskey, hasCode, hasPassword, totpNodes, aal2WebauthnNodes, lookupNo
             <summary>Use a backup code instead</summary>
             <form method="POST" enctype="application/x-www-form-urlencoded" action={ui?.action ?? '#'} class="focus-form aal2-form">
               <input type="hidden" name="csrf_token" value={csrf} />
+              <input type="hidden" name="method" value="lookup_secret" />
               {lookupNodes.map((n) => {
                 const a = asInput(n);
                 if (!a) return null;
@@ -212,7 +215,7 @@ const { hasPasskey, hasCode, hasPassword, totpNodes, aal2WebauthnNodes, lookupNo
                 }
                 if (a.type === 'submit') {
                   return (
-                    <button class="button button-secondary focus-btn" type="submit" name={a.name} value={String(a.value ?? '')}>
+                    <button class="button button-secondary focus-btn" type="submit">
                       Use backup code
                     </button>
                   );
@@ -281,6 +284,7 @@ const { hasPasskey, hasCode, hasPassword, totpNodes, aal2WebauthnNodes, lookupNo
         {!isCodeEntry && (
           <form method="POST" enctype="application/x-www-form-urlencoded" action={ui?.action ?? '#'} class="focus-form code-form">
             <input type="hidden" name="csrf_token" value={csrf} />
+            <input type="hidden" name="method" value="code" />
 
             <div class="field">
               <label for="code-identifier">Email address</label>
@@ -301,7 +305,7 @@ const { hasPasskey, hasCode, hasPassword, totpNodes, aal2WebauthnNodes, lookupNo
               if (!a) return null;
               if (a.type === 'submit' && a.name === 'method') {
                 return (
-                  <button class="button button-secondary focus-btn code-submit" type="submit" name={a.name} value={String(a.value ?? 'code')}>
+                  <button class="button button-secondary focus-btn code-submit" type="submit">
                     Email me a sign-in code
                   </button>
                 );
@@ -321,6 +325,7 @@ const { hasPasskey, hasCode, hasPassword, totpNodes, aal2WebauthnNodes, lookupNo
         {isCodeEntry && (
           <form method="POST" enctype="application/x-www-form-urlencoded" action={ui?.action ?? '#'} class="focus-form code-form">
             <input type="hidden" name="csrf_token" value={csrf} />
+            <input type="hidden" name="method" value="code" />
 
             {/* Hidden fields from the default group (state Kratos needs to verify the code), except the csrf token above. */}
             {ui && nodesByGroup(ui.nodes, 'default').map((n) => {
@@ -367,7 +372,7 @@ const { hasPasskey, hasCode, hasPassword, totpNodes, aal2WebauthnNodes, lookupNo
                 const a = asInput(n);
                 if (!a || a.type !== 'submit' || a.name !== 'method') return null;
                 return (
-                  <button class="button button-primary focus-btn code-submit" type="submit" name={a.name} value={String(a.value ?? 'code')}>
+                  <button class="button button-primary focus-btn code-submit" type="submit">
                     Verify code
                   </button>
                 );
