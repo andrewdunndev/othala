@@ -148,6 +148,9 @@ this subject), the handler still re-verifies a live Kratos session matching the
 remembered subject. Hydra only remembers; Kratos authenticates. Honouring a remembered login after a
 Kratos sign-out would sign the subject in again silently.
 
+Before it accepts, and on the landing page, `slide` (`portal/src/lib/session-slide.ts`) extends a live session through
+the Kratos admin API and relays the reissued cookie; forward-auth never does.
+
 A denial is logged server-side with its real reason and rejected upstream with an opaque
 `access_denied`, so group names and identity-state distinctions never reach the relying party.
 
@@ -169,6 +172,8 @@ force-logout, user sign-out-everywhere, and deactivation. Kratos sessions and Hy
 login and consent sessions are all cut, because a remembered
 Hydra login would otherwise still mint fresh tokens. Portal sign-out and narrowing someone's access run the Hydra
 half alone, as does the revoke-grants hook after any credential change.
+
+Hydra's `oauth2.token_hook` calls the portal's `/admin/token-hook` (`handleTokenHook`), which refuses a refresh with no active Kratos session, so chains end with the cap.
 
 Ending grants after a credential change does not rest on that hook. The portal records the credential fingerprint
 a revoke covered in the identity's `metadata_admin.grants_revoked`, and `portal/src/lib/grant-reconcile.ts` compares it on a timer

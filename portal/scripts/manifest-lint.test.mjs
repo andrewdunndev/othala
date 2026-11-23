@@ -3,6 +3,7 @@
 import { test } from 'vitest';
 import assert from 'node:assert/strict';
 import { lintManifests, lintBlockers } from '../src/lib/manifest-lint.ts';
+import { parseManifest } from '../src/lib/manifests.ts';
 
 function manifest(clientId, opts = {}) {
   return {
@@ -143,4 +144,40 @@ test('BLOCK: a retired icon_slug or icon_fallback points at <stem>.svg', () => {
   const b = lintBlockers([manifest('photos', { retiredIcon: true })], known);
   assert.equal(b.length, 1);
   assert.match(b[0].message, /<stem>\.svg/);
+});
+
+const launchManifest = (launch) =>
+  parseManifest(
+    `presentation:\n  name: Widget\n  url: https://widget.othala.test/\n  access: [access-widget]\n${launch ? `  launch_url: ${launch}\n` : ''}`,
+    'widget.yaml',
+  );
+
+test('BLOCK: a launch_url that is http or on another host', () => {
+  for (const bad of ['http://widget.othala.test/x', 'https://elsewhere.test/x', 'https://widget.othala.test:8443/x']) {
+    const b = lintBlockers([launchManifest(bad)], ['access-widget']);
+    assert.equal(b.length, 1, bad);
+    assert.match(b[0].message, /launch_url/);
+  }
+});
+
+test('clean: a same-host launch_url with a path and fragment', () => {
+  const m = launchManifest("'https://widget.othala.test/app/#/sso?identifier=dag'");
+  assert.equal(m.launchUrlProblem, undefined);
+  assert.deepEqual(lintBlockers([m], ['access-widget']), []);
+});
+
+test('BLOCK: skip_step_up on a presentation-only manifest', () => {
+  const m = parseManifest('presentation:\n  name: Widget\n  url: https://widget.othala.test/\n  access: [access-widget]\nconsent:\n  skip_step_up: true\n', 'widget.yaml');
+  const b = lintBlockers([m], ['access-widget']);
+  assert.equal(b.length, 1);
+  assert.match(b[0].message, /skip_step_up/);
+});
+
+test('BLOCK: skip_step_up with a device_code grant; clean on an authorization_code client', () => {
+  const doc = (grant) =>
+    `oidc:\n  client_id: widget\n  scope: openid\n  grant_types: [${grant}]\npresentation:\n  access: [access-widget]\nconsent:\n  skip_step_up: true\n`;
+  const bad = lintBlockers([parseManifest(doc('urn:ietf:params:oauth:grant-type:device_code'), 'widget.yaml')], ['access-widget']);
+  assert.equal(bad.length, 1);
+  assert.match(bad[0].message, /device_code/);
+  assert.deepEqual(lintBlockers([parseManifest(doc('authorization_code'), 'widget.yaml')], ['access-widget']), []);
 });

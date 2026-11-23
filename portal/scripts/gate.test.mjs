@@ -324,6 +324,9 @@ describe('step-up and elevation', () => {
     const member = (groups = ['x-access']) => buildIdentity({ metadataAdmin: { groups } });
     const aal1 = { authenticator_assurance_level: 'aal1' };
     const aal2 = { authenticator_assurance_level: 'aal2' };
+    const optOut = { ...x, skipStepUp: true };
+    const amr = (...ms) => ({ authenticator_assurance_level: 'aal1', authentication_methods: ms.map(([method, aal]) => ({ method, aal })) });
+    const passkey1 = amr(['passkey', 'aal1']);
     const cases = [
       ['app: member at aal1', member(), { app: x }, aal1, 'allow'],
       ['app: not in an access group', member([]), { app: x }, aal1, 'deny'],
@@ -335,6 +338,22 @@ describe('step-up and elevation', () => {
       ['app: admin marker at aal1', asAdmin(member()), { app: x }, aal1, 'stepUp'],
       ['app: elevated role at aal1', member(['x-access', 'x-admin']), { app: x }, aal1, 'stepUp'],
       ['app: denial outranks step-up', withTotp(member([])), { app: x }, aal1, 'deny'],
+      ['app opt-out: admin with a second factor, passkey at aal1', withTotp(asAdmin(member())), { app: optOut }, passkey1, 'allow'],
+      ['app opt-out: elevated role, passkey at aal1', member(['x-access', 'x-admin']), { app: optOut }, passkey1, 'allow'],
+      ['app opt-out: not in an access group', withTotp(member([])), { app: optOut }, passkey1, 'deny'],
+      ['app opt-out: inactive identity', { ...withTotp(member()), state: 'inactive' }, { app: optOut }, passkey1, 'deny'],
+      ['app opt-out: non-canonical stored group', withTotp(member(['x-access', 'Bad Name'])), { app: optOut }, passkey1, 'deny'],
+      ['app opt-out: password with a second factor at aal1', withTotp(member()), { app: optOut }, amr(['password', 'aal1']), 'stepUp'],
+      ['app opt-out: password, admin marker, at aal1', asAdmin(member()), { app: optOut }, amr(['password', 'aal1']), 'stepUp'],
+      ['app opt-out: emailed-code sign-in at aal1', withTotp(member()), { app: optOut }, amr(['code', 'aal1']), 'stepUp'],
+      ['app opt-out: no methods recorded', withTotp(member()), { app: optOut }, aal1, 'stepUp'],
+      ['app opt-out: passkey beside password at aal1', withTotp(member()), { app: optOut }, amr(['passkey', 'aal1'], ['password', 'aal1']), 'stepUp'],
+      ['app opt-out: password then passkey at aal1', withTotp(member()), { app: optOut }, amr(['password', 'aal1'], ['passkey', 'aal1']), 'stepUp'],
+      ['app opt-out: an aal-less method beside a passkey', withTotp(member()), { app: optOut }, amr(['passkey', 'aal1'], ['password', undefined]), 'stepUp'],
+      ['app opt-out: webauthn is not a passkey sign-in', withTotp(member()), { app: optOut }, amr(['webauthn', 'aal1']), 'stepUp'],
+      ['app opt-out: passkey then totp at aal2', withTotp(member()), { app: optOut }, { ...aal2, authentication_methods: [{ method: 'passkey', aal: 'aal1' }, { method: 'totp', aal: 'aal2' }] }, 'allow'],
+      ['app opt-out: the flag is not read for admin', withTotp(asAdmin(member())), 'admin', { ...aal1, fresh: true }, 'stepUp'],
+      ['group: second factor at aal1 (no opt-out form)', withTotp(member()), { group: 'x-access' }, aal1, 'stepUp'],
       ['group: member at aal1', member(), { group: 'x-access' }, aal1, 'allow'],
       ['group: not a member', member(), { group: 'y-access' }, aal1, 'deny'],
       ['group: non-canonical stored group', member(['x-access', 'Bad Name']), { group: 'x-access' }, aal1, 'deny'],

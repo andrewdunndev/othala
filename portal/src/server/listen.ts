@@ -1,6 +1,6 @@
 // Dual listener. PUBLIC (8080 on 0.0.0.0): the lazily imported Astro SSR handler (OAuth2 providers, /auth/*, /admin/*).
-// ADMIN (4431 on PORTAL_ADMIN_BIND_HOST, default 127.0.0.1 outside production): its own mux for /healthz, /readyz and the seven Kratos webhooks
-// (recovery-gate, login-code-gate, profile-gate, second-factor-gate, profile-sessions, passkey-prune, revoke-grants); never delegates to Astro. Also runs the grant sweep timer.
+// ADMIN (4431 on PORTAL_ADMIN_BIND_HOST, default 127.0.0.1 outside production): its own mux for /healthz, /readyz, the seven Kratos webhooks
+// (recovery-gate, login-code-gate, profile-gate, second-factor-gate, profile-sessions, passkey-prune, revoke-grants) and Hydra's token-hook; never delegates to Astro. Also runs the grant sweep timer.
 // RECOVERY_GATE_SECRET guards the webhooks: constant-time compare, fail-closed when unset.
 // Bundled by build:listener; run with `node ./dist/server/listen.mjs` after `npm run build`.
 // Nothing imported statically may load lib/config.ts: it throws on the first missing production var, before
@@ -330,6 +330,39 @@ export async function handleRevokeGrants(req: IncomingMessage, res: ServerRespon
   sendJson(res, 200, { revoked: true });
 }
 
+/** POST /admin/token-hook, Hydra's oauth2.token_hook: 403 a refresh_token grant whose subject has no active session; every other grant passes. */
+export async function handleTokenHook(req: IncomingMessage, res: ServerResponse, client: AdminClient = ADMIN_CLIENT) {
+  if (refuseUnlessHookBearer(req, res)) return;
+  const allow = () => {
+    res.writeHead(204);
+    res.end();
+  };
+  const deny = (why: string) => {
+    console.warn(`[portal/token-hook] refresh refused: ${why}`);
+    sendJson(res, 403, { error: 'forbidden' });
+  };
+  let body;
+  try {
+    body = JSON.parse((await readBody(req)) || '{}');
+  } catch {
+    return deny('malformed body');
+  }
+  const grants = body?.request?.grant_types;
+  if (!Array.isArray(grants)) return deny('grant_types missing');
+  if (!grants.includes('refresh_token')) return allow();
+  const sub = body?.session?.id_token?.subject;
+  if (typeof sub !== 'string' || !sub) return deny('subject missing');
+  let live;
+  try {
+    const now = Date.now();
+    // Fail closed if Kratos's own active filter ever loosens.
+    live = (await client.listSessions(sub)).some((s) => s.active && s.expires_at && new Date(s.expires_at).getTime() > now);
+  } catch (err) {
+    return deny(`session lookup failed: ${(err as Error)?.message ?? err}`);
+  }
+  return live ? allow() : deny('no active session');
+}
+
 /** The sweep period: a constant, overridable by OTHALA_REVOKE_SWEEP_SECONDS for the e2e suite only. Read here, not in config.ts. */
 export function sweepIntervalMs(env: NodeJS.ProcessEnv = process.env): number {
   const seconds = Number(env.OTHALA_REVOKE_SWEEP_SECONDS);
@@ -380,6 +413,7 @@ export const ADMIN_POST: ReadonlyMap<string, Handler> = new Map<string, Handler>
   ['/admin/profile-sessions', handleProfileSessions],
   ['/admin/passkey-prune', handlePasskeyPrune],
   ['/admin/revoke-grants', handleRevokeGrants],
+  ['/admin/token-hook', handleTokenHook],
 ]);
 
 function adminHandler(method: string | undefined, url: string | undefined): Handler | undefined {

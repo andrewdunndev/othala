@@ -91,7 +91,7 @@ const guide = splitGuide(entry.educationHtml);
           {requirements.map((r) => <PrereqCard requirement={r} ready={readiness === 'ready'} />)}
         </div>
       )}
-      <AppActions name={entry.name} href={safeHref(entry.url)} requirements={requirements} ready={readiness === 'ready'} />
+      <AppActions name={entry.name} href={safeHref(entry.launchUrl)} requirements={requirements} ready={readiness === 'ready'} />
     </header>
 
     <section class="app-body" aria-label={`Guide for ${entry.name}`}>

@@ -9,7 +9,7 @@ import { parse as parseYaml } from 'yaml';
 import { marked } from 'marked';
 import DOMPurify from 'isomorphic-dompurify';
 import { parseAccessGroups } from './access-groups';
-import { appsDir, CACHE_TTL_MS, contentDir, manifestFiles } from './manifests';
+import { appsDir, CACHE_TTL_MS, contentDir, launchUrlProblem, manifestFiles } from './manifests';
 import { DEFAULT_GROUP } from './constants';
 
 const ICON_MAX_BYTES = 32 * 1024;
@@ -92,6 +92,8 @@ export interface AppTile {
   name: string;
   description: string;
   url: string;
+  /** Where Open goes: `presentation.launch_url` when valid, else `url`. */
+  launchUrl: string;
   /** 1-3 char monogram fallback when no icon resolves. */
   icon: string;
   /** Route of the `<slug>.svg` sidecar; set only when it passed validation, else the monogram renders. */
@@ -333,6 +335,7 @@ function parseTile(slug: string, doc: Record<string, unknown>, dir: string): App
     name: String(p['name'] ?? slug),
     description: String(p['description'] ?? ''),
     url,
+    launchUrl: p['launch_url'] != null && !launchUrlProblem(url, p['launch_url']) ? String(p['launch_url']) : url,
     icon: String(p['icon'] ?? initials(String(p['name'] ?? slug))),
     authKind: String(p['auth_kind'] ?? 'external') as AuthKind,
     accessGroups,

@@ -9,6 +9,7 @@ import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { parse } from 'yaml';
 import { renderTemplate } from '../src/lib/render.ts';
+import { IDLE_MS } from '../src/lib/session-slide.ts';
 
 const root = fileURLToPath(new URL('../../', import.meta.url));
 
@@ -92,9 +93,14 @@ test('tracing blocks use the fixed provider, service name and environment', () =
   }
 });
 
-test('the e2e overlay turns off only the breach check', () => {
+test('the e2e overlay turns off the breach check and lets every call extend', () => {
   const overlay = parse(readFileSync(join(root, 'e2e/kratos.e2e.yml'), 'utf8'));
-  assert.deepEqual(overlay, { selfservice: { methods: { password: { config: { haveibeenpwned_enabled: false } } } } });
+  assert.deepEqual(overlay, { selfservice: { methods: { password: { config: { haveibeenpwned_enabled: false } } } }, session: { earliest_possible_extend: '2160h' } });
+});
+
+test('the slide idle constant equals the Kratos session lifespan', () => {
+  const hours = Number(/^(\d+)h$/.exec(render('kratos/kratos.yml').session.lifespan)?.[1]);
+  assert.equal(IDLE_MS, hours * 3_600_000);
 });
 
 test('render refuses an empty Ory admin bind', () => {
@@ -204,6 +210,13 @@ test('kratos: the email code is bounded at five tries and fifteen minutes', () =
 test('kratos: the recovery link method is not enabled', () => {
   const methods = render('kratos/kratos.yml').selfservice.methods;
   assert.ok(!methods.link || methods.link.enabled === false);
+});
+
+test('hydra: the token hook calls the portal with the hook bearer (unset, refresh chains are uncapped)', () => {
+  assert.deepEqual(render('hydra/hydra.yml').oauth2.token_hook, {
+    url: 'http://othala:4431/admin/token-hook',
+    auth: { type: 'api_key', config: { in: 'header', name: 'Authorization', value: 'Bearer gate' } },
+  });
 });
 
 test('hydra: subject identifiers are public only', () => {

@@ -39,6 +39,7 @@ function manifest(slug: string, name: string, over: Partial<ClientManifest>): Cl
     groupRoleMap: {},
     emitGroupsClaim: true,
     skipAccessCheck: false,
+    skipStepUp: false,
     sourcePath: `${slug}.yaml`,
     ...over,
   };

@@ -26,6 +26,7 @@ import {
 } from '../lib/tiles';
 import { devMockIdentity } from '../lib/dev-mock';
 import { getSession, browserFlows } from '../lib/kratos';
+import { slide } from '../lib/session-slide';
 import { stepUpAtLanding } from '../lib/gate';
 import { getIdentity } from '../lib/admin-api';
 import { parseIdentity } from '../lib/identity-facts';
@@ -57,11 +58,18 @@ if (devOverride === 'down' || devOverride === 'pre-auth' || devOverride === 'pos
     const session = await getSession(cookie);
     if (session?.active && session.identity) {
       state = 'post-auth';
+      // The slide branch and the whoami fallback both render a post-auth page, so neither may be cached.
+      Astro.response.headers.set('cache-control', 'no-store');
       // The public whoami omits metadata_admin, so re-fetch the full identity via the admin API for groups; on
       // failure fall back to the whoami identity (no groups, no tiles), never fail-open.
       try {
         identity = await getIdentity(session.identity.id);
         stepUp = stepUpAtLanding(session, identity);
+        // A session sent to step-up is not in use, so it must not be extended.
+        if (!stepUp) {
+          const slid = await slide(session, cookie);
+          for (const c of slid.setCookie) Astro.response.headers.append('set-cookie', c);
+        }
       } catch (lookupErr) {
         console.error('[othala/index] getIdentity failed; falling back to whoami (no groups):', lookupErr);
         identity = session.identity;
@@ -258,7 +266,7 @@ const devLinks = [
             data-app-mono={t.icon}
           >
             <div data-slot="actions">
-              <AppActions name={t.name} href={safeHref(t.url)} requirements={v.requirements} ready={v.readiness === 'ready'} />
+              <AppActions name={t.name} href={safeHref(t.launchUrl)} requirements={v.requirements} ready={v.readiness === 'ready'} />
             </div>
             <div data-slot="prereq">
               {v.requirements.map((r) => (

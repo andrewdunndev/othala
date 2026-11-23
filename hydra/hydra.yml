@@ -47,11 +47,20 @@ urls:
     success: "${OTHALA_PUBLIC_URL}/device/done"
 
 ttl:
-  refresh_token: 720h    # 30 days
+  refresh_token: 2160h    # 90 days, the Kratos session lifespan
   # The schema documents 10m but the code default is 15m.
   device_user_code: 10m
 
 oauth2:
+  # Refuses a refresh without an active Kratos session (portal handleTokenHook), failing closed; same bearer as the Kratos hooks.
+  token_hook:
+    url: "http://othala:4431/admin/token-hook"
+    auth:
+      type: api_key
+      config:
+        in: header
+        name: Authorization
+        value: "Bearer ${RECOVERY_GATE_SECRET}"
   pkce:
     # Global switch (no per-client PKCE knob): breaks any confidential client that cannot do PKCE.
     enforced: false

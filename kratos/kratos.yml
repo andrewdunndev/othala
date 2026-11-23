@@ -338,9 +338,11 @@ selfservice:
       ui_url: "${OTHALA_PUBLIC_URL}/auth/registration"
 
 session:
-  # 720h is the blast-radius knob: the cookie is apex-scoped, so a stolen one is good on every
-  # subdomain until it expires. Admin freshness is enforced portal-side (requireAdminSession).
-  lifespan: 720h
+  # 2160h is the idle limit and the blast-radius knob: the cookie is apex-scoped, so a stolen one is good on
+  # every subdomain until it expires. Only the portal extends (session-slide.ts), and no more than once a day
+  # (lifespan minus 24h). Admin freshness is enforced portal-side (requireAdminSession).
+  lifespan: 2160h
+  earliest_possible_extend: 2136h
   cookie:
     # Apex domain so the IdP and every subdomain app share the session cookie. SameSite=Lax permits
     # same-site POSTs; CSRF mitigation is per-request tokens in the portal (csrf.ts).

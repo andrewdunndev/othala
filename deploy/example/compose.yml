@@ -7,7 +7,7 @@
 
 services:
   render:
-    image: registry.gitlab.com/dunn.dev/othala:v0.19.2@sha256:091e576c9a7aea1ec75463e416414a17392f32afae32678b6a77a5ad26783922
+    image: registry.gitlab.com/dunn.dev/othala:v0.20.0
     restart: "no"
     user: "10000:10000"
     command: ["node", "dist/server/config.mjs", "render"]
@@ -122,6 +122,7 @@ services:
       edge: {}
       internal:
         ipv4_address: 10.200.11.11
+    extra_hosts: ["othala:10.200.11.12"]
     depends_on:
       hydra-migrate:
         condition: service_completed_successfully
@@ -134,7 +135,7 @@ services:
       start_period: 20s
 
   othala:
-    image: registry.gitlab.com/dunn.dev/othala:v0.19.2@sha256:091e576c9a7aea1ec75463e416414a17392f32afae32678b6a77a5ad26783922
+    image: registry.gitlab.com/dunn.dev/othala:v0.20.0
     restart: unless-stopped
     env_file: [othala.env, secrets.env]
     read_only: true

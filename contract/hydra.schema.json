@@ -3,10 +3,39 @@
   "$id": "https://dunn.dev/othala/contract/hydra.schema.json",
   "type": "object",
   "$defs": {"oneOrTwo": {"type": "array", "minItems": 1, "maxItems": 2}},
-  "required": ["urls"],
+  "required": ["urls", "oauth2"],
   "properties": {
     "secrets": {"type": "object", "properties": {"system": {"$ref": "#/$defs/oneOrTwo"}, "cookie": {"$ref": "#/$defs/oneOrTwo"}}},
     "serve": {"type": "object", "properties": {"admin": {"type": "object", "properties": {"port": {"const": 4445}}}}},
+    "oauth2": {
+      "type": "object",
+      "required": ["token_hook"],
+      "properties": {
+        "token_hook": {
+          "type": "object",
+          "required": ["url", "auth"],
+          "properties": {
+            "url": {"const": "http://othala:4431/admin/token-hook"},
+            "auth": {
+              "type": "object",
+              "required": ["type", "config"],
+              "properties": {
+                "type": {"const": "api_key"},
+                "config": {
+                  "type": "object",
+                  "required": ["in", "name", "value"],
+                  "properties": {
+                    "in": {"const": "header"},
+                    "name": {"const": "Authorization"},
+                    "value": {"type": "string", "pattern": "^Bearer \\S+$"}
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "urls": {
       "type": "object",
       "required": ["login", "consent", "logout", "error", "device"],

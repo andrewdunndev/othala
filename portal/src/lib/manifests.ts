@@ -41,11 +41,15 @@ export interface ClientManifest {
   emitGroupsClaim: boolean | null;
   /** Disables the access gate for this app. */
   skipAccessCheck: boolean;
+  /** An OIDC client that takes an aal1 passkey session where it would ask for step-up. Portal policy: only the app gate reads it. */
+  skipStepUp: boolean;
   sourcePath: string;
   /** Prerequisite names defined under requirements/. */
   requires?: string[];
   /** The manifest still carries the retired `icon_slug` or `icon_fallback`; the logo is now `<stem>.svg`. */
   retiredIcon?: boolean;
+  /** Why `presentation.launch_url` is unusable (not https, or not the host of `presentation.url`); absent when it is fine or unset. */
+  launchUrlProblem?: string;
 }
 
 /** Only an explicit `emit_groups_claim: false` suppresses. */
@@ -170,6 +174,19 @@ function readRequires(v: unknown): string[] {
   return Array.isArray(v) ? v.filter((x): x is string => typeof x === 'string') : [];
 }
 
+/** `presentation.launch_url` must be https on exactly the host of `presentation.url`, so a catalog edit cannot aim a tile off the estate. Undefined when unset or fine. */
+export function launchUrlProblem(url: unknown, launch: unknown): string | undefined {
+  if (launch == null) return undefined;
+  try {
+    const l = new URL(String(launch));
+    if (l.protocol !== 'https:') return 'presentation.launch_url must be https';
+    if (l.host !== new URL(String(url)).host) return 'presentation.launch_url must be on the same host as presentation.url';
+    return undefined;
+  } catch {
+    return 'presentation.launch_url and presentation.url must both be absolute URLs';
+  }
+}
+
 /** Parse one manifest YAML body; exported so tests skip the filesystem. */
 export function parseManifest(yamlText: string, filename: string): ClientManifest {
   const yaml = parseYaml(yamlText) ?? {};
@@ -213,9 +230,11 @@ export function parseManifest(yamlText: string, filename: string): ClientManifes
       groupRoleMap: {},
       emitGroupsClaim: null,
       skipAccessCheck: readFlag(c, 'skip_access_check', file) ?? false,
+      skipStepUp: readFlag(c, 'skip_step_up', file) ?? false,
       sourcePath: file,
       requires: readRequires(p.requires),
       retiredIcon,
+      launchUrlProblem: launchUrlProblem(p.url, p.launch_url),
     };
   }
 
@@ -245,9 +264,11 @@ export function parseManifest(yamlText: string, filename: string): ClientManifes
     groupRoleMap: normaliseGroupRoleMap(c.group_role_map),
     emitGroupsClaim: readFlag(c, 'emit_groups_claim', file),
     skipAccessCheck: readFlag(c, 'skip_access_check', file) ?? false,
+    skipStepUp: readFlag(c, 'skip_step_up', file) ?? false,
     sourcePath: file,
     requires: readRequires(p.requires),
     retiredIcon,
+    launchUrlProblem: launchUrlProblem(p.url, p.launch_url),
   };
 }
 

@@ -121,6 +121,10 @@ const KRATOS_PINS = [
   ['/selfservice/flows/settings/after/lookup_secret/hooks', (k) => (hook(k, 'settings', 'after', 'lookup_secret').hooks[0].config.can_interrupt = true), 'handleRevokeGrants, listen.ts: best-effort'],
 ];
 const HYDRA_PINS = [
+  ['/oauth2', (h) => delete h.oauth2.token_hook, 'handleTokenHook, listen.ts: without the hook refresh chains outlive the cap'],
+  ['/oauth2/token_hook/url', (h) => (h.oauth2.token_hook.url = 'http://othala:4431/admin/other'), 'handleTokenHook, listen.ts'],
+  ['/oauth2/token_hook/auth', (h) => delete h.oauth2.token_hook.auth, 'handleTokenHook, listen.ts: the hook is bearer-gated'],
+  ['/oauth2/token_hook/auth/config/value', (h) => (h.oauth2.token_hook.auth.config.value = 'Bearer'), 'handleTokenHook, listen.ts'],
   ...['login', 'consent', 'logout'].map((p) => [`/urls/${p}`, (h) => (h.urls[p] = 'https://a.example/x'), `pages/oauth2/${p}.ts`]),
   ['/urls', (h) => delete h.urls.consent, 'pages/oauth2/consent.ts'],
   ['/urls/error', (h) => (h.urls.error = 'https://a.example/x'), 'pages/auth/error.astro'],
@@ -216,8 +220,8 @@ test('the policy files must equal the image copies, compared as JSON and as trim
 const pathsOf = (doc) => JSON.stringify(doc).match(/"const":"([^"]+)"/g) ?? [];
 
 test('the contract names exactly the admin webhook routes', () => {
-  const schema = JSON.parse(readFileSync(join(root, 'contract/kratos.schema.json'), 'utf8'));
-  const paths = new Set(pathsOf(schema).map((c) => c.slice(9, -1)).filter((u) => u.startsWith('http://othala:4431')).map((u) => new URL(u).pathname));
+  const schemas = ['kratos', 'hydra'].map((n) => JSON.parse(readFileSync(join(root, `contract/${n}.schema.json`), 'utf8')));
+  const paths = new Set(pathsOf(schemas).map((c) => c.slice(9, -1)).filter((u) => u.startsWith('http://othala:4431')).map((u) => new URL(u).pathname));
   assert.deepEqual([...paths].sort(), [...ADMIN_POST.keys()].sort());
 });
 

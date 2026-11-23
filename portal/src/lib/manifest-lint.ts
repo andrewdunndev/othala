@@ -1,6 +1,7 @@
 // Manifest lint: cross-checks every group a manifest references against the
 // known-group set so a typo'd group surfaces as a finding, not a silent lockout.
-// BLOCK: a retired icon_slug or icon_fallback. BLOCK (also enforced by validateClients at load): empty accessGroups without
+// BLOCK: a retired icon_slug or icon_fallback; a launch_url that is not https on the host of url; consent.skip_step_up on a
+// presentation-only manifest or a device_code client. BLOCK (also enforced by validateClients at load): empty accessGroups without
 // skipAccessCheck, a duplicated group, an undeclared group_role_map role.
 // WARN: a group missing from the known set, or missing the canonical form; a `requires` name with no requirements/<name>.md.
 
@@ -50,9 +51,16 @@ export function lintManifests(
       );
     }
 
+    if (m.skipStepUp) {
+      if (m.presentationOnly) block('consent.skip_step_up is set on a presentation-only manifest: it has no OIDC client to opt out, and forward-auth never reads it');
+      if (m.grantTypes.includes('urn:ietf:params:oauth:grant-type:device_code')) block('consent.skip_step_up is set on a device_code client: a device grant always takes aal2');
+    }
+
     if (m.retiredIcon) {
       block('presentation.icon_slug and icon_fallback are retired: drop the logo beside the manifest as <stem>.svg');
     }
+
+    if (m.launchUrlProblem) block(m.launchUrlProblem);
 
     // BLOCK: duplicate group within this manifest's access binding.
     const seen = new Set<string>();

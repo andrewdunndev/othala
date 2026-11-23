@@ -134,7 +134,7 @@ Fixed by the image:
 | `hydra` | 4444 | Hydra public | edge |
 | `hydra` | 4445 | Hydra admin, on `HYDRA_ADMIN_BIND_HOST` | portal |
 | `othala` | 8080 | portal public | edge |
-| `othala` | 4431 | portal admin: health and the Kratos webhooks, on `PORTAL_ADMIN_BIND_HOST` | Kratos |
+| `othala` | 4431 | portal admin: health, the Kratos webhooks and Hydra's token hook, on `PORTAL_ADMIN_BIND_HOST` | Kratos, Hydra |
 | `postgres` | 5432 | the `kratos` and `hydra` databases | Kratos, Hydra |
 
 The Kratos and Hydra admin APIs take no bearer: bind each to its address on a network the edge never joins,

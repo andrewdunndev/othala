@@ -678,3 +678,19 @@ describe('tiles.ts: safeHref', () => {
     expect(safeHref(input)).toBe('#');
   });
 });
+
+test('launchUrl: falls back to url when unset or invalid, and takes a same-host launch_url', async () => {
+  const yaml = (extra) => `
+presentation:
+  name: Widget
+  url: https://widget.othala.test/
+  auth_kind: external
+${extra}`;
+  assert.equal((await parseSingleTile(yaml(''))).launchUrl, 'https://widget.othala.test/');
+  assert.equal((await parseSingleTile(yaml('  launch_url: https://other.test/x'))).launchUrl, 'https://widget.othala.test/');
+  assert.equal((await parseSingleTile(yaml('  launch_url: http://widget.othala.test/x'))).launchUrl, 'https://widget.othala.test/');
+  assert.equal(
+    (await parseSingleTile(yaml("  launch_url: 'https://widget.othala.test/#/sso?identifier=dag'"))).launchUrl,
+    'https://widget.othala.test/#/sso?identifier=dag',
+  );
+});

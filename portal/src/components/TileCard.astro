@@ -17,7 +17,7 @@ interface Props {
 const { tile, readiness, requirementTitles, groups } = Astro.props;
 // A tile whose prerequisite is unmet opens its setup page (the app page leads with the setup step) rather than an
 // address that will not load until the person is set up.
-const launchHref = readiness === 'needs' ? `/apps/${encodeURIComponent(tile.slug)}` : safeHref(tile.url);
+const launchHref = readiness === 'needs' ? `/apps/${encodeURIComponent(tile.slug)}` : safeHref(tile.launchUrl);
 ---
 
 <article class="tile" data-slug={tile.slug}>

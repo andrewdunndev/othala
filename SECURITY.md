@@ -150,9 +150,13 @@ Each names its enforcer and the test that fails if it stops working.
 - **A picture is public to anyone holding its URL.** `/avatar/<id>/<hash>` is served
   without a session because apps fetch it themselves; the URL needs the identity id
   and a prefix of the content hash; a new picture is a new URL and the old one stops serving.
-- **Sessions are long-lived and `whoami` answers at the first assurance level**
-  (`kratos/kratos.yml`, `session`). A stolen cookie stays valuable for the
-  session lifespan; revocation ends it sooner.
+- **A client with `skip_step_up` accepts a passkey alone, admins included.** Only a session whose aal1 sign-in methods are all `passkey` qualifies; password and emailed-code sessions step up. A stolen passkey-signed aal1 session reaches those apps, and any in-app admin role they map, for the session lifespan; portal admin, settings, device grants, forward-auth and other clients still require aal2.
+- **Sessions slide while used, and `whoami` answers at the first assurance level**
+  (`kratos/kratos.yml`, `session`). Each landing visit or app sign-in pushes expiry to 90 days, up to 365 days
+  after the last real sign-in, so a stolen cookie lives as long as anyone uses it and, with `skip_step_up`,
+  reaches in-app admin. Refresh chains obey the same cap: a Hydra token hook refuses a refresh once the subject has no
+  active Kratos session, and fails closed, so no token exchange succeeds while the portal is down. A refusal revokes nothing: it suspends
+  the chain until the subject signs in again. A single-session revoke suspends it only when it was the subject's last session; a suspected theft takes the subject-wide revoke.
 - **Role rank is a convention no code enforces.** `lookupRole`
   (`portal/src/lib/claims.ts`) reads declaration order in `consent.roles` as
   descending privilege, so a manifest listing roles ascending silently downgrades
