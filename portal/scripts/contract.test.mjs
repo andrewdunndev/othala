@@ -77,6 +77,10 @@ test('the rendered deploy/example passes, through the CLI', () => {
 const hook = (k, ...path) => path.reduce((o, p) => o[p], k.selfservice.flows);
 // pointer, mutation, consumer: each pinned key, where the portal depends on it (a symbol, never a line).
 const KRATOS_PINS = [
+  ['/oauth2', (h) => delete h.oauth2.token_hook, 'handleTokenHook, listen.ts: without the hook refresh chains outlive the cap'],
+  ['/oauth2/token_hook/url', (h) => (h.oauth2.token_hook.url = 'http://othala:4431/admin/other'), 'handleTokenHook, listen.ts'],
+  ['/oauth2/token_hook/auth', (h) => delete h.oauth2.token_hook.auth, 'handleTokenHook, listen.ts: the hook is bearer-gated'],
+  ['/oauth2/token_hook/auth/config/value', (h) => (h.oauth2.token_hook.auth.config.value = 'Bearer'), 'handleTokenHook, listen.ts'],
   ['/serve/admin/port', (k) => (k.serve.admin.port = 1), 'KRATOS_ADMIN_URL, constants.ts'],
   ['/serve/public/port', (k) => (k.serve.public = { port: 1 }), 'KRATOS_PUBLIC_URL, constants.ts'],
   ...['error', 'settings', 'recovery', 'verification', 'login'].map((f) => [`/selfservice/flows/${f}/ui_url`, (k) => (k.selfservice.flows[f].ui_url = 'https://a.example/x'), `pages/auth/${f}.astro`]),
@@ -216,9 +220,9 @@ test('the policy files must equal the image copies, compared as JSON and as trim
 const pathsOf = (doc) => JSON.stringify(doc).match(/"const":"([^"]+)"/g) ?? [];
 
 test('the contract names exactly the admin webhook routes', () => {
-  const schema = JSON.parse(readFileSync(join(root, 'contract/kratos.schema.json'), 'utf8'));
-  const paths = new Set(pathsOf(schema).map((c) => c.slice(9, -1)).filter((u) => u.startsWith('http://othala:4431')).map((u) => new URL(u).pathname));
-  assert.deepEqual([...paths].sort(), [...ADMIN_POST.keys()].filter((k) => k !== '/admin/token-hook').sort()); // Hydra's hook, not Kratos's
+  const schemas = ['kratos', 'hydra'].map((n) => JSON.parse(readFileSync(join(root, `contract/${n}.schema.json`), 'utf8')));
+  const paths = new Set(pathsOf(schemas).map((c) => c.slice(9, -1)).filter((u) => u.startsWith('http://othala:4431')).map((u) => new URL(u).pathname));
+  assert.deepEqual([...paths].sort(), [...ADMIN_POST.keys()].sort());
 });
 
 test('every ui_url, oauth2 and device page the contract names exists', () => {
