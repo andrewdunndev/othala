@@ -901,6 +901,7 @@ test('token hook: a refresh with no active session is refused (the 365-day cap r
   assert.equal(res.statusCode, 403);
   assert.deepEqual(asked, ['sub-1']);
   assert.equal((await tokenHook({ sessions: [session('aal1', ['password'], { expires_at: new Date(Date.now() - 1000) })] })).res.statusCode, 403, 'an expired row does not count');
+  assert.equal((await tokenHook({ sessions: [session('aal1', ['password'], { expires_at: undefined })] })).res.statusCode, 403, 'a row with no expiry does not count');
 });
 
 test('token hook: a refresh with an active session passes', async () => {
@@ -919,6 +920,8 @@ test('token hook: a Kratos error, a missing subject or a malformed body refuses 
   assert.equal((await tokenHook({ sessions: new Error('kratos down') })).res.statusCode, 403);
   assert.equal((await tokenHook({ body: JSON.stringify({ session: {}, request: { grant_types: ['refresh_token'] } }) })).res.statusCode, 403);
   assert.equal((await tokenHook({ body: '{not json' })).res.statusCode, 403);
+  assert.equal((await tokenHook({ body: '{}' })).res.statusCode, 403, 'no grant_types');
+  assert.equal((await tokenHook({ body: JSON.stringify({ session: { id_token: { id_token_claims: { sub: 'sub-1' } } }, request: { grant_types: ['refresh_token'] } }) })).res.statusCode, 403, 'the obfuscated claim is not a subject');
 });
 
 test('token hook: a call without the bearer is refused before any lookup', async () => {

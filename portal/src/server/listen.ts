@@ -330,10 +330,7 @@ export async function handleRevokeGrants(req: IncomingMessage, res: ServerRespon
   sendJson(res, 200, { revoked: true });
 }
 
-/**
- * POST /admin/token-hook, Hydra's oauth2.token_hook: a refresh_token grant needs an active Kratos session for its subject (204 allow, 403 deny), so no
- * refresh chain outlives the session cap. Any other grant passes without a Kratos call. Fail closed: a bad body or a Kratos error is a 403.
- */
+/** POST /admin/token-hook, Hydra's oauth2.token_hook: 403 a refresh_token grant whose subject has no active session; every other grant passes. */
 export async function handleTokenHook(req: IncomingMessage, res: ServerResponse, client: AdminClient = ADMIN_CLIENT) {
   if (refuseUnlessHookBearer(req, res)) return;
   const allow = () => {
@@ -341,7 +338,7 @@ export async function handleTokenHook(req: IncomingMessage, res: ServerResponse,
     res.end();
   };
   const deny = (why: string) => {
-    console.error(`[portal/token-hook] refresh refused: ${why}`);
+    console.warn(`[portal/token-hook] refresh refused: ${why}`);
     sendJson(res, 403, { error: 'forbidden' });
   };
   let body;
@@ -353,13 +350,13 @@ export async function handleTokenHook(req: IncomingMessage, res: ServerResponse,
   const grants = body?.request?.grant_types;
   if (!Array.isArray(grants)) return deny('grant_types missing');
   if (!grants.includes('refresh_token')) return allow();
-  const sub = body?.session?.id_token?.subject || body?.session?.id_token?.id_token_claims?.sub;
+  const sub = body?.session?.id_token?.subject;
   if (typeof sub !== 'string' || !sub) return deny('subject missing');
   let live;
   try {
     const now = Date.now();
-    // Kratos's active filter does not exclude an expired row.
-    live = (await client.listSessions(sub)).some((s) => s.active && (!s.expires_at || new Date(s.expires_at).getTime() > now));
+    // Fail closed if Kratos's own active filter ever loosens.
+    live = (await client.listSessions(sub)).some((s) => s.active && s.expires_at && new Date(s.expires_at).getTime() > now);
   } catch (err) {
     return deny(`session lookup failed: ${(err as Error)?.message ?? err}`);
   }
