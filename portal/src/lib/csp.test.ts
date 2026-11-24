@@ -36,9 +36,9 @@ describe('native-app redirect schemes', () => {
       formActionSources({
         apex: 'example.test',
         kratosUrls: ['https://auth.example.test/'],
-        redirectUris: ['https://app.example.test/cb', 'app.immich:///oauth-callback', 'App.Immich:/other', 'com.example.native:/cb'],
+        redirectUris: ['https://app.example.test/cb', 'app.photos:///oauth-callback', 'App.Photos:/other', 'com.example.native:/cb'],
       }),
-    ).toBe("'self' https://*.example.test https://auth.example.test app.immich: com.example.native:");
+    ).toBe("'self' https://*.example.test https://auth.example.test app.photos: com.example.native:");
   });
 
   it('refuses http(s) and script- or document-bearing schemes', () => {
