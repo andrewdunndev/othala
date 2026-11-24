@@ -16,6 +16,8 @@ import { csrfToken, nodesByGroup, asInput, scriptNodes, safeOnclick } from '../.
 import { deriveLoginTiers } from '../../lib/login-tiers';
 import { CODE_SHAPE, journeyText, noticeClass, noticeRole, passwordRefused } from '../../lib/journey';
 import { DEV_LOGIN_STATES, devLogin, isIn } from '../../lib/journey-fixtures';
+import { flowSpent, loginReturnOf } from '../../lib/flow-spent';
+import { publicUrl } from '../../lib/config';
 import type { FlowMessage } from '../../lib/types';
 
 const url = Astro.url;
@@ -54,6 +56,16 @@ if (!devFlow && flowId && (!result || result.kind !== 'ok') && !isDev) {
 
 // Dev without a real flow renders a static preview.
 const flow = devFlow ?? (result && result.kind === 'ok' ? result.flow : null);
+
+// A spent flow is never offered (flow-spent.ts): continue to its return, as the finished sign-in would have.
+if (flow && !devFlow && !isDev) {
+  const session = await getSession(cookie).catch(() => null);
+  if (flowSpent(flow, session)) return Astro.redirect(loginReturnOf(flow.return_to, publicUrl) ?? '/');
+  // The page URL also carries an app sign-in's return: once a sign-in completes, Kratos refuses this flow's fetch (the
+  // CSRF token is rotated), and the flow re-created above can find the return only in the query.
+  const back = returnTo ? undefined : loginReturnOf(flow.return_to, publicUrl);
+  if (back) return Astro.redirect(`/auth/login?${new URLSearchParams({ flow: flow.id, return_to: back }).toString()}`);
+}
 const ui = flow?.ui;
 const csrf = ui ? csrfToken(ui.nodes) : '';
 const scripts = ui ? scriptNodes(ui.nodes) : [];
@@ -453,6 +465,10 @@ const { hasPasskey, hasCode, hasPassword, totpNodes, aal2WebauthnNodes, lookupNo
   <script>
     // Focus the retry field without scrolling, so the heading and the error stay in view.
     document.querySelector<HTMLInputElement>('#password[data-focus-on-load]')?.focus({ preventScroll: true });
+    // A page restored from the back/forward cache may hold a flow finished since; the server decides again.
+    window.addEventListener('pageshow', (e) => {
+      if (e.persisted) location.reload();
+    });
   </script>
 
   {scripts.map((s) => (

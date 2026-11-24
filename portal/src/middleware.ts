@@ -15,6 +15,7 @@ import { defineMiddleware } from 'astro:middleware';
 import { contentSecurityPolicy } from './lib/csp';
 import { KRATOS_PUBLIC_URL } from './lib/constants';
 import { apex, publicUrl } from './lib/config';
+import { servingManifests } from './lib/manifest-store';
 
 // Routes that are themselves error pages — rewriting these would loop.
 const ERROR_ROUTES = ['/auth/error', '/404', '/500'];
@@ -39,6 +40,7 @@ function applySecurityHeaders(res: Response): void {
     contentSecurityPolicy({
       apex,
       kratosUrls: [publicUrl, KRATOS_PUBLIC_URL],
+      redirectUris: servingManifests().flatMap((m) => m.redirectUris),
     }),
   );
 }

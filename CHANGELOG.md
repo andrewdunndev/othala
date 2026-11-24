@@ -6,6 +6,13 @@ aims to follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 The git tag is the authoritative version; `portal/package.json` mirrors it.
 
+## [0.20.1] - 2026-11-24
+
+### Fixed
+
+- A native app whose `redirect_uri` uses its own scheme (`app.example:///callback`) receives its sign-in again: the portal's CSP `form-action` covers a form's whole redirect chain and allowed only https origins, so when a sign-in POST's chain ended on the app's scheme (a `skip_step_up` client signed in by passkey alone) the browser blocked the last hop and the page stayed put. `form-action` now also lists each non-http(s) `redirect_uri` scheme in the loaded client manifests; script- and document-bearing schemes (`javascript:`, `data:`, `blob:`, `filesystem:` and the like) are never added.
+- A login flow the session has already completed is no longer offered: the login page continues to the flow's return (an app's `/oauth2/login`, where its step-up rules decide) instead of rendering forms whose submission Kratos answers with a bare redirect to the site root. The login page URL carries an app sign-in's return, so a reload after the sign-in completed (when Kratos refuses the old flow) still continues to the app, and a sign-in page restored from the back/forward cache reloads. Second-factor forms render only on a flow that requests aal2.
+
 ## [0.20.0] - 2026-11-23
 
 ### Added

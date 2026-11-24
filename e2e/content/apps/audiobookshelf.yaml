@@ -26,6 +26,8 @@ oidc:
   scope: openid email profile groups offline_access
   redirect_uris:
     - https://audiobookshelf.othala.test/auth/openid/callback
+    # A native-app redirect_uri: its scheme joins the portal's CSP form-action (m-security-headers).
+    - app.othala-test:///oauth-callback
   post_logout_redirect_uris:
     - https://audiobookshelf.othala.test/
   token_endpoint_auth_method: client_secret_basic

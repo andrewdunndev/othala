@@ -8,6 +8,8 @@ const REQUIRED_HEADERS: Array<[string, string | RegExp]> = [
   ['referrer-policy', 'same-origin'],
   ['content-security-policy', /frame-ancestors\s+'none'/],
   ['content-security-policy', /form-action\s+'self'/],
+  // A sign-in POST chain ending on a native app's redirect_uri needs its scheme (audiobookshelf.yaml, csp.ts).
+  ['content-security-policy', /form-action [^;]*\bapp\.othala-test:(;|\s|$)/],
   ['strict-transport-security', /max-age=63072000/],
   ['cross-origin-opener-policy', 'same-origin'],
 ];
