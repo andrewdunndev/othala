@@ -28,6 +28,7 @@ import { devMockIdentity } from '../lib/dev-mock';
 import { getSession, browserFlows } from '../lib/kratos';
 import { slide } from '../lib/session-slide';
 import { stepUpAtLanding } from '../lib/gate';
+import { clearLoginReturn, readLoginReturn } from '../lib/login-return';
 import { getIdentity } from '../lib/admin-api';
 import { parseIdentity } from '../lib/identity-facts';
 import HeaderActions from '../components/HeaderActions.astro';
@@ -81,6 +82,16 @@ if (devOverride === 'down' || devOverride === 'pre-auth' || devOverride === 'pos
     state = 'down';
     console.error('[othala/index] session check failed:', err);
   }
+}
+
+// Kratos sends a login POST it will not run here, dropping an app sign-in's return; the kept one goes back (login-return.ts).
+const pending = state === 'post-auth' && !Astro.url.searchParams.has('ask') ? readLoginReturn(cookie) : undefined;
+if (pending && stepUp) return Astro.redirect(browserFlows.login({ aal: 'aal2', returnTo: pending }));
+if (pending) {
+  const headers = new Headers({ Location: pending, 'Cache-Control': 'no-store' });
+  for (const c of Astro.response.headers.getSetCookie()) headers.append('Set-Cookie', c);
+  headers.append('Set-Cookie', clearLoginReturn());
+  return new Response(null, { status: 302, headers });
 }
 
 // The ask moves to the front door so app sign-ins never ask; ?ask= keeps the contact form reachable from the step-up page.

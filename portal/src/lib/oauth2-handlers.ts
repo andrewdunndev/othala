@@ -17,6 +17,7 @@ import { publicUrl } from './config';
 import { hydraAdmin } from './ory-fetch';
 import { parseIdentity } from './identity-facts';
 import { isDeviceRequest, readDeviceCode, clearDeviceCode } from './device';
+import { clearLoginReturn, keepLoginReturn } from './login-return';
 
 // Hydra remembers a sign-in exactly as long as the Kratos session lives, so a later app sign-out still reaches
 // handleLogout. The session's own expires_at is the only source; without one, remember for the 1s minimum (0 would mean forever).
@@ -117,13 +118,15 @@ export function freshnessVerdict(
   return prompt.includes('none') ? 'login_required' : 'refresh';
 }
 
+// The return also rides in a cookie: a step-up POST Kratos will not run lands on the landing without it (login-return.ts).
 function loginBounce(challenge: string, query = ''): Response {
-  return redirect(`${LOGIN_UI_BASE}?${query}return_to=${encodeURIComponent(buildLoginReturnTo(challenge))}`);
+  const returnTo = buildLoginReturnTo(challenge);
+  return redirect(`${LOGIN_UI_BASE}?${query}return_to=${encodeURIComponent(returnTo)}`, keepLoginReturn(returnTo));
 }
 
 /** A refused device grant lands on the portal's error page: Hydra's own redirect ends on a raw JSON error. */
-const landing = (redirect_to: string, deviceReason?: string) =>
-  redirect(deviceReason ? `${publicUrl}/auth/error?reason=${deviceReason}` : redirect_to);
+const landing = (redirect_to: string, deviceReason?: string, setCookie: string[] = []) =>
+  redirect(deviceReason ? `${publicUrl}/auth/error?reason=${deviceReason}` : redirect_to, setCookie);
 
 async function rejectLogin(
   d: Required<Deps>,
@@ -137,7 +140,7 @@ async function rejectLogin(
       loginChallenge: challenge,
       rejectOAuth2Request: { error, error_description: error, status_code },
     });
-    return landing(redirect_to, deviceReason);
+    return landing(redirect_to, deviceReason, [clearLoginReturn()]);
   } catch (err) {
     upstream('rejectOAuth2LoginRequest', err);
     return upstreamError();
@@ -179,7 +182,8 @@ export async function handleLogin(req: Request, deps: Deps = {}): Promise<Respon
     login = await d.oauth2.getOAuth2LoginRequest({ loginChallenge: challenge });
   } catch (err) {
     upstream('getOAuth2LoginRequest', err);
-    return upstreamError();
+    // A kept return naming a spent challenge must not send the landing here again.
+    return new Response('upstream error', { status: 502, headers: { 'Set-Cookie': clearLoginReturn() } });
   }
 
   const clientId = login.client?.client_id ?? '';
@@ -244,7 +248,7 @@ export async function handleLogin(req: Request, deps: Deps = {}): Promise<Respon
         ...(acr ? { acr } : {}),
       },
     });
-    return redirect(redirect_to, slid.setCookie);
+    return redirect(redirect_to, [...slid.setCookie, clearLoginReturn()]);
   } catch (err) {
     upstream('acceptOAuth2LoginRequest', err);
     return upstreamError();

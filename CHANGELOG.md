@@ -6,6 +6,12 @@ aims to follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 The git tag is the authoritative version; `portal/package.json` mirrors it.
 
+## [Unreleased]
+
+### Fixed
+
+- A step-up POST that Kratos does not run (it answers a login POST whose flow asks for no more than the session already holds with a bare redirect to the site root) no longer strands an app sign-in on the portal home: the portal keeps the sign-in's return in a short-lived `__Host-` cookie, so the landing sends it back to a step-up bound to the same login challenge, or straight back to the app when the session already holds aal2. A refused code still re-renders on the same flow.
+
 ## [0.20.0] - 2026-11-23
 
 ### Added

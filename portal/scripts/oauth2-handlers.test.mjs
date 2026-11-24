@@ -10,6 +10,7 @@ import { parseManifest } from '../src/lib/manifests.ts';
 import { signToken, _resetForTests } from '../src/lib/csrf.ts';
 import { deepMergeClaims } from '../src/lib/claims.ts';
 import { publicUrl } from '../src/lib/config.ts';
+import { LOGIN_RETURN_COOKIE, clearLoginReturn, readLoginReturn } from '../src/lib/login-return.ts';
 import {
   identity, session, whoamiIdentity, withCredentials, avatarOf,
   oauth2LoginRequest, oauth2ConsentRequest, oauth2LogoutRequest,
@@ -1729,7 +1730,7 @@ test('login remembers until the extended expiry and relays the reissued cookie (
   });
   assert.equal(slideSession.mock.calls[0][1], 'ory_kratos_session=old');
   assert.ok(Math.abs(calls.acceptLoginBody.remember_for - 90 * 86_400) <= 2, `remember_for ${calls.acceptLoginBody.remember_for}`);
-  assert.deepEqual(res.headers.getSetCookie(), ['ory_kratos_session=new; Max-Age=7776000']);
+  assert.deepEqual(res.headers.getSetCookie(), ['ory_kratos_session=new; Max-Age=7776000', clearLoginReturn()]);
 });
 
 test('a denied login and a step-up bounce never slide the session (pins the slide placement after the gate)', async () => {
@@ -1750,4 +1751,68 @@ test('a denied login and a step-up bounce never slide the session (pins the slid
     manifest: () => loadManifest('grafana'),
   });
   assert.equal(slideSession.mock.calls.length, 0);
+});
+
+// A step-up POST Kratos will not run lands on the landing with no return_to, so every bounce keeps the return in a cookie
+// and every end of the login request clears it (login-return.ts).
+const keptReturn = (res) => readLoginReturn(res.headers.getSetCookie().map((c) => c.split(';')[0]).join('; '));
+const clearsReturn = (res) => res.headers.getSetCookie().includes(clearLoginReturn());
+
+test('login bounces keep the return in a cookie: no session, step-up and refresh', async () => {
+  const stale = new Date(Date.now() - 3600_000);
+  for (const [label, getSession, getReq] of [
+    ['no session', async () => null, FRESH],
+    ['step-up', defaultSession(), FRESH],
+    ['refresh', defaultSession({ authenticated_at: stale }), async () => oauth2LoginRequest({ request_url: 'https://sso.othala.test/oauth2/auth?prompt=login' })],
+  ]) {
+    const { api } = stubOAuth2({ getOAuth2LoginRequest: getReq });
+    const res = await handleLogin(new Request('https://x/oauth2/login?login_challenge=lc'), {
+      oauth2: api,
+      getIdentity: async () => activeMember({ credentials: withCredentials(activeMember(), 'password', 'totp').credentials }),
+      getSession,
+      manifest: () => loadManifest('grafana'),
+    });
+    assert.equal(new URL(res.headers.get('location'), 'https://x').pathname, '/auth/login', label);
+    assert.equal(keptReturn(res), '/oauth2/login?login_challenge=lc', label);
+    assert.match(res.headers.getSetCookie()[0], new RegExp(`^${LOGIN_RETURN_COOKIE}=.*HttpOnly; Secure; SameSite=Lax`), label);
+  }
+});
+
+test('login clears the kept return on accept, on reject and when Hydra no longer knows the challenge', async () => {
+  const accepted = stubOAuth2({ getOAuth2LoginRequest: FRESH });
+  const ok = await handleLogin(new Request('https://x/oauth2/login?login_challenge=lc'), {
+    oauth2: accepted.api,
+    getIdentity: async () => activeMember(),
+    getSession: defaultSession(),
+    manifest: () => loadManifest('grafana'),
+  });
+  assert.equal(accepted.calls.acceptLogin, 1);
+  assert.ok(clearsReturn(ok), 'accept clears');
+
+  const quiet = console.warn;
+  console.warn = () => {};
+  try {
+    const rejected = stubOAuth2({ getOAuth2LoginRequest: FRESH });
+    const no = await handleLogin(new Request('https://x/oauth2/login?login_challenge=lc'), {
+      oauth2: rejected.api,
+      getIdentity: async () => activeMember({ metadata_admin: { groups: [] } }),
+      getSession: defaultSession(),
+      manifest: () => loadManifest('grafana'),
+    });
+    assert.equal(rejected.calls.rejectLogin, 1);
+    assert.ok(clearsReturn(no), 'reject clears');
+  } finally {
+    console.warn = quiet;
+  }
+
+  const quietErr = console.error;
+  console.error = () => {};
+  try {
+    const { api } = stubOAuth2({ getOAuth2LoginRequest: async () => { throw new Error('410 gone'); } });
+    const gone = await handleLogin(new Request('https://x/oauth2/login?login_challenge=lc'), { oauth2: api });
+    assert.equal(gone.status, 502);
+    assert.ok(clearsReturn(gone), 'a spent challenge clears');
+  } finally {
+    console.error = quietErr;
+  }
 });

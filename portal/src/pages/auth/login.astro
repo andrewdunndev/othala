@@ -16,17 +16,19 @@ import { csrfToken, nodesByGroup, asInput, scriptNodes, safeOnclick } from '../.
 import { deriveLoginTiers } from '../../lib/login-tiers';
 import { CODE_SHAPE, journeyText, noticeClass, noticeRole, passwordRefused } from '../../lib/journey';
 import { DEV_LOGIN_STATES, devLogin, isIn } from '../../lib/journey-fixtures';
+import { readLoginReturn } from '../../lib/login-return';
 import type { FlowMessage } from '../../lib/types';
 
 const url = Astro.url;
 const flowId = url.searchParams.get('flow');
 let aal = (url.searchParams.get('aal') as 'aal1' | 'aal2' | null) ?? undefined;
 const refresh = url.searchParams.get('refresh') === 'true';
-const returnTo = url.searchParams.get('return_to') ?? undefined;
+const cookie = Astro.request.headers.get('cookie') ?? undefined;
+// A new flow keeps an app sign-in's return when the query has none (a lost or expired flow; login-return.ts).
+const returnTo = url.searchParams.get('return_to') ?? readLoginReturn(cookie);
 const isDev = import.meta.env.DEV;
 const devState = isDev ? url.searchParams.get('dev-state') : null;
 const devFlow = isIn(DEV_LOGIN_STATES, devState) ? devLogin(devState) : null;
-const cookie = Astro.request.headers.get('cookie') ?? undefined;
 
 // A live aal1 session that must step up (lib/gate.ts) gets an aal2 flow;
 // otherwise Kratos returns the browser to return_to and forward-auth loops.
