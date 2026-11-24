@@ -12,7 +12,7 @@
 
 # ----- Stage 1: build -----
 # UBI 10 nodejs-24: the runtime image is -minimal and has no npm.
-FROM registry.access.redhat.com/ubi10/nodejs-24:10.3@sha256:a4649e9ead64895034ec8cbb9f1097785035e20950810df9777d30639e79fb0e AS build
+FROM registry.access.redhat.com/ubi10/nodejs-24:10.3@sha256:228c8675a62feb55f88dc9dee94d5a82e6f0e887ec47bd8f5e524a797a0984d7 AS build
 
 WORKDIR /src
 USER root
