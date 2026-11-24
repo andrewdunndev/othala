@@ -16,7 +16,7 @@ import { csrfToken, nodesByGroup, asInput, scriptNodes, safeOnclick } from '../.
 import { deriveLoginTiers } from '../../lib/login-tiers';
 import { CODE_SHAPE, journeyText, noticeClass, noticeRole, passwordRefused } from '../../lib/journey';
 import { DEV_LOGIN_STATES, devLogin, isIn } from '../../lib/journey-fixtures';
-import { flowSpent, loginReturnOf, readLoginReturn } from '../../lib/login-return';
+import { clearLoginReturn, flowSpent, loginReturnOf, readLoginReturn } from '../../lib/login-return';
 import { publicUrl } from '../../lib/config';
 import type { FlowMessage } from '../../lib/types';
 
@@ -25,8 +25,7 @@ const flowId = url.searchParams.get('flow');
 let aal = (url.searchParams.get('aal') as 'aal1' | 'aal2' | null) ?? undefined;
 const refresh = url.searchParams.get('refresh') === 'true';
 const cookie = Astro.request.headers.get('cookie') ?? undefined;
-// A new flow keeps an app sign-in's return when the query has none (a lost or expired flow; login-return.ts).
-const returnTo = url.searchParams.get('return_to') ?? readLoginReturn(cookie);
+const returnTo = url.searchParams.get('return_to') ?? undefined;
 const isDev = import.meta.env.DEV;
 const devState = isDev ? url.searchParams.get('dev-state') : null;
 const devFlow = isIn(DEV_LOGIN_STATES, devState) ? devLogin(devState) : null;
@@ -46,13 +45,17 @@ if (!flowId && !aal && !isDev) {
 
 // In dev, skip the flow redirect when Kratos is unreachable.
 if (!flowId && !isDev) {
-  return Astro.redirect(browserFlows.login({ aal, refresh, returnTo }));
+  const res = Astro.redirect(browserFlows.login({ aal, refresh, returnTo }));
+  // A sign-in started at the front door abandons an app sign-in's kept return (login-return.ts).
+  if (!returnTo) res.headers.append('Set-Cookie', clearLoginReturn());
+  return res;
 }
 
 const result = !devFlow && flowId ? await getLoginFlow(flowId, cookie).catch(() => null) : null;
 
+// A lost or expired flow (the fetch is refused or gone) keeps an app sign-in's return (login-return.ts).
 if (!devFlow && flowId && (!result || result.kind !== 'ok') && !isDev) {
-  return Astro.redirect(browserFlows.login({ aal, refresh, returnTo }));
+  return Astro.redirect(browserFlows.login({ aal, refresh, returnTo: returnTo ?? readLoginReturn(cookie) }));
 }
 
 // Dev without a real flow renders a static preview.

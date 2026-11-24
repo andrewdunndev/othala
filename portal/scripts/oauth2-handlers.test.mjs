@@ -1821,3 +1821,21 @@ test('login clears the kept return on accept, on reject and when Hydra no longer
     console.error = quietErr;
   }
 });
+
+test('a bounce reached through the landing resume keeps no return, so the next landing stays home', async () => {
+  const { api } = stubOAuth2({ getOAuth2LoginRequest: FRESH });
+  const deps = {
+    oauth2: api,
+    getIdentity: async () => activeMember({ credentials: withCredentials(activeMember(), 'password', 'totp').credentials }),
+    getSession: defaultSession(),
+    manifest: () => loadManifest('grafana'),
+  };
+  const first = await handleLogin(new Request('https://x/oauth2/login?login_challenge=lc'), deps);
+  assert.equal(keptReturn(first), '/oauth2/login?login_challenge=lc');
+  const resumed = await handleLogin(new Request('https://x/oauth2/login?login_challenge=lc&resume=1'), deps);
+  const u = new URL(resumed.headers.get('location'), 'https://x');
+  assert.equal(u.searchParams.get('aal'), 'aal2');
+  assert.equal(u.searchParams.get('return_to'), '/oauth2/login?login_challenge=lc');
+  assert.deepEqual(resumed.headers.getSetCookie(), []);
+});
+

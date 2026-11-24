@@ -119,9 +119,10 @@ export function freshnessVerdict(
 }
 
 // The return also rides in a cookie: a step-up POST Kratos will not run lands on the landing without it (login-return.ts).
-function loginBounce(challenge: string, query = ''): Response {
+// A bounce the landing's one resume led to keeps nothing, so the next landing stays home.
+function loginBounce(challenge: string, query = '', keep = true): Response {
   const returnTo = buildLoginReturnTo(challenge);
-  return redirect(`${LOGIN_UI_BASE}?${query}return_to=${encodeURIComponent(returnTo)}`, keepLoginReturn(returnTo));
+  return redirect(`${LOGIN_UI_BASE}?${query}return_to=${encodeURIComponent(returnTo)}`, keep ? keepLoginReturn(returnTo) : []);
 }
 
 /** A refused device grant lands on the portal's error page: Hydra's own redirect ends on a raw JSON error. */
@@ -209,7 +210,8 @@ export async function handleLogin(req: Request, deps: Deps = {}): Promise<Respon
     }
     return redirect(login.request_url);
   }
-  if (!session?.active || !session.identity) return loginBounce(challenge);
+  const keep = params.get('resume') !== '1';
+  if (!session?.active || !session.identity) return loginBounce(challenge, '', keep);
   const subject = session.identity.id;
   const acr = session.authenticator_assurance_level ?? undefined;
 
@@ -231,10 +233,10 @@ export async function handleLogin(req: Request, deps: Deps = {}): Promise<Respon
 
   const freshness = freshnessVerdict(login.request_url, session);
   if (freshness === 'login_required') return rejectLogin(d, challenge, freshness, 400);
-  if (freshness === 'refresh') return loginBounce(challenge, device ? 'refresh=true&aal=aal2&' : 'refresh=true&');
+  if (freshness === 'refresh') return loginBounce(challenge, device ? 'refresh=true&aal=aal2&' : 'refresh=true&', keep);
 
   // The opt-out skips the step-up verdict, never the device grant's aal2.
-  if ('stepUp' in access || (device && acr !== 'aal2')) return loginBounce(challenge, 'aal=aal2&');
+  if ('stepUp' in access || (device && acr !== 'aal2')) return loginBounce(challenge, 'aal=aal2&', keep);
 
   // A sign-in to an app counts as use, and remember_for follows the extended expiry.
   const slid = await d.slideSession(session, req.headers.get('cookie') ?? undefined);

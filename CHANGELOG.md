@@ -10,7 +10,7 @@ The git tag is the authoritative version; `portal/package.json` mirrors it.
 
 ### Fixed
 
-- An app sign-in no longer ends on the portal home when its first-factor flow is posted again after it already signed in (a passkey sheet that does not follow the redirect back to `/oauth2/login`): Kratos answers such a POST with a bare redirect to the site root and drops the flow's return, and the landing then asked for the second step even on a `skip_step_up` client. A spent login flow is no longer offered (the login page continues to its return, and a page restored from the back/forward cache reloads), the landing sends a sign-in whose POST still reached Kratos back to `/oauth2/login` once (the return is kept for five minutes in a `__Host-` cookie, cleared when the login request ends), and second-factor forms render only on a flow that requests aal2.
+- An app sign-in no longer ends on the portal home when its first-factor flow is posted again after it already signed in (a passkey sheet that does not follow the redirect back to `/oauth2/login`): Kratos answers such a POST with a bare redirect to the site root and drops the flow's return, and the landing then asked for the second step even on a `skip_step_up` client. A spent login flow is no longer offered (the login page continues to its return, and a page restored from the back/forward cache reloads), the landing sends a sign-in whose POST still reached Kratos back to `/oauth2/login` once (the return is kept for five minutes in a `__Host-` cookie, cleared when the login request ends, when the landing uses it, and when a sign-in starts at the front door; a lost or expired flow also keeps it), and second-factor forms render only on a flow that requests aal2.
 
 ## [0.20.0] - 2026-11-23
 

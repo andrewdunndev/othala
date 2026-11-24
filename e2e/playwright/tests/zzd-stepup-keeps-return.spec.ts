@@ -7,6 +7,7 @@ import { test, expect, enrollTotpSecret, computeTotp, GRAFANA_CLIENT_ID, GRAFANA
 import { createIdentityWithPassword, TEST_PASSWORD } from '../actions/identity';
 import { loginViaJsonApi } from '../actions/login';
 import { registerPasskey } from '../actions/passkey';
+import { getSession } from '../actions/session';
 
 const APP_ORIGIN = 'https://grafana.othala.test';
 const OPT_OUT_CLIENT = 'audiobookshelf';
@@ -137,15 +138,12 @@ test('ZZD2 — skip_step_up client: the spent passkey flow page, loaded again, c
   await passkeyFirst(page, authorizeUrl(baseURL!, OPT_OUT_CLIENT, OPT_OUT_REDIRECT));
   await expect.poll(firstLocation, { message: 'ZZD2: the first passkey POST signs in and points at /oauth2/login', timeout: 15_000 }).toContain('/oauth2/login');
 
-  // Loaded again, the spent flow must not be offered: the page continues to the flow's return. If it is offered, use
-  // it as a person would, which sends the second POST of ZZD1.
+  // Loaded again, the spent flow is not offered: the login page redirects to the flow's return, and nothing is clicked.
+  const reloaded = page.waitForResponse((r) => r.request().method() === 'GET' && /\/auth\/login\?flow=/.test(r.url()));
   await page.reload().catch(() => {});
-  const offered = await page
-    .locator('form.passkey-block button[name="passkey_login_trigger"]')
-    .isVisible({ timeout: 3_000 })
-    .catch(() => false);
-  if (offered) await passkeyAgain(page);
+  expect((await reloaded).status(), 'ZZD2: the spent flow is not rendered; the page redirects to its return').toBe(302);
   await expectCallback(hits, OPT_OUT_REDIRECT, 'ZZD2');
+  await expect(page.locator('form.passkey-block'), 'ZZD2: the spent passkey form is not offered').toHaveCount(0);
   expect(asks, 'ZZD2: no request asks for aal2').toEqual([]);
 });
 
@@ -181,3 +179,67 @@ test('ZZD3 — a step-up POST answered after another one already signed in still
   await form.locator('button[type="submit"]').click();
   await expectCallback(hits, GRAFANA_REDIRECT_URI, 'ZZD3');
 });
+
+/** An app sign-in started and abandoned at its bounce: the kept return is set, and the page sits on the login page. */
+async function abandonAt(page: Page, baseURL: string): Promise<string[]> {
+  const resumes: string[] = [];
+  page.on('request', (r) => {
+    if (r.url().includes('/oauth2/login?')) resumes.push(r.url());
+  });
+  await page.goto(authorizeUrl(baseURL, GRAFANA_CLIENT_ID, GRAFANA_REDIRECT_URI), { waitUntil: 'commit' }).catch(() => {});
+  await page.waitForURL(/\/auth\/login\?flow=/, { timeout: 15_000 });
+  return resumes;
+}
+
+test('ZZD4 — a front-door sign-in after an abandoned app sign-in lands home, not in the app', async ({
+  baseURL,
+  kratosAdminURL,
+  page,
+  virtualAuthenticator,
+}) => {
+  test.setTimeout(120_000);
+  expect(virtualAuthenticator.authenticatorId, 'ZZD4: virtual authenticator is attached').toBeTruthy();
+  const ctx = page.context();
+  const username = `zzd4.member.${Date.now()}`;
+  const email = `${username}@othala.test`;
+  await createIdentityWithPassword({ email, username, displayName: 'ZZD zzd4', groups: ['grafana-access'], kratosAdminURL });
+  await loginViaJsonApi(ctx, { identifier: email, password: TEST_PASSWORD }, baseURL!);
+  await registerPasskey(page, baseURL!);
+  await ctx.clearCookies();
+  const hits = await recordApp(page, APP_ORIGIN);
+
+  const resumes = await abandonAt(page, baseURL!);
+  const before = resumes.length;
+  // The front door: a fresh sign-in with no app return.
+  await passkeyFirst(page, `${baseURL}/auth/login`);
+  await page.waitForURL((u) => u.pathname === '/', { timeout: 15_000 });
+  await expect(page.locator('#greeting'), 'ZZD4: lands on the dashboard').toBeVisible();
+  expect(resumes.slice(before), 'ZZD4: the abandoned app sign-in is not resumed').toEqual([]);
+  expect(hits, 'ZZD4: the app is never reached').toEqual([]);
+});
+
+test('ZZD5 — after an abandoned app step-up, Home resumes it once, then stays home', async ({ baseURL, kratosAdminURL, page }) => {
+  test.setTimeout(90_000);
+  const ctx = page.context();
+  const username = `zzd5.admin.${Date.now()}`;
+  const email = `${username}@othala.test`;
+  // Admin-marked with no second factor: the app steps up, the landing does not.
+  await createIdentityWithPassword({ email, username, displayName: 'ZZD zzd5', groups: ['grafana-access'], isAdmin: true, kratosAdminURL });
+  await loginViaJsonApi(ctx, { identifier: email, password: TEST_PASSWORD }, baseURL!);
+  expect((await getSession(ctx, baseURL!))?.authenticator_assurance_level, 'ZZD5: aal1').toBe('aal1');
+
+  const resumes = await abandonAt(page, baseURL!);
+  expect(new URL(page.url()).searchParams.get('flow'), 'ZZD5: the app asked for the second step').toBeTruthy();
+
+  const first = resumes.length;
+  await page.goto(`${baseURL}/`, { waitUntil: 'commit' }).catch(() => {});
+  await page.waitForURL(/\/auth\/login\?flow=/, { timeout: 15_000 });
+  expect(resumes.slice(first).some((u) => u.includes('resume=1')), 'ZZD5: the first Home resumes the app sign-in').toBe(true);
+
+  const second = resumes.length;
+  await page.goto(`${baseURL}/`, { waitUntil: 'networkidle' });
+  expect(new URL(page.url()).pathname, 'ZZD5: the second Home stays home').toBe('/');
+  await expect(page.locator('#greeting'), 'ZZD5: lands on the dashboard').toBeVisible();
+  expect(resumes.slice(second), 'ZZD5: nothing is resumed twice').toEqual([]);
+});
+
