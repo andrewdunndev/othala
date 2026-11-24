@@ -1,7 +1,7 @@
-// ZZD — a step-up POST that Kratos does not run keeps the app sign-in. Kratos answers a login POST whose flow asks for no
-// more than the session holds with a bare 303 to default_browser_return_url, dropping the flow's return_to; the portal keeps
-// the return in a cookie, so the landing sends the sign-in back to /oauth2/login. A passkey alone on a skip_step_up client
-// never sees the second step.
+// ZZD — a login POST Kratos does not run keeps the app sign-in. Kratos answers a POST to a flow the session already
+// satisfies with a bare 303 to default_browser_return_url, dropping the flow's return_to. In production the passkey POST
+// signed in, its 303 to /oauth2/login was not followed, and a second POST of the same first-factor flow sent the sheet
+// home, where the landing asked for TOTP although the app is skip_step_up. The sign-in must reach the app callback.
 import type { Page } from '@playwright/test';
 import { test, expect, enrollTotpSecret, computeTotp, GRAFANA_CLIENT_ID, GRAFANA_REDIRECT_URI } from '../fixtures';
 import { createIdentityWithPassword, TEST_PASSWORD } from '../actions/identity';
@@ -10,7 +10,8 @@ import { registerPasskey } from '../actions/passkey';
 
 const APP_ORIGIN = 'https://grafana.othala.test';
 const OPT_OUT_CLIENT = 'audiobookshelf';
-const OPT_OUT_REDIRECT = 'https://audiobookshelf.othala.test/auth/openid/callback';
+const OPT_OUT_ORIGIN = 'https://audiobookshelf.othala.test';
+const OPT_OUT_REDIRECT = `${OPT_OUT_ORIGIN}/auth/openid/callback`;
 
 const authorizeUrl = (baseURL: string, client: string, redirect: string) =>
   `${baseURL}/oauth2/auth?client_id=${client}&response_type=code` +
@@ -65,7 +66,39 @@ async function expectCallback(hits: string[], redirect: string, label: string): 
   expect(cb.searchParams.get('state'), `${label}: the callback carries the authorize state`).toBe('zzd-state');
 }
 
-test('ZZD1 — passkey, a wrong code, a step-up POST Kratos does not run, then the right code: the sign-in reaches the app', async ({
+/**
+ * The first passkey POST signs in, but its 303 to /oauth2/login is answered here with a 204, so the page stays on the
+ * spent first-factor flow, as the sheet did. Resolves to the 303's Location.
+ */
+async function holdFirstPasskeyPost(page: Page): Promise<() => string | undefined> {
+  let location: string | undefined;
+  let held = false;
+  await page.route(/\/self-service\/login\?flow=/, async (route) => {
+    if (route.request().method() !== 'POST' || held) return route.continue();
+    held = true;
+    const response = await route.fetch({ maxRedirects: 0 });
+    location = response.headers()['location'] ?? `status ${response.status()}`;
+    await route.fulfill({ response, status: 204, body: '' });
+  });
+  return () => location;
+}
+
+async function passkeyAgain(page: Page): Promise<void> {
+  const button = page.locator('form.passkey-block button[name="passkey_login_trigger"]');
+  await expect(button, 'ZZD: the spent first-factor flow is still offered').toBeVisible({ timeout: 10_000 });
+  await page.waitForFunction(() => typeof (window as unknown as Record<string, unknown>).oryPasskeyLogin === 'function');
+  await button.click();
+}
+
+function recordAsks(page: Page): string[] {
+  const asks: string[] = [];
+  page.on('request', (r) => {
+    if (r.url().includes('aal=aal2')) asks.push(r.url());
+  });
+  return asks;
+}
+
+test('ZZD1 — skip_step_up client: a second POST of the spent passkey flow still reaches the app with no second step', async ({
   baseURL,
   kratosAdminURL,
   page,
@@ -73,37 +106,22 @@ test('ZZD1 — passkey, a wrong code, a step-up POST Kratos does not run, then t
 }) => {
   test.setTimeout(120_000);
   expect(virtualAuthenticator.authenticatorId, 'ZZD1: virtual authenticator is attached').toBeTruthy();
-  const secret = await seed(page, 'zzd1.member', baseURL!, kratosAdminURL);
-  const hits = await recordApp(page, APP_ORIGIN);
+  await seed(page, 'zzd1.member', baseURL!, kratosAdminURL);
+  const hits = await recordApp(page, OPT_OUT_ORIGIN);
+  const asks = recordAsks(page);
+  const firstLocation = await holdFirstPasskeyPost(page);
 
-  const firstFactor = await passkeyFirst(page, authorizeUrl(baseURL!, GRAFANA_CLIENT_ID, GRAFANA_REDIRECT_URI));
-  const code = page.locator('#totp-code');
-  await expect(code, 'ZZD1: the client steps the passkey session up').toBeVisible({ timeout: 15_000 });
-  const stepUpFlow = new URL(page.url()).searchParams.get('flow');
+  await passkeyFirst(page, authorizeUrl(baseURL!, OPT_OUT_CLIENT, OPT_OUT_REDIRECT));
+  await expect.poll(firstLocation, { message: 'ZZD1: the first passkey POST signs in and points at /oauth2/login', timeout: 15_000 }).toContain('/oauth2/login');
 
-  // A wrong code is refused on the same flow, so the return rides on.
-  await code.fill(await computeTotp(secret, Date.now() / 1000 - 600));
-  await page.locator('form:has(#totp-code) button[type="submit"]').click();
-  await expect(page.locator('#totp-code-error, #flow-error').first(), 'ZZD1: the wrong code is refused in place').toBeVisible({ timeout: 15_000 });
-  expect(new URL(page.url()).searchParams.get('flow'), 'ZZD1: the refusal keeps the step-up flow').toBe(stepUpFlow);
-
-  // The production POST: Kratos found the session already at the posted flow's AAL, ran nothing and answered 303 to the
-  // site root. Posting the code to the spent first-factor flow (aal1, as the session is) takes that same branch.
-  await page.evaluate((action) => {
-    document.querySelector<HTMLFormElement>('form:has(#totp-code)')!.action = action;
-  }, firstFactor);
-  await code.fill(await computeTotp(secret));
-  await page.locator('form:has(#totp-code) button[type="submit"]').click();
-
-  // The landing sends the sign-in back to a step-up bound to the same login challenge.
-  await page.waitForURL((u) => u.pathname === '/auth/login' && !!u.searchParams.get('flow') && u.searchParams.get('flow') !== stepUpFlow, { timeout: 15_000 });
-  await expect(code, 'ZZD1: the second step is asked again').toBeVisible({ timeout: 15_000 });
-  await code.fill(await computeTotp(secret));
-  await page.locator('form:has(#totp-code) button[type="submit"]').click();
-  await expectCallback(hits, GRAFANA_REDIRECT_URI, 'ZZD1');
+  // The production second POST: Kratos runs nothing and answers 303 to the site root.
+  await passkeyAgain(page);
+  await expectCallback(hits, OPT_OUT_REDIRECT, 'ZZD1');
+  expect(asks, 'ZZD1: no request asks for aal2').toEqual([]);
+  await expect(page.locator('#totp-code'), 'ZZD1: the TOTP form never renders').toHaveCount(0);
 });
 
-test('ZZD2 — a step-up POST answered after another one already signed in still reaches the app', async ({
+test('ZZD2 — skip_step_up client: the spent passkey flow page, loaded again, continues to the app', async ({
   baseURL,
   kratosAdminURL,
   page,
@@ -111,12 +129,40 @@ test('ZZD2 — a step-up POST answered after another one already signed in still
 }) => {
   test.setTimeout(120_000);
   expect(virtualAuthenticator.authenticatorId, 'ZZD2: virtual authenticator is attached').toBeTruthy();
-  const secret = await seed(page, 'zzd2.member', baseURL!, kratosAdminURL);
+  await seed(page, 'zzd2.member', baseURL!, kratosAdminURL);
+  const hits = await recordApp(page, OPT_OUT_ORIGIN);
+  const asks = recordAsks(page);
+  const firstLocation = await holdFirstPasskeyPost(page);
+
+  await passkeyFirst(page, authorizeUrl(baseURL!, OPT_OUT_CLIENT, OPT_OUT_REDIRECT));
+  await expect.poll(firstLocation, { message: 'ZZD2: the first passkey POST signs in and points at /oauth2/login', timeout: 15_000 }).toContain('/oauth2/login');
+
+  // Loaded again, the spent flow must not be offered: the page continues to the flow's return. If it is offered, use
+  // it as a person would, which sends the second POST of ZZD1.
+  await page.reload().catch(() => {});
+  const offered = await page
+    .locator('form.passkey-block button[name="passkey_login_trigger"]')
+    .isVisible({ timeout: 3_000 })
+    .catch(() => false);
+  if (offered) await passkeyAgain(page);
+  await expectCallback(hits, OPT_OUT_REDIRECT, 'ZZD2');
+  expect(asks, 'ZZD2: no request asks for aal2').toEqual([]);
+});
+
+test('ZZD3 — a step-up POST answered after another one already signed in still reaches the app', async ({
+  baseURL,
+  kratosAdminURL,
+  page,
+  virtualAuthenticator,
+}) => {
+  test.setTimeout(120_000);
+  expect(virtualAuthenticator.authenticatorId, 'ZZD3: virtual authenticator is attached').toBeTruthy();
+  const secret = await seed(page, 'zzd3.member', baseURL!, kratosAdminURL);
   const hits = await recordApp(page, APP_ORIGIN);
 
   await passkeyFirst(page, authorizeUrl(baseURL!, GRAFANA_CLIENT_ID, GRAFANA_REDIRECT_URI));
   const code = page.locator('#totp-code');
-  await expect(code, 'ZZD2: the client steps the passkey session up').toBeVisible({ timeout: 15_000 });
+  await expect(code, 'ZZD3: the client steps the passkey session up').toBeVisible({ timeout: 15_000 });
 
   // One submit signs in out of the page's sight, as a doubled submit whose response the browser drops; the page's own
   // submit then meets a session already at aal2 and Kratos answers 303 to the site root.
@@ -128,31 +174,10 @@ test('ZZD2 — a step-up POST answered after another one already signed in still
     form: { csrf_token: csrf, method: 'totp', totp_code: totp },
     maxRedirects: 0,
   });
-  expect(out.status(), 'ZZD2: the out-of-sight submit signs in').toBe(303);
-  expect(out.headers()['location'] ?? '', 'ZZD2: and would have returned to the login challenge').toContain('/oauth2/login');
+  expect(out.status(), 'ZZD3: the out-of-sight submit signs in').toBe(303);
+  expect(out.headers()['location'] ?? '', 'ZZD3: and would have returned to the login challenge').toContain('/oauth2/login');
 
   await code.fill(totp);
   await form.locator('button[type="submit"]').click();
-  await expectCallback(hits, GRAFANA_REDIRECT_URI, 'ZZD2');
-});
-
-test('ZZD3 — a passkey alone on a skip_step_up client reaches the callback with no second step', async ({
-  baseURL,
-  kratosAdminURL,
-  page,
-  virtualAuthenticator,
-}) => {
-  test.setTimeout(120_000);
-  expect(virtualAuthenticator.authenticatorId, 'ZZD3: virtual authenticator is attached').toBeTruthy();
-  await seed(page, 'zzd3.member', baseURL!, kratosAdminURL);
-  const hits = await recordApp(page, 'https://audiobookshelf.othala.test');
-  const asks: string[] = [];
-  page.on('request', (r) => {
-    if (r.url().includes('aal=aal2')) asks.push(r.url());
-  });
-
-  await passkeyFirst(page, authorizeUrl(baseURL!, OPT_OUT_CLIENT, OPT_OUT_REDIRECT));
-  await expectCallback(hits, OPT_OUT_REDIRECT, 'ZZD3');
-  expect(asks, 'ZZD3: no request asks for aal2').toEqual([]);
-  await expect(page.locator('#totp-code'), 'ZZD3: the TOTP form never renders').toHaveCount(0);
+  await expectCallback(hits, GRAFANA_REDIRECT_URI, 'ZZD3');
 });

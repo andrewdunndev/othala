@@ -44,7 +44,8 @@ export function deriveLoginTiers(flow: LoginFlow | null, aal?: 'aal1' | 'aal2'):
   const flowRequestsAal2 = flow?.requested_aal === 'aal2';
   const hasSecondFactorNodes =
     totpNodes.length > 0 || aal2WebauthnNodes.length > 0 || lookupNodes.length > 0;
-  const isAal2 = flow ? (flowRequestsAal2 || hasSecondFactorNodes) : aal === 'aal2';
+  // The flow's requested AAL alone: second-factor forms on an aal1 flow would post to a flow Kratos no longer runs.
+  const isAal2 = flow ? flowRequestsAal2 : aal === 'aal2';
   const hasAal2Methods = isAal2 && hasSecondFactorNodes;
 
   return {

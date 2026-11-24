@@ -203,3 +203,19 @@ describe('deriveLoginTiers — fresh AAL1 flow with no webauthn method at all', 
     expect(tiers.lookupNodes).toHaveLength(0);
   });
 });
+
+describe('deriveLoginTiers — an aal1 flow is never a step-up', () => {
+  it('offers no second-factor form on an aal1 flow, whatever nodes it carries', () => {
+    const flow = freshAal1FlowNoWebauthn();
+    flow.ui.nodes.push({
+      type: 'input',
+      group: 'totp',
+      attributes: { name: 'totp_code', type: 'text', node_type: 'input' },
+      messages: [],
+      meta: {},
+    } as unknown as (typeof flow.ui.nodes)[number]);
+    const tiers = deriveLoginTiers(flow);
+    expect(tiers.isAal2).toBe(false);
+    expect(tiers.hasAal2Methods).toBe(false);
+  });
+});

@@ -1812,6 +1812,11 @@ test('login clears the kept return on accept, on reject and when Hydra no longer
     const gone = await handleLogin(new Request('https://x/oauth2/login?login_challenge=lc'), { oauth2: api });
     assert.equal(gone.status, 502);
     assert.ok(clearsReturn(gone), 'a spent challenge clears');
+    // The landing's one resume of a kept return lands home, not on an error page, when Hydra has finished the challenge.
+    const resumed = await handleLogin(new Request('https://x/oauth2/login?login_challenge=lc&resume=1'), { oauth2: api });
+    assert.equal(resumed.status, 302);
+    assert.equal(resumed.headers.get('location'), `${publicUrl}/`);
+    assert.ok(clearsReturn(resumed), 'a resumed spent challenge clears');
   } finally {
     console.error = quietErr;
   }

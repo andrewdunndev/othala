@@ -16,7 +16,8 @@ import { csrfToken, nodesByGroup, asInput, scriptNodes, safeOnclick } from '../.
 import { deriveLoginTiers } from '../../lib/login-tiers';
 import { CODE_SHAPE, journeyText, noticeClass, noticeRole, passwordRefused } from '../../lib/journey';
 import { DEV_LOGIN_STATES, devLogin, isIn } from '../../lib/journey-fixtures';
-import { readLoginReturn } from '../../lib/login-return';
+import { flowSpent, loginReturnOf, readLoginReturn } from '../../lib/login-return';
+import { publicUrl } from '../../lib/config';
 import type { FlowMessage } from '../../lib/types';
 
 const url = Astro.url;
@@ -56,6 +57,13 @@ if (!devFlow && flowId && (!result || result.kind !== 'ok') && !isDev) {
 
 // Dev without a real flow renders a static preview.
 const flow = devFlow ?? (result && result.kind === 'ok' ? result.flow : null);
+
+// A flow the session already satisfies is spent: Kratos would answer any form on it with a bare 303 to the site root and
+// drop its return_to. Continue to that return instead (an app's /oauth2/login gate decides), as a finished sign-in would.
+if (flow && !devFlow && !isDev) {
+  const session = await getSession(cookie).catch(() => null);
+  if (flowSpent(flow, session)) return Astro.redirect(loginReturnOf(flow.return_to, publicUrl) ?? '/');
+}
 const ui = flow?.ui;
 const csrf = ui ? csrfToken(ui.nodes) : '';
 const scripts = ui ? scriptNodes(ui.nodes) : [];
@@ -455,6 +463,10 @@ const { hasPasskey, hasCode, hasPassword, totpNodes, aal2WebauthnNodes, lookupNo
   <script>
     // Focus the retry field without scrolling, so the heading and the error stay in view.
     document.querySelector<HTMLInputElement>('#password[data-focus-on-load]')?.focus({ preventScroll: true });
+    // A page restored from the back/forward cache may hold a flow finished since; the server decides again.
+    window.addEventListener('pageshow', (e) => {
+      if (e.persisted) location.reload();
+    });
   </script>
 
   {scripts.map((s) => (

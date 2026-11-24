@@ -84,11 +84,11 @@ if (devOverride === 'down' || devOverride === 'pre-auth' || devOverride === 'pos
   }
 }
 
-// Kratos sends a login POST it will not run here, dropping an app sign-in's return; the kept one goes back (login-return.ts).
+// Kratos sends a login POST it will not run here, dropping an app sign-in's return; the kept one goes back to
+// /oauth2/login once, where the app's gate decides (login-return.ts).
 const pending = state === 'post-auth' && !Astro.url.searchParams.has('ask') ? readLoginReturn(cookie) : undefined;
-if (pending && stepUp) return Astro.redirect(browserFlows.login({ aal: 'aal2', returnTo: pending }));
 if (pending) {
-  const headers = new Headers({ Location: pending, 'Cache-Control': 'no-store' });
+  const headers = new Headers({ Location: `${pending}&resume=1`, 'Cache-Control': 'no-store' });
   for (const c of Astro.response.headers.getSetCookie()) headers.append('Set-Cookie', c);
   headers.append('Set-Cookie', clearLoginReturn());
   return new Response(null, { status: 302, headers });

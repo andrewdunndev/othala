@@ -172,7 +172,8 @@ async function rejectConsent(
 
 export async function handleLogin(req: Request, deps: Deps = {}): Promise<Response> {
   const d = resolve(deps);
-  const challenge = new URL(req.url).searchParams.get('login_challenge');
+  const params = new URL(req.url).searchParams;
+  const challenge = params.get('login_challenge');
   if (!challenge) {
     return new Response('missing login_challenge', { status: 400 });
   }
@@ -182,7 +183,8 @@ export async function handleLogin(req: Request, deps: Deps = {}): Promise<Respon
     login = await d.oauth2.getOAuth2LoginRequest({ loginChallenge: challenge });
   } catch (err) {
     upstream('getOAuth2LoginRequest', err);
-    // A kept return naming a spent challenge must not send the landing here again.
+    // A kept return the landing sent back names a challenge Hydra may have finished: home, not an error page.
+    if (params.get('resume') === '1') return redirect(`${publicUrl}/`, [clearLoginReturn()]);
     return new Response('upstream error', { status: 502, headers: { 'Set-Cookie': clearLoginReturn() } });
   }
 
