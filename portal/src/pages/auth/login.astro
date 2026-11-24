@@ -61,6 +61,10 @@ const flow = devFlow ?? (result && result.kind === 'ok' ? result.flow : null);
 if (flow && !devFlow && !isDev) {
   const session = await getSession(cookie).catch(() => null);
   if (flowSpent(flow, session)) return Astro.redirect(loginReturnOf(flow.return_to, publicUrl) ?? '/');
+  // The page URL also carries an app sign-in's return: once a sign-in completes, Kratos refuses this flow's fetch (the
+  // CSRF token is rotated), and the flow re-created above can find the return only in the query.
+  const back = returnTo ? undefined : loginReturnOf(flow.return_to, publicUrl);
+  if (back) return Astro.redirect(`/auth/login?${new URLSearchParams({ flow: flow.id, return_to: back }).toString()}`);
 }
 const ui = flow?.ui;
 const csrf = ui ? csrfToken(ui.nodes) : '';

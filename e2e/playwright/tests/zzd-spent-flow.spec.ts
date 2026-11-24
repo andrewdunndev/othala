@@ -151,12 +151,14 @@ test('ZZD2 — skip_step_up client: the spent passkey flow page, loaded again, c
   await passkeyFirst(page, authorizeUrl(baseURL!, OPT_OUT_CLIENT, OPT_OUT_REDIRECT));
   await expect.poll(firstLocation, { message: 'ZZD2: the first passkey POST signs in and points at /oauth2/login', timeout: 15_000 }).toContain('/oauth2/login');
 
-  // Loaded again, the spent flow is not offered: the login page redirects to the flow's return, and nothing is clicked.
+  // The page URL carries the flow's return, so the reload keeps it even though Kratos now refuses the spent flow's fetch.
+  expect(new URL(page.url()).searchParams.get('return_to') ?? '', 'ZZD2: the login page URL carries the app return').toMatch(/^\/oauth2\/login\?login_challenge=./);
+  // Loaded again, the spent flow is not offered: the login page redirects onward with the return, and nothing is clicked.
   const reloaded = page.waitForResponse((r) => r.request().method() === 'GET' && /\/auth\/login\?flow=/.test(r.url()));
   await page.reload().catch(() => {});
   const answer = await reloaded;
-  expect(answer.status(), 'ZZD2: the spent flow is not rendered; the page redirects to its return').toBe(302);
-  expect(answer.headers()['location'] ?? '', 'ZZD2: the redirect is the flow\'s /oauth2/login return').toMatch(/^\/oauth2\/login\?login_challenge=./);
+  expect(answer.status(), 'ZZD2: the spent flow is not rendered; the page redirects').toBe(302);
+  expect(decodeURIComponent(answer.headers()['location'] ?? ''), 'ZZD2: the redirect keeps the /oauth2/login return').toContain('/oauth2/login?login_challenge=');
   await expectCallback(hits, OPT_OUT_REDIRECT, 'ZZD2');
   await expect(page.locator('form.passkey-block'), 'ZZD2: the spent passkey form is not offered').toHaveCount(0);
   expect(asks, 'ZZD2: no request asks for aal2').toEqual([]);
