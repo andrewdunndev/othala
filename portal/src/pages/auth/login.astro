@@ -16,7 +16,7 @@ import { csrfToken, nodesByGroup, asInput, scriptNodes, safeOnclick } from '../.
 import { deriveLoginTiers } from '../../lib/login-tiers';
 import { CODE_SHAPE, journeyText, noticeClass, noticeRole, passwordRefused } from '../../lib/journey';
 import { DEV_LOGIN_STATES, devLogin, isIn } from '../../lib/journey-fixtures';
-import { clearLoginReturn, flowSpent, loginReturnOf, readLoginReturn } from '../../lib/login-return';
+import { flowSpent, loginReturnOf } from '../../lib/flow-spent';
 import { publicUrl } from '../../lib/config';
 import type { FlowMessage } from '../../lib/types';
 
@@ -24,11 +24,11 @@ const url = Astro.url;
 const flowId = url.searchParams.get('flow');
 let aal = (url.searchParams.get('aal') as 'aal1' | 'aal2' | null) ?? undefined;
 const refresh = url.searchParams.get('refresh') === 'true';
-const cookie = Astro.request.headers.get('cookie') ?? undefined;
 const returnTo = url.searchParams.get('return_to') ?? undefined;
 const isDev = import.meta.env.DEV;
 const devState = isDev ? url.searchParams.get('dev-state') : null;
 const devFlow = isIn(DEV_LOGIN_STATES, devState) ? devLogin(devState) : null;
+const cookie = Astro.request.headers.get('cookie') ?? undefined;
 
 // A live aal1 session that must step up (lib/gate.ts) gets an aal2 flow;
 // otherwise Kratos returns the browser to return_to and forward-auth loops.
@@ -45,24 +45,19 @@ if (!flowId && !aal && !isDev) {
 
 // In dev, skip the flow redirect when Kratos is unreachable.
 if (!flowId && !isDev) {
-  const res = Astro.redirect(browserFlows.login({ aal, refresh, returnTo }));
-  // A sign-in started at the front door abandons an app sign-in's kept return (login-return.ts).
-  if (!returnTo) res.headers.append('Set-Cookie', clearLoginReturn());
-  return res;
+  return Astro.redirect(browserFlows.login({ aal, refresh, returnTo }));
 }
 
 const result = !devFlow && flowId ? await getLoginFlow(flowId, cookie).catch(() => null) : null;
 
-// A lost or expired flow (the fetch is refused or gone) keeps an app sign-in's return (login-return.ts).
 if (!devFlow && flowId && (!result || result.kind !== 'ok') && !isDev) {
-  return Astro.redirect(browserFlows.login({ aal, refresh, returnTo: returnTo ?? readLoginReturn(cookie) }));
+  return Astro.redirect(browserFlows.login({ aal, refresh, returnTo }));
 }
 
 // Dev without a real flow renders a static preview.
 const flow = devFlow ?? (result && result.kind === 'ok' ? result.flow : null);
 
-// A flow the session already satisfies is spent: Kratos would answer any form on it with a bare 303 to the site root and
-// drop its return_to. Continue to that return instead (an app's /oauth2/login gate decides), as a finished sign-in would.
+// A spent flow is never offered (flow-spent.ts): continue to its return, as the finished sign-in would have.
 if (flow && !devFlow && !isDev) {
   const session = await getSession(cookie).catch(() => null);
   if (flowSpent(flow, session)) return Astro.redirect(loginReturnOf(flow.return_to, publicUrl) ?? '/');

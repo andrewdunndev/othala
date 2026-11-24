@@ -17,7 +17,6 @@ import { publicUrl } from './config';
 import { hydraAdmin } from './ory-fetch';
 import { parseIdentity } from './identity-facts';
 import { isDeviceRequest, readDeviceCode, clearDeviceCode } from './device';
-import { clearLoginReturn, keepLoginReturn } from './login-return';
 
 // Hydra remembers a sign-in exactly as long as the Kratos session lives, so a later app sign-out still reaches
 // handleLogout. The session's own expires_at is the only source; without one, remember for the 1s minimum (0 would mean forever).
@@ -118,16 +117,13 @@ export function freshnessVerdict(
   return prompt.includes('none') ? 'login_required' : 'refresh';
 }
 
-// The return also rides in a cookie: a step-up POST Kratos will not run lands on the landing without it (login-return.ts).
-// A bounce the landing's one resume led to keeps nothing, so the next landing stays home.
-function loginBounce(challenge: string, query = '', keep = true): Response {
-  const returnTo = buildLoginReturnTo(challenge);
-  return redirect(`${LOGIN_UI_BASE}?${query}return_to=${encodeURIComponent(returnTo)}`, keep ? keepLoginReturn(returnTo) : []);
+function loginBounce(challenge: string, query = ''): Response {
+  return redirect(`${LOGIN_UI_BASE}?${query}return_to=${encodeURIComponent(buildLoginReturnTo(challenge))}`);
 }
 
 /** A refused device grant lands on the portal's error page: Hydra's own redirect ends on a raw JSON error. */
-const landing = (redirect_to: string, deviceReason?: string, setCookie: string[] = []) =>
-  redirect(deviceReason ? `${publicUrl}/auth/error?reason=${deviceReason}` : redirect_to, setCookie);
+const landing = (redirect_to: string, deviceReason?: string) =>
+  redirect(deviceReason ? `${publicUrl}/auth/error?reason=${deviceReason}` : redirect_to);
 
 async function rejectLogin(
   d: Required<Deps>,
@@ -141,7 +137,7 @@ async function rejectLogin(
       loginChallenge: challenge,
       rejectOAuth2Request: { error, error_description: error, status_code },
     });
-    return landing(redirect_to, deviceReason, [clearLoginReturn()]);
+    return landing(redirect_to, deviceReason);
   } catch (err) {
     upstream('rejectOAuth2LoginRequest', err);
     return upstreamError();
@@ -173,8 +169,7 @@ async function rejectConsent(
 
 export async function handleLogin(req: Request, deps: Deps = {}): Promise<Response> {
   const d = resolve(deps);
-  const params = new URL(req.url).searchParams;
-  const challenge = params.get('login_challenge');
+  const challenge = new URL(req.url).searchParams.get('login_challenge');
   if (!challenge) {
     return new Response('missing login_challenge', { status: 400 });
   }
@@ -184,9 +179,7 @@ export async function handleLogin(req: Request, deps: Deps = {}): Promise<Respon
     login = await d.oauth2.getOAuth2LoginRequest({ loginChallenge: challenge });
   } catch (err) {
     upstream('getOAuth2LoginRequest', err);
-    // A kept return the landing sent back names a challenge Hydra may have finished: home, not an error page.
-    if (params.get('resume') === '1') return redirect(`${publicUrl}/`, [clearLoginReturn()]);
-    return new Response('upstream error', { status: 502, headers: { 'Set-Cookie': clearLoginReturn() } });
+    return upstreamError();
   }
 
   const clientId = login.client?.client_id ?? '';
@@ -210,8 +203,7 @@ export async function handleLogin(req: Request, deps: Deps = {}): Promise<Respon
     }
     return redirect(login.request_url);
   }
-  const keep = params.get('resume') !== '1';
-  if (!session?.active || !session.identity) return loginBounce(challenge, '', keep);
+  if (!session?.active || !session.identity) return loginBounce(challenge);
   const subject = session.identity.id;
   const acr = session.authenticator_assurance_level ?? undefined;
 
@@ -233,10 +225,10 @@ export async function handleLogin(req: Request, deps: Deps = {}): Promise<Respon
 
   const freshness = freshnessVerdict(login.request_url, session);
   if (freshness === 'login_required') return rejectLogin(d, challenge, freshness, 400);
-  if (freshness === 'refresh') return loginBounce(challenge, device ? 'refresh=true&aal=aal2&' : 'refresh=true&', keep);
+  if (freshness === 'refresh') return loginBounce(challenge, device ? 'refresh=true&aal=aal2&' : 'refresh=true&');
 
   // The opt-out skips the step-up verdict, never the device grant's aal2.
-  if ('stepUp' in access || (device && acr !== 'aal2')) return loginBounce(challenge, 'aal=aal2&', keep);
+  if ('stepUp' in access || (device && acr !== 'aal2')) return loginBounce(challenge, 'aal=aal2&');
 
   // A sign-in to an app counts as use, and remember_for follows the extended expiry.
   const slid = await d.slideSession(session, req.headers.get('cookie') ?? undefined);
@@ -252,7 +244,7 @@ export async function handleLogin(req: Request, deps: Deps = {}): Promise<Respon
         ...(acr ? { acr } : {}),
       },
     });
-    return redirect(redirect_to, [...slid.setCookie, clearLoginReturn()]);
+    return redirect(redirect_to, slid.setCookie);
   } catch (err) {
     upstream('acceptOAuth2LoginRequest', err);
     return upstreamError();
