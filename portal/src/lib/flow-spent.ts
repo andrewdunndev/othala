@@ -5,11 +5,6 @@
 
 import type { LoginFlow, Session } from './types';
 
-const RETURN_RE = /^\/oauth2\/login\?login_challenge=[A-Za-z0-9._~*+%-]+$/;
-const MAX_LEN = 3000;
-
-const isLoginReturn = (path: string): boolean => path.length <= MAX_LEN && RETURN_RE.test(path);
-
 /** True when Kratos would answer any POST to `flow` with the bare 303: a live session already at the flow's AAL. */
 export function flowSpent(
   flow: Pick<LoginFlow, 'refresh' | 'requested_aal'>,
@@ -19,14 +14,18 @@ export function flowSpent(
   return flow.requested_aal !== 'aal2' || session.authenticator_assurance_level === 'aal2';
 }
 
-/** A flow's return_to as a relative /oauth2/login return, whether it is stored relative or absolute on `origin`. */
+/**
+ * A flow's return_to as a relative /oauth2/login?login_challenge=... path on `origin`, or undefined. Kratos reports the
+ * return_to query value of the flow's request URL, so it may be relative or absolute and the challenge may be long.
+ */
 export function loginReturnOf(returnTo: string | undefined, origin: string): string | undefined {
   if (!returnTo) return undefined;
-  if (isLoginReturn(returnTo)) return returnTo;
   try {
-    const u = new URL(returnTo);
-    const path = u.pathname + u.search;
-    return u.origin === new URL(origin).origin && isLoginReturn(path) ? path : undefined;
+    const base = new URL(origin);
+    const u = new URL(returnTo, base);
+    const challenge = u.searchParams.get('login_challenge');
+    if (u.origin !== base.origin || u.pathname !== '/oauth2/login' || !challenge) return undefined;
+    return `/oauth2/login?${new URLSearchParams({ login_challenge: challenge }).toString()}`;
   } catch {
     return undefined;
   }

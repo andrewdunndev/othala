@@ -23,7 +23,13 @@ describe('flow-spent', () => {
     expect(loginReturnOf(`${origin}${RETURN}`, origin)).toBe(RETURN);
     expect(loginReturnOf(`https://evil.test${RETURN}`, origin)).toBeUndefined();
     expect(loginReturnOf('//evil.test/oauth2/login?login_challenge=x', origin)).toBeUndefined();
-    expect(loginReturnOf(`${RETURN}&next=/admin`, origin)).toBeUndefined();
+    // Only the challenge rides on: anything else in the query is dropped.
+    expect(loginReturnOf(`${RETURN}&next=/admin`, origin)).toBe(RETURN);
+    expect(loginReturnOf('/oauth2/consent?consent_challenge=x', origin)).toBeUndefined();
+    expect(loginReturnOf('/oauth2/login', origin)).toBeUndefined();
+    // A long challenge with URL-encoded characters round-trips.
+    const long = `/oauth2/login?${new URLSearchParams({ login_challenge: 'a+b/c='.repeat(800) }).toString()}`;
+    expect(loginReturnOf(long, origin)).toBe(long);
     expect(loginReturnOf(`${origin}/`, origin)).toBeUndefined();
     expect(loginReturnOf(undefined, origin)).toBeUndefined();
   });

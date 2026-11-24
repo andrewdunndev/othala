@@ -154,7 +154,9 @@ test('ZZD2 — skip_step_up client: the spent passkey flow page, loaded again, c
   // Loaded again, the spent flow is not offered: the login page redirects to the flow's return, and nothing is clicked.
   const reloaded = page.waitForResponse((r) => r.request().method() === 'GET' && /\/auth\/login\?flow=/.test(r.url()));
   await page.reload().catch(() => {});
-  expect((await reloaded).status(), 'ZZD2: the spent flow is not rendered; the page redirects to its return').toBe(302);
+  const answer = await reloaded;
+  expect(answer.status(), 'ZZD2: the spent flow is not rendered; the page redirects to its return').toBe(302);
+  expect(answer.headers()['location'] ?? '', 'ZZD2: the redirect is the flow\'s /oauth2/login return').toMatch(/^\/oauth2\/login\?login_challenge=./);
   await expectCallback(hits, OPT_OUT_REDIRECT, 'ZZD2');
   await expect(page.locator('form.passkey-block'), 'ZZD2: the spent passkey form is not offered').toHaveCount(0);
   expect(asks, 'ZZD2: no request asks for aal2').toEqual([]);
