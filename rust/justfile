@@ -3,7 +3,11 @@ set shell := ["bash", "-euo", "pipefail", "-c"]
 default:
     @just --list
 
-all: fmt lint confine twins test wasm thumb msrv deny api mutants rows
+all: lock fmt lint confine twins test wasm thumb msrv deny api mutants rows
+
+# a manifest change without its lock change fails here, before anything builds
+lock:
+    cargo metadata --locked --format-version 1 > /dev/null
 
 fmt:
     cargo fmt --all --check
