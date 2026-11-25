@@ -2,7 +2,7 @@ use alloc::string::String;
 use alloc::vec;
 
 use base64ct::{Base64UrlUnpadded, Encoding};
-use zeroize::Zeroize;
+use zeroize::{Zeroize, Zeroizing};
 
 use crate::{Error, ErrorKind};
 
@@ -14,13 +14,20 @@ pub fn b64url_encode(bytes: &[u8]) -> String {
 /// The longest text [`b64url_decode`] reads: 64 KiB of symbols, 48 KiB decoded.
 pub const MAX_B64URL_TEXT: usize = 65_536;
 
-/// Strict unpadded base64url: padding, a symbol outside the alphabet, or a non-canonical tail is `Malformed`;
-/// text past [`MAX_B64URL_TEXT`] is `TooLarge` before anything is allocated.
+/// Strict unpadded base64url: padding, a symbol outside the alphabet, or a non-canonical tail is `Malformed`
+/// with the partly decoded buffer wiped, so a secret's text may pass through; text past [`MAX_B64URL_TEXT`]
+/// is `TooLarge` before anything is allocated.
 pub fn b64url_decode(text: &str) -> Result<vec::Vec<u8>, Error> {
     if text.len() > MAX_B64URL_TEXT {
         return Err(Error::new(ErrorKind::TooLarge));
     }
-    Base64UrlUnpadded::decode_vec(text).map_err(|_| Error::new(ErrorKind::Malformed))
+    // sized by the text, an upper bound, so the buffer is never reallocated and left unwiped
+    let mut out = Zeroizing::new(vec![0; text.len()]);
+    let n = Base64UrlUnpadded::decode(text, &mut out)
+        .map_err(|_| Error::new(ErrorKind::Malformed))?
+        .len();
+    out.truncate(n);
+    Ok(core::mem::take(&mut *out))
 }
 
 /// Exactly `N` decoded bytes, or `Malformed` with the buffer wiped.

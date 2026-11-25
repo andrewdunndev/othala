@@ -1,6 +1,6 @@
 [workspace]
 resolver = "3"
-members = ["base", "testkit"]
+members = ["base", "testkit", "wipe"]
 exclude = ["base/fuzz"]
 
 [workspace.package]

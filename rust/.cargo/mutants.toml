@@ -1,8 +1,5 @@
 # Every skip carries its reason and is counted by `just rows`.
 exclude_re = [
-  # N1: zeroize on drop is a stated non-claim; no test observes freed memory.
-  "impl Drop for Secret",
-  "impl Drop for SecretBytes",
   # the reference store's unguarded-write tripwire: no builder, merge or lift yields such an effect, so no test reaches it
   "replace \\|\\| with && in <impl Store<K, R> for MemStore<K, R>>::apply",
 ]
