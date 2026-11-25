@@ -143,6 +143,9 @@ method Digest::from_bytes const fn(bytes: [u8; 32]) -> Self
 method Digest::to_b64url fn(self: &Self) -> String
 method Effect::builder fn(e: &mut impl Entropy) -> Builder<K, R>
 method Effect::check fn(self: &Self, live: impl FnMut(&K) -> Option<Version>) -> Result<(), Conflict<K>>
+method Effect::consumed fn(e: &mut impl Entropy, key: K) -> Self
+method Effect::created fn(e: &mut impl Entropy, key: K, record: R, expiry: Option<UnixTime>) -> Self
+method Effect::deleted fn<S>(e: &mut impl Entropy, key: K, seen: &Row<S>) -> Self
 method Effect::deletes fn(self: &Self) -> impl Iterator<Item = &K>
 method Effect::domain fn<D: Eq>(self: &Self, of: impl Fn(&K) -> D) -> Result<D, Error>
 method Effect::guards fn(self: &Self) -> impl Iterator<Item = Guard<&K>>
@@ -151,6 +154,7 @@ method Effect::id const fn(self: &Self) -> EffectId
 method Effect::lift fn<K2: StoreKey, R2>(self: Self, key: impl Fn(K) -> K2, record: impl Fn(R) -> R2) -> Result<Effect<K2, R2>, Error>
 method Effect::merge fn(self: Self, other: Self) -> Result<Self, Error>
 method Effect::puts fn(self: &Self) -> impl Iterator<Item = (&K, &R, Option<UnixTime>)>
+method Effect::updated fn<S>(e: &mut impl Entropy, key: K, seen: &Row<S>, record: R, expiry: Option<UnixTime>) -> Self
 method EffectId::as_bytes const fn(self: &Self) -> &[u8; 16]
 method Error::kind const fn(self: &Self) -> ErrorKind
 method Guard::key const fn(self: &Self) -> &K

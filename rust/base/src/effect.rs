@@ -138,7 +138,7 @@ pub struct Pending<T, K, R> {
 }
 
 impl<K: StoreKey, R> Effect<K, R> {
-    /// The only constructor; the id is 16 bytes drawn from `e`.
+    /// The general constructor; the id is 16 bytes drawn from `e`.
     pub fn builder(e: &mut impl Entropy) -> Builder<K, R> {
         let mut id = [0; 16];
         e.fill(&mut id);
@@ -148,6 +148,35 @@ impl<K: StoreKey, R> Effect<K, R> {
             size: 0,
             fault: None,
         }
+    }
+
+    // one guarded write is never empty, never overlaps and is far inside the bound, so it needs no `build`
+    fn single(e: &mut impl Entropy, key: K, op: Op<R>) -> Self {
+        Self {
+            id: Self::builder(e).id,
+            ops: BTreeMap::from([(key, op)]),
+        }
+    }
+
+    /// The one-op effect [`Builder::create`] builds, infallibly.
+    pub fn created(e: &mut impl Entropy, key: K, record: R, expiry: Option<UnixTime>) -> Self {
+        Self::single(e, key, Op::new(Check::Absent, Some(Write::Put(record, expiry))))
+    }
+
+    /// The one-op effect [`Builder::update`] builds, infallibly.
+    pub fn updated<S>(e: &mut impl Entropy, key: K, seen: &Row<S>, record: R, expiry: Option<UnixTime>) -> Self {
+        let check = Check::Unchanged(seen.version());
+        Self::single(e, key, Op::new(check, Some(Write::Put(record, expiry))))
+    }
+
+    /// The one-op effect [`Builder::consume`] builds, infallibly.
+    pub fn consumed(e: &mut impl Entropy, key: K) -> Self {
+        Self::single(e, key, Op::new(Check::Consume, Some(Write::Delete)))
+    }
+
+    /// The one-op effect [`Builder::delete`] builds, infallibly.
+    pub fn deleted<S>(e: &mut impl Entropy, key: K, seen: &Row<S>) -> Self {
+        Self::single(e, key, Op::new(Check::Unchanged(seen.version()), Some(Write::Delete)))
     }
 
     /// The effect's identity; a store records it to make re-applies idempotent.
@@ -518,6 +547,20 @@ mod tests {
             lifted.puts().collect::<Vec<_>>(),
             [(&K::S(1), &4u16, Some(UnixTime::new(9)))]
         );
+    }
+
+    #[test]
+    fn single_ops_are_the_builder_ops() {
+        let (seen, e) = (row(4), &mut Fill(0));
+        let pairs = [
+            (Effect::created(e, K::G(1), 1, Some(UnixTime::new(3))), builder(&mut Fill(0)).create(K::G(1), 1, Some(UnixTime::new(3)))),
+            (Effect::updated(e, K::G(2), &seen, 2, None), builder(&mut Fill(1)).update(K::G(2), &seen, 2, None)),
+            (Effect::consumed(e, K::G(3)), builder(&mut Fill(2)).consume(K::G(3))),
+            (Effect::deleted(e, K::G(4), &seen), builder(&mut Fill(3)).delete(K::G(4), &seen)),
+        ];
+        for (single, built) in pairs {
+            assert_eq!(format!("{single:?}"), format!("{:?}", built.build().unwrap()));
+        }
     }
 
     #[test]

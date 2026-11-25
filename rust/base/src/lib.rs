@@ -1,5 +1,45 @@
 //! Shared vocabulary for the identity primitives: time, entropy, secrets,
 //! digests, strict base64url, and the one store-effect contract.
+//!
+//! A decision reads rows and returns its verdict in a [`Pending`] beside the [`Effect`] that makes it true;
+//! the verdict counts only once a [`Store`] has applied that effect and answered its [`Receipt`]:
+//!
+//! ```
+//! use base::{Effect, Entropy, Pending, Rows, Scope, Slot, Store, StoreKey, UnixTime};
+//! use testkit::{MemStore, seeded};
+//!
+//! #[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord)]
+//! struct Ticket(u8);
+//!
+//! impl StoreKey for Ticket {
+//!     fn scope(&self) -> Scope {
+//!         Scope::Global
+//!     }
+//! }
+//!
+//! // a ticket admits once: the verdict is its record, and the effect consumes its row
+//! fn redeem(rows: &Rows<Ticket, &'static str>, e: &mut impl Entropy) -> Option<Pending<&'static str, Ticket, &'static str>> {
+//!     let Some(Slot::Row(row)) = rows.get(&Ticket(1)) else {
+//!         return None;
+//!     };
+//!     Some(Pending::new(*row.record(), Effect::consumed(e, Ticket(1))))
+//! }
+//!
+//! let (now, e) = (UnixTime::new(1_000), &mut seeded(1));
+//! let mut store = MemStore::new();
+//! assert!(store.apply(&Effect::created(e, Ticket(1), "admit one", None), now).unwrap().is_ok());
+//!
+//! // two decisions over the same rows race; the first to apply wins
+//! let rows = store.load(&[Ticket(1)], now).unwrap();
+//! let (first, second) = (redeem(&rows, e).unwrap(), redeem(&rows, e).unwrap());
+//! let receipt = store.apply(first.effect(), now).unwrap().unwrap();
+//! assert_eq!(first.settle(receipt).unwrap(), "admit one");
+//!
+//! // the loser's guard fails, so its verdict never settles; re-decided on fresh rows, nothing is left to redeem
+//! assert!(store.apply(second.effect(), now).unwrap().is_err());
+//! let rows = store.load(&[Ticket(1)], now).unwrap();
+//! assert!(redeem(&rows, e).is_none());
+//! ```
 #![no_std]
 
 extern crate alloc;
