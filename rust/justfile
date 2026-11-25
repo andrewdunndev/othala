@@ -44,6 +44,7 @@ twins:
 
 # skips and test args live in .cargo/mutants.toml; testkit's mutants are caught by the workspace's tests
 mutants:
+    mkdir -p target/mutants/base target/mutants/testkit
     cargo mutants --package base --test-workspace=false --no-shuffle --output target/mutants/base
     cargo mutants --package testkit --test-workspace=true --no-shuffle --output target/mutants/testkit
 

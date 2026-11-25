@@ -1,7 +1,7 @@
 # base contract
 
 One claim per line, each naming the check that proves it. Tags follow the claims ledger: *Type* (the program does not compile), *Runtime* (a check returns an error), *Obligation* (the host's, proven against every `Store`), *Non-claim*.
-Checks: `ui:x` is `tests/ui/fail/x.rs` with its committed `.stderr` (rustc code given) and the compiling twin `tests/ui/pass/x.rs` one line and one token away (`just twins`; `just ledger` runs with every feature on); `api` is the committed `public-api.txt` from rustdoc JSON on a pinned nightly (`just api`), one line per item, public field (tuple and variant fields included) and method with its full signature; `unit:m::t` is a test in `src/m.rs`; `it:f::t` is `tests/f.rs`; `mutants:m` is `just mutants` over `src/m.rs`; `conf:c` is case `c` of `testkit::store_conformance`, run here against `testkit::MemStore`; `race:t` is `tests/race.rs`.
+Checks: `ui:x` is `tests/ui/fail/x.rs` with its committed `.stderr` (rustc code given) and the compiling twin `tests/ui/pass/x.rs` one line and one token away (`just twins`; `just ledger` runs with every feature on); `api` is the committed `public-api.txt` from rustdoc JSON on a pinned nightly (`just api`), one line per item, public field (tuple and variant fields included) and method with its full signature; `unit:m::t` is a test in `src/m.rs`; `it:f::t` is `tests/f.rs`; `mutants:m` is `just mutants` over `src/m.rs`, named only where the claim's functions have a viable mutant (constructors and accessors whose every replacement fails to compile are measured by their unit tests); `conf:c` is case `c` of `testkit::store_conformance`, run here against `testkit::MemStore`; `race:t` is `tests/race.rs`.
 
 ## Type
 - T1 `Secret<N>` has no `Display`: ui:secret_display (E0277), api.
@@ -30,9 +30,9 @@ Checks: `ui:x` is `tests/ui/fail/x.rs` with its committed `.stderr` (rustc code 
 - R6 A non-canonical tail (nonzero trailing bits) is `Malformed`, so decoding is injective: of all 64 final symbols a 2-symbol tail accepts exactly `A Q g w` and a 3-symbol tail exactly the 16 with two zero low bits: unit:b64url::noncanonical_tail_is_malformed, mutants:b64url.
 - R7 Whatever decodes re-encodes to the same text: it:corpus::b64url_decode_corpus (21 committed seeds of `fuzz/fuzz_targets/b64url_decode.rs`, non-canonical tails `Zo` and `ZmC` among them), `just fuzz` (10 minutes on nightly; its scheduled CI job is not wired yet).
 - R8 `Debug` of `Secret<N>` and `SecretBytes` prints no secret byte, and of `Pending` only its effect id: it:golden::debug_redacts against `tests/golden/debug.txt`, unit:effect::pending_debug_shows_only_the_effect_id.
-- R9 `generate` draws exactly `N` bytes from `Entropy`: unit:secret::generate_draws_n_bytes, mutants:secret.
+- R9 `generate` draws exactly `N` bytes from `Entropy`: unit:secret::generate_draws_n_bytes.
 - R10 `ct_eq` is true only when every byte and the length match: unit:secret::ct_eq_compares_every_byte, mutants:secret; each `ct_eq` body is `subtle`'s `ConstantTimeEq` over both byte slices: `just confine`.
-- R11 `digest` is SHA-256 of the secret bytes: unit:secret::digest_is_sha256, mutants:secret.
+- R11 `digest` is SHA-256 of the secret bytes: unit:secret::digest_is_sha256.
 - R12 A key named twice in one builder is `Overlap`: unit:effect::overlap_in_builder, mutants:effect.
 - R13 A merge of effects sharing a key is `Overlap`: unit:effect::overlap_in_merge, mutants:effect.
 - R14 A non-injective lift is `Overlap`: unit:effect::overlap_in_lift, mutants:effect.
@@ -41,15 +41,15 @@ Checks: `ui:x` is `tests/ui/fail/x.rs` with its committed `.stderr` (rustc code 
 - R17 An effect whose guards plus writes exceed `MAX_EFFECT_SIZE` (128, asserted as a literal) is `TooLarge` from `build` and `merge`, and exactly 128 builds: unit:effect::size_bound; the builder latches its first fault and stops growing, and `merge` tests the bound before moving anything, so an oversize effect is never an allocation: unit:effect::oversize_builder_stops_growing, mutants:effect.
 - R18 `domain` is `SpansDomains` unless every key maps to one domain, the third of three keys included: unit:effect::domain_of_keys, mutants:effect.
 - R19 `settle` with another effect's receipt is `WrongReceipt`; its own receipt yields the verdict; `Receipt::effect_id` names the effect it settles: unit:effect::settle_by_receipt, mutants:effect.
-- R20 The id is 16 bytes of `Entropy`; `lift` keeps it; `merge` takes the first 16 bytes of SHA-256 of both ids in order: unit:effect::ids, mutants:effect.
+- R20 The id is 16 bytes of `Entropy`; `lift` keeps it; `merge` takes the first 16 bytes of SHA-256 of both ids in order: unit:effect::ids.
 - R21 `check` names every failed guard (`Missing`, `Changed`, `Present`) and passes when all hold: unit:effect::check_names_each_failure, mutants:effect.
 - R22 `guards`, `puts` and `deletes` show exactly what the builder paired, consumed rows among the deletes: unit:effect::views, mutants:effect.
 - R23 No builder, merge or lift sequence yields a write without a guard on its key, a key twice, or more than 128 guards plus writes: it:effect_props::construction_never_unguarded (proptest, fixed seed, 512 cases, distinct keys by construction and one repeated at times).
 - R24 Against the reference store, an effect applies whole or not at all, and a `Conflict` names exactly the guards that fail: it:effect_props::all_guards_or_nothing (proptest, fixed seed, 512 cases, guards drawn mostly holding so both halves are common).
 - R25 `Rows::get` reports a loaded row, an absent row, a corrupt row, and `None` for a key never loaded: unit:store::rows_slots.
 - R26 `UnixTime::saturating_add` and `saturating_sub` saturate at `u64::MAX` and the epoch; `checked_duration_since` is `None` when the other instant is later: unit:time::arithmetic_saturates.
-- R27 `Secret::<N>::from_b64url` takes canonical unpadded base64url of exactly `N` bytes and is `Malformed` otherwise, decoding into the secret's own buffer: unit:secret::from_b64url_takes_exactly_n, unit:b64url::exact_length, mutants:secret.
-- R28 `Digest` has a text form (43-symbol unpadded base64url) that round-trips, and under `serde` serializes as that text and deserializes only from it: unit:secret::digest_text_round_trips, unit:secret::digest_serde_is_text, mutants:secret.
+- R27 `Secret::<N>::from_b64url` takes canonical unpadded base64url of exactly `N` bytes and is `Malformed` otherwise, decoding into the secret's own buffer: unit:secret::from_b64url_takes_exactly_n, unit:b64url::exact_length.
+- R28 `Digest` has a text form (43-symbol unpadded base64url) that round-trips, and under `serde` serializes as that text and deserializes only from it: unit:secret::digest_text_round_trips, unit:secret::digest_serde_is_text.
 - R29 The vector runner counts only checked cases against its floor, and a zero floor, a total that disagrees with `SOURCES.toml` or an unlisted file fails: testkit unit:vectors (six cases).
 - R30 The builder takes and returns itself by value (`#[must_use]`), so a decision is one expression; `update`, `delete` and `expect` take the seen row as any `Row<S>` and read only its version, so a consumer guards a typed row in an effect over its store record: unit:effect::seen_rows_of_any_type, api.
 - R31 `b64url_decode` reads at most `MAX_B64URL_TEXT` (65,536 symbols, asserted as a literal); longer text is `TooLarge`, before anything is allocated and before any `Malformed`: unit:b64url::text_past_the_cap_is_too_large, mutants:b64url.
