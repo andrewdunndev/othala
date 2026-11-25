@@ -1,7 +1,5 @@
 set shell := ["bash", "-euo", "pipefail", "-c"]
 
-store_modules := "testkit/src/store.rs testkit/src/fixture.rs base/tests/conformance.rs"
-
 default:
     @just --list
 
@@ -13,19 +11,30 @@ fmt:
 lint:
     cargo clippy --workspace --all-targets --all-features -- -D warnings
 
-# F9: the receipt mint and the secret read stay in the modules CONTRACT.md names
+# F9: the receipt mint and the secret read stay in the modules CONTRACT.md names; the self-test plants evasions
 confine:
-    @bad=$(grep -rlE '(allow|expect)\([^)]*clippy::disallowed_methods' --include='*.rs' . | sed 's|^\./||' | grep -vxF -f <(tr ' ' '\n' <<< "{{store_modules}}") || true); [ -z "$bad" ] || { echo "$bad"; echo "disallowed_methods silenced outside store modules"; exit 1; }
+    ./confine.sh .
+    ./confine.sh --self-test
 
 test:
     cargo test --workspace --all-features
 
 ledger:
-    cargo test -p base --test ledger
+    cargo test -p base --all-features --test ledger
 
-# each Type case and its compiling twin differ in exactly one line
+# each Type case and its compiling twin differ in one line and in one token; no twin without a case
 twins:
-    @for f in base/tests/ui/fail/*.rs; do t=base/tests/ui/pass/${f##*/}; [ -f "${f%.rs}.stderr" ] || { echo "$f: no .stderr"; exit 1; }; n=$(diff "$f" "$t" | grep -c '^<' || true); [ "$n" = 1 ] || { echo "$f: $n lines differ from its twin"; exit 1; }; done
+    #!/usr/bin/env bash
+    set -euo pipefail
+    tok() { grep -oE '[A-Za-z_][A-Za-z0-9_]*|[0-9]+|[^[:space:][:alnum:]_]' "$1"; }
+    for t in base/tests/ui/pass/*.rs; do [ -f "base/tests/ui/fail/${t##*/}" ] || { echo "$t: no fail case"; exit 1; }; done
+    for f in base/tests/ui/fail/*.rs; do
+        t=base/tests/ui/pass/${f##*/}
+        [ -f "${f%.rs}.stderr" ] && [ -f "$t" ] || { echo "$f: no .stderr or no twin"; exit 1; }
+        lines=$(diff "$f" "$t" | grep -c '^[<>]' || true)
+        toks=$(diff <(tok "$f") <(tok "$t") | grep -c '^[<>]' || true)
+        [ "$lines" = 2 ] && [ "$toks" = 2 ] || { echo "$f: $lines lines and $toks tokens differ from its twin"; exit 1; }
+    done
 
 # skips and test args live in .cargo/mutants.toml
 mutants:
@@ -40,7 +49,7 @@ thumb:
     cargo build -p base --target thumbv7em-none-eabi --features rand_core,serde
 
 msrv:
-    cargo +1.85.0 check -p base --all-features
+    cargo +1.89.0 check -p base --all-features --locked
 
 deny:
     cargo deny check bans licenses sources
@@ -54,10 +63,15 @@ api nightly="nightly-2026-11-24":
 fuzz seconds="600":
     cd base/fuzz && cargo +nightly fuzz run b64url_decode corpus/b64url_decode -- -max_total_time={{seconds}}
 
-# rule 5.1 numbers for base (production: src/ above each test module)
+# rule 5.1 numbers for base (production: src/ above each file's test module)
 rows:
-    @echo "production lines: $(awk '/^#\[cfg\(test\)\]/{nextfile} {n++} END{print n}' base/src/*.rs)"
-    @echo "test lines: $(( $(awk '/^#\[cfg\(test\)\]/{t=1} t{n++} END{print n}' base/src/*.rs) + $(cat base/tests/*.rs base/fuzz/property.rs base/fuzz/fuzz_targets/*.rs | wc -l) )) (+ $(cat base/tests/ui/*/*.rs | wc -l) ledger case lines, testkit $(cat testkit/src/*.rs | wc -l))"
-    @echo "contract lines: $(grep -cE '^- [TROBN][0-9]+ ' base/CONTRACT.md)"
-    @echo "vector cases: $(grep -oE 'rfc4648/test-vectors.json.*cases = [0-9]+' vectors/SOURCES.toml | grep -oE '[0-9]+$') (RFC 4648 section 10; BASE64 ones checked)"
-    @echo "public items: $(grep -cE '^pub ' base/public-api.txt 2>/dev/null || echo 'n/a: run just api')"
+    #!/usr/bin/env bash
+    set -euo pipefail
+    split() { awk -v want="$1" 'FNR == 1 { t = 0 } /^#\[cfg\(test\)\]/ { t = 1 } t == want { n++ } END { print n }' base/src/*.rs; }
+    unit=$(split 1)
+    it=$(cat base/tests/*.rs base/fuzz/property.rs base/fuzz/fuzz_targets/*.rs | wc -l | tr -d ' ')
+    echo "production lines: $(split 0)"
+    echo "test lines: $((unit + it)) (unit $unit, tests and fuzz $it; + $(cat base/tests/ui/*/*.rs | wc -l | tr -d ' ') ledger case lines; testkit $(cat testkit/src/*.rs | wc -l | tr -d ' '))"
+    echo "contract lines: $(grep -cE '^- [TROBN][0-9]+ ' base/CONTRACT.md)"
+    echo "vector cases: $(grep -oE 'rfc4648/test-vectors.json.*cases = [0-9]+' vectors/SOURCES.toml | grep -oE '[0-9]+$') (RFC 4648 section 10; BASE64 ones checked)"
+    echo "public items: $(grep -vc '^impl ' base/public-api.txt) ($(grep -v '^impl ' base/public-api.txt | cut -d' ' -f1 | sort | uniq -c | awk '{printf "%s%s %s", sep, $1, $2; sep=", "}'))"

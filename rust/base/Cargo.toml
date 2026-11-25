@@ -13,6 +13,7 @@ rand_core = ["dep:rand_core"]
 serde = ["dep:serde"]
 
 [dependencies]
+base64ct.workspace = true
 sha2.workspace = true
 subtle.workspace = true
 zeroize.workspace = true
@@ -24,6 +25,9 @@ serde = { workspace = true, features = ["derive"] }
 trybuild.workspace = true
 testkit.workspace = true
 proptest.workspace = true
+serde_json.workspace = true
+rand.workspace = true
+getrandom.workspace = true
 
 [lints]
 workspace = true

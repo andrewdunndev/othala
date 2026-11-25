@@ -1,3 +1,4 @@
+use alloc::string::String;
 use alloc::vec::Vec;
 use core::fmt;
 
@@ -5,7 +6,8 @@ use sha2::{Digest as _, Sha256};
 use subtle::ConstantTimeEq;
 use zeroize::Zeroize;
 
-use crate::Entropy;
+use crate::b64url::decode_exact;
+use crate::{Entropy, Error};
 
 /// A fixed-size secret: no `Display`, `Clone`, `Serialize` or `PartialEq`, and `Debug` redacts.
 pub struct Secret<const N: usize>([u8; N]);
@@ -28,6 +30,11 @@ impl<const N: usize> Secret<N> {
     /// Takes ownership of bytes presented by a client or decoded from a host.
     pub const fn new(bytes: [u8; N]) -> Self {
         Self(bytes)
+    }
+
+    /// Decodes presented unpadded base64url of exactly `N` bytes; `Malformed` otherwise.
+    pub fn from_b64url(text: &str) -> Result<Self, Error> {
+        decode_exact(text).map(Self)
     }
 
     /// The single greppable read; confined by lint to the modules a `CONTRACT.md` names.
@@ -79,6 +86,16 @@ impl Digest {
         &self.0
     }
 
+    /// Decodes the text form; `Malformed` unless it is unpadded base64url of 32 bytes.
+    pub fn from_b64url(text: &str) -> Result<Self, Error> {
+        decode_exact(text).map(Self)
+    }
+
+    /// The text form: unpadded base64url, 43 symbols.
+    pub fn to_b64url(&self) -> String {
+        crate::b64url_encode(&self.0)
+    }
+
     pub(crate) fn of(parts: &[u8]) -> Self {
         Self(Sha256::digest(parts).into())
     }
@@ -119,14 +136,32 @@ impl fmt::Debug for Digest {
 #[cfg(feature = "serde")]
 impl serde::Serialize for Digest {
     fn serialize<S: serde::Serializer>(&self, s: S) -> Result<S::Ok, S::Error> {
-        s.serialize_bytes(&self.0)
+        s.serialize_str(&self.to_b64url())
+    }
+}
+
+#[cfg(feature = "serde")]
+impl<'de> serde::Deserialize<'de> for Digest {
+    fn deserialize<D: serde::Deserializer<'de>>(d: D) -> Result<Self, D::Error> {
+        struct Text;
+        impl serde::de::Visitor<'_> for Text {
+            type Value = Digest;
+            fn expecting(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+                f.write_str("a SHA-256 digest as unpadded base64url")
+            }
+            fn visit_str<E: serde::de::Error>(self, v: &str) -> Result<Digest, E> {
+                Digest::from_b64url(v)
+                    .map_err(|_| E::invalid_value(serde::de::Unexpected::Str(v), &self))
+            }
+        }
+        d.deserialize_str(Text)
     }
 }
 
 #[cfg(test)]
 mod tests {
     use super::{Digest, Secret, SecretBytes};
-    use crate::Entropy;
+    use crate::{Entropy, Error, ErrorKind};
     use alloc::format;
     use alloc::vec;
     use alloc::vec::Vec;
@@ -177,6 +212,40 @@ mod tests {
     fn exposes_what_it_holds() {
         assert_eq!(SecretBytes::new(vec![1, 2]).expose(), &[1, 2]);
         assert_eq!(Secret::new([3, 4]).expose(), &[3, 4]);
+    }
+
+    #[test]
+    fn from_b64url_takes_exactly_n() {
+        let s = Secret::<4>::from_b64url("AQIDBA").unwrap();
+        assert!(s.ct_eq(&Secret::new([1, 2, 3, 4])));
+        for wrong in ["AQID", "AQIDBAU", "AQIDBB", "AQIDBA=="] {
+            assert_eq!(
+                Secret::<4>::from_b64url(wrong).map(|_| ()),
+                Err(Error::new(ErrorKind::Malformed)),
+                "{wrong}"
+            );
+        }
+    }
+
+    #[test]
+    fn digest_text_round_trips() {
+        let d = Secret::new([9u8; 8]).digest();
+        let text = d.to_b64url();
+        assert_eq!(text.len(), 43);
+        assert_eq!(Digest::from_b64url(&text), Ok(d));
+        assert!(Digest::from_b64url(&text[..42]).is_err());
+        assert!(Digest::from_b64url("AQIDBA").is_err());
+    }
+
+    #[cfg(feature = "serde")]
+    #[test]
+    fn digest_serde_is_text() {
+        let d = Digest::from_bytes([0xfb; 32]);
+        let json = serde_json::to_string(&d).unwrap();
+        assert_eq!(json, alloc::format!("\"{}\"", "-_v7".repeat(10) + "-_s"));
+        assert_eq!(serde_json::from_str::<Digest>(&json).unwrap(), d);
+        assert!(serde_json::from_str::<Digest>("\"AQIDBA\"").is_err());
+        assert!(serde_json::from_str::<Digest>("[1,2]").is_err());
     }
 
     #[test]

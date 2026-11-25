@@ -11,8 +11,8 @@ pub type Decide<'a, K, R> = &'a dyn Fn(&mut MemStore<K, R>, &mut Seeded) -> Opti
 /// Decides every op against one snapshot of `start`, applies the effects in every order, and asserts:
 /// each decision guards every key it loaded; an effect fails only on keys an earlier winner wrote, so
 /// one that guards nothing a winner wrote applies; a loser re-decided within `REDECIDE` reaches the
-/// state of some serial run; and an effect applied twice applies once.
-pub fn race<K, R>(start: &MemStore<K, R>, ops: &[Decide<'_, K, R>], now: UnixTime)
+/// state of some serial run; and an effect applied twice applies once. Returns the conflicts raced.
+pub fn race<K, R>(start: &MemStore<K, R>, ops: &[Decide<'_, K, R>], now: UnixTime) -> usize
 where
     K: StoreKey + Debug,
     R: Clone + PartialEq + Debug,
@@ -33,6 +33,7 @@ where
             serial.contents(now)
         })
         .collect();
+    let mut conflicts = 0;
     for order in &orders {
         let mut raced = start.clone();
         let mut written = BTreeSet::new();
@@ -43,6 +44,7 @@ where
             match raced.apply(&effect, now).expect("reference store") {
                 Ok(_) => written.extend(writes(&effect)),
                 Err(conflict) => {
+                    conflicts += 1;
                     let failed: BTreeSet<K> =
                         conflict.failures().iter().map(|(k, _)| k.clone()).collect();
                     assert!(
@@ -77,6 +79,7 @@ where
             "op {i} applied twice wrote twice"
         );
     }
+    conflicts
 }
 
 fn decide<K, R>(state: &MemStore<K, R>, op: Decide<'_, K, R>, seed: u64) -> Option<Effect<K, R>>
@@ -145,7 +148,7 @@ fn seed(op: usize, round: u8) -> u64 {
     u64::try_from(op).expect("op index") * 256 + u64::from(round)
 }
 
-fn permutations(n: usize) -> Vec<Vec<usize>> {
+pub(crate) fn permutations(n: usize) -> Vec<Vec<usize>> {
     let Some(last) = n.checked_sub(1) else {
         return vec![Vec::new()];
     };
@@ -158,4 +161,25 @@ fn permutations(n: usize) -> Vec<Vec<usize>> {
         }
     }
     out
+}
+
+#[cfg(test)]
+mod tests {
+    use std::collections::BTreeSet;
+
+    use super::permutations;
+
+    #[test]
+    fn every_order_once() {
+        for (n, count) in [(0, 1), (1, 1), (2, 2), (3, 6), (4, 24)] {
+            let orders = permutations(n);
+            let distinct: BTreeSet<_> = orders.iter().cloned().collect();
+            assert_eq!((orders.len(), distinct.len()), (count, count));
+            assert!(orders.iter().all(|o| {
+                let mut sorted = o.clone();
+                sorted.sort_unstable();
+                sorted == (0..n).collect::<Vec<_>>()
+            }));
+        }
+    }
 }

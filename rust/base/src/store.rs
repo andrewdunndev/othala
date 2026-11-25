@@ -162,7 +162,7 @@ pub const REDECIDE: u8 = 3;
 
 #[cfg(test)]
 mod tests {
-    use super::{Retry, Row, Rows, Slot, Version};
+    use super::{REDECIDE, Retry, Row, Rows, Slot, Version};
 
     #[test]
     fn rows_slots() {
@@ -186,5 +186,10 @@ mod tests {
         assert_eq!((*row.record(), row.version().get()), (5, 7));
         assert_eq!(row.into_record(), 5);
         assert_eq!(Retry::new(2).attempts(), 2);
+    }
+
+    #[test]
+    fn redecide_is_three() {
+        assert_eq!(REDECIDE, 3);
     }
 }

@@ -1,6 +1,7 @@
 use alloc::collections::BTreeMap;
 use alloc::collections::btree_map::Entry;
 use alloc::vec::Vec;
+use core::fmt;
 
 use sha2::{Digest as _, Sha256};
 
@@ -93,6 +94,7 @@ pub struct Effect<K, R> {
 pub struct Builder<K, R> {
     id: EffectId,
     ops: BTreeMap<K, Op<R>>,
+    size: usize,
     fault: Option<ErrorKind>,
 }
 
@@ -122,7 +124,6 @@ pub struct Conflict<K> {
 
 /// A verdict that is void until settled with its effect's [`Receipt`].
 #[must_use]
-#[derive(Debug)]
 pub struct Pending<T, K, R> {
     verdict: T,
     effect: Effect<K, R>,
@@ -136,6 +137,7 @@ impl<K: StoreKey, R> Effect<K, R> {
         Builder {
             id: EffectId(id),
             ops: BTreeMap::new(),
+            size: 0,
             fault: None,
         }
     }
@@ -217,15 +219,15 @@ impl<K: StoreKey, R> Effect<K, R> {
 
     /// One effect from two: `Overlap` if a key is in both, `TooLarge` past the bound; the id is the digest of both ids.
     pub fn merge(self, other: Self) -> Result<Self, Error> {
+        if size(&self.ops) + size(&other.ops) > MAX_EFFECT_SIZE {
+            return Err(Error::new(ErrorKind::TooLarge));
+        }
         let mut ops = self.ops;
         for (k, op) in other.ops {
             match ops.entry(k) {
                 Entry::Vacant(slot) => slot.insert(op),
                 Entry::Occupied(_) => return Err(Error::new(ErrorKind::Overlap)),
             };
-        }
-        if size(&ops) > MAX_EFFECT_SIZE {
-            return Err(Error::new(ErrorKind::TooLarge));
         }
         Ok(Self {
             id: EffectId::merged(self.id, other.id),
@@ -251,7 +253,16 @@ impl<K: StoreKey, R> Effect<K, R> {
 }
 
 impl<K: StoreKey, R> Builder<K, R> {
+    // the first fault latches and later ops are dropped, so an oversize builder never grows
     fn op(&mut self, key: K, op: Op<R>) -> &mut Self {
+        if self.fault.is_some() {
+            return self;
+        }
+        self.size += op.size();
+        if self.size > MAX_EFFECT_SIZE {
+            self.fault = Some(ErrorKind::TooLarge);
+            return self;
+        }
         match self.ops.entry(key) {
             Entry::Vacant(slot) => {
                 slot.insert(op);
@@ -309,12 +320,11 @@ impl<K: StoreKey, R> Builder<K, R> {
         self.op(key, Op::new(Check::Absent, None))
     }
 
-    /// The effect, or `Overlap` for a key named twice, `Empty`, or `TooLarge`.
+    /// The effect, or the first fault: `Overlap` for a key named twice, `TooLarge` past the bound; else `Empty`.
     pub fn build(self) -> Result<Effect<K, R>, Error> {
         let fault = match self.fault {
             Some(kind) => Some(kind),
             None if self.ops.is_empty() => Some(ErrorKind::Empty),
-            None if size(&self.ops) > MAX_EFFECT_SIZE => Some(ErrorKind::TooLarge),
             None => None,
         };
         match fault {
@@ -367,14 +377,6 @@ impl<T, K: StoreKey, R> Pending<T, K, R> {
         }
     }
 
-    /// Maps the verdict; the effect is unchanged.
-    pub fn map<U>(self, f: impl FnOnce(T) -> U) -> Pending<U, K, R> {
-        Pending {
-            verdict: f(self.verdict),
-            effect: self.effect,
-        }
-    }
-
     /// As [`Effect::lift`].
     pub fn lift<K2: StoreKey, R2>(
         self,
@@ -396,10 +398,19 @@ impl<T, K: StoreKey, R> Pending<T, K, R> {
     }
 }
 
+impl<T, K, R> fmt::Debug for Pending<T, K, R> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("Pending")
+            .field("effect", &self.effect.id)
+            .finish_non_exhaustive()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::{Builder, Conflict, Effect, Failure, Guard, MAX_EFFECT_SIZE, Pending};
     use crate::{Entropy, ErrorKind, Row, Scope, StoreKey, UnixTime, Version};
+    use alloc::format;
     use alloc::vec::Vec;
     use sha2::{Digest as _, Sha256};
 
@@ -512,15 +523,15 @@ mod tests {
 
     #[test]
     fn size_bound() {
+        assert_eq!(MAX_EFFECT_SIZE, 128);
         let e = &mut Fill(0);
-        let half = u8::try_from(MAX_EFFECT_SIZE / 2).unwrap();
         let mut b = builder(e);
-        (0..half).for_each(|n| {
+        (0..64).for_each(|n| {
             b.create(K::G(n), n, None);
         });
         assert!(b.build().is_ok());
         let mut b = builder(e);
-        (0..half).for_each(|n| {
+        (0..64).for_each(|n| {
             b.create(K::G(n), n, None);
         });
         b.expect_absent(K::S(0));
@@ -529,16 +540,36 @@ mod tests {
         b.delete(K::G(0), &row(1))
             .consume(K::G(1))
             .update(K::G(2), &row(1), 0, None);
-        (3..u8::try_from(MAX_EFFECT_SIZE - 3).unwrap()).for_each(|n| {
+        (3..125).for_each(|n| {
             b.expect(K::G(n), &row(1));
         });
         assert!(b.build().is_ok());
-        let full = u8::try_from(MAX_EFFECT_SIZE).unwrap();
-        assert!(absent(e, 0..half).merge(absent(e, half..full)).is_ok());
+        assert!(absent(e, 0..64).merge(absent(e, 64..128)).is_ok());
         assert_eq!(
-            kind(absent(e, 0..half).merge(absent(e, half..=full))),
+            kind(absent(e, 0..64).merge(absent(e, 64..=128))),
             Some(ErrorKind::TooLarge)
         );
+        assert_eq!(
+            kind(absent(e, 0..64).merge(absent(e, 0..65))),
+            Some(ErrorKind::TooLarge)
+        );
+    }
+
+    #[test]
+    fn oversize_builder_stops_growing() {
+        let mut b = builder(&mut Fill(0));
+        (0..=255).for_each(|n| {
+            b.expect_absent(K::G(n)).expect_absent(K::S(n));
+        });
+        assert_eq!((b.ops.len(), b.size), (128, 129));
+        assert_eq!(kind(b.build()), Some(ErrorKind::TooLarge));
+        let mut b = builder(&mut Fill(0));
+        b.expect_absent(K::G(0)).expect_absent(K::G(0));
+        (1..=255).for_each(|n| {
+            b.expect_absent(K::G(n));
+        });
+        assert_eq!(b.ops.len(), 1);
+        assert_eq!(kind(b.build()), Some(ErrorKind::Overlap));
     }
 
     #[test]
@@ -614,7 +645,7 @@ mod tests {
     fn views() {
         let mut b = builder(&mut Fill(0));
         b.create(K::G(1), 10, Some(UnixTime::new(3)))
-            .update(K::G(2), &row(4), 20, None)
+            .update(K::G(2), &row(4), 20, Some(UnixTime::new(8)))
             .consume(K::G(3))
             .delete(K::G(4), &row(5))
             .expect(K::G(5), &row(6))
@@ -636,7 +667,7 @@ mod tests {
             e.puts().collect::<Vec<_>>(),
             [
                 (&K::G(1), &10, Some(UnixTime::new(3))),
-                (&K::G(2), &20, None)
+                (&K::G(2), &20, Some(UnixTime::new(8)))
             ]
         );
         assert_eq!(e.deletes().collect::<Vec<_>>(), [&K::G(3), &K::G(4)]);
@@ -647,16 +678,24 @@ mod tests {
         let e = &mut Fill(0);
         let a = Pending::new(1u8, absent(e, [1]));
         let b = Pending::new('b', absent(e, [2]));
-        let joined = a.map(|n| n + 1).join(b).unwrap();
-        let lifted = joined.lift(|k| k, |r| r).unwrap();
+        let lifted = a.join(b).unwrap().lift(|k| k, |r| r).unwrap();
         assert_eq!(lifted.effect().guards().count(), 2);
         let receipt = lifted.effect().host_applied();
-        assert_eq!(lifted.settle(receipt).unwrap(), (2, 'b'));
+        assert_eq!(lifted.settle(receipt).unwrap(), (1, 'b'));
         let clash = Pending::new(1u8, absent(e, [1])).join(Pending::new(2u8, absent(e, [1])));
         assert_eq!(kind(clash), Some(ErrorKind::Overlap));
         assert_eq!(
             kind(Pending::new(1u8, absent(e, [1, 2])).lift(|_| K::G(0), |r| r)),
             Some(ErrorKind::Overlap)
+        );
+    }
+
+    #[test]
+    fn pending_debug_shows_only_the_effect_id() {
+        let p = Pending::new("session granted", absent(&mut Fill(2), [1]));
+        assert_eq!(
+            format!("{p:?}"),
+            format!("Pending {{ effect: {:?}, .. }}", p.effect().id())
         );
     }
 }

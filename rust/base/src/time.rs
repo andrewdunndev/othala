@@ -12,6 +12,21 @@ impl UnixTime {
     pub const fn secs(self) -> u64 {
         self.0
     }
+
+    /// `secs` later, saturating at `u64::MAX` seconds.
+    pub const fn saturating_add(self, secs: u64) -> Self {
+        Self(self.0.saturating_add(secs))
+    }
+
+    /// `secs` earlier, saturating at the epoch.
+    pub const fn saturating_sub(self, secs: u64) -> Self {
+        Self(self.0.saturating_sub(secs))
+    }
+
+    /// Seconds from `earlier` to `self`, or `None` if `earlier` is later.
+    pub const fn checked_duration_since(self, earlier: Self) -> Option<u64> {
+        self.0.checked_sub(earlier.0)
+    }
 }
 
 #[cfg(feature = "std")]
@@ -32,6 +47,18 @@ mod tests {
     #[test]
     fn seconds_round_trip() {
         assert_eq!(UnixTime::new(42).secs(), 42);
+    }
+
+    #[test]
+    fn arithmetic_saturates() {
+        let t = UnixTime::new;
+        assert_eq!(t(5).saturating_add(3), t(8));
+        assert_eq!(t(u64::MAX - 1).saturating_add(5), t(u64::MAX));
+        assert_eq!(t(5).saturating_sub(3), t(2));
+        assert_eq!(t(3).saturating_sub(5), t(0));
+        assert_eq!(t(8).checked_duration_since(t(5)), Some(3));
+        assert_eq!(t(5).checked_duration_since(t(5)), Some(0));
+        assert_eq!(t(5).checked_duration_since(t(8)), None);
     }
 
     #[cfg(feature = "std")]

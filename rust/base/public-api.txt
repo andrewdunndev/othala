@@ -1,3 +1,12 @@
+constant MAX_EFFECT_SIZE
+constant REDECIDE
+enum ErrorKind
+enum Failure
+enum Guard
+enum Scope
+enum Slot
+function b64url_decode
+function b64url_encode
 impl Clone for Conflict
 impl Clone for Digest
 impl Clone for EffectId
@@ -44,6 +53,7 @@ impl Debug for Slot
 impl Debug for UnixTime
 impl Debug for Version
 impl Default for Rows
+impl Deserialize for Digest
 impl Display for Error
 impl Drop for Secret
 impl Drop for SecretBytes
@@ -104,149 +114,105 @@ impl StructuralPartialEq for Scope
 impl StructuralPartialEq for Slot
 impl StructuralPartialEq for UnixTime
 impl StructuralPartialEq for Version
-pub Builder::build
-pub Builder::consume
-pub Builder::create
-pub Builder::delete
-pub Builder::expect
-pub Builder::expect_absent
-pub Builder::update
-pub Conflict::failures
-pub Conflict::new
-pub Conflict::push
-pub Digest::as_bytes
-pub Digest::from_bytes
-pub Effect::builder
-pub Effect::check
-pub Effect::deletes
-pub Effect::domain
-pub Effect::guards
-pub Effect::host_applied
-pub Effect::id
-pub Effect::lift
-pub Effect::merge
-pub Effect::puts
-pub EffectId::as_bytes
-pub Entropy::fill
-pub Error::kind
-pub ErrorKind::Empty
-pub ErrorKind::Malformed
-pub ErrorKind::Overlap
-pub ErrorKind::ScopeChanged
-pub ErrorKind::SpansDomains
-pub ErrorKind::TooLarge
-pub ErrorKind::WrongReceipt
-pub Failure::Changed
-pub Failure::Missing
-pub Failure::Present
-pub Guard::Absent
-pub Guard::Consume
-pub Guard::Unchanged
-pub Guard::key
-pub Pending::effect
-pub Pending::join
-pub Pending::lift
-pub Pending::map
-pub Pending::new
-pub Pending::settle
-pub RandCore::new
-pub Retry::attempts
-pub Retry::new
-pub Row::into_record
-pub Row::new
-pub Row::record
-pub Row::version
-pub Rows::corrupt
-pub Rows::get
-pub Rows::insert
-pub Rows::new
-pub Scope::Global
-pub Scope::Subject
-pub Secret::ct_eq
-pub Secret::digest
-pub Secret::expose
-pub Secret::generate
-pub Secret::new
-pub SecretBytes::ct_eq
-pub SecretBytes::digest
-pub SecretBytes::expose
-pub SecretBytes::new
-pub Slot::Absent
-pub Slot::Corrupt
-pub Slot::Row
-pub Store::Error
-pub Store::apply
-pub Store::load
-pub StoreKey::scope
-pub UnixTime::new
-pub UnixTime::secs
-pub Version::get
-pub Version::new
-pub constant MAX_EFFECT_SIZE
-pub constant REDECIDE
-pub enum ErrorKind
-pub enum Failure
-pub enum Guard
-pub enum Scope
-pub enum Slot
-pub function as_bytes
-pub function attempts
-pub function b64url_decode
-pub function b64url_encode
-pub function build
-pub function builder
-pub function check
-pub function consume
-pub function corrupt
-pub function create
-pub function ct_eq
-pub function delete
-pub function deletes
-pub function digest
-pub function domain
-pub function effect
-pub function expect
-pub function expect_absent
-pub function expose
-pub function failures
-pub function from_bytes
-pub function generate
-pub function get
-pub function guards
-pub function host_applied
-pub function id
-pub function insert
-pub function into_record
-pub function join
-pub function key
-pub function kind
-pub function lift
-pub function map
-pub function merge
-pub function new
-pub function push
-pub function puts
-pub function record
-pub function secs
-pub function settle
-pub function update
-pub function version
-pub struct Builder
-pub struct Conflict
-pub struct Digest
-pub struct Effect
-pub struct EffectId
-pub struct Error
-pub struct Pending
-pub struct RandCore
-pub struct Receipt
-pub struct Retry
-pub struct Row
-pub struct Rows
-pub struct Secret
-pub struct SecretBytes
-pub struct UnixTime
-pub struct Version
-pub trait Entropy
-pub trait Store
-pub trait StoreKey
+method Builder::build
+method Builder::consume
+method Builder::create
+method Builder::delete
+method Builder::expect
+method Builder::expect_absent
+method Builder::update
+method Conflict::failures
+method Conflict::new
+method Conflict::push
+method Digest::as_bytes
+method Digest::from_b64url
+method Digest::from_bytes
+method Digest::to_b64url
+method Effect::builder
+method Effect::check
+method Effect::deletes
+method Effect::domain
+method Effect::guards
+method Effect::host_applied
+method Effect::id
+method Effect::lift
+method Effect::merge
+method Effect::puts
+method EffectId::as_bytes
+method Error::kind
+method Guard::key
+method Pending::effect
+method Pending::join
+method Pending::lift
+method Pending::new
+method Pending::settle
+method RandCore::new
+method Retry::attempts
+method Retry::new
+method Row::into_record
+method Row::new
+method Row::record
+method Row::version
+method Rows::corrupt
+method Rows::get
+method Rows::insert
+method Rows::new
+method Secret::ct_eq
+method Secret::digest
+method Secret::expose
+method Secret::from_b64url
+method Secret::generate
+method Secret::new
+method SecretBytes::ct_eq
+method SecretBytes::digest
+method SecretBytes::expose
+method SecretBytes::new
+method UnixTime::checked_duration_since
+method UnixTime::new
+method UnixTime::saturating_add
+method UnixTime::saturating_sub
+method UnixTime::secs
+method Version::get
+method Version::new
+struct Builder
+struct Conflict
+struct Digest
+struct Effect
+struct EffectId
+struct Error
+struct Pending
+struct RandCore
+struct Receipt
+struct Retry
+struct Row
+struct Rows
+struct Secret
+struct SecretBytes
+struct UnixTime
+struct Version
+trait Entropy
+trait Store
+trait StoreKey
+trait_item Entropy::fill
+trait_item Store::Error
+trait_item Store::apply
+trait_item Store::load
+trait_item StoreKey::scope
+variant ErrorKind::Empty
+variant ErrorKind::Malformed
+variant ErrorKind::Overlap
+variant ErrorKind::ScopeChanged
+variant ErrorKind::SpansDomains
+variant ErrorKind::TooLarge
+variant ErrorKind::WrongReceipt
+variant Failure::Changed
+variant Failure::Missing
+variant Failure::Present
+variant Guard::Absent
+variant Guard::Consume
+variant Guard::Unchanged
+variant Scope::Global
+variant Scope::Subject
+variant Slot::Absent
+variant Slot::Corrupt
+variant Slot::Row

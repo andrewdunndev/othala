@@ -6,7 +6,7 @@ exclude = ["base/fuzz"]
 [workspace.package]
 version = "0.0.0"
 edition = "2024"
-rust-version = "1.85"
+rust-version = "1.89"
 license = "MIT OR Apache-2.0"
 publish = false
 
@@ -14,6 +14,7 @@ publish = false
 base = { path = "base", version = "0.0.0" }
 testkit = { path = "testkit", version = "0.0.0" }
 sha2 = { version = "0.11", default-features = false }
+base64ct = { version = "1.8", default-features = false, features = ["alloc"] }
 subtle = { version = "2.6", default-features = false }
 zeroize = { version = "1.8", default-features = false, features = ["alloc"] }
 rand_core = { version = "0.10", default-features = false }
@@ -21,6 +22,9 @@ serde = { version = "1", default-features = false }
 trybuild = "1.0.110"
 rand_chacha = { version = "0.10", default-features = false }
 serde_json = "1"
+toml = { version = "1", default-features = false, features = ["std", "parse", "serde"] }
+rand = "0.10"
+getrandom = { version = "0.4", features = ["sys_rng"] }
 proptest = { version = "1.12", default-features = false, features = ["std"] }
 
 [workspace.lints.rust]

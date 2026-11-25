@@ -1,6 +1,8 @@
 //! The snapshot-race harness over small decisions, and probes that it catches what it claims to.
 #![allow(clippy::unwrap_used, reason = "test helpers fail by panicking")]
-use base::{Effect, Scope, Slot, Store, StoreKey, UnixTime};
+use std::cell::Cell;
+
+use base::{Effect, Row, Scope, Slot, Store, StoreKey, UnixTime, Version};
 use testkit::{Decide, MemStore, Seeded, race};
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
@@ -67,6 +69,28 @@ fn peek(k: u8, out: u8) -> Op {
     })
 }
 
+// bump(k), except that the calls listed in `stale` guard a version no store ever issued
+fn flaky(
+    k: u8,
+    counted: impl Fn(&Row<u8>) -> bool + 'static,
+    stale: std::ops::RangeInclusive<u8>,
+) -> Op {
+    let calls = Cell::new(0u8);
+    Box::new(move |s, e| {
+        let row = read(s, K(k))?;
+        let mut seen = row.clone();
+        if counted(&row) {
+            calls.set(calls.get() + 1);
+            if stale.contains(&calls.get()) {
+                seen = Row::new(*row.record(), Version::new(u64::MAX));
+            }
+        }
+        let mut b = Effect::builder(e);
+        b.update(K(k), &seen, row.record() + 1, None);
+        Some(b.build().unwrap())
+    })
+}
+
 fn start() -> S {
     let mut s = S::new();
     let mut b = Effect::builder(&mut testkit::seeded(99));
@@ -93,32 +117,68 @@ fn ops() -> Vec<Op> {
 #[test]
 fn pairs() {
     let all = ops();
+    let mut conflicts = 0;
     for a in &all {
         for b in &all {
             let pair: [Decide<'_, K, u8>; 2] = [a.as_ref(), b.as_ref()];
-            race(&start(), &pair, NOW);
+            conflicts += race(&start(), &pair, NOW);
         }
     }
+    assert!(conflicts > 0, "pairs raced without a conflict");
 }
 
 #[test]
 fn triples() {
     let all = ops();
+    let mut conflicts = 0;
     for (i, a) in all.iter().enumerate() {
         for b in all.iter().skip(i) {
             for c in all.iter().skip(i + 1) {
                 let triple: [Decide<'_, K, u8>; 3] = [a.as_ref(), b.as_ref(), c.as_ref()];
-                race(&start(), &triple, NOW);
+                conflicts += race(&start(), &triple, NOW);
             }
         }
     }
+    assert!(conflicts > 0, "triples raced without a conflict");
 }
 
 #[test]
 fn same_twice() {
     for op in ops() {
-        race(&start(), &[op.as_ref()], NOW);
+        assert_eq!(race(&start(), &[op.as_ref()], NOW), 0);
     }
+}
+
+#[test]
+#[should_panic(expected = "op 0 applied twice")]
+fn same_twice_catches_a_store_that_forgets_applied_ids() {
+    let mut forgetful = start();
+    forgetful.forget_applied_ids();
+    race(&forgetful, &[claim(2).as_ref()], NOW);
+}
+
+#[test]
+#[should_panic(expected = "winners wrote {}")]
+fn a_loser_fails_only_on_winners_writes() {
+    let second_call_stale = flaky(1, |_| true, 2..=2);
+    race(&start(), &[second_call_stale.as_ref()], NOW);
+}
+
+// the loser's re-decisions see the winner's bump (record 6); sighting 1 is the serial run's
+#[test]
+fn a_loser_redecides_up_to_three_times() {
+    let two_stale = flaky(1, |r| *r.record() == 6, 2..=3);
+    assert_eq!(
+        race(&start(), &[bump(1).as_ref(), two_stale.as_ref()], NOW),
+        2
+    );
+}
+
+#[test]
+#[should_panic(expected = "op 1 still in conflict after 3 re-decisions")]
+fn a_loser_gives_up_after_three() {
+    let three_stale = flaky(1, |r| *r.record() == 6, 2..=4);
+    race(&start(), &[bump(1).as_ref(), three_stale.as_ref()], NOW);
 }
 
 #[test]

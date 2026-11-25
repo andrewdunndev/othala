@@ -7,6 +7,7 @@ use base::{
     Version,
 };
 use proptest::prelude::*;
+use proptest::test_runner::RngSeed;
 use testkit::{MemStore, seeded};
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
@@ -39,17 +40,83 @@ enum Kind {
 
 type Spec = Vec<(Kind, K, bool)>;
 
-fn spec() -> impl Strategy<Value = Spec> {
-    let kind = prop_oneof![
+const SIZE_BOUND: usize = 128;
+
+fn kind() -> impl Strategy<Value = Kind> {
+    prop_oneof![
         Just(Kind::Create),
         Just(Kind::Update),
         Just(Kind::Consume),
         Just(Kind::Delete),
         Just(Kind::Expect),
         Just(Kind::ExpectAbsent)
-    ];
-    let key = prop_oneof![(0u8..6).prop_map(K::G), (0u8..6).prop_map(K::S)];
-    prop::collection::vec((kind, key, any::<bool>()), 0..10)
+    ]
+}
+
+fn pool(n: u8) -> Vec<K> {
+    (0..n).flat_map(|i| [K::G(i), K::S(i)]).collect()
+}
+
+// distinct keys by construction, plus at times one key named again at a random place
+fn spec(max: usize) -> impl Strategy<Value = Spec> {
+    prop::sample::subsequence(pool(80), 0..=max)
+        .prop_flat_map(|keys| {
+            let n = keys.len();
+            let again = (
+                any::<prop::sample::Index>(),
+                any::<prop::sample::Index>(),
+                kind(),
+            );
+            (
+                Just(keys),
+                prop::collection::vec((kind(), any::<bool>()), n),
+                prop::option::weighted(0.25, again),
+            )
+        })
+        .prop_map(|(keys, ops, again)| {
+            let mut spec: Spec = keys
+                .into_iter()
+                .zip(ops)
+                .map(|(k, (kind, fresh))| (kind, k, fresh))
+                .collect();
+            if let Some((which, at, kind)) = again
+                && let Some(&(_, k, _)) = spec.get(which.index(spec.len().max(1)))
+            {
+                spec.insert(at.index(spec.len() + 1), (kind, k, true));
+            }
+            spec
+        })
+}
+
+const fn op_size(kind: Kind) -> usize {
+    match kind {
+        Kind::Expect | Kind::ExpectAbsent => 1,
+        _ => 2,
+    }
+}
+
+// the builder latches its first fault: past the bound first, then a key named twice
+fn expected(spec: &Spec) -> Result<(), ErrorKind> {
+    let mut seen = BTreeSet::new();
+    let mut size = 0;
+    for &(kind, k, _) in spec {
+        size += op_size(kind);
+        if size > SIZE_BOUND {
+            return Err(ErrorKind::TooLarge);
+        }
+        if !seen.insert(k) {
+            return Err(ErrorKind::Overlap);
+        }
+    }
+    if spec.is_empty() {
+        Err(ErrorKind::Empty)
+    } else {
+        Ok(())
+    }
+}
+
+fn size(e: &Effect<K, u8>) -> usize {
+    e.guards().count() + e.puts().count() + e.deletes().count()
 }
 
 fn build(
@@ -95,27 +162,78 @@ fn well_formed(e: &Effect<K, u8>) -> Result<(), TestCaseError> {
     Ok(())
 }
 
-fn distinct(spec: &Spec) -> bool {
-    spec.iter().map(|s| s.1).collect::<BTreeSet<_>>().len() == spec.len()
+// mostly holding guards against `present`, so whole applies and conflicts are both common
+fn against(present: BTreeSet<K>) -> impl Strategy<Value = Spec> {
+    prop::sample::subsequence(pool(6), 1..=8)
+        .prop_flat_map(|keys| {
+            let n = keys.len();
+            (
+                Just(keys),
+                prop::collection::vec((prop::bool::weighted(0.85), 0u8..20), n),
+            )
+        })
+        .prop_map(move |(keys, picks)| {
+            keys.into_iter()
+                .zip(picks)
+                .map(|(k, (hold, v))| {
+                    let (kinds, fresh): (&[Kind], bool) = match (hold, present.contains(&k)) {
+                        (true, true) => (
+                            &[Kind::Update, Kind::Consume, Kind::Delete, Kind::Expect],
+                            true,
+                        ),
+                        (true, false) => (&[Kind::Create, Kind::ExpectAbsent], true),
+                        (false, true) => (
+                            &[
+                                Kind::Create,
+                                Kind::ExpectAbsent,
+                                Kind::Update,
+                                Kind::Delete,
+                                Kind::Expect,
+                            ],
+                            false,
+                        ),
+                        (false, false) => (
+                            &[Kind::Update, Kind::Consume, Kind::Delete, Kind::Expect],
+                            true,
+                        ),
+                    };
+                    let kind = kinds.get(usize::from(v) % kinds.len()).copied().unwrap();
+                    (kind, k, fresh)
+                })
+                .collect()
+        })
+}
+
+fn config() -> ProptestConfig {
+    ProptestConfig {
+        cases: 512,
+        rng_seed: RngSeed::Fixed(0x5eed_0001),
+        failure_persistence: None,
+        ..ProptestConfig::default()
+    }
 }
 
 proptest! {
+    #![proptest_config(config())]
+
     #[test]
-    fn construction_never_unguarded(a in spec(), b in spec(), to_global in any::<bool>()) {
+    fn construction_never_unguarded(a in spec(100), b in spec(40), to_global in any::<bool>()) {
         let none = BTreeMap::new();
         let built = build(&a, 1, &none);
-        let want = if !distinct(&a) { Err(ErrorKind::Overlap) } else if a.is_empty() { Err(ErrorKind::Empty) } else { Ok(()) };
-        prop_assert_eq!(built.as_ref().map(|_| ()).map_err(|e| e.kind()), want);
+        prop_assert_eq!(built.as_ref().map(|_| ()).map_err(|e| e.kind()), expected(&a));
         let (Ok(x), Ok(y)) = (built, build(&b, 2, &none)) else { return Ok(()) };
         well_formed(&x)?;
+        prop_assert!(size(&x) <= SIZE_BOUND);
         let xs: BTreeSet<K> = x.guards().map(|g| **g.key()).collect();
         let ys: BTreeSet<K> = y.guards().map(|g| **g.key()).collect();
+        let sum = size(&x) + size(&y);
         match x.merge(y) {
             Ok(m) => {
-                prop_assert!(xs.is_disjoint(&ys));
+                prop_assert!(xs.is_disjoint(&ys) && sum <= SIZE_BOUND);
                 well_formed(&m)?;
                 prop_assert_eq!(m.guards().count(), xs.len() + ys.len());
             }
+            Err(e) if sum > SIZE_BOUND => prop_assert_eq!(e.kind(), ErrorKind::TooLarge),
             Err(e) => prop_assert!(e.kind() == ErrorKind::Overlap && !xs.is_disjoint(&ys)),
         }
         let folded = |k: K| match k { K::G(n) if to_global => K::G(n / 2), K::S(n) => K::S(n / 2), k => k };
@@ -130,15 +248,18 @@ proptest! {
     }
 
     #[test]
-    fn all_guards_or_nothing(rows in prop::collection::vec((0u8..6).prop_map(K::G), 0..6), a in spec()) {
+    fn all_guards_or_nothing(
+        (a, present) in prop::sample::subsequence(pool(6), 0..=12)
+            .prop_map(|ks| ks.into_iter().collect::<BTreeSet<K>>())
+            .prop_flat_map(|present| (against(present.clone()), Just(present)))
+    ) {
         let mut store = MemStore::<K, u8>::new();
-        let present: BTreeSet<K> = rows.into_iter().collect();
         if !present.is_empty() {
             let mut b = Effect::builder(&mut seeded(3));
             present.iter().for_each(|&k| { b.create(k, 200, None); });
             prop_assert!(store.apply(&b.build().unwrap(), NOW).unwrap().is_ok());
         }
-        let all: Vec<K> = (0..6).flat_map(|n| [K::G(n), K::S(n)]).collect();
+        let all = pool(6);
         let loaded = store.load(&all, NOW).unwrap();
         let seen: BTreeMap<K, Version> = all.iter().filter_map(|k| match loaded.get(k) {
             Some(Slot::Row(r)) => Some((*k, r.version())),

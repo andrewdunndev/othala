@@ -33,6 +33,7 @@ pub struct MemStore<K, R> {
     counter: u64,
     reads: BTreeSet<K>,
     lose: u32,
+    forget: bool,
 }
 
 impl<K: StoreKey, R: Clone> MemStore<K, R> {
@@ -44,12 +45,19 @@ impl<K: StoreKey, R: Clone> MemStore<K, R> {
             counter: 0,
             reads: BTreeSet::new(),
             lose: 0,
+            forget: false,
         }
     }
 
     /// The next apply commits and then answers `Fault::Lost`.
     pub fn lose_next_result(&mut self) -> &mut Self {
         self.lose += 1;
+        self
+    }
+
+    /// Probes only: stop recording applied ids, so a re-apply is decided afresh (a broken store).
+    pub fn forget_applied_ids(&mut self) -> &mut Self {
+        self.forget = true;
         self
     }
 
@@ -98,17 +106,13 @@ impl<K: StoreKey, R: Clone> Store<K, R> for MemStore<K, R> {
         Ok(rows)
     }
 
-    #[expect(
-        clippy::disallowed_methods,
-        reason = "the reference store mints receipts"
-    )]
     fn apply(
         &mut self,
         effect: &Effect<K, R>,
         now: UnixTime,
     ) -> Result<Result<Receipt, Conflict<K>>, Fault> {
         if self.applied.contains(&effect.id()) {
-            return Ok(Ok(effect.host_applied()));
+            return Ok(Ok(mint(effect)));
         }
         let guarded: BTreeSet<&K> = effect.guards().map(|g| *g.key()).collect();
         if effect.puts().any(|(k, _, _)| !guarded.contains(k))
@@ -131,11 +135,21 @@ impl<K: StoreKey, R: Clone> Store<K, R> for MemStore<K, R> {
             };
             self.rows.insert(key.clone(), stored);
         }
-        self.applied.insert(effect.id());
+        if !self.forget {
+            self.applied.insert(effect.id());
+        }
         if self.lose > 0 {
             self.lose -= 1;
             return Err(Fault::Lost);
         }
-        Ok(Ok(effect.host_applied()))
+        Ok(Ok(mint(effect)))
     }
+}
+
+#[expect(
+    clippy::disallowed_methods,
+    reason = "the reference store's one receipt mint"
+)]
+fn mint<K: StoreKey, R>(effect: &Effect<K, R>) -> Receipt {
+    effect.host_applied()
 }

@@ -4,7 +4,7 @@ use core::fmt;
 #[non_exhaustive]
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub enum ErrorKind {
-    /// Input is not canonical unpadded base64url.
+    /// Input is not canonical unpadded base64url, or not the length expected.
     Malformed,
     /// A key appears twice in one effect, merge or lift.
     Overlap,

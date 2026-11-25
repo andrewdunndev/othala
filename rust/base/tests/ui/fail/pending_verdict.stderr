@@ -1,5 +1,9 @@
-error[E0599]: no method named `verdict` found for struct `base::Pending<T, K, R>` in the current scope
- --> tests/ui/fail/pending_verdict.rs:3:15
-  |
-3 |     let _ = p.verdict();
-  |               ^^^^^^^ private field, not a method
+error[E0599]: no method named `map` found for struct `base::Pending<u8, K, u8>` in the current scope
+  --> tests/ui/fail/pending_verdict.rs:13:15
+   |
+13 |     let _ = p.map(|v| out = Some(v));
+   |               ^^^ method not found in `base::Pending<u8, K, u8>`
+   |
+   = help: items from traits can only be used if the trait is implemented and in scope
+   = note: the following trait defines an item `map`, perhaps you need to implement it:
+           candidate #1: `Iterator`

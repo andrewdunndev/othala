@@ -1,5 +1,6 @@
 //! RFC 4648 section 10 through the testkit vector runner.
 use base::{b64url_decode, b64url_encode};
+use testkit::vector;
 use testkit::vectors::{Outcome, run};
 
 #[derive(serde::Deserialize)]
@@ -11,9 +12,7 @@ struct Case {
 
 #[test]
 fn rfc4648_section10() {
-    let sources = include_str!("../../vectors/SOURCES.toml");
-    let json = include_str!("../../vectors/rfc4648/test-vectors.json");
-    run::<Case>(sources, "rfc4648/test-vectors.json", json, 7, |c| {
+    let tally = run::<Case>(vector!("rfc4648/test-vectors.json"), 7, |c| {
         if c.encoding != "BASE64" {
             return Outcome::NotApplicable;
         }
@@ -27,4 +26,5 @@ fn rfc4648_section10() {
         );
         Outcome::Checked
     });
+    assert_eq!((tally.total(), tally.checked()), (28, 7));
 }
