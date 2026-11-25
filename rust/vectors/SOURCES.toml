@@ -121,7 +121,7 @@ files = [
   { path = "rfc8725-derived/jws-alg.json", sha256 = "bdb0203a76b79f1f7e04ca9f62b5ccfa1694f7f881686056a44219e091acc9d6", cases = 25 },
 ]
 
-[source."w3c-webauthn-3-none"]
+[source."w3c-webauthn-3-exam-spike"]
 url = "https://www.w3.org/TR/webauthn-3/"
 revision = "W3C WebAuthn L3 section 16.2"
 retrieved = "2026-11-24"
@@ -130,6 +130,25 @@ feeds = ["webauthn-rp"]
 notes = "Carried from origin/spike/exam-vectors (aed76f8) as extracted there to the exam JSON shape; ES256 none-attestation assertion plus derived refusal cases."
 cases = 8
 files = [
-  { path = "w3c-webauthn-3/none/webauthn.json", sha256 = "77aaae4543793ec3871cd019a8e4deecc6ef190d2b449b6c47c4fc75adbe1775", cases = 8 },
+  { path = "w3c-webauthn-3/exam-spike/assertion-none-es256.json", sha256 = "77aaae4543793ec3871cd019a8e4deecc6ef190d2b449b6c47c4fc75adbe1775", cases = 8 },
+]
+
+[source."w3c-webauthn-3"]
+url = "https://www.w3.org/TR/webauthn-3/"
+revision = "https://www.w3.org/TR/2026/REC-webauthn-3-20260825/ (spec html sha256 157030c980d44a3ce4b1ec5bcfaa16790c7dfefac20709af6ed2b11c7120970b)"
+retrieved = "2026-11-24"
+licence = "W3C Software and Document License"
+feeds = ["webauthn-rp"]
+notes = "Section 16 extracted by tools/extract_webauthn3.py (reproduces byte for byte from the dated HTML). Spec states section 16 is NOT normative; every vector here is non-normative example data. 'cases' counts registration+authentication ceremony pairs (16.1 counts the root certificate as 1, prf counts 5 API examples + 3 hmac-secret examples). none.json = 16.2, 16.4, 16.5, 16.6; packed.json = 16.3 (self) and 16.7-16.12 (ES256, ES384, ES512, RS256, Ed25519, Ed448); prf.json = 16.17.1 (prf only, spec defines no other extension vectors). All 444 h'..' tokens in section 16 are present in the output. exam-spike/assertion-none-es256.json is carried from the exam spike separately (see w3c-webauthn-3-exam-spike)."
+cases = 24
+files = [
+  { path = "w3c-webauthn-3/attestation-root.json", sha256 = "47382ee037cd6269946e349ff80c5f7c25566cf7832ea8d2c641e870f592ff4e", cases = 1 },
+  { path = "w3c-webauthn-3/none.json", sha256 = "fac1f3561b92f7fa1f1418ea7fac9bd6910b7af53aa90c139c7d34e53581cc18", cases = 4 },
+  { path = "w3c-webauthn-3/packed.json", sha256 = "1b97874a9d8356be917ce2b02e0c57c743afcffc96e1d1557a9757984ad34f57", cases = 7 },
+  { path = "w3c-webauthn-3/tpm.json", sha256 = "e49dbd476d8be14fe9b0c26dffc7e7905e289b08b03591b7633f2d4166eb4a3c", cases = 1 },
+  { path = "w3c-webauthn-3/android-key.json", sha256 = "c23fd5cae8370e41efd31d87205009f9c8502d3a920e601a4286968aafb04d9b", cases = 1 },
+  { path = "w3c-webauthn-3/apple.json", sha256 = "9f21fd426343f61ae43534e3f824ecc62f11410ec68325fb16e268d834a342eb", cases = 1 },
+  { path = "w3c-webauthn-3/fido-u2f.json", sha256 = "e7fc2247a0d34865131dd7221dfe0032836b080f4e9ac68e7e52c860117afbb0", cases = 1 },
+  { path = "w3c-webauthn-3/prf.json", sha256 = "07e59c88be25b3bf687b6895c8866628d523599d1c387def97c1599d415e8879", cases = 8 },
 ]
 
