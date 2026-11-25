@@ -29,16 +29,16 @@ proptest = { version = "1.12", default-features = false, features = ["std"] }
 
 [workspace.lints.rust]
 unsafe_code = "forbid"
-missing_docs = "deny"
-unreachable_pub = "deny"
+missing_docs = "forbid"
+unreachable_pub = "forbid"
 
 [workspace.lints.clippy]
 unwrap_used = "deny"
 expect_used = "deny"
 panic = "deny"
-indexing_slicing = "deny"
-as_conversions = "deny"
-print_stdout = "deny"
-dbg_macro = "deny"
+indexing_slicing = "forbid"
+as_conversions = "forbid"
+print_stdout = "forbid"
+dbg_macro = "forbid"
 disallowed_methods = "deny"
 disallowed_types = "deny"

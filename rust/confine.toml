@@ -1,0 +1,11 @@
+# The files and members confine.sh lets past its name and lint scans; a new crate adds its entries here.
+# may name disallowed_methods or disallowed_types
+silence = ["testkit/src/store.rs", "testkit/src/fixture.rs", "base/tests/conformance.rs", "base/tests/lint_canary.rs"]
+# may name host_applied, the receipt mint
+mint = ["base/src/effect.rs", "testkit/src/store.rs", "base/tests/conformance.rs", "base/tests/lint_canary.rs"]
+# may name expose, the secret read; each is named in its crate's CONTRACT.md
+read = ["base/src/secret.rs", "base/tests/lint_canary.rs"]
+# dev-only members whose src may expect a deny-list lint with a reason
+harness = ["testkit"]
+# dev-only members outside the workspace lints, for probes that need unsafe; no other crate depends on them
+unlinted = ["wipe"]
