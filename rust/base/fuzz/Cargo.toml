@@ -18,3 +18,6 @@ path = "fuzz_targets/b64url_decode.rs"
 test = false
 doc = false
 bench = false
+
+# its own workspace: the root lists base as a member, and a member path covers its subdirectories
+[workspace]

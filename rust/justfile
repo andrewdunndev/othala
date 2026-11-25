@@ -3,7 +3,7 @@ set shell := ["bash", "-euo", "pipefail", "-c"]
 default:
     @just --list
 
-all: lock fmt lint confine twins test doc wasm thumb msrv deny api mutants rows
+all: lock fmt lint confine twins test doc wasm thumb msrv deny deps api mutants rows
 
 # a manifest change without its lock change fails here, before anything builds
 lock:
@@ -45,11 +45,22 @@ twins:
         [ "$lines" = 2 ] && [ "$toks" = 2 ] || { echo "$f: $lines lines and $toks tokens differ from its twin"; exit 1; }
     done
 
-# skips and test args live in .cargo/mutants.toml; testkit's mutants are caught by the workspace's tests
+# the mutants each package yields after .cargo/mutants.toml's skips; raise them as code grows
+base_floor := "136"
+testkit_floor := "109"
+
+# skips and test args live in .cargo/mutants.toml; testkit's mutants are caught by the workspace's tests;
+# each run must reach its floor of mutants with none missed or timed out, so a filter that empties it fails
 mutants:
+    #!/usr/bin/env bash
+    set -euo pipefail
     mkdir -p target/mutants/base target/mutants/testkit
     cargo mutants --package base --test-package base,wipe --no-shuffle --output target/mutants/base
     cargo mutants --package testkit --test-workspace=true --no-shuffle --output target/mutants/testkit
+    for c in base:{{base_floor}} testkit:{{testkit_floor}}; do
+        jq -e --argjson floor "${c#*:}" '.total_mutants >= $floor and .missed == 0 and .timeout == 0' \
+            "target/mutants/${c%:*}/mutants.out/outcomes.json" > /dev/null || { echo "mutants ${c%:*}: under the floor of ${c#*:}, or missed or timed out"; exit 1; }
+    done
 
 wasm:
     cargo build -p base --target wasm32-unknown-unknown --no-default-features
@@ -64,6 +75,14 @@ msrv:
 
 deny:
     cargo deny check advisories bans licenses sources
+
+# each member's direct runtime dependencies, every feature on, are the ones deps.txt lists for it
+deps:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    for c in $(cargo metadata --locked --no-deps --format-version 1 | jq -r '.packages[].name' | sort); do
+        cargo tree --locked -p "$c" -e normal --all-features --depth 1 --prefix none --format '{p}' | tail -n +2 | cut -d' ' -f1 | sed "s/^/$c /"
+    done | sort -u | diff deps.txt -
 
 # public-API snapshot over rustdoc JSON (cargo-public-api needs openssl, absent on the build host)
 api nightly="nightly-2026-11-24":
@@ -91,8 +110,11 @@ rows:
     for c in base testkit; do
         o=target/mutants/$c/mutants.out/outcomes.json
         if [ -f "$o" ]; then
-            jq -r --arg c "$c" --arg skipped "$(grep -cE '^  "' .cargo/mutants.toml)" \
-                '"mutants \($c): \(.caught) caught, \(.missed) missed, \(.timeout) timed out, \(.unviable) unviable; \($skipped) skipped workspace-wide"' "$o"
+            # skipped: the mutants the config's filters remove, however they are written
+            all=$(cargo mutants --list --no-config --package "$c" | wc -l)
+            kept=$(cargo mutants --list --package "$c" | wc -l)
+            jq -r --arg c "$c" --arg skipped "$((all - kept))" \
+                '"mutants \($c): \(.caught) caught, \(.missed) missed, \(.timeout) timed out, \(.unviable) unviable of \(.total_mutants); \($skipped) skipped by .cargo/mutants.toml"' "$o"
         else
             echo "mutants $c: not run (just mutants)"
         fi

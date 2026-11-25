@@ -16,21 +16,15 @@ unknown-git = "deny"
 [bans]
 multiple-versions = "deny"
 wildcards = "deny"
+# this workspace's graph only; each lane adds its own crates as they land
 allow = [
-  { name = "block-buffer" }, { name = "cfg-if" }, { name = "const-oid" }, { name = "cpufeatures" }, { name = "crypto-common" },
-  { name = "digest" }, { name = "hybrid-array" }, { name = "itoa" }, { name = "libc" }, { name = "memchr" },
-  { name = "serde_core" }, { name = "serde_json" }, { name = "sha2" }, { name = "typenum" }, { name = "zmij" },
-  { name = "serde" }, { name = "serde_derive" }, { name = "syn" }, { name = "quote" }, { name = "proc-macro2" }, { name = "unicode-ident" },
-  { name = "autocfg" }, { name = "base16ct" }, { name = "cmov" }, { name = "cpubits" }, { name = "crypto-bigint" }, { name = "ctutils" },
-  { name = "der" }, { name = "ecdsa" }, { name = "elliptic-curve" }, { name = "ff" }, { name = "group" }, { name = "hmac" },
-  { name = "num-traits" }, { name = "p256" }, { name = "primefield" }, { name = "primeorder" }, { name = "rand_core" }, { name = "rfc6979" },
-  { name = "sec1" }, { name = "signature" }, { name = "subtle" }, { name = "wnaf" }, { name = "zeroize" },
-  { name = "crypto-primes" }, { name = "rsa" },
-  { name = "argon2" }, { name = "base64ct" }, { name = "blake2" }, { name = "password-hash" }, { name = "phc" }, { name = "sha1" },
-  { name = "jose" }, { name = "othala-core" },
-  { name = "base" }, { name = "testkit" }, { name = "rand_chacha" }, { name = "ppv-lite86" }, { name = "zerocopy" },
-  { name = "proptest" }, { name = "rand" }, { name = "chacha20" }, { name = "core_detect" }, { name = "getrandom" }, { name = "bitflags" },
-  { name = "rand_xorshift" }, { name = "regex-syntax" }, { name = "unarray" },
-  { name = "trybuild" }, { name = "glob" }, { name = "serde_spanned" }, { name = "target-triple" }, { name = "termcolor" }, { name = "toml" },
-  { name = "toml_datetime" }, { name = "toml_parser" }, { name = "toml_writer" }, { name = "winnow" },
+  { name = "block-buffer" }, { name = "cfg-if" }, { name = "cpufeatures" }, { name = "crypto-common" }, { name = "digest" }, { name = "hybrid-array" },
+  { name = "itoa" }, { name = "libc" }, { name = "memchr" }, { name = "serde_core" }, { name = "serde_json" }, { name = "sha2" },
+  { name = "typenum" }, { name = "zmij" }, { name = "serde" }, { name = "serde_derive" }, { name = "syn" }, { name = "quote" },
+  { name = "proc-macro2" }, { name = "unicode-ident" }, { name = "autocfg" }, { name = "num-traits" }, { name = "rand_core" }, { name = "subtle" },
+  { name = "zeroize" }, { name = "base64ct" }, { name = "base" }, { name = "testkit" }, { name = "rand_chacha" }, { name = "ppv-lite86" },
+  { name = "zerocopy" }, { name = "proptest" }, { name = "rand" }, { name = "chacha20" }, { name = "core_detect" }, { name = "getrandom" },
+  { name = "bitflags" }, { name = "rand_xorshift" }, { name = "regex-syntax" }, { name = "unarray" }, { name = "trybuild" }, { name = "glob" },
+  { name = "serde_spanned" }, { name = "target-triple" }, { name = "termcolor" }, { name = "toml" }, { name = "toml_datetime" }, { name = "toml_parser" },
+  { name = "toml_writer" }, { name = "winnow" }, { name = "wipe" },
 ]
