@@ -225,3 +225,32 @@ files = [
   { path = "rfc8037/appendix-a.json", sha256 = "2b07fba6ce6ec8e2753e7abd4c995364d67f1536ddf4f14247c74ed830a59253", cases = 7 },
 ]
 
+[source."android-key-attestation"]
+url = "https://github.com/google/android-key-attestation"
+revision = "f9846cd019289f1788cec65b062d9f81c0c4884c"
+retrieved = "2026-11-24"
+licence = "Apache-2.0"
+feeds = ["webauthn-rp"]
+notes = "Upstream src/test/resources/der (4 certificate chains of 4 certs: EC and RSA keys, TEE and StrongBox security levels, leaf cert0 first) and status.json (revocation list sample), unmodified; LICENSE copied from upstream. Upstream repo is deprecated (successor android/keyattestation). Android Keystore attestation certificates are the format carried in a WebAuthn android-key attestation statement x5c. Fills the android-key real-chain gap of the real-authenticator corpus; cases counts chains."
+cases = 4
+files = [
+  { path = "android-key-attestation/der/algorithm_EC_SecurityLevel_StrongBox/cert0.der", sha256 = "2cf480dd57886f787a6afd50ba73536c45ba06784fdfd0443b52466374dc6564", cases = 1 },
+  { path = "android-key-attestation/der/algorithm_EC_SecurityLevel_StrongBox/cert1.der", sha256 = "2a218be3031cb1929f3250f70233035cf9f2185ecc3589d957ad7784b53a8293", cases = 0 },
+  { path = "android-key-attestation/der/algorithm_EC_SecurityLevel_StrongBox/cert2.der", sha256 = "f5fc2653a2ee1c26f334bc0ad8f00519adb9f24321b77983df8ac5cec9ee57fe", cases = 0 },
+  { path = "android-key-attestation/der/algorithm_EC_SecurityLevel_StrongBox/cert3.der", sha256 = "19de1c3e1da7e06f3c2712301342c17941b1ec90ba5ee396a8ec2ee4f46dfad2", cases = 0 },
+  { path = "android-key-attestation/der/algorithm_EC_SecurityLevel_TEE/cert0.der", sha256 = "bf0d7c4e16403bab1e04d76e5880315369786dcdae4e452ee32f986df0e95b32", cases = 1 },
+  { path = "android-key-attestation/der/algorithm_EC_SecurityLevel_TEE/cert1.der", sha256 = "e537905ef02c970052ff5b7a333294d25df41154457a89cd880bc603768e3579", cases = 0 },
+  { path = "android-key-attestation/der/algorithm_EC_SecurityLevel_TEE/cert2.der", sha256 = "230f39bfd49ea76a8aab2ee9e2cb7176bd4125eca640828930a27fa5c27033e1", cases = 0 },
+  { path = "android-key-attestation/der/algorithm_EC_SecurityLevel_TEE/cert3.der", sha256 = "c1984a3ef45c1e2a918551de10603c86f7051b2249c4891cae3230eabd0c97d5", cases = 0 },
+  { path = "android-key-attestation/der/algorithm_RSA_SecurityLevel_StrongBox/cert0.der", sha256 = "921a60369b004bbbace9ee0c6ba2da0122dc9a06d25769f8a5be1db51e5f31cc", cases = 1 },
+  { path = "android-key-attestation/der/algorithm_RSA_SecurityLevel_StrongBox/cert1.der", sha256 = "611d1850bdb1d0583e90de50af0e9dbc30c73d28d54cfcf11d49db508969884d", cases = 0 },
+  { path = "android-key-attestation/der/algorithm_RSA_SecurityLevel_StrongBox/cert2.der", sha256 = "08b1507c570cd4f96f4945ab75f2191ab009659b8c2a895aed144aa1c57c64e9", cases = 0 },
+  { path = "android-key-attestation/der/algorithm_RSA_SecurityLevel_StrongBox/cert3.der", sha256 = "19de1c3e1da7e06f3c2712301342c17941b1ec90ba5ee396a8ec2ee4f46dfad2", cases = 0 },
+  { path = "android-key-attestation/der/algorithm_RSA_SecurityLevel_TEE/cert0.der", sha256 = "b792aa1e7b486818cfc4a0127007a6e1ba9e1883895d4d1d7847daf10cc3cdae", cases = 1 },
+  { path = "android-key-attestation/der/algorithm_RSA_SecurityLevel_TEE/cert1.der", sha256 = "f4f14459547ff436726b86087cf7741f21d567ac180efb7ad9dd937dd1cf8ad4", cases = 0 },
+  { path = "android-key-attestation/der/algorithm_RSA_SecurityLevel_TEE/cert2.der", sha256 = "df23a0037fc77a561b196cff1efe2e71e54818a1d6f15d86bc068b3739a239d3", cases = 0 },
+  { path = "android-key-attestation/der/algorithm_RSA_SecurityLevel_TEE/cert3.der", sha256 = "c1984a3ef45c1e2a918551de10603c86f7051b2249c4891cae3230eabd0c97d5", cases = 0 },
+  { path = "android-key-attestation/LICENSE", sha256 = "73ba74dfaa520b49a401b5d21459a8523a146f3b7518a833eea5efa85130bf68", cases = 0 },
+  { path = "android-key-attestation/status.json", sha256 = "6b204883d3ae63b42605552e20eddb1e1c4178f73b4a4fced40542c0d7c62211", cases = 0 },
+]
+
