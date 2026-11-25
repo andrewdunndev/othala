@@ -29,3 +29,25 @@ impl<R: rand_core::CryptoRng> Entropy for RandCore<R> {
         self.0.fill_bytes(out);
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::Entropy;
+
+    struct Ones;
+
+    impl Entropy for Ones {
+        fn fill(&mut self, out: &mut [u8]) {
+            out.fill(1);
+        }
+    }
+
+    #[test]
+    fn a_borrowed_source_fills() {
+        let mut out = [0u8; 2];
+        let mut source = Ones;
+        let mut borrowed: &mut dyn Entropy = &mut source;
+        Entropy::fill(&mut borrowed, &mut out);
+        assert_eq!(out, [1, 1]);
+    }
+}

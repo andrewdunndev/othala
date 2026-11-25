@@ -27,6 +27,7 @@ ledger:
 twins:
     @for f in base/tests/ui/fail/*.rs; do t=base/tests/ui/pass/${f##*/}; [ -f "${f%.rs}.stderr" ] || { echo "$f: no .stderr"; exit 1; }; n=$(diff "$f" "$t" | grep -c '^<' || true); [ "$n" = 1 ] || { echo "$f: $n lines differ from its twin"; exit 1; }; done
 
+# skips and test args live in .cargo/mutants.toml
 mutants:
     cargo mutants --package base --test-workspace=false --no-shuffle
 
@@ -51,10 +52,10 @@ api:
 fuzz seconds="600":
     cd base/fuzz && cargo +nightly fuzz run b64url_decode corpus/b64url_decode -- -max_total_time={{seconds}}
 
-# rule 5.1 numbers for base
+# rule 5.1 numbers for base (production: src/ above each test module)
 rows:
-    @echo "production lines: $(cat base/src/*.rs | wc -l)"
-    @echo "test lines: $(cat $(grep -rlE '#\[(test|cfg\(test\))\]|proptest!' base/src) base/tests/*.rs base/tests/ui/*/*.rs testkit/src/*.rs | wc -l) (src test modules counted whole)"
+    @echo "production lines: $(awk '/^#\[cfg\(test\)\]/{nextfile} {n++} END{print n}' base/src/*.rs)"
+    @echo "test lines: $(( $(awk '/^#\[cfg\(test\)\]/{t=1} t{n++} END{print n}' base/src/*.rs) + $(cat base/tests/*.rs base/fuzz/property.rs base/fuzz/fuzz_targets/*.rs | wc -l) )) (+ $(cat base/tests/ui/*/*.rs | wc -l) ledger case lines, testkit $(cat testkit/src/*.rs | wc -l))"
     @echo "contract lines: $(grep -cE '^- [TROBN][0-9]+ ' base/CONTRACT.md)"
-    @echo "vector cases: $(grep -A3 '^\[source."rfc4648"\]' vectors/SOURCES.toml >/dev/null; grep -oE 'rfc4648/test-vectors.json.*cases = [0-9]+' vectors/SOURCES.toml | grep -oE '[0-9]+$')"
-    @echo "public items: $(grep -cE '^pub ' base/public-api.txt 2>/dev/null || echo 'n/a (just api)')"
+    @echo "vector cases: $(grep -oE 'rfc4648/test-vectors.json.*cases = [0-9]+' vectors/SOURCES.toml | grep -oE '[0-9]+$') (RFC 4648 section 10; BASE64 ones checked)"
+    @echo "public items: $(grep -cE '^pub ' base/public-api.txt 2>/dev/null || echo 'n/a: run just api')"

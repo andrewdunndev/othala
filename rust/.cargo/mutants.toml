@@ -1,0 +1,11 @@
+# Every skip carries its reason and is counted on the scoreboard.
+exclude_re = [
+  # N1: zeroize on drop is a stated non-claim; no test observes freed memory.
+  "impl Drop for Secret",
+  "impl Drop for SecretBytes",
+  # equivalent: each | joins bit fields that cannot overlap, so ^ computes the same byte
+  "b64url.rs:.*: replace \\| with \\^ in b64url_(en|de)code",
+]
+additional_cargo_args = ["--all-features"]
+# the trybuild ledger proves signatures, which mutants do not change
+additional_cargo_test_args = ["--", "--skip", "ledger"]

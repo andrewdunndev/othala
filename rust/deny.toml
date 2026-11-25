@@ -28,4 +28,9 @@ allow = [
   { name = "crypto-primes" }, { name = "rsa" },
   { name = "argon2" }, { name = "base64ct" }, { name = "blake2" }, { name = "password-hash" }, { name = "phc" }, { name = "sha1" },
   { name = "wire" }, { name = "jose" }, { name = "authn" }, { name = "othala-core" }, { name = "surface" }, { name = "host" }, { name = "vectors" },
+  { name = "base" }, { name = "testkit" }, { name = "rand_chacha" }, { name = "ppv-lite86" }, { name = "zerocopy" },
+  { name = "proptest" }, { name = "rand" }, { name = "chacha20" }, { name = "core_detect" }, { name = "getrandom" }, { name = "bitflags" },
+  { name = "rand_xorshift" }, { name = "regex-syntax" }, { name = "unarray" },
+  { name = "trybuild" }, { name = "glob" }, { name = "serde_spanned" }, { name = "target-triple" }, { name = "termcolor" }, { name = "toml" },
+  { name = "toml_datetime" }, { name = "toml_parser" }, { name = "toml_writer" }, { name = "winnow" },
 ]
