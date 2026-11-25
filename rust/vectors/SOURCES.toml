@@ -1,0 +1,39 @@
+# Provenance for every committed vector file.
+# Our own files (this file, tools/): MIT OR Apache-2.0. Third-party files keep the licence recorded per source.
+# `cases` counts test cases as the file itself states them (numberOfTests for Wycheproof).
+# `feeds` names the crates/contract areas: base, jose, webauthn-rp, oidc-provider, factor.
+
+[source."wycheproof"]
+url = "https://github.com/C2SP/wycheproof"
+revision = "65ca494727a52944c204441c860b039e6786b99b"
+retrieved = "2026-11-24"
+licence = "Apache-2.0"
+feeds = ["jose"]
+notes = "Upstream testvectors_v1 files, unmodified. ECDSA P-256 and P-384 (DER and P1363), Ed25519, RSA PKCS#1 v1.5 2048/3072/4096 x SHA-256/384/512, RSA-PSS (JOSE shape: MGF1 hash = signing hash, salt = hash length) 2048/3072/4096 for the combinations upstream publishes, HMAC-SHA256/384/512. Upstream has no RSA-PSS 2048 SHA-512, 3072 SHA-384 or 3072 SHA-512 files in this shape. P-256 files carried across from the exam spike (byte-identical to upstream at this sha)."
+cases = 5377
+files = [
+  { path = "wycheproof/ecdsa_secp256r1_sha256_p1363_test.json", sha256 = "c60de693930e386c3a5472d08081623ef8504decc54b38ac01ec6b2a2575c986", cases = 262 },
+  { path = "wycheproof/ecdsa_secp256r1_sha256_test.json", sha256 = "182db4f3e230f6f9fa9f800d2a614dede30284b8e8438bbfe1171905402e9332", cases = 484 },
+  { path = "wycheproof/ecdsa_secp384r1_sha384_p1363_test.json", sha256 = "e27344bf6daae75fa19663620883809f91c79fc4b4420eff9eae8036b34476be", cases = 280 },
+  { path = "wycheproof/ecdsa_secp384r1_sha384_test.json", sha256 = "8a5b3ae1760975143414811f13588c24d951d9d8c904195087ba327591dfe9cc", cases = 504 },
+  { path = "wycheproof/ed25519_test.json", sha256 = "ea80ffebac085e21cb9d3e903e7fa2b448d96702da5b31f061d0b83b430b74b3", cases = 210 },
+  { path = "wycheproof/hmac_sha256_test.json", sha256 = "2d201cfa61d1bf95e6f5d07d96634b4a348b31e8eaa277ad7c8d09677b7a743f", cases = 174 },
+  { path = "wycheproof/hmac_sha384_test.json", sha256 = "28b9776e979dd755d852ca471043ea6cedce8b15f7a28abdf6ea9efd982b43c0", cases = 174 },
+  { path = "wycheproof/hmac_sha512_test.json", sha256 = "b6c90477bdb4a6fc8ee3d1f7b2c0b69a8dfffab34718abaa6cabd71cc2ba1207", cases = 174 },
+  { path = "wycheproof/rsa_pss_2048_sha256_mgf1_32_test.json", sha256 = "7f6efafc160f4816b96cbf1c12188a31051d7e3f001e27505d9edb5f2a0e325c", cases = 108 },
+  { path = "wycheproof/rsa_pss_2048_sha384_mgf1_48_test.json", sha256 = "66d464778b0b2f683a1d1a20e94f77e9472b8cc393b45f423fa08a48e677063c", cases = 141 },
+  { path = "wycheproof/rsa_pss_3072_sha256_mgf1_32_test.json", sha256 = "cca48433e6d1accb57f65b3396c4f4dd93c776467101c3f0948e74c283fd4749", cases = 108 },
+  { path = "wycheproof/rsa_pss_4096_sha256_mgf1_32_test.json", sha256 = "e627cbf5139a01e0a446c4fe15911f6268224fdd3ef4a1eb714b3942b5686410", cases = 108 },
+  { path = "wycheproof/rsa_pss_4096_sha384_mgf1_48_test.json", sha256 = "d632649a7630f7c267eda576714ca11cf0ff068d6622f576b8701f923c112577", cases = 141 },
+  { path = "wycheproof/rsa_pss_4096_sha512_mgf1_64_test.json", sha256 = "c93ceaa56a190c9fd4707441c5c6a75839f108202d88aec891697f9623042547", cases = 179 },
+  { path = "wycheproof/rsa_signature_2048_sha256_test.json", sha256 = "94a917b01ff50fb874cfc05bf29b4af44868d944a6558201cf18380da93fb393", cases = 259 },
+  { path = "wycheproof/rsa_signature_2048_sha384_test.json", sha256 = "c571c105d261c0ff588a2888a529f152563fb3b77894b7620d4e4f8f934f2c1d", cases = 258 },
+  { path = "wycheproof/rsa_signature_2048_sha512_test.json", sha256 = "16ea24b039905d054bdb6004f5fd179374e150b7b6d73a7ba654b6d00eab12ef", cases = 259 },
+  { path = "wycheproof/rsa_signature_3072_sha256_test.json", sha256 = "0f5f18cabfaad3e2792e82f7e9882f8999049b456714de924b8a5e202f61ca43", cases = 259 },
+  { path = "wycheproof/rsa_signature_3072_sha384_test.json", sha256 = "73499ee649d8fb703b3f0f455fa36f7682fde677c590a736958ebce05ab27dae", cases = 259 },
+  { path = "wycheproof/rsa_signature_3072_sha512_test.json", sha256 = "09aa3336fdb7be216180ce944ca7b2a052e1de38c210435c19506327d4a36ebd", cases = 260 },
+  { path = "wycheproof/rsa_signature_4096_sha256_test.json", sha256 = "957aca128e30bd02c8982f8ca482d6521d16683f4bbc3f193cdfd4c8f04bc667", cases = 258 },
+  { path = "wycheproof/rsa_signature_4096_sha384_test.json", sha256 = "bc26f16b9fc9a90628864d3d1111ef48a4bd00b9d4870bfab88ff326e309e073", cases = 259 },
+  { path = "wycheproof/rsa_signature_4096_sha512_test.json", sha256 = "9d6e67b1eb0d7040db411835238efd20e9302399a258bdff82de3f38e0f2855a", cases = 259 },
+]
+
