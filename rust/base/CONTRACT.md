@@ -26,7 +26,7 @@ Checks: `ui:x` is `tests/ui/fail/x.rs` with its committed `.stderr` (rustc code 
 - R4 A symbol outside the alphabet (`+`, `/`, space, non-ASCII) is `Malformed`: unit:b64url::foreign_symbol_is_malformed, mutants:b64url.
 - R5 A length of 1 mod 4 is `Malformed`: unit:b64url::lone_symbol_is_malformed, mutants:b64url.
 - R6 A non-canonical tail (nonzero trailing bits) is `Malformed`, so decoding is injective: of all 64 final symbols a 2-symbol tail accepts exactly `A Q g w` and a 3-symbol tail exactly the 16 with two zero low bits: unit:b64url::noncanonical_tail_is_malformed, mutants:b64url.
-- R7 Whatever decodes re-encodes to the same text: it:corpus::b64url_decode_corpus (22 committed seeds of `fuzz/fuzz_targets/b64url_decode.rs`, non-canonical tails `Zo` and `ZmC` among them), `just fuzz` in scheduled CI.
+- R7 Whatever decodes re-encodes to the same text: it:corpus::b64url_decode_corpus (21 committed seeds of `fuzz/fuzz_targets/b64url_decode.rs`, non-canonical tails `Zo` and `ZmC` among them), `just fuzz` in scheduled CI.
 - R8 `Debug` of `Secret<N>` and `SecretBytes` prints no secret byte, and of `Pending` only its effect id: it:golden::debug_redacts against `tests/golden/debug.txt`, unit:effect::pending_debug_shows_only_the_effect_id.
 - R9 `generate` draws exactly `N` bytes from `Entropy`: unit:secret::generate_draws_n_bytes, mutants:secret.
 - R10 `ct_eq` is true only when every byte and the length match: unit:secret::ct_eq_compares_every_byte, mutants:secret.
