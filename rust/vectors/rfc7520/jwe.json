@@ -1,0 +1,1671 @@
+{
+ "figures": [
+  {
+   "figure": 72,
+   "caption": "Plaintext Content",
+   "section": "5",
+   "example": "5",
+   "text": "\"You can trust us to stick with you through thick and \"\n\"thin\\xe2\\x80\\x93to the bitter end. And you can trust us to \"\n\"keep any secret of yours\\xe2\\x80\\x93closer than you keep it \"\n\"yourself. But you cannot trust us to let you face trouble \"\n\"alone, and go off without a word. We are your friends, Frodo.\"",
+   "joined": "\"Youcantrustustostickwithyouthroughthickand\"\"thin\\xe2\\x80\\x93tothebitterend.Andyoucantrustusto\"\"keepanysecretofyours\\xe2\\x80\\x93closerthanyoukeepit\"\"yourself.Butyoucannottrustustoletyoufacetrouble\"\"alone,andgooffwithoutaword.Weareyourfriends,Frodo.\""
+  },
+  {
+   "figure": 73,
+   "caption": "RSA 2048-Bit Key, in JWK Format",
+   "section": "5.1.1",
+   "example": "5.1",
+   "text": "{\n  \"kty\": \"RSA\",\n  \"kid\": \"frodo.baggins@hobbiton.example\",\n  \"use\": \"enc\",\n  \"n\": \"maxhbsmBtdQ3CNrKvprUE6n9lYcregDMLYNeTAWcLj8NnPU9XIYegT\n      HVHQjxKDSHP2l-F5jS7sppG1wgdAqZyhnWvXhYNvcM7RfgKxqNx_xAHx\n      6f3yy7s-M9PSNCwPC2lh6UAkR4I00EhV9lrypM9Pi4lBUop9t5fS9W5U\n      NwaAllhrd-osQGPjIeI1deHTwx-ZTHu3C60Pu_LJIl6hKn9wbwaUmA4c\n      R5Bd2pgbaY7ASgsjCUbtYJaNIHSoHXprUdJZKUMAzV0WOKPfA6OPI4oy\n      pBadjvMZ4ZAj3BnXaSYsEZhaueTXvZB4eZOAjIyh2e_VOIKVMsnDrJYA\n      VotGlvMQ\",\n  \"e\": \"AQAB\",\n  \"d\": \"Kn9tgoHfiTVi8uPu5b9TnwyHwG5dK6RE0uFdlpCGnJN7ZEi963R7wy\n      bQ1PLAHmpIbNTztfrheoAniRV1NCIqXaW_qS461xiDTp4ntEPnqcKsyO\n      5jMAji7-CL8vhpYYowNFvIesgMoVaPRYMYT9TW63hNM0aWs7USZ_hLg6\n      Oe1mY0vHTI3FucjSM86Nff4oIENt43r2fspgEPGRrdE6fpLc9Oaq-qeP\n      1GFULimrRdndm-P8q8kvN3KHlNAtEgrQAgTTgz80S-3VD0FgWfgnb1PN\n      miuPUxO8OpI9KDIfu_acc6fg14nsNaJqXe6RESvhGPH2afjHqSy_Fd2v\n      pzj85bQQ\",\n  \"p\": \"2DwQmZ43FoTnQ8IkUj3BmKRf5Eh2mizZA5xEJ2MinUE3sdTYKSLtaE\n      oekX9vbBZuWxHdVhM6UnKCJ_2iNk8Z0ayLYHL0_G21aXf9-unynEpUsH\n      7HHTklLpYAzOOx1ZgVljoxAdWNn3hiEFrjZLZGS7lOH-a3QQlDDQoJOJ\n      2VFmU\",\n  \"q\": \"te8LY4-W7IyaqH1ExujjMqkTAlTeRbv0VLQnfLY2xINnrWdwiQ93_V\n      F099aP1ESeLja2nw-6iKIe-qT7mtCPozKfVtUYfz5HrJ_XY2kfexJINb\n      9lhZHMv5p1skZpeIS-GPHCC6gRlKo1q-idn_qxyusfWv7WAxlSVfQfk8\n      d6Et0\",\n  \"dp\": \"UfYKcL_or492vVc0PzwLSplbg4L3-Z5wL48mwiswbpzOyIgd2xHTH\n      QmjJpFAIZ8q-zf9RmgJXkDrFs9rkdxPtAsL1WYdeCT5c125Fkdg317JV\n      RDo1inX7x2Kdh8ERCreW8_4zXItuTl_KiXZNU5lvMQjWbIw2eTx1lpsf\n      lo0rYU\",\n  \"dq\": \"iEgcO-QfpepdH8FWd7mUFyrXdnOkXJBCogChY6YKuIHGc_p8Le9Mb\n      pFKESzEaLlN1Ehf3B6oGBl5Iz_ayUlZj2IoQZ82znoUrpa9fVYNot87A\n      CfzIG7q9Mv7RiPAderZi03tkVXAdaBau_9vs5rS-7HMtxkVrxSUvJY14\n      TkXlHE\",\n  \"qi\": \"kC-lzZOqoFaZCr5l0tOVtREKoVqaAYhQiqIRGL-MzS4sCmRkxm5vZ\n      lXYx6RtE1n_AagjqajlkjieGlxTTThHD8Iga6foGBMaAr5uR1hGQpSc7\n      Gl7CF1DZkBJMTQN6EshYzZfxW08mIO8M6Rzuh0beL6fG9mkDcIyPrBXx\n      2bQ_mM\"\n}",
+   "joined": "{\"kty\":\"RSA\",\"kid\":\"frodo.baggins@hobbiton.example\",\"use\":\"enc\",\"n\":\"maxhbsmBtdQ3CNrKvprUE6n9lYcregDMLYNeTAWcLj8NnPU9XIYegTHVHQjxKDSHP2l-F5jS7sppG1wgdAqZyhnWvXhYNvcM7RfgKxqNx_xAHx6f3yy7s-M9PSNCwPC2lh6UAkR4I00EhV9lrypM9Pi4lBUop9t5fS9W5UNwaAllhrd-osQGPjIeI1deHTwx-ZTHu3C60Pu_LJIl6hKn9wbwaUmA4cR5Bd2pgbaY7ASgsjCUbtYJaNIHSoHXprUdJZKUMAzV0WOKPfA6OPI4oypBadjvMZ4ZAj3BnXaSYsEZhaueTXvZB4eZOAjIyh2e_VOIKVMsnDrJYAVotGlvMQ\",\"e\":\"AQAB\",\"d\":\"Kn9tgoHfiTVi8uPu5b9TnwyHwG5dK6RE0uFdlpCGnJN7ZEi963R7wybQ1PLAHmpIbNTztfrheoAniRV1NCIqXaW_qS461xiDTp4ntEPnqcKsyO5jMAji7-CL8vhpYYowNFvIesgMoVaPRYMYT9TW63hNM0aWs7USZ_hLg6Oe1mY0vHTI3FucjSM86Nff4oIENt43r2fspgEPGRrdE6fpLc9Oaq-qeP1GFULimrRdndm-P8q8kvN3KHlNAtEgrQAgTTgz80S-3VD0FgWfgnb1PNmiuPUxO8OpI9KDIfu_acc6fg14nsNaJqXe6RESvhGPH2afjHqSy_Fd2vpzj85bQQ\",\"p\":\"2DwQmZ43FoTnQ8IkUj3BmKRf5Eh2mizZA5xEJ2MinUE3sdTYKSLtaEoekX9vbBZuWxHdVhM6UnKCJ_2iNk8Z0ayLYHL0_G21aXf9-unynEpUsH7HHTklLpYAzOOx1ZgVljoxAdWNn3hiEFrjZLZGS7lOH-a3QQlDDQoJOJ2VFmU\",\"q\":\"te8LY4-W7IyaqH1ExujjMqkTAlTeRbv0VLQnfLY2xINnrWdwiQ93_VF099aP1ESeLja2nw-6iKIe-qT7mtCPozKfVtUYfz5HrJ_XY2kfexJINb9lhZHMv5p1skZpeIS-GPHCC6gRlKo1q-idn_qxyusfWv7WAxlSVfQfk8d6Et0\",\"dp\":\"UfYKcL_or492vVc0PzwLSplbg4L3-Z5wL48mwiswbpzOyIgd2xHTHQmjJpFAIZ8q-zf9RmgJXkDrFs9rkdxPtAsL1WYdeCT5c125Fkdg317JVRDo1inX7x2Kdh8ERCreW8_4zXItuTl_KiXZNU5lvMQjWbIw2eTx1lpsflo0rYU\",\"dq\":\"iEgcO-QfpepdH8FWd7mUFyrXdnOkXJBCogChY6YKuIHGc_p8Le9MbpFKESzEaLlN1Ehf3B6oGBl5Iz_ayUlZj2IoQZ82znoUrpa9fVYNot87ACfzIG7q9Mv7RiPAderZi03tkVXAdaBau_9vs5rS-7HMtxkVrxSUvJY14TkXlHE\",\"qi\":\"kC-lzZOqoFaZCr5l0tOVtREKoVqaAYhQiqIRGL-MzS4sCmRkxm5vZlXYx6RtE1n_AagjqajlkjieGlxTTThHD8Iga6foGBMaAr5uR1hGQpSc7Gl7CF1DZkBJMTQN6EshYzZfxW08mIO8M6Rzuh0beL6fG9mkDcIyPrBXx2bQ_mM\"}",
+   "json": {
+    "kty": "RSA",
+    "kid": "frodo.baggins@hobbiton.example",
+    "use": "enc",
+    "n": "maxhbsmBtdQ3CNrKvprUE6n9lYcregDMLYNeTAWcLj8NnPU9XIYegTHVHQjxKDSHP2l-F5jS7sppG1wgdAqZyhnWvXhYNvcM7RfgKxqNx_xAHx6f3yy7s-M9PSNCwPC2lh6UAkR4I00EhV9lrypM9Pi4lBUop9t5fS9W5UNwaAllhrd-osQGPjIeI1deHTwx-ZTHu3C60Pu_LJIl6hKn9wbwaUmA4cR5Bd2pgbaY7ASgsjCUbtYJaNIHSoHXprUdJZKUMAzV0WOKPfA6OPI4oypBadjvMZ4ZAj3BnXaSYsEZhaueTXvZB4eZOAjIyh2e_VOIKVMsnDrJYAVotGlvMQ",
+    "e": "AQAB",
+    "d": "Kn9tgoHfiTVi8uPu5b9TnwyHwG5dK6RE0uFdlpCGnJN7ZEi963R7wybQ1PLAHmpIbNTztfrheoAniRV1NCIqXaW_qS461xiDTp4ntEPnqcKsyO5jMAji7-CL8vhpYYowNFvIesgMoVaPRYMYT9TW63hNM0aWs7USZ_hLg6Oe1mY0vHTI3FucjSM86Nff4oIENt43r2fspgEPGRrdE6fpLc9Oaq-qeP1GFULimrRdndm-P8q8kvN3KHlNAtEgrQAgTTgz80S-3VD0FgWfgnb1PNmiuPUxO8OpI9KDIfu_acc6fg14nsNaJqXe6RESvhGPH2afjHqSy_Fd2vpzj85bQQ",
+    "p": "2DwQmZ43FoTnQ8IkUj3BmKRf5Eh2mizZA5xEJ2MinUE3sdTYKSLtaEoekX9vbBZuWxHdVhM6UnKCJ_2iNk8Z0ayLYHL0_G21aXf9-unynEpUsH7HHTklLpYAzOOx1ZgVljoxAdWNn3hiEFrjZLZGS7lOH-a3QQlDDQoJOJ2VFmU",
+    "q": "te8LY4-W7IyaqH1ExujjMqkTAlTeRbv0VLQnfLY2xINnrWdwiQ93_VF099aP1ESeLja2nw-6iKIe-qT7mtCPozKfVtUYfz5HrJ_XY2kfexJINb9lhZHMv5p1skZpeIS-GPHCC6gRlKo1q-idn_qxyusfWv7WAxlSVfQfk8d6Et0",
+    "dp": "UfYKcL_or492vVc0PzwLSplbg4L3-Z5wL48mwiswbpzOyIgd2xHTHQmjJpFAIZ8q-zf9RmgJXkDrFs9rkdxPtAsL1WYdeCT5c125Fkdg317JVRDo1inX7x2Kdh8ERCreW8_4zXItuTl_KiXZNU5lvMQjWbIw2eTx1lpsflo0rYU",
+    "dq": "iEgcO-QfpepdH8FWd7mUFyrXdnOkXJBCogChY6YKuIHGc_p8Le9MbpFKESzEaLlN1Ehf3B6oGBl5Iz_ayUlZj2IoQZ82znoUrpa9fVYNot87ACfzIG7q9Mv7RiPAderZi03tkVXAdaBau_9vs5rS-7HMtxkVrxSUvJY14TkXlHE",
+    "qi": "kC-lzZOqoFaZCr5l0tOVtREKoVqaAYhQiqIRGL-MzS4sCmRkxm5vZlXYx6RtE1n_AagjqajlkjieGlxTTThHD8Iga6foGBMaAr5uR1hGQpSc7Gl7CF1DZkBJMTQN6EshYzZfxW08mIO8M6Rzuh0beL6fG9mkDcIyPrBXx2bQ_mM"
+   }
+  },
+  {
+   "figure": 74,
+   "caption": "Content Encryption Key, base64url-encoded",
+   "section": "5.1.2",
+   "example": "5.1",
+   "text": "3qyTVhIWt5juqZUCpfRqpvauwB956MEJL2Rt-8qXKSo",
+   "joined": "3qyTVhIWt5juqZUCpfRqpvauwB956MEJL2Rt-8qXKSo"
+  },
+  {
+   "figure": 75,
+   "caption": "Initialization Vector, base64url-encoded",
+   "section": "5.1.2",
+   "example": "5.1",
+   "text": "bbd5sTkYwhAIqfHsx8DayA",
+   "joined": "bbd5sTkYwhAIqfHsx8DayA"
+  },
+  {
+   "figure": 76,
+   "caption": "Encrypted Key, base64url-encoded",
+   "section": "5.1.3",
+   "example": "5.1",
+   "text": "laLxI0j-nLH-_BgLOXMozKxmy9gffy2gTdvqzfTihJBuuzxg0V7yk1WClnQePF\nvG2K-pvSlWc9BRIazDrn50RcRai__3TDON395H3c62tIouJJ4XaRvYHFjZTZ2G\nXfz8YAImcc91Tfk0WXC2F5Xbb71ClQ1DDH151tlpH77f2ff7xiSxh9oSewYrcG\nTSLUeeCt36r1Kt3OSj7EyBQXoZlN7IxbyhMAfgIe7Mv1rOTOI5I8NQqeXXW8Vl\nzNmoxaGMny3YnGir5Wf6Qt2nBq4qDaPdnaAuuGUGEecelIO1wx1BpyIfgvfjOh\nMBs9M8XL223Fg47xlGsMXdfuY-4jaqVw",
+   "joined": "laLxI0j-nLH-_BgLOXMozKxmy9gffy2gTdvqzfTihJBuuzxg0V7yk1WClnQePFvG2K-pvSlWc9BRIazDrn50RcRai__3TDON395H3c62tIouJJ4XaRvYHFjZTZ2GXfz8YAImcc91Tfk0WXC2F5Xbb71ClQ1DDH151tlpH77f2ff7xiSxh9oSewYrcGTSLUeeCt36r1Kt3OSj7EyBQXoZlN7IxbyhMAfgIe7Mv1rOTOI5I8NQqeXXW8VlzNmoxaGMny3YnGir5Wf6Qt2nBq4qDaPdnaAuuGUGEecelIO1wx1BpyIfgvfjOhMBs9M8XL223Fg47xlGsMXdfuY-4jaqVw"
+  },
+  {
+   "figure": 77,
+   "caption": "JWE Protected Header JSON",
+   "section": "5.1.4",
+   "example": "5.1",
+   "text": "{\n  \"alg\": \"RSA1_5\",\n  \"kid\": \"frodo.baggins@hobbiton.example\",\n  \"enc\": \"A128CBC-HS256\"\n}",
+   "joined": "{\"alg\":\"RSA1_5\",\"kid\":\"frodo.baggins@hobbiton.example\",\"enc\":\"A128CBC-HS256\"}",
+   "json": {
+    "alg": "RSA1_5",
+    "kid": "frodo.baggins@hobbiton.example",
+    "enc": "A128CBC-HS256"
+   }
+  },
+  {
+   "figure": 78,
+   "caption": "JWE Protected Header, base64url-encoded",
+   "section": "5.1.4",
+   "example": "5.1",
+   "text": "eyJhbGciOiJSU0ExXzUiLCJraWQiOiJmcm9kby5iYWdnaW5zQGhvYmJpdG9uLm\nV4YW1wbGUiLCJlbmMiOiJBMTI4Q0JDLUhTMjU2In0",
+   "joined": "eyJhbGciOiJSU0ExXzUiLCJraWQiOiJmcm9kby5iYWdnaW5zQGhvYmJpdG9uLmV4YW1wbGUiLCJlbmMiOiJBMTI4Q0JDLUhTMjU2In0"
+  },
+  {
+   "figure": 79,
+   "caption": "Ciphertext, base64url-encoded",
+   "section": "5.1.4",
+   "example": "5.1",
+   "text": "0fys_TY_na7f8dwSfXLiYdHaA2DxUjD67ieF7fcVbIR62JhJvGZ4_FNVSiGc_r\naa0HnLQ6s1P2sv3Xzl1p1l_o5wR_RsSzrS8Z-wnI3Jvo0mkpEEnlDmZvDu_k8O\nWzJv7eZVEqiWKdyVzFhPpiyQU28GLOpRc2VbVbK4dQKPdNTjPPEmRqcaGeTWZV\nyeSUvf5k59yJZxRuSvWFf6KrNtmRdZ8R4mDOjHSrM_s8uwIFcqt4r5GX8TKaI0\nzT5CbL5Qlw3sRc7u_hg0yKVOiRytEAEs3vZkcfLkP6nbXdC_PkMdNS-ohP78T2\nO6_7uInMGhFeX4ctHG7VelHGiT93JfWDEQi5_V9UN1rhXNrYu-0fVMkZAKX3VW\ni7lzA6BP430m",
+   "joined": "0fys_TY_na7f8dwSfXLiYdHaA2DxUjD67ieF7fcVbIR62JhJvGZ4_FNVSiGc_raa0HnLQ6s1P2sv3Xzl1p1l_o5wR_RsSzrS8Z-wnI3Jvo0mkpEEnlDmZvDu_k8OWzJv7eZVEqiWKdyVzFhPpiyQU28GLOpRc2VbVbK4dQKPdNTjPPEmRqcaGeTWZVyeSUvf5k59yJZxRuSvWFf6KrNtmRdZ8R4mDOjHSrM_s8uwIFcqt4r5GX8TKaI0zT5CbL5Qlw3sRc7u_hg0yKVOiRytEAEs3vZkcfLkP6nbXdC_PkMdNS-ohP78T2O6_7uInMGhFeX4ctHG7VelHGiT93JfWDEQi5_V9UN1rhXNrYu-0fVMkZAKX3VWi7lzA6BP430m"
+  },
+  {
+   "figure": 80,
+   "caption": "Authentication Tag, base64url-encoded",
+   "section": "5.1.4",
+   "example": "5.1",
+   "text": "kvKuFBXHe5mQr4lqgobAUg",
+   "joined": "kvKuFBXHe5mQr4lqgobAUg"
+  },
+  {
+   "figure": 81,
+   "caption": "JWE Compact Serialization",
+   "section": "5.1.5",
+   "example": "5.1",
+   "text": "eyJhbGciOiJSU0ExXzUiLCJraWQiOiJmcm9kby5iYWdnaW5zQGhvYmJpdG9uLm\nV4YW1wbGUiLCJlbmMiOiJBMTI4Q0JDLUhTMjU2In0\n.\nlaLxI0j-nLH-_BgLOXMozKxmy9gffy2gTdvqzfTihJBuuzxg0V7yk1WClnQePF\nvG2K-pvSlWc9BRIazDrn50RcRai__3TDON395H3c62tIouJJ4XaRvYHFjZTZ2G\nXfz8YAImcc91Tfk0WXC2F5Xbb71ClQ1DDH151tlpH77f2ff7xiSxh9oSewYrcG\nTSLUeeCt36r1Kt3OSj7EyBQXoZlN7IxbyhMAfgIe7Mv1rOTOI5I8NQqeXXW8Vl\nzNmoxaGMny3YnGir5Wf6Qt2nBq4qDaPdnaAuuGUGEecelIO1wx1BpyIfgvfjOh\nMBs9M8XL223Fg47xlGsMXdfuY-4jaqVw\n.\nbbd5sTkYwhAIqfHsx8DayA\n.\n0fys_TY_na7f8dwSfXLiYdHaA2DxUjD67ieF7fcVbIR62JhJvGZ4_FNVSiGc_r\naa0HnLQ6s1P2sv3Xzl1p1l_o5wR_RsSzrS8Z-wnI3Jvo0mkpEEnlDmZvDu_k8O\nWzJv7eZVEqiWKdyVzFhPpiyQU28GLOpRc2VbVbK4dQKPdNTjPPEmRqcaGeTWZV\nyeSUvf5k59yJZxRuSvWFf6KrNtmRdZ8R4mDOjHSrM_s8uwIFcqt4r5GX8TKaI0\nzT5CbL5Qlw3sRc7u_hg0yKVOiRytEAEs3vZkcfLkP6nbXdC_PkMdNS-ohP78T2\nO6_7uInMGhFeX4ctHG7VelHGiT93JfWDEQi5_V9UN1rhXNrYu-0fVMkZAKX3VW\ni7lzA6BP430m\n.\nkvKuFBXHe5mQr4lqgobAUg",
+   "joined": "eyJhbGciOiJSU0ExXzUiLCJraWQiOiJmcm9kby5iYWdnaW5zQGhvYmJpdG9uLmV4YW1wbGUiLCJlbmMiOiJBMTI4Q0JDLUhTMjU2In0.laLxI0j-nLH-_BgLOXMozKxmy9gffy2gTdvqzfTihJBuuzxg0V7yk1WClnQePFvG2K-pvSlWc9BRIazDrn50RcRai__3TDON395H3c62tIouJJ4XaRvYHFjZTZ2GXfz8YAImcc91Tfk0WXC2F5Xbb71ClQ1DDH151tlpH77f2ff7xiSxh9oSewYrcGTSLUeeCt36r1Kt3OSj7EyBQXoZlN7IxbyhMAfgIe7Mv1rOTOI5I8NQqeXXW8VlzNmoxaGMny3YnGir5Wf6Qt2nBq4qDaPdnaAuuGUGEecelIO1wx1BpyIfgvfjOhMBs9M8XL223Fg47xlGsMXdfuY-4jaqVw.bbd5sTkYwhAIqfHsx8DayA.0fys_TY_na7f8dwSfXLiYdHaA2DxUjD67ieF7fcVbIR62JhJvGZ4_FNVSiGc_raa0HnLQ6s1P2sv3Xzl1p1l_o5wR_RsSzrS8Z-wnI3Jvo0mkpEEnlDmZvDu_k8OWzJv7eZVEqiWKdyVzFhPpiyQU28GLOpRc2VbVbK4dQKPdNTjPPEmRqcaGeTWZVyeSUvf5k59yJZxRuSvWFf6KrNtmRdZ8R4mDOjHSrM_s8uwIFcqt4r5GX8TKaI0zT5CbL5Qlw3sRc7u_hg0yKVOiRytEAEs3vZkcfLkP6nbXdC_PkMdNS-ohP78T2O6_7uInMGhFeX4ctHG7VelHGiT93JfWDEQi5_V9UN1rhXNrYu-0fVMkZAKX3VWi7lzA6BP430m.kvKuFBXHe5mQr4lqgobAUg"
+  },
+  {
+   "figure": 82,
+   "caption": "General JWE JSON Serialization",
+   "section": "5.1.5",
+   "example": "5.1",
+   "text": "{\n  \"recipients\": [\n    {\n      \"encrypted_key\": \"laLxI0j-nLH-_BgLOXMozKxmy9gffy2gTdvqzf\n          TihJBuuzxg0V7yk1WClnQePFvG2K-pvSlWc9BRIazDrn50RcRai_\n          _3TDON395H3c62tIouJJ4XaRvYHFjZTZ2GXfz8YAImcc91Tfk0WX\n          C2F5Xbb71ClQ1DDH151tlpH77f2ff7xiSxh9oSewYrcGTSLUeeCt\n          36r1Kt3OSj7EyBQXoZlN7IxbyhMAfgIe7Mv1rOTOI5I8NQqeXXW8\n          VlzNmoxaGMny3YnGir5Wf6Qt2nBq4qDaPdnaAuuGUGEecelIO1wx\n          1BpyIfgvfjOhMBs9M8XL223Fg47xlGsMXdfuY-4jaqVw\"\n    }\n  ],\n  \"protected\": \"eyJhbGciOiJSU0ExXzUiLCJraWQiOiJmcm9kby5iYWdnaW\n      5zQGhvYmJpdG9uLmV4YW1wbGUiLCJlbmMiOiJBMTI4Q0JDLUhTMjU2In\n      0\",\n  \"iv\": \"bbd5sTkYwhAIqfHsx8DayA\",\n  \"ciphertext\": \"0fys_TY_na7f8dwSfXLiYdHaA2DxUjD67ieF7fcVbIR62\n      JhJvGZ4_FNVSiGc_raa0HnLQ6s1P2sv3Xzl1p1l_o5wR_RsSzrS8Z-wn\n      I3Jvo0mkpEEnlDmZvDu_k8OWzJv7eZVEqiWKdyVzFhPpiyQU28GLOpRc\n      2VbVbK4dQKPdNTjPPEmRqcaGeTWZVyeSUvf5k59yJZxRuSvWFf6KrNtm\n      RdZ8R4mDOjHSrM_s8uwIFcqt4r5GX8TKaI0zT5CbL5Qlw3sRc7u_hg0y\n      KVOiRytEAEs3vZkcfLkP6nbXdC_PkMdNS-ohP78T2O6_7uInMGhFeX4c\n      tHG7VelHGiT93JfWDEQi5_V9UN1rhXNrYu-0fVMkZAKX3VWi7lzA6BP4\n      30m\",\n  \"tag\": \"kvKuFBXHe5mQr4lqgobAUg\"\n}",
+   "joined": "{\"recipients\":[{\"encrypted_key\":\"laLxI0j-nLH-_BgLOXMozKxmy9gffy2gTdvqzfTihJBuuzxg0V7yk1WClnQePFvG2K-pvSlWc9BRIazDrn50RcRai__3TDON395H3c62tIouJJ4XaRvYHFjZTZ2GXfz8YAImcc91Tfk0WXC2F5Xbb71ClQ1DDH151tlpH77f2ff7xiSxh9oSewYrcGTSLUeeCt36r1Kt3OSj7EyBQXoZlN7IxbyhMAfgIe7Mv1rOTOI5I8NQqeXXW8VlzNmoxaGMny3YnGir5Wf6Qt2nBq4qDaPdnaAuuGUGEecelIO1wx1BpyIfgvfjOhMBs9M8XL223Fg47xlGsMXdfuY-4jaqVw\"}],\"protected\":\"eyJhbGciOiJSU0ExXzUiLCJraWQiOiJmcm9kby5iYWdnaW5zQGhvYmJpdG9uLmV4YW1wbGUiLCJlbmMiOiJBMTI4Q0JDLUhTMjU2In0\",\"iv\":\"bbd5sTkYwhAIqfHsx8DayA\",\"ciphertext\":\"0fys_TY_na7f8dwSfXLiYdHaA2DxUjD67ieF7fcVbIR62JhJvGZ4_FNVSiGc_raa0HnLQ6s1P2sv3Xzl1p1l_o5wR_RsSzrS8Z-wnI3Jvo0mkpEEnlDmZvDu_k8OWzJv7eZVEqiWKdyVzFhPpiyQU28GLOpRc2VbVbK4dQKPdNTjPPEmRqcaGeTWZVyeSUvf5k59yJZxRuSvWFf6KrNtmRdZ8R4mDOjHSrM_s8uwIFcqt4r5GX8TKaI0zT5CbL5Qlw3sRc7u_hg0yKVOiRytEAEs3vZkcfLkP6nbXdC_PkMdNS-ohP78T2O6_7uInMGhFeX4ctHG7VelHGiT93JfWDEQi5_V9UN1rhXNrYu-0fVMkZAKX3VWi7lzA6BP430m\",\"tag\":\"kvKuFBXHe5mQr4lqgobAUg\"}",
+   "json": {
+    "recipients": [
+     {
+      "encrypted_key": "laLxI0j-nLH-_BgLOXMozKxmy9gffy2gTdvqzfTihJBuuzxg0V7yk1WClnQePFvG2K-pvSlWc9BRIazDrn50RcRai__3TDON395H3c62tIouJJ4XaRvYHFjZTZ2GXfz8YAImcc91Tfk0WXC2F5Xbb71ClQ1DDH151tlpH77f2ff7xiSxh9oSewYrcGTSLUeeCt36r1Kt3OSj7EyBQXoZlN7IxbyhMAfgIe7Mv1rOTOI5I8NQqeXXW8VlzNmoxaGMny3YnGir5Wf6Qt2nBq4qDaPdnaAuuGUGEecelIO1wx1BpyIfgvfjOhMBs9M8XL223Fg47xlGsMXdfuY-4jaqVw"
+     }
+    ],
+    "protected": "eyJhbGciOiJSU0ExXzUiLCJraWQiOiJmcm9kby5iYWdnaW5zQGhvYmJpdG9uLmV4YW1wbGUiLCJlbmMiOiJBMTI4Q0JDLUhTMjU2In0",
+    "iv": "bbd5sTkYwhAIqfHsx8DayA",
+    "ciphertext": "0fys_TY_na7f8dwSfXLiYdHaA2DxUjD67ieF7fcVbIR62JhJvGZ4_FNVSiGc_raa0HnLQ6s1P2sv3Xzl1p1l_o5wR_RsSzrS8Z-wnI3Jvo0mkpEEnlDmZvDu_k8OWzJv7eZVEqiWKdyVzFhPpiyQU28GLOpRc2VbVbK4dQKPdNTjPPEmRqcaGeTWZVyeSUvf5k59yJZxRuSvWFf6KrNtmRdZ8R4mDOjHSrM_s8uwIFcqt4r5GX8TKaI0zT5CbL5Qlw3sRc7u_hg0yKVOiRytEAEs3vZkcfLkP6nbXdC_PkMdNS-ohP78T2O6_7uInMGhFeX4ctHG7VelHGiT93JfWDEQi5_V9UN1rhXNrYu-0fVMkZAKX3VWi7lzA6BP430m",
+    "tag": "kvKuFBXHe5mQr4lqgobAUg"
+   }
+  },
+  {
+   "figure": 83,
+   "caption": "Flattened JWE JSON Serialization",
+   "section": "5.1.5",
+   "example": "5.1",
+   "text": "{\n  \"protected\": \"eyJhbGciOiJSU0ExXzUiLCJraWQiOiJmcm9kby5iYWdnaW\n      5zQGhvYmJpdG9uLmV4YW1wbGUiLCJlbmMiOiJBMTI4Q0JDLUhTMjU2In\n      0\",\n  \"encrypted_key\": \"laLxI0j-nLH-_BgLOXMozKxmy9gffy2gTdvqzfTihJ\n      Buuzxg0V7yk1WClnQePFvG2K-pvSlWc9BRIazDrn50RcRai__3TDON39\n      5H3c62tIouJJ4XaRvYHFjZTZ2GXfz8YAImcc91Tfk0WXC2F5Xbb71ClQ\n      1DDH151tlpH77f2ff7xiSxh9oSewYrcGTSLUeeCt36r1Kt3OSj7EyBQX\n      oZlN7IxbyhMAfgIe7Mv1rOTOI5I8NQqeXXW8VlzNmoxaGMny3YnGir5W\n      f6Qt2nBq4qDaPdnaAuuGUGEecelIO1wx1BpyIfgvfjOhMBs9M8XL223F\n      g47xlGsMXdfuY-4jaqVw\",\n  \"iv\": \"bbd5sTkYwhAIqfHsx8DayA\",\n  \"ciphertext\": \"0fys_TY_na7f8dwSfXLiYdHaA2DxUjD67ieF7fcVbIR62\n      JhJvGZ4_FNVSiGc_raa0HnLQ6s1P2sv3Xzl1p1l_o5wR_RsSzrS8Z-wn\n      I3Jvo0mkpEEnlDmZvDu_k8OWzJv7eZVEqiWKdyVzFhPpiyQU28GLOpRc\n      2VbVbK4dQKPdNTjPPEmRqcaGeTWZVyeSUvf5k59yJZxRuSvWFf6KrNtm\n      RdZ8R4mDOjHSrM_s8uwIFcqt4r5GX8TKaI0zT5CbL5Qlw3sRc7u_hg0y\n      KVOiRytEAEs3vZkcfLkP6nbXdC_PkMdNS-ohP78T2O6_7uInMGhFeX4c\n      tHG7VelHGiT93JfWDEQi5_V9UN1rhXNrYu-0fVMkZAKX3VWi7lzA6BP4\n      30m\",\n  \"tag\": \"kvKuFBXHe5mQr4lqgobAUg\"\n}",
+   "joined": "{\"protected\":\"eyJhbGciOiJSU0ExXzUiLCJraWQiOiJmcm9kby5iYWdnaW5zQGhvYmJpdG9uLmV4YW1wbGUiLCJlbmMiOiJBMTI4Q0JDLUhTMjU2In0\",\"encrypted_key\":\"laLxI0j-nLH-_BgLOXMozKxmy9gffy2gTdvqzfTihJBuuzxg0V7yk1WClnQePFvG2K-pvSlWc9BRIazDrn50RcRai__3TDON395H3c62tIouJJ4XaRvYHFjZTZ2GXfz8YAImcc91Tfk0WXC2F5Xbb71ClQ1DDH151tlpH77f2ff7xiSxh9oSewYrcGTSLUeeCt36r1Kt3OSj7EyBQXoZlN7IxbyhMAfgIe7Mv1rOTOI5I8NQqeXXW8VlzNmoxaGMny3YnGir5Wf6Qt2nBq4qDaPdnaAuuGUGEecelIO1wx1BpyIfgvfjOhMBs9M8XL223Fg47xlGsMXdfuY-4jaqVw\",\"iv\":\"bbd5sTkYwhAIqfHsx8DayA\",\"ciphertext\":\"0fys_TY_na7f8dwSfXLiYdHaA2DxUjD67ieF7fcVbIR62JhJvGZ4_FNVSiGc_raa0HnLQ6s1P2sv3Xzl1p1l_o5wR_RsSzrS8Z-wnI3Jvo0mkpEEnlDmZvDu_k8OWzJv7eZVEqiWKdyVzFhPpiyQU28GLOpRc2VbVbK4dQKPdNTjPPEmRqcaGeTWZVyeSUvf5k59yJZxRuSvWFf6KrNtmRdZ8R4mDOjHSrM_s8uwIFcqt4r5GX8TKaI0zT5CbL5Qlw3sRc7u_hg0yKVOiRytEAEs3vZkcfLkP6nbXdC_PkMdNS-ohP78T2O6_7uInMGhFeX4ctHG7VelHGiT93JfWDEQi5_V9UN1rhXNrYu-0fVMkZAKX3VWi7lzA6BP430m\",\"tag\":\"kvKuFBXHe5mQr4lqgobAUg\"}",
+   "json": {
+    "protected": "eyJhbGciOiJSU0ExXzUiLCJraWQiOiJmcm9kby5iYWdnaW5zQGhvYmJpdG9uLmV4YW1wbGUiLCJlbmMiOiJBMTI4Q0JDLUhTMjU2In0",
+    "encrypted_key": "laLxI0j-nLH-_BgLOXMozKxmy9gffy2gTdvqzfTihJBuuzxg0V7yk1WClnQePFvG2K-pvSlWc9BRIazDrn50RcRai__3TDON395H3c62tIouJJ4XaRvYHFjZTZ2GXfz8YAImcc91Tfk0WXC2F5Xbb71ClQ1DDH151tlpH77f2ff7xiSxh9oSewYrcGTSLUeeCt36r1Kt3OSj7EyBQXoZlN7IxbyhMAfgIe7Mv1rOTOI5I8NQqeXXW8VlzNmoxaGMny3YnGir5Wf6Qt2nBq4qDaPdnaAuuGUGEecelIO1wx1BpyIfgvfjOhMBs9M8XL223Fg47xlGsMXdfuY-4jaqVw",
+    "iv": "bbd5sTkYwhAIqfHsx8DayA",
+    "ciphertext": "0fys_TY_na7f8dwSfXLiYdHaA2DxUjD67ieF7fcVbIR62JhJvGZ4_FNVSiGc_raa0HnLQ6s1P2sv3Xzl1p1l_o5wR_RsSzrS8Z-wnI3Jvo0mkpEEnlDmZvDu_k8OWzJv7eZVEqiWKdyVzFhPpiyQU28GLOpRc2VbVbK4dQKPdNTjPPEmRqcaGeTWZVyeSUvf5k59yJZxRuSvWFf6KrNtmRdZ8R4mDOjHSrM_s8uwIFcqt4r5GX8TKaI0zT5CbL5Qlw3sRc7u_hg0yKVOiRytEAEs3vZkcfLkP6nbXdC_PkMdNS-ohP78T2O6_7uInMGhFeX4ctHG7VelHGiT93JfWDEQi5_V9UN1rhXNrYu-0fVMkZAKX3VWi7lzA6BP430m",
+    "tag": "kvKuFBXHe5mQr4lqgobAUg"
+   }
+  },
+  {
+   "figure": 84,
+   "caption": "RSA 4096-Bit Key",
+   "section": "5.2.1",
+   "example": "5.2",
+   "text": "{\n  \"kty\": \"RSA\",\n  \"kid\": \"samwise.gamgee@hobbiton.example\",\n  \"use\": \"enc\",\n  \"n\": \"wbdxI55VaanZXPY29Lg5hdmv2XhvqAhoxUkanfzf2-5zVUxa6prHRr\n      I4pP1AhoqJRlZfYtWWd5mmHRG2pAHIlh0ySJ9wi0BioZBl1XP2e-C-Fy\n      XJGcTy0HdKQWlrfhTm42EW7Vv04r4gfao6uxjLGwfpGrZLarohiWCPnk\n      Nrg71S2CuNZSQBIPGjXfkmIy2tl_VWgGnL22GplyXj5YlBLdxXp3XeSt\n      sqo571utNfoUTU8E4qdzJ3U1DItoVkPGsMwlmmnJiwA7sXRItBCivR4M\n      5qnZtdw-7v4WuR4779ubDuJ5nalMv2S66-RPcnFAzWSKxtBDnFJJDGIU\n      e7Tzizjg1nms0Xq_yPub_UOlWn0ec85FCft1hACpWG8schrOBeNqHBOD\n      FskYpUc2LC5JA2TaPF2dA67dg1TTsC_FupfQ2kNGcE1LgprxKHcVWYQb\n      86B-HozjHZcqtauBzFNV5tbTuB-TpkcvJfNcFLlH3b8mb-H_ox35FjqB\n      SAjLKyoeqfKTpVjvXhd09knwgJf6VKq6UC418_TOljMVfFTWXUxlnfhO\n      OnzW6HSSzD1c9WrCuVzsUMv54szidQ9wf1cYWf3g5qFDxDQKis99gcDa\n      iCAwM3yEBIzuNeeCa5dartHDb1xEB_HcHSeYbghbMjGfasvKn0aZRsnT\n      yC0xhWBlsolZE\",\n  \"e\": \"AQAB\",\n  \"alg\": \"RSA-OAEP\",\n  \"d\": \"n7fzJc3_WG59VEOBTkayzuSMM780OJQuZjN_KbH8lOZG25ZoA7T4Bx\n      cc0xQn5oZE5uSCIwg91oCt0JvxPcpmqzaJZg1nirjcWZ-oBtVk7gCAWq\n      -B3qhfF3izlbkosrzjHajIcY33HBhsy4_WerrXg4MDNE4HYojy68TcxT\n      2LYQRxUOCf5TtJXvM8olexlSGtVnQnDRutxEUCwiewfmmrfveEogLx9E\n      A-KMgAjTiISXxqIXQhWUQX1G7v_mV_Hr2YuImYcNcHkRvp9E7ook0876\n      DhkO8v4UOZLwA1OlUX98mkoqwc58A_Y2lBYbVx1_s5lpPsEqbbH-nqIj\n      h1fL0gdNfihLxnclWtW7pCztLnImZAyeCWAG7ZIfv-Rn9fLIv9jZ6r7r\n      -MSH9sqbuziHN2grGjD_jfRluMHa0l84fFKl6bcqN1JWxPVhzNZo01yD\n      F-1LiQnqUYSepPf6X3a2SOdkqBRiquE6EvLuSYIDpJq3jDIsgoL8Mo1L\n      oomgiJxUwL_GWEOGu28gplyzm-9Q0U0nyhEf1uhSR8aJAQWAiFImWH5W\n      _IQT9I7-yrindr_2fWQ_i1UgMsGzA7aOGzZfPljRy6z-tY_KuBG00-28\n      S_aWvjyUc-Alp8AUyKjBZ-7CWH32fGWK48j1t-zomrwjL_mnhsPbGs0c\n      9WsWgRzI-K8gE\",\n  \"p\": \"7_2v3OQZzlPFcHyYfLABQ3XP85Es4hCdwCkbDeltaUXgVy9l9etKgh\n      vM4hRkOvbb01kYVuLFmxIkCDtpi-zLCYAdXKrAK3PtSbtzld_XZ9nlsY\n      a_QZWpXB_IrtFjVfdKUdMz94pHUhFGFj7nr6NNxfpiHSHWFE1zD_AC3m\n      Y46J961Y2LRnreVwAGNw53p07Db8yD_92pDa97vqcZOdgtybH9q6uma-\n      RFNhO1AoiJhYZj69hjmMRXx-x56HO9cnXNbmzNSCFCKnQmn4GQLmRj9s\n      fbZRqL94bbtE4_e0Zrpo8RNo8vxRLqQNwIy85fc6BRgBJomt8QdQvIgP\n      gWCv5HoQ\",\n  \"q\": \"zqOHk1P6WN_rHuM7ZF1cXH0x6RuOHq67WuHiSknqQeefGBA9PWs6Zy\n      KQCO-O6mKXtcgE8_Q_hA2kMRcKOcvHil1hqMCNSXlflM7WPRPZu2qCDc\n      qssd_uMbP-DqYthH_EzwL9KnYoH7JQFxxmcv5An8oXUtTwk4knKjkIYG\n      RuUwfQTus0w1NfjFAyxOOiAQ37ussIcE6C6ZSsM3n41UlbJ7TCqewzVJ\n      aPJN5cxjySPZPD3Vp01a9YgAD6a3IIaKJdIxJS1ImnfPevSJQBE79-EX\n      e2kSwVgOzvt-gsmM29QQ8veHy4uAqca5dZzMs7hkkHtw1z0jHV90epQJ\n      JlXXnH8Q\",\n  \"dp\": \"19oDkBh1AXelMIxQFm2zZTqUhAzCIr4xNIGEPNoDt1jK83_FJA-xn\n      x5kA7-1erdHdms_Ef67HsONNv5A60JaR7w8LHnDiBGnjdaUmmuO8XAxQ\n      J_ia5mxjxNjS6E2yD44USo2JmHvzeeNczq25elqbTPLhUpGo1IZuG72F\n      ZQ5gTjXoTXC2-xtCDEUZfaUNh4IeAipfLugbpe0JAFlFfrTDAMUFpC3i\n      XjxqzbEanflwPvj6V9iDSgjj8SozSM0dLtxvu0LIeIQAeEgT_yXcrKGm\n      pKdSO08kLBx8VUjkbv_3Pn20Gyu2YEuwpFlM_H1NikuxJNKFGmnAq9Lc\n      nwwT0jvoQ\",\n  \"dq\": \"S6p59KrlmzGzaQYQM3o0XfHCGvfqHLYjCO557HYQf72O9kLMCfd_1\n      VBEqeD-1jjwELKDjck8kOBl5UvohK1oDfSP1DleAy-cnmL29DqWmhgwM\n      1ip0CCNmkmsmDSlqkUXDi6sAaZuntyukyflI-qSQ3C_BafPyFaKrt1fg\n      dyEwYa08pESKwwWisy7KnmoUvaJ3SaHmohFS78TJ25cfc10wZ9hQNOrI\n      ChZlkiOdFCtxDqdmCqNacnhgE3bZQjGp3n83ODSz9zwJcSUvODlXBPc2\n      AycH6Ci5yjbxt4Ppox_5pjm6xnQkiPgj01GpsUssMmBN7iHVsrE7N2iz\n      nBNCeOUIQ\",\n  \"qi\": \"FZhClBMywVVjnuUud-05qd5CYU0dK79akAgy9oX6RX6I3IIIPckCc\n      iRrokxglZn-omAY5CnCe4KdrnjFOT5YUZE7G_Pg44XgCXaarLQf4hl80\n      oPEf6-jJ5Iy6wPRx7G2e8qLxnh9cOdf-kRqgOS3F48Ucvw3ma5V6KGMw\n      QqWFeV31XtZ8l5cVI-I3NzBS7qltpUVgz2Ju021eyc7IlqgzR98qKONl\n      27DuEES0aK0WE97jnsyO27Yp88Wa2RiBrEocM89QZI1seJiGDizHRUP4\n      UZxw9zsXww46wy0P6f9grnYp7t8LkyDDk8eoI4KX6SNMNVcyVS9IWjlq\n      8EzqZEKIA\"\n}",
+   "joined": "{\"kty\":\"RSA\",\"kid\":\"samwise.gamgee@hobbiton.example\",\"use\":\"enc\",\"n\":\"wbdxI55VaanZXPY29Lg5hdmv2XhvqAhoxUkanfzf2-5zVUxa6prHRrI4pP1AhoqJRlZfYtWWd5mmHRG2pAHIlh0ySJ9wi0BioZBl1XP2e-C-FyXJGcTy0HdKQWlrfhTm42EW7Vv04r4gfao6uxjLGwfpGrZLarohiWCPnkNrg71S2CuNZSQBIPGjXfkmIy2tl_VWgGnL22GplyXj5YlBLdxXp3XeStsqo571utNfoUTU8E4qdzJ3U1DItoVkPGsMwlmmnJiwA7sXRItBCivR4M5qnZtdw-7v4WuR4779ubDuJ5nalMv2S66-RPcnFAzWSKxtBDnFJJDGIUe7Tzizjg1nms0Xq_yPub_UOlWn0ec85FCft1hACpWG8schrOBeNqHBODFskYpUc2LC5JA2TaPF2dA67dg1TTsC_FupfQ2kNGcE1LgprxKHcVWYQb86B-HozjHZcqtauBzFNV5tbTuB-TpkcvJfNcFLlH3b8mb-H_ox35FjqBSAjLKyoeqfKTpVjvXhd09knwgJf6VKq6UC418_TOljMVfFTWXUxlnfhOOnzW6HSSzD1c9WrCuVzsUMv54szidQ9wf1cYWf3g5qFDxDQKis99gcDaiCAwM3yEBIzuNeeCa5dartHDb1xEB_HcHSeYbghbMjGfasvKn0aZRsnTyC0xhWBlsolZE\",\"e\":\"AQAB\",\"alg\":\"RSA-OAEP\",\"d\":\"n7fzJc3_WG59VEOBTkayzuSMM780OJQuZjN_KbH8lOZG25ZoA7T4Bxcc0xQn5oZE5uSCIwg91oCt0JvxPcpmqzaJZg1nirjcWZ-oBtVk7gCAWq-B3qhfF3izlbkosrzjHajIcY33HBhsy4_WerrXg4MDNE4HYojy68TcxT2LYQRxUOCf5TtJXvM8olexlSGtVnQnDRutxEUCwiewfmmrfveEogLx9EA-KMgAjTiISXxqIXQhWUQX1G7v_mV_Hr2YuImYcNcHkRvp9E7ook0876DhkO8v4UOZLwA1OlUX98mkoqwc58A_Y2lBYbVx1_s5lpPsEqbbH-nqIjh1fL0gdNfihLxnclWtW7pCztLnImZAyeCWAG7ZIfv-Rn9fLIv9jZ6r7r-MSH9sqbuziHN2grGjD_jfRluMHa0l84fFKl6bcqN1JWxPVhzNZo01yDF-1LiQnqUYSepPf6X3a2SOdkqBRiquE6EvLuSYIDpJq3jDIsgoL8Mo1LoomgiJxUwL_GWEOGu28gplyzm-9Q0U0nyhEf1uhSR8aJAQWAiFImWH5W_IQT9I7-yrindr_2fWQ_i1UgMsGzA7aOGzZfPljRy6z-tY_KuBG00-28S_aWvjyUc-Alp8AUyKjBZ-7CWH32fGWK48j1t-zomrwjL_mnhsPbGs0c9WsWgRzI-K8gE\",\"p\":\"7_2v3OQZzlPFcHyYfLABQ3XP85Es4hCdwCkbDeltaUXgVy9l9etKghvM4hRkOvbb01kYVuLFmxIkCDtpi-zLCYAdXKrAK3PtSbtzld_XZ9nlsYa_QZWpXB_IrtFjVfdKUdMz94pHUhFGFj7nr6NNxfpiHSHWFE1zD_AC3mY46J961Y2LRnreVwAGNw53p07Db8yD_92pDa97vqcZOdgtybH9q6uma-RFNhO1AoiJhYZj69hjmMRXx-x56HO9cnXNbmzNSCFCKnQmn4GQLmRj9sfbZRqL94bbtE4_e0Zrpo8RNo8vxRLqQNwIy85fc6BRgBJomt8QdQvIgPgWCv5HoQ\",\"q\":\"zqOHk1P6WN_rHuM7ZF1cXH0x6RuOHq67WuHiSknqQeefGBA9PWs6ZyKQCO-O6mKXtcgE8_Q_hA2kMRcKOcvHil1hqMCNSXlflM7WPRPZu2qCDcqssd_uMbP-DqYthH_EzwL9KnYoH7JQFxxmcv5An8oXUtTwk4knKjkIYGRuUwfQTus0w1NfjFAyxOOiAQ37ussIcE6C6ZSsM3n41UlbJ7TCqewzVJaPJN5cxjySPZPD3Vp01a9YgAD6a3IIaKJdIxJS1ImnfPevSJQBE79-EXe2kSwVgOzvt-gsmM29QQ8veHy4uAqca5dZzMs7hkkHtw1z0jHV90epQJJlXXnH8Q\",\"dp\":\"19oDkBh1AXelMIxQFm2zZTqUhAzCIr4xNIGEPNoDt1jK83_FJA-xnx5kA7-1erdHdms_Ef67HsONNv5A60JaR7w8LHnDiBGnjdaUmmuO8XAxQJ_ia5mxjxNjS6E2yD44USo2JmHvzeeNczq25elqbTPLhUpGo1IZuG72FZQ5gTjXoTXC2-xtCDEUZfaUNh4IeAipfLugbpe0JAFlFfrTDAMUFpC3iXjxqzbEanflwPvj6V9iDSgjj8SozSM0dLtxvu0LIeIQAeEgT_yXcrKGmpKdSO08kLBx8VUjkbv_3Pn20Gyu2YEuwpFlM_H1NikuxJNKFGmnAq9LcnwwT0jvoQ\",\"dq\":\"S6p59KrlmzGzaQYQM3o0XfHCGvfqHLYjCO557HYQf72O9kLMCfd_1VBEqeD-1jjwELKDjck8kOBl5UvohK1oDfSP1DleAy-cnmL29DqWmhgwM1ip0CCNmkmsmDSlqkUXDi6sAaZuntyukyflI-qSQ3C_BafPyFaKrt1fgdyEwYa08pESKwwWisy7KnmoUvaJ3SaHmohFS78TJ25cfc10wZ9hQNOrIChZlkiOdFCtxDqdmCqNacnhgE3bZQjGp3n83ODSz9zwJcSUvODlXBPc2AycH6Ci5yjbxt4Ppox_5pjm6xnQkiPgj01GpsUssMmBN7iHVsrE7N2iznBNCeOUIQ\",\"qi\":\"FZhClBMywVVjnuUud-05qd5CYU0dK79akAgy9oX6RX6I3IIIPckCciRrokxglZn-omAY5CnCe4KdrnjFOT5YUZE7G_Pg44XgCXaarLQf4hl80oPEf6-jJ5Iy6wPRx7G2e8qLxnh9cOdf-kRqgOS3F48Ucvw3ma5V6KGMwQqWFeV31XtZ8l5cVI-I3NzBS7qltpUVgz2Ju021eyc7IlqgzR98qKONl27DuEES0aK0WE97jnsyO27Yp88Wa2RiBrEocM89QZI1seJiGDizHRUP4UZxw9zsXww46wy0P6f9grnYp7t8LkyDDk8eoI4KX6SNMNVcyVS9IWjlq8EzqZEKIA\"}",
+   "json": {
+    "kty": "RSA",
+    "kid": "samwise.gamgee@hobbiton.example",
+    "use": "enc",
+    "n": "wbdxI55VaanZXPY29Lg5hdmv2XhvqAhoxUkanfzf2-5zVUxa6prHRrI4pP1AhoqJRlZfYtWWd5mmHRG2pAHIlh0ySJ9wi0BioZBl1XP2e-C-FyXJGcTy0HdKQWlrfhTm42EW7Vv04r4gfao6uxjLGwfpGrZLarohiWCPnkNrg71S2CuNZSQBIPGjXfkmIy2tl_VWgGnL22GplyXj5YlBLdxXp3XeStsqo571utNfoUTU8E4qdzJ3U1DItoVkPGsMwlmmnJiwA7sXRItBCivR4M5qnZtdw-7v4WuR4779ubDuJ5nalMv2S66-RPcnFAzWSKxtBDnFJJDGIUe7Tzizjg1nms0Xq_yPub_UOlWn0ec85FCft1hACpWG8schrOBeNqHBODFskYpUc2LC5JA2TaPF2dA67dg1TTsC_FupfQ2kNGcE1LgprxKHcVWYQb86B-HozjHZcqtauBzFNV5tbTuB-TpkcvJfNcFLlH3b8mb-H_ox35FjqBSAjLKyoeqfKTpVjvXhd09knwgJf6VKq6UC418_TOljMVfFTWXUxlnfhOOnzW6HSSzD1c9WrCuVzsUMv54szidQ9wf1cYWf3g5qFDxDQKis99gcDaiCAwM3yEBIzuNeeCa5dartHDb1xEB_HcHSeYbghbMjGfasvKn0aZRsnTyC0xhWBlsolZE",
+    "e": "AQAB",
+    "alg": "RSA-OAEP",
+    "d": "n7fzJc3_WG59VEOBTkayzuSMM780OJQuZjN_KbH8lOZG25ZoA7T4Bxcc0xQn5oZE5uSCIwg91oCt0JvxPcpmqzaJZg1nirjcWZ-oBtVk7gCAWq-B3qhfF3izlbkosrzjHajIcY33HBhsy4_WerrXg4MDNE4HYojy68TcxT2LYQRxUOCf5TtJXvM8olexlSGtVnQnDRutxEUCwiewfmmrfveEogLx9EA-KMgAjTiISXxqIXQhWUQX1G7v_mV_Hr2YuImYcNcHkRvp9E7ook0876DhkO8v4UOZLwA1OlUX98mkoqwc58A_Y2lBYbVx1_s5lpPsEqbbH-nqIjh1fL0gdNfihLxnclWtW7pCztLnImZAyeCWAG7ZIfv-Rn9fLIv9jZ6r7r-MSH9sqbuziHN2grGjD_jfRluMHa0l84fFKl6bcqN1JWxPVhzNZo01yDF-1LiQnqUYSepPf6X3a2SOdkqBRiquE6EvLuSYIDpJq3jDIsgoL8Mo1LoomgiJxUwL_GWEOGu28gplyzm-9Q0U0nyhEf1uhSR8aJAQWAiFImWH5W_IQT9I7-yrindr_2fWQ_i1UgMsGzA7aOGzZfPljRy6z-tY_KuBG00-28S_aWvjyUc-Alp8AUyKjBZ-7CWH32fGWK48j1t-zomrwjL_mnhsPbGs0c9WsWgRzI-K8gE",
+    "p": "7_2v3OQZzlPFcHyYfLABQ3XP85Es4hCdwCkbDeltaUXgVy9l9etKghvM4hRkOvbb01kYVuLFmxIkCDtpi-zLCYAdXKrAK3PtSbtzld_XZ9nlsYa_QZWpXB_IrtFjVfdKUdMz94pHUhFGFj7nr6NNxfpiHSHWFE1zD_AC3mY46J961Y2LRnreVwAGNw53p07Db8yD_92pDa97vqcZOdgtybH9q6uma-RFNhO1AoiJhYZj69hjmMRXx-x56HO9cnXNbmzNSCFCKnQmn4GQLmRj9sfbZRqL94bbtE4_e0Zrpo8RNo8vxRLqQNwIy85fc6BRgBJomt8QdQvIgPgWCv5HoQ",
+    "q": "zqOHk1P6WN_rHuM7ZF1cXH0x6RuOHq67WuHiSknqQeefGBA9PWs6ZyKQCO-O6mKXtcgE8_Q_hA2kMRcKOcvHil1hqMCNSXlflM7WPRPZu2qCDcqssd_uMbP-DqYthH_EzwL9KnYoH7JQFxxmcv5An8oXUtTwk4knKjkIYGRuUwfQTus0w1NfjFAyxOOiAQ37ussIcE6C6ZSsM3n41UlbJ7TCqewzVJaPJN5cxjySPZPD3Vp01a9YgAD6a3IIaKJdIxJS1ImnfPevSJQBE79-EXe2kSwVgOzvt-gsmM29QQ8veHy4uAqca5dZzMs7hkkHtw1z0jHV90epQJJlXXnH8Q",
+    "dp": "19oDkBh1AXelMIxQFm2zZTqUhAzCIr4xNIGEPNoDt1jK83_FJA-xnx5kA7-1erdHdms_Ef67HsONNv5A60JaR7w8LHnDiBGnjdaUmmuO8XAxQJ_ia5mxjxNjS6E2yD44USo2JmHvzeeNczq25elqbTPLhUpGo1IZuG72FZQ5gTjXoTXC2-xtCDEUZfaUNh4IeAipfLugbpe0JAFlFfrTDAMUFpC3iXjxqzbEanflwPvj6V9iDSgjj8SozSM0dLtxvu0LIeIQAeEgT_yXcrKGmpKdSO08kLBx8VUjkbv_3Pn20Gyu2YEuwpFlM_H1NikuxJNKFGmnAq9LcnwwT0jvoQ",
+    "dq": "S6p59KrlmzGzaQYQM3o0XfHCGvfqHLYjCO557HYQf72O9kLMCfd_1VBEqeD-1jjwELKDjck8kOBl5UvohK1oDfSP1DleAy-cnmL29DqWmhgwM1ip0CCNmkmsmDSlqkUXDi6sAaZuntyukyflI-qSQ3C_BafPyFaKrt1fgdyEwYa08pESKwwWisy7KnmoUvaJ3SaHmohFS78TJ25cfc10wZ9hQNOrIChZlkiOdFCtxDqdmCqNacnhgE3bZQjGp3n83ODSz9zwJcSUvODlXBPc2AycH6Ci5yjbxt4Ppox_5pjm6xnQkiPgj01GpsUssMmBN7iHVsrE7N2iznBNCeOUIQ",
+    "qi": "FZhClBMywVVjnuUud-05qd5CYU0dK79akAgy9oX6RX6I3IIIPckCciRrokxglZn-omAY5CnCe4KdrnjFOT5YUZE7G_Pg44XgCXaarLQf4hl80oPEf6-jJ5Iy6wPRx7G2e8qLxnh9cOdf-kRqgOS3F48Ucvw3ma5V6KGMwQqWFeV31XtZ8l5cVI-I3NzBS7qltpUVgz2Ju021eyc7IlqgzR98qKONl27DuEES0aK0WE97jnsyO27Yp88Wa2RiBrEocM89QZI1seJiGDizHRUP4UZxw9zsXww46wy0P6f9grnYp7t8LkyDDk8eoI4KX6SNMNVcyVS9IWjlq8EzqZEKIA"
+   }
+  },
+  {
+   "figure": 85,
+   "caption": "Content Encryption Key, base64url-encoded",
+   "section": "5.2.2",
+   "example": "5.2",
+   "text": "o  Initialization Vector; this example uses the Initialization Vector\n   from Figure 86.\nmYMfsggkTAm0TbvtlFh2hyoXnbEzJQjMxmgLN3d8xXA",
+   "joined": "oInitializationVector;thisexampleusestheInitializationVectorfromFigure86.mYMfsggkTAm0TbvtlFh2hyoXnbEzJQjMxmgLN3d8xXA"
+  },
+  {
+   "figure": 86,
+   "caption": "Initialization Vector, base64url-encoded",
+   "section": "5.2.2",
+   "example": "5.2",
+   "text": "-nBoKLH0YkLZPSI9",
+   "joined": "-nBoKLH0YkLZPSI9"
+  },
+  {
+   "figure": 87,
+   "caption": "Encrypted Key, base64url-encoded",
+   "section": "5.2.3",
+   "example": "5.2",
+   "text": "rT99rwrBTbTI7IJM8fU3Eli7226HEB7IchCxNuh7lCiud48LxeolRdtFF4nzQi\nbeYOl5S_PJsAXZwSXtDePz9hk-BbtsTBqC2UsPOdwjC9NhNupNNu9uHIVftDyu\ncvI6hvALeZ6OGnhNV4v1zx2k7O1D89mAzfw-_kT3tkuorpDU-CpBENfIHX1Q58\n-Aad3FzMuo3Fn9buEP2yXakLXYa15BUXQsupM4A1GD4_H4Bd7V3u9h8Gkg8Bpx\nKdUV9ScfJQTcYm6eJEBz3aSwIaK4T3-dwWpuBOhROQXBosJzS1asnuHtVMt2pK\nIIfux5BC6huIvmY7kzV7W7aIUrpYm_3H4zYvyMeq5pGqFmW2k8zpO878TRlZx7\npZfPYDSXZyS0CfKKkMozT_qiCwZTSz4duYnt8hS4Z9sGthXn9uDqd6wycMagnQ\nfOTs_lycTWmY-aqWVDKhjYNRf03NiwRtb5BE-tOdFwCASQj3uuAgPGrO2AWBe3\n8UjQb0lvXn1SpyvYZ3WFc7WOJYaTa7A8DRn6MC6T-xDmMuxC0G7S2rscw5lQQU\n06MvZTlFOt0UvfuKBa03cxA_nIBIhLMjY2kOTxQMmpDPTr6Cbo8aKaOnx6ASE5\nJx9paBpnNmOOKH35j_QlrQhDWUN6A2Gg8iFayJ69xDEdHAVCGRzN3woEI2ozDR\ns",
+   "joined": "rT99rwrBTbTI7IJM8fU3Eli7226HEB7IchCxNuh7lCiud48LxeolRdtFF4nzQibeYOl5S_PJsAXZwSXtDePz9hk-BbtsTBqC2UsPOdwjC9NhNupNNu9uHIVftDyucvI6hvALeZ6OGnhNV4v1zx2k7O1D89mAzfw-_kT3tkuorpDU-CpBENfIHX1Q58-Aad3FzMuo3Fn9buEP2yXakLXYa15BUXQsupM4A1GD4_H4Bd7V3u9h8Gkg8BpxKdUV9ScfJQTcYm6eJEBz3aSwIaK4T3-dwWpuBOhROQXBosJzS1asnuHtVMt2pKIIfux5BC6huIvmY7kzV7W7aIUrpYm_3H4zYvyMeq5pGqFmW2k8zpO878TRlZx7pZfPYDSXZyS0CfKKkMozT_qiCwZTSz4duYnt8hS4Z9sGthXn9uDqd6wycMagnQfOTs_lycTWmY-aqWVDKhjYNRf03NiwRtb5BE-tOdFwCASQj3uuAgPGrO2AWBe38UjQb0lvXn1SpyvYZ3WFc7WOJYaTa7A8DRn6MC6T-xDmMuxC0G7S2rscw5lQQU06MvZTlFOt0UvfuKBa03cxA_nIBIhLMjY2kOTxQMmpDPTr6Cbo8aKaOnx6ASE5Jx9paBpnNmOOKH35j_QlrQhDWUN6A2Gg8iFayJ69xDEdHAVCGRzN3woEI2ozDRs"
+  },
+  {
+   "figure": 88,
+   "caption": "JWE Protected Header JSON",
+   "section": "5.2.4",
+   "example": "5.2",
+   "text": "{\n  \"alg\": \"RSA-OAEP\",\n  \"kid\": \"samwise.gamgee@hobbiton.example\",\n  \"enc\": \"A256GCM\"\n}",
+   "joined": "{\"alg\":\"RSA-OAEP\",\"kid\":\"samwise.gamgee@hobbiton.example\",\"enc\":\"A256GCM\"}",
+   "json": {
+    "alg": "RSA-OAEP",
+    "kid": "samwise.gamgee@hobbiton.example",
+    "enc": "A256GCM"
+   }
+  },
+  {
+   "figure": 89,
+   "caption": "JWE Protected Header, base64url-encoded",
+   "section": "5.2.4",
+   "example": "5.2",
+   "text": "eyJhbGciOiJSU0EtT0FFUCIsImtpZCI6InNhbXdpc2UuZ2FtZ2VlQGhvYmJpdG\n9uLmV4YW1wbGUiLCJlbmMiOiJBMjU2R0NNIn0",
+   "joined": "eyJhbGciOiJSU0EtT0FFUCIsImtpZCI6InNhbXdpc2UuZ2FtZ2VlQGhvYmJpdG9uLmV4YW1wbGUiLCJlbmMiOiJBMjU2R0NNIn0"
+  },
+  {
+   "figure": 90,
+   "caption": "Ciphertext, base64url-encoded",
+   "section": "5.2.4",
+   "example": "5.2",
+   "text": "o4k2cnGN8rSSw3IDo1YuySkqeS_t2m1GXklSgqBdpACm6UJuJowOHC5ytjqYgR\nL-I-soPlwqMUf4UgRWWeaOGNw6vGW-xyM01lTYxrXfVzIIaRdhYtEMRBvBWbEw\nP7ua1DRfvaOjgZv6Ifa3brcAM64d8p5lhhNcizPersuhw5f-pGYzseva-TUaL8\niWnctc-sSwy7SQmRkfhDjwbz0fz6kFovEgj64X1I5s7E6GLp5fnbYGLa1QUiML\n7Cc2GxgvI7zqWo0YIEc7aCflLG1-8BboVWFdZKLK9vNoycrYHumwzKluLWEbSV\nmaPpOslY2n525DxDfWaVFUfKQxMF56vn4B9QMpWAbnypNimbM8zVOw",
+   "joined": "o4k2cnGN8rSSw3IDo1YuySkqeS_t2m1GXklSgqBdpACm6UJuJowOHC5ytjqYgRL-I-soPlwqMUf4UgRWWeaOGNw6vGW-xyM01lTYxrXfVzIIaRdhYtEMRBvBWbEwP7ua1DRfvaOjgZv6Ifa3brcAM64d8p5lhhNcizPersuhw5f-pGYzseva-TUaL8iWnctc-sSwy7SQmRkfhDjwbz0fz6kFovEgj64X1I5s7E6GLp5fnbYGLa1QUiML7Cc2GxgvI7zqWo0YIEc7aCflLG1-8BboVWFdZKLK9vNoycrYHumwzKluLWEbSVmaPpOslY2n525DxDfWaVFUfKQxMF56vn4B9QMpWAbnypNimbM8zVOw"
+  },
+  {
+   "figure": 91,
+   "caption": "Authentication Tag, base64url-encoded",
+   "section": "5.2.4",
+   "example": "5.2",
+   "text": "UCGiqJxhBI3IFVdPalHHvA",
+   "joined": "UCGiqJxhBI3IFVdPalHHvA"
+  },
+  {
+   "figure": 92,
+   "caption": "JWE Compact Serialization",
+   "section": "5.2.5",
+   "example": "5.2",
+   "text": "eyJhbGciOiJSU0EtT0FFUCIsImtpZCI6InNhbXdpc2UuZ2FtZ2VlQGhvYmJpdG\n9uLmV4YW1wbGUiLCJlbmMiOiJBMjU2R0NNIn0\n.\nrT99rwrBTbTI7IJM8fU3Eli7226HEB7IchCxNuh7lCiud48LxeolRdtFF4nzQi\nbeYOl5S_PJsAXZwSXtDePz9hk-BbtsTBqC2UsPOdwjC9NhNupNNu9uHIVftDyu\ncvI6hvALeZ6OGnhNV4v1zx2k7O1D89mAzfw-_kT3tkuorpDU-CpBENfIHX1Q58\n-Aad3FzMuo3Fn9buEP2yXakLXYa15BUXQsupM4A1GD4_H4Bd7V3u9h8Gkg8Bpx\nKdUV9ScfJQTcYm6eJEBz3aSwIaK4T3-dwWpuBOhROQXBosJzS1asnuHtVMt2pK\nIIfux5BC6huIvmY7kzV7W7aIUrpYm_3H4zYvyMeq5pGqFmW2k8zpO878TRlZx7\npZfPYDSXZyS0CfKKkMozT_qiCwZTSz4duYnt8hS4Z9sGthXn9uDqd6wycMagnQ\nfOTs_lycTWmY-aqWVDKhjYNRf03NiwRtb5BE-tOdFwCASQj3uuAgPGrO2AWBe3\n8UjQb0lvXn1SpyvYZ3WFc7WOJYaTa7A8DRn6MC6T-xDmMuxC0G7S2rscw5lQQU\n06MvZTlFOt0UvfuKBa03cxA_nIBIhLMjY2kOTxQMmpDPTr6Cbo8aKaOnx6ASE5\nJx9paBpnNmOOKH35j_QlrQhDWUN6A2Gg8iFayJ69xDEdHAVCGRzN3woEI2ozDR\ns\n.\n-nBoKLH0YkLZPSI9\n.\no4k2cnGN8rSSw3IDo1YuySkqeS_t2m1GXklSgqBdpACm6UJuJowOHC5ytjqYgR\nL-I-soPlwqMUf4UgRWWeaOGNw6vGW-xyM01lTYxrXfVzIIaRdhYtEMRBvBWbEw\nP7ua1DRfvaOjgZv6Ifa3brcAM64d8p5lhhNcizPersuhw5f-pGYzseva-TUaL8\niWnctc-sSwy7SQmRkfhDjwbz0fz6kFovEgj64X1I5s7E6GLp5fnbYGLa1QUiML\n7Cc2GxgvI7zqWo0YIEc7aCflLG1-8BboVWFdZKLK9vNoycrYHumwzKluLWEbSV\nmaPpOslY2n525DxDfWaVFUfKQxMF56vn4B9QMpWAbnypNimbM8zVOw\n.\nUCGiqJxhBI3IFVdPalHHvA",
+   "joined": "eyJhbGciOiJSU0EtT0FFUCIsImtpZCI6InNhbXdpc2UuZ2FtZ2VlQGhvYmJpdG9uLmV4YW1wbGUiLCJlbmMiOiJBMjU2R0NNIn0.rT99rwrBTbTI7IJM8fU3Eli7226HEB7IchCxNuh7lCiud48LxeolRdtFF4nzQibeYOl5S_PJsAXZwSXtDePz9hk-BbtsTBqC2UsPOdwjC9NhNupNNu9uHIVftDyucvI6hvALeZ6OGnhNV4v1zx2k7O1D89mAzfw-_kT3tkuorpDU-CpBENfIHX1Q58-Aad3FzMuo3Fn9buEP2yXakLXYa15BUXQsupM4A1GD4_H4Bd7V3u9h8Gkg8BpxKdUV9ScfJQTcYm6eJEBz3aSwIaK4T3-dwWpuBOhROQXBosJzS1asnuHtVMt2pKIIfux5BC6huIvmY7kzV7W7aIUrpYm_3H4zYvyMeq5pGqFmW2k8zpO878TRlZx7pZfPYDSXZyS0CfKKkMozT_qiCwZTSz4duYnt8hS4Z9sGthXn9uDqd6wycMagnQfOTs_lycTWmY-aqWVDKhjYNRf03NiwRtb5BE-tOdFwCASQj3uuAgPGrO2AWBe38UjQb0lvXn1SpyvYZ3WFc7WOJYaTa7A8DRn6MC6T-xDmMuxC0G7S2rscw5lQQU06MvZTlFOt0UvfuKBa03cxA_nIBIhLMjY2kOTxQMmpDPTr6Cbo8aKaOnx6ASE5Jx9paBpnNmOOKH35j_QlrQhDWUN6A2Gg8iFayJ69xDEdHAVCGRzN3woEI2ozDRs.-nBoKLH0YkLZPSI9.o4k2cnGN8rSSw3IDo1YuySkqeS_t2m1GXklSgqBdpACm6UJuJowOHC5ytjqYgRL-I-soPlwqMUf4UgRWWeaOGNw6vGW-xyM01lTYxrXfVzIIaRdhYtEMRBvBWbEwP7ua1DRfvaOjgZv6Ifa3brcAM64d8p5lhhNcizPersuhw5f-pGYzseva-TUaL8iWnctc-sSwy7SQmRkfhDjwbz0fz6kFovEgj64X1I5s7E6GLp5fnbYGLa1QUiML7Cc2GxgvI7zqWo0YIEc7aCflLG1-8BboVWFdZKLK9vNoycrYHumwzKluLWEbSVmaPpOslY2n525DxDfWaVFUfKQxMF56vn4B9QMpWAbnypNimbM8zVOw.UCGiqJxhBI3IFVdPalHHvA"
+  },
+  {
+   "figure": 93,
+   "caption": "General JWE JSON Serialization",
+   "section": "5.2.5",
+   "example": "5.2",
+   "text": "{\n  \"recipients\": [\n    {\n      \"encrypted_key\": \"rT99rwrBTbTI7IJM8fU3Eli7226HEB7IchCxNu\n          h7lCiud48LxeolRdtFF4nzQibeYOl5S_PJsAXZwSXtDePz9hk-Bb\n          tsTBqC2UsPOdwjC9NhNupNNu9uHIVftDyucvI6hvALeZ6OGnhNV4\n          v1zx2k7O1D89mAzfw-_kT3tkuorpDU-CpBENfIHX1Q58-Aad3FzM\n          uo3Fn9buEP2yXakLXYa15BUXQsupM4A1GD4_H4Bd7V3u9h8Gkg8B\n          pxKdUV9ScfJQTcYm6eJEBz3aSwIaK4T3-dwWpuBOhROQXBosJzS1\n          asnuHtVMt2pKIIfux5BC6huIvmY7kzV7W7aIUrpYm_3H4zYvyMeq\n          5pGqFmW2k8zpO878TRlZx7pZfPYDSXZyS0CfKKkMozT_qiCwZTSz\n          4duYnt8hS4Z9sGthXn9uDqd6wycMagnQfOTs_lycTWmY-aqWVDKh\n          jYNRf03NiwRtb5BE-tOdFwCASQj3uuAgPGrO2AWBe38UjQb0lvXn\n          1SpyvYZ3WFc7WOJYaTa7A8DRn6MC6T-xDmMuxC0G7S2rscw5lQQU\n          06MvZTlFOt0UvfuKBa03cxA_nIBIhLMjY2kOTxQMmpDPTr6Cbo8a\n          KaOnx6ASE5Jx9paBpnNmOOKH35j_QlrQhDWUN6A2Gg8iFayJ69xD\n          EdHAVCGRzN3woEI2ozDRs\"\n    }\n  ],\n  \"protected\": \"eyJhbGciOiJSU0EtT0FFUCIsImtpZCI6InNhbXdpc2UuZ2\n      FtZ2VlQGhvYmJpdG9uLmV4YW1wbGUiLCJlbmMiOiJBMjU2R0NNIn0\",\n  \"iv\": \"-nBoKLH0YkLZPSI9\",\n  \"ciphertext\": \"o4k2cnGN8rSSw3IDo1YuySkqeS_t2m1GXklSgqBdpACm6\n      UJuJowOHC5ytjqYgRL-I-soPlwqMUf4UgRWWeaOGNw6vGW-xyM01lTYx\n      rXfVzIIaRdhYtEMRBvBWbEwP7ua1DRfvaOjgZv6Ifa3brcAM64d8p5lh\n      hNcizPersuhw5f-pGYzseva-TUaL8iWnctc-sSwy7SQmRkfhDjwbz0fz\n      6kFovEgj64X1I5s7E6GLp5fnbYGLa1QUiML7Cc2GxgvI7zqWo0YIEc7a\n      CflLG1-8BboVWFdZKLK9vNoycrYHumwzKluLWEbSVmaPpOslY2n525Dx\n      DfWaVFUfKQxMF56vn4B9QMpWAbnypNimbM8zVOw\",\n  \"tag\": \"UCGiqJxhBI3IFVdPalHHvA\"\n}",
+   "joined": "{\"recipients\":[{\"encrypted_key\":\"rT99rwrBTbTI7IJM8fU3Eli7226HEB7IchCxNuh7lCiud48LxeolRdtFF4nzQibeYOl5S_PJsAXZwSXtDePz9hk-BbtsTBqC2UsPOdwjC9NhNupNNu9uHIVftDyucvI6hvALeZ6OGnhNV4v1zx2k7O1D89mAzfw-_kT3tkuorpDU-CpBENfIHX1Q58-Aad3FzMuo3Fn9buEP2yXakLXYa15BUXQsupM4A1GD4_H4Bd7V3u9h8Gkg8BpxKdUV9ScfJQTcYm6eJEBz3aSwIaK4T3-dwWpuBOhROQXBosJzS1asnuHtVMt2pKIIfux5BC6huIvmY7kzV7W7aIUrpYm_3H4zYvyMeq5pGqFmW2k8zpO878TRlZx7pZfPYDSXZyS0CfKKkMozT_qiCwZTSz4duYnt8hS4Z9sGthXn9uDqd6wycMagnQfOTs_lycTWmY-aqWVDKhjYNRf03NiwRtb5BE-tOdFwCASQj3uuAgPGrO2AWBe38UjQb0lvXn1SpyvYZ3WFc7WOJYaTa7A8DRn6MC6T-xDmMuxC0G7S2rscw5lQQU06MvZTlFOt0UvfuKBa03cxA_nIBIhLMjY2kOTxQMmpDPTr6Cbo8aKaOnx6ASE5Jx9paBpnNmOOKH35j_QlrQhDWUN6A2Gg8iFayJ69xDEdHAVCGRzN3woEI2ozDRs\"}],\"protected\":\"eyJhbGciOiJSU0EtT0FFUCIsImtpZCI6InNhbXdpc2UuZ2FtZ2VlQGhvYmJpdG9uLmV4YW1wbGUiLCJlbmMiOiJBMjU2R0NNIn0\",\"iv\":\"-nBoKLH0YkLZPSI9\",\"ciphertext\":\"o4k2cnGN8rSSw3IDo1YuySkqeS_t2m1GXklSgqBdpACm6UJuJowOHC5ytjqYgRL-I-soPlwqMUf4UgRWWeaOGNw6vGW-xyM01lTYxrXfVzIIaRdhYtEMRBvBWbEwP7ua1DRfvaOjgZv6Ifa3brcAM64d8p5lhhNcizPersuhw5f-pGYzseva-TUaL8iWnctc-sSwy7SQmRkfhDjwbz0fz6kFovEgj64X1I5s7E6GLp5fnbYGLa1QUiML7Cc2GxgvI7zqWo0YIEc7aCflLG1-8BboVWFdZKLK9vNoycrYHumwzKluLWEbSVmaPpOslY2n525DxDfWaVFUfKQxMF56vn4B9QMpWAbnypNimbM8zVOw\",\"tag\":\"UCGiqJxhBI3IFVdPalHHvA\"}",
+   "json": {
+    "recipients": [
+     {
+      "encrypted_key": "rT99rwrBTbTI7IJM8fU3Eli7226HEB7IchCxNuh7lCiud48LxeolRdtFF4nzQibeYOl5S_PJsAXZwSXtDePz9hk-BbtsTBqC2UsPOdwjC9NhNupNNu9uHIVftDyucvI6hvALeZ6OGnhNV4v1zx2k7O1D89mAzfw-_kT3tkuorpDU-CpBENfIHX1Q58-Aad3FzMuo3Fn9buEP2yXakLXYa15BUXQsupM4A1GD4_H4Bd7V3u9h8Gkg8BpxKdUV9ScfJQTcYm6eJEBz3aSwIaK4T3-dwWpuBOhROQXBosJzS1asnuHtVMt2pKIIfux5BC6huIvmY7kzV7W7aIUrpYm_3H4zYvyMeq5pGqFmW2k8zpO878TRlZx7pZfPYDSXZyS0CfKKkMozT_qiCwZTSz4duYnt8hS4Z9sGthXn9uDqd6wycMagnQfOTs_lycTWmY-aqWVDKhjYNRf03NiwRtb5BE-tOdFwCASQj3uuAgPGrO2AWBe38UjQb0lvXn1SpyvYZ3WFc7WOJYaTa7A8DRn6MC6T-xDmMuxC0G7S2rscw5lQQU06MvZTlFOt0UvfuKBa03cxA_nIBIhLMjY2kOTxQMmpDPTr6Cbo8aKaOnx6ASE5Jx9paBpnNmOOKH35j_QlrQhDWUN6A2Gg8iFayJ69xDEdHAVCGRzN3woEI2ozDRs"
+     }
+    ],
+    "protected": "eyJhbGciOiJSU0EtT0FFUCIsImtpZCI6InNhbXdpc2UuZ2FtZ2VlQGhvYmJpdG9uLmV4YW1wbGUiLCJlbmMiOiJBMjU2R0NNIn0",
+    "iv": "-nBoKLH0YkLZPSI9",
+    "ciphertext": "o4k2cnGN8rSSw3IDo1YuySkqeS_t2m1GXklSgqBdpACm6UJuJowOHC5ytjqYgRL-I-soPlwqMUf4UgRWWeaOGNw6vGW-xyM01lTYxrXfVzIIaRdhYtEMRBvBWbEwP7ua1DRfvaOjgZv6Ifa3brcAM64d8p5lhhNcizPersuhw5f-pGYzseva-TUaL8iWnctc-sSwy7SQmRkfhDjwbz0fz6kFovEgj64X1I5s7E6GLp5fnbYGLa1QUiML7Cc2GxgvI7zqWo0YIEc7aCflLG1-8BboVWFdZKLK9vNoycrYHumwzKluLWEbSVmaPpOslY2n525DxDfWaVFUfKQxMF56vn4B9QMpWAbnypNimbM8zVOw",
+    "tag": "UCGiqJxhBI3IFVdPalHHvA"
+   }
+  },
+  {
+   "figure": 94,
+   "caption": "Flattened JWE JSON Serialization",
+   "section": "5.2.5",
+   "example": "5.2",
+   "text": "{\n  \"protected\": \"eyJhbGciOiJSU0EtT0FFUCIsImtpZCI6InNhbXdpc2UuZ2\n      FtZ2VlQGhvYmJpdG9uLmV4YW1wbGUiLCJlbmMiOiJBMjU2R0NNIn0\",\n  \"encrypted_key\": \"rT99rwrBTbTI7IJM8fU3Eli7226HEB7IchCxNuh7lC\n      iud48LxeolRdtFF4nzQibeYOl5S_PJsAXZwSXtDePz9hk-BbtsTBqC2U\n      sPOdwjC9NhNupNNu9uHIVftDyucvI6hvALeZ6OGnhNV4v1zx2k7O1D89\n      mAzfw-_kT3tkuorpDU-CpBENfIHX1Q58-Aad3FzMuo3Fn9buEP2yXakL\n      XYa15BUXQsupM4A1GD4_H4Bd7V3u9h8Gkg8BpxKdUV9ScfJQTcYm6eJE\n      Bz3aSwIaK4T3-dwWpuBOhROQXBosJzS1asnuHtVMt2pKIIfux5BC6huI\n      vmY7kzV7W7aIUrpYm_3H4zYvyMeq5pGqFmW2k8zpO878TRlZx7pZfPYD\n      SXZyS0CfKKkMozT_qiCwZTSz4duYnt8hS4Z9sGthXn9uDqd6wycMagnQ\n      fOTs_lycTWmY-aqWVDKhjYNRf03NiwRtb5BE-tOdFwCASQj3uuAgPGrO\n      2AWBe38UjQb0lvXn1SpyvYZ3WFc7WOJYaTa7A8DRn6MC6T-xDmMuxC0G\n      7S2rscw5lQQU06MvZTlFOt0UvfuKBa03cxA_nIBIhLMjY2kOTxQMmpDP\n      Tr6Cbo8aKaOnx6ASE5Jx9paBpnNmOOKH35j_QlrQhDWUN6A2Gg8iFayJ\n      69xDEdHAVCGRzN3woEI2ozDRs\",\n  \"iv\": \"-nBoKLH0YkLZPSI9\",\n  \"ciphertext\": \"o4k2cnGN8rSSw3IDo1YuySkqeS_t2m1GXklSgqBdpACm6\n      UJuJowOHC5ytjqYgRL-I-soPlwqMUf4UgRWWeaOGNw6vGW-xyM01lTYx\n      rXfVzIIaRdhYtEMRBvBWbEwP7ua1DRfvaOjgZv6Ifa3brcAM64d8p5lh\n      hNcizPersuhw5f-pGYzseva-TUaL8iWnctc-sSwy7SQmRkfhDjwbz0fz\n      6kFovEgj64X1I5s7E6GLp5fnbYGLa1QUiML7Cc2GxgvI7zqWo0YIEc7a\n      CflLG1-8BboVWFdZKLK9vNoycrYHumwzKluLWEbSVmaPpOslY2n525Dx\n      DfWaVFUfKQxMF56vn4B9QMpWAbnypNimbM8zVOw\",\n  \"tag\": \"UCGiqJxhBI3IFVdPalHHvA\"\n}",
+   "joined": "{\"protected\":\"eyJhbGciOiJSU0EtT0FFUCIsImtpZCI6InNhbXdpc2UuZ2FtZ2VlQGhvYmJpdG9uLmV4YW1wbGUiLCJlbmMiOiJBMjU2R0NNIn0\",\"encrypted_key\":\"rT99rwrBTbTI7IJM8fU3Eli7226HEB7IchCxNuh7lCiud48LxeolRdtFF4nzQibeYOl5S_PJsAXZwSXtDePz9hk-BbtsTBqC2UsPOdwjC9NhNupNNu9uHIVftDyucvI6hvALeZ6OGnhNV4v1zx2k7O1D89mAzfw-_kT3tkuorpDU-CpBENfIHX1Q58-Aad3FzMuo3Fn9buEP2yXakLXYa15BUXQsupM4A1GD4_H4Bd7V3u9h8Gkg8BpxKdUV9ScfJQTcYm6eJEBz3aSwIaK4T3-dwWpuBOhROQXBosJzS1asnuHtVMt2pKIIfux5BC6huIvmY7kzV7W7aIUrpYm_3H4zYvyMeq5pGqFmW2k8zpO878TRlZx7pZfPYDSXZyS0CfKKkMozT_qiCwZTSz4duYnt8hS4Z9sGthXn9uDqd6wycMagnQfOTs_lycTWmY-aqWVDKhjYNRf03NiwRtb5BE-tOdFwCASQj3uuAgPGrO2AWBe38UjQb0lvXn1SpyvYZ3WFc7WOJYaTa7A8DRn6MC6T-xDmMuxC0G7S2rscw5lQQU06MvZTlFOt0UvfuKBa03cxA_nIBIhLMjY2kOTxQMmpDPTr6Cbo8aKaOnx6ASE5Jx9paBpnNmOOKH35j_QlrQhDWUN6A2Gg8iFayJ69xDEdHAVCGRzN3woEI2ozDRs\",\"iv\":\"-nBoKLH0YkLZPSI9\",\"ciphertext\":\"o4k2cnGN8rSSw3IDo1YuySkqeS_t2m1GXklSgqBdpACm6UJuJowOHC5ytjqYgRL-I-soPlwqMUf4UgRWWeaOGNw6vGW-xyM01lTYxrXfVzIIaRdhYtEMRBvBWbEwP7ua1DRfvaOjgZv6Ifa3brcAM64d8p5lhhNcizPersuhw5f-pGYzseva-TUaL8iWnctc-sSwy7SQmRkfhDjwbz0fz6kFovEgj64X1I5s7E6GLp5fnbYGLa1QUiML7Cc2GxgvI7zqWo0YIEc7aCflLG1-8BboVWFdZKLK9vNoycrYHumwzKluLWEbSVmaPpOslY2n525DxDfWaVFUfKQxMF56vn4B9QMpWAbnypNimbM8zVOw\",\"tag\":\"UCGiqJxhBI3IFVdPalHHvA\"}",
+   "json": {
+    "protected": "eyJhbGciOiJSU0EtT0FFUCIsImtpZCI6InNhbXdpc2UuZ2FtZ2VlQGhvYmJpdG9uLmV4YW1wbGUiLCJlbmMiOiJBMjU2R0NNIn0",
+    "encrypted_key": "rT99rwrBTbTI7IJM8fU3Eli7226HEB7IchCxNuh7lCiud48LxeolRdtFF4nzQibeYOl5S_PJsAXZwSXtDePz9hk-BbtsTBqC2UsPOdwjC9NhNupNNu9uHIVftDyucvI6hvALeZ6OGnhNV4v1zx2k7O1D89mAzfw-_kT3tkuorpDU-CpBENfIHX1Q58-Aad3FzMuo3Fn9buEP2yXakLXYa15BUXQsupM4A1GD4_H4Bd7V3u9h8Gkg8BpxKdUV9ScfJQTcYm6eJEBz3aSwIaK4T3-dwWpuBOhROQXBosJzS1asnuHtVMt2pKIIfux5BC6huIvmY7kzV7W7aIUrpYm_3H4zYvyMeq5pGqFmW2k8zpO878TRlZx7pZfPYDSXZyS0CfKKkMozT_qiCwZTSz4duYnt8hS4Z9sGthXn9uDqd6wycMagnQfOTs_lycTWmY-aqWVDKhjYNRf03NiwRtb5BE-tOdFwCASQj3uuAgPGrO2AWBe38UjQb0lvXn1SpyvYZ3WFc7WOJYaTa7A8DRn6MC6T-xDmMuxC0G7S2rscw5lQQU06MvZTlFOt0UvfuKBa03cxA_nIBIhLMjY2kOTxQMmpDPTr6Cbo8aKaOnx6ASE5Jx9paBpnNmOOKH35j_QlrQhDWUN6A2Gg8iFayJ69xDEdHAVCGRzN3woEI2ozDRs",
+    "iv": "-nBoKLH0YkLZPSI9",
+    "ciphertext": "o4k2cnGN8rSSw3IDo1YuySkqeS_t2m1GXklSgqBdpACm6UJuJowOHC5ytjqYgRL-I-soPlwqMUf4UgRWWeaOGNw6vGW-xyM01lTYxrXfVzIIaRdhYtEMRBvBWbEwP7ua1DRfvaOjgZv6Ifa3brcAM64d8p5lhhNcizPersuhw5f-pGYzseva-TUaL8iWnctc-sSwy7SQmRkfhDjwbz0fz6kFovEgj64X1I5s7E6GLp5fnbYGLa1QUiML7Cc2GxgvI7zqWo0YIEc7aCflLG1-8BboVWFdZKLK9vNoycrYHumwzKluLWEbSVmaPpOslY2n525DxDfWaVFUfKQxMF56vn4B9QMpWAbnypNimbM8zVOw",
+    "tag": "UCGiqJxhBI3IFVdPalHHvA"
+   }
+  },
+  {
+   "figure": 95,
+   "caption": "Plaintext Content",
+   "section": "5.3.1",
+   "example": "5.3",
+   "text": "{\n  \"keys\": [\n    {\n      \"kty\": \"oct\",\n      \"kid\": \"77c7e2b8-6e13-45cf-8672-617b5b45243a\",\n      \"use\": \"enc\",\n      \"alg\": \"A128GCM\",\n      \"k\": \"XctOhJAkA-pD9Lh7ZgW_2A\"\n    },\n    {\n      \"kty\": \"oct\",\n      \"kid\": \"81b20965-8332-43d9-a468-82160ad91ac8\",\n      \"use\": \"enc\",\n      \"alg\": \"A128KW\",\n      \"k\": \"GZy6sIZ6wl9NJOKB-jnmVQ\"\n    },\n    {\n      \"kty\": \"oct\",\n      \"kid\": \"18ec08e1-bfa9-4d95-b205-2b4dd1d4321d\",\n      \"use\": \"enc\",\n      \"alg\": \"A256GCMKW\",\n      \"k\": \"qC57l_uxcm7Nm3K-ct4GFjx8tM1U8CZ0NLBvdQstiS8\"\n    }\n  ]\n}",
+   "joined": "{\"keys\":[{\"kty\":\"oct\",\"kid\":\"77c7e2b8-6e13-45cf-8672-617b5b45243a\",\"use\":\"enc\",\"alg\":\"A128GCM\",\"k\":\"XctOhJAkA-pD9Lh7ZgW_2A\"},{\"kty\":\"oct\",\"kid\":\"81b20965-8332-43d9-a468-82160ad91ac8\",\"use\":\"enc\",\"alg\":\"A128KW\",\"k\":\"GZy6sIZ6wl9NJOKB-jnmVQ\"},{\"kty\":\"oct\",\"kid\":\"18ec08e1-bfa9-4d95-b205-2b4dd1d4321d\",\"use\":\"enc\",\"alg\":\"A256GCMKW\",\"k\":\"qC57l_uxcm7Nm3K-ct4GFjx8tM1U8CZ0NLBvdQstiS8\"}]}",
+   "json": {
+    "keys": [
+     {
+      "kty": "oct",
+      "kid": "77c7e2b8-6e13-45cf-8672-617b5b45243a",
+      "use": "enc",
+      "alg": "A128GCM",
+      "k": "XctOhJAkA-pD9Lh7ZgW_2A"
+     },
+     {
+      "kty": "oct",
+      "kid": "81b20965-8332-43d9-a468-82160ad91ac8",
+      "use": "enc",
+      "alg": "A128KW",
+      "k": "GZy6sIZ6wl9NJOKB-jnmVQ"
+     },
+     {
+      "kty": "oct",
+      "kid": "18ec08e1-bfa9-4d95-b205-2b4dd1d4321d",
+      "use": "enc",
+      "alg": "A256GCMKW",
+      "k": "qC57l_uxcm7Nm3K-ct4GFjx8tM1U8CZ0NLBvdQstiS8"
+     }
+    ]
+   }
+  },
+  {
+   "figure": 96,
+   "caption": "Password",
+   "section": "5.3.1",
+   "example": "5.3",
+   "text": "entrap_o\\xe2\\x80\\x93peter_long\\xe2\\x80\\x93credit_tun",
+   "joined": "entrap_o\\xe2\\x80\\x93peter_long\\xe2\\x80\\x93credit_tun"
+  },
+  {
+   "figure": 97,
+   "caption": "Content Encryption Key, base64url-encoded",
+   "section": "5.3.2",
+   "example": "5.3",
+   "text": "uwsjJXaBK407Qaf0_zpcpmr1Cs0CC50hIUEyGNEt3m0",
+   "joined": "uwsjJXaBK407Qaf0_zpcpmr1Cs0CC50hIUEyGNEt3m0"
+  },
+  {
+   "figure": 98,
+   "caption": "Initialization Vector, base64url-encoded",
+   "section": "5.3.2",
+   "example": "5.3",
+   "text": "VBiCzVHNoLiR3F4V82uoTQ",
+   "joined": "VBiCzVHNoLiR3F4V82uoTQ"
+  },
+  {
+   "figure": 99,
+   "caption": "Salt Input, base64url-encoded",
+   "section": "5.3.3",
+   "example": "5.3",
+   "text": "8Q1SzinasR3xchYz6ZZcHA",
+   "joined": "8Q1SzinasR3xchYz6ZZcHA"
+  },
+  {
+   "figure": 100,
+   "caption": "Encrypted Key, base64url-encoded",
+   "section": "5.3.3",
+   "example": "5.3",
+   "text": "d3qNhUWfqheyPp4H8sjOWsDYajoej4c5Je6rlUtFPWdgtURtmeDV1g",
+   "joined": "d3qNhUWfqheyPp4H8sjOWsDYajoej4c5Je6rlUtFPWdgtURtmeDV1g"
+  },
+  {
+   "figure": 101,
+   "caption": "JWE Protected Header JSON",
+   "section": "5.3.4",
+   "example": "5.3",
+   "text": "{\n  \"alg\": \"PBES2-HS512+A256KW\",\n  \"p2s\": \"8Q1SzinasR3xchYz6ZZcHA\",\n  \"p2c\": 8192,\n  \"cty\": \"jwk-set+json\",\n  \"enc\": \"A128CBC-HS256\"\n}",
+   "joined": "{\"alg\":\"PBES2-HS512+A256KW\",\"p2s\":\"8Q1SzinasR3xchYz6ZZcHA\",\"p2c\":8192,\"cty\":\"jwk-set+json\",\"enc\":\"A128CBC-HS256\"}",
+   "json": {
+    "alg": "PBES2-HS512+A256KW",
+    "p2s": "8Q1SzinasR3xchYz6ZZcHA",
+    "p2c": 8192,
+    "cty": "jwk-set+json",
+    "enc": "A128CBC-HS256"
+   }
+  },
+  {
+   "figure": 102,
+   "caption": "JWE Protected Header, base64url-encoded",
+   "section": "5.3.4",
+   "example": "5.3",
+   "text": "eyJhbGciOiJQQkVTMi1IUzUxMitBMjU2S1ciLCJwMnMiOiI4UTFTemluYXNSM3\nhjaFl6NlpaY0hBIiwicDJjIjo4MTkyLCJjdHkiOiJqd2stc2V0K2pzb24iLCJl\nbmMiOiJBMTI4Q0JDLUhTMjU2In0",
+   "joined": "eyJhbGciOiJQQkVTMi1IUzUxMitBMjU2S1ciLCJwMnMiOiI4UTFTemluYXNSM3hjaFl6NlpaY0hBIiwicDJjIjo4MTkyLCJjdHkiOiJqd2stc2V0K2pzb24iLCJlbmMiOiJBMTI4Q0JDLUhTMjU2In0"
+  },
+  {
+   "figure": 103,
+   "caption": "Ciphertext, base64url-encoded",
+   "section": "5.3.4",
+   "example": "5.3",
+   "text": "o  Authentication Tag from Figure 104.\n23i-Tb1AV4n0WKVSSgcQrdg6GRqsUKxjruHXYsTHAJLZ2nsnGIX86vMXqIi6IR\nsfywCRFzLxEcZBRnTvG3nhzPk0GDD7FMyXhUHpDjEYCNA_XOmzg8yZR9oyjo6l\nTF6si4q9FZ2EhzgFQCLO_6h5EVg3vR75_hkBsnuoqoM3dwejXBtIodN84PeqMb\n6asmas_dpSsz7H10fC5ni9xIz424givB1YLldF6exVmL93R3fOoOJbmk2GBQZL\n_SEGllv2cQsBgeprARsaQ7Bq99tT80coH8ItBjgV08AtzXFFsx9qKvC982KLKd\nPQMTlVJKkqtV4Ru5LEVpBZXBnZrtViSOgyg6AiuwaS-rCrcD_ePOGSuxvgtrok\nAKYPqmXUeRdjFJwafkYEkiuDCV9vWGAi1DH2xTafhJwcmywIyzi4BqRpmdn_N-\nzl5tuJYyuvKhjKv6ihbsV_k1hJGPGAxJ6wUpmwC4PTQ2izEm0TuSE8oMKdTw8V\n3kobXZ77ulMwDs4p",
+   "joined": "oAuthenticationTagfromFigure104.23i-Tb1AV4n0WKVSSgcQrdg6GRqsUKxjruHXYsTHAJLZ2nsnGIX86vMXqIi6IRsfywCRFzLxEcZBRnTvG3nhzPk0GDD7FMyXhUHpDjEYCNA_XOmzg8yZR9oyjo6lTF6si4q9FZ2EhzgFQCLO_6h5EVg3vR75_hkBsnuoqoM3dwejXBtIodN84PeqMb6asmas_dpSsz7H10fC5ni9xIz424givB1YLldF6exVmL93R3fOoOJbmk2GBQZL_SEGllv2cQsBgeprARsaQ7Bq99tT80coH8ItBjgV08AtzXFFsx9qKvC982KLKdPQMTlVJKkqtV4Ru5LEVpBZXBnZrtViSOgyg6AiuwaS-rCrcD_ePOGSuxvgtrokAKYPqmXUeRdjFJwafkYEkiuDCV9vWGAi1DH2xTafhJwcmywIyzi4BqRpmdn_N-zl5tuJYyuvKhjKv6ihbsV_k1hJGPGAxJ6wUpmwC4PTQ2izEm0TuSE8oMKdTw8V3kobXZ77ulMwDs4p"
+  },
+  {
+   "figure": 104,
+   "caption": "Authentication Tag, base64url-encoded",
+   "section": "5.3.4",
+   "example": "5.3",
+   "text": "0HlwodAhOCILG5SQ2LQ9dg",
+   "joined": "0HlwodAhOCILG5SQ2LQ9dg"
+  },
+  {
+   "figure": 105,
+   "caption": "JWE Compact Serialization",
+   "section": "5.3.5",
+   "example": "5.3",
+   "text": "eyJhbGciOiJQQkVTMi1IUzUxMitBMjU2S1ciLCJwMnMiOiI4UTFTemluYXNSM3\nhjaFl6NlpaY0hBIiwicDJjIjo4MTkyLCJjdHkiOiJqd2stc2V0K2pzb24iLCJl\nbmMiOiJBMTI4Q0JDLUhTMjU2In0\n.\nd3qNhUWfqheyPp4H8sjOWsDYajoej4c5Je6rlUtFPWdgtURtmeDV1g\n.\nVBiCzVHNoLiR3F4V82uoTQ\n.\n23i-Tb1AV4n0WKVSSgcQrdg6GRqsUKxjruHXYsTHAJLZ2nsnGIX86vMXqIi6IR\nsfywCRFzLxEcZBRnTvG3nhzPk0GDD7FMyXhUHpDjEYCNA_XOmzg8yZR9oyjo6l\nTF6si4q9FZ2EhzgFQCLO_6h5EVg3vR75_hkBsnuoqoM3dwejXBtIodN84PeqMb\n6asmas_dpSsz7H10fC5ni9xIz424givB1YLldF6exVmL93R3fOoOJbmk2GBQZL\n_SEGllv2cQsBgeprARsaQ7Bq99tT80coH8ItBjgV08AtzXFFsx9qKvC982KLKd\nPQMTlVJKkqtV4Ru5LEVpBZXBnZrtViSOgyg6AiuwaS-rCrcD_ePOGSuxvgtrok\nAKYPqmXUeRdjFJwafkYEkiuDCV9vWGAi1DH2xTafhJwcmywIyzi4BqRpmdn_N-\nzl5tuJYyuvKhjKv6ihbsV_k1hJGPGAxJ6wUpmwC4PTQ2izEm0TuSE8oMKdTw8V\n3kobXZ77ulMwDs4p\n.\n0HlwodAhOCILG5SQ2LQ9dg",
+   "joined": "eyJhbGciOiJQQkVTMi1IUzUxMitBMjU2S1ciLCJwMnMiOiI4UTFTemluYXNSM3hjaFl6NlpaY0hBIiwicDJjIjo4MTkyLCJjdHkiOiJqd2stc2V0K2pzb24iLCJlbmMiOiJBMTI4Q0JDLUhTMjU2In0.d3qNhUWfqheyPp4H8sjOWsDYajoej4c5Je6rlUtFPWdgtURtmeDV1g.VBiCzVHNoLiR3F4V82uoTQ.23i-Tb1AV4n0WKVSSgcQrdg6GRqsUKxjruHXYsTHAJLZ2nsnGIX86vMXqIi6IRsfywCRFzLxEcZBRnTvG3nhzPk0GDD7FMyXhUHpDjEYCNA_XOmzg8yZR9oyjo6lTF6si4q9FZ2EhzgFQCLO_6h5EVg3vR75_hkBsnuoqoM3dwejXBtIodN84PeqMb6asmas_dpSsz7H10fC5ni9xIz424givB1YLldF6exVmL93R3fOoOJbmk2GBQZL_SEGllv2cQsBgeprARsaQ7Bq99tT80coH8ItBjgV08AtzXFFsx9qKvC982KLKdPQMTlVJKkqtV4Ru5LEVpBZXBnZrtViSOgyg6AiuwaS-rCrcD_ePOGSuxvgtrokAKYPqmXUeRdjFJwafkYEkiuDCV9vWGAi1DH2xTafhJwcmywIyzi4BqRpmdn_N-zl5tuJYyuvKhjKv6ihbsV_k1hJGPGAxJ6wUpmwC4PTQ2izEm0TuSE8oMKdTw8V3kobXZ77ulMwDs4p.0HlwodAhOCILG5SQ2LQ9dg"
+  },
+  {
+   "figure": 106,
+   "caption": "General JWE JSON Serialization",
+   "section": "5.3.5",
+   "example": "5.3",
+   "text": "{\n  \"recipients\": [\n    {\n      \"encrypted_key\": \"d3qNhUWfqheyPp4H8sjOWsDYajoej4c5Je6rlU\n          tFPWdgtURtmeDV1g\"\n    }\n  ],\n  \"protected\": \"eyJhbGciOiJQQkVTMi1IUzUxMitBMjU2S1ciLCJwMnMiOi\n      I4UTFTemluYXNSM3hjaFl6NlpaY0hBIiwicDJjIjo4MTkyLCJjdHkiOi\n      Jqd2stc2V0K2pzb24iLCJlbmMiOiJBMTI4Q0JDLUhTMjU2In0\",\n  \"iv\": \"VBiCzVHNoLiR3F4V82uoTQ\",\n  \"ciphertext\": \"23i-Tb1AV4n0WKVSSgcQrdg6GRqsUKxjruHXYsTHAJLZ2\n      nsnGIX86vMXqIi6IRsfywCRFzLxEcZBRnTvG3nhzPk0GDD7FMyXhUHpD\n      jEYCNA_XOmzg8yZR9oyjo6lTF6si4q9FZ2EhzgFQCLO_6h5EVg3vR75_\n      hkBsnuoqoM3dwejXBtIodN84PeqMb6asmas_dpSsz7H10fC5ni9xIz42\n      4givB1YLldF6exVmL93R3fOoOJbmk2GBQZL_SEGllv2cQsBgeprARsaQ\n      7Bq99tT80coH8ItBjgV08AtzXFFsx9qKvC982KLKdPQMTlVJKkqtV4Ru\n      5LEVpBZXBnZrtViSOgyg6AiuwaS-rCrcD_ePOGSuxvgtrokAKYPqmXUe\n      RdjFJwafkYEkiuDCV9vWGAi1DH2xTafhJwcmywIyzi4BqRpmdn_N-zl5\n      tuJYyuvKhjKv6ihbsV_k1hJGPGAxJ6wUpmwC4PTQ2izEm0TuSE8oMKdT\n      w8V3kobXZ77ulMwDs4p\",\n  \"tag\": \"0HlwodAhOCILG5SQ2LQ9dg\"\n}",
+   "joined": "{\"recipients\":[{\"encrypted_key\":\"d3qNhUWfqheyPp4H8sjOWsDYajoej4c5Je6rlUtFPWdgtURtmeDV1g\"}],\"protected\":\"eyJhbGciOiJQQkVTMi1IUzUxMitBMjU2S1ciLCJwMnMiOiI4UTFTemluYXNSM3hjaFl6NlpaY0hBIiwicDJjIjo4MTkyLCJjdHkiOiJqd2stc2V0K2pzb24iLCJlbmMiOiJBMTI4Q0JDLUhTMjU2In0\",\"iv\":\"VBiCzVHNoLiR3F4V82uoTQ\",\"ciphertext\":\"23i-Tb1AV4n0WKVSSgcQrdg6GRqsUKxjruHXYsTHAJLZ2nsnGIX86vMXqIi6IRsfywCRFzLxEcZBRnTvG3nhzPk0GDD7FMyXhUHpDjEYCNA_XOmzg8yZR9oyjo6lTF6si4q9FZ2EhzgFQCLO_6h5EVg3vR75_hkBsnuoqoM3dwejXBtIodN84PeqMb6asmas_dpSsz7H10fC5ni9xIz424givB1YLldF6exVmL93R3fOoOJbmk2GBQZL_SEGllv2cQsBgeprARsaQ7Bq99tT80coH8ItBjgV08AtzXFFsx9qKvC982KLKdPQMTlVJKkqtV4Ru5LEVpBZXBnZrtViSOgyg6AiuwaS-rCrcD_ePOGSuxvgtrokAKYPqmXUeRdjFJwafkYEkiuDCV9vWGAi1DH2xTafhJwcmywIyzi4BqRpmdn_N-zl5tuJYyuvKhjKv6ihbsV_k1hJGPGAxJ6wUpmwC4PTQ2izEm0TuSE8oMKdTw8V3kobXZ77ulMwDs4p\",\"tag\":\"0HlwodAhOCILG5SQ2LQ9dg\"}",
+   "json": {
+    "recipients": [
+     {
+      "encrypted_key": "d3qNhUWfqheyPp4H8sjOWsDYajoej4c5Je6rlUtFPWdgtURtmeDV1g"
+     }
+    ],
+    "protected": "eyJhbGciOiJQQkVTMi1IUzUxMitBMjU2S1ciLCJwMnMiOiI4UTFTemluYXNSM3hjaFl6NlpaY0hBIiwicDJjIjo4MTkyLCJjdHkiOiJqd2stc2V0K2pzb24iLCJlbmMiOiJBMTI4Q0JDLUhTMjU2In0",
+    "iv": "VBiCzVHNoLiR3F4V82uoTQ",
+    "ciphertext": "23i-Tb1AV4n0WKVSSgcQrdg6GRqsUKxjruHXYsTHAJLZ2nsnGIX86vMXqIi6IRsfywCRFzLxEcZBRnTvG3nhzPk0GDD7FMyXhUHpDjEYCNA_XOmzg8yZR9oyjo6lTF6si4q9FZ2EhzgFQCLO_6h5EVg3vR75_hkBsnuoqoM3dwejXBtIodN84PeqMb6asmas_dpSsz7H10fC5ni9xIz424givB1YLldF6exVmL93R3fOoOJbmk2GBQZL_SEGllv2cQsBgeprARsaQ7Bq99tT80coH8ItBjgV08AtzXFFsx9qKvC982KLKdPQMTlVJKkqtV4Ru5LEVpBZXBnZrtViSOgyg6AiuwaS-rCrcD_ePOGSuxvgtrokAKYPqmXUeRdjFJwafkYEkiuDCV9vWGAi1DH2xTafhJwcmywIyzi4BqRpmdn_N-zl5tuJYyuvKhjKv6ihbsV_k1hJGPGAxJ6wUpmwC4PTQ2izEm0TuSE8oMKdTw8V3kobXZ77ulMwDs4p",
+    "tag": "0HlwodAhOCILG5SQ2LQ9dg"
+   }
+  },
+  {
+   "figure": 107,
+   "caption": "Flattened JWE JSON Serialization",
+   "section": "5.3.5",
+   "example": "5.3",
+   "text": "{\n  \"protected\": \"eyJhbGciOiJQQkVTMi1IUzUxMitBMjU2S1ciLCJwMnMiOi\n      I4UTFTemluYXNSM3hjaFl6NlpaY0hBIiwicDJjIjo4MTkyLCJjdHkiOi\n      Jqd2stc2V0K2pzb24iLCJlbmMiOiJBMTI4Q0JDLUhTMjU2In0\",\n  \"encrypted_key\": \"d3qNhUWfqheyPp4H8sjOWsDYajoej4c5Je6rlUtFPW\n      dgtURtmeDV1g\",\n  \"iv\": \"VBiCzVHNoLiR3F4V82uoTQ\",\n  \"ciphertext\": \"23i-Tb1AV4n0WKVSSgcQrdg6GRqsUKxjruHXYsTHAJLZ2\n      nsnGIX86vMXqIi6IRsfywCRFzLxEcZBRnTvG3nhzPk0GDD7FMyXhUHpD\n      jEYCNA_XOmzg8yZR9oyjo6lTF6si4q9FZ2EhzgFQCLO_6h5EVg3vR75_\n      hkBsnuoqoM3dwejXBtIodN84PeqMb6asmas_dpSsz7H10fC5ni9xIz42\n      4givB1YLldF6exVmL93R3fOoOJbmk2GBQZL_SEGllv2cQsBgeprARsaQ\n      7Bq99tT80coH8ItBjgV08AtzXFFsx9qKvC982KLKdPQMTlVJKkqtV4Ru\n      5LEVpBZXBnZrtViSOgyg6AiuwaS-rCrcD_ePOGSuxvgtrokAKYPqmXUe\n      RdjFJwafkYEkiuDCV9vWGAi1DH2xTafhJwcmywIyzi4BqRpmdn_N-zl5\n      tuJYyuvKhjKv6ihbsV_k1hJGPGAxJ6wUpmwC4PTQ2izEm0TuSE8oMKdT\n      w8V3kobXZ77ulMwDs4p\",\n  \"tag\": \"0HlwodAhOCILG5SQ2LQ9dg\"\n}",
+   "joined": "{\"protected\":\"eyJhbGciOiJQQkVTMi1IUzUxMitBMjU2S1ciLCJwMnMiOiI4UTFTemluYXNSM3hjaFl6NlpaY0hBIiwicDJjIjo4MTkyLCJjdHkiOiJqd2stc2V0K2pzb24iLCJlbmMiOiJBMTI4Q0JDLUhTMjU2In0\",\"encrypted_key\":\"d3qNhUWfqheyPp4H8sjOWsDYajoej4c5Je6rlUtFPWdgtURtmeDV1g\",\"iv\":\"VBiCzVHNoLiR3F4V82uoTQ\",\"ciphertext\":\"23i-Tb1AV4n0WKVSSgcQrdg6GRqsUKxjruHXYsTHAJLZ2nsnGIX86vMXqIi6IRsfywCRFzLxEcZBRnTvG3nhzPk0GDD7FMyXhUHpDjEYCNA_XOmzg8yZR9oyjo6lTF6si4q9FZ2EhzgFQCLO_6h5EVg3vR75_hkBsnuoqoM3dwejXBtIodN84PeqMb6asmas_dpSsz7H10fC5ni9xIz424givB1YLldF6exVmL93R3fOoOJbmk2GBQZL_SEGllv2cQsBgeprARsaQ7Bq99tT80coH8ItBjgV08AtzXFFsx9qKvC982KLKdPQMTlVJKkqtV4Ru5LEVpBZXBnZrtViSOgyg6AiuwaS-rCrcD_ePOGSuxvgtrokAKYPqmXUeRdjFJwafkYEkiuDCV9vWGAi1DH2xTafhJwcmywIyzi4BqRpmdn_N-zl5tuJYyuvKhjKv6ihbsV_k1hJGPGAxJ6wUpmwC4PTQ2izEm0TuSE8oMKdTw8V3kobXZ77ulMwDs4p\",\"tag\":\"0HlwodAhOCILG5SQ2LQ9dg\"}",
+   "json": {
+    "protected": "eyJhbGciOiJQQkVTMi1IUzUxMitBMjU2S1ciLCJwMnMiOiI4UTFTemluYXNSM3hjaFl6NlpaY0hBIiwicDJjIjo4MTkyLCJjdHkiOiJqd2stc2V0K2pzb24iLCJlbmMiOiJBMTI4Q0JDLUhTMjU2In0",
+    "encrypted_key": "d3qNhUWfqheyPp4H8sjOWsDYajoej4c5Je6rlUtFPWdgtURtmeDV1g",
+    "iv": "VBiCzVHNoLiR3F4V82uoTQ",
+    "ciphertext": "23i-Tb1AV4n0WKVSSgcQrdg6GRqsUKxjruHXYsTHAJLZ2nsnGIX86vMXqIi6IRsfywCRFzLxEcZBRnTvG3nhzPk0GDD7FMyXhUHpDjEYCNA_XOmzg8yZR9oyjo6lTF6si4q9FZ2EhzgFQCLO_6h5EVg3vR75_hkBsnuoqoM3dwejXBtIodN84PeqMb6asmas_dpSsz7H10fC5ni9xIz424givB1YLldF6exVmL93R3fOoOJbmk2GBQZL_SEGllv2cQsBgeprARsaQ7Bq99tT80coH8ItBjgV08AtzXFFsx9qKvC982KLKdPQMTlVJKkqtV4Ru5LEVpBZXBnZrtViSOgyg6AiuwaS-rCrcD_ePOGSuxvgtrokAKYPqmXUeRdjFJwafkYEkiuDCV9vWGAi1DH2xTafhJwcmywIyzi4BqRpmdn_N-zl5tuJYyuvKhjKv6ihbsV_k1hJGPGAxJ6wUpmwC4PTQ2izEm0TuSE8oMKdTw8V3kobXZ77ulMwDs4p",
+    "tag": "0HlwodAhOCILG5SQ2LQ9dg"
+   }
+  },
+  {
+   "figure": 108,
+   "caption": "Elliptic Curve P-384 Key, in JWK Format",
+   "section": "5.4.1",
+   "example": "5.4",
+   "text": "{\n  \"kty\": \"EC\",\n  \"kid\": \"peregrin.took@tuckborough.example\",\n  \"use\": \"enc\",\n  \"crv\": \"P-384\",\n  \"x\": \"YU4rRUzdmVqmRtWOs2OpDE_T5fsNIodcG8G5FWPrTPMyxpzsSOGaQL\n      pe2FpxBmu2\",\n  \"y\": \"A8-yxCHxkfBz3hKZfI1jUYMjUhsEveZ9THuwFjH2sCNdtksRJU7D5-\n      SkgaFL1ETP\",\n  \"d\": \"iTx2pk7wW-GqJkHcEkFQb2EFyYcO7RugmaW3mRrQVAOUiPommT0Idn\n      YK2xDlZh-j\"\n}",
+   "joined": "{\"kty\":\"EC\",\"kid\":\"peregrin.took@tuckborough.example\",\"use\":\"enc\",\"crv\":\"P-384\",\"x\":\"YU4rRUzdmVqmRtWOs2OpDE_T5fsNIodcG8G5FWPrTPMyxpzsSOGaQLpe2FpxBmu2\",\"y\":\"A8-yxCHxkfBz3hKZfI1jUYMjUhsEveZ9THuwFjH2sCNdtksRJU7D5-SkgaFL1ETP\",\"d\":\"iTx2pk7wW-GqJkHcEkFQb2EFyYcO7RugmaW3mRrQVAOUiPommT0IdnYK2xDlZh-j\"}",
+   "json": {
+    "kty": "EC",
+    "kid": "peregrin.took@tuckborough.example",
+    "use": "enc",
+    "crv": "P-384",
+    "x": "YU4rRUzdmVqmRtWOs2OpDE_T5fsNIodcG8G5FWPrTPMyxpzsSOGaQLpe2FpxBmu2",
+    "y": "A8-yxCHxkfBz3hKZfI1jUYMjUhsEveZ9THuwFjH2sCNdtksRJU7D5-SkgaFL1ETP",
+    "d": "iTx2pk7wW-GqJkHcEkFQb2EFyYcO7RugmaW3mRrQVAOUiPommT0IdnYK2xDlZh-j"
+   }
+  },
+  {
+   "figure": 109,
+   "caption": "Content Encryption Key, base64url-encoded",
+   "section": "5.4.2",
+   "example": "5.4",
+   "text": "Nou2ueKlP70ZXDbq9UrRwg",
+   "joined": "Nou2ueKlP70ZXDbq9UrRwg"
+  },
+  {
+   "figure": 110,
+   "caption": "Initialization Vector, base64url-encoded",
+   "section": "5.4.2",
+   "example": "5.4",
+   "text": "mH-G2zVqgztUtnW_",
+   "joined": "mH-G2zVqgztUtnW_"
+  },
+  {
+   "figure": 111,
+   "caption": "Ephemeral Elliptic Curve P-384 Key, in JWK Format",
+   "section": "5.4.3",
+   "example": "5.4",
+   "text": "o  Ephemeral EC private key on the same curve as the EC public key;\n   this example uses the private key from Figure 111.\n{\n  \"kty\": \"EC\",\n  \"crv\": \"P-384\",\n  \"x\": \"uBo4kHPw6kbjx5l0xowrd_oYzBmaz-GKFZu4xAFFkbYiWgutEK6iuE\n      DsQ6wNdNg3\",\n  \"y\": \"sp3p5SGhZVC2faXumI-e9JU2Mo8KpoYrFDr5yPNVtW4PgEwZOyQTA-\n      JdaY8tb7E0\",\n  \"d\": \"D5H4Y_5PSKZvhfVFbcCYJOtcGZygRgfZkpsBr59Icmmhe9sW6nkZ8W\n      fwhinUfWJg\"\n}",
+   "joined": "oEphemeralECprivatekeyonthesamecurveastheECpublickey;thisexampleusestheprivatekeyfromFigure111.{\"kty\":\"EC\",\"crv\":\"P-384\",\"x\":\"uBo4kHPw6kbjx5l0xowrd_oYzBmaz-GKFZu4xAFFkbYiWgutEK6iuEDsQ6wNdNg3\",\"y\":\"sp3p5SGhZVC2faXumI-e9JU2Mo8KpoYrFDr5yPNVtW4PgEwZOyQTA-JdaY8tb7E0\",\"d\":\"D5H4Y_5PSKZvhfVFbcCYJOtcGZygRgfZkpsBr59Icmmhe9sW6nkZ8WfwhinUfWJg\"}"
+  },
+  {
+   "figure": 112,
+   "caption": "Encrypted Key, base64url-encoded",
+   "section": "5.4.3",
+   "example": "5.4",
+   "text": "0DJjBXri_kBcC46IkU5_Jk9BqaQeHdv2",
+   "joined": "0DJjBXri_kBcC46IkU5_Jk9BqaQeHdv2"
+  },
+  {
+   "figure": 113,
+   "caption": "JWE Protected Header JSON",
+   "section": "5.4.4",
+   "example": "5.4",
+   "text": "{\n  \"alg\": \"ECDH-ES+A128KW\",\n  \"kid\": \"peregrin.took@tuckborough.example\",\n  \"epk\": {\n    \"kty\": \"EC\",\n    \"crv\": \"P-384\",\n    \"x\": \"uBo4kHPw6kbjx5l0xowrd_oYzBmaz-GKFZu4xAFFkbYiWgutEK6i\n        uEDsQ6wNdNg3\",\n    \"y\": \"sp3p5SGhZVC2faXumI-e9JU2Mo8KpoYrFDr5yPNVtW4PgEwZOyQT\n        A-JdaY8tb7E0\"\n  },\n  \"enc\": \"A128GCM\"\n}",
+   "joined": "{\"alg\":\"ECDH-ES+A128KW\",\"kid\":\"peregrin.took@tuckborough.example\",\"epk\":{\"kty\":\"EC\",\"crv\":\"P-384\",\"x\":\"uBo4kHPw6kbjx5l0xowrd_oYzBmaz-GKFZu4xAFFkbYiWgutEK6iuEDsQ6wNdNg3\",\"y\":\"sp3p5SGhZVC2faXumI-e9JU2Mo8KpoYrFDr5yPNVtW4PgEwZOyQTA-JdaY8tb7E0\"},\"enc\":\"A128GCM\"}",
+   "json": {
+    "alg": "ECDH-ES+A128KW",
+    "kid": "peregrin.took@tuckborough.example",
+    "epk": {
+     "kty": "EC",
+     "crv": "P-384",
+     "x": "uBo4kHPw6kbjx5l0xowrd_oYzBmaz-GKFZu4xAFFkbYiWgutEK6iuEDsQ6wNdNg3",
+     "y": "sp3p5SGhZVC2faXumI-e9JU2Mo8KpoYrFDr5yPNVtW4PgEwZOyQTA-JdaY8tb7E0"
+    },
+    "enc": "A128GCM"
+   }
+  },
+  {
+   "figure": 114,
+   "caption": "JWE Protected Header, base64url-encoded",
+   "section": "5.4.4",
+   "example": "5.4",
+   "text": "eyJhbGciOiJFQ0RILUVTK0ExMjhLVyIsImtpZCI6InBlcmVncmluLnRvb2tAdH\nVja2Jvcm91Z2guZXhhbXBsZSIsImVwayI6eyJrdHkiOiJFQyIsImNydiI6IlAt\nMzg0IiwieCI6InVCbzRrSFB3Nmtiang1bDB4b3dyZF9vWXpCbWF6LUdLRlp1NH\nhBRkZrYllpV2d1dEVLNml1RURzUTZ3TmROZzMiLCJ5Ijoic3AzcDVTR2haVkMy\nZmFYdW1JLWU5SlUyTW84S3BvWXJGRHI1eVBOVnRXNFBnRXdaT3lRVEEtSmRhWT\nh0YjdFMCJ9LCJlbmMiOiJBMTI4R0NNIn0",
+   "joined": "eyJhbGciOiJFQ0RILUVTK0ExMjhLVyIsImtpZCI6InBlcmVncmluLnRvb2tAdHVja2Jvcm91Z2guZXhhbXBsZSIsImVwayI6eyJrdHkiOiJFQyIsImNydiI6IlAtMzg0IiwieCI6InVCbzRrSFB3Nmtiang1bDB4b3dyZF9vWXpCbWF6LUdLRlp1NHhBRkZrYllpV2d1dEVLNml1RURzUTZ3TmROZzMiLCJ5Ijoic3AzcDVTR2haVkMyZmFYdW1JLWU5SlUyTW84S3BvWXJGRHI1eVBOVnRXNFBnRXdaT3lRVEEtSmRhWTh0YjdFMCJ9LCJlbmMiOiJBMTI4R0NNIn0"
+  },
+  {
+   "figure": 115,
+   "caption": "Ciphertext, base64url-encoded",
+   "section": "5.4.4",
+   "example": "5.4",
+   "text": "tkZuOO9h95OgHJmkkrfLBisku8rGf6nzVxhRM3sVOhXgz5NJ76oID7lpnAi_cP\nWJRCjSpAaUZ5dOR3Spy7QuEkmKx8-3RCMhSYMzsXaEwDdXta9Mn5B7cCBoJKB0\nIgEnj_qfo1hIi-uEkUpOZ8aLTZGHfpl05jMwbKkTe2yK3mjF6SBAsgicQDVCkc\nY9BLluzx1RmC3ORXaM0JaHPB93YcdSDGgpgBWMVrNU1ErkjcMqMoT_wtCex3w0\n3XdLkjXIuEr2hWgeP-nkUZTPU9EoGSPj6fAS-bSz87RCPrxZdj_iVyC6QWcqAu\n07WNhjzJEPc4jVntRJ6K53NgPQ5p99l3Z408OUqj4ioYezbS6vTPlQ",
+   "joined": "tkZuOO9h95OgHJmkkrfLBisku8rGf6nzVxhRM3sVOhXgz5NJ76oID7lpnAi_cPWJRCjSpAaUZ5dOR3Spy7QuEkmKx8-3RCMhSYMzsXaEwDdXta9Mn5B7cCBoJKB0IgEnj_qfo1hIi-uEkUpOZ8aLTZGHfpl05jMwbKkTe2yK3mjF6SBAsgicQDVCkcY9BLluzx1RmC3ORXaM0JaHPB93YcdSDGgpgBWMVrNU1ErkjcMqMoT_wtCex3w03XdLkjXIuEr2hWgeP-nkUZTPU9EoGSPj6fAS-bSz87RCPrxZdj_iVyC6QWcqAu07WNhjzJEPc4jVntRJ6K53NgPQ5p99l3Z408OUqj4ioYezbS6vTPlQ"
+  },
+  {
+   "figure": 116,
+   "caption": "Authentication Tag, base64url-encoded",
+   "section": "5.4.4",
+   "example": "5.4",
+   "text": "WuGzxmcreYjpHGJoa17EBg",
+   "joined": "WuGzxmcreYjpHGJoa17EBg"
+  },
+  {
+   "figure": 117,
+   "caption": "JWE Compact Serialization",
+   "section": "5.4.5",
+   "example": "5.4",
+   "text": "eyJhbGciOiJFQ0RILUVTK0ExMjhLVyIsImtpZCI6InBlcmVncmluLnRvb2tAdH\nVja2Jvcm91Z2guZXhhbXBsZSIsImVwayI6eyJrdHkiOiJFQyIsImNydiI6IlAt\nMzg0IiwieCI6InVCbzRrSFB3Nmtiang1bDB4b3dyZF9vWXpCbWF6LUdLRlp1NH\nhBRkZrYllpV2d1dEVLNml1RURzUTZ3TmROZzMiLCJ5Ijoic3AzcDVTR2haVkMy\nZmFYdW1JLWU5SlUyTW84S3BvWXJGRHI1eVBOVnRXNFBnRXdaT3lRVEEtSmRhWT\nh0YjdFMCJ9LCJlbmMiOiJBMTI4R0NNIn0\n.\n0DJjBXri_kBcC46IkU5_Jk9BqaQeHdv2\n.\nmH-G2zVqgztUtnW_\n.\ntkZuOO9h95OgHJmkkrfLBisku8rGf6nzVxhRM3sVOhXgz5NJ76oID7lpnAi_cP\nWJRCjSpAaUZ5dOR3Spy7QuEkmKx8-3RCMhSYMzsXaEwDdXta9Mn5B7cCBoJKB0\nIgEnj_qfo1hIi-uEkUpOZ8aLTZGHfpl05jMwbKkTe2yK3mjF6SBAsgicQDVCkc\nY9BLluzx1RmC3ORXaM0JaHPB93YcdSDGgpgBWMVrNU1ErkjcMqMoT_wtCex3w0\n3XdLkjXIuEr2hWgeP-nkUZTPU9EoGSPj6fAS-bSz87RCPrxZdj_iVyC6QWcqAu\n07WNhjzJEPc4jVntRJ6K53NgPQ5p99l3Z408OUqj4ioYezbS6vTPlQ\n.\nWuGzxmcreYjpHGJoa17EBg",
+   "joined": "eyJhbGciOiJFQ0RILUVTK0ExMjhLVyIsImtpZCI6InBlcmVncmluLnRvb2tAdHVja2Jvcm91Z2guZXhhbXBsZSIsImVwayI6eyJrdHkiOiJFQyIsImNydiI6IlAtMzg0IiwieCI6InVCbzRrSFB3Nmtiang1bDB4b3dyZF9vWXpCbWF6LUdLRlp1NHhBRkZrYllpV2d1dEVLNml1RURzUTZ3TmROZzMiLCJ5Ijoic3AzcDVTR2haVkMyZmFYdW1JLWU5SlUyTW84S3BvWXJGRHI1eVBOVnRXNFBnRXdaT3lRVEEtSmRhWTh0YjdFMCJ9LCJlbmMiOiJBMTI4R0NNIn0.0DJjBXri_kBcC46IkU5_Jk9BqaQeHdv2.mH-G2zVqgztUtnW_.tkZuOO9h95OgHJmkkrfLBisku8rGf6nzVxhRM3sVOhXgz5NJ76oID7lpnAi_cPWJRCjSpAaUZ5dOR3Spy7QuEkmKx8-3RCMhSYMzsXaEwDdXta9Mn5B7cCBoJKB0IgEnj_qfo1hIi-uEkUpOZ8aLTZGHfpl05jMwbKkTe2yK3mjF6SBAsgicQDVCkcY9BLluzx1RmC3ORXaM0JaHPB93YcdSDGgpgBWMVrNU1ErkjcMqMoT_wtCex3w03XdLkjXIuEr2hWgeP-nkUZTPU9EoGSPj6fAS-bSz87RCPrxZdj_iVyC6QWcqAu07WNhjzJEPc4jVntRJ6K53NgPQ5p99l3Z408OUqj4ioYezbS6vTPlQ.WuGzxmcreYjpHGJoa17EBg"
+  },
+  {
+   "figure": 118,
+   "caption": "General JWE JSON Serialization",
+   "section": "5.4.5",
+   "example": "5.4",
+   "text": "{\n  \"recipients\": [\n    {\n      \"encrypted_key\": \"0DJjBXri_kBcC46IkU5_Jk9BqaQeHdv2\"\n    }\n  ],\n  \"protected\": \"eyJhbGciOiJFQ0RILUVTK0ExMjhLVyIsImtpZCI6InBlcm\n      VncmluLnRvb2tAdHVja2Jvcm91Z2guZXhhbXBsZSIsImVwayI6eyJrdH\n      kiOiJFQyIsImNydiI6IlAtMzg0IiwieCI6InVCbzRrSFB3Nmtiang1bD\n      B4b3dyZF9vWXpCbWF6LUdLRlp1NHhBRkZrYllpV2d1dEVLNml1RURzUT\n      Z3TmROZzMiLCJ5Ijoic3AzcDVTR2haVkMyZmFYdW1JLWU5SlUyTW84S3\n      BvWXJGRHI1eVBOVnRXNFBnRXdaT3lRVEEtSmRhWTh0YjdFMCJ9LCJlbm\n      MiOiJBMTI4R0NNIn0\",\n  \"iv\": \"mH-G2zVqgztUtnW_\",\n  \"ciphertext\": \"tkZuOO9h95OgHJmkkrfLBisku8rGf6nzVxhRM3sVOhXgz\n      5NJ76oID7lpnAi_cPWJRCjSpAaUZ5dOR3Spy7QuEkmKx8-3RCMhSYMzs\n      XaEwDdXta9Mn5B7cCBoJKB0IgEnj_qfo1hIi-uEkUpOZ8aLTZGHfpl05\n      jMwbKkTe2yK3mjF6SBAsgicQDVCkcY9BLluzx1RmC3ORXaM0JaHPB93Y\n      cdSDGgpgBWMVrNU1ErkjcMqMoT_wtCex3w03XdLkjXIuEr2hWgeP-nkU\n      ZTPU9EoGSPj6fAS-bSz87RCPrxZdj_iVyC6QWcqAu07WNhjzJEPc4jVn\n      tRJ6K53NgPQ5p99l3Z408OUqj4ioYezbS6vTPlQ\",\n  \"tag\": \"WuGzxmcreYjpHGJoa17EBg\"\n}",
+   "joined": "{\"recipients\":[{\"encrypted_key\":\"0DJjBXri_kBcC46IkU5_Jk9BqaQeHdv2\"}],\"protected\":\"eyJhbGciOiJFQ0RILUVTK0ExMjhLVyIsImtpZCI6InBlcmVncmluLnRvb2tAdHVja2Jvcm91Z2guZXhhbXBsZSIsImVwayI6eyJrdHkiOiJFQyIsImNydiI6IlAtMzg0IiwieCI6InVCbzRrSFB3Nmtiang1bDB4b3dyZF9vWXpCbWF6LUdLRlp1NHhBRkZrYllpV2d1dEVLNml1RURzUTZ3TmROZzMiLCJ5Ijoic3AzcDVTR2haVkMyZmFYdW1JLWU5SlUyTW84S3BvWXJGRHI1eVBOVnRXNFBnRXdaT3lRVEEtSmRhWTh0YjdFMCJ9LCJlbmMiOiJBMTI4R0NNIn0\",\"iv\":\"mH-G2zVqgztUtnW_\",\"ciphertext\":\"tkZuOO9h95OgHJmkkrfLBisku8rGf6nzVxhRM3sVOhXgz5NJ76oID7lpnAi_cPWJRCjSpAaUZ5dOR3Spy7QuEkmKx8-3RCMhSYMzsXaEwDdXta9Mn5B7cCBoJKB0IgEnj_qfo1hIi-uEkUpOZ8aLTZGHfpl05jMwbKkTe2yK3mjF6SBAsgicQDVCkcY9BLluzx1RmC3ORXaM0JaHPB93YcdSDGgpgBWMVrNU1ErkjcMqMoT_wtCex3w03XdLkjXIuEr2hWgeP-nkUZTPU9EoGSPj6fAS-bSz87RCPrxZdj_iVyC6QWcqAu07WNhjzJEPc4jVntRJ6K53NgPQ5p99l3Z408OUqj4ioYezbS6vTPlQ\",\"tag\":\"WuGzxmcreYjpHGJoa17EBg\"}",
+   "json": {
+    "recipients": [
+     {
+      "encrypted_key": "0DJjBXri_kBcC46IkU5_Jk9BqaQeHdv2"
+     }
+    ],
+    "protected": "eyJhbGciOiJFQ0RILUVTK0ExMjhLVyIsImtpZCI6InBlcmVncmluLnRvb2tAdHVja2Jvcm91Z2guZXhhbXBsZSIsImVwayI6eyJrdHkiOiJFQyIsImNydiI6IlAtMzg0IiwieCI6InVCbzRrSFB3Nmtiang1bDB4b3dyZF9vWXpCbWF6LUdLRlp1NHhBRkZrYllpV2d1dEVLNml1RURzUTZ3TmROZzMiLCJ5Ijoic3AzcDVTR2haVkMyZmFYdW1JLWU5SlUyTW84S3BvWXJGRHI1eVBOVnRXNFBnRXdaT3lRVEEtSmRhWTh0YjdFMCJ9LCJlbmMiOiJBMTI4R0NNIn0",
+    "iv": "mH-G2zVqgztUtnW_",
+    "ciphertext": "tkZuOO9h95OgHJmkkrfLBisku8rGf6nzVxhRM3sVOhXgz5NJ76oID7lpnAi_cPWJRCjSpAaUZ5dOR3Spy7QuEkmKx8-3RCMhSYMzsXaEwDdXta9Mn5B7cCBoJKB0IgEnj_qfo1hIi-uEkUpOZ8aLTZGHfpl05jMwbKkTe2yK3mjF6SBAsgicQDVCkcY9BLluzx1RmC3ORXaM0JaHPB93YcdSDGgpgBWMVrNU1ErkjcMqMoT_wtCex3w03XdLkjXIuEr2hWgeP-nkUZTPU9EoGSPj6fAS-bSz87RCPrxZdj_iVyC6QWcqAu07WNhjzJEPc4jVntRJ6K53NgPQ5p99l3Z408OUqj4ioYezbS6vTPlQ",
+    "tag": "WuGzxmcreYjpHGJoa17EBg"
+   }
+  },
+  {
+   "figure": 119,
+   "caption": "Flattened JWE JSON Serialization",
+   "section": "5.4.5",
+   "example": "5.4",
+   "text": "{\n  \"protected\": \"eyJhbGciOiJFQ0RILUVTK0ExMjhLVyIsImtpZCI6InBlcm\n      VncmluLnRvb2tAdHVja2Jvcm91Z2guZXhhbXBsZSIsImVwayI6eyJrdH\n      kiOiJFQyIsImNydiI6IlAtMzg0IiwieCI6InVCbzRrSFB3Nmtiang1bD\n      B4b3dyZF9vWXpCbWF6LUdLRlp1NHhBRkZrYllpV2d1dEVLNml1RURzUT\n      Z3TmROZzMiLCJ5Ijoic3AzcDVTR2haVkMyZmFYdW1JLWU5SlUyTW84S3\n      BvWXJGRHI1eVBOVnRXNFBnRXdaT3lRVEEtSmRhWTh0YjdFMCJ9LCJlbm\n      MiOiJBMTI4R0NNIn0\",\n  \"encrypted_key\": \"0DJjBXri_kBcC46IkU5_Jk9BqaQeHdv2\",\n  \"iv\": \"mH-G2zVqgztUtnW_\",\n  \"ciphertext\": \"tkZuOO9h95OgHJmkkrfLBisku8rGf6nzVxhRM3sVOhXgz\n      5NJ76oID7lpnAi_cPWJRCjSpAaUZ5dOR3Spy7QuEkmKx8-3RCMhSYMzs\n      XaEwDdXta9Mn5B7cCBoJKB0IgEnj_qfo1hIi-uEkUpOZ8aLTZGHfpl05\n      jMwbKkTe2yK3mjF6SBAsgicQDVCkcY9BLluzx1RmC3ORXaM0JaHPB93Y\n      cdSDGgpgBWMVrNU1ErkjcMqMoT_wtCex3w03XdLkjXIuEr2hWgeP-nkU\n      ZTPU9EoGSPj6fAS-bSz87RCPrxZdj_iVyC6QWcqAu07WNhjzJEPc4jVn\n      tRJ6K53NgPQ5p99l3Z408OUqj4ioYezbS6vTPlQ\",\n  \"tag\": \"WuGzxmcreYjpHGJoa17EBg\"\n}",
+   "joined": "{\"protected\":\"eyJhbGciOiJFQ0RILUVTK0ExMjhLVyIsImtpZCI6InBlcmVncmluLnRvb2tAdHVja2Jvcm91Z2guZXhhbXBsZSIsImVwayI6eyJrdHkiOiJFQyIsImNydiI6IlAtMzg0IiwieCI6InVCbzRrSFB3Nmtiang1bDB4b3dyZF9vWXpCbWF6LUdLRlp1NHhBRkZrYllpV2d1dEVLNml1RURzUTZ3TmROZzMiLCJ5Ijoic3AzcDVTR2haVkMyZmFYdW1JLWU5SlUyTW84S3BvWXJGRHI1eVBOVnRXNFBnRXdaT3lRVEEtSmRhWTh0YjdFMCJ9LCJlbmMiOiJBMTI4R0NNIn0\",\"encrypted_key\":\"0DJjBXri_kBcC46IkU5_Jk9BqaQeHdv2\",\"iv\":\"mH-G2zVqgztUtnW_\",\"ciphertext\":\"tkZuOO9h95OgHJmkkrfLBisku8rGf6nzVxhRM3sVOhXgz5NJ76oID7lpnAi_cPWJRCjSpAaUZ5dOR3Spy7QuEkmKx8-3RCMhSYMzsXaEwDdXta9Mn5B7cCBoJKB0IgEnj_qfo1hIi-uEkUpOZ8aLTZGHfpl05jMwbKkTe2yK3mjF6SBAsgicQDVCkcY9BLluzx1RmC3ORXaM0JaHPB93YcdSDGgpgBWMVrNU1ErkjcMqMoT_wtCex3w03XdLkjXIuEr2hWgeP-nkUZTPU9EoGSPj6fAS-bSz87RCPrxZdj_iVyC6QWcqAu07WNhjzJEPc4jVntRJ6K53NgPQ5p99l3Z408OUqj4ioYezbS6vTPlQ\",\"tag\":\"WuGzxmcreYjpHGJoa17EBg\"}",
+   "json": {
+    "protected": "eyJhbGciOiJFQ0RILUVTK0ExMjhLVyIsImtpZCI6InBlcmVncmluLnRvb2tAdHVja2Jvcm91Z2guZXhhbXBsZSIsImVwayI6eyJrdHkiOiJFQyIsImNydiI6IlAtMzg0IiwieCI6InVCbzRrSFB3Nmtiang1bDB4b3dyZF9vWXpCbWF6LUdLRlp1NHhBRkZrYllpV2d1dEVLNml1RURzUTZ3TmROZzMiLCJ5Ijoic3AzcDVTR2haVkMyZmFYdW1JLWU5SlUyTW84S3BvWXJGRHI1eVBOVnRXNFBnRXdaT3lRVEEtSmRhWTh0YjdFMCJ9LCJlbmMiOiJBMTI4R0NNIn0",
+    "encrypted_key": "0DJjBXri_kBcC46IkU5_Jk9BqaQeHdv2",
+    "iv": "mH-G2zVqgztUtnW_",
+    "ciphertext": "tkZuOO9h95OgHJmkkrfLBisku8rGf6nzVxhRM3sVOhXgz5NJ76oID7lpnAi_cPWJRCjSpAaUZ5dOR3Spy7QuEkmKx8-3RCMhSYMzsXaEwDdXta9Mn5B7cCBoJKB0IgEnj_qfo1hIi-uEkUpOZ8aLTZGHfpl05jMwbKkTe2yK3mjF6SBAsgicQDVCkcY9BLluzx1RmC3ORXaM0JaHPB93YcdSDGgpgBWMVrNU1ErkjcMqMoT_wtCex3w03XdLkjXIuEr2hWgeP-nkUZTPU9EoGSPj6fAS-bSz87RCPrxZdj_iVyC6QWcqAu07WNhjzJEPc4jVntRJ6K53NgPQ5p99l3Z408OUqj4ioYezbS6vTPlQ",
+    "tag": "WuGzxmcreYjpHGJoa17EBg"
+   }
+  },
+  {
+   "figure": 120,
+   "caption": "Elliptic Curve P-256 Key",
+   "section": "5.5.1",
+   "example": "5.5",
+   "text": "{\n  \"kty\": \"EC\",\n  \"kid\": \"meriadoc.brandybuck@buckland.example\",\n  \"use\": \"enc\",\n  \"crv\": \"P-256\",\n  \"x\": \"Ze2loSV3wrroKUN_4zhwGhCqo3Xhu1td4QjeQ5wIVR0\",\n  \"y\": \"HlLtdXARY_f55A3fnzQbPcm6hgr34Mp8p-nuzQCE0Zw\",\n  \"d\": \"r_kHyZ-a06rmxM3yESK84r1otSg-aQcVStkRhA-iCM8\"\n}",
+   "joined": "{\"kty\":\"EC\",\"kid\":\"meriadoc.brandybuck@buckland.example\",\"use\":\"enc\",\"crv\":\"P-256\",\"x\":\"Ze2loSV3wrroKUN_4zhwGhCqo3Xhu1td4QjeQ5wIVR0\",\"y\":\"HlLtdXARY_f55A3fnzQbPcm6hgr34Mp8p-nuzQCE0Zw\",\"d\":\"r_kHyZ-a06rmxM3yESK84r1otSg-aQcVStkRhA-iCM8\"}",
+   "json": {
+    "kty": "EC",
+    "kid": "meriadoc.brandybuck@buckland.example",
+    "use": "enc",
+    "crv": "P-256",
+    "x": "Ze2loSV3wrroKUN_4zhwGhCqo3Xhu1td4QjeQ5wIVR0",
+    "y": "HlLtdXARY_f55A3fnzQbPcm6hgr34Mp8p-nuzQCE0Zw",
+    "d": "r_kHyZ-a06rmxM3yESK84r1otSg-aQcVStkRhA-iCM8"
+   }
+  },
+  {
+   "figure": 121,
+   "caption": "Initialization Vector, base64url-encoded",
+   "section": "5.5.2",
+   "example": "5.5",
+   "text": "yc9N8v5sYyv3iGQT926IUg",
+   "joined": "yc9N8v5sYyv3iGQT926IUg"
+  },
+  {
+   "figure": 122,
+   "caption": "Ephemeral Private Key, in JWK Format",
+   "section": "5.5.3",
+   "example": "5.5",
+   "text": "{\n  \"kty\": \"EC\",\n  \"crv\": \"P-256\",\n  \"x\": \"mPUKT_bAWGHIhg0TpjjqVsP1rXWQu_vwVOHHtNkdYoA\",\n  \"y\": \"8BQAsImGeAS46fyWw5MhYfGTT0IjBpFw2SS34Dv4Irs\",\n  \"d\": \"AtH35vJsQ9SGjYfOsjUxYXQKrPH3FjZHmEtSKoSN8cM\"\n}",
+   "joined": "{\"kty\":\"EC\",\"crv\":\"P-256\",\"x\":\"mPUKT_bAWGHIhg0TpjjqVsP1rXWQu_vwVOHHtNkdYoA\",\"y\":\"8BQAsImGeAS46fyWw5MhYfGTT0IjBpFw2SS34Dv4Irs\",\"d\":\"AtH35vJsQ9SGjYfOsjUxYXQKrPH3FjZHmEtSKoSN8cM\"}",
+   "json": {
+    "kty": "EC",
+    "crv": "P-256",
+    "x": "mPUKT_bAWGHIhg0TpjjqVsP1rXWQu_vwVOHHtNkdYoA",
+    "y": "8BQAsImGeAS46fyWw5MhYfGTT0IjBpFw2SS34Dv4Irs",
+    "d": "AtH35vJsQ9SGjYfOsjUxYXQKrPH3FjZHmEtSKoSN8cM"
+   }
+  },
+  {
+   "figure": 123,
+   "caption": "Agreed-to Content Encryption Key, base64url-encoded",
+   "section": "5.5.3",
+   "example": "5.5",
+   "text": "hzHdlfQIAEehb8Hrd_mFRhKsKLEzPfshfXs9l6areCc",
+   "joined": "hzHdlfQIAEehb8Hrd_mFRhKsKLEzPfshfXs9l6areCc"
+  },
+  {
+   "figure": 124,
+   "caption": "JWE Protected Header JSON",
+   "section": "5.5.4",
+   "example": "5.5",
+   "text": "{\n  \"alg\": \"ECDH-ES\",\n  \"kid\": \"meriadoc.brandybuck@buckland.example\",\n  \"epk\": {\n    \"kty\": \"EC\",\n    \"crv\": \"P-256\",\n    \"x\": \"mPUKT_bAWGHIhg0TpjjqVsP1rXWQu_vwVOHHtNkdYoA\",\n    \"y\": \"8BQAsImGeAS46fyWw5MhYfGTT0IjBpFw2SS34Dv4Irs\"\n  },\n  \"enc\": \"A128CBC-HS256\"\n}",
+   "joined": "{\"alg\":\"ECDH-ES\",\"kid\":\"meriadoc.brandybuck@buckland.example\",\"epk\":{\"kty\":\"EC\",\"crv\":\"P-256\",\"x\":\"mPUKT_bAWGHIhg0TpjjqVsP1rXWQu_vwVOHHtNkdYoA\",\"y\":\"8BQAsImGeAS46fyWw5MhYfGTT0IjBpFw2SS34Dv4Irs\"},\"enc\":\"A128CBC-HS256\"}",
+   "json": {
+    "alg": "ECDH-ES",
+    "kid": "meriadoc.brandybuck@buckland.example",
+    "epk": {
+     "kty": "EC",
+     "crv": "P-256",
+     "x": "mPUKT_bAWGHIhg0TpjjqVsP1rXWQu_vwVOHHtNkdYoA",
+     "y": "8BQAsImGeAS46fyWw5MhYfGTT0IjBpFw2SS34Dv4Irs"
+    },
+    "enc": "A128CBC-HS256"
+   }
+  },
+  {
+   "figure": 125,
+   "caption": "JWE Protected Header, base64url-encoded",
+   "section": "5.5.4",
+   "example": "5.5",
+   "text": "eyJhbGciOiJFQ0RILUVTIiwia2lkIjoibWVyaWFkb2MuYnJhbmR5YnVja0BidW\nNrbGFuZC5leGFtcGxlIiwiZXBrIjp7Imt0eSI6IkVDIiwiY3J2IjoiUC0yNTYi\nLCJ4IjoibVBVS1RfYkFXR0hJaGcwVHBqanFWc1AxclhXUXVfdndWT0hIdE5rZF\nlvQSIsInkiOiI4QlFBc0ltR2VBUzQ2ZnlXdzVNaFlmR1RUMElqQnBGdzJTUzM0\nRHY0SXJzIn0sImVuYyI6IkExMjhDQkMtSFMyNTYifQ",
+   "joined": "eyJhbGciOiJFQ0RILUVTIiwia2lkIjoibWVyaWFkb2MuYnJhbmR5YnVja0BidWNrbGFuZC5leGFtcGxlIiwiZXBrIjp7Imt0eSI6IkVDIiwiY3J2IjoiUC0yNTYiLCJ4IjoibVBVS1RfYkFXR0hJaGcwVHBqanFWc1AxclhXUXVfdndWT0hIdE5rZFlvQSIsInkiOiI4QlFBc0ltR2VBUzQ2ZnlXdzVNaFlmR1RUMElqQnBGdzJTUzM0RHY0SXJzIn0sImVuYyI6IkExMjhDQkMtSFMyNTYifQ"
+  },
+  {
+   "figure": 126,
+   "caption": "Ciphertext, base64url-encoded",
+   "section": "5.5.4",
+   "example": "5.5",
+   "text": "BoDlwPnTypYq-ivjmQvAYJLb5Q6l-F3LIgQomlz87yW4OPKbWE1zSTEFjDfhU9\nIPIOSA9Bml4m7iDFwA-1ZXvHteLDtw4R1XRGMEsDIqAYtskTTmzmzNa-_q4F_e\nvAPUmwlO-ZG45Mnq4uhM1fm_D9rBtWolqZSF3xGNNkpOMQKF1Cl8i8wjzRli7-\nIXgyirlKQsbhhqRzkv8IcY6aHl24j03C-AR2le1r7URUhArM79BY8soZU0lzwI\n-sD5PZ3l4NDCCei9XkoIAfsXJWmySPoeRb2Ni5UZL4mYpvKDiwmyzGd65KqVw7\nMsFfI_K767G9C9Azp73gKZD0DyUn1mn0WW5LmyX_yJ-3AROq8p1WZBfG-ZyJ61\n95_JGG2m9Csg",
+   "joined": "BoDlwPnTypYq-ivjmQvAYJLb5Q6l-F3LIgQomlz87yW4OPKbWE1zSTEFjDfhU9IPIOSA9Bml4m7iDFwA-1ZXvHteLDtw4R1XRGMEsDIqAYtskTTmzmzNa-_q4F_evAPUmwlO-ZG45Mnq4uhM1fm_D9rBtWolqZSF3xGNNkpOMQKF1Cl8i8wjzRli7-IXgyirlKQsbhhqRzkv8IcY6aHl24j03C-AR2le1r7URUhArM79BY8soZU0lzwI-sD5PZ3l4NDCCei9XkoIAfsXJWmySPoeRb2Ni5UZL4mYpvKDiwmyzGd65KqVw7MsFfI_K767G9C9Azp73gKZD0DyUn1mn0WW5LmyX_yJ-3AROq8p1WZBfG-ZyJ6195_JGG2m9Csg"
+  },
+  {
+   "figure": 127,
+   "caption": "Authentication Tag, base64url-encoded",
+   "section": "5.5.4",
+   "example": "5.5",
+   "text": "WCCkNa-x4BeB9hIDIfFuhg",
+   "joined": "WCCkNa-x4BeB9hIDIfFuhg"
+  },
+  {
+   "figure": 128,
+   "caption": "JWE Compact Serialization",
+   "section": "5.5.5",
+   "example": "5.5",
+   "text": "eyJhbGciOiJFQ0RILUVTIiwia2lkIjoibWVyaWFkb2MuYnJhbmR5YnVja0BidW\nNrbGFuZC5leGFtcGxlIiwiZXBrIjp7Imt0eSI6IkVDIiwiY3J2IjoiUC0yNTYi\nLCJ4IjoibVBVS1RfYkFXR0hJaGcwVHBqanFWc1AxclhXUXVfdndWT0hIdE5rZF\nlvQSIsInkiOiI4QlFBc0ltR2VBUzQ2ZnlXdzVNaFlmR1RUMElqQnBGdzJTUzM0\nRHY0SXJzIn0sImVuYyI6IkExMjhDQkMtSFMyNTYifQ\n.\n.\nyc9N8v5sYyv3iGQT926IUg\n.\nBoDlwPnTypYq-ivjmQvAYJLb5Q6l-F3LIgQomlz87yW4OPKbWE1zSTEFjDfhU9\nIPIOSA9Bml4m7iDFwA-1ZXvHteLDtw4R1XRGMEsDIqAYtskTTmzmzNa-_q4F_e\nvAPUmwlO-ZG45Mnq4uhM1fm_D9rBtWolqZSF3xGNNkpOMQKF1Cl8i8wjzRli7-\nIXgyirlKQsbhhqRzkv8IcY6aHl24j03C-AR2le1r7URUhArM79BY8soZU0lzwI\n-sD5PZ3l4NDCCei9XkoIAfsXJWmySPoeRb2Ni5UZL4mYpvKDiwmyzGd65KqVw7\nMsFfI_K767G9C9Azp73gKZD0DyUn1mn0WW5LmyX_yJ-3AROq8p1WZBfG-ZyJ61\n95_JGG2m9Csg\n.\nWCCkNa-x4BeB9hIDIfFuhg",
+   "joined": "eyJhbGciOiJFQ0RILUVTIiwia2lkIjoibWVyaWFkb2MuYnJhbmR5YnVja0BidWNrbGFuZC5leGFtcGxlIiwiZXBrIjp7Imt0eSI6IkVDIiwiY3J2IjoiUC0yNTYiLCJ4IjoibVBVS1RfYkFXR0hJaGcwVHBqanFWc1AxclhXUXVfdndWT0hIdE5rZFlvQSIsInkiOiI4QlFBc0ltR2VBUzQ2ZnlXdzVNaFlmR1RUMElqQnBGdzJTUzM0RHY0SXJzIn0sImVuYyI6IkExMjhDQkMtSFMyNTYifQ..yc9N8v5sYyv3iGQT926IUg.BoDlwPnTypYq-ivjmQvAYJLb5Q6l-F3LIgQomlz87yW4OPKbWE1zSTEFjDfhU9IPIOSA9Bml4m7iDFwA-1ZXvHteLDtw4R1XRGMEsDIqAYtskTTmzmzNa-_q4F_evAPUmwlO-ZG45Mnq4uhM1fm_D9rBtWolqZSF3xGNNkpOMQKF1Cl8i8wjzRli7-IXgyirlKQsbhhqRzkv8IcY6aHl24j03C-AR2le1r7URUhArM79BY8soZU0lzwI-sD5PZ3l4NDCCei9XkoIAfsXJWmySPoeRb2Ni5UZL4mYpvKDiwmyzGd65KqVw7MsFfI_K767G9C9Azp73gKZD0DyUn1mn0WW5LmyX_yJ-3AROq8p1WZBfG-ZyJ6195_JGG2m9Csg.WCCkNa-x4BeB9hIDIfFuhg"
+  },
+  {
+   "figure": 129,
+   "caption": "General JWE JSON Serialization",
+   "section": "5.5.5",
+   "example": "5.5",
+   "text": "{\n  \"protected\": \"eyJhbGciOiJFQ0RILUVTIiwia2lkIjoibWVyaWFkb2MuYn\n      JhbmR5YnVja0BidWNrbGFuZC5leGFtcGxlIiwiZXBrIjp7Imt0eSI6Ik\n      VDIiwiY3J2IjoiUC0yNTYiLCJ4IjoibVBVS1RfYkFXR0hJaGcwVHBqan\n      FWc1AxclhXUXVfdndWT0hIdE5rZFlvQSIsInkiOiI4QlFBc0ltR2VBUz\n      Q2ZnlXdzVNaFlmR1RUMElqQnBGdzJTUzM0RHY0SXJzIn0sImVuYyI6Ik\n      ExMjhDQkMtSFMyNTYifQ\",\n  \"iv\": \"yc9N8v5sYyv3iGQT926IUg\",\n  \"ciphertext\": \"BoDlwPnTypYq-ivjmQvAYJLb5Q6l-F3LIgQomlz87yW4O\n      PKbWE1zSTEFjDfhU9IPIOSA9Bml4m7iDFwA-1ZXvHteLDtw4R1XRGMEs\n      DIqAYtskTTmzmzNa-_q4F_evAPUmwlO-ZG45Mnq4uhM1fm_D9rBtWolq\n      ZSF3xGNNkpOMQKF1Cl8i8wjzRli7-IXgyirlKQsbhhqRzkv8IcY6aHl2\n      4j03C-AR2le1r7URUhArM79BY8soZU0lzwI-sD5PZ3l4NDCCei9XkoIA\n      fsXJWmySPoeRb2Ni5UZL4mYpvKDiwmyzGd65KqVw7MsFfI_K767G9C9A\n      zp73gKZD0DyUn1mn0WW5LmyX_yJ-3AROq8p1WZBfG-ZyJ6195_JGG2m9\n      Csg\",\n  \"tag\": \"WCCkNa-x4BeB9hIDIfFuhg\"\n}",
+   "joined": "{\"protected\":\"eyJhbGciOiJFQ0RILUVTIiwia2lkIjoibWVyaWFkb2MuYnJhbmR5YnVja0BidWNrbGFuZC5leGFtcGxlIiwiZXBrIjp7Imt0eSI6IkVDIiwiY3J2IjoiUC0yNTYiLCJ4IjoibVBVS1RfYkFXR0hJaGcwVHBqanFWc1AxclhXUXVfdndWT0hIdE5rZFlvQSIsInkiOiI4QlFBc0ltR2VBUzQ2ZnlXdzVNaFlmR1RUMElqQnBGdzJTUzM0RHY0SXJzIn0sImVuYyI6IkExMjhDQkMtSFMyNTYifQ\",\"iv\":\"yc9N8v5sYyv3iGQT926IUg\",\"ciphertext\":\"BoDlwPnTypYq-ivjmQvAYJLb5Q6l-F3LIgQomlz87yW4OPKbWE1zSTEFjDfhU9IPIOSA9Bml4m7iDFwA-1ZXvHteLDtw4R1XRGMEsDIqAYtskTTmzmzNa-_q4F_evAPUmwlO-ZG45Mnq4uhM1fm_D9rBtWolqZSF3xGNNkpOMQKF1Cl8i8wjzRli7-IXgyirlKQsbhhqRzkv8IcY6aHl24j03C-AR2le1r7URUhArM79BY8soZU0lzwI-sD5PZ3l4NDCCei9XkoIAfsXJWmySPoeRb2Ni5UZL4mYpvKDiwmyzGd65KqVw7MsFfI_K767G9C9Azp73gKZD0DyUn1mn0WW5LmyX_yJ-3AROq8p1WZBfG-ZyJ6195_JGG2m9Csg\",\"tag\":\"WCCkNa-x4BeB9hIDIfFuhg\"}",
+   "json": {
+    "protected": "eyJhbGciOiJFQ0RILUVTIiwia2lkIjoibWVyaWFkb2MuYnJhbmR5YnVja0BidWNrbGFuZC5leGFtcGxlIiwiZXBrIjp7Imt0eSI6IkVDIiwiY3J2IjoiUC0yNTYiLCJ4IjoibVBVS1RfYkFXR0hJaGcwVHBqanFWc1AxclhXUXVfdndWT0hIdE5rZFlvQSIsInkiOiI4QlFBc0ltR2VBUzQ2ZnlXdzVNaFlmR1RUMElqQnBGdzJTUzM0RHY0SXJzIn0sImVuYyI6IkExMjhDQkMtSFMyNTYifQ",
+    "iv": "yc9N8v5sYyv3iGQT926IUg",
+    "ciphertext": "BoDlwPnTypYq-ivjmQvAYJLb5Q6l-F3LIgQomlz87yW4OPKbWE1zSTEFjDfhU9IPIOSA9Bml4m7iDFwA-1ZXvHteLDtw4R1XRGMEsDIqAYtskTTmzmzNa-_q4F_evAPUmwlO-ZG45Mnq4uhM1fm_D9rBtWolqZSF3xGNNkpOMQKF1Cl8i8wjzRli7-IXgyirlKQsbhhqRzkv8IcY6aHl24j03C-AR2le1r7URUhArM79BY8soZU0lzwI-sD5PZ3l4NDCCei9XkoIAfsXJWmySPoeRb2Ni5UZL4mYpvKDiwmyzGd65KqVw7MsFfI_K767G9C9Azp73gKZD0DyUn1mn0WW5LmyX_yJ-3AROq8p1WZBfG-ZyJ6195_JGG2m9Csg",
+    "tag": "WCCkNa-x4BeB9hIDIfFuhg"
+   }
+  },
+  {
+   "figure": 130,
+   "caption": "AES 128-Bit Key, in JWK Format",
+   "section": "5.6.1",
+   "example": "5.6",
+   "text": "{\n  \"kty\": \"oct\",\n  \"kid\": \"77c7e2b8-6e13-45cf-8672-617b5b45243a\",\n  \"use\": \"enc\",\n  \"alg\": \"A128GCM\",\n  \"k\": \"XctOhJAkA-pD9Lh7ZgW_2A\"\n}",
+   "joined": "{\"kty\":\"oct\",\"kid\":\"77c7e2b8-6e13-45cf-8672-617b5b45243a\",\"use\":\"enc\",\"alg\":\"A128GCM\",\"k\":\"XctOhJAkA-pD9Lh7ZgW_2A\"}",
+   "json": {
+    "kty": "oct",
+    "kid": "77c7e2b8-6e13-45cf-8672-617b5b45243a",
+    "use": "enc",
+    "alg": "A128GCM",
+    "k": "XctOhJAkA-pD9Lh7ZgW_2A"
+   }
+  },
+  {
+   "figure": 131,
+   "caption": "Initialization Vector, base64url-encoded",
+   "section": "5.6.2",
+   "example": "5.6",
+   "text": "refa467QzzKx6QAB",
+   "joined": "refa467QzzKx6QAB"
+  },
+  {
+   "figure": 132,
+   "caption": "JWE Protected Header JSON",
+   "section": "5.6.3",
+   "example": "5.6",
+   "text": "{\n  \"alg\": \"dir\",\n  \"kid\": \"77c7e2b8-6e13-45cf-8672-617b5b45243a\",\n  \"enc\": \"A128GCM\"\n}",
+   "joined": "{\"alg\":\"dir\",\"kid\":\"77c7e2b8-6e13-45cf-8672-617b5b45243a\",\"enc\":\"A128GCM\"}",
+   "json": {
+    "alg": "dir",
+    "kid": "77c7e2b8-6e13-45cf-8672-617b5b45243a",
+    "enc": "A128GCM"
+   }
+  },
+  {
+   "figure": 133,
+   "caption": "JWE Protected Header, base64url-encoded",
+   "section": "5.6.3",
+   "example": "5.6",
+   "text": "eyJhbGciOiJkaXIiLCJraWQiOiI3N2M3ZTJiOC02ZTEzLTQ1Y2YtODY3Mi02MT\ndiNWI0NTI0M2EiLCJlbmMiOiJBMTI4R0NNIn0",
+   "joined": "eyJhbGciOiJkaXIiLCJraWQiOiI3N2M3ZTJiOC02ZTEzLTQ1Y2YtODY3Mi02MTdiNWI0NTI0M2EiLCJlbmMiOiJBMTI4R0NNIn0"
+  },
+  {
+   "figure": 134,
+   "caption": "Ciphertext, base64url-encoded",
+   "section": "5.6.3",
+   "example": "5.6",
+   "text": "JW_i_f52hww_ELQPGaYyeAB6HYGcR559l9TYnSovc23XJoBcW29rHP8yZOZG7Y\nhLpT1bjFuvZPjQS-m0IFtVcXkZXdH_lr_FrdYt9HRUYkshtrMmIUAyGmUnd9zM\nDB2n0cRDIHAzFVeJUDxkUwVAE7_YGRPdcqMyiBoCO-FBdE-Nceb4h3-FtBP-c_\nBIwCPTjb9o0SbdcdREEMJMyZBH8ySWMVi1gPD9yxi-aQpGbSv_F9N4IZAxscj5\ng-NJsUPbjk29-s7LJAGb15wEBtXphVCgyy53CoIKLHHeJHXex45Uz9aKZSRSIn\nZI-wjsY0yu3cT4_aQ3i1o-tiE-F8Ios61EKgyIQ4CWao8PFMj8TTnp",
+   "joined": "JW_i_f52hww_ELQPGaYyeAB6HYGcR559l9TYnSovc23XJoBcW29rHP8yZOZG7YhLpT1bjFuvZPjQS-m0IFtVcXkZXdH_lr_FrdYt9HRUYkshtrMmIUAyGmUnd9zMDB2n0cRDIHAzFVeJUDxkUwVAE7_YGRPdcqMyiBoCO-FBdE-Nceb4h3-FtBP-c_BIwCPTjb9o0SbdcdREEMJMyZBH8ySWMVi1gPD9yxi-aQpGbSv_F9N4IZAxscj5g-NJsUPbjk29-s7LJAGb15wEBtXphVCgyy53CoIKLHHeJHXex45Uz9aKZSRSInZI-wjsY0yu3cT4_aQ3i1o-tiE-F8Ios61EKgyIQ4CWao8PFMj8TTnp"
+  },
+  {
+   "figure": 135,
+   "caption": "Authentication Tag, base64url-encoded",
+   "section": "5.6.3",
+   "example": "5.6",
+   "text": "vbb32Xvllea2OtmHAdccRQ",
+   "joined": "vbb32Xvllea2OtmHAdccRQ"
+  },
+  {
+   "figure": 136,
+   "caption": "JWE Compact Serialization",
+   "section": "5.6.4",
+   "example": "5.6",
+   "text": "eyJhbGciOiJkaXIiLCJraWQiOiI3N2M3ZTJiOC02ZTEzLTQ1Y2YtODY3Mi02MT\ndiNWI0NTI0M2EiLCJlbmMiOiJBMTI4R0NNIn0\n.\n.\nrefa467QzzKx6QAB\n.\nJW_i_f52hww_ELQPGaYyeAB6HYGcR559l9TYnSovc23XJoBcW29rHP8yZOZG7Y\nhLpT1bjFuvZPjQS-m0IFtVcXkZXdH_lr_FrdYt9HRUYkshtrMmIUAyGmUnd9zM\nDB2n0cRDIHAzFVeJUDxkUwVAE7_YGRPdcqMyiBoCO-FBdE-Nceb4h3-FtBP-c_\nBIwCPTjb9o0SbdcdREEMJMyZBH8ySWMVi1gPD9yxi-aQpGbSv_F9N4IZAxscj5\ng-NJsUPbjk29-s7LJAGb15wEBtXphVCgyy53CoIKLHHeJHXex45Uz9aKZSRSIn\nZI-wjsY0yu3cT4_aQ3i1o-tiE-F8Ios61EKgyIQ4CWao8PFMj8TTnp\n.\nvbb32Xvllea2OtmHAdccRQ",
+   "joined": "eyJhbGciOiJkaXIiLCJraWQiOiI3N2M3ZTJiOC02ZTEzLTQ1Y2YtODY3Mi02MTdiNWI0NTI0M2EiLCJlbmMiOiJBMTI4R0NNIn0..refa467QzzKx6QAB.JW_i_f52hww_ELQPGaYyeAB6HYGcR559l9TYnSovc23XJoBcW29rHP8yZOZG7YhLpT1bjFuvZPjQS-m0IFtVcXkZXdH_lr_FrdYt9HRUYkshtrMmIUAyGmUnd9zMDB2n0cRDIHAzFVeJUDxkUwVAE7_YGRPdcqMyiBoCO-FBdE-Nceb4h3-FtBP-c_BIwCPTjb9o0SbdcdREEMJMyZBH8ySWMVi1gPD9yxi-aQpGbSv_F9N4IZAxscj5g-NJsUPbjk29-s7LJAGb15wEBtXphVCgyy53CoIKLHHeJHXex45Uz9aKZSRSInZI-wjsY0yu3cT4_aQ3i1o-tiE-F8Ios61EKgyIQ4CWao8PFMj8TTnp.vbb32Xvllea2OtmHAdccRQ"
+  },
+  {
+   "figure": 137,
+   "caption": "General JWE JSON Serialization",
+   "section": "5.6.4",
+   "example": "5.6",
+   "text": "{\n  \"protected\": \"eyJhbGciOiJkaXIiLCJraWQiOiI3N2M3ZTJiOC02ZTEzLT\n      Q1Y2YtODY3Mi02MTdiNWI0NTI0M2EiLCJlbmMiOiJBMTI4R0NNIn0\",\n  \"iv\": \"refa467QzzKx6QAB\",\n  \"ciphertext\": \"JW_i_f52hww_ELQPGaYyeAB6HYGcR559l9TYnSovc23XJ\n      oBcW29rHP8yZOZG7YhLpT1bjFuvZPjQS-m0IFtVcXkZXdH_lr_FrdYt9\n      HRUYkshtrMmIUAyGmUnd9zMDB2n0cRDIHAzFVeJUDxkUwVAE7_YGRPdc\n      qMyiBoCO-FBdE-Nceb4h3-FtBP-c_BIwCPTjb9o0SbdcdREEMJMyZBH8\n      ySWMVi1gPD9yxi-aQpGbSv_F9N4IZAxscj5g-NJsUPbjk29-s7LJAGb1\n      5wEBtXphVCgyy53CoIKLHHeJHXex45Uz9aKZSRSInZI-wjsY0yu3cT4_\n      aQ3i1o-tiE-F8Ios61EKgyIQ4CWao8PFMj8TTnp\",\n  \"tag\": \"vbb32Xvllea2OtmHAdccRQ\"\n}",
+   "joined": "{\"protected\":\"eyJhbGciOiJkaXIiLCJraWQiOiI3N2M3ZTJiOC02ZTEzLTQ1Y2YtODY3Mi02MTdiNWI0NTI0M2EiLCJlbmMiOiJBMTI4R0NNIn0\",\"iv\":\"refa467QzzKx6QAB\",\"ciphertext\":\"JW_i_f52hww_ELQPGaYyeAB6HYGcR559l9TYnSovc23XJoBcW29rHP8yZOZG7YhLpT1bjFuvZPjQS-m0IFtVcXkZXdH_lr_FrdYt9HRUYkshtrMmIUAyGmUnd9zMDB2n0cRDIHAzFVeJUDxkUwVAE7_YGRPdcqMyiBoCO-FBdE-Nceb4h3-FtBP-c_BIwCPTjb9o0SbdcdREEMJMyZBH8ySWMVi1gPD9yxi-aQpGbSv_F9N4IZAxscj5g-NJsUPbjk29-s7LJAGb15wEBtXphVCgyy53CoIKLHHeJHXex45Uz9aKZSRSInZI-wjsY0yu3cT4_aQ3i1o-tiE-F8Ios61EKgyIQ4CWao8PFMj8TTnp\",\"tag\":\"vbb32Xvllea2OtmHAdccRQ\"}",
+   "json": {
+    "protected": "eyJhbGciOiJkaXIiLCJraWQiOiI3N2M3ZTJiOC02ZTEzLTQ1Y2YtODY3Mi02MTdiNWI0NTI0M2EiLCJlbmMiOiJBMTI4R0NNIn0",
+    "iv": "refa467QzzKx6QAB",
+    "ciphertext": "JW_i_f52hww_ELQPGaYyeAB6HYGcR559l9TYnSovc23XJoBcW29rHP8yZOZG7YhLpT1bjFuvZPjQS-m0IFtVcXkZXdH_lr_FrdYt9HRUYkshtrMmIUAyGmUnd9zMDB2n0cRDIHAzFVeJUDxkUwVAE7_YGRPdcqMyiBoCO-FBdE-Nceb4h3-FtBP-c_BIwCPTjb9o0SbdcdREEMJMyZBH8ySWMVi1gPD9yxi-aQpGbSv_F9N4IZAxscj5g-NJsUPbjk29-s7LJAGb15wEBtXphVCgyy53CoIKLHHeJHXex45Uz9aKZSRSInZI-wjsY0yu3cT4_aQ3i1o-tiE-F8Ios61EKgyIQ4CWao8PFMj8TTnp",
+    "tag": "vbb32Xvllea2OtmHAdccRQ"
+   }
+  },
+  {
+   "figure": 138,
+   "caption": "AES 256-Bit Key",
+   "section": "5.7.1",
+   "example": "5.7",
+   "text": "o  \"enc\" parameter of \"A128CBC-HS256\".\n{\n  \"kty\": \"oct\",\n  \"kid\": \"18ec08e1-bfa9-4d95-b205-2b4dd1d4321d\",\n  \"use\": \"enc\",\n  \"alg\": \"A256GCMKW\",\n  \"k\": \"qC57l_uxcm7Nm3K-ct4GFjx8tM1U8CZ0NLBvdQstiS8\"\n}",
+   "joined": "o\"enc\"parameterof\"A128CBC-HS256\".{\"kty\":\"oct\",\"kid\":\"18ec08e1-bfa9-4d95-b205-2b4dd1d4321d\",\"use\":\"enc\",\"alg\":\"A256GCMKW\",\"k\":\"qC57l_uxcm7Nm3K-ct4GFjx8tM1U8CZ0NLBvdQstiS8\"}"
+  },
+  {
+   "figure": 139,
+   "caption": "Content Encryption Key, base64url-encoded",
+   "section": "5.7.2",
+   "example": "5.7",
+   "text": "UWxARpat23nL9ReIj4WG3D1ee9I4r-Mv5QLuFXdy_rE",
+   "joined": "UWxARpat23nL9ReIj4WG3D1ee9I4r-Mv5QLuFXdy_rE"
+  },
+  {
+   "figure": 140,
+   "caption": "Initialization Vector, base64url-encoded",
+   "section": "5.7.2",
+   "example": "5.7",
+   "text": "gz6NjyEFNm_vm8Gj6FwoFQ",
+   "joined": "gz6NjyEFNm_vm8Gj6FwoFQ"
+  },
+  {
+   "figure": 141,
+   "caption": "Initialization Vector for Key Wrapping, base64url-encoded",
+   "section": "5.7.3",
+   "example": "5.7",
+   "text": "KkYT0GX_2jHlfqN_",
+   "joined": "KkYT0GX_2jHlfqN_"
+  },
+  {
+   "figure": 142,
+   "caption": "Encrypted Key, base64url-encoded",
+   "section": "5.7.3",
+   "example": "5.7",
+   "text": "lJf3HbOApxMEBkCMOoTnnABxs_CvTWUmZQ2ElLvYNok",
+   "joined": "lJf3HbOApxMEBkCMOoTnnABxs_CvTWUmZQ2ElLvYNok"
+  },
+  {
+   "figure": 143,
+   "caption": "Authentication Tag from Key Wrapping, base64url-encoded",
+   "section": "5.7.3",
+   "example": "5.7",
+   "text": "kfPduVQ3T3H6vnewt--ksw",
+   "joined": "kfPduVQ3T3H6vnewt--ksw"
+  },
+  {
+   "figure": 144,
+   "caption": "JWE Protected Header JSON",
+   "section": "5.7.4",
+   "example": "5.7",
+   "text": "{\n  \"alg\": \"A256GCMKW\",\n  \"kid\": \"18ec08e1-bfa9-4d95-b205-2b4dd1d4321d\",\n  \"tag\": \"kfPduVQ3T3H6vnewt--ksw\",\n  \"iv\": \"KkYT0GX_2jHlfqN_\",\n  \"enc\": \"A128CBC-HS256\"\n}",
+   "joined": "{\"alg\":\"A256GCMKW\",\"kid\":\"18ec08e1-bfa9-4d95-b205-2b4dd1d4321d\",\"tag\":\"kfPduVQ3T3H6vnewt--ksw\",\"iv\":\"KkYT0GX_2jHlfqN_\",\"enc\":\"A128CBC-HS256\"}",
+   "json": {
+    "alg": "A256GCMKW",
+    "kid": "18ec08e1-bfa9-4d95-b205-2b4dd1d4321d",
+    "tag": "kfPduVQ3T3H6vnewt--ksw",
+    "iv": "KkYT0GX_2jHlfqN_",
+    "enc": "A128CBC-HS256"
+   }
+  },
+  {
+   "figure": 145,
+   "caption": "JWE Protected Header, base64url-encoded",
+   "section": "5.7.4",
+   "example": "5.7",
+   "text": "eyJhbGciOiJBMjU2R0NNS1ciLCJraWQiOiIxOGVjMDhlMS1iZmE5LTRkOTUtYj\nIwNS0yYjRkZDFkNDMyMWQiLCJ0YWciOiJrZlBkdVZRM1QzSDZ2bmV3dC0ta3N3\nIiwiaXYiOiJLa1lUMEdYXzJqSGxmcU5fIiwiZW5jIjoiQTEyOENCQy1IUzI1Ni\nJ9",
+   "joined": "eyJhbGciOiJBMjU2R0NNS1ciLCJraWQiOiIxOGVjMDhlMS1iZmE5LTRkOTUtYjIwNS0yYjRkZDFkNDMyMWQiLCJ0YWciOiJrZlBkdVZRM1QzSDZ2bmV3dC0ta3N3IiwiaXYiOiJLa1lUMEdYXzJqSGxmcU5fIiwiZW5jIjoiQTEyOENCQy1IUzI1NiJ9"
+  },
+  {
+   "figure": 146,
+   "caption": "Ciphertext, base64url-encoded",
+   "section": "5.7.4",
+   "example": "5.7",
+   "text": "Jf5p9-ZhJlJy_IQ_byKFmI0Ro7w7G1QiaZpI8OaiVgD8EqoDZHyFKFBupS8iaE\neVIgMqWmsuJKuoVgzR3YfzoMd3GxEm3VxNhzWyWtZKX0gxKdy6HgLvqoGNbZCz\nLjqcpDiF8q2_62EVAbr2uSc2oaxFmFuIQHLcqAHxy51449xkjZ7ewzZaGV3eFq\nhpco8o4DijXaG5_7kp3h2cajRfDgymuxUbWgLqaeNQaJtvJmSMFuEOSAzw9Hde\nb6yhdTynCRmu-kqtO5Dec4lT2OMZKpnxc_F1_4yDJFcqb5CiDSmA-psB2k0Jtj\nxAj4UPI61oONK7zzFIu4gBfjJCndsZfdvG7h8wGjV98QhrKEnR7xKZ3KCr0_qR\n1B-gxpNk3xWU",
+   "joined": "Jf5p9-ZhJlJy_IQ_byKFmI0Ro7w7G1QiaZpI8OaiVgD8EqoDZHyFKFBupS8iaEeVIgMqWmsuJKuoVgzR3YfzoMd3GxEm3VxNhzWyWtZKX0gxKdy6HgLvqoGNbZCzLjqcpDiF8q2_62EVAbr2uSc2oaxFmFuIQHLcqAHxy51449xkjZ7ewzZaGV3eFqhpco8o4DijXaG5_7kp3h2cajRfDgymuxUbWgLqaeNQaJtvJmSMFuEOSAzw9Hdeb6yhdTynCRmu-kqtO5Dec4lT2OMZKpnxc_F1_4yDJFcqb5CiDSmA-psB2k0JtjxAj4UPI61oONK7zzFIu4gBfjJCndsZfdvG7h8wGjV98QhrKEnR7xKZ3KCr0_qR1B-gxpNk3xWU"
+  },
+  {
+   "figure": 147,
+   "caption": "Authentication Tag, base64url-encoded",
+   "section": "5.7.4",
+   "example": "5.7",
+   "text": "DKW7jrb4WaRSNfbXVPlT5g",
+   "joined": "DKW7jrb4WaRSNfbXVPlT5g"
+  },
+  {
+   "figure": 148,
+   "caption": "JWE Compact Serialization",
+   "section": "5.7.5",
+   "example": "5.7",
+   "text": "eyJhbGciOiJBMjU2R0NNS1ciLCJraWQiOiIxOGVjMDhlMS1iZmE5LTRkOTUtYj\nIwNS0yYjRkZDFkNDMyMWQiLCJ0YWciOiJrZlBkdVZRM1QzSDZ2bmV3dC0ta3N3\nIiwiaXYiOiJLa1lUMEdYXzJqSGxmcU5fIiwiZW5jIjoiQTEyOENCQy1IUzI1Ni\nJ9\n.\nlJf3HbOApxMEBkCMOoTnnABxs_CvTWUmZQ2ElLvYNok\n.\ngz6NjyEFNm_vm8Gj6FwoFQ\n.\nJf5p9-ZhJlJy_IQ_byKFmI0Ro7w7G1QiaZpI8OaiVgD8EqoDZHyFKFBupS8iaE\neVIgMqWmsuJKuoVgzR3YfzoMd3GxEm3VxNhzWyWtZKX0gxKdy6HgLvqoGNbZCz\nLjqcpDiF8q2_62EVAbr2uSc2oaxFmFuIQHLcqAHxy51449xkjZ7ewzZaGV3eFq\nhpco8o4DijXaG5_7kp3h2cajRfDgymuxUbWgLqaeNQaJtvJmSMFuEOSAzw9Hde\nb6yhdTynCRmu-kqtO5Dec4lT2OMZKpnxc_F1_4yDJFcqb5CiDSmA-psB2k0Jtj\nxAj4UPI61oONK7zzFIu4gBfjJCndsZfdvG7h8wGjV98QhrKEnR7xKZ3KCr0_qR\n1B-gxpNk3xWU\n.\nDKW7jrb4WaRSNfbXVPlT5g",
+   "joined": "eyJhbGciOiJBMjU2R0NNS1ciLCJraWQiOiIxOGVjMDhlMS1iZmE5LTRkOTUtYjIwNS0yYjRkZDFkNDMyMWQiLCJ0YWciOiJrZlBkdVZRM1QzSDZ2bmV3dC0ta3N3IiwiaXYiOiJLa1lUMEdYXzJqSGxmcU5fIiwiZW5jIjoiQTEyOENCQy1IUzI1NiJ9.lJf3HbOApxMEBkCMOoTnnABxs_CvTWUmZQ2ElLvYNok.gz6NjyEFNm_vm8Gj6FwoFQ.Jf5p9-ZhJlJy_IQ_byKFmI0Ro7w7G1QiaZpI8OaiVgD8EqoDZHyFKFBupS8iaEeVIgMqWmsuJKuoVgzR3YfzoMd3GxEm3VxNhzWyWtZKX0gxKdy6HgLvqoGNbZCzLjqcpDiF8q2_62EVAbr2uSc2oaxFmFuIQHLcqAHxy51449xkjZ7ewzZaGV3eFqhpco8o4DijXaG5_7kp3h2cajRfDgymuxUbWgLqaeNQaJtvJmSMFuEOSAzw9Hdeb6yhdTynCRmu-kqtO5Dec4lT2OMZKpnxc_F1_4yDJFcqb5CiDSmA-psB2k0JtjxAj4UPI61oONK7zzFIu4gBfjJCndsZfdvG7h8wGjV98QhrKEnR7xKZ3KCr0_qR1B-gxpNk3xWU.DKW7jrb4WaRSNfbXVPlT5g"
+  },
+  {
+   "figure": 149,
+   "caption": "General JWE JSON Serialization",
+   "section": "5.7.5",
+   "example": "5.7",
+   "text": "{\n  \"recipients\": [\n    {\n      \"encrypted_key\": \"lJf3HbOApxMEBkCMOoTnnABxs_CvTWUmZQ2ElL\n          vYNok\"\n    }\n  ],\n  \"protected\": \"eyJhbGciOiJBMjU2R0NNS1ciLCJraWQiOiIxOGVjMDhlMS\n      1iZmE5LTRkOTUtYjIwNS0yYjRkZDFkNDMyMWQiLCJ0YWciOiJrZlBkdV\n      ZRM1QzSDZ2bmV3dC0ta3N3IiwiaXYiOiJLa1lUMEdYXzJqSGxmcU5fIi\n      wiZW5jIjoiQTEyOENCQy1IUzI1NiJ9\",\n  \"iv\": \"gz6NjyEFNm_vm8Gj6FwoFQ\",\n  \"ciphertext\": \"Jf5p9-ZhJlJy_IQ_byKFmI0Ro7w7G1QiaZpI8OaiVgD8E\n      qoDZHyFKFBupS8iaEeVIgMqWmsuJKuoVgzR3YfzoMd3GxEm3VxNhzWyW\n      tZKX0gxKdy6HgLvqoGNbZCzLjqcpDiF8q2_62EVAbr2uSc2oaxFmFuIQ\n      HLcqAHxy51449xkjZ7ewzZaGV3eFqhpco8o4DijXaG5_7kp3h2cajRfD\n      gymuxUbWgLqaeNQaJtvJmSMFuEOSAzw9Hdeb6yhdTynCRmu-kqtO5Dec\n      4lT2OMZKpnxc_F1_4yDJFcqb5CiDSmA-psB2k0JtjxAj4UPI61oONK7z\n      zFIu4gBfjJCndsZfdvG7h8wGjV98QhrKEnR7xKZ3KCr0_qR1B-gxpNk3\n      xWU\",\n  \"tag\": \"DKW7jrb4WaRSNfbXVPlT5g\"\n}",
+   "joined": "{\"recipients\":[{\"encrypted_key\":\"lJf3HbOApxMEBkCMOoTnnABxs_CvTWUmZQ2ElLvYNok\"}],\"protected\":\"eyJhbGciOiJBMjU2R0NNS1ciLCJraWQiOiIxOGVjMDhlMS1iZmE5LTRkOTUtYjIwNS0yYjRkZDFkNDMyMWQiLCJ0YWciOiJrZlBkdVZRM1QzSDZ2bmV3dC0ta3N3IiwiaXYiOiJLa1lUMEdYXzJqSGxmcU5fIiwiZW5jIjoiQTEyOENCQy1IUzI1NiJ9\",\"iv\":\"gz6NjyEFNm_vm8Gj6FwoFQ\",\"ciphertext\":\"Jf5p9-ZhJlJy_IQ_byKFmI0Ro7w7G1QiaZpI8OaiVgD8EqoDZHyFKFBupS8iaEeVIgMqWmsuJKuoVgzR3YfzoMd3GxEm3VxNhzWyWtZKX0gxKdy6HgLvqoGNbZCzLjqcpDiF8q2_62EVAbr2uSc2oaxFmFuIQHLcqAHxy51449xkjZ7ewzZaGV3eFqhpco8o4DijXaG5_7kp3h2cajRfDgymuxUbWgLqaeNQaJtvJmSMFuEOSAzw9Hdeb6yhdTynCRmu-kqtO5Dec4lT2OMZKpnxc_F1_4yDJFcqb5CiDSmA-psB2k0JtjxAj4UPI61oONK7zzFIu4gBfjJCndsZfdvG7h8wGjV98QhrKEnR7xKZ3KCr0_qR1B-gxpNk3xWU\",\"tag\":\"DKW7jrb4WaRSNfbXVPlT5g\"}",
+   "json": {
+    "recipients": [
+     {
+      "encrypted_key": "lJf3HbOApxMEBkCMOoTnnABxs_CvTWUmZQ2ElLvYNok"
+     }
+    ],
+    "protected": "eyJhbGciOiJBMjU2R0NNS1ciLCJraWQiOiIxOGVjMDhlMS1iZmE5LTRkOTUtYjIwNS0yYjRkZDFkNDMyMWQiLCJ0YWciOiJrZlBkdVZRM1QzSDZ2bmV3dC0ta3N3IiwiaXYiOiJLa1lUMEdYXzJqSGxmcU5fIiwiZW5jIjoiQTEyOENCQy1IUzI1NiJ9",
+    "iv": "gz6NjyEFNm_vm8Gj6FwoFQ",
+    "ciphertext": "Jf5p9-ZhJlJy_IQ_byKFmI0Ro7w7G1QiaZpI8OaiVgD8EqoDZHyFKFBupS8iaEeVIgMqWmsuJKuoVgzR3YfzoMd3GxEm3VxNhzWyWtZKX0gxKdy6HgLvqoGNbZCzLjqcpDiF8q2_62EVAbr2uSc2oaxFmFuIQHLcqAHxy51449xkjZ7ewzZaGV3eFqhpco8o4DijXaG5_7kp3h2cajRfDgymuxUbWgLqaeNQaJtvJmSMFuEOSAzw9Hdeb6yhdTynCRmu-kqtO5Dec4lT2OMZKpnxc_F1_4yDJFcqb5CiDSmA-psB2k0JtjxAj4UPI61oONK7zzFIu4gBfjJCndsZfdvG7h8wGjV98QhrKEnR7xKZ3KCr0_qR1B-gxpNk3xWU",
+    "tag": "DKW7jrb4WaRSNfbXVPlT5g"
+   }
+  },
+  {
+   "figure": 150,
+   "caption": "Flattened JWE JSON Serialization",
+   "section": "5.7.5",
+   "example": "5.7",
+   "text": "{\n  \"protected\": \"eyJhbGciOiJBMjU2R0NNS1ciLCJpdiI6IktrWVQwR1hfMm\n      pIbGZxTl8iLCJraWQiOiIxOGVjMDhlMS1iZmE5LTRkOTUtYjIwNS0yYj\n      RkZDFkNDMyMWQiLCJ0YWciOiJrZlBkdVZRM1QzSDZ2bmV3dC0ta3N3Ii\n      wiZW5jIjoiQTEyOENCQy1IUzI1NiJ9\",\n  \"encrypted_key\": \"lJf3HbOApxMEBkCMOoTnnABxs_CvTWUmZQ2ElLvYNo\n      k\",\n  \"iv\": \"gz6NjyEFNm_vm8Gj6FwoFQ\",\n  \"ciphertext\": \"Jf5p9-ZhJlJy_IQ_byKFmI0Ro7w7G1QiaZpI8OaiVgD8E\n      qoDZHyFKFBupS8iaEeVIgMqWmsuJKuoVgzR3YfzoMd3GxEm3VxNhzWyW\n      tZKX0gxKdy6HgLvqoGNbZCzLjqcpDiF8q2_62EVAbr2uSc2oaxFmFuIQ\n      HLcqAHxy51449xkjZ7ewzZaGV3eFqhpco8o4DijXaG5_7kp3h2cajRfD\n      gymuxUbWgLqaeNQaJtvJmSMFuEOSAzw9Hdeb6yhdTynCRmu-kqtO5Dec\n      4lT2OMZKpnxc_F1_4yDJFcqb5CiDSmA-psB2k0JtjxAj4UPI61oONK7z\n      zFIu4gBfjJCndsZfdvG7h8wGjV98QhrKEnR7xKZ3KCr0_qR1B-gxpNk3\n      xWU\",\n  \"tag\": \"NvBveHr_vonkvflfnUrmBQ\"\n}",
+   "joined": "{\"protected\":\"eyJhbGciOiJBMjU2R0NNS1ciLCJpdiI6IktrWVQwR1hfMmpIbGZxTl8iLCJraWQiOiIxOGVjMDhlMS1iZmE5LTRkOTUtYjIwNS0yYjRkZDFkNDMyMWQiLCJ0YWciOiJrZlBkdVZRM1QzSDZ2bmV3dC0ta3N3IiwiZW5jIjoiQTEyOENCQy1IUzI1NiJ9\",\"encrypted_key\":\"lJf3HbOApxMEBkCMOoTnnABxs_CvTWUmZQ2ElLvYNok\",\"iv\":\"gz6NjyEFNm_vm8Gj6FwoFQ\",\"ciphertext\":\"Jf5p9-ZhJlJy_IQ_byKFmI0Ro7w7G1QiaZpI8OaiVgD8EqoDZHyFKFBupS8iaEeVIgMqWmsuJKuoVgzR3YfzoMd3GxEm3VxNhzWyWtZKX0gxKdy6HgLvqoGNbZCzLjqcpDiF8q2_62EVAbr2uSc2oaxFmFuIQHLcqAHxy51449xkjZ7ewzZaGV3eFqhpco8o4DijXaG5_7kp3h2cajRfDgymuxUbWgLqaeNQaJtvJmSMFuEOSAzw9Hdeb6yhdTynCRmu-kqtO5Dec4lT2OMZKpnxc_F1_4yDJFcqb5CiDSmA-psB2k0JtjxAj4UPI61oONK7zzFIu4gBfjJCndsZfdvG7h8wGjV98QhrKEnR7xKZ3KCr0_qR1B-gxpNk3xWU\",\"tag\":\"NvBveHr_vonkvflfnUrmBQ\"}",
+   "json": {
+    "protected": "eyJhbGciOiJBMjU2R0NNS1ciLCJpdiI6IktrWVQwR1hfMmpIbGZxTl8iLCJraWQiOiIxOGVjMDhlMS1iZmE5LTRkOTUtYjIwNS0yYjRkZDFkNDMyMWQiLCJ0YWciOiJrZlBkdVZRM1QzSDZ2bmV3dC0ta3N3IiwiZW5jIjoiQTEyOENCQy1IUzI1NiJ9",
+    "encrypted_key": "lJf3HbOApxMEBkCMOoTnnABxs_CvTWUmZQ2ElLvYNok",
+    "iv": "gz6NjyEFNm_vm8Gj6FwoFQ",
+    "ciphertext": "Jf5p9-ZhJlJy_IQ_byKFmI0Ro7w7G1QiaZpI8OaiVgD8EqoDZHyFKFBupS8iaEeVIgMqWmsuJKuoVgzR3YfzoMd3GxEm3VxNhzWyWtZKX0gxKdy6HgLvqoGNbZCzLjqcpDiF8q2_62EVAbr2uSc2oaxFmFuIQHLcqAHxy51449xkjZ7ewzZaGV3eFqhpco8o4DijXaG5_7kp3h2cajRfDgymuxUbWgLqaeNQaJtvJmSMFuEOSAzw9Hdeb6yhdTynCRmu-kqtO5Dec4lT2OMZKpnxc_F1_4yDJFcqb5CiDSmA-psB2k0JtjxAj4UPI61oONK7zzFIu4gBfjJCndsZfdvG7h8wGjV98QhrKEnR7xKZ3KCr0_qR1B-gxpNk3xWU",
+    "tag": "NvBveHr_vonkvflfnUrmBQ"
+   }
+  },
+  {
+   "figure": 151,
+   "caption": "AES 128-Bit Key",
+   "section": "5.8.1",
+   "example": "5.8",
+   "text": "o  \"enc\" parameter of \"A128GCM\".\n{\n  \"kty\": \"oct\",\n  \"kid\": \"81b20965-8332-43d9-a468-82160ad91ac8\",\n  \"use\": \"enc\",\n  \"alg\": \"A128KW\",\n  \"k\": \"GZy6sIZ6wl9NJOKB-jnmVQ\"\n}",
+   "joined": "o\"enc\"parameterof\"A128GCM\".{\"kty\":\"oct\",\"kid\":\"81b20965-8332-43d9-a468-82160ad91ac8\",\"use\":\"enc\",\"alg\":\"A128KW\",\"k\":\"GZy6sIZ6wl9NJOKB-jnmVQ\"}"
+  },
+  {
+   "figure": 152,
+   "caption": "Content Encryption Key, base64url-encoded",
+   "section": "5.8.2",
+   "example": "5.8",
+   "text": "aY5_Ghmk9KxWPBLu_glx1w",
+   "joined": "aY5_Ghmk9KxWPBLu_glx1w"
+  },
+  {
+   "figure": 153,
+   "caption": "Initialization Vector, base64url-encoded",
+   "section": "5.8.2",
+   "example": "5.8",
+   "text": "Qx0pmsDa8KnJc9Jo",
+   "joined": "Qx0pmsDa8KnJc9Jo"
+  },
+  {
+   "figure": 154,
+   "caption": "Encrypted Key, base64url-encoded",
+   "section": "5.8.3",
+   "example": "5.8",
+   "text": "CBI6oDw8MydIx1IBntf_lQcw2MmJKIQx",
+   "joined": "CBI6oDw8MydIx1IBntf_lQcw2MmJKIQx"
+  },
+  {
+   "figure": 155,
+   "caption": "JWE Protected Header JSON",
+   "section": "5.8.4",
+   "example": "5.8",
+   "text": "o  JWE Protected Header; this example uses the header from\n   Figure 155, encoded to base64url [RFC4648] as Figure 156.\n{\n  \"alg\": \"A128KW\",\n  \"kid\": \"81b20965-8332-43d9-a468-82160ad91ac8\",\n  \"enc\": \"A128GCM\"\n}",
+   "joined": "oJWEProtectedHeader;thisexampleusestheheaderfromFigure155,encodedtobase64url[RFC4648]asFigure156.{\"alg\":\"A128KW\",\"kid\":\"81b20965-8332-43d9-a468-82160ad91ac8\",\"enc\":\"A128GCM\"}"
+  },
+  {
+   "figure": 156,
+   "caption": "JWE Protected Header, base64url-encoded",
+   "section": "5.8.4",
+   "example": "5.8",
+   "text": "eyJhbGciOiJBMTI4S1ciLCJraWQiOiI4MWIyMDk2NS04MzMyLTQzZDktYTQ2OC\n04MjE2MGFkOTFhYzgiLCJlbmMiOiJBMTI4R0NNIn0",
+   "joined": "eyJhbGciOiJBMTI4S1ciLCJraWQiOiI4MWIyMDk2NS04MzMyLTQzZDktYTQ2OC04MjE2MGFkOTFhYzgiLCJlbmMiOiJBMTI4R0NNIn0"
+  },
+  {
+   "figure": 157,
+   "caption": "Ciphertext, base64url-encoded",
+   "section": "5.8.4",
+   "example": "5.8",
+   "text": "AwliP-KmWgsZ37BvzCefNen6VTbRK3QMA4TkvRkH0tP1bTdhtFJgJxeVmJkLD6\n1A1hnWGetdg11c9ADsnWgL56NyxwSYjU1ZEHcGkd3EkU0vjHi9gTlb90qSYFfe\nF0LwkcTtjbYKCsiNJQkcIp1yeM03OmuiYSoYJVSpf7ej6zaYcMv3WwdxDFl8RE\nwOhNImk2Xld2JXq6BR53TSFkyT7PwVLuq-1GwtGHlQeg7gDT6xW0JqHDPn_H-p\nuQsmthc9Zg0ojmJfqqFvETUxLAF-KjcBTS5dNy6egwkYtOt8EIHK-oEsKYtZRa\na8Z7MOZ7UGxGIMvEmxrGCPeJa14slv2-gaqK0kEThkaSqdYw0FkQZF",
+   "joined": "AwliP-KmWgsZ37BvzCefNen6VTbRK3QMA4TkvRkH0tP1bTdhtFJgJxeVmJkLD61A1hnWGetdg11c9ADsnWgL56NyxwSYjU1ZEHcGkd3EkU0vjHi9gTlb90qSYFfeF0LwkcTtjbYKCsiNJQkcIp1yeM03OmuiYSoYJVSpf7ej6zaYcMv3WwdxDFl8REwOhNImk2Xld2JXq6BR53TSFkyT7PwVLuq-1GwtGHlQeg7gDT6xW0JqHDPn_H-puQsmthc9Zg0ojmJfqqFvETUxLAF-KjcBTS5dNy6egwkYtOt8EIHK-oEsKYtZRaa8Z7MOZ7UGxGIMvEmxrGCPeJa14slv2-gaqK0kEThkaSqdYw0FkQZF"
+  },
+  {
+   "figure": 158,
+   "caption": "Authentication Tag, base64url-encoded",
+   "section": "5.8.4",
+   "example": "5.8",
+   "text": "ER7MWJZ1FBI_NKvn7Zb1Lw",
+   "joined": "ER7MWJZ1FBI_NKvn7Zb1Lw"
+  },
+  {
+   "figure": 159,
+   "caption": "JWE Compact Serialization",
+   "section": "5.8.5",
+   "example": "5.8",
+   "text": "eyJhbGciOiJBMTI4S1ciLCJraWQiOiI4MWIyMDk2NS04MzMyLTQzZDktYTQ2OC\n04MjE2MGFkOTFhYzgiLCJlbmMiOiJBMTI4R0NNIn0\n.\nCBI6oDw8MydIx1IBntf_lQcw2MmJKIQx\n.\nQx0pmsDa8KnJc9Jo\n.\nAwliP-KmWgsZ37BvzCefNen6VTbRK3QMA4TkvRkH0tP1bTdhtFJgJxeVmJkLD6\n1A1hnWGetdg11c9ADsnWgL56NyxwSYjU1ZEHcGkd3EkU0vjHi9gTlb90qSYFfe\nF0LwkcTtjbYKCsiNJQkcIp1yeM03OmuiYSoYJVSpf7ej6zaYcMv3WwdxDFl8RE\nwOhNImk2Xld2JXq6BR53TSFkyT7PwVLuq-1GwtGHlQeg7gDT6xW0JqHDPn_H-p\nuQsmthc9Zg0ojmJfqqFvETUxLAF-KjcBTS5dNy6egwkYtOt8EIHK-oEsKYtZRa\na8Z7MOZ7UGxGIMvEmxrGCPeJa14slv2-gaqK0kEThkaSqdYw0FkQZF\n.\nER7MWJZ1FBI_NKvn7Zb1Lw",
+   "joined": "eyJhbGciOiJBMTI4S1ciLCJraWQiOiI4MWIyMDk2NS04MzMyLTQzZDktYTQ2OC04MjE2MGFkOTFhYzgiLCJlbmMiOiJBMTI4R0NNIn0.CBI6oDw8MydIx1IBntf_lQcw2MmJKIQx.Qx0pmsDa8KnJc9Jo.AwliP-KmWgsZ37BvzCefNen6VTbRK3QMA4TkvRkH0tP1bTdhtFJgJxeVmJkLD61A1hnWGetdg11c9ADsnWgL56NyxwSYjU1ZEHcGkd3EkU0vjHi9gTlb90qSYFfeF0LwkcTtjbYKCsiNJQkcIp1yeM03OmuiYSoYJVSpf7ej6zaYcMv3WwdxDFl8REwOhNImk2Xld2JXq6BR53TSFkyT7PwVLuq-1GwtGHlQeg7gDT6xW0JqHDPn_H-puQsmthc9Zg0ojmJfqqFvETUxLAF-KjcBTS5dNy6egwkYtOt8EIHK-oEsKYtZRaa8Z7MOZ7UGxGIMvEmxrGCPeJa14slv2-gaqK0kEThkaSqdYw0FkQZF.ER7MWJZ1FBI_NKvn7Zb1Lw"
+  },
+  {
+   "figure": 160,
+   "caption": "General JWE JSON Serialization",
+   "section": "5.8.5",
+   "example": "5.8",
+   "text": "{\n  \"recipients\": [\n    {\n      \"encrypted_key\": \"CBI6oDw8MydIx1IBntf_lQcw2MmJKIQx\"\n    }\n  ],\n  \"protected\": \"eyJhbGciOiJBMTI4S1ciLCJraWQiOiI4MWIyMDk2NS04Mz\n      MyLTQzZDktYTQ2OC04MjE2MGFkOTFhYzgiLCJlbmMiOiJBMTI4R0NNIn\n      0\",\n  \"iv\": \"Qx0pmsDa8KnJc9Jo\",\n  \"ciphertext\": \"AwliP-KmWgsZ37BvzCefNen6VTbRK3QMA4TkvRkH0tP1b\n      TdhtFJgJxeVmJkLD61A1hnWGetdg11c9ADsnWgL56NyxwSYjU1ZEHcGk\n      d3EkU0vjHi9gTlb90qSYFfeF0LwkcTtjbYKCsiNJQkcIp1yeM03OmuiY\n      SoYJVSpf7ej6zaYcMv3WwdxDFl8REwOhNImk2Xld2JXq6BR53TSFkyT7\n      PwVLuq-1GwtGHlQeg7gDT6xW0JqHDPn_H-puQsmthc9Zg0ojmJfqqFvE\n      TUxLAF-KjcBTS5dNy6egwkYtOt8EIHK-oEsKYtZRaa8Z7MOZ7UGxGIMv\n      EmxrGCPeJa14slv2-gaqK0kEThkaSqdYw0FkQZF\",\n  \"tag\": \"ER7MWJZ1FBI_NKvn7Zb1Lw\"\n}",
+   "joined": "{\"recipients\":[{\"encrypted_key\":\"CBI6oDw8MydIx1IBntf_lQcw2MmJKIQx\"}],\"protected\":\"eyJhbGciOiJBMTI4S1ciLCJraWQiOiI4MWIyMDk2NS04MzMyLTQzZDktYTQ2OC04MjE2MGFkOTFhYzgiLCJlbmMiOiJBMTI4R0NNIn0\",\"iv\":\"Qx0pmsDa8KnJc9Jo\",\"ciphertext\":\"AwliP-KmWgsZ37BvzCefNen6VTbRK3QMA4TkvRkH0tP1bTdhtFJgJxeVmJkLD61A1hnWGetdg11c9ADsnWgL56NyxwSYjU1ZEHcGkd3EkU0vjHi9gTlb90qSYFfeF0LwkcTtjbYKCsiNJQkcIp1yeM03OmuiYSoYJVSpf7ej6zaYcMv3WwdxDFl8REwOhNImk2Xld2JXq6BR53TSFkyT7PwVLuq-1GwtGHlQeg7gDT6xW0JqHDPn_H-puQsmthc9Zg0ojmJfqqFvETUxLAF-KjcBTS5dNy6egwkYtOt8EIHK-oEsKYtZRaa8Z7MOZ7UGxGIMvEmxrGCPeJa14slv2-gaqK0kEThkaSqdYw0FkQZF\",\"tag\":\"ER7MWJZ1FBI_NKvn7Zb1Lw\"}",
+   "json": {
+    "recipients": [
+     {
+      "encrypted_key": "CBI6oDw8MydIx1IBntf_lQcw2MmJKIQx"
+     }
+    ],
+    "protected": "eyJhbGciOiJBMTI4S1ciLCJraWQiOiI4MWIyMDk2NS04MzMyLTQzZDktYTQ2OC04MjE2MGFkOTFhYzgiLCJlbmMiOiJBMTI4R0NNIn0",
+    "iv": "Qx0pmsDa8KnJc9Jo",
+    "ciphertext": "AwliP-KmWgsZ37BvzCefNen6VTbRK3QMA4TkvRkH0tP1bTdhtFJgJxeVmJkLD61A1hnWGetdg11c9ADsnWgL56NyxwSYjU1ZEHcGkd3EkU0vjHi9gTlb90qSYFfeF0LwkcTtjbYKCsiNJQkcIp1yeM03OmuiYSoYJVSpf7ej6zaYcMv3WwdxDFl8REwOhNImk2Xld2JXq6BR53TSFkyT7PwVLuq-1GwtGHlQeg7gDT6xW0JqHDPn_H-puQsmthc9Zg0ojmJfqqFvETUxLAF-KjcBTS5dNy6egwkYtOt8EIHK-oEsKYtZRaa8Z7MOZ7UGxGIMvEmxrGCPeJa14slv2-gaqK0kEThkaSqdYw0FkQZF",
+    "tag": "ER7MWJZ1FBI_NKvn7Zb1Lw"
+   }
+  },
+  {
+   "figure": 161,
+   "caption": "Flattened JWE JSON Serialization",
+   "section": "5.8.5",
+   "example": "5.8",
+   "text": "{\n  \"protected\": \"eyJhbGciOiJBMTI4S1ciLCJraWQiOiI4MWIyMDk2NS04Mz\n      MyLTQzZDktYTQ2OC04MjE2MGFkOTFhYzgiLCJlbmMiOiJBMTI4R0NNIn\n      0\",\n  \"encrypted_key\": \"CBI6oDw8MydIx1IBntf_lQcw2MmJKIQx\",\n  \"iv\": \"Qx0pmsDa8KnJc9Jo\",\n  \"ciphertext\": \"AwliP-KmWgsZ37BvzCefNen6VTbRK3QMA4TkvRkH0tP1b\n      TdhtFJgJxeVmJkLD61A1hnWGetdg11c9ADsnWgL56NyxwSYjU1ZEHcGk\n      d3EkU0vjHi9gTlb90qSYFfeF0LwkcTtjbYKCsiNJQkcIp1yeM03OmuiY\n      SoYJVSpf7ej6zaYcMv3WwdxDFl8REwOhNImk2Xld2JXq6BR53TSFkyT7\n      PwVLuq-1GwtGHlQeg7gDT6xW0JqHDPn_H-puQsmthc9Zg0ojmJfqqFvE\n      TUxLAF-KjcBTS5dNy6egwkYtOt8EIHK-oEsKYtZRaa8Z7MOZ7UGxGIMv\n      EmxrGCPeJa14slv2-gaqK0kEThkaSqdYw0FkQZF\",\n  \"tag\": \"ER7MWJZ1FBI_NKvn7Zb1Lw\"\n}",
+   "joined": "{\"protected\":\"eyJhbGciOiJBMTI4S1ciLCJraWQiOiI4MWIyMDk2NS04MzMyLTQzZDktYTQ2OC04MjE2MGFkOTFhYzgiLCJlbmMiOiJBMTI4R0NNIn0\",\"encrypted_key\":\"CBI6oDw8MydIx1IBntf_lQcw2MmJKIQx\",\"iv\":\"Qx0pmsDa8KnJc9Jo\",\"ciphertext\":\"AwliP-KmWgsZ37BvzCefNen6VTbRK3QMA4TkvRkH0tP1bTdhtFJgJxeVmJkLD61A1hnWGetdg11c9ADsnWgL56NyxwSYjU1ZEHcGkd3EkU0vjHi9gTlb90qSYFfeF0LwkcTtjbYKCsiNJQkcIp1yeM03OmuiYSoYJVSpf7ej6zaYcMv3WwdxDFl8REwOhNImk2Xld2JXq6BR53TSFkyT7PwVLuq-1GwtGHlQeg7gDT6xW0JqHDPn_H-puQsmthc9Zg0ojmJfqqFvETUxLAF-KjcBTS5dNy6egwkYtOt8EIHK-oEsKYtZRaa8Z7MOZ7UGxGIMvEmxrGCPeJa14slv2-gaqK0kEThkaSqdYw0FkQZF\",\"tag\":\"ER7MWJZ1FBI_NKvn7Zb1Lw\"}",
+   "json": {
+    "protected": "eyJhbGciOiJBMTI4S1ciLCJraWQiOiI4MWIyMDk2NS04MzMyLTQzZDktYTQ2OC04MjE2MGFkOTFhYzgiLCJlbmMiOiJBMTI4R0NNIn0",
+    "encrypted_key": "CBI6oDw8MydIx1IBntf_lQcw2MmJKIQx",
+    "iv": "Qx0pmsDa8KnJc9Jo",
+    "ciphertext": "AwliP-KmWgsZ37BvzCefNen6VTbRK3QMA4TkvRkH0tP1bTdhtFJgJxeVmJkLD61A1hnWGetdg11c9ADsnWgL56NyxwSYjU1ZEHcGkd3EkU0vjHi9gTlb90qSYFfeF0LwkcTtjbYKCsiNJQkcIp1yeM03OmuiYSoYJVSpf7ej6zaYcMv3WwdxDFl8REwOhNImk2Xld2JXq6BR53TSFkyT7PwVLuq-1GwtGHlQeg7gDT6xW0JqHDPn_H-puQsmthc9Zg0ojmJfqqFvETUxLAF-KjcBTS5dNy6egwkYtOt8EIHK-oEsKYtZRaa8Z7MOZ7UGxGIMvEmxrGCPeJa14slv2-gaqK0kEThkaSqdYw0FkQZF",
+    "tag": "ER7MWJZ1FBI_NKvn7Zb1Lw"
+   }
+  },
+  {
+   "figure": 162,
+   "caption": "Compressed Plaintext, base64url-encoded",
+   "section": "5.9.2",
+   "example": "5.9",
+   "text": "bY_BDcIwDEVX-QNU3QEOrIA4pqlDokYxchxVvbEDGzIJbioOSJwc-f___HPjBu\n8KVFpVtAplVE1-wZo0YjNZo3C7R5v72pV5f5X382VWjYQpqZKAyjziZOr2B7kQ\nPSy6oZIXUnDYbVKN4jNXi2u0yB7t1qSHTjmMODf9QgvrDzfTIQXnyQRuUya4zI\nWG3vTOdir0v7BRHFYWq3k1k1A_gSDJqtcBF-GZxw8",
+   "joined": "bY_BDcIwDEVX-QNU3QEOrIA4pqlDokYxchxVvbEDGzIJbioOSJwc-f___HPjBu8KVFpVtAplVE1-wZo0YjNZo3C7R5v72pV5f5X382VWjYQpqZKAyjziZOr2B7kQPSy6oZIXUnDYbVKN4jNXi2u0yB7t1qSHTjmMODf9QgvrDzfTIQXnyQRuUya4zIWG3vTOdir0v7BRHFYWq3k1k1A_gSDJqtcBF-GZxw8"
+  },
+  {
+   "figure": 163,
+   "caption": "Content Encryption Key, base64url-encoded",
+   "section": "5.9.2",
+   "example": "5.9",
+   "text": "hC-MpLZSuwWv8sexS6ydfw",
+   "joined": "hC-MpLZSuwWv8sexS6ydfw"
+  },
+  {
+   "figure": 164,
+   "caption": "Initialization Vector, base64url-encoded",
+   "section": "5.9.2",
+   "example": "5.9",
+   "text": "p9pUq6XHY0jfEZIl",
+   "joined": "p9pUq6XHY0jfEZIl"
+  },
+  {
+   "figure": 165,
+   "caption": "Encrypted Key, base64url-encoded",
+   "section": "5.9.3",
+   "example": "5.9",
+   "text": "5vUT2WOtQxKWcekM_IzVQwkGgzlFDwPi",
+   "joined": "5vUT2WOtQxKWcekM_IzVQwkGgzlFDwPi"
+  },
+  {
+   "figure": 166,
+   "caption": "JWE Protected Header JSON",
+   "section": "5.9.4",
+   "example": "5.9",
+   "text": "{\n  \"alg\": \"A128KW\",\n  \"kid\": \"81b20965-8332-43d9-a468-82160ad91ac8\",\n  \"enc\": \"A128GCM\",\n  \"zip\": \"DEF\"\n}",
+   "joined": "{\"alg\":\"A128KW\",\"kid\":\"81b20965-8332-43d9-a468-82160ad91ac8\",\"enc\":\"A128GCM\",\"zip\":\"DEF\"}",
+   "json": {
+    "alg": "A128KW",
+    "kid": "81b20965-8332-43d9-a468-82160ad91ac8",
+    "enc": "A128GCM",
+    "zip": "DEF"
+   }
+  },
+  {
+   "figure": 167,
+   "caption": "JWE Protected Header, base64url-encoded",
+   "section": "5.9.4",
+   "example": "5.9",
+   "text": "eyJhbGciOiJBMTI4S1ciLCJraWQiOiI4MWIyMDk2NS04MzMyLTQzZDktYTQ2OC\n04MjE2MGFkOTFhYzgiLCJlbmMiOiJBMTI4R0NNIiwiemlwIjoiREVGIn0",
+   "joined": "eyJhbGciOiJBMTI4S1ciLCJraWQiOiI4MWIyMDk2NS04MzMyLTQzZDktYTQ2OC04MjE2MGFkOTFhYzgiLCJlbmMiOiJBMTI4R0NNIiwiemlwIjoiREVGIn0"
+  },
+  {
+   "figure": 168,
+   "caption": "Ciphertext, base64url-encoded",
+   "section": "5.9.4",
+   "example": "5.9",
+   "text": "HbDtOsdai1oYziSx25KEeTxmwnh8L8jKMFNc1k3zmMI6VB8hry57tDZ61jXyez\nSPt0fdLVfe6Jf5y5-JaCap_JQBcb5opbmT60uWGml8blyiMQmOn9J--XhhlYg0\nm-BHaqfDO5iTOWxPxFMUedx7WCy8mxgDHj0aBMG6152PsM-w5E_o2B3jDbrYBK\nhpYA7qi3AyijnCJ7BP9rr3U8kxExCpG3mK420TjOw",
+   "joined": "HbDtOsdai1oYziSx25KEeTxmwnh8L8jKMFNc1k3zmMI6VB8hry57tDZ61jXyezSPt0fdLVfe6Jf5y5-JaCap_JQBcb5opbmT60uWGml8blyiMQmOn9J--XhhlYg0m-BHaqfDO5iTOWxPxFMUedx7WCy8mxgDHj0aBMG6152PsM-w5E_o2B3jDbrYBKhpYA7qi3AyijnCJ7BP9rr3U8kxExCpG3mK420TjOw"
+  },
+  {
+   "figure": 169,
+   "caption": "Authentication Tag, base64url-encoded",
+   "section": "5.9.4",
+   "example": "5.9",
+   "text": "VILuUwuIxaLVmh5X-T7kmA",
+   "joined": "VILuUwuIxaLVmh5X-T7kmA"
+  },
+  {
+   "figure": 170,
+   "caption": "JWE Compact Serialization",
+   "section": "5.9.5",
+   "example": "5.9",
+   "text": "eyJhbGciOiJBMTI4S1ciLCJraWQiOiI4MWIyMDk2NS04MzMyLTQzZDktYTQ2OC\n04MjE2MGFkOTFhYzgiLCJlbmMiOiJBMTI4R0NNIiwiemlwIjoiREVGIn0\n.\n5vUT2WOtQxKWcekM_IzVQwkGgzlFDwPi\n.\np9pUq6XHY0jfEZIl\n.\nHbDtOsdai1oYziSx25KEeTxmwnh8L8jKMFNc1k3zmMI6VB8hry57tDZ61jXyez\nSPt0fdLVfe6Jf5y5-JaCap_JQBcb5opbmT60uWGml8blyiMQmOn9J--XhhlYg0\nm-BHaqfDO5iTOWxPxFMUedx7WCy8mxgDHj0aBMG6152PsM-w5E_o2B3jDbrYBK\nhpYA7qi3AyijnCJ7BP9rr3U8kxExCpG3mK420TjOw\n.\nVILuUwuIxaLVmh5X-T7kmA",
+   "joined": "eyJhbGciOiJBMTI4S1ciLCJraWQiOiI4MWIyMDk2NS04MzMyLTQzZDktYTQ2OC04MjE2MGFkOTFhYzgiLCJlbmMiOiJBMTI4R0NNIiwiemlwIjoiREVGIn0.5vUT2WOtQxKWcekM_IzVQwkGgzlFDwPi.p9pUq6XHY0jfEZIl.HbDtOsdai1oYziSx25KEeTxmwnh8L8jKMFNc1k3zmMI6VB8hry57tDZ61jXyezSPt0fdLVfe6Jf5y5-JaCap_JQBcb5opbmT60uWGml8blyiMQmOn9J--XhhlYg0m-BHaqfDO5iTOWxPxFMUedx7WCy8mxgDHj0aBMG6152PsM-w5E_o2B3jDbrYBKhpYA7qi3AyijnCJ7BP9rr3U8kxExCpG3mK420TjOw.VILuUwuIxaLVmh5X-T7kmA"
+  },
+  {
+   "figure": 171,
+   "caption": "General JWE JSON Serialization",
+   "section": "5.9.5",
+   "example": "5.9",
+   "text": "{\n  \"recipients\": [\n    {\n      \"encrypted_key\": \"5vUT2WOtQxKWcekM_IzVQwkGgzlFDwPi\"\n    }\n  ],\n  \"protected\": \"eyJhbGciOiJBMTI4S1ciLCJraWQiOiI4MWIyMDk2NS04Mz\n      MyLTQzZDktYTQ2OC04MjE2MGFkOTFhYzgiLCJlbmMiOiJBMTI4R0NNIi\n      wiemlwIjoiREVGIn0\",\n  \"iv\": \"p9pUq6XHY0jfEZIl\",\n  \"ciphertext\": \"HbDtOsdai1oYziSx25KEeTxmwnh8L8jKMFNc1k3zmMI6V\n      B8hry57tDZ61jXyezSPt0fdLVfe6Jf5y5-JaCap_JQBcb5opbmT60uWG\n      ml8blyiMQmOn9J--XhhlYg0m-BHaqfDO5iTOWxPxFMUedx7WCy8mxgDH\n      j0aBMG6152PsM-w5E_o2B3jDbrYBKhpYA7qi3AyijnCJ7BP9rr3U8kxE\n      xCpG3mK420TjOw\",\n  \"tag\": \"VILuUwuIxaLVmh5X-T7kmA\"\n}",
+   "joined": "{\"recipients\":[{\"encrypted_key\":\"5vUT2WOtQxKWcekM_IzVQwkGgzlFDwPi\"}],\"protected\":\"eyJhbGciOiJBMTI4S1ciLCJraWQiOiI4MWIyMDk2NS04MzMyLTQzZDktYTQ2OC04MjE2MGFkOTFhYzgiLCJlbmMiOiJBMTI4R0NNIiwiemlwIjoiREVGIn0\",\"iv\":\"p9pUq6XHY0jfEZIl\",\"ciphertext\":\"HbDtOsdai1oYziSx25KEeTxmwnh8L8jKMFNc1k3zmMI6VB8hry57tDZ61jXyezSPt0fdLVfe6Jf5y5-JaCap_JQBcb5opbmT60uWGml8blyiMQmOn9J--XhhlYg0m-BHaqfDO5iTOWxPxFMUedx7WCy8mxgDHj0aBMG6152PsM-w5E_o2B3jDbrYBKhpYA7qi3AyijnCJ7BP9rr3U8kxExCpG3mK420TjOw\",\"tag\":\"VILuUwuIxaLVmh5X-T7kmA\"}",
+   "json": {
+    "recipients": [
+     {
+      "encrypted_key": "5vUT2WOtQxKWcekM_IzVQwkGgzlFDwPi"
+     }
+    ],
+    "protected": "eyJhbGciOiJBMTI4S1ciLCJraWQiOiI4MWIyMDk2NS04MzMyLTQzZDktYTQ2OC04MjE2MGFkOTFhYzgiLCJlbmMiOiJBMTI4R0NNIiwiemlwIjoiREVGIn0",
+    "iv": "p9pUq6XHY0jfEZIl",
+    "ciphertext": "HbDtOsdai1oYziSx25KEeTxmwnh8L8jKMFNc1k3zmMI6VB8hry57tDZ61jXyezSPt0fdLVfe6Jf5y5-JaCap_JQBcb5opbmT60uWGml8blyiMQmOn9J--XhhlYg0m-BHaqfDO5iTOWxPxFMUedx7WCy8mxgDHj0aBMG6152PsM-w5E_o2B3jDbrYBKhpYA7qi3AyijnCJ7BP9rr3U8kxExCpG3mK420TjOw",
+    "tag": "VILuUwuIxaLVmh5X-T7kmA"
+   }
+  },
+  {
+   "figure": 172,
+   "caption": "Flattened JWE JSON Serialization",
+   "section": "5.9.5",
+   "example": "5.9",
+   "text": "{\n  \"protected\": \"eyJhbGciOiJBMTI4S1ciLCJraWQiOiI4MWIyMDk2NS04Mz\n      MyLTQzZDktYTQ2OC04MjE2MGFkOTFhYzgiLCJlbmMiOiJBMTI4R0NNIi\n      wiemlwIjoiREVGIn0\",\n  \"encrypted_key\": \"5vUT2WOtQxKWcekM_IzVQwkGgzlFDwPi\",\n  \"iv\": \"p9pUq6XHY0jfEZIl\",\n  \"ciphertext\": \"HbDtOsdai1oYziSx25KEeTxmwnh8L8jKMFNc1k3zmMI6V\n      B8hry57tDZ61jXyezSPt0fdLVfe6Jf5y5-JaCap_JQBcb5opbmT60uWG\n      ml8blyiMQmOn9J--XhhlYg0m-BHaqfDO5iTOWxPxFMUedx7WCy8mxgDH\n      j0aBMG6152PsM-w5E_o2B3jDbrYBKhpYA7qi3AyijnCJ7BP9rr3U8kxE\n      xCpG3mK420TjOw\",\n  \"tag\": \"VILuUwuIxaLVmh5X-T7kmA\"\n}",
+   "joined": "{\"protected\":\"eyJhbGciOiJBMTI4S1ciLCJraWQiOiI4MWIyMDk2NS04MzMyLTQzZDktYTQ2OC04MjE2MGFkOTFhYzgiLCJlbmMiOiJBMTI4R0NNIiwiemlwIjoiREVGIn0\",\"encrypted_key\":\"5vUT2WOtQxKWcekM_IzVQwkGgzlFDwPi\",\"iv\":\"p9pUq6XHY0jfEZIl\",\"ciphertext\":\"HbDtOsdai1oYziSx25KEeTxmwnh8L8jKMFNc1k3zmMI6VB8hry57tDZ61jXyezSPt0fdLVfe6Jf5y5-JaCap_JQBcb5opbmT60uWGml8blyiMQmOn9J--XhhlYg0m-BHaqfDO5iTOWxPxFMUedx7WCy8mxgDHj0aBMG6152PsM-w5E_o2B3jDbrYBKhpYA7qi3AyijnCJ7BP9rr3U8kxExCpG3mK420TjOw\",\"tag\":\"VILuUwuIxaLVmh5X-T7kmA\"}",
+   "json": {
+    "protected": "eyJhbGciOiJBMTI4S1ciLCJraWQiOiI4MWIyMDk2NS04MzMyLTQzZDktYTQ2OC04MjE2MGFkOTFhYzgiLCJlbmMiOiJBMTI4R0NNIiwiemlwIjoiREVGIn0",
+    "encrypted_key": "5vUT2WOtQxKWcekM_IzVQwkGgzlFDwPi",
+    "iv": "p9pUq6XHY0jfEZIl",
+    "ciphertext": "HbDtOsdai1oYziSx25KEeTxmwnh8L8jKMFNc1k3zmMI6VB8hry57tDZ61jXyezSPt0fdLVfe6Jf5y5-JaCap_JQBcb5opbmT60uWGml8blyiMQmOn9J--XhhlYg0m-BHaqfDO5iTOWxPxFMUedx7WCy8mxgDHj0aBMG6152PsM-w5E_o2B3jDbrYBKhpYA7qi3AyijnCJ7BP9rr3U8kxExCpG3mK420TjOw",
+    "tag": "VILuUwuIxaLVmh5X-T7kmA"
+   }
+  },
+  {
+   "figure": 173,
+   "caption": "Additional Authenticated Data, in JSON Format",
+   "section": "5.10.1",
+   "example": "5.10",
+   "text": "o  Additional Authenticated Data; this example uses a vCard [RFC7095]\n   from Figure 173, serialized to UTF-8.\n[\n  \"vcard\",\n  [\n    [ \"version\", {}, \"text\", \"4.0\" ],\n    [ \"fn\", {}, \"text\", \"Meriadoc Brandybuck\" ],\n    [ \"n\", {},\n      \"text\", [\n        \"Brandybuck\", \"Meriadoc\", \"Mr.\", \"\"\n      ]\n    ],\n    [ \"bday\", {}, \"text\", \"TA 2982\" ],\n    [ \"gender\", {}, \"text\", \"M\" ]\n  ]\n]",
+   "joined": "oAdditionalAuthenticatedData;thisexampleusesavCard[RFC7095]fromFigure173,serializedtoUTF-8.[\"vcard\",[[\"version\",{},\"text\",\"4.0\"],[\"fn\",{},\"text\",\"MeriadocBrandybuck\"],[\"n\",{},\"text\",[\"Brandybuck\",\"Meriadoc\",\"Mr.\",\"\"]],[\"bday\",{},\"text\",\"TA2982\"],[\"gender\",{},\"text\",\"M\"]]]"
+  },
+  {
+   "figure": 174,
+   "caption": "Content Encryption Key, base64url-encoded",
+   "section": "5.10.2",
+   "example": "5.10",
+   "text": "75m1ALsYv10pZTKPWrsqdg",
+   "joined": "75m1ALsYv10pZTKPWrsqdg"
+  },
+  {
+   "figure": 175,
+   "caption": "Initialization Vector, base64url-encoded",
+   "section": "5.10.2",
+   "example": "5.10",
+   "text": "veCx9ece2orS7c_N",
+   "joined": "veCx9ece2orS7c_N"
+  },
+  {
+   "figure": 176,
+   "caption": "Additional Authenticated Data, base64url-encoded",
+   "section": "5.10.2",
+   "example": "5.10",
+   "text": "WyJ2Y2FyZCIsW1sidmVyc2lvbiIse30sInRleHQiLCI0LjAiXSxbImZuIix7fS\nwidGV4dCIsIk1lcmlhZG9jIEJyYW5keWJ1Y2siXSxbIm4iLHt9LCJ0ZXh0Iixb\nIkJyYW5keWJ1Y2siLCJNZXJpYWRvYyIsIk1yLiIsIiJdXSxbImJkYXkiLHt9LC\nJ0ZXh0IiwiVEEgMjk4MiJdLFsiZ2VuZGVyIix7fSwidGV4dCIsIk0iXV1d",
+   "joined": "WyJ2Y2FyZCIsW1sidmVyc2lvbiIse30sInRleHQiLCI0LjAiXSxbImZuIix7fSwidGV4dCIsIk1lcmlhZG9jIEJyYW5keWJ1Y2siXSxbIm4iLHt9LCJ0ZXh0IixbIkJyYW5keWJ1Y2siLCJNZXJpYWRvYyIsIk1yLiIsIiJdXSxbImJkYXkiLHt9LCJ0ZXh0IiwiVEEgMjk4MiJdLFsiZ2VuZGVyIix7fSwidGV4dCIsIk0iXV1d"
+  },
+  {
+   "figure": 177,
+   "caption": "Encrypted Key, base64url-encoded",
+   "section": "5.10.3",
+   "example": "5.10",
+   "text": "4YiiQ_ZzH76TaIkJmYfRFgOV9MIpnx4X",
+   "joined": "4YiiQ_ZzH76TaIkJmYfRFgOV9MIpnx4X"
+  },
+  {
+   "figure": 178,
+   "caption": "JWE Protected Header JSON",
+   "section": "5.10.4",
+   "example": "5.10",
+   "text": "{\n  \"alg\": \"A128KW\",\n  \"kid\": \"81b20965-8332-43d9-a468-82160ad91ac8\",\n  \"enc\": \"A128GCM\"\n}",
+   "joined": "{\"alg\":\"A128KW\",\"kid\":\"81b20965-8332-43d9-a468-82160ad91ac8\",\"enc\":\"A128GCM\"}",
+   "json": {
+    "alg": "A128KW",
+    "kid": "81b20965-8332-43d9-a468-82160ad91ac8",
+    "enc": "A128GCM"
+   }
+  },
+  {
+   "figure": 179,
+   "caption": "JWE Protected Header, base64url-encoded",
+   "section": "5.10.4",
+   "example": "5.10",
+   "text": "eyJhbGciOiJBMTI4S1ciLCJraWQiOiI4MWIyMDk2NS04MzMyLTQzZDktYTQ2OC\n04MjE2MGFkOTFhYzgiLCJlbmMiOiJBMTI4R0NNIn0",
+   "joined": "eyJhbGciOiJBMTI4S1ciLCJraWQiOiI4MWIyMDk2NS04MzMyLTQzZDktYTQ2OC04MjE2MGFkOTFhYzgiLCJlbmMiOiJBMTI4R0NNIn0"
+  },
+  {
+   "figure": 180,
+   "caption": "Ciphertext, base64url-encoded",
+   "section": "5.10.4",
+   "example": "5.10",
+   "text": "o  Authentication Tag from Figure 181.\nZ_3cbr0k3bVM6N3oSNmHz7Lyf3iPppGf3Pj17wNZqteJ0Ui8p74SchQP8xygM1\noFRWCNzeIa6s6BcEtp8qEFiqTUEyiNkOWDNoF14T_4NFqF-p2Mx8zkbKxI7oPK\n8KNarFbyxIDvICNqBLba-v3uzXBdB89fzOI-Lv4PjOFAQGHrgv1rjXAmKbgkft\n9cB4WeyZw8MldbBhc-V_KWZslrsLNygon_JJWd_ek6LQn5NRehvApqf9ZrxB4a\nq3FXBxOxCys35PhCdaggy2kfUfl2OkwKnWUbgXVD1C6HxLIlqHhCwXDG59weHr\nRDQeHyMRoBljoV3X_bUTJDnKBFOod7nLz-cj48JMx3SnCZTpbQAkFV",
+   "joined": "oAuthenticationTagfromFigure181.Z_3cbr0k3bVM6N3oSNmHz7Lyf3iPppGf3Pj17wNZqteJ0Ui8p74SchQP8xygM1oFRWCNzeIa6s6BcEtp8qEFiqTUEyiNkOWDNoF14T_4NFqF-p2Mx8zkbKxI7oPK8KNarFbyxIDvICNqBLba-v3uzXBdB89fzOI-Lv4PjOFAQGHrgv1rjXAmKbgkft9cB4WeyZw8MldbBhc-V_KWZslrsLNygon_JJWd_ek6LQn5NRehvApqf9ZrxB4aq3FXBxOxCys35PhCdaggy2kfUfl2OkwKnWUbgXVD1C6HxLIlqHhCwXDG59weHrRDQeHyMRoBljoV3X_bUTJDnKBFOod7nLz-cj48JMx3SnCZTpbQAkFV"
+  },
+  {
+   "figure": 181,
+   "caption": "Authentication Tag, base64url-encoded",
+   "section": "5.10.4",
+   "example": "5.10",
+   "text": "vOaH_Rajnpy_3hOtqvZHRA",
+   "joined": "vOaH_Rajnpy_3hOtqvZHRA"
+  },
+  {
+   "figure": 182,
+   "caption": "General JWE JSON Serialization",
+   "section": "5.10.5",
+   "example": "5.10",
+   "text": "{\n  \"recipients\": [\n    {\n      \"encrypted_key\": \"4YiiQ_ZzH76TaIkJmYfRFgOV9MIpnx4X\"\n    }\n  ],\n  \"protected\": \"eyJhbGciOiJBMTI4S1ciLCJraWQiOiI4MWIyMDk2NS04Mz\n      MyLTQzZDktYTQ2OC04MjE2MGFkOTFhYzgiLCJlbmMiOiJBMTI4R0NNIn\n      0\",\n  \"iv\": \"veCx9ece2orS7c_N\",\n  \"aad\": \"WyJ2Y2FyZCIsW1sidmVyc2lvbiIse30sInRleHQiLCI0LjAiXSxb\n      ImZuIix7fSwidGV4dCIsIk1lcmlhZG9jIEJyYW5keWJ1Y2siXSxbIm4i\n      LHt9LCJ0ZXh0IixbIkJyYW5keWJ1Y2siLCJNZXJpYWRvYyIsIk1yLiIs\n      IiJdXSxbImJkYXkiLHt9LCJ0ZXh0IiwiVEEgMjk4MiJdLFsiZ2VuZGVy\n      Iix7fSwidGV4dCIsIk0iXV1d\",\n  \"ciphertext\": \"Z_3cbr0k3bVM6N3oSNmHz7Lyf3iPppGf3Pj17wNZqteJ0\n      Ui8p74SchQP8xygM1oFRWCNzeIa6s6BcEtp8qEFiqTUEyiNkOWDNoF14\n      T_4NFqF-p2Mx8zkbKxI7oPK8KNarFbyxIDvICNqBLba-v3uzXBdB89fz\n      OI-Lv4PjOFAQGHrgv1rjXAmKbgkft9cB4WeyZw8MldbBhc-V_KWZslrs\n      LNygon_JJWd_ek6LQn5NRehvApqf9ZrxB4aq3FXBxOxCys35PhCdaggy\n      2kfUfl2OkwKnWUbgXVD1C6HxLIlqHhCwXDG59weHrRDQeHyMRoBljoV3\n      X_bUTJDnKBFOod7nLz-cj48JMx3SnCZTpbQAkFV\",\n  \"tag\": \"vOaH_Rajnpy_3hOtqvZHRA\"\n}",
+   "joined": "{\"recipients\":[{\"encrypted_key\":\"4YiiQ_ZzH76TaIkJmYfRFgOV9MIpnx4X\"}],\"protected\":\"eyJhbGciOiJBMTI4S1ciLCJraWQiOiI4MWIyMDk2NS04MzMyLTQzZDktYTQ2OC04MjE2MGFkOTFhYzgiLCJlbmMiOiJBMTI4R0NNIn0\",\"iv\":\"veCx9ece2orS7c_N\",\"aad\":\"WyJ2Y2FyZCIsW1sidmVyc2lvbiIse30sInRleHQiLCI0LjAiXSxbImZuIix7fSwidGV4dCIsIk1lcmlhZG9jIEJyYW5keWJ1Y2siXSxbIm4iLHt9LCJ0ZXh0IixbIkJyYW5keWJ1Y2siLCJNZXJpYWRvYyIsIk1yLiIsIiJdXSxbImJkYXkiLHt9LCJ0ZXh0IiwiVEEgMjk4MiJdLFsiZ2VuZGVyIix7fSwidGV4dCIsIk0iXV1d\",\"ciphertext\":\"Z_3cbr0k3bVM6N3oSNmHz7Lyf3iPppGf3Pj17wNZqteJ0Ui8p74SchQP8xygM1oFRWCNzeIa6s6BcEtp8qEFiqTUEyiNkOWDNoF14T_4NFqF-p2Mx8zkbKxI7oPK8KNarFbyxIDvICNqBLba-v3uzXBdB89fzOI-Lv4PjOFAQGHrgv1rjXAmKbgkft9cB4WeyZw8MldbBhc-V_KWZslrsLNygon_JJWd_ek6LQn5NRehvApqf9ZrxB4aq3FXBxOxCys35PhCdaggy2kfUfl2OkwKnWUbgXVD1C6HxLIlqHhCwXDG59weHrRDQeHyMRoBljoV3X_bUTJDnKBFOod7nLz-cj48JMx3SnCZTpbQAkFV\",\"tag\":\"vOaH_Rajnpy_3hOtqvZHRA\"}",
+   "json": {
+    "recipients": [
+     {
+      "encrypted_key": "4YiiQ_ZzH76TaIkJmYfRFgOV9MIpnx4X"
+     }
+    ],
+    "protected": "eyJhbGciOiJBMTI4S1ciLCJraWQiOiI4MWIyMDk2NS04MzMyLTQzZDktYTQ2OC04MjE2MGFkOTFhYzgiLCJlbmMiOiJBMTI4R0NNIn0",
+    "iv": "veCx9ece2orS7c_N",
+    "aad": "WyJ2Y2FyZCIsW1sidmVyc2lvbiIse30sInRleHQiLCI0LjAiXSxbImZuIix7fSwidGV4dCIsIk1lcmlhZG9jIEJyYW5keWJ1Y2siXSxbIm4iLHt9LCJ0ZXh0IixbIkJyYW5keWJ1Y2siLCJNZXJpYWRvYyIsIk1yLiIsIiJdXSxbImJkYXkiLHt9LCJ0ZXh0IiwiVEEgMjk4MiJdLFsiZ2VuZGVyIix7fSwidGV4dCIsIk0iXV1d",
+    "ciphertext": "Z_3cbr0k3bVM6N3oSNmHz7Lyf3iPppGf3Pj17wNZqteJ0Ui8p74SchQP8xygM1oFRWCNzeIa6s6BcEtp8qEFiqTUEyiNkOWDNoF14T_4NFqF-p2Mx8zkbKxI7oPK8KNarFbyxIDvICNqBLba-v3uzXBdB89fzOI-Lv4PjOFAQGHrgv1rjXAmKbgkft9cB4WeyZw8MldbBhc-V_KWZslrsLNygon_JJWd_ek6LQn5NRehvApqf9ZrxB4aq3FXBxOxCys35PhCdaggy2kfUfl2OkwKnWUbgXVD1C6HxLIlqHhCwXDG59weHrRDQeHyMRoBljoV3X_bUTJDnKBFOod7nLz-cj48JMx3SnCZTpbQAkFV",
+    "tag": "vOaH_Rajnpy_3hOtqvZHRA"
+   }
+  },
+  {
+   "figure": 183,
+   "caption": "Flattened JWE JSON Serialization",
+   "section": "5.10.5",
+   "example": "5.10",
+   "text": "{\n  \"protected\": \"eyJhbGciOiJBMTI4S1ciLCJraWQiOiI4MWIyMDk2NS04Mz\n      MyLTQzZDktYTQ2OC04MjE2MGFkOTFhYzgiLCJlbmMiOiJBMTI4R0NNIn\n      0\",\n  \"encrypted_key\": \"4YiiQ_ZzH76TaIkJmYfRFgOV9MIpnx4X\",\n  \"aad\": \"WyJ2Y2FyZCIsW1sidmVyc2lvbiIse30sInRleHQiLCI0LjAiXSxb\n      ImZuIix7fSwidGV4dCIsIk1lcmlhZG9jIEJyYW5keWJ1Y2siXSxbIm4i\n      LHt9LCJ0ZXh0IixbIkJyYW5keWJ1Y2siLCJNZXJpYWRvYyIsIk1yLiIs\n      IiJdXSxbImJkYXkiLHt9LCJ0ZXh0IiwiVEEgMjk4MiJdLFsiZ2VuZGVy\n      Iix7fSwidGV4dCIsIk0iXV1d\",\n  \"iv\": \"veCx9ece2orS7c_N\",\n  \"ciphertext\": \"Z_3cbr0k3bVM6N3oSNmHz7Lyf3iPppGf3Pj17wNZqteJ0\n      Ui8p74SchQP8xygM1oFRWCNzeIa6s6BcEtp8qEFiqTUEyiNkOWDNoF14\n      T_4NFqF-p2Mx8zkbKxI7oPK8KNarFbyxIDvICNqBLba-v3uzXBdB89fz\n      OI-Lv4PjOFAQGHrgv1rjXAmKbgkft9cB4WeyZw8MldbBhc-V_KWZslrs\n      LNygon_JJWd_ek6LQn5NRehvApqf9ZrxB4aq3FXBxOxCys35PhCdaggy\n      2kfUfl2OkwKnWUbgXVD1C6HxLIlqHhCwXDG59weHrRDQeHyMRoBljoV3\n      X_bUTJDnKBFOod7nLz-cj48JMx3SnCZTpbQAkFV\",\n  \"tag\": \"vOaH_Rajnpy_3hOtqvZHRA\"\n}",
+   "joined": "{\"protected\":\"eyJhbGciOiJBMTI4S1ciLCJraWQiOiI4MWIyMDk2NS04MzMyLTQzZDktYTQ2OC04MjE2MGFkOTFhYzgiLCJlbmMiOiJBMTI4R0NNIn0\",\"encrypted_key\":\"4YiiQ_ZzH76TaIkJmYfRFgOV9MIpnx4X\",\"aad\":\"WyJ2Y2FyZCIsW1sidmVyc2lvbiIse30sInRleHQiLCI0LjAiXSxbImZuIix7fSwidGV4dCIsIk1lcmlhZG9jIEJyYW5keWJ1Y2siXSxbIm4iLHt9LCJ0ZXh0IixbIkJyYW5keWJ1Y2siLCJNZXJpYWRvYyIsIk1yLiIsIiJdXSxbImJkYXkiLHt9LCJ0ZXh0IiwiVEEgMjk4MiJdLFsiZ2VuZGVyIix7fSwidGV4dCIsIk0iXV1d\",\"iv\":\"veCx9ece2orS7c_N\",\"ciphertext\":\"Z_3cbr0k3bVM6N3oSNmHz7Lyf3iPppGf3Pj17wNZqteJ0Ui8p74SchQP8xygM1oFRWCNzeIa6s6BcEtp8qEFiqTUEyiNkOWDNoF14T_4NFqF-p2Mx8zkbKxI7oPK8KNarFbyxIDvICNqBLba-v3uzXBdB89fzOI-Lv4PjOFAQGHrgv1rjXAmKbgkft9cB4WeyZw8MldbBhc-V_KWZslrsLNygon_JJWd_ek6LQn5NRehvApqf9ZrxB4aq3FXBxOxCys35PhCdaggy2kfUfl2OkwKnWUbgXVD1C6HxLIlqHhCwXDG59weHrRDQeHyMRoBljoV3X_bUTJDnKBFOod7nLz-cj48JMx3SnCZTpbQAkFV\",\"tag\":\"vOaH_Rajnpy_3hOtqvZHRA\"}",
+   "json": {
+    "protected": "eyJhbGciOiJBMTI4S1ciLCJraWQiOiI4MWIyMDk2NS04MzMyLTQzZDktYTQ2OC04MjE2MGFkOTFhYzgiLCJlbmMiOiJBMTI4R0NNIn0",
+    "encrypted_key": "4YiiQ_ZzH76TaIkJmYfRFgOV9MIpnx4X",
+    "aad": "WyJ2Y2FyZCIsW1sidmVyc2lvbiIse30sInRleHQiLCI0LjAiXSxbImZuIix7fSwidGV4dCIsIk1lcmlhZG9jIEJyYW5keWJ1Y2siXSxbIm4iLHt9LCJ0ZXh0IixbIkJyYW5keWJ1Y2siLCJNZXJpYWRvYyIsIk1yLiIsIiJdXSxbImJkYXkiLHt9LCJ0ZXh0IiwiVEEgMjk4MiJdLFsiZ2VuZGVyIix7fSwidGV4dCIsIk0iXV1d",
+    "iv": "veCx9ece2orS7c_N",
+    "ciphertext": "Z_3cbr0k3bVM6N3oSNmHz7Lyf3iPppGf3Pj17wNZqteJ0Ui8p74SchQP8xygM1oFRWCNzeIa6s6BcEtp8qEFiqTUEyiNkOWDNoF14T_4NFqF-p2Mx8zkbKxI7oPK8KNarFbyxIDvICNqBLba-v3uzXBdB89fzOI-Lv4PjOFAQGHrgv1rjXAmKbgkft9cB4WeyZw8MldbBhc-V_KWZslrsLNygon_JJWd_ek6LQn5NRehvApqf9ZrxB4aq3FXBxOxCys35PhCdaggy2kfUfl2OkwKnWUbgXVD1C6HxLIlqHhCwXDG59weHrRDQeHyMRoBljoV3X_bUTJDnKBFOod7nLz-cj48JMx3SnCZTpbQAkFV",
+    "tag": "vOaH_Rajnpy_3hOtqvZHRA"
+   }
+  },
+  {
+   "figure": 184,
+   "caption": "Content Encryption Key, base64url-encoded",
+   "section": "5.11.2",
+   "example": "5.11",
+   "text": "WDgEptBmQs9ouUvArz6x6g",
+   "joined": "WDgEptBmQs9ouUvArz6x6g"
+  },
+  {
+   "figure": 185,
+   "caption": "Initialization Vector, base64url-encoded",
+   "section": "5.11.2",
+   "example": "5.11",
+   "text": "WgEJsDS9bkoXQ3nR",
+   "joined": "WgEJsDS9bkoXQ3nR"
+  },
+  {
+   "figure": 186,
+   "caption": "Encrypted Key, base64url-encoded",
+   "section": "5.11.3",
+   "example": "5.11",
+   "text": "jJIcM9J-hbx3wnqhf5FlkEYos0sHsF0H",
+   "joined": "jJIcM9J-hbx3wnqhf5FlkEYos0sHsF0H"
+  },
+  {
+   "figure": 187,
+   "caption": "JWE Protected Header JSON",
+   "section": "5.11.4",
+   "example": "5.11",
+   "text": "{\n  \"enc\": \"A128GCM\"\n}",
+   "joined": "{\"enc\":\"A128GCM\"}",
+   "json": {
+    "enc": "A128GCM"
+   }
+  },
+  {
+   "figure": 188,
+   "caption": "JWE Protected Header, base64url-encoded",
+   "section": "5.11.4",
+   "example": "5.11",
+   "text": "eyJlbmMiOiJBMTI4R0NNIn0",
+   "joined": "eyJlbmMiOiJBMTI4R0NNIn0"
+  },
+  {
+   "figure": 189,
+   "caption": "Ciphertext, base64url-encoded",
+   "section": "5.11.4",
+   "example": "5.11",
+   "text": "lIbCyRmRJxnB2yLQOTqjCDKV3H30ossOw3uD9DPsqLL2DM3swKkjOwQyZtWsFL\nYMj5YeLht_StAn21tHmQJuuNt64T8D4t6C7kC9OCCJ1IHAolUv4MyOt80MoPb8\nfZYbNKqplzYJgIL58g8N2v46OgyG637d6uuKPwhAnTGm_zWhqc_srOvgiLkzyF\nXPq1hBAURbc3-8BqeRb48iR1-_5g5UjWVD3lgiLCN_P7AW8mIiFvUNXBPJK3nO\nWL4teUPS8yHLbWeL83olU4UAgL48x-8dDkH23JykibVSQju-f7e-1xreHWXzWL\nHs1NqBbre0dEwK3HX_xM0LjUz77Krppgegoutpf5qaKg3l-_xMINmf",
+   "joined": "lIbCyRmRJxnB2yLQOTqjCDKV3H30ossOw3uD9DPsqLL2DM3swKkjOwQyZtWsFLYMj5YeLht_StAn21tHmQJuuNt64T8D4t6C7kC9OCCJ1IHAolUv4MyOt80MoPb8fZYbNKqplzYJgIL58g8N2v46OgyG637d6uuKPwhAnTGm_zWhqc_srOvgiLkzyFXPq1hBAURbc3-8BqeRb48iR1-_5g5UjWVD3lgiLCN_P7AW8mIiFvUNXBPJK3nOWL4teUPS8yHLbWeL83olU4UAgL48x-8dDkH23JykibVSQju-f7e-1xreHWXzWLHs1NqBbre0dEwK3HX_xM0LjUz77Krppgegoutpf5qaKg3l-_xMINmf"
+  },
+  {
+   "figure": 190,
+   "caption": "Authentication Tag, base64url-encoded",
+   "section": "5.11.4",
+   "example": "5.11",
+   "text": "fNYLqpUe84KD45lvDiaBAQ",
+   "joined": "fNYLqpUe84KD45lvDiaBAQ"
+  },
+  {
+   "figure": 191,
+   "caption": "JWE Shared Unprotected Header JSON",
+   "section": "5.11.5",
+   "example": "5.11",
+   "text": "{\n  \"alg\": \"A128KW\",\n  \"kid\": \"81b20965-8332-43d9-a468-82160ad91ac8\"\n}",
+   "joined": "{\"alg\":\"A128KW\",\"kid\":\"81b20965-8332-43d9-a468-82160ad91ac8\"}",
+   "json": {
+    "alg": "A128KW",
+    "kid": "81b20965-8332-43d9-a468-82160ad91ac8"
+   }
+  },
+  {
+   "figure": 192,
+   "caption": "General JWE JSON Serialization",
+   "section": "5.11.5",
+   "example": "5.11",
+   "text": "{\n  \"recipients\": [\n    {\n      \"encrypted_key\": \"jJIcM9J-hbx3wnqhf5FlkEYos0sHsF0H\"\n    }\n  ],\n  \"unprotected\": {\n    \"alg\": \"A128KW\",\n    \"kid\": \"81b20965-8332-43d9-a468-82160ad91ac8\"\n  },\n  \"protected\": \"eyJlbmMiOiJBMTI4R0NNIn0\",\n  \"iv\": \"WgEJsDS9bkoXQ3nR\",\n  \"ciphertext\": \"lIbCyRmRJxnB2yLQOTqjCDKV3H30ossOw3uD9DPsqLL2D\n      M3swKkjOwQyZtWsFLYMj5YeLht_StAn21tHmQJuuNt64T8D4t6C7kC9O\n      CCJ1IHAolUv4MyOt80MoPb8fZYbNKqplzYJgIL58g8N2v46OgyG637d6\n      uuKPwhAnTGm_zWhqc_srOvgiLkzyFXPq1hBAURbc3-8BqeRb48iR1-_5\n      g5UjWVD3lgiLCN_P7AW8mIiFvUNXBPJK3nOWL4teUPS8yHLbWeL83olU\n      4UAgL48x-8dDkH23JykibVSQju-f7e-1xreHWXzWLHs1NqBbre0dEwK3\n      HX_xM0LjUz77Krppgegoutpf5qaKg3l-_xMINmf\",\n  \"tag\": \"fNYLqpUe84KD45lvDiaBAQ\"\n}",
+   "joined": "{\"recipients\":[{\"encrypted_key\":\"jJIcM9J-hbx3wnqhf5FlkEYos0sHsF0H\"}],\"unprotected\":{\"alg\":\"A128KW\",\"kid\":\"81b20965-8332-43d9-a468-82160ad91ac8\"},\"protected\":\"eyJlbmMiOiJBMTI4R0NNIn0\",\"iv\":\"WgEJsDS9bkoXQ3nR\",\"ciphertext\":\"lIbCyRmRJxnB2yLQOTqjCDKV3H30ossOw3uD9DPsqLL2DM3swKkjOwQyZtWsFLYMj5YeLht_StAn21tHmQJuuNt64T8D4t6C7kC9OCCJ1IHAolUv4MyOt80MoPb8fZYbNKqplzYJgIL58g8N2v46OgyG637d6uuKPwhAnTGm_zWhqc_srOvgiLkzyFXPq1hBAURbc3-8BqeRb48iR1-_5g5UjWVD3lgiLCN_P7AW8mIiFvUNXBPJK3nOWL4teUPS8yHLbWeL83olU4UAgL48x-8dDkH23JykibVSQju-f7e-1xreHWXzWLHs1NqBbre0dEwK3HX_xM0LjUz77Krppgegoutpf5qaKg3l-_xMINmf\",\"tag\":\"fNYLqpUe84KD45lvDiaBAQ\"}",
+   "json": {
+    "recipients": [
+     {
+      "encrypted_key": "jJIcM9J-hbx3wnqhf5FlkEYos0sHsF0H"
+     }
+    ],
+    "unprotected": {
+     "alg": "A128KW",
+     "kid": "81b20965-8332-43d9-a468-82160ad91ac8"
+    },
+    "protected": "eyJlbmMiOiJBMTI4R0NNIn0",
+    "iv": "WgEJsDS9bkoXQ3nR",
+    "ciphertext": "lIbCyRmRJxnB2yLQOTqjCDKV3H30ossOw3uD9DPsqLL2DM3swKkjOwQyZtWsFLYMj5YeLht_StAn21tHmQJuuNt64T8D4t6C7kC9OCCJ1IHAolUv4MyOt80MoPb8fZYbNKqplzYJgIL58g8N2v46OgyG637d6uuKPwhAnTGm_zWhqc_srOvgiLkzyFXPq1hBAURbc3-8BqeRb48iR1-_5g5UjWVD3lgiLCN_P7AW8mIiFvUNXBPJK3nOWL4teUPS8yHLbWeL83olU4UAgL48x-8dDkH23JykibVSQju-f7e-1xreHWXzWLHs1NqBbre0dEwK3HX_xM0LjUz77Krppgegoutpf5qaKg3l-_xMINmf",
+    "tag": "fNYLqpUe84KD45lvDiaBAQ"
+   }
+  },
+  {
+   "figure": 193,
+   "caption": "Flattened JWE JSON Serialization",
+   "section": "5.11.5",
+   "example": "5.11",
+   "text": "{\n  \"protected\": \"eyJlbmMiOiJBMTI4R0NNIn0\",\n  \"unprotected\": {\n    \"alg\": \"A128KW\",\n    \"kid\": \"81b20965-8332-43d9-a468-82160ad91ac8\"\n  },\n  \"encrypted_key\": \"jJIcM9J-hbx3wnqhf5FlkEYos0sHsF0H\",\n  \"iv\": \"WgEJsDS9bkoXQ3nR\",\n  \"ciphertext\": \"lIbCyRmRJxnB2yLQOTqjCDKV3H30ossOw3uD9DPsqLL2D\n      M3swKkjOwQyZtWsFLYMj5YeLht_StAn21tHmQJuuNt64T8D4t6C7kC9O\n      CCJ1IHAolUv4MyOt80MoPb8fZYbNKqplzYJgIL58g8N2v46OgyG637d6\n      uuKPwhAnTGm_zWhqc_srOvgiLkzyFXPq1hBAURbc3-8BqeRb48iR1-_5\n      g5UjWVD3lgiLCN_P7AW8mIiFvUNXBPJK3nOWL4teUPS8yHLbWeL83olU\n      4UAgL48x-8dDkH23JykibVSQju-f7e-1xreHWXzWLHs1NqBbre0dEwK3\n      HX_xM0LjUz77Krppgegoutpf5qaKg3l-_xMINmf\",\n  \"tag\": \"fNYLqpUe84KD45lvDiaBAQ\"\n}",
+   "joined": "{\"protected\":\"eyJlbmMiOiJBMTI4R0NNIn0\",\"unprotected\":{\"alg\":\"A128KW\",\"kid\":\"81b20965-8332-43d9-a468-82160ad91ac8\"},\"encrypted_key\":\"jJIcM9J-hbx3wnqhf5FlkEYos0sHsF0H\",\"iv\":\"WgEJsDS9bkoXQ3nR\",\"ciphertext\":\"lIbCyRmRJxnB2yLQOTqjCDKV3H30ossOw3uD9DPsqLL2DM3swKkjOwQyZtWsFLYMj5YeLht_StAn21tHmQJuuNt64T8D4t6C7kC9OCCJ1IHAolUv4MyOt80MoPb8fZYbNKqplzYJgIL58g8N2v46OgyG637d6uuKPwhAnTGm_zWhqc_srOvgiLkzyFXPq1hBAURbc3-8BqeRb48iR1-_5g5UjWVD3lgiLCN_P7AW8mIiFvUNXBPJK3nOWL4teUPS8yHLbWeL83olU4UAgL48x-8dDkH23JykibVSQju-f7e-1xreHWXzWLHs1NqBbre0dEwK3HX_xM0LjUz77Krppgegoutpf5qaKg3l-_xMINmf\",\"tag\":\"fNYLqpUe84KD45lvDiaBAQ\"}",
+   "json": {
+    "protected": "eyJlbmMiOiJBMTI4R0NNIn0",
+    "unprotected": {
+     "alg": "A128KW",
+     "kid": "81b20965-8332-43d9-a468-82160ad91ac8"
+    },
+    "encrypted_key": "jJIcM9J-hbx3wnqhf5FlkEYos0sHsF0H",
+    "iv": "WgEJsDS9bkoXQ3nR",
+    "ciphertext": "lIbCyRmRJxnB2yLQOTqjCDKV3H30ossOw3uD9DPsqLL2DM3swKkjOwQyZtWsFLYMj5YeLht_StAn21tHmQJuuNt64T8D4t6C7kC9OCCJ1IHAolUv4MyOt80MoPb8fZYbNKqplzYJgIL58g8N2v46OgyG637d6uuKPwhAnTGm_zWhqc_srOvgiLkzyFXPq1hBAURbc3-8BqeRb48iR1-_5g5UjWVD3lgiLCN_P7AW8mIiFvUNXBPJK3nOWL4teUPS8yHLbWeL83olU4UAgL48x-8dDkH23JykibVSQju-f7e-1xreHWXzWLHs1NqBbre0dEwK3HX_xM0LjUz77Krppgegoutpf5qaKg3l-_xMINmf",
+    "tag": "fNYLqpUe84KD45lvDiaBAQ"
+   }
+  },
+  {
+   "figure": 194,
+   "caption": "Content Encryption Key, base64url-encoded",
+   "section": "5.12.2",
+   "example": "5.12",
+   "text": "KBooAFl30QPV3vkcZlXnzQ",
+   "joined": "KBooAFl30QPV3vkcZlXnzQ"
+  },
+  {
+   "figure": 195,
+   "caption": "Initialization Vector, base64url-encoded",
+   "section": "5.12.2",
+   "example": "5.12",
+   "text": "YihBoVOGsR1l7jCD",
+   "joined": "YihBoVOGsR1l7jCD"
+  },
+  {
+   "figure": 196,
+   "caption": "Encrypted Key, base64url-encoded",
+   "section": "5.12.3",
+   "example": "5.12",
+   "text": "244YHfO_W7RMpQW81UjQrZcq5LSyqiPv",
+   "joined": "244YHfO_W7RMpQW81UjQrZcq5LSyqiPv"
+  },
+  {
+   "figure": 197,
+   "caption": "Ciphertext, base64url-encoded",
+   "section": "5.12.4",
+   "example": "5.12",
+   "text": "o  Authentication Tag from Figure 198.\nqtPIMMaOBRgASL10dNQhOa7Gqrk7Eal1vwht7R4TT1uq-arsVCPaIeFwQfzrSS\n6oEUWbBtxEasE0vC6r7sphyVziMCVJEuRJyoAHFSP3eqQPb4Ic1SDSqyXjw_L3\nsvybhHYUGyQuTmUQEDjgjJfBOifwHIsDsRPeBz1NomqeifVPq5GTCWFo5k_MNI\nQURR2Wj0AHC2k7JZfu2iWjUHLF8ExFZLZ4nlmsvJu_mvifMYiikfNfsZAudISO\na6O73yPZtL04k_1FI7WDfrb2w7OqKLWDXzlpcxohPVOLQwpA3mFNRKdY-bQz4Z\n4KX9lfz1cne31N4-8BKmojpw-OdQjKdLOGkC445Fb_K1tlDQXw2sBF",
+   "joined": "oAuthenticationTagfromFigure198.qtPIMMaOBRgASL10dNQhOa7Gqrk7Eal1vwht7R4TT1uq-arsVCPaIeFwQfzrSS6oEUWbBtxEasE0vC6r7sphyVziMCVJEuRJyoAHFSP3eqQPb4Ic1SDSqyXjw_L3svybhHYUGyQuTmUQEDjgjJfBOifwHIsDsRPeBz1NomqeifVPq5GTCWFo5k_MNIQURR2Wj0AHC2k7JZfu2iWjUHLF8ExFZLZ4nlmsvJu_mvifMYiikfNfsZAudISOa6O73yPZtL04k_1FI7WDfrb2w7OqKLWDXzlpcxohPVOLQwpA3mFNRKdY-bQz4Z4KX9lfz1cne31N4-8BKmojpw-OdQjKdLOGkC445Fb_K1tlDQXw2sBF"
+  },
+  {
+   "figure": 198,
+   "caption": "Authentication Tag, base64url-encoded",
+   "section": "5.12.4",
+   "example": "5.12",
+   "text": "e2m0Vm7JvjK2VpCKXS-kyg",
+   "joined": "e2m0Vm7JvjK2VpCKXS-kyg"
+  },
+  {
+   "figure": 199,
+   "caption": "JWE Shared Unprotected Header JSON",
+   "section": "5.12.5",
+   "example": "5.12",
+   "text": "{\n  \"alg\": \"A128KW\",\n  \"kid\": \"81b20965-8332-43d9-a468-82160ad91ac8\",\n  \"enc\": \"A128GCM\"\n}",
+   "joined": "{\"alg\":\"A128KW\",\"kid\":\"81b20965-8332-43d9-a468-82160ad91ac8\",\"enc\":\"A128GCM\"}",
+   "json": {
+    "alg": "A128KW",
+    "kid": "81b20965-8332-43d9-a468-82160ad91ac8",
+    "enc": "A128GCM"
+   }
+  },
+  {
+   "figure": 200,
+   "caption": "General JWE JSON Serialization",
+   "section": "5.12.5",
+   "example": "5.12",
+   "text": "{\n  \"recipients\": [\n    {\n      \"encrypted_key\": \"244YHfO_W7RMpQW81UjQrZcq5LSyqiPv\"\n    }\n  ],\n  \"unprotected\": {\n    \"alg\": \"A128KW\",\n    \"kid\": \"81b20965-8332-43d9-a468-82160ad91ac8\",\n    \"enc\": \"A128GCM\"\n  },\n  \"iv\": \"YihBoVOGsR1l7jCD\",\n  \"ciphertext\": \"qtPIMMaOBRgASL10dNQhOa7Gqrk7Eal1vwht7R4TT1uq-\n      arsVCPaIeFwQfzrSS6oEUWbBtxEasE0vC6r7sphyVziMCVJEuRJyoAHF\n      SP3eqQPb4Ic1SDSqyXjw_L3svybhHYUGyQuTmUQEDjgjJfBOifwHIsDs\n      RPeBz1NomqeifVPq5GTCWFo5k_MNIQURR2Wj0AHC2k7JZfu2iWjUHLF8\n      ExFZLZ4nlmsvJu_mvifMYiikfNfsZAudISOa6O73yPZtL04k_1FI7WDf\n      rb2w7OqKLWDXzlpcxohPVOLQwpA3mFNRKdY-bQz4Z4KX9lfz1cne31N4\n      -8BKmojpw-OdQjKdLOGkC445Fb_K1tlDQXw2sBF\",\n  \"tag\": \"e2m0Vm7JvjK2VpCKXS-kyg\"\n}",
+   "joined": "{\"recipients\":[{\"encrypted_key\":\"244YHfO_W7RMpQW81UjQrZcq5LSyqiPv\"}],\"unprotected\":{\"alg\":\"A128KW\",\"kid\":\"81b20965-8332-43d9-a468-82160ad91ac8\",\"enc\":\"A128GCM\"},\"iv\":\"YihBoVOGsR1l7jCD\",\"ciphertext\":\"qtPIMMaOBRgASL10dNQhOa7Gqrk7Eal1vwht7R4TT1uq-arsVCPaIeFwQfzrSS6oEUWbBtxEasE0vC6r7sphyVziMCVJEuRJyoAHFSP3eqQPb4Ic1SDSqyXjw_L3svybhHYUGyQuTmUQEDjgjJfBOifwHIsDsRPeBz1NomqeifVPq5GTCWFo5k_MNIQURR2Wj0AHC2k7JZfu2iWjUHLF8ExFZLZ4nlmsvJu_mvifMYiikfNfsZAudISOa6O73yPZtL04k_1FI7WDfrb2w7OqKLWDXzlpcxohPVOLQwpA3mFNRKdY-bQz4Z4KX9lfz1cne31N4-8BKmojpw-OdQjKdLOGkC445Fb_K1tlDQXw2sBF\",\"tag\":\"e2m0Vm7JvjK2VpCKXS-kyg\"}",
+   "json": {
+    "recipients": [
+     {
+      "encrypted_key": "244YHfO_W7RMpQW81UjQrZcq5LSyqiPv"
+     }
+    ],
+    "unprotected": {
+     "alg": "A128KW",
+     "kid": "81b20965-8332-43d9-a468-82160ad91ac8",
+     "enc": "A128GCM"
+    },
+    "iv": "YihBoVOGsR1l7jCD",
+    "ciphertext": "qtPIMMaOBRgASL10dNQhOa7Gqrk7Eal1vwht7R4TT1uq-arsVCPaIeFwQfzrSS6oEUWbBtxEasE0vC6r7sphyVziMCVJEuRJyoAHFSP3eqQPb4Ic1SDSqyXjw_L3svybhHYUGyQuTmUQEDjgjJfBOifwHIsDsRPeBz1NomqeifVPq5GTCWFo5k_MNIQURR2Wj0AHC2k7JZfu2iWjUHLF8ExFZLZ4nlmsvJu_mvifMYiikfNfsZAudISOa6O73yPZtL04k_1FI7WDfrb2w7OqKLWDXzlpcxohPVOLQwpA3mFNRKdY-bQz4Z4KX9lfz1cne31N4-8BKmojpw-OdQjKdLOGkC445Fb_K1tlDQXw2sBF",
+    "tag": "e2m0Vm7JvjK2VpCKXS-kyg"
+   }
+  },
+  {
+   "figure": 201,
+   "caption": "Flattened JWE JSON Serialization",
+   "section": "5.12.5",
+   "example": "5.12",
+   "text": "{\n  \"unprotected\": {\n    \"alg\": \"A128KW\",\n    \"kid\": \"81b20965-8332-43d9-a468-82160ad91ac8\",\n    \"enc\": \"A128GCM\"\n  },\n  \"encrypted_key\": \"244YHfO_W7RMpQW81UjQrZcq5LSyqiPv\",\n  \"iv\": \"YihBoVOGsR1l7jCD\",\n  \"ciphertext\": \"qtPIMMaOBRgASL10dNQhOa7Gqrk7Eal1vwht7R4TT1uq-\n      arsVCPaIeFwQfzrSS6oEUWbBtxEasE0vC6r7sphyVziMCVJEuRJyoAHF\n      SP3eqQPb4Ic1SDSqyXjw_L3svybhHYUGyQuTmUQEDjgjJfBOifwHIsDs\n      RPeBz1NomqeifVPq5GTCWFo5k_MNIQURR2Wj0AHC2k7JZfu2iWjUHLF8\n      ExFZLZ4nlmsvJu_mvifMYiikfNfsZAudISOa6O73yPZtL04k_1FI7WDf\n      rb2w7OqKLWDXzlpcxohPVOLQwpA3mFNRKdY-bQz4Z4KX9lfz1cne31N4\n      -8BKmojpw-OdQjKdLOGkC445Fb_K1tlDQXw2sBF\",\n  \"tag\": \"e2m0Vm7JvjK2VpCKXS-kyg\"\n}",
+   "joined": "{\"unprotected\":{\"alg\":\"A128KW\",\"kid\":\"81b20965-8332-43d9-a468-82160ad91ac8\",\"enc\":\"A128GCM\"},\"encrypted_key\":\"244YHfO_W7RMpQW81UjQrZcq5LSyqiPv\",\"iv\":\"YihBoVOGsR1l7jCD\",\"ciphertext\":\"qtPIMMaOBRgASL10dNQhOa7Gqrk7Eal1vwht7R4TT1uq-arsVCPaIeFwQfzrSS6oEUWbBtxEasE0vC6r7sphyVziMCVJEuRJyoAHFSP3eqQPb4Ic1SDSqyXjw_L3svybhHYUGyQuTmUQEDjgjJfBOifwHIsDsRPeBz1NomqeifVPq5GTCWFo5k_MNIQURR2Wj0AHC2k7JZfu2iWjUHLF8ExFZLZ4nlmsvJu_mvifMYiikfNfsZAudISOa6O73yPZtL04k_1FI7WDfrb2w7OqKLWDXzlpcxohPVOLQwpA3mFNRKdY-bQz4Z4KX9lfz1cne31N4-8BKmojpw-OdQjKdLOGkC445Fb_K1tlDQXw2sBF\",\"tag\":\"e2m0Vm7JvjK2VpCKXS-kyg\"}",
+   "json": {
+    "unprotected": {
+     "alg": "A128KW",
+     "kid": "81b20965-8332-43d9-a468-82160ad91ac8",
+     "enc": "A128GCM"
+    },
+    "encrypted_key": "244YHfO_W7RMpQW81UjQrZcq5LSyqiPv",
+    "iv": "YihBoVOGsR1l7jCD",
+    "ciphertext": "qtPIMMaOBRgASL10dNQhOa7Gqrk7Eal1vwht7R4TT1uq-arsVCPaIeFwQfzrSS6oEUWbBtxEasE0vC6r7sphyVziMCVJEuRJyoAHFSP3eqQPb4Ic1SDSqyXjw_L3svybhHYUGyQuTmUQEDjgjJfBOifwHIsDsRPeBz1NomqeifVPq5GTCWFo5k_MNIQURR2Wj0AHC2k7JZfu2iWjUHLF8ExFZLZ4nlmsvJu_mvifMYiikfNfsZAudISOa6O73yPZtL04k_1FI7WDfrb2w7OqKLWDXzlpcxohPVOLQwpA3mFNRKdY-bQz4Z4KX9lfz1cne31N4-8BKmojpw-OdQjKdLOGkC445Fb_K1tlDQXw2sBF",
+    "tag": "e2m0Vm7JvjK2VpCKXS-kyg"
+   }
+  },
+  {
+   "figure": 202,
+   "caption": "Content Encryption Key, base64url-encoded",
+   "section": "5.13.2",
+   "example": "5.13",
+   "text": "o  Initialization Vector; this example uses the Initialization Vector\n   from Figure 203.\nzXayeJ4gvm8NJr3IUInyokTUO-LbQNKEhe_zWlYbdpQ",
+   "joined": "oInitializationVector;thisexampleusestheInitializationVectorfromFigure203.zXayeJ4gvm8NJr3IUInyokTUO-LbQNKEhe_zWlYbdpQ"
+  },
+  {
+   "figure": 203,
+   "caption": "Initialization Vector, base64url-encoded",
+   "section": "5.13.2",
+   "example": "5.13",
+   "text": "VgEIHY20EnzUtZFl2RpB1g",
+   "joined": "VgEIHY20EnzUtZFl2RpB1g"
+  },
+  {
+   "figure": 204,
+   "caption": "Recipient #1 Encrypted Key, base64url-encoded",
+   "section": "5.13.3",
+   "example": "5.13",
+   "text": "dYOD28kab0Vvf4ODgxVAJXgHcSZICSOp8M51zjwj4w6Y5G4XJQsNNIBiqyvUUA\nOcpL7S7-cFe7Pio7gV_Q06WmCSa-vhW6me4bWrBf7cHwEQJdXihidAYWVajJIa\nKMXMvFRMV6iDlRr076DFthg2_AV0_tSiV6xSEIFqt1xnYPpmP91tc5WJDOGb-w\nqjw0-b-S1laS11QVbuP78dQ7Fa0zAVzzjHX-xvyM2wxj_otxr9clN1LnZMbeYS\nrRicJK5xodvWgkpIdkMHo4LvdhRRvzoKzlic89jFWPlnBq_V4n5trGuExtp_-d\nbHcGlihqc_wGgho9fLMK8JOArYLcMDNQ",
+   "joined": "dYOD28kab0Vvf4ODgxVAJXgHcSZICSOp8M51zjwj4w6Y5G4XJQsNNIBiqyvUUAOcpL7S7-cFe7Pio7gV_Q06WmCSa-vhW6me4bWrBf7cHwEQJdXihidAYWVajJIaKMXMvFRMV6iDlRr076DFthg2_AV0_tSiV6xSEIFqt1xnYPpmP91tc5WJDOGb-wqjw0-b-S1laS11QVbuP78dQ7Fa0zAVzzjHX-xvyM2wxj_otxr9clN1LnZMbeYSrRicJK5xodvWgkpIdkMHo4LvdhRRvzoKzlic89jFWPlnBq_V4n5trGuExtp_-dbHcGlihqc_wGgho9fLMK8JOArYLcMDNQ"
+  },
+  {
+   "figure": 205,
+   "caption": "Recipient #1 JWE Per-Recipient Unprotected Header JSON",
+   "section": "5.13.3",
+   "example": "5.13",
+   "text": "{\n  \"alg\": \"RSA1_5\",\n  \"kid\": \"frodo.baggins@hobbiton.example\"\n}",
+   "joined": "{\"alg\":\"RSA1_5\",\"kid\":\"frodo.baggins@hobbiton.example\"}",
+   "json": {
+    "alg": "RSA1_5",
+    "kid": "frodo.baggins@hobbiton.example"
+   }
+  },
+  {
+   "figure": 206,
+   "caption": "Recipient #1 JSON",
+   "section": "5.13.3",
+   "example": "5.13",
+   "text": "{\n  \"encrypted_key\": \"dYOD28kab0Vvf4ODgxVAJXgHcSZICSOp8M51zjwj4w\n      6Y5G4XJQsNNIBiqyvUUAOcpL7S7-cFe7Pio7gV_Q06WmCSa-vhW6me4b\n      WrBf7cHwEQJdXihidAYWVajJIaKMXMvFRMV6iDlRr076DFthg2_AV0_t\n      SiV6xSEIFqt1xnYPpmP91tc5WJDOGb-wqjw0-b-S1laS11QVbuP78dQ7\n      Fa0zAVzzjHX-xvyM2wxj_otxr9clN1LnZMbeYSrRicJK5xodvWgkpIdk\n      MHo4LvdhRRvzoKzlic89jFWPlnBq_V4n5trGuExtp_-dbHcGlihqc_wG\n      gho9fLMK8JOArYLcMDNQ\",\n  \"header\": {\n    \"alg\": \"RSA1_5\",\n    \"kid\": \"frodo.baggins@hobbiton.example\"\n  }\n}",
+   "joined": "{\"encrypted_key\":\"dYOD28kab0Vvf4ODgxVAJXgHcSZICSOp8M51zjwj4w6Y5G4XJQsNNIBiqyvUUAOcpL7S7-cFe7Pio7gV_Q06WmCSa-vhW6me4bWrBf7cHwEQJdXihidAYWVajJIaKMXMvFRMV6iDlRr076DFthg2_AV0_tSiV6xSEIFqt1xnYPpmP91tc5WJDOGb-wqjw0-b-S1laS11QVbuP78dQ7Fa0zAVzzjHX-xvyM2wxj_otxr9clN1LnZMbeYSrRicJK5xodvWgkpIdkMHo4LvdhRRvzoKzlic89jFWPlnBq_V4n5trGuExtp_-dbHcGlihqc_wGgho9fLMK8JOArYLcMDNQ\",\"header\":{\"alg\":\"RSA1_5\",\"kid\":\"frodo.baggins@hobbiton.example\"}}",
+   "json": {
+    "encrypted_key": "dYOD28kab0Vvf4ODgxVAJXgHcSZICSOp8M51zjwj4w6Y5G4XJQsNNIBiqyvUUAOcpL7S7-cFe7Pio7gV_Q06WmCSa-vhW6me4bWrBf7cHwEQJdXihidAYWVajJIaKMXMvFRMV6iDlRr076DFthg2_AV0_tSiV6xSEIFqt1xnYPpmP91tc5WJDOGb-wqjw0-b-S1laS11QVbuP78dQ7Fa0zAVzzjHX-xvyM2wxj_otxr9clN1LnZMbeYSrRicJK5xodvWgkpIdkMHo4LvdhRRvzoKzlic89jFWPlnBq_V4n5trGuExtp_-dbHcGlihqc_wGgho9fLMK8JOArYLcMDNQ",
+    "header": {
+     "alg": "RSA1_5",
+     "kid": "frodo.baggins@hobbiton.example"
+    }
+   }
+  },
+  {
+   "figure": 207,
+   "caption": "Ephemeral Private Key for Recipient #2, in JWK Format",
+   "section": "5.13.4",
+   "example": "5.13",
+   "text": "{\n  \"kty\": \"EC\",\n  \"crv\": \"P-384\",\n  \"x\": \"Uzdvk3pi5wKCRc1izp5_r0OjeqT-I68i8g2b8mva8diRhsE2xAn2Dt\n      MRb25Ma2CX\",\n  \"y\": \"VDrRyFJh-Kwd1EjAgmj5Eo-CTHAZ53MC7PjjpLioy3ylEjI1pOMbw9\n      1fzZ84pbfm\",\n  \"d\": \"1DKHfTv-PiifVw2VBHM_ZiVcwOMxkOyANS_lQHJcrDxVY3jhVCvZPw\n      MxJKIE793C\"\n}",
+   "joined": "{\"kty\":\"EC\",\"crv\":\"P-384\",\"x\":\"Uzdvk3pi5wKCRc1izp5_r0OjeqT-I68i8g2b8mva8diRhsE2xAn2DtMRb25Ma2CX\",\"y\":\"VDrRyFJh-Kwd1EjAgmj5Eo-CTHAZ53MC7PjjpLioy3ylEjI1pOMbw91fzZ84pbfm\",\"d\":\"1DKHfTv-PiifVw2VBHM_ZiVcwOMxkOyANS_lQHJcrDxVY3jhVCvZPwMxJKIE793C\"}",
+   "json": {
+    "kty": "EC",
+    "crv": "P-384",
+    "x": "Uzdvk3pi5wKCRc1izp5_r0OjeqT-I68i8g2b8mva8diRhsE2xAn2DtMRb25Ma2CX",
+    "y": "VDrRyFJh-Kwd1EjAgmj5Eo-CTHAZ53MC7PjjpLioy3ylEjI1pOMbw91fzZ84pbfm",
+    "d": "1DKHfTv-PiifVw2VBHM_ZiVcwOMxkOyANS_lQHJcrDxVY3jhVCvZPwMxJKIE793C"
+   }
+  },
+  {
+   "figure": 208,
+   "caption": "Recipient #2 Encrypted Key, base64url-encoded",
+   "section": "5.13.4",
+   "example": "5.13",
+   "text": "ExInT0io9BqBMYF6-maw5tZlgoZXThD1zWKsHixJuw_elY4gSSId_w",
+   "joined": "ExInT0io9BqBMYF6-maw5tZlgoZXThD1zWKsHixJuw_elY4gSSId_w"
+  },
+  {
+   "figure": 209,
+   "caption": "Recipient #2 JWE Per-Recipient Unprotected Header JSON",
+   "section": "5.13.4",
+   "example": "5.13",
+   "text": "{\n  \"alg\": \"ECDH-ES+A256KW\",\n  \"kid\": \"peregrin.took@tuckborough.example\",\n  \"epk\": {\n    \"kty\": \"EC\",\n    \"crv\": \"P-384\",\n    \"x\": \"Uzdvk3pi5wKCRc1izp5_r0OjeqT-I68i8g2b8mva8diRhsE2xAn2\n        DtMRb25Ma2CX\",\n    \"y\": \"VDrRyFJh-Kwd1EjAgmj5Eo-CTHAZ53MC7PjjpLioy3ylEjI1pOMb\n        w91fzZ84pbfm\"\n  }\n}",
+   "joined": "{\"alg\":\"ECDH-ES+A256KW\",\"kid\":\"peregrin.took@tuckborough.example\",\"epk\":{\"kty\":\"EC\",\"crv\":\"P-384\",\"x\":\"Uzdvk3pi5wKCRc1izp5_r0OjeqT-I68i8g2b8mva8diRhsE2xAn2DtMRb25Ma2CX\",\"y\":\"VDrRyFJh-Kwd1EjAgmj5Eo-CTHAZ53MC7PjjpLioy3ylEjI1pOMbw91fzZ84pbfm\"}}",
+   "json": {
+    "alg": "ECDH-ES+A256KW",
+    "kid": "peregrin.took@tuckborough.example",
+    "epk": {
+     "kty": "EC",
+     "crv": "P-384",
+     "x": "Uzdvk3pi5wKCRc1izp5_r0OjeqT-I68i8g2b8mva8diRhsE2xAn2DtMRb25Ma2CX",
+     "y": "VDrRyFJh-Kwd1EjAgmj5Eo-CTHAZ53MC7PjjpLioy3ylEjI1pOMbw91fzZ84pbfm"
+    }
+   }
+  },
+  {
+   "figure": 210,
+   "caption": "Recipient #2 JSON",
+   "section": "5.13.4",
+   "example": "5.13",
+   "text": "{\n  \"encrypted_key\": \"ExInT0io9BqBMYF6-maw5tZlgoZXThD1zWKsHixJuw\n      _elY4gSSId_w\",\n  \"header\": {\n    \"alg\": \"ECDH-ES+A256KW\",\n    \"kid\": \"peregrin.took@tuckborough.example\",\n    \"epk\": {\n      \"kty\": \"EC\",\n      \"crv\": \"P-384\",\n      \"x\": \"Uzdvk3pi5wKCRc1izp5_r0OjeqT-I68i8g2b8mva8diRhsE2xA\n          n2DtMRb25Ma2CX\",\n      \"y\": \"VDrRyFJh-Kwd1EjAgmj5Eo-CTHAZ53MC7PjjpLioy3ylEjI1pO\n          Mbw91fzZ84pbfm\"\n    }\n  }\n}",
+   "joined": "{\"encrypted_key\":\"ExInT0io9BqBMYF6-maw5tZlgoZXThD1zWKsHixJuw_elY4gSSId_w\",\"header\":{\"alg\":\"ECDH-ES+A256KW\",\"kid\":\"peregrin.took@tuckborough.example\",\"epk\":{\"kty\":\"EC\",\"crv\":\"P-384\",\"x\":\"Uzdvk3pi5wKCRc1izp5_r0OjeqT-I68i8g2b8mva8diRhsE2xAn2DtMRb25Ma2CX\",\"y\":\"VDrRyFJh-Kwd1EjAgmj5Eo-CTHAZ53MC7PjjpLioy3ylEjI1pOMbw91fzZ84pbfm\"}}}",
+   "json": {
+    "encrypted_key": "ExInT0io9BqBMYF6-maw5tZlgoZXThD1zWKsHixJuw_elY4gSSId_w",
+    "header": {
+     "alg": "ECDH-ES+A256KW",
+     "kid": "peregrin.took@tuckborough.example",
+     "epk": {
+      "kty": "EC",
+      "crv": "P-384",
+      "x": "Uzdvk3pi5wKCRc1izp5_r0OjeqT-I68i8g2b8mva8diRhsE2xAn2DtMRb25Ma2CX",
+      "y": "VDrRyFJh-Kwd1EjAgmj5Eo-CTHAZ53MC7PjjpLioy3ylEjI1pOMbw91fzZ84pbfm"
+     }
+    }
+   }
+  },
+  {
+   "figure": 211,
+   "caption": "Recipient #2 Initialization Vector for Key Wrapping, base64url-encoded",
+   "section": "5.13.5",
+   "example": "5.13",
+   "text": "AvpeoPZ9Ncn9mkBn",
+   "joined": "AvpeoPZ9Ncn9mkBn"
+  },
+  {
+   "figure": 212,
+   "caption": "Recipient #3 Encrypted Key, base64url-encoded",
+   "section": "5.13.5",
+   "example": "5.13",
+   "text": "o  Authentication Tag from Figure 213.\na7CclAejo_7JSuPB8zeagxXRam8dwCfmkt9-WyTpS1E",
+   "joined": "oAuthenticationTagfromFigure213.a7CclAejo_7JSuPB8zeagxXRam8dwCfmkt9-WyTpS1E"
+  },
+  {
+   "figure": 213,
+   "caption": "Recipient #3 Authentication Tag from Key Wrapping, base64url-encoded",
+   "section": "5.13.5",
+   "example": "5.13",
+   "text": "59Nqh1LlYtVIhfD3pgRGvw",
+   "joined": "59Nqh1LlYtVIhfD3pgRGvw"
+  },
+  {
+   "figure": 214,
+   "caption": "Recipient #3 JWE Per-Recipient Unprotected Header JSON",
+   "section": "5.13.5",
+   "example": "5.13",
+   "text": "{\n  \"alg\": \"A256GCMKW\",\n  \"kid\": \"18ec08e1-bfa9-4d95-b205-2b4dd1d4321d\",\n  \"tag\": \"59Nqh1LlYtVIhfD3pgRGvw\",\n  \"iv\": \"AvpeoPZ9Ncn9mkBn\"\n}",
+   "joined": "{\"alg\":\"A256GCMKW\",\"kid\":\"18ec08e1-bfa9-4d95-b205-2b4dd1d4321d\",\"tag\":\"59Nqh1LlYtVIhfD3pgRGvw\",\"iv\":\"AvpeoPZ9Ncn9mkBn\"}",
+   "json": {
+    "alg": "A256GCMKW",
+    "kid": "18ec08e1-bfa9-4d95-b205-2b4dd1d4321d",
+    "tag": "59Nqh1LlYtVIhfD3pgRGvw",
+    "iv": "AvpeoPZ9Ncn9mkBn"
+   }
+  },
+  {
+   "figure": 215,
+   "caption": "Recipient #3 JSON",
+   "section": "5.13.5",
+   "example": "5.13",
+   "text": "{\n  \"encrypted_key\": \"a7CclAejo_7JSuPB8zeagxXRam8dwCfmkt9-WyTpS1\n      E\",\n  \"header\": {\n    \"alg\": \"A256GCMKW\",\n    \"kid\": \"18ec08e1-bfa9-4d95-b205-2b4dd1d4321d\",\n    \"tag\": \"59Nqh1LlYtVIhfD3pgRGvw\",\n    \"iv\": \"AvpeoPZ9Ncn9mkBn\"\n  }\n}",
+   "joined": "{\"encrypted_key\":\"a7CclAejo_7JSuPB8zeagxXRam8dwCfmkt9-WyTpS1E\",\"header\":{\"alg\":\"A256GCMKW\",\"kid\":\"18ec08e1-bfa9-4d95-b205-2b4dd1d4321d\",\"tag\":\"59Nqh1LlYtVIhfD3pgRGvw\",\"iv\":\"AvpeoPZ9Ncn9mkBn\"}}",
+   "json": {
+    "encrypted_key": "a7CclAejo_7JSuPB8zeagxXRam8dwCfmkt9-WyTpS1E",
+    "header": {
+     "alg": "A256GCMKW",
+     "kid": "18ec08e1-bfa9-4d95-b205-2b4dd1d4321d",
+     "tag": "59Nqh1LlYtVIhfD3pgRGvw",
+     "iv": "AvpeoPZ9Ncn9mkBn"
+    }
+   }
+  },
+  {
+   "figure": 216,
+   "caption": "JWE Protected Header JSON",
+   "section": "5.13.6",
+   "example": "5.13",
+   "text": "o  JWE Protected Header; this example uses the header from\n   Figure 216, encoded to base64url [RFC4648] as Figure 217.\n{\n  \"enc\": \"A128CBC-HS256\"\n}",
+   "joined": "oJWEProtectedHeader;thisexampleusestheheaderfromFigure216,encodedtobase64url[RFC4648]asFigure217.{\"enc\":\"A128CBC-HS256\"}"
+  },
+  {
+   "figure": 217,
+   "caption": "JWE Protected Header, base64url-encoded",
+   "section": "5.13.6",
+   "example": "5.13",
+   "text": "eyJlbmMiOiJBMTI4Q0JDLUhTMjU2In0",
+   "joined": "eyJlbmMiOiJBMTI4Q0JDLUhTMjU2In0"
+  },
+  {
+   "figure": 218,
+   "caption": "Ciphertext, base64url-encoded",
+   "section": "5.13.6",
+   "example": "5.13",
+   "text": "ajm2Q-OpPXCr7-MHXicknb1lsxLdXxK_yLds0KuhJzfWK04SjdxQeSw2L9mu3a\n_k1C55kCQ_3xlkcVKC5yr__Is48VOoK0k63_QRM9tBURMFqLByJ8vOYQX0oJW4\nVUHJLmGhF-tVQWB7Kz8mr8zeE7txF0MSaP6ga7-siYxStR7_G07Thd1jh-zGT0\nwxM5g-VRORtq0K6AXpLlwEqRp7pkt2zRM0ZAXqSpe1O6FJ7FHLDyEFnD-zDIZu\nkLpCbzhzMDLLw2-8I14FQrgi-iEuzHgIJFIJn2wh9Tj0cg_kOZy9BqMRZbmYXM\nY9YQjorZ_P_JYG3ARAIF3OjDNqpdYe-K_5Q5crGJSDNyij_ygEiItR5jssQVH2\nofDQdLChtazE",
+   "joined": "ajm2Q-OpPXCr7-MHXicknb1lsxLdXxK_yLds0KuhJzfWK04SjdxQeSw2L9mu3a_k1C55kCQ_3xlkcVKC5yr__Is48VOoK0k63_QRM9tBURMFqLByJ8vOYQX0oJW4VUHJLmGhF-tVQWB7Kz8mr8zeE7txF0MSaP6ga7-siYxStR7_G07Thd1jh-zGT0wxM5g-VRORtq0K6AXpLlwEqRp7pkt2zRM0ZAXqSpe1O6FJ7FHLDyEFnD-zDIZukLpCbzhzMDLLw2-8I14FQrgi-iEuzHgIJFIJn2wh9Tj0cg_kOZy9BqMRZbmYXMY9YQjorZ_P_JYG3ARAIF3OjDNqpdYe-K_5Q5crGJSDNyij_ygEiItR5jssQVH2ofDQdLChtazE"
+  },
+  {
+   "figure": 219,
+   "caption": "Authentication Tag, base64url-encoded",
+   "section": "5.13.6",
+   "example": "5.13",
+   "text": "BESYyFN7T09KY7i8zKs5_g",
+   "joined": "BESYyFN7T09KY7i8zKs5_g"
+  },
+  {
+   "figure": 220,
+   "caption": "JWE Shared Unprotected Header JSON",
+   "section": "5.13.6",
+   "example": "5.13",
+   "text": "{\n  \"cty\": \"text/plain\"\n}",
+   "joined": "{\"cty\":\"text/plain\"}",
+   "json": {
+    "cty": "text/plain"
+   }
+  },
+  {
+   "figure": 221,
+   "caption": "General JWE JSON Serialization",
+   "section": "5.13.7",
+   "example": "5.13",
+   "text": "{\n  \"recipients\": [\n    {\n      \"encrypted_key\": \"dYOD28kab0Vvf4ODgxVAJXgHcSZICSOp8M51zj\n          wj4w6Y5G4XJQsNNIBiqyvUUAOcpL7S7-cFe7Pio7gV_Q06WmCSa-\n          vhW6me4bWrBf7cHwEQJdXihidAYWVajJIaKMXMvFRMV6iDlRr076\n          DFthg2_AV0_tSiV6xSEIFqt1xnYPpmP91tc5WJDOGb-wqjw0-b-S\n          1laS11QVbuP78dQ7Fa0zAVzzjHX-xvyM2wxj_otxr9clN1LnZMbe\n          YSrRicJK5xodvWgkpIdkMHo4LvdhRRvzoKzlic89jFWPlnBq_V4n\n          5trGuExtp_-dbHcGlihqc_wGgho9fLMK8JOArYLcMDNQ\",\n      \"header\": {\n        \"alg\": \"RSA1_5\",\n        \"kid\": \"frodo.baggins@hobbiton.example\"\n      }\n    },\n    {\n      \"encrypted_key\": \"ExInT0io9BqBMYF6-maw5tZlgoZXThD1zWKsHi\n          xJuw_elY4gSSId_w\",\n      \"header\": {\n        \"alg\": \"ECDH-ES+A256KW\",\n        \"kid\": \"peregrin.took@tuckborough.example\",\n        \"epk\": {\n          \"kty\": \"EC\",\n          \"crv\": \"P-384\",\n          \"x\": \"Uzdvk3pi5wKCRc1izp5_r0OjeqT-I68i8g2b8mva8diRhs\n              E2xAn2DtMRb25Ma2CX\",\n          \"y\": \"VDrRyFJh-Kwd1EjAgmj5Eo-CTHAZ53MC7PjjpLioy3ylEj\n              I1pOMbw91fzZ84pbfm\"\n        }\n      }\n    },\n    {\n      \"encrypted_key\": \"a7CclAejo_7JSuPB8zeagxXRam8dwCfmkt9-Wy\n          TpS1E\",\n      \"header\": {\n        \"alg\": \"A256GCMKW\",\n        \"kid\": \"18ec08e1-bfa9-4d95-b205-2b4dd1d4321d\",\n        \"tag\": \"59Nqh1LlYtVIhfD3pgRGvw\",\n        \"iv\": \"AvpeoPZ9Ncn9mkBn\"\n      }\n    }\n  ],\n  \"unprotected\": {\n    \"cty\": \"text/plain\"\n  },\n  \"protected\": \"eyJlbmMiOiJBMTI4Q0JDLUhTMjU2In0\",\n  \"iv\": \"VgEIHY20EnzUtZFl2RpB1g\",\n  \"ciphertext\": \"ajm2Q-OpPXCr7-MHXicknb1lsxLdXxK_yLds0KuhJzfWK\n      04SjdxQeSw2L9mu3a_k1C55kCQ_3xlkcVKC5yr__Is48VOoK0k63_QRM\n      9tBURMFqLByJ8vOYQX0oJW4VUHJLmGhF-tVQWB7Kz8mr8zeE7txF0MSa\n      P6ga7-siYxStR7_G07Thd1jh-zGT0wxM5g-VRORtq0K6AXpLlwEqRp7p\n      kt2zRM0ZAXqSpe1O6FJ7FHLDyEFnD-zDIZukLpCbzhzMDLLw2-8I14FQ\n      rgi-iEuzHgIJFIJn2wh9Tj0cg_kOZy9BqMRZbmYXMY9YQjorZ_P_JYG3\n      ARAIF3OjDNqpdYe-K_5Q5crGJSDNyij_ygEiItR5jssQVH2ofDQdLCht\n      azE\",\n  \"tag\": \"BESYyFN7T09KY7i8zKs5_g\"\n}",
+   "joined": "{\"recipients\":[{\"encrypted_key\":\"dYOD28kab0Vvf4ODgxVAJXgHcSZICSOp8M51zjwj4w6Y5G4XJQsNNIBiqyvUUAOcpL7S7-cFe7Pio7gV_Q06WmCSa-vhW6me4bWrBf7cHwEQJdXihidAYWVajJIaKMXMvFRMV6iDlRr076DFthg2_AV0_tSiV6xSEIFqt1xnYPpmP91tc5WJDOGb-wqjw0-b-S1laS11QVbuP78dQ7Fa0zAVzzjHX-xvyM2wxj_otxr9clN1LnZMbeYSrRicJK5xodvWgkpIdkMHo4LvdhRRvzoKzlic89jFWPlnBq_V4n5trGuExtp_-dbHcGlihqc_wGgho9fLMK8JOArYLcMDNQ\",\"header\":{\"alg\":\"RSA1_5\",\"kid\":\"frodo.baggins@hobbiton.example\"}},{\"encrypted_key\":\"ExInT0io9BqBMYF6-maw5tZlgoZXThD1zWKsHixJuw_elY4gSSId_w\",\"header\":{\"alg\":\"ECDH-ES+A256KW\",\"kid\":\"peregrin.took@tuckborough.example\",\"epk\":{\"kty\":\"EC\",\"crv\":\"P-384\",\"x\":\"Uzdvk3pi5wKCRc1izp5_r0OjeqT-I68i8g2b8mva8diRhsE2xAn2DtMRb25Ma2CX\",\"y\":\"VDrRyFJh-Kwd1EjAgmj5Eo-CTHAZ53MC7PjjpLioy3ylEjI1pOMbw91fzZ84pbfm\"}}},{\"encrypted_key\":\"a7CclAejo_7JSuPB8zeagxXRam8dwCfmkt9-WyTpS1E\",\"header\":{\"alg\":\"A256GCMKW\",\"kid\":\"18ec08e1-bfa9-4d95-b205-2b4dd1d4321d\",\"tag\":\"59Nqh1LlYtVIhfD3pgRGvw\",\"iv\":\"AvpeoPZ9Ncn9mkBn\"}}],\"unprotected\":{\"cty\":\"text/plain\"},\"protected\":\"eyJlbmMiOiJBMTI4Q0JDLUhTMjU2In0\",\"iv\":\"VgEIHY20EnzUtZFl2RpB1g\",\"ciphertext\":\"ajm2Q-OpPXCr7-MHXicknb1lsxLdXxK_yLds0KuhJzfWK04SjdxQeSw2L9mu3a_k1C55kCQ_3xlkcVKC5yr__Is48VOoK0k63_QRM9tBURMFqLByJ8vOYQX0oJW4VUHJLmGhF-tVQWB7Kz8mr8zeE7txF0MSaP6ga7-siYxStR7_G07Thd1jh-zGT0wxM5g-VRORtq0K6AXpLlwEqRp7pkt2zRM0ZAXqSpe1O6FJ7FHLDyEFnD-zDIZukLpCbzhzMDLLw2-8I14FQrgi-iEuzHgIJFIJn2wh9Tj0cg_kOZy9BqMRZbmYXMY9YQjorZ_P_JYG3ARAIF3OjDNqpdYe-K_5Q5crGJSDNyij_ygEiItR5jssQVH2ofDQdLChtazE\",\"tag\":\"BESYyFN7T09KY7i8zKs5_g\"}",
+   "json": {
+    "recipients": [
+     {
+      "encrypted_key": "dYOD28kab0Vvf4ODgxVAJXgHcSZICSOp8M51zjwj4w6Y5G4XJQsNNIBiqyvUUAOcpL7S7-cFe7Pio7gV_Q06WmCSa-vhW6me4bWrBf7cHwEQJdXihidAYWVajJIaKMXMvFRMV6iDlRr076DFthg2_AV0_tSiV6xSEIFqt1xnYPpmP91tc5WJDOGb-wqjw0-b-S1laS11QVbuP78dQ7Fa0zAVzzjHX-xvyM2wxj_otxr9clN1LnZMbeYSrRicJK5xodvWgkpIdkMHo4LvdhRRvzoKzlic89jFWPlnBq_V4n5trGuExtp_-dbHcGlihqc_wGgho9fLMK8JOArYLcMDNQ",
+      "header": {
+       "alg": "RSA1_5",
+       "kid": "frodo.baggins@hobbiton.example"
+      }
+     },
+     {
+      "encrypted_key": "ExInT0io9BqBMYF6-maw5tZlgoZXThD1zWKsHixJuw_elY4gSSId_w",
+      "header": {
+       "alg": "ECDH-ES+A256KW",
+       "kid": "peregrin.took@tuckborough.example",
+       "epk": {
+        "kty": "EC",
+        "crv": "P-384",
+        "x": "Uzdvk3pi5wKCRc1izp5_r0OjeqT-I68i8g2b8mva8diRhsE2xAn2DtMRb25Ma2CX",
+        "y": "VDrRyFJh-Kwd1EjAgmj5Eo-CTHAZ53MC7PjjpLioy3ylEjI1pOMbw91fzZ84pbfm"
+       }
+      }
+     },
+     {
+      "encrypted_key": "a7CclAejo_7JSuPB8zeagxXRam8dwCfmkt9-WyTpS1E",
+      "header": {
+       "alg": "A256GCMKW",
+       "kid": "18ec08e1-bfa9-4d95-b205-2b4dd1d4321d",
+       "tag": "59Nqh1LlYtVIhfD3pgRGvw",
+       "iv": "AvpeoPZ9Ncn9mkBn"
+      }
+     }
+    ],
+    "unprotected": {
+     "cty": "text/plain"
+    },
+    "protected": "eyJlbmMiOiJBMTI4Q0JDLUhTMjU2In0",
+    "iv": "VgEIHY20EnzUtZFl2RpB1g",
+    "ciphertext": "ajm2Q-OpPXCr7-MHXicknb1lsxLdXxK_yLds0KuhJzfWK04SjdxQeSw2L9mu3a_k1C55kCQ_3xlkcVKC5yr__Is48VOoK0k63_QRM9tBURMFqLByJ8vOYQX0oJW4VUHJLmGhF-tVQWB7Kz8mr8zeE7txF0MSaP6ga7-siYxStR7_G07Thd1jh-zGT0wxM5g-VRORtq0K6AXpLlwEqRp7pkt2zRM0ZAXqSpe1O6FJ7FHLDyEFnD-zDIZukLpCbzhzMDLLw2-8I14FQrgi-iEuzHgIJFIJn2wh9Tj0cg_kOZy9BqMRZbmYXMY9YQjorZ_P_JYG3ARAIF3OjDNqpdYe-K_5Q5crGJSDNyij_ygEiItR5jssQVH2ofDQdLChtazE",
+    "tag": "BESYyFN7T09KY7i8zKs5_g"
+   }
+  }
+ ]
+}

@@ -152,3 +152,40 @@ files = [
   { path = "w3c-webauthn-3/prf.json", sha256 = "07e59c88be25b3bf687b6895c8866628d523599d1c387def97c1599d415e8879", cases = 8 },
 ]
 
+[source."rfc7520-jwk"]
+url = "https://www.rfc-editor.org/rfc/rfc7520.txt"
+revision = "RFC 7520 section 3"
+retrieved = "2026-11-24"
+licence = "IETF Trust (RFC text; data values only)"
+feeds = ["jose"]
+notes = "Extracted by tools/extract_rfc_figures.py from rfc7520.txt (sha256 14798c3b2d72e35375d5fb86d280a1e8df6109a6ee6cbfc091a0c57a8cc076c6): every numbered figure as text, joined (whitespace removed) and parsed json where it is JSON. RFC 7520 is Informational. Section 3 JWK examples 3.1-3.6."
+cases = 6
+files = [
+  { path = "rfc7520/jwk.json", sha256 = "2b7a236fb1955edd7e7192358f8fded289c9b0e18ccfff55e02edf683059bd5c", cases = 6 },
+]
+
+[source."rfc7520-jws"]
+url = "https://www.rfc-editor.org/rfc/rfc7520.txt"
+revision = "RFC 7520 section 4"
+retrieved = "2026-11-24"
+licence = "IETF Trust (RFC text; data values only)"
+feeds = ["jose"]
+notes = "Extracted by tools/extract_rfc_figures.py from rfc7520.txt (sha256 14798c3b2d72e35375d5fb86d280a1e8df6109a6ee6cbfc091a0c57a8cc076c6): every numbered figure as text, joined (whitespace removed) and parsed json where it is JSON. RFC 7520 is Informational. Section 4 JWS examples 4.1-4.8 (RS256, PS384, ES512, HS256, detached, protected-field variants, content-only, multiple signatures). HS256 example 4.4 re-verified by hand against the JWK of 3.5."
+cases = 8
+files = [
+  { path = "rfc7520/jws.json", sha256 = "36da0568090a9e9585a3adf94653583f52aa733a1705d09768167ef9b51944c3", cases = 8 },
+]
+
+[source."rfc7520-jwe"]
+url = "https://www.rfc-editor.org/rfc/rfc7520.txt"
+revision = "RFC 7520 section 5"
+retrieved = "2026-11-24"
+licence = "IETF Trust (RFC text; data values only)"
+feeds = ["jose"]
+tag = "pending-D3"
+notes = "Extracted by tools/extract_rfc_figures.py from rfc7520.txt (sha256 14798c3b2d72e35375d5fb86d280a1e8df6109a6ee6cbfc091a0c57a8cc076c6): every numbered figure as text, joined (whitespace removed) and parsed json where it is JSON. RFC 7520 is Informational. Section 5 JWE examples 5.1-5.13. Tagged pending decision D3 (JWE later); committed so the data is on hand."
+cases = 13
+files = [
+  { path = "rfc7520/jwe.json", sha256 = "ab0533f1c25db15a919f4b70ba70f89a0f2795d9b79f6f7db14af653faff569d", cases = 13 },
+]
+

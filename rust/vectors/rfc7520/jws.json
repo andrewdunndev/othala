@@ -1,0 +1,717 @@
+{
+ "figures": [
+  {
+   "figure": 7,
+   "caption": "Payload Content Plaintext",
+   "section": "4",
+   "example": "4",
+   "text": "\"It\\xe2\\x80\\x99s a dangerous business, Frodo, going out your \"\n\"door. You step onto the road, and if you don't keep your feet, \"\n\"there\\xe2\\x80\\x99s no knowing where you might be swept off \"\n\"to.\"",
+   "joined": "\"It\\xe2\\x80\\x99sadangerousbusiness,Frodo,goingoutyour\"\"door.Youstepontotheroad,andifyoudon'tkeepyourfeet,\"\"there\\xe2\\x80\\x99snoknowingwhereyoumightbesweptoff\"\"to.\""
+  },
+  {
+   "figure": 8,
+   "caption": "Payload Content, base64url-encoded",
+   "section": "4",
+   "example": "4",
+   "text": "SXTigJlzIGEgZGFuZ2Vyb3VzIGJ1c2luZXNzLCBGcm9kbywgZ29pbmcgb3V0IH\nlvdXIgZG9vci4gWW91IHN0ZXAgb250byB0aGUgcm9hZCwgYW5kIGlmIHlvdSBk\nb24ndCBrZWVwIHlvdXIgZmVldCwgdGhlcmXigJlzIG5vIGtub3dpbmcgd2hlcm\nUgeW91IG1pZ2h0IGJlIHN3ZXB0IG9mZiB0by4",
+   "joined": "SXTigJlzIGEgZGFuZ2Vyb3VzIGJ1c2luZXNzLCBGcm9kbywgZ29pbmcgb3V0IHlvdXIgZG9vci4gWW91IHN0ZXAgb250byB0aGUgcm9hZCwgYW5kIGlmIHlvdSBkb24ndCBrZWVwIHlvdXIgZmVldCwgdGhlcmXigJlzIG5vIGtub3dpbmcgd2hlcmUgeW91IG1pZ2h0IGJlIHN3ZXB0IG9mZiB0by4"
+  },
+  {
+   "figure": 9,
+   "caption": "JWS Protected Header JSON",
+   "section": "4.1.2",
+   "example": "4.1",
+   "text": "{\n  \"alg\": \"RS256\",\n  \"kid\": \"bilbo.baggins@hobbiton.example\"\n}",
+   "joined": "{\"alg\":\"RS256\",\"kid\":\"bilbo.baggins@hobbiton.example\"}",
+   "json": {
+    "alg": "RS256",
+    "kid": "bilbo.baggins@hobbiton.example"
+   }
+  },
+  {
+   "figure": 10,
+   "caption": "JWS Protected Header, base64url-encoded",
+   "section": "4.1.2",
+   "example": "4.1",
+   "text": "eyJhbGciOiJSUzI1NiIsImtpZCI6ImJpbGJvLmJhZ2dpbnNAaG9iYml0b24uZX\nhhbXBsZSJ9",
+   "joined": "eyJhbGciOiJSUzI1NiIsImtpZCI6ImJpbGJvLmJhZ2dpbnNAaG9iYml0b24uZXhhbXBsZSJ9"
+  },
+  {
+   "figure": 11,
+   "caption": "JWS Signing Input",
+   "section": "4.1.2",
+   "example": "4.1",
+   "text": "eyJhbGciOiJSUzI1NiIsImtpZCI6ImJpbGJvLmJhZ2dpbnNAaG9iYml0b24uZX\nhhbXBsZSJ9\n.\nSXTigJlzIGEgZGFuZ2Vyb3VzIGJ1c2luZXNzLCBGcm9kbywgZ29pbmcgb3V0IH\nlvdXIgZG9vci4gWW91IHN0ZXAgb250byB0aGUgcm9hZCwgYW5kIGlmIHlvdSBk\nb24ndCBrZWVwIHlvdXIgZmVldCwgdGhlcmXigJlzIG5vIGtub3dpbmcgd2hlcm\nUgeW91IG1pZ2h0IGJlIHN3ZXB0IG9mZiB0by4",
+   "joined": "eyJhbGciOiJSUzI1NiIsImtpZCI6ImJpbGJvLmJhZ2dpbnNAaG9iYml0b24uZXhhbXBsZSJ9.SXTigJlzIGEgZGFuZ2Vyb3VzIGJ1c2luZXNzLCBGcm9kbywgZ29pbmcgb3V0IHlvdXIgZG9vci4gWW91IHN0ZXAgb250byB0aGUgcm9hZCwgYW5kIGlmIHlvdSBkb24ndCBrZWVwIHlvdXIgZmVldCwgdGhlcmXigJlzIG5vIGtub3dpbmcgd2hlcmUgeW91IG1pZ2h0IGJlIHN3ZXB0IG9mZiB0by4"
+  },
+  {
+   "figure": 12,
+   "caption": "JWS Signature, base64url-encoded",
+   "section": "4.1.2",
+   "example": "4.1",
+   "text": "MRjdkly7_-oTPTS3AXP41iQIGKa80A0ZmTuV5MEaHoxnW2e5CZ5NlKtainoFmK\nZopdHM1O2U4mwzJdQx996ivp83xuglII7PNDi84wnB-BDkoBwA78185hX-Es4J\nIwmDLJK3lfWRa-XtL0RnltuYv746iYTh_qHRD68BNt1uSNCrUCTJDt5aAE6x8w\nW1Kt9eRo4QPocSadnHXFxnt8Is9UzpERV0ePPQdLuW3IS_de3xyIrDaLGdjluP\nxUAhb6L2aXic1U12podGU0KLUQSE_oI-ZnmKJ3F4uOZDnd6QZWJushZ41Axf_f\ncIe8u9ipH84ogoree7vjbU5y18kDquDg",
+   "joined": "MRjdkly7_-oTPTS3AXP41iQIGKa80A0ZmTuV5MEaHoxnW2e5CZ5NlKtainoFmKZopdHM1O2U4mwzJdQx996ivp83xuglII7PNDi84wnB-BDkoBwA78185hX-Es4JIwmDLJK3lfWRa-XtL0RnltuYv746iYTh_qHRD68BNt1uSNCrUCTJDt5aAE6x8wW1Kt9eRo4QPocSadnHXFxnt8Is9UzpERV0ePPQdLuW3IS_de3xyIrDaLGdjluPxUAhb6L2aXic1U12podGU0KLUQSE_oI-ZnmKJ3F4uOZDnd6QZWJushZ41Axf_fcIe8u9ipH84ogoree7vjbU5y18kDquDg"
+  },
+  {
+   "figure": 13,
+   "caption": "JWS Compact Serialization",
+   "section": "4.1.3",
+   "example": "4.1",
+   "text": "eyJhbGciOiJSUzI1NiIsImtpZCI6ImJpbGJvLmJhZ2dpbnNAaG9iYml0b24uZX\nhhbXBsZSJ9\n.\nSXTigJlzIGEgZGFuZ2Vyb3VzIGJ1c2luZXNzLCBGcm9kbywgZ29pbmcgb3V0IH\nlvdXIgZG9vci4gWW91IHN0ZXAgb250byB0aGUgcm9hZCwgYW5kIGlmIHlvdSBk\nb24ndCBrZWVwIHlvdXIgZmVldCwgdGhlcmXigJlzIG5vIGtub3dpbmcgd2hlcm\nUgeW91IG1pZ2h0IGJlIHN3ZXB0IG9mZiB0by4\n.\nMRjdkly7_-oTPTS3AXP41iQIGKa80A0ZmTuV5MEaHoxnW2e5CZ5NlKtainoFmK\nZopdHM1O2U4mwzJdQx996ivp83xuglII7PNDi84wnB-BDkoBwA78185hX-Es4J\nIwmDLJK3lfWRa-XtL0RnltuYv746iYTh_qHRD68BNt1uSNCrUCTJDt5aAE6x8w\nW1Kt9eRo4QPocSadnHXFxnt8Is9UzpERV0ePPQdLuW3IS_de3xyIrDaLGdjluP\nxUAhb6L2aXic1U12podGU0KLUQSE_oI-ZnmKJ3F4uOZDnd6QZWJushZ41Axf_f\ncIe8u9ipH84ogoree7vjbU5y18kDquDg",
+   "joined": "eyJhbGciOiJSUzI1NiIsImtpZCI6ImJpbGJvLmJhZ2dpbnNAaG9iYml0b24uZXhhbXBsZSJ9.SXTigJlzIGEgZGFuZ2Vyb3VzIGJ1c2luZXNzLCBGcm9kbywgZ29pbmcgb3V0IHlvdXIgZG9vci4gWW91IHN0ZXAgb250byB0aGUgcm9hZCwgYW5kIGlmIHlvdSBkb24ndCBrZWVwIHlvdXIgZmVldCwgdGhlcmXigJlzIG5vIGtub3dpbmcgd2hlcmUgeW91IG1pZ2h0IGJlIHN3ZXB0IG9mZiB0by4.MRjdkly7_-oTPTS3AXP41iQIGKa80A0ZmTuV5MEaHoxnW2e5CZ5NlKtainoFmKZopdHM1O2U4mwzJdQx996ivp83xuglII7PNDi84wnB-BDkoBwA78185hX-Es4JIwmDLJK3lfWRa-XtL0RnltuYv746iYTh_qHRD68BNt1uSNCrUCTJDt5aAE6x8wW1Kt9eRo4QPocSadnHXFxnt8Is9UzpERV0ePPQdLuW3IS_de3xyIrDaLGdjluPxUAhb6L2aXic1U12podGU0KLUQSE_oI-ZnmKJ3F4uOZDnd6QZWJushZ41Axf_fcIe8u9ipH84ogoree7vjbU5y18kDquDg"
+  },
+  {
+   "figure": 14,
+   "caption": "General JWS JSON Serialization",
+   "section": "4.1.3",
+   "example": "4.1",
+   "text": "{\n  \"payload\": \"SXTigJlzIGEgZGFuZ2Vyb3VzIGJ1c2luZXNzLCBGcm9kbywg\n      Z29pbmcgb3V0IHlvdXIgZG9vci4gWW91IHN0ZXAgb250byB0aGUgcm9h\n      ZCwgYW5kIGlmIHlvdSBkb24ndCBrZWVwIHlvdXIgZmVldCwgdGhlcmXi\n      gJlzIG5vIGtub3dpbmcgd2hlcmUgeW91IG1pZ2h0IGJlIHN3ZXB0IG9m\n      ZiB0by4\",\n  \"signatures\": [\n    {\n      \"protected\": \"eyJhbGciOiJSUzI1NiIsImtpZCI6ImJpbGJvLmJhZ2\n          dpbnNAaG9iYml0b24uZXhhbXBsZSJ9\",\n      \"signature\": \"MRjdkly7_-oTPTS3AXP41iQIGKa80A0ZmTuV5MEaHo\n          xnW2e5CZ5NlKtainoFmKZopdHM1O2U4mwzJdQx996ivp83xuglII\n          7PNDi84wnB-BDkoBwA78185hX-Es4JIwmDLJK3lfWRa-XtL0Rnlt\n          uYv746iYTh_qHRD68BNt1uSNCrUCTJDt5aAE6x8wW1Kt9eRo4QPo\n          cSadnHXFxnt8Is9UzpERV0ePPQdLuW3IS_de3xyIrDaLGdjluPxU\n          Ahb6L2aXic1U12podGU0KLUQSE_oI-ZnmKJ3F4uOZDnd6QZWJush\n          Z41Axf_fcIe8u9ipH84ogoree7vjbU5y18kDquDg\"\n    }\n  ]\n}",
+   "joined": "{\"payload\":\"SXTigJlzIGEgZGFuZ2Vyb3VzIGJ1c2luZXNzLCBGcm9kbywgZ29pbmcgb3V0IHlvdXIgZG9vci4gWW91IHN0ZXAgb250byB0aGUgcm9hZCwgYW5kIGlmIHlvdSBkb24ndCBrZWVwIHlvdXIgZmVldCwgdGhlcmXigJlzIG5vIGtub3dpbmcgd2hlcmUgeW91IG1pZ2h0IGJlIHN3ZXB0IG9mZiB0by4\",\"signatures\":[{\"protected\":\"eyJhbGciOiJSUzI1NiIsImtpZCI6ImJpbGJvLmJhZ2dpbnNAaG9iYml0b24uZXhhbXBsZSJ9\",\"signature\":\"MRjdkly7_-oTPTS3AXP41iQIGKa80A0ZmTuV5MEaHoxnW2e5CZ5NlKtainoFmKZopdHM1O2U4mwzJdQx996ivp83xuglII7PNDi84wnB-BDkoBwA78185hX-Es4JIwmDLJK3lfWRa-XtL0RnltuYv746iYTh_qHRD68BNt1uSNCrUCTJDt5aAE6x8wW1Kt9eRo4QPocSadnHXFxnt8Is9UzpERV0ePPQdLuW3IS_de3xyIrDaLGdjluPxUAhb6L2aXic1U12podGU0KLUQSE_oI-ZnmKJ3F4uOZDnd6QZWJushZ41Axf_fcIe8u9ipH84ogoree7vjbU5y18kDquDg\"}]}",
+   "json": {
+    "payload": "SXTigJlzIGEgZGFuZ2Vyb3VzIGJ1c2luZXNzLCBGcm9kbywgZ29pbmcgb3V0IHlvdXIgZG9vci4gWW91IHN0ZXAgb250byB0aGUgcm9hZCwgYW5kIGlmIHlvdSBkb24ndCBrZWVwIHlvdXIgZmVldCwgdGhlcmXigJlzIG5vIGtub3dpbmcgd2hlcmUgeW91IG1pZ2h0IGJlIHN3ZXB0IG9mZiB0by4",
+    "signatures": [
+     {
+      "protected": "eyJhbGciOiJSUzI1NiIsImtpZCI6ImJpbGJvLmJhZ2dpbnNAaG9iYml0b24uZXhhbXBsZSJ9",
+      "signature": "MRjdkly7_-oTPTS3AXP41iQIGKa80A0ZmTuV5MEaHoxnW2e5CZ5NlKtainoFmKZopdHM1O2U4mwzJdQx996ivp83xuglII7PNDi84wnB-BDkoBwA78185hX-Es4JIwmDLJK3lfWRa-XtL0RnltuYv746iYTh_qHRD68BNt1uSNCrUCTJDt5aAE6x8wW1Kt9eRo4QPocSadnHXFxnt8Is9UzpERV0ePPQdLuW3IS_de3xyIrDaLGdjluPxUAhb6L2aXic1U12podGU0KLUQSE_oI-ZnmKJ3F4uOZDnd6QZWJushZ41Axf_fcIe8u9ipH84ogoree7vjbU5y18kDquDg"
+     }
+    ]
+   }
+  },
+  {
+   "figure": 15,
+   "caption": "Flattened JWS JSON Serialization",
+   "section": "4.1.3",
+   "example": "4.1",
+   "text": "{\n  \"payload\": \"SXTigJlzIGEgZGFuZ2Vyb3VzIGJ1c2luZXNzLCBGcm9kbywg\n      Z29pbmcgb3V0IHlvdXIgZG9vci4gWW91IHN0ZXAgb250byB0aGUgcm9h\n      ZCwgYW5kIGlmIHlvdSBkb24ndCBrZWVwIHlvdXIgZmVldCwgdGhlcmXi\n      gJlzIG5vIGtub3dpbmcgd2hlcmUgeW91IG1pZ2h0IGJlIHN3ZXB0IG9m\n      ZiB0by4\",\n  \"protected\": \"eyJhbGciOiJSUzI1NiIsImtpZCI6ImJpbGJvLmJhZ2dpbn\n      NAaG9iYml0b24uZXhhbXBsZSJ9\",\n  \"signature\": \"MRjdkly7_-oTPTS3AXP41iQIGKa80A0ZmTuV5MEaHoxnW2\n      e5CZ5NlKtainoFmKZopdHM1O2U4mwzJdQx996ivp83xuglII7PNDi84w\n      nB-BDkoBwA78185hX-Es4JIwmDLJK3lfWRa-XtL0RnltuYv746iYTh_q\n      HRD68BNt1uSNCrUCTJDt5aAE6x8wW1Kt9eRo4QPocSadnHXFxnt8Is9U\n      zpERV0ePPQdLuW3IS_de3xyIrDaLGdjluPxUAhb6L2aXic1U12podGU0\n      KLUQSE_oI-ZnmKJ3F4uOZDnd6QZWJushZ41Axf_fcIe8u9ipH84ogore\n      e7vjbU5y18kDquDg\"\n}",
+   "joined": "{\"payload\":\"SXTigJlzIGEgZGFuZ2Vyb3VzIGJ1c2luZXNzLCBGcm9kbywgZ29pbmcgb3V0IHlvdXIgZG9vci4gWW91IHN0ZXAgb250byB0aGUgcm9hZCwgYW5kIGlmIHlvdSBkb24ndCBrZWVwIHlvdXIgZmVldCwgdGhlcmXigJlzIG5vIGtub3dpbmcgd2hlcmUgeW91IG1pZ2h0IGJlIHN3ZXB0IG9mZiB0by4\",\"protected\":\"eyJhbGciOiJSUzI1NiIsImtpZCI6ImJpbGJvLmJhZ2dpbnNAaG9iYml0b24uZXhhbXBsZSJ9\",\"signature\":\"MRjdkly7_-oTPTS3AXP41iQIGKa80A0ZmTuV5MEaHoxnW2e5CZ5NlKtainoFmKZopdHM1O2U4mwzJdQx996ivp83xuglII7PNDi84wnB-BDkoBwA78185hX-Es4JIwmDLJK3lfWRa-XtL0RnltuYv746iYTh_qHRD68BNt1uSNCrUCTJDt5aAE6x8wW1Kt9eRo4QPocSadnHXFxnt8Is9UzpERV0ePPQdLuW3IS_de3xyIrDaLGdjluPxUAhb6L2aXic1U12podGU0KLUQSE_oI-ZnmKJ3F4uOZDnd6QZWJushZ41Axf_fcIe8u9ipH84ogoree7vjbU5y18kDquDg\"}",
+   "json": {
+    "payload": "SXTigJlzIGEgZGFuZ2Vyb3VzIGJ1c2luZXNzLCBGcm9kbywgZ29pbmcgb3V0IHlvdXIgZG9vci4gWW91IHN0ZXAgb250byB0aGUgcm9hZCwgYW5kIGlmIHlvdSBkb24ndCBrZWVwIHlvdXIgZmVldCwgdGhlcmXigJlzIG5vIGtub3dpbmcgd2hlcmUgeW91IG1pZ2h0IGJlIHN3ZXB0IG9mZiB0by4",
+    "protected": "eyJhbGciOiJSUzI1NiIsImtpZCI6ImJpbGJvLmJhZ2dpbnNAaG9iYml0b24uZXhhbXBsZSJ9",
+    "signature": "MRjdkly7_-oTPTS3AXP41iQIGKa80A0ZmTuV5MEaHoxnW2e5CZ5NlKtainoFmKZopdHM1O2U4mwzJdQx996ivp83xuglII7PNDi84wnB-BDkoBwA78185hX-Es4JIwmDLJK3lfWRa-XtL0RnltuYv746iYTh_qHRD68BNt1uSNCrUCTJDt5aAE6x8wW1Kt9eRo4QPocSadnHXFxnt8Is9UzpERV0ePPQdLuW3IS_de3xyIrDaLGdjluPxUAhb6L2aXic1U12podGU0KLUQSE_oI-ZnmKJ3F4uOZDnd6QZWJushZ41Axf_fcIe8u9ipH84ogoree7vjbU5y18kDquDg"
+   }
+  },
+  {
+   "figure": 16,
+   "caption": "JWS Protected Header JSON",
+   "section": "4.2.2",
+   "example": "4.2",
+   "text": "{\n  \"alg\": \"PS384\",\n  \"kid\": \"bilbo.baggins@hobbiton.example\"\n}",
+   "joined": "{\"alg\":\"PS384\",\"kid\":\"bilbo.baggins@hobbiton.example\"}",
+   "json": {
+    "alg": "PS384",
+    "kid": "bilbo.baggins@hobbiton.example"
+   }
+  },
+  {
+   "figure": 17,
+   "caption": "JWS Protected Header, base64url-encoded",
+   "section": "4.2.2",
+   "example": "4.2",
+   "text": "eyJhbGciOiJQUzM4NCIsImtpZCI6ImJpbGJvLmJhZ2dpbnNAaG9iYml0b24uZX\nhhbXBsZSJ9",
+   "joined": "eyJhbGciOiJQUzM4NCIsImtpZCI6ImJpbGJvLmJhZ2dpbnNAaG9iYml0b24uZXhhbXBsZSJ9"
+  },
+  {
+   "figure": 18,
+   "caption": "JWS Signing Input",
+   "section": "4.2.2",
+   "example": "4.2",
+   "text": "eyJhbGciOiJQUzM4NCIsImtpZCI6ImJpbGJvLmJhZ2dpbnNAaG9iYml0b24uZX\nhhbXBsZSJ9\n.\nSXTigJlzIGEgZGFuZ2Vyb3VzIGJ1c2luZXNzLCBGcm9kbywgZ29pbmcgb3V0IH\nlvdXIgZG9vci4gWW91IHN0ZXAgb250byB0aGUgcm9hZCwgYW5kIGlmIHlvdSBk\nb24ndCBrZWVwIHlvdXIgZmVldCwgdGhlcmXigJlzIG5vIGtub3dpbmcgd2hlcm\nUgeW91IG1pZ2h0IGJlIHN3ZXB0IG9mZiB0by4",
+   "joined": "eyJhbGciOiJQUzM4NCIsImtpZCI6ImJpbGJvLmJhZ2dpbnNAaG9iYml0b24uZXhhbXBsZSJ9.SXTigJlzIGEgZGFuZ2Vyb3VzIGJ1c2luZXNzLCBGcm9kbywgZ29pbmcgb3V0IHlvdXIgZG9vci4gWW91IHN0ZXAgb250byB0aGUgcm9hZCwgYW5kIGlmIHlvdSBkb24ndCBrZWVwIHlvdXIgZmVldCwgdGhlcmXigJlzIG5vIGtub3dpbmcgd2hlcmUgeW91IG1pZ2h0IGJlIHN3ZXB0IG9mZiB0by4"
+  },
+  {
+   "figure": 19,
+   "caption": "JWS Signature, base64url-encoded",
+   "section": "4.2.2",
+   "example": "4.2",
+   "text": "cu22eBqkYDKgIlTpzDXGvaFfz6WGoz7fUDcfT0kkOy42miAh2qyBzk1xEsnk2I\npN6-tPid6VrklHkqsGqDqHCdP6O8TTB5dDDItllVo6_1OLPpcbUrhiUSMxbbXU\nvdvWXzg-UD8biiReQFlfz28zGWVsdiNAUf8ZnyPEgVFn442ZdNqiVJRmBqrYRX\ne8P_ijQ7p8Vdz0TTrxUeT3lm8d9shnr2lfJT8ImUjvAA2Xez2Mlp8cBE5awDzT\n0qI0n6uiP1aCN_2_jLAeQTlqRHtfa64QQSUmFAAjVKPbByi7xho0uTOcbH510a\n6GYmJUAfmWjwZ6oD4ifKo8DYM-X72Eaw",
+   "joined": "cu22eBqkYDKgIlTpzDXGvaFfz6WGoz7fUDcfT0kkOy42miAh2qyBzk1xEsnk2IpN6-tPid6VrklHkqsGqDqHCdP6O8TTB5dDDItllVo6_1OLPpcbUrhiUSMxbbXUvdvWXzg-UD8biiReQFlfz28zGWVsdiNAUf8ZnyPEgVFn442ZdNqiVJRmBqrYRXe8P_ijQ7p8Vdz0TTrxUeT3lm8d9shnr2lfJT8ImUjvAA2Xez2Mlp8cBE5awDzT0qI0n6uiP1aCN_2_jLAeQTlqRHtfa64QQSUmFAAjVKPbByi7xho0uTOcbH510a6GYmJUAfmWjwZ6oD4ifKo8DYM-X72Eaw"
+  },
+  {
+   "figure": 20,
+   "caption": "JWS Compact Serialization",
+   "section": "4.2.3",
+   "example": "4.2",
+   "text": "eyJhbGciOiJQUzM4NCIsImtpZCI6ImJpbGJvLmJhZ2dpbnNAaG9iYml0b24uZX\nhhbXBsZSJ9\n.\nSXTigJlzIGEgZGFuZ2Vyb3VzIGJ1c2luZXNzLCBGcm9kbywgZ29pbmcgb3V0IH\nlvdXIgZG9vci4gWW91IHN0ZXAgb250byB0aGUgcm9hZCwgYW5kIGlmIHlvdSBk\nb24ndCBrZWVwIHlvdXIgZmVldCwgdGhlcmXigJlzIG5vIGtub3dpbmcgd2hlcm\nUgeW91IG1pZ2h0IGJlIHN3ZXB0IG9mZiB0by4\n.\ncu22eBqkYDKgIlTpzDXGvaFfz6WGoz7fUDcfT0kkOy42miAh2qyBzk1xEsnk2I\npN6-tPid6VrklHkqsGqDqHCdP6O8TTB5dDDItllVo6_1OLPpcbUrhiUSMxbbXU\nvdvWXzg-UD8biiReQFlfz28zGWVsdiNAUf8ZnyPEgVFn442ZdNqiVJRmBqrYRX\ne8P_ijQ7p8Vdz0TTrxUeT3lm8d9shnr2lfJT8ImUjvAA2Xez2Mlp8cBE5awDzT\n0qI0n6uiP1aCN_2_jLAeQTlqRHtfa64QQSUmFAAjVKPbByi7xho0uTOcbH510a\n6GYmJUAfmWjwZ6oD4ifKo8DYM-X72Eaw",
+   "joined": "eyJhbGciOiJQUzM4NCIsImtpZCI6ImJpbGJvLmJhZ2dpbnNAaG9iYml0b24uZXhhbXBsZSJ9.SXTigJlzIGEgZGFuZ2Vyb3VzIGJ1c2luZXNzLCBGcm9kbywgZ29pbmcgb3V0IHlvdXIgZG9vci4gWW91IHN0ZXAgb250byB0aGUgcm9hZCwgYW5kIGlmIHlvdSBkb24ndCBrZWVwIHlvdXIgZmVldCwgdGhlcmXigJlzIG5vIGtub3dpbmcgd2hlcmUgeW91IG1pZ2h0IGJlIHN3ZXB0IG9mZiB0by4.cu22eBqkYDKgIlTpzDXGvaFfz6WGoz7fUDcfT0kkOy42miAh2qyBzk1xEsnk2IpN6-tPid6VrklHkqsGqDqHCdP6O8TTB5dDDItllVo6_1OLPpcbUrhiUSMxbbXUvdvWXzg-UD8biiReQFlfz28zGWVsdiNAUf8ZnyPEgVFn442ZdNqiVJRmBqrYRXe8P_ijQ7p8Vdz0TTrxUeT3lm8d9shnr2lfJT8ImUjvAA2Xez2Mlp8cBE5awDzT0qI0n6uiP1aCN_2_jLAeQTlqRHtfa64QQSUmFAAjVKPbByi7xho0uTOcbH510a6GYmJUAfmWjwZ6oD4ifKo8DYM-X72Eaw"
+  },
+  {
+   "figure": 21,
+   "caption": "General JWS JSON Serialization",
+   "section": "4.2.3",
+   "example": "4.2",
+   "text": "{\n  \"payload\": \"SXTigJlzIGEgZGFuZ2Vyb3VzIGJ1c2luZXNzLCBGcm9kbywg\n      Z29pbmcgb3V0IHlvdXIgZG9vci4gWW91IHN0ZXAgb250byB0aGUgcm9h\n      ZCwgYW5kIGlmIHlvdSBkb24ndCBrZWVwIHlvdXIgZmVldCwgdGhlcmXi\n      gJlzIG5vIGtub3dpbmcgd2hlcmUgeW91IG1pZ2h0IGJlIHN3ZXB0IG9m\n      ZiB0by4\",\n  \"signatures\": [\n    {\n      \"protected\": \"eyJhbGciOiJQUzM4NCIsImtpZCI6ImJpbGJvLmJhZ2\n          dpbnNAaG9iYml0b24uZXhhbXBsZSJ9\",\n      \"signature\": \"cu22eBqkYDKgIlTpzDXGvaFfz6WGoz7fUDcfT0kkOy\n          42miAh2qyBzk1xEsnk2IpN6-tPid6VrklHkqsGqDqHCdP6O8TTB5\n          dDDItllVo6_1OLPpcbUrhiUSMxbbXUvdvWXzg-UD8biiReQFlfz2\n          8zGWVsdiNAUf8ZnyPEgVFn442ZdNqiVJRmBqrYRXe8P_ijQ7p8Vd\n          z0TTrxUeT3lm8d9shnr2lfJT8ImUjvAA2Xez2Mlp8cBE5awDzT0q\n          I0n6uiP1aCN_2_jLAeQTlqRHtfa64QQSUmFAAjVKPbByi7xho0uT\n          OcbH510a6GYmJUAfmWjwZ6oD4ifKo8DYM-X72Eaw\"\n    }\n  ]\n}",
+   "joined": "{\"payload\":\"SXTigJlzIGEgZGFuZ2Vyb3VzIGJ1c2luZXNzLCBGcm9kbywgZ29pbmcgb3V0IHlvdXIgZG9vci4gWW91IHN0ZXAgb250byB0aGUgcm9hZCwgYW5kIGlmIHlvdSBkb24ndCBrZWVwIHlvdXIgZmVldCwgdGhlcmXigJlzIG5vIGtub3dpbmcgd2hlcmUgeW91IG1pZ2h0IGJlIHN3ZXB0IG9mZiB0by4\",\"signatures\":[{\"protected\":\"eyJhbGciOiJQUzM4NCIsImtpZCI6ImJpbGJvLmJhZ2dpbnNAaG9iYml0b24uZXhhbXBsZSJ9\",\"signature\":\"cu22eBqkYDKgIlTpzDXGvaFfz6WGoz7fUDcfT0kkOy42miAh2qyBzk1xEsnk2IpN6-tPid6VrklHkqsGqDqHCdP6O8TTB5dDDItllVo6_1OLPpcbUrhiUSMxbbXUvdvWXzg-UD8biiReQFlfz28zGWVsdiNAUf8ZnyPEgVFn442ZdNqiVJRmBqrYRXe8P_ijQ7p8Vdz0TTrxUeT3lm8d9shnr2lfJT8ImUjvAA2Xez2Mlp8cBE5awDzT0qI0n6uiP1aCN_2_jLAeQTlqRHtfa64QQSUmFAAjVKPbByi7xho0uTOcbH510a6GYmJUAfmWjwZ6oD4ifKo8DYM-X72Eaw\"}]}",
+   "json": {
+    "payload": "SXTigJlzIGEgZGFuZ2Vyb3VzIGJ1c2luZXNzLCBGcm9kbywgZ29pbmcgb3V0IHlvdXIgZG9vci4gWW91IHN0ZXAgb250byB0aGUgcm9hZCwgYW5kIGlmIHlvdSBkb24ndCBrZWVwIHlvdXIgZmVldCwgdGhlcmXigJlzIG5vIGtub3dpbmcgd2hlcmUgeW91IG1pZ2h0IGJlIHN3ZXB0IG9mZiB0by4",
+    "signatures": [
+     {
+      "protected": "eyJhbGciOiJQUzM4NCIsImtpZCI6ImJpbGJvLmJhZ2dpbnNAaG9iYml0b24uZXhhbXBsZSJ9",
+      "signature": "cu22eBqkYDKgIlTpzDXGvaFfz6WGoz7fUDcfT0kkOy42miAh2qyBzk1xEsnk2IpN6-tPid6VrklHkqsGqDqHCdP6O8TTB5dDDItllVo6_1OLPpcbUrhiUSMxbbXUvdvWXzg-UD8biiReQFlfz28zGWVsdiNAUf8ZnyPEgVFn442ZdNqiVJRmBqrYRXe8P_ijQ7p8Vdz0TTrxUeT3lm8d9shnr2lfJT8ImUjvAA2Xez2Mlp8cBE5awDzT0qI0n6uiP1aCN_2_jLAeQTlqRHtfa64QQSUmFAAjVKPbByi7xho0uTOcbH510a6GYmJUAfmWjwZ6oD4ifKo8DYM-X72Eaw"
+     }
+    ]
+   }
+  },
+  {
+   "figure": 22,
+   "caption": "Flattened JWS JSON Serialization",
+   "section": "4.2.3",
+   "example": "4.2",
+   "text": "{\n  \"payload\": \"SXTigJlzIGEgZGFuZ2Vyb3VzIGJ1c2luZXNzLCBGcm9kbywg\n      Z29pbmcgb3V0IHlvdXIgZG9vci4gWW91IHN0ZXAgb250byB0aGUgcm9h\n      ZCwgYW5kIGlmIHlvdSBkb24ndCBrZWVwIHlvdXIgZmVldCwgdGhlcmXi\n      gJlzIG5vIGtub3dpbmcgd2hlcmUgeW91IG1pZ2h0IGJlIHN3ZXB0IG9m\n      ZiB0by4\",\n  \"protected\": \"eyJhbGciOiJQUzM4NCIsImtpZCI6ImJpbGJvLmJhZ2dpbn\n      NAaG9iYml0b24uZXhhbXBsZSJ9\",\n  \"signature\": \"cu22eBqkYDKgIlTpzDXGvaFfz6WGoz7fUDcfT0kkOy42mi\n      Ah2qyBzk1xEsnk2IpN6-tPid6VrklHkqsGqDqHCdP6O8TTB5dDDItllV\n      o6_1OLPpcbUrhiUSMxbbXUvdvWXzg-UD8biiReQFlfz28zGWVsdiNAUf\n      8ZnyPEgVFn442ZdNqiVJRmBqrYRXe8P_ijQ7p8Vdz0TTrxUeT3lm8d9s\n      hnr2lfJT8ImUjvAA2Xez2Mlp8cBE5awDzT0qI0n6uiP1aCN_2_jLAeQT\n      lqRHtfa64QQSUmFAAjVKPbByi7xho0uTOcbH510a6GYmJUAfmWjwZ6oD\n      4ifKo8DYM-X72Eaw\"\n}",
+   "joined": "{\"payload\":\"SXTigJlzIGEgZGFuZ2Vyb3VzIGJ1c2luZXNzLCBGcm9kbywgZ29pbmcgb3V0IHlvdXIgZG9vci4gWW91IHN0ZXAgb250byB0aGUgcm9hZCwgYW5kIGlmIHlvdSBkb24ndCBrZWVwIHlvdXIgZmVldCwgdGhlcmXigJlzIG5vIGtub3dpbmcgd2hlcmUgeW91IG1pZ2h0IGJlIHN3ZXB0IG9mZiB0by4\",\"protected\":\"eyJhbGciOiJQUzM4NCIsImtpZCI6ImJpbGJvLmJhZ2dpbnNAaG9iYml0b24uZXhhbXBsZSJ9\",\"signature\":\"cu22eBqkYDKgIlTpzDXGvaFfz6WGoz7fUDcfT0kkOy42miAh2qyBzk1xEsnk2IpN6-tPid6VrklHkqsGqDqHCdP6O8TTB5dDDItllVo6_1OLPpcbUrhiUSMxbbXUvdvWXzg-UD8biiReQFlfz28zGWVsdiNAUf8ZnyPEgVFn442ZdNqiVJRmBqrYRXe8P_ijQ7p8Vdz0TTrxUeT3lm8d9shnr2lfJT8ImUjvAA2Xez2Mlp8cBE5awDzT0qI0n6uiP1aCN_2_jLAeQTlqRHtfa64QQSUmFAAjVKPbByi7xho0uTOcbH510a6GYmJUAfmWjwZ6oD4ifKo8DYM-X72Eaw\"}",
+   "json": {
+    "payload": "SXTigJlzIGEgZGFuZ2Vyb3VzIGJ1c2luZXNzLCBGcm9kbywgZ29pbmcgb3V0IHlvdXIgZG9vci4gWW91IHN0ZXAgb250byB0aGUgcm9hZCwgYW5kIGlmIHlvdSBkb24ndCBrZWVwIHlvdXIgZmVldCwgdGhlcmXigJlzIG5vIGtub3dpbmcgd2hlcmUgeW91IG1pZ2h0IGJlIHN3ZXB0IG9mZiB0by4",
+    "protected": "eyJhbGciOiJQUzM4NCIsImtpZCI6ImJpbGJvLmJhZ2dpbnNAaG9iYml0b24uZXhhbXBsZSJ9",
+    "signature": "cu22eBqkYDKgIlTpzDXGvaFfz6WGoz7fUDcfT0kkOy42miAh2qyBzk1xEsnk2IpN6-tPid6VrklHkqsGqDqHCdP6O8TTB5dDDItllVo6_1OLPpcbUrhiUSMxbbXUvdvWXzg-UD8biiReQFlfz28zGWVsdiNAUf8ZnyPEgVFn442ZdNqiVJRmBqrYRXe8P_ijQ7p8Vdz0TTrxUeT3lm8d9shnr2lfJT8ImUjvAA2Xez2Mlp8cBE5awDzT0qI0n6uiP1aCN_2_jLAeQTlqRHtfa64QQSUmFAAjVKPbByi7xho0uTOcbH510a6GYmJUAfmWjwZ6oD4ifKo8DYM-X72Eaw"
+   }
+  },
+  {
+   "figure": 23,
+   "caption": "JWS Protected Header JSON",
+   "section": "4.3.2",
+   "example": "4.3",
+   "text": "{\n  \"alg\": \"ES512\",\n  \"kid\": \"bilbo.baggins@hobbiton.example\"\n}",
+   "joined": "{\"alg\":\"ES512\",\"kid\":\"bilbo.baggins@hobbiton.example\"}",
+   "json": {
+    "alg": "ES512",
+    "kid": "bilbo.baggins@hobbiton.example"
+   }
+  },
+  {
+   "figure": 24,
+   "caption": "JWS Protected Header, base64url-encoded",
+   "section": "4.3.2",
+   "example": "4.3",
+   "text": "eyJhbGciOiJFUzUxMiIsImtpZCI6ImJpbGJvLmJhZ2dpbnNAaG9iYml0b24uZX\nhhbXBsZSJ9",
+   "joined": "eyJhbGciOiJFUzUxMiIsImtpZCI6ImJpbGJvLmJhZ2dpbnNAaG9iYml0b24uZXhhbXBsZSJ9"
+  },
+  {
+   "figure": 25,
+   "caption": "JWS Signing Input",
+   "section": "4.3.2",
+   "example": "4.3",
+   "text": "eyJhbGciOiJFUzUxMiIsImtpZCI6ImJpbGJvLmJhZ2dpbnNAaG9iYml0b24uZX\nhhbXBsZSJ9\n.\nSXTigJlzIGEgZGFuZ2Vyb3VzIGJ1c2luZXNzLCBGcm9kbywgZ29pbmcgb3V0IH\nlvdXIgZG9vci4gWW91IHN0ZXAgb250byB0aGUgcm9hZCwgYW5kIGlmIHlvdSBk\nb24ndCBrZWVwIHlvdXIgZmVldCwgdGhlcmXigJlzIG5vIGtub3dpbmcgd2hlcm\nUgeW91IG1pZ2h0IGJlIHN3ZXB0IG9mZiB0by4",
+   "joined": "eyJhbGciOiJFUzUxMiIsImtpZCI6ImJpbGJvLmJhZ2dpbnNAaG9iYml0b24uZXhhbXBsZSJ9.SXTigJlzIGEgZGFuZ2Vyb3VzIGJ1c2luZXNzLCBGcm9kbywgZ29pbmcgb3V0IHlvdXIgZG9vci4gWW91IHN0ZXAgb250byB0aGUgcm9hZCwgYW5kIGlmIHlvdSBkb24ndCBrZWVwIHlvdXIgZmVldCwgdGhlcmXigJlzIG5vIGtub3dpbmcgd2hlcmUgeW91IG1pZ2h0IGJlIHN3ZXB0IG9mZiB0by4"
+  },
+  {
+   "figure": 26,
+   "caption": "JWS Signature, base64url-encoded",
+   "section": "4.3.2",
+   "example": "4.3",
+   "text": "AE_R_YZCChjn4791jSQCrdPZCNYqHXCTZH0-JZGYNlaAjP2kqaluUIIUnC9qvb\nu9Plon7KRTzoNEuT4Va2cmL1eJAQy3mtPBu_u_sDDyYjnAMDxXPn7XrT0lw-kv\nAD890jl8e2puQens_IEKBpHABlsbEPX6sFY8OcGDqoRuBomu9xQ2",
+   "joined": "AE_R_YZCChjn4791jSQCrdPZCNYqHXCTZH0-JZGYNlaAjP2kqaluUIIUnC9qvbu9Plon7KRTzoNEuT4Va2cmL1eJAQy3mtPBu_u_sDDyYjnAMDxXPn7XrT0lw-kvAD890jl8e2puQens_IEKBpHABlsbEPX6sFY8OcGDqoRuBomu9xQ2"
+  },
+  {
+   "figure": 27,
+   "caption": "JWS Compact Serialization",
+   "section": "4.3.3",
+   "example": "4.3",
+   "text": "eyJhbGciOiJFUzUxMiIsImtpZCI6ImJpbGJvLmJhZ2dpbnNAaG9iYml0b24uZX\nhhbXBsZSJ9\n.\nSXTigJlzIGEgZGFuZ2Vyb3VzIGJ1c2luZXNzLCBGcm9kbywgZ29pbmcgb3V0IH\nlvdXIgZG9vci4gWW91IHN0ZXAgb250byB0aGUgcm9hZCwgYW5kIGlmIHlvdSBk\nb24ndCBrZWVwIHlvdXIgZmVldCwgdGhlcmXigJlzIG5vIGtub3dpbmcgd2hlcm\nUgeW91IG1pZ2h0IGJlIHN3ZXB0IG9mZiB0by4\n.\nAE_R_YZCChjn4791jSQCrdPZCNYqHXCTZH0-JZGYNlaAjP2kqaluUIIUnC9qvb\nu9Plon7KRTzoNEuT4Va2cmL1eJAQy3mtPBu_u_sDDyYjnAMDxXPn7XrT0lw-kv\nAD890jl8e2puQens_IEKBpHABlsbEPX6sFY8OcGDqoRuBomu9xQ2",
+   "joined": "eyJhbGciOiJFUzUxMiIsImtpZCI6ImJpbGJvLmJhZ2dpbnNAaG9iYml0b24uZXhhbXBsZSJ9.SXTigJlzIGEgZGFuZ2Vyb3VzIGJ1c2luZXNzLCBGcm9kbywgZ29pbmcgb3V0IHlvdXIgZG9vci4gWW91IHN0ZXAgb250byB0aGUgcm9hZCwgYW5kIGlmIHlvdSBkb24ndCBrZWVwIHlvdXIgZmVldCwgdGhlcmXigJlzIG5vIGtub3dpbmcgd2hlcmUgeW91IG1pZ2h0IGJlIHN3ZXB0IG9mZiB0by4.AE_R_YZCChjn4791jSQCrdPZCNYqHXCTZH0-JZGYNlaAjP2kqaluUIIUnC9qvbu9Plon7KRTzoNEuT4Va2cmL1eJAQy3mtPBu_u_sDDyYjnAMDxXPn7XrT0lw-kvAD890jl8e2puQens_IEKBpHABlsbEPX6sFY8OcGDqoRuBomu9xQ2"
+  },
+  {
+   "figure": 28,
+   "caption": "General JWS JSON Serialization",
+   "section": "4.3.3",
+   "example": "4.3",
+   "text": "{\n  \"payload\": \"SXTigJlzIGEgZGFuZ2Vyb3VzIGJ1c2luZXNzLCBGcm9kbywg\n      Z29pbmcgb3V0IHlvdXIgZG9vci4gWW91IHN0ZXAgb250byB0aGUgcm9h\n      ZCwgYW5kIGlmIHlvdSBkb24ndCBrZWVwIHlvdXIgZmVldCwgdGhlcmXi\n      gJlzIG5vIGtub3dpbmcgd2hlcmUgeW91IG1pZ2h0IGJlIHN3ZXB0IG9m\n      ZiB0by4\",\n  \"signatures\": [\n    {\n      \"protected\": \"eyJhbGciOiJFUzUxMiIsImtpZCI6ImJpbGJvLmJhZ2\n          dpbnNAaG9iYml0b24uZXhhbXBsZSJ9\",\n      \"signature\": \"AE_R_YZCChjn4791jSQCrdPZCNYqHXCTZH0-JZGYNl\n          aAjP2kqaluUIIUnC9qvbu9Plon7KRTzoNEuT4Va2cmL1eJAQy3mt\n          PBu_u_sDDyYjnAMDxXPn7XrT0lw-kvAD890jl8e2puQens_IEKBp\n          HABlsbEPX6sFY8OcGDqoRuBomu9xQ2\"\n    }\n  ]\n}",
+   "joined": "{\"payload\":\"SXTigJlzIGEgZGFuZ2Vyb3VzIGJ1c2luZXNzLCBGcm9kbywgZ29pbmcgb3V0IHlvdXIgZG9vci4gWW91IHN0ZXAgb250byB0aGUgcm9hZCwgYW5kIGlmIHlvdSBkb24ndCBrZWVwIHlvdXIgZmVldCwgdGhlcmXigJlzIG5vIGtub3dpbmcgd2hlcmUgeW91IG1pZ2h0IGJlIHN3ZXB0IG9mZiB0by4\",\"signatures\":[{\"protected\":\"eyJhbGciOiJFUzUxMiIsImtpZCI6ImJpbGJvLmJhZ2dpbnNAaG9iYml0b24uZXhhbXBsZSJ9\",\"signature\":\"AE_R_YZCChjn4791jSQCrdPZCNYqHXCTZH0-JZGYNlaAjP2kqaluUIIUnC9qvbu9Plon7KRTzoNEuT4Va2cmL1eJAQy3mtPBu_u_sDDyYjnAMDxXPn7XrT0lw-kvAD890jl8e2puQens_IEKBpHABlsbEPX6sFY8OcGDqoRuBomu9xQ2\"}]}",
+   "json": {
+    "payload": "SXTigJlzIGEgZGFuZ2Vyb3VzIGJ1c2luZXNzLCBGcm9kbywgZ29pbmcgb3V0IHlvdXIgZG9vci4gWW91IHN0ZXAgb250byB0aGUgcm9hZCwgYW5kIGlmIHlvdSBkb24ndCBrZWVwIHlvdXIgZmVldCwgdGhlcmXigJlzIG5vIGtub3dpbmcgd2hlcmUgeW91IG1pZ2h0IGJlIHN3ZXB0IG9mZiB0by4",
+    "signatures": [
+     {
+      "protected": "eyJhbGciOiJFUzUxMiIsImtpZCI6ImJpbGJvLmJhZ2dpbnNAaG9iYml0b24uZXhhbXBsZSJ9",
+      "signature": "AE_R_YZCChjn4791jSQCrdPZCNYqHXCTZH0-JZGYNlaAjP2kqaluUIIUnC9qvbu9Plon7KRTzoNEuT4Va2cmL1eJAQy3mtPBu_u_sDDyYjnAMDxXPn7XrT0lw-kvAD890jl8e2puQens_IEKBpHABlsbEPX6sFY8OcGDqoRuBomu9xQ2"
+     }
+    ]
+   }
+  },
+  {
+   "figure": 29,
+   "caption": "Flattened JWS JSON Serialization",
+   "section": "4.3.3",
+   "example": "4.3",
+   "text": "{\n  \"payload\": \"SXTigJlzIGEgZGFuZ2Vyb3VzIGJ1c2luZXNzLCBGcm9kbywg\n      Z29pbmcgb3V0IHlvdXIgZG9vci4gWW91IHN0ZXAgb250byB0aGUgcm9h\n      ZCwgYW5kIGlmIHlvdSBkb24ndCBrZWVwIHlvdXIgZmVldCwgdGhlcmXi\n      gJlzIG5vIGtub3dpbmcgd2hlcmUgeW91IG1pZ2h0IGJlIHN3ZXB0IG9m\n      ZiB0by4\",\n  \"protected\": \"eyJhbGciOiJFUzUxMiIsImtpZCI6ImJpbGJvLmJhZ2dpbn\n      NAaG9iYml0b24uZXhhbXBsZSJ9\",\n  \"signature\": \"AE_R_YZCChjn4791jSQCrdPZCNYqHXCTZH0-JZGYNlaAjP\n      2kqaluUIIUnC9qvbu9Plon7KRTzoNEuT4Va2cmL1eJAQy3mtPBu_u_sD\n      DyYjnAMDxXPn7XrT0lw-kvAD890jl8e2puQens_IEKBpHABlsbEPX6sF\n      Y8OcGDqoRuBomu9xQ2\"\n}",
+   "joined": "{\"payload\":\"SXTigJlzIGEgZGFuZ2Vyb3VzIGJ1c2luZXNzLCBGcm9kbywgZ29pbmcgb3V0IHlvdXIgZG9vci4gWW91IHN0ZXAgb250byB0aGUgcm9hZCwgYW5kIGlmIHlvdSBkb24ndCBrZWVwIHlvdXIgZmVldCwgdGhlcmXigJlzIG5vIGtub3dpbmcgd2hlcmUgeW91IG1pZ2h0IGJlIHN3ZXB0IG9mZiB0by4\",\"protected\":\"eyJhbGciOiJFUzUxMiIsImtpZCI6ImJpbGJvLmJhZ2dpbnNAaG9iYml0b24uZXhhbXBsZSJ9\",\"signature\":\"AE_R_YZCChjn4791jSQCrdPZCNYqHXCTZH0-JZGYNlaAjP2kqaluUIIUnC9qvbu9Plon7KRTzoNEuT4Va2cmL1eJAQy3mtPBu_u_sDDyYjnAMDxXPn7XrT0lw-kvAD890jl8e2puQens_IEKBpHABlsbEPX6sFY8OcGDqoRuBomu9xQ2\"}",
+   "json": {
+    "payload": "SXTigJlzIGEgZGFuZ2Vyb3VzIGJ1c2luZXNzLCBGcm9kbywgZ29pbmcgb3V0IHlvdXIgZG9vci4gWW91IHN0ZXAgb250byB0aGUgcm9hZCwgYW5kIGlmIHlvdSBkb24ndCBrZWVwIHlvdXIgZmVldCwgdGhlcmXigJlzIG5vIGtub3dpbmcgd2hlcmUgeW91IG1pZ2h0IGJlIHN3ZXB0IG9mZiB0by4",
+    "protected": "eyJhbGciOiJFUzUxMiIsImtpZCI6ImJpbGJvLmJhZ2dpbnNAaG9iYml0b24uZXhhbXBsZSJ9",
+    "signature": "AE_R_YZCChjn4791jSQCrdPZCNYqHXCTZH0-JZGYNlaAjP2kqaluUIIUnC9qvbu9Plon7KRTzoNEuT4Va2cmL1eJAQy3mtPBu_u_sDDyYjnAMDxXPn7XrT0lw-kvAD890jl8e2puQens_IEKBpHABlsbEPX6sFY8OcGDqoRuBomu9xQ2"
+   }
+  },
+  {
+   "figure": 30,
+   "caption": "JWS Protected Header JSON",
+   "section": "4.4.2",
+   "example": "4.4",
+   "text": "{\n  \"alg\": \"HS256\",\n  \"kid\": \"018c0ae5-4d9b-471b-bfd6-eef314bc7037\"\n}",
+   "joined": "{\"alg\":\"HS256\",\"kid\":\"018c0ae5-4d9b-471b-bfd6-eef314bc7037\"}",
+   "json": {
+    "alg": "HS256",
+    "kid": "018c0ae5-4d9b-471b-bfd6-eef314bc7037"
+   }
+  },
+  {
+   "figure": 31,
+   "caption": "JWS Protected Header, base64url-encoded",
+   "section": "4.4.2",
+   "example": "4.4",
+   "text": "eyJhbGciOiJIUzI1NiIsImtpZCI6IjAxOGMwYWU1LTRkOWItNDcxYi1iZmQ2LW\nVlZjMxNGJjNzAzNyJ9",
+   "joined": "eyJhbGciOiJIUzI1NiIsImtpZCI6IjAxOGMwYWU1LTRkOWItNDcxYi1iZmQ2LWVlZjMxNGJjNzAzNyJ9"
+  },
+  {
+   "figure": 32,
+   "caption": "JWS Signing Input",
+   "section": "4.4.2",
+   "example": "4.4",
+   "text": "eyJhbGciOiJIUzI1NiIsImtpZCI6IjAxOGMwYWU1LTRkOWItNDcxYi1iZmQ2LW\nVlZjMxNGJjNzAzNyJ9\n.\nSXTigJlzIGEgZGFuZ2Vyb3VzIGJ1c2luZXNzLCBGcm9kbywgZ29pbmcgb3V0IH\nlvdXIgZG9vci4gWW91IHN0ZXAgb250byB0aGUgcm9hZCwgYW5kIGlmIHlvdSBk\nb24ndCBrZWVwIHlvdXIgZmVldCwgdGhlcmXigJlzIG5vIGtub3dpbmcgd2hlcm\nUgeW91IG1pZ2h0IGJlIHN3ZXB0IG9mZiB0by4",
+   "joined": "eyJhbGciOiJIUzI1NiIsImtpZCI6IjAxOGMwYWU1LTRkOWItNDcxYi1iZmQ2LWVlZjMxNGJjNzAzNyJ9.SXTigJlzIGEgZGFuZ2Vyb3VzIGJ1c2luZXNzLCBGcm9kbywgZ29pbmcgb3V0IHlvdXIgZG9vci4gWW91IHN0ZXAgb250byB0aGUgcm9hZCwgYW5kIGlmIHlvdSBkb24ndCBrZWVwIHlvdXIgZmVldCwgdGhlcmXigJlzIG5vIGtub3dpbmcgd2hlcmUgeW91IG1pZ2h0IGJlIHN3ZXB0IG9mZiB0by4"
+  },
+  {
+   "figure": 33,
+   "caption": "JWS Signature, base64url-encoded",
+   "section": "4.4.2",
+   "example": "4.4",
+   "text": "s0h6KThzkfBBBkLspW1h84VsJZFTsPPqMDA7g1Md7p0",
+   "joined": "s0h6KThzkfBBBkLspW1h84VsJZFTsPPqMDA7g1Md7p0"
+  },
+  {
+   "figure": 34,
+   "caption": "JWS Compact Serialization",
+   "section": "4.4.3",
+   "example": "4.4",
+   "text": "eyJhbGciOiJIUzI1NiIsImtpZCI6IjAxOGMwYWU1LTRkOWItNDcxYi1iZmQ2LW\nVlZjMxNGJjNzAzNyJ9\n.\nSXTigJlzIGEgZGFuZ2Vyb3VzIGJ1c2luZXNzLCBGcm9kbywgZ29pbmcgb3V0IH\nlvdXIgZG9vci4gWW91IHN0ZXAgb250byB0aGUgcm9hZCwgYW5kIGlmIHlvdSBk\nb24ndCBrZWVwIHlvdXIgZmVldCwgdGhlcmXigJlzIG5vIGtub3dpbmcgd2hlcm\nUgeW91IG1pZ2h0IGJlIHN3ZXB0IG9mZiB0by4\n.\ns0h6KThzkfBBBkLspW1h84VsJZFTsPPqMDA7g1Md7p0",
+   "joined": "eyJhbGciOiJIUzI1NiIsImtpZCI6IjAxOGMwYWU1LTRkOWItNDcxYi1iZmQ2LWVlZjMxNGJjNzAzNyJ9.SXTigJlzIGEgZGFuZ2Vyb3VzIGJ1c2luZXNzLCBGcm9kbywgZ29pbmcgb3V0IHlvdXIgZG9vci4gWW91IHN0ZXAgb250byB0aGUgcm9hZCwgYW5kIGlmIHlvdSBkb24ndCBrZWVwIHlvdXIgZmVldCwgdGhlcmXigJlzIG5vIGtub3dpbmcgd2hlcmUgeW91IG1pZ2h0IGJlIHN3ZXB0IG9mZiB0by4.s0h6KThzkfBBBkLspW1h84VsJZFTsPPqMDA7g1Md7p0"
+  },
+  {
+   "figure": 35,
+   "caption": "General JWS JSON Serialization",
+   "section": "4.4.3",
+   "example": "4.4",
+   "text": "{\n  \"payload\": \"SXTigJlzIGEgZGFuZ2Vyb3VzIGJ1c2luZXNzLCBGcm9kbywg\n      Z29pbmcgb3V0IHlvdXIgZG9vci4gWW91IHN0ZXAgb250byB0aGUgcm9h\n      ZCwgYW5kIGlmIHlvdSBkb24ndCBrZWVwIHlvdXIgZmVldCwgdGhlcmXi\n      gJlzIG5vIGtub3dpbmcgd2hlcmUgeW91IG1pZ2h0IGJlIHN3ZXB0IG9m\n      ZiB0by4\",\n  \"signatures\": [\n    {\n      \"protected\": \"eyJhbGciOiJIUzI1NiIsImtpZCI6IjAxOGMwYWU1LT\n          RkOWItNDcxYi1iZmQ2LWVlZjMxNGJjNzAzNyJ9\",\n      \"signature\": \"s0h6KThzkfBBBkLspW1h84VsJZFTsPPqMDA7g1Md7p\n          0\"\n    }\n  ]\n}",
+   "joined": "{\"payload\":\"SXTigJlzIGEgZGFuZ2Vyb3VzIGJ1c2luZXNzLCBGcm9kbywgZ29pbmcgb3V0IHlvdXIgZG9vci4gWW91IHN0ZXAgb250byB0aGUgcm9hZCwgYW5kIGlmIHlvdSBkb24ndCBrZWVwIHlvdXIgZmVldCwgdGhlcmXigJlzIG5vIGtub3dpbmcgd2hlcmUgeW91IG1pZ2h0IGJlIHN3ZXB0IG9mZiB0by4\",\"signatures\":[{\"protected\":\"eyJhbGciOiJIUzI1NiIsImtpZCI6IjAxOGMwYWU1LTRkOWItNDcxYi1iZmQ2LWVlZjMxNGJjNzAzNyJ9\",\"signature\":\"s0h6KThzkfBBBkLspW1h84VsJZFTsPPqMDA7g1Md7p0\"}]}",
+   "json": {
+    "payload": "SXTigJlzIGEgZGFuZ2Vyb3VzIGJ1c2luZXNzLCBGcm9kbywgZ29pbmcgb3V0IHlvdXIgZG9vci4gWW91IHN0ZXAgb250byB0aGUgcm9hZCwgYW5kIGlmIHlvdSBkb24ndCBrZWVwIHlvdXIgZmVldCwgdGhlcmXigJlzIG5vIGtub3dpbmcgd2hlcmUgeW91IG1pZ2h0IGJlIHN3ZXB0IG9mZiB0by4",
+    "signatures": [
+     {
+      "protected": "eyJhbGciOiJIUzI1NiIsImtpZCI6IjAxOGMwYWU1LTRkOWItNDcxYi1iZmQ2LWVlZjMxNGJjNzAzNyJ9",
+      "signature": "s0h6KThzkfBBBkLspW1h84VsJZFTsPPqMDA7g1Md7p0"
+     }
+    ]
+   }
+  },
+  {
+   "figure": 36,
+   "caption": "Flattened JWS JSON Serialization",
+   "section": "4.4.3",
+   "example": "4.4",
+   "text": "{\n  \"payload\": \"SXTigJlzIGEgZGFuZ2Vyb3VzIGJ1c2luZXNzLCBGcm9kbywg\n      Z29pbmcgb3V0IHlvdXIgZG9vci4gWW91IHN0ZXAgb250byB0aGUgcm9h\n      ZCwgYW5kIGlmIHlvdSBkb24ndCBrZWVwIHlvdXIgZmVldCwgdGhlcmXi\n      gJlzIG5vIGtub3dpbmcgd2hlcmUgeW91IG1pZ2h0IGJlIHN3ZXB0IG9m\n      ZiB0by4\",\n  \"protected\": \"eyJhbGciOiJIUzI1NiIsImtpZCI6IjAxOGMwYWU1LTRkOW\n      ItNDcxYi1iZmQ2LWVlZjMxNGJjNzAzNyJ9\",\n  \"signature\": \"s0h6KThzkfBBBkLspW1h84VsJZFTsPPqMDA7g1Md7p0\"\n}",
+   "joined": "{\"payload\":\"SXTigJlzIGEgZGFuZ2Vyb3VzIGJ1c2luZXNzLCBGcm9kbywgZ29pbmcgb3V0IHlvdXIgZG9vci4gWW91IHN0ZXAgb250byB0aGUgcm9hZCwgYW5kIGlmIHlvdSBkb24ndCBrZWVwIHlvdXIgZmVldCwgdGhlcmXigJlzIG5vIGtub3dpbmcgd2hlcmUgeW91IG1pZ2h0IGJlIHN3ZXB0IG9mZiB0by4\",\"protected\":\"eyJhbGciOiJIUzI1NiIsImtpZCI6IjAxOGMwYWU1LTRkOWItNDcxYi1iZmQ2LWVlZjMxNGJjNzAzNyJ9\",\"signature\":\"s0h6KThzkfBBBkLspW1h84VsJZFTsPPqMDA7g1Md7p0\"}",
+   "json": {
+    "payload": "SXTigJlzIGEgZGFuZ2Vyb3VzIGJ1c2luZXNzLCBGcm9kbywgZ29pbmcgb3V0IHlvdXIgZG9vci4gWW91IHN0ZXAgb250byB0aGUgcm9hZCwgYW5kIGlmIHlvdSBkb24ndCBrZWVwIHlvdXIgZmVldCwgdGhlcmXigJlzIG5vIGtub3dpbmcgd2hlcmUgeW91IG1pZ2h0IGJlIHN3ZXB0IG9mZiB0by4",
+    "protected": "eyJhbGciOiJIUzI1NiIsImtpZCI6IjAxOGMwYWU1LTRkOWItNDcxYi1iZmQ2LWVlZjMxNGJjNzAzNyJ9",
+    "signature": "s0h6KThzkfBBBkLspW1h84VsJZFTsPPqMDA7g1Md7p0"
+   }
+  },
+  {
+   "figure": 37,
+   "caption": "JWS Protected Header JSON",
+   "section": "4.5.2",
+   "example": "4.5",
+   "text": "{\n  \"alg\": \"HS256\",\n  \"kid\": \"018c0ae5-4d9b-471b-bfd6-eef314bc7037\"\n}",
+   "joined": "{\"alg\":\"HS256\",\"kid\":\"018c0ae5-4d9b-471b-bfd6-eef314bc7037\"}",
+   "json": {
+    "alg": "HS256",
+    "kid": "018c0ae5-4d9b-471b-bfd6-eef314bc7037"
+   }
+  },
+  {
+   "figure": 38,
+   "caption": "JWS Protected Header, base64url-encoded",
+   "section": "4.5.2",
+   "example": "4.5",
+   "text": "eyJhbGciOiJIUzI1NiIsImtpZCI6IjAxOGMwYWU1LTRkOWItNDcxYi1iZmQ2LW\nVlZjMxNGJjNzAzNyJ9",
+   "joined": "eyJhbGciOiJIUzI1NiIsImtpZCI6IjAxOGMwYWU1LTRkOWItNDcxYi1iZmQ2LWVlZjMxNGJjNzAzNyJ9"
+  },
+  {
+   "figure": 39,
+   "caption": "JWS Signing Input",
+   "section": "4.5.2",
+   "example": "4.5",
+   "text": "eyJhbGciOiJIUzI1NiIsImtpZCI6IjAxOGMwYWU1LTRkOWItNDcxYi1iZmQ2LW\nVlZjMxNGJjNzAzNyJ9\n.\nSXTigJlzIGEgZGFuZ2Vyb3VzIGJ1c2luZXNzLCBGcm9kbywgZ29pbmcgb3V0IH\nlvdXIgZG9vci4gWW91IHN0ZXAgb250byB0aGUgcm9hZCwgYW5kIGlmIHlvdSBk\nb24ndCBrZWVwIHlvdXIgZmVldCwgdGhlcmXigJlzIG5vIGtub3dpbmcgd2hlcm\nUgeW91IG1pZ2h0IGJlIHN3ZXB0IG9mZiB0by4",
+   "joined": "eyJhbGciOiJIUzI1NiIsImtpZCI6IjAxOGMwYWU1LTRkOWItNDcxYi1iZmQ2LWVlZjMxNGJjNzAzNyJ9.SXTigJlzIGEgZGFuZ2Vyb3VzIGJ1c2luZXNzLCBGcm9kbywgZ29pbmcgb3V0IHlvdXIgZG9vci4gWW91IHN0ZXAgb250byB0aGUgcm9hZCwgYW5kIGlmIHlvdSBkb24ndCBrZWVwIHlvdXIgZmVldCwgdGhlcmXigJlzIG5vIGtub3dpbmcgd2hlcmUgeW91IG1pZ2h0IGJlIHN3ZXB0IG9mZiB0by4"
+  },
+  {
+   "figure": 40,
+   "caption": "JWS Signature, base64url-encoded",
+   "section": "4.5.2",
+   "example": "4.5",
+   "text": "s0h6KThzkfBBBkLspW1h84VsJZFTsPPqMDA7g1Md7p0",
+   "joined": "s0h6KThzkfBBBkLspW1h84VsJZFTsPPqMDA7g1Md7p0"
+  },
+  {
+   "figure": 41,
+   "caption": "General JWS JSON Serialization",
+   "section": "4.5.3",
+   "example": "4.5",
+   "text": "eyJhbGciOiJIUzI1NiIsImtpZCI6IjAxOGMwYWU1LTRkOWItNDcxYi1iZmQ2LW\nVlZjMxNGJjNzAzNyJ9\n.\n.\ns0h6KThzkfBBBkLspW1h84VsJZFTsPPqMDA7g1Md7p0",
+   "joined": "eyJhbGciOiJIUzI1NiIsImtpZCI6IjAxOGMwYWU1LTRkOWItNDcxYi1iZmQ2LWVlZjMxNGJjNzAzNyJ9..s0h6KThzkfBBBkLspW1h84VsJZFTsPPqMDA7g1Md7p0"
+  },
+  {
+   "figure": 42,
+   "caption": "General JWS JSON Serialization",
+   "section": "4.5.3",
+   "example": "4.5",
+   "text": "{\n  \"signatures\": [\n    {\n      \"protected\": \"eyJhbGciOiJIUzI1NiIsImtpZCI6IjAxOGMwYWU1LT\n          RkOWItNDcxYi1iZmQ2LWVlZjMxNGJjNzAzNyJ9\",\n      \"signature\": \"s0h6KThzkfBBBkLspW1h84VsJZFTsPPqMDA7g1Md7p\n          0\"\n    }\n  ]\n}",
+   "joined": "{\"signatures\":[{\"protected\":\"eyJhbGciOiJIUzI1NiIsImtpZCI6IjAxOGMwYWU1LTRkOWItNDcxYi1iZmQ2LWVlZjMxNGJjNzAzNyJ9\",\"signature\":\"s0h6KThzkfBBBkLspW1h84VsJZFTsPPqMDA7g1Md7p0\"}]}",
+   "json": {
+    "signatures": [
+     {
+      "protected": "eyJhbGciOiJIUzI1NiIsImtpZCI6IjAxOGMwYWU1LTRkOWItNDcxYi1iZmQ2LWVlZjMxNGJjNzAzNyJ9",
+      "signature": "s0h6KThzkfBBBkLspW1h84VsJZFTsPPqMDA7g1Md7p0"
+     }
+    ]
+   }
+  },
+  {
+   "figure": 43,
+   "caption": "Flattened JWS JSON Serialization",
+   "section": "4.5.3",
+   "example": "4.5",
+   "text": "{\n  \"protected\": \"eyJhbGciOiJIUzI1NiIsImtpZCI6IjAxOGMwYWU1LTRkOW\n      ItNDcxYi1iZmQ2LWVlZjMxNGJjNzAzNyJ9\",\n  \"signature\": \"s0h6KThzkfBBBkLspW1h84VsJZFTsPPqMDA7g1Md7p0\"\n}",
+   "joined": "{\"protected\":\"eyJhbGciOiJIUzI1NiIsImtpZCI6IjAxOGMwYWU1LTRkOWItNDcxYi1iZmQ2LWVlZjMxNGJjNzAzNyJ9\",\"signature\":\"s0h6KThzkfBBBkLspW1h84VsJZFTsPPqMDA7g1Md7p0\"}",
+   "json": {
+    "protected": "eyJhbGciOiJIUzI1NiIsImtpZCI6IjAxOGMwYWU1LTRkOWItNDcxYi1iZmQ2LWVlZjMxNGJjNzAzNyJ9",
+    "signature": "s0h6KThzkfBBBkLspW1h84VsJZFTsPPqMDA7g1Md7p0"
+   }
+  },
+  {
+   "figure": 44,
+   "caption": "JWS Protected Header JSON",
+   "section": "4.6.2",
+   "example": "4.6",
+   "text": "{\n  \"alg\": \"HS256\"\n}",
+   "joined": "{\"alg\":\"HS256\"}",
+   "json": {
+    "alg": "HS256"
+   }
+  },
+  {
+   "figure": 45,
+   "caption": "JWS Protected Header, base64url-encoded",
+   "section": "4.6.2",
+   "example": "4.6",
+   "text": "eyJhbGciOiJIUzI1NiJ9",
+   "joined": "eyJhbGciOiJIUzI1NiJ9"
+  },
+  {
+   "figure": 46,
+   "caption": "JWS Unprotected Header JSON",
+   "section": "4.6.2",
+   "example": "4.6",
+   "text": "{\n  \"kid\": \"018c0ae5-4d9b-471b-bfd6-eef314bc7037\"\n}",
+   "joined": "{\"kid\":\"018c0ae5-4d9b-471b-bfd6-eef314bc7037\"}",
+   "json": {
+    "kid": "018c0ae5-4d9b-471b-bfd6-eef314bc7037"
+   }
+  },
+  {
+   "figure": 47,
+   "caption": "JWS Signing Input",
+   "section": "4.6.2",
+   "example": "4.6",
+   "text": "eyJhbGciOiJIUzI1NiJ9\n.\nSXTigJlzIGEgZGFuZ2Vyb3VzIGJ1c2luZXNzLCBGcm9kbywgZ29pbmcgb3V0IH\nlvdXIgZG9vci4gWW91IHN0ZXAgb250byB0aGUgcm9hZCwgYW5kIGlmIHlvdSBk\nb24ndCBrZWVwIHlvdXIgZmVldCwgdGhlcmXigJlzIG5vIGtub3dpbmcgd2hlcm\nUgeW91IG1pZ2h0IGJlIHN3ZXB0IG9mZiB0by4",
+   "joined": "eyJhbGciOiJIUzI1NiJ9.SXTigJlzIGEgZGFuZ2Vyb3VzIGJ1c2luZXNzLCBGcm9kbywgZ29pbmcgb3V0IHlvdXIgZG9vci4gWW91IHN0ZXAgb250byB0aGUgcm9hZCwgYW5kIGlmIHlvdSBkb24ndCBrZWVwIHlvdXIgZmVldCwgdGhlcmXigJlzIG5vIGtub3dpbmcgd2hlcmUgeW91IG1pZ2h0IGJlIHN3ZXB0IG9mZiB0by4"
+  },
+  {
+   "figure": 48,
+   "caption": "JWS Signature, base64url-encoded",
+   "section": "4.6.2",
+   "example": "4.6",
+   "text": "bWUSVaxorn7bEF1djytBd0kHv70Ly5pvbomzMWSOr20",
+   "joined": "bWUSVaxorn7bEF1djytBd0kHv70Ly5pvbomzMWSOr20"
+  },
+  {
+   "figure": 49,
+   "caption": "General JWS JSON Serialization",
+   "section": "4.6.3",
+   "example": "4.6",
+   "text": "{\n  \"payload\": \"SXTigJlzIGEgZGFuZ2Vyb3VzIGJ1c2luZXNzLCBGcm9kbywg\n      Z29pbmcgb3V0IHlvdXIgZG9vci4gWW91IHN0ZXAgb250byB0aGUgcm9h\n      ZCwgYW5kIGlmIHlvdSBkb24ndCBrZWVwIHlvdXIgZmVldCwgdGhlcmXi\n      gJlzIG5vIGtub3dpbmcgd2hlcmUgeW91IG1pZ2h0IGJlIHN3ZXB0IG9m\n      ZiB0by4\",\n  \"signatures\": [\n    {\n      \"protected\": \"eyJhbGciOiJIUzI1NiJ9\",\n      \"header\": {\n        \"kid\": \"018c0ae5-4d9b-471b-bfd6-eef314bc7037\"\n      },\n      \"signature\": \"bWUSVaxorn7bEF1djytBd0kHv70Ly5pvbomzMWSOr2\n          0\"\n    }\n  ]\n}",
+   "joined": "{\"payload\":\"SXTigJlzIGEgZGFuZ2Vyb3VzIGJ1c2luZXNzLCBGcm9kbywgZ29pbmcgb3V0IHlvdXIgZG9vci4gWW91IHN0ZXAgb250byB0aGUgcm9hZCwgYW5kIGlmIHlvdSBkb24ndCBrZWVwIHlvdXIgZmVldCwgdGhlcmXigJlzIG5vIGtub3dpbmcgd2hlcmUgeW91IG1pZ2h0IGJlIHN3ZXB0IG9mZiB0by4\",\"signatures\":[{\"protected\":\"eyJhbGciOiJIUzI1NiJ9\",\"header\":{\"kid\":\"018c0ae5-4d9b-471b-bfd6-eef314bc7037\"},\"signature\":\"bWUSVaxorn7bEF1djytBd0kHv70Ly5pvbomzMWSOr20\"}]}",
+   "json": {
+    "payload": "SXTigJlzIGEgZGFuZ2Vyb3VzIGJ1c2luZXNzLCBGcm9kbywgZ29pbmcgb3V0IHlvdXIgZG9vci4gWW91IHN0ZXAgb250byB0aGUgcm9hZCwgYW5kIGlmIHlvdSBkb24ndCBrZWVwIHlvdXIgZmVldCwgdGhlcmXigJlzIG5vIGtub3dpbmcgd2hlcmUgeW91IG1pZ2h0IGJlIHN3ZXB0IG9mZiB0by4",
+    "signatures": [
+     {
+      "protected": "eyJhbGciOiJIUzI1NiJ9",
+      "header": {
+       "kid": "018c0ae5-4d9b-471b-bfd6-eef314bc7037"
+      },
+      "signature": "bWUSVaxorn7bEF1djytBd0kHv70Ly5pvbomzMWSOr20"
+     }
+    ]
+   }
+  },
+  {
+   "figure": 50,
+   "caption": "Flattened JWS JSON Serialization",
+   "section": "4.6.3",
+   "example": "4.6",
+   "text": "{\n  \"payload\": \"SXTigJlzIGEgZGFuZ2Vyb3VzIGJ1c2luZXNzLCBGcm9kbywg\n      Z29pbmcgb3V0IHlvdXIgZG9vci4gWW91IHN0ZXAgb250byB0aGUgcm9h\n      ZCwgYW5kIGlmIHlvdSBkb24ndCBrZWVwIHlvdXIgZmVldCwgdGhlcmXi\n      gJlzIG5vIGtub3dpbmcgd2hlcmUgeW91IG1pZ2h0IGJlIHN3ZXB0IG9m\n      ZiB0by4\",\n  \"protected\": \"eyJhbGciOiJIUzI1NiJ9\",\n  \"header\": {\n    \"kid\": \"018c0ae5-4d9b-471b-bfd6-eef314bc7037\"\n  },\n  \"signature\": \"bWUSVaxorn7bEF1djytBd0kHv70Ly5pvbomzMWSOr20\"\n}",
+   "joined": "{\"payload\":\"SXTigJlzIGEgZGFuZ2Vyb3VzIGJ1c2luZXNzLCBGcm9kbywgZ29pbmcgb3V0IHlvdXIgZG9vci4gWW91IHN0ZXAgb250byB0aGUgcm9hZCwgYW5kIGlmIHlvdSBkb24ndCBrZWVwIHlvdXIgZmVldCwgdGhlcmXigJlzIG5vIGtub3dpbmcgd2hlcmUgeW91IG1pZ2h0IGJlIHN3ZXB0IG9mZiB0by4\",\"protected\":\"eyJhbGciOiJIUzI1NiJ9\",\"header\":{\"kid\":\"018c0ae5-4d9b-471b-bfd6-eef314bc7037\"},\"signature\":\"bWUSVaxorn7bEF1djytBd0kHv70Ly5pvbomzMWSOr20\"}",
+   "json": {
+    "payload": "SXTigJlzIGEgZGFuZ2Vyb3VzIGJ1c2luZXNzLCBGcm9kbywgZ29pbmcgb3V0IHlvdXIgZG9vci4gWW91IHN0ZXAgb250byB0aGUgcm9hZCwgYW5kIGlmIHlvdSBkb24ndCBrZWVwIHlvdXIgZmVldCwgdGhlcmXigJlzIG5vIGtub3dpbmcgd2hlcmUgeW91IG1pZ2h0IGJlIHN3ZXB0IG9mZiB0by4",
+    "protected": "eyJhbGciOiJIUzI1NiJ9",
+    "header": {
+     "kid": "018c0ae5-4d9b-471b-bfd6-eef314bc7037"
+    },
+    "signature": "bWUSVaxorn7bEF1djytBd0kHv70Ly5pvbomzMWSOr20"
+   }
+  },
+  {
+   "figure": 51,
+   "caption": "JWS Unprotected Header JSON",
+   "section": "4.7.2",
+   "example": "4.7",
+   "text": "{\n  \"alg\": \"HS256\",\n  \"kid\": \"018c0ae5-4d9b-471b-bfd6-eef314bc7037\"\n}",
+   "joined": "{\"alg\":\"HS256\",\"kid\":\"018c0ae5-4d9b-471b-bfd6-eef314bc7037\"}",
+   "json": {
+    "alg": "HS256",
+    "kid": "018c0ae5-4d9b-471b-bfd6-eef314bc7037"
+   }
+  },
+  {
+   "figure": 52,
+   "caption": "JWS Signing Input",
+   "section": "4.7.2",
+   "example": "4.7",
+   "text": ".\nSXTigJlzIGEgZGFuZ2Vyb3VzIGJ1c2luZXNzLCBGcm9kbywgZ29pbmcgb3V0IH\nlvdXIgZG9vci4gWW91IHN0ZXAgb250byB0aGUgcm9hZCwgYW5kIGlmIHlvdSBk\nb24ndCBrZWVwIHlvdXIgZmVldCwgdGhlcmXigJlzIG5vIGtub3dpbmcgd2hlcm\nUgeW91IG1pZ2h0IGJlIHN3ZXB0IG9mZiB0by4",
+   "joined": ".SXTigJlzIGEgZGFuZ2Vyb3VzIGJ1c2luZXNzLCBGcm9kbywgZ29pbmcgb3V0IHlvdXIgZG9vci4gWW91IHN0ZXAgb250byB0aGUgcm9hZCwgYW5kIGlmIHlvdSBkb24ndCBrZWVwIHlvdXIgZmVldCwgdGhlcmXigJlzIG5vIGtub3dpbmcgd2hlcmUgeW91IG1pZ2h0IGJlIHN3ZXB0IG9mZiB0by4"
+  },
+  {
+   "figure": 53,
+   "caption": "JWS Signature, base64url-encoded",
+   "section": "4.7.2",
+   "example": "4.7",
+   "text": "xuLifqLGiblpv9zBpuZczWhNj1gARaLV3UxvxhJxZuk",
+   "joined": "xuLifqLGiblpv9zBpuZczWhNj1gARaLV3UxvxhJxZuk"
+  },
+  {
+   "figure": 54,
+   "caption": "General JWS JSON Serialization",
+   "section": "4.7.3",
+   "example": "4.7",
+   "text": "{\n  \"payload\": \"SXTigJlzIGEgZGFuZ2Vyb3VzIGJ1c2luZXNzLCBGcm9kbywg\n      Z29pbmcgb3V0IHlvdXIgZG9vci4gWW91IHN0ZXAgb250byB0aGUgcm9h\n      ZCwgYW5kIGlmIHlvdSBkb24ndCBrZWVwIHlvdXIgZmVldCwgdGhlcmXi\n      gJlzIG5vIGtub3dpbmcgd2hlcmUgeW91IG1pZ2h0IGJlIHN3ZXB0IG9m\n      ZiB0by4\",\n  \"signatures\": [\n    {\n      \"header\": {\n        \"alg\": \"HS256\",\n        \"kid\": \"018c0ae5-4d9b-471b-bfd6-eef314bc7037\"\n      },\n      \"signature\": \"xuLifqLGiblpv9zBpuZczWhNj1gARaLV3UxvxhJxZu\n          k\"\n    }\n  ]\n}",
+   "joined": "{\"payload\":\"SXTigJlzIGEgZGFuZ2Vyb3VzIGJ1c2luZXNzLCBGcm9kbywgZ29pbmcgb3V0IHlvdXIgZG9vci4gWW91IHN0ZXAgb250byB0aGUgcm9hZCwgYW5kIGlmIHlvdSBkb24ndCBrZWVwIHlvdXIgZmVldCwgdGhlcmXigJlzIG5vIGtub3dpbmcgd2hlcmUgeW91IG1pZ2h0IGJlIHN3ZXB0IG9mZiB0by4\",\"signatures\":[{\"header\":{\"alg\":\"HS256\",\"kid\":\"018c0ae5-4d9b-471b-bfd6-eef314bc7037\"},\"signature\":\"xuLifqLGiblpv9zBpuZczWhNj1gARaLV3UxvxhJxZuk\"}]}",
+   "json": {
+    "payload": "SXTigJlzIGEgZGFuZ2Vyb3VzIGJ1c2luZXNzLCBGcm9kbywgZ29pbmcgb3V0IHlvdXIgZG9vci4gWW91IHN0ZXAgb250byB0aGUgcm9hZCwgYW5kIGlmIHlvdSBkb24ndCBrZWVwIHlvdXIgZmVldCwgdGhlcmXigJlzIG5vIGtub3dpbmcgd2hlcmUgeW91IG1pZ2h0IGJlIHN3ZXB0IG9mZiB0by4",
+    "signatures": [
+     {
+      "header": {
+       "alg": "HS256",
+       "kid": "018c0ae5-4d9b-471b-bfd6-eef314bc7037"
+      },
+      "signature": "xuLifqLGiblpv9zBpuZczWhNj1gARaLV3UxvxhJxZuk"
+     }
+    ]
+   }
+  },
+  {
+   "figure": 55,
+   "caption": "Flattened JWS JSON Serialization",
+   "section": "4.7.3",
+   "example": "4.7",
+   "text": "{\n  \"payload\": \"SXTigJlzIGEgZGFuZ2Vyb3VzIGJ1c2luZXNzLCBGcm9kbywg\n      Z29pbmcgb3V0IHlvdXIgZG9vci4gWW91IHN0ZXAgb250byB0aGUgcm9h\n      ZCwgYW5kIGlmIHlvdSBkb24ndCBrZWVwIHlvdXIgZmVldCwgdGhlcmXi\n      gJlzIG5vIGtub3dpbmcgd2hlcmUgeW91IG1pZ2h0IGJlIHN3ZXB0IG9m\n      ZiB0by4\",\n  \"header\": {\n    \"alg\": \"HS256\",\n    \"kid\": \"018c0ae5-4d9b-471b-bfd6-eef314bc7037\"\n  },\n  \"signature\": \"xuLifqLGiblpv9zBpuZczWhNj1gARaLV3UxvxhJxZuk\"\n}",
+   "joined": "{\"payload\":\"SXTigJlzIGEgZGFuZ2Vyb3VzIGJ1c2luZXNzLCBGcm9kbywgZ29pbmcgb3V0IHlvdXIgZG9vci4gWW91IHN0ZXAgb250byB0aGUgcm9hZCwgYW5kIGlmIHlvdSBkb24ndCBrZWVwIHlvdXIgZmVldCwgdGhlcmXigJlzIG5vIGtub3dpbmcgd2hlcmUgeW91IG1pZ2h0IGJlIHN3ZXB0IG9mZiB0by4\",\"header\":{\"alg\":\"HS256\",\"kid\":\"018c0ae5-4d9b-471b-bfd6-eef314bc7037\"},\"signature\":\"xuLifqLGiblpv9zBpuZczWhNj1gARaLV3UxvxhJxZuk\"}",
+   "json": {
+    "payload": "SXTigJlzIGEgZGFuZ2Vyb3VzIGJ1c2luZXNzLCBGcm9kbywgZ29pbmcgb3V0IHlvdXIgZG9vci4gWW91IHN0ZXAgb250byB0aGUgcm9hZCwgYW5kIGlmIHlvdSBkb24ndCBrZWVwIHlvdXIgZmVldCwgdGhlcmXigJlzIG5vIGtub3dpbmcgd2hlcmUgeW91IG1pZ2h0IGJlIHN3ZXB0IG9mZiB0by4",
+    "header": {
+     "alg": "HS256",
+     "kid": "018c0ae5-4d9b-471b-bfd6-eef314bc7037"
+    },
+    "signature": "xuLifqLGiblpv9zBpuZczWhNj1gARaLV3UxvxhJxZuk"
+   }
+  },
+  {
+   "figure": 56,
+   "caption": "Signature #1 JWS Protected Header JSON",
+   "section": "4.8.2",
+   "example": "4.8",
+   "text": "{\n  \"alg\": \"RS256\"\n}",
+   "joined": "{\"alg\":\"RS256\"}",
+   "json": {
+    "alg": "RS256"
+   }
+  },
+  {
+   "figure": 57,
+   "caption": "Signature #1 JWS Protected Header, base64url-encoded",
+   "section": "4.8.2",
+   "example": "4.8",
+   "text": "eyJhbGciOiJSUzI1NiJ9",
+   "joined": "eyJhbGciOiJSUzI1NiJ9"
+  },
+  {
+   "figure": 58,
+   "caption": "Signature #1 JWS Unprotected Header JSON",
+   "section": "4.8.2",
+   "example": "4.8",
+   "text": "{\n  \"kid\": \"bilbo.baggins@hobbiton.example\"\n}",
+   "joined": "{\"kid\":\"bilbo.baggins@hobbiton.example\"}",
+   "json": {
+    "kid": "bilbo.baggins@hobbiton.example"
+   }
+  },
+  {
+   "figure": 59,
+   "caption": "JWS Signing Input",
+   "section": "4.8.2",
+   "example": "4.8",
+   "text": "eyJhbGciOiJSUzI1NiJ9\n.\nSXTigJlzIGEgZGFuZ2Vyb3VzIGJ1c2luZXNzLCBGcm9kbywgZ29pbmcgb3V0IH\nlvdXIgZG9vci4gWW91IHN0ZXAgb250byB0aGUgcm9hZCwgYW5kIGlmIHlvdSBk\nb24ndCBrZWVwIHlvdXIgZmVldCwgdGhlcmXigJlzIG5vIGtub3dpbmcgd2hlcm\nUgeW91IG1pZ2h0IGJlIHN3ZXB0IG9mZiB0by4",
+   "joined": "eyJhbGciOiJSUzI1NiJ9.SXTigJlzIGEgZGFuZ2Vyb3VzIGJ1c2luZXNzLCBGcm9kbywgZ29pbmcgb3V0IHlvdXIgZG9vci4gWW91IHN0ZXAgb250byB0aGUgcm9hZCwgYW5kIGlmIHlvdSBkb24ndCBrZWVwIHlvdXIgZmVldCwgdGhlcmXigJlzIG5vIGtub3dpbmcgd2hlcmUgeW91IG1pZ2h0IGJlIHN3ZXB0IG9mZiB0by4"
+  },
+  {
+   "figure": 60,
+   "caption": "JWS Signature #1, base64url-encoded",
+   "section": "4.8.2",
+   "example": "4.8",
+   "text": "MIsjqtVlOpa71KE-Mss8_Nq2YH4FGhiocsqrgi5NvyG53uoimic1tcMdSg-qpt\nrzZc7CG6Svw2Y13TDIqHzTUrL_lR2ZFcryNFiHkSw129EghGpwkpxaTn_THJTC\nglNbADko1MZBCdwzJxwqZc-1RlpO2HibUYyXSwO97BSe0_evZKdjvvKSgsIqjy\ntKSeAMbhMBdMma622_BG5t4sdbuCHtFjp9iJmkio47AIwqkZV1aIZsv33uPUqB\nBCXbYoQJwt7mxPftHmNlGoOSMxR_3thmXTCm4US-xiNOyhbm8afKK64jU6_TPt\nQHiJeQJxz9G3Tx-083B745_AfYOnlC9w",
+   "joined": "MIsjqtVlOpa71KE-Mss8_Nq2YH4FGhiocsqrgi5NvyG53uoimic1tcMdSg-qptrzZc7CG6Svw2Y13TDIqHzTUrL_lR2ZFcryNFiHkSw129EghGpwkpxaTn_THJTCglNbADko1MZBCdwzJxwqZc-1RlpO2HibUYyXSwO97BSe0_evZKdjvvKSgsIqjytKSeAMbhMBdMma622_BG5t4sdbuCHtFjp9iJmkio47AIwqkZV1aIZsv33uPUqBBCXbYoQJwt7mxPftHmNlGoOSMxR_3thmXTCm4US-xiNOyhbm8afKK64jU6_TPtQHiJeQJxz9G3Tx-083B745_AfYOnlC9w"
+  },
+  {
+   "figure": 61,
+   "caption": "Signature #1 JSON",
+   "section": "4.8.2",
+   "example": "4.8",
+   "text": "{\n  \"protected\": \"eyJhbGciOiJSUzI1NiJ9\",\n  \"header\": {\n    \"kid\": \"bilbo.baggins@hobbiton.example\"\n  },\n  \"signature\": \"MIsjqtVlOpa71KE-Mss8_Nq2YH4FGhiocsqrgi5NvyG53u\n      oimic1tcMdSg-qptrzZc7CG6Svw2Y13TDIqHzTUrL_lR2ZFcryNFiHkS\n      w129EghGpwkpxaTn_THJTCglNbADko1MZBCdwzJxwqZc-1RlpO2HibUY\n      yXSwO97BSe0_evZKdjvvKSgsIqjytKSeAMbhMBdMma622_BG5t4sdbuC\n      HtFjp9iJmkio47AIwqkZV1aIZsv33uPUqBBCXbYoQJwt7mxPftHmNlGo\n      OSMxR_3thmXTCm4US-xiNOyhbm8afKK64jU6_TPtQHiJeQJxz9G3Tx-0\n      83B745_AfYOnlC9w\"\n}",
+   "joined": "{\"protected\":\"eyJhbGciOiJSUzI1NiJ9\",\"header\":{\"kid\":\"bilbo.baggins@hobbiton.example\"},\"signature\":\"MIsjqtVlOpa71KE-Mss8_Nq2YH4FGhiocsqrgi5NvyG53uoimic1tcMdSg-qptrzZc7CG6Svw2Y13TDIqHzTUrL_lR2ZFcryNFiHkSw129EghGpwkpxaTn_THJTCglNbADko1MZBCdwzJxwqZc-1RlpO2HibUYyXSwO97BSe0_evZKdjvvKSgsIqjytKSeAMbhMBdMma622_BG5t4sdbuCHtFjp9iJmkio47AIwqkZV1aIZsv33uPUqBBCXbYoQJwt7mxPftHmNlGoOSMxR_3thmXTCm4US-xiNOyhbm8afKK64jU6_TPtQHiJeQJxz9G3Tx-083B745_AfYOnlC9w\"}",
+   "json": {
+    "protected": "eyJhbGciOiJSUzI1NiJ9",
+    "header": {
+     "kid": "bilbo.baggins@hobbiton.example"
+    },
+    "signature": "MIsjqtVlOpa71KE-Mss8_Nq2YH4FGhiocsqrgi5NvyG53uoimic1tcMdSg-qptrzZc7CG6Svw2Y13TDIqHzTUrL_lR2ZFcryNFiHkSw129EghGpwkpxaTn_THJTCglNbADko1MZBCdwzJxwqZc-1RlpO2HibUYyXSwO97BSe0_evZKdjvvKSgsIqjytKSeAMbhMBdMma622_BG5t4sdbuCHtFjp9iJmkio47AIwqkZV1aIZsv33uPUqBBCXbYoQJwt7mxPftHmNlGoOSMxR_3thmXTCm4US-xiNOyhbm8afKK64jU6_TPtQHiJeQJxz9G3Tx-083B745_AfYOnlC9w"
+   }
+  },
+  {
+   "figure": 62,
+   "caption": "Signature #2 JWS Unprotected Header JSON",
+   "section": "4.8.3",
+   "example": "4.8",
+   "text": "{\n  \"alg\": \"ES512\",\n  \"kid\": \"bilbo.baggins@hobbiton.example\"\n}",
+   "joined": "{\"alg\":\"ES512\",\"kid\":\"bilbo.baggins@hobbiton.example\"}",
+   "json": {
+    "alg": "ES512",
+    "kid": "bilbo.baggins@hobbiton.example"
+   }
+  },
+  {
+   "figure": 63,
+   "caption": "JWS Signing Input",
+   "section": "4.8.3",
+   "example": "4.8",
+   "text": ".\nSXTigJlzIGEgZGFuZ2Vyb3VzIGJ1c2luZXNzLCBGcm9kbywgZ29pbmcgb3V0IH\nlvdXIgZG9vci4gWW91IHN0ZXAgb250byB0aGUgcm9hZCwgYW5kIGlmIHlvdSBk\nb24ndCBrZWVwIHlvdXIgZmVldCwgdGhlcmXigJlzIG5vIGtub3dpbmcgd2hlcm\nUgeW91IG1pZ2h0IGJlIHN3ZXB0IG9mZiB0by4",
+   "joined": ".SXTigJlzIGEgZGFuZ2Vyb3VzIGJ1c2luZXNzLCBGcm9kbywgZ29pbmcgb3V0IHlvdXIgZG9vci4gWW91IHN0ZXAgb250byB0aGUgcm9hZCwgYW5kIGlmIHlvdSBkb24ndCBrZWVwIHlvdXIgZmVldCwgdGhlcmXigJlzIG5vIGtub3dpbmcgd2hlcmUgeW91IG1pZ2h0IGJlIHN3ZXB0IG9mZiB0by4"
+  },
+  {
+   "figure": 64,
+   "caption": "JWS Signature #2, base64url-encoded",
+   "section": "4.8.3",
+   "example": "4.8",
+   "text": "ARcVLnaJJaUWG8fG-8t5BREVAuTY8n8YHjwDO1muhcdCoFZFFjfISu0Cdkn9Yb\ndlmi54ho0x924DUz8sK7ZXkhc7AFM8ObLfTvNCrqcI3Jkl2U5IX3utNhODH6v7\nxgy1Qahsn0fyb4zSAkje8bAWz4vIfj5pCMYxxm4fgV3q7ZYhm5eD",
+   "joined": "ARcVLnaJJaUWG8fG-8t5BREVAuTY8n8YHjwDO1muhcdCoFZFFjfISu0Cdkn9Ybdlmi54ho0x924DUz8sK7ZXkhc7AFM8ObLfTvNCrqcI3Jkl2U5IX3utNhODH6v7xgy1Qahsn0fyb4zSAkje8bAWz4vIfj5pCMYxxm4fgV3q7ZYhm5eD"
+  },
+  {
+   "figure": 65,
+   "caption": "Signature #2 JSON",
+   "section": "4.8.3",
+   "example": "4.8",
+   "text": "{\n  \"header\": {\n    \"alg\": \"ES512\",\n    \"kid\": \"bilbo.baggins@hobbiton.example\"\n  },\n  \"signature\": \"ARcVLnaJJaUWG8fG-8t5BREVAuTY8n8YHjwDO1muhcdCoF\n      ZFFjfISu0Cdkn9Ybdlmi54ho0x924DUz8sK7ZXkhc7AFM8ObLfTvNCrq\n      cI3Jkl2U5IX3utNhODH6v7xgy1Qahsn0fyb4zSAkje8bAWz4vIfj5pCM\n      Yxxm4fgV3q7ZYhm5eD\"\n}",
+   "joined": "{\"header\":{\"alg\":\"ES512\",\"kid\":\"bilbo.baggins@hobbiton.example\"},\"signature\":\"ARcVLnaJJaUWG8fG-8t5BREVAuTY8n8YHjwDO1muhcdCoFZFFjfISu0Cdkn9Ybdlmi54ho0x924DUz8sK7ZXkhc7AFM8ObLfTvNCrqcI3Jkl2U5IX3utNhODH6v7xgy1Qahsn0fyb4zSAkje8bAWz4vIfj5pCMYxxm4fgV3q7ZYhm5eD\"}",
+   "json": {
+    "header": {
+     "alg": "ES512",
+     "kid": "bilbo.baggins@hobbiton.example"
+    },
+    "signature": "ARcVLnaJJaUWG8fG-8t5BREVAuTY8n8YHjwDO1muhcdCoFZFFjfISu0Cdkn9Ybdlmi54ho0x924DUz8sK7ZXkhc7AFM8ObLfTvNCrqcI3Jkl2U5IX3utNhODH6v7xgy1Qahsn0fyb4zSAkje8bAWz4vIfj5pCMYxxm4fgV3q7ZYhm5eD"
+   }
+  },
+  {
+   "figure": 66,
+   "caption": "Signature #3 JWS Protected Header JSON",
+   "section": "4.8.4",
+   "example": "4.8",
+   "text": "{\n  \"alg\": \"HS256\",\n  \"kid\": \"018c0ae5-4d9b-471b-bfd6-eef314bc7037\"\n}",
+   "joined": "{\"alg\":\"HS256\",\"kid\":\"018c0ae5-4d9b-471b-bfd6-eef314bc7037\"}",
+   "json": {
+    "alg": "HS256",
+    "kid": "018c0ae5-4d9b-471b-bfd6-eef314bc7037"
+   }
+  },
+  {
+   "figure": 67,
+   "caption": "Signature #3 JWS Protected Header, base64url-encoded",
+   "section": "4.8.4",
+   "example": "4.8",
+   "text": "eyJhbGciOiJIUzI1NiIsImtpZCI6IjAxOGMwYWU1LTRkOWItNDcxYi1iZmQ2LW\nVlZjMxNGJjNzAzNyJ9",
+   "joined": "eyJhbGciOiJIUzI1NiIsImtpZCI6IjAxOGMwYWU1LTRkOWItNDcxYi1iZmQ2LWVlZjMxNGJjNzAzNyJ9"
+  },
+  {
+   "figure": 68,
+   "caption": "JWS Signing Input",
+   "section": "4.8.4",
+   "example": "4.8",
+   "text": "eyJhbGciOiJIUzI1NiIsImtpZCI6IjAxOGMwYWU1LTRkOWItNDcxYi1iZmQ2LW\nVlZjMxNGJjNzAzNyJ9\n.\nSXTigJlzIGEgZGFuZ2Vyb3VzIGJ1c2luZXNzLCBGcm9kbywgZ29pbmcgb3V0IH\nlvdXIgZG9vci4gWW91IHN0ZXAgb250byB0aGUgcm9hZCwgYW5kIGlmIHlvdSBk\nb24ndCBrZWVwIHlvdXIgZmVldCwgdGhlcmXigJlzIG5vIGtub3dpbmcgd2hlcm\nUgeW91IG1pZ2h0IGJlIHN3ZXB0IG9mZiB0by4",
+   "joined": "eyJhbGciOiJIUzI1NiIsImtpZCI6IjAxOGMwYWU1LTRkOWItNDcxYi1iZmQ2LWVlZjMxNGJjNzAzNyJ9.SXTigJlzIGEgZGFuZ2Vyb3VzIGJ1c2luZXNzLCBGcm9kbywgZ29pbmcgb3V0IHlvdXIgZG9vci4gWW91IHN0ZXAgb250byB0aGUgcm9hZCwgYW5kIGlmIHlvdSBkb24ndCBrZWVwIHlvdXIgZmVldCwgdGhlcmXigJlzIG5vIGtub3dpbmcgd2hlcmUgeW91IG1pZ2h0IGJlIHN3ZXB0IG9mZiB0by4"
+  },
+  {
+   "figure": 69,
+   "caption": "JWS Signature #3, base64url-encoded",
+   "section": "4.8.4",
+   "example": "4.8",
+   "text": "s0h6KThzkfBBBkLspW1h84VsJZFTsPPqMDA7g1Md7p0",
+   "joined": "s0h6KThzkfBBBkLspW1h84VsJZFTsPPqMDA7g1Md7p0"
+  },
+  {
+   "figure": 70,
+   "caption": "Signature #3 JSON",
+   "section": "4.8.4",
+   "example": "4.8",
+   "text": "{\n  \"protected\": \"eyJhbGciOiJIUzI1NiIsImtpZCI6IjAxOGMwYWU1LTRkOW\n      ItNDcxYi1iZmQ2LWVlZjMxNGJjNzAzNyJ9\",\n  \"signature\": \"s0h6KThzkfBBBkLspW1h84VsJZFTsPPqMDA7g1Md7p0\"\n}",
+   "joined": "{\"protected\":\"eyJhbGciOiJIUzI1NiIsImtpZCI6IjAxOGMwYWU1LTRkOWItNDcxYi1iZmQ2LWVlZjMxNGJjNzAzNyJ9\",\"signature\":\"s0h6KThzkfBBBkLspW1h84VsJZFTsPPqMDA7g1Md7p0\"}",
+   "json": {
+    "protected": "eyJhbGciOiJIUzI1NiIsImtpZCI6IjAxOGMwYWU1LTRkOWItNDcxYi1iZmQ2LWVlZjMxNGJjNzAzNyJ9",
+    "signature": "s0h6KThzkfBBBkLspW1h84VsJZFTsPPqMDA7g1Md7p0"
+   }
+  },
+  {
+   "figure": 71,
+   "caption": "General JWS JSON Serialization",
+   "section": "4.8.5",
+   "example": "4.8",
+   "text": "{\n  \"payload\": \"SXTigJlzIGEgZGFuZ2Vyb3VzIGJ1c2luZXNzLCBGcm9kbywg\n      Z29pbmcgb3V0IHlvdXIgZG9vci4gWW91IHN0ZXAgb250byB0aGUgcm9h\n      ZCwgYW5kIGlmIHlvdSBkb24ndCBrZWVwIHlvdXIgZmVldCwgdGhlcmXi\n      gJlzIG5vIGtub3dpbmcgd2hlcmUgeW91IG1pZ2h0IGJlIHN3ZXB0IG9m\n      ZiB0by4\",\n  \"signatures\": [\n    {\n      \"protected\": \"eyJhbGciOiJSUzI1NiJ9\",\n      \"header\": {\n        \"kid\": \"bilbo.baggins@hobbiton.example\"\n      },\n      \"signature\": \"MIsjqtVlOpa71KE-Mss8_Nq2YH4FGhiocsqrgi5Nvy\n          G53uoimic1tcMdSg-qptrzZc7CG6Svw2Y13TDIqHzTUrL_lR2ZFc\n          ryNFiHkSw129EghGpwkpxaTn_THJTCglNbADko1MZBCdwzJxwqZc\n          -1RlpO2HibUYyXSwO97BSe0_evZKdjvvKSgsIqjytKSeAMbhMBdM\n          ma622_BG5t4sdbuCHtFjp9iJmkio47AIwqkZV1aIZsv33uPUqBBC\n          XbYoQJwt7mxPftHmNlGoOSMxR_3thmXTCm4US-xiNOyhbm8afKK6\n          4jU6_TPtQHiJeQJxz9G3Tx-083B745_AfYOnlC9w\"\n    },\n    {\n      \"header\": {\n        \"alg\": \"ES512\",\n        \"kid\": \"bilbo.baggins@hobbiton.example\"\n      },\n      \"signature\": \"ARcVLnaJJaUWG8fG-8t5BREVAuTY8n8YHjwDO1muhc\n          dCoFZFFjfISu0Cdkn9Ybdlmi54ho0x924DUz8sK7ZXkhc7AFM8Ob\n          LfTvNCrqcI3Jkl2U5IX3utNhODH6v7xgy1Qahsn0fyb4zSAkje8b\n          AWz4vIfj5pCMYxxm4fgV3q7ZYhm5eD\"\n    },\n    {\n      \"protected\": \"eyJhbGciOiJIUzI1NiIsImtpZCI6IjAxOGMwYWU1LT\n          RkOWItNDcxYi1iZmQ2LWVlZjMxNGJjNzAzNyJ9\",\n      \"signature\": \"s0h6KThzkfBBBkLspW1h84VsJZFTsPPqMDA7g1Md7p\n          0\"\n    }\n  ]\n}",
+   "joined": "{\"payload\":\"SXTigJlzIGEgZGFuZ2Vyb3VzIGJ1c2luZXNzLCBGcm9kbywgZ29pbmcgb3V0IHlvdXIgZG9vci4gWW91IHN0ZXAgb250byB0aGUgcm9hZCwgYW5kIGlmIHlvdSBkb24ndCBrZWVwIHlvdXIgZmVldCwgdGhlcmXigJlzIG5vIGtub3dpbmcgd2hlcmUgeW91IG1pZ2h0IGJlIHN3ZXB0IG9mZiB0by4\",\"signatures\":[{\"protected\":\"eyJhbGciOiJSUzI1NiJ9\",\"header\":{\"kid\":\"bilbo.baggins@hobbiton.example\"},\"signature\":\"MIsjqtVlOpa71KE-Mss8_Nq2YH4FGhiocsqrgi5NvyG53uoimic1tcMdSg-qptrzZc7CG6Svw2Y13TDIqHzTUrL_lR2ZFcryNFiHkSw129EghGpwkpxaTn_THJTCglNbADko1MZBCdwzJxwqZc-1RlpO2HibUYyXSwO97BSe0_evZKdjvvKSgsIqjytKSeAMbhMBdMma622_BG5t4sdbuCHtFjp9iJmkio47AIwqkZV1aIZsv33uPUqBBCXbYoQJwt7mxPftHmNlGoOSMxR_3thmXTCm4US-xiNOyhbm8afKK64jU6_TPtQHiJeQJxz9G3Tx-083B745_AfYOnlC9w\"},{\"header\":{\"alg\":\"ES512\",\"kid\":\"bilbo.baggins@hobbiton.example\"},\"signature\":\"ARcVLnaJJaUWG8fG-8t5BREVAuTY8n8YHjwDO1muhcdCoFZFFjfISu0Cdkn9Ybdlmi54ho0x924DUz8sK7ZXkhc7AFM8ObLfTvNCrqcI3Jkl2U5IX3utNhODH6v7xgy1Qahsn0fyb4zSAkje8bAWz4vIfj5pCMYxxm4fgV3q7ZYhm5eD\"},{\"protected\":\"eyJhbGciOiJIUzI1NiIsImtpZCI6IjAxOGMwYWU1LTRkOWItNDcxYi1iZmQ2LWVlZjMxNGJjNzAzNyJ9\",\"signature\":\"s0h6KThzkfBBBkLspW1h84VsJZFTsPPqMDA7g1Md7p0\"}]}",
+   "json": {
+    "payload": "SXTigJlzIGEgZGFuZ2Vyb3VzIGJ1c2luZXNzLCBGcm9kbywgZ29pbmcgb3V0IHlvdXIgZG9vci4gWW91IHN0ZXAgb250byB0aGUgcm9hZCwgYW5kIGlmIHlvdSBkb24ndCBrZWVwIHlvdXIgZmVldCwgdGhlcmXigJlzIG5vIGtub3dpbmcgd2hlcmUgeW91IG1pZ2h0IGJlIHN3ZXB0IG9mZiB0by4",
+    "signatures": [
+     {
+      "protected": "eyJhbGciOiJSUzI1NiJ9",
+      "header": {
+       "kid": "bilbo.baggins@hobbiton.example"
+      },
+      "signature": "MIsjqtVlOpa71KE-Mss8_Nq2YH4FGhiocsqrgi5NvyG53uoimic1tcMdSg-qptrzZc7CG6Svw2Y13TDIqHzTUrL_lR2ZFcryNFiHkSw129EghGpwkpxaTn_THJTCglNbADko1MZBCdwzJxwqZc-1RlpO2HibUYyXSwO97BSe0_evZKdjvvKSgsIqjytKSeAMbhMBdMma622_BG5t4sdbuCHtFjp9iJmkio47AIwqkZV1aIZsv33uPUqBBCXbYoQJwt7mxPftHmNlGoOSMxR_3thmXTCm4US-xiNOyhbm8afKK64jU6_TPtQHiJeQJxz9G3Tx-083B745_AfYOnlC9w"
+     },
+     {
+      "header": {
+       "alg": "ES512",
+       "kid": "bilbo.baggins@hobbiton.example"
+      },
+      "signature": "ARcVLnaJJaUWG8fG-8t5BREVAuTY8n8YHjwDO1muhcdCoFZFFjfISu0Cdkn9Ybdlmi54ho0x924DUz8sK7ZXkhc7AFM8ObLfTvNCrqcI3Jkl2U5IX3utNhODH6v7xgy1Qahsn0fyb4zSAkje8bAWz4vIfj5pCMYxxm4fgV3q7ZYhm5eD"
+     },
+     {
+      "protected": "eyJhbGciOiJIUzI1NiIsImtpZCI6IjAxOGMwYWU1LTRkOWItNDcxYi1iZmQ2LWVlZjMxNGJjNzAzNyJ9",
+      "signature": "s0h6KThzkfBBBkLspW1h84VsJZFTsPPqMDA7g1Md7p0"
+     }
+    ]
+   }
+  }
+ ]
+}
