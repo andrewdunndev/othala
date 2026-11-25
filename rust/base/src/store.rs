@@ -130,7 +130,7 @@ pub trait Store<K: StoreKey, R> {
     /// Outcome unknown; a store's own constraint failure is a [`Conflict`], never this.
     type Error;
 
-    /// Loads `keys`; a row past its expiry at `now` is absent.
+    /// Loads `keys`; a row at or after its expiry at `now` is absent.
     fn load(&mut self, keys: &[K], now: UnixTime) -> Result<Rows<K, R>, Self::Error>;
 
     /// Applies `effect` in one transaction: every guard holds or nothing is applied.

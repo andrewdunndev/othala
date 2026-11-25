@@ -4,8 +4,9 @@
 # clippy.toml path and each deny-list lint is an error at the workspace lint level, with the canary's expects removed.
 set -euo pipefail
 
-# no source relaxes these, so rustc rejects any allow of them, macro-generated ones included
-forbidden="unsafe_code missing_docs unreachable_pub clippy::indexing_slicing clippy::as_conversions clippy::print_stdout clippy::dbg_macro"
+# no source relaxes these, so rustc rejects any allow of them, macro-generated ones included;
+# renamed_and_removed_lints is here so a renamed alias such as clippy::option_unwrap_used cannot slip past the deny list
+forbidden="unsafe_code missing_docs unreachable_pub renamed_and_removed_lints clippy::indexing_slicing clippy::as_conversions clippy::print_stdout clippy::dbg_macro"
 denied="$forbidden clippy::unwrap_used clippy::expect_used clippy::panic clippy::disallowed_methods clippy::disallowed_types"
 groups="warnings unfulfilled_lint_expectations clippy clippy::all clippy::style clippy::restriction"
 flag='^(-A|-W|--allow|--warn|--cap-lints|--force-warn)'
@@ -178,6 +179,8 @@ self_test() {
     plant testkit/src/race.rs '#![allow(clippy::unwrap_used)]'
     plant testkit/src/race.rs '#![allow(missing_docs)]'
     plant testkit/src/race.rs '#![warn(unreachable_pub)]'
+    plant testkit/src/race.rs '#![allow(renamed_and_removed_lints, clippy::option_unwrap_used)]'
+    plant base/src/time.rs '#[allow(renamed_and_removed_lints)]\n#[allow(clippy::result_expect_used)]\nfn probe() {}'
     plant base/tests/golden.rs '#[allow(clippy::panic)]\nfn probe() {}'
     plant base/src/time.rs '#[expect(clippy::indexing_slicing, reason = "probe")]\nfn probe() {}'
     plant testkit/src/fixture.rs 'fn m(e: &base::Effect<u8, u8>) -> base::Receipt {\n    e.host_applied()\n}'
@@ -206,6 +209,7 @@ self_test() {
         flagged "an extra member that allows the lint"
     mutate Cargo.toml 's/^panic = "deny"/panic = "allow"/m'
     mutate Cargo.toml 's/^missing_docs = "forbid"\n//m'
+    mutate Cargo.toml 's/^renamed_and_removed_lints = "forbid"\n//m'
     mutate Cargo.toml 's/^dbg_macro = "forbid"/dbg_macro = "deny"/m'
     mutate base/Cargo.toml 's/\[lints\].*//s'
     mutate base/src/secret.rs 's/self\.0\.as_slice\(\)\.ct_eq\(other\.0\.as_slice\(\)\)\.into\(\)/self.0 == other.0/'
@@ -239,6 +243,9 @@ canary() {
     missing=$(comm -23 <(echo "$want") <(echo "$got"))
     [ -z "$missing" ] || { echo "canary: not an error at the workspace level:" $missing; exit 1; }
     cat >> "$tmp/base/src/lib.rs" << 'PROBES'
+/// canary
+#[allow(clippy::option_unwrap_used)]
+pub fn canary_renamed() {}
 /// canary
 pub fn canary_unwrap(x: Option<u8>) -> u8 {
     x.unwrap()

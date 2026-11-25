@@ -16,6 +16,7 @@ pub struct Secret<const N: usize>([u8; N]);
 pub struct SecretBytes(Vec<u8>);
 
 /// A SHA-256 digest: safe to store, index and compare.
+// Derived equality is not constant-time because a digest is a hash the comparer holds, never a value an attacker can choose.
 #[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct Digest([u8; 32]);
 

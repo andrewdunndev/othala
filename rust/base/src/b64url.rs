@@ -30,7 +30,7 @@ pub fn b64url_decode(text: &str) -> Result<vec::Vec<u8>, Error> {
     Ok(core::mem::take(&mut *out))
 }
 
-/// Exactly `N` decoded bytes, or `Malformed` with the buffer wiped.
+/// Exactly `N` decoded bytes, or `Malformed`; the decode buffer is a stack array that is zeroed on failure, best effort.
 pub(crate) fn decode_exact<const N: usize>(text: &str) -> Result<[u8; N], Error> {
     let mut out = [0; N];
     let n = Base64UrlUnpadded::decode(text, &mut out).map(<[u8]>::len);

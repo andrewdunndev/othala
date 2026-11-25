@@ -13,7 +13,7 @@ publish = false
 [workspace.dependencies]
 base = { path = "base", version = "0.0.0" }
 testkit = { path = "testkit", version = "0.0.0" }
-sha2 = { version = "0.11", default-features = false }
+sha2 = { version = "0.11", default-features = false, features = ["zeroize"] }
 base64ct = { version = "1.8", default-features = false, features = ["alloc"] }
 subtle = { version = "2.6", default-features = false }
 zeroize = { version = "1.8", default-features = false, features = ["alloc"] }
@@ -31,6 +31,7 @@ proptest = { version = "1.12", default-features = false, features = ["std"] }
 unsafe_code = "forbid"
 missing_docs = "forbid"
 unreachable_pub = "forbid"
+renamed_and_removed_lints = "forbid"
 
 [workspace.lints.clippy]
 unwrap_used = "deny"

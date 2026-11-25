@@ -12,8 +12,15 @@ impl<E: Entropy + ?Sized> Entropy for &mut E {
 
 /// Adapts any `rand_core` cryptographic generator into an [`Entropy`].
 #[cfg(feature = "rand_core")]
-#[derive(Debug)]
 pub struct RandCore<R>(R);
+
+// A generator's own Debug may print its state, so this prints none of it.
+#[cfg(feature = "rand_core")]
+impl<R> core::fmt::Debug for RandCore<R> {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        f.write_str("RandCore(redacted)")
+    }
+}
 
 #[cfg(feature = "rand_core")]
 impl<R: rand_core::CryptoRng> RandCore<R> {
@@ -49,5 +56,16 @@ mod tests {
         let mut borrowed: &mut dyn Entropy = &mut source;
         Entropy::fill(&mut borrowed, &mut out);
         assert_eq!(out, [1, 1]);
+    }
+
+    #[cfg(feature = "rand_core")]
+    #[test]
+    fn rand_core_debug_prints_no_generator_state() {
+        #[derive(Debug)]
+        struct Loud;
+        assert_eq!(
+            alloc::format!("{:?}", super::RandCore(Loud)),
+            "RandCore(redacted)"
+        );
     }
 }
