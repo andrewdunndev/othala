@@ -3,7 +3,7 @@ set shell := ["bash", "-euo", "pipefail", "-c"]
 default:
     @just --list
 
-all: lock fmt lint confine twins test wasm thumb msrv deny api mutants rows
+all: lock fmt lint confine twins test doc wasm thumb msrv deny api mutants rows
 
 # a manifest change without its lock change fails here, before anything builds
 lock:
@@ -24,6 +24,9 @@ confine:
 
 test:
     cargo test --workspace --all-features
+
+doc:
+    RUSTDOCFLAGS="-D warnings" cargo doc -p base -p testkit --all-features --no-deps
 
 ledger:
     cargo test -p base --all-features --test ledger
@@ -60,7 +63,7 @@ msrv:
     cargo +1.89.0 check --workspace --all-features --all-targets --locked
 
 deny:
-    cargo deny check bans licenses sources
+    cargo deny check advisories bans licenses sources
 
 # public-API snapshot over rustdoc JSON (cargo-public-api needs openssl, absent on the build host)
 api nightly="nightly-2026-11-24":
@@ -94,4 +97,4 @@ rows:
             echo "mutants $c: not run (just mutants)"
         fi
     done
-    echo "public items: $(grep -vc '^impl ' base/public-api.txt) ($(grep -v '^impl ' base/public-api.txt | cut -d' ' -f1 | sort | uniq -c | awk '{printf "%s%s %s", sep, $1, $2; sep=", "}'))"
+    echo "public items: $(grep -vcE '^(impl|attr) ' base/public-api.txt) ($(grep -vE '^(impl|attr) ' base/public-api.txt | cut -d' ' -f1 | sort | uniq -c | awk '{printf "%s%s %s", sep, $1, $2; sep=", "}'))"
