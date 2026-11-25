@@ -160,11 +160,21 @@ impl<K: StoreKey, R> Effect<K, R> {
 
     /// The one-op effect [`Builder::create`] builds, infallibly.
     pub fn created(e: &mut impl Entropy, key: K, record: R, expiry: Option<UnixTime>) -> Self {
-        Self::single(e, key, Op::new(Check::Absent, Some(Write::Put(record, expiry))))
+        Self::single(
+            e,
+            key,
+            Op::new(Check::Absent, Some(Write::Put(record, expiry))),
+        )
     }
 
     /// The one-op effect [`Builder::update`] builds, infallibly.
-    pub fn updated<S>(e: &mut impl Entropy, key: K, seen: &Row<S>, record: R, expiry: Option<UnixTime>) -> Self {
+    pub fn updated<S>(
+        e: &mut impl Entropy,
+        key: K,
+        seen: &Row<S>,
+        record: R,
+        expiry: Option<UnixTime>,
+    ) -> Self {
         let check = Check::Unchanged(seen.version());
         Self::single(e, key, Op::new(check, Some(Write::Put(record, expiry))))
     }
@@ -176,7 +186,11 @@ impl<K: StoreKey, R> Effect<K, R> {
 
     /// The one-op effect [`Builder::delete`] builds, infallibly.
     pub fn deleted<S>(e: &mut impl Entropy, key: K, seen: &Row<S>) -> Self {
-        Self::single(e, key, Op::new(Check::Unchanged(seen.version()), Some(Write::Delete)))
+        Self::single(
+            e,
+            key,
+            Op::new(Check::Unchanged(seen.version()), Some(Write::Delete)),
+        )
     }
 
     /// The effect's identity; a store records it to make re-applies idempotent.
@@ -553,13 +567,28 @@ mod tests {
     fn single_ops_are_the_builder_ops() {
         let (seen, e) = (row(4), &mut Fill(0));
         let pairs = [
-            (Effect::created(e, K::G(1), 1, Some(UnixTime::new(3))), builder(&mut Fill(0)).create(K::G(1), 1, Some(UnixTime::new(3)))),
-            (Effect::updated(e, K::G(2), &seen, 2, None), builder(&mut Fill(1)).update(K::G(2), &seen, 2, None)),
-            (Effect::consumed(e, K::G(3)), builder(&mut Fill(2)).consume(K::G(3))),
-            (Effect::deleted(e, K::G(4), &seen), builder(&mut Fill(3)).delete(K::G(4), &seen)),
+            (
+                Effect::created(e, K::G(1), 1, Some(UnixTime::new(3))),
+                builder(&mut Fill(0)).create(K::G(1), 1, Some(UnixTime::new(3))),
+            ),
+            (
+                Effect::updated(e, K::G(2), &seen, 2, None),
+                builder(&mut Fill(1)).update(K::G(2), &seen, 2, None),
+            ),
+            (
+                Effect::consumed(e, K::G(3)),
+                builder(&mut Fill(2)).consume(K::G(3)),
+            ),
+            (
+                Effect::deleted(e, K::G(4), &seen),
+                builder(&mut Fill(3)).delete(K::G(4), &seen),
+            ),
         ];
         for (single, built) in pairs {
-            assert_eq!(format!("{single:?}"), format!("{:?}", built.build().unwrap()));
+            assert_eq!(
+                format!("{single:?}"),
+                format!("{:?}", built.build().unwrap())
+            );
         }
     }
 
