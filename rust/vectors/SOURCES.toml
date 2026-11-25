@@ -37,3 +37,99 @@ files = [
   { path = "wycheproof/rsa_signature_4096_sha512_test.json", sha256 = "9d6e67b1eb0d7040db411835238efd20e9302399a258bdff82de3f38e0f2855a", cases = 259 },
 ]
 
+[source."rfc4226"]
+url = "https://www.rfc-editor.org/rfc/rfc4226.txt"
+revision = "RFC 4226 appendix D"
+retrieved = "2026-11-24"
+licence = "IETF Trust (RFC text; data values only)"
+feeds = ["factor"]
+notes = "Carried from origin/spike/exam-vectors (aed76f8) as extracted there to the exam JSON shape; appendix D HOTP values."
+cases = 10
+files = [
+  { path = "rfc4226/hotp.json", sha256 = "538a49f23e45e0ae6ccfff28997c12b1258f8d5e6547376f8bb5e93cb9a85880", cases = 10 },
+]
+
+[source."rfc6238"]
+url = "https://www.rfc-editor.org/rfc/rfc6238.txt"
+revision = "RFC 6238 appendix B"
+retrieved = "2026-11-24"
+licence = "IETF Trust (RFC text; data values only)"
+feeds = ["factor"]
+notes = "Carried from origin/spike/exam-vectors (aed76f8) as extracted there to the exam JSON shape; appendix B TOTP values; includes derived window/last_step cases."
+cases = 45
+files = [
+  { path = "rfc6238/totp.json", sha256 = "9517434c65cf3215fd0e1c66ac45a9a01da9dcc67809f56b5e1c2db9d307628c", cases = 45 },
+]
+
+[source."rfc7515"]
+url = "https://www.rfc-editor.org/rfc/rfc7515.txt"
+revision = "RFC 7515 appendix A.1-A.3"
+retrieved = "2026-11-24"
+licence = "IETF Trust (RFC text; data values only)"
+feeds = ["jose"]
+notes = "Carried from origin/spike/exam-vectors (aed76f8) as extracted there to the exam JSON shape; A.1 HS256, A.2 RS256, A.3 ES256 plus derived tamper/truncation/alg-confusion refusal cases."
+cases = 19
+files = [
+  { path = "rfc7515/jws.json", sha256 = "fd5677344718a2358ce49032737b2e6ca8456d2e249e21b03c587362ee34f2e9", cases = 19 },
+]
+
+[source."rfc7636"]
+url = "https://www.rfc-editor.org/rfc/rfc7636.txt"
+revision = "RFC 7636 appendix B, section 4.1"
+retrieved = "2026-11-24"
+licence = "IETF Trust (RFC text; data values only)"
+feeds = ["oidc-provider", "base"]
+notes = "Carried from origin/spike/exam-vectors (aed76f8) as extracted there to the exam JSON shape; appendix B plus derived refusal cases."
+cases = 7
+files = [
+  { path = "rfc7636/pkce.json", sha256 = "ee320613ce27d87214bfae384eaba5308e846d6ebb4c3dfe9e1a75248d805b05", cases = 7 },
+]
+
+[source."rfc7638"]
+url = "https://www.rfc-editor.org/rfc/rfc7638.txt"
+revision = "RFC 7638 section 3.1"
+retrieved = "2026-11-24"
+licence = "IETF Trust (RFC text; data values only)"
+feeds = ["jose"]
+notes = "Carried from origin/spike/exam-vectors (aed76f8) as extracted there to the exam JSON shape; section 3.1 RSA thumbprint plus two derived cases."
+cases = 3
+files = [
+  { path = "rfc7638/thumbprint.json", sha256 = "2392070412212b1788aec0037069dbbd815b30286e5bd30f6243ee06bdb3109f", cases = 3 },
+]
+
+[source."rfc9106"]
+url = "https://www.rfc-editor.org/rfc/rfc9106.txt"
+revision = "RFC 9106 section 5.3"
+retrieved = "2026-11-24"
+licence = "IETF Trust (RFC text; data values only)"
+feeds = ["factor"]
+notes = "Carried from origin/spike/exam-vectors (aed76f8) as extracted there to the exam JSON shape; section 5.3 Argon2id only; sections 5.1 (Argon2d) and 5.2 (Argon2i) not extracted."
+cases = 1
+files = [
+  { path = "rfc9106/argon2id.json", sha256 = "cd1db3ed9942cd04bce7ca2256728e37b5a2ddca29964ecdeed264a53e02ef69", cases = 1 },
+]
+
+[source."rfc8725-derived"]
+url = "https://www.rfc-editor.org/rfc/rfc8725.txt"
+revision = "RFC 8725 section 3.1 with RFC 7515 section 4.1.1"
+retrieved = "2026-11-24"
+licence = "MIT OR Apache-2.0 (our own derived data)"
+feeds = ["jose"]
+notes = "Derived, not published by the RFC: valid signatures under a header alg that does not match the key or the expectation, made once with Node crypto from throwaway keys. The generator is not committed because fresh keys make it non-reproducible; the file is frozen output. Carried from origin/spike/exam-vectors (aed76f8) as extracted there to the exam JSON shape; "
+cases = 25
+files = [
+  { path = "rfc8725-derived/jws-alg.json", sha256 = "bdb0203a76b79f1f7e04ca9f62b5ccfa1694f7f881686056a44219e091acc9d6", cases = 25 },
+]
+
+[source."w3c-webauthn-3-none"]
+url = "https://www.w3.org/TR/webauthn-3/"
+revision = "W3C WebAuthn L3 section 16.2"
+retrieved = "2026-11-24"
+licence = "W3C Software and Document License"
+feeds = ["webauthn-rp"]
+notes = "Carried from origin/spike/exam-vectors (aed76f8) as extracted there to the exam JSON shape; ES256 none-attestation assertion plus derived refusal cases."
+cases = 8
+files = [
+  { path = "w3c-webauthn-3/none/webauthn.json", sha256 = "77aaae4543793ec3871cd019a8e4deecc6ef190d2b449b6c47c4fc75adbe1775", cases = 8 },
+]
+
