@@ -47,19 +47,19 @@ Checks: `ui:x` is `tests/ui/fail/x.rs` with its committed `.stderr` (rustc code 
 - R25 `Rows::get` reports a loaded row, an absent row, a corrupt row, and `None` for a key never loaded: unit:store::rows_slots.
 
 ## Obligation (every host's; `testkit::store_conformance` on the shell's exact apply path)
-- O1 One transaction per apply: every guard holds or nothing is applied, and the `Conflict` names each failed guard: conf:atomic.
+- O1 One transaction per apply: every guard holds or nothing is applied, and the `Conflict` names each failed guard: conf:atomic; a store that skips writes or reports a conflict as `Error` fails conformance: it:conformance::catches_a_store_that_skips_writes, it:conformance::catches_a_store_that_reports_conflict_as_error.
 - O2 A guard that fails after a write in key order leaves that write unapplied: conf:fails_after_write.
-- O3 Two effects conflict only when one writes a row the other guards or writes; disjoint effects and effects that only `expect` one row both apply: conf:expect_shared, conf:disjoint, race:pairs.
-- O4 Concurrent applies equal some serial order, and a loser re-decided against the winner's state matches it: race:pairs, race:triples.
+- O3 An effect fails only on a key an earlier winner wrote, so disjoint effects and effects that only `expect` one row both apply; `Consume` checks existence only, so a decision that depends on a row's content uses `delete` against the seen row: conf:expect_shared, conf:disjoint, race:pairs, race:consume_checks_existence_only.
+- O4 Concurrent applies equal some serial order once each loser is re-decided against the winners' state: race:pairs, race:triples.
 - O5 Re-applying an applied effect returns `Ok` with a receipt that settles it, and writes nothing twice: conf:reapply, race:same_twice.
 - O6 The applied-id record shares the effect's transaction and is checked before any guard: conf:reapply (a re-applied `create` would otherwise be `Present`).
 - O7 A store's own constraint failure is `Conflict`, never `Error`: conf:duplicate_create.
 - O8 A row past its expiry is absent to `load` and to every guard, purged or not: conf:expired.
 - O9 A version never repeats for a key, across delete and recreate: conf:recreate.
 - O10 An effect at `MAX_EFFECT_SIZE` applies: conf:at_bound.
-- O11 Every key a decision loaded is guarded in its effect: race:read_set (the reference store records loads).
-- O12 A `Receipt` is minted only after its effect committed: `host_applied` is in clippy `disallowed_methods` outside store modules (`just lint`), and `just confine` fails on any `allow` or `expect` of that lint outside `testkit/src/store.rs` and `testkit/src/fixture.rs`.
-- O13 `expose` is read only in modules a `CONTRACT.md` names; for `base`, none outside `src/secret.rs`: `just lint`, `just confine`.
+- O11 Every key a decision loaded is guarded in its effect: race:read_set (the reference store records loads; the case is a probe that must fail).
+- O12 A `Receipt` is minted only after its effect committed: `host_applied` is in clippy `disallowed_methods` for every crate but `base` (`just lint`; the reference store's `expect` of the lint must be fulfilled), and `just confine` fails on any `allow` or `expect` of that lint outside `testkit/src/store.rs`, `testkit/src/fixture.rs` and the probe stores of `tests/conformance.rs`.
+- O13 `expose` is read only in modules a `CONTRACT.md` names; `base` names none, and its own tests are outside the lint: `just lint`, `just confine`.
 - O14 After `Conflict` a decider re-decides at most `REDECIDE` (3) times; after `Error` the host re-applies the same effect with the decision's `now`, within `Retry`: consumers' contracts; race:pairs re-decides within `REDECIDE`.
 
 ## Build

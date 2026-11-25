@@ -22,6 +22,8 @@ serde = { workspace = true, optional = true }
 [dev-dependencies]
 serde = { workspace = true, features = ["derive"] }
 trybuild.workspace = true
+testkit.workspace = true
+proptest.workspace = true
 
 [lints]
 workspace = true

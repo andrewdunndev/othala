@@ -1,6 +1,6 @@
 set shell := ["bash", "-euo", "pipefail", "-c"]
 
-store_modules := "testkit/src/store.rs testkit/src/fixture.rs"
+store_modules := "testkit/src/store.rs testkit/src/fixture.rs base/tests/conformance.rs"
 
 default:
     @just --list
