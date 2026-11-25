@@ -1,3 +1,4 @@
+constant MAX_B64URL_TEXT: usize = 65_536
 constant MAX_EFFECT_SIZE: usize = 128
 constant REDECIDE: u8 = 3
 enum ErrorKind
@@ -10,7 +11,7 @@ field Guard::Consume::0: K
 field Guard::Unchanged::0: K
 field Guard::Unchanged::1: crate::Version
 field Slot::Row::0: &'a Row<R>
-function b64url_decode fn(text: &str) -> Result<alloc::vec::Vec<u8>, crate::Error>
+function b64url_decode fn(text: &str) -> Result<vec::Vec<u8>, crate::Error>
 function b64url_encode fn(bytes: &[u8]) -> alloc::string::String
 impl Clone for Conflict
 impl Clone for Digest

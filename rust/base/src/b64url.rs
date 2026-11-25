@@ -1,5 +1,5 @@
 use alloc::string::String;
-use alloc::vec::Vec;
+use alloc::vec;
 
 use base64ct::{Base64UrlUnpadded, Encoding};
 use zeroize::Zeroize;
@@ -11,8 +11,15 @@ pub fn b64url_encode(bytes: &[u8]) -> String {
     Base64UrlUnpadded::encode_string(bytes)
 }
 
-/// Strict unpadded base64url: padding, a symbol outside the alphabet, or a non-canonical tail is `Malformed`.
-pub fn b64url_decode(text: &str) -> Result<Vec<u8>, Error> {
+/// The longest text [`b64url_decode`] reads: 64 KiB of symbols, 48 KiB decoded.
+pub const MAX_B64URL_TEXT: usize = 65_536;
+
+/// Strict unpadded base64url: padding, a symbol outside the alphabet, or a non-canonical tail is `Malformed`;
+/// text past [`MAX_B64URL_TEXT`] is `TooLarge` before anything is allocated.
+pub fn b64url_decode(text: &str) -> Result<vec::Vec<u8>, Error> {
+    if text.len() > MAX_B64URL_TEXT {
+        return Err(Error::new(ErrorKind::TooLarge));
+    }
     Base64UrlUnpadded::decode_vec(text).map_err(|_| Error::new(ErrorKind::Malformed))
 }
 
@@ -30,7 +37,7 @@ pub(crate) fn decode_exact<const N: usize>(text: &str) -> Result<[u8; N], Error>
 
 #[cfg(test)]
 mod tests {
-    use super::{b64url_decode, b64url_encode, decode_exact};
+    use super::{MAX_B64URL_TEXT, b64url_decode, b64url_encode, decode_exact};
     use crate::ErrorKind;
     use alloc::format;
     use alloc::string::String;
@@ -99,6 +106,17 @@ mod tests {
                 Err(ErrorKind::Malformed),
                 "{wrong}"
             );
+        }
+    }
+
+    #[test]
+    fn text_past_the_cap_is_too_large() {
+        assert_eq!(MAX_B64URL_TEXT, 65_536);
+        let at_cap = "A".repeat(65_536);
+        assert_eq!(b64url_decode(&at_cap).map(|b| b.len()), Ok(49_152));
+        for over in [65_537, 65_540] {
+            let kind = b64url_decode(&"A".repeat(over)).map_err(|e| e.kind());
+            assert_eq!(kind, Err(ErrorKind::TooLarge), "{over} symbols");
         }
     }
 }

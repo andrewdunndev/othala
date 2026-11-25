@@ -42,9 +42,10 @@ twins:
         [ "$lines" = 2 ] && [ "$toks" = 2 ] || { echo "$f: $lines lines and $toks tokens differ from its twin"; exit 1; }
     done
 
-# skips and test args live in .cargo/mutants.toml
+# skips and test args live in .cargo/mutants.toml; testkit's mutants are caught by the workspace's tests
 mutants:
-    cargo mutants --package base --test-workspace=false --no-shuffle
+    cargo mutants --package base --test-workspace=false --no-shuffle --output target/mutants/base
+    cargo mutants --package testkit --test-workspace=true --no-shuffle --output target/mutants/testkit
 
 wasm:
     cargo build -p base --target wasm32-unknown-unknown --no-default-features
@@ -69,15 +70,27 @@ api nightly="nightly-2026-11-24":
 fuzz seconds="600":
     cd base/fuzz && cargo +nightly fuzz run b64url_decode corpus/b64url_decode -- -max_total_time={{seconds}}
 
-# rule 5.1 numbers for base (production: src/ above each file's test module)
+# the scoreboard for base (production: src/ above each file's test module); mutant counts are from the last `just mutants`
 rows:
     #!/usr/bin/env bash
     set -euo pipefail
     split() { awk -v want="$1" 'FNR == 1 { t = 0 } /^#\[cfg\(test\)\]/ { t = 1 } t == want { n++ } END { print n }' base/src/*.rs; }
+    prod=$(split 0)
     unit=$(split 1)
     it=$(cat base/tests/*.rs base/fuzz/property.rs base/fuzz/fuzz_targets/*.rs | wc -l | tr -d ' ')
-    echo "production lines: $(split 0)"
-    echo "test lines: $((unit + it)) (unit $unit, tests and fuzz $it; + $(cat base/tests/ui/*/*.rs | wc -l | tr -d ' ') ledger case lines; testkit $(cat testkit/src/*.rs | wc -l | tr -d ' '))"
-    echo "contract lines: $(grep -cE '^- [TROBN][0-9]+ ' base/CONTRACT.md)"
+    contract=$(grep -cE '^- [TROBN][0-9]+ ' base/CONTRACT.md)
+    per() { awk -v a="$1" -v b="$contract" 'BEGIN { printf "%.1f", a / b }'; }
+    echo "production lines: $prod ($(per "$prod") per contract line)"
+    echo "test lines: $((unit + it)) ($(per $((unit + it))) per contract line; unit $unit, tests and fuzz $it; + $(cat base/tests/ui/*/*.rs | wc -l | tr -d ' ') ledger case lines; testkit $(cat testkit/src/*.rs | wc -l | tr -d ' '))"
+    echo "contract lines: $contract"
     echo "vector cases: $(grep -oE 'rfc4648/test-vectors.json.*cases = [0-9]+' vectors/SOURCES.toml | grep -oE '[0-9]+$') (RFC 4648 section 10; BASE64 ones checked)"
+    for c in base testkit; do
+        o=target/mutants/$c/mutants.out/outcomes.json
+        if [ -f "$o" ]; then
+            jq -r --arg c "$c" --arg skipped "$(grep -cE '^  "' .cargo/mutants.toml)" \
+                '"mutants \($c): \(.caught) caught, \(.missed) missed, \(.timeout) timed out, \(.unviable) unviable; \($skipped) skipped workspace-wide"' "$o"
+        else
+            echo "mutants $c: not run (just mutants)"
+        fi
+    done
     echo "public items: $(grep -vc '^impl ' base/public-api.txt) ($(grep -v '^impl ' base/public-api.txt | cut -d' ' -f1 | sort | uniq -c | awk '{printf "%s%s %s", sep, $1, $2; sep=", "}'))"

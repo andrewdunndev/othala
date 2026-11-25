@@ -22,13 +22,13 @@ Checks: `ui:x` is `tests/ui/fail/x.rs` with its committed `.stderr` (rustc code 
 - T16 `SecretBytes` and `Secret<N>` hold their bytes in private fields, so only `expose` reads them: ui:secret_bytes_fields (E0423), api (no public field).
 
 ## Runtime
-- R1 `b64url_encode` and `b64url_decode` (a wrapper over `base64ct`'s unpadded base64url, the D6 adoption) agree with RFC 4648 section 10 under the section 5 alphabet: it:vectors::rfc4648_section10 (total 28, 7 checked), mutants:b64url.
+- R1 `b64url_encode` and `b64url_decode` (a wrapper over `base64ct`'s unpadded base64url) agree with RFC 4648 section 10 under the section 5 alphabet: it:vectors::rfc4648_section10 (total 28, 7 checked), mutants:b64url.
 - R2 Symbols 62 and 63 are `-` and `_`: unit:b64url::alphabet_edges, mutants:b64url.
 - R3 Padding is `Malformed`: unit:b64url::padding_is_malformed, mutants:b64url.
 - R4 A symbol outside the alphabet (`+`, `/`, space, non-ASCII) is `Malformed`: unit:b64url::foreign_symbol_is_malformed, mutants:b64url.
 - R5 A length of 1 mod 4 is `Malformed`: unit:b64url::lone_symbol_is_malformed, mutants:b64url.
 - R6 A non-canonical tail (nonzero trailing bits) is `Malformed`, so decoding is injective: of all 64 final symbols a 2-symbol tail accepts exactly `A Q g w` and a 3-symbol tail exactly the 16 with two zero low bits: unit:b64url::noncanonical_tail_is_malformed, mutants:b64url.
-- R7 Whatever decodes re-encodes to the same text: it:corpus::b64url_decode_corpus (21 committed seeds of `fuzz/fuzz_targets/b64url_decode.rs`, non-canonical tails `Zo` and `ZmC` among them), `just fuzz` in scheduled CI.
+- R7 Whatever decodes re-encodes to the same text: it:corpus::b64url_decode_corpus (21 committed seeds of `fuzz/fuzz_targets/b64url_decode.rs`, non-canonical tails `Zo` and `ZmC` among them), `just fuzz` (10 minutes on nightly; its scheduled CI job is not wired yet).
 - R8 `Debug` of `Secret<N>` and `SecretBytes` prints no secret byte, and of `Pending` only its effect id: it:golden::debug_redacts against `tests/golden/debug.txt`, unit:effect::pending_debug_shows_only_the_effect_id.
 - R9 `generate` draws exactly `N` bytes from `Entropy`: unit:secret::generate_draws_n_bytes, mutants:secret.
 - R10 `ct_eq` is true only when every byte and the length match: unit:secret::ct_eq_compares_every_byte, mutants:secret; each `ct_eq` body is `subtle`'s `ConstantTimeEq` over both byte slices: `just confine`.
@@ -52,6 +52,7 @@ Checks: `ui:x` is `tests/ui/fail/x.rs` with its committed `.stderr` (rustc code 
 - R28 `Digest` has a text form (43-symbol unpadded base64url) that round-trips, and under `serde` serializes as that text and deserializes only from it: unit:secret::digest_text_round_trips, unit:secret::digest_serde_is_text, mutants:secret.
 - R29 The vector runner counts only checked cases against its floor, and a zero floor, a total that disagrees with `SOURCES.toml` or an unlisted file fails: testkit unit:vectors (six cases).
 - R30 The builder takes and returns itself by value (`#[must_use]`), so a decision is one expression; `update`, `delete` and `expect` take the seen row as any `Row<S>` and read only its version, so a consumer guards a typed row in an effect over its store record: unit:effect::seen_rows_of_any_type, api.
+- R31 `b64url_decode` reads at most `MAX_B64URL_TEXT` (65,536 symbols, asserted as a literal); longer text is `TooLarge`, before anything is allocated and before any `Malformed`: unit:b64url::text_past_the_cap_is_too_large, mutants:b64url.
 
 ## Obligation (every host's; `testkit::store_conformance` on the shell's exact apply path)
 - O1 One transaction per apply: every guard holds or nothing is applied (puts, deletes and consumes alike), the `Conflict` names each failed guard, and every apply that commits answers its own effect's receipt: conf:atomic (every case checks each receipt it is given). Each case is proven sensitive by it:conformance::each_lie_is_caught_by_its_case, seventeen stores with one lie each that must fail in the case named here, the same store without a lie passing (it:conformance::the_honest_liar_passes); atomic catches skipped writes, a conflict reported as `Error`, puts or deletes applied despite a conflict, and another effect's receipt.
@@ -73,7 +74,7 @@ Checks: `ui:x` is `tests/ui/fail/x.rs` with its committed `.stderr` (rustc code 
 ## Build
 - B1 `no_std` + `alloc` for wasm32-unknown-unknown and thumbv7em-none-eabi, with `std`, `rand_core` and `serde` features off and on: `just wasm`, `just thumb`.
 - B2 `RandCore` makes any `rand_core::CryptoRng` an `Entropy`: testkit `seeded` is built on it, it:vectors and every seeded test.
-- B3 MSRV 1.89 (the D6 ruling): `just msrv` (`--locked`).
+- B3 MSRV 1.89, workspace-wide, against the committed lock: `just msrv` (`--locked`), and `just lock` fails first when a manifest changed without its lock.
 
 ## Non-claim
 - N1 Zeroize on drop is best effort (moves and copies are not tracked); no check can prove it.

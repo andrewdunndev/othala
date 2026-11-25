@@ -14,7 +14,7 @@ mod secret;
 mod store;
 mod time;
 
-pub use b64url::{b64url_decode, b64url_encode};
+pub use b64url::{MAX_B64URL_TEXT, b64url_decode, b64url_encode};
 pub use effect::{
     Builder, Conflict, Effect, EffectId, Failure, Guard, MAX_EFFECT_SIZE, Pending, Receipt,
 };
