@@ -12,10 +12,12 @@ lock:
 fmt:
     cargo fmt --all --check
 
+# the canary step removes every canary expect and requires each clippy.toml path to error at the configured level
 lint:
     cargo clippy --workspace --all-targets --all-features -- -D warnings
+    ./confine.sh --canary
 
-# F9: the receipt mint and the secret read stay in the modules CONTRACT.md names; the self-test plants evasions
+# the receipt mint, the secret read and every lint level stay where CONTRACT.md says; the self-test plants evasions
 confine:
     ./confine.sh .
     ./confine.sh --self-test
