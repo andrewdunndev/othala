@@ -6,7 +6,7 @@ pub trait Entropy {
 
 impl<E: Entropy + ?Sized> Entropy for &mut E {
     fn fill(&mut self, out: &mut [u8]) {
-        todo!()
+        (**self).fill(out);
     }
 }
 
@@ -18,14 +18,14 @@ pub struct RandCore<R>(R);
 #[cfg(feature = "rand_core")]
 impl<R: rand_core::CryptoRng> RandCore<R> {
     /// Wraps a cryptographic generator.
-    pub fn new(rng: R) -> Self {
-        todo!()
+    pub const fn new(rng: R) -> Self {
+        Self(rng)
     }
 }
 
 #[cfg(feature = "rand_core")]
 impl<R: rand_core::CryptoRng> Entropy for RandCore<R> {
     fn fill(&mut self, out: &mut [u8]) {
-        todo!()
+        self.0.fill_bytes(out);
     }
 }

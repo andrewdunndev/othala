@@ -28,19 +28,51 @@ pub struct Error {
 
 impl Error {
     pub(crate) const fn new(kind: ErrorKind) -> Self {
-        todo!()
+        Self { kind }
     }
 
     /// What went wrong.
     pub const fn kind(&self) -> ErrorKind {
-        todo!()
+        self.kind
     }
 }
 
 impl fmt::Display for Error {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        todo!()
+        f.write_str(match self.kind {
+            ErrorKind::Malformed => "malformed base64url",
+            ErrorKind::Overlap => "key named twice in one effect",
+            ErrorKind::TooLarge => "effect exceeds its bound",
+            ErrorKind::Empty => "effect has no guard",
+            ErrorKind::ScopeChanged => "lift changes a key's scope",
+            ErrorKind::SpansDomains => "effect spans transaction domains",
+            ErrorKind::WrongReceipt => "receipt is for another effect",
+        })
     }
 }
 
 impl core::error::Error for Error {}
+
+#[cfg(test)]
+mod tests {
+    use super::{Error, ErrorKind};
+    use alloc::collections::BTreeSet;
+    use alloc::string::ToString;
+
+    #[test]
+    fn each_kind_reads_distinctly() {
+        let kinds = [
+            ErrorKind::Malformed,
+            ErrorKind::Overlap,
+            ErrorKind::TooLarge,
+            ErrorKind::Empty,
+            ErrorKind::ScopeChanged,
+            ErrorKind::SpansDomains,
+            ErrorKind::WrongReceipt,
+        ];
+        let texts: BTreeSet<_> = kinds.iter().map(|&k| Error::new(k).to_string()).collect();
+        assert_eq!(texts.len(), kinds.len());
+        assert!(!texts.contains(""));
+        assert!(kinds.iter().all(|&k| Error::new(k).kind() == k));
+    }
+}

@@ -25,12 +25,12 @@ pub struct Version(u64);
 impl Version {
     /// A version as the store recorded it.
     pub const fn new(v: u64) -> Self {
-        todo!()
+        Self(v)
     }
 
     /// The stored value.
     pub const fn get(self) -> u64 {
-        todo!()
+        self.0
     }
 }
 
@@ -44,22 +44,22 @@ pub struct Row<R> {
 impl<R> Row<R> {
     /// A row read from a store.
     pub const fn new(record: R, version: Version) -> Self {
-        todo!()
+        Self { record, version }
     }
 
     /// The decoded record.
     pub const fn record(&self) -> &R {
-        todo!()
+        &self.record
     }
 
     /// The version the row was read at.
     pub const fn version(&self) -> Version {
-        todo!()
+        self.version
     }
 
     /// The record, giving up the row.
     pub fn into_record(self) -> R {
-        todo!()
+        self.record
     }
 }
 
@@ -91,22 +91,31 @@ pub struct Rows<K, R> {
 impl<K: Ord, R> Rows<K, R> {
     /// An empty row set.
     pub const fn new() -> Self {
-        todo!()
+        Self {
+            slots: BTreeMap::new(),
+        }
     }
 
     /// Records a loaded key: `Some` row, or `None` for absent.
     pub fn insert(&mut self, key: K, row: Option<Row<R>>) -> &mut Self {
-        todo!()
+        self.slots
+            .insert(key, row.map_or(Stored::Absent, Stored::Row));
+        self
     }
 
     /// Records a key whose stored row failed to decode.
     pub fn corrupt(&mut self, key: K) -> &mut Self {
-        todo!()
+        self.slots.insert(key, Stored::Corrupt);
+        self
     }
 
     /// What was loaded for `key`; `None` if it was not loaded.
     pub fn get(&self, key: &K) -> Option<Slot<'_, R>> {
-        todo!()
+        self.slots.get(key).map(|s| match s {
+            Stored::Row(row) => Slot::Row(row),
+            Stored::Absent => Slot::Absent,
+            Stored::Corrupt => Slot::Corrupt,
+        })
     }
 }
 
@@ -139,14 +148,43 @@ pub struct Retry(u8);
 impl Retry {
     /// Allows `attempts` re-applies.
     pub const fn new(attempts: u8) -> Self {
-        todo!()
+        Self(attempts)
     }
 
     /// The re-applies allowed.
     pub const fn attempts(self) -> u8 {
-        todo!()
+        self.0
     }
 }
 
 /// Re-decisions a decider makes after a [`Conflict`] before it answers a server error.
 pub const REDECIDE: u8 = 3;
+
+#[cfg(test)]
+mod tests {
+    use super::{Retry, Row, Rows, Slot, Version};
+
+    #[test]
+    fn rows_slots() {
+        let mut rows = Rows::new();
+        rows.insert(1, Some(Row::new("r", Version::new(9))))
+            .insert(2, None)
+            .corrupt(3);
+        assert_eq!(
+            rows.get(&1),
+            Some(Slot::Row(&Row::new("r", Version::new(9))))
+        );
+        assert_eq!(rows.get(&2), Some(Slot::Absent));
+        assert_eq!(rows.get(&3), Some(Slot::Corrupt));
+        assert_eq!(rows.get(&4), None);
+        assert!(Rows::<u8, u8>::default().get(&1).is_none());
+    }
+
+    #[test]
+    fn accessors_return_what_was_given() {
+        let row = Row::new(5u8, Version::new(7));
+        assert_eq!((*row.record(), row.version().get()), (5, 7));
+        assert_eq!(row.into_record(), 5);
+        assert_eq!(Retry::new(2).attempts(), 2);
+    }
+}
