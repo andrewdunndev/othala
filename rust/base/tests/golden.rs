@@ -26,7 +26,7 @@ impl Entropy for Sevens {
 }
 
 #[test]
-fn debug_redacts() {
+fn debug_redacts() -> Result<(), base::Error> {
     let holder = Holder {
         token: Secret::new([0x41; 16]),
         key: SecretBytes::new(b"hunter2".to_vec()),
@@ -34,11 +34,12 @@ fn debug_redacts() {
     let effect = Effect::<K, u8>::builder(&mut Sevens)
         .expect_absent(K)
         .build();
-    let pending = Pending::new("session granted", effect.unwrap());
+    let pending = Pending::new("session granted", effect?);
     let got = format!(
         "{:?}\n{:?}\n{holder:?}\n{holder:#?}\n{pending:?}\n",
         Secret::new([0x41u8; 32]),
         SecretBytes::new(vec![0x42; 3])
     );
     assert_eq!(got, include_str!("golden/debug.txt"));
+    Ok(())
 }

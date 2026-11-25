@@ -244,7 +244,7 @@ check-rust:
     - if: '$CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH'
     - if: '$CI_PIPELINE_SOURCE =~ /^(web|api)$/'
   script:
-    - just lock fmt lint confine twins test doc wasm thumb msrv deny deps api
+    - just lock fmt lint canary twins test doc wasm thumb msrv deny deps api
 
 check-rust-scheduled:
   extends: .rust

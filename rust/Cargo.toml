@@ -1,6 +1,6 @@
 [workspace]
 resolver = "3"
-members = ["base", "testkit", "wipe"]
+members = ["base", "store", "testkit", "wipe"]
 exclude = ["base/fuzz"]
 
 [workspace.package]
@@ -12,6 +12,7 @@ publish = false
 
 [workspace.dependencies]
 base = { path = "base", version = "0.0.0" }
+store = { path = "store", version = "0.0.0" }
 testkit = { path = "testkit", version = "0.0.0" }
 sha2 = { version = "0.11", default-features = false, features = ["zeroize"] }
 base64ct = { version = "1.8", default-features = false, features = ["alloc"] }
@@ -34,12 +35,13 @@ unreachable_pub = "forbid"
 renamed_and_removed_lints = "forbid"
 
 [workspace.lints.clippy]
-unwrap_used = "deny"
-expect_used = "deny"
-panic = "deny"
+unwrap_used = "forbid"
+expect_used = "forbid"
+panic = "forbid"
 indexing_slicing = "forbid"
 as_conversions = "forbid"
 print_stdout = "forbid"
 dbg_macro = "forbid"
-disallowed_methods = "deny"
-disallowed_types = "deny"
+disallowed_methods = "forbid"
+disallowed_types = "forbid"
+disallowed_macros = "forbid"

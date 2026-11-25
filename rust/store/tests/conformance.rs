@@ -5,7 +5,8 @@ use base::{
     Conflict, Effect, EffectId, Guard, Receipt, Row, Rows, Scope, Store, StoreKey, UnixTime,
     Version,
 };
-use testkit::{Fault, MemStore, store_conformance};
+use store::{Fault, MemStore};
+use testkit::store_conformance;
 
 #[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord)]
 struct K(u8);

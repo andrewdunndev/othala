@@ -1,5 +1,4 @@
 //! Properties of `Effect` construction and of applying it to the reference store.
-#![expect(clippy::unwrap_used, reason = "test helpers fail by panicking")]
 use std::collections::{BTreeMap, BTreeSet};
 
 use base::{
@@ -7,7 +6,7 @@ use base::{
     Version,
 };
 use proptest::prelude::*;
-use proptest::test_runner::RngSeed;
+use proptest::test_runner::{RngSeed, TestError, TestRunner};
 use testkit::{MemStore, seeded};
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
@@ -125,10 +124,9 @@ fn build(
     seen: &BTreeMap<K, Version>,
 ) -> Result<Effect<K, u8>, base::Error> {
     let mut b: Builder<K, u8> = Effect::builder(&mut seeded(seed));
-    for (i, &(kind, k, fresh)) in spec.iter().enumerate() {
+    for (&(kind, k, fresh), r) in spec.iter().zip(0u8..) {
         let v = seen.get(&k).copied().filter(|_| fresh).unwrap_or(STALE);
         let row = Row::new(0, v);
-        let r = u8::try_from(i).unwrap();
         b = match kind {
             Kind::Create => b.create(k, r, None),
             Kind::Update => b.update(k, &row, r, None),
@@ -197,11 +195,19 @@ fn against(present: BTreeSet<K>) -> impl Strategy<Value = Spec> {
                             true,
                         ),
                     };
-                    let kind = kinds.get(usize::from(v) % kinds.len()).copied().unwrap();
+                    // v % len is in bounds, so the default is never taken
+                    let kind = kinds
+                        .get(usize::from(v) % kinds.len())
+                        .copied()
+                        .unwrap_or(Kind::Expect);
                     (kind, k, fresh)
                 })
                 .collect()
         })
+}
+
+fn fail(e: impl std::fmt::Debug) -> TestCaseError {
+    TestCaseError::fail(format!("{e:?}"))
 }
 
 fn config() -> ProptestConfig {
@@ -213,76 +219,105 @@ fn config() -> ProptestConfig {
     }
 }
 
-proptest! {
-    #![proptest_config(config())]
-
-    #[test]
-    fn construction_never_unguarded(a in spec(100), b in spec(40), to_global in any::<bool>()) {
-        let none = BTreeMap::new();
-        let built = build(&a, 1, &none);
-        prop_assert_eq!(built.as_ref().map(|_| ()).map_err(|e| e.kind()), expected(&a));
-        let (Ok(x), Ok(y)) = (built, build(&b, 2, &none)) else { return Ok(()) };
-        well_formed(&x)?;
-        prop_assert!(size(&x) <= SIZE_BOUND);
-        let xs: BTreeSet<K> = x.guards().map(|g| **g.key()).collect();
-        let ys: BTreeSet<K> = y.guards().map(|g| **g.key()).collect();
-        let sum = size(&x) + size(&y);
-        match x.merge(y) {
-            Ok(m) => {
-                prop_assert!(xs.is_disjoint(&ys) && sum <= SIZE_BOUND);
-                well_formed(&m)?;
-                prop_assert_eq!(m.guards().count(), xs.len() + ys.len());
+#[test]
+fn construction_never_unguarded() -> Result<(), TestError<(Spec, Spec, bool)>> {
+    TestRunner::new(config()).run(
+        &(spec(100), spec(40), any::<bool>()),
+        |(a, b, to_global)| {
+            let none = BTreeMap::new();
+            let built = build(&a, 1, &none);
+            prop_assert_eq!(
+                built.as_ref().map(|_| ()).map_err(|e| e.kind()),
+                expected(&a)
+            );
+            let (Ok(x), Ok(y)) = (built, build(&b, 2, &none)) else {
+                return Ok(());
+            };
+            well_formed(&x)?;
+            prop_assert!(size(&x) <= SIZE_BOUND);
+            let xs: BTreeSet<K> = x.guards().map(|g| **g.key()).collect();
+            let ys: BTreeSet<K> = y.guards().map(|g| **g.key()).collect();
+            let sum = size(&x) + size(&y);
+            match x.merge(y) {
+                Ok(m) => {
+                    prop_assert!(xs.is_disjoint(&ys) && sum <= SIZE_BOUND);
+                    well_formed(&m)?;
+                    prop_assert_eq!(m.guards().count(), xs.len() + ys.len());
+                }
+                Err(e) if sum > SIZE_BOUND => prop_assert_eq!(e.kind(), ErrorKind::TooLarge),
+                Err(e) => prop_assert!(e.kind() == ErrorKind::Overlap && !xs.is_disjoint(&ys)),
             }
-            Err(e) if sum > SIZE_BOUND => prop_assert_eq!(e.kind(), ErrorKind::TooLarge),
-            Err(e) => prop_assert!(e.kind() == ErrorKind::Overlap && !xs.is_disjoint(&ys)),
-        }
-        let folded = |k: K| match k { K::G(n) if to_global => K::G(n / 2), K::S(n) => K::S(n / 2), k => k };
-        let images: BTreeSet<K> = xs.iter().map(|&k| folded(k)).collect();
-        match build(&a, 1, &none).unwrap().lift(folded, |r| r) {
-            Ok(l) => {
-                prop_assert_eq!(images.len(), xs.len());
-                well_formed(&l)?;
+            let folded = |k: K| match k {
+                K::G(n) if to_global => K::G(n / 2),
+                K::S(n) => K::S(n / 2),
+                k => k,
+            };
+            let images: BTreeSet<K> = xs.iter().map(|&k| folded(k)).collect();
+            match build(&a, 1, &none).map_err(fail)?.lift(folded, |r| r) {
+                Ok(l) => {
+                    prop_assert_eq!(images.len(), xs.len());
+                    well_formed(&l)?;
+                }
+                Err(e) => prop_assert!(e.kind() == ErrorKind::Overlap && images.len() < xs.len()),
             }
-            Err(e) => prop_assert!(e.kind() == ErrorKind::Overlap && images.len() < xs.len()),
-        }
-    }
+            Ok(())
+        },
+    )
+}
 
-    #[test]
-    fn all_guards_or_nothing(
-        (a, present) in prop::sample::subsequence(pool(6), 0..=12)
-            .prop_map(|ks| ks.into_iter().collect::<BTreeSet<K>>())
-            .prop_flat_map(|present| (against(present.clone()), Just(present)))
-    ) {
+#[test]
+fn all_guards_or_nothing() -> Result<(), TestError<(Spec, BTreeSet<K>)>> {
+    let cases = prop::sample::subsequence(pool(6), 0..=12)
+        .prop_map(|ks| ks.into_iter().collect::<BTreeSet<K>>())
+        .prop_flat_map(|present| (against(present.clone()), Just(present)));
+    TestRunner::new(config()).run(&cases, |(a, present)| {
         let mut store = MemStore::<K, u8>::new();
         if !present.is_empty() {
-            let b = present.iter().fold(Effect::builder(&mut seeded(3)), |b, &k| b.create(k, 200, None));
-            prop_assert!(store.apply(&b.build().unwrap(), NOW).unwrap().is_ok());
+            let b = present
+                .iter()
+                .fold(Effect::builder(&mut seeded(3)), |b, &k| {
+                    b.create(k, 200, None)
+                });
+            let created = b.build().map_err(fail)?;
+            prop_assert!(matches!(store.apply(&created, NOW), Ok(Ok(_))));
         }
         let all = pool(6);
-        let loaded = store.load(&all, NOW).unwrap();
-        let seen: BTreeMap<K, Version> = all.iter().filter_map(|k| match loaded.get(k) {
-            Some(Slot::Row(r)) => Some((*k, r.version())),
-            _ => None,
-        }).collect();
-        let Ok(effect) = build(&a, 4, &seen) else { return Ok(()) };
-        let mut want: Vec<(K, Failure)> = effect.guards().filter_map(|g| match g {
-            Guard::Consume(k) if !seen.contains_key(k) => Some((*k, Failure::Missing)),
-            Guard::Unchanged(k, v) => match seen.get(k) {
-                None => Some((*k, Failure::Missing)),
-                Some(now) if *now != v => Some((*k, Failure::Changed)),
+        let loaded = store.load(&all, NOW).map_err(fail)?;
+        let seen: BTreeMap<K, Version> = all
+            .iter()
+            .filter_map(|k| match loaded.get(k) {
+                Some(Slot::Row(r)) => Some((*k, r.version())),
                 _ => None,
-            },
-            Guard::Absent(k) if seen.contains_key(k) => Some((*k, Failure::Present)),
-            _ => None,
-        }).collect();
+            })
+            .collect();
+        let Ok(effect) = build(&a, 4, &seen) else {
+            return Ok(());
+        };
+        let mut want: Vec<(K, Failure)> = effect
+            .guards()
+            .filter_map(|g| match g {
+                Guard::Consume(k) if !seen.contains_key(k) => Some((*k, Failure::Missing)),
+                Guard::Unchanged(k, v) => match seen.get(k) {
+                    None => Some((*k, Failure::Missing)),
+                    Some(now) if *now != v => Some((*k, Failure::Changed)),
+                    _ => None,
+                },
+                Guard::Absent(k) if seen.contains_key(k) => Some((*k, Failure::Present)),
+                _ => None,
+            })
+            .collect();
         want.sort_by_key(|f| f.0);
         let before = store.contents(NOW);
-        match store.apply(&effect, NOW).unwrap() {
+        match store.apply(&effect, NOW).map_err(fail)? {
             Ok(_) => {
                 prop_assert!(want.is_empty(), "applied although {:?} fail", want);
                 let mut after = before.clone();
-                effect.deletes().for_each(|k| { after.remove(k); });
-                effect.puts().for_each(|(k, r, _)| { after.insert(*k, *r); });
+                effect.deletes().for_each(|k| {
+                    after.remove(k);
+                });
+                effect.puts().for_each(|(k, r, _)| {
+                    after.insert(*k, *r);
+                });
                 prop_assert_eq!(store.contents(NOW), after);
             }
             Err(conflict) => {
@@ -292,5 +327,6 @@ proptest! {
                 prop_assert_eq!(store.contents(NOW), before);
             }
         }
-    }
+        Ok(())
+    })
 }

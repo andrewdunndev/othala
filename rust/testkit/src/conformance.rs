@@ -1,5 +1,6 @@
 #![expect(
     clippy::panic,
+    clippy::disallowed_macros,
     reason = "a harness reports a failed claim by panicking"
 )]
 use std::fmt::Debug;

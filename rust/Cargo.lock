@@ -331,6 +331,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "store"
+version = "0.0.0"
+dependencies = [
+ "base",
+ "testkit",
+]
+
+[[package]]
 name = "subtle"
 version = "2.6.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -382,6 +390,7 @@ dependencies = [
  "serde",
  "serde_json",
  "sha2",
+ "store",
  "toml",
 ]
 

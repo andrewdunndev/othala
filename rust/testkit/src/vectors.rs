@@ -2,6 +2,8 @@
 #![expect(
     clippy::expect_used,
     clippy::panic,
+    clippy::disallowed_methods,
+    clippy::disallowed_macros,
     reason = "a harness reports a failed claim by panicking"
 )]
 use std::collections::BTreeMap;

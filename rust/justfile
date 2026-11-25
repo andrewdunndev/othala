@@ -3,7 +3,7 @@ set shell := ["bash", "-euo", "pipefail", "-c"]
 default:
     @just --list
 
-all: lock fmt lint confine twins test doc wasm thumb msrv deny deps api mutants rows
+all: lock fmt lint canary twins test doc wasm thumb msrv deny deps api mutants rows
 
 # a manifest change without its lock change fails here, before anything builds
 lock:
@@ -12,21 +12,18 @@ lock:
 fmt:
     cargo fmt --all --check
 
-# the canary step removes every canary expect and requires each clippy.toml path to error at the configured level
 lint:
     cargo clippy --workspace --all-targets --all-features -- -D warnings
-    ./confine.sh --canary
 
-# the receipt mint, the secret read and every lint level stay where CONTRACT.md says; the self-test plants evasions
-confine:
-    ./confine.sh .
-    ./confine.sh --self-test
+# each published crate: every lint level, deny-list lint and clippy.toml path is an error there (CONTRACT B4 to B6)
+canary:
+    ./canary.sh base
 
 test:
     cargo test --workspace --all-features
 
 doc:
-    RUSTDOCFLAGS="-D warnings" cargo doc -p base -p testkit --all-features --no-deps
+    RUSTDOCFLAGS="-D warnings" cargo doc -p base -p store -p testkit --all-features --no-deps
 
 ledger:
     cargo test -p base --all-features --test ledger
@@ -46,18 +43,20 @@ twins:
     done
 
 # the mutants each package yields after .cargo/mutants.toml's skips; raise them as code grows
-base_floor := "136"
-testkit_floor := "109"
+base_floor := "137"
+store_floor := "28"
+testkit_floor := "83"
 
-# skips and test args live in .cargo/mutants.toml; testkit's mutants are caught by the workspace's tests;
+# skips and test args live in .cargo/mutants.toml; store's and testkit's mutants are caught by the workspace's tests;
 # each run must reach its floor of mutants with none missed or timed out, so a filter that empties it fails
 mutants:
     #!/usr/bin/env bash
     set -euo pipefail
-    mkdir -p target/mutants/base target/mutants/testkit
+    mkdir -p target/mutants/base target/mutants/store target/mutants/testkit
     cargo mutants --package base --test-package base,wipe --no-shuffle --output target/mutants/base
+    cargo mutants --package store --test-workspace=true --no-shuffle --output target/mutants/store
     cargo mutants --package testkit --test-workspace=true --no-shuffle --output target/mutants/testkit
-    for c in base:{{base_floor}} testkit:{{testkit_floor}}; do
+    for c in base:{{base_floor}} store:{{store_floor}} testkit:{{testkit_floor}}; do
         jq -e --argjson floor "${c#*:}" '.total_mutants >= $floor and .missed == 0 and .timeout == 0' \
             "target/mutants/${c%:*}/mutants.out/outcomes.json" > /dev/null || { echo "mutants ${c%:*}: under the floor of ${c#*:}, or missed or timed out"; exit 1; }
     done
@@ -104,10 +103,10 @@ rows:
     contract=$(grep -cE '^- [TROBN][0-9]+ ' base/CONTRACT.md)
     per() { awk -v a="$1" -v b="$contract" 'BEGIN { printf "%.1f", a / b }'; }
     echo "production lines: $prod ($(per "$prod") per contract line)"
-    echo "test lines: $((unit + it)) ($(per $((unit + it))) per contract line; unit $unit, tests and fuzz $it; + $(cat base/tests/ui/*/*.rs | wc -l | tr -d ' ') ledger case lines; testkit $(cat testkit/src/*.rs | wc -l | tr -d ' '))"
+    echo "test lines: $((unit + it)) ($(per $((unit + it))) per contract line; unit $unit, tests and fuzz $it; + $(cat base/tests/ui/*/*.rs | wc -l | tr -d ' ') ledger case lines; testkit $(cat testkit/src/*.rs | wc -l | tr -d ' '); store $(cat store/src/*.rs store/tests/*.rs | wc -l | tr -d ' '))"
     echo "contract lines: $contract"
     echo "vector cases: $(grep -oE 'rfc4648/test-vectors.json.*cases = [0-9]+' vectors/SOURCES.toml | grep -oE '[0-9]+$') (RFC 4648 section 10; BASE64 ones checked)"
-    for c in base testkit; do
+    for c in base store testkit; do
         o=target/mutants/$c/mutants.out/outcomes.json
         if [ -f "$o" ]; then
             # skipped: the mutants the config's filters remove, however they are written

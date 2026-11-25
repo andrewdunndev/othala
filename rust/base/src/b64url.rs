@@ -48,6 +48,7 @@ mod tests {
     use crate::ErrorKind;
     use alloc::format;
     use alloc::string::String;
+    use alloc::vec;
 
     const ALPHABET: &str = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_";
 
@@ -57,14 +58,13 @@ mod tests {
 
     #[test]
     fn alphabet_edges() {
-        for (i, c) in ALPHABET.chars().enumerate() {
-            let value = u8::try_from(i).unwrap();
+        for (value, c) in (0..=u8::MAX).zip(ALPHABET.chars()) {
             let text = format!("AAA{c}");
-            assert_eq!(b64url_decode(&text).unwrap(), [0, 0, value]);
+            assert_eq!(b64url_decode(&text), Ok(vec![0, 0, value]));
             assert_eq!(b64url_encode(&[0, 0, value]), text);
         }
         assert_eq!(b64url_encode(&[0xfb, 0xff]), "-_8");
-        assert_eq!(b64url_decode("-_8").unwrap(), [0xfb, 0xff]);
+        assert_eq!(b64url_decode("-_8"), Ok(vec![0xfb, 0xff]));
     }
 
     #[test]
@@ -99,9 +99,9 @@ mod tests {
         assert_eq!(accepted("Z"), "AQgw");
         assert_eq!(accepted("Zm"), "AEIMQUYcgkosw048");
         assert_eq!(accepted("Zm9").len(), 64);
-        assert_eq!(b64url_decode("Zg").unwrap(), b"f");
-        assert_eq!(b64url_decode("Zm8").unwrap(), b"fo");
-        assert_eq!(b64url_decode("").unwrap(), b"");
+        assert_eq!(b64url_decode("Zg"), Ok(b"f".to_vec()));
+        assert_eq!(b64url_decode("Zm8"), Ok(b"fo".to_vec()));
+        assert_eq!(b64url_decode(""), Ok(vec![]));
     }
 
     #[test]

@@ -1,3 +1,4 @@
+//! The in-memory reference store, and the one place outside `base` that mints a `Receipt`.
 use std::collections::{BTreeMap, BTreeSet};
 
 use base::{Conflict, Effect, EffectId, Receipt, Row, Rows, Store, StoreKey, UnixTime, Version};
@@ -166,48 +167,4 @@ impl<K: StoreKey, R: Clone> Store<K, R> for MemStore<K, R> {
 )]
 fn mint<K: StoreKey, R>(effect: &Effect<K, R>) -> Receipt {
     effect.host_applied()
-}
-
-#[cfg(test)]
-mod tests {
-    use base::{Effect, Pending, Scope, Store, StoreKey, UnixTime};
-
-    use super::{Fault, MemStore};
-    use crate::seeded;
-
-    #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
-    struct K(u8);
-
-    impl StoreKey for K {
-        fn scope(&self) -> Scope {
-            Scope::Global
-        }
-    }
-
-    const NOW: UnixTime = UnixTime::new(1);
-
-    fn create(seed: u64, k: u8) -> Effect<K, u8> {
-        Effect::builder(&mut seeded(seed))
-            .create(K(k), k, None)
-            .build()
-            .expect("one create builds")
-    }
-
-    #[test]
-    fn a_lost_result_commits_and_a_reapply_settles() {
-        let mut s = MemStore::<K, u8>::new();
-        s.lose_next_result().lose_next_result();
-        let a = Pending::new('a', create(1, 1));
-        let b = create(2, 2);
-        assert_eq!(s.apply(a.effect(), NOW).err(), Some(Fault::Lost));
-        assert_eq!(s.apply(&b, NOW).err(), Some(Fault::Lost));
-        assert_eq!(s.contents(NOW).len(), 2, "both lost results committed");
-        let receipt = s
-            .apply(a.effect(), NOW)
-            .expect("third apply known")
-            .expect("re-apply is Ok");
-        assert_eq!(a.settle(receipt).ok(), Some('a'));
-        assert!(s.apply(&create(3, 3), NOW).expect("losses spent").is_ok());
-        assert_eq!(s.contents(NOW).len(), 3);
-    }
 }

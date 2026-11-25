@@ -22,7 +22,7 @@ allow = [
   { name = "itoa" }, { name = "libc" }, { name = "memchr" }, { name = "serde_core" }, { name = "serde_json" }, { name = "sha2" },
   { name = "typenum" }, { name = "zmij" }, { name = "serde" }, { name = "serde_derive" }, { name = "syn" }, { name = "quote" },
   { name = "proc-macro2" }, { name = "unicode-ident" }, { name = "autocfg" }, { name = "num-traits" }, { name = "rand_core" }, { name = "subtle" },
-  { name = "zeroize" }, { name = "base64ct" }, { name = "base" }, { name = "testkit" }, { name = "rand_chacha" }, { name = "ppv-lite86" },
+  { name = "zeroize" }, { name = "base64ct" }, { name = "base" }, { name = "store" }, { name = "testkit" }, { name = "rand_chacha" }, { name = "ppv-lite86" },
   { name = "zerocopy" }, { name = "proptest" }, { name = "rand" }, { name = "chacha20" }, { name = "core_detect" }, { name = "getrandom" },
   { name = "bitflags" }, { name = "rand_xorshift" }, { name = "regex-syntax" }, { name = "unarray" }, { name = "trybuild" }, { name = "glob" },
   { name = "serde_spanned" }, { name = "target-triple" }, { name = "termcolor" }, { name = "toml" }, { name = "toml_datetime" }, { name = "toml_parser" },

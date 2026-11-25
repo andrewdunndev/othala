@@ -3,7 +3,6 @@
 mod conformance;
 pub mod fixture;
 mod race;
-mod store;
 pub mod vectors;
 
 pub use conformance::store_conformance;

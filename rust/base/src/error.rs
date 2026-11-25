@@ -78,7 +78,8 @@ mod tests {
 
     #[test]
     fn too_large_names_text_and_effects() {
-        let e = crate::b64url_decode(&"A".repeat(crate::MAX_B64URL_TEXT + 1)).unwrap_err();
-        assert_eq!(e.to_string(), "input or effect exceeds its bound");
+        let e = crate::b64url_decode(&"A".repeat(crate::MAX_B64URL_TEXT + 1))
+            .map_err(|e| e.to_string());
+        assert_eq!(e, Err("input or effect exceeds its bound".into()));
     }
 }

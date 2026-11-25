@@ -38,7 +38,7 @@ impl<const N: usize> Secret<N> {
         decode_exact(text).map(Self)
     }
 
-    /// The single greppable read; confined by lint to the modules a `CONTRACT.md` names.
+    /// The single greppable read; a lint forbids it in every published crate.
     pub const fn expose(&self) -> &[u8; N] {
         &self.0
     }
@@ -60,7 +60,7 @@ impl SecretBytes {
         Self(bytes)
     }
 
-    /// The single greppable read; confined by lint to the modules a `CONTRACT.md` names.
+    /// The single greppable read; a lint forbids it in every published crate.
     pub fn expose(&self) -> &[u8] {
         &self.0
     }
@@ -164,17 +164,18 @@ mod tests {
     use super::{Digest, Secret, SecretBytes};
     use crate::{Entropy, Error, ErrorKind};
     use alloc::format;
+    use alloc::string::ToString;
     use alloc::vec;
     use alloc::vec::Vec;
     use sha2::{Digest as _, Sha256};
 
-    struct Counting(usize);
+    struct Counting(u8);
 
     impl Entropy for Counting {
         fn fill(&mut self, out: &mut [u8]) {
             for b in out.iter_mut() {
                 self.0 += 1;
-                *b = u8::try_from(self.0).unwrap();
+                *b = self.0;
             }
         }
     }
@@ -217,8 +218,8 @@ mod tests {
 
     #[test]
     fn from_b64url_takes_exactly_n() {
-        let s = Secret::<4>::from_b64url("AQIDBA").unwrap();
-        assert!(s.ct_eq(&Secret::new([1, 2, 3, 4])));
+        let s = Secret::<4>::from_b64url("AQIDBA");
+        assert!(s.is_ok_and(|s| s.ct_eq(&Secret::new([1, 2, 3, 4]))));
         for wrong in ["AQID", "AQIDBAU", "AQIDBB", "AQIDBA=="] {
             assert_eq!(
                 Secret::<4>::from_b64url(wrong).map(|_| ()),
@@ -242,19 +243,19 @@ mod tests {
     #[test]
     fn digest_serde_is_text() {
         let d = Digest::from_bytes([0xfb; 32]);
-        let json = serde_json::to_string(&d).unwrap();
-        assert_eq!(json, alloc::format!("\"{}\"", "-_v7".repeat(10) + "-_s"));
-        assert_eq!(serde_json::from_str::<Digest>(&json).unwrap(), d);
-        let e = serde_json::from_str::<Digest>("[1,2]").unwrap_err();
+        let json = serde_json::to_string(&d).map_err(|e| e.to_string());
+        let want = alloc::format!("\"{}\"", "-_v7".repeat(10) + "-_s");
+        assert_eq!(json.as_deref(), Ok(want.as_str()));
+        assert_eq!(serde_json::from_str::<Digest>(&want).ok(), Some(d));
+        let e = serde_json::from_str::<Digest>("[1,2]")
+            .map_or_else(|e| e.to_string(), |_| "decoded".into());
         assert!(
-            format!("{e}").contains("expected a SHA-256 digest as unpadded base64url"),
+            e.contains("expected a SHA-256 digest as unpadded base64url"),
             "{e}"
         );
         let presented = "supersecretpresentedtoken";
-        let e = format!(
-            "{}",
-            serde_json::from_str::<Digest>(&format!("\"{presented}\"")).unwrap_err()
-        );
+        let e = serde_json::from_str::<Digest>(&format!("\"{presented}\""))
+            .map_or_else(|e| e.to_string(), |_| "decoded".into());
         assert!(
             e.contains("not a SHA-256 digest as unpadded base64url"),
             "{e}"

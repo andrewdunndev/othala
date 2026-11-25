@@ -1,5 +1,4 @@
 //! The snapshot-race harness over small decisions, and probes that it catches what it claims to.
-#![expect(clippy::unwrap_used, reason = "test helpers fail by panicking")]
 use std::cell::Cell;
 
 use base::{Effect, Row, Scope, Slot, Store, StoreKey, UnixTime, Version};
@@ -19,47 +18,44 @@ type Op = Box<dyn Fn(&mut S, &mut Seeded) -> Option<Effect<K, u8>>>;
 
 const NOW: UnixTime = UnixTime::new(100);
 
-fn read(s: &mut S, k: K) -> Option<base::Row<u8>> {
-    let rows = s.load(&[k], NOW).unwrap();
-    match rows.get(&k).unwrap() {
-        Slot::Row(r) => Some(r.clone()),
-        _ => None,
+// the outer None is a failed load, so the op that read makes no write
+fn read(s: &mut S, k: K) -> Option<Option<base::Row<u8>>> {
+    match s.load(&[k], NOW).ok()?.get(&k)? {
+        Slot::Row(r) => Some(Some(r.clone())),
+        _ => Some(None),
     }
 }
 
 fn claim(k: u8) -> Op {
     Box::new(move |s, e| {
-        read(s, K(k))
+        read(s, K(k))?
             .is_none()
-            .then(|| Effect::builder(e).create(K(k), 1, None).build().unwrap())
+            .then(|| Effect::created(e, K(k), 1, None))
     })
 }
 
 fn bump(k: u8) -> Op {
     Box::new(move |s, e| {
-        let b = Effect::builder(e);
-        let b = match read(s, K(k)) {
-            Some(row) => b.update(K(k), &row, row.record() + 1, None),
-            None => b.create(K(k), 1, None),
-        };
-        Some(b.build().unwrap())
+        Some(match read(s, K(k))? {
+            Some(row) => Effect::updated(e, K(k), &row, row.record() + 1, None),
+            None => Effect::created(e, K(k), 1, None),
+        })
     })
 }
 
 fn take(k: u8) -> Op {
-    Box::new(move |s, e| read(s, K(k)).map(|_| Effect::builder(e).consume(K(k)).build().unwrap()))
+    Box::new(move |s, e| read(s, K(k))?.map(|_| Effect::consumed(e, K(k))))
 }
 
 fn peek(k: u8, out: u8) -> Op {
     Box::new(move |s, e| {
-        let row = read(s, K(k))?;
-        read(s, K(out)).is_none().then(|| {
-            Effect::builder(e)
-                .expect(K(k), &row)
-                .create(K(out), *row.record(), None)
-                .build()
-                .unwrap()
-        })
+        let row = read(s, K(k))??;
+        read(s, K(out))?.is_none().then_some(())?;
+        Effect::builder(e)
+            .expect(K(k), &row)
+            .create(K(out), *row.record(), None)
+            .build()
+            .ok()
     })
 }
 
@@ -71,7 +67,7 @@ fn flaky(
 ) -> Op {
     let calls = Cell::new(0u8);
     Box::new(move |s, e| {
-        let row = read(s, K(k))?;
+        let row = read(s, K(k))??;
         let mut seen = row.clone();
         if counted(&row) {
             calls.set(calls.get() + 1);
@@ -79,8 +75,7 @@ fn flaky(
                 seen = Row::new(*row.record(), Version::new(u64::MAX));
             }
         }
-        let b = Effect::builder(e).update(K(k), &seen, row.record() + 1, None);
-        Some(b.build().unwrap())
+        Some(Effect::updated(e, K(k), &seen, row.record() + 1, None))
     })
 }
 
@@ -89,7 +84,10 @@ fn start() -> S {
     let b = Effect::builder(&mut testkit::seeded(99))
         .create(K(1), 5, None)
         .create(K(4), 1, None);
-    assert!(s.apply(&b.build().unwrap(), NOW).unwrap().is_ok());
+    assert!(
+        b.build()
+            .is_ok_and(|e| matches!(s.apply(&e, NOW), Ok(Ok(_))))
+    );
     s
 }
 
@@ -185,9 +183,8 @@ fn a_loser_gives_up_after_three() {
 #[should_panic(expected = "without guarding")]
 fn read_set() {
     let sloppy: Op = Box::new(|s, e| {
-        let seen = read(s, K(1))?;
-        let b = Effect::builder(e).create(K(9), *seen.record(), None);
-        Some(b.build().unwrap())
+        let seen = read(s, K(1))??;
+        Some(Effect::created(e, K(9), *seen.record(), None))
     });
     race(&start(), &[sloppy.as_ref()], NOW);
 }
@@ -196,11 +193,12 @@ fn read_set() {
 #[should_panic(expected = "against every serial run")]
 fn consume_checks_existence_only() {
     let carry: Op = Box::new(|s, e| {
-        let seen = read(s, K(1))?;
-        let b = Effect::builder(e)
+        let seen = read(s, K(1))??;
+        Effect::builder(e)
             .consume(K(1))
-            .create(K(9), *seen.record(), None);
-        Some(b.build().unwrap())
+            .create(K(9), *seen.record(), None)
+            .build()
+            .ok()
     });
     race(&start(), &[bump(1).as_ref(), carry.as_ref()], NOW);
 }

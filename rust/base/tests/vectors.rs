@@ -19,8 +19,8 @@ fn rfc4648_section10() {
         let unpadded = c.output.trim_end_matches('=');
         assert_eq!(b64url_encode(c.input.as_bytes()), unpadded, "{}", c.input);
         assert_eq!(
-            b64url_decode(unpadded).unwrap(),
-            c.input.as_bytes(),
+            b64url_decode(unpadded).as_deref(),
+            Ok(c.input.as_bytes()),
             "{}",
             c.input
         );

@@ -297,7 +297,7 @@ impl<K: StoreKey, R> Effect<K, R> {
         }
     }
 
-    /// The one receipt mint; lint-confined to store modules.
+    /// The one receipt mint; a lint forbids it in every published crate, and only the `store` member expects it.
     pub const fn host_applied(&self) -> Receipt {
         Receipt { id: self.id }
     }
@@ -495,11 +495,13 @@ mod tests {
         r.err().map(|e| e.kind())
     }
 
-    fn absent(e: &mut Fill, keys: impl IntoIterator<Item = u8>) -> Effect<K, u8> {
+    fn absent(
+        e: &mut Fill,
+        keys: impl IntoIterator<Item = u8>,
+    ) -> Result<Effect<K, u8>, crate::Error> {
         keys.into_iter()
             .fold(builder(e), |b, n| b.expect_absent(K::G(n)))
             .build()
-            .unwrap()
     }
 
     #[test]
@@ -512,59 +514,58 @@ mod tests {
     }
 
     #[test]
-    fn overlap_in_merge() {
+    fn overlap_in_merge() -> Result<(), crate::Error> {
         let e = &mut Fill(0);
         assert_eq!(
-            kind(absent(e, [1, 2]).merge(absent(e, [2, 3]))),
+            kind(absent(e, [1, 2])?.merge(absent(e, [2, 3])?)),
             Some(ErrorKind::Overlap)
         );
-        let merged = absent(e, [1]).merge(absent(e, [2])).unwrap();
+        let merged = absent(e, [1])?.merge(absent(e, [2])?)?;
         assert_eq!(
             merged.guards().collect::<Vec<_>>(),
             [Guard::Absent(&K::G(1)), Guard::Absent(&K::G(2))]
         );
+        Ok(())
     }
 
     #[test]
-    fn overlap_in_lift() {
+    fn overlap_in_lift() -> Result<(), crate::Error> {
         let e = &mut Fill(0);
         assert_eq!(
-            kind(absent(e, [1, 2]).lift(|_| K::G(9), |r| r)),
+            kind(absent(e, [1, 2])?.lift(|_| K::G(9), |r| r)),
             Some(ErrorKind::Overlap)
         );
-        let lifted = absent(e, [1, 2])
-            .lift(|k| if k == K::G(1) { K::G(7) } else { k }, |r| r)
-            .unwrap();
+        let lifted = absent(e, [1, 2])?.lift(|k| if k == K::G(1) { K::G(7) } else { k }, |r| r)?;
         assert_eq!(
             lifted.guards().map(|g| **g.key()).collect::<Vec<_>>(),
             [K::G(2), K::G(7)]
         );
+        Ok(())
     }
 
     #[test]
-    fn scope_changed_in_lift() {
+    fn scope_changed_in_lift() -> Result<(), crate::Error> {
         let e = &mut Fill(0);
         let to_subject = |k| match k {
             K::G(n) | K::S(n) => K::S(n),
         };
         assert_eq!(
-            kind(absent(e, [1]).lift(to_subject, |r| r)),
+            kind(absent(e, [1])?.lift(to_subject, |r| r)),
             Some(ErrorKind::ScopeChanged)
         );
         let lifted = builder(e)
             .create(K::S(1), 4, Some(UnixTime::new(9)))
-            .build()
-            .unwrap()
-            .lift(to_subject, u16::from)
-            .unwrap();
+            .build()?
+            .lift(to_subject, u16::from)?;
         assert_eq!(
             lifted.puts().collect::<Vec<_>>(),
             [(&K::S(1), &4u16, Some(UnixTime::new(9)))]
         );
+        Ok(())
     }
 
     #[test]
-    fn single_ops_are_the_builder_ops() {
+    fn single_ops_are_the_builder_ops() -> Result<(), crate::Error> {
         let (seen, e) = (row(4), &mut Fill(0));
         let pairs = [
             (
@@ -585,11 +586,9 @@ mod tests {
             ),
         ];
         for (single, built) in pairs {
-            assert_eq!(
-                format!("{single:?}"),
-                format!("{:?}", built.build().unwrap())
-            );
+            assert_eq!(format!("{single:?}"), format!("{:?}", built.build()?));
         }
+        Ok(())
     }
 
     #[test]
@@ -598,7 +597,7 @@ mod tests {
     }
 
     #[test]
-    fn size_bound() {
+    fn size_bound() -> Result<(), crate::Error> {
         assert_eq!(MAX_EFFECT_SIZE, 128);
         let e = &mut Fill(0);
         let creates = |e: &mut Fill| (0..64).fold(builder(e), |b, n| b.create(K::G(n), n, None));
@@ -612,15 +611,16 @@ mod tests {
                 .update(K::G(2), &row(1), 0, None);
         let b = (3..125).fold(b, |b, n| b.expect(K::G(n), &row(1)));
         assert!(b.build().is_ok());
-        assert!(absent(e, 0..64).merge(absent(e, 64..128)).is_ok());
+        assert!(absent(e, 0..64)?.merge(absent(e, 64..128)?).is_ok());
         assert_eq!(
-            kind(absent(e, 0..64).merge(absent(e, 64..=128))),
+            kind(absent(e, 0..64)?.merge(absent(e, 64..=128)?)),
             Some(ErrorKind::TooLarge)
         );
         assert_eq!(
-            kind(absent(e, 0..64).merge(absent(e, 0..65))),
+            kind(absent(e, 0..64)?.merge(absent(e, 0..65)?)),
             Some(ErrorKind::TooLarge)
         );
+        Ok(())
     }
 
     #[test]
@@ -639,50 +639,53 @@ mod tests {
     }
 
     #[test]
-    fn domain_of_keys() {
+    fn domain_of_keys() -> Result<(), crate::Error> {
         let e = &mut Fill(0);
-        let two = absent(e, [1, 2]);
-        assert_eq!(two.domain(|_| 'a').unwrap(), 'a');
+        let two = absent(e, [1, 2])?;
+        assert_eq!(two.domain(|_| 'a')?, 'a');
         assert_eq!(kind(two.domain(|k| *k)), Some(ErrorKind::SpansDomains));
-        assert_eq!(absent(e, [5]).domain(|k| *k).unwrap(), K::G(5));
-        let third_differs = absent(e, [1, 2, 3]).domain(|k| u8::from(*k == K::G(3)));
+        assert_eq!(absent(e, [5])?.domain(|k| *k)?, K::G(5));
+        let third_differs = absent(e, [1, 2, 3])?.domain(|k| u8::from(*k == K::G(3)));
         assert_eq!(kind(third_differs), Some(ErrorKind::SpansDomains));
+        Ok(())
     }
 
     #[test]
-    fn settle_by_receipt() {
+    fn settle_by_receipt() -> Result<(), crate::Error> {
         let e = &mut Fill(0);
-        let mine = Pending::new(7, absent(e, [1]));
-        let other = absent(e, [1]);
+        let mine = Pending::new(7, absent(e, [1])?);
+        let other = absent(e, [1])?;
         assert_eq!(other.host_applied().effect_id(), other.id());
         assert_ne!(other.host_applied().effect_id(), mine.effect().id());
         assert_eq!(
             kind(mine.settle(other.host_applied())),
             Some(ErrorKind::WrongReceipt)
         );
-        let mine = Pending::new(7, absent(e, [1]));
+        let mine = Pending::new(7, absent(e, [1])?);
         let receipt = mine.effect().host_applied();
-        assert_eq!(mine.settle(receipt).unwrap(), 7);
+        assert_eq!(mine.settle(receipt)?, 7);
+        Ok(())
     }
 
     #[test]
-    fn ids() {
+    fn ids() -> Result<(), crate::Error> {
         let e = &mut Fill(4);
-        let a = absent(e, [1]);
+        let a = absent(e, [1])?;
         assert_eq!(a.id().as_bytes(), &[5; 16]);
-        let b = absent(e, [2]);
+        let b = absent(e, [2])?;
         let want = Sha256::new()
             .chain_update([5; 16])
             .chain_update([6; 16])
             .finalize();
-        let merged = a.merge(b).unwrap();
+        let merged = a.merge(b)?;
         assert_eq!(merged.id().as_bytes()[..], want[..16]);
         let id = merged.id();
-        assert_eq!(merged.lift(|k| k, |r| r).unwrap().id(), id);
+        assert_eq!(merged.lift(|k| k, |r| r)?.id(), id);
+        Ok(())
     }
 
     #[test]
-    fn check_names_each_failure() {
+    fn check_names_each_failure() -> Result<(), crate::Error> {
         let effect = builder(&mut Fill(0))
             .consume(K::G(1))
             .update(K::G(2), &row(1), 0, None)
@@ -690,8 +693,7 @@ mod tests {
             .expect(K::G(4), &row(1))
             .delete(K::G(5), &row(1))
             .create(K::G(6), 0, None)
-            .build()
-            .unwrap();
+            .build()?;
         let held = |k: &K| match k {
             K::G(3) | K::G(6) => None,
             _ => Some(Version::new(1)),
@@ -710,10 +712,11 @@ mod tests {
             .push(K::G(5), Failure::Missing);
         assert_eq!(effect.check(broken), Err(want.clone()));
         assert_eq!(want.failures().len(), 4);
+        Ok(())
     }
 
     #[test]
-    fn views() {
+    fn views() -> Result<(), crate::Error> {
         let e = builder(&mut Fill(0))
             .create(K::G(1), 10, Some(UnixTime::new(3)))
             .update(K::G(2), &row(4), 20, Some(UnixTime::new(8)))
@@ -721,8 +724,7 @@ mod tests {
             .delete(K::G(4), &row(5))
             .expect(K::G(5), &row(6))
             .expect_absent(K::G(6))
-            .build()
-            .unwrap();
+            .build()?;
         let v = Version::new;
         assert_eq!(
             e.guards().collect::<Vec<_>>(),
@@ -743,17 +745,17 @@ mod tests {
             ]
         );
         assert_eq!(e.deletes().collect::<Vec<_>>(), [&K::G(3), &K::G(4)]);
+        Ok(())
     }
 
     #[test]
-    fn seen_rows_of_any_type() {
+    fn seen_rows_of_any_type() -> Result<(), crate::Error> {
         let typed = Row::new("credential", Version::new(3));
         let e = builder(&mut Fill(0))
             .update(K::G(1), &typed, 1, None)
             .delete(K::G(2), &typed)
             .expect(K::G(3), &typed)
-            .build()
-            .unwrap();
+            .build()?;
         let v = Version::new(3);
         assert_eq!(
             e.guards().collect::<Vec<_>>(),
@@ -763,31 +765,34 @@ mod tests {
                 Guard::Unchanged(&K::G(3), v),
             ]
         );
+        Ok(())
     }
 
     #[test]
-    fn pending_combinators() {
+    fn pending_combinators() -> Result<(), crate::Error> {
         let e = &mut Fill(0);
-        let a = Pending::new(1u8, absent(e, [1]));
-        let b = Pending::new('b', absent(e, [2]));
-        let lifted = a.join(b).unwrap().lift(|k| k, |r| r).unwrap();
+        let a = Pending::new(1u8, absent(e, [1])?);
+        let b = Pending::new('b', absent(e, [2])?);
+        let lifted = a.join(b)?.lift(|k| k, |r| r)?;
         assert_eq!(lifted.effect().guards().count(), 2);
         let receipt = lifted.effect().host_applied();
-        assert_eq!(lifted.settle(receipt).unwrap(), (1, 'b'));
-        let clash = Pending::new(1u8, absent(e, [1])).join(Pending::new(2u8, absent(e, [1])));
+        assert_eq!(lifted.settle(receipt)?, (1, 'b'));
+        let clash = Pending::new(1u8, absent(e, [1])?).join(Pending::new(2u8, absent(e, [1])?));
         assert_eq!(kind(clash), Some(ErrorKind::Overlap));
         assert_eq!(
-            kind(Pending::new(1u8, absent(e, [1, 2])).lift(|_| K::G(0), |r| r)),
+            kind(Pending::new(1u8, absent(e, [1, 2])?).lift(|_| K::G(0), |r| r)),
             Some(ErrorKind::Overlap)
         );
+        Ok(())
     }
 
     #[test]
-    fn pending_debug_shows_only_the_effect_id() {
-        let p = Pending::new("session granted", absent(&mut Fill(2), [1]));
+    fn pending_debug_shows_only_the_effect_id() -> Result<(), crate::Error> {
+        let p = Pending::new("session granted", absent(&mut Fill(2), [1])?);
         assert_eq!(
             format!("{p:?}"),
             format!("Pending {{ effect: {:?}, .. }}", p.effect().id())
         );
+        Ok(())
     }
 }
