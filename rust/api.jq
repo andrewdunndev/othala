@@ -1,5 +1,5 @@
-# The public surface of a crate from rustdoc JSON: one line per item, public field, method with its signature,
-# variant and trait impl (blanket and auto impls omitted).
+# The public surface of a crate from rustdoc JSON: one line per item, item attribute, public field, method with its
+# signature, variant and trait impl (blanket and auto impls omitted).
 .index as $ix
 | def kind: .inner | keys[0];
   def name_of($id): $ix[($id|tostring)].name;
@@ -44,6 +44,7 @@
     | if kind == "function" then "function \(.name) \(sig)"
       elif kind == "constant" then "constant \(.name): \(.inner.constant.type | ty) = \(.inner.constant.const.expr)"
       else "\(kind) \(.name)" end,
+      ( .attrs[]? | if type == "object" then keys[0] | select(. != "other") else . end | "attr \($item.name) \(.)" ),
       ( (.inner.struct.kind? | objects | (.plain.fields[]?, (.tuple[]? | select(. != null))))
         | $ix[(.|tostring)] | select(.visibility == "public") | "field \($item.name)::\(.name): \(.inner.struct_field | ty)" ),
       ( .inner.enum.variants[]? | $ix[(.|tostring)] as $v

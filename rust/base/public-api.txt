@@ -1,3 +1,10 @@
+attr Builder must_use
+attr ErrorKind non_exhaustive
+attr Failure non_exhaustive
+attr Guard non_exhaustive
+attr Pending must_use
+attr Scope non_exhaustive
+attr Slot non_exhaustive
 constant MAX_B64URL_TEXT: usize = 65_536
 constant MAX_EFFECT_SIZE: usize = 128
 constant REDECIDE: u8 = 3
