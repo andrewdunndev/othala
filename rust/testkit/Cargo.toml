@@ -12,6 +12,7 @@ base = { workspace = true, features = ["std", "rand_core"] }
 rand_chacha.workspace = true
 serde = { workspace = true, features = ["derive"] }
 serde_json.workspace = true
+sha2.workspace = true
 toml.workspace = true
 
 [lints]

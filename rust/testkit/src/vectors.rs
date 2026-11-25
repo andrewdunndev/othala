@@ -1,4 +1,4 @@
-//! The one vector runner: every case is visited, the total matches `SOURCES.toml`, and enough cases ran.
+//! The one vector runner: the file hashes and counts as `SOURCES.toml` lists it, every case is visited, and enough ran.
 #![expect(
     clippy::expect_used,
     clippy::panic,
@@ -8,6 +8,7 @@ use std::collections::BTreeMap;
 
 use serde::Deserialize;
 use serde::de::DeserializeOwned;
+use sha2::{Digest as _, Sha256};
 
 const SOURCES: &str = include_str!("../../vectors/SOURCES.toml");
 
@@ -79,6 +80,7 @@ struct Source {
 #[derive(Deserialize)]
 struct Listed {
     path: String,
+    sha256: String,
     cases: usize,
 }
 
@@ -87,8 +89,8 @@ struct File<C> {
     cases: Vec<C>,
 }
 
-/// Runs `check` over every case of `vector`; panics unless the file holds the cases `SOURCES.toml`
-/// declares and at least `floor` (nonzero) were checked.
+/// Runs `check` over every case of `vector`; panics unless the file has the SHA-256 and holds the cases
+/// `SOURCES.toml` declares and at least `floor` (nonzero) were checked.
 pub fn run<C: DeserializeOwned>(
     vector: Vector,
     floor: usize,
@@ -106,20 +108,28 @@ fn run_against<C: DeserializeOwned>(
     let path = vector.path;
     let file: File<C> = serde_json::from_str(vector.json).expect("vector file decodes");
     let sources: Sources = toml::from_str(sources).expect("SOURCES.toml decodes");
-    let declared: Vec<usize> = sources
+    let listed: Vec<&Listed> = sources
         .source
         .values()
         .flat_map(|s| &s.files)
         .filter(|f| f.path == path)
-        .map(|f| f.cases)
         .collect();
-    let &[declared] = declared.as_slice() else {
-        panic!("{path}: listed {} times in SOURCES.toml", declared.len());
+    let &[listed] = listed.as_slice() else {
+        panic!("{path}: listed {} times in SOURCES.toml", listed.len());
     };
+    let declared = listed.cases;
     assert_eq!(
         file.cases.len(),
         declared,
         "{path}: cases in file against SOURCES.toml"
+    );
+    let sha256: String = Sha256::digest(vector.json)
+        .iter()
+        .map(|b| format!("{b:02x}"))
+        .collect();
+    assert_eq!(
+        sha256, listed.sha256,
+        "{path}: SHA-256 of the file against SOURCES.toml"
     );
     let checked = file
         .cases
@@ -143,7 +153,7 @@ mod tests {
     const SOURCES: &str = r#"
 [source."a"]
 url = "https://example.invalid/a"
-files = [ { path = "a/three.json", sha256 = "00", cases = 3 } ]
+files = [ { path = "a/three.json", sha256 = "70aee6cd93f55814211815ffaf84781c23aba9af5a837dd67bf03a55aa280d92", cases = 3 } ]
 [source."b"]
 notes = "a source with no files"
 "#;
@@ -196,6 +206,13 @@ notes = "a source with no files"
     fn total_mismatch_fails() {
         let two = r#"{ "cases": [ { "n": 1 }, { "n": 3 } ] }"#;
         run_against(SOURCES, Vector::new("a/three.json", two), 1, odd);
+    }
+
+    #[test]
+    #[should_panic(expected = "a/three.json: SHA-256 of the file against SOURCES.toml")]
+    fn altered_file_fails() {
+        let altered = r#"{ "cases": [ { "n": 1 }, { "n": 2 }, { "n": 5 } ] }"#;
+        run_against(SOURCES, Vector::new("a/three.json", altered), 1, odd);
     }
 
     #[test]

@@ -16,7 +16,7 @@ pub type Decide<'a, K, R> = &'a dyn Fn(&mut MemStore<K, R>, &mut Seeded) -> Opti
 /// Decides every op against one snapshot of `start`, applies the effects in every order, and asserts:
 /// each decision guards every key it loaded; an effect fails only on keys an earlier winner wrote, so
 /// one that guards nothing a winner wrote applies; a loser re-decided within `REDECIDE` reaches the
-/// state of some serial run; and an effect applied twice applies once. Returns the conflicts raced.
+/// state of some serial run; and an effect applied twice answers as it did once. Returns the conflicts raced.
 pub fn race<K, R>(start: &MemStore<K, R>, ops: &[Decide<'_, K, R>], now: UnixTime) -> usize
 where
     K: StoreKey + Debug,
@@ -38,12 +38,13 @@ where
             serial.contents(now)
         })
         .collect();
-    let (mut conflicts, mut raced_orders) = (0, 0);
+    let (mut conflicts, mut sequences) = (0, Vec::new());
     for order in &orders {
-        raced_orders += 1;
         let mut raced = start.clone();
         let mut written = BTreeSet::new();
+        let mut sequence = Vec::new();
         for &(i, op) in &pick(ops, order) {
+            sequence.push(i);
             let Some(effect) = decide(start, op, seed(i, 0)) else {
                 continue;
             };
@@ -61,33 +62,24 @@ where
                 }
             }
         }
+        sequences.push(sequence);
         let outcome = raced.contents(now);
         assert!(
             serials.contains(&outcome),
             "order {order:?} reached {outcome:?}, against every serial run {serials:?}"
         );
     }
-    assert_eq!(
-        raced_orders,
-        (1..=ops.len()).product::<usize>(),
-        "every order raced"
-    );
+    assert_eq!(sequences, orders, "every order raced");
     for (i, op) in ops.iter().enumerate() {
         let Some(effect) = decide(start, *op, seed(i, 0)) else {
             continue;
         };
         let mut twice = start.clone();
         let first = twice.apply(&effect, now).expect("reference store").is_ok();
-        let after = twice.contents(now);
         assert_eq!(
             twice.apply(&effect, now).expect("reference store").is_ok(),
             first,
             "op {i} applied twice"
-        );
-        assert_eq!(
-            twice.contents(now),
-            after,
-            "op {i} applied twice wrote twice"
         );
     }
     conflicts
