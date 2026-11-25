@@ -254,3 +254,51 @@ files = [
   { path = "android-key-attestation/status.json", sha256 = "6b204883d3ae63b42605552e20eddb1e1c4178f73b4a4fced40542c0d7c62211", cases = 0 },
 ]
 
+# Real-authenticator corpus. Seeded from the survey failure list (survey-webauthn.md section 4 item 3).
+# Nothing below is committed yet except android-key-attestation above. Candidate sources are named by
+# repository and stated licence only; no candidate has been read or copied. Excluded and never used:
+# Ory projects, Kanidm projects (including webauthn-rs and its issue-derived fixtures).
+[wanted]
+purpose = "Attestation interop long tail: real-device registrations that break strict verifiers"
+
+[[wanted.item]]
+need = "Apple anonymous attestation x5c chain from a current OS (leaf key-usage handling)"
+feeds = ["webauthn-rp"]
+candidates = ["MasterKale/SimpleWebAuthn (MIT) apple attestation test fixtures, inline TypeScript", "go-webauthn/webauthn (BSD-3-Clause) protocol tests"]
+status = "candidate, extraction and per-file licence check pending"
+
+[[wanted.item]]
+need = "TPM attestation with critical extensions in the AIK certificate, and with a lower-case or odd-case fTPM manufacturer string"
+feeds = ["webauthn-rp"]
+candidates = ["MasterKale/SimpleWebAuthn (MIT) tpm fixtures", "go-webauthn/webauthn (BSD-3-Clause) tpm fixtures"]
+status = "candidate, extraction pending"
+
+[[wanted.item]]
+need = "android-key attestationObject whose x5c repeats a certificate, plus a full WebAuthn registration around the committed Android chains"
+feeds = ["webauthn-rp"]
+candidates = ["MasterKale/SimpleWebAuthn (MIT) android-key fixtures", "google/android-key-attestation chains (committed as android-key-attestation)"]
+status = "chains committed; WebAuthn-level objects pending"
+
+[[wanted.item]]
+need = "FIDO U2F attestation certificates from real security keys (gnubby-style and vendor-style)"
+feeds = ["webauthn-rp"]
+candidates = ["Yubico/java-webauthn-server src/test/resources u2f testdata (BSD-2-Clause per COPYING; repo licence field reads NOASSERTION, so read per-file headers before copying)"]
+status = "candidate, licence confirmation pending"
+
+[[wanted.item]]
+need = "Packed and U2F registrations from a current open-hardware security key (compatibility failures reported against a Rust verifier)"
+feeds = ["webauthn-rp"]
+candidates = []
+status = "no public licence-clear source found; the only known reports sit in an excluded project"
+
+[[wanted.item]]
+need = "Browser and password-manager quirks: Samsung and Google Password Manager registrations, Android without Google managers, synced passkeys with BE and BS flags set"
+feeds = ["webauthn-rp"]
+candidates = []
+status = "no public licence-clear source found; capture from own test devices later"
+
+[[wanted.item]]
+need = "Real-device packed self and full attestation across ES256, RS256 and EdDSA, plus none attestation from platform authenticators"
+feeds = ["webauthn-rp"]
+candidates = ["web-platform-tests/wpt (BSD-3-Clause) webauthn resources, synthetic not real-device"]
+status = "synthetic coverage already in w3c-webauthn-3; real-device data pending"
