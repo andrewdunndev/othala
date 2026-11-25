@@ -1,0 +1,145 @@
+{
+ "source": "RFC 4648 section 10",
+ "cases": [
+  {
+   "encoding": "BASE64",
+   "input": "",
+   "output": ""
+  },
+  {
+   "encoding": "BASE64",
+   "input": "f",
+   "output": "Zg=="
+  },
+  {
+   "encoding": "BASE64",
+   "input": "fo",
+   "output": "Zm8="
+  },
+  {
+   "encoding": "BASE64",
+   "input": "foo",
+   "output": "Zm9v"
+  },
+  {
+   "encoding": "BASE64",
+   "input": "foob",
+   "output": "Zm9vYg=="
+  },
+  {
+   "encoding": "BASE64",
+   "input": "fooba",
+   "output": "Zm9vYmE="
+  },
+  {
+   "encoding": "BASE64",
+   "input": "foobar",
+   "output": "Zm9vYmFy"
+  },
+  {
+   "encoding": "BASE32",
+   "input": "",
+   "output": ""
+  },
+  {
+   "encoding": "BASE32",
+   "input": "f",
+   "output": "MY======"
+  },
+  {
+   "encoding": "BASE32",
+   "input": "fo",
+   "output": "MZXQ===="
+  },
+  {
+   "encoding": "BASE32",
+   "input": "foo",
+   "output": "MZXW6==="
+  },
+  {
+   "encoding": "BASE32",
+   "input": "foob",
+   "output": "MZXW6YQ="
+  },
+  {
+   "encoding": "BASE32",
+   "input": "fooba",
+   "output": "MZXW6YTB"
+  },
+  {
+   "encoding": "BASE32",
+   "input": "foobar",
+   "output": "MZXW6YTBOI======"
+  },
+  {
+   "encoding": "BASE32-HEX",
+   "input": "",
+   "output": ""
+  },
+  {
+   "encoding": "BASE32-HEX",
+   "input": "f",
+   "output": "CO======"
+  },
+  {
+   "encoding": "BASE32-HEX",
+   "input": "fo",
+   "output": "CPNG===="
+  },
+  {
+   "encoding": "BASE32-HEX",
+   "input": "foo",
+   "output": "CPNMU==="
+  },
+  {
+   "encoding": "BASE32-HEX",
+   "input": "foob",
+   "output": "CPNMUOG="
+  },
+  {
+   "encoding": "BASE32-HEX",
+   "input": "fooba",
+   "output": "CPNMUOJ1"
+  },
+  {
+   "encoding": "BASE32-HEX",
+   "input": "foobar",
+   "output": "CPNMUOJ1E8======"
+  },
+  {
+   "encoding": "BASE16",
+   "input": "",
+   "output": ""
+  },
+  {
+   "encoding": "BASE16",
+   "input": "f",
+   "output": "66"
+  },
+  {
+   "encoding": "BASE16",
+   "input": "fo",
+   "output": "666F"
+  },
+  {
+   "encoding": "BASE16",
+   "input": "foo",
+   "output": "666F6F"
+  },
+  {
+   "encoding": "BASE16",
+   "input": "foob",
+   "output": "666F6F62"
+  },
+  {
+   "encoding": "BASE16",
+   "input": "fooba",
+   "output": "666F6F6261"
+  },
+  {
+   "encoding": "BASE16",
+   "input": "foobar",
+   "output": "666F6F626172"
+  }
+ ]
+}

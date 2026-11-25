@@ -1,0 +1,383 @@
+{
+ "source": "derived with Node crypto from fresh keys by gen-alg.mjs: valid signatures under a header alg that differs from the key record alg (RFC 8725 section 3.1, RFC 7515 section 4.1.1), plus one positive control per key type",
+ "cases": [
+  {
+   "id": "es256-key-hs256-header-mac-jwk-json",
+   "op": "jws_verify",
+   "alg": "ES256",
+   "jwk": {
+    "kty": "EC",
+    "x": "uxWCHeAyUjNikWSPMDoD25cU-IHQSV3DigVO2CVyXAI",
+    "y": "6e3c2noBuR9MskZnH0kEMRCZN7MxroXKufUczNp49Co",
+    "crv": "P-256"
+   },
+   "jws": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJvdGhhbGEiLCJzdWIiOiJhbGctdmVjdG9yIiwiZXhwIjo0MTAyNDQ0ODAwfQ._5ywKLk6yFUvnb30rRLtHp0ghoaMY3VGaZIkMVK0wv4",
+   "expect": {
+    "ok": false
+   },
+   "note": "ES256 key record, header HS256, valid HMAC keyed by the public key as jwk-json"
+  },
+  {
+   "id": "es256-key-hs256-header-mac-sec1-point",
+   "op": "jws_verify",
+   "alg": "ES256",
+   "jwk": {
+    "kty": "EC",
+    "x": "uxWCHeAyUjNikWSPMDoD25cU-IHQSV3DigVO2CVyXAI",
+    "y": "6e3c2noBuR9MskZnH0kEMRCZN7MxroXKufUczNp49Co",
+    "crv": "P-256"
+   },
+   "jws": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJvdGhhbGEiLCJzdWIiOiJhbGctdmVjdG9yIiwiZXhwIjo0MTAyNDQ0ODAwfQ.0XoKhD7rQLVpU6pHye0q0oCPFGC3GUg7zqIbPGt6KNM",
+   "expect": {
+    "ok": false
+   },
+   "note": "ES256 key record, header HS256, valid HMAC keyed by the public key as sec1-point"
+  },
+  {
+   "id": "es256-key-hs256-header-mac-spki-der",
+   "op": "jws_verify",
+   "alg": "ES256",
+   "jwk": {
+    "kty": "EC",
+    "x": "uxWCHeAyUjNikWSPMDoD25cU-IHQSV3DigVO2CVyXAI",
+    "y": "6e3c2noBuR9MskZnH0kEMRCZN7MxroXKufUczNp49Co",
+    "crv": "P-256"
+   },
+   "jws": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJvdGhhbGEiLCJzdWIiOiJhbGctdmVjdG9yIiwiZXhwIjo0MTAyNDQ0ODAwfQ.nH2XPrlQD7yQgM2dfrXkribzODpuhz3wrC7WoYc8NbI",
+   "expect": {
+    "ok": false
+   },
+   "note": "ES256 key record, header HS256, valid HMAC keyed by the public key as spki-der"
+  },
+  {
+   "id": "es256-key-hs256-header-mac-spki-pem",
+   "op": "jws_verify",
+   "alg": "ES256",
+   "jwk": {
+    "kty": "EC",
+    "x": "uxWCHeAyUjNikWSPMDoD25cU-IHQSV3DigVO2CVyXAI",
+    "y": "6e3c2noBuR9MskZnH0kEMRCZN7MxroXKufUczNp49Co",
+    "crv": "P-256"
+   },
+   "jws": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJvdGhhbGEiLCJzdWIiOiJhbGctdmVjdG9yIiwiZXhwIjo0MTAyNDQ0ODAwfQ.Mz1ZQOm8HClaKeHwHJKFv6TtgffsrTz6_ZYhKqMK3xI",
+   "expect": {
+    "ok": false
+   },
+   "note": "ES256 key record, header HS256, valid HMAC keyed by the public key as spki-pem"
+  },
+  {
+   "id": "es256-key-es384-header-valid-sig",
+   "op": "jws_verify",
+   "alg": "ES256",
+   "jwk": {
+    "kty": "EC",
+    "x": "uxWCHeAyUjNikWSPMDoD25cU-IHQSV3DigVO2CVyXAI",
+    "y": "6e3c2noBuR9MskZnH0kEMRCZN7MxroXKufUczNp49Co",
+    "crv": "P-256"
+   },
+   "jws": "eyJhbGciOiJFUzM4NCIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJvdGhhbGEiLCJzdWIiOiJhbGctdmVjdG9yIiwiZXhwIjo0MTAyNDQ0ODAwfQ.wnyGb6InOhhddUiCyrrt7oE_Z-yg0fUWY13GLNn0TTM9CseV-6Voe7TeL5lfJK4KDmENjSRT2zeZcu_rl8wc6Q",
+   "expect": {
+    "ok": false
+   },
+   "note": "ES256 key record, header ES384, valid ES384 signature by the same key"
+  },
+  {
+   "id": "rs256-key-hs256-header-mac-modulus",
+   "op": "jws_verify",
+   "alg": "RS256",
+   "jwk": {
+    "kty": "RSA",
+    "n": "xqp8GTAjjMWokpAN8uF3kTXF0syBQocRDgM4VpFtG2k8YCjDuzbfB5IzHmkwhEpNL1O63CmPESDhf3CKjjB1feM9bbQ-9usYzk6cHqAfRSflyw_02od4tqH1-YzRDdaMg4gmGADfGmJuhaFo1SazHxNTP1Gb9TpHvLePGG_5w4TvyxmVqzGPlMGcp_nAIX69KAbRJmwfmZzPdnYumW8UG3FOfxnrsO-hc-E5hUQo0h9QMKlBVTFOjcdfYcqkAUdV6JjIhLoJXnNOupjRWlQBh2vJ7IJpObryRuv8hH_9o9NIik7kdRPNYrtnYA_OaAW7Arr9GCqlEP002ZXcuWVORw",
+    "e": "AQAB"
+   },
+   "jws": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJvdGhhbGEiLCJzdWIiOiJhbGctdmVjdG9yIiwiZXhwIjo0MTAyNDQ0ODAwfQ.fnekMZD5k4qryCdLiWMNLJ1jyCC6Oc6508J42npLh5s",
+   "expect": {
+    "ok": false
+   },
+   "note": "RS256 key record, header HS256, valid HMAC keyed by the public key as modulus"
+  },
+  {
+   "id": "rs256-key-hs256-header-mac-jwk-json",
+   "op": "jws_verify",
+   "alg": "RS256",
+   "jwk": {
+    "kty": "RSA",
+    "n": "xqp8GTAjjMWokpAN8uF3kTXF0syBQocRDgM4VpFtG2k8YCjDuzbfB5IzHmkwhEpNL1O63CmPESDhf3CKjjB1feM9bbQ-9usYzk6cHqAfRSflyw_02od4tqH1-YzRDdaMg4gmGADfGmJuhaFo1SazHxNTP1Gb9TpHvLePGG_5w4TvyxmVqzGPlMGcp_nAIX69KAbRJmwfmZzPdnYumW8UG3FOfxnrsO-hc-E5hUQo0h9QMKlBVTFOjcdfYcqkAUdV6JjIhLoJXnNOupjRWlQBh2vJ7IJpObryRuv8hH_9o9NIik7kdRPNYrtnYA_OaAW7Arr9GCqlEP002ZXcuWVORw",
+    "e": "AQAB"
+   },
+   "jws": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJvdGhhbGEiLCJzdWIiOiJhbGctdmVjdG9yIiwiZXhwIjo0MTAyNDQ0ODAwfQ.RoJSkft7ZXbo-CpKG0gKX3AdI-l6yTSxaggj2PBq13M",
+   "expect": {
+    "ok": false
+   },
+   "note": "RS256 key record, header HS256, valid HMAC keyed by the public key as jwk-json"
+  },
+  {
+   "id": "rs256-key-hs256-header-mac-spki-der",
+   "op": "jws_verify",
+   "alg": "RS256",
+   "jwk": {
+    "kty": "RSA",
+    "n": "xqp8GTAjjMWokpAN8uF3kTXF0syBQocRDgM4VpFtG2k8YCjDuzbfB5IzHmkwhEpNL1O63CmPESDhf3CKjjB1feM9bbQ-9usYzk6cHqAfRSflyw_02od4tqH1-YzRDdaMg4gmGADfGmJuhaFo1SazHxNTP1Gb9TpHvLePGG_5w4TvyxmVqzGPlMGcp_nAIX69KAbRJmwfmZzPdnYumW8UG3FOfxnrsO-hc-E5hUQo0h9QMKlBVTFOjcdfYcqkAUdV6JjIhLoJXnNOupjRWlQBh2vJ7IJpObryRuv8hH_9o9NIik7kdRPNYrtnYA_OaAW7Arr9GCqlEP002ZXcuWVORw",
+    "e": "AQAB"
+   },
+   "jws": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJvdGhhbGEiLCJzdWIiOiJhbGctdmVjdG9yIiwiZXhwIjo0MTAyNDQ0ODAwfQ.aiL6SKPbia3QLy03W1QhKn6QbEkiOAhni4Mglwfpk-Y",
+   "expect": {
+    "ok": false
+   },
+   "note": "RS256 key record, header HS256, valid HMAC keyed by the public key as spki-der"
+  },
+  {
+   "id": "rs256-key-hs256-header-mac-spki-pem",
+   "op": "jws_verify",
+   "alg": "RS256",
+   "jwk": {
+    "kty": "RSA",
+    "n": "xqp8GTAjjMWokpAN8uF3kTXF0syBQocRDgM4VpFtG2k8YCjDuzbfB5IzHmkwhEpNL1O63CmPESDhf3CKjjB1feM9bbQ-9usYzk6cHqAfRSflyw_02od4tqH1-YzRDdaMg4gmGADfGmJuhaFo1SazHxNTP1Gb9TpHvLePGG_5w4TvyxmVqzGPlMGcp_nAIX69KAbRJmwfmZzPdnYumW8UG3FOfxnrsO-hc-E5hUQo0h9QMKlBVTFOjcdfYcqkAUdV6JjIhLoJXnNOupjRWlQBh2vJ7IJpObryRuv8hH_9o9NIik7kdRPNYrtnYA_OaAW7Arr9GCqlEP002ZXcuWVORw",
+    "e": "AQAB"
+   },
+   "jws": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJvdGhhbGEiLCJzdWIiOiJhbGctdmVjdG9yIiwiZXhwIjo0MTAyNDQ0ODAwfQ.u08EVWx_6oUSzw0fB4I3RULQvWIv0YED3OAKJ7Augys",
+   "expect": {
+    "ok": false
+   },
+   "note": "RS256 key record, header HS256, valid HMAC keyed by the public key as spki-pem"
+  },
+  {
+   "id": "rs256-key-hs256-header-mac-pkcs1-pem",
+   "op": "jws_verify",
+   "alg": "RS256",
+   "jwk": {
+    "kty": "RSA",
+    "n": "xqp8GTAjjMWokpAN8uF3kTXF0syBQocRDgM4VpFtG2k8YCjDuzbfB5IzHmkwhEpNL1O63CmPESDhf3CKjjB1feM9bbQ-9usYzk6cHqAfRSflyw_02od4tqH1-YzRDdaMg4gmGADfGmJuhaFo1SazHxNTP1Gb9TpHvLePGG_5w4TvyxmVqzGPlMGcp_nAIX69KAbRJmwfmZzPdnYumW8UG3FOfxnrsO-hc-E5hUQo0h9QMKlBVTFOjcdfYcqkAUdV6JjIhLoJXnNOupjRWlQBh2vJ7IJpObryRuv8hH_9o9NIik7kdRPNYrtnYA_OaAW7Arr9GCqlEP002ZXcuWVORw",
+    "e": "AQAB"
+   },
+   "jws": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJvdGhhbGEiLCJzdWIiOiJhbGctdmVjdG9yIiwiZXhwIjo0MTAyNDQ0ODAwfQ.QR3eoDnQbdbuUu8XpvNTiHL62592jwG6kdc4_205x7s",
+   "expect": {
+    "ok": false
+   },
+   "note": "RS256 key record, header HS256, valid HMAC keyed by the public key as pkcs1-pem"
+  },
+  {
+   "id": "rs256-key-rs512-header-valid-sig",
+   "op": "jws_verify",
+   "alg": "RS256",
+   "jwk": {
+    "kty": "RSA",
+    "n": "xqp8GTAjjMWokpAN8uF3kTXF0syBQocRDgM4VpFtG2k8YCjDuzbfB5IzHmkwhEpNL1O63CmPESDhf3CKjjB1feM9bbQ-9usYzk6cHqAfRSflyw_02od4tqH1-YzRDdaMg4gmGADfGmJuhaFo1SazHxNTP1Gb9TpHvLePGG_5w4TvyxmVqzGPlMGcp_nAIX69KAbRJmwfmZzPdnYumW8UG3FOfxnrsO-hc-E5hUQo0h9QMKlBVTFOjcdfYcqkAUdV6JjIhLoJXnNOupjRWlQBh2vJ7IJpObryRuv8hH_9o9NIik7kdRPNYrtnYA_OaAW7Arr9GCqlEP002ZXcuWVORw",
+    "e": "AQAB"
+   },
+   "jws": "eyJhbGciOiJSUzUxMiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJvdGhhbGEiLCJzdWIiOiJhbGctdmVjdG9yIiwiZXhwIjo0MTAyNDQ0ODAwfQ.SSOBVKchwqlQc-MfRI19u7FcuDXVSs2FkGYMn8Bnhoaz58Mzw4Hxw5GKI9hDzhErFrMX06A23C5KGfGPMHFo81oRK4PVBzwtqMjDjij0ruNb4fZ6hASGmBUsosHS69rvIdmniQipcW3mUBYpU5xbxceot1OUqGpOvOWRc3M6X8y2LhC54463R3YYbZ0r0hwDQrQL2lAtemZWAOBERhnPe63twSHHb4PinIYlOdZba6vLlljNIxR3FXCDut_RjKuErSWpHQh13537l6di1cCIKLMCosXUYAyWh3Y5NaTWSQ0f9kCm63FqMknxAqdBLJkrsGWfaZ0b8grm7tbSjfUB7Q",
+   "expect": {
+    "ok": false
+   },
+   "note": "RS256 key record, header RS512, valid RS512 signature by the same key"
+  },
+  {
+   "id": "hs256-key-es256-header-valid-sig-other-key",
+   "op": "jws_verify",
+   "alg": "HS256",
+   "jwk": {
+    "kty": "oct",
+    "k": "WJ-09H99SaeXwfPwT6M0_LOAEeWVoJEJP8LXUIPFOyI"
+   },
+   "jws": "eyJhbGciOiJFUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJvdGhhbGEiLCJzdWIiOiJhbGctdmVjdG9yIiwiZXhwIjo0MTAyNDQ0ODAwfQ.tGSvItWnKfm1qAWvbJw53Zioivh_JbB0Cyuz2D2Khi-nMdU2Wq8ka01G4FSPTwhPxj8OkKVA9jA7JACMuOXq5A",
+   "expect": {
+    "ok": false
+   },
+   "note": "HS256 key record, header ES256, valid ES256 signature by an unrelated key"
+  },
+  {
+   "id": "hs256-key-rs256-header-valid-sig-other-key",
+   "op": "jws_verify",
+   "alg": "HS256",
+   "jwk": {
+    "kty": "oct",
+    "k": "WJ-09H99SaeXwfPwT6M0_LOAEeWVoJEJP8LXUIPFOyI"
+   },
+   "jws": "eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJvdGhhbGEiLCJzdWIiOiJhbGctdmVjdG9yIiwiZXhwIjo0MTAyNDQ0ODAwfQ.JF0VozxGdfNdW4fnO7M_T43ggX6-2oZjaULScagLyGDEcaK2GTLdGz9IioRRO-FBIk07uLXie0ecZ8Ng4gnZ7fEWFTuTHWeSEoA443E11amRTlKOnGE0WQ4mNbQ1W2Yw_jMdPP_ot7XUDiCPIfCbBRJnl8kEtYF2rOP3eLejXYXibWnCk4gCrBh925O7ZEOe5NUNCORKHAfTnxI3OvRIT1jGwy86ZTyaVseeMJhnSWV7QmboQT0hqD3_kemMZssvkPzVkW3oNJSFWNbQqzlcljeDW1lOVrcw84DufhEqkepi8fhssP0LIJ-jxB2jQWk4Gx0AsQFjP-2aQMebIzlNvw",
+   "expect": {
+    "ok": false
+   },
+   "note": "HS256 key record, header RS256, valid RS256 signature by an unrelated key"
+  },
+  {
+   "id": "es256-key-none-header-empty-sig",
+   "op": "jws_verify",
+   "alg": "ES256",
+   "jwk": {
+    "kty": "EC",
+    "x": "uxWCHeAyUjNikWSPMDoD25cU-IHQSV3DigVO2CVyXAI",
+    "y": "6e3c2noBuR9MskZnH0kEMRCZN7MxroXKufUczNp49Co",
+    "crv": "P-256"
+   },
+   "jws": "eyJhbGciOiJub25lIiwidHlwIjoiSldUIn0.eyJpc3MiOiJvdGhhbGEiLCJzdWIiOiJhbGctdmVjdG9yIiwiZXhwIjo0MTAyNDQ0ODAwfQ.",
+   "expect": {
+    "ok": false
+   },
+   "note": "ES256 key record, header none, empty signature"
+  },
+  {
+   "id": "rs256-key-none-header-empty-sig",
+   "op": "jws_verify",
+   "alg": "RS256",
+   "jwk": {
+    "kty": "RSA",
+    "n": "xqp8GTAjjMWokpAN8uF3kTXF0syBQocRDgM4VpFtG2k8YCjDuzbfB5IzHmkwhEpNL1O63CmPESDhf3CKjjB1feM9bbQ-9usYzk6cHqAfRSflyw_02od4tqH1-YzRDdaMg4gmGADfGmJuhaFo1SazHxNTP1Gb9TpHvLePGG_5w4TvyxmVqzGPlMGcp_nAIX69KAbRJmwfmZzPdnYumW8UG3FOfxnrsO-hc-E5hUQo0h9QMKlBVTFOjcdfYcqkAUdV6JjIhLoJXnNOupjRWlQBh2vJ7IJpObryRuv8hH_9o9NIik7kdRPNYrtnYA_OaAW7Arr9GCqlEP002ZXcuWVORw",
+    "e": "AQAB"
+   },
+   "jws": "eyJhbGciOiJub25lIiwidHlwIjoiSldUIn0.eyJpc3MiOiJvdGhhbGEiLCJzdWIiOiJhbGctdmVjdG9yIiwiZXhwIjo0MTAyNDQ0ODAwfQ.",
+   "expect": {
+    "ok": false
+   },
+   "note": "RS256 key record, header none, empty signature"
+  },
+  {
+   "id": "hs256-key-none-header-empty-sig",
+   "op": "jws_verify",
+   "alg": "HS256",
+   "jwk": {
+    "kty": "oct",
+    "k": "WJ-09H99SaeXwfPwT6M0_LOAEeWVoJEJP8LXUIPFOyI"
+   },
+   "jws": "eyJhbGciOiJub25lIiwidHlwIjoiSldUIn0.eyJpc3MiOiJvdGhhbGEiLCJzdWIiOiJhbGctdmVjdG9yIiwiZXhwIjo0MTAyNDQ0ODAwfQ.",
+   "expect": {
+    "ok": false
+   },
+   "note": "HS256 key record, header none, empty signature"
+  },
+  {
+   "id": "es256-key-ES384-header-sig-valid-under-key-alg",
+   "op": "jws_verify",
+   "alg": "ES256",
+   "jwk": {
+    "kty": "EC",
+    "x": "uxWCHeAyUjNikWSPMDoD25cU-IHQSV3DigVO2CVyXAI",
+    "y": "6e3c2noBuR9MskZnH0kEMRCZN7MxroXKufUczNp49Co",
+    "crv": "P-256"
+   },
+   "jws": "eyJhbGciOiJFUzM4NCIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJvdGhhbGEiLCJzdWIiOiJhbGctdmVjdG9yIiwiZXhwIjo0MTAyNDQ0ODAwfQ.LS_wx9eBi1cCQB-asqjmlCZYt6vFGyQBUIMLtNZzfK667j8I-ZdlXuAahL0_nO0K8WEvjc7ksd0WTJM7tnuQBQ",
+   "expect": {
+    "ok": false
+   },
+   "note": "ES256 key record, header ES384, signature valid under the key alg only"
+  },
+  {
+   "id": "es256-key-none-header-sig-valid-under-key-alg",
+   "op": "jws_verify",
+   "alg": "ES256",
+   "jwk": {
+    "kty": "EC",
+    "x": "uxWCHeAyUjNikWSPMDoD25cU-IHQSV3DigVO2CVyXAI",
+    "y": "6e3c2noBuR9MskZnH0kEMRCZN7MxroXKufUczNp49Co",
+    "crv": "P-256"
+   },
+   "jws": "eyJhbGciOiJub25lIiwidHlwIjoiSldUIn0.eyJpc3MiOiJvdGhhbGEiLCJzdWIiOiJhbGctdmVjdG9yIiwiZXhwIjo0MTAyNDQ0ODAwfQ.pWtL9StvazKf3AQe9SLsizlXgK4iWX-IakCOMV8PweibhPy3tK_FeRyhHxDNBsyrZlZesh1E7gX2myxim6sh9w",
+   "expect": {
+    "ok": false
+   },
+   "note": "ES256 key record, header none, signature valid under the key alg only"
+  },
+  {
+   "id": "rs256-key-RS512-header-sig-valid-under-key-alg",
+   "op": "jws_verify",
+   "alg": "RS256",
+   "jwk": {
+    "kty": "RSA",
+    "n": "xqp8GTAjjMWokpAN8uF3kTXF0syBQocRDgM4VpFtG2k8YCjDuzbfB5IzHmkwhEpNL1O63CmPESDhf3CKjjB1feM9bbQ-9usYzk6cHqAfRSflyw_02od4tqH1-YzRDdaMg4gmGADfGmJuhaFo1SazHxNTP1Gb9TpHvLePGG_5w4TvyxmVqzGPlMGcp_nAIX69KAbRJmwfmZzPdnYumW8UG3FOfxnrsO-hc-E5hUQo0h9QMKlBVTFOjcdfYcqkAUdV6JjIhLoJXnNOupjRWlQBh2vJ7IJpObryRuv8hH_9o9NIik7kdRPNYrtnYA_OaAW7Arr9GCqlEP002ZXcuWVORw",
+    "e": "AQAB"
+   },
+   "jws": "eyJhbGciOiJSUzUxMiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJvdGhhbGEiLCJzdWIiOiJhbGctdmVjdG9yIiwiZXhwIjo0MTAyNDQ0ODAwfQ.N6s2m2UdEVFHucX4BCz-KVsYqKC2xkkXFkICAqh-NelmwoARQKQXCDz5o5Lm0CvotoV-1_M0dxhBPaIM3RRh5HFoN78bVn20fmyF57THiazk8oabj5bmmCZyyi0sIIyWCh4813FeQrRZO9TDQ2E1kgUwiIv7pJsj0bjJUmp-Mtv9jWrbPpbxQoo_Gx4T9o5fiAADtBURZ2mPeKqgNEOPmJqgZ-Vp7eEXlLslyriXNJ0uMzOZjwHDEXQgARiA-NPqVJFRDEYnzk6J8jbdaLQmGduGeV5HKmfg3tkPrdLUQef7Gx8bPv6FH8DdOPzLpOTWMIsWy57Uvpzi3A-FvYP60w",
+   "expect": {
+    "ok": false
+   },
+   "note": "RS256 key record, header RS512, signature valid under the key alg only"
+  },
+  {
+   "id": "rs256-key-none-header-sig-valid-under-key-alg",
+   "op": "jws_verify",
+   "alg": "RS256",
+   "jwk": {
+    "kty": "RSA",
+    "n": "xqp8GTAjjMWokpAN8uF3kTXF0syBQocRDgM4VpFtG2k8YCjDuzbfB5IzHmkwhEpNL1O63CmPESDhf3CKjjB1feM9bbQ-9usYzk6cHqAfRSflyw_02od4tqH1-YzRDdaMg4gmGADfGmJuhaFo1SazHxNTP1Gb9TpHvLePGG_5w4TvyxmVqzGPlMGcp_nAIX69KAbRJmwfmZzPdnYumW8UG3FOfxnrsO-hc-E5hUQo0h9QMKlBVTFOjcdfYcqkAUdV6JjIhLoJXnNOupjRWlQBh2vJ7IJpObryRuv8hH_9o9NIik7kdRPNYrtnYA_OaAW7Arr9GCqlEP002ZXcuWVORw",
+    "e": "AQAB"
+   },
+   "jws": "eyJhbGciOiJub25lIiwidHlwIjoiSldUIn0.eyJpc3MiOiJvdGhhbGEiLCJzdWIiOiJhbGctdmVjdG9yIiwiZXhwIjo0MTAyNDQ0ODAwfQ.uluHiMcLE27uENUjh2AeaB8UKwujAf1iRKheErz2p3RwAWbZWaYHKDzj1HLk2mU-tNodzP74qWrInzZbB1SaMpqntqecVvcYtrNgu8LyIKvlr4USYh9GMw9nuGLwA2xASxvyjLq-4s8PTOtD4k-qASerXvEDkY50e73k4tPGG549gziUjd7cO4QhC8BjjUB1t7Uv48SBmnfGvX61nRwYslcUdsFr8fFZfqLUdHtrK1HyliVKgno8glo1hRwtaaFFgA3cOrh26B1UXbq1HoFEvlCvEbDxlLZgfnjeEECPeq7p9kJbgq8y6tuDk5neXAbj-E4BdaO6hX1SlleXM9CK5g",
+   "expect": {
+    "ok": false
+   },
+   "note": "RS256 key record, header none, signature valid under the key alg only"
+  },
+  {
+   "id": "hs256-key-HS384-header-sig-valid-under-key-alg",
+   "op": "jws_verify",
+   "alg": "HS256",
+   "jwk": {
+    "kty": "oct",
+    "k": "WJ-09H99SaeXwfPwT6M0_LOAEeWVoJEJP8LXUIPFOyI"
+   },
+   "jws": "eyJhbGciOiJIUzM4NCIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJvdGhhbGEiLCJzdWIiOiJhbGctdmVjdG9yIiwiZXhwIjo0MTAyNDQ0ODAwfQ.K_GglGKE3xDOrGH8CN3wUtlPqynBuRL2Lrs-QYZHsOo",
+   "expect": {
+    "ok": false
+   },
+   "note": "HS256 key record, header HS384, signature valid under the key alg only"
+  },
+  {
+   "id": "hs256-key-none-header-sig-valid-under-key-alg",
+   "op": "jws_verify",
+   "alg": "HS256",
+   "jwk": {
+    "kty": "oct",
+    "k": "WJ-09H99SaeXwfPwT6M0_LOAEeWVoJEJP8LXUIPFOyI"
+   },
+   "jws": "eyJhbGciOiJub25lIiwidHlwIjoiSldUIn0.eyJpc3MiOiJvdGhhbGEiLCJzdWIiOiJhbGctdmVjdG9yIiwiZXhwIjo0MTAyNDQ0ODAwfQ.yeBV-zl3T7g4KU2AdbpbfMQ2hB2V3Nw2YuuD8QfMEsE",
+   "expect": {
+    "ok": false
+   },
+   "note": "HS256 key record, header none, signature valid under the key alg only"
+  },
+  {
+   "id": "es256-control-valid",
+   "op": "jws_verify",
+   "alg": "ES256",
+   "jwk": {
+    "kty": "EC",
+    "x": "uxWCHeAyUjNikWSPMDoD25cU-IHQSV3DigVO2CVyXAI",
+    "y": "6e3c2noBuR9MskZnH0kEMRCZN7MxroXKufUczNp49Co",
+    "crv": "P-256"
+   },
+   "jws": "eyJhbGciOiJFUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJvdGhhbGEiLCJzdWIiOiJhbGctdmVjdG9yIiwiZXhwIjo0MTAyNDQ0ODAwfQ.Sy6WkF_vGecCj0mUrnbg7RJcHVGgKoDD4jfjiQVtC0HxxN2wnF9lYJE-CGCgYjEq1j_LU55YVLsH-Mka31ZeSA",
+   "expect": {
+    "ok": true
+   },
+   "note": "positive control: header ES256, valid signature"
+  },
+  {
+   "id": "rs256-control-valid",
+   "op": "jws_verify",
+   "alg": "RS256",
+   "jwk": {
+    "kty": "RSA",
+    "n": "xqp8GTAjjMWokpAN8uF3kTXF0syBQocRDgM4VpFtG2k8YCjDuzbfB5IzHmkwhEpNL1O63CmPESDhf3CKjjB1feM9bbQ-9usYzk6cHqAfRSflyw_02od4tqH1-YzRDdaMg4gmGADfGmJuhaFo1SazHxNTP1Gb9TpHvLePGG_5w4TvyxmVqzGPlMGcp_nAIX69KAbRJmwfmZzPdnYumW8UG3FOfxnrsO-hc-E5hUQo0h9QMKlBVTFOjcdfYcqkAUdV6JjIhLoJXnNOupjRWlQBh2vJ7IJpObryRuv8hH_9o9NIik7kdRPNYrtnYA_OaAW7Arr9GCqlEP002ZXcuWVORw",
+    "e": "AQAB"
+   },
+   "jws": "eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJvdGhhbGEiLCJzdWIiOiJhbGctdmVjdG9yIiwiZXhwIjo0MTAyNDQ0ODAwfQ.aNH_fcfqBKPgQfhcX_ST4j_2c8c4f45XJELVnUMBDK7MwqGz1dUIDdNOPKl3n2hZ-mSjqH-pIWojG-OfswrL-yuxvEHwEhw9DCflwpxCbzI78IAcb7cahrILHrKLUar4SBLV_Yh4PjtFD86RB1coqvoTAmiRj0tLLhRztp-glf3yXuqPYBQtUNTeZxtr49OzcEmktrVQpPXcYJh9krtf2GCTDlYeEMiFmeukhIngW2bEHnfGMhmXJlvliyS4q2kN3f1LOzQti3A7EwIu5Rawsff0P4IKD9R0APFR4juT1KxQ9jeXthJTX9Stajh-KidA0ugd8YvnHMFo0-4INbqdaA",
+   "expect": {
+    "ok": true
+   },
+   "note": "positive control: header RS256, valid signature"
+  },
+  {
+   "id": "hs256-control-valid",
+   "op": "jws_verify",
+   "alg": "HS256",
+   "jwk": {
+    "kty": "oct",
+    "k": "WJ-09H99SaeXwfPwT6M0_LOAEeWVoJEJP8LXUIPFOyI"
+   },
+   "jws": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJvdGhhbGEiLCJzdWIiOiJhbGctdmVjdG9yIiwiZXhwIjo0MTAyNDQ0ODAwfQ.ziRX2pLkC9XBhXsZXo6UzLAnryQJEE_q5azHuq37jts",
+   "expect": {
+    "ok": true
+   },
+   "note": "positive control: header HS256, valid MAC"
+  }
+ ]
+}

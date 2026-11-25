@@ -1,0 +1,304 @@
+# Provenance for every committed vector file.
+# Our own files (this file, tools/): MIT OR Apache-2.0. Third-party files keep the licence recorded per source.
+# `cases` counts test cases as the file itself states them (numberOfTests for Wycheproof).
+# `feeds` names the crates/contract areas: base, jose, webauthn-rp, oidc-provider, factor.
+
+[source."wycheproof"]
+url = "https://github.com/C2SP/wycheproof"
+revision = "65ca494727a52944c204441c860b039e6786b99b"
+retrieved = "2026-11-24"
+licence = "Apache-2.0"
+feeds = ["jose"]
+notes = "Upstream testvectors_v1 files, unmodified. ECDSA P-256 and P-384 (DER and P1363), Ed25519, RSA PKCS#1 v1.5 2048/3072/4096 x SHA-256/384/512, RSA-PSS (JOSE shape: MGF1 hash = signing hash, salt = hash length) 2048/3072/4096 for the combinations upstream publishes, HMAC-SHA256/384/512. Upstream has no RSA-PSS 2048 SHA-512, 3072 SHA-384 or 3072 SHA-512 files in this shape. P-256 files carried across from the exam spike (byte-identical to upstream at this sha)."
+cases = 5377
+files = [
+  { path = "wycheproof/ecdsa_secp256r1_sha256_p1363_test.json", sha256 = "c60de693930e386c3a5472d08081623ef8504decc54b38ac01ec6b2a2575c986", cases = 262 },
+  { path = "wycheproof/ecdsa_secp256r1_sha256_test.json", sha256 = "182db4f3e230f6f9fa9f800d2a614dede30284b8e8438bbfe1171905402e9332", cases = 484 },
+  { path = "wycheproof/ecdsa_secp384r1_sha384_p1363_test.json", sha256 = "e27344bf6daae75fa19663620883809f91c79fc4b4420eff9eae8036b34476be", cases = 280 },
+  { path = "wycheproof/ecdsa_secp384r1_sha384_test.json", sha256 = "8a5b3ae1760975143414811f13588c24d951d9d8c904195087ba327591dfe9cc", cases = 504 },
+  { path = "wycheproof/LICENSE", sha256 = "58d1e17ffe5109a7ae296caafcadfdbe6a7d176f0bc4ab01e12a689b0499d8bd", cases = 0 },
+  { path = "wycheproof/ed25519_test.json", sha256 = "ea80ffebac085e21cb9d3e903e7fa2b448d96702da5b31f061d0b83b430b74b3", cases = 210 },
+  { path = "wycheproof/hmac_sha256_test.json", sha256 = "2d201cfa61d1bf95e6f5d07d96634b4a348b31e8eaa277ad7c8d09677b7a743f", cases = 174 },
+  { path = "wycheproof/hmac_sha384_test.json", sha256 = "28b9776e979dd755d852ca471043ea6cedce8b15f7a28abdf6ea9efd982b43c0", cases = 174 },
+  { path = "wycheproof/hmac_sha512_test.json", sha256 = "b6c90477bdb4a6fc8ee3d1f7b2c0b69a8dfffab34718abaa6cabd71cc2ba1207", cases = 174 },
+  { path = "wycheproof/rsa_pss_2048_sha256_mgf1_32_test.json", sha256 = "7f6efafc160f4816b96cbf1c12188a31051d7e3f001e27505d9edb5f2a0e325c", cases = 108 },
+  { path = "wycheproof/rsa_pss_2048_sha384_mgf1_48_test.json", sha256 = "66d464778b0b2f683a1d1a20e94f77e9472b8cc393b45f423fa08a48e677063c", cases = 141 },
+  { path = "wycheproof/rsa_pss_3072_sha256_mgf1_32_test.json", sha256 = "cca48433e6d1accb57f65b3396c4f4dd93c776467101c3f0948e74c283fd4749", cases = 108 },
+  { path = "wycheproof/rsa_pss_4096_sha256_mgf1_32_test.json", sha256 = "e627cbf5139a01e0a446c4fe15911f6268224fdd3ef4a1eb714b3942b5686410", cases = 108 },
+  { path = "wycheproof/rsa_pss_4096_sha384_mgf1_48_test.json", sha256 = "d632649a7630f7c267eda576714ca11cf0ff068d6622f576b8701f923c112577", cases = 141 },
+  { path = "wycheproof/rsa_pss_4096_sha512_mgf1_64_test.json", sha256 = "c93ceaa56a190c9fd4707441c5c6a75839f108202d88aec891697f9623042547", cases = 179 },
+  { path = "wycheproof/rsa_signature_2048_sha256_test.json", sha256 = "94a917b01ff50fb874cfc05bf29b4af44868d944a6558201cf18380da93fb393", cases = 259 },
+  { path = "wycheproof/rsa_signature_2048_sha384_test.json", sha256 = "c571c105d261c0ff588a2888a529f152563fb3b77894b7620d4e4f8f934f2c1d", cases = 258 },
+  { path = "wycheproof/rsa_signature_2048_sha512_test.json", sha256 = "16ea24b039905d054bdb6004f5fd179374e150b7b6d73a7ba654b6d00eab12ef", cases = 259 },
+  { path = "wycheproof/rsa_signature_3072_sha256_test.json", sha256 = "0f5f18cabfaad3e2792e82f7e9882f8999049b456714de924b8a5e202f61ca43", cases = 259 },
+  { path = "wycheproof/rsa_signature_3072_sha384_test.json", sha256 = "73499ee649d8fb703b3f0f455fa36f7682fde677c590a736958ebce05ab27dae", cases = 259 },
+  { path = "wycheproof/rsa_signature_3072_sha512_test.json", sha256 = "09aa3336fdb7be216180ce944ca7b2a052e1de38c210435c19506327d4a36ebd", cases = 260 },
+  { path = "wycheproof/rsa_signature_4096_sha256_test.json", sha256 = "957aca128e30bd02c8982f8ca482d6521d16683f4bbc3f193cdfd4c8f04bc667", cases = 258 },
+  { path = "wycheproof/rsa_signature_4096_sha384_test.json", sha256 = "bc26f16b9fc9a90628864d3d1111ef48a4bd00b9d4870bfab88ff326e309e073", cases = 259 },
+  { path = "wycheproof/rsa_signature_4096_sha512_test.json", sha256 = "9d6e67b1eb0d7040db411835238efd20e9302399a258bdff82de3f38e0f2855a", cases = 259 },
+]
+
+[source."rfc4226"]
+url = "https://www.rfc-editor.org/rfc/rfc4226.txt"
+revision = "RFC 4226 appendix D"
+retrieved = "2026-11-24"
+licence = "IETF Trust (RFC text; data values only)"
+feeds = ["factor"]
+notes = "Carried from origin/spike/exam-vectors (aed76f8) as extracted there to the exam JSON shape; appendix D HOTP values."
+cases = 10
+files = [
+  { path = "rfc4226/hotp.json", sha256 = "538a49f23e45e0ae6ccfff28997c12b1258f8d5e6547376f8bb5e93cb9a85880", cases = 10 },
+]
+
+[source."rfc6238"]
+url = "https://www.rfc-editor.org/rfc/rfc6238.txt"
+revision = "RFC 6238 appendix B"
+retrieved = "2026-11-24"
+licence = "IETF Trust (RFC text; data values only)"
+feeds = ["factor"]
+notes = "Carried from origin/spike/exam-vectors (aed76f8) as extracted there to the exam JSON shape; appendix B TOTP values; includes derived window/last_step cases."
+cases = 45
+files = [
+  { path = "rfc6238/totp.json", sha256 = "9517434c65cf3215fd0e1c66ac45a9a01da9dcc67809f56b5e1c2db9d307628c", cases = 45 },
+]
+
+[source."rfc7515"]
+url = "https://www.rfc-editor.org/rfc/rfc7515.txt"
+revision = "RFC 7515 appendix A.1-A.3"
+retrieved = "2026-11-24"
+licence = "IETF Trust (RFC text; data values only)"
+feeds = ["jose"]
+notes = "Carried from origin/spike/exam-vectors (aed76f8) as extracted there to the exam JSON shape; A.1 HS256, A.2 RS256, A.3 ES256 plus derived tamper/truncation/alg-confusion refusal cases."
+cases = 19
+files = [
+  { path = "rfc7515/jws.json", sha256 = "fd5677344718a2358ce49032737b2e6ca8456d2e249e21b03c587362ee34f2e9", cases = 19 },
+]
+
+[source."rfc7636"]
+url = "https://www.rfc-editor.org/rfc/rfc7636.txt"
+revision = "RFC 7636 appendix B, section 4.1"
+retrieved = "2026-11-24"
+licence = "IETF Trust (RFC text; data values only)"
+feeds = ["oidc-provider", "base"]
+notes = "Carried from origin/spike/exam-vectors (aed76f8) as extracted there to the exam JSON shape; appendix B plus derived refusal cases."
+cases = 7
+files = [
+  { path = "rfc7636/pkce.json", sha256 = "ee320613ce27d87214bfae384eaba5308e846d6ebb4c3dfe9e1a75248d805b05", cases = 7 },
+]
+
+[source."rfc7638"]
+url = "https://www.rfc-editor.org/rfc/rfc7638.txt"
+revision = "RFC 7638 section 3.1"
+retrieved = "2026-11-24"
+licence = "IETF Trust (RFC text; data values only)"
+feeds = ["jose"]
+notes = "Carried from origin/spike/exam-vectors (aed76f8) as extracted there to the exam JSON shape; section 3.1 RSA thumbprint plus two derived cases."
+cases = 3
+files = [
+  { path = "rfc7638/thumbprint.json", sha256 = "2392070412212b1788aec0037069dbbd815b30286e5bd30f6243ee06bdb3109f", cases = 3 },
+]
+
+[source."rfc9106"]
+url = "https://www.rfc-editor.org/rfc/rfc9106.txt"
+revision = "RFC 9106 section 5.3"
+retrieved = "2026-11-24"
+licence = "IETF Trust (RFC text; data values only)"
+feeds = ["factor"]
+notes = "Carried from origin/spike/exam-vectors (aed76f8) as extracted there to the exam JSON shape; section 5.3 Argon2id only; sections 5.1 (Argon2d) and 5.2 (Argon2i) not extracted."
+cases = 1
+files = [
+  { path = "rfc9106/argon2id.json", sha256 = "cd1db3ed9942cd04bce7ca2256728e37b5a2ddca29964ecdeed264a53e02ef69", cases = 1 },
+]
+
+[source."rfc8725-derived"]
+url = "https://www.rfc-editor.org/rfc/rfc8725.txt"
+revision = "RFC 8725 section 3.1 with RFC 7515 section 4.1.1"
+retrieved = "2026-11-24"
+licence = "MIT OR Apache-2.0 (our own derived data)"
+feeds = ["jose"]
+notes = "Derived, not published by the RFC: valid signatures under a header alg that does not match the key or the expectation, made once with Node crypto from throwaway keys. The generator is not committed because fresh keys make it non-reproducible; the file is frozen output. Carried from origin/spike/exam-vectors (aed76f8) as extracted there to the exam JSON shape; "
+cases = 25
+files = [
+  { path = "rfc8725-derived/jws-alg.json", sha256 = "bdb0203a76b79f1f7e04ca9f62b5ccfa1694f7f881686056a44219e091acc9d6", cases = 25 },
+]
+
+[source."w3c-webauthn-3-exam-spike"]
+url = "https://www.w3.org/TR/webauthn-3/"
+revision = "W3C WebAuthn L3 section 16.2"
+retrieved = "2026-11-24"
+licence = "W3C Software and Document License"
+feeds = ["webauthn-rp"]
+notes = "Carried from origin/spike/exam-vectors (aed76f8) as extracted there to the exam JSON shape; ES256 none-attestation assertion plus derived refusal cases."
+cases = 8
+files = [
+  { path = "w3c-webauthn-3/exam-spike/assertion-none-es256.json", sha256 = "77aaae4543793ec3871cd019a8e4deecc6ef190d2b449b6c47c4fc75adbe1775", cases = 8 },
+]
+
+[source."w3c-webauthn-3"]
+url = "https://www.w3.org/TR/webauthn-3/"
+revision = "https://www.w3.org/TR/2026/REC-webauthn-3-20260825/ (spec html sha256 157030c980d44a3ce4b1ec5bcfaa16790c7dfefac20709af6ed2b11c7120970b)"
+retrieved = "2026-11-24"
+licence = "W3C Software and Document License"
+feeds = ["webauthn-rp"]
+notes = "Section 16 extracted by tools/extract_webauthn3.py (reproduces byte for byte from the dated HTML). Spec states section 16 is NOT normative; every vector here is non-normative example data. 'cases' counts registration+authentication ceremony pairs (16.1 counts the root certificate as 1, prf counts 5 API examples + 3 hmac-secret examples). none.json = 16.2, 16.4, 16.5, 16.6; packed.json = 16.3 (self) and 16.7-16.12 (ES256, ES384, ES512, RS256, Ed25519, Ed448); prf.json = 16.17.1 (prf only, spec defines no other extension vectors). All 444 h'..' tokens in section 16 are present in the output. exam-spike/assertion-none-es256.json is carried from the exam spike separately (see w3c-webauthn-3-exam-spike)."
+cases = 24
+files = [
+  { path = "w3c-webauthn-3/attestation-root.json", sha256 = "47382ee037cd6269946e349ff80c5f7c25566cf7832ea8d2c641e870f592ff4e", cases = 1 },
+  { path = "w3c-webauthn-3/none.json", sha256 = "fac1f3561b92f7fa1f1418ea7fac9bd6910b7af53aa90c139c7d34e53581cc18", cases = 4 },
+  { path = "w3c-webauthn-3/packed.json", sha256 = "1b97874a9d8356be917ce2b02e0c57c743afcffc96e1d1557a9757984ad34f57", cases = 7 },
+  { path = "w3c-webauthn-3/tpm.json", sha256 = "e49dbd476d8be14fe9b0c26dffc7e7905e289b08b03591b7633f2d4166eb4a3c", cases = 1 },
+  { path = "w3c-webauthn-3/android-key.json", sha256 = "c23fd5cae8370e41efd31d87205009f9c8502d3a920e601a4286968aafb04d9b", cases = 1 },
+  { path = "w3c-webauthn-3/apple.json", sha256 = "9f21fd426343f61ae43534e3f824ecc62f11410ec68325fb16e268d834a342eb", cases = 1 },
+  { path = "w3c-webauthn-3/fido-u2f.json", sha256 = "e7fc2247a0d34865131dd7221dfe0032836b080f4e9ac68e7e52c860117afbb0", cases = 1 },
+  { path = "w3c-webauthn-3/prf.json", sha256 = "07e59c88be25b3bf687b6895c8866628d523599d1c387def97c1599d415e8879", cases = 8 },
+]
+
+[source."rfc7520-jwk"]
+url = "https://www.rfc-editor.org/rfc/rfc7520.txt"
+revision = "RFC 7520 section 3"
+retrieved = "2026-11-24"
+licence = "IETF Trust (RFC text; data values only)"
+feeds = ["jose"]
+notes = "Extracted by tools/extract_rfc_figures.py from rfc7520.txt (sha256 14798c3b2d72e35375d5fb86d280a1e8df6109a6ee6cbfc091a0c57a8cc076c6): every numbered figure as text, joined (whitespace removed) and parsed json where it is JSON. RFC 7520 is Informational. Section 3 JWK examples 3.1-3.6."
+cases = 6
+files = [
+  { path = "rfc7520/jwk.json", sha256 = "2b7a236fb1955edd7e7192358f8fded289c9b0e18ccfff55e02edf683059bd5c", cases = 6 },
+]
+
+[source."rfc7520-jws"]
+url = "https://www.rfc-editor.org/rfc/rfc7520.txt"
+revision = "RFC 7520 section 4"
+retrieved = "2026-11-24"
+licence = "IETF Trust (RFC text; data values only)"
+feeds = ["jose"]
+notes = "Extracted by tools/extract_rfc_figures.py from rfc7520.txt (sha256 14798c3b2d72e35375d5fb86d280a1e8df6109a6ee6cbfc091a0c57a8cc076c6): every numbered figure as text, joined (whitespace removed) and parsed json where it is JSON. RFC 7520 is Informational. Section 4 JWS examples 4.1-4.8 (RS256, PS384, ES512, HS256, detached, protected-field variants, content-only, multiple signatures). HS256 example 4.4 re-verified by hand against the JWK of 3.5."
+cases = 8
+files = [
+  { path = "rfc7520/jws.json", sha256 = "36da0568090a9e9585a3adf94653583f52aa733a1705d09768167ef9b51944c3", cases = 8 },
+]
+
+[source."rfc7520-jwe"]
+url = "https://www.rfc-editor.org/rfc/rfc7520.txt"
+revision = "RFC 7520 section 5"
+retrieved = "2026-11-24"
+licence = "IETF Trust (RFC text; data values only)"
+feeds = ["jose"]
+tag = "pending-D3"
+notes = "Extracted by tools/extract_rfc_figures.py from rfc7520.txt (sha256 14798c3b2d72e35375d5fb86d280a1e8df6109a6ee6cbfc091a0c57a8cc076c6): every numbered figure as text, joined (whitespace removed) and parsed json where it is JSON. RFC 7520 is Informational. Section 5 JWE examples 5.1-5.13. Tagged pending decision D3 (JWE later); committed so the data is on hand."
+cases = 13
+files = [
+  { path = "rfc7520/jwe.json", sha256 = "ab0533f1c25db15a919f4b70ba70f89a0f2795d9b79f6f7db14af653faff569d", cases = 13 },
+]
+
+[source."rfc4648"]
+url = "https://www.rfc-editor.org/rfc/rfc4648.txt"
+revision = "RFC 4648 section 10"
+retrieved = "2026-11-24"
+licence = "IETF Trust (RFC text; data values only)"
+feeds = ["base"]
+notes = "tools/extract_rfc4648.py on rfc4648.txt (sha256 84e14418f795d503be5f34bf23ce4ebaa119e9ec7c9f667d8caeb111385b178f). BASE16/32/32-HEX/64 test vectors; the spec has no base64url vectors in section 10 (base64url is the section 5 alphabet over the BASE64 vectors)."
+cases = 28
+files = [
+  { path = "rfc4648/test-vectors.json", sha256 = "7dca64c8c1a30c62fdd5619d21b878c37f5e1b93379390f78faa49d6c6c46d3a", cases = 28 },
+]
+
+[source."rfc7515-a4-a7"]
+url = "https://www.rfc-editor.org/rfc/rfc7515.txt"
+revision = "RFC 7515 appendix A.4-A.7"
+retrieved = "2026-11-24"
+licence = "IETF Trust (RFC text; data values only)"
+feeds = ["jose"]
+notes = "tools/extract_rfc_sections.py on rfc7515.txt (sha256 ecbf84674118e62526511c1237e1deaa86aada86d25b247623a2a7e04ae62e40) with sections A.4 A.4.1 A.4.2 A.5 A.6 A.6.1 A.6.2 A.6.3 A.6.4 A.7: ES512 (verified by hand), unsecured JWS, general and flattened JSON serialization. A.1-A.3 live in source rfc7515. cases = A.4, A.5, A.6, A.7."
+cases = 4
+files = [
+  { path = "rfc7515/appendix-a4-a7.json", sha256 = "e4f28ab5653c307317fc66646d832eee1966e1996f2a73db4072311b2e1f50a2", cases = 4 },
+]
+
+[source."rfc8037"]
+url = "https://www.rfc-editor.org/rfc/rfc8037.txt"
+revision = "RFC 8037 appendix A"
+retrieved = "2026-11-24"
+licence = "IETF Trust (RFC text; data values only)"
+feeds = ["jose"]
+notes = "tools/extract_rfc_sections.py on rfc8037.txt (sha256 f14347f9d8eead78ef6e7a1ea3d795d35d664033095a76a80fcd567904aaedaa) with sections A.1-A.7: Ed25519 keys, thumbprint, signing and validation (verified by hand), ECDH-ES with X25519 and X448."
+cases = 7
+files = [
+  { path = "rfc8037/appendix-a.json", sha256 = "2b07fba6ce6ec8e2753e7abd4c995364d67f1536ddf4f14247c74ed830a59253", cases = 7 },
+]
+
+[source."android-key-attestation"]
+url = "https://github.com/google/android-key-attestation"
+revision = "f9846cd019289f1788cec65b062d9f81c0c4884c"
+retrieved = "2026-11-24"
+licence = "Apache-2.0"
+feeds = ["webauthn-rp"]
+notes = "Upstream src/test/resources/der (4 certificate chains of 4 certs: EC and RSA keys, TEE and StrongBox security levels, leaf cert0 first) and status.json (revocation list sample), unmodified; LICENSE copied from upstream. Upstream repo is deprecated (successor android/keyattestation). Android Keystore attestation certificates are the format carried in a WebAuthn android-key attestation statement x5c. Fills the android-key real-chain gap of the real-authenticator corpus; cases counts chains."
+cases = 4
+files = [
+  { path = "android-key-attestation/der/algorithm_EC_SecurityLevel_StrongBox/cert0.der", sha256 = "2cf480dd57886f787a6afd50ba73536c45ba06784fdfd0443b52466374dc6564", cases = 1 },
+  { path = "android-key-attestation/der/algorithm_EC_SecurityLevel_StrongBox/cert1.der", sha256 = "2a218be3031cb1929f3250f70233035cf9f2185ecc3589d957ad7784b53a8293", cases = 0 },
+  { path = "android-key-attestation/der/algorithm_EC_SecurityLevel_StrongBox/cert2.der", sha256 = "f5fc2653a2ee1c26f334bc0ad8f00519adb9f24321b77983df8ac5cec9ee57fe", cases = 0 },
+  { path = "android-key-attestation/der/algorithm_EC_SecurityLevel_StrongBox/cert3.der", sha256 = "19de1c3e1da7e06f3c2712301342c17941b1ec90ba5ee396a8ec2ee4f46dfad2", cases = 0 },
+  { path = "android-key-attestation/der/algorithm_EC_SecurityLevel_TEE/cert0.der", sha256 = "bf0d7c4e16403bab1e04d76e5880315369786dcdae4e452ee32f986df0e95b32", cases = 1 },
+  { path = "android-key-attestation/der/algorithm_EC_SecurityLevel_TEE/cert1.der", sha256 = "e537905ef02c970052ff5b7a333294d25df41154457a89cd880bc603768e3579", cases = 0 },
+  { path = "android-key-attestation/der/algorithm_EC_SecurityLevel_TEE/cert2.der", sha256 = "230f39bfd49ea76a8aab2ee9e2cb7176bd4125eca640828930a27fa5c27033e1", cases = 0 },
+  { path = "android-key-attestation/der/algorithm_EC_SecurityLevel_TEE/cert3.der", sha256 = "c1984a3ef45c1e2a918551de10603c86f7051b2249c4891cae3230eabd0c97d5", cases = 0 },
+  { path = "android-key-attestation/der/algorithm_RSA_SecurityLevel_StrongBox/cert0.der", sha256 = "921a60369b004bbbace9ee0c6ba2da0122dc9a06d25769f8a5be1db51e5f31cc", cases = 1 },
+  { path = "android-key-attestation/der/algorithm_RSA_SecurityLevel_StrongBox/cert1.der", sha256 = "611d1850bdb1d0583e90de50af0e9dbc30c73d28d54cfcf11d49db508969884d", cases = 0 },
+  { path = "android-key-attestation/der/algorithm_RSA_SecurityLevel_StrongBox/cert2.der", sha256 = "08b1507c570cd4f96f4945ab75f2191ab009659b8c2a895aed144aa1c57c64e9", cases = 0 },
+  { path = "android-key-attestation/der/algorithm_RSA_SecurityLevel_StrongBox/cert3.der", sha256 = "19de1c3e1da7e06f3c2712301342c17941b1ec90ba5ee396a8ec2ee4f46dfad2", cases = 0 },
+  { path = "android-key-attestation/der/algorithm_RSA_SecurityLevel_TEE/cert0.der", sha256 = "b792aa1e7b486818cfc4a0127007a6e1ba9e1883895d4d1d7847daf10cc3cdae", cases = 1 },
+  { path = "android-key-attestation/der/algorithm_RSA_SecurityLevel_TEE/cert1.der", sha256 = "f4f14459547ff436726b86087cf7741f21d567ac180efb7ad9dd937dd1cf8ad4", cases = 0 },
+  { path = "android-key-attestation/der/algorithm_RSA_SecurityLevel_TEE/cert2.der", sha256 = "df23a0037fc77a561b196cff1efe2e71e54818a1d6f15d86bc068b3739a239d3", cases = 0 },
+  { path = "android-key-attestation/der/algorithm_RSA_SecurityLevel_TEE/cert3.der", sha256 = "c1984a3ef45c1e2a918551de10603c86f7051b2249c4891cae3230eabd0c97d5", cases = 0 },
+  { path = "android-key-attestation/LICENSE", sha256 = "73ba74dfaa520b49a401b5d21459a8523a146f3b7518a833eea5efa85130bf68", cases = 0 },
+  { path = "android-key-attestation/status.json", sha256 = "6b204883d3ae63b42605552e20eddb1e1c4178f73b4a4fced40542c0d7c62211", cases = 0 },
+]
+
+# Real-authenticator corpus. Seeded from the survey failure list (survey-webauthn.md section 4 item 3).
+# Nothing below is committed yet except android-key-attestation above. Candidate sources are named by
+# repository and stated licence only; no candidate has been read or copied.
+[wanted]
+purpose = "Attestation interop long tail: real-device registrations that break strict verifiers"
+
+[[wanted.item]]
+need = "Apple anonymous attestation x5c chain from a current OS (leaf key-usage handling)"
+feeds = ["webauthn-rp"]
+candidates = ["MasterKale/SimpleWebAuthn (MIT) apple attestation test fixtures, inline TypeScript", "go-webauthn/webauthn (BSD-3-Clause) protocol tests"]
+status = "candidate, extraction and per-file licence check pending"
+
+[[wanted.item]]
+need = "TPM attestation with critical extensions in the AIK certificate, and with a lower-case or odd-case fTPM manufacturer string"
+feeds = ["webauthn-rp"]
+candidates = ["MasterKale/SimpleWebAuthn (MIT) tpm fixtures", "go-webauthn/webauthn (BSD-3-Clause) tpm fixtures"]
+status = "candidate, extraction pending"
+
+[[wanted.item]]
+need = "android-key attestationObject whose x5c repeats a certificate, plus a full WebAuthn registration around the committed Android chains"
+feeds = ["webauthn-rp"]
+candidates = ["MasterKale/SimpleWebAuthn (MIT) android-key fixtures", "google/android-key-attestation chains (committed as android-key-attestation)"]
+status = "chains committed; WebAuthn-level objects pending"
+
+[[wanted.item]]
+need = "FIDO U2F attestation certificates from real security keys (gnubby-style and vendor-style)"
+feeds = ["webauthn-rp"]
+candidates = ["Yubico/java-webauthn-server src/test/resources u2f testdata (BSD-2-Clause per COPYING; repo licence field reads NOASSERTION, so read per-file headers before copying)"]
+status = "candidate, licence confirmation pending"
+
+[[wanted.item]]
+need = "Packed and U2F registrations from a current open-hardware security key (compatibility failures reported against a Rust verifier)"
+feeds = ["webauthn-rp"]
+candidates = []
+status = "no public licence-clear source found; the only known reports sit in an excluded project"
+
+[[wanted.item]]
+need = "Browser and password-manager quirks: Samsung and Google Password Manager registrations, Android without Google managers, synced passkeys with BE and BS flags set"
+feeds = ["webauthn-rp"]
+candidates = []
+status = "no public licence-clear source found; capture from own test devices later"
+
+[[wanted.item]]
+need = "Real-device packed self and full attestation across ES256, RS256 and EdDSA, plus none attestation from platform authenticators"
+feeds = ["webauthn-rp"]
+candidates = ["web-platform-tests/wpt (BSD-3-Clause) webauthn resources, synthetic not real-device"]
+status = "synthetic coverage already in w3c-webauthn-3; real-device data pending"

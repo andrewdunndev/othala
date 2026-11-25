@@ -1,0 +1,90 @@
+{
+ "figures": [
+  {
+   "figure": 1,
+   "caption": "Elliptic Curve P-521 Public Key",
+   "section": "3.1",
+   "example": "3.1",
+   "text": "{\n  \"kty\": \"EC\",\n  \"kid\": \"bilbo.baggins@hobbiton.example\",\n  \"use\": \"sig\",\n  \"crv\": \"P-521\",\n  \"x\": \"AHKZLLOsCOzz5cY97ewNUajB957y-C-U88c3v13nmGZx6sYl_oJXu9\n      A5RkTKqjqvjyekWF-7ytDyRXYgCF5cj0Kt\",\n  \"y\": \"AdymlHvOiLxXkEhayXQnNCvDX4h9htZaCJN34kfmC6pV5OhQHiraVy\n      SsUdaQkAgDPrwQrJmbnX9cwlGfP-HqHZR1\"\n}",
+   "joined": "{\"kty\":\"EC\",\"kid\":\"bilbo.baggins@hobbiton.example\",\"use\":\"sig\",\"crv\":\"P-521\",\"x\":\"AHKZLLOsCOzz5cY97ewNUajB957y-C-U88c3v13nmGZx6sYl_oJXu9A5RkTKqjqvjyekWF-7ytDyRXYgCF5cj0Kt\",\"y\":\"AdymlHvOiLxXkEhayXQnNCvDX4h9htZaCJN34kfmC6pV5OhQHiraVySsUdaQkAgDPrwQrJmbnX9cwlGfP-HqHZR1\"}",
+   "json": {
+    "kty": "EC",
+    "kid": "bilbo.baggins@hobbiton.example",
+    "use": "sig",
+    "crv": "P-521",
+    "x": "AHKZLLOsCOzz5cY97ewNUajB957y-C-U88c3v13nmGZx6sYl_oJXu9A5RkTKqjqvjyekWF-7ytDyRXYgCF5cj0Kt",
+    "y": "AdymlHvOiLxXkEhayXQnNCvDX4h9htZaCJN34kfmC6pV5OhQHiraVySsUdaQkAgDPrwQrJmbnX9cwlGfP-HqHZR1"
+   }
+  },
+  {
+   "figure": 2,
+   "caption": "Elliptic Curve P-521 Private Key",
+   "section": "3.2",
+   "example": "3.2",
+   "text": "{\n  \"kty\": \"EC\",\n  \"kid\": \"bilbo.baggins@hobbiton.example\",\n  \"use\": \"sig\",\n  \"crv\": \"P-521\",\n  \"x\": \"AHKZLLOsCOzz5cY97ewNUajB957y-C-U88c3v13nmGZx6sYl_oJXu9\n      A5RkTKqjqvjyekWF-7ytDyRXYgCF5cj0Kt\",\n  \"y\": \"AdymlHvOiLxXkEhayXQnNCvDX4h9htZaCJN34kfmC6pV5OhQHiraVy\n      SsUdaQkAgDPrwQrJmbnX9cwlGfP-HqHZR1\",\n  \"d\": \"AAhRON2r9cqXX1hg-RoI6R1tX5p2rUAYdmpHZoC1XNM56KtscrX6zb\n      KipQrCW9CGZH3T4ubpnoTKLDYJ_fF3_rJt\"\n}",
+   "joined": "{\"kty\":\"EC\",\"kid\":\"bilbo.baggins@hobbiton.example\",\"use\":\"sig\",\"crv\":\"P-521\",\"x\":\"AHKZLLOsCOzz5cY97ewNUajB957y-C-U88c3v13nmGZx6sYl_oJXu9A5RkTKqjqvjyekWF-7ytDyRXYgCF5cj0Kt\",\"y\":\"AdymlHvOiLxXkEhayXQnNCvDX4h9htZaCJN34kfmC6pV5OhQHiraVySsUdaQkAgDPrwQrJmbnX9cwlGfP-HqHZR1\",\"d\":\"AAhRON2r9cqXX1hg-RoI6R1tX5p2rUAYdmpHZoC1XNM56KtscrX6zbKipQrCW9CGZH3T4ubpnoTKLDYJ_fF3_rJt\"}",
+   "json": {
+    "kty": "EC",
+    "kid": "bilbo.baggins@hobbiton.example",
+    "use": "sig",
+    "crv": "P-521",
+    "x": "AHKZLLOsCOzz5cY97ewNUajB957y-C-U88c3v13nmGZx6sYl_oJXu9A5RkTKqjqvjyekWF-7ytDyRXYgCF5cj0Kt",
+    "y": "AdymlHvOiLxXkEhayXQnNCvDX4h9htZaCJN34kfmC6pV5OhQHiraVySsUdaQkAgDPrwQrJmbnX9cwlGfP-HqHZR1",
+    "d": "AAhRON2r9cqXX1hg-RoI6R1tX5p2rUAYdmpHZoC1XNM56KtscrX6zbKipQrCW9CGZH3T4ubpnoTKLDYJ_fF3_rJt"
+   }
+  },
+  {
+   "figure": 3,
+   "caption": "RSA 2048-Bit Public Key",
+   "section": "3.3",
+   "example": "3.3",
+   "text": "{\n  \"kty\": \"RSA\",\n  \"kid\": \"bilbo.baggins@hobbiton.example\",\n  \"use\": \"sig\",\n  \"n\": \"n4EPtAOCc9AlkeQHPzHStgAbgs7bTZLwUBZdR8_KuKPEHLd4rHVTeT\n      -O-XV2jRojdNhxJWTDvNd7nqQ0VEiZQHz_AJmSCpMaJMRBSFKrKb2wqV\n      wGU_NsYOYL-QtiWN2lbzcEe6XC0dApr5ydQLrHqkHHig3RBordaZ6Aj-\n      oBHqFEHYpPe7Tpe-OfVfHd1E6cS6M1FZcD1NNLYD5lFHpPI9bTwJlsde\n      3uhGqC0ZCuEHg8lhzwOHrtIQbS0FVbb9k3-tVTU4fg_3L_vniUFAKwuC\n      LqKnS2BYwdq_mzSnbLY7h_qixoR7jig3__kRhuaxwUkRz5iaiQkqgc5g\n      HdrNP5zw\",\n  \"e\": \"AQAB\"\n}",
+   "joined": "{\"kty\":\"RSA\",\"kid\":\"bilbo.baggins@hobbiton.example\",\"use\":\"sig\",\"n\":\"n4EPtAOCc9AlkeQHPzHStgAbgs7bTZLwUBZdR8_KuKPEHLd4rHVTeT-O-XV2jRojdNhxJWTDvNd7nqQ0VEiZQHz_AJmSCpMaJMRBSFKrKb2wqVwGU_NsYOYL-QtiWN2lbzcEe6XC0dApr5ydQLrHqkHHig3RBordaZ6Aj-oBHqFEHYpPe7Tpe-OfVfHd1E6cS6M1FZcD1NNLYD5lFHpPI9bTwJlsde3uhGqC0ZCuEHg8lhzwOHrtIQbS0FVbb9k3-tVTU4fg_3L_vniUFAKwuCLqKnS2BYwdq_mzSnbLY7h_qixoR7jig3__kRhuaxwUkRz5iaiQkqgc5gHdrNP5zw\",\"e\":\"AQAB\"}",
+   "json": {
+    "kty": "RSA",
+    "kid": "bilbo.baggins@hobbiton.example",
+    "use": "sig",
+    "n": "n4EPtAOCc9AlkeQHPzHStgAbgs7bTZLwUBZdR8_KuKPEHLd4rHVTeT-O-XV2jRojdNhxJWTDvNd7nqQ0VEiZQHz_AJmSCpMaJMRBSFKrKb2wqVwGU_NsYOYL-QtiWN2lbzcEe6XC0dApr5ydQLrHqkHHig3RBordaZ6Aj-oBHqFEHYpPe7Tpe-OfVfHd1E6cS6M1FZcD1NNLYD5lFHpPI9bTwJlsde3uhGqC0ZCuEHg8lhzwOHrtIQbS0FVbb9k3-tVTU4fg_3L_vniUFAKwuCLqKnS2BYwdq_mzSnbLY7h_qixoR7jig3__kRhuaxwUkRz5iaiQkqgc5gHdrNP5zw",
+    "e": "AQAB"
+   }
+  },
+  {
+   "figure": 4,
+   "caption": "RSA 2048-Bit Private Key",
+   "section": "3.4",
+   "example": "3.4",
+   "text": "Note that whitespace is added for readability as described in\nSection 1.1.\n{\n  \"kty\": \"RSA\",\n  \"kid\": \"bilbo.baggins@hobbiton.example\",\n  \"use\": \"sig\",\n  \"n\": \"n4EPtAOCc9AlkeQHPzHStgAbgs7bTZLwUBZdR8_KuKPEHLd4rHVTeT\n      -O-XV2jRojdNhxJWTDvNd7nqQ0VEiZQHz_AJmSCpMaJMRBSFKrKb2wqV\n      wGU_NsYOYL-QtiWN2lbzcEe6XC0dApr5ydQLrHqkHHig3RBordaZ6Aj-\n      oBHqFEHYpPe7Tpe-OfVfHd1E6cS6M1FZcD1NNLYD5lFHpPI9bTwJlsde\n      3uhGqC0ZCuEHg8lhzwOHrtIQbS0FVbb9k3-tVTU4fg_3L_vniUFAKwuC\n      LqKnS2BYwdq_mzSnbLY7h_qixoR7jig3__kRhuaxwUkRz5iaiQkqgc5g\n      HdrNP5zw\",\n  \"e\": \"AQAB\",\n  \"d\": \"bWUC9B-EFRIo8kpGfh0ZuyGPvMNKvYWNtB_ikiH9k20eT-O1q_I78e\n      iZkpXxXQ0UTEs2LsNRS-8uJbvQ-A1irkwMSMkK1J3XTGgdrhCku9gRld\n      Y7sNA_AKZGh-Q661_42rINLRCe8W-nZ34ui_qOfkLnK9QWDDqpaIsA-b\n      MwWWSDFu2MUBYwkHTMEzLYGqOe04noqeq1hExBTHBOBdkMXiuFhUq1BU\n      6l-DqEiWxqg82sXt2h-LMnT3046AOYJoRioz75tSUQfGCshWTBnP5uDj\n      d18kKhyv07lhfSJdrPdM5Plyl21hsFf4L_mHCuoFau7gdsPfHPxxjVOc\n      OpBrQzwQ\",\n  \"p\": \"3Slxg_DwTXJcb6095RoXygQCAZ5RnAvZlno1yhHtnUex_fp7AZ_9nR\n      aO7HX_-SFfGQeutao2TDjDAWU4Vupk8rw9JR0AzZ0N2fvuIAmr_WCsmG\n      peNqQnev1T7IyEsnh8UMt-n5CafhkikzhEsrmndH6LxOrvRJlsPp6Zv8\n      bUq0k\",\n  \"q\": \"uKE2dh-cTf6ERF4k4e_jy78GfPYUIaUyoSSJuBzp3Cubk3OCqs6grT\n      8bR_cu0Dm1MZwWmtdqDyI95HrUeq3MP15vMMON8lHTeZu2lmKvwqW7an\n      V5UzhM1iZ7z4yMkuUwFWoBvyY898EXvRD-hdqRxHlSqAZ192zB3pVFJ0\n      s7pFc\",\n  \"dp\": \"B8PVvXkvJrj2L-GYQ7v3y9r6Kw5g9SahXBwsWUzp19TVlgI-YV85q\n      1NIb1rxQtD-IsXXR3-TanevuRPRt5OBOdiMGQp8pbt26gljYfKU_E9xn\n      -RULHz0-ed9E9gXLKD4VGngpz-PfQ_q29pk5xWHoJp009Qf1HvChixRX\n      59ehik\",\n  \"dq\": \"CLDmDGduhylc9o7r84rEUVn7pzQ6PF83Y-iBZx5NT-TpnOZKF1pEr\n      AMVeKzFEl41DlHHqqBLSM0W1sOFbwTxYWZDm6sI6og5iTbwQGIC3gnJK\n      bi_7k_vJgGHwHxgPaX2PnvP-zyEkDERuf-ry4c_Z11Cq9AqC2yeL6kdK\n      T1cYF8\",\n  \"qi\": \"3PiqvXQN0zwMeE-sBvZgi289XP9XCQF3VWqPzMKnIgQp7_Tugo6-N\n      ZBKCQsMf3HaEGBjTVJs_jcK8-TRXvaKe-7ZMaQj8VfBdYkssbu0NKDDh\n      jJ-GtiseaDVWt7dcH0cfwxgFUHpQh7FoCrjFJ6h6ZEpMF6xmujs4qMpP\n      z8aaI4\"\n}",
+   "joined": "NotethatwhitespaceisaddedforreadabilityasdescribedinSection1.1.{\"kty\":\"RSA\",\"kid\":\"bilbo.baggins@hobbiton.example\",\"use\":\"sig\",\"n\":\"n4EPtAOCc9AlkeQHPzHStgAbgs7bTZLwUBZdR8_KuKPEHLd4rHVTeT-O-XV2jRojdNhxJWTDvNd7nqQ0VEiZQHz_AJmSCpMaJMRBSFKrKb2wqVwGU_NsYOYL-QtiWN2lbzcEe6XC0dApr5ydQLrHqkHHig3RBordaZ6Aj-oBHqFEHYpPe7Tpe-OfVfHd1E6cS6M1FZcD1NNLYD5lFHpPI9bTwJlsde3uhGqC0ZCuEHg8lhzwOHrtIQbS0FVbb9k3-tVTU4fg_3L_vniUFAKwuCLqKnS2BYwdq_mzSnbLY7h_qixoR7jig3__kRhuaxwUkRz5iaiQkqgc5gHdrNP5zw\",\"e\":\"AQAB\",\"d\":\"bWUC9B-EFRIo8kpGfh0ZuyGPvMNKvYWNtB_ikiH9k20eT-O1q_I78eiZkpXxXQ0UTEs2LsNRS-8uJbvQ-A1irkwMSMkK1J3XTGgdrhCku9gRldY7sNA_AKZGh-Q661_42rINLRCe8W-nZ34ui_qOfkLnK9QWDDqpaIsA-bMwWWSDFu2MUBYwkHTMEzLYGqOe04noqeq1hExBTHBOBdkMXiuFhUq1BU6l-DqEiWxqg82sXt2h-LMnT3046AOYJoRioz75tSUQfGCshWTBnP5uDjd18kKhyv07lhfSJdrPdM5Plyl21hsFf4L_mHCuoFau7gdsPfHPxxjVOcOpBrQzwQ\",\"p\":\"3Slxg_DwTXJcb6095RoXygQCAZ5RnAvZlno1yhHtnUex_fp7AZ_9nRaO7HX_-SFfGQeutao2TDjDAWU4Vupk8rw9JR0AzZ0N2fvuIAmr_WCsmGpeNqQnev1T7IyEsnh8UMt-n5CafhkikzhEsrmndH6LxOrvRJlsPp6Zv8bUq0k\",\"q\":\"uKE2dh-cTf6ERF4k4e_jy78GfPYUIaUyoSSJuBzp3Cubk3OCqs6grT8bR_cu0Dm1MZwWmtdqDyI95HrUeq3MP15vMMON8lHTeZu2lmKvwqW7anV5UzhM1iZ7z4yMkuUwFWoBvyY898EXvRD-hdqRxHlSqAZ192zB3pVFJ0s7pFc\",\"dp\":\"B8PVvXkvJrj2L-GYQ7v3y9r6Kw5g9SahXBwsWUzp19TVlgI-YV85q1NIb1rxQtD-IsXXR3-TanevuRPRt5OBOdiMGQp8pbt26gljYfKU_E9xn-RULHz0-ed9E9gXLKD4VGngpz-PfQ_q29pk5xWHoJp009Qf1HvChixRX59ehik\",\"dq\":\"CLDmDGduhylc9o7r84rEUVn7pzQ6PF83Y-iBZx5NT-TpnOZKF1pErAMVeKzFEl41DlHHqqBLSM0W1sOFbwTxYWZDm6sI6og5iTbwQGIC3gnJKbi_7k_vJgGHwHxgPaX2PnvP-zyEkDERuf-ry4c_Z11Cq9AqC2yeL6kdKT1cYF8\",\"qi\":\"3PiqvXQN0zwMeE-sBvZgi289XP9XCQF3VWqPzMKnIgQp7_Tugo6-NZBKCQsMf3HaEGBjTVJs_jcK8-TRXvaKe-7ZMaQj8VfBdYkssbu0NKDDhjJ-GtiseaDVWt7dcH0cfwxgFUHpQh7FoCrjFJ6h6ZEpMF6xmujs4qMpPz8aaI4\"}"
+  },
+  {
+   "figure": 5,
+   "caption": "HMAC SHA-256 Symmetric Key",
+   "section": "3.5",
+   "example": "3.5",
+   "text": "{\n  \"kty\": \"oct\",\n  \"kid\": \"018c0ae5-4d9b-471b-bfd6-eef314bc7037\",\n  \"use\": \"sig\",\n  \"alg\": \"HS256\",\n  \"k\": \"hJtXIZ2uSN5kbQfbtTNWbpdmhkV8FJG-Onbc6mxCcYg\"\n}",
+   "joined": "{\"kty\":\"oct\",\"kid\":\"018c0ae5-4d9b-471b-bfd6-eef314bc7037\",\"use\":\"sig\",\"alg\":\"HS256\",\"k\":\"hJtXIZ2uSN5kbQfbtTNWbpdmhkV8FJG-Onbc6mxCcYg\"}",
+   "json": {
+    "kty": "oct",
+    "kid": "018c0ae5-4d9b-471b-bfd6-eef314bc7037",
+    "use": "sig",
+    "alg": "HS256",
+    "k": "hJtXIZ2uSN5kbQfbtTNWbpdmhkV8FJG-Onbc6mxCcYg"
+   }
+  },
+  {
+   "figure": 6,
+   "caption": "AES 256-Bit Symmetric Encryption Key",
+   "section": "3.6",
+   "example": "3.6",
+   "text": "{\n  \"kty\": \"oct\",\n  \"kid\": \"1e571774-2e08-40da-8308-e8d68773842d\",\n  \"use\": \"enc\",\n  \"alg\": \"A256GCM\",\n  \"k\": \"AAPapAv4LbFbiVawEjagUBluYqN5rhna-8nuldDvOx8\"\n}",
+   "joined": "{\"kty\":\"oct\",\"kid\":\"1e571774-2e08-40da-8308-e8d68773842d\",\"use\":\"enc\",\"alg\":\"A256GCM\",\"k\":\"AAPapAv4LbFbiVawEjagUBluYqN5rhna-8nuldDvOx8\"}",
+   "json": {
+    "kty": "oct",
+    "kid": "1e571774-2e08-40da-8308-e8d68773842d",
+    "use": "enc",
+    "alg": "A256GCM",
+    "k": "AAPapAv4LbFbiVawEjagUBluYqN5rhna-8nuldDvOx8"
+   }
+  }
+ ]
+}

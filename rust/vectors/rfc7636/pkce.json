@@ -1,0 +1,68 @@
+{
+ "source": "RFC 7636 appendix B and section 4.1",
+ "cases": [
+  {
+   "id": "b-valid",
+   "op": "pkce_s256",
+   "verifier": "dBjftJeZ4CVP-mB92K27uhbUJU1p1r_wW1gFWFOEjXk",
+   "challenge": "E9Melhoa2OwvFrEMTJguCHaoeK1t8URWbuGJSstw-cM",
+   "expect": {
+    "ok": true
+   }
+  },
+  {
+   "id": "wrong-verifier",
+   "op": "pkce_s256",
+   "verifier": "ABjftJeZ4CVP-mB92K27uhbUJU1p1r_wW1gFWFOEjXk",
+   "challenge": "E9Melhoa2OwvFrEMTJguCHaoeK1t8URWbuGJSstw-cM",
+   "expect": {
+    "ok": false
+   }
+  },
+  {
+   "id": "wrong-challenge",
+   "op": "pkce_s256",
+   "verifier": "dBjftJeZ4CVP-mB92K27uhbUJU1p1r_wW1gFWFOEjXk",
+   "challenge": "A9Melhoa2OwvFrEMTJguCHaoeK1t8URWbuGJSstw-cM",
+   "expect": {
+    "ok": false
+   }
+  },
+  {
+   "id": "plain-as-s256",
+   "op": "pkce_s256",
+   "verifier": "dBjftJeZ4CVP-mB92K27uhbUJU1p1r_wW1gFWFOEjXk",
+   "challenge": "dBjftJeZ4CVP-mB92K27uhbUJU1p1r_wW1gFWFOEjXk",
+   "expect": {
+    "ok": false
+   }
+  },
+  {
+   "id": "padded-challenge",
+   "op": "pkce_s256",
+   "verifier": "dBjftJeZ4CVP-mB92K27uhbUJU1p1r_wW1gFWFOEjXk",
+   "challenge": "E9Melhoa2OwvFrEMTJguCHaoeK1t8URWbuGJSstw-cM=",
+   "expect": {
+    "ok": false
+   }
+  },
+  {
+   "id": "verifier-too-short",
+   "op": "pkce_s256",
+   "verifier": "dBjftJeZ4CVP-mB92K27uhbUJU1p1r_wW1gFWFOEjX",
+   "challenge": "MzGuVmuCfiyhtA8T4e8WBVUlbW1KtArN4Sk-n-PRX_s",
+   "expect": {
+    "ok": false
+   }
+  },
+  {
+   "id": "verifier-bad-char",
+   "op": "pkce_s256",
+   "verifier": "dBjftJeZ4CVP-mB92K27uhbUJU1p1r_wW1gFWFOEjX+",
+   "challenge": "GEQzKnlMKuWdiqG5OGQaeLyu4bt9JQqQivfuxi4fm50",
+   "expect": {
+    "ok": false
+   }
+  }
+ ]
+}
