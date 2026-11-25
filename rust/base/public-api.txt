@@ -1,0 +1,252 @@
+impl Clone for Conflict
+impl Clone for Digest
+impl Clone for EffectId
+impl Clone for Error
+impl Clone for ErrorKind
+impl Clone for Failure
+impl Clone for Guard
+impl Clone for Retry
+impl Clone for Row
+impl Clone for Scope
+impl Clone for Slot
+impl Clone for UnixTime
+impl Clone for Version
+impl Copy for Digest
+impl Copy for EffectId
+impl Copy for Error
+impl Copy for ErrorKind
+impl Copy for Failure
+impl Copy for Guard
+impl Copy for Retry
+impl Copy for Scope
+impl Copy for Slot
+impl Copy for UnixTime
+impl Copy for Version
+impl Debug for Builder
+impl Debug for Conflict
+impl Debug for Digest
+impl Debug for Effect
+impl Debug for EffectId
+impl Debug for Error
+impl Debug for ErrorKind
+impl Debug for Failure
+impl Debug for Guard
+impl Debug for Pending
+impl Debug for RandCore
+impl Debug for Receipt
+impl Debug for Retry
+impl Debug for Row
+impl Debug for Rows
+impl Debug for Scope
+impl Debug for Secret
+impl Debug for SecretBytes
+impl Debug for Slot
+impl Debug for UnixTime
+impl Debug for Version
+impl Default for Rows
+impl Display for Error
+impl Drop for Secret
+impl Drop for SecretBytes
+impl Entropy for RandCore
+impl Eq for Conflict
+impl Eq for Digest
+impl Eq for EffectId
+impl Eq for Error
+impl Eq for ErrorKind
+impl Eq for Failure
+impl Eq for Guard
+impl Eq for Retry
+impl Eq for Row
+impl Eq for Scope
+impl Eq for Slot
+impl Eq for UnixTime
+impl Eq for Version
+impl Error for Error
+impl From for UnixTime
+impl Hash for Digest
+impl Hash for EffectId
+impl Hash for ErrorKind
+impl Hash for Scope
+impl Hash for UnixTime
+impl Hash for Version
+impl Ord for Digest
+impl Ord for EffectId
+impl Ord for UnixTime
+impl Ord for Version
+impl PartialEq for Conflict
+impl PartialEq for Digest
+impl PartialEq for EffectId
+impl PartialEq for Error
+impl PartialEq for ErrorKind
+impl PartialEq for Failure
+impl PartialEq for Guard
+impl PartialEq for Retry
+impl PartialEq for Row
+impl PartialEq for Scope
+impl PartialEq for Slot
+impl PartialEq for UnixTime
+impl PartialEq for Version
+impl PartialOrd for Digest
+impl PartialOrd for EffectId
+impl PartialOrd for UnixTime
+impl PartialOrd for Version
+impl Serialize for Digest
+impl StructuralPartialEq for Conflict
+impl StructuralPartialEq for Digest
+impl StructuralPartialEq for EffectId
+impl StructuralPartialEq for Error
+impl StructuralPartialEq for ErrorKind
+impl StructuralPartialEq for Failure
+impl StructuralPartialEq for Guard
+impl StructuralPartialEq for Retry
+impl StructuralPartialEq for Row
+impl StructuralPartialEq for Scope
+impl StructuralPartialEq for Slot
+impl StructuralPartialEq for UnixTime
+impl StructuralPartialEq for Version
+pub Builder::build
+pub Builder::consume
+pub Builder::create
+pub Builder::delete
+pub Builder::expect
+pub Builder::expect_absent
+pub Builder::update
+pub Conflict::failures
+pub Conflict::new
+pub Conflict::push
+pub Digest::as_bytes
+pub Digest::from_bytes
+pub Effect::builder
+pub Effect::check
+pub Effect::deletes
+pub Effect::domain
+pub Effect::guards
+pub Effect::host_applied
+pub Effect::id
+pub Effect::lift
+pub Effect::merge
+pub Effect::puts
+pub EffectId::as_bytes
+pub Entropy::fill
+pub Error::kind
+pub ErrorKind::Empty
+pub ErrorKind::Malformed
+pub ErrorKind::Overlap
+pub ErrorKind::ScopeChanged
+pub ErrorKind::SpansDomains
+pub ErrorKind::TooLarge
+pub ErrorKind::WrongReceipt
+pub Failure::Changed
+pub Failure::Missing
+pub Failure::Present
+pub Guard::Absent
+pub Guard::Consume
+pub Guard::Unchanged
+pub Guard::key
+pub Pending::effect
+pub Pending::join
+pub Pending::lift
+pub Pending::map
+pub Pending::new
+pub Pending::settle
+pub RandCore::new
+pub Retry::attempts
+pub Retry::new
+pub Row::into_record
+pub Row::new
+pub Row::record
+pub Row::version
+pub Rows::corrupt
+pub Rows::get
+pub Rows::insert
+pub Rows::new
+pub Scope::Global
+pub Scope::Subject
+pub Secret::ct_eq
+pub Secret::digest
+pub Secret::expose
+pub Secret::generate
+pub Secret::new
+pub SecretBytes::ct_eq
+pub SecretBytes::digest
+pub SecretBytes::expose
+pub SecretBytes::new
+pub Slot::Absent
+pub Slot::Corrupt
+pub Slot::Row
+pub Store::Error
+pub Store::apply
+pub Store::load
+pub StoreKey::scope
+pub UnixTime::new
+pub UnixTime::secs
+pub Version::get
+pub Version::new
+pub constant MAX_EFFECT_SIZE
+pub constant REDECIDE
+pub enum ErrorKind
+pub enum Failure
+pub enum Guard
+pub enum Scope
+pub enum Slot
+pub function as_bytes
+pub function attempts
+pub function b64url_decode
+pub function b64url_encode
+pub function build
+pub function builder
+pub function check
+pub function consume
+pub function corrupt
+pub function create
+pub function ct_eq
+pub function delete
+pub function deletes
+pub function digest
+pub function domain
+pub function effect
+pub function expect
+pub function expect_absent
+pub function expose
+pub function failures
+pub function from_bytes
+pub function generate
+pub function get
+pub function guards
+pub function host_applied
+pub function id
+pub function insert
+pub function into_record
+pub function join
+pub function key
+pub function kind
+pub function lift
+pub function map
+pub function merge
+pub function new
+pub function push
+pub function puts
+pub function record
+pub function secs
+pub function settle
+pub function update
+pub function version
+pub struct Builder
+pub struct Conflict
+pub struct Digest
+pub struct Effect
+pub struct EffectId
+pub struct Error
+pub struct Pending
+pub struct RandCore
+pub struct Receipt
+pub struct Retry
+pub struct Row
+pub struct Rows
+pub struct Secret
+pub struct SecretBytes
+pub struct UnixTime
+pub struct Version
+pub trait Entropy
+pub trait Store
+pub trait StoreKey

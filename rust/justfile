@@ -5,7 +5,7 @@ store_modules := "testkit/src/store.rs testkit/src/fixture.rs base/tests/conform
 default:
     @just --list
 
-all: fmt lint confine twins test wasm thumb msrv deny mutants rows
+all: fmt lint confine twins test wasm thumb msrv deny api mutants rows
 
 fmt:
     cargo fmt --all --check
@@ -45,8 +45,10 @@ msrv:
 deny:
     cargo deny check bans licenses sources
 
-api:
-    cargo +nightly public-api -p base --all-features -ss > base/public-api.txt
+# public-API snapshot over rustdoc JSON (cargo-public-api needs openssl, absent on the build host)
+api nightly="nightly-2026-11-24":
+    cargo +{{nightly}} rustdoc -p base --all-features -- -Z unstable-options --output-format json
+    jq -r -f api.jq target/doc/base.json > base/public-api.txt
     git diff --exit-code base/public-api.txt
 
 fuzz seconds="600":

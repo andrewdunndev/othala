@@ -1,7 +1,7 @@
 # base contract
 
 One claim per line, each naming the check that proves it. Tags follow the claims ledger: *Type* (the program does not compile), *Runtime* (a check returns an error), *Obligation* (the host's, proven against every `Store`), *Non-claim*.
-Checks: `ui:x` is `tests/ui/fail/x.rs` with its committed `.stderr` (rustc code given) and the compiling twin `tests/ui/pass/x.rs` one token away (`just twins`); `api` is the committed `public-api.txt` (`just api`); `unit:m::t` is a test in `src/m.rs`; `it:f::t` is `tests/f.rs`; `mutants:m` is `just mutants` over `src/m.rs`; `conf:c` is case `c` of `testkit::store_conformance`, run here against `testkit::MemStore`; `race:t` is `tests/race.rs`.
+Checks: `ui:x` is `tests/ui/fail/x.rs` with its committed `.stderr` (rustc code given) and the compiling twin `tests/ui/pass/x.rs` one token away (`just twins`); `api` is the committed `public-api.txt` from rustdoc JSON on a pinned nightly (`just api`); `unit:m::t` is a test in `src/m.rs`; `it:f::t` is `tests/f.rs`; `mutants:m` is `just mutants` over `src/m.rs`; `conf:c` is case `c` of `testkit::store_conformance`, run here against `testkit::MemStore`; `race:t` is `tests/race.rs`.
 
 ## Type
 - T1 `Secret<N>` has no `Display`: ui:secret_display (E0277), api.
