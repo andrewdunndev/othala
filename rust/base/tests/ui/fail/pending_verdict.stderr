@@ -1,9 +1,14 @@
-error[E0599]: no method named `map` found for struct `base::Pending<u8, K, u8>` in the current scope
+error[E0599]: `base::Pending<u8, K, u8>` is not an iterator
   --> tests/ui/fail/pending_verdict.rs:13:15
    |
 13 |     let _ = p.map(|v| out = Some(v));
-   |               ^^^ method not found in `base::Pending<u8, K, u8>`
+   |               ^^^ `base::Pending<u8, K, u8>` is not an iterator
    |
-   = help: items from traits can only be used if the trait is implemented and in scope
-   = note: the following trait defines an item `map`, perhaps you need to implement it:
-           candidate #1: `Iterator`
+  ::: src/effect.rs
+   |
+   | pub struct Pending<T, K, R> {
+   | --------------------------- doesn't satisfy `base::Pending<u8, K, u8>: Iterator`
+   |
+   = note: the following trait bounds were not satisfied:
+           `base::Pending<u8, K, u8>: Iterator`
+           which is required by `&mut base::Pending<u8, K, u8>: Iterator`
