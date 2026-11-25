@@ -57,7 +57,11 @@ mod tests {
         assert_eq!(left, [0; 32], "a dropped Secret's slot is zero");
 
         let secret = SecretBytes::new(vec![0xaa; 8192]);
-        assert_eq!(freed(8192, || drop(secret)), (1, 0), "a dropped SecretBytes buffer is zero when freed");
+        assert_eq!(
+            freed(8192, || drop(secret)),
+            (1, 0),
+            "a dropped SecretBytes buffer is zero when freed"
+        );
 
         // a text whose every symbol but the last decodes, so the buffer holds 5,997 bytes when the last is refused
         let mut text = b64url_encode(&[0xaa; 6000]);
@@ -66,6 +70,10 @@ mod tests {
         let mut outcome = None;
         let seen = freed(text.len(), || outcome = Some(b64url_decode(&text).is_err()));
         assert_eq!(outcome, Some(true), "the text is refused");
-        assert_eq!(seen, (1, 0), "a refused text's decode buffer is zero when freed");
+        assert_eq!(
+            seen,
+            (1, 0),
+            "a refused text's decode buffer is zero when freed"
+        );
     }
 }

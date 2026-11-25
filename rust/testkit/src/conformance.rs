@@ -40,6 +40,8 @@ pub fn store_conformance<K, R, S>(
     c.disjoint(&mut fresh());
     c.name = "reapply";
     c.reapply(&mut fresh());
+    c.name = "reused_id";
+    c.reused_id(&mut fresh());
     c.name = "conflict_not_applied";
     c.conflict_not_applied(&mut fresh());
     c.name = "duplicate_create";
@@ -277,6 +279,25 @@ impl<K: StoreKey + Debug, R: Clone + PartialEq + Debug> Case<'_, K, R> {
         self.holds(s, 0, first.as_ref(), "nothing written twice");
     }
 
+    // entropy that repeats gives two effects one id; answering the second Ok would settle it with nothing written
+    fn reused_id<S: Store<K, R>>(&mut self, s: &mut S)
+    where
+        S::Error: Debug,
+    {
+        let saved = std::mem::replace(&mut self.e, seeded(1));
+        let first = self.build(|b, c| b.create(c.k(0), c.r(0), None));
+        self.e = seeded(1);
+        let second = self.build(|b, c| b.create(c.k(1), c.r(1), None));
+        self.e = saved;
+        assert_eq!(first.id(), second.id(), "{}", self.fail("one seed, one id"));
+        self.applies(s, &first, "the first apply");
+        assert!(
+            !matches!(s.apply(&second, self.now), Ok(Ok(_))),
+            "{}",
+            self.fail("a reused id with different keys is not Ok")
+        );
+    }
+
     fn conflict_not_applied<S: Store<K, R>>(&mut self, s: &mut S)
     where
         S::Error: Debug,
@@ -365,12 +386,55 @@ impl<K: StoreKey + Debug, R: Clone + PartialEq + Debug> Case<'_, K, R> {
     {
         let guards = self.build(|b, c| (0..128).fold(b, |b, n| b.expect_absent(c.k(n))));
         self.applies(s, &guards, "128 guards apply");
-        let writes = self.build(|b, c| (0..64).fold(b, |b, n| b.create(c.k(n), c.r(n), None)));
-        self.applies(s, &writes, "64 guarded writes apply");
+        let creates = self.build(|b, c| (0..64).fold(b, |b, n| b.create(c.k(n), c.r(n), None)));
+        self.applies(s, &creates, "64 creates apply");
+        let seen = self.all(s);
+        let updates = self.build(|b, c| {
+            seen.iter()
+                .zip(0..)
+                .fold(b, |b, (row, n)| b.update(c.k(n), row, c.r(n + 64), None))
+        });
+        self.applies(s, &updates, "64 updates apply");
+        let seen = self.all(s);
         assert!(
-            (0..64).all(|n| self.row(s, n).is_some()),
+            seen.iter()
+                .zip(0..)
+                .all(|(row, n)| row.record() == &self.r(n + 64)),
             "{}",
-            self.fail("every row written")
+            self.fail("every row updated")
         );
+        let deletes = self.build(|b, c| {
+            seen.iter()
+                .zip(0..)
+                .fold(b, |b, (row, n)| b.delete(c.k(n), row))
+        });
+        self.applies(s, &deletes, "64 deletes apply");
+        assert!(
+            (0..64).all(|n| self.row(s, n).is_none()),
+            "{}",
+            self.fail("every row deleted")
+        );
+        let again = self.build(|b, c| (0..64).fold(b, |b, n| b.create(c.k(n), c.r(n), None)));
+        self.applies(s, &again, "64 creates apply over deleted rows");
+        let consumes = self.build(|b, c| (0..64).fold(b, |b, n| b.consume(c.k(n))));
+        self.applies(s, &consumes, "64 consumes apply");
+        assert!(
+            (0..64).all(|n| self.row(s, n).is_none()),
+            "{}",
+            self.fail("every row consumed")
+        );
+    }
+
+    // rows 0 to 63, each present
+    fn all<S: Store<K, R>>(&self, s: &mut S) -> Vec<Row<R>>
+    where
+        S::Error: Debug,
+    {
+        (0..64)
+            .map(|n| {
+                self.row(s, n)
+                    .unwrap_or_else(|| panic!("{}", self.fail("every row written")))
+            })
+            .collect()
     }
 }

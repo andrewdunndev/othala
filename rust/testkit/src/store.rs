@@ -10,6 +10,8 @@ pub enum Fault {
     Lost,
     /// A put on a key the same effect does not guard; never reachable through the builder.
     Unguarded,
+    /// An applied effect's id arrived with other keys: entropy repeated, so this effect is not the one applied.
+    ReusedId,
 }
 
 #[derive(Clone, Debug)]
@@ -35,7 +37,8 @@ enum AppliedIds {
 #[derive(Clone, Debug)]
 pub struct MemStore<K, R> {
     rows: BTreeMap<K, Stored<R>>,
-    applied: BTreeSet<EffectId>,
+    // each applied id with its effect's keys, so a reused id is told from a re-apply
+    applied: BTreeMap<EffectId, BTreeSet<K>>,
     counter: u64,
     reads: BTreeSet<K>,
     lose: u32,
@@ -47,7 +50,7 @@ impl<K: StoreKey, R: Clone> MemStore<K, R> {
     pub const fn new() -> Self {
         Self {
             rows: BTreeMap::new(),
-            applied: BTreeSet::new(),
+            applied: BTreeMap::new(),
             counter: 0,
             reads: BTreeSet::new(),
             lose: 0,
@@ -117,10 +120,14 @@ impl<K: StoreKey, R: Clone> Store<K, R> for MemStore<K, R> {
         effect: &Effect<K, R>,
         now: UnixTime,
     ) -> Result<Result<Receipt, Conflict<K>>, Fault> {
-        if self.applied.contains(&effect.id()) {
-            return Ok(Ok(mint(effect)));
-        }
         let guarded: BTreeSet<&K> = effect.guards().map(|g| *g.key()).collect();
+        if let Some(keys) = self.applied.get(&effect.id()) {
+            return if keys.iter().eq(guarded.iter().copied()) {
+                Ok(Ok(mint(effect)))
+            } else {
+                Err(Fault::ReusedId)
+            };
+        }
         if effect.puts().any(|(k, _, _)| !guarded.contains(k))
             || effect.deletes().any(|k| !guarded.contains(k))
         {
@@ -142,7 +149,8 @@ impl<K: StoreKey, R: Clone> Store<K, R> for MemStore<K, R> {
             self.rows.insert(key.clone(), stored);
         }
         if self.ids == AppliedIds::Recorded {
-            self.applied.insert(effect.id());
+            let keys = guarded.into_iter().cloned().collect();
+            self.applied.insert(effect.id(), keys);
         }
         if self.lose > 0 {
             self.lose -= 1;

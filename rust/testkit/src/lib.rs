@@ -16,7 +16,8 @@ use rand_chacha::rand_core::SeedableRng;
 /// Deterministic entropy for tests.
 pub type Seeded = base::RandCore<ChaCha20Rng>;
 
-/// ChaCha20 seeded from `seed`, through the `rand_core` adapter.
+/// ChaCha20 seeded from `seed`, through the `rand_core` adapter. The same `seed` gives the same effect ids, so
+/// draw every effect one store sees from one advancing source; a reused id with other keys is `Fault::ReusedId`.
 pub fn seeded(seed: u64) -> Seeded {
     base::RandCore::new(ChaCha20Rng::seed_from_u64(seed))
 }

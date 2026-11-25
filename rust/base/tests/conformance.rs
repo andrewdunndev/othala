@@ -43,10 +43,12 @@ enum Lie {
     RecreateAfterExpiryRepeats,
     VersionPerKey,
     SmallBound,
+    SmallDeleteBound,
+    IdOnly,
     WrongReceipt,
 }
 
-const CAUGHT_IN: [(Lie, &str); 20] = [
+const CAUGHT_IN: [(Lie, &str); 22] = [
     (Lie::SkipWrites, "atomic: "),
     (Lie::ConflictAsError, "atomic: "),
     (Lie::EagerPuts, "atomic: "),
@@ -66,6 +68,8 @@ const CAUGHT_IN: [(Lie, &str); 20] = [
     (Lie::RecreateAfterExpiryRepeats, "expired: "),
     (Lie::VersionPerKey, "recreate: "),
     (Lie::SmallBound, "at_bound: "),
+    (Lie::SmallDeleteBound, "at_bound: "),
+    (Lie::IdOnly, "reused_id: "),
     (Lie::WrongReceipt, "atomic: "),
 ];
 
@@ -104,7 +108,7 @@ enum Reader {
 struct Liar {
     lie: Lie,
     rows: BTreeMap<K, (u16, Version, Option<UnixTime>)>,
-    applied: BTreeSet<EffectId>,
+    applied: BTreeMap<EffectId, BTreeSet<K>>,
     counter: u64,
     writes: u64,
     loaded_at: BTreeMap<K, u64>,
@@ -115,7 +119,7 @@ impl Liar {
         Self {
             lie,
             rows: BTreeMap::new(),
-            applied: BTreeSet::new(),
+            applied: BTreeMap::new(),
             counter: 0,
             writes: 0,
             loaded_at: BTreeMap::new(),
@@ -192,11 +196,17 @@ impl Store<K, u16> for Liar {
         now: UnixTime,
     ) -> Result<Result<Receipt, Conflict<K>>, Fault> {
         let lie = self.lie;
-        let seen_id = self.applied.contains(&effect.id());
-        if seen_id && lie != Lie::IdAfterGuards {
+        let keys: BTreeSet<K> = effect.guards().map(|g| (*g.key()).clone()).collect();
+        let seen_id = self.applied.get(&effect.id()).map(|seen| *seen == keys);
+        if seen_id == Some(false) && lie != Lie::IdOnly {
+            return Err(Fault::ReusedId);
+        }
+        if seen_id.is_some() && lie != Lie::IdAfterGuards {
             return Ok(Ok(mint(effect)));
         }
-        if lie == Lie::SmallBound && effect.guards().count() > 100 {
+        if lie == Lie::SmallBound && effect.guards().count() > 100
+            || lie == Lie::SmallDeleteBound && effect.deletes().count() > 40
+        {
             return Err(Fault::Lost);
         }
         let puts: BTreeSet<K> = effect.puts().map(|(k, _, _)| k.clone()).collect();
@@ -239,7 +249,7 @@ impl Store<K, u16> for Liar {
             match lie {
                 Lie::ConflictAsError => return Err(Fault::Lost),
                 Lie::RecordsConflictedId => {
-                    self.applied.insert(effect.id());
+                    self.applied.insert(effect.id(), keys);
                 }
                 Lie::EagerPuts => self.write(effect, &puts),
                 Lie::EagerDeletes => self.write(effect, &deletes),
@@ -255,7 +265,7 @@ impl Store<K, u16> for Liar {
             }
             return Ok(Err(conflict));
         }
-        if seen_id {
+        if seen_id.is_some() {
             return Ok(Ok(mint(effect)));
         }
         if lie == Lie::UniqueAsError && creates.iter().any(|k| self.rows.contains_key(k)) {
@@ -277,7 +287,7 @@ impl Store<K, u16> for Liar {
             expected.iter().for_each(|k| self.bump(k));
         }
         if lie != Lie::NoAppliedId {
-            self.applied.insert(effect.id());
+            self.applied.insert(effect.id(), keys);
         }
         if lie == Lie::WrongReceipt {
             let other = Effect::builder(&mut testkit::seeded(0))
