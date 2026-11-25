@@ -189,3 +189,39 @@ files = [
   { path = "rfc7520/jwe.json", sha256 = "ab0533f1c25db15a919f4b70ba70f89a0f2795d9b79f6f7db14af653faff569d", cases = 13 },
 ]
 
+[source."rfc4648"]
+url = "https://www.rfc-editor.org/rfc/rfc4648.txt"
+revision = "RFC 4648 section 10"
+retrieved = "2026-11-24"
+licence = "IETF Trust (RFC text; data values only)"
+feeds = ["base"]
+notes = "tools/extract_rfc4648.py on rfc4648.txt (sha256 84e14418f795d503be5f34bf23ce4ebaa119e9ec7c9f667d8caeb111385b178f). BASE16/32/32-HEX/64 test vectors; the spec has no base64url vectors in section 10 (base64url is the section 5 alphabet over the BASE64 vectors)."
+cases = 28
+files = [
+  { path = "rfc4648/test-vectors.json", sha256 = "7dca64c8c1a30c62fdd5619d21b878c37f5e1b93379390f78faa49d6c6c46d3a", cases = 28 },
+]
+
+[source."rfc7515-a4-a7"]
+url = "https://www.rfc-editor.org/rfc/rfc7515.txt"
+revision = "RFC 7515 appendix A.4-A.7"
+retrieved = "2026-11-24"
+licence = "IETF Trust (RFC text; data values only)"
+feeds = ["jose"]
+notes = "tools/extract_rfc_sections.py on rfc7515.txt (sha256 ecbf84674118e62526511c1237e1deaa86aada86d25b247623a2a7e04ae62e40) with sections A.4 A.4.1 A.4.2 A.5 A.6 A.6.1 A.6.2 A.6.3 A.6.4 A.7: ES512 (verified by hand), unsecured JWS, general and flattened JSON serialization. A.1-A.3 live in source rfc7515. cases = A.4, A.5, A.6, A.7."
+cases = 4
+files = [
+  { path = "rfc7515/appendix-a4-a7.json", sha256 = "e4f28ab5653c307317fc66646d832eee1966e1996f2a73db4072311b2e1f50a2", cases = 4 },
+]
+
+[source."rfc8037"]
+url = "https://www.rfc-editor.org/rfc/rfc8037.txt"
+revision = "RFC 8037 appendix A"
+retrieved = "2026-11-24"
+licence = "IETF Trust (RFC text; data values only)"
+feeds = ["jose"]
+notes = "tools/extract_rfc_sections.py on rfc8037.txt (sha256 f14347f9d8eead78ef6e7a1ea3d795d35d664033095a76a80fcd567904aaedaa) with sections A.1-A.7: Ed25519 keys, thumbprint, signing and validation (verified by hand), ECDH-ES with X25519 and X448."
+cases = 7
+files = [
+  { path = "rfc8037/appendix-a.json", sha256 = "2b07fba6ce6ec8e2753e7abd4c995364d67f1536ddf4f14247c74ed830a59253", cases = 7 },
+]
+

@@ -1,0 +1,371 @@
+{
+ "sections": [
+  {
+   "section": "A.4",
+   "title": "Example JWS Using ECDSA P-521 SHA-512",
+   "blocks": []
+  },
+  {
+   "section": "A.4.1",
+   "title": "Encoding",
+   "blocks": [
+    {
+     "text": "The JWS Protected Header for this example differs from the previous\nexample because different ECDSA curves and hash functions are used.\nThe JWS Protected Header used is:",
+     "joined": "TheJWSProtectedHeaderforthisexamplediffersfromthepreviousexamplebecausedifferentECDSAcurvesandhashfunctionsareused.TheJWSProtectedHeaderusedis:"
+    },
+    {
+     "text": "{\"alg\":\"ES512\"}",
+     "joined": "{\"alg\":\"ES512\"}",
+     "json": {
+      "alg": "ES512"
+     }
+    },
+    {
+     "text": "The octets representing UTF8(JWS Protected Header) in this example\n(using JSON array notation) are:",
+     "joined": "TheoctetsrepresentingUTF8(JWSProtectedHeader)inthisexample(usingJSONarraynotation)are:"
+    },
+    {
+     "text": "[123, 34, 97, 108, 103, 34, 58, 34, 69, 83, 53, 49, 50, 34, 125]",
+     "joined": "[123,34,97,108,103,34,58,34,69,83,53,49,50,34,125]",
+     "json": [
+      123,
+      34,
+      97,
+      108,
+      103,
+      34,
+      58,
+      34,
+      69,
+      83,
+      53,
+      49,
+      50,
+      34,
+      125
+     ]
+    },
+    {
+     "text": "Encoding this JWS Protected Header as BASE64URL(UTF8(JWS Protected\nHeader)) gives this value:",
+     "joined": "EncodingthisJWSProtectedHeaderasBASE64URL(UTF8(JWSProtectedHeader))givesthisvalue:"
+    },
+    {
+     "text": "eyJhbGciOiJFUzUxMiJ9",
+     "joined": "eyJhbGciOiJFUzUxMiJ9"
+    },
+    {
+     "text": "The JWS Payload used in this example is the ASCII string \"Payload\".\nThe representation of this string is the following octet sequence:",
+     "joined": "TheJWSPayloadusedinthisexampleistheASCIIstring\"Payload\".Therepresentationofthisstringisthefollowingoctetsequence:"
+    },
+    {
+     "text": "[80, 97, 121, 108, 111, 97, 100]",
+     "joined": "[80,97,121,108,111,97,100]",
+     "json": [
+      80,
+      97,
+      121,
+      108,
+      111,
+      97,
+      100
+     ]
+    },
+    {
+     "text": "Encoding this JWS Payload as BASE64URL(JWS Payload) gives this value:",
+     "joined": "EncodingthisJWSPayloadasBASE64URL(JWSPayload)givesthisvalue:"
+    },
+    {
+     "text": "UGF5bG9hZA",
+     "joined": "UGF5bG9hZA"
+    },
+    {
+     "text": "Combining these as BASE64URL(UTF8(JWS Protected Header)) || '.' ||\nBASE64URL(JWS Payload) gives this string:",
+     "joined": "CombiningtheseasBASE64URL(UTF8(JWSProtectedHeader))||'.'||BASE64URL(JWSPayload)givesthisstring:"
+    },
+    {
+     "text": "eyJhbGciOiJFUzUxMiJ9.UGF5bG9hZA",
+     "joined": "eyJhbGciOiJFUzUxMiJ9.UGF5bG9hZA"
+    },
+    {
+     "text": "The resulting JWS Signing Input value, which is the ASCII\nrepresentation of above string, is the following octet sequence:",
+     "joined": "TheresultingJWSSigningInputvalue,whichistheASCIIrepresentationofabovestring,isthefollowingoctetsequence:"
+    },
+    {
+     "text": "[101, 121, 74, 104, 98, 71, 99, 105, 79, 105, 74, 70, 85, 122, 85,\n120, 77, 105, 74, 57, 46, 85, 71, 70, 53, 98, 71, 57, 104, 90, 65]\nThis example uses the Elliptic Curve key represented in JSON Web Key\n[JWK] format below (with line breaks within values for display\npurposes only):",
+     "joined": "[101,121,74,104,98,71,99,105,79,105,74,70,85,122,85,120,77,105,74,57,46,85,71,70,53,98,71,57,104,90,65]ThisexampleusestheEllipticCurvekeyrepresentedinJSONWebKey[JWK]formatbelow(withlinebreakswithinvaluesfordisplaypurposesonly):"
+    },
+    {
+     "text": "{\"kty\":\"EC\",\n \"crv\":\"P-521\",\n \"x\":\"AekpBQ8ST8a8VcfVOTNl353vSrDCLLJXmPk06wTjxrrjcBpXp5EOnYG_\n      NjFZ6OvLFV1jSfS9tsz4qUxcWceqwQGk\",\n \"y\":\"ADSmRA43Z1DSNx_RvcLI87cdL07l6jQyyBXMoxVg_l2Th-x3S1WDhjDl\n      y79ajL4Kkd0AZMaZmh9ubmf63e3kyMj2\",\n \"d\":\"AY5pb7A0UFiB3RELSD64fTLOSV_jazdF7fLYyuTw8lOfRhWg6Y6rUrPA\n      xerEzgdRhajnu0ferB0d53vM9mE15j2C\"\n}",
+     "joined": "{\"kty\":\"EC\",\"crv\":\"P-521\",\"x\":\"AekpBQ8ST8a8VcfVOTNl353vSrDCLLJXmPk06wTjxrrjcBpXp5EOnYG_NjFZ6OvLFV1jSfS9tsz4qUxcWceqwQGk\",\"y\":\"ADSmRA43Z1DSNx_RvcLI87cdL07l6jQyyBXMoxVg_l2Th-x3S1WDhjDly79ajL4Kkd0AZMaZmh9ubmf63e3kyMj2\",\"d\":\"AY5pb7A0UFiB3RELSD64fTLOSV_jazdF7fLYyuTw8lOfRhWg6Y6rUrPAxerEzgdRhajnu0ferB0d53vM9mE15j2C\"}",
+     "json": {
+      "kty": "EC",
+      "crv": "P-521",
+      "x": "AekpBQ8ST8a8VcfVOTNl353vSrDCLLJXmPk06wTjxrrjcBpXp5EOnYG_NjFZ6OvLFV1jSfS9tsz4qUxcWceqwQGk",
+      "y": "ADSmRA43Z1DSNx_RvcLI87cdL07l6jQyyBXMoxVg_l2Th-x3S1WDhjDly79ajL4Kkd0AZMaZmh9ubmf63e3kyMj2",
+      "d": "AY5pb7A0UFiB3RELSD64fTLOSV_jazdF7fLYyuTw8lOfRhWg6Y6rUrPAxerEzgdRhajnu0ferB0d53vM9mE15j2C"
+     }
+    },
+    {
+     "text": "The ECDSA private part d is then passed to an ECDSA signing function,\nwhich also takes the curve type, P-521, the hash type, SHA-512, and\nthe JWS Signing Input as inputs.  The result of the digital signature\nis the EC point (R, S), where R and S are unsigned integers.  In this\nexample, the R and S values, given as octet sequences representing\nbig-endian integers are:",
+     "joined": "TheECDSAprivatepartdisthenpassedtoanECDSAsigningfunction,whichalsotakesthecurvetype,P-521,thehashtype,SHA-512,andtheJWSSigningInputasinputs.TheresultofthedigitalsignatureistheECpoint(R,S),whereRandSareunsignedintegers.Inthisexample,theRandSvalues,givenasoctetsequencesrepresentingbig-endianintegersare:"
+    },
+    {
+     "text": "+--------+----------------------------------------------------------+\n| Result | Value                                                    |\n| Name   |                                                          |\n+--------+----------------------------------------------------------+\n| R      | [1, 220, 12, 129, 231, 171, 194, 209, 232, 135, 233,     |\n|        | 117, 247, 105, 122, 210, 26, 125, 192, 1, 217, 21, 82,   |\n|        | 91, 45, 240, 255, 83, 19, 34, 239, 71, 48, 157, 147,     |\n|        | 152, 105, 18, 53, 108, 163, 214, 68, 231, 62, 153, 150,  |\n|        | 106, 194, 164, 246, 72, 143, 138, 24, 50, 129, 223, 133, |\n|        | 206, 209, 172, 63, 237, 119, 109]                        |\n| S      | [0, 111, 6, 105, 44, 5, 41, 208, 128, 61, 152, 40, 92,   |\n|        | 61, 152, 4, 150, 66, 60, 69, 247, 196, 170, 81, 193,     |\n|        | 199, 78, 59, 194, 169, 16, 124, 9, 143, 42, 142, 131,    |\n|        | 48, 206, 238, 34, 175, 83, 203, 220, 159, 3, 107, 155,   |\n|        | 22, 27, 73, 111, 68, 68, 21, 238, 144, 229, 232, 148,    |\n|        | 188, 222, 59, 242, 103]                                  |\n+--------+----------------------------------------------------------+",
+     "joined": "+--------+----------------------------------------------------------+|Result|Value||Name||+--------+----------------------------------------------------------+|R|[1,220,12,129,231,171,194,209,232,135,233,|||117,247,105,122,210,26,125,192,1,217,21,82,|||91,45,240,255,83,19,34,239,71,48,157,147,|||152,105,18,53,108,163,214,68,231,62,153,150,|||106,194,164,246,72,143,138,24,50,129,223,133,|||206,209,172,63,237,119,109]||S|[0,111,6,105,44,5,41,208,128,61,152,40,92,|||61,152,4,150,66,60,69,247,196,170,81,193,|||199,78,59,194,169,16,124,9,143,42,142,131,|||48,206,238,34,175,83,203,220,159,3,107,155,|||22,27,73,111,68,68,21,238,144,229,232,148,|||188,222,59,242,103]|+--------+----------------------------------------------------------+"
+    },
+    {
+     "text": "The JWS Signature is the value R || S.  Encoding the signature as\nBASE64URL(JWS Signature) produces this value (with line breaks for\ndisplay purposes only):",
+     "joined": "TheJWSSignatureisthevalueR||S.EncodingthesignatureasBASE64URL(JWSSignature)producesthisvalue(withlinebreaksfordisplaypurposesonly):"
+    },
+    {
+     "text": "  AdwMgeerwtHoh-l192l60hp9wAHZFVJbLfD_UxMi70cwnZOYaRI1bKPWROc-mZZq\n  wqT2SI-KGDKB34XO0aw_7XdtAG8GaSwFKdCAPZgoXD2YBJZCPEX3xKpRwcdOO8Kp\n  EHwJjyqOgzDO7iKvU8vcnwNrmxYbSW9ERBXukOXolLzeO_Jn\nConcatenating these values in the order Header.Payload.Signature with\nperiod ('.') characters between the parts yields this complete JWS\nrepresentation using the JWS Compact Serialization (with line breaks\nfor display purposes only):",
+     "joined": "AdwMgeerwtHoh-l192l60hp9wAHZFVJbLfD_UxMi70cwnZOYaRI1bKPWROc-mZZqwqT2SI-KGDKB34XO0aw_7XdtAG8GaSwFKdCAPZgoXD2YBJZCPEX3xKpRwcdOO8KpEHwJjyqOgzDO7iKvU8vcnwNrmxYbSW9ERBXukOXolLzeO_JnConcatenatingthesevaluesintheorderHeader.Payload.Signaturewithperiod('.')charactersbetweenthepartsyieldsthiscompleteJWSrepresentationusingtheJWSCompactSerialization(withlinebreaksfordisplaypurposesonly):"
+    },
+    {
+     "text": "eyJhbGciOiJFUzUxMiJ9\n.\nUGF5bG9hZA\n.\nAdwMgeerwtHoh-l192l60hp9wAHZFVJbLfD_UxMi70cwnZOYaRI1bKPWROc-mZZq\nwqT2SI-KGDKB34XO0aw_7XdtAG8GaSwFKdCAPZgoXD2YBJZCPEX3xKpRwcdOO8Kp\nEHwJjyqOgzDO7iKvU8vcnwNrmxYbSW9ERBXukOXolLzeO_Jn",
+     "joined": "eyJhbGciOiJFUzUxMiJ9.UGF5bG9hZA.AdwMgeerwtHoh-l192l60hp9wAHZFVJbLfD_UxMi70cwnZOYaRI1bKPWROc-mZZqwqT2SI-KGDKB34XO0aw_7XdtAG8GaSwFKdCAPZgoXD2YBJZCPEX3xKpRwcdOO8KpEHwJjyqOgzDO7iKvU8vcnwNrmxYbSW9ERBXukOXolLzeO_Jn"
+    }
+   ]
+  },
+  {
+   "section": "A.4.2",
+   "title": "Validating",
+   "blocks": [
+    {
+     "text": "Since the \"alg\" Header Parameter is \"ES512\", we validate the ECDSA\nP-521 SHA-512 digital signature contained in the JWS Signature.",
+     "joined": "Sincethe\"alg\"HeaderParameteris\"ES512\",wevalidatetheECDSAP-521SHA-512digitalsignaturecontainedintheJWSSignature."
+    },
+    {
+     "text": "Validating this JWS Signature is very similar to the previous\nexample.  We need to split the 132-member octet sequence of the JWS\nSignature into two 66-octet sequences, the first representing R and\nthe second S.  We then pass the public key (x, y), the signature (R,\nS), and the JWS Signing Input to an ECDSA signature verifier that has\nbeen configured to use the P-521 curve with the SHA-512 hash\nfunction.",
+     "joined": "ValidatingthisJWSSignatureisverysimilartothepreviousexample.Weneedtosplitthe132-memberoctetsequenceoftheJWSSignatureintotwo66-octetsequences,thefirstrepresentingRandthesecondS.Wethenpassthepublickey(x,y),thesignature(R,S),andtheJWSSigningInputtoanECDSAsignatureverifierthathasbeenconfiguredtousetheP-521curvewiththeSHA-512hashfunction."
+    }
+   ]
+  },
+  {
+   "section": "A.5",
+   "title": "Example Unsecured JWS",
+   "blocks": [
+    {
+     "text": "The following example JWS Protected Header declares that the encoded\nobject is an Unsecured JWS:",
+     "joined": "ThefollowingexampleJWSProtectedHeaderdeclaresthattheencodedobjectisanUnsecuredJWS:"
+    },
+    {
+     "text": "{\"alg\":\"none\"}",
+     "joined": "{\"alg\":\"none\"}",
+     "json": {
+      "alg": "none"
+     }
+    },
+    {
+     "text": "Encoding this JWS Protected Header as BASE64URL(UTF8(JWS Protected\nHeader)) gives this value:",
+     "joined": "EncodingthisJWSProtectedHeaderasBASE64URL(UTF8(JWSProtectedHeader))givesthisvalue:"
+    },
+    {
+     "text": "eyJhbGciOiJub25lIn0",
+     "joined": "eyJhbGciOiJub25lIn0"
+    },
+    {
+     "text": "The JWS Payload used in this example, which follows, is the same as\nin the previous examples.  Since the BASE64URL(JWS Payload) value\nwill therefore be the same, its computation is not repeated here.",
+     "joined": "TheJWSPayloadusedinthisexample,whichfollows,isthesameasinthepreviousexamples.SincetheBASE64URL(JWSPayload)valuewillthereforebethesame,itscomputationisnotrepeatedhere."
+    },
+    {
+     "text": "{\"iss\":\"joe\",\n \"exp\":1300819380,\n \"http://example.com/is_root\":true}",
+     "joined": "{\"iss\":\"joe\",\"exp\":1300819380,\"http://example.com/is_root\":true}",
+     "json": {
+      "iss": "joe",
+      "exp": 1300819380,
+      "http://example.com/is_root": true
+     }
+    },
+    {
+     "text": "The JWS Signature is the empty octet string and BASE64URL(JWS\nSignature) is the empty string.\nConcatenating these values in the order Header.Payload.Signature with\nperiod ('.') characters between the parts yields this complete JWS\nrepresentation using the JWS Compact Serialization (with line breaks\nfor display purposes only):",
+     "joined": "TheJWSSignatureistheemptyoctetstringandBASE64URL(JWSSignature)istheemptystring.ConcatenatingthesevaluesintheorderHeader.Payload.Signaturewithperiod('.')charactersbetweenthepartsyieldsthiscompleteJWSrepresentationusingtheJWSCompactSerialization(withlinebreaksfordisplaypurposesonly):"
+    },
+    {
+     "text": "eyJhbGciOiJub25lIn0\n.\neyJpc3MiOiJqb2UiLA0KICJleHAiOjEzMDA4MTkzODAsDQogImh0dHA6Ly9leGFt\ncGxlLmNvbS9pc19yb290Ijp0cnVlfQ\n.",
+     "joined": "eyJhbGciOiJub25lIn0.eyJpc3MiOiJqb2UiLA0KICJleHAiOjEzMDA4MTkzODAsDQogImh0dHA6Ly9leGFtcGxlLmNvbS9pc19yb290Ijp0cnVlfQ."
+    }
+   ]
+  },
+  {
+   "section": "A.6",
+   "title": "Example JWS Using General JWS JSON Serialization",
+   "blocks": [
+    {
+     "text": "This section contains an example using the general JWS JSON\nSerialization syntax.  This example demonstrates the capability for\nconveying multiple digital signatures and/or MACs for the same\npayload.",
+     "joined": "ThissectioncontainsanexampleusingthegeneralJWSJSONSerializationsyntax.Thisexampledemonstratesthecapabilityforconveyingmultipledigitalsignaturesand/orMACsforthesamepayload."
+    },
+    {
+     "text": "The JWS Payload used in this example is the same as that used in the\nexamples in Appendix A.2 and Appendix A.3 (with line breaks for\ndisplay purposes only):",
+     "joined": "TheJWSPayloadusedinthisexampleisthesameasthatusedintheexamplesinAppendixA.2andAppendixA.3(withlinebreaksfordisplaypurposesonly):"
+    },
+    {
+     "text": "eyJpc3MiOiJqb2UiLA0KICJleHAiOjEzMDA4MTkzODAsDQogImh0dHA6Ly9leGFt\ncGxlLmNvbS9pc19yb290Ijp0cnVlfQ",
+     "joined": "eyJpc3MiOiJqb2UiLA0KICJleHAiOjEzMDA4MTkzODAsDQogImh0dHA6Ly9leGFtcGxlLmNvbS9pc19yb290Ijp0cnVlfQ"
+    },
+    {
+     "text": "Two digital signatures are used in this example: the first using\nRSASSA-PKCS1-v1_5 SHA-256 and the second using ECDSA P-256 SHA-256.\nFor the first, the JWS Protected Header and key are the same as in\nAppendix A.2, resulting in the same JWS Signature value; therefore,\nits computation is not repeated here.  For the second, the JWS\nProtected Header and key are the same as in Appendix A.3, resulting\nin the same JWS Signature value; therefore, its computation is not\nrepeated here.",
+     "joined": "Twodigitalsignaturesareusedinthisexample:thefirstusingRSASSA-PKCS1-v1_5SHA-256andthesecondusingECDSAP-256SHA-256.Forthefirst,theJWSProtectedHeaderandkeyarethesameasinAppendixA.2,resultinginthesameJWSSignaturevalue;therefore,itscomputationisnotrepeatedhere.Forthesecond,theJWSProtectedHeaderandkeyarethesameasinAppendixA.3,resultinginthesameJWSSignaturevalue;therefore,itscomputationisnotrepeatedhere."
+    }
+   ]
+  },
+  {
+   "section": "A.6.1",
+   "title": "JWS Per-Signature Protected Headers",
+   "blocks": [
+    {
+     "text": "The JWS Protected Header value used for the first signature is:",
+     "joined": "TheJWSProtectedHeadervalueusedforthefirstsignatureis:"
+    },
+    {
+     "text": "{\"alg\":\"RS256\"}",
+     "joined": "{\"alg\":\"RS256\"}",
+     "json": {
+      "alg": "RS256"
+     }
+    },
+    {
+     "text": "Encoding this JWS Protected Header as BASE64URL(UTF8(JWS Protected\nHeader)) gives this value:",
+     "joined": "EncodingthisJWSProtectedHeaderasBASE64URL(UTF8(JWSProtectedHeader))givesthisvalue:"
+    },
+    {
+     "text": "eyJhbGciOiJSUzI1NiJ9",
+     "joined": "eyJhbGciOiJSUzI1NiJ9"
+    },
+    {
+     "text": "The JWS Protected Header value used for the second signature is:",
+     "joined": "TheJWSProtectedHeadervalueusedforthesecondsignatureis:"
+    },
+    {
+     "text": "  {\"alg\":\"ES256\"}\nEncoding this JWS Protected Header as BASE64URL(UTF8(JWS Protected\nHeader)) gives this value:",
+     "joined": "{\"alg\":\"ES256\"}EncodingthisJWSProtectedHeaderasBASE64URL(UTF8(JWSProtectedHeader))givesthisvalue:"
+    },
+    {
+     "text": "eyJhbGciOiJFUzI1NiJ9",
+     "joined": "eyJhbGciOiJFUzI1NiJ9"
+    }
+   ]
+  },
+  {
+   "section": "A.6.2",
+   "title": "JWS Per-Signature Unprotected Headers",
+   "blocks": [
+    {
+     "text": "Key ID values are supplied for both keys using per-signature Header\nParameters.  The two JWS Unprotected Header values used to represent\nthese key IDs are:",
+     "joined": "KeyIDvaluesaresuppliedforbothkeysusingper-signatureHeaderParameters.ThetwoJWSUnprotectedHeadervaluesusedtorepresentthesekeyIDsare:"
+    },
+    {
+     "text": "{\"kid\":\"2010-12-29\"}",
+     "joined": "{\"kid\":\"2010-12-29\"}",
+     "json": {
+      "kid": "2010-12-29"
+     }
+    },
+    {
+     "text": "and",
+     "joined": "and"
+    },
+    {
+     "text": "{\"kid\":\"e9bc097a-ce51-4036-9562-d2ade882db0d\"}",
+     "joined": "{\"kid\":\"e9bc097a-ce51-4036-9562-d2ade882db0d\"}",
+     "json": {
+      "kid": "e9bc097a-ce51-4036-9562-d2ade882db0d"
+     }
+    }
+   ]
+  },
+  {
+   "section": "A.6.3",
+   "title": "Complete JOSE Header Values",
+   "blocks": [
+    {
+     "text": "Combining the JWS Protected Header and JWS Unprotected Header values\nsupplied, the JOSE Header values used for the first and second\nsignatures, respectively, are:",
+     "joined": "CombiningtheJWSProtectedHeaderandJWSUnprotectedHeadervaluessupplied,theJOSEHeadervaluesusedforthefirstandsecondsignatures,respectively,are:"
+    },
+    {
+     "text": "{\"alg\":\"RS256\",\n \"kid\":\"2010-12-29\"}",
+     "joined": "{\"alg\":\"RS256\",\"kid\":\"2010-12-29\"}",
+     "json": {
+      "alg": "RS256",
+      "kid": "2010-12-29"
+     }
+    },
+    {
+     "text": "and",
+     "joined": "and"
+    },
+    {
+     "text": "{\"alg\":\"ES256\",\n \"kid\":\"e9bc097a-ce51-4036-9562-d2ade882db0d\"}",
+     "joined": "{\"alg\":\"ES256\",\"kid\":\"e9bc097a-ce51-4036-9562-d2ade882db0d\"}",
+     "json": {
+      "alg": "ES256",
+      "kid": "e9bc097a-ce51-4036-9562-d2ade882db0d"
+     }
+    }
+   ]
+  },
+  {
+   "section": "A.6.4",
+   "title": "Complete JWS JSON Serialization Representation",
+   "blocks": [
+    {
+     "text": "The complete JWS JSON Serialization for these values is as follows\n(with line breaks within values for display purposes only):",
+     "joined": "ThecompleteJWSJSONSerializationforthesevaluesisasfollows(withlinebreakswithinvaluesfordisplaypurposesonly):"
+    },
+    {
+     "text": "{\n \"payload\":\n  \"eyJpc3MiOiJqb2UiLA0KICJleHAiOjEzMDA4MTkzODAsDQogImh0dHA6Ly9leGF\n   tcGxlLmNvbS9pc19yb290Ijp0cnVlfQ\",\n \"signatures\":[\n  {\"protected\":\"eyJhbGciOiJSUzI1NiJ9\",\n   \"header\":\n    {\"kid\":\"2010-12-29\"},\n   \"signature\":\n    \"cC4hiUPoj9Eetdgtv3hF80EGrhuB__dzERat0XF9g2VtQgr9PJbu3XOiZj5RZ\n     mh7AAuHIm4Bh-0Qc_lF5YKt_O8W2Fp5jujGbds9uJdbF9CUAr7t1dnZcAcQjb\n     KBYNX4BAynRFdiuB--f_nZLgrnbyTyWzO75vRK5h6xBArLIARNPvkSjtQBMHl\n     b1L07Qe7K0GarZRmB_eSN9383LcOLn6_dO--xi12jzDwusC-eOkHWEsqtFZES\n     c6BfI7noOPqvhJ1phCnvWh6IeYI2w9QOYEUipUTI8np6LbgGY9Fs98rqVt5AX\n     LIhWkWywlVmtVrBp0igcN_IoypGlUPQGe77Rw\"},\n  {\"protected\":\"eyJhbGciOiJFUzI1NiJ9\",\n   \"header\":\n    {\"kid\":\"e9bc097a-ce51-4036-9562-d2ade882db0d\"},\n   \"signature\":\n    \"DtEhU3ljbEg8L38VWAfUAqOyKAM6-Xx-F4GawxaepmXFCgfTjDxw5djxLa8IS\n     lSApmWQxfKTUJqPP3-Kg6NU1Q\"}]\n}",
+     "joined": "{\"payload\":\"eyJpc3MiOiJqb2UiLA0KICJleHAiOjEzMDA4MTkzODAsDQogImh0dHA6Ly9leGFtcGxlLmNvbS9pc19yb290Ijp0cnVlfQ\",\"signatures\":[{\"protected\":\"eyJhbGciOiJSUzI1NiJ9\",\"header\":{\"kid\":\"2010-12-29\"},\"signature\":\"cC4hiUPoj9Eetdgtv3hF80EGrhuB__dzERat0XF9g2VtQgr9PJbu3XOiZj5RZmh7AAuHIm4Bh-0Qc_lF5YKt_O8W2Fp5jujGbds9uJdbF9CUAr7t1dnZcAcQjbKBYNX4BAynRFdiuB--f_nZLgrnbyTyWzO75vRK5h6xBArLIARNPvkSjtQBMHlb1L07Qe7K0GarZRmB_eSN9383LcOLn6_dO--xi12jzDwusC-eOkHWEsqtFZESc6BfI7noOPqvhJ1phCnvWh6IeYI2w9QOYEUipUTI8np6LbgGY9Fs98rqVt5AXLIhWkWywlVmtVrBp0igcN_IoypGlUPQGe77Rw\"},{\"protected\":\"eyJhbGciOiJFUzI1NiJ9\",\"header\":{\"kid\":\"e9bc097a-ce51-4036-9562-d2ade882db0d\"},\"signature\":\"DtEhU3ljbEg8L38VWAfUAqOyKAM6-Xx-F4GawxaepmXFCgfTjDxw5djxLa8ISlSApmWQxfKTUJqPP3-Kg6NU1Q\"}]}",
+     "json": {
+      "payload": "eyJpc3MiOiJqb2UiLA0KICJleHAiOjEzMDA4MTkzODAsDQogImh0dHA6Ly9leGFtcGxlLmNvbS9pc19yb290Ijp0cnVlfQ",
+      "signatures": [
+       {
+        "protected": "eyJhbGciOiJSUzI1NiJ9",
+        "header": {
+         "kid": "2010-12-29"
+        },
+        "signature": "cC4hiUPoj9Eetdgtv3hF80EGrhuB__dzERat0XF9g2VtQgr9PJbu3XOiZj5RZmh7AAuHIm4Bh-0Qc_lF5YKt_O8W2Fp5jujGbds9uJdbF9CUAr7t1dnZcAcQjbKBYNX4BAynRFdiuB--f_nZLgrnbyTyWzO75vRK5h6xBArLIARNPvkSjtQBMHlb1L07Qe7K0GarZRmB_eSN9383LcOLn6_dO--xi12jzDwusC-eOkHWEsqtFZESc6BfI7noOPqvhJ1phCnvWh6IeYI2w9QOYEUipUTI8np6LbgGY9Fs98rqVt5AXLIhWkWywlVmtVrBp0igcN_IoypGlUPQGe77Rw"
+       },
+       {
+        "protected": "eyJhbGciOiJFUzI1NiJ9",
+        "header": {
+         "kid": "e9bc097a-ce51-4036-9562-d2ade882db0d"
+        },
+        "signature": "DtEhU3ljbEg8L38VWAfUAqOyKAM6-Xx-F4GawxaepmXFCgfTjDxw5djxLa8ISlSApmWQxfKTUJqPP3-Kg6NU1Q"
+       }
+      ]
+     }
+    }
+   ]
+  },
+  {
+   "section": "A.7",
+   "title": "Example JWS Using Flattened JWS JSON Serialization",
+   "blocks": [
+    {
+     "text": "This section contains an example using the flattened JWS JSON\nSerialization syntax.  This example demonstrates the capability for\nconveying a single digital signature or MAC in a flattened JSON\nstructure.",
+     "joined": "ThissectioncontainsanexampleusingtheflattenedJWSJSONSerializationsyntax.ThisexampledemonstratesthecapabilityforconveyingasingledigitalsignatureorMACinaflattenedJSONstructure."
+    },
+    {
+     "text": "The values in this example are the same as those in the second\nsignature of the previous example in Appendix A.6.",
+     "joined": "ThevaluesinthisexamplearethesameasthoseinthesecondsignatureofthepreviousexampleinAppendixA.6."
+    },
+    {
+     "text": "The complete JWS JSON Serialization for these values is as follows\n(with line breaks within values for display purposes only):",
+     "joined": "ThecompleteJWSJSONSerializationforthesevaluesisasfollows(withlinebreakswithinvaluesfordisplaypurposesonly):"
+    },
+    {
+     "text": "{\n \"payload\":\n  \"eyJpc3MiOiJqb2UiLA0KICJleHAiOjEzMDA4MTkzODAsDQogImh0dHA6Ly9leGF\n   tcGxlLmNvbS9pc19yb290Ijp0cnVlfQ\",\n \"protected\":\"eyJhbGciOiJFUzI1NiJ9\",\n \"header\":\n  {\"kid\":\"e9bc097a-ce51-4036-9562-d2ade882db0d\"},\n \"signature\":\n  \"DtEhU3ljbEg8L38VWAfUAqOyKAM6-Xx-F4GawxaepmXFCgfTjDxw5djxLa8IS\n   lSApmWQxfKTUJqPP3-Kg6NU1Q\"\n}",
+     "joined": "{\"payload\":\"eyJpc3MiOiJqb2UiLA0KICJleHAiOjEzMDA4MTkzODAsDQogImh0dHA6Ly9leGFtcGxlLmNvbS9pc19yb290Ijp0cnVlfQ\",\"protected\":\"eyJhbGciOiJFUzI1NiJ9\",\"header\":{\"kid\":\"e9bc097a-ce51-4036-9562-d2ade882db0d\"},\"signature\":\"DtEhU3ljbEg8L38VWAfUAqOyKAM6-Xx-F4GawxaepmXFCgfTjDxw5djxLa8ISlSApmWQxfKTUJqPP3-Kg6NU1Q\"}",
+     "json": {
+      "payload": "eyJpc3MiOiJqb2UiLA0KICJleHAiOjEzMDA4MTkzODAsDQogImh0dHA6Ly9leGFtcGxlLmNvbS9pc19yb290Ijp0cnVlfQ",
+      "protected": "eyJhbGciOiJFUzI1NiJ9",
+      "header": {
+       "kid": "e9bc097a-ce51-4036-9562-d2ade882db0d"
+      },
+      "signature": "DtEhU3ljbEg8L38VWAfUAqOyKAM6-Xx-F4GawxaepmXFCgfTjDxw5djxLa8ISlSApmWQxfKTUJqPP3-Kg6NU1Q"
+     }
+    }
+   ]
+  }
+ ]
+}
