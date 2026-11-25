@@ -1,5 +1,5 @@
 //! Properties of `Effect` construction and of applying it to the reference store.
-#![allow(clippy::unwrap_used, reason = "test helpers fail by panicking")]
+#![expect(clippy::unwrap_used, reason = "test helpers fail by panicking")]
 use std::collections::{BTreeMap, BTreeSet};
 
 use base::{
@@ -129,7 +129,7 @@ fn build(
         let v = seen.get(&k).copied().filter(|_| fresh).unwrap_or(STALE);
         let row = Row::new(0, v);
         let r = u8::try_from(i).unwrap();
-        match kind {
+        b = match kind {
             Kind::Create => b.create(k, r, None),
             Kind::Update => b.update(k, &row, r, None),
             Kind::Consume => b.consume(k),
@@ -255,8 +255,7 @@ proptest! {
     ) {
         let mut store = MemStore::<K, u8>::new();
         if !present.is_empty() {
-            let mut b = Effect::builder(&mut seeded(3));
-            present.iter().for_each(|&k| { b.create(k, 200, None); });
+            let b = present.iter().fold(Effect::builder(&mut seeded(3)), |b, &k| b.create(k, 200, None));
             prop_assert!(store.apply(&b.build().unwrap(), NOW).unwrap().is_ok());
         }
         let all = pool(6);

@@ -1,5 +1,5 @@
-error[E0599]: no method named `put` found for mutable reference `&mut base::Builder<K, R>` in the current scope
+error[E0599]: no method named `put` found for struct `base::Builder<K, R>` in the current scope
  --> tests/ui/fail/unguarded_put.rs:3:7
   |
-3 |     b.put(k, r, None);
-  |       ^^^ method not found in `&mut base::Builder<K, R>`
+3 |     b.put(k, r, None)
+  |       ^^^ method not found in `base::Builder<K, R>`

@@ -25,6 +25,12 @@ impl<R> Stored<R> {
     }
 }
 
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum AppliedIds {
+    Recorded,
+    Forgotten,
+}
+
 /// The in-memory reference `Store`: strict, single-threaded, and recording every key loaded.
 #[derive(Clone, Debug)]
 pub struct MemStore<K, R> {
@@ -33,7 +39,7 @@ pub struct MemStore<K, R> {
     counter: u64,
     reads: BTreeSet<K>,
     lose: u32,
-    forget: bool,
+    ids: AppliedIds,
 }
 
 impl<K: StoreKey, R: Clone> MemStore<K, R> {
@@ -45,7 +51,7 @@ impl<K: StoreKey, R: Clone> MemStore<K, R> {
             counter: 0,
             reads: BTreeSet::new(),
             lose: 0,
-            forget: false,
+            ids: AppliedIds::Recorded,
         }
     }
 
@@ -57,7 +63,7 @@ impl<K: StoreKey, R: Clone> MemStore<K, R> {
 
     /// Probes only: stop recording applied ids, so a re-apply is decided afresh (a broken store).
     pub fn forget_applied_ids(&mut self) -> &mut Self {
-        self.forget = true;
+        self.ids = AppliedIds::Forgotten;
         self
     }
 
@@ -135,7 +141,7 @@ impl<K: StoreKey, R: Clone> Store<K, R> for MemStore<K, R> {
             };
             self.rows.insert(key.clone(), stored);
         }
-        if !self.forget {
+        if self.ids == AppliedIds::Recorded {
             self.applied.insert(effect.id());
         }
         if self.lose > 0 {
@@ -152,4 +158,48 @@ impl<K: StoreKey, R: Clone> Store<K, R> for MemStore<K, R> {
 )]
 fn mint<K: StoreKey, R>(effect: &Effect<K, R>) -> Receipt {
     effect.host_applied()
+}
+
+#[cfg(test)]
+mod tests {
+    use base::{Effect, Pending, Scope, Store, StoreKey, UnixTime};
+
+    use super::{Fault, MemStore};
+    use crate::seeded;
+
+    #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
+    struct K(u8);
+
+    impl StoreKey for K {
+        fn scope(&self) -> Scope {
+            Scope::Global
+        }
+    }
+
+    const NOW: UnixTime = UnixTime::new(1);
+
+    fn create(seed: u64, k: u8) -> Effect<K, u8> {
+        Effect::builder(&mut seeded(seed))
+            .create(K(k), k, None)
+            .build()
+            .expect("one create builds")
+    }
+
+    #[test]
+    fn a_lost_result_commits_and_a_reapply_settles() {
+        let mut s = MemStore::<K, u8>::new();
+        s.lose_next_result().lose_next_result();
+        let a = Pending::new('a', create(1, 1));
+        let b = create(2, 2);
+        assert_eq!(s.apply(a.effect(), NOW).err(), Some(Fault::Lost));
+        assert_eq!(s.apply(&b, NOW).err(), Some(Fault::Lost));
+        assert_eq!(s.contents(NOW).len(), 2, "both lost results committed");
+        let receipt = s
+            .apply(a.effect(), NOW)
+            .expect("third apply known")
+            .expect("re-apply is Ok");
+        assert_eq!(a.settle(receipt).ok(), Some('a'));
+        assert!(s.apply(&create(3, 3), NOW).expect("losses spent").is_ok());
+        assert_eq!(s.contents(NOW).len(), 3);
+    }
 }

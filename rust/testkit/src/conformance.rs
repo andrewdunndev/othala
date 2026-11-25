@@ -1,3 +1,7 @@
+#![expect(
+    clippy::panic,
+    reason = "a harness reports a failed claim by panicking"
+)]
 use std::fmt::Debug;
 
 use base::{
@@ -69,12 +73,11 @@ impl<K: StoreKey + Debug, R: Clone + PartialEq + Debug> Case<'_, K, R> {
         format!("{}: {what}", self.name)
     }
 
-    fn build(&mut self, f: impl FnOnce(&mut Builder<K, R>, &Self)) -> Effect<K, R> {
-        let mut b = Effect::builder(&mut self.e);
-        f(&mut b, self);
-        let name = self.name;
-        b.build()
-            .unwrap_or_else(|e| panic!("{name}: conformance effect builds: {e}"))
+    fn build(&mut self, f: impl FnOnce(Builder<K, R>, &Self) -> Builder<K, R>) -> Effect<K, R> {
+        let b = Effect::builder(&mut self.e);
+        f(b, self)
+            .build()
+            .unwrap_or_else(|e| panic!("{}: conformance effect builds: {e}", self.name))
     }
 
     fn apply<S: Store<K, R>>(&self, s: &mut S, e: &Effect<K, R>) -> Result<Receipt, Conflict<K>>
@@ -89,7 +92,15 @@ impl<K: StoreKey + Debug, R: Clone + PartialEq + Debug> Case<'_, K, R> {
     where
         S::Error: Debug,
     {
-        assert!(self.apply(s, e).is_ok(), "{}", self.fail(what));
+        let receipt = self
+            .apply(s, e)
+            .unwrap_or_else(|_| panic!("{}", self.fail(what)));
+        assert_eq!(
+            receipt.effect_id(),
+            e.id(),
+            "{}",
+            self.fail("an apply answers its own effect's receipt")
+        );
     }
 
     fn conflicts<S: Store<K, R>>(&self, s: &mut S, e: &Effect<K, R>, want: Vec<(K, Failure)>)
@@ -140,11 +151,7 @@ impl<K: StoreKey + Debug, R: Clone + PartialEq + Debug> Case<'_, K, R> {
     where
         S::Error: Debug,
     {
-        let e = self.build(|b, c| {
-            for n in ns {
-                b.create(c.k(n), c.r(n), None);
-            }
-        });
+        let e = self.build(|b, c| ns.iter().fold(b, |b, &n| b.create(c.k(n), c.r(n), None)));
         self.applies(s, &e, "seed rows apply");
         ns.map(|n| {
             self.row(s, n)
@@ -164,7 +171,7 @@ impl<K: StoreKey + Debug, R: Clone + PartialEq + Debug> Case<'_, K, R> {
                 .update(c.k(2), r2, c.r(9), None)
                 .delete(c.k(3), r3)
                 .consume(c.k(4))
-                .create(c.k(6), c.r(6), None);
+                .create(c.k(6), c.r(6), None)
         });
         self.conflicts(
             s,
@@ -179,7 +186,7 @@ impl<K: StoreKey + Debug, R: Clone + PartialEq + Debug> Case<'_, K, R> {
             b.update(c.k(1), r1, c.r(9), None)
                 .consume(c.k(2))
                 .delete(c.k(3), r3)
-                .create(c.k(5), c.r(5), None);
+                .create(c.k(5), c.r(5), None)
         });
         self.applies(s, &whole, "holding guards apply");
         let after = self
@@ -199,9 +206,7 @@ impl<K: StoreKey + Debug, R: Clone + PartialEq + Debug> Case<'_, K, R> {
             "{}",
             self.fail("create writes")
         );
-        let stale = self.build(|b, c| {
-            b.expect(c.k(1), r1);
-        });
+        let stale = self.build(|b, c| b.expect(c.k(1), r1));
         self.conflicts(s, &stale, vec![(self.k(1), Failure::Changed)]);
     }
 
@@ -210,9 +215,7 @@ impl<K: StoreKey + Debug, R: Clone + PartialEq + Debug> Case<'_, K, R> {
         S::Error: Debug,
     {
         let [r1] = &self.seed(s, [1]);
-        let e = self.build(|b, c| {
-            b.create(c.k(0), c.r(0), None).expect_absent(c.k(1));
-        });
+        let e = self.build(|b, c| b.create(c.k(0), c.r(0), None).expect_absent(c.k(1)));
         self.conflicts(s, &e, vec![(self.k(1), Failure::Present)]);
         self.holds(
             s,
@@ -229,12 +232,8 @@ impl<K: StoreKey + Debug, R: Clone + PartialEq + Debug> Case<'_, K, R> {
         S::Error: Debug,
     {
         let [row] = &self.seed(s, [0]);
-        let a = self.build(|b, c| {
-            b.expect(c.k(0), row);
-        });
-        let b = self.build(|b, c| {
-            b.expect(c.k(0), row);
-        });
+        let a = self.build(|b, c| b.expect(c.k(0), row));
+        let b = self.build(|b, c| b.expect(c.k(0), row));
         self.applies(s, &a, "the first expect applies");
         self.applies(s, &b, "a second expect of the same row applies");
         self.holds(s, 0, Some(row), "expect writes nothing");
@@ -245,12 +244,8 @@ impl<K: StoreKey + Debug, R: Clone + PartialEq + Debug> Case<'_, K, R> {
         S::Error: Debug,
     {
         let [r0, r1] = &self.seed(s, [0, 1]);
-        let a = self.build(|b, c| {
-            b.update(c.k(0), r0, c.r(5), None);
-        });
-        let b = self.build(|b, c| {
-            b.delete(c.k(1), r1).create(c.k(2), c.r(2), None);
-        });
+        let a = self.build(|b, c| b.update(c.k(0), r0, c.r(5), None));
+        let b = self.build(|b, c| b.delete(c.k(1), r1).create(c.k(2), c.r(2), None));
         self.applies(s, &a, "the first of two disjoint effects applies");
         self.applies(s, &b, "the second of two disjoint effects applies");
         assert_eq!(
@@ -266,9 +261,7 @@ impl<K: StoreKey + Debug, R: Clone + PartialEq + Debug> Case<'_, K, R> {
     where
         S::Error: Debug,
     {
-        let created = self.build(|b, c| {
-            b.create(c.k(0), c.r(0), None);
-        });
+        let created = self.build(|b, c| b.create(c.k(0), c.r(0), None));
         let pending = Pending::new('v', created);
         self.applies(s, pending.effect(), "first apply");
         let first = self.row(s, 0);
@@ -289,13 +282,9 @@ impl<K: StoreKey + Debug, R: Clone + PartialEq + Debug> Case<'_, K, R> {
         S::Error: Debug,
     {
         self.seed(s, [0]);
-        let e = self.build(|b, c| {
-            b.expect_absent(c.k(0)).create(c.k(1), c.r(1), None);
-        });
+        let e = self.build(|b, c| b.expect_absent(c.k(0)).create(c.k(1), c.r(1), None));
         self.conflicts(s, &e, vec![(self.k(0), Failure::Present)]);
-        let clear = self.build(|b, c| {
-            b.consume(c.k(0));
-        });
+        let clear = self.build(|b, c| b.consume(c.k(0)));
         self.applies(s, &clear, "clearing the conflict applies");
         self.applies(
             s,
@@ -314,12 +303,8 @@ impl<K: StoreKey + Debug, R: Clone + PartialEq + Debug> Case<'_, K, R> {
     where
         S::Error: Debug,
     {
-        let a = self.build(|b, c| {
-            b.create(c.k(0), c.r(0), None);
-        });
-        let b = self.build(|b, c| {
-            b.create(c.k(0), c.r(1), None);
-        });
+        let a = self.build(|b, c| b.create(c.k(0), c.r(0), None));
+        let b = self.build(|b, c| b.create(c.k(0), c.r(1), None));
         self.applies(s, &a, "first create");
         let first = self.row(s, 0);
         self.conflicts(s, &b, vec![(self.k(0), Failure::Present)]);
@@ -336,7 +321,7 @@ impl<K: StoreKey + Debug, R: Clone + PartialEq + Debug> Case<'_, K, R> {
         let e = self.build(|b, c| {
             b.create(c.k(0), c.r(0), Some(deadline))
                 .create(c.k(1), c.r(1), Some(deadline))
-                .update(c.k(2), r2, c.r(3), Some(deadline));
+                .update(c.k(2), r2, c.r(3), Some(deadline))
         });
         self.applies(s, &e, "create and update with a deadline");
         let seen = self
@@ -345,13 +330,9 @@ impl<K: StoreKey + Debug, R: Clone + PartialEq + Debug> Case<'_, K, R> {
         self.now = deadline;
         self.holds(s, 0, None, "absent to load at its deadline");
         self.holds(s, 2, None, "an update's deadline holds");
-        let stale = self.build(|b, c| {
-            b.expect(c.k(1), &seen);
-        });
+        let stale = self.build(|b, c| b.expect(c.k(1), &seen));
         self.conflicts(s, &stale, vec![(self.k(1), Failure::Missing)]);
-        let again = self.build(|b, c| {
-            b.create(c.k(0), c.r(2), None);
-        });
+        let again = self.build(|b, c| b.create(c.k(0), c.r(2), None));
         self.applies(s, &again, "Absent holds over an unpurged expired row");
         self.now = start;
     }
@@ -361,14 +342,10 @@ impl<K: StoreKey + Debug, R: Clone + PartialEq + Debug> Case<'_, K, R> {
         S::Error: Debug,
     {
         let [row] = &self.seed(s, [0]);
-        let gone = self.build(|b, c| {
-            b.delete(c.k(0), row);
-        });
+        let gone = self.build(|b, c| b.delete(c.k(0), row));
         self.applies(s, &gone, "delete");
         self.seed(s, [0]);
-        let stale = self.build(|b, c| {
-            b.update(c.k(0), row, c.r(1), None);
-        });
+        let stale = self.build(|b, c| b.update(c.k(0), row, c.r(1), None));
         self.conflicts(s, &stale, vec![(self.k(0), Failure::Changed)]);
     }
 
@@ -376,17 +353,9 @@ impl<K: StoreKey + Debug, R: Clone + PartialEq + Debug> Case<'_, K, R> {
     where
         S::Error: Debug,
     {
-        let guards = self.build(|b, c| {
-            for n in 0..128 {
-                b.expect_absent(c.k(n));
-            }
-        });
+        let guards = self.build(|b, c| (0..128).fold(b, |b, n| b.expect_absent(c.k(n))));
         self.applies(s, &guards, "128 guards apply");
-        let writes = self.build(|b, c| {
-            for n in 0..64 {
-                b.create(c.k(n), c.r(n), None);
-            }
-        });
+        let writes = self.build(|b, c| (0..64).fold(b, |b, n| b.create(c.k(n), c.r(n), None)));
         self.applies(s, &writes, "64 guarded writes apply");
         assert!(
             (0..64).all(|n| self.row(s, n).is_some()),

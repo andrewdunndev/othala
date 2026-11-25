@@ -1,3 +1,8 @@
+#![expect(
+    clippy::expect_used,
+    clippy::panic,
+    reason = "a harness reports a failed claim by panicking"
+)]
 use std::collections::BTreeSet;
 use std::fmt::Debug;
 
@@ -33,8 +38,9 @@ where
             serial.contents(now)
         })
         .collect();
-    let mut conflicts = 0;
+    let (mut conflicts, mut raced_orders) = (0, 0);
     for order in &orders {
+        raced_orders += 1;
         let mut raced = start.clone();
         let mut written = BTreeSet::new();
         for &(i, op) in &pick(ops, order) {
@@ -61,6 +67,11 @@ where
             "order {order:?} reached {outcome:?}, against every serial run {serials:?}"
         );
     }
+    assert_eq!(
+        raced_orders,
+        (1..=ops.len()).product::<usize>(),
+        "every order raced"
+    );
     for (i, op) in ops.iter().enumerate() {
         let Some(effect) = decide(start, *op, seed(i, 0)) else {
             continue;

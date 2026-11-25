@@ -1,9 +1,4 @@
 //! Test harnesses for the identity primitives; a dev-dependency only.
-#![allow(
-    clippy::expect_used,
-    clippy::panic,
-    reason = "a harness reports a failed claim by panicking"
-)]
 
 mod conformance;
 pub mod fixture;

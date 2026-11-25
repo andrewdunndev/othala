@@ -40,9 +40,10 @@ enum Lie {
     UpdateDropsExpiry,
     VersionPerKey,
     SmallBound,
+    WrongReceipt,
 }
 
-const CAUGHT_IN: [(Lie, &str); 16] = [
+const CAUGHT_IN: [(Lie, &str); 17] = [
     (Lie::SkipWrites, "atomic: "),
     (Lie::ConflictAsError, "atomic: "),
     (Lie::EagerPuts, "atomic: "),
@@ -59,6 +60,7 @@ const CAUGHT_IN: [(Lie, &str); 16] = [
     (Lie::UpdateDropsExpiry, "expired: "),
     (Lie::VersionPerKey, "recreate: "),
     (Lie::SmallBound, "at_bound: "),
+    (Lie::WrongReceipt, "atomic: "),
 ];
 
 #[test]
@@ -85,6 +87,12 @@ fn each_lie_is_caught_by_its_case() {
     }
 }
 
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum Reader {
+    Load,
+    Guard,
+}
+
 // a store written from scratch, honest unless its one lie says otherwise
 struct Liar {
     lie: Lie,
@@ -107,24 +115,24 @@ impl Liar {
         }
     }
 
-    fn live(&self, k: &K, now: UnixTime, guard: bool) -> Option<Version> {
+    fn live(&self, k: &K, now: UnixTime, reader: Reader) -> Option<Version> {
         let &(_, version, expiry) = self.rows.get(k)?;
         let alive = match expiry {
             None => true,
-            Some(_) if guard && self.lie == Lie::GuardsIgnoreExpiry => true,
+            Some(_) if reader == Reader::Guard && self.lie == Lie::GuardsIgnoreExpiry => true,
             Some(t) if self.lie == Lie::LiveAtDeadline => now <= t,
             Some(t) => now < t,
         };
         alive.then_some(version)
     }
 
-    fn write(&mut self, effect: &Effect<K, u16>, keep: impl Fn(&K) -> bool) {
+    fn write(&mut self, effect: &Effect<K, u16>, only: &BTreeSet<K>) {
         let mut wrote = false;
-        for k in effect.deletes().filter(|k| keep(k)) {
+        for k in effect.deletes().filter(|k| only.contains(k)) {
             wrote = true;
             self.rows.remove(k);
         }
-        for (k, &r, expiry) in effect.puts().filter(|(k, _, _)| keep(k)) {
+        for (k, &r, expiry) in effect.puts().filter(|(k, _, _)| only.contains(k)) {
             wrote = true;
             let old = self.rows.get(k).map(|row| row.1);
             self.counter += 1;
@@ -159,7 +167,7 @@ impl Store<K, u16> for Liar {
         for k in keys {
             self.loaded_at.insert(k.clone(), self.writes);
             let row = self
-                .live(k, now, false)
+                .live(k, now, Reader::Load)
                 .and_then(|v| self.rows.get(k).map(|r| Row::new(r.0, v)));
             rows.insert(k.clone(), row);
         }
@@ -192,7 +200,7 @@ impl Store<K, u16> for Liar {
             if lie == Lie::UniqueAsError && creates.contains(k) {
                 return None;
             }
-            let v = self.live(k, now, true)?;
+            let v = self.live(k, now, Reader::Guard)?;
             let stale = self.loaded_at.get(k).is_some_and(|&at| at < self.writes);
             Some(if lie == Lie::TableVersion && stale {
                 Version::new(u64::MAX)
@@ -207,9 +215,16 @@ impl Store<K, u16> for Liar {
                 Lie::RecordsConflictedId => {
                     self.applied.insert(effect.id());
                 }
-                Lie::EagerPuts => self.write(effect, |k| puts.contains(k)),
-                Lie::EagerDeletes => self.write(effect, |k| deletes.contains(k)),
-                Lie::StopAtFirstFailure => self.write(effect, |k| Some(k) < first.as_ref()),
+                Lie::EagerPuts => self.write(effect, &puts),
+                Lie::EagerDeletes => self.write(effect, &deletes),
+                Lie::StopAtFirstFailure => {
+                    let before: BTreeSet<K> = puts
+                        .union(&deletes)
+                        .filter(|k| Some(*k) < first.as_ref())
+                        .cloned()
+                        .collect();
+                    self.write(effect, &before);
+                }
                 _ => {}
             }
             return Ok(Err(conflict));
@@ -221,7 +236,7 @@ impl Store<K, u16> for Liar {
             return Err(Fault::Lost);
         }
         if lie != Lie::SkipWrites {
-            self.write(effect, |_| true);
+            self.write(effect, &puts.union(&deletes).cloned().collect());
         }
         if lie == Lie::ExpectBumps {
             let expected: Vec<K> = effect
@@ -237,6 +252,12 @@ impl Store<K, u16> for Liar {
         }
         if lie != Lie::NoAppliedId {
             self.applied.insert(effect.id());
+        }
+        if lie == Lie::WrongReceipt {
+            let other = Effect::builder(&mut testkit::seeded(0))
+                .expect_absent(K(0))
+                .build();
+            return Ok(Ok(other.map_or_else(|_| mint(effect), |o| mint(&o))));
         }
         Ok(Ok(mint(effect)))
     }

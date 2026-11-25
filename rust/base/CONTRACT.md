@@ -1,7 +1,7 @@
 # base contract
 
 One claim per line, each naming the check that proves it. Tags follow the claims ledger: *Type* (the program does not compile), *Runtime* (a check returns an error), *Obligation* (the host's, proven against every `Store`), *Non-claim*.
-Checks: `ui:x` is `tests/ui/fail/x.rs` with its committed `.stderr` (rustc code given) and the compiling twin `tests/ui/pass/x.rs` one line and one token away (`just twins`; `just ledger` runs with every feature on); `api` is the committed `public-api.txt` from rustdoc JSON on a pinned nightly (`just api`); `unit:m::t` is a test in `src/m.rs`; `it:f::t` is `tests/f.rs`; `mutants:m` is `just mutants` over `src/m.rs`; `conf:c` is case `c` of `testkit::store_conformance`, run here against `testkit::MemStore`; `race:t` is `tests/race.rs`.
+Checks: `ui:x` is `tests/ui/fail/x.rs` with its committed `.stderr` (rustc code given) and the compiling twin `tests/ui/pass/x.rs` one line and one token away (`just twins`; `just ledger` runs with every feature on); `api` is the committed `public-api.txt` from rustdoc JSON on a pinned nightly (`just api`), one line per item, public field (tuple and variant fields included) and method with its full signature; `unit:m::t` is a test in `src/m.rs`; `it:f::t` is `tests/f.rs`; `mutants:m` is `just mutants` over `src/m.rs`; `conf:c` is case `c` of `testkit::store_conformance`, run here against `testkit::MemStore`; `race:t` is `tests/race.rs`.
 
 ## Type
 - T1 `Secret<N>` has no `Display`: ui:secret_display (E0277), api.
@@ -13,11 +13,13 @@ Checks: `ui:x` is `tests/ui/fail/x.rs` with its committed `.stderr` (rustc code 
 - T7 `Secret<N>` has no `Serialize`, so no serde record field holds one: ui:secret_serialize (E0277; the twin is `Digest`, which serializes only under `serde`), api.
 - T8 `SecretBytes` has no `Serialize`: ui:secret_bytes_serialize (E0277), api.
 - T9 A secret cannot be a `StoreKey` (no `Clone`, no `Ord`); store-facing keys take `Digest`: ui:secret_key (E0277, E0369).
-- T10 A verdict leaves `Pending` only through `settle`: api (no accessor, no `map`; `lift` and `join` keep it inside), `Debug` prints only the effect id (it:golden::debug_redacts), and ui:pending_verdict shows a closure cannot move it out through `map` (E0599).
-- T11 `Receipt` has no public constructor; `Effect::host_applied` is the one mint: ui:receipt_forge (E0599), api.
+- T10 A verdict leaves `Pending` only through `settle`: api (no accessor, no public field, no `map`; the `lift` and `join` signatures keep it inside), ui:pending_field (E0616), `Debug` prints only the effect id (it:golden::debug_redacts), and ui:pending_verdict shows a closure cannot move it out through `map` (E0599).
+- T11 `Receipt` has no public constructor or field; `Effect::host_applied` is the one mint: ui:receipt_fields (E0451), api (no public field; `effect_id` only reads); ui:receipt_forge (E0599) is the named-guess illustration.
 - T12 `Receipt` is not `Clone`: ui:receipt_clone (E0277), api.
 - T13 No put without a guard on its key (`create` is `Absent` plus put, `update` is `Unchanged` plus put): api (the builder's only writes are the six guarded ones); ui:unguarded_put (E0599) is the named-guess illustration.
 - T14 No delete without a guard on its key (`consume`, or `delete` against a seen row): api; ui:unguarded_delete (E0599) is the named-guess illustration.
+- T15 `EffectId` has no public constructor or field, so an id comes only from `Entropy` or a merge: ui:effect_id_fields (E0423), api.
+- T16 `SecretBytes` and `Secret<N>` hold their bytes in private fields, so only `expose` reads them: ui:secret_bytes_fields (E0423), api (no public field).
 
 ## Runtime
 - R1 `b64url_encode` and `b64url_decode` (a wrapper over `base64ct`'s unpadded base64url, the D6 adoption) agree with RFC 4648 section 10 under the section 5 alphabet: it:vectors::rfc4648_section10 (total 28, 7 checked), mutants:b64url.
@@ -37,8 +39,8 @@ Checks: `ui:x` is `tests/ui/fail/x.rs` with its committed `.stderr` (rustc code 
 - R15 A lift that changes a key's `scope()` is `ScopeChanged`: unit:effect::scope_changed_in_lift, mutants:effect.
 - R16 `build` of an effect with no guard is `Empty`: unit:effect::empty_build, mutants:effect.
 - R17 An effect whose guards plus writes exceed `MAX_EFFECT_SIZE` (128, asserted as a literal) is `TooLarge` from `build` and `merge`, and exactly 128 builds: unit:effect::size_bound; the builder latches its first fault and stops growing, and `merge` tests the bound before moving anything, so an oversize effect is never an allocation: unit:effect::oversize_builder_stops_growing, mutants:effect.
-- R18 `domain` is `SpansDomains` unless every key maps to one domain: unit:effect::domain_of_keys, mutants:effect.
-- R19 `settle` with another effect's receipt is `WrongReceipt`; its own receipt yields the verdict: unit:effect::settle_by_receipt, mutants:effect.
+- R18 `domain` is `SpansDomains` unless every key maps to one domain, the third of three keys included: unit:effect::domain_of_keys, mutants:effect.
+- R19 `settle` with another effect's receipt is `WrongReceipt`; its own receipt yields the verdict; `Receipt::effect_id` names the effect it settles: unit:effect::settle_by_receipt, mutants:effect.
 - R20 The id is 16 bytes of `Entropy`; `lift` keeps it; `merge` takes the first 16 bytes of SHA-256 of both ids in order: unit:effect::ids, mutants:effect.
 - R21 `check` names every failed guard (`Missing`, `Changed`, `Present`) and passes when all hold: unit:effect::check_names_each_failure, mutants:effect.
 - R22 `guards`, `puts` and `deletes` show exactly what the builder paired, consumed rows among the deletes: unit:effect::views, mutants:effect.
@@ -49,12 +51,13 @@ Checks: `ui:x` is `tests/ui/fail/x.rs` with its committed `.stderr` (rustc code 
 - R27 `Secret::<N>::from_b64url` takes canonical unpadded base64url of exactly `N` bytes and is `Malformed` otherwise, decoding into the secret's own buffer: unit:secret::from_b64url_takes_exactly_n, unit:b64url::exact_length, mutants:secret.
 - R28 `Digest` has a text form (43-symbol unpadded base64url) that round-trips, and under `serde` serializes as that text and deserializes only from it: unit:secret::digest_text_round_trips, unit:secret::digest_serde_is_text, mutants:secret.
 - R29 The vector runner counts only checked cases against its floor, and a zero floor, a total that disagrees with `SOURCES.toml` or an unlisted file fails: testkit unit:vectors (six cases).
+- R30 The builder takes and returns itself by value (`#[must_use]`), so a decision is one expression; `update`, `delete` and `expect` take the seen row as any `Row<S>` and read only its version, so a consumer guards a typed row in an effect over its store record: unit:effect::seen_rows_of_any_type, api.
 
 ## Obligation (every host's; `testkit::store_conformance` on the shell's exact apply path)
-- O1 One transaction per apply: every guard holds or nothing is applied (puts, deletes and consumes alike), and the `Conflict` names each failed guard: conf:atomic. Each case is proven sensitive by it:conformance::each_lie_is_caught_by_its_case, sixteen stores with one lie each that must fail in the case named here, the same store without a lie passing (it:conformance::the_honest_liar_passes); atomic catches skipped writes, a conflict reported as `Error`, and puts or deletes applied despite a conflict.
+- O1 One transaction per apply: every guard holds or nothing is applied (puts, deletes and consumes alike), the `Conflict` names each failed guard, and every apply that commits answers its own effect's receipt: conf:atomic (every case checks each receipt it is given). Each case is proven sensitive by it:conformance::each_lie_is_caught_by_its_case, seventeen stores with one lie each that must fail in the case named here, the same store without a lie passing (it:conformance::the_honest_liar_passes); atomic catches skipped writes, a conflict reported as `Error`, puts or deletes applied despite a conflict, and another effect's receipt.
 - O2 A guard that fails after a write in key order leaves that write unapplied: conf:fails_after_write (a store that stops at the first failing guard).
 - O3 An effect fails only on a key an earlier winner wrote, so disjoint effects and effects that only `expect` one row both apply; `Consume` checks existence only, so a decision that depends on a row's content uses `delete` against the seen row: conf:expect_shared (a store that bumps an expected row), conf:disjoint (a store that checks a table-wide version), race:pairs, race:consume_checks_existence_only, race:a_loser_fails_only_on_winners_writes.
-- O4 Concurrent applies equal some serial order once each loser is re-decided against the winners' state: race:pairs, race:triples (each asserts conflicts were raced), testkit unit:race::every_order_once.
+- O4 Concurrent applies equal some serial order once each loser is re-decided against the winners' state: race:pairs, race:triples (each pins its seeded conflict total, and `race` asserts it raced all n! orders), testkit unit:race::every_order_once.
 - O5 Re-applying an applied effect returns `Ok` with a receipt that settles it, and writes nothing twice: conf:reapply (a store with no applied-id record), race:same_twice, race:same_twice_catches_a_store_that_forgets_applied_ids.
 - O6 The applied-id record shares the effect's transaction and is checked before any guard, and a conflicted effect's id is not recorded: conf:reapply (a store that checks the id after the guards), conf:conflict_not_applied (a store that records a conflicted id).
 - O7 A store's own constraint failure is `Conflict`, never `Error`: conf:duplicate_create (a store that leaves `Absent` on a create to a unique constraint that errors).
@@ -64,7 +67,8 @@ Checks: `ui:x` is `tests/ui/fail/x.rs` with its committed `.stderr` (rustc code 
 - O11 Every key a decision loaded is guarded in its effect: race:read_set (the reference store records loads; the case is a probe that must fail).
 - O12 A `Receipt` is minted only after its effect committed: `host_applied` is in clippy `disallowed_methods` for every crate but `base` (`just lint`; it:lint_canary expects every `clippy.toml` path to fire, so a path that stops resolving fails), and `just confine` (`confine.sh`) fails on a `.rs` file that names `disallowed_methods` outside `testkit/src/store.rs`, `testkit/src/fixture.rs`, `tests/conformance.rs` and `tests/lint_canary.rs`, names `host_applied` outside `src/effect.rs`, the two store modules and the canary, silences a group that holds the lint (`warnings`, `clippy::style`, `clippy::all`), or on a member `Cargo.toml` that overrides or does not inherit the workspace lints; `confine.sh --self-test` plants ten evasions, multi-line attributes among them, and requires each flagged.
 - O13 `expose` is read only in modules a `CONTRACT.md` names; `base` names none: `just lint` (it:lint_canary), `just confine` (names `expose` outside `src/secret.rs` and the canary). `base`'s own `src/` does not resolve the `base::` path, so its unit tests call `expose` unflagged.
-- O14 After `Conflict` a decider re-decides at most `REDECIDE` (3) times; after `Error` the host re-applies the same effect with the decision's `now`, within `Retry`: consumers' contracts; unit:store::redecide_is_three, race:a_loser_redecides_up_to_three_times, race:a_loser_gives_up_after_three.
+- O14 After `Conflict` a decider re-decides at most `REDECIDE` (3) times; after `Error` the host re-applies the same effect with the decision's `now`, within `Retry`: consumers' contracts; unit:store::redecide_is_three, race:a_loser_redecides_up_to_three_times, race:a_loser_gives_up_after_three; the reference store's injected lost result commits and its re-apply settles: testkit unit:store::a_lost_result_commits_and_a_reapply_settles.
+- O15 The `Entropy` given to `Effect::builder` never repeats a 16-byte draw among effects one store sees, since the id is the store's only idempotence key: a repeated id answers `Ok` with a receipt and applies nothing. A host's obligation, unchecked; `testkit::seeded(n)` repeats for the same `n`, so a test draws every effect for one store from one advancing source.
 
 ## Build
 - B1 `no_std` + `alloc` for wasm32-unknown-unknown and thumbv7em-none-eabi, with `std`, `rand_core` and `serde` features off and on: `just wasm`, `just thumb`.
@@ -75,3 +79,4 @@ Checks: `ui:x` is `tests/ui/fail/x.rs` with its committed `.stderr` (rustc code 
 - N1 Zeroize on drop is best effort (moves and copies are not tracked); no check can prove it.
 - N2 The base64url codec is `base64ct`'s; its constant-time property is that crate's claim, not checked here.
 - N3 `UnixTime::from(SystemTime)` saturates instants before the epoch to 0.
+- N5 No effect constructor is infallible: `build` is `Overlap`, `TooLarge` or `Empty`, so a consumer entry point that builds an effect returns a `Result`.

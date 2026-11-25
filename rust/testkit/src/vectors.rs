@@ -1,4 +1,9 @@
 //! The one vector runner: every case is visited, the total matches `SOURCES.toml`, and enough cases ran.
+#![expect(
+    clippy::expect_used,
+    clippy::panic,
+    reason = "a harness reports a failed claim by panicking"
+)]
 use std::collections::BTreeMap;
 
 use serde::Deserialize;

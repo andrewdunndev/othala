@@ -1,12 +1,17 @@
-constant MAX_EFFECT_SIZE
-constant REDECIDE
+constant MAX_EFFECT_SIZE: usize = 128
+constant REDECIDE: u8 = 3
 enum ErrorKind
 enum Failure
 enum Guard
 enum Scope
 enum Slot
-function b64url_decode
-function b64url_encode
+field Guard::Absent::0: K
+field Guard::Consume::0: K
+field Guard::Unchanged::0: K
+field Guard::Unchanged::1: crate::Version
+field Slot::Row::0: &'a Row<R>
+function b64url_decode fn(text: &str) -> Result<alloc::vec::Vec<u8>, crate::Error>
+function b64url_encode fn(bytes: &[u8]) -> alloc::string::String
 impl Clone for Conflict
 impl Clone for Digest
 impl Clone for EffectId
@@ -114,66 +119,67 @@ impl StructuralPartialEq for Scope
 impl StructuralPartialEq for Slot
 impl StructuralPartialEq for UnixTime
 impl StructuralPartialEq for Version
-method Builder::build
-method Builder::consume
-method Builder::create
-method Builder::delete
-method Builder::expect
-method Builder::expect_absent
-method Builder::update
-method Conflict::failures
-method Conflict::new
-method Conflict::push
-method Digest::as_bytes
-method Digest::from_b64url
-method Digest::from_bytes
-method Digest::to_b64url
-method Effect::builder
-method Effect::check
-method Effect::deletes
-method Effect::domain
-method Effect::guards
-method Effect::host_applied
-method Effect::id
-method Effect::lift
-method Effect::merge
-method Effect::puts
-method EffectId::as_bytes
-method Error::kind
-method Guard::key
-method Pending::effect
-method Pending::join
-method Pending::lift
-method Pending::new
-method Pending::settle
-method RandCore::new
-method Retry::attempts
-method Retry::new
-method Row::into_record
-method Row::new
-method Row::record
-method Row::version
-method Rows::corrupt
-method Rows::get
-method Rows::insert
-method Rows::new
-method Secret::ct_eq
-method Secret::digest
-method Secret::expose
-method Secret::from_b64url
-method Secret::generate
-method Secret::new
-method SecretBytes::ct_eq
-method SecretBytes::digest
-method SecretBytes::expose
-method SecretBytes::new
-method UnixTime::checked_duration_since
-method UnixTime::new
-method UnixTime::saturating_add
-method UnixTime::saturating_sub
-method UnixTime::secs
-method Version::get
-method Version::new
+method Builder::build fn(self: Self) -> Result<Effect<K, R>, Error>
+method Builder::consume fn(self: Self, key: K) -> Self
+method Builder::create fn(self: Self, key: K, record: R, expiry: Option<UnixTime>) -> Self
+method Builder::delete fn<S>(self: Self, key: K, seen: &Row<S>) -> Self
+method Builder::expect fn<S>(self: Self, key: K, seen: &Row<S>) -> Self
+method Builder::expect_absent fn(self: Self, key: K) -> Self
+method Builder::update fn<S>(self: Self, key: K, seen: &Row<S>, record: R, expiry: Option<UnixTime>) -> Self
+method Conflict::failures fn(self: &Self) -> &[(K, Failure)]
+method Conflict::new fn(key: K, failure: Failure) -> Self
+method Conflict::push fn(self: &mut Self, key: K, failure: Failure) -> &mut Self
+method Digest::as_bytes const fn(self: &Self) -> &[u8; 32]
+method Digest::from_b64url fn(text: &str) -> Result<Self, Error>
+method Digest::from_bytes const fn(bytes: [u8; 32]) -> Self
+method Digest::to_b64url fn(self: &Self) -> String
+method Effect::builder fn(e: &mut impl Entropy) -> Builder<K, R>
+method Effect::check fn(self: &Self, live: impl FnMut(&K) -> Option<Version>) -> Result<(), Conflict<K>>
+method Effect::deletes fn(self: &Self) -> impl Iterator<Item = &K>
+method Effect::domain fn<D: Eq>(self: &Self, of: impl Fn(&K) -> D) -> Result<D, Error>
+method Effect::guards fn(self: &Self) -> impl Iterator<Item = Guard<&K>>
+method Effect::host_applied const fn(self: &Self) -> Receipt
+method Effect::id const fn(self: &Self) -> EffectId
+method Effect::lift fn<K2: StoreKey, R2>(self: Self, key: impl Fn(K) -> K2, record: impl Fn(R) -> R2) -> Result<Effect<K2, R2>, Error>
+method Effect::merge fn(self: Self, other: Self) -> Result<Self, Error>
+method Effect::puts fn(self: &Self) -> impl Iterator<Item = (&K, &R, Option<UnixTime>)>
+method EffectId::as_bytes const fn(self: &Self) -> &[u8; 16]
+method Error::kind const fn(self: &Self) -> ErrorKind
+method Guard::key const fn(self: &Self) -> &K
+method Pending::effect const fn(self: &Self) -> &Effect<K, R>
+method Pending::join fn<U>(self: Self, other: Pending<U, K, R>) -> Result<Pending<(T, U), K, R>, Error>
+method Pending::lift fn<K2: StoreKey, R2>(self: Self, key: impl Fn(K) -> K2, record: impl Fn(R) -> R2) -> Result<Pending<T, K2, R2>, Error>
+method Pending::new const fn(verdict: T, effect: Effect<K, R>) -> Self
+method Pending::settle fn(self: Self, receipt: Receipt) -> Result<T, Error>
+method RandCore::new const fn(rng: R) -> Self
+method Receipt::effect_id const fn(self: &Self) -> EffectId
+method Retry::attempts const fn(self: Self) -> u8
+method Retry::new const fn(attempts: u8) -> Self
+method Row::into_record fn(self: Self) -> R
+method Row::new const fn(record: R, version: Version) -> Self
+method Row::record const fn(self: &Self) -> &R
+method Row::version const fn(self: &Self) -> Version
+method Rows::corrupt fn(self: &mut Self, key: K) -> &mut Self
+method Rows::get fn(self: &Self, key: &K) -> Option<Slot<'_, R>>
+method Rows::insert fn(self: &mut Self, key: K, row: Option<Row<R>>) -> &mut Self
+method Rows::new const fn() -> Self
+method Secret::ct_eq fn(self: &Self, other: &Self) -> bool
+method Secret::digest fn(self: &Self) -> Digest
+method Secret::expose const fn(self: &Self) -> &[u8; N]
+method Secret::from_b64url fn(text: &str) -> Result<Self, Error>
+method Secret::generate fn(e: &mut impl Entropy) -> Self
+method Secret::new const fn(bytes: [u8; N]) -> Self
+method SecretBytes::ct_eq fn(self: &Self, other: &Self) -> bool
+method SecretBytes::digest fn(self: &Self) -> Digest
+method SecretBytes::expose fn(self: &Self) -> &[u8]
+method SecretBytes::new const fn(bytes: Vec<u8>) -> Self
+method UnixTime::checked_duration_since const fn(self: Self, earlier: Self) -> Option<u64>
+method UnixTime::new const fn(secs: u64) -> Self
+method UnixTime::saturating_add const fn(self: Self, secs: u64) -> Self
+method UnixTime::saturating_sub const fn(self: Self, secs: u64) -> Self
+method UnixTime::secs const fn(self: Self) -> u64
+method Version::get const fn(self: Self) -> u64
+method Version::new const fn(v: u64) -> Self
 struct Builder
 struct Conflict
 struct Digest
@@ -193,11 +199,11 @@ struct Version
 trait Entropy
 trait Store
 trait StoreKey
-trait_item Entropy::fill
+trait_item Entropy::fill fn(self: &mut Self, out: &mut [u8])
 trait_item Store::Error
-trait_item Store::apply
-trait_item Store::load
-trait_item StoreKey::scope
+trait_item Store::apply fn(self: &mut Self, effect: &Effect<K, R>, now: UnixTime) -> Result<Result<Receipt, Conflict<K>>, Self::Error>
+trait_item Store::load fn(self: &mut Self, keys: &[K], now: UnixTime) -> Result<Rows<K, R>, Self::Error>
+trait_item StoreKey::scope fn(self: &Self) -> Scope
 variant ErrorKind::Empty
 variant ErrorKind::Malformed
 variant ErrorKind::Overlap

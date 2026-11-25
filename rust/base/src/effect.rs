@@ -7,7 +7,7 @@ use sha2::{Digest as _, Sha256};
 
 use crate::{Entropy, Error, ErrorKind, Row, StoreKey, UnixTime, Version};
 
-/// The bound on one effect's guards plus writes (section 5 rule 7).
+/// The bound on one effect's guards plus writes.
 pub const MAX_EFFECT_SIZE: usize = 128;
 
 /// An effect's identity: 16 bytes of entropy, or the digest of two merged ids.
@@ -89,7 +89,8 @@ pub struct Effect<K, R> {
     ops: BTreeMap<K, Op<R>>,
 }
 
-/// Builds an [`Effect`]; every write is paired with a guard on its own key.
+/// Builds an [`Effect`] by value, so a decision is one expression; every write is paired with a guard on its own key.
+#[must_use]
 #[derive(Debug)]
 pub struct Builder<K, R> {
     id: EffectId,
@@ -102,6 +103,13 @@ pub struct Builder<K, R> {
 #[derive(Debug)]
 pub struct Receipt {
     id: EffectId,
+}
+
+impl Receipt {
+    /// The id of the effect this receipt settles.
+    pub const fn effect_id(&self) -> EffectId {
+        self.id
+    }
 }
 
 /// Why one guard failed.
@@ -254,7 +262,7 @@ impl<K: StoreKey, R> Effect<K, R> {
 
 impl<K: StoreKey, R> Builder<K, R> {
     // the first fault latches and later ops are dropped, so an oversize builder never grows
-    fn op(&mut self, key: K, op: Op<R>) -> &mut Self {
+    fn op(mut self, key: K, op: Op<R>) -> Self {
         if self.fault.is_some() {
             return self;
         }
@@ -273,21 +281,15 @@ impl<K: StoreKey, R> Builder<K, R> {
     }
 
     /// `Absent` guard plus a put.
-    pub fn create(&mut self, key: K, record: R, expiry: Option<UnixTime>) -> &mut Self {
+    pub fn create(self, key: K, record: R, expiry: Option<UnixTime>) -> Self {
         self.op(
             key,
             Op::new(Check::Absent, Some(Write::Put(record, expiry))),
         )
     }
 
-    /// `Unchanged` guard at the seen version plus a put.
-    pub fn update(
-        &mut self,
-        key: K,
-        seen: &Row<R>,
-        record: R,
-        expiry: Option<UnixTime>,
-    ) -> &mut Self {
+    /// `Unchanged` guard at the seen version plus a put; `seen` may be any typed view of the row.
+    pub fn update<S>(self, key: K, seen: &Row<S>, record: R, expiry: Option<UnixTime>) -> Self {
         self.op(
             key,
             Op::new(
@@ -298,12 +300,12 @@ impl<K: StoreKey, R> Builder<K, R> {
     }
 
     /// `Consume` guard: the row must exist and is deleted.
-    pub fn consume(&mut self, key: K) -> &mut Self {
+    pub fn consume(self, key: K) -> Self {
         self.op(key, Op::new(Check::Consume, Some(Write::Delete)))
     }
 
     /// `Unchanged` guard at the seen version plus a delete.
-    pub fn delete(&mut self, key: K, seen: &Row<R>) -> &mut Self {
+    pub fn delete<S>(self, key: K, seen: &Row<S>) -> Self {
         self.op(
             key,
             Op::new(Check::Unchanged(seen.version()), Some(Write::Delete)),
@@ -311,12 +313,12 @@ impl<K: StoreKey, R> Builder<K, R> {
     }
 
     /// `Unchanged` guard only.
-    pub fn expect(&mut self, key: K, seen: &Row<R>) -> &mut Self {
+    pub fn expect<S>(self, key: K, seen: &Row<S>) -> Self {
         self.op(key, Op::new(Check::Unchanged(seen.version()), None))
     }
 
     /// `Absent` guard only.
-    pub fn expect_absent(&mut self, key: K) -> &mut Self {
+    pub fn expect_absent(self, key: K) -> Self {
         self.op(key, Op::new(Check::Absent, None))
     }
 
@@ -451,17 +453,16 @@ mod tests {
     }
 
     fn absent(e: &mut Fill, keys: impl IntoIterator<Item = u8>) -> Effect<K, u8> {
-        let mut b = builder(e);
-        keys.into_iter().for_each(|n| {
-            b.expect_absent(K::G(n));
-        });
-        b.build().unwrap()
+        keys.into_iter()
+            .fold(builder(e), |b, n| b.expect_absent(K::G(n)))
+            .build()
+            .unwrap()
     }
 
     #[test]
     fn overlap_in_builder() {
-        let mut b = builder(&mut Fill(0));
-        b.create(K::G(1), 1, None)
+        let b = builder(&mut Fill(0))
+            .create(K::G(1), 1, None)
             .expect_absent(K::G(1))
             .create(K::G(2), 2, None);
         assert_eq!(kind(b.build()), Some(ErrorKind::Overlap));
@@ -507,9 +508,12 @@ mod tests {
             kind(absent(e, [1]).lift(to_subject, |r| r)),
             Some(ErrorKind::ScopeChanged)
         );
-        let mut b = builder(e);
-        b.create(K::S(1), 4, Some(UnixTime::new(9)));
-        let lifted = b.build().unwrap().lift(to_subject, u16::from).unwrap();
+        let lifted = builder(e)
+            .create(K::S(1), 4, Some(UnixTime::new(9)))
+            .build()
+            .unwrap()
+            .lift(to_subject, u16::from)
+            .unwrap();
         assert_eq!(
             lifted.puts().collect::<Vec<_>>(),
             [(&K::S(1), &4u16, Some(UnixTime::new(9)))]
@@ -525,24 +529,16 @@ mod tests {
     fn size_bound() {
         assert_eq!(MAX_EFFECT_SIZE, 128);
         let e = &mut Fill(0);
-        let mut b = builder(e);
-        (0..64).for_each(|n| {
-            b.create(K::G(n), n, None);
-        });
-        assert!(b.build().is_ok());
-        let mut b = builder(e);
-        (0..64).for_each(|n| {
-            b.create(K::G(n), n, None);
-        });
-        b.expect_absent(K::S(0));
+        let creates = |e: &mut Fill| (0..64).fold(builder(e), |b, n| b.create(K::G(n), n, None));
+        assert!(creates(e).build().is_ok());
+        let b = creates(e).expect_absent(K::S(0));
         assert_eq!(kind(b.build()), Some(ErrorKind::TooLarge));
-        let mut b = builder(e);
-        b.delete(K::G(0), &row(1))
-            .consume(K::G(1))
-            .update(K::G(2), &row(1), 0, None);
-        (3..125).for_each(|n| {
-            b.expect(K::G(n), &row(1));
-        });
+        let b =
+            builder(e)
+                .delete(K::G(0), &row(1))
+                .consume(K::G(1))
+                .update(K::G(2), &row(1), 0, None);
+        let b = (3..125).fold(b, |b, n| b.expect(K::G(n), &row(1)));
         assert!(b.build().is_ok());
         assert!(absent(e, 0..64).merge(absent(e, 64..128)).is_ok());
         assert_eq!(
@@ -557,17 +553,15 @@ mod tests {
 
     #[test]
     fn oversize_builder_stops_growing() {
-        let mut b = builder(&mut Fill(0));
-        (0..=255).for_each(|n| {
-            b.expect_absent(K::G(n)).expect_absent(K::S(n));
+        let b = (0..=255).fold(builder(&mut Fill(0)), |b, n| {
+            b.expect_absent(K::G(n)).expect_absent(K::S(n))
         });
         assert_eq!((b.ops.len(), b.size), (128, 129));
         assert_eq!(kind(b.build()), Some(ErrorKind::TooLarge));
-        let mut b = builder(&mut Fill(0));
-        b.expect_absent(K::G(0)).expect_absent(K::G(0));
-        (1..=255).for_each(|n| {
-            b.expect_absent(K::G(n));
-        });
+        let b = builder(&mut Fill(0))
+            .expect_absent(K::G(0))
+            .expect_absent(K::G(0));
+        let b = (1..=255).fold(b, |b, n| b.expect_absent(K::G(n)));
         assert_eq!(b.ops.len(), 1);
         assert_eq!(kind(b.build()), Some(ErrorKind::Overlap));
     }
@@ -579,6 +573,8 @@ mod tests {
         assert_eq!(two.domain(|_| 'a').unwrap(), 'a');
         assert_eq!(kind(two.domain(|k| *k)), Some(ErrorKind::SpansDomains));
         assert_eq!(absent(e, [5]).domain(|k| *k).unwrap(), K::G(5));
+        let third_differs = absent(e, [1, 2, 3]).domain(|k| u8::from(*k == K::G(3)));
+        assert_eq!(kind(third_differs), Some(ErrorKind::SpansDomains));
     }
 
     #[test]
@@ -586,6 +582,8 @@ mod tests {
         let e = &mut Fill(0);
         let mine = Pending::new(7, absent(e, [1]));
         let other = absent(e, [1]);
+        assert_eq!(other.host_applied().effect_id(), other.id());
+        assert_ne!(other.host_applied().effect_id(), mine.effect().id());
         assert_eq!(
             kind(mine.settle(other.host_applied())),
             Some(ErrorKind::WrongReceipt)
@@ -613,14 +611,15 @@ mod tests {
 
     #[test]
     fn check_names_each_failure() {
-        let mut b = builder(&mut Fill(0));
-        b.consume(K::G(1))
+        let effect = builder(&mut Fill(0))
+            .consume(K::G(1))
             .update(K::G(2), &row(1), 0, None)
             .expect_absent(K::G(3))
             .expect(K::G(4), &row(1))
             .delete(K::G(5), &row(1))
-            .create(K::G(6), 0, None);
-        let effect = b.build().unwrap();
+            .create(K::G(6), 0, None)
+            .build()
+            .unwrap();
         let held = |k: &K| match k {
             K::G(3) | K::G(6) => None,
             _ => Some(Version::new(1)),
@@ -643,14 +642,15 @@ mod tests {
 
     #[test]
     fn views() {
-        let mut b = builder(&mut Fill(0));
-        b.create(K::G(1), 10, Some(UnixTime::new(3)))
+        let e = builder(&mut Fill(0))
+            .create(K::G(1), 10, Some(UnixTime::new(3)))
             .update(K::G(2), &row(4), 20, Some(UnixTime::new(8)))
             .consume(K::G(3))
             .delete(K::G(4), &row(5))
             .expect(K::G(5), &row(6))
-            .expect_absent(K::G(6));
-        let e = b.build().unwrap();
+            .expect_absent(K::G(6))
+            .build()
+            .unwrap();
         let v = Version::new;
         assert_eq!(
             e.guards().collect::<Vec<_>>(),
@@ -671,6 +671,26 @@ mod tests {
             ]
         );
         assert_eq!(e.deletes().collect::<Vec<_>>(), [&K::G(3), &K::G(4)]);
+    }
+
+    #[test]
+    fn seen_rows_of_any_type() {
+        let typed = Row::new("credential", Version::new(3));
+        let e = builder(&mut Fill(0))
+            .update(K::G(1), &typed, 1, None)
+            .delete(K::G(2), &typed)
+            .expect(K::G(3), &typed)
+            .build()
+            .unwrap();
+        let v = Version::new(3);
+        assert_eq!(
+            e.guards().collect::<Vec<_>>(),
+            [
+                Guard::Unchanged(&K::G(1), v),
+                Guard::Unchanged(&K::G(2), v),
+                Guard::Unchanged(&K::G(3), v),
+            ]
+        );
     }
 
     #[test]

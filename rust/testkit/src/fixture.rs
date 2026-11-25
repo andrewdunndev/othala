@@ -1,4 +1,8 @@
 //! Committed fixture files read at test time (fuzz corpora).
+#![expect(
+    clippy::expect_used,
+    reason = "a fixture that does not load fails its test"
+)]
 use std::path::Path;
 
 /// Every file in `dir`, sorted by name, as (name, bytes).

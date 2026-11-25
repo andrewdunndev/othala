@@ -1,5 +1,5 @@
 //! The snapshot-race harness over small decisions, and probes that it catches what it claims to.
-#![allow(clippy::unwrap_used, reason = "test helpers fail by panicking")]
+#![expect(clippy::unwrap_used, reason = "test helpers fail by panicking")]
 use std::cell::Cell;
 
 use base::{Effect, Row, Scope, Slot, Store, StoreKey, UnixTime, Version};
@@ -29,18 +29,16 @@ fn read(s: &mut S, k: K) -> Option<base::Row<u8>> {
 
 fn claim(k: u8) -> Op {
     Box::new(move |s, e| {
-        read(s, K(k)).is_none().then(|| {
-            let mut b = Effect::builder(e);
-            b.create(K(k), 1, None);
-            b.build().unwrap()
-        })
+        read(s, K(k))
+            .is_none()
+            .then(|| Effect::builder(e).create(K(k), 1, None).build().unwrap())
     })
 }
 
 fn bump(k: u8) -> Op {
     Box::new(move |s, e| {
-        let mut b = Effect::builder(e);
-        match read(s, K(k)) {
+        let b = Effect::builder(e);
+        let b = match read(s, K(k)) {
             Some(row) => b.update(K(k), &row, row.record() + 1, None),
             None => b.create(K(k), 1, None),
         };
@@ -49,22 +47,18 @@ fn bump(k: u8) -> Op {
 }
 
 fn take(k: u8) -> Op {
-    Box::new(move |s, e| {
-        read(s, K(k)).map(|_| {
-            let mut b = Effect::builder(e);
-            b.consume(K(k));
-            b.build().unwrap()
-        })
-    })
+    Box::new(move |s, e| read(s, K(k)).map(|_| Effect::builder(e).consume(K(k)).build().unwrap()))
 }
 
 fn peek(k: u8, out: u8) -> Op {
     Box::new(move |s, e| {
         let row = read(s, K(k))?;
         read(s, K(out)).is_none().then(|| {
-            let mut b = Effect::builder(e);
-            b.expect(K(k), &row).create(K(out), *row.record(), None);
-            b.build().unwrap()
+            Effect::builder(e)
+                .expect(K(k), &row)
+                .create(K(out), *row.record(), None)
+                .build()
+                .unwrap()
         })
     })
 }
@@ -85,16 +79,16 @@ fn flaky(
                 seen = Row::new(*row.record(), Version::new(u64::MAX));
             }
         }
-        let mut b = Effect::builder(e);
-        b.update(K(k), &seen, row.record() + 1, None);
+        let b = Effect::builder(e).update(K(k), &seen, row.record() + 1, None);
         Some(b.build().unwrap())
     })
 }
 
 fn start() -> S {
     let mut s = S::new();
-    let mut b = Effect::builder(&mut testkit::seeded(99));
-    b.create(K(1), 5, None).create(K(4), 1, None);
+    let b = Effect::builder(&mut testkit::seeded(99))
+        .create(K(1), 5, None)
+        .create(K(4), 1, None);
     assert!(s.apply(&b.build().unwrap(), NOW).unwrap().is_ok());
     s
 }
@@ -124,7 +118,10 @@ fn pairs() {
             conflicts += race(&start(), &pair, NOW);
         }
     }
-    assert!(conflicts > 0, "pairs raced without a conflict");
+    assert_eq!(
+        conflicts, 56,
+        "pairs: the seeded run raced another number of conflicts"
+    );
 }
 
 #[test]
@@ -139,7 +136,10 @@ fn triples() {
             }
         }
     }
-    assert!(conflicts > 0, "triples raced without a conflict");
+    assert_eq!(
+        conflicts, 1410,
+        "triples: the seeded run raced another number of conflicts"
+    );
 }
 
 #[test]
@@ -186,8 +186,7 @@ fn a_loser_gives_up_after_three() {
 fn read_set() {
     let sloppy: Op = Box::new(|s, e| {
         let seen = read(s, K(1))?;
-        let mut b = Effect::builder(e);
-        b.create(K(9), *seen.record(), None);
+        let b = Effect::builder(e).create(K(9), *seen.record(), None);
         Some(b.build().unwrap())
     });
     race(&start(), &[sloppy.as_ref()], NOW);
@@ -198,8 +197,9 @@ fn read_set() {
 fn consume_checks_existence_only() {
     let carry: Op = Box::new(|s, e| {
         let seen = read(s, K(1))?;
-        let mut b = Effect::builder(e);
-        b.consume(K(1)).create(K(9), *seen.record(), None);
+        let b = Effect::builder(e)
+            .consume(K(1))
+            .create(K(9), *seen.record(), None);
         Some(b.build().unwrap())
     });
     race(&start(), &[bump(1).as_ref(), carry.as_ref()], NOW);

@@ -31,9 +31,10 @@ fn debug_redacts() {
         token: Secret::new([0x41; 16]),
         key: SecretBytes::new(b"hunter2".to_vec()),
     };
-    let mut b = Effect::<K, u8>::builder(&mut Sevens);
-    b.expect_absent(K);
-    let pending = Pending::new("session granted", b.build().unwrap());
+    let effect = Effect::<K, u8>::builder(&mut Sevens)
+        .expect_absent(K)
+        .build();
+    let pending = Pending::new("session granted", effect.unwrap());
     let got = format!(
         "{:?}\n{:?}\n{holder:?}\n{holder:#?}\n{pending:?}\n",
         Secret::new([0x41u8; 32]),
