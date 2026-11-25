@@ -8,7 +8,7 @@ pub enum ErrorKind {
     Malformed,
     /// A key appears twice in one effect, merge or lift.
     Overlap,
-    /// An effect exceeds [`crate::MAX_EFFECT_SIZE`].
+    /// An effect exceeds [`crate::MAX_EFFECT_SIZE`], or text exceeds [`crate::MAX_B64URL_TEXT`].
     TooLarge,
     /// An effect has no guard.
     Empty,
@@ -42,7 +42,7 @@ impl fmt::Display for Error {
         f.write_str(match self.kind {
             ErrorKind::Malformed => "malformed base64url",
             ErrorKind::Overlap => "key named twice in one effect",
-            ErrorKind::TooLarge => "effect exceeds its bound",
+            ErrorKind::TooLarge => "input or effect exceeds its bound",
             ErrorKind::Empty => "effect has no guard",
             ErrorKind::ScopeChanged => "lift changes a key's scope",
             ErrorKind::SpansDomains => "effect spans transaction domains",
@@ -74,5 +74,11 @@ mod tests {
         assert_eq!(texts.len(), kinds.len());
         assert!(!texts.contains(""));
         assert!(kinds.iter().all(|&k| Error::new(k).kind() == k));
+    }
+
+    #[test]
+    fn too_large_names_text_and_effects() {
+        let e = crate::b64url_decode(&"A".repeat(crate::MAX_B64URL_TEXT + 1)).unwrap_err();
+        assert_eq!(e.to_string(), "input or effect exceeds its bound");
     }
 }

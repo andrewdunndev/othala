@@ -151,7 +151,7 @@ impl<'de> serde::Deserialize<'de> for Digest {
             }
             fn visit_str<E: serde::de::Error>(self, v: &str) -> Result<Digest, E> {
                 Digest::from_b64url(v)
-                    .map_err(|_| E::invalid_value(serde::de::Unexpected::Str(v), &self))
+                    .map_err(|_| E::custom("not a SHA-256 digest as unpadded base64url"))
             }
         }
         d.deserialize_str(Text)
@@ -244,13 +244,21 @@ mod tests {
         let json = serde_json::to_string(&d).unwrap();
         assert_eq!(json, alloc::format!("\"{}\"", "-_v7".repeat(10) + "-_s"));
         assert_eq!(serde_json::from_str::<Digest>(&json).unwrap(), d);
-        for bad in ["\"AQIDBA\"", "[1,2]"] {
-            let e = serde_json::from_str::<Digest>(bad).unwrap_err();
-            assert!(
-                format!("{e}").contains("expected a SHA-256 digest as unpadded base64url"),
-                "{e}"
-            );
-        }
+        let e = serde_json::from_str::<Digest>("[1,2]").unwrap_err();
+        assert!(
+            format!("{e}").contains("expected a SHA-256 digest as unpadded base64url"),
+            "{e}"
+        );
+        let presented = "supersecretpresentedtoken";
+        let e = format!(
+            "{}",
+            serde_json::from_str::<Digest>(&format!("\"{presented}\"")).unwrap_err()
+        );
+        assert!(
+            e.contains("not a SHA-256 digest as unpadded base64url"),
+            "{e}"
+        );
+        assert!(!e.contains(presented), "the error echoes its input: {e}");
     }
 
     #[test]
