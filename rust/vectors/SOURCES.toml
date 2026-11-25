@@ -16,6 +16,7 @@ files = [
   { path = "wycheproof/ecdsa_secp256r1_sha256_test.json", sha256 = "182db4f3e230f6f9fa9f800d2a614dede30284b8e8438bbfe1171905402e9332", cases = 484 },
   { path = "wycheproof/ecdsa_secp384r1_sha384_p1363_test.json", sha256 = "e27344bf6daae75fa19663620883809f91c79fc4b4420eff9eae8036b34476be", cases = 280 },
   { path = "wycheproof/ecdsa_secp384r1_sha384_test.json", sha256 = "8a5b3ae1760975143414811f13588c24d951d9d8c904195087ba327591dfe9cc", cases = 504 },
+  { path = "wycheproof/LICENSE", sha256 = "58d1e17ffe5109a7ae296caafcadfdbe6a7d176f0bc4ab01e12a689b0499d8bd", cases = 0 },
   { path = "wycheproof/ed25519_test.json", sha256 = "ea80ffebac085e21cb9d3e903e7fa2b448d96702da5b31f061d0b83b430b74b3", cases = 210 },
   { path = "wycheproof/hmac_sha256_test.json", sha256 = "2d201cfa61d1bf95e6f5d07d96634b4a348b31e8eaa277ad7c8d09677b7a743f", cases = 174 },
   { path = "wycheproof/hmac_sha384_test.json", sha256 = "28b9776e979dd755d852ca471043ea6cedce8b15f7a28abdf6ea9efd982b43c0", cases = 174 },
@@ -256,8 +257,7 @@ files = [
 
 # Real-authenticator corpus. Seeded from the survey failure list (survey-webauthn.md section 4 item 3).
 # Nothing below is committed yet except android-key-attestation above. Candidate sources are named by
-# repository and stated licence only; no candidate has been read or copied. Excluded and never used:
-# Ory projects, Kanidm projects (including webauthn-rs and its issue-derived fixtures).
+# repository and stated licence only; no candidate has been read or copied.
 [wanted]
 purpose = "Attestation interop long tail: real-device registrations that break strict verifiers"
 
