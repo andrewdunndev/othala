@@ -324,16 +324,26 @@ impl<K: StoreKey + Debug, R: Clone + PartialEq + Debug> Case<'_, K, R> {
                 .update(c.k(2), r2, c.r(3), Some(deadline))
         });
         self.applies(s, &e, "create and update with a deadline");
-        let seen = self
-            .row(s, 1)
-            .unwrap_or_else(|| panic!("{}", self.fail("live before its deadline")));
+        let [seen, updated] = [1, 2].map(|n| {
+            self.row(s, n)
+                .unwrap_or_else(|| panic!("{}", self.fail("live before its deadline")))
+        });
         self.now = deadline;
         self.holds(s, 0, None, "absent to load at its deadline");
         self.holds(s, 2, None, "an update's deadline holds");
         let stale = self.build(|b, c| b.expect(c.k(1), &seen));
         self.conflicts(s, &stale, vec![(self.k(1), Failure::Missing)]);
-        let again = self.build(|b, c| b.create(c.k(0), c.r(2), None));
+        let consume = self.build(|b, c| b.consume(c.k(0)));
+        self.conflicts(s, &consume, vec![(self.k(0), Failure::Missing)]);
+        let update = self.build(|b, c| b.update(c.k(1), &seen, c.r(4), None));
+        self.conflicts(s, &update, vec![(self.k(1), Failure::Missing)]);
+        let delete = self.build(|b, c| b.delete(c.k(2), &updated));
+        self.conflicts(s, &delete, vec![(self.k(2), Failure::Missing)]);
+        let again = self.build(|b, c| b.create(c.k(0), c.r(2), None).create(c.k(1), c.r(1), None));
         self.applies(s, &again, "Absent holds over an unpurged expired row");
+        // same record as before, so only a fresh version tells the incarnations apart
+        let aba = self.build(|b, c| b.expect(c.k(1), &seen));
+        self.conflicts(s, &aba, vec![(self.k(1), Failure::Changed)]);
         self.now = start;
     }
 
