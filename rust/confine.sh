@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# The gate behind CONTRACT O12, O13 and R10. `confine.sh DIR` checks a tree; `confine.sh --self-test` plants
+# The gate behind CONTRACT O12, O13, R10 and B4 to B11. `confine.sh DIR` checks a tree; `confine.sh --self-test` plants
 # each evasion in a copy of this tree and requires the check to flag it; `confine.sh --canary` proves each
 # clippy.toml path and each deny-list lint is an error at the workspace lint level, with the canary's expects removed.
 set -euo pipefail
