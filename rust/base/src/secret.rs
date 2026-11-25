@@ -244,8 +244,13 @@ mod tests {
         let json = serde_json::to_string(&d).unwrap();
         assert_eq!(json, alloc::format!("\"{}\"", "-_v7".repeat(10) + "-_s"));
         assert_eq!(serde_json::from_str::<Digest>(&json).unwrap(), d);
-        assert!(serde_json::from_str::<Digest>("\"AQIDBA\"").is_err());
-        assert!(serde_json::from_str::<Digest>("[1,2]").is_err());
+        for bad in ["\"AQIDBA\"", "[1,2]"] {
+            let e = serde_json::from_str::<Digest>(bad).unwrap_err();
+            assert!(
+                format!("{e}").contains("expected a SHA-256 digest as unpadded base64url"),
+                "{e}"
+            );
+        }
     }
 
     #[test]
