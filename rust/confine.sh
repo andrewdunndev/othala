@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # The gate behind CONTRACT O12, O13 and R10. `confine.sh DIR` checks a tree; `confine.sh --self-test` plants
 # each evasion in a copy of this tree and requires the check to flag it; `confine.sh --canary` proves each
-# clippy.toml path is an error at the workspace lint level, with the canary's expects removed.
+# clippy.toml path and each deny-list lint is an error at the workspace lint level, with the canary's expects removed.
 set -euo pipefail
 
 silence="testkit/src/store.rs testkit/src/fixture.rs base/tests/conformance.rs base/tests/lint_canary.rs"
@@ -55,6 +55,20 @@ check() (
                 fi
             fi
         done | sort -u
+        # include! is never needed; a #[path] must name a .rs file inside this tree, so the scan reads it too
+        perl -0ne '
+            use Cwd qw(abs_path);
+            (my $code = $_) =~ s{//[^\n]*|/\*.*?\*/}{}gs;
+            s{ ((?<![A-Za-z0-9_])b?r(\#*)".*?"\2) | (b?"(?:\\.|[^\\"])*") | (\x27(?:\\.|[^\\\x27])\x27) | (//[^\n]*) | (/\*.*?\*/) }
+             { defined $1 || defined $3 ? q("") : q( ) }gsex;
+            print "$ARGV: pulls in code with include!\n" if /\binclude\s*!/;
+            my $paths = () = /#!?\[[^\]]*\bpath\s*=/g;
+            my ($root, $dir) = (abs_path("."), $ARGV =~ s{[^/]*\z}{}r);
+            my @inside = grep {
+                my $p = abs_path("$dir$_");
+                /\.rs\z/ && defined $p && -f $p && index($p, "$root/") == 0
+            } $code =~ /#!?\[[^\]]*?\bpath\s*=\s*"([^"\\]*)"/g;
+            print "$ARGV: a #[path] that is not a .rs file in this tree\n" if $paths != @inside' $rs
         bodies=$(perl -0ne 'while (/\bfn ct_eq\b[^{]*(\{(?:[^{}]++|(?1))*\})/g) { print(($1 =~ s/\s+//gr), "\n") }' base/src/secret.rs)
         if [ "$(grep -c . <<< "$bodies")" -lt 2 ] || grep -vxE '\{self\.0\.as_slice\(\)\.ct_eq\(other\.0\.as_slice\(\)\)\.into\(\)\}' <<< "$bodies" | grep -q .; then
             echo "base/src/secret.rs: a ct_eq body is not subtle's ConstantTimeEq over both byte slices"
@@ -68,7 +82,19 @@ check() (
             dir=${toml%/Cargo.toml}
             listed "$dir" "$ms $excluded" || echo "$toml: not a workspace member and not excluded"
         done < <(find . -name target -prune -o -name Cargo.toml -print | sed 's|^\./||' | grep -vx Cargo.toml)
+        DENIED=$(echo $denied) perl -ne '
+            BEGIN { %ok = map { /^clippy::(.*)/ ? ("clippy.$1" => 1) : ("rust.$_" => 1) } split " ", $ENV{DENIED} }
+            if (/^\s*\[/) {
+                ($t) = /^\[workspace\.lints\.(rust|clippy)\]\s*$/;
+                $in = /lints/;
+                print "Cargo.toml:$.: a lint table other than [workspace.lints.rust] or [workspace.lints.clippy]\n" if $in && !defined $t;
+                next;
+            }
+            next if /^\s*(#.*)?$/;
+            if ($in) { print "Cargo.toml:$.: not a deny-list lint = \"deny\" or \"forbid\"\n" unless defined $t && /^([a-z_]+) = "(deny|forbid)"$/ && $ok{"$t.$1"} }
+            elsif (/lints/) { print "Cargo.toml:$.: sets lints outside the workspace lint tables\n" }' Cargo.toml
         for m in $ms; do
+            if [ -e "$m/build.rs" ] || grep -qE '^\s*build\s*=' "$m/Cargo.toml"; then echo "$m: has a build script"; fi
             if grep -qE 'disallowed_|^\[lints\.' "$m/Cargo.toml"; then echo "$m/Cargo.toml: overrides the workspace lints"; fi
             awk '/^\[lints\]/ { getline; ok = ($0 == "workspace = true") } END { exit !ok }' "$m/Cargo.toml" ||
                 echo "$m/Cargo.toml: does not inherit the workspace lints"
@@ -80,10 +106,10 @@ check() (
             while [ "$here" != / ]; do here=$(dirname "$here"); echo "$here/.cargo/config" "$here/.cargo/config.toml"; done
             echo "${CARGO_HOME:-$HOME/.cargo}/config" "${CARGO_HOME:-$HOME/.cargo}/config.toml")
         for f in $configs; do
-            [ -f "$f" ] && grep -qE '(^|[^A-Za-z])(-A|-W|--cap-lints|--force-warn)' "$f" && echo "$f: passes rustc a lint level"
+            [ -f "$f" ] && grep -qE '(^|[^A-Za-z])(-A|-W|--allow|--warn|--cap-lints|--force-warn)' "$f" && echo "$f: passes rustc a lint level"
         done
         for v in RUSTFLAGS CARGO_ENCODED_RUSTFLAGS CARGO_BUILD_RUSTFLAGS $(compgen -e | grep -E '^CARGO_TARGET_.*_RUSTFLAGS$' || true); do
-            grep -qE -- '-A|-W|--cap-lints|--force-warn' <<< "${!v:-}" && echo "\$$v: passes rustc a lint level"
+            grep -qE -- '-A|-W|--allow|--warn|--cap-lints|--force-warn' <<< "${!v:-}" && echo "\$$v: passes rustc a lint level"
         done
         [ -z "${CLIPPY_CONF_DIR:-}" ] || echo "\$CLIPPY_CONF_DIR: points clippy at another clippy.toml"
         true
@@ -127,6 +153,16 @@ self_test() {
     plant testkit/Cargo.toml '[lints.clippy]\ndisallowed_methods = "allow"'
     plant .cargo/config.toml '[build]\nrustflags = ["-Aclippy::disallowed_methods"]'
     plant .cargo/config.toml '[target.x86_64-unknown-linux-gnu]\nrustflags = ["--cap-lints", "warn"]'
+    plant .cargo/config.toml '[build]\nrustflags = ["--allow", "clippy::disallowed_methods"]'
+    plant .cargo/config.toml '[build]\nrustflags = ["--warn=clippy::unwrap_used"]'
+    plant base/tests/probe.rs 'include!("probe.txt");'
+    plant base/tests/probe.rs '#[path = "probe.txt"]\nmod probe;'
+    plant base/tests/probe.rs '#[path = "../../../outside.rs"]\nmod probe;'
+    plant base/tests/probe.rs '#[cfg_attr(all(), path = "probe.txt")]\nmod probe;'
+    plant base/build.rs 'fn main() {}'
+    plant Cargo.toml 'restriction = { level = "allow", priority = 1 }'
+    plant Cargo.toml 'style = "deny"'
+    plant Cargo.toml '[workspace.lints]\nclippy.unwrap_used = "allow"'
     plant testkit/clippy.toml 'disallowed-methods = []'
     plant extra/Cargo.toml '[package]\nname = "extra"'
     fresh && perl -0pi -e 's/members = \[/members = ["extra", /' "$tmp/t/Cargo.toml" && mkdir "$tmp/t/extra" &&
@@ -136,25 +172,76 @@ self_test() {
     mutate Cargo.toml 's/^missing_docs = "deny"\n//m'
     mutate base/Cargo.toml 's/\[lints\].*//s'
     mutate base/src/secret.rs 's/self\.0\.as_slice\(\)\.ct_eq\(other\.0\.as_slice\(\)\)\.into\(\)/self.0 == other.0/'
-    fresh && n=$((n + 1)) && if RUSTFLAGS=-Aclippy::all check "$tmp/t" > /dev/null; then echo "self-test $n: RUSTFLAGS passed"; exit 1; fi
+    mutate base/Cargo.toml 's/^(\[package\]\n)/$1build = "probe.rs"\n/m'
+    for flags in -Aclippy::all "--allow clippy::unwrap_used" --warn=clippy::panic; do
+        fresh && n=$((n + 1)) && if RUSTFLAGS=$flags check "$tmp/t" > /dev/null; then echo "self-test $n: RUSTFLAGS=$flags passed"; exit 1; fi
+    done
     echo "confine self-test: $n planted evasions flagged"
 }
 
-# with every canary expect removed, clippy at the configured levels (no -D warnings) must error once per listed path
+# with every canary expect removed, clippy at the configured levels (no -D warnings) must error once per listed path,
+# and a lib probe per deny-list lint must error; the copy sits inside this tree so every ancestor cargo config applies
 canary() {
-    local here tmp want got
+    local here tmp want got missing lib
     here=$(pwd -P)
-    tmp=$(mktemp -d)
+    mkdir -p "$here/target"
+    tmp=$(mktemp -d "$here/target/canary.XXXXXX")
     trap "rm -rf '$tmp'" EXIT
-    tar cf - --exclude target --exclude 'mutants.out*' . | tar xf - -C "$tmp"
+    tar cf - --exclude ./target --exclude 'mutants.out*' . | tar xf - -C "$tmp"
+    errors() {
+        (cd "$tmp" && CARGO_TARGET_DIR="$here/target" cargo clippy -p base --all-features "$@" --message-format=json 2> /dev/null || true) |
+            jq -r 'select(.reason == "compiler-message" and .message.level == "error")
+                | "\(.message.code.code // "")\t\(.message.spans[0].line_start)"' | sort -u
+    }
     perl -ni -e 'print unless /^\s*#\[expect\(clippy::disallowed_(methods|types), reason = "canary"\)\]$/' "$tmp/base/tests/lint_canary.rs"
     want=$(grep -cE '^\s*\{ path = ' clippy.toml)
-    got=$( (cd "$tmp" && CARGO_TARGET_DIR="$here/target" cargo clippy -p base --all-features --test lint_canary --message-format=json 2> /dev/null || true) |
-        jq -r 'select(.reason == "compiler-message" and .message.level == "error")
-            | select(.message.code.code // "" | test("^clippy::disallowed_(methods|types)$"))
-            | .message.spans[0].line_start' | sort -u | grep -c . || true)
+    got=$(errors --test lint_canary | grep -cE $'^clippy::disallowed_(methods|types)\t' || true)
     [ "$got" = "$want" ] || { echo "canary: $got of $want clippy.toml paths are errors at the workspace level"; exit 1; }
-    echo "canary: $want of $want clippy.toml paths are errors at the workspace level"
+    cat >> "$tmp/base/src/lib.rs" << 'PROBES'
+/// canary
+pub fn canary_unwrap(x: Option<u8>) -> u8 {
+    x.unwrap()
+}
+/// canary
+pub fn canary_expect(x: Option<u8>) -> u8 {
+    x.expect("canary")
+}
+/// canary
+pub fn canary_panic() {
+    panic!("canary")
+}
+/// canary
+pub fn canary_index(x: &[u8]) -> u8 {
+    x[0]
+}
+/// canary
+pub fn canary_as(x: u16) -> u8 {
+    x as u8
+}
+/// canary
+pub fn canary_print() {
+    std::println!("canary")
+}
+/// canary
+pub fn canary_dbg(x: u8) -> u8 {
+    std::dbg!(x)
+}
+/// canary
+pub fn canary_unsafe() {
+    unsafe {}
+}
+pub fn canary_undocumented() {}
+mod canary_hidden {
+    pub fn unreachable() {}
+}
+PROBES
+    lib=$(errors --lib | cut -f1)
+    # shellcheck disable=SC2086
+    missing=$(for lint in $denied; do
+        [[ $lint == clippy::disallowed_* ]] || grep -qxF "$lint" <<< "$lib" || echo "$lint"
+    done)
+    [ -z "$missing" ] || { echo "canary: not an error at the workspace level:" $missing; exit 1; }
+    echo "canary: $want of $want clippy.toml paths and every deny-list lint are errors at the workspace level"
 }
 
 case "${1:-.}" in
