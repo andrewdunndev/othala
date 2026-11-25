@@ -1,0 +1,29 @@
+disallowed-methods = [
+  { path = "std::time::SystemTime::now", reason = "inject a Clock; only crates/host reads the OS clock" },
+  { path = "std::time::SystemTime::elapsed", reason = "inject a Clock; only crates/host reads the OS clock" },
+  { path = "std::time::Instant::now", reason = "inject a Clock; only crates/host reads the OS clock" },
+  { path = "std::time::Instant::elapsed", reason = "inject a Clock; only crates/host reads the OS clock" },
+  { path = "rand::random", reason = "inject an Rng; only crates/host reads OS randomness" },
+  { path = "getrandom::getrandom", reason = "inject an Rng; only crates/host reads OS randomness" },
+  { path = "std::hash::RandomState::new", reason = "inject an Rng; only crates/host reads OS randomness" },
+  { path = "std::net::TcpStream::connect", reason = "network belongs to crates/host" },
+  { path = "std::net::TcpListener::bind", reason = "network belongs to crates/host" },
+  { path = "std::net::UdpSocket::bind", reason = "network belongs to crates/host" },
+  { path = "std::fs::read", reason = "files belong to crates/host" },
+  { path = "std::fs::read_to_string", reason = "files belong to crates/host" },
+  { path = "std::fs::write", reason = "files belong to crates/host" },
+  { path = "std::fs::File::open", reason = "files belong to crates/host" },
+  { path = "std::fs::File::create", reason = "files belong to crates/host" },
+  { path = "std::fs::read_dir", reason = "files belong to crates/host" },
+  { path = "std::fs::remove_file", reason = "files belong to crates/host" },
+  { path = "base::Secret::expose", reason = "the one secret read; only modules a CONTRACT.md names", allow-invalid = true },
+  { path = "base::SecretBytes::expose", reason = "the one secret read; only modules a CONTRACT.md names", allow-invalid = true },
+  { path = "base::Effect::host_applied", reason = "the one Receipt mint; store modules only", allow-invalid = true },
+]
+disallowed-types = [
+  { path = "serde_json::Value", reason = "typed records only; Value belongs in wire-decoding modules", allow-invalid = true },
+]
+allow-unwrap-in-tests = true
+allow-expect-in-tests = true
+allow-panic-in-tests = true
+allow-indexing-slicing-in-tests = true

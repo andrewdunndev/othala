@@ -1,0 +1,5 @@
+error[E0599]: no method named `verdict` found for struct `base::Pending<T, K, R>` in the current scope
+ --> tests/ui/fail/pending_verdict.rs:3:15
+  |
+3 |     let _ = p.verdict();
+  |               ^^^^^^^ private field, not a method

@@ -1,0 +1,5 @@
+error[E0599]: no method named `remove` found for mutable reference `&mut base::Builder<K, R>` in the current scope
+ --> tests/ui/fail/unguarded_delete.rs:3:7
+  |
+3 |     b.remove(k);
+  |       ^^^^^^ method not found in `&mut base::Builder<K, R>`

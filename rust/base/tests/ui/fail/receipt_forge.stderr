@@ -1,0 +1,5 @@
+error[E0599]: no associated function or constant named `new` found for struct `Receipt` in the current scope
+ --> tests/ui/fail/receipt_forge.rs:3:28
+  |
+3 |     let _ = base::Receipt::new(7);
+  |                            ^^^ associated function or constant not found in `Receipt`

@@ -1,0 +1,36 @@
+[workspace]
+resolver = "3"
+members = ["base"]
+exclude = ["base/fuzz"]
+
+[workspace.package]
+version = "0.0.0"
+edition = "2024"
+rust-version = "1.85"
+license = "MIT OR Apache-2.0"
+publish = false
+
+[workspace.dependencies]
+base = { path = "base", version = "0.0.0" }
+sha2 = { version = "0.11", default-features = false }
+subtle = { version = "2.6", default-features = false }
+zeroize = { version = "1.8", default-features = false, features = ["alloc"] }
+rand_core = { version = "0.10", default-features = false }
+serde = { version = "1", default-features = false }
+trybuild = "1.0.110"
+
+[workspace.lints.rust]
+unsafe_code = "forbid"
+missing_docs = "deny"
+unreachable_pub = "deny"
+
+[workspace.lints.clippy]
+unwrap_used = "deny"
+expect_used = "deny"
+panic = "deny"
+indexing_slicing = "deny"
+as_conversions = "deny"
+print_stdout = "deny"
+dbg_macro = "deny"
+disallowed_methods = "deny"
+disallowed_types = "deny"
