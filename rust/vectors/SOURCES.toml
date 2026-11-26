@@ -184,7 +184,7 @@ files = [
   { path = "webauthn-rp-derived/chains.json", sha256 = "44c09c2fec2e1c20fbbe66b3261c2485783359b311afe5cb95e64605175204e4", cases = 54 },
   { path = "webauthn-rp-derived/cose.json", sha256 = "35666f7d1e2b4e496c2278e01e2f7a74238c7227be91818fce6cd8654ddd71c1", cases = 50 },
   { path = "webauthn-rp-derived/extensions.json", sha256 = "a0f78ac32a50af8d8cbb9e7bdb52b8d81c1d8245b1bd9882b0e6d4ada38ec8f7", cases = 70 },
-  { path = "webauthn-rp-derived/limits.json", sha256 = "081157cbdafb3563a3159524063f18e3cc3aa37eae5b76b4bec0398e96fad8b0", cases = 48 },
+  { path = "webauthn-rp-derived/limits.json", sha256 = "eeceeca0d3d609fd81b1aaafa6e614ba4fa2a890a934d3cdbd0096d7328e2e99", cases = 48 },
   { path = "webauthn-rp-derived/options-json.json", sha256 = "0bfd6ba34a3b78e4e71223bf82dee44c7b4ff13940595e5e172c3de1f54c9d2e", cases = 42 },
   { path = "webauthn-rp-derived/origins.json", sha256 = "4ef298257655d6d5b3b6cf69a5b9323bad2c254bc28f3c2a62f1ac6003c62c89", cases = 90 },
   { path = "webauthn-rp-derived/registration-ids.json", sha256 = "40b22f357f83a8dc2fe56a414be9afa1a934540ad129300367cdbbea100426a8", cases = 6 },
