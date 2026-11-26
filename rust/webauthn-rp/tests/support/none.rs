@@ -3,7 +3,8 @@ use serde::Deserialize;
 use sha2::{Digest, Sha256};
 use store::MemStore;
 use webauthn_rp::{
-    Counter, CredentialId, CrossOrigin, ErrorKind, Key, Record, Requirement, SpecStep, UserHandle,
+    Backup, BackupState, Counter, CredentialId, CrossOrigin, ErrorKind, Key, Record, Requirement,
+    SpecStep, UserHandle,
 };
 
 use crate::ceremony::{Authentication, Registration, authenticate, register, relying_party};
@@ -64,18 +65,17 @@ fn sections() -> Vec<Section> {
 pub(crate) fn cases() {
     let all = sections();
     assert_eq!(all.len(), 4);
-    for s in &all {
-        check(s);
-    }
+    // a renamed phase would skip a section and still pass
+    assert_eq!(all.iter().filter(|s| check(s)).count(), 4);
 }
 
-fn check(s: &Section) {
+fn check(s: &Section) -> bool {
     {
         let (Some(reg), Some(auth)) = (
             s.blocks.iter().find(|b| b.phase == "registration"),
             s.blocks.iter().find(|b| b.phase == "authentication"),
         ) else {
-            return;
+            return false;
         };
         // 16.4 and 16.5 are sent from a cross-origin frame, which is refused unless the relying party allows it
         let cross_origin = matches!(s.section.as_str(), "16.4" | "16.5");
@@ -89,7 +89,7 @@ fn check(s: &Section) {
         let mut denied: MemStore<Key, Record> = MemStore::default();
         let strict = relying_party("example.org", "https://example.org", CrossOrigin::Deny);
         let Ok(strict) = strict else {
-            return;
+            return false;
         };
         let refused = register(&mut denied, &strict, &registration);
         let refusal = refused.as_ref().ok().and_then(|r| r.result.as_ref().err());
@@ -112,18 +112,18 @@ fn check(s: &Section) {
         );
         let permissive = relying_party("example.org", "https://example.org", CrossOrigin::AnyTop);
         let Ok(permissive) = permissive else {
-            return;
+            return false;
         };
         let mut store: MemStore<Key, Record> = MemStore::default();
         let done = register(&mut store, &permissive, &registration);
         assert_eq!(done.as_ref().err(), None, "{}", s.section);
         let Ok(done) = done else {
-            return;
+            return false;
         };
         let registered = done.result;
         assert_eq!(registered.as_ref().err(), None, "{}", s.section);
         let Ok(registered) = registered else {
-            return;
+            return false;
         };
         assert_eq!(
             registered.credential().id().as_bytes(),
@@ -137,10 +137,17 @@ fn check(s: &Section) {
             "{}",
             s.section
         );
+        // 16.2 sets UP, BE and BS
+        if s.section == "16.2" {
+            assert_eq!(
+                registered.credential().backup(),
+                Backup::MultiDevice(BackupState::BackedUp)
+            );
+        }
         let id = CredentialId::from_bytes(registered.credential().id().as_bytes());
         let user = UserHandle::from_stored(b"user-handle");
         let (Ok(id), Ok(user)) = (id, user) else {
-            return;
+            return false;
         };
         let authentication = Authentication {
             id: &id,
@@ -153,7 +160,7 @@ fn check(s: &Section) {
         let verified = authenticate(&mut store, &permissive, &authentication);
         assert_eq!(verified.as_ref().err(), None, "{}", s.section);
         let Ok(verified) = verified else {
-            return;
+            return false;
         };
         assert_eq!(verified.as_ref().err(), None, "{}", s.section);
         assert_eq!(
@@ -167,7 +174,7 @@ fn check(s: &Section) {
             register(&mut store, &permissive, &registration),
             Ok::<(), ()>(()),
         ) else {
-            return;
+            return false;
         };
         let again = authenticate(&mut store, &strict, &authentication);
         let again = again.ok().and_then(Result::err);
@@ -182,4 +189,5 @@ fn check(s: &Section) {
             s.section
         );
     }
+    true
 }
