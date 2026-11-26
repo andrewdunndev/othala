@@ -340,3 +340,11 @@ Each function lands with the item whose row it turns green.
 - W-S7 and W-S8 as stated.
 
 **R-i** The score runs jose rows with every feature on, plus one run with every feature off (rows that must refuse with features off).
+
+**R-j** Secret exposure is confined per crate, by the compiler. `Secret::expose` and `SecretBytes::expose` exist only behind a base feature `expose`, and are no longer in clippy.toml's disallowed list. A crate may read secret bytes only if its Cargo.toml enables `base/expose` and its gates.json declares `"expose": ["<module>", ...]`. The canary fails if the cargo metadata feature graph enables `expose` for a crate whose gates.json does not declare it. Within the crate, the named modules are an Obligation that review checks, named in its CONTRACT. Crates never keep their own secret buffers: imported OTP and HS keys are `SecretBytes`. User-supplied inputs (a password, an OTP code, a recovery code) are crate types that wrap `SecretBytes`.
+
+**R-k** HOTP verification with a stored counter (look-ahead, resync) is a non-goal. HOTP is the primitive under TOTP. Row tests count the oracle's hotp_verify and hotp_resync cases as not applicable, under the total assertion.
+
+**R-l** A row may be a `--lib` filter where the claim needs crate-internal code: R34's Argon2id mapping, and HOTP before TOTP lands.
+
+**R-m** Lockout cap floor is 1 h. othala-core carries an Obligation to alert on a subject's sustained backoff. NIST 800-63B-4 3.2.2 is met on rate, not by disabling; CONTRACT N6 states this.
