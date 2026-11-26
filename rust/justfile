@@ -6,7 +6,7 @@ target := env("CARGO_TARGET_DIR", "target")
 default:
     @just --list
 
-all: floor-rule gate-selftest lock queue fmt lint canary twins test doc wasm thumb msrv deny deps api mutants rows
+all: floor-rule gate-selftest lock queue claims fmt lint canary twins test doc wasm thumb msrv deny deps api mutants rows
 
 # a manifest change without its lock change fails here, before anything builds
 lock:
@@ -15,6 +15,11 @@ lock:
 # queue.json and rows.json are well formed and agree
 queue:
     ../primitives/check.sh
+
+# every CONTRACT.md test ref resolves to a test, row, ui case, vector or fuzz target, each pending ref gives its reason, and a quoted mutants floor is gates.json's; the tool first proves itself on planted defects
+claims:
+    node canary/claims.mjs --selftest
+    node canary/claims.mjs
 
 # fail when this branch touches a path outside the item's globs, or any oracle path
 own item:
