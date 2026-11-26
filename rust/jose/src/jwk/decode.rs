@@ -368,7 +368,7 @@ fn okp(r: &Raw<'_>) -> Result<Key, Error> {
 
 fn rsa(r: &Raw<'_>) -> Result<Key, Error> {
     let (n, e) = (uint(r.n)?, uint(r.e)?);
-    // a first octet that is not zero makes a longer `n` past the bit bound, so no big integer is built for it
+    // `uint` refuses a leading zero, so this byte bound is the bit bound and no big integer is built past it
     if n.expose().len() > MAX_RSA_BITS / 8 {
         return Err(ErrorKind::TooLarge.into());
     }
@@ -381,7 +381,7 @@ fn rsa(r: &Raw<'_>) -> Result<Key, Error> {
             .iter()
             .fold(0_u64, |sum, byte| sum * 256 + u64::from(*byte))
     });
-    if bits > MAX_RSA_BITS || exponent.is_none_or(|e| e > MAX_RSA_EXPONENT) {
+    if exponent.is_none_or(|e| e > MAX_RSA_EXPONENT) {
         return Err(ErrorKind::TooLarge.into());
     }
     let private = [r.d, r.p, r.q, r.dp, r.dq, r.qi]
@@ -462,8 +462,19 @@ fn meta(r: &Raw<'_>) -> Result<Meta, Error> {
 
 /// The one JWK reader: a document is a public key, a private key or an `oct` key, and nothing else.
 pub(crate) fn parse(json: &[u8]) -> Result<(Meta, Key), Error> {
+    parse_filtered(json, false)?.ok_or_else(malformed)
+}
+
+/// As [`parse`]; with `public_only` a key carrying a private parameter or an `oct` key is `None`, before any is built.
+pub(crate) fn parse_filtered(json: &[u8], public_only: bool) -> Result<Option<(Meta, Key)>, Error> {
     scan(json)?;
     let r: Raw<'_> = serde_json::from_slice(json).map_err(|_| malformed())?;
+    let private = [r.d, r.p, r.q, r.dp, r.dq, r.qi]
+        .iter()
+        .any(Option::is_some);
+    if public_only && (private || r.kty == "oct") {
+        return Ok(None);
+    }
     let key = match r.kty {
         "EC" => ec(&r)?,
         "RSA" => rsa(&r)?,
@@ -477,7 +488,7 @@ pub(crate) fn parse(json: &[u8]) -> Result<(Meta, Key), Error> {
         }
         _ => return Err(ErrorKind::UnsupportedAlg.into()),
     };
-    Ok((meta(&r)?, key))
+    Ok(Some((meta(&r)?, key)))
 }
 
 fn copy(key: &SecretBytes) -> SecretBytes {

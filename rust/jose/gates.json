@@ -38,6 +38,7 @@
     "aes-gcm",
     "aes-kw",
     "base16ct",
+    "block-padding",
     "cbc",
     "cipher",
     "cmov",

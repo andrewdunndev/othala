@@ -5,7 +5,7 @@ use serde::ser::{SerializeMap as _, Serializer};
 use serde::{Deserialize, Serialize};
 use serde_json::value::RawValue;
 
-use crate::jwk::decode::{Key, parse, scan};
+use crate::jwk::decode::{Key, parse_filtered, scan};
 use crate::jwk::thumbprint::members;
 use crate::{Error, ErrorKind, Jwk, Kid, MAX_JWKS_KEYS, SecretJwk};
 
@@ -56,12 +56,14 @@ struct Document<'a> {
 impl JwkSet {
     /// Decodes `{"keys": [...]}`: a member that is not a supported key (an unknown `kty`, X25519, a weak modulus) is
     /// skipped and not counted; a malformed one, a name used twice or more than `MAX_JWKS_KEYS` kept keys is refused.
+    /// For a document fetched from a remote `jwks_uri`, use [`Self::decode_public`].
     pub fn decode(json: &[u8]) -> Result<Self, Error> {
         Self::read(json, false)
     }
 
-    /// As [`Self::decode`] for a document fetched from a remote `jwks_uri`: a private or `oct` member is dropped and
-    /// not counted, so the set holds asymmetric public keys only and no secret an issuer published is ever a key.
+    /// As [`Self::decode`] for a document fetched from a remote `jwks_uri`: a key carrying any private parameter (`d`,
+    /// `p`, `q`, `dp`, `dq`, `qi`), and any `oct` key, is dropped whole and not counted, so the set holds asymmetric
+    /// public keys only and no secret an issuer published is ever a key.
     pub fn decode_public(json: &[u8]) -> Result<Self, Error> {
         Self::read(json, true)
     }
@@ -72,12 +74,12 @@ impl JwkSet {
             serde_json::from_slice(json).map_err(|_| ErrorKind::Malformed)?;
         let mut keys = Vec::new();
         for raw in document.keys {
-            match parse(raw.get().as_bytes()) {
-                Ok((_, Key::Private(_))) if public_only => {}
-                Ok((meta, Key::Public(material))) => {
+            match parse_filtered(raw.get().as_bytes(), public_only) {
+                Ok(None) => {}
+                Ok(Some((meta, Key::Public(material)))) => {
                     keys.push(Member::Public(Jwk { meta, material }));
                 }
-                Ok((meta, Key::Private(material))) => {
+                Ok(Some((meta, Key::Private(material)))) => {
                     keys.push(Member::Secret(SecretJwk { meta, material }));
                 }
                 Err(error)
@@ -212,6 +214,16 @@ mod tests {
                 .ok(),
             Some(0)
         );
+    }
+
+    #[test]
+    fn remote_sets_drop_any_private_parameter_unparsed() {
+        let lone = r#"{"keys":[{"kty":"EC","crv":"P-256","d":"!"}]}"#;
+        let kept = |decode: fn(&[u8]) -> Result<JwkSet, crate::Error>| {
+            decode(lone.as_bytes()).map(|s| s.entries().len()).ok()
+        };
+        assert_eq!(kept(JwkSet::decode), None);
+        assert_eq!(kept(JwkSet::decode_public), Some(0));
     }
 
     #[test]
