@@ -2,15 +2,15 @@
 #![allow(dead_code, reason = "each row uses part of this")]
 use base::{Effect, Row, Slot, Store, UnixTime};
 use factor::{
-    Digits, ErrorKind, Key, OtpAlg, OtpCode, OtpKey, OtpMatch, Period, Record, Rejected, Skew,
-    Throttle, Totp,
+    Attempts, Digits, ErrorKind, Key, OtpAlg, OtpCode, OtpKey, OtpMatch, Period, Record, Rejected,
+    Skew, Throttle, Totp,
 };
 use serde::Deserialize;
 use testkit::{MemStore, Seeded, seeded};
 
 pub(crate) type Mem = MemStore<Key, Record>;
 
-#[derive(Deserialize)]
+#[derive(Clone, Deserialize)]
 pub(crate) struct Case {
     pub(crate) id: String,
     pub(crate) secret: String,
@@ -24,7 +24,7 @@ pub(crate) struct Case {
     pub(crate) expect: Expect,
 }
 
-#[derive(Deserialize)]
+#[derive(Clone, Deserialize)]
 pub(crate) struct Expect {
     pub(crate) ok: bool,
     pub(crate) step: Option<u64>,
@@ -97,6 +97,51 @@ pub(crate) fn attempts(store: &mut Mem) -> Option<Vec<u8>> {
     stored(store, Key::Attempts).map(|r| r.record().encode())
 }
 
+pub(crate) fn attempts_row(store: &mut Mem) -> Option<Row<Attempts>> {
+    let row = stored(store, Key::Attempts)?;
+    match row.record() {
+        Record::Attempts(a) => Some(Row::new(*a, row.version())),
+        _ => None,
+    }
+}
+
+/// The stored count, read from the row's encoding (R5: bytes 2 to 5, big-endian).
+pub(crate) fn count(store: &mut Mem) -> Option<u32> {
+    let bytes = stored(store, Key::Attempts)?.record().encode();
+    bytes.get(2..6)?.try_into().ok().map(u32::from_be_bytes)
+}
+
+pub(crate) fn seen<T>(row: &Row<T>) -> Row<&T> {
+    Row::new(row.record(), row.version())
+}
+
+/// One verdict as a host runs it: read the rows, check, verify, apply, settle.
+pub(crate) fn verify_once(
+    store: &mut Mem,
+    e: &mut Seeded,
+    totp: &Totp,
+    code: &OtpCode,
+    now: UnixTime,
+) -> Option<Result<OtpMatch, Rejected>> {
+    let (attempts, step) = (attempts_row(store), last(store));
+    let permit = Throttle::unlimited()
+        .check(attempts.as_ref().map(seen), now)
+        .ok()?;
+    let pending = totp.verify(permit, code, step.as_ref().map(seen), e).ok()?;
+    let receipt = applied(store, pending.effect(), now)?;
+    pending.settle(receipt).ok()
+}
+
+/// The rows of the RFC 6238 file, for tests that need codes known to be right.
+pub(crate) fn rfc6238() -> Vec<Case> {
+    let mut cases = Vec::new();
+    testkit::vectors::run(testkit::vector!("rfc6238/totp.json"), 1, |c: &Case| {
+        cases.push(c.clone());
+        testkit::vectors::Outcome::Checked
+    });
+    cases
+}
+
 pub(crate) enum Outcome {
     Unparsed(ErrorKind),
     Verdict(Result<OtpMatch, Rejected>),
@@ -108,17 +153,11 @@ pub(crate) fn run(c: &Case) -> Option<(Outcome, Mem)> {
     if let Some(step) = c.last_step {
         seed_step(&mut store, &mut e, step)?;
     }
-    let before = last(&mut store);
     let Ok(code) = OtpCode::parse(&c.code) else {
         return OtpCode::parse(&c.code)
             .err()
             .map(|err| (Outcome::Unparsed(err.kind()), store));
     };
-    let now = UnixTime::new(c.time);
-    let permit = Throttle::unlimited().check(None, now).ok()?;
-    let seen = before.as_ref().map(|r| Row::new(r.record(), r.version()));
-    let pending = totp(c)?.verify(permit, &code, seen, &mut e).ok()?;
-    let receipt = applied(&mut store, pending.effect(), now)?;
-    let verdict = pending.settle(receipt).ok()?;
+    let verdict = verify_once(&mut store, &mut e, &totp(c)?, &code, UnixTime::new(c.time))?;
     Some((Outcome::Verdict(verdict), store))
 }
