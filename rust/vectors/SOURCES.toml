@@ -337,6 +337,21 @@ files = [
   { path = "factor-derived/totp.json", sha256 = "719cc30fc1ccec9c7241c54e4fffde9ece9a54a26d22554a05582f4637f4ae89", cases = 23 },
 ]
 
+[source."webauthn-rp-derived"]
+url = "https://www.w3.org/TR/webauthn-3/"
+revision = "https://www.w3.org/TR/2026/REC-webauthn-3-20260825/ (spec html sha256 157030c980d44a3ce4b1ec5bcfaa16790c7dfefac20709af6ed2b11c7120970b) sections 6.1, 6.5, 7.1, 7.2, 8.7; RFC 8949 3, 4.2.1, 5.6; CTAP2 canonical CBOR; RFC 6979 A.2.5 key"
+retrieved = "2026-11-26"
+licence = "MIT OR Apache-2.0 (our own derived data)"
+feeds = ["webauthn-rp"]
+notes = "Derived by tools/derive_webauthn.py (deterministic) from the specs only (ruling R-b). Step numbers are L3 7.1 and 7.2 as numbered in the pinned dated HTML. Assertions (op webauthn_assert, the field names of the exam-spike file plus policy fields) and registrations (op webauthn_register, none attestation) use the RFC 6979 A.2.5 P-256 key with RFC 6979 deterministic signatures; the script checks the key and the A.2.5 sample signature first, and Node crypto verified all 40 assertion signatures, so every refusal is for the rule the case names. cbor.json: hand-written inputs per RFC 8949 and CTAP2 canonical form (op cbor_decode) plus two parametric bounds of contract rule 5.7 (op cbor_limit, webauthn_rp::MAX_CBOR_DEPTH and webauthn_rp::MAX_CBOR_ITEMS, TooLarge). expect.kind only where the contract names the class (CounterRegressed, TooLarge). Oracle choices: cross-origin deny-by-default (contract), a topOrigin without crossOrigin refused, BE change refused (7.2 step 19 applies because Assertion::backup() feeds RP policy)."
+cases = 78
+files = [
+  { path = "webauthn-rp-derived/authenticator-data.json", sha256 = "091d2fd048460440edc25c530d703988f47822ca23913c4bff7037af6c0518f5", cases = 20 },
+  { path = "webauthn-rp-derived/cbor.json", sha256 = "d35068e42113595e9158ad9dbd2ea0f5f2d5d5d5d9af7a4383c87cbd057784d0", cases = 21 },
+  { path = "webauthn-rp-derived/client-data.json", sha256 = "8cad78c18e11d9a96adb7a03367d7b11555a7fa7693058568c6477c10bb8e929", cases = 20 },
+  { path = "webauthn-rp-derived/registration.json", sha256 = "1a8e3b2accd84f8a51bb693dd3226231fa111b47a0435c18f14733376b84fced", cases = 17 },
+]
+
 # Real-authenticator corpus. Seeded from the survey failure list (survey-webauthn.md section 4 item 3).
 # Nothing below is committed yet except android-key-attestation above. Candidate sources are named by
 # repository and stated licence only; no candidate has been read or copied.
