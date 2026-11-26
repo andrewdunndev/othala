@@ -400,8 +400,10 @@ method Jwk::encrypt_key fn<K: PublicKeyAlg>(self: &Self) -> Result<EncryptKey<K>
 method Jwk::kid const fn(self: &Self) -> Option<&Kid>
 method Jwk::kty fn(self: &Self) -> Kty
 method Jwk::sig_alg fn(self: &Self) -> Option<SigningAlg>
+method Jwk::thumbprint fn(self: &Self) -> Digest
 method Jwk::verify_key fn<A: PublicAlg>(self: &Self) -> Result<VerifyKey<A>, Error>
 method Kid::as_str fn(self: &Self) -> &str
+method Kid::from_thumbprint fn(thumbprint: &Digest) -> Self
 method Kid::new fn(text: &str) -> Result<Self, Error>
 method SecretJwk::decode fn(json: &[u8]) -> Result<Self, Error>
 method SecretJwk::decrypt_key fn<K: KeyAlg>(self: &Self) -> Result<DecryptKey<K>, Error>
@@ -411,6 +413,7 @@ method SecretJwk::kid const fn(self: &Self) -> Option<&Kid>
 method SecretJwk::kty fn(self: &Self) -> Kty
 method SecretJwk::public fn(self: &Self) -> Option<Jwk>
 method SecretJwk::signing_key fn<A: SignAlg>(self: &Self) -> Result<SigningKey<A>, Error>
+method SecretJwk::thumbprint fn(self: &Self) -> Digest
 method SecretJwk::verify_key fn<A: Alg>(self: &Self) -> Result<VerifyKey<A>, Error>
 method SigningAlg::name const fn(self: Self) -> &'static str
 method VerifyKey::verify_signature fn(self: &Self, signing_input: &[u8], signature: &[u8]) -> Result<(), Error>

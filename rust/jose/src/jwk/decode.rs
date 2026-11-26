@@ -466,7 +466,7 @@ pub(crate) fn dup_private(key: &Private) -> Private {
     }
 }
 
-fn public_of(key: &Private) -> Public {
+pub(crate) fn public_of(key: &Private) -> Public {
     match key {
         Private::Oct(k) => Public::Oct(copy(k)),
         Private::P256(k) => Public::P256(k.public_key()),
