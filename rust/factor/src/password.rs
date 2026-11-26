@@ -4,8 +4,8 @@ use core::fmt;
 use argon2::password_hash::phc::{ParamsString, PasswordHash};
 use argon2::password_hash::{self, PasswordHasher, PasswordVerifier};
 use argon2::{ARGON2ID_IDENT, Algorithm, Argon2, AssociatedData, Params, ParamsBuilder, Version};
-use expose::Expose as _;
 use base::{Entropy, SecretBytes};
+use expose::Expose as _;
 
 use crate::{Error, ErrorKind, Pending, Permit, Rejected};
 
@@ -383,9 +383,10 @@ mod rfc9106 {
 
     #[test]
     fn section_5_3() {
-        run(testkit::vector!("rfc9106/argon2id.json"), 1, |c: &Case| {
+        let tally = run(testkit::vector!("rfc9106/argon2id.json"), 1, |c: &Case| {
             assert_eq!(tag(c), unhex(&c.expect.out));
             Outcome::Checked
         });
+        assert_eq!(tally.checked(), tally.total());
     }
 }

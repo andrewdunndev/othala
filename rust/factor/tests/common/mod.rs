@@ -135,10 +135,11 @@ pub(crate) fn verify_once(
 /// The rows of the RFC 6238 file, for tests that need codes known to be right.
 pub(crate) fn rfc6238() -> Vec<Case> {
     let mut cases = Vec::new();
-    testkit::vectors::run(testkit::vector!("rfc6238/totp.json"), 1, |c: &Case| {
+    let tally = testkit::vectors::run(testkit::vector!("rfc6238/totp.json"), 1, |c: &Case| {
         cases.push(c.clone());
         testkit::vectors::Outcome::Checked
     });
+    assert_eq!(tally.checked(), tally.total());
     cases
 }
 

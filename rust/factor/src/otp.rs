@@ -2,8 +2,8 @@ use alloc::vec;
 use alloc::vec::Vec;
 use core::fmt;
 
-use expose::Expose as _;
 use base::{Entropy, Row, SecretBytes, UnixTime};
+use expose::Expose as _;
 use hmac::{Hmac, KeyInit, Mac};
 use sha1::Sha1;
 use sha2::{Sha256, Sha512};
@@ -307,6 +307,8 @@ impl Totp {
 #[cfg(test)]
 mod tests {
     use alloc::vec;
+
+    use expose::Expose as _;
 
     use super::{OtpAlg, OtpKey};
     use crate::ErrorKind;

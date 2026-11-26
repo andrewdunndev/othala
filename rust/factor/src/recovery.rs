@@ -1,8 +1,8 @@
 use alloc::vec::Vec;
 use core::fmt;
 
-use expose::Expose as _;
 use base::{Digest, Entropy, Row, SecretBytes};
+use expose::Expose as _;
 use sha2::{Digest as _, Sha256};
 use subtle::ConstantTimeEq;
 use zeroize::Zeroizing;
