@@ -129,6 +129,11 @@ fn same(a: &[u8], b: &[u8]) -> bool {
     a.len() == b.len() && a.iter().zip(b).fold(0, |d, (x, y)| d | (x ^ y)) == 0
 }
 
+// the host stores the credential row, so a row the codec refuses is refused here, with the ceremony spent
+fn credential_fits(credential: &Credential) -> Result<(), Error> {
+    Record::Credential(credential.clone()).encode().map(|_| ())
+}
+
 impl RelyingParty {
     /// L3 7.1 step 1, bound to the starting browser: options for the client, and the effect that creates the ceremony row under its challenge's digest, expiring at its deadline; an over-long list or salt is `TooLarge`.
     pub fn start_registration(
@@ -314,6 +319,7 @@ impl RelyingParty {
                 large_blob: LargeBlobSupport::NotRequested,
             },
         };
+        credential_fits(&credential)?;
         Ok((registered, credential))
     }
 
@@ -1561,6 +1567,23 @@ mod tests {
         assert_eq!(
             done.left.values().next(),
             Some(&Record::Credential(c.clone()))
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn a_credential_row_past_the_record_bound_is_refused_at_finish() -> Result<(), Error> {
+        let mut credential = Reg::new()?.run()?.result?.credential().clone();
+        assert_eq!(super::credential_fits(&credential), Ok(()));
+        credential.attestation.chain = vec![sha256(b"c"); 255];
+        let row = Record::Credential(credential.clone());
+        assert_eq!(
+            row.encode().err().map(|e| e.kind()),
+            Some(ErrorKind::TooLarge)
+        );
+        assert_eq!(
+            super::credential_fits(&credential).err().map(|e| e.kind()),
+            Some(ErrorKind::TooLarge)
         );
         Ok(())
     }

@@ -148,81 +148,198 @@ const REGISTRATION: u8 = 0;
 const AUTHENTICATION: u8 = 1;
 const CREDENTIAL: u8 = 2;
 // each variant's tag is its stable encoding; an unmapped variant fails the match to compile
-macro_rules! tagged {
-    ($table:ident: $ty:ty = [$($variant:path = $tag:literal),+ $(,)?]) => {
-        impl Tag for $ty {
-            fn tag(&self) -> u8 {
-                match self {
-                    $($variant => $tag,)+
-                }
-            }
-        }
-        const $table: &[$ty] = &[$($variant),+];
-    };
-}
-
 trait Tag {
     fn tag(&self) -> u8;
 }
 
-tagged!(REQUIREMENTS: Requirement = [
-    Requirement::Required = 0,
-    Requirement::Preferred = 1,
-    Requirement::Discouraged = 2,
-]);
-tagged!(RESIDENT_KEYS: ResidentKey = [
-    ResidentKey::Required = 0,
-    ResidentKey::Preferred = 1,
-    ResidentKey::Discouraged = 2,
-]);
-tagged!(ATTACHMENTS: Attachment = [Attachment::Platform = 0, Attachment::CrossPlatform = 1]);
-tagged!(CONVEYANCES: Conveyance = [
-    Conveyance::None = 0,
-    Conveyance::Indirect = 1,
-    Conveyance::Direct = 2,
-    Conveyance::Enterprise = 3,
-]);
-tagged!(HINTS: Hint = [Hint::SecurityKey = 0, Hint::ClientDevice = 1, Hint::Hybrid = 2]);
-tagged!(MEDIATIONS: Mediation = [Mediation::Optional = 0, Mediation::Conditional = 1]);
-tagged!(TRANSPORTS: Transport = [
-    Transport::Usb = 0,
-    Transport::Nfc = 1,
-    Transport::Ble = 2,
-    Transport::SmartCard = 3,
-    Transport::Hybrid = 4,
-    Transport::Internal = 5,
-]);
-tagged!(ALGORITHMS: CoseAlgorithm = [
-    CoseAlgorithm::Es256 = 0,
-    CoseAlgorithm::Es384 = 1,
-    CoseAlgorithm::EdDsa = 2,
-    CoseAlgorithm::Rs256 = 3,
-]);
-tagged!(FORMATS: Format = [
-    Format::None = 0,
-    Format::Packed = 1,
-    Format::Tpm = 2,
-    Format::AndroidKey = 3,
-    Format::Apple = 4,
-    Format::FidoU2f = 5,
-]);
-tagged!(KINDS: AttestationType = [
-    AttestationType::None = 0,
-    AttestationType::SelfAttestation = 1,
-    AttestationType::Basic = 2,
-    AttestationType::AttCa = 3,
-    AttestationType::AnonCa = 4,
-    AttestationType::Uncertain = 5,
-]);
-tagged!(TRUSTS: Trust = [Trust::Anchored = 0, Trust::Unanchored = 1]);
-tagged!(LARGE_BLOBS: LargeBlobRequest = [
-    LargeBlobRequest::Required = 0,
-    LargeBlobRequest::Preferred = 1,
-]);
-tagged!(VERIFICATIONS: UserVerification = [
-    UserVerification::Verified = 0,
-    UserVerification::PresenceOnly = 1,
-]);
+impl Tag for Requirement {
+    fn tag(&self) -> u8 {
+        match self {
+            Requirement::Required => 0,
+            Requirement::Preferred => 1,
+            Requirement::Discouraged => 2,
+        }
+    }
+}
+const REQUIREMENTS: &[Requirement] = &[
+    Requirement::Required,
+    Requirement::Preferred,
+    Requirement::Discouraged,
+];
+
+impl Tag for ResidentKey {
+    fn tag(&self) -> u8 {
+        match self {
+            ResidentKey::Required => 0,
+            ResidentKey::Preferred => 1,
+            ResidentKey::Discouraged => 2,
+        }
+    }
+}
+const RESIDENT_KEYS: &[ResidentKey] = &[
+    ResidentKey::Required,
+    ResidentKey::Preferred,
+    ResidentKey::Discouraged,
+];
+
+impl Tag for Attachment {
+    fn tag(&self) -> u8 {
+        match self {
+            Attachment::Platform => 0,
+            Attachment::CrossPlatform => 1,
+        }
+    }
+}
+const ATTACHMENTS: &[Attachment] = &[Attachment::Platform, Attachment::CrossPlatform];
+
+impl Tag for Conveyance {
+    fn tag(&self) -> u8 {
+        match self {
+            Conveyance::None => 0,
+            Conveyance::Indirect => 1,
+            Conveyance::Direct => 2,
+            Conveyance::Enterprise => 3,
+        }
+    }
+}
+const CONVEYANCES: &[Conveyance] = &[
+    Conveyance::None,
+    Conveyance::Indirect,
+    Conveyance::Direct,
+    Conveyance::Enterprise,
+];
+
+impl Tag for Hint {
+    fn tag(&self) -> u8 {
+        match self {
+            Hint::SecurityKey => 0,
+            Hint::ClientDevice => 1,
+            Hint::Hybrid => 2,
+        }
+    }
+}
+const HINTS: &[Hint] = &[Hint::SecurityKey, Hint::ClientDevice, Hint::Hybrid];
+
+impl Tag for Mediation {
+    fn tag(&self) -> u8 {
+        match self {
+            Mediation::Optional => 0,
+            Mediation::Conditional => 1,
+        }
+    }
+}
+const MEDIATIONS: &[Mediation] = &[Mediation::Optional, Mediation::Conditional];
+
+impl Tag for Transport {
+    fn tag(&self) -> u8 {
+        match self {
+            Transport::Usb => 0,
+            Transport::Nfc => 1,
+            Transport::Ble => 2,
+            Transport::SmartCard => 3,
+            Transport::Hybrid => 4,
+            Transport::Internal => 5,
+        }
+    }
+}
+const TRANSPORTS: &[Transport] = &[
+    Transport::Usb,
+    Transport::Nfc,
+    Transport::Ble,
+    Transport::SmartCard,
+    Transport::Hybrid,
+    Transport::Internal,
+];
+
+impl Tag for CoseAlgorithm {
+    fn tag(&self) -> u8 {
+        match self {
+            CoseAlgorithm::Es256 => 0,
+            CoseAlgorithm::Es384 => 1,
+            CoseAlgorithm::EdDsa => 2,
+            CoseAlgorithm::Rs256 => 3,
+        }
+    }
+}
+const ALGORITHMS: &[CoseAlgorithm] = &[
+    CoseAlgorithm::Es256,
+    CoseAlgorithm::Es384,
+    CoseAlgorithm::EdDsa,
+    CoseAlgorithm::Rs256,
+];
+
+impl Tag for Format {
+    fn tag(&self) -> u8 {
+        match self {
+            Format::None => 0,
+            Format::Packed => 1,
+            Format::Tpm => 2,
+            Format::AndroidKey => 3,
+            Format::Apple => 4,
+            Format::FidoU2f => 5,
+        }
+    }
+}
+const FORMATS: &[Format] = &[
+    Format::None,
+    Format::Packed,
+    Format::Tpm,
+    Format::AndroidKey,
+    Format::Apple,
+    Format::FidoU2f,
+];
+
+impl Tag for AttestationType {
+    fn tag(&self) -> u8 {
+        match self {
+            AttestationType::None => 0,
+            AttestationType::SelfAttestation => 1,
+            AttestationType::Basic => 2,
+            AttestationType::AttCa => 3,
+            AttestationType::AnonCa => 4,
+            AttestationType::Uncertain => 5,
+        }
+    }
+}
+const KINDS: &[AttestationType] = &[
+    AttestationType::None,
+    AttestationType::SelfAttestation,
+    AttestationType::Basic,
+    AttestationType::AttCa,
+    AttestationType::AnonCa,
+    AttestationType::Uncertain,
+];
+
+impl Tag for Trust {
+    fn tag(&self) -> u8 {
+        match self {
+            Trust::Anchored => 0,
+            Trust::Unanchored => 1,
+        }
+    }
+}
+const TRUSTS: &[Trust] = &[Trust::Anchored, Trust::Unanchored];
+
+impl Tag for LargeBlobRequest {
+    fn tag(&self) -> u8 {
+        match self {
+            LargeBlobRequest::Required => 0,
+            LargeBlobRequest::Preferred => 1,
+        }
+    }
+}
+const LARGE_BLOBS: &[LargeBlobRequest] = &[LargeBlobRequest::Required, LargeBlobRequest::Preferred];
+
+impl Tag for UserVerification {
+    fn tag(&self) -> u8 {
+        match self {
+            UserVerification::Verified => 0,
+            UserVerification::PresenceOnly => 1,
+        }
+    }
+}
+const VERIFICATIONS: &[UserVerification] =
+    &[UserVerification::Verified, UserVerification::PresenceOnly];
 
 fn put_pick<T: Tag>(out: &mut Vec<u8>, value: &T) -> Result<(), Error> {
     out.push(value.tag());
