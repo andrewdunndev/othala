@@ -3,3 +3,5 @@
 [tools]
 node = "24"
 just = "1.59.0"
+"cargo:cargo-mutants" = "27.1.0"
+jq = "1.8.2"

@@ -246,6 +246,7 @@ check-rust:
     - if: '$CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH'
     - if: '$CI_PIPELINE_SOURCE =~ /^(web|api)$/'
   script:
+    - just tool-pins jq
     - just lock queue fmt lint canary twins test doc wasm thumb msrv deny deps api
 
 # check-ownership: a branch item/<id> changes only the paths its primitives/queue.json item owns, and no oracle path.
@@ -273,7 +274,8 @@ check-rust-scheduled:
   rules:
     - if: '$CI_PIPELINE_SOURCE == "schedule"'
   script:
-    - cargo install --locked cargo-mutants@27.1.0 cargo-fuzz@0.13.1
+    - cargo install --locked cargo-mutants@$(just mutants-pin) cargo-fuzz@0.13.1
+    - just tool-pins
     - just mutants rows
     - just mutants-off
     - rustup toolchain install nightly --profile minimal

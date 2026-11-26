@@ -67,8 +67,27 @@ twins:
         done
     done
 
+# the cargo-mutants version ../mise.toml pins, for CI's cargo install
+mutants-pin:
+    @sed -n 's/^"cargo:cargo-mutants" = "\([0-9][0-9.]*\)"$/\1/p' ../mise.toml
+
+# the installed cargo-mutants and jq must be the versions ../mise.toml pins; CI installs by the same pin and is graded here
+tool-pins *tools="cargo-mutants jq":
+    #!/usr/bin/env bash
+    set -euo pipefail
+    for t in {{tools}}; do
+        case "$t" in
+            cargo-mutants) key='"cargo:cargo-mutants"'; have=$(cargo mutants --version | sed -n 's/^cargo-mutants \([0-9][0-9.]*\).*/\1/p') ;;
+            jq) key='jq'; have=$(jq --version | sed -n 's/^jq-\([0-9][0-9.]*\).*/\1/p') ;;
+            *) echo "tool-pins: unknown tool $t"; exit 1 ;;
+        esac
+        want=$(sed -n "s/^$key = \"\([0-9][0-9.]*\)\"\$/\1/p" ../mise.toml)
+        [ -n "$want" ] || { echo "tool-pins: ../mise.toml has no pin for $t"; exit 1; }
+        [ "$want" = "$have" ] || { echo "$t ${have:-unknown} is installed, mise.toml pins $want"; exit 1; }
+    done
+
 # each run catches at least its gates.json floor (unviable mutants do not count) with none missed or timed out, so a filter that empties it fails; skips are in .cargo/mutants.toml
-mutants crate="":
+mutants crate="": (tool-pins "cargo-mutants" "jq")
     #!/usr/bin/env bash
     set -euo pipefail
     runs=$(./crates.sh | jq -r --arg c "{{crate}}" 'select(.mutants and ($c == "" or .name == $c)) | "\(.name) \(.mutants.floor) \(.mutants.tests // [] | join(","))"')
@@ -83,7 +102,7 @@ mutants crate="":
     done <<< "$runs"
 
 # the features-off run of the jose files whose refusals are dead code with all features on: it skips only when the jose crate is absent, fails when a listed file is missing, and the floor is the caught count of a real run
-mutants-off floor="5":
+mutants-off floor="5": (tool-pins "cargo-mutants" "jq")
     #!/usr/bin/env bash
     set -euo pipefail
     [ -d jose ] || { echo "mutants-off: no jose crate, skipped"; exit 0; }
@@ -100,7 +119,7 @@ mutants-off floor="5":
         "$out/mutants.out/outcomes.json" > /dev/null || { echo "mutants-off: under the floor of {{floor}}, or missed or timed out"; exit 1; }
 
 # the pre-merge mutation gate: `just mutants <crate>` (the gates.json floor, whole crate) for each crate the commits since the merge base with origin/main change; a change to justfile, crates.sh, ../mise.toml, .cargo/ or any gates.json, to Cargo.toml, Cargo.lock, rust-toolchain.toml or vectors/ runs every floored crate; a change under a crate named in a run's `tests` (or, with no `tests` key, under any crate's tests/) runs that crate; a changed jose also runs mutants-off; a floor that dropped or vanished since the merge base fails unless a commit says `floor-lowered: <crate> <reason>`; no merge base is an error, not a skip
-mutants-changed base="origin/main":
+mutants-changed base="origin/main": (tool-pins "cargo-mutants" "jq")
     #!/usr/bin/env bash
     set -euo pipefail
     mb=$(git merge-base "{{base}}" HEAD) || { echo "mutants-changed: no merge base with {{base}}"; exit 1; }
@@ -142,7 +161,7 @@ mutants-changed base="origin/main":
     if grep -qx jose <<< "$plan"; then just mutants-off; fi
 
 # a quick pre-check, not the gate: cargo mutants --in-diff on each crate this branch changes, none missed or timed out
-mutants-diff base="origin/main":
+mutants-diff base="origin/main": (tool-pins "cargo-mutants" "jq")
     #!/usr/bin/env bash
     set -euo pipefail
     mb=$(git merge-base "{{base}}" HEAD) || { echo "mutants-diff: no merge base with {{base}}"; exit 1; }
