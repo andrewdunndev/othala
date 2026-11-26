@@ -154,7 +154,7 @@ impl RelyingParty {
             user: user.handle.clone(),
             options: opts.clone(),
         });
-        if record.encode().len() > MAX_RECORD {
+        if record.encode()?.len() > MAX_RECORD {
             return Err(Error::new(ErrorKind::TooLarge));
         }
         let creation = CreationOptions {
@@ -347,7 +347,7 @@ impl RelyingParty {
             allowed: listed.iter().map(|d| sha256(d.id.as_bytes())).collect(),
             options: opts.clone(),
         });
-        if record.encode().len() > MAX_RECORD {
+        if record.encode()?.len() > MAX_RECORD {
             return Err(Error::new(ErrorKind::TooLarge));
         }
         let request = RequestOptions {
@@ -1358,7 +1358,7 @@ mod tests {
         let Some((_, empty, _)) = effect.puts().next() else {
             return Err(bad(()));
         };
-        let room = MAX_RECORD - empty.encode().len();
+        let room = MAX_RECORD - empty.encode()?.len();
         assert_eq!(start(0, &blob(room)), Ok(()), "a row of exactly MAX_RECORD");
         assert_eq!(
             start(0, &blob(room + 1)).err().map(|e| e.kind()),
@@ -1874,7 +1874,7 @@ mod tests {
         let Some((_, record, _)) = effect.puts().next() else {
             return Err(bad(()));
         };
-        let room = MAX_RECORD - record.encode().len();
+        let room = MAX_RECORD - record.encode()?.len();
         assert!(
             start(0, &sized(room)).is_ok(),
             "a row of exactly MAX_RECORD"
@@ -1883,6 +1883,18 @@ mod tests {
             start(0, &sized(room + 1)).err().map(|e| e.kind()),
             Some(ErrorKind::TooLarge)
         );
+        for lists in 0..3 {
+            let mut o = options.clone();
+            match lists {
+                0 => o.hints = vec![crate::options::Hint::Hybrid; 256],
+                1 => o.algorithms = vec![crate::cose::CoseAlgorithm::Es256; 256],
+                _ => o.formats = vec![Format::None; 261],
+            }
+            assert_eq!(
+                start(0, &o).err().map(|e| e.kind()),
+                Some(ErrorKind::TooLarge)
+            );
+        }
         Ok(())
     }
 }

@@ -156,7 +156,7 @@ impl Aaguid {
 impl StoreKey for Key { fn scope(&self) -> Scope; }
 impl Record {
     /// The row's bytes, version-tagged.
-    pub fn encode(&self) -> Vec<u8>;
+    pub fn encode(&self) -> Result<Vec<u8>, Error>;
     /// Read a row back; an unknown version or shape is `Corrupt`, past `MAX_RECORD` is `TooLarge`.
     pub fn decode(bytes: &[u8]) -> Result<Self, Error>;
 }
@@ -422,7 +422,7 @@ Each later item edits its own files and row file; where it must touch another it
 - R12 `UserHandle::generate` draws exactly 32 bytes; `from_stored` takes 1 to 64 bytes: unit:options::user_handle.
 - R13 `Timeout::from_secs` takes 1 to `MAX_TIMEOUT_SECS`; zero is `Malformed`: unit:options::timeout_bounds.
 - R14 `Transport::as_str` is the L3 5.8.4 name and `Transport::parse` reads exactly those six names back; `CredentialDescriptor::new` keeps each transport once, in the order given: unit:options::transport_names.
-- R15 `Record::encode` writes a version tag and `decode` reads it back to an equal record (`PartialEq`); an unknown version or shape is `Corrupt`: prop:record_round_trip, fuzz:record, mutants:record.
+- R15 `Record::encode` writes a version tag and `decode` reads it back to an equal record (`PartialEq`); a list past 255 entries encodes to `TooLarge`, the setters keep each hint, algorithm and format once, and an unknown version, shape or non-canonical `cred_props` byte is `Corrupt`: prop:record_round_trip, fuzz:record, mutants:record.
 - R16 `RegistrationResponse::new` and `AuthenticationResponse::new` parse everything they are given (client data, CBOR, authenticator data, statement shape) before any finish runs; an empty `userHandle` reads as absent: fuzz:attestation_object, fuzz:authenticator_data, oracle-pending:authentication.json (empty user handle).
 - R17 A registration's raw id must equal the attested `credentialId` byte for byte, else `CredentialIdInvalid`; `Key::Credential`, `RegistrationResponse::id` and `Credential::id` are the attested id (L3 13.1: the outer id is unsigned): oracle-pending:registration-ids.json.
 - R18 `TrustAnchor::from_der` takes exactly one DER certificate of at most `MAX_CERTIFICATE` bytes; `TrustAnchor::digest` is the SHA-256 of that DER: row:w3c_attestation_root over w3c:attestation-root.json#16.1, oracle-pending:limits.json, fuzz:trust_anchor.

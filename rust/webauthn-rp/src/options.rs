@@ -370,9 +370,11 @@ impl AuthenticationOptions {
         }
     }
 
-    /// Add a user-agent hint, in order.
+    /// Add a user-agent hint, in order; a repeat is ignored.
     pub fn hint(mut self, hint: Hint) -> Self {
-        self.hints.push(hint);
+        if !self.hints.contains(&hint) {
+            self.hints.push(hint);
+        }
         self
     }
 }
@@ -398,9 +400,11 @@ impl RegistrationOptions {
         }
     }
 
-    /// Offer one more algorithm, in preference order; with none offered, ES256, EdDSA, ES384 and RS256.
+    /// Offer one more algorithm, in preference order (a repeat is ignored); with none offered, ES256, EdDSA, ES384 and RS256.
     pub fn algorithm(mut self, alg: CoseAlgorithm) -> Self {
-        self.algorithms.push(alg);
+        if !self.algorithms.contains(&alg) {
+            self.algorithms.push(alg);
+        }
         self
     }
 
@@ -416,15 +420,19 @@ impl RegistrationOptions {
         self
     }
 
-    /// Prefer one more attestation format (`attestationFormats`), in order.
+    /// Prefer one more attestation format (`attestationFormats`), in order; a repeat is ignored.
     pub fn attestation_format(mut self, format: Format) -> Self {
-        self.formats.push(format);
+        if !self.formats.contains(&format) {
+            self.formats.push(format);
+        }
         self
     }
 
-    /// Add a user-agent hint, in order.
+    /// Add a user-agent hint, in order; a repeat is ignored.
     pub fn hint(mut self, hint: Hint) -> Self {
-        self.hints.push(hint);
+        if !self.hints.contains(&hint) {
+            self.hints.push(hint);
+        }
         self
     }
 

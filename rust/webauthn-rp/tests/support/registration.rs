@@ -145,7 +145,7 @@ pub(crate) fn cases() {
                     let stored = key
                         .ok()
                         .and_then(|k| done.left.get(&k).cloned())
-                        .map(|r| r.encode());
+                        .and_then(|r| r.encode().ok());
                     assert_eq!(
                         done.left.len(),
                         1,

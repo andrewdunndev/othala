@@ -496,7 +496,7 @@ method Lookup::user fn(self: &Self) -> Option<&UserHandle>
 method Origin::as_str fn(self: &Self) -> &str
 method Origin::parse fn(text: &str) -> Result<Self, Error>
 method Record::decode fn(bytes: &[u8]) -> Result<Self, Error>
-method Record::encode fn(self: &Self) -> Vec<u8>
+method Record::encode fn(self: &Self) -> Result<Vec<u8>, Error>
 method Registered::credential fn(self: &Self) -> &Credential
 method Registered::user_verification fn(self: &Self) -> UserVerification
 method RegistrationCeremony::from_row fn<R>(row: &Row<R>, record: impl FnOnce(&R) -> Option<&Record>) -> Result<Row<Self>, Error>

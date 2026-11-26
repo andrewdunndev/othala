@@ -211,10 +211,6 @@ fn put_pick<T: PartialEq>(out: &mut Vec<u8>, table: &[T], value: &T) {
     );
 }
 
-fn put_len(out: &mut Vec<u8>, len: usize) {
-    out.push(u8::try_from(len).unwrap_or(u8::MAX));
-}
-
 fn put_bytes(out: &mut Vec<u8>, bytes: &[u8]) {
     out.extend_from_slice(&u32::try_from(bytes.len()).unwrap_or(u32::MAX).to_be_bytes());
     out.extend_from_slice(bytes);
@@ -227,9 +223,15 @@ fn put_opt<T>(out: &mut Vec<u8>, value: Option<&T>, put: impl FnOnce(&mut Vec<u8
     }
 }
 
-fn put_list<T>(out: &mut Vec<u8>, values: &[T], put: impl Fn(&mut Vec<u8>, &T)) {
-    put_len(out, values.len());
+// a list length is one byte; a longer list is refused, not clamped
+fn put_list<T>(
+    out: &mut Vec<u8>,
+    values: &[T],
+    put: impl Fn(&mut Vec<u8>, &T),
+) -> Result<(), Error> {
+    out.push(u8::try_from(values.len()).map_err(|_| Error::new(ErrorKind::TooLarge))?);
     values.iter().for_each(|v| put(out, v));
+    Ok(())
 }
 
 fn put_eval(out: &mut Vec<u8>, eval: &PrfEval) {
@@ -251,17 +253,17 @@ fn put_key(out: &mut Vec<u8>, key: &CoseKey) {
     }
 }
 
-fn put_registration_options(out: &mut Vec<u8>, o: &RegistrationOptions) {
+fn put_registration_options(out: &mut Vec<u8>, o: &RegistrationOptions) -> Result<(), Error> {
     put_pick(out, &REQUIREMENTS, &o.user_verification);
     put_pick(out, &RESIDENT_KEYS, &o.resident_key);
     out.extend_from_slice(&o.timeout.0.to_be_bytes());
-    put_list(out, &o.algorithms, |o, a| put_pick(o, &ALGORITHMS, a));
+    put_list(out, &o.algorithms, |o, a| put_pick(o, &ALGORITHMS, a))?;
     put_opt(out, o.attachment.as_ref(), |o, a| {
         put_pick(o, &ATTACHMENTS, a)
     });
     put_pick(out, &CONVEYANCES, &o.conveyance);
-    put_list(out, &o.formats, |o, f| put_pick(o, &FORMATS, f));
-    put_list(out, &o.hints, |o, h| put_pick(o, &HINTS, h));
+    put_list(out, &o.formats, |o, f| put_pick(o, &FORMATS, f))?;
+    put_list(out, &o.hints, |o, h| put_pick(o, &HINTS, h))?;
     put_pick(out, &MEDIATIONS, &o.mediation);
     let e = &o.extensions;
     out.push(u8::from(e.cred_props));
@@ -278,19 +280,20 @@ fn put_registration_options(out: &mut Vec<u8>, o: &RegistrationOptions) {
     put_opt(out, e.app_id_exclude.as_ref(), |o, a| {
         put_bytes(o, a.0.as_bytes())
     });
+    Ok(())
 }
 
-fn put_authentication_options(out: &mut Vec<u8>, o: &AuthenticationOptions) {
+fn put_authentication_options(out: &mut Vec<u8>, o: &AuthenticationOptions) -> Result<(), Error> {
     put_pick(out, &REQUIREMENTS, &o.user_verification);
     out.extend_from_slice(&o.timeout.0.to_be_bytes());
-    put_list(out, &o.hints, |o, h| put_pick(o, &HINTS, h));
+    put_list(out, &o.hints, |o, h| put_pick(o, &HINTS, h))?;
     let e = &o.extensions;
     put_opt(out, e.app_id.as_ref(), |o, a| put_bytes(o, a.0.as_bytes()));
     put_opt(out, e.prf.as_ref(), put_eval);
     put_list(out, &e.prf_by_credential, |o, (id, eval)| {
         put_bytes(o, &id.0);
         put_eval(o, eval);
-    });
+    })?;
     put_opt(out, e.large_blob.as_ref(), |o, l| match l {
         LargeBlobOp::Read => o.push(0),
         LargeBlobOp::Write(blob) => {
@@ -298,11 +301,12 @@ fn put_authentication_options(out: &mut Vec<u8>, o: &AuthenticationOptions) {
             put_bytes(o, blob);
         }
     });
+    Ok(())
 }
 
 impl Record {
-    /// The row's bytes, version-tagged.
-    pub fn encode(&self) -> Vec<u8> {
+    /// The row's bytes, version-tagged; a list past 255 entries is `TooLarge`.
+    pub fn encode(&self) -> Result<Vec<u8>, Error> {
         let mut out = alloc::vec![VERSION];
         match self {
             Self::Registration(c) => {
@@ -311,7 +315,7 @@ impl Record {
                 out.extend_from_slice(c.browser.as_bytes());
                 out.extend_from_slice(&c.deadline.secs().to_be_bytes());
                 put_bytes(&mut out, &c.user.0);
-                put_registration_options(&mut out, &c.options);
+                put_registration_options(&mut out, &c.options)?;
             }
             Self::Authentication(c) => {
                 out.push(AUTHENTICATION);
@@ -321,8 +325,8 @@ impl Record {
                 put_opt(&mut out, c.user.as_ref(), |o, u| put_bytes(o, &u.0));
                 put_list(&mut out, &c.allowed, |o, d| {
                     o.extend_from_slice(d.as_bytes())
-                });
-                put_authentication_options(&mut out, &c.options);
+                })?;
+                put_authentication_options(&mut out, &c.options)?;
             }
             Self::Credential(c) => {
                 out.push(CREDENTIAL);
@@ -334,7 +338,7 @@ impl Record {
                     &[UserVerification::Verified, UserVerification::PresenceOnly],
                     &c.uv_initialized,
                 );
-                put_list(&mut out, &c.transports, |o, t| put_pick(o, &TRANSPORTS, t));
+                put_list(&mut out, &c.transports, |o, t| put_pick(o, &TRANSPORTS, t))?;
                 out.push(match c.backup {
                     Backup::SingleDevice => 0,
                     Backup::MultiDevice(BackupState::NotBackedUp) => 1,
@@ -346,13 +350,13 @@ impl Record {
                 put_pick(&mut out, &FORMATS, &a.format);
                 put_pick(&mut out, &KINDS, &a.kind);
                 put_pick(&mut out, &TRUSTS, &a.trust);
-                put_list(&mut out, &a.chain, |o, d| o.extend_from_slice(d.as_bytes()));
+                put_list(&mut out, &a.chain, |o, d| o.extend_from_slice(d.as_bytes()))?;
                 put_opt(&mut out, a.anchor.as_ref(), |o, d| {
                     o.extend_from_slice(d.as_bytes())
                 });
             }
         }
-        out
+        Ok(out)
     }
 }
 
@@ -457,7 +461,11 @@ impl<'a> In<'a> {
             hints: self.list(|i| i.pick(&HINTS))?,
             mediation: self.pick(&MEDIATIONS)?,
             extensions: RegistrationExtensions {
-                cred_props: self.u8()? == 1,
+                cred_props: match self.u8()? {
+                    0 => false,
+                    1 => true,
+                    _ => return Err(corrupt()),
+                },
                 prf: self.opt(|i| match i.u8()? {
                     0 => Ok(PrfRequest::Enable),
                     1 => i.eval().map(PrfRequest::Eval),
@@ -802,7 +810,7 @@ mod tests {
     #[test]
     fn every_record_reads_back_equal() -> Result<(), Error> {
         for record in all()? {
-            assert_eq!(Record::decode(&record.encode()), Ok(record));
+            assert_eq!(Record::decode(&record.encode()?), Ok(record));
         }
         let mut plain = authentication()?;
         if let Record::Authentication(c) = &mut plain {
@@ -811,18 +819,18 @@ mod tests {
             c.options = AuthenticationOptions::new(Requirement::Preferred, Timeout::from_secs(1)?);
             c.options.extensions.large_blob = Some(LargeBlobOp::Read);
         }
-        assert_eq!(Record::decode(&plain.encode()), Ok(plain));
+        assert_eq!(Record::decode(&plain.encode()?), Ok(plain));
         let mut single = credential(CoseKey::EdDsa([5; 32]))?;
         if let Record::Credential(c) = &mut single {
             c.backup = Backup::MultiDevice(BackupState::NotBackedUp);
             c.attestation.anchor = None;
             c.uv_initialized = UserVerification::Verified;
         }
-        assert_eq!(Record::decode(&single.encode()), Ok(single.clone()));
+        assert_eq!(Record::decode(&single.encode()?), Ok(single.clone()));
         if let Record::Credential(c) = &mut single {
             c.backup = Backup::SingleDevice;
         }
-        assert_eq!(Record::decode(&single.encode()), Ok(single));
+        assert_eq!(Record::decode(&single.encode()?), Ok(single));
         let mut conditional = registration()?;
         if let Record::Registration(c) = &mut conditional {
             c.options.extensions.prf = Some(PrfRequest::Enable);
@@ -830,14 +838,14 @@ mod tests {
             c.options.attachment = Some(Attachment::Platform);
             c.options.mediation = Mediation::Optional;
         }
-        assert_eq!(Record::decode(&conditional.encode()), Ok(conditional));
+        assert_eq!(Record::decode(&conditional.encode()?), Ok(conditional));
         Ok(())
     }
 
     #[test]
     fn a_damaged_row_is_corrupt() -> Result<(), Error> {
         for record in all()? {
-            let bytes = record.encode();
+            let bytes = record.encode()?;
             for len in 0..bytes.len() {
                 assert_eq!(
                     Record::decode(bytes.get(..len).unwrap_or(&[]))
@@ -1017,5 +1025,297 @@ mod tests {
             )
         );
         Ok(())
+    }
+
+    fn registration_with(
+        algorithms: Vec<CoseAlgorithm>,
+        formats: Vec<Format>,
+        hints: Vec<Hint>,
+    ) -> Result<Record, Error> {
+        let mut record = registration()?;
+        if let Record::Registration(c) = &mut record {
+            c.options.algorithms = algorithms;
+            c.options.formats = formats;
+            c.options.hints = hints;
+        }
+        Ok(record)
+    }
+
+    #[test]
+    fn a_list_past_one_byte_is_too_large_not_a_different_row() -> Result<(), Error> {
+        let too_large = |r: Record| r.encode().err().map(|e| e.kind());
+        for (algorithms, formats, hints) in [
+            (vec![CoseAlgorithm::Es256; 256], vec![], vec![]),
+            (vec![], vec![Format::None; 261], vec![]),
+            (vec![], vec![], vec![Hint::Hybrid; 256]),
+        ] {
+            assert_eq!(
+                too_large(registration_with(algorithms, formats, hints)?),
+                Some(ErrorKind::TooLarge)
+            );
+        }
+        let longest = registration_with(
+            vec![CoseAlgorithm::Es256; 255],
+            vec![Format::None; 255],
+            vec![Hint::Hybrid; 255],
+        )?;
+        assert_eq!(Record::decode(&longest.encode()?), Ok(longest));
+        Ok(())
+    }
+
+    #[test]
+    fn the_setters_dedupe_to_their_table() -> Result<(), Error> {
+        let mut options = RegistrationOptions::new(
+            Requirement::Required,
+            ResidentKey::Preferred,
+            Timeout::from_secs(90)?,
+        );
+        let mut request =
+            AuthenticationOptions::new(Requirement::Required, Timeout::from_secs(90)?);
+        for i in 0..300 {
+            options = options
+                .algorithm(super::ALGORITHMS[i % 4])
+                .attestation_format(super::FORMATS[i % 6])
+                .hint(super::HINTS[i % 3]);
+            request = request.hint(super::HINTS[i % 3]);
+        }
+        assert_eq!(options.algorithms, super::ALGORITHMS);
+        assert_eq!(options.formats, super::FORMATS);
+        assert_eq!(options.hints, super::HINTS);
+        assert_eq!(request.hints, super::HINTS);
+        Ok(())
+    }
+
+    #[test]
+    fn a_non_canonical_cred_props_byte_is_corrupt() -> Result<(), Error> {
+        let (mut on, mut off) = (registration()?, registration()?);
+        for (record, flag) in [(&mut on, true), (&mut off, false)] {
+            if let Record::Registration(c) = record {
+                c.options.extensions.cred_props = flag;
+            }
+        }
+        let (on, off) = (on.encode()?, off.encode()?);
+        let flag = on
+            .iter()
+            .zip(&off)
+            .position(|(a, b)| a != b)
+            .ok_or_else(|| bad(()))?;
+        for byte in [0, 1] {
+            let mut row = on.clone();
+            row[flag] = byte;
+            assert!(Record::decode(&row).is_ok());
+        }
+        let mut row = on.clone();
+        row[flag] = 2;
+        assert_eq!(
+            Record::decode(&row).err().map(|e| e.kind()),
+            Some(ErrorKind::Corrupt)
+        );
+        Ok(())
+    }
+
+    mod identity {
+        use alloc::vec::Vec;
+
+        use proptest::prelude::*;
+
+        use super::super::{
+            ALGORITHMS, AuthenticationCeremony, FORMATS, HINTS, KINDS, TRANSPORTS, TRUSTS,
+        };
+        use super::super::{Aaguid, Credential, CredentialId, Record, RegistrationCeremony};
+        use super::{digest, user};
+        use crate::cose::CoseKey;
+        use crate::error::ErrorKind;
+        use crate::extensions::{AppId, LargeBlobOp, LargeBlobRequest, PrfEval, PrfRequest};
+        use crate::options::{
+            AuthenticationOptions, Mediation, RegistrationOptions, Requirement, ResidentKey,
+            Timeout,
+        };
+        use crate::trust::Attestation;
+        use crate::verify::{Backup, BackupState, UserVerification};
+        use base::UnixTime;
+
+        fn pick<T: Clone + core::fmt::Debug + 'static>(
+            table: &'static [T],
+            max: usize,
+        ) -> impl Strategy<Value = Vec<T>> {
+            prop::collection::vec(prop::sample::select(table), 0..max)
+        }
+
+        fn eval() -> impl Strategy<Value = PrfEval> {
+            (
+                prop::collection::vec(any::<u8>(), 0..8),
+                prop::option::of(prop::collection::vec(any::<u8>(), 0..8)),
+            )
+                .prop_map(|(first, second)| PrfEval { first, second })
+        }
+
+        fn registration() -> impl Strategy<Value = Record> {
+            (
+                (
+                    pick(&ALGORITHMS, 300),
+                    pick(&FORMATS, 300),
+                    pick(&HINTS, 300),
+                ),
+                (
+                    any::<bool>(),
+                    prop::option::of(prop_oneof![
+                        Just(PrfRequest::Enable),
+                        eval().prop_map(PrfRequest::Eval)
+                    ]),
+                    prop::option::of(prop_oneof![
+                        Just(LargeBlobRequest::Required),
+                        Just(LargeBlobRequest::Preferred)
+                    ]),
+                    prop::option::of("[a-z]{0,8}"),
+                    prop::bool::ANY,
+                ),
+            )
+                .prop_map(
+                    |((algorithms, formats, hints), (cp, prf, lb, app, cond))| {
+                        let mut options = RegistrationOptions::new(
+                            Requirement::Required,
+                            ResidentKey::Required,
+                            Timeout::from_secs(30).unwrap_or(Timeout(30)),
+                        );
+                        options.algorithms = algorithms;
+                        options.formats = formats;
+                        options.hints = hints;
+                        options.mediation = if cond {
+                            Mediation::Conditional
+                        } else {
+                            Mediation::Optional
+                        };
+                        options.extensions.cred_props = cp;
+                        options.extensions.prf = prf;
+                        options.extensions.large_blob = lb;
+                        options.extensions.app_id_exclude = app.map(AppId);
+                        Record::Registration(RegistrationCeremony {
+                            challenge: digest(1),
+                            browser: digest(2),
+                            deadline: UnixTime::new(7),
+                            user: user().unwrap_or_else(|_| unreachable!()),
+                            options,
+                        })
+                    },
+                )
+        }
+
+        fn authentication() -> impl Strategy<Value = Record> {
+            (
+                pick(&HINTS, 300),
+                prop::collection::vec(any::<u8>(), 0..300),
+                prop::option::of(eval()),
+                prop::option::of(prop_oneof![
+                    Just(LargeBlobOp::Read),
+                    prop::collection::vec(any::<u8>(), 0..4).prop_map(LargeBlobOp::Write)
+                ]),
+            )
+                .prop_map(|(hints, allowed, prf, large_blob)| {
+                    let mut options = AuthenticationOptions::new(
+                        Requirement::Preferred,
+                        Timeout::from_secs(30).unwrap_or(Timeout(30)),
+                    );
+                    options.hints = hints;
+                    options.extensions.prf = prf;
+                    options.extensions.large_blob = large_blob;
+                    options.extensions.prf_by_credential = allowed
+                        .iter()
+                        .filter_map(|b| CredentialId::from_bytes(&[*b]).ok())
+                        .map(|id| {
+                            (
+                                id,
+                                PrfEval {
+                                    first: Vec::new(),
+                                    second: None,
+                                },
+                            )
+                        })
+                        .collect();
+                    Record::Authentication(AuthenticationCeremony {
+                        challenge: digest(3),
+                        browser: digest(4),
+                        deadline: UnixTime::new(9),
+                        user: None,
+                        allowed: allowed.iter().map(|b| digest(*b)).collect(),
+                        options,
+                    })
+                })
+        }
+
+        fn credential() -> impl Strategy<Value = Record> {
+            (
+                pick(&TRANSPORTS, 300),
+                prop::collection::vec(any::<u8>(), 0..300),
+                any::<u32>(),
+                0..3_u8,
+                (
+                    prop::sample::select(&FORMATS[..]),
+                    prop::sample::select(&KINDS[..]),
+                    prop::sample::select(&TRUSTS[..]),
+                ),
+            )
+                .prop_map(
+                    |(transports, chain, sign_count, backup, (format, kind, trust))| {
+                        Record::Credential(Credential {
+                            id: CredentialId::from_bytes(b"id").unwrap_or_else(|_| unreachable!()),
+                            public_key: CoseKey::EdDsa([8; 32]),
+                            sign_count,
+                            uv_initialized: UserVerification::Verified,
+                            transports,
+                            backup: match backup {
+                                0 => Backup::SingleDevice,
+                                1 => Backup::MultiDevice(BackupState::NotBackedUp),
+                                _ => Backup::MultiDevice(BackupState::BackedUp),
+                            },
+                            user: user().unwrap_or_else(|_| unreachable!()),
+                            aaguid: Aaguid::from_bytes([1; 16]),
+                            attestation: Attestation {
+                                format,
+                                kind,
+                                trust,
+                                chain: chain.iter().map(|b| digest(*b)).collect(),
+                                anchor: None,
+                            },
+                        })
+                    },
+                )
+        }
+
+        fn widest(record: &Record) -> usize {
+            match record {
+                Record::Registration(c) => c
+                    .options
+                    .algorithms
+                    .len()
+                    .max(c.options.formats.len())
+                    .max(c.options.hints.len()),
+                Record::Authentication(c) => c
+                    .allowed
+                    .len()
+                    .max(c.options.hints.len())
+                    .max(c.options.extensions.prf_by_credential.len()),
+                Record::Credential(c) => c.transports.len().max(c.attestation.chain.len()),
+            }
+        }
+
+        proptest! {
+            #[test]
+            fn record_round_trip(
+                record in prop_oneof![registration(), authentication(), credential()]
+            ) {
+                match record.encode() {
+                    // the start paths refuse a row past MAX_RECORD, so only smaller rows must read back
+                    Ok(bytes) if bytes.len() <= crate::MAX_RECORD => {
+                        prop_assert_eq!(Record::decode(&bytes), Ok(record));
+                    }
+                    Ok(_) => {}
+                    Err(e) => {
+                        prop_assert_eq!(e.kind(), ErrorKind::TooLarge);
+                        prop_assert!(widest(&record) > 255);
+                    }
+                }
+            }
+        }
     }
 }
