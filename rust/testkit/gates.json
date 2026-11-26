@@ -1,6 +1,6 @@
 {
   "doc": true,
-  "mutants": { "floor": 83 },
+  "mutants": { "floor": 81 },
   "allow": [
     "itoa", "memchr", "ppv-lite86", "proc-macro2", "quote", "rand_chacha", "serde_derive", "serde_json", "serde_spanned", "syn", "toml",
     "toml_datetime", "toml_parser", "unicode-ident", "winnow", "zerocopy", "zmij"

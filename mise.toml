@@ -3,3 +3,6 @@
 [tools]
 node = "24"
 just = "1.59.0"
+"github:sourcefrog/cargo-mutants" = "27.1.0"
+jq = "1.7"
+"github:EmbarkStudios/cargo-deny" = "0.22.1"

@@ -243,7 +243,8 @@ files = [ { path = "w/t.json", sha256 = "SHA", cases = 2 } ]
             Vector::new("w/t.json", json),
             1,
             |_, _| Outcome::Checked,
-        );
+        )
+        .total();
     }
 
     #[test]
@@ -270,7 +271,8 @@ files = [ { path = "w/t.json", sha256 = "SHA", cases = 2 } ]
         let sources = sources_for(TWO);
         wycheproof_against(&sources, Vector::new("w/t.json", "not json"), 1, |_, _| {
             Outcome::Checked
-        });
+        })
+        .total();
     }
 
     macro_rules! files {
@@ -344,7 +346,8 @@ files = [ { path = "w/t.json", sha256 = "SHA", cases = 2 } ]
                     || c.key.is_some();
                 assert!(keyed, "tcId {} of {} has no key", c.tc_id, g.kind);
                 Outcome::Checked
-            });
+            })
+            .total();
         }
     }
 }

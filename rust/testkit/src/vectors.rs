@@ -35,6 +35,7 @@ pub enum Outcome {
 }
 
 /// The counts a run asserted.
+#[must_use]
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct Tally {
     total: usize,
@@ -215,7 +216,7 @@ notes = "a source with no files"
     #[test]
     #[should_panic(expected = "a/three.json: 2 cases checked, floor 3")]
     fn floor_counts_only_checked_cases() {
-        run_against(SOURCES, Vector::new("a/three.json", THREE), 3, odd);
+        run_against(SOURCES, Vector::new("a/three.json", THREE), 3, odd).total();
     }
 
     #[test]
@@ -226,32 +227,33 @@ notes = "a source with no files"
             Vector::new("a/three.json", THREE),
             1,
             |_: &Case| Outcome::NotApplicable,
-        );
+        )
+        .total();
     }
 
     #[test]
     #[should_panic(expected = "floor 0")]
     fn zero_floor_fails() {
-        run_against(SOURCES, Vector::new("a/three.json", THREE), 0, odd);
+        run_against(SOURCES, Vector::new("a/three.json", THREE), 0, odd).total();
     }
 
     #[test]
     #[should_panic(expected = "cases in file against SOURCES.toml")]
     fn total_mismatch_fails() {
         let two = r#"{ "cases": [ { "n": 1 }, { "n": 3 } ] }"#;
-        run_against(SOURCES, Vector::new("a/two.json", two), 1, odd);
+        run_against(SOURCES, Vector::new("a/two.json", two), 1, odd).total();
     }
 
     #[test]
     #[should_panic(expected = "a/three.json: SHA-256 of the file against SOURCES.toml")]
     fn altered_file_fails() {
         let altered = r#"{ "cases": [ { "n": 1 }, { "n": 2 }, { "n": 5 } ] }"#;
-        run_against(SOURCES, Vector::new("a/three.json", altered), 1, odd);
+        run_against(SOURCES, Vector::new("a/three.json", altered), 1, odd).total();
     }
 
     #[test]
     #[should_panic(expected = "listed 0 times")]
     fn unlisted_file_fails() {
-        run_against(SOURCES, Vector::new("a/other.json", THREE), 1, odd);
+        run_against(SOURCES, Vector::new("a/other.json", THREE), 1, odd).total();
     }
 }
