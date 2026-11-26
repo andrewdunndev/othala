@@ -1,0 +1,73 @@
+{
+ "source": "one oversize input per bound of contract rule 5.7; the rule states no number, so each case is parametric: build the input per `recipe` at the named crate constant plus `excess`",
+ "cases": [
+  {
+   "id": "compact-bytes",
+   "op": "limit",
+   "bound": "jose::MAX_COMPACT_LEN",
+   "excess": 1,
+   "recipe": "compact JWS, header {\"alg\":\"HS256\"}, payload the ASCII byte 'a' repeated, HS256 with jwk; the shortest such token longer than the bound",
+   "alg": "HS256",
+   "jwk": {
+    "kty": "oct",
+    "k": "AyM1SysPpbyDfgZld3umj1qzKObwVMkoqQ-EstJQLr_T-1qS0gZH75aKtMN3Yj0iPS4hcgUuTwjAzZr1Z9CAow"
+   },
+   "spec": "contract rule 5.7 (compact token bytes)",
+   "expect": {
+    "ok": false,
+    "kind": "TooLarge"
+   }
+  },
+  {
+   "id": "header-depth",
+   "op": "limit",
+   "bound": "jose::MAX_JSON_DEPTH",
+   "excess": 1,
+   "recipe": "compact JWS whose header is {\"alg\":\"HS256\",\"x\":V} with V nested arrays [[...[]...]] so that the header's depth (the outer object is 1, each nested array or object adds 1) is the bound plus one; payload {}, HS256 with jwk",
+   "alg": "HS256",
+   "jwk": {
+    "kty": "oct",
+    "k": "AyM1SysPpbyDfgZld3umj1qzKObwVMkoqQ-EstJQLr_T-1qS0gZH75aKtMN3Yj0iPS4hcgUuTwjAzZr1Z9CAow"
+   },
+   "spec": "contract rule 5.7 (header JSON depth)",
+   "expect": {
+    "ok": false,
+    "kind": "TooLarge"
+   }
+  },
+  {
+   "id": "claims-depth",
+   "op": "limit",
+   "bound": "jose::MAX_JSON_DEPTH",
+   "excess": 1,
+   "recipe": "compact JWS, header {\"alg\":\"HS256\"}, payload {\"x\":V} with V nested arrays so that the claims depth (counted as for the header) is the bound plus one; HS256 with jwk",
+   "alg": "HS256",
+   "jwk": {
+    "kty": "oct",
+    "k": "AyM1SysPpbyDfgZld3umj1qzKObwVMkoqQ-EstJQLr_T-1qS0gZH75aKtMN3Yj0iPS4hcgUuTwjAzZr1Z9CAow"
+   },
+   "spec": "contract rule 5.7 (claims JSON depth)",
+   "expect": {
+    "ok": false,
+    "kind": "TooLarge"
+   }
+  },
+  {
+   "id": "jwks-key-count",
+   "op": "limit",
+   "bound": "jose::MAX_JWKS_KEYS",
+   "excess": 1,
+   "recipe": "{\"keys\":[...]} holding the bound plus one copies of jwk, the i-th (from 0) with kid \"k<i>\"",
+   "alg": "HS256",
+   "jwk": {
+    "kty": "oct",
+    "k": "AyM1SysPpbyDfgZld3umj1qzKObwVMkoqQ-EstJQLr_T-1qS0gZH75aKtMN3Yj0iPS4hcgUuTwjAzZr1Z9CAow"
+   },
+   "spec": "contract rule 5.7 (JWKS key count)",
+   "expect": {
+    "ok": false,
+    "kind": "TooLarge"
+   }
+  }
+ ]
+}

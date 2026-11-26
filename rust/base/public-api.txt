@@ -90,6 +90,8 @@ impl Eq for Slot<'a, R>
 impl Eq for UnixTime
 impl Eq for Version
 impl Error for Error
+impl Expose for Secret<N>
+impl Expose for SecretBytes
 impl From<&Secret<32>> for BrowserBinding
 impl From<SystemTime> for UnixTime
 impl Hash for Digest
@@ -185,13 +187,11 @@ method Rows::insert fn(self: &mut Self, key: K, row: Option<Row<R>>) -> &mut Sel
 method Rows::new const fn() -> Self
 method Secret::ct_eq fn(self: &Self, other: &Self) -> bool
 method Secret::digest fn(self: &Self) -> Digest
-method Secret::expose const fn(self: &Self) -> &[u8; N]
 method Secret::from_b64url fn(text: &str) -> Result<Self, Error>
 method Secret::generate fn(e: &mut impl Entropy) -> Self
 method Secret::new const fn(bytes: [u8; N]) -> Self
 method SecretBytes::ct_eq fn(self: &Self, other: &Self) -> bool
 method SecretBytes::digest fn(self: &Self) -> Digest
-method SecretBytes::expose fn(self: &Self) -> &[u8]
 method SecretBytes::new const fn(bytes: Vec<u8>) -> Self
 method UnixTime::checked_duration_since const fn(self: Self, earlier: Self) -> Option<u64>
 method UnixTime::new const fn(secs: u64) -> Self

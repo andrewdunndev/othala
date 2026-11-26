@@ -1,0 +1,387 @@
+{
+ "source": "TOTP window, skew and replay; derived by tools/derive_factor.py from the RFC 6238 appendix B seeds (step 30, T0 0); `step` on success is the matched step",
+ "cases": [
+  {
+   "id": "current-step",
+   "op": "totp",
+   "secret": "3132333435363738393031323334353637383930",
+   "alg": "sha1",
+   "digits": 8,
+   "step": 30,
+   "time": 1111111109,
+   "window": 1,
+   "last_step": null,
+   "code": "07081804",
+   "spec": "RFC 6238 4.2",
+   "expect": {
+    "ok": true,
+    "step": 37037036
+   }
+  },
+  {
+   "id": "skew-one-previous-step",
+   "op": "totp",
+   "secret": "3132333435363738393031323334353637383930",
+   "alg": "sha1",
+   "digits": 8,
+   "step": 30,
+   "time": 1111111109,
+   "window": 1,
+   "last_step": null,
+   "code": "89731029",
+   "spec": "RFC 6238 5.2 (one step of delay allowed)",
+   "expect": {
+    "ok": true,
+    "step": 37037035
+   }
+  },
+  {
+   "id": "skew-one-next-step",
+   "op": "totp",
+   "secret": "3132333435363738393031323334353637383930",
+   "alg": "sha1",
+   "digits": 8,
+   "step": 30,
+   "time": 1111111109,
+   "window": 1,
+   "last_step": null,
+   "code": "14050471",
+   "spec": "RFC 6238 5.2 and 6 (drift)",
+   "expect": {
+    "ok": true,
+    "step": 37037037
+   }
+  },
+  {
+   "id": "skew-one-two-back",
+   "op": "totp",
+   "secret": "3132333435363738393031323334353637383930",
+   "alg": "sha1",
+   "digits": 8,
+   "step": 30,
+   "time": 1111111109,
+   "window": 1,
+   "last_step": null,
+   "code": "48150727",
+   "spec": "RFC 6238 5.2",
+   "expect": {
+    "ok": false
+   }
+  },
+  {
+   "id": "skew-one-two-ahead",
+   "op": "totp",
+   "secret": "3132333435363738393031323334353637383930",
+   "alg": "sha1",
+   "digits": 8,
+   "step": 30,
+   "time": 1111111109,
+   "window": 1,
+   "last_step": null,
+   "code": "44266759",
+   "spec": "RFC 6238 5.2",
+   "expect": {
+    "ok": false
+   }
+  },
+  {
+   "id": "skew-none-previous-step",
+   "op": "totp",
+   "secret": "3132333435363738393031323334353637383930",
+   "alg": "sha1",
+   "digits": 8,
+   "step": 30,
+   "time": 1111111109,
+   "window": 0,
+   "last_step": null,
+   "code": "89731029",
+   "spec": "RFC 6238 5.2",
+   "expect": {
+    "ok": false
+   }
+  },
+  {
+   "id": "skew-none-next-step",
+   "op": "totp",
+   "secret": "3132333435363738393031323334353637383930",
+   "alg": "sha1",
+   "digits": 8,
+   "step": 30,
+   "time": 1111111109,
+   "window": 0,
+   "last_step": null,
+   "code": "14050471",
+   "spec": "RFC 6238 5.2",
+   "expect": {
+    "ok": false
+   }
+  },
+  {
+   "id": "replay-same-step",
+   "op": "totp",
+   "secret": "3132333435363738393031323334353637383930",
+   "alg": "sha1",
+   "digits": 8,
+   "step": 30,
+   "time": 1111111109,
+   "window": 1,
+   "last_step": 37037036,
+   "code": "07081804",
+   "spec": "RFC 6238 5.2 (MUST NOT accept the second attempt of the same OTP)",
+   "expect": {
+    "ok": false,
+    "kind": "Replayed"
+   }
+  },
+  {
+   "id": "replay-older-step-in-window",
+   "op": "totp",
+   "secret": "3132333435363738393031323334353637383930",
+   "alg": "sha1",
+   "digits": 8,
+   "step": 30,
+   "time": 1111111109,
+   "window": 1,
+   "last_step": 37037036,
+   "code": "89731029",
+   "spec": "RFC 6238 5.2 with the contract (a step at or below last is Replayed)",
+   "expect": {
+    "ok": false,
+    "kind": "Replayed"
+   }
+  },
+  {
+   "id": "newer-step-after-last",
+   "op": "totp",
+   "secret": "3132333435363738393031323334353637383930",
+   "alg": "sha1",
+   "digits": 8,
+   "step": 30,
+   "time": 1111111109,
+   "window": 1,
+   "last_step": 37037036,
+   "code": "14050471",
+   "spec": "RFC 6238 5.2",
+   "expect": {
+    "ok": true,
+    "step": 37037037
+   }
+  },
+  {
+   "id": "current-after-previous-last",
+   "op": "totp",
+   "secret": "3132333435363738393031323334353637383930",
+   "alg": "sha1",
+   "digits": 8,
+   "step": 30,
+   "time": 1111111109,
+   "window": 1,
+   "last_step": 37037035,
+   "code": "07081804",
+   "spec": "RFC 6238 5.2",
+   "expect": {
+    "ok": true,
+    "step": 37037036
+   }
+  },
+  {
+   "id": "last-ahead-of-clock",
+   "op": "totp",
+   "secret": "3132333435363738393031323334353637383930",
+   "alg": "sha1",
+   "digits": 8,
+   "step": 30,
+   "time": 1111111109,
+   "window": 1,
+   "last_step": 37037037,
+   "code": "07081804",
+   "spec": "RFC 6238 5.2 with the contract (a stored step after the current one still bars it)",
+   "expect": {
+    "ok": false,
+    "kind": "Replayed"
+   }
+  },
+  {
+   "id": "step-start-boundary",
+   "op": "totp",
+   "secret": "3132333435363738393031323334353637383930",
+   "alg": "sha1",
+   "digits": 8,
+   "step": 30,
+   "time": 1111111080,
+   "window": 1,
+   "last_step": null,
+   "code": "07081804",
+   "spec": "RFC 6238 4.2 (T = floor((now - T0) / X))",
+   "expect": {
+    "ok": true,
+    "step": 37037036
+   }
+  },
+  {
+   "id": "step-end-boundary",
+   "op": "totp",
+   "secret": "3132333435363738393031323334353637383930",
+   "alg": "sha1",
+   "digits": 8,
+   "step": 30,
+   "time": 1111111109,
+   "window": 1,
+   "last_step": null,
+   "code": "07081804",
+   "spec": "RFC 6238 4.2",
+   "expect": {
+    "ok": true,
+    "step": 37037036
+   }
+  },
+  {
+   "id": "t59-at-t60-skew-none",
+   "op": "totp",
+   "secret": "3132333435363738393031323334353637383930",
+   "alg": "sha1",
+   "digits": 8,
+   "step": 30,
+   "time": 60,
+   "window": 0,
+   "last_step": null,
+   "code": "94287082",
+   "spec": "RFC 6238 4.2 and appendix B (59 and 60 are different steps)",
+   "expect": {
+    "ok": false
+   }
+  },
+  {
+   "id": "t59-at-t60-skew-one",
+   "op": "totp",
+   "secret": "3132333435363738393031323334353637383930",
+   "alg": "sha1",
+   "digits": 8,
+   "step": 30,
+   "time": 60,
+   "window": 1,
+   "last_step": null,
+   "code": "94287082",
+   "spec": "RFC 6238 5.2",
+   "expect": {
+    "ok": true,
+    "step": 1
+   }
+  },
+  {
+   "id": "sha256-replay",
+   "op": "totp",
+   "secret": "3132333435363738393031323334353637383930313233343536373839303132",
+   "alg": "sha256",
+   "digits": 8,
+   "step": 30,
+   "time": 1111111109,
+   "window": 1,
+   "last_step": 37037036,
+   "code": "68084774",
+   "spec": "RFC 6238 1.2 and 5.2",
+   "expect": {
+    "ok": false,
+    "kind": "Replayed"
+   }
+  },
+  {
+   "id": "sha512-replay",
+   "op": "totp",
+   "secret": "31323334353637383930313233343536373839303132333435363738393031323334353637383930313233343536373839303132333435363738393031323334",
+   "alg": "sha512",
+   "digits": 8,
+   "step": 30,
+   "time": 1111111109,
+   "window": 1,
+   "last_step": 37037036,
+   "code": "25091201",
+   "spec": "RFC 6238 1.2 and 5.2",
+   "expect": {
+    "ok": false,
+    "kind": "Replayed"
+   }
+  },
+  {
+   "id": "six-digit-leading-zero",
+   "op": "totp",
+   "secret": "3132333435363738393031323334353637383930",
+   "alg": "sha1",
+   "digits": 6,
+   "step": 30,
+   "time": 1111111080,
+   "window": 1,
+   "last_step": null,
+   "code": "081804",
+   "spec": "RFC 4226 5.3 (the value is zero-padded to Digit digits)",
+   "expect": {
+    "ok": true,
+    "step": 37037036
+   }
+  },
+  {
+   "id": "six-digit-leading-zero-stripped",
+   "op": "totp",
+   "secret": "3132333435363738393031323334353637383930",
+   "alg": "sha1",
+   "digits": 6,
+   "step": 30,
+   "time": 1111111080,
+   "window": 1,
+   "last_step": null,
+   "code": "81804",
+   "spec": "RFC 4226 5.3",
+   "expect": {
+    "ok": false
+   }
+  },
+  {
+   "id": "eight-digit-code-for-six",
+   "op": "totp",
+   "secret": "3132333435363738393031323334353637383930",
+   "alg": "sha1",
+   "digits": 6,
+   "step": 30,
+   "time": 1111111109,
+   "window": 1,
+   "last_step": null,
+   "code": "07081804",
+   "spec": "RFC 4226 5.3 (Digit is fixed per key)",
+   "expect": {
+    "ok": false
+   }
+  },
+  {
+   "id": "non-digit-code",
+   "op": "totp",
+   "secret": "3132333435363738393031323334353637383930",
+   "alg": "sha1",
+   "digits": 8,
+   "step": 30,
+   "time": 1111111109,
+   "window": 1,
+   "last_step": null,
+   "code": "9428708a",
+   "spec": "RFC 4226 5.3 (decimal digits)",
+   "expect": {
+    "ok": false
+   }
+  },
+  {
+   "id": "code-with-space",
+   "op": "totp",
+   "secret": "3132333435363738393031323334353637383930",
+   "alg": "sha1",
+   "digits": 8,
+   "step": 30,
+   "time": 1111111109,
+   "window": 1,
+   "last_step": null,
+   "code": " 7081804",
+   "spec": "RFC 4226 5.3",
+   "expect": {
+    "ok": false
+   }
+  }
+ ]
+}

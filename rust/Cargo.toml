@@ -13,6 +13,7 @@ publish = false
 
 [workspace.dependencies]
 base = { path = "base", version = "0.0.0" }
+expose = { path = "expose", version = "0.0.0" }
 store = { path = "store", version = "0.0.0" }
 testkit = { path = "testkit", version = "0.0.0" }
 sha2 = { version = "0.11", default-features = false, features = ["zeroize"] }

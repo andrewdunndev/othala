@@ -1,0 +1,148 @@
+{
+ "source": "HOTP look-ahead and resynchronization; derived by tools/derive_factor.py from the RFC 4226 appendix D secret; `next_counter` on success is the matched counter plus one",
+ "cases": [
+  {
+   "id": "expected-counter",
+   "op": "hotp_verify",
+   "secret": "3132333435363738393031323334353637383930",
+   "digits": 6,
+   "counter": 3,
+   "look_ahead": 3,
+   "code": "969429",
+   "spec": "RFC 4226 7.2",
+   "expect": {
+    "ok": true,
+    "next_counter": 4
+   }
+  },
+  {
+   "id": "look-ahead-edge",
+   "op": "hotp_verify",
+   "secret": "3132333435363738393031323334353637383930",
+   "digits": 6,
+   "counter": 3,
+   "look_ahead": 3,
+   "code": "287922",
+   "spec": "RFC 4226 7.4 (look-ahead window s)",
+   "expect": {
+    "ok": true,
+    "next_counter": 7
+   }
+  },
+  {
+   "id": "look-ahead-past-edge",
+   "op": "hotp_verify",
+   "secret": "3132333435363738393031323334353637383930",
+   "digits": 6,
+   "counter": 3,
+   "look_ahead": 3,
+   "code": "162583",
+   "spec": "RFC 4226 7.4",
+   "expect": {
+    "ok": false
+   }
+  },
+  {
+   "id": "look-ahead-zero-next",
+   "op": "hotp_verify",
+   "secret": "3132333435363738393031323334353637383930",
+   "digits": 6,
+   "counter": 3,
+   "look_ahead": 0,
+   "code": "338314",
+   "spec": "RFC 4226 7.4",
+   "expect": {
+    "ok": false
+   }
+  },
+  {
+   "id": "previous-counter",
+   "op": "hotp_verify",
+   "secret": "3132333435363738393031323334353637383930",
+   "digits": 6,
+   "counter": 3,
+   "look_ahead": 3,
+   "code": "359152",
+   "spec": "RFC 4226 7.2 (the counter only moves forward after a success)",
+   "expect": {
+    "ok": false
+   }
+  },
+  {
+   "id": "counter-zero",
+   "op": "hotp_verify",
+   "secret": "3132333435363738393031323334353637383930",
+   "digits": 6,
+   "counter": 0,
+   "look_ahead": 0,
+   "code": "755224",
+   "spec": "RFC 4226 appendix D",
+   "expect": {
+    "ok": true,
+    "next_counter": 1
+   }
+  },
+  {
+   "id": "wrong-code",
+   "op": "hotp_verify",
+   "secret": "3132333435363738393031323334353637383930",
+   "digits": 6,
+   "counter": 3,
+   "look_ahead": 3,
+   "code": "000000",
+   "spec": "RFC 4226 7.2",
+   "expect": {
+    "ok": false
+   }
+  },
+  {
+   "id": "resync-two-consecutive",
+   "op": "hotp_resync",
+   "secret": "3132333435363738393031323334353637383930",
+   "digits": 6,
+   "counter": 0,
+   "look_ahead": 9,
+   "codes": [
+    "162583",
+    "399871"
+   ],
+   "spec": "RFC 4226 E.4 (resynchronization with consecutive values)",
+   "expect": {
+    "ok": true,
+    "next_counter": 9
+   }
+  },
+  {
+   "id": "resync-not-consecutive",
+   "op": "hotp_resync",
+   "secret": "3132333435363738393031323334353637383930",
+   "digits": 6,
+   "counter": 0,
+   "look_ahead": 9,
+   "codes": [
+    "162583",
+    "520489"
+   ],
+   "spec": "RFC 4226 E.4",
+   "expect": {
+    "ok": false
+   }
+  },
+  {
+   "id": "resync-past-window",
+   "op": "hotp_resync",
+   "secret": "3132333435363738393031323334353637383930",
+   "digits": 6,
+   "counter": 0,
+   "look_ahead": 5,
+   "codes": [
+    "162583",
+    "399871"
+   ],
+   "spec": "RFC 4226 E.4 and 7.4",
+   "expect": {
+    "ok": false
+   }
+  }
+ ]
+}

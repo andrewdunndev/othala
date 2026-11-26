@@ -1,0 +1,176 @@
+{
+ "source": "JWK Set decoding and lookup; derived by tools/derive_jose.py from keys pinned under vectors/ (RFC 7515 A.1-A.4, RFC 7520 3 and 5.4, RFC 8037 A); one spec section per case in `spec`",
+ "cases": [
+  {
+   "id": "two-keys",
+   "op": "jwks_decode",
+   "jwks": {
+    "keys": [
+     {
+      "kty": "oct",
+      "kid": "018c0ae5-4d9b-471b-bfd6-eef314bc7037",
+      "use": "sig",
+      "alg": "HS256",
+      "k": "hJtXIZ2uSN5kbQfbtTNWbpdmhkV8FJG-Onbc6mxCcYg"
+     },
+     {
+      "kty": "RSA",
+      "kid": "bilbo.baggins@hobbiton.example",
+      "use": "sig",
+      "n": "n4EPtAOCc9AlkeQHPzHStgAbgs7bTZLwUBZdR8_KuKPEHLd4rHVTeT-O-XV2jRojdNhxJWTDvNd7nqQ0VEiZQHz_AJmSCpMaJMRBSFKrKb2wqVwGU_NsYOYL-QtiWN2lbzcEe6XC0dApr5ydQLrHqkHHig3RBordaZ6Aj-oBHqFEHYpPe7Tpe-OfVfHd1E6cS6M1FZcD1NNLYD5lFHpPI9bTwJlsde3uhGqC0ZCuEHg8lhzwOHrtIQbS0FVbb9k3-tVTU4fg_3L_vniUFAKwuCLqKnS2BYwdq_mzSnbLY7h_qixoR7jig3__kRhuaxwUkRz5iaiQkqgc5gHdrNP5zw",
+      "e": "AQAB"
+     }
+    ]
+   },
+   "spec": "RFC 7517 5",
+   "expect": {
+    "ok": true,
+    "keys": 2
+   }
+  },
+  {
+   "id": "unknown-kty-skipped",
+   "op": "jwks_decode",
+   "jwks": {
+    "keys": [
+     {
+      "kty": "oct",
+      "kid": "018c0ae5-4d9b-471b-bfd6-eef314bc7037",
+      "use": "sig",
+      "alg": "HS256",
+      "k": "hJtXIZ2uSN5kbQfbtTNWbpdmhkV8FJG-Onbc6mxCcYg"
+     },
+     {
+      "kty": "unknown-kty",
+      "kid": "u"
+     }
+    ]
+   },
+   "spec": "RFC 7517 5 (SHOULD ignore JWKs whose kty is not understood)",
+   "expect": {
+    "ok": true,
+    "keys": 1
+   }
+  },
+  {
+   "id": "keys-missing",
+   "op": "jwks_decode",
+   "jwks": {
+    "kids": []
+   },
+   "spec": "RFC 7517 5.1 (keys is REQUIRED)",
+   "expect": {
+    "ok": false
+   }
+  },
+  {
+   "id": "keys-not-array",
+   "op": "jwks_decode",
+   "jwks": {
+    "keys": {
+     "kty": "oct",
+     "kid": "018c0ae5-4d9b-471b-bfd6-eef314bc7037",
+     "use": "sig",
+     "alg": "HS256",
+     "k": "hJtXIZ2uSN5kbQfbtTNWbpdmhkV8FJG-Onbc6mxCcYg"
+    }
+   },
+   "spec": "RFC 7517 5.1 (an array of JWKs)",
+   "expect": {
+    "ok": false
+   }
+  },
+  {
+   "id": "dup-keys-member",
+   "op": "jwks_decode",
+   "jwks_json": "{\"keys\":[],\"keys\":[]}",
+   "spec": "RFC 8259 4 with RFC 7517 5 (this oracle rejects duplicate names)",
+   "expect": {
+    "ok": false,
+    "kind": "DuplicateMember"
+   }
+  },
+  {
+   "id": "find-by-kid",
+   "op": "jwks_find",
+   "jwks": {
+    "keys": [
+     {
+      "kty": "oct",
+      "kid": "018c0ae5-4d9b-471b-bfd6-eef314bc7037",
+      "use": "sig",
+      "alg": "HS256",
+      "k": "hJtXIZ2uSN5kbQfbtTNWbpdmhkV8FJG-Onbc6mxCcYg"
+     },
+     {
+      "kty": "RSA",
+      "kid": "bilbo.baggins@hobbiton.example",
+      "use": "sig",
+      "n": "n4EPtAOCc9AlkeQHPzHStgAbgs7bTZLwUBZdR8_KuKPEHLd4rHVTeT-O-XV2jRojdNhxJWTDvNd7nqQ0VEiZQHz_AJmSCpMaJMRBSFKrKb2wqVwGU_NsYOYL-QtiWN2lbzcEe6XC0dApr5ydQLrHqkHHig3RBordaZ6Aj-oBHqFEHYpPe7Tpe-OfVfHd1E6cS6M1FZcD1NNLYD5lFHpPI9bTwJlsde3uhGqC0ZCuEHg8lhzwOHrtIQbS0FVbb9k3-tVTU4fg_3L_vniUFAKwuCLqKnS2BYwdq_mzSnbLY7h_qixoR7jig3__kRhuaxwUkRz5iaiQkqgc5gHdrNP5zw",
+      "e": "AQAB"
+     }
+    ]
+   },
+   "kid": "018c0ae5-4d9b-471b-bfd6-eef314bc7037",
+   "spec": "RFC 7517 4.5",
+   "expect": {
+    "ok": true,
+    "kty": "oct"
+   }
+  },
+  {
+   "id": "find-absent-kid",
+   "op": "jwks_find",
+   "jwks": {
+    "keys": [
+     {
+      "kty": "oct",
+      "kid": "018c0ae5-4d9b-471b-bfd6-eef314bc7037",
+      "use": "sig",
+      "alg": "HS256",
+      "k": "hJtXIZ2uSN5kbQfbtTNWbpdmhkV8FJG-Onbc6mxCcYg"
+     },
+     {
+      "kty": "RSA",
+      "kid": "bilbo.baggins@hobbiton.example",
+      "use": "sig",
+      "n": "n4EPtAOCc9AlkeQHPzHStgAbgs7bTZLwUBZdR8_KuKPEHLd4rHVTeT-O-XV2jRojdNhxJWTDvNd7nqQ0VEiZQHz_AJmSCpMaJMRBSFKrKb2wqVwGU_NsYOYL-QtiWN2lbzcEe6XC0dApr5ydQLrHqkHHig3RBordaZ6Aj-oBHqFEHYpPe7Tpe-OfVfHd1E6cS6M1FZcD1NNLYD5lFHpPI9bTwJlsde3uhGqC0ZCuEHg8lhzwOHrtIQbS0FVbb9k3-tVTU4fg_3L_vniUFAKwuCLqKnS2BYwdq_mzSnbLY7h_qixoR7jig3__kRhuaxwUkRz5iaiQkqgc5gHdrNP5zw",
+      "e": "AQAB"
+     }
+    ]
+   },
+   "kid": "absent",
+   "spec": "RFC 7517 4.5",
+   "expect": {
+    "ok": false
+   }
+  },
+  {
+   "id": "find-duplicate-kid",
+   "op": "jwks_find",
+   "jwks": {
+    "keys": [
+     {
+      "kty": "oct",
+      "kid": "018c0ae5-4d9b-471b-bfd6-eef314bc7037",
+      "use": "sig",
+      "alg": "HS256",
+      "k": "hJtXIZ2uSN5kbQfbtTNWbpdmhkV8FJG-Onbc6mxCcYg"
+     },
+     {
+      "kty": "oct",
+      "kid": "018c0ae5-4d9b-471b-bfd6-eef314bc7037",
+      "use": "sig",
+      "alg": "HS256",
+      "k": "AAECAwQFBgcICQoLDA0ODxAREhMUFRYXGBkaGxwdHh8"
+     }
+    ]
+   },
+   "kid": "018c0ae5-4d9b-471b-bfd6-eef314bc7037",
+   "spec": "RFC 7517 4.5 (kids SHOULD be distinct; an ambiguous lookup is refused, never a pick)",
+   "expect": {
+    "ok": false
+   }
+  }
+ ]
+}
