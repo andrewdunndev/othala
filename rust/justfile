@@ -76,7 +76,8 @@ mutants crate="":
     while read -r c floor tests; do
         if [ -n "$tests" ]; then scope=(--test-package "$tests"); else scope=(--test-workspace=true); fi
         mkdir -p "{{target}}/mutants/$c"
-        cargo mutants --package "$c" "${scope[@]}" --no-shuffle --output "{{target}}/mutants/$c" < /dev/null
+        jobs=$(nproc); [ "$jobs" -le "${MUTANTS_JOBS:-4}" ] || jobs=${MUTANTS_JOBS:-4}
+        env -u CARGO_TARGET_DIR cargo mutants --package "$c" "${scope[@]}" --jobs "$jobs" --no-shuffle --output "{{target}}/mutants/$c" < /dev/null
         jq -e --argjson floor "$floor" '.caught >= $floor and .missed == 0 and .timeout == 0' \
             "{{target}}/mutants/$c/mutants.out/outcomes.json" > /dev/null || { echo "mutants $c: under the floor of $floor, or missed or timed out"; exit 1; }
     done <<< "$runs"
@@ -97,7 +98,7 @@ mutants-off floor="5":
     jq -e --argjson floor "{{floor}}" '.caught >= $floor and .missed == 0 and .timeout == 0' \
         "$out/mutants.out/outcomes.json" > /dev/null || { echo "mutants-off: under the floor of {{floor}}, or missed or timed out"; exit 1; }
 
-# MR gate: on each crate this branch changes since its merge base with origin/main, cargo mutants --in-diff with none missed or timed out and no floor (the floors are the scheduled run's); a change to a crate whose tests a mutants run uses runs that whole crate, and a change to Cargo.toml, Cargo.lock, rust-toolchain.toml, .cargo/ or vectors/ only prints that the floor runs are left to the scheduled job; a changed jose also runs mutants-off; no merge base is an error, not a skip
+# the pre-merge mutation gate: `just mutants <crate>` (the gates.json floor, whole crate) for each crate this branch changes since its merge base with origin/main; Cargo.toml, Cargo.lock, rust-toolchain.toml, .cargo/ or vectors/ changes run every floored crate, a change to a crate whose tests a mutants run uses runs that crate, a changed jose also runs mutants-off; no merge base is an error, not a skip
 mutants-changed base="origin/main":
     #!/usr/bin/env bash
     set -euo pipefail
@@ -106,31 +107,44 @@ mutants-changed base="origin/main":
     files=$(git diff --no-renames --name-only --relative "$mb" -- .)
     runs=$(./crates.sh | jq -r 'select(.mutants) | "\(.name) \(.mutants.tests // [] | join(","))"')
     touched() { grep -q "^$1/" <<< "$files"; }
-    glob=$(grep -E '^(Cargo\.toml|Cargo\.lock|rust-toolchain\.toml|\.cargo/|vectors/)' <<< "$files" | head -1 || true)
-    [ -z "$glob" ] || echo "global change ($glob): the whole-crate floor runs are left to check-rust-scheduled"
+    all=0
+    grep -qE '^(Cargo\.toml|Cargo\.lock|rust-toolchain\.toml|\.cargo/|vectors/)' <<< "$files" && all=1
     plan=""
     while read -r c tests; do
-        mode=""
-        touched "$c" && mode=diff
-        for t in ${tests//,/ }; do [ "$t" != "$c" ] && touched "$t" && mode=whole; done
-        [ -n "$mode" ] && plan="$plan$c $mode"$'\n'
+        hit=$all
+        touched "$c" && hit=1
+        for t in ${tests//,/ }; do [ "$t" != "$c" ] && touched "$t" && hit=1; done
+        [ "$hit" = 1 ] && plan="$plan$c"$'\n'
     done <<< "$runs"
     [ -n "$plan" ] || { echo "mutants-changed: no crate with a mutants floor changed since $mb"; exit 0; }
-    while read -r c mode; do
+    while read -r c; do
         [ -n "$c" ] || continue
-        tests=$(grep "^$c " <<< "$runs" | cut -d' ' -f2)
+        just mutants "$c"
+    done <<< "$plan"
+    if grep -qx jose <<< "$plan"; then just mutants-off; fi
+
+# a quick pre-check, not the gate: cargo mutants --in-diff on each crate this branch changes, none missed or timed out
+mutants-diff base="origin/main":
+    #!/usr/bin/env bash
+    set -euo pipefail
+    mb=$(git merge-base "{{base}}" HEAD) || { echo "mutants-diff: no merge base with {{base}}"; exit 1; }
+    [ -n "$mb" ] || { echo "mutants-diff: no merge base with {{base}}"; exit 1; }
+    files=$(git diff --no-renames --name-only --relative "$mb" -- .)
+    runs=$(./crates.sh | jq -r 'select(.mutants) | "\(.name) \(.mutants.tests // [] | join(","))"')
+    n=0
+    while read -r c tests; do
+        grep -q "^$c/" <<< "$files" || continue
+        n=1
         if [ -n "$tests" ]; then scope=(--test-package "$tests"); else scope=(--test-workspace=true); fi
         rm -rf "{{target}}/mutants/$c"; mkdir -p "{{target}}/mutants/$c"
-        if [ "$mode" = diff ]; then
-            git diff --no-renames --relative "$mb" -- "$c/" > "{{target}}/mutants/$c.diff"
-            sel=(--in-diff "{{target}}/mutants/$c.diff")
-        else sel=(); fi
-        cargo mutants --package "$c" "${scope[@]}" --no-shuffle "${sel[@]}" --output "{{target}}/mutants/$c" < /dev/null
+        git diff --no-renames --relative "$mb" -- "$c/" > "{{target}}/mutants/$c.diff"
+        jobs=$(nproc); [ "$jobs" -le "${MUTANTS_JOBS:-4}" ] || jobs=${MUTANTS_JOBS:-4}
+        env -u CARGO_TARGET_DIR cargo mutants --package "$c" "${scope[@]}" --jobs "$jobs" --no-shuffle --in-diff "{{target}}/mutants/$c.diff" --output "{{target}}/mutants/$c" < /dev/null
         out="{{target}}/mutants/$c/mutants.out/outcomes.json"
-        if [ "$mode" = diff ] && [ ! -f "$out" ]; then echo "mutants-changed $c: the diff holds no mutant"; continue; fi
-        jq -e '.missed == 0 and .timeout == 0' "$out" > /dev/null || { echo "mutants-changed $c: a mutant was missed or timed out"; exit 1; }
-    done <<< "$plan"
-    if grep -q '^jose ' <<< "$plan"; then just mutants-off; fi
+        if [ ! -f "$out" ]; then echo "mutants-diff $c: the diff holds no mutant"; continue; fi
+        jq -e '.missed == 0 and .timeout == 0' "$out" > /dev/null || { echo "mutants-diff $c: a mutant was missed or timed out"; exit 1; }
+    done <<< "$runs"
+    [ "$n" = 1 ] || echo "mutants-diff: no crate with a mutants floor changed since $mb"
 
 wasm: (build "wasm32-unknown-unknown")
 
