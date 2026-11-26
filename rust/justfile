@@ -92,27 +92,45 @@ mutants-off floor="5":
         [ -f "$f" ] || { echo "mutants-off: $f is missing"; exit 1; }
     done
     out="{{target}}/mutants/jose-off"
+    jobs=$(nproc); [ "$jobs" -le "${MUTANTS_JOBS:-4}" ] || jobs=${MUTANTS_JOBS:-4}
     mkdir -p "$out"
-    env -u CARGO_TARGET_DIR cargo mutants -p jose --no-config --no-default-features --jobs 2 --no-shuffle --output "$out" \
+    env -u CARGO_TARGET_DIR cargo mutants -p jose --no-config --no-default-features --jobs "$jobs" --no-shuffle --output "$out" \
         "${files[@]/#/--file=}" --re "supported|replace == with != in Jw[se]<'a>::parse_json" -- -- --skip ledger < /dev/null
     jq -e --argjson floor "{{floor}}" '.caught >= $floor and .missed == 0 and .timeout == 0' \
         "$out/mutants.out/outcomes.json" > /dev/null || { echo "mutants-off: under the floor of {{floor}}, or missed or timed out"; exit 1; }
 
-# the pre-merge mutation gate: `just mutants <crate>` (the gates.json floor, whole crate) for each crate this branch changes since its merge base with origin/main; Cargo.toml, Cargo.lock, rust-toolchain.toml, .cargo/ or vectors/ changes run every floored crate, a change to a crate whose tests a mutants run uses runs that crate, a changed jose also runs mutants-off; no merge base is an error, not a skip
+# the pre-merge mutation gate: `just mutants <crate>` (the gates.json floor, whole crate) for each crate the commits since the merge base with origin/main change; a change to justfile, crates.sh, ../mise.toml, .cargo/ or any gates.json, to Cargo.toml, Cargo.lock, rust-toolchain.toml or vectors/ runs every floored crate; a change under a crate named in a run's `tests` (or, with no `tests` key, under any crate's tests/) runs that crate; a changed jose also runs mutants-off; a floor that dropped or vanished since the merge base fails unless a commit says `floor-lowered: <crate> <reason>`; no merge base is an error, not a skip
 mutants-changed base="origin/main":
     #!/usr/bin/env bash
     set -euo pipefail
     mb=$(git merge-base "{{base}}" HEAD) || { echo "mutants-changed: no merge base with {{base}}"; exit 1; }
     [ -n "$mb" ] || { echo "mutants-changed: no merge base with {{base}}"; exit 1; }
-    files=$(git diff --no-renames --name-only --relative "$mb" -- .)
+    [ -z "$(git status --porcelain -- .)" ] || echo "mutants-changed: warning: uncommitted changes are not judged, only commits since ${mb:0:8}" >&2
+    files=$(git diff --no-renames --name-only --relative "$mb" HEAD -- .)
+    top=$(git diff --no-renames --name-only "$mb" HEAD)
+    msgs=$(git log --format=%B "$mb..HEAD")
+    # a floor is held against the merge base's, so a branch cannot lower its own
+    while read -r c; do
+        [ -n "$c" ] || continue
+        old=$(git show "$mb:./$c/gates.json" | jq -r '.mutants.floor // empty')
+        [ -n "$old" ] || continue
+        new=$(git show "HEAD:./$c/gates.json" 2> /dev/null | jq -r '.mutants.floor // empty' || true)
+        if [ -z "$new" ] || [ "$new" -lt "$old" ]; then
+            grep -qE "^floor-lowered: $c .+" <<< "$msgs" || { echo "mutants-changed: $c's floor went from $old to ${new:-nothing}; a commit must say 'floor-lowered: $c <reason>'"; exit 1; }
+        fi
+    done < <(git ls-tree --name-only "$mb" -- . | tr -d / | while read -r d; do git cat-file -e "$mb:./$d/gates.json" 2> /dev/null && echo "$d"; done)
     runs=$(./crates.sh | jq -r 'select(.mutants) | "\(.name) \(.mutants.tests // [] | join(","))"')
     touched() { grep -q "^$1/" <<< "$files"; }
     all=0
-    grep -qE '^(Cargo\.toml|Cargo\.lock|rust-toolchain\.toml|\.cargo/|vectors/)' <<< "$files" && all=1
+    grep -qE '^(justfile|crates\.sh|Cargo\.toml|Cargo\.lock|rust-toolchain\.toml|\.cargo/|vectors/|[^/]+/gates\.json$)' <<< "$files" && all=1
+    grep -qx 'mise\.toml' <<< "$top" && all=1
+    anytests=0
+    grep -qE '^[^/]+/tests/' <<< "$files" && anytests=1
     plan=""
     while read -r c tests; do
         hit=$all
         touched "$c" && hit=1
+        [ -z "$tests" ] && [ "$anytests" = 1 ] && hit=1
         for t in ${tests//,/ }; do [ "$t" != "$c" ] && touched "$t" && hit=1; done
         [ "$hit" = 1 ] && plan="$plan$c"$'\n'
     done <<< "$runs"
