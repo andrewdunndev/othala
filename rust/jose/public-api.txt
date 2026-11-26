@@ -31,6 +31,7 @@ field Typ::Explicit::0: &'static str
 impl Alg for EdDsa
 impl Alg for Es256
 impl Alg for Es384
+impl Alg for Es512
 impl Alg for Hs256
 impl Alg for Hs384
 impl Alg for Hs512
@@ -276,6 +277,7 @@ impl Hash for SigningAlg
 impl LocalAlg for EdDsa
 impl LocalAlg for Es256
 impl LocalAlg for Es384
+impl LocalAlg for Es512
 impl LocalAlg for Hs256
 impl LocalAlg for Hs384
 impl LocalAlg for Hs512
@@ -339,6 +341,7 @@ impl PartialOrd for SigningAlg
 impl PublicAlg for EdDsa
 impl PublicAlg for Es256
 impl PublicAlg for Es384
+impl PublicAlg for Es512
 impl PublicAlg for Ps256
 impl PublicAlg for Ps384
 impl PublicAlg for Ps512
@@ -351,6 +354,7 @@ impl Serialize for Kid
 impl SignAlg for EdDsa
 impl SignAlg for Es256
 impl SignAlg for Es384
+impl SignAlg for Es512
 impl SignAlg for Hs256
 impl SignAlg for Hs384
 impl SignAlg for Hs512

@@ -116,6 +116,8 @@ impl<'a> Jws<'a> {
             SigningAlg::Ps512 => under!(Ps512),
             SigningAlg::Es256 => under!(Es256),
             SigningAlg::Es384 => under!(Es384),
+            #[cfg(feature = "es512")]
+            SigningAlg::Es512 => under!(crate::Es512),
             SigningAlg::EdDsa => under!(EdDsa),
             _ => Err(ErrorKind::UnsupportedAlg.into()),
         }

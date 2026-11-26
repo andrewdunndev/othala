@@ -134,6 +134,7 @@ fn public_keys() -> BTreeMap<String, String> {
         if [
             "es256-p256",
             "es256-p384-key",
+            "es256-p521-key",
             "rs256-2048",
             "eddsa-ed25519",
         ]
@@ -154,7 +155,11 @@ fn public_keys() -> BTreeMap<String, String> {
 #[test]
 fn jwk_round_trip() -> Result<(), TestError<Draw>> {
     let keys: Vec<String> = public_keys().into_values().collect();
-    assert_eq!(keys.len(), 4);
+    assert_eq!(keys.len(), 5);
+    let keys: Vec<String> = keys
+        .into_iter()
+        .filter(|k| cfg!(feature = "es512") || !k.contains("P-521"))
+        .collect();
     let algs = [
         "ES256", "ES384", "RS256", "PS512", "EdDSA", "A128KW", "ECDH-ES", "A256GCM",
     ];
@@ -290,6 +295,8 @@ fn any_key_verifies_under_its_own_algorithm_only() {
         ("rs256-2048", SigningAlg::Ps384),
         ("rs256-2048", SigningAlg::Ps512),
     ];
+    #[cfg(feature = "es512")]
+    let pairs = [pairs.as_slice(), &[("es256-p521-key", SigningAlg::Es512)]].concat();
     for (id, alg) in pairs {
         let jwk = keys
             .get(id)

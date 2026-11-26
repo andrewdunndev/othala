@@ -25,6 +25,8 @@ pub(crate) fn verify(alg: &str, jwk: &str, jws: &str) -> Result<(), Error> {
         "PS384" => go::<Ps384>(public.and_then(|k| k.verify_key()), jws),
         "PS512" => go::<Ps512>(public.and_then(|k| k.verify_key()), jws),
         "ES256" => go::<Es256>(public.and_then(|k| k.verify_key()), jws),
+        #[cfg(feature = "es512")]
+        "ES512" => go::<jose::Es512>(public.and_then(|k| k.verify_key()), jws),
         "ES384" => go::<Es384>(public.and_then(|k| k.verify_key()), jws),
         "EdDSA" => go::<EdDsa>(public.and_then(|k| k.verify_key()), jws),
         _ => go::<Hs256>(Err(jose::ErrorKind::UnsupportedAlg.into()), jws),
