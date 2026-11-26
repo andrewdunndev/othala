@@ -1,0 +1,249 @@
+attr Closed non_exhaustive
+attr Digits non_exhaustive
+attr ErrorKind non_exhaustive
+attr Key non_exhaustive
+attr Minimum non_exhaustive
+attr OtpAlg non_exhaustive
+attr Record non_exhaustive
+attr Rehash non_exhaustive
+attr Rejected non_exhaustive
+attr Skew non_exhaustive
+enum Closed
+enum Digits
+enum ErrorKind
+enum Key
+enum Minimum
+enum OtpAlg
+enum Record
+enum Rehash
+enum Rejected
+enum Skew
+field Closed::Wait::0: base::UnixTime
+field Key::Recovery::0: base::Digest
+field Record::Attempts::0: crate::Attempts
+field Record::Recovery::0: crate::RecoveryHash
+field Record::TotpStep::0: crate::TotpStep
+field Rehash::Needed::0: Phc
+impl Clone for Attempts
+impl Clone for Backoff
+impl Clone for Cap
+impl Clone for Closed
+impl Clone for Cost
+impl Clone for Digits
+impl Clone for Error
+impl Clone for ErrorKind
+impl Clone for FreeAttempts
+impl Clone for Key
+impl Clone for Lanes
+impl Clone for Memory
+impl Clone for Minimum
+impl Clone for OtpAlg
+impl Clone for Passes
+impl Clone for Period
+impl Clone for Phc
+impl Clone for Record
+impl Clone for RecoveryCount
+impl Clone for RecoveryHash
+impl Clone for Rehash
+impl Clone for Rejected
+impl Clone for Skew
+impl Clone for Throttle
+impl Clone for TotpStep
+impl Clone for Wait
+impl Copy for Attempts
+impl Copy for Backoff
+impl Copy for Cap
+impl Copy for Closed
+impl Copy for Cost
+impl Copy for Digits
+impl Copy for Error
+impl Copy for ErrorKind
+impl Copy for FreeAttempts
+impl Copy for Key
+impl Copy for Lanes
+impl Copy for Memory
+impl Copy for Minimum
+impl Copy for OtpAlg
+impl Copy for Passes
+impl Copy for Period
+impl Copy for RecoveryCount
+impl Copy for RecoveryHash
+impl Copy for Rejected
+impl Copy for Skew
+impl Copy for Throttle
+impl Copy for TotpStep
+impl Copy for Wait
+impl Debug for Attempts
+impl Debug for Backoff
+impl Debug for Cap
+impl Debug for Closed
+impl Debug for Cost
+impl Debug for Digits
+impl Debug for Error
+impl Debug for ErrorKind
+impl Debug for FreeAttempts
+impl Debug for Key
+impl Debug for Lanes
+impl Debug for Memory
+impl Debug for Minimum
+impl Debug for OtpAlg
+impl Debug for OtpMatch
+impl Debug for Passes
+impl Debug for Period
+impl Debug for Permit
+impl Debug for Record
+impl Debug for RecoveryCount
+impl Debug for RecoveryHash
+impl Debug for RecoveryMatch
+impl Debug for Rejected
+impl Debug for Skew
+impl Debug for Throttle
+impl Debug for TotpStep
+impl Debug for Wait
+impl Display for Error
+impl Eq for Attempts
+impl Eq for Backoff
+impl Eq for Cap
+impl Eq for Closed
+impl Eq for Cost
+impl Eq for Digits
+impl Eq for Error
+impl Eq for ErrorKind
+impl Eq for FreeAttempts
+impl Eq for Key
+impl Eq for Lanes
+impl Eq for Memory
+impl Eq for Minimum
+impl Eq for OtpAlg
+impl Eq for Passes
+impl Eq for Period
+impl Eq for Record
+impl Eq for RecoveryCount
+impl Eq for RecoveryHash
+impl Eq for Rejected
+impl Eq for Skew
+impl Eq for Throttle
+impl Eq for TotpStep
+impl Eq for Wait
+impl Error for Error
+impl Hash for Closed
+impl Hash for Cost
+impl Hash for Digits
+impl Hash for ErrorKind
+impl Hash for Key
+impl Hash for Lanes
+impl Hash for Memory
+impl Hash for Minimum
+impl Hash for OtpAlg
+impl Hash for Passes
+impl Hash for Rejected
+impl Hash for Skew
+impl Ord for Key
+impl PartialEq for Attempts
+impl PartialEq for Backoff
+impl PartialEq for Cap
+impl PartialEq for Closed
+impl PartialEq for Cost
+impl PartialEq for Digits
+impl PartialEq for Error
+impl PartialEq for ErrorKind
+impl PartialEq for FreeAttempts
+impl PartialEq for Key
+impl PartialEq for Lanes
+impl PartialEq for Memory
+impl PartialEq for Minimum
+impl PartialEq for OtpAlg
+impl PartialEq for Passes
+impl PartialEq for Period
+impl PartialEq for Record
+impl PartialEq for RecoveryCount
+impl PartialEq for RecoveryHash
+impl PartialEq for Rejected
+impl PartialEq for Skew
+impl PartialEq for Throttle
+impl PartialEq for TotpStep
+impl PartialEq for Wait
+impl PartialOrd for Key
+impl StoreKey for Key
+impl StructuralPartialEq for Attempts
+impl StructuralPartialEq for Backoff
+impl StructuralPartialEq for Cap
+impl StructuralPartialEq for Closed
+impl StructuralPartialEq for Cost
+impl StructuralPartialEq for Digits
+impl StructuralPartialEq for Error
+impl StructuralPartialEq for ErrorKind
+impl StructuralPartialEq for FreeAttempts
+impl StructuralPartialEq for Key
+impl StructuralPartialEq for Lanes
+impl StructuralPartialEq for Memory
+impl StructuralPartialEq for Minimum
+impl StructuralPartialEq for OtpAlg
+impl StructuralPartialEq for Passes
+impl StructuralPartialEq for Period
+impl StructuralPartialEq for Record
+impl StructuralPartialEq for RecoveryCount
+impl StructuralPartialEq for RecoveryHash
+impl StructuralPartialEq for Rejected
+impl StructuralPartialEq for Skew
+impl StructuralPartialEq for Throttle
+impl StructuralPartialEq for TotpStep
+impl StructuralPartialEq for Wait
+method Error::kind const fn(self: &Self) -> ErrorKind
+struct Attempts
+struct Backoff
+struct Cap
+struct Cost
+struct Error
+struct FreeAttempts
+struct Lanes
+struct Memory
+struct NewPassword
+struct OtpCode
+struct OtpKey
+struct OtpMatch
+struct Passes
+struct Password
+struct PasswordMatch
+struct Period
+struct Permit
+struct Phc
+struct RecoveryCode
+struct RecoveryCount
+struct RecoveryHash
+struct RecoveryMatch
+struct Throttle
+struct Totp
+struct TotpStep
+struct Wait
+type_alias Effect
+type_alias Pending
+variant Closed::Wait
+variant Digits::Eight
+variant Digits::Six
+variant ErrorKind::Internal
+variant ErrorKind::Malformed
+variant ErrorKind::OutOfMemory
+variant ErrorKind::OutOfRange
+variant ErrorKind::PasswordLength
+variant ErrorKind::TooLarge
+variant ErrorKind::Unsupported
+variant ErrorKind::WeakCost
+variant ErrorKind::WeakKey
+variant Key::Attempts
+variant Key::Recovery
+variant Key::TotpStep
+variant Minimum::MultiFactor
+variant Minimum::SingleFactor
+variant OtpAlg::Sha1
+variant OtpAlg::Sha256
+variant OtpAlg::Sha512
+variant Record::Attempts
+variant Record::Recovery
+variant Record::TotpStep
+variant Rehash::Current
+variant Rehash::Needed
+variant Rejected::Replayed
+variant Rejected::Wrong
+variant Skew::Exact
+variant Skew::One

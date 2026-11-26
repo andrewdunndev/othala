@@ -1,0 +1,12 @@
+error[E0423]: cannot initialize a tuple struct which contains private fields
+ --> tests/ui/fail/totp_step_forge.rs:5:13
+  |
+5 |     let _ = TotpStep(u64::MAX);
+  |             ^^^^^^^^
+  |
+  = note: a struct named `TotpStep` exists in another namespace
+note: constructor is not visible here due to private fields
+ --> src/otp.rs
+  |
+  | pub struct TotpStep(u64);
+  |                     ^^^ private field

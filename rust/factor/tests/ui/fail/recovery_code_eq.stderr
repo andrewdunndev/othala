@@ -1,0 +1,12 @@
+error[E0277]: can't compare `RecoveryCode` with `RecoveryCode`
+ --> tests/ui/fail/recovery_code_eq.rs:6:13
+  |
+6 |     needs::<T>();
+  |             ^ no implementation for `RecoveryCode == RecoveryCode`
+  |
+  = help: the trait `PartialEq` is not implemented for `RecoveryCode`
+note: required by a bound in `needs`
+ --> tests/ui/fail/recovery_code_eq.rs:4:13
+  |
+4 | fn needs<C: PartialEq>() {}
+  |             ^^^^^^^^^ required by this bound in `needs`
