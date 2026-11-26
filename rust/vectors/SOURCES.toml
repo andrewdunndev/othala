@@ -324,6 +324,19 @@ files = [
   { path = "jose-derived/thumbprint.json", sha256 = "6e0127398009b39c2a124711a5eadbdd189e8c0e7e49aa3934fe82945f6b6209", cases = 7 },
 ]
 
+[source."factor-derived"]
+url = "https://www.rfc-editor.org/rfc/rfc6238.txt"
+revision = "RFC 6238 4.2, 5.2 and appendix B; RFC 4226 5.3, 7.2, 7.4, appendices D and E.4; seeds from sources rfc4226 and rfc6238"
+retrieved = "2026-11-26"
+licence = "MIT OR Apache-2.0 (our own derived data; seeds from the RFCs, IETF Trust)"
+feeds = ["factor"]
+notes = "Derived by tools/derive_factor.py (deterministic) from the specs only (ruling R-b); it first recomputes every upstream RFC 4226 and RFC 6238 value. totp.json: skew none and one, two-step misses, replay of the same, an older and a future-stored step (Replayed, the contract's RFC 6238 5.2 MUST), step boundaries, 6-digit zero padding and malformed codes; op totp with the field names of rfc6238/totp.json, plus `step` on success. hotp.json: look-ahead edges, a used counter, and E.4 two-value resynchronization (ops hotp_verify, hotp_resync). Supersedes the derived- cases inside rfc6238/totp.json for new rows."
+cases = 33
+files = [
+  { path = "factor-derived/hotp.json", sha256 = "9f6680dcb2e52157d909c1ca700f94fa7589bd33275bbde53866e7f0acd24ff2", cases = 10 },
+  { path = "factor-derived/totp.json", sha256 = "719cc30fc1ccec9c7241c54e4fffde9ece9a54a26d22554a05582f4637f4ae89", cases = 23 },
+]
+
 # Real-authenticator corpus. Seeded from the survey failure list (survey-webauthn.md section 4 item 3).
 # Nothing below is committed yet except android-key-attestation above. Candidate sources are named by
 # repository and stated licence only; no candidate has been read or copied.
