@@ -7,7 +7,7 @@ use hmac::{Hmac, KeyInit, Mac};
 use sha1::Sha1;
 use sha2::{Sha256, Sha512};
 use subtle::ConstantTimeEq;
-use zeroize::Zeroizing;
+use zeroize::{Zeroize, Zeroizing};
 
 use crate::{Effect, Error, ErrorKind, Key, Pending, Permit, Record, Rejected};
 
@@ -72,7 +72,10 @@ impl OtpKey {
 fn mac<M: Mac + KeyInit>(key: &[u8], counter: u64) -> Option<Zeroizing<Vec<u8>>> {
     let mut mac = <M as KeyInit>::new_from_slice(key).ok()?;
     mac.update(&counter.to_be_bytes());
-    Some(Zeroizing::new(mac.finalize().into_bytes().to_vec()))
+    let mut out = mac.finalize().into_bytes();
+    let tag = Zeroizing::new(out.to_vec());
+    out.as_mut_slice().zeroize();
+    Some(tag)
 }
 
 /// RFC 4226 5.3: HMAC of the counter, dynamic truncation, modulo `10^digits`.

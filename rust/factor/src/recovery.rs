@@ -84,6 +84,9 @@ impl RecoveryCode {
         for b in text.bytes().filter(|b| !matches!(b, b'-' | b' ')) {
             let v = value(b).ok_or(err(ErrorKind::Malformed))?;
             symbols += 1;
+            if symbols > SYMBOLS {
+                return Err(err(ErrorKind::Malformed));
+            }
             (acc, bits) = ((acc << 5) + v, bits + 5);
             if bits >= 8 {
                 bits -= 8;

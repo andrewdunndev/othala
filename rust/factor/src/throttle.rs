@@ -58,7 +58,11 @@ pub enum Closed {
 pub struct Permit {
     seen: Option<(Version, Attempts)>,
     at: UnixTime,
+    fault: bool,
 }
+
+// a stamp this far ahead is a fault, not skew: smaller skews stay fail-closed so two skewed nodes cannot trade permits
+const FAULT_FLOOR: u64 = 86_400;
 
 const fn within<T: Copy>(ok: bool, value: T) -> Result<T, Error> {
     if ok {
@@ -98,14 +102,14 @@ impl Backoff {
     }
 
     fn faulted(self, last: UnixTime, now: UnixTime) -> bool {
-        last > now.saturating_add(self.cap.0)
+        last > now.saturating_add(self.cap.0.max(FAULT_FLOOR))
     }
 
     fn until(self, seen: Attempts, now: UnixTime) -> Option<UnixTime> {
         let doublings = seen.count.checked_sub(self.free.0)?;
         let wait = 2u64.saturating_pow(doublings).saturating_mul(self.first.0);
         let due = seen.last.saturating_add(wait.min(self.cap.0));
-        // a `last` more than one cap ahead is a clock fault, released here and restamped by the next count
+        // a `last` more than the fault threshold ahead is a clock fault, released here and restamped by the next count
         (!self.faulted(seen.last, now)).then_some(due)
     }
 }
@@ -134,11 +138,19 @@ impl Throttle {
             Some(until) if now < until => Err(Closed::Wait(until)),
             _ => {
                 let faulted = |p: Backoff, a: &Attempts| p.faulted(a.last, now);
+                let mut fault = false;
                 let seen = seen.map(|(v, a)| match self.policy {
-                    Some(p) if faulted(p, &a) => (v, Attempts { last: now, ..a }),
+                    Some(p) if faulted(p, &a) => {
+                        fault = true;
+                        (v, Attempts { last: now, ..a })
+                    }
                     _ => (v, a),
                 });
-                Ok(Permit { seen, at: now })
+                Ok(Permit {
+                    seen,
+                    at: now,
+                    fault,
+                })
             }
         }
     }
@@ -150,6 +162,11 @@ impl Throttle {
 }
 
 impl Permit {
+    /// True when the stored stamp was ahead of the clock by more than a day and was released and restamped; hosts alert on it.
+    pub const fn clock_fault(&self) -> bool {
+        self.fault
+    }
+
     pub(crate) const fn time(&self) -> UnixTime {
         self.at
     }
@@ -276,6 +293,56 @@ mod tests {
             last: LAST,
         });
         assert!(matches!(effect, Some(Ok(ef)) if ef.puts().all(|(_, rec, _)| *rec == put)));
+        Ok(())
+    }
+
+    #[test]
+    fn a_fault_is_flagged_and_a_clean_permit_is_not() -> Result<(), Error> {
+        let t = throttle()?;
+        let ahead = row(9, UnixTime::new(LAST.secs() + 100 * 365 * 86_400));
+        let behind = row(0, LAST);
+        assert!(
+            t.check(Some(seen(&ahead)), LAST)
+                .is_ok_and(|p| p.clock_fault())
+        );
+        assert!(
+            t.check(Some(seen(&behind)), LAST)
+                .is_ok_and(|p| !p.clock_fault())
+        );
+        assert!(t.check(None, LAST).is_ok_and(|p| !p.clock_fault()));
+        // a day and a second ahead is a fault; exactly a day ahead is not
+        let edge = |d: u64| row(9, UnixTime::new(LAST.secs() + d));
+        let day = edge(86_400);
+        assert!(t.check(Some(seen(&day)), LAST).is_err());
+        let over = edge(86_401);
+        assert!(
+            t.check(Some(seen(&over)), LAST)
+                .is_ok_and(|p| p.clock_fault())
+        );
+        Ok(())
+    }
+
+    // two nodes whose clocks differ by more than the cap, less than the fault threshold, trading attempts one second apart
+    #[test]
+    fn skewed_nodes_cannot_trade_permits() -> Result<(), Error> {
+        let (mut store, mut e) = (Mem::new(), seeded(8));
+        let t = throttle()?;
+        let skew = 12 * 3_600;
+        let mut permits = 0;
+        for i in 0..200u64 {
+            let now = UnixTime::new(1_000_000 + i + if i % 2 == 0 { skew } else { 0 });
+            let read = load(&mut store);
+            let Ok(permit) = t.check(read.as_ref().map(seen), now) else {
+                continue;
+            };
+            assert!(!permit.clock_fault());
+            permits += 1;
+            let Ok(effect) = permit.count(&mut e).build() else {
+                continue;
+            };
+            assert!(matches!(store.apply(&effect, LAST), Ok(Ok(_))));
+        }
+        assert!(permits <= 4, "{permits} permits");
         Ok(())
     }
 

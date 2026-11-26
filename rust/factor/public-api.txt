@@ -217,6 +217,7 @@ method Passes::new const fn(passes: u32) -> Self
 method Password::presented fn(text: &str) -> Result<Self, Error>
 method PasswordMatch::rehash const fn(self: &Self) -> &Rehash
 method Period::new const fn(secs: u32) -> Result<Self, Error>
+method Permit::clock_fault const fn(self: &Self) -> bool
 method Phc::as_str fn(self: &Self) -> &str
 method Phc::parse fn(text: &str) -> Result<Self, Error>
 method Record::decode fn(bytes: &[u8]) -> Result<Self, Error>

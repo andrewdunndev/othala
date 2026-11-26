@@ -54,12 +54,15 @@ fn a_row_from_a_fast_clock_is_released() -> Result<(), Box<dyn std::error::Error
             .err()
             .unwrap_or(Closed::Wait(UnixTime::new(0))))
     };
-    // a `last` 100 years ahead is released at once; one cap ahead is a lagging clock and waits one cap
+    // a `last` 100 years ahead is released at once; anything up to a day ahead is skew and waits
     assert_eq!(
         at(now + 100 * 365 * 86_400)?,
         Closed::Wait(UnixTime::new(0))
     );
     assert_eq!(at(now + 3_600)?, Closed::Wait(UnixTime::new(now + 7_200)));
-    assert_eq!(at(now + 3_601)?, Closed::Wait(UnixTime::new(0)));
+    assert_eq!(at(now + 3_601)?, Closed::Wait(UnixTime::new(now + 7_201)));
+    let day = now + 86_400;
+    assert_eq!(at(day)?, Closed::Wait(UnixTime::new(day + 3_600)));
+    assert_eq!(at(day + 1)?, Closed::Wait(UnixTime::new(0)));
     Ok(())
 }

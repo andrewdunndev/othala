@@ -367,6 +367,10 @@ fn rehash_only_when_below_the_cost_given() -> Result<(), Boxed> {
             Some("$argon2id$v=19$m=65536,t=2,p=1$"),
         ),
         (
+            foreign("pw-for-rehash", (12_288, 3, 1), &salt16, 32)?,
+            Some("$argon2id$v=19$m=19456,t=3,p=1$"),
+        ),
+        (
             foreign("pw-for-rehash", (19_456, 1, 4), &salt16, 32)?,
             Some("$argon2id$v=19$m=19456,t=2,p=4$"),
         ),
