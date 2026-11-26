@@ -240,11 +240,28 @@ check-rust:
     - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
       changes:
         - rust/**/*
+        - primitives/**/*
         - .gitlab-ci.yml
     - if: '$CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH'
     - if: '$CI_PIPELINE_SOURCE =~ /^(web|api)$/'
   script:
-    - just lock fmt lint canary twins test doc wasm thumb msrv deny deps api
+    - just lock queue fmt lint canary twins test doc wasm thumb msrv deny deps api
+
+# check-ownership: a branch item/<id> changes only the paths its primitives/queue.json item owns, and no oracle path.
+check-ownership:
+  extends: .rust
+  variables:
+    GIT_DEPTH: "0"
+  cache: []
+  rules:
+    - if: '$CI_MERGE_REQUEST_SOURCE_BRANCH_NAME =~ /^item\//'
+    - if: '$CI_COMMIT_BRANCH =~ /^item\//'
+  before_script:
+    - git config --global --add safe.directory "$CI_PROJECT_DIR"
+    - git fetch origin +refs/heads/main:refs/remotes/origin/main
+  script:
+    - branch=${CI_MERGE_REQUEST_SOURCE_BRANCH_NAME:-$CI_COMMIT_BRANCH}
+    - primitives/own.sh "${branch#item/}"
 
 check-rust-scheduled:
   extends: .rust

@@ -6,11 +6,19 @@ target := env("CARGO_TARGET_DIR", "target")
 default:
     @just --list
 
-all: lock fmt lint canary twins test doc wasm thumb msrv deny deps api mutants rows
+all: lock queue fmt lint canary twins test doc wasm thumb msrv deny deps api mutants rows
 
 # a manifest change without its lock change fails here, before anything builds
 lock:
     cargo metadata --locked --format-version 1 > /dev/null
+
+# queue.json and rows.json are well formed and agree
+queue:
+    ../primitives/check.sh
+
+# fail when this branch touches a path outside the item's globs, or any oracle path
+own item:
+    ../primitives/own.sh {{item}}
 
 # one line per oracle row, then per-milestone totals
 score:
