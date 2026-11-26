@@ -1261,6 +1261,61 @@ mod tests {
         Ok(())
     }
 
+    fn assert_tags<T: super::Tag + Copy + PartialEq + core::fmt::Debug>(table: &[T]) {
+        for (i, v) in table.iter().enumerate() {
+            assert_eq!(usize::from(v.tag()), i, "{v:?}");
+            assert_eq!(super::In(&[v.tag()]).pick(table), Ok(*v), "{v:?}");
+        }
+    }
+
+    #[test]
+    fn every_table_entry_encodes_as_its_index_and_decodes_back() {
+        use super::{
+            ALGORITHMS, ATTACHMENTS, CONVEYANCES, FORMATS, HINTS, KINDS, LARGE_BLOBS, MEDIATIONS,
+            REQUIREMENTS, RESIDENT_KEYS, TRANSPORTS, TRUSTS, VERIFICATIONS,
+        };
+        assert_tags(REQUIREMENTS);
+        assert_tags(RESIDENT_KEYS);
+        assert_tags(ATTACHMENTS);
+        assert_tags(CONVEYANCES);
+        assert_tags(HINTS);
+        assert_tags(MEDIATIONS);
+        assert_tags(TRANSPORTS);
+        assert_tags(ALGORITHMS);
+        assert_tags(FORMATS);
+        assert_tags(KINDS);
+        assert_tags(TRUSTS);
+        assert_tags(LARGE_BLOBS);
+        assert_tags(VERIFICATIONS);
+    }
+
+    #[test]
+    fn the_widest_credential_row_fits_the_record_bound() -> Result<(), Error> {
+        let credential = Credential {
+            id: CredentialId::from_bytes(&[7; MAX_CREDENTIAL_ID])?,
+            public_key: CoseKey::Rs256 {
+                n: vec![1; crate::MAX_RSA_BITS / 8],
+                e: vec![1; crate::MAX_RSA_BITS / 8],
+            },
+            sign_count: u32::MAX,
+            uv_initialized: UserVerification::Verified,
+            transports: super::TRANSPORTS.to_vec(),
+            backup: Backup::MultiDevice(BackupState::BackedUp),
+            user: UserHandle::from_stored(&[3; crate::MAX_USER_HANDLE])?,
+            aaguid: Aaguid::from_bytes([1; 16]),
+            attestation: Attestation {
+                format: Format::Packed,
+                kind: AttestationType::Basic,
+                trust: Trust::Anchored,
+                chain: vec![digest(2); crate::MAX_X5C],
+                anchor: Some(digest(3)),
+            },
+        };
+        let row = Record::Credential(credential).encode()?;
+        assert!(row.len() <= MAX_RECORD, "{}", row.len());
+        Ok(())
+    }
+
     mod identity {
         use alloc::boxed::Box;
         use alloc::vec::Vec;
@@ -1269,7 +1324,8 @@ mod tests {
         use proptest::test_runner::{RngSeed, TestError, TestRunner};
 
         use super::super::{
-            ALGORITHMS, AuthenticationCeremony, FORMATS, HINTS, KINDS, TRANSPORTS, TRUSTS,
+            ALGORITHMS, ATTACHMENTS, AuthenticationCeremony, CONVEYANCES, FORMATS, HINTS, KINDS,
+            MEDIATIONS, REQUIREMENTS, RESIDENT_KEYS, TRANSPORTS, TRUSTS, VERIFICATIONS,
         };
         use super::super::{Aaguid, Credential, CredentialId, Record, RegistrationCeremony};
         use super::{digest, user};
@@ -1277,12 +1333,9 @@ mod tests {
         use crate::error::ErrorKind;
         use crate::extensions::{AppId, LargeBlobOp, LargeBlobRequest, PrfEval, PrfRequest};
         use crate::options::UserHandle;
-        use crate::options::{
-            AuthenticationOptions, Mediation, RegistrationOptions, Requirement, ResidentKey,
-            Timeout,
-        };
+        use crate::options::{AuthenticationOptions, RegistrationOptions, Timeout};
         use crate::trust::Attestation;
-        use crate::verify::{Backup, BackupState, UserVerification};
+        use crate::verify::{Backup, BackupState};
         use base::UnixTime;
 
         fn pick<T: Clone + core::fmt::Debug + 'static>(
@@ -1304,6 +1357,13 @@ mod tests {
             (
                 (pick(ALGORITHMS, 300), pick(FORMATS, 300), pick(HINTS, 300)),
                 (
+                    prop::sample::select(REQUIREMENTS),
+                    prop::sample::select(RESIDENT_KEYS),
+                    prop::option::of(prop::sample::select(ATTACHMENTS)),
+                    prop::sample::select(CONVEYANCES),
+                    prop::sample::select(MEDIATIONS),
+                ),
+                (
                     any::<bool>(),
                     prop::option::of(prop_oneof![
                         Just(PrfRequest::Enable),
@@ -1314,24 +1374,25 @@ mod tests {
                         Just(LargeBlobRequest::Preferred)
                     ]),
                     prop::option::of("[a-z]{0,8}"),
-                    prop::bool::ANY,
                 ),
             )
                 .prop_map(
-                    move |((algorithms, formats, hints), (cp, prf, lb, app, cond))| {
+                    move |(
+                        (algorithms, formats, hints),
+                        (requirement, resident, attachment, conveyance, mediation),
+                        (cp, prf, lb, app),
+                    )| {
                         let mut options = RegistrationOptions::new(
-                            Requirement::Required,
-                            ResidentKey::Required,
+                            requirement,
+                            resident,
                             Timeout::from_secs(30).unwrap_or(Timeout(30)),
                         );
+                        options.attachment = attachment;
+                        options.conveyance = conveyance;
                         options.algorithms = algorithms;
                         options.formats = formats;
                         options.hints = hints;
-                        options.mediation = if cond {
-                            Mediation::Conditional
-                        } else {
-                            Mediation::Optional
-                        };
+                        options.mediation = mediation;
                         options.extensions.cred_props = cp;
                         options.extensions.prf = prf;
                         options.extensions.large_blob = lb;
@@ -1350,6 +1411,7 @@ mod tests {
         fn authentication() -> impl Strategy<Value = Record> {
             (
                 pick(HINTS, 300),
+                prop::sample::select(REQUIREMENTS),
                 prop::collection::vec(any::<u8>(), 0..300),
                 prop::collection::vec(any::<u16>(), 0..300),
                 prop::option::of(eval()),
@@ -1358,36 +1420,38 @@ mod tests {
                     prop::collection::vec(any::<u8>(), 0..4).prop_map(LargeBlobOp::Write)
                 ]),
             )
-                .prop_map(|(hints, allowed, by_credential, prf, large_blob)| {
-                    let mut options = AuthenticationOptions::new(
-                        Requirement::Preferred,
-                        Timeout::from_secs(30).unwrap_or(Timeout(30)),
-                    );
-                    options.hints = hints;
-                    options.extensions.prf = prf;
-                    options.extensions.large_blob = large_blob;
-                    options.extensions.prf_by_credential = by_credential
-                        .iter()
-                        .filter_map(|b| CredentialId::from_bytes(&b.to_be_bytes()).ok())
-                        .map(|id| {
-                            (
-                                id,
-                                PrfEval {
-                                    first: Vec::new(),
-                                    second: None,
-                                },
-                            )
+                .prop_map(
+                    |(hints, requirement, allowed, by_credential, prf, large_blob)| {
+                        let mut options = AuthenticationOptions::new(
+                            requirement,
+                            Timeout::from_secs(30).unwrap_or(Timeout(30)),
+                        );
+                        options.hints = hints;
+                        options.extensions.prf = prf;
+                        options.extensions.large_blob = large_blob;
+                        options.extensions.prf_by_credential = by_credential
+                            .iter()
+                            .filter_map(|b| CredentialId::from_bytes(&b.to_be_bytes()).ok())
+                            .map(|id| {
+                                (
+                                    id,
+                                    PrfEval {
+                                        first: Vec::new(),
+                                        second: None,
+                                    },
+                                )
+                            })
+                            .collect();
+                        Record::Authentication(AuthenticationCeremony {
+                            challenge: digest(3),
+                            browser: digest(4),
+                            deadline: UnixTime::new(9),
+                            user: None,
+                            allowed: allowed.iter().map(|b| digest(*b)).collect(),
+                            options,
                         })
-                        .collect();
-                    Record::Authentication(AuthenticationCeremony {
-                        challenge: digest(3),
-                        browser: digest(4),
-                        deadline: UnixTime::new(9),
-                        user: None,
-                        allowed: allowed.iter().map(|b| digest(*b)).collect(),
-                        options,
-                    })
-                })
+                    },
+                )
         }
 
         fn credential(handle: UserHandle, id: CredentialId) -> impl Strategy<Value = Record> {
@@ -1401,14 +1465,15 @@ mod tests {
                     prop::sample::select(KINDS),
                     prop::sample::select(TRUSTS),
                 ),
+                prop::sample::select(VERIFICATIONS),
             )
                 .prop_map(
-                    move |(transports, chain, sign_count, backup, (format, kind, trust))| {
+                    move |(transports, chain, sign_count, backup, (format, kind, trust), uv)| {
                         Record::Credential(Credential {
                             id: id.clone(),
                             public_key: CoseKey::EdDsa([8; 32]),
                             sign_count,
-                            uv_initialized: UserVerification::Verified,
+                            uv_initialized: uv,
                             transports,
                             backup: match backup {
                                 0 => Backup::SingleDevice,
