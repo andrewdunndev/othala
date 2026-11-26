@@ -2,6 +2,7 @@
 # `own.sh ITEM`: fail when this branch's diff from main names a path outside ITEM's globs (rust/Cargo.lock and each rust/*/public-api.txt excepted: both are regenerated at integration and checked by their gates) or
 # an oracle path (OWN_MAIN overrides origin/main). Globs and oracle patterns are bash patterns over repo-root paths, where * also crosses /.
 # The queue is read from the merge base, never the branch, so a branch cannot widen its own globs; CI runs the base's own.sh.
+# It judges commits only, merge base against HEAD, so an LFS-filtered checkout cannot read as a change; uncommitted edits are ignored.
 set -euo pipefail
 cd "$(git rev-parse --show-toplevel)"
 item=${1:?own: name an item}
@@ -19,7 +20,7 @@ else
     # the ownership gate and the queue are the spine's: no other item may rewrite what checks it
     oracle+=(primitives/queue.json 'primitives/*.sh' .gitlab-ci.yml)
 fi
-mapfile -d '' -t paths < <(git diff --name-only --no-renames -z "$base")
+mapfile -d '' -t paths < <(git diff --name-only --no-renames -z "$base" HEAD)
 bad=0
 for p in "${paths[@]}"; do
     case "$p" in rust/Cargo.lock | rust/*/public-api.txt) continue ;; esac
