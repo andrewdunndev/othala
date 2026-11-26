@@ -1,0 +1,104 @@
+{
+ "source": "JWK thumbprints computed per RFC 7638 3.2 (SHA-256 of the required members, sorted, no whitespace); derived by tools/derive_jose.py from keys pinned under vectors/ (RFC 7515 A.1-A.4, RFC 7520 3 and 5.4, RFC 8037 A); one spec section per case in `spec`",
+ "cases": [
+  {
+   "id": "ec-p256",
+   "op": "jwk_thumbprint",
+   "jwk": {
+    "kty": "EC",
+    "crv": "P-256",
+    "x": "f83OJ3D2xF1Bg8vub9tLe1gHMzV76e8Tus9uPHvRVEU",
+    "y": "x_FEzRu9m36HLN_tue659LNpXW6pCyStikYjKIWI5a0"
+   },
+   "spec": "RFC 7638 3.2 (crv, kty, x, y)",
+   "expect": {
+    "out": "oKIywvGUpTVTyxMQ3bwIIeQUudfr_CkLMjCE19ECD-U"
+   }
+  },
+  {
+   "id": "ec-p384-private-members-ignored",
+   "op": "jwk_thumbprint",
+   "jwk": {
+    "kty": "EC",
+    "kid": "peregrin.took@tuckborough.example",
+    "use": "enc",
+    "crv": "P-384",
+    "x": "YU4rRUzdmVqmRtWOs2OpDE_T5fsNIodcG8G5FWPrTPMyxpzsSOGaQLpe2FpxBmu2",
+    "y": "A8-yxCHxkfBz3hKZfI1jUYMjUhsEveZ9THuwFjH2sCNdtksRJU7D5-SkgaFL1ETP",
+    "d": "iTx2pk7wW-GqJkHcEkFQb2EFyYcO7RugmaW3mRrQVAOUiPommT0IdnYK2xDlZh-j"
+   },
+   "spec": "RFC 7638 3.2 and 3.3 (only required public members)",
+   "expect": {
+    "out": "YlKlB7M2wnS0cPn_V7OW-FuDLuWdJ9z4OvPHmhGDfeE"
+   }
+  },
+  {
+   "id": "rsa-optional-members-ignored",
+   "op": "jwk_thumbprint",
+   "jwk": {
+    "kty": "RSA",
+    "kid": "bilbo.baggins@hobbiton.example",
+    "use": "sig",
+    "n": "n4EPtAOCc9AlkeQHPzHStgAbgs7bTZLwUBZdR8_KuKPEHLd4rHVTeT-O-XV2jRojdNhxJWTDvNd7nqQ0VEiZQHz_AJmSCpMaJMRBSFKrKb2wqVwGU_NsYOYL-QtiWN2lbzcEe6XC0dApr5ydQLrHqkHHig3RBordaZ6Aj-oBHqFEHYpPe7Tpe-OfVfHd1E6cS6M1FZcD1NNLYD5lFHpPI9bTwJlsde3uhGqC0ZCuEHg8lhzwOHrtIQbS0FVbb9k3-tVTU4fg_3L_vniUFAKwuCLqKnS2BYwdq_mzSnbLY7h_qixoR7jig3__kRhuaxwUkRz5iaiQkqgc5gHdrNP5zw",
+    "e": "AQAB"
+   },
+   "spec": "RFC 7638 3.2 (e, kty, n)",
+   "expect": {
+    "out": "9jg46WB3rR_AHD-EBXdN7cBkH1WOu0tA3M9fm21mqTI"
+   }
+  },
+  {
+   "id": "oct",
+   "op": "jwk_thumbprint",
+   "jwk": {
+    "kty": "oct",
+    "kid": "018c0ae5-4d9b-471b-bfd6-eef314bc7037",
+    "use": "sig",
+    "alg": "HS256",
+    "k": "hJtXIZ2uSN5kbQfbtTNWbpdmhkV8FJG-Onbc6mxCcYg"
+   },
+   "spec": "RFC 7638 3.2 (k, kty)",
+   "expect": {
+    "out": "RtoRur_1Dir5M4wuOfqNkDYOf9O_4RJ-aHkTA75RLA8"
+   }
+  },
+  {
+   "id": "okp-ed25519",
+   "op": "jwk_thumbprint",
+   "jwk": {
+    "kty": "OKP",
+    "crv": "Ed25519",
+    "x": "11qYAYKxCrfVS_7TyWQHOg7hcvPapiMlrwIaaPcHURo"
+   },
+   "spec": "RFC 8037 2 (crv, kty, x) and A.3",
+   "expect": {
+    "out": "kPrK_qmxVWaYVA9wwBF6Iuo3vVzz7TxHCTwXBygrS4k"
+   }
+  },
+  {
+   "id": "ec-y-missing",
+   "op": "jwk_thumbprint",
+   "jwk": {
+    "kty": "EC",
+    "crv": "P-256",
+    "x": "f83OJ3D2xF1Bg8vub9tLe1gHMzV76e8Tus9uPHvRVEU"
+   },
+   "spec": "RFC 7638 3.2 (required members must be present)",
+   "expect": {
+    "ok": false
+   }
+  },
+  {
+   "id": "kty-unknown",
+   "op": "jwk_thumbprint",
+   "jwk": {
+    "kty": "unknown-kty",
+    "x": "AA"
+   },
+   "spec": "RFC 7638 3.2 (members are defined per kty)",
+   "expect": {
+    "ok": false
+   }
+  }
+ ]
+}
