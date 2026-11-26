@@ -34,6 +34,9 @@ impl Alg for Es384
 impl Alg for Hs256
 impl Alg for Hs384
 impl Alg for Hs512
+impl Alg for Rs256
+impl Alg for Rs384
+impl Alg for Rs512
 impl Clone for A128CbcHs256
 impl Clone for A128Gcm
 impl Clone for A128GcmKw
@@ -329,6 +332,9 @@ impl PartialOrd for SigningAlg
 impl PublicAlg for EdDsa
 impl PublicAlg for Es256
 impl PublicAlg for Es384
+impl PublicAlg for Rs256
+impl PublicAlg for Rs384
+impl PublicAlg for Rs512
 impl Serialize for Kid
 impl SignAlg for EdDsa
 impl SignAlg for Es256
