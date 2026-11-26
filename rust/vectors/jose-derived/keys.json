@@ -1,0 +1,433 @@
+{
+ "source": "key and algorithm binding; derived by tools/derive_jose.py from keys pinned under vectors/ (RFC 7515 A.1-A.4, RFC 7520 3 and 5.4, RFC 8037 A); one spec section per case in `spec`",
+ "cases": [
+  {
+   "id": "es256-p256",
+   "op": "jwk_verify_key",
+   "alg": "ES256",
+   "jwk": {
+    "kty": "EC",
+    "crv": "P-256",
+    "x": "f83OJ3D2xF1Bg8vub9tLe1gHMzV76e8Tus9uPHvRVEU",
+    "y": "x_FEzRu9m36HLN_tue659LNpXW6pCyStikYjKIWI5a0"
+   },
+   "spec": "RFC 7518 3.4",
+   "expect": {
+    "ok": true
+   }
+  },
+  {
+   "id": "es256-p384-key",
+   "op": "jwk_verify_key",
+   "alg": "ES256",
+   "jwk": {
+    "kty": "EC",
+    "crv": "P-384",
+    "x": "YU4rRUzdmVqmRtWOs2OpDE_T5fsNIodcG8G5FWPrTPMyxpzsSOGaQLpe2FpxBmu2",
+    "y": "A8-yxCHxkfBz3hKZfI1jUYMjUhsEveZ9THuwFjH2sCNdtksRJU7D5-SkgaFL1ETP"
+   },
+   "spec": "RFC 7518 3.4 (ES256 is P-256) and RFC 8725 3.1",
+   "expect": {
+    "ok": false
+   }
+  },
+  {
+   "id": "es256-p521-key",
+   "op": "jwk_verify_key",
+   "alg": "ES256",
+   "jwk": {
+    "kty": "EC",
+    "crv": "P-521",
+    "x": "AekpBQ8ST8a8VcfVOTNl353vSrDCLLJXmPk06wTjxrrjcBpXp5EOnYG_NjFZ6OvLFV1jSfS9tsz4qUxcWceqwQGk",
+    "y": "ADSmRA43Z1DSNx_RvcLI87cdL07l6jQyyBXMoxVg_l2Th-x3S1WDhjDly79ajL4Kkd0AZMaZmh9ubmf63e3kyMj2"
+   },
+   "spec": "RFC 7518 3.4 and RFC 8725 3.1",
+   "expect": {
+    "ok": false
+   }
+  },
+  {
+   "id": "es384-p256-key",
+   "op": "jwk_verify_key",
+   "alg": "ES384",
+   "jwk": {
+    "kty": "EC",
+    "crv": "P-256",
+    "x": "f83OJ3D2xF1Bg8vub9tLe1gHMzV76e8Tus9uPHvRVEU",
+    "y": "x_FEzRu9m36HLN_tue659LNpXW6pCyStikYjKIWI5a0"
+   },
+   "spec": "RFC 7518 3.4 (ES384 is P-384)",
+   "expect": {
+    "ok": false
+   }
+  },
+  {
+   "id": "es256-rsa-key",
+   "op": "jwk_verify_key",
+   "alg": "ES256",
+   "jwk": {
+    "kty": "RSA",
+    "n": "ofgWCuLjybRlzo0tZWJjNiuSfb4p4fAkd_wWJcyQoTbji9k0l8W26mPddxHmfHQp-Vaw-4qPCJrcS2mJPMEzP1Pt0Bm4d4QlL-yRT-SFd2lZS-pCgNMsD1W_YpRPEwOWvG6b32690r2jZ47soMZo9wGzjb_7OMg0LOL-bSf63kpaSHSXndS5z5rexMdbBYUsLA9e-KXBdQOS-UTo7WTBEMa2R2CapHg665xsmtdVMTBQY4uDZlxvb3qCo5ZwKh9kG4LT6_I5IhlJH7aGhyxXFvUK-DWNmoudF8NAco9_h9iaGNj8q2ethFkMLs91kzk2PAcDTW9gb54h4FRWyuXpoQ",
+    "e": "AQAB"
+   },
+   "spec": "RFC 7518 3.4 and RFC 8725 3.1",
+   "expect": {
+    "ok": false
+   }
+  },
+  {
+   "id": "es256-okp-key",
+   "op": "jwk_verify_key",
+   "alg": "ES256",
+   "jwk": {
+    "kty": "OKP",
+    "crv": "Ed25519",
+    "x": "11qYAYKxCrfVS_7TyWQHOg7hcvPapiMlrwIaaPcHURo"
+   },
+   "spec": "RFC 7518 3.4 and RFC 8037 3.1",
+   "expect": {
+    "ok": false
+   }
+  },
+  {
+   "id": "rs256-ec-key",
+   "op": "jwk_verify_key",
+   "alg": "RS256",
+   "jwk": {
+    "kty": "EC",
+    "crv": "P-256",
+    "x": "f83OJ3D2xF1Bg8vub9tLe1gHMzV76e8Tus9uPHvRVEU",
+    "y": "x_FEzRu9m36HLN_tue659LNpXW6pCyStikYjKIWI5a0"
+   },
+   "spec": "RFC 7518 3.3 and RFC 8725 3.1",
+   "expect": {
+    "ok": false
+   }
+  },
+  {
+   "id": "hs256-rsa-key",
+   "op": "jwk_verify_key",
+   "alg": "HS256",
+   "jwk": {
+    "kty": "RSA",
+    "n": "ofgWCuLjybRlzo0tZWJjNiuSfb4p4fAkd_wWJcyQoTbji9k0l8W26mPddxHmfHQp-Vaw-4qPCJrcS2mJPMEzP1Pt0Bm4d4QlL-yRT-SFd2lZS-pCgNMsD1W_YpRPEwOWvG6b32690r2jZ47soMZo9wGzjb_7OMg0LOL-bSf63kpaSHSXndS5z5rexMdbBYUsLA9e-KXBdQOS-UTo7WTBEMa2R2CapHg665xsmtdVMTBQY4uDZlxvb3qCo5ZwKh9kG4LT6_I5IhlJH7aGhyxXFvUK-DWNmoudF8NAco9_h9iaGNj8q2ethFkMLs91kzk2PAcDTW9gb54h4FRWyuXpoQ",
+    "e": "AQAB"
+   },
+   "spec": "RFC 7518 3.2 and RFC 8725 3.1 (RS-to-HS swap)",
+   "expect": {
+    "ok": false
+   }
+  },
+  {
+   "id": "eddsa-x25519-key",
+   "op": "jwk_verify_key",
+   "alg": "EdDSA",
+   "jwk": {
+    "kty": "OKP",
+    "crv": "X25519",
+    "kid": "Bob",
+    "x": "3p7bfXt9wbTTW2HC7OQ1Nz-DQ8hbeGdNrfx-FG-IK08"
+   },
+   "spec": "RFC 8037 3.1 (X25519 is not a signature curve) and ruling R-e",
+   "expect": {
+    "ok": false
+   }
+  },
+  {
+   "id": "eddsa-ed25519",
+   "op": "jwk_verify_key",
+   "alg": "EdDSA",
+   "jwk": {
+    "kty": "OKP",
+    "crv": "Ed25519",
+    "x": "11qYAYKxCrfVS_7TyWQHOg7hcvPapiMlrwIaaPcHURo"
+   },
+   "spec": "RFC 8037 3.1",
+   "expect": {
+    "ok": true
+   }
+  },
+  {
+   "id": "es256-off-curve",
+   "op": "jwk_verify_key",
+   "alg": "ES256",
+   "jwk": {
+    "kty": "EC",
+    "crv": "P-256",
+    "x": "f83OJ3D2xF1Bg8vub9tLe1gHMzV76e8Tus9uPHvRVEU",
+    "y": "xvFEzRu9m36HLN_tue659LNpXW6pCyStikYjKIWI5a0"
+   },
+   "spec": "RFC 8725 3.4 (validate the point)",
+   "expect": {
+    "ok": false
+   }
+  },
+  {
+   "id": "es256-point-zero",
+   "op": "jwk_verify_key",
+   "alg": "ES256",
+   "jwk": {
+    "kty": "EC",
+    "crv": "P-256",
+    "x": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
+    "y": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
+   },
+   "spec": "RFC 8725 3.4 and SEC 1 3.2.2",
+   "expect": {
+    "ok": false
+   }
+  },
+  {
+   "id": "es256-x-short",
+   "op": "jwk_verify_key",
+   "alg": "ES256",
+   "jwk": {
+    "kty": "EC",
+    "crv": "P-256",
+    "x": "zc4ncPbEXUGDy-5v20t7WAczNXvp7xO6z248e9FURQ",
+    "y": "x_FEzRu9m36HLN_tue659LNpXW6pCyStikYjKIWI5a0"
+   },
+   "spec": "RFC 7518 6.2.1.2 (x MUST be the full coordinate size)",
+   "expect": {
+    "ok": false
+   }
+  },
+  {
+   "id": "es256-crv-missing",
+   "op": "jwk_verify_key",
+   "alg": "ES256",
+   "jwk": {
+    "kty": "EC",
+    "x": "f83OJ3D2xF1Bg8vub9tLe1gHMzV76e8Tus9uPHvRVEU",
+    "y": "x_FEzRu9m36HLN_tue659LNpXW6pCyStikYjKIWI5a0"
+   },
+   "spec": "RFC 7518 6.2.1.1 (crv is required)",
+   "expect": {
+    "ok": false
+   }
+  },
+  {
+   "id": "es256-y-missing",
+   "op": "jwk_verify_key",
+   "alg": "ES256",
+   "jwk": {
+    "kty": "EC",
+    "crv": "P-256",
+    "x": "f83OJ3D2xF1Bg8vub9tLe1gHMzV76e8Tus9uPHvRVEU"
+   },
+   "spec": "RFC 7518 6.2.1.3 (y is required for P-256)",
+   "expect": {
+    "ok": false
+   }
+  },
+  {
+   "id": "rs256-2048",
+   "op": "jwk_verify_key",
+   "alg": "RS256",
+   "jwk": {
+    "kty": "RSA",
+    "n": "ofgWCuLjybRlzo0tZWJjNiuSfb4p4fAkd_wWJcyQoTbji9k0l8W26mPddxHmfHQp-Vaw-4qPCJrcS2mJPMEzP1Pt0Bm4d4QlL-yRT-SFd2lZS-pCgNMsD1W_YpRPEwOWvG6b32690r2jZ47soMZo9wGzjb_7OMg0LOL-bSf63kpaSHSXndS5z5rexMdbBYUsLA9e-KXBdQOS-UTo7WTBEMa2R2CapHg665xsmtdVMTBQY4uDZlxvb3qCo5ZwKh9kG4LT6_I5IhlJH7aGhyxXFvUK-DWNmoudF8NAco9_h9iaGNj8q2ethFkMLs91kzk2PAcDTW9gb54h4FRWyuXpoQ",
+    "e": "AQAB"
+   },
+   "spec": "RFC 7518 3.3 (2048 bits or larger)",
+   "expect": {
+    "ok": true
+   }
+  },
+  {
+   "id": "rs256-2047",
+   "op": "jwk_verify_key",
+   "alg": "RS256",
+   "jwk": {
+    "kty": "RSA",
+    "n": "auxwzBXcd6WIYy2F62YBfhUjv7x-9Mk37f0C-EsN-mL7iLXvr4qk2YPzRj0ZdDc03_1tggnL9VNgx1-JASk4Xewk-xNJONINf4Ne9EeCbOuq1xtHlKMhbtORvBm3RHZY3MFANuLm_0F7E3erdZCionWwyQ0fek2KRlwYqm1ft6JD-IWCXI-xkvFo3Dufp-9aiEgz7BjQQG-NbTdj6f8B9nNcQF7C4YRe9djDhHGZuaO9boYmjfkUVBqi2tMz48P7gr_7OykzVyr6SKrNQ4uD7PKU2GEDIeg4p9h-Qn3IhgCSI7YXj4Up9v64khYVfU42J7sqm3hKvB01DiGxx7Ovew",
+    "e": "AQAB"
+   },
+   "spec": "RFC 7518 3.3 (MUST be 2048 bits or larger)",
+   "expect": {
+    "ok": false,
+    "kind": "WeakKey"
+   }
+  },
+  {
+   "id": "rs256-1024",
+   "op": "jwk_verify_key",
+   "alg": "RS256",
+   "jwk": {
+    "kty": "RSA",
+    "n": "1djhmCu470sQxlsL1swC_CpHf3j96ZJv2_oF8JYb9MX3EWvfXxVJswfmjHoy6G5pv_rbBBOX6qbBjr8SAlJz76X3aXsFYxUiCEk43EHzBbtMknCcpVF21lZicInDUqbzBL7fM9IGuroRKQdt5daaTbbfFRGPox6fcM23aFcfCpM",
+    "e": "AQAB"
+   },
+   "spec": "RFC 7518 3.3",
+   "expect": {
+    "ok": false,
+    "kind": "WeakKey"
+   }
+  },
+  {
+   "id": "hs256-32-bytes",
+   "op": "jwk_verify_key",
+   "alg": "HS256",
+   "jwk": {
+    "kty": "oct",
+    "k": "AAECAwQFBgcICQoLDA0ODxAREhMUFRYXGBkaGxwdHh8"
+   },
+   "spec": "RFC 7518 3.2 (a key as long as the hash output)",
+   "expect": {
+    "ok": true
+   }
+  },
+  {
+   "id": "hs256-31-bytes",
+   "op": "jwk_verify_key",
+   "alg": "HS256",
+   "jwk": {
+    "kty": "oct",
+    "k": "AAECAwQFBgcICQoLDA0ODxAREhMUFRYXGBkaGxwdHg"
+   },
+   "spec": "RFC 7518 3.2 (MUST be at least the hash output size)",
+   "expect": {
+    "ok": false,
+    "kind": "WeakKey"
+   }
+  },
+  {
+   "id": "hs384-47-bytes",
+   "op": "jwk_verify_key",
+   "alg": "HS384",
+   "jwk": {
+    "kty": "oct",
+    "k": "AAECAwQFBgcICQoLDA0ODxAREhMUFRYXGBkaGxwdHh8gISIjJCUmJygpKissLS4"
+   },
+   "spec": "RFC 7518 3.2",
+   "expect": {
+    "ok": false,
+    "kind": "WeakKey"
+   }
+  },
+  {
+   "id": "hs512-63-bytes",
+   "op": "jwk_verify_key",
+   "alg": "HS512",
+   "jwk": {
+    "kty": "oct",
+    "k": "AAECAwQFBgcICQoLDA0ODxAREhMUFRYXGBkaGxwdHh8gISIjJCUmJygpKissLS4vMDEyMzQ1Njc4OTo7PD0-"
+   },
+   "spec": "RFC 7518 3.2",
+   "expect": {
+    "ok": false,
+    "kind": "WeakKey"
+   }
+  },
+  {
+   "id": "hs256-use-enc",
+   "op": "jwk_verify_key",
+   "alg": "HS256",
+   "jwk": {
+    "kty": "oct",
+    "k": "AAECAwQFBgcICQoLDA0ODxAREhMUFRYXGBkaGxwdHh8",
+    "use": "enc"
+   },
+   "spec": "RFC 7517 4.2 (use enc is not for signatures)",
+   "expect": {
+    "ok": false,
+    "kind": "KeyUse"
+   }
+  },
+  {
+   "id": "hs256-key-ops-encrypt",
+   "op": "jwk_verify_key",
+   "alg": "HS256",
+   "jwk": {
+    "kty": "oct",
+    "k": "AAECAwQFBgcICQoLDA0ODxAREhMUFRYXGBkaGxwdHh8",
+    "key_ops": [
+     "encrypt"
+    ]
+   },
+   "spec": "RFC 7517 4.3 (key_ops without verify)",
+   "expect": {
+    "ok": false,
+    "kind": "KeyUse"
+   }
+  },
+  {
+   "id": "hs256-use-key-ops-disagree",
+   "op": "jwk_verify_key",
+   "alg": "HS256",
+   "jwk": {
+    "kty": "oct",
+    "k": "AAECAwQFBgcICQoLDA0ODxAREhMUFRYXGBkaGxwdHh8",
+    "use": "sig",
+    "key_ops": [
+     "encrypt"
+    ]
+   },
+   "spec": "RFC 7517 4.3 (use and key_ops SHOULD NOT both be used; when they disagree the key is refused)",
+   "expect": {
+    "ok": false
+   }
+  },
+  {
+   "id": "any-alg-bound",
+   "op": "any_verify_key",
+   "jwk": {
+    "kty": "oct",
+    "kid": "018c0ae5-4d9b-471b-bfd6-eef314bc7037",
+    "use": "sig",
+    "alg": "HS256",
+    "k": "hJtXIZ2uSN5kbQfbtTNWbpdmhkV8FJG-Onbc6mxCcYg"
+   },
+   "spec": "RFC 7517 4.4 with RFC 8725 3.1 (the JWK alg binds)",
+   "expect": {
+    "ok": true
+   }
+  },
+  {
+   "id": "any-alg-missing",
+   "op": "any_verify_key",
+   "jwk": {
+    "kty": "oct",
+    "kid": "018c0ae5-4d9b-471b-bfd6-eef314bc7037",
+    "use": "sig",
+    "k": "hJtXIZ2uSN5kbQfbtTNWbpdmhkV8FJG-Onbc6mxCcYg"
+   },
+   "spec": "RFC 8725 3.1 (a key used dynamically needs its alg)",
+   "expect": {
+    "ok": false,
+    "kind": "KeyAlgMissing"
+   }
+  },
+  {
+   "id": "any-alg-kty-mismatch",
+   "op": "any_verify_key",
+   "jwk": {
+    "kty": "EC",
+    "crv": "P-256",
+    "x": "f83OJ3D2xF1Bg8vub9tLe1gHMzV76e8Tus9uPHvRVEU",
+    "y": "x_FEzRu9m36HLN_tue659LNpXW6pCyStikYjKIWI5a0",
+    "alg": "RS256"
+   },
+   "spec": "RFC 7518 3.1 and RFC 8725 3.1",
+   "expect": {
+    "ok": false
+   }
+  },
+  {
+   "id": "any-enc-key",
+   "op": "any_verify_key",
+   "jwk": {
+    "kty": "oct",
+    "kid": "1e571774-2e08-40da-8308-e8d68773842d",
+    "use": "enc",
+    "alg": "A256GCM",
+    "k": "AAPapAv4LbFbiVawEjagUBluYqN5rhna-8nuldDvOx8"
+   },
+   "spec": "RFC 7517 4.2",
+   "expect": {
+    "ok": false,
+    "kind": "KeyUse"
+   }
+  }
+ ]
+}
