@@ -204,6 +204,8 @@ method NewPassword::new fn(text: &str, minimum: Minimum) -> Result<Self, Error>
 method OtpKey::import fn(key: Vec<u8>) -> Result<Self, Error>
 method Passes::new const fn(passes: u32) -> Self
 method Phc::as_str fn(self: &Self) -> &str
+method Record::decode fn(bytes: &[u8]) -> Result<Self, Error>
+method Record::encode fn(self: &Self) -> Vec<u8>
 method Throttle::check fn(self: &Self, attempts: Option<Row<&Attempts>>, now: UnixTime) -> Result<Permit, Closed>
 method Throttle::new const fn(policy: Backoff) -> Self
 method Throttle::reset fn(attempts: Row<&Attempts>, e: &mut impl Entropy) -> Effect

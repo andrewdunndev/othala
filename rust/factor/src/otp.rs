@@ -107,6 +107,16 @@ pub struct Totp {
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct TotpStep(u64);
 
+impl TotpStep {
+    pub(crate) const fn new(step: u64) -> Self {
+        Self(step)
+    }
+
+    pub(crate) const fn parts(&self) -> u64 {
+        self.0
+    }
+}
+
 /// A code as presented: six or eight ASCII digits, wiped on drop by base.
 pub struct OtpCode(SecretBytes);
 

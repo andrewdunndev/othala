@@ -111,9 +111,9 @@ pub fn recovery_verify(permit: Permit, code: &RecoveryCode, stored: Option<Row<&
 Store (architecture section 2, R-g)
 - R1 Every `Key` is `Scope::Subject`: unit:store::every_key_is_subject.
 - R2 `Error`'s `Display` names its kind only, one fixed phrase per kind with no secret-derived detail: unit:tests::display_names_the_kind_only.
-- R3 A verdict's effect holds `Attempts` and exactly the factor row it read: a TOTP match updates `TotpStep` (or creates it under `Absent`), a recovery match is `Consume(Recovery(d))`, every rejection `expect`s the factor row read (or `expect_absent`s it), and a password verdict holds `Attempts` only; no verdict writes the row holding an OTP key or a hash, since the host stores those: unit:store::verdict_effects [factor-04], race:read_set [factor-09].
-- R4 No put carries a store expiry: unit:store::no_expiry [factor-04].
-- R5 `Record::decode(r.encode())` is `r` for every variant, one committed encoding per variant decodes to its stated value, and `decode` is `TooLarge` over 64 bytes before reading, `Malformed` for an unknown version or tag or trailing bytes; the fuzz oracle is that a decoded row re-encodes to its input: unit:store::round_trip, row:golden, mutants:store [factor-04], fuzz:record_decode [factor-04].
+- R3 A verdict's effect holds `Attempts` and exactly the factor row it read: a TOTP match updates `TotpStep` (or creates it under `Absent`), a recovery match is `Consume(Recovery(d))`, every rejection `expect`s the factor row read (or `expect_absent`s it), and a password verdict holds `Attempts` only; no verdict writes the row holding an OTP key or a hash, since the host stores those: unit:store::verdict_effects, race:read_set [factor-09].
+- R4 No put carries a store expiry: unit:store::no_expiry [factor-09].
+- R5 A record is a version byte (1), a tag byte (0 `Attempts`, 1 `TotpStep`, 2 `Recovery`) and its fields in big-endian: `Attempts` is the count as a u32 then the time as a u64 (14 bytes), `TotpStep` the step as a u64 (10), `Recovery` the 32 digest bytes (34). `Record::decode(r.encode())` is `r` for every variant, one committed encoding per variant decodes to its stated `Debug` text, and `decode` is `TooLarge` over 64 bytes before reading and `Malformed` for a truncated row, trailing bytes, an unknown version or an unknown tag; the fuzz oracle is that a decoded row re-encodes to its input: unit:store::round_trip, row:record (`tests/row_record.rs`, goldens in `tests/golden/`), mutants:store, fuzz:record_decode [factor-04].
 - R6 `Internal` is never returned for inputs the constructors accepted, except by `recovery_generate` under a repeating `Entropy` (O10): prop:no_internal [factor-09].
 
 Throttle (F1: verdicts only increment; the session effect does the one reset; operator ruling of 2026-11-26)
@@ -199,10 +199,10 @@ Recovery codes (NIST SP 800-63B-4 3.1.2)
 | factor-01 | `lib.rs`, every `src/` type, `tests/ledger.rs`, `tests/ui/`, `gates.json`, `deps.txt`, `public-api.txt` | this file, T1 to T13, R1, R2, B1 to B6 | ledger, twins, api |
 | factor-02 | `src/otp.rs` | `hotp`, `OtpKey::import` | m3.rfc4226.hotp (R13, R14) |
 | factor-03 | `src/throttle.rs`, `tests/row_throttle.rs` | the throttle | m3.inv.throttle-schedule, m3.inv.reset-only (R7 to R11) |
-| factor-04 | `src/store.rs`, `tests/golden.rs`, `fuzz/` | the record codec | R3 to R5, B8 |
+| factor-04 | `src/store.rs`, `tests/row_record.rs`, `tests/golden/`, `fuzz/` | the record codec | m3-factor-record (R5, B8) |
 | factor-05 | `src/password.rs` | `argon2id`, costs, `NewPassword`, `password_hash` | m3.rfc9106.argon2id (R22 to R25) |
 | factor-06 | `src/otp.rs`, `tests/row_rfc6238.rs` | TOTP and its last step | m3.rfc6238.* (R15 to R21) |
 | factor-07 | `src/password.rs`, `tests/row_password.rs` | `Password`, `Phc::parse`, verify and rehash | R26 to R28 |
 | factor-08 | `src/recovery.rs`, `tests/row_recovery.rs` | recovery codes | R30 to R33 |
-| factor-09 | `tests/props.rs`, `tests/race.rs` | invariants | R6, R12, R17, R29, R33, O2, O3 |
+| factor-09 | `src/store.rs`, `tests/props.rs`, `tests/race.rs` | invariants | R3, R4, R6, R12, R17, R29, R33, O2, O3 |
 | factor-10 | `fuzz/`, `gates.json` `mutants` | fuzz and the mutants floor | B7, B8 |

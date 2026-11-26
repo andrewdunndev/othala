@@ -13,6 +13,16 @@ pub struct RecoveryCode(SecretBytes);
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct RecoveryHash(Digest);
 
+impl RecoveryHash {
+    pub(crate) const fn new(digest: Digest) -> Self {
+        Self(digest)
+    }
+
+    pub(crate) const fn parts(&self) -> Digest {
+        self.0
+    }
+}
+
 /// A presented code matched an unused one, which the verdict's effect consumes.
 #[derive(Debug)]
 pub struct RecoveryMatch(());

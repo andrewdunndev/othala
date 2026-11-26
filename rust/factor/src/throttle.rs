@@ -9,6 +9,16 @@ pub struct Attempts {
     last: UnixTime,
 }
 
+impl Attempts {
+    pub(crate) const fn new(count: u32, last: UnixTime) -> Self {
+        Self { count, last }
+    }
+
+    pub(crate) const fn parts(&self) -> (u32, UnixTime) {
+        (self.count, self.last)
+    }
+}
+
 /// How many attempts after a reset wait for nothing: 0 to 10.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct FreeAttempts(u32);
