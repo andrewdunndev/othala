@@ -9,10 +9,12 @@ mod cbor;
 pub mod cose;
 #[path = "../src/error.rs"]
 pub mod error;
+#[path = "support/hex.rs"]
+mod hex;
 #[path = "support/cbor.rs"]
-mod support;
+mod oracle;
 
 #[test]
 fn cbor() {
-    support::cases();
+    oracle::cases();
 }

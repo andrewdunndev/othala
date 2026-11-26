@@ -256,6 +256,8 @@ impl Debug for Registered
 impl Debug for RegistrationCeremony
 impl Debug for RegistrationOptions
 impl Debug for RelatedOrigins
+impl Debug for RelyingParty
+impl Debug for RelyingPartyBuilder
 impl Debug for RequestOptions
 impl Debug for Requirement
 impl Debug for ResidentKey
@@ -446,6 +448,18 @@ impl StructuralPartialEq for UserName
 impl StructuralPartialEq for UserVerification
 method Error::kind fn(self: &Self) -> ErrorKind
 method Error::spec_step fn(self: &Self) -> Option<SpecStep>
+method Origin::as_str fn(self: &Self) -> &str
+method Origin::parse fn(text: &str) -> Result<Self, Error>
+method RelyingParty::builder fn(id: RpId, name: DisplayName, origin: Origin, counter: CounterPolicy) -> RelyingPartyBuilder
+method RelyingParty::id fn(self: &Self) -> &RpId
+method RelyingPartyBuilder::android_key fn(self: Self, policy: KeyEnforcement) -> Self
+method RelyingPartyBuilder::build fn(self: Self) -> Result<RelyingParty, Error>
+method RelyingPartyBuilder::cross_origin fn(self: Self, policy: CrossOrigin) -> Self
+method RelyingPartyBuilder::origin fn(self: Self, origin: Origin) -> Self
+method RelyingPartyBuilder::trust fn(self: Self, policy: TrustPolicy) -> Self
+method RelyingPartyBuilder::unsolicited fn(self: Self, policy: UnsolicitedExtensions) -> Self
+method RpId::as_str fn(self: &Self) -> &str
+method RpId::parse fn(text: &str) -> Result<Self, Error>
 struct Aaguid
 struct AppId
 struct Assertion

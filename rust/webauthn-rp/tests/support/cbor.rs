@@ -1,10 +1,11 @@
 //! The oracle's CBOR cases through the strict reader and the COSE parser.
-use serde::{Deserialize, Deserializer};
+use serde::Deserialize;
 use testkit::vector;
 use testkit::vectors::{Outcome, run};
 
 use crate::cbor::{Order, decode};
 use crate::cose::CoseKey;
+use crate::hex::hex;
 use crate::{MAX_CBOR_DEPTH, MAX_CBOR_ITEMS};
 
 #[derive(Deserialize)]
@@ -20,15 +21,6 @@ struct Case {
 struct Expect {
     ok: bool,
     kind: Option<String>,
-}
-
-fn hex<'de, D: Deserializer<'de>>(d: D) -> Result<Vec<u8>, D::Error> {
-    let text = String::deserialize(d)?;
-    (0..text.len())
-        .step_by(2)
-        .map(|i| u8::from_str_radix(text.get(i..i + 2).unwrap_or(""), 16))
-        .collect::<Result<_, _>>()
-        .map_err(serde::de::Error::custom)
 }
 
 // the bound plus one: nested arrays, or one array of zeros
