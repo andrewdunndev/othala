@@ -6,7 +6,7 @@ target := env("CARGO_TARGET_DIR", "target")
 default:
     @just --list
 
-all: floor-rule gate-selftest lock queue claims fmt lint canary twins test doc wasm thumb msrv deny deps api mutants rows
+all: floor-rule gate-selftest lock queue claims vectors fmt lint canary twins test doc wasm thumb msrv deny deps api mutants rows
 
 # a manifest change without its lock change fails here, before anything builds
 lock:
@@ -21,6 +21,13 @@ claims:
     command -v node > /dev/null || { echo 'claims: node is not on PATH; mise.toml pins it, so run under `mise x --`'; exit 1; }
     node canary/claims.mjs --selftest
     node canary/claims.mjs
+
+# the vector oracle's gate, offline: every derive script reproduces its committed files, SOURCES.toml's hashes and counts match, every WebAuthn step or section a vector cites exists and each quoted passage is in its step, and webauthn-ext passes (rust/vectors/justfile check)
+vectors:
+    command -v python3 > /dev/null || { echo 'vectors: python3 is not on PATH; the gate needs python 3.11 or newer'; exit 1; }
+    python3 -c 'import sys; sys.exit(sys.version_info < (3, 11))' || { echo 'vectors: python3 is older than 3.11 (tomllib)'; exit 1; }
+    command -v node > /dev/null || { echo 'vectors: node is not on PATH; mise.toml pins it, so run under `mise x --`'; exit 1; }
+    {{ just_executable() }} --justfile vectors/justfile check
 
 # fail when this branch touches a path outside the item's globs, or any oracle path
 own item:
