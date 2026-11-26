@@ -1,0 +1,49 @@
+[package]
+name = "jose"
+description = "JWS, JWE, JWK, JWA and JWT with each algorithm bound to its key's type and the RFC 8725 practices as the only behaviour"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+publish.workspace = true
+
+# Every feature is off by default. rsa-sign and rsa-decrypt carry the Marvin residual risk (CONTRACT NC3).
+[features]
+# ES512, and ECDH-ES on P-521
+es512 = ["dep:p521"]
+# RSA-OAEP and RSA-OAEP-256 decryption; Marvin residual risk (RUSTSEC-2023-0071)
+rsa-decrypt = ["dep:sha1", "dep:rand_core"]
+# RS256/384/512 and PS256/384/512 signing; Marvin residual risk (RUSTSEC-2023-0071)
+rsa-sign = ["dep:rand_core"]
+
+[dependencies]
+base.workspace = true
+serde = { workspace = true, features = ["alloc"] }
+serde_json = { version = "1.0.154", default-features = false, features = ["alloc"] }
+sha2.workspace = true
+hmac = "0.13"
+p256 = { version = "0.14", default-features = false, features = ["ecdsa", "ecdh"] }
+p384 = { version = "0.14", default-features = false, features = ["ecdsa", "ecdh"] }
+p521 = { version = "0.14", default-features = false, features = ["ecdsa", "ecdh"], optional = true }
+ecdsa = { version = "0.17", default-features = false, features = ["algorithm"] }
+ed25519-dalek = { version = "3", default-features = false }
+rsa = { version = "0.10", default-features = false, features = ["pkcs1v15"] }
+aes = { version = "0.9", default-features = false }
+aes-gcm = { version = "0.11", default-features = false, features = ["aes", "alloc"] }
+cbc = { version = "0.2", default-features = false }
+aes-kw = { version = "0.3", default-features = false }
+one-step-kdf = { version = "=0.1.0-rc.1", default-features = false }
+sha1 = { version = "0.11", default-features = false, optional = true }
+rand_core = { workspace = true, optional = true }
+
+[dev-dependencies]
+serde = { workspace = true, features = ["derive"] }
+trybuild.workspace = true
+testkit.workspace = true
+# the canary's path probes name these
+rand.workspace = true
+getrandom.workspace = true
+serde_json.workspace = true
+
+[lints]
+workspace = true

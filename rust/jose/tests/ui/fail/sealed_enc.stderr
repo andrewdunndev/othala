@@ -1,0 +1,18 @@
+error[E0277]: the trait bound `Mine: jose::jwe::envelope::sealed::Enc` is not satisfied
+ --> tests/ui/fail/sealed_enc.rs:6:20
+  |
+6 | impl jose::Enc for Mine {
+  |                    ^^^^ unsatisfied trait bound
+  |
+help: the trait `jose::jwe::envelope::sealed::Enc` is not implemented for `Mine`
+ --> tests/ui/fail/sealed_enc.rs:5:1
+  |
+5 | struct Mine;
+  | ^^^^^^^^^^^
+  = note: `Mine` implements similarly named trait `Enc`, but not `jose::jwe::envelope::sealed::Enc`
+note: required by a bound in `Enc`
+ --> src/alg.rs
+  |
+  | pub trait Enc: crate::jwe::envelope::sealed::Enc {
+  |                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ required by this bound in `Enc`
+  = note: `Enc` is a "sealed trait", because to implement it you also need to implement `jose::jwe::envelope::sealed::Enc`, which is not accessible; this is usually done to force you to use one of the provided types that already implement it

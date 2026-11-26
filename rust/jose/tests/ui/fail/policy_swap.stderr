@@ -1,0 +1,7 @@
+error[E0308]: mismatched types
+ --> tests/ui/fail/policy_swap.rs:3:5
+  |
+2 | fn f(name: jose::Audience) -> jose::Issuer {
+  |                               ------------ expected `jose::Issuer` because of return type
+3 |     name
+  |     ^^^^ expected `Issuer`, found `Audience`

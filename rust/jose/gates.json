@@ -1,0 +1,79 @@
+{
+  "published": true,
+  "doc": true,
+  "ui": true,
+  "api": true,
+  "targets": {
+    "wasm32-unknown-unknown": [
+      "--no-default-features",
+      "--all-features"
+    ],
+    "thumbv7em-none-eabi": [
+      "--no-default-features",
+      "--all-features"
+    ]
+  },
+  "mutants": {
+    "floor": 0
+  },
+  "vectors": [
+    "wycheproof",
+    "rfc7515",
+    "rfc7515-a4-a7",
+    "rfc7516",
+    "rfc7518",
+    "rfc7520-jwk",
+    "rfc7520-jws",
+    "rfc7520-jwe",
+    "rfc7520-jwe-cases",
+    "rfc7638",
+    "rfc8037",
+    "rfc8725-derived",
+    "jose-derived"
+  ],
+  "allow": [
+    "aead",
+    "aes",
+    "aes-gcm",
+    "aes-kw",
+    "base16ct",
+    "cbc",
+    "cipher",
+    "cmov",
+    "const-oid",
+    "cpubits",
+    "crypto-bigint",
+    "crypto-primes",
+    "ctr",
+    "ctutils",
+    "curve25519-dalek",
+    "curve25519-dalek-derive",
+    "der",
+    "ecdsa",
+    "ed25519",
+    "ed25519-dalek",
+    "elliptic-curve",
+    "ff",
+    "ghash",
+    "group",
+    "hkdf",
+    "hmac",
+    "inout",
+    "one-step-kdf",
+    "p256",
+    "p384",
+    "p521",
+    "polyval",
+    "primefield",
+    "primeorder",
+    "rfc6979",
+    "rsa",
+    "rustc_version",
+    "sec1",
+    "semver",
+    "sha1",
+    "signature",
+    "universal-hash",
+    "wnaf"
+  ]
+}
