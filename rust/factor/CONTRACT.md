@@ -191,7 +191,7 @@ Recovery codes (NIST SP 800-63B-4 3.1.2)
 - N8 `RecoveryMatch` carries no remaining count: codes are rows of their own, and the host counts them if it lists them.
 
 ## Refinements of architecture section 2
-`check` returns `Closed::Wait(until)`, never a lock (R-g). `Totp::verify` takes no `now`: the permit's time is its one clock. `password_verify` takes the host's `&Phc` and `Cost`, and `recovery_verify` the one row under `RecoveryCode::key`, not the whole set. `recovery_generate` returns its codes inside a `Pending`, so they leave only once their rows commit. `Rehash::Needed` carries the new `Phc`. `OtpKey` holds its bytes in a base `SecretBytes` and leaves as one; factor reads secret bytes through base's `expose` only in the modules O17 names (R-j).
+`check` returns `Closed::Wait(until)`, never a lock (R-g). `Totp::verify` takes no `now`: the permit's time is its one clock. `password_verify` takes the host's `&Phc` and `Cost`, and `recovery_verify` the one row under `RecoveryCode::key`, not the whole set. `recovery_generate` returns its codes inside a `Pending`, so they leave only once their rows commit. `Rehash::Needed` carries the new `Phc`. `OtpKey` holds its bytes in a base `SecretBytes` and leaves as one; factor reads secret bytes through `expose::Expose` only in the modules O17 names (R-j).
 
 ## Module map
 | Item | File | Lands | Rows and checks |
