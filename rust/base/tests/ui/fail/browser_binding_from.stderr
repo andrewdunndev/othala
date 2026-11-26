@@ -1,0 +1,13 @@
+error[E0277]: the trait bound `BrowserBinding: From<&Digest>` is not satisfied
+ --> tests/ui/fail/browser_binding_from.rs:5:5
+  |
+5 |     base::BrowserBinding::from(held)
+  |     ^^^^^^^^^^^^^^^^^^^^ the trait `From<&Digest>` is not implemented for `BrowserBinding`
+  |
+help: the trait `From<&Digest>` is not implemented for `BrowserBinding`
+      but trait `From<&Secret<32>>` is implemented for it
+ --> src/secret.rs
+  |
+  | impl From<&Secret<32>> for BrowserBinding {
+  | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  = help: for that trait implementation, expected `Secret<32>`, found `Digest`
