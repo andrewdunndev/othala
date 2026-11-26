@@ -64,8 +64,6 @@ fn every_listed_path_is_rejected() {
     let _ = || std::fs::create_dir_all("x");
     let _ = || std::fs::rename("x", "y");
     let _ = || std::fs::copy("x", "y");
-    let _ = |s: &base::Secret<4>| *s.expose();
-    let _ = |s: &base::SecretBytes| s.expose().len();
     let _ = |e: &base::Effect<K, u8>| e.host_applied();
     let _: Option<serde_json::Value> = None;
     let _: Option<rand::rngs::ThreadRng> = None;

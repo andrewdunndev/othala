@@ -42,11 +42,6 @@ impl<const N: usize> Secret<N> {
         decode_exact(text).map(Self)
     }
 
-    /// The single greppable read; a lint forbids it in every published crate.
-    pub const fn expose(&self) -> &[u8; N] {
-        &self.0
-    }
-
     /// Constant-time equality.
     pub fn ct_eq(&self, other: &Self) -> bool {
         self.0.as_slice().ct_eq(other.0.as_slice()).into()
@@ -58,15 +53,26 @@ impl<const N: usize> Secret<N> {
     }
 }
 
+impl<const N: usize> expose::Expose for Secret<N> {
+    type Bytes = [u8; N];
+
+    fn expose(&self) -> &[u8; N] {
+        &self.0
+    }
+}
+
+impl expose::Expose for SecretBytes {
+    type Bytes = [u8];
+
+    fn expose(&self) -> &[u8] {
+        &self.0
+    }
+}
+
 impl SecretBytes {
     /// Takes ownership of imported key bytes.
     pub const fn new(bytes: Vec<u8>) -> Self {
         Self(bytes)
-    }
-
-    /// The single greppable read; a lint forbids it in every published crate.
-    pub fn expose(&self) -> &[u8] {
-        &self.0
     }
 
     /// Constant-time equality over equal lengths; unequal lengths are unequal.
@@ -203,6 +209,7 @@ mod tests {
     use alloc::string::ToString;
     use alloc::vec;
     use alloc::vec::Vec;
+    use expose::Expose as _;
     use sha2::{Digest as _, Sha256};
 
     struct Counting(u8);
@@ -221,7 +228,7 @@ mod tests {
         let mut e = Counting(0);
         let s = Secret::<4>::generate(&mut e);
         assert_eq!(e.0, 4);
-        assert_eq!(s.expose(), &[1, 2, 3, 4]);
+        assert_eq!(&s.0, &[1, 2, 3, 4]);
     }
 
     #[test]

@@ -1,0 +1,5 @@
+error[E0451]: field `step` of struct `factor::OtpMatch` is private
+ --> tests/ui/fail/otp_match_forge.rs:7:24
+  |
+7 |     let _ = OtpMatch { step: s };
+  |                        ^^^^ private field
