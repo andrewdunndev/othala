@@ -1,0 +1,2 @@
+//! Row `derived`: the oracle family `vectors/webauthn-rp-derived/` (client-data, authenticator-data, registration and cbor), each case through the byte constructors; it proves CONTRACT R1 to R7, R33 to R53, R62, R70 to R81, R90, R145.
+//! Its tests land with webauthn-02 (cbor), 03 (client data), 04 (authenticator data and assertions) and 05 (registrations); until then the row reads red (`running 0 tests`).

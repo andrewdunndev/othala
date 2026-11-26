@@ -1,0 +1,15 @@
+{
+  "published": true,
+  "doc": true,
+  "ui": true,
+  "api": true,
+  "targets": {
+    "wasm32-unknown-unknown": ["--no-default-features", "--all-features", "--no-default-features --features none", "--no-default-features --features packed", "--no-default-features --features tpm", "--no-default-features --features android-key", "--no-default-features --features apple", "--no-default-features --features fido-u2f", "--no-default-features --features serde", "--no-default-features --features std"],
+    "thumbv7em-none-eabi": ["--no-default-features", "--no-default-features --features none,packed,tpm,android-key,apple,fido-u2f,serde"]
+  },
+  "mutants": {
+    "floor": 0
+  },
+  "vectors": ["w3c-webauthn-3", "w3c-webauthn-3-exam-spike", "android-key-attestation", "webauthn-rp-derived"],
+  "allow": ["base16ct", "cmov", "const-oid", "cpubits", "crypto-bigint", "crypto-primes", "ctutils", "curve25519-dalek", "curve25519-dalek-derive", "der", "der_derive", "ecdsa", "ed25519", "ed25519-dalek", "elliptic-curve", "ff", "flagset", "group", "hmac", "p256", "p384", "primefield", "primeorder", "rfc6979", "rsa", "rustc_version", "sec1", "semver", "sha1", "signature", "spki", "wnaf", "x509-cert"]
+}

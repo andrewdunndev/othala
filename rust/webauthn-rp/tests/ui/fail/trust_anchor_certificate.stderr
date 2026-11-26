@@ -1,0 +1,5 @@
+error[E0599]: no associated function or constant named `certificate` found for struct `TrustAnchor` in the current scope
+ --> tests/ui/fail/trust_anchor_certificate.rs:5:26
+  |
+5 |     let _ = TrustAnchor::certificate;
+  |                          ^^^^^^^^^^^ associated function or constant not found in `TrustAnchor`

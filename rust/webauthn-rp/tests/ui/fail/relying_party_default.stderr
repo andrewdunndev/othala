@@ -1,0 +1,5 @@
+error[E0599]: no associated function or constant named `default` found for struct `RelyingParty` in the current scope
+ --> tests/ui/fail/relying_party_default.rs:5:27
+  |
+5 |     let _ = RelyingParty::default;
+  |                           ^^^^^^^ associated function or constant not found in `RelyingParty`

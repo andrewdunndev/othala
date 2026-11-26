@@ -1,0 +1,8 @@
+error[E0599]: no associated function or constant named `new` found for struct `RegistrationCeremony` in the current scope
+ --> tests/ui/fail/ceremony_new.rs:5:35
+  |
+5 |     let _ = RegistrationCeremony::new;
+  |                                   ^^^ associated function or constant not found in `RegistrationCeremony`
+  |
+help: there is a method `ne` with a similar name
+ --> $RUST/core/src/cmp.rs

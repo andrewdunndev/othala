@@ -1,0 +1,7 @@
+error[E0618]: expected function, found `Backup`
+ --> tests/ui/fail/backup_single_device.rs:4:5
+  |
+4 |     Backup::SingleDevice(s)
+  |     ^^^^^^^^^^^^^^^^^^^^---
+  |     |
+  |     call expression requires function

@@ -1,0 +1,48 @@
+[package]
+name = "webauthn-rp"
+description = "WebAuthn Level 3 relying-party ceremonies and verifier: sans-IO, strict CBOR and COSE inside, effects as data"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+publish.workspace = true
+
+[features]
+default = ["none", "packed", "tpm", "android-key", "apple", "fido-u2f"]
+none = []
+packed = ["dep:x509-cert", "dep:der", "dep:spki", "dep:const-oid"]
+tpm = ["dep:x509-cert", "dep:der", "dep:spki", "dep:const-oid", "dep:sha1"]
+android-key = ["dep:x509-cert", "dep:der", "dep:spki", "dep:const-oid"]
+apple = ["dep:x509-cert", "dep:der", "dep:spki", "dep:const-oid"]
+fido-u2f = ["dep:x509-cert", "dep:der", "dep:spki", "dep:const-oid"]
+serde = ["dep:serde"]
+# base's std (`UnixTime` from `SystemTime`); verification never needs it
+std = ["base/std"]
+
+[dependencies]
+base.workspace = true
+# oid: rsa's PKCS#1 v1.5 verifier names its digest by OID
+sha2 = { workspace = true, features = ["oid"] }
+sha1 = { version = "0.11", default-features = false, features = ["oid"], optional = true }
+p256 = { version = "0.14", default-features = false, features = ["ecdsa"] }
+p384 = { version = "0.14", default-features = false, features = ["ecdsa"] }
+ed25519-dalek = { version = "3", default-features = false }
+rsa = { version = "0.10", default-features = false, features = ["pkcs1v15"] }
+x509-cert = { version = "0.3.1", default-features = false, optional = true }
+der = { version = "0.8.3", default-features = false, features = ["alloc", "derive", "oid"], optional = true }
+spki = { version = "0.8.1", default-features = false, features = ["alloc"], optional = true }
+const-oid = { version = "0.10.3", default-features = false, optional = true }
+serde = { workspace = true, optional = true }
+
+[dev-dependencies]
+testkit.workspace = true
+store.workspace = true
+proptest.workspace = true
+serde_json.workspace = true
+# the canary paths probe names their OS-randomness paths
+rand.workspace = true
+getrandom.workspace = true
+trybuild.workspace = true
+
+[lints]
+workspace = true
