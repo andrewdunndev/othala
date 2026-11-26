@@ -76,7 +76,7 @@ deny-pin:
     @sed -n 's/^"cargo:cargo-deny" = "\([0-9][0-9.]*\)"$/\1/p' ../mise.toml
 
 # the installed cargo-mutants, cargo-deny and jq must be the versions ../mise.toml pins; CI installs by the same pin and is graded here
-tool-pins *tools="cargo-mutants cargo-deny jq":
+tool-pins *tools="cargo-mutants jq cargo-deny":
     #!/usr/bin/env bash
     set -euo pipefail
     for t in {{tools}}; do
