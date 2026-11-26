@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# `own.sh ITEM`: fail when this branch's diff from main names a path outside ITEM's globs (rust/Cargo.lock excepted) or
+# `own.sh ITEM`: fail when this branch's diff from main names a path outside ITEM's globs (rust/Cargo.lock and each rust/*/public-api.txt excepted: both are regenerated at integration and checked by their gates) or
 # an oracle path (OWN_MAIN overrides origin/main). Globs and oracle patterns are bash patterns over repo-root paths, where * also crosses /.
 # The queue is read from the merge base, never the branch, so a branch cannot widen its own globs; CI runs the base's own.sh.
 set -euo pipefail
@@ -22,7 +22,7 @@ fi
 mapfile -d '' -t paths < <(git diff --name-only --no-renames -z "$base")
 bad=0
 for p in "${paths[@]}"; do
-    [ "$p" = rust/Cargo.lock ] && continue
+    case "$p" in rust/Cargo.lock | rust/*/public-api.txt) continue ;; esac
     for o in "${oracle[@]}"; do [[ $p == $o ]] && { echo "own $item: $p is oracle"; bad=1; continue 2; }; done
     for g in "${globs[@]}"; do [[ $p == $g ]] && continue 2; done
     echo "own $item: $p is outside its globs"

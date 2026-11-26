@@ -1,4 +1,6 @@
 // `just canary` appends this to each published crate's src/lib.rs; each line marked `want:` must be that error there.
+// aliased so it neither collides with a crate's own `extern crate std` nor needs std in scope in a no_std crate
+extern crate std as canary_std;
 macro_rules! canary_in_macro {
     ($x:expr) => {
         $x.unwrap() // want: clippy::disallowed_methods
@@ -39,11 +41,11 @@ pub fn canary_as(x: u16) -> u8 {
 }
 /// canary
 pub fn canary_print() {
-    std::println!("canary") // want: clippy::print_stdout
+    canary_std::println!("canary") // want: clippy::print_stdout
 }
 /// canary
 pub fn canary_dbg(x: u8) -> u8 {
-    std::dbg!(x) // want: clippy::dbg_macro
+    canary_std::dbg!(x) // want: clippy::dbg_macro
 }
 /// canary
 pub fn canary_unsafe() {
