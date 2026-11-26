@@ -1,0 +1,8 @@
+error[E0599]: no variant, associated function, or constant named `None` found for enum `SigningAlg` in the current scope
+ --> tests/ui/fail/no_none_alg.rs:2:49
+  |
+2 | const ALG: jose::SigningAlg = jose::SigningAlg::None;
+  |                                                 ^^^^ variant, associated function, or constant not found in `SigningAlg`
+  |
+help: there is a method `ne` with a similar name
+ --> $RUST/core/src/cmp.rs
