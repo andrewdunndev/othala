@@ -24,6 +24,7 @@ field Record::Attempts::0: crate::Attempts
 field Record::Recovery::0: crate::RecoveryHash
 field Record::TotpStep::0: crate::TotpStep
 field Rehash::Needed::0: Phc
+function password_hash fn(password: &NewPassword, cost: Cost, e: &mut impl Entropy) -> Result<Phc, crate::Error>
 impl Clone for Attempts
 impl Clone for Backoff
 impl Clone for Cap
@@ -86,11 +87,14 @@ impl Debug for Key
 impl Debug for Lanes
 impl Debug for Memory
 impl Debug for Minimum
+impl Debug for NewPassword
 impl Debug for OtpAlg
 impl Debug for OtpMatch
 impl Debug for Passes
+impl Debug for Password
 impl Debug for Period
 impl Debug for Permit
+impl Debug for Phc
 impl Debug for Record
 impl Debug for RecoveryCount
 impl Debug for RecoveryHash
@@ -191,9 +195,15 @@ impl StructuralPartialEq for TotpStep
 impl StructuralPartialEq for Wait
 method Backoff::new const fn(free: FreeAttempts, first: Wait, cap: Cap) -> Self
 method Cap::new const fn(secs: u64) -> Result<Self, Error>
+method Cost::new const fn(memory: Memory, passes: Passes, lanes: Lanes) -> Result<Self, Error>
 method Error::kind const fn(self: &Self) -> ErrorKind
 method FreeAttempts::new const fn(attempts: u32) -> Result<Self, Error>
+method Lanes::new const fn(lanes: u32) -> Self
+method Memory::kib const fn(kib: u32) -> Self
+method NewPassword::new fn(text: &str, minimum: Minimum) -> Result<Self, Error>
 method OtpKey::import fn(key: Vec<u8>) -> Result<Self, Error>
+method Passes::new const fn(passes: u32) -> Self
+method Phc::as_str fn(self: &Self) -> &str
 method Throttle::check fn(self: &Self, attempts: Option<Row<&Attempts>>, now: UnixTime) -> Result<Permit, Closed>
 method Throttle::new const fn(policy: Backoff) -> Self
 method Throttle::reset fn(attempts: Row<&Attempts>, e: &mut impl Entropy) -> Effect

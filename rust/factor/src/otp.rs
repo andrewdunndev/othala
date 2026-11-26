@@ -141,6 +141,7 @@ mod rfc4226 {
     use testkit::vectors::{Outcome, run};
 
     use super::{Digits, OtpAlg, OtpKey, hotp};
+    use crate::tests::unhex;
 
     #[derive(Deserialize)]
     struct Appendix {
@@ -169,13 +170,6 @@ mod rfc4226 {
     struct Verdict {
         ok: bool,
         next_counter: Option<u64>,
-    }
-
-    fn unhex(text: &str) -> Option<alloc::vec::Vec<u8>> {
-        text.as_bytes()
-            .chunks(2)
-            .map(|pair| u8::from_str_radix(core::str::from_utf8(pair).ok()?, 16).ok())
-            .collect()
     }
 
     fn digits(n: u8) -> Option<Digits> {
