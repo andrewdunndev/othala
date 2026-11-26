@@ -88,7 +88,7 @@ Checks: `ui:x` is `tests/ui/fail/x.rs` with its committed `.stderr` (rustc code 
 - B7 Three members are not published and set their own lint tables in `Cargo.toml`: `store` (`disallowed_methods` at `deny`, for its one receipt mint), `testkit` (`unwrap_used`, `expect_used`, `panic` and the three disallowed lints at `deny`: a harness reports by panicking and reads fixtures from disk) and `wipe` (outside the lints: its probes need `unsafe`). None is a runtime dependency of a published crate: `just deps` (B12).
 - B8 A cargo config, `RUSTFLAGS` or `--cap-lints` that weakens a level fails B4 to B6, since `just canary` builds inside the tree with the caller's environment.
 - B12 Each member's direct runtime dependencies, every feature on, are the ones `deps.txt` lists: `just deps` (in `just all` and CI); `deny.toml` allows only this workspace's graph: `just deny`.
-- B13 The ledger measures what is on disk: `just ledger` hands trybuild each `.rs` file of `tests/ui/fail` and `tests/ui/pass` and asserts 21 of each.
+- B13 The ledger measures what is on disk: `just ledger` hands trybuild each `.rs` file of `tests/ui/fail` and `tests/ui/pass` and asserts 22 of each.
 - B14 `just mutants` fails unless each package reaches its floor (base 73, store 28, testkit 83) with none missed or timed out; `just rows` counts the skipped as `cargo mutants --list --no-config` less `--list`.
 
 ## Non-claim
