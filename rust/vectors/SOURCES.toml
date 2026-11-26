@@ -349,7 +349,7 @@ files = [
   { path = "webauthn-rp-derived/authenticator-data.json", sha256 = "ab947f3152b3b750bc4735b5ed65acb9ec7900969942d2d7d4e597e4bcbb393d", cases = 20 },
   { path = "webauthn-rp-derived/cbor.json", sha256 = "d35068e42113595e9158ad9dbd2ea0f5f2d5d5d5d9af7a4383c87cbd057784d0", cases = 21 },
   { path = "webauthn-rp-derived/client-data.json", sha256 = "8cad78c18e11d9a96adb7a03367d7b11555a7fa7693058568c6477c10bb8e929", cases = 20 },
-  { path = "webauthn-rp-derived/registration.json", sha256 = "8631b16ed2aba28903ef74703905db44def6bfd3025a2b163cb8ac3194abaf26", cases = 17 },
+  { path = "webauthn-rp-derived/registration.json", sha256 = "0c09657edf08efbc33e775f4cac8f5decfbb375c42f06ca9158e2cd03ab79f45", cases = 17 },
 ]
 
 # Real-authenticator corpus. Seeded from the survey failure list (survey-webauthn.md section 4 item 3).
