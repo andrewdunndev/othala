@@ -394,7 +394,8 @@ mod tests {
         let _ = (Json::text, JweEnc::A128Gcm);
     }
 
-    /// Bad tag, bad padding and both at once are the one `Decrypt`: the padding is never reached on a bad tag.
+    /// A bad tag, a body that does not decrypt, and both at once are refused, each as the one `Decrypt`; the order of the
+    /// tag check and the decryption is held by review (CONTRACT R56), not by this test.
     fn tag_first_for<E: Sealed, D: EagerHash>() {
         let cek = SecretBytes::new(
             (0..E::CEK_LEN)

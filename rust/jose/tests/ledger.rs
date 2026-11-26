@@ -1,11 +1,11 @@
 //! The Type claims of CONTRACT.md: each case fails to compile, each twin compiles, and the cases on disk are
-//! exactly the `ui:` names CONTRACT.md gives without a landing item. Cases named `off_*` hold with every feature
+//! exactly the `ui:` names CONTRACT.md gives. Cases named `off_*` hold with every feature
 //! off and run only then; the others run with every feature on.
 use std::collections::{BTreeMap, BTreeSet};
 use std::path::{Path, PathBuf};
 
 // a glob or a parse that matched nothing would pass while measuring nothing
-const EVERY_FEATURE: usize = 20;
+const EVERY_FEATURE: usize = 23;
 const NO_FEATURE: usize = 3;
 
 #[test]
