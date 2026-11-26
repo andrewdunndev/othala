@@ -35,11 +35,19 @@ exposers() { # tree: one package name per line
 }
 declared=$(jq -r 'select(.expose) | .name' <<< "$crates" | sort -u)
 [ "$(exposers "$here")" = "$declared" ] || { echo "canary: expose is a dependency of [$(exposers "$here" | xargs)] but declared by [$(echo $declared)]"; exit 1; }
-for c in $declared; do
-    for m in $(jq -r '.expose[]' "$c/gates.json"); do [ -f "$c/src/$m.rs" ] || [ -f "$c/src/$m/mod.rs" ] || { echo "canary $c: expose module $m has no source"; exit 1; }; done
-done
+no_source() { # tree: the declared expose modules with no source, as crate/module
+    local c m
+    for c in $declared; do
+        for m in $(jq -r '.expose[]' "$1/$c/gates.json"); do [ -f "$1/$c/src/$m.rs" ] || [ -f "$1/$c/src/$m/mod.rs" ] || echo "$c/$m"; done
+    done
+}
+missing=$(no_source "$here")
+[ -z "$missing" ] || { echo "canary: expose module has no source: $(echo $missing)"; exit 1; }
 # a build script can pass `-L crate=` and name a crate that is not a dependency
-builds=$(cargo metadata --offline --no-deps --format-version 1 | jq -r '.packages[] | select(any(.targets[]; .kind | index("custom-build"))) | .name')
+build_scripts() { # tree: the members with a custom-build target
+    (cd "$1" && cargo metadata --offline --no-deps --format-version 1) | jq -r '.packages[] | select(any(.targets[]; .kind | index("custom-build"))) | .name'
+}
+builds=$(build_scripts "$here")
 [ -z "$builds" ] || { echo "canary: build script in [$(echo $builds)]"; exit 1; }
 # no cargo config, mise file or CI env may inject a crate, a wrapper or a flag: the only file under .cargo is cargo-mutants' own. Only tracked files count (CI's CARGO_HOME holds the config files bundled in registry crates), so the tracked tree must not hold any CARGO_HOME
 tracked() { git -C "$1" ls-files; }
@@ -144,6 +152,19 @@ wipers() { # tree: members with a non-dev dependency on wipe
 printf '\n[dependencies.wipe]\npath = "../wipe"\n' >> "$tmp/$probe/Cargo.toml"
 [ "$(wipers "$tmp")" = "$probe" ] || { echo "canary: a normal wipe dependency planted in $probe went unreported"; exit 1; }
 cp "$probe/Cargo.toml" "$tmp/$probe/Cargo.toml"
+# a declared module without a source and a build script are refused
+dc=$(echo $declared | cut -d' ' -f1)
+dm=$(jq -r '.expose[0]' "$dc/gates.json")
+[ -z "$(no_source "$tmp")" ] || { echo "canary: the scratch copy has a declared module with no source"; exit 1; }
+f="$tmp/$dc/src/$dm.rs"
+[ -f "$f" ] || f="$tmp/$dc/src/$dm/mod.rs"
+mv "$f" "$f.planted"
+[ "$(no_source "$tmp")" = "$dc/$dm" ] || { echo "canary: a declared module with its source removed went unreported"; exit 1; }
+mv "$f.planted" "$f"
+[ -z "$(build_scripts "$tmp")" ] || { echo "canary: the scratch copy has a build script"; exit 1; }
+echo 'fn main() {}' > "$tmp/$probe/build.rs"
+[ "$(build_scripts "$tmp")" = "$probe" ] || { echo "canary: a build.rs planted in $probe went unreported"; exit 1; }
+rm "$tmp/$probe/build.rs"
 # unsafe is forbidden workspace-wide; only wipe may allow it
 for c in $undeclared; do
     [ "$c" != wipe ] || continue
@@ -255,7 +276,7 @@ pub fn f() {}'
 printf '#[cfg_attr(all(), doc = "x")]\n#[cfg(feature = "doc")]\npub fn f() {}\n' > "$tmp/planted_doc.rs"
 [ -z "$(doc_cfg "$tmp/planted_doc.rs")" ] || { echo "canary: a doc = attribute or a doc feature was reported as a doc cfg"; exit 1; }
 rm "$tmp/planted_doc.rs"
-echo "canary: expose is a dependency of [$(echo $declared)] only; undeclared plants in [$(echo $undeclared)] are caught (edges in $probe, unsafe, E0599, E0432, re-export and dyn and subtrait leaks, tracked cargo configs and files under .cargo-home, CARGO_HOME, CI and mise flag variables, doc cfgs, doc(hidden) leaks, wipe)"
+echo "canary: expose is a dependency of [$(echo $declared)] only; undeclared plants in [$(echo $undeclared)] are caught (edges in $probe, unsafe, E0599, E0432, re-export and dyn and subtrait leaks, declared-module sources, build scripts, tracked cargo configs and files under .cargo-home, CARGO_HOME, CI and mise flag variables, doc cfgs, doc(hidden) leaks, wipe)"
 want_paths=$(sed -nE 's/^[[:space:]]*\{ path = "([^"]+)".*/\1/p' clippy.toml | sort -u)
 for c in "$@"; do
     offset=$(wc -l < "$c/src/lib.rs")
