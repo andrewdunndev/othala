@@ -47,7 +47,8 @@ function parts(c) {
     const f = kids(raw, x);
     exts[oidStr(raw.subarray(f[0].vs, f[0].e))] = { crit: f.length === 3 && raw[f[1].vs] !== 0, val: raw.subarray(f[f.length - 1].vs, f[f.length - 1].e) };
   }
-  return { version, issuer: raw.subarray(t[i + 2].s, t[i + 2].e), subject: raw.subarray(t[i + 4].s, t[i + 4].e), exts };
+  const sigAlg = oidStr(raw.subarray(kids(raw, kids(raw, der(raw, 0))[1])[0].vs, kids(raw, kids(raw, der(raw, 0))[1])[0].e));
+  return { sigAlg, version, issuer: raw.subarray(t[i + 2].s, t[i + 2].e), subject: raw.subarray(t[i + 4].s, t[i + 4].e), exts };
 }
 const okVerify = (c, by) => { try { return c.verify(by.publicKey); } catch { return false; } };
 // link faults: the issuer name is byte for byte the next certificate's subject, and the signature verifies under its key
@@ -58,6 +59,17 @@ function linkFaults(x) {
     if (!okVerify(e, x[i + 1])) out.push(`link ${i} signature fails`);
   });
   return out;
+}
+// R116: chain signatures are ecdsa-with-SHA256 or -SHA384 on P-256 or P-384, or sha256, sha384, sha512 with RSA of 2048 to 4096 bits; anything else that verifies is refused by policy (R117)
+const R116_ECDSA = new Set(["1.2.840.10045.4.3.2", "1.2.840.10045.4.3.3"]);
+const R116_CURVES = new Set(["prime256v1", "secp384r1"]);
+const R116_RSA = new Set(["1.2.840.113549.1.1.11", "1.2.840.113549.1.1.12", "1.2.840.113549.1.1.13"]);
+const R116_RSA_BITS = [2048, 4096];
+function r116Refusal(c, signer) {
+  const oid = parts(c).sigAlg, k = signer.publicKey, d = k.asymmetricKeyDetails;
+  if (k.asymmetricKeyType === "ec") return R116_ECDSA.has(oid) && R116_CURVES.has(d.namedCurve) ? null : `signature ${oid} under ${d.namedCurve} is outside R116`;
+  if (k.asymmetricKeyType === "rsa") return R116_RSA.has(oid) && d.modulusLength >= R116_RSA_BITS[0] && d.modulusLength <= R116_RSA_BITS[1] ? null : `signature ${oid} under RSA-${d.modulusLength} is outside R116`;
+  return `signature ${oid} under ${k.asymmetricKeyType} is outside R116`;
 }
 const CA_CRIT_OK = new Set(["2.5.29.19", "2.5.29.15", "2.5.29.37", "2.5.29.17"]);
 // a certificate used as a CA: version 3, basicConstraints CA true, keyCertSign if keyUsage, critical extensions in the allowed set, pathLen respected
@@ -89,8 +101,10 @@ for (const c of load("chains.json")) {
   if (!exact && matching.length > 0 && matching.every((a) => !validAt(a, c.now) || caFaults(a, x.length - 1).length > 0)) faults.push("every matching anchor is unusable");
   const viaAnchor = exact || matching.length > 0;
   const out = c.expect.outcome;
-  // chains refused by algorithm policy alone: every name, signature and rule holds, the walk still reports Unanchored (R117)
-  const policy = ["ecdsa-sha1-leaf", "ecdsa-sha512-on-p256-leaf", "rsa-sha1-intermediate", "ecdsa-sha1-to-anchor", "p521-intermediate", "p521-anchor"].includes(c.id);
+  // chains refused by algorithm policy alone (a verifying link outside the R116 table): every name, signature and rule holds, the walk still reports Unanchored (R117)
+  const signers = x.slice(0, -1).map((_, i) => x[i + 1]).concat(exact ? [] : matching.slice(0, 1));
+  const refusals = signers.flatMap((s, i) => (okVerify(x[i], s) ? [r116Refusal(x[i], s)] : [])).filter(Boolean);
+  const policy = refusals.length > 0 && faults.length === 0;
   if (policy) { if (out !== "Unanchored") fail(`chains#${c.id}: policy case must expect Unanchored, expects ${out}`); if (faults.length || !viaAnchor) fail(`chains#${c.id}: policy case whose chain does not verify (${faults.join("; ") || "no anchor"})`); chains++; continue; }
   if (out === "Anchored" && (faults.length || !viaAnchor)) fail(`chains#${c.id}: expected Anchored, found ${faults.join("; ") || "no anchor"}`);
   if (out === "Unanchored" && (faults.length || viaAnchor)) fail(`chains#${c.id}: expected Unanchored, ${faults.length ? "found " + faults.join("; ") : "the chain anchors"}`);
@@ -113,7 +127,11 @@ function cbor(buf, o = { i: 0 }) {
 }
 let atts = 0, tpms = 0, chainsChecked = 0;
 // ids that name a fault; each must produce exactly that fault, and no other case may
-const sigFault = /signature-(over-other-data|other-data|bit-flip|other-key)|packed-alg-not-the-leaf-key|tpm-alg-es256-rsa-aik|android-key-signature-other-key/;
+const sigFault = /signature-(over-other-data|other-data|bit-flip|other-key)|packed-alg-not-the-leaf-key|android-key-signature-other-key/;
+// TPM alg table (R95): RS256, RS1 or ES256 only, each with the key it needs; a case names a fault by id, any other mismatch is a finding of its own
+const TPM_ALG = { [-7]: { kty: "ec", curve: "prime256v1", hash: "sha256" }, [-257]: { kty: "rsa", hash: "sha256" }, [-65535]: { kty: "rsa", hash: "sha1" } };
+const tpmAlgKeyFault = /tpm-alg-es256-rsa-aik/;
+const tpmAlgUnlistedFault = /tpm-alg-es384/;
 const extraFault = /certinfo-extradata/;
 const nameFault = /certinfo-name-(other-pubarea|wrong-alg-prefix)/;
 const unparsable = /certinfo-(magic|type-quote|truncated)|pubarea-(truncated|wrong-type)/;
@@ -147,7 +165,7 @@ for (const c of load("attestation.json")) {
   if (ao.fmt === "packed" || ao.fmt === "android-key") {
     ok = verify(st.alg === -7 ? "sha256" : "sha384", Buffer.concat([ao.authData, cdh]), { key, dsaEncoding: "der" }, st.sig);
   } else if (ao.fmt === "tpm") {
-    const h = { [-65535]: "sha1", [-35]: "sha384" }[st.alg] || "sha256";
+    const h = TPM_ALG[st.alg]?.hash || { [-35]: "sha384" }[st.alg] || "sha256";
     ok = verify(h, st.certInfo, { key, dsaEncoding: "der" }, st.sig);
     const ci = (() => { try { return certInfo(st.certInfo); } catch { return null; } })();
     if (ci === null) { if (!unparsable.test(c.id)) fail(`attestation#${c.id}: certInfo does not parse and the id names no parse fault`); }
@@ -158,7 +176,14 @@ for (const c of load("attestation.json")) {
       if (extraOk === extraFault.test(c.id)) fail(`attestation#${c.id}: extraData ${extraOk ? "matches" : "differs"} against the case id (R94)`);
       if (nameOk === nameFault.test(c.id)) fail(`attestation#${c.id}: attested name ${nameOk ? "matches" : "differs"} against the case id (R94)`);
     }
-    tpms++;
+    const row = TPM_ALG[st.alg];
+    const fits = !!row && row.kty === key.asymmetricKeyType && (row.curve === undefined || row.curve === key.asymmetricKeyDetails?.namedCurve);
+    if (tpmAlgUnlistedFault.test(c.id) === !!row) fail(`attestation#${c.id}: fault tpm-alg-not-in-r95: alg ${st.alg} ${row ? "is" : "is not"} one of RS256, RS1, ES256 against the case id`);
+    else if (row && fits === tpmAlgKeyFault.test(c.id)) fail(`attestation#${c.id}: fault tpm-alg-key-mismatch: alg ${st.alg} needs ${row.kty}${row.curve ? " on " + row.curve : ""}, the AIK is ${key.asymmetricKeyType}${key.asymmetricKeyDetails?.namedCurve ? " on " + key.asymmetricKeyDetails.namedCurve : ""} against the case id (R95)`);
+    if (c.expect.ok && !ok) fail(`attestation#${c.id}: expected ok but the statement signature does not verify`);
+    if (ok === sigFault.test(c.id)) fail(`attestation#${c.id}: signature ${ok ? "verifies" : "fails"} against the case id`);
+    tpms++; atts++;
+    continue;
   }
   if (({ [-7]: "ec", [-35]: "ec", [-257]: "rsa", [-65535]: "rsa" })[st.alg] !== key.asymmetricKeyType) ok = false; // alg must fit the key type
   if (st.alg === -7 && key.asymmetricKeyDetails?.namedCurve !== "prime256v1") ok = false; // ES256 needs P-256

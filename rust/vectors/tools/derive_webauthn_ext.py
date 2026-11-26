@@ -712,7 +712,7 @@ def limit_cases():
                    "input_len": 65536 + ex, "input_sha256": sha(bytes([3]) * (65536 + ex)).hex(), "input_b64url": b64(bytes([3]) * (65536 + ex)), "recipe": "the byte 0x03 repeated bound+excess times, returned as the largeBlob `blob` after a Read request", "expect": OK if ex == 0 else TOO})
     cs += [
         {"id": "record-large-blob-half-bound", "op": "start_authentication", "bound": "webauthn_rp::MAX_RECORD", "blob_len": 4096,
-         "spec": "contract R1 and R61 (a ceremony row well under MAX_RECORD: a largeBlob write of MAX_RECORD/2 bytes is accepted)",
+         "spec": "contract R1, R15, R61 and R142 (a ceremony row well under MAX_RECORD: a largeBlob write of MAX_RECORD/2 bytes is accepted). Oracle choice, a disclosed gap: R15 and R142 do not say what the row keeps of the blob, so this case reads the row as keeping it at no more than its length plus a fixed overhead; the TooLarge record case stays dropped until the CONTRACT fixes that",
          "allow": "discoverable", "extensions": {"largeBlob": {"write": b64(bytes([3]) * 4096)}}, "expect": OK},
         {"id": "trust-anchor-one-certificate", "op": "trust_anchor_from_der", "input": ROOT.der.hex(), "spec": "contract R18 (exactly one DER certificate; digest is the SHA-256 of that DER)", "expect": {"ok": True, "digest": sha(ROOT.der).hex()}},
         {"id": "trust-anchor-two-certificates", "op": "trust_anchor_from_der", "input": (ROOT.der + INT.der).hex(), "spec": "contract R18 (exactly one DER certificate, not a concatenation)", "expect": NO},
