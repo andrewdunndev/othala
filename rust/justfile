@@ -81,16 +81,16 @@ floor-rule: (tool-pins "jq")
     set -euo pipefail
     bad=0
     for f in 0 23 100; do
-        echo "{\"mutants\": {\"floor\": $f}}" | jq -e -L . 'include "floor"; floor_ok' > /dev/null || { echo "floor-rule: refused good floor $f"; bad=1; }
+        echo "{\"mutants\": {\"floor\": $f}}" | ./crates.sh --floor || { echo "floor-rule: refused good floor $f"; bad=1; }
     done
     for f in 1e2 23.0 -0 null false 0.5 -1 '"5"' '[]' '{}'; do
-        echo "{\"mutants\": {\"floor\": $f}}" | jq -e -L . 'include "floor"; floor_ok' > /dev/null && { echo "floor-rule: accepted bad floor $f"; bad=1; }
+        echo "{\"mutants\": {\"floor\": $f}}" | ./crates.sh --floor && { echo "floor-rule: accepted bad floor $f"; bad=1; }
     done
-    echo '{"mutants": {"tests": ["a"]}}' | jq -e -L . 'include "floor"; floor_ok' > /dev/null && { echo "floor-rule: accepted a missing floor"; bad=1; }
-    echo '{"mutants": 5}' | jq -e -L . 'include "floor"; floor_ok' > /dev/null && { echo "floor-rule: accepted a non-object mutants"; bad=1; }
-    echo '{"doc": true}' | jq -e -L . 'include "floor"; floor_ok' > /dev/null || { echo "floor-rule: refused a crate with no mutants key"; bad=1; }
+    echo '{"mutants": {"tests": ["a"]}}' | ./crates.sh --floor && { echo "floor-rule: accepted a missing floor"; bad=1; }
+    echo '{"mutants": 5}' | ./crates.sh --floor && { echo "floor-rule: accepted a non-object mutants"; bad=1; }
+    echo '{"doc": true}' | ./crates.sh --floor || { echo "floor-rule: refused a crate with no mutants key"; bad=1; }
     # crates.sh itself must carry the rule
-    grep -q 'floor_ok' crates.sh || { echo "floor-rule: crates.sh does not apply floor_ok"; bad=1; }
+    grep -q 'if floor_ok then' crates.sh || { echo "floor-rule: crates.sh does not apply floor_ok"; bad=1; }
     exit $bad
 
 # the installed cargo-mutants, cargo-deny and jq must be the versions ../mise.toml pins; CI installs by the same pin and is graded here
@@ -154,11 +154,11 @@ mutants-changed base="origin/main": (tool-pins "cargo-mutants" "jq")
     # a floor is held against the merge base's, so a branch cannot lower its own
     while read -r c; do
         [ -n "$c" ] || continue
-        git show "$mb:./$c/gates.json" | jq -e -L . 'include "floor"; floor_ok' > /dev/null || { echo "mutants-changed: $c's merge-base mutants.floor must be a non-negative integer"; exit 1; }
+        git show "$mb:./$c/gates.json" | ./crates.sh --floor || { echo "mutants-changed: $c's merge-base mutants.floor must be a non-negative integer"; exit 1; }
         old=$(git show "$mb:./$c/gates.json" | jq -r '.mutants.floor // empty')
         [ -n "$old" ] || continue
         if git cat-file -e "HEAD:./$c/gates.json" 2> /dev/null; then
-            git show "HEAD:./$c/gates.json" | jq -e -L . 'include "floor"; floor_ok' > /dev/null || { echo "mutants-changed: $c's mutants.floor must be a non-negative integer"; exit 1; }
+            git show "HEAD:./$c/gates.json" | ./crates.sh --floor || { echo "mutants-changed: $c's mutants.floor must be a non-negative integer"; exit 1; }
             new=$(git show "HEAD:./$c/gates.json" | jq -r '.mutants.floor // empty')
         else
             new=""
