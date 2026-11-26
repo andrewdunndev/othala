@@ -9,8 +9,8 @@ revision = "65ca494727a52944c204441c860b039e6786b99b"
 retrieved = "2026-11-24"
 licence = "Apache-2.0"
 feeds = ["jose"]
-notes = "Upstream testvectors_v1 files, unmodified. ECDSA P-256 and P-384 (DER and P1363), Ed25519, RSA PKCS#1 v1.5 2048/3072/4096 x SHA-256/384/512, RSA-PSS (JOSE shape: MGF1 hash = signing hash, salt = hash length) 2048/3072/4096 for the combinations upstream publishes, HMAC-SHA256/384/512. Upstream has no RSA-PSS 2048 SHA-512, 3072 SHA-384 or 3072 SHA-512 files in this shape. P-256 files carried across from the exam spike (byte-identical to upstream at this sha)."
-cases = 5377
+notes = "Upstream testvectors_v1 files, unmodified. ECDSA P-256 and P-384 (DER and P1363), Ed25519, RSA PKCS#1 v1.5 2048/3072/4096 x SHA-256/384/512, RSA-PSS (JOSE shape: MGF1 hash = signing hash, salt = hash length) 2048/3072/4096 for the combinations upstream publishes, HMAC-SHA256/384/512. Upstream has no RSA-PSS 2048 SHA-512, 3072 SHA-384 or 3072 SHA-512 files in this shape. P-256 files carried across from the exam spike (byte-identical to upstream at this sha). JOSE additions at the same sha, git blob ids checked against the upstream tree: ECDSA P-521 SHA-512 (DER and P1363, ES512 behind p521); AES-GCM; AES key wrap (RFC 3394, aes_wrap); AES-CBC-PKCS5; A128CBC-HS256, A192CBC-HS384 and A256CBC-HS512 (the RFC 7518 composite AEAD, upstream names a1xxcbc_hsyyy); RSA-OAEP decrypt with SHA-256 and MGF1-SHA256 at 2048/3072/4096 (RSA-OAEP-256) and SHA-1/MGF1-SHA1 at 2048 (RSA-OAEP; upstream has no 3072 or 4096 SHA-1 file), behind rsa-decrypt; ECDH P-256/P-384/P-521 webcrypto variants (public keys as JWK) for ECDH-ES. X25519 files deliberately not taken: ECDH-ES over OKP is a non-goal (ruling R-e)."
+cases = 9165
 files = [
   { path = "wycheproof/ecdsa_secp256r1_sha256_p1363_test.json", sha256 = "c60de693930e386c3a5472d08081623ef8504decc54b38ac01ec6b2a2575c986", cases = 262 },
   { path = "wycheproof/ecdsa_secp256r1_sha256_test.json", sha256 = "182db4f3e230f6f9fa9f800d2a614dede30284b8e8438bbfe1171905402e9332", cases = 484 },
@@ -36,6 +36,21 @@ files = [
   { path = "wycheproof/rsa_signature_4096_sha256_test.json", sha256 = "957aca128e30bd02c8982f8ca482d6521d16683f4bbc3f193cdfd4c8f04bc667", cases = 258 },
   { path = "wycheproof/rsa_signature_4096_sha384_test.json", sha256 = "bc26f16b9fc9a90628864d3d1111ef48a4bd00b9d4870bfab88ff326e309e073", cases = 259 },
   { path = "wycheproof/rsa_signature_4096_sha512_test.json", sha256 = "9d6e67b1eb0d7040db411835238efd20e9302399a258bdff82de3f38e0f2855a", cases = 259 },
+  { path = "wycheproof/ecdsa_secp521r1_sha512_p1363_test.json", sha256 = "d294cbe0485dff0a2c53f6b363103ddb81c444e7e5ee44df56549ea92b873840", cases = 318 },
+  { path = "wycheproof/ecdsa_secp521r1_sha512_test.json", sha256 = "0fa3bb09a2319242253028b53d555fb8ec2081d891271321205cdaeabb3eef3e", cases = 542 },
+  { path = "wycheproof/aes_gcm_test.json", sha256 = "985e5ecc172e181eaf49e89508b9470dcf478002eb7e8559c707eb42dc97dfe7", cases = 316 },
+  { path = "wycheproof/aes_wrap_test.json", sha256 = "2fdb3661fd8823d1ec50e03886b24066415018975677dff83d83e77f5a51562d", cases = 165 },
+  { path = "wycheproof/aes_cbc_pkcs5_test.json", sha256 = "e45234427e10cf91f27324e52afe8c00906f294dbae061535e2ae13dd300a46a", cases = 216 },
+  { path = "wycheproof/a128cbc_hs256_test.json", sha256 = "ed844579d1ade7195bdcf67369fc2b2112029f185bd46b2d53076dddc607f464", cases = 94 },
+  { path = "wycheproof/a192cbc_hs384_test.json", sha256 = "e795bad158298c87541bc1357ee8658b0e96849d40eb8e7654f1f137c1413865", cases = 94 },
+  { path = "wycheproof/a256cbc_hs512_test.json", sha256 = "28fd47c8f3a353dd51e32956c3ab780f231805e7ffc01bf545e234ffd4219391", cases = 94 },
+  { path = "wycheproof/rsa_oaep_2048_sha256_mgf1sha256_test.json", sha256 = "83dce701e3d8640ac56e6d7bf37a5a8f9bd6a336e1e932a1e9bfe4ba9c5ea3a9", cases = 37 },
+  { path = "wycheproof/rsa_oaep_3072_sha256_mgf1sha256_test.json", sha256 = "c8122302f522bfd539650c71c4aa966bd1f89acb50c6f4c190030fdb9b2684a4", cases = 37 },
+  { path = "wycheproof/rsa_oaep_4096_sha256_mgf1sha256_test.json", sha256 = "e0eb85bcd6d66a85941ee3d98e44f7d1ffb0cf870ba6550e1ed3bec4174c60a9", cases = 37 },
+  { path = "wycheproof/rsa_oaep_2048_sha1_mgf1sha1_test.json", sha256 = "2c7b3694cd9265eb88ddb586ca29aefcea02938bde772e19a71a4fa601fc71c5", cases = 36 },
+  { path = "wycheproof/ecdh_secp256r1_webcrypto_test.json", sha256 = "578ddbae7cba6ba89583ed539b15cb601fcbd78c9614480895b577199bc8c985", cases = 353 },
+  { path = "wycheproof/ecdh_secp384r1_webcrypto_test.json", sha256 = "4eff6afc6923dcf01a21ceb42eeb4bcca9512ad9f7135e775bd7b56eac042cfc", cases = 794 },
+  { path = "wycheproof/ecdh_secp521r1_webcrypto_test.json", sha256 = "58888e023292d60a52f53ceb26e0eb3eb88c3e2eed66852fb09493ec3a40e943", cases = 655 },
 ]
 
 [source."rfc4226"]
@@ -183,11 +198,47 @@ revision = "RFC 7520 section 5"
 retrieved = "2026-11-24"
 licence = "IETF Trust (RFC text; data values only)"
 feeds = ["jose"]
-tag = "pending-D3"
-notes = "Extracted by tools/extract_rfc_figures.py from rfc7520.txt (sha256 14798c3b2d72e35375d5fb86d280a1e8df6109a6ee6cbfc091a0c57a8cc076c6): every numbered figure as text, joined (whitespace removed) and parsed json where it is JSON. RFC 7520 is Informational. Section 5 JWE examples 5.1-5.13. Tagged pending decision D3 (JWE later); committed so the data is on hand."
+notes = "Extracted by tools/extract_rfc_figures.py from rfc7520.txt (sha256 14798c3b2d72e35375d5fb86d280a1e8df6109a6ee6cbfc091a0c57a8cc076c6): every numbered figure as text, joined (whitespace removed) and parsed json where it is JSON. RFC 7520 is Informational. Section 5 JWE examples 5.1-5.13 as raw figures; D3 put JWE in scope, and the runnable cases are source rfc7520-jwe-cases."
 cases = 13
 files = [
   { path = "rfc7520/jwe.json", sha256 = "ab0533f1c25db15a919f4b70ba70f89a0f2795d9b79f6f7db14af653faff569d", cases = 13 },
+]
+
+[source."rfc7520-jwe-cases"]
+url = "https://www.rfc-editor.org/rfc/rfc7520.txt"
+revision = "RFC 7520 section 5"
+retrieved = "2026-11-26"
+licence = "IETF Trust (RFC text; data values only)"
+feeds = ["jose"]
+notes = "tools/extract_jwe.py on rfc7520.txt (sha256 14798c3b2d72e35375d5fb86d280a1e8df6109a6ee6cbfc091a0c57a8cc076c6), case shape of rfc7515/jws.json, op jwe_decrypt. Every compact, general and flattened serialization of 5.1-5.13 with the key the example names. In scope (RSA-OAEP behind rsa-decrypt, ECDH-ES and ECDH-ES+A128KW/A256KW, dir, A256GCMKW, A128KW; A128GCM, A256GCM, A128CBC-HS256) expect the Figure 72 plaintext; each in-scope compact form adds five derived refusals (tampered tag, ciphertext, IV and encrypted key, truncated tag; for dir and ECDH-ES a non-empty encrypted key, RFC 7516 5.2 step 10). Must-refuse (non-goals): 5.1 RSA1_5, 5.3 PBES2-HS512+A256KW, 5.9 zip DEF, and 5.13 recipient 1 (RSA1_5); 5.13 recipients 2 and 3 decrypt. All 95 cases of this file, rfc7516/jwe.json and rfc7518/*.json cross-checked against Node WebCrypto/OpenSSL before commit."
+cases = 64
+files = [
+  { path = "rfc7520/jwe-cases.json", sha256 = "7a2d93a97b578c4264eed5ca77955d6422b4af722a396076315527cdcf78d77b", cases = 64 },
+]
+
+[source."rfc7516"]
+url = "https://www.rfc-editor.org/rfc/rfc7516.txt"
+revision = "RFC 7516 appendix A.1-A.3"
+retrieved = "2026-11-26"
+licence = "IETF Trust (RFC text; data values only)"
+feeds = ["jose"]
+notes = "tools/extract_jwe.py on rfc7516.txt (sha256 722cfcddc15f58e746891ba4b846853d3711153a774e4dd55ad6db100474a21f), case shape of rfc7515/jws.json, op jwe_decrypt. A.1 RSA-OAEP + A256GCM (behind rsa-decrypt) and A.3 A128KW + A128CBC-HS256 each valid plus five derived refusals (tampered tag, ciphertext, IV, encrypted key; truncated tag). A.2 RSA1_5 + A128CBC-HS256 is must-refuse (non-goal). A.4 and A.5 (general and flattened JSON, RSA1_5 plus A128KW recipients) not extracted; RFC 7520 section 5 covers both serializations."
+cases = 13
+files = [
+  { path = "rfc7516/jwe.json", sha256 = "3e9147da581ab0b991cf36bc9f04afefdfa5520e77c33fda9fe381bb9d4a5c8a", cases = 13 },
+]
+
+[source."rfc7518"]
+url = "https://www.rfc-editor.org/rfc/rfc7518.txt"
+revision = "RFC 7518 appendices B.1-B.3 and C"
+retrieved = "2026-11-26"
+licence = "IETF Trust (RFC text; data values only)"
+feeds = ["jose"]
+notes = "tools/extract_jwe.py on rfc7518.txt (sha256 9a9ae524b09ea700ad3f189bac115df95ba69af84b26ffdbe3cdfb8d2152b1fc). appendix-b.json: AES_CBC_HMAC_SHA2 B.1-B.3 (A128CBC-HS256, A192CBC-HS384, A256CBC-HS512), hex as given; per test one cbc_hmac_encrypt (E, T and the MAC_KEY, ENC_KEY, AL, M intermediates), one cbc_hmac_decrypt, and three derived tampered decrypts (tag, ciphertext, AAD). appendix-c.json: ECDH-ES Concat KDF for A128GCM, op ecdh_es_derive, Z and OtherInfo as hex and the derived CEK; recipient side as given, sender side derived (Bob's public members), and a derived off-curve epk refusal (RFC 8725 3.4)."
+cases = 18
+files = [
+  { path = "rfc7518/appendix-b.json", sha256 = "cd83e9a1e78b7d46a05c0b2d7f6307d0765ae4dd9972d3087b67e8776c560008", cases = 15 },
+  { path = "rfc7518/appendix-c.json", sha256 = "f932fd6625116202c93790a0c3ac9cbeadff7604c956277a775c42a295c6321e", cases = 3 },
 ]
 
 [source."rfc4648"]
@@ -220,7 +271,7 @@ revision = "RFC 8037 appendix A"
 retrieved = "2026-11-24"
 licence = "IETF Trust (RFC text; data values only)"
 feeds = ["jose"]
-notes = "tools/extract_rfc_sections.py on rfc8037.txt (sha256 f14347f9d8eead78ef6e7a1ea3d795d35d664033095a76a80fcd567904aaedaa) with sections A.1-A.7: Ed25519 keys, thumbprint, signing and validation (verified by hand), ECDH-ES with X25519 and X448."
+notes = "tools/extract_rfc_sections.py on rfc8037.txt (sha256 f14347f9d8eead78ef6e7a1ea3d795d35d664033095a76a80fcd567904aaedaa) with sections A.1-A.7: Ed25519 keys, thumbprint, signing and validation (verified by hand), ECDH-ES with X25519 and X448. A.6 and A.7 (ECDH-ES over OKP) are must-refuse: a non-goal under ruling R-e."
 cases = 7
 files = [
   { path = "rfc8037/appendix-a.json", sha256 = "2b07fba6ce6ec8e2753e7abd4c995364d67f1536ddf4f14247c74ed830a59253", cases = 7 },

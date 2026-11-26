@@ -1,0 +1,84 @@
+{
+ "source": "RFC 7518 appendix C (ECDH-ES with Concat KDF, A128GCM); byte arrays as hex; sender and off-curve cases derived",
+ "cases": [
+  {
+   "op": "ecdh_es_derive",
+   "alg": "ECDH-ES",
+   "enc": "A128GCM",
+   "apu": "QWxpY2U",
+   "apv": "Qm9i",
+   "id": "c-recipient",
+   "private_jwk": {
+    "kty": "EC",
+    "crv": "P-256",
+    "x": "weNJy2HscCSM6AEDTDg04biOvhFhyyWvOHQfeF_PxMQ",
+    "y": "e8lnCO-AlStT-NJVX-crhB7QRYhiix03illJOVAOyck",
+    "d": "VEmDZpDXXK8p8N0Cndsxs924q6nS1RXFASRl6BfUqdw"
+   },
+   "public_jwk": {
+    "kty": "EC",
+    "crv": "P-256",
+    "x": "gI0GAILBdu7T53akrFmMyGcsF3n5dO7MmwNBHKW5SV0",
+    "y": "SLW_xSffzlPWrHEVI30DHM_4egVwt3NQqeUD7nMFpps"
+   },
+   "expect": {
+    "ok": true,
+    "z": "9e56d91d817135d372834283bf84269cfb316ea3da806a48f6daa7798cfe90c4",
+    "other_info": "000000074131323847434d00000005416c69636500000003426f6200000080",
+    "cek": "VqqN6vgjbSBcIijNcacQGg"
+   }
+  },
+  {
+   "op": "ecdh_es_derive",
+   "alg": "ECDH-ES",
+   "enc": "A128GCM",
+   "apu": "QWxpY2U",
+   "apv": "Qm9i",
+   "id": "c-sender",
+   "private_jwk": {
+    "kty": "EC",
+    "crv": "P-256",
+    "x": "gI0GAILBdu7T53akrFmMyGcsF3n5dO7MmwNBHKW5SV0",
+    "y": "SLW_xSffzlPWrHEVI30DHM_4egVwt3NQqeUD7nMFpps",
+    "d": "0_NxaRPUMQoAJt50Gz8YiTr8gRTwyEaCumd-MToTmIo"
+   },
+   "public_jwk": {
+    "kty": "EC",
+    "crv": "P-256",
+    "x": "weNJy2HscCSM6AEDTDg04biOvhFhyyWvOHQfeF_PxMQ",
+    "y": "e8lnCO-AlStT-NJVX-crhB7QRYhiix03illJOVAOyck"
+   },
+   "expect": {
+    "ok": true,
+    "z": "9e56d91d817135d372834283bf84269cfb316ea3da806a48f6daa7798cfe90c4",
+    "other_info": "000000074131323847434d00000005416c69636500000003426f6200000080",
+    "cek": "VqqN6vgjbSBcIijNcacQGg"
+   }
+  },
+  {
+   "op": "ecdh_es_derive",
+   "alg": "ECDH-ES",
+   "enc": "A128GCM",
+   "apu": "QWxpY2U",
+   "apv": "Qm9i",
+   "id": "c-recipient-off-curve-epk",
+   "private_jwk": {
+    "kty": "EC",
+    "crv": "P-256",
+    "x": "weNJy2HscCSM6AEDTDg04biOvhFhyyWvOHQfeF_PxMQ",
+    "y": "e8lnCO-AlStT-NJVX-crhB7QRYhiix03illJOVAOyck",
+    "d": "VEmDZpDXXK8p8N0Cndsxs924q6nS1RXFASRl6BfUqdw"
+   },
+   "public_jwk": {
+    "kty": "EC",
+    "crv": "P-256",
+    "x": "gI0GAILBdu7T53akrFmMyGcsF3n5dO7MmwNBHKW5SV0",
+    "y": "SLW_xSffzlPWrHEVI30DHM_4egVwt3NQqeUD7nMFppA"
+   },
+   "expect": {
+    "ok": false
+   },
+   "note": "epk y edited so the point is off P-256; RFC 8725 section 3.4"
+  }
+ ]
+}
