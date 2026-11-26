@@ -20,17 +20,17 @@ field Guard::Unchanged::1: crate::Version
 field Slot::Row::0: &'a Row<R>
 function b64url_decode fn(text: &str) -> Result<vec::Vec<u8>, crate::Error>
 function b64url_encode fn(bytes: &[u8]) -> alloc::string::String
-impl Clone for Conflict
+impl Clone for Conflict<K>
 impl Clone for Digest
 impl Clone for EffectId
 impl Clone for Error
 impl Clone for ErrorKind
 impl Clone for Failure
-impl Clone for Guard
+impl Clone for Guard<K>
 impl Clone for Retry
-impl Clone for Row
+impl Clone for Row<R>
 impl Clone for Scope
-impl Clone for Slot
+impl Clone for Slot<'a, R>
 impl Clone for UnixTime
 impl Clone for Version
 impl Copy for Digest
@@ -38,54 +38,54 @@ impl Copy for EffectId
 impl Copy for Error
 impl Copy for ErrorKind
 impl Copy for Failure
-impl Copy for Guard
+impl Copy for Guard<K>
 impl Copy for Retry
 impl Copy for Scope
-impl Copy for Slot
+impl Copy for Slot<'a, R>
 impl Copy for UnixTime
 impl Copy for Version
-impl Debug for Builder
-impl Debug for Conflict
+impl Debug for Builder<K, R>
+impl Debug for Conflict<K>
 impl Debug for Digest
-impl Debug for Effect
+impl Debug for Effect<K, R>
 impl Debug for EffectId
 impl Debug for Error
 impl Debug for ErrorKind
 impl Debug for Failure
-impl Debug for Guard
-impl Debug for Pending
-impl Debug for RandCore
+impl Debug for Guard<K>
+impl Debug for Pending<T, K, R>
+impl Debug for RandCore<R>
 impl Debug for Receipt
 impl Debug for Retry
-impl Debug for Row
-impl Debug for Rows
+impl Debug for Row<R>
+impl Debug for Rows<K, R>
 impl Debug for Scope
-impl Debug for Secret
+impl Debug for Secret<N>
 impl Debug for SecretBytes
-impl Debug for Slot
+impl Debug for Slot<'a, R>
 impl Debug for UnixTime
 impl Debug for Version
-impl Default for Rows
-impl Deserialize for Digest
+impl Default for Rows<K, R>
+impl Deserialize<'de> for Digest
 impl Display for Error
-impl Drop for Secret
+impl Drop for Secret<N>
 impl Drop for SecretBytes
-impl Entropy for RandCore
-impl Eq for Conflict
+impl Entropy for RandCore<R>
+impl Eq for Conflict<K>
 impl Eq for Digest
 impl Eq for EffectId
 impl Eq for Error
 impl Eq for ErrorKind
 impl Eq for Failure
-impl Eq for Guard
+impl Eq for Guard<K>
 impl Eq for Retry
-impl Eq for Row
+impl Eq for Row<R>
 impl Eq for Scope
-impl Eq for Slot
+impl Eq for Slot<'a, R>
 impl Eq for UnixTime
 impl Eq for Version
 impl Error for Error
-impl From for UnixTime
+impl From<SystemTime> for UnixTime
 impl Hash for Digest
 impl Hash for EffectId
 impl Hash for ErrorKind
@@ -96,17 +96,17 @@ impl Ord for Digest
 impl Ord for EffectId
 impl Ord for UnixTime
 impl Ord for Version
-impl PartialEq for Conflict
+impl PartialEq for Conflict<K>
 impl PartialEq for Digest
 impl PartialEq for EffectId
 impl PartialEq for Error
 impl PartialEq for ErrorKind
 impl PartialEq for Failure
-impl PartialEq for Guard
+impl PartialEq for Guard<K>
 impl PartialEq for Retry
-impl PartialEq for Row
+impl PartialEq for Row<R>
 impl PartialEq for Scope
-impl PartialEq for Slot
+impl PartialEq for Slot<'a, R>
 impl PartialEq for UnixTime
 impl PartialEq for Version
 impl PartialOrd for Digest
@@ -114,17 +114,17 @@ impl PartialOrd for EffectId
 impl PartialOrd for UnixTime
 impl PartialOrd for Version
 impl Serialize for Digest
-impl StructuralPartialEq for Conflict
+impl StructuralPartialEq for Conflict<K>
 impl StructuralPartialEq for Digest
 impl StructuralPartialEq for EffectId
 impl StructuralPartialEq for Error
 impl StructuralPartialEq for ErrorKind
 impl StructuralPartialEq for Failure
-impl StructuralPartialEq for Guard
+impl StructuralPartialEq for Guard<K>
 impl StructuralPartialEq for Retry
-impl StructuralPartialEq for Row
+impl StructuralPartialEq for Row<R>
 impl StructuralPartialEq for Scope
-impl StructuralPartialEq for Slot
+impl StructuralPartialEq for Slot<'a, R>
 impl StructuralPartialEq for UnixTime
 impl StructuralPartialEq for Version
 method Builder::build fn(self: Self) -> Result<Effect<K, R>, Error>
