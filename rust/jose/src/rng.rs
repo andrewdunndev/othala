@@ -6,33 +6,26 @@ use rand_core::{TryCryptoRng, TryRng};
 
 pub(crate) struct Source<'a>(pub(crate) &'a mut dyn Entropy);
 
-// a macro keeps the three draws one unit: a draw that fills nothing would spin `rsa`'s blinding forever
-macro_rules! generator {
-    () => {
-        impl TryRng for Source<'_> {
-            type Error = Infallible;
+impl TryRng for Source<'_> {
+    type Error = Infallible;
 
-            fn try_next_u32(&mut self) -> Result<u32, Infallible> {
-                let mut bytes = [0; 4];
-                self.0.fill(&mut bytes);
-                Ok(u32::from_le_bytes(bytes))
-            }
+    fn try_next_u32(&mut self) -> Result<u32, Infallible> {
+        let mut bytes = [0; 4];
+        self.0.fill(&mut bytes);
+        Ok(u32::from_le_bytes(bytes))
+    }
 
-            fn try_next_u64(&mut self) -> Result<u64, Infallible> {
-                let mut bytes = [0; 8];
-                self.0.fill(&mut bytes);
-                Ok(u64::from_le_bytes(bytes))
-            }
+    fn try_next_u64(&mut self) -> Result<u64, Infallible> {
+        let mut bytes = [0; 8];
+        self.0.fill(&mut bytes);
+        Ok(u64::from_le_bytes(bytes))
+    }
 
-            fn try_fill_bytes(&mut self, dst: &mut [u8]) -> Result<(), Infallible> {
-                self.0.fill(dst);
-                Ok(())
-            }
-        }
-    };
+    fn try_fill_bytes(&mut self, dst: &mut [u8]) -> Result<(), Infallible> {
+        self.0.fill(dst);
+        Ok(())
+    }
 }
-
-generator!();
 
 impl TryCryptoRng for Source<'_> {}
 

@@ -2,6 +2,8 @@
 exclude_re = [
   # the reference store's unguarded-write tripwire: no builder, merge or lift yields such an effect, so no test reaches it
   "replace \\|\\| with && in <impl Store<K, R> for MemStore<K, R>>::apply",
+  # a no-op fill leaves rsa's blinding factor unusable, so the mutant spins until the timeout instead of failing a test
+  "replace <impl TryRng for Source<'_>>::try_fill_bytes -> Result<\\(\\), Infallible> with Ok\\(\\(\\)\\)",
 ]
 additional_cargo_args = ["--all-features"]
 # the trybuild ledger proves signatures, which mutants do not change
