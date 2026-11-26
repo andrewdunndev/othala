@@ -88,7 +88,7 @@ Checks: `ui:x` is `tests/ui/fail/x.rs` with its committed `.stderr` (rustc code 
 - B8 A cargo config, `RUSTFLAGS` or `--cap-lints` that weakens a level fails B4 to B6, since `just canary` builds inside the tree with the caller's environment.
 - B12 Each member's direct runtime dependencies, every feature on, are the ones `deps.txt` lists: `just deps` (in `just all` and CI); `deny.toml` allows only this workspace's graph: `just deny`.
 - B13 The ledger measures what is on disk: `just ledger` hands trybuild each `.rs` file of `tests/ui/fail` and `tests/ui/pass` and asserts 21 of each.
-- B14 `just mutants` fails unless each package reaches its floor (base 137, store 28, testkit 83) with none missed or timed out; `just rows` counts the skipped as `cargo mutants --list --no-config` less `--list`.
+- B14 `just mutants` fails unless each package reaches its floor (base 142, store 28, testkit 83) with none missed or timed out; `just rows` counts the skipped as `cargo mutants --list --no-config` less `--list`.
 
 ## Non-claim
 - N1 Copies and moves are not wiped: a `Secret<N>` moved by value, a buffer a caller copied out of `expose`, or a `Vec` handed to `SecretBytes::new` after it reallocated leaves bytes behind; the stack array a fixed-size decode fills, which is zeroed on failure but not measured; R32 covers only the storage a secret owns when dropped.
