@@ -24,7 +24,7 @@
    },
    "entropy": "9897b40ffec15be7ac14e363ace7cfbfbcc7289cd58dcacd4b964828ecc9cdea",
    "now": 1800000000,
-   "spec": "contract R30 and R130 (PublicKeyCredentialCreationOptionsJSON, WebAuthn L3 5.1.8) (base64url for the challenge and user id; ES256, EdDSA, ES384, RS256 by default; timeout in milliseconds; oracle choice: excludeCredentials and allowCredentials are always emitted, empty when none)",
+   "spec": "contract R30 and R130 (PublicKeyCredentialCreationOptionsJSON, WebAuthn L3 5.1.8) (base64url for the challenge and user id; ES256, EdDSA, ES384, RS256 by default; timeout in milliseconds; oracle choice: excludeCredentials and allowCredentials are always emitted, empty when none, while hints and attestationFormats are emitted only when set)",
    "expect": {
     "ok": true,
     "json": {

@@ -158,7 +158,7 @@ def cose_cases():
         c("eddsa-valid", "RFC 9053 2.2 and contract R5 (kty 1, crv 6, a 32-byte valid point; the RFC 8032 base point)", build(OKP), {"ok": True, "alg": -8}),
         c("eddsa-rfc8032-key", "RFC 8032 7.1 test 1 public key as a COSE_Key (contract R5)", build(OKP, n2=c_bytes(ED_RFC8032_1)), {"ok": True, "alg": -8}),
         c("rs256-valid", "RFC 8812 2 and contract R5 (kty 3, a 2048-bit n, e 65537)", build(RSA), {"ok": True, "alg": -257}),
-        c("rsa-4096-bit-n", "contract R5 (MAX_RSA_BITS 4096 is accepted; n is an odd 4096-bit integer, not a product of primes)", build(RSA, n1=c_bytes(int_bytes(odd_int("n4096", 4096)))), {"ok": True, "alg": -257}),
+        c("rsa-4096-bit-n", "contract R5 (MAX_RSA_BITS 4096 is accepted; n is an odd 4096-bit integer, not a product of primes)", build(RSA, n1=c_bytes(int_bytes(odd_int("n4096", 4096)))), {"ok": True, "alg": -257}) | {"bound": "webauthn_rp::MAX_RSA_BITS", "excess": 0},
         c("unknown-label-ignored", "contract R5 (unknown labels are ignored)", build(E256, p99=ci(1)), {"ok": True, "alg": -7}),
         c("unknown-text-label-ignored", "contract R5 (unknown labels are ignored); a text label sorts after the integer labels", m(list(E256.items()) + [("extra", ci(1))]).hex(), {"ok": True, "alg": -7}),
         bad("es256-x-31-bytes", "contract R5 (x is 32 bytes)", build(E256, n2=c_bytes(short))),
@@ -187,7 +187,8 @@ def cose_cases():
         bad("eddsa-33-bytes", "contract R5 (a 32-byte point)", build(OKP, n2=c_bytes(ED_B + b"\x00"))),
         bad("eddsa-y-not-reduced", "RFC 8032 5.1.3 (y must be below p; this is y = p, whose encoding is not canonical)", build(OKP, n2=c_bytes((EP).to_bytes(32, "little")))),
         bad("rsa-1024-bit-n", "contract R5 and RFC 8725 3.5 (n below MIN_RSA_BITS, taken as 2048; n is an odd 1024-bit integer)", build(RSA, n1=c_bytes(int_bytes(odd_int("n1024", 1024))))),
-        bad("rsa-4097-bit-n", "contract R5 (n past MAX_RSA_BITS 4096; n is an odd 4097-bit integer)", build(RSA, n1=c_bytes(int_bytes(odd_int("n4097", 4097))))),
+        c("rsa-4097-bit-n", "contract R1 and R5 (n past MAX_RSA_BITS 4096 is TooLarge; the excess is in bits; n is an odd 4097-bit integer)", build(RSA, n1=c_bytes(int_bytes(odd_int("n4097", 4097)))), TOO) | {"bound": "webauthn_rp::MAX_RSA_BITS", "excess": 1},
+        bad("rsa-2047-bit-n", "contract R5 (n below MIN_RSA_BITS 2048 by one bit; n is an odd 2047-bit integer)", build(RSA, n1=c_bytes(int_bytes(odd_int("n2047", 2047))))),
         bad("rsa-e-3", "contract R5 (e is 65537)", build(RSA, n2=c_bytes(b"\x03"))),
         bad("rsa-e-65537-padded", "contract R5 (e is 65537; a leading zero byte is not the integer's minimal form)", build(RSA, n2=c_bytes(b"\x00\x01\x00\x01"))),
         bad("rsa-n-missing", "contract R5 (n is required)", build(RSA, n1=None)),
@@ -311,7 +312,7 @@ def regid_cases():
 
 # ================================================================ origins.json (R8, R9, R10)
 def origin_cases():
-    apk = "AB" * 21 + "A"  # low entropy on purpose: a real signer hash would read as a credential to the repository secret scan
+    apk = ("AZaz09-_" * 6)[:43]  # low entropy on purpose, every base64url symbol present: a real signer hash would read as a credential to the repository secret scan
     assert len(apk) == 43
     o = lambda cid, s, spec, ok: {"id": cid, "op": "origin_parse", "input": s, "spec": spec, "expect": OK if ok else NO}
     r = lambda cid, s, spec, ok: {"id": cid, "op": "rp_id_parse", "input": s, "spec": spec, "expect": OK if ok else NO}
@@ -421,8 +422,8 @@ class Ent:
 
 def dn(cn, printable_all=False):
     if printable_all:
-        return seq(sset(seq(oid("2.5.4.6"), printable("XX"))), sset(seq(oid("2.5.4.10"), printable("Derived Test PKI"))), sset(seq(oid("2.5.4.3"), printable(cn))))
-    return name(C="XX", O="Derived Test PKI", CN=cn)
+        return seq(sset(seq(oid("2.5.4.6"), printable("US"))), sset(seq(oid("2.5.4.10"), printable("Derived Test PKI"))), sset(seq(oid("2.5.4.3"), printable(cn))))
+    return name(C="US", O="Derived Test PKI", CN=cn)
 
 
 def issue(cn, issuer=None, kind="p256", ca=True, pathlen=None, ku="default", extra=(), bc=True, nb=1_700_000_000, na=1_900_000_000,
@@ -521,7 +522,7 @@ def chain_cases():
     add(chain("leaf-not-after-equals-now", Wk + "R114 and RFC 5280 4.1.2.5 (the validity period includes notAfter)", [issue("Derived Boundary Leaf Na", INT, "p256", ca=False, na=NOW), INT], [ROOT], ok))
     add(chain("leaf-one-second-past-not-after", Wk + "R114", [issue("Derived Boundary Leaf Past", INT, "p256", ca=False, na=NOW - 1), INT], [ROOT], bad))
     exp_root = issue("Derived Root", None, "p256", na=NOW - 1, label="webauthn-rp-derived-ext expired root")
-    add(chain("anchor-expired", Wk + "R114 (every certificate's validity, an anchor's included; oracle choice)", [issue("Leaf Exp Root", INT0 := issue("Derived Int Under Exp Root", exp_root, "p256", pathlen=0), "p256", ca=False), INT0], [exp_root], bad))
+    add(chain("anchor-expired", Wk + "R114 (every certificate's validity, an anchor's included; oracle choice: RFC 5280 6.1 does not check a trust anchor's validity, so this is stricter than the RFC)", [issue("Leaf Exp Root", INT0 := issue("Derived Int Under Exp Root", exp_root, "p256", pathlen=0), "p256", ca=False), INT0], [exp_root], bad))
     add(chain("leaf-validity-in-generalized-time", Wk + "R114 (a validity past 2049 is a GeneralizedTime, RFC 5280 4.1.2.5)", [issue("Derived Long Leaf", INT, "p256", ca=False, na=2_600_000_000), INT], [ROOT], ok))
     # --- critical extensions (R115)
     add(chain("leaf-critical-unknown-extension", Wk + "R115 (the leaf may carry critical extensions the walk does not read)", [issue("Derived Crit Leaf", INT, "p256", ca=False, extra=[CRIT_UNKNOWN]), INT], [ROOT], ok))
@@ -549,7 +550,7 @@ def chain_cases():
     add(chain("ecdsa-sha1-leaf", Wk + "R117 (a chain signed by an algorithm outside R116, ecdsa-with-SHA1, is Unanchored)", [issue("Derived Leaf Sha1", INT, "p256", ca=False, hname="sha1"), INT], [ROOT], un))
     add(chain("ecdsa-sha512-on-p256-leaf", Wk + "R117 (ecdsa-with-SHA512 is outside R116)", [issue("Derived Leaf Sha512", INT, "p256", ca=False, hname="sha512"), INT], [ROOT], un))
     add(chain("rsa-sha1-intermediate", Wk + "R117 (sha1 with RSA is outside R116)", [issue("Derived Leaf Under RSA Sha1", s := issue("Derived Int RSA Sha1", rsa_root, "p256", pathlen=0, hname="sha1"), "p256", ca=False), s], [rsa_root], un))
-    add(chain("ecdsa-sha1-to-anchor", Wk + "R117 (the last certificate's signature under the anchor is ecdsa-with-SHA1)", [LEAF, issue("Derived Int Sha1 To Root", ROOT, "p256", pathlen=0, hname="sha1")], [ROOT], un))
+    add(chain("ecdsa-sha1-to-anchor", Wk + "R117 (the last certificate's signature under the anchor is ecdsa-with-SHA1)", [issue("Derived Leaf Under Sha1 Int", s1 := issue("Derived Int Sha1 To Root", ROOT, "p256", pathlen=0, hname="sha1"), "p256", ca=False), s1], [ROOT], un))
     r521 = issue("Derived Root P521", None, "p521")
     i521 = issue("Derived Int P521", r521, "p521", pathlen=0)
     add(chain("p521-anchor", "N3 and R117 (chain signatures on P-521 keys are Unanchored)", [issue("Derived Leaf Under P521", i521, "p256", ca=False), i521], [r521], un))
@@ -581,6 +582,8 @@ def sized(cid, op, bound, value, excess, spec, make, expect_ok=None, recipe=None
         case["input_len"], case["input_sha256"] = len(data), sha(data).hex()
         if len(data) <= 4096:
             case["input"] = data.hex()
+        else:
+            case["input_b64url"] = b64(data)
     else:
         case["input"] = data
     if recipe:
@@ -592,11 +595,9 @@ def sized(cid, op, bound, value, excess, spec, make, expect_ok=None, recipe=None
 
 def pad_to(target, build):
     n = max(target - len(build(0)), 0)
-    for _ in range(12):
-        got = len(build(n))
-        if got == target:
-            return build(n)
-        n += target - got
+    for k in range(-40, 41):
+        if n + k >= 0 and len(out := build(n + k)) == target:
+            return out
     raise ValueError(target)
 
 
@@ -636,9 +637,13 @@ def make_cbor_items(items):
 
 
 def make_anchor(total):
-    def build(k):
-        return issue("Derived Padded Anchor", None, "p256", extra=[ext("1.3.6.1.4.1.99999.1.3", octets(bytes(k)))], serial=1).der
-    return pad_to(total, build)
+    # the ECDSA signature length varies with the content, so a serial number is tried until the DER is exactly the target
+    for serial in range(1, 64):
+        try:
+            return pad_to(total, lambda k: issue("Derived Padded Anchor", None, "p256", extra=[ext("1.3.6.1.4.1.99999.1.3", octets(bytes(k)))], serial=serial).der)
+        except ValueError:
+            continue
+    raise ValueError(total)
 
 
 def make_rp_id(total):
@@ -690,6 +695,12 @@ def limit_cases():
                    "allow_credentials": [sha(f"allow {i}".encode())[:16].hex() for i in range(n)], "expect": OK if ex == 0 else TOO})
         cs.append({"id": f"prf-salt-{sfx}", "op": "start_registration", "bound": "webauthn_rp::MAX_PRF_SALT", "excess": ex, "spec": L + " and R31 (a PRF salt over MAX_PRF_SALT)",
                    "extensions": {"prf": {"eval": {"first": (bytes([7]) * (256 + ex)).hex()}}}, "expect": OK if ex == 0 else TOO})
+        cs.append({"id": f"prf-salt-auth-{sfx}", "op": "start_authentication", "bound": "webauthn_rp::MAX_PRF_SALT", "excess": ex, "spec": L + " and R61 (a PRF salt over MAX_PRF_SALT at start_authentication; the salt is base64url as in the other authentication extension requests)",
+                   "allow": "discoverable", "extensions": {"prf": {"eval": {"first": b64(bytes([7]) * (256 + ex))}}}, "expect": OK if ex == 0 else TOO})
+        blob = bytes([3]) * (8192 - 91 + ex)
+        cs.append({"id": f"record-{sfx}", "op": "start_authentication", "bound": "webauthn_rp::MAX_RECORD", "excess": ex,
+                   "spec": L + " and R61 (a ceremony row that Record::encode refuses past MAX_RECORD; the row is the 91 fixed bytes of a discoverable ceremony with default options plus the largeBlob write, so the blob length sets the row length: bound+excess-91)",
+                   "allow": "discoverable", "extensions": {"largeBlob": {"write": b64(blob)}}, "expect": OK if ex == 0 else TOO})
         cs.append({"id": f"origins-{sfx}", "op": "relying_party_build", "bound": "webauthn_rp::MAX_ORIGINS", "excess": ex, "spec": L + " and R19 (more than MAX_ORIGINS origins and top origins together)",
                    "origins": [f"https://o{i}.example.org" for i in range(32 + ex)], "expect": OK if ex == 0 else TOO})
         cs.append({"id": f"timeout-{sfx}", "op": "start_registration", "bound": "webauthn_rp::MAX_TIMEOUT_SECS", "excess": ex, "spec": L + " (a timeout over MAX_TIMEOUT_SECS seconds)",
@@ -701,7 +712,7 @@ def limit_cases():
         cs.append({"id": f"signature-{sfx}", "op": "assertion_response", "bound": "webauthn_rp::MAX_SIGNATURE", "excess": ex, "spec": L + " (AuthenticationResponse::new reads a signature of at most MAX_SIGNATURE bytes; it is not verified at construction)",
                    "signature": (bytes([5]) * (1024 + ex)).hex(), "expect": OK if ex == 0 else TOO})
         cs.append({"id": f"large-blob-{sfx}", "op": "largeblob_result", "bound": "webauthn_rp::MAX_LARGE_BLOB", "excess": ex, "spec": L + " and R127 (a blob past MAX_LARGE_BLOB is TooLarge)",
-                   "input_len": 65536 + ex, "input_sha256": sha(bytes([3]) * (65536 + ex)).hex(), "recipe": "the byte 0x03 repeated bound+excess times, returned as the largeBlob `blob` after a Read request", "expect": OK if ex == 0 else TOO})
+                   "input_len": 65536 + ex, "input_sha256": sha(bytes([3]) * (65536 + ex)).hex(), "input_b64url": b64(bytes([3]) * (65536 + ex)), "recipe": "the byte 0x03 repeated bound+excess times, returned as the largeBlob `blob` after a Read request", "expect": OK if ex == 0 else TOO})
     cs += [
         {"id": "trust-anchor-one-certificate", "op": "trust_anchor_from_der", "input": ROOT.der.hex(), "spec": "contract R18 (exactly one DER certificate; digest is the SHA-256 of that DER)", "expect": {"ok": True, "digest": sha(ROOT.der).hex()}},
         {"id": "trust-anchor-two-certificates", "op": "trust_anchor_from_der", "input": (ROOT.der + INT.der).hex(), "spec": "contract R18 (exactly one DER certificate, not a concatenation)", "expect": NO},
@@ -739,7 +750,7 @@ PACKED_SIGDATA = PACKED_AD + CDH
 
 
 def packed_leaf(cn="Derived Packed Attestation", exts=None, **kw):
-    subj = kw.pop("subject", None) or name(C="XX", O="Derived Vendor", OU="Authenticator Attestation", CN=cn)
+    subj = kw.pop("subject", None) or name(C="US", O="Derived Vendor", OU="Authenticator Attestation", CN=cn)
     return issue(cn, ATT_INT, "p256", ca=False, subject=subj, extra=exts or [], label=f"webauthn-rp-derived-ext packed leaf {cn}", **kw)
 
 
@@ -765,19 +776,19 @@ def packed_cases():
     add("packed-aaguid-one-byte-short", "(the AAGUID extension holds 16 bytes)", NO, packed_leaf("Derived Packed Aaguid Short", exts=[AAGUID_EXT(AAGUID[:15])]))
     add("packed-aaguid-critical", "(the AAGUID extension MUST be non-critical)", NO, packed_leaf("Derived Packed Aaguid Critical", exts=[AAGUID_EXT(AAGUID, True)]))
     add("packed-serial-critical", "(the serial-number extension MUST be non-critical)", NO, packed_leaf("Derived Packed Serial Critical", exts=[SERNUM_EXT(True)]))
-    add("packed-subject-ou-wrong", "(OU MUST be the literal string Authenticator Attestation)", NO, packed_leaf("Derived Packed OU", subject=name(C="XX", O="Derived Vendor", OU="Authenticator Attestations", CN="Derived Packed OU")))
+    add("packed-subject-ou-wrong", "(OU MUST be the literal string Authenticator Attestation)", NO, packed_leaf("Derived Packed OU", subject=name(C="US", O="Derived Vendor", OU="Authenticator Attestations", CN="Derived Packed OU")))
     add("packed-subject-no-c", "(the subject has C)", NO, packed_leaf("Derived Packed No C", subject=name(O="Derived Vendor", OU="Authenticator Attestation", CN="Derived Packed No C")))
-    add("packed-subject-no-o", "(the subject has O)", NO, packed_leaf("Derived Packed No O", subject=name(C="XX", OU="Authenticator Attestation", CN="Derived Packed No O")))
-    add("packed-subject-no-ou", "(the subject has OU)", NO, packed_leaf("Derived Packed No OU", subject=name(C="XX", O="Derived Vendor", CN="Derived Packed No OU")))
-    add("packed-subject-no-cn", "(the subject has CN)", NO, packed_leaf("Derived Packed No CN", subject=name(C="XX", O="Derived Vendor", OU="Authenticator Attestation")))
-    cs.append(att_reg("packed-leaf-is-ca", P + "(basicConstraints CA MUST be false)", NO, "packed", packed_stmt(L := issue("Derived Packed CA Leaf", ATT_INT, "p256", ca=True, pathlen=0, subject=name(C="XX", O="Derived Vendor", OU="Authenticator Attestation", CN="Derived Packed CA Leaf"), label="webauthn-rp-derived-ext packed ca leaf"))))
-    cs.append(att_reg("packed-leaf-version-1", P + "(the certificate MUST be version 3)", NO, "packed", packed_stmt(issue("Derived Packed V1", ATT_INT, "p256", ca=False, version=1, subject=name(C="XX", O="Derived Vendor", OU="Authenticator Attestation", CN="Derived Packed V1"), label="webauthn-rp-derived-ext packed v1"))))
+    add("packed-subject-no-o", "(the subject has O)", NO, packed_leaf("Derived Packed No O", subject=name(C="US", OU="Authenticator Attestation", CN="Derived Packed No O")))
+    add("packed-subject-no-ou", "(the subject has OU)", NO, packed_leaf("Derived Packed No OU", subject=name(C="US", O="Derived Vendor", CN="Derived Packed No OU")))
+    add("packed-subject-no-cn", "(the subject has CN)", NO, packed_leaf("Derived Packed No CN", subject=name(C="US", O="Derived Vendor", OU="Authenticator Attestation")))
+    cs.append(att_reg("packed-leaf-is-ca", P + "(basicConstraints CA MUST be false)", NO, "packed", packed_stmt(L := issue("Derived Packed CA Leaf", ATT_INT, "p256", ca=True, pathlen=0, subject=name(C="US", O="Derived Vendor", OU="Authenticator Attestation", CN="Derived Packed CA Leaf"), label="webauthn-rp-derived-ext packed ca leaf"))))
+    cs.append(att_reg("packed-leaf-version-1", P + "(the certificate MUST be version 3)", NO, "packed", packed_stmt(issue("Derived Packed V1", ATT_INT, "p256", ca=False, version=1, subject=name(C="US", O="Derived Vendor", OU="Authenticator Attestation", CN="Derived Packed V1"), label="webauthn-rp-derived-ext packed v1"))))
     base = packed_leaf("Derived Packed Sig")
     add("packed-signature-other-data", "(sig covers authenticatorData and clientDataHash; this one covers authenticatorData alone)", NO, base, data=PACKED_AD)
     add("packed-signature-bit-flip", "(sig verifies with the x5c[0] key)", NO, base, sig=base.key.sign(PACKED_SIGDATA[:-1] + bytes([PACKED_SIGDATA[-1] ^ 1])))
     add("packed-signature-other-key", "(sig verifies with the x5c[0] key, not another key)", NO, base, key=CRED)
     add("packed-alg-not-the-leaf-key", "(sig is verified under alg: ES384 over a P-256 leaf fails)", NO, base, alg=-35)
-    add("packed-leaf-expired", "with R114 (the leaf's validity contains now)", NO, issue("Derived Packed Expired", ATT_INT, "p256", ca=False, na=NOW - 1, subject=name(C="XX", O="Derived Vendor", OU="Authenticator Attestation", CN="Derived Packed Expired"), label="webauthn-rp-derived-ext packed expired"))
+    add("packed-leaf-expired", "with R114 (the leaf's validity contains now)", NO, issue("Derived Packed Expired", ATT_INT, "p256", ca=False, na=NOW - 1, subject=name(C="US", O="Derived Vendor", OU="Authenticator Attestation", CN="Derived Packed Expired"), label="webauthn-rp-derived-ext packed expired"))
     cs.append(att_reg("packed-x5c-empty", P + "(x5c is a non-empty array for a full attestation)", NO, "packed",
                       c_map([(T("alg"), c_int(-7)), (T("sig"), c_bytes(base.key.sign(PACKED_SIGDATA))), (T("x5c"), c_array())])))
     cs.append(att_reg("packed-unanchored-accepted", "contract R50 and R117 (under the default TrustPolicy::AcceptUntrusted a verified statement whose chain meets no anchor registers, reported Unanchored)", REG_OK(attestation={"fmt": "packed", "type": "Uncertain", "trust": "Unanchored"}),
@@ -801,7 +812,7 @@ def tpm_pub_rsa(n, name_alg=0x000B):
 
 
 def tpm_name(pub, name_alg=0x000B):
-    h = {0x000B: hashlib.sha256, 0x0004: hashlib.sha1}[name_alg]
+    h = {0x000B: hashlib.sha256, 0x0004: hashlib.sha1, 0x000C: hashlib.sha384}[name_alg]
     return name_alg.to_bytes(2, "big") + h(pub).digest()
 
 
@@ -829,9 +840,9 @@ def tpm_case(cid, spec, expect, *, aik=None, alg=-7, ver="2.0", pub=None, cert_i
     cose = cose or COSE
     ad = registered_ad(cose=cose)
     cdh = CDH
-    hname = "sha1" if alg == -65535 else "sha256"
+    hname = {-65535: "sha1", -35: "sha384"}.get(alg, "sha256")
     pa = pub_override if pub_override is not None else (pub if pub is not None else (tpm_pub_rsa(RSA_C["n"], name_alg) if cose is not COSE and params and params[0] == -257 else tpm_pub_ecc(PUB, name_alg)))
-    aik = aik or (aik_cert(TPM_AIK_P, "Derived TPM AIK P256") if alg == -7 else aik_cert(TPM_AIK_R, "Derived TPM AIK RSA"))
+    aik = aik or (aik_cert(TPM_AIK_P, "Derived TPM AIK P256") if alg in (-7, -35) else aik_cert(TPM_AIK_R, "Derived TPM AIK RSA"))
     ci = cert_info if cert_info is not None else tpm_attest(hashlib.new(hname, ad + cdh).digest(), tpm_name(pa, name_alg))
     sk = sig_key or aik.key
     sg = sk.sign(data if data is not None else ci, hname)
@@ -860,7 +871,7 @@ def tpm_cases():
     add(tpm_case("tpm-pubarea-wrong-type", "(pubArea is an RSA or ECC TPMT_PUBLIC; type 0x0008 is KEYEDHASH)", NO, pub=b"\x00\x08" + tpm_pub_ecc(PUB)[2:]))
     add(tpm_case("tpm-pubarea-trailing-bytes", "(own bounded parser: nothing after the unique field)", NO, pub=tpm_pub_ecc(PUB, extra=b"\x00")))
     add(tpm_case("tpm-pubarea-truncated", "(own bounded parser: a declared length past the input)", NO, pub=tpm_pub_ecc(PUB)[:-1]))
-    add(tpm_case("tpm-pubarea-name-alg-unsupported", "(nameAlg is SHA-256 or SHA-1; 0x000c is SHA-384)", NO, pub=tpm_pub_ecc(PUB, name_alg=0x000C)))
+    add(tpm_case("tpm-pubarea-name-alg-unsupported", "(nameAlg is SHA-256 or SHA-1; 0x000c is SHA-384, with the attested name and the pubArea otherwise consistent)", NO, name_alg=0x000C))
     pa = tpm_pub_ecc(PUB)
     ed = hashlib.sha256(PACKED_AD + CDH).digest()
     good_extra = hashlib.sha256(registered_ad() + CDH).digest()
@@ -874,7 +885,7 @@ def tpm_cases():
     add(tpm_case("tpm-signature-over-other-data", "(sig verifies over certInfo)", NO, data=b"not certInfo"))
     add(tpm_case("tpm-signature-other-key", "(sig verifies with the AIK certificate key)", NO, sig_key=CRED))
     add(tpm_case("tpm-alg-es256-rsa-aik", "(alg ES256 with an RSA AIK: the signature cannot verify under alg)", NO, aik=aik_cert(TPM_AIK_R, "Derived TPM AIK RSA Mismatch"), alg=-7))
-    add(tpm_case("tpm-alg-es384", "(alg is RS256, RS1 or ES256; ES384 is not accepted)", NO, alg=-35))
+    add(tpm_case("tpm-alg-es384", "(alg is RS256, RS1 or ES256; ES384 is not accepted: the statement is otherwise valid under ES384 with SHA-384)", NO, alg=-35))
     add(tpm_case("tpm-aik-subject-not-empty", "and 8.3.1 (the AIK certificate subject is empty)", NO, aik=aik_cert(TPM_AIK_P, "Derived TPM AIK Subject", subject=dn("Derived TPM AIK Subject"))))
     add(tpm_case("tpm-aik-no-san", "and 8.3.1 (a subject alternative name is required)", NO, aik=aik_cert(TPM_AIK_P, "Derived TPM AIK No SAN", san=False)))
     add(tpm_case("tpm-aik-no-eku", "and 8.3.1 (extended key usage 2.23.133.8.3 is required)", NO, aik=aik_cert(TPM_AIK_P, "Derived TPM AIK No EKU", eku=())))
@@ -1115,7 +1126,7 @@ def options_cases():
     desc = lambda cid, transports=(): {"id": cid.hex(), "transports": list(transports)}
     jd = lambda cid, transports=(): dict({"type": "public-key", "id": b64(cid)}, **({"transports": list(transports)} if transports else {}))
     cs = [
-        creation("creation-defaults", C + "(base64url for the challenge and user id; ES256, EdDSA, ES384, RS256 by default; timeout in milliseconds; oracle choice: excludeCredentials and allowCredentials are always emitted, empty when none)"),
+        creation("creation-defaults", C + "(base64url for the challenge and user id; ES256, EdDSA, ES384, RS256 by default; timeout in milliseconds; oracle choice: excludeCredentials and allowCredentials are always emitted, empty when none, while hints and attestationFormats are emitted only when set)"),
         creation("creation-resident-required", C + "(requireResidentKey is true exactly when residentKey is required)", opts={"resident_key": "required"}),
         creation("creation-resident-discouraged", C + "(requireResidentKey is false unless residentKey is required)", opts={"resident_key": "discouraged"}),
         creation("creation-user-verification-required", C + "(userVerification in authenticatorSelection)", opts={"user_verification": "required"}),
@@ -1268,7 +1279,7 @@ write("authentication.json", "authentication steps 5 and 6 (WebAuthn L3 7.2; con
 write("browser-binding.json", "browser binding on finish (ruling R-d, contract R58 and R63); binding and finish_binding are the 32-byte binding digests; " + CTX, binding_cases())
 write("registration-ids.json", "registration raw id against the attested credential id (WebAuthn L3 13.1, contract R17); " + CTX, regid_cases())
 write("origins.json", "Origin, RpId and AppId parsing (contract R8-R10; RFC 5890 2.3.1 for LDH labels)", origin_cases())
-write("limits.json", "input bounds (contract R1, R6, R18, R19, R31). An excess 0 case is well formed apart from its size and is accepted by the reader its op names; excess 1 is TooLarge. Large inputs carry input_len and input_sha256 and a recipe, small ones the bytes", limit_cases())
+write("limits.json", "input bounds (contract R1, R6, R18, R19, R31). An excess 0 case is well formed apart from its size and is accepted by the reader its op names; excess 1 is TooLarge. Every case carries its bytes: hex in `input` up to 4096 bytes, base64url in `input_b64url` above, with input_len and input_sha256 and a recipe saying how they were built", limit_cases())
 write("chains.json", "x5c chain walk (contract R110-R117, ruling R-h W-S6); certificates are built by tools/derive_webauthn_ext.py with RFC 6979 ECDSA and PKCS#1 v1.5 from keys derived from labels; now is a fixed unix time; outcome is Anchored, Unanchored or AttestationInvalid", chain_cases())
 write("attestation.json", "attestation statements (WebAuthn L3 8.2-8.4, contract R92-R97); " + CTX + "; trust_anchors are DER certificates, now is a fixed unix time", packed_cases() + tpm_cases() + android_cases())
 write("extensions.json", "client and authenticator extension outputs (WebAuthn L3 10.1, contract R120-R128); " + CTX + "; unsolicited defaults to reject", ext_cases())
