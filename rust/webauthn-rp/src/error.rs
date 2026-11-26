@@ -1,4 +1,5 @@
-//! The one error type: a kind plus the ceremony step that raised it (R145, R146); bodies with webauthn-02.
+//! The one error type: a kind plus the ceremony step that raised it (R145, R146).
+use core::fmt;
 
 /// The crate's one error type. `Display` names the kind and the spec step, never input bytes.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -75,4 +76,62 @@ pub enum SpecStep {
     Registration(u8),
     /// Section 7.2, verifying an authentication assertion.
     Authentication(u8),
+}
+
+impl Error {
+    /// What failed.
+    pub fn kind(&self) -> ErrorKind {
+        self.kind
+    }
+
+    /// The L3 7.1 or 7.2 step that failed, when the failure is a ceremony step.
+    pub fn spec_step(&self) -> Option<SpecStep> {
+        self.step
+    }
+
+    pub(crate) const fn new(kind: ErrorKind) -> Self {
+        Self { kind, step: None }
+    }
+}
+
+impl fmt::Display for Error {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{:?}", self.kind)?;
+        match self.step {
+            Some(SpecStep::Registration(n)) => write!(f, " at registration step {n}"),
+            Some(SpecStep::Authentication(n)) => write!(f, " at authentication step {n}"),
+            None => Ok(()),
+        }
+    }
+}
+
+impl core::error::Error for Error {}
+
+#[cfg(test)]
+mod tests {
+    use alloc::format;
+
+    use super::{Error, ErrorKind, SpecStep};
+
+    #[test]
+    fn display_names_kind_and_step() {
+        let at = |step| Error {
+            kind: ErrorKind::Type,
+            step,
+        };
+        assert_eq!(format!("{}", Error::new(ErrorKind::Type)), "Type");
+        assert_eq!(
+            format!("{}", at(Some(SpecStep::Registration(9)))),
+            "Type at registration step 9"
+        );
+        assert_eq!(
+            format!("{}", at(Some(SpecStep::Authentication(10)))),
+            "Type at authentication step 10"
+        );
+        assert_eq!(
+            at(Some(SpecStep::Authentication(3))).spec_step(),
+            Some(SpecStep::Authentication(3))
+        );
+        assert_eq!(Error::new(ErrorKind::Type).spec_step(), None);
+    }
 }

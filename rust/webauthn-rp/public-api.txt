@@ -271,6 +271,7 @@ impl Debug for TrustQuery
 impl Debug for UnsolicitedExtensions
 impl Debug for UserHandle
 impl Debug for UserVerification
+impl Display for Error
 impl Eq for Aaguid
 impl Eq for AppId
 impl Eq for AppIdUsed
@@ -321,6 +322,7 @@ impl Eq for UserEntity
 impl Eq for UserHandle
 impl Eq for UserName
 impl Eq for UserVerification
+impl Error for Error
 impl Hash for Aaguid
 impl Hash for CoseAlgorithm
 impl Hash for CredentialId
@@ -442,6 +444,8 @@ impl StructuralPartialEq for UserEntity
 impl StructuralPartialEq for UserHandle
 impl StructuralPartialEq for UserName
 impl StructuralPartialEq for UserVerification
+method Error::kind fn(self: &Self) -> ErrorKind
+method Error::spec_step fn(self: &Self) -> Option<SpecStep>
 struct Aaguid
 struct AppId
 struct Assertion
