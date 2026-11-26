@@ -65,8 +65,12 @@
   {"id": "m1-jose-oaep-wycheproof", "milestone": "M1", "title": "jose: Wycheproof RSA-OAEP", "cmd": "cargo test -p jose --all-features --lib jwe::oaep::"},
   {"id": "m1-jose-features-off", "milestone": "M1", "title": "jose: every feature off: the cases that must refuse there", "cmd": "cargo test -p jose --no-default-features --test row_features_off"},
   {"id": "m2-webauthn-rp-packed-self", "milestone": "M2", "title": "webauthn-rp: packed self attestation", "cmd": "cargo test -p webauthn-rp --all-features --test row_packed_self"},
-  {"id": "m2-webauthn-rp-cose-algs", "milestone": "M2", "title": "webauthn-rp: COSE ES384, RS256 and EdDSA verification", "cmd": "cargo test -p webauthn-rp --all-features --test row_cose_algs"},
-  {"id": "m2-webauthn-rp-extensions", "milestone": "M2", "title": "webauthn-rp: credProps, appid and largeBlob extensions", "cmd": "cargo test -p webauthn-rp --all-features --test row_extensions"},
+  {"id": "m2-webauthn-rp-cose-algs-es384", "milestone": "M2", "title": "webauthn-rp: COSE ES384 verification", "cmd": "cargo test -p webauthn-rp --all-features --test row_cose_algs es384::"},
+  {"id": "m2-webauthn-rp-cose-algs-rs256", "milestone": "M2", "title": "webauthn-rp: COSE RS256 verification", "cmd": "cargo test -p webauthn-rp --all-features --test row_cose_algs rs256::"},
+  {"id": "m2-webauthn-rp-cose-algs-eddsa", "milestone": "M2", "title": "webauthn-rp: COSE EdDSA verification", "cmd": "cargo test -p webauthn-rp --all-features --test row_cose_algs eddsa::"},
+  {"id": "m2-webauthn-rp-extensions-credprops", "milestone": "M2", "title": "webauthn-rp: credProps extension", "cmd": "cargo test -p webauthn-rp --all-features --test row_extensions credprops::"},
+  {"id": "m2-webauthn-rp-extensions-appid", "milestone": "M2", "title": "webauthn-rp: appid extension", "cmd": "cargo test -p webauthn-rp --all-features --test row_extensions appid::"},
+  {"id": "m2-webauthn-rp-extensions-largeblob", "milestone": "M2", "title": "webauthn-rp: largeBlob extension", "cmd": "cargo test -p webauthn-rp --all-features --test row_extensions largeblob::"},
   {"id": "m2-webauthn-rp-json-goldens", "milestone": "M2", "title": "webauthn-rp: JSON option shapes against goldens", "cmd": "cargo test -p webauthn-rp --all-features --test row_json_goldens"},
-  {"id": "m0-spine-selftest", "milestone": "M0", "title": "spine: gate self-test plants each bad input and asserts the specific refusal", "cmd": "just gate-selftest"}
+  {"id": "m0-spine-selftest", "milestone": "M0", "title": "spine: gate self-test plants one bad input per claim and asserts the specific refusal: S1 a non-cargo cmd printing `test result:` with 0 passed; S2 a branch queue.json or own.sh differing from main's, and a failing git show; S3 an item in each refused state and a privileged id on an item/ branch; S4 a primitives/ branch outside the map and a prefix lookalike; S4b an oracle item touching a path outside rust/vectors/* and one from an unmapped branch; S5 a crate set with no ui crate; S6 a target-gated dependency; S8 a grep that fails when the ARCHITECTURE.md Tracked line lacks a name", "cmd": "just gate-selftest"}
 ]
