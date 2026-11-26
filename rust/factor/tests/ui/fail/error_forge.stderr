@@ -1,0 +1,5 @@
+error[E0451]: field `kind` of struct `factor::Error` is private
+ --> tests/ui/fail/error_forge.rs:7:21
+  |
+7 |     let _ = Error { kind: ErrorKind::Malformed };
+  |                     ^^^^ private field
