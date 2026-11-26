@@ -246,8 +246,8 @@ def registration_cases():
         registration("fmt-unknown", "WebAuthn L3 7.1 step 21 (case-sensitive match against supported formats)", NO, ao=att_object(fmt="None")),
         registration("none-with-statement", "WebAuthn L3 8.7 (the none attStmt is the empty map)", NO, ao=att_object(att_stmt=b"\xa1" + cbor_text("x") + b"\x00")),
         registration("at-clear", "WebAuthn L3 7.1 step 13 and 6.5.1 (registration carries attested credential data)", NO, ao=att_object(flags=UP | UV)),
-        registration("credential-id-1023", "WebAuthn L3 7.1 step 28 (an id of at most 1023 bytes is within the limit)", dict(ok, credential_id=(bytes(range(256)) * 4)[:1023].hex()), ao=att_object(cred_id=(bytes(range(256)) * 4)[:1023])),
-        registration("credential-id-1024", "WebAuthn L3 7.1 step 28 (an id over 1023 bytes SHOULD fail the ceremony: an oracle choice, the crate refuses)", NO, ao=att_object(cred_id=bytes(range(256)) * 4)),
+        registration("credential-id-1023", "WebAuthn L3 7.1 step 25 (an id of at most 1023 bytes is within the limit)", dict(ok, credential_id=(bytes(range(256)) * 4)[:1023].hex()), ao=att_object(cred_id=(bytes(range(256)) * 4)[:1023])),
+        registration("credential-id-1024", "WebAuthn L3 7.1 step 25 (an id over 1023 bytes SHOULD fail the ceremony: an oracle choice, the crate refuses)", NO, ao=att_object(cred_id=bytes(range(256)) * 4)),
     ]
 
 

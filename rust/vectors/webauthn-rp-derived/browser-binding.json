@@ -1,0 +1,193 @@
+{
+ "source": "browser binding on finish (ruling R-d, contract R58 and R63); binding and finish_binding are the 32-byte binding digests; assertions and attestation signed with a P-256 key derived from a label in tools/derive_webauthn_ext.py (RFC 6979 deterministic k); rp example.org, origin https://example.org, stored counter 5, BE stored clear, cross-origin denied unless the case says otherwise",
+ "cases": [
+  {
+   "id": "registration-same-browser",
+   "op": "webauthn_register",
+   "attestation_object": "a363666d74646e6f6e656761747453746d74a068617574684461746158a4bfabc37432958b063360d3ad6461c9c4735ae7f8edd46592a5e0f01452b2e4b5450000000000112233445566778899aabbccddeeff00207317953e73992f05b1443b42b67a3b4491d438a0b268fe9af4b03cbb6f6a3482a501020326200121582066a521fa1e52d5fbc8e31a9771d4731f607a7f366d11f64d9859fd4c21ebeb5c22582005913812577650be7bce1059e89feac011a773878025cb2374e67173175baa10",
+   "client_data_json": "7b2274797065223a22776562617574686e2e637265617465222c226368616c6c656e6765223a2245696a646d7172504e745043534352346155425f792d637a574533513766597569616b4531306e354d6463222c226f726967696e223a2268747470733a2f2f6578616d706c652e6f7267222c2263726f73734f726967696e223a66616c73657d",
+   "rp_id": "example.org",
+   "origin": "https://example.org",
+   "challenge": "EijdmqrPNtPCSCR4aUB_y-czWE3Q7fYuiakE10n5Mdc",
+   "user_verification": "preferred",
+   "pub_key_cred_params": [
+    -7
+   ],
+   "cross_origin": "deny",
+   "binding": "741b188a27fcad7718ef2b7d3b30d6eb8fe3f7f32ed5dfad08a99b1d544fdd7f",
+   "finish_binding": "741b188a27fcad7718ef2b7d3b30d6eb8fe3f7f32ed5dfad08a99b1d544fdd7f",
+   "spec": "ruling R-d and contract R58 (BrowserMismatch)",
+   "expect": {
+    "ok": true,
+    "user_verified": true,
+    "credential_id": "7317953e73992f05b1443b42b67a3b4491d438a0b268fe9af4b03cbb6f6a3482",
+    "public_key": {
+     "x": "66a521fa1e52d5fbc8e31a9771d4731f607a7f366d11f64d9859fd4c21ebeb5c",
+     "y": "05913812577650be7bce1059e89feac011a773878025cb2374e67173175baa10"
+    }
+   }
+  },
+  {
+   "id": "registration-other-browser",
+   "op": "webauthn_register",
+   "attestation_object": "a363666d74646e6f6e656761747453746d74a068617574684461746158a4bfabc37432958b063360d3ad6461c9c4735ae7f8edd46592a5e0f01452b2e4b5450000000000112233445566778899aabbccddeeff00207317953e73992f05b1443b42b67a3b4491d438a0b268fe9af4b03cbb6f6a3482a501020326200121582066a521fa1e52d5fbc8e31a9771d4731f607a7f366d11f64d9859fd4c21ebeb5c22582005913812577650be7bce1059e89feac011a773878025cb2374e67173175baa10",
+   "client_data_json": "7b2274797065223a22776562617574686e2e637265617465222c226368616c6c656e6765223a2245696a646d7172504e745043534352346155425f792d637a574533513766597569616b4531306e354d6463222c226f726967696e223a2268747470733a2f2f6578616d706c652e6f7267222c2263726f73734f726967696e223a66616c73657d",
+   "rp_id": "example.org",
+   "origin": "https://example.org",
+   "challenge": "EijdmqrPNtPCSCR4aUB_y-czWE3Q7fYuiakE10n5Mdc",
+   "user_verification": "preferred",
+   "pub_key_cred_params": [
+    -7
+   ],
+   "cross_origin": "deny",
+   "binding": "741b188a27fcad7718ef2b7d3b30d6eb8fe3f7f32ed5dfad08a99b1d544fdd7f",
+   "finish_binding": "1aa63be39597fb795e1a0cf1fb8645047de4035cde72fd6c3ed5048b2e70acbd",
+   "spec": "ruling R-d and contract R58 (BrowserMismatch): the ceremony was started in another browser",
+   "expect": {
+    "ok": false
+   }
+  },
+  {
+   "id": "registration-one-bit-differs",
+   "op": "webauthn_register",
+   "attestation_object": "a363666d74646e6f6e656761747453746d74a068617574684461746158a4bfabc37432958b063360d3ad6461c9c4735ae7f8edd46592a5e0f01452b2e4b5450000000000112233445566778899aabbccddeeff00207317953e73992f05b1443b42b67a3b4491d438a0b268fe9af4b03cbb6f6a3482a501020326200121582066a521fa1e52d5fbc8e31a9771d4731f607a7f366d11f64d9859fd4c21ebeb5c22582005913812577650be7bce1059e89feac011a773878025cb2374e67173175baa10",
+   "client_data_json": "7b2274797065223a22776562617574686e2e637265617465222c226368616c6c656e6765223a2245696a646d7172504e745043534352346155425f792d637a574533513766597569616b4531306e354d6463222c226f726967696e223a2268747470733a2f2f6578616d706c652e6f7267222c2263726f73734f726967696e223a66616c73657d",
+   "rp_id": "example.org",
+   "origin": "https://example.org",
+   "challenge": "EijdmqrPNtPCSCR4aUB_y-czWE3Q7fYuiakE10n5Mdc",
+   "user_verification": "preferred",
+   "pub_key_cred_params": [
+    -7
+   ],
+   "cross_origin": "deny",
+   "binding": "741b188a27fcad7718ef2b7d3b30d6eb8fe3f7f32ed5dfad08a99b1d544fdd7f",
+   "finish_binding": "741b188a27fcad7718ef2b7d3b30d6eb8fe3f7f32ed5dfad08a99b1d544fdd7e",
+   "spec": "ruling R-d and contract R58 (BrowserMismatch): one bit of the binding differs",
+   "expect": {
+    "ok": false
+   }
+  },
+  {
+   "id": "registration-zero-binding",
+   "op": "webauthn_register",
+   "attestation_object": "a363666d74646e6f6e656761747453746d74a068617574684461746158a4bfabc37432958b063360d3ad6461c9c4735ae7f8edd46592a5e0f01452b2e4b5450000000000112233445566778899aabbccddeeff00207317953e73992f05b1443b42b67a3b4491d438a0b268fe9af4b03cbb6f6a3482a501020326200121582066a521fa1e52d5fbc8e31a9771d4731f607a7f366d11f64d9859fd4c21ebeb5c22582005913812577650be7bce1059e89feac011a773878025cb2374e67173175baa10",
+   "client_data_json": "7b2274797065223a22776562617574686e2e637265617465222c226368616c6c656e6765223a2245696a646d7172504e745043534352346155425f792d637a574533513766597569616b4531306e354d6463222c226f726967696e223a2268747470733a2f2f6578616d706c652e6f7267222c2263726f73734f726967696e223a66616c73657d",
+   "rp_id": "example.org",
+   "origin": "https://example.org",
+   "challenge": "EijdmqrPNtPCSCR4aUB_y-czWE3Q7fYuiakE10n5Mdc",
+   "user_verification": "preferred",
+   "pub_key_cred_params": [
+    -7
+   ],
+   "cross_origin": "deny",
+   "binding": "741b188a27fcad7718ef2b7d3b30d6eb8fe3f7f32ed5dfad08a99b1d544fdd7f",
+   "finish_binding": "0000000000000000000000000000000000000000000000000000000000000000",
+   "spec": "ruling R-d and contract R58 (BrowserMismatch): an all-zero binding does not match a real one",
+   "expect": {
+    "ok": false
+   }
+  },
+  {
+   "id": "authentication-same-browser",
+   "op": "webauthn_assert",
+   "pub": {
+    "x": "66a521fa1e52d5fbc8e31a9771d4731f607a7f366d11f64d9859fd4c21ebeb5c",
+    "y": "05913812577650be7bce1059e89feac011a773878025cb2374e67173175baa10"
+   },
+   "authenticator_data": "bfabc37432958b063360d3ad6461c9c4735ae7f8edd46592a5e0f01452b2e4b50500000006",
+   "client_data_json": "7b2274797065223a22776562617574686e2e676574222c226368616c6c656e6765223a2245696a646d7172504e745043534352346155425f792d637a574533513766597569616b4531306e354d6463222c226f726967696e223a2268747470733a2f2f6578616d706c652e6f7267222c2263726f73734f726967696e223a66616c73657d",
+   "signature": "3045022100ec15ba5273a32632f35c01fc99e472c81b4febe02be17ee069d9f1d76ea82958022051097a686273c3d3c05ac29502f3f5a7245d619a17b87be52faf41666e7a8fab",
+   "rp_id": "example.org",
+   "origin": "https://example.org",
+   "challenge": "EijdmqrPNtPCSCR4aUB_y-czWE3Q7fYuiakE10n5Mdc",
+   "user_verification": "preferred",
+   "counter_policy": "reject",
+   "stored_counter": 5,
+   "stored_backup_eligible": false,
+   "cross_origin": "deny",
+   "binding": "741b188a27fcad7718ef2b7d3b30d6eb8fe3f7f32ed5dfad08a99b1d544fdd7f",
+   "finish_binding": "741b188a27fcad7718ef2b7d3b30d6eb8fe3f7f32ed5dfad08a99b1d544fdd7f",
+   "spec": "ruling R-d and contract R63 (BrowserMismatch)",
+   "expect": {
+    "ok": true,
+    "user_verified": true,
+    "counter": 6
+   }
+  },
+  {
+   "id": "authentication-other-browser",
+   "op": "webauthn_assert",
+   "pub": {
+    "x": "66a521fa1e52d5fbc8e31a9771d4731f607a7f366d11f64d9859fd4c21ebeb5c",
+    "y": "05913812577650be7bce1059e89feac011a773878025cb2374e67173175baa10"
+   },
+   "authenticator_data": "bfabc37432958b063360d3ad6461c9c4735ae7f8edd46592a5e0f01452b2e4b50500000006",
+   "client_data_json": "7b2274797065223a22776562617574686e2e676574222c226368616c6c656e6765223a2245696a646d7172504e745043534352346155425f792d637a574533513766597569616b4531306e354d6463222c226f726967696e223a2268747470733a2f2f6578616d706c652e6f7267222c2263726f73734f726967696e223a66616c73657d",
+   "signature": "3045022100ec15ba5273a32632f35c01fc99e472c81b4febe02be17ee069d9f1d76ea82958022051097a686273c3d3c05ac29502f3f5a7245d619a17b87be52faf41666e7a8fab",
+   "rp_id": "example.org",
+   "origin": "https://example.org",
+   "challenge": "EijdmqrPNtPCSCR4aUB_y-czWE3Q7fYuiakE10n5Mdc",
+   "user_verification": "preferred",
+   "counter_policy": "reject",
+   "stored_counter": 5,
+   "stored_backup_eligible": false,
+   "cross_origin": "deny",
+   "binding": "741b188a27fcad7718ef2b7d3b30d6eb8fe3f7f32ed5dfad08a99b1d544fdd7f",
+   "finish_binding": "1aa63be39597fb795e1a0cf1fb8645047de4035cde72fd6c3ed5048b2e70acbd",
+   "spec": "ruling R-d and contract R63 (BrowserMismatch): the login was started in another browser (login CSRF)",
+   "expect": {
+    "ok": false
+   }
+  },
+  {
+   "id": "authentication-one-bit-differs",
+   "op": "webauthn_assert",
+   "pub": {
+    "x": "66a521fa1e52d5fbc8e31a9771d4731f607a7f366d11f64d9859fd4c21ebeb5c",
+    "y": "05913812577650be7bce1059e89feac011a773878025cb2374e67173175baa10"
+   },
+   "authenticator_data": "bfabc37432958b063360d3ad6461c9c4735ae7f8edd46592a5e0f01452b2e4b50500000006",
+   "client_data_json": "7b2274797065223a22776562617574686e2e676574222c226368616c6c656e6765223a2245696a646d7172504e745043534352346155425f792d637a574533513766597569616b4531306e354d6463222c226f726967696e223a2268747470733a2f2f6578616d706c652e6f7267222c2263726f73734f726967696e223a66616c73657d",
+   "signature": "3045022100ec15ba5273a32632f35c01fc99e472c81b4febe02be17ee069d9f1d76ea82958022051097a686273c3d3c05ac29502f3f5a7245d619a17b87be52faf41666e7a8fab",
+   "rp_id": "example.org",
+   "origin": "https://example.org",
+   "challenge": "EijdmqrPNtPCSCR4aUB_y-czWE3Q7fYuiakE10n5Mdc",
+   "user_verification": "preferred",
+   "counter_policy": "reject",
+   "stored_counter": 5,
+   "stored_backup_eligible": false,
+   "cross_origin": "deny",
+   "binding": "741b188a27fcad7718ef2b7d3b30d6eb8fe3f7f32ed5dfad08a99b1d544fdd7f",
+   "finish_binding": "741b188a27fcad7718ef2b7d3b30d6eb8fe3f7f32ed5dfad08a99b1d544fdd7e",
+   "spec": "ruling R-d and contract R63 (BrowserMismatch): one bit of the binding differs",
+   "expect": {
+    "ok": false
+   }
+  },
+  {
+   "id": "authentication-zero-binding",
+   "op": "webauthn_assert",
+   "pub": {
+    "x": "66a521fa1e52d5fbc8e31a9771d4731f607a7f366d11f64d9859fd4c21ebeb5c",
+    "y": "05913812577650be7bce1059e89feac011a773878025cb2374e67173175baa10"
+   },
+   "authenticator_data": "bfabc37432958b063360d3ad6461c9c4735ae7f8edd46592a5e0f01452b2e4b50500000006",
+   "client_data_json": "7b2274797065223a22776562617574686e2e676574222c226368616c6c656e6765223a2245696a646d7172504e745043534352346155425f792d637a574533513766597569616b4531306e354d6463222c226f726967696e223a2268747470733a2f2f6578616d706c652e6f7267222c2263726f73734f726967696e223a66616c73657d",
+   "signature": "3045022100ec15ba5273a32632f35c01fc99e472c81b4febe02be17ee069d9f1d76ea82958022051097a686273c3d3c05ac29502f3f5a7245d619a17b87be52faf41666e7a8fab",
+   "rp_id": "example.org",
+   "origin": "https://example.org",
+   "challenge": "EijdmqrPNtPCSCR4aUB_y-czWE3Q7fYuiakE10n5Mdc",
+   "user_verification": "preferred",
+   "counter_policy": "reject",
+   "stored_counter": 5,
+   "stored_backup_eligible": false,
+   "cross_origin": "deny",
+   "binding": "741b188a27fcad7718ef2b7d3b30d6eb8fe3f7f32ed5dfad08a99b1d544fdd7f",
+   "finish_binding": "0000000000000000000000000000000000000000000000000000000000000000",
+   "spec": "ruling R-d and contract R63 (BrowserMismatch): an all-zero binding does not match a real one",
+   "expect": {
+    "ok": false
+   }
+  }
+ ]
+}

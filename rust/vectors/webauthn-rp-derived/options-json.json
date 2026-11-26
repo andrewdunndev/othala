@@ -1,0 +1,2187 @@
+{
+ "source": "options JSON shapes, related origins and signals (WebAuthn L3 5.1.8-5.1.10, 5.11; contract R30, R31, R60, R121, R130, R131, R134, R135); the challenge is the first 32 bytes the Entropy yields; JSON is compared as a value, member order aside",
+ "cases": [
+  {
+   "id": "creation-defaults",
+   "op": "creation_options_json",
+   "rp": {
+    "id": "example.org",
+    "name": "Example",
+    "origins": [
+     "https://example.org"
+    ]
+   },
+   "user": {
+    "handle": "d7275b0aaaf6e49e1b79541a697eb4e2175c3d99b13765d57f6f1d0db4d65465",
+    "name": "alice",
+    "display_name": "Alice Example"
+   },
+   "exclude_credentials": [],
+   "options": {
+    "user_verification": "preferred",
+    "resident_key": "preferred",
+    "timeout_secs": 300
+   },
+   "entropy": "9897b40ffec15be7ac14e363ace7cfbfbcc7289cd58dcacd4b964828ecc9cdea",
+   "now": 1800000000,
+   "spec": "contract R30 and R130 (PublicKeyCredentialCreationOptionsJSON, WebAuthn L3 5.1.8) (base64url for the challenge and user id; ES256, EdDSA, ES384, RS256 by default; timeout in milliseconds; oracle choice: excludeCredentials and allowCredentials are always emitted, empty when none, while hints and attestationFormats are emitted only when set)",
+   "expect": {
+    "ok": true,
+    "json": {
+     "rp": {
+      "id": "example.org",
+      "name": "Example"
+     },
+     "user": {
+      "id": "1ydbCqr25J4beVQaaX604hdcPZmxN2XVf28dDbTWVGU",
+      "name": "alice",
+      "displayName": "Alice Example"
+     },
+     "challenge": "mJe0D_7BW-esFONjrOfPv7zHKJzVjcrNS5ZIKOzJzeo",
+     "pubKeyCredParams": [
+      {
+       "type": "public-key",
+       "alg": -7
+      },
+      {
+       "type": "public-key",
+       "alg": -8
+      },
+      {
+       "type": "public-key",
+       "alg": -35
+      },
+      {
+       "type": "public-key",
+       "alg": -257
+      }
+     ],
+     "timeout": 300000,
+     "excludeCredentials": [],
+     "authenticatorSelection": {
+      "residentKey": "preferred",
+      "requireResidentKey": false,
+      "userVerification": "preferred"
+     },
+     "attestation": "none"
+    },
+    "effect": {
+     "ceremony_row": "b28ce8fd513ce8953ba0b80cd29a8369dc8b43de03464529cb5f3e1ec111e316",
+     "expiry": 1800000300
+    }
+   }
+  },
+  {
+   "id": "creation-resident-required",
+   "op": "creation_options_json",
+   "rp": {
+    "id": "example.org",
+    "name": "Example",
+    "origins": [
+     "https://example.org"
+    ]
+   },
+   "user": {
+    "handle": "d7275b0aaaf6e49e1b79541a697eb4e2175c3d99b13765d57f6f1d0db4d65465",
+    "name": "alice",
+    "display_name": "Alice Example"
+   },
+   "exclude_credentials": [],
+   "options": {
+    "user_verification": "preferred",
+    "resident_key": "required",
+    "timeout_secs": 300
+   },
+   "entropy": "9897b40ffec15be7ac14e363ace7cfbfbcc7289cd58dcacd4b964828ecc9cdea",
+   "now": 1800000000,
+   "spec": "contract R30 and R130 (PublicKeyCredentialCreationOptionsJSON, WebAuthn L3 5.1.8) (requireResidentKey is true exactly when residentKey is required)",
+   "expect": {
+    "ok": true,
+    "json": {
+     "rp": {
+      "id": "example.org",
+      "name": "Example"
+     },
+     "user": {
+      "id": "1ydbCqr25J4beVQaaX604hdcPZmxN2XVf28dDbTWVGU",
+      "name": "alice",
+      "displayName": "Alice Example"
+     },
+     "challenge": "mJe0D_7BW-esFONjrOfPv7zHKJzVjcrNS5ZIKOzJzeo",
+     "pubKeyCredParams": [
+      {
+       "type": "public-key",
+       "alg": -7
+      },
+      {
+       "type": "public-key",
+       "alg": -8
+      },
+      {
+       "type": "public-key",
+       "alg": -35
+      },
+      {
+       "type": "public-key",
+       "alg": -257
+      }
+     ],
+     "timeout": 300000,
+     "excludeCredentials": [],
+     "authenticatorSelection": {
+      "residentKey": "required",
+      "requireResidentKey": true,
+      "userVerification": "preferred"
+     },
+     "attestation": "none"
+    },
+    "effect": {
+     "ceremony_row": "b28ce8fd513ce8953ba0b80cd29a8369dc8b43de03464529cb5f3e1ec111e316",
+     "expiry": 1800000300
+    }
+   }
+  },
+  {
+   "id": "creation-resident-discouraged",
+   "op": "creation_options_json",
+   "rp": {
+    "id": "example.org",
+    "name": "Example",
+    "origins": [
+     "https://example.org"
+    ]
+   },
+   "user": {
+    "handle": "d7275b0aaaf6e49e1b79541a697eb4e2175c3d99b13765d57f6f1d0db4d65465",
+    "name": "alice",
+    "display_name": "Alice Example"
+   },
+   "exclude_credentials": [],
+   "options": {
+    "user_verification": "preferred",
+    "resident_key": "discouraged",
+    "timeout_secs": 300
+   },
+   "entropy": "9897b40ffec15be7ac14e363ace7cfbfbcc7289cd58dcacd4b964828ecc9cdea",
+   "now": 1800000000,
+   "spec": "contract R30 and R130 (PublicKeyCredentialCreationOptionsJSON, WebAuthn L3 5.1.8) (requireResidentKey is false unless residentKey is required)",
+   "expect": {
+    "ok": true,
+    "json": {
+     "rp": {
+      "id": "example.org",
+      "name": "Example"
+     },
+     "user": {
+      "id": "1ydbCqr25J4beVQaaX604hdcPZmxN2XVf28dDbTWVGU",
+      "name": "alice",
+      "displayName": "Alice Example"
+     },
+     "challenge": "mJe0D_7BW-esFONjrOfPv7zHKJzVjcrNS5ZIKOzJzeo",
+     "pubKeyCredParams": [
+      {
+       "type": "public-key",
+       "alg": -7
+      },
+      {
+       "type": "public-key",
+       "alg": -8
+      },
+      {
+       "type": "public-key",
+       "alg": -35
+      },
+      {
+       "type": "public-key",
+       "alg": -257
+      }
+     ],
+     "timeout": 300000,
+     "excludeCredentials": [],
+     "authenticatorSelection": {
+      "residentKey": "discouraged",
+      "requireResidentKey": false,
+      "userVerification": "preferred"
+     },
+     "attestation": "none"
+    },
+    "effect": {
+     "ceremony_row": "b28ce8fd513ce8953ba0b80cd29a8369dc8b43de03464529cb5f3e1ec111e316",
+     "expiry": 1800000300
+    }
+   }
+  },
+  {
+   "id": "creation-user-verification-required",
+   "op": "creation_options_json",
+   "rp": {
+    "id": "example.org",
+    "name": "Example",
+    "origins": [
+     "https://example.org"
+    ]
+   },
+   "user": {
+    "handle": "d7275b0aaaf6e49e1b79541a697eb4e2175c3d99b13765d57f6f1d0db4d65465",
+    "name": "alice",
+    "display_name": "Alice Example"
+   },
+   "exclude_credentials": [],
+   "options": {
+    "user_verification": "required",
+    "resident_key": "preferred",
+    "timeout_secs": 300
+   },
+   "entropy": "9897b40ffec15be7ac14e363ace7cfbfbcc7289cd58dcacd4b964828ecc9cdea",
+   "now": 1800000000,
+   "spec": "contract R30 and R130 (PublicKeyCredentialCreationOptionsJSON, WebAuthn L3 5.1.8) (userVerification in authenticatorSelection)",
+   "expect": {
+    "ok": true,
+    "json": {
+     "rp": {
+      "id": "example.org",
+      "name": "Example"
+     },
+     "user": {
+      "id": "1ydbCqr25J4beVQaaX604hdcPZmxN2XVf28dDbTWVGU",
+      "name": "alice",
+      "displayName": "Alice Example"
+     },
+     "challenge": "mJe0D_7BW-esFONjrOfPv7zHKJzVjcrNS5ZIKOzJzeo",
+     "pubKeyCredParams": [
+      {
+       "type": "public-key",
+       "alg": -7
+      },
+      {
+       "type": "public-key",
+       "alg": -8
+      },
+      {
+       "type": "public-key",
+       "alg": -35
+      },
+      {
+       "type": "public-key",
+       "alg": -257
+      }
+     ],
+     "timeout": 300000,
+     "excludeCredentials": [],
+     "authenticatorSelection": {
+      "residentKey": "preferred",
+      "requireResidentKey": false,
+      "userVerification": "required"
+     },
+     "attestation": "none"
+    },
+    "effect": {
+     "ceremony_row": "b28ce8fd513ce8953ba0b80cd29a8369dc8b43de03464529cb5f3e1ec111e316",
+     "expiry": 1800000300
+    }
+   }
+  },
+  {
+   "id": "creation-attachment",
+   "op": "creation_options_json",
+   "rp": {
+    "id": "example.org",
+    "name": "Example",
+    "origins": [
+     "https://example.org"
+    ]
+   },
+   "user": {
+    "handle": "d7275b0aaaf6e49e1b79541a697eb4e2175c3d99b13765d57f6f1d0db4d65465",
+    "name": "alice",
+    "display_name": "Alice Example"
+   },
+   "exclude_credentials": [],
+   "options": {
+    "user_verification": "preferred",
+    "resident_key": "preferred",
+    "timeout_secs": 300,
+    "attachment": "platform"
+   },
+   "entropy": "9897b40ffec15be7ac14e363ace7cfbfbcc7289cd58dcacd4b964828ecc9cdea",
+   "now": 1800000000,
+   "spec": "contract R30 and R130 (PublicKeyCredentialCreationOptionsJSON, WebAuthn L3 5.1.8) (authenticatorAttachment in authenticatorSelection)",
+   "expect": {
+    "ok": true,
+    "json": {
+     "rp": {
+      "id": "example.org",
+      "name": "Example"
+     },
+     "user": {
+      "id": "1ydbCqr25J4beVQaaX604hdcPZmxN2XVf28dDbTWVGU",
+      "name": "alice",
+      "displayName": "Alice Example"
+     },
+     "challenge": "mJe0D_7BW-esFONjrOfPv7zHKJzVjcrNS5ZIKOzJzeo",
+     "pubKeyCredParams": [
+      {
+       "type": "public-key",
+       "alg": -7
+      },
+      {
+       "type": "public-key",
+       "alg": -8
+      },
+      {
+       "type": "public-key",
+       "alg": -35
+      },
+      {
+       "type": "public-key",
+       "alg": -257
+      }
+     ],
+     "timeout": 300000,
+     "excludeCredentials": [],
+     "authenticatorSelection": {
+      "residentKey": "preferred",
+      "requireResidentKey": false,
+      "userVerification": "preferred",
+      "authenticatorAttachment": "platform"
+     },
+     "attestation": "none"
+    },
+    "effect": {
+     "ceremony_row": "b28ce8fd513ce8953ba0b80cd29a8369dc8b43de03464529cb5f3e1ec111e316",
+     "expiry": 1800000300
+    }
+   }
+  },
+  {
+   "id": "creation-algorithms-set",
+   "op": "creation_options_json",
+   "rp": {
+    "id": "example.org",
+    "name": "Example",
+    "origins": [
+     "https://example.org"
+    ]
+   },
+   "user": {
+    "handle": "d7275b0aaaf6e49e1b79541a697eb4e2175c3d99b13765d57f6f1d0db4d65465",
+    "name": "alice",
+    "display_name": "Alice Example"
+   },
+   "exclude_credentials": [],
+   "options": {
+    "user_verification": "preferred",
+    "resident_key": "preferred",
+    "timeout_secs": 300,
+    "algorithms": [
+     -257,
+     -7
+    ]
+   },
+   "entropy": "9897b40ffec15be7ac14e363ace7cfbfbcc7289cd58dcacd4b964828ecc9cdea",
+   "now": 1800000000,
+   "spec": "contract R30 and R130 (PublicKeyCredentialCreationOptionsJSON, WebAuthn L3 5.1.8) (algorithms offered replace the default, in preference order)",
+   "expect": {
+    "ok": true,
+    "json": {
+     "rp": {
+      "id": "example.org",
+      "name": "Example"
+     },
+     "user": {
+      "id": "1ydbCqr25J4beVQaaX604hdcPZmxN2XVf28dDbTWVGU",
+      "name": "alice",
+      "displayName": "Alice Example"
+     },
+     "challenge": "mJe0D_7BW-esFONjrOfPv7zHKJzVjcrNS5ZIKOzJzeo",
+     "pubKeyCredParams": [
+      {
+       "type": "public-key",
+       "alg": -257
+      },
+      {
+       "type": "public-key",
+       "alg": -7
+      }
+     ],
+     "timeout": 300000,
+     "excludeCredentials": [],
+     "authenticatorSelection": {
+      "residentKey": "preferred",
+      "requireResidentKey": false,
+      "userVerification": "preferred"
+     },
+     "attestation": "none"
+    },
+    "effect": {
+     "ceremony_row": "b28ce8fd513ce8953ba0b80cd29a8369dc8b43de03464529cb5f3e1ec111e316",
+     "expiry": 1800000300
+    }
+   }
+  },
+  {
+   "id": "creation-algorithms-repeated-once",
+   "op": "creation_options_json",
+   "rp": {
+    "id": "example.org",
+    "name": "Example",
+    "origins": [
+     "https://example.org"
+    ]
+   },
+   "user": {
+    "handle": "d7275b0aaaf6e49e1b79541a697eb4e2175c3d99b13765d57f6f1d0db4d65465",
+    "name": "alice",
+    "display_name": "Alice Example"
+   },
+   "exclude_credentials": [],
+   "options": {
+    "user_verification": "preferred",
+    "resident_key": "preferred",
+    "timeout_secs": 300,
+    "algorithms": [
+     -7,
+     -257,
+     -7
+    ]
+   },
+   "entropy": "9897b40ffec15be7ac14e363ace7cfbfbcc7289cd58dcacd4b964828ecc9cdea",
+   "now": 1800000000,
+   "spec": "contract R30 and R130 (PublicKeyCredentialCreationOptionsJSON, WebAuthn L3 5.1.8) and R15 (the setters keep each algorithm once)",
+   "expect": {
+    "ok": true,
+    "json": {
+     "rp": {
+      "id": "example.org",
+      "name": "Example"
+     },
+     "user": {
+      "id": "1ydbCqr25J4beVQaaX604hdcPZmxN2XVf28dDbTWVGU",
+      "name": "alice",
+      "displayName": "Alice Example"
+     },
+     "challenge": "mJe0D_7BW-esFONjrOfPv7zHKJzVjcrNS5ZIKOzJzeo",
+     "pubKeyCredParams": [
+      {
+       "type": "public-key",
+       "alg": -7
+      },
+      {
+       "type": "public-key",
+       "alg": -257
+      }
+     ],
+     "timeout": 300000,
+     "excludeCredentials": [],
+     "authenticatorSelection": {
+      "residentKey": "preferred",
+      "requireResidentKey": false,
+      "userVerification": "preferred"
+     },
+     "attestation": "none"
+    },
+    "effect": {
+     "ceremony_row": "b28ce8fd513ce8953ba0b80cd29a8369dc8b43de03464529cb5f3e1ec111e316",
+     "expiry": 1800000300
+    }
+   }
+  },
+  {
+   "id": "creation-attestation-direct",
+   "op": "creation_options_json",
+   "rp": {
+    "id": "example.org",
+    "name": "Example",
+    "origins": [
+     "https://example.org"
+    ]
+   },
+   "user": {
+    "handle": "d7275b0aaaf6e49e1b79541a697eb4e2175c3d99b13765d57f6f1d0db4d65465",
+    "name": "alice",
+    "display_name": "Alice Example"
+   },
+   "exclude_credentials": [],
+   "options": {
+    "user_verification": "preferred",
+    "resident_key": "preferred",
+    "timeout_secs": 300,
+    "attestation": "direct"
+   },
+   "entropy": "9897b40ffec15be7ac14e363ace7cfbfbcc7289cd58dcacd4b964828ecc9cdea",
+   "now": 1800000000,
+   "spec": "contract R30 and R130 (PublicKeyCredentialCreationOptionsJSON, WebAuthn L3 5.1.8) (attestation conveyance)",
+   "expect": {
+    "ok": true,
+    "json": {
+     "rp": {
+      "id": "example.org",
+      "name": "Example"
+     },
+     "user": {
+      "id": "1ydbCqr25J4beVQaaX604hdcPZmxN2XVf28dDbTWVGU",
+      "name": "alice",
+      "displayName": "Alice Example"
+     },
+     "challenge": "mJe0D_7BW-esFONjrOfPv7zHKJzVjcrNS5ZIKOzJzeo",
+     "pubKeyCredParams": [
+      {
+       "type": "public-key",
+       "alg": -7
+      },
+      {
+       "type": "public-key",
+       "alg": -8
+      },
+      {
+       "type": "public-key",
+       "alg": -35
+      },
+      {
+       "type": "public-key",
+       "alg": -257
+      }
+     ],
+     "timeout": 300000,
+     "excludeCredentials": [],
+     "authenticatorSelection": {
+      "residentKey": "preferred",
+      "requireResidentKey": false,
+      "userVerification": "preferred"
+     },
+     "attestation": "direct"
+    },
+    "effect": {
+     "ceremony_row": "b28ce8fd513ce8953ba0b80cd29a8369dc8b43de03464529cb5f3e1ec111e316",
+     "expiry": 1800000300
+    }
+   }
+  },
+  {
+   "id": "creation-attestation-formats-ordered",
+   "op": "creation_options_json",
+   "rp": {
+    "id": "example.org",
+    "name": "Example",
+    "origins": [
+     "https://example.org"
+    ]
+   },
+   "user": {
+    "handle": "d7275b0aaaf6e49e1b79541a697eb4e2175c3d99b13765d57f6f1d0db4d65465",
+    "name": "alice",
+    "display_name": "Alice Example"
+   },
+   "exclude_credentials": [],
+   "options": {
+    "user_verification": "preferred",
+    "resident_key": "preferred",
+    "timeout_secs": 300,
+    "attestation": "direct",
+    "attestation_formats": [
+     "packed",
+     "tpm",
+     "packed"
+    ]
+   },
+   "entropy": "9897b40ffec15be7ac14e363ace7cfbfbcc7289cd58dcacd4b964828ecc9cdea",
+   "now": 1800000000,
+   "spec": "contract R30 and R130 (PublicKeyCredentialCreationOptionsJSON, WebAuthn L3 5.1.8) (attestationFormats in order, without repeats)",
+   "expect": {
+    "ok": true,
+    "json": {
+     "rp": {
+      "id": "example.org",
+      "name": "Example"
+     },
+     "user": {
+      "id": "1ydbCqr25J4beVQaaX604hdcPZmxN2XVf28dDbTWVGU",
+      "name": "alice",
+      "displayName": "Alice Example"
+     },
+     "challenge": "mJe0D_7BW-esFONjrOfPv7zHKJzVjcrNS5ZIKOzJzeo",
+     "pubKeyCredParams": [
+      {
+       "type": "public-key",
+       "alg": -7
+      },
+      {
+       "type": "public-key",
+       "alg": -8
+      },
+      {
+       "type": "public-key",
+       "alg": -35
+      },
+      {
+       "type": "public-key",
+       "alg": -257
+      }
+     ],
+     "timeout": 300000,
+     "excludeCredentials": [],
+     "authenticatorSelection": {
+      "residentKey": "preferred",
+      "requireResidentKey": false,
+      "userVerification": "preferred"
+     },
+     "attestation": "direct",
+     "attestationFormats": [
+      "packed",
+      "tpm"
+     ]
+    },
+    "effect": {
+     "ceremony_row": "b28ce8fd513ce8953ba0b80cd29a8369dc8b43de03464529cb5f3e1ec111e316",
+     "expiry": 1800000300
+    }
+   }
+  },
+  {
+   "id": "creation-hints-ordered",
+   "op": "creation_options_json",
+   "rp": {
+    "id": "example.org",
+    "name": "Example",
+    "origins": [
+     "https://example.org"
+    ]
+   },
+   "user": {
+    "handle": "d7275b0aaaf6e49e1b79541a697eb4e2175c3d99b13765d57f6f1d0db4d65465",
+    "name": "alice",
+    "display_name": "Alice Example"
+   },
+   "exclude_credentials": [],
+   "options": {
+    "user_verification": "preferred",
+    "resident_key": "preferred",
+    "timeout_secs": 300,
+    "hints": [
+     "hybrid",
+     "security-key",
+     "hybrid"
+    ]
+   },
+   "entropy": "9897b40ffec15be7ac14e363ace7cfbfbcc7289cd58dcacd4b964828ecc9cdea",
+   "now": 1800000000,
+   "spec": "contract R30 and R130 (PublicKeyCredentialCreationOptionsJSON, WebAuthn L3 5.1.8) (hints in order, without repeats)",
+   "expect": {
+    "ok": true,
+    "json": {
+     "rp": {
+      "id": "example.org",
+      "name": "Example"
+     },
+     "user": {
+      "id": "1ydbCqr25J4beVQaaX604hdcPZmxN2XVf28dDbTWVGU",
+      "name": "alice",
+      "displayName": "Alice Example"
+     },
+     "challenge": "mJe0D_7BW-esFONjrOfPv7zHKJzVjcrNS5ZIKOzJzeo",
+     "pubKeyCredParams": [
+      {
+       "type": "public-key",
+       "alg": -7
+      },
+      {
+       "type": "public-key",
+       "alg": -8
+      },
+      {
+       "type": "public-key",
+       "alg": -35
+      },
+      {
+       "type": "public-key",
+       "alg": -257
+      }
+     ],
+     "timeout": 300000,
+     "excludeCredentials": [],
+     "authenticatorSelection": {
+      "residentKey": "preferred",
+      "requireResidentKey": false,
+      "userVerification": "preferred"
+     },
+     "attestation": "none",
+     "hints": [
+      "hybrid",
+      "security-key"
+     ]
+    },
+    "effect": {
+     "ceremony_row": "b28ce8fd513ce8953ba0b80cd29a8369dc8b43de03464529cb5f3e1ec111e316",
+     "expiry": 1800000300
+    }
+   }
+  },
+  {
+   "id": "creation-exclude-credentials",
+   "op": "creation_options_json",
+   "rp": {
+    "id": "example.org",
+    "name": "Example",
+    "origins": [
+     "https://example.org"
+    ]
+   },
+   "user": {
+    "handle": "d7275b0aaaf6e49e1b79541a697eb4e2175c3d99b13765d57f6f1d0db4d65465",
+    "name": "alice",
+    "display_name": "Alice Example"
+   },
+   "exclude_credentials": [
+    {
+     "id": "c0c26343bd1acbab9a88c2375bfbdd43",
+     "transports": [
+      "usb",
+      "nfc",
+      "usb"
+     ]
+    },
+    {
+     "id": "5ee6f045b2fc1b081f8f33dfe46c28967d9ba9627c946aab",
+     "transports": []
+    }
+   ],
+   "options": {
+    "user_verification": "preferred",
+    "resident_key": "preferred",
+    "timeout_secs": 300
+   },
+   "entropy": "9897b40ffec15be7ac14e363ace7cfbfbcc7289cd58dcacd4b964828ecc9cdea",
+   "now": 1800000000,
+   "spec": "contract R30 and R130 (PublicKeyCredentialCreationOptionsJSON, WebAuthn L3 5.1.8) (excludeCredentials as base64url ids; a repeated transport is kept once, in order)",
+   "expect": {
+    "ok": true,
+    "json": {
+     "rp": {
+      "id": "example.org",
+      "name": "Example"
+     },
+     "user": {
+      "id": "1ydbCqr25J4beVQaaX604hdcPZmxN2XVf28dDbTWVGU",
+      "name": "alice",
+      "displayName": "Alice Example"
+     },
+     "challenge": "mJe0D_7BW-esFONjrOfPv7zHKJzVjcrNS5ZIKOzJzeo",
+     "pubKeyCredParams": [
+      {
+       "type": "public-key",
+       "alg": -7
+      },
+      {
+       "type": "public-key",
+       "alg": -8
+      },
+      {
+       "type": "public-key",
+       "alg": -35
+      },
+      {
+       "type": "public-key",
+       "alg": -257
+      }
+     ],
+     "timeout": 300000,
+     "excludeCredentials": [
+      {
+       "type": "public-key",
+       "id": "wMJjQ70ay6uaiMI3W_vdQw",
+       "transports": [
+        "usb",
+        "nfc"
+       ]
+      },
+      {
+       "type": "public-key",
+       "id": "XubwRbL8GwgfjzPf5Gwoln2bqWJ8lGqr"
+      }
+     ],
+     "authenticatorSelection": {
+      "residentKey": "preferred",
+      "requireResidentKey": false,
+      "userVerification": "preferred"
+     },
+     "attestation": "none"
+    },
+    "effect": {
+     "ceremony_row": "b28ce8fd513ce8953ba0b80cd29a8369dc8b43de03464529cb5f3e1ec111e316",
+     "expiry": 1800000300
+    }
+   }
+  },
+  {
+   "id": "creation-ext-cred-props",
+   "op": "creation_options_json",
+   "rp": {
+    "id": "example.org",
+    "name": "Example",
+    "origins": [
+     "https://example.org"
+    ]
+   },
+   "user": {
+    "handle": "d7275b0aaaf6e49e1b79541a697eb4e2175c3d99b13765d57f6f1d0db4d65465",
+    "name": "alice",
+    "display_name": "Alice Example"
+   },
+   "exclude_credentials": [],
+   "options": {
+    "user_verification": "preferred",
+    "resident_key": "preferred",
+    "timeout_secs": 300,
+    "extensions": {
+     "credProps": true
+    }
+   },
+   "entropy": "9897b40ffec15be7ac14e363ace7cfbfbcc7289cd58dcacd4b964828ecc9cdea",
+   "now": 1800000000,
+   "spec": "contract R30 and R130 (PublicKeyCredentialCreationOptionsJSON, WebAuthn L3 5.1.8) (extensions: credProps)",
+   "expect": {
+    "ok": true,
+    "json": {
+     "rp": {
+      "id": "example.org",
+      "name": "Example"
+     },
+     "user": {
+      "id": "1ydbCqr25J4beVQaaX604hdcPZmxN2XVf28dDbTWVGU",
+      "name": "alice",
+      "displayName": "Alice Example"
+     },
+     "challenge": "mJe0D_7BW-esFONjrOfPv7zHKJzVjcrNS5ZIKOzJzeo",
+     "pubKeyCredParams": [
+      {
+       "type": "public-key",
+       "alg": -7
+      },
+      {
+       "type": "public-key",
+       "alg": -8
+      },
+      {
+       "type": "public-key",
+       "alg": -35
+      },
+      {
+       "type": "public-key",
+       "alg": -257
+      }
+     ],
+     "timeout": 300000,
+     "excludeCredentials": [],
+     "authenticatorSelection": {
+      "residentKey": "preferred",
+      "requireResidentKey": false,
+      "userVerification": "preferred"
+     },
+     "attestation": "none",
+     "extensions": {
+      "credProps": true
+     }
+    },
+    "effect": {
+     "ceremony_row": "b28ce8fd513ce8953ba0b80cd29a8369dc8b43de03464529cb5f3e1ec111e316",
+     "expiry": 1800000300
+    }
+   }
+  },
+  {
+   "id": "creation-ext-appid-exclude",
+   "op": "creation_options_json",
+   "rp": {
+    "id": "example.org",
+    "name": "Example",
+    "origins": [
+     "https://example.org"
+    ]
+   },
+   "user": {
+    "handle": "d7275b0aaaf6e49e1b79541a697eb4e2175c3d99b13765d57f6f1d0db4d65465",
+    "name": "alice",
+    "display_name": "Alice Example"
+   },
+   "exclude_credentials": [],
+   "options": {
+    "user_verification": "preferred",
+    "resident_key": "preferred",
+    "timeout_secs": 300,
+    "extensions": {
+     "appidExclude": "https://example.org/app-id.json"
+    }
+   },
+   "entropy": "9897b40ffec15be7ac14e363ace7cfbfbcc7289cd58dcacd4b964828ecc9cdea",
+   "now": 1800000000,
+   "spec": "contract R121 and contract R30 and R130 (PublicKeyCredentialCreationOptionsJSON, WebAuthn L3 5.1.8) (extensions: appidExclude carries the AppID)",
+   "expect": {
+    "ok": true,
+    "json": {
+     "rp": {
+      "id": "example.org",
+      "name": "Example"
+     },
+     "user": {
+      "id": "1ydbCqr25J4beVQaaX604hdcPZmxN2XVf28dDbTWVGU",
+      "name": "alice",
+      "displayName": "Alice Example"
+     },
+     "challenge": "mJe0D_7BW-esFONjrOfPv7zHKJzVjcrNS5ZIKOzJzeo",
+     "pubKeyCredParams": [
+      {
+       "type": "public-key",
+       "alg": -7
+      },
+      {
+       "type": "public-key",
+       "alg": -8
+      },
+      {
+       "type": "public-key",
+       "alg": -35
+      },
+      {
+       "type": "public-key",
+       "alg": -257
+      }
+     ],
+     "timeout": 300000,
+     "excludeCredentials": [],
+     "authenticatorSelection": {
+      "residentKey": "preferred",
+      "requireResidentKey": false,
+      "userVerification": "preferred"
+     },
+     "attestation": "none",
+     "extensions": {
+      "appidExclude": "https://example.org/app-id.json"
+     }
+    },
+    "effect": {
+     "ceremony_row": "b28ce8fd513ce8953ba0b80cd29a8369dc8b43de03464529cb5f3e1ec111e316",
+     "expiry": 1800000300
+    }
+   }
+  },
+  {
+   "id": "creation-ext-prf-enable",
+   "op": "creation_options_json",
+   "rp": {
+    "id": "example.org",
+    "name": "Example",
+    "origins": [
+     "https://example.org"
+    ]
+   },
+   "user": {
+    "handle": "d7275b0aaaf6e49e1b79541a697eb4e2175c3d99b13765d57f6f1d0db4d65465",
+    "name": "alice",
+    "display_name": "Alice Example"
+   },
+   "exclude_credentials": [],
+   "options": {
+    "user_verification": "preferred",
+    "resident_key": "preferred",
+    "timeout_secs": 300,
+    "extensions": {
+     "prf": {
+      "enable": true
+     }
+    }
+   },
+   "entropy": "9897b40ffec15be7ac14e363ace7cfbfbcc7289cd58dcacd4b964828ecc9cdea",
+   "now": 1800000000,
+   "spec": "contract R124 (Enable emits prf: {})",
+   "expect": {
+    "ok": true,
+    "json": {
+     "rp": {
+      "id": "example.org",
+      "name": "Example"
+     },
+     "user": {
+      "id": "1ydbCqr25J4beVQaaX604hdcPZmxN2XVf28dDbTWVGU",
+      "name": "alice",
+      "displayName": "Alice Example"
+     },
+     "challenge": "mJe0D_7BW-esFONjrOfPv7zHKJzVjcrNS5ZIKOzJzeo",
+     "pubKeyCredParams": [
+      {
+       "type": "public-key",
+       "alg": -7
+      },
+      {
+       "type": "public-key",
+       "alg": -8
+      },
+      {
+       "type": "public-key",
+       "alg": -35
+      },
+      {
+       "type": "public-key",
+       "alg": -257
+      }
+     ],
+     "timeout": 300000,
+     "excludeCredentials": [],
+     "authenticatorSelection": {
+      "residentKey": "preferred",
+      "requireResidentKey": false,
+      "userVerification": "preferred"
+     },
+     "attestation": "none",
+     "extensions": {
+      "prf": {}
+     }
+    },
+    "effect": {
+     "ceremony_row": "b28ce8fd513ce8953ba0b80cd29a8369dc8b43de03464529cb5f3e1ec111e316",
+     "expiry": 1800000300
+    }
+   }
+  },
+  {
+   "id": "creation-ext-prf-eval",
+   "op": "creation_options_json",
+   "rp": {
+    "id": "example.org",
+    "name": "Example",
+    "origins": [
+     "https://example.org"
+    ]
+   },
+   "user": {
+    "handle": "d7275b0aaaf6e49e1b79541a697eb4e2175c3d99b13765d57f6f1d0db4d65465",
+    "name": "alice",
+    "display_name": "Alice Example"
+   },
+   "exclude_credentials": [],
+   "options": {
+    "user_verification": "preferred",
+    "resident_key": "preferred",
+    "timeout_secs": 300,
+    "extensions": {
+     "prf": {
+      "eval": {
+       "first": "73616c74206f6e65",
+       "second": "73616c742074776f"
+      }
+     }
+    }
+   },
+   "entropy": "9897b40ffec15be7ac14e363ace7cfbfbcc7289cd58dcacd4b964828ecc9cdea",
+   "now": 1800000000,
+   "spec": "contract R124 (Eval emits base64url eval.first and eval.second)",
+   "expect": {
+    "ok": true,
+    "json": {
+     "rp": {
+      "id": "example.org",
+      "name": "Example"
+     },
+     "user": {
+      "id": "1ydbCqr25J4beVQaaX604hdcPZmxN2XVf28dDbTWVGU",
+      "name": "alice",
+      "displayName": "Alice Example"
+     },
+     "challenge": "mJe0D_7BW-esFONjrOfPv7zHKJzVjcrNS5ZIKOzJzeo",
+     "pubKeyCredParams": [
+      {
+       "type": "public-key",
+       "alg": -7
+      },
+      {
+       "type": "public-key",
+       "alg": -8
+      },
+      {
+       "type": "public-key",
+       "alg": -35
+      },
+      {
+       "type": "public-key",
+       "alg": -257
+      }
+     ],
+     "timeout": 300000,
+     "excludeCredentials": [],
+     "authenticatorSelection": {
+      "residentKey": "preferred",
+      "requireResidentKey": false,
+      "userVerification": "preferred"
+     },
+     "attestation": "none",
+     "extensions": {
+      "prf": {
+       "eval": {
+        "first": "c2FsdCBvbmU",
+        "second": "c2FsdCB0d28"
+       }
+      }
+     }
+    },
+    "effect": {
+     "ceremony_row": "b28ce8fd513ce8953ba0b80cd29a8369dc8b43de03464529cb5f3e1ec111e316",
+     "expiry": 1800000300
+    }
+   }
+  },
+  {
+   "id": "creation-ext-prf-eval-first-only",
+   "op": "creation_options_json",
+   "rp": {
+    "id": "example.org",
+    "name": "Example",
+    "origins": [
+     "https://example.org"
+    ]
+   },
+   "user": {
+    "handle": "d7275b0aaaf6e49e1b79541a697eb4e2175c3d99b13765d57f6f1d0db4d65465",
+    "name": "alice",
+    "display_name": "Alice Example"
+   },
+   "exclude_credentials": [],
+   "options": {
+    "user_verification": "preferred",
+    "resident_key": "preferred",
+    "timeout_secs": 300,
+    "extensions": {
+     "prf": {
+      "eval": {
+       "first": "73616c74206f6e65"
+      }
+     }
+    }
+   },
+   "entropy": "9897b40ffec15be7ac14e363ace7cfbfbcc7289cd58dcacd4b964828ecc9cdea",
+   "now": 1800000000,
+   "spec": "contract R124",
+   "expect": {
+    "ok": true,
+    "json": {
+     "rp": {
+      "id": "example.org",
+      "name": "Example"
+     },
+     "user": {
+      "id": "1ydbCqr25J4beVQaaX604hdcPZmxN2XVf28dDbTWVGU",
+      "name": "alice",
+      "displayName": "Alice Example"
+     },
+     "challenge": "mJe0D_7BW-esFONjrOfPv7zHKJzVjcrNS5ZIKOzJzeo",
+     "pubKeyCredParams": [
+      {
+       "type": "public-key",
+       "alg": -7
+      },
+      {
+       "type": "public-key",
+       "alg": -8
+      },
+      {
+       "type": "public-key",
+       "alg": -35
+      },
+      {
+       "type": "public-key",
+       "alg": -257
+      }
+     ],
+     "timeout": 300000,
+     "excludeCredentials": [],
+     "authenticatorSelection": {
+      "residentKey": "preferred",
+      "requireResidentKey": false,
+      "userVerification": "preferred"
+     },
+     "attestation": "none",
+     "extensions": {
+      "prf": {
+       "eval": {
+        "first": "c2FsdCBvbmU"
+       }
+      }
+     }
+    },
+    "effect": {
+     "ceremony_row": "b28ce8fd513ce8953ba0b80cd29a8369dc8b43de03464529cb5f3e1ec111e316",
+     "expiry": 1800000300
+    }
+   }
+  },
+  {
+   "id": "creation-ext-large-blob",
+   "op": "creation_options_json",
+   "rp": {
+    "id": "example.org",
+    "name": "Example",
+    "origins": [
+     "https://example.org"
+    ]
+   },
+   "user": {
+    "handle": "d7275b0aaaf6e49e1b79541a697eb4e2175c3d99b13765d57f6f1d0db4d65465",
+    "name": "alice",
+    "display_name": "Alice Example"
+   },
+   "exclude_credentials": [],
+   "options": {
+    "user_verification": "preferred",
+    "resident_key": "preferred",
+    "timeout_secs": 300,
+    "extensions": {
+     "largeBlob": {
+      "support": "required"
+     }
+    }
+   },
+   "entropy": "9897b40ffec15be7ac14e363ace7cfbfbcc7289cd58dcacd4b964828ecc9cdea",
+   "now": 1800000000,
+   "spec": "contract R126 (support is emitted)",
+   "expect": {
+    "ok": true,
+    "json": {
+     "rp": {
+      "id": "example.org",
+      "name": "Example"
+     },
+     "user": {
+      "id": "1ydbCqr25J4beVQaaX604hdcPZmxN2XVf28dDbTWVGU",
+      "name": "alice",
+      "displayName": "Alice Example"
+     },
+     "challenge": "mJe0D_7BW-esFONjrOfPv7zHKJzVjcrNS5ZIKOzJzeo",
+     "pubKeyCredParams": [
+      {
+       "type": "public-key",
+       "alg": -7
+      },
+      {
+       "type": "public-key",
+       "alg": -8
+      },
+      {
+       "type": "public-key",
+       "alg": -35
+      },
+      {
+       "type": "public-key",
+       "alg": -257
+      }
+     ],
+     "timeout": 300000,
+     "excludeCredentials": [],
+     "authenticatorSelection": {
+      "residentKey": "preferred",
+      "requireResidentKey": false,
+      "userVerification": "preferred"
+     },
+     "attestation": "none",
+     "extensions": {
+      "largeBlob": {
+       "support": "required"
+      }
+     }
+    },
+    "effect": {
+     "ceremony_row": "b28ce8fd513ce8953ba0b80cd29a8369dc8b43de03464529cb5f3e1ec111e316",
+     "expiry": 1800000300
+    }
+   }
+  },
+  {
+   "id": "creation-ext-all",
+   "op": "creation_options_json",
+   "rp": {
+    "id": "example.org",
+    "name": "Example",
+    "origins": [
+     "https://example.org"
+    ]
+   },
+   "user": {
+    "handle": "d7275b0aaaf6e49e1b79541a697eb4e2175c3d99b13765d57f6f1d0db4d65465",
+    "name": "alice",
+    "display_name": "Alice Example"
+   },
+   "exclude_credentials": [],
+   "options": {
+    "user_verification": "preferred",
+    "resident_key": "preferred",
+    "timeout_secs": 300,
+    "extensions": {
+     "credProps": true,
+     "prf": {
+      "enable": true
+     },
+     "largeBlob": {
+      "support": "preferred"
+     }
+    }
+   },
+   "entropy": "9897b40ffec15be7ac14e363ace7cfbfbcc7289cd58dcacd4b964828ecc9cdea",
+   "now": 1800000000,
+   "spec": "contract R30 and R130 (PublicKeyCredentialCreationOptionsJSON, WebAuthn L3 5.1.8) (several extensions in one object)",
+   "expect": {
+    "ok": true,
+    "json": {
+     "rp": {
+      "id": "example.org",
+      "name": "Example"
+     },
+     "user": {
+      "id": "1ydbCqr25J4beVQaaX604hdcPZmxN2XVf28dDbTWVGU",
+      "name": "alice",
+      "displayName": "Alice Example"
+     },
+     "challenge": "mJe0D_7BW-esFONjrOfPv7zHKJzVjcrNS5ZIKOzJzeo",
+     "pubKeyCredParams": [
+      {
+       "type": "public-key",
+       "alg": -7
+      },
+      {
+       "type": "public-key",
+       "alg": -8
+      },
+      {
+       "type": "public-key",
+       "alg": -35
+      },
+      {
+       "type": "public-key",
+       "alg": -257
+      }
+     ],
+     "timeout": 300000,
+     "excludeCredentials": [],
+     "authenticatorSelection": {
+      "residentKey": "preferred",
+      "requireResidentKey": false,
+      "userVerification": "preferred"
+     },
+     "attestation": "none",
+     "extensions": {
+      "credProps": true,
+      "prf": {},
+      "largeBlob": {
+       "support": "preferred"
+      }
+     }
+    },
+    "effect": {
+     "ceremony_row": "b28ce8fd513ce8953ba0b80cd29a8369dc8b43de03464529cb5f3e1ec111e316",
+     "expiry": 1800000300
+    }
+   }
+  },
+  {
+   "id": "creation-timeout-max",
+   "op": "creation_options_json",
+   "rp": {
+    "id": "example.org",
+    "name": "Example",
+    "origins": [
+     "https://example.org"
+    ]
+   },
+   "user": {
+    "handle": "d7275b0aaaf6e49e1b79541a697eb4e2175c3d99b13765d57f6f1d0db4d65465",
+    "name": "alice",
+    "display_name": "Alice Example"
+   },
+   "exclude_credentials": [],
+   "options": {
+    "user_verification": "preferred",
+    "resident_key": "preferred",
+    "timeout_secs": 600
+   },
+   "entropy": "9897b40ffec15be7ac14e363ace7cfbfbcc7289cd58dcacd4b964828ecc9cdea",
+   "now": 1800000000,
+   "spec": "contract R30 and R130 (PublicKeyCredentialCreationOptionsJSON, WebAuthn L3 5.1.8) (timeout in milliseconds: MAX_TIMEOUT_SECS 600 is 600000)",
+   "expect": {
+    "ok": true,
+    "json": {
+     "rp": {
+      "id": "example.org",
+      "name": "Example"
+     },
+     "user": {
+      "id": "1ydbCqr25J4beVQaaX604hdcPZmxN2XVf28dDbTWVGU",
+      "name": "alice",
+      "displayName": "Alice Example"
+     },
+     "challenge": "mJe0D_7BW-esFONjrOfPv7zHKJzVjcrNS5ZIKOzJzeo",
+     "pubKeyCredParams": [
+      {
+       "type": "public-key",
+       "alg": -7
+      },
+      {
+       "type": "public-key",
+       "alg": -8
+      },
+      {
+       "type": "public-key",
+       "alg": -35
+      },
+      {
+       "type": "public-key",
+       "alg": -257
+      }
+     ],
+     "timeout": 600000,
+     "excludeCredentials": [],
+     "authenticatorSelection": {
+      "residentKey": "preferred",
+      "requireResidentKey": false,
+      "userVerification": "preferred"
+     },
+     "attestation": "none"
+    },
+    "effect": {
+     "ceremony_row": "b28ce8fd513ce8953ba0b80cd29a8369dc8b43de03464529cb5f3e1ec111e316",
+     "expiry": 1800000600
+    }
+   }
+  },
+  {
+   "id": "creation-short-user-handle",
+   "op": "creation_options_json",
+   "rp": {
+    "id": "example.org",
+    "name": "Example",
+    "origins": [
+     "https://example.org"
+    ]
+   },
+   "user": {
+    "handle": "01",
+    "name": "bob",
+    "display_name": "Bob"
+   },
+   "exclude_credentials": [],
+   "options": {
+    "user_verification": "preferred",
+    "resident_key": "preferred",
+    "timeout_secs": 300
+   },
+   "entropy": "9897b40ffec15be7ac14e363ace7cfbfbcc7289cd58dcacd4b964828ecc9cdea",
+   "now": 1800000000,
+   "spec": "contract R30 and R130 (PublicKeyCredentialCreationOptionsJSON, WebAuthn L3 5.1.8) (any 1 to 64 byte handle, base64url)",
+   "expect": {
+    "ok": true,
+    "json": {
+     "rp": {
+      "id": "example.org",
+      "name": "Example"
+     },
+     "user": {
+      "id": "AQ",
+      "name": "bob",
+      "displayName": "Bob"
+     },
+     "challenge": "mJe0D_7BW-esFONjrOfPv7zHKJzVjcrNS5ZIKOzJzeo",
+     "pubKeyCredParams": [
+      {
+       "type": "public-key",
+       "alg": -7
+      },
+      {
+       "type": "public-key",
+       "alg": -8
+      },
+      {
+       "type": "public-key",
+       "alg": -35
+      },
+      {
+       "type": "public-key",
+       "alg": -257
+      }
+     ],
+     "timeout": 300000,
+     "excludeCredentials": [],
+     "authenticatorSelection": {
+      "residentKey": "preferred",
+      "requireResidentKey": false,
+      "userVerification": "preferred"
+     },
+     "attestation": "none"
+    },
+    "effect": {
+     "ceremony_row": "b28ce8fd513ce8953ba0b80cd29a8369dc8b43de03464529cb5f3e1ec111e316",
+     "expiry": 1800000300
+    }
+   }
+  },
+  {
+   "id": "creation-non-ascii-names",
+   "op": "creation_options_json",
+   "rp": {
+    "id": "example.org",
+    "name": "Caf\u00e9",
+    "origins": [
+     "https://example.org"
+    ]
+   },
+   "user": {
+    "handle": "d7275b0aaaf6e49e1b79541a697eb4e2175c3d99b13765d57f6f1d0db4d65465",
+    "name": "zo\u00eb",
+    "display_name": "Zo\u00eb \u65e5\u672c"
+   },
+   "exclude_credentials": [],
+   "options": {
+    "user_verification": "preferred",
+    "resident_key": "preferred",
+    "timeout_secs": 300
+   },
+   "entropy": "9897b40ffec15be7ac14e363ace7cfbfbcc7289cd58dcacd4b964828ecc9cdea",
+   "now": 1800000000,
+   "spec": "contract R30 and R130 (PublicKeyCredentialCreationOptionsJSON, WebAuthn L3 5.1.8) (names are UTF-8 text, not escaped away)",
+   "expect": {
+    "ok": true,
+    "json": {
+     "rp": {
+      "id": "example.org",
+      "name": "Caf\u00e9"
+     },
+     "user": {
+      "id": "1ydbCqr25J4beVQaaX604hdcPZmxN2XVf28dDbTWVGU",
+      "name": "zo\u00eb",
+      "displayName": "Zo\u00eb \u65e5\u672c"
+     },
+     "challenge": "mJe0D_7BW-esFONjrOfPv7zHKJzVjcrNS5ZIKOzJzeo",
+     "pubKeyCredParams": [
+      {
+       "type": "public-key",
+       "alg": -7
+      },
+      {
+       "type": "public-key",
+       "alg": -8
+      },
+      {
+       "type": "public-key",
+       "alg": -35
+      },
+      {
+       "type": "public-key",
+       "alg": -257
+      }
+     ],
+     "timeout": 300000,
+     "excludeCredentials": [],
+     "authenticatorSelection": {
+      "residentKey": "preferred",
+      "requireResidentKey": false,
+      "userVerification": "preferred"
+     },
+     "attestation": "none"
+    },
+    "effect": {
+     "ceremony_row": "b28ce8fd513ce8953ba0b80cd29a8369dc8b43de03464529cb5f3e1ec111e316",
+     "expiry": 1800000300
+    }
+   }
+  },
+  {
+   "id": "request-discoverable",
+   "op": "request_options_json",
+   "rp": {
+    "id": "example.org",
+    "name": "Example",
+    "origins": [
+     "https://example.org"
+    ]
+   },
+   "allow": "discoverable",
+   "options": {
+    "user_verification": "preferred",
+    "timeout_secs": 300
+   },
+   "entropy": "9897b40ffec15be7ac14e363ace7cfbfbcc7289cd58dcacd4b964828ecc9cdea",
+   "now": 1800000000,
+   "spec": "contract R60 and R131 (PublicKeyCredentialRequestOptionsJSON, WebAuthn L3 5.1.9) (allowCredentials is empty for Allow::Discoverable and present; rpId; userVerification; timeout in milliseconds)",
+   "expect": {
+    "ok": true,
+    "json": {
+     "challenge": "mJe0D_7BW-esFONjrOfPv7zHKJzVjcrNS5ZIKOzJzeo",
+     "rpId": "example.org",
+     "timeout": 300000,
+     "allowCredentials": [],
+     "userVerification": "preferred"
+    },
+    "effect": {
+     "ceremony_row": "b28ce8fd513ce8953ba0b80cd29a8369dc8b43de03464529cb5f3e1ec111e316",
+     "expiry": 1800000300
+    }
+   }
+  },
+  {
+   "id": "request-allow-user",
+   "op": "request_options_json",
+   "rp": {
+    "id": "example.org",
+    "name": "Example",
+    "origins": [
+     "https://example.org"
+    ]
+   },
+   "allow": [
+    {
+     "id": "c0c26343bd1acbab9a88c2375bfbdd43",
+     "transports": [
+      "internal",
+      "internal",
+      "hybrid"
+     ]
+    },
+    {
+     "id": "5ee6f045b2fc1b081f8f33dfe46c28967d9ba9627c946aab",
+     "transports": []
+    }
+   ],
+   "options": {
+    "user_verification": "preferred",
+    "timeout_secs": 300
+   },
+   "entropy": "9897b40ffec15be7ac14e363ace7cfbfbcc7289cd58dcacd4b964828ecc9cdea",
+   "now": 1800000000,
+   "spec": "contract R60 and R131 (PublicKeyCredentialRequestOptionsJSON, WebAuthn L3 5.1.9) (allowCredentials lists the Allow::User list with transports, once each)",
+   "expect": {
+    "ok": true,
+    "json": {
+     "challenge": "mJe0D_7BW-esFONjrOfPv7zHKJzVjcrNS5ZIKOzJzeo",
+     "rpId": "example.org",
+     "timeout": 300000,
+     "allowCredentials": [
+      {
+       "type": "public-key",
+       "id": "wMJjQ70ay6uaiMI3W_vdQw",
+       "transports": [
+        "internal",
+        "hybrid"
+       ]
+      },
+      {
+       "type": "public-key",
+       "id": "XubwRbL8GwgfjzPf5Gwoln2bqWJ8lGqr"
+      }
+     ],
+     "userVerification": "preferred"
+    },
+    "effect": {
+     "ceremony_row": "b28ce8fd513ce8953ba0b80cd29a8369dc8b43de03464529cb5f3e1ec111e316",
+     "expiry": 1800000300
+    }
+   }
+  },
+  {
+   "id": "request-user-verification-required",
+   "op": "request_options_json",
+   "rp": {
+    "id": "example.org",
+    "name": "Example",
+    "origins": [
+     "https://example.org"
+    ]
+   },
+   "allow": "discoverable",
+   "options": {
+    "user_verification": "required",
+    "timeout_secs": 300
+   },
+   "entropy": "9897b40ffec15be7ac14e363ace7cfbfbcc7289cd58dcacd4b964828ecc9cdea",
+   "now": 1800000000,
+   "spec": "contract R60 and R131 (PublicKeyCredentialRequestOptionsJSON, WebAuthn L3 5.1.9) (userVerification)",
+   "expect": {
+    "ok": true,
+    "json": {
+     "challenge": "mJe0D_7BW-esFONjrOfPv7zHKJzVjcrNS5ZIKOzJzeo",
+     "rpId": "example.org",
+     "timeout": 300000,
+     "allowCredentials": [],
+     "userVerification": "required"
+    },
+    "effect": {
+     "ceremony_row": "b28ce8fd513ce8953ba0b80cd29a8369dc8b43de03464529cb5f3e1ec111e316",
+     "expiry": 1800000300
+    }
+   }
+  },
+  {
+   "id": "request-hints-ordered",
+   "op": "request_options_json",
+   "rp": {
+    "id": "example.org",
+    "name": "Example",
+    "origins": [
+     "https://example.org"
+    ]
+   },
+   "allow": "discoverable",
+   "options": {
+    "user_verification": "preferred",
+    "timeout_secs": 300,
+    "hints": [
+     "client-device",
+     "hybrid",
+     "client-device"
+    ]
+   },
+   "entropy": "9897b40ffec15be7ac14e363ace7cfbfbcc7289cd58dcacd4b964828ecc9cdea",
+   "now": 1800000000,
+   "spec": "contract R60 and R131 (PublicKeyCredentialRequestOptionsJSON, WebAuthn L3 5.1.9) (hints in order, without repeats)",
+   "expect": {
+    "ok": true,
+    "json": {
+     "challenge": "mJe0D_7BW-esFONjrOfPv7zHKJzVjcrNS5ZIKOzJzeo",
+     "rpId": "example.org",
+     "timeout": 300000,
+     "allowCredentials": [],
+     "userVerification": "preferred",
+     "hints": [
+      "client-device",
+      "hybrid"
+     ]
+    },
+    "effect": {
+     "ceremony_row": "b28ce8fd513ce8953ba0b80cd29a8369dc8b43de03464529cb5f3e1ec111e316",
+     "expiry": 1800000300
+    }
+   }
+  },
+  {
+   "id": "request-ext-appid",
+   "op": "request_options_json",
+   "rp": {
+    "id": "example.org",
+    "name": "Example",
+    "origins": [
+     "https://example.org"
+    ]
+   },
+   "allow": "discoverable",
+   "options": {
+    "user_verification": "preferred",
+    "timeout_secs": 300,
+    "extensions": {
+     "appid": "https://example.org/app-id.json"
+    }
+   },
+   "entropy": "9897b40ffec15be7ac14e363ace7cfbfbcc7289cd58dcacd4b964828ecc9cdea",
+   "now": 1800000000,
+   "spec": "contract R120 and contract R60 and R131 (PublicKeyCredentialRequestOptionsJSON, WebAuthn L3 5.1.9) (extensions: appid carries the AppID)",
+   "expect": {
+    "ok": true,
+    "json": {
+     "challenge": "mJe0D_7BW-esFONjrOfPv7zHKJzVjcrNS5ZIKOzJzeo",
+     "rpId": "example.org",
+     "timeout": 300000,
+     "allowCredentials": [],
+     "userVerification": "preferred",
+     "extensions": {
+      "appid": "https://example.org/app-id.json"
+     }
+    },
+    "effect": {
+     "ceremony_row": "b28ce8fd513ce8953ba0b80cd29a8369dc8b43de03464529cb5f3e1ec111e316",
+     "expiry": 1800000300
+    }
+   }
+  },
+  {
+   "id": "request-ext-prf-eval",
+   "op": "request_options_json",
+   "rp": {
+    "id": "example.org",
+    "name": "Example",
+    "origins": [
+     "https://example.org"
+    ]
+   },
+   "allow": "discoverable",
+   "options": {
+    "user_verification": "preferred",
+    "timeout_secs": 300,
+    "extensions": {
+     "prf": {
+      "eval": {
+       "first": "73616c74206f6e65"
+      }
+     }
+    }
+   },
+   "entropy": "9897b40ffec15be7ac14e363ace7cfbfbcc7289cd58dcacd4b964828ecc9cdea",
+   "now": 1800000000,
+   "spec": "contract R125 (eval: base64url salts)",
+   "expect": {
+    "ok": true,
+    "json": {
+     "challenge": "mJe0D_7BW-esFONjrOfPv7zHKJzVjcrNS5ZIKOzJzeo",
+     "rpId": "example.org",
+     "timeout": 300000,
+     "allowCredentials": [],
+     "userVerification": "preferred",
+     "extensions": {
+      "prf": {
+       "eval": {
+        "first": "c2FsdCBvbmU"
+       }
+      }
+     }
+    },
+    "effect": {
+     "ceremony_row": "b28ce8fd513ce8953ba0b80cd29a8369dc8b43de03464529cb5f3e1ec111e316",
+     "expiry": 1800000300
+    }
+   }
+  },
+  {
+   "id": "request-ext-prf-by-credential",
+   "op": "request_options_json",
+   "rp": {
+    "id": "example.org",
+    "name": "Example",
+    "origins": [
+     "https://example.org"
+    ]
+   },
+   "allow": [
+    {
+     "id": "c0c26343bd1acbab9a88c2375bfbdd43",
+     "transports": []
+    }
+   ],
+   "options": {
+    "user_verification": "preferred",
+    "timeout_secs": 300,
+    "extensions": {
+     "prf": {
+      "evalByCredential": {
+       "c0c26343bd1acbab9a88c2375bfbdd43": {
+        "first": "73616c74206f6e65"
+       }
+      }
+     }
+    }
+   },
+   "entropy": "9897b40ffec15be7ac14e363ace7cfbfbcc7289cd58dcacd4b964828ecc9cdea",
+   "now": 1800000000,
+   "spec": "contract R125 (evalByCredential keyed by base64url credential id)",
+   "expect": {
+    "ok": true,
+    "json": {
+     "challenge": "mJe0D_7BW-esFONjrOfPv7zHKJzVjcrNS5ZIKOzJzeo",
+     "rpId": "example.org",
+     "timeout": 300000,
+     "allowCredentials": [
+      {
+       "type": "public-key",
+       "id": "wMJjQ70ay6uaiMI3W_vdQw"
+      }
+     ],
+     "userVerification": "preferred",
+     "extensions": {
+      "prf": {
+       "evalByCredential": {
+        "wMJjQ70ay6uaiMI3W_vdQw": {
+         "first": "c2FsdCBvbmU"
+        }
+       }
+      }
+     }
+    },
+    "effect": {
+     "ceremony_row": "b28ce8fd513ce8953ba0b80cd29a8369dc8b43de03464529cb5f3e1ec111e316",
+     "expiry": 1800000300
+    }
+   }
+  },
+  {
+   "id": "request-ext-large-blob-read",
+   "op": "request_options_json",
+   "rp": {
+    "id": "example.org",
+    "name": "Example",
+    "origins": [
+     "https://example.org"
+    ]
+   },
+   "allow": "discoverable",
+   "options": {
+    "user_verification": "preferred",
+    "timeout_secs": 300,
+    "extensions": {
+     "largeBlob": {
+      "read": true
+     }
+    }
+   },
+   "entropy": "9897b40ffec15be7ac14e363ace7cfbfbcc7289cd58dcacd4b964828ecc9cdea",
+   "now": 1800000000,
+   "spec": "contract R127 (the one LargeBlobOp: read)",
+   "expect": {
+    "ok": true,
+    "json": {
+     "challenge": "mJe0D_7BW-esFONjrOfPv7zHKJzVjcrNS5ZIKOzJzeo",
+     "rpId": "example.org",
+     "timeout": 300000,
+     "allowCredentials": [],
+     "userVerification": "preferred",
+     "extensions": {
+      "largeBlob": {
+       "read": true
+      }
+     }
+    },
+    "effect": {
+     "ceremony_row": "b28ce8fd513ce8953ba0b80cd29a8369dc8b43de03464529cb5f3e1ec111e316",
+     "expiry": 1800000300
+    }
+   }
+  },
+  {
+   "id": "request-ext-large-blob-write",
+   "op": "request_options_json",
+   "rp": {
+    "id": "example.org",
+    "name": "Example",
+    "origins": [
+     "https://example.org"
+    ]
+   },
+   "allow": "discoverable",
+   "options": {
+    "user_verification": "preferred",
+    "timeout_secs": 300,
+    "extensions": {
+     "largeBlob": {
+      "write": "626c6f62"
+     }
+    }
+   },
+   "entropy": "9897b40ffec15be7ac14e363ace7cfbfbcc7289cd58dcacd4b964828ecc9cdea",
+   "now": 1800000000,
+   "spec": "contract R127 (the one LargeBlobOp: write, base64url)",
+   "expect": {
+    "ok": true,
+    "json": {
+     "challenge": "mJe0D_7BW-esFONjrOfPv7zHKJzVjcrNS5ZIKOzJzeo",
+     "rpId": "example.org",
+     "timeout": 300000,
+     "allowCredentials": [],
+     "userVerification": "preferred",
+     "extensions": {
+      "largeBlob": {
+       "write": "YmxvYg"
+      }
+     }
+    },
+    "effect": {
+     "ceremony_row": "b28ce8fd513ce8953ba0b80cd29a8369dc8b43de03464529cb5f3e1ec111e316",
+     "expiry": 1800000300
+    }
+   }
+  },
+  {
+   "id": "related-origins-others-in-order",
+   "op": "related_origins_json",
+   "rp_id": "example.org",
+   "origins": [
+    "https://example.org",
+    "https://example.net",
+    "https://app.example.org:8443",
+    "https://shop.example.com"
+   ],
+   "spec": "contract R134 and WebAuthn L3 5.11 (every configured origin whose host is neither the RP ID nor under it, in configuration order)",
+   "expect": {
+    "ok": true,
+    "json": {
+     "origins": [
+      "https://example.net",
+      "https://shop.example.com"
+     ]
+    }
+   }
+  },
+  {
+   "id": "related-origins-none",
+   "op": "related_origins_json",
+   "rp_id": "example.org",
+   "origins": [
+    "https://example.org",
+    "https://login.example.org"
+   ],
+   "spec": "contract R134 and WebAuthn L3 5.11 (no related origin: an empty list)",
+   "expect": {
+    "ok": true,
+    "json": {
+     "origins": []
+    }
+   }
+  },
+  {
+   "id": "related-origins-suffix-lookalike",
+   "op": "related_origins_json",
+   "rp_id": "example.org",
+   "origins": [
+    "https://example.org",
+    "https://notexample.org"
+   ],
+   "spec": "contract R134 and WebAuthn L3 5.11 (a host that merely ends in the RP ID text is not under it: notexample.org)",
+   "expect": {
+    "ok": true,
+    "json": {
+     "origins": [
+      "https://notexample.org"
+     ]
+    }
+   }
+  },
+  {
+   "id": "related-origins-all",
+   "op": "related_origins_json",
+   "rp_id": "example.org",
+   "origins": [
+    "https://example.net",
+    "https://example.com"
+   ],
+   "spec": "contract R134 and WebAuthn L3 5.11 (none of the origins is under the RP ID)",
+   "expect": {
+    "ok": true,
+    "json": {
+     "origins": [
+      "https://example.net",
+      "https://example.com"
+     ]
+    }
+   }
+  },
+  {
+   "id": "related-origins-port-kept",
+   "op": "related_origins_json",
+   "rp_id": "example.org",
+   "origins": [
+    "https://example.org",
+    "https://example.net:8443"
+   ],
+   "spec": "contract R134 and WebAuthn L3 5.11 (an origin is listed as configured, port included)",
+   "expect": {
+    "ok": true,
+    "json": {
+     "origins": [
+      "https://example.net:8443"
+     ]
+    }
+   }
+  },
+  {
+   "id": "signal-unknown-credential",
+   "op": "signal_json",
+   "kind": "unknown_credential",
+   "credential_id": "c0c26343bd1acbab9a88c2375bfbdd43",
+   "rp_id": "example.org",
+   "spec": "contract R135 and WebAuthn L3 5.1.10 (5.1.10.2: the RP ID is filled in; {rpId, credentialId})",
+   "expect": {
+    "ok": true,
+    "json": {
+     "rpId": "example.org",
+     "credentialId": "wMJjQ70ay6uaiMI3W_vdQw"
+    }
+   }
+  },
+  {
+   "id": "signal-all-accepted-credentials",
+   "op": "signal_json",
+   "kind": "all_accepted_credentials",
+   "user_id": "d7275b0aaaf6e49e1b79541a697eb4e2175c3d99b13765d57f6f1d0db4d65465",
+   "credential_ids": [
+    "c0c26343bd1acbab9a88c2375bfbdd43",
+    "5ee6f045b2fc1b081f8f33dfe46c28967d9ba9627c946aab"
+   ],
+   "rp_id": "example.org",
+   "spec": "contract R135 and WebAuthn L3 5.1.10 (5.1.10.3: {rpId, userId, allAcceptedCredentialIds})",
+   "expect": {
+    "ok": true,
+    "json": {
+     "rpId": "example.org",
+     "userId": "1ydbCqr25J4beVQaaX604hdcPZmxN2XVf28dDbTWVGU",
+     "allAcceptedCredentialIds": [
+      "wMJjQ70ay6uaiMI3W_vdQw",
+      "XubwRbL8GwgfjzPf5Gwoln2bqWJ8lGqr"
+     ]
+    }
+   }
+  },
+  {
+   "id": "signal-all-accepted-none",
+   "op": "signal_json",
+   "kind": "all_accepted_credentials",
+   "user_id": "d7275b0aaaf6e49e1b79541a697eb4e2175c3d99b13765d57f6f1d0db4d65465",
+   "credential_ids": [],
+   "rp_id": "example.org",
+   "spec": "contract R135 and WebAuthn L3 5.1.10 (5.1.10.3: an empty list tells the client to remove every credential of the user)",
+   "expect": {
+    "ok": true,
+    "json": {
+     "rpId": "example.org",
+     "userId": "1ydbCqr25J4beVQaaX604hdcPZmxN2XVf28dDbTWVGU",
+     "allAcceptedCredentialIds": []
+    }
+   }
+  },
+  {
+   "id": "signal-current-user-details",
+   "op": "signal_json",
+   "kind": "current_user_details",
+   "user_id": "d7275b0aaaf6e49e1b79541a697eb4e2175c3d99b13765d57f6f1d0db4d65465",
+   "name": "alice",
+   "display_name": "Alice Example",
+   "rp_id": "example.org",
+   "spec": "contract R135 and WebAuthn L3 5.1.10 (5.1.10.4: {rpId, userId, name, displayName})",
+   "expect": {
+    "ok": true,
+    "json": {
+     "rpId": "example.org",
+     "userId": "1ydbCqr25J4beVQaaX604hdcPZmxN2XVf28dDbTWVGU",
+     "name": "alice",
+     "displayName": "Alice Example"
+    }
+   }
+  },
+  {
+   "id": "creation-user-name-empty",
+   "op": "user_entity",
+   "name": "",
+   "display_name": "Alice",
+   "spec": "contract N18 (the crate checks length and emptiness only: an empty name is Malformed)",
+   "expect": {
+    "ok": false
+   }
+  },
+  {
+   "id": "creation-display-name-empty",
+   "op": "user_entity",
+   "name": "alice",
+   "display_name": "",
+   "spec": "contract N18 (an empty display name is Malformed)",
+   "expect": {
+    "ok": false
+   }
+  },
+  {
+   "id": "creation-timeout-zero",
+   "op": "timeout_from_secs",
+   "secs": 0,
+   "spec": "contract Timeout::from_secs (zero is Malformed)",
+   "expect": {
+    "ok": false
+   }
+  }
+ ]
+}
