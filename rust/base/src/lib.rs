@@ -62,6 +62,6 @@ pub use entropy::Entropy;
 #[cfg(feature = "rand_core")]
 pub use entropy::RandCore;
 pub use error::{Error, ErrorKind};
-pub use secret::{Digest, Secret, SecretBytes};
+pub use secret::{BrowserBinding, Digest, Secret, SecretBytes};
 pub use store::{REDECIDE, Retry, Row, Rows, Scope, Slot, Store, StoreKey, Version};
 pub use time::UnixTime;
