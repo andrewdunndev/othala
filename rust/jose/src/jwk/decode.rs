@@ -929,7 +929,11 @@ mod tests {
                     parse(case.jwk.text().as_bytes()).err().map(|e| e.kind()),
                     Some(ErrorKind::UnsupportedAlg)
                 );
-            } else if case.id.ends_with("-key") && !case.expect.ok {
+            } else if case.id.ends_with("-key")
+                && !case.expect.ok
+                // with es512 off a P-521 key is refused whole, before any alg comparison
+                && (cfg!(feature = "es512") || case.id != "es256-p521-key")
+            {
                 assert_eq!(
                     outcome.as_ref().err().map(|e| e.kind()),
                     Some(ErrorKind::AlgMismatch),
@@ -1055,6 +1059,7 @@ mod tests {
         );
     }
 
+    #[cfg(feature = "es512")]
     #[test]
     fn p521_follows_the_feature() {
         for example in ["3.1", "3.2"] {

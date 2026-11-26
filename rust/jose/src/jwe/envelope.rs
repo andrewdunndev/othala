@@ -3,6 +3,7 @@ use alloc::borrow::ToOwned as _;
 use alloc::collections::{BTreeMap, BTreeSet};
 use alloc::format;
 use alloc::string::String;
+use alloc::sync::Arc;
 use alloc::vec;
 use alloc::vec::Vec;
 use core::fmt;
@@ -19,7 +20,6 @@ use crate::jws::header::REGISTERED;
 use crate::key::{Private, Public};
 use crate::{
     Compact, Enc, Error, ErrorKind, KeyAlg, Kid, LocalKeyAlg, MAX_COMPACT_LEN, MAX_ENTRIES,
-    MAX_JSON_LEN,
 };
 
 /// Per-algorithm operations, implemented beside each algorithm's markers.
@@ -98,7 +98,7 @@ pub(crate) mod sealed {
 
 /// One recipient's key-management header parameters.
 pub(crate) struct Params {
-    pub(crate) epk: Option<Public>,
+    pub(crate) epk: Option<Arc<Public>>,
     pub(crate) apu: Vec<u8>,
     pub(crate) apv: Vec<u8>,
     pub(crate) iv: Option<[u8; 12]>,
@@ -193,7 +193,7 @@ fn read(json: &[u8]) -> Result<Header, Error> {
         .map(|raw| parse(raw.get().as_bytes()))
         .transpose()?
     {
-        Some((_, Key::Public(key))) => Some(key),
+        Some((_, Key::Public(key))) => Some(Arc::new(key)),
         Some(_) => return Err(malformed()),
         None => None,
     };
@@ -236,16 +236,17 @@ fn read(json: &[u8]) -> Result<Header, Error> {
 /// The recipient the protected, shared unprotected and per-recipient headers make: a name in two of them is
 /// `DuplicateMember`, `crit` belongs to the protected header only and is refused, and `enc` is required.
 fn merge(
-    protected: Option<Header>,
-    shared: Option<Header>,
-    own: Option<Header>,
+    protected: Option<&Header>,
+    shared: Option<&Header>,
+    own: Option<&Header>,
 ) -> Result<(String, Recipient, Option<Kid>), Error> {
+    let blank = empty();
     let (protected, shared, own) = (
-        protected.unwrap_or_else(empty),
-        shared.unwrap_or_else(empty),
-        own.unwrap_or_else(empty),
+        protected.unwrap_or(&blank),
+        shared.unwrap_or(&blank),
+        own.unwrap_or(&blank),
     );
-    let all = [&protected, &shared, &own];
+    let all = [protected, shared, own];
     let clash = all.iter().enumerate().any(|(i, a)| {
         all.iter()
             .skip(i + 1)
@@ -269,7 +270,7 @@ fn merge(
         }
         .into());
     }
-    let enc = [&protected, &shared, &own]
+    let enc = all
         .iter()
         .find_map(|header| header.fields.enc.clone())
         .ok_or_else(malformed)?;
@@ -282,37 +283,44 @@ fn merge(
         iv: None,
         tag: None,
     };
-    for header in [protected, shared, own] {
-        alg = alg.or(header.fields.alg);
-        kid = kid.or(header.fields.kid);
-        let given = header.params;
+    for header in all {
+        alg = alg.or_else(|| header.fields.alg.clone());
+        kid = kid.or_else(|| header.fields.kid.clone());
+        let given = &header.params;
         params = Params {
-            epk: params.epk.or(given.epk),
+            epk: params.epk.or_else(|| given.epk.clone()),
             apu: if given.apu.is_empty() {
                 params.apu
             } else {
-                given.apu
+                given.apu.clone()
             },
             apv: if given.apv.is_empty() {
                 params.apv
             } else {
-                given.apv
+                given.apv.clone()
             },
             iv: params.iv.or(given.iv),
             tag: params.tag.or(given.tag),
         };
     }
     let alg = alg.ok_or_else(malformed)?;
-    #[cfg(not(feature = "rsa-decrypt"))]
-    if alg.starts_with("RSA-OAEP") {
-        return Err(ErrorKind::UnsupportedAlg.into());
-    }
     let recipient = Recipient {
         alg,
         params,
         encrypted_key: Vec::new(),
     };
     Ok((enc, recipient, kid.and_then(|kid| Kid::new(&kid).ok())))
+}
+
+/// An `alg` that needs a feature that is off is `UnsupportedAlg` for a sole recipient; among several it is skipped as
+/// not the key's `alg`.
+fn supported(recipient: &Recipient) -> Result<(), Error> {
+    #[cfg(not(feature = "rsa-decrypt"))]
+    if matches!(recipient.alg.as_str(), "RSA-OAEP" | "RSA-OAEP-256") {
+        return Err(ErrorKind::UnsupportedAlg.into());
+    }
+    let _ = recipient;
+    Ok(())
 }
 
 fn empty() -> Header {
@@ -366,7 +374,8 @@ impl<'a> Jwe<'a> {
             return Err(malformed());
         };
         let header = read(&bytes(protected)?)?;
-        let (enc, mut recipient, kid) = merge(Some(header), None, None)?;
+        let (enc, mut recipient, kid) = merge(Some(&header), None, None)?;
+        supported(&recipient)?;
         recipient.encrypted_key = bytes(key)?;
         Ok(Self {
             protected,
@@ -383,9 +392,6 @@ impl<'a> Jwe<'a> {
     /// Parses the general (`recipients`) or flattened JSON serialization; more than `MAX_ENTRIES` recipients is
     /// `TooLarge`.
     pub fn parse_json(json: &'a [u8]) -> Result<Self, Error> {
-        if json.len() > MAX_JSON_LEN {
-            return Err(ErrorKind::TooLarge.into());
-        }
         scan(json)?;
         let document: Document<'a> = serde_json::from_slice(json).map_err(|_| malformed())?;
         let entries = match document.recipients {
@@ -405,22 +411,31 @@ impl<'a> Jwe<'a> {
             return Err(malformed());
         }
         let protected = document.protected.unwrap_or_default();
-        let read_text = |text: &str| read(text.as_bytes());
-        let mut enc = None;
+        let first = if protected.is_empty() {
+            None
+        } else {
+            Some(read(&bytes(protected)?)?)
+        };
+        let shared = document
+            .unprotected
+            .map(|raw| read(raw.get().as_bytes()))
+            .transpose()?;
+        let sole = entries.len() == 1;
+        let mut enc: Option<String> = None;
         let mut recipients = Vec::new();
         let mut kids = Vec::new();
         for entry in entries {
-            let first = if protected.is_empty() {
-                None
-            } else {
-                Some(read(&bytes(protected)?)?)
-            };
-            let shared = document
-                .unprotected
-                .map(|raw| read_text(raw.get()))
+            let own = entry
+                .header
+                .map(|raw| read(raw.get().as_bytes()))
                 .transpose()?;
-            let own = entry.header.map(|raw| read_text(raw.get())).transpose()?;
-            let (found, mut recipient, kid) = merge(first, shared, own)?;
+            let (found, mut recipient, kid) = merge(first.as_ref(), shared.as_ref(), own.as_ref())?;
+            if enc.as_ref().is_some_and(|held| *held != found) {
+                return Err(malformed());
+            }
+            if sole {
+                supported(&recipient)?;
+            }
             recipient.encrypted_key = entry
                 .encrypted_key
                 .map(bytes)
@@ -676,6 +691,43 @@ mod tests {
 
     fn kind(wire: &str) -> Option<ErrorKind> {
         Jwe::parse(wire).err().map(|e| e.kind())
+    }
+
+    #[test]
+    fn an_alg_behind_an_off_feature_skips_one_recipient_not_the_token() {
+        let protected = b64url_encode(br#"{"enc":"A128GCM"}"#);
+        let entry = |alg: &str| format!(r#"{{"header":{{"alg":"{alg}"}},"encrypted_key":"AA"}}"#);
+        let general = |entries: &[String]| {
+            format!(
+                r#"{{"protected":"{protected}","recipients":[{}],"iv":"AA","ciphertext":"AA","tag":"AA"}}"#,
+                entries.join(",")
+            )
+        };
+        assert_eq!(
+            json_kind(&general(&[entry("RSA-OAEP"), entry("dir")])),
+            None
+        );
+        let off = cfg!(not(feature = "rsa-decrypt"));
+        assert_eq!(
+            json_kind(&general(&[entry("RSA-OAEP-256")])),
+            off.then_some(ErrorKind::UnsupportedAlg)
+        );
+    }
+
+    #[test]
+    fn recipients_that_disagree_on_enc_are_malformed() {
+        let entry = |enc: &str| format!(r#"{{"header":{{"alg":"dir","enc":"{enc}"}}}}"#);
+        let wire = format!(
+            r#"{{"recipients":[{},{}],"iv":"AA","ciphertext":"AA","tag":"AA"}}"#,
+            entry("A128GCM"),
+            entry("A256GCM")
+        );
+        assert_eq!(json_kind(&wire), Some(ErrorKind::Malformed));
+        let same = format!(
+            r#"{{"recipients":[{0},{0}],"iv":"AA","ciphertext":"AA","tag":"AA"}}"#,
+            entry("A128GCM")
+        );
+        assert_eq!(json_kind(&same), None);
     }
 
     fn compact(header: &str) -> String {

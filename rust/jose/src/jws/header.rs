@@ -44,6 +44,16 @@ fn read(json: &[u8]) -> Result<(Fields, BTreeMap<String, IgnoredAny>), Error> {
 }
 
 impl Parsed {
+    /// An `alg` that needs a feature that is off is `UnsupportedAlg` for a compact or sole-signature token; among
+    /// several signatures it is skipped as not the key's `alg`.
+    pub(crate) fn supported(&self) -> Result<(), Error> {
+        #[cfg(not(feature = "es512"))]
+        if self.alg.as_deref() == Some("ES512") {
+            return Err(ErrorKind::UnsupportedAlg.into());
+        }
+        Ok(())
+    }
+
     /// The header a protected segment of base64url text and an optional unprotected header object hold, merged. A name
     /// in both is `DuplicateMember`; `crit` and `b64` are refused; `typ` and `cty` are read from the protected header
     /// only. A string `kid` that is not a valid [`Kid`] is dropped: a `kid` is a hint and never refuses a token.
@@ -77,10 +87,6 @@ impl Parsed {
         }
         let kid = first.kid.or(second.kid);
         let alg = first.alg.or(second.alg).ok_or(ErrorKind::Malformed)?;
-        #[cfg(not(feature = "es512"))]
-        if matches!(alg.as_str(), "ES512") {
-            return Err(ErrorKind::UnsupportedAlg.into());
-        }
         Ok(Self {
             alg: Some(alg),
             kid: kid.and_then(|kid| Kid::new(&kid).ok()),

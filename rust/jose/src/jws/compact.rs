@@ -49,6 +49,7 @@ impl<'a> Jws<'a> {
             return Err(malformed());
         };
         let header = Parsed::parse(protected, None)?;
+        header.supported()?;
         b64url_decode(payload).map_err(|_| malformed())?;
         let bytes = b64url_decode(signature).map_err(|_| malformed())?;
         Ok(Self {

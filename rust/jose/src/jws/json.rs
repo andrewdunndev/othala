@@ -53,12 +53,17 @@ impl<'a> Jws<'a> {
             return Err(ErrorKind::Malformed.into());
         }
         b64url_decode(document.payload).map_err(|_| ErrorKind::Malformed)?;
+        let sole = entries.len() == 1;
         let mut signatures = Vec::new();
         for entry in entries {
             let protected = entry.protected.unwrap_or_default();
+            let header = Parsed::parse(protected, entry.header.map(|h| h.get()))?;
+            if sole {
+                header.supported()?;
+            }
             signatures.push(Signature {
                 protected,
-                header: Parsed::parse(protected, entry.header.map(|h| h.get()))?,
+                header,
                 bytes: b64url_decode(entry.signature).map_err(|_| ErrorKind::Malformed)?,
             });
         }
@@ -141,6 +146,19 @@ mod tests {
 
     fn token(protected: &str, payload: &str, signature: &str) -> Compact {
         Compact(format!("{protected}.{payload}.{signature}"))
+    }
+
+    #[test]
+    fn an_alg_behind_an_off_feature_skips_one_entry_not_the_token() {
+        let es512 = base::b64url_encode(br#"{"alg":"ES512"}"#);
+        let entry = |protected: &str| format!(r#"{{"protected":"{protected}","signature":"AQ"}}"#);
+        let general = |entries: &[String]| {
+            format!(r#"{{"payload":"AA","signatures":[{}]}}"#, entries.join(","))
+        };
+        assert_eq!(kind(&general(&[entry(&es512), entry(H)])), None);
+        let sole = general(&[entry(&es512)]);
+        let off = cfg!(not(feature = "es512"));
+        assert_eq!(kind(&sole), off.then_some(ErrorKind::UnsupportedAlg));
     }
 
     #[test]

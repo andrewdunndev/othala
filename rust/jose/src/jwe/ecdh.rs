@@ -151,7 +151,7 @@ fn wrap(
 ) -> Result<(SecretBytes, Vec<u8>), Error> {
     let eph = ephemeral(key, e)?;
     let z = agree(&eph, key)?;
-    params.epk = Some(public_of(&eph));
+    params.epk = Some(alloc::sync::Arc::new(public_of(&eph)));
     match mode {
         Mode::Direct => Ok((derive(&z, enc.name(), params, enc.cek_len())?, Vec::new())),
         Mode::Wrap(len) => {
@@ -519,6 +519,6 @@ mod tests {
                 .map(|(cek, _)| cek.expose().len())
         });
         assert_eq!(made.and_then(Result::ok), Some(16));
-        assert!(matches!(p.epk, Some(Public::P521(_))));
+        assert!(matches!(p.epk.as_deref(), Some(Public::P521(_))));
     }
 }
