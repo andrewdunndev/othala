@@ -67,8 +67,50 @@ twins:
         done
     done
 
+# the cargo-mutants version ../mise.toml pins, for CI's cargo install
+mutants-pin:
+    @sed -n 's|^"github:sourcefrog/cargo-mutants" = "\([0-9][0-9.]*\)"$|\1|p' ../mise.toml
+
+# the cargo-deny version ../mise.toml pins, for CI's cargo install
+deny-pin:
+    @sed -n 's|^"github:EmbarkStudios/cargo-deny" = "\([0-9][0-9.]*\)"$|\1|p' ../mise.toml
+
+# the floor rule (floor.jq) accepts digits-only floors and refuses every other spelling, null and a missing floor
+floor-rule: (tool-pins "jq")
+    #!/usr/bin/env bash
+    set -euo pipefail
+    bad=0
+    for f in 0 23 100; do
+        echo "{\"mutants\": {\"floor\": $f}}" | ./crates.sh --floor || { echo "floor-rule: refused good floor $f"; bad=1; }
+    done
+    for f in 1e2 23.0 -0 null false 0.5 -1 '"5"' '[]' '{}'; do
+        echo "{\"mutants\": {\"floor\": $f}}" | ./crates.sh --floor && { echo "floor-rule: accepted bad floor $f"; bad=1; }
+    done
+    echo '{"mutants": {"tests": ["a"]}}' | ./crates.sh --floor && { echo "floor-rule: accepted a missing floor"; bad=1; }
+    echo '{"mutants": 5}' | ./crates.sh --floor && { echo "floor-rule: accepted a non-object mutants"; bad=1; }
+    echo '{"doc": true}' | ./crates.sh --floor || { echo "floor-rule: refused a crate with no mutants key"; bad=1; }
+    # crates.sh itself must carry the rule
+    grep -q 'if floor_ok then' crates.sh || { echo "floor-rule: crates.sh does not apply floor_ok"; bad=1; }
+    exit $bad
+
+# the installed cargo-mutants, cargo-deny and jq must be the versions ../mise.toml pins; CI installs by the same pin and is graded here
+tool-pins *tools="cargo-mutants jq cargo-deny":
+    #!/usr/bin/env bash
+    set -euo pipefail
+    for t in {{tools}}; do
+        case "$t" in
+            cargo-mutants) key='"github:sourcefrog\/cargo-mutants"'; have=$(cargo mutants --version | sed -n 's/^cargo-mutants \([0-9][0-9.]*\).*/\1/p') ;;
+            cargo-deny) key='"github:EmbarkStudios\/cargo-deny"'; have=$(cargo deny --version | sed -n 's/^cargo-deny \([0-9][0-9.]*\).*/\1/p') ;;
+            jq) key='jq'; have=$(jq --version | sed -n 's/^jq-\([0-9][0-9.]*\).*/\1/p') ;;
+            *) echo "tool-pins: unknown tool $t"; exit 1 ;;
+        esac
+        want=$(sed -n "s/^$key = \"\([0-9][0-9.]*\)\"\$/\1/p" ../mise.toml)
+        [ -n "$want" ] || { echo "tool-pins: ../mise.toml has no pin for $t"; exit 1; }
+        [ "$want" = "$have" ] || { echo "$t ${have:-unknown} is installed, mise.toml pins $want"; exit 1; }
+    done
+
 # each run catches at least its gates.json floor (unviable mutants do not count) with none missed or timed out, so a filter that empties it fails; skips are in .cargo/mutants.toml
-mutants crate="":
+mutants crate="": (tool-pins "cargo-mutants" "jq")
     #!/usr/bin/env bash
     set -euo pipefail
     runs=$(./crates.sh | jq -r --arg c "{{crate}}" 'select(.mutants and ($c == "" or .name == $c)) | "\(.name) \(.mutants.floor) \(.mutants.tests // [] | join(","))"')
@@ -76,10 +118,99 @@ mutants crate="":
     while read -r c floor tests; do
         if [ -n "$tests" ]; then scope=(--test-package "$tests"); else scope=(--test-workspace=true); fi
         mkdir -p "{{target}}/mutants/$c"
-        cargo mutants --package "$c" "${scope[@]}" --no-shuffle --output "{{target}}/mutants/$c" < /dev/null
+        jobs=$(nproc); [ "$jobs" -le "${MUTANTS_JOBS:-4}" ] || jobs=${MUTANTS_JOBS:-4}
+        env -u CARGO_TARGET_DIR cargo mutants --package "$c" "${scope[@]}" --jobs "$jobs" --no-shuffle --minimum-test-timeout 60 --output "{{target}}/mutants/$c" < /dev/null
         jq -e --argjson floor "$floor" '.caught >= $floor and .missed == 0 and .timeout == 0' \
             "{{target}}/mutants/$c/mutants.out/outcomes.json" > /dev/null || { echo "mutants $c: under the floor of $floor, or missed or timed out"; exit 1; }
     done <<< "$runs"
+
+# the features-off run of the jose files whose refusals are dead code with all features on: it skips only when the jose crate is absent, fails when a listed file is missing, and the floor is the caught count of a real run
+mutants-off floor="5": (tool-pins "cargo-mutants" "jq")
+    #!/usr/bin/env bash
+    set -euo pipefail
+    [ -d jose ] || { echo "mutants-off: no jose crate, skipped"; exit 0; }
+    files=(jose/src/jws/header.rs jose/src/jws/json.rs jose/src/jwe/envelope.rs)
+    for f in "${files[@]}"; do
+        [ -f "$f" ] || { echo "mutants-off: $f is missing"; exit 1; }
+    done
+    out="{{target}}/mutants/jose-off"
+    jobs=$(nproc); [ "$jobs" -le "${MUTANTS_JOBS:-4}" ] || jobs=${MUTANTS_JOBS:-4}
+    mkdir -p "$out"
+    env -u CARGO_TARGET_DIR cargo mutants -p jose --no-config --no-default-features --jobs "$jobs" --no-shuffle --minimum-test-timeout 60 --output "$out" \
+        "${files[@]/#/--file=}" --re "supported|replace == with != in Jw[se]<'a>::parse_json" -- -- --skip ledger < /dev/null
+    jq -e --argjson floor "{{floor}}" '.caught >= $floor and .missed == 0 and .timeout == 0' \
+        "$out/mutants.out/outcomes.json" > /dev/null || { echo "mutants-off: under the floor of {{floor}}, or missed or timed out"; exit 1; }
+
+# the pre-merge mutation gate: `just mutants <crate>` (the gates.json floor, whole crate) for each crate the commits since the merge base with origin/main change; a change to justfile, crates.sh, ../mise.toml, .cargo/ or any gates.json, to Cargo.toml, Cargo.lock, rust-toolchain.toml or vectors/ runs every floored crate; a change under a crate named in a run's `tests` (or, with no `tests` key, under any crate's tests/) runs that crate; a changed jose also runs mutants-off; a floor that dropped or vanished since the merge base fails unless a commit says `floor-lowered: <crate> <reason>`; no merge base is an error, not a skip
+mutants-changed base="origin/main": (tool-pins "cargo-mutants" "jq")
+    #!/usr/bin/env bash
+    set -euo pipefail
+    mb=$(git merge-base "{{base}}" HEAD) || { echo "mutants-changed: no merge base with {{base}}"; exit 1; }
+    [ -n "$mb" ] || { echo "mutants-changed: no merge base with {{base}}"; exit 1; }
+    [ -z "$(git status --porcelain -- .)" ] || echo "mutants-changed: warning: uncommitted changes are not judged, only commits since ${mb:0:8}" >&2
+    files=$(git diff --no-renames --name-only --relative "$mb" HEAD -- .)
+    top=$(git diff --no-renames --name-only "$mb" HEAD)
+    msgs=$(git log --format=%B "$mb..HEAD")
+    # a floor is held against the merge base's, so a branch cannot lower its own
+    while read -r c; do
+        [ -n "$c" ] || continue
+        git show "$mb:./$c/gates.json" | ./crates.sh --floor || { echo "mutants-changed: $c's merge-base mutants.floor must be a non-negative integer"; exit 1; }
+        old=$(git show "$mb:./$c/gates.json" | jq -r '.mutants.floor // empty')
+        [ -n "$old" ] || continue
+        if git cat-file -e "HEAD:./$c/gates.json" 2> /dev/null; then
+            git show "HEAD:./$c/gates.json" | ./crates.sh --floor || { echo "mutants-changed: $c's mutants.floor must be a non-negative integer"; exit 1; }
+            new=$(git show "HEAD:./$c/gates.json" | jq -r '.mutants.floor // empty')
+        else
+            new=""
+        fi
+        if [ -z "$new" ] || [ "$new" -lt "$old" ]; then
+            grep -qE "^floor-lowered: $c .+" <<< "$msgs" || { echo "mutants-changed: $c's floor went from $old to ${new:-nothing}; a commit must say 'floor-lowered: $c <reason>'"; exit 1; }
+        fi
+    done < <(git ls-tree --name-only "$mb" -- . | tr -d / | while read -r d; do git cat-file -e "$mb:./$d/gates.json" 2> /dev/null && echo "$d"; done)
+    runs=$(./crates.sh | jq -r 'select(.mutants) | "\(.name) \(.mutants.tests // [] | join(","))"')
+    touched() { grep -q "^$1/" <<< "$files"; }
+    all=0
+    grep -qE '^(justfile|crates\.sh|Cargo\.toml|Cargo\.lock|rust-toolchain\.toml|\.cargo/|vectors/|[^/]+/gates\.json$)' <<< "$files" && all=1
+    grep -qx 'mise\.toml' <<< "$top" && all=1
+    anytests=0
+    grep -qE '^[^/]+/tests/' <<< "$files" && anytests=1
+    plan=""
+    while read -r c tests; do
+        hit=$all
+        touched "$c" && hit=1
+        [ -z "$tests" ] && [ "$anytests" = 1 ] && hit=1
+        for t in ${tests//,/ }; do [ "$t" != "$c" ] && touched "$t" && hit=1; done
+        [ "$hit" = 1 ] && plan="$plan$c"$'\n'
+    done <<< "$runs"
+    [ -n "$plan" ] || { echo "mutants-changed: no crate with a mutants floor changed since $mb"; exit 0; }
+    while read -r c; do
+        [ -n "$c" ] || continue
+        just mutants "$c"
+    done <<< "$plan"
+    if grep -qx jose <<< "$plan"; then just mutants-off; fi
+
+# a quick pre-check, not the gate: cargo mutants --in-diff on each crate this branch changes, none missed or timed out
+mutants-diff base="origin/main": (tool-pins "cargo-mutants" "jq")
+    #!/usr/bin/env bash
+    set -euo pipefail
+    mb=$(git merge-base "{{base}}" HEAD) || { echo "mutants-diff: no merge base with {{base}}"; exit 1; }
+    [ -n "$mb" ] || { echo "mutants-diff: no merge base with {{base}}"; exit 1; }
+    files=$(git diff --no-renames --name-only --relative "$mb" -- .)
+    runs=$(./crates.sh | jq -r 'select(.mutants) | "\(.name) \(.mutants.tests // [] | join(","))"')
+    n=0
+    while read -r c tests; do
+        grep -q "^$c/" <<< "$files" || continue
+        n=1
+        if [ -n "$tests" ]; then scope=(--test-package "$tests"); else scope=(--test-workspace=true); fi
+        rm -rf "{{target}}/mutants/$c"; mkdir -p "{{target}}/mutants/$c"
+        git diff --no-renames --relative "$mb" -- "$c/" > "{{target}}/mutants/$c.diff"
+        jobs=$(nproc); [ "$jobs" -le "${MUTANTS_JOBS:-4}" ] || jobs=${MUTANTS_JOBS:-4}
+        env -u CARGO_TARGET_DIR cargo mutants --package "$c" "${scope[@]}" --jobs "$jobs" --no-shuffle --minimum-test-timeout 60 --in-diff "{{target}}/mutants/$c.diff" --output "{{target}}/mutants/$c" < /dev/null
+        out="{{target}}/mutants/$c/mutants.out/outcomes.json"
+        if [ ! -f "$out" ]; then echo "mutants-diff $c: the diff holds no mutant"; continue; fi
+        jq -e '.missed == 0 and .timeout == 0' "$out" > /dev/null || { echo "mutants-diff $c: a mutant was missed or timed out"; exit 1; }
+    done <<< "$runs"
+    [ "$n" = 1 ] || echo "mutants-diff: no crate with a mutants floor changed since $mb"
 
 wasm: (build "wasm32-unknown-unknown")
 
@@ -100,7 +231,7 @@ msrv:
     cargo +1.89.0 check --workspace --all-features --all-targets --locked
 
 # deny.toml is the policy; bans.allow is appended from every member's name and the crates its gates.json allows
-deny:
+deny: (tool-pins "cargo-deny")
     #!/usr/bin/env bash
     set -euo pipefail
     mkdir -p "{{target}}"
