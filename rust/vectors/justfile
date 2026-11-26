@@ -1,22 +1,32 @@
 set shell := ["bash", "-euo", "pipefail", "-c"]
 
-# run as `just --justfile rust/vectors/justfile webauthn-ext`; the oracle gate for webauthn-rp-derived: the committed files equal a fresh derivation, Node re-verifies them, and a planted TPM alg/key mismatch fails with its own fault id
+# run as `just --justfile rust/vectors/justfile webauthn-ext`; the oracle gate for webauthn-rp-derived: the committed files equal a fresh derivation, then webauthn-ext-verify
 webauthn-ext:
     #!/usr/bin/env bash
     set -euo pipefail
     cd "{{ justfile_directory() }}"
     t=$(mktemp -d); trap 'rm -rf "$t"' EXIT
     python3 -I tools/derive_webauthn_ext.py "$t" > /dev/null
-    for f in "$t"/webauthn-rp-derived/*.json; do
-        cmp -s "$f" "webauthn-rp-derived/${f##*/}" || { echo "stale: ${f##*/} differs from a fresh derivation"; exit 1; }
-    done
+    python3 -I -c 'import filecmp, glob, os, sys
+    bad = [os.path.basename(f) for f in sorted(glob.glob(sys.argv[1] + "/webauthn-rp-derived/*.json")) if not filecmp.cmp(f, "webauthn-rp-derived/" + os.path.basename(f), shallow=False)]
+    [print("stale: " + b + " differs from a fresh derivation") for b in bad]
+    sys.exit(1 if bad else 0)' "$t"
+    "{{ just_executable() }}" --justfile "{{ justfile() }}" webauthn-ext-verify
+
+# Node re-verifies the committed webauthn-rp-derived files, and a planted TPM alg/key mismatch fails with its own fault id; the files' equality with a fresh derivation is webauthn-ext's or check_vectors.py's
+webauthn-ext-verify:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    cd "{{ justfile_directory() }}"
+    t=$(mktemp -d); trap 'rm -rf "$t"' EXIT
     node tools/check_webauthn_ext.mjs .
+    cp -r webauthn-rp-derived "$t"
     python3 -I tools/plant_webauthn_ext.py "$t" > /dev/null
     if out=$(node tools/check_webauthn_ext.mjs "$t"); then echo "plant not caught"; exit 1; fi
     [ "$(grep -c '^FAIL' <<< "$out")" = 1 ] && grep -q 'tpm-plant-es256-p384-aik: fault tpm-alg-key-mismatch' <<< "$out" || { echo "plant caught by the wrong fault: $out"; exit 1; }
     echo "webauthn-ext: ok (plant fails as tpm-alg-key-mismatch)"
 
-# run as `just --justfile rust/vectors/justfile check`, offline; the vector gate: every derive script reproduces its committed files, SOURCES.toml's hashes and counts match the files, every WebAuthn step or section cited exists and each quoted passage is in its step (tools/check_vectors.py), then webauthn-ext
+# run as `just --justfile rust/vectors/justfile check`, offline; the vector gate: every derive script reproduces its committed files, SOURCES.toml's hashes and counts match the files, every WebAuthn step or section cited exists and each quoted passage is in its step (tools/check_vectors.py), then webauthn-ext-verify
 check:
     #!/usr/bin/env bash
     set -euo pipefail
@@ -24,4 +34,4 @@ check:
     command -v python3 > /dev/null || { echo 'vectors: python3 is not on PATH'; exit 1; }
     command -v node > /dev/null || { echo 'vectors: node is not on PATH; mise.toml pins it, so run under `mise x --`'; exit 1; }
     python3 -I tools/check_vectors.py .
-    "{{ just_executable() }}" --justfile "{{ justfile() }}" webauthn-ext
+    "{{ just_executable() }}" --justfile "{{ justfile() }}" webauthn-ext-verify
