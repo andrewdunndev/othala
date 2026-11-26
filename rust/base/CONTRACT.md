@@ -22,7 +22,7 @@ Checks: `ui:x` is `tests/ui/fail/x.rs` with its committed `.stderr` (rustc code 
 - T16 `SecretBytes` and `Secret<N>` hold their bytes in private fields, so only `expose` reads them: ui:secret_bytes_fields (E0423), api (no public field).
 - T17 `Pending` and `Builder` are `#[must_use]`, so an unsettled verdict dropped as a statement is the `unused_must_use` lint: ui:pending_unused (the lint at deny; the twin warns), api (`attr Pending must_use`, `attr Builder must_use`).
 - T18 Every public enum is `#[non_exhaustive]`, so a consumer's match keeps a wildcard arm: ui:error_kind_exhaustive (E0004), api (one `attr ... non_exhaustive` per enum).
-- T19 A `BrowserBinding` is built only from a `&Secret<32>`, never from a `Digest` or bytes, so a constant cannot pass for one: ui:browser_binding_from (E0277), api (no public field; `From<&Secret<32>>` is the one constructor, and under `serde` a stored binding deserializes from its text).
+- T19 A `BrowserBinding` is built only from a `&Secret<32>` or, under `serde`, from its stored text, never from a `Digest` or bytes: ui:browser_binding_from (E0277), api (no public field; `From<&Secret<32>>` is the one constructor, and under `serde` a stored binding deserializes from its text). `Secret::new` is a public `const fn`, so the type does not stop a constant secret; that is O16.
 
 ## Runtime
 - R1 `b64url_encode` and `b64url_decode` (a wrapper over `base64ct`'s unpadded base64url) agree with RFC 4648 section 10 under the section 5 alphabet: it:vectors::rfc4648_section10 (total 28, 7 checked), mutants:b64url.
@@ -76,6 +76,7 @@ Checks: `ui:x` is `tests/ui/fail/x.rs` with its committed `.stderr` (rustc code 
 - O13 No published crate reads a secret: `expose` is in clippy `disallowed_methods`, `forbid` in every published crate (B4, B6); `base`'s own `src/` does not resolve the `base::` path, so its unit tests call `expose` unflagged.
 - O14 After `Conflict` a decider re-decides at most `REDECIDE` (3) times; after `Error` the host re-applies the same effect with the decision's `now`, within `Retry`: consumers' contracts; unit:store::redecide_is_three, race:a_loser_redecides_up_to_three_times, race:a_loser_gives_up_after_three; the reference store's injected lost result commits and its re-apply settles: testkit unit:store::a_lost_result_commits_and_a_reapply_settles.
 - O15 A repeated effect id with other keys is never `Ok`, since it would settle a verdict with nothing written: conf:reused_id (a store that answers `Ok` for any applied id); the reference store records each applied id's keys and answers `Fault::ReusedId`. That the `Entropy` given to `Effect::builder` never repeats a 16-byte draw among effects one store sees is the host's obligation, unchecked; `testkit::seeded(n)` repeats for the same `n`, so a test draws every effect for one store from one advancing source.
+- O16 The `Secret<32>` a host gives `BrowserBinding::from` is derived from the host's cookie secret, never a constant or a value the client can choose, and `webauthn-rp` and `oidc-provider` pass only such a secret; the type cannot tell a derived secret from a literal, so this is the host's obligation, unchecked.
 
 ## Build
 - B1 `no_std` + `alloc` for wasm32-unknown-unknown and thumbv7em-none-eabi, with `std`, `rand_core` and `serde` features off and on: `just wasm`, `just thumb`.
