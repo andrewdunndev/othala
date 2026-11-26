@@ -247,7 +247,7 @@ check-rust:
     - if: '$CI_PIPELINE_SOURCE =~ /^(web|api)$/'
   script:
     - just tool-pins jq
-    - just lock queue fmt lint canary twins test doc wasm thumb msrv deny deps api
+    - just floor-rule lock queue fmt lint canary twins test doc wasm thumb msrv deny deps api
 
 # check-ownership: a branch item/<id> changes only the paths its primitives/queue.json item owns, and no oracle path.
 check-ownership:
