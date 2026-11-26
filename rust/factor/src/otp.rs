@@ -2,6 +2,7 @@ use alloc::vec;
 use alloc::vec::Vec;
 use core::fmt;
 
+use expose::Expose as _;
 use base::{Entropy, Row, SecretBytes, UnixTime};
 use hmac::{Hmac, KeyInit, Mac};
 use sha1::Sha1;

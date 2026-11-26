@@ -1,0 +1,3 @@
+trait Expose
+trait_item Expose::Bytes
+trait_item Expose::expose fn(self: &Self) -> &Self::Bytes

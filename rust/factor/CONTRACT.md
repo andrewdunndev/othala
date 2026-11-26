@@ -164,17 +164,17 @@ Recovery codes (NIST SP 800-63B-4 3.1.2)
 - O10 The `Entropy` given draws from an approved random bit generator (NIST SP 800-90A), since keys, salts and codes come from it: the host's, unchecked.
 - O11 The consumer reads a `Pending`'s effect only to apply it: its shape reveals a TOTP or recovery match before settle (R3); password verdicts are shape-uniform: othala-core's contract.
 - O12 The host passes `Minimum::SingleFactor` unless every login with the password also requires another factor (NIST 3.1.1.2 SHALL): othala-core's login-path test.
-- O13 The host stores `OtpKey::export` encrypted at rest (RFC 4226 7.5, RFC 6238 5.1), reads it only through base's confined `expose`, and stores `Phc` and `Totp`'s parameters itself: the shells' storage test.
+- O13 The host stores `OtpKey::export` encrypted at rest (RFC 4226 7.5, RFC 6238 5.1), reads it only through the confined `expose::Expose`, and stores `Phc` and `Totp`'s parameters itself: the shells' storage test.
 - O14 The host's `FreeAttempts` covers the factors one login presents, since a match counts too and only a completed login resets: othala-core's configuration test.
 - O15 The host confirms a candidate with `Totp::confirm`, applying its effect, before it stores the authenticator: othala-core's settings-flow test.
 - O16 The host consumes a superseded recovery set's rows in the effect that installs the new set (base `Pending::join`): othala-core's settings-flow test.
-- O17 Only `otp`, `password` and `recovery` call base's `expose`, the modules `gates.json` `expose` names, so `Cargo.toml` may enable `base/expose` (R-j): review checks the modules; `just canary` fails an enable that `gates.json` does not declare (base O13).
+- O17 Only `otp`, `password` and `recovery` import `expose::Expose`, the modules `gates.json` `expose` names, so `Cargo.toml` may depend on `expose` (R-j): review checks the modules; `just canary` fails a dependency on `expose` that `gates.json` does not declare (base O13).
 - O18 Every node supplying `now` to `Throttle::check` for one subject agrees with the others within `Cap`; skew past `FAULT` releases a stamped row, so N6's rate bound holds only under this, and the host alerts on `Permit::clock_fault()` (R-m): the shells' clock test.
 
 ## Build
 - B1 `no_std` + `alloc` on wasm32-unknown-unknown and thumbv7em-none-eabi with no features; the one feature, `std`, links std and base's `std` and changes no behaviour, and no algorithm or policy is a feature: `just wasm`, `just thumb` (`gates.json` `targets`).
 - B2 MSRV 1.89 against the committed lock: `just msrv`, `just lock`.
-- B3 The runtime dependencies are exactly argon2 (`alloc`, `password-hash`, `zeroize`; no `getrandom`, no `std`), base (with `expose`), hmac and sha1 (each with `zeroize`), sha2, subtle and zeroize (D6): `just deps` over `deps.txt`, `just deny` over `gates.json` `allow`.
+- B3 The runtime dependencies are exactly argon2 (`alloc`, `password-hash`, `zeroize`; no `getrandom`, no `std`), base, expose, hmac and sha1 (each with `zeroize`), sha2, subtle and zeroize (D6): `just deps` over `deps.txt`, `just deny` over `gates.json` `allow`.
 - B4 The public API is the committed snapshot: `just api` over `public-api.txt`.
 - B5 The ledger runs every case on disk and pins 32 cases and 32 twins, so a glob that matched nothing cannot pass: `just ledger` (`CASES` in `tests/ledger.rs`), `just twins`.
 - B6 Every workspace deny-list lint is `forbid` here, so no module calls base's `host_applied` or allows a lint: `just canary`, `just lint`. `OtpKey`, `OtpCode`, `Password` and `RecoveryCode` wrap base `SecretBytes`, which base wipes (base R32) (R-j), and the crate's own transient secret buffers (a parsed code's bytes, an HMAC tag) are `Zeroizing` and wiped on drop: api, review.
@@ -192,7 +192,7 @@ Recovery codes (NIST SP 800-63B-4 3.1.2)
 - N8 `RecoveryMatch` carries no remaining count: codes are rows of their own, and the host counts them if it lists them.
 
 ## Refinements of architecture section 2
-`check` returns `Closed::Wait(until)`, never a lock (R-g). `Totp::verify` takes no `now`: the permit's time is its one clock. `password_verify` takes the host's `&Phc` and `Cost`, and `recovery_verify` the one row under `RecoveryCode::key`, not the whole set. `recovery_generate` returns its codes inside a `Pending`, so they leave only once their rows commit. `Rehash::Needed` carries the new `Phc`. `OtpKey` holds its bytes in a base `SecretBytes` and leaves as one; factor reads secret bytes through base's `expose` only in the modules O17 names (R-j).
+`check` returns `Closed::Wait(until)`, never a lock (R-g). `Totp::verify` takes no `now`: the permit's time is its one clock. `password_verify` takes the host's `&Phc` and `Cost`, and `recovery_verify` the one row under `RecoveryCode::key`, not the whole set. `recovery_generate` returns its codes inside a `Pending`, so they leave only once their rows commit. `Rehash::Needed` carries the new `Phc`. `OtpKey` holds its bytes in a base `SecretBytes` and leaves as one; factor reads secret bytes through `expose::Expose` only in the modules O17 names (R-j).
 
 ## Module map
 | Item | File | Lands | Rows and checks |

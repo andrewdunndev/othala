@@ -4,6 +4,7 @@ use core::fmt;
 use argon2::password_hash::phc::{ParamsString, PasswordHash};
 use argon2::password_hash::{self, PasswordHasher, PasswordVerifier};
 use argon2::{ARGON2ID_IDENT, Algorithm, Argon2, AssociatedData, Params, ParamsBuilder, Version};
+use expose::Expose as _;
 use base::{Entropy, SecretBytes};
 
 use crate::{Error, ErrorKind, Pending, Permit, Rejected};
