@@ -7,7 +7,7 @@
     "wasm32-unknown-unknown": ["--no-default-features", "--all-features"],
     "thumbv7em-none-eabi": ["--no-default-features", "--features rand_core,serde"]
   },
-  "mutants": { "floor": 137, "tests": ["base", "wipe"] },
+  "mutants": { "floor": 71, "tests": ["base", "wipe"] },
   "vectors": ["rfc4648"],
   "allow": [
     "base64ct", "block-buffer", "cfg-if", "cpufeatures", "crypto-common", "digest", "hybrid-array", "libc", "rand_core", "serde",

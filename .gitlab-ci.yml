@@ -261,7 +261,9 @@ check-ownership:
     - git fetch origin +refs/heads/main:refs/remotes/origin/main
   script:
     - branch=${CI_MERGE_REQUEST_SOURCE_BRANCH_NAME:-$CI_COMMIT_BRANCH}
-    - primitives/own.sh "${branch#item/}"
+    # the base's own.sh and queue judge the branch, so a branch edit to either has no effect
+    - base=$(git merge-base origin/main HEAD)
+    - git show "$base:primitives/own.sh" | bash -s -- "${branch#item/}"
 
 check-rust-scheduled:
   extends: .rust

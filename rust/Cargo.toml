@@ -2,7 +2,7 @@
 resolver = "3"
 # every top-level directory but these is a member, so a new crate adds only its own directory
 members = ["*"]
-exclude = ["base/fuzz", ".cargo", "canary", "target", "vectors"]
+exclude = ["base/fuzz", ".cargo", "canary", "target", "vectors", "mutants.out", "mutants.out.old"]
 
 [workspace.package]
 version = "0.0.0"
