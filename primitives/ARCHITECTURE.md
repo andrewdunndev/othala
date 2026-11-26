@@ -348,3 +348,7 @@ Each function lands with the item whose row it turns green.
 **R-l** A row may be a `--lib` filter where the claim needs crate-internal code: R34's Argon2id mapping, and HOTP before TOTP lands.
 
 **R-m** Lockout cap floor is 1 h. othala-core carries an Obligation to alert on a subject's sustained backoff. NIST 800-63B-4 3.2.2 is met on rate, not by disabling; CONTRACT N6 states this.
+
+**R-n** CBOR key order. The strict reader enforces CTAP2 canonical order on authenticator-produced CBOR: the credential public key and extensions inside authData, and attStmt. The outer attestationObject map, which a client may re-encode (none conveyance), is read order-tolerant. It still refuses duplicate keys, indefinite lengths and non-shortest integers.
+
+**R-o** A -01 item may land derives (Debug, Clone, PartialEq, Hash, Eq) on bodiless types. Placeholder fields carry no meaning until the item that adds a constructor lands, and that item owns the derive's correctness.
