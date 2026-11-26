@@ -25,7 +25,7 @@
    "client_extension_results": {
     "appid": true
    },
-   "spec": "contract R120 and WebAuthn L3 10.1.1 (appid true: rpIdHash is the hash of the AppID, 7.2 step 15)",
+   "spec": "contract R120 and WebAuthn L3 10.1.1 (appid true: rpIdHash is the hash of the AppID, 7.2 step 15 \"If using the appid extension, this step needs some special logic\")",
    "expect": {
     "ok": true,
     "user_verified": true,
@@ -124,7 +124,7 @@
    "client_extension_results": {
     "appid": true
    },
-   "spec": "contract R120 (appid true selects the AppID hash: the RP ID hash fails 7.2 step 15)",
+   "spec": "contract R120 (appid true selects the AppID hash: the RP ID hash fails 7.2 step 15 \"If using the appid extension, this step needs some special logic\")",
    "expect": {
     "ok": false
    }
@@ -293,7 +293,7 @@
     "appid": true
    },
    "unsolicited": "ignore",
-   "spec": "contract R128 (a dropped output selects nothing: the AppID hash fails 7.2 step 15)",
+   "spec": "contract R128 (a dropped output selects nothing: the AppID hash fails 7.2 step 15 \"If using the appid extension, this step needs some special logic\")",
    "expect": {
     "ok": false
    }

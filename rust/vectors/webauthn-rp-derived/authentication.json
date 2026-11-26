@@ -28,7 +28,7 @@
      "b843ec497b9f452b8867b92268ef95dac37c255dbf71eb2596aaeeaca0269f5d"
     ]
    },
-   "spec": "WebAuthn L3 7.2 step 5 (the credential is among allowCredentials)",
+   "spec": "WebAuthn L3 7.2 step 5 \"verify that credential.id identifies one of the public key credentials listed in pkOptions.allowCredentials\" (the credential is among allowCredentials)",
    "expect": {
     "ok": true,
     "user_verified": true,
@@ -61,7 +61,7 @@
      "b843ec497b9f452b8867b92268ef95dac37c255dbf71eb2596aaeeaca0269f5d"
     ]
    },
-   "spec": "WebAuthn L3 7.2 step 5 (id not in allowCredentials; contract R64 NotAllowed)",
+   "spec": "WebAuthn L3 7.2 step 5 \"verify that credential.id identifies one of the public key credentials listed in pkOptions.allowCredentials\" (id not in allowCredentials; contract R64 NotAllowed)",
    "expect": {
     "ok": false
    }
@@ -92,7 +92,7 @@
      "7317953e73992f05b1443b42b67a3b4491d438a0b268fe9af4b03cbb6f6a3482"
     ]
    },
-   "spec": "WebAuthn L3 7.2 step 5 (a single listed credential that is not the response's; contract R64)",
+   "spec": "WebAuthn L3 7.2 step 5 \"verify that credential.id identifies one of the public key credentials listed in pkOptions.allowCredentials\" (a single listed credential that is not the response's; contract R64)",
    "expect": {
     "ok": false
    }
@@ -120,7 +120,7 @@
    "stored_user_handle": "0101010101010101010101010101010101010101010101010101010101010101",
    "allow": "discoverable",
    "user_handle": "0101010101010101010101010101010101010101010101010101010101010101",
-   "spec": "WebAuthn L3 7.2 step 5 (an empty allow list adds no constraint; Allow::Discoverable)",
+   "spec": "WebAuthn L3 7.2 step 5 \"If pkOptions.allowCredentials is not empty\" (an empty allow list adds no constraint; Allow::Discoverable)",
    "expect": {
     "ok": true,
     "user_verified": true,
@@ -153,7 +153,7 @@
      "7317953e73992f05b1443b42b67a3b4491d438a0b268fe9af4b03cbb6f6a3482"
     ]
    },
-   "spec": "WebAuthn L3 7.2 step 6 (the stored credential's id is the response's; contract R65 CredentialMismatch)",
+   "spec": "WebAuthn L3 7.2 step 6 \"verify that the identified user account contains a credential record whose id equals credential.rawId\" (the stored credential's id is the response's; contract R65 CredentialMismatch)",
    "expect": {
     "ok": false
    }
@@ -183,7 +183,7 @@
     "credentials": [],
     "identified_user": "0101010101010101010101010101010101010101010101010101010101010101"
    },
-   "spec": "WebAuthn L3 7.2 step 6 (the stored credential's user is the identified user; contract R66 UserHandleMismatch)",
+   "spec": "WebAuthn L3 7.2 step 6 \"verify that the identified user account contains a credential record whose id equals credential.rawId\" (the stored credential's user is the identified user; contract R66 UserHandleMismatch)",
    "expect": {
     "ok": false
    }
@@ -213,7 +213,7 @@
     "credentials": [],
     "identified_user": "0101010101010101010101010101010101010101010101010101010101010101"
    },
-   "spec": "WebAuthn L3 7.2 step 6 (contract R66)",
+   "spec": "WebAuthn L3 7.2 step 6 \"verify that the identified user account contains a credential record whose id equals credential.rawId\" (contract R66)",
    "expect": {
     "ok": true,
     "user_verified": true,
@@ -246,7 +246,7 @@
     "identified_user": "0101010101010101010101010101010101010101010101010101010101010101"
    },
    "user_handle": "0202020202020202020202020202020202020202020202020202020202020202",
-   "spec": "WebAuthn L3 7.2 step 6 (a present userHandle equals the identified user; contract R67 UserHandleMismatch)",
+   "spec": "WebAuthn L3 7.2 step 6 \"If response.userHandle is present, verify that it equals the user handle of the user account\" (a present userHandle equals the identified user; contract R67 UserHandleMismatch)",
    "expect": {
     "ok": false
    }
@@ -277,7 +277,7 @@
     "identified_user": "0101010101010101010101010101010101010101010101010101010101010101"
    },
    "user_handle": "0101010101010101010101010101010101010101010101010101010101010101",
-   "spec": "WebAuthn L3 7.2 step 6 (contract R67)",
+   "spec": "WebAuthn L3 7.2 step 6 \"If response.userHandle is present, verify that it equals the user handle of the user account\" (contract R67)",
    "expect": {
     "ok": true,
     "user_verified": true,
@@ -309,7 +309,7 @@
     "credentials": [],
     "identified_user": "0101010101010101010101010101010101010101010101010101010101010101"
    },
-   "spec": "WebAuthn L3 7.2 step 6 (contract R67: a userHandle may be absent under Allow::User)",
+   "spec": "WebAuthn L3 7.2 step 6 \"If response.userHandle is present, verify that it equals the user handle of the user account\" (contract R67: a userHandle may be absent under Allow::User)",
    "expect": {
     "ok": true,
     "user_verified": true,
@@ -342,7 +342,7 @@
     "identified_user": "0101010101010101010101010101010101010101010101010101010101010101"
    },
    "user_handle": "",
-   "spec": "contract R16 (an empty userHandle reads as absent) with WebAuthn L3 7.2 step 6",
+   "spec": "contract R16 (an empty userHandle reads as absent) with WebAuthn L3 7.2 step 6 \"If response.userHandle is present, verify that it equals the user handle of the user account\"",
    "expect": {
     "ok": true,
     "user_verified": true,
@@ -371,7 +371,7 @@
    "stored_credential_id": "7317953e73992f05b1443b42b67a3b4491d438a0b268fe9af4b03cbb6f6a3482",
    "stored_user_handle": "0101010101010101010101010101010101010101010101010101010101010101",
    "allow": "discoverable",
-   "spec": "WebAuthn L3 7.2 step 6 (a discoverable response must carry userHandle; contract R68 UserHandleMismatch)",
+   "spec": "WebAuthn L3 7.2 step 6 \"verify that response.userHandle is present\" (a discoverable response must carry userHandle; contract R68 UserHandleMismatch)",
    "expect": {
     "ok": false
    }
@@ -427,7 +427,7 @@
    "stored_user_handle": "0101010101010101010101010101010101010101010101010101010101010101",
    "allow": "discoverable",
    "user_handle": "0202020202020202020202020202020202020202020202020202020202020202",
-   "spec": "WebAuthn L3 7.2 step 6 (the userHandle is the stored credential's user; contract R69 UserHandleMismatch)",
+   "spec": "WebAuthn L3 7.2 step 6 \"Verify that the user account identified by response.userHandle contains a credential record whose id equals credential.rawId\" (the userHandle is the stored credential's user; contract R69 UserHandleMismatch)",
    "expect": {
     "ok": false
    }
@@ -455,7 +455,7 @@
    "stored_user_handle": "0101010101010101010101010101010101010101010101010101010101010101",
    "allow": "discoverable",
    "user_handle": "0101010101010101010101010101010101010101010101010101010101010101",
-   "spec": "WebAuthn L3 7.2 step 6 (contract R69)",
+   "spec": "WebAuthn L3 7.2 step 6 \"Verify that the user account identified by response.userHandle contains a credential record whose id equals credential.rawId\" (contract R69)",
    "expect": {
     "ok": true,
     "user_verified": true,
@@ -485,7 +485,7 @@
    "stored_user_handle": "0101010101010101010101010101010101010101010101010101010101010101",
    "allow": "discoverable",
    "user_handle": "0101010101010101010101010101010101010101010101010101010101010100",
-   "spec": "WebAuthn L3 7.2 step 6 (the handle compares in full: one bit differs; contract R69)",
+   "spec": "WebAuthn L3 7.2 step 6 \"Verify that the user account identified by response.userHandle contains a credential record whose id equals credential.rawId\" (the handle compares in full: one bit differs; contract R69)",
    "expect": {
     "ok": false
    }
