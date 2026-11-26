@@ -7,7 +7,11 @@ version = 2
 [licenses]
 version = 2
 allow = ["MIT", "Apache-2.0", "Unicode-3.0"]
-exceptions = [{ name = "subtle", allow = ["BSD-3-Clause"] }]
+exceptions = [
+    { name = "subtle", allow = ["BSD-3-Clause"] },
+    { name = "curve25519-dalek", allow = ["BSD-3-Clause"] },
+    { name = "ed25519-dalek", allow = ["BSD-3-Clause"] },
+]
 
 [sources]
 unknown-registry = "deny"
@@ -16,15 +20,6 @@ unknown-git = "deny"
 [bans]
 multiple-versions = "deny"
 wildcards = "deny"
-# this workspace's graph only; each lane adds its own crates as they land
-allow = [
-  { name = "block-buffer" }, { name = "cfg-if" }, { name = "cpufeatures" }, { name = "crypto-common" }, { name = "digest" }, { name = "hybrid-array" },
-  { name = "itoa" }, { name = "libc" }, { name = "memchr" }, { name = "serde_core" }, { name = "serde_json" }, { name = "sha2" },
-  { name = "typenum" }, { name = "zmij" }, { name = "serde" }, { name = "serde_derive" }, { name = "syn" }, { name = "quote" },
-  { name = "proc-macro2" }, { name = "unicode-ident" }, { name = "autocfg" }, { name = "num-traits" }, { name = "rand_core" }, { name = "subtle" },
-  { name = "zeroize" }, { name = "base64ct" }, { name = "base" }, { name = "store" }, { name = "testkit" }, { name = "rand_chacha" }, { name = "ppv-lite86" },
-  { name = "zerocopy" }, { name = "proptest" }, { name = "rand" }, { name = "chacha20" }, { name = "core_detect" }, { name = "getrandom" },
-  { name = "bitflags" }, { name = "rand_xorshift" }, { name = "regex-syntax" }, { name = "unarray" }, { name = "trybuild" }, { name = "glob" },
-  { name = "serde_spanned" }, { name = "target-triple" }, { name = "termcolor" }, { name = "toml" }, { name = "toml_datetime" }, { name = "toml_parser" },
-  { name = "toml_writer" }, { name = "winnow" }, { name = "wipe" },
-]
+# der_derive and curve25519-dalek-derive still build on syn 2; serde_derive is on syn 3
+skip = [{ crate = "syn@2", reason = "proc-macro only, until der_derive and curve25519-dalek-derive move to syn 3" }]
+# keep this table last: `just deny` appends allow from each member's name and its gates.json allow list

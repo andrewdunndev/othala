@@ -1,0 +1,18 @@
+{
+  "published": true,
+  "doc": true,
+  "ui": true,
+  "api": true,
+  "targets": {
+    "wasm32-unknown-unknown": ["--no-default-features", "--all-features"],
+    "thumbv7em-none-eabi": ["--no-default-features", "--features rand_core,serde"]
+  },
+  "mutants": { "floor": 71, "tests": ["base", "wipe"] },
+  "vectors": ["rfc4648"],
+  "allow": [
+    "base64ct", "block-buffer", "cfg-if", "cpufeatures", "crypto-common", "digest", "hybrid-array", "libc", "rand_core", "serde",
+    "serde_core", "sha2", "subtle", "typenum", "zeroize",
+    "autocfg", "bitflags", "chacha20", "core_detect", "getrandom", "glob", "num-traits", "proptest", "rand", "rand_xorshift",
+    "regex-syntax", "target-triple", "termcolor", "toml_writer", "trybuild", "unarray"
+  ]
+}
