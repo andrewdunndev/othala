@@ -15,3 +15,13 @@ webauthn-ext:
     if out=$(node tools/check_webauthn_ext.mjs "$t"); then echo "plant not caught"; exit 1; fi
     [ "$(grep -c '^FAIL' <<< "$out")" = 1 ] && grep -q 'tpm-plant-es256-p384-aik: fault tpm-alg-key-mismatch' <<< "$out" || { echo "plant caught by the wrong fault: $out"; exit 1; }
     echo "webauthn-ext: ok (plant fails as tpm-alg-key-mismatch)"
+
+# run as `just --justfile rust/vectors/justfile check`, offline; the vector gate: every derive script reproduces its committed files, SOURCES.toml's hashes and counts match the files, every WebAuthn step or section cited exists and each quoted passage is in its step (tools/check_vectors.py), then webauthn-ext
+check:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    cd "{{ justfile_directory() }}"
+    command -v python3 > /dev/null || { echo 'vectors: python3 is not on PATH'; exit 1; }
+    command -v node > /dev/null || { echo 'vectors: node is not on PATH; mise.toml pins it, so run under `mise x --`'; exit 1; }
+    python3 -I tools/check_vectors.py .
+    "{{ just_executable() }}" --justfile "{{ justfile() }}" webauthn-ext

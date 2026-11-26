@@ -1,0 +1,712 @@
+attr ErrorKind non_exhaustive
+attr Expiry non_exhaustive
+attr JweAlg non_exhaustive
+attr JweEnc non_exhaustive
+attr JwkEntry non_exhaustive
+attr Kty non_exhaustive
+attr SigningAlg non_exhaustive
+attr Typ non_exhaustive
+attr Unsigned must_use
+constant MAX_COMPACT_LEN: usize = 16_384
+constant MAX_ENTRIES: usize = 8
+constant MAX_JSON_DEPTH: usize = 32
+constant MAX_JSON_LEN: usize = 65_536
+constant MAX_JWKS_KEYS: usize = 32
+constant MAX_LEEWAY: u64 = 300
+constant MAX_NAME_LEN: usize = 256
+constant MAX_RSA_BITS: usize = 8192
+constant MAX_RSA_EXPONENT: u64 = _
+constant MIN_RSA_BITS: usize = 2048
+enum ErrorKind
+enum Expiry
+enum JweAlg
+enum JweEnc
+enum JwkEntry
+enum Kty
+enum SigningAlg
+enum Typ
+field JwkEntry::Public::0: &'a crate::Jwk
+field JwkEntry::Secret::0: &'a crate::SecretJwk
+field Typ::Explicit::0: &'static str
+impl Alg for EdDsa
+impl Alg for Es256
+impl Alg for Es384
+impl Alg for Es512
+impl Alg for Hs256
+impl Alg for Hs384
+impl Alg for Hs512
+impl Alg for Ps256
+impl Alg for Ps384
+impl Alg for Ps512
+impl Alg for Rs256
+impl Alg for Rs384
+impl Alg for Rs512
+impl BlindedAlg for crate::Ps256
+impl BlindedAlg for crate::Ps384
+impl BlindedAlg for crate::Ps512
+impl BlindedAlg for crate::Rs256
+impl BlindedAlg for crate::Rs384
+impl BlindedAlg for crate::Rs512
+impl BlindedKeyAlg for RsaOaep
+impl BlindedKeyAlg for RsaOaep256
+impl Clone for A128CbcHs256
+impl Clone for A128Gcm
+impl Clone for A128GcmKw
+impl Clone for A128Kw
+impl Clone for A192CbcHs384
+impl Clone for A192Gcm
+impl Clone for A192GcmKw
+impl Clone for A192Kw
+impl Clone for A256CbcHs512
+impl Clone for A256Gcm
+impl Clone for A256GcmKw
+impl Clone for A256Kw
+impl Clone for Audience
+impl Clone for Compact
+impl Clone for Dir
+impl Clone for EcdhEs
+impl Clone for EcdhEsA128Kw
+impl Clone for EcdhEsA192Kw
+impl Clone for EcdhEsA256Kw
+impl Clone for EdDsa
+impl Clone for Error
+impl Clone for ErrorKind
+impl Clone for Es256
+impl Clone for Es384
+impl Clone for Es512
+impl Clone for Expiry
+impl Clone for Header<A>
+impl Clone for Hs256
+impl Clone for Hs384
+impl Clone for Hs512
+impl Clone for Issuer
+impl Clone for JweAlg
+impl Clone for JweEnc
+impl Clone for Jwk
+impl Clone for JwkEntry<'a>
+impl Clone for Kid
+impl Clone for Kty
+impl Clone for Leeway
+impl Clone for Policy<K>
+impl Clone for Ps256
+impl Clone for Ps384
+impl Clone for Ps512
+impl Clone for Rs256
+impl Clone for Rs384
+impl Clone for Rs512
+impl Clone for RsaOaep
+impl Clone for RsaOaep256
+impl Clone for SigningAlg
+impl Clone for Typ
+impl Copy for A128CbcHs256
+impl Copy for A128Gcm
+impl Copy for A128GcmKw
+impl Copy for A128Kw
+impl Copy for A192CbcHs384
+impl Copy for A192Gcm
+impl Copy for A192GcmKw
+impl Copy for A192Kw
+impl Copy for A256CbcHs512
+impl Copy for A256Gcm
+impl Copy for A256GcmKw
+impl Copy for A256Kw
+impl Copy for Dir
+impl Copy for EcdhEs
+impl Copy for EcdhEsA128Kw
+impl Copy for EcdhEsA192Kw
+impl Copy for EcdhEsA256Kw
+impl Copy for EdDsa
+impl Copy for Error
+impl Copy for ErrorKind
+impl Copy for Es256
+impl Copy for Es384
+impl Copy for Es512
+impl Copy for Expiry
+impl Copy for Hs256
+impl Copy for Hs384
+impl Copy for Hs512
+impl Copy for JweAlg
+impl Copy for JweEnc
+impl Copy for JwkEntry<'a>
+impl Copy for Kty
+impl Copy for Leeway
+impl Copy for Ps256
+impl Copy for Ps384
+impl Copy for Ps512
+impl Copy for Rs256
+impl Copy for Rs384
+impl Copy for Rs512
+impl Copy for RsaOaep
+impl Copy for RsaOaep256
+impl Copy for SigningAlg
+impl Copy for Typ
+impl Debug for A128CbcHs256
+impl Debug for A128Gcm
+impl Debug for A128GcmKw
+impl Debug for A128Kw
+impl Debug for A192CbcHs384
+impl Debug for A192Gcm
+impl Debug for A192GcmKw
+impl Debug for A192Kw
+impl Debug for A256CbcHs512
+impl Debug for A256Gcm
+impl Debug for A256GcmKw
+impl Debug for A256Kw
+impl Debug for AnySigningKey
+impl Debug for AnyVerifyKey
+impl Debug for Audience
+impl Debug for Compact
+impl Debug for DecryptKey<K>
+impl Debug for Dir
+impl Debug for EcdhEs
+impl Debug for EcdhEsA128Kw
+impl Debug for EcdhEsA192Kw
+impl Debug for EcdhEsA256Kw
+impl Debug for EdDsa
+impl Debug for EncryptKey<K>
+impl Debug for Error
+impl Debug for ErrorKind
+impl Debug for Es256
+impl Debug for Es384
+impl Debug for Es512
+impl Debug for Expiry
+impl Debug for Header<A>
+impl Debug for Hs256
+impl Debug for Hs384
+impl Debug for Hs512
+impl Debug for Issuer
+impl Debug for Jwe<'_>
+impl Debug for JweAlg
+impl Debug for JweEnc
+impl Debug for Jwk
+impl Debug for Jws<'_>
+impl Debug for Jwt<'_>
+impl Debug for Kid
+impl Debug for Kty
+impl Debug for Leeway
+impl Debug for Payload
+impl Debug for Plaintext
+impl Debug for Policy<K>
+impl Debug for Ps256
+impl Debug for Ps384
+impl Debug for Ps512
+impl Debug for Rs256
+impl Debug for Rs384
+impl Debug for Rs512
+impl Debug for RsaOaep
+impl Debug for RsaOaep256
+impl Debug for SecretJwk
+impl Debug for SigningAlg
+impl Debug for SigningKey<A>
+impl Debug for Typ
+impl Debug for Unsigned<A>
+impl Debug for VerifiedJwt
+impl Debug for VerifyKey<A>
+impl Default for Header<A>
+impl Deserialize<'de> for Audience
+impl Deserialize<'de> for Issuer
+impl Deserialize<'de> for JweAlg
+impl Deserialize<'de> for JweEnc
+impl Deserialize<'de> for Kid
+impl Deserialize<'de> for SigningAlg
+impl Display for Error
+impl Enc for A128CbcHs256
+impl Enc for A128Gcm
+impl Enc for A192CbcHs384
+impl Enc for A192Gcm
+impl Enc for A256CbcHs512
+impl Enc for A256Gcm
+impl Eq for A128CbcHs256
+impl Eq for A128Gcm
+impl Eq for A128GcmKw
+impl Eq for A128Kw
+impl Eq for A192CbcHs384
+impl Eq for A192Gcm
+impl Eq for A192GcmKw
+impl Eq for A192Kw
+impl Eq for A256CbcHs512
+impl Eq for A256Gcm
+impl Eq for A256GcmKw
+impl Eq for A256Kw
+impl Eq for Audience
+impl Eq for Dir
+impl Eq for EcdhEs
+impl Eq for EcdhEsA128Kw
+impl Eq for EcdhEsA192Kw
+impl Eq for EcdhEsA256Kw
+impl Eq for EdDsa
+impl Eq for Error
+impl Eq for ErrorKind
+impl Eq for Es256
+impl Eq for Es384
+impl Eq for Es512
+impl Eq for Expiry
+impl Eq for Header<A>
+impl Eq for Hs256
+impl Eq for Hs384
+impl Eq for Hs512
+impl Eq for Issuer
+impl Eq for JweAlg
+impl Eq for JweEnc
+impl Eq for Kid
+impl Eq for Kty
+impl Eq for Leeway
+impl Eq for Policy<K>
+impl Eq for Ps256
+impl Eq for Ps384
+impl Eq for Ps512
+impl Eq for Rs256
+impl Eq for Rs384
+impl Eq for Rs512
+impl Eq for RsaOaep
+impl Eq for RsaOaep256
+impl Eq for SigningAlg
+impl Eq for Typ
+impl Error for Error
+impl From<ErrorKind> for Error
+impl Hash for A128CbcHs256
+impl Hash for A128Gcm
+impl Hash for A128GcmKw
+impl Hash for A128Kw
+impl Hash for A192CbcHs384
+impl Hash for A192Gcm
+impl Hash for A192GcmKw
+impl Hash for A192Kw
+impl Hash for A256CbcHs512
+impl Hash for A256Gcm
+impl Hash for A256GcmKw
+impl Hash for A256Kw
+impl Hash for Audience
+impl Hash for Dir
+impl Hash for EcdhEs
+impl Hash for EcdhEsA128Kw
+impl Hash for EcdhEsA192Kw
+impl Hash for EcdhEsA256Kw
+impl Hash for EdDsa
+impl Hash for ErrorKind
+impl Hash for Es256
+impl Hash for Es384
+impl Hash for Es512
+impl Hash for Hs256
+impl Hash for Hs384
+impl Hash for Hs512
+impl Hash for Issuer
+impl Hash for JweAlg
+impl Hash for JweEnc
+impl Hash for Kid
+impl Hash for Kty
+impl Hash for Leeway
+impl Hash for Ps256
+impl Hash for Ps384
+impl Hash for Ps512
+impl Hash for Rs256
+impl Hash for Rs384
+impl Hash for Rs512
+impl Hash for RsaOaep
+impl Hash for RsaOaep256
+impl Hash for SigningAlg
+impl KeyAlg for A128GcmKw
+impl KeyAlg for A128Kw
+impl KeyAlg for A192GcmKw
+impl KeyAlg for A192Kw
+impl KeyAlg for A256GcmKw
+impl KeyAlg for A256Kw
+impl KeyAlg for Dir
+impl KeyAlg for EcdhEs
+impl KeyAlg for EcdhEsA128Kw
+impl KeyAlg for EcdhEsA192Kw
+impl KeyAlg for EcdhEsA256Kw
+impl KeyAlg for RsaOaep
+impl KeyAlg for RsaOaep256
+impl LocalAlg for EdDsa
+impl LocalAlg for Es256
+impl LocalAlg for Es384
+impl LocalAlg for Es512
+impl LocalAlg for Hs256
+impl LocalAlg for Hs384
+impl LocalAlg for Hs512
+impl LocalKeyAlg for A128GcmKw
+impl LocalKeyAlg for A128Kw
+impl LocalKeyAlg for A192GcmKw
+impl LocalKeyAlg for A192Kw
+impl LocalKeyAlg for A256GcmKw
+impl LocalKeyAlg for A256Kw
+impl LocalKeyAlg for Dir
+impl LocalKeyAlg for EcdhEs
+impl LocalKeyAlg for EcdhEsA128Kw
+impl LocalKeyAlg for EcdhEsA192Kw
+impl LocalKeyAlg for EcdhEsA256Kw
+impl Ord for Audience
+impl Ord for Issuer
+impl Ord for JweAlg
+impl Ord for JweEnc
+impl Ord for Kid
+impl Ord for SigningAlg
+impl PartialEq for A128CbcHs256
+impl PartialEq for A128Gcm
+impl PartialEq for A128GcmKw
+impl PartialEq for A128Kw
+impl PartialEq for A192CbcHs384
+impl PartialEq for A192Gcm
+impl PartialEq for A192GcmKw
+impl PartialEq for A192Kw
+impl PartialEq for A256CbcHs512
+impl PartialEq for A256Gcm
+impl PartialEq for A256GcmKw
+impl PartialEq for A256Kw
+impl PartialEq for Audience
+impl PartialEq for Dir
+impl PartialEq for EcdhEs
+impl PartialEq for EcdhEsA128Kw
+impl PartialEq for EcdhEsA192Kw
+impl PartialEq for EcdhEsA256Kw
+impl PartialEq for EdDsa
+impl PartialEq for Error
+impl PartialEq for ErrorKind
+impl PartialEq for Es256
+impl PartialEq for Es384
+impl PartialEq for Es512
+impl PartialEq for Expiry
+impl PartialEq for Header<A>
+impl PartialEq for Hs256
+impl PartialEq for Hs384
+impl PartialEq for Hs512
+impl PartialEq for Issuer
+impl PartialEq for JweAlg
+impl PartialEq for JweEnc
+impl PartialEq for Kid
+impl PartialEq for Kty
+impl PartialEq for Leeway
+impl PartialEq for Policy<K>
+impl PartialEq for Ps256
+impl PartialEq for Ps384
+impl PartialEq for Ps512
+impl PartialEq for Rs256
+impl PartialEq for Rs384
+impl PartialEq for Rs512
+impl PartialEq for RsaOaep
+impl PartialEq for RsaOaep256
+impl PartialEq for SigningAlg
+impl PartialEq for Typ
+impl PartialOrd for Audience
+impl PartialOrd for Issuer
+impl PartialOrd for JweAlg
+impl PartialOrd for JweEnc
+impl PartialOrd for Kid
+impl PartialOrd for SigningAlg
+impl PublicAlg for EdDsa
+impl PublicAlg for Es256
+impl PublicAlg for Es384
+impl PublicAlg for Es512
+impl PublicAlg for Ps256
+impl PublicAlg for Ps384
+impl PublicAlg for Ps512
+impl PublicAlg for Rs256
+impl PublicAlg for Rs384
+impl PublicAlg for Rs512
+impl PublicKeyAlg for EcdhEs
+impl PublicKeyAlg for EcdhEsA128Kw
+impl PublicKeyAlg for EcdhEsA192Kw
+impl PublicKeyAlg for EcdhEsA256Kw
+impl PublicKeyAlg for RsaOaep
+impl PublicKeyAlg for RsaOaep256
+impl Serialize for Audience
+impl Serialize for Issuer
+impl Serialize for JweAlg
+impl Serialize for JweEnc
+impl Serialize for JwkSet
+impl Serialize for Kid
+impl Serialize for SigningAlg
+impl Serialize for crate::Jwk
+impl SignAlg for EdDsa
+impl SignAlg for Es256
+impl SignAlg for Es384
+impl SignAlg for Es512
+impl SignAlg for Hs256
+impl SignAlg for Hs384
+impl SignAlg for Hs512
+impl SignAlg for crate::Ps256
+impl SignAlg for crate::Ps384
+impl SignAlg for crate::Ps512
+impl SignAlg for crate::Rs256
+impl SignAlg for crate::Rs384
+impl SignAlg for crate::Rs512
+impl Signer<A> for AnySigningKey
+impl Signer<A> for SigningKey<A>
+impl StructuralPartialEq for A128CbcHs256
+impl StructuralPartialEq for A128Gcm
+impl StructuralPartialEq for A128GcmKw
+impl StructuralPartialEq for A128Kw
+impl StructuralPartialEq for A192CbcHs384
+impl StructuralPartialEq for A192Gcm
+impl StructuralPartialEq for A192GcmKw
+impl StructuralPartialEq for A192Kw
+impl StructuralPartialEq for A256CbcHs512
+impl StructuralPartialEq for A256Gcm
+impl StructuralPartialEq for A256GcmKw
+impl StructuralPartialEq for A256Kw
+impl StructuralPartialEq for Audience
+impl StructuralPartialEq for Dir
+impl StructuralPartialEq for EcdhEs
+impl StructuralPartialEq for EcdhEsA128Kw
+impl StructuralPartialEq for EcdhEsA192Kw
+impl StructuralPartialEq for EcdhEsA256Kw
+impl StructuralPartialEq for EdDsa
+impl StructuralPartialEq for Error
+impl StructuralPartialEq for ErrorKind
+impl StructuralPartialEq for Es256
+impl StructuralPartialEq for Es384
+impl StructuralPartialEq for Es512
+impl StructuralPartialEq for Expiry
+impl StructuralPartialEq for Header<A>
+impl StructuralPartialEq for Hs256
+impl StructuralPartialEq for Hs384
+impl StructuralPartialEq for Hs512
+impl StructuralPartialEq for Issuer
+impl StructuralPartialEq for JweAlg
+impl StructuralPartialEq for JweEnc
+impl StructuralPartialEq for Kid
+impl StructuralPartialEq for Kty
+impl StructuralPartialEq for Leeway
+impl StructuralPartialEq for Ps256
+impl StructuralPartialEq for Ps384
+impl StructuralPartialEq for Ps512
+impl StructuralPartialEq for Rs256
+impl StructuralPartialEq for Rs384
+impl StructuralPartialEq for Rs512
+impl StructuralPartialEq for RsaOaep
+impl StructuralPartialEq for RsaOaep256
+impl StructuralPartialEq for SigningAlg
+impl StructuralPartialEq for Typ
+method AnySigningKey::alg const fn(self: &Self) -> SigningAlg
+method AnySigningKey::from_jwk fn(jwk: &SecretJwk) -> Result<Self, Error>
+method AnyVerifyKey::alg const fn(self: &Self) -> SigningAlg
+method AnyVerifyKey::from_jwk fn(jwk: &Jwk) -> Result<Self, Error>
+method AnyVerifyKey::from_jwk_for fn(jwk: &Jwk, alg: SigningAlg) -> Result<Self, Error>
+method Audience::as_str fn(self: &Self) -> &str
+method Audience::new fn(text: &str) -> Result<Self, Error>
+method Compact::as_str fn(self: &Self) -> &str
+method Compact::flattened fn(self: &Self) -> String
+method Compact::general fn(tokens: &[Compact]) -> Result<String, Error>
+method EncryptKey::encrypt fn<E: Enc>(self: &Self, plaintext: &[u8], e: &mut impl Entropy) -> Result<Compact, Error>
+method EncryptKey::encrypt_jwt fn<E: Enc>(self: &Self, jwt: &Compact, e: &mut impl Entropy) -> Result<Compact, Error>
+method Error::kind const fn(self: &Self) -> ErrorKind
+method Header::alg const fn(self: &Self) -> SigningAlg
+method Header::kid const fn(self: &Self) -> Option<&Kid>
+method Header::new const fn() -> Self
+method Header::with_kid fn(self: Self, kid: Kid) -> Self
+method Issuer::as_str fn(self: &Self) -> &str
+method Issuer::new fn(text: &str) -> Result<Self, Error>
+method Jwe::decrypt fn<K: LocalKeyAlg, E: Enc>(self: Self, key: &DecryptKey<K>) -> Result<Plaintext, Error>
+method Jwe::decrypt_blinded fn<K: crate::BlindedKeyAlg, E: Enc>(self: Self, key: &DecryptKey<K>, e: &mut impl Entropy) -> Result<Plaintext, Error>
+method Jwe::kids fn(self: &Self) -> &[Kid]
+method Jwe::parse fn(compact: &'a str) -> Result<Self, Error>
+method Jwe::parse_json fn(json: &'a [u8]) -> Result<Self, Error>
+method JweAlg::name const fn(self: Self) -> &'static str
+method JweAlg::parse fn(name: &str) -> Result<Self, Error>
+method JweEnc::name const fn(self: Self) -> &'static str
+method JweEnc::parse fn(name: &str) -> Result<Self, Error>
+method Jwk::decode fn(json: &[u8]) -> Result<Self, Error>
+method Jwk::encrypt_key fn<K: PublicKeyAlg>(self: &Self) -> Result<EncryptKey<K>, Error>
+method Jwk::kid const fn(self: &Self) -> Option<&Kid>
+method Jwk::kty fn(self: &Self) -> Kty
+method Jwk::sig_alg fn(self: &Self) -> Option<SigningAlg>
+method Jwk::thumbprint fn(self: &Self) -> Digest
+method Jwk::verify_key fn<A: PublicAlg>(self: &Self) -> Result<VerifyKey<A>, Error>
+method JwkSet::decode fn(json: &[u8]) -> Result<Self, Error>
+method JwkSet::decode_public fn(json: &[u8]) -> Result<Self, Error>
+method JwkSet::entries fn(self: &Self) -> impl ExactSizeIterator<Item = JwkEntry<'_>>
+method JwkSet::find fn(self: &Self, kid: &Kid) -> Result<JwkEntry<'_>, Error>
+method JwkSet::new fn(keys: Vec<Jwk>) -> Result<Self, Error>
+method Jws::kids fn(self: &Self) -> &[Kid]
+method Jws::parse fn(compact: &'a str) -> Result<Self, Error>
+method Jws::parse_json fn(json: &'a [u8]) -> Result<Self, Error>
+method Jws::verify fn<A: Alg>(self: Self, key: &VerifyKey<A>) -> Result<Payload, Error>
+method Jws::verify_any fn(self: Self, key: &AnyVerifyKey) -> Result<Payload, Error>
+method Jwt::kid fn(self: &Self) -> Option<&Kid>
+method Jwt::parse fn(compact: &'a str) -> Result<Self, Error>
+method Jwt::verify fn<A: Alg>(self: Self, key: &VerifyKey<A>) -> Result<VerifiedJwt, Error>
+method Jwt::verify_any fn(self: Self, key: &AnyVerifyKey) -> Result<VerifiedJwt, Error>
+method Kid::as_str fn(self: &Self) -> &str
+method Kid::from_thumbprint fn(thumbprint: &Digest) -> Self
+method Kid::new fn(text: &str) -> Result<Self, Error>
+method Leeway::new const fn(seconds: u64) -> Result<Self, Error>
+method Leeway::seconds const fn(self: Self) -> u64
+method Payload::bytes fn(self: &Self) -> &[u8]
+method Plaintext::aad fn(self: &Self) -> Option<&[u8]>
+method Plaintext::bytes fn(self: &Self) -> &[u8]
+method Policy::new fn(issuer: Issuer, audience: Audience, leeway: Leeway) -> Result<Self, Error>
+method Policy::read_back fn(issuer: Issuer, leeway: Leeway, expiry: Expiry) -> Result<Self, Error>
+method SecretJwk::decode fn(json: &[u8]) -> Result<Self, Error>
+method SecretJwk::decrypt_key fn<K: KeyAlg>(self: &Self) -> Result<DecryptKey<K>, Error>
+method SecretJwk::encrypt_key fn<K: KeyAlg>(self: &Self) -> Result<EncryptKey<K>, Error>
+method SecretJwk::from_oct const fn(key: SecretBytes) -> Self
+method SecretJwk::kid const fn(self: &Self) -> Option<&Kid>
+method SecretJwk::kty fn(self: &Self) -> Kty
+method SecretJwk::public fn(self: &Self) -> Option<Jwk>
+method SecretJwk::signing_key fn<A: SignAlg>(self: &Self) -> Result<SigningKey<A>, Error>
+method SecretJwk::thumbprint fn(self: &Self) -> Digest
+method SecretJwk::verify_key fn<A: Alg>(self: &Self) -> Result<VerifyKey<A>, Error>
+method SigningAlg::half_hash fn(self: Self, octets: &[u8]) -> String
+method SigningAlg::name const fn(self: Self) -> &'static str
+method SigningAlg::parse fn(name: &str) -> Result<Self, Error>
+method Unsigned::finish fn(self: Self, signature: A::Signature) -> Result<Compact, Error>
+method Unsigned::header const fn(self: &Self) -> &Header<A>
+method Unsigned::jws fn(header: Header<A>, payload: &[u8]) -> Result<Self, Error>
+method Unsigned::jwt fn<K: TokenKind>(header: Header<A>, claims: &K::Claims) -> Result<Self, Error>
+method Unsigned::sign fn(self: Self, signer: &impl Signer<A>) -> Result<Compact, Error>
+method Unsigned::sign_blinded fn(self: Self, key: &SigningKey<A>, e: &mut impl base::Entropy) -> Result<Compact, Error>
+method Unsigned::signing_input fn(self: &Self) -> &[u8]
+method VerifiedJwt::claims fn<K: TokenKind>(self: Self, policy: &Policy<K>, now: UnixTime) -> Result<K::Claims, Error>
+method VerifyKey::verify_signature fn(self: &Self, signing_input: &[u8], signature: &[u8]) -> Result<(), Error>
+struct A128CbcHs256
+struct A128Gcm
+struct A128GcmKw
+struct A128Kw
+struct A192CbcHs384
+struct A192Gcm
+struct A192GcmKw
+struct A192Kw
+struct A256CbcHs512
+struct A256Gcm
+struct A256GcmKw
+struct A256Kw
+struct AnySigningKey
+struct AnyVerifyKey
+struct Audience
+struct Compact
+struct DecryptKey
+struct Dir
+struct EcdhEs
+struct EcdhEsA128Kw
+struct EcdhEsA192Kw
+struct EcdhEsA256Kw
+struct EdDsa
+struct EncryptKey
+struct Error
+struct Es256
+struct Es384
+struct Es512
+struct Header
+struct Hs256
+struct Hs384
+struct Hs512
+struct Issuer
+struct Jwe
+struct Jwk
+struct JwkSet
+struct Jws
+struct Jwt
+struct Kid
+struct Leeway
+struct Payload
+struct Plaintext
+struct Policy
+struct Ps256
+struct Ps384
+struct Ps512
+struct Rs256
+struct Rs384
+struct Rs512
+struct RsaOaep
+struct RsaOaep256
+struct SecretJwk
+struct SigningKey
+struct Unsigned
+struct VerifiedJwt
+struct VerifyKey
+trait Alg
+trait Blinded
+trait BlindedAlg
+trait BlindedKeyAlg
+trait BlindedUnwrap
+trait Enc
+trait KeyAlg
+trait Local
+trait LocalAlg
+trait LocalKeyAlg
+trait PublicAlg
+trait PublicKeyAlg
+trait ReadBack
+trait SignAlg
+trait Signer
+trait TokenKind
+trait Unwrap
+trait_item Alg::ALG
+trait_item Alg::Signature
+trait_item Alg::verify fn(key: &key::Public, input: &[u8], signature: &[u8]) -> Result<(), Error>
+trait_item Blinded::sign fn(key: &key::Private, input: &[u8], e: &mut dyn base::Entropy) -> Result<Self::Signature, Error>
+trait_item BlindedUnwrap::unwrap fn(key: &Private, encrypted_key: &[u8], enc: JweEnc, e: &mut dyn Entropy) -> SecretBytes
+trait_item Enc::CEK_LEN
+trait_item Enc::ENC
+trait_item Enc::IV_LEN
+trait_item Enc::open fn(cek: &SecretBytes, iv: &[u8], aad: &[u8], ciphertext: &[u8], tag: &[u8]) -> Result<SecretBytes, Error>
+trait_item Enc::seal fn(cek: &SecretBytes, iv: &[u8], aad: &[u8], plaintext: &[u8]) -> Result<(Vec<u8>, Vec<u8>), Error>
+trait_item KeyAlg::ALG
+trait_item KeyAlg::wrap fn(key: &Public, enc: JweEnc, params: &mut Params, e: &mut dyn Entropy) -> Result<(SecretBytes, Vec<u8>), Error>
+trait_item Local::sign fn(key: &key::Private, input: &[u8]) -> Result<Self::Signature, Error>
+trait_item Signer::sign fn(self: &Self, input: &[u8]) -> Result<A::Signature, Error>
+trait_item TokenKind::Claims
+trait_item TokenKind::TYP
+trait_item Unwrap::unwrap fn(key: &Private, encrypted_key: &[u8], enc: JweEnc, params: &Params) -> Result<SecretBytes, Error>
+variant ErrorKind::AlgMismatch
+variant ErrorKind::Audience
+variant ErrorKind::BadSignature
+variant ErrorKind::ClaimType
+variant ErrorKind::CriticalHeader
+variant ErrorKind::Decrypt
+variant ErrorKind::DuplicateMember
+variant ErrorKind::Expired
+variant ErrorKind::Issuer
+variant ErrorKind::KeyAlgMissing
+variant ErrorKind::KeyUse
+variant ErrorKind::Malformed
+variant ErrorKind::MissingClaim
+variant ErrorKind::NotYetValid
+variant ErrorKind::Signer
+variant ErrorKind::TooLarge
+variant ErrorKind::Type
+variant ErrorKind::UnsupportedAlg
+variant ErrorKind::WeakKey
+variant Expiry::Required
+variant Expiry::Unchecked
+variant JweAlg::A128GcmKw
+variant JweAlg::A128Kw
+variant JweAlg::A192GcmKw
+variant JweAlg::A192Kw
+variant JweAlg::A256GcmKw
+variant JweAlg::A256Kw
+variant JweAlg::Dir
+variant JweAlg::EcdhEs
+variant JweAlg::EcdhEsA128Kw
+variant JweAlg::EcdhEsA192Kw
+variant JweAlg::EcdhEsA256Kw
+variant JweAlg::RsaOaep
+variant JweAlg::RsaOaep256
+variant JweEnc::A128CbcHs256
+variant JweEnc::A128Gcm
+variant JweEnc::A192CbcHs384
+variant JweEnc::A192Gcm
+variant JweEnc::A256CbcHs512
+variant JweEnc::A256Gcm
+variant JwkEntry::Public
+variant JwkEntry::Secret
+variant Kty::Ec
+variant Kty::Oct
+variant Kty::Okp
+variant Kty::Rsa
+variant SigningAlg::EdDsa
+variant SigningAlg::Es256
+variant SigningAlg::Es384
+variant SigningAlg::Es512
+variant SigningAlg::Hs256
+variant SigningAlg::Hs384
+variant SigningAlg::Hs512
+variant SigningAlg::Ps256
+variant SigningAlg::Ps384
+variant SigningAlg::Ps512
+variant SigningAlg::Rs256
+variant SigningAlg::Rs384
+variant SigningAlg::Rs512
+variant Typ::Explicit
+variant Typ::Generic

@@ -1,0 +1,14 @@
+error[E0308]: mismatched types
+ --> tests/ui/fail/alg_bound.rs:3:5
+  |
+2 | fn f<A: jose::Alg, B: jose::Alg>(key: jose::VerifyKey<A>) -> jose::VerifyKey<B> {
+  |      -             - expected type parameter                 ------------------ expected `VerifyKey<B>` because of return type
+  |      |
+  |      found type parameter
+3 |     key
+  |     ^^^ expected `VerifyKey<B>`, found `VerifyKey<A>`
+  |
+  = note: expected struct `VerifyKey<B>`
+             found struct `VerifyKey<A>`
+  = note: a type parameter was expected, but a different one was found; you might be missing a type parameter or trait bound
+  = note: for more information, visit https://doc.rust-lang.org/book/ch10-02-traits.html#traits-as-parameters

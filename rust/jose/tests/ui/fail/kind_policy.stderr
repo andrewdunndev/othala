@@ -1,0 +1,14 @@
+error[E0308]: mismatched types
+ --> tests/ui/fail/kind_policy.rs:3:5
+  |
+2 | fn f<K: jose::TokenKind, L: jose::TokenKind>(policy: jose::Policy<K>) -> jose::Policy<L> {
+  |      -                   - expected type parameter                       --------------- expected `Policy<L>` because of return type
+  |      |
+  |      found type parameter
+3 |     policy
+  |     ^^^^^^ expected `Policy<L>`, found `Policy<K>`
+  |
+  = note: expected struct `Policy<L>`
+             found struct `Policy<K>`
+  = note: a type parameter was expected, but a different one was found; you might be missing a type parameter or trait bound
+  = note: for more information, visit https://doc.rust-lang.org/book/ch10-02-traits.html#traits-as-parameters

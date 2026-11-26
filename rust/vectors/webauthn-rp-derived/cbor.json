@@ -1,11 +1,11 @@
 {
- "source": "strict CBOR decoding (RFC 8949 4.2.1 and CTAP2 canonical form, as WebAuthn L3 6.5.6 requires of authenticators); hex inputs written by hand per the rule named in `spec`",
+ "source": "strict CBOR decoding (RFC 8949 4.2.1 and CTAP2 canonical form, as WebAuthn L3 2.4 requires of the conformance classes it names); hex inputs written by hand per the rule named in `spec`",
  "cases": [
   {
    "id": "cose-key-canonical",
    "op": "cbor_decode",
    "input": "a501020326200121582060fed4ba255a9d31c961eb74c6356d68c049b8923b61fa6ce669622e60f29fb62258207903fe1008b8bc99a41ae9e95628bc64f2f1b20c2d7e9f5177a3c294d4462299",
-   "spec": "CTAP2 canonical CBOR (WebAuthn L3 6.5.6, CTAP 2.2 8)",
+   "spec": "CTAP2 canonical CBOR (WebAuthn L3 6.5.1, CTAP 2.2 8)",
    "expect": {
     "ok": true
    }

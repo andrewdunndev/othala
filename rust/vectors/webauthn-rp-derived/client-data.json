@@ -94,7 +94,7 @@
    "stored_counter": 5,
    "stored_backup_eligible": false,
    "cross_origin": "deny",
-   "spec": "WebAuthn L3 7.2 step 10 (type MUST be webauthn.get)",
+   "spec": "WebAuthn L3 7.2 step 10 \"C.type is the string webauthn.get\" (type MUST be webauthn.get)",
    "expect": {
     "ok": false
    }
@@ -117,7 +117,7 @@
    "stored_counter": 5,
    "stored_backup_eligible": false,
    "cross_origin": "deny",
-   "spec": "WebAuthn L3 7.2 step 10",
+   "spec": "WebAuthn L3 7.2 step 10 \"C.type is the string webauthn.get\"",
    "expect": {
     "ok": false
    }
@@ -140,7 +140,7 @@
    "stored_counter": 5,
    "stored_backup_eligible": false,
    "cross_origin": "deny",
-   "spec": "WebAuthn L3 7.2 step 10 (an exact string)",
+   "spec": "WebAuthn L3 7.2 step 10 \"C.type is the string webauthn.get\" (an exact string)",
    "expect": {
     "ok": false
    }
@@ -163,7 +163,7 @@
    "stored_counter": 5,
    "stored_backup_eligible": false,
    "cross_origin": "deny",
-   "spec": "WebAuthn L3 7.2 step 11",
+   "spec": "WebAuthn L3 7.2 step 11 \"C.challenge equals the base64url encoding of pkOptions.challenge\"",
    "expect": {
     "ok": false
    }
@@ -186,7 +186,7 @@
    "stored_counter": 5,
    "stored_backup_eligible": false,
    "cross_origin": "deny",
-   "spec": "WebAuthn L3 7.2 step 11 with 5.8.1 (base64url, no padding)",
+   "spec": "WebAuthn L3 7.2 step 11 \"C.challenge equals the base64url encoding of pkOptions.challenge\" with 5.8.1 (base64url, no padding)",
    "expect": {
     "ok": false
    }
@@ -209,7 +209,7 @@
    "stored_counter": 5,
    "stored_backup_eligible": false,
    "cross_origin": "deny",
-   "spec": "WebAuthn L3 7.2 step 11",
+   "spec": "WebAuthn L3 7.2 step 11 \"C.challenge equals the base64url encoding of pkOptions.challenge\"",
    "expect": {
     "ok": false
    }
@@ -232,7 +232,7 @@
    "stored_counter": 5,
    "stored_backup_eligible": false,
    "cross_origin": "deny",
-   "spec": "WebAuthn L3 7.2 step 11",
+   "spec": "WebAuthn L3 7.2 step 11 \"C.challenge equals the base64url encoding of pkOptions.challenge\"",
    "expect": {
     "ok": false
    }
@@ -255,7 +255,7 @@
    "stored_counter": 5,
    "stored_backup_eligible": false,
    "cross_origin": "deny",
-   "spec": "WebAuthn L3 7.2 step 12",
+   "spec": "WebAuthn L3 7.2 step 12 \"C.origin is an origin expected by the Relying Party\"",
    "expect": {
     "ok": false
    }
@@ -278,7 +278,7 @@
    "stored_counter": 5,
    "stored_backup_eligible": false,
    "cross_origin": "deny",
-   "spec": "WebAuthn L3 7.2 step 12 and 13.4.9 (an origin, compared exactly)",
+   "spec": "WebAuthn L3 7.2 step 12 and 13.4.9 \"C.origin is an origin expected by the Relying Party\" (an origin, compared exactly)",
    "expect": {
     "ok": false
    }
@@ -301,7 +301,7 @@
    "stored_counter": 5,
    "stored_backup_eligible": false,
    "cross_origin": "deny",
-   "spec": "WebAuthn L3 7.2 step 12 and 13.4.9",
+   "spec": "WebAuthn L3 7.2 step 12 and 13.4.9 \"C.origin is an origin expected by the Relying Party\"",
    "expect": {
     "ok": false
    }
@@ -324,7 +324,7 @@
    "stored_counter": 5,
    "stored_backup_eligible": false,
    "cross_origin": "deny",
-   "spec": "WebAuthn L3 7.2 step 12",
+   "spec": "WebAuthn L3 7.2 step 12 \"C.origin is an origin expected by the Relying Party\"",
    "expect": {
     "ok": false
    }
@@ -347,7 +347,7 @@
    "stored_counter": 5,
    "stored_backup_eligible": false,
    "cross_origin": "deny",
-   "spec": "WebAuthn L3 7.2 step 12 (subdomains are not expected unless listed)",
+   "spec": "WebAuthn L3 7.2 step 12 \"C.origin is an origin expected by the Relying Party\" (subdomains are not expected unless listed)",
    "expect": {
     "ok": false
    }
@@ -370,7 +370,7 @@
    "stored_counter": 5,
    "stored_backup_eligible": false,
    "cross_origin": "deny",
-   "spec": "WebAuthn L3 7.2 step 13 with the contract (cross-origin is deny-by-default)",
+   "spec": "WebAuthn L3 7.2 step 13 \"If C.crossOrigin is present and set to true\" with the contract (cross-origin is deny-by-default)",
    "expect": {
     "ok": false
    }
@@ -397,7 +397,7 @@
      "https://top.example"
     ]
    },
-   "spec": "WebAuthn L3 7.2 steps 13 and 14 (topOrigin is an expected top-level origin)",
+   "spec": "WebAuthn L3 7.2 steps 13 and 14 \"Verify that the value of C.topOrigin matches the origin of a page that the Relying Party expects to be sub-framed within\" (topOrigin is an expected top-level origin)",
    "expect": {
     "ok": true,
     "user_verified": true,
@@ -426,7 +426,7 @@
      "https://top.example"
     ]
    },
-   "spec": "WebAuthn L3 7.2 step 14",
+   "spec": "WebAuthn L3 7.2 step 14 \"Verify that the value of C.topOrigin matches the origin of a page that the Relying Party expects to be sub-framed within\"",
    "expect": {
     "ok": false
    }
@@ -472,7 +472,7 @@
    "stored_counter": 5,
    "stored_backup_eligible": false,
    "cross_origin": "deny",
-   "spec": "WebAuthn L3 7.2 step 9",
+   "spec": "WebAuthn L3 7.2 step 9 \"be the result of running an implementation-specific JSON parser on JSONtext\"",
    "expect": {
     "ok": false
    }

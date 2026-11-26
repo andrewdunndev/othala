@@ -1,0 +1,25 @@
+error[E0277]: the trait bound `jose::Hs256: PublicAlg` is not satisfied
+ --> tests/ui/fail/hmac_public_jwk.rs:3:30
+  |
+3 |     let _ = jwk.verify_key::<jose::Hs256>();
+  |                 ----------   ^^^^^^^^^^^ the trait `PublicAlg` is not implemented for `jose::Hs256`
+  |                 |
+  |                 required by a bound introduced by this call
+  |
+  = help: the following other types implement trait `PublicAlg`:
+            jose::EdDsa
+            jose::Es256
+            jose::Es384
+            jose::Es512
+            jose::Ps256
+            jose::Ps384
+            jose::Ps512
+            jose::Rs256
+          and $N others
+note: required by a bound in `Jwk::verify_key`
+ --> src/jwk/decode.rs
+  |
+  | impl Jwk {
+...
+  |     pub fn verify_key<A: PublicAlg>(&self) -> Result<VerifyKey<A>, Error> {
+  |                          ^^^^^^^^^ required by this bound in `Jwk::verify_key`

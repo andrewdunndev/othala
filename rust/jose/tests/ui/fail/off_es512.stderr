@@ -1,0 +1,23 @@
+error[E0425]: cannot find type `Es512` in crate `jose`
+ --> tests/ui/fail/off_es512.rs:2:18
+  |
+2 | fn f(_alg: jose::Es512) {}
+  |                  ^^^^^ not found in `jose`
+  |
+note: similarly named struct `Hs512` defined here
+ --> src/sig/hmac.rs
+  |
+  | pub struct Hs512;
+  | ^^^^^^^^^^^^^^^^
+note: found an item that was configured out
+ --> src/lib.rs
+  |
+  | #[cfg(feature = "es512")]
+  |       ----------------- the item is gated behind the `es512` feature
+  | pub use sig::ecdsa_p521::Es512;
+  |                          ^^^^^
+help: a struct with a similar name exists
+  |
+2 - fn f(_alg: jose::Es512) {}
+2 + fn f(_alg: jose::Hs512) {}
+  |
