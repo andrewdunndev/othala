@@ -2016,4 +2016,48 @@ mod tests {
         assert!(!has(&row, &request.challenge));
         Ok(())
     }
+
+    #[test]
+    fn an_assertion_past_its_deadline_is_expired() -> Result<(), Error> {
+        let mut fx = Fx::new()?;
+        fx.now = DEADLINE + 1;
+        assert_eq!(fx.refused()?, (ErrorKind::Expired, None));
+        Ok(())
+    }
+
+    #[test]
+    fn a_registration_past_its_deadline_is_expired() -> Result<(), Error> {
+        let mut fx = Reg::new()?;
+        fx.now = DEADLINE + 1;
+        assert_eq!(fx.refused()?, (ErrorKind::Expired, None));
+        Ok(())
+    }
+
+    #[test]
+    fn the_registration_row_holds_the_challenge_digest_and_never_the_challenge() -> Result<(), Error>
+    {
+        let fx = Reg::new()?;
+        let entity = UserEntity::new(
+            UserHandle::from_stored(USER)?,
+            UserName::parse("ada")?,
+            DisplayName::parse("Ada")?,
+        );
+        let (creation, effect) = fx.rp.start_registration(
+            &entity,
+            &[],
+            &fx.ceremony.options,
+            &fx.browser,
+            UnixTime::new(NOW),
+            &mut testkit::seeded(5),
+        )?;
+        let puts: Vec<_> = effect.puts().collect();
+        let [(_, record, _)] = puts.as_slice() else {
+            return Err(bad(()));
+        };
+        let row = record.encode()?;
+        let has = |needle: &[u8]| row.windows(needle.len()).any(|w| w == needle);
+        assert!(has(sha256(&creation.challenge).as_bytes()));
+        assert!(!has(&creation.challenge));
+        Ok(())
+    }
 }

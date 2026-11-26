@@ -67,13 +67,14 @@ fn among(
     match formats.iter().find(|(name, _)| *name == fmt) {
         None => Err(Error::new(ErrorKind::UnknownFormat)),
         Some((_, false)) => Err(Error::new(ErrorKind::FormatDisabled)),
-        Some((_, true)) => match statement.att_stmt {
+        Some(("none", true)) => match statement.att_stmt {
             Value::Map(entries) if entries.is_empty() => Ok(Verified {
                 kind: AttestationType::None,
                 x5c: Vec::new(),
             }),
             _ => Err(Error::new(ErrorKind::AttestationInvalid)),
         },
+        Some((_, true)) => Err(Error::new(ErrorKind::AttestationInvalid)),
     }
 }
 
@@ -144,6 +145,16 @@ mod tests {
         assert_eq!(
             check_in(&formats, "tpm", &empty)?,
             Err(ErrorKind::UnknownFormat)
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn a_listed_format_with_no_procedure_is_refused() -> Result<(), Error> {
+        let empty = Value::Map(vec![]);
+        assert_eq!(
+            check_in(&[("packed", true)], "packed", &empty)?,
+            Err(ErrorKind::AttestationInvalid)
         );
         Ok(())
     }
