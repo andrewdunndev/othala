@@ -31,10 +31,10 @@ Errors (`src/error.rs`):
 pub enum ErrorKind { Malformed, TooLarge, DuplicateMember, UnsupportedAlg, AlgMismatch, KeyAlgMissing, CriticalHeader, WeakKey,
     KeyUse, BadSignature, Decrypt, Expired, NotYetValid, Issuer, Audience, Type, MissingClaim, ClaimType, Signer }  // [01]
 #[derive(Clone, Copy, Debug, PartialEq, Eq)] pub struct Error;                                                     // [01]
-impl Error { pub const fn kind(&self) -> ErrorKind }                                                               // [02]
-impl From<ErrorKind> for Error                                                                                     // [02]
-impl core::fmt::Display for Error                                                                                  // [02]
-impl core::error::Error for Error                                                                                  // [02]
+impl Error { pub const fn kind(&self) -> ErrorKind }                                                               // [07]
+impl From<ErrorKind> for Error                                                                                     // [07]
+impl core::fmt::Display for Error                                                                                  // [07]
+impl core::error::Error for Error                                                                                  // [07]
 ```
 
 Algorithms (`src/alg.rs` `[01]`; `sealed::*` are crate-private supertraits):
@@ -55,10 +55,12 @@ pub enum SigningAlg { Hs256, Hs384, Hs512, Rs256, Rs384, Rs512, Ps256, Ps384, Ps
 pub enum JweAlg { A128Kw, A192Kw, A256Kw, A128GcmKw, A192GcmKw, A256GcmKw, Dir, EcdhEs, EcdhEsA128Kw, EcdhEsA192Kw, EcdhEsA256Kw, RsaOaep, RsaOaep256 }
 #[non_exhaustive] #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub enum JweEnc { A128Gcm, A192Gcm, A256Gcm, A128CbcHs256, A192CbcHs384, A256CbcHs512 }
-impl SigningAlg { pub fn parse(name: &str) -> Result<Self, Error>; pub const fn name(self) -> &'static str }  // [09]
+impl SigningAlg { pub const fn name(self) -> &'static str }                                         // [07]
+impl SigningAlg { pub fn parse(name: &str) -> Result<Self, Error> }                                  // [09]
 impl serde::Serialize for SigningAlg; impl<'de> serde::Deserialize<'de> for SigningAlg               // [09], the registry name through parse
 impl SigningAlg { pub fn half_hash(self, octets: &[u8]) -> String }                                  // [16]
-impl JweAlg { pub fn parse(name: &str) -> Result<Self, Error>; pub const fn name(self) -> &'static str }     // [17]
+impl JweAlg { pub const fn name(self) -> &'static str }                                             // [07]
+impl JweAlg { pub fn parse(name: &str) -> Result<Self, Error> }                                      // [17]
 impl JweEnc { pub fn parse(name: &str) -> Result<Self, Error>; pub const fn name(self) -> &'static str }     // [17]
 ```
 
@@ -295,7 +297,7 @@ Each bound is a named `pub const` at the crate root; each is checked before anyt
 - O8 An HMAC or `oct` key carries the entropy its length implies: the host's, since R13 checks only the length.
 - O9 A `ReadBack` kind is implemented only for tokens the verifier itself issued, and read back only under its own key (O2): the kind's author.
 - O10 `rsa-sign` and `rsa-decrypt` are enabled only where an RSA private key is required, accepting the Marvin residual risk (NC2): the host's.
-- O11 HS keys, `oct` JWK material and content-encryption keys are `base::SecretBytes`, never jose-owned buffers, and are read (`expose`) only in `src/sig/hmac.rs`, `src/jwk/decode.rs` (decoding into the curve and rsa types), `src/jwk/thumbprint.rs` (an `oct` key's `k`), `src/jwe/kw.rs`, `src/jwe/content.rs`, `src/jwe/ecdh.rs` and `src/jwe/oaep.rs`; private EC, Ed25519 and RSA keys live in their crates' own types, so `src/sig/{ecdsa,ecdsa_p521,eddsa,rsa_sign}.rs` read none. Held by gate:lint, gate:canary and gate:own under ruling R-j once base-expose lands: jose then enables `base/expose` and declares these modules as `expose` in `gates.json` (a dependency of the first item that calls `expose`, jose-02).
+- O11 HS keys, `oct` JWK material and content-encryption keys are `base::SecretBytes`, never jose-owned buffers, and are read (`expose`) only in `src/sig/hmac.rs`, `src/jwk/decode.rs` (decoding into the curve and rsa types), `src/jwk/thumbprint.rs` (an `oct` key's `k`), `src/jwe/kw.rs`, `src/jwe/content.rs`, `src/jwe/ecdh.rs` and `src/jwe/oaep.rs`; private EC, Ed25519 and RSA keys live in their crates' own types, so `src/sig/{ecdsa,ecdsa_p521,eddsa,rsa_sign}.rs` read none. Held by gate:lint, gate:canary and gate:own under ruling R-j once base-expose lands: jose then enables `base/expose` and declares these modules as `expose` in `gates.json` (a dependency of the first item that calls `expose`, jose-07).
 
 ## Consumption (oidc-provider)
 These are the types `oidc-provider` takes from jose rather than defining its own (rule 5.5): `Issuer` (its URL rule is oidc-provider's checked constructor over `Issuer::new`), `Audience`, `Kid`, `SigningAlg` (discovery's `*_signing_alg_values_supported` and a client's `id_token_signed_response_alg`), `Jwk` and `JwkSet` (`jwks_uri`, through `Serialize`), `Header<A>`, `Unsigned<A>`, `Compact` and `Signer<A>` (`Step::Sign` carries `Unsigned::header()` and `signing_input()` out and takes the signature back through `finish`), `AnyVerifyKey` and `Policy::read_back` (`id_token_hint`), and `SigningAlg::half_hash` (`at_hash`, `c_hash`). Serde: `SigningAlg`, `Kid`, `Issuer` and `Audience` are `Serialize` and `Deserialize`, deserializing through their checked constructors; `Jwk` and `JwkSet` are `Serialize` only; nothing else is either.
@@ -342,12 +344,12 @@ One private module per item, so a later item touches only its own modules and ro
 
 | Item | Modules | Row files |
 |---|---|---|
-| jose-02 hmac | `src/sig/hmac.rs`, `src/error.rs` bodies, `src/key.rs` bodies (`verify_signature`, `Debug`) | `row_wycheproof_hmac` |
+| jose-07 jwk decode | `src/jwk/decode.rs`, `src/error.rs` bodies, `SigningAlg::name` and `JweAlg::name` in `src/alg.rs` | `row_rfc7520_jwk` |
+| jose-02 hmac | `src/sig/hmac.rs`, `src/key.rs` bodies (`verify_signature`, `Debug`) | `row_wycheproof_hmac` |
 | jose-03 ecdsa | `src/sig/ecdsa.rs` | `row_wycheproof_ecdsa` |
 | jose-04 eddsa | `src/sig/eddsa.rs` | `row_wycheproof_eddsa` |
 | jose-05 rsa | `src/sig/rsa.rs` | `row_wycheproof_rsa` |
 | jose-06 pss | `src/sig/pss.rs` | `row_wycheproof_pss` |
-| jose-07 jwk decode | `src/jwk/decode.rs` | `row_rfc7520_jwk` |
 | jose-08 thumbprint | `src/jwk/thumbprint.rs` | `row_rfc7638` |
 | jose-09 compact jws | `src/jws/header.rs`, `src/jws/compact.rs` | `row_rfc7515`, `row_rfc8725` |
 | jose-10 any key | `src/key/any.rs`, `src/jwk/set.rs` | `row_keys` |
@@ -364,4 +366,4 @@ One private module per item, so a later item touches only its own modules and ro
 The Wycheproof AEAD, key-wrap, ECDH and OAEP files and RFC 7518 B give raw primitive inputs (an arbitrary IV, AAD or shared secret) that no JWE can carry, so those rows are `--lib` filters inside their module (R-l), and the JWE public surface stays the token API. The JWS Wycheproof rows are row files, through `VerifyKey::verify_signature`. `row_features_off` gathers the refusals of all three features and lands last, with jose-19.
 - A row file holds only the cases its own item turns green. A case that needs a later item's code (ES512, RS and PS signing, ECDH-ES, RSA-OAEP) is counted not applicable by name in the earlier file, under the total assertion, and checked in the later item's own file (`row_es512`, `row_rsa_sign`, `row_rfc7520_jwe_ecdh`, `row_oaep`).
 - Seams: every private representation a later module builds or reads is a `pub(crate)` field or a `pub(crate)` enum (`key::Public`, `key::Private`, `jwe::envelope::Params`, `jws::header::Parsed`, `jwk::decode::Meta`), so no item needs a constructor or accessor from another item's module, and none is a function body before its row.
-- Exceptions to "an item touches only its own modules and row files": the last item to land deletes `lib.rs`'s `#![expect(dead_code)]` (the compiler requires it once nothing is dead); items that add mutants raise `gates.json`'s floor; jose-02 enables `base/expose` and declares `expose` in `gates.json` once base-expose lands (O11).
+- Exceptions to "an item touches only its own modules and row files": the last item to land deletes `lib.rs`'s `#![expect(dead_code)]` (the compiler requires it once nothing is dead); items that add mutants raise `gates.json`'s floor; jose-07 enables `base/expose` and declares `expose` in `gates.json` once base-expose lands (O11).

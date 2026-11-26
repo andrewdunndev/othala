@@ -48,3 +48,38 @@ pub enum ErrorKind {
 pub struct Error {
     pub(crate) kind: ErrorKind,
 }
+
+impl Error {
+    /// What went wrong.
+    pub const fn kind(&self) -> ErrorKind {
+        self.kind
+    }
+}
+
+impl From<ErrorKind> for Error {
+    fn from(kind: ErrorKind) -> Self {
+        Self { kind }
+    }
+}
+
+impl core::fmt::Display for Error {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        core::fmt::Debug::fmt(&self.kind, f)
+    }
+}
+
+impl core::error::Error for Error {}
+
+#[cfg(test)]
+mod tests {
+    use alloc::string::ToString;
+
+    use crate::{Error, ErrorKind};
+
+    #[test]
+    fn display_names_kind_only() {
+        let error = Error::from(ErrorKind::WeakKey);
+        assert_eq!(error.kind(), ErrorKind::WeakKey);
+        assert_eq!(error.to_string(), "WeakKey");
+    }
+}

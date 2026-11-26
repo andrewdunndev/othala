@@ -160,3 +160,45 @@ pub enum JweEnc {
     /// `A256CBC-HS512`.
     A256CbcHs512,
 }
+
+impl SigningAlg {
+    /// The registry value.
+    pub const fn name(self) -> &'static str {
+        match self {
+            Self::Hs256 => "HS256",
+            Self::Hs384 => "HS384",
+            Self::Hs512 => "HS512",
+            Self::Rs256 => "RS256",
+            Self::Rs384 => "RS384",
+            Self::Rs512 => "RS512",
+            Self::Ps256 => "PS256",
+            Self::Ps384 => "PS384",
+            Self::Ps512 => "PS512",
+            Self::Es256 => "ES256",
+            Self::Es384 => "ES384",
+            Self::Es512 => "ES512",
+            Self::EdDsa => "EdDSA",
+        }
+    }
+}
+
+impl JweAlg {
+    /// The registry value.
+    pub const fn name(self) -> &'static str {
+        match self {
+            Self::A128Kw => "A128KW",
+            Self::A192Kw => "A192KW",
+            Self::A256Kw => "A256KW",
+            Self::A128GcmKw => "A128GCMKW",
+            Self::A192GcmKw => "A192GCMKW",
+            Self::A256GcmKw => "A256GCMKW",
+            Self::Dir => "dir",
+            Self::EcdhEs => "ECDH-ES",
+            Self::EcdhEsA128Kw => "ECDH-ES+A128KW",
+            Self::EcdhEsA192Kw => "ECDH-ES+A192KW",
+            Self::EcdhEsA256Kw => "ECDH-ES+A256KW",
+            Self::RsaOaep => "RSA-OAEP",
+            Self::RsaOaep256 => "RSA-OAEP-256",
+        }
+    }
+}

@@ -61,6 +61,7 @@ impl Clone for Hs512
 impl Clone for Issuer
 impl Clone for JweAlg
 impl Clone for JweEnc
+impl Clone for Jwk
 impl Clone for JwkEntry
 impl Clone for Kid
 impl Clone for Kty
@@ -149,6 +150,7 @@ impl Debug for Hs512
 impl Debug for Issuer
 impl Debug for JweAlg
 impl Debug for JweEnc
+impl Debug for Jwk
 impl Debug for Kid
 impl Debug for Kty
 impl Debug for Leeway
@@ -160,8 +162,11 @@ impl Debug for Rs384
 impl Debug for Rs512
 impl Debug for RsaOaep
 impl Debug for RsaOaep256
+impl Debug for SecretJwk
 impl Debug for SigningAlg
 impl Debug for Typ
+impl Deserialize for Kid
+impl Display for Error
 impl Eq for A128CbcHs256
 impl Eq for A128Gcm
 impl Eq for A128GcmKw
@@ -207,6 +212,9 @@ impl Eq for RsaOaep
 impl Eq for RsaOaep256
 impl Eq for SigningAlg
 impl Eq for Typ
+impl Error for Error
+impl From for Error
+impl From for ErrorKind
 impl Hash for A128CbcHs256
 impl Hash for A128Gcm
 impl Hash for A128GcmKw
@@ -305,6 +313,7 @@ impl PartialOrd for JweAlg
 impl PartialOrd for JweEnc
 impl PartialOrd for Kid
 impl PartialOrd for SigningAlg
+impl Serialize for Kid
 impl StructuralPartialEq for A128CbcHs256
 impl StructuralPartialEq for A128Gcm
 impl StructuralPartialEq for A128GcmKw
@@ -350,6 +359,26 @@ impl StructuralPartialEq for RsaOaep
 impl StructuralPartialEq for RsaOaep256
 impl StructuralPartialEq for SigningAlg
 impl StructuralPartialEq for Typ
+method Error::kind const fn(self: &Self) -> ErrorKind
+method JweAlg::name const fn(self: Self) -> &'static str
+method Jwk::decode fn(json: &[u8]) -> Result<Self, Error>
+method Jwk::encrypt_key fn<K: PublicKeyAlg>(self: &Self) -> Result<EncryptKey<K>, Error>
+method Jwk::kid const fn(self: &Self) -> Option<&Kid>
+method Jwk::kty fn(self: &Self) -> Kty
+method Jwk::sig_alg fn(self: &Self) -> Option<SigningAlg>
+method Jwk::verify_key fn<A: PublicAlg>(self: &Self) -> Result<VerifyKey<A>, Error>
+method Kid::as_str fn(self: &Self) -> &str
+method Kid::new fn(text: &str) -> Result<Self, Error>
+method SecretJwk::decode fn(json: &[u8]) -> Result<Self, Error>
+method SecretJwk::decrypt_key fn<K: KeyAlg>(self: &Self) -> Result<DecryptKey<K>, Error>
+method SecretJwk::encrypt_key fn<K: KeyAlg>(self: &Self) -> Result<EncryptKey<K>, Error>
+method SecretJwk::from_oct const fn(key: SecretBytes) -> Self
+method SecretJwk::kid const fn(self: &Self) -> Option<&Kid>
+method SecretJwk::kty fn(self: &Self) -> Kty
+method SecretJwk::public fn(self: &Self) -> Option<Jwk>
+method SecretJwk::signing_key fn<A: SignAlg>(self: &Self) -> Result<SigningKey<A>, Error>
+method SecretJwk::verify_key fn<A: Alg>(self: &Self) -> Result<VerifyKey<A>, Error>
+method SigningAlg::name const fn(self: Self) -> &'static str
 struct A128CbcHs256
 struct A128Gcm
 struct A128GcmKw
