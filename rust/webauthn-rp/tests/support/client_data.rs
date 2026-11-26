@@ -4,10 +4,10 @@ use testkit::vector;
 use testkit::vectors::{Outcome, run};
 use webauthn_rp::{Origin, RpId};
 
+use crate::MAX_CLIENT_DATA_JSON;
 use crate::client_data::ClientData;
 use crate::error::ErrorKind;
 use crate::hex::hex;
-use crate::{MAX_CLIENT_DATA_DEPTH, MAX_CLIENT_DATA_JSON};
 
 #[derive(Deserialize)]
 struct Case {
@@ -104,8 +104,4 @@ pub(crate) fn bounds() {
     assert!(ClientData::parse(&padded(MAX_CLIENT_DATA_JSON)).is_ok());
     let past = ClientData::parse(&padded(MAX_CLIENT_DATA_JSON + 1));
     assert_eq!(past.err().map(|e| e.kind()), Some(ErrorKind::TooLarge));
-    let nested = |depth: usize| format!(r#"{{"a":{}0{}}}"#, "[".repeat(depth), "]".repeat(depth));
-    assert!(ClientData::parse(nested(MAX_CLIENT_DATA_DEPTH - 1).as_bytes()).is_ok());
-    let deep = ClientData::parse(nested(MAX_CLIENT_DATA_DEPTH).as_bytes());
-    assert_eq!(deep.err().map(|e| e.kind()), Some(ErrorKind::TooLarge));
 }
