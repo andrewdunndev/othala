@@ -300,7 +300,7 @@
     -7
    ],
    "cross_origin": "deny",
-   "spec": "WebAuthn L3 7.1 step 28 (an id of at most 1023 bytes is within the limit)",
+   "spec": "WebAuthn L3 7.1 step 25 (an id of at most 1023 bytes is within the limit)",
    "expect": {
     "ok": true,
     "user_verified": true,
@@ -324,7 +324,7 @@
     -7
    ],
    "cross_origin": "deny",
-   "spec": "WebAuthn L3 7.1 step 28 (an id over 1023 bytes SHOULD fail the ceremony: an oracle choice, the crate refuses)",
+   "spec": "WebAuthn L3 7.1 step 25 (an id over 1023 bytes SHOULD fail the ceremony: an oracle choice, the crate refuses)",
    "expect": {
     "ok": false
    }
