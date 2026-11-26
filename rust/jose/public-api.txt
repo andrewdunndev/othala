@@ -163,9 +163,11 @@ impl Debug for Issuer
 impl Debug for JweAlg
 impl Debug for JweEnc
 impl Debug for Jwk
+impl Debug for Jws
 impl Debug for Kid
 impl Debug for Kty
 impl Debug for Leeway
+impl Debug for Payload
 impl Debug for Ps256
 impl Debug for Ps384
 impl Debug for Ps512
@@ -402,9 +404,13 @@ method Jwk::kty fn(self: &Self) -> Kty
 method Jwk::sig_alg fn(self: &Self) -> Option<SigningAlg>
 method Jwk::thumbprint fn(self: &Self) -> Digest
 method Jwk::verify_key fn<A: PublicAlg>(self: &Self) -> Result<VerifyKey<A>, Error>
+method Jws::kids fn(self: &Self) -> &[Kid]
+method Jws::parse fn(compact: &'a str) -> Result<Self, Error>
+method Jws::verify fn<A: Alg>(self: Self, key: &VerifyKey<A>) -> Result<Payload, Error>
 method Kid::as_str fn(self: &Self) -> &str
 method Kid::from_thumbprint fn(thumbprint: &Digest) -> Self
 method Kid::new fn(text: &str) -> Result<Self, Error>
+method Payload::bytes fn(self: &Self) -> &[u8]
 method SecretJwk::decode fn(json: &[u8]) -> Result<Self, Error>
 method SecretJwk::decrypt_key fn<K: KeyAlg>(self: &Self) -> Result<DecryptKey<K>, Error>
 method SecretJwk::encrypt_key fn<K: KeyAlg>(self: &Self) -> Result<EncryptKey<K>, Error>
