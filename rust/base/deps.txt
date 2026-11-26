@@ -1,4 +1,5 @@
 base64ct
+expose
 rand_core
 serde
 sha2

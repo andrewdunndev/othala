@@ -23,67 +23,63 @@ errors() { # crate, then cargo args: code<TAB>file<TAB>line<TAB>message per erro
             | .message as $m | $m.spans[] | select(.is_primary)
             | "\($m.code.code // "")\t\(.file_name)\t\(.line_start)\t\($m.message)"' | sort -u
 }
-# R-j: the packages in the resolve graph that enable base/expose (a dependency feature, a forward in a feature list, possibly through a renamed key or a base feature that implies it) must be the ones gates.json gives `expose` modules
+# R-j: only a crate with a direct dependency (of any kind, renamed or under a target table) on `expose` can name the read, so the members with such an edge, base apart, must be the ones gates.json gives `expose` modules
 exposers() { # tree: one package name per line
-    (cd "$1" && cargo metadata --offline --format-version 1) | jq -r '
-        (.packages[] | select(.name == "base") | .features) as $bf
-        | (reduce range(0; 8) as $_ (["expose"]; . as $f | ($f + [$bf | to_entries[] | select(any(.value[]; . as $v | $f | index($v))) | .key]) | unique)) as $F
-        | .packages[] | select(.name != "base")
-        | [.dependencies[] | select(.name == "base")] as $deps
-        | select(any($deps[]; any(.features[]; . as $x | $F | index($x))) or any($deps[]; .uses_default_features and ($F | index("default")))
-            or any(.features[][]; . as $v | any($deps[]; (.rename // .name) as $k | $v | test("^" + $k + "\\??/(" + ($F | join("|")) + ")$"))))
-        | .name' | sort -u
+    (cd "$1" && cargo metadata --offline --no-deps --format-version 1) | jq -r '
+        .packages[] | select(.name != "base" and any(.dependencies[]; .name == "expose")) | .name' | sort -u
 }
 declared=$(jq -r 'select(.expose) | .name' <<< "$crates" | sort -u)
-[ "$(exposers "$here")" = "$declared" ] || { echo "canary: base/expose is enabled by [$(exposers "$here" | xargs)] but declared by [$(echo $declared)]"; exit 1; }
+[ "$(exposers "$here")" = "$declared" ] || { echo "canary: expose is a dependency of [$(exposers "$here" | xargs)] but declared by [$(echo $declared)]"; exit 1; }
 for c in $declared; do
     for m in $(jq -r '.expose[]' "$c/gates.json"); do [ -f "$c/src/$m.rs" ] || [ -f "$c/src/$m/mod.rs" ] || { echo "canary $c: expose module $m has no source"; exit 1; }; done
 done
-# the checks must catch an undeclared use: each plant in a scratch copy of a probe member is the only difference they may report; the probe has no declaring crate in its dependency graph, so the manifest checks alone must see its plant
+# a build script can pass `-L crate=` and name a crate that is not a dependency
+builds=$(cargo metadata --offline --no-deps --format-version 1 | jq -r '.packages[] | select(any(.targets[]; .kind | index("custom-build"))) | .name')
+[ -z "$builds" ] || { echo "canary: build script in [$(echo $builds)]"; exit 1; }
+# the checks must catch an undeclared use: each plant in a scratch copy of a probe member is the only difference they may report
 undeclared=$(jq -r 'select((.expose | not) and .name != "base") | .name' <<< "$crates")
-probe=$(cargo metadata --offline --format-version 1 | jq -r --arg u "$undeclared" --arg d "$declared" '
-    ($u | split("\n") | map(select(. != ""))) as $U | ($d | split("\n") | map(select(. != ""))) as $D
-    | (reduce .packages[] as $p ({}; .[$p.name] += [$p.dependencies[].name])) as $g
-    | $U[] | . as $n | (reduce range(0; 64) as $_ ([$n]; (. + (map($g[.] // []) | add // [])) | unique)) as $cl
-    | select(all($D[]; . as $x | $cl | index($x) | not))' | head -n 1)
+probe=$(cargo metadata --offline --no-deps --format-version 1 | jq -r --arg u "$undeclared" '
+    ($u | split("\n") | map(select(. != "" and . != "expose"))) as $U
+    | .packages[] | select(.name as $n | $U | index($n)) | select(any(.dependencies[]; .name == "base" and .kind == null)) | .name' | head -n 1)
 [ -n "$probe" ] || { echo "canary: no undeclared member to probe"; exit 1; }
-planted() { # a dependency table, then an optional feature line (into the existing [features] table, else a new one); the exposers it adds
+planted() { # a dependency table; the exposers it adds
     local m="$tmp/$probe/Cargo.toml"
     cp "$probe/Cargo.toml" "$m"
-    printf '%s\n' "$1" >> "$m"
-    if [ -n "${2:-}" ]; then
-        if grep -q '^\[features\]' "$m"; then sed -i "/^\[features\]/a $2" "$m"; else printf '[features]\n%s\n' "$2" >> "$m"; fi
-    fi
+    printf '\n%s\n' "$1" >> "$m"
     comm -23 <(exposers "$tmp") <(echo "$declared") || true
     cp "$probe/Cargo.toml" "$m"
 }
-cfg="[target.'cfg(all())'.dependencies]"
-caught=$(planted "$cfg
-base = { path = \"../base\", features = [\"expose\"] }")
-[ "$caught" = "$probe" ] || { echo "canary: an undeclared base/expose (direct) in $probe went unreported (got [$caught])"; exit 1; }
-caught=$(planted "$cfg
-b = { path = \"../base\", package = \"base\", optional = true }" 'leak = ["b/expose"]')
-[ "$caught" = "$probe" ] || { echo "canary: an undeclared base/expose (renamed forward) in $probe went unreported (got [$caught])"; exit 1; }
-# a feature-unified check (--all-features) lets any member borrow a declaring one's feature, so each undeclared member is checked on its own features; a member that depends on a declaring crate gets expose transitively, so the word `expose` outside comments fails it
-call() { # directory: every `expose` word outside a line comment in its .rs files
-    find "$@" -name '*.rs' -print0 2> /dev/null | xargs -0 -r awk '{ l = $0; sub(/\/\/.*/, "", l); if (l ~ /(^|[^[:alnum:]_])expose([^[:alnum:]_]|$)/) print FILENAME ":" FNR ": " $0 }' || true
+plant_edge() { # what, then a dependency table
+    local caught
+    caught=$(planted "$2")
+    [ "$caught" = "$probe" ] || { echo "canary: an undeclared expose edge ($1) in $probe went unreported (got [$caught])"; exit 1; }
 }
+plant_edge direct '[dependencies.expose]
+path = "../expose"'
+plant_edge renamed '[dependencies.e]
+path = "../expose"
+package = "expose"'
+plant_edge "target dev" "[target.'cfg(all())'.dev-dependencies]
+expose = { path = \"../expose\" }"
+plant_edge build '[build-dependencies.expose]
+path = "../expose"'
+# unsafe is forbidden workspace-wide; only wipe may allow it
 for c in $undeclared; do
-    [ -z "$(call "$c")" ] || { echo "canary $c: the word expose is used but gates.json declares no expose module:"; call "$c" | head -n 20; exit 1; }
-    (cd "$tmp" && cargo check --offline -p "$c" --all-features --all-targets 2> /dev/null) || { echo "canary $c: cargo check --all-features --all-targets fails"; exit 1; }
+    [ "$c" != wipe ] || continue
+    printf '\npub fn planted_unsafe() { unsafe {} }\n' >> "$tmp/$c/src/lib.rs"
+    errors "$c" --lib | cut -f1 | grep -qx unsafe_code || { echo "canary: unsafe {} planted in $c was not an unsafe_code error"; exit 1; }
+    cp "$c/src/lib.rs" "$tmp/$c/src/lib.rs"
 done
-leak_call='pub fn planted_leak(s: &base::SecretBytes) -> usize { s.expose().len() }'
-leak_macro='macro_rules! planted_leak { ($s:expr) => { $s.expose() }; }'
-leak_ptr='pub fn planted_leak() { let _f = base::SecretBytes::expose; }'
-for leak in "$leak_call" "$leak_macro" "$leak_ptr"; do
-    printf '\n%s\n' "$leak" >> "$tmp/$probe/src/lib.rs"
-    [ -n "$(call "$tmp/$probe")" ] || { echo "canary: the expose grep missed a plant in $probe: $leak"; exit 1; }
-    cp "$probe/src/lib.rs" "$tmp/$probe/src/lib.rs"
-done
-printf '\n%s\n' "$leak_call" >> "$tmp/$probe/src/lib.rs"
-(cd "$tmp" && cargo check --offline -p "$probe" --all-targets 2>&1 || true) | grep -q 'no method named `expose`' || { echo "canary: an expose() call planted in $probe was not refused for want of base/expose"; exit 1; }
+# the read is refused to a crate without the edge, and a path through include! does not name the crate either
+printf '\npub fn planted_leak(s: &base::SecretBytes) -> usize { s.expose().len() }\n' >> "$tmp/$probe/src/lib.rs"
+errors "$probe" --lib | cut -f1 | grep -qx E0599 || { echo "canary: an expose() call planted in $probe was not an E0599"; exit 1; }
 cp "$probe/src/lib.rs" "$tmp/$probe/src/lib.rs"
-echo "canary: base/expose only in [$(echo $declared)]; undeclared use in [$(echo $undeclared)] is caught as a direct enable, a renamed forward and a call"
+echo 'use expose::Expose;' > "$tmp/$probe/src/planted_use.rs"
+printf '\ninclude!("planted_use.rs");\n' >> "$tmp/$probe/src/lib.rs"
+errors "$probe" --lib | cut -f1 | grep -qx E0432 || { echo "canary: use expose::Expose planted in $probe was not an E0432"; exit 1; }
+cp "$probe/src/lib.rs" "$tmp/$probe/src/lib.rs"
+rm "$tmp/$probe/src/planted_use.rs"
+echo "canary: expose is a dependency of [$(echo $declared)] only; undeclared plants in [$(echo $undeclared)] are caught (edges in $probe, unsafe, E0599, E0432)"
 want_paths=$(sed -nE 's/^[[:space:]]*\{ path = "([^"]+)".*/\1/p' clippy.toml | sort -u)
 for c in "$@"; do
     offset=$(wc -l < "$c/src/lib.rs")
