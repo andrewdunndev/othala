@@ -34,6 +34,9 @@ impl Alg for Es384
 impl Alg for Hs256
 impl Alg for Hs384
 impl Alg for Hs512
+impl Alg for Ps256
+impl Alg for Ps384
+impl Alg for Ps512
 impl Alg for Rs256
 impl Alg for Rs384
 impl Alg for Rs512
@@ -332,6 +335,9 @@ impl PartialOrd for SigningAlg
 impl PublicAlg for EdDsa
 impl PublicAlg for Es256
 impl PublicAlg for Es384
+impl PublicAlg for Ps256
+impl PublicAlg for Ps384
+impl PublicAlg for Ps512
 impl PublicAlg for Rs256
 impl PublicAlg for Rs384
 impl PublicAlg for Rs512
