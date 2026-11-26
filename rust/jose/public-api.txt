@@ -146,6 +146,7 @@ impl Debug for A256Kw
 impl Debug for AnySigningKey
 impl Debug for AnyVerifyKey
 impl Debug for Audience
+impl Debug for Compact
 impl Debug for Dir
 impl Debug for EcdhEs
 impl Debug for EcdhEsA128Kw
@@ -181,8 +182,11 @@ impl Debug for RsaOaep
 impl Debug for RsaOaep256
 impl Debug for SecretJwk
 impl Debug for SigningAlg
+impl Debug for SigningKey
 impl Debug for Typ
+impl Debug for Unsigned
 impl Debug for VerifyKey
+impl Default for Header
 impl Deserialize for Kid
 impl Display for Error
 impl Eq for A128CbcHs256
@@ -359,6 +363,7 @@ impl SignAlg for Hs256
 impl SignAlg for Hs384
 impl SignAlg for Hs512
 impl Signer for AnySigningKey
+impl Signer for SigningKey
 impl StructuralPartialEq for A128CbcHs256
 impl StructuralPartialEq for A128Gcm
 impl StructuralPartialEq for A128GcmKw
@@ -409,9 +414,14 @@ method AnySigningKey::from_jwk fn(jwk: &SecretJwk) -> Result<Self, Error>
 method AnyVerifyKey::alg const fn(self: &Self) -> SigningAlg
 method AnyVerifyKey::from_jwk fn(jwk: &Jwk) -> Result<Self, Error>
 method AnyVerifyKey::from_jwk_for fn(jwk: &Jwk, alg: SigningAlg) -> Result<Self, Error>
+method Compact::as_str fn(self: &Self) -> &str
 method Compact::flattened fn(self: &Self) -> String
 method Compact::general fn(tokens: &[Compact]) -> Result<String, Error>
 method Error::kind const fn(self: &Self) -> ErrorKind
+method Header::alg const fn(self: &Self) -> SigningAlg
+method Header::kid const fn(self: &Self) -> Option<&Kid>
+method Header::new const fn() -> Self
+method Header::with_kid fn(self: Self, kid: Kid) -> Self
 method JweAlg::name const fn(self: Self) -> &'static str
 method Jwk::decode fn(json: &[u8]) -> Result<Self, Error>
 method Jwk::encrypt_key fn<K: PublicKeyAlg>(self: &Self) -> Result<EncryptKey<K>, Error>
@@ -444,6 +454,12 @@ method SecretJwk::signing_key fn<A: SignAlg>(self: &Self) -> Result<SigningKey<A
 method SecretJwk::thumbprint fn(self: &Self) -> Digest
 method SecretJwk::verify_key fn<A: Alg>(self: &Self) -> Result<VerifyKey<A>, Error>
 method SigningAlg::name const fn(self: Self) -> &'static str
+method Unsigned::finish fn(self: Self, signature: A::Signature) -> Result<Compact, Error>
+method Unsigned::header const fn(self: &Self) -> &Header<A>
+method Unsigned::jws fn(header: Header<A>, payload: &[u8]) -> Result<Self, Error>
+method Unsigned::jwt fn<K: TokenKind>(header: Header<A>, claims: &K::Claims) -> Result<Self, Error>
+method Unsigned::sign fn(self: Self, signer: &impl Signer<A>) -> Result<Compact, Error>
+method Unsigned::signing_input fn(self: &Self) -> &[u8]
 method VerifyKey::verify_signature fn(self: &Self, signing_input: &[u8], signature: &[u8]) -> Result<(), Error>
 struct A128CbcHs256
 struct A128Gcm
