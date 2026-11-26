@@ -1,0 +1,503 @@
+{
+ "source": "JWT claims validation under a Policy (iss, aud, typ at+jwt, leeway 60, now 1700000000); derived by tools/derive_jose.py from keys pinned under vectors/ (RFC 7515 A.1-A.4, RFC 7520 3 and 5.4, RFC 8037 A); one spec section per case in `spec`",
+ "cases": [
+  {
+   "id": "valid",
+   "op": "jwt_claims",
+   "alg": "HS256",
+   "jwk": {
+    "kty": "oct",
+    "k": "AyM1SysPpbyDfgZld3umj1qzKObwVMkoqQ-EstJQLr_T-1qS0gZH75aKtMN3Yj0iPS4hcgUuTwjAzZr1Z9CAow"
+   },
+   "jwt": "eyJhbGciOiJIUzI1NiIsInR5cCI6ImF0K2p3dCJ9.eyJpc3MiOiJodHRwczovL2lzc3Vlci5leGFtcGxlIiwiYXVkIjoiY2xpZW50LTEiLCJleHAiOjE3MDAwMDAzMDAsImlhdCI6MTY5OTk5OTk5MCwibmJmIjoxNjk5OTk5OTkwfQ.6FKZvWDAOQEzRm-9dFuiLd0wqfEITw5BSN0VimKTX8E",
+   "policy": {
+    "iss": "https://issuer.example",
+    "aud": "client-1",
+    "typ": "at+jwt",
+    "leeway": 60
+   },
+   "now": 1700000000,
+   "spec": "RFC 7519 7.2",
+   "expect": {
+    "ok": true
+   }
+  },
+  {
+   "id": "aud-array-contains",
+   "op": "jwt_claims",
+   "alg": "HS256",
+   "jwk": {
+    "kty": "oct",
+    "k": "AyM1SysPpbyDfgZld3umj1qzKObwVMkoqQ-EstJQLr_T-1qS0gZH75aKtMN3Yj0iPS4hcgUuTwjAzZr1Z9CAow"
+   },
+   "jwt": "eyJhbGciOiJIUzI1NiIsInR5cCI6ImF0K2p3dCJ9.eyJpc3MiOiJodHRwczovL2lzc3Vlci5leGFtcGxlIiwiYXVkIjpbIm90aGVyIiwiY2xpZW50LTEiXSwiZXhwIjoxNzAwMDAwMzAwLCJpYXQiOjE2OTk5OTk5OTAsIm5iZiI6MTY5OTk5OTk5MH0.NVJB9ItFtay464Vk5rkYPUCeezryfjqZ3QitN6uQ9YQ",
+   "policy": {
+    "iss": "https://issuer.example",
+    "aud": "client-1",
+    "typ": "at+jwt",
+    "leeway": 60
+   },
+   "now": 1700000000,
+   "spec": "RFC 7519 4.1.3 (an array of which one is ours)",
+   "expect": {
+    "ok": true
+   }
+  },
+  {
+   "id": "exp-fractional",
+   "op": "jwt_claims",
+   "alg": "HS256",
+   "jwk": {
+    "kty": "oct",
+    "k": "AyM1SysPpbyDfgZld3umj1qzKObwVMkoqQ-EstJQLr_T-1qS0gZH75aKtMN3Yj0iPS4hcgUuTwjAzZr1Z9CAow"
+   },
+   "jwt": "eyJhbGciOiJIUzI1NiIsInR5cCI6ImF0K2p3dCJ9.eyJpc3MiOiJodHRwczovL2lzc3Vlci5leGFtcGxlIiwiYXVkIjoiY2xpZW50LTEiLCJleHAiOjE3MDAwMDAzMDAuNSwiaWF0IjoxNjk5OTk5OTkwLCJuYmYiOjE2OTk5OTk5OTB9.VmfEUA8dBsFIMB4weW3ZiN_2cdimYdp97lHIzwXONXA",
+   "policy": {
+    "iss": "https://issuer.example",
+    "aud": "client-1",
+    "typ": "at+jwt",
+    "leeway": 60
+   },
+   "now": 1700000000,
+   "spec": "RFC 7519 2 (NumericDate may be non-integer)",
+   "expect": {
+    "ok": true
+   }
+  },
+  {
+   "id": "typ-application-prefix",
+   "op": "jwt_claims",
+   "alg": "HS256",
+   "jwk": {
+    "kty": "oct",
+    "k": "AyM1SysPpbyDfgZld3umj1qzKObwVMkoqQ-EstJQLr_T-1qS0gZH75aKtMN3Yj0iPS4hcgUuTwjAzZr1Z9CAow"
+   },
+   "jwt": "eyJhbGciOiJIUzI1NiIsInR5cCI6ImFwcGxpY2F0aW9uL2F0K2p3dCJ9.eyJpc3MiOiJodHRwczovL2lzc3Vlci5leGFtcGxlIiwiYXVkIjoiY2xpZW50LTEiLCJleHAiOjE3MDAwMDAzMDAsImlhdCI6MTY5OTk5OTk5MCwibmJmIjoxNjk5OTk5OTkwfQ.NdwHK-OV1fifsV_YRM2HNlDCPsfn2hgvsysjFPKklAs",
+   "policy": {
+    "iss": "https://issuer.example",
+    "aud": "client-1",
+    "typ": "at+jwt",
+    "leeway": 60
+   },
+   "now": 1700000000,
+   "spec": "RFC 7515 4.1.9 (application/ prefix may be omitted) and RFC 9068 2.1",
+   "expect": {
+    "ok": true
+   }
+  },
+  {
+   "id": "iss-wrong",
+   "op": "jwt_claims",
+   "alg": "HS256",
+   "jwk": {
+    "kty": "oct",
+    "k": "AyM1SysPpbyDfgZld3umj1qzKObwVMkoqQ-EstJQLr_T-1qS0gZH75aKtMN3Yj0iPS4hcgUuTwjAzZr1Z9CAow"
+   },
+   "jwt": "eyJhbGciOiJIUzI1NiIsInR5cCI6ImF0K2p3dCJ9.eyJpc3MiOiJodHRwczovL290aGVyLmV4YW1wbGUiLCJhdWQiOiJjbGllbnQtMSIsImV4cCI6MTcwMDAwMDMwMCwiaWF0IjoxNjk5OTk5OTkwLCJuYmYiOjE2OTk5OTk5OTB9.zboZQNyrx9kW4n2RcgLKN3iRXBq5iWlvdiGdTn06y0I",
+   "policy": {
+    "iss": "https://issuer.example",
+    "aud": "client-1",
+    "typ": "at+jwt",
+    "leeway": 60
+   },
+   "now": 1700000000,
+   "spec": "RFC 7519 4.1.1 and RFC 8725 3.8",
+   "expect": {
+    "ok": false,
+    "kind": "Issuer"
+   }
+  },
+  {
+   "id": "iss-missing",
+   "op": "jwt_claims",
+   "alg": "HS256",
+   "jwk": {
+    "kty": "oct",
+    "k": "AyM1SysPpbyDfgZld3umj1qzKObwVMkoqQ-EstJQLr_T-1qS0gZH75aKtMN3Yj0iPS4hcgUuTwjAzZr1Z9CAow"
+   },
+   "jwt": "eyJhbGciOiJIUzI1NiIsInR5cCI6ImF0K2p3dCJ9.eyJhdWQiOiJjbGllbnQtMSIsImV4cCI6MTcwMDAwMDMwMCwiaWF0IjoxNjk5OTk5OTkwLCJuYmYiOjE2OTk5OTk5OTB9.LmgKn9mSx5ccXPAfy0Jbmj79jcPNGvXLU6QRNAuPAVU",
+   "policy": {
+    "iss": "https://issuer.example",
+    "aud": "client-1",
+    "typ": "at+jwt",
+    "leeway": 60
+   },
+   "now": 1700000000,
+   "spec": "RFC 8725 3.8",
+   "expect": {
+    "ok": false,
+    "kind": "MissingClaim"
+   }
+  },
+  {
+   "id": "aud-wrong",
+   "op": "jwt_claims",
+   "alg": "HS256",
+   "jwk": {
+    "kty": "oct",
+    "k": "AyM1SysPpbyDfgZld3umj1qzKObwVMkoqQ-EstJQLr_T-1qS0gZH75aKtMN3Yj0iPS4hcgUuTwjAzZr1Z9CAow"
+   },
+   "jwt": "eyJhbGciOiJIUzI1NiIsInR5cCI6ImF0K2p3dCJ9.eyJpc3MiOiJodHRwczovL2lzc3Vlci5leGFtcGxlIiwiYXVkIjoib3RoZXIiLCJleHAiOjE3MDAwMDAzMDAsImlhdCI6MTY5OTk5OTk5MCwibmJmIjoxNjk5OTk5OTkwfQ.8tsx1tMULwTCO_HetLTOUfMjG54Hc-hh2IWVQ-Laa74",
+   "policy": {
+    "iss": "https://issuer.example",
+    "aud": "client-1",
+    "typ": "at+jwt",
+    "leeway": 60
+   },
+   "now": 1700000000,
+   "spec": "RFC 7519 4.1.3 (MUST be rejected)",
+   "expect": {
+    "ok": false,
+    "kind": "Audience"
+   }
+  },
+  {
+   "id": "aud-array-without",
+   "op": "jwt_claims",
+   "alg": "HS256",
+   "jwk": {
+    "kty": "oct",
+    "k": "AyM1SysPpbyDfgZld3umj1qzKObwVMkoqQ-EstJQLr_T-1qS0gZH75aKtMN3Yj0iPS4hcgUuTwjAzZr1Z9CAow"
+   },
+   "jwt": "eyJhbGciOiJIUzI1NiIsInR5cCI6ImF0K2p3dCJ9.eyJpc3MiOiJodHRwczovL2lzc3Vlci5leGFtcGxlIiwiYXVkIjpbIm90aGVyIiwiYW5vdGhlciJdLCJleHAiOjE3MDAwMDAzMDAsImlhdCI6MTY5OTk5OTk5MCwibmJmIjoxNjk5OTk5OTkwfQ.e33lnpEQgW0c3hSRXZ39LHhFeNgo1An4MAWxsWfe5LY",
+   "policy": {
+    "iss": "https://issuer.example",
+    "aud": "client-1",
+    "typ": "at+jwt",
+    "leeway": 60
+   },
+   "now": 1700000000,
+   "spec": "RFC 7519 4.1.3",
+   "expect": {
+    "ok": false,
+    "kind": "Audience"
+   }
+  },
+  {
+   "id": "aud-missing",
+   "op": "jwt_claims",
+   "alg": "HS256",
+   "jwk": {
+    "kty": "oct",
+    "k": "AyM1SysPpbyDfgZld3umj1qzKObwVMkoqQ-EstJQLr_T-1qS0gZH75aKtMN3Yj0iPS4hcgUuTwjAzZr1Z9CAow"
+   },
+   "jwt": "eyJhbGciOiJIUzI1NiIsInR5cCI6ImF0K2p3dCJ9.eyJpc3MiOiJodHRwczovL2lzc3Vlci5leGFtcGxlIiwiZXhwIjoxNzAwMDAwMzAwLCJpYXQiOjE2OTk5OTk5OTAsIm5iZiI6MTY5OTk5OTk5MH0.59WVYf7yGhpkQkGTqwl4PAqhArmUdhwK5OVrR0mICu4",
+   "policy": {
+    "iss": "https://issuer.example",
+    "aud": "client-1",
+    "typ": "at+jwt",
+    "leeway": 60
+   },
+   "now": 1700000000,
+   "spec": "RFC 8725 3.9",
+   "expect": {
+    "ok": false,
+    "kind": "MissingClaim"
+   }
+  },
+  {
+   "id": "exp-missing",
+   "op": "jwt_claims",
+   "alg": "HS256",
+   "jwk": {
+    "kty": "oct",
+    "k": "AyM1SysPpbyDfgZld3umj1qzKObwVMkoqQ-EstJQLr_T-1qS0gZH75aKtMN3Yj0iPS4hcgUuTwjAzZr1Z9CAow"
+   },
+   "jwt": "eyJhbGciOiJIUzI1NiIsInR5cCI6ImF0K2p3dCJ9.eyJpc3MiOiJodHRwczovL2lzc3Vlci5leGFtcGxlIiwiYXVkIjoiY2xpZW50LTEiLCJpYXQiOjE2OTk5OTk5OTAsIm5iZiI6MTY5OTk5OTk5MH0.r5rfRT6hNbpsnxuzdEQ_jxrxCT3a1grSc0ZFOndMcEY",
+   "policy": {
+    "iss": "https://issuer.example",
+    "aud": "client-1",
+    "typ": "at+jwt",
+    "leeway": 60
+   },
+   "now": 1700000000,
+   "spec": "RFC 8725 3.10 with the contract (Expiry::Unchecked is opt-in)",
+   "expect": {
+    "ok": false,
+    "kind": "MissingClaim"
+   }
+  },
+  {
+   "id": "exp-at-leeway-edge",
+   "op": "jwt_claims",
+   "alg": "HS256",
+   "jwk": {
+    "kty": "oct",
+    "k": "AyM1SysPpbyDfgZld3umj1qzKObwVMkoqQ-EstJQLr_T-1qS0gZH75aKtMN3Yj0iPS4hcgUuTwjAzZr1Z9CAow"
+   },
+   "jwt": "eyJhbGciOiJIUzI1NiIsInR5cCI6ImF0K2p3dCJ9.eyJpc3MiOiJodHRwczovL2lzc3Vlci5leGFtcGxlIiwiYXVkIjoiY2xpZW50LTEiLCJleHAiOjE2OTk5OTk5NDAsImlhdCI6MTY5OTk5OTk5MCwibmJmIjoxNjk5OTk5OTkwfQ.6tXXjktGr95p9S4Lp7DwQNyAnhnyFlu7eBjolJaz-ag",
+   "policy": {
+    "iss": "https://issuer.example",
+    "aud": "client-1",
+    "typ": "at+jwt",
+    "leeway": 60
+   },
+   "now": 1700000000,
+   "spec": "RFC 7519 4.1.4 (now MUST be before exp; leeway added)",
+   "expect": {
+    "ok": false,
+    "kind": "Expired"
+   }
+  },
+  {
+   "id": "exp-inside-leeway",
+   "op": "jwt_claims",
+   "alg": "HS256",
+   "jwk": {
+    "kty": "oct",
+    "k": "AyM1SysPpbyDfgZld3umj1qzKObwVMkoqQ-EstJQLr_T-1qS0gZH75aKtMN3Yj0iPS4hcgUuTwjAzZr1Z9CAow"
+   },
+   "jwt": "eyJhbGciOiJIUzI1NiIsInR5cCI6ImF0K2p3dCJ9.eyJpc3MiOiJodHRwczovL2lzc3Vlci5leGFtcGxlIiwiYXVkIjoiY2xpZW50LTEiLCJleHAiOjE2OTk5OTk5NDEsImlhdCI6MTY5OTk5OTk5MCwibmJmIjoxNjk5OTk5OTkwfQ.YaHxwA3p-l-ThWAzVC2_syRLtqamtxe9Sj0upFneejY",
+   "policy": {
+    "iss": "https://issuer.example",
+    "aud": "client-1",
+    "typ": "at+jwt",
+    "leeway": 60
+   },
+   "now": 1700000000,
+   "spec": "RFC 7519 4.1.4 (small leeway allowed)",
+   "expect": {
+    "ok": true
+   }
+  },
+  {
+   "id": "exp-past",
+   "op": "jwt_claims",
+   "alg": "HS256",
+   "jwk": {
+    "kty": "oct",
+    "k": "AyM1SysPpbyDfgZld3umj1qzKObwVMkoqQ-EstJQLr_T-1qS0gZH75aKtMN3Yj0iPS4hcgUuTwjAzZr1Z9CAow"
+   },
+   "jwt": "eyJhbGciOiJIUzI1NiIsInR5cCI6ImF0K2p3dCJ9.eyJpc3MiOiJodHRwczovL2lzc3Vlci5leGFtcGxlIiwiYXVkIjoiY2xpZW50LTEiLCJleHAiOjE2OTk5OTY0MDAsImlhdCI6MTY5OTk5OTk5MCwibmJmIjoxNjk5OTk5OTkwfQ.VqarCfct4Fyo7-x5sIlpg98jvQKwgCJu-dyLUG5nZ4Y",
+   "policy": {
+    "iss": "https://issuer.example",
+    "aud": "client-1",
+    "typ": "at+jwt",
+    "leeway": 60
+   },
+   "now": 1700000000,
+   "spec": "RFC 7519 4.1.4",
+   "expect": {
+    "ok": false,
+    "kind": "Expired"
+   }
+  },
+  {
+   "id": "exp-string",
+   "op": "jwt_claims",
+   "alg": "HS256",
+   "jwk": {
+    "kty": "oct",
+    "k": "AyM1SysPpbyDfgZld3umj1qzKObwVMkoqQ-EstJQLr_T-1qS0gZH75aKtMN3Yj0iPS4hcgUuTwjAzZr1Z9CAow"
+   },
+   "jwt": "eyJhbGciOiJIUzI1NiIsInR5cCI6ImF0K2p3dCJ9.eyJpc3MiOiJodHRwczovL2lzc3Vlci5leGFtcGxlIiwiYXVkIjoiY2xpZW50LTEiLCJleHAiOiIxNzAwMDAwMzAwIiwiaWF0IjoxNjk5OTk5OTkwLCJuYmYiOjE2OTk5OTk5OTB9.t1-JouQau8m7NgS4o-NgpHJe_a0wZaosY1CuJ9IAVb8",
+   "policy": {
+    "iss": "https://issuer.example",
+    "aud": "client-1",
+    "typ": "at+jwt",
+    "leeway": 60
+   },
+   "now": 1700000000,
+   "spec": "RFC 7519 2 (NumericDate is a JSON number)",
+   "expect": {
+    "ok": false,
+    "kind": "ClaimType"
+   }
+  },
+  {
+   "id": "nbf-at-leeway-edge",
+   "op": "jwt_claims",
+   "alg": "HS256",
+   "jwk": {
+    "kty": "oct",
+    "k": "AyM1SysPpbyDfgZld3umj1qzKObwVMkoqQ-EstJQLr_T-1qS0gZH75aKtMN3Yj0iPS4hcgUuTwjAzZr1Z9CAow"
+   },
+   "jwt": "eyJhbGciOiJIUzI1NiIsInR5cCI6ImF0K2p3dCJ9.eyJpc3MiOiJodHRwczovL2lzc3Vlci5leGFtcGxlIiwiYXVkIjoiY2xpZW50LTEiLCJleHAiOjE3MDAwMDAzMDAsImlhdCI6MTY5OTk5OTk5MCwibmJmIjoxNzAwMDAwMDYwfQ._cbCOXUxiV-1-dir7BaJvVzX4elrtogcnL6qGyrrgSM",
+   "policy": {
+    "iss": "https://issuer.example",
+    "aud": "client-1",
+    "typ": "at+jwt",
+    "leeway": 60
+   },
+   "now": 1700000000,
+   "spec": "RFC 7519 4.1.5 (now MUST be at or after nbf; leeway added)",
+   "expect": {
+    "ok": true
+   }
+  },
+  {
+   "id": "nbf-past-leeway",
+   "op": "jwt_claims",
+   "alg": "HS256",
+   "jwk": {
+    "kty": "oct",
+    "k": "AyM1SysPpbyDfgZld3umj1qzKObwVMkoqQ-EstJQLr_T-1qS0gZH75aKtMN3Yj0iPS4hcgUuTwjAzZr1Z9CAow"
+   },
+   "jwt": "eyJhbGciOiJIUzI1NiIsInR5cCI6ImF0K2p3dCJ9.eyJpc3MiOiJodHRwczovL2lzc3Vlci5leGFtcGxlIiwiYXVkIjoiY2xpZW50LTEiLCJleHAiOjE3MDAwMDAzMDAsImlhdCI6MTY5OTk5OTk5MCwibmJmIjoxNzAwMDAwMDYxfQ.GHSRtdX_DicaUvoe530DA-NLDuFJPhWqQtzlWAXj7Ew",
+   "policy": {
+    "iss": "https://issuer.example",
+    "aud": "client-1",
+    "typ": "at+jwt",
+    "leeway": 60
+   },
+   "now": 1700000000,
+   "spec": "RFC 7519 4.1.5",
+   "expect": {
+    "ok": false,
+    "kind": "NotYetValid"
+   }
+  },
+  {
+   "id": "nbf-string",
+   "op": "jwt_claims",
+   "alg": "HS256",
+   "jwk": {
+    "kty": "oct",
+    "k": "AyM1SysPpbyDfgZld3umj1qzKObwVMkoqQ-EstJQLr_T-1qS0gZH75aKtMN3Yj0iPS4hcgUuTwjAzZr1Z9CAow"
+   },
+   "jwt": "eyJhbGciOiJIUzI1NiIsInR5cCI6ImF0K2p3dCJ9.eyJpc3MiOiJodHRwczovL2lzc3Vlci5leGFtcGxlIiwiYXVkIjoiY2xpZW50LTEiLCJleHAiOjE3MDAwMDAzMDAsImlhdCI6MTY5OTk5OTk5MCwibmJmIjoiMTcwMDAwMDAwMCJ9.1JDH5sNxyIbi0kxbDquW8phK_Ywysyj8ZoAr-ehToOE",
+   "policy": {
+    "iss": "https://issuer.example",
+    "aud": "client-1",
+    "typ": "at+jwt",
+    "leeway": 60
+   },
+   "now": 1700000000,
+   "spec": "RFC 7519 2",
+   "expect": {
+    "ok": false,
+    "kind": "ClaimType"
+   }
+  },
+  {
+   "id": "iat-string",
+   "op": "jwt_claims",
+   "alg": "HS256",
+   "jwk": {
+    "kty": "oct",
+    "k": "AyM1SysPpbyDfgZld3umj1qzKObwVMkoqQ-EstJQLr_T-1qS0gZH75aKtMN3Yj0iPS4hcgUuTwjAzZr1Z9CAow"
+   },
+   "jwt": "eyJhbGciOiJIUzI1NiIsInR5cCI6ImF0K2p3dCJ9.eyJpc3MiOiJodHRwczovL2lzc3Vlci5leGFtcGxlIiwiYXVkIjoiY2xpZW50LTEiLCJleHAiOjE3MDAwMDAzMDAsImlhdCI6IjE3MDAwMDAwMDAiLCJuYmYiOjE2OTk5OTk5OTB9.YHjqXVpB-V3enFXQz16My-ARHkyZLHrSNFNRMZ_vZaI",
+   "policy": {
+    "iss": "https://issuer.example",
+    "aud": "client-1",
+    "typ": "at+jwt",
+    "leeway": 60
+   },
+   "now": 1700000000,
+   "spec": "RFC 7519 2 and 4.1.6",
+   "expect": {
+    "ok": false,
+    "kind": "ClaimType"
+   }
+  },
+  {
+   "id": "iat-future-past-leeway",
+   "op": "jwt_claims",
+   "alg": "HS256",
+   "jwk": {
+    "kty": "oct",
+    "k": "AyM1SysPpbyDfgZld3umj1qzKObwVMkoqQ-EstJQLr_T-1qS0gZH75aKtMN3Yj0iPS4hcgUuTwjAzZr1Z9CAow"
+   },
+   "jwt": "eyJhbGciOiJIUzI1NiIsInR5cCI6ImF0K2p3dCJ9.eyJpc3MiOiJodHRwczovL2lzc3Vlci5leGFtcGxlIiwiYXVkIjoiY2xpZW50LTEiLCJleHAiOjE3MDAwMDAzMDAsImlhdCI6MTcwMDAwMDA2MSwibmJmIjoxNjk5OTk5OTkwfQ.6HtVy3CmfdYmcLmvQnRKMmoruyqEEhS2uvkxqK8aU58",
+   "policy": {
+    "iss": "https://issuer.example",
+    "aud": "client-1",
+    "typ": "at+jwt",
+    "leeway": 60
+   },
+   "now": 1700000000,
+   "spec": "RFC 7519 4.1.6 with OIDC Core 3.1.3.7 step 10 (this oracle refuses an iat beyond now plus leeway)",
+   "expect": {
+    "ok": false
+   }
+  },
+  {
+   "id": "typ-wrong",
+   "op": "jwt_claims",
+   "alg": "HS256",
+   "jwk": {
+    "kty": "oct",
+    "k": "AyM1SysPpbyDfgZld3umj1qzKObwVMkoqQ-EstJQLr_T-1qS0gZH75aKtMN3Yj0iPS4hcgUuTwjAzZr1Z9CAow"
+   },
+   "jwt": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJodHRwczovL2lzc3Vlci5leGFtcGxlIiwiYXVkIjoiY2xpZW50LTEiLCJleHAiOjE3MDAwMDAzMDAsImlhdCI6MTY5OTk5OTk5MCwibmJmIjoxNjk5OTk5OTkwfQ.4NtHlvoAv4u-sGv11GBWLRsSn05fHEtFYydJAHXyu7Q",
+   "policy": {
+    "iss": "https://issuer.example",
+    "aud": "client-1",
+    "typ": "at+jwt",
+    "leeway": 60
+   },
+   "now": 1700000000,
+   "spec": "RFC 8725 3.11 (explicit typing)",
+   "expect": {
+    "ok": false,
+    "kind": "Type"
+   }
+  },
+  {
+   "id": "typ-missing",
+   "op": "jwt_claims",
+   "alg": "HS256",
+   "jwk": {
+    "kty": "oct",
+    "k": "AyM1SysPpbyDfgZld3umj1qzKObwVMkoqQ-EstJQLr_T-1qS0gZH75aKtMN3Yj0iPS4hcgUuTwjAzZr1Z9CAow"
+   },
+   "jwt": "eyJhbGciOiJIUzI1NiJ9.eyJpc3MiOiJodHRwczovL2lzc3Vlci5leGFtcGxlIiwiYXVkIjoiY2xpZW50LTEiLCJleHAiOjE3MDAwMDAzMDAsImlhdCI6MTY5OTk5OTk5MCwibmJmIjoxNjk5OTk5OTkwfQ.tjyWx0V8P2p4sRMhjJH34uKsBvQwijOANAHbVGzmfTI",
+   "policy": {
+    "iss": "https://issuer.example",
+    "aud": "client-1",
+    "typ": "at+jwt",
+    "leeway": 60
+   },
+   "now": 1700000000,
+   "spec": "RFC 8725 3.11 and RFC 9068 4",
+   "expect": {
+    "ok": false,
+    "kind": "Type"
+   }
+  },
+  {
+   "id": "dup-claim",
+   "op": "jwt_claims",
+   "alg": "HS256",
+   "jwk": {
+    "kty": "oct",
+    "k": "AyM1SysPpbyDfgZld3umj1qzKObwVMkoqQ-EstJQLr_T-1qS0gZH75aKtMN3Yj0iPS4hcgUuTwjAzZr1Z9CAow"
+   },
+   "jwt": "eyJhbGciOiJIUzI1NiIsInR5cCI6ImF0K2p3dCJ9.eyJpc3MiOiJodHRwczovL290aGVyLmV4YW1wbGUiLCJpc3MiOiJodHRwczovL2lzc3Vlci5leGFtcGxlIiwiYXVkIjoiY2xpZW50LTEiLCJleHAiOjE3MDAwMDAzMDB9.K1M2yRsibW3BC6E7_hNpacZAhfwKRbg-jjlAgr5nIrM",
+   "policy": {
+    "iss": "https://issuer.example",
+    "aud": "client-1",
+    "typ": "at+jwt",
+    "leeway": 60
+   },
+   "now": 1700000000,
+   "spec": "RFC 7519 4 (MUST reject or use the last; this oracle rejects)",
+   "expect": {
+    "ok": false,
+    "kind": "DuplicateMember"
+   }
+  },
+  {
+   "id": "claims-array",
+   "op": "jwt_claims",
+   "alg": "HS256",
+   "jwk": {
+    "kty": "oct",
+    "k": "AyM1SysPpbyDfgZld3umj1qzKObwVMkoqQ-EstJQLr_T-1qS0gZH75aKtMN3Yj0iPS4hcgUuTwjAzZr1Z9CAow"
+   },
+   "jwt": "eyJhbGciOiJIUzI1NiIsInR5cCI6ImF0K2p3dCJ9.WzFd.DulKijYykbAQW1xTEEj5BWJGFQV2A4XOlM3Ngsi6C20",
+   "policy": {
+    "iss": "https://issuer.example",
+    "aud": "client-1",
+    "typ": "at+jwt",
+    "leeway": 60
+   },
+   "now": 1700000000,
+   "spec": "RFC 7519 7.2 step 10 (a JSON object)",
+   "expect": {
+    "ok": false
+   }
+  }
+ ]
+}
