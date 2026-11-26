@@ -144,19 +144,19 @@ def authdata_cases():
         assertion("uv-clear-preferred", "WebAuthn L3 7.2 step 17 (only required checks UV)", OK(uv=False), ad=auth_data(flags=UP)),
         assertion("uv-set-required", "WebAuthn L3 7.2 step 17", OK(), user_verification="required"),
         assertion("bs-without-be", "WebAuthn L3 6.1 (BS MUST be 0 when BE is 0) and 7.2 step 18", NO, ad=auth_data(flags=UP | UV | BS)),
-        assertion("be-stored-clear-now-set", "WebAuthn L3 7.2 step 19 (backupEligible MUST NOT change)", NO, ad=auth_data(flags=UP | UV | BE)),
-        assertion("be-stored-set-now-clear", "WebAuthn L3 7.2 step 19", NO, ad=auth_data(flags=UP | UV), stored_backup_eligible=True),
-        assertion("be-bs-set-eligible", "WebAuthn L3 7.2 steps 18 and 19 (BS may change while BE is set)", OK(), ad=auth_data(flags=UP | UV | BE | BS), stored_backup_eligible=True),
+        assertion("be-stored-clear-now-set", "WebAuthn L3 7.2 step 19 (backupEligible MUST NOT change; the condition holds because the credential record stores BE, so this is a policy of the crate: oracle choice)", NO, ad=auth_data(flags=UP | UV | BE)),
+        assertion("be-stored-set-now-clear", "WebAuthn L3 7.2 step 19 (the stored BE is set and the response clears it; same condition: the credential record stores BE, oracle choice)", NO, ad=auth_data(flags=UP | UV), stored_backup_eligible=True),
+        assertion("be-bs-set-eligible", "WebAuthn L3 7.2 steps 18 and 19 (BS may change while BE is set and unchanged; the credential record stores BE)", OK(), ad=auth_data(flags=UP | UV | BE | BS), stored_backup_eligible=True),
         assertion("counter-advanced", "WebAuthn L3 7.2 step 22", OK()),
         assertion("counter-regressed", "WebAuthn L3 7.2 step 22 with the contract (Reject)", {"ok": False, "kind": "CounterRegressed"}, ad=auth_data(count=3)),
-        assertion("counter-equal", "WebAuthn L3 7.2 step 22 (MUST be greater than the stored value)", {"ok": False, "kind": "CounterRegressed"}, ad=auth_data(count=5)),
-        assertion("counter-zero-after-nonzero", "WebAuthn L3 7.2 step 22", {"ok": False, "kind": "CounterRegressed"}, ad=auth_data(count=0)),
+        assertion("counter-equal", "WebAuthn L3 7.2 step 22 with the contract (Reject)", {"ok": False, "kind": "CounterRegressed"}, ad=auth_data(count=5)),
+        assertion("counter-zero-after-nonzero", "WebAuthn L3 7.2 step 22 with the contract (Reject)", {"ok": False, "kind": "CounterRegressed"}, ad=auth_data(count=0)),
         assertion("counter-both-zero", "WebAuthn L3 7.2 step 22 (no counter on either side)", OK(counter=0), ad=auth_data(count=0), stored_counter=0),
         assertion("counter-regressed-tolerate", "WebAuthn L3 7.2 step 22 with the contract (Tolerate reports, never drops)", {"ok": True, "user_verified": True, "counter": {"regressed": {"stored": 5, "seen": 3}}}, ad=auth_data(count=3), counter_policy="tolerate"),
         assertion("authdata-truncated", "WebAuthn L3 6.1 (37 bytes at least)", NO, ad=auth_data()[:36]),
         assertion("authdata-at-flag-no-data", "WebAuthn L3 6.1 (AT set needs attested credential data)", NO, ad=auth_data(flags=UP | UV | 0x40)),
         assertion("authdata-ed-flag-no-data", "WebAuthn L3 6.1 (ED set needs extensions)", NO, ad=auth_data(flags=UP | UV | 0x80)),
-        assertion("authdata-trailing-bytes", "WebAuthn L3 6.1 (no bytes after the declared parts)", NO, ad=auth_data() + b"\x00"),
+        assertion("authdata-trailing-bytes", "WebAuthn L3 6.1 (no bytes after the declared parts: oracle choice, a strict reader refuses what the layout does not account for)", NO, ad=auth_data() + b"\x00"),
     ]
 
 
@@ -246,8 +246,8 @@ def registration_cases():
         registration("fmt-unknown", "WebAuthn L3 7.1 step 21 (case-sensitive match against supported formats)", NO, ao=att_object(fmt="None")),
         registration("none-with-statement", "WebAuthn L3 8.7 (the none attStmt is the empty map)", NO, ao=att_object(att_stmt=b"\xa1" + cbor_text("x") + b"\x00")),
         registration("at-clear", "WebAuthn L3 7.1 step 13 and 6.5.1 (registration carries attested credential data)", NO, ao=att_object(flags=UP | UV)),
-        registration("credential-id-1023", "WebAuthn L3 7.1 step 25", dict(ok, credential_id=(bytes(range(256)) * 4)[:1023].hex()), ao=att_object(cred_id=(bytes(range(256)) * 4)[:1023])),
-        registration("credential-id-1024", "WebAuthn L3 7.1 step 25 (MUST be at most 1023 bytes)", NO, ao=att_object(cred_id=bytes(range(256)) * 4)),
+        registration("credential-id-1023", "WebAuthn L3 7.1 step 28 (an id of at most 1023 bytes is within the limit)", dict(ok, credential_id=(bytes(range(256)) * 4)[:1023].hex()), ao=att_object(cred_id=(bytes(range(256)) * 4)[:1023])),
+        registration("credential-id-1024", "WebAuthn L3 7.1 step 28 (an id over 1023 bytes SHOULD fail the ceremony: an oracle choice, the crate refuses)", NO, ao=att_object(cred_id=bytes(range(256)) * 4)),
     ]
 
 

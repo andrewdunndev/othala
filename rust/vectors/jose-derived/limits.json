@@ -1,12 +1,93 @@
 {
- "source": "one oversize input per bound of contract rule 5.7; the rule states no number, so each case is parametric: build the input per `recipe` at the named crate constant plus `excess`",
+ "source": "each bound of contract rule 5.7 at the crate constant (excess 0, accepted by the reader the bound names; for claims-depth-at-bound, whose public reader VerifiedJwt::claims needs a Policy, the expectation is not_kind TooLarge: any outcome but TooLarge) and one past it (excess 1, TooLarge); the rule states no number, so `bound` names the crate constant, whose value is read from rust/jose/CONTRACT.md Signatures (MAX_COMPACT_LEN 16384, MAX_JSON_DEPTH 32 for header, claims and JWK depth, MAX_JWKS_KEYS 32), and each case carries its exact input (header_json and payload_json or payload_repeat for a JWS, `input` for the JWKS text) built per `recipe`",
  "cases": [
+  {
+   "id": "compact-bytes-at-bound",
+   "op": "limit",
+   "bound": "jose::MAX_COMPACT_LEN",
+   "excess": 0,
+   "recipe": "compact JWS, header {\"alg\":\"HS256\"}, payload the ASCII byte 'a' repeated, HS256 with jwk; the token is exactly the bound plus excess bytes long",
+   "header_json": "{\"alg\":\"HS256\"}",
+   "payload_repeat": {
+    "byte": "a",
+    "count": 12239
+   },
+   "token_len": 16384,
+   "alg": "HS256",
+   "jwk": {
+    "kty": "oct",
+    "k": "AyM1SysPpbyDfgZld3umj1qzKObwVMkoqQ-EstJQLr_T-1qS0gZH75aKtMN3Yj0iPS4hcgUuTwjAzZr1Z9CAow"
+   },
+   "spec": "contract rule 5.7 (compact token bytes) (accepted: the input is exactly at the bound)",
+   "expect": {
+    "ok": true
+   }
+  },
+  {
+   "id": "header-depth-at-bound",
+   "op": "limit",
+   "bound": "jose::MAX_JSON_DEPTH",
+   "excess": 0,
+   "recipe": "compact JWS whose header is {\"alg\":\"HS256\",\"x\":V} with V nested arrays [[...[]...]] so that the header's depth (the outer object is 1, each nested array or object adds 1) is the bound plus excess; payload {}, HS256 with jwk",
+   "header_json": "{\"alg\":\"HS256\",\"x\":[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]}",
+   "payload_json": "{}",
+   "alg": "HS256",
+   "jwk": {
+    "kty": "oct",
+    "k": "AyM1SysPpbyDfgZld3umj1qzKObwVMkoqQ-EstJQLr_T-1qS0gZH75aKtMN3Yj0iPS4hcgUuTwjAzZr1Z9CAow"
+   },
+   "spec": "contract rule 5.7 (header JSON depth) (accepted: the input is exactly at the bound)",
+   "expect": {
+    "ok": true
+   }
+  },
+  {
+   "id": "claims-depth-at-bound",
+   "op": "limit",
+   "bound": "jose::MAX_JSON_DEPTH",
+   "excess": 0,
+   "recipe": "compact JWS, header {\"alg\":\"HS256\"}, payload {\"x\":V} with V nested arrays so that the claims depth (counted as for the header) is the bound plus excess; HS256 with jwk; the claims are read through VerifiedJwt::claims with some Policy, so at excess 0 the expectation is {\"not_kind\": \"TooLarge\"}, not ok (a policy refusal such as MissingClaim is not the depth bound) and at excess 1 it is TooLarge",
+   "header_json": "{\"alg\":\"HS256\"}",
+   "payload_json": "{\"x\":[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]}",
+   "alg": "HS256",
+   "jwk": {
+    "kty": "oct",
+    "k": "AyM1SysPpbyDfgZld3umj1qzKObwVMkoqQ-EstJQLr_T-1qS0gZH75aKtMN3Yj0iPS4hcgUuTwjAzZr1Z9CAow"
+   },
+   "spec": "contract rule 5.7 (claims JSON depth) (not TooLarge: the input is exactly at the bound)",
+   "expect": {
+    "not_kind": "TooLarge"
+   }
+  },
+  {
+   "id": "jwks-key-count-at-bound",
+   "op": "limit",
+   "bound": "jose::MAX_JWKS_KEYS",
+   "excess": 0,
+   "recipe": "{\"keys\":[...]} holding the bound plus excess copies of jwk, the i-th (from 0) with kid \"k<i>\"",
+   "input": "{\"keys\":[{\"kty\":\"oct\",\"k\":\"AyM1SysPpbyDfgZld3umj1qzKObwVMkoqQ-EstJQLr_T-1qS0gZH75aKtMN3Yj0iPS4hcgUuTwjAzZr1Z9CAow\",\"kid\":\"k0\"},{\"kty\":\"oct\",\"k\":\"AyM1SysPpbyDfgZld3umj1qzKObwVMkoqQ-EstJQLr_T-1qS0gZH75aKtMN3Yj0iPS4hcgUuTwjAzZr1Z9CAow\",\"kid\":\"k1\"},{\"kty\":\"oct\",\"k\":\"AyM1SysPpbyDfgZld3umj1qzKObwVMkoqQ-EstJQLr_T-1qS0gZH75aKtMN3Yj0iPS4hcgUuTwjAzZr1Z9CAow\",\"kid\":\"k2\"},{\"kty\":\"oct\",\"k\":\"AyM1SysPpbyDfgZld3umj1qzKObwVMkoqQ-EstJQLr_T-1qS0gZH75aKtMN3Yj0iPS4hcgUuTwjAzZr1Z9CAow\",\"kid\":\"k3\"},{\"kty\":\"oct\",\"k\":\"AyM1SysPpbyDfgZld3umj1qzKObwVMkoqQ-EstJQLr_T-1qS0gZH75aKtMN3Yj0iPS4hcgUuTwjAzZr1Z9CAow\",\"kid\":\"k4\"},{\"kty\":\"oct\",\"k\":\"AyM1SysPpbyDfgZld3umj1qzKObwVMkoqQ-EstJQLr_T-1qS0gZH75aKtMN3Yj0iPS4hcgUuTwjAzZr1Z9CAow\",\"kid\":\"k5\"},{\"kty\":\"oct\",\"k\":\"AyM1SysPpbyDfgZld3umj1qzKObwVMkoqQ-EstJQLr_T-1qS0gZH75aKtMN3Yj0iPS4hcgUuTwjAzZr1Z9CAow\",\"kid\":\"k6\"},{\"kty\":\"oct\",\"k\":\"AyM1SysPpbyDfgZld3umj1qzKObwVMkoqQ-EstJQLr_T-1qS0gZH75aKtMN3Yj0iPS4hcgUuTwjAzZr1Z9CAow\",\"kid\":\"k7\"},{\"kty\":\"oct\",\"k\":\"AyM1SysPpbyDfgZld3umj1qzKObwVMkoqQ-EstJQLr_T-1qS0gZH75aKtMN3Yj0iPS4hcgUuTwjAzZr1Z9CAow\",\"kid\":\"k8\"},{\"kty\":\"oct\",\"k\":\"AyM1SysPpbyDfgZld3umj1qzKObwVMkoqQ-EstJQLr_T-1qS0gZH75aKtMN3Yj0iPS4hcgUuTwjAzZr1Z9CAow\",\"kid\":\"k9\"},{\"kty\":\"oct\",\"k\":\"AyM1SysPpbyDfgZld3umj1qzKObwVMkoqQ-EstJQLr_T-1qS0gZH75aKtMN3Yj0iPS4hcgUuTwjAzZr1Z9CAow\",\"kid\":\"k10\"},{\"kty\":\"oct\",\"k\":\"AyM1SysPpbyDfgZld3umj1qzKObwVMkoqQ-EstJQLr_T-1qS0gZH75aKtMN3Yj0iPS4hcgUuTwjAzZr1Z9CAow\",\"kid\":\"k11\"},{\"kty\":\"oct\",\"k\":\"AyM1SysPpbyDfgZld3umj1qzKObwVMkoqQ-EstJQLr_T-1qS0gZH75aKtMN3Yj0iPS4hcgUuTwjAzZr1Z9CAow\",\"kid\":\"k12\"},{\"kty\":\"oct\",\"k\":\"AyM1SysPpbyDfgZld3umj1qzKObwVMkoqQ-EstJQLr_T-1qS0gZH75aKtMN3Yj0iPS4hcgUuTwjAzZr1Z9CAow\",\"kid\":\"k13\"},{\"kty\":\"oct\",\"k\":\"AyM1SysPpbyDfgZld3umj1qzKObwVMkoqQ-EstJQLr_T-1qS0gZH75aKtMN3Yj0iPS4hcgUuTwjAzZr1Z9CAow\",\"kid\":\"k14\"},{\"kty\":\"oct\",\"k\":\"AyM1SysPpbyDfgZld3umj1qzKObwVMkoqQ-EstJQLr_T-1qS0gZH75aKtMN3Yj0iPS4hcgUuTwjAzZr1Z9CAow\",\"kid\":\"k15\"},{\"kty\":\"oct\",\"k\":\"AyM1SysPpbyDfgZld3umj1qzKObwVMkoqQ-EstJQLr_T-1qS0gZH75aKtMN3Yj0iPS4hcgUuTwjAzZr1Z9CAow\",\"kid\":\"k16\"},{\"kty\":\"oct\",\"k\":\"AyM1SysPpbyDfgZld3umj1qzKObwVMkoqQ-EstJQLr_T-1qS0gZH75aKtMN3Yj0iPS4hcgUuTwjAzZr1Z9CAow\",\"kid\":\"k17\"},{\"kty\":\"oct\",\"k\":\"AyM1SysPpbyDfgZld3umj1qzKObwVMkoqQ-EstJQLr_T-1qS0gZH75aKtMN3Yj0iPS4hcgUuTwjAzZr1Z9CAow\",\"kid\":\"k18\"},{\"kty\":\"oct\",\"k\":\"AyM1SysPpbyDfgZld3umj1qzKObwVMkoqQ-EstJQLr_T-1qS0gZH75aKtMN3Yj0iPS4hcgUuTwjAzZr1Z9CAow\",\"kid\":\"k19\"},{\"kty\":\"oct\",\"k\":\"AyM1SysPpbyDfgZld3umj1qzKObwVMkoqQ-EstJQLr_T-1qS0gZH75aKtMN3Yj0iPS4hcgUuTwjAzZr1Z9CAow\",\"kid\":\"k20\"},{\"kty\":\"oct\",\"k\":\"AyM1SysPpbyDfgZld3umj1qzKObwVMkoqQ-EstJQLr_T-1qS0gZH75aKtMN3Yj0iPS4hcgUuTwjAzZr1Z9CAow\",\"kid\":\"k21\"},{\"kty\":\"oct\",\"k\":\"AyM1SysPpbyDfgZld3umj1qzKObwVMkoqQ-EstJQLr_T-1qS0gZH75aKtMN3Yj0iPS4hcgUuTwjAzZr1Z9CAow\",\"kid\":\"k22\"},{\"kty\":\"oct\",\"k\":\"AyM1SysPpbyDfgZld3umj1qzKObwVMkoqQ-EstJQLr_T-1qS0gZH75aKtMN3Yj0iPS4hcgUuTwjAzZr1Z9CAow\",\"kid\":\"k23\"},{\"kty\":\"oct\",\"k\":\"AyM1SysPpbyDfgZld3umj1qzKObwVMkoqQ-EstJQLr_T-1qS0gZH75aKtMN3Yj0iPS4hcgUuTwjAzZr1Z9CAow\",\"kid\":\"k24\"},{\"kty\":\"oct\",\"k\":\"AyM1SysPpbyDfgZld3umj1qzKObwVMkoqQ-EstJQLr_T-1qS0gZH75aKtMN3Yj0iPS4hcgUuTwjAzZr1Z9CAow\",\"kid\":\"k25\"},{\"kty\":\"oct\",\"k\":\"AyM1SysPpbyDfgZld3umj1qzKObwVMkoqQ-EstJQLr_T-1qS0gZH75aKtMN3Yj0iPS4hcgUuTwjAzZr1Z9CAow\",\"kid\":\"k26\"},{\"kty\":\"oct\",\"k\":\"AyM1SysPpbyDfgZld3umj1qzKObwVMkoqQ-EstJQLr_T-1qS0gZH75aKtMN3Yj0iPS4hcgUuTwjAzZr1Z9CAow\",\"kid\":\"k27\"},{\"kty\":\"oct\",\"k\":\"AyM1SysPpbyDfgZld3umj1qzKObwVMkoqQ-EstJQLr_T-1qS0gZH75aKtMN3Yj0iPS4hcgUuTwjAzZr1Z9CAow\",\"kid\":\"k28\"},{\"kty\":\"oct\",\"k\":\"AyM1SysPpbyDfgZld3umj1qzKObwVMkoqQ-EstJQLr_T-1qS0gZH75aKtMN3Yj0iPS4hcgUuTwjAzZr1Z9CAow\",\"kid\":\"k29\"},{\"kty\":\"oct\",\"k\":\"AyM1SysPpbyDfgZld3umj1qzKObwVMkoqQ-EstJQLr_T-1qS0gZH75aKtMN3Yj0iPS4hcgUuTwjAzZr1Z9CAow\",\"kid\":\"k30\"},{\"kty\":\"oct\",\"k\":\"AyM1SysPpbyDfgZld3umj1qzKObwVMkoqQ-EstJQLr_T-1qS0gZH75aKtMN3Yj0iPS4hcgUuTwjAzZr1Z9CAow\",\"kid\":\"k31\"}]}",
+   "alg": "HS256",
+   "jwk": {
+    "kty": "oct",
+    "k": "AyM1SysPpbyDfgZld3umj1qzKObwVMkoqQ-EstJQLr_T-1qS0gZH75aKtMN3Yj0iPS4hcgUuTwjAzZr1Z9CAow"
+   },
+   "spec": "contract rule 5.7 (JWKS key count) (accepted: the input is exactly at the bound)",
+   "expect": {
+    "ok": true
+   }
+  },
   {
    "id": "compact-bytes",
    "op": "limit",
    "bound": "jose::MAX_COMPACT_LEN",
    "excess": 1,
-   "recipe": "compact JWS, header {\"alg\":\"HS256\"}, payload the ASCII byte 'a' repeated, HS256 with jwk; the shortest such token longer than the bound",
+   "recipe": "compact JWS, header {\"alg\":\"HS256\"}, payload the ASCII byte 'a' repeated, HS256 with jwk; the token is exactly the bound plus excess bytes long",
+   "header_json": "{\"alg\":\"HS256\"}",
+   "payload_repeat": {
+    "byte": "a",
+    "count": 12240
+   },
+   "token_len": 16385,
    "alg": "HS256",
    "jwk": {
     "kty": "oct",
@@ -23,7 +104,9 @@
    "op": "limit",
    "bound": "jose::MAX_JSON_DEPTH",
    "excess": 1,
-   "recipe": "compact JWS whose header is {\"alg\":\"HS256\",\"x\":V} with V nested arrays [[...[]...]] so that the header's depth (the outer object is 1, each nested array or object adds 1) is the bound plus one; payload {}, HS256 with jwk",
+   "recipe": "compact JWS whose header is {\"alg\":\"HS256\",\"x\":V} with V nested arrays [[...[]...]] so that the header's depth (the outer object is 1, each nested array or object adds 1) is the bound plus excess; payload {}, HS256 with jwk",
+   "header_json": "{\"alg\":\"HS256\",\"x\":[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]}",
+   "payload_json": "{}",
    "alg": "HS256",
    "jwk": {
     "kty": "oct",
@@ -40,7 +123,9 @@
    "op": "limit",
    "bound": "jose::MAX_JSON_DEPTH",
    "excess": 1,
-   "recipe": "compact JWS, header {\"alg\":\"HS256\"}, payload {\"x\":V} with V nested arrays so that the claims depth (counted as for the header) is the bound plus one; HS256 with jwk",
+   "recipe": "compact JWS, header {\"alg\":\"HS256\"}, payload {\"x\":V} with V nested arrays so that the claims depth (counted as for the header) is the bound plus excess; HS256 with jwk; the claims are read through VerifiedJwt::claims with some Policy, so at excess 0 the expectation is {\"not_kind\": \"TooLarge\"}, not ok (a policy refusal such as MissingClaim is not the depth bound) and at excess 1 it is TooLarge",
+   "header_json": "{\"alg\":\"HS256\"}",
+   "payload_json": "{\"x\":[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]}",
    "alg": "HS256",
    "jwk": {
     "kty": "oct",
@@ -57,7 +142,8 @@
    "op": "limit",
    "bound": "jose::MAX_JWKS_KEYS",
    "excess": 1,
-   "recipe": "{\"keys\":[...]} holding the bound plus one copies of jwk, the i-th (from 0) with kid \"k<i>\"",
+   "recipe": "{\"keys\":[...]} holding the bound plus excess copies of jwk, the i-th (from 0) with kid \"k<i>\"",
+   "input": "{\"keys\":[{\"kty\":\"oct\",\"k\":\"AyM1SysPpbyDfgZld3umj1qzKObwVMkoqQ-EstJQLr_T-1qS0gZH75aKtMN3Yj0iPS4hcgUuTwjAzZr1Z9CAow\",\"kid\":\"k0\"},{\"kty\":\"oct\",\"k\":\"AyM1SysPpbyDfgZld3umj1qzKObwVMkoqQ-EstJQLr_T-1qS0gZH75aKtMN3Yj0iPS4hcgUuTwjAzZr1Z9CAow\",\"kid\":\"k1\"},{\"kty\":\"oct\",\"k\":\"AyM1SysPpbyDfgZld3umj1qzKObwVMkoqQ-EstJQLr_T-1qS0gZH75aKtMN3Yj0iPS4hcgUuTwjAzZr1Z9CAow\",\"kid\":\"k2\"},{\"kty\":\"oct\",\"k\":\"AyM1SysPpbyDfgZld3umj1qzKObwVMkoqQ-EstJQLr_T-1qS0gZH75aKtMN3Yj0iPS4hcgUuTwjAzZr1Z9CAow\",\"kid\":\"k3\"},{\"kty\":\"oct\",\"k\":\"AyM1SysPpbyDfgZld3umj1qzKObwVMkoqQ-EstJQLr_T-1qS0gZH75aKtMN3Yj0iPS4hcgUuTwjAzZr1Z9CAow\",\"kid\":\"k4\"},{\"kty\":\"oct\",\"k\":\"AyM1SysPpbyDfgZld3umj1qzKObwVMkoqQ-EstJQLr_T-1qS0gZH75aKtMN3Yj0iPS4hcgUuTwjAzZr1Z9CAow\",\"kid\":\"k5\"},{\"kty\":\"oct\",\"k\":\"AyM1SysPpbyDfgZld3umj1qzKObwVMkoqQ-EstJQLr_T-1qS0gZH75aKtMN3Yj0iPS4hcgUuTwjAzZr1Z9CAow\",\"kid\":\"k6\"},{\"kty\":\"oct\",\"k\":\"AyM1SysPpbyDfgZld3umj1qzKObwVMkoqQ-EstJQLr_T-1qS0gZH75aKtMN3Yj0iPS4hcgUuTwjAzZr1Z9CAow\",\"kid\":\"k7\"},{\"kty\":\"oct\",\"k\":\"AyM1SysPpbyDfgZld3umj1qzKObwVMkoqQ-EstJQLr_T-1qS0gZH75aKtMN3Yj0iPS4hcgUuTwjAzZr1Z9CAow\",\"kid\":\"k8\"},{\"kty\":\"oct\",\"k\":\"AyM1SysPpbyDfgZld3umj1qzKObwVMkoqQ-EstJQLr_T-1qS0gZH75aKtMN3Yj0iPS4hcgUuTwjAzZr1Z9CAow\",\"kid\":\"k9\"},{\"kty\":\"oct\",\"k\":\"AyM1SysPpbyDfgZld3umj1qzKObwVMkoqQ-EstJQLr_T-1qS0gZH75aKtMN3Yj0iPS4hcgUuTwjAzZr1Z9CAow\",\"kid\":\"k10\"},{\"kty\":\"oct\",\"k\":\"AyM1SysPpbyDfgZld3umj1qzKObwVMkoqQ-EstJQLr_T-1qS0gZH75aKtMN3Yj0iPS4hcgUuTwjAzZr1Z9CAow\",\"kid\":\"k11\"},{\"kty\":\"oct\",\"k\":\"AyM1SysPpbyDfgZld3umj1qzKObwVMkoqQ-EstJQLr_T-1qS0gZH75aKtMN3Yj0iPS4hcgUuTwjAzZr1Z9CAow\",\"kid\":\"k12\"},{\"kty\":\"oct\",\"k\":\"AyM1SysPpbyDfgZld3umj1qzKObwVMkoqQ-EstJQLr_T-1qS0gZH75aKtMN3Yj0iPS4hcgUuTwjAzZr1Z9CAow\",\"kid\":\"k13\"},{\"kty\":\"oct\",\"k\":\"AyM1SysPpbyDfgZld3umj1qzKObwVMkoqQ-EstJQLr_T-1qS0gZH75aKtMN3Yj0iPS4hcgUuTwjAzZr1Z9CAow\",\"kid\":\"k14\"},{\"kty\":\"oct\",\"k\":\"AyM1SysPpbyDfgZld3umj1qzKObwVMkoqQ-EstJQLr_T-1qS0gZH75aKtMN3Yj0iPS4hcgUuTwjAzZr1Z9CAow\",\"kid\":\"k15\"},{\"kty\":\"oct\",\"k\":\"AyM1SysPpbyDfgZld3umj1qzKObwVMkoqQ-EstJQLr_T-1qS0gZH75aKtMN3Yj0iPS4hcgUuTwjAzZr1Z9CAow\",\"kid\":\"k16\"},{\"kty\":\"oct\",\"k\":\"AyM1SysPpbyDfgZld3umj1qzKObwVMkoqQ-EstJQLr_T-1qS0gZH75aKtMN3Yj0iPS4hcgUuTwjAzZr1Z9CAow\",\"kid\":\"k17\"},{\"kty\":\"oct\",\"k\":\"AyM1SysPpbyDfgZld3umj1qzKObwVMkoqQ-EstJQLr_T-1qS0gZH75aKtMN3Yj0iPS4hcgUuTwjAzZr1Z9CAow\",\"kid\":\"k18\"},{\"kty\":\"oct\",\"k\":\"AyM1SysPpbyDfgZld3umj1qzKObwVMkoqQ-EstJQLr_T-1qS0gZH75aKtMN3Yj0iPS4hcgUuTwjAzZr1Z9CAow\",\"kid\":\"k19\"},{\"kty\":\"oct\",\"k\":\"AyM1SysPpbyDfgZld3umj1qzKObwVMkoqQ-EstJQLr_T-1qS0gZH75aKtMN3Yj0iPS4hcgUuTwjAzZr1Z9CAow\",\"kid\":\"k20\"},{\"kty\":\"oct\",\"k\":\"AyM1SysPpbyDfgZld3umj1qzKObwVMkoqQ-EstJQLr_T-1qS0gZH75aKtMN3Yj0iPS4hcgUuTwjAzZr1Z9CAow\",\"kid\":\"k21\"},{\"kty\":\"oct\",\"k\":\"AyM1SysPpbyDfgZld3umj1qzKObwVMkoqQ-EstJQLr_T-1qS0gZH75aKtMN3Yj0iPS4hcgUuTwjAzZr1Z9CAow\",\"kid\":\"k22\"},{\"kty\":\"oct\",\"k\":\"AyM1SysPpbyDfgZld3umj1qzKObwVMkoqQ-EstJQLr_T-1qS0gZH75aKtMN3Yj0iPS4hcgUuTwjAzZr1Z9CAow\",\"kid\":\"k23\"},{\"kty\":\"oct\",\"k\":\"AyM1SysPpbyDfgZld3umj1qzKObwVMkoqQ-EstJQLr_T-1qS0gZH75aKtMN3Yj0iPS4hcgUuTwjAzZr1Z9CAow\",\"kid\":\"k24\"},{\"kty\":\"oct\",\"k\":\"AyM1SysPpbyDfgZld3umj1qzKObwVMkoqQ-EstJQLr_T-1qS0gZH75aKtMN3Yj0iPS4hcgUuTwjAzZr1Z9CAow\",\"kid\":\"k25\"},{\"kty\":\"oct\",\"k\":\"AyM1SysPpbyDfgZld3umj1qzKObwVMkoqQ-EstJQLr_T-1qS0gZH75aKtMN3Yj0iPS4hcgUuTwjAzZr1Z9CAow\",\"kid\":\"k26\"},{\"kty\":\"oct\",\"k\":\"AyM1SysPpbyDfgZld3umj1qzKObwVMkoqQ-EstJQLr_T-1qS0gZH75aKtMN3Yj0iPS4hcgUuTwjAzZr1Z9CAow\",\"kid\":\"k27\"},{\"kty\":\"oct\",\"k\":\"AyM1SysPpbyDfgZld3umj1qzKObwVMkoqQ-EstJQLr_T-1qS0gZH75aKtMN3Yj0iPS4hcgUuTwjAzZr1Z9CAow\",\"kid\":\"k28\"},{\"kty\":\"oct\",\"k\":\"AyM1SysPpbyDfgZld3umj1qzKObwVMkoqQ-EstJQLr_T-1qS0gZH75aKtMN3Yj0iPS4hcgUuTwjAzZr1Z9CAow\",\"kid\":\"k29\"},{\"kty\":\"oct\",\"k\":\"AyM1SysPpbyDfgZld3umj1qzKObwVMkoqQ-EstJQLr_T-1qS0gZH75aKtMN3Yj0iPS4hcgUuTwjAzZr1Z9CAow\",\"kid\":\"k30\"},{\"kty\":\"oct\",\"k\":\"AyM1SysPpbyDfgZld3umj1qzKObwVMkoqQ-EstJQLr_T-1qS0gZH75aKtMN3Yj0iPS4hcgUuTwjAzZr1Z9CAow\",\"kid\":\"k31\"},{\"kty\":\"oct\",\"k\":\"AyM1SysPpbyDfgZld3umj1qzKObwVMkoqQ-EstJQLr_T-1qS0gZH75aKtMN3Yj0iPS4hcgUuTwjAzZr1Z9CAow\",\"kid\":\"k32\"}]}",
    "alg": "HS256",
    "jwk": {
     "kty": "oct",

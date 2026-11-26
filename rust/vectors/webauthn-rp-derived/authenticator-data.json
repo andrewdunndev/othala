@@ -184,7 +184,7 @@
    "stored_counter": 5,
    "stored_backup_eligible": false,
    "cross_origin": "deny",
-   "spec": "WebAuthn L3 7.2 step 19 (backupEligible MUST NOT change)",
+   "spec": "WebAuthn L3 7.2 step 19 (backupEligible MUST NOT change; the condition holds because the credential record stores BE, so this is a policy of the crate: oracle choice)",
    "expect": {
     "ok": false
    }
@@ -207,7 +207,7 @@
    "stored_counter": 5,
    "stored_backup_eligible": true,
    "cross_origin": "deny",
-   "spec": "WebAuthn L3 7.2 step 19",
+   "spec": "WebAuthn L3 7.2 step 19 (the stored BE is set and the response clears it; same condition: the credential record stores BE, oracle choice)",
    "expect": {
     "ok": false
    }
@@ -230,7 +230,7 @@
    "stored_counter": 5,
    "stored_backup_eligible": true,
    "cross_origin": "deny",
-   "spec": "WebAuthn L3 7.2 steps 18 and 19 (BS may change while BE is set)",
+   "spec": "WebAuthn L3 7.2 steps 18 and 19 (BS may change while BE is set and unchanged; the credential record stores BE)",
    "expect": {
     "ok": true,
     "user_verified": true,
@@ -304,7 +304,7 @@
    "stored_counter": 5,
    "stored_backup_eligible": false,
    "cross_origin": "deny",
-   "spec": "WebAuthn L3 7.2 step 22 (MUST be greater than the stored value)",
+   "spec": "WebAuthn L3 7.2 step 22 with the contract (Reject)",
    "expect": {
     "ok": false,
     "kind": "CounterRegressed"
@@ -328,7 +328,7 @@
    "stored_counter": 5,
    "stored_backup_eligible": false,
    "cross_origin": "deny",
-   "spec": "WebAuthn L3 7.2 step 22",
+   "spec": "WebAuthn L3 7.2 step 22 with the contract (Reject)",
    "expect": {
     "ok": false,
     "kind": "CounterRegressed"
@@ -476,7 +476,7 @@
    "stored_counter": 5,
    "stored_backup_eligible": false,
    "cross_origin": "deny",
-   "spec": "WebAuthn L3 6.1 (no bytes after the declared parts)",
+   "spec": "WebAuthn L3 6.1 (no bytes after the declared parts: oracle choice, a strict reader refuses what the layout does not account for)",
    "expect": {
     "ok": false
    }
