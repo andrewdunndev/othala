@@ -28,6 +28,9 @@ enum Typ
 field JwkEntry::Public::0: &'a crate::Jwk
 field JwkEntry::Secret::0: &'a crate::SecretJwk
 field Typ::Explicit::0: &'static str
+impl Alg for Hs256
+impl Alg for Hs384
+impl Alg for Hs512
 impl Clone for A128CbcHs256
 impl Clone for A128Gcm
 impl Clone for A128GcmKw
@@ -165,6 +168,7 @@ impl Debug for RsaOaep256
 impl Debug for SecretJwk
 impl Debug for SigningAlg
 impl Debug for Typ
+impl Debug for VerifyKey
 impl Deserialize for Kid
 impl Display for Error
 impl Eq for A128CbcHs256
@@ -256,6 +260,9 @@ impl Hash for Rs512
 impl Hash for RsaOaep
 impl Hash for RsaOaep256
 impl Hash for SigningAlg
+impl LocalAlg for Hs256
+impl LocalAlg for Hs384
+impl LocalAlg for Hs512
 impl Ord for Audience
 impl Ord for Issuer
 impl Ord for JweAlg
@@ -314,6 +321,9 @@ impl PartialOrd for JweEnc
 impl PartialOrd for Kid
 impl PartialOrd for SigningAlg
 impl Serialize for Kid
+impl SignAlg for Hs256
+impl SignAlg for Hs384
+impl SignAlg for Hs512
 impl StructuralPartialEq for A128CbcHs256
 impl StructuralPartialEq for A128Gcm
 impl StructuralPartialEq for A128GcmKw
@@ -379,6 +389,7 @@ method SecretJwk::public fn(self: &Self) -> Option<Jwk>
 method SecretJwk::signing_key fn<A: SignAlg>(self: &Self) -> Result<SigningKey<A>, Error>
 method SecretJwk::verify_key fn<A: Alg>(self: &Self) -> Result<VerifyKey<A>, Error>
 method SigningAlg::name const fn(self: Self) -> &'static str
+method VerifyKey::verify_signature fn(self: &Self, signing_input: &[u8], signature: &[u8]) -> Result<(), Error>
 struct A128CbcHs256
 struct A128Gcm
 struct A128GcmKw
