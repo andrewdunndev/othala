@@ -36,6 +36,9 @@ done
 # a build script can pass `-L crate=` and name a crate that is not a dependency
 builds=$(cargo metadata --offline --no-deps --format-version 1 | jq -r '.packages[] | select(any(.targets[]; .kind | index("custom-build"))) | .name')
 [ -z "$builds" ] || { echo "canary: build script in [$(echo $builds)]"; exit 1; }
+# base implements the read and never re-exports it: no `pub use` of expose in its sources, and its own crate root names no Expose
+reexports=$(find base/src -name '*.rs' -exec cat {} + | tr '\n' ' ' | grep -oE 'pub +(use|extern +crate) +[^;]*\bexpose\b[^;]*' || true)
+[ -z "$reexports" ] || { echo "canary: base re-exports expose: $reexports"; exit 1; }
 # the checks must catch an undeclared use: each plant in a scratch copy of a probe member is the only difference they may report
 undeclared=$(jq -r 'select((.expose | not) and .name != "base") | .name' <<< "$crates")
 probe=$(cargo metadata --offline --no-deps --format-version 1 | jq -r --arg u "$undeclared" '
@@ -79,6 +82,9 @@ printf '\ninclude!("planted_use.rs");\n' >> "$tmp/$probe/src/lib.rs"
 errors "$probe" --lib | cut -f1 | grep -qx E0432 || { echo "canary: use expose::Expose planted in $probe was not an E0432"; exit 1; }
 cp "$probe/src/lib.rs" "$tmp/$probe/src/lib.rs"
 rm "$tmp/$probe/src/planted_use.rs"
+printf '\nuse base::Expose as _;\n' >> "$tmp/$probe/src/lib.rs"
+errors "$probe" --lib | cut -f1 | grep -qx E0432 || { echo "canary: base::Expose resolved in $probe, so base re-exports the read"; exit 1; }
+cp "$probe/src/lib.rs" "$tmp/$probe/src/lib.rs"
 echo "canary: expose is a dependency of [$(echo $declared)] only; undeclared plants in [$(echo $undeclared)] are caught (edges in $probe, unsafe, E0599, E0432)"
 want_paths=$(sed -nE 's/^[[:space:]]*\{ path = "([^"]+)".*/\1/p' clippy.toml | sort -u)
 for c in "$@"; do
