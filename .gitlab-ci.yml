@@ -214,7 +214,8 @@ check-purity:
 
 # check-rust: every gate of rust/justfile that holds on a merge (rust/base/CONTRACT.md),
 # on the catalog's ci-rust image; the MSRV and pinned-nightly toolchains and
-# cargo-deny are added at job start. Mutants and fuzz run on a schedule only.
+# cargo-deny are added at job start. Fuzz and the full mutants run are scheduled;
+# check-rust-mutants runs the mutants of the crates a merge request changes.
 .rust:
   stage: verify
   image: registry.gitlab.com/dunn.dev/pipeline/ci-rust:4.16.1@sha256:3ff8f71ade7e88629d3d1e24a7e6479b30c4d78dadac97ca6a9a4379c4a15ff4
@@ -265,6 +266,26 @@ check-ownership:
     # the base's own.sh and queue judge the branch, so a branch edit to either has no effect
     - base=$(git merge-base origin/main HEAD)
     - git show "$base:primitives/own.sh" | bash -s -- "${branch#item/}"
+
+# check-rust-mutants: `just mutants-changed`, the floors of each crate the MR changes since its merge base with main; no merge base fails the job.
+check-rust-mutants:
+  extends: .rust
+  timeout: 1h
+  variables:
+    CARGO_HOME: "$CI_PROJECT_DIR/.cargo-home"
+    GIT_DEPTH: "0"
+  rules:
+    - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
+      changes:
+        - rust/**/*
+  before_script:
+    - git config --global --add safe.directory "$CI_PROJECT_DIR"
+    - git fetch origin +refs/heads/main:refs/remotes/origin/main
+    - cd rust
+    - rustup toolchain install
+    - cargo install --locked cargo-mutants@27.1.0
+  script:
+    - just mutants-changed
 
 check-rust-scheduled:
   extends: .rust

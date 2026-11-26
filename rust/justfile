@@ -81,19 +81,36 @@ mutants crate="":
             "{{target}}/mutants/$c/mutants.out/outcomes.json" > /dev/null || { echo "mutants $c: under the floor of $floor, or missed or timed out"; exit 1; }
     done <<< "$runs"
 
-# the features-off run of the jose files whose refusals are dead code with all features on; it skips when a file is absent, and the floor is the caught count of a real run
-mutants-off floor="3":
+# the features-off run of the jose files whose refusals are dead code with all features on: it skips only when the jose crate is absent, fails when a listed file is missing, and the floor is the caught count of a real run
+mutants-off floor="5":
     #!/usr/bin/env bash
     set -euo pipefail
-    for f in jose/src/jws/header.rs jose/src/jwe/envelope.rs; do
-        [ -f "$f" ] || { echo "mutants-off: $f is absent, skipped"; exit 0; }
+    [ -d jose ] || { echo "mutants-off: no jose crate, skipped"; exit 0; }
+    files=(jose/src/jws/header.rs jose/src/jws/json.rs jose/src/jwe/envelope.rs)
+    for f in "${files[@]}"; do
+        [ -f "$f" ] || { echo "mutants-off: $f is missing"; exit 1; }
     done
     out="{{target}}/mutants/jose-off"
     mkdir -p "$out"
-    cargo mutants -p jose --no-config --no-default-features --jobs 2 --no-shuffle --output "$out" \
-        --file jose/src/jws/header.rs --file jose/src/jwe/envelope.rs --re 'supported' -- -- --skip ledger < /dev/null
+    env -u CARGO_TARGET_DIR cargo mutants -p jose --no-config --no-default-features --jobs 2 --no-shuffle --output "$out" \
+        "${files[@]/#/--file=}" --re "supported|replace == with != in Jw[se]<'a>::parse_json" -- -- --skip ledger < /dev/null
     jq -e --argjson floor "{{floor}}" '.caught >= $floor and .missed == 0 and .timeout == 0' \
         "$out/mutants.out/outcomes.json" > /dev/null || { echo "mutants-off: under the floor of {{floor}}, or missed or timed out"; exit 1; }
+
+# MR gate: `just mutants` on each crate this branch changes since its merge base with origin/main (a change to Cargo.toml, Cargo.lock or .cargo/ means all); no merge base is an error, not a skip
+mutants-changed base="origin/main":
+    #!/usr/bin/env bash
+    set -euo pipefail
+    mb=$(git merge-base "{{base}}" HEAD) || { echo "mutants-changed: no merge base with {{base}}"; exit 1; }
+    [ -n "$mb" ] || { echo "mutants-changed: no merge base with {{base}}"; exit 1; }
+    files=$(git diff --name-only --relative "$mb" -- .)
+    members=$(./crates.sh | jq -r 'select(.mutants) | .name')
+    if grep -qE '^(Cargo\.toml|Cargo\.lock|\.cargo/)' <<< "$files"; then changed=$members
+    else
+        changed=$(for c in $members; do grep -q "^$c/" <<< "$files" && echo "$c"; done || true)
+    fi
+    [ -n "$changed" ] || { echo "mutants-changed: no crate with a mutants floor changed since $mb"; exit 0; }
+    for c in $changed; do just mutants "$c"; done
 
 wasm: (build "wasm32-unknown-unknown")
 
